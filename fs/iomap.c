@@ -1072,10 +1072,14 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 				break;
 
 			if (!(iocb->ki_flags & IOCB_HIPRI) ||
-			    !dio->submit.last_queue ||
-			    !blk_poll(dio->submit.last_queue,
-					 dio->submit.cookie))
+			    !dio->submit.last_queue)
 				io_schedule();
+			else if (!blk_poll(dio->submit.last_queue,
+					 dio->submit.cookie)) {
+				if (need_resched())
+					set_current_state(TASK_RUNNING);
+				io_schedule();
+			}
 		}
 		__set_current_state(TASK_RUNNING);
 	}

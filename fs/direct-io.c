@@ -518,9 +518,13 @@ static struct bio *dio_await_one(struct dio *dio)
 		__set_current_state(TASK_UNINTERRUPTIBLE);
 		dio->waiter = current;
 		spin_unlock_irqrestore(&dio->bio_lock, flags);
-		if (!(dio->iocb->ki_flags & IOCB_HIPRI) ||
-		    !blk_poll(dio->bio_disk->queue, dio->bio_cookie))
+		if (!(dio->iocb->ki_flags & IOCB_HIPRI))
 			io_schedule();
+		else if (!blk_poll(dio->bio_disk->queue, dio->bio_cookie)) {
+			if (need_resched())
+				__set_current_state(TASK_RUNNING);
+			io_schedule();
+		}
 		/* wake up sets us TASK_RUNNING */
 		spin_lock_irqsave(&dio->bio_lock, flags);
 		dio->waiter = NULL;
