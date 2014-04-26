@@ -147,6 +147,7 @@ static ssize_t goldfish_audio_write(struct file *fp, const char __user *buf,
 
 	while (count > 0) {
 		ssize_t copy = count;
+
 		if (copy > WRITE_BUFFER_SIZE)
 			copy = WRITE_BUFFER_SIZE;
 		wait_event_interruptible(data->wait, (data->buffer_status &
@@ -334,6 +335,7 @@ static int goldfish_audio_probe(struct platform_device *pdev)
 	return 0;
 
 err_misc_register_failed:
+	free_irq(data->irq, data);
 err_request_irq_failed:
 	dma_free_coherent(&pdev->dev, COMBINED_BUFFER_SIZE,
 					data->buffer_virt, data->buffer_phys);
