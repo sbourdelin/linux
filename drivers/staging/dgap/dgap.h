@@ -571,8 +571,8 @@ struct board_t {
 	ulong		membase;	/* Start of base memory of the card */
 	ulong		membase_end;	/* End of base memory of the card */
 
-	u8		*re_map_port;	/* Remapped io port of the card */
-	u8		*re_map_membase;/* Remapped memory of the card */
+	u8 __iomem	*re_map_port;	/* Remapped io port of the card */
+	u8 __iomem	*re_map_membase;/* Remapped memory of the card */
 
 	u8		runwait;	/* # Processes waiting for FEP  */
 	u8		inhibit_poller; /* Tells the poller to leave us alone */
@@ -593,7 +593,7 @@ struct board_t {
 	u32		dgap_Serial_Major;
 	u32		dgap_TransparentPrint_Major;
 
-	struct bs_t	*bd_bs;		/* Base structure pointer         */
+	struct bs_t __iomem *bd_bs;	/* Base structure pointer         */
 
 	char	*flipbuf;		/* Our flip buffer, alloced if    */
 					/* board is found                 */
@@ -968,12 +968,12 @@ struct digi_cmd {
  ************************************************************************/
 struct channel_t {
 	int magic;			/* Channel Magic Number		*/
-	struct bs_t	*ch_bs;		/* Base structure pointer       */
-	struct cm_t	*ch_cm;		/* Command queue pointer        */
+	struct bs_t __iomem *ch_bs;	/* Base structure pointer       */
+	struct cm_t __iomem *ch_cm;	/* Command queue pointer        */
 	struct board_t *ch_bd;		/* Board structure pointer      */
-	unsigned char *ch_vaddr;	/* FEP memory origin            */
-	unsigned char *ch_taddr;	/* Write buffer origin          */
-	unsigned char *ch_raddr;	/* Read buffer origin           */
+	u8 __iomem *ch_vaddr;		/* FEP memory origin            */
+	u8 __iomem *ch_taddr;		/* Write buffer origin          */
+	u8 __iomem *ch_raddr;		/* Read buffer origin           */
 	struct digi_t  ch_digi;		/* Transparent Print structure  */
 	struct un_t ch_tun;		/* Terminal unit info           */
 	struct un_t ch_pun;		/* Printer unit info            */

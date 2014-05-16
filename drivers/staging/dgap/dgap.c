@@ -226,7 +226,7 @@ static uint dgap_count = 500;
 /*
  * Poller stuff
  */
-DEFINE_SPINLOCK(dgap_poll_lock);	/* Poll scheduling lock */
+static DEFINE_SPINLOCK(dgap_poll_lock);	/* Poll scheduling lock */
 static ulong dgap_poll_time;		/* Time of next poll */
 static uint dgap_poll_stop;		/* Used to tell poller to stop */
 static struct timer_list dgap_poll_timer;
@@ -318,22 +318,22 @@ struct firmware_info {
  * Firmware - BIOS, FEP, and CONC filenames
  */
 static struct firmware_info fw_info[] = {
-	{ "dgap/dgap.conf", "dgap/sxbios.bin",  "dgap/sxfep.bin",  0, 0 },
-	{ "dgap/dgap.conf", "dgap/cxpbios.bin", "dgap/cxpfep.bin", 0, 1 },
-	{ "dgap/dgap.conf", "dgap/cxpbios.bin", "dgap/cxpfep.bin", 0, 2 },
-	{ "dgap/dgap.conf", "dgap/pcibios.bin", "dgap/pcifep.bin", 0, 3 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 4 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 5 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 6 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 7 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 8 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 9 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 10 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 11 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 12 },
-	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  0, 13 },
-	{ "dgap/dgap.conf", "dgap/sxbios.bin",  "dgap/sxfep.bin",  0, 14 },
-	{0,}
+	{ "dgap/dgap.conf", "dgap/sxbios.bin",  "dgap/sxfep.bin",  NULL, 0 },
+	{ "dgap/dgap.conf", "dgap/cxpbios.bin", "dgap/cxpfep.bin", NULL, 1 },
+	{ "dgap/dgap.conf", "dgap/cxpbios.bin", "dgap/cxpfep.bin", NULL, 2 },
+	{ "dgap/dgap.conf", "dgap/pcibios.bin", "dgap/pcifep.bin", NULL, 3 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 4 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 5 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 6 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 7 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 8 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 9 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 10 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 11 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 12 },
+	{ "dgap/dgap.conf", "dgap/xrbios.bin",  "dgap/xrfep.bin",  NULL, 13 },
+	{ "dgap/dgap.conf", "dgap/sxbios.bin",  "dgap/sxfep.bin",  NULL, 14 },
+	{NULL,}
 };
 
 /*
@@ -820,6 +820,7 @@ static int dgap_firmware_load(struct pci_dev *pdev, int card_type)
 {
 	struct board_t *brd = dgap_Board[dgap_NumBoards - 1];
 	const struct firmware *fw;
+	char *tmp_ptr;
 	int ret;
 
 	dgap_get_vpd(brd);
@@ -834,7 +835,7 @@ static int dgap_firmware_load(struct pci_dev *pdev, int card_type)
 			return ret;
 		}
 
-		dgap_config_buf = kmalloc(fw->size + 1, GFP_KERNEL);
+		dgap_config_buf = kzalloc(fw->size + 1, GFP_KERNEL);
 		if (!dgap_config_buf) {
 			release_firmware(fw);
 			return -ENOMEM;
@@ -842,9 +843,15 @@ static int dgap_firmware_load(struct pci_dev *pdev, int card_type)
 
 		memcpy(dgap_config_buf, fw->data, fw->size);
 		release_firmware(fw);
-		dgap_config_buf[fw->size + 1] = '\0';
 
-		if (dgap_parsefile(&dgap_config_buf, TRUE) != 0) {
+		/*
+		 * preserve dgap_config_buf
+		 * as dgap_parsefile would
+		 * otherwise alter it.
+		 */
+		tmp_ptr = dgap_config_buf;
+
+		if (dgap_parsefile(&tmp_ptr, TRUE) != 0) {
 			kfree(dgap_config_buf);
 			return -EINVAL;
 		}
@@ -1293,11 +1300,11 @@ static int dgap_tty_init(struct board_t *brd)
 	int i;
 	int tlw;
 	uint true_count = 0;
-	u8 *vaddr;
+	u8 __iomem *vaddr;
 	u8 modem = 0;
 	struct channel_t *ch;
-	struct bs_t *bs;
-	struct cm_t *cm;
+	struct bs_t __iomem *bs;
+	struct cm_t __iomem *cm;
 
 	if (!brd)
 		return -ENXIO;
@@ -1358,8 +1365,8 @@ static int dgap_tty_init(struct board_t *brd)
 	ch = brd->channels[0];
 	vaddr = brd->re_map_membase;
 
-	bs = (struct bs_t *) ((ulong) vaddr + CHANBUF);
-	cm = (struct cm_t *) ((ulong) vaddr + CMDBUF);
+	bs = (struct bs_t __iomem *) ((ulong) vaddr + CHANBUF);
+	cm = (struct cm_t __iomem *) ((ulong) vaddr + CMDBUF);
 
 	brd->bd_bs = bs;
 
@@ -1628,7 +1635,7 @@ static void dgap_sniff_nowait_nolock(struct channel_t *ch, u8 *text,
 static void dgap_input(struct channel_t *ch)
 {
 	struct board_t *bd;
-	struct bs_t	*bs;
+	struct bs_t __iomem *bs;
 	struct tty_struct *tp;
 	struct tty_ldisc *ld;
 	uint	rmask;
@@ -1779,7 +1786,7 @@ static void dgap_input(struct channel_t *ch)
 		if (s <= 0)
 			break;
 
-		memcpy_fromio(buf, (char *) ch->ch_raddr + tail, s);
+		memcpy_fromio(buf, ch->ch_raddr + tail, s);
 		dgap_sniff_nowait_nolock(ch, "USER READ", buf, s);
 
 		tail += s;
@@ -1955,7 +1962,7 @@ static int dgap_tty_open(struct tty_struct *tty, struct file *file)
 	struct board_t	*brd;
 	struct channel_t *ch;
 	struct un_t	*un;
-	struct bs_t	*bs;
+	struct bs_t __iomem *bs;
 	uint		major = 0;
 	uint		minor = 0;
 	int		rc = 0;
@@ -2409,7 +2416,7 @@ static int dgap_tty_chars_in_buffer(struct tty_struct *tty)
 	struct board_t *bd = NULL;
 	struct channel_t *ch = NULL;
 	struct un_t *un = NULL;
-	struct bs_t *bs = NULL;
+	struct bs_t __iomem *bs;
 	u8 tbusy;
 	uint chars = 0;
 	u16 thead, ttail, tmask, chead, ctail;
@@ -2500,7 +2507,7 @@ static int dgap_wait_for_drain(struct tty_struct *tty)
 {
 	struct channel_t *ch;
 	struct un_t *un;
-	struct bs_t *bs;
+	struct bs_t __iomem *bs;
 	int ret = -EIO;
 	uint count = 1;
 	ulong   lock_flags = 0;
@@ -2611,7 +2618,7 @@ static int dgap_maxcps_room(struct tty_struct *tty, int bytes_available)
 static inline void dgap_set_firmware_event(struct un_t *un, unsigned int event)
 {
 	struct channel_t *ch = NULL;
-	struct bs_t *bs = NULL;
+	struct bs_t __iomem *bs = NULL;
 
 	if (!un || un->magic != DGAP_UNIT_MAGIC)
 		return;
@@ -2645,7 +2652,7 @@ static int dgap_tty_write_room(struct tty_struct *tty)
 {
 	struct channel_t *ch = NULL;
 	struct un_t *un = NULL;
-	struct bs_t *bs = NULL;
+	struct bs_t __iomem *bs;
 	u16 head, tail, tmask;
 	int ret = 0;
 	ulong   lock_flags = 0;
@@ -2734,8 +2741,8 @@ static int dgap_tty_write(struct tty_struct *tty, const unsigned char *buf,
 {
 	struct channel_t *ch = NULL;
 	struct un_t *un = NULL;
-	struct bs_t *bs = NULL;
-	char *vaddr = NULL;
+	struct bs_t __iomem *bs;
+	char __iomem *vaddr;
 	u16 head, tail, tmask, remain;
 	int bufcount = 0, n = 0;
 	int orig_count = 0;
@@ -4303,7 +4310,7 @@ static int dgap_tty_register_ports(struct board_t *brd)
  */
 static void dgap_do_bios_load(struct board_t *brd, const u8 *ubios, int len)
 {
-	u8 *addr;
+	u8 __iomem *addr;
 	uint offset;
 	int i;
 
@@ -4336,7 +4343,7 @@ static void dgap_do_bios_load(struct board_t *brd, const u8 *ubios, int len)
  */
 static int dgap_test_bios(struct board_t *brd)
 {
-	u8 *addr;
+	u8 __iomem *addr;
 	u16 word;
 	u16 err1;
 	u16 err2;
@@ -4379,7 +4386,7 @@ static int dgap_test_bios(struct board_t *brd)
  */
 static void dgap_do_fep_load(struct board_t *brd, const u8 *ufep, int len)
 {
-	u8 *addr;
+	u8 __iomem *addr;
 	uint offset;
 
 	if (!brd || (brd->magic != DGAP_BOARD_MAGIC) || !brd->re_map_membase)
@@ -4399,7 +4406,8 @@ static void dgap_do_fep_load(struct board_t *brd, const u8 *ufep, int len)
 	 */
 	if ((brd->type == PCX) || (brd->type == PEPC)) {
 		u8 string[100];
-		u8 *config, *xconfig;
+		u8 __iomem *config;
+		u8 *xconfig;
 		int i = 0;
 
 		xconfig = dgap_create_config_string(brd, string);
@@ -4423,7 +4431,7 @@ static void dgap_do_fep_load(struct board_t *brd, const u8 *ufep, int len)
  */
 static int dgap_test_fep(struct board_t *brd)
 {
-	u8 *addr;
+	u8 __iomem *addr;
 	u16 word;
 	u16 err1;
 	u16 err2;
@@ -4522,7 +4530,7 @@ static void dgap_do_reset_board(struct board_t *brd)
  */
 static void dgap_do_conc_load(struct board_t *brd, u8 *uaddr, int len)
 {
-	char *vaddr;
+	char __iomem *vaddr;
 	u16 offset = 0;
 	struct downld_t *to_dp;
 
@@ -4660,7 +4668,7 @@ static void dgap_poll_tasklet(unsigned long data)
 {
 	struct board_t *bd = (struct board_t *) data;
 	ulong  lock_flags;
-	char *vaddr;
+	char __iomem *vaddr;
 	u16 head, tail;
 
 	if (!bd || (bd->magic != DGAP_BOARD_MAGIC))
@@ -4678,7 +4686,7 @@ static void dgap_poll_tasklet(unsigned long data)
 	 */
 	if (bd->state == BOARD_READY) {
 
-		struct ev_t *eaddr = NULL;
+		struct ev_t __iomem *eaddr;
 
 		if (!bd->re_map_membase) {
 			spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -4692,7 +4700,7 @@ static void dgap_poll_tasklet(unsigned long data)
 		if (!bd->nasync)
 			goto out;
 
-		eaddr = (struct ev_t *) (vaddr + EVBUF);
+		eaddr = (struct ev_t __iomem *) (vaddr + EVBUF);
 
 		/* Get our head and tail */
 		head = readw(&(eaddr->ev_head));
@@ -4736,8 +4744,8 @@ out:
 static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
 			u8 byte2, uint ncmds)
 {
-	char		*vaddr = NULL;
-	struct cm_t	*cm_addr = NULL;
+	char __iomem	*vaddr;
+	struct __iomem cm_t *cm_addr;
 	uint		count;
 	uint		n;
 	u16		head;
@@ -4761,7 +4769,7 @@ static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
 	if (!vaddr)
 		return;
 
-	cm_addr = (struct cm_t *) (vaddr + CMDBUF);
+	cm_addr = (struct cm_t __iomem *) (vaddr + CMDBUF);
 	head = readw(&(cm_addr->cm_head));
 
 	/*
@@ -4775,10 +4783,10 @@ static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
 	/*
 	 * Put the data in the circular command buffer.
 	 */
-	writeb(cmd, (char *) (vaddr + head + CMDSTART + 0));
-	writeb((u8) ch->ch_portnum, (char *) (vaddr + head + CMDSTART + 1));
-	writeb(byte1, (char *) (vaddr + head + CMDSTART + 2));
-	writeb(byte2, (char *) (vaddr + head + CMDSTART + 3));
+	writeb(cmd, (vaddr + head + CMDSTART + 0));
+	writeb((u8) ch->ch_portnum, (vaddr + head + CMDSTART + 1));
+	writeb(byte1, (vaddr + head + CMDSTART + 2));
+	writeb(byte2, (vaddr + head + CMDSTART + 3));
 
 	head = (head + 4) & (CMDMAX - CMDSTART - 4);
 
@@ -4821,8 +4829,8 @@ static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
  *=======================================================================*/
 static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds)
 {
-	char		*vaddr = NULL;
-	struct cm_t	*cm_addr = NULL;
+	char __iomem	*vaddr;
+	struct __iomem cm_t *cm_addr;
 	uint		count;
 	uint		n;
 	u16		head;
@@ -4845,7 +4853,7 @@ static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds)
 	if (!vaddr)
 		return;
 
-	cm_addr = (struct cm_t *) (vaddr + CMDBUF);
+	cm_addr = (struct cm_t __iomem *) (vaddr + CMDBUF);
 	head = readw(&(cm_addr->cm_head));
 
 	/*
@@ -4859,9 +4867,9 @@ static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds)
 	/*
 	 * Put the data in the circular command buffer.
 	 */
-	writeb(cmd, (char *) (vaddr + head + CMDSTART + 0));
-	writeb((u8) ch->ch_portnum, (char *) (vaddr + head + CMDSTART + 1));
-	writew((u16) word, (char *) (vaddr + head + CMDSTART + 2));
+	writeb(cmd, (vaddr + head + CMDSTART + 0));
+	writeb((u8) ch->ch_portnum, (vaddr + head + CMDSTART + 1));
+	writew((u16) word, (vaddr + head + CMDSTART + 2));
 
 	head = (head + 4) & (CMDMAX - CMDSTART - 4);
 
@@ -4904,8 +4912,8 @@ static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds)
  *=======================================================================*/
 static void dgap_cmdw_ext(struct channel_t *ch, u16 cmd, u16 word, uint ncmds)
 {
-	char		*vaddr = NULL;
-	struct cm_t	*cm_addr = NULL;
+	char __iomem	*vaddr;
+	struct __iomem cm_t *cm_addr;
 	uint		count;
 	uint		n;
 	u16		head;
@@ -4928,7 +4936,7 @@ static void dgap_cmdw_ext(struct channel_t *ch, u16 cmd, u16 word, uint ncmds)
 	if (!vaddr)
 		return;
 
-	cm_addr = (struct cm_t *) (vaddr + CMDBUF);
+	cm_addr = (struct cm_t __iomem *) (vaddr + CMDBUF);
 	head = readw(&(cm_addr->cm_head));
 
 	/*
@@ -4944,19 +4952,19 @@ static void dgap_cmdw_ext(struct channel_t *ch, u16 cmd, u16 word, uint ncmds)
 	 */
 
 	/* Write an FF to tell the FEP that we want an extended command */
-	writeb((u8) 0xff, (char *) (vaddr + head + CMDSTART + 0));
+	writeb((u8) 0xff, (vaddr + head + CMDSTART + 0));
 
-	writeb((u8) ch->ch_portnum, (u8 *) (vaddr + head + CMDSTART + 1));
-	writew((u16) cmd, (char *) (vaddr + head + CMDSTART + 2));
+	writeb((u8) ch->ch_portnum, (vaddr + head + CMDSTART + 1));
+	writew((u16) cmd, (vaddr + head + CMDSTART + 2));
 
 	/*
 	 * If the second part of the command won't fit,
 	 * put it at the beginning of the circular buffer.
 	 */
 	if (((head + 4) >= ((CMDMAX - CMDSTART)) || (head & 03)))
-		writew((u16) word, (char *) (vaddr + CMDSTART));
+		writew((u16) word, (vaddr + CMDSTART));
 	else
-		writew((u16) word, (char *) (vaddr + head + CMDSTART + 4));
+		writew((u16) word, (vaddr + head + CMDSTART + 4));
 
 	head = (head + 8) & (CMDMAX - CMDSTART - 4);
 
@@ -4998,8 +5006,8 @@ static void dgap_cmdw_ext(struct channel_t *ch, u16 cmd, u16 word, uint ncmds)
 static void dgap_wmove(struct channel_t *ch, char *buf, uint cnt)
 {
 	int    n;
-	char   *taddr;
-	struct bs_t    *bs;
+	char   __iomem *taddr;
+	struct bs_t __iomem *bs;
 	u16    head;
 
 	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
@@ -5051,8 +5059,8 @@ static void dgap_wmove(struct channel_t *ch, char *buf, uint cnt)
  */
 static uint dgap_get_custom_baud(struct channel_t *ch)
 {
-	u8 *vaddr;
-	ulong offset = 0;
+	u8 __iomem *vaddr;
+	ulong offset;
 	uint value = 0;
 
 	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
@@ -5073,7 +5081,7 @@ static uint dgap_get_custom_baud(struct channel_t *ch)
 	 * Go get from fep mem, what the fep
 	 * believes the custom baud rate is.
 	 */
-	offset = ((((*(unsigned short *)(vaddr + ECS_SEG)) << 4) +
+	offset = ((((*(unsigned short __iomem *)(vaddr + ECS_SEG)) << 4) +
 		(ch->ch_portnum * 0x28) + LINE_SPEED));
 
 	value = readw(vaddr + offset);
@@ -5118,7 +5126,7 @@ static int dgap_param(struct tty_struct *tty)
 	struct ktermios *ts;
 	struct board_t *bd;
 	struct channel_t *ch;
-	struct bs_t   *bs;
+	struct bs_t __iomem *bs;
 	struct un_t   *un;
 	u16	head;
 	u16	cflag;
@@ -5571,10 +5579,10 @@ static int dgap_event(struct board_t *bd)
 	struct channel_t *ch;
 	ulong		lock_flags;
 	ulong		lock_flags2;
-	struct bs_t	*bs;
-	u8		*event;
-	u8		*vaddr = NULL;
-	struct ev_t	*eaddr = NULL;
+	struct bs_t __iomem *bs;
+	u8 __iomem	*event;
+	u8 __iomem	*vaddr;
+	struct ev_t __iomem *eaddr;
 	uint		head;
 	uint		tail;
 	int		port;
@@ -5594,7 +5602,7 @@ static int dgap_event(struct board_t *bd)
 		return -ENXIO;
 	}
 
-	eaddr = (struct ev_t *) (vaddr + EVBUF);
+	eaddr = (struct ev_t __iomem *) (vaddr + EVBUF);
 
 	/* Get our head and tail */
 	head = readw(&(eaddr->ev_head));
