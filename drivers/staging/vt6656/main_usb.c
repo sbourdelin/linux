@@ -60,7 +60,6 @@
 #include "tcrc.h"
 #include "rxtx.h"
 #include "bssdb.h"
-#include "hostap.h"
 #include "wpactl.h"
 #include "iwctl.h"
 #include "dpc.h"
@@ -217,7 +216,6 @@ static int  device_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int device_init_registers(struct vnt_private *pDevice);
 static bool device_init_defrag_cb(struct vnt_private *pDevice);
 static void device_init_diversity_timer(struct vnt_private *pDevice);
-static int  device_dma0_tx_80211(struct sk_buff *skb, struct net_device *dev);
 
 static int  ethtool_ioctl(struct net_device *dev, struct ifreq *);
 static void device_free_tx_bufs(struct vnt_private *pDevice);
@@ -262,9 +260,6 @@ device_set_options(struct vnt_private *pDevice) {
     pDevice->byBBType = BBP_TYPE_DEF;
     pDevice->byPacketType = pDevice->byBBType;
     pDevice->byAutoFBCtrl = AUTO_FB_0;
-    pDevice->bUpdateBBVGA = true;
-    pDevice->byFOETuning = 0;
-    pDevice->byAutoPwrTunning = 0;
     pDevice->byPreambleType = 0;
     pDevice->bExistSWNetAddr = false;
     /* pDevice->bDiversityRegCtlON = true; */
@@ -368,8 +363,6 @@ static int device_init_registers(struct vnt_private *pDevice)
 
 	/* do MACbSoftwareReset in MACvInitialize */
 
-	/* force CCK */
-	pDevice->bCCK = true;
 	pDevice->bProtectMode = false;
 	/* only used in 11g type, sync with ERP IE */
 	pDevice->bNonERPPresent = false;
@@ -387,7 +380,7 @@ static int device_init_registers(struct vnt_private *pDevice)
 
 	pDevice->byTopOFDMBasicRate = RATE_24M;
 	pDevice->byTopCCKBasicRate = RATE_1M;
-	pDevice->byRevId = 0;
+
 	/* target to IF pin while programming to RF chip */
 	pDevice->byCurPwr = 0xFF;
 
@@ -490,16 +483,10 @@ static int device_init_registers(struct vnt_private *pDevice)
 	/* get Auto Fall Back type */
 	pDevice->byAutoFBCtrl = AUTO_FB_0;
 
-	/* set SCAN Time */
-	pDevice->uScanTime = WLAN_SCAN_MINITIME;
-
 	/* default Auto Mode */
 	/* pDevice->NetworkType = Ndis802_11Automode; */
 	pDevice->eConfigPHYMode = PHY_TYPE_AUTO;
 	pDevice->byBBType = BB_TYPE_11G;
-
-	/* initialize BBP registers */
-	pDevice->ulTxPower = 25;
 
 	/* get channel range */
 	pDevice->byMinChannel = 1;
@@ -507,11 +494,6 @@ static int device_init_registers(struct vnt_private *pDevice)
 
 	/* get RFType */
 	pDevice->byRFType = init_rsp->rf_type;
-
-	if ((pDevice->byRFType & RF_EMU) != 0) {
-		/* force change RevID for VT3253 emu */
-		pDevice->byRevId = 0x80;
-	}
 
 	/* load vt3266 calibration parameters in EEPROM */
 	if (pDevice->byRFType == RF_VT3226D0) {
@@ -581,12 +563,10 @@ static int device_init_registers(struct vnt_private *pDevice)
 	BBvSetShortSlotTime(pDevice);
 	CARDvSetBSSMode(pDevice);
 
-	if (pDevice->bUpdateBBVGA) {
-		pDevice->byBBVGACurrent = pDevice->abyBBVGA[0];
-		pDevice->byBBVGANew = pDevice->byBBVGACurrent;
+	pDevice->byBBVGACurrent = pDevice->abyBBVGA[0];
+	pDevice->byBBVGANew = pDevice->byBBVGACurrent;
 
-		BBvSetVGAGainOffset(pDevice, pDevice->abyBBVGA[0]);
-	}
+	BBvSetVGAGainOffset(pDevice, pDevice->abyBBVGA[0]);
 
 	pDevice->byRadioCtl = pDevice->abyEEPROM[EEP_OFS_RADIOCTL];
 	pDevice->bHWRadioOff = false;
@@ -702,7 +682,6 @@ vt6656_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	INIT_WORK(&pDevice->read_work_item, RXvWorkItem);
 	INIT_WORK(&pDevice->rx_mng_work_item, RXvMngWorkItem);
 
-	pDevice->tx_80211 = device_dma0_tx_80211;
 	pDevice->vnt_mgmt.pAdapter = (void *) pDevice;
 
 	netdev->netdev_ops = &device_netdev_ops;
@@ -1127,22 +1106,6 @@ static void vt6656_disconnect(struct usb_interface *intf)
 	}
 }
 
-static int device_dma0_tx_80211(struct sk_buff *skb, struct net_device *dev)
-{
-	struct vnt_private *pDevice = netdev_priv(dev);
-
-	spin_lock_irq(&pDevice->lock);
-
-	if (unlikely(pDevice->bStopTx0Pkt))
-		dev_kfree_skb_irq(skb);
-	else
-		vDMA0_tx_80211(pDevice, skb);
-
-	spin_unlock_irq(&pDevice->lock);
-
-	return NETDEV_TX_OK;
-}
-
 static int device_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct vnt_private *pDevice = netdev_priv(dev);
@@ -1409,20 +1372,9 @@ static struct net_device_stats *device_get_stats(struct net_device *dev)
 
 static int device_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct vnt_private *pDevice = netdev_priv(dev);
-	struct iwreq *wrq = (struct iwreq *) rq;
 	int rc = 0;
 
 	switch (cmd) {
-
-	case IOCTL_CMD_HOSTAPD:
-
-		if (!(pDevice->flags & DEVICE_FLAGS_OPENED))
-			rc = -EFAULT;
-
-		rc = vt6656_hostap_ioctl(pDevice, &wrq->u.data);
-		break;
-
 	case SIOCETHTOOL:
 		return ethtool_ioctl(dev, rq);
 
