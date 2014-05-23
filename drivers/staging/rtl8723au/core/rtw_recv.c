@@ -296,9 +296,9 @@ int recvframe_chkmic(struct rtw_adapter *adapter,
 
 	stainfo = rtw_get_stainfo23a(&adapter->stapriv, &prxattrib->ta[0]);
 
-	if (prxattrib->encrypt == _TKIP_) {
+	if (prxattrib->encrypt == WLAN_CIPHER_SUITE_TKIP) {
 		RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
-			 ("\n recvframe_chkmic:prxattrib->encrypt == _TKIP_\n"));
+			 ("\n recvframe_chkmic:prxattrib->encrypt == WLAN_CIPHER_SUITE_TKIP\n"));
 		RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
 			 ("\n recvframe_chkmic:da = 0x%02x:0x%02x:0x%02x:0x%02x:"
 			  "0x%02x:0x%02x\n", prxattrib->ra[0],
@@ -313,7 +313,7 @@ int recvframe_chkmic(struct rtw_adapter *adapter,
 				RT_TRACE(_module_rtl871x_recv_c_, _drv_info_,
 					 ("\n recvframe_chkmic: bcmc key\n"));
 
-				if (psecuritypriv->binstallGrpkey == false) {
+				if (!psecuritypriv->binstallGrpkey) {
 					res = _FAIL;
 					RT_TRACE(_module_rtl871x_recv_c_,
 						 _drv_err_,
@@ -442,9 +442,9 @@ int recvframe_chkmic(struct rtw_adapter *adapter,
 				res = _FAIL;
 			} else {
 				/* mic checked ok */
-				if ((psecuritypriv->bcheck_grpkey == false) &&
-				    (is_multicast_ether_addr(prxattrib->ra))) {
-					psecuritypriv->bcheck_grpkey = true;
+				if (!psecuritypriv->bcheck_grpkey &&
+				    is_multicast_ether_addr(prxattrib->ra)) {
+					psecuritypriv->bcheck_grpkey = 1;
 					RT_TRACE(_module_rtl871x_recv_c_,
 						 _drv_err_,
 						 ("psecuritypriv->bcheck_grp"
@@ -491,13 +491,13 @@ struct recv_frame *decryptor(struct rtw_adapter *padapter,
 				  prxattrib->key_index);
 
 			switch (prxattrib->encrypt) {
-			case _WEP40_:
-			case _WEP104_:
+			case WLAN_CIPHER_SUITE_WEP40:
+			case WLAN_CIPHER_SUITE_WEP104:
 				prxattrib->key_index =
 					psecuritypriv->dot11PrivacyKeyIndex;
 				break;
-			case _TKIP_:
-			case _AES_:
+			case WLAN_CIPHER_SUITE_TKIP:
+			case WLAN_CIPHER_SUITE_CCMP:
 			default:
 				prxattrib->key_index =
 					psecuritypriv->dot118021XGrpKeyid;
@@ -507,16 +507,16 @@ struct recv_frame *decryptor(struct rtw_adapter *padapter,
 	}
 
 	if ((prxattrib->encrypt > 0) && ((prxattrib->bdecrypted == 0))) {
-		psecuritypriv->hw_decrypted = false;
+		psecuritypriv->hw_decrypted = 0;
 		switch (prxattrib->encrypt) {
-		case _WEP40_:
-		case _WEP104_:
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104:
 			rtw_wep_decrypt23a(padapter, precv_frame);
 			break;
-		case _TKIP_:
+		case WLAN_CIPHER_SUITE_TKIP:
 			res = rtw_tkip_decrypt23a(padapter, precv_frame);
 			break;
-		case _AES_:
+		case WLAN_CIPHER_SUITE_CCMP:
 			res = rtw_aes_decrypt23a(padapter, precv_frame);
 			break;
 		default:
@@ -524,8 +524,8 @@ struct recv_frame *decryptor(struct rtw_adapter *padapter,
 		}
 	} else if (prxattrib->bdecrypted == 1 && prxattrib->encrypt > 0 &&
 		   (psecuritypriv->busetkipkey == 1 ||
-		    prxattrib->encrypt != _TKIP_)) {
-			psecuritypriv->hw_decrypted = true;
+		    prxattrib->encrypt != WLAN_CIPHER_SUITE_TKIP)) {
+			psecuritypriv->hw_decrypted = 1;
 	}
 
 	if (res == _FAIL) {
@@ -1408,22 +1408,18 @@ static int validate_recv_data_frame(struct rtw_adapter *adapter,
 
 		switch (pattrib->encrypt)
 		{
-		case _WEP40_:
-		case _WEP104_:
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104:
 			pattrib->iv_len = 4;
 			pattrib->icv_len = 4;
 			break;
-		case _TKIP_:
+		case WLAN_CIPHER_SUITE_TKIP:
 			pattrib->iv_len = 8;
 			pattrib->icv_len = 4;
 			break;
-		case _AES_:
+		case WLAN_CIPHER_SUITE_CCMP:
 			pattrib->iv_len = 8;
 			pattrib->icv_len = 8;
-			break;
-		case _SMS4_:
-			pattrib->iv_len = 18;
-			pattrib->icv_len = 16;
 			break;
 		default:
 			pattrib->iv_len = 0;

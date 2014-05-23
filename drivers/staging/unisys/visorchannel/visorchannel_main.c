@@ -22,13 +22,16 @@
 #include "globals.h"
 #include "channel.h"
 #include "visorchannel.h"
-#include "guidutils.h"
+#include <linux/uuid.h>
 
 #define MYDRVNAME "visorchannel"
 
 static int __init
 visorchannel_init(void)
 {
+	if (!unisys_spar_platform)
+		return -ENODEV;
+
 	INFODRV("driver version %s loaded", VERSION);
 	return 0;
 }

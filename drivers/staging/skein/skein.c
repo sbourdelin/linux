@@ -11,9 +11,9 @@
 #define  SKEIN_PORT_CODE /* instantiate any code in skein_port.h */
 
 #include <linux/string.h>       /* get the memcpy/memset functions */
-#include <skein.h> /* get the Skein API definitions   */
-#include <skein_iv.h>    /* get precomputed IVs */
-#include <skein_block.h>
+#include "skein.h" /* get the Skein API definitions   */
+#include "skein_iv.h"    /* get precomputed IVs */
+#include "skein_block.h"
 
 /*****************************************************************/
 /*     256-bit Skein                                             */
@@ -21,28 +21,28 @@
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a straight hashing operation  */
-int Skein_256_Init(struct skein_256_ctx *ctx, size_t hashBitLen)
+int skein_256_init(struct skein_256_ctx *ctx, size_t hash_bit_len)
 {
 	union {
-		u8  b[SKEIN_256_STATE_BYTES];
-		u64  w[SKEIN_256_STATE_WORDS];
+		u8 b[SKEIN_256_STATE_BYTES];
+		u64 w[SKEIN_256_STATE_WORDS];
 	} cfg;                              /* config block */
 
-	Skein_Assert(hashBitLen > 0, SKEIN_BAD_HASHLEN);
-	ctx->h.hashBitLen = hashBitLen;         /* output hash bit count */
+	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
+	ctx->h.hash_bit_len = hash_bit_len;         /* output hash bit count */
 
-	switch (hashBitLen) { /* use pre-computed values, where available */
+	switch (hash_bit_len) { /* use pre-computed values, where available */
 	case  256:
-		memcpy(ctx->X, SKEIN_256_IV_256, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_256_IV_256, sizeof(ctx->x));
 		break;
 	case  224:
-		memcpy(ctx->X, SKEIN_256_IV_224, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_256_IV_224, sizeof(ctx->x));
 		break;
 	case  160:
-		memcpy(ctx->X, SKEIN_256_IV_160, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_256_IV_160, sizeof(ctx->x));
 		break;
 	case  128:
-		memcpy(ctx->X, SKEIN_256_IV_128, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_256_IV_128, sizeof(ctx->x));
 		break;
 	default:
 		/* here if there is no precomputed IV value available */
@@ -51,141 +51,142 @@ int Skein_256_Init(struct skein_256_ctx *ctx, size_t hashBitLen)
 		 * precomputed)
 		 */
 		/* set tweaks: T0=0; T1=CFG | FINAL */
-		Skein_Start_New_Type(ctx, CFG_FINAL);
+		skein_start_new_type(ctx, CFG_FINAL);
 
 		/* set the schema, version */
-		cfg.w[0] = Skein_Swap64(SKEIN_SCHEMA_VER);
+		cfg.w[0] = skein_swap64(SKEIN_SCHEMA_VER);
 		/* hash result length in bits */
-		cfg.w[1] = Skein_Swap64(hashBitLen);
-		cfg.w[2] = Skein_Swap64(SKEIN_CFG_TREE_INFO_SEQUENTIAL);
+		cfg.w[1] = skein_swap64(hash_bit_len);
+		cfg.w[2] = skein_swap64(SKEIN_CFG_TREE_INFO_SEQUENTIAL);
 		/* zero pad config block */
 		memset(&cfg.w[3], 0, sizeof(cfg) - 3*sizeof(cfg.w[0]));
 
 		/* compute the initial chaining values from config block */
 		/* zero the chaining variables */
-		memset(ctx->X, 0, sizeof(ctx->X));
-		Skein_256_Process_Block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
+		memset(ctx->x, 0, sizeof(ctx->x));
+		skein_256_process_block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
 		break;
 	}
-	/* The chaining vars ctx->X are now initialized for hashBitLen. */
+	/* The chaining vars ctx->x are now initialized for hash_bit_len. */
 	/* Set up to process the data message portion of the hash (default) */
-	Skein_Start_New_Type(ctx, MSG);              /* T0=0, T1= MSG type */
+	skein_start_new_type(ctx, MSG);              /* T0=0, T1= MSG type */
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a MAC and/or tree hash operation */
-/* [identical to Skein_256_Init() when keyBytes == 0 && \
- *	treeInfo == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
-int Skein_256_InitExt(struct skein_256_ctx *ctx, size_t hashBitLen,
-			u64 treeInfo, const u8 *key, size_t keyBytes)
+/* [identical to skein_256_init() when key_bytes == 0 && \
+ *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
+int skein_256_init_ext(struct skein_256_ctx *ctx, size_t hash_bit_len,
+		       u64 tree_info, const u8 *key, size_t key_bytes)
 {
 	union {
 		u8  b[SKEIN_256_STATE_BYTES];
-		u64  w[SKEIN_256_STATE_WORDS];
+		u64 w[SKEIN_256_STATE_WORDS];
 	} cfg; /* config block */
 
-	Skein_Assert(hashBitLen > 0, SKEIN_BAD_HASHLEN);
-	Skein_Assert(keyBytes == 0 || key != NULL, SKEIN_FAIL);
+	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
+	skein_assert_ret(key_bytes == 0 || key != NULL, SKEIN_FAIL);
 
-	/* compute the initial chaining values ctx->X[], based on key */
-	if (keyBytes == 0) { /* is there a key? */
+	/* compute the initial chaining values ctx->x[], based on key */
+	if (key_bytes == 0) { /* is there a key? */
 		/* no key: use all zeroes as key for config block */
-		memset(ctx->X, 0, sizeof(ctx->X));
+		memset(ctx->x, 0, sizeof(ctx->x));
 	} else { /* here to pre-process a key */
-		Skein_assert(sizeof(cfg.b) >= sizeof(ctx->X));
+		skein_assert(sizeof(cfg.b) >= sizeof(ctx->x));
 		/* do a mini-Init right here */
 		/* set output hash bit count = state size */
-		ctx->h.hashBitLen = 8*sizeof(ctx->X);
+		ctx->h.hash_bit_len = 8*sizeof(ctx->x);
 		/* set tweaks: T0 = 0; T1 = KEY type */
-		Skein_Start_New_Type(ctx, KEY);
+		skein_start_new_type(ctx, KEY);
 		/* zero the initial chaining variables */
-		memset(ctx->X, 0, sizeof(ctx->X));
+		memset(ctx->x, 0, sizeof(ctx->x));
 		/* hash the key */
-		Skein_256_Update(ctx, key, keyBytes);
+		skein_256_update(ctx, key, key_bytes);
 		/* put result into cfg.b[] */
-		Skein_256_Final_Pad(ctx, cfg.b);
-		/* copy over into ctx->X[] */
-		memcpy(ctx->X, cfg.b, sizeof(cfg.b));
+		skein_256_final_pad(ctx, cfg.b);
+		/* copy over into ctx->x[] */
+		memcpy(ctx->x, cfg.b, sizeof(cfg.b));
 	}
 	/*
 	 * build/process the config block, type == CONFIG (could be
 	 * precomputed for each key)
 	 */
 	/* output hash bit count */
-	ctx->h.hashBitLen = hashBitLen;
-	Skein_Start_New_Type(ctx, CFG_FINAL);
+	ctx->h.hash_bit_len = hash_bit_len;
+	skein_start_new_type(ctx, CFG_FINAL);
 
 	/* pre-pad cfg.w[] with zeroes */
 	memset(&cfg.w, 0, sizeof(cfg.w));
-	cfg.w[0] = Skein_Swap64(SKEIN_SCHEMA_VER);
+	cfg.w[0] = skein_swap64(SKEIN_SCHEMA_VER);
 	/* hash result length in bits */
-	cfg.w[1] = Skein_Swap64(hashBitLen);
+	cfg.w[1] = skein_swap64(hash_bit_len);
 	/* tree hash config info (or SKEIN_CFG_TREE_INFO_SEQUENTIAL) */
-	cfg.w[2] = Skein_Swap64(treeInfo);
+	cfg.w[2] = skein_swap64(tree_info);
 
-	Skein_Show_Key(256, &ctx->h, key, keyBytes);
+	skein_show_key(256, &ctx->h, key, key_bytes);
 
 	/* compute the initial chaining values from config block */
-	Skein_256_Process_Block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
+	skein_256_process_block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
 
-	/* The chaining vars ctx->X are now initialized */
+	/* The chaining vars ctx->x are now initialized */
 	/* Set up to process the data message portion of the hash (default) */
-	Skein_Start_New_Type(ctx, MSG);
+	skein_start_new_type(ctx, MSG);
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* process the input bytes */
-int Skein_256_Update(struct skein_256_ctx *ctx, const u8 *msg,
-			size_t msgByteCnt)
+int skein_256_update(struct skein_256_ctx *ctx, const u8 *msg,
+		     size_t msg_byte_cnt)
 {
 	size_t n;
 
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* process full blocks, if any */
-	if (msgByteCnt + ctx->h.bCnt > SKEIN_256_BLOCK_BYTES) {
+	if (msg_byte_cnt + ctx->h.b_cnt > SKEIN_256_BLOCK_BYTES) {
 		/* finish up any buffered message data */
-		if (ctx->h.bCnt) {
+		if (ctx->h.b_cnt) {
 			/* # bytes free in buffer b[] */
-			n = SKEIN_256_BLOCK_BYTES - ctx->h.bCnt;
+			n = SKEIN_256_BLOCK_BYTES - ctx->h.b_cnt;
 			if (n) {
 				/* check on our logic here */
-				Skein_assert(n < msgByteCnt);
-				memcpy(&ctx->b[ctx->h.bCnt], msg, n);
-				msgByteCnt  -= n;
+				skein_assert(n < msg_byte_cnt);
+				memcpy(&ctx->b[ctx->h.b_cnt], msg, n);
+				msg_byte_cnt  -= n;
 				msg         += n;
-				ctx->h.bCnt += n;
+				ctx->h.b_cnt += n;
 			}
-			Skein_assert(ctx->h.bCnt == SKEIN_256_BLOCK_BYTES);
-			Skein_256_Process_Block(ctx, ctx->b, 1,
+			skein_assert(ctx->h.b_cnt == SKEIN_256_BLOCK_BYTES);
+			skein_256_process_block(ctx, ctx->b, 1,
 						SKEIN_256_BLOCK_BYTES);
-			ctx->h.bCnt = 0;
+			ctx->h.b_cnt = 0;
 		}
 		/*
 		 * now process any remaining full blocks, directly from input
 		 * message data
 		 */
-		if (msgByteCnt > SKEIN_256_BLOCK_BYTES) {
+		if (msg_byte_cnt > SKEIN_256_BLOCK_BYTES) {
 			/* number of full blocks to process */
-			n = (msgByteCnt-1) / SKEIN_256_BLOCK_BYTES;
-			Skein_256_Process_Block(ctx, msg, n,
+			n = (msg_byte_cnt-1) / SKEIN_256_BLOCK_BYTES;
+			skein_256_process_block(ctx, msg, n,
 						SKEIN_256_BLOCK_BYTES);
-			msgByteCnt -= n * SKEIN_256_BLOCK_BYTES;
+			msg_byte_cnt -= n * SKEIN_256_BLOCK_BYTES;
 			msg        += n * SKEIN_256_BLOCK_BYTES;
 		}
-		Skein_assert(ctx->h.bCnt == 0);
+		skein_assert(ctx->h.b_cnt == 0);
 	}
 
 	/* copy any remaining source message data bytes into b[] */
-	if (msgByteCnt) {
-		Skein_assert(msgByteCnt + ctx->h.bCnt <= SKEIN_256_BLOCK_BYTES);
-		memcpy(&ctx->b[ctx->h.bCnt], msg, msgByteCnt);
-		ctx->h.bCnt += msgByteCnt;
+	if (msg_byte_cnt) {
+		skein_assert(msg_byte_cnt + ctx->h.b_cnt <=
+			     SKEIN_256_BLOCK_BYTES);
+		memcpy(&ctx->b[ctx->h.b_cnt], msg, msg_byte_cnt);
+		ctx->h.b_cnt += msg_byte_cnt;
 	}
 
 	return SKEIN_SUCCESS;
@@ -193,49 +194,49 @@ int Skein_256_Update(struct skein_256_ctx *ctx, const u8 *msg,
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* finalize the hash computation and output the result */
-int Skein_256_Final(struct skein_256_ctx *ctx, u8 *hashVal)
+int skein_256_final(struct skein_256_ctx *ctx, u8 *hash_val)
 {
-	size_t i, n, byteCnt;
-	u64 X[SKEIN_256_STATE_WORDS];
+	size_t i, n, byte_cnt;
+	u64 x[SKEIN_256_STATE_WORDS];
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* tag as the final block */
-	ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;
+	ctx->h.tweak[1] |= SKEIN_T1_FLAG_FINAL;
 	/* zero pad b[] if necessary */
-	if (ctx->h.bCnt < SKEIN_256_BLOCK_BYTES)
-		memset(&ctx->b[ctx->h.bCnt], 0,
-			SKEIN_256_BLOCK_BYTES - ctx->h.bCnt);
+	if (ctx->h.b_cnt < SKEIN_256_BLOCK_BYTES)
+		memset(&ctx->b[ctx->h.b_cnt], 0,
+			SKEIN_256_BLOCK_BYTES - ctx->h.b_cnt);
 
 	/* process the final block */
-	Skein_256_Process_Block(ctx, ctx->b, 1, ctx->h.bCnt);
+	skein_256_process_block(ctx, ctx->b, 1, ctx->h.b_cnt);
 
 	/* now output the result */
 	/* total number of output bytes */
-	byteCnt = (ctx->h.hashBitLen + 7) >> 3;
+	byte_cnt = (ctx->h.hash_bit_len + 7) >> 3;
 
 	/* run Threefish in "counter mode" to generate output */
 	/* zero out b[], so it can hold the counter */
 	memset(ctx->b, 0, sizeof(ctx->b));
 	/* keep a local copy of counter mode "key" */
-	memcpy(X, ctx->X, sizeof(X));
-	for (i = 0; i*SKEIN_256_BLOCK_BYTES < byteCnt; i++) {
+	memcpy(x, ctx->x, sizeof(x));
+	for (i = 0; i*SKEIN_256_BLOCK_BYTES < byte_cnt; i++) {
 		/* build the counter block */
-		((u64 *)ctx->b)[0] = Skein_Swap64((u64) i);
-		Skein_Start_New_Type(ctx, OUT_FINAL);
+		((u64 *)ctx->b)[0] = skein_swap64((u64) i);
+		skein_start_new_type(ctx, OUT_FINAL);
 		/* run "counter mode" */
-		Skein_256_Process_Block(ctx, ctx->b, 1, sizeof(u64));
+		skein_256_process_block(ctx, ctx->b, 1, sizeof(u64));
 		/* number of output bytes left to go */
-		n = byteCnt - i*SKEIN_256_BLOCK_BYTES;
+		n = byte_cnt - i*SKEIN_256_BLOCK_BYTES;
 		if (n >= SKEIN_256_BLOCK_BYTES)
 			n  = SKEIN_256_BLOCK_BYTES;
 		/* "output" the ctr mode bytes */
-		Skein_Put64_LSB_First(hashVal+i*SKEIN_256_BLOCK_BYTES, ctx->X,
+		skein_put64_lsb_first(hash_val+i*SKEIN_256_BLOCK_BYTES, ctx->x,
 				      n);
-		Skein_Show_Final(256, &ctx->h, n,
-				 hashVal+i*SKEIN_256_BLOCK_BYTES);
+		skein_show_final(256, &ctx->h, n,
+				 hash_val+i*SKEIN_256_BLOCK_BYTES);
 		/* restore the counter mode key for next time */
-		memcpy(ctx->X, X, sizeof(X));
+		memcpy(ctx->x, x, sizeof(x));
 	}
 	return SKEIN_SUCCESS;
 }
@@ -246,28 +247,28 @@ int Skein_256_Final(struct skein_256_ctx *ctx, u8 *hashVal)
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a straight hashing operation  */
-int Skein_512_Init(struct skein_512_ctx *ctx, size_t hashBitLen)
+int skein_512_init(struct skein_512_ctx *ctx, size_t hash_bit_len)
 {
 	union {
-		u8  b[SKEIN_512_STATE_BYTES];
-		u64  w[SKEIN_512_STATE_WORDS];
+		u8 b[SKEIN_512_STATE_BYTES];
+		u64 w[SKEIN_512_STATE_WORDS];
 	} cfg;                              /* config block */
 
-	Skein_Assert(hashBitLen > 0, SKEIN_BAD_HASHLEN);
-	ctx->h.hashBitLen = hashBitLen;         /* output hash bit count */
+	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
+	ctx->h.hash_bit_len = hash_bit_len;         /* output hash bit count */
 
-	switch (hashBitLen) { /* use pre-computed values, where available */
+	switch (hash_bit_len) { /* use pre-computed values, where available */
 	case  512:
-		memcpy(ctx->X, SKEIN_512_IV_512, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_512_IV_512, sizeof(ctx->x));
 		break;
 	case  384:
-		memcpy(ctx->X, SKEIN_512_IV_384, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_512_IV_384, sizeof(ctx->x));
 		break;
 	case  256:
-		memcpy(ctx->X, SKEIN_512_IV_256, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_512_IV_256, sizeof(ctx->x));
 		break;
 	case  224:
-		memcpy(ctx->X, SKEIN_512_IV_224, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_512_IV_224, sizeof(ctx->x));
 		break;
 	default:
 		/* here if there is no precomputed IV value available */
@@ -276,144 +277,145 @@ int Skein_512_Init(struct skein_512_ctx *ctx, size_t hashBitLen)
 		 * precomputed)
 		 */
 		/* set tweaks: T0=0; T1=CFG | FINAL */
-		Skein_Start_New_Type(ctx, CFG_FINAL);
+		skein_start_new_type(ctx, CFG_FINAL);
 
 		/* set the schema, version */
-		cfg.w[0] = Skein_Swap64(SKEIN_SCHEMA_VER);
+		cfg.w[0] = skein_swap64(SKEIN_SCHEMA_VER);
 		/* hash result length in bits */
-		cfg.w[1] = Skein_Swap64(hashBitLen);
-		cfg.w[2] = Skein_Swap64(SKEIN_CFG_TREE_INFO_SEQUENTIAL);
+		cfg.w[1] = skein_swap64(hash_bit_len);
+		cfg.w[2] = skein_swap64(SKEIN_CFG_TREE_INFO_SEQUENTIAL);
 		/* zero pad config block */
 		memset(&cfg.w[3], 0, sizeof(cfg) - 3*sizeof(cfg.w[0]));
 
 		/* compute the initial chaining values from config block */
 		/* zero the chaining variables */
-		memset(ctx->X, 0, sizeof(ctx->X));
-		Skein_512_Process_Block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
+		memset(ctx->x, 0, sizeof(ctx->x));
+		skein_512_process_block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
 		break;
 	}
 
 	/*
-	 * The chaining vars ctx->X are now initialized for the given
-	 * hashBitLen.
+	 * The chaining vars ctx->x are now initialized for the given
+	 * hash_bit_len.
 	 */
 	/* Set up to process the data message portion of the hash (default) */
-	Skein_Start_New_Type(ctx, MSG);              /* T0=0, T1= MSG type */
+	skein_start_new_type(ctx, MSG);              /* T0=0, T1= MSG type */
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a MAC and/or tree hash operation */
-/* [identical to Skein_512_Init() when keyBytes == 0 && \
- *	treeInfo == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
-int Skein_512_InitExt(struct skein_512_ctx *ctx, size_t hashBitLen,
-			u64 treeInfo, const u8 *key, size_t keyBytes)
+/* [identical to skein_512_init() when key_bytes == 0 && \
+ *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
+int skein_512_init_ext(struct skein_512_ctx *ctx, size_t hash_bit_len,
+		       u64 tree_info, const u8 *key, size_t key_bytes)
 {
 	union {
-		u8  b[SKEIN_512_STATE_BYTES];
-		u64  w[SKEIN_512_STATE_WORDS];
+		u8 b[SKEIN_512_STATE_BYTES];
+		u64 w[SKEIN_512_STATE_WORDS];
 	} cfg;                              /* config block */
 
-	Skein_Assert(hashBitLen > 0, SKEIN_BAD_HASHLEN);
-	Skein_Assert(keyBytes == 0 || key != NULL, SKEIN_FAIL);
+	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
+	skein_assert_ret(key_bytes == 0 || key != NULL, SKEIN_FAIL);
 
-	/* compute the initial chaining values ctx->X[], based on key */
-	if (keyBytes == 0) { /* is there a key? */
+	/* compute the initial chaining values ctx->x[], based on key */
+	if (key_bytes == 0) { /* is there a key? */
 		/* no key: use all zeroes as key for config block */
-		memset(ctx->X, 0, sizeof(ctx->X));
+		memset(ctx->x, 0, sizeof(ctx->x));
 	} else { /* here to pre-process a key */
-		Skein_assert(sizeof(cfg.b) >= sizeof(ctx->X));
+		skein_assert(sizeof(cfg.b) >= sizeof(ctx->x));
 		/* do a mini-Init right here */
 		/* set output hash bit count = state size */
-		ctx->h.hashBitLen = 8*sizeof(ctx->X);
+		ctx->h.hash_bit_len = 8*sizeof(ctx->x);
 		/* set tweaks: T0 = 0; T1 = KEY type */
-		Skein_Start_New_Type(ctx, KEY);
+		skein_start_new_type(ctx, KEY);
 		/* zero the initial chaining variables */
-		memset(ctx->X, 0, sizeof(ctx->X));
+		memset(ctx->x, 0, sizeof(ctx->x));
 		/* hash the key */
-		Skein_512_Update(ctx, key, keyBytes);
+		skein_512_update(ctx, key, key_bytes);
 		/* put result into cfg.b[] */
-		Skein_512_Final_Pad(ctx, cfg.b);
-		/* copy over into ctx->X[] */
-		memcpy(ctx->X, cfg.b, sizeof(cfg.b));
+		skein_512_final_pad(ctx, cfg.b);
+		/* copy over into ctx->x[] */
+		memcpy(ctx->x, cfg.b, sizeof(cfg.b));
 	}
 	/*
 	 * build/process the config block, type == CONFIG (could be
 	 * precomputed for each key)
 	 */
-	ctx->h.hashBitLen = hashBitLen;             /* output hash bit count */
-	Skein_Start_New_Type(ctx, CFG_FINAL);
+	ctx->h.hash_bit_len = hash_bit_len;          /* output hash bit count */
+	skein_start_new_type(ctx, CFG_FINAL);
 
 	/* pre-pad cfg.w[] with zeroes */
 	memset(&cfg.w, 0, sizeof(cfg.w));
-	cfg.w[0] = Skein_Swap64(SKEIN_SCHEMA_VER);
+	cfg.w[0] = skein_swap64(SKEIN_SCHEMA_VER);
 	/* hash result length in bits */
-	cfg.w[1] = Skein_Swap64(hashBitLen);
+	cfg.w[1] = skein_swap64(hash_bit_len);
 	/* tree hash config info (or SKEIN_CFG_TREE_INFO_SEQUENTIAL) */
-	cfg.w[2] = Skein_Swap64(treeInfo);
+	cfg.w[2] = skein_swap64(tree_info);
 
-	Skein_Show_Key(512, &ctx->h, key, keyBytes);
+	skein_show_key(512, &ctx->h, key, key_bytes);
 
 	/* compute the initial chaining values from config block */
-	Skein_512_Process_Block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
+	skein_512_process_block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
 
-	/* The chaining vars ctx->X are now initialized */
+	/* The chaining vars ctx->x are now initialized */
 	/* Set up to process the data message portion of the hash (default) */
-	Skein_Start_New_Type(ctx, MSG);
+	skein_start_new_type(ctx, MSG);
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* process the input bytes */
-int Skein_512_Update(struct skein_512_ctx *ctx, const u8 *msg,
-			size_t msgByteCnt)
+int skein_512_update(struct skein_512_ctx *ctx, const u8 *msg,
+		     size_t msg_byte_cnt)
 {
 	size_t n;
 
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* process full blocks, if any */
-	if (msgByteCnt + ctx->h.bCnt > SKEIN_512_BLOCK_BYTES) {
+	if (msg_byte_cnt + ctx->h.b_cnt > SKEIN_512_BLOCK_BYTES) {
 		/* finish up any buffered message data */
-		if (ctx->h.bCnt) {
+		if (ctx->h.b_cnt) {
 			/* # bytes free in buffer b[] */
-			n = SKEIN_512_BLOCK_BYTES - ctx->h.bCnt;
+			n = SKEIN_512_BLOCK_BYTES - ctx->h.b_cnt;
 			if (n) {
 				/* check on our logic here */
-				Skein_assert(n < msgByteCnt);
-				memcpy(&ctx->b[ctx->h.bCnt], msg, n);
-				msgByteCnt  -= n;
+				skein_assert(n < msg_byte_cnt);
+				memcpy(&ctx->b[ctx->h.b_cnt], msg, n);
+				msg_byte_cnt  -= n;
 				msg         += n;
-				ctx->h.bCnt += n;
+				ctx->h.b_cnt += n;
 			}
-			Skein_assert(ctx->h.bCnt == SKEIN_512_BLOCK_BYTES);
-			Skein_512_Process_Block(ctx, ctx->b, 1,
+			skein_assert(ctx->h.b_cnt == SKEIN_512_BLOCK_BYTES);
+			skein_512_process_block(ctx, ctx->b, 1,
 						SKEIN_512_BLOCK_BYTES);
-			ctx->h.bCnt = 0;
+			ctx->h.b_cnt = 0;
 		}
 		/*
 		 * now process any remaining full blocks, directly from input
 		 * message data
 		 */
-		if (msgByteCnt > SKEIN_512_BLOCK_BYTES) {
+		if (msg_byte_cnt > SKEIN_512_BLOCK_BYTES) {
 			/* number of full blocks to process */
-			n = (msgByteCnt-1) / SKEIN_512_BLOCK_BYTES;
-			Skein_512_Process_Block(ctx, msg, n,
+			n = (msg_byte_cnt-1) / SKEIN_512_BLOCK_BYTES;
+			skein_512_process_block(ctx, msg, n,
 						SKEIN_512_BLOCK_BYTES);
-			msgByteCnt -= n * SKEIN_512_BLOCK_BYTES;
+			msg_byte_cnt -= n * SKEIN_512_BLOCK_BYTES;
 			msg        += n * SKEIN_512_BLOCK_BYTES;
 		}
-		Skein_assert(ctx->h.bCnt == 0);
+		skein_assert(ctx->h.b_cnt == 0);
 	}
 
 	/* copy any remaining source message data bytes into b[] */
-	if (msgByteCnt) {
-		Skein_assert(msgByteCnt + ctx->h.bCnt <= SKEIN_512_BLOCK_BYTES);
-		memcpy(&ctx->b[ctx->h.bCnt], msg, msgByteCnt);
-		ctx->h.bCnt += msgByteCnt;
+	if (msg_byte_cnt) {
+		skein_assert(msg_byte_cnt + ctx->h.b_cnt <=
+			     SKEIN_512_BLOCK_BYTES);
+		memcpy(&ctx->b[ctx->h.b_cnt], msg, msg_byte_cnt);
+		ctx->h.b_cnt += msg_byte_cnt;
 	}
 
 	return SKEIN_SUCCESS;
@@ -421,49 +423,49 @@ int Skein_512_Update(struct skein_512_ctx *ctx, const u8 *msg,
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* finalize the hash computation and output the result */
-int Skein_512_Final(struct skein_512_ctx *ctx, u8 *hashVal)
+int skein_512_final(struct skein_512_ctx *ctx, u8 *hash_val)
 {
-	size_t i, n, byteCnt;
-	u64 X[SKEIN_512_STATE_WORDS];
+	size_t i, n, byte_cnt;
+	u64 x[SKEIN_512_STATE_WORDS];
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* tag as the final block */
-	ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;
+	ctx->h.tweak[1] |= SKEIN_T1_FLAG_FINAL;
 	/* zero pad b[] if necessary */
-	if (ctx->h.bCnt < SKEIN_512_BLOCK_BYTES)
-		memset(&ctx->b[ctx->h.bCnt], 0,
-			SKEIN_512_BLOCK_BYTES - ctx->h.bCnt);
+	if (ctx->h.b_cnt < SKEIN_512_BLOCK_BYTES)
+		memset(&ctx->b[ctx->h.b_cnt], 0,
+			SKEIN_512_BLOCK_BYTES - ctx->h.b_cnt);
 
 	/* process the final block */
-	Skein_512_Process_Block(ctx, ctx->b, 1, ctx->h.bCnt);
+	skein_512_process_block(ctx, ctx->b, 1, ctx->h.b_cnt);
 
 	/* now output the result */
 	/* total number of output bytes */
-	byteCnt = (ctx->h.hashBitLen + 7) >> 3;
+	byte_cnt = (ctx->h.hash_bit_len + 7) >> 3;
 
 	/* run Threefish in "counter mode" to generate output */
 	/* zero out b[], so it can hold the counter */
 	memset(ctx->b, 0, sizeof(ctx->b));
 	/* keep a local copy of counter mode "key" */
-	memcpy(X, ctx->X, sizeof(X));
-	for (i = 0; i*SKEIN_512_BLOCK_BYTES < byteCnt; i++) {
+	memcpy(x, ctx->x, sizeof(x));
+	for (i = 0; i*SKEIN_512_BLOCK_BYTES < byte_cnt; i++) {
 		/* build the counter block */
-		((u64 *)ctx->b)[0] = Skein_Swap64((u64) i);
-		Skein_Start_New_Type(ctx, OUT_FINAL);
+		((u64 *)ctx->b)[0] = skein_swap64((u64) i);
+		skein_start_new_type(ctx, OUT_FINAL);
 		/* run "counter mode" */
-		Skein_512_Process_Block(ctx, ctx->b, 1, sizeof(u64));
+		skein_512_process_block(ctx, ctx->b, 1, sizeof(u64));
 		/* number of output bytes left to go */
-		n = byteCnt - i*SKEIN_512_BLOCK_BYTES;
+		n = byte_cnt - i*SKEIN_512_BLOCK_BYTES;
 		if (n >= SKEIN_512_BLOCK_BYTES)
 			n  = SKEIN_512_BLOCK_BYTES;
 		/* "output" the ctr mode bytes */
-		Skein_Put64_LSB_First(hashVal+i*SKEIN_512_BLOCK_BYTES, ctx->X,
+		skein_put64_lsb_first(hash_val+i*SKEIN_512_BLOCK_BYTES, ctx->x,
 				      n);
-		Skein_Show_Final(512, &ctx->h, n,
-				 hashVal+i*SKEIN_512_BLOCK_BYTES);
+		skein_show_final(512, &ctx->h, n,
+				 hash_val+i*SKEIN_512_BLOCK_BYTES);
 		/* restore the counter mode key for next time */
-		memcpy(ctx->X, X, sizeof(X));
+		memcpy(ctx->x, x, sizeof(x));
 	}
 	return SKEIN_SUCCESS;
 }
@@ -474,25 +476,25 @@ int Skein_512_Final(struct skein_512_ctx *ctx, u8 *hashVal)
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a straight hashing operation  */
-int Skein1024_Init(struct skein1024_ctx *ctx, size_t hashBitLen)
+int skein_1024_init(struct skein_1024_ctx *ctx, size_t hash_bit_len)
 {
 	union {
-		u8  b[SKEIN1024_STATE_BYTES];
-		u64  w[SKEIN1024_STATE_WORDS];
+		u8 b[SKEIN_1024_STATE_BYTES];
+		u64 w[SKEIN_1024_STATE_WORDS];
 	} cfg;                              /* config block */
 
-	Skein_Assert(hashBitLen > 0, SKEIN_BAD_HASHLEN);
-	ctx->h.hashBitLen = hashBitLen;         /* output hash bit count */
+	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
+	ctx->h.hash_bit_len = hash_bit_len;         /* output hash bit count */
 
-	switch (hashBitLen) { /* use pre-computed values, where available */
+	switch (hash_bit_len) { /* use pre-computed values, where available */
 	case  512:
-		memcpy(ctx->X, SKEIN1024_IV_512, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_1024_IV_512, sizeof(ctx->x));
 		break;
 	case  384:
-		memcpy(ctx->X, SKEIN1024_IV_384, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_1024_IV_384, sizeof(ctx->x));
 		break;
 	case 1024:
-		memcpy(ctx->X, SKEIN1024_IV_1024, sizeof(ctx->X));
+		memcpy(ctx->x, SKEIN_1024_IV_1024, sizeof(ctx->x));
 		break;
 	default:
 		/* here if there is no precomputed IV value available */
@@ -501,142 +503,143 @@ int Skein1024_Init(struct skein1024_ctx *ctx, size_t hashBitLen)
 		 * (could be precomputed)
 		 */
 		/* set tweaks: T0=0; T1=CFG | FINAL */
-		Skein_Start_New_Type(ctx, CFG_FINAL);
+		skein_start_new_type(ctx, CFG_FINAL);
 
 		/* set the schema, version */
-		cfg.w[0] = Skein_Swap64(SKEIN_SCHEMA_VER);
+		cfg.w[0] = skein_swap64(SKEIN_SCHEMA_VER);
 		/* hash result length in bits */
-		cfg.w[1] = Skein_Swap64(hashBitLen);
-		cfg.w[2] = Skein_Swap64(SKEIN_CFG_TREE_INFO_SEQUENTIAL);
+		cfg.w[1] = skein_swap64(hash_bit_len);
+		cfg.w[2] = skein_swap64(SKEIN_CFG_TREE_INFO_SEQUENTIAL);
 		/* zero pad config block */
 		memset(&cfg.w[3], 0, sizeof(cfg) - 3*sizeof(cfg.w[0]));
 
 		/* compute the initial chaining values from config block */
 		/* zero the chaining variables */
-		memset(ctx->X, 0, sizeof(ctx->X));
-		Skein1024_Process_Block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
+		memset(ctx->x, 0, sizeof(ctx->x));
+		skein_1024_process_block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
 		break;
 	}
 
-	/* The chaining vars ctx->X are now initialized for the hashBitLen. */
+	/* The chaining vars ctx->x are now initialized for the hash_bit_len. */
 	/* Set up to process the data message portion of the hash (default) */
-	Skein_Start_New_Type(ctx, MSG);              /* T0=0, T1= MSG type */
+	skein_start_new_type(ctx, MSG);              /* T0=0, T1= MSG type */
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a MAC and/or tree hash operation */
-/* [identical to Skein1024_Init() when keyBytes == 0 && \
- *	treeInfo == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
-int Skein1024_InitExt(struct skein1024_ctx *ctx, size_t hashBitLen,
-			u64 treeInfo, const u8 *key, size_t keyBytes)
+/* [identical to skein_1024_init() when key_bytes == 0 && \
+ *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
+int skein_1024_init_ext(struct skein_1024_ctx *ctx, size_t hash_bit_len,
+			u64 tree_info, const u8 *key, size_t key_bytes)
 {
 	union {
-		u8  b[SKEIN1024_STATE_BYTES];
-		u64  w[SKEIN1024_STATE_WORDS];
+		u8 b[SKEIN_1024_STATE_BYTES];
+		u64 w[SKEIN_1024_STATE_WORDS];
 	} cfg;                              /* config block */
 
-	Skein_Assert(hashBitLen > 0, SKEIN_BAD_HASHLEN);
-	Skein_Assert(keyBytes == 0 || key != NULL, SKEIN_FAIL);
+	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
+	skein_assert_ret(key_bytes == 0 || key != NULL, SKEIN_FAIL);
 
-	/* compute the initial chaining values ctx->X[], based on key */
-	if (keyBytes == 0) { /* is there a key? */
+	/* compute the initial chaining values ctx->x[], based on key */
+	if (key_bytes == 0) { /* is there a key? */
 		/* no key: use all zeroes as key for config block */
-		memset(ctx->X, 0, sizeof(ctx->X));
+		memset(ctx->x, 0, sizeof(ctx->x));
 	} else { /* here to pre-process a key */
-		Skein_assert(sizeof(cfg.b) >= sizeof(ctx->X));
+		skein_assert(sizeof(cfg.b) >= sizeof(ctx->x));
 		/* do a mini-Init right here */
 		/* set output hash bit count = state size */
-		ctx->h.hashBitLen = 8*sizeof(ctx->X);
+		ctx->h.hash_bit_len = 8*sizeof(ctx->x);
 		/* set tweaks: T0 = 0; T1 = KEY type */
-		Skein_Start_New_Type(ctx, KEY);
+		skein_start_new_type(ctx, KEY);
 		/* zero the initial chaining variables */
-		memset(ctx->X, 0, sizeof(ctx->X));
+		memset(ctx->x, 0, sizeof(ctx->x));
 		/* hash the key */
-		Skein1024_Update(ctx, key, keyBytes);
+		skein_1024_update(ctx, key, key_bytes);
 		/* put result into cfg.b[] */
-		Skein1024_Final_Pad(ctx, cfg.b);
-		/* copy over into ctx->X[] */
-		memcpy(ctx->X, cfg.b, sizeof(cfg.b));
+		skein_1024_final_pad(ctx, cfg.b);
+		/* copy over into ctx->x[] */
+		memcpy(ctx->x, cfg.b, sizeof(cfg.b));
 	}
 	/*
 	 * build/process the config block, type == CONFIG (could be
 	 * precomputed for each key)
 	 */
 	/* output hash bit count */
-	ctx->h.hashBitLen = hashBitLen;
-	Skein_Start_New_Type(ctx, CFG_FINAL);
+	ctx->h.hash_bit_len = hash_bit_len;
+	skein_start_new_type(ctx, CFG_FINAL);
 
 	/* pre-pad cfg.w[] with zeroes */
 	memset(&cfg.w, 0, sizeof(cfg.w));
-	cfg.w[0] = Skein_Swap64(SKEIN_SCHEMA_VER);
+	cfg.w[0] = skein_swap64(SKEIN_SCHEMA_VER);
 	/* hash result length in bits */
-	cfg.w[1] = Skein_Swap64(hashBitLen);
+	cfg.w[1] = skein_swap64(hash_bit_len);
 	/* tree hash config info (or SKEIN_CFG_TREE_INFO_SEQUENTIAL) */
-	cfg.w[2] = Skein_Swap64(treeInfo);
+	cfg.w[2] = skein_swap64(tree_info);
 
-	Skein_Show_Key(1024, &ctx->h, key, keyBytes);
+	skein_show_key(1024, &ctx->h, key, key_bytes);
 
 	/* compute the initial chaining values from config block */
-	Skein1024_Process_Block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
+	skein_1024_process_block(ctx, cfg.b, 1, SKEIN_CFG_STR_LEN);
 
-	/* The chaining vars ctx->X are now initialized */
+	/* The chaining vars ctx->x are now initialized */
 	/* Set up to process the data message portion of the hash (default) */
-	Skein_Start_New_Type(ctx, MSG);
+	skein_start_new_type(ctx, MSG);
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* process the input bytes */
-int Skein1024_Update(struct skein1024_ctx *ctx, const u8 *msg,
-			size_t msgByteCnt)
+int skein_1024_update(struct skein_1024_ctx *ctx, const u8 *msg,
+		      size_t msg_byte_cnt)
 {
 	size_t n;
 
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN1024_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_1024_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* process full blocks, if any */
-	if (msgByteCnt + ctx->h.bCnt > SKEIN1024_BLOCK_BYTES) {
+	if (msg_byte_cnt + ctx->h.b_cnt > SKEIN_1024_BLOCK_BYTES) {
 		/* finish up any buffered message data */
-		if (ctx->h.bCnt) {
+		if (ctx->h.b_cnt) {
 			/* # bytes free in buffer b[] */
-			n = SKEIN1024_BLOCK_BYTES - ctx->h.bCnt;
+			n = SKEIN_1024_BLOCK_BYTES - ctx->h.b_cnt;
 			if (n) {
 				/* check on our logic here */
-				Skein_assert(n < msgByteCnt);
-				memcpy(&ctx->b[ctx->h.bCnt], msg, n);
-				msgByteCnt  -= n;
+				skein_assert(n < msg_byte_cnt);
+				memcpy(&ctx->b[ctx->h.b_cnt], msg, n);
+				msg_byte_cnt  -= n;
 				msg         += n;
-				ctx->h.bCnt += n;
+				ctx->h.b_cnt += n;
 			}
-			Skein_assert(ctx->h.bCnt == SKEIN1024_BLOCK_BYTES);
-			Skein1024_Process_Block(ctx, ctx->b, 1,
-						SKEIN1024_BLOCK_BYTES);
-			ctx->h.bCnt = 0;
+			skein_assert(ctx->h.b_cnt == SKEIN_1024_BLOCK_BYTES);
+			skein_1024_process_block(ctx, ctx->b, 1,
+						 SKEIN_1024_BLOCK_BYTES);
+			ctx->h.b_cnt = 0;
 		}
 		/*
 		 * now process any remaining full blocks, directly from input
 		 * message data
 		 */
-		if (msgByteCnt > SKEIN1024_BLOCK_BYTES) {
+		if (msg_byte_cnt > SKEIN_1024_BLOCK_BYTES) {
 			/* number of full blocks to process */
-			n = (msgByteCnt-1) / SKEIN1024_BLOCK_BYTES;
-			Skein1024_Process_Block(ctx, msg, n,
-						SKEIN1024_BLOCK_BYTES);
-			msgByteCnt -= n * SKEIN1024_BLOCK_BYTES;
-			msg        += n * SKEIN1024_BLOCK_BYTES;
+			n = (msg_byte_cnt-1) / SKEIN_1024_BLOCK_BYTES;
+			skein_1024_process_block(ctx, msg, n,
+						 SKEIN_1024_BLOCK_BYTES);
+			msg_byte_cnt -= n * SKEIN_1024_BLOCK_BYTES;
+			msg        += n * SKEIN_1024_BLOCK_BYTES;
 		}
-		Skein_assert(ctx->h.bCnt == 0);
+		skein_assert(ctx->h.b_cnt == 0);
 	}
 
 	/* copy any remaining source message data bytes into b[] */
-	if (msgByteCnt) {
-		Skein_assert(msgByteCnt + ctx->h.bCnt <= SKEIN1024_BLOCK_BYTES);
-		memcpy(&ctx->b[ctx->h.bCnt], msg, msgByteCnt);
-		ctx->h.bCnt += msgByteCnt;
+	if (msg_byte_cnt) {
+		skein_assert(msg_byte_cnt + ctx->h.b_cnt <=
+			     SKEIN_1024_BLOCK_BYTES);
+		memcpy(&ctx->b[ctx->h.b_cnt], msg, msg_byte_cnt);
+		ctx->h.b_cnt += msg_byte_cnt;
 	}
 
 	return SKEIN_SUCCESS;
@@ -644,49 +647,49 @@ int Skein1024_Update(struct skein1024_ctx *ctx, const u8 *msg,
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* finalize the hash computation and output the result */
-int Skein1024_Final(struct skein1024_ctx *ctx, u8 *hashVal)
+int skein_1024_final(struct skein_1024_ctx *ctx, u8 *hash_val)
 {
-	size_t i, n, byteCnt;
-	u64 X[SKEIN1024_STATE_WORDS];
+	size_t i, n, byte_cnt;
+	u64 x[SKEIN_1024_STATE_WORDS];
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN1024_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_1024_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* tag as the final block */
-	ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;
+	ctx->h.tweak[1] |= SKEIN_T1_FLAG_FINAL;
 	/* zero pad b[] if necessary */
-	if (ctx->h.bCnt < SKEIN1024_BLOCK_BYTES)
-		memset(&ctx->b[ctx->h.bCnt], 0,
-			SKEIN1024_BLOCK_BYTES - ctx->h.bCnt);
+	if (ctx->h.b_cnt < SKEIN_1024_BLOCK_BYTES)
+		memset(&ctx->b[ctx->h.b_cnt], 0,
+			SKEIN_1024_BLOCK_BYTES - ctx->h.b_cnt);
 
 	/* process the final block */
-	Skein1024_Process_Block(ctx, ctx->b, 1, ctx->h.bCnt);
+	skein_1024_process_block(ctx, ctx->b, 1, ctx->h.b_cnt);
 
 	/* now output the result */
 	/* total number of output bytes */
-	byteCnt = (ctx->h.hashBitLen + 7) >> 3;
+	byte_cnt = (ctx->h.hash_bit_len + 7) >> 3;
 
 	/* run Threefish in "counter mode" to generate output */
 	/* zero out b[], so it can hold the counter */
 	memset(ctx->b, 0, sizeof(ctx->b));
 	/* keep a local copy of counter mode "key" */
-	memcpy(X, ctx->X, sizeof(X));
-	for (i = 0; i*SKEIN1024_BLOCK_BYTES < byteCnt; i++) {
+	memcpy(x, ctx->x, sizeof(x));
+	for (i = 0; i*SKEIN_1024_BLOCK_BYTES < byte_cnt; i++) {
 		/* build the counter block */
-		((u64 *)ctx->b)[0] = Skein_Swap64((u64) i);
-		Skein_Start_New_Type(ctx, OUT_FINAL);
+		((u64 *)ctx->b)[0] = skein_swap64((u64) i);
+		skein_start_new_type(ctx, OUT_FINAL);
 		/* run "counter mode" */
-		Skein1024_Process_Block(ctx, ctx->b, 1, sizeof(u64));
+		skein_1024_process_block(ctx, ctx->b, 1, sizeof(u64));
 		/* number of output bytes left to go */
-		n = byteCnt - i*SKEIN1024_BLOCK_BYTES;
-		if (n >= SKEIN1024_BLOCK_BYTES)
-			n  = SKEIN1024_BLOCK_BYTES;
+		n = byte_cnt - i*SKEIN_1024_BLOCK_BYTES;
+		if (n >= SKEIN_1024_BLOCK_BYTES)
+			n  = SKEIN_1024_BLOCK_BYTES;
 		/* "output" the ctr mode bytes */
-		Skein_Put64_LSB_First(hashVal+i*SKEIN1024_BLOCK_BYTES, ctx->X,
+		skein_put64_lsb_first(hash_val+i*SKEIN_1024_BLOCK_BYTES, ctx->x,
 				      n);
-		Skein_Show_Final(1024, &ctx->h, n,
-				 hashVal+i*SKEIN1024_BLOCK_BYTES);
+		skein_show_final(1024, &ctx->h, n,
+				 hash_val+i*SKEIN_1024_BLOCK_BYTES);
 		/* restore the counter mode key for next time */
-		memcpy(ctx->X, X, sizeof(X));
+		memcpy(ctx->x, x, sizeof(x));
 	}
 	return SKEIN_SUCCESS;
 }
@@ -696,66 +699,66 @@ int Skein1024_Final(struct skein1024_ctx *ctx, u8 *hashVal)
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* finalize the hash computation and output the block, no OUTPUT stage */
-int Skein_256_Final_Pad(struct skein_256_ctx *ctx, u8 *hashVal)
+int skein_256_final_pad(struct skein_256_ctx *ctx, u8 *hash_val)
 {
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* tag as the final block */
-	ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;
+	ctx->h.tweak[1] |= SKEIN_T1_FLAG_FINAL;
 	/* zero pad b[] if necessary */
-	if (ctx->h.bCnt < SKEIN_256_BLOCK_BYTES)
-		memset(&ctx->b[ctx->h.bCnt], 0,
-			SKEIN_256_BLOCK_BYTES - ctx->h.bCnt);
+	if (ctx->h.b_cnt < SKEIN_256_BLOCK_BYTES)
+		memset(&ctx->b[ctx->h.b_cnt], 0,
+			SKEIN_256_BLOCK_BYTES - ctx->h.b_cnt);
 	/* process the final block */
-	Skein_256_Process_Block(ctx, ctx->b, 1, ctx->h.bCnt);
+	skein_256_process_block(ctx, ctx->b, 1, ctx->h.b_cnt);
 
 	/* "output" the state bytes */
-	Skein_Put64_LSB_First(hashVal, ctx->X, SKEIN_256_BLOCK_BYTES);
+	skein_put64_lsb_first(hash_val, ctx->x, SKEIN_256_BLOCK_BYTES);
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* finalize the hash computation and output the block, no OUTPUT stage */
-int Skein_512_Final_Pad(struct skein_512_ctx *ctx, u8 *hashVal)
+int skein_512_final_pad(struct skein_512_ctx *ctx, u8 *hash_val)
 {
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* tag as the final block */
-	ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;
+	ctx->h.tweak[1] |= SKEIN_T1_FLAG_FINAL;
 	/* zero pad b[] if necessary */
-	if (ctx->h.bCnt < SKEIN_512_BLOCK_BYTES)
-		memset(&ctx->b[ctx->h.bCnt], 0,
-			SKEIN_512_BLOCK_BYTES - ctx->h.bCnt);
+	if (ctx->h.b_cnt < SKEIN_512_BLOCK_BYTES)
+		memset(&ctx->b[ctx->h.b_cnt], 0,
+			SKEIN_512_BLOCK_BYTES - ctx->h.b_cnt);
 	/* process the final block */
-	Skein_512_Process_Block(ctx, ctx->b, 1, ctx->h.bCnt);
+	skein_512_process_block(ctx, ctx->b, 1, ctx->h.b_cnt);
 
 	/* "output" the state bytes */
-	Skein_Put64_LSB_First(hashVal, ctx->X, SKEIN_512_BLOCK_BYTES);
+	skein_put64_lsb_first(hash_val, ctx->x, SKEIN_512_BLOCK_BYTES);
 
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* finalize the hash computation and output the block, no OUTPUT stage */
-int Skein1024_Final_Pad(struct skein1024_ctx *ctx, u8 *hashVal)
+int skein_1024_final_pad(struct skein_1024_ctx *ctx, u8 *hash_val)
 {
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN1024_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_1024_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* tag as the final block */
-	ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;
+	ctx->h.tweak[1] |= SKEIN_T1_FLAG_FINAL;
 	/* zero pad b[] if necessary */
-	if (ctx->h.bCnt < SKEIN1024_BLOCK_BYTES)
-		memset(&ctx->b[ctx->h.bCnt], 0,
-			SKEIN1024_BLOCK_BYTES - ctx->h.bCnt);
+	if (ctx->h.b_cnt < SKEIN_1024_BLOCK_BYTES)
+		memset(&ctx->b[ctx->h.b_cnt], 0,
+			SKEIN_1024_BLOCK_BYTES - ctx->h.b_cnt);
 	/* process the final block */
-	Skein1024_Process_Block(ctx, ctx->b, 1, ctx->h.bCnt);
+	skein_1024_process_block(ctx, ctx->b, 1, ctx->h.b_cnt);
 
 	/* "output" the state bytes */
-	Skein_Put64_LSB_First(hashVal, ctx->X, SKEIN1024_BLOCK_BYTES);
+	skein_put64_lsb_first(hash_val, ctx->x, SKEIN_1024_BLOCK_BYTES);
 
 	return SKEIN_SUCCESS;
 }
@@ -763,117 +766,117 @@ int Skein1024_Final_Pad(struct skein1024_ctx *ctx, u8 *hashVal)
 #if SKEIN_TREE_HASH
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* just do the OUTPUT stage                                       */
-int Skein_256_Output(struct skein_256_ctx *ctx, u8 *hashVal)
+int skein_256_output(struct skein_256_ctx *ctx, u8 *hash_val)
 {
-	size_t i, n, byteCnt;
-	u64 X[SKEIN_256_STATE_WORDS];
+	size_t i, n, byte_cnt;
+	u64 x[SKEIN_256_STATE_WORDS];
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_256_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* now output the result */
 	/* total number of output bytes */
-	byteCnt = (ctx->h.hashBitLen + 7) >> 3;
+	byte_cnt = (ctx->h.hash_bit_len + 7) >> 3;
 
 	/* run Threefish in "counter mode" to generate output */
 	/* zero out b[], so it can hold the counter */
 	memset(ctx->b, 0, sizeof(ctx->b));
 	/* keep a local copy of counter mode "key" */
-	memcpy(X, ctx->X, sizeof(X));
-	for (i = 0; i*SKEIN_256_BLOCK_BYTES < byteCnt; i++) {
+	memcpy(x, ctx->x, sizeof(x));
+	for (i = 0; i*SKEIN_256_BLOCK_BYTES < byte_cnt; i++) {
 		/* build the counter block */
-		((u64 *)ctx->b)[0] = Skein_Swap64((u64) i);
-		Skein_Start_New_Type(ctx, OUT_FINAL);
+		((u64 *)ctx->b)[0] = skein_swap64((u64) i);
+		skein_start_new_type(ctx, OUT_FINAL);
 		/* run "counter mode" */
-		Skein_256_Process_Block(ctx, ctx->b, 1, sizeof(u64));
+		skein_256_process_block(ctx, ctx->b, 1, sizeof(u64));
 		/* number of output bytes left to go */
-		n = byteCnt - i*SKEIN_256_BLOCK_BYTES;
+		n = byte_cnt - i*SKEIN_256_BLOCK_BYTES;
 		if (n >= SKEIN_256_BLOCK_BYTES)
 			n  = SKEIN_256_BLOCK_BYTES;
 		/* "output" the ctr mode bytes */
-		Skein_Put64_LSB_First(hashVal+i*SKEIN_256_BLOCK_BYTES, ctx->X,
+		skein_put64_lsb_first(hash_val+i*SKEIN_256_BLOCK_BYTES, ctx->x,
 				      n);
-		Skein_Show_Final(256, &ctx->h, n,
-				 hashVal+i*SKEIN_256_BLOCK_BYTES);
+		skein_show_final(256, &ctx->h, n,
+				 hash_val+i*SKEIN_256_BLOCK_BYTES);
 		/* restore the counter mode key for next time */
-		memcpy(ctx->X, X, sizeof(X));
+		memcpy(ctx->x, x, sizeof(x));
 	}
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* just do the OUTPUT stage                                       */
-int Skein_512_Output(struct skein_512_ctx *ctx, u8 *hashVal)
+int skein_512_output(struct skein_512_ctx *ctx, u8 *hash_val)
 {
-	size_t i, n, byteCnt;
-	u64 X[SKEIN_512_STATE_WORDS];
+	size_t i, n, byte_cnt;
+	u64 x[SKEIN_512_STATE_WORDS];
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_512_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* now output the result */
 	/* total number of output bytes */
-	byteCnt = (ctx->h.hashBitLen + 7) >> 3;
+	byte_cnt = (ctx->h.hash_bit_len + 7) >> 3;
 
 	/* run Threefish in "counter mode" to generate output */
 	/* zero out b[], so it can hold the counter */
 	memset(ctx->b, 0, sizeof(ctx->b));
 	/* keep a local copy of counter mode "key" */
-	memcpy(X, ctx->X, sizeof(X));
-	for (i = 0; i*SKEIN_512_BLOCK_BYTES < byteCnt; i++) {
+	memcpy(x, ctx->x, sizeof(x));
+	for (i = 0; i*SKEIN_512_BLOCK_BYTES < byte_cnt; i++) {
 		/* build the counter block */
-		((u64 *)ctx->b)[0] = Skein_Swap64((u64) i);
-		Skein_Start_New_Type(ctx, OUT_FINAL);
+		((u64 *)ctx->b)[0] = skein_swap64((u64) i);
+		skein_start_new_type(ctx, OUT_FINAL);
 		/* run "counter mode" */
-		Skein_512_Process_Block(ctx, ctx->b, 1, sizeof(u64));
+		skein_512_process_block(ctx, ctx->b, 1, sizeof(u64));
 		/* number of output bytes left to go */
-		n = byteCnt - i*SKEIN_512_BLOCK_BYTES;
+		n = byte_cnt - i*SKEIN_512_BLOCK_BYTES;
 		if (n >= SKEIN_512_BLOCK_BYTES)
 			n  = SKEIN_512_BLOCK_BYTES;
 		/* "output" the ctr mode bytes */
-		Skein_Put64_LSB_First(hashVal+i*SKEIN_512_BLOCK_BYTES, ctx->X,
+		skein_put64_lsb_first(hash_val+i*SKEIN_512_BLOCK_BYTES, ctx->x,
 				      n);
-		Skein_Show_Final(256, &ctx->h, n,
-				 hashVal+i*SKEIN_512_BLOCK_BYTES);
+		skein_show_final(256, &ctx->h, n,
+				 hash_val+i*SKEIN_512_BLOCK_BYTES);
 		/* restore the counter mode key for next time */
-		memcpy(ctx->X, X, sizeof(X));
+		memcpy(ctx->x, x, sizeof(x));
 	}
 	return SKEIN_SUCCESS;
 }
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* just do the OUTPUT stage                                       */
-int Skein1024_Output(struct skein1024_ctx *ctx, u8 *hashVal)
+int skein_1024_output(struct skein_1024_ctx *ctx, u8 *hash_val)
 {
-	size_t i, n, byteCnt;
-	u64 X[SKEIN1024_STATE_WORDS];
+	size_t i, n, byte_cnt;
+	u64 x[SKEIN_1024_STATE_WORDS];
 	/* catch uninitialized context */
-	Skein_Assert(ctx->h.bCnt <= SKEIN1024_BLOCK_BYTES, SKEIN_FAIL);
+	skein_assert_ret(ctx->h.b_cnt <= SKEIN_1024_BLOCK_BYTES, SKEIN_FAIL);
 
 	/* now output the result */
 	/* total number of output bytes */
-	byteCnt = (ctx->h.hashBitLen + 7) >> 3;
+	byte_cnt = (ctx->h.hash_bit_len + 7) >> 3;
 
 	/* run Threefish in "counter mode" to generate output */
 	/* zero out b[], so it can hold the counter */
 	memset(ctx->b, 0, sizeof(ctx->b));
 	/* keep a local copy of counter mode "key" */
-	memcpy(X, ctx->X, sizeof(X));
-	for (i = 0; i*SKEIN1024_BLOCK_BYTES < byteCnt; i++) {
+	memcpy(x, ctx->x, sizeof(x));
+	for (i = 0; i*SKEIN_1024_BLOCK_BYTES < byte_cnt; i++) {
 		/* build the counter block */
-		((u64 *)ctx->b)[0] = Skein_Swap64((u64) i);
-		Skein_Start_New_Type(ctx, OUT_FINAL);
+		((u64 *)ctx->b)[0] = skein_swap64((u64) i);
+		skein_start_new_type(ctx, OUT_FINAL);
 		/* run "counter mode" */
-		Skein1024_Process_Block(ctx, ctx->b, 1, sizeof(u64));
+		skein_1024_process_block(ctx, ctx->b, 1, sizeof(u64));
 		/* number of output bytes left to go */
-		n = byteCnt - i*SKEIN1024_BLOCK_BYTES;
-		if (n >= SKEIN1024_BLOCK_BYTES)
-			n  = SKEIN1024_BLOCK_BYTES;
+		n = byte_cnt - i*SKEIN_1024_BLOCK_BYTES;
+		if (n >= SKEIN_1024_BLOCK_BYTES)
+			n  = SKEIN_1024_BLOCK_BYTES;
 		/* "output" the ctr mode bytes */
-		Skein_Put64_LSB_First(hashVal+i*SKEIN1024_BLOCK_BYTES, ctx->X,
+		skein_put64_lsb_first(hash_val+i*SKEIN_1024_BLOCK_BYTES, ctx->x,
 				      n);
-		Skein_Show_Final(256, &ctx->h, n,
-				 hashVal+i*SKEIN1024_BLOCK_BYTES);
+		skein_show_final(256, &ctx->h, n,
+				 hash_val+i*SKEIN_1024_BLOCK_BYTES);
 		/* restore the counter mode key for next time */
-		memcpy(ctx->X, X, sizeof(X));
+		memcpy(ctx->x, x, sizeof(x));
 	}
 	return SKEIN_SUCCESS;
 }

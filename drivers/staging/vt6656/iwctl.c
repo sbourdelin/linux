@@ -34,13 +34,11 @@
 #include "iwctl.h"
 #include "mac.h"
 #include "card.h"
-#include "hostap.h"
 #include "power.h"
 #include "rf.h"
 #include "iowpa.h"
 #include "wpactl.h"
 #include "control.h"
-#include "rndis.h"
 #include "baseband.h"
 
 static const long frequency_list[] = {
@@ -384,12 +382,6 @@ int iwctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 	if (pMgmt == NULL)
 		return -EFAULT;
 
-	if (pMgmt->eCurrMode == WMAC_MODE_ESS_AP && pDevice->bEnableHostapd) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"Can't set operation mode, hostapd is running\n");
-		return rc;
-	}
-
 	switch (*wmode) {
 	case IW_MODE_ADHOC:
 		if (pMgmt->eConfigMode != WMAC_CONFIG_IBSS_STA) {
@@ -409,17 +401,7 @@ int iwctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO "set mode to infrastructure\n");
 		break;
 	case IW_MODE_MASTER:
-
-		pMgmt->eConfigMode = WMAC_CONFIG_ESS_STA;
 		rc = -EOPNOTSUPP;
-		break;
-
-		if (pMgmt->eConfigMode != WMAC_CONFIG_AP) {
-			pMgmt->eConfigMode = WMAC_CONFIG_AP;
-			if (pDevice->flags & DEVICE_FLAGS_OPENED)
-				pDevice->bCommit = true;
-		}
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO "set mode to Access Point\n");
 		break;
 
 	case IW_MODE_REPEAT:

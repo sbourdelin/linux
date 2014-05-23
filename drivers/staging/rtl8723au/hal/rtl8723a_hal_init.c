@@ -339,12 +339,11 @@ int rtl8723a_FirmwareDownload(struct rtw_adapter *padapter)
 		rtStatus = _FAIL;
 		goto Exit;
 	}
-	firmware_buf = kzalloc(fw->size, GFP_KERNEL);
+	firmware_buf = kmemdup(fw->data, fw->size, GFP_KERNEL);
 	if (!firmware_buf) {
 		rtStatus = _FAIL;
 		goto Exit;
 	}
-	memcpy(firmware_buf, fw->data, fw->size);
 	buf = firmware_buf;
 	fw_size = fw->size;
 	release_firmware(fw);
@@ -1720,9 +1719,9 @@ static void Hal_EEValueCheck(u8 EEType, void *pInValue, void *pOutValue)
 		u8 *pIn, *pOut;
 		pIn = (u8 *) pInValue;
 		pOut = (u8 *) pOutValue;
-		if (*pIn >= 0 && *pIn <= 63) {
+		if (*pIn <= 63)
 			*pOut = *pIn;
-		} else {
+		else {
 			RT_TRACE(_module_hci_hal_init_c_, _drv_err_,
 				 ("EETYPE_TX_PWR, value =%d is invalid, set "
 				  "to default = 0x%x\n",
@@ -2081,18 +2080,17 @@ static void fill_txdesc_sectype(struct pkt_attrib *pattrib,
 	if ((pattrib->encrypt > 0) && !pattrib->bswenc) {
 		switch (pattrib->encrypt) {
 			/*  SEC_TYPE */
-		case _WEP40_:
-		case _WEP104_:
-		case _TKIP_:
-		case _TKIP_WTMIC_:
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104:
+		case WLAN_CIPHER_SUITE_TKIP:
 			ptxdesc->sectype = 1;
 			break;
 
-		case _AES_:
+		case WLAN_CIPHER_SUITE_CCMP:
 			ptxdesc->sectype = 3;
 			break;
 
-		case _NO_PRIVACY_:
+		case 0:
 		default:
 			break;
 		}

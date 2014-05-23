@@ -18,6 +18,7 @@
 #include <drv_types.h>
 #include <osdep_intf.h>
 #include <rtl8723a_cmd.h>
+#include <rtw_sreset.h>
 
 #ifdef CONFIG_8723AU_BT_COEXIST
 #include <rtl8723a_hal.h>
@@ -78,8 +79,10 @@ int ips_leave23a(struct rtw_adapter * padapter)
 
 		DBG_8723A_LEVEL(_drv_always_, "nolinked power save leave\n");
 
-		if (psecuritypriv->dot11PrivacyAlgrthm == _WEP40_ ||
-		    psecuritypriv->dot11PrivacyAlgrthm == _WEP104_) {
+		if (psecuritypriv->dot11PrivacyAlgrthm ==
+		    WLAN_CIPHER_SUITE_WEP40 ||
+		    psecuritypriv->dot11PrivacyAlgrthm ==
+		    WLAN_CIPHER_SUITE_WEP104) {
 			DBG_8723A("==>%s, channel(%d), processing(%x)\n",
 				  __func__, padapter->mlmeextpriv.cur_channel,
 				  pwrpriv->bips_processing);
@@ -305,7 +308,7 @@ static u8 PS_RDY_CHECK(struct rtw_adapter * padapter)
 	if (pwrpriv->bInSuspend)
 		return false;
 	if (padapter->securitypriv.dot11AuthAlgrthm == dot11AuthAlgrthm_8021X &&
-	    padapter->securitypriv.binstallGrpkey == false) {
+	    !padapter->securitypriv.binstallGrpkey) {
 		DBG_8723A("Group handshake still in progress !!!\n");
 		return false;
 	}

@@ -51,9 +51,6 @@
 //endpoint 2: read bulk
 //endpoint 3: write bulk
 
-//static int          msglevel                =MSG_LEVEL_DEBUG;
-static int          msglevel                =MSG_LEVEL_INFO;
-
 #define USB_CTL_WAIT   500 //ms
 
 #ifndef URB_ASYNC_UNLINK
@@ -64,45 +61,45 @@ static void s_nsInterruptUsbIoCompleteRead(struct urb *urb);
 static void s_nsBulkInUsbIoCompleteRead(struct urb *urb);
 static void s_nsBulkOutIoCompleteWrite(struct urb *urb);
 
-int PIPEnsControlOut(struct vnt_private *pDevice, u8 byRequest, u16 wValue,
-		u16 wIndex, u16 wLength, u8 *pbyBuffer)
+int PIPEnsControlOut(struct vnt_private *priv, u8 request, u16 value,
+		u16 index, u16 length, u8 *buffer)
 {
-	int ntStatus = 0;
+	int status = 0;
 
-	if (pDevice->Flags & fMP_DISCONNECTED)
+	if (priv->Flags & fMP_DISCONNECTED)
 		return STATUS_FAILURE;
 
-	mutex_lock(&pDevice->usb_lock);
+	mutex_lock(&priv->usb_lock);
 
-	ntStatus = usb_control_msg(pDevice->usb,
-		usb_sndctrlpipe(pDevice->usb, 0), byRequest, 0x40, wValue,
-			wIndex, pbyBuffer, wLength, USB_CTL_WAIT);
+	status = usb_control_msg(priv->usb,
+		usb_sndctrlpipe(priv->usb, 0), request, 0x40, value,
+			index, buffer, length, USB_CTL_WAIT);
 
-	mutex_unlock(&pDevice->usb_lock);
+	mutex_unlock(&priv->usb_lock);
 
-	if (ntStatus < (int)wLength)
+	if (status < (int)length)
 		return STATUS_FAILURE;
 
 	return STATUS_SUCCESS;
 }
 
-int PIPEnsControlIn(struct vnt_private *pDevice, u8 byRequest, u16 wValue,
-	u16 wIndex, u16 wLength, u8 *pbyBuffer)
+int PIPEnsControlIn(struct vnt_private *priv, u8 request, u16 value,
+		u16 index, u16 length, u8 *buffer)
 {
-	int ntStatus;
+	int status;
 
-	if (pDevice->Flags & fMP_DISCONNECTED)
+	if (priv->Flags & fMP_DISCONNECTED)
 		return STATUS_FAILURE;
 
-	mutex_lock(&pDevice->usb_lock);
+	mutex_lock(&priv->usb_lock);
 
-	ntStatus = usb_control_msg(pDevice->usb,
-		usb_rcvctrlpipe(pDevice->usb, 0), byRequest, 0xc0, wValue,
-			wIndex, pbyBuffer, wLength, USB_CTL_WAIT);
+	status = usb_control_msg(priv->usb,
+		usb_rcvctrlpipe(priv->usb, 0), request, 0xc0, value,
+			index, buffer, length, USB_CTL_WAIT);
 
-	mutex_unlock(&pDevice->usb_lock);
+	mutex_unlock(&priv->usb_lock);
 
-	if (ntStatus < (int)wLength)
+	if (status < (int)length)
 		return STATUS_FAILURE;
 
 	return STATUS_SUCCESS;
@@ -126,9 +123,6 @@ int PIPEnsInterruptRead(struct vnt_private *priv)
 {
 	int status = STATUS_FAILURE;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"---->s_nsStartInterruptUsbRead()\n");
-
 	if (priv->int_buf.in_use == true)
 		return STATUS_FAILURE;
 
@@ -145,13 +139,9 @@ int PIPEnsInterruptRead(struct vnt_private *priv)
 
 	status = usb_submit_urb(priv->pInterruptURB, GFP_ATOMIC);
 	if (status) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"Submit int URB failed %d\n", status);
+		dev_dbg(&priv->usb->dev, "Submit int URB failed %d\n", status);
 		priv->int_buf.in_use = false;
 	}
-
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-		"<----s_nsStartInterruptUsbRead Return(%x)\n", status);
 
 	return status;
 }
@@ -176,9 +166,6 @@ static void s_nsInterruptUsbIoCompleteRead(struct urb *urb)
 	struct vnt_private *priv = urb->context;
 	int status;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"---->s_nsInterruptUsbIoCompleteRead\n");
-
 	switch (urb->status) {
 	case 0:
 	case -ETIMEDOUT:
@@ -194,22 +181,17 @@ static void s_nsInterruptUsbIoCompleteRead(struct urb *urb)
 
 	status = urb->status;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-		"s_nsInterruptUsbIoCompleteRead Status %d\n", status);
-
 	if (status != STATUS_SUCCESS) {
 		priv->int_buf.in_use = false;
 
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"IntUSBIoCompleteControl STATUS = %d\n", status);
+		dev_dbg(&priv->usb->dev, "%s status = %d\n", __func__, status);
 	} else {
 		INTnsProcessData(priv);
 	}
 
 	status = usb_submit_urb(priv->pInterruptURB, GFP_ATOMIC);
 	if (status) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"Submit int URB failed %d\n", status);
+		dev_dbg(&priv->usb->dev, "Submit int URB failed %d\n", status);
 	} else {
 		priv->int_buf.in_use = true;
 	}
@@ -236,14 +218,12 @@ int PIPEnsBulkInUsbRead(struct vnt_private *priv, struct vnt_rcb *rcb)
 	int status = 0;
 	struct urb *urb;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"---->s_nsStartBulkInUsbRead\n");
-
 	if (priv->Flags & fMP_DISCONNECTED)
 		return STATUS_FAILURE;
 
 	urb = rcb->pUrb;
 	if (rcb->skb == NULL) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"rcb->skb is null\n");
+		dev_dbg(&priv->usb->dev, "rcb->skb is null\n");
 		return status;
 	}
 
@@ -257,8 +237,7 @@ int PIPEnsBulkInUsbRead(struct vnt_private *priv, struct vnt_rcb *rcb)
 
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status != 0) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				"Submit Rx URB failed %d\n", status);
+		dev_dbg(&priv->usb->dev, "Submit Rx URB failed %d\n", status);
 		return STATUS_FAILURE ;
 	}
 
@@ -290,8 +269,6 @@ static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
 	unsigned long flags;
 	int re_alloc_skb = false;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"---->s_nsBulkInUsbIoCompleteRead\n");
-
 	switch (urb->status) {
 	case 0:
 		break;
@@ -301,8 +278,7 @@ static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
 		return;
 	case -ETIMEDOUT:
 	default:
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				"BULK In failed %d\n", urb->status);
+		dev_dbg(&priv->usb->dev, "BULK In failed %d\n", urb->status);
 		break;
 	}
 
@@ -317,8 +293,9 @@ static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
 
 	rcb->Ref--;
 	if (rcb->Ref == 0) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"RxvFreeNormal %d\n",
-							priv->NumRecvFreeList);
+		dev_dbg(&priv->usb->dev,
+				"RxvFreeNormal %d\n", priv->NumRecvFreeList);
+
 		spin_lock_irqsave(&priv->lock, flags);
 
 		RXvFreeRCB(rcb, re_alloc_skb);
@@ -351,8 +328,6 @@ int PIPEnsSendBulkOut(struct vnt_private *priv,
 
 	priv->bPWBitOn = false;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"s_nsSendBulkOut\n");
-
 	if (!(MP_IS_READY(priv) && priv->Flags & fMP_POST_WRITES)) {
 		context->in_use = false;
 		return STATUS_RESOURCES;
@@ -370,8 +345,8 @@ int PIPEnsSendBulkOut(struct vnt_private *priv,
 
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status != 0) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				"Submit Tx URB failed %d\n", status);
+		dev_dbg(&priv->usb->dev, "Submit Tx URB failed %d\n", status);
+
 		context->in_use = false;
 		return STATUS_FAILURE;
 	}
@@ -413,12 +388,9 @@ static void s_nsBulkOutIoCompleteWrite(struct urb *urb)
 	struct vnt_private *priv = context->priv;
 	u8 context_type = context->type;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"---->s_nsBulkOutIoCompleteWrite\n");
-
 	switch (urb->status) {
 	case 0:
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"Write %d bytes\n", context->buf_len);
+		dev_dbg(&priv->usb->dev, "Write %d bytes\n", context->buf_len);
 		break;
 	case -ECONNRESET:
 	case -ENOENT:
@@ -427,8 +399,7 @@ static void s_nsBulkOutIoCompleteWrite(struct urb *urb)
 		return;
 	case -ETIMEDOUT:
 	default:
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				"BULK Out failed %d\n", urb->status);
+		dev_dbg(&priv->usb->dev, "BULK Out failed %d\n", urb->status);
 		break;
 	}
 
@@ -439,8 +410,8 @@ static void s_nsBulkOutIoCompleteWrite(struct urb *urb)
 		if (context->skb != NULL) {
 			dev_kfree_skb_irq(context->skb);
 			context->skb = NULL;
-			DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				"tx  %d bytes\n", context->buf_len);
+			dev_dbg(&priv->usb->dev,
+					"tx  %d bytes\n", context->buf_len);
 		}
 
 		priv->dev->trans_start = jiffies;

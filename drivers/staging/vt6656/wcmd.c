@@ -51,7 +51,6 @@
 #include "control.h"
 #include "rxtx.h"
 #include "rf.h"
-#include "rndis.h"
 #include "channel.h"
 #include "iowpa.h"
 
@@ -345,11 +344,10 @@ void vRunCommand(struct work_struct *work)
 			CARDbSetMediaChannel(pDevice, pMgmt->uScanChannel);
 			// Set Baseband to be more sensitive.
 
-			if (pDevice->bUpdateBBVGA) {
-				BBvSetShortSlotTime(pDevice);
-				BBvSetVGAGainOffset(pDevice, pDevice->abyBBVGA[0]);
-				BBvUpdatePreEDThreshold(pDevice, true);
-			}
+			BBvSetShortSlotTime(pDevice);
+			BBvSetVGAGainOffset(pDevice, pDevice->abyBBVGA[0]);
+			BBvUpdatePreEDThreshold(pDevice, true);
+
 			pMgmt->uScanChannel++;
 
 			while (!ChannelValid(pDevice->byZoneType, pMgmt->uScanChannel) &&
@@ -382,11 +380,9 @@ void vRunCommand(struct work_struct *work)
 			CARDvSetBSSMode(pDevice);
 		}
 
-		if (pDevice->bUpdateBBVGA) {
-			BBvSetShortSlotTime(pDevice);
-			BBvSetVGAGainOffset(pDevice, pDevice->byBBVGACurrent);
-			BBvUpdatePreEDThreshold(pDevice, false);
-		}
+		BBvSetShortSlotTime(pDevice);
+		BBvSetVGAGainOffset(pDevice, pDevice->byBBVGACurrent);
+		BBvUpdatePreEDThreshold(pDevice, false);
 
 		// Set channel back
 		vAdHocBeaconRestart(pDevice);
@@ -631,10 +627,9 @@ void vRunCommand(struct work_struct *work)
 			pMgmt->eCurrMode = WMAC_MODE_STANDBY;
 			pDevice->bLinkPass = false;
 			ControlvMaskByte(pDevice, MESSAGE_REQUEST_MACREG, MAC_REG_PAPEDELAY, LEDSTS_STS, LEDSTS_SLOW);
-			if (pDevice->bEnableHostWEP == true)
-				BSSvClearNodeDBTable(pDevice, 1);
-			else
-				BSSvClearNodeDBTable(pDevice, 0);
+
+			BSSvClearNodeDBTable(pDevice, 0);
+
 			pDevice->uAssocCount = 0;
 			pMgmt->eCurrState = WMAC_STATE_IDLE;
 			pDevice->bFixRate = false;

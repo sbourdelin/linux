@@ -19,6 +19,7 @@
 #include <recv_osdep.h>
 #include <mlme_osdep.h>
 #include <rtl8723a_cmd.h>
+#include <rtw_sreset.h>
 
 #ifdef CONFIG_8723AU_BT_COEXIST
 #include <rtl8723a_hal.h>
@@ -476,11 +477,11 @@ int rtw_joinbss_cmd23a(struct rtw_adapter *padapter,
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	struct registry_priv *pregistrypriv = &padapter->registrypriv;
 	struct ht_priv *phtpriv = &pmlmepriv->htpriv;
-	enum ndis_802_11_net_infra ndis_network_mode;
+	enum nl80211_iftype ifmode;
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
-	ndis_network_mode = pnetwork->network.InfrastructureMode;
+	ifmode = pnetwork->network.ifmode;
 
 	rtw_led_control(padapter, LED_CTL_START_TO_LINK);
 
@@ -504,16 +505,15 @@ int rtw_joinbss_cmd23a(struct rtw_adapter *padapter,
 
 	/* for hidden ap to set fw_state here */
 	if (!check_fwstate(pmlmepriv, WIFI_STATION_STATE|WIFI_ADHOC_STATE)) {
-		switch (ndis_network_mode) {
-		case Ndis802_11IBSS:
+		switch (ifmode) {
+		case NL80211_IFTYPE_ADHOC:
 			set_fwstate(pmlmepriv, WIFI_ADHOC_STATE);
 			break;
-		case Ndis802_11Infrastructure:
+		case NL80211_IFTYPE_P2P_CLIENT:
+		case NL80211_IFTYPE_STATION:
 			set_fwstate(pmlmepriv, WIFI_STATION_STATE);
 			break;
-		case Ndis802_11APMode:
-		case Ndis802_11AutoUnknown:
-		case Ndis802_11InfrastructureMax:
+		default:
 			break;
 		}
 	}
@@ -587,13 +587,14 @@ int rtw_joinbss_cmd23a(struct rtw_adapter *padapter,
 
 	phtpriv->ht_option = false;
 	if (pregistrypriv->ht_enable) {
+		u32 algo = padapter->securitypriv.dot11PrivacyAlgrthm;
 		/*	Added by Albert 2010/06/23 */
 		/*	For the WEP mode, we will use the bg mode to do
 			the connection to avoid some IOT issue. */
 		/*	Especially for Realtek 8192u SoftAP. */
-		if ((padapter->securitypriv.dot11PrivacyAlgrthm != _WEP40_) &&
-		    (padapter->securitypriv.dot11PrivacyAlgrthm != _WEP104_) &&
-		    (padapter->securitypriv.dot11PrivacyAlgrthm != _TKIP_)) {
+		if (algo != WLAN_CIPHER_SUITE_WEP40 &&
+		    algo != WLAN_CIPHER_SUITE_WEP104 &&
+		    algo != WLAN_CIPHER_SUITE_TKIP) {
 			/* rtw_restructure_ht_ie23a */
 			rtw_restructure_ht_ie23a(padapter,
 						 &pnetwork->network.IEs[0],
@@ -672,7 +673,7 @@ exit:
 }
 
 int rtw_setopmode_cmd23a(struct rtw_adapter *padapter,
-			 enum ndis_802_11_net_infra networktype)
+			 enum nl80211_iftype ifmode)
 {
 	struct	cmd_obj *ph2c;
 	struct	setopmode_parm *psetop;
@@ -693,7 +694,7 @@ int rtw_setopmode_cmd23a(struct rtw_adapter *padapter,
 	}
 
 	init_h2fwcmd_w_parm_no_rsp(ph2c, psetop, _SetOpMode_CMD_);
-	psetop->mode = (u8)networktype;
+	psetop->mode = ifmode;
 
 	res = rtw_enqueue_cmd23a(pcmdpriv, ph2c);
 exit:
@@ -755,7 +756,7 @@ int rtw_setstakey_cmd23a(struct rtw_adapter *padapter, u8 *psta, u8 unicast_key)
         }
 
 	/* jeff: set this becasue at least sw key is ready */
-	padapter->securitypriv.busetkipkey = true;
+	padapter->securitypriv.busetkipkey = 1;
 
 	res = rtw_enqueue_cmd23a(pcmdpriv, ph2c);
 
@@ -807,7 +808,7 @@ int rtw_clearstakey_cmd23a(struct rtw_adapter *padapter, u8 *psta, u8 entry,
 
 		ether_addr_copy(psetstakey_para->addr, sta->hwaddr);
 
-		psetstakey_para->algorithm = _NO_PRIVACY_;
+		psetstakey_para->algorithm = 0;
 
 		psetstakey_para->id = entry;
 

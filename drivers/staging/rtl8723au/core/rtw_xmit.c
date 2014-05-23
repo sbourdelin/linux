@@ -296,9 +296,10 @@ static void update_attrib_vcs_info(struct rtw_adapter *padapter, struct xmit_fra
 	} else {
 		while (true) {
 			/* IOT action */
-			if ((pmlmeinfo->assoc_AP_vendor == HT_IOT_PEER_ATHEROS) &&
-			    (pattrib->ampdu_en) &&
-			    (padapter->securitypriv.dot11PrivacyAlgrthm == _AES_)) {
+			if (pmlmeinfo->assoc_AP_vendor == HT_IOT_PEER_ATHEROS &&
+			    pattrib->ampdu_en &&
+			    padapter->securitypriv.dot11PrivacyAlgrthm ==
+			    WLAN_CIPHER_SUITE_CCMP) {
 				pattrib->vcs_mode = CTS_TO_SELF;
 				break;
 			}
@@ -421,7 +422,7 @@ static void set_qos(struct sk_buff *skb, struct pkt_attrib *pattrib)
 
 	pattrib->priority = UserPriority;
 	pattrib->hdrlen = sizeof(struct ieee80211_qos_hdr);
-	pattrib->subtype = WIFI_QOS_DATA_TYPE;
+	pattrib->type = IEEE80211_FTYPE_DATA | IEEE80211_STYPE_QOS_DATA;
 }
 
 static int update_attrib(struct rtw_adapter *padapter,
@@ -536,7 +537,7 @@ static int update_attrib(struct rtw_adapter *padapter,
 	pattrib->pkt_hdrlen = ETH_HLEN;
 
 	pattrib->hdrlen = sizeof(struct ieee80211_hdr_3addr);
-	pattrib->subtype = WIFI_DATA_TYPE;
+	pattrib->type = IEEE80211_FTYPE_DATA;
 	pattrib->priority = 0;
 
 	if (check_fwstate(pmlmepriv, WIFI_AP_STATE | WIFI_ADHOC_STATE |
@@ -594,29 +595,30 @@ static int update_attrib(struct rtw_adapter *padapter,
 	}
 
 	switch (pattrib->encrypt) {
-	case _WEP40_:
-	case _WEP104_:
+	case WLAN_CIPHER_SUITE_WEP40:
+	case WLAN_CIPHER_SUITE_WEP104:
 		pattrib->iv_len = 4;
 		pattrib->icv_len = 4;
 		break;
 
-	case _TKIP_:
+	case WLAN_CIPHER_SUITE_TKIP:
 		pattrib->iv_len = 8;
 		pattrib->icv_len = 4;
 
-		if (padapter->securitypriv.busetkipkey == _FAIL) {
+		if (!padapter->securitypriv.busetkipkey) {
 			RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_,
 				 ("\npadapter->securitypriv.busetkip"
-				  "key(%d) == _FAIL drop packet\n",
+				  "key(%d) == false drop packet\n",
 				  padapter->securitypriv.busetkipkey));
 			res = _FAIL;
 			goto exit;
 		}
 
 		break;
-	case _AES_:
+	case WLAN_CIPHER_SUITE_CCMP:
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_info_,
-			 ("pattrib->encrypt =%d (_AES_)\n", pattrib->encrypt));
+			 ("pattrib->encrypt =%d (WLAN_CIPHER_SUITE_CCMP)\n",
+			  pattrib->encrypt));
 		pattrib->iv_len = 8;
 		pattrib->icv_len = 8;
 		break;
@@ -630,7 +632,7 @@ static int update_attrib(struct rtw_adapter *padapter,
 	RT_TRACE(_module_rtl871x_xmit_c_, _drv_info_,
 		 ("update_attrib: encrypt =%d\n", pattrib->encrypt));
 
-	if (pattrib->encrypt && psecuritypriv->hw_decrypted == false) {
+	if (pattrib->encrypt && !psecuritypriv->hw_decrypted) {
 		pattrib->bswenc = true;
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_,
 			 ("update_attrib: encrypt =%d bswenc = true\n",
@@ -680,7 +682,7 @@ static int xmitframe_addmic(struct rtw_adapter *padapter,
 
 	hw_hdr_offset = TXDESC_OFFSET;
 
-	if (pattrib->encrypt == _TKIP_) {
+	if (pattrib->encrypt == WLAN_CIPHER_SUITE_TKIP) {
 		/* encode mic code */
 		if (stainfo) {
 			u8 null_key[16]={0x0, 0x0, 0x0, 0x0,
@@ -834,14 +836,14 @@ static int xmitframe_swencrypt(struct rtw_adapter *padapter,
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_alert_,
 			 ("### xmitframe_swencrypt\n"));
 		switch (pattrib->encrypt) {
-		case _WEP40_:
-		case _WEP104_:
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104:
 			rtw_wep_encrypt23a(padapter, pxmitframe);
 			break;
-		case _TKIP_:
+		case WLAN_CIPHER_SUITE_TKIP:
 			rtw_tkip_encrypt23a(padapter, pxmitframe);
 			break;
-		case _AES_:
+		case WLAN_CIPHER_SUITE_CCMP:
 			rtw_aes_encrypt23a(padapter, pxmitframe);
 			break;
 		default:
@@ -856,16 +858,14 @@ static int xmitframe_swencrypt(struct rtw_adapter *padapter,
 	return _SUCCESS;
 }
 
-int rtw_make_wlanhdr23a(struct rtw_adapter *padapter, u8 *hdr,
-		        struct pkt_attrib *pattrib)
+static int rtw_make_wlanhdr(struct rtw_adapter *padapter, u8 *hdr,
+			    struct pkt_attrib *pattrib)
 {
-	u16 *qc;
-
 	struct ieee80211_hdr *pwlanhdr = (struct ieee80211_hdr *)hdr;
+	struct ieee80211_qos_hdr *qoshdr;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	u8 qos_option = false;
 	int res = _SUCCESS;
-	__le16 *fctrl = &pwlanhdr->frame_control;
 
 	struct sta_info *psta;
 
@@ -894,13 +894,14 @@ int rtw_make_wlanhdr23a(struct rtw_adapter *padapter, u8 *hdr,
 
 	memset(hdr, 0, WLANHDR_OFFSET);
 
-	SetFrameSubType(fctrl, pattrib->subtype);
+	pwlanhdr->frame_control = cpu_to_le16(pattrib->type);
 
-	if (pattrib->subtype & WIFI_DATA_TYPE) {
+	if (pattrib->type & IEEE80211_FTYPE_DATA) {
 		if ((check_fwstate(pmlmepriv,  WIFI_STATION_STATE) == true)) {
 			/* to_ds = 1, fr_ds = 0; */
 			/* Data transfer to AP */
-			SetToDs(fctrl);
+			pwlanhdr->frame_control |=
+				cpu_to_le16(IEEE80211_FCTL_TODS);
 			memcpy(pwlanhdr->addr1, get_bssid(pmlmepriv), ETH_ALEN);
 			memcpy(pwlanhdr->addr2, pattrib->src, ETH_ALEN);
 			memcpy(pwlanhdr->addr3, pattrib->dst, ETH_ALEN);
@@ -911,7 +912,8 @@ int rtw_make_wlanhdr23a(struct rtw_adapter *padapter, u8 *hdr,
 		}
 		else if ((check_fwstate(pmlmepriv,  WIFI_AP_STATE) == true)) {
 			/* to_ds = 0, fr_ds = 1; */
-			SetFrDs(fctrl);
+			pwlanhdr->frame_control |=
+				cpu_to_le16(IEEE80211_FCTL_FROMDS);
 			memcpy(pwlanhdr->addr1, pattrib->dst, ETH_ALEN);
 			memcpy(pwlanhdr->addr2, get_bssid(pmlmepriv), ETH_ALEN);
 			memcpy(pwlanhdr->addr3, pattrib->src, ETH_ALEN);
@@ -934,15 +936,24 @@ int rtw_make_wlanhdr23a(struct rtw_adapter *padapter, u8 *hdr,
 			goto exit;
 		}
 		if (pattrib->mdata)
-			SetMData(fctrl);
+			pwlanhdr->frame_control |=
+				cpu_to_le16(IEEE80211_FCTL_MOREDATA);
 		if (pattrib->encrypt)
-			SetPrivacy(fctrl);
+			pwlanhdr->frame_control |=
+				cpu_to_le16(IEEE80211_FCTL_PROTECTED);
 		if (qos_option) {
-			qc = (unsigned short *)(hdr + pattrib->hdrlen - 2);
-			if (pattrib->priority)
-				SetPriority(qc, pattrib->priority);
-			SetEOSP(qc, pattrib->eosp);
-			SetAckpolicy(qc, pattrib->ack_policy);
+			qoshdr = (struct ieee80211_qos_hdr *)hdr;
+
+			qoshdr->qos_ctrl = cpu_to_le16(
+				pattrib->priority & IEEE80211_QOS_CTL_TID_MASK);
+
+			qoshdr->qos_ctrl |= cpu_to_le16(
+				(pattrib->ack_policy << 5) &
+				IEEE80211_QOS_CTL_ACK_POLICY_MASK);
+
+			if (pattrib->eosp)
+				qoshdr->qos_ctrl |=
+					cpu_to_le16(IEEE80211_QOS_CTL_EOSP);
 		}
 		/* TODO: fill HT Control Field */
 
@@ -951,7 +962,9 @@ int rtw_make_wlanhdr23a(struct rtw_adapter *padapter, u8 *hdr,
 			psta->sta_xmitpriv.txseq_tid[pattrib->priority]++;
 			psta->sta_xmitpriv.txseq_tid[pattrib->priority] &= 0xFFF;
 			pattrib->seqnum = psta->sta_xmitpriv.txseq_tid[pattrib->priority];
-			SetSeqNum(hdr, pattrib->seqnum);
+			/* We dont need to worry about frag bits here */
+			pwlanhdr->seq_ctrl = cpu_to_le16(IEEE80211_SN_TO_SEQ(
+							      pattrib->seqnum));
 			/* check if enable ampdu */
 			if (pattrib->ht_en && psta->htpriv.ampdu_enable) {
 				if (pattrib->priority >= 16)
@@ -1052,7 +1065,7 @@ u32 rtw_calculate_wlan_pkt_size_by_attribue23a(struct pkt_attrib *pattrib)
 	len = pattrib->hdrlen + pattrib->iv_len; /*  WLAN Header and IV */
 	len += SNAP_SIZE + sizeof(u16); /*  LLC */
 	len += pattrib->pktlen;
-	if (pattrib->encrypt == _TKIP_) len += 8; /*  MIC */
+	if (pattrib->encrypt == WLAN_CIPHER_SUITE_TKIP) len += 8; /*  MIC */
 	len += ((pattrib->bswenc) ? pattrib->icv_len : 0); /*  ICV */
 
 	return len;
@@ -1076,6 +1089,7 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 	struct sta_info *psta;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct pkt_attrib *pattrib = &pxmitframe->attrib;
+	struct ieee80211_hdr *hdr;
 	s32 frg_inx, frg_len, mpdu_len, llc_sz, mem_sz;
 	u8 *pframe, *mem_start;
 	u8 hw_hdr_offset;
@@ -1114,10 +1128,9 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 
 	mem_start = pbuf_start + hw_hdr_offset;
 
-	if (rtw_make_wlanhdr23a(padapter, mem_start, pattrib) == _FAIL) {
+	if (rtw_make_wlanhdr(padapter, mem_start, pattrib) == _FAIL) {
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_,
-			 ("rtw_xmitframe_coalesce23a: rtw_make_wlanhdr23a "
-			  "fail; drop pkt\n"));
+			 ("%s: rtw_make_wlanhdr fail; drop pkt\n", __func__));
 		res = _FAIL;
 		goto exit;
 	}
@@ -1134,8 +1147,7 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 		mpdu_len = frg_len;
 
 		pframe = mem_start;
-
-		SetMFrag(mem_start);
+		hdr = (struct ieee80211_hdr *)mem_start;
 
 		pframe += pattrib->hdrlen;
 		mpdu_len -= pattrib->hdrlen;
@@ -1144,12 +1156,12 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 		if (pattrib->iv_len) {
 			if (psta) {
 				switch (pattrib->encrypt) {
-				case _WEP40_:
-				case _WEP104_:
+				case WLAN_CIPHER_SUITE_WEP40:
+				case WLAN_CIPHER_SUITE_WEP104:
 					WEP_IV(pattrib->iv, psta->dot11txpn,
 					       pattrib->key_idx);
 					break;
-				case _TKIP_:
+				case WLAN_CIPHER_SUITE_TKIP:
 					if (bmcst)
 						TKIP_IV(pattrib->iv,
 							psta->dot11txpn,
@@ -1158,7 +1170,7 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 						TKIP_IV(pattrib->iv,
 							psta->dot11txpn, 0);
 					break;
-				case _AES_:
+				case WLAN_CIPHER_SUITE_CCMP:
 					if (bmcst)
 						AES_IV(pattrib->iv,
 						       psta->dot11txpn,
@@ -1218,8 +1230,8 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 						llc_sz : 0) +
 						((pattrib->bswenc) ?
 						pattrib->icv_len : 0) + mem_sz;
-
-			ClearMFrag(mem_start);
+			hdr->frame_control &=
+				~cpu_to_le16(IEEE80211_FCTL_MOREFRAGS);
 
 			break;
 		} else {
@@ -1227,6 +1239,7 @@ int rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *skb,
 				 ("%s: There're still something in packet!\n",
 				  __func__));
 		}
+		hdr->frame_control |= cpu_to_le16(IEEE80211_FCTL_MOREFRAGS);
 
 		mem_start = PTR_ALIGN(pframe, 4) + hw_hdr_offset;
 		memcpy(mem_start, pbuf_start + hw_hdr_offset, pattrib->hdrlen);
