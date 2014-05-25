@@ -4735,10 +4735,9 @@ static void bp_tpl_timer_fn(unsigned long param)
 
 static void remove_bypass_tpl_auto(struct bpctl_dev *pbpctl_dev)
 {
-	struct bpctl_dev *pbpctl_dev_b = NULL;
+	struct bpctl_dev *pbpctl_dev_b;
 	if (!pbpctl_dev)
 		return;
-	pbpctl_dev_b = get_status_port_fn(pbpctl_dev);
 
 	if (pbpctl_dev->bp_caps & TPL_CAP) {
 		del_timer_sync(&pbpctl_dev->bp_tpl_timer);
@@ -4785,11 +4784,9 @@ static int set_bypass_tpl_auto(struct bpctl_dev *pbpctl_dev, unsigned int param)
 static int set_tpl_fn(struct bpctl_dev *pbpctl_dev, int tpl_mode)
 {
 
-	struct bpctl_dev *pbpctl_dev_b = NULL;
+	struct bpctl_dev *pbpctl_dev_b;
 	if (!pbpctl_dev)
 		return -1;
-
-	pbpctl_dev_b = get_status_port_fn(pbpctl_dev);
 
 	if (pbpctl_dev->bp_caps & TPL_CAP) {
 		if (tpl_mode) {
@@ -6371,33 +6368,26 @@ static int __init bypass_init_module(void)
 
 	sema_init(&bpctl_sema, 1);
 	spin_lock_init(&bpvm_lock);
-	{
 
-		struct bpctl_dev *pbpctl_dev_c = NULL;
-		for (idx_dev = 0, dev = bpctl_dev_arr;
-		     idx_dev < device_num && dev->pdev;
-		     idx_dev++, dev++) {
-			if (dev->bp_10g9) {
-				pbpctl_dev_c = get_status_port_fn(dev);
-				if (is_bypass_fn(dev)) {
-					printk(KERN_INFO "%s found, ",
-					       dev->name);
-					dev->bp_fw_ver = bypass_fw_ver(dev);
-					printk("firmware version: 0x%x\n",
-					       dev->bp_fw_ver);
-				}
-				dev->wdt_status = WDT_STATUS_UNKNOWN;
-				dev->reset_time = 0;
-				atomic_set(&dev->wdt_busy, 0);
-				dev->bp_status_un = 1;
-
-				bypass_caps_init(dev);
-
-				init_bypass_wd_auto(dev);
-				init_bypass_tpl_auto(dev);
-
+	for (idx_dev = 0, dev = bpctl_dev_arr;
+	     idx_dev < device_num && dev->pdev;
+	     idx_dev++, dev++) {
+		if (dev->bp_10g9) {
+			if (is_bypass_fn(dev)) {
+				printk(KERN_INFO "%s found, ", dev->name);
+				dev->bp_fw_ver = bypass_fw_ver(dev);
+				printk("firmware version: 0x%x\n",
+				       dev->bp_fw_ver);
 			}
+			dev->wdt_status = WDT_STATUS_UNKNOWN;
+			dev->reset_time = 0;
+			atomic_set(&dev->wdt_busy, 0);
+			dev->bp_status_un = 1;
 
+			bypass_caps_init(dev);
+
+			init_bypass_wd_auto(dev);
+			init_bypass_tpl_auto(dev);
 		}
 	}
 
@@ -7448,8 +7438,8 @@ static int bypass_proc_create_dev_sd(struct bpctl_dev *pbp_device_block)
 
 static int bypass_proc_remove_dev_sd(struct bpctl_dev *pbp_device_block)
 {
-
 	struct bypass_pfs_sd *current_pfs = &pbp_device_block->bypass_pfs_set;
+
 	remove_proc_subtree(current_pfs->dir_name, bp_procfs_dir);
 	current_pfs->bypass_entry = NULL;
 	return 0;

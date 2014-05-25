@@ -8,38 +8,70 @@
 
 #include "addi-data/hwdrv_apci1564.c"
 
-static const struct addi_board apci1564_boardtypes[] = {
-	{
-		.pc_DriverName		= "apci1564",
-		.i_NbrDiChannel		= 32,
-		.i_NbrDoChannel		= 32,
-		.i_DoMaxdata		= 0xffffffff,
-		.i_Timer		= 1,
-		.interrupt		= apci1564_interrupt,
-		.reset			= apci1564_reset,
-		.do_config		= apci1564_do_config,
-		.do_bits		= apci1564_do_insn_bits,
-		.do_read		= apci1564_do_read,
-		.timer_config		= apci1564_timer_config,
-		.timer_write		= apci1564_timer_write,
-		.timer_read		= apci1564_timer_read,
-	},
-};
-
 static irqreturn_t v_ADDI_Interrupt(int irq, void *d)
 {
-	struct comedi_device *dev = d;
-	const struct addi_board *this_board = comedi_board(dev);
-
-	this_board->interrupt(irq, d);
+	apci1564_interrupt(irq, d);
 	return IRQ_RETVAL(1);
 }
 
-static int i_ADDI_Reset(struct comedi_device *dev)
+static int apci1564_di_insn_bits(struct comedi_device *dev,
+				 struct comedi_subdevice *s,
+				 struct comedi_insn *insn,
+				 unsigned int *data)
 {
-	const struct addi_board *this_board = comedi_board(dev);
+	struct addi_private *devpriv = dev->private;
 
-	this_board->reset(dev);
+	data[1] = inl(devpriv->i_IobaseAmcc + APCI1564_DI_REG);
+
+	return insn->n;
+}
+
+static int apci1564_do_insn_bits(struct comedi_device *dev,
+				 struct comedi_subdevice *s,
+				 struct comedi_insn *insn,
+				 unsigned int *data)
+{
+	struct addi_private *devpriv = dev->private;
+
+	s->state = inl(devpriv->i_IobaseAmcc + APCI1564_DO_REG);
+
+	if (comedi_dio_update_state(s, data))
+		outl(s->state, devpriv->i_IobaseAmcc + APCI1564_DO_REG);
+
+	data[1] = s->state;
+
+	return insn->n;
+}
+
+static int apci1564_reset(struct comedi_device *dev)
+{
+	struct addi_private *devpriv = dev->private;
+
+	ui_Type = 0;
+
+	/* Disable the input interrupts and reset status register */
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_DI_IRQ_REG);
+	inl(devpriv->i_IobaseAmcc + APCI1564_DI_INT_STATUS_REG);
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_DI_INT_MODE1_REG);
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_DI_INT_MODE2_REG);
+
+	/* Reset the output channels and disable interrupts */
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_DO_REG);
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_DO_INT_CTRL_REG);
+
+	/* Reset the watchdog registers */
+	addi_watchdog_reset(devpriv->i_IobaseAmcc + APCI1564_WDOG_REG);
+
+	/* Reset the timer registers */
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_TIMER_CTRL_REG);
+	outl(0x0, devpriv->i_IobaseAmcc + APCI1564_TIMER_RELOAD_REG);
+
+	/* Reset the counter registers */
+	outl(0x0, dev->iobase + APCI1564_TCW_CTRL_REG(APCI1564_COUNTER1));
+	outl(0x0, dev->iobase + APCI1564_TCW_CTRL_REG(APCI1564_COUNTER2));
+	outl(0x0, dev->iobase + APCI1564_TCW_CTRL_REG(APCI1564_COUNTER3));
+	outl(0x0, dev->iobase + APCI1564_TCW_CTRL_REG(APCI1564_COUNTER4));
+
 	return 0;
 }
 
@@ -47,12 +79,11 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 				      unsigned long context_unused)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
-	const struct addi_board *this_board = comedi_board(dev);
 	struct addi_private *devpriv;
 	struct comedi_subdevice *s;
-	int ret, n_subdevices;
+	int ret;
 
-	dev->board_name = this_board->pc_DriverName;
+	dev->board_name = dev->driver->driver_name;
 
 	devpriv = comedi_alloc_devpriv(dev, sizeof(*devpriv));
 	if (!devpriv)
@@ -65,6 +96,8 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 	dev->iobase = pci_resource_start(pcidev, 1);
 	devpriv->i_IobaseAmcc = pci_resource_start(pcidev, 0);
 
+	apci1564_reset(dev);
+
 	if (pcidev->irq > 0) {
 		ret = request_irq(pcidev->irq, v_ADDI_Interrupt, IRQF_SHARED,
 				  dev->board_name, dev);
@@ -72,21 +105,12 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 			dev->irq = pcidev->irq;
 	}
 
-	n_subdevices = 7;
-	ret = comedi_alloc_subdevices(dev, n_subdevices);
+	ret = comedi_alloc_subdevices(dev, 3);
 	if (ret)
 		return ret;
 
-	/*  Allocate and Initialise AI Subdevice Structures */
-	s = &dev->subdevices[0];
-	s->type = COMEDI_SUBD_UNUSED;
-
-	/*  Allocate and Initialise AO Subdevice Structures */
-	s = &dev->subdevices[1];
-	s->type = COMEDI_SUBD_UNUSED;
-
 	/*  Allocate and Initialise DI Subdevice Structures */
-	s = &dev->subdevices[2];
+	s = &dev->subdevices[0];
 	s->type = COMEDI_SUBD_DI;
 	s->subdev_flags = SDF_READABLE;
 	s->n_chan = 32;
@@ -97,52 +121,29 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 	s->insn_bits = apci1564_di_insn_bits;
 
 	/*  Allocate and Initialise DO Subdevice Structures */
-	s = &dev->subdevices[3];
-	if (this_board->i_NbrDoChannel) {
-		s->type = COMEDI_SUBD_DO;
-		s->subdev_flags =
-			SDF_READABLE | SDF_WRITEABLE | SDF_GROUND | SDF_COMMON;
-		s->n_chan = this_board->i_NbrDoChannel;
-		s->maxdata = this_board->i_DoMaxdata;
-		s->len_chanlist = this_board->i_NbrDoChannel;
-		s->range_table = &range_digital;
-
-		/* insn_config - for digital output memory */
-		s->insn_config = this_board->do_config;
-		s->insn_write = this_board->do_write;
-		s->insn_bits = this_board->do_bits;
-		s->insn_read = this_board->do_read;
-	} else {
-		s->type = COMEDI_SUBD_UNUSED;
-	}
+	s = &dev->subdevices[1];
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITEABLE;
+	s->n_chan = 32;
+	s->maxdata = 0xffffffff;
+	s->len_chanlist = 32;
+	s->range_table = &range_digital;
+	s->insn_config = apci1564_do_config;
+	s->insn_bits = apci1564_do_insn_bits;
+	s->insn_read = apci1564_do_read;
 
 	/*  Allocate and Initialise Timer Subdevice Structures */
-	s = &dev->subdevices[4];
-	if (this_board->i_Timer) {
-		s->type = COMEDI_SUBD_TIMER;
-		s->subdev_flags = SDF_WRITEABLE | SDF_GROUND | SDF_COMMON;
-		s->n_chan = 1;
-		s->maxdata = 0;
-		s->len_chanlist = 1;
-		s->range_table = &range_digital;
+	s = &dev->subdevices[2];
+	s->type = COMEDI_SUBD_TIMER;
+	s->subdev_flags = SDF_WRITEABLE;
+	s->n_chan = 1;
+	s->maxdata = 0;
+	s->len_chanlist = 1;
+	s->range_table = &range_digital;
+	s->insn_write = apci1564_timer_write;
+	s->insn_read = apci1564_timer_read;
+	s->insn_config = apci1564_timer_config;
 
-		s->insn_write = this_board->timer_write;
-		s->insn_read = this_board->timer_read;
-		s->insn_config = this_board->timer_config;
-		s->insn_bits = this_board->timer_bits;
-	} else {
-		s->type = COMEDI_SUBD_UNUSED;
-	}
-
-	/*  Allocate and Initialise TTL */
-	s = &dev->subdevices[5];
-	s->type = COMEDI_SUBD_UNUSED;
-
-	/* EEPROM */
-	s = &dev->subdevices[6];
-	s->type = COMEDI_SUBD_UNUSED;
-
-	i_ADDI_Reset(dev);
 	return 0;
 }
 
@@ -152,7 +153,7 @@ static void apci1564_detach(struct comedi_device *dev)
 
 	if (devpriv) {
 		if (dev->iobase)
-			i_ADDI_Reset(dev);
+			apci1564_reset(dev);
 		if (dev->irq)
 			free_irq(dev->irq, dev);
 	}

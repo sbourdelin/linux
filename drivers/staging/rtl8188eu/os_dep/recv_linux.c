@@ -28,13 +28,6 @@
 #include <osdep_intf.h>
 #include <usb_ops.h>
 
-/* init os related resource in struct recv_priv */
-int rtw_os_recv_resource_init(struct recv_priv *precvpriv,
-			      struct adapter *padapter)
-{
-	return _SUCCESS;
-}
-
 /* alloc os related resource in struct recv_frame */
 int rtw_os_recv_resource_alloc(struct adapter *padapter,
 			       struct recv_frame *precvframe)
@@ -42,11 +35,6 @@ int rtw_os_recv_resource_alloc(struct adapter *padapter,
 	precvframe->pkt_newalloc = NULL;
 	precvframe->pkt = NULL;
 	return _SUCCESS;
-}
-
-/* free os related resource in struct recv_frame */
-void rtw_os_recv_resource_free(struct recv_priv *precvpriv)
-{
 }
 
 /* alloc os related resource in struct recv_buf */
@@ -61,14 +49,6 @@ int rtw_os_recvbuf_resource_alloc(struct adapter *padapter,
 	precvbuf->pskb = NULL;
 	precvbuf->reuse = false;
 	return res;
-}
-
-/* free os related resource in struct recv_buf */
-int rtw_os_recvbuf_resource_free(struct adapter *padapter,
-				 struct recv_buf *precvbuf)
-{
-	usb_free_urb(precvbuf->purb);
-	return _SUCCESS;
 }
 
 void rtw_handle_tkip_mic_err(struct adapter *padapter, u8 bgroup)
@@ -105,11 +85,6 @@ void rtw_handle_tkip_mic_err(struct adapter *padapter, u8 bgroup)
 	wrqu.data.length = sizeof(ev);
 	wireless_send_event(padapter->pnetdev, IWEVMICHAELMICFAILURE,
 			    &wrqu, (char *)&ev);
-}
-
-void rtw_hostapd_mlme_rx(struct adapter *padapter,
-			 struct recv_frame *precv_frame)
-{
 }
 
 int rtw_recv_indicatepkt(struct adapter *padapter,

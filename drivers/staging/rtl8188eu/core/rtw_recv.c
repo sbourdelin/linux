@@ -63,8 +63,6 @@ int _rtw_init_recv_priv(struct recv_priv *precvpriv, struct adapter *padapter)
 
 	int	res = _SUCCESS;
 
-	spin_lock_init(&precvpriv->lock);
-
 	_rtw_init_queue(&precvpriv->free_recv_queue);
 	_rtw_init_queue(&precvpriv->recv_pending_queue);
 	_rtw_init_queue(&precvpriv->uc_swdec_pending_queue);
@@ -72,8 +70,6 @@ int _rtw_init_recv_priv(struct recv_priv *precvpriv, struct adapter *padapter)
 	precvpriv->adapter = padapter;
 
 	precvpriv->free_recvframe_cnt = NR_RECVFRAME;
-
-	rtw_os_recv_resource_init(precvpriv, padapter);
 
 	precvpriv->pallocated_frame_buf = vzalloc(NR_RECVFRAME * sizeof(struct recv_frame) + RXFRAME_ALIGN_SZ);
 
@@ -101,8 +97,6 @@ int _rtw_init_recv_priv(struct recv_priv *precvpriv, struct adapter *padapter)
 	}
 	precvpriv->rx_pending_cnt = 1;
 
-	sema_init(&precvpriv->allrxreturnevt, 0);
-
 	res = rtw_hal_init_recv_priv(padapter);
 
 	_init_timer(&precvpriv->signal_stat_timer, padapter->pnetdev, RTW_TIMER_HDL_NAME(signal_stat), padapter);
@@ -122,8 +116,6 @@ void _rtw_free_recv_priv (struct recv_priv *precvpriv)
 
 
 	rtw_free_uc_swdec_pending_queue(padapter);
-
-	rtw_os_recv_resource_free(precvpriv);
 
 	if (precvpriv->pallocated_frame_buf) {
 		vfree(precvpriv->pallocated_frame_buf);
@@ -505,6 +497,7 @@ static struct recv_frame *portctrl(struct adapter *adapter,
 	u16	ether_type;
 	u16  eapol_type = 0x888e;/* for Funia BD's WPA issue */
 	struct rx_pkt_attrib *pattrib;
+	__be16 be_tmp;
 
 
 	pstapriv = &adapter->stapriv;
@@ -524,8 +517,8 @@ static struct recv_frame *portctrl(struct adapter *adapter,
 	if (auth_alg == 2) {
 		/* get ether_type */
 		ptr = ptr + pfhdr->attrib.hdrlen + LLC_HEADER_SIZE;
-		memcpy(&ether_type, ptr, 2);
-		ether_type = ntohs((unsigned short)ether_type);
+		memcpy(&be_tmp, ptr, 2);
+		ether_type = ntohs(be_tmp);
 
 		if ((psta != NULL) && (psta->ieee8021x_blocked)) {
 			/* blocked */
@@ -598,8 +591,8 @@ static int recv_decache(struct recv_frame *precv_frame, u8 bretry,
 	return _SUCCESS;
 }
 
-void process_pwrbit_data(struct adapter *padapter,
-			 struct recv_frame *precv_frame)
+static void process_pwrbit_data(struct adapter *padapter,
+				struct recv_frame *precv_frame)
 {
 #ifdef CONFIG_88EU_AP_MODE
 	unsigned char pwrbit;
@@ -1773,8 +1766,8 @@ static int check_indicate_seq(struct recv_reorder_ctrl *preorder_ctrl, u16 seq_n
 	return true;
 }
 
-int enqueue_reorder_recvframe(struct recv_reorder_ctrl *preorder_ctrl,
-			      struct recv_frame *prframe)
+static int enqueue_reorder_recvframe(struct recv_reorder_ctrl *preorder_ctrl,
+				     struct recv_frame *prframe)
 {
 	struct rx_pkt_attrib *pattrib = &prframe->attrib;
 	struct __queue *ppending_recvframe_queue = &preorder_ctrl->pending_recvframe_queue;

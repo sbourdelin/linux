@@ -251,7 +251,7 @@ static int resize_async_buffer(struct comedi_device *dev,
 			"subdevice is busy, cannot resize buffer\n");
 		return -EBUSY;
 	}
-	if (comedi_buf_is_mmapped(async)) {
+	if (comedi_buf_is_mmapped(s)) {
 		dev_dbg(dev->class_dev,
 			"subdevice is mmapped, cannot resize buffer\n");
 		return -EBUSY;
@@ -583,7 +583,7 @@ static void do_become_nonbusy(struct comedi_device *dev,
 
 	comedi_set_subdevice_runflags(s, SRF_RUNNING, 0);
 	if (async) {
-		comedi_buf_reset(async);
+		comedi_buf_reset(s);
 		async->inttrig = NULL;
 		kfree(async->cmd.chanlist);
 		async->cmd.chanlist = NULL;
@@ -635,7 +635,7 @@ static int is_device_busy(struct comedi_device *dev)
 		s = &dev->subdevices[i];
 		if (s->busy)
 			return 1;
-		if (s->async && comedi_buf_is_mmapped(s->async))
+		if (s->async && comedi_buf_is_mmapped(s))
 			return 1;
 	}
 
@@ -993,8 +993,8 @@ static int do_bufinfo_ioctl(struct comedi_device *dev,
 		return -EACCES;
 
 	if (bi.bytes_read && (s->subdev_flags & SDF_CMD_READ)) {
-		bi.bytes_read = comedi_buf_read_alloc(async, bi.bytes_read);
-		comedi_buf_read_free(async, bi.bytes_read);
+		bi.bytes_read = comedi_buf_read_alloc(s, bi.bytes_read);
+		comedi_buf_read_free(s, bi.bytes_read);
 
 		if (comedi_is_subdevice_idle(s) &&
 		    async->buf_write_count == async->buf_read_count) {
@@ -1004,8 +1004,8 @@ static int do_bufinfo_ioctl(struct comedi_device *dev,
 
 	if (bi.bytes_written && (s->subdev_flags & SDF_CMD_WRITE)) {
 		bi.bytes_written =
-		    comedi_buf_write_alloc(async, bi.bytes_written);
-		comedi_buf_write_free(async, bi.bytes_written);
+		    comedi_buf_write_alloc(s, bi.bytes_written);
+		comedi_buf_write_free(s, bi.bytes_written);
 	}
 
 copyback_position:
@@ -1557,7 +1557,7 @@ static int do_cmd_ioctl(struct comedi_device *dev,
 		goto cleanup;
 	}
 
-	comedi_buf_reset(async);
+	comedi_buf_reset(s);
 
 	async->cb_mask =
 	    COMEDI_CB_EOA | COMEDI_CB_BLOCK | COMEDI_CB_ERROR |
@@ -2029,7 +2029,7 @@ static unsigned int comedi_poll(struct file *file, poll_table *wait)
 	if (s && s->async) {
 		poll_wait(file, &s->async->wait_head, wait);
 		if (!s->busy || !comedi_is_subdevice_running(s) ||
-		    comedi_buf_read_n_available(s->async) > 0)
+		    comedi_buf_read_n_available(s) > 0)
 			mask |= POLLIN | POLLRDNORM;
 	}
 
@@ -2038,9 +2038,9 @@ static unsigned int comedi_poll(struct file *file, poll_table *wait)
 		unsigned int bps = bytes_per_sample(s);
 
 		poll_wait(file, &s->async->wait_head, wait);
-		comedi_buf_write_alloc(s->async, s->async->prealloc_bufsz);
+		comedi_buf_write_alloc(s, s->async->prealloc_bufsz);
 		if (!s->busy || !comedi_is_subdevice_running(s) ||
-		    comedi_buf_write_n_allocated(s->async) >= bps)
+		    comedi_buf_write_n_allocated(s) >= bps)
 			mask |= POLLOUT | POLLWRNORM;
 	}
 
@@ -2136,9 +2136,9 @@ static ssize_t comedi_write(struct file *file, const char __user *buf,
 		m = n;
 		if (async->buf_write_ptr + m > async->prealloc_bufsz)
 			m = async->prealloc_bufsz - async->buf_write_ptr;
-		comedi_buf_write_alloc(async, async->prealloc_bufsz);
-		if (m > comedi_buf_write_n_allocated(async))
-			m = comedi_buf_write_n_allocated(async);
+		comedi_buf_write_alloc(s, async->prealloc_bufsz);
+		if (m > comedi_buf_write_n_allocated(s))
+			m = comedi_buf_write_n_allocated(s);
 		if (m < n)
 			n = m;
 
@@ -2167,7 +2167,7 @@ static ssize_t comedi_write(struct file *file, const char __user *buf,
 			n -= m;
 			retval = -EFAULT;
 		}
-		comedi_buf_write_free(async, n);
+		comedi_buf_write_free(s, n);
 
 		count += n;
 		nbytes -= n;
@@ -2229,7 +2229,7 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 
 		n = nbytes;
 
-		m = comedi_buf_read_n_available(async);
+		m = comedi_buf_read_n_available(s);
 		/* printk("%d available\n",m); */
 		if (async->buf_read_ptr + m > async->prealloc_bufsz)
 			m = async->prealloc_bufsz - async->buf_read_ptr;
@@ -2272,8 +2272,8 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 			retval = -EFAULT;
 		}
 
-		comedi_buf_read_alloc(async, n);
-		comedi_buf_read_free(async, n);
+		comedi_buf_read_alloc(s, n);
+		comedi_buf_read_free(s, n);
 
 		count += n;
 		nbytes -= n;

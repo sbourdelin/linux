@@ -131,7 +131,7 @@ init_msg_header(CONTROLVM_MESSAGE *msg, U32 id, uint rsp, uint svr)
 static __iomem void *
 init_vbus_channel(U64 channelAddr, U32 channelBytes, int isServer)
 {
-	void *rc = NULL;
+	void __iomem *rc = NULL;
 	void __iomem *pChan = uislib_ioremap_cache(channelAddr, channelBytes);
 	if (!pChan) {
 		LOGERR("CONTROLVM_BUS_CREATE error: ioremap_cache of channelAddr:%Lx for channelBytes:%llu failed",
@@ -447,7 +447,7 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 				struct guest_msgs cmd;
 				if (!uuid_le_cmp(dev->channelTypeGuid,
 				     UltraVhbaChannelProtocolGuid)) {
-					WAIT_FOR_VALID_GUID(((CHANNEL_HEADER
+					wait_for_valid_guid(&((CHANNEL_HEADER
 							      __iomem *) (dev->
 								  chanptr))->
 							    Type);
@@ -472,7 +472,7 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 				} else
 				    if (!uuid_le_cmp(dev->channelTypeGuid,
 					 UltraVnicChannelProtocolGuid)) {
-					WAIT_FOR_VALID_GUID(((CHANNEL_HEADER
+					wait_for_valid_guid(&((CHANNEL_HEADER
 							      __iomem *) (dev->
 								  chanptr))->
 							    Type);
