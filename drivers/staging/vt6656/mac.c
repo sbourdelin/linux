@@ -53,11 +53,11 @@ static int          msglevel                =MSG_LEVEL_INFO;
  * Return Value: none
  *
  */
-void MACvWriteMultiAddr(struct vnt_private *pDevice, u64 mc_filter)
+void MACvWriteMultiAddr(struct vnt_private *priv, u64 mc_filter)
 {
 	__le64 le_mc = cpu_to_le64(mc_filter);
 
-	CONTROLnsRequestOut(pDevice, MESSAGE_TYPE_WRITE, MAC_REG_MAR0,
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, MAC_REG_MAR0,
 		MESSAGE_REQUEST_MACREG, sizeof(le_mc), (u8 *)&le_mc);
 }
 
@@ -72,31 +72,20 @@ void MACvWriteMultiAddr(struct vnt_private *pDevice, u64 mc_filter)
  *
  *
  */
-void MACbShutdown(struct vnt_private *pDevice)
+void MACbShutdown(struct vnt_private *priv)
 {
-	CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_MACSHUTDOWN,
-                        0,
-                        0,
-                        0,
-                        NULL
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_MACSHUTDOWN, 0, 0, 0, NULL);
 }
 
-void MACvSetBBType(struct vnt_private *pDevice, u8 byType)
+void MACvSetBBType(struct vnt_private *priv, u8 type)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = byType;
-    pbyData[1] = EnCFG_BBType_MASK;
+	data[0] = type;
+	data[1] = EnCFG_BBType_MASK;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        MAC_REG_ENCFG0,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK, MAC_REG_ENCFG0,
+		MESSAGE_REQUEST_MACREG,	ARRAY_SIZE(data), data);
 }
 
 /*
@@ -113,20 +102,10 @@ void MACvSetBBType(struct vnt_private *pDevice, u8 byType)
  * Return Value: none
  *
  */
-void MACvDisableKeyEntry(struct vnt_private *pDevice, u32 uEntryIdx)
+void MACvDisableKeyEntry(struct vnt_private *priv, u8 entry_idx)
 {
-	u8 byData;
-
-    byData = (u8) uEntryIdx;
-
-    //issue write misc fifo command to device
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_CLRKEYENTRY,
-                        0,
-                        0,
-                        1,
-                        &byData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_CLRKEYENTRY, 0, 0,
+		sizeof(entry_idx), &entry_idx);
 }
 
 /*
@@ -202,151 +181,96 @@ void MACvSetKeyEntry(struct vnt_private *pDevice, u16 wKeyCtl, u32 uEntryIdx,
 
 }
 
-void MACvRegBitsOff(struct vnt_private *pDevice, u8 byRegOfs, u8 byBits)
+void MACvRegBitsOff(struct vnt_private *priv, u8 reg_ofs, u8 bits)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = 0;
-    pbyData[1] = byBits;
+	data[0] = 0;
+	data[1] = bits;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        byRegOfs,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK,
+		reg_ofs, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvRegBitsOn(struct vnt_private *pDevice, u8 byRegOfs, u8 byBits)
+void MACvRegBitsOn(struct vnt_private *priv, u8 reg_ofs, u8 bits)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = byBits;
-    pbyData[1] = byBits;
+	data[0] = bits;
+	data[1] = bits;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        byRegOfs,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK,
+		reg_ofs, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvWriteWord(struct vnt_private *pDevice, u8 byRegOfs, u16 wData)
+void MACvWriteWord(struct vnt_private *priv, u8 reg_ofs, u16 word)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = (u8)(wData & 0xff);
-    pbyData[1] = (u8)(wData >> 8);
+	data[0] = (u8)(word & 0xff);
+	data[1] = (u8)(word >> 8);
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE,
-                        byRegOfs,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
-
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE,
+		reg_ofs, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvWriteBSSIDAddress(struct vnt_private *pDevice, u8 *pbyEtherAddr)
+void MACvWriteBSSIDAddress(struct vnt_private *priv, u8 *addr)
 {
-	u8 pbyData[6];
-
-    pbyData[0] = *((u8 *)pbyEtherAddr);
-    pbyData[1] = *((u8 *)pbyEtherAddr+1);
-    pbyData[2] = *((u8 *)pbyEtherAddr+2);
-    pbyData[3] = *((u8 *)pbyEtherAddr+3);
-    pbyData[4] = *((u8 *)pbyEtherAddr+4);
-    pbyData[5] = *((u8 *)pbyEtherAddr+5);
-
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE,
-                        MAC_REG_BSSID0,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, MAC_REG_BSSID0,
+		MESSAGE_REQUEST_MACREG, ETH_ALEN, addr);
 }
 
-void MACvEnableProtectMD(struct vnt_private *pDevice)
+void MACvEnableProtectMD(struct vnt_private *priv)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = EnCFG_ProtectMd;
-    pbyData[1] = EnCFG_ProtectMd;
+	data[0] = EnCFG_ProtectMd;
+	data[1] = EnCFG_ProtectMd;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        MAC_REG_ENCFG0,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK,
+		MAC_REG_ENCFG0, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvDisableProtectMD(struct vnt_private *pDevice)
+void MACvDisableProtectMD(struct vnt_private *priv)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = 0;
-    pbyData[1] = EnCFG_ProtectMd;
+	data[0] = 0;
+	data[1] = EnCFG_ProtectMd;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        MAC_REG_ENCFG0,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK,
+		MAC_REG_ENCFG0, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvEnableBarkerPreambleMd(struct vnt_private *pDevice)
+void MACvEnableBarkerPreambleMd(struct vnt_private *priv)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = EnCFG_BarkerPream;
-    pbyData[1] = EnCFG_BarkerPream;
+	data[0] = EnCFG_BarkerPream;
+	data[1] = EnCFG_BarkerPream;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        MAC_REG_ENCFG2,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK,
+		MAC_REG_ENCFG2, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvDisableBarkerPreambleMd(struct vnt_private *pDevice)
+void MACvDisableBarkerPreambleMd(struct vnt_private *priv)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-    pbyData[0] = 0;
-    pbyData[1] = EnCFG_BarkerPream;
+	data[0] = 0;
+	data[1] = EnCFG_BarkerPream;
 
-    CONTROLnsRequestOut(pDevice,
-                        MESSAGE_TYPE_WRITE_MASK,
-                        MAC_REG_ENCFG2,
-                        MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-                        pbyData
-                        );
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE_MASK,
+		MAC_REG_ENCFG2, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }
 
-void MACvWriteBeaconInterval(struct vnt_private *pDevice, u16 wInterval)
+void MACvWriteBeaconInterval(struct vnt_private *priv, u16 interval)
 {
-	u8 pbyData[2];
+	u8 data[2];
 
-	pbyData[0] = (u8)(wInterval & 0xff);
-	pbyData[1] = (u8)(wInterval >> 8);
+	data[0] = (u8)(interval & 0xff);
+	data[1] = (u8)(interval >> 8);
 
-    CONTROLnsRequestOut(pDevice,
-			MESSAGE_TYPE_WRITE,
-			MAC_REG_BI,
-			MESSAGE_REQUEST_MACREG,
-			ARRAY_SIZE(pbyData),
-			pbyData
-			);
+	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE,
+		MAC_REG_BI, MESSAGE_REQUEST_MACREG, ARRAY_SIZE(data), data);
 }

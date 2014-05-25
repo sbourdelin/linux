@@ -864,7 +864,7 @@ static void ni_sync_ai_dma(struct comedi_device *dev)
 
 	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
 	if (devpriv->ai_mite_chan)
-		mite_sync_input_dma(devpriv->ai_mite_chan, s->async);
+		mite_sync_input_dma(devpriv->ai_mite_chan, s);
 	spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
 }
 
@@ -877,7 +877,7 @@ static void mite_handle_b_linkc(struct mite_struct *mite,
 
 	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
 	if (devpriv->ao_mite_chan)
-		mite_sync_output_dma(devpriv->ao_mite_chan, s->async);
+		mite_sync_output_dma(devpriv->ao_mite_chan, s);
 	spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
 }
 
@@ -1149,7 +1149,7 @@ static void ni_ao_fifo_load(struct comedi_device *dev,
 
 	chan = async->cur_chan;
 	for (i = 0; i < n; i++) {
-		err &= comedi_buf_get(async, &d);
+		err &= comedi_buf_get(s, &d);
 		if (err == 0)
 			break;
 
@@ -1159,7 +1159,7 @@ static void ni_ao_fifo_load(struct comedi_device *dev,
 			packed_data = d & 0xffff;
 			/* 6711 only has 16 bit wide ao fifo */
 			if (board->reg_type != ni_reg_6711) {
-				err &= comedi_buf_get(async, &d);
+				err &= comedi_buf_get(s, &d);
 				if (err == 0)
 					break;
 				chan++;
@@ -1200,7 +1200,7 @@ static int ni_ao_fifo_half_empty(struct comedi_device *dev,
 	const struct ni_board_struct *board = comedi_board(dev);
 	int n;
 
-	n = comedi_buf_read_n_available(s->async);
+	n = comedi_buf_read_n_available(s);
 	if (n == 0) {
 		s->async->events |= COMEDI_CB_OVERFLOW;
 		return 0;
@@ -1230,7 +1230,7 @@ static int ni_ao_prep_fifo(struct comedi_device *dev,
 		ni_ao_win_outl(dev, 0x6, AO_FIFO_Offset_Load_611x);
 
 	/* load some data */
-	n = comedi_buf_read_n_available(s->async);
+	n = comedi_buf_read_n_available(s);
 	if (n == 0)
 		return 0;
 
@@ -1505,7 +1505,7 @@ static int ni_ai_setup_MITE_dma(struct comedi_device *dev)
 /* printk("comedi_debug: using mite channel %i for ai.\n", devpriv->ai_mite_chan->channel); */
 
 	/* write alloc the entire buffer */
-	comedi_buf_write_alloc(s->async, s->async->prealloc_bufsz);
+	comedi_buf_write_alloc(s, s->async->prealloc_bufsz);
 
 	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
 	if (devpriv->ai_mite_chan == NULL) {
@@ -1545,7 +1545,7 @@ static int ni_ao_setup_MITE_dma(struct comedi_device *dev)
 		return retval;
 
 	/* read alloc the entire buffer */
-	comedi_buf_read_alloc(s->async, s->async->prealloc_bufsz);
+	comedi_buf_read_alloc(s, s->async->prealloc_bufsz);
 
 	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
 	if (devpriv->ao_mite_chan) {
@@ -3565,7 +3565,7 @@ static int ni_cdo_inttrig(struct comedi_device *dev,
 	s->async->inttrig = NULL;
 
 	/* read alloc the entire buffer */
-	comedi_buf_read_alloc(s->async, s->async->prealloc_bufsz);
+	comedi_buf_read_alloc(s, s->async->prealloc_bufsz);
 
 #ifdef PCIDMA
 	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
@@ -3640,7 +3640,7 @@ static void handle_cdio_interrupt(struct comedi_device *dev)
 			       devpriv->mite->mite_io_addr +
 			       MITE_CHOR(devpriv->cdo_mite_chan->channel));
 		}
-		mite_sync_output_dma(devpriv->cdo_mite_chan, s->async);
+		mite_sync_output_dma(devpriv->cdo_mite_chan, s);
 	}
 	spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
 #endif

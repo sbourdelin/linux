@@ -175,7 +175,6 @@ recv_thread(passive) ; returnpkt(dispatch)
 using enter_critical section to protect
 */
 struct recv_priv {
-	spinlock_t lock;
 	struct __queue free_recv_queue;
 	struct __queue recv_pending_queue;
 	struct __queue uc_swdec_pending_queue;
@@ -189,11 +188,6 @@ struct recv_priv {
 	u64	rx_drop;
 	u64	last_rx_bytes;
 
-	uint  rx_icv_err;
-	uint  rx_largepacket_crcerr;
-	uint  rx_smallpacket_crcerr;
-	uint  rx_middlepacket_crcerr;
-	struct semaphore allrxreturnevt;
 	uint	ff_hwaddr;
 	u8	rx_pending_cnt;
 
@@ -213,9 +207,7 @@ struct recv_priv {
 	u8 signal_strength;
 	u8 signal_qual;
 	u8 noise;
-	int RxSNRdB[2];
 	s8 RxRssi[2];
-	int FalseAlmCnt_all;
 
 	struct timer_list signal_stat_timer;
 	u32 signal_stat_sampling_interval;
@@ -261,15 +253,12 @@ struct recv_frame {
 	struct sk_buff	 *pkt;
 	struct sk_buff	 *pkt_newalloc;
 	struct adapter  *adapter;
-	u8 fragcnt;
-	int frame_tag;
 	struct rx_pkt_attrib attrib;
 	uint  len;
 	u8 *rx_head;
 	u8 *rx_data;
 	u8 *rx_tail;
 	u8 *rx_end;
-	void *precvbuf;
 	struct sta_info *psta;
 	/* for A-MPDU Rx reordering buffer control */
 	struct recv_reorder_ctrl *preorder_ctrl;
@@ -297,31 +286,6 @@ static inline u8 *get_rxmem(struct recv_frame *precvframe)
 	if (precvframe == NULL)
 		return NULL;
 	return precvframe->rx_head;
-}
-
-static inline u8 *get_rx_status(struct recv_frame *precvframe)
-{
-	return get_rxmem(precvframe);
-}
-
-static inline u8 *recvframe_push(struct recv_frame *precvframe, int sz)
-{
-	/*  append data before rx_data */
-
-	/* add data to the start of recv_frame
- *
- *      This function extends the used data area of the recv_frame at the buffer
- *      start. rx_data must be still larger than rx_head, after pushing.
- */
-	if (precvframe == NULL)
-		return NULL;
-	precvframe->rx_data -= sz;
-	if (precvframe->rx_data < precvframe->rx_head) {
-		precvframe->rx_data += sz;
-		return NULL;
-	}
-	precvframe->len += sz;
-	return precvframe->rx_data;
 }
 
 static inline u8 *recvframe_pull(struct recv_frame *precvframe, int sz)

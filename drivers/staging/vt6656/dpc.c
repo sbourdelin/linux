@@ -45,7 +45,6 @@
 #include "baseband.h"
 #include "michael.h"
 #include "tkip.h"
-#include "tcrc.h"
 #include "wctl.h"
 #include "rf.h"
 #include "iowpa.h"
@@ -557,13 +556,6 @@ int RXbBulkInProcessData(struct vnt_private *pDevice, struct vnt_rcb *pRCB,
         }
     }
 
-    // Now it only supports 802.11g Infrastructure Mode, and support rate must up to 54 Mbps
-    if (pDevice->bDiversityEnable && (FrameSize>50) &&
-	pDevice->op_mode == NL80211_IFTYPE_STATION &&
-       (pDevice->bLinkPass == true)) {
-        BBvAntennaDiversity(pDevice, s_byGetRateIdx(*pbyRxRate), 0);
-    }
-
     // ++++++++ For BaseBand Algorithm +++++++++++++++
     pDevice->uCurrRSSI = *pbyRSSI;
     pDevice->byCurrSQ = *pbySQ;
@@ -871,13 +863,14 @@ void RXvWorkItem(struct work_struct *work)
 		container_of(work, struct vnt_private, read_work_item);
 	int status;
 	struct vnt_rcb *rcb = NULL;
+	unsigned long flags;
 
 	if (priv->Flags & fMP_DISCONNECTED)
 		return;
 
 	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"---->Rx Polling Thread\n");
 
-	spin_lock_irq(&priv->lock);
+	spin_lock_irqsave(&priv->lock, flags);
 
 	while ((priv->Flags & fMP_POST_READS) && MP_IS_READY(priv) &&
 			(priv->NumRecvFreeList != 0)) {
@@ -892,7 +885,7 @@ void RXvWorkItem(struct work_struct *work)
 
 	priv->bIsRxWorkItemQueued = false;
 
-	spin_unlock_irq(&priv->lock);
+	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
 void RXvFreeRCB(struct vnt_rcb *rcb, int re_alloc_skb)
