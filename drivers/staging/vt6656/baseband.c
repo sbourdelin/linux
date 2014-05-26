@@ -43,9 +43,6 @@
 #include "control.h"
 #include "datarate.h"
 
-static int          msglevel                =MSG_LEVEL_INFO;
-//static int          msglevel                =MSG_LEVEL_DEBUG;
-
 static u8 abyVT3184_AGC[] = {
     0x00,   //0
     0x00,   //1
@@ -889,10 +886,10 @@ void BBvSetAntennaMode(struct vnt_private *priv, u8 antenna_mode)
 int BBbVT3184Init(struct vnt_private *priv)
 {
 	int status;
-	u16 lenght;
+	u16 length;
 	u8 *addr;
 	u8 *agc;
-	u16 lenght_agc;
+	u16 length_agc;
 	u8 array[256];
 	u8 data;
 
@@ -910,20 +907,20 @@ int BBbVT3184Init(struct vnt_private *priv)
 			(priv->abyEEPROM[EEP_OFS_ZONETYPE] != 0x00)) {
 			priv->abyEEPROM[EEP_OFS_ZONETYPE] = 0;
 			priv->abyEEPROM[EEP_OFS_MAXCHANNEL] = 0x0B;
-			DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-						"Init Zone Type :USA\n");
+
+			dev_dbg(&priv->usb->dev, "Init Zone Type :USA\n");
 		} else if ((priv->config_file.ZoneType == 1) &&
 			(priv->abyEEPROM[EEP_OFS_ZONETYPE] != 0x01)) {
 			priv->abyEEPROM[EEP_OFS_ZONETYPE] = 0x01;
 			priv->abyEEPROM[EEP_OFS_MAXCHANNEL] = 0x0D;
-			DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-						"Init Zone Type :Japan\n");
+
+			dev_dbg(&priv->usb->dev, "Init Zone Type :Japan\n");
 		} else if ((priv->config_file.ZoneType == 2) &&
 			(priv->abyEEPROM[EEP_OFS_ZONETYPE] != 0x02)) {
 			priv->abyEEPROM[EEP_OFS_ZONETYPE] = 0x02;
 			priv->abyEEPROM[EEP_OFS_MAXCHANNEL] = 0x0D;
-			DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-						"Init Zone Type :Europe\n");
+
+			dev_dbg(&priv->usb->dev, "Init Zone Type :Europe\n");
 		} else {
 			if (priv->config_file.ZoneType !=
 					priv->abyEEPROM[EEP_OFS_ZONETYPE])
@@ -943,18 +940,17 @@ int BBbVT3184Init(struct vnt_private *priv)
 
 	priv->byRFType = priv->abyEEPROM[EEP_OFS_RFTYPE];
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"Zone Type %x\n",
-							priv->byZoneType);
+	dev_dbg(&priv->usb->dev, "Zone Type %x\n", priv->byZoneType);
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"RF Type %d\n", priv->byRFType);
+	dev_dbg(&priv->usb->dev, "RF Type %d\n", priv->byRFType);
 
 	if ((priv->byRFType == RF_AL2230) ||
 				(priv->byRFType == RF_AL2230S)) {
 		priv->byBBRxConf = abyVT3184_AL2230[10];
-		lenght = sizeof(abyVT3184_AL2230);
+		length = sizeof(abyVT3184_AL2230);
 		addr = abyVT3184_AL2230;
 		agc = abyVT3184_AGC;
-		lenght_agc = sizeof(abyVT3184_AGC);
+		length_agc = sizeof(abyVT3184_AGC);
 
 		priv->abyBBVGA[0] = 0x1C;
 		priv->abyBBVGA[1] = 0x10;
@@ -966,10 +962,10 @@ int BBbVT3184Init(struct vnt_private *priv)
 		priv->ldBmThreshold[3] = 0;
 	} else if (priv->byRFType == RF_AIROHA7230) {
 		priv->byBBRxConf = abyVT3184_AL2230[10];
-		lenght = sizeof(abyVT3184_AL2230);
+		length = sizeof(abyVT3184_AL2230);
 		addr = abyVT3184_AL2230;
 		agc = abyVT3184_AGC;
-		lenght_agc = sizeof(abyVT3184_AGC);
+		length_agc = sizeof(abyVT3184_AGC);
 
 		addr[0xd7] = 0x06;
 
@@ -984,10 +980,10 @@ int BBbVT3184Init(struct vnt_private *priv)
 	} else if ((priv->byRFType == RF_VT3226) ||
 			(priv->byRFType == RF_VT3226D0)) {
 		priv->byBBRxConf = abyVT3184_VT3226D0[10];
-		lenght = sizeof(abyVT3184_VT3226D0);
+		length = sizeof(abyVT3184_VT3226D0);
 		addr = abyVT3184_VT3226D0;
 		agc = abyVT3184_AGC;
-		lenght_agc = sizeof(abyVT3184_AGC);
+		length_agc = sizeof(abyVT3184_AGC);
 
 		priv->abyBBVGA[0] = 0x20;
 		priv->abyBBVGA[1] = 0x10;
@@ -1001,10 +997,10 @@ int BBbVT3184Init(struct vnt_private *priv)
 		MACvRegBitsOn(priv, MAC_REG_SOFTPWRCTL2, SOFTPWRCTL_RFLEOPT);
 	} else if ((priv->byRFType == RF_VT3342A0)) {
 		priv->byBBRxConf = abyVT3184_VT3226D0[10];
-		lenght = sizeof(abyVT3184_VT3226D0);
+		length = sizeof(abyVT3184_VT3226D0);
 		addr = abyVT3184_VT3226D0;
 		agc = abyVT3184_AGC;
-		lenght_agc = sizeof(abyVT3184_AGC);
+		length_agc = sizeof(abyVT3184_AGC);
 
 		priv->abyBBVGA[0] = 0x20;
 		priv->abyBBVGA[1] = 0x10;
@@ -1020,15 +1016,15 @@ int BBbVT3184Init(struct vnt_private *priv)
 		return true;
 	}
 
-	memcpy(array, addr, lenght);
+	memcpy(array, addr, length);
 
 	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, 0,
-		MESSAGE_REQUEST_BBREG, lenght, array);
+		MESSAGE_REQUEST_BBREG, length, array);
 
-	memcpy(array, agc, lenght_agc);
+	memcpy(array, agc, length_agc);
 
 	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, 0,
-		MESSAGE_REQUEST_BBAGC, lenght_agc, array);
+		MESSAGE_REQUEST_BBAGC, length_agc, array);
 
 	if ((priv->byRFType == RF_VT3226) ||
 		(priv->byRFType == RF_VT3342A0)) {
