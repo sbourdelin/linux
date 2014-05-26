@@ -59,9 +59,6 @@
 #include "datarate.h"
 #include "control.h"
 
-//static int          msglevel                =MSG_LEVEL_DEBUG;
-static int          msglevel                =MSG_LEVEL_INFO;
-
 //const u16 cwRXBCNTSFOff[MAX_RATE] =
 //{17, 34, 96, 192, 34, 23, 17, 11, 8, 5, 4, 3};
 
@@ -123,20 +120,20 @@ void CARDbSetMediaChannel(struct vnt_private *priv, u32 connection_channel)
  *
  * Parameters:
  *  In:
- *      pDevice             - The adapter to be set
- *      wRateIdx            - Receiving data rate
+ *      priv		- The adapter to be set
+ *      rate_idx	- Receiving data rate
  *  Out:
  *      none
  *
  * Return Value: response Control frame rate
  *
  */
-static u16 swGetCCKControlRate(struct vnt_private *pDevice, u16 wRateIdx)
+static u16 swGetCCKControlRate(struct vnt_private *priv, u16 rate_idx)
 {
-	u16 ui = wRateIdx;
+	u16 ui = rate_idx;
 
 	while (ui > RATE_1M) {
-		if (pDevice->wBasicRate & (1 << ui))
+		if (priv->wBasicRate & (1 << ui))
 			return ui;
 		ui--;
 	}
@@ -149,39 +146,39 @@ static u16 swGetCCKControlRate(struct vnt_private *pDevice, u16 wRateIdx)
  *
  * Parameters:
  *  In:
- *      pDevice             - The adapter to be set
- *      wRateIdx            - Receiving data rate
+ *      priv		- The adapter to be set
+ *      rate_idx	- Receiving data rate
  *  Out:
  *      none
  *
  * Return Value: response Control frame rate
  *
  */
-static u16 swGetOFDMControlRate(struct vnt_private *pDevice, u16 wRateIdx)
+static u16 swGetOFDMControlRate(struct vnt_private *priv, u16 rate_idx)
 {
-	u16 ui = wRateIdx;
+	u16 ui = rate_idx;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"BASIC RATE: %X\n",
-		pDevice->wBasicRate);
+	dev_dbg(&priv->usb->dev, "%s basic rate: %d\n",
+					__func__,  priv->wBasicRate);
 
-	if (!CARDbIsOFDMinBasicRate(pDevice)) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-			"swGetOFDMControlRate:(NO OFDM) %d\n", wRateIdx);
-		if (wRateIdx > RATE_24M)
-			wRateIdx = RATE_24M;
-		return wRateIdx;
+	if (!CARDbIsOFDMinBasicRate(priv)) {
+		dev_dbg(&priv->usb->dev, "%s (NO OFDM) %d\n",
+						__func__, rate_idx);
+		if (rate_idx > RATE_24M)
+			rate_idx = RATE_24M;
+		return rate_idx;
 	}
 
 	while (ui > RATE_11M) {
-		if (pDevice->wBasicRate & (1 << ui)) {
-			DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				"swGetOFDMControlRate: %d\n", ui);
+		if (priv->wBasicRate & (1 << ui)) {
+			dev_dbg(&priv->usb->dev, "%s rate: %d\n",
+							__func__, ui);
 			return ui;
 		}
 		ui--;
 	}
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"swGetOFDMControlRate: 6M\n");
+	dev_dbg(&priv->usb->dev, "%s basic rate: 24M\n", __func__);
 
 	return RATE_24M;
 }
@@ -755,8 +752,7 @@ void CARDvUpdateNextTBTT(struct vnt_private *priv, u64 tsf,
 	CONTROLnsRequestOut(priv, MESSAGE_TYPE_SET_TSFTBTT,
 		MESSAGE_REQUEST_TBTT, 0, 8, data);
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-		"Card:Update Next TBTT[%8lx]\n", (unsigned long)tsf);
+	dev_dbg(&priv->usb->dev, "%s TBTT: %8llx\n", __func__, tsf);
 
 	return;
 }
