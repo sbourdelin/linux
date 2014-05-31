@@ -975,7 +975,7 @@ static int dgap_firmware_load(struct pci_dev *pdev, int card_type)
 static int dgap_do_remap(struct board_t *brd)
 {
 	if (!brd || brd->magic != DGAP_BOARD_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	if (!request_mem_region(brd->membase, 0x200000, "dgap"))
 		return -ENOMEM;
@@ -1329,7 +1329,7 @@ static int dgap_tty_init(struct board_t *brd)
 	struct cm_t __iomem *cm;
 
 	if (!brd)
-		return -ENXIO;
+		return -EIO;
 
 	/*
 	 * Initialize board structure elements.
@@ -1367,7 +1367,7 @@ static int dgap_tty_init(struct board_t *brd)
 		if (!brd->nasync) {
 			brd->state = BOARD_FAILED;
 			brd->dpastatus = BD_NOFEP;
-			return -ENXIO;
+			return -EIO;
 		}
 	}
 
@@ -1503,8 +1503,6 @@ static void dgap_tty_uninit(struct board_t *brd)
 			tty_unregister_device(brd->serial_driver, i);
 		}
 		tty_unregister_driver(brd->serial_driver);
-		kfree(brd->serial_driver->ttys);
-		brd->serial_driver->ttys = NULL;
 		put_tty_driver(brd->serial_driver);
 		kfree(brd->serial_ports);
 		brd->dgap_major_serial_registered = FALSE;
@@ -1520,8 +1518,6 @@ static void dgap_tty_uninit(struct board_t *brd)
 			tty_unregister_device(brd->print_driver, i);
 		}
 		tty_unregister_driver(brd->print_driver);
-		kfree(brd->print_driver->ttys);
-		brd->print_driver->ttys = NULL;
 		put_tty_driver(brd->print_driver);
 		kfree(brd->printer_ports);
 		brd->dgap_major_transparent_print_registered = FALSE;
@@ -1877,12 +1873,12 @@ static int dgap_tty_open(struct tty_struct *tty, struct file *file)
 	minor = MINOR(tty_devnum(tty));
 
 	if (major > 255)
-		return -ENXIO;
+		return -EIO;
 
 	/* Get board pointer from our array of majors we have allocated */
 	brd = dgap_boards_by_major[major];
 	if (!brd)
-		return -ENXIO;
+		return -EIO;
 
 	/*
 	 * If board is not yet up to a state of READY, go to
@@ -1899,19 +1895,19 @@ static int dgap_tty_open(struct tty_struct *tty, struct file *file)
 	/* The wait above should guarantee this cannot happen */
 	if (brd->state != BOARD_READY) {
 		spin_unlock_irqrestore(&brd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	/* If opened device is greater than our number of ports, bail. */
 	if (MINOR(tty_devnum(tty)) > brd->nasync) {
 		spin_unlock_irqrestore(&brd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	ch = brd->channels[minor];
 	if (!ch) {
 		spin_unlock_irqrestore(&brd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	/* Grab channel lock */
@@ -1927,7 +1923,7 @@ static int dgap_tty_open(struct tty_struct *tty, struct file *file)
 	} else {
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&brd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	/* Store our unit into driver_data, so we always have it available. */
@@ -1940,7 +1936,7 @@ static int dgap_tty_open(struct tty_struct *tty, struct file *file)
 	if (!bs) {
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&brd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	/*
@@ -2025,11 +2021,11 @@ static int dgap_block_til_ready(struct tty_struct *tty, struct file *file,
 
 	if (!tty || tty->magic != TTY_MAGIC || !file || !ch ||
 		ch->magic != DGAP_CHANNEL_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	un = tty->driver_data;
 	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	spin_lock_irqsave(&ch->ch_lock, lock_flags);
 
@@ -2045,7 +2041,7 @@ static int dgap_block_til_ready(struct tty_struct *tty, struct file *file,
 		 * bail with error.
 		 */
 		if (ch->ch_bd->state == BOARD_FAILED) {
-			retval = -ENXIO;
+			retval = -EIO;
 			break;
 		}
 
@@ -2322,7 +2318,7 @@ static int dgap_tty_chars_in_buffer(struct tty_struct *tty)
 	ulong lock_flags = 0;
 	ulong lock_flags2 = 0;
 
-	if (tty == NULL)
+	if (!tty)
 		return 0;
 
 	un = tty->driver_data;
@@ -2468,7 +2464,7 @@ static int dgap_maxcps_room(struct tty_struct *tty, int bytes_available)
 	struct channel_t *ch;
 	struct un_t *un;
 
-	if (tty == NULL)
+	if (!tty)
 		return bytes_available;
 
 	un = tty->driver_data;
@@ -3033,7 +3029,7 @@ static int dgap_get_modem_info(struct channel_t *ch, unsigned int __user *value)
 	int rc;
 
 	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	spin_lock_irqsave(&ch->ch_lock, lock_flags);
 
@@ -4144,19 +4140,20 @@ static int dgap_tty_register_ports(struct board_t *brd)
 
 	brd->serial_ports = kcalloc(brd->nasync, sizeof(*brd->serial_ports),
 					GFP_KERNEL);
-	if (brd->serial_ports == NULL)
+	if (!brd->serial_ports)
 		return -ENOMEM;
-	for (i = 0; i < brd->nasync; i++)
-		tty_port_init(&brd->serial_ports[i]);
 
 	brd->printer_ports = kcalloc(brd->nasync, sizeof(*brd->printer_ports),
 					GFP_KERNEL);
-	if (brd->printer_ports == NULL) {
+	if (!brd->printer_ports) {
 		kfree(brd->serial_ports);
 		return -ENOMEM;
 	}
-	for (i = 0; i < brd->nasync; i++)
+
+	for (i = 0; i < brd->nasync; i++) {
+		tty_port_init(&brd->serial_ports[i]);
 		tty_port_init(&brd->printer_ports[i]);
+	}
 
 	ch = brd->channels[0];
 	for (i = 0; i < brd->nasync; i++, ch = brd->channels[i]) {
@@ -5012,23 +5009,23 @@ static int dgap_param(struct tty_struct *tty)
 	u8 hflow;
 
 	if (!tty || tty->magic != TTY_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	un = (struct un_t *) tty->driver_data;
 	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	ch = un->un_ch;
 	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	bd = ch->ch_bd;
 	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	bs = ch->ch_bs;
 	if (!bs)
-		return -ENXIO;
+		return -EIO;
 
 	ts = &tty->termios;
 
@@ -5467,7 +5464,7 @@ static int dgap_event(struct board_t *bd)
 	int b1;
 
 	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -ENXIO;
+		return -EIO;
 
 	spin_lock_irqsave(&bd->bd_lock, lock_flags);
 
@@ -5475,7 +5472,7 @@ static int dgap_event(struct board_t *bd)
 
 	if (!vaddr) {
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	eaddr = (struct ev_t __iomem *) (vaddr + EVBUF);
@@ -5492,7 +5489,7 @@ static int dgap_event(struct board_t *bd)
 	    (head | tail) & 03) {
 		/* Let go of board lock */
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return -ENXIO;
+		return -EIO;
 	}
 
 	/*
@@ -6529,7 +6526,7 @@ static int dgap_parsefile(char **in, int remove)
 				return -1;
 			}
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6547,7 +6544,7 @@ static int dgap_parsefile(char **in, int remove)
 				return -1;
 			}
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6565,7 +6562,7 @@ static int dgap_parsefile(char **in, int remove)
 				return -1;
 			}
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6576,7 +6573,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p->u.board.v_pcibus = 1;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6594,7 +6591,7 @@ static int dgap_parsefile(char **in, int remove)
 				return -1;
 			}
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6608,7 +6605,7 @@ static int dgap_parsefile(char **in, int remove)
 				return -1;
 			}
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6618,7 +6615,7 @@ static int dgap_parsefile(char **in, int remove)
 		case NPORTS:	/* number of ports */
 			if (p->type == BNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6629,7 +6626,7 @@ static int dgap_parsefile(char **in, int remove)
 				p->u.board.v_nport = 1;
 			} else if (p->type == CNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6640,7 +6637,7 @@ static int dgap_parsefile(char **in, int remove)
 				p->u.conc.v_nport = 1;
 			} else if (p->type == MNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6657,7 +6654,7 @@ static int dgap_parsefile(char **in, int remove)
 
 		case ID:	/* letter ID used in tty name */
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6679,7 +6676,7 @@ static int dgap_parsefile(char **in, int remove)
 		case STARTO:	/* start offset of ID */
 			if (p->type == BNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6690,7 +6687,7 @@ static int dgap_parsefile(char **in, int remove)
 				p->u.board.v_start = 1;
 			} else if (p->type == CNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6701,7 +6698,7 @@ static int dgap_parsefile(char **in, int remove)
 				p->u.conc.v_start = 1;
 			} else if (p->type == MNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6761,7 +6758,7 @@ static int dgap_parsefile(char **in, int remove)
 		case LINE:	/* line information */
 			if (dgap_checknode(p))
 				return -1;
-			if (brd == NULL) {
+			if (!brd) {
 				dgap_err("must specify board before line info");
 				return -1;
 			}
@@ -6784,7 +6781,7 @@ static int dgap_parsefile(char **in, int remove)
 		case CONC:	/* concentrator information */
 			if (dgap_checknode(p))
 				return -1;
-			if (line == NULL) {
+			if (!line) {
 				dgap_err("must specify line info before concentrator");
 				return -1;
 			}
@@ -6823,7 +6820,7 @@ static int dgap_parsefile(char **in, int remove)
 		case MOD:	/* EBI module */
 			if (dgap_checknode(p))
 				return -1;
-			if (brd == NULL) {
+			if (!brd) {
 				dgap_err("must specify board info before EBI modules");
 				return -1;
 			}
@@ -6832,7 +6829,7 @@ static int dgap_parsefile(char **in, int remove)
 				linecnt = 0;
 				break;
 			default:
-				if (conc == NULL) {
+				if (!conc) {
 					dgap_err("must specify concentrator info before EBI module");
 					return -1;
 				}
@@ -6883,7 +6880,7 @@ static int dgap_parsefile(char **in, int remove)
 		case SPEED:	/* sync line speed indication */
 			if (p->type == LNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6894,7 +6891,7 @@ static int dgap_parsefile(char **in, int remove)
 				p->u.line.v_speed = 1;
 			} else if (p->type == CNODE) {
 				s = dgap_getword(in);
-				if (s == NULL) {
+				if (!s) {
 					dgap_err("unexpected end of file");
 					return -1;
 				}
@@ -6951,7 +6948,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6971,7 +6968,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -6991,7 +6988,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7011,7 +7008,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7031,7 +7028,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7051,7 +7048,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7071,7 +7068,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7091,7 +7088,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7111,7 +7108,7 @@ static int dgap_parsefile(char **in, int remove)
 			}
 			p = p->next;
 			s = dgap_getword(in);
-			if (s == NULL) {
+			if (!s) {
 				dgap_err("unexpected end of file");
 				return -1;
 			}
@@ -7359,51 +7356,53 @@ static struct cnode *dgap_find_config(int type, int bus, int slot)
 		prev = p;
 		p = p->next;
 
-		if (p->type == BNODE) {
+		if (p->type != BNODE)
+			continue;
 
-			if (p->u.board.type == type) {
+		if (p->u.board.type != type)
+			continue;
 
-				if (p->u.board.v_pcibus &&
-				    p->u.board.pcibus != bus)
-					continue;
-				if (p->u.board.v_pcislot &&
-				    p->u.board.pcislot != slot)
-					continue;
+		if (p->u.board.v_pcibus &&
+		    p->u.board.pcibus != bus)
+			continue;
 
-				found = p;
-				/*
-				 * Keep walking thru the list till we
-				 * find the next board.
-				 */
-				while (p->next) {
-					prev2 = p;
-					p = p->next;
-					if (p->type == BNODE) {
+		if (p->u.board.v_pcislot &&
+		    p->u.board.pcislot != slot)
+			continue;
 
-						/*
-						 * Mark the end of our 1 board
-						 * chain of configs.
-						 */
-						prev2->next = NULL;
+		found = p;
+		/*
+		 * Keep walking thru the list till we
+		 * find the next board.
+		 */
+		while (p->next) {
+			prev2 = p;
+			p = p->next;
 
-						/*
-						 * Link the "next" board to the
-						 * previous board, effectively
-						 * "unlinking" our board from
-						 * the main config.
-						 */
-						prev->next = p;
+			if (p->type != BNODE)
+				continue;
 
-						return found;
-					}
-				}
-				/*
-				 * It must be the last board in the list.
-				 */
-				prev->next = NULL;
-				return found;
-			}
+			/*
+			 * Mark the end of our 1 board
+			 * chain of configs.
+			 */
+			prev2->next = NULL;
+
+			/*
+			 * Link the "next" board to the
+			 * previous board, effectively
+			 * "unlinking" our board from
+			 * the main config.
+			 */
+			prev->next = p;
+
+			return found;
 		}
+		/*
+		 * It must be the last board in the list.
+		 */
+		prev->next = NULL;
+		return found;
 	}
 	return NULL;
 }

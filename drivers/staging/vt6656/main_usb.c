@@ -65,7 +65,7 @@
 #include "datarate.h"
 #include "rf.h"
 #include "firmware.h"
-#include "control.h"
+#include "usbpipe.h"
 #include "channel.h"
 #include "int.h"
 #include "iowpa.h"
@@ -314,7 +314,7 @@ static int device_init_registers(struct vnt_private *pDevice)
 	init_cmd->long_retry_limit = pDevice->byLongRetryLimit;
 
 	/* issue card_init command to device */
-	ntStatus = CONTROLnsRequestOut(pDevice,
+	ntStatus = vnt_control_out(pDevice,
 		MESSAGE_TYPE_CARDINIT, 0, 0,
 		sizeof(struct vnt_cmd_card_init), (u8 *)init_cmd);
 	if (ntStatus != STATUS_SUCCESS) {
@@ -322,7 +322,7 @@ static int device_init_registers(struct vnt_private *pDevice)
 		return false;
 	}
 
-	ntStatus = CONTROLnsRequestIn(pDevice, MESSAGE_TYPE_INIT_RSP, 0, 0,
+	ntStatus = vnt_control_in(pDevice, MESSAGE_TYPE_INIT_RSP, 0, 0,
 		sizeof(struct vnt_rsp_card_init), (u8 *)init_rsp);
 	if (ntStatus != STATUS_SUCCESS) {
 		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
@@ -331,7 +331,7 @@ static int device_init_registers(struct vnt_private *pDevice)
 	}
 
 	/* local ID for AES functions */
-	ntStatus = CONTROLnsRequestIn(pDevice, MESSAGE_TYPE_READ,
+	ntStatus = vnt_control_in(pDevice, MESSAGE_TYPE_READ,
 		MAC_REG_LOCALID, MESSAGE_REQUEST_MACREG, 1,
 			&pDevice->byLocalID);
 	if (ntStatus != STATUS_SUCCESS)
@@ -468,28 +468,28 @@ static int device_init_registers(struct vnt_private *pDevice)
 			byCalibRXIQ = pDevice->abyEEPROM[EEP_OFS_CALIB_RX_IQ];
 			if (byCalibTXIQ || byCalibTXDC || byCalibRXIQ) {
 			/* CR255, enable TX/RX IQ and DC compensation mode */
-				ControlvWriteByte(pDevice,
+				vnt_control_out_u8(pDevice,
 					MESSAGE_REQUEST_BBREG,
 					0xff,
 					0x03);
 			/* CR251, TX I/Q Imbalance Calibration */
-				ControlvWriteByte(pDevice,
+				vnt_control_out_u8(pDevice,
 					MESSAGE_REQUEST_BBREG,
 					0xfb,
 					byCalibTXIQ);
 			/* CR252, TX DC-Offset Calibration */
-				ControlvWriteByte(pDevice,
+				vnt_control_out_u8(pDevice,
 					MESSAGE_REQUEST_BBREG,
 					0xfC,
 					byCalibTXDC);
 			/* CR253, RX I/Q Imbalance Calibration */
-				ControlvWriteByte(pDevice,
+				vnt_control_out_u8(pDevice,
 					MESSAGE_REQUEST_BBREG,
 					0xfd,
 					byCalibRXIQ);
 			} else {
 			/* CR255, turn off BB Calibration compensation */
-				ControlvWriteByte(pDevice,
+				vnt_control_out_u8(pDevice,
 					MESSAGE_REQUEST_BBREG,
 					0xff,
 					0x0);
@@ -535,7 +535,7 @@ static int device_init_registers(struct vnt_private *pDevice)
 	pDevice->bHWRadioOff = false;
 
 	if ((pDevice->byRadioCtl & EEP_RADIOCTL_ENABLE) != 0) {
-		ntStatus = CONTROLnsRequestIn(pDevice, MESSAGE_TYPE_READ,
+		ntStatus = vnt_control_in(pDevice, MESSAGE_TYPE_READ,
 			MAC_REG_GPIOCTL1, MESSAGE_REQUEST_MACREG, 1, &byTmp);
 
 		if (ntStatus != STATUS_SUCCESS)
@@ -551,11 +551,9 @@ static int device_init_registers(struct vnt_private *pDevice)
 
 	}
 
-	ControlvMaskByte(pDevice, MESSAGE_REQUEST_MACREG,
-				MAC_REG_PAPEDELAY, LEDSTS_TMLEN, 0x38);
+	vnt_mac_set_led(pDevice, LEDSTS_TMLEN, 0x38);
 
-	ControlvMaskByte(pDevice, MESSAGE_REQUEST_MACREG,
-				MAC_REG_PAPEDELAY, LEDSTS_STS, LEDSTS_SLOW);
+	vnt_mac_set_led(pDevice, LEDSTS_STS, LEDSTS_SLOW);
 
 	MACvRegBitsOn(pDevice, MAC_REG_GPIOCTL0, 0x01);
 
@@ -1269,7 +1267,7 @@ void vnt_configure_filter(struct vnt_private *priv)
 	u8 tmp = 0;
 	int rc;
 
-	rc = CONTROLnsRequestIn(priv, MESSAGE_TYPE_READ,
+	rc = vnt_control_in(priv, MESSAGE_TYPE_READ,
 		MAC_REG_RCR, MESSAGE_REQUEST_MACREG, 1, &tmp);
 	if (rc == 0)
 		priv->byRxMode = tmp;
@@ -1310,7 +1308,7 @@ void vnt_configure_filter(struct vnt_private *priv)
 		priv->byRxMode &= ~(RCR_UNICAST);
 	}
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_MACREG,
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG,
 					MAC_REG_RCR, priv->byRxMode);
 
 	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO

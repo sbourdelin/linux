@@ -53,7 +53,7 @@
 #include "card.h"
 #include "mac.h"
 #include "wpa2.h"
-#include "control.h"
+#include "usbpipe.h"
 #include "iowpa.h"
 #include "power.h"
 
@@ -457,8 +457,9 @@ int BSSbInsertToBSSList(struct vnt_private *pDevice,
 
 	/* Monitor if RSSI is too strong. */
 	pBSSList->byRSSIStatCnt = 0;
-	RFvRSSITodBm(pDevice, (u8) (pRxPacket->uRSSI),
-			     &pBSSList->ldBmMAX);
+
+	vnt_rf_rssi_to_dbm(pDevice, (u8)pRxPacket->uRSSI, &pBSSList->ldBmMAX);
+
 	pBSSList->ldBmAverage[0] = pBSSList->ldBmMAX;
 	pBSSList->ldBmAverRange = pBSSList->ldBmMAX;
 	for (ii = 1; ii < RSSI_STAT_COUNT; ii++)
@@ -578,7 +579,7 @@ int BSSbUpdateToBSSList(struct vnt_private *pDevice,
 	}
 
 	if (pRxPacket->uRSSI != 0) {
-		RFvRSSITodBm(pDevice, (u8) (pRxPacket->uRSSI), &ldBm);
+		vnt_rf_rssi_to_dbm(pDevice, (u8)pRxPacket->uRSSI, &ldBm);
 		/* Monitor if RSSI is too strong. */
 		pBSSList->byRSSIStatCnt++;
 		pBSSList->byRSSIStatCnt %= RSSI_STAT_COUNT;
@@ -1015,10 +1016,10 @@ void BSSvSecondCallBack(struct work_struct *work)
 				pMgmt->eCurrState = WMAC_STATE_IDLE;
 				netif_stop_queue(pDevice->dev);
 				pDevice->bLinkPass = false;
-				ControlvMaskByte(pDevice,
-						 MESSAGE_REQUEST_MACREG,
-						 MAC_REG_PAPEDELAY, LEDSTS_STS,
-						 LEDSTS_SLOW);
+
+				vnt_mac_set_led(pDevice, LEDSTS_STS,
+								LEDSTS_SLOW);
+
 				pDevice->bRoaming = true;
 				pDevice->bIsRoaming = false;
 
@@ -1126,10 +1127,8 @@ void BSSvSecondCallBack(struct work_struct *work)
 				pMgmt->eCurrState = WMAC_STATE_STARTED;
 				netif_stop_queue(pDevice->dev);
 				pDevice->bLinkPass = false;
-				ControlvMaskByte(pDevice,
-						 MESSAGE_REQUEST_MACREG,
-						 MAC_REG_PAPEDELAY, LEDSTS_STS,
-						 LEDSTS_SLOW);
+				vnt_mac_set_led(pDevice, LEDSTS_STS,
+								LEDSTS_SLOW);
 			}
 		}
 	}
@@ -1419,7 +1418,7 @@ static void s_uCalculateLinkQual(struct vnt_private *pDevice)
 	if (pDevice->bLinkPass != true) {
 		pDevice->wstats.qual.qual = 0;
 	} else {
-		RFvRSSITodBm(pDevice, (u8) (pDevice->uCurrRSSI), &ldBm);
+		vnt_rf_rssi_to_dbm(pDevice, (u8) (pDevice->uCurrRSSI), &ldBm);
 		if (-ldBm < 50)
 			RssiRatio = 4000;
 		else if (-ldBm > 90)

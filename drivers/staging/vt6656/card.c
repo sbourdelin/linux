@@ -57,7 +57,7 @@
 #include "rc4.h"
 #include "country.h"
 #include "datarate.h"
-#include "control.h"
+#include "usbpipe.h"
 
 //const u16 cwRXBCNTSFOff[MAX_RATE] =
 //{17, 34, 96, 192, 34, 23, 17, 11, 8, 5, 4, 3};
@@ -94,24 +94,24 @@ void CARDbSetMediaChannel(struct vnt_private *priv, u32 connection_channel)
 	/* Set Channel[7] = 0 to tell H/W channel is changing now. */
 	MACvRegBitsOff(priv, MAC_REG_CHANNEL, 0xb0);
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_SELECT_CHANNLE,
+	vnt_control_out(priv, MESSAGE_TYPE_SELECT_CHANNLE,
 					connection_channel, 0, 0, NULL);
 
 	if (priv->byBBType == BB_TYPE_11A) {
 		priv->byCurPwr = 0xff;
-		RFbRawSetPower(priv,
+		vnt_rf_set_txpower(priv,
 			priv->abyOFDMAPwrTbl[connection_channel-15], RATE_54M);
 	} else if (priv->byBBType == BB_TYPE_11G) {
 		priv->byCurPwr = 0xff;
-		RFbRawSetPower(priv,
+		vnt_rf_set_txpower(priv,
 			priv->abyOFDMPwrTbl[connection_channel-1], RATE_54M);
 	} else {
 		priv->byCurPwr = 0xff;
-		RFbRawSetPower(priv,
+		vnt_rf_set_txpower(priv,
 			priv->abyCCKPwrTbl[connection_channel-1], RATE_1M);
 	}
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_MACREG, MAC_REG_CHANNEL,
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG, MAC_REG_CHANNEL,
 		(u8)(connection_channel|0x80));
 }
 
@@ -197,7 +197,7 @@ static u16 swGetOFDMControlRate(struct vnt_private *priv, u16 rate_idx)
  * Return Value: none
  *
  */
-void CARDvCalculateOFDMRParameter(u16 rate, u8 bb_type,
+static void CARDvCalculateOFDMRParameter(u16 rate, u8 bb_type,
 					u8 *tx_rate, u8 *rsv_time)
 {
 
@@ -373,7 +373,7 @@ void CARDvSetRSPINF(struct vnt_private *priv, u8 bb_type)
 		data[16 + i * 2 + 1] = rsv_time[i];
 	}
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE,
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE,
 		MAC_REG_RSPINF_B_1, MESSAGE_REQUEST_MACREG, 34, &data[0]);
 }
 
@@ -461,12 +461,12 @@ void vUpdateIFS(struct vnt_private *priv)
 	data[2] = (u8)priv->uEIFS;
 	data[3] = (u8)priv->uSlot;
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, MAC_REG_SIFS,
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE, MAC_REG_SIFS,
 		MESSAGE_REQUEST_MACREG, 4, &data[0]);
 
 	max_min |= 0xa0;
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, MAC_REG_CWMAXMIN0,
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE, MAC_REG_CWMAXMIN0,
 		MESSAGE_REQUEST_MACREG, 1, &max_min);
 }
 
@@ -603,7 +603,7 @@ void CARDvAdjustTSF(struct vnt_private *priv, u8 rx_rate,
 	data[6] = (u8)(tsf_offset >> 48);
 	data[7] = (u8)(tsf_offset >> 56);
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_SET_TSFTBTT,
+	vnt_control_out(priv, MESSAGE_TYPE_SET_TSFTBTT,
 		MESSAGE_REQUEST_TSF, 0, 8, data);
 }
 /*
@@ -712,7 +712,7 @@ void CARDvSetFirstNextTBTT(struct vnt_private *priv, u16 beacon_interval)
 	data[6] = (u8)(next_tbtt >> 48);
 	data[7] = (u8)(next_tbtt >> 56);
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_SET_TSFTBTT,
+	vnt_control_out(priv, MESSAGE_TYPE_SET_TSFTBTT,
 		MESSAGE_REQUEST_TBTT, 0, 8, data);
 
 	return;
@@ -749,7 +749,7 @@ void CARDvUpdateNextTBTT(struct vnt_private *priv, u64 tsf,
 	data[6] = (u8)(tsf >> 48);
 	data[7] = (u8)(tsf >> 56);
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_SET_TSFTBTT,
+	vnt_control_out(priv, MESSAGE_TYPE_SET_TSFTBTT,
 		MESSAGE_REQUEST_TBTT, 0, 8, data);
 
 	dev_dbg(&priv->usb->dev, "%s TBTT: %8llx\n", __func__, tsf);
@@ -844,11 +844,11 @@ void CARDvSetBSSMode(struct vnt_private *priv)
 	priv->byPacketType = CARDbyGetPktType(priv);
 
 	if (priv->byBBType == BB_TYPE_11A)
-		ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x03);
+		vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x03);
 	else if (priv->byBBType == BB_TYPE_11B)
-		ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x02);
+		vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x02);
 	else if (priv->byBBType == BB_TYPE_11G)
-		ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x08);
+		vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x08);
 
 	vUpdateIFS(priv);
 	CARDvSetRSPINF(priv, (u8)priv->byBBType);
@@ -857,7 +857,7 @@ void CARDvSetBSSMode(struct vnt_private *priv)
 		if (priv->byRFType == RF_AIROHA7230) {
 			priv->abyBBVGA[0] = 0x20;
 
-			ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG,
+			vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG,
 						0xe7, priv->abyBBVGA[0]);
 		}
 
@@ -867,7 +867,7 @@ void CARDvSetBSSMode(struct vnt_private *priv)
 		if (priv->byRFType == RF_AIROHA7230) {
 			priv->abyBBVGA[0] = 0x1c;
 
-			ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG,
+			vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG,
 						0xe7, priv->abyBBVGA[0]);
 		}
 
