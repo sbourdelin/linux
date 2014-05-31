@@ -40,7 +40,7 @@
 #include "mac.h"
 #include "baseband.h"
 #include "rf.h"
-#include "control.h"
+#include "usbpipe.h"
 #include "datarate.h"
 
 static u8 abyVT3184_AGC[] = {
@@ -865,7 +865,7 @@ void BBvSetAntennaMode(struct vnt_private *priv, u8 antenna_mode)
 		break;
 	}
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_SET_ANTMD,
+	vnt_control_out(priv, MESSAGE_TYPE_SET_ANTMD,
 		(u16)antenna_mode, 0, 0, NULL);
 }
 
@@ -893,7 +893,7 @@ int BBbVT3184Init(struct vnt_private *priv)
 	u8 array[256];
 	u8 data;
 
-	status = CONTROLnsRequestIn(priv, MESSAGE_TYPE_READ, 0,
+	status = vnt_control_in(priv, MESSAGE_TYPE_READ, 0,
 		MESSAGE_REQUEST_EEPROM, EEP_MAX_CONTEXT_SIZE,
 						priv->abyEEPROM);
 	if (status != STATUS_SUCCESS)
@@ -1018,38 +1018,37 @@ int BBbVT3184Init(struct vnt_private *priv)
 
 	memcpy(array, addr, length);
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, 0,
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE, 0,
 		MESSAGE_REQUEST_BBREG, length, array);
 
 	memcpy(array, agc, length_agc);
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, 0,
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE, 0,
 		MESSAGE_REQUEST_BBAGC, length_agc, array);
 
 	if ((priv->byRFType == RF_VT3226) ||
 		(priv->byRFType == RF_VT3342A0)) {
-		ControlvWriteByte(priv, MESSAGE_REQUEST_MACREG,
+		vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG,
 						MAC_REG_ITRTMSET, 0x23);
 		MACvRegBitsOn(priv, MAC_REG_PAPEDELAY, 0x01);
 	} else if (priv->byRFType == RF_VT3226D0) {
-		ControlvWriteByte(priv, MESSAGE_REQUEST_MACREG,
+		vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG,
 						MAC_REG_ITRTMSET, 0x11);
 		MACvRegBitsOn(priv, MAC_REG_PAPEDELAY, 0x01);
 	}
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x04, 0x7f);
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0x01);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x04, 0x7f);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0x01);
 
-	RFbRFTableDownload(priv);
-
+	vnt_rf_table_download(priv);
 
 	/* Fix for TX USB resets from vendors driver */
-	CONTROLnsRequestIn(priv, MESSAGE_TYPE_READ, USB_REG4,
+	vnt_control_in(priv, MESSAGE_TYPE_READ, USB_REG4,
 		MESSAGE_REQUEST_MEM, sizeof(data), &data);
 
 	data |= 0x2;
 
-	CONTROLnsRequestOut(priv, MESSAGE_TYPE_WRITE, USB_REG4,
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE, USB_REG4,
 		MESSAGE_REQUEST_MEM, sizeof(data), &data);
 
 	return true;
@@ -1076,18 +1075,18 @@ void BBvSetShortSlotTime(struct vnt_private *priv)
 	else
 		priv->byBBRxConf |= 0x20;
 
-	ControlvReadByte(priv, MESSAGE_REQUEST_BBREG, 0xe7, &bb_vga);
+	vnt_control_in_u8(priv, MESSAGE_REQUEST_BBREG, 0xe7, &bb_vga);
 
 	if (bb_vga == priv->abyBBVGA[0])
 		priv->byBBRxConf |= 0x20;
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
 }
 
 void BBvSetVGAGainOffset(struct vnt_private *priv, u8 data)
 {
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0xE7, data);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0xE7, data);
 
 	/* patch for 3253B0 Baseband with Cardbus module */
 	if (priv->bShortSlotTime)
@@ -1095,7 +1094,7 @@ void BBvSetVGAGainOffset(struct vnt_private *priv, u8 data)
 	else
 		priv->byBBRxConf |= 0x20; /* 0010 0000 */
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
 }
 
 /*
@@ -1112,14 +1111,14 @@ void BBvSetVGAGainOffset(struct vnt_private *priv, u8 data)
  */
 void BBvSetDeepSleep(struct vnt_private *priv)
 {
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0c, 0x17);/* CR12 */
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0xB9);/* CR13 */
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0c, 0x17);/* CR12 */
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0xB9);/* CR13 */
 }
 
 void BBvExitDeepSleep(struct vnt_private *priv)
 {
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0c, 0x00);/* CR12 */
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0x01);/* CR13 */
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0c, 0x00);/* CR12 */
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0x01);/* CR13 */
 }
 
 void BBvUpdatePreEDThreshold(struct vnt_private *priv, int scanning)
@@ -1384,7 +1383,7 @@ void BBvUpdatePreEDThreshold(struct vnt_private *priv, int scanning)
 	if (!cr_201 && !cr_206)
 		return;
 
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0xc9, cr_201);
-	ControlvWriteByte(priv, MESSAGE_REQUEST_BBREG, 0xce, cr_206);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0xc9, cr_201);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0xce, cr_206);
 }
 

@@ -219,13 +219,6 @@ static void usb_dvobj_deinit(struct usb_interface *usb_intf)
 
 }
 
-static void chip_by_usb_id(struct adapter *padapter,
-			   const struct usb_device_id *pdid)
-{
-	padapter->chip_type = NULL_CHIP_TYPE;
-	hal_set_hw_type(padapter);
-}
-
 static void usb_intf_start(struct adapter *padapter)
 {
 	RT_TRACE(_module_hci_intfs_c_, _drv_err_, ("+usb_intf_start\n"));
@@ -314,7 +307,7 @@ int rtw_hw_suspend(struct adapter *padapter)
 	/* s1. */
 	if (pnetdev) {
 		netif_carrier_off(pnetdev);
-		rtw_netif_stop_queue(pnetdev);
+		netif_tx_stop_all_queues(pnetdev);
 	}
 
 	/* s2. */
@@ -423,7 +416,7 @@ static int rtw_suspend(struct usb_interface *pusb_intf, pm_message_t message)
 	/* s1. */
 	if (pnetdev) {
 		netif_carrier_off(pnetdev);
-		rtw_netif_stop_queue(pnetdev);
+		netif_tx_stop_all_queues(pnetdev);
 	}
 
 	/* s2. */
@@ -546,18 +539,12 @@ static struct adapter *rtw_usb_if1_init(struct dvobj_priv *dvobj,
 	dvobj->if1 = padapter;
 
 	padapter->bDriverStopped = true;
-
 	padapter->hw_init_mutex = &usb_drv->hw_init_mutex;
-
-	/* step 1-1., decide the chip_type via vid/pid */
-	chip_by_usb_id(padapter, pdid);
-
-	if (rtw_handle_dualmac(padapter, 1) != _SUCCESS)
-		goto free_adapter;
+	padapter->chip_type = RTL8188E;
 
 	pnetdev = rtw_init_netdev(padapter);
 	if (pnetdev == NULL)
-		goto handle_dualmac;
+		goto free_adapter;
 	SET_NETDEV_DEV(pnetdev, dvobj_to_dev(dvobj));
 	padapter = rtw_netdev_priv(pnetdev);
 
@@ -631,9 +618,6 @@ static struct adapter *rtw_usb_if1_init(struct dvobj_priv *dvobj,
 free_hal_data:
 	if (status != _SUCCESS)
 		kfree(padapter->HalData);
-handle_dualmac:
-	if (status != _SUCCESS)
-		rtw_handle_dualmac(padapter, 0);
 free_adapter:
 	if (status != _SUCCESS) {
 		if (pnetdev)
@@ -670,7 +654,6 @@ static void rtw_usb_if1_deinit(struct adapter *if1)
 	rtw_dev_unload(if1);
 	DBG_88E("+r871xu_dev_remove, hw_init_completed=%d\n",
 		if1->hw_init_completed);
-	rtw_handle_dualmac(if1, 0);
 	rtw_free_drv_sw(if1);
 	if (pnetdev)
 		rtw_free_netdev(pnetdev);

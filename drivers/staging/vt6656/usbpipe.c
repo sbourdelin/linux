@@ -26,10 +26,10 @@
  * Date: Mar. 29, 2005
  *
  * Functions:
- *      CONTROLnsRequestOut - Write variable length bytes to MEM/BB/MAC/EEPROM
- *      CONTROLnsRequestIn - Read variable length bytes from MEM/BB/MAC/EEPROM
- *      ControlvWriteByte - Write one byte to MEM/BB/MAC/EEPROM
- *      ControlvReadByte - Read one byte from MEM/BB/MAC/EEPROM
+ *	vnt_control_out - Write variable length bytes to MEM/BB/MAC/EEPROM
+ *	vnt_control_in - Read variable length bytes from MEM/BB/MAC/EEPROM
+ *	vnt_control_out_u8 - Write one byte to MEM/BB/MAC/EEPROM
+ *	vnt_control_in_u8 - Read one byte from MEM/BB/MAC/EEPROM
  *      ControlvMaskByte - Read one byte from MEM/BB/MAC/EEPROM and clear/set some bits in the same address
  *
  * Revision History:
@@ -41,9 +41,9 @@
 #include "int.h"
 #include "rxtx.h"
 #include "dpc.h"
-#include "control.h"
 #include "desc.h"
 #include "device.h"
+#include "usbpipe.h"
 
 //endpoint def
 //endpoint 0: control
@@ -61,7 +61,7 @@ static void s_nsInterruptUsbIoCompleteRead(struct urb *urb);
 static void s_nsBulkInUsbIoCompleteRead(struct urb *urb);
 static void s_nsBulkOutIoCompleteWrite(struct urb *urb);
 
-int PIPEnsControlOut(struct vnt_private *priv, u8 request, u16 value,
+int vnt_control_out(struct vnt_private *priv, u8 request, u16 value,
 		u16 index, u16 length, u8 *buffer)
 {
 	int status = 0;
@@ -83,7 +83,13 @@ int PIPEnsControlOut(struct vnt_private *priv, u8 request, u16 value,
 	return STATUS_SUCCESS;
 }
 
-int PIPEnsControlIn(struct vnt_private *priv, u8 request, u16 value,
+void vnt_control_out_u8(struct vnt_private *priv, u8 reg, u8 reg_off, u8 data)
+{
+	vnt_control_out(priv, MESSAGE_TYPE_WRITE,
+					reg_off, reg, sizeof(u8), &data);
+}
+
+int vnt_control_in(struct vnt_private *priv, u8 request, u16 value,
 		u16 index, u16 length, u8 *buffer)
 {
 	int status;
@@ -103,6 +109,12 @@ int PIPEnsControlIn(struct vnt_private *priv, u8 request, u16 value,
 		return STATUS_FAILURE;
 
 	return STATUS_SUCCESS;
+}
+
+void vnt_control_in_u8(struct vnt_private *priv, u8 reg, u8 reg_off, u8 *data)
+{
+	vnt_control_in(priv, MESSAGE_TYPE_READ,
+			reg_off, reg, sizeof(u8), data);
 }
 
 /*

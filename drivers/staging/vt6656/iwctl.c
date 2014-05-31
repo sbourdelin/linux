@@ -38,7 +38,7 @@
 #include "rf.h"
 #include "iowpa.h"
 #include "wpactl.h"
-#include "control.h"
+#include "usbpipe.h"
 #include "baseband.h"
 
 static const long frequency_list[] = {
@@ -57,7 +57,7 @@ struct iw_statistics *iwctl_get_wireless_stats(struct net_device *dev)
 	long ldBm;
 
 	pDevice->wstats.status = pDevice->op_mode;
-	RFvRSSITodBm(pDevice, (u8)(pDevice->uCurrRSSI), &ldBm);
+	vnt_rf_rssi_to_dbm(pDevice, (u8)(pDevice->uCurrRSSI), &ldBm);
 	pDevice->wstats.qual.level = ldBm;
 	pDevice->wstats.qual.noise = 0;
 	pDevice->wstats.qual.updated = 1;
@@ -235,7 +235,7 @@ int iwctl_giwscan(struct net_device *dev, struct iw_request_info *info,
 			// ADD quality
 			memset(&iwe, 0, sizeof(iwe));
 			iwe.cmd = IWEVQUAL;
-			RFvRSSITodBm(pDevice, (u8)(pBSS->uRSSI), &ldBm);
+			vnt_rf_rssi_to_dbm(pDevice, (u8)(pBSS->uRSSI), &ldBm);
 			iwe.u.qual.level = ldBm;
 			iwe.u.qual.noise = 0;
 
@@ -442,9 +442,7 @@ int iwctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 				memset(pMgmt->abyCurrBSSID, 0, 6);
 			}
 
-			ControlvMaskByte(pDevice,
-				MESSAGE_REQUEST_MACREG,	MAC_REG_PAPEDELAY,
-					LEDSTS_STS, LEDSTS_SLOW);
+			vnt_mac_set_led(pDevice, LEDSTS_STS, LEDSTS_SLOW);
 
 			netif_stop_queue(pDevice->dev);
 
@@ -1401,7 +1399,7 @@ int iwctl_giwsens(struct net_device *dev, struct iw_request_info *info,
 
 	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO " SIOCGIWSENS\n");
 	if (pDevice->bLinkPass == true) {
-		RFvRSSITodBm(pDevice, (u8)(pDevice->uCurrRSSI), &ldBm);
+		vnt_rf_rssi_to_dbm(pDevice, (u8)(pDevice->uCurrRSSI), &ldBm);
 		wrq->value = ldBm;
 	} else {
 		wrq->value = 0;

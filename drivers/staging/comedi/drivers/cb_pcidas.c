@@ -837,7 +837,7 @@ static int cb_pcidas_ai_cmdtest(struct comedi_device *dev,
 	const struct cb_pcidas_board *thisboard = comedi_board(dev);
 	struct cb_pcidas_private *devpriv = dev->private;
 	int err = 0;
-	int tmp;
+	unsigned int arg;
 
 	/* Step 1 : check if triggers are trivially valid */
 
@@ -912,22 +912,20 @@ static int cb_pcidas_ai_cmdtest(struct comedi_device *dev,
 	/* step 4: fix up any arguments */
 
 	if (cmd->scan_begin_src == TRIG_TIMER) {
-		tmp = cmd->scan_begin_arg;
+		arg = cmd->scan_begin_arg;
 		i8253_cascade_ns_to_timer(I8254_OSC_BASE_10MHZ,
 					  &devpriv->divisor1,
 					  &devpriv->divisor2,
-					  &cmd->scan_begin_arg, cmd->flags);
-		if (tmp != cmd->scan_begin_arg)
-			err++;
+					  &arg, cmd->flags);
+		err |= cfc_check_trigger_arg_is(&cmd->scan_begin_arg, arg);
 	}
 	if (cmd->convert_src == TRIG_TIMER) {
-		tmp = cmd->convert_arg;
+		arg = cmd->convert_arg;
 		i8253_cascade_ns_to_timer(I8254_OSC_BASE_10MHZ,
 					  &devpriv->divisor1,
 					  &devpriv->divisor2,
-					  &cmd->convert_arg, cmd->flags);
-		if (tmp != cmd->convert_arg)
-			err++;
+					  &arg, cmd->flags);
+		err |= cfc_check_trigger_arg_is(&cmd->convert_arg, arg);
 	}
 
 	if (err)
@@ -1064,7 +1062,7 @@ static int cb_pcidas_ao_cmdtest(struct comedi_device *dev,
 	const struct cb_pcidas_board *thisboard = comedi_board(dev);
 	struct cb_pcidas_private *devpriv = dev->private;
 	int err = 0;
-	int tmp;
+	unsigned int arg;
 
 	/* Step 1 : check if triggers are trivially valid */
 
@@ -1107,13 +1105,12 @@ static int cb_pcidas_ao_cmdtest(struct comedi_device *dev,
 	/* step 4: fix up any arguments */
 
 	if (cmd->scan_begin_src == TRIG_TIMER) {
-		tmp = cmd->scan_begin_arg;
+		arg = cmd->scan_begin_arg;
 		i8253_cascade_ns_to_timer(I8254_OSC_BASE_10MHZ,
 					  &devpriv->ao_divisor1,
 					  &devpriv->ao_divisor2,
-					  &cmd->scan_begin_arg, cmd->flags);
-		if (tmp != cmd->scan_begin_arg)
-			err++;
+					  &arg, cmd->flags);
+		err |= cfc_check_trigger_arg_is(&cmd->scan_begin_arg, arg);
 	}
 
 	if (err)
@@ -1324,7 +1321,7 @@ static void handle_ao_interrupt(struct comedi_device *dev, unsigned int status)
 					       num_points * sizeof(short));
 		num_points = num_bytes / sizeof(short);
 
-		if (async->cmd.stop_src == TRIG_COUNT)
+		if (cmd->stop_src == TRIG_COUNT)
 			devpriv->ao_count -= num_points;
 		/*  write data to board's fifo */
 		outsw(devpriv->ao_registers + DACDATA, devpriv->ao_buffer,
@@ -1346,6 +1343,7 @@ static irqreturn_t cb_pcidas_interrupt(int irq, void *d)
 	struct cb_pcidas_private *devpriv = dev->private;
 	struct comedi_subdevice *s = dev->read_subdev;
 	struct comedi_async *async;
+	struct comedi_cmd *cmd;
 	int status, s5933_status;
 	int half_fifo = thisboard->fifo_size / 2;
 	unsigned int num_samples, i;
@@ -1356,6 +1354,7 @@ static irqreturn_t cb_pcidas_interrupt(int irq, void *d)
 		return IRQ_NONE;
 
 	async = s->async;
+	cmd = &async->cmd;
 
 	s5933_status = inl(devpriv->s5933_config + AMCC_OP_REG_INTCSR);
 
@@ -1378,7 +1377,7 @@ static irqreturn_t cb_pcidas_interrupt(int irq, void *d)
 	if (status & ADHFI) {
 		/*  read data */
 		num_samples = half_fifo;
-		if (async->cmd.stop_src == TRIG_COUNT &&
+		if (cmd->stop_src == TRIG_COUNT &&
 		    num_samples > devpriv->count) {
 			num_samples = devpriv->count;
 		}
@@ -1387,7 +1386,7 @@ static irqreturn_t cb_pcidas_interrupt(int irq, void *d)
 		cfc_write_array_to_buffer(s, devpriv->ai_buffer,
 					  num_samples * sizeof(short));
 		devpriv->count -= num_samples;
-		if (async->cmd.stop_src == TRIG_COUNT && devpriv->count == 0)
+		if (cmd->stop_src == TRIG_COUNT && devpriv->count == 0)
 			async->events |= COMEDI_CB_EOA;
 		/*  clear half-full interrupt latch */
 		spin_lock_irqsave(&dev->spinlock, flags);
@@ -1402,7 +1401,7 @@ static irqreturn_t cb_pcidas_interrupt(int irq, void *d)
 					INT_ADCFIFO)) == 0)
 				break;
 			cfc_write_to_buffer(s, inw(devpriv->adc_fifo));
-			if (async->cmd.stop_src == TRIG_COUNT &&
+			if (cmd->stop_src == TRIG_COUNT &&
 			    --devpriv->count == 0) {
 				/* end of acquisition */
 				async->events |= COMEDI_CB_EOA;
