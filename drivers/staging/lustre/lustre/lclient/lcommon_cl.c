@@ -126,6 +126,7 @@ void ccc_key_fini(const struct lu_context *ctx,
 			 struct lu_context_key *key, void *data)
 {
 	struct ccc_thread_info *info = data;
+
 	OBD_SLAB_FREE_PTR(info, ccc_thread_kmem);
 }
 
@@ -144,6 +145,7 @@ void ccc_session_key_fini(const struct lu_context *ctx,
 				 struct lu_context_key *key, void *data)
 {
 	struct ccc_session *session = data;
+
 	OBD_SLAB_FREE_PTR(session, ccc_session_kmem);
 }
 
@@ -264,7 +266,7 @@ int ccc_req_init(const struct lu_env *env, struct cl_device *dev,
  * fails. Access to this environment is serialized by ccc_inode_fini_guard
  * mutex.
  */
-static struct lu_env *ccc_inode_fini_env = NULL;
+static struct lu_env *ccc_inode_fini_env;
 
 /**
  * A mutex serializing calls to slp_inode_fini() under extreme memory
@@ -572,6 +574,7 @@ void ccc_lock_delete(const struct lu_env *env,
 void ccc_lock_fini(const struct lu_env *env, struct cl_lock_slice *slice)
 {
 	struct ccc_lock *clk = cl2ccc_lock(slice);
+
 	OBD_SLAB_FREE_PTR(clk, ccc_lock_kmem);
 }
 
@@ -720,31 +723,12 @@ int ccc_io_one_lock_index(const struct lu_env *env, struct cl_io *io,
 void ccc_io_update_iov(const struct lu_env *env,
 		       struct ccc_io *cio, struct cl_io *io)
 {
-	int i;
 	size_t size = io->u.ci_rw.crw_count;
 
-	cio->cui_iov_olen = 0;
-	if (!cl_is_normalio(env, io) || cio->cui_tot_nrsegs == 0)
+	if (!cl_is_normalio(env, io) || cio->cui_iter == NULL)
 		return;
 
-	for (i = 0; i < cio->cui_tot_nrsegs; i++) {
-		struct iovec *iv = &cio->cui_iov[i];
-
-		if (iv->iov_len < size)
-			size -= iv->iov_len;
-		else {
-			if (iv->iov_len > size) {
-				cio->cui_iov_olen = iv->iov_len;
-				iv->iov_len = size;
-			}
-			break;
-		}
-	}
-
-	cio->cui_nrsegs = i + 1;
-	LASSERTF(cio->cui_tot_nrsegs >= cio->cui_nrsegs,
-		 "tot_nrsegs: %lu, nrsegs: %lu\n",
-		 cio->cui_tot_nrsegs, cio->cui_nrsegs);
+	iov_iter_truncate(cio->cui_iter, size);
 }
 
 int ccc_io_one_lock(const struct lu_env *env, struct cl_io *io,
@@ -752,6 +736,7 @@ int ccc_io_one_lock(const struct lu_env *env, struct cl_io *io,
 		    loff_t start, loff_t end)
 {
 	struct cl_object *obj = io->ci_obj;
+
 	return ccc_io_one_lock_index(env, io, enqflags, mode,
 				     cl_index(obj, start), cl_index(obj, end));
 }
@@ -775,30 +760,7 @@ void ccc_io_advance(const struct lu_env *env,
 	if (!cl_is_normalio(env, io))
 		return;
 
-	LASSERT(cio->cui_tot_nrsegs >= cio->cui_nrsegs);
-	LASSERT(cio->cui_tot_count  >= nob);
-
-	cio->cui_iov	+= cio->cui_nrsegs;
-	cio->cui_tot_nrsegs -= cio->cui_nrsegs;
-	cio->cui_tot_count  -= nob;
-
-	/* update the iov */
-	if (cio->cui_iov_olen > 0) {
-		struct iovec *iv;
-
-		cio->cui_iov--;
-		cio->cui_tot_nrsegs++;
-		iv = &cio->cui_iov[0];
-		if (io->ci_continue) {
-			iv->iov_base += iv->iov_len;
-			LASSERT(cio->cui_iov_olen > iv->iov_len);
-			iv->iov_len = cio->cui_iov_olen - iv->iov_len;
-		} else {
-			/* restore the iov_len, in case of restart io. */
-			iv->iov_len = cio->cui_iov_olen;
-		}
-		cio->cui_iov_olen = 0;
-	}
+	iov_iter_reexpand(cio->cui_iter, cio->cui_tot_count  -= nob);
 }
 
 /**
@@ -859,11 +821,12 @@ int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
 				 * linux-2.6.18-128.1.1 miss to do that.
 				 * --bug 17336 */
 				loff_t size = cl_isize_read(inode);
-				unsigned long cur_index = start >> PAGE_CACHE_SHIFT;
+				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
+				loff_t size_index = ((size - 1) >> PAGE_CACHE_SHIFT);
 
 				if ((size == 0 && cur_index != 0) ||
-				    (((size - 1) >> PAGE_CACHE_SHIFT) < cur_index))
-				*exceed = 1;
+				    size_index < cur_index)
+					*exceed = 1;
 			}
 			return result;
 		} else {
@@ -1311,7 +1274,7 @@ struct lov_stripe_md *ccc_inode_lsm_get(struct inode *inode)
 	return lov_lsm_get(cl_i2info(inode)->lli_clob);
 }
 
-void inline ccc_inode_lsm_put(struct inode *inode, struct lov_stripe_md *lsm)
+inline void ccc_inode_lsm_put(struct inode *inode, struct lov_stripe_md *lsm)
 {
 	lov_lsm_put(cl_i2info(inode)->lli_clob, lsm);
 }
