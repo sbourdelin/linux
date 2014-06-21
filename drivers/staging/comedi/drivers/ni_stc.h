@@ -1421,18 +1421,6 @@ struct ni_board_struct {
 #define NUM_GPCT	2
 
 struct ni_private {
-	uint8_t (*readb)(struct comedi_device *, int reg);
-	uint16_t (*readw)(struct comedi_device *, int reg);
-	uint32_t (*readl)(struct comedi_device *, int reg);
-	void (*writeb)(struct comedi_device *, uint8_t value, int reg);
-	void (*writew)(struct comedi_device *, uint16_t value, int reg);
-	void (*writel)(struct comedi_device *, uint32_t value, int reg);
-
-	uint16_t (*stc_readw)(struct comedi_device *, int reg);
-	uint32_t (*stc_readl)(struct comedi_device *, int reg);
-	void (*stc_writew)(struct comedi_device *, uint16_t value, int reg);
-	void (*stc_writel)(struct comedi_device *, uint32_t value, int reg);
-
 	unsigned short dio_output;
 	unsigned short dio_control;
 	int aimode;
@@ -1503,6 +1491,8 @@ struct ni_private {
 	struct mite_dma_descriptor_ring *ao_mite_ring;
 	struct mite_dma_descriptor_ring *cdo_mite_ring;
 	struct mite_dma_descriptor_ring *gpct_mite_ring[NUM_GPCT];
+
+	unsigned int is_m_series:1;
 };
 
 #endif /* _COMEDI_NI_STC_H */
