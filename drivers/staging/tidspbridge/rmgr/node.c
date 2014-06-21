@@ -273,6 +273,7 @@ static struct node_ldr_fxns nldr_fxns = {
 enum node_state node_get_state(void *hnode)
 {
 	struct node_object *pnode = (struct node_object *)hnode;
+
 	if (!pnode)
 		return -1;
 	return pnode->node_state;
@@ -935,7 +936,7 @@ int node_connect(struct node_object *node1, u32 stream1,
 				 node2_type == NODE_DAISSOCKET)) {
 		/* Find available pipe */
 		pipe_id = find_first_zero_bit(hnode_mgr->pipe_map, MAXPIPES);
-		if (pipe_id >= MAXPIPES) {
+		if (pipe_id == MAXPIPES) {
 			status = -ECONNREFUSED;
 			goto out_unlock;
 		}
@@ -1008,7 +1009,7 @@ int node_connect(struct node_object *node1, u32 stream1,
 			status = -EINVAL;
 			goto out_unlock;
 		}
-		if (chnl_id >= CHNL_MAXCHANNELS) {
+		if (chnl_id == CHNL_MAXCHANNELS) {
 			status = -ECONNREFUSED;
 			goto out_unlock;
 		}
@@ -2365,6 +2366,7 @@ static void delete_node(struct node_object *hnode,
 	    (struct proc_object *)hnode->processor;
 #endif
 	int status;
+
 	if (!hnode)
 		goto func_end;
 	hnode_mgr = hnode->node_mgr;
