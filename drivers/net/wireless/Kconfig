@@ -242,6 +242,13 @@ config ADM8211
 
 	  Thanks to Infineon-ADMtek for their support of this driver.
 
+config RTLMAC
+	tristate "RTL8723AU (mac80211) support"
+	depends on MAC80211 && USB
+	---help---
+	  This is an alternate driver for the RTL8723au using the
+	  MAC80211 stack.
+
 config MAC80211_HWSIM
 	tristate "Simulated radio testing tool for mac80211"
 	depends on MAC80211

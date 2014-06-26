@@ -49,6 +49,8 @@ obj-$(CONFIG_P54_COMMON)	+= p54/
 
 obj-$(CONFIG_ATH_CARDS)		+= ath/
 
+obj-$(CONFIG_RTLMAC)	+= rtlmac.o
+
 obj-$(CONFIG_MAC80211_HWSIM)	+= mac80211_hwsim.o
 
 obj-$(CONFIG_WL_TI)	+= ti/
