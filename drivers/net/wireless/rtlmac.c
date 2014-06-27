@@ -332,7 +332,7 @@ static int rtlmac_power_on(struct rtlmac_priv *priv)
 //	PHY_SetBBReg(priv, REG_EFUSE_CTRL, BIT(28)|BIT(29)|BIT(30), 0x06);
 	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
 	val32 &= ~(BIT(28)|BIT(29)|BIT(30));
-	val32 |= 0x06 << 28;
+	val32 |= (0x06 << 28);
 	rtl8723au_write32(priv, REG_EFUSE_CTRL, val32);
 exit:
 	return ret;
