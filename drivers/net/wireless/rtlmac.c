@@ -192,6 +192,20 @@ int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 	return ret;
 }
 
+int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
+{
+	struct usb_device *udev = priv->udev;
+	int ret;
+
+	ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
+			      addr, 0, buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
+
+	printk(KERN_DEBUG "%s(%04x) = %p, len %02x\n",
+	       __func__, addr, buf, len);
+	return ret;
+}
+
 static int rtlmac_power_on(struct rtlmac_priv *priv)
 {
 	u8 val8;
