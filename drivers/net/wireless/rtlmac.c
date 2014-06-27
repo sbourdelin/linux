@@ -206,6 +206,52 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 	return ret;
 }
 
+static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
+{
+	u8 val8;
+	u32 val32;
+	int count, ret = -EBUSY;
+
+	/* Active to Low Power sequence */
+	rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
+
+	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
+		val32 = rtl8723au_read32(priv, 0x05f8);
+		if (val32 == 0x00) {
+			ret = 0;
+			break;
+		}
+		udelay(10);
+	}
+
+	/* CCK and OFDM are disabled, and clock are gated */
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC_EN);
+	val8 &= ~BIT(0);
+	rtl8723au_write8(priv, REG_SYS_FUNC_EN, val8);
+
+	udelay(2);
+
+	/*Whole BB is reset*/
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC_EN);
+	val8 &= ~BIT(1);
+	rtl8723au_write8(priv, REG_SYS_FUNC_EN, val8);
+
+	/*Reset MAC TRX*/
+	rtl8723au_write8(priv, REG_CR, HCI_TXDMA_EN | HCI_RXDMA_EN);
+
+	/* 'ENSEC' */
+	val8 = rtl8723au_read8(priv, REG_CR);
+	val8 &= ~BIT(1);
+	rtl8723au_write8(priv, REG_CR, val8);
+
+	/* Respond TxOK to scheduler */
+	val8 = rtl8723au_read8(priv, REG_DUAL_TSF_RST);
+	val8 |= BIT(5);
+	rtl8723au_write8(priv, REG_DUAL_TSF_RST, val8);
+
+	return ret;
+}
+
 static int rtlmac_power_on(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -232,13 +278,12 @@ static int rtlmac_power_on(struct rtlmac_priv *priv)
 	val8 |= BIT(1);
 	rtl8723au_write8(priv, 0x05, val8);
 
-	count = 0;
-	do {
+	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
 		val8 = rtl8723au_read8(priv, 0x05);
 		if ((val8 & BIT(1)) == 0)
 			break;
 		udelay(10);
-	} while (count++ < RTLMAC_MAX_REG_POLL);
+	}
 
 	if (count == RTLMAC_MAX_REG_POLL) {
 		printk(KERN_WARNING "%s: Turn off MAC timed out\n", __func__);
@@ -290,6 +335,15 @@ static int rtlmac_power_on(struct rtlmac_priv *priv)
 	val32 |= 0x06 << 28;
 	rtl8723au_write32(priv, REG_EFUSE_CTRL, val32);
 exit:
+	return ret;
+}
+
+static int rtlmac_power_off(struct rtlmac_priv *priv)
+{
+	int ret = 0;
+
+	rtlmac_low_power_flow(priv);
+
 	return ret;
 }
 
@@ -534,6 +588,14 @@ exit:
 	return ret;
 }
 
+static int rtlmac_disable_device(struct ieee80211_hw *hw)
+{
+	struct rtlmac_priv *priv = hw->priv;
+
+	rtlmac_power_off(priv);
+	return 0;
+}
+
 static void rtlmac_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
@@ -649,6 +711,7 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 
 	hw = usb_get_intfdata(interface);
 	priv = hw->priv;
+	rtlmac_disable_device(hw);
 	usb_set_intfdata(interface, NULL);
 	ieee80211_free_hw(hw);
 
