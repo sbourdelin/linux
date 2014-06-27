@@ -131,7 +131,7 @@ u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 	return le16_to_cpu(data);
 }
 
-u16 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
+u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
