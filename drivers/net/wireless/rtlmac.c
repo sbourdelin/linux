@@ -111,7 +111,8 @@ u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 			      addr, 0, &data, sizeof(data),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %02x\n", __func__, addr, data);
+	printk(KERN_DEBUG "%s(%04x) = 0x%02x len %i\n",
+	       __func__, addr, data, len);
 	return data;
 }
 
@@ -126,8 +127,8 @@ u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 			      addr, 0, &data, sizeof(data),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %04x\n",
-	       __func__, addr, le16_to_cpu(data));
+	printk(KERN_DEBUG "%s(%04x) = 0x%04x len %i\n",
+	       __func__, addr, le16_to_cpu(data), len);
 	return le16_to_cpu(data);
 }
 
@@ -142,8 +143,8 @@ u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 			      addr, 0, &data, sizeof(data),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %08x\n",
-	       __func__, addr, le32_to_cpu(data));
+	printk(KERN_DEBUG "%s(%04x) = 0x%08x, len %i\n",
+	       __func__, addr, le32_to_cpu(data), len);
 	return le32_to_cpu(data);
 }
 
@@ -153,12 +154,13 @@ int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 	int ret;
 	u8 data = val;
 
-	ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
 			      addr, 0, &data, sizeof(data),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %02x\n", __func__, addr, data);
+	printk(KERN_DEBUG "%s(%04x) = %02x, ret %i\n",
+	       __func__, addr, data, ret);
 	return ret;
 }
 
@@ -168,12 +170,13 @@ int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 	int ret;
 	__le16 data = cpu_to_le16(val);
 
-	ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
 			      addr, 0, &data, sizeof(data),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %04x\n", __func__, addr, data);
+	printk(KERN_DEBUG "%s(%04x) = %04x, ret %i\n",
+	       __func__, addr, data, ret);
 	return ret;
 }
 
@@ -183,12 +186,13 @@ int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 	int ret;
 	__le32 data = cpu_to_le32(val);
 
-	ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
 			      addr, 0, &data, sizeof(data),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %04x\n", __func__, addr, data);
+	printk(KERN_DEBUG "%s(%04x) = %04x, ret %i\n",
+	       __func__, addr, data, ret);
 	return ret;
 }
 
@@ -197,7 +201,7 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 	struct usb_device *udev = priv->udev;
 	int ret;
 
-	ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
+	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
 			      addr, 0, buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
 
@@ -460,7 +464,6 @@ static int rtlmac_power_on(struct rtlmac_priv *priv)
 	rtl8723au_write16(priv, REG_CR, val16);
 
 	/* for Efuse PG */
-//	PHY_SetBBReg(priv, REG_EFUSE_CTRL, BIT(28)|BIT(29)|BIT(30), 0x06);
 	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
 	val32 &= ~(BIT(28)|BIT(29)|BIT(30));
 	val32 |= (0x06 << 28);
