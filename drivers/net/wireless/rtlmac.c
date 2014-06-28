@@ -183,6 +183,36 @@ static int rtlmac_llt_write(struct rtlmac_priv *priv, u8 address, u8 data)
 	return ret;
 }
 
+static int rtlmac_init_llt_table(struct rtlmac_priv *priv, u8 last_tx_page)
+{
+	int ret;
+	int i;
+
+	for (i = 0; i < last_tx_page; i++) {
+		ret = rtlmac_llt_write(priv, i, i + 1);
+		if (ret)
+			goto exit;
+	}
+
+	ret = rtlmac_llt_write(priv, last_tx_page, 0xff);
+	if (ret)
+		goto exit;
+
+	/* Mark remaining pages as a ring buffer */
+	for (i = last_tx_page + 1; i < 0xff; i++) {
+		ret = rtlmac_llt_write(priv, i, (i + 1));
+		if (ret)
+			goto exit;
+	}
+
+	/*  Let last entry point to the start entry of ring buffer */
+	ret = rtlmac_llt_write(priv, 0xff, last_tx_page + 1);
+	if (ret)
+		goto exit;
+
+exit:
+	return ret;
+}
 
 static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 {
@@ -478,26 +508,22 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		goto exit;
 	}
 
-#if 0
-	if (!pregistrypriv->wifi_spec) {
-		boundary = TX_PAGE_BOUNDARY;
-	} else {
-		/*  for WMM */
-		boundary = WMM_NORMAL_TX_PAGE_BOUNDARY;
-	}
-
-	if (!pHalData->bMACFuncEnable) {
-		ret =  InitLLTTable23a(Adapter, boundary);
-		if (ret == _FAIL) {
-			RT_TRACE(_module_hci_hal_init_c_, _drv_err_,
-				 ("Failed to init LLT table\n"));
+	printk(KERN_DEBUG "macpower %i\n", macpower);
+	if (!macpower) {
+		ret = rtlmac_init_llt_table(priv, LLT_LAST_TX_PAGE);
+		if (ret) {
+			printk(KERN_DEBUG "%s: LLT table init failed\n",
+			       __func__);
 			goto exit;
 		}
 	}
 
+#if 0
 	if (pHalData->bRDGEnable)
 		_InitRDGSetting(Adapter);
+#endif
 
+#if 0
 	ret = rtl8723a_FirmwareDownload(Adapter);
 	if (ret != _SUCCESS) {
 		Adapter->bFWReady = false;

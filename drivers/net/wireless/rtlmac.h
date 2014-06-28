@@ -23,7 +23,9 @@ struct rtlmac_priv {
 #define RTW_USB_CONTROL_MSG_TIMEOUT	500
 #define RTLMAC_MAX_REG_POLL		500
 
-#define REALTEK_USB_READ		0xC0
+#define REALTEK_USB_READ		0xc0
 #define REALTEK_USB_WRITE		0x40
 #define REALTEK_USB_CMD_REQ		0x05
 #define REALTEK_USB_CMD_IDX		0x00
+
+#define LLT_LAST_TX_PAGE		0xf8
