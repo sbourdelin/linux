@@ -55,8 +55,32 @@
 #define REG_GPIO_PIN_CTRL_2		0x0060
 /*  RTL8723 WIFI/BT/GPS Multi-Function GPIO Select. */
 #define REG_GPIO_IO_SEL_2		0x0062
-/*  RTL8723 WIFI/BT/GPS Multi-Function control source. */
+
+/*  RTL8723 only WIFI/BT/GPS Multi-Function control source. */
 #define REG_MULTI_FUNC_CTRL		0x0068
+
+#define	 MULTI_FN_WIFI_HW_PWRDOWN_EN	BIT(0)	/* Enable GPIO[9] as WiFi HW
+						   powerdown source */
+#define	 MULTI_FN_WIFI_HW_PWRDOWN_SL	BIT(1)	/* WiFi HW powerdown polarity
+						   control */
+#define	 MULTI_WIFI_FUNC_EN		BIT(2)	/* WiFi function enable */
+
+#define	 MULTI_WIFI_HW_ROF_EN		BIT(3)	/* Enable GPIO[9] as WiFi RF HW
+						   powerdown source */
+#define	 MULTI_BT_HW_PWRDOWN_EN		BIT(16)	/* Enable GPIO[11] as BT HW
+						   powerdown source */
+#define	 MULTI_BT_HW_PWRDOWN_SL		BIT(17)	/* BT HW powerdown polarity
+						   control */
+#define	 MULTI_BT_FUNC_EN		BIT(18)	/* BT function enable */
+#define	 MULTI_BT_HW_ROF_EN		BIT(19)	/* Enable GPIO[11] as BT/GPS
+						   RF HW powerdown source */
+#define	 MULTI_GPS_HW_PWRDOWN_EN	BIT(20)	/* Enable GPIO[10] as GPS HW
+						   powerdown source */
+#define	 MULTI_GPS_HW_PWRDOWN_SL	BIT(21)	/* GPS HW powerdown polarity
+						   control */
+#define	 MULTI_GPS_FUNC_EN		BIT(22)	/* GPS function enable */
+
+
 #define REG_MCUFWDL			0x0080
 #define REG_HMEBOX_EXT_0		0x0088
 #define REG_HMEBOX_EXT_1		0x008A
@@ -74,7 +98,77 @@
 #define REG_PCIE_MIO_INTD		0x00E8
 #define REG_HPON_FSM			0x00EC
 #define REG_SYS_CFG			0x00F0
+
+#define XCLK_VLD			BIT(0)
+#define ACLK_VLD			BIT(1)
+#define UCLK_VLD			BIT(2)
+#define PCLK_VLD			BIT(3)
+#define PCIRSTB				BIT(4)
+#define V15_VLD				BIT(5)
+#define TRP_B15V_EN			BIT(7)
+#define SIC_IDLE			BIT(8)
+#define BD_MAC2				BIT(9)
+#define BD_MAC1				BIT(10)
+#define IC_MACPHY_MODE			BIT(11)
+#define CHIP_VER			(BIT(12)|BIT(13)|BIT(14)|BIT(15))
+#define BT_FUNC				BIT(16)
+#define VENDOR_ID			BIT(19)
+#define PAD_HWPD_IDN			BIT(22)
+#define TRP_VAUX_EN			BIT(23)
+#define TRP_BT_EN			BIT(24)
+#define BD_PKG_SEL			BIT(25)
+#define BD_HCI_SEL			BIT(26)
+#define TYPE_ID				BIT(27)
+
+#define  SYS_CFG_XCLK_VLD		BIT(0)
+#define  SYS_CFG_ACLK_VLD		BIT(1)
+#define  SYS_CFG_UCLK_VLD		BIT(2)
+#define  SYS_CFG_PCLK_VLD		BIT(3)
+#define  SYS_CFG_PCIRSTB		BIT(4)
+#define  SYS_CFG_V15_VLD		BIT(5)
+#define  SYS_CFG_TRP_B15V_EN		BIT(7)
+#define  SYS_CFG_SIC_IDLE		BIT(8)
+#define  SYS_CFG_BD_MAC2		BIT(9)
+#define  SYS_CFG_BD_MAC1		BIT(10)
+#define  SYS_CFG_IC_MACPHY_MODE		BIT(11)
+#define  SYS_CFG_CHIP_VER		(BIT(12)|BIT(13)|BIT(14)|BIT(15))
+#define  SYS_CFG_BT_FUNC		BIT(16)
+#define  SYS_CFG_VENDOR_ID		BIT(19)
+#define  SYS_CFG_PAD_HWPD_IDN		BIT(22)
+#define  SYS_CFG_TRP_VAUX_EN		BIT(23)
+#define  SYS_CFG_TRP_BT_EN		BIT(24)
+#define  SYS_CFG_BD_PKG_SEL		BIT(25)
+#define  SYS_CFG_BD_HCI_SEL		BIT(26)
+#define  SYS_CFG_TYPE_ID		BIT(27)
+#define  SYS_CFG_RTL_ID			BIT(23) /*  TestChip ID,
+						    1:Test(RLE); 0:MP(RL) */
+#define  SYS_CFG_SPS_SEL		BIT(24) /*  1:LDO regulator mode;
+						    0:Switching regulator mode*/
+#define  SYS_CFG_CHIP_VERSION_MASK	0xF000	/* Bit 12 - 15 */
+#define  SYS_CFG_CHIP_VERSION_SHIFT	12
+
+
 #define REG_GPIO_OUTSTS			0x00F4	/*  For RTL8723 only. */
+#define	 GPIO_EFS_HCI_SEL		(BIT(0)|BIT(1))
+#define	 GPIO_PAD_HCI_SEL		(BIT(2)|BIT(3))
+#define	 GPIO_HCI_SEL			(BIT(4)|BIT(5))
+#define	 GPIO_PKG_SEL_HCI		BIT(6)
+#define	 GPIO_FEN_GPS			BIT(7)
+#define	 GPIO_FEN_BT			BIT(8)
+#define	 GPIO_FEN_WL			BIT(9)
+#define	 GPIO_FEN_PCI			BIT(10)
+#define	 GPIO_FEN_USB			BIT(11)
+#define	 GPIO_BTRF_HWPDN_N		BIT(12)
+#define	 GPIO_WLRF_HWPDN_N		BIT(13)
+#define	 GPIO_PDN_BT_N			BIT(14)
+#define	 GPIO_PDN_GPS_N			BIT(15)
+#define	 GPIO_BT_CTL_HWPDN		BIT(16)
+#define	 GPIO_GPS_CTL_HWPDN		BIT(17)
+#define	 GPIO_PPHY_SUSB			BIT(20)
+#define	 GPIO_UPHY_SUSB			BIT(21)
+#define	 GPIO_PCI_SUSEN			BIT(22)
+#define	 GPIO_USB_SUSEN			BIT(23)
+#define	 GPIO_RF_RL_ID			(BIT(31)|BIT(30)|BIT(29)|BIT(28))
 
 /* 0x0100 ~ 0x01FF	MACTOP General Configuration */
 #define REG_CR				0x0100

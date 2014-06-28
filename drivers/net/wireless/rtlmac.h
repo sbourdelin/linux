@@ -17,6 +17,13 @@ struct rtlmac_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	u8 mac_addr[ETH_ALEN];
+	u32 chip_cut:4;
+	u32 rom_rev:4;
+	u32 has_wifi:1;
+	u32 has_bluetooth:1;
+	u32 enable_bluetooth:1;
+	u32 has_gps:1;
+	u32 has_polarity_ctrl:1;
 };
 
 #define RTL_MAX_VENDOR_REQ_CMD_SIZE	254

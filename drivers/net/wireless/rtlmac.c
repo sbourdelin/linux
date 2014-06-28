@@ -162,6 +162,42 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 	return ret;
 }
 
+static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
+{
+	u32 val32;
+	int ret = 0;
+	char *cut;
+
+	val32 = rtl8723au_read32(priv, REG_SYS_CFG);
+	priv->chip_cut = (val32 & SYS_CFG_CHIP_VERSION_MASK) >>
+		SYS_CFG_CHIP_VERSION_SHIFT;
+	switch(priv->chip_cut) {
+	case 0:
+		cut = "A";
+		break;
+	case 1:
+		cut = "B";
+		break;
+	default:
+		cut = "unknown";
+	}
+
+	val32 = rtl8723au_read32(priv, REG_GPIO_OUTSTS);
+	priv->rom_rev = (val32 & GPIO_RF_RL_ID) >> 28;
+
+	val32 = rtl8723au_read32(priv, REG_MULTI_FUNC_CTRL);
+	if (val32 & MULTI_WIFI_FUNC_EN)
+		priv->has_wifi = 1;
+	if (val32 & MULTI_BT_FUNC_EN)
+		priv->has_bluetooth = 1;
+	if (val32 & MULTI_GPS_FUNC_EN)
+		priv->has_gps = 1;
+
+	printk(KERN_INFO "RTL8723 rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
+	       cut, priv->has_wifi, priv->has_bluetooth, priv->has_gps);
+	return ret;
+}
+
 static int rtlmac_llt_write(struct rtlmac_priv *priv, u8 address, u8 data)
 {
 	int ret = -EBUSY;
@@ -829,6 +865,8 @@ static int rtlmac_probe(struct usb_interface *interface,
 	priv->udev = udev;
 
 	usb_set_intfdata(interface, hw);
+
+	rtlmac_8723au_identify_chip(priv);
 
 	ret = rtlmac_init_device(hw);
 
