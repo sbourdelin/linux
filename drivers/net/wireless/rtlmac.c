@@ -414,15 +414,15 @@ static int rtlmac_emu_to_powerdown(struct rtlmac_priv *priv)
 	u8 val8;
 
 	/* 0x0007[7:0] = 0x20 SOP option to disable BG/MB/ACK/SWR*/
-	rtl8723au_write8(priv, 0x0007, 0x20);
+	rtl8723au_write8(priv, REG_APS_FSMCO + 3, 0x20);
 
-	val8 = rtl8723au_read8(priv, 0x0006);
+	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 2);
 	val8 &= ~BIT(0);
-	rtl8723au_write8(priv, 0x0006, val8);
+	rtl8723au_write8(priv, REG_APS_FSMCO + 2, val8);
 
-	val8 = rtl8723au_read8(priv, 0x0005);
+	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 	val8 |= BIT(7);
-	rtl8723au_write8(priv, 0x0005, val8);
+	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
 	return 0;
 }
