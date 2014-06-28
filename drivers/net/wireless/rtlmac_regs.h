@@ -127,6 +127,11 @@
 #define REG_HMEBOX_3			0x01DC
 
 #define REG_LLT_INIT			0x01E0
+#define  LLT_OP_INACTIVE		0x0
+#define  LLT_OP_WRITE			(0x1 << 30)
+#define  LLT_OP_READ			(0x2 << 30)
+#define  LLT_OP_MASK			(0x3 << 30)
+
 #define REG_BB_ACCEESS_CTRL		0x01E8
 #define REG_BB_ACCESS_DATA		0x01EC
 

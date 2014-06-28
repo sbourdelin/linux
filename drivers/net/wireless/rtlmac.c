@@ -162,6 +162,28 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 	return ret;
 }
 
+static int rtlmac_llt_write(struct rtlmac_priv *priv, u8 address, u8 data)
+{
+	int ret = -EBUSY;
+	int count = 0;
+	u32 value;
+
+	value = LLT_OP_WRITE | address << 8 | data;
+
+	rtl8723au_write32(priv, REG_LLT_INIT, value);
+
+	do {
+		value = rtl8723au_read32(priv, REG_LLT_INIT);
+		if ((value & LLT_OP_MASK) == LLT_OP_INACTIVE) {
+			ret = 0;
+			break;
+		}
+	} while (count++ < 20);
+
+	return ret;
+}
+
+
 static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 {
 	u8 val8;
