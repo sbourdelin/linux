@@ -52,54 +52,6 @@ static struct usb_device_id dev_table[] = {
 
 MODULE_DEVICE_TABLE(usb, dev_table);
 
-#if 0
-static int usbctrl_vendorreq(struct rtlmac_priv *priv, u8 req, u16 addr,
-			     u16 index, void *pdata, u16 len, u8 type)
-{
-	unsigned int pipe;
-	int ret;
-	u8 *pio_buf;
-	int vendorreq_times = 0;
-
-	if (len > RTL_MAX_VENDOR_REQ_CMD_SIZE) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	if (type == REALTEK_USB_READ) {
-		pipe = usb_rcvctrlpipe(udev, 0);/* read_in */
-	} else {
-		pipe = usb_sndctrlpipe(udev, 0);/* write_out */
-		memcpy(pio_buf, pdata, len);
-	}
-
-	ret = usb_control_msg(priv->udev, pipe, req, type,
-			      value, index, pio_buf, len,
-			      RTW_USB_CONTROL_MSG_TIMEOUT);
-
-	if (ret == len) {   /*  Success this control transfer. */
-		if (type == REALTEK_USB_READ) {
-			/*
-			 * For Control read transfer, we have to copy
-			 * the read data from pio_buf to pdata.
-			 */
-			memcpy(pdata, pio_buf, len);
-		}
-	} else { /*  error cases */
-		printk(KERN_WARN ("%s: usb_control_msg() failed (%i)\n", ret);
-
-		if (ret < 0) {
-			if (ret == -ESHUTDOWN || ret == -ENODEV)
-				priv->bSurpriseRemoved = true;
-		}
-	}
-
-
-exit:
-	return status;
-}
-#endif
-
 u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
