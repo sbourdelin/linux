@@ -29,3 +29,5 @@ struct rtlmac_priv {
 #define REALTEK_USB_CMD_IDX		0x00
 
 #define LLT_LAST_TX_PAGE		0xf8
+
+#define RTL_FW_PAGE_SIZE		4096
