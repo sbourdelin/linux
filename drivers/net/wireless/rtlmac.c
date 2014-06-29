@@ -36,6 +36,9 @@
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
 MODULE_LICENSE("GPL");
+MODULE_FIRMWARE("rtlwifi/rtl8723aufw_A.bin");
+MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B.bin");
+MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B_NoBT.bin");
 
 #define USB_VENDER_ID_REALTEK		0x0BDA
 
@@ -193,8 +196,70 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	if (val32 & MULTI_GPS_FUNC_EN)
 		priv->has_gps = 1;
 
-	printk(KERN_INFO "RTL8723 rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
-	       cut, priv->has_wifi, priv->has_bluetooth, priv->has_gps);
+	printk(KERN_INFO
+	       "%s: RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
+	       DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
+	       priv->has_gps);
+	return ret;
+}
+
+static int rtlmac_load_firmware(struct rtlmac_priv *priv)
+{
+	const struct firmware *fw;
+	char *fw_name;
+	int ret = 0;
+	u16 signature;
+
+	switch(priv->chip_cut) {
+	case 0:
+		fw_name = "rtlwifi/rtl8723aufw_A.bin";
+		break;
+	case 1:
+		if (priv->enable_bluetooth)
+			fw_name = "rtlwifi/rtl8723aufw_B.bin";
+		else
+			fw_name = "rtlwifi/rtl8723aufw_B_NoBT.bin";
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	printk(KERN_DEBUG "%s: Loading firmware %s\n", DRIVER_NAME, fw_name);
+	if (request_firmware(&fw, fw_name, &priv->udev->dev)) {
+		printk(KERN_WARNING "%s: request_firmware(%s) failed\n",
+		       DRIVER_NAME, fw_name);
+		ret = -EAGAIN;
+		goto exit;
+	}
+	if (!fw) {
+		printk(KERN_WARNING "%s: Firmware data not available\n",
+		       DRIVER_NAME);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	priv->fw_data = kmemdup(fw->data, fw->size, GFP_KERNEL);
+	priv->fw_size = fw->size;
+
+	signature = le16_to_cpu(priv->fw_data->signature);
+	switch(signature & 0xfff0) {
+	case 0x92c0:
+	case 0x88c0:
+	case 0x2300:
+		break;
+	default:
+		ret = -EINVAL;
+		printk(KERN_DEBUG "%s: Invalid firmware signature: 0x%04x\n",
+		       DRIVER_NAME, signature);
+	}
+
+	printk(KERN_DEBUG "%s: Firmware revision %i.%i (signature 0x%04x)\n",
+	       DRIVER_NAME, le16_to_cpu(priv->fw_data->major_version),
+	       priv->fw_data->minor_version, signature);
+
+exit:
+	release_firmware(fw);
 	return ret;
 }
 
@@ -867,6 +932,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	usb_set_intfdata(interface, hw);
 
 	rtlmac_8723au_identify_chip(priv);
+	rtlmac_load_firmware(priv);
 
 	ret = rtlmac_init_device(hw);
 
@@ -883,8 +949,11 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 
 	hw = usb_get_intfdata(interface);
 	priv = hw->priv;
+
 	rtlmac_disable_device(hw);
 	usb_set_intfdata(interface, NULL);
+
+	kfree(priv->fw_data);
 	ieee80211_free_hw(hw);
 
 	wiphy_info(hw->wiphy, "disconnecting\n");

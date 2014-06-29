@@ -13,19 +13,6 @@
  * Register definitions taken from original Realttek rtl8723au driver
  */
 
-struct rtlmac_priv {
-	struct ieee80211_hw *hw;
-	struct usb_device *udev;
-	u8 mac_addr[ETH_ALEN];
-	u32 chip_cut:4;
-	u32 rom_rev:4;
-	u32 has_wifi:1;
-	u32 has_bluetooth:1;
-	u32 enable_bluetooth:1;
-	u32 has_gps:1;
-	u32 has_polarity_ctrl:1;
-};
-
 #define RTL_MAX_VENDOR_REQ_CMD_SIZE	254
 #define RTW_USB_CONTROL_MSG_TIMEOUT	500
 #define RTLMAC_MAX_REG_POLL		500
@@ -38,3 +25,47 @@ struct rtlmac_priv {
 #define LLT_LAST_TX_PAGE		0xf8
 
 #define RTL_FW_PAGE_SIZE		4096
+
+struct rtlmac_firmware_header {
+	__le16	signature;		/*  92C0: test chip; 92C,
+					    88C0: test chip;
+					    88C1: MP A-cut;
+					    92C1: MP A-cut */
+	u8	category;		/*  AP/NIC and USB/PCI */
+	u8	function;
+
+	__le16	major_version;		/*  FW Version */
+	u8	minor_version;		/*  FW Subversion, default 0x00 */
+	u8	reserved1;
+
+	u8	month;			/*  Release time Month field */
+	u8	date;			/*  Release time Date field */
+	u8	hour;			/*  Release time Hour field */
+	u8	minute;			/*  Release time Minute field */
+
+	__le16	ramcodesize;		/*  Size of RAM code */
+	u16	reserved2;
+
+	__le32	svn_idx;		/*  SVN entry index */
+	u32	reserved3;
+
+	u32	reserved4;
+	u32	reserved5;
+
+	u8	data[0];
+};
+
+struct rtlmac_priv {
+	struct ieee80211_hw *hw;
+	struct usb_device *udev;
+	u8 mac_addr[ETH_ALEN];
+	u32 chip_cut:4;
+	u32 rom_rev:4;
+	u32 has_wifi:1;
+	u32 has_bluetooth:1;
+	u32 enable_bluetooth:1;
+	u32 has_gps:1;
+	u32 has_polarity_ctrl:1;
+	const struct rtlmac_firmware_header *fw_data;
+	size_t fw_size;
+};
