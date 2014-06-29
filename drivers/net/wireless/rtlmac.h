@@ -56,9 +56,14 @@ struct rtlmac_firmware_header {
 	u8	data[0];
 };
 
-struct rtlmac_regval {
+struct rtlmac_reg8val {
 	u16 reg;
 	u8 val;
+};
+
+struct rtlmac_reg32val {
+	u16 reg;
+	u32 val;
 };
 
 struct rtlmac_priv {

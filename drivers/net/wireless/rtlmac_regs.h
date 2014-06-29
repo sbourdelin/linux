@@ -10,7 +10,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * Register definitions taken from original Realttek rtl8723au driver
+ * Register definitions taken from original Realtek rtl8723au driver
  */
 
 /* 0x0000 ~ 0x00FF	System Configuration */
@@ -41,13 +41,31 @@
 #define REG_SPS0_CTRL			0x0011
 #define REG_SPS_OCP_CFG			0x0018
 #define REG_RSV_CTRL			0x001C
+
 #define REG_RF_CTRL			0x001F
+#define  RF_ENABLE			BIT(0)
+#define  RF_RSTB			BIT(1)
+#define  RF_SDMRSTB			BIT(2)
+
 #define REG_LDOA15_CTRL			0x0020
 #define REG_LDOV12D_CTRL		0x0021
 #define REG_LDOHCI12_CTRL		0x0022
 #define REG_LPLDO_CTRL			0x0023
+
 #define REG_AFE_XTAL_CTRL		0x0024
+#define  AFE_XTAL_ENABLE		BIT(0)
+#define  AFE_XTAL_B_SELECT		BIT(1)
+#define  AFE_XTAL_RF_GATE		BIT(14)
+#define  AFE_XTAL_BT_GATE		BIT(20)
+
 #define REG_AFE_PLL_CTRL		0x0028
+#define  AFE_PLL_ENABLE			BIT(0)
+#define  AFE_PLL_320_ENABLE		BIT(1)
+#define  APE_PLL_FREF_SELECT		BIT(2)
+#define  AFE_PLL_EDGE_SELECT		BIT(3)
+#define  AFE_PLL_WDOGB			BIT(4)
+#define  AFE_PLL_LPF_ENABLE		BIT(5)
+
 #define REG_MAC_PHY_CTRL		0x002c
 #define REG_EFUSE_CTRL			0x0030
 #define REG_EFUSE_TEST			0x0034
