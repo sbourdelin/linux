@@ -735,30 +735,6 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 #if 0
-	if (pHalData->bRDGEnable)
-		_InitRDGSetting(Adapter);
-#endif
-
-#if 0
-	rtl8723a_InitializeFirmwareVars(Adapter);
-
-	if (pwrctrlpriv->reg_rfoff == true) {
-		pwrctrlpriv->rf_pwrstate = rf_off;
-	}
-
-	/*  2010/08/09 MH We need to check if we need to turnon or off RF after detecting */
-	/*  HW GPIO pin. Before PHY_RFConfig8192C. */
-	/* HalDetectPwrDownMode(Adapter); */
-	/*  2010/08/26 MH If Efuse does not support sective suspend then disable the function. */
-	/* HalDetectSelectiveSuspendMode(Adapter); */
-
-	/*  Set RF type for BB/RF configuration */
-	_InitRFType(Adapter);/* _ReadRFType() */
-
-	/*  Save target channel */
-	/*  <Roger_Notes> Current Channel will be updated again later. */
-	pHalData->CurrentChannel = 6;/* default set to 6 */
-
 	ret = PHY_MACConfig8723A(Adapter);
 	if (ret == _FAIL) {
 		DBG_8723A("PHY_MACConfig8723A fault !!\n");
