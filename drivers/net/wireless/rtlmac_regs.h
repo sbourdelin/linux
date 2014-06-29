@@ -15,7 +15,24 @@
 
 /* 0x0000 ~ 0x00FF	System Configuration */
 #define REG_SYS_ISO_CTRL		0x0000
-#define REG_SYS_FUNC_EN			0x0002
+#define REG_SYS_FUNC			0x0002
+#define  SYS_FUNC_BBRSTB		BIT(0)
+#define  SYS_FUNC_BB_GLB_RSTN		BIT(1)
+#define  SYS_FUNC_USBA			BIT(2)
+#define  SYS_FUNC_UPLL			BIT(3)
+#define  SYS_FUNC_USBD			BIT(4)
+#define  SYS_FUNC_DIO_PCIE		BIT(5)
+#define  SYS_FUNC_PCIEA			BIT(6)
+#define  SYS_FUNC_PPLL			BIT(7)
+#define  SYS_FUNC_PCIED			BIT(8)
+#define  SYS_FUNC_DIOE			BIT(9)
+#define  SYS_FUNC_CPU_ENABLE		BIT(10)
+#define  SYS_FUNC_DCORE			BIT(11)
+#define  SYS_FUNC_ELDR			BIT(12)
+#define  SYS_FUNC_DIO_RF		BIT(13)
+#define  SYS_FUNC_HWPDN			BIT(14)
+#define  SYS_FUNC_MREGEN		BIT(15)
+
 #define REG_APS_FSMCO			0x0004
 #define REG_SYS_CLKR			0x0008
 #define REG_9346CR			0x000A
@@ -81,7 +98,17 @@
 #define	 MULTI_GPS_FUNC_EN		BIT(22)	/* GPS function enable */
 
 
-#define REG_MCUFWDL			0x0080
+#define REG_MCU_FW_DL			0x0080
+#define  MCU_FW_DL_ENABLE		BIT(0)
+#define  MCU_FW_DL_READY		BIT(1)
+#define  MCU_FW_DL_CSUM_REPORT		BIT(2)
+#define  MCU_MAC_INIT_READY		BIT(3)
+#define  MCU_BB_INIT_READY		BIT(4)
+#define  MCU_RF_INIT_READY		BIT(5)
+#define  MCU_WINT_INIT_READY		BIT(6)
+#define  MCU_FW_RAM_SEL			BIT(7)	/* 1: RAM, 0:ROM */
+#define  MCU_CP_RESET			BIT(23)
+
 #define REG_HMEBOX_EXT_0		0x0088
 #define REG_HMEBOX_EXT_1		0x008A
 #define REG_HMEBOX_EXT_2		0x008C
@@ -416,3 +443,5 @@
 
 #define REG_MACID1			0x0700
 #define REG_BSSID1			0x0708
+
+#define REG_8723A_FW_START_ADDRESS	0x1000

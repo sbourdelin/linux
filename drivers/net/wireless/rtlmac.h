@@ -66,6 +66,6 @@ struct rtlmac_priv {
 	u32 enable_bluetooth:1;
 	u32 has_gps:1;
 	u32 has_polarity_ctrl:1;
-	const struct rtlmac_firmware_header *fw_data;
+	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
 };

@@ -203,6 +203,71 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	return ret;
 }
 
+static int rtlmac_download_firmware(struct rtlmac_priv *priv)
+{
+	int pages, remainder, i, ret;
+	u8 val8;
+	u16 val16;
+	u32 val32;
+	u8 *fwptr = priv->fw_data->data;
+
+	/* 8051 enable */
+	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
+	rtl8723au_write16(priv, REG_SYS_FUNC, val16 | SYS_FUNC_CPU_ENABLE);
+
+	/* MCU firmware download enable */
+	val8 = rtl8723au_read8(priv, REG_MCU_FW_DL);
+	rtl8723au_write8(priv, REG_MCU_FW_DL, val8 | MCU_FW_DL_ENABLE);
+
+	/* 8051 reset */
+	val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
+	rtl8723au_write32(priv, REG_MCU_FW_DL, val32 & ~BIT(19));
+
+/* Do the firmware download dance here */
+
+	/* Reset firmware download checksum */
+	val8 = rtl8723au_read8(priv, REG_MCU_FW_DL);
+	rtl8723au_write8(priv, REG_MCU_FW_DL, val8 | MCU_FW_DL_CSUM_REPORT);
+
+	pages = priv->fw_size / RTL_FW_PAGE_SIZE;
+	remainder = priv->fw_size % RTL_FW_PAGE_SIZE;
+
+	for (i = 0; i < pages; i++) {
+		val8 = rtl8723au_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
+		rtl8723au_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
+
+		ret = rtl8723au_writeN(priv, REG_8723A_FW_START_ADDRESS,
+				       fwptr, RTL_FW_PAGE_SIZE);
+		if (ret != RTL_FW_PAGE_SIZE) {
+			ret = -EAGAIN;
+			goto fw_abort;
+		}
+
+		fwptr += RTL_FW_PAGE_SIZE;
+	}
+
+	if (remainder) {
+		val8 = rtl8723au_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
+		rtl8723au_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
+		ret = rtl8723au_writeN(priv, REG_8723A_FW_START_ADDRESS,
+				       fwptr, remainder);
+		if (ret != remainder) {
+			ret = -EAGAIN;
+			goto fw_abort;
+		}
+
+	}
+
+	ret = 0;
+fw_abort:
+	/* MCU firmware download disable */
+	val16 = rtl8723au_read16(priv, REG_MCU_FW_DL);
+	rtl8723au_write16(priv, REG_MCU_FW_DL,
+			  val16 & (~MCU_FW_DL_ENABLE & 0xff));
+
+	return ret;
+}
+
 static int rtlmac_load_firmware(struct rtlmac_priv *priv)
 {
 	const struct firmware *fw;
@@ -240,7 +305,7 @@ static int rtlmac_load_firmware(struct rtlmac_priv *priv)
 	}
 
 	priv->fw_data = kmemdup(fw->data, fw->size, GFP_KERNEL);
-	priv->fw_size = fw->size;
+	priv->fw_size = fw->size - sizeof(struct rtlmac_firmware_header);
 
 	signature = le16_to_cpu(priv->fw_data->signature);
 	switch(signature & 0xfff0) {
@@ -334,16 +399,16 @@ static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 	}
 
 	/* CCK and OFDM are disabled, and clock are gated */
-	val8 = rtl8723au_read8(priv, REG_SYS_FUNC_EN);
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC);
 	val8 &= ~BIT(0);
-	rtl8723au_write8(priv, REG_SYS_FUNC_EN, val8);
+	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
 
 	udelay(2);
 
 	/*Whole BB is reset*/
-	val8 = rtl8723au_read8(priv, REG_SYS_FUNC_EN);
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC);
 	val8 &= ~BIT(1);
-	rtl8723au_write8(priv, REG_SYS_FUNC_EN, val8);
+	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
 
 	/*Reset MAC TRX*/
 	rtl8723au_write8(priv, REG_CR, HCI_TXDMA_EN | HCI_RXDMA_EN);
@@ -619,6 +684,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		}
 	}
 
+	ret = rtlmac_download_firmware(priv);
 #if 0
 	if (pHalData->bRDGEnable)
 		_InitRDGSetting(Adapter);
