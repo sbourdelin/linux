@@ -25,6 +25,7 @@
 #define LLT_LAST_TX_PAGE		0xf8
 
 #define RTL_FW_PAGE_SIZE		4096
+#define RTLMAC_FIRMWARE_POLL_MAX	1000
 
 struct rtlmac_firmware_header {
 	__le16	signature;		/*  92C0: test chip; 92C,

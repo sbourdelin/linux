@@ -203,6 +203,50 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	return ret;
 }
 
+static int rtlmac_start_firmware(struct rtlmac_priv *priv)
+{
+	int ret = 0, i;
+	u32 val32;
+
+	/* Poll checksum report */
+	for (i = 0; i < RTLMAC_FIRMWARE_POLL_MAX; i++) {
+		val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
+		if (val32 & MCU_FW_DL_CSUM_REPORT)
+			break;
+	}
+
+	if (i == RTLMAC_FIRMWARE_POLL_MAX) {
+		printk(KERN_WARNING "%s: Firmware checksum poll timed out\n",
+		       DRIVER_NAME);
+		ret = -EAGAIN;
+		goto exit;
+	}
+
+	val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
+	val32 |= MCU_FW_DL_READY;
+	val32 &= ~MCU_WINT_INIT_READY;
+	rtl8723au_write32(priv, REG_MCU_FW_DL, val32);
+
+	/* Wait for firmware to become ready */
+	for (i = 0; i < RTLMAC_FIRMWARE_POLL_MAX; i++) {
+		val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
+		if (val32 & MCU_WINT_INIT_READY)
+			break;
+
+		udelay(100);
+	}
+
+	if (i == RTLMAC_FIRMWARE_POLL_MAX) {
+		printk(KERN_WARNING "%s: Firmware failed to start\n",
+		       DRIVER_NAME);
+		ret = -EAGAIN;
+		goto exit;
+	}
+
+exit:
+	return ret;
+}
+
 static int rtlmac_download_firmware(struct rtlmac_priv *priv)
 {
 	int pages, remainder, i, ret;
@@ -685,24 +729,17 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	}
 
 	ret = rtlmac_download_firmware(priv);
+	if (ret)
+		goto exit;
+	ret = rtlmac_start_firmware(priv);
+	if (ret)
+		goto exit;
 #if 0
 	if (pHalData->bRDGEnable)
 		_InitRDGSetting(Adapter);
 #endif
 
 #if 0
-	ret = rtl8723a_FirmwareDownload(Adapter);
-	if (ret != _SUCCESS) {
-		Adapter->bFWReady = false;
-		pHalData->fw_ractrl = false;
-		DBG_8723A("fw download fail!\n");
-		goto exit;
-	} else {
-		Adapter->bFWReady = true;
-		pHalData->fw_ractrl = true;
-		DBG_8723A("fw download ok!\n");
-	}
-
 	rtl8723a_InitializeFirmwareVars(Adapter);
 
 	if (pwrctrlpriv->reg_rfoff == true) {
