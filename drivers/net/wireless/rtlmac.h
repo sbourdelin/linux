@@ -56,6 +56,11 @@ struct rtlmac_firmware_header {
 	u8	data[0];
 };
 
+struct rtlmac_regval {
+	u16 reg;
+	u8 val;
+};
+
 struct rtlmac_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
