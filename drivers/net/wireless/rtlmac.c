@@ -343,6 +343,54 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	return ret;
 }
 
+static int rtlmac_read_eeprom(struct rtlmac_priv *priv)
+{
+	int ret = 0;
+	u8 val8;
+	u16 val16;
+	u32 val32;
+
+	val16 = rtl8723au_read16(priv, REG_9346CR);
+	if (val16 & EEPROM_ENABLE)
+		priv->has_eeprom = 1;
+	if (val16 & EEPROM_BOOT)
+		priv->boot_eeprom = 1;
+
+	val32 = rtl8723au_read32(priv, REG_EFUSE_TEST);
+	val32 = (val32 & ~EFUSE_SELECT_MASK) | EFUSE_WIFI_SELECT;
+	rtl8723au_write32(priv, REG_EFUSE_TEST, val32);
+
+	printk(KERN_DEBUG "%s: Booting from %s\n", DRIVER_NAME,
+	       priv->boot_eeprom ? "EEPROM" : "EFUSE");
+
+	rtl8723au_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_ENABLE);
+
+	/*  1.2V Power: From VDDON with Power Cut(0x0000[15]), default valid */
+	val16 = rtl8723au_read16(priv, REG_SYS_ISO_CTRL);
+	if (!(val16 & SYS_ISO_PWC_EV12V)) {
+		val16 |= SYS_ISO_PWC_EV12V;
+		rtl8723au_write16(priv, REG_SYS_ISO_CTRL, val16);
+	}
+	/*  Reset: 0x0000[28], default valid */
+	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
+	if (!(val16 & SYS_FUNC_ELDR)) {
+		val16 |= SYS_FUNC_ELDR;
+		rtl8723au_write16(priv, REG_SYS_FUNC, val16);
+	}
+
+	/* Clock: Gated(0x0008[5]) 8M(0x0008[1]) clock from ANA,
+	   default valid */
+	val16 = rtl8723au_read16(priv, REG_SYS_CLKR);
+	if (!(val16 & SYS_CLK_LOADER_ENABLE) || !(val16 & SYS_CLK_ANA8M)) {
+		val16 |= (SYS_CLK_LOADER_ENABLE | SYS_CLK_ANA8M);
+		rtl8723au_write16(priv, REG_SYS_CLKR, val16);
+	}
+
+	rtl8723au_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_DISABLE);
+
+	return ret;
+}
+
 static int rtlmac_start_firmware(struct rtlmac_priv *priv)
 {
 	int ret = 0, i;

@@ -15,6 +15,9 @@
 
 /* 0x0000 ~ 0x00FF	System Configuration */
 #define REG_SYS_ISO_CTRL		0x0000
+#define  SYS_ISO_PWC_EV25V		BIT(14)
+#define  SYS_ISO_PWC_EV12V		BIT(15)
+
 #define REG_SYS_FUNC			0x0002
 #define  SYS_FUNC_BBRSTB		BIT(0)
 #define  SYS_FUNC_BB_GLB_RSTN		BIT(1)
@@ -34,8 +37,24 @@
 #define  SYS_FUNC_MREGEN		BIT(15)
 
 #define REG_APS_FSMCO			0x0004
+
 #define REG_SYS_CLKR			0x0008
+#define  SYS_CLK_ANAD16V_ENABLE		BIT(0)
+#define  SYS_CLK_ANA8M			BIT(1)
+#define  SYS_CLK_MACSLP			BIT(4)
+#define  SYS_CLK_LOADER_ENABLE		BIT(5)
+#define  SYS_CLK_80M_SSC_DISABLE	BIT(7)
+#define  SYS_CLK_80M_SSC_ENABLE_HO	BIT(8)
+#define  SYS_CLK_PHY_SSC_RSTB		BIT(9)
+#define  SYS_CLK_SEC_CLK_ENABLE		BIT(10)
+#define  SYS_CLK_MAC_CLK_ENABLE		BIT(11)
+#define  SYS_CLK_ENABLE			BIT(12)
+#define  SYS_CLK_RING_CLK_ENABLE	BIT(13)
+
 #define REG_9346CR			0x000A
+#define	 EEPROM_BOOT			BIT(4)
+#define	 EEPROM_ENABLE			BIT(5)
+
 #define REG_EE_VPD			0x000C
 #define REG_AFE_MISC			0x0010
 #define REG_SPS0_CTRL			0x0011
@@ -67,8 +86,22 @@
 #define  AFE_PLL_LPF_ENABLE		BIT(5)
 
 #define REG_MAC_PHY_CTRL		0x002c
+
 #define REG_EFUSE_CTRL			0x0030
 #define REG_EFUSE_TEST			0x0034
+#define  EFUSE_TRPT			BIT(7)
+	/*  00: Wifi Efuse, 01: BT Efuse0, 10: BT Efuse1, 11: BT Efuse2 */
+#define  EFUSE_CELL_SEL			(BIT(8)|BIT(9))
+#define  EFUSE_LDOE25_ENABLE		BIT(31)
+#define  EFUSE_SELECT_MASK		0x0300
+#define  EFUSE_WIFI_SELECT		0x0000
+#define  EFUSE_BT0_SELECT		0x0100
+#define  EFUSE_BT1_SELECT		0x0200
+#define  EFUSE_BT2_SELECT		0x0300
+
+#define  EFUSE_ACCESS_ENABLE		0x69	/* RTL8723 only */
+#define  EFUSE_ACCESS_DISABLE		0x00	/* RTL8723 only */
+
 #define REG_PWR_DATA			0x0038
 #define REG_CAL_TIMER			0x003C
 #define REG_ACLK_MON			0x003E

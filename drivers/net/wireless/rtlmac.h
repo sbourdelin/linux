@@ -27,6 +27,9 @@
 #define RTL_FW_PAGE_SIZE		4096
 #define RTLMAC_FIRMWARE_POLL_MAX	1000
 
+#define EFUSE_MAP_LEN_8723A		256
+#define EFUSE_BT_MAP_LEN_8723A		1024
+
 struct rtlmac_firmware_header {
 	__le16	signature;		/*  92C0: test chip; 92C,
 					    88C0: test chip;
@@ -77,6 +80,9 @@ struct rtlmac_priv {
 	u32 enable_bluetooth:1;
 	u32 has_gps:1;
 	u32 has_polarity_ctrl:1;
+	u32 has_eeprom:1;
+	u32 boot_eeprom:1;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
+	u8 efuse_wifi[EFUSE_MAP_LEN_8723A];
 };
