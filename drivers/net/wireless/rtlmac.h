@@ -84,5 +84,11 @@ struct rtlmac_priv {
 	u32 boot_eeprom:1;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
+	struct mutex usb_buf_mutex;
+	union {
+		__le32 val32;
+		__le16 val16;
+		u8 val8;
+	} usb_buf;
 	u8 efuse_wifi[EFUSE_MAP_LEN_8723A];
 };

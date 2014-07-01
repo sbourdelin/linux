@@ -201,12 +201,15 @@ u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 	int len;
 	u8 data;
 
+	mutex_lock(&priv->usb_buf_mutex);
 	len = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_READ,
-			      addr, 0, &data, sizeof(data),
+			      addr, 0, &priv->usb_buf.val8, sizeof(u8),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
+	data = priv->usb_buf.val8;
+	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x) =  0x%02x len %i\n",
+	printk(KERN_DEBUG "%s(%04x)   = 0x%02x, len %i\n",
 	       __func__, addr, data, len);
 	return data;
 }
@@ -215,47 +218,56 @@ u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
-	__le16 data;
+	u16 data;
 
+	mutex_lock(&priv->usb_buf_mutex);
 	len = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_READ,
-			      addr, 0, &data, sizeof(data),
+			      addr, 0, &priv->usb_buf.val16, sizeof(u16),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
+	data = le16_to_cpu(priv->usb_buf.val16);
+	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x) =  0x%04x len %i\n",
-	       __func__, addr, le16_to_cpu(data), len);
-	return le16_to_cpu(data);
+	printk(KERN_DEBUG "%s(%04x)  = 0x%04x, len %i\n",
+	       __func__, addr, data, len);
+	return data;
 }
 
 u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
-	__le32 data;
+	u32 data;
 
+	mutex_lock(&priv->usb_buf_mutex);
 	len = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_READ,
-			      addr, 0, &data, sizeof(data),
+			      addr, 0, &priv->usb_buf.val32, sizeof(u32),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
+	data = le32_to_cpu(priv->usb_buf.val32);
+	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x) =  0x%08x, len %i\n",
-	       __func__, addr, le32_to_cpu(data), len);
-	return le32_to_cpu(data);
+	printk(KERN_DEBUG "%s(%04x)  = 0x%08x, len %i\n",
+	       __func__, addr, data, len);
+	return data;
 }
 
 int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
-	u8 data = val;
 
+	mutex_lock(&priv->usb_buf_mutex);
+	priv->usb_buf.val8 = val;
 	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
-			      addr, 0, &data, sizeof(data),
+			      addr, 0, &priv->usb_buf.val8, sizeof(u8),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = 0x%02x, ret %i\n",
-	       __func__, addr, data, ret);
+	mutex_unlock(&priv->usb_buf_mutex);
+
+	printk(KERN_DEBUG "%s(%04x)  = 0x%02x, ret %i\n",
+	       __func__, addr, val, ret);
 	return ret;
 }
 
@@ -263,15 +275,17 @@ int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
-	__le16 data = cpu_to_le16(val);
 
+	mutex_lock(&priv->usb_buf_mutex);
+	priv->usb_buf.val16 = cpu_to_le16(val);
 	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
-			      addr, 0, &data, sizeof(data),
+			      addr, 0, &priv->usb_buf.val16, sizeof(u16),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
+	mutex_unlock(&priv->usb_buf_mutex);
 
 	printk(KERN_DEBUG "%s(%04x) = 0x%04x, ret %i\n",
-	       __func__, addr, data, ret);
+	       __func__, addr, val, ret);
 	return ret;
 }
 
@@ -279,15 +293,17 @@ int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
-	__le32 data = cpu_to_le32(val);
 
+	mutex_lock(&priv->usb_buf_mutex);
+	priv->usb_buf.val32 = cpu_to_le32(val);
 	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
-			      addr, 0, &data, sizeof(data),
+			      addr, 0, &priv->usb_buf.val32, sizeof(u32),
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
+	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x) = 0x%04x, ret %i\n",
-	       __func__, addr, data, ret);
+	printk(KERN_DEBUG "%s(%04x) = 0x%08x, ret %i\n",
+	       __func__, addr, val, ret);
 	return ret;
 }
 
@@ -1296,6 +1312,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	priv = hw->priv;
 	priv->hw = hw;
 	priv->udev = udev;
+	mutex_init(&priv->usb_buf_mutex);
 
 	usb_set_intfdata(interface, hw);
 
@@ -1322,6 +1339,8 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 	usb_set_intfdata(interface, NULL);
 
 	kfree(priv->fw_data);
+	mutex_destroy(&priv->usb_buf_mutex);
+
 	ieee80211_free_hw(hw);
 
 	wiphy_info(hw->wiphy, "disconnecting\n");
