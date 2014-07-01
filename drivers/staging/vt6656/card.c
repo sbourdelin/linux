@@ -46,7 +46,6 @@
  */
 
 #include "device.h"
-#include "tmacro.h"
 #include "card.h"
 #include "baseband.h"
 #include "mac.h"
@@ -54,9 +53,6 @@
 #include "rf.h"
 #include "power.h"
 #include "key.h"
-#include "rc4.h"
-#include "country.h"
-#include "datarate.h"
 #include "usbpipe.h"
 
 //const u16 cwRXBCNTSFOff[MAX_RATE] =
@@ -402,10 +398,8 @@ void vnt_update_ifs(struct vnt_private *priv)
 		priv->uCwMin = C_CWMIN_B;
 		max_min = 5;
 	} else {/* PK_TYPE_11GA & PK_TYPE_11GB */
-		u8 rate = 0;
 		bool ofdm_rate = false;
 		unsigned int ii = 0;
-		PWLAN_IE_SUPP_RATES item_rates = NULL;
 
 		priv->uSIFS = C_SIFS_BG;
 
@@ -416,26 +410,10 @@ void vnt_update_ifs(struct vnt_private *priv)
 
 		priv->uDIFS = C_SIFS_BG + 2 * priv->uSlot;
 
-		item_rates =
-			(PWLAN_IE_SUPP_RATES)priv->vnt_mgmt.abyCurrSuppRates;
-
-		for (ii = 0; ii < item_rates->len; ii++) {
-			rate = (u8)(item_rates->abyRates[ii] & 0x7f);
-			if (RATEwGetRateIdx(rate) > RATE_11M) {
+		for (ii = RATE_54M; ii >= RATE_6M; ii--) {
+			if (priv->wBasicRate & ((u32)(0x1 << ii))) {
 				ofdm_rate = true;
 				break;
-			}
-		}
-
-		if (ofdm_rate == false) {
-			item_rates = (PWLAN_IE_SUPP_RATES)priv->vnt_mgmt
-				.abyCurrExtSuppRates;
-			for (ii = 0; ii < item_rates->len; ii++) {
-				rate = (u8)(item_rates->abyRates[ii] & 0x7f);
-				if (RATEwGetRateIdx(rate) > RATE_11M) {
-					ofdm_rate = true;
-					break;
-				}
 			}
 		}
 
@@ -491,28 +469,6 @@ void vnt_update_top_rates(struct vnt_private *priv)
 
 	priv->byTopCCKBasicRate = top_cck;
  }
-
-/*
- * Description: Set NIC Tx Basic Rate
- *
- * Parameters:
- *  In:
- *      pDevice         - The adapter to be set
- *      wBasicRate      - Basic Rate to be set
- *  Out:
- *      none
- *
- * Return Value: true if succeeded; false if failed.
- *
- */
-void vnt_add_basic_rate(struct vnt_private *priv, u16 rate_idx)
-{
-
-	priv->wBasicRate |= (1 << rate_idx);
-
-	/*Determines the highest basic rate.*/
-	vnt_update_top_rates(priv);
-}
 
 int vnt_ofdm_min_rate(struct vnt_private *priv)
 {
@@ -869,4 +825,6 @@ void vnt_set_bss_mode(struct vnt_private *priv)
 		priv->abyBBVGA[2] = 0x0;
 		priv->abyBBVGA[3] = 0x0;
 	}
+
+	BBvSetVGAGainOffset(priv, priv->abyBBVGA[0]);
 }

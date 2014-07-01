@@ -153,7 +153,7 @@ u8 rtl8188e_set_raid_cmd(struct adapter *adapt, u32 mask)
 	if (haldata->fw_ractrl) {
 		__le32 lmask;
 
-		_rtw_memset(buf, 0, 3);
+		memset(buf, 0, 3);
 		lmask = cpu_to_le32(mask);
 		memcpy(buf, &lmask, 3);
 
@@ -476,12 +476,6 @@ static void ConstructProbeRsp(struct adapter *adapt, u8 *pframe, u32 *pLength, u
 	*pLength = pktlen;
 }
 
-/*  To check if reserved page content is destroyed by beacon because beacon is too large. */
-/*  2010.06.23. Added by tynli. */
-void CheckFwRsvdPageContent(struct adapter *Adapter)
-{
-}
-
 /*  */
 /*  Description: Fill the reserved packets that FW will use to RSVD page. */
 /*			Now we just send 4 types packet to rsvd page. */
@@ -509,7 +503,7 @@ static void SetFwRsvdPagePkt(struct adapter *adapt, bool bDLFinished)
 	struct rsvdpage_loc RsvdPageLoc;
 
 	DBG_88E("%s\n", __func__);
-	ReservedPagePacket = (u8 *)rtw_zmalloc(1000);
+	ReservedPagePacket = kzalloc(1000, GFP_KERNEL);
 	if (ReservedPagePacket == NULL) {
 		DBG_88E("%s: alloc ReservedPagePacket fail!\n", __func__);
 		return;
@@ -706,7 +700,7 @@ void rtl8188e_set_p2p_ps_offload_cmd(struct adapter *adapt, u8 p2p_ps_state)
 	switch (p2p_ps_state) {
 	case P2P_PS_DISABLE:
 		DBG_88E("P2P_PS_DISABLE\n");
-		_rtw_memset(p2p_ps_offload, 0, 1);
+		memset(p2p_ps_offload, 0, 1);
 		break;
 	case P2P_PS_ENABLE:
 		DBG_88E("P2P_PS_ENABLE\n");

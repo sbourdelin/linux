@@ -749,7 +749,6 @@ u32 rtw_start_drv_threads(struct adapter *padapter)
 	else
 		_rtw_down_sema(&padapter->cmdpriv.terminate_cmdthread_sema); /* wait for cmd_thread to run */
 
-	rtw_hal_start_thread(padapter);
 	return _status;
 }
 
@@ -762,7 +761,6 @@ void rtw_stop_drv_threads(struct adapter *padapter)
 	if (padapter->cmdThread)
 		_rtw_down_sema(&padapter->cmdpriv.terminate_cmdthread_sema);
 
-	rtw_hal_stop_thread(padapter);
 }
 
 static u8 rtw_init_default_value(struct adapter *padapter)
@@ -932,22 +930,22 @@ void rtw_cancel_all_timer(struct adapter *padapter)
 {
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("+rtw_cancel_all_timer\n"));
 
-	_cancel_timer_ex(&padapter->mlmepriv.assoc_timer);
+	del_timer_sync(&padapter->mlmepriv.assoc_timer);
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("rtw_cancel_all_timer:cancel association timer complete!\n"));
 
-	_cancel_timer_ex(&padapter->mlmepriv.scan_to_timer);
+	del_timer_sync(&padapter->mlmepriv.scan_to_timer);
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("rtw_cancel_all_timer:cancel scan_to_timer!\n"));
 
-	_cancel_timer_ex(&padapter->mlmepriv.dynamic_chk_timer);
+	del_timer_sync(&padapter->mlmepriv.dynamic_chk_timer);
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("rtw_cancel_all_timer:cancel dynamic_chk_timer!\n"));
 
 	/*  cancel sw led timer */
 	rtw_hal_sw_led_deinit(padapter);
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("rtw_cancel_all_timer:cancel DeInitSwLeds!\n"));
 
-	_cancel_timer_ex(&padapter->pwrctrlpriv.pwr_state_check_timer);
+	del_timer_sync(&padapter->pwrctrlpriv.pwr_state_check_timer);
 
-	_cancel_timer_ex(&padapter->recvpriv.signal_stat_timer);
+	del_timer_sync(&padapter->recvpriv.signal_stat_timer);
 }
 
 u8 rtw_free_drv_sw(struct adapter *padapter)
@@ -961,9 +959,9 @@ u8 rtw_free_drv_sw(struct adapter *padapter)
 	{
 		struct wifidirect_info *pwdinfo = &padapter->wdinfo;
 		if (!rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE)) {
-			_cancel_timer_ex(&pwdinfo->find_phase_timer);
-			_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
-			_cancel_timer_ex(&pwdinfo->pre_tx_scan_timer);
+			del_timer_sync(&pwdinfo->find_phase_timer);
+			del_timer_sync(&pwdinfo->restore_p2p_state_timer);
+			del_timer_sync(&pwdinfo->pre_tx_scan_timer);
 			rtw_p2p_set_state(pwdinfo, P2P_STATE_NONE);
 		}
 	}

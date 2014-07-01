@@ -26,7 +26,6 @@
 #include <rtl8188e_hal.h>
 #include <rtl8188e_led.h>
 #include <rtw_iol.h>
-#include <usb_ops.h>
 #include <usb_hal.h>
 #include <usb_osintf.h>
 
@@ -1150,10 +1149,6 @@ readAdapterInfo_8188EU(
 	Hal_EfuseParseBoardType88E(adapt, eeprom->efuse_eeprom_data, eeprom->bautoload_fail_flag);
 	Hal_ReadThermalMeter_88E(adapt, eeprom->efuse_eeprom_data, eeprom->bautoload_fail_flag);
 
-	/*  */
-	/*  The following part initialize some vars by PG info. */
-	/*  */
-	Hal_InitChannelPlan(adapt);
 }
 
 static void _ReadPROMContent(
@@ -2216,7 +2211,7 @@ void rtl8188eu_set_hal_ops(struct adapter *adapt)
 	struct hal_ops	*halfunc = &adapt->HalFunc;
 
 
-	adapt->HalData = rtw_zmalloc(sizeof(struct hal_data_8188e));
+	adapt->HalData = kzalloc(sizeof(struct hal_data_8188e), GFP_KERNEL);
 	if (adapt->HalData == NULL)
 		DBG_88E("cant not alloc memory for HAL DATA\n");
 
@@ -2228,7 +2223,6 @@ void rtl8188eu_set_hal_ops(struct adapter *adapt)
 	halfunc->inirp_deinit = &rtl8188eu_inirp_deinit;
 
 	halfunc->init_xmit_priv = &rtl8188eu_init_xmit_priv;
-	halfunc->free_xmit_priv = &rtl8188eu_free_xmit_priv;
 
 	halfunc->init_recv_priv = &rtl8188eu_init_recv_priv;
 	halfunc->free_recv_priv = &rtl8188eu_free_recv_priv;

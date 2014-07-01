@@ -28,7 +28,7 @@
 #include <linux/vmalloc.h>
 #include <osdep_intf.h>
 
-#include <usb_ops.h>
+#include <usb_ops_linux.h>
 #include <usb_osintf.h>
 #include <usb_hal.h>
 #include <rtw_ioctl.h>
@@ -66,7 +66,7 @@ static struct dvobj_priv *usb_dvobj_init(struct usb_interface *usb_intf)
 	struct usb_device	*pusbd;
 
 
-	pdvobjpriv = (struct dvobj_priv *)rtw_zmalloc(sizeof(*pdvobjpriv));
+	pdvobjpriv = kzalloc(sizeof(*pdvobjpriv), GFP_KERNEL);
 	if (pdvobjpriv == NULL)
 		goto exit;
 
@@ -116,12 +116,10 @@ static struct dvobj_priv *usb_dvobj_init(struct usb_interface *usb_intf)
 		pdvobjpriv->ishighspeed = false;
 
 	mutex_init(&pdvobjpriv->usb_vendor_req_mutex);
-	pdvobjpriv->usb_vendor_req_buf = rtw_zmalloc(MAX_USB_IO_CTL_SIZE);
+	pdvobjpriv->usb_vendor_req_buf = kzalloc(MAX_USB_IO_CTL_SIZE, GFP_KERNEL);
 
 	if (!pdvobjpriv->usb_vendor_req_buf)
 		goto free_dvobj;
-
-	rtw_reset_continual_urb_error(pdvobjpriv);
 
 	usb_get_dev(pusbd);
 

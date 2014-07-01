@@ -97,7 +97,7 @@ static void _init_mp_priv_(struct mp_priv *pmp_priv)
 {
 	struct wlan_bssid_ex *pnetwork;
 
-	_rtw_memset(pmp_priv, 0, sizeof(struct mp_priv));
+	memset(pmp_priv, 0, sizeof(struct mp_priv));
 
 	pmp_priv->mode = MP_OFF;
 
@@ -138,12 +138,12 @@ static void mp_init_xmit_attrib(struct mp_tx *pmptx, struct adapter *padapter)
 
 	/*  init xmitframe attribute */
 	pattrib = &pmptx->attrib;
-	_rtw_memset(pattrib, 0, sizeof(struct pkt_attrib));
+	memset(pattrib, 0, sizeof(struct pkt_attrib));
 	desc = &pmptx->desc;
-	_rtw_memset(desc, 0, TXDESC_SIZE);
+	memset(desc, 0, TXDESC_SIZE);
 
 	pattrib->ether_type = 0x8712;
-	_rtw_memset(pattrib->dst, 0xFF, ETH_ALEN);
+	memset(pattrib->dst, 0xFF, ETH_ALEN);
 	pattrib->ack_policy = 0;
 	pattrib->hdrlen = WLAN_HDR_A3_LEN;
 	pattrib->subtype = WIFI_DATA;
@@ -362,7 +362,6 @@ s32 mp_start_test(struct adapter *padapter)
 	mpt_ProStartTest(padapter);
 
 	/* 3 1. initialize a new struct wlan_bssid_ex */
-/*	_rtw_memset(&bssid, 0, sizeof(struct wlan_bssid_ex)); */
 	memcpy(bssid.MacAddress, pmppriv->network_macaddr, ETH_ALEN);
 	bssid.Ssid.SsidLength = strlen("mp_pseudo_adhoc");
 	memcpy(bssid.Ssid.Ssid, (u8 *)"mp_pseudo_adhoc", bssid.Ssid.SsidLength);
@@ -454,7 +453,7 @@ void mp_stop_test(struct adapter *padapter)
 		pmlmepriv->fw_state = pmppriv->prev_fw_state; /*  WIFI_STATION_STATE; */
 
 		/* flush the cur_network */
-		_rtw_memset(tgt_network, 0, sizeof(struct wlan_network));
+		memset(tgt_network, 0, sizeof(struct wlan_network));
 
 		_clr_fwstate_(pmlmepriv, WIFI_MP_STATE);
 
@@ -598,7 +597,7 @@ static int mp_xmit_packet_thread(void *context)
 	padapter = pmp_priv->papdater;
 	pxmitpriv = &(padapter->xmitpriv);
 
-	thread_enter("RTW_MP_THREAD");
+	allow_signal(SIGTERM);
 
 	/* DBG_88E("%s:pkTx Start\n", __func__); */
 	while (1) {
@@ -630,7 +629,8 @@ static int mp_xmit_packet_thread(void *context)
 		    (pmptx->count == pmptx->sended))
 			goto exit;
 
-		flush_signals_thread();
+		if (signal_pending(current))
+			flush_signals(current);
 	}
 
 exit:
@@ -688,7 +688,7 @@ void SetPacketTx(struct adapter *padapter)
 	kfree(pmp_priv->tx.pallocated_buf);
 	pmp_priv->tx.write_size = pkt_size;
 	pmp_priv->tx.buf_size = pkt_size + XMITBUF_ALIGN_SZ;
-	pmp_priv->tx.pallocated_buf = rtw_zmalloc(pmp_priv->tx.buf_size);
+	pmp_priv->tx.pallocated_buf = kzalloc(pmp_priv->tx.buf_size, GFP_KERNEL);
 	if (pmp_priv->tx.pallocated_buf == NULL) {
 		DBG_88E("%s: malloc(%d) fail!!\n", __func__, pmp_priv->tx.buf_size);
 		return;
@@ -697,7 +697,7 @@ void SetPacketTx(struct adapter *padapter)
 	ptr = pmp_priv->tx.buf;
 
 	desc = &(pmp_priv->tx.desc);
-	_rtw_memset(desc, 0, TXDESC_SIZE);
+	memset(desc, 0, TXDESC_SIZE);
 	pkt_start = ptr;
 	pkt_end = pkt_start + pkt_size;
 
@@ -770,7 +770,7 @@ void SetPacketTx(struct adapter *padapter)
 		break;
 	}
 
-	_rtw_memset(ptr, payload, pkt_end - ptr);
+	memset(ptr, payload, pkt_end - ptr);
 
 	/* 3 6. start thread */
 	pmp_priv->tx.PktTxThread = kthread_run(mp_xmit_packet_thread, pmp_priv, "RTW_MP_THREAD");
@@ -905,7 +905,7 @@ u32 mp_query_psd(struct adapter *pAdapter, u8 *data)
 			return 0;
 	}
 
-	_rtw_memset(data, '\0', sizeof(*data));
+	memset(data, '\0', sizeof(*data));
 
 	i = psd_start;
 	while (i < psd_stop) {
@@ -972,7 +972,7 @@ void _rtw_mp_xmit_priv(struct xmit_priv *pxmitpriv)
 	pxmitbuf = (struct xmit_buf *)pxmitpriv->pxmit_extbuf;
 
 	for (i = 0; i < num_xmit_extbuf; i++) {
-		_rtw_init_listhead(&pxmitbuf->list);
+		INIT_LIST_HEAD(&pxmitbuf->list);
 
 		pxmitbuf->priv_data = NULL;
 		pxmitbuf->padapter = padapter;
@@ -984,7 +984,7 @@ void _rtw_mp_xmit_priv(struct xmit_priv *pxmitpriv)
 			goto exit;
 		}
 
-		rtw_list_insert_tail(&pxmitbuf->list, &(pxmitpriv->free_xmit_extbuf_queue.queue));
+		list_add_tail(&pxmitbuf->list, &(pxmitpriv->free_xmit_extbuf_queue.queue));
 		pxmitbuf++;
 	}
 
