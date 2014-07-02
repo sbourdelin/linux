@@ -437,7 +437,7 @@ static int rtlmac_read_efuse(struct rtlmac_priv *priv)
 	}
 
 	/* Default value is 0xff */
-	memset(priv->efuse_wifi, 0xff, EFUSE_MAP_LEN_8723A);
+	memset(priv->efuse_wifi.raw, 0xff, EFUSE_MAP_LEN_8723A);
 
 	efuse_addr = 0;
 	while (efuse_addr < EFUSE_REAL_CONTENT_LEN_8723A) {
@@ -484,13 +484,12 @@ static int rtlmac_read_efuse(struct rtlmac_priv *priv)
 					ret = rtlmac_read_efuse8(priv,
 								 efuse_addr++,
 								 &val8);
-					priv->efuse_wifi[map_addr++] = val8;
+					priv->efuse_wifi.raw[map_addr++] = val8;
 
 					ret = rtlmac_read_efuse8(priv,
 								 efuse_addr++,
 								 &val8);
-					priv->efuse_wifi[map_addr++] = val8;
-					printk(KERN_DEBUG "reading two bytes at %04x: %02x %02x\n", map_addr - 2, priv->efuse_wifi[map_addr - 2], priv->efuse_wifi[map_addr - 1]);
+					priv->efuse_wifi.raw[map_addr++] = val8;
 				} else
 					map_addr += 2;
 			}
@@ -505,6 +504,9 @@ static int rtlmac_read_efuse(struct rtlmac_priv *priv)
 
 exit:
 	rtl8723au_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_DISABLE);
+
+	if (priv->efuse_wifi.efuse.rtl_id != cpu_to_le16(0x8129))
+		ret = EINVAL;
 
 	return ret;
 }
@@ -1420,9 +1422,19 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	rtlmac_8723au_identify_chip(priv);
 	rtlmac_read_efuse(priv);
+	printk(KERN_INFO "%s: RTL8723au %02x:%02x:%02x:%02x:%02x:%02x\n",
+	       DRIVER_NAME,
+	       priv->efuse_wifi.efuse.mac_addr[0],
+	       priv->efuse_wifi.efuse.mac_addr[1],
+	       priv->efuse_wifi.efuse.mac_addr[2],
+	       priv->efuse_wifi.efuse.mac_addr[3],
+	       priv->efuse_wifi.efuse.mac_addr[4],
+	       priv->efuse_wifi.efuse.mac_addr[5]);
+
 	rtlmac_load_firmware(priv);
 
 	ret = rtlmac_init_device(hw);
+
 
 exit:
 	if (ret < 0)

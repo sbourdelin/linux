@@ -62,6 +62,46 @@ struct rtlmac_firmware_header {
 	u8	data[0];
 };
 
+struct rtl8723au_efuse {
+	__le16 rtl_id;
+	u8 res0[0xe];
+	u8 cck_tx_power_index;
+	u8 res1[5];
+ 	u8 ht40_1s_tx_power_index;	/* 0x16 */
+	u8 res2[5];
+ 	u8 ht20_tx_power_index_diff;	/* 0x1c */
+	u8 res3[2];
+	u8 ofdm_tx_power_index_diff;	/* 0x1f */
+	u8 res4[2];
+	u8 ht40_max_power_offset;	/* 0x22 */
+	u8 res5[2];
+	u8 ht20_max_power_offset;	/* 0x25 */
+	u8 res6[2];
+	u8 channel_plan;		/* 0x28 */
+	u8 tssi_a;
+	u8 thermal_meter;
+	u8 rf_option_1;
+	u8 rf_option_2;
+	u8 rf_option_3;
+	u8 rf_option_4;
+	u8 res7;
+	u8 version			/* 0x30 */;
+	u8 customer_id_major;
+	u8 customer_id_minor;
+	u8 xtal_k;
+	u8 chipset;			/* 0x34 */
+	u8 res8[0x82];
+	u8 vid;				/* 0xb7 */
+	u8 res9;
+	u8 pid;				/* 0xb9 */
+	u8 res10[0x0c];
+	u8 mac_addr[ETH_ALEN];		/* 0xc6 */
+	u8 res11[2];
+	u8 vendor_name[7];
+	u8 res12[2];
+	u8 device_name[0x29];		/* 0xd7 */
+};
+
 struct rtlmac_reg8val {
 	u16 reg;
 	u8 val;
@@ -93,5 +133,8 @@ struct rtlmac_priv {
 		__le16 val16;
 		u8 val8;
 	} usb_buf;
-	u8 efuse_wifi[EFUSE_MAP_LEN_8723A];
+	union {
+		u8 raw[EFUSE_MAP_LEN_8723A];
+		struct rtl8723au_efuse efuse;
+	} efuse_wifi;
 };
