@@ -28,7 +28,10 @@
 #define RTLMAC_FIRMWARE_POLL_MAX	1000
 
 #define EFUSE_MAP_LEN_8723A		256
+#define EFUSE_MAX_SECTION_8723A		32
+#define EFUSE_REAL_CONTENT_LEN_8723A	512
 #define EFUSE_BT_MAP_LEN_8723A		1024
+#define EFUSE_MAX_WORD_UNIT		4
 
 struct rtlmac_firmware_header {
 	__le16	signature;		/*  92C0: test chip; 92C,

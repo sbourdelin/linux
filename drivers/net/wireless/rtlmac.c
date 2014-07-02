@@ -359,11 +359,45 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	return ret;
 }
 
-static int rtlmac_read_eeprom(struct rtlmac_priv *priv)
+static int rtlmac_read_efuse8(struct rtlmac_priv *priv, u16 offset, u8 *data)
 {
-	int ret = 0;
+	int i;
 	u8 val8;
-	u16 val16;
+	u32 val32;
+
+	/* Write Address */
+	rtl8723au_write8(priv, REG_EFUSE_CTRL + 1, offset & 0xff);
+	val8 = rtl8723au_read8(priv, REG_EFUSE_CTRL + 2);
+	val8 &= 0xfc;
+	val8 |= (offset >> 8) & 0x03;
+	rtl8723au_write8(priv, REG_EFUSE_CTRL + 2, val8);
+
+	val8 = rtl8723au_read8(priv, REG_EFUSE_CTRL + 3);
+	rtl8723au_write8(priv, REG_EFUSE_CTRL + 3, val8 & 0x7f);
+
+	/* Poll for data read */
+	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
+	for (i = 0; i < RTLMAC_MAX_REG_POLL; i++) {
+		val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
+		if (val32 & BIT(31))
+			break;
+	}
+
+	if (i == RTLMAC_MAX_REG_POLL)
+		return -EIO;
+
+	udelay(50);
+	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
+
+	*data = val32 & 0xff;
+	return 0;
+}
+
+static int rtlmac_read_efuse(struct rtlmac_priv *priv)
+{
+	int i, ret = 0;
+	u8 val8, word_mask, header, extheader;
+	u16 val16, efuse_addr, offset;
 	u32 val32;
 
 	val16 = rtl8723au_read16(priv, REG_9346CR);
@@ -402,6 +436,74 @@ static int rtlmac_read_eeprom(struct rtlmac_priv *priv)
 		rtl8723au_write16(priv, REG_SYS_CLKR, val16);
 	}
 
+	/* Default value is 0xff */
+	memset(priv->efuse_wifi, 0xff, EFUSE_MAP_LEN_8723A);
+
+	efuse_addr = 0;
+	while (efuse_addr < EFUSE_REAL_CONTENT_LEN_8723A) {
+		ret = rtlmac_read_efuse8(priv, efuse_addr++, &header);
+		if (ret || header == 0xff)
+			goto exit;
+
+		if ((header & 0x1f) == 0x0f) {	/* extended header */
+			offset = (header & 0xe0) >> 5;
+
+			ret = rtlmac_read_efuse8(priv, efuse_addr++,
+						 &extheader);
+			if (ret)
+				goto exit;
+			/* All words disabled */
+			if ((extheader & 0x0f) == 0x0f)
+				continue;
+
+			offset |= ((extheader & 0xf0) >> 1);
+			word_mask = extheader & 0x0f;
+		} else {
+			offset = (header >> 4) & 0x0f;
+			word_mask = header & 0x0f;
+		}
+
+		if (offset < EFUSE_MAX_SECTION_8723A) {
+			u16 map_addr;
+			/* Get word enable value from PG header */
+
+			/* We have 8 bits to indicate validity */
+			map_addr = offset * 8;
+			if (map_addr >= EFUSE_MAP_LEN_8723A) {
+				printk(KERN_DEBUG "%s: %s: Illegal map_addr "
+				       "(%04x), efuse corrupt!\n", DRIVER_NAME,
+				       __func__, map_addr);
+			ret = -EINVAL;
+			goto exit;
+
+				ret = -EINVAL;
+			}
+			for (i = 0; i < EFUSE_MAX_WORD_UNIT; i++) {
+				/* Check word enable condition in the section */
+				if (!(word_mask & BIT(i))) {
+					ret = rtlmac_read_efuse8(priv,
+								 efuse_addr++,
+								 &val8);
+					priv->efuse_wifi[map_addr++] = val8;
+
+					ret = rtlmac_read_efuse8(priv,
+								 efuse_addr++,
+								 &val8);
+					priv->efuse_wifi[map_addr++] = val8;
+					printk(KERN_DEBUG "reading two bytes at %04x: %02x %02x\n", map_addr - 2, priv->efuse_wifi[map_addr - 2], priv->efuse_wifi[map_addr - 1]);
+				} else
+					map_addr += 2;
+			}
+		} else {
+			printk(KERN_DEBUG "%s: %s: Illegal offset (%04x), "
+			       "efuse corrupt!\n", DRIVER_NAME, __func__,
+			       offset);
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+
+exit:
 	rtl8723au_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_DISABLE);
 
 	return ret;
@@ -1317,6 +1419,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	usb_set_intfdata(interface, hw);
 
 	rtlmac_8723au_identify_chip(priv);
+	rtlmac_read_efuse(priv);
 	rtlmac_load_firmware(priv);
 
 	ret = rtlmac_init_device(hw);
