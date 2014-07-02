@@ -736,7 +736,8 @@ static int rtlmac_init_phy_regs(struct rtlmac_priv *priv,
  */
 static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 {
-	u8 val8;
+	u8 val8, ldoa15, ldov12d, lpldo, ldohci12;
+	u32 val32;
 
 	val8 = rtl8723au_read8(priv, REG_AFE_PLL_CTRL);
 	udelay(2);
@@ -766,16 +767,24 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_RF_CTRL, val8);
 
 	rtlmac_init_phy_regs(priv, rtl8723a_phy_1t_init_table);
-#if 0
-/* only for B-cut */
-	if (pHalData->EEPROMVersion >= 0x01) {
-		CrystalCap = pHalData->CrystalCap & 0x3F;
-		PHY_SetBBReg(Adapter, REG_MAC_PHY_CTRL, 0xFFF000,
-			     (CrystalCap | (CrystalCap << 6)));
+	if (priv->efuse_wifi.efuse.version >= 0x01) {
+		val32 = rtl8723au_read32(priv, REG_MAC_PHY_CTRL);
+
+		val8 = priv->efuse_wifi.efuse.xtal_k & 0x3f;
+		val32 &= 0xff000fff;
+		val32 |= ((val8 | (val8 << 6)) << 12);
+
+		rtl8723au_write32(priv, REG_MAC_PHY_CTRL, val32);
 	}
 
-	PHY_SetBBReg(Adapter, REG_LDOA15_CTRL, bMaskDWord, 0x01572505);
-#endif
+	ldoa15 = LDOA15_ENABLE | LDOA15_OBUF;
+	ldov12d = LDOV12D_ENABLE | BIT(2) | (2 << LDOV12D_VADJ_SHIFT);
+	ldohci12 = 0x57;
+	lpldo = 1;
+	val32 = (lpldo << 24) | (ldohci12 << 16) | (ldov12d << 8)| ldoa15;
+
+	rtl8723au_write32(priv, REG_LDOA15_CTRL, val32);
+
 	return 0;
 }
 

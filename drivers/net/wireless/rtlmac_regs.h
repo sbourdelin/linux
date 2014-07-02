@@ -67,9 +67,22 @@
 #define  RF_SDMRSTB			BIT(2)
 
 #define REG_LDOA15_CTRL			0x0020
+#define  LDOA15_ENABLE			BIT(0)
+#define  LDOA15_STANDBY			BIT(1)
+#define  LDOA15_OBUF			BIT(2)
+#define  LDOA15_REG_VOS			BIT(3)
+#define  LDOA15_VOADJ_SHIFT		4
+
 #define REG_LDOV12D_CTRL		0x0021
+#define  LDOV12D_ENABLE			BIT(0)
+#define  LDOV12D_STANDBY		BIT(1)
+#define  LDOV12D_VADJ_SHIFT		4
+
 #define REG_LDOHCI12_CTRL		0x0022
+
 #define REG_LPLDO_CTRL			0x0023
+#define  LPLDO_HSM			BIT(2)
+#define  LPLDO_LSM_DIS			BIT(3)
 
 #define REG_AFE_XTAL_CTRL		0x0024
 #define  AFE_XTAL_ENABLE		BIT(0)
