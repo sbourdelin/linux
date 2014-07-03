@@ -739,6 +739,11 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	u8 val8, ldoa15, ldov12d, lpldo, ldohci12;
 	u32 val32;
 
+	/*
+	 * Todo: The vendor driver maintains a table of PHY register
+	 *       addresses, which is initialized here. Do we need this?
+	 */
+
 	val8 = rtl8723au_read8(priv, REG_AFE_PLL_CTRL);
 	udelay(2);
 	val8 |= AFE_PLL_320_ENABLE;
@@ -1159,15 +1164,6 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 #if 0
-	/*  */
-	/* d. Initialize BB related configurations. */
-	/*  */
-	ret = PHY_BBConfig8723A(Adapter);
-	if (ret == _FAIL) {
-		DBG_8723A("PHY_BBConfig8723A fault !!\n");
-		goto exit;
-	}
-
 	/*  Add for tx power by rate fine tune. We need to call the function after BB config. */
 	/*  Because the tx power by rate table is inited in BB config. */
 
@@ -1178,23 +1174,21 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	}
 
 	/* reducing 80M spur */
-	PHY_SetBBReg(Adapter, RF_T_METER, bMaskDWord, 0x0381808d);
-	PHY_SetBBReg(Adapter, RF_SYN_G4, bMaskDWord, 0xf2ffff83);
-	PHY_SetBBReg(Adapter, RF_SYN_G4, bMaskDWord, 0xf2ffff82);
-	PHY_SetBBReg(Adapter, RF_SYN_G4, bMaskDWord, 0xf2ffff83);
+	rtl8723au_write32(priv, RF_T_METER, 0x0381808d);
+	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
+	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff82);
+	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
 
 	/* RFSW Control */
-	PHY_SetBBReg(Adapter, rFPGA0_TxInfo, bMaskDWord, 0x00000003);	/* 0x804[14]= 0 */
-	PHY_SetBBReg(Adapter, rFPGA0_XAB_RFInterfaceSW, bMaskDWord, 0x07000760);	/* 0x870[6:5]= b'11 */
-	PHY_SetBBReg(Adapter, rFPGA0_XA_RFInterfaceOE, bMaskDWord, 0x66F60210); /* 0x860[6:5]= b'00 */
-
-	RT_TRACE(_module_hci_hal_init_c_, _drv_info_, ("%s: 0x870 = value 0x%x\n", __func__, PHY_QueryBBReg(Adapter, 0x870, bMaskDWord)));
+	rtl8723au_write32(priv, REG_FPGA0_TXINFO, 0x00000003);	/* 0x804[14]= 0 */
+	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, 0x07000760);	/* 0x870[6:5]= b'11 */
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_OE, 0x66F60210); /* 0x860[6:5]= b'00 */
 
 	/*  */
 	/*  Joseph Note: Keep RfRegChnlVal for later use. */
 	/*  */
-	pHalData->RfRegChnlVal[0] = PHY_QueryRFReg(Adapter, (enum RF_RADIO_PATH)0, RF_CHNLBW, bRFRegOffsetMask);
-	pHalData->RfRegChnlVal[1] = PHY_QueryRFReg(Adapter, (enum RF_RADIO_PATH)1, RF_CHNLBW, bRFRegOffsetMask);
+	pHalData->RfRegChnlVal[0] = PHY_QueryRFReg(priv, (enum RF_RADIO_PATH)0, RF_CHNLBW, bRFRegOffsetMask);
+	pHalData->RfRegChnlVal[1] = PHY_QueryRFReg(priv, (enum RF_RADIO_PATH)1, RF_CHNLBW, bRFRegOffsetMask);
 
 	if (!pHalData->bMACFuncEnable) {
 		_InitQueueReservedPage(Adapter);
@@ -1205,10 +1199,10 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	_InitTransferPageSize(Adapter);
 
 	/*  Get Rx PHY status in order to report RSSI and others. */
-	_InitDriverInfoSize(Adapter, DRVINFO_SZ);
+	_InitDriverInfoSize(priv, DRVINFO_SZ);
 
 	_InitInterrupt(Adapter);
-	hw_var_set_macaddr(Adapter, Adapter->eeprompriv.mac_addr);
+	hw_var_set_macaddr(priv, Adapter->eeprompriv.mac_addr);
 	_InitNetworkType(Adapter);/* set msr */
 	_InitWMACSetting(Adapter);
 	_InitAdaptiveCtrl(Adapter);
@@ -1227,22 +1221,22 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	invalidate_cam_all23a(Adapter);
 
 	/*  2010/12/17 MH We need to set TX power according to EFUSE content at first. */
-	PHY_SetTxPowerLevel8723A(Adapter, pHalData->CurrentChannel);
+	PHY_SetTxPowerLevel8723A(priv, pHalData->CurrentChannel);
 
 	rtl8723a_InitAntenna_Selection(Adapter);
 
 	/*  HW SEQ CTRL */
 	/* set 0x0 to 0xFF by tynli. Default enable HW SEQ NUM. */
-	rtl8723au_write8(Adapter, REG_HWSEQ_CTRL, 0xFF);
+	rtl8723au_write8(priv, REG_HWSEQ_CTRL, 0xFF);
 
 	/*  */
 	/*  Disable BAR, suggested by Scott */
 	/*  2010.04.09 add by hpfan */
 	/*  */
-	rtl8723au_write32(Adapter, REG_BAR_MODE_CTRL, 0x0201ffff);
+	rtl8723au_write32(priv, REG_BAR_MODE_CTRL, 0x0201ffff);
 
 	if (pregistrypriv->wifi_spec)
-		rtl8723au_write16(Adapter, REG_FAST_EDCA_CTRL, 0);
+		rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
 
 	/*  Move by Neo for USB SS from above setp */
 	_RfPowerSave(Adapter);
@@ -1253,9 +1247,9 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/* recovery for 8192cu and 9723Au 20111017 */
 	if (pwrctrlpriv->rf_pwrstate == rf_on) {
 		if (pHalData->bIQKInitialized) {
-			rtl8723a_phy_iq_calibrate(Adapter, true);
+			rtl8723a_phy_iq_calibrate(priv, true);
 		} else {
-			rtl8723a_phy_iq_calibrate(Adapter, false);
+			rtl8723a_phy_iq_calibrate(priv, false);
 			pHalData->bIQKInitialized = true;
 		}
 
@@ -1267,32 +1261,31 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	}
 
 	/* fixed USB interface interference issue */
-	rtl8723au_write8(Adapter, 0xfe40, 0xe0);
-	rtl8723au_write8(Adapter, 0xfe41, 0x8d);
-	rtl8723au_write8(Adapter, 0xfe42, 0x80);
-	rtl8723au_write32(Adapter, 0x20c, 0xfd0320);
+	rtl8723au_write8(priv, 0xfe40, 0xe0);
+	rtl8723au_write8(priv, 0xfe41, 0x8d);
+	rtl8723au_write8(priv, 0xfe42, 0x80);
+	rtl8723au_write32(priv, REG_TXDMA_OFFSET_CHK, 0xfd0320);
 	/* Solve too many protocol error on USB bus */
 	if (!IS_81xxC_VENDOR_UMC_A_CUT(pHalData->VersionID)) {
-		/*  0xE6 = 0x94 */
-		rtl8723au_write8(Adapter, 0xFE40, 0xE6);
-		rtl8723au_write8(Adapter, 0xFE41, 0x94);
-		rtl8723au_write8(Adapter, 0xFE42, 0x80);
+		/*  0xe6 = 0x94 */
+		rtl8723au_write8(priv, 0xfe40, 0xe6);
+		rtl8723au_write8(priv, 0xfe41, 0x94);
+		rtl8723au_write8(priv, 0xfe42, 0x80);
 
-		/*  0xE0 = 0x19 */
-		rtl8723au_write8(Adapter, 0xFE40, 0xE0);
-		rtl8723au_write8(Adapter, 0xFE41, 0x19);
-		rtl8723au_write8(Adapter, 0xFE42, 0x80);
+		/*  0xe0 = 0x19 */
+		rtl8723au_write8(priv, 0xfe40, 0xe0);
+		rtl8723au_write8(priv, 0xfe41, 0x19);
+		rtl8723au_write8(priv, 0xfe42, 0x80);
 
-		/*  0xE5 = 0x91 */
-		rtl8723au_write8(Adapter, 0xFE40, 0xE5);
-		rtl8723au_write8(Adapter, 0xFE41, 0x91);
-		rtl8723au_write8(Adapter, 0xFE42, 0x80);
+		/*  0xe5 = 0x91 */
+		rtl8723au_write8(priv, 0xfe40, 0xe5);
+		rtl8723au_write8(priv, 0xfe41, 0x91);
+		rtl8723au_write8(priv, 0xfe42, 0x80);
 
-		/*  0xE2 = 0x81 */
-		rtl8723au_write8(Adapter, 0xFE40, 0xE2);
-		rtl8723au_write8(Adapter, 0xFE41, 0x81);
-		rtl8723au_write8(Adapter, 0xFE42, 0x80);
-
+		/*  0xe2 = 0x81 */
+		rtl8723au_write8(priv, 0xfe40, 0xe2);
+		rtl8723au_write8(priv, 0xfe41, 0x81);
+		rtl8723au_write8(priv, 0xfe42, 0x80);
 	}
 
 /*	_InitPABias(Adapter); */
@@ -1302,18 +1295,18 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 	rtl8723a_InitHalDm(Adapter);
 
-	rtl8723a_set_nav_upper(Adapter, WiFiNavUpperUs);
+	rtl8723a_set_nav_upper(priv, WiFiNavUpperUs);
 
 	/*  2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test, but we need to fin root cause. */
-	if (((rtl8723au_read32(Adapter, rFPGA0_RFMOD) & 0xFF000000) !=
+	if (((rtl8723au_read32(priv, rFPGA0_RFMOD) & 0xFF000000) !=
 	     0x83000000)) {
-		PHY_SetBBReg(Adapter, rFPGA0_RFMOD, BIT(24), 1);
+		PHY_SetBBReg(priv, rFPGA0_RFMOD, BIT(24), 1);
 		RT_TRACE(_module_hci_hal_init_c_, _drv_err_, ("%s: IQK fail recorver\n", __func__));
 	}
 
 	/* ack for xmit mgmt frames. */
-	rtl8723au_write32(Adapter, REG_FWHW_TXQ_CTRL,
-			  rtl8723au_read32(Adapter, REG_FWHW_TXQ_CTRL)|BIT(12));
+	rtl8723au_write32(priv, REG_FWHW_TXQ_CTRL,
+			  rtl8723au_read32(priv, REG_FWHW_TXQ_CTRL)|BIT(12));
 #endif
 
 exit:

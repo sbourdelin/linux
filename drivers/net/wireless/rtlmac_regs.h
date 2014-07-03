@@ -333,6 +333,8 @@
 #define REG_RXPKT_NUM			0x0284
 #define REG_RXDMA_STATUS		0x0288
 
+#define REG_RF_BB_CMD_ADDR		0x02c0
+#define REG_RF_BB_CMD_DATA		0x02c4
 
 /*  spec version 11 */
 /* 0x0400 ~ 0x047F	Protocol Configuration */
@@ -507,5 +509,11 @@
 
 #define REG_MACID1			0x0700
 #define REG_BSSID1			0x0708
+
+#define REG_FPGA0_RF_MODE		0x0800
+#define REG_FPGA0_TXINFO		0x0804
+#define REG_FPGA0_XA_RF_OE		0x0860	/*  RF Channel switch */
+#define REG_FPGA0_XAB_RF_SW_CTRL	0x0870
+#define REG_FPGA0_XCD_RF_SW_CTRL	0x0874
 
 #define REG_8723A_FW_START_ADDRESS	0x1000
