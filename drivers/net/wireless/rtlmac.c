@@ -752,12 +752,12 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	val8 |= SYS_FUNC_BB_GLB_RSTN | SYS_FUNC_BBRSTB;
 	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
 
-	/* AFE_XTAL_RF_GATE (bit 14) if addressing as 16 bit register */
+	/* AFE_XTAL_RF_GATE (bit 14) if addressing as 32 bit register */
 	val8 = rtl8723au_read8(priv, REG_AFE_XTAL_CTRL + 1);
 	val8 &= ~BIT(6);
 	rtl8723au_write8(priv, REG_AFE_XTAL_CTRL + 1, val8);
 
-	/* AFE_XTAL_BT_GATE (bit 20) if addressing as 16 bit register */
+	/* AFE_XTAL_BT_GATE (bit 20) if addressing as 32 bit register */
 	val8 = rtl8723au_read8(priv, REG_AFE_XTAL_CTRL + 2);
 	val8 &= ~BIT(4);
 	rtl8723au_write8(priv, REG_AFE_XTAL_CTRL + 2, val8);
