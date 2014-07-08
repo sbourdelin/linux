@@ -520,6 +520,9 @@
 #define REG_FPGA0_XB_HSSI_PARM2		0x082c
 #define  FPGA0_HSSI_3WIRE_DATA_LEN	0x800
 #define  FPGA0_HSSI_3WIRE_ADDR_LEN	0x400
+#define  FPGA0_HSSI_PARM2_ADDR_SHIFT	23
+#define  FPGA0_HSSI_PARM2_ADDR_MASK	0x7f800000	/* 0xff << 23 */
+#define  FPGA0_HSSI_PARM2_EDGE_READ	BIT(31)
 
 #define REG_FPGA0_XA_RF_INT_OE		0x0860	/* RF Channel switch */
 #define REG_FPGA0_XB_RF_INT_OE		0x0864
@@ -541,5 +544,10 @@
 #define  FPGA0_RF_ANTSWB		0x200
 #define  FPGA0_RF_PAPE			0x400
 #define  FPGA0_RF_PAPE5G		0x800
+
+#define REG_FPGA0_XA_LSSI_READBACK	0x8a0	/* Tranceiver LSSI Readback */
+#define REG_FPGA0_XB_LSSI_READBACK	0x8a4
+#define REG_HSPI_XA_READBACK		0x8b8	/* Transceiver A HSPI read */
+#define REG_HSPI_XB_READBACK		0x8bc	/* Transceiver B HSPI read */
 
 #define REG_8723A_FW_START_ADDRESS	0x1000

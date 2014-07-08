@@ -321,6 +321,40 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 	return ret;
 }
 
+static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
+{
+	u32 hssia, val32, retval;
+
+	hssia = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
+	/*
+	 * For path B it seems we should be reading REG_FPGA0_XB_HSSI_PARM1
+	 * into val32
+	 */
+	val32 = hssia;
+	val32 &= ~FPGA0_HSSI_PARM2_ADDR_MASK;
+	val32 |= (reg << FPGA0_HSSI_PARM2_ADDR_SHIFT) |
+		FPGA0_HSSI_PARM2_EDGE_READ;
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2,
+			  hssia &= ~FPGA0_HSSI_PARM2_EDGE_READ);
+	udelay(10);
+	/* Here use XB for path B */
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
+	udelay(100);
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2,
+			  hssia |= FPGA0_HSSI_PARM2_EDGE_READ);
+	udelay(10);
+	/* Use XB for path B */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
+	if (val32 & BIT(8))	/* RF PI enabled */
+		retval = rtl8723au_read32(priv, REG_HSPI_XA_READBACK);
+	else
+		retval = rtl8723au_read32(priv, REG_FPGA0_XA_LSSI_READBACK);
+
+	retval &= 0xfffff;
+
+	return retval;
+}
+
 static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 {
 	u32 val32;
