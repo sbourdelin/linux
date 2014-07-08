@@ -112,6 +112,11 @@ struct rtlmac_reg32val {
 	u32 val;
 };
 
+struct rtlmac_rfregval {
+	u8 reg;
+	u32 val;
+};
+
 struct rtlmac_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
