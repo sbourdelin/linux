@@ -355,6 +355,19 @@ static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 	return retval;
 }
 
+static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
+{
+	int ret;
+	u32 dataaddr;
+
+	data &= FPGA0_LSSI_PARM_DATA_MASK;
+	dataaddr = (reg << FPGA0_LSSI_PARM_ADDR_SHIFT) | data;
+
+	/* Use XB for path B */
+	ret = rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, dataaddr);
+	return ret;
+}
+
 static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 {
 	u32 val32;
