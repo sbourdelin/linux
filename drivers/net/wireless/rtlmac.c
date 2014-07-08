@@ -848,6 +848,7 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	u32 val32;
 	u16 val16, rfsi_rfenv;
 
+	/* For path B, use XB */
 	rfsi_rfenv = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
 	rfsi_rfenv &= FPGA0_RF_RFENV;
 
@@ -877,6 +878,7 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
 	udelay(1);
 
+	/* For path B, use XB */
 	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
 	val16 &= ~FPGA0_RF_RFENV;
 	val16 |= rfsi_rfenv;
