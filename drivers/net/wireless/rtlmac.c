@@ -352,6 +352,9 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	if (val32 & MULTI_GPS_FUNC_EN)
 		priv->has_gps = 1;
 
+	/* The rtl8192 presumably can have 2 */
+	priv->rf_paths = 1;
+
 	printk(KERN_INFO
 	       "%s: RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
 	       DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
@@ -793,6 +796,48 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	return 0;
 }
 
+static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
+{
+	u32 val32;
+	u16 val16, rfsi_rfenv;
+
+	rfsi_rfenv = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
+	rfsi_rfenv &= FPGA0_RF_RFENV;
+
+	/*
+	 * These two we might be able to optimize into one
+	 */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_INT_OE);
+	val32 |= BIT(20);	/* 0x10 << 16 */
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, val32);
+	udelay(1);
+
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_INT_OE);
+	val32 |= BIT(4);
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, val32);
+	udelay(1);
+
+	/*
+	 * These two we might be able to optimize into one
+	 */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
+	val32 &= ~FPGA0_HSSI_3WIRE_ADDR_LEN;
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
+	udelay(1);
+
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
+	val32 &= ~FPGA0_HSSI_3WIRE_DATA_LEN;
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
+	udelay(1);
+
+	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
+	val16 &= ~FPGA0_RF_RFENV;
+	val16 |= rfsi_rfenv;
+	rtl8723au_write16(priv, REG_FPGA0_XA_RF_SW_CTRL, val16);
+
+	return 0;
+}
+
 static int rtlmac_llt_write(struct rtlmac_priv *priv, u8 address, u8 data)
 {
 	int ret = -EBUSY;
@@ -1161,6 +1206,10 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		goto exit;
 
 	ret = rtlmac_init_phy_bb(priv);
+	if (ret)
+		goto exit;
+
+	ret = rtlmac_init_phy_rf(priv);
 	if (ret)
 		goto exit;
 #if 0

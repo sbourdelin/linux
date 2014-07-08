@@ -125,6 +125,7 @@ struct rtlmac_priv {
 	u32 has_polarity_ctrl:1;
 	u32 has_eeprom:1;
 	u32 boot_eeprom:1;
+	int rf_paths;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
 	struct mutex usb_buf_mutex;

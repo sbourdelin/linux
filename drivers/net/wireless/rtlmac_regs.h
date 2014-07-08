@@ -512,8 +512,34 @@
 
 #define REG_FPGA0_RF_MODE		0x0800
 #define REG_FPGA0_TXINFO		0x0804
-#define REG_FPGA0_XA_RF_OE		0x0860	/*  RF Channel switch */
+#define REG_FPGA0_PSD_FUNC		0x0808
+#define REG_FPGA0_TX_GAIN		0x080c
+#define REG_FPGA0_XA_HSSI_PARM1		0x0820	/* RF 3 wire register */
+#define REG_FPGA0_XA_HSSI_PARM2		0x0824
+#define REG_FPGA0_XB_HSSI_PARM1		0x0828
+#define REG_FPGA0_XB_HSSI_PARM2		0x082c
+#define  FPGA0_HSSI_3WIRE_DATA_LEN	0x800
+#define  FPGA0_HSSI_3WIRE_ADDR_LEN	0x400
+
+#define REG_FPGA0_XA_RF_INT_OE		0x0860	/* RF Channel switch */
+#define REG_FPGA0_XB_RF_INT_OE		0x0864
 #define REG_FPGA0_XAB_RF_SW_CTRL	0x0870
+#define REG_FPGA0_XA_RF_SW_CTRL		0x0870	/* 16 bit */
+#define REG_FPGA0_XB_RF_SW_CTRL		0x0872	/* 16 bit */
 #define REG_FPGA0_XCD_RF_SW_CTRL	0x0874
+#define REG_FPGA0_XC_RF_SW_CTRL		0x0874	/* 16 bit */
+#define REG_FPGA0_XD_RF_SW_CTRL		0x0876	/* 16 bit */
+#define  FPGA0_RF_3WIRE_DATA		0x1
+#define  FPGA0_RF_3WIRE_CLOC		0x2
+#define  FPGA0_RF_3WIRE_LOAD		0x4
+#define  FPGA0_RF_3WIRE_RW		0x8
+#define  FPGA0_RF_3WIRE_MASK		0xf
+#define  FPGA0_RF_RFENV			0x10
+#define  FPGA0_RF_TRSW			0x20	/* Useless now */
+#define  FPGA0_RF_TRSWB			0x40
+#define  FPGA0_RF_ANTSW			0x100
+#define  FPGA0_RF_ANTSWB		0x200
+#define  FPGA0_RF_PAPE			0x400
+#define  FPGA0_RF_PAPE5G		0x800
 
 #define REG_8723A_FW_START_ADDRESS	0x1000
