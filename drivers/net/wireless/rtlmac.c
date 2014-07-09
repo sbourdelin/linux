@@ -1489,9 +1489,15 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 		rtl8723au_write32(priv, REG_RQPN, val32);
 
-#if 0
-		_InitTxBufferBoundary(Adapter);
-#endif
+		/*
+		 * Set TX buffer boundary
+		 */
+		val8 = TX_TOTAL_PAGE_NUM + 1;
+		rtl8723au_write8(priv, REG_TXPKTBUF_BCNQ_BDNY, val8);
+		rtl8723au_write8(priv, REG_TXPKTBUF_MGQ_BDNY, val8);
+		rtl8723au_write8(priv, REG_TXPKTBUF_WMAC_LBK_BF_HD, val8);
+		rtl8723au_write8(priv, REG_TRXFF_BNDY, val8);
+		rtl8723au_write8(priv, REG_TDECTRL + 1, val8);
 	}
 #if 0
 	_InitQueuePriority(Adapter);
@@ -1560,7 +1566,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		rtl8723a_dual_antenna_detection(Adapter);
 	}
 
-	/* fixed USB interface interference issue */
+	/* fix USB interface interference issue */
 	rtl8723au_write8(priv, 0xfe40, 0xe0);
 	rtl8723au_write8(priv, 0xfe41, 0x8d);
 	rtl8723au_write8(priv, 0xfe42, 0x80);
