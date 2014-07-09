@@ -1579,9 +1579,18 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
+	/*
+	 * Set RX page boundary
+	 */
+	rtl8723au_write16(priv, REG_TRXFF_BNDY + 2, 0x27ff);
+	/*
+	 * Transfer page size is always 128
+	 */
+	val8 = (PBP_PAGE_SIZE_128 << PBP_PAGE_SIZE_RX_SHIFT) |
+		(PBP_PAGE_SIZE_128 << PBP_PAGE_SIZE_TX_SHIFT);
+	rtl8723au_write8(priv, REG_PBP, val8);
+
 #if 0
-	_InitPageBoundary(Adapter);
-	_InitTransferPageSize(Adapter);
 
 	/*  Get Rx PHY status in order to report RSSI and others. */
 	_InitDriverInfoSize(priv, DRVINFO_SZ);

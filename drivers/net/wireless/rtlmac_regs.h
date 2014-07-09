@@ -254,6 +254,14 @@
 #define  CALTMR_EN			BIT(10)
 
 #define REG_PBP				0x0104
+#define  PBP_PAGE_SIZE_RX_SHIFT		0
+#define  PBP_PAGE_SIZE_TX_SHIFT		4
+#define  PBP_PAGE_SIZE_64		0x0
+#define  PBP_PAGE_SIZE_128		0x1
+#define  PBP_PAGE_SIZE_256		0x2
+#define  PBP_PAGE_SIZE_512		0x3
+#define  PBP_PAGE_SIZE_1024		0x4
+
 #define REG_TRXDMA_CTRL			0x010c
 #define  TRXDMA_CTRL_VOQ_SHIFT		4
 #define  TRXDMA_CTRL_VIQ_SHIFT		6
