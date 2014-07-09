@@ -130,6 +130,10 @@ struct rtlmac_priv {
 	u32 has_polarity_ctrl:1;
 	u32 has_eeprom:1;
 	u32 boot_eeprom:1;
+	u32 ep_tx_high_queue:1;
+	u32 ep_tx_normal_queue:1;
+	u32 ep_tx_low_queue:1;
+	int ep_tx_count;
 	int rf_paths;
 	u32 rf_mode_ag[2];
 	struct rtlmac_firmware_header *fw_data;

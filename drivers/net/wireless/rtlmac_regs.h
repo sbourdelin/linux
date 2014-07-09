@@ -551,6 +551,11 @@
 #define REG_NORMAL_SIE_PID		0xfe62	/* 0xfe62 - 0xfe63 */
 #define REG_NORMAL_SIE_OPTIONAL		0xfe64
 #define REG_NORMAL_SIE_EP		0xfe65	/* 0xfe65 - 0xfe67 */
+#define REG_NORMAL_SIE_EP_TX		0xfe66
+#define  NORMAL_SIE_EP_TX_HIGH_MASK	0x000f
+#define  NORMAL_SIE_EP_TX_NORMAL_MASK	0x00f0
+#define  NORMAL_SIE_EP_TX_LOW_MASK	0x0f00
+
 #define REG_NORMAL_SIE_PHY		0xfe68	/* 0xfe68 - 0xfe6b */
 #define REG_NORMAL_SIE_OPTIONAL2	0xfe6c
 #define REG_NORMAL_SIE_GPS_EP		0xfe6d	/* RTL8723 only */

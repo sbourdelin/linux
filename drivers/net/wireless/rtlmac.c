@@ -485,6 +485,7 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 {
 	u32 val32;
+	u16 val16;
 	int ret = 0;
 	char *cut;
 
@@ -516,10 +517,30 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	/* The rtl8192 presumably can have 2 */
 	priv->rf_paths = 1;
 
+	val16 = rtl8723au_read16(priv, REG_NORMAL_SIE_EP_TX);
+	if (val16 & NORMAL_SIE_EP_TX_HIGH_MASK) {
+		priv->ep_tx_high_queue = 1;
+		priv->ep_tx_count++;
+	}
+
+	if (val16 & NORMAL_SIE_EP_TX_NORMAL_MASK) {
+		priv->ep_tx_normal_queue = 1;
+		priv->ep_tx_count++;
+	}
+
+	if (val16 & NORMAL_SIE_EP_TX_LOW_MASK) {
+		priv->ep_tx_low_queue = 1;
+		priv->ep_tx_count++;
+	}
+
 	printk(KERN_INFO
 	       "%s: RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
 	       DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
 	       priv->has_gps);
+
+	printk(KERN_DEBUG "%s: RTL8723au number of TX queues: %i\n",
+	       DRIVER_NAME, priv->ep_tx_count);
+
 	return ret;
 }
 
