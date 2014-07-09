@@ -428,6 +428,7 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 {
 	u32 hssia, val32, retval;
+	printk(KERN_DEBUG "reading rfreg %02x\n", reg);
 
 	hssia = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
 	/*
@@ -448,7 +449,7 @@ static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 			  hssia |= FPGA0_HSSI_PARM2_EDGE_READ);
 	udelay(10);
 	/* Use XB for path B */
-	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
 	if (val32 & BIT(8))	/* RF PI enabled */
 		retval = rtl8723au_read32(priv, REG_HSPI_XA_READBACK);
 	else
@@ -1048,6 +1049,8 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	val16 |= rfsi_rfenv;
 	rtl8723au_write16(priv, REG_FPGA0_XA_RF_SW_CTRL, val16);
 
+	priv->rf_mode_ag[0] = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+
 	return 0;
 }
 
@@ -1380,6 +1383,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	int macpower;
 	int ret = 0;
 	u8 val8;
+	u32 val32;
 
 	/* Check if MAC is already powered on */
 	val8 = rtl8723au_read8(priv, REG_CR);
@@ -1426,26 +1430,27 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 #if 0
-	/*  Add for tx power by rate fine tune. We need to call the function after BB config. */
-	/*  Because the tx power by rate table is inited in BB config. */
-
-	ret = PHY_RF6052_Config8723A(Adapter);
-	if (ret == _FAIL) {
-		DBG_8723A("PHY_RFConfig8723A fault !!\n");
-		goto exit;
-	}
-
+	/*
+	 * The RTL driver does this, but it cannot be correct since
+	 * RF_T_METER is an RF register, and should be written with
+	 * rtl8723au_write_rfreg() not rtl8723au_write32()
+	 */
 	/* reducing 80M spur */
 	rtl8723au_write32(priv, RF_T_METER, 0x0381808d);
 	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
 	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff82);
 	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
+#endif
 
-	/* RFSW Control */
-	rtl8723au_write32(priv, REG_FPGA0_TXINFO, 0x00000003);	/* 0x804[14]= 0 */
-	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, 0x07000760);	/* 0x870[6:5]= b'11 */
-	rtl8723au_write32(priv, REG_FPGA0_XA_RF_OE, 0x66F60210); /* 0x860[6:5]= b'00 */
+	/* RFSW Control - to clear bit 14 ?? */
+	rtl8723au_write32(priv, REG_FPGA0_TXINFO, 0x00000003);
+	/* 0x07000760 */
+	val32 = 0x07000000 | FPGA0_RF_TRSW | FPGA0_RF_TRSWB |
+		FPGA0_RF_ANTSW | FPGA0_RF_ANTSWB | FPGA0_RF_PAPE;
+	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, val32);
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210); /* 0x860[6:5]= b'00 */
 
+#if 0
 	/*  */
 	/*  Joseph Note: Keep RfRegChnlVal for later use. */
 	/*  */

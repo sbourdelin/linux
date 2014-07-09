@@ -557,3 +557,56 @@
 #define REG_HSPI_XB_READBACK		0x8bc	/* Transceiver B HSPI read */
 
 #define REG_8723A_FW_START_ADDRESS	0x1000
+
+/* RF6052 registers */
+#define RF6052_REG_AC			0x00
+#define RF6052_REG_IQADJ_G1		0x01
+#define RF6052_REG_IQADJ_G2		0x02
+#define RF6052_REG_BS_PA_APSET_G1_G4	0x03
+#define RF6052_REG_BS_PA_APSET_G5_G8	0x04
+#define RF6052_REG_POW_TRSW		0x05
+#define RF6052_REG_GAIN_RX		0x06
+#define RF6052_REG_GAIN_TX		0x07
+#define RF6052_REG_TXM_IDAC		0x08
+#define RF6052_REG_IPA_G		0x09
+#define RF6052_REG_TXBIAS_G		0x0a
+#define RF6052_REG_TXPA_AG		0x0b
+#define RF6052_REG_IPA_A		0x0c
+#define RF6052_REG_TXBIAS_A		0x0d
+#define RF6052_REG_BS_PA_APSET_G9_G11	0x0e
+#define RF6052_REG_BS_IQGEN		0x0f
+#define RF6052_REG_MODE1		0x10
+#define RF6052_REG_MODE2		0x11
+#define RF6052_REG_RX_AGC_HP		0x12
+#define RF6052_REG_TX_AGC		0x13
+#define RF6052_REG_BIAS			0x14
+#define RF6052_REG_IPA			0x15
+#define RF6052_REG_TXBIAS		0x16
+#define RF6052_REG_POW_ABILITY		0x17
+#define RF6052_REG_MODE_AG		0x18	/* RF channel and BW switch */
+#define RF6052_REG_TOP			0x19
+#define RF6052_REG_RX_G1		0x1a
+#define RF6052_REG_RX_G2		0x1b
+#define RF6052_REG_RX_BB2		0x1c
+#define RF6052_REG_RX_BB1		0x1d
+#define RF6052_REG_RCK1			0x1e
+#define RF6052_REG_RCK2			0x1f
+#define RF6052_REG_TX_G1		0x20
+#define RF6052_REG_TX_G2		0x21
+#define RF6052_REG_TX_G3		0x22
+#define RF6052_REG_TX_BB1		0x23
+#define RF6052_REG_T_METER		0x24
+#define RF6052_REG_SYN_G1		0x25	/* RF TX Power control */
+#define RF6052_REG_SYN_G2		0x26	/* RF TX Power control */
+#define RF6052_REG_SYN_G3		0x27	/* RF TX Power control */
+#define RF6052_REG_SYN_G4		0x28	/* RF TX Power control */
+#define RF6052_REG_SYN_G5		0x29	/* RF TX Power control */
+#define RF6052_REG_SYN_G6		0x2a	/* RF TX Power control */
+#define RF6052_REG_SYN_G7		0x2b	/* RF TX Power control */
+#define RF6052_REG_SYN_G8		0x2c	/* RF TX Power control */
+
+#define RF6052_REG_RCK_OS		0x30	/* RF TX PA control */
+
+#define RF6052_REG_TXPA_G1		0x31	/* RF TX PA control */
+#define RF6052_REG_TXPA_G2		0x32	/* RF TX PA control */
+#define RF6052_REG_TXPA_G3		0x33	/* RF TX PA control */
