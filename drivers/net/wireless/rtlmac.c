@@ -1590,12 +1590,18 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		(PBP_PAGE_SIZE_128 << PBP_PAGE_SIZE_TX_SHIFT);
 	rtl8723au_write8(priv, REG_PBP, val8);
 
+	/*
+	 * Unit in 8 bytes, not obvious what it is used for
+	 */
+	rtl8723au_write8(priv, REG_RX_DRVINFO_SZ, 4);
+
+	/*
+	 * Enable all interrupts - not obvious USB needs to do this
+	 */
+	rtl8723au_write32(priv, REG_HISR, 0xffffffff);
+	rtl8723au_write32(priv, REG_HIMR, 0xffffffff);
+
 #if 0
-
-	/*  Get Rx PHY status in order to report RSSI and others. */
-	_InitDriverInfoSize(priv, DRVINFO_SZ);
-
-	_InitInterrupt(Adapter);
 	hw_var_set_macaddr(priv, Adapter->eeprompriv.mac_addr);
 	_InitNetworkType(Adapter);/* set msr */
 	_InitWMACSetting(Adapter);
