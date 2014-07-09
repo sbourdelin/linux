@@ -300,6 +300,11 @@
 
 /* 0x0200 ~ 0x027F	TXDMA Configuration */
 #define REG_RQPN			0x0200
+#define  RQPN_HI_PQ_SHIFT		0
+#define  RQPN_LO_PQ_SHIFT		8
+#define  RQPN_NORM_PQ_SHIFT		16
+#define  RQPN_LOAD			BIT(31)
+
 #define REG_FIFOPAGE			0x0204
 #define REG_TDECTRL			0x0208
 #define REG_TXDMA_OFFSET_CHK		0x020c

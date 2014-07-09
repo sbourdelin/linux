@@ -1424,7 +1424,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 	printk(KERN_DEBUG "macpower %i\n", macpower);
 	if (!macpower) {
-		ret = rtlmac_init_llt_table(priv, LLT_LAST_TX_PAGE);
+		ret = rtlmac_init_llt_table(priv, TX_TOTAL_PAGE_NUM);
 		if (ret) {
 			printk(KERN_DEBUG "%s: LLT table init failed\n",
 			       __func__);
@@ -1472,11 +1472,28 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 /* 0x860[6:5]= 00 - why? - this sets antenna B */
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
 
-#if 0
 	if (!macpower) {
-		_InitQueueReservedPage(Adapter);
+		if (priv->ep_tx_normal_queue)
+			val8 = TX_PAGE_NUM_NORM_PQ;
+		else
+			val8 = 0;
+
+		rtl8723au_write8(priv, REG_RQPN_NPQ, val8);
+
+		val32 = (TX_PAGE_NUM_PUBQ << RQPN_NORM_PQ_SHIFT) | RQPN_LOAD;
+
+		if (priv->ep_tx_high_queue)
+			val32 |= (TX_PAGE_NUM_HI_PQ << RQPN_HI_PQ_SHIFT);
+		if (priv->ep_tx_low_queue)
+			val32 |= (TX_PAGE_NUM_LO_PQ << RQPN_LO_PQ_SHIFT);
+
+		rtl8723au_write32(priv, REG_RQPN, val32);
+
+#if 0
 		_InitTxBufferBoundary(Adapter);
+#endif
 	}
+#if 0
 	_InitQueuePriority(Adapter);
 	_InitPageBoundary(Adapter);
 	_InitTransferPageSize(Adapter);
