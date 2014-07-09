@@ -1380,7 +1380,7 @@ static int rtlmac_power_off(struct rtlmac_priv *priv)
 static int rtlmac_init_device(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
-	int macpower;
+	bool macpower;
 	int ret = 0;
 	u8 val8;
 	u32 val32;
@@ -1391,9 +1391,9 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/* Fix 92DU-VC S3 hang with the reason is that secondary mac is not
 	   initialized. First MAC returns 0xea, second MAC returns 0x00 */
 	if (val8 == 0xea)
-		macpower = 0;
+		macpower = false;
 	else
-		macpower = 1;
+		macpower = true;
 
 	ret = rtlmac_power_on(priv);
 	if (ret < 0) {
@@ -1452,7 +1452,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
 
 #if 0
-	if (!pHalData->bMACFuncEnable) {
+	if (!macpower) {
 		_InitQueueReservedPage(Adapter);
 		_InitTxBufferBoundary(Adapter);
 	}
