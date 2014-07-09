@@ -1127,6 +1127,81 @@ exit:
 	return ret;
 }
 
+static int rtlmac_init_queue_priotiy(struct rtlmac_priv *priv)
+{
+	u16 val16, hi, lo;
+	u16 hiq, mgq, bkq, beq, viq, voq;
+	int ret = 0;
+
+	switch(priv->ep_tx_count) {
+	case 1:
+		if (priv->ep_tx_high_queue) {
+			hi = TRXDMA_QUEUE_HIGH;
+		} else if (priv->ep_tx_low_queue) {
+			hi = TRXDMA_QUEUE_LOW;
+		} else if (priv->ep_tx_normal_queue) {
+			hi = TRXDMA_QUEUE_NORMAL;
+		} else {
+			hi = 0;
+			ret = -EINVAL;
+		}
+
+		hiq = hi;
+		mgq = hi;
+		bkq = hi;
+		beq = hi;
+		viq = hi;
+		voq = hi;
+
+		break;
+	case 2:
+		if (priv->ep_tx_high_queue && priv->ep_tx_low_queue) {
+			hi = TRXDMA_QUEUE_HIGH;
+			lo = TRXDMA_QUEUE_LOW;
+		} else if (priv->ep_tx_normal_queue && priv->ep_tx_low_queue) {
+			hi = TRXDMA_QUEUE_NORMAL;
+			lo = TRXDMA_QUEUE_LOW;
+		} else if (priv->ep_tx_normal_queue && priv->ep_tx_low_queue) {
+			hi = TRXDMA_QUEUE_HIGH;
+			lo = TRXDMA_QUEUE_LOW;
+		} else {
+			ret = -EINVAL;
+			hi = 0;
+			lo = 0;
+		}
+		hiq = hi;
+		mgq = lo;
+		bkq = hi;
+		beq = lo;
+		viq = hi;
+		voq = lo;
+
+		break;
+	case 3:
+		beq = TRXDMA_QUEUE_LOW;
+		bkq = TRXDMA_QUEUE_NORMAL;
+		viq = TRXDMA_QUEUE_NORMAL;
+		voq = TRXDMA_QUEUE_HIGH;
+		mgq = TRXDMA_QUEUE_HIGH;
+		hiq = TRXDMA_QUEUE_HIGH;
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	if (!ret) {
+		val16 = (voq << TRXDMA_CTRL_VOQ_SHIFT) |
+			(viq << TRXDMA_CTRL_VIQ_SHIFT) |
+			(beq << TRXDMA_CTRL_BEQ_SHIFT) |
+			(bkq << TRXDMA_CTRL_BKQ_SHIFT) |
+			(mgq << TRXDMA_CTRL_MGQ_SHIFT) |
+			(hiq << TRXDMA_CTRL_HIQ_SHIFT);
+		rtl8723au_write16(priv, REG_TRXDMA_CTRL, val16);
+	}
+
+	return ret;
+}
+
 static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -1499,8 +1574,12 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		rtl8723au_write8(priv, REG_TRXFF_BNDY, val8);
 		rtl8723au_write8(priv, REG_TDECTRL + 1, val8);
 	}
+
+	ret = rtlmac_init_queue_priotiy(priv);
+	if (ret)
+		goto exit;
+
 #if 0
-	_InitQueuePriority(Adapter);
 	_InitPageBoundary(Adapter);
 	_InitTransferPageSize(Adapter);
 
