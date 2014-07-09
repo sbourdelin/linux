@@ -1442,21 +1442,16 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
 #endif
 
-	/* RFSW Control - to clear bit 14 ?? */
+	/* RFSW Control - clear bit 14 ?? */
 	rtl8723au_write32(priv, REG_FPGA0_TXINFO, 0x00000003);
 	/* 0x07000760 */
 	val32 = 0x07000000 | FPGA0_RF_TRSW | FPGA0_RF_TRSWB |
 		FPGA0_RF_ANTSW | FPGA0_RF_ANTSWB | FPGA0_RF_PAPE;
 	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, val32);
-	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210); /* 0x860[6:5]= b'00 */
+	 /* 0x860[6:5]= 00 - why? - this sets antenna B */
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
 
 #if 0
-	/*  */
-	/*  Joseph Note: Keep RfRegChnlVal for later use. */
-	/*  */
-	pHalData->RfRegChnlVal[0] = PHY_QueryRFReg(priv, (enum RF_RADIO_PATH)0, RF_CHNLBW, bRFRegOffsetMask);
-	pHalData->RfRegChnlVal[1] = PHY_QueryRFReg(priv, (enum RF_RADIO_PATH)1, RF_CHNLBW, bRFRegOffsetMask);
-
 	if (!pHalData->bMACFuncEnable) {
 		_InitQueueReservedPage(Adapter);
 		_InitTxBufferBoundary(Adapter);
