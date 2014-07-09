@@ -1202,6 +1202,19 @@ static int rtlmac_init_queue_priotiy(struct rtlmac_priv *priv)
 	return ret;
 }
 
+static int rtlmac_set_mac(struct rtlmac_priv *priv)
+{
+	int i;
+	u16 reg;
+
+	reg = REG_MACID;
+
+	for (i = 0; i < ETH_ALEN; i++)
+		rtl8723au_write8(priv, reg + i, priv->mac_addr[i]);
+
+	return 0;
+}
+
 static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -1601,8 +1614,8 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_HISR, 0xffffffff);
 	rtl8723au_write32(priv, REG_HIMR, 0xffffffff);
 
+	rtlmac_set_mac(priv);
 #if 0
-	hw_var_set_macaddr(priv, Adapter->eeprompriv.mac_addr);
 	_InitNetworkType(Adapter);/* set msr */
 	_InitWMACSetting(Adapter);
 	_InitAdaptiveCtrl(Adapter);
@@ -1824,6 +1837,8 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	rtlmac_8723au_identify_chip(priv);
 	rtlmac_read_efuse(priv);
+	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
+
 	printk(KERN_INFO "%s: RTL8723au %02x:%02x:%02x:%02x:%02x:%02x\n",
 	       DRIVER_NAME,
 	       priv->efuse_wifi.efuse.mac_addr[0],
