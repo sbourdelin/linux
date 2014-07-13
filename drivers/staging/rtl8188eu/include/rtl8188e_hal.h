@@ -386,10 +386,6 @@ struct hal_data_8188e {
 
 	u16	EfuseUsedBytes;
 
-#ifdef CONFIG_88EU_P2P
-	struct P2P_PS_Offload_t	p2p_ps_offload;
-#endif
-
 	/*  Auto FSM to Turn On, include clock, isolation, power control
 	 *  for MAC only */
 	u8	bMacPwrCtrlOn;
@@ -455,9 +451,6 @@ void Hal_EfuseParseBoardType88E(struct adapter *pAdapter, u8 *hwinfo,
 void Hal_ReadPowerSavingMode88E(struct adapter *pAdapter, u8 *hwinfo,
 				bool AutoLoadFail);
 
-bool HalDetectPwrDownMode88E(struct adapter *Adapter);
-
-void Hal_InitChannelPlan(struct adapter *padapter);
 void rtl8188e_set_hal_ops(struct hal_ops *pHalFunc);
 
 /*  register */

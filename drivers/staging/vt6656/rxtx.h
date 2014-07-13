@@ -33,13 +33,15 @@
 #include "wcmd.h"
 #include "baseband.h"
 
+#define DEFAULT_MGN_LIFETIME_RES_64us	125  /* 64us */
+#define DEFAULT_MSDU_LIFETIME_RES_64us  8000
+
 /* MIC HDR data header */
 struct vnt_mic_hdr {
 	u8 id;
 	u8 tx_priority;
 	u8 mic_addr2[6];
-	__be32 tsc_47_16;
-	__be16 tsc_15_0;
+	u8 ccmp_pn[IEEE80211_CCMP_PN_LEN];
 	__be16 payload_len;
 	__be16 hlen;
 	__le16 frame_control;
@@ -222,7 +224,7 @@ struct vnt_tx_fifo_head {
 	u8 tx_key[WLAN_KEY_LEN_CCMP];
 	u16 wFIFOCtl;
 	__le16 time_stamp;
-	u16 wFragCtl;
+	__le16 frag_ctl;
 	__le16 current_rate;
 } __packed;
 
@@ -247,12 +249,12 @@ struct vnt_beacon_buffer {
 	u8 byPKTNO;
 	__le16 tx_byte_count;
 	struct vnt_tx_short_buf_head short_head;
-	struct ieee80211_hdr hdr;
+	struct ieee80211_mgmt mgmt_hdr;
 } __packed;
 
-void vDMA0_tx_80211(struct vnt_private *, struct sk_buff *skb);
-int nsDMA_tx_packet(struct vnt_private *, struct sk_buff *skb);
-CMD_STATUS csMgmt_xmit(struct vnt_private *, struct vnt_tx_mgmt *);
-CMD_STATUS csBeacon_xmit(struct vnt_private *, struct vnt_tx_mgmt *);
+int vnt_tx_packet(struct vnt_private *, struct sk_buff *);
+int vnt_beacon_make(struct vnt_private *, struct ieee80211_vif *);
+int vnt_beacon_enable(struct vnt_private *, struct ieee80211_vif *,
+	struct ieee80211_bss_conf *);
 
 #endif /* __RXTX_H__ */

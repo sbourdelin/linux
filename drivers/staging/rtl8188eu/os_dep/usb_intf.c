@@ -28,8 +28,7 @@
 #include <linux/vmalloc.h>
 #include <osdep_intf.h>
 
-#include <usb_ops.h>
-#include <usb_osintf.h>
+#include <usb_ops_linux.h>
 #include <usb_hal.h>
 #include <rtw_ioctl.h>
 
@@ -66,7 +65,7 @@ static struct dvobj_priv *usb_dvobj_init(struct usb_interface *usb_intf)
 	struct usb_device	*pusbd;
 
 
-	pdvobjpriv = (struct dvobj_priv *)rtw_zmalloc(sizeof(*pdvobjpriv));
+	pdvobjpriv = kzalloc(sizeof(*pdvobjpriv), GFP_KERNEL);
 	if (pdvobjpriv == NULL)
 		goto exit;
 
@@ -116,12 +115,10 @@ static struct dvobj_priv *usb_dvobj_init(struct usb_interface *usb_intf)
 		pdvobjpriv->ishighspeed = false;
 
 	mutex_init(&pdvobjpriv->usb_vendor_req_mutex);
-	pdvobjpriv->usb_vendor_req_buf = rtw_zmalloc(MAX_USB_IO_CTL_SIZE);
+	pdvobjpriv->usb_vendor_req_buf = kzalloc(MAX_USB_IO_CTL_SIZE, GFP_KERNEL);
 
 	if (!pdvobjpriv->usb_vendor_req_buf)
 		goto free_dvobj;
-
-	rtw_reset_continual_urb_error(pdvobjpriv);
 
 	usb_get_dev(pusbd);
 
@@ -304,15 +301,7 @@ exit:
 	return ret;
 }
 
-static int rtw_resume(struct usb_interface *pusb_intf)
-{
-	struct dvobj_priv *dvobj = usb_get_intfdata(pusb_intf);
-	struct adapter *padapter = dvobj->if1;
-
-	return rtw_resume_process(padapter);
-}
-
-int rtw_resume_process(struct adapter *padapter)
+static int rtw_resume_process(struct adapter *padapter)
 {
 	struct net_device *pnetdev;
 	struct pwrctrl_priv *pwrpriv = NULL;
@@ -357,6 +346,14 @@ exit:
 
 
 	return ret;
+}
+
+static int rtw_resume(struct usb_interface *pusb_intf)
+{
+	struct dvobj_priv *dvobj = usb_get_intfdata(pusb_intf);
+	struct adapter *padapter = dvobj->if1;
+
+	return rtw_resume_process(padapter);
 }
 
 /*
@@ -431,10 +428,6 @@ static struct adapter *rtw_usb_if1_init(struct dvobj_priv *dvobj,
 	/*  alloc dev name after read efuse. */
 	rtw_init_netdev_name(pnetdev, padapter->registrypriv.ifname);
 	rtw_macaddr_cfg(padapter->eeprompriv.mac_addr);
-#ifdef CONFIG_88EU_P2P
-	rtw_init_wifidirect_addrs(padapter, padapter->eeprompriv.mac_addr,
-				  padapter->eeprompriv.mac_addr);
-#endif
 	memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
 	DBG_88E("MAC Address from pnetdev->dev_addr =  %pM\n",
 		pnetdev->dev_addr);

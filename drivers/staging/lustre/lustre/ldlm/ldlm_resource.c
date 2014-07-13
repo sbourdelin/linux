@@ -40,10 +40,9 @@
  */
 
 #define DEBUG_SUBSYSTEM S_LDLM
-# include <lustre_dlm.h>
-
-#include <lustre_fid.h>
-#include <obd_class.h>
+#include "../include/lustre_dlm.h"
+#include "../include/lustre_fid.h"
+#include "../include/obd_class.h"
 #include "ldlm_internal.h"
 
 struct kmem_cache *ldlm_resource_slab, *ldlm_lock_slab;
@@ -72,7 +71,7 @@ extern unsigned int ldlm_cancel_unused_locks_before_replay;
  * DDOS. */
 unsigned int ldlm_dump_granted_max = 256;
 
-#ifdef LPROCFS
+#if defined (CONFIG_PROC_FS)
 static ssize_t lprocfs_wr_dump_ns(struct file *file, const char *buffer,
 				  size_t count, loff_t *off)
 {
@@ -383,12 +382,12 @@ int ldlm_namespace_proc_register(struct ldlm_namespace *ns)
 	return 0;
 }
 #undef MAX_STRING_SIZE
-#else /* LPROCFS */
+#else /* CONFIG_PROC_FS */
 
 #define ldlm_namespace_proc_unregister(ns)      ({;})
 #define ldlm_namespace_proc_register(ns)	({0;})
 
-#endif /* LPROCFS */
+#endif /* CONFIG_PROC_FS */
 
 static unsigned ldlm_res_hop_hash(struct cfs_hash *hs,
 				  const void *key, unsigned mask)
@@ -1134,9 +1133,9 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
 		OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_CREATE_RESOURCE, 2);
 		rc = ns->ns_lvbo->lvbo_init(res);
 		if (rc < 0) {
-			CERROR("%s: lvbo_init failed for resource "LPX64":"
-			       LPX64": rc = %d\n", ns->ns_obd->obd_name,
-			       name->name[0], name->name[1], rc);
+			CERROR("%s: lvbo_init failed for resource %#llx:%#llx: rc = %d\n",
+			       ns->ns_obd->obd_name, name->name[0],
+			       name->name[1], rc);
 			if (res->lr_lvb_data) {
 				OBD_FREE(res->lr_lvb_data, res->lr_lvb_len);
 				res->lr_lvb_data = NULL;
@@ -1370,7 +1369,7 @@ void ldlm_namespace_dump(int level, struct ldlm_namespace *ns)
 	       ldlm_ns_name(ns), atomic_read(&ns->ns_bref),
 	       ns_is_client(ns) ? "client" : "server");
 
-	if (cfs_time_before(cfs_time_current(), ns->ns_next_dump))
+	if (time_before(cfs_time_current(), ns->ns_next_dump))
 		return;
 
 	cfs_hash_for_each_nolock(ns->ns_rs_hash,

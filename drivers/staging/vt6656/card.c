@@ -46,7 +46,6 @@
  */
 
 #include "device.h"
-#include "tmacro.h"
 #include "card.h"
 #include "baseband.h"
 #include "mac.h"
@@ -54,9 +53,6 @@
 #include "rf.h"
 #include "power.h"
 #include "key.h"
-#include "rc4.h"
-#include "country.h"
-#include "datarate.h"
 #include "usbpipe.h"
 
 //const u16 cwRXBCNTSFOff[MAX_RATE] =
@@ -78,15 +74,8 @@ static const u16 cwRXBCNTSFOff[MAX_RATE] =
 void vnt_set_channel(struct vnt_private *priv, u32 connection_channel)
 {
 
-	if (priv->byBBType == BB_TYPE_11A) {
-		if ((connection_channel < (CB_MAX_CHANNEL_24G + 1)) ||
-					(connection_channel > CB_MAX_CHANNEL))
-			connection_channel = (CB_MAX_CHANNEL_24G + 1);
-	} else {
-		if ((connection_channel > CB_MAX_CHANNEL_24G) ||
-						(connection_channel == 0))
-			connection_channel = 1;
-	}
+	if (connection_channel > CB_MAX_CHANNEL || !connection_channel)
+		return;
 
 	/* clear NAV */
 	vnt_mac_reg_bits_on(priv, MAC_REG_MACCR, MACCR_CLRNAV);
@@ -96,20 +85,6 @@ void vnt_set_channel(struct vnt_private *priv, u32 connection_channel)
 
 	vnt_control_out(priv, MESSAGE_TYPE_SELECT_CHANNLE,
 					connection_channel, 0, 0, NULL);
-
-	if (priv->byBBType == BB_TYPE_11A) {
-		priv->byCurPwr = 0xff;
-		vnt_rf_set_txpower(priv,
-			priv->abyOFDMAPwrTbl[connection_channel-15], RATE_54M);
-	} else if (priv->byBBType == BB_TYPE_11G) {
-		priv->byCurPwr = 0xff;
-		vnt_rf_set_txpower(priv,
-			priv->abyOFDMPwrTbl[connection_channel-1], RATE_54M);
-	} else {
-		priv->byCurPwr = 0xff;
-		vnt_rf_set_txpower(priv,
-			priv->abyCCKPwrTbl[connection_channel-1], RATE_1M);
-	}
 
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG, MAC_REG_CHANNEL,
 		(u8)(connection_channel|0x80));
@@ -402,10 +377,8 @@ void vnt_update_ifs(struct vnt_private *priv)
 		priv->uCwMin = C_CWMIN_B;
 		max_min = 5;
 	} else {/* PK_TYPE_11GA & PK_TYPE_11GB */
-		u8 rate = 0;
 		bool ofdm_rate = false;
 		unsigned int ii = 0;
-		PWLAN_IE_SUPP_RATES item_rates = NULL;
 
 		priv->uSIFS = C_SIFS_BG;
 
@@ -416,26 +389,10 @@ void vnt_update_ifs(struct vnt_private *priv)
 
 		priv->uDIFS = C_SIFS_BG + 2 * priv->uSlot;
 
-		item_rates =
-			(PWLAN_IE_SUPP_RATES)priv->vnt_mgmt.abyCurrSuppRates;
-
-		for (ii = 0; ii < item_rates->len; ii++) {
-			rate = (u8)(item_rates->abyRates[ii] & 0x7f);
-			if (RATEwGetRateIdx(rate) > RATE_11M) {
+		for (ii = RATE_54M; ii >= RATE_6M; ii--) {
+			if (priv->wBasicRate & ((u32)(0x1 << ii))) {
 				ofdm_rate = true;
 				break;
-			}
-		}
-
-		if (ofdm_rate == false) {
-			item_rates = (PWLAN_IE_SUPP_RATES)priv->vnt_mgmt
-				.abyCurrExtSuppRates;
-			for (ii = 0; ii < item_rates->len; ii++) {
-				rate = (u8)(item_rates->abyRates[ii] & 0x7f);
-				if (RATEwGetRateIdx(rate) > RATE_11M) {
-					ofdm_rate = true;
-					break;
-				}
 			}
 		}
 
@@ -450,6 +407,36 @@ void vnt_update_ifs(struct vnt_private *priv)
 
 	priv->uCwMax = C_CWMAX;
 	priv->uEIFS = C_EIFS;
+
+	switch (priv->byRFType) {
+	case RF_VT3226D0:
+		if (priv->byBBType != BB_TYPE_11B) {
+			priv->uSIFS -= 1;
+			priv->uDIFS -= 1;
+			break;
+		}
+	case RF_AIROHA7230:
+	case RF_AL2230:
+	case RF_AL2230S:
+		if (priv->byBBType != BB_TYPE_11B)
+			break;
+	case RF_RFMD2959:
+	case RF_VT3226:
+	case RF_VT3342A0:
+		priv->uSIFS -= 3;
+		priv->uDIFS -= 3;
+		break;
+	case RF_MAXIM2829:
+		if (priv->byBBType == BB_TYPE_11A) {
+			priv->uSIFS -= 5;
+			priv->uDIFS -= 5;
+		} else {
+			priv->uSIFS -= 2;
+			priv->uDIFS -= 2;
+		}
+
+		break;
+	}
 
 	data[0] = (u8)priv->uSIFS;
 	data[1] = (u8)priv->uDIFS;
@@ -491,28 +478,6 @@ void vnt_update_top_rates(struct vnt_private *priv)
 
 	priv->byTopCCKBasicRate = top_cck;
  }
-
-/*
- * Description: Set NIC Tx Basic Rate
- *
- * Parameters:
- *  In:
- *      pDevice         - The adapter to be set
- *      wBasicRate      - Basic Rate to be set
- *  Out:
- *      none
- *
- * Return Value: true if succeeded; false if failed.
- *
- */
-void vnt_add_basic_rate(struct vnt_private *priv, u16 rate_idx)
-{
-
-	priv->wBasicRate |= (1 << rate_idx);
-
-	/*Determines the highest basic rate.*/
-	vnt_update_top_rates(priv);
-}
 
 int vnt_ofdm_min_rate(struct vnt_private *priv)
 {
@@ -869,4 +834,6 @@ void vnt_set_bss_mode(struct vnt_private *priv)
 		priv->abyBBVGA[2] = 0x0;
 		priv->abyBBVGA[3] = 0x0;
 	}
+
+	BBvSetVGAGainOffset(priv, priv->abyBBVGA[0]);
 }

@@ -126,7 +126,7 @@ static sint _enqueue_cmd(struct  __queue *queue, struct cmd_obj *obj)
 	if (obj == NULL)
 		return _SUCCESS;
 	spin_lock_irqsave(&queue->lock, irqL);
-	list_insert_tail(&obj->list, &queue->queue);
+	list_add_tail(&obj->list, &queue->queue);
 	spin_unlock_irqrestore(&queue->lock, irqL);
 	return _SUCCESS;
 }
@@ -137,12 +137,12 @@ static struct cmd_obj *_dequeue_cmd(struct  __queue *queue)
 	struct cmd_obj *obj;
 
 	spin_lock_irqsave(&(queue->lock), irqL);
-	if (is_list_empty(&(queue->queue)))
+	if (list_empty(&(queue->queue)))
 		obj = NULL;
 	else {
-		obj = LIST_CONTAINOR(get_next(&(queue->queue)),
+		obj = LIST_CONTAINOR(queue->queue.next,
 				     struct cmd_obj, list);
-		list_delete(&obj->list);
+		list_del_init(&obj->list);
 	}
 	spin_unlock_irqrestore(&(queue->lock), irqL);
 	return obj;
@@ -190,7 +190,7 @@ u32 r8712_enqueue_cmd_ex(struct cmd_priv *pcmdpriv, struct cmd_obj *obj)
 		return _FAIL;
 	queue = &pcmdpriv->cmd_queue;
 	spin_lock_irqsave(&queue->lock, irqL);
-	list_insert_tail(&obj->list, &queue->queue);
+	list_add_tail(&obj->list, &queue->queue);
 	spin_unlock_irqrestore(&queue->lock, irqL);
 	up(&pcmdpriv->cmd_queue_sema);
 	return _SUCCESS;
@@ -413,7 +413,7 @@ u8 r8712_getrfreg_cmd(struct _adapter *padapter, u8 offset, u8 *pval)
 		kfree((u8 *) ph2c);
 		return _FAIL;
 	}
-	_init_listhead(&ph2c->list);
+	INIT_LIST_HEAD(&ph2c->list);
 	ph2c->cmdcode = GEN_CMD_CODE(_GetRFReg);
 	ph2c->parmbuf = (unsigned char *)prdrfparm;
 	ph2c->cmdsz =  sizeof(struct readRF_parm);
@@ -452,7 +452,7 @@ u8 r8712_createbss_cmd(struct _adapter *padapter)
 	pcmd = kmalloc(sizeof(*pcmd), GFP_ATOMIC);
 	if (pcmd == NULL)
 		return _FAIL;
-	_init_listhead(&pcmd->list);
+	INIT_LIST_HEAD(&pcmd->list);
 	pcmd->cmdcode = _CreateBss_CMD_;
 	pcmd->parmbuf = (unsigned char *)pdev_network;
 	pcmd->cmdsz = r8712_get_ndis_wlan_bssid_ex_sz((
@@ -606,7 +606,7 @@ u8 r8712_joinbss_cmd(struct _adapter  *padapter, struct wlan_network *pnetwork)
 				psecnetwork->InfrastructureMode);
 	psecnetwork->IELength = cpu_to_le32(psecnetwork->IELength);
 #endif
-	_init_listhead(&pcmd->list);
+	INIT_LIST_HEAD(&pcmd->list);
 	pcmd->cmdcode = _JoinBss_CMD_;
 	pcmd->parmbuf = (unsigned char *)psecnetwork;
 	pcmd->rsp = NULL;
@@ -758,7 +758,7 @@ u8 r8712_gettssi_cmd(struct _adapter *padapter, u8 offset, u8 *pval)
 		kfree((unsigned char *) ph2c);
 		return _FAIL;
 	}
-	_init_listhead(&ph2c->list);
+	INIT_LIST_HEAD(&ph2c->list);
 	ph2c->cmdcode = GEN_CMD_CODE(_ReadTSSI);
 	ph2c->parmbuf = (unsigned char *)prdtssiparm;
 	ph2c->cmdsz = sizeof(struct readTSSI_parm);
@@ -956,7 +956,7 @@ void r8712_createbss_cmd_callback(struct _adapter *padapter,
 				goto createbss_cmd_fail;
 			pwlan->last_scanned = jiffies;
 		} else
-			list_insert_tail(&(pwlan->list),
+			list_add_tail(&(pwlan->list),
 					 &pmlmepriv->scanned_queue.queue);
 		pnetwork->Length = r8712_get_ndis_wlan_bssid_ex_sz(pnetwork);
 		memcpy(&(pwlan->network), pnetwork, pnetwork->Length);

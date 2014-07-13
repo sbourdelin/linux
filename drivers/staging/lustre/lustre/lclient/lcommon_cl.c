@@ -41,7 +41,7 @@
 
 #define DEBUG_SUBSYSTEM S_LLITE
 
-# include <linux/libcfs/libcfs.h>
+#include "../../include/linux/libcfs/libcfs.h"
 # include <linux/fs.h>
 # include <linux/sched.h>
 # include <linux/mm.h>
@@ -50,16 +50,16 @@
 # include <linux/pagemap.h>
 # include <linux/rbtree.h>
 
-#include <obd.h>
-#include <obd_support.h>
-#include <lustre_fid.h>
-#include <lustre_lite.h>
-#include <lustre_dlm.h>
-#include <lustre_ver.h>
-#include <lustre_mdc.h>
-#include <cl_object.h>
+#include "../include/obd.h"
+#include "../include/obd_support.h"
+#include "../include/lustre_fid.h"
+#include "../include/lustre_lite.h"
+#include "../include/lustre_dlm.h"
+#include "../include/lustre_ver.h"
+#include "../include/lustre_mdc.h"
+#include "../include/cl_object.h"
 
-#include <lclient.h>
+#include "../include/lclient.h"
 
 #include "../llite/llite_internal.h"
 
@@ -843,7 +843,7 @@ int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
 			if (cl_isize_read(inode) < kms) {
 				cl_isize_write_nolock(inode, kms);
 				CDEBUG(D_VFSTRACE,
-				       DFID" updating i_size "LPU64"\n",
+				       DFID" updating i_size %llu\n",
 				       PFID(lu_object_fid(&obj->co_lu)),
 				       (__u64)cl_isize_read(inode));
 
