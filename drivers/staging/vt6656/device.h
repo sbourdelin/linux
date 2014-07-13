@@ -246,6 +246,8 @@ struct vnt_usb_send_context {
 	unsigned int buf_len;
 	u16 tx_hdr_size;
 	u8 type;
+	u8 pkt_no;
+	u8 fb_option;
 	bool in_use;
 	unsigned char data[MAX_TOTAL_SIZE_WITH_ALL_HEADERS];
 };
@@ -438,6 +440,7 @@ struct vnt_private {
 	u8 byChannelSwitchCount;
 
 	struct iw_statistics wstats; /* wireless stats */
+	struct ieee80211_low_level_stats low_stats;
 };
 
 #define ADD_ONE_WITH_WRAP_AROUND(uVar, uModulo) {   \

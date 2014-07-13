@@ -38,9 +38,6 @@
 #define TX_HZ		2000
 #define TX_INTERVAL	(1000000/TX_HZ)
 
-static int init_sdio(struct sdiowm_dev *sdev);
-static void release_sdio(struct sdiowm_dev *sdev);
-
 static struct sdio_tx *alloc_tx_struct(struct tx_cxt *tx)
 {
 	struct sdio_tx *t = kzalloc(sizeof(*t), GFP_ATOMIC);
@@ -124,6 +121,43 @@ static void put_rx_struct(struct rx_cxt *rx, struct sdio_rx *r)
 	list_add_tail(&r->list, &rx->free_list);
 }
 
+static void release_sdio(struct sdiowm_dev *sdev)
+{
+	struct tx_cxt	*tx = &sdev->tx;
+	struct rx_cxt	*rx = &sdev->rx;
+	struct sdio_tx	*t, *t_next;
+	struct sdio_rx	*r, *r_next;
+
+	kfree(tx->sdu_buf);
+
+	list_for_each_entry_safe(t, t_next, &tx->free_list, list) {
+		list_del(&t->list);
+		free_tx_struct(t);
+	}
+
+	list_for_each_entry_safe(t, t_next, &tx->sdu_list, list) {
+		list_del(&t->list);
+		free_tx_struct(t);
+	}
+
+	list_for_each_entry_safe(t, t_next, &tx->hci_list, list) {
+		list_del(&t->list);
+		free_tx_struct(t);
+	}
+
+	kfree(rx->rx_buf);
+
+	list_for_each_entry_safe(r, r_next, &rx->free_list, list) {
+		list_del(&r->list);
+		free_rx_struct(r);
+	}
+
+	list_for_each_entry_safe(r, r_next, &rx->req_list, list) {
+		list_del(&r->list);
+		free_rx_struct(r);
+	}
+}
+
 static int init_sdio(struct sdiowm_dev *sdev)
 {
 	int ret = 0, i;
@@ -174,43 +208,6 @@ static int init_sdio(struct sdiowm_dev *sdev)
 fail:
 	release_sdio(sdev);
 	return ret;
-}
-
-static void release_sdio(struct sdiowm_dev *sdev)
-{
-	struct tx_cxt	*tx = &sdev->tx;
-	struct rx_cxt	*rx = &sdev->rx;
-	struct sdio_tx	*t, *t_next;
-	struct sdio_rx	*r, *r_next;
-
-	kfree(tx->sdu_buf);
-
-	list_for_each_entry_safe(t, t_next, &tx->free_list, list) {
-		list_del(&t->list);
-		free_tx_struct(t);
-	}
-
-	list_for_each_entry_safe(t, t_next, &tx->sdu_list, list) {
-		list_del(&t->list);
-		free_tx_struct(t);
-	}
-
-	list_for_each_entry_safe(t, t_next, &tx->hci_list, list) {
-		list_del(&t->list);
-		free_tx_struct(t);
-	}
-
-	kfree(rx->rx_buf);
-
-	list_for_each_entry_safe(r, r_next, &rx->free_list, list) {
-		list_del(&r->list);
-		free_rx_struct(r);
-	}
-
-	list_for_each_entry_safe(r, r_next, &rx->req_list, list) {
-		list_del(&r->list);
-		free_rx_struct(r);
-	}
 }
 
 static void send_sdio_pkt(struct sdio_func *func, u8 *data, int len)
@@ -275,8 +272,9 @@ static void send_sdu(struct sdio_func *func, struct tx_cxt *tx)
 	aggr_len = pos;
 
 	hci = (struct hci_s *)(tx->sdu_buf + TYPE_A_HEADER_SIZE);
-	hci->cmd_evt = H2B(WIMAX_TX_SDU_AGGR);
-	hci->length = H2B(aggr_len - TYPE_A_HEADER_SIZE - HCI_HEADER_SIZE);
+	hci->cmd_evt = cpu_to_be16(WIMAX_TX_SDU_AGGR);
+	hci->length = cpu_to_be16(aggr_len - TYPE_A_HEADER_SIZE -
+				  HCI_HEADER_SIZE);
 
 	spin_unlock_irqrestore(&tx->lock, flags);
 

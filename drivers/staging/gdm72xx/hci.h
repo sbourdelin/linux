@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef HCI_H_20080801
-#define HCI_H_20080801
+#ifndef __GDM72XX_HCI_H__
+#define __GDM72XX_HCI_H__
 
 #define HCI_HEADER_SIZE		4
 #define HCI_VALUE_OFFS		(HCI_HEADER_SIZE)
@@ -198,10 +198,16 @@
 #define T_FFTSIZE			(0xda	| (4 << 16))
 #define T_DUPLEX_MODE			(0xdb	| (4 << 16))
 
+/* T_CAPABILITY */
+#define T_CAPABILITY_MULTI_CS		(1 << 0)
+#define T_CAPABILITY_WIMAX		(1 << 1)
+#define T_CAPABILITY_QOS		(1 << 2)
+#define T_CAPABILITY_AGGREGATION	(1 << 3)
+
 struct hci_s {
-	unsigned short cmd_evt;
-	unsigned short length;
-	unsigned char  data[0];
+	__be16	cmd_evt;
+	__be16	length;
+	u8	data[0];
 } __packed;
 
-#endif
+#endif /* __GDM72XX_HCI_H__ */

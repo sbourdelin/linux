@@ -36,11 +36,11 @@
 
 #define DEBUG_SUBSYSTEM S_LOV
 
-#include <linux/libcfs/libcfs.h>
+#include "../../include/linux/libcfs/libcfs.h"
 
-#include <obd_class.h>
-#include <obd_ost.h>
-#include <lustre/lustre_idl.h>
+#include "../include/obd_class.h"
+#include "../include/obd_ost.h"
+#include "../include/lustre/lustre_idl.h"
 #include "lov_internal.h"
 
 static void lov_init_set(struct lov_request_set *set)
@@ -1076,7 +1076,7 @@ int lov_prep_setattr_set(struct obd_export *exp, struct obd_info *oinfo,
 			if (off < 0 && req->rq_oi.oi_oa->o_size)
 				req->rq_oi.oi_oa->o_size--;
 
-			CDEBUG(D_INODE, "stripe %d has size "LPU64"/"LPU64"\n",
+			CDEBUG(D_INODE, "stripe %d has size %llu/%llu\n",
 			       i, req->rq_oi.oi_oa->o_size,
 			       oinfo->oi_oa->o_size);
 		}

@@ -1,4 +1,4 @@
-/*
+ /*
  * GPL HEADER START
  *
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -14,23 +14,16 @@
  * in the LICENSE file that accompanied this code).
  *
  * You should have received a copy of the GNU General Public License
- * version 2 along with this program; If not, see
- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+ * version 2 along with this program; If not, see http://www.gnu.org/licenses
  *
- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- * CA 95054 USA or visit www.sun.com if you need additional information or
- * have any questions.
+ * Please  visit http://www.xyratex.com/contact if you need additional
+ * information or have any questions.
  *
  * GPL HEADER END
  */
-/*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Use is subject to license terms.
+
+/**
+ * Functions for start/stop shash adler32 algorithm.
  */
-/*
- * This file is part of Lustre, http://www.lustre.org/
- * Lustre is a trademark of Sun Microsystems, Inc.
- *
- * libcfs/include/libcfs/user-bitops.h
- */
-#include <linux/types.h>
+int cfs_crypto_adler32_register(void);
+void cfs_crypto_adler32_unregister(void);

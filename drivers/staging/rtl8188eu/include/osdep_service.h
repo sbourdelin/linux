@@ -154,8 +154,6 @@ u32  _rtw_down_sema(struct semaphore *sema);
 
 void _rtw_init_queue(struct __queue *pqueue);
 
-u32  rtw_systime_to_ms(u32 systime);
-u32  rtw_ms_to_systime(u32 ms);
 s32  rtw_get_passing_time_ms(u32 start);
 
 struct rtw_netdev_priv_indicator {
@@ -164,7 +162,6 @@ struct rtw_netdev_priv_indicator {
 };
 struct net_device *rtw_alloc_etherdev_with_old_priv(int sizeof_priv,
 						    void *old_priv);
-struct net_device *rtw_alloc_etherdev(int sizeof_priv);
 
 #define rtw_netdev_priv(netdev)					\
 	(((struct rtw_netdev_priv_indicator *)netdev_priv(netdev))->priv)
@@ -190,18 +187,4 @@ u64 rtw_modular64(u64 x, u64 y);
 
 void rtw_buf_free(u8 **buf, u32 *buf_len);
 void rtw_buf_update(u8 **buf, u32 *buf_len, u8 *src, u32 src_len);
-
-struct rtw_cbuf {
-	u32 write;
-	u32 read;
-	u32 size;
-	void *bufs[0];
-};
-
-bool rtw_cbuf_full(struct rtw_cbuf *cbuf);
-bool rtw_cbuf_empty(struct rtw_cbuf *cbuf);
-bool rtw_cbuf_push(struct rtw_cbuf *cbuf, void *buf);
-void *rtw_cbuf_pop(struct rtw_cbuf *cbuf);
-struct rtw_cbuf *rtw_cbuf_alloc(u32 size);
-
 #endif

@@ -48,9 +48,7 @@
 #include <rtw_event.h>
 #include <rtw_led.h>
 #include <rtw_mlme_ext.h>
-#include <rtw_p2p.h>
 #include <rtw_ap.h>
-#include <rtw_mp.h>
 
 #define SPEC_DEV_ID_NONE		BIT(0)
 #define SPEC_DEV_ID_DISABLE_HT		BIT(1)
@@ -191,7 +189,6 @@ struct adapter {
 	struct	mlme_priv mlmepriv;
 	struct	mlme_ext_priv mlmeextpriv;
 	struct	cmd_priv	cmdpriv;
-	struct	evt_priv	evtpriv;
 	struct	xmit_priv	xmitpriv;
 	struct	recv_priv	recvpriv;
 	struct	sta_priv	stapriv;
@@ -200,7 +197,6 @@ struct adapter {
 	struct	pwrctrl_priv	pwrctrlpriv;
 	struct	eeprom_priv eeprompriv;
 	struct	led_priv	ledpriv;
-	struct	mp_priv	mppriv;
 
 #ifdef CONFIG_88EU_AP_MODE
 	struct	hostapd_priv	*phostapdpriv;
@@ -243,11 +239,6 @@ struct adapter {
 	/* The driver will show up the desired channel number
 	 * when this flag is 1. */
 	u8 bNotifyChannelChange;
-#ifdef CONFIG_88EU_P2P
-	/* The driver will show the current P2P status when the
-	 * upper application reads it. */
-	u8 bShowGetP2PState;
-#endif
 
 	struct mutex hw_init_mutex;
 

@@ -44,14 +44,14 @@ MODULE_LICENSE("GPL v2");
 #define XILLY_RX_TIMEOUT (10*HZ/1000)
 #define XILLY_TIMEOUT (100*HZ/1000)
 
-#define fpga_msg_ctrl_reg 0x0002
-#define fpga_dma_control_reg 0x0008
-#define fpga_dma_bufno_reg 0x0009
-#define fpga_dma_bufaddr_lowaddr_reg 0x000a
-#define fpga_dma_bufaddr_highaddr_reg 0x000b
-#define fpga_buf_ctrl_reg 0x000c
-#define fpga_buf_offset_reg 0x000d
-#define fpga_endian_reg 0x0010
+#define fpga_msg_ctrl_reg              0x0008
+#define fpga_dma_control_reg           0x0020
+#define fpga_dma_bufno_reg             0x0024
+#define fpga_dma_bufaddr_lowaddr_reg   0x0028
+#define fpga_dma_bufaddr_highaddr_reg  0x002c
+#define fpga_buf_ctrl_reg              0x0030
+#define fpga_buf_offset_reg            0x0034
+#define fpga_endian_reg                0x0040
 
 #define XILLYMSG_OPCODE_RELEASEBUF 1
 #define XILLYMSG_OPCODE_QUIESCEACK 2
@@ -170,7 +170,7 @@ irqreturn_t xillybus_isr(int irq, void *data)
 					DMA_FROM_DEVICE);
 
 				iowrite32(0x01,  /* Message NACK */
-					  &ep->registers[fpga_msg_ctrl_reg]);
+					  ep->registers + fpga_msg_ctrl_reg);
 			}
 			return IRQ_HANDLED;
 		} else if (buf[i] & (1 << 22)) /* Last message */
@@ -267,6 +267,12 @@ irqreturn_t xillybus_isr(int irq, void *data)
 
 			break;
 		case XILLYMSG_OPCODE_FIFOEOF:
+			if ((msg_channel > ep->num_channels) ||
+			    (msg_channel == 0) || (!msg_dir) ||
+			    !ep->channels[msg_channel]->num_wr_buffers) {
+				malformed_message(ep, &buf[i]);
+				break;
+			}
 			channel = ep->channels[msg_channel];
 			spin_lock(&channel->wr_spinlock);
 			channel->wr_eof = msg_bufno;
@@ -299,7 +305,7 @@ irqreturn_t xillybus_isr(int irq, void *data)
 
 	ep->msg_counter = (ep->msg_counter + 1) & 0xf;
 	ep->failed_messages = 0;
-	iowrite32(0x03, &ep->registers[fpga_msg_ctrl_reg]); /* Message ACK */
+	iowrite32(0x03, ep->registers + fpga_msg_ctrl_reg); /* Message ACK */
 
 	return IRQ_HANDLED;
 }
@@ -313,28 +319,130 @@ EXPORT_SYMBOL(xillybus_isr);
 
 static void xillybus_autoflush(struct work_struct *work);
 
+struct xilly_alloc_state {
+	void *salami;
+	int left_of_salami;
+	int nbuffer;
+	enum dma_data_direction direction;
+	u32 regdirection;
+};
+
+static int xilly_get_dma_buffers(struct xilly_endpoint *ep,
+				 struct xilly_alloc_state *s,
+				 struct xilly_buffer **buffers,
+				 int bufnum, int bytebufsize)
+{
+	int i, rc;
+	dma_addr_t dma_addr;
+	struct device *dev = ep->dev;
+	struct xilly_buffer *this_buffer = NULL; /* Init to silence warning */
+
+	if (buffers) { /* Not the message buffer */
+		this_buffer = devm_kzalloc(
+			dev, bufnum * sizeof(struct xilly_buffer),
+			GFP_KERNEL);
+
+		if (!this_buffer)
+			return -ENOMEM;
+	}
+
+	for (i = 0; i < bufnum; i++) {
+		/*
+		 * Buffers are expected in descending size order, so there
+		 * is either enough space for this buffer or none at all.
+		 */
+
+		if ((s->left_of_salami < bytebufsize) &&
+		    (s->left_of_salami > 0)) {
+			dev_err(ep->dev,
+				"Corrupt buffer allocation in IDT. Aborting.\n");
+			return -ENODEV;
+		}
+
+		if (s->left_of_salami == 0) {
+			int allocorder, allocsize;
+
+			allocsize = PAGE_SIZE;
+			allocorder = 0;
+			while (bytebufsize > allocsize) {
+				allocsize *= 2;
+				allocorder++;
+			}
+
+			s->salami = (void *) devm_get_free_pages(
+				dev,
+				GFP_KERNEL | __GFP_DMA32 | __GFP_ZERO,
+				allocorder);
+
+			if (!s->salami)
+				return -ENOMEM;
+			s->left_of_salami = allocsize;
+		}
+
+		rc = ep->ephw->map_single(ep, s->salami,
+					  bytebufsize, s->direction,
+					  &dma_addr);
+
+		if (rc)
+			return rc;
+
+		iowrite32((u32) (dma_addr & 0xffffffff),
+			  ep->registers + fpga_dma_bufaddr_lowaddr_reg);
+		iowrite32(((u32) ((((u64) dma_addr) >> 32) & 0xffffffff)),
+			  ep->registers + fpga_dma_bufaddr_highaddr_reg);
+		mmiowb();
+
+		if (buffers) { /* Not the message buffer */
+			this_buffer->addr = s->salami;
+			this_buffer->dma_addr = dma_addr;
+			buffers[i] = this_buffer++;
+
+			iowrite32(s->regdirection | s->nbuffer++,
+				  ep->registers + fpga_dma_bufno_reg);
+		} else {
+			ep->msgbuf_addr = s->salami;
+			ep->msgbuf_dma_addr = dma_addr;
+			ep->msg_buf_size = bytebufsize;
+
+			iowrite32(s->regdirection,
+				  ep->registers + fpga_dma_bufno_reg);
+		}
+
+		s->left_of_salami -= bytebufsize;
+		s->salami += bytebufsize;
+	}
+	return 0; /* Success */
+}
+
 static int xilly_setupchannels(struct xilly_endpoint *ep,
 			       unsigned char *chandesc,
 			       int entries
 	)
 {
 	struct device *dev = ep->dev;
-	int i, entry, wr_nbuffer, rd_nbuffer;
+	int i, entry, rc;
 	struct xilly_channel *channel;
 	int channelnum, bufnum, bufsize, format, is_writebuf;
 	int bytebufsize;
 	int synchronous, allowpartial, exclusive_open, seekable;
 	int supports_nonempty;
-	void *wr_salami = NULL;
-	void *rd_salami = NULL;
-	int left_of_wr_salami = 0;
-	int left_of_rd_salami = 0;
-	dma_addr_t dma_addr;
 	int msg_buf_done = 0;
-	const gfp_t gfp_mask = GFP_KERNEL | __GFP_DMA32 | __GFP_ZERO;
 
-	struct xilly_buffer *this_buffer = NULL; /* Init to silence warning */
-	int rc = 0;
+	struct xilly_alloc_state rd_alloc = {
+		.salami = NULL,
+		.left_of_salami = 0,
+		.nbuffer = 1,
+		.direction = DMA_TO_DEVICE,
+		.regdirection = 0,
+	};
+
+	struct xilly_alloc_state wr_alloc = {
+		.salami = NULL,
+		.left_of_salami = 0,
+		.nbuffer = 1,
+		.direction = DMA_FROM_DEVICE,
+		.regdirection = 0x80000000,
+	};
 
 	channel = devm_kzalloc(dev, ep->num_channels *
 			       sizeof(struct xilly_channel), GFP_KERNEL);
@@ -389,17 +497,9 @@ static int xilly_setupchannels(struct xilly_endpoint *ep,
 		ep->channels[i] = channel++;
 	}
 
-	/*
-	 * The DMA buffer address update is atomic on the FPGA, so even if
-	 * it was in the middle of sending messages to some buffer, changing
-	 * the address is safe, since the data will go to either of the
-	 * buffers. Not that this situation should occur at all anyhow.
-	 */
-
-	wr_nbuffer = 1;
-	rd_nbuffer = 1; /* Buffer zero isn't used at all */
-
 	for (entry = 0; entry < entries; entry++, chandesc += 4) {
+		struct xilly_buffer **buffers = NULL;
+
 		is_writebuf = chandesc[0] & 0x01;
 		channelnum = (chandesc[0] >> 1) | ((chandesc[1] & 0x0f) << 7);
 		format = (chandesc[1] >> 4) & 0x03;
@@ -420,40 +520,35 @@ static int xilly_setupchannels(struct xilly_endpoint *ep,
 
 		channel = ep->channels[channelnum]; /* NULL for msg channel */
 
-		bytebufsize = bufsize << 2; /* Overwritten just below */
+		if (!is_writebuf || channelnum > 0) {
+			channel->log2_element_size = ((format > 2) ?
+						      2 : format);
+
+			bytebufsize = channel->rd_buf_size = bufsize *
+				(1 << channel->log2_element_size);
+
+			buffers = devm_kzalloc(dev,
+				bufnum * sizeof(struct xilly_buffer *),
+				GFP_KERNEL);
+
+			if (!buffers)
+				goto memfail;
+		} else
+			bytebufsize = bufsize << 2;
 
 		if (!is_writebuf) {
 			channel->num_rd_buffers = bufnum;
-			channel->log2_element_size = ((format > 2) ?
-						      2 : format);
-			bytebufsize = channel->rd_buf_size = bufsize *
-				(1 << channel->log2_element_size);
 			channel->rd_allow_partial = allowpartial;
 			channel->rd_synchronous = synchronous;
 			channel->rd_exclusive_open = exclusive_open;
 			channel->seekable = seekable;
 
-			channel->rd_buffers = devm_kzalloc(dev,
-				bufnum * sizeof(struct xilly_buffer *),
-				GFP_KERNEL);
-
-			if (!channel->rd_buffers)
-				goto memfail;
-
-			this_buffer = devm_kzalloc(dev,
-				bufnum * sizeof(struct xilly_buffer),
-				GFP_KERNEL);
-
-			if (!this_buffer)
-				goto memfail;
+			channel->rd_buffers = buffers;
+			rc = xilly_get_dma_buffers(ep, &rd_alloc, buffers,
+						   bufnum, bytebufsize);
 		}
-
 		else if (channelnum > 0) {
 			channel->num_wr_buffers = bufnum;
-			channel->log2_element_size = ((format > 2) ?
-						      2 : format);
-			bytebufsize = channel->wr_buf_size = bufsize *
-				(1 << channel->log2_element_size);
 
 			channel->seekable = seekable;
 			channel->wr_supports_nonempty = supports_nonempty;
@@ -462,171 +557,17 @@ static int xilly_setupchannels(struct xilly_endpoint *ep,
 			channel->wr_synchronous = synchronous;
 			channel->wr_exclusive_open = exclusive_open;
 
-			channel->wr_buffers = devm_kzalloc(dev,
-				bufnum * sizeof(struct xilly_buffer *),
-				GFP_KERNEL);
-
-			if (!channel->wr_buffers)
-				goto memfail;
-
-			this_buffer = devm_kzalloc(dev,
-				bufnum * sizeof(struct xilly_buffer),
-				GFP_KERNEL);
-
-			if (!this_buffer)
-				goto memfail;
+			channel->wr_buffers = buffers;
+			rc = xilly_get_dma_buffers(ep, &wr_alloc, buffers,
+						   bufnum, bytebufsize);
+		} else {
+			rc = xilly_get_dma_buffers(ep, &wr_alloc, NULL,
+						   bufnum, bytebufsize);
+			msg_buf_done++;
 		}
 
-		/*
-		 * Although daunting, we cut the chunks for read buffers
-		 * from a different salami than the write buffers',
-		 * possibly improving performance.
-		 */
-
-		if (is_writebuf)
-			for (i = 0; i < bufnum; i++) {
-				/*
-				 * Buffers are expected in descending
-				 * byte-size order, so there is either
-				 * enough for this buffer or none at all.
-				 */
-				if ((left_of_wr_salami < bytebufsize) &&
-				    (left_of_wr_salami > 0)) {
-					dev_err(ep->dev,
-						"Corrupt buffer allocation in IDT. Aborting.\n");
-					return -ENODEV;
-				}
-
-				if (left_of_wr_salami == 0) {
-					int allocorder, allocsize;
-
-					allocsize = PAGE_SIZE;
-					allocorder = 0;
-					while (bytebufsize > allocsize) {
-						allocsize *= 2;
-						allocorder++;
-					}
-
-					wr_salami = (void *)
-						devm_get_free_pages(
-							dev, gfp_mask,
-							allocorder);
-
-					if (!wr_salami)
-						goto memfail;
-					left_of_wr_salami = allocsize;
-				}
-
-				rc = ep->ephw->map_single(ep, wr_salami,
-							  bytebufsize,
-							  DMA_FROM_DEVICE,
-							  &dma_addr);
-
-				if (rc)
-					goto dmafail;
-
-				iowrite32(
-					(u32) (dma_addr & 0xffffffff),
-					&ep->registers[
-						fpga_dma_bufaddr_lowaddr_reg]
-					);
-				iowrite32(
-					((u32) ((((u64) dma_addr) >> 32)
-						& 0xffffffff)),
-					&ep->registers[
-						fpga_dma_bufaddr_highaddr_reg]
-					);
-				mmiowb();
-
-				if (channelnum > 0) {
-					this_buffer->addr = wr_salami;
-					this_buffer->dma_addr = dma_addr;
-					channel->wr_buffers[i] = this_buffer++;
-
-					iowrite32(
-						0x80000000 | wr_nbuffer++,
-						&ep->registers[
-							fpga_dma_bufno_reg]);
-				} else {
-					ep->msgbuf_addr = wr_salami;
-					ep->msgbuf_dma_addr = dma_addr;
-					ep->msg_buf_size = bytebufsize;
-					msg_buf_done++;
-
-					iowrite32(
-						0x80000000, &ep->registers[
-							fpga_dma_bufno_reg]);
-				}
-
-				left_of_wr_salami -= bytebufsize;
-				wr_salami += bytebufsize;
-			}
-		else /* Read buffers */
-			for (i = 0; i < bufnum; i++) {
-				/*
-				 * Buffers are expected in descending
-				 * byte-size order, so there is either
-				 * enough for this buffer or none at all.
-				 */
-				if ((left_of_rd_salami < bytebufsize) &&
-				    (left_of_rd_salami > 0)) {
-					dev_err(ep->dev,
-						"Corrupt buffer allocation in IDT. Aborting.\n");
-					return -ENODEV;
-				}
-
-				if (left_of_rd_salami == 0) {
-					int allocorder, allocsize;
-
-					allocsize = PAGE_SIZE;
-					allocorder = 0;
-					while (bytebufsize > allocsize) {
-						allocsize *= 2;
-						allocorder++;
-					}
-
-					rd_salami = (void *)
-						devm_get_free_pages(
-							dev, gfp_mask,
-							allocorder);
-
-					if (!rd_salami)
-						goto memfail;
-					left_of_rd_salami = allocsize;
-				}
-
-
-				rc = ep->ephw->map_single(ep, rd_salami,
-							  bytebufsize,
-							  DMA_TO_DEVICE,
-							  &dma_addr);
-
-				if (rc)
-					goto dmafail;
-
-				iowrite32(
-					(u32) (dma_addr & 0xffffffff),
-					&ep->registers[
-						fpga_dma_bufaddr_lowaddr_reg]
-					);
-				iowrite32(
-					((u32) ((((u64) dma_addr) >> 32)
-						& 0xffffffff)),
-					&ep->registers[
-						fpga_dma_bufaddr_highaddr_reg]
-					);
-				mmiowb();
-
-				this_buffer->addr = rd_salami;
-				this_buffer->dma_addr = dma_addr;
-				channel->rd_buffers[i] = this_buffer++;
-
-				iowrite32(rd_nbuffer++,
-					  &ep->registers[fpga_dma_bufno_reg]);
-
-				left_of_rd_salami -= bytebufsize;
-				rd_salami += bytebufsize;
-			}
+		if (rc)
+			goto memfail;
 	}
 
 	if (!msg_buf_done) {
@@ -634,16 +575,12 @@ static int xilly_setupchannels(struct xilly_endpoint *ep,
 			"Corrupt IDT: No message buffer. Aborting.\n");
 		return -ENODEV;
 	}
-
 	return 0;
 
 memfail:
 	dev_err(ep->dev,
-		"Failed to allocate write buffer memory. Aborting.\n");
+		"Failed to assign DMA buffer memory. Aborting.\n");
 	return -ENOMEM;
-dmafail:
-	dev_err(ep->dev, "Failed to map DMA memory!. Aborting.\n");
-	return rc;
 }
 
 static void xilly_scan_idt(struct xilly_endpoint *endpoint,
@@ -703,7 +640,7 @@ static int xilly_obtain_idt(struct xilly_endpoint *endpoint)
 
 	iowrite32(1 |
 		   (3 << 24), /* Opcode 3 for channel 0 = Send IDT */
-		   &endpoint->registers[fpga_buf_ctrl_reg]);
+		   endpoint->registers + fpga_buf_ctrl_reg);
 	mmiowb(); /* Just to appear safe */
 
 	wait_event_interruptible_timeout(channel->wr_wait,
@@ -875,8 +812,8 @@ static ssize_t xillybus_read(struct file *filp, char __user *userbuf,
 
 				iowrite32(1 | (channel->chan_num << 1)
 					   | (bufidx << 12),
-					   &channel->endpoint->registers[
-						   fpga_buf_ctrl_reg]);
+					   channel->endpoint->registers +
+					   fpga_buf_ctrl_reg);
 				mmiowb(); /* Just to appear safe */
 			}
 
@@ -962,15 +899,15 @@ static ssize_t xillybus_read(struct file *filp, char __user *userbuf,
 				mutex_lock(&channel->endpoint->register_mutex);
 
 				iowrite32(offsetlimit,
-					  &channel->endpoint->registers[
-						  fpga_buf_offset_reg]);
+					  channel->endpoint->registers +
+					  fpga_buf_offset_reg);
 				mmiowb();
 
 				iowrite32(1 | (channel->chan_num << 1) |
 					   (2 << 24) |  /* 2 = offset limit */
 					   (waiting_bufidx << 12),
-					   &channel->endpoint->registers[
-						   fpga_buf_ctrl_reg]);
+					   channel->endpoint->registers +
+					   fpga_buf_ctrl_reg);
 
 				mmiowb(); /* Just to appear safe */
 
@@ -1062,8 +999,8 @@ desperate:
 			iowrite32(1 | (channel->chan_num << 1) |
 				   (3 << 24) |  /* Opcode 3, flush it all! */
 				   (waiting_bufidx << 12),
-				   &channel->endpoint->registers[
-					   fpga_buf_ctrl_reg]);
+				   channel->endpoint->registers +
+				   fpga_buf_ctrl_reg);
 			mmiowb(); /* Just to appear safe */
 		}
 
@@ -1175,13 +1112,13 @@ static int xillybus_myflush(struct xilly_channel *channel, long timeout)
 		mutex_lock(&channel->endpoint->register_mutex);
 
 		iowrite32(end_offset_plus1 - 1,
-			  &channel->endpoint->registers[fpga_buf_offset_reg]);
+			  channel->endpoint->registers + fpga_buf_offset_reg);
 		mmiowb();
 
 		iowrite32((channel->chan_num << 1) | /* Channel ID */
 			   (2 << 24) |  /* Opcode 2, submit buffer */
 			   (bufidx << 12),
-			   &channel->endpoint->registers[fpga_buf_ctrl_reg]);
+			   channel->endpoint->registers + fpga_buf_ctrl_reg);
 		mmiowb(); /* Just to appear safe */
 
 		mutex_unlock(&channel->endpoint->register_mutex);
@@ -1425,14 +1362,14 @@ static ssize_t xillybus_write(struct file *filp, const char __user *userbuf,
 				mutex_lock(&channel->endpoint->register_mutex);
 
 				iowrite32(end_offset_plus1 - 1,
-					  &channel->endpoint->registers[
-						  fpga_buf_offset_reg]);
+					  channel->endpoint->registers +
+					  fpga_buf_offset_reg);
 				mmiowb();
 				iowrite32((channel->chan_num << 1) |
 					   (2 << 24) |  /* 2 = submit buffer */
 					   (bufidx << 12),
-					   &channel->endpoint->registers[
-						   fpga_buf_ctrl_reg]);
+					   channel->endpoint->registers +
+					   fpga_buf_ctrl_reg);
 				mmiowb(); /* Just to appear safe */
 
 				mutex_unlock(&channel->endpoint->
@@ -1627,8 +1564,8 @@ static int xillybus_open(struct inode *inode, struct file *filp)
 			iowrite32(1 | (channel->chan_num << 1) |
 				  (4 << 24) |  /* Opcode 4, open channel */
 				  ((channel->wr_synchronous & 1) << 23),
-				  &channel->endpoint->registers[
-					  fpga_buf_ctrl_reg]);
+				  channel->endpoint->registers +
+				  fpga_buf_ctrl_reg);
 			mmiowb(); /* Just to appear safe */
 		}
 
@@ -1649,8 +1586,8 @@ static int xillybus_open(struct inode *inode, struct file *filp)
 
 			iowrite32((channel->chan_num << 1) |
 				  (4 << 24),   /* Opcode 4, open channel */
-				  &channel->endpoint->registers[
-					  fpga_buf_ctrl_reg]);
+				  channel->endpoint->registers +
+				  fpga_buf_ctrl_reg);
 			mmiowb(); /* Just to appear safe */
 		}
 
@@ -1702,8 +1639,8 @@ static int xillybus_release(struct inode *inode, struct file *filp)
 
 			iowrite32((channel->chan_num << 1) | /* Channel ID */
 				  (5 << 24),  /* Opcode 5, close channel */
-				  &channel->endpoint->registers[
-					  fpga_buf_ctrl_reg]);
+				  channel->endpoint->registers +
+				  fpga_buf_ctrl_reg);
 			mmiowb(); /* Just to appear safe */
 		}
 		mutex_unlock(&channel->rd_mutex);
@@ -1723,8 +1660,8 @@ static int xillybus_release(struct inode *inode, struct file *filp)
 
 			iowrite32(1 | (channel->chan_num << 1) |
 				   (5 << 24),  /* Opcode 5, close channel */
-				   &channel->endpoint->registers[
-					   fpga_buf_ctrl_reg]);
+				   channel->endpoint->registers +
+				   fpga_buf_ctrl_reg);
 			mmiowb(); /* Just to appear safe */
 
 			/*
@@ -1829,11 +1766,11 @@ static loff_t xillybus_llseek(struct file *filp, loff_t offset, int whence)
 	mutex_lock(&channel->endpoint->register_mutex);
 
 	iowrite32(pos >> channel->log2_element_size,
-		  &channel->endpoint->registers[fpga_buf_offset_reg]);
+		  channel->endpoint->registers + fpga_buf_offset_reg);
 	mmiowb();
 	iowrite32((channel->chan_num << 1) |
 		  (6 << 24),  /* Opcode 6, set address */
-		  &channel->endpoint->registers[fpga_buf_ctrl_reg]);
+		  channel->endpoint->registers + fpga_buf_ctrl_reg);
 	mmiowb(); /* Just to appear safe */
 
 	mutex_unlock(&channel->endpoint->register_mutex);
@@ -2050,7 +1987,7 @@ static int xilly_quiesce(struct xilly_endpoint *endpoint)
 	endpoint->idtlen = -1;
 	wmb(); /* Make sure idtlen is set before sending command */
 	iowrite32((u32) (endpoint->dma_using_dac & 0x0001),
-		  &endpoint->registers[fpga_dma_control_reg]);
+		  endpoint->registers + fpga_dma_control_reg);
 	mmiowb();
 
 	wait_event_interruptible_timeout(endpoint->ep_wait,
@@ -2090,7 +2027,7 @@ int xillybus_endpoint_discovery(struct xilly_endpoint *endpoint)
 	 * necessary.
 	 */
 
-	iowrite32(1, &endpoint->registers[fpga_endian_reg]);
+	iowrite32(1, endpoint->registers + fpga_endian_reg);
 	mmiowb(); /* Writes below are affected by the one above. */
 
 	/* Bootstrap phase I: Allocate temporary message buffer */
@@ -2107,7 +2044,7 @@ int xillybus_endpoint_discovery(struct xilly_endpoint *endpoint)
 		return rc;
 
 	/* Clear the message subsystem (and counter in particular) */
-	iowrite32(0x04, &endpoint->registers[fpga_msg_ctrl_reg]);
+	iowrite32(0x04, endpoint->registers + fpga_msg_ctrl_reg);
 	mmiowb();
 
 	endpoint->idtlen = -1;
@@ -2119,7 +2056,7 @@ int xillybus_endpoint_discovery(struct xilly_endpoint *endpoint)
 	 * buffer size.
 	 */
 	iowrite32((u32) (endpoint->dma_using_dac & 0x0001),
-		   &endpoint->registers[fpga_dma_control_reg]);
+		   endpoint->registers + fpga_dma_control_reg);
 	mmiowb();
 
 	wait_event_interruptible_timeout(endpoint->ep_wait,
@@ -2133,7 +2070,7 @@ int xillybus_endpoint_discovery(struct xilly_endpoint *endpoint)
 
 	/* Enable DMA */
 	iowrite32((u32) (0x0002 | (endpoint->dma_using_dac & 0x0001)),
-		   &endpoint->registers[fpga_dma_control_reg]);
+		   endpoint->registers + fpga_dma_control_reg);
 	mmiowb();
 
 	/* Bootstrap phase II: Allocate buffer for IDT and obtain it */

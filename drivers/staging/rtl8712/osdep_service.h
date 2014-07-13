@@ -50,7 +50,6 @@ struct	__queue	{
 #define _pkt struct sk_buff
 #define _buffer unsigned char
 #define thread_exit() complete_and_exit(NULL, 0)
-#define _workitem struct work_struct
 
 #define _init_queue(pqueue)				\
 	do {						\
@@ -79,16 +78,6 @@ static inline void _cancel_timer(struct timer_list *ptimer, u8 *bcancelled)
 {
 	del_timer(ptimer);
 	*bcancelled = true; /*true ==1; false==0*/
-}
-
-static inline void _init_workitem(_workitem *pwork, void *pfunc, void *cntx)
-{
-	INIT_WORK(pwork, pfunc);
-}
-
-static inline void _set_workitem(_workitem *pwork)
-{
-	schedule_work(pwork);
 }
 
 #ifndef BIT
@@ -127,11 +116,6 @@ static inline void sleep_schedulable(int ms)
 static inline unsigned char _cancel_timer_ex(struct timer_list *ptimer)
 {
 	return del_timer(ptimer);
-}
-
-static inline void thread_enter(void *context)
-{
-	allow_signal(SIGTERM);
 }
 
 static inline void flush_signals_thread(void)

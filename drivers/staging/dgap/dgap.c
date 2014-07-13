@@ -74,7 +74,6 @@ static struct board_t *dgap_found_board(struct pci_dev *pdev, int id,
 					int boardnum);
 static void dgap_cleanup_board(struct board_t *brd);
 static void dgap_poll_handler(ulong dummy);
-static int dgap_init_pci(void);
 static int dgap_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
 static void dgap_remove_one(struct pci_dev *dev);
 static int dgap_do_remap(struct board_t *brd);
@@ -87,12 +86,12 @@ static int dgap_block_til_ready(struct tty_struct *tty, struct file *file,
 				struct channel_t *ch);
 static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 				unsigned long arg);
-static int dgap_tty_digigeta(struct tty_struct *tty,
-				struct digi_t __user *retinfo);
-static int dgap_tty_digiseta(struct tty_struct *tty,
-				struct digi_t __user *new_info);
+static int dgap_tty_digigeta(struct channel_t *ch, struct digi_t __user *retinfo);
+static int dgap_tty_digiseta(struct channel_t *ch, struct board_t *bd,
+			     struct un_t *un, struct digi_t __user *new_info);
 static int dgap_tty_digigetedelay(struct tty_struct *tty, int __user *retinfo);
-static int dgap_tty_digisetedelay(struct tty_struct *tty, int __user *new_info);
+static int dgap_tty_digisetedelay(struct channel_t *ch, struct board_t *bd,
+				  struct un_t *un, int __user *new_info);
 static int dgap_tty_write_room(struct tty_struct *tty);
 static int dgap_tty_chars_in_buffer(struct tty_struct *tty);
 static void dgap_tty_start(struct tty_struct *tty);
@@ -103,14 +102,14 @@ static void dgap_tty_flush_chars(struct tty_struct *tty);
 static void dgap_tty_flush_buffer(struct tty_struct *tty);
 static void dgap_tty_hangup(struct tty_struct *tty);
 static int dgap_wait_for_drain(struct tty_struct *tty);
-static int dgap_set_modem_info(struct tty_struct *tty, unsigned int command,
-				unsigned int __user *value);
+static int dgap_set_modem_info(struct channel_t *ch, struct board_t *bd, struct un_t *un,
+			       unsigned int command, unsigned int __user *value);
 static int dgap_get_modem_info(struct channel_t *ch,
 				unsigned int __user *value);
-static int dgap_tty_digisetcustombaud(struct tty_struct *tty,
-				int __user *new_info);
-static int dgap_tty_digigetcustombaud(struct tty_struct *tty,
-				int __user *retinfo);
+static int dgap_tty_digisetcustombaud(struct channel_t *ch, struct board_t *bd,
+				      struct un_t *un, int __user *new_info);
+static int dgap_tty_digigetcustombaud(struct channel_t *ch, struct un_t *un,
+				      int __user *retinfo);
 static int dgap_tty_tiocmget(struct tty_struct *tty);
 static int dgap_tty_tiocmset(struct tty_struct *tty, unsigned int set,
 				unsigned int clear);
@@ -142,7 +141,7 @@ static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
 			u8 byte2, uint ncmds);
 static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds);
 static void dgap_wmove(struct channel_t *ch, char *buf, uint cnt);
-static int dgap_param(struct tty_struct *tty);
+static int dgap_param(struct channel_t *ch, struct board_t *bd, u32 un_type);
 static void dgap_parity_scan(struct channel_t *ch, unsigned char *cbuf,
 				unsigned char *fbuf, int *len);
 static uint dgap_get_custom_baud(struct channel_t *ch);
@@ -202,7 +201,7 @@ static int dgap_test_bios(struct board_t *brd);
 static int dgap_test_fep(struct board_t *brd);
 static int dgap_tty_register_ports(struct board_t *brd);
 static int dgap_firmware_load(struct pci_dev *pdev, int card_type,
-			      struct board_t* brd);
+			      struct board_t *brd);
 
 static void dgap_cleanup_module(void);
 
@@ -219,7 +218,6 @@ static uint dgap_numboards;
 static struct board_t *dgap_board[MAXBOARDS];
 static ulong dgap_poll_counter;
 static int dgap_driver_state = DRIVER_INITIALIZED;
-static wait_queue_head_t dgap_dl_wait;
 static int dgap_poll_tick = 20;	/* Poll interval - 20 ms */
 
 static struct class *dgap_class;
@@ -479,7 +477,7 @@ static int dgap_init_module(void)
 	if (rc)
 		return rc;
 
-	rc = dgap_init_pci();
+	rc = pci_register_driver(&dgap_driver);
 	if (rc)
 		goto err_cleanup;
 
@@ -563,18 +561,10 @@ failed_class:
 	return rc;
 }
 
-/*
- * Register pci driver, and return how many boards we have.
- */
-static int dgap_init_pci(void)
-{
-	return pci_register_driver(&dgap_driver);
-}
-
 static int dgap_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	int rc;
-	struct board_t* brd;
+	struct board_t *brd;
 
 	if (dgap_numboards >= MAXBOARDS)
 		return -EPERM;
@@ -872,7 +862,7 @@ static void dgap_free_irq(struct board_t *brd)
 }
 
 static int dgap_firmware_load(struct pci_dev *pdev, int card_type,
-			      struct board_t* brd)
+			      struct board_t *brd)
 {
 	const struct firmware *fw;
 	char *tmp_ptr;
@@ -1209,8 +1199,6 @@ static void dgap_init_globals(void)
 		dgap_board[i] = NULL;
 
 	init_timer(&dgap_poll_timer);
-
-	init_waitqueue_head(&dgap_dl_wait);
 }
 
 /************************************************************************
@@ -1374,9 +1362,6 @@ static int dgap_tty_init(struct board_t *brd)
 	struct bs_t __iomem *bs;
 	struct cm_t __iomem *cm;
 	int ret;
-
-	if (!brd)
-		return -EIO;
 
 	/*
 	 * Initialize board structure elements.
@@ -2044,7 +2029,7 @@ static int dgap_tty_open(struct tty_struct *tty, struct file *file)
 	/*
 	 * Run param in case we changed anything
 	 */
-	dgap_param(tty);
+	dgap_param(ch, brd, un->un_type);
 
 	/*
 	 * follow protocol for opening port
@@ -2522,22 +2507,9 @@ static int dgap_wait_for_drain(struct tty_struct *tty)
  * returns the new bytes_available.  This only affects printer
  * output.
  */
-static int dgap_maxcps_room(struct tty_struct *tty, int bytes_available)
+static int dgap_maxcps_room(struct channel_t *ch, struct un_t *un,
+			    int bytes_available)
 {
-	struct channel_t *ch;
-	struct un_t *un;
-
-	if (!tty)
-		return bytes_available;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return bytes_available;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return bytes_available;
-
 	/*
 	 * If its not the Transparent print device, return
 	 * the full data amount.
@@ -2639,7 +2611,7 @@ static int dgap_tty_write_room(struct tty_struct *tty)
 		ret += ch->ch_tsize;
 
 	/* Limit printer to maxcps */
-	ret = dgap_maxcps_room(tty, ret);
+	ret = dgap_maxcps_room(ch, un, ret);
 
 	/*
 	 * If we are printer device, leave space for
@@ -2744,7 +2716,7 @@ static int dgap_tty_write(struct tty_struct *tty, const unsigned char *buf,
 	 * Limit printer output to maxcps overall, with bursts allowed
 	 * up to bufsize characters.
 	 */
-	bufcount = dgap_maxcps_room(tty, bufcount);
+	bufcount = dgap_maxcps_room(ch, un, bufcount);
 
 	/*
 	 * Take minimum of what the user wants to send, and the
@@ -2955,7 +2927,7 @@ static int dgap_tty_tiocmset(struct tty_struct *tty,
 		ch->ch_mval   &= ~(D_DTR(ch));
 	}
 
-	dgap_param(tty);
+	dgap_param(ch, bd, un->un_type);
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 	spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -3077,8 +3049,6 @@ static void dgap_tty_send_xchar(struct tty_struct *tty, char c)
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 	spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-
-	return;
 }
 
 /*
@@ -3090,9 +3060,6 @@ static int dgap_get_modem_info(struct channel_t *ch, unsigned int __user *value)
 	u8 mstat;
 	ulong lock_flags;
 	int rc;
-
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -EIO;
 
 	spin_lock_irqsave(&ch->ch_lock, lock_flags);
 
@@ -3127,31 +3094,13 @@ static int dgap_get_modem_info(struct channel_t *ch, unsigned int __user *value)
  *
  * Set modem signals, called by ld.
  */
-static int dgap_set_modem_info(struct tty_struct *tty, unsigned int command,
-				unsigned int __user *value)
+static int dgap_set_modem_info(struct channel_t *ch, struct board_t *bd, struct un_t *un,
+			       unsigned int command, unsigned int __user *value)
 {
-	struct board_t *bd;
-	struct channel_t *ch;
-	struct un_t *un;
 	int ret;
 	unsigned int arg;
 	ulong lock_flags;
 	ulong lock_flags2;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EIO;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EIO;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -EIO;
-
-	bd = ch->ch_bd;
-	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -EIO;
 
 	ret = get_user(arg, value);
 	if (ret)
@@ -3206,7 +3155,7 @@ static int dgap_set_modem_info(struct tty_struct *tty, unsigned int command,
 	spin_lock_irqsave(&bd->bd_lock, lock_flags);
 	spin_lock_irqsave(&ch->ch_lock, lock_flags2);
 
-	dgap_param(tty);
+	dgap_param(ch, bd, un->un_type);
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 	spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -3222,26 +3171,12 @@ static int dgap_set_modem_info(struct tty_struct *tty, unsigned int command,
  *
  *
  */
-static int dgap_tty_digigeta(struct tty_struct *tty,
-				struct digi_t __user *retinfo)
+static int dgap_tty_digigeta(struct channel_t *ch, struct digi_t __user *retinfo)
 {
-	struct channel_t *ch;
-	struct un_t *un;
 	struct digi_t tmp;
 	ulong lock_flags;
 
 	if (!retinfo)
-		return -EFAULT;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EFAULT;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EFAULT;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
 		return -EFAULT;
 
 	memset(&tmp, 0, sizeof(tmp));
@@ -3264,30 +3199,12 @@ static int dgap_tty_digigeta(struct tty_struct *tty,
  *
  *
  */
-static int dgap_tty_digiseta(struct tty_struct *tty,
-				struct digi_t __user *new_info)
+static int dgap_tty_digiseta(struct channel_t *ch, struct board_t *bd,
+			     struct un_t *un, struct digi_t __user *new_info)
 {
-	struct board_t *bd;
-	struct channel_t *ch;
-	struct un_t *un;
 	struct digi_t new_digi;
 	ulong lock_flags = 0;
 	unsigned long lock_flags2;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EFAULT;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EFAULT;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -EFAULT;
-
-	bd = ch->ch_bd;
-	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -EFAULT;
 
 	if (copy_from_user(&new_digi, new_info, sizeof(struct digi_t)))
 		return -EFAULT;
@@ -3318,7 +3235,7 @@ static int dgap_tty_digiseta(struct tty_struct *tty,
 	if (ch->ch_digi.digi_offlen > DIGI_PLEN)
 		ch->ch_digi.digi_offlen = DIGI_PLEN;
 
-	dgap_param(tty);
+	dgap_param(ch, bd, un->un_type);
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 	spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -3373,29 +3290,12 @@ static int dgap_tty_digigetedelay(struct tty_struct *tty, int __user *retinfo)
  * Ioctl to set the EDELAY setting
  *
  */
-static int dgap_tty_digisetedelay(struct tty_struct *tty, int __user *new_info)
+static int dgap_tty_digisetedelay(struct channel_t *ch, struct board_t *bd,
+				  struct un_t *un, int __user *new_info)
 {
-	struct board_t *bd;
-	struct channel_t *ch;
-	struct un_t *un;
 	int new_digi;
 	ulong lock_flags;
 	ulong lock_flags2;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EFAULT;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EFAULT;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -EFAULT;
-
-	bd = ch->ch_bd;
-	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -EFAULT;
 
 	if (copy_from_user(&new_digi, new_info, sizeof(int)))
 		return -EFAULT;
@@ -3405,7 +3305,7 @@ static int dgap_tty_digisetedelay(struct tty_struct *tty, int __user *new_info)
 
 	writew((u16) new_digi, &(ch->ch_bs->edelay));
 
-	dgap_param(tty);
+	dgap_param(ch, bd, un->un_type);
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 	spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -3418,26 +3318,13 @@ static int dgap_tty_digisetedelay(struct tty_struct *tty, int __user *new_info)
  *
  * Ioctl to get the current custom baud rate setting.
  */
-static int dgap_tty_digigetcustombaud(struct tty_struct *tty,
-					int __user *retinfo)
+static int dgap_tty_digigetcustombaud(struct channel_t *ch, struct un_t *un,
+				      int __user *retinfo)
 {
-	struct channel_t *ch;
-	struct un_t *un;
 	int tmp;
 	ulong lock_flags;
 
 	if (!retinfo)
-		return -EFAULT;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EFAULT;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EFAULT;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
 		return -EFAULT;
 
 	memset(&tmp, 0, sizeof(tmp));
@@ -3457,31 +3344,12 @@ static int dgap_tty_digigetcustombaud(struct tty_struct *tty,
  *
  * Ioctl to set the custom baud rate setting
  */
-static int dgap_tty_digisetcustombaud(struct tty_struct *tty,
-					int __user *new_info)
+static int dgap_tty_digisetcustombaud(struct channel_t *ch, struct board_t *bd,
+				      struct un_t *un, int __user *new_info)
 {
-	struct board_t *bd;
-	struct channel_t *ch;
-	struct un_t *un;
 	uint new_rate;
 	ulong lock_flags;
 	ulong lock_flags2;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EFAULT;
-
-	un = tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EFAULT;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -EFAULT;
-
-	bd = ch->ch_bd;
-	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -EFAULT;
-
 
 	if (copy_from_user(&new_rate, new_info, sizeof(unsigned int)))
 		return -EFAULT;
@@ -3493,7 +3361,7 @@ static int dgap_tty_digisetcustombaud(struct tty_struct *tty,
 
 		ch->ch_custom_speed = new_rate;
 
-		dgap_param(tty);
+		dgap_param(ch, bd, un->un_type);
 
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -3540,7 +3408,7 @@ static void dgap_tty_set_termios(struct tty_struct *tty,
 	ch->ch_stopc     = tty->termios.c_cc[VSTOP];
 
 	dgap_carrier(ch);
-	dgap_param(tty);
+	dgap_param(ch, bd, un->un_type);
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 	spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
@@ -3947,7 +3815,7 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 		spin_lock_irqsave(&ch->ch_lock, lock_flags2);
 		tty->termios.c_cflag = ((tty->termios.c_cflag & ~CLOCAL) |
 						(arg ? CLOCAL : 0));
-		dgap_param(tty);
+		dgap_param(ch, bd, un->un_type);
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
 
@@ -3963,7 +3831,7 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 	case TIOCMSET:
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return dgap_set_modem_info(tty, cmd, uarg);
+		return dgap_set_modem_info(ch, bd, un, cmd, uarg);
 
 		/*
 		 * Here are any additional ioctl's that we want to implement
@@ -4111,7 +3979,7 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 		/* get information for ditty */
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return dgap_tty_digigeta(tty, uarg);
+		return dgap_tty_digigeta(ch, uarg);
 
 	case DIGI_SETAW:
 	case DIGI_SETAF:
@@ -4133,7 +4001,7 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 	case DIGI_SETA:
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return dgap_tty_digiseta(tty, uarg);
+		return dgap_tty_digiseta(ch, bd, un, uarg);
 
 	case DIGI_GEDELAY:
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
@@ -4143,21 +4011,21 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 	case DIGI_SEDELAY:
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return dgap_tty_digisetedelay(tty, uarg);
+		return dgap_tty_digisetedelay(ch, bd, un, uarg);
 
 	case DIGI_GETCUSTOMBAUD:
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return dgap_tty_digigetcustombaud(tty, uarg);
+		return dgap_tty_digigetcustombaud(ch, un, uarg);
 
 	case DIGI_SETCUSTOMBAUD:
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
-		return dgap_tty_digisetcustombaud(tty, uarg);
+		return dgap_tty_digisetcustombaud(ch, bd, un, uarg);
 
 	case DIGI_RESET_PORT:
 		dgap_firmware_reset_port(ch);
-		dgap_param(tty);
+		dgap_param(ch, bd, un->un_type);
 		spin_unlock_irqrestore(&ch->ch_lock, lock_flags2);
 		spin_unlock_irqrestore(&bd->bd_lock, lock_flags);
 		return 0;
@@ -4172,11 +4040,6 @@ static int dgap_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 
 static int dgap_alloc_flipbuf(struct board_t *brd)
 {
-	/*
-	 * Initialize KME waitqueues...
-	 */
-	init_waitqueue_head(&brd->kme_wait);
-
 	/*
 	 * allocate flip buffer for board.
 	 */
@@ -5104,39 +4967,13 @@ static void dgap_firmware_reset_port(struct channel_t *ch)
  *              struct tty_struct *     - TTY for port.
  *
  *=======================================================================*/
-static int dgap_param(struct tty_struct *tty)
+static int dgap_param(struct channel_t *ch, struct board_t *bd, u32 un_type)
 {
-	struct ktermios *ts;
-	struct board_t *bd;
-	struct channel_t *ch;
-	struct bs_t __iomem *bs;
-	struct un_t *un;
 	u16 head;
 	u16 cflag;
 	u16 iflag;
 	u8 mval;
 	u8 hflow;
-
-	if (!tty || tty->magic != TTY_MAGIC)
-		return -EIO;
-
-	un = (struct un_t *) tty->driver_data;
-	if (!un || un->magic != DGAP_UNIT_MAGIC)
-		return -EIO;
-
-	ch = un->un_ch;
-	if (!ch || ch->magic != DGAP_CHANNEL_MAGIC)
-		return -EIO;
-
-	bd = ch->ch_bd;
-	if (!bd || bd->magic != DGAP_BOARD_MAGIC)
-		return -EIO;
-
-	bs = ch->ch_bs;
-	if (!bs)
-		return -EIO;
-
-	ts = &tty->termios;
 
 	/*
 	 * If baud rate is zero, flush queues, and set mval to drop DTR.
@@ -5217,7 +5054,7 @@ static int dgap_param(struct tty_struct *tty)
 		 * terminal unit is NOT open
 		 */
 		if (!(ch->ch_tun.un_flags & UN_ISOPEN) &&
-		     (un->un_type == DGAP_PRINT))
+		    un_type == DGAP_PRINT)
 			baud = C_BAUD(ch->ch_pun.un_tty) & 0xff;
 		else
 			baud = C_BAUD(ch->ch_tun.un_tty) & 0xff;
@@ -5390,6 +5227,7 @@ static int dgap_param(struct tty_struct *tty)
 	 */
 	if (bd->bd_flags & BD_FEP5PLUS) {
 		u16 hflow2 = 0;
+
 		if (ch->ch_digi.digi_flags & DIGI_RTS_TOGGLE)
 			hflow2 |= (D_RTS(ch));
 		if (ch->ch_digi.digi_flags & DIGI_DTR_TOGGLE)
@@ -5414,7 +5252,7 @@ static int dgap_param(struct tty_struct *tty)
 	/*
 	 * Read modem signals, and then call carrier function.
 	 */
-	ch->ch_mistat = readb(&(bs->m_stat));
+	ch->ch_mistat = readb(&(ch->ch_bs->m_stat));
 	dgap_carrier(ch);
 
 	/*
@@ -5799,6 +5637,7 @@ static int dgap_create_driver_sysfiles(struct pci_driver *dgap_driver)
 static void dgap_remove_driver_sysfiles(struct pci_driver *dgap_driver)
 {
 	struct device_driver *driverfs = &dgap_driver->driver;
+
 	driver_remove_file(driverfs, &driver_attr_version);
 	driver_remove_file(driverfs, &driver_attr_boards);
 	driver_remove_file(driverfs, &driver_attr_maxboards);
@@ -6392,6 +6231,7 @@ static ssize_t dgap_tty_name_show(struct device *d,
 
 		if (cptr->type == TNODE && found == TRUE) {
 			char *ptr1;
+
 			if (strstr(cptr->u.ttyname, "tty")) {
 				ptr1 = cptr->u.ttyname;
 				ptr1 += 3;
@@ -7338,11 +7178,9 @@ static struct cnode *dgap_newnode(int t)
 {
 	struct cnode *n;
 
-	n = kmalloc(sizeof(struct cnode), GFP_KERNEL);
-	if (n) {
-		memset((char *)n, 0, sizeof(struct cnode));
+	n = kzalloc(sizeof(struct cnode), GFP_KERNEL);
+	if (n)
 		n->type = t;
-	}
 	return n;
 }
 

@@ -48,13 +48,13 @@
 
 #define DEBUG_SUBSYSTEM S_LLITE
 
-#include <obd_support.h>
-#include <obd_class.h>
-#include <lustre_lib.h>
-#include <lustre/lustre_idl.h>
-#include <lustre_lite.h>
-#include <lustre_dlm.h>
-#include <lustre_fid.h>
+#include "../include/obd_support.h"
+#include "../include/obd_class.h"
+#include "../include/lustre_lib.h"
+#include "../include/lustre/lustre_idl.h"
+#include "../include/lustre_lite.h"
+#include "../include/lustre_dlm.h"
+#include "../include/lustre_fid.h"
 #include "llite_internal.h"
 
 /*
@@ -158,7 +158,7 @@ static int ll_dir_filler(void *_hash, struct page *page0)
 	int i;
 	int rc;
 
-	CDEBUG(D_VFSTRACE, "VFS Op:inode=%lu/%u(%p) hash "LPU64"\n",
+	CDEBUG(D_VFSTRACE, "VFS Op:inode=%lu/%u(%p) hash %llu\n",
 	       inode->i_ino, inode->i_generation, inode, hash);
 
 	LASSERT(max_pages > 0 && max_pages <= MD_MAX_BRW_PAGES);
@@ -302,9 +302,9 @@ static struct page *ll_dir_page_locate(struct inode *dir, __u64 *hash,
 				*start = le64_to_cpu(dp->ldp_hash_start);
 				*end   = le64_to_cpu(dp->ldp_hash_end);
 			}
-			LASSERTF(*start <= *hash, "start = "LPX64",end = "
-				 LPX64",hash = "LPX64"\n", *start, *end, *hash);
-			CDEBUG(D_VFSTRACE, "page %lu [%llu %llu], hash "LPU64"\n",
+			LASSERTF(*start <= *hash, "start = %#llx,end = %#llx,hash = %#llx\n",
+				 *start, *end, *hash);
+			CDEBUG(D_VFSTRACE, "page %lu [%llu %llu], hash %llu\n",
 			       offset, *start, *end, *hash);
 			if (*hash > *end) {
 				ll_release_page(page, 0);
@@ -376,7 +376,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 		if (request)
 			ptlrpc_req_finished(request);
 		if (rc < 0) {
-			CERROR("lock enqueue: "DFID" at "LPU64": rc %d\n",
+			CERROR("lock enqueue: "DFID" at %llu: rc %d\n",
 				PFID(ll_inode2fid(dir)), hash, rc);
 			return ERR_PTR(rc);
 		}
@@ -396,7 +396,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 	mutex_lock(&lli->lli_readdir_mutex);
 	page = ll_dir_page_locate(dir, &lhash, &start, &end);
 	if (IS_ERR(page)) {
-		CERROR("dir page locate: "DFID" at "LPU64": rc %ld\n",
+		CERROR("dir page locate: "DFID" at %llu: rc %ld\n",
 		       PFID(ll_inode2fid(dir)), lhash, PTR_ERR(page));
 		GOTO(out_unlock, page);
 	} else if (page != NULL) {
@@ -420,7 +420,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 	page = read_cache_page(mapping, hash_x_index(hash, hash64),
 			       ll_dir_filler, &lhash);
 	if (IS_ERR(page)) {
-		CERROR("read cache page: "DFID" at "LPU64": rc %ld\n",
+		CERROR("read cache page: "DFID" at %llu: rc %ld\n",
 		       PFID(ll_inode2fid(dir)), hash, PTR_ERR(page));
 		GOTO(out_unlock, page);
 	}
@@ -428,14 +428,14 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 	wait_on_page_locked(page);
 	(void)kmap(page);
 	if (!PageUptodate(page)) {
-		CERROR("page not updated: "DFID" at "LPU64": rc %d\n",
+		CERROR("page not updated: "DFID" at %llu: rc %d\n",
 		       PFID(ll_inode2fid(dir)), hash, -5);
 		goto fail;
 	}
 	if (!PageChecked(page))
 		ll_check_page(dir, page);
 	if (PageError(page)) {
-		CERROR("page error: "DFID" at "LPU64": rc %d\n",
+		CERROR("page error: "DFID" at %llu: rc %d\n",
 		       PFID(ll_inode2fid(dir)), hash, -5);
 		goto fail;
 	}
@@ -452,10 +452,9 @@ hash_collision:
 	}
 	if (end == start) {
 		LASSERT(start == lhash);
-		CWARN("Page-wide hash collision: "LPU64"\n", end);
+		CWARN("Page-wide hash collision: %llu\n", end);
 		if (BITS_PER_LONG == 32 && hash64)
-			CWARN("Real page-wide hash collision at ["LPU64" "LPU64
-			      "] with hash "LPU64"\n",
+			CWARN("Real page-wide hash collision at [%llu %llu] with hash %llu\n",
 			      le64_to_cpu(dp->ldp_hash_start),
 			      le64_to_cpu(dp->ldp_hash_end), hash);
 		/*
@@ -926,8 +925,7 @@ static int ll_ioc_copy_start(struct super_block *sb, struct hsm_copy *copy)
 		iput(inode);
 		if (rc != 0) {
 			CDEBUG(D_HSM, "Could not read file data version of "
-				      DFID" (rc = %d). Archive request ("
-				      LPX64") could not be done.\n",
+				      DFID" (rc = %d). Archive request (%#llx) could not be done.\n",
 				      PFID(&copy->hc_hai.hai_fid), rc,
 				      copy->hc_hai.hai_cookie);
 			hpk.hpk_flags |= HP_FLAG_RETRY;
@@ -1023,7 +1021,7 @@ static int ll_ioc_copy_end(struct super_block *sb, struct hsm_copy *copy)
 		    (copy->hc_data_version != data_version)) {
 			CDEBUG(D_HSM, "File data version mismatched. "
 			      "File content was changed during archiving. "
-			       DFID", start:"LPX64" current:"LPX64"\n",
+			       DFID", start:%#llx current:%#llx\n",
 			       PFID(&copy->hc_hai.hai_fid),
 			       copy->hc_data_version, data_version);
 			/* File was changed, send error to cdt. Do not ask for

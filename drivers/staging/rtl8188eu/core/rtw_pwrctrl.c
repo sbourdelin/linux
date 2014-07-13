@@ -24,7 +24,6 @@
 #include <osdep_intf.h>
 #include <usb_ops_linux.h>
 #include <linux/usb.h>
-#include <usb_osintf.h>
 
 static int rtw_hw_suspend(struct adapter *padapter)
 {
@@ -219,10 +218,6 @@ int ips_leave(struct adapter *padapter)
 static bool rtw_pwr_unassociated_idle(struct adapter *adapter)
 {
 	struct mlme_priv *pmlmepriv = &(adapter->mlmepriv);
-#ifdef CONFIG_88EU_P2P
-	struct wifidirect_info	*pwdinfo = &(adapter->wdinfo);
-#endif
-
 	bool ret = false;
 
 	if (time_after_eq(adapter->pwrctrlpriv.ips_deny_time, jiffies))
@@ -231,12 +226,7 @@ static bool rtw_pwr_unassociated_idle(struct adapter *adapter)
 	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE|WIFI_SITE_MONITOR) ||
 	    check_fwstate(pmlmepriv, WIFI_UNDER_LINKING|WIFI_UNDER_WPS) ||
 	    check_fwstate(pmlmepriv, WIFI_AP_STATE) ||
-	    check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE|WIFI_ADHOC_STATE) ||
-#if defined(CONFIG_88EU_P2P)
-	    !rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE))
-#else
-	    0)
-#endif
+	    check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE|WIFI_ADHOC_STATE))
 		goto exit;
 
 	ret = true;
@@ -388,9 +378,6 @@ static u8 PS_RDY_CHECK(struct adapter *padapter)
 void rtw_set_ps_mode(struct adapter *padapter, u8 ps_mode, u8 smart_ps, u8 bcn_ant_mode)
 {
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-#ifdef CONFIG_88EU_P2P
-	struct wifidirect_info	*pwdinfo = &(padapter->wdinfo);
-#endif /* CONFIG_88EU_P2P */
 
 	RT_TRACE(_module_rtl871x_pwrctrl_c_, _drv_notice_,
 		 ("%s: PowerMode=%d Smart_PS=%d\n",
@@ -412,16 +399,6 @@ void rtw_set_ps_mode(struct adapter *padapter, u8 ps_mode, u8 smart_ps, u8 bcn_a
 
 	/* if (pwrpriv->pwr_mode == PS_MODE_ACTIVE) */
 	if (ps_mode == PS_MODE_ACTIVE) {
-#ifdef CONFIG_88EU_P2P
-		if (pwdinfo->opp_ps == 0) {
-			DBG_88E("rtw_set_ps_mode: Leave 802.11 power save\n");
-			pwrpriv->pwr_mode = ps_mode;
-			rtw_set_rpwm(padapter, PS_STATE_S4);
-			rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_PWRMODE, (u8 *)(&ps_mode));
-			pwrpriv->bFwCurrentInPSMode = false;
-		}
-	} else {
-#endif /* CONFIG_88EU_P2P */
 		if (PS_RDY_CHECK(padapter)) {
 			DBG_88E("%s: Enter 802.11 power save\n", __func__);
 			pwrpriv->bFwCurrentInPSMode = true;
@@ -429,13 +406,6 @@ void rtw_set_ps_mode(struct adapter *padapter, u8 ps_mode, u8 smart_ps, u8 bcn_a
 			pwrpriv->smart_ps = smart_ps;
 			pwrpriv->bcn_ant_mode = bcn_ant_mode;
 			rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_PWRMODE, (u8 *)(&ps_mode));
-
-#ifdef CONFIG_88EU_P2P
-			/*  Set CTWindow after LPS */
-			if (pwdinfo->opp_ps == 1)
-				p2p_ps_wk_cmd(padapter, P2P_PS_ENABLE, 0);
-#endif /* CONFIG_88EU_P2P */
-
 			rtw_set_rpwm(padapter, PS_STATE_S2);
 		}
 	}
@@ -532,11 +502,8 @@ void LeaveAllPowerSaveMode(struct adapter *Adapter)
 	struct mlme_priv	*pmlmepriv = &(Adapter->mlmepriv);
 	u8	enqueue = 0;
 
-	if (check_fwstate(pmlmepriv, _FW_LINKED)) { /* connect */
-		p2p_ps_wk_cmd(Adapter, P2P_PS_DISABLE, enqueue);
-
+	if (check_fwstate(pmlmepriv, _FW_LINKED))
 		rtw_lps_ctrl_wk_cmd(Adapter, LPS_CTRL_LEAVE, enqueue);
-	}
 }
 
 void rtw_init_pwrctrl_priv(struct adapter *padapter)
@@ -584,7 +551,7 @@ void rtw_init_pwrctrl_priv(struct adapter *padapter)
 inline void rtw_set_ips_deny(struct adapter *padapter, u32 ms)
 {
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-	pwrpriv->ips_deny_time = jiffies + rtw_ms_to_systime(ms);
+	pwrpriv->ips_deny_time = jiffies + msecs_to_jiffies(ms);
 }
 
 /*
@@ -601,9 +568,9 @@ int _rtw_pwr_wakeup(struct adapter *padapter, u32 ips_deffer_ms, const char *cal
 	unsigned long expires;
 	int ret = _SUCCESS;
 
-	expires = jiffies + rtw_ms_to_systime(ips_deffer_ms);
+	expires = jiffies + msecs_to_jiffies(ips_deffer_ms);
 	if (time_before(pwrpriv->ips_deny_time, expires))
-		pwrpriv->ips_deny_time = jiffies + rtw_ms_to_systime(ips_deffer_ms);
+		pwrpriv->ips_deny_time = jiffies + msecs_to_jiffies(ips_deffer_ms);
 
 {
 	u32 start = jiffies;
@@ -657,9 +624,9 @@ int _rtw_pwr_wakeup(struct adapter *padapter, u32 ips_deffer_ms, const char *cal
 	}
 
 exit:
-	expires = jiffies + rtw_ms_to_systime(ips_deffer_ms);
+	expires = jiffies + msecs_to_jiffies(ips_deffer_ms);
 	if (time_before(pwrpriv->ips_deny_time, expires))
-		pwrpriv->ips_deny_time = jiffies + rtw_ms_to_systime(ips_deffer_ms);
+		pwrpriv->ips_deny_time = jiffies + msecs_to_jiffies(ips_deffer_ms);
 	return ret;
 }
 

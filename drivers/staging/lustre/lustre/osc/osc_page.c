@@ -352,7 +352,7 @@ static const char *osc_list(struct list_head *head)
 	return list_empty(head) ? "-" : "+";
 }
 
-static inline cfs_time_t osc_submit_duration(struct osc_page *opg)
+static inline unsigned long osc_submit_duration(struct osc_page *opg)
 {
 	if (opg->ops_submit_time == 0)
 		return 0;
@@ -371,7 +371,7 @@ static int osc_page_print(const struct lu_env *env,
 
 	return (*printer)(env, cookie, LUSTRE_OSC_NAME"-page@%p: "
 			  "1< %#x %d %u %s %s > "
-			  "2< "LPU64" %u %u %#x %#x | %p %p %p > "
+			  "2< %llu %u %u %#x %#x | %p %p %p > "
 			  "3< %s %p %d %lu %d > "
 			  "4< %d %d %d %lu %s | %s %s %s %s > "
 			  "5< %s %s %s %s | %d %s | %d %s %s>\n",

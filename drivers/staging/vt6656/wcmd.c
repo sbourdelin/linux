@@ -49,220 +49,167 @@
 #include "rf.h"
 #include "channel.h"
 
-static int msglevel = MSG_LEVEL_INFO;
-//static int msglevel = MSG_LEVEL_DEBUG;
-
 static int s_bCommandComplete(struct vnt_private *);
 
-static void
-vCommandTimerWait(struct vnt_private *pDevice, unsigned long MSecond)
+static void vCommandTimerWait(struct vnt_private *priv, unsigned long msecs)
 {
-	schedule_delayed_work(&pDevice->run_command_work,
-						msecs_to_jiffies(MSecond));
+	schedule_delayed_work(&priv->run_command_work, msecs_to_jiffies(msecs));
 }
 
 void vRunCommand(struct work_struct *work)
 {
-	struct vnt_private *pDevice =
+	struct vnt_private *priv =
 		container_of(work, struct vnt_private, run_command_work.work);
-	u8 byData;
 
-	if (pDevice->Flags & fMP_DISCONNECTED)
+	if (priv->Flags & fMP_DISCONNECTED)
 		return;
 
-	if (pDevice->bCmdRunning != true)
+	if (priv->bCmdRunning != true)
 		return;
 
-	switch (pDevice->eCommandState) {
+	switch (priv->eCommandState) {
 	case WLAN_CMD_INIT_MAC80211_START:
-		if (pDevice->mac_hw)
+		if (priv->mac_hw)
 			break;
 
-		dev_info(&pDevice->usb->dev, "Starting mac80211\n");
+		dev_info(&priv->usb->dev, "Starting mac80211\n");
 
-		if (vnt_init(pDevice)) {
+		if (vnt_init(priv)) {
 			/* If fail all ends TODO retry */
-			dev_err(&pDevice->usb->dev, "failed to start\n");
-			ieee80211_free_hw(pDevice->hw);
+			dev_err(&priv->usb->dev, "failed to start\n");
+			ieee80211_free_hw(priv->hw);
 			return;
 		}
 
 		break;
 
-	case WLAN_CMD_CHANGE_BBSENSITIVITY_START:
-
-		pDevice->bStopDataPkt = true;
-		pDevice->byBBVGACurrent = pDevice->byBBVGANew;
-		BBvSetVGAGainOffset(pDevice, pDevice->byBBVGACurrent);
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"Change sensitivity pDevice->byBBVGACurrent = %x\n", pDevice->byBBVGACurrent);
-		pDevice->bStopDataPkt = false;
-		break;
-
 	case WLAN_CMD_TBTT_WAKEUP_START:
-		vnt_next_tbtt_wakeup(pDevice);
+		vnt_next_tbtt_wakeup(priv);
 		break;
 
 	case WLAN_CMD_BECON_SEND_START:
-		if (!pDevice->vif)
+		if (!priv->vif)
 			break;
 
-		vnt_beacon_make(pDevice, pDevice->vif);
+		vnt_beacon_make(priv, priv->vif);
 
-		vnt_mac_reg_bits_on(pDevice, MAC_REG_TCR, TCR_AUTOBCNTX);
+		vnt_mac_reg_bits_on(priv, MAC_REG_TCR, TCR_AUTOBCNTX);
 
 		break;
 
 	case WLAN_CMD_SETPOWER_START:
 
-		vnt_rf_setpower(pDevice, pDevice->wCurrentRate,
-				pDevice->hw->conf.chandef.chan->hw_value);
+		vnt_rf_setpower(priv, priv->wCurrentRate,
+				priv->hw->conf.chandef.chan->hw_value);
 
 		break;
 
 	case WLAN_CMD_CHANGE_ANTENNA_START:
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"Change from Antenna%d to", (int)pDevice->dwRxAntennaSel);
-		if (pDevice->dwRxAntennaSel == 0) {
-			pDevice->dwRxAntennaSel = 1;
-			if (pDevice->bTxRxAntInv == true)
-				BBvSetAntennaMode(pDevice, ANT_RXA);
-			else
-				BBvSetAntennaMode(pDevice, ANT_RXB);
-		} else {
-			pDevice->dwRxAntennaSel = 0;
-			if (pDevice->bTxRxAntInv == true)
-				BBvSetAntennaMode(pDevice, ANT_RXB);
-			else
-				BBvSetAntennaMode(pDevice, ANT_RXA);
-		}
-		break;
+		dev_dbg(&priv->usb->dev, "Change from Antenna%d to",
+							priv->dwRxAntennaSel);
 
-	case WLAN_CMD_MAC_DISPOWERSAVING_START:
-		vnt_control_in_u8(pDevice, MESSAGE_REQUEST_MACREG, MAC_REG_PSCTL, &byData);
-		if ((byData & PSCTL_PS) != 0) {
-			// disable power saving hw function
-			vnt_control_out(pDevice,
-					MESSAGE_TYPE_DISABLE_PS,
-					0,
-					0,
-					0,
-					NULL
-					);
+		if (priv->dwRxAntennaSel == 0) {
+			priv->dwRxAntennaSel = 1;
+			if (priv->bTxRxAntInv == true)
+				BBvSetAntennaMode(priv, ANT_RXA);
+			else
+				BBvSetAntennaMode(priv, ANT_RXB);
+		} else {
+			priv->dwRxAntennaSel = 0;
+			if (priv->bTxRxAntInv == true)
+				BBvSetAntennaMode(priv, ANT_RXB);
+			else
+				BBvSetAntennaMode(priv, ANT_RXA);
 		}
 		break;
 
 	case WLAN_CMD_11H_CHSW_START:
-		vnt_set_channel(pDevice, pDevice->hw->conf.chandef.chan->hw_value);
+		vnt_set_channel(priv, priv->hw->conf.chandef.chan->hw_value);
 		break;
 
-	case WLAN_CMD_CONFIGURE_FILTER_START:
-		break;
 	default:
 		break;
 	} //switch
 
-	s_bCommandComplete(pDevice);
+	s_bCommandComplete(priv);
 
 	return;
 }
 
-static int s_bCommandComplete(struct vnt_private *pDevice)
+static int s_bCommandComplete(struct vnt_private *priv)
 {
-	int bRadioCmd = false;
-	int bForceSCAN = true;
 
-	pDevice->eCommandState = WLAN_CMD_IDLE;
-	if (pDevice->cbFreeCmdQueue == CMD_Q_SIZE) {
-		//Command Queue Empty
-		pDevice->bCmdRunning = false;
+	priv->eCommandState = WLAN_CMD_IDLE;
+	if (priv->cbFreeCmdQueue == CMD_Q_SIZE) {
+		/* Command Queue Empty */
+		priv->bCmdRunning = false;
 		return true;
-	} else {
-		pDevice->eCommand = pDevice->eCmdQueue[pDevice->uCmdDequeueIdx].eCmd;
-		bRadioCmd = pDevice->eCmdQueue[pDevice->uCmdDequeueIdx].bRadioCmd;
-		bForceSCAN = pDevice->eCmdQueue[pDevice->uCmdDequeueIdx].bForceSCAN;
-		ADD_ONE_WITH_WRAP_AROUND(pDevice->uCmdDequeueIdx, CMD_Q_SIZE);
-		pDevice->cbFreeCmdQueue++;
-		pDevice->bCmdRunning = true;
-		switch (pDevice->eCommand) {
-		case WLAN_CMD_INIT_MAC80211:
-			pDevice->eCommandState = WLAN_CMD_INIT_MAC80211_START;
-			break;
-
-		case WLAN_CMD_RADIO:
-			pDevice->eCommandState = WLAN_CMD_RADIO_START;
-			pDevice->bRadioCmd = bRadioCmd;
-			break;
-		case WLAN_CMD_CHANGE_BBSENSITIVITY:
-			pDevice->eCommandState = WLAN_CMD_CHANGE_BBSENSITIVITY_START;
-			break;
-
-		case WLAN_CMD_TBTT_WAKEUP:
-			pDevice->eCommandState = WLAN_CMD_TBTT_WAKEUP_START;
-			break;
-
-		case WLAN_CMD_BECON_SEND:
-			pDevice->eCommandState = WLAN_CMD_BECON_SEND_START;
-			break;
-
-		case WLAN_CMD_SETPOWER:
-			pDevice->eCommandState = WLAN_CMD_SETPOWER_START;
-			break;
-
-		case WLAN_CMD_CHANGE_ANTENNA:
-			pDevice->eCommandState = WLAN_CMD_CHANGE_ANTENNA_START;
-			break;
-
-		case WLAN_CMD_MAC_DISPOWERSAVING:
-			pDevice->eCommandState = WLAN_CMD_MAC_DISPOWERSAVING_START;
-			break;
-
-		case WLAN_CMD_11H_CHSW:
-			pDevice->eCommandState = WLAN_CMD_11H_CHSW_START;
-			break;
-
-		default:
-			break;
-		}
-		vCommandTimerWait(pDevice, 0);
 	}
+
+	priv->eCommand = priv->eCmdQueue[priv->uCmdDequeueIdx].eCmd;
+
+	ADD_ONE_WITH_WRAP_AROUND(priv->uCmdDequeueIdx, CMD_Q_SIZE);
+	priv->cbFreeCmdQueue++;
+	priv->bCmdRunning = true;
+
+	switch (priv->eCommand) {
+	case WLAN_CMD_INIT_MAC80211:
+		priv->eCommandState = WLAN_CMD_INIT_MAC80211_START;
+		break;
+
+	case WLAN_CMD_TBTT_WAKEUP:
+		priv->eCommandState = WLAN_CMD_TBTT_WAKEUP_START;
+		break;
+
+	case WLAN_CMD_BECON_SEND:
+		priv->eCommandState = WLAN_CMD_BECON_SEND_START;
+		break;
+
+	case WLAN_CMD_SETPOWER:
+		priv->eCommandState = WLAN_CMD_SETPOWER_START;
+		break;
+
+	case WLAN_CMD_CHANGE_ANTENNA:
+		priv->eCommandState = WLAN_CMD_CHANGE_ANTENNA_START;
+		break;
+
+	case WLAN_CMD_11H_CHSW:
+		priv->eCommandState = WLAN_CMD_11H_CHSW_START;
+		break;
+
+	default:
+		break;
+	}
+
+	vCommandTimerWait(priv, 0);
 
 	return true;
 }
 
-int bScheduleCommand(struct vnt_private *pDevice,
-		CMD_CODE eCommand, u8 *pbyItem0)
+int bScheduleCommand(struct vnt_private *priv, CMD_CODE command, u8 *item0)
 {
 
-	if (pDevice->cbFreeCmdQueue == 0)
+	if (priv->cbFreeCmdQueue == 0)
 		return false;
-	pDevice->eCmdQueue[pDevice->uCmdEnqueueIdx].eCmd = eCommand;
-	pDevice->eCmdQueue[pDevice->uCmdEnqueueIdx].bForceSCAN = true;
-	if (pbyItem0 != NULL) {
-		switch (eCommand) {
-		case WLAN_CMD_RADIO:
-			pDevice->eCmdQueue[pDevice->uCmdEnqueueIdx].bRadioCmd = *((int *)pbyItem0);
-			break;
 
-		default:
-			break;
-		}
-	}
+	priv->eCmdQueue[priv->uCmdEnqueueIdx].eCmd = command;
 
-	ADD_ONE_WITH_WRAP_AROUND(pDevice->uCmdEnqueueIdx, CMD_Q_SIZE);
-	pDevice->cbFreeCmdQueue--;
+	ADD_ONE_WITH_WRAP_AROUND(priv->uCmdEnqueueIdx, CMD_Q_SIZE);
+	priv->cbFreeCmdQueue--;
 
-	if (pDevice->bCmdRunning == false)
-		s_bCommandComplete(pDevice);
+	if (priv->bCmdRunning == false)
+		s_bCommandComplete(priv);
 
 	return true;
 
 }
 
-void vResetCommandTimer(struct vnt_private *pDevice)
+void vResetCommandTimer(struct vnt_private *priv)
 {
-	pDevice->cbFreeCmdQueue = CMD_Q_SIZE;
-	pDevice->uCmdDequeueIdx = 0;
-	pDevice->uCmdEnqueueIdx = 0;
-	pDevice->eCommandState = WLAN_CMD_IDLE;
-	pDevice->bCmdRunning = false;
-	pDevice->bCmdClear = false;
+	priv->cbFreeCmdQueue = CMD_Q_SIZE;
+	priv->uCmdDequeueIdx = 0;
+	priv->uCmdEnqueueIdx = 0;
+	priv->eCommandState = WLAN_CMD_IDLE;
+	priv->bCmdRunning = false;
+	priv->bCmdClear = false;
 }

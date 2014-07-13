@@ -276,7 +276,6 @@ static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
 	struct vnt_rcb *rcb = urb->context;
 	struct vnt_private *priv = rcb->pDevice;
 	unsigned long flags;
-	int re_alloc_skb = false;
 
 	switch (urb->status) {
 	case 0:
@@ -294,24 +293,25 @@ static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
 	if (urb->actual_length) {
 		spin_lock_irqsave(&priv->lock, flags);
 
-		if (vnt_rx_data(priv, rcb, urb->actual_length))
-			re_alloc_skb = true;
+		if (vnt_rx_data(priv, rcb, urb->actual_length)) {
+			rcb->skb = dev_alloc_skb(priv->rx_buf_sz);
+			if (!rcb->skb) {
+				dev_dbg(&priv->usb->dev,
+					"Failed to re-alloc rx skb\n");
 
-		spin_unlock_irqrestore(&priv->lock, flags);
-	}
-
-	if (re_alloc_skb) {
-		rcb->skb = dev_alloc_skb(priv->rx_buf_sz);
-		if (!rcb->skb) {
-			dev_dbg(&priv->usb->dev, "Failed to re-alloc rx skb\n");
-
-			rcb->bBoolInUse = false;
-
-			return;
+				rcb->bBoolInUse = false;
+				spin_unlock_irqrestore(&priv->lock, flags);
+				return;
+			}
+		} else {
+			skb_push(rcb->skb, skb_headroom(rcb->skb));
+			skb_trim(rcb->skb, 0);
 		}
 
 		urb->transfer_buffer = skb_put(rcb->skb,
 						skb_tailroom(rcb->skb));
+
+		spin_unlock_irqrestore(&priv->lock, flags);
 	}
 
 	if (usb_submit_urb(urb, GFP_ATOMIC)) {
@@ -401,7 +401,6 @@ static void s_nsBulkOutIoCompleteWrite(struct urb *urb)
 {
 	struct vnt_usb_send_context *context = urb->context;
 	struct vnt_private *priv = context->priv;
-	struct ieee80211_tx_info *info;
 
 	switch (urb->status) {
 	case 0:
@@ -418,20 +417,15 @@ static void s_nsBulkOutIoCompleteWrite(struct urb *urb)
 		break;
 	}
 
-	if (context->skb) {
-		info = IEEE80211_SKB_CB(context->skb);
-		ieee80211_tx_info_clear_status(info);
-		info->status.rates[0].idx = priv->wCurrentRate;
-		info->status.rates[0].count = 0;
-		if (!urb->status)
-			info->flags |= IEEE80211_TX_STAT_ACK;
-		ieee80211_tx_status_irqsafe(priv->hw, context->skb);
-	}
-
 	if (context->type == CONTEXT_DATA_PACKET)
 		ieee80211_wake_queues(priv->hw);
 
-	context->in_use = false;
+	if (urb->status || context->type == CONTEXT_BEACON_PACKET) {
+		if (context->skb)
+			ieee80211_free_txskb(priv->hw, context->skb);
+
+		context->in_use = false;
+	}
 
 	return;
 }

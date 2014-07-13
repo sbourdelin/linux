@@ -36,21 +36,21 @@
 
 #define DEBUG_SUBSYSTEM S_OSC
 
-#include <linux/libcfs/libcfs.h>
+#include "../../include/linux/libcfs/libcfs.h"
 
 
-#include <lustre_dlm.h>
-#include <lustre_net.h>
-#include <lustre/lustre_user.h>
-#include <obd_cksum.h>
-#include <obd_ost.h>
+#include "../include/lustre_dlm.h"
+#include "../include/lustre_net.h"
+#include "../include/lustre/lustre_user.h"
+#include "../include/obd_cksum.h"
+#include "../include/obd_ost.h"
 
-#include <lustre_ha.h>
-#include <lprocfs_status.h>
-#include <lustre_log.h>
-#include <lustre_debug.h>
-#include <lustre_param.h>
-#include <lustre_fid.h>
+#include "../include/lustre_ha.h"
+#include "../include/lprocfs_status.h"
+#include "../include/lustre_log.h"
+#include "../include/lustre_debug.h"
+#include "../include/lustre_param.h"
+#include "../include/lustre_fid.h"
 #include "osc_internal.h"
 #include "osc_cl_internal.h"
 
@@ -483,7 +483,7 @@ int osc_real_create(struct obd_export *exp, struct obdo *oa,
 		}
 	}
 
-	CDEBUG(D_HA, "transno: "LPD64"\n",
+	CDEBUG(D_HA, "transno: %lld\n",
 	       lustre_msg_get_transno(req->rq_repmsg));
 out_req:
 	ptlrpc_req_finished(req);
@@ -836,7 +836,7 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
 	oa->o_dropped = cli->cl_lost_grant;
 	cli->cl_lost_grant = 0;
 	client_obd_list_unlock(&cli->cl_loi_list_lock);
-	CDEBUG(D_CACHE,"dirty: "LPU64" undirty: %u dropped %u grant: "LPU64"\n",
+	CDEBUG(D_CACHE,"dirty: %llu undirty: %u dropped %u grant: %llu\n",
 	       oa->o_dirty, oa->o_undirty, oa->o_dropped, oa->o_grant);
 
 }
@@ -859,7 +859,7 @@ static void __osc_update_grant(struct client_obd *cli, obd_size grant)
 static void osc_update_grant(struct client_obd *cli, struct ost_body *body)
 {
 	if (body->oa.o_valid & OBD_MD_FLGRANT) {
-		CDEBUG(D_CACHE, "got "LPU64" extra grant\n", body->oa.o_grant);
+		CDEBUG(D_CACHE, "got %llu extra grant\n", body->oa.o_grant);
 		__osc_update_grant(cli, body->oa.o_grant);
 	}
 }
@@ -966,8 +966,8 @@ int osc_shrink_grant_to_target(struct client_obd *cli, __u64 target_bytes)
 
 static int osc_should_shrink_grant(struct client_obd *client)
 {
-	cfs_time_t time = cfs_time_current();
-	cfs_time_t next_shrink = client->cl_next_shrink_grant;
+	unsigned long time = cfs_time_current();
+	unsigned long next_shrink = client->cl_next_shrink_grant;
 
 	if ((client->cl_import->imp_connect_data.ocd_connect_flags &
 	     OBD_CONNECT_GRANT_SHRINK) == 0)
@@ -1313,11 +1313,11 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,struct obdo *oa,
 			  ergo(i > 0 && i < page_count - 1,
 			       poff == 0 && pg->count == PAGE_CACHE_SIZE)   &&
 			  ergo(i == page_count - 1, poff == 0)),
-			 "i: %d/%d pg: %p off: "LPU64", count: %u\n",
+			 "i: %d/%d pg: %p off: %llu, count: %u\n",
 			 i, page_count, pg, pg->off, pg->count);
 		LASSERTF(i == 0 || pg->off > pg_prev->off,
-			 "i %d p_c %u pg %p [pri %lu ind %lu] off "LPU64
-			 " prev_pg %p [pri %lu ind %lu] off "LPU64"\n",
+			 "i %d p_c %u pg %p [pri %lu ind %lu] off %llu"
+			 " prev_pg %p [pri %lu ind %lu] off %llu\n",
 			 i, page_count,
 			 pg->pg, page_private(pg->pg), pg->pg->index, pg->off,
 			 pg_prev->pg, page_private(pg_prev->pg),
@@ -1452,7 +1452,7 @@ static int check_write_checksum(struct obdo *oa, const lnet_process_id_t *peer,
 		      "likely false positive due to mmap IO (bug 11742)";
 
 	LCONSOLE_ERROR_MSG(0x132, "BAD WRITE CHECKSUM: %s: from %s inode "DFID
-			   " object "DOSTID" extent ["LPU64"-"LPU64"]\n",
+			   " object "DOSTID" extent [%llu-%llu]\n",
 			   msg, libcfs_nid2str(peer->nid),
 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_seq : (__u64)0,
 			   oa->o_valid & OBD_MD_FLFID ? oa->o_parent_oid : 0,
@@ -1492,7 +1492,7 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
 	    body->oa.o_valid & (OBD_MD_FLUSRQUOTA | OBD_MD_FLGRPQUOTA)) {
 		unsigned int qid[MAXQUOTAS] = { body->oa.o_uid, body->oa.o_gid };
 
-		CDEBUG(D_QUOTA, "setdq for [%u %u] with valid "LPX64", flags %x\n",
+		CDEBUG(D_QUOTA, "setdq for [%u %u] with valid %#llx, flags %x\n",
 		       body->oa.o_uid, body->oa.o_gid, body->oa.o_valid,
 		       body->oa.o_flags);
 		osc_quota_setdq(cli, qid, body->oa.o_valid, body->oa.o_flags);
@@ -1573,7 +1573,7 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
 		if (server_cksum != client_cksum) {
 			LCONSOLE_ERROR_MSG(0x133, "%s: BAD READ CHECKSUM: from "
 					   "%s%s%s inode "DFID" object "DOSTID
-					   " extent ["LPU64"-"LPU64"]\n",
+					   " extent [%llu-%llu]\n",
 					   req->rq_import->imp_obd->obd_name,
 					   libcfs_nid2str(peer->nid),
 					   via, router,
@@ -1639,7 +1639,7 @@ restart_bulk:
 	if (resends) {
 		req->rq_generation_set = 1;
 		req->rq_import_generation = generation;
-		req->rq_sent = cfs_time_current_sec() + resends;
+		req->rq_sent = get_seconds() + resends;
 	}
 
 	rc = ptlrpc_queue_wait(req);
@@ -1722,9 +1722,9 @@ static int osc_brw_redo_request(struct ptlrpc_request *request,
 	/* cap resend delay to the current request timeout, this is similar to
 	 * what ptlrpc does (see after_reply()) */
 	if (aa->aa_resends > new_req->rq_timeout)
-		new_req->rq_sent = cfs_time_current_sec() + new_req->rq_timeout;
+		new_req->rq_sent = get_seconds() + new_req->rq_timeout;
 	else
-		new_req->rq_sent = cfs_time_current_sec() + aa->aa_resends;
+		new_req->rq_sent = get_seconds() + aa->aa_resends;
 	new_req->rq_generation_set = 1;
 	new_req->rq_import_generation = request->rq_import_generation;
 
@@ -1930,8 +1930,7 @@ static int brw_interpret(const struct lu_env *env,
 		    client_should_resend(aa->aa_resends, aa->aa_cli)) {
 			rc = osc_brw_redo_request(req, aa, rc);
 		} else {
-			CERROR("%s: too many resent retries for object: "
-			       ""LPU64":"LPU64", rc = %d.\n",
+			CERROR("%s: too many resent retries for object: %llu:%llu, rc = %d.\n",
 			       req->rq_import->imp_obd->obd_name,
 			       POSTID(&aa->aa_oa->o_oi), rc);
 		}
@@ -2321,7 +2320,7 @@ static int osc_enqueue_fini(struct ptlrpc_request *req, struct ost_lvb *lvb,
 	if ((intent != 0 && rc == ELDLM_LOCK_ABORTED && agl == 0) ||
 	    (rc == 0)) {
 		*flags |= LDLM_FL_LVB_READY;
-		CDEBUG(D_INODE,"got kms "LPU64" blocks "LPU64" mtime "LPU64"\n",
+		CDEBUG(D_INODE,"got kms %llu blocks %llu mtime %llu\n",
 		       lvb->lvb_size, lvb->lvb_blocks, lvb->lvb_mtime);
 	}
 
@@ -2409,12 +2408,11 @@ void osc_update_enqueue(struct lustre_handle *lov_lockhp,
 		if (tmp > lock->l_policy_data.l_extent.end)
 			tmp = lock->l_policy_data.l_extent.end + 1;
 		if (tmp >= loi->loi_kms) {
-			LDLM_DEBUG(lock, "lock acquired, setting rss="LPU64
-				   ", kms="LPU64, loi->loi_lvb.lvb_size, tmp);
+			LDLM_DEBUG(lock, "lock acquired, setting rss=%llu, kms=%llu",
+				   loi->loi_lvb.lvb_size, tmp);
 			loi_kms_set(loi, tmp);
 		} else {
-			LDLM_DEBUG(lock, "lock acquired, setting rss="
-				   LPU64"; leaving kms="LPU64", end="LPU64,
+			LDLM_DEBUG(lock, "lock acquired, setting rss=%llu; leaving kms=%llu, end=%llu",
 				   loi->loi_lvb.lvb_size, loi->loi_kms,
 				   lock->l_policy_data.l_extent.end);
 		}
@@ -2423,8 +2421,8 @@ void osc_update_enqueue(struct lustre_handle *lov_lockhp,
 		LASSERT(lock != NULL);
 		loi->loi_lvb = *lvb;
 		ldlm_lock_allow_match(lock);
-		CDEBUG(D_INODE, "glimpsed, setting rss="LPU64"; leaving"
-		       " kms="LPU64"\n", loi->loi_lvb.lvb_size, loi->loi_kms);
+		CDEBUG(D_INODE, "glimpsed, setting rss=%llu; leaving kms=%llu\n",
+		       loi->loi_lvb.lvb_size, loi->loi_kms);
 		rc = ELDLM_OK;
 	}
 
@@ -3262,7 +3260,7 @@ static int osc_reconnect(const struct lu_env *env,
 		cli->cl_lost_grant = 0;
 		client_obd_list_unlock(&cli->cl_loi_list_lock);
 
-		CDEBUG(D_RPCTRACE, "ocd_connect_flags: "LPX64" ocd_version: %d"
+		CDEBUG(D_RPCTRACE, "ocd_connect_flags: %#llx ocd_version: %d"
 		       " ocd_grant: %d, lost: %ld.\n", data->ocd_connect_flags,
 		       data->ocd_version, data->ocd_grant, lost_grant);
 	}
