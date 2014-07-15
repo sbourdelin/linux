@@ -365,10 +365,10 @@
 #define REG_LIFETIME_EN			0x0426
 #define REG_MULTI_BCNQ_OFFSET		0x0427
 #define REG_SPEC_SIFS			0x0428
-#define REG_RL				0x042a
+#define REG_RETRY_LIMIT			0x042a
 #define REG_DARFRC			0x0430
 #define REG_RARFRC			0x0438
-#define REG_RRSR			0x0440
+#define REG_RESPONSE_RATE_SET		0x0440
 #define REG_ARFR0			0x0444
 #define REG_ARFR1			0x0448
 #define REG_ARFR2			0x044c
