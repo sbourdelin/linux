@@ -252,11 +252,14 @@
 #define  CR_SW_BEACON_ENABLE		BIT(8)
 #define  CR_SECURITY_ENABLE		BIT(9)
 #define  CR_CALTIMER_ENABLE		BIT(10)
-#define  CR_LINKTYPE_MASK		0x30000
-#define  CR_LINKTYPE_NONE		0x00000
-#define  CR_LINKTYPE_ADHOC		0x10000
-#define  CR_LINKTYPE_AP			0x20000
-#define  CR_LINKTYPE_AS_AP		0x30000
+
+/* Media Status Register */
+#define REG_MSR				0x0102
+#define  MSR_LINKTYPE_MASK		0x3
+#define  MSR_LINKTYPE_NONE		0x0
+#define  MSR_LINKTYPE_ADHOC		0x1
+#define  MSR_LINKTYPE_STATION		0x2
+#define  MSR_LINKTYPE_AP		0x3
 
 #define REG_PBP				0x0104
 #define  PBP_PAGE_SIZE_RX_SHIFT		0
