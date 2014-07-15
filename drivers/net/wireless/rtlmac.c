@@ -1630,8 +1630,21 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtlmac_set_mac(priv);
 	rtlmac_set_linktype(priv, MSR_LINKTYPE_STATION);
 
+	/*
+	 * Configure initial WMAC settings
+	 */
+	val32 = RCR_ACCEPT_PM | RCR_ACCEPT_MCAST | RCR_ACCEPT_BCAST |
+		RCR_ACCEPT_BSSID_MATCH | RCR_ACCEPT_BSSID_BEACON |
+		RCR_ACCEPT_MGMT_FRAME | RCR_HTC_LOC_CTRL |
+		RCR_APPEND_PHYSTAT | RCR_APPEND_ICV | RCR_APPEND_MIC;
+	rtl8723au_write32(priv, REG_RCR, val32);
+
+	/*
+	 * Accept all multicast
+	 */
+	rtl8723au_write32(priv, REG_MAR, 0xffffffff);
+	rtl8723au_write32(priv, REG_MAR + 4, 0xffffffff);
 #if 0
-	_InitWMACSetting(Adapter);
 	_InitAdaptiveCtrl(Adapter);
 	_InitEDCA(Adapter);
 	_InitRateFallback(Adapter);
@@ -1647,7 +1660,8 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 	invalidate_cam_all23a(Adapter);
 
-	/*  2010/12/17 MH We need to set TX power according to EFUSE content at first. */
+	/*  2010/12/17 MH We need to set TX power according to
+	    EFUSE content at first. */
 	PHY_SetTxPowerLevel8723A(priv, pHalData->CurrentChannel);
 
 	rtl8723a_InitAntenna_Selection(Adapter);

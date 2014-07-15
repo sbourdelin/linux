@@ -462,7 +462,35 @@
 #define REG_APSD_CTRL			0x0600
 #define REG_BWOPMODE			0x0603
 #define REG_TCR				0x0604
+
+/* Receive Configuration Register */
 #define REG_RCR				0x0608
+#define  RCR_ACCEPT_AP			BIT(0)  /* Accept all unicast packet */
+#define  RCR_ACCEPT_PHYS_MATCH		BIT(1)  /* Accept phys match packet */
+#define  RCR_ACCEPT_MCAST		BIT(2)
+#define  RCR_ACCEPT_BCAST		BIT(3)
+#define  RCR_ACCEPT_ADDR3		BIT(4)  /* Accept address 3 match
+						 packet */
+#define  RCR_ACCEPT_PM			BIT(5)  /* Accept power management
+						 packet */
+#define  RCR_ACCEPT_BSSID_MATCH		BIT(6)  /* Accept BSSID match packet */
+#define  RCR_ACCEPT_BSSID_BEACON	BIT(7)  /* Accept BSSID match packet
+						 (Rx beacon, probe rsp) */
+#define  RCR_ACCEPT_CRC32		BIT(8)  /* Accept CRC32 error packet */
+#define  RCR_ACCEPT_ICV			BIT(9)  /* Accept ICV error packet */
+#define  RCR_ACCEPT_DATA_FRAME		BIT(11)
+#define  RCR_ACCEPT_CTRL_FRAME		BIT(12)
+#define  RCR_ACCEPT_MGMT_FRAME		BIT(13)
+#define  RCR_HTC_LOC_CTRL		BIT(14) /* MFC<--HTC=1 MFC-->HTC=0 */
+#define  RCR_MFBEN			BIT(22)
+#define  RCR_LSIGEN			BIT(23)
+#define  RCR_MULTI_BSSID_ENABLE		BIT(24) /* Enable Multiple BssId */
+#define  RCR_ACCEPT_BA_SSN		BIT(27) /* Accept BA SSN */
+#define  RCR_APPEND_PHYSTAT		BIT(28)
+#define  RCR_APPEND_ICV			BIT(29)
+#define  RCR_APPEND_MIC			BIT(30)
+#define  RCR_APPEND_FCS			BIT(31) /* WMAC append FCS after */
+
 #define REG_RX_PKT_LIMIT		0x060c
 #define REG_RX_DLK_TIME			0x060d
 #define REG_RX_DRVINFO_SZ		0x060f
