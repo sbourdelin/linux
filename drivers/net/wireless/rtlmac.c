@@ -746,7 +746,7 @@ static int rtlmac_download_firmware(struct rtlmac_priv *priv)
 	u8 val8;
 	u16 val16;
 	u32 val32;
-	u8 *fwptr = priv->fw_data->data;
+	u8 *fwptr;
 
 	/* 8051 enable */
 	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
@@ -760,14 +760,14 @@ static int rtlmac_download_firmware(struct rtlmac_priv *priv)
 	val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
 	rtl8723au_write32(priv, REG_MCU_FW_DL, val32 & ~BIT(19));
 
-/* Do the firmware download dance here */
-
 	/* Reset firmware download checksum */
 	val8 = rtl8723au_read8(priv, REG_MCU_FW_DL);
 	rtl8723au_write8(priv, REG_MCU_FW_DL, val8 | MCU_FW_DL_CSUM_REPORT);
 
 	pages = priv->fw_size / RTL_FW_PAGE_SIZE;
 	remainder = priv->fw_size % RTL_FW_PAGE_SIZE;
+
+	fwptr = priv->fw_data->data;
 
 	for (i = 0; i < pages; i++) {
 		val8 = rtl8723au_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
