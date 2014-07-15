@@ -1245,13 +1245,14 @@ static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 	val8 &= ~BIT(1);
 	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
 
-	/*Reset MAC TRX*/
-	rtl8723au_write8(priv, REG_CR, HCI_TXDMA_EN | HCI_RXDMA_EN);
+	/* Reset MAC T/RX */
+	rtl8723au_write8(priv, REG_CR,
+			 CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE);
 
-	/* 'ENSEC' */
-	val8 = rtl8723au_read8(priv, REG_CR);
+	/* Disable security - BIT(9) */
+	val8 = rtl8723au_read8(priv, REG_CR + 1);
 	val8 &= ~BIT(1);
-	rtl8723au_write8(priv, REG_CR, val8);
+	rtl8723au_write8(priv, REG_CR + 1, val8);
 
 	/* Respond TxOK to scheduler */
 	val8 = rtl8723au_read8(priv, REG_DUAL_TSF_RST);
@@ -1463,9 +1464,11 @@ static int rtlmac_power_on(struct rtlmac_priv *priv)
 	/*  Enable MAC DMA/WMAC/SCHEDULE/SEC block */
 	/*  Set CR bit10 to enable 32k calibration. */
 	val16 = rtl8723au_read16(priv, REG_CR);
-	val16 |= (HCI_TXDMA_EN | HCI_RXDMA_EN | TXDMA_EN | RXDMA_EN |
-		  PROTOCOL_EN | SCHEDULE_EN | MACTXEN | MACRXEN |
-		  ENSEC | CALTMR_EN);
+	val16 |= (CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE |
+		  CR_TXDMA_ENABLE | CR_RXDMA_ENABLE |
+		  CR_PROTOCOL_ENABLE | CR_SCHEDULE_ENABLE |
+		  CR_MAC_TX_ENABLE | CR_MAC_RX_ENABLE |
+		  CR_SECURITY_ENABLE | CR_CALTIMER_ENABLE);
 	rtl8723au_write16(priv, REG_CR, val16);
 
 	/* for Efuse PG */

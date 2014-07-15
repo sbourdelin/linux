@@ -241,17 +241,22 @@
 
 /* 0x0100 ~ 0x01FF	MACTOP General Configuration */
 #define REG_CR				0x0100
-#define  HCI_TXDMA_EN			BIT(0)
-#define  HCI_RXDMA_EN			BIT(1)
-#define  TXDMA_EN			BIT(2)
-#define  RXDMA_EN			BIT(3)
-#define  PROTOCOL_EN			BIT(4)
-#define  SCHEDULE_EN			BIT(5)
-#define  MACTXEN			BIT(6)
-#define  MACRXEN			BIT(7)
-#define  ENSWBCN			BIT(8)
-#define  ENSEC				BIT(9)
-#define  CALTMR_EN			BIT(10)
+#define  CR_HCI_TXDMA_ENABLE		BIT(0)
+#define  CR_HCI_RXDMA_ENABLE		BIT(1)
+#define  CR_TXDMA_ENABLE		BIT(2)
+#define  CR_RXDMA_ENABLE		BIT(3)
+#define  CR_PROTOCOL_ENABLE		BIT(4)
+#define  CR_SCHEDULE_ENABLE		BIT(5)
+#define  CR_MAC_TX_ENABLE		BIT(6)
+#define  CR_MAC_RX_ENABLE		BIT(7)
+#define  CR_SW_BEACON_ENABLE		BIT(8)
+#define  CR_SECURITY_ENABLE		BIT(9)
+#define  CR_CALTIMER_ENABLE		BIT(10)
+#define  CR_LINKTYPE_MASK		0x30000
+#define  CR_LINKTYPE_NONE		0x00000
+#define  CR_LINKTYPE_ADHOC		0x10000
+#define  CR_LINKTYPE_AP			0x20000
+#define  CR_LINKTYPE_AS_AP		0x30000
 
 #define REG_PBP				0x0104
 #define  PBP_PAGE_SIZE_RX_SHIFT		0
