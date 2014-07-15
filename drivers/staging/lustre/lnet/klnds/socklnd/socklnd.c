@@ -962,7 +962,7 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
 }
 
 int
-ksocknal_accept (lnet_ni_t *ni, socket_t *sock)
+ksocknal_accept (lnet_ni_t *ni, struct socket *sock)
 {
 	ksock_connreq_t    *cr;
 	int		 rc;
@@ -1008,7 +1008,7 @@ ksocknal_connecting (ksock_peer_t *peer, __u32 ipaddr)
 
 int
 ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
-		      socket_t *sock, int type)
+		      struct socket *sock, int type)
 {
 	rwlock_t		*global_lock = &ksocknal_data.ksnd_global_lock;
 	LIST_HEAD     (zombies);
@@ -1258,7 +1258,7 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
 
 	conn->ksnc_tx_last_post = cfs_time_current();
 	/* Set the deadline for the outgoing HELLO to drain */
-	conn->ksnc_tx_bufnob = cfs_sock_wmem_queued(sock);
+	conn->ksnc_tx_bufnob = sock->sk->sk_wmem_queued;
 	conn->ksnc_tx_deadline = cfs_time_shift(*ksocknal_tunables.ksnd_timeout);
 	mb();   /* order with adding to peer's conn list */
 
@@ -1289,7 +1289,7 @@ ksocknal_create_conn (lnet_ni_t *ni, ksock_route_t *route,
 	 */
 
 	CDEBUG(D_NET, "New conn %s p %d.x %pI4h -> %pI4h/%d"
-	       " incarnation:"LPD64" sched[%d:%d]\n",
+	       " incarnation:%lld sched[%d:%d]\n",
 	       libcfs_id2str(peerid), conn->ksnc_proto->pro_version,
 	       &conn->ksnc_myipaddr, &conn->ksnc_ipaddr,
 	       conn->ksnc_port, incarnation, cpt,
@@ -1483,7 +1483,7 @@ void
 ksocknal_peer_failed (ksock_peer_t *peer)
 {
 	int	notify = 0;
-	cfs_time_t last_alive = 0;
+	unsigned long last_alive = 0;
 
 	/* There has been a connection failure or comms error; but I'll only
 	 * tell LNET I think the peer is dead if it's to another kernel and
@@ -1620,7 +1620,7 @@ ksocknal_queue_zombie_conn (ksock_conn_t *conn)
 void
 ksocknal_destroy_conn (ksock_conn_t *conn)
 {
-	cfs_time_t      last_rcv;
+	unsigned long      last_rcv;
 
 	/* Final coup-de-grace of the reaper */
 	CDEBUG (D_NET, "connection %p\n", conn);
@@ -1789,11 +1789,11 @@ ksocknal_notify (lnet_ni_t *ni, lnet_nid_t gw_nid, int alive)
 }
 
 void
-ksocknal_query (lnet_ni_t *ni, lnet_nid_t nid, cfs_time_t *when)
+ksocknal_query (lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
 {
 	int		connect = 1;
-	cfs_time_t	 last_alive = 0;
-	cfs_time_t	 now = cfs_time_current();
+	unsigned long	 last_alive = 0;
+	unsigned long	 now = cfs_time_current();
 	ksock_peer_t      *peer = NULL;
 	rwlock_t		*glock = &ksocknal_data.ksnd_global_lock;
 	lnet_process_id_t  id = {.nid = nid, .pid = LUSTRE_SRV_LNET_PID};
@@ -1808,7 +1808,7 @@ ksocknal_query (lnet_ni_t *ni, lnet_nid_t nid, cfs_time_t *when)
 
 		list_for_each (tmp, &peer->ksnp_conns) {
 			conn = list_entry(tmp, ksock_conn_t, ksnc_list);
-			bufnob = cfs_sock_wmem_queued(conn->ksnc_sock);
+			bufnob = conn->ksnc_sock->sk->sk_wmem_queued;
 
 			if (bufnob < conn->ksnc_tx_bufnob) {
 				/* something got ACKed */
@@ -2445,7 +2445,7 @@ ksocknal_base_startup(void)
 
 	ksocknal_data.ksnd_connd_starting	 = 0;
 	ksocknal_data.ksnd_connd_failed_stamp     = 0;
-	ksocknal_data.ksnd_connd_starting_stamp   = cfs_time_current_sec();
+	ksocknal_data.ksnd_connd_starting_stamp   = get_seconds();
 	/* must have at least 2 connds to remain responsive to accepts while
 	 * connecting */
 	if (*ksocknal_tunables.ksnd_nconnds < SOCKNAL_CONND_RESV + 1)
@@ -2517,7 +2517,7 @@ ksocknal_debug_peerhash (lnet_ni_t *ni)
 		ksock_conn_t  *conn;
 
 		CWARN ("Active peer on shutdown: %s, ref %d, scnt %d, "
-		       "closing %d, accepting %d, err %d, zcookie "LPU64", "
+		       "closing %d, accepting %d, err %d, zcookie %llu, "
 		       "txq %d, zc_req %d\n", libcfs_id2str(peer->ksnp_id),
 		       atomic_read(&peer->ksnp_refcount),
 		       peer->ksnp_sharecount, peer->ksnp_closing,

@@ -43,12 +43,12 @@
 
 #define DEBUG_SUBSYSTEM S_LDLM
 
-# include <linux/libcfs/libcfs.h>
-#include <obd.h>
-#include <obd_class.h>
-#include <lustre_dlm.h>
-#include <lustre_net.h>
-#include <lustre_sec.h>
+#include "../../include/linux/libcfs/libcfs.h"
+#include "../include/obd.h"
+#include "../include/obd_class.h"
+#include "../include/lustre_dlm.h"
+#include "../include/lustre_net.h"
+#include "../include/lustre_sec.h"
 #include "ldlm_internal.h"
 
 /* @priority: If non-zero, move the selected connection to the list head.
@@ -517,7 +517,7 @@ int client_connect_import(const struct lu_env *env,
 
 	if (data) {
 		LASSERTF((ocd->ocd_connect_flags & data->ocd_connect_flags) ==
-			 ocd->ocd_connect_flags, "old "LPX64", new "LPX64"\n",
+			 ocd->ocd_connect_flags, "old %#llx, new %#llx\n",
 			 data->ocd_connect_flags, ocd->ocd_connect_flags);
 		data->ocd_connect_flags = ocd->ocd_connect_flags;
 	}
@@ -545,7 +545,7 @@ int client_disconnect_export(struct obd_export *exp)
 	int rc = 0, err;
 
 	if (!obd) {
-		CERROR("invalid export for disconnect: exp %p cookie "LPX64"\n",
+		CERROR("invalid export for disconnect: exp %p cookie %#llx\n",
 		       exp, exp ? exp->exp_handle.h_cookie : -1);
 		return -EINVAL;
 	}
@@ -697,7 +697,7 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
 	rs->rs_opc       = lustre_msg_get_opc(req->rq_reqmsg);
 
 	spin_lock(&exp->exp_uncommitted_replies_lock);
-	CDEBUG(D_NET, "rs transno = "LPU64", last committed = "LPU64"\n",
+	CDEBUG(D_NET, "rs transno = %llu, last committed = %llu\n",
 	       rs->rs_transno, exp->exp_last_committed);
 	if (rs->rs_transno > exp->exp_last_committed) {
 		/* not committed already */

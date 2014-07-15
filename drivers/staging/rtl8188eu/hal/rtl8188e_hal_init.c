@@ -28,8 +28,6 @@
 
 #include <rtw_iol.h>
 
-#include <usb_ops.h>
-
 void iol_mode_enable(struct adapter *padapter, u8 enable)
 {
 	u8 reg_0xf0 = 0;
@@ -546,10 +544,6 @@ static void rtl8188e_read_chip_version(struct adapter *padapter)
 	ReadChipVersion8188E(padapter);
 }
 
-static void rtl8188e_GetHalODMVar(struct adapter *Adapter, enum hal_odm_variable eVariable, void *pValue1, bool bSet)
-{
-}
-
 static void rtl8188e_SetHalODMVar(struct adapter *Adapter, enum hal_odm_variable eVariable, void *pValue1, bool bSet)
 {
 	struct hal_data_8188e	*pHalData = GET_HAL_DATA(Adapter);
@@ -579,14 +573,6 @@ static void rtl8188e_SetHalODMVar(struct adapter *Adapter, enum hal_odm_variable
 	}
 }
 
-void rtl8188e_start_thread(struct adapter *padapter)
-{
-}
-
-void rtl8188e_stop_thread(struct adapter *padapter)
-{
-}
-
 static void hal_notch_filter_8188e(struct adapter *adapter, bool enable)
 {
 	if (enable) {
@@ -611,8 +597,6 @@ void rtl8188e_set_hal_ops(struct hal_ops *pHalFunc)
 	pHalFunc->hal_dm_watchdog = &rtl8188e_HalDmWatchDog;
 
 	pHalFunc->Add_RateATid = &rtl8188e_Add_RateATid;
-	pHalFunc->run_thread = &rtl8188e_start_thread;
-	pHalFunc->cancel_thread = &rtl8188e_stop_thread;
 
 	pHalFunc->AntDivBeforeLinkHandler = &AntDivBeforeLink8188E;
 	pHalFunc->AntDivCompareHandler = &AntDivCompare8188E;
@@ -624,7 +608,6 @@ void rtl8188e_set_hal_ops(struct hal_ops *pHalFunc)
 	pHalFunc->sreset_init_value = &sreset_init_value;
 	pHalFunc->sreset_get_wifi_status  = &sreset_get_wifi_status;
 
-	pHalFunc->GetHalODMVarHandler = &rtl8188e_GetHalODMVar;
 	pHalFunc->SetHalODMVarHandler = &rtl8188e_SetHalODMVar;
 
 	pHalFunc->IOL_exec_cmds_sync = &rtl8188e_IOL_exec_cmds_sync;
@@ -758,7 +741,7 @@ static void Hal_ReadPowerValueFromPROM_8188E(struct txpowerinfo24g *pwrInfo24G, 
 {
 	u32 rfPath, eeAddr = EEPROM_TX_PWR_INX_88E, group, TxCount = 0;
 
-	_rtw_memset(pwrInfo24G, 0, sizeof(struct txpowerinfo24g));
+	memset(pwrInfo24G, 0, sizeof(struct txpowerinfo24g));
 
 	if (AutoLoadFail) {
 		for (rfPath = 0; rfPath < MAX_RF_PATH; rfPath++) {
@@ -1095,29 +1078,6 @@ void Hal_ReadThermalMeter_88E(struct adapter *Adapter, u8 *PROMContent, bool Aut
 	}
 	DBG_88E("ThermalMeter = 0x%x\n", pHalData->EEPROMThermalMeter);
 }
-
-void Hal_InitChannelPlan(struct adapter *padapter)
-{
-}
-
-bool HalDetectPwrDownMode88E(struct adapter *Adapter)
-{
-	u8 tmpvalue = 0;
-	struct hal_data_8188e *pHalData = GET_HAL_DATA(Adapter);
-	struct pwrctrl_priv *pwrctrlpriv = &Adapter->pwrctrlpriv;
-
-	EFUSE_ShadowRead(Adapter, 1, EEPROM_RF_FEATURE_OPTION_88E, (u32 *)&tmpvalue);
-
-	/*  2010/08/25 MH INF priority > PDN Efuse value. */
-	if (tmpvalue & BIT(4) && pwrctrlpriv->reg_pdnmode)
-		pHalData->pwrdown = true;
-	else
-		pHalData->pwrdown = false;
-
-	DBG_88E("HalDetectPwrDownMode(): PDN =%d\n", pHalData->pwrdown);
-
-	return pHalData->pwrdown;
-}	/*  HalDetectPwrDownMode */
 
 /*  This function is used only for 92C to set REG_BCN_CTRL(0x550) register. */
 /*  We just reserve the value of the register in variable pHalData->RegBcnCtrlVal and then operate */

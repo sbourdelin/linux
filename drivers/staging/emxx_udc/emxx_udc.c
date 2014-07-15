@@ -34,6 +34,7 @@
 #include <linux/string.h>
 #include <linux/dma-mapping.h>
 #include <linux/workqueue.h>
+#include <linux/device.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
@@ -3284,7 +3285,7 @@ static void __init nbu2ss_drv_set_ep_info(
 
 		tempbuf[0] = name[2];
 		tempbuf[1] = '\0';
-		res = strict_strtol(tempbuf, 16, &num);
+		res = kstrtol(tempbuf, 16, &num);
 
 		if (num == 0)
 			ep->ep.maxpacket = EP0_PACKETSIZE;
@@ -3367,11 +3368,9 @@ static int nbu2ss_drv_probe(struct platform_device *pdev)
 
 	/* require I/O memory and IRQ to be provided as resources */
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	mmio_base = devm_request_and_ioremap(&pdev->dev, r);
-	if (IS_ERR(mmio_base)) {
-		dev_err(&pdev->dev, "failed to map I/O memory\n");
+	mmio_base = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(mmio_base))
 		return PTR_ERR(mmio_base);
-	}
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
@@ -3512,24 +3511,7 @@ static struct platform_driver udc_driver = {
 	},
 };
 
-
-
-/*-------------------------------------------------------------------------*/
-/* module */
-
-/*-------------------------------------------------------------------------*/
-static int __init udc_init(void)
-{
-	return platform_driver_register(&udc_driver);
-}
-module_init(udc_init);
-
-/*-------------------------------------------------------------------------*/
-static void __exit udc_exit(void)
-{
-	platform_driver_unregister(&udc_driver);
-}
-module_exit(udc_exit);
+module_platform_driver(udc_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR("Renesas Electronics Corporation");

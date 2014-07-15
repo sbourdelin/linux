@@ -99,12 +99,6 @@ struct efuse_hal {
 	u8 fakeBTEfuseModifiedMap[EFUSE_BT_MAX_MAP_LEN];
 };
 
-u8 efuse_GetCurrentSize(struct adapter *adapter, u16 *size);
-u16 efuse_GetMaxSize(struct adapter *adapter);
-u8 rtw_efuse_access(struct adapter *adapter, u8 read, u16 start_addr,
-		    u16 cnts, u8 *data);
-u8 rtw_efuse_map_read(struct adapter *adapter, u16 addr, u16 cnts, u8 *data);
-u8 rtw_efuse_map_write(struct adapter *adapter, u16 addr, u16 cnts, u8 *data);
 u16 Efuse_GetCurrentSize(struct adapter *adapter);
 u8 Efuse_CalculateWordCnts(u8 word_en);
 void EFUSE_GetEfuseDefinition(struct adapter *adapt, u8 type, u8 type1,
@@ -122,6 +116,4 @@ u8 Efuse_WordEnableDataWrite(struct adapter *adapter, u16 efuse_addr,
 			     u8 word_en, u8 *data);
 
 void EFUSE_ShadowMapUpdate(struct adapter *adapter, u8 efusetype);
-void EFUSE_ShadowRead(struct adapter *adapt, u8 type, u16 offset, u32 *val);
-
 #endif

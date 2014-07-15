@@ -103,7 +103,7 @@ efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
 	u16	efuse_utilized = 0;
 	u8 u1temp = 0;
 
-	efuseTbl = (u8 *)rtw_zmalloc(EFUSE_MAP_LEN_88E);
+	efuseTbl = kzalloc(EFUSE_MAP_LEN_88E, GFP_KERNEL);
 	if (efuseTbl == NULL) {
 		DBG_88E("%s: alloc efuseTbl fail!\n", __func__);
 		goto exit;
@@ -213,7 +213,7 @@ exit:
 	kfree(efuseTbl);
 
 	if (eFuseWord)
-		rtw_mfree2d((void *)eFuseWord, EFUSE_MAX_SECTION_88E, EFUSE_MAX_WORD_UNIT, sizeof(u16));
+		kfree(eFuseWord);
 }
 
 static void efuse_read_phymap_from_txpktbuf(
@@ -304,7 +304,7 @@ static s32 iol_read_efuse(struct adapter *padapter, u8 txpktbuf_bndy, u16 offset
 	u16 size = 512;
 
 	usb_write8(padapter, REG_TDECTRL+1, txpktbuf_bndy);
-	_rtw_memset(physical_map, 0xFF, 512);
+	memset(physical_map, 0xFF, 512);
 	usb_write8(padapter, REG_PKT_BUFF_ACCESS_CTRL, TXPKT_BUF_SELECT);
 	status = iol_execute(padapter, CMD_READ_EFUSE_MAP);
 	if (status == _SUCCESS)
@@ -395,7 +395,7 @@ u8 Efuse_WordEnableDataWrite(struct adapter *pAdapter, u16 efuse_addr, u8 word_e
 	u8 badworden = 0x0F;
 	u8 tmpdata[8];
 
-	_rtw_memset((void *)tmpdata, 0xff, PGPKT_DATA_SIZE);
+	memset((void *)tmpdata, 0xff, PGPKT_DATA_SIZE);
 
 	if (!(word_en&BIT0)) {
 		tmpaddr = start_addr;
@@ -501,8 +501,8 @@ int Efuse_PgPacketRead(struct adapter *pAdapter, u8 offset, u8 *data)
 	if (offset > max_section)
 		return false;
 
-	_rtw_memset((void *)data, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
-	_rtw_memset((void *)tmpdata, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
+	memset((void *)data, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
+	memset((void *)tmpdata, 0xff, sizeof(u8)*PGPKT_DATA_SIZE);
 
 	/*  <Roger_TODO> Efuse has been pre-programmed dummy 5Bytes at the end of Efuse by CP. */
 	/*  Skip dummy parts to prevent unexpected data read from Efuse. */
@@ -573,7 +573,7 @@ static bool hal_EfuseFixHeaderProcess(struct adapter *pAdapter, u8 efuseType, st
 	u16	efuse_addr = *pAddr;
 	u32	PgWriteSuccess = 0;
 
-	_rtw_memset((void *)originaldata, 0xff, 8);
+	memset((void *)originaldata, 0xff, 8);
 
 	if (Efuse_PgPacketRead(pAdapter, pFixPkt->offset, originaldata)) {
 		/* check if data exist */
@@ -868,7 +868,7 @@ hal_EfusePgCheckAvailableAddr(
 
 static void hal_EfuseConstructPGPkt(u8 offset, u8 word_en, u8 *pData, struct pgpkt *pTargetPkt)
 {
-	_rtw_memset((void *)pTargetPkt->data, 0xFF, sizeof(u8)*8);
+	memset((void *)pTargetPkt->data, 0xFF, sizeof(u8)*8);
 	pTargetPkt->offset = offset;
 	pTargetPkt->word_en = word_en;
 	efuse_WordEnableDataRead(word_en, pData, pTargetPkt->data);
@@ -982,231 +982,6 @@ void efuse_WordEnableDataRead(u8 word_en, u8 *sourdata, u8 *targetdata)
 	}
 }
 
-static u8 efuse_read8(struct adapter *padapter, u16 address, u8 *value)
-{
-	return efuse_OneByteRead(padapter, address, value);
-}
-
-static u8 efuse_write8(struct adapter *padapter, u16 address, u8 *value)
-{
-	return efuse_OneByteWrite(padapter, address, *value);
-}
-
-/*
- * read/wirte raw efuse data
- */
-u8 rtw_efuse_access(struct adapter *padapter, u8 write, u16 start_addr, u16 cnts, u8 *data)
-{
-	int i = 0;
-	u16 real_content_len = 0, max_available_size = 0;
-	u8 res = _FAIL;
-	u8 (*rw8)(struct adapter *, u16, u8*);
-
-	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_EFUSE_REAL_CONTENT_LEN, (void *)&real_content_len);
-	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_AVAILABLE_EFUSE_BYTES_TOTAL, (void *)&max_available_size);
-
-	if (start_addr > real_content_len)
-		return _FAIL;
-
-	if (write) {
-		if ((start_addr + cnts) > max_available_size)
-			return _FAIL;
-		rw8 = &efuse_write8;
-	} else {
-		rw8 = &efuse_read8;
-	}
-
-	Efuse_PowerSwitch(padapter, write, true);
-
-	/*  e-fuse one byte read / write */
-	for (i = 0; i < cnts; i++) {
-		if (start_addr >= real_content_len) {
-			res = _FAIL;
-			break;
-		}
-
-		res = rw8(padapter, start_addr++, data++);
-		if (_FAIL == res)
-			break;
-	}
-
-	Efuse_PowerSwitch(padapter, write, false);
-
-	return res;
-}
-
-u16 efuse_GetMaxSize(struct adapter *padapter)
-{
-	u16 max_size;
-	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI , TYPE_AVAILABLE_EFUSE_BYTES_TOTAL, (void *)&max_size);
-	return max_size;
-}
-
-u8 efuse_GetCurrentSize(struct adapter *padapter, u16 *size)
-{
-	Efuse_PowerSwitch(padapter, false, true);
-	*size = Efuse_GetCurrentSize(padapter);
-	Efuse_PowerSwitch(padapter, false, false);
-
-	return _SUCCESS;
-}
-
-u8 rtw_efuse_map_read(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
-{
-	u16 mapLen = 0;
-
-	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_EFUSE_MAP_LEN, (void *)&mapLen);
-
-	if ((addr + cnts) > mapLen)
-		return _FAIL;
-
-	Efuse_PowerSwitch(padapter, false, true);
-
-	efuse_ReadEFuse(padapter, EFUSE_WIFI, addr, cnts, data);
-
-	Efuse_PowerSwitch(padapter, false, false);
-
-	return _SUCCESS;
-}
-
-u8 rtw_efuse_map_write(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
-{
-	u8 offset, word_en;
-	u8 *map;
-	u8 newdata[PGPKT_DATA_SIZE + 1];
-	s32	i, idx;
-	u8 ret = _SUCCESS;
-	u16 mapLen = 0;
-
-	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_EFUSE_MAP_LEN, (void *)&mapLen);
-
-	if ((addr + cnts) > mapLen)
-		return _FAIL;
-
-	map = rtw_zmalloc(mapLen);
-	if (map == NULL)
-		return _FAIL;
-
-	ret = rtw_efuse_map_read(padapter, 0, mapLen, map);
-	if (ret == _FAIL)
-		goto exit;
-
-	Efuse_PowerSwitch(padapter, true, true);
-
-	offset = (addr >> 3);
-	word_en = 0xF;
-	_rtw_memset(newdata, 0xFF, PGPKT_DATA_SIZE + 1);
-	i = addr & 0x7;	/*  index of one package */
-	idx = 0;	/*  data index */
-
-	if (i & 0x1) {
-		/*  odd start */
-		if (data[idx] != map[addr+idx]) {
-			word_en &= ~BIT(i >> 1);
-			newdata[i-1] = map[addr+idx-1];
-			newdata[i] = data[idx];
-		}
-		i++;
-		idx++;
-	}
-	do {
-		for (; i < PGPKT_DATA_SIZE; i += 2) {
-			if (cnts == idx)
-				break;
-			if ((cnts - idx) == 1) {
-				if (data[idx] != map[addr+idx]) {
-					word_en &= ~BIT(i >> 1);
-					newdata[i] = data[idx];
-					newdata[i+1] = map[addr+idx+1];
-				}
-				idx++;
-				break;
-			} else {
-				if ((data[idx] != map[addr+idx]) ||
-				    (data[idx+1] != map[addr+idx+1])) {
-					word_en &= ~BIT(i >> 1);
-					newdata[i] = data[idx];
-					newdata[i+1] = data[idx + 1];
-				}
-				idx += 2;
-			}
-			if (idx == cnts)
-				break;
-		}
-
-		if (word_en != 0xF) {
-			ret = Efuse_PgPacketWrite(padapter, offset, word_en, newdata);
-			DBG_88E("offset=%x\n", offset);
-			DBG_88E("word_en=%x\n", word_en);
-
-			for (i = 0; i < PGPKT_DATA_SIZE; i++)
-				DBG_88E("data=%x \t", newdata[i]);
-			if (ret == _FAIL)
-				break;
-		}
-
-		if (idx == cnts)
-			break;
-
-		offset++;
-		i = 0;
-		word_en = 0xF;
-		_rtw_memset(newdata, 0xFF, PGPKT_DATA_SIZE);
-	} while (1);
-
-	Efuse_PowerSwitch(padapter, true, false);
-exit:
-	kfree(map);
-	return ret;
-}
-
-/*
- * Function:   efuse_ShadowRead1Byte
- *             efuse_ShadowRead2Byte
- *             efuse_ShadowRead4Byte
- *
- * Overview:   Read from efuse init map by one/two/four bytes !!!!!
- */
-static void
-efuse_ShadowRead1Byte(
-		struct adapter *pAdapter,
-		u16 Offset,
-		u8 *Value)
-{
-	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(pAdapter);
-
-	*Value = pEEPROM->efuse_eeprom_data[Offset];
-
-}
-
-static void
-efuse_ShadowRead2Byte(
-		struct adapter *pAdapter,
-		u16 Offset,
-		u16 *Value)
-{
-	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(pAdapter);
-
-	*Value = pEEPROM->efuse_eeprom_data[Offset];
-	*Value |= pEEPROM->efuse_eeprom_data[Offset+1]<<8;
-
-}
-
-static void
-efuse_ShadowRead4Byte(
-		struct adapter *pAdapter,
-		u16 Offset,
-		u32 *Value)
-{
-	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(pAdapter);
-
-	*Value = pEEPROM->efuse_eeprom_data[Offset];
-	*Value |= pEEPROM->efuse_eeprom_data[Offset+1]<<8;
-	*Value |= pEEPROM->efuse_eeprom_data[Offset+2]<<16;
-	*Value |= pEEPROM->efuse_eeprom_data[Offset+3]<<24;
-
-}
-
 /*
  * Overview:	Read All Efuse content
  */
@@ -1236,20 +1011,7 @@ void EFUSE_ShadowMapUpdate(
 	EFUSE_GetEfuseDefinition(pAdapter, efuseType, TYPE_EFUSE_MAP_LEN, (void *)&mapLen);
 
 	if (pEEPROM->bautoload_fail_flag)
-		_rtw_memset(pEEPROM->efuse_eeprom_data, 0xFF, mapLen);
+		memset(pEEPROM->efuse_eeprom_data, 0xFF, mapLen);
 	else
 		Efuse_ReadAllMap(pAdapter, efuseType, pEEPROM->efuse_eeprom_data);
-}
-
-/*
- * Overview:	Read from efuse init map !!!!!
- */
-void EFUSE_ShadowRead(struct adapter *pAdapter, u8 Type, u16 Offset, u32 *Value)
-{
-	if (Type == 1)
-		efuse_ShadowRead1Byte(pAdapter, Offset, (u8 *)Value);
-	else if (Type == 2)
-		efuse_ShadowRead2Byte(pAdapter, Offset, (u16 *)Value);
-	else if (Type == 4)
-		efuse_ShadowRead4Byte(pAdapter, Offset, (u32 *)Value);
 }

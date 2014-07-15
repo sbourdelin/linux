@@ -22,7 +22,6 @@
 #include <osdep_service.h>
 #include <drv_types.h>
 #include <recv_osdep.h>
-#include <cmd_osdep.h>
 #include <mlme_osdep.h>
 #include <rtw_ioctl_set.h>
 
@@ -153,7 +152,7 @@ u8 rtl8188e_set_raid_cmd(struct adapter *adapt, u32 mask)
 	if (haldata->fw_ractrl) {
 		__le32 lmask;
 
-		_rtw_memset(buf, 0, 3);
+		memset(buf, 0, 3);
 		lmask = cpu_to_le32(mask);
 		memcpy(buf, &lmask, 3);
 
@@ -476,12 +475,6 @@ static void ConstructProbeRsp(struct adapter *adapt, u8 *pframe, u32 *pLength, u
 	*pLength = pktlen;
 }
 
-/*  To check if reserved page content is destroyed by beacon because beacon is too large. */
-/*  2010.06.23. Added by tynli. */
-void CheckFwRsvdPageContent(struct adapter *Adapter)
-{
-}
-
 /*  */
 /*  Description: Fill the reserved packets that FW will use to RSVD page. */
 /*			Now we just send 4 types packet to rsvd page. */
@@ -509,7 +502,7 @@ static void SetFwRsvdPagePkt(struct adapter *adapt, bool bDLFinished)
 	struct rsvdpage_loc RsvdPageLoc;
 
 	DBG_88E("%s\n", __func__);
-	ReservedPagePacket = (u8 *)rtw_zmalloc(1000);
+	ReservedPagePacket = kzalloc(1000, GFP_KERNEL);
 	if (ReservedPagePacket == NULL) {
 		DBG_88E("%s: alloc ReservedPagePacket fail!\n", __func__);
 		return;
@@ -692,76 +685,4 @@ void rtl8188e_set_FwJoinBssReport_cmd(struct adapter *adapt, u8 mstatus)
 		haldata->RegCR_1 &= (~BIT0);
 		usb_write8(adapt,  REG_CR+1, haldata->RegCR_1);
 	}
-}
-
-void rtl8188e_set_p2p_ps_offload_cmd(struct adapter *adapt, u8 p2p_ps_state)
-{
-#ifdef CONFIG_88EU_P2P
-	struct hal_data_8188e *haldata = GET_HAL_DATA(adapt);
-	struct wifidirect_info	*pwdinfo = &(adapt->wdinfo);
-	struct P2P_PS_Offload_t	*p2p_ps_offload = &haldata->p2p_ps_offload;
-	u8 i;
-
-
-	switch (p2p_ps_state) {
-	case P2P_PS_DISABLE:
-		DBG_88E("P2P_PS_DISABLE\n");
-		_rtw_memset(p2p_ps_offload, 0, 1);
-		break;
-	case P2P_PS_ENABLE:
-		DBG_88E("P2P_PS_ENABLE\n");
-		/*  update CTWindow value. */
-		if (pwdinfo->ctwindow > 0) {
-			p2p_ps_offload->CTWindow_En = 1;
-			usb_write8(adapt, REG_P2P_CTWIN, pwdinfo->ctwindow);
-		}
-
-		/*  hw only support 2 set of NoA */
-		for (i = 0; i < pwdinfo->noa_num; i++) {
-			/*  To control the register setting for which NOA */
-			usb_write8(adapt, REG_NOA_DESC_SEL, (i << 4));
-			if (i == 0)
-				p2p_ps_offload->NoA0_En = 1;
-			else
-				p2p_ps_offload->NoA1_En = 1;
-
-			/*  config P2P NoA Descriptor Register */
-			usb_write32(adapt, REG_NOA_DESC_DURATION, pwdinfo->noa_duration[i]);
-			usb_write32(adapt, REG_NOA_DESC_INTERVAL, pwdinfo->noa_interval[i]);
-			usb_write32(adapt, REG_NOA_DESC_START, pwdinfo->noa_start_time[i]);
-			usb_write8(adapt, REG_NOA_DESC_COUNT, pwdinfo->noa_count[i]);
-		}
-
-		if ((pwdinfo->opp_ps == 1) || (pwdinfo->noa_num > 0)) {
-			/*  rst p2p circuit */
-			usb_write8(adapt, REG_DUAL_TSF_RST, BIT(4));
-
-			p2p_ps_offload->Offload_En = 1;
-
-			if (pwdinfo->role == P2P_ROLE_GO) {
-				p2p_ps_offload->role = 1;
-				p2p_ps_offload->AllStaSleep = 0;
-			} else {
-				p2p_ps_offload->role = 0;
-			}
-
-			p2p_ps_offload->discovery = 0;
-		}
-		break;
-	case P2P_PS_SCAN:
-		DBG_88E("P2P_PS_SCAN\n");
-		p2p_ps_offload->discovery = 1;
-		break;
-	case P2P_PS_SCAN_DONE:
-		DBG_88E("P2P_PS_SCAN_DONE\n");
-		p2p_ps_offload->discovery = 0;
-		pwdinfo->p2p_ps_state = P2P_PS_ENABLE;
-		break;
-	default:
-		break;
-	}
-
-	FillH2CCmd_88E(adapt, H2C_PS_P2P_OFFLOAD, 1, (u8 *)p2p_ps_offload);
-#endif
-
 }
