@@ -482,6 +482,16 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 	return retval;
 }
 
+static void rtlmac_set_linktype(struct rtlmac_priv *priv, u16 linktype)
+{
+	u16 val16;
+
+	val16 = rtl8723au_read16(priv, REG_MSR);
+	val16 &= ~MSR_LINKTYPE_MASK;
+	val16 |= linktype;
+	rtl8723au_write16(priv, REG_MSR, val16);
+}
+
 static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 {
 	u32 val32;
@@ -1618,8 +1628,9 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_HIMR, 0xffffffff);
 
 	rtlmac_set_mac(priv);
+	rtlmac_set_linktype(priv, MSR_LINKTYPE_STATION);
+
 #if 0
-	_InitNetworkType(Adapter);/* set msr */
 	_InitWMACSetting(Adapter);
 	_InitAdaptiveCtrl(Adapter);
 	_InitEDCA(Adapter);
