@@ -551,10 +551,10 @@
 /*  Security */
 #define REG_CAMCMD			0x0670
 #define	 CAM_CMD_POLLINIG		BIT(31)
-#define REG_CAMWRITE			0x0674
-#define REG_CAMREAD			0x0678
-#define REG_CAMDBG			0x067c
-#define REG_SECCFG			0x0680
+#define REG_CAM_WRITE			0x0674
+#define REG_CAM_READ			0x0678
+#define REG_CAM_DEBUG			0x067c
+#define REG_SECURITY_CFG		0x0680
 
 /*  Power */
 #define REG_WOW_CTRL			0x0690

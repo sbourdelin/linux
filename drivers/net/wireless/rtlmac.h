@@ -67,21 +67,36 @@ struct rtlmac_firmware_header {
 	u8	data[0];
 };
 
+/*
+ * The 8723au has 3 channel groups: 1-3, 4-9, and 10-14
+ */
+struct rtl8723au_idx {
+#if defined (__LITTLE_ENDIAN)
+	int	a:4;
+	int	b:4;
+#elif defined (__LITTLE_ENDIAN)
+	int	b:4;
+	int	a:4;
+#else
+#error "no endianess defined"
+#endif
+} __attribute__((packed));
+
 struct rtl8723au_efuse {
 	__le16 rtl_id;
 	u8 res0[0xe];
-	u8 cck_tx_power_index;
-	u8 res1[5];
- 	u8 ht40_1s_tx_power_index;	/* 0x16 */
-	u8 res2[5];
- 	u8 ht20_tx_power_index_diff;	/* 0x1c */
-	u8 res3[2];
-	u8 ofdm_tx_power_index_diff;	/* 0x1f */
-	u8 res4[2];
-	u8 ht40_max_power_offset;	/* 0x22 */
-	u8 res5[2];
-	u8 ht20_max_power_offset;	/* 0x25 */
-	u8 res6[2];
+	u8 cck_tx_power_index_A[3];	/* 0x10 */
+	u8 cck_tx_power_index_B[3];
+	u8 ht40_1s_tx_power_index_A[3];	/* 0x16 */
+	u8 ht40_1s_tx_power_index_B[3];
+	/*
+	 * The following entries are half-bytes split as:
+	 * bits 0-3: path A, bits 4-7: path B, all values 4 bits signed
+	 */
+	struct rtl8723au_idx ht20_tx_power_index_diff[3];
+	struct rtl8723au_idx ofdm_tx_power_index_diff[3];
+	struct rtl8723au_idx ht40_max_power_offset[3];
+	struct rtl8723au_idx ht20_max_power_offset[3];
 	u8 channel_plan;		/* 0x28 */
 	u8 tssi_a;
 	u8 thermal_meter;
