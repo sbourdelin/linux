@@ -1704,8 +1704,6 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_RARFRC + 4, 0x08070605);
 
 #if 0
-	InitUsbAggregationSetting(Adapter);
-	_InitOperationMode(Adapter);/* todo */
 	rtl8723a_InitBeaconParameters(Adapter);
 
 	_InitHWLed(Adapter);
