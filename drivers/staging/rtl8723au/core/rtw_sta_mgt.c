@@ -253,7 +253,7 @@ int rtw_free_stainfo23a(struct rtw_adapter *padapter, struct sta_info *psta)
 			pstapriv->asoc_sta_count, psta->hwaddr[0],
 			psta->hwaddr[1], psta->hwaddr[2], psta->hwaddr[3],
 			psta->hwaddr[4], psta->hwaddr[5]));
-	pstapriv->asoc_sta_count-;
+	pstapriv->asoc_sta_count--;
 
 	/*  re-init sta_info; 20061114  will be init in alloc_stainfo */
 	/* _rtw_init_sta_xmit_priv23a(&psta->sta_xmitpriv); */
