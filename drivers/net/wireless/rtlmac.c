@@ -1735,7 +1735,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 	/*  HW SEQ CTRL */
 	/* set 0x0 to 0xFF by tynli. Default enable HW SEQ NUM. */
-	rtl8723au_write8(priv, REG_HWSEQ_CTRL, 0xFF);
+	rtl8723au_write8(priv, REG_HWSEQ_CTRL, 0xff);
 
 	/*  */
 	/*  Disable BAR, suggested by Scott */
@@ -1806,7 +1806,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723a_set_nav_upper(priv, WiFiNavUpperUs);
 
 	/*  2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test, but we need to fin root cause. */
-	if (((rtl8723au_read32(priv, rFPGA0_RFMOD) & 0xFF000000) !=
+	if (((rtl8723au_read32(priv, rFPGA0_RFMOD) & 0xff000000) !=
 	     0x83000000)) {
 		PHY_SetBBReg(priv, rFPGA0_RFMOD, BIT(24), 1);
 		RT_TRACE(_module_hci_hal_init_c_, _drv_err_, ("%s: IQK fail recorver\n", __func__));
