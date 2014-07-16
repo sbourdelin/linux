@@ -1721,9 +1721,12 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	val32 |= (FPGA0_RF_MODE_CCK | FPGA0_RF_MODE_OFDM);
 	rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
 
-#if 0
-	invalidate_cam_all23a(Adapter);
+	/*
+	 * Invalidate all CAM entries - bit 30 is undocumented
+	 */
+	rtl8723au_write32(priv, REG_CAMCMD, CAM_CMD_POLLINIG | BIT(30));
 
+#if 0
 	/*  2010/12/17 MH We need to set TX power according to
 	    EFUSE content at first. */
 	PHY_SetTxPowerLevel8723A(priv, pHalData->CurrentChannel);
