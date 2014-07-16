@@ -505,7 +505,7 @@ rtlmac_set_retry(struct rtlmac_priv *priv, u16 short_retry, u16 long_retry)
 	rtl8723au_write16(priv, REG_RETRY_LIMIT, val16);
 }
 
-static void rtlmac_set_sifs(struct rtlmac_priv *priv, u16 cck, u16 ofdm)
+static void rtlmac_set_spec_sifs(struct rtlmac_priv *priv, u16 cck, u16 ofdm)
 {
 	u16 val16;
 
@@ -1676,10 +1676,28 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	val32 |= RESPONSE_RATE_RRSR_CCK_ONLY_1M;
 	rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
 
-	rtlmac_set_sifs(priv, 0x10, 0x10);
+	/* CCK = 0x0a, OFDM = 0x10 */
+	rtlmac_set_spec_sifs(priv, 0x0a, 0x10);
 	rtlmac_set_retry(priv, 0x30, 0x30);
+
+	/*
+	 * Init EDCA
+	 */
+	rtl8723au_write16(priv, REG_MAC_SPEC_SIFS, 0x100a);
+
+	/* Set CCK SIFS */
+	rtl8723au_write16(priv, REG_SIFS_CTX, 0x100a);
+
+	/* Set OFDM SIFS */
+	rtl8723au_write16(priv, REG_SIFS_TRX, 0x100a);
+
+	/* TXOP */
+	rtl8723au_write32(priv, REG_EDCA_BE_PARAM, 0x005ea42b);
+	rtl8723au_write32(priv, REG_EDCA_BK_PARAM, 0x0000a44f);
+	rtl8723au_write32(priv, REG_EDCA_VI_PARAM, 0x005ea324);
+	rtl8723au_write32(priv, REG_EDCA_VO_PARAM, 0x002fa226);
+
 #if 0
-	_InitEDCA(Adapter);
 	_InitRateFallback(Adapter);
 	_InitRetryFunction(Adapter);
 	InitUsbAggregationSetting(Adapter);
