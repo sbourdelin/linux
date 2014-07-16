@@ -550,6 +550,7 @@
 
 /*  Security */
 #define REG_CAMCMD			0x0670
+#define	 CAM_CMD_POLLINIG		BIT(31)
 #define REG_CAMWRITE			0x0674
 #define REG_CAMREAD			0x0678
 #define REG_CAMDBG			0x067c
