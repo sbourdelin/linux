@@ -1528,6 +1528,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	bool macpower;
 	int ret = 0;
 	u8 val8;
+	u16 val16;
 	u32 val32;
 
 	/* Check if MAC is already powered on */
@@ -1703,9 +1704,17 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_RARFRC, 0x04030201);
 	rtl8723au_write32(priv, REG_RARFRC + 4, 0x08070605);
 
-#if 0
-	rtl8723a_InitBeaconParameters(Adapter);
+	/*
+	 * Initialize beacon parameters
+	 */
+	val16 = BEACON_TSF_UPDATE | (BEACON_TSF_UPDATE << 8);
+	rtl8723au_write16(priv, REG_BEACON_CTRL, val16);
+	rtl8723au_write16(priv, REG_TBTT_PROHIBIT, 0x6404);
+	rtl8723au_write8(priv, REG_DRIVER_EARLY_INT, DRIVER_EARLY_INT_TIME);
+	rtl8723au_write8(priv, REG_BEACON_DMA_TIME, BEACON_DMA_ATIME_INT_TIME);
+	rtl8723au_write16(priv, REG_BEACON_TCFG, 0x660F);
 
+#if 0
 	_InitHWLed(Adapter);
 
 	_BBTurnOnBlock(Adapter);
