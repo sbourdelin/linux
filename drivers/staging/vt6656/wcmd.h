@@ -34,49 +34,35 @@
 #define AUTHENTICATE_TIMEOUT   1000 //ms
 #define ASSOCIATE_TIMEOUT      1000 //ms
 
-// Command code
-typedef enum tagCMD_CODE {
-    WLAN_CMD_INIT_MAC80211,
-    WLAN_CMD_SETPOWER,
-    WLAN_CMD_TBTT_WAKEUP,
-    WLAN_CMD_BECON_SEND,
-    WLAN_CMD_CHANGE_ANTENNA,
-    WLAN_CMD_11H_CHSW,
-} CMD_CODE, *PCMD_CODE;
+/* Command code */
+enum vnt_cmd {
+	WLAN_CMD_INIT_MAC80211,
+	WLAN_CMD_SETPOWER,
+	WLAN_CMD_TBTT_WAKEUP,
+	WLAN_CMD_BECON_SEND,
+	WLAN_CMD_CHANGE_ANTENNA,
+	WLAN_CMD_11H_CHSW,
+};
 
 #define CMD_Q_SIZE              32
 
-typedef enum tagCMD_STATUS {
-
-    CMD_STATUS_SUCCESS = 0,
-    CMD_STATUS_FAILURE,
-    CMD_STATUS_RESOURCES,
-    CMD_STATUS_TIMEOUT,
-    CMD_STATUS_PENDING
-
-} CMD_STATUS, *PCMD_STATUS;
-
-typedef struct tagCMD_ITEM {
-    CMD_CODE eCmd;
-} CMD_ITEM, *PCMD_ITEM;
-
-// Command state
-typedef enum tagCMD_STATE {
-    WLAN_CMD_INIT_MAC80211_START,
-    WLAN_CMD_SETPOWER_START,
-    WLAN_CMD_TBTT_WAKEUP_START,
-    WLAN_CMD_BECON_SEND_START,
-    WLAN_CMD_CHANGE_ANTENNA_START,
-    WLAN_CMD_11H_CHSW_START,
-    WLAN_CMD_IDLE
-} CMD_STATE, *PCMD_STATE;
+/* Command state */
+enum vnt_cmd_state {
+	WLAN_CMD_INIT_MAC80211_START,
+	WLAN_CMD_SETPOWER_START,
+	WLAN_CMD_TBTT_WAKEUP_START,
+	WLAN_CMD_BECON_SEND_START,
+	WLAN_CMD_CHANGE_ANTENNA_START,
+	WLAN_CMD_11H_CHSW_START,
+	WLAN_CMD_IDLE
+};
 
 struct vnt_private;
 
-void vResetCommandTimer(struct vnt_private *);
+void vnt_reset_command_timer(struct vnt_private *);
 
-int bScheduleCommand(struct vnt_private *, CMD_CODE eCommand, u8 *pbyItem0);
+int vnt_schedule_command(struct vnt_private *, enum vnt_cmd);
 
-void vRunCommand(struct work_struct *work);
+void vnt_run_command(struct work_struct *work);
 
 #endif /* __WCMD_H__ */

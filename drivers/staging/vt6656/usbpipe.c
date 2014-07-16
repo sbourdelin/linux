@@ -57,9 +57,9 @@
 #define URB_ASYNC_UNLINK    0
 #endif
 
-static void s_nsInterruptUsbIoCompleteRead(struct urb *urb);
-static void s_nsBulkInUsbIoCompleteRead(struct urb *urb);
-static void s_nsBulkOutIoCompleteWrite(struct urb *urb);
+static void vnt_start_interrupt_urb_complete(struct urb *urb);
+static void vnt_submit_rx_urb_complete(struct urb *urb);
+static void vnt_tx_context_complete(struct urb *urb);
 
 int vnt_control_out(struct vnt_private *priv, u8 request, u16 value,
 		u16 index, u16 length, u8 *buffer)
@@ -117,21 +117,7 @@ void vnt_control_in_u8(struct vnt_private *priv, u8 reg, u8 reg_off, u8 *data)
 			reg_off, reg, sizeof(u8), data);
 }
 
-/*
- * Description:
- *      Allocates an usb interrupt in irp and calls USBD.
- *
- * Parameters:
- *  In:
- *      pDevice     - Pointer to the adapter
- *  Out:
- *      none
- *
- * Return Value: STATUS_INSUFFICIENT_RESOURCES or result of IoCallDriver
- *
- */
-
-int PIPEnsInterruptRead(struct vnt_private *priv)
+int vnt_start_interrupt_urb(struct vnt_private *priv)
 {
 	int status = STATUS_FAILURE;
 
@@ -145,7 +131,7 @@ int PIPEnsInterruptRead(struct vnt_private *priv)
 		usb_rcvintpipe(priv->usb, 1),
 		priv->int_buf.data_buf,
 		MAX_INTERRUPT_SIZE,
-		s_nsInterruptUsbIoCompleteRead,
+		vnt_start_interrupt_urb_complete,
 		priv,
 		priv->int_interval);
 
@@ -158,22 +144,7 @@ int PIPEnsInterruptRead(struct vnt_private *priv)
 	return status;
 }
 
-/*
- * Description:
- *      Complete function of usb interrupt in irp.
- *
- * Parameters:
- *  In:
- *      pDevice     - Pointer to the adapter
- *
- *  Out:
- *      none
- *
- * Return Value: STATUS_INSUFFICIENT_RESOURCES or result of IoCallDriver
- *
- */
-
-static void s_nsInterruptUsbIoCompleteRead(struct urb *urb)
+static void vnt_start_interrupt_urb_complete(struct urb *urb)
 {
 	struct vnt_private *priv = urb->context;
 	int status;
@@ -198,7 +169,7 @@ static void s_nsInterruptUsbIoCompleteRead(struct urb *urb)
 
 		dev_dbg(&priv->usb->dev, "%s status = %d\n", __func__, status);
 	} else {
-		INTnsProcessData(priv);
+		vnt_int_process_data(priv);
 	}
 
 	status = usb_submit_urb(priv->pInterruptURB, GFP_ATOMIC);
@@ -211,21 +182,7 @@ static void s_nsInterruptUsbIoCompleteRead(struct urb *urb)
 	return;
 }
 
-/*
- * Description:
- *      Allocates an usb BulkIn  irp and calls USBD.
- *
- * Parameters:
- *  In:
- *      pDevice     - Pointer to the adapter
- *  Out:
- *      none
- *
- * Return Value: STATUS_INSUFFICIENT_RESOURCES or result of IoCallDriver
- *
- */
-
-int PIPEnsBulkInUsbRead(struct vnt_private *priv, struct vnt_rcb *rcb)
+int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
 {
 	int status = 0;
 	struct urb *urb;
@@ -241,7 +198,7 @@ int PIPEnsBulkInUsbRead(struct vnt_private *priv, struct vnt_rcb *rcb)
 		usb_rcvbulkpipe(priv->usb, 2),
 		skb_put(rcb->skb, skb_tailroom(rcb->skb)),
 		MAX_TOTAL_SIZE_WITH_ALL_HEADERS,
-		s_nsBulkInUsbIoCompleteRead,
+		vnt_submit_rx_urb_complete,
 		rcb);
 
 	status = usb_submit_urb(urb, GFP_ATOMIC);
@@ -256,22 +213,7 @@ int PIPEnsBulkInUsbRead(struct vnt_private *priv, struct vnt_rcb *rcb)
 	return status;
 }
 
-/*
- * Description:
- *      Complete function of usb BulkIn irp.
- *
- * Parameters:
- *  In:
- *      pDevice     - Pointer to the adapter
- *
- *  Out:
- *      none
- *
- * Return Value: STATUS_INSUFFICIENT_RESOURCES or result of IoCallDriver
- *
- */
-
-static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
+static void vnt_submit_rx_urb_complete(struct urb *urb)
 {
 	struct vnt_rcb *rcb = urb->context;
 	struct vnt_private *priv = rcb->pDevice;
@@ -323,21 +265,7 @@ static void s_nsBulkInUsbIoCompleteRead(struct urb *urb)
 	return;
 }
 
-/*
- * Description:
- *      Allocates an usb BulkOut  irp and calls USBD.
- *
- * Parameters:
- *  In:
- *      pDevice     - Pointer to the adapter
- *  Out:
- *      none
- *
- * Return Value: STATUS_INSUFFICIENT_RESOURCES or result of IoCallDriver
- *
- */
-
-int PIPEnsSendBulkOut(struct vnt_private *priv,
+int vnt_tx_context(struct vnt_private *priv,
 				struct vnt_usb_send_context *context)
 {
 	int status;
@@ -355,7 +283,7 @@ int PIPEnsSendBulkOut(struct vnt_private *priv,
 			usb_sndbulkpipe(priv->usb, 3),
 			context->data,
 			context->buf_len,
-			s_nsBulkOutIoCompleteWrite,
+			vnt_tx_context_complete,
 			context);
 
 	status = usb_submit_urb(urb, GFP_ATOMIC);
@@ -369,35 +297,7 @@ int PIPEnsSendBulkOut(struct vnt_private *priv,
 	return STATUS_PENDING;
 }
 
-/*
- * Description: s_nsBulkOutIoCompleteWrite
- *     1a) Indicate to the protocol the status of the write.
- *     1b) Return ownership of the packet to the protocol.
- *
- *     2)  If any more packets are queue for sending, send another packet
- *         to USBD.
- *         If the attempt to send the packet to the driver fails,
- *         return ownership of the packet to the protocol and
- *         try another packet (until one succeeds).
- *
- * Parameters:
- *  In:
- *      pdoUsbDevObj  - pointer to the USB device object which
- *                      completed the irp
- *      pIrp          - the irp which was completed by the
- *                      device object
- *      pContext      - the context given to IoSetCompletionRoutine
- *                      before calling IoCallDriver on the irp
- *                      The pContext is a pointer to the USB device object.
- *  Out:
- *      none
- *
- * Return Value: STATUS_MORE_PROCESSING_REQUIRED - allows the completion routine
- *               (IofCompleteRequest) to stop working on the irp.
- *
- */
-
-static void s_nsBulkOutIoCompleteWrite(struct urb *urb)
+static void vnt_tx_context_complete(struct urb *urb)
 {
 	struct vnt_usb_send_context *context = urb->context;
 	struct vnt_private *priv = context->priv;

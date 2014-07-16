@@ -150,9 +150,8 @@ static void dgap_firmware_reset_port(struct channel_t *ch);
 /*
  * Function prototypes from dgap_parse.c.
  */
-static int dgap_gettok(char **in, struct cnode *p);
+static int dgap_gettok(char **in);
 static char *dgap_getword(char **in);
-static struct cnode *dgap_newnode(int t);
 static int dgap_checknode(struct cnode *p);
 static void dgap_err(char *s);
 
@@ -2181,10 +2180,7 @@ static int dgap_block_til_ready(struct tty_struct *tty, struct file *file,
 
 	spin_unlock_irqrestore(&ch->ch_lock, lock_flags);
 
-	if (retval)
-		return retval;
-
-	return 0;
+	return retval;
 }
 
 /*
@@ -6345,7 +6341,7 @@ static int dgap_parsefile(char **in)
 		p = p->next;
 
 	/* file must start with a BEGIN */
-	while ((rc = dgap_gettok(in, p)) != BEGIN) {
+	while ((rc = dgap_gettok(in)) != BEGIN) {
 		if (rc == 0) {
 			dgap_err("unexpected EOF");
 			return -1;
@@ -6353,17 +6349,13 @@ static int dgap_parsefile(char **in)
 	}
 
 	for (; ;) {
-		rc = dgap_gettok(in, p);
+		rc = dgap_gettok(in);
 		if (rc == 0) {
 			dgap_err("unexpected EOF");
 			return -1;
 		}
 
 		switch (rc) {
-		case 0:
-			dgap_err("unexpected end of file");
-			return -1;
-
 		case BEGIN:	/* should only be 1 begin */
 			dgap_err("unexpected config_begin\n");
 			return -1;
@@ -6374,13 +6366,15 @@ static int dgap_parsefile(char **in)
 		case BOARD:	/* board info */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(BNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
 			p = p->next;
 
+			p->type = BNODE;
 			p->u.board.status = kstrdup("No", GFP_KERNEL);
 			line = conc = NULL;
 			brd = p;
@@ -6665,12 +6659,16 @@ static int dgap_parsefile(char **in)
 		case TTYN:	/* tty name prefix */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(TNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = TNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpeced end of file");
@@ -6686,12 +6684,16 @@ static int dgap_parsefile(char **in)
 		case CU:	/* cu name prefix */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(CUNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = CUNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpeced end of file");
@@ -6716,12 +6718,15 @@ static int dgap_parsefile(char **in)
 				dgap_err("line not vaild for PC/em");
 				return -1;
 			}
-			p->next = dgap_newnode(LNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = LNODE;
 			conc = NULL;
 			line = p;
 			linecnt++;
@@ -6734,13 +6739,17 @@ static int dgap_parsefile(char **in)
 				dgap_err("must specify line info before concentrator");
 				return -1;
 			}
-			p->next = dgap_newnode(CNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = CNODE;
 			conc = p;
+
 			if (linecnt)
 				brd->u.board.conc2++;
 			else
@@ -6783,12 +6792,15 @@ static int dgap_parsefile(char **in)
 					return -1;
 				}
 			}
-			p->next = dgap_newnode(MNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
 			p = p->next;
+			p->type = MNODE;
+
 			if (linecnt)
 				brd->u.board.module2++;
 			else
@@ -6869,12 +6881,16 @@ static int dgap_parsefile(char **in)
 		case PRINT:	/* transparent print name prefix */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(PNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = PNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpeced end of file");
@@ -6890,12 +6906,16 @@ static int dgap_parsefile(char **in)
 		case CMAJOR:	/* major number */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(JNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = JNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -6910,12 +6930,16 @@ static int dgap_parsefile(char **in)
 		case ALTPIN:	/* altpin setting */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(ANODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = ANODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -6930,12 +6954,14 @@ static int dgap_parsefile(char **in)
 		case USEINTR:		/* enable interrupt setting */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(INTRNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
 			p = p->next;
+			p->type = INTRNODE;
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -6950,12 +6976,16 @@ static int dgap_parsefile(char **in)
 		case TTSIZ:	/* size of tty structure */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(TSNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = TSNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -6970,12 +7000,16 @@ static int dgap_parsefile(char **in)
 		case CHSIZ:	/* channel structure size */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(CSNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = CSNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -6990,12 +7024,16 @@ static int dgap_parsefile(char **in)
 		case BSSIZ:	/* board structure size */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(BSNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = BSNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -7010,12 +7048,16 @@ static int dgap_parsefile(char **in)
 		case UNTSIZ:	/* sched structure size */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(USNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = USNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -7030,12 +7072,16 @@ static int dgap_parsefile(char **in)
 		case F2SIZ:	/* f2200 structure size */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(FSNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = FSNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -7050,12 +7096,16 @@ static int dgap_parsefile(char **in)
 		case VPSIZ:	/* vpix structure size */
 			if (dgap_checknode(p))
 				return -1;
-			p->next = dgap_newnode(VSNODE);
+
+			p->next = kzalloc(sizeof(struct cnode), GFP_KERNEL);
 			if (!p->next) {
 				dgap_err("out of memory");
 				return -1;
 			}
+
 			p = p->next;
+			p->type = VSNODE;
+
 			s = dgap_getword(in);
 			if (!s) {
 				dgap_err("unexpected end of file");
@@ -7107,12 +7157,12 @@ static char *dgap_sindex(char *string, char *group)
 /*
  * Get a token from the input file; return 0 if end of file is reached
  */
-static int dgap_gettok(char **in, struct cnode *p)
+static int dgap_gettok(char **in)
 {
 	char *w;
 	struct toklist *t;
 
-	if (strstr(dgap_cword, "boar")) {
+	if (strstr(dgap_cword, "board")) {
 		w = dgap_getword(in);
 		snprintf(dgap_cword, MAXCWORD, "%s", w);
 		for (t = dgap_tlist; t->token != 0; t++) {
@@ -7169,19 +7219,6 @@ static char *dgap_getword(char **in)
 static void dgap_err(char *s)
 {
 	pr_err("dgap: parse: %s\n", s);
-}
-
-/*
- * allocate a new configuration node of type t
- */
-static struct cnode *dgap_newnode(int t)
-{
-	struct cnode *n;
-
-	n = kzalloc(sizeof(struct cnode), GFP_KERNEL);
-	if (n)
-		n->type = t;
-	return n;
 }
 
 /*
