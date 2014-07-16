@@ -1697,9 +1697,13 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_EDCA_VI_PARAM, 0x005ea324);
 	rtl8723au_write32(priv, REG_EDCA_VO_PARAM, 0x002fa226);
 
+	/* Set data auto rate fallback retry count */
+	rtl8723au_write32(priv, REG_DARFRC, 0x00000000);
+	rtl8723au_write32(priv, REG_DARFRC + 4, 0x10080404);
+	rtl8723au_write32(priv, REG_RARFRC, 0x04030201);
+	rtl8723au_write32(priv, REG_RARFRC + 4, 0x08070605);
+
 #if 0
-	_InitRateFallback(Adapter);
-	_InitRetryFunction(Adapter);
 	InitUsbAggregationSetting(Adapter);
 	_InitOperationMode(Adapter);/* todo */
 	rtl8723a_InitBeaconParameters(Adapter);
