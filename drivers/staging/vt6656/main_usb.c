@@ -62,7 +62,7 @@
 #include "int.h"
 
 /* static int msglevel = MSG_LEVEL_DEBUG; */
-static int          msglevel                =MSG_LEVEL_INFO;
+static int msglevel = MSG_LEVEL_INFO;
 
 /*
  * define module options
@@ -75,18 +75,18 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION(DEVICE_FULL_DRV_NAM);
 
-#define DEVICE_PARAM(N,D) \
-        static int N[MAX_UINTS]=OPTION_DEFAULT;\
-        module_param_array(N, int, NULL, 0);\
-        MODULE_PARM_DESC(N, D);
+#define DEVICE_PARAM(N, D)				\
+	static int N[MAX_UINTS] = OPTION_DEFAULT;	\
+	module_param_array(N, int, NULL, 0);		\
+	MODULE_PARM_DESC(N, D)
 
-#define RX_DESC_DEF0     64
-DEVICE_PARAM(RxDescriptors0,"Number of receive usb desc buffer");
+#define RX_DESC_DEF0 64
+DEVICE_PARAM(RxDescriptors0, "Number of receive usb desc buffer");
 
-#define TX_DESC_DEF0     64
-DEVICE_PARAM(TxDescriptors0,"Number of transmit usb desc buffer");
+#define TX_DESC_DEF0 64
+DEVICE_PARAM(TxDescriptors0, "Number of transmit usb desc buffer");
 
-#define CHANNEL_DEF     6
+#define CHANNEL_DEF 6
 DEVICE_PARAM(Channel, "Channel number");
 
 /* PreambleType[] is the preamble length used for transmit.
@@ -177,13 +177,12 @@ static struct usb_device_id vt6656_table[] = {
 /* frequency list (map channels to frequencies) */
 /*
 static const long frequency_list[] = {
-    2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462, 2467, 2472, 2484,
-    4915, 4920, 4925, 4935, 4940, 4945, 4960, 4980,
-    5035, 5040, 5045, 5055, 5060, 5080, 5170, 5180, 5190, 5200, 5210, 5220, 5230, 5240,
-    5260, 5280, 5300, 5320, 5500, 5520, 5540, 5560, 5580, 5600, 5620, 5640, 5660, 5680,
-    5700, 5745, 5765, 5785, 5805, 5825
-	};
-
+	2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462, 2467,
+	2472, 2484, 4915, 4920, 4925, 4935, 4940, 4945, 4960, 4980, 5035, 5040,
+	5045, 5055, 5060, 5080, 5170, 5180, 5190, 5200, 5210, 5220, 5230, 5240,
+	5260, 5280, 5300, 5320, 5500, 5520, 5540, 5560, 5580, 5600, 5620, 5640,
+	5660, 5680, 5700, 5745, 5765, 5785, 5805, 5825
+};
 */
 
 static int vt6656_probe(struct usb_interface *intf,
@@ -206,16 +205,16 @@ static void usb_device_reset(struct vnt_private *pDevice);
 
 static void
 device_set_options(struct vnt_private *pDevice) {
-    pDevice->cbTD = TX_DESC_DEF0;
-    pDevice->cbRD = RX_DESC_DEF0;
-    pDevice->byShortRetryLimit = SHORT_RETRY_DEF;
-    pDevice->byLongRetryLimit = LONG_RETRY_DEF;
-    pDevice->op_mode = NL80211_IFTYPE_UNSPECIFIED;
-    pDevice->byBBType = BBP_TYPE_DEF;
-    pDevice->byPacketType = pDevice->byBBType;
-    pDevice->byAutoFBCtrl = AUTO_FB_0;
-    pDevice->byPreambleType = 0;
-    pDevice->bExistSWNetAddr = false;
+	pDevice->cbTD = TX_DESC_DEF0;
+	pDevice->cbRD = RX_DESC_DEF0;
+	pDevice->byShortRetryLimit = SHORT_RETRY_DEF;
+	pDevice->byLongRetryLimit = LONG_RETRY_DEF;
+	pDevice->op_mode = NL80211_IFTYPE_UNSPECIFIED;
+	pDevice->byBBType = BBP_TYPE_DEF;
+	pDevice->byPacketType = pDevice->byBBType;
+	pDevice->byAutoFBCtrl = AUTO_FB_0;
+	pDevice->byPreambleType = 0;
+	pDevice->bExistSWNetAddr = false;
 }
 
 /*
@@ -371,6 +370,9 @@ static int device_init_registers(struct vnt_private *pDevice)
 		}
 	}
 
+	/* Set initial antenna mode */
+	BBvSetAntennaMode(pDevice, pDevice->byRxAntennaMode);
+
 	/* get Auto Fall Back type */
 	pDevice->byAutoFBCtrl = AUTO_FB_0;
 
@@ -383,38 +385,40 @@ static int device_init_registers(struct vnt_private *pDevice)
 	/* load vt3266 calibration parameters in EEPROM */
 	if (pDevice->byRFType == RF_VT3226D0) {
 		if ((pDevice->abyEEPROM[EEP_OFS_MAJOR_VER] == 0x1) &&
-			(pDevice->abyEEPROM[EEP_OFS_MINOR_VER] >= 0x4)) {
+		    (pDevice->abyEEPROM[EEP_OFS_MINOR_VER] >= 0x4)) {
 
 			byCalibTXIQ = pDevice->abyEEPROM[EEP_OFS_CALIB_TX_IQ];
 			byCalibTXDC = pDevice->abyEEPROM[EEP_OFS_CALIB_TX_DC];
 			byCalibRXIQ = pDevice->abyEEPROM[EEP_OFS_CALIB_RX_IQ];
 			if (byCalibTXIQ || byCalibTXDC || byCalibRXIQ) {
-			/* CR255, enable TX/RX IQ and DC compensation mode */
+				/* CR255, enable TX/RX IQ and
+				   DC compensation mode */
 				vnt_control_out_u8(pDevice,
-					MESSAGE_REQUEST_BBREG,
-					0xff,
-					0x03);
-			/* CR251, TX I/Q Imbalance Calibration */
+						   MESSAGE_REQUEST_BBREG,
+						   0xff,
+						   0x03);
+				/* CR251, TX I/Q Imbalance Calibration */
 				vnt_control_out_u8(pDevice,
-					MESSAGE_REQUEST_BBREG,
-					0xfb,
-					byCalibTXIQ);
-			/* CR252, TX DC-Offset Calibration */
+						   MESSAGE_REQUEST_BBREG,
+						   0xfb,
+						   byCalibTXIQ);
+				/* CR252, TX DC-Offset Calibration */
 				vnt_control_out_u8(pDevice,
-					MESSAGE_REQUEST_BBREG,
-					0xfC,
-					byCalibTXDC);
-			/* CR253, RX I/Q Imbalance Calibration */
+						   MESSAGE_REQUEST_BBREG,
+						   0xfC,
+						   byCalibTXDC);
+				/* CR253, RX I/Q Imbalance Calibration */
 				vnt_control_out_u8(pDevice,
-					MESSAGE_REQUEST_BBREG,
-					0xfd,
-					byCalibRXIQ);
+						   MESSAGE_REQUEST_BBREG,
+						   0xfd,
+						   byCalibRXIQ);
 			} else {
-			/* CR255, turn off BB Calibration compensation */
+				/* CR255, turn off
+				   BB Calibration compensation */
 				vnt_control_out_u8(pDevice,
-					MESSAGE_REQUEST_BBREG,
-					0xff,
-					0x0);
+						   MESSAGE_REQUEST_BBREG,
+						   0xff,
+						   0x0);
 			}
 		}
 	}
@@ -526,8 +530,9 @@ static void device_free_rx_bufs(struct vnt_private *priv)
 
 static void usb_device_reset(struct vnt_private *pDevice)
 {
- int status;
- status = usb_reset_device(pDevice->usb);
+	int status;
+
+	status = usb_reset_device(pDevice->usb);
 	if (status)
             printk("usb_device_reset fail status=%d\n",status);
 	return ;
@@ -600,7 +605,7 @@ static bool device_alloc_bufs(struct vnt_private *priv)
 		rcb->bBoolInUse = false;
 
 		/* submit rx urb */
-		if (PIPEnsBulkInUsbRead(priv, rcb))
+		if (vnt_submit_rx_urb(priv, rcb))
 			goto free_rx_tx;
 	}
 
@@ -664,7 +669,7 @@ static int vnt_start(struct ieee80211_hw *hw)
 
 	priv->int_interval = 1;  /* bInterval is set to 1 */
 
-	INTvWorkItem(priv);
+	vnt_int_start_interrupt(priv);
 
 	priv->flags |= DEVICE_FLAGS_OPENED;
 
@@ -708,7 +713,7 @@ static void vnt_stop(struct ieee80211_hw *hw)
 
 	cancel_delayed_work_sync(&priv->run_command_work);
 
-	priv->bCmdRunning = false;
+	priv->cmd_running = false;
 
 	priv->flags &= ~DEVICE_FLAGS_OPENED;
 
@@ -836,6 +841,7 @@ static void vnt_bss_info_changed(struct ieee80211_hw *hw,
 		u32 changed)
 {
 	struct vnt_private *priv = hw->priv;
+
 	priv->current_aid = conf->aid;
 
 	if (changed & BSS_CHANGED_BSSID)
@@ -1111,7 +1117,7 @@ vt6656_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	spin_lock_init(&priv->lock);
 	mutex_init(&priv->usb_lock);
 
-	INIT_DELAYED_WORK(&priv->run_command_work, vRunCommand);
+	INIT_DELAYED_WORK(&priv->run_command_work, vnt_run_command);
 
 	usb_set_intfdata(intf, priv);
 
@@ -1135,9 +1141,9 @@ vt6656_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	usb_device_reset(priv);
 
 	MP_CLEAR_FLAG(priv, fMP_DISCONNECTED);
-	vResetCommandTimer(priv);
+	vnt_reset_command_timer(priv);
 
-	bScheduleCommand(priv, WLAN_CMD_INIT_MAC80211, NULL);
+	vnt_schedule_command(priv, WLAN_CMD_INIT_MAC80211);
 
 	return 0;
 

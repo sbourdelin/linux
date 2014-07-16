@@ -289,7 +289,6 @@ struct vnt_private {
 	u8 mac_hw;
 	/* netdev */
 	struct usb_device *usb;
-	struct net_device_stats stats;
 
 	u64 tsf_time;
 	u8 rx_rate;
@@ -398,21 +397,19 @@ struct vnt_private {
 	/* Beacon releated */
 	u16 wSeqCounter;
 
-	CMD_STATE eCommandState;
+	enum vnt_cmd_state command_state;
 
-	CMD_CODE eCommand;
+	enum vnt_cmd command;
 
 	int bStopDataPkt;
 
 	/* 802.11 counter */
 
-	CMD_ITEM eCmdQueue[CMD_Q_SIZE];
-	u32 uCmdDequeueIdx;
-	u32 uCmdEnqueueIdx;
-	u32 cbFreeCmdQueue;
-	int bCmdRunning;
-	int bCmdClear;
-	int bNeedRadioOFF;
+	enum vnt_cmd cmd_queue[CMD_Q_SIZE];
+	u32 cmd_dequeue_idx;
+	u32 cmd_enqueue_idx;
+	u32 free_cmd_queue;
+	int cmd_running;
 
 	unsigned long key_entry_inuse;
 
@@ -439,15 +436,14 @@ struct vnt_private {
 	u8 byNewChannel;
 	u8 byChannelSwitchCount;
 
-	struct iw_statistics wstats; /* wireless stats */
 	struct ieee80211_low_level_stats low_stats;
 };
 
-#define ADD_ONE_WITH_WRAP_AROUND(uVar, uModulo) {   \
-    if ((uVar) >= ((uModulo) - 1))                  \
-        (uVar) = 0;                                 \
-    else                                            \
-        (uVar)++;                                   \
+#define ADD_ONE_WITH_WRAP_AROUND(uVar, uModulo) {	\
+	if ((uVar) >= ((uModulo) - 1))			\
+		(uVar) = 0;				\
+	else						\
+		(uVar)++;				\
 }
 
 #define fMP_DISCONNECTED                    0x00000002
