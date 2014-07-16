@@ -492,6 +492,29 @@ static void rtlmac_set_linktype(struct rtlmac_priv *priv, u16 linktype)
 	rtl8723au_write16(priv, REG_MSR, val16);
 }
 
+static void
+rtlmac_set_retry(struct rtlmac_priv *priv, u16 short_retry, u16 long_retry)
+{
+	u16 val16;
+
+	val16 = ((short_retry << RETRY_LIMIT_SHORT_SHIFT) &
+		 RETRY_LIMIT_SHORT_MASK) |
+		((long_retry << RETRY_LIMIT_LONG_SHIFT) &
+		 RETRY_LIMIT_LONG_MASK);
+
+	rtl8723au_write16(priv, REG_RETRY_LIMIT, val16);
+}
+
+static void rtlmac_set_sifs(struct rtlmac_priv *priv, u16 cck, u16 ofdm)
+{
+	u16 val16;
+
+	val16 = ((cck << SPEC_SIFS_CCK_SHIFT) & SPEC_SIFS_CCK_MASK) |
+		((ofdm << SPEC_SIFS_OFDM_SHIFT) & SPEC_SIFS_OFDM_MASK);
+
+	rtl8723au_write16(priv, REG_SPEC_SIFS, val16);
+}
+
 static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 {
 	u32 val32;
@@ -1644,8 +1667,18 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 */
 	rtl8723au_write32(priv, REG_MAR, 0xffffffff);
 	rtl8723au_write32(priv, REG_MAR + 4, 0xffffffff);
+
+	/*
+	 * Init adaptive controls
+	 */
+	val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
+	val32 &= ~RESPONSE_RATE_BITMAP_ALL;
+	val32 |= RESPONSE_RATE_RRSR_CCK_ONLY_1M;
+	rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
+
+	rtlmac_set_sifs(priv, 0x10, 0x10);
+	rtlmac_set_retry(priv, 0x30, 0x30);
 #if 0
-	_InitAdaptiveCtrl(Adapter);
 	_InitEDCA(Adapter);
 	_InitRateFallback(Adapter);
 	_InitRetryFunction(Adapter);
