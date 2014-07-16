@@ -37,8 +37,6 @@
 #include "power.h"
 #include "usbpipe.h"
 
-static int msglevel = MSG_LEVEL_INFO; /* MSG_LEVEL_DEBUG */
-
 static const u8 fallback_rate0[5][5] = {
 	{RATE_18M, RATE_18M, RATE_12M, RATE_12M, RATE_12M},
 	{RATE_24M, RATE_24M, RATE_18M, RATE_12M, RATE_12M},
@@ -55,40 +53,18 @@ static const u8 fallback_rate1[5][5] = {
 	{RATE_54M, RATE_54M, RATE_36M, RATE_18M, RATE_18M}
 };
 
-/*+
- *
- *  Function:   InterruptPollingThread
- *
- *  Synopsis:   Thread running at IRQL PASSIVE_LEVEL.
- *
- *  Arguments: Device Extension
- *
- *  Returns:
- *
- *  Algorithm:  Call USBD for input data;
- *
- *  History:    dd-mm-yyyy   Author    Comment
- *
- *
- *  Notes:
- *
- *  USB reads are by nature 'Blocking', and when in a read, the device looks
- *  like it's in a 'stall' condition, so we deliberately time out every second
- *  if we've gotten no data
- *
--*/
-void INTvWorkItem(struct vnt_private *pDevice)
+void vnt_int_start_interrupt(struct vnt_private *priv)
 {
 	unsigned long flags;
-	int ntStatus;
+	int status;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"---->Interrupt Polling Thread\n");
+	dev_dbg(&priv->usb->dev, "---->Interrupt Polling Thread\n");
 
-	spin_lock_irqsave(&pDevice->lock, flags);
+	spin_lock_irqsave(&priv->lock, flags);
 
-	ntStatus = PIPEnsInterruptRead(pDevice);
+	status = vnt_start_interrupt_urb(priv);
 
-	spin_unlock_irqrestore(&pDevice->lock, flags);
+	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
 static int vnt_int_report_rate(struct vnt_private *priv, u8 pkt_no, u8 tsr)
@@ -147,13 +123,12 @@ static int vnt_int_report_rate(struct vnt_private *priv, u8 pkt_no, u8 tsr)
 	return 0;
 }
 
-void INTnsProcessData(struct vnt_private *priv)
+void vnt_int_process_data(struct vnt_private *priv)
 {
 	struct vnt_interrupt_data *int_data;
-	struct net_device_stats *stats = &priv->stats;
 	struct ieee80211_low_level_stats *low_stats = &priv->low_stats;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"---->s_nsInterruptProcessData\n");
+	dev_dbg(&priv->usb->dev, "---->s_nsInterruptProcessData\n");
 
 	int_data = (struct vnt_interrupt_data *)priv->int_buf.data_buf;
 
@@ -172,20 +147,18 @@ void INTnsProcessData(struct vnt_private *priv)
 	if (int_data->isr0 != 0) {
 		if (int_data->isr0 & ISR_BNTX &&
 				priv->op_mode == NL80211_IFTYPE_AP)
-			bScheduleCommand(priv, WLAN_CMD_BECON_SEND, NULL);
+			vnt_schedule_command(priv, WLAN_CMD_BECON_SEND);
 
 		if (int_data->isr0 & ISR_TBTT) {
 			if (priv->hw->conf.flags & IEEE80211_CONF_PS)
-				bScheduleCommand((void *) priv,
-						WLAN_CMD_TBTT_WAKEUP,
-						NULL);
+				vnt_schedule_command(priv,
+							WLAN_CMD_TBTT_WAKEUP);
 #if 0 /* TODO channel switch */
 			if (priv->bChannelSwitch) {
 				priv->byChannelSwitchCount--;
 				if (priv->byChannelSwitchCount == 0)
-					bScheduleCommand((void *) priv,
-							WLAN_CMD_11H_CHSW,
-							NULL);
+					vnt_schedule_command(priv,
+							WLAN_CMD_11H_CHSW);
 			}
 #endif
 		}
@@ -198,7 +171,4 @@ void INTnsProcessData(struct vnt_private *priv)
 	}
 
 	priv->int_buf.in_use = false;
-
-	stats->tx_errors = priv->wstats.discard.retries;
-	stats->tx_dropped = priv->wstats.discard.retries;
 }
