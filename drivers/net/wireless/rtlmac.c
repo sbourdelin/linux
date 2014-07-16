@@ -1194,9 +1194,9 @@ static int rtlmac_init_queue_priotiy(struct rtlmac_priv *priv)
 		} else if (priv->ep_tx_normal_queue && priv->ep_tx_low_queue) {
 			hi = TRXDMA_QUEUE_NORMAL;
 			lo = TRXDMA_QUEUE_LOW;
-		} else if (priv->ep_tx_normal_queue && priv->ep_tx_low_queue) {
+		} else if (priv->ep_tx_high_queue && priv->ep_tx_normal_queue) {
 			hi = TRXDMA_QUEUE_HIGH;
-			lo = TRXDMA_QUEUE_LOW;
+			lo = TRXDMA_QUEUE_NORMAL;
 		} else {
 			ret = -EINVAL;
 			hi = 0;
@@ -1714,12 +1714,14 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write8(priv, REG_BEACON_DMA_TIME, BEACON_DMA_ATIME_INT_TIME);
 	rtl8723au_write16(priv, REG_BEACON_TCFG, 0x660F);
 
+	/*
+	 * Enable CCK and OFDM block
+	 */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+	val32 |= (FPGA0_RF_MODE_CCK | FPGA0_RF_MODE_OFDM);
+	rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
+
 #if 0
-	_InitHWLed(Adapter);
-
-	_BBTurnOnBlock(Adapter);
-	/* NicIFSetMacAddress(padapter, padapter->PermanentAddress); */
-
 	invalidate_cam_all23a(Adapter);
 
 	/*  2010/12/17 MH We need to set TX power according to
