@@ -126,6 +126,7 @@
 #define REG_LEDCFG0			0x004c
 #define REG_LEDCFG1			0x004d
 #define REG_LEDCFG2			0x004e
+#define  LEDCFG2_DPDT_SELECT		BIT(7)
 #define REG_LEDCFG3			0x004f
 #define REG_LEDCFG			REG_LEDCFG2
 #define REG_FSIMR			0x0050
@@ -641,6 +642,14 @@
 #define REG_FPGA0_XB_LSSI_READBACK	0x8a4
 #define REG_HSPI_XA_READBACK		0x8b8	/* Transceiver A HSPI read */
 #define REG_HSPI_XB_READBACK		0x8bc	/* Transceiver B HSPI read */
+
+#define REG_OFDM1_LSTF			0xd00
+#define  OFDM_CONTINUE_TX		0x10000000
+#define  OFDM_SINGLE_CARRIER		0x20000000
+#define  OFDM_SINGLE_TONE		0x40000000
+#define  OFDM_LSTF_MASK			0x70000000
+
+#define REG_OFDM1_TRX_PATH_ENABLE	0xd04
 
 #define REG_TX_AGC_A_RATE18_06		0xe00
 #define REG_TX_AGC_A_RATE54_24		0xe04

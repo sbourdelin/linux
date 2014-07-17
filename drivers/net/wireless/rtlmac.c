@@ -1345,6 +1345,67 @@ static int rtlmac_init_queue_priotiy(struct rtlmac_priv *priv)
 	return ret;
 }
 
+static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
+{
+	u32 val32;
+	u32 RF_Amode, LC_Cal, lstf;
+
+	/* Check continuous TX and Packet TX */
+	lstf = rtl8723au_read32(priv, REG_OFDM1_LSTF);
+
+	if (lstf & OFDM_LSTF_MASK) {
+		/* Disable all continuous TX */
+		val32 = lstf & ~OFDM_LSTF_MASK;
+		rtl8723au_write32(priv, REG_OFDM1_LSTF, val32);
+
+		/* Read original RF mode Path A */
+		RF_Amode = rtl8723au_read_rfreg(priv, RF6052_REG_AC);
+
+#if 0
+		/* Path-B */
+		if (is2T)
+			RF_Bmode = PHY_QueryRFReg(pAdapter, RF_PATH_B, RF_AC, bMask12Bits);
+#endif
+
+		/* Set RF mode to standby Path A */
+		rtl8723au_write_rfreg(priv, RF6052_REG_AC,
+				      (RF_Amode & 0xfff) | 0x10000);
+
+#if 0
+		/* Path-B */
+		if (is2T)
+			PHY_SetRFReg(pAdapter, RF_PATH_B, RF_AC, bMask12Bits, (RF_Bmode&0x8FFFF)|0x10000);
+#endif
+	} else {
+		/*  Deal with Packet TX case */
+		/*  block all queues */
+		rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
+	}
+
+	/* Read RF reg18 */
+	LC_Cal = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	LC_Cal &= 0xfff;
+
+	/* Start LC calibration */
+	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, LC_Cal | 0x08000);
+
+	msleep(100);
+
+	/* Restore original parameters */
+	if (lstf & OFDM_LSTF_MASK) {
+		/* Path-A */
+		rtl8723au_write32(priv, REG_OFDM1_LSTF, lstf);
+		rtl8723au_write_rfreg(priv, RF6052_REG_AC, RF_Amode);
+
+#if 0
+		/* Path-B */
+		if (is2T)
+			PHY_SetRFReg(pAdapter, RF_PATH_B, RF_AC, bMask12Bits, RF_Bmode);
+#endif
+	} else /*  Deal with Packet TX case */
+		rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
+}
+
 static int rtlmac_set_mac(struct rtlmac_priv *priv)
 {
 	int i;
@@ -1840,49 +1901,47 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 * Start out with default power levels for channel 6, 20MHz
 	 */
 	rtl8723a_set_tx_power(priv, 6, true);
-#if 0
-	rtl8723a_InitAntenna_Selection(Adapter);
 
-	/*  HW SEQ CTRL */
-	/* set 0x0 to 0xFF by tynli. Default enable HW SEQ NUM. */
+	/* Let the 8051 take control of antenna setting */
+	val8 = rtl8723au_read8(priv, REG_LEDCFG2);
+	val8 |= LEDCFG2_DPDT_SELECT;
+	rtl8723au_write8(priv, REG_LEDCFG2, val8);
+
 	rtl8723au_write8(priv, REG_HWSEQ_CTRL, 0xff);
 
-	/*  */
-	/*  Disable BAR, suggested by Scott */
-	/*  2010.04.09 add by hpfan */
-	/*  */
+	/* Disable BAR - not sure if this has any effect on USB */
 	rtl8723au_write32(priv, REG_BAR_MODE_CTRL, 0x0201ffff);
 
+#if 0
 	if (pregistrypriv->wifi_spec)
 		rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
+#endif
 
-	/*  Move by Neo for USB SS from above setp */
-	_RfPowerSave(Adapter);
-
-	/*  2010/08/26 MH Merge from 8192CE. */
-	/* sherry masked that it has been done in _RfPowerSave */
-	/* 20110927 */
-	/* recovery for 8192cu and 9723Au 20111017 */
-	if (pwrctrlpriv->rf_pwrstate == rf_on) {
-		if (pHalData->bIQKInitialized) {
-			rtl8723a_phy_iq_calibrate(priv, true);
-		} else {
-			rtl8723a_phy_iq_calibrate(priv, false);
-			pHalData->bIQKInitialized = true;
-		}
-
-		rtl8723a_odm_check_tx_power_tracking(Adapter);
-
-		rtl8723a_phy_lc_calibrate(Adapter);
-
-		rtl8723a_dual_antenna_detection(Adapter);
+#if 0
+	/*
+	 * Not sure if we should get into this at all
+	 */
+	if (pHalData->bIQKInitialized) {
+		rtl8723a_phy_iq_calibrate(priv, true);
+	} else {
+		rtl8723a_phy_iq_calibrate(priv, false);
+		pHalData->bIQKInitialized = true;
 	}
+#endif
+
+	/*
+	 * This should enable termal meter
+	 */
+	rtl8723au_write_rfreg(priv, RF6052_REG_T_METER, 0x60);
+
+	rtl8723a_phy_lc_calibrate(priv);
 
 	/* fix USB interface interference issue */
 	rtl8723au_write8(priv, 0xfe40, 0xe0);
 	rtl8723au_write8(priv, 0xfe41, 0x8d);
 	rtl8723au_write8(priv, 0xfe42, 0x80);
 	rtl8723au_write32(priv, REG_TXDMA_OFFSET_CHK, 0xfd0320);
+#if 0
 	/* Solve too many protocol error on USB bus */
 	if (!IS_81xxC_VENDOR_UMC_A_CUT(pHalData->VersionID)) {
 		/*  0xe6 = 0x94 */
