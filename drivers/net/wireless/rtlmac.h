@@ -32,6 +32,10 @@
 #define RTL_FW_PAGE_SIZE		4096
 #define RTLMAC_FIRMWARE_POLL_MAX	1000
 
+#define RTL8723A_CHANNEL_GROUPS		3
+#define RTL8723A_MAX_RF_PATHS		2
+#define RF6052_MAX_TX_PWR		0x3f
+
 #define EFUSE_MAP_LEN_8723A		256
 #define EFUSE_MAX_SECTION_8723A		32
 #define EFUSE_REAL_CONTENT_LEN_8723A	512
@@ -100,7 +104,7 @@ struct rtl8723au_efuse {
 	u8 channel_plan;		/* 0x28 */
 	u8 tssi_a;
 	u8 thermal_meter;
-	u8 rf_option_1;
+	u8 rf_regulatory;
 	u8 rf_option_2;
 	u8 rf_option_3;
 	u8 rf_option_4;

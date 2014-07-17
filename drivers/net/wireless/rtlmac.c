@@ -482,6 +482,116 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 	return retval;
 }
 
+/*
+ * The rtl8723a has 3 channel groups for it's efuse settings. It only
+ * supports the 2.4GHz band, so channels 1 - 14:
+ *  group 0: channels 1 - 3
+ *  group 1: channels 4 - 9
+ *  group 2: channels 10 - 14
+ *
+ * Note: We index from 0 in the code
+ */
+static int rtl8723a_channel_to_group(int channel)
+{
+	int group;
+
+	if (channel < 4)
+		group = 0;
+	else if (channel < 10)
+		group = 1;
+	else
+		group = 2;
+
+	return group;
+}
+
+static void
+rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht20)
+{
+	struct rtl8723au_efuse *efuse;
+	u8 cck[RTL8723A_MAX_RF_PATHS], ofdm[RTL8723A_MAX_RF_PATHS];
+	u8 ofdmbase[RTL8723A_MAX_RF_PATHS], mcsbase[RTL8723A_MAX_RF_PATHS];
+	u32 val32;
+	int group, i;
+
+	efuse = &priv->efuse_wifi.efuse;
+
+	group = rtl8723a_channel_to_group(channel);
+
+	cck[0] = efuse->cck_tx_power_index_A[group];
+	cck[1] = efuse->cck_tx_power_index_B[group];
+
+	ofdm[0] = efuse->ht40_1s_tx_power_index_A[group];
+	ofdm[1] = efuse->ht40_1s_tx_power_index_B[group];
+
+	printk(KERN_DEBUG "%s: Setting TX power CCK A: %i, CCK B: %i, "
+	       "OFDM A: %i, OFD`M B: %i\n", DRIVER_NAME,
+	       cck[0], cck[1], ofdm[0], ofdm[1]);
+	printk(KERN_DEBUG "%s: Regulatory 0x%02x\n",
+	       DRIVER_NAME, efuse->rf_regulatory);
+
+	for (i = 0; RTL8723A_MAX_RF_PATHS; i++) {
+		if (cck[i] > RF6052_MAX_TX_PWR)
+			cck[i] = RF6052_MAX_TX_PWR;
+		if (ofdm[i] > RF6052_MAX_TX_PWR)
+			ofdm[i] = RF6052_MAX_TX_PWR;
+	}
+
+	val32 = rtl8723au_read32(priv, REG_TX_AGC_A_CCK1_MCS32);
+	val32 &= 0xffff00ff;
+	val32 |= (cck[0] << 8);
+	rtl8723au_write32(priv, REG_TX_AGC_A_CCK1_MCS32, val32);
+
+	val32 = rtl8723au_read32(priv, REG_TX_AGC_B_CCK11_A_CCK2_11);
+	val32 &= 0xff;
+	val32 |= ((cck[0] << 8) | (cck[0] << 16) | (cck[0] << 24));
+	rtl8723au_write32(priv, REG_TX_AGC_B_CCK11_A_CCK2_11, val32);
+
+	val32 = rtl8723au_read32(priv, REG_TX_AGC_B_CCK11_A_CCK2_11);
+	val32 &= 0xffffff00;
+	val32 |= cck[1];
+	rtl8723au_write32(priv, REG_TX_AGC_B_CCK11_A_CCK2_11, val32);
+
+	val32 = rtl8723au_read32(priv, REG_TX_AGC_B_CCK1_55_MCS32);
+	val32 &= 0xff;
+	val32 |= ((cck[1] << 8) | (cck[1] << 16) | (cck[1] << 24));
+	rtl8723au_write32(priv, REG_TX_AGC_B_CCK1_55_MCS32, val32);
+
+	ofdmbase[0] = ofdm[0] +	efuse->ofdm_tx_power_index_diff[group].a;
+	mcsbase[0] = ofdm[0];
+	if (!ht20)
+		mcsbase[0] += efuse->ht20_tx_power_index_diff[group].a;
+
+	ofdmbase[1] = ofdm[1] +	efuse->ofdm_tx_power_index_diff[group].b;
+	mcsbase[1] = ofdm[1];
+	if (!ht20)
+		mcsbase[1] += efuse->ht20_tx_power_index_diff[group].b;
+
+	val32 = ofdmbase[0] | ofdmbase[0] << 8 |
+		ofdmbase[0] << 16 | ofdmbase[0] <<24;
+	rtl8723au_write32(priv, REG_TX_AGC_A_RATE18_06, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_A_RATE54_24, val32);
+
+	val32 = mcsbase[0] | mcsbase[0] << 8 |
+		mcsbase[0] << 16 | mcsbase[0] <<24;
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS03_MCS00, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS07_MCS04, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS11_MCS08, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS15_MCS12, val32);
+
+	val32 = ofdmbase[1] | ofdmbase[1] << 8 |
+		ofdmbase[1] << 16 | ofdmbase[1] <<24;
+	rtl8723au_write32(priv, REG_TX_AGC_B_RATE18_06, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_B_RATE54_24, val32);
+
+	val32 = mcsbase[1] | mcsbase[1] << 8 |
+		mcsbase[1] << 16 | mcsbase[1] <<24;
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS03_MCS00, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS07_MCS04, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS11_MCS08, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS15_MCS12, val32);
+}
+
 static void rtlmac_set_linktype(struct rtlmac_priv *priv, u16 linktype)
 {
 	u16 val16;
@@ -1726,11 +1836,11 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 */
 	rtl8723au_write32(priv, REG_CAMCMD, CAM_CMD_POLLINIG | BIT(30));
 
+	/*
+	 * Start out with default power levels for channel 6, 20MHz
+	 */
+	rtl8723a_set_tx_power(priv, 6, true);
 #if 0
-	/*  2010/12/17 MH We need to set TX power according to
-	    EFUSE content at first. */
-	PHY_SetTxPowerLevel8723A(priv, pHalData->CurrentChannel);
-
 	rtl8723a_InitAntenna_Selection(Adapter);
 
 	/*  HW SEQ CTRL */
