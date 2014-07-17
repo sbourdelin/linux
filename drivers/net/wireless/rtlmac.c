@@ -657,6 +657,9 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	if (val32 & MULTI_GPS_FUNC_EN)
 		priv->has_gps = 1;
 
+	if (val32 & SYS_CFG_VENDOR_ID)
+		priv->vendor_umc = 1;
+
 	/* The rtl8192 presumably can have 2 */
 	priv->rf_paths = 1;
 
@@ -1941,46 +1944,43 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write8(priv, 0xfe41, 0x8d);
 	rtl8723au_write8(priv, 0xfe42, 0x80);
 	rtl8723au_write32(priv, REG_TXDMA_OFFSET_CHK, 0xfd0320);
-#if 0
+
 	/* Solve too many protocol error on USB bus */
-	if (!IS_81xxC_VENDOR_UMC_A_CUT(pHalData->VersionID)) {
-		/*  0xe6 = 0x94 */
-		rtl8723au_write8(priv, 0xfe40, 0xe6);
-		rtl8723au_write8(priv, 0xfe41, 0x94);
-		rtl8723au_write8(priv, 0xfe42, 0x80);
+	/* Can't do this for 8188/8192 UMC A cut parts */
+	rtl8723au_write8(priv, 0xfe40, 0xe6);
+	rtl8723au_write8(priv, 0xfe41, 0x94);
+	rtl8723au_write8(priv, 0xfe42, 0x80);
 
-		/*  0xe0 = 0x19 */
-		rtl8723au_write8(priv, 0xfe40, 0xe0);
-		rtl8723au_write8(priv, 0xfe41, 0x19);
-		rtl8723au_write8(priv, 0xfe42, 0x80);
+	rtl8723au_write8(priv, 0xfe40, 0xe0);
+	rtl8723au_write8(priv, 0xfe41, 0x19);
+	rtl8723au_write8(priv, 0xfe42, 0x80);
 
-		/*  0xe5 = 0x91 */
-		rtl8723au_write8(priv, 0xfe40, 0xe5);
-		rtl8723au_write8(priv, 0xfe41, 0x91);
-		rtl8723au_write8(priv, 0xfe42, 0x80);
+	rtl8723au_write8(priv, 0xfe40, 0xe5);
+	rtl8723au_write8(priv, 0xfe41, 0x91);
+	rtl8723au_write8(priv, 0xfe42, 0x80);
 
-		/*  0xe2 = 0x81 */
-		rtl8723au_write8(priv, 0xfe40, 0xe2);
-		rtl8723au_write8(priv, 0xfe41, 0x81);
-		rtl8723au_write8(priv, 0xfe42, 0x80);
-	}
+	rtl8723au_write8(priv, 0xfe40, 0xe2);
+	rtl8723au_write8(priv, 0xfe41, 0x81);
+	rtl8723au_write8(priv, 0xfe42, 0x80);
 
-/*	_InitPABias(Adapter); */
-
+#if 0
 	/*  Init BT hw config. */
 	rtl8723a_BT_init_hwconfig(Adapter);
 
 	rtl8723a_InitHalDm(Adapter);
 
 	rtl8723a_set_nav_upper(priv, WiFiNavUpperUs);
+#endif
 
-	/*  2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test, but we need to fin root cause. */
-	if (((rtl8723au_read32(priv, rFPGA0_RFMOD) & 0xff000000) !=
-	     0x83000000)) {
-		PHY_SetBBReg(priv, rFPGA0_RFMOD, BIT(24), 1);
-		RT_TRACE(_module_hci_hal_init_c_, _drv_err_, ("%s: IQK fail recorver\n", __func__));
+	/*  2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test,
+	    but we need to fin root cause. */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+	if ((val32 & 0xff000000) != 0x83000000) {
+		val32 |= FPGA0_RF_MODE_CCK;
+		rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
 	}
 
+#if 0
 	/* ack for xmit mgmt frames. */
 	rtl8723au_write32(priv, REG_FWHW_TXQ_CTRL,
 			  rtl8723au_read32(priv, REG_FWHW_TXQ_CTRL)|BIT(12));

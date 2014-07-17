@@ -151,6 +151,7 @@ struct rtlmac_priv {
 	u32 has_bluetooth:1;
 	u32 enable_bluetooth:1;
 	u32 has_gps:1;
+	u32 vendor_umc:1;
 	u32 has_polarity_ctrl:1;
 	u32 has_eeprom:1;
 	u32 boot_eeprom:1;
