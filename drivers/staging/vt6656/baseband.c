@@ -29,7 +29,7 @@
  *	vnt_get_frame_time	- Calculate data frame transmitting time
  *	vnt_get_phy_field	- Calculate PhyLength, PhyService and Phy
  *				  Signal parameter for baseband Tx
- *	BBbVT3184Init		- VIA VT3184 baseband chip init code
+ *	vnt_vt3184_init		- VIA VT3184 baseband chip init code
  *
  * Revision History:
  *
@@ -123,7 +123,7 @@ static u8 vnt_vt3184_vt3226d0[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  /* 0xff */
 };
 
-static const u16 awcFrameTime[MAX_RATE] = {
+static const u16 vnt_frame_time[MAX_RATE] = {
 	10, 20, 55, 110, 24, 36, 48, 72, 96, 144, 192, 216
 };
 
@@ -152,7 +152,7 @@ unsigned int vnt_get_frame_time(u8 preamble_type, u8 pkt_type,
 	if (tx_rate > RATE_54M)
 		return 0;
 
-	rate = (unsigned int)awcFrameTime[tx_rate];
+	rate = (unsigned int)vnt_frame_time[tx_rate];
 
 	if (tx_rate <= 3) {
 		if (preamble_type == 1)
@@ -345,7 +345,7 @@ void vnt_get_phy_field(struct vnt_private *priv, u32 frame_length,
  * Return Value: none
  *
  */
-void BBvSetAntennaMode(struct vnt_private *priv, u8 antenna_mode)
+void vnt_set_antenna_mode(struct vnt_private *priv, u8 antenna_mode)
 {
 	switch (antenna_mode) {
 	case ANT_TXA:
@@ -378,7 +378,7 @@ void BBvSetAntennaMode(struct vnt_private *priv, u8 antenna_mode)
  *
  */
 
-int BBbVT3184Init(struct vnt_private *priv)
+int vnt_vt3184_init(struct vnt_private *priv)
 {
 	int status;
 	u16 length;
@@ -526,7 +526,7 @@ int BBbVT3184Init(struct vnt_private *priv)
  * Return Value: none
  *
  */
-void BBvSetShortSlotTime(struct vnt_private *priv)
+void vnt_set_short_slot_time(struct vnt_private *priv)
 {
 	u8 bb_vga = 0;
 
@@ -543,7 +543,7 @@ void BBvSetShortSlotTime(struct vnt_private *priv)
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
 }
 
-void BBvSetVGAGainOffset(struct vnt_private *priv, u8 data)
+void vnt_set_vga_gain_offset(struct vnt_private *priv, u8 data)
 {
 
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0xE7, data);
@@ -558,7 +558,7 @@ void BBvSetVGAGainOffset(struct vnt_private *priv, u8 data)
 }
 
 /*
- * Description: BBvSetDeepSleep
+ * Description: vnt_set_deep_sleep
  *
  * Parameters:
  *  In:
@@ -569,19 +569,19 @@ void BBvSetVGAGainOffset(struct vnt_private *priv, u8 data)
  * Return Value: none
  *
  */
-void BBvSetDeepSleep(struct vnt_private *priv)
+void vnt_set_deep_sleep(struct vnt_private *priv)
 {
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0c, 0x17);/* CR12 */
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0xB9);/* CR13 */
 }
 
-void BBvExitDeepSleep(struct vnt_private *priv)
+void vnt_exit_deep_sleep(struct vnt_private *priv)
 {
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0c, 0x00);/* CR12 */
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0d, 0x01);/* CR13 */
 }
 
-void BBvUpdatePreEDThreshold(struct vnt_private *priv, int scanning)
+void vnt_update_pre_ed_threshold(struct vnt_private *priv, int scanning)
 {
 	u8 cr_201 = 0x0, cr_206 = 0x0;
 	u8 ed_inx = priv->byBBPreEDIndex;
