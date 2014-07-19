@@ -541,6 +541,10 @@
 
 /* WMA, BA, CCX */
 #define REG_NAV_CTRL			0x0650
+/* In units of 128us */
+#define REG_NAV_UPPER			0x0652
+#define  NAV_UPPER_UNIT			128
+
 #define REG_BACAMCMD			0x0654
 #define REG_BACAMCONTENT		0x0658
 #define REG_LBDLY			0x0660

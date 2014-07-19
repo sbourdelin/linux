@@ -1982,9 +1982,9 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	val32 = rtl8723au_read32(priv, REG_OFDM0_XA_AGC_CORE1);
 	priv->path_a_ig_value = val32 & OFDM0_X_AGC_CORE1_IGI_MASK;
 
-#if 0
-	rtl8723a_set_nav_upper(priv, WiFiNavUpperUs);
-#endif
+	/* Set NAV_UPPER to 30000us */
+	val8 = ((30000 + NAV_UPPER_UNIT - 1) / NAV_UPPER_UNIT);
+	rtl8723au_write8(priv, REG_NAV_UPPER, val8);
 
 	/*  2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test,
 	    but we need to fin root cause. */
