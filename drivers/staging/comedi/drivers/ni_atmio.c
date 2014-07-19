@@ -108,66 +108,58 @@ static const struct ni_board_struct ni_boards[] = {
 		.device_id	= 44,
 		.isapnp_id	= 0x0000,	/* XXX unknown */
 		.n_adchan	= 16,
-		.adbits		= 12,
+		.ai_maxdata	= 0x0fff,
 		.ai_fifo_depth	= 8192,
 		.gainlkup	= ai_gain_16,
 		.ai_speed	= 800,
 		.n_aochan	= 2,
-		.aobits		= 12,
+		.ao_maxdata	= 0x0fff,
 		.ao_fifo_depth	= 2048,
 		.ao_range_table	= &range_ni_E_ao_ext,
-		.ao_unipolar	= 1,
 		.ao_speed	= 1000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { mb88341 },
 	}, {
 		.name		= "at-mio-16e-2",
 		.device_id	= 25,
 		.isapnp_id	= 0x1900,
 		.n_adchan	= 16,
-		.adbits		= 12,
+		.ai_maxdata	= 0x0fff,
 		.ai_fifo_depth	= 2048,
 		.gainlkup	= ai_gain_16,
 		.ai_speed	= 2000,
 		.n_aochan	= 2,
-		.aobits		= 12,
+		.ao_maxdata	= 0x0fff,
 		.ao_fifo_depth	= 2048,
 		.ao_range_table	= &range_ni_E_ao_ext,
-		.ao_unipolar	= 1,
 		.ao_speed	= 1000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { mb88341 },
 	}, {
 		.name		= "at-mio-16e-10",
 		.device_id	= 36,
 		.isapnp_id	= 0x2400,
 		.n_adchan	= 16,
-		.adbits		= 12,
+		.ai_maxdata	= 0x0fff,
 		.ai_fifo_depth	= 512,
 		.gainlkup	= ai_gain_16,
 		.ai_speed	= 10000,
 		.n_aochan	= 2,
-		.aobits		= 12,
+		.ao_maxdata	= 0x0fff,
 		.ao_range_table	= &range_ni_E_ao_ext,
-		.ao_unipolar	= 1,
 		.ao_speed	= 10000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { ad8804_debug },
 	}, {
 		.name		= "at-mio-16de-10",
 		.device_id	= 37,
 		.isapnp_id	= 0x2500,
 		.n_adchan	= 16,
-		.adbits		= 12,
+		.ai_maxdata	= 0x0fff,
 		.ai_fifo_depth	= 512,
 		.gainlkup	= ai_gain_16,
 		.ai_speed	= 10000,
 		.n_aochan	= 2,
-		.aobits		= 12,
+		.ao_maxdata	= 0x0fff,
 		.ao_range_table	= &range_ni_E_ao_ext,
-		.ao_unipolar	= 1,
 		.ao_speed	= 10000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { ad8804_debug },
 		.has_8255	= 1,
 	}, {
@@ -175,63 +167,57 @@ static const struct ni_board_struct ni_boards[] = {
 		.device_id	= 38,
 		.isapnp_id	= 0x2600,
 		.n_adchan	= 64,
-		.adbits		= 12,
+		.ai_maxdata	= 0x0fff,
 		.ai_fifo_depth	= 2048,
 		.gainlkup	= ai_gain_16,
 		.ai_speed	= 2000,
 		.n_aochan	= 2,
-		.aobits		= 12,
+		.ao_maxdata	= 0x0fff,
 		.ao_fifo_depth	= 2048,
 		.ao_range_table	= &range_ni_E_ao_ext,
-		.ao_unipolar	= 1,
 		.ao_speed	= 1000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { ad8804_debug },
 	}, {
 		.name		= "at-mio-16xe-50",
 		.device_id	= 39,
 		.isapnp_id	= 0x2700,
 		.n_adchan	= 16,
-		.adbits		= 16,
+		.ai_maxdata	= 0xffff,
 		.ai_fifo_depth	= 512,
 		.alwaysdither	= 1,
 		.gainlkup	= ai_gain_8,
 		.ai_speed	= 50000,
 		.n_aochan	= 2,
-		.aobits		= 12,
+		.ao_maxdata	= 0x0fff,
 		.ao_range_table	= &range_bipolar10,
 		.ao_speed	= 50000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { dac8800, dac8043 },
 	}, {
 		.name		= "at-mio-16xe-10",
 		.device_id	= 50,
 		.isapnp_id	= 0x0000,	/* XXX unknown */
 		.n_adchan	= 16,
-		.adbits		= 16,
+		.ai_maxdata	= 0xffff,
 		.ai_fifo_depth	= 512,
 		.alwaysdither	= 1,
 		.gainlkup	= ai_gain_14,
 		.ai_speed	= 10000,
 		.n_aochan	= 2,
-		.aobits		= 16,
+		.ao_maxdata	= 0xffff,
 		.ao_fifo_depth	= 2048,
 		.ao_range_table	= &range_ni_E_ao_ext,
-		.ao_unipolar	= 1,
 		.ao_speed	= 1000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { dac8800, dac8043, ad8522 },
 	}, {
 		.name		= "at-ai-16xe-10",
 		.device_id	= 51,
 		.isapnp_id	= 0x0000,	/* XXX unknown */
 		.n_adchan	= 16,
-		.adbits		= 16,
+		.ai_maxdata	= 0xffff,
 		.ai_fifo_depth	= 512,
 		.alwaysdither	= 1,	/* unknown */
 		.gainlkup	= ai_gain_14,
 		.ai_speed	= 10000,
-		.num_p0_dio_channels = 8,
 		.caldac		= { dac8800, dac8043, ad8522 },
 	},
 };
@@ -267,20 +253,17 @@ static int ni_isapnp_find_board(struct pnp_dev **dev)
 		if (isapnp_dev == NULL || isapnp_dev->card == NULL)
 			continue;
 
-		if (pnp_device_attach(isapnp_dev) < 0) {
-			printk
-			 ("ni_atmio: %s found but already active, skipping.\n",
-			  ni_boards[i].name);
+		if (pnp_device_attach(isapnp_dev) < 0)
 			continue;
-		}
+
 		if (pnp_activate_dev(isapnp_dev) < 0) {
 			pnp_device_detach(isapnp_dev);
 			return -EAGAIN;
 		}
-		if (!pnp_port_valid(isapnp_dev, 0)
-		    || !pnp_irq_valid(isapnp_dev, 0)) {
+
+		if (!pnp_port_valid(isapnp_dev, 0) ||
+		    !pnp_irq_valid(isapnp_dev, 0)) {
 			pnp_device_detach(isapnp_dev);
-			printk("ni_atmio: pnp invalid port or irq, aborting\n");
 			return -ENOMEM;
 		}
 		break;
@@ -302,11 +285,13 @@ static int ni_getboardtype(struct comedi_device *dev)
 
 	}
 	if (device_id == 255)
-		printk(" can't find board\n");
+		dev_err(dev->class_dev, "can't find board\n");
 	 else if (device_id == 0)
-		printk(" EEPROM read error (?) or device not found\n");
+		dev_err(dev->class_dev,
+			"EEPROM read error (?) or device not found\n");
 	 else
-		printk(" unknown device ID %d -- contact author\n", device_id);
+		dev_err(dev->class_dev,
+			"unknown device ID %d -- contact author\n", device_id);
 
 	return -1;
 }
@@ -352,25 +337,18 @@ static int ni_atmio_attach(struct comedi_device *dev,
 
 	dev->board_ptr = ni_boards + board;
 	boardtype = comedi_board(dev);
-
-	printk(" %s", boardtype->name);
 	dev->board_name = boardtype->name;
 
 	/* irq stuff */
 
 	if (irq != 0) {
-		if (irq > 15 || ni_irqpin[irq] == -1) {
-			printk(" invalid irq %u\n", irq);
+		if (irq > 15 || ni_irqpin[irq] == -1)
 			return -EINVAL;
-		}
-		printk(" ( irq = %u )", irq);
 		ret = request_irq(irq, ni_E_interrupt, 0,
 				  "ni_atmio", dev);
 
-		if (ret < 0) {
-			printk(" irq not available\n");
+		if (ret < 0)
 			return -EINVAL;
-		}
 		dev->irq = irq;
 	}
 

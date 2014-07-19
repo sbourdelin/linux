@@ -280,7 +280,6 @@ static inline const void *comedi_board(const struct comedi_device *dev)
  */
 
 void comedi_event(struct comedi_device *dev, struct comedi_subdevice *s);
-void comedi_error(const struct comedi_device *dev, const char *s);
 
 /* we can expand the number of bits used to encode devices/subdevices into
  the minor number soon, after more distros support > 8 bit minor numbers
@@ -289,6 +288,7 @@ enum comedi_minor_bits {
 	COMEDI_DEVICE_MINOR_MASK = 0xf,
 	COMEDI_SUBDEVICE_MINOR_MASK = 0xf0
 };
+
 static const unsigned COMEDI_SUBDEVICE_MINOR_SHIFT = 4;
 static const unsigned COMEDI_SUBDEVICE_MINOR_OFFSET = 1;
 
@@ -363,6 +363,12 @@ static inline bool comedi_range_is_unipolar(struct comedi_subdevice *s,
 	return s->range_table->range[range].min >= 0;
 }
 
+static inline bool comedi_range_is_external(struct comedi_subdevice *s,
+					    unsigned int range)
+{
+	return !!(s->range_table->range[range].flags & RF_EXTERNAL);
+}
+
 static inline bool comedi_chan_range_is_bipolar(struct comedi_subdevice *s,
 						unsigned int chan,
 						unsigned int range)
@@ -375,6 +381,13 @@ static inline bool comedi_chan_range_is_unipolar(struct comedi_subdevice *s,
 						 unsigned int range)
 {
 	return s->range_table_list[chan]->range[range].min >= 0;
+}
+
+static inline bool comedi_chan_range_is_external(struct comedi_subdevice *s,
+						 unsigned int chan,
+						 unsigned int range)
+{
+	return !!(s->range_table_list[chan]->range[range].flags & RF_EXTERNAL);
 }
 
 /* munge between offset binary and two's complement values */
@@ -556,9 +569,9 @@ int comedi_pcmcia_auto_config(struct pcmcia_device *, struct comedi_driver *);
 void comedi_pcmcia_auto_unconfig(struct pcmcia_device *);
 
 int comedi_pcmcia_driver_register(struct comedi_driver *,
-					struct pcmcia_driver *);
+				  struct pcmcia_driver *);
 void comedi_pcmcia_driver_unregister(struct comedi_driver *,
-					struct pcmcia_driver *);
+				     struct pcmcia_driver *);
 
 /**
  * module_comedi_pcmcia_driver() - Helper macro for registering a comedi PCMCIA driver

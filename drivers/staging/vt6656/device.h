@@ -185,16 +185,6 @@
 /* USB registers */
 #define USB_REG4			0x604
 
-#define DBG_PRT(l, p, args...) { if (l <= msglevel) printk(p, ##args); }
-
-typedef enum __device_msg_level {
-	MSG_LEVEL_ERR = 0,            /* Errors causing abnormal operation */
-	MSG_LEVEL_NOTICE = 1,         /* Errors needing user notification */
-	MSG_LEVEL_INFO = 2,           /* Normal message. */
-	MSG_LEVEL_VERBOSE = 3,        /* Will report all trival errors. */
-	MSG_LEVEL_DEBUG = 4           /* Only for debug purpose. */
-} DEVICE_MSG_LEVEL, *PDEVICE_MSG_LEVEL;
-
 #define DEVICE_INIT_COLD	0x0 /* cold init */
 #define DEVICE_INIT_RESET	0x1 /* reset init or Dx to D0 power remain */
 #define DEVICE_INIT_DXPL	0x2 /* Dx to D0 power lost init */
@@ -229,12 +219,10 @@ enum {
 
 /* RCB (Receive Control Block) */
 struct vnt_rcb {
-	void *Next;
-	signed long Ref;
-	void *pDevice;
-	struct urb *pUrb;
+	void *priv;
+	struct urb *urb;
 	struct sk_buff *skb;
-	int bBoolInUse;
+	int in_use;
 };
 
 /* used to track bulk out irps */
@@ -252,12 +240,6 @@ struct vnt_usb_send_context {
 	unsigned char data[MAX_TOTAL_SIZE_WITH_ALL_HEADERS];
 };
 
-/* tx packet info for rxtx */
-struct vnt_tx_pkt_info {
-	u16 fifo_ctl;
-	u8 dest_addr[ETH_ALEN];
-};
-
 /*
  * Structure to keep track of USB interrupt packets
  */
@@ -268,13 +250,12 @@ struct vnt_interrupt_buffer {
 
 /*++ NDIS related */
 
-typedef enum __DEVICE_NDIS_STATUS {
-    STATUS_SUCCESS = 0,
-    STATUS_FAILURE,
-    STATUS_RESOURCES,
-    STATUS_PENDING,
-} DEVICE_NDIS_STATUS, *PDEVICE_NDIS_STATUS;
-
+enum {
+	STATUS_SUCCESS = 0,
+	STATUS_FAILURE,
+	STATUS_RESOURCES,
+	STATUS_PENDING,
+};
 
 /* flags for options */
 #define     DEVICE_FLAGS_UNPLUG          0x00000001UL
@@ -303,17 +284,16 @@ struct vnt_private {
 	unsigned long Flags;
 
 	/* USB */
-	struct urb *pInterruptURB;
+	struct urb *interrupt_urb;
 	u32 int_interval;
 
 	/* Variables to track resources for the BULK In Pipe */
-	struct vnt_rcb *apRCB[CB_MAX_RX_DESC];
+	struct vnt_rcb *rcb[CB_MAX_RX_DESC];
 	u32 cbRD;
 
 	/* Variables to track resources for the BULK Out Pipe */
-	struct vnt_usb_send_context *apTD[CB_MAX_TX_DESC];
+	struct vnt_usb_send_context *tx_context[CB_MAX_TX_DESC];
 	u32 cbTD;
-	struct vnt_tx_pkt_info pkt_info[16];
 
 	/* Variables to track resources for the Interrupt In Pipe */
 	struct vnt_interrupt_buffer int_buf;
@@ -346,7 +326,6 @@ struct vnt_private {
 	u8 byRxAntennaMode;
 	u8 byTxAntennaMode;
 	u8 byRadioCtl;
-	u8 bHWRadioOff;
 
 	/* IFS & Cw */
 	u32 uSIFS;  /* Current SIFS */
@@ -388,9 +367,6 @@ struct vnt_private {
 	int bShortSlotTime;
 	int bBarkerPreambleMd;
 
-	int bRadioControlOff;
-	int bRadioOff;
-
 	/* Power save */
 	u16 current_aid;
 
@@ -400,8 +376,6 @@ struct vnt_private {
 	enum vnt_cmd_state command_state;
 
 	enum vnt_cmd command;
-
-	int bStopDataPkt;
 
 	/* 802.11 counter */
 
@@ -416,21 +390,14 @@ struct vnt_private {
 	u8 byAutoFBCtrl;
 
 	/* For Update BaseBand VGA Gain Offset */
-	u32 uBBVGADiffCount;
-	u8 byBBVGANew;
-	u8 byBBVGACurrent;
 	u8 abyBBVGA[BB_VGA_LEVEL];
 	signed long ldBmThreshold[BB_VGA_LEVEL];
 
 	u8 byBBPreEDRSSI;
 	u8 byBBPreEDIndex;
 
-	int bRadioCmd;
-
 	/* command timer */
 	struct delayed_work run_command_work;
-
-	u8 tx_data_time_out;
 
 	int bChannelSwitch;
 	u8 byNewChannel;
