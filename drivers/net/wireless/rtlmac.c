@@ -1994,11 +1994,10 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
 	}
 
-#if 0
+	val32 = rtl8723au_read32(priv, REG_FWHW_TXQ_CTRL);
+	val32 |= FWHW_TXQ_CTRL_XMIT_MGMT_ACK;
 	/* ack for xmit mgmt frames. */
-	rtl8723au_write32(priv, REG_FWHW_TXQ_CTRL,
-			  rtl8723au_read32(priv, REG_FWHW_TXQ_CTRL)|BIT(12));
-#endif
+	rtl8723au_write32(priv, REG_FWHW_TXQ_CTRL, val32);
 
 exit:
 	return ret;
