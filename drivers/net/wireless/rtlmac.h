@@ -158,6 +158,9 @@ struct rtlmac_priv {
 	u32 ep_tx_high_queue:1;
 	u32 ep_tx_normal_queue:1;
 	u32 ep_tx_low_queue:1;
+	u32 path_a_hi_power:1;
+	u32 path_a_rf_paths:4;
+	u8 path_a_ig_value;
 	int ep_tx_count;
 	int rf_paths;
 	u32 rf_mode_ag[2];
