@@ -126,7 +126,7 @@ int vnt_start_interrupt_urb(struct vnt_private *priv)
 
 	priv->int_buf.in_use = true;
 
-	usb_fill_int_urb(priv->pInterruptURB,
+	usb_fill_int_urb(priv->interrupt_urb,
 		priv->usb,
 		usb_rcvintpipe(priv->usb, 1),
 		priv->int_buf.data_buf,
@@ -135,7 +135,7 @@ int vnt_start_interrupt_urb(struct vnt_private *priv)
 		priv,
 		priv->int_interval);
 
-	status = usb_submit_urb(priv->pInterruptURB, GFP_ATOMIC);
+	status = usb_submit_urb(priv->interrupt_urb, GFP_ATOMIC);
 	if (status) {
 		dev_dbg(&priv->usb->dev, "Submit int URB failed %d\n", status);
 		priv->int_buf.in_use = false;
@@ -172,7 +172,7 @@ static void vnt_start_interrupt_urb_complete(struct urb *urb)
 		vnt_int_process_data(priv);
 	}
 
-	status = usb_submit_urb(priv->pInterruptURB, GFP_ATOMIC);
+	status = usb_submit_urb(priv->interrupt_urb, GFP_ATOMIC);
 	if (status) {
 		dev_dbg(&priv->usb->dev, "Submit int URB failed %d\n", status);
 	} else {
@@ -187,7 +187,7 @@ int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
 	int status = 0;
 	struct urb *urb;
 
-	urb = rcb->pUrb;
+	urb = rcb->urb;
 	if (rcb->skb == NULL) {
 		dev_dbg(&priv->usb->dev, "rcb->skb is null\n");
 		return status;
@@ -207,8 +207,7 @@ int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
 		return STATUS_FAILURE ;
 	}
 
-	rcb->Ref = 1;
-	rcb->bBoolInUse = true;
+	rcb->in_use = true;
 
 	return status;
 }
@@ -216,7 +215,7 @@ int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
 static void vnt_submit_rx_urb_complete(struct urb *urb)
 {
 	struct vnt_rcb *rcb = urb->context;
-	struct vnt_private *priv = rcb->pDevice;
+	struct vnt_private *priv = rcb->priv;
 	unsigned long flags;
 
 	switch (urb->status) {
@@ -241,7 +240,7 @@ static void vnt_submit_rx_urb_complete(struct urb *urb)
 				dev_dbg(&priv->usb->dev,
 					"Failed to re-alloc rx skb\n");
 
-				rcb->bBoolInUse = false;
+				rcb->in_use = false;
 				spin_unlock_irqrestore(&priv->lock, flags);
 				return;
 			}
@@ -259,7 +258,7 @@ static void vnt_submit_rx_urb_complete(struct urb *urb)
 	if (usb_submit_urb(urb, GFP_ATOMIC)) {
 		dev_dbg(&priv->usb->dev, "Failed to re submit rx skb\n");
 
-		rcb->bBoolInUse = false;
+		rcb->in_use = false;
 	}
 
 	return;

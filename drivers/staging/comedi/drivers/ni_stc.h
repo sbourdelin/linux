@@ -1393,7 +1393,7 @@ struct ni_board_struct {
 	int isapnp_id;
 
 	int n_adchan;
-	int adbits;
+	unsigned int ai_maxdata;
 
 	int ai_fifo_depth;
 	unsigned int alwaysdither:1;
@@ -1401,17 +1401,14 @@ struct ni_board_struct {
 	int ai_speed;
 
 	int n_aochan;
-	int aobits;
+	unsigned int ao_maxdata;
 	int ao_fifo_depth;
 	const struct comedi_lrange *ao_range_table;
 	unsigned ao_speed;
 
-	unsigned num_p0_dio_channels;
-
 	int reg_type;
-	unsigned int ao_unipolar:1;
 	unsigned int has_8255:1;
-	unsigned int has_analog_trig:1;
+	unsigned int has_32dio_chan:1;
 
 	enum caldac_enum caldac[3];
 };
@@ -1424,7 +1421,6 @@ struct ni_private {
 	unsigned short dio_output;
 	unsigned short dio_control;
 	int aimode;
-	int ai_continuous;
 	unsigned int ai_calib_source;
 	unsigned int ai_calib_source_enabled;
 	spinlock_t window_lock;
@@ -1472,10 +1468,6 @@ struct ni_private {
 	unsigned clock_ns;
 	unsigned clock_source;
 
-	unsigned short atrig_mode;
-	unsigned short atrig_high;
-	unsigned short atrig_low;
-
 	unsigned short pwm_up_count;
 	unsigned short pwm_down_count;
 
@@ -1492,7 +1484,17 @@ struct ni_private {
 	struct mite_dma_descriptor_ring *cdo_mite_ring;
 	struct mite_dma_descriptor_ring *gpct_mite_ring[NUM_GPCT];
 
+	/* ni_pcimio board type flags (based on the boardinfo reg_type) */
 	unsigned int is_m_series:1;
+	unsigned int is_6xxx:1;
+	unsigned int is_611x:1;
+	unsigned int is_6143:1;
+	unsigned int is_622x:1;
+	unsigned int is_625x:1;
+	unsigned int is_628x:1;
+	unsigned int is_67xx:1;
+	unsigned int is_6711:1;
+	unsigned int is_6713:1;
 };
 
 #endif /* _COMEDI_NI_STC_H */

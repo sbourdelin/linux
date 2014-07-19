@@ -319,7 +319,7 @@ static int ni_pcidio_request_di_mite_channel(struct comedi_device *dev)
 					  devpriv->di_mite_ring, 1, 2);
 	if (devpriv->di_mite_chan == NULL) {
 		spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
-		comedi_error(dev, "failed to reserve mite dma channel.");
+		dev_err(dev->class_dev, "failed to reserve mite dma channel\n");
 		return -EBUSY;
 	}
 	devpriv->di_mite_chan->dir = COMEDI_INPUT;
@@ -711,6 +711,7 @@ static int ni_pcidio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 
 	{
 		int retval = setup_mite_dma(dev, s);
+
 		if (retval)
 			return retval;
 	}
@@ -853,6 +854,7 @@ static int pci_6534_load_fpga(struct comedi_device *dev,
 	}
 	for (j = 0; j + 1 < data_len;) {
 		unsigned int value = data[j++];
+
 		value |= data[j++] << 8;
 		writew(value,
 		       devpriv->mite->daq_io_addr + Firmware_Data_Register);

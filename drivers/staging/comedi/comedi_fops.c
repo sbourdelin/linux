@@ -16,6 +16,8 @@
     GNU General Public License for more details.
 */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include "comedi_compat32.h"
 
 #include <linux/module.h>
@@ -1073,11 +1075,10 @@ static int check_insn_config_length(struct comedi_insn *insn,
 		/* by default we allow the insn since we don't have checks for
 		 * all possible cases yet */
 	default:
-		pr_warn("comedi: No check for data length of config insn id %i is implemented.\n",
+		pr_warn("No check for data length of config insn id %i is implemented\n",
 			data[0]);
-		pr_warn("comedi: Add a check to %s in %s.\n",
-			__func__, __FILE__);
-		pr_warn("comedi: Assuming n=%i is correct.\n", insn->n);
+		pr_warn("Add a check to %s in %s\n", __func__, __FILE__);
+		pr_warn("Assuming n=%i is correct\n", insn->n);
 		return 0;
 	}
 	return -EINVAL;
@@ -1226,10 +1227,9 @@ static int parse_insn(struct comedi_device *dev, struct comedi_insn *insn,
 				/* Most drivers ignore the base channel in
 				 * insn->chanspec.  Fix this here if
 				 * the subdevice has <= 32 channels.  */
-				unsigned int shift;
-				unsigned int orig_mask;
+				unsigned int orig_mask = data[0];
+				unsigned int shift = 0;
 
-				orig_mask = data[0];
 				if (s->n_chan <= 32) {
 					shift = CR_CHAN(insn->chanspec);
 					if (shift > 0) {
@@ -1237,8 +1237,7 @@ static int parse_insn(struct comedi_device *dev, struct comedi_insn *insn,
 						data[0] <<= shift;
 						data[1] <<= shift;
 					}
-				} else
-					shift = 0;
+				}
 				ret = s->insn_bits(dev, s, insn, data);
 				data[0] = orig_mask;
 				if (shift > 0)
@@ -2177,7 +2176,7 @@ out:
 }
 
 static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
-				loff_t *offset)
+			   loff_t *offset)
 {
 	struct comedi_subdevice *s;
 	struct comedi_async *async;
@@ -2221,10 +2220,8 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 		n = nbytes;
 
 		m = comedi_buf_read_n_available(s);
-		/* printk("%d available\n",m); */
 		if (async->buf_read_ptr + m > async->prealloc_bufsz)
 			m = async->prealloc_bufsz - async->buf_read_ptr;
-		/* printk("%d contiguous\n",m); */
 		if (m < n)
 			n = m;
 
@@ -2401,12 +2398,6 @@ static const struct file_operations comedi_fops = {
 	.llseek = noop_llseek,
 };
 
-void comedi_error(const struct comedi_device *dev, const char *s)
-{
-	dev_err(dev->class_dev, "%s: %s\n", dev->driver->driver_name, s);
-}
-EXPORT_SYMBOL_GPL(comedi_error);
-
 void comedi_event(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct comedi_async *async = s->async;
@@ -2450,7 +2441,7 @@ struct comedi_device *comedi_alloc_board_minor(struct device *hardware_device)
 	struct device *csdev;
 	unsigned i;
 
-	dev = kzalloc(sizeof(struct comedi_device), GFP_KERNEL);
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (dev == NULL)
 		return ERR_PTR(-ENOMEM);
 	comedi_device_init(dev);
@@ -2469,7 +2460,7 @@ struct comedi_device *comedi_alloc_board_minor(struct device *hardware_device)
 		mutex_unlock(&dev->mutex);
 		comedi_device_cleanup(dev);
 		comedi_dev_put(dev);
-		pr_err("comedi: error: ran out of minor numbers for board device files.\n");
+		pr_err("ran out of minor numbers for board device files\n");
 		return ERR_PTR(-EBUSY);
 	}
 	dev->minor = i;
@@ -2522,7 +2513,7 @@ int comedi_alloc_subdevice_minor(struct comedi_subdevice *s)
 	}
 	mutex_unlock(&comedi_subdevice_minor_table_lock);
 	if (i == COMEDI_NUM_SUBDEVICE_MINORS) {
-		pr_err("comedi: error: ran out of minor numbers for subdevice files.\n");
+		pr_err("ran out of minor numbers for subdevice files\n");
 		return -EBUSY;
 	}
 	i += COMEDI_NUM_BOARD_MINORS;
@@ -2572,11 +2563,11 @@ static int __init comedi_init(void)
 	int i;
 	int retval;
 
-	pr_info("comedi: version " COMEDI_RELEASE " - http://www.comedi.org\n");
+	pr_info("version " COMEDI_RELEASE " - http://www.comedi.org\n");
 
 	if (comedi_num_legacy_minors < 0 ||
 	    comedi_num_legacy_minors > COMEDI_NUM_BOARD_MINORS) {
-		pr_err("comedi: error: invalid value for module parameter \"comedi_num_legacy_minors\".  Valid values are 0 through %i.\n",
+		pr_err("invalid value for module parameter \"comedi_num_legacy_minors\".  Valid values are 0 through %i.\n",
 		       COMEDI_NUM_BOARD_MINORS);
 		return -EINVAL;
 	}
@@ -2602,7 +2593,7 @@ static int __init comedi_init(void)
 	}
 	comedi_class = class_create(THIS_MODULE, "comedi");
 	if (IS_ERR(comedi_class)) {
-		pr_err("comedi: failed to create class\n");
+		pr_err("failed to create class\n");
 		cdev_del(&comedi_cdev);
 		unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0),
 					 COMEDI_NUM_MINORS);

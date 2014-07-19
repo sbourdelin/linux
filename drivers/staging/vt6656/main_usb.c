@@ -61,9 +61,6 @@
 #include "channel.h"
 #include "int.h"
 
-/* static int msglevel = MSG_LEVEL_DEBUG; */
-static int msglevel = MSG_LEVEL_INFO;
-
 /*
  * define module options
  */
@@ -75,77 +72,20 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION(DEVICE_FULL_DRV_NAM);
 
-#define DEVICE_PARAM(N, D)				\
-	static int N[MAX_UINTS] = OPTION_DEFAULT;	\
-	module_param_array(N, int, NULL, 0);		\
-	MODULE_PARM_DESC(N, D)
-
 #define RX_DESC_DEF0 64
-DEVICE_PARAM(RxDescriptors0, "Number of receive usb desc buffer");
+static int vnt_rx_buffers = RX_DESC_DEF0;
+module_param_named(rx_buffers, vnt_rx_buffers, int, 0644);
+MODULE_PARM_DESC(rx_buffers, "Number of receive usb rx buffers");
 
 #define TX_DESC_DEF0 64
-DEVICE_PARAM(TxDescriptors0, "Number of transmit usb desc buffer");
-
-#define CHANNEL_DEF 6
-DEVICE_PARAM(Channel, "Channel number");
-
-/* PreambleType[] is the preamble length used for transmit.
-   0: indicate allows long preamble type
-   1: indicate allows short preamble type
-*/
-
-#define PREAMBLE_TYPE_DEF     1
-
-DEVICE_PARAM(PreambleType, "Preamble Type");
+static int vnt_tx_buffers = TX_DESC_DEF0;
+module_param_named(tx_buffers, vnt_tx_buffers, int, 0644);
+MODULE_PARM_DESC(tx_buffers, "Number of receive usb tx buffers");
 
 #define RTS_THRESH_DEF     2347
-DEVICE_PARAM(RTSThreshold, "RTS threshold");
-
 #define FRAG_THRESH_DEF     2346
-DEVICE_PARAM(FragThreshold, "Fragmentation threshold");
-
-#define DATA_RATE_DEF     13
-/* datarate[] index
-   0: indicate 1 Mbps   0x02
-   1: indicate 2 Mbps   0x04
-   2: indicate 5.5 Mbps 0x0B
-   3: indicate 11 Mbps  0x16
-   4: indicate 6 Mbps   0x0c
-   5: indicate 9 Mbps   0x12
-   6: indicate 12 Mbps  0x18
-   7: indicate 18 Mbps  0x24
-   8: indicate 24 Mbps  0x30
-   9: indicate 36 Mbps  0x48
-  10: indicate 48 Mbps  0x60
-  11: indicate 54 Mbps  0x6c
-  12: indicate 72 Mbps  0x90
-  13: indicate auto rate
-*/
-
-DEVICE_PARAM(ConnectionRate, "Connection data rate");
-
-#define OP_MODE_DEF     0
-DEVICE_PARAM(OPMode, "Infrastruct, adhoc, AP mode ");
-
-/* OpMode[] is used for transmit.
-   0: indicate infrastruct mode used
-   1: indicate adhoc mode used
-   2: indicate AP mode used
-*/
-
-/* PSMode[]
-   0: indicate disable power saving mode
-   1: indicate enable power saving mode
-*/
-
-#define PS_MODE_DEF     0
-DEVICE_PARAM(PSMode, "Power saving mode");
-
 #define SHORT_RETRY_DEF     8
-DEVICE_PARAM(ShortRetryLimit, "Short frame retry limits");
-
 #define LONG_RETRY_DEF     4
-DEVICE_PARAM(LongRetryLimit, "long frame retry limits");
 
 /* BasebandType[] baseband type selected
    0: indicate 802.11a type
@@ -154,16 +94,6 @@ DEVICE_PARAM(LongRetryLimit, "long frame retry limits");
 */
 
 #define BBP_TYPE_DEF     2
-DEVICE_PARAM(BasebandType, "baseband type");
-
-/* 80211hEnable[]
-   0: indicate disable 802.11h
-   1: indicate enable 802.11h
-*/
-
-#define X80211h_MODE_DEF     0
-
-DEVICE_PARAM(b80211hEnable, "802.11h mode");
 
 /*
  * Static vars definitions
@@ -174,136 +104,116 @@ static struct usb_device_id vt6656_table[] = {
 	{}
 };
 
-/* frequency list (map channels to frequencies) */
-/*
-static const long frequency_list[] = {
-	2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462, 2467,
-	2472, 2484, 4915, 4920, 4925, 4935, 4940, 4945, 4960, 4980, 5035, 5040,
-	5045, 5055, 5060, 5080, 5170, 5180, 5190, 5200, 5210, 5220, 5230, 5240,
-	5260, 5280, 5300, 5320, 5500, 5520, 5540, 5560, 5580, 5600, 5620, 5640,
-	5660, 5680, 5700, 5745, 5765, 5785, 5805, 5825
-};
-*/
+static void device_set_options(struct vnt_private *priv)
+{
+	/* Set number of TX buffers */
+	if (vnt_tx_buffers < CB_MIN_TX_DESC || vnt_tx_buffers > CB_MAX_TX_DESC)
+		priv->cbTD = TX_DESC_DEF0;
+	else
+		priv->cbTD = vnt_tx_buffers;
 
-static int vt6656_probe(struct usb_interface *intf,
-			const struct usb_device_id *id);
-static void vt6656_disconnect(struct usb_interface *intf);
+	/* Set number of RX buffers */
+	if (vnt_rx_buffers < CB_MIN_RX_DESC || vnt_rx_buffers > CB_MAX_RX_DESC)
+		priv->cbRD = RX_DESC_DEF0;
+	else
+		priv->cbRD = vnt_rx_buffers;
 
-#ifdef CONFIG_PM	/* Minimal support for suspend and resume */
-static int vt6656_suspend(struct usb_interface *intf, pm_message_t message);
-static int vt6656_resume(struct usb_interface *intf);
-#endif /* CONFIG_PM */
-
-static int device_init_registers(struct vnt_private *pDevice);
-
-static void device_free_tx_bufs(struct vnt_private *pDevice);
-static void device_free_rx_bufs(struct vnt_private *pDevice);
-static void device_free_int_bufs(struct vnt_private *pDevice);
-static bool device_alloc_bufs(struct vnt_private *pDevice);
-
-static void usb_device_reset(struct vnt_private *pDevice);
-
-static void
-device_set_options(struct vnt_private *pDevice) {
-	pDevice->cbTD = TX_DESC_DEF0;
-	pDevice->cbRD = RX_DESC_DEF0;
-	pDevice->byShortRetryLimit = SHORT_RETRY_DEF;
-	pDevice->byLongRetryLimit = LONG_RETRY_DEF;
-	pDevice->op_mode = NL80211_IFTYPE_UNSPECIFIED;
-	pDevice->byBBType = BBP_TYPE_DEF;
-	pDevice->byPacketType = pDevice->byBBType;
-	pDevice->byAutoFBCtrl = AUTO_FB_0;
-	pDevice->byPreambleType = 0;
-	pDevice->bExistSWNetAddr = false;
+	priv->byShortRetryLimit = SHORT_RETRY_DEF;
+	priv->byLongRetryLimit = LONG_RETRY_DEF;
+	priv->op_mode = NL80211_IFTYPE_UNSPECIFIED;
+	priv->byBBType = BBP_TYPE_DEF;
+	priv->byPacketType = priv->byBBType;
+	priv->byAutoFBCtrl = AUTO_FB_0;
+	priv->byPreambleType = 0;
+	priv->bExistSWNetAddr = false;
 }
 
 /*
  * initialization of MAC & BBP registers
  */
-static int device_init_registers(struct vnt_private *pDevice)
+static int device_init_registers(struct vnt_private *priv)
 {
-	struct vnt_cmd_card_init *init_cmd = &pDevice->init_command;
-	struct vnt_rsp_card_init *init_rsp = &pDevice->init_response;
-	u8 byAntenna;
+	struct vnt_cmd_card_init *init_cmd = &priv->init_command;
+	struct vnt_rsp_card_init *init_rsp = &priv->init_response;
+	u8 antenna;
 	int ii;
-	int ntStatus = STATUS_SUCCESS;
-	u8 byTmp;
-	u8 byCalibTXIQ = 0, byCalibTXDC = 0, byCalibRXIQ = 0;
+	int status = STATUS_SUCCESS;
+	u8 tmp;
+	u8 calib_tx_iq = 0, calib_tx_dc = 0, calib_rx_iq = 0;
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO "---->INIbInitAdapter. [%d][%d]\n",
-				DEVICE_INIT_COLD, pDevice->byPacketType);
+	dev_dbg(&priv->usb->dev, "---->INIbInitAdapter. [%d][%d]\n",
+				DEVICE_INIT_COLD, priv->byPacketType);
 
-	if (!vnt_check_firmware_version(pDevice)) {
-		if (vnt_download_firmware(pDevice) == true) {
-			if (vnt_firmware_branch_to_sram(pDevice) == false) {
-				DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
+	if (!vnt_check_firmware_version(priv)) {
+		if (vnt_download_firmware(priv) == true) {
+			if (vnt_firmware_branch_to_sram(priv) == false) {
+				dev_dbg(&priv->usb->dev,
 					" vnt_firmware_branch_to_sram fail\n");
 				return false;
 			}
 		} else {
-			DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
-				" FIRMWAREbDownload fail\n");
+			dev_dbg(&priv->usb->dev, "FIRMWAREbDownload fail\n");
 			return false;
 		}
 	}
 
-	if (!BBbVT3184Init(pDevice)) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO" BBbVT3184Init fail\n");
+	if (!vnt_vt3184_init(priv)) {
+		dev_dbg(&priv->usb->dev, "vnt_vt3184_init fail\n");
 		return false;
 	}
 
 	init_cmd->init_class = DEVICE_INIT_COLD;
-	init_cmd->exist_sw_net_addr = (u8) pDevice->bExistSWNetAddr;
+	init_cmd->exist_sw_net_addr = (u8) priv->bExistSWNetAddr;
 	for (ii = 0; ii < 6; ii++)
-		init_cmd->sw_net_addr[ii] = pDevice->abyCurrentNetAddr[ii];
-	init_cmd->short_retry_limit = pDevice->byShortRetryLimit;
-	init_cmd->long_retry_limit = pDevice->byLongRetryLimit;
+		init_cmd->sw_net_addr[ii] = priv->abyCurrentNetAddr[ii];
+	init_cmd->short_retry_limit = priv->byShortRetryLimit;
+	init_cmd->long_retry_limit = priv->byLongRetryLimit;
 
 	/* issue card_init command to device */
-	ntStatus = vnt_control_out(pDevice,
+	status = vnt_control_out(priv,
 		MESSAGE_TYPE_CARDINIT, 0, 0,
 		sizeof(struct vnt_cmd_card_init), (u8 *)init_cmd);
-	if (ntStatus != STATUS_SUCCESS) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO" Issue Card init fail\n");
+	if (status != STATUS_SUCCESS) {
+		dev_dbg(&priv->usb->dev, "Issue Card init fail\n");
 		return false;
 	}
 
-	ntStatus = vnt_control_in(pDevice, MESSAGE_TYPE_INIT_RSP, 0, 0,
+	status = vnt_control_in(priv, MESSAGE_TYPE_INIT_RSP, 0, 0,
 		sizeof(struct vnt_rsp_card_init), (u8 *)init_rsp);
-	if (ntStatus != STATUS_SUCCESS) {
-		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO
+	if (status != STATUS_SUCCESS) {
+		dev_dbg(&priv->usb->dev,
 			"Cardinit request in status fail!\n");
 		return false;
 	}
 
 	/* local ID for AES functions */
-	ntStatus = vnt_control_in(pDevice, MESSAGE_TYPE_READ,
+	status = vnt_control_in(priv, MESSAGE_TYPE_READ,
 		MAC_REG_LOCALID, MESSAGE_REQUEST_MACREG, 1,
-			&pDevice->byLocalID);
-	if (ntStatus != STATUS_SUCCESS)
+			&priv->byLocalID);
+	if (status != STATUS_SUCCESS)
 		return false;
 
 	/* do MACbSoftwareReset in MACvInitialize */
 
-	pDevice->byTopOFDMBasicRate = RATE_24M;
-	pDevice->byTopCCKBasicRate = RATE_1M;
+	priv->byTopOFDMBasicRate = RATE_24M;
+	priv->byTopCCKBasicRate = RATE_1M;
 
 	/* target to IF pin while programming to RF chip */
-	pDevice->byCurPwr = 0xFF;
+	priv->byCurPwr = 0xFF;
 
-	pDevice->byCCKPwr = pDevice->abyEEPROM[EEP_OFS_PWR_CCK];
-	pDevice->byOFDMPwrG = pDevice->abyEEPROM[EEP_OFS_PWR_OFDMG];
+	priv->byCCKPwr = priv->abyEEPROM[EEP_OFS_PWR_CCK];
+	priv->byOFDMPwrG = priv->abyEEPROM[EEP_OFS_PWR_OFDMG];
 	/* load power table */
 	for (ii = 0; ii < 14; ii++) {
-		pDevice->abyCCKPwrTbl[ii] =
-			pDevice->abyEEPROM[ii + EEP_OFS_CCK_PWR_TBL];
+		priv->abyCCKPwrTbl[ii] =
+			priv->abyEEPROM[ii + EEP_OFS_CCK_PWR_TBL];
 
-		if (pDevice->abyCCKPwrTbl[ii] == 0)
-			pDevice->abyCCKPwrTbl[ii] = pDevice->byCCKPwr;
-		pDevice->abyOFDMPwrTbl[ii] =
-				pDevice->abyEEPROM[ii + EEP_OFS_OFDM_PWR_TBL];
-		if (pDevice->abyOFDMPwrTbl[ii] == 0)
-			pDevice->abyOFDMPwrTbl[ii] = pDevice->byOFDMPwrG;
+		if (priv->abyCCKPwrTbl[ii] == 0)
+			priv->abyCCKPwrTbl[ii] = priv->byCCKPwr;
+		priv->abyOFDMPwrTbl[ii] =
+				priv->abyEEPROM[ii + EEP_OFS_OFDM_PWR_TBL];
+		if (priv->abyOFDMPwrTbl[ii] == 0)
+			priv->abyOFDMPwrTbl[ii] = priv->byOFDMPwrG;
 	}
 
 	/*
@@ -311,111 +221,111 @@ static int device_init_registers(struct vnt_private *pDevice)
 	 * then need to recover 12, 13, 14 channels with 11 channel
 	 */
 	for (ii = 11; ii < 14; ii++) {
-		pDevice->abyCCKPwrTbl[ii] = pDevice->abyCCKPwrTbl[10];
-		pDevice->abyOFDMPwrTbl[ii] = pDevice->abyOFDMPwrTbl[10];
+		priv->abyCCKPwrTbl[ii] = priv->abyCCKPwrTbl[10];
+		priv->abyOFDMPwrTbl[ii] = priv->abyOFDMPwrTbl[10];
 	}
 
-	pDevice->byOFDMPwrA = 0x34; /* same as RFbMA2829SelectChannel */
+	priv->byOFDMPwrA = 0x34; /* same as RFbMA2829SelectChannel */
 
 	/* load OFDM A power table */
 	for (ii = 0; ii < CB_MAX_CHANNEL_5G; ii++) {
-		pDevice->abyOFDMAPwrTbl[ii] =
-			pDevice->abyEEPROM[ii + EEP_OFS_OFDMA_PWR_TBL];
+		priv->abyOFDMAPwrTbl[ii] =
+			priv->abyEEPROM[ii + EEP_OFS_OFDMA_PWR_TBL];
 
-		if (pDevice->abyOFDMAPwrTbl[ii] == 0)
-			pDevice->abyOFDMAPwrTbl[ii] = pDevice->byOFDMPwrA;
+		if (priv->abyOFDMAPwrTbl[ii] == 0)
+			priv->abyOFDMAPwrTbl[ii] = priv->byOFDMPwrA;
 	}
 
-	byAntenna = pDevice->abyEEPROM[EEP_OFS_ANTENNA];
+	antenna = priv->abyEEPROM[EEP_OFS_ANTENNA];
 
-	if (byAntenna & EEP_ANTINV)
-		pDevice->bTxRxAntInv = true;
+	if (antenna & EEP_ANTINV)
+		priv->bTxRxAntInv = true;
 	else
-		pDevice->bTxRxAntInv = false;
+		priv->bTxRxAntInv = false;
 
-	byAntenna &= (EEP_ANTENNA_AUX | EEP_ANTENNA_MAIN);
+	antenna &= (EEP_ANTENNA_AUX | EEP_ANTENNA_MAIN);
 
-	if (byAntenna == 0) /* if not set default is both */
-		byAntenna = (EEP_ANTENNA_AUX | EEP_ANTENNA_MAIN);
+	if (antenna == 0) /* if not set default is both */
+		antenna = (EEP_ANTENNA_AUX | EEP_ANTENNA_MAIN);
 
-	if (byAntenna == (EEP_ANTENNA_AUX | EEP_ANTENNA_MAIN)) {
-		pDevice->byAntennaCount = 2;
-		pDevice->byTxAntennaMode = ANT_B;
-		pDevice->dwTxAntennaSel = 1;
-		pDevice->dwRxAntennaSel = 1;
+	if (antenna == (EEP_ANTENNA_AUX | EEP_ANTENNA_MAIN)) {
+		priv->byAntennaCount = 2;
+		priv->byTxAntennaMode = ANT_B;
+		priv->dwTxAntennaSel = 1;
+		priv->dwRxAntennaSel = 1;
 
-		if (pDevice->bTxRxAntInv == true)
-			pDevice->byRxAntennaMode = ANT_A;
+		if (priv->bTxRxAntInv == true)
+			priv->byRxAntennaMode = ANT_A;
 		else
-			pDevice->byRxAntennaMode = ANT_B;
+			priv->byRxAntennaMode = ANT_B;
 	} else  {
-		pDevice->byAntennaCount = 1;
-		pDevice->dwTxAntennaSel = 0;
-		pDevice->dwRxAntennaSel = 0;
+		priv->byAntennaCount = 1;
+		priv->dwTxAntennaSel = 0;
+		priv->dwRxAntennaSel = 0;
 
-		if (byAntenna & EEP_ANTENNA_AUX) {
-			pDevice->byTxAntennaMode = ANT_A;
+		if (antenna & EEP_ANTENNA_AUX) {
+			priv->byTxAntennaMode = ANT_A;
 
-			if (pDevice->bTxRxAntInv == true)
-				pDevice->byRxAntennaMode = ANT_B;
+			if (priv->bTxRxAntInv == true)
+				priv->byRxAntennaMode = ANT_B;
 			else
-				pDevice->byRxAntennaMode = ANT_A;
+				priv->byRxAntennaMode = ANT_A;
 		} else {
-			pDevice->byTxAntennaMode = ANT_B;
+			priv->byTxAntennaMode = ANT_B;
 
-		if (pDevice->bTxRxAntInv == true)
-			pDevice->byRxAntennaMode = ANT_A;
+		if (priv->bTxRxAntInv == true)
+			priv->byRxAntennaMode = ANT_A;
 		else
-			pDevice->byRxAntennaMode = ANT_B;
+			priv->byRxAntennaMode = ANT_B;
 		}
 	}
 
 	/* Set initial antenna mode */
-	BBvSetAntennaMode(pDevice, pDevice->byRxAntennaMode);
+	vnt_set_antenna_mode(priv, priv->byRxAntennaMode);
 
 	/* get Auto Fall Back type */
-	pDevice->byAutoFBCtrl = AUTO_FB_0;
+	priv->byAutoFBCtrl = AUTO_FB_0;
 
 	/* default Auto Mode */
-	pDevice->byBBType = BB_TYPE_11G;
+	priv->byBBType = BB_TYPE_11G;
 
 	/* get RFType */
-	pDevice->byRFType = init_rsp->rf_type;
+	priv->byRFType = init_rsp->rf_type;
 
 	/* load vt3266 calibration parameters in EEPROM */
-	if (pDevice->byRFType == RF_VT3226D0) {
-		if ((pDevice->abyEEPROM[EEP_OFS_MAJOR_VER] == 0x1) &&
-		    (pDevice->abyEEPROM[EEP_OFS_MINOR_VER] >= 0x4)) {
+	if (priv->byRFType == RF_VT3226D0) {
+		if ((priv->abyEEPROM[EEP_OFS_MAJOR_VER] == 0x1) &&
+		    (priv->abyEEPROM[EEP_OFS_MINOR_VER] >= 0x4)) {
 
-			byCalibTXIQ = pDevice->abyEEPROM[EEP_OFS_CALIB_TX_IQ];
-			byCalibTXDC = pDevice->abyEEPROM[EEP_OFS_CALIB_TX_DC];
-			byCalibRXIQ = pDevice->abyEEPROM[EEP_OFS_CALIB_RX_IQ];
-			if (byCalibTXIQ || byCalibTXDC || byCalibRXIQ) {
+			calib_tx_iq = priv->abyEEPROM[EEP_OFS_CALIB_TX_IQ];
+			calib_tx_dc = priv->abyEEPROM[EEP_OFS_CALIB_TX_DC];
+			calib_rx_iq = priv->abyEEPROM[EEP_OFS_CALIB_RX_IQ];
+			if (calib_tx_iq || calib_tx_dc || calib_rx_iq) {
 				/* CR255, enable TX/RX IQ and
 				   DC compensation mode */
-				vnt_control_out_u8(pDevice,
+				vnt_control_out_u8(priv,
 						   MESSAGE_REQUEST_BBREG,
 						   0xff,
 						   0x03);
 				/* CR251, TX I/Q Imbalance Calibration */
-				vnt_control_out_u8(pDevice,
+				vnt_control_out_u8(priv,
 						   MESSAGE_REQUEST_BBREG,
 						   0xfb,
-						   byCalibTXIQ);
+						   calib_tx_iq);
 				/* CR252, TX DC-Offset Calibration */
-				vnt_control_out_u8(pDevice,
+				vnt_control_out_u8(priv,
 						   MESSAGE_REQUEST_BBREG,
 						   0xfC,
-						   byCalibTXDC);
+						   calib_tx_dc);
 				/* CR253, RX I/Q Imbalance Calibration */
-				vnt_control_out_u8(pDevice,
+				vnt_control_out_u8(priv,
 						   MESSAGE_REQUEST_BBREG,
 						   0xfd,
-						   byCalibRXIQ);
+						   calib_rx_iq);
 			} else {
 				/* CR255, turn off
 				   BB Calibration compensation */
-				vnt_control_out_u8(pDevice,
+				vnt_control_out_u8(priv,
 						   MESSAGE_REQUEST_BBREG,
 						   0xff,
 						   0x0);
@@ -424,61 +334,51 @@ static int device_init_registers(struct vnt_private *pDevice)
 	}
 
 	/* get permanent network address */
-	memcpy(pDevice->abyPermanentNetAddr, init_rsp->net_addr, 6);
-	memcpy(pDevice->abyCurrentNetAddr,
-				pDevice->abyPermanentNetAddr, ETH_ALEN);
+	memcpy(priv->abyPermanentNetAddr, init_rsp->net_addr, 6);
+	memcpy(priv->abyCurrentNetAddr,
+				priv->abyPermanentNetAddr, ETH_ALEN);
 
 	/* if exist SW network address, use it */
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"Network address = %pM\n",
-		pDevice->abyCurrentNetAddr);
+	dev_dbg(&priv->usb->dev, "Network address = %pM\n",
+		priv->abyCurrentNetAddr);
 
 	/*
 	* set BB and packet type at the same time
 	* set Short Slot Time, xIFS, and RSPINF
 	*/
-	if (pDevice->byBBType == BB_TYPE_11A)
-		pDevice->bShortSlotTime = true;
+	if (priv->byBBType == BB_TYPE_11A)
+		priv->bShortSlotTime = true;
 	else
-		pDevice->bShortSlotTime = false;
+		priv->bShortSlotTime = false;
 
-	BBvSetShortSlotTime(pDevice);
+	vnt_set_short_slot_time(priv);
 
-	pDevice->byRadioCtl = pDevice->abyEEPROM[EEP_OFS_RADIOCTL];
-	pDevice->bHWRadioOff = false;
+	priv->byRadioCtl = priv->abyEEPROM[EEP_OFS_RADIOCTL];
 
-	if ((pDevice->byRadioCtl & EEP_RADIOCTL_ENABLE) != 0) {
-		ntStatus = vnt_control_in(pDevice, MESSAGE_TYPE_READ,
-			MAC_REG_GPIOCTL1, MESSAGE_REQUEST_MACREG, 1, &byTmp);
+	if ((priv->byRadioCtl & EEP_RADIOCTL_ENABLE) != 0) {
+		status = vnt_control_in(priv, MESSAGE_TYPE_READ,
+			MAC_REG_GPIOCTL1, MESSAGE_REQUEST_MACREG, 1, &tmp);
 
-		if (ntStatus != STATUS_SUCCESS)
+		if (status != STATUS_SUCCESS)
 			return false;
 
-		if ((byTmp & GPIO3_DATA) == 0) {
-			pDevice->bHWRadioOff = true;
-			vnt_mac_reg_bits_on(pDevice, MAC_REG_GPIOCTL1,
+		if ((tmp & GPIO3_DATA) == 0)
+			vnt_mac_reg_bits_on(priv, MAC_REG_GPIOCTL1,
 								GPIO3_INTMD);
-		} else {
-			vnt_mac_reg_bits_off(pDevice, MAC_REG_GPIOCTL1,
+		else
+			vnt_mac_reg_bits_off(priv, MAC_REG_GPIOCTL1,
 								GPIO3_INTMD);
-			pDevice->bHWRadioOff = false;
-		}
-
 	}
 
-	vnt_mac_set_led(pDevice, LEDSTS_TMLEN, 0x38);
+	vnt_mac_set_led(priv, LEDSTS_TMLEN, 0x38);
 
-	vnt_mac_set_led(pDevice, LEDSTS_STS, LEDSTS_SLOW);
+	vnt_mac_set_led(priv, LEDSTS_STS, LEDSTS_SLOW);
 
-	vnt_mac_reg_bits_on(pDevice, MAC_REG_GPIOCTL0, 0x01);
+	vnt_mac_reg_bits_on(priv, MAC_REG_GPIOCTL0, 0x01);
 
-	if ((pDevice->bHWRadioOff == true) ||
-				(pDevice->bRadioControlOff == true)) {
-		vnt_radio_power_off(pDevice);
-	} else {
-		vnt_radio_power_on(pDevice);
-	}
+	vnt_radio_power_on(priv);
 
-	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"<----INIbInitAdapter Exit\n");
+	dev_dbg(&priv->usb->dev, "<----INIbInitAdapter Exit\n");
 
 	return true;
 }
@@ -489,7 +389,7 @@ static void device_free_tx_bufs(struct vnt_private *priv)
 	int ii;
 
 	for (ii = 0; ii < priv->cbTD; ii++) {
-		tx_context = priv->apTD[ii];
+		tx_context = priv->tx_context[ii];
 		/* deallocate URBs */
 		if (tx_context->urb) {
 			usb_kill_urb(tx_context->urb);
@@ -508,14 +408,14 @@ static void device_free_rx_bufs(struct vnt_private *priv)
 	int ii;
 
 	for (ii = 0; ii < priv->cbRD; ii++) {
-		rcb = priv->apRCB[ii];
+		rcb = priv->rcb[ii];
 		if (!rcb)
 			continue;
 
 		/* deallocate URBs */
-		if (rcb->pUrb) {
-			usb_kill_urb(rcb->pUrb);
-			usb_free_urb(rcb->pUrb);
+		if (rcb->urb) {
+			usb_kill_urb(rcb->urb);
+			usb_free_urb(rcb->urb);
 		}
 
 		/* deallocate skb */
@@ -528,13 +428,14 @@ static void device_free_rx_bufs(struct vnt_private *priv)
 	return;
 }
 
-static void usb_device_reset(struct vnt_private *pDevice)
+static void usb_device_reset(struct vnt_private *priv)
 {
 	int status;
 
-	status = usb_reset_device(pDevice->usb);
+	status = usb_reset_device(priv->usb);
 	if (status)
-            printk("usb_device_reset fail status=%d\n",status);
+		dev_warn(&priv->usb->dev,
+			 "usb_device_reset fail status=%d\n", status);
 	return ;
 }
 
@@ -560,15 +461,14 @@ static bool device_alloc_bufs(struct vnt_private *priv)
 			goto free_tx;
 		}
 
-		priv->apTD[ii] = tx_context;
+		priv->tx_context[ii] = tx_context;
 		tx_context->priv = priv;
 		tx_context->pkt_no = ii;
 
 		/* allocate URBs */
 		tx_context->urb = usb_alloc_urb(0, GFP_ATOMIC);
 		if (!tx_context->urb) {
-			DBG_PRT(MSG_LEVEL_ERR,
-				KERN_ERR "alloc tx urb failed\n");
+			dev_err(&priv->usb->dev, "alloc tx urb failed\n");
 			goto free_tx;
 		}
 
@@ -576,49 +476,47 @@ static bool device_alloc_bufs(struct vnt_private *priv)
 	}
 
 	for (ii = 0; ii < priv->cbRD; ii++) {
-		priv->apRCB[ii] = kzalloc(sizeof(struct vnt_rcb), GFP_KERNEL);
-		if (!priv->apRCB[ii]) {
+		priv->rcb[ii] = kzalloc(sizeof(struct vnt_rcb), GFP_KERNEL);
+		if (!priv->rcb[ii]) {
 			dev_err(&priv->usb->dev,
 					"failed to allocate rcb no %d\n", ii);
 			goto free_rx_tx;
 		}
 
-		rcb = priv->apRCB[ii];
+		rcb = priv->rcb[ii];
 
-		rcb->pDevice = priv;
+		rcb->priv = priv;
 
 		/* allocate URBs */
-		rcb->pUrb = usb_alloc_urb(0, GFP_ATOMIC);
-		if (rcb->pUrb == NULL) {
-			DBG_PRT(MSG_LEVEL_ERR, KERN_ERR
-				" Failed to alloc rx urb\n");
+		rcb->urb = usb_alloc_urb(0, GFP_ATOMIC);
+		if (rcb->urb == NULL) {
+			dev_err(&priv->usb->dev, "Failed to alloc rx urb\n");
 			goto free_rx_tx;
 		}
 
 		rcb->skb = dev_alloc_skb(priv->rx_buf_sz);
 		if (rcb->skb == NULL) {
-			DBG_PRT(MSG_LEVEL_ERR, KERN_ERR
-						" Failed to alloc rx skb\n");
+			dev_err(&priv->usb->dev, "Failed to alloc rx skb\n");
 			goto free_rx_tx;
 		}
 
-		rcb->bBoolInUse = false;
+		rcb->in_use = false;
 
 		/* submit rx urb */
 		if (vnt_submit_rx_urb(priv, rcb))
 			goto free_rx_tx;
 	}
 
-	priv->pInterruptURB = usb_alloc_urb(0, GFP_ATOMIC);
-	if (priv->pInterruptURB == NULL) {
-		DBG_PRT(MSG_LEVEL_ERR, KERN_ERR"Failed to alloc int urb\n");
+	priv->interrupt_urb = usb_alloc_urb(0, GFP_ATOMIC);
+	if (priv->interrupt_urb == NULL) {
+		dev_err(&priv->usb->dev, "Failed to alloc int urb\n");
 		goto free_rx_tx;
 	}
 
 	priv->int_buf.data_buf = kmalloc(MAX_INTERRUPT_SIZE, GFP_KERNEL);
 	if (priv->int_buf.data_buf == NULL) {
-		DBG_PRT(MSG_LEVEL_ERR, KERN_ERR"Failed to alloc int buf\n");
-		usb_free_urb(priv->pInterruptURB);
+		dev_err(&priv->usb->dev, "Failed to alloc int buf\n");
+		usb_free_urb(priv->interrupt_urb);
 		goto free_rx_tx;
 	}
 
@@ -682,8 +580,8 @@ free_all:
 	device_free_tx_bufs(priv);
 	device_free_int_bufs(priv);
 
-	usb_kill_urb(priv->pInterruptURB);
-	usb_free_urb(priv->pInterruptURB);
+	usb_kill_urb(priv->interrupt_urb);
+	usb_free_urb(priv->interrupt_urb);
 
 	return -ENOMEM;
 }
@@ -721,8 +619,8 @@ static void vnt_stop(struct ieee80211_hw *hw)
 	device_free_rx_bufs(priv);
 	device_free_int_bufs(priv);
 
-	usb_kill_urb(priv->pInterruptURB);
-	usb_free_urb(priv->pInterruptURB);
+	usb_kill_urb(priv->interrupt_urb);
+	usb_free_urb(priv->interrupt_urb);
 
 	return;
 }
@@ -879,9 +777,9 @@ static void vnt_bss_info_changed(struct ieee80211_hw *hw,
 		else
 			priv->bShortSlotTime = false;
 
-		BBvSetShortSlotTime(priv);
-		BBvSetVGAGainOffset(priv, priv->abyBBVGA[0]);
-		BBvUpdatePreEDThreshold(priv, false);
+		vnt_set_short_slot_time(priv);
+		vnt_set_vga_gain_offset(priv, priv->abyBBVGA[0]);
+		vnt_update_pre_ed_threshold(priv, false);
 	}
 
 	if (changed & BSS_CHANGED_TXPOWER)
@@ -1002,7 +900,7 @@ static void vnt_sw_scan_start(struct ieee80211_hw *hw)
 
 	vnt_set_bss_mode(priv);
 	/* Set max sensitivity*/
-	BBvUpdatePreEDThreshold(priv, true);
+	vnt_update_pre_ed_threshold(priv, true);
 }
 
 static void vnt_sw_scan_complete(struct ieee80211_hw *hw)
@@ -1010,7 +908,7 @@ static void vnt_sw_scan_complete(struct ieee80211_hw *hw)
 	struct vnt_private *priv = hw->priv;
 
 	/* Return sensitivity to channel level*/
-	BBvUpdatePreEDThreshold(priv, false);
+	vnt_update_pre_ed_threshold(priv, false);
 }
 
 static int vnt_get_stats(struct ieee80211_hw *hw,
