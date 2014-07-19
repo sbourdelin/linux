@@ -1967,7 +1967,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/*  Init BT hw config. */
 	rtl8723a_BT_init_hwconfig(Adapter);
 
-	rtl8723a_InitHalDm(Adapter);
+	ODM23a_DMInit(pDM_Odm);
 
 	rtl8723a_set_nav_upper(priv, WiFiNavUpperUs);
 #endif
