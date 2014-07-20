@@ -2197,6 +2197,9 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->cipher_suites = rtlmac_cipher_suites;
 	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtlmac_cipher_suites);
 
+	SET_IEEE80211_DEV(priv->hw, &interface->dev);
+	SET_IEEE80211_PERM_ADDR(hw, priv->mac_addr);
+
 exit:
 	if (ret < 0)
 		usb_put_dev(udev);
