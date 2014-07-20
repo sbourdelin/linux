@@ -55,6 +55,59 @@ static struct usb_device_id dev_table[] = {
 
 MODULE_DEVICE_TABLE(usb, dev_table);
 
+static struct ieee80211_rate rtlmac_rates[] = {
+	{ .bitrate = 10, .hw_value = 0x1, .flags = 0 },
+	{ .bitrate = 20, .hw_value = 0x2, .flags = 0 },
+	{ .bitrate = 55, .hw_value = 0x4, .flags = 0 },
+	{ .bitrate = 110, .hw_value = 0x8, .flags = 0 },
+	{ .bitrate = 60, .hw_value = 0x10, .flags = 0 },
+	{ .bitrate = 90, .hw_value = 0x20, .flags = 0 },
+	{ .bitrate = 120, .hw_value = 0x40, .flags = 0 },
+	{ .bitrate = 180, .hw_value = 0x80, .flags = 0 },
+	{ .bitrate = 240, .hw_value = 0x100, .flags = 0 },
+	{ .bitrate = 360, .hw_value = 0x200, .flags = 0 },
+	{ .bitrate = 480, .hw_value = 0x400, .flags = 0 },
+	{ .bitrate = 540, .hw_value = 0x800, .flags = 0 },
+};
+
+static struct ieee80211_channel rtlmac_channels_2g[] = {
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2412,
+	  .hw_value = 1, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2417,
+	  .hw_value = 2, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2422,
+	  .hw_value = 3, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2427,
+	  .hw_value = 4, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2432,
+	  .hw_value = 5, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2437,
+	  .hw_value = 6, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2442,
+	  .hw_value = 7, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2447,
+	  .hw_value = 8, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2452,
+	  .hw_value = 9, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2457,
+	  .hw_value = 10, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2462,
+	  .hw_value = 11, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2467,
+	  .hw_value = 12, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2472,
+	  .hw_value = 13, .max_power = 30 },
+	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2484,
+	  .hw_value = 14, .max_power = 30 }
+};
+
+static struct ieee80211_supported_band rtlmac_supported_band = {
+	.channels = rtlmac_channels_2g,
+	.n_channels = ARRAY_SIZE(rtlmac_channels_2g),
+	.bitrates = rtlmac_rates,
+	.n_bitrates = ARRAY_SIZE(rtlmac_rates),
+};
+
 static struct rtlmac_reg8val rtl8723a_mac_init_table[] = {
 	{0x420, 0x80}, {0x423, 0x00}, {0x430, 0x00}, {0x431, 0x00},
 	{0x432, 0x00}, {0x433, 0x01}, {0x434, 0x04}, {0x435, 0x05},
@@ -2129,6 +2182,10 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	ret = rtlmac_init_device(hw);
 
+	hw->wiphy->max_scan_ssids = 1;
+	hw->wiphy->max_scan_ie_len = 0;
+	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
+	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &rtlmac_supported_band;
 
 exit:
 	if (ret < 0)
