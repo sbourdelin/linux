@@ -108,6 +108,13 @@ static struct ieee80211_supported_band rtlmac_supported_band = {
 	.n_bitrates = ARRAY_SIZE(rtlmac_rates),
 };
 
+static const u32 rtlmac_cipher_suites[] = {
+	WLAN_CIPHER_SUITE_WEP40,
+	WLAN_CIPHER_SUITE_WEP104,
+	WLAN_CIPHER_SUITE_TKIP,
+	WLAN_CIPHER_SUITE_CCMP,
+};
+
 static struct rtlmac_reg8val rtl8723a_mac_init_table[] = {
 	{0x420, 0x80}, {0x423, 0x00}, {0x430, 0x00}, {0x431, 0x00},
 	{0x432, 0x00}, {0x433, 0x01}, {0x434, 0x04}, {0x435, 0x05},
@@ -2183,9 +2190,12 @@ static int rtlmac_probe(struct usb_interface *interface,
 	ret = rtlmac_init_device(hw);
 
 	hw->wiphy->max_scan_ssids = 1;
-	hw->wiphy->max_scan_ie_len = 0;
+	hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
 	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &rtlmac_supported_band;
+	hw->wiphy->max_remain_on_channel_duration = 65535; /* ms */
+	hw->wiphy->cipher_suites = rtlmac_cipher_suites;
+	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtlmac_cipher_suites);
 
 exit:
 	if (ret < 0)
