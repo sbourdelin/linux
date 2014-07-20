@@ -590,7 +590,7 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht20)
 	printk(KERN_DEBUG "%s: Regulatory 0x%02x\n",
 	       DRIVER_NAME, efuse->rf_regulatory);
 
-	for (i = 0; RTL8723A_MAX_RF_PATHS; i++) {
+	for (i = 0; i < RTL8723A_MAX_RF_PATHS; i++) {
 		if (cck[i] > RF6052_MAX_TX_PWR)
 			cck[i] = RF6052_MAX_TX_PWR;
 		if (ofdm[i] > RF6052_MAX_TX_PWR)
@@ -2229,7 +2229,7 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 	kfree(priv->fw_data);
 	mutex_destroy(&priv->usb_buf_mutex);
 
-	usb_put_dev(interface);
+	usb_put_dev(priv->udev);
 	ieee80211_free_hw(hw);
 
 	wiphy_info(hw->wiphy, "disconnecting\n");
