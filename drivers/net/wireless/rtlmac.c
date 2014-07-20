@@ -2200,6 +2200,13 @@ static int rtlmac_probe(struct usb_interface *interface,
 	SET_IEEE80211_DEV(priv->hw, &interface->dev);
 	SET_IEEE80211_PERM_ADDR(hw, priv->mac_addr);
 
+	ret = ieee80211_register_hw(priv->hw);
+	if (ret) {
+		printk(KERN_ERR "%s: RTL8723au failed to register: %is\n",
+		       DRIVER_NAME, ret);
+		goto exit;
+	}
+
 exit:
 	if (ret < 0)
 		usb_put_dev(udev);
@@ -2217,9 +2224,12 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 	rtlmac_disable_device(hw);
 	usb_set_intfdata(interface, NULL);
 
+	ieee80211_unregister_hw(hw);
+
 	kfree(priv->fw_data);
 	mutex_destroy(&priv->usb_buf_mutex);
 
+	usb_put_dev(interface);
 	ieee80211_free_hw(hw);
 
 	wiphy_info(hw->wiphy, "disconnecting\n");
