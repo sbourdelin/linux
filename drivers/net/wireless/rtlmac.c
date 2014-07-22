@@ -488,7 +488,6 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 {
 	u32 hssia, val32, retval;
-	printk(KERN_DEBUG "reading rfreg %02x\n", reg);
 
 	hssia = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
 	/*
@@ -517,6 +516,7 @@ static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 
 	retval &= 0xfffff;
 
+	printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, retval);
 	return retval;
 }
 
