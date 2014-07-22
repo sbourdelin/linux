@@ -684,7 +684,7 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	ofdm[1] = efuse->ht40_1s_tx_power_index_B[group];
 
 	printk(KERN_DEBUG "%s: Setting TX power CCK A: %i, CCK B: %i, "
-	       "OFDM A: %i, OFD`M B: %i\n", DRIVER_NAME,
+	       "OFDM A: %i, OFDM B: %i\n", DRIVER_NAME,
 	       cck[0], cck[1], ofdm[0], ofdm[1]);
 	printk(KERN_DEBUG "%s: Regulatory 0x%02x\n",
 	       DRIVER_NAME, efuse->rf_regulatory);
