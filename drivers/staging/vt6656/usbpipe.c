@@ -45,21 +45,7 @@
 #include "device.h"
 #include "usbpipe.h"
 
-//endpoint def
-//endpoint 0: control
-//endpoint 1: interrupt
-//endpoint 2: read bulk
-//endpoint 3: write bulk
-
-#define USB_CTL_WAIT   500 //ms
-
-#ifndef URB_ASYNC_UNLINK
-#define URB_ASYNC_UNLINK    0
-#endif
-
-static void vnt_start_interrupt_urb_complete(struct urb *urb);
-static void vnt_submit_rx_urb_complete(struct urb *urb);
-static void vnt_tx_context_complete(struct urb *urb);
+#define USB_CTL_WAIT	500 /* ms */
 
 int vnt_control_out(struct vnt_private *priv, u8 request, u16 value,
 		u16 index, u16 length, u8 *buffer)
@@ -117,33 +103,6 @@ void vnt_control_in_u8(struct vnt_private *priv, u8 reg, u8 reg_off, u8 *data)
 			reg_off, reg, sizeof(u8), data);
 }
 
-int vnt_start_interrupt_urb(struct vnt_private *priv)
-{
-	int status = STATUS_FAILURE;
-
-	if (priv->int_buf.in_use == true)
-		return STATUS_FAILURE;
-
-	priv->int_buf.in_use = true;
-
-	usb_fill_int_urb(priv->interrupt_urb,
-		priv->usb,
-		usb_rcvintpipe(priv->usb, 1),
-		priv->int_buf.data_buf,
-		MAX_INTERRUPT_SIZE,
-		vnt_start_interrupt_urb_complete,
-		priv,
-		priv->int_interval);
-
-	status = usb_submit_urb(priv->interrupt_urb, GFP_ATOMIC);
-	if (status) {
-		dev_dbg(&priv->usb->dev, "Submit int URB failed %d\n", status);
-		priv->int_buf.in_use = false;
-	}
-
-	return status;
-}
-
 static void vnt_start_interrupt_urb_complete(struct urb *urb)
 {
 	struct vnt_private *priv = urb->context;
@@ -182,32 +141,29 @@ static void vnt_start_interrupt_urb_complete(struct urb *urb)
 	return;
 }
 
-int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
+int vnt_start_interrupt_urb(struct vnt_private *priv)
 {
-	int status = 0;
-	struct urb *urb;
+	int status = STATUS_FAILURE;
 
-	urb = rcb->urb;
-	if (rcb->skb == NULL) {
-		dev_dbg(&priv->usb->dev, "rcb->skb is null\n");
-		return status;
+	if (priv->int_buf.in_use == true)
+		return STATUS_FAILURE;
+
+	priv->int_buf.in_use = true;
+
+	usb_fill_int_urb(priv->interrupt_urb,
+			 priv->usb,
+			 usb_rcvintpipe(priv->usb, 1),
+			 priv->int_buf.data_buf,
+			 MAX_INTERRUPT_SIZE,
+			 vnt_start_interrupt_urb_complete,
+			 priv,
+			 priv->int_interval);
+
+	status = usb_submit_urb(priv->interrupt_urb, GFP_ATOMIC);
+	if (status) {
+		dev_dbg(&priv->usb->dev, "Submit int URB failed %d\n", status);
+		priv->int_buf.in_use = false;
 	}
-
-	usb_fill_bulk_urb(urb,
-		priv->usb,
-		usb_rcvbulkpipe(priv->usb, 2),
-		skb_put(rcb->skb, skb_tailroom(rcb->skb)),
-		MAX_TOTAL_SIZE_WITH_ALL_HEADERS,
-		vnt_submit_rx_urb_complete,
-		rcb);
-
-	status = usb_submit_urb(urb, GFP_ATOMIC);
-	if (status != 0) {
-		dev_dbg(&priv->usb->dev, "Submit Rx URB failed %d\n", status);
-		return STATUS_FAILURE ;
-	}
-
-	rcb->in_use = true;
 
 	return status;
 }
@@ -264,36 +220,34 @@ static void vnt_submit_rx_urb_complete(struct urb *urb)
 	return;
 }
 
-int vnt_tx_context(struct vnt_private *priv,
-				struct vnt_usb_send_context *context)
+int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
 {
-	int status;
+	int status = 0;
 	struct urb *urb;
 
-	if (!(MP_IS_READY(priv) && priv->Flags & fMP_POST_WRITES)) {
-		context->in_use = false;
-		return STATUS_RESOURCES;
+	urb = rcb->urb;
+	if (rcb->skb == NULL) {
+		dev_dbg(&priv->usb->dev, "rcb->skb is null\n");
+		return status;
 	}
 
-	urb = context->urb;
-
 	usb_fill_bulk_urb(urb,
-			priv->usb,
-			usb_sndbulkpipe(priv->usb, 3),
-			context->data,
-			context->buf_len,
-			vnt_tx_context_complete,
-			context);
+			  priv->usb,
+			  usb_rcvbulkpipe(priv->usb, 2),
+			  skb_put(rcb->skb, skb_tailroom(rcb->skb)),
+			  MAX_TOTAL_SIZE_WITH_ALL_HEADERS,
+			  vnt_submit_rx_urb_complete,
+			  rcb);
 
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status != 0) {
-		dev_dbg(&priv->usb->dev, "Submit Tx URB failed %d\n", status);
-
-		context->in_use = false;
+		dev_dbg(&priv->usb->dev, "Submit Rx URB failed %d\n", status);
 		return STATUS_FAILURE;
 	}
 
-	return STATUS_PENDING;
+	rcb->in_use = true;
+
+	return status;
 }
 
 static void vnt_tx_context_complete(struct urb *urb)
@@ -327,4 +281,36 @@ static void vnt_tx_context_complete(struct urb *urb)
 	}
 
 	return;
+}
+
+int vnt_tx_context(struct vnt_private *priv,
+		   struct vnt_usb_send_context *context)
+{
+	int status;
+	struct urb *urb;
+
+	if (!(MP_IS_READY(priv) && priv->Flags & fMP_POST_WRITES)) {
+		context->in_use = false;
+		return STATUS_RESOURCES;
+	}
+
+	urb = context->urb;
+
+	usb_fill_bulk_urb(urb,
+			  priv->usb,
+			  usb_sndbulkpipe(priv->usb, 3),
+			  context->data,
+			  context->buf_len,
+			  vnt_tx_context_complete,
+			  context);
+
+	status = usb_submit_urb(urb, GFP_ATOMIC);
+	if (status != 0) {
+		dev_dbg(&priv->usb->dev, "Submit Tx URB failed %d\n", status);
+
+		context->in_use = false;
+		return STATUS_FAILURE;
+	}
+
+	return STATUS_PENDING;
 }

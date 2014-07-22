@@ -624,7 +624,7 @@ int vnt_rf_write_embedded(struct vnt_private *priv, u32 data)
 int vnt_rf_setpower(struct vnt_private *priv, u32 rate, u32 channel)
 {
 	int ret = true;
-	u8 power = priv->byCCKPwr;
+	u8 power = priv->cck_pwr;
 
 	if (channel == 0)
 		return -EINVAL;
@@ -636,8 +636,8 @@ int vnt_rf_setpower(struct vnt_private *priv, u32 rate, u32 channel)
 	case RATE_11M:
 		channel--;
 
-		if (channel < sizeof(priv->abyCCKPwrTbl))
-			power = priv->abyCCKPwrTbl[channel];
+		if (channel < sizeof(priv->cck_pwr_tbl))
+			power = priv->cck_pwr_tbl[channel];
 		break;
 	case RATE_6M:
 	case RATE_9M:
@@ -647,9 +647,9 @@ int vnt_rf_setpower(struct vnt_private *priv, u32 rate, u32 channel)
 	case RATE_48M:
 	case RATE_54M:
 		if (channel > CB_MAX_CHANNEL_24G)
-			power = priv->abyOFDMAPwrTbl[channel-15];
+			power = priv->ofdm_a_pwr_tbl[channel-15];
 		else
-			power = priv->abyOFDMPwrTbl[channel-1];
+			power = priv->ofdm_pwr_tbl[channel-1];
 		break;
 	}
 
@@ -660,12 +660,12 @@ int vnt_rf_setpower(struct vnt_private *priv, u32 rate, u32 channel)
 
 static u8 vnt_rf_addpower(struct vnt_private *priv)
 {
-	s32 rssi = -priv->uCurrRSSI;
+	s32 rssi = -priv->current_rssi;
 
 	if (!rssi)
 		return 7;
 
-	if (priv->byRFType == RF_VT3226D0) {
+	if (priv->rf_type == RF_VT3226D0) {
 		if (rssi < -70)
 			return 9;
 		else if (rssi < -65)
@@ -694,12 +694,12 @@ int vnt_rf_set_txpower(struct vnt_private *priv, u8 power, u32 rate)
 	if (power > VNT_RF_MAX_POWER)
 		power = VNT_RF_MAX_POWER;
 
-	if (priv->byCurPwr == power)
+	if (priv->power == power)
 		return true;
 
-	priv->byCurPwr = power;
+	priv->power = power;
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_AL2230:
 		if (power >= AL2230_PWR_IDX_LEN)
 			return false;
@@ -811,7 +811,7 @@ void vnt_rf_rssi_to_dbm(struct vnt_private *priv, u8 rssi, long *dbm)
 	long a = 0;
 	u8 airoharf[4] = {0, 18, 0, 40};
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_AL2230:
 	case RF_AL2230S:
 	case RF_AIROHA7230:
@@ -834,7 +834,7 @@ void vnt_rf_table_download(struct vnt_private *priv)
 	u16 length, value;
 	u8 array[256];
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_AL2230:
 	case RF_AL2230S:
 		length1 = CB_AL2230_INIT_SEQ * 3;
@@ -920,7 +920,7 @@ void vnt_rf_table_download(struct vnt_private *priv)
 		addr3 += length;
 	}
 
-	if (priv->byRFType == RF_AIROHA7230) {
+	if (priv->rf_type == RF_AIROHA7230) {
 		length1 = CB_AL7230_INIT_SEQ * 3;
 		length2 = CB_MAX_CHANNEL * 3;
 		addr1 = &(al7230_init_table_amode[0][0]);

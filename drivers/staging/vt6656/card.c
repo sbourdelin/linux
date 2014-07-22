@@ -109,7 +109,7 @@ static u16 vnt_get_cck_rate(struct vnt_private *priv, u16 rate_idx)
 	u16 ui = rate_idx;
 
 	while (ui > RATE_1M) {
-		if (priv->wBasicRate & (1 << ui))
+		if (priv->basic_rates & (1 << ui))
 			return ui;
 		ui--;
 	}
@@ -135,7 +135,7 @@ static u16 vnt_get_ofdm_rate(struct vnt_private *priv, u16 rate_idx)
 	u16 ui = rate_idx;
 
 	dev_dbg(&priv->usb->dev, "%s basic rate: %d\n",
-					__func__,  priv->wBasicRate);
+					__func__,  priv->basic_rates);
 
 	if (!vnt_ofdm_min_rate(priv)) {
 		dev_dbg(&priv->usb->dev, "%s (NO OFDM) %d\n",
@@ -146,7 +146,7 @@ static u16 vnt_get_ofdm_rate(struct vnt_private *priv, u16 rate_idx)
 	}
 
 	while (ui > RATE_11M) {
-		if (priv->wBasicRate & (1 << ui)) {
+		if (priv->basic_rates & (1 << ui)) {
 			dev_dbg(&priv->usb->dev, "%s rate: %d\n",
 							__func__, ui);
 			return ui;
@@ -365,84 +365,78 @@ void vnt_update_ifs(struct vnt_private *priv)
 	u8 max_min = 0;
 	u8 data[4];
 
-	if (priv->byPacketType == PK_TYPE_11A) {
-		priv->uSlot = C_SLOT_SHORT;
-		priv->uSIFS = C_SIFS_A;
-		priv->uDIFS = C_SIFS_A + 2 * C_SLOT_SHORT;
-		priv->uCwMin = C_CWMIN_A;
+	if (priv->packet_type == PK_TYPE_11A) {
+		priv->slot = C_SLOT_SHORT;
+		priv->sifs = C_SIFS_A;
+		priv->difs = C_SIFS_A + 2 * C_SLOT_SHORT;
 		max_min = 4;
-	} else if (priv->byPacketType == PK_TYPE_11B) {
-		priv->uSlot = C_SLOT_LONG;
-		priv->uSIFS = C_SIFS_BG;
-		priv->uDIFS = C_SIFS_BG + 2 * C_SLOT_LONG;
-		priv->uCwMin = C_CWMIN_B;
+	} else if (priv->packet_type == PK_TYPE_11B) {
+		priv->slot = C_SLOT_LONG;
+		priv->sifs = C_SIFS_BG;
+		priv->difs = C_SIFS_BG + 2 * C_SLOT_LONG;
 		max_min = 5;
 	} else {/* PK_TYPE_11GA & PK_TYPE_11GB */
 		bool ofdm_rate = false;
 		unsigned int ii = 0;
 
-		priv->uSIFS = C_SIFS_BG;
+		priv->sifs = C_SIFS_BG;
 
-		if (priv->bShortSlotTime)
-			priv->uSlot = C_SLOT_SHORT;
+		if (priv->short_slot_time)
+			priv->slot = C_SLOT_SHORT;
 		else
-			priv->uSlot = C_SLOT_LONG;
+			priv->slot = C_SLOT_LONG;
 
-		priv->uDIFS = C_SIFS_BG + 2 * priv->uSlot;
+		priv->difs = C_SIFS_BG + 2 * priv->slot;
 
 		for (ii = RATE_54M; ii >= RATE_6M; ii--) {
-			if (priv->wBasicRate & ((u32)(0x1 << ii))) {
+			if (priv->basic_rates & ((u32)(0x1 << ii))) {
 				ofdm_rate = true;
 				break;
 			}
 		}
 
-		if (ofdm_rate == true) {
-			priv->uCwMin = C_CWMIN_A;
+		if (ofdm_rate == true)
 			max_min = 4;
-		} else {
-			priv->uCwMin = C_CWMIN_B;
+		else
 			max_min = 5;
-			}
 	}
 
-	priv->uCwMax = C_CWMAX;
-	priv->uEIFS = C_EIFS;
+	priv->eifs = C_EIFS;
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_VT3226D0:
-		if (priv->byBBType != BB_TYPE_11B) {
-			priv->uSIFS -= 1;
-			priv->uDIFS -= 1;
+		if (priv->bb_type != BB_TYPE_11B) {
+			priv->sifs -= 1;
+			priv->difs -= 1;
 			break;
 		}
 	case RF_AIROHA7230:
 	case RF_AL2230:
 	case RF_AL2230S:
-		if (priv->byBBType != BB_TYPE_11B)
+		if (priv->bb_type != BB_TYPE_11B)
 			break;
 	case RF_RFMD2959:
 	case RF_VT3226:
 	case RF_VT3342A0:
-		priv->uSIFS -= 3;
-		priv->uDIFS -= 3;
+		priv->sifs -= 3;
+		priv->difs -= 3;
 		break;
 	case RF_MAXIM2829:
-		if (priv->byBBType == BB_TYPE_11A) {
-			priv->uSIFS -= 5;
-			priv->uDIFS -= 5;
+		if (priv->bb_type == BB_TYPE_11A) {
+			priv->sifs -= 5;
+			priv->difs -= 5;
 		} else {
-			priv->uSIFS -= 2;
-			priv->uDIFS -= 2;
+			priv->sifs -= 2;
+			priv->difs -= 2;
 		}
 
 		break;
 	}
 
-	data[0] = (u8)priv->uSIFS;
-	data[1] = (u8)priv->uDIFS;
-	data[2] = (u8)priv->uEIFS;
-	data[3] = (u8)priv->uSlot;
+	data[0] = (u8)priv->sifs;
+	data[1] = (u8)priv->difs;
+	data[2] = (u8)priv->eifs;
+	data[3] = (u8)priv->slot;
 
 	vnt_control_out(priv, MESSAGE_TYPE_WRITE, MAC_REG_SIFS,
 		MESSAGE_REQUEST_MACREG, 4, &data[0]);
@@ -460,16 +454,16 @@ void vnt_update_top_rates(struct vnt_private *priv)
 
 	/*Determines the highest basic rate.*/
 	for (i = RATE_54M; i >= RATE_6M; i--) {
-		if (priv->wBasicRate & (u16)(1 << i)) {
+		if (priv->basic_rates & (u16)(1 << i)) {
 			top_ofdm = i;
 			break;
 		}
 	}
 
-	priv->byTopOFDMBasicRate = top_ofdm;
+	priv->top_ofdm_basic_rate = top_ofdm;
 
 	for (i = RATE_11M;; i--) {
-		if (priv->wBasicRate & (u16)(1 << i)) {
+		if (priv->basic_rates & (u16)(1 << i)) {
 			top_cck = i;
 			break;
 		}
@@ -477,7 +471,7 @@ void vnt_update_top_rates(struct vnt_private *priv)
 			break;
 	}
 
-	priv->byTopCCKBasicRate = top_cck;
+	priv->top_cck_basic_rate = top_cck;
 }
 
 int vnt_ofdm_min_rate(struct vnt_private *priv)
@@ -485,7 +479,7 @@ int vnt_ofdm_min_rate(struct vnt_private *priv)
 	int ii;
 
 	for (ii = RATE_54M; ii >= RATE_6M; ii--) {
-		if ((priv->wBasicRate) & ((u16)(1 << ii)))
+		if ((priv->basic_rates) & ((u16)(1 << ii)))
 			return true;
 	}
 
@@ -495,8 +489,8 @@ int vnt_ofdm_min_rate(struct vnt_private *priv)
 u8 vnt_get_pkt_type(struct vnt_private *priv)
 {
 
-	if (priv->byBBType == BB_TYPE_11A || priv->byBBType == BB_TYPE_11B)
-		return (u8)priv->byBBType;
+	if (priv->bb_type == BB_TYPE_11A || priv->bb_type == BB_TYPE_11B)
+		return (u8)priv->bb_type;
 	else if (vnt_ofdm_min_rate(priv))
 		return PK_TYPE_11GA;
 	else
@@ -583,7 +577,7 @@ void vnt_adjust_tsf(struct vnt_private *priv, u8 rx_rate,
 bool vnt_get_current_tsf(struct vnt_private *priv, u64 *current_tsf)
 {
 
-	*current_tsf = priv->qwCurrTSF;
+	*current_tsf = priv->current_tsf;
 
 	return true;
 }
@@ -604,7 +598,7 @@ bool vnt_clear_current_tsf(struct vnt_private *priv)
 
 	vnt_mac_reg_bits_on(priv, MAC_REG_TFTCTL, TFTCTL_TSFCNTRST);
 
-	priv->qwCurrTSF = 0;
+	priv->current_tsf = 0;
 
 	return true;
 }
@@ -734,7 +728,7 @@ int vnt_radio_power_off(struct vnt_private *priv)
 {
 	int ret = true;
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_AL2230:
 	case RF_AL2230S:
 	case RF_AIROHA7230:
@@ -775,7 +769,7 @@ int vnt_radio_power_on(struct vnt_private *priv)
 
 	vnt_mac_reg_bits_on(priv, MAC_REG_HOSTCR, HOSTCR_RXON);
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_AL2230:
 	case RF_AL2230S:
 	case RF_AIROHA7230:
@@ -794,44 +788,44 @@ int vnt_radio_power_on(struct vnt_private *priv)
 
 void vnt_set_bss_mode(struct vnt_private *priv)
 {
-	if (priv->byRFType == RF_AIROHA7230 && priv->byBBType == BB_TYPE_11A)
+	if (priv->rf_type == RF_AIROHA7230 && priv->bb_type == BB_TYPE_11A)
 		vnt_mac_set_bb_type(priv, BB_TYPE_11G);
 	else
-		vnt_mac_set_bb_type(priv, priv->byBBType);
+		vnt_mac_set_bb_type(priv, priv->bb_type);
 
-	priv->byPacketType = vnt_get_pkt_type(priv);
+	priv->packet_type = vnt_get_pkt_type(priv);
 
-	if (priv->byBBType == BB_TYPE_11A)
+	if (priv->bb_type == BB_TYPE_11A)
 		vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x03);
-	else if (priv->byBBType == BB_TYPE_11B)
+	else if (priv->bb_type == BB_TYPE_11B)
 		vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x02);
-	else if (priv->byBBType == BB_TYPE_11G)
+	else if (priv->bb_type == BB_TYPE_11G)
 		vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x88, 0x08);
 
 	vnt_update_ifs(priv);
-	vnt_set_rspinf(priv, (u8)priv->byBBType);
+	vnt_set_rspinf(priv, (u8)priv->bb_type);
 
-	if (priv->byBBType == BB_TYPE_11A) {
-		if (priv->byRFType == RF_AIROHA7230) {
-			priv->abyBBVGA[0] = 0x20;
+	if (priv->bb_type == BB_TYPE_11A) {
+		if (priv->rf_type == RF_AIROHA7230) {
+			priv->bb_vga[0] = 0x20;
 
 			vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG,
-						0xe7, priv->abyBBVGA[0]);
+						0xe7, priv->bb_vga[0]);
 		}
 
-		priv->abyBBVGA[2] = 0x10;
-		priv->abyBBVGA[3] = 0x10;
+		priv->bb_vga[2] = 0x10;
+		priv->bb_vga[3] = 0x10;
 	} else {
-		if (priv->byRFType == RF_AIROHA7230) {
-			priv->abyBBVGA[0] = 0x1c;
+		if (priv->rf_type == RF_AIROHA7230) {
+			priv->bb_vga[0] = 0x1c;
 
 			vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG,
-						0xe7, priv->abyBBVGA[0]);
+						0xe7, priv->bb_vga[0]);
 		}
 
-		priv->abyBBVGA[2] = 0x0;
-		priv->abyBBVGA[3] = 0x0;
+		priv->bb_vga[2] = 0x0;
+		priv->bb_vga[3] = 0x0;
 	}
 
-	vnt_set_vga_gain_offset(priv, priv->abyBBVGA[0]);
+	vnt_set_vga_gain_offset(priv, priv->bb_vga[0]);
 }
