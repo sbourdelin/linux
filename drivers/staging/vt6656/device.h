@@ -232,9 +232,13 @@ struct vnt_usb_send_context {
 	struct urb *urb;
 	struct ieee80211_hdr *hdr;
 	unsigned int buf_len;
+	u32 frame_len;
 	u16 tx_hdr_size;
+	u16 tx_rate;
 	u8 type;
 	u8 pkt_no;
+	u8 pkt_type;
+	u8 need_ack;
 	u8 fb_option;
 	bool in_use;
 	unsigned char data[MAX_TOTAL_SIZE_WITH_ALL_HEADERS];
@@ -289,89 +293,82 @@ struct vnt_private {
 
 	/* Variables to track resources for the BULK In Pipe */
 	struct vnt_rcb *rcb[CB_MAX_RX_DESC];
-	u32 cbRD;
+	u32 num_rcb;
 
 	/* Variables to track resources for the BULK Out Pipe */
 	struct vnt_usb_send_context *tx_context[CB_MAX_TX_DESC];
-	u32 cbTD;
+	u32 num_tx_context;
 
 	/* Variables to track resources for the Interrupt In Pipe */
 	struct vnt_interrupt_buffer int_buf;
 
 	/* Version control */
-	u16 wFirmwareVersion;
-	u8 byLocalID;
-	u8 byRFType;
-	u8 byBBRxConf;
-
-	u8 byZoneType;
+	u16 firmware_version;
+	u8 local_id;
+	u8 rf_type;
+	u8 bb_rx_conf;
 
 	struct vnt_cmd_card_init init_command;
 	struct vnt_rsp_card_init init_response;
-	u8 abyCurrentNetAddr[ETH_ALEN];
-	u8 abyPermanentNetAddr[ETH_ALEN];
+	u8 current_net_addr[ETH_ALEN];
+	u8 permanent_net_addr[ETH_ALEN];
 
-	int bExistSWNetAddr;
+	u8 exist_sw_net_addr;
 
-	u64 qwCurrTSF;
+	u64 current_tsf;
 
 	/* 802.11 MAC specific */
-	u32 uCurrRSSI;
+	u32 current_rssi;
 
 	/* Antenna Diversity */
-	int bTxRxAntInv;
-	u32 dwRxAntennaSel;
-	u32 dwTxAntennaSel;
-	u8 byAntennaCount;
-	u8 byRxAntennaMode;
-	u8 byTxAntennaMode;
-	u8 byRadioCtl;
+	int tx_rx_ant_inv;
+	u32 rx_antenna_sel;
+	u8 rx_antenna_mode;
+	u8 tx_antenna_mode;
+	u8 radio_ctl;
 
 	/* IFS & Cw */
-	u32 uSIFS;  /* Current SIFS */
-	u32 uDIFS;  /* Current DIFS */
-	u32 uEIFS;  /* Current EIFS */
-	u32 uSlot;  /* Current SlotTime */
-	u32 uCwMin; /* Current CwMin */
-	u32 uCwMax; /* CwMax is fixed on 1023 */
+	u32 sifs;  /* Current SIFS */
+	u32 difs;  /* Current DIFS */
+	u32 eifs;  /* Current EIFS */
+	u32 slot;  /* Current SlotTime */
 
 	/* Rate */
-	u8 byBBType; /* 0: 11A, 1:11B, 2:11G */
-	u8 byPacketType; /* 0:11a 1:11b 2:11gb 3:11ga */
-	u32 wBasicRate;
-	u8 byTopOFDMBasicRate;
-	u8 byTopCCKBasicRate;
+	u8 bb_type; /* 0: 11A, 1:11B, 2:11G */
+	u8 packet_type; /* 0:11a 1:11b 2:11gb 3:11ga */
+	u32 basic_rates;
+	u8 top_ofdm_basic_rate;
+	u8 top_cck_basic_rate;
 
-	u8 abyEEPROM[EEP_MAX_CONTEXT_SIZE];  /*u32 alignment */
+	u8 eeprom[EEP_MAX_CONTEXT_SIZE];  /*u32 alignment */
 
-	u8 byPreambleType;
+	u8 preamble_type;
 
 	/* For RF Power table */
-	u8 byCCKPwr;
-	u8 byOFDMPwrG;
-	u8 byOFDMPwrA;
-	u8 byCurPwr;
-	u8 abyCCKPwrTbl[14];
-	u8 abyOFDMPwrTbl[14];
-	u8 abyOFDMAPwrTbl[42];
+	u8 cck_pwr;
+	u8 ofdm_pwr_g;
+	u8 ofdm_pwr_a;
+	u8 power;
+	u8 cck_pwr_tbl[14];
+	u8 ofdm_pwr_tbl[14];
+	u8 ofdm_a_pwr_tbl[42];
 
-	u16 wCurrentRate;
+	u16 current_rate;
 	u16 tx_rate_fb0;
 	u16 tx_rate_fb1;
 
-	u8 byShortRetryLimit;
-	u8 byLongRetryLimit;
+	u8 short_retry_limit;
+	u8 long_retry_limit;
 
 	enum nl80211_iftype op_mode;
 
-	int bShortSlotTime;
-	int bBarkerPreambleMd;
+	int short_slot_time;
 
 	/* Power save */
 	u16 current_aid;
 
 	/* Beacon releated */
-	u16 wSeqCounter;
+	u16 seq_counter;
 
 	enum vnt_cmd_state command_state;
 
@@ -387,21 +384,16 @@ struct vnt_private {
 
 	unsigned long key_entry_inuse;
 
-	u8 byAutoFBCtrl;
+	u8 auto_fb_ctrl;
 
 	/* For Update BaseBand VGA Gain Offset */
-	u8 abyBBVGA[BB_VGA_LEVEL];
-	signed long ldBmThreshold[BB_VGA_LEVEL];
+	u8 bb_vga[BB_VGA_LEVEL];
 
-	u8 byBBPreEDRSSI;
-	u8 byBBPreEDIndex;
+	u8 bb_pre_ed_rssi;
+	u8 bb_pre_ed_index;
 
 	/* command timer */
 	struct delayed_work run_command_work;
-
-	int bChannelSwitch;
-	u8 byNewChannel;
-	u8 byChannelSwitchCount;
 
 	struct ieee80211_low_level_stats low_stats;
 };

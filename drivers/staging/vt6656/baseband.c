@@ -207,7 +207,7 @@ void vnt_get_phy_field(struct vnt_private *priv, u32 frame_length,
 	u32 count = 0;
 	u32 tmp;
 	int ext_bit;
-	u8 preamble_type = priv->byPreambleType;
+	u8 preamble_type = priv->preamble_type;
 
 	bit_count = frame_length * 8;
 	ext_bit = false;
@@ -352,11 +352,11 @@ void vnt_set_antenna_mode(struct vnt_private *priv, u8 antenna_mode)
 	case ANT_TXB:
 		break;
 	case ANT_RXA:
-		priv->byBBRxConf &= 0xFC;
+		priv->bb_rx_conf &= 0xFC;
 		break;
 	case ANT_RXB:
-		priv->byBBRxConf &= 0xFE;
-		priv->byBBRxConf |= 0x02;
+		priv->bb_rx_conf &= 0xFE;
+		priv->bb_rx_conf |= 0x02;
 		break;
 	}
 
@@ -390,36 +390,29 @@ int vnt_vt3184_init(struct vnt_private *priv)
 
 	status = vnt_control_in(priv, MESSAGE_TYPE_READ, 0,
 		MESSAGE_REQUEST_EEPROM, EEP_MAX_CONTEXT_SIZE,
-						priv->abyEEPROM);
+						priv->eeprom);
 	if (status != STATUS_SUCCESS)
 		return false;
 
-	priv->byZoneType = priv->abyEEPROM[EEP_OFS_ZONETYPE];
+	priv->rf_type = priv->eeprom[EEP_OFS_RFTYPE];
 
-	priv->byRFType = priv->abyEEPROM[EEP_OFS_RFTYPE];
+	dev_dbg(&priv->usb->dev, "RF Type %d\n", priv->rf_type);
 
-	dev_dbg(&priv->usb->dev, "Zone Type %x\n", priv->byZoneType);
-
-	dev_dbg(&priv->usb->dev, "RF Type %d\n", priv->byRFType);
-
-	if ((priv->byRFType == RF_AL2230) ||
-				(priv->byRFType == RF_AL2230S)) {
-		priv->byBBRxConf = vnt_vt3184_al2230[10];
+	if ((priv->rf_type == RF_AL2230) ||
+				(priv->rf_type == RF_AL2230S)) {
+		priv->bb_rx_conf = vnt_vt3184_al2230[10];
 		length = sizeof(vnt_vt3184_al2230);
 		addr = vnt_vt3184_al2230;
 		agc = vnt_vt3184_agc;
 		length_agc = sizeof(vnt_vt3184_agc);
 
-		priv->abyBBVGA[0] = 0x1C;
-		priv->abyBBVGA[1] = 0x10;
-		priv->abyBBVGA[2] = 0x0;
-		priv->abyBBVGA[3] = 0x0;
-		priv->ldBmThreshold[0] = -70;
-		priv->ldBmThreshold[1] = -48;
-		priv->ldBmThreshold[2] = 0;
-		priv->ldBmThreshold[3] = 0;
-	} else if (priv->byRFType == RF_AIROHA7230) {
-		priv->byBBRxConf = vnt_vt3184_al2230[10];
+		priv->bb_vga[0] = 0x1C;
+		priv->bb_vga[1] = 0x10;
+		priv->bb_vga[2] = 0x0;
+		priv->bb_vga[3] = 0x0;
+
+	} else if (priv->rf_type == RF_AIROHA7230) {
+		priv->bb_rx_conf = vnt_vt3184_al2230[10];
 		length = sizeof(vnt_vt3184_al2230);
 		addr = vnt_vt3184_al2230;
 		agc = vnt_vt3184_agc;
@@ -427,48 +420,39 @@ int vnt_vt3184_init(struct vnt_private *priv)
 
 		addr[0xd7] = 0x06;
 
-		priv->abyBBVGA[0] = 0x1c;
-		priv->abyBBVGA[1] = 0x10;
-		priv->abyBBVGA[2] = 0x0;
-		priv->abyBBVGA[3] = 0x0;
-		priv->ldBmThreshold[0] = -70;
-		priv->ldBmThreshold[1] = -48;
-		priv->ldBmThreshold[2] = 0;
-		priv->ldBmThreshold[3] = 0;
-	} else if ((priv->byRFType == RF_VT3226) ||
-			(priv->byRFType == RF_VT3226D0)) {
-		priv->byBBRxConf = vnt_vt3184_vt3226d0[10];
+		priv->bb_vga[0] = 0x1c;
+		priv->bb_vga[1] = 0x10;
+		priv->bb_vga[2] = 0x0;
+		priv->bb_vga[3] = 0x0;
+
+	} else if ((priv->rf_type == RF_VT3226) ||
+			(priv->rf_type == RF_VT3226D0)) {
+		priv->bb_rx_conf = vnt_vt3184_vt3226d0[10];
 		length = sizeof(vnt_vt3184_vt3226d0);
 		addr = vnt_vt3184_vt3226d0;
 		agc = vnt_vt3184_agc;
 		length_agc = sizeof(vnt_vt3184_agc);
 
-		priv->abyBBVGA[0] = 0x20;
-		priv->abyBBVGA[1] = 0x10;
-		priv->abyBBVGA[2] = 0x0;
-		priv->abyBBVGA[3] = 0x0;
-		priv->ldBmThreshold[0] = -70;
-		priv->ldBmThreshold[1] = -48;
-		priv->ldBmThreshold[2] = 0;
-		priv->ldBmThreshold[3] = 0;
+		priv->bb_vga[0] = 0x20;
+		priv->bb_vga[1] = 0x10;
+		priv->bb_vga[2] = 0x0;
+		priv->bb_vga[3] = 0x0;
+
 		/* Fix VT3226 DFC system timing issue */
 		vnt_mac_reg_bits_on(priv, MAC_REG_SOFTPWRCTL2,
 				    SOFTPWRCTL_RFLEOPT);
-	} else if (priv->byRFType == RF_VT3342A0) {
-		priv->byBBRxConf = vnt_vt3184_vt3226d0[10];
+	} else if (priv->rf_type == RF_VT3342A0) {
+		priv->bb_rx_conf = vnt_vt3184_vt3226d0[10];
 		length = sizeof(vnt_vt3184_vt3226d0);
 		addr = vnt_vt3184_vt3226d0;
 		agc = vnt_vt3184_agc;
 		length_agc = sizeof(vnt_vt3184_agc);
 
-		priv->abyBBVGA[0] = 0x20;
-		priv->abyBBVGA[1] = 0x10;
-		priv->abyBBVGA[2] = 0x0;
-		priv->abyBBVGA[3] = 0x0;
-		priv->ldBmThreshold[0] = -70;
-		priv->ldBmThreshold[1] = -48;
-		priv->ldBmThreshold[2] = 0;
-		priv->ldBmThreshold[3] = 0;
+		priv->bb_vga[0] = 0x20;
+		priv->bb_vga[1] = 0x10;
+		priv->bb_vga[2] = 0x0;
+		priv->bb_vga[3] = 0x0;
+
 		/* Fix VT3226 DFC system timing issue */
 		vnt_mac_reg_bits_on(priv, MAC_REG_SOFTPWRCTL2,
 				    SOFTPWRCTL_RFLEOPT);
@@ -486,12 +470,12 @@ int vnt_vt3184_init(struct vnt_private *priv)
 	vnt_control_out(priv, MESSAGE_TYPE_WRITE, 0,
 		MESSAGE_REQUEST_BBAGC, length_agc, array);
 
-	if ((priv->byRFType == RF_VT3226) ||
-		(priv->byRFType == RF_VT3342A0)) {
+	if ((priv->rf_type == RF_VT3226) ||
+		(priv->rf_type == RF_VT3342A0)) {
 		vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG,
 						MAC_REG_ITRTMSET, 0x23);
 		vnt_mac_reg_bits_on(priv, MAC_REG_PAPEDELAY, 0x01);
-	} else if (priv->byRFType == RF_VT3226D0) {
+	} else if (priv->rf_type == RF_VT3226D0) {
 		vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG,
 						MAC_REG_ITRTMSET, 0x11);
 		vnt_mac_reg_bits_on(priv, MAC_REG_PAPEDELAY, 0x01);
@@ -530,17 +514,17 @@ void vnt_set_short_slot_time(struct vnt_private *priv)
 {
 	u8 bb_vga = 0;
 
-	if (priv->bShortSlotTime)
-		priv->byBBRxConf &= 0xdf;
+	if (priv->short_slot_time)
+		priv->bb_rx_conf &= 0xdf;
 	else
-		priv->byBBRxConf |= 0x20;
+		priv->bb_rx_conf |= 0x20;
 
 	vnt_control_in_u8(priv, MESSAGE_REQUEST_BBREG, 0xe7, &bb_vga);
 
-	if (bb_vga == priv->abyBBVGA[0])
-		priv->byBBRxConf |= 0x20;
+	if (bb_vga == priv->bb_vga[0])
+		priv->bb_rx_conf |= 0x20;
 
-	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->bb_rx_conf);
 }
 
 void vnt_set_vga_gain_offset(struct vnt_private *priv, u8 data)
@@ -549,12 +533,12 @@ void vnt_set_vga_gain_offset(struct vnt_private *priv, u8 data)
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0xE7, data);
 
 	/* patch for 3253B0 Baseband with Cardbus module */
-	if (priv->bShortSlotTime)
-		priv->byBBRxConf &= 0xdf; /* 1101 1111 */
+	if (priv->short_slot_time)
+		priv->bb_rx_conf &= 0xdf; /* 1101 1111 */
 	else
-		priv->byBBRxConf |= 0x20; /* 0010 0000 */
+		priv->bb_rx_conf |= 0x20; /* 0010 0000 */
 
-	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->byBBRxConf);
+	vnt_control_out_u8(priv, MESSAGE_REQUEST_BBREG, 0x0a, priv->bb_rx_conf);
 }
 
 /*
@@ -584,9 +568,9 @@ void vnt_exit_deep_sleep(struct vnt_private *priv)
 void vnt_update_pre_ed_threshold(struct vnt_private *priv, int scanning)
 {
 	u8 cr_201 = 0x0, cr_206 = 0x0;
-	u8 ed_inx = priv->byBBPreEDIndex;
+	u8 ed_inx = priv->bb_pre_ed_index;
 
-	switch (priv->byRFType) {
+	switch (priv->rf_type) {
 	case RF_AL2230:
 	case RF_AL2230S:
 	case RF_AIROHA7230:
@@ -596,69 +580,69 @@ void vnt_update_pre_ed_threshold(struct vnt_private *priv, int scanning)
 			break;
 		}
 
-		if (priv->byBBPreEDRSSI <= 45) {
+		if (priv->bb_pre_ed_rssi <= 45) {
 			ed_inx = 20;
 			cr_201 = 0xff;
-		} else if (priv->byBBPreEDRSSI <= 46) {
+		} else if (priv->bb_pre_ed_rssi <= 46) {
 			ed_inx = 19;
 			cr_201 = 0x1a;
-		} else if (priv->byBBPreEDRSSI <= 47) {
+		} else if (priv->bb_pre_ed_rssi <= 47) {
 			ed_inx = 18;
 			cr_201 = 0x15;
-		} else if (priv->byBBPreEDRSSI <= 49) {
+		} else if (priv->bb_pre_ed_rssi <= 49) {
 			ed_inx = 17;
 			cr_201 = 0xe;
-		} else if (priv->byBBPreEDRSSI <= 51) {
+		} else if (priv->bb_pre_ed_rssi <= 51) {
 			ed_inx = 16;
 			cr_201 = 0x9;
-		} else if (priv->byBBPreEDRSSI <= 53) {
+		} else if (priv->bb_pre_ed_rssi <= 53) {
 			ed_inx = 15;
 			cr_201 = 0x6;
-		} else if (priv->byBBPreEDRSSI <= 55) {
+		} else if (priv->bb_pre_ed_rssi <= 55) {
 			ed_inx = 14;
 			cr_201 = 0x3;
-		} else if (priv->byBBPreEDRSSI <= 56) {
+		} else if (priv->bb_pre_ed_rssi <= 56) {
 			ed_inx = 13;
 			cr_201 = 0x2;
 			cr_206 = 0xa0;
-		} else if (priv->byBBPreEDRSSI <= 57) {
+		} else if (priv->bb_pre_ed_rssi <= 57) {
 			ed_inx = 12;
 			cr_201 = 0x2;
 			cr_206 = 0x20;
-		} else if (priv->byBBPreEDRSSI <= 58) {
+		} else if (priv->bb_pre_ed_rssi <= 58) {
 			ed_inx = 11;
 			cr_201 = 0x1;
 			cr_206 = 0xa0;
-		} else if (priv->byBBPreEDRSSI <= 59) {
+		} else if (priv->bb_pre_ed_rssi <= 59) {
 			ed_inx = 10;
 			cr_201 = 0x1;
 			cr_206 = 0x54;
-		} else if (priv->byBBPreEDRSSI <= 60) {
+		} else if (priv->bb_pre_ed_rssi <= 60) {
 			ed_inx = 9;
 			cr_201 = 0x1;
 			cr_206 = 0x18;
-		} else if (priv->byBBPreEDRSSI <= 61) {
+		} else if (priv->bb_pre_ed_rssi <= 61) {
 			ed_inx = 8;
 			cr_206 = 0xe3;
-		} else if (priv->byBBPreEDRSSI <= 62) {
+		} else if (priv->bb_pre_ed_rssi <= 62) {
 			ed_inx = 7;
 			cr_206 = 0xb9;
-		} else if (priv->byBBPreEDRSSI <= 63) {
+		} else if (priv->bb_pre_ed_rssi <= 63) {
 			ed_inx = 6;
 			cr_206 = 0x93;
-		} else if (priv->byBBPreEDRSSI <= 64) {
+		} else if (priv->bb_pre_ed_rssi <= 64) {
 			ed_inx = 5;
 			cr_206 = 0x79;
-		} else if (priv->byBBPreEDRSSI <= 65) {
+		} else if (priv->bb_pre_ed_rssi <= 65) {
 			ed_inx = 4;
 			cr_206 = 0x62;
-		} else if (priv->byBBPreEDRSSI <= 66) {
+		} else if (priv->bb_pre_ed_rssi <= 66) {
 			ed_inx = 3;
 			cr_206 = 0x51;
-		} else if (priv->byBBPreEDRSSI <= 67) {
+		} else if (priv->bb_pre_ed_rssi <= 67) {
 			ed_inx = 2;
 			cr_206 = 0x43;
-		} else if (priv->byBBPreEDRSSI <= 68) {
+		} else if (priv->bb_pre_ed_rssi <= 68) {
 			ed_inx = 1;
 			cr_206 = 0x36;
 		} else {
@@ -675,75 +659,75 @@ void vnt_update_pre_ed_threshold(struct vnt_private *priv, int scanning)
 			break;
 		}
 
-		if (priv->byBBPreEDRSSI <= 41) {
+		if (priv->bb_pre_ed_rssi <= 41) {
 			ed_inx = 22;
 			cr_201 = 0xff;
-		} else if (priv->byBBPreEDRSSI <= 42) {
+		} else if (priv->bb_pre_ed_rssi <= 42) {
 			ed_inx = 21;
 			cr_201 = 0x36;
-		} else if (priv->byBBPreEDRSSI <= 43) {
+		} else if (priv->bb_pre_ed_rssi <= 43) {
 			ed_inx = 20;
 			cr_201 = 0x26;
-		} else if (priv->byBBPreEDRSSI <= 45) {
+		} else if (priv->bb_pre_ed_rssi <= 45) {
 			ed_inx = 19;
 			cr_201 = 0x18;
-		} else if (priv->byBBPreEDRSSI <= 47) {
+		} else if (priv->bb_pre_ed_rssi <= 47) {
 			ed_inx = 18;
 			cr_201 = 0x11;
-		} else if (priv->byBBPreEDRSSI <= 49) {
+		} else if (priv->bb_pre_ed_rssi <= 49) {
 			ed_inx = 17;
 			cr_201 = 0xa;
-		} else if (priv->byBBPreEDRSSI <= 51) {
+		} else if (priv->bb_pre_ed_rssi <= 51) {
 			ed_inx = 16;
 			cr_201 = 0x7;
-		} else if (priv->byBBPreEDRSSI <= 53) {
+		} else if (priv->bb_pre_ed_rssi <= 53) {
 			ed_inx = 15;
 			cr_201 = 0x4;
-		} else if (priv->byBBPreEDRSSI <= 55) {
+		} else if (priv->bb_pre_ed_rssi <= 55) {
 			ed_inx = 14;
 			cr_201 = 0x2;
 			cr_206 = 0xc0;
-		} else if (priv->byBBPreEDRSSI <= 56) {
+		} else if (priv->bb_pre_ed_rssi <= 56) {
 			ed_inx = 13;
 			cr_201 = 0x2;
 			cr_206 = 0x30;
-		} else if (priv->byBBPreEDRSSI <= 57) {
+		} else if (priv->bb_pre_ed_rssi <= 57) {
 			ed_inx = 12;
 			cr_201 = 0x1;
 			cr_206 = 0xb0;
-		} else if (priv->byBBPreEDRSSI <= 58) {
+		} else if (priv->bb_pre_ed_rssi <= 58) {
 			ed_inx = 11;
 			cr_201 = 0x1;
 			cr_206 = 0x70;
-		} else if (priv->byBBPreEDRSSI <= 59) {
+		} else if (priv->bb_pre_ed_rssi <= 59) {
 			ed_inx = 10;
 			cr_201 = 0x1;
 			cr_206 = 0x30;
-		} else if (priv->byBBPreEDRSSI <= 60) {
+		} else if (priv->bb_pre_ed_rssi <= 60) {
 			ed_inx = 9;
 			cr_206 = 0xea;
-		} else if (priv->byBBPreEDRSSI <= 61) {
+		} else if (priv->bb_pre_ed_rssi <= 61) {
 			ed_inx = 8;
 			cr_206 = 0xc0;
-		} else if (priv->byBBPreEDRSSI <= 62) {
+		} else if (priv->bb_pre_ed_rssi <= 62) {
 			ed_inx = 7;
 			cr_206 = 0x9c;
-		} else if (priv->byBBPreEDRSSI <= 63) {
+		} else if (priv->bb_pre_ed_rssi <= 63) {
 			ed_inx = 6;
 			cr_206 = 0x80;
-		} else if (priv->byBBPreEDRSSI <= 64) {
+		} else if (priv->bb_pre_ed_rssi <= 64) {
 			ed_inx = 5;
 			cr_206 = 0x68;
-		} else if (priv->byBBPreEDRSSI <= 65) {
+		} else if (priv->bb_pre_ed_rssi <= 65) {
 			ed_inx = 4;
 			cr_206 = 0x52;
-		} else if (priv->byBBPreEDRSSI <= 66) {
+		} else if (priv->bb_pre_ed_rssi <= 66) {
 			ed_inx = 3;
 			cr_206 = 0x43;
-		} else if (priv->byBBPreEDRSSI <= 67) {
+		} else if (priv->bb_pre_ed_rssi <= 67) {
 			ed_inx = 2;
 			cr_206 = 0x36;
-		} else if (priv->byBBPreEDRSSI <= 68) {
+		} else if (priv->bb_pre_ed_rssi <= 68) {
 			ed_inx = 1;
 			cr_206 = 0x2d;
 		} else {
@@ -759,69 +743,69 @@ void vnt_update_pre_ed_threshold(struct vnt_private *priv, int scanning)
 			break;
 		}
 
-		if (priv->byBBPreEDRSSI <= 41) {
+		if (priv->bb_pre_ed_rssi <= 41) {
 			ed_inx = 20;
 			cr_201 = 0xff;
-		} else if (priv->byBBPreEDRSSI <= 42) {
+		} else if (priv->bb_pre_ed_rssi <= 42) {
 			ed_inx = 19;
 			cr_201 = 0x36;
-		} else if (priv->byBBPreEDRSSI <= 43) {
+		} else if (priv->bb_pre_ed_rssi <= 43) {
 			ed_inx = 18;
 			cr_201 = 0x26;
-		} else if (priv->byBBPreEDRSSI <= 45) {
+		} else if (priv->bb_pre_ed_rssi <= 45) {
 			ed_inx = 17;
 			cr_201 = 0x18;
-		} else if (priv->byBBPreEDRSSI <= 47) {
+		} else if (priv->bb_pre_ed_rssi <= 47) {
 			ed_inx = 16;
 			cr_201 = 0x11;
-		} else if (priv->byBBPreEDRSSI <= 49) {
+		} else if (priv->bb_pre_ed_rssi <= 49) {
 			ed_inx = 15;
 			cr_201 = 0xa;
-		} else if (priv->byBBPreEDRSSI <= 51) {
+		} else if (priv->bb_pre_ed_rssi <= 51) {
 			ed_inx = 14;
 			cr_201 = 0x7;
-		} else if (priv->byBBPreEDRSSI <= 53) {
+		} else if (priv->bb_pre_ed_rssi <= 53) {
 			ed_inx = 13;
 			cr_201 = 0x4;
-		} else if (priv->byBBPreEDRSSI <= 55) {
+		} else if (priv->bb_pre_ed_rssi <= 55) {
 			ed_inx = 12;
 			cr_201 = 0x2;
 			cr_206 = 0xc0;
-		} else if (priv->byBBPreEDRSSI <= 56) {
+		} else if (priv->bb_pre_ed_rssi <= 56) {
 			ed_inx = 11;
 			cr_201 = 0x2;
 			cr_206 = 0x30;
-		} else if (priv->byBBPreEDRSSI <= 57) {
+		} else if (priv->bb_pre_ed_rssi <= 57) {
 			ed_inx = 10;
 			cr_201 = 0x1;
 			cr_206 = 0xb0;
-		} else if (priv->byBBPreEDRSSI <= 58) {
+		} else if (priv->bb_pre_ed_rssi <= 58) {
 			ed_inx = 9;
 			cr_201 = 0x1;
 			cr_206 = 0x70;
-		} else if (priv->byBBPreEDRSSI <= 59) {
+		} else if (priv->bb_pre_ed_rssi <= 59) {
 			ed_inx = 8;
 			cr_201 = 0x1;
 			cr_206 = 0x30;
-		} else if (priv->byBBPreEDRSSI <= 60) {
+		} else if (priv->bb_pre_ed_rssi <= 60) {
 			ed_inx = 7;
 			cr_206 = 0xea;
-		} else if (priv->byBBPreEDRSSI <= 61) {
+		} else if (priv->bb_pre_ed_rssi <= 61) {
 			ed_inx = 6;
 			cr_206 = 0xc0;
-		} else if (priv->byBBPreEDRSSI <= 62) {
+		} else if (priv->bb_pre_ed_rssi <= 62) {
 			ed_inx = 5;
 			cr_206 = 0x9c;
-		} else if (priv->byBBPreEDRSSI <= 63) {
+		} else if (priv->bb_pre_ed_rssi <= 63) {
 			ed_inx = 4;
 			cr_206 = 0x80;
-		} else if (priv->byBBPreEDRSSI <= 64) {
+		} else if (priv->bb_pre_ed_rssi <= 64) {
 			ed_inx = 3;
 			cr_206 = 0x68;
-		} else if (priv->byBBPreEDRSSI <= 65) {
+		} else if (priv->bb_pre_ed_rssi <= 65) {
 			ed_inx = 2;
 			cr_206 = 0x52;
-		} else if (priv->byBBPreEDRSSI <= 66) {
+		} else if (priv->bb_pre_ed_rssi <= 66) {
 			ed_inx = 1;
 			cr_206 = 0x43;
 		} else {
@@ -832,13 +816,13 @@ void vnt_update_pre_ed_threshold(struct vnt_private *priv, int scanning)
 
 	}
 
-	if (ed_inx == priv->byBBPreEDIndex && !scanning)
+	if (ed_inx == priv->bb_pre_ed_index && !scanning)
 		return;
 
-	priv->byBBPreEDIndex = ed_inx;
+	priv->bb_pre_ed_index = ed_inx;
 
-	dev_dbg(&priv->usb->dev, "%s byBBPreEDRSSI %d\n",
-					__func__, priv->byBBPreEDRSSI);
+	dev_dbg(&priv->usb->dev, "%s bb_pre_ed_rssi %d\n",
+					__func__, priv->bb_pre_ed_rssi);
 
 	if (!cr_201 && !cr_206)
 		return;

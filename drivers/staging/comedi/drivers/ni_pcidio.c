@@ -58,9 +58,6 @@ comedi_nonfree_firmware tarball available from http://www.comedi.org
 #include "comedi_fc.h"
 #include "mite.h"
 
-#define PCI_DIO_SIZE 4096
-#define PCI_MITE_SIZE 4096
-
 /* defines for the PCI-DIO-32HS */
 
 #define Window_Address			4	/* W */
@@ -297,16 +294,6 @@ struct nidio96_private {
 	spinlock_t mite_channel_lock;
 };
 
-static int ni_pcidio_cmdtest(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_cmd *cmd);
-static int ni_pcidio_cmd(struct comedi_device *dev, struct comedi_subdevice *s);
-static int ni_pcidio_inttrig(struct comedi_device *dev,
-			     struct comedi_subdevice *s, unsigned int trignum);
-static int ni_pcidio_ns_to_timer(int *nanosec, int round_mode);
-static int setup_mite_dma(struct comedi_device *dev,
-			  struct comedi_subdevice *s);
-
 static int ni_pcidio_request_di_mite_channel(struct comedi_device *dev)
 {
 	struct nidio96_private *devpriv = dev->private;
@@ -348,6 +335,30 @@ static void ni_pcidio_release_di_mite_channel(struct comedi_device *dev)
 		mmiowb();
 	}
 	spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
+}
+
+static int setup_mite_dma(struct comedi_device *dev, struct comedi_subdevice *s)
+{
+	struct nidio96_private *devpriv = dev->private;
+	int retval;
+	unsigned long flags;
+
+	retval = ni_pcidio_request_di_mite_channel(dev);
+	if (retval)
+		return retval;
+
+	/* write alloc the entire buffer */
+	comedi_buf_write_alloc(s, s->async->prealloc_bufsz);
+
+	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
+	if (devpriv->di_mite_chan) {
+		mite_prep_dma(devpriv->di_mite_chan, 32, 32);
+		mite_dma_arm(devpriv->di_mite_chan);
+	} else
+		retval = -EIO;
+	spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
+
+	return retval;
 }
 
 static int ni_pcidio_poll(struct comedi_device *dev, struct comedi_subdevice *s)
@@ -532,6 +543,29 @@ static int ni_pcidio_insn_bits(struct comedi_device *dev,
 	return insn->n;
 }
 
+static int ni_pcidio_ns_to_timer(int *nanosec, unsigned int flags)
+{
+	int divider, base;
+
+	base = TIMER_BASE;
+
+	switch (flags & TRIG_ROUND_MASK) {
+	case TRIG_ROUND_NEAREST:
+	default:
+		divider = (*nanosec + base / 2) / base;
+		break;
+	case TRIG_ROUND_DOWN:
+		divider = (*nanosec) / base;
+		break;
+	case TRIG_ROUND_UP:
+		divider = (*nanosec + base - 1) / base;
+		break;
+	}
+
+	*nanosec = base * divider;
+	return divider;
+}
+
 static int ni_pcidio_cmdtest(struct comedi_device *dev,
 			     struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
@@ -596,7 +630,7 @@ static int ni_pcidio_cmdtest(struct comedi_device *dev,
 
 	if (cmd->scan_begin_src == TRIG_TIMER) {
 		arg = cmd->scan_begin_arg;
-		ni_pcidio_ns_to_timer(&arg, cmd->flags & TRIG_ROUND_MASK);
+		ni_pcidio_ns_to_timer(&arg, cmd->flags);
 		err |= cfc_check_trigger_arg_is(&cmd->scan_begin_arg, arg);
 	}
 
@@ -606,27 +640,20 @@ static int ni_pcidio_cmdtest(struct comedi_device *dev,
 	return 0;
 }
 
-static int ni_pcidio_ns_to_timer(int *nanosec, int round_mode)
+static int ni_pcidio_inttrig(struct comedi_device *dev,
+			     struct comedi_subdevice *s,
+			     unsigned int trig_num)
 {
-	int divider, base;
+	struct nidio96_private *devpriv = dev->private;
+	struct comedi_cmd *cmd = &s->async->cmd;
 
-	base = TIMER_BASE;
+	if (trig_num != cmd->start_arg)
+		return -EINVAL;
 
-	switch (round_mode) {
-	case TRIG_ROUND_NEAREST:
-	default:
-		divider = (*nanosec + base / 2) / base;
-		break;
-	case TRIG_ROUND_DOWN:
-		divider = (*nanosec) / base;
-		break;
-	case TRIG_ROUND_UP:
-		divider = (*nanosec + base - 1) / base;
-		break;
-	}
+	writeb(devpriv->OpModeBits, devpriv->mite->daq_io_addr + OpMode);
+	s->async->inttrig = NULL;
 
-	*nanosec = base * divider;
-	return divider;
+	return 1;
 }
 
 static int ni_pcidio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
@@ -745,46 +772,6 @@ static int ni_pcidio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	}
 
 	return 0;
-}
-
-static int setup_mite_dma(struct comedi_device *dev, struct comedi_subdevice *s)
-{
-	struct nidio96_private *devpriv = dev->private;
-	int retval;
-	unsigned long flags;
-
-	retval = ni_pcidio_request_di_mite_channel(dev);
-	if (retval)
-		return retval;
-
-	/* write alloc the entire buffer */
-	comedi_buf_write_alloc(s, s->async->prealloc_bufsz);
-
-	spin_lock_irqsave(&devpriv->mite_channel_lock, flags);
-	if (devpriv->di_mite_chan) {
-		mite_prep_dma(devpriv->di_mite_chan, 32, 32);
-		mite_dma_arm(devpriv->di_mite_chan);
-	} else
-		retval = -EIO;
-	spin_unlock_irqrestore(&devpriv->mite_channel_lock, flags);
-
-	return retval;
-}
-
-static int ni_pcidio_inttrig(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     unsigned int trig_num)
-{
-	struct nidio96_private *devpriv = dev->private;
-	struct comedi_cmd *cmd = &s->async->cmd;
-
-	if (trig_num != cmd->start_arg)
-		return -EINVAL;
-
-	writeb(devpriv->OpModeBits, devpriv->mite->daq_io_addr + OpMode);
-	s->async->inttrig = NULL;
-
-	return 1;
 }
 
 static int ni_pcidio_cancel(struct comedi_device *dev,
