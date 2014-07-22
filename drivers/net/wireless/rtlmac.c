@@ -2113,7 +2113,7 @@ static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 	printk(KERN_DEBUG "%s: changed_flags %08x, total_flags %08x\n",
 	       __func__, changed_flags, *total_flags);
 
-	*total_flags &= (FIF_ALLMULTI | FIF_CONTROL);
+	*total_flags &= (FIF_ALLMULTI | FIF_CONTROL | FIF_BCN_PRBRESP_PROMISC);
 }
 
 static int rtlmac_start(struct ieee80211_hw *hw)
