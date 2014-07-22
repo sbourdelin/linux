@@ -75,7 +75,7 @@ static int vnt_int_report_rate(struct vnt_private *priv, u8 pkt_no, u8 tsr)
 	u8 tx_retry = (tsr & 0xf0) >> 4;
 	s8 idx;
 
-	if (pkt_no >= priv->cbTD)
+	if (pkt_no >= priv->num_tx_context)
 		return -EINVAL;
 
 	context = priv->tx_context[pkt_no];
@@ -153,16 +153,8 @@ void vnt_int_process_data(struct vnt_private *priv)
 			if (priv->hw->conf.flags & IEEE80211_CONF_PS)
 				vnt_schedule_command(priv,
 							WLAN_CMD_TBTT_WAKEUP);
-#if 0 /* TODO channel switch */
-			if (priv->bChannelSwitch) {
-				priv->byChannelSwitchCount--;
-				if (priv->byChannelSwitchCount == 0)
-					vnt_schedule_command(priv,
-							WLAN_CMD_11H_CHSW);
-			}
-#endif
 		}
-		priv->qwCurrTSF = le64_to_cpu(int_data->tsf);
+		priv->current_tsf = le64_to_cpu(int_data->tsf);
 
 		low_stats->dot11RTSSuccessCount += int_data->rts_success;
 		low_stats->dot11RTSFailureCount += int_data->rts_fail;

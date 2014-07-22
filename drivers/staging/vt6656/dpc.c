@@ -133,7 +133,7 @@ int vnt_rx_data(struct vnt_private *priv, struct vnt_rcb *ptr_rcb,
 
 	priv->tsf_time = le64_to_cpu(*tsf_time);
 
-	if (priv->byBBType == BB_TYPE_11G) {
+	if (priv->bb_type == BB_TYPE_11G) {
 		sq_3 = skb_data + 8 + pay_load_with_padding + 12;
 		sq = sq_3;
 	} else {
@@ -152,8 +152,8 @@ int vnt_rx_data(struct vnt_private *priv, struct vnt_rcb *ptr_rcb,
 
 	vnt_rf_rssi_to_dbm(priv, *rssi, &rx_dbm);
 
-	priv->byBBPreEDRSSI = (u8)rx_dbm + 1;
-	priv->uCurrRSSI = priv->byBBPreEDRSSI;
+	priv->bb_pre_ed_rssi = (u8)rx_dbm + 1;
+	priv->current_rssi = priv->bb_pre_ed_rssi;
 
 	frame = skb_data + 8;
 
@@ -175,7 +175,7 @@ int vnt_rx_data(struct vnt_private *priv, struct vnt_rcb *ptr_rcb,
 	rx_status.rate_idx = rate_idx;
 
 	if (ieee80211_has_protected(fc)) {
-		if (priv->byLocalID > REV_ID_VT3253_A1) {
+		if (priv->local_id > REV_ID_VT3253_A1) {
 			rx_status.flag |= RX_FLAG_DECRYPTED;
 
 			/* Drop packet */
