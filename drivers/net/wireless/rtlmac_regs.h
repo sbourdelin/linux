@@ -386,6 +386,31 @@
 #define REG_RESPONSE_RATE_SET		0x0440
 #define  RESPONSE_RATE_BITMAP_ALL	0xfffff
 #define  RESPONSE_RATE_RRSR_CCK_ONLY_1M	0xffff1
+#define  RSR_1M				BIT(0)
+#define  RSR_2M				BIT(1)
+#define  RSR_5_5M			BIT(2)
+#define  RSR_11M			BIT(3)
+#define  RSR_6M				BIT(4)
+#define  RSR_9M				BIT(5)
+#define  RSR_12M			BIT(6)
+#define  RSR_18M			BIT(7)
+#define  RSR_24M			BIT(8)
+#define  RSR_36M			BIT(9)
+#define  RSR_48M			BIT(10)
+#define  RSR_54M			BIT(11)
+#define  RSR_MCS0			BIT(12)
+#define  RSR_MCS1			BIT(13)
+#define  RSR_MCS2			BIT(14)
+#define  RSR_MCS3			BIT(15)
+#define  RSR_MCS4			BIT(16)
+#define  RSR_MCS5			BIT(17)
+#define  RSR_MCS6			BIT(18)
+#define  RSR_MCS7			BIT(19)
+#define  RSR_RSC_LOWER_SUB_CHANNEL	BIT(21)	/* 0x200000 */
+#define  RSR_RSC_UPPER_SUB_CHANNEL	BIT(22)	/* 0x400000 */
+#define  RSR_RSC_BANDWIDTH_40M		(RSR_RSC_UPPER_SUB_CHANNEL|\
+					 RSR_RSC_LOWER_SUB_CHANNEL)
+#define  RSR_ACK_SHORT_PREAMBLE		BIT(23)
 
 #define REG_ARFR0			0x0444
 #define REG_ARFR1			0x0448
@@ -490,7 +515,11 @@
 
 /* 0x0600 ~ 0x07FF  WMAC Configuration */
 #define REG_APSD_CTRL			0x0600
-#define REG_BWOPMODE			0x0603
+#define REG_BW_OPMODE			0x0603
+#define	 BW_OPMODE_20MHZ		BIT(2)
+#define	 BW_OPMODE_5G			BIT(1)
+#define	 BW_OPMODE_11J			BIT(0)
+
 #define REG_TCR				0x0604
 
 /* Receive Configuration Register */
@@ -584,14 +613,18 @@
 #define REG_BSSID1			0x0708
 
 #define REG_FPGA0_RF_MODE		0x0800
-#define  FPGA0_RF_MODE			BIT(0)
-#define  FPGA0_RF_MODE_JAPAN		BIT(1)
-#define  FPGA0_RF_MODE_CCK		BIT(24)
-#define  FPGA0_RF_MODE_OFDM		BIT(25)
+#define  FPGA_RF_MODE			BIT(0)
+#define  FPGA_RF_MODE_JAPAN		BIT(1)
+#define  FPGA_RF_MODE_CCK		BIT(24)
+#define  FPGA_RF_MODE_OFDM		BIT(25)
 
 #define REG_FPGA0_TXINFO		0x0804
 #define REG_FPGA0_PSD_FUNC		0x0808
 #define REG_FPGA0_TX_GAIN		0x080c
+#define REG_FPGA0_POWER_SAVE		0x0818
+#define  FPGA0_PS_LOWER_CHANNEL		BIT(26)
+#define  FPGA0_PS_UPPER_CHANNEL		BIT(27)
+
 #define REG_FPGA0_XA_HSSI_PARM1		0x0820	/* RF 3 wire register */
 #define REG_FPGA0_XA_HSSI_PARM2		0x0824
 #define REG_FPGA0_XB_HSSI_PARM1		0x0828
@@ -646,39 +679,49 @@
 #define  FPGA0_RF_PAPE			0x400
 #define  FPGA0_RF_PAPE5G		0x800
 
-#define REG_FPGA0_XA_LSSI_READBACK	0x8a0	/* Tranceiver LSSI Readback */
-#define REG_FPGA0_XB_LSSI_READBACK	0x8a4
-#define REG_HSPI_XA_READBACK		0x8b8	/* Transceiver A HSPI read */
-#define REG_HSPI_XB_READBACK		0x8bc	/* Transceiver B HSPI read */
+#define REG_FPGA0_ANALOG1		0x0880
+#define REG_FPGA0_ANALOG2		0x0884
+#define REG_FPGA0_ANALOG3		0x0888
+#define REG_FPGA0_ANALOG4		0x088c
 
-#define REG_OFDM0_TRX_PATH_ENABLE	0xc04
+#define REG_FPGA0_XA_LSSI_READBACK	0x08a0	/* Tranceiver LSSI Readback */
+#define REG_FPGA0_XB_LSSI_READBACK	0x08a4
+#define REG_HSPI_XA_READBACK		0x08b8	/* Transceiver A HSPI read */
+#define REG_HSPI_XB_READBACK		0x08bc	/* Transceiver B HSPI read */
+
+#define REG_FPGA1_RF_MODE		0x0900
+
+#define REG_CCK0_SYSTEM			0x0a00
+#define  CCK0_SIDEBAND			BIT(4)
+
+#define REG_OFDM0_TRX_PATH_ENABLE	0x0c04
 #define OFDM0_RF_PATH_RX_MASK		0x0f
 
-#define REG_OFDM0_XA_AGC_CORE1		0xc50
-#define REG_OFDM0_XA_AGC_CORE2		0xc54
-#define REG_OFDM0_XB_AGC_CORE1		0xc58
-#define REG_OFDM0_XB_AGC_CORE2		0xc5c
-#define REG_OFDM0_XC_AGC_CORE1		0xc60
-#define REG_OFDM0_XC_AGC_CORE2		0xc64
-#define REG_OFDM0_XD_AGC_CORE1		0xc68
-#define REG_OFDM0_XD_AGC_CORE2		0xc6c
+#define REG_OFDM0_XA_AGC_CORE1		0x0c50
+#define REG_OFDM0_XA_AGC_CORE2		0x0c54
+#define REG_OFDM0_XB_AGC_CORE1		0x0c58
+#define REG_OFDM0_XB_AGC_CORE2		0x0c5c
+#define REG_OFDM0_XC_AGC_CORE1		0x0c60
+#define REG_OFDM0_XC_AGC_CORE2		0x0c64
+#define REG_OFDM0_XD_AGC_CORE1		0x0c68
+#define REG_OFDM0_XD_AGC_CORE2		0x0c6c
 #define  OFDM0_X_AGC_CORE1_IGI_MASK	0x0000007F
 
-#define REG_OFDM1_LSTF			0xd00
+#define REG_OFDM1_LSTF			0x0d00
 #define  OFDM_CONTINUE_TX		0x10000000
 #define  OFDM_SINGLE_CARRIER		0x20000000
 #define  OFDM_SINGLE_TONE		0x40000000
 #define  OFDM_LSTF_MASK			0x70000000
 
-#define REG_OFDM1_TRX_PATH_ENABLE	0xd04
+#define REG_OFDM1_TRX_PATH_ENABLE	0x0d04
 
-#define REG_TX_AGC_A_RATE18_06		0xe00
-#define REG_TX_AGC_A_RATE54_24		0xe04
-#define REG_TX_AGC_A_CCK1_MCS32		0xe08
-#define REG_TX_AGC_A_MCS03_MCS00	0xe10
-#define REG_TX_AGC_A_MCS07_MCS04	0xe14
-#define REG_TX_AGC_A_MCS11_MCS08	0xe18
-#define REG_TX_AGC_A_MCS15_MCS12	0xe1c
+#define REG_TX_AGC_A_RATE18_06		0x0e00
+#define REG_TX_AGC_A_RATE54_24		0x0e04
+#define REG_TX_AGC_A_CCK1_MCS32		0x0e08
+#define REG_TX_AGC_A_MCS03_MCS00	0x0e10
+#define REG_TX_AGC_A_MCS07_MCS04	0x0e14
+#define REG_TX_AGC_A_MCS11_MCS08	0x0e18
+#define REG_TX_AGC_A_MCS15_MCS12	0x0e1c
 
 #define REG_8723A_FW_START_ADDRESS	0x1000
 
@@ -729,6 +772,9 @@
 #define RF6052_REG_TXBIAS		0x16
 #define RF6052_REG_POW_ABILITY		0x17
 #define RF6052_REG_MODE_AG		0x18	/* RF channel and BW switch */
+#define  MODE_AG_CHANNEL_MASK		0x3ff
+#define  MODE_AG_CHANNEL_20MHZ		BIT(10)
+
 #define RF6052_REG_TOP			0x19
 #define RF6052_REG_RX_G1		0x1a
 #define RF6052_REG_RX_G2		0x1b

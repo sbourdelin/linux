@@ -565,8 +565,107 @@ static int rtl8723a_channel_to_group(int channel)
 	return group;
 }
 
+static void rtl8723au_config_channel(struct ieee80211_hw *hw)
+{
+	struct rtlmac_priv *priv = hw->priv;
+	u32 val32;
+	u8 opmode;
+	u32 rsr;
+	int sec_ch_above;
+
+	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	val32 &= ~MODE_AG_CHANNEL_MASK;
+	val32 |= hw->conf.chandef.chan->hw_value;
+	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, val32);
+
+	opmode = rtl8723au_read8(priv, REG_BW_OPMODE);
+	rsr = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
+
+	switch (hw->conf.chandef.width) {
+	case NL80211_CHAN_WIDTH_20_NOHT:
+	case NL80211_CHAN_WIDTH_20:
+		opmode |= BW_OPMODE_20MHZ;
+		rtl8723au_write8(priv, REG_BW_OPMODE, opmode);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+		val32 &= ~FPGA_RF_MODE;
+		rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA1_RF_MODE);
+		val32 &= ~FPGA_RF_MODE;
+		rtl8723au_write32(priv, REG_FPGA1_RF_MODE, val32);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA0_ANALOG2);
+		val32 |= BIT(10);
+		rtl8723au_write32(priv, REG_FPGA0_ANALOG2, val32);
+		break;
+	case NL80211_CHAN_WIDTH_40:
+                if (hw->conf.chandef.center_freq1 >
+		    hw->conf.chandef.chan->center_freq)
+                        sec_ch_above = 1;
+		else
+			sec_ch_above = 0;
+
+		opmode &= ~BW_OPMODE_20MHZ;
+		rtl8723au_write8(priv, REG_BW_OPMODE, opmode);
+		rsr &= ~RSR_RSC_BANDWIDTH_40M;
+		if (sec_ch_above)
+			rsr |= RSR_RSC_UPPER_SUB_CHANNEL;
+		else
+			rsr |= RSR_RSC_LOWER_SUB_CHANNEL;
+		rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, rsr);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+		val32 |= FPGA_RF_MODE;
+		rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA1_RF_MODE);
+		val32 |= FPGA_RF_MODE;
+		rtl8723au_write32(priv, REG_FPGA1_RF_MODE, val32);
+
+		/*  Set Control channel to upper or lower. These settings
+		    are required only for 40MHz */
+		val32 = rtl8723au_read32(priv, REG_CCK0_SYSTEM);
+		val32 &= ~CCK0_SIDEBAND;
+		if (!sec_ch_above)
+			val32 |= CCK0_SIDEBAND;
+		rtl8723au_write32(priv, REG_CCK0_SYSTEM, val32);
+
+		val32 = rtl8723au_read32(priv, REG_OFDM1_LSTF);
+		val32 &= ~(BIT(10) | BIT(11)); /* 0xc00 */
+		if (sec_ch_above)
+			val32 |= BIT(10);
+		else
+			val32 |= BIT(11);
+		rtl8723au_write32(priv, REG_OFDM1_LSTF, val32);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA0_ANALOG2);
+		val32 &= ~BIT(10);
+		rtl8723au_write32(priv, REG_FPGA0_ANALOG2, val32);
+
+		val32 = rtl8723au_read32(priv, REG_FPGA0_POWER_SAVE);
+		val32 &= ~(FPGA0_PS_LOWER_CHANNEL | FPGA0_PS_UPPER_CHANNEL);
+		if (sec_ch_above)
+			val32 |= FPGA0_PS_UPPER_CHANNEL;
+		else
+			val32 |= FPGA0_PS_LOWER_CHANNEL;
+		rtl8723au_write32(priv, REG_FPGA0_POWER_SAVE, val32);
+		break;
+
+	default:
+		break;
+	}
+
+	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	if (hw->conf.chandef.width == NL80211_CHAN_WIDTH_40)
+		val32 &= ~MODE_AG_CHANNEL_20MHZ;
+	else
+		val32 |= MODE_AG_CHANNEL_20MHZ;
+	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, val32);
+}
+
 static void
-rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht20)
+rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 {
 	struct rtl8723au_efuse *efuse;
 	u8 cck[RTL8723A_MAX_RF_PATHS], ofdm[RTL8723A_MAX_RF_PATHS];
@@ -619,12 +718,12 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht20)
 
 	ofdmbase[0] = ofdm[0] +	efuse->ofdm_tx_power_index_diff[group].a;
 	mcsbase[0] = ofdm[0];
-	if (!ht20)
+	if (ht40)
 		mcsbase[0] += efuse->ht20_tx_power_index_diff[group].a;
 
 	ofdmbase[1] = ofdm[1] +	efuse->ofdm_tx_power_index_diff[group].b;
 	mcsbase[1] = ofdm[1];
-	if (!ht20)
+	if (ht40)
 		mcsbase[1] += efuse->ht20_tx_power_index_diff[group].b;
 
 	val32 = ofdmbase[0] | ofdmbase[0] << 8 |
@@ -1952,7 +2051,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 * Enable CCK and OFDM block
 	 */
 	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
-	val32 |= (FPGA0_RF_MODE_CCK | FPGA0_RF_MODE_OFDM);
+	val32 |= (FPGA_RF_MODE_CCK | FPGA_RF_MODE_OFDM);
 	rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
 
 	/*
@@ -1963,7 +2062,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/*
 	 * Start out with default power levels for channel 6, 20MHz
 	 */
-	rtl8723a_set_tx_power(priv, 6, true);
+	rtl8723a_set_tx_power(priv, 6, false);
 
 	/* Let the 8051 take control of antenna setting */
 	val8 = rtl8723au_read8(priv, REG_LEDCFG2);
@@ -2050,7 +2149,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	    but we need to fin root cause. */
 	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
 	if ((val32 & 0xff000000) != 0x83000000) {
-		val32 |= FPGA0_RF_MODE_CCK;
+		val32 |= FPGA_RF_MODE_CCK;
 		rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
 	}
 
@@ -2102,8 +2201,36 @@ static void rtlmac_remove_interface(struct ieee80211_hw *hw,
 
 static int rtlmac_config(struct ieee80211_hw *hw, u32 changed)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
-	return 0;
+	struct rtlmac_priv *priv = hw->priv;
+	int ret = 0, channel;
+	bool ht40;
+
+	printk(KERN_DEBUG "%s: channel: %i (changed %08x)\n",
+	       __func__, hw->conf.chandef.chan->hw_value, changed);
+
+	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
+		switch (hw->conf.chandef.width) {
+		case NL80211_CHAN_WIDTH_20_NOHT:
+		case NL80211_CHAN_WIDTH_20:
+			ht40 = false;
+			break;
+		case NL80211_CHAN_WIDTH_40:
+			ht40 = true;
+			break;
+		default:
+			ret = -ENOTSUPP;
+			goto exit;
+		}
+
+		channel = hw->conf.chandef.chan->hw_value;
+
+		rtl8723a_set_tx_power(priv, channel, ht40);
+
+		rtl8723au_config_channel(hw);
+	}
+
+exit:
+	return ret;
 }
 
 static void rtlmac_configure_filter(struct ieee80211_hw *hw,
