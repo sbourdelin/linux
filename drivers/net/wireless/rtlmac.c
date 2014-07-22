@@ -2333,6 +2333,12 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->cipher_suites = rtlmac_cipher_suites;
 	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtlmac_cipher_suites);
 
+	/*
+	 * Let the stack do crypto for now
+	 */
+	hw->wiphy->cipher_suites = NULL;
+	hw->wiphy->n_cipher_suites = 0;
+
 	SET_IEEE80211_DEV(priv->hw, &interface->dev);
 	SET_IEEE80211_PERM_ADDR(hw, priv->mac_addr);
 
