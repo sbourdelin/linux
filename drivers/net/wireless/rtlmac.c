@@ -2082,9 +2082,15 @@ static int rtlmac_add_interface(struct ieee80211_hw *hw,
 {
 	int ret;
 
-	ret = -EOPNOTSUPP;
+	switch (vif->type) {
+	case NL80211_IFTYPE_STATION:
+		ret = 0;
+		break;
+	default:
+		ret = -EOPNOTSUPP;
+	}
 
-	printk(KERN_DEBUG "%s\n", __func__);
+	printk(KERN_DEBUG "%s = %i\n", __func__, ret);
 	return ret;
 }
 
@@ -2104,7 +2110,10 @@ static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 				    unsigned int changed_flags,
 				    unsigned int *total_flags, u64 multicast)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
+	printk(KERN_DEBUG "%s: changed_flags %08x, total_flags %08x\n",
+	       __func__, changed_flags, *total_flags);
+
+	*total_flags &= (FIF_ALLMULTI | FIF_CONTROL);
 }
 
 static int rtlmac_start(struct ieee80211_hw *hw)
