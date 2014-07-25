@@ -177,3 +177,56 @@ struct rtlmac_priv {
 		struct rtl8723au_efuse efuse;
 	} efuse_wifi;
 };
+
+struct rtlmac_tx_desc {
+	__le32 txdw0;
+	__le32 txdw1;
+	__le32 txdw2;
+	__le32 txdw3;
+	__le32 txdw4;
+	__le32 txdw5;
+	__le32 txdw6;
+	__le32 txdw7;
+};
+
+#define TXDESC_QUEUE_BK		0x2	/* 0x1 */
+#define TXDESC_QUEUE_BE		0x0
+#define TXDESC_QUEUE_VI		0x5	/* 0x4 */
+#define TXDESC_QUEUE_VO		0x7	/* 0x6 */
+#define TXDESC_QUEUE_BEACON	0x10
+#define TXDESC_QUEUE_HIGH	0x11
+#define TXDESC_QUEUE_MGNT	0x12
+#define TXDESC_QUEUE_CMD	0x13
+
+#define TXDESC_OFFSET_SZ	0
+#define TXDESC_OFFSET_SHT	16
+#define TXDESC_BMC		BIT(24)
+#define TXDESC_LSG		BIT(26)
+#define TXDESC_FSG		BIT(27)
+#define TXDESC_OWN		BIT(31)
+
+/* OFFSET 4 */
+#define TXDESC_PKT_OFFSET_SZ	0
+#define TXDESC_BK		BIT(6)
+#define TXDESC_QUEUE_SHIFT	8
+#define TXDESC_RATE_SHIFT	16
+#define TXDESC_NAVUSEHDR	BIT(20)
+#define TXDESC_PKT_OFFSET_SHIFT	26
+#define TXDESC_HWPC		BIT(31)
+
+/* OFFSET 8 */
+#define TXDESC_AGG_EN		BIT(29)
+
+/* OFFSET 12 */
+#define TXDESC_SEQ_SHIFT	16
+
+/* OFFSET 16 */
+#define TXDESC_QOS		BIT(6)
+#define TXDESC_HW_SEQ_ENABLE	BIT(7)
+#define TXDESC_USERATE		BIT(8)
+#define TXDESC_DISDATAFB	BIT(10)
+#define TXDESC_DATA_SHORT	BIT(24)
+#define TXDESC_DATA_BW		BIT(25)
+
+/* OFFSET 20 */
+#define TXDESC_SGI		BIT(6)
