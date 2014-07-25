@@ -2258,14 +2258,6 @@ static void rtlmac_stop(struct ieee80211_hw *hw)
 	printk(KERN_DEBUG "%s\n", __func__);
 }
 
-static int rtlmac_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-			  struct cfg80211_scan_request *req)
-{
-	printk(KERN_DEBUG "%s: n_ssids %i\n", __func__, req->n_ssids);
-
-	return 0;
-}
-
 static const struct ieee80211_ops rtlmac_ops = {
 	.tx = rtlmac_tx,
 	.add_interface = rtlmac_add_interface,
@@ -2277,7 +2269,6 @@ static const struct ieee80211_ops rtlmac_ops = {
 	.configure_filter = rtlmac_configure_filter,
 	.start = rtlmac_start,
 	.stop = rtlmac_stop,
-	.hw_scan = rtlmac_hw_scan,
 #if 0
 	.set_key = rtlmac_set_key,
 #endif
