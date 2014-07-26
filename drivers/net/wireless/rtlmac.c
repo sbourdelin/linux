@@ -2225,6 +2225,9 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	tx_desc->pkt_size = cpu_to_le16(pktlen);
 	tx_desc->pkt_offset = sizeof(struct rtlmac_tx_desc);
 
+	tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
+	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
+
 	dev_kfree_skb(skb);
 	return;
 error:

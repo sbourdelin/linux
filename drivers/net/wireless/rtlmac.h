@@ -254,22 +254,25 @@ struct rtlmac_tx_desc {
 #define TXDESC_OWN		BIT(7)
 #endif
 
-/* OFFSET 4 */
+/* Word 1 */
 #define TXDESC_PKT_OFFSET_SZ	0
 #define TXDESC_BK		BIT(6)
 #define TXDESC_QUEUE_SHIFT	8
-#define TXDESC_RATE_SHIFT	16
+#define TXDESC_QUEUE_MASK	0x1f00
+#define TXDESC_RATE_ID_SHIFT	16
+#define TXDESC_RATE_ID_MASK	0xf
 #define TXDESC_NAVUSEHDR	BIT(20)
 #define TXDESC_PKT_OFFSET_SHIFT	26
 #define TXDESC_HWPC		BIT(31)
 
-/* OFFSET 8 */
+/* Word 2 */
 #define TXDESC_AGG_EN		BIT(29)
 
-/* OFFSET 12 */
+/* Word 3 */
 #define TXDESC_SEQ_SHIFT	16
+#define TXDESC_SEQ_MASK		0x000fff0000
 
-/* OFFSET 16 */
+/* Word 4 */
 #define TXDESC_QOS		BIT(6)
 #define TXDESC_HW_SEQ_ENABLE	BIT(7)
 #define TXDESC_USERATE		BIT(8)
@@ -277,5 +280,7 @@ struct rtlmac_tx_desc {
 #define TXDESC_DATA_SHORT	BIT(24)
 #define TXDESC_DATA_BW		BIT(25)
 
-/* OFFSET 20 */
-#define TXDESC_SGI		BIT(6)
+/* Word 5 */
+#define TXDESC_SHORT_GI		BIT(6)
+#define TXDESC_RATE_SHIFT	0
+#define TXDESC_RATE_MASK	0x3f
