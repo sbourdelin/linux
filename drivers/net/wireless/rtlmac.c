@@ -57,18 +57,18 @@ static struct usb_device_id dev_table[] = {
 MODULE_DEVICE_TABLE(usb, dev_table);
 
 static struct ieee80211_rate rtlmac_rates[] = {
-	{ .bitrate = 10, .hw_value = 0x1, .flags = 0 },
-	{ .bitrate = 20, .hw_value = 0x2, .flags = 0 },
-	{ .bitrate = 55, .hw_value = 0x4, .flags = 0 },
-	{ .bitrate = 110, .hw_value = 0x8, .flags = 0 },
-	{ .bitrate = 60, .hw_value = 0x10, .flags = 0 },
-	{ .bitrate = 90, .hw_value = 0x20, .flags = 0 },
-	{ .bitrate = 120, .hw_value = 0x40, .flags = 0 },
-	{ .bitrate = 180, .hw_value = 0x80, .flags = 0 },
-	{ .bitrate = 240, .hw_value = 0x100, .flags = 0 },
-	{ .bitrate = 360, .hw_value = 0x200, .flags = 0 },
-	{ .bitrate = 480, .hw_value = 0x400, .flags = 0 },
-	{ .bitrate = 540, .hw_value = 0x800, .flags = 0 },
+	{ .bitrate = 10, .hw_value = TXDESC_RATE_1M, .flags = 0 },
+	{ .bitrate = 20, .hw_value = TXDESC_RATE_2M, .flags = 0 },
+	{ .bitrate = 55, .hw_value = TXDESC_RATE_5_5M, .flags = 0 },
+	{ .bitrate = 110, .hw_value = TXDESC_RATE_11M, .flags = 0 },
+	{ .bitrate = 60, .hw_value = TXDESC_RATE_6M, .flags = 0 },
+	{ .bitrate = 90, .hw_value = TXDESC_RATE_9M, .flags = 0 },
+	{ .bitrate = 120, .hw_value = TXDESC_RATE_12M, .flags = 0 },
+	{ .bitrate = 180, .hw_value = TXDESC_RATE_18M, .flags = 0 },
+	{ .bitrate = 240, .hw_value = TXDESC_RATE_24M, .flags = 0 },
+	{ .bitrate = 360, .hw_value = TXDESC_RATE_36M, .flags = 0 },
+	{ .bitrate = 480, .hw_value = TXDESC_RATE_48M, .flags = 0 },
+	{ .bitrate = 540, .hw_value = TXDESC_RATE_54M, .flags = 0 },
 };
 
 static struct ieee80211_channel rtlmac_channels_2g[] = {
