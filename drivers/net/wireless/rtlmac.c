@@ -2183,7 +2183,52 @@ static int rtlmac_disable_device(struct ieee80211_hw *hw)
 static void rtlmac_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
-	printk(KERN_DEBUG "%s\n", __func__);
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
+	struct rtlmac_tx_desc *tx_desc;
+	u16 pktlen;
+	u16 seq_number;
+
+	if (skb_headroom(skb) < sizeof(struct rtlmac_tx_desc)) {
+		printk(KERN_DEBUG "%s: Not enough skb headroom space (%i) for "
+		       "tx descriptor\n", __func__, skb_headroom(skb));
+		goto error;
+	}
+
+	if (unlikely(skb->len > (65535 - sizeof(struct rtlmac_tx_desc)))) {
+		printk(KERN_DEBUG "%s: Trying to send over sized skb (%i)\n",
+		       __func__, skb->len);
+		goto error;
+	}
+
+	pktlen = skb->len;
+
+	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
+
+	if (ieee80211_is_mgmt(hdr->frame_control))
+		printk(KERN_DEBUG "%s: mgmt frame\n", __func__);
+	else if (ieee80211_is_ctl(hdr->frame_control))
+		printk(KERN_DEBUG "%s: ctl frame\n", __func__);
+	else if (ieee80211_is_data(hdr->frame_control))
+		printk(KERN_DEBUG "%s: data frame\n", __func__);
+	else if (ieee80211_is_data_qos(hdr->frame_control))
+		printk(KERN_DEBUG "%s: data qos frame\n", __func__);
+
+	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
+	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
+
+	tx_desc = (struct rtlmac_tx_desc *)
+		skb_push(skb, sizeof(struct rtlmac_tx_desc));
+
+	memset(tx_desc, 0, sizeof(struct rtlmac_tx_desc));
+	tx_desc->pkt_size = cpu_to_le16(pktlen);
+	tx_desc->pkt_offset = sizeof(struct rtlmac_tx_desc);
+
+	dev_kfree_skb(skb);
+	return;
+error:
+	dev_kfree_skb(skb);
 }
 
 static int rtlmac_add_interface(struct ieee80211_hw *hw,
