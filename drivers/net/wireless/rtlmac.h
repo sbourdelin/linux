@@ -13,6 +13,11 @@
  * Register definitions taken from original Realttek rtl8723au driver
  */
 
+#define RTLMAC_DEBUG_REG_WRITE		1
+#define RTLMAC_DEBUG_REG_READ		2
+#define RTLMAC_DEBUG_RFREG_WRITE	4
+#define RTLMAC_DEBUG_RFREG_READ		8
+
 #define RTL_MAX_VENDOR_REQ_CMD_SIZE	254
 #define RTW_USB_CONTROL_MSG_TIMEOUT	500
 #define RTLMAC_MAX_REG_POLL		500

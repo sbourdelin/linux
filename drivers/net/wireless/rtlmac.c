@@ -33,6 +33,8 @@
 
 #define DRIVER_NAME "rtlmac"
 
+static int rtlmac_debug = 0;
+
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
 MODULE_LICENSE("GPL");
@@ -43,7 +45,6 @@ MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B_NoBT.bin");
 #define USB_VENDER_ID_REALTEK		0x0BDA
 
 static struct usb_device_id dev_table[] = {
-	/* Generic AT76C503/3861 device */
 	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDER_ID_REALTEK, 0x8724,
 				       0xff, 0xff, 0xff)},
 	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDER_ID_REALTEK, 0x1724,
@@ -373,8 +374,9 @@ u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 	data = priv->usb_buf.val8;
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x)   = 0x%02x, len %i\n",
-	       __func__, addr, data, len);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_READ)
+		printk(KERN_DEBUG "%s(%04x)   = 0x%02x, len %i\n",
+		       __func__, addr, data, len);
 	return data;
 }
 
@@ -392,8 +394,9 @@ u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 	data = le16_to_cpu(priv->usb_buf.val16);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x)  = 0x%04x, len %i\n",
-	       __func__, addr, data, len);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_READ)
+		printk(KERN_DEBUG "%s(%04x)  = 0x%04x, len %i\n",
+		       __func__, addr, data, len);
 	return data;
 }
 
@@ -411,8 +414,9 @@ u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 	data = le32_to_cpu(priv->usb_buf.val32);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x)  = 0x%08x, len %i\n",
-	       __func__, addr, data, len);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_READ)
+		printk(KERN_DEBUG "%s(%04x)  = 0x%08x, len %i\n",
+		       __func__, addr, data, len);
 	return data;
 }
 
@@ -430,8 +434,9 @@ int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x)  = 0x%02x, ret %i\n",
-	       __func__, addr, val, ret);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+		printk(KERN_DEBUG "%s(%04x)  = 0x%02x, ret %i\n",
+		       __func__, addr, val, ret);
 	return ret;
 }
 
@@ -448,8 +453,9 @@ int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x) = 0x%04x, ret %i\n",
-	       __func__, addr, val, ret);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+		printk(KERN_DEBUG "%s(%04x) = 0x%04x, ret %i\n",
+		       __func__, addr, val, ret);
 	return ret;
 }
 
@@ -466,8 +472,9 @@ int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	printk(KERN_DEBUG "%s(%04x) = 0x%08x, ret %i\n",
-	       __func__, addr, val, ret);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+		printk(KERN_DEBUG "%s(%04x) = 0x%08x, ret %i\n",
+		       __func__, addr, val, ret);
 	return ret;
 }
 
@@ -480,8 +487,9 @@ int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
 			      addr, 0, buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	printk(KERN_DEBUG "%s(%04x) = %p, len 0x%02x\n",
-	       __func__, addr, buf, len);
+	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+		printk(KERN_DEBUG "%s(%04x) = %p, len 0x%02x\n",
+		       __func__, addr, buf, len);
 	return ret;
 }
 
@@ -516,7 +524,8 @@ static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 
 	retval &= 0xfffff;
 
-	printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, retval);
+	if (rtlmac_debug & RTLMAC_DEBUG_RFREG_READ)
+		printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, retval);
 	return retval;
 }
 
@@ -525,7 +534,8 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 	int ret, retval;
 	u32 dataaddr;
 
-	printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, data);
+	if (rtlmac_debug & RTLMAC_DEBUG_RFREG_WRITE)
+		printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, data);
 
 	data &= FPGA0_LSSI_PARM_DATA_MASK;
 	dataaddr = (reg << FPGA0_LSSI_PARM_ADDR_SHIFT) | data;
