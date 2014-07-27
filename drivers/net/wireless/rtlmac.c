@@ -2213,6 +2213,20 @@ static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 	return queue;
 }
 
+static void rtlmac_calc_tx_desc_csum(struct rtlmac_tx_desc *tx_desc)
+{
+	u16 *ptr = (u16 *)tx_desc;
+	u16 csum = 0;
+	int i;
+
+	tx_desc->csum = cpu_to_le32(0);
+
+	for (i = 0 ; i < (sizeof(struct rtlmac_tx_desc) / sizeof(u16)); i++)
+		csum = csum ^ le16_to_cpu(ptr[i]);
+
+	tx_desc->csum |= cpu_to_le32(csum);
+}
+
 static void rtlmac_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
@@ -2220,7 +2234,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
 	struct rtlmac_tx_desc *tx_desc;
-	u16 pktlen;
+	u16 pktlen = skb->len;
 	u16 seq_number;
 	u8 rate_flag = tx_info->control.rates[0].flags;
 
@@ -2248,14 +2262,18 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
 	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
 
-	pktlen = skb->len;
-
 	tx_desc = (struct rtlmac_tx_desc *)
 		skb_push(skb, sizeof(struct rtlmac_tx_desc));
 
 	memset(tx_desc, 0, sizeof(struct rtlmac_tx_desc));
 	tx_desc->pkt_size = cpu_to_le16(pktlen);
 	tx_desc->pkt_offset = sizeof(struct rtlmac_tx_desc);
+
+	tx_desc->txdw0 = TXDESC_OWN | TXDESC_FSG| TXDESC_LSG;
+	if (is_multicast_ether_addr(ieee80211_get_DA(hdr)) ||
+	    is_broadcast_ether_addr(ieee80211_get_DA(hdr)))
+		tx_desc->txdw0 |= TXDESC_BROADMULTICAST;
+
 	/*
 	 * Select TX HW queue
 	 */
@@ -2275,6 +2293,8 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw5 |= cpu_to_le32(6 << TXDESC_RETRY_LIMIT_SHIFT);
 		tx_desc->txdw5 |= cpu_to_le32(TXDESC_RETRY_LIMIT_ENABLE);
 	}
+
+	rtlmac_calc_tx_desc_csum(tx_desc);
 
 	dev_kfree_skb(skb);
 	return;

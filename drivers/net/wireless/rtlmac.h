@@ -192,7 +192,8 @@ struct rtlmac_tx_desc {
 	__le32 txdw4;
 	__le32 txdw5;
 	__le32 txdw6;
-	__le32 txdw7;
+	__le16 csum;
+	__le16 txdw7;
 };
 
 /*  CCK Rates, TxHT = 0 */
@@ -239,7 +240,7 @@ struct rtlmac_tx_desc {
 #define TXDESC_FSG			BIT(27)
 #define TXDESC_OWN			BIT(31)
 #else
-#define TXDESC_BMC			BIT(0)
+#define TXDESC_BROADMULTICAST		BIT(0)
 #define TXDESC_LSG			BIT(2)
 #define TXDESC_FSG			BIT(3)
 #define TXDESC_OWN			BIT(7)
