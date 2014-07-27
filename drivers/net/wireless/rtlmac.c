@@ -2180,6 +2180,39 @@ static int rtlmac_disable_device(struct ieee80211_hw *hw)
 	return 0;
 }
 
+static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
+{
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	u32 queue;
+
+	if (unlikely(ieee80211_is_beacon(hdr->frame_control))) {
+		queue = TXDESC_QUEUE_BEACON;
+	}
+	if (ieee80211_is_mgmt(hdr->frame_control)) {
+		queue = TXDESC_QUEUE_MGNT;
+	} else {
+		switch (skb_get_queue_mapping(skb)) {
+		case IEEE80211_AC_VO:
+			queue = TXDESC_QUEUE_VO;
+			break;
+		case IEEE80211_AC_VI:
+			queue = TXDESC_QUEUE_VI;
+			break;
+		case IEEE80211_AC_BE:
+			queue = TXDESC_QUEUE_BE;
+			break;
+		case IEEE80211_AC_BK:
+			queue = TXDESC_QUEUE_BK;
+			break;
+		default:
+			queue = TXDESC_QUEUE_BE;
+		break;
+		}
+	}
+
+	return queue;
+}
+
 static void rtlmac_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
@@ -2189,6 +2222,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	struct rtlmac_tx_desc *tx_desc;
 	u16 pktlen;
 	u16 seq_number;
+	u8 rate_flag = tx_info->control.rates[0].flags;
 
 	if (skb_headroom(skb) < sizeof(struct rtlmac_tx_desc)) {
 		printk(KERN_DEBUG "%s: Not enough skb headroom space (%i) for "
@@ -2224,9 +2258,23 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	memset(tx_desc, 0, sizeof(struct rtlmac_tx_desc));
 	tx_desc->pkt_size = cpu_to_le16(pktlen);
 	tx_desc->pkt_offset = sizeof(struct rtlmac_tx_desc);
+	/*
+	 * Select TX HW queue
+	 */
+	tx_desc->txdw1 = cpu_to_le32(rtlmac_queue_select(hw, skb));
 
-	tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
+	tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
+
+	if (ieee80211_is_data_qos(hdr->frame_control))
+		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
+	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
+		tx_desc->txdw4 |= cpu_to_le32(TXDESC_SHORT_PREAMBLE);
+	if (ieee80211_is_mgmt(hdr->frame_control)) {
+		tx_desc->txdw4 |= cpu_to_le32(TXDESC_USE_DRIVER_RATE);
+		tx_desc->txdw5 |= cpu_to_le32(6 << TXDESC_RETRY_LIMIT_SHIFT);
+		tx_desc->txdw5 |= cpu_to_le32(TXDESC_RETRY_LIMIT_ENABLE);
+	}
 
 	dev_kfree_skb(skb);
 	return;
