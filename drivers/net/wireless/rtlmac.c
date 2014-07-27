@@ -2236,10 +2236,6 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		goto error;
 	}
 
-	pktlen = skb->len;
-
-	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
-
 	if (ieee80211_is_mgmt(hdr->frame_control))
 		printk(KERN_DEBUG "%s: mgmt frame\n", __func__);
 	else if (ieee80211_is_ctl(hdr->frame_control))
@@ -2252,6 +2248,8 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
 	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
 
+	pktlen = skb->len;
+
 	tx_desc = (struct rtlmac_tx_desc *)
 		skb_push(skb, sizeof(struct rtlmac_tx_desc));
 
@@ -2263,7 +2261,9 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	 */
 	tx_desc->txdw1 = cpu_to_le32(rtlmac_queue_select(hw, skb));
 
+	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
+
 	tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
 
 	if (ieee80211_is_data_qos(hdr->frame_control))
