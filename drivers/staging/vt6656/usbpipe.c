@@ -30,7 +30,6 @@
  *	vnt_control_in - Read variable length bytes from MEM/BB/MAC/EEPROM
  *	vnt_control_out_u8 - Write one byte to MEM/BB/MAC/EEPROM
  *	vnt_control_in_u8 - Read one byte from MEM/BB/MAC/EEPROM
- *      ControlvMaskByte - Read one byte from MEM/BB/MAC/EEPROM and clear/set some bits in the same address
  *
  * Revision History:
  *      04-05-2004 Jerry Chen:  Initial release
@@ -52,7 +51,7 @@ int vnt_control_out(struct vnt_private *priv, u8 request, u16 value,
 {
 	int status = 0;
 
-	if (priv->Flags & fMP_DISCONNECTED)
+	if (test_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags))
 		return STATUS_FAILURE;
 
 	mutex_lock(&priv->usb_lock);
@@ -80,7 +79,7 @@ int vnt_control_in(struct vnt_private *priv, u8 request, u16 value,
 {
 	int status;
 
-	if (priv->Flags & fMP_DISCONNECTED)
+	if (test_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags))
 		return STATUS_FAILURE;
 
 	mutex_lock(&priv->usb_lock);
@@ -137,8 +136,6 @@ static void vnt_start_interrupt_urb_complete(struct urb *urb)
 	} else {
 		priv->int_buf.in_use = true;
 	}
-
-	return;
 }
 
 int vnt_start_interrupt_urb(struct vnt_private *priv)
@@ -216,8 +213,6 @@ static void vnt_submit_rx_urb_complete(struct urb *urb)
 
 		rcb->in_use = false;
 	}
-
-	return;
 }
 
 int vnt_submit_rx_urb(struct vnt_private *priv, struct vnt_rcb *rcb)
@@ -279,8 +274,6 @@ static void vnt_tx_context_complete(struct urb *urb)
 
 		context->in_use = false;
 	}
-
-	return;
 }
 
 int vnt_tx_context(struct vnt_private *priv,
@@ -289,7 +282,7 @@ int vnt_tx_context(struct vnt_private *priv,
 	int status;
 	struct urb *urb;
 
-	if (!(MP_IS_READY(priv) && priv->Flags & fMP_POST_WRITES)) {
+	if (test_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags)) {
 		context->in_use = false;
 		return STATUS_RESOURCES;
 	}
