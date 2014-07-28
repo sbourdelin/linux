@@ -1485,16 +1485,16 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 			lo = 0;
 		}
 		hiq = hi;
-		mgq = lo;
-		bkq = hi;
+		mgq = hi;
+		bkq = lo;
 		beq = lo;
 		viq = hi;
-		voq = lo;
+		voq = hi;
 
 		break;
 	case 3:
 		beq = TRXDMA_QUEUE_LOW;
-		bkq = TRXDMA_QUEUE_NORMAL;
+		bkq = TRXDMA_QUEUE_LOW;
 		viq = TRXDMA_QUEUE_NORMAL;
 		voq = TRXDMA_QUEUE_HIGH;
 		mgq = TRXDMA_QUEUE_HIGH;
