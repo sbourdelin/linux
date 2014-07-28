@@ -81,7 +81,7 @@
 #define DEVICE_NAME			"vt6656"
 #define DEVICE_FULL_DRV_NAM		"VIA Networking Wireless LAN USB Driver"
 
-#define DEVICE_VERSION			"1.19_12"
+#define DEVICE_VERSION			"mac80211"
 
 #define CONFIG_PATH			"/etc/vntconfiguration.dat"
 
@@ -262,10 +262,8 @@ enum {
 };
 
 /* flags for options */
-#define     DEVICE_FLAGS_UNPLUG          0x00000001UL
-
-/* flags for driver status */
-#define     DEVICE_FLAGS_OPENED          0x00010000UL
+#define DEVICE_FLAGS_UNPLUG		BIT(0)
+#define DEVICE_FLAGS_DISCONNECTED	BIT(1)
 
 struct vnt_private {
 	/* mac80211 */
@@ -284,8 +282,7 @@ struct vnt_private {
 	spinlock_t lock;
 	struct mutex usb_lock;
 
-	u32 flags;
-	unsigned long Flags;
+	unsigned long flags;
 
 	/* USB */
 	struct urb *interrupt_urb;
@@ -404,16 +401,6 @@ struct vnt_private {
 	else						\
 		(uVar)++;				\
 }
-
-#define fMP_DISCONNECTED                    0x00000002
-#define fMP_POST_READS                      0x00000100
-#define fMP_POST_WRITES                     0x00000200
-
-#define MP_SET_FLAG(_M, _F)             ((_M)->Flags |= (_F))
-#define MP_CLEAR_FLAG(_M, _F)            ((_M)->Flags &= ~(_F))
-#define MP_TEST_FLAGS(_M, _F)            (((_M)->Flags & (_F)) == (_F))
-
-#define MP_IS_READY(_M)        (((_M)->Flags & fMP_DISCONNECTED) == 0)
 
 int vnt_init(struct vnt_private *priv);
 

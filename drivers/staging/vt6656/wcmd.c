@@ -97,7 +97,7 @@ void vnt_run_command(struct work_struct *work)
 	struct vnt_private *priv =
 		container_of(work, struct vnt_private, run_command_work.work);
 
-	if (priv->Flags & fMP_DISCONNECTED)
+	if (test_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags))
 		return;
 
 	if (priv->cmd_running != true)
@@ -164,8 +164,6 @@ void vnt_run_command(struct work_struct *work)
 	}
 
 	vnt_cmd_complete(priv);
-
-	return;
 }
 
 int vnt_schedule_command(struct vnt_private *priv, enum vnt_cmd command)

@@ -128,6 +128,7 @@ VNTWIFIpGetCurrentSSID(
 )
 {
 	PSMgmtObject        pMgmt = (PSMgmtObject)pMgmtHandle;
+
 	return (PWLAN_IE_SSID) pMgmt->abyCurrSSID;
 }
 
@@ -151,6 +152,7 @@ VNTWIFIpGetCurrentChannel(
 )
 {
 	PSMgmtObject        pMgmt = (PSMgmtObject)pMgmtHandle;
+
 	if (pMgmtHandle != NULL)
 		return pMgmt->uCurrChannel;
 
@@ -177,6 +179,7 @@ VNTWIFIwGetAssocID(
 )
 {
 	PSMgmtObject        pMgmt = (PSMgmtObject)pMgmtHandle;
+
 	return pMgmt->wCurrAID;
 }
 
@@ -500,8 +503,6 @@ VNTWIFIvUpdateNodeTxCounter(
 	pMgmt->sNodeDBTable[uNodeIndex].uTxRetry += pbyTxFailCount[MAX_RATE];
 	for (ii = 0; ii < MAX_RATE; ii++)
 		pMgmt->sNodeDBTable[uNodeIndex].uTxFail[ii] += pbyTxFailCount[ii];
-
-	return;
 }
 
 void
@@ -543,7 +544,7 @@ VNTWIFIvGetTxRate(
 
 		wTxDataRate = (pMgmt->sNodeDBTable[0].wTxDataRate);
 #ifdef	PLICE_DEBUG
-		printk(KERN_DEBUG "GetTxRate:AP MAC is %pM,TxRate is %d\n",
+		pr_debug("GetTxRate:AP MAC is %pM,TxRate is %d\n",
 		       pMgmt->sNodeDBTable[0].abyMACAddr, wTxDataRate);
 #endif
 
@@ -569,7 +570,6 @@ VNTWIFIvGetTxRate(
 	*pbyACKRate = byACKRate;
 	*pbyCCKBasicRate = byCCKBasicRate;
 	*pbyOFDMBasicRate = byOFDMBasicRate;
-	return;
 }
 
 unsigned char
@@ -684,9 +684,8 @@ VNTWIFIbMeasureReport(
 		pMgmt->uLengthOfRepEIDs += (2 + pMgmt->pCurrMeasureEIDRep->len);
 		pMgmt->pCurrMeasureEIDRep = (PWLAN_IE_MEASURE_REP) pbyCurrentEID;
 	}
-	if (bEndOfReport) {
+	if (bEndOfReport)
 		IEEE11hbMSRRepTx(pMgmt);
-	}
 
 	return true;
 }

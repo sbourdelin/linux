@@ -47,13 +47,21 @@
  *	    (National Instruments) PXI-6521 [ni_65xx]
  *	    (National Instruments) PCI-6528 [ni_65xx]
  *	    (National Instruments) PXI-6528 [ni_65xx]
- * Updated: Wed Oct 18 08:59:11 EDT 2006
+ * Updated: Mon, 21 Jul 2014 12:49:58 +0000
  *
  * Configuration Options: not applicable, uses PCI auto config
  *
  * Based on the PCI-6527 driver by ds.
  * The interrupt subdevice (subdevice 3) is probably broken for all
  * boards except maybe the 6514.
+ *
+ * This driver previously inverted the outputs on PCI-6513 through to
+ * PCI-6519 and on PXI-6513 through to PXI-6515.  It no longer inverts
+ * outputs on those cards by default as it didn't make much sense.  If
+ * you require the outputs to be inverted on those cards for legacy
+ * reasons, set the module parameter "legacy_invert_outputs=true" when
+ * loading the module, or set "ni_65xx.legacy_invert_outputs=true" on
+ * the kernel command line if the driver is built in to the kernel.
  */
 
 /*
@@ -163,7 +171,7 @@ struct ni_65xx_board {
 	unsigned num_dio_ports;
 	unsigned num_di_ports;
 	unsigned num_do_ports;
-	unsigned invert_outputs:1;
+	unsigned legacy_invert:1;
 };
 
 static const struct ni_65xx_board ni_65xx_boards[] = {
@@ -198,58 +206,58 @@ static const struct ni_65xx_board ni_65xx_boards[] = {
 	[BOARD_PCI6513] = {
 		.name		= "pci-6513",
 		.num_do_ports	= 8,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PXI6513] = {
 		.name		= "pxi-6513",
 		.num_do_ports	= 8,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6514] = {
 		.name		= "pci-6514",
 		.num_di_ports	= 4,
 		.num_do_ports	= 4,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PXI6514] = {
 		.name		= "pxi-6514",
 		.num_di_ports	= 4,
 		.num_do_ports	= 4,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6515] = {
 		.name		= "pci-6515",
 		.num_di_ports	= 4,
 		.num_do_ports	= 4,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PXI6515] = {
 		.name		= "pxi-6515",
 		.num_di_ports	= 4,
 		.num_do_ports	= 4,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6516] = {
 		.name		= "pci-6516",
 		.num_do_ports	= 4,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6517] = {
 		.name		= "pci-6517",
 		.num_do_ports	= 4,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6518] = {
 		.name		= "pci-6518",
 		.num_di_ports	= 2,
 		.num_do_ports	= 2,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6519] = {
 		.name		= "pci-6519",
 		.num_di_ports	= 2,
 		.num_do_ports	= 2,
-		.invert_outputs	= 1,
+		.legacy_invert	= 1,
 	},
 	[BOARD_PCI6520] = {
 		.name		= "pci-6520",
@@ -278,20 +286,28 @@ static const struct ni_65xx_board ni_65xx_boards[] = {
 	},
 };
 
+static bool ni_65xx_legacy_invert_outputs;
+module_param_named(legacy_invert_outputs, ni_65xx_legacy_invert_outputs,
+		   bool, 0444);
+MODULE_PARM_DESC(legacy_invert_outputs,
+		 "invert outputs of PCI/PXI-6513/6514/6515/6516/6517/6518/6519 for compatibility with old user code");
+
 struct ni_65xx_private {
 	void __iomem *mmio;
 };
 
-static void ni_65xx_disable_input_filters(struct comedi_device *dev)
+static unsigned int ni_65xx_num_ports(struct comedi_device *dev)
 {
 	const struct ni_65xx_board *board = comedi_board(dev);
-	struct ni_65xx_private *devpriv = dev->private;
-	unsigned num_ports;
-	int i;
 
-	num_ports = board->num_dio_ports +
-		    board->num_di_ports +
-		    board->num_do_ports;
+	return board->num_dio_ports + board->num_di_ports + board->num_do_ports;
+}
+
+static void ni_65xx_disable_input_filters(struct comedi_device *dev)
+{
+	struct ni_65xx_private *devpriv = dev->private;
+	unsigned int num_ports = ni_65xx_num_ports(dev);
+	int i;
 
 	/* disable input filtering on all ports */
 	for (i = 0; i < num_ports; ++i)
@@ -299,6 +315,64 @@ static void ni_65xx_disable_input_filters(struct comedi_device *dev)
 
 	/* set filter interval to 0 (32bit reg) */
 	writel(0x00000000, devpriv->mmio + NI_65XX_FILTER_REG);
+}
+
+/* updates edge detection for base_chan to base_chan+31 */
+static void ni_65xx_update_edge_detection(struct comedi_device *dev,
+					  unsigned int base_chan,
+					  unsigned int rising,
+					  unsigned int falling)
+{
+	struct ni_65xx_private *devpriv = dev->private;
+	unsigned int num_ports = ni_65xx_num_ports(dev);
+	unsigned int port;
+
+	if (base_chan >= NI_65XX_PORT_TO_CHAN(num_ports))
+		return;
+
+	for (port = NI_65XX_CHAN_TO_PORT(base_chan); port < num_ports; port++) {
+		int bitshift = (int)(NI_65XX_PORT_TO_CHAN(port) - base_chan);
+		unsigned int port_mask, port_rising, port_falling;
+
+		if (bitshift >= 32)
+			break;
+
+		if (bitshift >= 0) {
+			port_mask = ~0U >> bitshift;
+			port_rising = rising >> bitshift;
+			port_falling = falling >> bitshift;
+		} else {
+			port_mask = ~0U << -bitshift;
+			port_rising = rising << -bitshift;
+			port_falling = falling << -bitshift;
+		}
+		if (port_mask & 0xff) {
+			if (~port_mask & 0xff) {
+				port_rising |=
+				    readb(devpriv->mmio +
+					  NI_65XX_RISE_EDGE_ENA_REG(port)) &
+				    ~port_mask;
+				port_falling |=
+				    readb(devpriv->mmio +
+					  NI_65XX_FALL_EDGE_ENA_REG(port)) &
+				    ~port_mask;
+			}
+			writeb(port_rising & 0xff,
+			       devpriv->mmio + NI_65XX_RISE_EDGE_ENA_REG(port));
+			writeb(port_falling & 0xff,
+			       devpriv->mmio + NI_65XX_FALL_EDGE_ENA_REG(port));
+		}
+	}
+}
+
+static void ni_65xx_disable_edge_detection(struct comedi_device *dev)
+{
+	/* clear edge detection for channels 0 to 31 */
+	ni_65xx_update_edge_detection(dev, 0, 0, 0);
+	/* clear edge detection for channels 32 to 63 */
+	ni_65xx_update_edge_detection(dev, 32, 0, 0);
+	/* clear edge detection for channels 64 to 95 */
+	ni_65xx_update_edge_detection(dev, 64, 0, 0);
 }
 
 static int ni_65xx_dio_insn_config(struct comedi_device *dev,
@@ -529,37 +603,39 @@ static int ni_65xx_intr_insn_config(struct comedi_device *dev,
 				    struct comedi_insn *insn,
 				    unsigned int *data)
 {
-	struct ni_65xx_private *devpriv = dev->private;
-
 	switch (data[0]) {
 	case INSN_CONFIG_CHANGE_NOTIFY:
 		/* add instruction to check_insn_config_length() */
 		if (insn->n != 3)
 			return -EINVAL;
 
-		/*
-		 * This only works for the first 4 ports (32 channels)!
-		 */
-
-		/* set the channels to monitor for rising edges */
-		writeb(data[1] & 0xff,
-		       devpriv->mmio + NI_65XX_RISE_EDGE_ENA_REG(0));
-		writeb((data[1] >> 8) & 0xff,
-		       devpriv->mmio + NI_65XX_RISE_EDGE_ENA_REG(1));
-		writeb((data[1] >> 16) & 0xff,
-		       devpriv->mmio + NI_65XX_RISE_EDGE_ENA_REG(2));
-		writeb((data[1] >> 24) & 0xff,
-		       devpriv->mmio + NI_65XX_RISE_EDGE_ENA_REG(3));
-
-		/* set the channels to monitor for falling edges */
-		writeb(data[2] & 0xff,
-		       devpriv->mmio + NI_65XX_FALL_EDGE_ENA_REG(0));
-		writeb((data[2] >> 8) & 0xff,
-		       devpriv->mmio + NI_65XX_FALL_EDGE_ENA_REG(1));
-		writeb((data[2] >> 16) & 0xff,
-		       devpriv->mmio + NI_65XX_FALL_EDGE_ENA_REG(2));
-		writeb((data[2] >> 24) & 0xff,
-		       devpriv->mmio + NI_65XX_FALL_EDGE_ENA_REG(3));
+		/* update edge detection for channels 0 to 31 */
+		ni_65xx_update_edge_detection(dev, 0, data[1], data[2]);
+		/* clear edge detection for channels 32 to 63 */
+		ni_65xx_update_edge_detection(dev, 32, 0, 0);
+		/* clear edge detection for channels 64 to 95 */
+		ni_65xx_update_edge_detection(dev, 64, 0, 0);
+		break;
+	case INSN_CONFIG_DIGITAL_TRIG:
+		/* check trigger number */
+		if (data[1] != 0)
+			return -EINVAL;
+		/* check digital trigger operation */
+		switch (data[2]) {
+		case COMEDI_DIGITAL_TRIG_DISABLE:
+			ni_65xx_disable_edge_detection(dev);
+			break;
+		case COMEDI_DIGITAL_TRIG_ENABLE_EDGES:
+			/*
+			 * update edge detection for channels data[3]
+			 * to (data[3] + 31)
+			 */
+			ni_65xx_update_edge_detection(dev, data[3],
+						      data[4], data[5]);
+			break;
+		default:
+			return -EINVAL;
+		}
 		break;
 	default:
 		return -EINVAL;
@@ -670,8 +746,13 @@ static int ni_65xx_auto_attach(struct comedi_device *dev,
 		/* the output ports always start after the input ports */
 		s->private = (void *)(unsigned long)board->num_di_ports;
 
-		/* use the io_bits to handle the inverted outputs */
-		s->io_bits	= (board->invert_outputs) ? 0xff : 0x00;
+		/*
+		 * Use the io_bits to handle the inverted outputs.  Inverted
+		 * outputs are only supported if the "legacy_invert_outputs"
+		 * module parameter is set to "true".
+		 */
+		if (ni_65xx_legacy_invert_outputs && board->legacy_invert)
+			s->io_bits = 0xff;
 
 		/* reset all output ports to comedi '0' */
 		for (i = 0; i < board->num_do_ports; ++i) {
@@ -723,6 +804,7 @@ static int ni_65xx_auto_attach(struct comedi_device *dev,
 	}
 
 	ni_65xx_disable_input_filters(dev);
+	ni_65xx_disable_edge_detection(dev);
 
 	return 0;
 }
