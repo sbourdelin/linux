@@ -75,7 +75,7 @@ static int msglevel = MSG_LEVEL_INFO;
 /*---------------------  Static Variables  --------------------------*/
 
 #define CB_VT3253_INIT_FOR_RFMD 446
-unsigned char byVT3253InitTab_RFMD[CB_VT3253_INIT_FOR_RFMD][2] = {
+static unsigned char byVT3253InitTab_RFMD[CB_VT3253_INIT_FOR_RFMD][2] = {
 	{0x00, 0x30},
 	{0x01, 0x00},
 	{0x02, 0x00},
@@ -525,7 +525,7 @@ unsigned char byVT3253InitTab_RFMD[CB_VT3253_INIT_FOR_RFMD][2] = {
 };
 
 #define CB_VT3253B0_INIT_FOR_RFMD 256
-unsigned char byVT3253B0_RFMD[CB_VT3253B0_INIT_FOR_RFMD][2] = {
+static unsigned char byVT3253B0_RFMD[CB_VT3253B0_INIT_FOR_RFMD][2] = {
 	{0x00, 0x31},
 	{0x01, 0x00},
 	{0x02, 0x00},
@@ -786,7 +786,7 @@ unsigned char byVT3253B0_RFMD[CB_VT3253B0_INIT_FOR_RFMD][2] = {
 
 #define CB_VT3253B0_AGC_FOR_RFMD2959 195
 /* For RFMD2959 */
-unsigned char byVT3253B0_AGC4_RFMD2959[CB_VT3253B0_AGC_FOR_RFMD2959][2] = {
+static unsigned char byVT3253B0_AGC4_RFMD2959[CB_VT3253B0_AGC_FOR_RFMD2959][2] = {
 	{0xF0, 0x00},
 	{0xF1, 0x3E},
 	{0xF0, 0x80},
@@ -986,7 +986,7 @@ unsigned char byVT3253B0_AGC4_RFMD2959[CB_VT3253B0_AGC_FOR_RFMD2959][2] = {
 
 #define CB_VT3253B0_INIT_FOR_AIROHA2230 256
 /* For AIROHA */
-unsigned char byVT3253B0_AIROHA2230[CB_VT3253B0_INIT_FOR_AIROHA2230][2] = {
+static unsigned char byVT3253B0_AIROHA2230[CB_VT3253B0_INIT_FOR_AIROHA2230][2] = {
 	{0x00, 0x31},
 	{0x01, 0x00},
 	{0x02, 0x00},
@@ -1247,7 +1247,7 @@ unsigned char byVT3253B0_AIROHA2230[CB_VT3253B0_INIT_FOR_AIROHA2230][2] = {
 
 #define CB_VT3253B0_INIT_FOR_UW2451 256
 /* For UW2451 */
-unsigned char byVT3253B0_UW2451[CB_VT3253B0_INIT_FOR_UW2451][2] = {
+static unsigned char byVT3253B0_UW2451[CB_VT3253B0_INIT_FOR_UW2451][2] = {
 	{0x00, 0x31},
 	{0x01, 0x00},
 	{0x02, 0x00},
@@ -1508,7 +1508,7 @@ unsigned char byVT3253B0_UW2451[CB_VT3253B0_INIT_FOR_UW2451][2] = {
 
 #define CB_VT3253B0_AGC 193
 /* For AIROHA */
-unsigned char byVT3253B0_AGC[CB_VT3253B0_AGC][2] = {
+static unsigned char byVT3253B0_AGC[CB_VT3253B0_AGC][2] = {
 	{0xF0, 0x00},
 	{0xF1, 0x00},
 	{0xF0, 0x80},
@@ -1704,7 +1704,7 @@ unsigned char byVT3253B0_AGC[CB_VT3253B0_AGC][2] = {
 	{0xF0, 0x00},
 };
 
-const unsigned short awcFrameTime[MAX_RATE] =
+static const unsigned short awcFrameTime[MAX_RATE] =
 {10, 20, 55, 110, 24, 36, 48, 72, 96, 144, 192, 216};
 
 /*---------------------  Static Functions  --------------------------*/
@@ -1987,7 +1987,7 @@ BBvCalculateParameter(
  * Return Value: true if succeeded; false if failed.
  *
  */
-bool BBbReadEmbedded(unsigned long dwIoBase, unsigned char byBBAddr, unsigned char *pbyData)
+bool BBbReadEmbedded(void __iomem *dwIoBase, unsigned char byBBAddr, unsigned char *pbyData)
 {
 	unsigned short ww;
 	unsigned char byValue;
@@ -2029,7 +2029,7 @@ bool BBbReadEmbedded(unsigned long dwIoBase, unsigned char byBBAddr, unsigned ch
  * Return Value: true if succeeded; false if failed.
  *
  */
-bool BBbWriteEmbedded(unsigned long dwIoBase, unsigned char byBBAddr, unsigned char byData)
+bool BBbWriteEmbedded(void __iomem *dwIoBase, unsigned char byBBAddr, unsigned char byData)
 {
 	unsigned short ww;
 	unsigned char byValue;
@@ -2070,7 +2070,7 @@ bool BBbWriteEmbedded(unsigned long dwIoBase, unsigned char byBBAddr, unsigned c
  * Return Value: true if all TestBits are set; false otherwise.
  *
  */
-bool BBbIsRegBitsOn(unsigned long dwIoBase, unsigned char byBBAddr, unsigned char byTestBits)
+bool BBbIsRegBitsOn(void __iomem *dwIoBase, unsigned char byBBAddr, unsigned char byTestBits)
 {
 	unsigned char byOrgData;
 
@@ -2092,7 +2092,7 @@ bool BBbIsRegBitsOn(unsigned long dwIoBase, unsigned char byBBAddr, unsigned cha
  * Return Value: true if all TestBits are clear; false otherwise.
  *
  */
-bool BBbIsRegBitsOff(unsigned long dwIoBase, unsigned char byBBAddr, unsigned char byTestBits)
+bool BBbIsRegBitsOff(void __iomem *dwIoBase, unsigned char byBBAddr, unsigned char byTestBits)
 {
 	unsigned char byOrgData;
 
@@ -2119,7 +2119,7 @@ bool BBbVT3253Init(PSDevice pDevice)
 {
 	bool bResult = true;
 	int        ii;
-	unsigned long dwIoBase = pDevice->PortOffset;
+	void __iomem *dwIoBase = pDevice->PortOffset;
 	unsigned char byRFType = pDevice->byRFType;
 	unsigned char byLocalID = pDevice->byLocalID;
 
@@ -2285,10 +2285,11 @@ bool BBbVT3253Init(PSDevice pDevice)
  * Return Value: none
  *
  */
-void BBvReadAllRegs(unsigned long dwIoBase, unsigned char *pbyBBRegs)
+void BBvReadAllRegs(void __iomem *dwIoBase, unsigned char *pbyBBRegs)
 {
 	int  ii;
 	unsigned char byBase = 1;
+
 	for (ii = 0; ii < BB_MAX_CONTEXT_SIZE; ii++) {
 		BBbReadEmbedded(dwIoBase, (unsigned char)(ii*byBase), pbyBBRegs);
 		pbyBBRegs += byBase;
@@ -2312,7 +2313,7 @@ void BBvReadAllRegs(unsigned long dwIoBase, unsigned char *pbyBBRegs)
 void BBvLoopbackOn(PSDevice pDevice)
 {
 	unsigned char byData;
-	unsigned long dwIoBase = pDevice->PortOffset;
+	void __iomem *dwIoBase = pDevice->PortOffset;
 
 	/* CR C9 = 0x00 */
 	BBbReadEmbedded(dwIoBase, 0xC9, &pDevice->byBBCRc9); /* CR201 */
@@ -2365,7 +2366,7 @@ void BBvLoopbackOn(PSDevice pDevice)
 void BBvLoopbackOff(PSDevice pDevice)
 {
 	unsigned char byData;
-	unsigned long dwIoBase = pDevice->PortOffset;
+	void __iomem *dwIoBase = pDevice->PortOffset;
 
 	BBbWriteEmbedded(dwIoBase, 0xC9, pDevice->byBBCRc9); /* CR201 */
 	BBbWriteEmbedded(dwIoBase, 0x88, pDevice->byBBCR88); /* CR136 */
@@ -2448,7 +2449,7 @@ void BBvSetVGAGainOffset(PSDevice pDevice, unsigned char byData)
  *
  */
 void
-BBvSoftwareReset(unsigned long dwIoBase)
+BBvSoftwareReset(void __iomem *dwIoBase)
 {
 	BBbWriteEmbedded(dwIoBase, 0x50, 0x40);
 	BBbWriteEmbedded(dwIoBase, 0x50, 0);
@@ -2469,7 +2470,7 @@ BBvSoftwareReset(unsigned long dwIoBase)
  *
  */
 void
-BBvPowerSaveModeON(unsigned long dwIoBase)
+BBvPowerSaveModeON(void __iomem *dwIoBase)
 {
 	unsigned char byOrgData;
 
@@ -2491,7 +2492,7 @@ BBvPowerSaveModeON(unsigned long dwIoBase)
  *
  */
 void
-BBvPowerSaveModeOFF(unsigned long dwIoBase)
+BBvPowerSaveModeOFF(void __iomem *dwIoBase)
 {
 	unsigned char byOrgData;
 
@@ -2515,7 +2516,7 @@ BBvPowerSaveModeOFF(unsigned long dwIoBase)
  */
 
 void
-BBvSetTxAntennaMode(unsigned long dwIoBase, unsigned char byAntennaMode)
+BBvSetTxAntennaMode(void __iomem *dwIoBase, unsigned char byAntennaMode)
 {
 	unsigned char byBBTxConf;
 
@@ -2548,7 +2549,7 @@ BBvSetTxAntennaMode(unsigned long dwIoBase, unsigned char byAntennaMode)
  */
 
 void
-BBvSetRxAntennaMode(unsigned long dwIoBase, unsigned char byAntennaMode)
+BBvSetRxAntennaMode(void __iomem *dwIoBase, unsigned char byAntennaMode)
 {
 	unsigned char byBBRxConf;
 
@@ -2578,14 +2579,14 @@ BBvSetRxAntennaMode(unsigned long dwIoBase, unsigned char byAntennaMode)
  *
  */
 void
-BBvSetDeepSleep(unsigned long dwIoBase, unsigned char byLocalID)
+BBvSetDeepSleep(void __iomem *dwIoBase, unsigned char byLocalID)
 {
 	BBbWriteEmbedded(dwIoBase, 0x0C, 0x17); /* CR12 */
 	BBbWriteEmbedded(dwIoBase, 0x0D, 0xB9); /* CR13 */
 }
 
 void
-BBvExitDeepSleep(unsigned long dwIoBase, unsigned char byLocalID)
+BBvExitDeepSleep(void __iomem *dwIoBase, unsigned char byLocalID)
 {
 	BBbWriteEmbedded(dwIoBase, 0x0C, 0x00); /* CR12 */
 	BBbWriteEmbedded(dwIoBase, 0x0D, 0x01); /* CR13 */
@@ -2814,7 +2815,6 @@ TimerSQ3CallBack(
 	add_timer(&pDevice->TimerSQ3Tmax2);
 
 	spin_unlock_irq(&pDevice->lock);
-	return;
 }
 
 /*+
@@ -2873,6 +2873,4 @@ TimerState1CallBack(
 	pDevice->byAntennaState = 0;
 	BBvClearAntDivSQ3Value(pDevice);
 	spin_unlock_irq(&pDevice->lock);
-
-	return;
 }

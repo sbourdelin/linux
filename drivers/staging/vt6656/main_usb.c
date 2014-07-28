@@ -27,20 +27,8 @@
  * Functions:
  *
  *   vt6656_probe - module initial (insmod) driver entry
- *   device_remove1 - module remove entry
- *   device_open - allocate dma/descripter resource & initial mac/bbp function
- *   device_xmit - asynchronous data tx function
- *   device_set_multi - set mac filter
- *   device_ioctl - ioctl entry
- *   device_close - shutdown mac/bbp & free dma/descriptor resource
- *   device_alloc_frag_buf - rx fragement pre-allocated function
- *   device_free_tx_bufs - free tx buffer function
- *   device_dma0_tx_80211- tx 802.11 frame via dma0
- *   device_dma0_xmit- tx PS buffered frame via dma0
- *   device_init_registers- initial MAC & BBP & RF internal registers.
- *   device_init_rings- initial tx/rx ring buffer
- *   device_init_defrag_cb- initial & allocate de-fragement buffer.
- *   device_tx_srv- tx interrupt service function
+ *   vnt_free_tx_bufs - free tx buffer function
+ *   vnt_init_registers- initial MAC & BBP & RF internal registers.
  *
  * Revision History:
  */
@@ -104,7 +92,7 @@ static struct usb_device_id vt6656_table[] = {
 	{}
 };
 
-static void device_set_options(struct vnt_private *priv)
+static void vnt_set_options(struct vnt_private *priv)
 {
 	/* Set number of TX buffers */
 	if (vnt_tx_buffers < CB_MIN_TX_DESC || vnt_tx_buffers > CB_MAX_TX_DESC)
@@ -131,7 +119,7 @@ static void device_set_options(struct vnt_private *priv)
 /*
  * initialization of MAC & BBP registers
  */
-static int device_init_registers(struct vnt_private *priv)
+static int vnt_init_registers(struct vnt_private *priv)
 {
 	struct vnt_cmd_card_init *init_cmd = &priv->init_command;
 	struct vnt_rsp_card_init *init_rsp = &priv->init_response;
@@ -378,7 +366,7 @@ static int device_init_registers(struct vnt_private *priv)
 	return true;
 }
 
-static void device_free_tx_bufs(struct vnt_private *priv)
+static void vnt_free_tx_bufs(struct vnt_private *priv)
 {
 	struct vnt_usb_send_context *tx_context;
 	int ii;
@@ -393,11 +381,9 @@ static void device_free_tx_bufs(struct vnt_private *priv)
 
 		kfree(tx_context);
 	}
-
-	return;
 }
 
-static void device_free_rx_bufs(struct vnt_private *priv)
+static void vnt_free_rx_bufs(struct vnt_private *priv)
 {
 	struct vnt_rcb *rcb;
 	int ii;
@@ -419,8 +405,6 @@ static void device_free_rx_bufs(struct vnt_private *priv)
 
 		kfree(rcb);
 	}
-
-	return;
 }
 
 static void usb_device_reset(struct vnt_private *priv)
@@ -431,17 +415,14 @@ static void usb_device_reset(struct vnt_private *priv)
 	if (status)
 		dev_warn(&priv->usb->dev,
 			 "usb_device_reset fail status=%d\n", status);
-	return ;
 }
 
-static void device_free_int_bufs(struct vnt_private *priv)
+static void vnt_free_int_bufs(struct vnt_private *priv)
 {
 	kfree(priv->int_buf.data_buf);
-
-	return;
 }
 
-static bool device_alloc_bufs(struct vnt_private *priv)
+static bool vnt_alloc_bufs(struct vnt_private *priv)
 {
 	struct vnt_usb_send_context *tx_context;
 	struct vnt_rcb *rcb;
@@ -518,10 +499,10 @@ static bool device_alloc_bufs(struct vnt_private *priv)
 	return true;
 
 free_rx_tx:
-	device_free_rx_bufs(priv);
+	vnt_free_rx_bufs(priv);
 
 free_tx:
-	device_free_tx_bufs(priv);
+	vnt_free_tx_bufs(priv);
 
 	return false;
 }
@@ -546,16 +527,14 @@ static int vnt_start(struct ieee80211_hw *hw)
 
 	priv->rx_buf_sz = MAX_TOTAL_SIZE_WITH_ALL_HEADERS;
 
-	if (device_alloc_bufs(priv) == false) {
-		dev_dbg(&priv->usb->dev, "device_alloc_bufs fail...\n");
+	if (vnt_alloc_bufs(priv) == false) {
+		dev_dbg(&priv->usb->dev, "vnt_alloc_bufs fail...\n");
 		return -ENOMEM;
 	}
 
-	MP_CLEAR_FLAG(priv, fMP_DISCONNECTED);
-	MP_SET_FLAG(priv, fMP_POST_READS);
-	MP_SET_FLAG(priv, fMP_POST_WRITES);
+	clear_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags);
 
-	if (device_init_registers(priv) == false) {
+	if (vnt_init_registers(priv) == false) {
 		dev_dbg(&priv->usb->dev, " init register fail\n");
 		goto free_all;
 	}
@@ -564,16 +543,14 @@ static int vnt_start(struct ieee80211_hw *hw)
 
 	vnt_int_start_interrupt(priv);
 
-	priv->flags |= DEVICE_FLAGS_OPENED;
-
 	ieee80211_wake_queues(hw);
 
 	return 0;
 
 free_all:
-	device_free_rx_bufs(priv);
-	device_free_tx_bufs(priv);
-	device_free_int_bufs(priv);
+	vnt_free_rx_bufs(priv);
+	vnt_free_tx_bufs(priv);
+	vnt_free_int_bufs(priv);
 
 	usb_kill_urb(priv->interrupt_urb);
 	usb_free_urb(priv->interrupt_urb);
@@ -595,29 +572,23 @@ static void vnt_stop(struct ieee80211_hw *hw)
 	/* clear all keys */
 	priv->key_entry_inuse = 0;
 
-	if ((priv->flags & DEVICE_FLAGS_UNPLUG) == false)
+	if (!test_bit(DEVICE_FLAGS_UNPLUG, &priv->flags))
 		vnt_mac_shutdown(priv);
 
 	ieee80211_stop_queues(hw);
 
-	MP_SET_FLAG(priv, fMP_DISCONNECTED);
-	MP_CLEAR_FLAG(priv, fMP_POST_WRITES);
-	MP_CLEAR_FLAG(priv, fMP_POST_READS);
+	set_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags);
 
 	cancel_delayed_work_sync(&priv->run_command_work);
 
 	priv->cmd_running = false;
 
-	priv->flags &= ~DEVICE_FLAGS_OPENED;
-
-	device_free_tx_bufs(priv);
-	device_free_rx_bufs(priv);
-	device_free_int_bufs(priv);
+	vnt_free_tx_bufs(priv);
+	vnt_free_rx_bufs(priv);
+	vnt_free_int_bufs(priv);
 
 	usb_kill_urb(priv->interrupt_urb);
 	usb_free_urb(priv->interrupt_urb);
-
-	return;
 }
 
 static int vnt_add_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
@@ -683,8 +654,6 @@ static void vnt_remove_interface(struct ieee80211_hw *hw,
 
 	/* LED slow blink */
 	vnt_mac_set_led(priv, LEDSTS_STS, LEDSTS_SLOW);
-
-	return;
 }
 
 static int vnt_config(struct ieee80211_hw *hw, u32 changed)
@@ -864,8 +833,6 @@ static void vnt_configure(struct ieee80211_hw *hw,
 	vnt_control_out_u8(priv, MESSAGE_REQUEST_MACREG, MAC_REG_RCR, rx_mode);
 
 	dev_dbg(&priv->usb->dev, "rx mode out= %x\n", rx_mode);
-
-	return;
 }
 
 static int vnt_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
@@ -962,7 +929,7 @@ static const struct ieee80211_ops vnt_mac_ops = {
 int vnt_init(struct vnt_private *priv)
 {
 
-	if (!(device_init_registers(priv)))
+	if (!(vnt_init_registers(priv)))
 		return -EAGAIN;
 
 	SET_IEEE80211_PERM_ADDR(priv->hw, priv->permanent_net_addr);
@@ -1005,7 +972,7 @@ vt6656_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	priv->hw = hw;
 	priv->usb = udev;
 
-	device_set_options(priv);
+	vnt_set_options(priv);
 
 	spin_lock_init(&priv->lock);
 	mutex_init(&priv->usb_lock);
@@ -1033,7 +1000,7 @@ vt6656_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	usb_device_reset(priv);
 
-	MP_CLEAR_FLAG(priv, fMP_DISCONNECTED);
+	clear_bit(DEVICE_FLAGS_DISCONNECTED, &priv->flags);
 	vnt_reset_command_timer(priv);
 
 	vnt_schedule_command(priv, WLAN_CMD_INIT_MAC80211);
@@ -1059,7 +1026,7 @@ static void vt6656_disconnect(struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 	usb_put_dev(interface_to_usbdev(intf));
 
-	priv->flags |= DEVICE_FLAGS_UNPLUG;
+	set_bit(DEVICE_FLAGS_UNPLUG, &priv->flags);
 
 	ieee80211_free_hw(priv->hw);
 }

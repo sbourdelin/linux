@@ -222,22 +222,22 @@ union vnt_tx_head {
 
 struct vnt_tx_fifo_head {
 	u8 tx_key[WLAN_KEY_LEN_CCMP];
-	u16 wFIFOCtl;
+	__le16 fifo_ctl;
 	__le16 time_stamp;
 	__le16 frag_ctl;
 	__le16 current_rate;
 } __packed;
 
 struct vnt_tx_buffer {
-	u8 byType;
-	u8 byPKTNO;
+	u8 type;
+	u8 pkt_no;
 	__le16 tx_byte_count;
 	struct vnt_tx_fifo_head fifo_head;
 	union vnt_tx_head tx_head;
 } __packed;
 
 struct vnt_tx_short_buf_head {
-	u16 fifo_ctl;
+	__le16 fifo_ctl;
 	u16 time_stamp;
 	struct vnt_phy_field ab;
 	__le16 duration;
@@ -245,8 +245,8 @@ struct vnt_tx_short_buf_head {
 } __packed;
 
 struct vnt_beacon_buffer {
-	u8 byType;
-	u8 byPKTNO;
+	u8 type;
+	u8 pkt_no;
 	__le16 tx_byte_count;
 	struct vnt_tx_short_buf_head short_head;
 	struct ieee80211_mgmt mgmt_hdr;
