@@ -1504,6 +1504,10 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 		ret = -EINVAL;
 	}
 
+	/*
+	 * None of the vendor drivers are configuring the beacon
+	 * queue here .... why?
+	 */
 	if (!ret) {
 		val16 = rtl8723au_read16(priv, REG_TRXDMA_CTRL);
 		val16 &= 0x7;
