@@ -21,7 +21,15 @@
 #define RTW_USB_CONTROL_MSG_TIMEOUT	500
 #define RTLMAC_MAX_REG_POLL		500
 
-#define RTLMAC_OUT_PIPES		3
+#define RTLMAC_OUT_ENDPOINTS		3
+#define RTLMAC_OUT_QUEUES		8
+
+enum rtlmac_ac_numbers {
+	RTLMAC_AC_BCN		= 4,
+	RTLMAC_AC_MGT		= 5,
+	RTLMAC_AC_HIGH		= 6,
+	RTLMAC_AC_CMD		= 7,
+};
 
 #define REALTEK_USB_READ		0xc0
 #define REALTEK_USB_WRITE		0x40
@@ -168,7 +176,8 @@ struct rtlmac_priv {
 	u32 path_a_rf_paths:4;
 	unsigned int pipe_interrupt;
 	unsigned int pipe_in;
-	unsigned int pipe_out[RTLMAC_OUT_PIPES];
+	unsigned int pipe_out[RTLMAC_OUT_QUEUES];
+	u8 out_ep[RTLMAC_OUT_ENDPOINTS];
 	u8 path_a_ig_value;
 	int ep_tx_count;
 	int rf_paths;

@@ -1446,6 +1446,7 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 {
 	u16 val16, hi, lo;
 	u16 hiq, mgq, bkq, beq, viq, voq;
+	int hip, mgp, bkp, bep, vip, vop;
 	int ret = 0;
 
 	switch(priv->ep_tx_count) {
@@ -1468,6 +1469,12 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 		viq = hi;
 		voq = hi;
 
+		hip = 0;
+		mgp = 0;
+		bkp = 0;
+		bep = 0;
+		vip = 0;
+		vop = 0;
 		break;
 	case 2:
 		if (priv->ep_tx_high_queue && priv->ep_tx_low_queue) {
@@ -1484,6 +1491,7 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 			hi = 0;
 			lo = 0;
 		}
+
 		hiq = hi;
 		mgq = hi;
 		bkq = lo;
@@ -1491,6 +1499,12 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 		viq = hi;
 		voq = hi;
 
+		hip = 0;
+		mgp = 0;
+		bkp = 1;
+		bep = 1;
+		vip = 0;
+		vop = 0;
 		break;
 	case 3:
 		beq = TRXDMA_QUEUE_LOW;
@@ -1499,6 +1513,13 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 		voq = TRXDMA_QUEUE_HIGH;
 		mgq = TRXDMA_QUEUE_HIGH;
 		hiq = TRXDMA_QUEUE_HIGH;
+
+		hip = hiq ^ 3;
+		mgp = mgq ^ 3;
+		bkp = bkq ^ 3;
+		bep = beq ^ 3;
+		vip = viq ^ 3;
+		vop = viq ^ 3;
 		break;
 	default:
 		ret = -EINVAL;
@@ -1518,6 +1539,23 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 			(mgq << TRXDMA_CTRL_MGQ_SHIFT) |
 			(hiq << TRXDMA_CTRL_HIQ_SHIFT);
 		rtl8723au_write16(priv, REG_TRXDMA_CTRL, val16);
+
+		priv->pipe_out[IEEE80211_AC_VO] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[vop]);
+		priv->pipe_out[IEEE80211_AC_VI] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[vip]);
+		priv->pipe_out[IEEE80211_AC_BE] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[bep]);
+		priv->pipe_out[IEEE80211_AC_BK] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[bkp]);
+		priv->pipe_out[RTLMAC_AC_BCN] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[0]);
+		priv->pipe_out[RTLMAC_AC_MGT] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[mgp]);
+		priv->pipe_out[RTLMAC_AC_HIGH] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[hip]);
+		priv->pipe_out[RTLMAC_AC_CMD] =
+			usb_sndbulkpipe(priv->udev, priv->out_ep[0]);
 	}
 
 	return ret;
@@ -2466,15 +2504,14 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 			    usb_endpoint_xfer_bulk(endpoint)) {
 				printk(KERN_DEBUG "%s: out endpoint num %i\n",
 				       __func__, num);
-				if (j >= RTLMAC_OUT_PIPES) {
+				if (j >= RTLMAC_OUT_ENDPOINTS) {
 					printk(KERN_WARNING "%s: Unsupported "
 					       "number ouf OUT pipes\n",
 					       __func__);
 					ret = -EINVAL;
 					goto exit;
 				}
-				priv->pipe_out[j++] =
-					usb_sndbulkpipe(priv->udev, num);
+				priv->out_ep[j++] = num;
 			}
 		}
 	}
