@@ -1505,7 +1505,9 @@ static int rtlmac_init_queue_priotiy(struct rtlmac_priv *priv)
 	}
 
 	if (!ret) {
-		val16 = (voq << TRXDMA_CTRL_VOQ_SHIFT) |
+		val16 = rtl8723au_read16(priv, REG_TRXDMA_CTRL);
+		val16 &= 0x7;
+		val16 |= (voq << TRXDMA_CTRL_VOQ_SHIFT) |
 			(viq << TRXDMA_CTRL_VIQ_SHIFT) |
 			(beq << TRXDMA_CTRL_BEQ_SHIFT) |
 			(bkq << TRXDMA_CTRL_BKQ_SHIFT) |
