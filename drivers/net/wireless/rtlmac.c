@@ -2234,6 +2234,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
 	struct rtlmac_tx_desc *tx_desc;
+	u32 queue;
 	u16 pktlen = skb->len;
 	u16 seq_number;
 	u8 rate_flag = tx_info->control.rates[0].flags;
@@ -2274,10 +2275,8 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	    is_broadcast_ether_addr(ieee80211_get_DA(hdr)))
 		tx_desc->txdw0 |= TXDESC_BROADMULTICAST;
 
-	/*
-	 * Select TX HW queue
-	 */
-	tx_desc->txdw1 = cpu_to_le32(rtlmac_queue_select(hw, skb));
+	queue = rtlmac_queue_select(hw, skb);
+	tx_desc->txdw1 = cpu_to_le32(queue << TXDESC_QUEUE_SHIFT);
 
 	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
