@@ -1442,7 +1442,7 @@ exit:
 	return ret;
 }
 
-static int rtlmac_init_queue_priotiy(struct rtlmac_priv *priv)
+static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 {
 	u16 val16, hi, lo;
 	u16 hiq, mgq, bkq, beq, viq, voq;
@@ -1970,7 +1970,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		rtl8723au_write8(priv, REG_TDECTRL + 1, val8);
 	}
 
-	ret = rtlmac_init_queue_priotiy(priv);
+	ret = rtlmac_init_queue_priority(priv);
 	if (ret)
 		goto exit;
 
