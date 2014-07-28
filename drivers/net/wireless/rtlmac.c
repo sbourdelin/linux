@@ -2399,6 +2399,83 @@ static const struct ieee80211_ops rtlmac_ops = {
 #endif
 };
 
+static int rtlmac_parse_usb(struct rtlmac_priv *priv,
+			    struct usb_interface *interface)
+{
+	struct usb_interface_descriptor *interface_desc;
+	struct usb_host_interface *host_interface;
+	struct usb_host_endpoint *host_endpoint;
+	struct usb_endpoint_descriptor *endpoint;
+	int i, j = 0, endpoints;
+	u8 dir, xtype, num;
+	int ret = 0;
+
+	host_interface = &interface->altsetting[0];
+	interface_desc = &host_interface->desc;
+	endpoints = interface_desc->bNumEndpoints;
+
+	for (i = 0; i < endpoints; i++) {
+		host_endpoint = host_interface->endpoint + i;
+		if (host_endpoint) {
+			endpoint = &host_endpoint->desc;
+			dir = endpoint->bEndpointAddress &
+				USB_ENDPOINT_DIR_MASK;
+			num = usb_endpoint_num(endpoint);
+			xtype = usb_endpoint_type(endpoint);
+			printk(KERN_DEBUG "%s: endpoint: dir %02x, num %02x, "
+			       "type %02x\n", __func__, dir, num, xtype);
+			if (usb_endpoint_dir_in(endpoint) &&
+			    usb_endpoint_xfer_bulk(endpoint)) {
+				printk(KERN_DEBUG "%s: in endpoint num %i\n",
+				       __func__, num);
+
+				if (priv->pipe_in) {
+					printk(KERN_WARNING "%s: Too many "
+					       "IN pipes\n", __func__);
+					ret = -EINVAL;
+					goto exit;
+				}
+
+				priv->pipe_in =
+					usb_rcvbulkpipe(priv->udev, num);
+			}
+
+			if (usb_endpoint_dir_in(endpoint) &&
+			    usb_endpoint_xfer_int(endpoint)) {
+				printk(KERN_DEBUG "%s: interrupt endpoint num "
+				       "%i\n", __func__, num);
+
+				if (priv->pipe_interrupt) {
+					printk(KERN_WARNING "%s: Too many "
+					       "INTERRUPT pipes\n", __func__);
+					ret = -EINVAL;
+					goto exit;
+				}
+
+				priv->pipe_interrupt =
+					usb_rcvintpipe(priv->udev, num);
+			}
+
+			if (usb_endpoint_dir_out(endpoint) &&
+			    usb_endpoint_xfer_bulk(endpoint)) {
+				printk(KERN_DEBUG "%s: out endpoint num %i\n",
+				       __func__, num);
+				if (j >= RTLMAC_OUT_PIPES) {
+					printk(KERN_WARNING "%s: Unsupported "
+					       "number ouf OUT pipes\n",
+					       __func__);
+					ret = -EINVAL;
+					goto exit;
+				}
+				priv->pipe_out[j++] =
+					usb_sndbulkpipe(priv->udev, num);
+			}
+		}
+	}
+exit:
+	return ret;
+}
+
 static int rtlmac_probe(struct usb_interface *interface,
 			const struct usb_device_id *id)
 {
@@ -2421,6 +2498,10 @@ static int rtlmac_probe(struct usb_interface *interface,
 	mutex_init(&priv->usb_buf_mutex);
 
 	usb_set_intfdata(interface, hw);
+
+	ret = rtlmac_parse_usb(priv, interface);
+	if (ret)
+		goto exit;
 
 	rtlmac_8723au_identify_chip(priv);
 	rtlmac_read_efuse(priv);
