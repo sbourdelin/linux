@@ -2271,17 +2271,31 @@ static void rtlmac_calc_tx_desc_csum(struct rtlmac_tx_desc *tx_desc)
 	tx_desc->csum |= cpu_to_le32(csum);
 }
 
+static void rtlmac_tx_complete(struct urb *urb)
+{
+	struct sk_buff *skb = (struct sk_buff *)urb->context;
+
+	printk(KERN_DEBUG "%s: Completing skb %p (status %i)\n", __func__, skb,
+		urb->status);
+
+	usb_free_urb(urb);
+	dev_kfree_skb(skb);
+}
+
 static void rtlmac_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
+	struct rtlmac_priv *priv = hw->priv;
 	struct rtlmac_tx_desc *tx_desc;
+	struct urb *urb;
 	u32 queue;
 	u16 pktlen = skb->len;
 	u16 seq_number;
 	u8 rate_flag = tx_info->control.rates[0].flags;
+	int ret;
 
 	if (skb_headroom(skb) < sizeof(struct rtlmac_tx_desc)) {
 		printk(KERN_DEBUG "%s: Not enough skb headroom space (%i) for "
@@ -2292,6 +2306,12 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	if (unlikely(skb->len > (65535 - sizeof(struct rtlmac_tx_desc)))) {
 		printk(KERN_DEBUG "%s: Trying to send over sized skb (%i)\n",
 		       __func__, skb->len);
+		goto error;
+	}
+
+	urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!urb) {
+		printk(KERN_DEBUG "%s: Unable to allocate urb\n", __func__);
 		goto error;
 	}
 
@@ -2339,7 +2359,12 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 
 	rtlmac_calc_tx_desc_csum(tx_desc);
 
-	dev_kfree_skb(skb);
+	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
+			  skb->len, rtlmac_tx_complete, skb);
+
+	ret = usb_submit_urb(urb, GFP_KERNEL);
+	printk(KERN_DEBUG "%s: Sending skb %p (ret=%i)\n", __func__, skb, ret);
+
 	return;
 error:
 	dev_kfree_skb(skb);
