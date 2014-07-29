@@ -22,14 +22,6 @@
 #define RTLMAC_MAX_REG_POLL		500
 
 #define RTLMAC_OUT_ENDPOINTS		3
-#define RTLMAC_OUT_QUEUES		8
-
-enum rtlmac_ac_numbers {
-	RTLMAC_AC_BCN		= 4,
-	RTLMAC_AC_MGT		= 5,
-	RTLMAC_AC_HIGH		= 6,
-	RTLMAC_AC_CMD		= 7,
-};
 
 #define REALTEK_USB_READ		0xc0
 #define REALTEK_USB_WRITE		0x40
@@ -55,6 +47,115 @@ enum rtlmac_ac_numbers {
 #define EFUSE_REAL_CONTENT_LEN_8723A	512
 #define EFUSE_BT_MAP_LEN_8723A		1024
 #define EFUSE_MAX_WORD_UNIT		4
+
+
+struct rtlmac_tx_desc {
+	__le16 pkt_size;
+	u8 pkt_offset;
+	u8 txdw0;
+	__le32 txdw1;
+	__le32 txdw2;
+	__le32 txdw3;
+	__le32 txdw4;
+	__le32 txdw5;
+	__le32 txdw6;
+	__le16 csum;
+	__le16 txdw7;
+};
+
+/*  CCK Rates, TxHT = 0 */
+#define TXDESC_RATE_1M			0x00
+#define TXDESC_RATE_2M			0x01
+#define TXDESC_RATE_5_5M		0x02
+#define TXDESC_RATE_11M			0x03
+
+/*  OFDM Rates, TxHT = 0 */
+#define TXDESC_RATE_6M			0x04
+#define TXDESC_RATE_9M			0x05
+#define TXDESC_RATE_12M			0x06
+#define TXDESC_RATE_18M			0x07
+#define TXDESC_RATE_24M			0x08
+#define TXDESC_RATE_36M			0x09
+#define TXDESC_RATE_48M			0x0a
+#define TXDESC_RATE_54M			0x0b
+
+/*  MCS Rates, TxHT = 1 */
+#define TXDESC_RATE_MCS0		0x0c
+#define TXDESC_RATE_MCS1		0x0d
+#define TXDESC_RATE_MCS2		0x0e
+#define TXDESC_RATE_MCS3		0x0f
+#define TXDESC_RATE_MCS4		0x10
+#define TXDESC_RATE_MCS5		0x11
+#define TXDESC_RATE_MCS6		0x12
+#define TXDESC_RATE_MCS7		0x13
+#define TXDESC_RATE_MCS8		0x14
+#define TXDESC_RATE_MCS9		0x15
+#define TXDESC_RATE_MCS10		0x16
+#define TXDESC_RATE_MCS11		0x17
+#define TXDESC_RATE_MCS12		0x18
+#define TXDESC_RATE_MCS13		0x19
+#define TXDESC_RATE_MCS14		0x1a
+#define TXDESC_RATE_MCS15		0x1b
+#define TXDESC_RATE_MCS15_SG		0x1c
+#define TXDESC_RATE_MCS32		0x20
+
+#define TXDESC_OFFSET_SZ		0
+#define TXDESC_OFFSET_SHT		16
+#if 0
+#define TXDESC_BMC			BIT(24)
+#define TXDESC_LSG			BIT(26)
+#define TXDESC_FSG			BIT(27)
+#define TXDESC_OWN			BIT(31)
+#else
+#define TXDESC_BROADMULTICAST		BIT(0)
+#define TXDESC_LSG			BIT(2)
+#define TXDESC_FSG			BIT(3)
+#define TXDESC_OWN			BIT(7)
+#endif
+
+/* Word 1 */
+#define TXDESC_PKT_OFFSET_SZ		0
+#define TXDESC_BK			BIT(6)
+#define TXDESC_QUEUE_SHIFT		8
+#define TXDESC_QUEUE_MASK		0x1f00
+#define TXDESC_QUEUE_BK			0x2
+#define TXDESC_QUEUE_BE			0x0
+#define TXDESC_QUEUE_VI			0x5
+#define TXDESC_QUEUE_VO			0x7
+#define TXDESC_QUEUE_BEACON		0x10
+#define TXDESC_QUEUE_HIGH		0x11
+#define TXDESC_QUEUE_MGNT		0x12
+#define TXDESC_QUEUE_CMD		0x13
+#define TXDESC_QUEUE_MAX		(TXDESC_QUEUE_CMD + 1)
+
+#define TXDESC_RATE_ID_SHIFT		16
+#define TXDESC_RATE_ID_MASK		0xf
+#define TXDESC_NAVUSEHDR		BIT(20)
+#define TXDESC_PKT_OFFSET_SHIFT		26
+#define TXDESC_HWPC			BIT(31)
+
+/* Word 2 */
+#define TXDESC_AGG_EN			BIT(29)
+
+/* Word 3 */
+#define TXDESC_SEQ_SHIFT		16
+#define TXDESC_SEQ_MASK			0x000fff0000
+
+/* Word 4 */
+#define TXDESC_QOS			BIT(6)
+#define TXDESC_HW_SEQ_ENABLE		BIT(7)
+#define TXDESC_USE_DRIVER_RATE		BIT(8)
+#define TXDESC_DISABLE_DATA_FB		BIT(10)
+#define TXDESC_SHORT_PREAMBLE		BIT(24)
+#define TXDESC_DATA_BW			BIT(25)
+
+/* Word 5 */
+#define TXDESC_RATE_SHIFT		0
+#define TXDESC_RATE_MASK		0x3f
+#define TXDESC_SHORT_GI			BIT(6)
+#define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
+#define TXDESC_RETRY_LIMIT_SHIFT	18
+#define TXDESC_RETRY_LIMIT_MASK		0x00ff0000
 
 struct rtlmac_firmware_header {
 	__le16	signature;		/*  92C0: test chip; 92C,
@@ -176,7 +277,7 @@ struct rtlmac_priv {
 	u32 path_a_rf_paths:4;
 	unsigned int pipe_interrupt;
 	unsigned int pipe_in;
-	unsigned int pipe_out[RTLMAC_OUT_QUEUES];
+	unsigned int pipe_out[TXDESC_QUEUE_MAX];
 	u8 out_ep[RTLMAC_OUT_ENDPOINTS];
 	u8 path_a_ig_value;
 	int ep_tx_count;
@@ -195,110 +296,3 @@ struct rtlmac_priv {
 		struct rtl8723au_efuse efuse;
 	} efuse_wifi;
 };
-
-struct rtlmac_tx_desc {
-	__le16 pkt_size;
-	u8 pkt_offset;
-	u8 txdw0;
-	__le32 txdw1;
-	__le32 txdw2;
-	__le32 txdw3;
-	__le32 txdw4;
-	__le32 txdw5;
-	__le32 txdw6;
-	__le16 csum;
-	__le16 txdw7;
-};
-
-/*  CCK Rates, TxHT = 0 */
-#define TXDESC_RATE_1M			0x00
-#define TXDESC_RATE_2M			0x01
-#define TXDESC_RATE_5_5M		0x02
-#define TXDESC_RATE_11M			0x03
-
-/*  OFDM Rates, TxHT = 0 */
-#define TXDESC_RATE_6M			0x04
-#define TXDESC_RATE_9M			0x05
-#define TXDESC_RATE_12M			0x06
-#define TXDESC_RATE_18M			0x07
-#define TXDESC_RATE_24M			0x08
-#define TXDESC_RATE_36M			0x09
-#define TXDESC_RATE_48M			0x0a
-#define TXDESC_RATE_54M			0x0b
-
-/*  MCS Rates, TxHT = 1 */
-#define TXDESC_RATE_MCS0		0x0c
-#define TXDESC_RATE_MCS1		0x0d
-#define TXDESC_RATE_MCS2		0x0e
-#define TXDESC_RATE_MCS3		0x0f
-#define TXDESC_RATE_MCS4		0x10
-#define TXDESC_RATE_MCS5		0x11
-#define TXDESC_RATE_MCS6		0x12
-#define TXDESC_RATE_MCS7		0x13
-#define TXDESC_RATE_MCS8		0x14
-#define TXDESC_RATE_MCS9		0x15
-#define TXDESC_RATE_MCS10		0x16
-#define TXDESC_RATE_MCS11		0x17
-#define TXDESC_RATE_MCS12		0x18
-#define TXDESC_RATE_MCS13		0x19
-#define TXDESC_RATE_MCS14		0x1a
-#define TXDESC_RATE_MCS15		0x1b
-#define TXDESC_RATE_MCS15_SG		0x1c
-#define TXDESC_RATE_MCS32		0x20
-
-#define TXDESC_OFFSET_SZ		0
-#define TXDESC_OFFSET_SHT		16
-#if 0
-#define TXDESC_BMC			BIT(24)
-#define TXDESC_LSG			BIT(26)
-#define TXDESC_FSG			BIT(27)
-#define TXDESC_OWN			BIT(31)
-#else
-#define TXDESC_BROADMULTICAST		BIT(0)
-#define TXDESC_LSG			BIT(2)
-#define TXDESC_FSG			BIT(3)
-#define TXDESC_OWN			BIT(7)
-#endif
-
-/* Word 1 */
-#define TXDESC_PKT_OFFSET_SZ		0
-#define TXDESC_BK			BIT(6)
-#define TXDESC_QUEUE_SHIFT		8
-#define TXDESC_QUEUE_MASK		0x1f00
-#define TXDESC_QUEUE_BK			0x2
-#define TXDESC_QUEUE_BE			0x0
-#define TXDESC_QUEUE_VI			0x5
-#define TXDESC_QUEUE_VO			0x7
-#define TXDESC_QUEUE_BEACON		0x10
-#define TXDESC_QUEUE_HIGH		0x11
-#define TXDESC_QUEUE_MGNT		0x12
-#define TXDESC_QUEUE_CMD		0x13
-
-#define TXDESC_RATE_ID_SHIFT		16
-#define TXDESC_RATE_ID_MASK		0xf
-#define TXDESC_NAVUSEHDR		BIT(20)
-#define TXDESC_PKT_OFFSET_SHIFT		26
-#define TXDESC_HWPC			BIT(31)
-
-/* Word 2 */
-#define TXDESC_AGG_EN			BIT(29)
-
-/* Word 3 */
-#define TXDESC_SEQ_SHIFT		16
-#define TXDESC_SEQ_MASK			0x000fff0000
-
-/* Word 4 */
-#define TXDESC_QOS			BIT(6)
-#define TXDESC_HW_SEQ_ENABLE		BIT(7)
-#define TXDESC_USE_DRIVER_RATE		BIT(8)
-#define TXDESC_DISABLE_DATA_FB		BIT(10)
-#define TXDESC_SHORT_PREAMBLE		BIT(24)
-#define TXDESC_DATA_BW			BIT(25)
-
-/* Word 5 */
-#define TXDESC_RATE_SHIFT		0
-#define TXDESC_RATE_MASK		0x3f
-#define TXDESC_SHORT_GI			BIT(6)
-#define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
-#define TXDESC_RETRY_LIMIT_SHIFT	18
-#define TXDESC_RETRY_LIMIT_MASK		0x00ff0000

@@ -1540,21 +1540,21 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 			(hiq << TRXDMA_CTRL_HIQ_SHIFT);
 		rtl8723au_write16(priv, REG_TRXDMA_CTRL, val16);
 
-		priv->pipe_out[IEEE80211_AC_VO] =
+		priv->pipe_out[TXDESC_QUEUE_VO] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[vop]);
-		priv->pipe_out[IEEE80211_AC_VI] =
+		priv->pipe_out[TXDESC_QUEUE_VI] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[vip]);
-		priv->pipe_out[IEEE80211_AC_BE] =
+		priv->pipe_out[TXDESC_QUEUE_BE] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[bep]);
-		priv->pipe_out[IEEE80211_AC_BK] =
+		priv->pipe_out[TXDESC_QUEUE_BK] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[bkp]);
-		priv->pipe_out[RTLMAC_AC_BCN] =
+		priv->pipe_out[TXDESC_QUEUE_BEACON] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[0]);
-		priv->pipe_out[RTLMAC_AC_MGT] =
+		priv->pipe_out[TXDESC_QUEUE_MGNT] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[mgp]);
-		priv->pipe_out[RTLMAC_AC_HIGH] =
+		priv->pipe_out[TXDESC_QUEUE_HIGH] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[hip]);
-		priv->pipe_out[RTLMAC_AC_CMD] =
+		priv->pipe_out[TXDESC_QUEUE_CMD] =
 			usb_sndbulkpipe(priv->udev, priv->out_ep[0]);
 	}
 
