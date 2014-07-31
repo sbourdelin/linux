@@ -2370,6 +2370,56 @@ error:
 	dev_kfree_skb(skb);
 }
 
+static void rtlmac_rx_complete(struct urb *urb)
+{
+	struct sk_buff *skb = (struct sk_buff *)urb->context;
+	struct rtlmac_rx_desc *rx_desc = (struct rtlmac_rx_desc *)skb->data;
+	int cnt, len;
+
+	cnt = (cpu_to_le32(rx_desc->rxdw2) >> 16) & 0xff;
+	len = cpu_to_le32(rx_desc->rxdw0) & 0x3fff;
+	skb_put(skb, urb->actual_length);
+	printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb size %i "
+	       "cnt %i size %i\n",
+	       __func__, skb, urb->status, skb->len, cnt, len);
+
+	skb_pull(skb, sizeof(struct rtlmac_rx_desc));
+
+	usb_free_urb(urb);
+	dev_kfree_skb(skb);
+}
+
+static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
+{
+	struct rtlmac_priv *priv = hw->priv;
+	struct sk_buff *skb;
+	struct urb *urb;
+	int ret;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	skb = dev_alloc_skb(sizeof(struct rtlmac_rx_desc) +
+			    IEEE80211_MAX_FRAME_LEN);
+	if (!skb)
+		return -ENOMEM;
+
+	urb = usb_alloc_urb(0, GFP_ATOMIC);
+	if (!urb) {
+		dev_kfree_skb(skb);
+		return -ENOMEM;
+	}
+
+	/*
+	 * Temporary
+	 */
+	priv->rx_urb = urb;
+
+	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_in, skb->data,
+			  skb->len, rtlmac_rx_complete, skb);
+	ret = usb_submit_urb(urb, GFP_ATOMIC);
+	return ret;
+}
+
 static int rtlmac_add_interface(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif)
 {
@@ -2443,7 +2493,9 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 
 	ret = 0;
 
-	printk(KERN_DEBUG "%s\n", __func__);
+	ret = rtlmac_submit_rx_urb(hw);
+
+	printk(KERN_DEBUG "%s, %i\n", __func__, ret);
 	return ret;
 }
 

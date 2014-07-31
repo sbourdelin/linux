@@ -48,6 +48,14 @@
 #define EFUSE_BT_MAP_LEN_8723A		1024
 #define EFUSE_MAX_WORD_UNIT		4
 
+struct rtlmac_rx_desc {
+	__le32 rxdw0;
+	__le32 rxdw1;
+	__le32 rxdw2;
+	__le32 rxdw3;
+	__le32 rxdw4;
+	__le32 rxdw5;
+};
 
 struct rtlmac_tx_desc {
 	__le16 pkt_size;
@@ -283,6 +291,7 @@ struct rtlmac_priv {
 	int ep_tx_count;
 	int rf_paths;
 	u32 rf_mode_ag[2];
+	struct urb *rx_urb;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
 	struct mutex usb_buf_mutex;
