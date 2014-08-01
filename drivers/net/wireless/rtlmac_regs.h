@@ -679,6 +679,13 @@
 #define  FPGA0_RF_PAPE			0x400
 #define  FPGA0_RF_PAPE5G		0x800
 
+#define REG_FPGA0_XAB_RF_PARM		0x0878	/* Antenna select path in ODM */
+#define REG_FPGA0_XA_RF_PARM		0x0878	/* 16 bit */
+#define REG_FPGA0_XB_RF_PARM		0x087a	/* 16 bit */
+#define REG_FPGA0_XCD_RF_PARM		0x087c
+#define REG_FPGA0_XC_RF_PARM		0x087c	/* 16 bit */
+#define REG_FPGA0_XD_RF_PARM		0x087e	/* 16 bit */
+
 #define REG_FPGA0_ANALOG1		0x0880
 #define REG_FPGA0_ANALOG2		0x0884
 #define REG_FPGA0_ANALOG3		0x0888

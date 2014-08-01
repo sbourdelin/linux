@@ -552,6 +552,34 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 	return retval;
 }
 
+static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
+{
+	u8 val8;
+	u16 val16;
+
+	val8 = rtl8723au_read8(priv, REG_SPS0_CTRL);
+	val8 |= BIT(0) | BIT(3);
+	rtl8723au_write8(priv, REG_SPS0_CTRL, val8);
+
+	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_PARM);
+	val16 &= ~(BIT(4) | BIT(5));
+	val16 |= BIT(3);
+	rtl8723au_write16(priv, REG_FPGA0_XA_RF_PARM, val16);
+
+	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0x32d95);
+
+	val8 = rtl8723au_read8(priv, REG_TXPAUSE);
+
+	printk(KERN_DEBUG "TX_PAUSE %02x\n", val8);
+#if 0
+	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
+	rtl8723au_write8(priv, REG_APSD_CTRL, 0x00);
+	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE2);
+	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
+	rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
+#endif
+}
+
 /*
  * The rtl8723a has 3 channel groups for it's efuse settings. It only
  * supports the 2.4GHz band, so channels 1 - 14:
@@ -2489,10 +2517,12 @@ static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 
 static int rtlmac_start(struct ieee80211_hw *hw)
 {
+	struct rtlmac_priv *priv = hw->priv;
 	int ret;
 
 	ret = 0;
 
+	rtl8723a_enable_rf(priv);
 	ret = rtlmac_submit_rx_urb(hw);
 
 	printk(KERN_DEBUG "%s, %i\n", __func__, ret);
