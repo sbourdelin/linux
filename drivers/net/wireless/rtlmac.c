@@ -2448,6 +2448,48 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	return ret;
 }
 
+static void rtlmac_int_complete(struct urb *urb)
+{
+	struct rtlmac_priv *priv = (struct rtlmac_priv *)urb->context;
+	int i;
+
+	if (urb->status == 0) {
+		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
+			printk("%02x ", priv->int_buf[i]);
+			if ((i & 0x0f) == 0x0f)
+				printk("\n");
+		}
+
+		usb_submit_urb(urb, GFP_ATOMIC);
+	} else {
+		printk(KERN_DEBUG "%s: Error %i\n", __func__, urb->status);
+	}
+}
+
+
+static int rtlmac_submit_int_urb(struct ieee80211_hw *hw)
+{
+	struct rtlmac_priv *priv = hw->priv;
+	struct urb *urb;
+	u32 val32;
+	int ret;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!urb)
+		return -ENOMEM;
+
+	usb_fill_int_urb(urb, priv->udev, priv->pipe_interrupt, priv->int_buf,
+			 USB_INTR_CONTENT_LENGTH, rtlmac_int_complete, priv, 1);
+	ret = usb_submit_urb(urb, GFP_KERNEL);
+
+	val32 = rtl8723au_read32(priv, REG_USB_HIMR);
+	val32 |= USB_HIMR_CPWM;
+	rtl8723au_write32(priv, REG_USB_HIMR, val32);
+	return ret;
+}
+
 static int rtlmac_add_interface(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif)
 {
@@ -2523,8 +2565,12 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 	ret = 0;
 
 	rtl8723a_enable_rf(priv);
+	ret = rtlmac_submit_int_urb(hw);
+	if (ret)
+		goto exit;
 	ret = rtlmac_submit_rx_urb(hw);
 
+exit:
 	printk(KERN_DEBUG "%s, %i\n", __func__, ret);
 	return ret;
 }

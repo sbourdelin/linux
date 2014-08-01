@@ -20,6 +20,7 @@
 
 #define RTW_USB_CONTROL_MSG_TIMEOUT	500
 #define RTLMAC_MAX_REG_POLL		500
+#define	USB_INTR_CONTENT_LENGTH		56
 
 #define RTLMAC_OUT_ENDPOINTS		3
 
@@ -304,4 +305,5 @@ struct rtlmac_priv {
 		u8 raw[EFUSE_MAP_LEN_8723A];
 		struct rtl8723au_efuse efuse;
 	} efuse_wifi;
+	u8 int_buf[USB_INTR_CONTENT_LENGTH];
 };

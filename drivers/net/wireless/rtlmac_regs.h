@@ -733,6 +733,43 @@
 #define REG_8723A_FW_START_ADDRESS	0x1000
 
 #define REG_USB_INFO			0xfe17
+#define REG_USB_HIMR			0xfe38
+#define  USB_HIMR_TIMEOUT2		BIT(31)
+#define  USB_HIMR_TIMEOUT1		BIT(30)
+#define  USB_HIMR_PSTIMEOUT		BIT(29)
+#define  USB_HIMR_GTINT4		BIT(28)
+#define  USB_HIMR_GTINT3		BIT(27)
+#define  USB_HIMR_TXBCNERR		BIT(26)
+#define  USB_HIMR_TXBCNOK		BIT(25)
+#define  USB_HIMR_TSF_BIT32_TOGGLE	BIT(24)
+#define  USB_HIMR_BCNDMAINT3		BIT(23)
+#define  USB_HIMR_BCNDMAINT2		BIT(22)
+#define  USB_HIMR_BCNDMAINT1		BIT(21)
+#define  USB_HIMR_BCNDMAINT0		BIT(20)
+#define  USB_HIMR_BCNDOK3		BIT(19)
+#define  USB_HIMR_BCNDOK2		BIT(18)
+#define  USB_HIMR_BCNDOK1		BIT(17)
+#define  USB_HIMR_BCNDOK0		BIT(16)
+#define  USB_HIMR_HSISR_IND		BIT(15)
+#define  USB_HIMR_BCNDMAINT_E		BIT(14)
+/* RSVD	BIT(13) */
+#define  USB_HIMR_CTW_END		BIT(12)
+/* RSVD	BIT(11) */
+#define  USB_HIMR_C2HCMD		BIT(10)
+#define  USB_HIMR_CPWM2			BIT(9)
+#define  USB_HIMR_CPWM			BIT(8)
+#define  USB_HIMR_HIGHDOK		BIT(7)	/*  High Queue DMA OK
+						    Interrupt */
+#define  USB_HIMR_MGNTDOK		BIT(6)	/*  Management Queue DMA OK
+						    Interrupt */
+#define  USB_HIMR_BKDOK			BIT(5)	/*  AC_BK DMA OK Interrupt */
+#define  USB_HIMR_BEDOK			BIT(4)	/*  AC_BE DMA OK Interrupt */
+#define  USB_HIMR_VIDOK			BIT(3)	/*  AC_VI DMA OK Interrupt */
+#define  USB_HIMR_VODOK			BIT(2)	/*  AC_VO DMA Interrupt */
+#define  USB_HIMR_RDU			BIT(1)	/*  Receive Descriptor
+						    Unavailable */
+#define  USB_HIMR_ROK			BIT(0)	/*  Receive DMA OK Interrupt */
+
 #define REG_USB_SPECIAL_OPTION		0xfe55
 #define REG_USB_DMA_AGG_TO		0xfe5b
 #define REG_USB_AGG_TO			0xfe5c
