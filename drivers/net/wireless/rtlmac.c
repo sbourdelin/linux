@@ -3027,6 +3027,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	if (!skb)
 		return -ENOMEM;
 
+	memset(skb->data, 0, sizeof(struct rtlmac_rx_desc));
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
 		dev_kfree_skb(skb);
@@ -3156,7 +3157,7 @@ static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 static int rtlmac_start(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
-	int ret;
+	int ret, i;
 
 	ret = 0;
 
@@ -3164,7 +3165,9 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 	ret = rtlmac_submit_int_urb(hw);
 	if (ret)
 		goto exit;
-	ret = rtlmac_submit_rx_urb(hw);
+
+	for (i = 0; i < 8; i++)
+		ret = rtlmac_submit_rx_urb(hw);
 
 exit:
 	printk(KERN_DEBUG "%s, %i\n", __func__, ret);
