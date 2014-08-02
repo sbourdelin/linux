@@ -1589,6 +1589,585 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 	return ret;
 }
 
+static void rtlmac_fill_iqk_matrix_a(struct rtlmac_priv *priv,
+				     bool bIQKOK, int result[][8],
+				     u8 final_candidate, bool bTxOnly)
+{
+	u32 Oldval_0, X, TX0_A, reg;
+	s32 Y, TX0_C;
+	u32 val32;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	if (bIQKOK) {
+		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
+		Oldval_0 = (val32 >> 22) & 0x3FF;
+
+		X = result[final_candidate][0];
+		if ((X & 0x00000200) != 0)
+			X = X | 0xFFFFFC00;
+		TX0_A = (X * Oldval_0) >> 8;
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
+		val32 &= ~0x3ff;
+		val32 |= TX0_A;
+		rtl8723au_write32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE, val32);
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_ENERGY_CCA_THRES);
+		val32 &= ~BIT(31);
+		if ((X * Oldval_0 >> 7) & 0x1)
+			val32 |= BIT(31);
+		rtl8723au_write32(priv, REG_OFDM0_ENERGY_CCA_THRES, val32);
+
+		Y = result[final_candidate][1];
+		if ((Y & 0x00000200) != 0)
+			Y = Y | 0xfffffc00;
+		TX0_C = (Y * Oldval_0) >> 8;
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_XC_TX_AFE);
+		val32 &= ~0xf0000000;
+		val32 |= (((TX0_C & 0x3c0) >> 6) << 28);
+		rtl8723au_write32(priv, REG_OFDM0_XC_TX_AFE, val32);
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
+		val32 &= ~0x003F0000;
+		val32 |= ((TX0_C & 0x3f) << 16);
+		rtl8723au_write32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE, val32);
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_ENERGY_CCA_THRES);
+		val32 &= ~BIT(29);
+		if ((Y * Oldval_0>>7) & 0x1)
+			val32 |= BIT(29);
+		rtl8723au_write32(priv, REG_OFDM0_ENERGY_CCA_THRES, val32);
+
+		if (bTxOnly) {
+			printk(KERN_DEBUG "%s: only Tx\n", __func__);
+			return;
+		}
+
+		reg = result[final_candidate][2];
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE);
+		val32 &= ~0x3ff;
+		val32 |= (reg & 0x3ff);
+		rtl8723au_write32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE, val32);
+
+		reg = result[final_candidate][3] & 0x3F;
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE);
+		val32 &= ~0xfc00;
+		val32 |= ((reg << 10) & 0xfc00);
+		rtl8723au_write32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE, val32);
+
+		reg = (result[final_candidate][3] >> 6) & 0xF;
+
+		val32 = rtl8723au_read32(priv, REG_OFDM0_RX_IQ_EXT_ANTA);
+		val32 &= ~0xf0000000;
+		val32 |= (reg << 28);
+		rtl8723au_write32(priv, REG_OFDM0_RX_IQ_EXT_ANTA, val32);
+	}
+}
+
+#define MAX_TOLERANCE		5
+
+static bool rtlmac_simularity_compare(struct rtlmac_priv *priv,
+				      int result[][8], u8 c1, u8 c2)
+{
+	u32 i, j, diff, SimularityBitMap, bound = 0;
+	u8 final_candidate[2] = {0xFF, 0xFF};	/* for path A and path B */
+	bool bResult = true, is2T = false;
+
+	if (is2T)
+		bound = 8;
+	else
+		bound = 4;
+
+	SimularityBitMap = 0;
+
+	for (i = 0; i < bound; i++) {
+		diff = (result[c1][i] > result[c2][i]) ?
+			(result[c1][i] - result[c2][i]) :
+			(result[c2][i] - result[c1][i]);
+		if (diff > MAX_TOLERANCE) {
+			if ((i == 2 || i == 6) && !SimularityBitMap) {
+				if (result[c1][i]+result[c1][i+1] == 0)
+					final_candidate[(i/4)] = c2;
+				else if (result[c2][i]+result[c2][i+1] == 0)
+					final_candidate[(i/4)] = c1;
+				else
+					SimularityBitMap =
+						SimularityBitMap|(1<<i);
+			} else {
+				SimularityBitMap = SimularityBitMap|(1<<i);
+			}
+		}
+	}
+
+	if (SimularityBitMap == 0) {
+		for (i = 0; i < (bound/4); i++) {
+			if (final_candidate[i] != 0xFF) {
+				for (j = i*4; j < (i+1)*4-2; j++)
+					result[3][j] =
+						result[final_candidate[i]][j];
+				bResult = false;
+			}
+		}
+		return bResult;
+	} else if (!(SimularityBitMap & 0x0F)) {
+		/* path A OK */
+		for (i = 0; i < 4; i++)
+			result[3][i] = result[c1][i];
+		return false;
+	} else if (!(SimularityBitMap & 0xF0) && is2T) {
+		/* path B OK */
+		for (i = 4; i < 8; i++)
+			result[3][i] = result[c1][i];
+		return false;
+	} else {
+		return false;
+	}
+}
+
+static void rtlmac_save_mac_regs(struct rtlmac_priv *priv,
+				 u32 *reg, u32 *backup)
+{
+	int i;
+
+	for (i = 0 ; i < (RTLMAC_MAC_REGS - 1); i++) {
+		backup[i] = rtl8723au_read8(priv, reg[i]);
+	}
+	backup[i] = rtl8723au_read32(priv, reg[i]);
+}
+
+static void rtlmac_restore_mac_regs(struct rtlmac_priv *priv,
+				    u32 *reg, u32 *backup)
+{
+	int i;
+
+	for (i = 0 ; i < (RTLMAC_MAC_REGS - 1); i++) {
+		rtl8723au_write8(priv, reg[i], backup[i]);
+	}
+	rtl8723au_write32(priv, reg[i], backup[i]);
+}
+
+static void rtlmac_save_regs(struct rtlmac_priv *priv, u32 *regs,
+			     u32 *backup, int count)
+{
+	int i;
+
+	for (i = 0 ; i < count ; i++)
+		backup[i] = rtl8723au_read32(priv, regs[i]);
+}
+
+static void rtlmac_restore_regs(struct rtlmac_priv *priv, u32 *regs,
+				u32 *backup, int count)
+{
+	int i;
+
+	for (i = 0 ; i < count ; i++)
+		rtl8723au_write32(priv, regs[i], backup[i]);
+}
+
+
+static void rtlmac_path_adda_on(struct rtlmac_priv *priv, u32 *regs,
+				bool isPathAOn, bool is2T)
+{
+	u32 pathOn;
+	u32 i;
+
+	pathOn = isPathAOn ? 0x04db25a4 : 0x0b1b25a4;
+	if (false == is2T) {
+		pathOn = 0x0bdb25a0;
+		rtl8723au_write32(priv, regs[0], 0x0b1b25a0);
+	} else {
+		rtl8723au_write32(priv, regs[0], pathOn);
+	}
+
+	for (i = 1 ; i < RTLMAC_ADDA_REGS ; i++)
+		rtl8723au_write32(priv, regs[i], pathOn);
+}
+
+static void rtlmac_mac_calibration(struct rtlmac_priv *priv, u32 *regs,
+				   u32 *backup)
+{
+	int i = 0;
+
+	rtl8723au_write8(priv, regs[i], 0x3F);
+
+	for (i = 1 ; i < (RTLMAC_MAC_REGS - 1); i++) {
+		rtl8723au_write8(priv, regs[i],
+				 (u8)(backup[i] & ~BIT(3)));
+	}
+	rtl8723au_write8(priv, regs[i], (u8)(backup[i] & ~BIT(5)));
+}
+
+static u8 rtlmac_iqk_path_a(struct rtlmac_priv *priv, bool configPathB)
+{
+	u32 regEAC, regE94, regE9C, regEA4;
+	u8 result = 0;
+
+	/* path-A IQK setting */
+	rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x10008c1f);
+	rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x10008c1f);
+	rtl8723au_write32(priv, REG_TX_IQK_PI_A, 0x82140102);
+
+	rtl8723au_write32(priv, REG_RX_IQK_PI_A, configPathB ? 0x28160202 :
+			  /*IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID)?0x28160202: */ 0x28160502);
+
+	/* path-B IQK setting */
+	if (configPathB) {
+		rtl8723au_write32(priv, REG_TX_IQK_TONE_B, 0x10008c22);
+		rtl8723au_write32(priv, REG_RX_IQK_TONE_B, 0x10008c22);
+		rtl8723au_write32(priv, REG_TX_IQK_PI_B, 0x82140102);
+		rtl8723au_write32(priv, REG_RX_IQK_PI_B, 0x28160202);
+	}
+
+	/* LO calibration setting */
+	rtl8723au_write32(priv, REG_IQK_AGC_RSP, 0x001028d1);
+
+	/* One shot, path A LOK & IQK */
+	rtl8723au_write32(priv, REG_IQK_AGC_PTS, 0xf9000000);
+	rtl8723au_write32(priv, REG_IQK_AGC_PTS, 0xf8000000);
+
+	mdelay(1);
+
+	/*  Check failed */
+	regEAC = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_A_2);
+	regE94 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A);
+	regE9C = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A);
+	regEA4 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_A_2);
+
+	if (!(regEAC & BIT(28)) &&
+	    (((regE94 & 0x03FF0000) >> 16) != 0x142) &&
+	    (((regE9C & 0x03FF0000) >> 16) != 0x42))
+		result |= 0x01;
+	else			/* if Tx not OK, ignore Rx */
+		return result;
+
+	/* if Tx is OK, check whether Rx is OK */
+	if (!(regEAC & BIT(27)) &&
+	    (((regEA4 & 0x03FF0000) >> 16) != 0x132) &&
+	    (((regEAC & 0x03FF0000) >> 16) != 0x36))
+		result |= 0x02;
+	else
+		printk(KERN_WARNING "Path A Rx IQK fail!!\n");
+	return result;
+}
+
+static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
+			     int result[][8], u8 t, bool is2T)
+{
+	u32 i;
+	u8 PathAOK/*, PathBOK*/;
+	u32 ADDA_REG[RTLMAC_ADDA_REGS] = {
+		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
+		REG_RX_WAIT_CCA, REG_TX_CCK_RFON,
+		REG_TX_CCK_BBON, REG_TX_OFDM_RFON,
+		REG_TX_OFDM_BBON, REG_TX_TO_RX,
+		REG_TX_TO_TX, REG_RX_CCK,
+		REG_RX_OFDM, REG_RX_WAIT_RIFS,
+		REG_RX_TO_RX, REG_STANDBY,
+		REG_SLEEP, REG_PMPD_ANAEN
+	};
+
+	u32 IQK_MAC_REG[RTLMAC_MAC_REGS] = {
+		REG_TXPAUSE, REG_BEACON_CTRL,
+		REG_BEACON_CTRL_1, REG_GPIO_MUXCFG
+	};
+
+	u32 IQK_BB_REG_92C[RTLMAC_BB_REGS] = {
+		REG_OFDM0_TRX_PATH_ENABLE, REG_OFDM0_TR_MUX_PAR,
+		REG_FPGA0_XCD_RF_SW_CTRL, REG_CONFIG_ANT_A, REG_CONFIG_ANT_B,
+		REG_FPGA0_XAB_RF_SW_CTRL, REG_FPGA0_XA_RF_INT_OE,
+		REG_FPGA0_XB_RF_INT_OE, REG_FPGA0_RF_MODE
+	};
+
+	const u32 retryCount = 2;
+
+	/*  Note: IQ calibration must be performed after loading  */
+	/*		PHY_REG.txt , and radio_a, radio_b.txt	 */
+
+	u32 val32;
+
+	if (t == 0) {
+		/*  Save ADDA parameters, turn Path A ADDA on */
+		rtlmac_save_regs(priv, ADDA_REG, priv->adda_backup,
+				 RTLMAC_ADDA_REGS);
+		rtlmac_save_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
+		rtlmac_save_regs(priv, IQK_BB_REG_92C,
+				 priv->bb_backup, RTLMAC_BB_REGS);
+	}
+
+	rtlmac_path_adda_on(priv, ADDA_REG, true, is2T);
+
+	if (t == 0) {
+		val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
+		if (val32 & FPGA0_HSSI_PARM1_PI)
+			priv->pi_enabled = 1;
+	}
+
+	if (!priv->pi_enabled) {
+		/*  Switch BB to PI mode to do IQ Calibration. */
+		rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM1,
+				  0x01000100);
+		rtl8723au_write32(priv, REG_FPGA0_XB_HSSI_PARM1,
+				  0x01000100);
+	}
+
+	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+	val32 &= ~FPGA_RF_MODE_CCK;
+	rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
+
+	rtl8723au_write32(priv, REG_OFDM0_TRX_PATH_ENABLE, 0x03a05600);
+	rtl8723au_write32(priv, REG_OFDM0_TR_MUX_PAR, 0x000800e4);
+	rtl8723au_write32(priv, REG_FPGA0_XCD_RF_SW_CTRL, 0x22204000);
+
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XAB_RF_SW_CTRL);
+	val32 |= (BIT(10) | BIT(26));
+	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, val32);
+
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_INT_OE);
+	val32 &= ~BIT(10);
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, val32);
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XB_RF_INT_OE);
+	val32 &= ~BIT(10);
+	rtl8723au_write32(priv, REG_FPGA0_XB_RF_INT_OE, val32);
+
+	if (is2T) {
+		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00010000);
+		rtl8723au_write32(priv, REG_FPGA0_XB_LSSI_PARM, 0x00010000);
+	}
+
+	/* MAC settings */
+	rtlmac_mac_calibration(priv, IQK_MAC_REG, priv->mac_backup);
+
+	/* Page B init */
+	rtl8723au_write32(priv, REG_CONFIG_ANT_A, 0x00080000);
+
+	if (is2T)
+		rtl8723au_write32(priv, REG_CONFIG_ANT_B, 0x00080000);
+
+	/*  IQ calibration setting */
+	rtl8723au_write32(priv, REG_FPGA0_IQK, 0x80800000);
+	rtl8723au_write32(priv, REG_TX_IQK, 0x01007c00);
+	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
+
+	for (i = 0 ; i < retryCount ; i++) {
+		PathAOK = rtlmac_iqk_path_a(priv, is2T);
+		if (PathAOK == 0x03) {
+			printk(KERN_DEBUG "Path A IQK Success!!\n");
+			result[t][0] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A)&0x3FF0000)>>16;
+			result[t][1] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A)&0x3FF0000)>>16;
+			result[t][2] = (rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_A_2)&0x3FF0000)>>16;
+			result[t][3] = (rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_A_2)&0x3FF0000)>>16;
+			break;
+		} else if (i == (retryCount-1) && PathAOK == 0x01) {
+			/* Tx IQK OK */
+			printk(KERN_DEBUG "Path A IQK Only Tx Success!!\n");
+
+			result[t][0] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A)&0x3FF0000)>>16;
+			result[t][1] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A)&0x3FF0000)>>16;
+		}
+	}
+
+	if (0x00 == PathAOK) {
+		printk(KERN_DEBUG "Path A IQK failed!!\n");
+	}
+
+#if 0
+	if (is2T) {
+		_PHY_PathAStandBy(priv);
+
+		/*  Turn Path B ADDA on */
+		_PHY_PathADDAOn(priv, ADDA_REG, false, is2T);
+
+		for (i = 0 ; i < retryCount ; i++) {
+			PathBOK = _PHY_PathB_IQK(priv);
+			if (PathBOK == 0x03) {
+				printk(KERN_DEBUG "Path B IQK Success!!\n");
+				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B)&0x3FF0000)>>16;
+				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B)&0x3FF0000)>>16;
+				result[t][6] = (rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2)&0x3FF0000)>>16;
+				result[t][7] = (rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2)&0x3FF0000)>>16;
+				break;
+			} else if (i == (retryCount - 1) && PathBOK == 0x01) {
+				/* Tx IQK OK */
+				DBG_8723A("Path B Only Tx IQK Success!!\n");
+				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B)&0x3FF0000)>>16;
+				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B)&0x3FF0000)>>16;
+			}
+		}
+
+		if (0x00 == PathBOK) {
+			DBG_8723A("Path B IQK failed!!\n");
+		}
+	}
+#endif
+
+	/* Back to BB mode, load original value */
+	rtl8723au_write32(priv, REG_FPGA0_IQK, 0);
+
+	if (t != 0) {
+		if (!priv->pi_enabled) {
+			/*
+			 * Switch back BB to SI mode after finishing
+			 * IQ Calibration
+			 */
+			rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM1,
+					  0x01000000);
+			rtl8723au_write32(priv, REG_FPGA0_XB_HSSI_PARM1,
+					  0x01000000);
+		}
+
+		/*  Reload ADDA power saving parameters */
+		rtlmac_restore_regs(priv, ADDA_REG, priv->adda_backup,
+				    RTLMAC_ADDA_REGS);
+
+		/*  Reload MAC parameters */
+		rtlmac_restore_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
+
+		/*  Reload BB parameters */
+		rtlmac_restore_regs(priv, IQK_BB_REG_92C,
+				    priv->bb_backup, RTLMAC_BB_REGS);
+
+		/*  Restore RX initial gain */
+		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
+#if 0
+		if (is2T) {
+			rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM,
+					  0x00032ed3);
+		}
+#endif
+
+		/* load 0xe30 IQC default value */
+		rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x01008c00);
+		rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x01008c00);
+	}
+}
+
+void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
+{
+	int result[4][8];	/* last is final result */
+	u8 i, final_candidate;
+	bool bPathAOK /*, bPathBOK */;
+	s32 RegE94, RegE9C, RegEA4, RegEAC, RegEB4, RegEBC, RegEC4;
+	s32 RegECC, RegTmp = 0;
+	bool is12simular, is13simular, is23simular;
+	u32 IQK_BB_REG_92C[RTLMAC_BB_REGS] = {
+		REG_OFDM0_XA_RX_IQ_IMBALANCE, REG_OFDM0_XB_RX_IQ_IMBALANCE,
+		REG_OFDM0_ENERGY_CCA_THRES, REG_OFDM0_AGCR_SSI_TABLE,
+		REG_OFDM0_XA_TX_IQ_IMBALANCE, REG_OFDM0_XB_TX_IQ_IMBALANCE,
+		REG_OFDM0_XC_TX_AFE, REG_OFDM0_XD_TX_AFE,
+		REG_OFDM0_RX_IQ_EXT_ANTA
+	};
+
+	if (recovery) {
+		rtlmac_restore_regs(priv, IQK_BB_REG_92C,
+				    priv->bb_recovery_backup, RTLMAC_BB_REGS);
+		return;
+	}
+
+	for (i = 0; i < 8; i++) {
+		result[0][i] = 0;
+		result[1][i] = 0;
+		result[2][i] = 0;
+		result[3][i] = 0;
+	}
+	final_candidate = 0xff;
+
+	bPathAOK = false;
+#if 0
+	bPathBOK = false;
+#endif
+	is12simular = false;
+	is23simular = false;
+	is13simular = false;
+
+	rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+
+	for (i = 0; i < 3; i++) {
+		_PHY_IQCalibrate(priv, result, i, false);
+
+		if (i == 1) {
+			is12simular =
+				rtlmac_simularity_compare(priv, result, 0, 1);
+			if (is12simular) {
+				final_candidate = 0;
+				break;
+			}
+		}
+
+		if (i == 2) {
+			is13simular =
+				rtlmac_simularity_compare(priv, result, 0, 2);
+			if (is13simular) {
+				final_candidate = 0;
+				break;
+			}
+
+			is23simular =
+				rtlmac_simularity_compare(priv, result, 1, 2);
+			if (is23simular) {
+				final_candidate = 1;
+			} else {
+				for (i = 0; i < 8; i++)
+					RegTmp += result[3][i];
+
+				if (RegTmp != 0)
+					final_candidate = 3;
+				else
+					final_candidate = 0xFF;
+			}
+		}
+	}
+
+	for (i = 0; i < 4; i++) {
+		RegE94 = result[i][0];
+		RegE9C = result[i][1];
+		RegEA4 = result[i][2];
+		RegEAC = result[i][3];
+		RegEB4 = result[i][4];
+		RegEBC = result[i][5];
+		RegEC4 = result[i][6];
+		RegECC = result[i][7];
+	}
+
+	if (final_candidate != 0xff) {
+		RegE94 = result[final_candidate][0];
+		priv->rege94 =  RegE94;
+		RegE9C = result[final_candidate][1];
+		priv->rege9c = RegE9C;
+		RegEA4 = result[final_candidate][2];
+		RegEAC = result[final_candidate][3];
+		RegEB4 = result[final_candidate][4];
+		priv->regeb4 = RegEB4;
+		RegEBC = result[final_candidate][5];
+		priv->regebc = RegEBC;
+		RegEC4 = result[final_candidate][6];
+		RegECC = result[final_candidate][7];
+		printk(KERN_DEBUG "%s: final_candidate is %x\n",
+		       __func__, final_candidate);
+		printk(KERN_DEBUG "%s: RegE94 =%x RegE9C =%x RegEA4 =%x "
+		       "RegEAC =%x RegEB4 =%x RegEBC =%x RegEC4 =%x "
+		       "RegECC =%x\n ", __func__, RegE94, RegE9C,
+		       RegEA4, RegEAC, RegEB4, RegEBC, RegEC4, RegECC);
+		bPathAOK = true;
+#if 0
+		bPathBOK = true;
+#endif
+	} else {
+		RegE94 = RegEB4 = priv->rege94 = priv->regeb4 = 0x100;
+		RegE9C = RegEBC = priv->rege9c = priv->regebc = 0x0;
+	}
+
+	if (RegE94 && final_candidate != 0xff)
+		rtlmac_fill_iqk_matrix_a(priv, bPathAOK, result,
+					 final_candidate, (RegEA4 == 0));
+
+	rtlmac_save_regs(priv, IQK_BB_REG_92C,
+			 priv->bb_recovery_backup, RTLMAC_BB_REGS);
+}
+
 static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 {
 	u32 val32;
@@ -1608,7 +2187,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 #if 0
 		/* Path-B */
 		if (is2T)
-			RF_Bmode = PHY_QueryRFReg(pAdapter, RF_PATH_B, RF_AC, bMask12Bits);
+			RF_Bmode = PHY_QueryRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits);
 #endif
 
 		/* Set RF mode to standby Path A */
@@ -1618,7 +2197,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 #if 0
 		/* Path-B */
 		if (is2T)
-			PHY_SetRFReg(pAdapter, RF_PATH_B, RF_AC, bMask12Bits, (RF_Bmode&0x8FFFF)|0x10000);
+			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits, (RF_Bmode&0x8FFFF)|0x10000);
 #endif
 	} else {
 		/*  Deal with Packet TX case */
@@ -1644,7 +2223,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 #if 0
 		/* Path-B */
 		if (is2T)
-			PHY_SetRFReg(pAdapter, RF_PATH_B, RF_AC, bMask12Bits, RF_Bmode);
+			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits, RF_Bmode);
 #endif
 	} else /*  Deal with Packet TX case */
 		rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
@@ -2163,14 +2742,28 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 #if 0
 	/*
+	 * From 8192cu driver
+	 */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_INT_OE);
+	val32 &= ~BIT(6);
+	val32 |= BIT(5);
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, val32);
+#endif
+
+#if 1
+	/*
 	 * Not sure if we should get into this at all
 	 */
-	if (pHalData->bIQKInitialized) {
+	if (priv->iqk_initialized) {
 		rtl8723a_phy_iq_calibrate(priv, true);
 	} else {
 		rtl8723a_phy_iq_calibrate(priv, false);
-		pHalData->bIQKInitialized = true;
+		priv->iqk_initialized = true;
 	}
+#else
+	rtl8723au_write32(priv, REG_FPGA0_IQK, 0);
+	rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x01008c00);
+	rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x01008c00);
 #endif
 
 	/*

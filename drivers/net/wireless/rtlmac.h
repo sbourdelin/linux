@@ -166,6 +166,13 @@ struct rtlmac_tx_desc {
 #define TXDESC_RETRY_LIMIT_SHIFT	18
 #define TXDESC_RETRY_LIMIT_MASK		0x00ff0000
 
+/*
+ * Regs to backup
+ */
+#define RTLMAC_ADDA_REGS	16
+#define RTLMAC_MAC_REGS		4
+#define RTLMAC_BB_REGS		9
+
 struct rtlmac_firmware_header {
 	__le16	signature;		/*  92C0: test chip; 92C,
 					    88C0: test chip;
@@ -292,6 +299,11 @@ struct rtlmac_priv {
 	int ep_tx_count;
 	int rf_paths;
 	u32 rf_mode_ag[2];
+	u32 rege94;
+	u32 rege9c;
+	u32 regeb4;
+	u32 regebc;
+
 	struct urb *rx_urb;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
@@ -305,5 +317,11 @@ struct rtlmac_priv {
 		u8 raw[EFUSE_MAP_LEN_8723A];
 		struct rtl8723au_efuse efuse;
 	} efuse_wifi;
+	u32 adda_backup[RTLMAC_ADDA_REGS];
+	u32 mac_backup[RTLMAC_MAC_REGS];
+	u32 bb_backup[RTLMAC_BB_REGS];
+	u32 bb_recovery_backup[RTLMAC_BB_REGS];
+	u8 pi_enabled:1;
+	u8 iqk_initialized:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
 };
