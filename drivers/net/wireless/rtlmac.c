@@ -36,7 +36,7 @@
 
 #define DRIVER_NAME "rtlmac"
 
-static int rtlmac_debug = 0;
+static int rtlmac_debug = RTLMAC_DEBUG_REG_WRITE;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
@@ -257,6 +257,170 @@ static struct rtlmac_reg32val rtl8723a_phy_1t_init_table[] = {
 	{0xeec, 0x6b1b25a0}, {0xf14, 0x00000003},
 	{0xf4c, 0x00000000}, {0xf00, 0x00000300},
 	{0xffff, 0xffffffff},
+};
+
+static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
+	{0xc78, 0x7B000001},
+	{0xc78, 0x7B010001},
+	{0xc78, 0x7B020001},
+	{0xc78, 0x7B030001},
+	{0xc78, 0x7B040001},
+	{0xc78, 0x7B050001},
+	{0xc78, 0x7A060001},
+	{0xc78, 0x79070001},
+	{0xc78, 0x78080001},
+	{0xc78, 0x77090001},
+	{0xc78, 0x760A0001},
+	{0xc78, 0x750B0001},
+	{0xc78, 0x740C0001},
+	{0xc78, 0x730D0001},
+	{0xc78, 0x720E0001},
+	{0xc78, 0x710F0001},
+	{0xc78, 0x70100001},
+	{0xc78, 0x6F110001},
+	{0xc78, 0x6E120001},
+	{0xc78, 0x6D130001},
+	{0xc78, 0x6C140001},
+	{0xc78, 0x6B150001},
+	{0xc78, 0x6A160001},
+	{0xc78, 0x69170001},
+	{0xc78, 0x68180001},
+	{0xc78, 0x67190001},
+	{0xc78, 0x661A0001},
+	{0xc78, 0x651B0001},
+	{0xc78, 0x641C0001},
+	{0xc78, 0x631D0001},
+	{0xc78, 0x621E0001},
+	{0xc78, 0x611F0001},
+	{0xc78, 0x60200001},
+	{0xc78, 0x49210001},
+	{0xc78, 0x48220001},
+	{0xc78, 0x47230001},
+	{0xc78, 0x46240001},
+	{0xc78, 0x45250001},
+	{0xc78, 0x44260001},
+	{0xc78, 0x43270001},
+	{0xc78, 0x42280001},
+	{0xc78, 0x41290001},
+	{0xc78, 0x402A0001},
+	{0xc78, 0x262B0001},
+	{0xc78, 0x252C0001},
+	{0xc78, 0x242D0001},
+	{0xc78, 0x232E0001},
+	{0xc78, 0x222F0001},
+	{0xc78, 0x21300001},
+	{0xc78, 0x20310001},
+	{0xc78, 0x06320001},
+	{0xc78, 0x05330001},
+	{0xc78, 0x04340001},
+	{0xc78, 0x03350001},
+	{0xc78, 0x02360001},
+	{0xc78, 0x01370001},
+	{0xc78, 0x00380001},
+	{0xc78, 0x00390001},
+	{0xc78, 0x003A0001},
+	{0xc78, 0x003B0001},
+	{0xc78, 0x003C0001},
+	{0xc78, 0x003D0001},
+	{0xc78, 0x003E0001},
+	{0xc78, 0x003F0001},
+	{0xc78, 0x7B400001},
+	{0xc78, 0x7B410001},
+	{0xc78, 0x7B420001},
+	{0xc78, 0x7B430001},
+	{0xc78, 0x7B440001},
+	{0xc78, 0x7B450001},
+	{0xc78, 0x7A460001},
+	{0xc78, 0x79470001},
+	{0xc78, 0x78480001},
+	{0xc78, 0x77490001},
+	{0xc78, 0x764A0001},
+	{0xc78, 0x754B0001},
+	{0xc78, 0x744C0001},
+	{0xc78, 0x734D0001},
+	{0xc78, 0x724E0001},
+	{0xc78, 0x714F0001},
+	{0xc78, 0x70500001},
+	{0xc78, 0x6F510001},
+	{0xc78, 0x6E520001},
+	{0xc78, 0x6D530001},
+	{0xc78, 0x6C540001},
+	{0xc78, 0x6B550001},
+	{0xc78, 0x6A560001},
+	{0xc78, 0x69570001},
+	{0xc78, 0x68580001},
+	{0xc78, 0x67590001},
+	{0xc78, 0x665A0001},
+	{0xc78, 0x655B0001},
+	{0xc78, 0x645C0001},
+	{0xc78, 0x635D0001},
+	{0xc78, 0x625E0001},
+	{0xc78, 0x615F0001},
+	{0xc78, 0x60600001},
+	{0xc78, 0x49610001},
+	{0xc78, 0x48620001},
+	{0xc78, 0x47630001},
+	{0xc78, 0x46640001},
+	{0xc78, 0x45650001},
+	{0xc78, 0x44660001},
+	{0xc78, 0x43670001},
+	{0xc78, 0x42680001},
+	{0xc78, 0x41690001},
+	{0xc78, 0x406A0001},
+	{0xc78, 0x266B0001},
+	{0xc78, 0x256C0001},
+	{0xc78, 0x246D0001},
+	{0xc78, 0x236E0001},
+	{0xc78, 0x226F0001},
+	{0xc78, 0x21700001},
+	{0xc78, 0x20710001},
+	{0xc78, 0x06720001},
+	{0xc78, 0x05730001},
+	{0xc78, 0x04740001},
+	{0xc78, 0x03750001},
+	{0xc78, 0x02760001},
+	{0xc78, 0x01770001},
+	{0xc78, 0x00780001},
+	{0xc78, 0x00790001},
+	{0xc78, 0x007A0001},
+	{0xc78, 0x007B0001},
+	{0xc78, 0x007C0001},
+	{0xc78, 0x007D0001},
+	{0xc78, 0x007E0001},
+	{0xc78, 0x007F0001},
+	{0xc78, 0x3800001e},
+	{0xc78, 0x3801001e},
+	{0xc78, 0x3802001e},
+	{0xc78, 0x3803001e},
+	{0xc78, 0x3804001e},
+	{0xc78, 0x3805001e},
+	{0xc78, 0x3806001e},
+	{0xc78, 0x3807001e},
+	{0xc78, 0x3808001e},
+	{0xc78, 0x3C09001e},
+	{0xc78, 0x3E0A001e},
+	{0xc78, 0x400B001e},
+	{0xc78, 0x440C001e},
+	{0xc78, 0x480D001e},
+	{0xc78, 0x4C0E001e},
+	{0xc78, 0x500F001e},
+	{0xc78, 0x5210001e},
+	{0xc78, 0x5611001e},
+	{0xc78, 0x5A12001e},
+	{0xc78, 0x5E13001e},
+	{0xc78, 0x6014001e},
+	{0xc78, 0x6015001e},
+	{0xc78, 0x6016001e},
+	{0xc78, 0x6217001e},
+	{0xc78, 0x6218001e},
+	{0xc78, 0x6219001e},
+	{0xc78, 0x621A001e},
+	{0xc78, 0x621B001e},
+	{0xc78, 0x621C001e},
+	{0xc78, 0x621D001e},
+	{0xc78, 0x621E001e},
+	{0xc78, 0x621F001e},
+	{0xffff, 0xffffffff}
 };
 
 static struct rtlmac_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
@@ -794,12 +958,12 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 
 static void rtlmac_set_linktype(struct rtlmac_priv *priv, u16 linktype)
 {
-	u16 val16;
+	u16 val8;
 
-	val16 = rtl8723au_read16(priv, REG_MSR);
-	val16 &= ~MSR_LINKTYPE_MASK;
-	val16 |= linktype;
-	rtl8723au_write16(priv, REG_MSR, val16);
+	val8 = rtl8723au_read16(priv, REG_MSR);
+	val8 &= ~MSR_LINKTYPE_MASK;
+	val8 |= linktype;
+	rtl8723au_write8(priv, REG_MSR, val8);
 }
 
 static void
@@ -1094,9 +1258,28 @@ static int rtlmac_download_firmware(struct rtlmac_priv *priv)
 	u32 val32;
 	u8 *fwptr;
 
+	printk(KERN_DEBUG "%s: %04x, 1-%02x 2-%02x\n", __func__,
+	       rtl8723au_read16(priv, REG_SYS_FUNC),
+	       rtl8723au_read8(priv, REG_SYS_FUNC),
+	       rtl8723au_read8(priv, REG_SYS_FUNC + 1));
+
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC + 1);
+	val8 |= 4;
+	rtl8723au_write8(priv, REG_SYS_FUNC + 1, val8);
+
+	printk(KERN_DEBUG "%s: %04x, 1-%02x 2-%02x\n", __func__,
+	       rtl8723au_read16(priv, REG_SYS_FUNC),
+	       rtl8723au_read8(priv, REG_SYS_FUNC),
+	       rtl8723au_read8(priv, REG_SYS_FUNC + 1));
+
 	/* 8051 enable */
 	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
 	rtl8723au_write16(priv, REG_SYS_FUNC, val16 | SYS_FUNC_CPU_ENABLE);
+
+	printk(KERN_DEBUG "%s: %04x, 1-%02x 2-%02x\n", __func__,
+	       rtl8723au_read16(priv, REG_SYS_FUNC),
+	       rtl8723au_read8(priv, REG_SYS_FUNC),
+	       rtl8723au_read8(priv, REG_SYS_FUNC + 1));
 
 	/* MCU firmware download enable */
 	val8 = rtl8723au_read8(priv, REG_MCU_FW_DL);
@@ -1233,6 +1416,8 @@ static int rtlmac_init_mac(struct rtlmac_priv *priv,
 		}
 	}
 
+	rtl8723au_write8(priv, REG_MAX_AGGR_NUM, 0x0a);
+
 	return 0;
 }
 
@@ -1303,6 +1488,8 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_RF_CTRL, val8);
 
 	rtlmac_init_phy_regs(priv, rtl8723a_phy_1t_init_table);
+
+	rtlmac_init_phy_regs(priv, rtl8723a_agc_1t_init_table);
 	if (priv->efuse_wifi.efuse.version >= 0x01) {
 		val32 = rtl8723au_read32(priv, REG_MAC_PHY_CTRL);
 
@@ -1341,22 +1528,22 @@ static int rtlmac_init_rf_regs(struct rtlmac_priv *priv,
 		switch(reg) {
 		case 0xfe:
 			msleep(50);
-			break;
+			continue;
 		case 0xfd:
 			mdelay(5);
-			break;
+			continue;
 		case 0xfc:
 			mdelay(1);
-			break;
+			continue;
 		case 0xfb:
 			udelay(50);
-			break;
+			continue;
 		case 0xfa:
 			udelay(5);
-			break;
+			continue;
 		case 0xf9:
 			udelay(1);
-			break;
+			continue;
 		}
 
 		reg &= 0x3f;
@@ -1411,12 +1598,17 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	rtlmac_init_rf_regs(priv, rtl8723au_radioa_rf6052_1t_init_table);
 
 	/* For path B, use XB */
+#if 0
 	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
 	val16 &= ~FPGA0_RF_RFENV;
 	val16 |= rfsi_rfenv;
 	rtl8723au_write16(priv, REG_FPGA0_XA_RF_SW_CTRL, val16);
-
-	priv->rf_mode_ag[0] = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+#else
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_SW_CTRL);
+	val32 &= ~FPGA0_RF_RFENV;
+	val32 |= rfsi_rfenv;
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_SW_CTRL, val32);
+#endif
 
 	return 0;
 }
@@ -2304,7 +2496,7 @@ static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
 
 	/* 0x004E[7] = 0, switch DPDT_SEL_P output from register 0x0065[2] */
 	val8 = rtl8723au_read8(priv, REG_LEDCFG2);
-	val8 &= ~BIT(7);
+	val8 &= ~LEDCFG2_DPDT_SELECT;
 	rtl8723au_write8(priv, REG_LEDCFG2, val8);
 
 	/* 0x0005[1] = 1 turn off MAC by HW state machine*/
@@ -2441,8 +2633,13 @@ static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
 	}
 
 	/* 0x4C[23] = 0x4E[7] = 1, switch DPDT_SEL_P output from WL BB */
+	/*
+	 * Note: Vendor driver actually clears this bit, despite the
+	 * documentation claims it's being set!
+	 */
 	val8 = rtl8723au_read8(priv, REG_LEDCFG2);
-	val8 |= BIT(7);
+	val8 |= LEDCFG2_DPDT_SELECT;
+	val8 &= ~LEDCFG2_DPDT_SELECT;
 	rtl8723au_write8(priv, REG_LEDCFG2, val8);
 
 exit:
@@ -2594,6 +2791,8 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 /* 0x860[6:5]= 00 - why? - this sets antenna B */
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
 
+	priv->rf_mode_ag[0] = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+
 	if (!macpower) {
 		if (priv->ep_tx_normal_queue)
 			val8 = TX_PAGE_NUM_NORM_PQ;
@@ -2654,7 +2853,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/*
 	 * Configure initial WMAC settings
 	 */
-	val32 = RCR_ACCEPT_PM | RCR_ACCEPT_MCAST | RCR_ACCEPT_BCAST |
+	val32 = RCR_ACCEPT_PHYS_MATCH | RCR_ACCEPT_MCAST | RCR_ACCEPT_BCAST |
 		RCR_ACCEPT_BSSID_MATCH | RCR_ACCEPT_BSSID_BEACON |
 		RCR_ACCEPT_MGMT_FRAME | RCR_HTC_LOC_CTRL |
 		RCR_APPEND_PHYSTAT | RCR_APPEND_ICV | RCR_APPEND_MIC;
@@ -2675,8 +2874,13 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
 
 	/* CCK = 0x0a, OFDM = 0x10 */
+#if 0
 	rtlmac_set_spec_sifs(priv, 0x0a, 0x10);
+#else
+	rtlmac_set_spec_sifs(priv, 0x10, 0x10);
+#endif
 	rtlmac_set_retry(priv, 0x30, 0x30);
+	rtlmac_set_spec_sifs(priv, 0x0a, 0x10);
 
 	/*
 	 * Init EDCA
@@ -2700,6 +2904,13 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_DARFRC + 4, 0x10080404);
 	rtl8723au_write32(priv, REG_RARFRC, 0x04030201);
 	rtl8723au_write32(priv, REG_RARFRC + 4, 0x08070605);
+
+        val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL);
+        val8 |= FWHW_TXQ_CTRL_AMPDU_RETRY;
+        rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL, val8);
+
+        /*  Set ACK timeout */
+        rtl8723au_write8(priv, REG_ACKTO, 0x40);
 
 	/*
 	 * Initialize beacon parameters
@@ -3170,7 +3381,10 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 		ret = rtlmac_submit_rx_urb(hw);
 
 exit:
-	printk(KERN_DEBUG "%s, %i\n", __func__, ret);
+	printk(KERN_DEBUG "%s, %i, RCR %08x MSR %04x\n", __func__, ret,
+	       rtl8723au_read32(priv, REG_RCR),
+	       rtl8723au_read16(priv, REG_MSR));
+
 	return ret;
 }
 
