@@ -3234,7 +3234,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	printk(KERN_DEBUG "%s\n", __func__);
 
 	skb = dev_alloc_skb(sizeof(struct rtlmac_rx_desc) +
-			    IEEE80211_MAX_FRAME_LEN);
+			    IEEE80211_MAX_FRAME_LEN + 64);
 	if (!skb)
 		return -ENOMEM;
 
@@ -3381,9 +3381,22 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 		ret = rtlmac_submit_rx_urb(hw);
 
 exit:
-	printk(KERN_DEBUG "%s, %i, RCR %08x MSR %04x\n", __func__, ret,
+	printk(KERN_DEBUG "%s, %i, RCR %08x MSR %04x, RXFLTMAP2 %04x\n",
+	       __func__, ret,
 	       rtl8723au_read32(priv, REG_RCR),
-	       rtl8723au_read16(priv, REG_MSR));
+	       rtl8723au_read16(priv, REG_MSR),
+	       rtl8723au_read16(priv, REG_RXFLTMAP2));
+
+#if 0
+	/*
+	 * Accept all data frames
+	 */
+	rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
+	/*
+	 * Accept all mgmt frames
+	 */
+	rtl8723au_write16(priv, REG_RXFLTMAP0, 0xffff);
+#endif
 
 	return ret;
 }
