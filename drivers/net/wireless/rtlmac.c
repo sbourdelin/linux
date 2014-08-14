@@ -602,8 +602,8 @@ int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
-		printk(KERN_DEBUG "%s(%04x)  = 0x%02x, ret %i\n",
-		       __func__, addr, val, ret);
+		printk(KERN_DEBUG "%s(%04x) = 0x%02x\n",
+		       __func__, addr, val);
 	return ret;
 }
 
@@ -621,8 +621,8 @@ int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
-		printk(KERN_DEBUG "%s(%04x) = 0x%04x, ret %i\n",
-		       __func__, addr, val, ret);
+		printk(KERN_DEBUG "%s(%04x) = 0x%04x\n",
+		       __func__, addr, val);
 	return ret;
 }
 
@@ -640,8 +640,8 @@ int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
-		printk(KERN_DEBUG "%s(%04x) = 0x%08x, ret %i\n",
-		       __func__, addr, val, ret);
+		printk(KERN_DEBUG "%s(%04x) = 0x%08x\n",
+		       __func__, addr, val);
 	return ret;
 }
 
@@ -3229,12 +3229,13 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	struct rtlmac_priv *priv = hw->priv;
 	struct sk_buff *skb;
 	struct urb *urb;
+	int skb_size;
 	int ret;
 
 	printk(KERN_DEBUG "%s\n", __func__);
 
-	skb = dev_alloc_skb(sizeof(struct rtlmac_rx_desc) +
-			    IEEE80211_MAX_FRAME_LEN + 64);
+	skb_size = sizeof(struct rtlmac_rx_desc) + IEEE80211_MAX_FRAME_LEN;
+	skb = dev_alloc_skb(skb_size);
 	if (!skb)
 		return -ENOMEM;
 
@@ -3251,7 +3252,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	priv->rx_urb = urb;
 
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_in, skb->data,
-			  skb->len, rtlmac_rx_complete, skb);
+			  skb_size, rtlmac_rx_complete, skb);
 	ret = usb_submit_urb(urb, GFP_ATOMIC);
 	return ret;
 }
