@@ -25,7 +25,8 @@
 #include <linux/module.h>
 #include <linux/debugfs.h>
 
-#include "commontypes.h"
+#include <linux/types.h>
+#include <linux/uuid.h>
 
 #include <linux/version.h>
 #include "uniklog.h"
@@ -74,7 +75,7 @@ static struct bus_info *BusListHead;
 static rwlock_t BusListLock;
 static int BusListCount;	/* number of buses in the list */
 static int MaxBusCount;		/* maximum number of buses expected */
-static U64 PhysicalDataChan;
+static u64 PhysicalDataChan;
 static int PlatformNumber;
 
 static struct uisthread_info Incoming_ThreadInfo;
@@ -120,7 +121,7 @@ static const struct file_operations debugfs_info_fops = {
 };
 
 static void
-init_msg_header(CONTROLVM_MESSAGE *msg, U32 id, uint rsp, uint svr)
+init_msg_header(CONTROLVM_MESSAGE *msg, u32 id, uint rsp, uint svr)
 {
 	memset(msg, 0, sizeof(CONTROLVM_MESSAGE));
 	msg->hdr.Id = id;
@@ -129,10 +130,11 @@ init_msg_header(CONTROLVM_MESSAGE *msg, U32 id, uint rsp, uint svr)
 }
 
 static __iomem void *
-init_vbus_channel(U64 channelAddr, U32 channelBytes)
+init_vbus_channel(u64 channelAddr, u32 channelBytes)
 {
 	void __iomem *rc = NULL;
 	void __iomem *pChan = uislib_ioremap_cache(channelAddr, channelBytes);
+
 	if (!pChan) {
 		LOGERR("CONTROLVM_BUS_CREATE error: ioremap_cache of channelAddr:%Lx for channelBytes:%llu failed",
 		     (unsigned long long) channelAddr,
@@ -154,7 +156,7 @@ Away:
 static int
 create_bus(CONTROLVM_MESSAGE *msg, char *buf)
 {
-	U32 busNo, deviceCount;
+	u32 busNo, deviceCount;
 	struct bus_info *tmp, *bus;
 	size_t size;
 
@@ -229,6 +231,7 @@ create_bus(CONTROLVM_MESSAGE *msg, char *buf)
 	/* the msg is bound for virtpci; send guest_msgs struct to callback */
 	if (!msg->hdr.Flags.server) {
 		struct guest_msgs cmd;
+
 		cmd.msgtype = GUEST_ADD_VBUS;
 		cmd.add_vbus.busNo = busNo;
 		cmd.add_vbus.chanptr = bus->pBusChannel;
@@ -273,52 +276,19 @@ destroy_bus(CONTROLVM_MESSAGE *msg, char *buf)
 {
 	int i;
 	struct bus_info *bus, *prev = NULL;
-	U32 busNo;
+	struct guest_msgs cmd;
+	u32 busNo;
 
 	busNo = msg->cmd.destroyBus.busNo;
 
-	/* find and delete the bus */
 	read_lock(&BusListLock);
-	for (bus = BusListHead; bus; prev = bus, bus = bus->next) {
-		if (bus->busNo == busNo) {
-			/* found the bus - ensure that all device
-			 * slots are NULL
-			 */
-			for (i = 0; i < bus->deviceCount; i++) {
-				if (bus->device[i] != NULL) {
-					LOGERR("CONTROLVM_BUS_DESTROY Failed: device %i attached to bus %d.",
-					     i, busNo);
-					read_unlock(&BusListLock);
-					return CONTROLVM_RESP_ERROR_BUS_DEVICE_ATTACHED;
-				}
-			}
-			read_unlock(&BusListLock);
-			/* the msg is bound for virtpci; send
-			 * guest_msgs struct to callback
-			 */
-			if (!msg->hdr.Flags.server) {
-				struct guest_msgs cmd;
-				cmd.msgtype = GUEST_DEL_VBUS;
-				cmd.del_vbus.busNo = busNo;
-				if (!VirtControlChanFunc) {
-					LOGERR("CONTROLVM_BUS_DESTROY Failed: virtpci callback not registered.");
-					return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
-				}
-				if (!VirtControlChanFunc(&cmd)) {
-					LOGERR("CONTROLVM_BUS_DESTROY Failed: virtpci GUEST_DEL_VBUS returned error.");
-					return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
-				}
-			}
-			/* remove the bus from the list */
-			write_lock(&BusListLock);
-			if (prev)	/* not at head */
-				prev->next = bus->next;
-			else
-				BusListHead = bus->next;
-			BusListCount--;
-			write_unlock(&BusListLock);
+
+	bus = BusListHead;
+	while (bus) {
+		if (bus->busNo == busNo)
 			break;
-		}
+		prev = bus;
+		bus = bus->next;
 	}
 
 	if (!bus) {
@@ -327,6 +297,44 @@ destroy_bus(CONTROLVM_MESSAGE *msg, char *buf)
 		read_unlock(&BusListLock);
 		return CONTROLVM_RESP_ERROR_ALREADY_DONE;
 	}
+
+	/* verify that this bus has no devices. */
+	for (i = 0; i < bus->deviceCount; i++) {
+		if (bus->device[i] != NULL) {
+			LOGERR("CONTROLVM_BUS_DESTROY Failed: device %i attached to bus %d.",
+			     i, busNo);
+			read_unlock(&BusListLock);
+			return CONTROLVM_RESP_ERROR_BUS_DEVICE_ATTACHED;
+		}
+	}
+	read_unlock(&BusListLock);
+
+	if (msg->hdr.Flags.server)
+		goto remove;
+
+	/* client messages require us to call the virtpci callback associated
+	   with this bus. */
+	cmd.msgtype = GUEST_DEL_VBUS;
+	cmd.del_vbus.busNo = busNo;
+	if (!VirtControlChanFunc) {
+		LOGERR("CONTROLVM_BUS_DESTROY Failed: virtpci callback not registered.");
+		return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
+	}
+	if (!VirtControlChanFunc(&cmd)) {
+		LOGERR("CONTROLVM_BUS_DESTROY Failed: virtpci GUEST_DEL_VBUS returned error.");
+		return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
+	}
+
+	/* finally, remove the bus from the list */
+remove:
+	write_lock(&BusListLock);
+	if (prev)	/* not at head */
+		prev->next = bus->next;
+	else
+		BusListHead = bus->next;
+	BusListCount--;
+	write_unlock(&BusListLock);
+
 	if (bus->pBusChannel) {
 		uislib_iounmap(bus->pBusChannel);
 		bus->pBusChannel = NULL;
@@ -341,9 +349,9 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 {
 	struct device_info *dev;
 	struct bus_info *bus;
-	U32 busNo, devNo;
+	u32 busNo, devNo;
 	int result = CONTROLVM_RESP_SUCCESS;
-	U64 minSize = MIN_IO_CHANNEL_SIZE;
+	u64 minSize = MIN_IO_CHANNEL_SIZE;
 	ReqHandlerInfo_t *pReqHandler;
 
 	busNo = msg->cmd.createDevice.busNo;
@@ -433,6 +441,7 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 			 */
 			if (!msg->hdr.Flags.server) {
 				struct guest_msgs cmd;
+
 				if (!uuid_le_cmp(dev->channelTypeGuid,
 				     UltraVhbaChannelProtocolGuid)) {
 					wait_for_valid_guid(&((CHANNEL_HEADER
@@ -535,7 +544,7 @@ Away:
 static int
 pause_device(CONTROLVM_MESSAGE *msg)
 {
-	U32 busNo, devNo;
+	u32 busNo, devNo;
 	struct bus_info *bus;
 	struct device_info *dev;
 	struct guest_msgs cmd;
@@ -607,7 +616,7 @@ pause_device(CONTROLVM_MESSAGE *msg)
 static int
 resume_device(CONTROLVM_MESSAGE *msg)
 {
-	U32 busNo, devNo;
+	u32 busNo, devNo;
 	struct bus_info *bus;
 	struct device_info *dev;
 	struct guest_msgs cmd;
@@ -679,7 +688,7 @@ resume_device(CONTROLVM_MESSAGE *msg)
 static int
 destroy_device(CONTROLVM_MESSAGE *msg, char *buf)
 {
-	U32 busNo, devNo;
+	u32 busNo, devNo;
 	struct bus_info *bus;
 	struct device_info *dev;
 	struct guest_msgs cmd;
@@ -791,7 +800,7 @@ init_chipset(CONTROLVM_MESSAGE *msg, char *buf)
 }
 
 static int
-delete_bus_glue(U32 busNo)
+delete_bus_glue(u32 busNo)
 {
 	CONTROLVM_MESSAGE msg;
 
@@ -805,7 +814,7 @@ delete_bus_glue(U32 busNo)
 }
 
 static int
-delete_device_glue(U32 busNo, U32 devNo)
+delete_device_glue(u32 busNo, u32 devNo)
 {
 	CONTROLVM_MESSAGE msg;
 
@@ -821,8 +830,8 @@ delete_device_glue(U32 busNo, U32 devNo)
 }
 
 int
-uislib_client_inject_add_bus(U32 busNo, uuid_le instGuid,
-			     U64 channelAddr, ulong nChannelBytes)
+uislib_client_inject_add_bus(u32 busNo, uuid_le instGuid,
+			     u64 channelAddr, ulong nChannelBytes)
 {
 	CONTROLVM_MESSAGE msg;
 
@@ -872,14 +881,14 @@ EXPORT_SYMBOL_GPL(uislib_client_inject_add_bus);
 
 
 int
-uislib_client_inject_del_bus(U32 busNo)
+uislib_client_inject_del_bus(u32 busNo)
 {
 	return delete_bus_glue(busNo);
 }
 EXPORT_SYMBOL_GPL(uislib_client_inject_del_bus);
 
 int
-uislib_client_inject_pause_vhba(U32 busNo, U32 devNo)
+uislib_client_inject_pause_vhba(u32 busNo, u32 devNo)
 {
 	CONTROLVM_MESSAGE msg;
 	int rc;
@@ -899,7 +908,7 @@ uislib_client_inject_pause_vhba(U32 busNo, U32 devNo)
 EXPORT_SYMBOL_GPL(uislib_client_inject_pause_vhba);
 
 int
-uislib_client_inject_resume_vhba(U32 busNo, U32 devNo)
+uislib_client_inject_resume_vhba(u32 busNo, u32 devNo)
 {
 	CONTROLVM_MESSAGE msg;
 	int rc;
@@ -920,8 +929,8 @@ uislib_client_inject_resume_vhba(U32 busNo, U32 devNo)
 EXPORT_SYMBOL_GPL(uislib_client_inject_resume_vhba);
 
 int
-uislib_client_inject_add_vhba(U32 busNo, U32 devNo,
-			      U64 phys_chan_addr, U32 chan_bytes,
+uislib_client_inject_add_vhba(u32 busNo, u32 devNo,
+			      u64 phys_chan_addr, u32 chan_bytes,
 			      int is_test_addr, uuid_le instGuid,
 			      struct InterruptInfo *intr)
 {
@@ -972,15 +981,15 @@ uislib_client_inject_add_vhba(U32 busNo, U32 devNo,
 EXPORT_SYMBOL_GPL(uislib_client_inject_add_vhba);
 
 int
-uislib_client_inject_del_vhba(U32 busNo, U32 devNo)
+uislib_client_inject_del_vhba(u32 busNo, u32 devNo)
 {
 	return delete_device_glue(busNo, devNo);
 }
 EXPORT_SYMBOL_GPL(uislib_client_inject_del_vhba);
 
 int
-uislib_client_inject_add_vnic(U32 busNo, U32 devNo,
-			      U64 phys_chan_addr, U32 chan_bytes,
+uislib_client_inject_add_vnic(u32 busNo, u32 devNo,
+			      u64 phys_chan_addr, u32 chan_bytes,
 			      int is_test_addr, uuid_le instGuid,
 			      struct InterruptInfo *intr)
 {
@@ -1032,7 +1041,7 @@ uislib_client_inject_add_vnic(U32 busNo, U32 devNo,
 EXPORT_SYMBOL_GPL(uislib_client_inject_add_vnic);
 
 int
-uislib_client_inject_pause_vnic(U32 busNo, U32 devNo)
+uislib_client_inject_pause_vnic(u32 busNo, u32 devNo)
 {
 	CONTROLVM_MESSAGE msg;
 	int rc;
@@ -1052,7 +1061,7 @@ uislib_client_inject_pause_vnic(U32 busNo, U32 devNo)
 EXPORT_SYMBOL_GPL(uislib_client_inject_pause_vnic);
 
 int
-uislib_client_inject_resume_vnic(U32 busNo, U32 devNo)
+uislib_client_inject_resume_vnic(u32 busNo, u32 devNo)
 {
 	CONTROLVM_MESSAGE msg;
 	int rc;
@@ -1073,14 +1082,14 @@ uislib_client_inject_resume_vnic(U32 busNo, U32 devNo)
 EXPORT_SYMBOL_GPL(uislib_client_inject_resume_vnic);
 
 int
-uislib_client_inject_del_vnic(U32 busNo, U32 devNo)
+uislib_client_inject_del_vnic(u32 busNo, u32 devNo)
 {
 	return delete_device_glue(busNo, devNo);
 }
 EXPORT_SYMBOL_GPL(uislib_client_inject_del_vnic);
 
 static int
-uislib_client_add_vnic(U32 busNo)
+uislib_client_add_vnic(u32 busNo)
 {
 	BOOL busCreated = FALSE;
 	int devNo = 0;		/* Default to 0, since only one device
@@ -1129,7 +1138,7 @@ AwayCleanup:
 EXPORT_SYMBOL_GPL(uislib_client_add_vnic);
 
 static int
-uislib_client_delete_vnic(U32 busNo)
+uislib_client_delete_vnic(u32 busNo)
 {
 	int devNo = 0;		/* Default to 0, since only one device
 				 * will be created for this bus... */
@@ -1164,6 +1173,7 @@ uislib_cache_alloc(struct kmem_cache *cur_pool, char *fn, int ln)
 	* invoke oom killer), which will probably cripple the system.
 	*/
 	void *p = kmem_cache_alloc(cur_pool, GFP_ATOMIC | __GFP_NORETRY);
+
 	if (p == NULL) {
 		LOGERR("uislib_malloc failed to alloc uiscmdrsp @%s:%d",
 		       fn, ln);
@@ -1285,7 +1295,7 @@ info_debugfs_read(struct file *file, char __user *buf,
 }
 
 static struct device_info *
-find_dev(U32 busNo, U32 devNo)
+find_dev(u32 busNo, u32 devNo)
 {
 	struct bus_info *bus;
 	struct device_info *dev = NULL;
@@ -1339,6 +1349,7 @@ Process_Incoming(void *v)
 	unsigned long long cur_cycles, old_cycles, idle_cycles, delta_cycles;
 	struct list_head *new_tail = NULL;
 	int i;
+
 	UIS_DAEMONIZE("dev_incoming");
 	for (i = 0; i < 16; i++) {
 		old_cycles = get_cycles();
@@ -1361,18 +1372,19 @@ Process_Incoming(void *v)
 		struct device_info *dev = NULL;
 
 		/* poll each channel for input */
-		LOCKSEM_UNINTERRUPTIBLE(&Lock_Polling_Device_Channels);
+		down(&Lock_Polling_Device_Channels);
 		new_tail = NULL;
 		list_for_each_safe(lelt, tmp, &List_Polling_Device_Channels) {
 			int rc = 0;
+
 			dev = list_entry(lelt, struct device_info,
 					 list_polling_device_channels);
-			LOCKSEM_UNINTERRUPTIBLE(&dev->interrupt_callback_lock);
+			down(&dev->interrupt_callback_lock);
 			if (dev->interrupt)
 				rc = dev->interrupt(dev->interrupt_context);
 			else
 				continue;
-			UNLOCKSEM(&dev->interrupt_callback_lock);
+			up(&dev->interrupt_callback_lock);
 			if (rc) {
 				/* dev->interrupt returned, but there
 				* is still more work to do.
@@ -1399,7 +1411,7 @@ Process_Incoming(void *v)
 			tot_moved_to_tail_cnt++;
 			list_move_tail(new_tail, &List_Polling_Device_Channels);
 		}
-		UNLOCKSEM(&Lock_Polling_Device_Channels);
+		up(&Lock_Polling_Device_Channels);
 		cur_cycles = get_cycles();
 		delta_cycles = cur_cycles - old_cycles;
 		old_cycles = cur_cycles;
@@ -1458,25 +1470,26 @@ Initialize_incoming_thread(void)
  *                        function.
  */
 void
-uislib_enable_channel_interrupts(U32 busNo, U32 devNo,
+uislib_enable_channel_interrupts(u32 busNo, u32 devNo,
 				 int (*interrupt)(void *),
 				 void *interrupt_context)
 {
 	struct device_info *dev;
+
 	dev = find_dev(busNo, devNo);
 	if (!dev) {
 		LOGERR("%s busNo=%d, devNo=%d", __func__, (int) (busNo),
 		       (int) (devNo));
 		return;
 	}
-	LOCKSEM_UNINTERRUPTIBLE(&Lock_Polling_Device_Channels);
+	down(&Lock_Polling_Device_Channels);
 	Initialize_incoming_thread();
 	dev->interrupt = interrupt;
 	dev->interrupt_context = interrupt_context;
 	dev->polling = TRUE;
 	list_add_tail(&(dev->list_polling_device_channels),
 		      &List_Polling_Device_Channels);
-	UNLOCKSEM(&Lock_Polling_Device_Channels);
+	up(&Lock_Polling_Device_Channels);
 }
 EXPORT_SYMBOL_GPL(uislib_enable_channel_interrupts);
 
@@ -1484,20 +1497,21 @@ EXPORT_SYMBOL_GPL(uislib_enable_channel_interrupts);
  *  Process_Incoming().
  */
 void
-uislib_disable_channel_interrupts(U32 busNo, U32 devNo)
+uislib_disable_channel_interrupts(u32 busNo, u32 devNo)
 {
 	struct device_info *dev;
+
 	dev = find_dev(busNo, devNo);
 	if (!dev) {
 		LOGERR("%s busNo=%d, devNo=%d", __func__, (int) (busNo),
 		       (int) (devNo));
 		return;
 	}
-	LOCKSEM_UNINTERRUPTIBLE(&Lock_Polling_Device_Channels);
+	down(&Lock_Polling_Device_Channels);
 	list_del(&dev->list_polling_device_channels);
 	dev->polling = FALSE;
 	dev->interrupt = NULL;
-	UNLOCKSEM(&Lock_Polling_Device_Channels);
+	up(&Lock_Polling_Device_Channels);
 }
 EXPORT_SYMBOL_GPL(uislib_disable_channel_interrupts);
 
@@ -1517,7 +1531,7 @@ static DECLARE_WORK(Work_wakeup_polling_device_channels,
  *  your device might have more requests.
  */
 void
-uislib_force_channel_interrupt(U32 busNo, U32 devNo)
+uislib_force_channel_interrupt(u32 busNo, u32 devNo)
 {
 	if (en_smart_wakeup == 0)
 		return;
@@ -1612,7 +1626,6 @@ uislib_mod_exit(void)
 	debugfs_remove(dir_debugfs);
 
 	DBGINF("goodbye.\n");
-	return;
 }
 
 module_init(uislib_mod_init);

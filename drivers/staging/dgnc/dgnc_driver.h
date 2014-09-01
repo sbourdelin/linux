@@ -49,16 +49,14 @@
  * three lines, and the driver printk's will all automagically change.
  *
  * APR((fmt, args, ...));	Always prints message
- * DPR((fmt, args, ...));	Only prints if DGNC_TRACER is defined at
- *				  compile time and dgnc_debug!=0
  */
 #define	PROCSTR		"dgnc"			/* /proc entries	 */
 #define	DEVSTR		"/dev/dg/dgnc"		/* /dev entries		 */
 #define	DRVSTR		"dgnc"			/* Driver name string
 						 * displayed by APR	 */
-#define	APR(args)	do { PRINTF_TO_KMEM(args); printk(DRVSTR": "); printk args; \
+#define	APR(args)	do { printk(DRVSTR": "); printk args; \
 			   } while (0)
-#define	RAPR(args)	do { PRINTF_TO_KMEM(args); printk args; } while (0)
+#define	RAPR(args)	do { printk args; } while (0)
 
 #define TRC_TO_CONSOLE 1
 
@@ -90,81 +88,6 @@
 #define	DBG_INTR		(dgnc_debug & 0x8000)
 
 #define	DBG_CARR		(dgnc_debug & 0x10000)
-
-
-#if defined(DGNC_TRACER)
-
-# if defined(TRC_TO_KMEM)
-/* Choose one: */
-#  define TRC_ON_OVERFLOW_WRAP_AROUND
-#  undef  TRC_ON_OVERFLOW_SHIFT_BUFFER
-# endif /* TRC_TO_KMEM */
-
-# define TRC_MAXMSG		1024
-# define TRC_OVERFLOW		"(OVERFLOW)"
-# define TRC_DTRC		"/usr/bin/dtrc"
-
-#if defined TRC_TO_CONSOLE
-#define PRINTF_TO_CONSOLE(args) { printk(DRVSTR": "); printk args; }
-#else /* !defined TRACE_TO_CONSOLE */
-#define PRINTF_TO_CONSOLE(args)
-#endif
-
-#if defined TRC_TO_KMEM
-#define PRINTF_TO_KMEM(args) dgnc_tracef args
-#else /* !defined TRC_TO_KMEM */
-#define PRINTF_TO_KMEM(args)
-#endif
-
-#define	TRC(args)	{ PRINTF_TO_KMEM(args); PRINTF_TO_CONSOLE(args) }
-
-# define DPR_INIT(ARGS)		if (DBG_INIT) TRC(ARGS)
-# define DPR_BASIC(ARGS)	if (DBG_BASIC) TRC(ARGS)
-# define DPR_CORE(ARGS)		if (DBG_CORE) TRC(ARGS)
-# define DPR_OPEN(ARGS)		if (DBG_OPEN)  TRC(ARGS)
-# define DPR_CLOSE(ARGS)	if (DBG_CLOSE)  TRC(ARGS)
-# define DPR_READ(ARGS)		if (DBG_READ)  TRC(ARGS)
-# define DPR_WRITE(ARGS)	if (DBG_WRITE) TRC(ARGS)
-# define DPR_IOCTL(ARGS)	if (DBG_IOCTL) TRC(ARGS)
-# define DPR_PROC(ARGS)		if (DBG_PROC)  TRC(ARGS)
-# define DPR_PARAM(ARGS)	if (DBG_PARAM)  TRC(ARGS)
-# define DPR_PSCAN(ARGS)	if (DBG_PSCAN)  TRC(ARGS)
-# define DPR_EVENT(ARGS)	if (DBG_EVENT)  TRC(ARGS)
-# define DPR_DRAIN(ARGS)	if (DBG_DRAIN)  TRC(ARGS)
-# define DPR_CARR(ARGS)		if (DBG_CARR)  TRC(ARGS)
-# define DPR_MGMT(ARGS)		if (DBG_MGMT)  TRC(ARGS)
-# define DPR_INTR(ARGS)		if (DBG_INTR)  TRC(ARGS)
-# define DPR_MSIGS(ARGS)	if (DBG_MSIGS)  TRC(ARGS)
-
-# define DPR(ARGS)		if (dgnc_debug) TRC(ARGS)
-# define P(X)			dgnc_tracef(#X "=%p\n", X)
-# define X(X)			dgnc_tracef(#X "=%x\n", X)
-
-#else/* !defined DGNC_TRACER */
-
-#define PRINTF_TO_KMEM(args)
-# define TRC(ARGS)
-# define DPR_INIT(ARGS)
-# define DPR_BASIC(ARGS)
-# define DPR_CORE(ARGS)
-# define DPR_OPEN(ARGS)
-# define DPR_CLOSE(ARGS)
-# define DPR_READ(ARGS)
-# define DPR_WRITE(ARGS)
-# define DPR_IOCTL(ARGS)
-# define DPR_PROC(ARGS)
-# define DPR_PARAM(ARGS)
-# define DPR_PSCAN(ARGS)
-# define DPR_EVENT(ARGS)
-# define DPR_DRAIN(ARGS)
-# define DPR_CARR(ARGS)
-# define DPR_MGMT(ARGS)
-# define DPR_INTR(ARGS)
-# define DPR_MSIGS(ARGS)
-
-# define DPR(args)
-
-#endif/* DGNC_TRACER */
 
 /* Number of boards we support at once. */
 #define	MAXBOARDS	20
@@ -534,20 +457,9 @@ struct channel_t {
 	wait_queue_head_t ch_sniff_wait;
 };
 
-
-/*************************************************************************
- *
- * Prototypes for non-static functions used in more than one module
- *
- *************************************************************************/
-
-extern int		dgnc_ms_sleep(ulong ms);
-extern char		*dgnc_ioctl_name(int cmd);
-
 /*
  * Our Global Variables.
  */
-extern int		dgnc_driver_state;	/* The state of the driver	*/
 extern uint		dgnc_Major;		/* Our driver/mgmt major	*/
 extern int		dgnc_debug;		/* Debug variable		*/
 extern int		dgnc_rawreadok;		/* Set if user wants rawreads	*/
@@ -556,8 +468,6 @@ extern int		dgnc_trcbuf_size;	/* Size of the ringbuffer	*/
 extern spinlock_t	dgnc_global_lock;	/* Driver global spinlock	*/
 extern uint		dgnc_NumBoards;		/* Total number of boards	*/
 extern struct dgnc_board	*dgnc_Board[MAXBOARDS];	/* Array of board structs	*/
-extern ulong		dgnc_poll_counter;	/* Times the poller has run	*/
 extern char		*dgnc_state_text[];	/* Array of state text		*/
-extern char		*dgnc_driver_state_text[];/* Array of driver state text */
 
 #endif

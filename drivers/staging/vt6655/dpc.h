@@ -35,10 +35,8 @@
 
 bool
 device_receive_frame(
-	PSDevice pDevice,
+	struct vnt_private *,
 	PSRxDesc pCurrRD
 );
-
-void	MngWorkItem(void *Context);
 
 #endif // __RXTX_H__

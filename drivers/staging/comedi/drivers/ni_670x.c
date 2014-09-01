@@ -81,55 +81,40 @@ static const struct ni_670x_board ni_670x_boards[] = {
 };
 
 struct ni_670x_private {
-	void __iomem *mmio;
 	int boardtype;
 	int dio;
-	unsigned int ao_readback[32];
 };
 
-static int ni_670x_ao_winsn(struct comedi_device *dev,
-			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn, unsigned int *data)
+static int ni_670x_ao_insn_write(struct comedi_device *dev,
+				 struct comedi_subdevice *s,
+				 struct comedi_insn *insn,
+				 unsigned int *data)
 {
-	struct ni_670x_private *devpriv = dev->private;
+	unsigned int chan = CR_CHAN(insn->chanspec);
+	unsigned int val = s->readback[chan];
 	int i;
-	int chan = CR_CHAN(insn->chanspec);
 
-	/* Channel number mapping :
-
-	   NI 6703/ NI 6704     | NI 6704 Only
-	   ----------------------------------------------------
-	   vch(0)       :       0       | ich(16)       :       1
-	   vch(1)       :       2       | ich(17)       :       3
-	   .    :       .       |   .                   .
-	   .    :       .       |   .                   .
-	   .    :       .       |   .                   .
-	   vch(15)      :       30      | ich(31)       :       31      */
-
+	/*
+	 * Channel number mapping:
+	 *
+	 * NI 6703/ NI 6704 | NI 6704 Only
+	 * -------------------------------
+	 * vch(0)  :  0     | ich(16) :  1
+	 * vch(1)  :  2     | ich(17) :  3
+	 * ...              | ...
+	 * vch(15) : 30     | ich(31) : 31
+	 */
 	for (i = 0; i < insn->n; i++) {
+		val = data[i];
 		/* First write in channel register which channel to use */
 		writel(((chan & 15) << 1) | ((chan & 16) >> 4),
-		       devpriv->mmio + AO_CHAN_OFFSET);
+		       dev->mmio + AO_CHAN_OFFSET);
 		/* write channel value */
-		writel(data[i], devpriv->mmio + AO_VALUE_OFFSET);
-		devpriv->ao_readback[chan] = data[i];
+		writel(val, dev->mmio + AO_VALUE_OFFSET);
 	}
+	s->readback[chan] = val;
 
-	return i;
-}
-
-static int ni_670x_ao_rinsn(struct comedi_device *dev,
-			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn, unsigned int *data)
-{
-	struct ni_670x_private *devpriv = dev->private;
-	int i;
-	int chan = CR_CHAN(insn->chanspec);
-
-	for (i = 0; i < insn->n; i++)
-		data[i] = devpriv->ao_readback[chan];
-
-	return i;
+	return insn->n;
 }
 
 static int ni_670x_dio_insn_bits(struct comedi_device *dev,
@@ -137,13 +122,10 @@ static int ni_670x_dio_insn_bits(struct comedi_device *dev,
 				 struct comedi_insn *insn,
 				 unsigned int *data)
 {
-	struct ni_670x_private *devpriv = dev->private;
-	void __iomem *io_addr = devpriv->mmio + DIO_PORT0_DATA_OFFSET;
-
 	if (comedi_dio_update_state(s, data))
-		writel(s->state, io_addr);
+		writel(s->state, dev->mmio + DIO_PORT0_DATA_OFFSET);
 
-	data[1] = readl(io_addr);
+	data[1] = readl(dev->mmio + DIO_PORT0_DATA_OFFSET);
 
 	return insn->n;
 }
@@ -153,14 +135,13 @@ static int ni_670x_dio_insn_config(struct comedi_device *dev,
 				   struct comedi_insn *insn,
 				   unsigned int *data)
 {
-	struct ni_670x_private *devpriv = dev->private;
 	int ret;
 
 	ret = comedi_dio_insn_config(dev, s, insn, data, 0);
 	if (ret)
 		return ret;
 
-	writel(s->io_bits, devpriv->mmio + DIO_PORT0_DIR_OFFSET);
+	writel(s->io_bits, dev->mmio + DIO_PORT0_DIR_OFFSET);
 
 	return insn->n;
 }
@@ -217,8 +198,8 @@ static int ni_670x_auto_attach(struct comedi_device *dev,
 	if (ret)
 		return ret;
 
-	devpriv->mmio = pci_ioremap_bar(pcidev, 1);
-	if (!devpriv->mmio)
+	dev->mmio = pci_ioremap_bar(pcidev, 1);
+	if (!dev->mmio)
 		return -ENOMEM;
 
 	ret = comedi_alloc_subdevices(dev, 2);
@@ -246,8 +227,12 @@ static int ni_670x_auto_attach(struct comedi_device *dev,
 	} else {
 		s->range_table = &range_bipolar10;
 	}
-	s->insn_write = &ni_670x_ao_winsn;
-	s->insn_read = &ni_670x_ao_rinsn;
+	s->insn_write = ni_670x_ao_insn_write;
+	s->insn_read = comedi_readback_insn_read;
+
+	ret = comedi_alloc_subdev_readback(s);
+	if (ret)
+		return ret;
 
 	s = &dev->subdevices[1];
 	/* digital i/o subdevice */
@@ -260,26 +245,23 @@ static int ni_670x_auto_attach(struct comedi_device *dev,
 	s->insn_config = ni_670x_dio_insn_config;
 
 	/* Config of misc registers */
-	writel(0x10, devpriv->mmio + MISC_CONTROL_OFFSET);
+	writel(0x10, dev->mmio + MISC_CONTROL_OFFSET);
 	/* Config of ao registers */
-	writel(0x00, devpriv->mmio + AO_CONTROL_OFFSET);
+	writel(0x00, dev->mmio + AO_CONTROL_OFFSET);
 
 	return 0;
 }
 
 static void ni_670x_detach(struct comedi_device *dev)
 {
-	struct ni_670x_private *devpriv = dev->private;
 	struct comedi_subdevice *s;
 
+	comedi_pci_detach(dev);
 	if (dev->n_subdevices) {
 		s = &dev->subdevices[0];
 		if (s)
 			kfree(s->range_table_list);
 	}
-	if (devpriv && devpriv->mmio)
-		iounmap(devpriv->mmio);
-	comedi_pci_disable(dev);
 }
 
 static struct comedi_driver ni_670x_driver = {

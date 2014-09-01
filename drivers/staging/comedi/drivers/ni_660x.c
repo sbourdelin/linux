@@ -587,17 +587,14 @@ static inline void ni_660x_write_register(struct comedi_device *dev,
 					  unsigned chip, unsigned bits,
 					  enum ni_660x_register reg)
 {
-	struct ni_660x_private *devpriv = dev->private;
-	void __iomem *write_address =
-	    devpriv->mite->daq_io_addr + GPCT_OFFSET[chip] +
-	    registerData[reg].offset;
+	unsigned int addr = GPCT_OFFSET[chip] + registerData[reg].offset;
 
 	switch (registerData[reg].size) {
 	case DATA_2B:
-		writew(bits, write_address);
+		writew(bits, dev->mmio + addr);
 		break;
 	case DATA_4B:
-		writel(bits, write_address);
+		writel(bits, dev->mmio + addr);
 		break;
 	default:
 		BUG();
@@ -609,16 +606,13 @@ static inline unsigned ni_660x_read_register(struct comedi_device *dev,
 					     unsigned chip,
 					     enum ni_660x_register reg)
 {
-	struct ni_660x_private *devpriv = dev->private;
-	void __iomem *read_address =
-	    devpriv->mite->daq_io_addr + GPCT_OFFSET[chip] +
-	    registerData[reg].offset;
+	unsigned int addr = GPCT_OFFSET[chip] + registerData[reg].offset;
 
 	switch (registerData[reg].size) {
 	case DATA_2B:
-		return readw(read_address);
+		return readw(dev->mmio + addr);
 	case DATA_4B:
-		return readl(read_address);
+		return readl(dev->mmio + addr);
 	default:
 		BUG();
 		break;
@@ -749,7 +743,7 @@ static int ni_660x_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 			"no dma channel available for use by counter\n");
 		return retval;
 	}
-	ni_tio_acknowledge_and_confirm(counter, NULL, NULL, NULL, NULL);
+	ni_tio_acknowledge(counter);
 
 	return ni_tio_cmd(dev, s);
 }
@@ -1078,11 +1072,9 @@ static int ni_660x_auto_attach(struct comedi_device *dev,
 	if (!devpriv->mite)
 		return -ENOMEM;
 
-	ret = mite_setup2(devpriv->mite, 1);
-	if (ret < 0) {
-		dev_warn(dev->class_dev, "error setting up mite\n");
+	ret = mite_setup2(dev, devpriv->mite, true);
+	if (ret < 0)
 		return ret;
-	}
 
 	ret = ni_660x_alloc_mite_rings(dev);
 	if (ret < 0)
@@ -1192,6 +1184,8 @@ static void ni_660x_detach(struct comedi_device *dev)
 		ni_660x_free_mite_rings(dev);
 		mite_detach(devpriv->mite);
 	}
+	if (dev->mmio)
+		iounmap(dev->mmio);
 	comedi_pci_disable(dev);
 }
 

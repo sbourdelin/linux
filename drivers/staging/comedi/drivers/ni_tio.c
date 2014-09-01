@@ -51,7 +51,7 @@ TODO:
 
 /*
  * clock sources for ni e and m series boards,
- * get bits with Gi_Source_Select_Bits()
+ * get bits with GI_SRC_SEL()
  */
 #define NI_M_TIMEBASE_1_CLK		0x0	/* 20MHz */
 #define NI_M_PFI_CLK(x)			(((x) < 10) ? (1 + (x)) : (0xb + (x)))
@@ -69,7 +69,7 @@ TODO:
 
 /*
  * clock sources for ni_660x boards,
- * get bits with Gi_Source_Select_Bits()
+ * get bits with GI_SRC_SEL()
  */
 #define NI_660X_TIMEBASE_1_CLK		0x0	/* 20MHz */
 #define NI_660X_SRC_PIN_I_CLK		0x1
@@ -116,70 +116,56 @@ TODO:
 #define NI_660X_LOGIC_LOW_GATE2_SEL	0x1f
 #define NI_660X_MAX_UP_DOWN_PIN		7
 
-static inline enum Gi_Counting_Mode_Reg_Bits
-Gi_Alternate_Sync_Bit(enum ni_gpct_variant variant)
+static inline unsigned GI_ALT_SYNC(enum ni_gpct_variant variant)
 {
 	switch (variant) {
 	case ni_gpct_variant_e_series:
 	default:
 		return 0;
 	case ni_gpct_variant_m_series:
-		return Gi_M_Series_Alternate_Sync_Bit;
+		return GI_M_ALT_SYNC;
 	case ni_gpct_variant_660x:
-		return Gi_660x_Alternate_Sync_Bit;
+		return GI_660X_ALT_SYNC;
 	}
 }
 
-static inline enum Gi_Counting_Mode_Reg_Bits
-Gi_Prescale_X2_Bit(enum ni_gpct_variant variant)
+static inline unsigned GI_PRESCALE_X2(enum ni_gpct_variant variant)
 {
 	switch (variant) {
 	case ni_gpct_variant_e_series:
 	default:
 		return 0;
 	case ni_gpct_variant_m_series:
-		return Gi_M_Series_Prescale_X2_Bit;
+		return GI_M_PRESCALE_X2;
 	case ni_gpct_variant_660x:
-		return Gi_660x_Prescale_X2_Bit;
+		return GI_660X_PRESCALE_X2;
 	}
 }
 
-static inline enum Gi_Counting_Mode_Reg_Bits
-Gi_Prescale_X8_Bit(enum ni_gpct_variant variant)
+static inline unsigned GI_PRESCALE_X8(enum ni_gpct_variant variant)
 {
 	switch (variant) {
 	case ni_gpct_variant_e_series:
 	default:
 		return 0;
 	case ni_gpct_variant_m_series:
-		return Gi_M_Series_Prescale_X8_Bit;
+		return GI_M_PRESCALE_X8;
 	case ni_gpct_variant_660x:
-		return Gi_660x_Prescale_X8_Bit;
+		return GI_660X_PRESCALE_X8;
 	}
 }
 
-static inline enum Gi_Counting_Mode_Reg_Bits
-Gi_HW_Arm_Select_Mask(enum ni_gpct_variant variant)
+static inline unsigned GI_HW_ARM_SEL_MASK(enum ni_gpct_variant variant)
 {
 	switch (variant) {
 	case ni_gpct_variant_e_series:
 	default:
 		return 0;
 	case ni_gpct_variant_m_series:
-		return Gi_M_Series_HW_Arm_Select_Mask;
+		return GI_M_HW_ARM_SEL_MASK;
 	case ni_gpct_variant_660x:
-		return Gi_660x_HW_Arm_Select_Mask;
+		return GI_660X_HW_ARM_SEL_MASK;
 	}
-}
-
-static inline unsigned Gi_Source_Select_Bits(unsigned source)
-{
-	return (source << Gi_Source_Select_Shift) & Gi_Source_Select_Mask;
-}
-
-static inline unsigned Gi_Gate_Select_Bits(unsigned gate_select)
-{
-	return (gate_select << Gi_Gate_Select_Shift) & Gi_Gate_Select_Mask;
 }
 
 static int ni_tio_has_gate2_registers(const struct ni_gpct_device *counter_dev)
@@ -198,7 +184,7 @@ static void ni_tio_reset_count_and_disarm(struct ni_gpct *counter)
 {
 	unsigned cidx = counter->counter_index;
 
-	write_register(counter, Gi_Reset_Bit(cidx), NITIO_RESET_REG(cidx));
+	write_register(counter, GI_RESET(cidx), NITIO_RESET_REG(cidx));
 }
 
 static uint64_t ni_tio_clock_period_ps(const struct ni_gpct *counter,
@@ -252,11 +238,11 @@ static unsigned ni_tio_clock_src_modifiers(const struct ni_gpct *counter)
 	unsigned bits = 0;
 
 	if (ni_tio_get_soft_copy(counter, NITIO_INPUT_SEL_REG(cidx)) &
-	    Gi_Source_Polarity_Bit)
+	    GI_SRC_POL_INVERT)
 		bits |= NI_GPCT_INVERT_CLOCK_SRC_BIT;
-	if (counting_mode_bits & Gi_Prescale_X2_Bit(counter_dev->variant))
+	if (counting_mode_bits & GI_PRESCALE_X2(counter_dev->variant))
 		bits |= NI_GPCT_PRESCALE_X2_CLOCK_SRC_BITS;
-	if (counting_mode_bits & Gi_Prescale_X8_Bit(counter_dev->variant))
+	if (counting_mode_bits & GI_PRESCALE_X8(counter_dev->variant))
 		bits |= NI_GPCT_PRESCALE_X8_CLOCK_SRC_BITS;
 	return bits;
 }
@@ -267,12 +253,13 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 	unsigned cidx = counter->counter_index;
 	const unsigned second_gate_reg = NITIO_GATE2_REG(cidx);
 	unsigned clock_source = 0;
+	unsigned src;
 	unsigned i;
-	const unsigned input_select =
-		(ni_tio_get_soft_copy(counter, NITIO_INPUT_SEL_REG(cidx)) &
-			Gi_Source_Select_Mask) >> Gi_Source_Select_Shift;
 
-	switch (input_select) {
+	src = GI_BITS_TO_SRC(ni_tio_get_soft_copy(counter,
+						  NITIO_INPUT_SEL_REG(cidx)));
+
+	switch (src) {
 	case NI_M_TIMEBASE_1_CLK:
 		clock_source = NI_GPCT_TIMEBASE_1_CLOCK_SRC_BITS;
 		break;
@@ -280,8 +267,7 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 		clock_source = NI_GPCT_TIMEBASE_2_CLOCK_SRC_BITS;
 		break;
 	case NI_M_TIMEBASE_3_CLK:
-		if (counter_dev->regs[second_gate_reg] &
-		    Gi_Source_Subselect_Bit)
+		if (counter_dev->regs[second_gate_reg] & GI_SRC_SUBSEL)
 			clock_source =
 			    NI_GPCT_ANALOG_TRIGGER_OUT_CLOCK_SRC_BITS;
 		else
@@ -291,8 +277,7 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 		clock_source = NI_GPCT_LOGIC_LOW_CLOCK_SRC_BITS;
 		break;
 	case NI_M_NEXT_GATE_CLK:
-		if (counter_dev->regs[second_gate_reg] &
-		    Gi_Source_Subselect_Bit)
+		if (counter_dev->regs[second_gate_reg] & GI_SRC_SUBSEL)
 			clock_source = NI_GPCT_PXI_STAR_TRIGGER_CLOCK_SRC_BITS;
 		else
 			clock_source = NI_GPCT_NEXT_GATE_CLOCK_SRC_BITS;
@@ -305,7 +290,7 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 		break;
 	default:
 		for (i = 0; i <= NI_M_MAX_RTSI_CHAN; ++i) {
-			if (input_select == NI_M_RTSI_CLK(i)) {
+			if (src == NI_M_RTSI_CLK(i)) {
 				clock_source = NI_GPCT_RTSI_CLOCK_SRC_BITS(i);
 				break;
 			}
@@ -313,7 +298,7 @@ static unsigned ni_m_series_clock_src_select(const struct ni_gpct *counter)
 		if (i <= NI_M_MAX_RTSI_CHAN)
 			break;
 		for (i = 0; i <= NI_M_MAX_PFI_CHAN; ++i) {
-			if (input_select == NI_M_PFI_CLK(i)) {
+			if (src == NI_M_PFI_CLK(i)) {
 				clock_source = NI_GPCT_PFI_CLOCK_SRC_BITS(i);
 				break;
 			}
@@ -331,12 +316,13 @@ static unsigned ni_660x_clock_src_select(const struct ni_gpct *counter)
 {
 	unsigned clock_source = 0;
 	unsigned cidx = counter->counter_index;
-	const unsigned input_select =
-		(ni_tio_get_soft_copy(counter, NITIO_INPUT_SEL_REG(cidx)) &
-			Gi_Source_Select_Mask) >> Gi_Source_Select_Shift;
+	unsigned src;
 	unsigned i;
 
-	switch (input_select) {
+	src = GI_BITS_TO_SRC(ni_tio_get_soft_copy(counter,
+						  NITIO_INPUT_SEL_REG(cidx)));
+
+	switch (src) {
 	case NI_660X_TIMEBASE_1_CLK:
 		clock_source = NI_GPCT_TIMEBASE_1_CLOCK_SRC_BITS;
 		break;
@@ -360,7 +346,7 @@ static unsigned ni_660x_clock_src_select(const struct ni_gpct *counter)
 		break;
 	default:
 		for (i = 0; i <= NI_660X_MAX_RTSI_CHAN; ++i) {
-			if (input_select == NI_660X_RTSI_CLK(i)) {
+			if (src == NI_660X_RTSI_CLK(i)) {
 				clock_source = NI_GPCT_RTSI_CLOCK_SRC_BITS(i);
 				break;
 			}
@@ -368,7 +354,7 @@ static unsigned ni_660x_clock_src_select(const struct ni_gpct *counter)
 		if (i <= NI_660X_MAX_RTSI_CHAN)
 			break;
 		for (i = 0; i <= NI_660X_MAX_SRC_PIN; ++i) {
-			if (input_select == NI_660X_SRC_PIN_CLK(i)) {
+			if (src == NI_660X_SRC_PIN_CLK(i)) {
 				clock_source =
 				    NI_GPCT_SOURCE_PIN_CLOCK_SRC_BITS(i);
 				break;
@@ -401,17 +387,18 @@ static void ni_tio_set_sync_mode(struct ni_gpct *counter, int force_alt_sync)
 	unsigned cidx = counter->counter_index;
 	const unsigned counting_mode_reg = NITIO_CNT_MODE_REG(cidx);
 	static const uint64_t min_normal_sync_period_ps = 25000;
+	unsigned mode;
 	uint64_t clock_period_ps;
 
 	if (ni_tio_counting_mode_registers_present(counter_dev) == 0)
 		return;
 
-	switch (ni_tio_get_soft_copy(counter, counting_mode_reg) &
-		Gi_Counting_Mode_Mask) {
-	case Gi_Counting_Mode_QuadratureX1_Bits:
-	case Gi_Counting_Mode_QuadratureX2_Bits:
-	case Gi_Counting_Mode_QuadratureX4_Bits:
-	case Gi_Counting_Mode_Sync_Source_Bits:
+	mode = ni_tio_get_soft_copy(counter, counting_mode_reg);
+	switch (mode & GI_CNT_MODE_MASK) {
+	case GI_CNT_MODE_QUADX1:
+	case GI_CNT_MODE_QUADX2:
+	case GI_CNT_MODE_QUADX4:
+	case GI_CNT_MODE_SYNC_SRC:
 		force_alt_sync = 1;
 		break;
 	default:
@@ -429,11 +416,11 @@ static void ni_tio_set_sync_mode(struct ni_gpct *counter, int force_alt_sync)
 	if (force_alt_sync ||
 	    (clock_period_ps && clock_period_ps < min_normal_sync_period_ps)) {
 		ni_tio_set_bits(counter, counting_mode_reg,
-				Gi_Alternate_Sync_Bit(counter_dev->variant),
-				Gi_Alternate_Sync_Bit(counter_dev->variant));
+				GI_ALT_SYNC(counter_dev->variant),
+				GI_ALT_SYNC(counter_dev->variant));
 	} else {
 		ni_tio_set_bits(counter, counting_mode_reg,
-				Gi_Alternate_Sync_Bit(counter_dev->variant),
+				GI_ALT_SYNC(counter_dev->variant),
 				0x0);
 	}
 }
@@ -452,18 +439,18 @@ static int ni_tio_set_counter_mode(struct ni_gpct *counter, unsigned mode)
 	    NI_GPCT_HARDWARE_DISARM_MASK | NI_GPCT_LOADING_ON_TC_BIT |
 	    NI_GPCT_LOADING_ON_GATE_BIT | NI_GPCT_LOAD_B_SELECT_BIT;
 
-	mode_reg_mask = mode_reg_direct_mask | Gi_Reload_Source_Switching_Bit;
+	mode_reg_mask = mode_reg_direct_mask | GI_RELOAD_SRC_SWITCHING;
 	mode_reg_values = mode & mode_reg_direct_mask;
 	switch (mode & NI_GPCT_RELOAD_SOURCE_MASK) {
 	case NI_GPCT_RELOAD_SOURCE_FIXED_BITS:
 		break;
 	case NI_GPCT_RELOAD_SOURCE_SWITCHING_BITS:
-		mode_reg_values |= Gi_Reload_Source_Switching_Bit;
+		mode_reg_values |= GI_RELOAD_SRC_SWITCHING;
 		break;
 	case NI_GPCT_RELOAD_SOURCE_GATE_SELECT_BITS:
-		input_select_bits |= Gi_Gate_Select_Load_Source_Bit;
-		mode_reg_mask |= Gi_Gating_Mode_Mask;
-		mode_reg_values |= Gi_Level_Gating_Bits;
+		input_select_bits |= GI_GATE_SEL_LOAD_SRC;
+		mode_reg_mask |= GI_GATING_MODE_MASK;
+		mode_reg_values |= GI_LEVEL_GATING;
 		break;
 	default:
 		break;
@@ -472,34 +459,28 @@ static int ni_tio_set_counter_mode(struct ni_gpct *counter, unsigned mode)
 			mode_reg_mask, mode_reg_values);
 
 	if (ni_tio_counting_mode_registers_present(counter_dev)) {
-		unsigned counting_mode_bits = 0;
+		unsigned bits = 0;
 
-		counting_mode_bits |=
-		    (mode >> NI_GPCT_COUNTING_MODE_SHIFT) &
-		    Gi_Counting_Mode_Mask;
-		counting_mode_bits |=
-		    ((mode >> NI_GPCT_INDEX_PHASE_BITSHIFT) <<
-		     Gi_Index_Phase_Bitshift) & Gi_Index_Phase_Mask;
+		bits |= GI_CNT_MODE(mode >> NI_GPCT_COUNTING_MODE_SHIFT);
+		bits |= GI_INDEX_PHASE((mode >> NI_GPCT_INDEX_PHASE_BITSHIFT));
 		if (mode & NI_GPCT_INDEX_ENABLE_BIT)
-			counting_mode_bits |= Gi_Index_Mode_Bit;
+			bits |= GI_INDEX_MODE;
 		ni_tio_set_bits(counter, NITIO_CNT_MODE_REG(cidx),
-				Gi_Counting_Mode_Mask | Gi_Index_Phase_Mask |
-				Gi_Index_Mode_Bit, counting_mode_bits);
+				GI_CNT_MODE_MASK | GI_INDEX_PHASE_MASK |
+				GI_INDEX_MODE, bits);
 		ni_tio_set_sync_mode(counter, 0);
 	}
 
-	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx),
-			Gi_Up_Down_Mask,
-			(mode >> NI_GPCT_COUNTING_DIRECTION_SHIFT) <<
-			Gi_Up_Down_Shift);
+	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx), GI_CNT_DIR_MASK,
+			GI_CNT_DIR(mode >> NI_GPCT_COUNTING_DIRECTION_SHIFT));
 
 	if (mode & NI_GPCT_OR_GATE_BIT)
-		input_select_bits |= Gi_Or_Gate_Bit;
+		input_select_bits |= GI_OR_GATE;
 	if (mode & NI_GPCT_INVERT_OUTPUT_BIT)
-		input_select_bits |= Gi_Output_Polarity_Bit;
+		input_select_bits |= GI_OUTPUT_POL_INVERT;
 	ni_tio_set_bits(counter, NITIO_INPUT_SEL_REG(cidx),
-			Gi_Gate_Select_Load_Source_Bit | Gi_Or_Gate_Bit |
-			Gi_Output_Polarity_Bit, input_select_bits);
+			GI_GATE_SEL_LOAD_SRC | GI_OR_GATE |
+			GI_OUTPUT_POL_INVERT, input_select_bits);
 
 	return 0;
 }
@@ -513,16 +494,19 @@ int ni_tio_arm(struct ni_gpct *counter, int arm, unsigned start_trigger)
 	if (arm) {
 		switch (start_trigger) {
 		case NI_GPCT_ARM_IMMEDIATE:
-			command_transient_bits |= Gi_Arm_Bit;
+			command_transient_bits |= GI_ARM;
 			break;
 		case NI_GPCT_ARM_PAIRED_IMMEDIATE:
-			command_transient_bits |= Gi_Arm_Bit | Gi_Arm_Copy_Bit;
+			command_transient_bits |= GI_ARM | GI_ARM_COPY;
 			break;
 		default:
 			break;
 		}
 		if (ni_tio_counting_mode_registers_present(counter_dev)) {
-			unsigned counting_mode_bits = 0;
+			unsigned bits = 0;
+			unsigned sel_mask;
+
+			sel_mask = GI_HW_ARM_SEL_MASK(counter_dev->variant);
 
 			switch (start_trigger) {
 			case NI_GPCT_ARM_IMMEDIATE:
@@ -535,28 +519,19 @@ int ni_tio_arm(struct ni_gpct *counter, int arm, unsigned start_trigger)
 					 * bits so we can figure out what
 					 * select later
 					 */
-					unsigned hw_arm_select_bits =
-					    (start_trigger <<
-					     Gi_HW_Arm_Select_Shift) &
-					    Gi_HW_Arm_Select_Mask
-					    (counter_dev->variant);
-
-					counting_mode_bits |=
-					    Gi_HW_Arm_Enable_Bit |
-					    hw_arm_select_bits;
+					bits |= GI_HW_ARM_ENA |
+						(GI_HW_ARM_SEL(start_trigger) &
+						 sel_mask);
 				} else {
 					return -EINVAL;
 				}
 				break;
 			}
 			ni_tio_set_bits(counter, NITIO_CNT_MODE_REG(cidx),
-					Gi_HW_Arm_Select_Mask
-					(counter_dev->variant) |
-					Gi_HW_Arm_Enable_Bit,
-					counting_mode_bits);
+					GI_HW_ARM_ENA | sel_mask, bits);
 		}
 	} else {
-		command_transient_bits |= Gi_Disarm_Bit;
+		command_transient_bits |= GI_DISARM;
 	}
 	ni_tio_set_bits_transient(counter, NITIO_CMD_REG(cidx),
 				  0, 0, command_transient_bits);
@@ -613,7 +588,7 @@ static unsigned ni_660x_clk_src(unsigned int clock_source)
 		BUG();
 		break;
 	}
-	return Gi_Source_Select_Bits(ni_660x_clock);
+	return GI_SRC_SEL(ni_660x_clock);
 }
 
 static unsigned ni_m_clk_src(unsigned int clock_source)
@@ -673,7 +648,7 @@ static unsigned ni_m_clk_src(unsigned int clock_source)
 		ni_m_series_clock = 0;
 		break;
 	}
-	return Gi_Source_Select_Bits(ni_m_series_clock);
+	return GI_SRC_SEL(ni_m_series_clock);
 };
 
 static void ni_tio_set_source_subselect(struct ni_gpct *counter,
@@ -689,12 +664,12 @@ static void ni_tio_set_source_subselect(struct ni_gpct *counter,
 		/* Gi_Source_Subselect is zero */
 	case NI_GPCT_NEXT_GATE_CLOCK_SRC_BITS:
 	case NI_GPCT_TIMEBASE_3_CLOCK_SRC_BITS:
-		counter_dev->regs[second_gate_reg] &= ~Gi_Source_Subselect_Bit;
+		counter_dev->regs[second_gate_reg] &= ~GI_SRC_SUBSEL;
 		break;
 		/* Gi_Source_Subselect is one */
 	case NI_GPCT_ANALOG_TRIGGER_OUT_CLOCK_SRC_BITS:
 	case NI_GPCT_PXI_STAR_TRIGGER_CLOCK_SRC_BITS:
-		counter_dev->regs[second_gate_reg] |= Gi_Source_Subselect_Bit;
+		counter_dev->regs[second_gate_reg] |= GI_SRC_SUBSEL;
 		break;
 		/* Gi_Source_Subselect doesn't matter */
 	default:
@@ -724,9 +699,9 @@ static int ni_tio_set_clock_src(struct ni_gpct *counter,
 		break;
 	}
 	if (clock_source & NI_GPCT_INVERT_CLOCK_SRC_BIT)
-		bits |= Gi_Source_Polarity_Bit;
+		bits |= GI_SRC_POL_INVERT;
 	ni_tio_set_bits(counter, NITIO_INPUT_SEL_REG(cidx),
-			Gi_Source_Select_Mask | Gi_Source_Polarity_Bit, bits);
+			GI_SRC_SEL_MASK | GI_SRC_POL_INVERT, bits);
 	ni_tio_set_source_subselect(counter, clock_source);
 
 	if (ni_tio_counting_mode_registers_present(counter_dev)) {
@@ -735,17 +710,17 @@ static int ni_tio_set_clock_src(struct ni_gpct *counter,
 		case NI_GPCT_NO_PRESCALE_CLOCK_SRC_BITS:
 			break;
 		case NI_GPCT_PRESCALE_X2_CLOCK_SRC_BITS:
-			bits |= Gi_Prescale_X2_Bit(counter_dev->variant);
+			bits |= GI_PRESCALE_X2(counter_dev->variant);
 			break;
 		case NI_GPCT_PRESCALE_X8_CLOCK_SRC_BITS:
-			bits |= Gi_Prescale_X8_Bit(counter_dev->variant);
+			bits |= GI_PRESCALE_X8(counter_dev->variant);
 			break;
 		default:
 			return -EINVAL;
 		}
 		ni_tio_set_bits(counter, NITIO_CNT_MODE_REG(cidx),
-				Gi_Prescale_X2_Bit(counter_dev->variant) |
-				Gi_Prescale_X8_Bit(counter_dev->variant), bits);
+				GI_PRESCALE_X2(counter_dev->variant) |
+				GI_PRESCALE_X8(counter_dev->variant), bits);
 	}
 	counter->clock_period_ps = period_ns * 1000;
 	ni_tio_set_sync_mode(counter, 0);
@@ -801,7 +776,7 @@ static int ni_660x_set_gate(struct ni_gpct *counter, unsigned int gate_source)
 		return -EINVAL;
 	}
 	ni_tio_set_bits(counter, NITIO_INPUT_SEL_REG(cidx),
-			Gi_Gate_Select_Mask, Gi_Gate_Select_Bits(gate_sel));
+			GI_GATE_SEL_MASK, GI_GATE_SEL(gate_sel));
 	return 0;
 }
 
@@ -843,7 +818,7 @@ static int ni_m_set_gate(struct ni_gpct *counter, unsigned int gate_source)
 		return -EINVAL;
 	}
 	ni_tio_set_bits(counter, NITIO_INPUT_SEL_REG(cidx),
-			Gi_Gate_Select_Mask, Gi_Gate_Select_Bits(gate_sel));
+			GI_GATE_SEL_MASK, GI_GATE_SEL(gate_sel));
 	return 0;
 }
 
@@ -886,9 +861,9 @@ static int ni_660x_set_gate2(struct ni_gpct *counter, unsigned int gate_source)
 			break;
 		return -EINVAL;
 	}
-	counter_dev->regs[gate2_reg] |= Gi_Second_Gate_Mode_Bit;
-	counter_dev->regs[gate2_reg] &= ~Gi_Second_Gate_Select_Mask;
-	counter_dev->regs[gate2_reg] |= Gi_Second_Gate_Select_Bits(gate2_sel);
+	counter_dev->regs[gate2_reg] |= GI_GATE2_MODE;
+	counter_dev->regs[gate2_reg] &= ~GI_GATE2_SEL_MASK;
+	counter_dev->regs[gate2_reg] |= GI_GATE2_SEL(gate2_sel);
 	write_register(counter, counter_dev->regs[gate2_reg], gate2_reg);
 	return 0;
 }
@@ -910,9 +885,9 @@ static int ni_m_set_gate2(struct ni_gpct *counter, unsigned int gate_source)
 		gate2_sel = chan & 0x1f;
 		break;
 	}
-	counter_dev->regs[gate2_reg] |= Gi_Second_Gate_Mode_Bit;
-	counter_dev->regs[gate2_reg] &= ~Gi_Second_Gate_Select_Mask;
-	counter_dev->regs[gate2_reg] |= Gi_Second_Gate_Select_Bits(gate2_sel);
+	counter_dev->regs[gate2_reg] |= GI_GATE2_MODE;
+	counter_dev->regs[gate2_reg] &= ~GI_GATE2_SEL_MASK;
+	counter_dev->regs[gate2_reg] |= GI_GATE2_SEL(gate2_sel);
 	write_register(counter, counter_dev->regs[gate2_reg], gate2_reg);
 	return 0;
 }
@@ -930,18 +905,18 @@ int ni_tio_set_gate_src(struct ni_gpct *counter, unsigned gate_index,
 	case 0:
 		if (chan == NI_GPCT_DISABLED_GATE_SELECT) {
 			ni_tio_set_bits(counter, NITIO_MODE_REG(cidx),
-					Gi_Gating_Mode_Mask,
-					Gi_Gating_Disabled_Bits);
+					GI_GATING_MODE_MASK,
+					GI_GATING_DISABLED);
 			return 0;
 		}
 		if (gate_source & CR_INVERT)
-			mode |= Gi_Gate_Polarity_Bit;
+			mode |= GI_GATE_POL_INVERT;
 		if (gate_source & CR_EDGE)
-			mode |= Gi_Rising_Edge_Gating_Bits;
+			mode |= GI_RISING_EDGE_GATING;
 		else
-			mode |= Gi_Level_Gating_Bits;
+			mode |= GI_LEVEL_GATING;
 		ni_tio_set_bits(counter, NITIO_MODE_REG(cidx),
-				Gi_Gate_Polarity_Bit | Gi_Gating_Mode_Mask,
+				GI_GATE_POL_INVERT | GI_GATING_MODE_MASK,
 				mode);
 		switch (counter_dev->variant) {
 		case ni_gpct_variant_e_series:
@@ -957,19 +932,15 @@ int ni_tio_set_gate_src(struct ni_gpct *counter, unsigned gate_index,
 			return -EINVAL;
 
 		if (chan == NI_GPCT_DISABLED_GATE_SELECT) {
-			counter_dev->regs[gate2_reg] &=
-						~Gi_Second_Gate_Mode_Bit;
+			counter_dev->regs[gate2_reg] &= ~GI_GATE2_MODE;
 			write_register(counter, counter_dev->regs[gate2_reg],
 				       gate2_reg);
 			return 0;
 		}
-		if (gate_source & CR_INVERT) {
-			counter_dev->regs[gate2_reg] |=
-						Gi_Second_Gate_Polarity_Bit;
-		} else {
-			counter_dev->regs[gate2_reg] &=
-						~Gi_Second_Gate_Polarity_Bit;
-		}
+		if (gate_source & CR_INVERT)
+			counter_dev->regs[gate2_reg] |= GI_GATE2_POL_INVERT;
+		else
+			counter_dev->regs[gate2_reg] &= ~GI_GATE2_POL_INVERT;
 		switch (counter_dev->variant) {
 		case ni_gpct_variant_m_series:
 			return ni_m_set_gate2(counter, gate_source);
@@ -1041,14 +1012,10 @@ static unsigned ni_660x_gate_to_generic_gate(unsigned gate)
 			if (gate == NI_660X_RTSI_GATE_SEL(i))
 				return NI_GPCT_RTSI_GATE_SELECT(i);
 		}
-		if (i <= NI_660X_MAX_RTSI_CHAN)
-			break;
 		for (i = 0; i <= NI_660X_MAX_GATE_PIN; ++i) {
 			if (gate == NI_660X_PIN_GATE_SEL(i))
 				return NI_GPCT_GATE_PIN_GATE_SELECT(i);
 		}
-		if (i <= NI_660X_MAX_GATE_PIN)
-			break;
 		BUG();
 		break;
 	}
@@ -1081,14 +1048,10 @@ static unsigned ni_m_gate_to_generic_gate(unsigned gate)
 			if (gate == NI_M_RTSI_GATE_SEL(i))
 				return NI_GPCT_RTSI_GATE_SELECT(i);
 		}
-		if (i <= NI_M_MAX_RTSI_CHAN)
-			break;
 		for (i = 0; i <= NI_M_MAX_PFI_CHAN; ++i) {
 			if (gate == NI_M_PFI_GATE_SEL(i))
 				return NI_GPCT_PFI_GATE_SELECT(i);
 		}
-		if (i <= NI_M_MAX_PFI_CHAN)
-			break;
 		BUG();
 		break;
 	}
@@ -1117,14 +1080,10 @@ static unsigned ni_660x_gate2_to_generic_gate(unsigned gate)
 			if (gate == NI_660X_RTSI_GATE2_SEL(i))
 				return NI_GPCT_RTSI_GATE_SELECT(i);
 		}
-		if (i <= NI_660X_MAX_RTSI_CHAN)
-			break;
 		for (i = 0; i <= NI_660X_MAX_UP_DOWN_PIN; ++i) {
 			if (gate == NI_660X_UD_PIN_GATE2_SEL(i))
 				return NI_GPCT_UP_DOWN_PIN_GATE_SELECT(i);
 		}
-		if (i <= NI_660X_MAX_UP_DOWN_PIN)
-			break;
 		BUG();
 		break;
 	}
@@ -1151,60 +1110,56 @@ static int ni_tio_get_gate_src(struct ni_gpct *counter, unsigned gate_index,
 	unsigned cidx = counter->counter_index;
 	unsigned mode = ni_tio_get_soft_copy(counter, NITIO_MODE_REG(cidx));
 	unsigned gate2_reg = NITIO_GATE2_REG(cidx);
-	unsigned gate_sel;
+	unsigned gate;
 
 	switch (gate_index) {
 	case 0:
-		if ((mode & Gi_Gating_Mode_Mask) == Gi_Gating_Disabled_Bits) {
+		if ((mode & GI_GATING_MODE_MASK) == GI_GATING_DISABLED) {
 			*gate_source = NI_GPCT_DISABLED_GATE_SELECT;
 			return 0;
 		}
 
-		gate_sel = ni_tio_get_soft_copy(counter,
-						NITIO_INPUT_SEL_REG(cidx));
-		gate_sel &= Gi_Gate_Select_Mask;
-		gate_sel >>= Gi_Gate_Select_Shift;
+		gate = GI_BITS_TO_GATE(ni_tio_get_soft_copy(counter,
+						NITIO_INPUT_SEL_REG(cidx)));
 
 		switch (counter_dev->variant) {
 		case ni_gpct_variant_e_series:
 		case ni_gpct_variant_m_series:
 		default:
-			*gate_source = ni_m_gate_to_generic_gate(gate_sel);
+			*gate_source = ni_m_gate_to_generic_gate(gate);
 			break;
 		case ni_gpct_variant_660x:
-			*gate_source = ni_660x_gate_to_generic_gate(gate_sel);
+			*gate_source = ni_660x_gate_to_generic_gate(gate);
 			break;
 		}
-		if (mode & Gi_Gate_Polarity_Bit)
+		if (mode & GI_GATE_POL_INVERT)
 			*gate_source |= CR_INVERT;
-		if ((mode & Gi_Gating_Mode_Mask) != Gi_Level_Gating_Bits)
+		if ((mode & GI_GATING_MODE_MASK) != GI_LEVEL_GATING)
 			*gate_source |= CR_EDGE;
 		break;
 	case 1:
-		if ((mode & Gi_Gating_Mode_Mask) == Gi_Gating_Disabled_Bits ||
-		    !(counter_dev->regs[gate2_reg] & Gi_Second_Gate_Mode_Bit)) {
+		if ((mode & GI_GATING_MODE_MASK) == GI_GATING_DISABLED ||
+		    !(counter_dev->regs[gate2_reg] & GI_GATE2_MODE)) {
 			*gate_source = NI_GPCT_DISABLED_GATE_SELECT;
 			return 0;
 		}
 
-		gate_sel = counter_dev->regs[gate2_reg];
-		gate_sel &= Gi_Second_Gate_Select_Mask;
-		gate_sel >>= Gi_Second_Gate_Select_Shift;
+		gate = GI_BITS_TO_GATE2(counter_dev->regs[gate2_reg]);
 
 		switch (counter_dev->variant) {
 		case ni_gpct_variant_e_series:
 		case ni_gpct_variant_m_series:
 		default:
-			*gate_source = ni_m_gate2_to_generic_gate(gate_sel);
+			*gate_source = ni_m_gate2_to_generic_gate(gate);
 			break;
 		case ni_gpct_variant_660x:
-			*gate_source = ni_660x_gate2_to_generic_gate(gate_sel);
+			*gate_source = ni_660x_gate2_to_generic_gate(gate);
 			break;
 		}
-		if (counter_dev->regs[gate2_reg] & Gi_Second_Gate_Polarity_Bit)
+		if (counter_dev->regs[gate2_reg] & GI_GATE2_POL_INVERT)
 			*gate_source |= CR_INVERT;
 		/* second gate can't have edge/level mode set independently */
-		if ((mode & Gi_Gating_Mode_Mask) != Gi_Level_Gating_Bits)
+		if ((mode & GI_GATING_MODE_MASK) != GI_LEVEL_GATING)
 			*gate_source |= CR_EDGE;
 		break;
 	default:
@@ -1233,9 +1188,9 @@ int ni_tio_insn_config(struct comedi_device *dev,
 	case INSN_CONFIG_GET_COUNTER_STATUS:
 		data[1] = 0;
 		status = read_register(counter, NITIO_SHARED_STATUS_REG(cidx));
-		if (status & Gi_Armed_Bit(cidx)) {
+		if (status & GI_ARMED(cidx)) {
 			data[1] |= COMEDI_COUNTER_ARMED;
-			if (status & Gi_Counting_Bit(cidx))
+			if (status & GI_COUNTING(cidx))
 				data[1] |= COMEDI_COUNTER_COUNTING;
 		}
 		data[2] = COMEDI_COUNTER_ARMED | COMEDI_COUNTER_COUNTING;
@@ -1266,13 +1221,11 @@ static unsigned int ni_tio_read_sw_save_reg(struct comedi_device *dev,
 {
 	struct ni_gpct *counter = s->private;
 	unsigned cidx = counter->counter_index;
-	unsigned int first_read;
-	unsigned int second_read;
-	unsigned int correct_read;
+	unsigned int val;
 
-	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx), Gi_Save_Trace_Bit, 0);
+	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx), GI_SAVE_TRACE, 0);
 	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx),
-			Gi_Save_Trace_Bit, Gi_Save_Trace_Bit);
+			GI_SAVE_TRACE, GI_SAVE_TRACE);
 
 	/*
 	 * The count doesn't get latched until the next clock edge, so it is
@@ -1283,14 +1236,11 @@ static unsigned int ni_tio_read_sw_save_reg(struct comedi_device *dev,
 	 * will be correct since the count value will definitely have latched
 	 * by then.
 	 */
-	first_read = read_register(counter, NITIO_SW_SAVE_REG(cidx));
-	second_read = read_register(counter, NITIO_SW_SAVE_REG(cidx));
-	if (first_read != second_read)
-		correct_read = read_register(counter, NITIO_SW_SAVE_REG(cidx));
-	else
-		correct_read = first_read;
+	val = read_register(counter, NITIO_SW_SAVE_REG(cidx));
+	if (val != read_register(counter, NITIO_SW_SAVE_REG(cidx)))
+		val = read_register(counter, NITIO_SW_SAVE_REG(cidx));
 
-	return correct_read;
+	return val;
 }
 
 int ni_tio_insn_read(struct comedi_device *dev,
@@ -1327,7 +1277,7 @@ static unsigned ni_tio_next_load_register(struct ni_gpct *counter)
 	const unsigned bits =
 		read_register(counter, NITIO_SHARED_STATUS_REG(cidx));
 
-	return (bits & Gi_Next_Load_Source_Bit(cidx))
+	return (bits & GI_NEXT_LOAD_SRC(cidx))
 			? NITIO_LOADB_REG(cidx)
 			: NITIO_LOADA_REG(cidx);
 }
@@ -1359,7 +1309,7 @@ int ni_tio_insn_write(struct comedi_device *dev,
 		load_reg = ni_tio_next_load_register(counter);
 		write_register(counter, data[0], load_reg);
 		ni_tio_set_bits_transient(counter, NITIO_CMD_REG(cidx),
-					  0, 0, Gi_Load_Bit);
+					  0, 0, GI_LOAD);
 		/* restore load reg */
 		write_register(counter, counter_dev->regs[load_reg], load_reg);
 		break;
@@ -1390,7 +1340,7 @@ void ni_tio_init_counter(struct ni_gpct *counter)
 	write_register(counter, 0x0, NITIO_AUTO_INC_REG(cidx));
 
 	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx),
-			~0, Gi_Synchronize_Gate_Bit);
+			~0, GI_SYNC_GATE);
 
 	ni_tio_set_bits(counter, NITIO_MODE_REG(cidx), ~0, 0);
 
