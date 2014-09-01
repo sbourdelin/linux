@@ -4833,8 +4833,9 @@ void linked_status_chk(struct adapter *padapter)
 	}
 }
 
-void survey_timer_hdl(struct adapter *padapter)
+void survey_timer_hdl(void *function_context)
 {
+	struct adapter *padapter = (struct adapter *)function_context;
 	struct cmd_obj	*ph2c;
 	struct sitesurvey_parm	*psurveyPara;
 	struct cmd_priv					*pcmdpriv = &padapter->cmdpriv;
@@ -4872,8 +4873,9 @@ exit_survey_timer_hdl:
 	return;
 }
 
-void link_timer_hdl(struct adapter *padapter)
+void link_timer_hdl(void *function_context)
 {
+	struct adapter *padapter = (struct adapter *)function_context;
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 
@@ -4908,8 +4910,9 @@ void link_timer_hdl(struct adapter *padapter)
 	return;
 }
 
-void addba_timer_hdl(struct sta_info *psta)
+void addba_timer_hdl(void *function_context)
 {
+	struct sta_info *psta = (struct sta_info *)function_context;
 	struct ht_priv	*phtpriv;
 
 	if (!psta)

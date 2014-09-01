@@ -28,8 +28,6 @@ source "drivers/staging/et131x/Kconfig"
 
 source "drivers/staging/slicoss/Kconfig"
 
-source "drivers/staging/usbip/Kconfig"
-
 source "drivers/staging/wlan-ng/Kconfig"
 
 source "drivers/staging/comedi/Kconfig"
@@ -113,8 +111,6 @@ source "drivers/staging/dgnc/Kconfig"
 source "drivers/staging/dgap/Kconfig"
 
 source "drivers/staging/gs_fpgaboot/Kconfig"
-
-source "drivers/staging/nokia_h4p/Kconfig"
 
 source "drivers/staging/skein/Kconfig"
 

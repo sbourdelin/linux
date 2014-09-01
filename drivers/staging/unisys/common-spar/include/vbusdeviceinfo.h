@@ -16,7 +16,7 @@
 #ifndef __VBUSDEVICEINFO_H__
 #define __VBUSDEVICEINFO_H__
 
-#include "commontypes.h"
+#include <linux/types.h>
 
 #pragma pack(push, 1)		/* both GCC and VC now allow this pragma */
 
@@ -26,11 +26,11 @@
  * and driver from the client's perspective.
  */
 typedef struct _ULTRA_VBUS_DEVICEINFO {
-	U8 devType[16];		/* short string identifying the device type */
-	U8 drvName[16];		/* driver .sys file name */
-	U8 infoStrings[96];	/* sequence of tab-delimited id strings: */
+	u8 devType[16];		/* short string identifying the device type */
+	u8 drvName[16];		/* driver .sys file name */
+	u8 infoStrings[96];	/* sequence of tab-delimited id strings: */
 	/* <DRIVER_REV> <DRIVER_VERTAG> <DRIVER_COMPILETIME> */
-	U8 reserved[128];	/* pad size to 256 bytes */
+	u8 reserved[128];	/* pad size to 256 bytes */
 } ULTRA_VBUS_DEVICEINFO;
 
 #pragma pack(pop)
@@ -54,6 +54,7 @@ vbuschannel_sanitize_buffer(char *p, int remain, char *src, int srcmax)
 {
 	int chars = 0;
 	int nonprintable_streak = 0;
+
 	while (srcmax > 0) {
 		if ((*src >= ' ') && (*src < 0x7f)) {
 			if (nonprintable_streak) {

@@ -24,7 +24,6 @@
  *  the client devices and client drivers for the server end to see.
  */
 #include <linux/uuid.h>
-#include "commontypes.h"
 #include "vbusdeviceinfo.h"
 #include "channel.h"
 
@@ -63,17 +62,17 @@ static const uuid_le UltraVbusChannelProtocolGuid =
 
 #pragma pack(push, 1)		/* both GCC and VC now allow this pragma */
 typedef struct _ULTRA_VBUS_HEADERINFO {
-	U32 structBytes;	/* size of this struct in bytes */
-	U32 deviceInfoStructBytes;	/* sizeof(ULTRA_VBUS_DEVICEINFO) */
-	U32 devInfoCount;	/* num of items in DevInfo member */
+	u32 structBytes;	/* size of this struct in bytes */
+	u32 deviceInfoStructBytes;	/* sizeof(ULTRA_VBUS_DEVICEINFO) */
+	u32 devInfoCount;	/* num of items in DevInfo member */
 	/* (this is the allocated size) */
-	U32 chpInfoByteOffset;	/* byte offset from beginning of this struct */
+	u32 chpInfoByteOffset;	/* byte offset from beginning of this struct */
 	/* to the the ChpInfo struct (below) */
-	U32 busInfoByteOffset;	/* byte offset from beginning of this struct */
+	u32 busInfoByteOffset;	/* byte offset from beginning of this struct */
 	/* to the the BusInfo struct (below) */
-	U32 devInfoByteOffset;	/* byte offset from beginning of this struct */
+	u32 devInfoByteOffset;	/* byte offset from beginning of this struct */
 	/* to the the DevInfo array (below) */
-	U8 reserved[104];
+	u8 reserved[104];
 } ULTRA_VBUS_HEADERINFO;
 
 typedef struct _ULTRA_VBUS_CHANNEL_PROTOCOL {

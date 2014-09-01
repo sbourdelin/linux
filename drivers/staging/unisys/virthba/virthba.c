@@ -160,8 +160,8 @@ struct scsipending {
 #define VIRTHBA_ERROR_COUNT 30
 #define IOS_ERROR_THRESHOLD 1000
 struct virtdisk_info {
-	U32 valid;
-	U32 channel, id, lun;	/* Disk Path */
+	u32 valid;
+	u32 channel, id, lun;	/* Disk Path */
 	atomic_t ios_threshold;
 	atomic_t error_count;
 	struct virtdisk_info *next;
@@ -188,7 +188,7 @@ struct virthba_info {
 	unsigned long long interrupts_notme;
 	unsigned long long interrupts_disabled;
 	struct work_struct serverdown_completion;
-	U64 __iomem *flags_addr;
+	u64 __iomem *flags_addr;
 	atomic_t interrupt_rcvd;
 	wait_queue_head_t rsp_queue;
 	struct virtdisk_info head;
@@ -196,9 +196,9 @@ struct virthba_info {
 
 /* Work Data for DARWorkQ */
 struct diskaddremove {
-	U8 add;			/* 0-remove, 1-add */
+	u8 add;			/* 0-remove, 1-add */
 	struct Scsi_Host *shost; /* Scsi Host for this virthba instance */
-	U32 channel, id, lun;	/* Disk Path */
+	u32 channel, id, lun;	/* Disk Path */
 	struct diskaddremove *next;
 };
 
@@ -422,7 +422,7 @@ virthba_ISR(int irq, void *dev_id)
 	struct virthba_info *virthbainfo = (struct virthba_info *) dev_id;
 	CHANNEL_HEADER __iomem *pChannelHeader;
 	SIGNAL_QUEUE_HEADER __iomem *pqhdr;
-	U64 mask;
+	u64 mask;
 	unsigned long long rc1;
 
 	if (virthbainfo == NULL)
@@ -463,7 +463,7 @@ virthba_probe(struct virtpci_dev *virtpcidev, const struct pci_device_id *id)
 	irq_handler_t handler = virthba_ISR;
 	CHANNEL_HEADER __iomem *pChannelHeader;
 	SIGNAL_QUEUE_HEADER __iomem *pqhdr;
-	U64 mask;
+	u64 mask;
 
 	LOGVER("entering virthba_probe...\n");
 	LOGVER("virtpcidev busNo<<%d>>devNo<<%d>>", virtpcidev->busNo,
@@ -517,7 +517,7 @@ virthba_probe(struct virtpci_dev *virtpcidev, const struct pci_device_id *id)
 	    (unsigned short) (virtpcidev->scsi.max.max_io_size / PAGE_SIZE);
 	if (scsihost->sg_tablesize > MAX_PHYS_INFO)
 		scsihost->sg_tablesize = MAX_PHYS_INFO;
-	LOGINF("scsihost->max_channel=%u, max_id=%u, max_lun=%u, cmd_per_lun=%u, max_sectors=%hu, sg_tablesize=%hu\n",
+	LOGINF("scsihost->max_channel=%u, max_id=%u, max_lun=%llu, cmd_per_lun=%u, max_sectors=%hu, sg_tablesize=%hu\n",
 	     scsihost->max_channel, scsihost->max_id, scsihost->max_lun,
 	     scsihost->cmd_per_lun, scsihost->max_sectors,
 	     scsihost->sg_tablesize);
@@ -621,7 +621,7 @@ virthba_probe(struct virtpci_dev *virtpcidev, const struct pci_device_id *id)
 		virthbainfo->interrupt_vector = -1;
 		POSTCODE_LINUX_2(VHBA_PROBE_FAILURE_PC, POSTCODE_SEVERITY_ERR);
 	} else {
-		U64 __iomem *Features_addr =
+		u64 __iomem *Features_addr =
 		    &virthbainfo->chinfo.queueinfo->chan->Features;
 		LOGERR("request_irq(%d) uislib_virthba_ISR request succeeded\n",
 		       virthbainfo->interrupt_vector);
@@ -723,7 +723,7 @@ forward_vdiskmgmt_command(VDISK_MGMT_TYPES vdiskcmdtype,
 	uisqueue_put_cmdrsp_with_lock_client(virthbainfo->chinfo.queueinfo,
 					     cmdrsp, IOCHAN_TO_IOPART,
 					     &virthbainfo->chinfo.insertlock,
-					     DONT_ISSUE_INTERRUPT, (U64) NULL,
+					     DONT_ISSUE_INTERRUPT, (u64) NULL,
 					     OK_TO_WAIT, "vhba");
 	LOGINF("VdiskMgmt waiting on event notifyevent=0x%p\n",
 	       cmdrsp->scsitaskmgmt.notify);
@@ -746,7 +746,7 @@ forward_taskmgmt_command(TASK_MGMT_TYPES tasktype, struct scsi_device *scsidev)
 	int notifyresult = 0xffff;
 	wait_queue_head_t notifyevent;
 
-	LOGINF("TaskMgmt:%d %d:%d:%d\n", tasktype,
+	LOGINF("TaskMgmt:%d %d:%d:%llu\n", tasktype,
 	       scsidev->channel, scsidev->id, scsidev->lun);
 
 	if (virthbainfo->serverdown || virthbainfo->serverchangingstate) {
@@ -784,7 +784,7 @@ forward_taskmgmt_command(TASK_MGMT_TYPES tasktype, struct scsi_device *scsidev)
 	uisqueue_put_cmdrsp_with_lock_client(virthbainfo->chinfo.queueinfo,
 					     cmdrsp, IOCHAN_TO_IOPART,
 					     &virthbainfo->chinfo.insertlock,
-					     DONT_ISSUE_INTERRUPT, (U64) NULL,
+					     DONT_ISSUE_INTERRUPT, (u64) NULL,
 					     OK_TO_WAIT, "vhba");
 	LOGINF("TaskMgmt waiting on event notifyevent=0x%p\n",
 	       cmdrsp->scsitaskmgmt.notify);
@@ -1022,7 +1022,7 @@ virthba_queue_command_lck(struct scsi_cmnd *scsicmd,
 						 &virthbainfo->chinfo.
 						 insertlock,
 						 DONT_ISSUE_INTERRUPT,
-						 (U64) NULL, DONT_WAIT, "vhba");
+						 (u64) NULL, DONT_WAIT, "vhba");
 	if (i == 0) {
 		/* queue must be full - and we said don't wait - return busy */
 		LOGERR("uisqueue_put_cmdrsp_with_lock ****FAILED\n");
@@ -1139,7 +1139,7 @@ do_scsi_linuxstat(struct uiscmdrsp *cmdrsp, struct scsi_cmnd *scsicmd)
 
 		if (atomic_read(&vdisk->error_count) < VIRTHBA_ERROR_COUNT) {
 			atomic_inc(&vdisk->error_count);
-			LOGERR("SCSICMD ****FAILED scsicmd:0x%p op:0x%x <%d:%d:%d:%d> 0x%x-0x%x-0x%x-0x%x-0x%x.\n",
+			LOGERR("SCSICMD ****FAILED scsicmd:0x%p op:0x%x <%d:%d:%d:%llu> 0x%x-0x%x-0x%x-0x%x-0x%x.\n",
 			       scsicmd, cmdrsp->scsi.cmnd[0],
 			       scsidev->host->host_no, scsidev->id,
 			       scsidev->channel, scsidev->lun,
@@ -1148,7 +1148,7 @@ do_scsi_linuxstat(struct uiscmdrsp *cmdrsp, struct scsi_cmnd *scsicmd)
 			       sd->AdditionalSenseCodeQualifier);
 			if (atomic_read(&vdisk->error_count) ==
 			    VIRTHBA_ERROR_COUNT) {
-				LOGERR("Throtling SCSICMD errors disk <%d:%d:%d:%d>\n",
+				LOGERR("Throtling SCSICMD errors disk <%d:%d:%d:%llu>\n",
 				     scsidev->host->host_no, scsidev->id,
 				     scsidev->channel, scsidev->lun);
 			}
@@ -1335,7 +1335,7 @@ process_incoming_rsps(void *v)
 	struct chaninfo *dc = &virthbainfo->chinfo;
 	struct uiscmdrsp *cmdrsp = NULL;
 	const int SZ = sizeof(struct uiscmdrsp);
-	U64 mask;
+	u64 mask;
 	unsigned long long rc1;
 
 	UIS_DAEMONIZE("vhba_incoming");
@@ -1374,7 +1374,7 @@ static ssize_t info_debugfs_read(struct file *file,
 {
 	ssize_t bytes_read = 0;
 	int str_pos = 0;
-	U64 phys_flags_addr;
+	u64 phys_flags_addr;
 	int i;
 	struct virthba_info *virthbainfo;
 	char *vbuf;
@@ -1428,8 +1428,8 @@ static ssize_t enable_ints_write(struct file *file,
 	int i, new_value;
 	struct virthba_info *virthbainfo;
 
-	U64 __iomem *Features_addr;
-	U64 mask;
+	u64 __iomem *Features_addr;
+	u64 mask;
 
 	if (count >= ARRAY_SIZE(buf))
 		return -EINVAL;

@@ -662,7 +662,7 @@ static void _rtl_pci_tx_isr(struct ieee80211_hw *hw, int prio)
 			RT_TRACE(COMP_ERR, DBG_LOUD,
 					("more desc left, wake"
 					 "skb_queue@%d,ring->idx = %d,"
-					 "skb_queue_len = 0x%d\n",
+					 "skb_queue_len = 0x%x\n",
 					 prio, ring->idx,
 					 skb_queue_len(&ring->queue)));
 
@@ -1248,9 +1248,10 @@ static int _rtl_pci_init_tx_ring(struct ieee80211_hw *hw,
 
 	/* alloc tx buffer desc for new trx flow*/
 	if (rtlpriv->use_new_trx_flow) {
-		buffer_desc = pci_alloc_consistent(rtlpci->pdev,
-					    sizeof(*buffer_desc) * entries,
-					    &buffer_desc_dma);
+		buffer_desc =
+			pci_zalloc_consistent(rtlpci->pdev,
+					      sizeof(*buffer_desc) * entries,
+					      &buffer_desc_dma);
 
 		if (!buffer_desc || (unsigned long)buffer_desc & 0xFF) {
 			RT_TRACE(COMP_ERR, DBG_EMERG,
@@ -1259,7 +1260,6 @@ static int _rtl_pci_init_tx_ring(struct ieee80211_hw *hw,
 			return -ENOMEM;
 		}
 
-		memset(buffer_desc, 0, sizeof(*buffer_desc) * entries);
 		rtlpci->tx_ring[prio].buffer_desc = buffer_desc;
 		rtlpci->tx_ring[prio].buffer_desc_dma = buffer_desc_dma;
 
@@ -1270,8 +1270,8 @@ static int _rtl_pci_init_tx_ring(struct ieee80211_hw *hw,
 	}
 
 	/* alloc dma for this ring */
-	desc = pci_alloc_consistent(rtlpci->pdev,
-				    sizeof(*desc) * entries, &desc_dma);
+	desc = pci_zalloc_consistent(rtlpci->pdev, sizeof(*desc) * entries,
+				     &desc_dma);
 
 	if (!desc || (unsigned long)desc & 0xFF) {
 		RT_TRACE(COMP_ERR, DBG_EMERG,
@@ -1279,7 +1279,6 @@ static int _rtl_pci_init_tx_ring(struct ieee80211_hw *hw,
 		return -ENOMEM;
 	}
 
-	memset(desc, 0, sizeof(*desc) * entries);
 	rtlpci->tx_ring[prio].desc = desc;
 	rtlpci->tx_ring[prio].dma = desc_dma;
 
@@ -1316,20 +1315,14 @@ static int _rtl_pci_init_rx_ring(struct ieee80211_hw *hw, int rxring_idx)
 		struct rtl_rx_buffer_desc *entry = NULL;
 		/* alloc dma for this ring */
 		rtlpci->rx_ring[rxring_idx].buffer_desc =
-		    pci_alloc_consistent(rtlpci->pdev,
-					 sizeof(*rtlpci->rx_ring[rxring_idx].
-					        buffer_desc) *
-					        rtlpci->rxringcount,
-					 &rtlpci->rx_ring[rxring_idx].dma);
+			pci_zalloc_consistent(rtlpci->pdev,
+					      sizeof(*rtlpci->rx_ring[rxring_idx].buffer_desc) * rtlpci->rxringcount,
+					      &rtlpci->rx_ring[rxring_idx].dma);
 		if (!rtlpci->rx_ring[rxring_idx].buffer_desc ||
 		    (unsigned long)rtlpci->rx_ring[rxring_idx].buffer_desc & 0xFF) {
 			RT_TRACE(COMP_ERR, DBG_EMERG, ("Cannot allocate RX ring\n"));
 			return -ENOMEM;
 		}
-
-		memset(rtlpci->rx_ring[rxring_idx].buffer_desc, 0,
-		       sizeof(*rtlpci->rx_ring[rxring_idx].buffer_desc) *
-		       rtlpci->rxringcount);
 
 		/* init every desc in this ring */
 		rtlpci->rx_ring[rxring_idx].idx = 0;
@@ -1344,20 +1337,15 @@ static int _rtl_pci_init_rx_ring(struct ieee80211_hw *hw, int rxring_idx)
 		u8 tmp_one = 1;
 		/* alloc dma for this ring */
 		rtlpci->rx_ring[rxring_idx].desc =
-		    pci_alloc_consistent(rtlpci->pdev,
-					 sizeof(*rtlpci->rx_ring[rxring_idx].
-					        desc) * rtlpci->rxringcount,
-					 &rtlpci->rx_ring[rxring_idx].dma);
+			pci_zalloc_consistent(rtlpci->pdev,
+					      sizeof(*rtlpci->rx_ring[rxring_idx].desc) * rtlpci->rxringcount,
+					      &rtlpci->rx_ring[rxring_idx].dma);
 		if (!rtlpci->rx_ring[rxring_idx].desc ||
 		    (unsigned long)rtlpci->rx_ring[rxring_idx].desc & 0xFF) {
 			RT_TRACE(COMP_ERR, DBG_EMERG,
 				 ("Cannot allocate RX ring\n"));
 			return -ENOMEM;
 		}
-
-		memset(rtlpci->rx_ring[rxring_idx].desc, 0,
-		       sizeof(*rtlpci->rx_ring[rxring_idx].desc) *
-		       rtlpci->rxringcount);
 
 		/* init every desc in this ring */
 		rtlpci->rx_ring[rxring_idx].idx = 0;
@@ -1662,7 +1650,7 @@ static int rtl_pci_tx(struct ieee80211_hw *hw,
 		if ((own == 1) && (hw_queue != BEACON_QUEUE)) {
 			RT_TRACE(COMP_ERR, DBG_WARNING,
 				 ("No more TX desc@%d, ring->idx = %d,"
-				  "idx = %d, skb_queue_len = 0x%d\n",
+				  "idx = %d, skb_queue_len = 0x%x\n",
 				  hw_queue, ring->idx, idx,
 				  skb_queue_len(&ring->queue)));
 
@@ -1707,7 +1695,7 @@ static int rtl_pci_tx(struct ieee80211_hw *hw,
 		RT_TRACE(COMP_ERR, DBG_LOUD,
 			 ("less desc left, stop skb_queue@%d, "
 			  "ring->idx = %d,"
-			  "idx = %d, skb_queue_len = 0x%d\n",
+			  "idx = %d, skb_queue_len = 0x%x\n",
 			  hw_queue, ring->idx, idx,
 			  skb_queue_len(&ring->queue)));
 
