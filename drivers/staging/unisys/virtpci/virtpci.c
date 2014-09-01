@@ -24,9 +24,11 @@
 #include "uniklog.h"
 #include "diagnostics/appos_subsystems.h"
 #include "uisutils.h"
-#include "commontypes.h"
 #include "vbuschannel.h"
 #include "vbushelper.h"
+#include <linux/types.h>
+#include <linux/io.h>
+#include <linux/uuid.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -196,7 +198,7 @@ static int write_vbus_chpInfo(ULTRA_VBUS_CHANNEL_PROTOCOL *chan,
 		LOGERR("vbus channel not used, because chpInfoByteOffset == 0");
 		return -1;
 	}
-	memcpy(((U8 *) (chan)) + off, info, sizeof(*info));
+	memcpy(((u8 *) (chan)) + off, info, sizeof(*info));
 	return 0;
 }
 
@@ -214,7 +216,7 @@ static int write_vbus_busInfo(ULTRA_VBUS_CHANNEL_PROTOCOL *chan,
 		LOGERR("vbus channel not used, because busInfoByteOffset == 0");
 		return -1;
 	}
-	memcpy(((U8 *) (chan)) + off, info, sizeof(*info));
+	memcpy(((u8 *) (chan)) + off, info, sizeof(*info));
 	return 0;
 }
 
@@ -238,7 +240,7 @@ write_vbus_devInfo(ULTRA_VBUS_CHANNEL_PROTOCOL *chan,
 		LOGERR("vbus channel not used, because devInfoByteOffset == 0");
 		return -1;
 	}
-	memcpy(((U8 *) (chan)) + off, info, sizeof(*info));
+	memcpy(((u8 *) (chan)) + off, info, sizeof(*info));
 	return 0;
 }
 

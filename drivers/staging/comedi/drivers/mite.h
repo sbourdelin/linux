@@ -55,7 +55,6 @@ struct mite_struct {
 	resource_size_t mite_phys_addr;
 	void __iomem *mite_io_addr;
 	resource_size_t daq_phys_addr;
-	void __iomem *daq_io_addr;
 	struct mite_channel channels[MAX_MITE_DMA_CHANNELS];
 	short channel_allocated[MAX_MITE_DMA_CHANNELS];
 	int num_channels;
@@ -65,8 +64,14 @@ struct mite_struct {
 
 struct mite_struct *mite_alloc(struct pci_dev *pcidev);
 
-int mite_setup(struct mite_struct *mite);
-int mite_setup2(struct mite_struct *mite, unsigned use_iodwbsr_1);
+int mite_setup2(struct comedi_device *, struct mite_struct *, bool use_win1);
+
+static inline int mite_setup(struct comedi_device *dev,
+			     struct mite_struct *mite)
+{
+	return mite_setup2(dev, mite, false);
+}
+
 void mite_detach(struct mite_struct *mite);
 struct mite_dma_descriptor_ring *mite_alloc_ring(struct mite_struct *mite);
 void mite_free_ring(struct mite_dma_descriptor_ring *ring);

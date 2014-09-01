@@ -202,7 +202,7 @@ static const struct file_operations imx_drm_driver_fops = {
 
 void imx_drm_connector_destroy(struct drm_connector *connector)
 {
-	drm_sysfs_connector_remove(connector);
+	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 }
 EXPORT_SYMBOL_GPL(imx_drm_connector_destroy);
@@ -293,10 +293,10 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
 	 * userspace will expect to be able to access DRM at this point.
 	 */
 	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
-		ret = drm_sysfs_connector_add(connector);
+		ret = drm_connector_register(connector);
 		if (ret) {
 			dev_err(drm->dev,
-				"[CONNECTOR:%d:%s] drm_sysfs_connector_add failed: %d\n",
+				"[CONNECTOR:%d:%s] drm_connector_register failed: %d\n",
 				connector->base.id,
 				connector->name, ret);
 			goto err_unbind;
@@ -427,6 +427,7 @@ static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
 
 	for (i = 0; i < MAX_CRTC; i++) {
 		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
+
 		if (imx_drm_crtc && imx_drm_crtc->port == port)
 			return drm_crtc_mask(imx_drm_crtc->crtc);
 	}
@@ -438,6 +439,7 @@ static struct device_node *imx_drm_of_get_next_endpoint(
 		const struct device_node *parent, struct device_node *prev)
 {
 	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
+
 	of_node_put(prev);
 	return node;
 }
@@ -471,8 +473,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
 		crtc_mask |= mask;
 	}
 
-	if (ep)
-		of_node_put(ep);
+	of_node_put(ep);
 	if (i == 0)
 		return -ENOENT;
 
