@@ -325,3 +325,9 @@ struct rtlmac_priv {
 	u8 iqk_initialized:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
 };
+
+struct rtlmac_rx_urb
+{
+	struct urb urb;
+	struct ieee80211_hw *hw;
+};
