@@ -471,7 +471,7 @@ static int me4000_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *subdevice,
 			       struct comedi_insn *insn, unsigned int *data)
 {
-	const struct me4000_board *thisboard = comedi_board(dev);
+	const struct me4000_board *thisboard = dev->board_ptr;
 	int chan = CR_CHAN(insn->chanspec);
 	int rang = CR_RANGE(insn->chanspec);
 	int aref = CR_AREF(insn->chanspec);
@@ -599,7 +599,7 @@ static int me4000_ai_check_chanlist(struct comedi_device *dev,
 				    struct comedi_subdevice *s,
 				    struct comedi_cmd *cmd)
 {
-	const struct me4000_board *board = comedi_board(dev);
+	const struct me4000_board *board = dev->board_ptr;
 	unsigned int max_diff_chan = board->ai_diff_nchan;
 	unsigned int aref0 = CR_AREF(cmd->chanlist[0]);
 	int i;
@@ -650,10 +650,10 @@ static int ai_round_cmd_args(struct comedi_device *dev,
 		*init_ticks = (cmd->start_arg * 33) / 1000;
 		rest = (cmd->start_arg * 33) % 1000;
 
-		if ((cmd->flags & TRIG_ROUND_MASK) == TRIG_ROUND_NEAREST) {
+		if ((cmd->flags & CMDF_ROUND_MASK) == CMDF_ROUND_NEAREST) {
 			if (rest > 33)
 				(*init_ticks)++;
-		} else if ((cmd->flags & TRIG_ROUND_MASK) == TRIG_ROUND_UP) {
+		} else if ((cmd->flags & CMDF_ROUND_MASK) == CMDF_ROUND_UP) {
 			if (rest)
 				(*init_ticks)++;
 		}
@@ -663,10 +663,10 @@ static int ai_round_cmd_args(struct comedi_device *dev,
 		*scan_ticks = (cmd->scan_begin_arg * 33) / 1000;
 		rest = (cmd->scan_begin_arg * 33) % 1000;
 
-		if ((cmd->flags & TRIG_ROUND_MASK) == TRIG_ROUND_NEAREST) {
+		if ((cmd->flags & CMDF_ROUND_MASK) == CMDF_ROUND_NEAREST) {
 			if (rest > 33)
 				(*scan_ticks)++;
-		} else if ((cmd->flags & TRIG_ROUND_MASK) == TRIG_ROUND_UP) {
+		} else if ((cmd->flags & CMDF_ROUND_MASK) == CMDF_ROUND_UP) {
 			if (rest)
 				(*scan_ticks)++;
 		}
@@ -676,10 +676,10 @@ static int ai_round_cmd_args(struct comedi_device *dev,
 		*chan_ticks = (cmd->convert_arg * 33) / 1000;
 		rest = (cmd->convert_arg * 33) % 1000;
 
-		if ((cmd->flags & TRIG_ROUND_MASK) == TRIG_ROUND_NEAREST) {
+		if ((cmd->flags & CMDF_ROUND_MASK) == CMDF_ROUND_NEAREST) {
 			if (rest > 33)
 				(*chan_ticks)++;
-		} else if ((cmd->flags & TRIG_ROUND_MASK) == TRIG_ROUND_UP) {
+		} else if ((cmd->flags & CMDF_ROUND_MASK) == CMDF_ROUND_UP) {
 			if (rest)
 				(*chan_ticks)++;
 		}
@@ -849,7 +849,7 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	int err = 0;
 
 	/* Only rounding flags are implemented */
-	cmd->flags &= TRIG_ROUND_NEAREST | TRIG_ROUND_UP | TRIG_ROUND_DOWN;
+	cmd->flags &= CMDF_ROUND_NEAREST | CMDF_ROUND_UP | CMDF_ROUND_DOWN;
 
 	/* Round the timer arguments */
 	ai_round_cmd_args(dev, s, cmd, &init_ticks, &scan_ticks, &chan_ticks);
@@ -922,6 +922,11 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 		cmd->convert_arg = 2000;
 		err |= -EINVAL;
 	}
+
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
+		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
 		return 3;
@@ -1026,13 +1031,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
 			cmd->start_arg = 2000;	/*  66 ticks at least */
-			err++;
-		}
-	}
-	if (cmd->stop_src == TRIG_COUNT) {
-		if (cmd->stop_arg == 0) {
-			dev_err(dev->class_dev, "Invalid stop arg\n");
-			cmd->stop_arg = 1;
 			err++;
 		}
 	}

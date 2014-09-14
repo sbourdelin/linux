@@ -156,7 +156,7 @@ static void labpc_ai_set_chan_and_gain(struct comedi_device *dev,
 				       unsigned int range,
 				       unsigned int aref)
 {
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
 
 	if (board->is_labpc1200) {
@@ -186,7 +186,7 @@ static void labpc_setup_cmd6_reg(struct comedi_device *dev,
 				 unsigned int aref,
 				 bool ena_intr)
 {
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
 
 	if (!board->is_labpc1200)
@@ -397,21 +397,21 @@ static void labpc_adc_timing(struct comedi_device *dev, struct comedi_cmd *cmd,
 		base_period = I8254_OSC_BASE_2MHZ * devpriv->divisor_b0;
 
 		/*  set a0 for conversion frequency and b1 for scan frequency */
-		switch (cmd->flags & TRIG_ROUND_MASK) {
+		switch (cmd->flags & CMDF_ROUND_MASK) {
 		default:
-		case TRIG_ROUND_NEAREST:
+		case CMDF_ROUND_NEAREST:
 			devpriv->divisor_a0 =
 			    (convert_period + (base_period / 2)) / base_period;
 			devpriv->divisor_b1 =
 			    (scan_period + (base_period / 2)) / base_period;
 			break;
-		case TRIG_ROUND_UP:
+		case CMDF_ROUND_UP:
 			devpriv->divisor_a0 =
 			    (convert_period + (base_period - 1)) / base_period;
 			devpriv->divisor_b1 =
 			    (scan_period + (base_period - 1)) / base_period;
 			break;
-		case TRIG_ROUND_DOWN:
+		case CMDF_ROUND_DOWN:
 			devpriv->divisor_a0 = convert_period / base_period;
 			devpriv->divisor_b1 = scan_period / base_period;
 			break;
@@ -544,7 +544,7 @@ static int labpc_ai_check_chanlist(struct comedi_device *dev,
 static int labpc_ai_cmdtest(struct comedi_device *dev,
 			    struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	int err = 0;
 	int tmp, tmp2;
 	unsigned int stop_mask;
@@ -652,7 +652,7 @@ static int labpc_ai_cmdtest(struct comedi_device *dev,
 
 static int labpc_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
 	struct comedi_async *async = s->async;
 	struct comedi_cmd *cmd = &async->cmd;
@@ -689,13 +689,13 @@ static int labpc_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	/* figure out what method we will use to transfer data */
 	if (labpc_have_dma_chan(dev) &&
 	    /* dma unsafe at RT priority,
-	     * and too much setup time for TRIG_WAKE_EOS */
-	    (cmd->flags & (TRIG_WAKE_EOS | TRIG_RT)) == 0)
+	     * and too much setup time for CMDF_WAKE_EOS */
+	    (cmd->flags & (CMDF_WAKE_EOS | CMDF_PRIORITY)) == 0)
 		xfer = isa_dma_transfer;
 	else if (/* pc-plus has no fifo-half full interrupt */
 		 board->is_labpc1200 &&
 		 /* wake-end-of-scan should interrupt on fifo not empty */
-		 (cmd->flags & TRIG_WAKE_EOS) == 0 &&
+		 (cmd->flags & CMDF_WAKE_EOS) == 0 &&
 		 /* make sure we are taking more than just a few points */
 		 (cmd->stop_src != TRIG_COUNT || devpriv->count > 256))
 		xfer = fifo_half_full_transfer;
@@ -846,7 +846,7 @@ static void labpc_drain_dregs(struct comedi_device *dev)
 static irqreturn_t labpc_interrupt(int irq, void *d)
 {
 	struct comedi_device *dev = d;
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
 	struct comedi_subdevice *s = dev->read_subdev;
 	struct comedi_async *async;
@@ -923,7 +923,7 @@ static int labpc_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_insn *insn,
 			       unsigned int *data)
 {
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
 	int channel, range;
 	unsigned long flags;
@@ -1248,7 +1248,7 @@ static int labpc_eeprom_insn_read(struct comedi_device *dev,
 int labpc_common_attach(struct comedi_device *dev,
 			unsigned int irq, unsigned long isr_flags)
 {
-	const struct labpc_boardinfo *board = comedi_board(dev);
+	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
 	struct comedi_subdevice *s;
 	int ret;

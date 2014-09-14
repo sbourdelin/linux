@@ -991,7 +991,7 @@ int ll_inode_getattr(struct inode *inode, struct obdo *obdo,
 		CDEBUG(D_INODE, "objid "DOSTID" size %llu, blocks %llu,"
 		       " blksize %lu\n", POSTID(oi), i_size_read(inode),
 		       (unsigned long long)inode->i_blocks,
-		       (unsigned long)ll_inode_blksize(inode));
+		       1UL << inode->i_blkbits);
 	}
 	ccc_inode_lsm_put(inode, lsm);
 	return rc;
@@ -1013,10 +1013,10 @@ int ll_merge_lvb(const struct lu_env *env, struct inode *inode)
 	LTIME_S(inode->i_ctime) = lli->lli_lvb.lvb_ctime;
 
 	lvb.lvb_size = i_size_read(inode);
-        lvb.lvb_blocks = inode->i_blocks;
-        lvb.lvb_mtime = LTIME_S(inode->i_mtime);
-        lvb.lvb_atime = LTIME_S(inode->i_atime);
-        lvb.lvb_ctime = LTIME_S(inode->i_ctime);
+	lvb.lvb_blocks = inode->i_blocks;
+	lvb.lvb_mtime = LTIME_S(inode->i_mtime);
+	lvb.lvb_atime = LTIME_S(inode->i_atime);
+	lvb.lvb_ctime = LTIME_S(inode->i_ctime);
 
 	cl_object_attr_lock(obj);
 	rc = cl_object_attr_get(env, obj, attr);

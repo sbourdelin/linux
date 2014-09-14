@@ -377,15 +377,15 @@ static int dt3k_ns_to_timer(unsigned int timer_base, unsigned int *nanosec,
 
 	for (prescale = 0; prescale < 16; prescale++) {
 		base = timer_base * (prescale + 1);
-		switch (flags & TRIG_ROUND_MASK) {
-		case TRIG_ROUND_NEAREST:
+		switch (flags & CMDF_ROUND_MASK) {
+		case CMDF_ROUND_NEAREST:
 		default:
 			divider = (*nanosec + base / 2) / base;
 			break;
-		case TRIG_ROUND_DOWN:
+		case CMDF_ROUND_DOWN:
 			divider = (*nanosec) / base;
 			break;
-		case TRIG_ROUND_UP:
+		case CMDF_ROUND_UP:
 			divider = (*nanosec) / base;
 			break;
 		}
@@ -405,7 +405,7 @@ static int dt3k_ns_to_timer(unsigned int timer_base, unsigned int *nanosec,
 static int dt3k_ai_cmdtest(struct comedi_device *dev,
 			   struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
-	const struct dt3k_boardtype *this_board = comedi_board(dev);
+	const struct dt3k_boardtype *this_board = dev->board_ptr;
 	int err = 0;
 	unsigned int arg;
 

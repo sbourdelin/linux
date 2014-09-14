@@ -406,21 +406,14 @@ static irqreturn_t interrupt_pcmmio(int irq, void *d)
 }
 
 /* devpriv->spinlock is already locked */
-static int pcmmio_start_intr(struct comedi_device *dev,
-			     struct comedi_subdevice *s)
+static void pcmmio_start_intr(struct comedi_device *dev,
+			      struct comedi_subdevice *s)
 {
 	struct pcmmio_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
 	unsigned int bits = 0;
 	unsigned int pol_bits = 0;
 	int i;
-
-	if (cmd->stop_src == TRIG_COUNT && devpriv->stop_count == 0) {
-		/* An empty acquisition! */
-		s->async->events |= COMEDI_CB_EOA;
-		devpriv->active = 0;
-		return 1;
-	}
 
 	devpriv->enabled_mask = 0;
 	devpriv->active = 1;
@@ -441,8 +434,6 @@ static int pcmmio_start_intr(struct comedi_device *dev,
 	/* set polarity and enable interrupts */
 	pcmmio_dio_write(dev, pol_bits, PCMMIO_PAGE_POL, 0);
 	pcmmio_dio_write(dev, bits, PCMMIO_PAGE_ENAB, 0);
-
-	return 0;
 }
 
 static int pcmmio_cancel(struct comedi_device *dev, struct comedi_subdevice *s)
@@ -465,7 +456,6 @@ static int pcmmio_inttrig_start_intr(struct comedi_device *dev,
 	struct pcmmio_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
 	unsigned long flags;
-	int event = 0;
 
 	if (trig_num != cmd->start_arg)
 		return -EINVAL;
@@ -473,11 +463,8 @@ static int pcmmio_inttrig_start_intr(struct comedi_device *dev,
 	spin_lock_irqsave(&devpriv->spinlock, flags);
 	s->async->inttrig = NULL;
 	if (devpriv->active)
-		event = pcmmio_start_intr(dev, s);
+		pcmmio_start_intr(dev, s);
 	spin_unlock_irqrestore(&devpriv->spinlock, flags);
-
-	if (event)
-		comedi_event(dev, s);
 
 	return 1;
 }
@@ -490,27 +477,19 @@ static int pcmmio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	struct pcmmio_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
 	unsigned long flags;
-	int event = 0;
 
 	spin_lock_irqsave(&devpriv->spinlock, flags);
 	devpriv->active = 1;
 
-	/* Set up end of acquisition. */
-	if (cmd->stop_src == TRIG_COUNT)
-		devpriv->stop_count = cmd->stop_arg;
-	else	/* TRIG_NONE */
-		devpriv->stop_count = 0;
+	devpriv->stop_count = cmd->stop_arg;
 
 	/* Set up start of acquisition. */
 	if (cmd->start_src == TRIG_INT)
 		s->async->inttrig = pcmmio_inttrig_start_intr;
 	else	/* TRIG_NOW */
-		event = pcmmio_start_intr(dev, s);
+		pcmmio_start_intr(dev, s);
 
 	spin_unlock_irqrestore(&devpriv->spinlock, flags);
-
-	if (event)
-		comedi_event(dev, s);
 
 	return 0;
 }
@@ -549,16 +528,10 @@ static int pcmmio_cmdtest(struct comedi_device *dev,
 	err |= cfc_check_trigger_arg_is(&cmd->convert_arg, 0);
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	switch (cmd->stop_src) {
-	case TRIG_COUNT:
-		/* any count allowed */
-		break;
-	case TRIG_NONE:
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
-		break;
-	default:
-		break;
-	}
 
 	if (err)
 		return 3;

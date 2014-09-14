@@ -558,12 +558,10 @@ static int usbduxsigma_ai_cmdtest(struct comedi_device *dev,
 
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	if (cmd->stop_src == TRIG_COUNT) {
-		/* any count is allowed */
-	} else {
-		/* TRIG_NONE */
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
-	}
 
 	if (err)
 		return 3;
@@ -784,7 +782,7 @@ static int usbduxsigma_ai_insn_read(struct comedi_device *dev,
 		}
 
 		/* 32 bits big endian from the A/D converter */
-		val = be32_to_cpu(get_unaligned((uint32_t
+		val = be32_to_cpu(get_unaligned((__be32
 						 *)(devpriv->insn_buf + 1)));
 		val &= 0x00ffffff;	/* strip status byte */
 		val ^= 0x00800000;	/* convert to unsigned */
@@ -935,12 +933,10 @@ static int usbduxsigma_ao_cmdtest(struct comedi_device *dev,
 
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	if (cmd->stop_src == TRIG_COUNT) {
-		/* any count is allowed */
-	} else {
-		/* TRIG_NONE */
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
-	}
 
 	if (err)
 		return 3;
@@ -1343,7 +1339,7 @@ static int usbduxsigma_getstatusinfo(struct comedi_device *dev, int chan)
 		return ret;
 
 	/* 32 bits big endian from the A/D converter */
-	val = be32_to_cpu(get_unaligned((uint32_t *)(devpriv->insn_buf + 1)));
+	val = be32_to_cpu(get_unaligned((__be32 *)(devpriv->insn_buf + 1)));
 	val &= 0x00ffffff;	/* strip status byte */
 	val ^= 0x00800000;	/* convert to unsigned */
 
