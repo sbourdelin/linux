@@ -2263,94 +2263,6 @@ int mdc_get_info(const struct lu_env *env, struct obd_export *exp,
 	return rc;
 }
 
-static int mdc_pin(struct obd_export *exp, const struct lu_fid *fid,
-		   struct obd_capa *oc, struct obd_client_handle *handle,
-		   int flags)
-{
-	struct ptlrpc_request *req;
-	struct mdt_body       *body;
-	int		    rc;
-
-	req = ptlrpc_request_alloc(class_exp2cliimp(exp), &RQF_MDS_PIN);
-	if (req == NULL)
-		return -ENOMEM;
-
-	mdc_set_capa_size(req, &RMF_CAPA1, oc);
-
-	rc = ptlrpc_request_pack(req, LUSTRE_MDS_VERSION, MDS_PIN);
-	if (rc) {
-		ptlrpc_request_free(req);
-		return rc;
-	}
-
-	mdc_pack_body(req, fid, oc, 0, 0, -1, flags);
-
-	ptlrpc_request_set_replen(req);
-
-	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-	rc = ptlrpc_queue_wait(req);
-	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-	if (rc) {
-		CERROR("Pin failed: %d\n", rc);
-		goto err_out;
-	}
-
-	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
-	if (body == NULL) {
-		rc = -EPROTO;
-		goto err_out;
-	}
-
-	handle->och_fh = body->handle;
-	handle->och_magic = OBD_CLIENT_HANDLE_MAGIC;
-
-	handle->och_mod = obd_mod_alloc();
-	if (handle->och_mod == NULL) {
-		DEBUG_REQ(D_ERROR, req, "can't allocate md_open_data");
-		rc = -ENOMEM;
-		goto err_out;
-	}
-	handle->och_mod->mod_open_req = req; /* will be dropped by unpin */
-
-	return 0;
-
-err_out:
-	ptlrpc_req_finished(req);
-	return rc;
-}
-
-static int mdc_unpin(struct obd_export *exp, struct obd_client_handle *handle,
-		     int flag)
-{
-	struct ptlrpc_request *req;
-	struct mdt_body       *body;
-	int		    rc;
-
-	req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp), &RQF_MDS_UNPIN,
-					LUSTRE_MDS_VERSION, MDS_UNPIN);
-	if (req == NULL)
-		return -ENOMEM;
-
-	body = req_capsule_client_get(&req->rq_pill, &RMF_MDT_BODY);
-	body->handle = handle->och_fh;
-	body->flags = flag;
-
-	ptlrpc_request_set_replen(req);
-
-	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-	rc = ptlrpc_queue_wait(req);
-	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-
-	if (rc != 0)
-		CERROR("Unpin failed: %d\n", rc);
-
-	ptlrpc_req_finished(req);
-	ptlrpc_req_finished(handle->och_mod->mod_open_req);
-
-	obd_mod_put(handle->och_mod);
-	return rc;
-}
-
 int mdc_sync(struct obd_export *exp, const struct lu_fid *fid,
 	     struct obd_capa *oc, struct ptlrpc_request **request)
 {
@@ -2482,6 +2394,33 @@ struct ldlm_valblock_ops inode_lvbo = {
 	.lvbo_free = mdc_resource_inode_free,
 };
 
+static int mdc_llog_init(struct obd_device *obd)
+{
+	struct obd_llog_group	*olg = &obd->obd_olg;
+	struct llog_ctxt	*ctxt;
+	int			 rc;
+
+	rc = llog_setup(NULL, obd, olg, LLOG_CHANGELOG_REPL_CTXT, obd,
+			&llog_client_ops);
+	if (rc)
+		return rc;
+
+	ctxt = llog_group_get_ctxt(olg, LLOG_CHANGELOG_REPL_CTXT);
+	llog_initiator_connect(ctxt);
+	llog_ctxt_put(ctxt);
+
+	return 0;
+}
+
+static void mdc_llog_finish(struct obd_device *obd)
+{
+	struct llog_ctxt *ctxt;
+
+	ctxt = llog_get_context(obd, LLOG_CHANGELOG_REPL_CTXT);
+	if (ctxt)
+		llog_cleanup(NULL, ctxt);
+}
+
 static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
 {
 	struct client_obd *cli = &obd->u.cli;
@@ -2514,7 +2453,7 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
 
 	obd->obd_namespace->ns_lvbo = &inode_lvbo;
 
-	rc = obd_llog_init(obd, &obd->obd_olg, obd, NULL);
+	rc = mdc_llog_init(obd);
 	if (rc) {
 		mdc_cleanup(obd);
 		CERROR("failed to setup llogging subsystems\n");
@@ -2575,9 +2514,7 @@ static int mdc_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
 		ptlrpc_lprocfs_unregister_obd(obd);
 		lprocfs_obd_cleanup(obd);
 
-		rc = obd_llog_finish(obd, 0);
-		if (rc != 0)
-			CERROR("failed to cleanup llogging subsystems\n");
+		mdc_llog_finish(obd);
 		break;
 	}
 	return rc;
@@ -2593,38 +2530,6 @@ static int mdc_cleanup(struct obd_device *obd)
 	ptlrpcd_decref();
 
 	return client_obd_cleanup(obd);
-}
-
-
-static int mdc_llog_init(struct obd_device *obd, struct obd_llog_group *olg,
-			 struct obd_device *tgt, int *index)
-{
-	struct llog_ctxt	*ctxt;
-	int			 rc;
-
-	LASSERT(olg == &obd->obd_olg);
-
-	rc = llog_setup(NULL, obd, olg, LLOG_CHANGELOG_REPL_CTXT, tgt,
-			&llog_client_ops);
-	if (rc)
-		return rc;
-
-	ctxt = llog_group_get_ctxt(olg, LLOG_CHANGELOG_REPL_CTXT);
-	llog_initiator_connect(ctxt);
-	llog_ctxt_put(ctxt);
-
-	return 0;
-}
-
-static int mdc_llog_finish(struct obd_device *obd, int count)
-{
-	struct llog_ctxt *ctxt;
-
-	ctxt = llog_get_context(obd, LLOG_CHANGELOG_REPL_CTXT);
-	if (ctxt)
-		llog_cleanup(NULL, ctxt);
-
-	return 0;
 }
 
 static int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
@@ -2756,14 +2661,10 @@ struct obd_ops mdc_obd_ops = {
 	.o_iocontrol	= mdc_iocontrol,
 	.o_set_info_async   = mdc_set_info_async,
 	.o_statfs	   = mdc_statfs,
-	.o_pin	      = mdc_pin,
-	.o_unpin	    = mdc_unpin,
 	.o_fid_init	    = client_fid_init,
 	.o_fid_fini	    = client_fid_fini,
 	.o_fid_alloc	= mdc_fid_alloc,
 	.o_import_event     = mdc_import_event,
-	.o_llog_init	= mdc_llog_init,
-	.o_llog_finish      = mdc_llog_finish,
 	.o_get_info	 = mdc_get_info,
 	.o_process_config   = mdc_process_config,
 	.o_get_uuid	 = mdc_get_uuid,

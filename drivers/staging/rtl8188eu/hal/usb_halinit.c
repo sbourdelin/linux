@@ -107,7 +107,9 @@ static u32 rtl8188eu_InitPowerOn(struct adapter *adapt)
 	if (haldata->bMacPwrCtrlOn)
 		return _SUCCESS;
 
-	if (!HalPwrSeqCmdParsing(adapt, PWR_CUT_ALL_MSK, PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK, Rtl8188E_NIC_PWR_ON_FLOW)) {
+	if (!rtl88eu_pwrseqcmdparsing(adapt, PWR_CUT_ALL_MSK,
+				      PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK,
+				      Rtl8188E_NIC_PWR_ON_FLOW)) {
 		DBG_88E(KERN_ERR "%s: run power on flow fail\n", __func__);
 		return _FAIL;
 	}
@@ -692,14 +694,14 @@ static u32 rtl8188eu_hal_init(struct adapter *Adapter)
 	if (Adapter->pwrctrlpriv.bkeepfwalive) {
 
 		if (haldata->odmpriv.RFCalibrateInfo.bIQKInitialized) {
-			PHY_IQCalibrate_8188E(Adapter, true);
+			rtl88eu_phy_iq_calibrate(Adapter, true);
 		} else {
-			PHY_IQCalibrate_8188E(Adapter, false);
+			rtl88eu_phy_iq_calibrate(Adapter, false);
 			haldata->odmpriv.RFCalibrateInfo.bIQKInitialized = true;
 		}
 
 		ODM_TXPowerTrackingCheck(&haldata->odmpriv);
-		PHY_LCCalibrate_8188E(Adapter);
+		rtl88eu_phy_lc_calibrate(Adapter);
 
 		goto exit;
 	}
@@ -880,9 +882,9 @@ HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_IQK);
 		/*  2010/08/26 MH Merge from 8192CE. */
 	if (pwrctrlpriv->rf_pwrstate == rf_on) {
 		if (haldata->odmpriv.RFCalibrateInfo.bIQKInitialized) {
-				PHY_IQCalibrate_8188E(Adapter, true);
+				rtl88eu_phy_iq_calibrate(Adapter, true);
 		} else {
-			PHY_IQCalibrate_8188E(Adapter, false);
+			rtl88eu_phy_iq_calibrate(Adapter, false);
 			haldata->odmpriv.RFCalibrateInfo.bIQKInitialized = true;
 		}
 
@@ -891,7 +893,7 @@ HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_PW_TRACK);
 		ODM_TXPowerTrackingCheck(&haldata->odmpriv);
 
 HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_LCK);
-			PHY_LCCalibrate_8188E(Adapter);
+			rtl88eu_phy_lc_calibrate(Adapter);
 	}
 
 /* HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_INIT_PABIAS); */
@@ -925,7 +927,9 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 	usb_write8(Adapter, REG_CR, 0x0);
 
 	/*  Run LPS WL RFOFF flow */
-	HalPwrSeqCmdParsing(Adapter, PWR_CUT_ALL_MSK, PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK, Rtl8188E_NIC_LPS_ENTER_FLOW);
+	rtl88eu_pwrseqcmdparsing(Adapter, PWR_CUT_ALL_MSK,
+				 PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK,
+				 Rtl8188E_NIC_LPS_ENTER_FLOW);
 
 	/*  2. 0x1F[7:0] = 0		turn off RF */
 
@@ -946,7 +950,9 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 	usb_write8(Adapter, REG_32K_CTRL, val8&(~BIT0));
 
 	/*  Card disable power action flow */
-	HalPwrSeqCmdParsing(Adapter, PWR_CUT_ALL_MSK, PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK, Rtl8188E_NIC_DISABLE_FLOW);
+	rtl88eu_pwrseqcmdparsing(Adapter, PWR_CUT_ALL_MSK,
+				 PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK,
+				 Rtl8188E_NIC_DISABLE_FLOW);
 
 	/*  Reset MCU IO Wrapper */
 	val8 = usb_read8(Adapter, REG_RSV_CTRL+1);

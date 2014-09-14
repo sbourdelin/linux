@@ -1537,9 +1537,9 @@ int ksocknal_scheduler(void *arg)
 			nloops = 0;
 
 			if (!did_something) {   /* wait for something to do */
-				cfs_wait_event_interruptible_exclusive(
+				rc = wait_event_interruptible_exclusive(
 					sched->kss_waitq,
-					!ksocknal_sched_cansleep(sched), rc);
+					!ksocknal_sched_cansleep(sched));
 				LASSERT (rc == 0);
 			} else {
 				cond_resched();
@@ -1594,8 +1594,8 @@ void ksocknal_write_callback (ksock_conn_t *conn)
 
 	conn->ksnc_tx_ready = 1;
 
-	if (!conn->ksnc_tx_scheduled && // not being progressed
-	    !list_empty(&conn->ksnc_tx_queue)){//packets to send
+	if (!conn->ksnc_tx_scheduled && /* not being progressed */
+	    !list_empty(&conn->ksnc_tx_queue)) { /* packets to send */
 		list_add_tail (&conn->ksnc_tx_list,
 				   &sched->kss_tx_conns);
 		conn->ksnc_tx_scheduled = 1;
