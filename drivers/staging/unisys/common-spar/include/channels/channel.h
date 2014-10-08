@@ -347,17 +347,21 @@ ULTRA_check_channel_client(void __iomem *pChannel,
 			   u64 expectedSignature,
 			   char *fileName, int lineNumber, void *logCtx)
 {
-	if (uuid_le_cmp(expectedTypeGuid, NULL_UUID_LE) != 0)
+	if (uuid_le_cmp(expectedTypeGuid, NULL_UUID_LE) != 0) {
+		uuid_le guid;
+
+		memcpy_fromio(&guid,
+			      &((CHANNEL_HEADER __iomem *)(pChannel))->Type,
+			      sizeof(guid));
 		/* caller wants us to verify type GUID */
-		if (uuid_le_cmp((((CHANNEL_HEADER __iomem *)(pChannel))->Type),
-			   expectedTypeGuid) != 0) {
+		if (uuid_le_cmp(guid, expectedTypeGuid) != 0) {
 			CHANNEL_GUID_MISMATCH(expectedTypeGuid, channelName,
 					      "type", expectedTypeGuid,
-					      ((CHANNEL_HEADER __iomem *)
-					       (pChannel))->Type, fileName,
+					      guid, fileName,
 					      lineNumber, logCtx);
 			return 0;
 		}
+	}
 	if (expectedMinBytes > 0)	/* caller wants us to verify
 					 * channel size */
 		if (readq(&((CHANNEL_HEADER __iomem *)
@@ -430,6 +434,7 @@ PathName_Last_N_Nodes(u8 *s, unsigned int n)
 {
 	u8 *p = s;
 	unsigned int node_count = 0;
+
 	while (*p != '\0') {
 		if ((*p == '/') || (*p == '\\'))
 			node_count++;
@@ -573,6 +578,7 @@ ULTRA_channel_client_release_os(void __iomem *pChannel, u8 *chanId,
 				void *logCtx, char *file, int line, char *func)
 {
 	CHANNEL_HEADER __iomem *pChan = pChannel;
+
 	if (readb(&pChan->CliErrorOS) != 0) {
 		/* we are in an error msg throttling state; come out of it */
 		UltraLogEvent(logCtx, CHANNELSTATE_DIAG_EVENTID_TRANSITOK,

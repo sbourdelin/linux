@@ -600,9 +600,9 @@ static void rtl8192_qos_activate(void *data)
 	RT_TRACE(COMP_QOS, "qos active process with associate response "
 		 "received\n");
 
-	for (i = 0; i <  QOS_QUEUE_NUM; i++) {
+	for (i = 0; i <  QOS_QUEUE_NUM; i++)
 		priv->rtllib->SetHwRegHandler(dev, HW_VAR_AC_PARAM, (u8 *)(&i));
-	}
+
 
 success:
 	mutex_unlock(&priv->mutex);
@@ -669,19 +669,18 @@ static int rtl8192_handle_beacon(struct net_device *dev,
 static int rtl8192_qos_association_resp(struct r8192_priv *priv,
 	struct rtllib_network *network)
 {
-	int ret = 0;
 	unsigned long flags;
 	u32 size = sizeof(struct rtllib_qos_parameters);
 	int set_qos_param = 0;
 
 	if ((priv == NULL) || (network == NULL))
-		return ret;
+		return 0;
 
 	if (priv->rtllib->state != RTLLIB_LINKED)
-		return ret;
+		return 0;
 
 	if ((priv->rtllib->iw_mode != IW_MODE_INFRA))
-		return ret;
+		return 0;
 
 	spin_lock_irqsave(&priv->rtllib->lock, flags);
 	if (network->flags & NETWORK_HAS_QOS_PARAMETERS) {
@@ -711,7 +710,7 @@ static int rtl8192_qos_association_resp(struct r8192_priv *priv,
 		dm_init_edca_turbo(priv->rtllib->dev);
 		queue_work_rsl(priv->priv_wq, &priv->qos_activate);
 	}
-	return ret;
+	return 0;
 }
 
 static int rtl8192_handle_assoc_response(struct net_device *dev,
@@ -1511,7 +1510,7 @@ RESET_START:
 			RT_TRACE(COMP_ERR, "%s():the driver is not up! "
 				 "return\n", __func__);
 			up(&priv->wx_sem);
-			return ;
+			return;
 		}
 		priv->up = 0;
 

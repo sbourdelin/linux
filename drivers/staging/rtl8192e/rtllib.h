@@ -1456,7 +1456,7 @@ enum eap_type {
 	EAPOL_ENCAP_ASF_ALERT
 };
 
-static const char *eap_types[] = {
+static const char * const eap_types[] = {
 	[EAP_PACKET]		= "EAP-Packet",
 	[EAPOL_START]		= "EAPOL-Start",
 	[EAPOL_LOGOFF]		= "EAPOL-Logoff",
@@ -2514,7 +2514,7 @@ struct rtllib_device {
 	void (*AllowAllDestAddrHandler)(struct net_device *dev,
 					bool bAllowAllDA, bool WriteIntoReg);
 
-	void (*rtllib_ips_leave_wq) (struct net_device *dev);
+	void (*rtllib_ips_leave_wq)(struct net_device *dev);
 	void (*rtllib_ips_leave)(struct net_device *dev);
 	void (*LeisurePSLeave)(struct net_device *dev);
 	void (*rtllib_rfkill_poll)(struct net_device *dev);
