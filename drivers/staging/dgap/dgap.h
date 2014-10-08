@@ -572,7 +572,6 @@ struct board_t {
 	u8 __iomem	*re_map_port;	/* Remapped io port of the card */
 	u8 __iomem	*re_map_membase;/* Remapped memory of the card */
 
-	u8		runwait;	/* # Processes waiting for FEP  */
 	u8		inhibit_poller; /* Tells the poller to leave us alone */
 
 	struct channel_t *channels[MAXPORTS]; /* array of pointers to our */
@@ -981,9 +980,6 @@ struct channel_t {
 	u32 ch_portnum;			/* Port number, 0 offset.	*/
 	u32 ch_open_count;		/* open count			*/
 	u32	ch_flags;		/* Channel flags                */
-
-	u32	ch_close_delay;		/* How long we should drop      */
-					/* RTS/DTR for                  */
 
 	u32	ch_cpstime;		/* Time for CPS calculations    */
 

@@ -62,8 +62,8 @@ static struct timer_list poll_timer = {
 
 static u16 cmdbuffer[1024];
 static u8 tempbuffer[1600];
-static u8 ft1000_card_present = 0;
-static u8 flarion_ft1000_cnt = 0;
+static u8 ft1000_card_present;
+static u8 flarion_ft1000_cnt;
 
 static irqreturn_t ft1000_interrupt(int irq, void *dev_id);
 static void ft1000_enable_interrupts(struct net_device *dev);
@@ -1077,7 +1077,7 @@ static void ft1000_proc_drvmsg(struct net_device *dev)
 			}
             }
             else {
-                DEBUG(1,"Media is down\n");
+                DEBUG(1, "Media is down\n");
                 if (info->mediastate == 1) {
                     info->mediastate = 0;
                     netif_carrier_off(dev);
@@ -2063,7 +2063,7 @@ static irqreturn_t ft1000_interrupt(int irq, void *dev_id)
 
 		/* Read interrupt type */
 		inttype = ft1000_read_reg (dev, FT1000_REG_SUP_ISR);
-		DEBUG(1,"ft1000_hw: interrupt status register after clear = 0x%x\n",inttype);
+		DEBUG(1, "ft1000_hw: interrupt status register after clear = 0x%x\n", inttype);
 	}
 	ft1000_enable_interrupts(dev);
 	return IRQ_HANDLED;
@@ -2098,7 +2098,7 @@ void stop_ft1000_card(struct net_device *dev)
 	}
 
 	free_irq(dev->irq, dev);
-	release_region(dev->base_addr,256);
+	release_region(dev->base_addr, 256);
 	release_firmware(fw_entry);
 	flarion_ft1000_cnt--;
 

@@ -269,11 +269,6 @@ struct comedi_device {
 	void (*close)(struct comedi_device *dev);
 };
 
-static inline const void *comedi_board(const struct comedi_device *dev)
-{
-	return dev->board_ptr;
-}
-
 /*
  * function prototypes
  */
@@ -431,6 +426,11 @@ void comedi_buf_memcpy_to(struct comedi_subdevice *s, unsigned int offset,
 			  const void *source, unsigned int num_bytes);
 void comedi_buf_memcpy_from(struct comedi_subdevice *s, unsigned int offset,
 			    void *destination, unsigned int num_bytes);
+unsigned int comedi_write_array_to_buffer(struct comedi_subdevice *s,
+					  const void *data,
+					  unsigned int num_bytes);
+unsigned int comedi_read_array_from_buffer(struct comedi_subdevice *s,
+					   void *data, unsigned int num_bytes);
 
 /* drivers.c - general comedi driver functions */
 
@@ -442,11 +442,17 @@ int comedi_timeout(struct comedi_device *, struct comedi_subdevice *,
 			     struct comedi_insn *, unsigned long context),
 		   unsigned long context);
 
+unsigned int comedi_handle_events(struct comedi_device *dev,
+				  struct comedi_subdevice *s);
+
 int comedi_dio_insn_config(struct comedi_device *, struct comedi_subdevice *,
 			   struct comedi_insn *, unsigned int *data,
 			   unsigned int mask);
 unsigned int comedi_dio_update_state(struct comedi_subdevice *,
 				     unsigned int *data);
+unsigned int comedi_bytes_per_scan(struct comedi_subdevice *s);
+void comedi_inc_scan_progress(struct comedi_subdevice *s,
+			      unsigned int num_bytes);
 
 void *comedi_alloc_devpriv(struct comedi_device *, size_t);
 int comedi_alloc_subdevices(struct comedi_device *, int);

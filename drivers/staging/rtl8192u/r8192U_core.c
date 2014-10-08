@@ -1911,19 +1911,18 @@ static int rtl8192_handle_beacon(struct net_device *dev,
 static int rtl8192_qos_association_resp(struct r8192_priv *priv,
 					struct ieee80211_network *network)
 {
-	int ret = 0;
 	unsigned long flags;
 	u32 size = sizeof(struct ieee80211_qos_parameters);
 	int set_qos_param = 0;
 
 	if ((priv == NULL) || (network == NULL))
-		return ret;
+		return 0;
 
 	if (priv->ieee80211->state != IEEE80211_LINKED)
-		return ret;
+		return 0;
 
 	if ((priv->ieee80211->iw_mode != IW_MODE_INFRA))
-		return ret;
+		return 0;
 
 	spin_lock_irqsave(&priv->ieee80211->lock, flags);
 	if (network->flags & NETWORK_HAS_QOS_PARAMETERS) {
@@ -1952,7 +1951,7 @@ static int rtl8192_qos_association_resp(struct r8192_priv *priv,
 		queue_work(priv->priv_wq, &priv->qos_activate);
 
 
-	return ret;
+	return 0;
 }
 
 
@@ -3188,34 +3187,6 @@ RESET_START:
 		write_nic_byte(dev, UFWP, 1);
 		RT_TRACE(COMP_RESET, "Reset finished!! ====>[%d]\n", priv->reset_count);
 	}
-}
-
-void CAM_read_entry(struct net_device *dev, u32 iIndex)
-{
-	u32 target_command = 0;
-	u32 target_content = 0;
-	u8 entry_i = 0;
-	u32 ulStatus;
-	s32 i = 100;
-	for (entry_i = 0; entry_i < CAM_CONTENT_COUNT; entry_i++) {
-		// polling bit, and No Write enable, and address
-		target_command = entry_i+CAM_CONTENT_COUNT*iIndex;
-		target_command = target_command | BIT31;
-
-		//Check polling bit is clear
-		while ((i--) >= 0) {
-			read_nic_dword(dev, RWCAM, &ulStatus);
-			if (ulStatus & BIT31)
-				continue;
-			else
-				break;
-		}
-		write_nic_dword(dev, RWCAM, target_command);
-		RT_TRACE(COMP_SEC, "CAM_read_entry(): WRITE A0: %x \n", target_command);
-		read_nic_dword(dev, RCAMO, &target_content);
-		RT_TRACE(COMP_SEC, "CAM_read_entry(): WRITE A8: %x \n", target_content);
-	}
-	printk("\n");
 }
 
 static void rtl819x_update_rxcounts(struct r8192_priv *priv, u32 *TotalRxBcnNum,
@@ -4797,16 +4768,6 @@ static void rtl8192_usb_disconnect(struct usb_interface *intf)
 	free_ieee80211(dev);
 	RT_TRACE(COMP_DOWN, "wlan driver removed\n");
 }
-
-/* fun with the built-in ieee80211 stack... */
-extern int ieee80211_crypto_init(void);
-extern void ieee80211_crypto_deinit(void);
-extern int ieee80211_crypto_tkip_init(void);
-extern void ieee80211_crypto_tkip_exit(void);
-extern int ieee80211_crypto_ccmp_init(void);
-extern void ieee80211_crypto_ccmp_exit(void);
-extern int ieee80211_crypto_wep_init(void);
-extern void ieee80211_crypto_wep_exit(void);
 
 static int __init rtl8192_usb_module_init(void)
 {
