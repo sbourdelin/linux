@@ -53,7 +53,7 @@ static inline void neo_set_ixoff_flow_control(struct channel_t *ch);
 static inline void neo_set_no_output_flow_control(struct channel_t *ch);
 static inline void neo_set_no_input_flow_control(struct channel_t *ch);
 static inline void neo_set_new_start_stop_chars(struct channel_t *ch);
-static void neo_parse_modem(struct channel_t *ch, uchar signals);
+static void neo_parse_modem(struct channel_t *ch, unsigned char signals);
 static void neo_tasklet(unsigned long data);
 static void neo_vpd(struct dgnc_board *brd);
 static void neo_uart_init(struct channel_t *ch);
@@ -113,8 +113,8 @@ static inline void neo_pci_posting_flush(struct dgnc_board *bd)
 
 static inline void neo_set_cts_flow_control(struct channel_t *ch)
 {
-	uchar ier = readb(&ch->ch_neo_uart->ier);
-	uchar efr = readb(&ch->ch_neo_uart->efr);
+	unsigned char ier = readb(&ch->ch_neo_uart->ier);
+	unsigned char efr = readb(&ch->ch_neo_uart->efr);
 
 
 	/* Turn on auto CTS flow control */
@@ -150,8 +150,8 @@ static inline void neo_set_cts_flow_control(struct channel_t *ch)
 
 static inline void neo_set_rts_flow_control(struct channel_t *ch)
 {
-	uchar ier = readb(&ch->ch_neo_uart->ier);
-	uchar efr = readb(&ch->ch_neo_uart->efr);
+	unsigned char ier = readb(&ch->ch_neo_uart->ier);
+	unsigned char efr = readb(&ch->ch_neo_uart->efr);
 
 	/* Turn on auto RTS flow control */
 #if 1
@@ -193,8 +193,8 @@ static inline void neo_set_rts_flow_control(struct channel_t *ch)
 
 static inline void neo_set_ixon_flow_control(struct channel_t *ch)
 {
-	uchar ier = readb(&ch->ch_neo_uart->ier);
-	uchar efr = readb(&ch->ch_neo_uart->efr);
+	unsigned char ier = readb(&ch->ch_neo_uart->ier);
+	unsigned char efr = readb(&ch->ch_neo_uart->efr);
 
 	/* Turn off auto CTS flow control */
 	ier &= ~(UART_17158_IER_CTSDSR);
@@ -230,8 +230,8 @@ static inline void neo_set_ixon_flow_control(struct channel_t *ch)
 
 static inline void neo_set_ixoff_flow_control(struct channel_t *ch)
 {
-	uchar ier = readb(&ch->ch_neo_uart->ier);
-	uchar efr = readb(&ch->ch_neo_uart->efr);
+	unsigned char ier = readb(&ch->ch_neo_uart->ier);
+	unsigned char efr = readb(&ch->ch_neo_uart->efr);
 
 	/* Turn off auto RTS flow control */
 	ier &= ~(UART_17158_IER_RTSDTR);
@@ -268,8 +268,8 @@ static inline void neo_set_ixoff_flow_control(struct channel_t *ch)
 
 static inline void neo_set_no_input_flow_control(struct channel_t *ch)
 {
-	uchar ier = readb(&ch->ch_neo_uart->ier);
-	uchar efr = readb(&ch->ch_neo_uart->efr);
+	unsigned char ier = readb(&ch->ch_neo_uart->ier);
+	unsigned char efr = readb(&ch->ch_neo_uart->efr);
 
 	/* Turn off auto RTS flow control */
 	ier &= ~(UART_17158_IER_RTSDTR);
@@ -308,8 +308,8 @@ static inline void neo_set_no_input_flow_control(struct channel_t *ch)
 
 static inline void neo_set_no_output_flow_control(struct channel_t *ch)
 {
-	uchar ier = readb(&ch->ch_neo_uart->ier);
-	uchar efr = readb(&ch->ch_neo_uart->efr);
+	unsigned char ier = readb(&ch->ch_neo_uart->ier);
+	unsigned char efr = readb(&ch->ch_neo_uart->efr);
 
 	/* Turn off auto CTS flow control */
 	ier &= ~(UART_17158_IER_CTSDSR);
@@ -368,13 +368,13 @@ static inline void neo_set_new_start_stop_chars(struct channel_t *ch)
  */
 static inline void neo_clear_break(struct channel_t *ch, int force)
 {
-	ulong lock_flags;
+	unsigned long flags;
 
-	DGNC_LOCK(ch->ch_lock, lock_flags);
+	spin_lock_irqsave(&ch->ch_lock, flags);
 
 	/* Bail if we aren't currently sending a break. */
 	if (!ch->ch_stop_sending_break) {
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 		return;
 	}
 
@@ -382,7 +382,7 @@ static inline void neo_clear_break(struct channel_t *ch, int force)
 	if (ch->ch_flags & CH_BREAK_SENDING) {
 		if (time_after_eq(jiffies, ch->ch_stop_sending_break)
 		    || force) {
-			uchar temp = readb(&ch->ch_neo_uart->lcr);
+			unsigned char temp = readb(&ch->ch_neo_uart->lcr);
 
 			writeb((temp & ~UART_LCR_SBC), &ch->ch_neo_uart->lcr);
 			neo_pci_posting_flush(ch->ch_bd);
@@ -390,7 +390,7 @@ static inline void neo_clear_break(struct channel_t *ch, int force)
 			ch->ch_stop_sending_break = 0;
 		}
 	}
-	DGNC_UNLOCK(ch->ch_lock, lock_flags);
+	spin_unlock_irqrestore(&ch->ch_lock, flags);
 }
 
 
@@ -400,9 +400,9 @@ static inline void neo_clear_break(struct channel_t *ch, int force)
 static inline void neo_parse_isr(struct dgnc_board *brd, uint port)
 {
 	struct channel_t *ch;
-	uchar isr;
-	uchar cause;
-	ulong lock_flags;
+	unsigned char isr;
+	unsigned char cause;
+	unsigned long flags;
 
 	if (!brd || brd->magic != DGNC_BOARD_MAGIC)
 		return;
@@ -435,18 +435,18 @@ static inline void neo_parse_isr(struct dgnc_board *brd, uint port)
 			neo_copy_data_from_uart_to_queue(ch);
 
 			/* Call our tty layer to enforce queue flow control if needed. */
-			DGNC_LOCK(ch->ch_lock, lock_flags);
+			spin_lock_irqsave(&ch->ch_lock, flags);
 			dgnc_check_queue_flow_control(ch);
-			DGNC_UNLOCK(ch->ch_lock, lock_flags);
+			spin_unlock_irqrestore(&ch->ch_lock, flags);
 		}
 
 		if (isr & UART_IIR_THRI) {
 			brd->intr_tx++;
 			ch->ch_intr_tx++;
 			/* Transfer data (if any) from Write Queue -> UART. */
-			DGNC_LOCK(ch->ch_lock, lock_flags);
+			spin_lock_irqsave(&ch->ch_lock, flags);
 			ch->ch_flags |= (CH_TX_FIFO_EMPTY | CH_TX_FIFO_LWM);
-			DGNC_UNLOCK(ch->ch_lock, lock_flags);
+			spin_unlock_irqrestore(&ch->ch_lock, flags);
 			neo_copy_data_from_queue_to_uart(ch);
 		}
 
@@ -461,15 +461,19 @@ static inline void neo_parse_isr(struct dgnc_board *brd, uint port)
 			if (cause == UART_17158_XON_DETECT) {
 				/* Is output stopped right now, if so, resume it */
 				if (brd->channels[port]->ch_flags & CH_STOP) {
-					DGNC_LOCK(ch->ch_lock, lock_flags);
+					spin_lock_irqsave(&ch->ch_lock,
+							  flags);
 					ch->ch_flags &= ~(CH_STOP);
-					DGNC_UNLOCK(ch->ch_lock, lock_flags);
+					spin_unlock_irqrestore(&ch->ch_lock,
+							       flags);
 				}
 			} else if (cause == UART_17158_XOFF_DETECT) {
 				if (!(brd->channels[port]->ch_flags & CH_STOP)) {
-					DGNC_LOCK(ch->ch_lock, lock_flags);
+					spin_lock_irqsave(&ch->ch_lock,
+							  flags);
 					ch->ch_flags |= CH_STOP;
-					DGNC_UNLOCK(ch->ch_lock, lock_flags);
+					spin_unlock_irqrestore(&ch->ch_lock,
+							       flags);
 				}
 			}
 		}
@@ -485,23 +489,31 @@ static inline void neo_parse_isr(struct dgnc_board *brd, uint port)
 			/* Which pin is doing auto flow? RTS or DTR? */
 			if ((cause & 0x4) == 0) {
 				if (cause & UART_MCR_RTS) {
-					DGNC_LOCK(ch->ch_lock, lock_flags);
+					spin_lock_irqsave(&ch->ch_lock,
+							  flags);
 					ch->ch_mostat |= UART_MCR_RTS;
-					DGNC_UNLOCK(ch->ch_lock, lock_flags);
+					spin_unlock_irqrestore(&ch->ch_lock,
+							       flags);
 				} else {
-					DGNC_LOCK(ch->ch_lock, lock_flags);
+					spin_lock_irqsave(&ch->ch_lock,
+							  flags);
 					ch->ch_mostat &= ~(UART_MCR_RTS);
-					DGNC_UNLOCK(ch->ch_lock, lock_flags);
+					spin_unlock_irqrestore(&ch->ch_lock,
+							       flags);
 				}
 			} else {
 				if (cause & UART_MCR_DTR) {
-					DGNC_LOCK(ch->ch_lock, lock_flags);
+					spin_lock_irqsave(&ch->ch_lock,
+							  flags);
 					ch->ch_mostat |= UART_MCR_DTR;
-					DGNC_UNLOCK(ch->ch_lock, lock_flags);
+					spin_unlock_irqrestore(&ch->ch_lock,
+							       flags);
 				} else {
-					DGNC_LOCK(ch->ch_lock, lock_flags);
+					spin_lock_irqsave(&ch->ch_lock,
+							  flags);
 					ch->ch_mostat &= ~(UART_MCR_DTR);
-					DGNC_UNLOCK(ch->ch_lock, lock_flags);
+					spin_unlock_irqrestore(&ch->ch_lock,
+							       flags);
 				}
 			}
 		}
@@ -516,7 +528,7 @@ static inline void neo_parse_lsr(struct dgnc_board *brd, uint port)
 {
 	struct channel_t *ch;
 	int linestatus;
-	ulong lock_flags;
+	unsigned long flags;
 
 	if (!brd)
 		return;
@@ -540,9 +552,9 @@ static inline void neo_parse_lsr(struct dgnc_board *brd, uint port)
 		ch->ch_intr_rx++;
 		/* Read data from uart -> queue */
 		neo_copy_data_from_uart_to_queue(ch);
-		DGNC_LOCK(ch->ch_lock, lock_flags);
+		spin_lock_irqsave(&ch->ch_lock, flags);
 		dgnc_check_queue_flow_control(ch);
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 	}
 
 	/*
@@ -572,18 +584,18 @@ static inline void neo_parse_lsr(struct dgnc_board *brd, uint port)
 	if (linestatus & UART_LSR_THRE) {
 		brd->intr_tx++;
 		ch->ch_intr_tx++;
-		DGNC_LOCK(ch->ch_lock, lock_flags);
+		spin_lock_irqsave(&ch->ch_lock, flags);
 		ch->ch_flags |= (CH_TX_FIFO_EMPTY | CH_TX_FIFO_LWM);
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 
 		/* Transfer data (if any) from Write Queue -> UART. */
 		neo_copy_data_from_queue_to_uart(ch);
 	} else if (linestatus & UART_17158_TX_AND_FIFO_CLR) {
 		brd->intr_tx++;
 		ch->ch_intr_tx++;
-		DGNC_LOCK(ch->ch_lock, lock_flags);
+		spin_lock_irqsave(&ch->ch_lock, flags);
 		ch->ch_flags |= (CH_TX_FIFO_EMPTY | CH_TX_FIFO_LWM);
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 
 		/* Transfer data (if any) from Write Queue -> UART. */
 		neo_copy_data_from_queue_to_uart(ch);
@@ -597,10 +609,10 @@ static inline void neo_parse_lsr(struct dgnc_board *brd, uint port)
  */
 static void neo_param(struct tty_struct *tty)
 {
-	uchar lcr = 0;
-	uchar uart_lcr = 0;
-	uchar ier = 0;
-	uchar uart_ier = 0;
+	unsigned char lcr = 0;
+	unsigned char uart_lcr = 0;
+	unsigned char ier = 0;
+	unsigned char uart_ier = 0;
 	uint baud = 9600;
 	int quot = 0;
 	struct dgnc_board *bd;
@@ -626,9 +638,12 @@ static void neo_param(struct tty_struct *tty)
 	 * If baud rate is zero, flush queues, and set mval to drop DTR.
 	 */
 	if ((ch->ch_c_cflag & (CBAUD)) == 0) {
-		ch->ch_r_head = ch->ch_r_tail = 0;
-		ch->ch_e_head = ch->ch_e_tail = 0;
-		ch->ch_w_head = ch->ch_w_tail = 0;
+		ch->ch_r_head = 0;
+		ch->ch_r_tail = 0;
+		ch->ch_e_head = 0;
+		ch->ch_e_tail = 0;
+		ch->ch_w_head = 0;
+		ch->ch_w_tail = 0;
 
 		neo_flush_uart_write(ch);
 		neo_flush_uart_read(ch);
@@ -754,7 +769,9 @@ static void neo_param(struct tty_struct *tty)
 		break;
 	}
 
-	ier = uart_ier = readb(&ch->ch_neo_uart->ier);
+	uart_ier = readb(&ch->ch_neo_uart->ier);
+	ier = uart_ier;
+
 	uart_lcr = readb(&ch->ch_neo_uart->lcr);
 
 	if (baud == 0)
@@ -847,7 +864,7 @@ static void neo_tasklet(unsigned long data)
 {
 	struct dgnc_board *bd = (struct dgnc_board *) data;
 	struct channel_t *ch;
-	ulong  lock_flags;
+	unsigned long flags;
 	int i;
 	int state = 0;
 	int ports = 0;
@@ -858,16 +875,16 @@ static void neo_tasklet(unsigned long data)
 	}
 
 	/* Cache a couple board values */
-	DGNC_LOCK(bd->bd_lock, lock_flags);
+	spin_lock_irqsave(&bd->bd_lock, flags);
 	state = bd->state;
 	ports = bd->nasync;
-	DGNC_UNLOCK(bd->bd_lock, lock_flags);
+	spin_unlock_irqrestore(&bd->bd_lock, flags);
 
 	/*
 	 * Do NOT allow the interrupt routine to read the intr registers
 	 * Until we release this lock.
 	 */
-	DGNC_LOCK(bd->bd_intr_lock, lock_flags);
+	spin_lock_irqsave(&bd->bd_intr_lock, flags);
 
 	/*
 	 * If board is ready, parse deeper to see if there is anything to do.
@@ -916,7 +933,7 @@ static void neo_tasklet(unsigned long data)
 	}
 
 	/* Allow interrupt routine to access the interrupt register again */
-	DGNC_UNLOCK(bd->bd_intr_lock, lock_flags);
+	spin_unlock_irqrestore(&bd->bd_intr_lock, flags);
 
 }
 
@@ -935,8 +952,8 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
 	int current_port;
 	u32 tmp;
 	u32 uart_poll;
-	unsigned long lock_flags;
-	unsigned long lock_flags2;
+	unsigned long flags;
+	unsigned long flags2;
 
 	if (!brd) {
 		APR(("Received interrupt (%d) with null board associated\n", irq));
@@ -954,7 +971,7 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
 	brd->intr_count++;
 
 	/* Lock out the slow poller from running on this board. */
-	DGNC_LOCK(brd->bd_intr_lock, lock_flags);
+	spin_lock_irqsave(&brd->bd_intr_lock, flags);
 
 	/*
 	 * Read in "extended" IRQ information from the 32bit Neo register.
@@ -968,7 +985,7 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
 	 * This can happen if the IRQ is shared among a couple Neo/Classic boards.
 	 */
 	if (!uart_poll) {
-		DGNC_UNLOCK(brd->bd_intr_lock, lock_flags);
+		spin_unlock_irqrestore(&brd->bd_intr_lock, flags);
 		return IRQ_NONE;
 	}
 
@@ -1016,9 +1033,9 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
 			neo_copy_data_from_uart_to_queue(ch);
 
 			/* Call our tty layer to enforce queue flow control if needed. */
-			DGNC_LOCK(ch->ch_lock, lock_flags2);
+			spin_lock_irqsave(&ch->ch_lock, flags2);
 			dgnc_check_queue_flow_control(ch);
-			DGNC_UNLOCK(ch->ch_lock, lock_flags2);
+			spin_unlock_irqrestore(&ch->ch_lock, flags2);
 
 			continue;
 
@@ -1068,7 +1085,7 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
 	 */
 	tasklet_schedule(&brd->helper_tasklet);
 
-	DGNC_UNLOCK(brd->bd_intr_lock, lock_flags);
+	spin_unlock_irqrestore(&brd->bd_intr_lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -1081,7 +1098,7 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
  */
 static void neo_disable_receiver(struct channel_t *ch)
 {
-	uchar tmp = readb(&ch->ch_neo_uart->ier);
+	unsigned char tmp = readb(&ch->ch_neo_uart->ier);
 
 	tmp &= ~(UART_IER_RDI);
 	writeb(tmp, &ch->ch_neo_uart->ier);
@@ -1096,7 +1113,7 @@ static void neo_disable_receiver(struct channel_t *ch)
  */
 static void neo_enable_receiver(struct channel_t *ch)
 {
-	uchar tmp = readb(&ch->ch_neo_uart->ier);
+	unsigned char tmp = readb(&ch->ch_neo_uart->ier);
 
 	tmp |= (UART_IER_RDI);
 	writeb(tmp, &ch->ch_neo_uart->ier);
@@ -1107,18 +1124,18 @@ static void neo_enable_receiver(struct channel_t *ch)
 static void neo_copy_data_from_uart_to_queue(struct channel_t *ch)
 {
 	int qleft = 0;
-	uchar linestatus = 0;
-	uchar error_mask = 0;
+	unsigned char linestatus = 0;
+	unsigned char error_mask = 0;
 	int n = 0;
 	int total = 0;
 	ushort head;
 	ushort tail;
-	ulong lock_flags;
+	unsigned long flags;
 
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
 		return;
 
-	DGNC_LOCK(ch->ch_lock, lock_flags);
+	spin_lock_irqsave(&ch->ch_lock, flags);
 
 	/* cache head and tail of queue */
 	head = ch->ch_r_head & RQUEUEMASK;
@@ -1269,7 +1286,7 @@ static void neo_copy_data_from_uart_to_queue(struct channel_t *ch)
 		 * Discard character if we are ignoring the error mask.
 		 */
 		if (linestatus & error_mask)  {
-			uchar discard;
+			unsigned char discard;
 
 			linestatus = 0;
 			memcpy_fromio(&discard, &ch->ch_neo_uart->txrxburst, 1);
@@ -1285,13 +1302,14 @@ static void neo_copy_data_from_uart_to_queue(struct channel_t *ch)
 		 * I hope thats okay with everyone? Yes? Good.
 		 */
 		while (qleft < 1) {
-			ch->ch_r_tail = tail = (tail + 1) & RQUEUEMASK;
+			tail = (tail + 1) & RQUEUEMASK;
+			ch->ch_r_tail = tail;
 			ch->ch_err_overrun++;
 			qleft++;
 		}
 
 		memcpy_fromio(ch->ch_rqueue + head, &ch->ch_neo_uart->txrxburst, 1);
-		ch->ch_equeue[head] = (uchar) linestatus;
+		ch->ch_equeue[head] = (unsigned char) linestatus;
 		dgnc_sniff_nowait_nolock(ch, "UART READ", ch->ch_rqueue + head, 1);
 
 		/* Ditch any remaining linestatus value. */
@@ -1310,7 +1328,7 @@ static void neo_copy_data_from_uart_to_queue(struct channel_t *ch)
 	ch->ch_r_head = head & RQUEUEMASK;
 	ch->ch_e_head = head & EQUEUEMASK;
 
-	DGNC_UNLOCK(ch->ch_lock, lock_flags);
+	spin_unlock_irqrestore(&ch->ch_lock, flags);
 }
 
 
@@ -1320,7 +1338,7 @@ static void neo_copy_data_from_uart_to_queue(struct channel_t *ch)
  */
 static int neo_drain(struct tty_struct *tty, uint seconds)
 {
-	ulong lock_flags;
+	unsigned long flags;
 	struct channel_t *ch;
 	struct un_t *un;
 	int rc = 0;
@@ -1336,9 +1354,9 @@ static int neo_drain(struct tty_struct *tty, uint seconds)
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
 		return -ENXIO;
 
-	DGNC_LOCK(ch->ch_lock, lock_flags);
+	spin_lock_irqsave(&ch->ch_lock, flags);
 	un->un_flags |= UN_EMPTY;
-	DGNC_UNLOCK(ch->ch_lock, lock_flags);
+	spin_unlock_irqrestore(&ch->ch_lock, flags);
 
 	/*
 	 * Go to sleep waiting for the tty layer to wake me back up when
@@ -1360,7 +1378,7 @@ static int neo_drain(struct tty_struct *tty, uint seconds)
  */
 static void neo_flush_uart_write(struct channel_t *ch)
 {
-	uchar tmp = 0;
+	unsigned char tmp = 0;
 	int i = 0;
 
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
@@ -1390,7 +1408,7 @@ static void neo_flush_uart_write(struct channel_t *ch)
  */
 static void neo_flush_uart_read(struct channel_t *ch)
 {
-	uchar tmp = 0;
+	unsigned char tmp = 0;
 	int i = 0;
 
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
@@ -1419,22 +1437,22 @@ static void neo_copy_data_from_queue_to_uart(struct channel_t *ch)
 	int s;
 	int qlen;
 	uint len_written = 0;
-	ulong lock_flags;
+	unsigned long flags;
 
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
 		return;
 
-	DGNC_LOCK(ch->ch_lock, lock_flags);
+	spin_lock_irqsave(&ch->ch_lock, flags);
 
 	/* No data to write to the UART */
 	if (ch->ch_w_tail == ch->ch_w_head) {
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 		return;
 	}
 
 	/* If port is "stopped", don't send any data to the UART */
 	if ((ch->ch_flags & CH_FORCED_STOP) || (ch->ch_flags & CH_BREAK_SENDING)) {
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 		return;
 	}
 
@@ -1442,7 +1460,7 @@ static void neo_copy_data_from_queue_to_uart(struct channel_t *ch)
 	 * If FIFOs are disabled. Send data directly to txrx register
 	 */
 	if (!(ch->ch_flags & CH_FIFO_ENABLED)) {
-		uchar lsrbits = readb(&ch->ch_neo_uart->lsr);
+		unsigned char lsrbits = readb(&ch->ch_neo_uart->lsr);
 
 		/* Cache the LSR bits for later parsing */
 		ch->ch_cached_lsr |= lsrbits;
@@ -1477,7 +1495,7 @@ static void neo_copy_data_from_queue_to_uart(struct channel_t *ch)
 			ch->ch_w_tail &= WQUEUEMASK;
 			ch->ch_txcount++;
 		}
-		DGNC_UNLOCK(ch->ch_lock, lock_flags);
+		spin_unlock_irqrestore(&ch->ch_lock, flags);
 		return;
 	}
 
@@ -1486,7 +1504,7 @@ static void neo_copy_data_from_queue_to_uart(struct channel_t *ch)
 	 */
 	if ((ch->ch_bd->dvid & 0xf0) < UART_XR17E158_DVID) {
 		if (!(ch->ch_flags & (CH_TX_FIFO_EMPTY | CH_TX_FIFO_LWM))) {
-			DGNC_UNLOCK(ch->ch_lock, lock_flags);
+			spin_unlock_irqrestore(&ch->ch_lock, flags);
 			return;
 		}
 
@@ -1495,7 +1513,7 @@ static void neo_copy_data_from_queue_to_uart(struct channel_t *ch)
 		n = readb(&ch->ch_neo_uart->tfifo);
 
 		if ((unsigned int) n > ch->ch_t_tlevel) {
-			DGNC_UNLOCK(ch->ch_lock, lock_flags);
+			spin_unlock_irqrestore(&ch->ch_lock, flags);
 			return;
 		}
 
@@ -1562,13 +1580,13 @@ static void neo_copy_data_from_queue_to_uart(struct channel_t *ch)
 		ch->ch_flags &= ~(CH_TX_FIFO_EMPTY | CH_TX_FIFO_LWM);
 	}
 
-	DGNC_UNLOCK(ch->ch_lock, lock_flags);
+	spin_unlock_irqrestore(&ch->ch_lock, flags);
 }
 
 
-static void neo_parse_modem(struct channel_t *ch, uchar signals)
+static void neo_parse_modem(struct channel_t *ch, unsigned char signals)
 {
-	uchar msignals = signals;
+	unsigned char msignals = signals;
 
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
 		return;
@@ -1578,7 +1596,7 @@ static void neo_parse_modem(struct channel_t *ch, uchar signals)
 	 * This prolly breaks DSRPACE, so we should be more clever here.
 	 */
 	if (ch->ch_digi.digi_flags & DIGI_ALTPIN) {
-		uchar mswap = msignals;
+		unsigned char mswap = msignals;
 
 		if (mswap & UART_MSR_DDCD) {
 			msignals &= ~UART_MSR_DDCD;
@@ -1626,7 +1644,7 @@ static void neo_parse_modem(struct channel_t *ch, uchar signals)
 /* Make the UART raise any of the output signals we want up */
 static void neo_assert_modem_signals(struct channel_t *ch)
 {
-	uchar out;
+	unsigned char out;
 
 	if (!ch || ch->magic != DGNC_CHANNEL_MAGIC)
 		return;
@@ -1713,8 +1731,8 @@ static void neo_uart_off(struct channel_t *ch)
 
 static uint neo_get_uart_bytes_left(struct channel_t *ch)
 {
-	uchar left = 0;
-	uchar lsr = readb(&ch->ch_neo_uart->lsr);
+	unsigned char left = 0;
+	unsigned char lsr = readb(&ch->ch_neo_uart->lsr);
 
 	/* We must cache the LSR as some of the bits get reset once read... */
 	ch->ch_cached_lsr |= lsr;
@@ -1741,7 +1759,7 @@ static void neo_send_break(struct channel_t *ch, int msecs)
 	 */
 	if (msecs == 0) {
 		if (ch->ch_flags & CH_BREAK_SENDING) {
-			uchar temp = readb(&ch->ch_neo_uart->lcr);
+			unsigned char temp = readb(&ch->ch_neo_uart->lcr);
 
 			writeb((temp & ~UART_LCR_SBC), &ch->ch_neo_uart->lcr);
 			neo_pci_posting_flush(ch->ch_bd);
@@ -1760,7 +1778,7 @@ static void neo_send_break(struct channel_t *ch, int msecs)
 
 	/* Tell the UART to start sending the break */
 	if (!(ch->ch_flags & CH_BREAK_SENDING)) {
-		uchar temp = readb(&ch->ch_neo_uart->lcr);
+		unsigned char temp = readb(&ch->ch_neo_uart->lcr);
 
 		writeb((temp | UART_LCR_SBC), &ch->ch_neo_uart->lcr);
 		neo_pci_posting_flush(ch->ch_bd);

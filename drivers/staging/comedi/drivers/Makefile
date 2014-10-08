@@ -9,7 +9,6 @@ obj-$(CONFIG_COMEDI_BOND)		+= comedi_bond.o
 obj-$(CONFIG_COMEDI_TEST)		+= comedi_test.o
 obj-$(CONFIG_COMEDI_PARPORT)		+= comedi_parport.o
 obj-$(CONFIG_COMEDI_SERIAL2002)		+= serial2002.o
-obj-$(CONFIG_COMEDI_SKEL)		+= skel.o
 
 # Comedi ISA drivers
 obj-$(CONFIG_COMEDI_AMPLC_DIO200_ISA)	+= amplc_dio200.o
@@ -143,4 +142,3 @@ obj-$(CONFIG_COMEDI_8255)		+= 8255.o
 obj-$(CONFIG_COMEDI_AMPLC_DIO200)	+= amplc_dio200_common.o
 obj-$(CONFIG_COMEDI_AMPLC_PC236)	+= amplc_pc236_common.o
 obj-$(CONFIG_COMEDI_DAS08)		+= das08.o
-obj-$(CONFIG_COMEDI_FC)			+= comedi_fc.o

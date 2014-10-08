@@ -356,8 +356,10 @@ struct proc_dir_entry *lprocfs_register(const char *name,
 	struct proc_dir_entry *entry;
 
 	entry = proc_mkdir(name, parent);
-	if (entry == NULL)
-		GOTO(out, entry = ERR_PTR(-ENOMEM));
+	if (entry == NULL) {
+		entry = ERR_PTR(-ENOMEM);
+		goto out;
+	}
 
 	if (list != NULL) {
 		int rc = lprocfs_add_vars(entry, list, data);
@@ -1012,6 +1014,43 @@ void lprocfs_free_per_client_stats(struct obd_device *obd)
 }
 EXPORT_SYMBOL(lprocfs_free_per_client_stats);
 
+int lprocfs_stats_alloc_one(struct lprocfs_stats *stats, unsigned int cpuid)
+{
+	struct lprocfs_counter  *cntr;
+	unsigned int            percpusize;
+	int                     rc = -ENOMEM;
+	unsigned long           flags = 0;
+	int                     i;
+
+	LASSERT(stats->ls_percpu[cpuid] == NULL);
+	LASSERT((stats->ls_flags & LPROCFS_STATS_FLAG_NOPERCPU) == 0);
+
+	percpusize = lprocfs_stats_counter_size(stats);
+	LIBCFS_ALLOC_ATOMIC(stats->ls_percpu[cpuid], percpusize);
+	if (stats->ls_percpu[cpuid] != NULL) {
+		rc = 0;
+		if (unlikely(stats->ls_biggest_alloc_num <= cpuid)) {
+			if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE)
+				spin_lock_irqsave(&stats->ls_lock, flags);
+			else
+				spin_lock(&stats->ls_lock);
+			if (stats->ls_biggest_alloc_num <= cpuid)
+				stats->ls_biggest_alloc_num = cpuid + 1;
+			if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE)
+				spin_unlock_irqrestore(&stats->ls_lock, flags);
+			else
+				spin_unlock(&stats->ls_lock);
+		}
+		/* initialize the ls_percpu[cpuid] non-zero counter */
+		for (i = 0; i < stats->ls_num; ++i) {
+			cntr = lprocfs_stats_counter_get(stats, cpuid, i);
+			cntr->lc_min = LC_MIN_INIT;
+		}
+	}
+	return rc;
+}
+EXPORT_SYMBOL(lprocfs_stats_alloc_one);
+
 struct lprocfs_stats *lprocfs_alloc_stats(unsigned int num,
 					  enum lprocfs_stats_flags flags)
 {
@@ -1309,44 +1348,24 @@ void lprocfs_init_ops_stats(int num_private_stats, struct lprocfs_stats *stats)
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, packmd);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, unpackmd);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, preallocate);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, precreate);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, create);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, create_async);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, destroy);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, setattr);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, setattr_async);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, getattr);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, getattr_async);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, brw);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, merge_lvb);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, adjust_kms);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, punch);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, sync);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, migrate);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, copy);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, iterate);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, preprw);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, commitrw);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, enqueue);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, change_cbdata);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, find_cbdata);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, cancel);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, cancel_unused);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, init_export);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, destroy_export);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, extent_calc);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, llog_init);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, llog_connect);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, llog_finish);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, pin);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, unpin);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, import_event);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, notify);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, health_check);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, get_uuid);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, quotacheck);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, quotactl);
-	LPROCFS_OBD_OP_INIT(num_private_stats, stats, ping);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, pool_new);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, pool_rem);
 	LPROCFS_OBD_OP_INIT(num_private_stats, stats, pool_add);
@@ -1683,12 +1702,15 @@ int lprocfs_exp_setup(struct obd_export *exp, lnet_nid_t *nid, int *newnid)
 	 * entry already has been created */
 	if (old_stat != new_stat) {
 		exp->exp_nid_stats = old_stat;
-		GOTO(destroy_new, rc = -EALREADY);
+		rc = -EALREADY;
+		goto destroy_new;
 	}
 	/* not found - create */
 	OBD_ALLOC(buffer, LNET_NIDSTR_SIZE);
-	if (buffer == NULL)
-		GOTO(destroy_new, rc = -ENOMEM);
+	if (buffer == NULL) {
+		rc = -ENOMEM;
+		goto destroy_new;
+	}
 
 	memcpy(buffer, libcfs_nid2str(*nid), LNET_NIDSTR_SIZE);
 	new_stat->nid_proc = lprocfs_register(buffer,
@@ -1701,7 +1723,7 @@ int lprocfs_exp_setup(struct obd_export *exp, lnet_nid_t *nid, int *newnid)
 		       libcfs_nid2str(*nid));
 		rc = PTR_ERR(new_stat->nid_proc);
 		new_stat->nid_proc = NULL;
-		GOTO(destroy_new_ns, rc);
+		goto destroy_new_ns;
 	}
 
 	entry = lprocfs_add_simple(new_stat->nid_proc, "uuid",
@@ -1709,7 +1731,7 @@ int lprocfs_exp_setup(struct obd_export *exp, lnet_nid_t *nid, int *newnid)
 	if (IS_ERR(entry)) {
 		CWARN("Error adding the NID stats file\n");
 		rc = PTR_ERR(entry);
-		GOTO(destroy_new_ns, rc);
+		goto destroy_new_ns;
 	}
 
 	entry = lprocfs_add_simple(new_stat->nid_proc, "hash",
@@ -1717,7 +1739,7 @@ int lprocfs_exp_setup(struct obd_export *exp, lnet_nid_t *nid, int *newnid)
 	if (IS_ERR(entry)) {
 		CWARN("Error adding the hash file\n");
 		rc = PTR_ERR(entry);
-		GOTO(destroy_new_ns, rc);
+		goto destroy_new_ns;
 	}
 
 	exp->exp_nid_stats = new_stat;
@@ -1754,6 +1776,48 @@ int lprocfs_exp_cleanup(struct obd_export *exp)
 	return 0;
 }
 EXPORT_SYMBOL(lprocfs_exp_cleanup);
+
+__s64 lprocfs_read_helper(struct lprocfs_counter *lc,
+			  struct lprocfs_counter_header *header,
+			  enum lprocfs_stats_flags flags,
+			  enum lprocfs_fields_flags field)
+{
+	__s64 ret = 0;
+
+	if (lc == NULL || header == NULL)
+		return 0;
+
+	switch (field) {
+	case LPROCFS_FIELDS_FLAGS_CONFIG:
+		ret = header->lc_config;
+		break;
+	case LPROCFS_FIELDS_FLAGS_SUM:
+		ret = lc->lc_sum;
+		if ((flags & LPROCFS_STATS_FLAG_IRQ_SAFE) != 0)
+			ret += lc->lc_sum_irq;
+		break;
+	case LPROCFS_FIELDS_FLAGS_MIN:
+		ret = lc->lc_min;
+		break;
+	case LPROCFS_FIELDS_FLAGS_MAX:
+		ret = lc->lc_max;
+		break;
+	case LPROCFS_FIELDS_FLAGS_AVG:
+		ret = (lc->lc_max - lc->lc_min) / 2;
+		break;
+	case LPROCFS_FIELDS_FLAGS_SUMSQUARE:
+		ret = lc->lc_sumsquare;
+		break;
+	case LPROCFS_FIELDS_FLAGS_COUNT:
+		ret = lc->lc_count;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(lprocfs_read_helper);
 
 int lprocfs_write_helper(const char *buffer, unsigned long count,
 			 int *val)

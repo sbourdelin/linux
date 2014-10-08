@@ -399,15 +399,15 @@ static int rtd_ns_to_timer_base(unsigned int *nanosec,
 {
 	int divider;
 
-	switch (flags & TRIG_ROUND_MASK) {
-	case TRIG_ROUND_NEAREST:
+	switch (flags & CMDF_ROUND_MASK) {
+	case CMDF_ROUND_NEAREST:
 	default:
 		divider = (*nanosec + base / 2) / base;
 		break;
-	case TRIG_ROUND_DOWN:
+	case CMDF_ROUND_DOWN:
 		divider = (*nanosec) / base;
 		break;
-	case TRIG_ROUND_UP:
+	case CMDF_ROUND_UP:
 		divider = (*nanosec + base - 1) / base;
 		break;
 	}
@@ -437,7 +437,7 @@ static int rtd_ns_to_timer(unsigned int *ns, unsigned int flags)
 static unsigned short rtd_convert_chan_gain(struct comedi_device *dev,
 					    unsigned int chanspec, int index)
 {
-	const struct rtd_boardinfo *board = comedi_board(dev);
+	const struct rtd_boardinfo *board = dev->board_ptr;
 	struct rtd_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(chanspec);
 	unsigned int range = CR_RANGE(chanspec);
@@ -808,26 +808,26 @@ static int rtd_ai_cmdtest(struct comedi_device *dev,
 			if (cfc_check_trigger_arg_min(&cmd->scan_begin_arg,
 						      RTD_MAX_SPEED_1)) {
 				rtd_ns_to_timer(&cmd->scan_begin_arg,
-						TRIG_ROUND_UP);
+						CMDF_ROUND_UP);
 				err |= -EINVAL;
 			}
 			if (cfc_check_trigger_arg_max(&cmd->scan_begin_arg,
 						      RTD_MIN_SPEED_1)) {
 				rtd_ns_to_timer(&cmd->scan_begin_arg,
-						TRIG_ROUND_DOWN);
+						CMDF_ROUND_DOWN);
 				err |= -EINVAL;
 			}
 		} else {
 			if (cfc_check_trigger_arg_min(&cmd->scan_begin_arg,
 						      RTD_MAX_SPEED)) {
 				rtd_ns_to_timer(&cmd->scan_begin_arg,
-						TRIG_ROUND_UP);
+						CMDF_ROUND_UP);
 				err |= -EINVAL;
 			}
 			if (cfc_check_trigger_arg_max(&cmd->scan_begin_arg,
 						      RTD_MIN_SPEED)) {
 				rtd_ns_to_timer(&cmd->scan_begin_arg,
-						TRIG_ROUND_DOWN);
+						CMDF_ROUND_DOWN);
 				err |= -EINVAL;
 			}
 		}
@@ -843,26 +843,26 @@ static int rtd_ai_cmdtest(struct comedi_device *dev,
 			if (cfc_check_trigger_arg_min(&cmd->convert_arg,
 						      RTD_MAX_SPEED_1)) {
 				rtd_ns_to_timer(&cmd->convert_arg,
-						TRIG_ROUND_UP);
+						CMDF_ROUND_UP);
 				err |= -EINVAL;
 			}
 			if (cfc_check_trigger_arg_max(&cmd->convert_arg,
 						      RTD_MIN_SPEED_1)) {
 				rtd_ns_to_timer(&cmd->convert_arg,
-						TRIG_ROUND_DOWN);
+						CMDF_ROUND_DOWN);
 				err |= -EINVAL;
 			}
 		} else {
 			if (cfc_check_trigger_arg_min(&cmd->convert_arg,
 						      RTD_MAX_SPEED)) {
 				rtd_ns_to_timer(&cmd->convert_arg,
-						TRIG_ROUND_UP);
+						CMDF_ROUND_UP);
 				err |= -EINVAL;
 			}
 			if (cfc_check_trigger_arg_max(&cmd->convert_arg,
 						      RTD_MIN_SPEED)) {
 				rtd_ns_to_timer(&cmd->convert_arg,
-						TRIG_ROUND_DOWN);
+						CMDF_ROUND_DOWN);
 				err |= -EINVAL;
 			}
 		}
@@ -874,12 +874,10 @@ static int rtd_ai_cmdtest(struct comedi_device *dev,
 
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	if (cmd->stop_src == TRIG_COUNT) {
-		/* TODO check for rounding error due to counter wrap */
-	} else {
-		/* TRIG_NONE */
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
-	}
 
 	if (err)
 		return 3;
@@ -955,7 +953,7 @@ static int rtd_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	if (TRIG_TIMER == cmd->scan_begin_src) {
 		/* scan_begin_arg is in nanoseconds */
 		/* find out how many samples to wait before transferring */
-		if (cmd->flags & TRIG_WAKE_EOS) {
+		if (cmd->flags & CMDF_WAKE_EOS) {
 			/*
 			 * this may generate un-sustainable interrupt rates
 			 * the application is responsible for doing the
@@ -1019,7 +1017,7 @@ static int rtd_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	switch (cmd->scan_begin_src) {
 	case TRIG_TIMER:	/* periodic scanning */
 		timer = rtd_ns_to_timer(&cmd->scan_begin_arg,
-					TRIG_ROUND_NEAREST);
+					CMDF_ROUND_NEAREST);
 		/* set PACER clock */
 		writel(timer & 0xffffff, dev->mmio + LAS0_PCLK);
 
@@ -1037,7 +1035,7 @@ static int rtd_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 		if (cmd->chanlist_len > 1) {
 			/* only needed for multi-channel */
 			timer = rtd_ns_to_timer(&cmd->convert_arg,
-						TRIG_ROUND_NEAREST);
+						CMDF_ROUND_NEAREST);
 			/* setup BURST clock */
 			writel(timer & 0x3ff, dev->mmio + LAS0_BCLK);
 		}

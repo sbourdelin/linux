@@ -75,7 +75,7 @@ EXPORT_SYMBOL_GPL(uisutil_add_proc_line_ex);
 
 int
 uisctrl_register_req_handler(int type, void *fptr,
-			     ULTRA_VBUS_DEVICEINFO *chipset_DriverInfo)
+			     ULTRA_VBUS_DEVICEINFO *chipset_driver_info)
 {
 	LOGINF("type = %d, fptr = 0x%p.\n", type, fptr);
 
@@ -96,8 +96,8 @@ uisctrl_register_req_handler(int type, void *fptr,
 		LOGERR("invalid type %d.\n", type);
 		return 0;
 	}
-	if (chipset_DriverInfo)
-		BusDeviceInfo_Init(chipset_DriverInfo, "chipset", "uislib",
+	if (chipset_driver_info)
+		bus_device_info_init(chipset_driver_info, "chipset", "uislib",
 				   VERSION, NULL);
 
 	return 1;
@@ -150,7 +150,7 @@ uisctrl_register_req_handler_ex(uuid_le switchTypeGuid,
 Away:
 	if (rc) {
 		if (chipset_DriverInfo)
-			BusDeviceInfo_Init(chipset_DriverInfo, "chipset",
+			bus_device_info_init(chipset_DriverInfo, "chipset",
 					   "uislib", VERSION, NULL);
 	} else
 		LOGERR("failed to register type %pUL.\n", &switchTypeGuid);

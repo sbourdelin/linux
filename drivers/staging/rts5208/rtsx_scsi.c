@@ -440,6 +440,7 @@ static int test_unit_ready(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 #ifdef SUPPORT_SD_LOCK
 	if (get_lun_card(chip, SCSI_LUN(srb)) == SD_CARD) {
 		struct sd_info *sd_card = &(chip->sd_card);
+
 		if (sd_card->sd_lock_notify) {
 			sd_card->sd_lock_notify = 0;
 			set_sense_type(chip, lun, SENSE_TYPE_MEDIA_CHANGE);
@@ -585,10 +586,9 @@ static int start_stop_unit(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 	case LOAD_MEDIUM:
 		if (check_card_ready(chip, lun)) {
 			return TRANSPORT_GOOD;
-		} else {
-			set_sense_type(chip, lun, SENSE_TYPE_MEDIA_NOT_PRESENT);
-			TRACE_RET(chip, TRANSPORT_FAILED);
 		}
+		set_sense_type(chip, lun, SENSE_TYPE_MEDIA_NOT_PRESENT);
+		TRACE_RET(chip, TRANSPORT_FAILED);
 
 		break;
 	}
@@ -746,6 +746,7 @@ static void ms_mode_sense(struct rtsx_chip *chip, u8 cmd,
 	if (data_size > sys_info_offset) {
 		/* 96 Bytes Attribute Data */
 		int len = data_size - sys_info_offset;
+
 		len = (len < 96) ? len : 96;
 
 		memcpy(buf + sys_info_offset, ms_card->raw_sys_info, len);
@@ -1568,6 +1569,7 @@ static int get_variable(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 		rtsx_stor_set_xfer_buf(&tmp, 1, srb);
 	} else if (srb->cmnd[3] == 2) {
 		u8 tmp = chip->blink_led;
+
 		rtsx_stor_set_xfer_buf(&tmp, 1, srb);
 	} else {
 		set_sense_type(chip, lun, SENSE_TYPE_MEDIA_INVALID_CMD_FIELD);

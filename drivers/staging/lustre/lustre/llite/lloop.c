@@ -126,7 +126,7 @@ struct lloop_device {
 	struct block_device *lo_device;
 	unsigned	     lo_blocksize;
 
-	int		  old_gfp_mask;
+	gfp_t		  old_gfp_mask;
 
 	spinlock_t		lo_lock;
 	struct bio		*lo_bio;
@@ -548,7 +548,7 @@ static int loop_clr_fd(struct lloop_device *lo, struct block_device *bdev,
 		       int count)
 {
 	struct file *filp = lo->lo_backing_file;
-	int gfp = lo->old_gfp_mask;
+	gfp_t gfp = lo->old_gfp_mask;
 
 	if (lo->lo_state != LLOOP_BOUND)
 		return -ENXIO;
@@ -793,11 +793,11 @@ static int __init lloop_init(void)
 	if (ll_iocontrol_magic == NULL)
 		goto out_mem1;
 
-	OBD_ALLOC_WAIT(loop_dev, max_loop * sizeof(*loop_dev));
+	loop_dev = kzalloc(max_loop * sizeof(*loop_dev), GFP_KERNEL);
 	if (!loop_dev)
 		goto out_mem1;
 
-	OBD_ALLOC_WAIT(disks, max_loop * sizeof(*disks));
+	disks = kzalloc(max_loop * sizeof(*disks), GFP_KERNEL);
 	if (!disks)
 		goto out_mem2;
 

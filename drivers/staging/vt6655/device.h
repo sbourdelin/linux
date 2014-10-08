@@ -55,12 +55,7 @@
 #include <linux/proc_fs.h>
 #include <linux/inetdevice.h>
 #include <linux/reboot.h>
-#ifdef SIOCETHTOOL
-#define DEVICE_ETHTOOL_IOCTL_SUPPORT
 #include <linux/ethtool.h>
-#else
-#undef DEVICE_ETHTOOL_IOCTL_SUPPORT
-#endif
 /* Include Wireless Extension definition and check version - Jean II */
 #include <linux/wireless.h>
 #include <net/iw_handler.h>	// New driver API
@@ -333,13 +328,8 @@ typedef struct __device_opt {
 struct vnt_private {
 	struct pci_dev *pcid;
 
-#ifdef CONFIG_PM
-	u32                         pci_state[16];
-#endif
-
 // netdev
 	struct net_device *dev;
-	struct net_device_stats     stats;
 
 //dma addr, rx/tx pool
 	dma_addr_t                  pool_dma;

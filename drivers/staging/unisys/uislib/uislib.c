@@ -315,7 +315,7 @@ destroy_bus(CONTROLVM_MESSAGE *msg, char *buf)
 	/* client messages require us to call the virtpci callback associated
 	   with this bus. */
 	cmd.msgtype = GUEST_DEL_VBUS;
-	cmd.del_vbus.busNo = busNo;
+	cmd.del_vbus.bus_no = busNo;
 	if (!VirtControlChanFunc) {
 		LOGERR("CONTROLVM_BUS_DESTROY Failed: virtpci callback not registered.");
 		return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
@@ -368,18 +368,18 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 		return CONTROLVM_RESP_ERROR_KMALLOC_FAILED;
 	}
 
-	dev->channelTypeGuid = msg->cmd.createDevice.dataTypeGuid;
+	dev->channel_uuid = msg->cmd.createDevice.dataTypeGuid;
 	dev->intr = msg->cmd.createDevice.intr;
-	dev->channelAddr = msg->cmd.createDevice.channelAddr;
-	dev->busNo = busNo;
-	dev->devNo = devNo;
+	dev->channel_addr = msg->cmd.createDevice.channelAddr;
+	dev->bus_no = busNo;
+	dev->dev_no = devNo;
 	sema_init(&dev->interrupt_callback_lock, 1);	/* unlocked */
 	sprintf(dev->devid, "vbus%u:dev%u", (unsigned) busNo, (unsigned) devNo);
 	/* map the channel memory for the device. */
 	if (msg->hdr.Flags.testMessage)
-		dev->chanptr = (void __iomem *)__va(dev->channelAddr);
+		dev->chanptr = (void __iomem *)__va(dev->channel_addr);
 	else {
-		pReqHandler = ReqHandlerFind(dev->channelTypeGuid);
+		pReqHandler = ReqHandlerFind(dev->channel_uuid);
 		if (pReqHandler)
 			/* generic service handler registered for this
 			 * channel
@@ -395,11 +395,11 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 			goto Away;
 		}
 		dev->chanptr =
-		    uislib_ioremap_cache(dev->channelAddr,
+		    uislib_ioremap_cache(dev->channel_addr,
 					 msg->cmd.createDevice.channelBytes);
 		if (!dev->chanptr) {
 			LOGERR("CONTROLVM_DEVICE_CREATE Failed: ioremap_cache of channelAddr:%Lx for channelBytes:%llu failed",
-			     dev->channelAddr,
+			     dev->channel_addr,
 			     msg->cmd.createDevice.channelBytes);
 			result = CONTROLVM_RESP_ERROR_IOREMAP_FAILED;
 			POSTCODE_LINUX_4(DEVICE_CREATE_FAILURE_PC, devNo, busNo,
@@ -407,8 +407,8 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 			goto Away;
 		}
 	}
-	dev->devInstGuid = msg->cmd.createDevice.devInstGuid;
-	dev->channelBytes = msg->cmd.createDevice.channelBytes;
+	dev->instance_uuid = msg->cmd.createDevice.devInstGuid;
+	dev->channel_bytes = msg->cmd.createDevice.channelBytes;
 
 	read_lock(&BusListLock);
 	for (bus = BusListHead; bus; bus = bus->next) {
@@ -442,7 +442,7 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 			if (!msg->hdr.Flags.server) {
 				struct guest_msgs cmd;
 
-				if (!uuid_le_cmp(dev->channelTypeGuid,
+				if (!uuid_le_cmp(dev->channel_uuid,
 				     UltraVhbaChannelProtocolGuid)) {
 					wait_for_valid_guid(&((CHANNEL_HEADER
 							      __iomem *) (dev->
@@ -461,13 +461,13 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 					}
 					cmd.msgtype = GUEST_ADD_VHBA;
 					cmd.add_vhba.chanptr = dev->chanptr;
-					cmd.add_vhba.busNo = busNo;
-					cmd.add_vhba.deviceNo = devNo;
-					cmd.add_vhba.devInstGuid =
-					    dev->devInstGuid;
+					cmd.add_vhba.bus_no = busNo;
+					cmd.add_vhba.device_no = devNo;
+					cmd.add_vhba.instance_uuid =
+					    dev->instance_uuid;
 					cmd.add_vhba.intr = dev->intr;
 				} else
-				    if (!uuid_le_cmp(dev->channelTypeGuid,
+				    if (!uuid_le_cmp(dev->channel_uuid,
 					 UltraVnicChannelProtocolGuid)) {
 					wait_for_valid_guid(&((CHANNEL_HEADER
 							      __iomem *) (dev->
@@ -486,10 +486,10 @@ create_device(CONTROLVM_MESSAGE *msg, char *buf)
 					}
 					cmd.msgtype = GUEST_ADD_VNIC;
 					cmd.add_vnic.chanptr = dev->chanptr;
-					cmd.add_vnic.busNo = busNo;
-					cmd.add_vnic.deviceNo = devNo;
-					cmd.add_vnic.devInstGuid =
-					    dev->devInstGuid;
+					cmd.add_vnic.bus_no = busNo;
+					cmd.add_vnic.device_no = devNo;
+					cmd.add_vnic.instance_uuid =
+					    dev->instance_uuid;
 					cmd.add_vhba.intr = dev->intr;
 				} else {
 					LOGERR("CONTROLVM_DEVICE_CREATE Failed: unknown channelTypeGuid.\n");
@@ -548,6 +548,7 @@ pause_device(CONTROLVM_MESSAGE *msg)
 	struct bus_info *bus;
 	struct device_info *dev;
 	struct guest_msgs cmd;
+	int retval = CONTROLVM_RESP_SUCCESS;
 
 	busNo = msg->cmd.deviceChangeState.busNo;
 	devNo = msg->cmd.deviceChangeState.devNo;
@@ -559,58 +560,53 @@ pause_device(CONTROLVM_MESSAGE *msg)
 			if (devNo >= bus->deviceCount) {
 				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: device(%d) >= deviceCount(%d).",
 				     devNo, bus->deviceCount);
-				read_unlock(&BusListLock);
-				return CONTROLVM_RESP_ERROR_DEVICE_INVALID;
-			}
-			/* make sure this device exists */
-			dev = bus->device[devNo];
-			if (!dev) {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: device %d does not exist.",
-				     devNo);
-				read_unlock(&BusListLock);
-				return CONTROLVM_RESP_ERROR_ALREADY_DONE;
-			}
-			read_unlock(&BusListLock);
-			/* the msg is bound for virtpci; send
-			 * guest_msgs struct to callback
-			 */
-			if (!uuid_le_cmp(dev->channelTypeGuid,
-					UltraVhbaChannelProtocolGuid)) {
-				cmd.msgtype = GUEST_PAUSE_VHBA;
-				cmd.pause_vhba.chanptr = dev->chanptr;
-			} else
-			    if (!uuid_le_cmp(dev->channelTypeGuid,
-					    UltraVnicChannelProtocolGuid)) {
-				cmd.msgtype = GUEST_PAUSE_VNIC;
-				cmd.pause_vnic.chanptr = dev->chanptr;
+				retval = CONTROLVM_RESP_ERROR_DEVICE_INVALID;
 			} else {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: unknown channelTypeGuid.\n");
-				return
-				    CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN;
-			}
-
-			if (!VirtControlChanFunc) {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE Failed: virtpci callback not registered.");
-				return
-				    CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
-			}
-
-			if (!VirtControlChanFunc(&cmd)) {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: virtpci GUEST_PAUSE_[VHBA||VNIC] returned error.");
-				return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
+				/* make sure this device exists */
+				dev = bus->device[devNo];
+				if (!dev) {
+					LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: device %d does not exist.",
+					     devNo);
+					retval =
+					  CONTROLVM_RESP_ERROR_ALREADY_DONE;
+				}
 			}
 			break;
 		}
 	}
-
 	if (!bus) {
 		LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: bus %d does not exist",
 		     busNo);
-		read_unlock(&BusListLock);
-		return CONTROLVM_RESP_ERROR_BUS_INVALID;
+		retval = CONTROLVM_RESP_ERROR_BUS_INVALID;
 	}
-
-	return CONTROLVM_RESP_SUCCESS;
+	read_unlock(&BusListLock);
+	if (retval == CONTROLVM_RESP_SUCCESS) {
+		/* the msg is bound for virtpci; send
+		 * guest_msgs struct to callback
+		 */
+		if (!uuid_le_cmp(dev->channel_uuid,
+				UltraVhbaChannelProtocolGuid)) {
+			cmd.msgtype = GUEST_PAUSE_VHBA;
+			cmd.pause_vhba.chanptr = dev->chanptr;
+		} else if (!uuid_le_cmp(dev->channel_uuid,
+					UltraVnicChannelProtocolGuid)) {
+			cmd.msgtype = GUEST_PAUSE_VNIC;
+			cmd.pause_vnic.chanptr = dev->chanptr;
+		} else {
+			LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: unknown channelTypeGuid.\n");
+			return CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN;
+		}
+		if (!VirtControlChanFunc) {
+			LOGERR("CONTROLVM_DEVICE_CHANGESTATE Failed: virtpci callback not registered.");
+			return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
+		}
+		if (!VirtControlChanFunc(&cmd)) {
+			LOGERR("CONTROLVM_DEVICE_CHANGESTATE:pause Failed: virtpci GUEST_PAUSE_[VHBA||VNIC] returned error.");
+			return
+			  CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
+		}
+	}
+	return retval;
 }
 
 static int
@@ -620,6 +616,7 @@ resume_device(CONTROLVM_MESSAGE *msg)
 	struct bus_info *bus;
 	struct device_info *dev;
 	struct guest_msgs cmd;
+	int retval = CONTROLVM_RESP_SUCCESS;
 
 	busNo = msg->cmd.deviceChangeState.busNo;
 	devNo = msg->cmd.deviceChangeState.devNo;
@@ -631,45 +628,16 @@ resume_device(CONTROLVM_MESSAGE *msg)
 			if (devNo >= bus->deviceCount) {
 				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: device(%d) >= deviceCount(%d).",
 				     devNo, bus->deviceCount);
-				read_unlock(&BusListLock);
-				return CONTROLVM_RESP_ERROR_DEVICE_INVALID;
-			}
-			/* make sure this device exists */
-			dev = bus->device[devNo];
-			if (!dev) {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: device %d does not exist.",
-				     devNo);
-				read_unlock(&BusListLock);
-				return CONTROLVM_RESP_ERROR_ALREADY_DONE;
-			}
-			read_unlock(&BusListLock);
-			/* the msg is bound for virtpci; send
-			 * guest_msgs struct to callback
-			 */
-			if (!uuid_le_cmp(dev->channelTypeGuid,
-					UltraVhbaChannelProtocolGuid)) {
-				cmd.msgtype = GUEST_RESUME_VHBA;
-				cmd.resume_vhba.chanptr = dev->chanptr;
-			} else
-			    if (!uuid_le_cmp(dev->channelTypeGuid,
-					    UltraVnicChannelProtocolGuid)) {
-				cmd.msgtype = GUEST_RESUME_VNIC;
-				cmd.resume_vnic.chanptr = dev->chanptr;
+				retval = CONTROLVM_RESP_ERROR_DEVICE_INVALID;
 			} else {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: unknown channelTypeGuid.\n");
-				return
-				    CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN;
-			}
-
-			if (!VirtControlChanFunc) {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE Failed: virtpci callback not registered.");
-				return
-				    CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
-			}
-
-			if (!VirtControlChanFunc(&cmd)) {
-				LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: virtpci GUEST_RESUME_[VHBA||VNIC] returned error.");
-				return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
+				/* make sure this device exists */
+				dev = bus->device[devNo];
+				if (!dev) {
+					LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: device %d does not exist.",
+					     devNo);
+					retval =
+					  CONTROLVM_RESP_ERROR_ALREADY_DONE;
+				}
 			}
 			break;
 		}
@@ -678,11 +646,36 @@ resume_device(CONTROLVM_MESSAGE *msg)
 	if (!bus) {
 		LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: bus %d does not exist",
 		     busNo);
-		read_unlock(&BusListLock);
-		return CONTROLVM_RESP_ERROR_BUS_INVALID;
+		retval = CONTROLVM_RESP_ERROR_BUS_INVALID;
 	}
-
-	return CONTROLVM_RESP_SUCCESS;
+	read_unlock(&BusListLock);
+	/* the msg is bound for virtpci; send
+	 * guest_msgs struct to callback
+	 */
+	if (retval == CONTROLVM_RESP_SUCCESS) {
+		if (!uuid_le_cmp(dev->channel_uuid,
+				 UltraVhbaChannelProtocolGuid)) {
+			cmd.msgtype = GUEST_RESUME_VHBA;
+			cmd.resume_vhba.chanptr = dev->chanptr;
+		} else if (!uuid_le_cmp(dev->channel_uuid,
+					UltraVnicChannelProtocolGuid)) {
+			cmd.msgtype = GUEST_RESUME_VNIC;
+			cmd.resume_vnic.chanptr = dev->chanptr;
+		} else {
+			LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: unknown channelTypeGuid.\n");
+			return CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN;
+		}
+		if (!VirtControlChanFunc) {
+			LOGERR("CONTROLVM_DEVICE_CHANGESTATE Failed: virtpci callback not registered.");
+			return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
+		}
+		if (!VirtControlChanFunc(&cmd)) {
+			LOGERR("CONTROLVM_DEVICE_CHANGESTATE:resume Failed: virtpci GUEST_RESUME_[VHBA||VNIC] returned error.");
+			return
+			  CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
+		}
+	}
+	return retval;
 }
 
 static int
@@ -692,6 +685,7 @@ destroy_device(CONTROLVM_MESSAGE *msg, char *buf)
 	struct bus_info *bus;
 	struct device_info *dev;
 	struct guest_msgs cmd;
+	int retval = CONTROLVM_RESP_SUCCESS;
 
 	busNo = msg->cmd.destroyDevice.busNo;
 	devNo = msg->cmd.destroyDevice.devNo;
@@ -703,63 +697,18 @@ destroy_device(CONTROLVM_MESSAGE *msg, char *buf)
 			/* make sure the device number is valid */
 			if (devNo >= bus->deviceCount) {
 				LOGERR("CONTROLVM_DEVICE_DESTORY Failed: device(%d) >= deviceCount(%d).",
-				     devNo, bus->deviceCount);
-				read_unlock(&BusListLock);
-				return CONTROLVM_RESP_ERROR_DEVICE_INVALID;
-			}
-			/* make sure this device exists */
-			dev = bus->device[devNo];
-			if (!dev) {
-				LOGERR("CONTROLVM_DEVICE_DESTROY Failed: device %d does not exist.",
-				     devNo);
-				read_unlock(&BusListLock);
-				return CONTROLVM_RESP_ERROR_ALREADY_DONE;
-			}
-			read_unlock(&BusListLock);
-			/* the msg is bound for virtpci; send
-			 * guest_msgs struct to callback
-			 */
-			if (!uuid_le_cmp(dev->channelTypeGuid,
-					UltraVhbaChannelProtocolGuid)) {
-				cmd.msgtype = GUEST_DEL_VHBA;
-				cmd.del_vhba.chanptr = dev->chanptr;
-			} else
-			    if (!uuid_le_cmp(dev->channelTypeGuid,
-					    UltraVnicChannelProtocolGuid)) {
-				cmd.msgtype = GUEST_DEL_VNIC;
-				cmd.del_vnic.chanptr = dev->chanptr;
+				       devNo, bus->deviceCount);
+				retval = CONTROLVM_RESP_ERROR_DEVICE_INVALID;
 			} else {
-				LOGERR("CONTROLVM_DEVICE_DESTROY Failed: unknown channelTypeGuid.\n");
-				return
-				    CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN;
+				/* make sure this device exists */
+				dev = bus->device[devNo];
+				if (!dev) {
+					LOGERR("CONTROLVM_DEVICE_DESTROY Failed: device %d does not exist.",
+					       devNo);
+					retval =
+					     CONTROLVM_RESP_ERROR_ALREADY_DONE;
+				}
 			}
-
-			if (!VirtControlChanFunc) {
-				LOGERR("CONTROLVM_DEVICE_DESTORY Failed: virtpci callback not registered.");
-				return
-				    CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
-			}
-
-			if (!VirtControlChanFunc(&cmd)) {
-				LOGERR("CONTROLVM_DEVICE_DESTROY Failed: virtpci GUEST_DEL_[VHBA||VNIC] returned error.");
-				return CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
-			}
-/* you must disable channel interrupts BEFORE you unmap the channel,
- * because if you unmap first, there may still be some activity going
- * on which accesses the channel and you will get a "unable to handle
- * kernel paging request"
- */
-			if (dev->polling) {
-				LOGINF("calling uislib_disable_channel_interrupts");
-				uislib_disable_channel_interrupts(busNo, devNo);
-			}
-			/* unmap the channel memory for the device. */
-			if (!msg->hdr.Flags.testMessage) {
-				LOGINF("destroy_device, doing iounmap");
-				uislib_iounmap(dev->chanptr);
-			}
-			kfree(dev);
-			bus->device[devNo] = NULL;
 			break;
 		}
 	}
@@ -767,11 +716,54 @@ destroy_device(CONTROLVM_MESSAGE *msg, char *buf)
 	if (!bus) {
 		LOGERR("CONTROLVM_DEVICE_DESTROY Failed: bus %d does not exist",
 		       busNo);
-		read_unlock(&BusListLock);
-		return CONTROLVM_RESP_ERROR_BUS_INVALID;
+		retval = CONTROLVM_RESP_ERROR_BUS_INVALID;
 	}
-
-	return CONTROLVM_RESP_SUCCESS;
+	read_unlock(&BusListLock);
+	if (retval == CONTROLVM_RESP_SUCCESS) {
+		/* the msg is bound for virtpci; send
+		 * guest_msgs struct to callback
+		 */
+		if (!uuid_le_cmp(dev->channel_uuid,
+				 UltraVhbaChannelProtocolGuid)) {
+			cmd.msgtype = GUEST_DEL_VHBA;
+			cmd.del_vhba.chanptr = dev->chanptr;
+		} else if (!uuid_le_cmp(dev->channel_uuid,
+					UltraVnicChannelProtocolGuid)) {
+			cmd.msgtype = GUEST_DEL_VNIC;
+			cmd.del_vnic.chanptr = dev->chanptr;
+		} else {
+			LOGERR("CONTROLVM_DEVICE_DESTROY Failed: unknown channelTypeGuid.\n");
+			return
+			    CONTROLVM_RESP_ERROR_CHANNEL_TYPE_UNKNOWN;
+		}
+		if (!VirtControlChanFunc) {
+			LOGERR("CONTROLVM_DEVICE_DESTORY Failed: virtpci callback not registered.");
+			return
+			    CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_FAILURE;
+		}
+		if (!VirtControlChanFunc(&cmd)) {
+			LOGERR("CONTROLVM_DEVICE_DESTROY Failed: virtpci GUEST_DEL_[VHBA||VNIC] returned error.");
+			return
+			    CONTROLVM_RESP_ERROR_VIRTPCI_DRIVER_CALLBACK_ERROR;
+		}
+/* you must disable channel interrupts BEFORE you unmap the channel,
+ * because if you unmap first, there may still be some activity going
+ * on which accesses the channel and you will get a "unable to handle
+ * kernel paging request"
+ */
+		if (dev->polling) {
+			LOGINF("calling uislib_disable_channel_interrupts");
+			uislib_disable_channel_interrupts(busNo, devNo);
+		}
+		/* unmap the channel memory for the device. */
+		if (!msg->hdr.Flags.testMessage) {
+			LOGINF("destroy_device, doing iounmap");
+			uislib_iounmap(dev->chanptr);
+		}
+		kfree(dev);
+		bus->device[devNo] = NULL;
+	}
+	return retval;
 }
 
 static int
@@ -1470,16 +1462,16 @@ Initialize_incoming_thread(void)
  *                        function.
  */
 void
-uislib_enable_channel_interrupts(u32 busNo, u32 devNo,
+uislib_enable_channel_interrupts(u32 bus_no, u32 dev_no,
 				 int (*interrupt)(void *),
 				 void *interrupt_context)
 {
 	struct device_info *dev;
 
-	dev = find_dev(busNo, devNo);
+	dev = find_dev(bus_no, dev_no);
 	if (!dev) {
-		LOGERR("%s busNo=%d, devNo=%d", __func__, (int) (busNo),
-		       (int) (devNo));
+		LOGERR("%s busNo=%d, devNo=%d", __func__, (int) (bus_no),
+		       (int) (dev_no));
 		return;
 	}
 	down(&Lock_Polling_Device_Channels);
@@ -1497,14 +1489,14 @@ EXPORT_SYMBOL_GPL(uislib_enable_channel_interrupts);
  *  Process_Incoming().
  */
 void
-uislib_disable_channel_interrupts(u32 busNo, u32 devNo)
+uislib_disable_channel_interrupts(u32 bus_no, u32 dev_no)
 {
 	struct device_info *dev;
 
-	dev = find_dev(busNo, devNo);
+	dev = find_dev(bus_no, dev_no);
 	if (!dev) {
-		LOGERR("%s busNo=%d, devNo=%d", __func__, (int) (busNo),
-		       (int) (devNo));
+		LOGERR("%s busNo=%d, devNo=%d", __func__, (int) (bus_no),
+		       (int) (dev_no));
 		return;
 	}
 	down(&Lock_Polling_Device_Channels);
@@ -1531,7 +1523,7 @@ static DECLARE_WORK(Work_wakeup_polling_device_channels,
  *  your device might have more requests.
  */
 void
-uislib_force_channel_interrupt(u32 busNo, u32 devNo)
+uislib_force_channel_interrupt(u32 bus_no, u32 dev_no)
 {
 	if (en_smart_wakeup == 0)
 		return;

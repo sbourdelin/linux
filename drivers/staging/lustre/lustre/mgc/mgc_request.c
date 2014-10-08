@@ -904,14 +904,6 @@ static int mgc_enqueue(struct obd_export *exp, struct lov_stripe_md *lsm,
 	return rc;
 }
 
-static int mgc_cancel(struct obd_export *exp, struct lov_stripe_md *md,
-		      __u32 mode, struct lustre_handle *lockh)
-{
-	ldlm_lock_decref(lockh, mode);
-
-	return 0;
-}
-
 static void mgc_notify_active(struct obd_device *unused)
 {
 	/* wakeup mgc_requeue_thread to requeue mgc lock */
@@ -1469,54 +1461,11 @@ out:
 	return rc;
 }
 
-static int mgc_llog_local_copy(const struct lu_env *env,
-			       struct obd_device *obd,
-			       struct llog_ctxt *rctxt,
-			       struct llog_ctxt *lctxt, char *logname)
-{
-	char	*temp_log;
-	int	 rc;
-
-
-
-	/*
-	 * - copy it to backup using llog_backup()
-	 * - copy remote llog to logname using llog_backup()
-	 * - if failed then move backup to logname again
-	 */
-
-	OBD_ALLOC(temp_log, strlen(logname) + 1);
-	if (!temp_log)
-		return -ENOMEM;
-	sprintf(temp_log, "%sT", logname);
-
-	/* make a copy of local llog at first */
-	rc = llog_backup(env, obd, lctxt, lctxt, logname, temp_log);
-	if (rc < 0 && rc != -ENOENT)
-		goto out;
-	/* copy remote llog to the local copy */
-	rc = llog_backup(env, obd, rctxt, lctxt, logname, logname);
-	if (rc == -ENOENT) {
-		/* no remote llog, delete local one too */
-		llog_erase(env, lctxt, NULL, logname);
-	} else if (rc < 0) {
-		/* error during backup, get local one back from the copy */
-		llog_backup(env, obd, lctxt, lctxt, temp_log, logname);
-out:
-		CERROR("%s: failed to copy remote log %s: rc = %d\n",
-		       obd->obd_name, logname, rc);
-	}
-	llog_erase(env, lctxt, NULL, temp_log);
-	OBD_FREE(temp_log, strlen(logname) + 1);
-	return rc;
-}
-
 /* local_only means it cannot get remote llogs */
 static int mgc_process_cfg_log(struct obd_device *mgc,
 			       struct config_llog_data *cld, int local_only)
 {
-	struct llog_ctxt	*ctxt, *lctxt = NULL;
-	struct dt_object        *cl_mgc_dir = mgc->u.cli.cl_mgc_configs_dir;
+	struct llog_ctxt	*ctxt;
 	struct lustre_sb_info	*lsi = NULL;
 	int			 rc = 0;
 	bool			 sptlrpc_started = false;
@@ -1546,40 +1495,9 @@ static int mgc_process_cfg_log(struct obd_device *mgc,
 	ctxt = llog_get_context(mgc, LLOG_CONFIG_REPL_CTXT);
 	LASSERT(ctxt);
 
-	lctxt = llog_get_context(mgc, LLOG_CONFIG_ORIG_CTXT);
-
-	/* Copy the setup log locally if we can. Don't mess around if we're
-	 * running an MGS though (logs are already local). */
-	if (lctxt && lsi && IS_SERVER(lsi) && !IS_MGS(lsi) &&
-	    cl_mgc_dir != NULL &&
-	    lu2dt_dev(cl_mgc_dir->do_lu.lo_dev) == lsi->lsi_dt_dev) {
-		if (!local_only)
-			/* Only try to copy log if we have the lock. */
-			rc = mgc_llog_local_copy(env, mgc, ctxt, lctxt,
-						 cld->cld_logname);
-		if (local_only || rc) {
-			if (llog_is_empty(env, lctxt, cld->cld_logname)) {
-				LCONSOLE_ERROR_MSG(0x13a,
-						   "Failed to get MGS log %s and no local copy.\n",
-						   cld->cld_logname);
-				rc = -ENOENT;
-				goto out_pop;
-			}
-			CDEBUG(D_MGC,
-			       "Failed to get MGS log %s, using local copy for now, will try to update later.\n",
-			       cld->cld_logname);
-		}
-		/* Now, whether we copied or not, start using the local llog.
-		 * If we failed to copy, we'll start using whatever the old
-		 * log has. */
-		llog_ctxt_put(ctxt);
-		ctxt = lctxt;
-		lctxt = NULL;
-	} else {
-		if (local_only) /* no local log at client side */ {
-			rc = -EIO;
-			goto out_pop;
-		}
+	if (local_only) /* no local log at client side */ {
+		rc = -EIO;
+		goto out_pop;
 	}
 
 	if (cld_is_sptlrpc(cld)) {
@@ -1595,8 +1513,6 @@ static int mgc_process_cfg_log(struct obd_device *mgc,
 
 out_pop:
 	__llog_ctxt_put(env, ctxt);
-	if (lctxt)
-		__llog_ctxt_put(env, lctxt);
 
 	/*
 	 * update settings on existing OBDs. doing it inside
@@ -1679,12 +1595,8 @@ int mgc_process_log(struct obd_device *mgc, struct config_llog_data *cld)
 	mutex_unlock(&cld->cld_lock);
 
 	/* Now drop the lock so MGS can revoke it */
-	if (!rcl) {
-		rcl = mgc_cancel(mgc->u.cli.cl_mgc_mgsexp, NULL,
-				 LCK_CR, &lockh);
-		if (rcl)
-			CERROR("Can't drop cfg lock: %d\n", rcl);
-	}
+	if (!rcl)
+		ldlm_lock_decref(&lockh, LCK_CR);
 
 	return rc;
 }
@@ -1814,7 +1726,6 @@ struct obd_ops mgc_obd_ops = {
 	.o_connect      = client_connect_import,
 	.o_disconnect   = client_disconnect_export,
 	/* .o_enqueue      = mgc_enqueue, */
-	.o_cancel       = mgc_cancel,
 	/* .o_iocontrol    = mgc_iocontrol, */
 	.o_set_info_async = mgc_set_info_async,
 	.o_get_info       = mgc_get_info,

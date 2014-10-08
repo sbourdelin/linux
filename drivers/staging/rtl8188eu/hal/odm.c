@@ -23,6 +23,7 @@
 #include "odm_precomp.h"
 #include "phy.h"
 
+u32 GlobalDebugLevel;
 static const u16 dB_Invert_Table[8][12] = {
 	{1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4},
 	{4, 5, 6, 6, 7, 8, 9, 10, 11, 13, 14, 16},
@@ -172,6 +173,13 @@ u8 CCKSwingTable_Ch14[CCK_TABLE_SIZE][8] = {
 #define		RxDefaultAnt1		0x65a9
 #define	RxDefaultAnt2		0x569a
 
+void ODM_InitDebugSetting(struct odm_dm_struct *pDM_Odm)
+{
+	pDM_Odm->DebugLevel = ODM_DBG_TRACE;
+
+	pDM_Odm->DebugComponents = 0;
+}
+
 /* 3 Export Interface */
 
 /*  2011/09/21 MH Add to describe different team necessary resource allocate?? */
@@ -183,7 +191,6 @@ void ODM_DMInit(struct odm_dm_struct *pDM_Odm)
 	odm_DIGInit(pDM_Odm);
 	odm_RateAdaptiveMaskInit(pDM_Odm);
 
-	odm_PrimaryCCA_Init(pDM_Odm);    /*  Gary */
 	odm_DynamicTxPowerInit(pDM_Odm);
 	odm_TXPowerTrackingInit(pDM_Odm);
 	ODM_EdcaTurboInit(pDM_Odm);
@@ -1241,7 +1248,7 @@ void odm_TXPowerTrackingCheckCE(struct odm_dm_struct *pDM_Odm)
 		pDM_Odm->RFCalibrateInfo.TM_Trigger = 1;
 		return;
 	} else {
-		odm_TXPowerTrackingCallback_ThermalMeter_8188E(Adapter);
+		rtl88eu_dm_txpower_tracking_callback_thermalmeter(Adapter);
 		pDM_Odm->RFCalibrateInfo.TM_Trigger = 0;
 	}
 }
@@ -1257,7 +1264,7 @@ void odm_InitHybridAntDiv(struct odm_dm_struct *pDM_Odm)
 		return;
 	}
 
-	ODM_AntennaDiversityInit_88E(pDM_Odm);
+	rtl88eu_dm_antenna_div_init(pDM_Odm);
 }
 
 void odm_HwAntDiv(struct odm_dm_struct *pDM_Odm)
@@ -1267,7 +1274,7 @@ void odm_HwAntDiv(struct odm_dm_struct *pDM_Odm)
 		return;
 	}
 
-	ODM_AntennaDiversity_88E(pDM_Odm);
+	rtl88eu_dm_antenna_diversity(pDM_Odm);
 }
 
 /* EDCA Turbo */

@@ -743,7 +743,7 @@ static int trimpot_8402_write(struct comedi_device *dev, unsigned int channel,
 static int cb_pcidas_trimpot_write(struct comedi_device *dev,
 				   unsigned int channel, unsigned int value)
 {
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 
 	if (devpriv->trimpot_value[channel] == value)
@@ -817,7 +817,7 @@ static int cb_pcidas_ai_cmdtest(struct comedi_device *dev,
 				struct comedi_subdevice *s,
 				struct comedi_cmd *cmd)
 {
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 	int err = 0;
 	unsigned int arg;
@@ -886,7 +886,9 @@ static int cb_pcidas_ai_cmdtest(struct comedi_device *dev,
 
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	if (cmd->stop_src == TRIG_NONE)
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -939,7 +941,7 @@ static void cb_pcidas_ai_load_counters(struct comedi_device *dev)
 static int cb_pcidas_ai_cmd(struct comedi_device *dev,
 			    struct comedi_subdevice *s)
 {
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 	struct comedi_async *async = s->async;
 	struct comedi_cmd *cmd = &async->cmd;
@@ -981,7 +983,7 @@ static int cb_pcidas_ai_cmd(struct comedi_device *dev,
 	spin_lock_irqsave(&dev->spinlock, flags);
 	devpriv->adc_fifo_bits |= INTE;
 	devpriv->adc_fifo_bits &= ~INT_MASK;
-	if (cmd->flags & TRIG_WAKE_EOS) {
+	if (cmd->flags & CMDF_WAKE_EOS) {
 		if (cmd->convert_src == TRIG_NOW && cmd->chanlist_len > 1) {
 			/* interrupt end of burst */
 			devpriv->adc_fifo_bits |= INT_EOS;
@@ -1042,7 +1044,7 @@ static int cb_pcidas_ao_cmdtest(struct comedi_device *dev,
 				struct comedi_subdevice *s,
 				struct comedi_cmd *cmd)
 {
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 	int err = 0;
 	unsigned int arg;
@@ -1079,7 +1081,9 @@ static int cb_pcidas_ao_cmdtest(struct comedi_device *dev,
 
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	if (cmd->stop_src == TRIG_NONE)
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -1134,7 +1138,7 @@ static int cb_pcidas_ao_inttrig(struct comedi_device *dev,
 				struct comedi_subdevice *s,
 				unsigned int trig_num)
 {
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 	unsigned int num_bytes, num_points = thisboard->fifo_size;
 	struct comedi_async *async = s->async;
@@ -1266,7 +1270,7 @@ static int cb_pcidas_ao_cancel(struct comedi_device *dev,
 
 static void handle_ao_interrupt(struct comedi_device *dev, unsigned int status)
 {
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 	struct comedi_subdevice *s = dev->write_subdev;
 	struct comedi_async *async = s->async;
@@ -1321,7 +1325,7 @@ static void handle_ao_interrupt(struct comedi_device *dev, unsigned int status)
 static irqreturn_t cb_pcidas_interrupt(int irq, void *d)
 {
 	struct comedi_device *dev = (struct comedi_device *)d;
-	const struct cb_pcidas_board *thisboard = comedi_board(dev);
+	const struct cb_pcidas_board *thisboard = dev->board_ptr;
 	struct cb_pcidas_private *devpriv = dev->private;
 	struct comedi_subdevice *s = dev->read_subdev;
 	struct comedi_async *async;

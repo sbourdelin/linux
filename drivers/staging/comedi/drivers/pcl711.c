@@ -334,7 +334,9 @@ static int pcl711_ai_cmdtest(struct comedi_device *dev,
 	err |= cfc_check_trigger_arg_is(&cmd->convert_arg, 0);
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
-	if (cmd->stop_src == TRIG_NONE)
+	if (cmd->stop_src == TRIG_COUNT)
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
+	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -376,15 +378,8 @@ static int pcl711_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 
 	pcl711_set_changain(dev, s, cmd->chanlist[0]);
 
-	if (cmd->stop_src == TRIG_COUNT) {
-		if (cmd->stop_arg == 0) {
-			/* an empty acquisition */
-			s->async->events |= COMEDI_CB_EOA;
-			comedi_event(dev, s);
-			return 0;
-		}
+	if (cmd->stop_src == TRIG_COUNT)
 		devpriv->ntrig = cmd->stop_arg;
-	}
 
 	if (cmd->scan_begin_src == TRIG_TIMER) {
 		pcl711_ai_load_counters(dev);
@@ -459,7 +454,7 @@ static int pcl711_do_insn_bits(struct comedi_device *dev,
 
 static int pcl711_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 {
-	const struct pcl711_board *board = comedi_board(dev);
+	const struct pcl711_board *board = dev->board_ptr;
 	struct pcl711_private *devpriv;
 	struct comedi_subdevice *s;
 	int ret;

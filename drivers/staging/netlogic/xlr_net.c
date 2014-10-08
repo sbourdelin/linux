@@ -112,10 +112,8 @@ static inline unsigned char *xlr_alloc_skb(void)
 
 	/* skb->data is cache aligned */
 	skb = alloc_skb(XLR_RX_BUF_SIZE, GFP_ATOMIC);
-	if (!skb) {
-		pr_err("SKB allocation failed\n");
+	if (!skb)
 		return NULL;
-	}
 	skb_data = skb->data;
 	skb_put(skb, MAC_SKB_BACK_PTR_SIZE);
 	skb_pull(skb, MAC_SKB_BACK_PTR_SIZE);
@@ -179,6 +177,7 @@ static int xlr_get_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
 		return -ENODEV;
 	return phy_ethtool_gset(phydev, ecmd);
 }
+
 static int xlr_set_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
 {
 	struct xlr_net_priv *priv = netdev_priv(ndev);
@@ -193,7 +192,6 @@ static struct ethtool_ops xlr_ethtool_ops = {
 	.get_settings = xlr_get_settings,
 	.set_settings = xlr_set_settings,
 };
-
 
 /*
  * Net operations
@@ -221,7 +219,6 @@ static int xlr_net_open(struct net_device *ndev)
 	u32 err;
 	struct xlr_net_priv *priv = netdev_priv(ndev);
 	struct phy_device *phydev = priv->mii_bus->phy_map[priv->phy_addr];
-
 
 	/* schedule a link state check */
 	phy_start(phydev);
@@ -696,7 +693,6 @@ static int xlr_phy_read(u32 *base_addr, int phy_addr, int regnum)
 	xlr_nae_wreg(base_addr, R_MII_MGMT_COMMAND,
 			(1 << O_MII_MGMT_COMMAND__rstat));
 
-
 	/* poll for the read cycle to complete */
 	while (!timedout) {
 		checktime = jiffies;
@@ -766,7 +762,6 @@ static void xlr_sgmii_init(struct xlr_net_priv *priv)
 
 	xlr_nae_wreg(priv->gpio_addr, 0x22, 0x7e6802);
 	xlr_nae_wreg(priv->gpio_addr, 0x21, 0x7104);
-
 
 	/* enable autoneg - more magic */
 	phy = priv->phy_addr % 4 + 27;

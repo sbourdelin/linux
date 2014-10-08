@@ -78,7 +78,6 @@ struct s626_buffer_dma {
 
 struct s626_private {
 	uint8_t ai_cmd_running;		/* ai_cmd is running */
-	uint8_t ai_continuous;		/* continuous acquisition */
 	int ai_sample_count;		/* number of samples to acquire */
 	unsigned int ai_sample_timer;	/* time between samples in
 					 * units of the timer */
@@ -1502,19 +1501,20 @@ static bool s626_handle_eos_interrupt(struct comedi_device *dev)
 	/* end of scan occurs */
 	async->events |= COMEDI_CB_EOS;
 
-	if (!devpriv->ai_continuous)
+	if (cmd->stop_src == TRIG_COUNT) {
 		devpriv->ai_sample_count--;
-	if (devpriv->ai_sample_count <= 0) {
-		devpriv->ai_cmd_running = 0;
+		if (devpriv->ai_sample_count <= 0) {
+			devpriv->ai_cmd_running = 0;
 
-		/* Stop RPS program */
-		s626_mc_disable(dev, S626_MC1_ERPS1, S626_P_MC1);
+			/* Stop RPS program */
+			s626_mc_disable(dev, S626_MC1_ERPS1, S626_P_MC1);
 
-		/* send end of acquisition */
-		async->events |= COMEDI_CB_EOA;
+			/* send end of acquisition */
+			async->events |= COMEDI_CB_EOA;
 
-		/* disable master interrupt */
-		finished = true;
+			/* disable master interrupt */
+			finished = true;
+		}
 	}
 
 	if (devpriv->ai_cmd_running && cmd->scan_begin_src == TRIG_EXT)
@@ -1967,15 +1967,15 @@ static int s626_ns_to_timer(unsigned int *nanosec, unsigned int flags)
 
 	base = 500;		/* 2MHz internal clock */
 
-	switch (flags & TRIG_ROUND_MASK) {
-	case TRIG_ROUND_NEAREST:
+	switch (flags & CMDF_ROUND_MASK) {
+	case CMDF_ROUND_NEAREST:
 	default:
 		divider = (*nanosec + base / 2) / base;
 		break;
-	case TRIG_ROUND_DOWN:
+	case CMDF_ROUND_DOWN:
 		divider = (*nanosec) / base;
 		break;
-	case TRIG_ROUND_UP:
+	case CMDF_ROUND_UP:
 		divider = (*nanosec + base - 1) / base;
 		break;
 	}
@@ -2102,18 +2102,7 @@ static int s626_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 		break;
 	}
 
-	switch (cmd->stop_src) {
-	case TRIG_COUNT:
-		/* data arrives as one packet */
-		devpriv->ai_sample_count = cmd->stop_arg;
-		devpriv->ai_continuous = 0;
-		break;
-	case TRIG_NONE:
-		/* continuous acquisition */
-		devpriv->ai_continuous = 1;
-		devpriv->ai_sample_count = 1;
-		break;
-	}
+	devpriv->ai_sample_count = cmd->stop_arg;
 
 	s626_reset_adc(dev, ppl);
 
@@ -2219,7 +2208,7 @@ static int s626_ai_cmdtest(struct comedi_device *dev,
 	err |= cfc_check_trigger_arg_is(&cmd->scan_end_arg, cmd->chanlist_len);
 
 	if (cmd->stop_src == TRIG_COUNT)
-		err |= cfc_check_trigger_arg_max(&cmd->stop_arg, 0x00ffffff);
+		err |= cfc_check_trigger_arg_min(&cmd->stop_arg, 1);
 	else	/* TRIG_NONE */
 		err |= cfc_check_trigger_arg_is(&cmd->stop_arg, 0);
 
