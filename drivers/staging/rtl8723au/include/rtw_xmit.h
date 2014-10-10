@@ -314,11 +314,6 @@ struct	xmit_priv {
 	struct semaphore	tx_retevt;/* all tx return event; */
 
 	struct tasklet_struct xmit_tasklet;
-	/* per AC pending irp */
-	int beq_cnt;
-	int bkq_cnt;
-	int viq_cnt;
-	int voq_cnt;
 
 	struct rtw_queue free_xmitbuf_queue;
 	struct list_head xmitbuf_list;		/* track buffers for cleanup */
