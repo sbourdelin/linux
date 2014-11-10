@@ -345,7 +345,7 @@ static void *__netdev_alloc_frag(unsigned int fragsz, gfp_t gfp_mask)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	nc = &__get_cpu_var(netdev_alloc_cache);
+	nc = this_cpu_ptr(&netdev_alloc_cache);
 	if (unlikely(!nc->frag.page)) {
 refill:
 		for (order = NETDEV_FRAG_PAGE_MAX_ORDER; ;) {
@@ -360,18 +360,29 @@ refill:
 				goto end;
 		}
 		nc->frag.size = PAGE_SIZE << order;
-recycle:
-		atomic_set(&nc->frag.page->_count, NETDEV_PAGECNT_MAX_BIAS);
+		/* Even if we own the page, we do not use atomic_set().
+		 * This would break get_page_unless_zero() users.
+		 */
+		atomic_add(NETDEV_PAGECNT_MAX_BIAS - 1,
+			   &nc->frag.page->_count);
 		nc->pagecnt_bias = NETDEV_PAGECNT_MAX_BIAS;
 		nc->frag.offset = 0;
 	}
 
 	if (nc->frag.offset + fragsz > nc->frag.size) {
-		/* avoid unnecessary locked operations if possible */
-		if ((atomic_read(&nc->frag.page->_count) == nc->pagecnt_bias) ||
-		    atomic_sub_and_test(nc->pagecnt_bias, &nc->frag.page->_count))
-			goto recycle;
-		goto refill;
+		if (atomic_read(&nc->frag.page->_count) != nc->pagecnt_bias) {
+			if (!atomic_sub_and_test(nc->pagecnt_bias,
+						 &nc->frag.page->_count))
+				goto refill;
+			/* OK, page count is 0, we can safely set it */
+			atomic_set(&nc->frag.page->_count,
+				   NETDEV_PAGECNT_MAX_BIAS);
+		} else {
+			atomic_add(NETDEV_PAGECNT_MAX_BIAS - nc->pagecnt_bias,
+				   &nc->frag.page->_count);
+		}
+		nc->pagecnt_bias = NETDEV_PAGECNT_MAX_BIAS;
+		nc->frag.offset = 0;
 	}
 
 	data = page_address(nc->frag.page) + nc->frag.offset;
@@ -4059,15 +4070,22 @@ EXPORT_SYMBOL_GPL(skb_scrub_packet);
 unsigned int skb_gso_transport_seglen(const struct sk_buff *skb)
 {
 	const struct skb_shared_info *shinfo = skb_shinfo(skb);
+	unsigned int thlen = 0;
 
-	if (likely(shinfo->gso_type & (SKB_GSO_TCPV4 | SKB_GSO_TCPV6)))
-		return tcp_hdrlen(skb) + shinfo->gso_size;
+	if (skb->encapsulation) {
+		thlen = skb_inner_transport_header(skb) -
+			skb_transport_header(skb);
 
+		if (likely(shinfo->gso_type & (SKB_GSO_TCPV4 | SKB_GSO_TCPV6)))
+			thlen += inner_tcp_hdrlen(skb);
+	} else if (likely(shinfo->gso_type & (SKB_GSO_TCPV4 | SKB_GSO_TCPV6))) {
+		thlen = tcp_hdrlen(skb);
+	}
 	/* UFO sets gso_size to the size of the fragmentation
 	 * payload, i.e. the size of the L4 (UDP) header is already
 	 * accounted for.
 	 */
-	return shinfo->gso_size;
+	return thlen + shinfo->gso_size;
 }
 EXPORT_SYMBOL_GPL(skb_gso_transport_seglen);
 
@@ -4126,11 +4144,11 @@ EXPORT_SYMBOL(skb_vlan_untag);
 /**
  * alloc_skb_with_frags - allocate skb with page frags
  *
- * header_len: size of linear part
- * data_len: needed length in frags
- * max_page_order: max page order desired.
- * errcode: pointer to error code if any
- * gfp_mask: allocation mask
+ * @header_len: size of linear part
+ * @data_len: needed length in frags
+ * @max_page_order: max page order desired.
+ * @errcode: pointer to error code if any
+ * @gfp_mask: allocation mask
  *
  * This can be used to allocate a paged skb, given a maximal order for frags.
  */

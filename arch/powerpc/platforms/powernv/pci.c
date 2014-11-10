@@ -505,7 +505,7 @@ static bool pnv_pci_cfg_check(struct pci_controller *hose,
 	edev = of_node_to_eeh_dev(dn);
 	if (edev) {
 		if (edev->pe &&
-		    (edev->pe->state & EEH_PE_RESET))
+		    (edev->pe->state & EEH_PE_CFG_BLOCKED))
 			return false;
 
 		if (edev->mode & EEH_DEV_REMOVED)
@@ -751,6 +751,17 @@ int pnv_pci_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
 	if (phb && phb->dma_set_mask)
 		return phb->dma_set_mask(phb, pdev, dma_mask);
 	return __dma_set_mask(&pdev->dev, dma_mask);
+}
+
+u64 pnv_pci_dma_get_required_mask(struct pci_dev *pdev)
+{
+	struct pci_controller *hose = pci_bus_to_host(pdev->bus);
+	struct pnv_phb *phb = hose->private_data;
+
+	if (phb && phb->dma_get_required_mask)
+		return phb->dma_get_required_mask(phb, pdev);
+
+	return __dma_get_required_mask(&pdev->dev);
 }
 
 void pnv_pci_shutdown(void)

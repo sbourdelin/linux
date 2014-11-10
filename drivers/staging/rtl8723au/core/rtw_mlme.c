@@ -50,7 +50,6 @@ static void rtw_init_mlme_timer(struct rtw_adapter *padapter)
 int rtw_init_mlme_priv23a(struct rtw_adapter *padapter)
 {
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-	int res = _SUCCESS;
 
 	pmlmepriv->nic_hdl = padapter;
 
@@ -68,7 +67,7 @@ int rtw_init_mlme_priv23a(struct rtw_adapter *padapter)
 	rtw_clear_scan_deny(padapter);
 
 	rtw_init_mlme_timer(padapter);
-	return res;
+	return _SUCCESS;
 }
 
 #ifdef CONFIG_8723AU_AP_MODE
@@ -217,8 +216,6 @@ void rtw_generate_random_ibss23a(u8 *pibss)
 	pibss[3] = curtime & 0xff;/* p[0]; */
 	pibss[4] = (curtime >> 8) & 0xff;/* p[1]; */
 	pibss[5] = (curtime >> 16) & 0xff;/* p[2]; */
-
-	return;
 }
 
 void rtw_set_roaming(struct rtw_adapter *adapter, u8 to_roaming)
@@ -576,8 +573,6 @@ void rtw_atimdone_event_callback23a(struct rtw_adapter *adapter, const u8 *pbuf)
 {
 	RT_TRACE(_module_rtl871x_mlme_c_, _drv_err_,
 		 ("receive atimdone_evet\n"));
-
-	return;
 }
 
 void rtw_survey_event_cb23a(struct rtw_adapter *adapter, const u8 *pbuf)
@@ -647,8 +642,6 @@ exit:
 
 	kfree(survey->bss);
 	survey->bss = NULL;
-
-	return;
 }
 
 void
@@ -1127,7 +1120,7 @@ void rtw_joinbss_event_prehandle23a(struct rtw_adapter *adapter, u8 *pbuf)
 		if (check_fwstate(pmlmepriv, _FW_UNDER_LINKING)) {
 			/* s1. find ptarget_wlan */
 			if (check_fwstate(pmlmepriv, _FW_LINKED)) {
-				if (the_same_macaddr == true) {
+				if (the_same_macaddr) {
 					ptarget_wlan = rtw_find_network23a(&pmlmepriv->scanned_queue, cur_network->network.MacAddress);
 				} else {
 					pcur_wlan = rtw_find_network23a(&pmlmepriv->scanned_queue, cur_network->network.MacAddress);
@@ -1510,18 +1503,21 @@ out:
 inline bool rtw_is_scan_deny(struct rtw_adapter *adapter)
 {
 	struct mlme_priv *mlmepriv = &adapter->mlmepriv;
+
 	return (atomic_read(&mlmepriv->set_scan_deny) != 0) ? true : false;
 }
 
 void rtw_clear_scan_deny(struct rtw_adapter *adapter)
 {
 	struct mlme_priv *mlmepriv = &adapter->mlmepriv;
+
 	atomic_set(&mlmepriv->set_scan_deny, 0);
 }
 
 void rtw_set_scan_deny_timer_hdl(unsigned long data)
 {
 	struct rtw_adapter *adapter = (struct rtw_adapter *)data;
+
 	rtw_clear_scan_deny(adapter);
 }
 
@@ -1535,7 +1531,8 @@ void rtw_set_scan_deny(struct rtw_adapter *adapter, u32 ms)
 }
 
 #if defined(IEEE80211_SCAN_RESULT_EXPIRE)
-#define RTW_SCAN_RESULT_EXPIRE IEEE80211_SCAN_RESULT_EXPIRE/HZ*1000 -1000 /* 3000 -1000 */
+#define RTW_SCAN_RESULT_EXPIRE  \
+	((IEEE80211_SCAN_RESULT_EXPIRE / (HZ*1000)) - 1000) /* 3000 -1000 */
 #else
 #define RTW_SCAN_RESULT_EXPIRE 2000
 #endif
@@ -2146,6 +2143,7 @@ bool rtw_restructure_ht_ie23a(struct rtw_adapter *padapter, u8 *in_ie,
 
 	if (p && p[1] > 0) {
 		u32 rx_packet_offset, max_recvbuf_sz;
+
 		if (pmlmepriv->qos_option == 0) {
 			out_len = *pout_len;
 			pframe = rtw_set_ie23a(out_ie + out_len,

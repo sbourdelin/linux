@@ -29,8 +29,6 @@
 
 #define MAX_CRTC	4
 
-struct imx_drm_crtc;
-
 struct imx_drm_component {
 	struct device_node *of_node;
 	struct list_head list;
@@ -531,6 +529,7 @@ static struct drm_driver imx_drm_driver = {
 	.unload			= imx_drm_driver_unload,
 	.lastclose		= imx_drm_driver_lastclose,
 	.preclose		= imx_drm_driver_preclose,
+	.set_busid		= drm_platform_set_busid,
 	.gem_free_object	= drm_gem_cma_free_object,
 	.gem_vm_ops		= &drm_gem_cma_vm_ops,
 	.dumb_create		= drm_gem_cma_dumb_create,
@@ -631,7 +630,8 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
 				continue;
 			}
 
-			component_match_add(&pdev->dev, &match, compare_of, remote);
+			component_match_add(&pdev->dev, &match, compare_of,
+					    remote);
 			of_node_put(remote);
 		}
 		of_node_put(port);
