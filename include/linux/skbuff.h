@@ -557,7 +557,9 @@ struct sk_buff {
 	/* fields enclosed in headers_start/headers_end are copied
 	 * using a single memcpy() in __copy_skb_header()
 	 */
+	/* private: */
 	__u32			headers_start[0];
+	/* public: */
 
 /* if you move pkt_type around you also must adapt those constants */
 #ifdef __BIG_ENDIAN_BITFIELD
@@ -642,7 +644,9 @@ struct sk_buff {
 	__u16			network_header;
 	__u16			mac_header;
 
+	/* private: */
 	__u32			headers_end[0];
+	/* public: */
 
 	/* These elements must be at the end, see alloc_skb() for details.  */
 	sk_buff_data_t		tail;
@@ -795,15 +799,19 @@ struct sk_buff_fclones {
  *	@skb: buffer
  *
  * Returns true is skb is a fast clone, and its clone is not freed.
+ * Some drivers call skb_orphan() in their ndo_start_xmit(),
+ * so we also check that this didnt happen.
  */
-static inline bool skb_fclone_busy(const struct sk_buff *skb)
+static inline bool skb_fclone_busy(const struct sock *sk,
+				   const struct sk_buff *skb)
 {
 	const struct sk_buff_fclones *fclones;
 
 	fclones = container_of(skb, struct sk_buff_fclones, skb1);
 
 	return skb->fclone == SKB_FCLONE_ORIG &&
-	       fclones->skb2.fclone == SKB_FCLONE_CLONE;
+	       fclones->skb2.fclone == SKB_FCLONE_CLONE &&
+	       fclones->skb2.sk == sk;
 }
 
 static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
@@ -1203,7 +1211,12 @@ static inline struct sk_buff *skb_unshare(struct sk_buff *skb,
 	might_sleep_if(pri & __GFP_WAIT);
 	if (skb_cloned(skb)) {
 		struct sk_buff *nskb = skb_copy(skb, pri);
-		kfree_skb(skb);	/* Free our shared copy */
+
+		/* Free our shared copy */
+		if (likely(nskb))
+			consume_skb(skb);
+		else
+			kfree_skb(skb);
 		skb = nskb;
 	}
 	return skb;
