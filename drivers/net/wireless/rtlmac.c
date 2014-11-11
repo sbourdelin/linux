@@ -3214,6 +3214,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
 	struct rtlmac_rx_desc *rx_desc = (struct rtlmac_rx_desc *)skb->data;
 	struct ieee80211_rx_status *rx_status = IEEE80211_SKB_RXCB(skb);
+	struct ieee80211_mgmt *mgmt;
 	int cnt, len, skb_size, drvinfo_sz, desc_shift, i;
 
 	cnt = (cpu_to_le32(rx_desc->rxdw2) >> 16) & 0xff;
@@ -3221,11 +3222,16 @@ static void rtlmac_rx_complete(struct urb *urb)
 	drvinfo_sz = ((cpu_to_le32(rx_desc->rxdw0) >> 16) & 0xf) * 8;
 	desc_shift = (cpu_to_le32(rx_desc->rxdw0) >> 24) & 0x3;
 	skb_put(skb, urb->actual_length);
-	for (i = 0; i < min_t(int, 128, skb->len); i++) {
+#if 0
+	for (i = sizeof(struct rtlmac_rx_desc) + drvinfo_sz, j = 0;
+	     j < min_t(int, 128,
+		       skb->len - (sizeof(struct rtlmac_rx_desc) + drvinfo_sz));
+	     i++, j++) {
 		printk("%02x ", skb->data[i]);
-		if ((i & 0xf) == 0xf)
+		if ((j & 0xf) == 0xf)
 			printk("\n");
 	}
+#endif
 
 	printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb size %i "
 	       "cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
@@ -3235,6 +3241,27 @@ static void rtlmac_rx_complete(struct urb *urb)
 	if (urb->status == 0) {
 		skb_pull(skb, sizeof(struct rtlmac_rx_desc));
 		skb_pull(skb, drvinfo_sz + desc_shift);
+
+		mgmt = (struct ieee80211_mgmt *)skb->data;
+
+		if (ieee80211_is_assoc_req(mgmt->frame_control)) {
+			printk(KERN_DEBUG "Received assoc req\n");
+		}
+		if (ieee80211_is_assoc_resp(mgmt->frame_control)) {
+			printk(KERN_DEBUG "Received assoc resp\n");
+		}
+		if (ieee80211_is_probe_req(mgmt->frame_control)) {
+			printk(KERN_DEBUG "Received prob req\n");
+		}
+		if (ieee80211_is_probe_resp(mgmt->frame_control)) {
+			printk(KERN_DEBUG "Received prob resp\n");
+		}
+
+		for (i = 0; i < min_t(int, 128, skb->len); i++) {
+			printk("%02x ", skb->data[i]);
+			if ((i & 0xf) == 0xf)
+				printk("\n");
+		}
 
 		memset(rx_status, 0, sizeof(struct ieee80211_rx_status));
 
