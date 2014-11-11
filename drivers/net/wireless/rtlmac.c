@@ -2402,10 +2402,10 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 
 	/* Read RF reg18 */
 	LC_Cal = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
-	LC_Cal &= 0xfff;
+	LC_Cal |= 0x08000;
 
 	/* Start LC calibration */
-	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, LC_Cal | 0x08000);
+	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, LC_Cal);
 
 	msleep(100);
 
