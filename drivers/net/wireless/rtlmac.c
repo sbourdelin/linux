@@ -745,6 +745,14 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
 	rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 #endif
+
+	rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, 0x00);
+	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 1, 0x64);
+	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, 0x00);
+	rtl8723au_write8(priv, REG_BEACON_CTRL,
+			 BEACON_ATIM | BEACON_FUNCTION_ENABLE |
+			 BEACON_TSF_UPDATE);
+	rtl8723au_write8(priv, REG_MSR, MSR_LINKTYPE_STATION);
 }
 
 /*
@@ -3051,11 +3059,30 @@ exit:
 	return ret;
 }
 
-static int rtlmac_disable_device(struct ieee80211_hw *hw)
+static void rtlmac_disable_device(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
 
 	rtlmac_power_off(priv);
+}
+
+static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
+{
+	struct rtlmac_priv *priv = hw->priv;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
+}
+
+static int rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
+{
+	struct rtlmac_priv *priv = hw->priv;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+//	rtlmac_set_linktype(priv, MSR_LINKTYPE_STATION);
+
 	return 0;
 }
 
@@ -3251,10 +3278,10 @@ static void rtlmac_rx_complete(struct urb *urb)
 			printk(KERN_DEBUG "Received assoc resp\n");
 		}
 		if (ieee80211_is_probe_req(mgmt->frame_control)) {
-			printk(KERN_DEBUG "Received prob req\n");
+			printk(KERN_DEBUG "Received probe req\n");
 		}
 		if (ieee80211_is_probe_resp(mgmt->frame_control)) {
-			printk(KERN_DEBUG "Received prob resp\n");
+			printk(KERN_DEBUG "Received probe resp\n");
 		}
 
 		for (i = 0; i < min_t(int, 128, skb->len); i++) {
@@ -3484,6 +3511,8 @@ static const struct ieee80211_ops rtlmac_ops = {
 	.configure_filter = rtlmac_configure_filter,
 	.start = rtlmac_start,
 	.stop = rtlmac_stop,
+	.sw_scan_start = rtlmac_sw_scan_start,
+	.sw_scan_complete = rtlmac_sw_scan_complete,
 #if 0
 	.set_key = rtlmac_set_key,
 #endif
