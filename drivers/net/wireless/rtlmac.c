@@ -891,10 +891,15 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	group = rtl8723a_channel_to_group(channel);
 
 	cck[0] = efuse->cck_tx_power_index_A[group];
-	cck[1] = efuse->cck_tx_power_index_B[group];
-
 	ofdm[0] = efuse->ht40_1s_tx_power_index_A[group];
-	ofdm[1] = efuse->ht40_1s_tx_power_index_B[group];
+
+	if (priv->rf_paths > 1) {
+		cck[1] = efuse->cck_tx_power_index_B[group];
+		ofdm[1] = efuse->ht40_1s_tx_power_index_B[group];
+	} else {
+		cck[1] = 0;
+		ofdm[1] = 0;
+	}
 
 	printk(KERN_DEBUG "%s: Setting TX power CCK A: %i, CCK B: %i, "
 	       "OFDM A: %i, OFDM B: %i\n", DRIVER_NAME,
