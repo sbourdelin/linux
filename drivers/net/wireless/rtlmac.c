@@ -883,7 +883,8 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	struct rtl8723au_efuse *efuse;
 	u8 cck[RTL8723A_MAX_RF_PATHS], ofdm[RTL8723A_MAX_RF_PATHS];
 	u8 ofdmbase[RTL8723A_MAX_RF_PATHS], mcsbase[RTL8723A_MAX_RF_PATHS];
-	u32 val32;
+	u32 val32, ofdm_a, ofdm_b, mcs_a, mcs_b;
+	u8 val8;
 	int group, i;
 
 	efuse = &priv->efuse_wifi.efuse;
@@ -901,8 +902,8 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 		ofdm[1] = 0;
 	}
 
-	printk(KERN_DEBUG "%s: Setting TX power CCK A: %i, CCK B: %i, "
-	       "OFDM A: %i, OFDM B: %i\n", DRIVER_NAME,
+	printk(KERN_DEBUG "%s: Setting TX power CCK A: %02x, CCK B: %02x, "
+	       "OFDM A: %02x, OFDM B: %02x\n", DRIVER_NAME,
 	       cck[0], cck[1], ofdm[0], ofdm[1]);
 	printk(KERN_DEBUG "%s: Regulatory 0x%02x\n",
 	       DRIVER_NAME, efuse->rf_regulatory);
@@ -944,29 +945,46 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	if (!ht40)
 		mcsbase[1] += efuse->ht20_tx_power_index_diff[group].b;
 
-	val32 = ofdmbase[0] | ofdmbase[0] << 8 |
+	ofdm_a = ofdmbase[0] | ofdmbase[0] << 8 |
 		ofdmbase[0] << 16 | ofdmbase[0] <<24;
-	rtl8723au_write32(priv, REG_TX_AGC_A_RATE18_06, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_A_RATE54_24, val32);
-
-	val32 = mcsbase[0] | mcsbase[0] << 8 |
-		mcsbase[0] << 16 | mcsbase[0] <<24;
-	rtl8723au_write32(priv, REG_TX_AGC_A_MCS03_MCS00, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_A_MCS07_MCS04, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_A_MCS11_MCS08, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_A_MCS15_MCS12, val32);
-
-	val32 = ofdmbase[1] | ofdmbase[1] << 8 |
+	ofdm_b = ofdmbase[1] | ofdmbase[1] << 8 |
 		ofdmbase[1] << 16 | ofdmbase[1] <<24;
-	rtl8723au_write32(priv, REG_TX_AGC_B_RATE18_06, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_B_RATE54_24, val32);
+	rtl8723au_write32(priv, REG_TX_AGC_A_RATE18_06, ofdm_a);
+	rtl8723au_write32(priv, REG_TX_AGC_B_RATE18_06, ofdm_b);
 
-	val32 = mcsbase[1] | mcsbase[1] << 8 |
+	rtl8723au_write32(priv, REG_TX_AGC_A_RATE54_24, ofdm_a);
+	rtl8723au_write32(priv, REG_TX_AGC_B_RATE54_24, ofdm_b);
+
+	mcs_a = mcsbase[0] | mcsbase[0] << 8 |
+		mcsbase[0] << 16 | mcsbase[0] <<24;
+	mcs_b = mcsbase[1] | mcsbase[1] << 8 |
 		mcsbase[1] << 16 | mcsbase[1] <<24;
-	rtl8723au_write32(priv, REG_TX_AGC_B_MCS03_MCS00, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_B_MCS07_MCS04, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_B_MCS11_MCS08, val32);
-	rtl8723au_write32(priv, REG_TX_AGC_B_MCS15_MCS12, val32);
+
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS03_MCS00, mcs_a);
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS03_MCS00, mcs_b);
+
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS07_MCS04, mcs_a);
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS07_MCS04, mcs_b);
+
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS11_MCS08, mcs_a);
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS11_MCS08, mcs_b);
+
+	rtl8723au_write32(priv, REG_TX_AGC_A_MCS15_MCS12, mcs_a);
+	for (i = 0; i < 3; i++) {
+		if (i != 2)
+			val8 = (mcsbase[0] > 8) ? (mcsbase[0] - 8) : 0;
+		else
+			val8 = (mcsbase[0] > 6) ? (mcsbase[0] - 6) : 0;
+		rtl8723au_write8(priv, REG_OFDM0_XC_TX_IQ_IMBALANCE + i, val8);
+	}
+	rtl8723au_write32(priv, REG_TX_AGC_B_MCS15_MCS12, mcs_b);
+	for (i = 0; i < 3; i++) {
+		if (i != 2)
+			val8 = (mcsbase[1] > 8) ? (mcsbase[1] - 8) : 0;
+		else
+			val8 = (mcsbase[1] > 6) ? (mcsbase[1] - 6) : 0;
+		rtl8723au_write8(priv, REG_OFDM0_XD_TX_IQ_IMBALANCE + i, val8);
+	}
 }
 
 static void rtlmac_set_linktype(struct rtlmac_priv *priv, u16 linktype)
@@ -2950,7 +2968,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/*
 	 * Start out with default power levels for channel 6, 20MHz
 	 */
-	rtl8723a_set_tx_power(priv, 6, false);
+	rtl8723a_set_tx_power(priv, 1, false);
 
 	/* Let the 8051 take control of antenna setting */
 	val8 = rtl8723au_read8(priv, REG_LEDCFG2);
@@ -3079,11 +3097,11 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 
 
 	rtl8723au_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
-	rtl8723au_write32(priv, REG_RCR, 0x700060ce);
+	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
+	rtl8723au_write32(priv, REG_RCR, 0x7000600e);
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
 			 BEACON_FUNCTION_ENABLE | BEACON_TSF_UPDATE);
-	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
 }
 
 static int rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
@@ -3243,6 +3261,8 @@ error:
 	dev_kfree_skb(skb);
 }
 
+static int rx_count = 30;
+
 static void rtlmac_rx_complete(struct urb *urb)
 {
 	struct rtlmac_rx_urb *rx_urb = container_of(urb,
@@ -3271,7 +3291,8 @@ static void rtlmac_rx_complete(struct urb *urb)
 	}
 #endif
 
-	printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb size %i "
+	if (rx_count)
+		printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb size %i "
 	       "cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
 	       __func__, skb, urb->status, skb->len, cnt, len, drvinfo_sz,
 	       desc_shift);
@@ -3284,21 +3305,25 @@ static void rtlmac_rx_complete(struct urb *urb)
 
 		if (ieee80211_is_assoc_req(mgmt->frame_control)) {
 			printk(KERN_DEBUG "Received assoc req\n");
-		}
-		if (ieee80211_is_assoc_resp(mgmt->frame_control)) {
+		} else if (ieee80211_is_assoc_resp(mgmt->frame_control)) {
 			printk(KERN_DEBUG "Received assoc resp\n");
-		}
-		if (ieee80211_is_probe_req(mgmt->frame_control)) {
+		} if (ieee80211_is_probe_req(mgmt->frame_control)) {
 			printk(KERN_DEBUG "Received probe req\n");
-		}
-		if (ieee80211_is_probe_resp(mgmt->frame_control)) {
+		} if (ieee80211_is_probe_resp(mgmt->frame_control)) {
 			printk(KERN_DEBUG "Received probe resp\n");
+		} if (ieee80211_is_mgmt(mgmt->frame_control)) {
+			printk(KERN_DEBUG "Received mgmt\n");
+		} else {
+			printk(KERN_DEBUG "Received something else\n");
 		}
 
-		for (i = 0; i < min_t(int, 128, skb->len); i++) {
-			printk("%02x ", skb->data[i]);
-			if ((i & 0xf) == 0xf)
-				printk("\n");
+		if (rx_count) {
+			for (i = 0; i < min_t(int, 128, skb->len); i++) {
+				printk("%02x ", skb->data[i]);
+				if ((i & 0xf) == 0xf)
+					printk("\n");
+			}
+			rx_count--;
 		}
 
 		memset(rx_status, 0, sizeof(struct ieee80211_rx_status));
