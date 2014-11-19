@@ -936,12 +936,12 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 
 	ofdmbase[0] = ofdm[0] +	efuse->ofdm_tx_power_index_diff[group].a;
 	mcsbase[0] = ofdm[0];
-	if (ht40)
+	if (!ht40)
 		mcsbase[0] += efuse->ht20_tx_power_index_diff[group].a;
 
 	ofdmbase[1] = ofdm[1] +	efuse->ofdm_tx_power_index_diff[group].b;
 	mcsbase[1] = ofdm[1];
-	if (ht40)
+	if (!ht40)
 		mcsbase[1] += efuse->ht20_tx_power_index_diff[group].b;
 
 	val32 = ofdmbase[0] | ofdmbase[0] << 8 |
