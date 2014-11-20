@@ -3111,11 +3111,7 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 
 static int rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
-
 	printk(KERN_DEBUG "%s\n", __func__);
-
-//	rtlmac_set_linktype(priv, MSR_LINKTYPE_STATION);
 
 	return 0;
 }
