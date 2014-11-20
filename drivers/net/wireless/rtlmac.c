@@ -3684,6 +3684,8 @@ static int rtlmac_probe(struct usb_interface *interface,
 	SET_IEEE80211_DEV(priv->hw, &interface->dev);
 	SET_IEEE80211_PERM_ADDR(hw, priv->mac_addr);
 
+	hw->extra_tx_headroom = sizeof(struct rtlmac_tx_desc);
+
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
 		printk(KERN_ERR "%s: RTL8723au failed to register: %is\n",
