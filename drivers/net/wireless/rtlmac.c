@@ -1629,17 +1629,10 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	rtlmac_init_rf_regs(priv, rtl8723au_radioa_rf6052_1t_init_table);
 
 	/* For path B, use XB */
-#if 0
 	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
 	val16 &= ~FPGA0_RF_RFENV;
 	val16 |= rfsi_rfenv;
 	rtl8723au_write16(priv, REG_FPGA0_XA_RF_SW_CTRL, val16);
-#else
-	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_SW_CTRL);
-	val32 &= ~FPGA0_RF_RFENV;
-	val32 |= rfsi_rfenv;
-	rtl8723au_write32(priv, REG_FPGA0_XA_RF_SW_CTRL, val32);
-#endif
 
 	return 0;
 }
