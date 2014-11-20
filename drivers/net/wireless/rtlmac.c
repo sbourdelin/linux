@@ -3272,22 +3272,12 @@ static void rtlmac_rx_complete(struct urb *urb)
 	drvinfo_sz = ((cpu_to_le32(rx_desc->rxdw0) >> 16) & 0xf) * 8;
 	desc_shift = (cpu_to_le32(rx_desc->rxdw0) >> 24) & 0x3;
 	skb_put(skb, urb->actual_length);
-#if 0
-	for (i = sizeof(struct rtlmac_rx_desc) + drvinfo_sz, j = 0;
-	     j < min_t(int, 128,
-		       skb->len - (sizeof(struct rtlmac_rx_desc) + drvinfo_sz));
-	     i++, j++) {
-		printk("%02x ", skb->data[i]);
-		if ((j & 0xf) == 0xf)
-			printk("\n");
-	}
-#endif
 
 	if (rx_count)
-		printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb size %i "
-	       "cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
-	       __func__, skb, urb->status, skb->len, cnt, len, drvinfo_sz,
-	       desc_shift);
+		printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb "
+		       "size %i cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
+		       __func__, skb, urb->status, skb->len, cnt, len,
+		       drvinfo_sz, desc_shift);
 
 	if (urb->status == 0) {
 		skb_pull(skb, sizeof(struct rtlmac_rx_desc));
