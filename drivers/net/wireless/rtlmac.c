@@ -3092,13 +3092,18 @@ static void rtlmac_disable_device(struct ieee80211_hw *hw)
 static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
+	u32 val32;
 
 	printk(KERN_DEBUG "%s\n", __func__);
 
 
 	rtl8723au_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
 	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
-	rtl8723au_write32(priv, REG_RCR, 0x7000600e);
+
+	val32 = rtl8723au_read32(priv, REG_RCR);
+	val32 &= ~(RCR_ACCEPT_BSSID_MATCH | RCR_ACCEPT_BSSID_BEACON);
+	rtl8723au_write32(priv, REG_RCR, val32);
+
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
 			 BEACON_FUNCTION_ENABLE | BEACON_TSF_UPDATE);
