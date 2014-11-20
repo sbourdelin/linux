@@ -3165,6 +3165,8 @@ static void rtlmac_tx_complete(struct urb *urb)
 	dev_kfree_skb(skb);
 }
 
+static int tx_count = 5;
+
 static void rtlmac_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
@@ -3178,7 +3180,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	u16 pktlen = skb->len;
 	u16 seq_number;
 	u8 rate_flag = tx_info->control.rates[0].flags;
-	int ret;
+	int ret, i;
 
 	if (skb_headroom(skb) < sizeof(struct rtlmac_tx_desc)) {
 		printk(KERN_DEBUG "%s: Not enough skb headroom space (%i) for "
@@ -3245,15 +3247,24 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
 			  skb->len, rtlmac_tx_complete, skb);
 
+	if (tx_count--) {
+		for (i = 0; i < min_t(int, 128, skb->len); i++) {
+			printk("%02x ", skb->data[i]);
+			if ((i & 0xf) == 0xf)
+				printk("\n");
+		}
+	}
+
 	ret = usb_submit_urb(urb, GFP_KERNEL);
-	printk(KERN_DEBUG "%s: Sending skb %p (ret=%i)\n", __func__, skb, ret);
+
+	printk(KERN_DEBUG "%s: Sent skb %p (ret=%i)\n", __func__, skb, ret);
 
 	return;
 error:
 	dev_kfree_skb(skb);
 }
 
-static int rx_count = 30;
+static int rx_count = 10;
 
 static void rtlmac_rx_complete(struct urb *urb)
 {
