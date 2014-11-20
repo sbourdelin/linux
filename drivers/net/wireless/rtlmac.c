@@ -3102,11 +3102,9 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 			 BEACON_FUNCTION_ENABLE | BEACON_TSF_UPDATE);
 }
 
-static int rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
+static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 {
 	printk(KERN_DEBUG "%s\n", __func__);
-
-	return 0;
 }
 
 static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
