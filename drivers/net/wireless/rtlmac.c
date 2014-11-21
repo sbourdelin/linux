@@ -3262,12 +3262,13 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
 			  skb->len, rtlmac_tx_complete, skb);
 
-	if (tx_count--) {
+	if (tx_count) {
 		for (i = 0; i < min_t(int, 128, skb->len); i++) {
 			printk("%02x ", skb->data[i]);
 			if ((i & 0xf) == 0xf)
 				printk("\n");
 		}
+		tx_count--;
 	}
 
 	ret = usb_submit_urb(urb, GFP_KERNEL);
