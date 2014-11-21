@@ -36,7 +36,7 @@
 
 #define DRIVER_NAME "rtlmac"
 
-static int rtlmac_debug = RTLMAC_DEBUG_REG_WRITE;
+static int rtlmac_debug = 0 /*RTLMAC_DEBUG_REG_WRITE*/;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
