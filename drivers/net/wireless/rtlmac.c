@@ -751,7 +751,7 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, 0x00);
 	rtl8723au_write8(priv, REG_BEACON_CTRL,
 			 BEACON_ATIM | BEACON_FUNCTION_ENABLE |
-			 BEACON_TSF_UPDATE);
+			 BEACON_DISABLE_TSF_UPDATE);
 	rtl8723au_write8(priv, REG_MSR, MSR_LINKTYPE_STATION);
 }
 
@@ -2939,7 +2939,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/*
 	 * Initialize beacon parameters
 	 */
-	val16 = BEACON_TSF_UPDATE | (BEACON_TSF_UPDATE << 8);
+	val16 = BEACON_DISABLE_TSF_UPDATE | (BEACON_DISABLE_TSF_UPDATE << 8);
 	rtl8723au_write16(priv, REG_BEACON_CTRL, val16);
 	rtl8723au_write16(priv, REG_TBTT_PROHIBIT, 0x6404);
 	rtl8723au_write8(priv, REG_DRIVER_EARLY_INT, DRIVER_EARLY_INT_TIME);
@@ -3089,7 +3089,6 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 
 	printk(KERN_DEBUG "%s\n", __func__);
 
-
 	rtl8723au_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
 	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
 
@@ -3099,12 +3098,28 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
-			 BEACON_FUNCTION_ENABLE | BEACON_TSF_UPDATE);
+			 BEACON_FUNCTION_ENABLE | BEACON_DISABLE_TSF_UPDATE);
 }
 
 static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 {
+	struct rtlmac_priv *priv = hw->priv;
+	u8 val8;
+
 	printk(KERN_DEBUG "%s\n", __func__);
+
+#if 0
+	val32 = rtl8723au_read32(priv, REG_RCR);
+	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
+	rtl8723au_write32(priv, REG_RCR, val32);
+#endif
+
+	/* Enable RX of data frames */
+	rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
+
+	val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
+	val8 &= ~BEACON_DISABLE_TSF_UPDATE;
+	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
 }
 
 static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
