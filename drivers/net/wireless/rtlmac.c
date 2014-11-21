@@ -2461,6 +2461,22 @@ static int rtlmac_set_mac(struct rtlmac_priv *priv)
 	return 0;
 }
 
+static int rtlmac_set_bssid(struct rtlmac_priv *priv, const u8 *bssid)
+{
+	int i;
+	u16 reg;
+
+	printk(KERN_DEBUG "%s (%02x:%02x:%02x:%02x:%02x:%02x)\n", __func__,
+	       bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+
+	reg = REG_BSSID;
+
+	for (i = 0; i < ETH_ALEN; i++)
+		rtl8723au_write8(priv, reg + i, bssid[i]);
+
+	return 0;
+}
+
 static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -3122,6 +3138,26 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
 }
 
+static void
+rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+			struct ieee80211_bss_conf *bss_conf, u32 changed)
+{
+	struct rtlmac_priv *priv = hw->priv;
+	u32 val32;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	if (changed & BSS_CHANGED_ASSOC) {
+		if (bss_conf->assoc) {
+			rtlmac_set_bssid(priv, bss_conf->bssid);
+
+			val32 = rtl8723au_read32(priv, REG_RCR);
+			val32 |= /* RCR_CHECK_BSSID_MATCH |*/ RCR_CHECK_BSSID_BEACON;
+			rtl8723au_write32(priv, REG_RCR, val32);
+		}
+	}
+}
+
 static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
@@ -3557,9 +3593,7 @@ static const struct ieee80211_ops rtlmac_ops = {
 	.add_interface = rtlmac_add_interface,
 	.remove_interface = rtlmac_remove_interface,
 	.config = rtlmac_config,
-#if 0
 	.bss_info_changed = rtlmac_bss_info_changed,
-#endif
 	.configure_filter = rtlmac_configure_filter,
 	.start = rtlmac_start,
 	.stop = rtlmac_stop,
