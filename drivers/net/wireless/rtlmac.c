@@ -3276,12 +3276,17 @@ static void rtlmac_rx_complete(struct urb *urb)
 	struct rtlmac_rx_desc *rx_desc = (struct rtlmac_rx_desc *)skb->data;
 	struct ieee80211_rx_status *rx_status = IEEE80211_SKB_RXCB(skb);
 	struct ieee80211_mgmt *mgmt;
+	__le32 *_rx_desc_le = (__le32 *)skb->data;
+	u32 *_rx_desc = (u32 *)skb->data;
 	int cnt, len, skb_size, drvinfo_sz, desc_shift, i;
 
-	cnt = (cpu_to_le32(rx_desc->rxdw2) >> 16) & 0xff;
-	len = cpu_to_le32(rx_desc->rxdw0) & 0x3fff;
-	drvinfo_sz = ((cpu_to_le32(rx_desc->rxdw0) >> 16) & 0xf) * 8;
-	desc_shift = (cpu_to_le32(rx_desc->rxdw0) >> 24) & 0x3;
+	for (i = 0; i < (sizeof(struct rtlmac_rx_desc) / sizeof(u32)); i++)
+		_rx_desc[i] = le32_to_cpu(_rx_desc_le[i]);
+
+	cnt = rx_desc->frag;
+	len = rx_desc->pktlen;
+	drvinfo_sz = rx_desc->drvinfo_sz * 8;
+	desc_shift = rx_desc->shift;
 	skb_put(skb, urb->actual_length);
 
 	if (rx_count)
@@ -3296,6 +3301,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 
 		mgmt = (struct ieee80211_mgmt *)skb->data;
 
+#if 0
 		if (ieee80211_is_assoc_req(mgmt->frame_control)) {
 			printk(KERN_DEBUG "Received assoc req\n");
 		} else if (ieee80211_is_assoc_resp(mgmt->frame_control)) {
@@ -3309,6 +3315,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 		} else {
 			printk(KERN_DEBUG "Received something else\n");
 		}
+#endif
 
 		if (rx_count) {
 			for (i = 0; i < min_t(int, 128, skb->len); i++) {
@@ -3685,6 +3692,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	SET_IEEE80211_PERM_ADDR(hw, priv->mac_addr);
 
 	hw->extra_tx_headroom = sizeof(struct rtlmac_tx_desc);
+	hw->flags = IEEE80211_HW_SIGNAL_DBM;
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {

@@ -50,12 +50,75 @@
 #define EFUSE_MAX_WORD_UNIT		4
 
 struct rtlmac_rx_desc {
-	__le32 rxdw0;
-	__le32 rxdw1;
-	__le32 rxdw2;
-	__le32 rxdw3;
-	__le32 rxdw4;
-	__le32 rxdw5;
+	u32 pktlen:14;
+	u32 crc32:1;
+	u32 icverr:1;
+	u32 drvinfo_sz:4;
+	u32 security:3;
+	u32 qos:1;
+	u32 shift:2;
+	u32 physt:1;
+	u32 swdec:1;
+	u32 ls:1;
+	u32 fs:1;
+	u32 eor:1;
+	u32 own:1;
+
+	u32 macid:5;
+	u32 tid:4;
+	u32 hwrsvd:4;
+	u32 amsdu:1;
+	u32 paggr:1;
+	u32 faggr:1;
+	u32 a1fit:4;
+	u32 a2fit:4;
+	u32 pam:1;
+	u32 pwr:1;
+	u32 md:1;
+	u32 mf:1;
+	u32 type:2;
+	u32 mc:1;
+	u32 bc:1;
+
+	u32 seq:12;
+	u32 frag:4;
+	u32 nextpktlen:14;
+	u32 nextind:1;
+	u32 reserved0:1;
+
+	u32 rxmcs:6;
+	u32 rxht:1;
+	u32 gf:1;
+	u32 splcp:1;
+	u32 bw:1;
+	u32 htc:1;
+	u32 eosp:1;
+	u32 bssidfit:2;
+	u32 reserved1:16;
+	u32 unicastwake:1;
+	u32 magicwake:1;
+
+	u32 pattern0match:1;
+	u32 pattern1match:1;
+	u32 pattern2match:1;
+	u32 pattern3match:1;
+	u32 pattern4match:1;
+	u32 pattern5match:1;
+	u32 pattern6match:1;
+	u32 pattern7match:1;
+	u32 pattern8match:1;
+	u32 pattern9match:1;
+	u32 patternamatch:1;
+	u32 patternbmatch:1;
+	u32 patterncmatch:1;
+	u32 reserved2:19;
+
+	u32 tsfl;
+#if 0
+	u32 bassn:12;
+	u32 bavld:1;
+	u32 reserved3:19;
+#endif
 };
 
 struct rtlmac_tx_desc {
