@@ -2878,7 +2878,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 * Configure initial WMAC settings
 	 */
 	val32 = RCR_ACCEPT_PHYS_MATCH | RCR_ACCEPT_MCAST | RCR_ACCEPT_BCAST |
-		RCR_ACCEPT_BSSID_MATCH | RCR_ACCEPT_BSSID_BEACON |
+		RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON |
 		RCR_ACCEPT_MGMT_FRAME | RCR_HTC_LOC_CTRL |
 		RCR_APPEND_PHYSTAT | RCR_APPEND_ICV | RCR_APPEND_MIC;
 	rtl8723au_write32(priv, REG_RCR, val32);
@@ -3094,7 +3094,7 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
 
 	val32 = rtl8723au_read32(priv, REG_RCR);
-	val32 &= ~(RCR_ACCEPT_BSSID_MATCH | RCR_ACCEPT_BSSID_BEACON);
+	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
 	rtl8723au_write32(priv, REG_RCR, val32);
 
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);

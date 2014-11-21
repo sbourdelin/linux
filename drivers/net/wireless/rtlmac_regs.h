@@ -532,8 +532,8 @@
 						 packet */
 #define  RCR_ACCEPT_PM			BIT(5)  /* Accept power management
 						 packet */
-#define  RCR_ACCEPT_BSSID_MATCH		BIT(6)  /* Accept BSSID match packet */
-#define  RCR_ACCEPT_BSSID_BEACON	BIT(7)  /* Accept BSSID match packet
+#define  RCR_CHECK_BSSID_MATCH		BIT(6)  /* Accept BSSID match packet */
+#define  RCR_CHECK_BSSID_BEACON		BIT(7)  /* Accept BSSID match packet
 						 (Rx beacon, probe rsp) */
 #define  RCR_ACCEPT_CRC32		BIT(8)  /* Accept CRC32 error packet */
 #define  RCR_ACCEPT_ICV			BIT(9)  /* Accept ICV error packet */
