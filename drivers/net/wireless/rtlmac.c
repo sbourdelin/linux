@@ -3034,7 +3034,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 #endif
 
 	/*
-	 * This should enable termal meter
+	 * This should enable thermal meter
 	 */
 	rtl8723au_write_rfreg(priv, RF6052_REG_T_METER, 0x60);
 
@@ -3136,12 +3136,6 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 	u8 val8;
 
 	printk(KERN_DEBUG "%s\n", __func__);
-
-#if 0
-	val32 = rtl8723au_read32(priv, REG_RCR);
-	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
-	rtl8723au_write32(priv, REG_RCR, val32);
-#endif
 
 	/* Enable RX of data frames */
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
