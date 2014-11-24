@@ -3216,9 +3216,6 @@ static void rtlmac_tx_complete(struct urb *urb)
 {
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
 
-	printk(KERN_DEBUG "%s: Completing skb %p (status %i)\n", __func__, skb,
-		urb->status);
-
 	usb_free_urb(urb);
 	dev_kfree_skb(skb);
 }
@@ -3258,6 +3255,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		goto error;
 	}
 
+#if 0
 	if (ieee80211_is_mgmt(hdr->frame_control))
 		printk(KERN_DEBUG "%s: mgmt frame\n", __func__);
 	else if (ieee80211_is_ctl(hdr->frame_control))
@@ -3266,6 +3264,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		printk(KERN_DEBUG "%s: data frame\n", __func__);
 	else if (ieee80211_is_data_qos(hdr->frame_control))
 		printk(KERN_DEBUG "%s: data qos frame\n", __func__);
+#endif
 
 	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
 	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
