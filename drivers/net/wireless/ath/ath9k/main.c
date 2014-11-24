@@ -1162,6 +1162,9 @@ static void ath9k_assign_hw_queues(struct ieee80211_hw *hw,
 {
 	int i;
 
+	if (!ath9k_is_chanctx_enabled())
+		return;
+
 	for (i = 0; i < IEEE80211_NUM_ACS; i++)
 		vif->hw_queue[i] = i;
 
@@ -2332,7 +2335,7 @@ static void ath9k_remove_chanctx(struct ieee80211_hw *hw,
 		conf->def.chan->center_freq);
 
 	ctx->assigned = false;
-	ctx->hw_queue_base = -1;
+	ctx->hw_queue_base = 0;
 	ath_chanctx_event(sc, NULL, ATH_CHANCTX_EVENT_UNASSIGN);
 
 	mutex_unlock(&sc->mutex);

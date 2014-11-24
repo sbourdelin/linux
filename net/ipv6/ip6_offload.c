@@ -46,6 +46,7 @@ static int ipv6_gso_pull_exthdrs(struct sk_buff *skb, int proto)
 		if (unlikely(!pskb_may_pull(skb, len)))
 			break;
 
+		opth = (void *)skb->data;
 		proto = opth->nexthdr;
 		__skb_pull(skb, len);
 	}
@@ -89,7 +90,7 @@ static struct sk_buff *ipv6_gso_segment(struct sk_buff *skb,
 
 	encap = SKB_GSO_CB(skb)->encap_level > 0;
 	if (encap)
-		features = skb->dev->hw_enc_features & netif_skb_features(skb);
+		features &= skb->dev->hw_enc_features;
 	SKB_GSO_CB(skb)->encap_level += sizeof(*ipv6h);
 
 	ipv6h = ipv6_hdr(skb);

@@ -163,15 +163,19 @@ void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
 		netif_carrier_on(dev);
 
 		switch (pi->link_cfg.speed) {
-		case SPEED_10000:
+		case 40000:
+			s = "40Gbps";
+			break;
+
+		case 10000:
 			s = "10Gbps";
 			break;
 
-		case SPEED_1000:
+		case 1000:
 			s = "1000Mbps";
 			break;
 
-		case SPEED_100:
+		case 100:
 			s = "100Mbps";
 			break;
 
@@ -2351,7 +2355,7 @@ static void cfg_queues(struct adapter *adapter)
 		struct port_info *pi = adap2pinfo(adapter, pidx);
 
 		pi->first_qset = qidx;
-		pi->nqsets = is_10g_port(&pi->link_cfg) ? q10g : 1;
+		pi->nqsets = is_x_10g_port(&pi->link_cfg) ? q10g : 1;
 		qidx += pi->nqsets;
 	}
 	s->ethqsets = qidx;
@@ -2925,14 +2929,14 @@ static const struct pci_device_id cxgb4vf_pci_tbl[] = {
 	CH_DEVICE(0x480d),	/* T480-cr */
 	CH_DEVICE(0x480e),	/* T440-lp-cr */
 	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
-	CH_DEVICE(0x4880),
+	CH_DEVICE(0x4881),
+	CH_DEVICE(0x4882),
+	CH_DEVICE(0x4883),
+	CH_DEVICE(0x4884),
+	CH_DEVICE(0x4885),
+	CH_DEVICE(0x4886),
+	CH_DEVICE(0x4887),
+	CH_DEVICE(0x4888),
 	CH_DEVICE(0x5801),	/* T520-cr */
 	CH_DEVICE(0x5802),	/* T522-cr */
 	CH_DEVICE(0x5803),	/* T540-cr */

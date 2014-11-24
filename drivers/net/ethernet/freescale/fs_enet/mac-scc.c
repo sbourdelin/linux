@@ -116,7 +116,7 @@ static int do_pd_setup(struct fs_enet_private *fep)
 }
 
 #define SCC_NAPI_RX_EVENT_MSK	(SCCE_ENET_RXF | SCCE_ENET_RXB)
-#define SCC_NAPI_TX_EVENT_MSK	(SCCE_ENET_TXF | SCCE_ENET_TXB)
+#define SCC_NAPI_TX_EVENT_MSK	(SCCE_ENET_TXB)
 #define SCC_RX_EVENT		(SCCE_ENET_RXF)
 #define SCC_TX_EVENT		(SCCE_ENET_TXB)
 #define SCC_ERR_EVENT_MSK	(SCCE_ENET_TXE | SCCE_ENET_BSY)
@@ -354,6 +354,9 @@ static void restart(struct net_device *dev)
 	/* Set full duplex mode if needed */
 	if (fep->phydev->duplex)
 		S16(sccp, scc_psmr, SCC_PSMR_LPB | SCC_PSMR_FDE);
+
+	/* Restore multicast and promiscuous settings */
+	set_multicast_list(dev);
 
 	S32(sccp, scc_gsmrl, SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 }

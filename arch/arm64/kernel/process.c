@@ -72,7 +72,6 @@ void (*pm_power_off)(void);
 EXPORT_SYMBOL_GPL(pm_power_off);
 
 void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
-EXPORT_SYMBOL_GPL(arm_pm_restart);
 
 /*
  * This is our default idle handler.
@@ -154,6 +153,8 @@ void machine_restart(char *cmd)
 	/* Now call the architecture specific reboot code. */
 	if (arm_pm_restart)
 		arm_pm_restart(reboot_mode, cmd);
+	else
+		do_kernel_restart(cmd);
 
 	/*
 	 * Whoops - the architecture was unable to reboot.
@@ -376,9 +377,4 @@ static unsigned long randomize_base(unsigned long base)
 unsigned long arch_randomize_brk(struct mm_struct *mm)
 {
 	return randomize_base(mm->brk);
-}
-
-unsigned long randomize_et_dyn(unsigned long base)
-{
-	return randomize_base(base);
 }
