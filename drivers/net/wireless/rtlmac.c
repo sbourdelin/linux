@@ -2077,7 +2077,7 @@ static u8 rtlmac_iqk_path_a(struct rtlmac_priv *priv, bool configPathB)
 static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 			     int result[][8], u8 t, bool is2T)
 {
-	u32 i;
+	u32 i, val32;
 	u8 PathAOK/*, PathBOK*/;
 	u32 ADDA_REG[RTLMAC_ADDA_REGS] = {
 		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
@@ -2106,8 +2106,6 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 
 	/*  Note: IQ calibration must be performed after loading  */
 	/*		PHY_REG.txt , and radio_a, radio_b.txt	 */
-
-	u32 val32;
 
 	if (t == 0) {
 		/*  Save ADDA parameters, turn Path A ADDA on */
@@ -2176,21 +2174,33 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 		PathAOK = rtlmac_iqk_path_a(priv, is2T);
 		if (PathAOK == 0x03) {
 			printk(KERN_DEBUG "Path A IQK Success!!\n");
-			result[t][0] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A)&0x3FF0000)>>16;
-			result[t][1] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A)&0x3FF0000)>>16;
-			result[t][2] = (rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_A_2)&0x3FF0000)>>16;
-			result[t][3] = (rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_A_2)&0x3FF0000)>>16;
+			val32 = rtl8723au_read32(priv,
+						 REG_TX_POWER_BEFORE_IQK_A);
+			result[t][0] = (val32 & 0x3FF0000) >> 16;
+			val32 = rtl8723au_read32(priv,
+						 REG_TX_POWER_AFTER_IQK_A);
+			result[t][1] = (val32 & 0x3FF0000) >> 16;
+			val32 = rtl8723au_read32(priv,
+						 REG_RX_POWER_BEFORE_IQK_A_2);
+			result[t][2] = (val32 & 0x3FF0000) >> 16;
+			val32 = rtl8723au_read32(priv,
+						 REG_RX_POWER_AFTER_IQK_A_2);
+			result[t][3] = (val32 & 0x3FF0000) >> 16;
 			break;
-		} else if (i == (retryCount-1) && PathAOK == 0x01) {
+		} else if (i == (retryCount - 1) && PathAOK == 0x01) {
 			/* Tx IQK OK */
 			printk(KERN_DEBUG "Path A IQK Only Tx Success!!\n");
 
-			result[t][0] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A)&0x3FF0000)>>16;
-			result[t][1] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A)&0x3FF0000)>>16;
+			val32 = rtl8723au_read32(priv,
+						 REG_TX_POWER_BEFORE_IQK_A);
+			result[t][0] = (val32 & 0x3FF0000) >> 16;
+			val32 = rtl8723au_read32(priv,
+						 REG_TX_POWER_AFTER_IQK_A);
+			result[t][1] = (val32 & 0x3FF0000) >> 16;
 		}
 	}
 
-	if (0x00 == PathAOK) {
+	if (PathAOK == 0x00) {
 		printk(KERN_DEBUG "Path A IQK failed!!\n");
 	}
 
@@ -2417,7 +2427,8 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 #if 0
 		/* Path-B */
 		if (is2T)
-			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits, (RF_Bmode&0x8FFFF)|0x10000);
+			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
+				     (RF_Bmode & 0x8FFFF) | 0x10000);
 #endif
 	} else {
 		/*  Deal with Packet TX case */
@@ -2443,7 +2454,8 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 #if 0
 		/* Path-B */
 		if (is2T)
-			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits, RF_Bmode);
+			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
+				     RF_Bmode);
 #endif
 	} else /*  Deal with Packet TX case */
 		rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
