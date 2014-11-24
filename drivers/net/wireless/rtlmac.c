@@ -3326,6 +3326,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 	struct rtlmac_priv *priv = hw->priv;
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
 	struct rtlmac_rx_desc *rx_desc = (struct rtlmac_rx_desc *)skb->data;
+	struct rtl8723au_phy_stats *phy_stats;
 	struct ieee80211_rx_status *rx_status = IEEE80211_SKB_RXCB(skb);
 	struct ieee80211_mgmt *mgmt;
 	__le32 *_rx_desc_le = (__le32 *)skb->data;
@@ -3349,6 +3350,8 @@ static void rtlmac_rx_complete(struct urb *urb)
 
 	if (urb->status == 0) {
 		skb_pull(skb, sizeof(struct rtlmac_rx_desc));
+		phy_stats = (struct rtl8723au_phy_stats *)skb->data;
+
 		skb_pull(skb, drvinfo_sz + desc_shift);
 
 		mgmt = (struct ieee80211_mgmt *)skb->data;
@@ -3380,8 +3383,28 @@ static void rtlmac_rx_complete(struct urb *urb)
 
 		memset(rx_status, 0, sizeof(struct ieee80211_rx_status));
 
+		/*
+		 * Note this is valid for CCK rates only - FIXME
+		 */
+		if (rx_desc->phy_stats) {
+			u8 cck_agc_rpt = phy_stats->cck_agc_rpt_ofdm_cfosho_a;
+
+			switch (cck_agc_rpt & 0xc0) {
+			case 0xc0:
+				rx_status->signal = -46 - (cck_agc_rpt & 0x3e);
+				break;
+			case 0x80:
+				rx_status->signal = -26 - (cck_agc_rpt & 0x3e);
+				break;
+			case 0x40:
+				rx_status->signal = -12 - (cck_agc_rpt & 0x3e);
+				break;
+			case 0x00:
+				rx_status->signal = 16 - (cck_agc_rpt & 0x3e);
+				break;
+			}
+		}
 #if 0
-		rx_status->signal = buf->rssi;
 		rx_status->flag |= RX_FLAG_DECRYPTED;
 		rx_status->flag |= RX_FLAG_IV_STRIPPED;
 #endif

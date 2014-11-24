@@ -57,7 +57,7 @@ struct rtlmac_rx_desc {
 	u32 security:3;
 	u32 qos:1;
 	u32 shift:2;
-	u32 physt:1;
+	u32 phy_stats:1;
 	u32 swdec:1;
 	u32 ls:1;
 	u32 fs:1;
@@ -228,6 +228,52 @@ struct rtlmac_tx_desc {
 #define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
 #define TXDESC_RETRY_LIMIT_SHIFT	18
 #define TXDESC_RETRY_LIMIT_MASK		0x00ff0000
+
+struct phy_rx_agc_info {
+#ifdef __LITTLE_ENDIAN
+	u8	gain:7, trsw:1;
+#else
+	u8	trsw:1, gain:7;
+#endif
+};
+
+struct rtl8723au_phy_stats {
+	struct phy_rx_agc_info path_agc[RTL8723A_MAX_RF_PATHS];
+	u8	ch_corr[RTL8723A_MAX_RF_PATHS];
+	u8	cck_sig_qual_ofdm_pwdb_all;
+	u8	cck_agc_rpt_ofdm_cfosho_a;
+	u8	cck_rpt_b_ofdm_cfosho_b;
+	u8	reserved_1;
+	u8	noise_power_db_msb;
+	u8	path_cfotail[RTL8723A_MAX_RF_PATHS];
+	u8	pcts_mask[RTL8723A_MAX_RF_PATHS];
+	s8	stream_rxevm[RTL8723A_MAX_RF_PATHS];
+	u8	path_rxsnr[RTL8723A_MAX_RF_PATHS];
+	u8	noise_power_db_lsb;
+	u8	reserved_2[3];
+	u8	stream_csi[RTL8723A_MAX_RF_PATHS];
+	u8	stream_target_csi[RTL8723A_MAX_RF_PATHS];
+	s8	sig_evm;
+	u8	reserved_3;
+
+#ifdef __LITTLE_ENDIAN
+	u8	antsel_rx_keep_2:1;	/* ex_intf_flg:1; */
+	u8	sgi_en:1;
+	u8	rxsc:2;
+	u8	idle_long:1;
+	u8	r_ant_train_en:1;
+	u8	antenna_select_b:1;
+	u8	antenna_select:1;
+#else	/*  _BIG_ENDIAN_ */
+	u8	antenna_select:1;
+	u8	antenna_select_b:1;
+	u8	r_ant_train_en:1;
+	u8	idle_long:1;
+	u8	rxsc:2;
+	u8	sgi_en:1;
+	u8	antsel_rx_keep_2:1;	/* ex_intf_flg:1; */
+#endif
+};
 
 /*
  * Regs to backup
