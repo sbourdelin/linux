@@ -3151,6 +3151,8 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 {
 	struct rtlmac_priv *priv = hw->priv;
 	u32 val32;
+	u16 val16;
+	u8 val8;
 
 	printk(KERN_DEBUG "%s\n", __func__);
 
@@ -3161,6 +3163,58 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			val32 = rtl8723au_read32(priv, REG_RCR);
 			val32 |= /* RCR_CHECK_BSSID_MATCH |*/ RCR_CHECK_BSSID_BEACON;
 			rtl8723au_write32(priv, REG_RCR, val32);
+
+			rtl8723au_write8(priv, REG_BCN_MAX_ERR, 0xff);
+
+			/* Stop TX beacon */
+			val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL + 2);
+			val8 &= ~BIT(6);
+			rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, val8);
+
+			rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 1, 0x64);
+			val8 = rtl8723au_read8(priv, REG_TBTT_PROHIBIT + 2);
+			val8 &= ~BIT(0);
+			rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, val8);
+
+			/* joinbss sequence */
+			rtl8723au_write16(priv, REG_BCN_PSR_RPT,
+					  0xc000 | bss_conf->aid);
+
+#if 0
+			val16 = rtl8723au_read16(priv, REG_CR);
+			val16 |= CR_SW_BEACON_ENABLE;
+			rtl8723au_read16(priv, REG_CR, val16);
+
+			val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
+			val8 &= ~BEACON_FUNCTION_ENABLE;
+			val8 |= BEACON_DISABLE_TSF_UPDATE;
+			rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
+
+			val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL + 2);
+			if (val8 & BIT(6))
+				recover = true;
+
+			val8 &= ~BIT(6);
+			rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, val8);
+
+			/* build fake beacon */
+
+			val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
+			val8 |= BEACON_FUNCTION_ENABLE;
+			val8 &= ~BEACON_DISABLE_TSF_UPDATE;
+			rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
+
+			if (recover) {
+				val8 = rtl8723au_read8(priv,
+						       REG_FWHW_TXQ_CTRL + 2);
+				val8 |= BIT(6);
+				rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2,
+						 val8);
+			}
+			val16 = rtl8723au_read16(priv, REG_CR);
+			val16 &= ~CR_SW_BEACON_ENABLE;
+			rtl8723au_read16(priv, REG_CR, val16);
+#endif
 		}
 	}
 }
