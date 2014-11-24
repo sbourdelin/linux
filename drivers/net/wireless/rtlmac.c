@@ -527,7 +527,7 @@ static struct rtlmac_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
 	{0xff, 0xffffffff}
 };
 
-u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
+static u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
@@ -547,7 +547,7 @@ u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 	return data;
 }
 
-u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
+static u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
@@ -567,7 +567,7 @@ u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 	return data;
 }
 
-u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
+static u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
@@ -587,7 +587,7 @@ u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 	return data;
 }
 
-int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
+static int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -607,7 +607,7 @@ int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 	return ret;
 }
 
-int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
+static int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -626,7 +626,7 @@ int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 	return ret;
 }
 
-int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
+static int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -645,7 +645,8 @@ int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 	return ret;
 }
 
-int rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
+static int
+rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -2264,7 +2265,7 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 	}
 }
 
-void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
+static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 {
 	int result[4][8];	/* last is final result */
 	u8 i, final_candidate;
