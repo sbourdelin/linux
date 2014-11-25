@@ -415,7 +415,8 @@ struct rtlmac_priv {
 	u32 regeb4;
 	u32 regebc;
 
-	struct urb *rx_urb;
+	struct usb_anchor rx_anchor;
+	struct usb_anchor tx_anchor;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
 	struct mutex usb_buf_mutex;
