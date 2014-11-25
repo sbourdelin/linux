@@ -3369,8 +3369,6 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 
 	ret = usb_submit_urb(urb, GFP_KERNEL);
 
-	printk(KERN_DEBUG "%s: Sent skb %p (ret=%i)\n", __func__, skb, ret);
-
 	return;
 error:
 	dev_kfree_skb(skb);
@@ -3592,8 +3590,9 @@ static int rtlmac_config(struct ieee80211_hw *hw, u32 changed)
 	int ret = 0, channel;
 	bool ht40;
 
-	printk(KERN_DEBUG "%s: channel: %i (changed %08x)\n",
-	       __func__, hw->conf.chandef.chan->hw_value, changed);
+	printk(KERN_DEBUG "%s: channel: %i (changed %08x chandef.width %02x)\n",
+	       __func__, hw->conf.chandef.chan->hw_value, changed,
+	       hw->conf.chandef.width);
 
 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
 		switch (hw->conf.chandef.width) {
