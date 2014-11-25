@@ -988,14 +988,34 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	}
 }
 
-static void rtlmac_set_linktype(struct rtlmac_priv *priv, u16 linktype)
+static void rtlmac_set_linktype(struct rtlmac_priv *priv,
+				enum nl80211_iftype linktype)
 {
 	u16 val8;
 
 	val8 = rtl8723au_read16(priv, REG_MSR);
 	val8 &= ~MSR_LINKTYPE_MASK;
-	val8 |= linktype;
+
+	switch (linktype) {
+	case NL80211_IFTYPE_UNSPECIFIED:
+		val8 |= MSR_LINKTYPE_NONE;
+		break;
+	case NL80211_IFTYPE_ADHOC:
+		val8 |= MSR_LINKTYPE_ADHOC;
+		break;
+	case NL80211_IFTYPE_STATION:
+		val8 |= MSR_LINKTYPE_STATION;
+		break;
+	case NL80211_IFTYPE_AP:
+		val8 |= MSR_LINKTYPE_AP;
+		break;
+	default:
+		goto out;
+	}
+
 	rtl8723au_write8(priv, REG_MSR, val8);
+out:
+	return;
 }
 
 static void
@@ -2901,7 +2921,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_HIMR, 0xffffffff);
 
 	rtlmac_set_mac(priv);
-	rtlmac_set_linktype(priv, MSR_LINKTYPE_STATION);
+	rtlmac_set_linktype(priv, NL80211_IFTYPE_STATION);
 
 	/*
 	 * Configure initial WMAC settings
@@ -3119,13 +3139,11 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 	printk(KERN_DEBUG "%s\n", __func__);
 
 	rtl8723au_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
-	rtlmac_set_linktype(priv, MSR_LINKTYPE_NONE);
 
 	val32 = rtl8723au_read32(priv, REG_RCR);
 	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
 	rtl8723au_write32(priv, REG_RCR, val32);
 
-	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
 			 BEACON_FUNCTION_ENABLE | BEACON_DISABLE_TSF_UPDATE);
 }
@@ -3136,9 +3154,6 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 	u8 val8;
 
 	printk(KERN_DEBUG "%s\n", __func__);
-
-	/* Enable RX of data frames */
-	rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
 
 	val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
 	val8 &= ~BEACON_DISABLE_TSF_UPDATE;
@@ -3157,12 +3172,17 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	printk(KERN_DEBUG "%s\n", __func__);
 
 	if (changed & BSS_CHANGED_ASSOC) {
+		rtlmac_set_linktype(priv, vif->type);
+
 		if (bss_conf->assoc) {
 			rtlmac_set_bssid(priv, bss_conf->bssid);
 
 			val32 = rtl8723au_read32(priv, REG_RCR);
 			val32 |= /* RCR_CHECK_BSSID_MATCH |*/ RCR_CHECK_BSSID_BEACON;
 			rtl8723au_write32(priv, REG_RCR, val32);
+
+			/* Enable RX of data frames */
+			rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
 
 			rtl8723au_write8(priv, REG_BCN_MAX_ERR, 0xff);
 
@@ -3215,6 +3235,9 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			val16 &= ~CR_SW_BEACON_ENABLE;
 			rtl8723au_read16(priv, REG_CR, val16);
 #endif
+		} else {
+			/* Disable RX of data frames */
+			rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 		}
 	}
 }
