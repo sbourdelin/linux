@@ -3546,6 +3546,8 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 			  skb_size, rtlmac_rx_complete, skb);
 	usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
 	ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
+	if (ret)
+		usb_unanchor_urb(&rx_urb->urb);
 	return ret;
 }
 
