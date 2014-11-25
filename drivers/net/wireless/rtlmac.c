@@ -3690,7 +3690,14 @@ exit:
 
 static void rtlmac_stop(struct ieee80211_hw *hw)
 {
+	struct rtlmac_priv *priv = hw->priv;
+
 	printk(KERN_DEBUG "%s\n", __func__);
+
+	rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
+
+	rtl8723au_write16(priv, REG_RXFLTMAP0, 0x0000);
+	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 }
 
 static const struct ieee80211_ops rtlmac_ops = {
