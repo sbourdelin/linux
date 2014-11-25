@@ -3388,8 +3388,12 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		tx_count--;
 	}
 
+	usb_anchor_urb(urb, &priv->tx_anchor);
 	ret = usb_submit_urb(urb, GFP_KERNEL);
-
+	if (ret) {
+		usb_unanchor_urb(urb);
+		goto error;
+	}
 	return;
 error:
 	dev_kfree_skb(skb);
@@ -3499,11 +3503,15 @@ static void rtlmac_rx_complete(struct urb *urb)
 			usb_fill_bulk_urb(&rx_urb->urb, priv->udev,
 					  priv->pipe_in, skb->data,
 					  skb_size, rtlmac_rx_complete, skb);
+
+			usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
 			usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
 		} else {
 			printk(KERN_WARNING "%s: Out of memory\n", __func__);
+			usb_free_urb(urb);
 		}
 	} else {
+		printk(KERN_DEBUG "%s: status %i\n", __func__, urb->status);
 		usb_free_urb(urb);
 		dev_kfree_skb(skb);
 	}
@@ -3536,6 +3544,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 
 	usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in, skb->data,
 			  skb_size, rtlmac_rx_complete, skb);
+	usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
 	ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
 	return ret;
 }
@@ -3662,6 +3671,9 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
+	init_usb_anchor(&priv->rx_anchor);
+	init_usb_anchor(&priv->tx_anchor);
+
 	for (i = 0; i < 8; i++)
 		ret = rtlmac_submit_rx_urb(hw);
 
@@ -3698,6 +3710,9 @@ static void rtlmac_stop(struct ieee80211_hw *hw)
 
 	rtl8723au_write16(priv, REG_RXFLTMAP0, 0x0000);
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
+
+	usb_kill_anchored_urbs(&priv->rx_anchor);
+	usb_kill_anchored_urbs(&priv->tx_anchor);
 }
 
 static const struct ieee80211_ops rtlmac_ops = {
