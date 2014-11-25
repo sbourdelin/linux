@@ -10,7 +10,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * Register definitions taken from original Realttek rtl8723au driver
+ * Register definitions taken from original Realtek rtl8723au driver
  */
 
 #include <asm/byteorder.h>
