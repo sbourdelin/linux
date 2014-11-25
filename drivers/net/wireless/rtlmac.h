@@ -13,6 +13,8 @@
  * Register definitions taken from original Realttek rtl8723au driver
  */
 
+#include <asm/byteorder.h>
+
 #define RTLMAC_DEBUG_REG_WRITE		1
 #define RTLMAC_DEBUG_REG_READ		2
 #define RTLMAC_DEBUG_RFREG_WRITE	4
