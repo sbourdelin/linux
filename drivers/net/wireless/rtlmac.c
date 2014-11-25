@@ -3138,8 +3138,6 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 
 	printk(KERN_DEBUG "%s\n", __func__);
 
-	rtl8723au_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
-
 	val32 = rtl8723au_read32(priv, REG_RCR);
 	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
 	rtl8723au_write32(priv, REG_RCR, val32);
@@ -3679,11 +3677,13 @@ exit:
 	 * Accept all data frames
 	 */
 	rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
+#endif
 	/*
 	 * Accept all mgmt frames
 	 */
 	rtl8723au_write16(priv, REG_RXFLTMAP0, 0xffff);
-#endif
+
+	rtl8723au_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
 
 	return ret;
 }
