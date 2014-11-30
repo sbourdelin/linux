@@ -356,9 +356,6 @@ struct cb_pcidas_private {
 	/* divisors of master clock for analog output pacing */
 	unsigned int ao_divisor1;
 	unsigned int ao_divisor2;
-	unsigned int caldac_value[NUM_CHANNELS_8800];
-	unsigned int trimpot_value[NUM_CHANNELS_8402];
-	unsigned int dac08_value;
 	unsigned int calibration_source;
 };
 
@@ -592,24 +589,13 @@ static void write_calibration_bitstream(struct comedi_device *dev,
 	}
 }
 
-static int caldac_8800_write(struct comedi_device *dev, unsigned int address,
-			     uint8_t value)
+static void caldac_8800_write(struct comedi_device *dev,
+			      unsigned int chan, uint8_t val)
 {
 	struct cb_pcidas_private *devpriv = dev->private;
-	static const int num_caldac_channels = 8;
 	static const int bitstream_length = 11;
-	unsigned int bitstream = ((address & 0x7) << 8) | value;
+	unsigned int bitstream = ((chan & 0x7) << 8) | val;
 	static const int caldac_8800_udelay = 1;
-
-	if (address >= num_caldac_channels) {
-		dev_err(dev->class_dev, "illegal caldac channel\n");
-		return -1;
-	}
-
-	if (value == devpriv->caldac_value[address])
-		return 1;
-
-	devpriv->caldac_value[address] = value;
 
 	write_calibration_bitstream(dev, cal_enable_bits(dev), bitstream,
 				    bitstream_length);
@@ -619,75 +605,62 @@ static int caldac_8800_write(struct comedi_device *dev, unsigned int address,
 	     devpriv->control_status + CALIBRATION_REG);
 	udelay(caldac_8800_udelay);
 	outw(cal_enable_bits(dev), devpriv->control_status + CALIBRATION_REG);
-
-	return 1;
 }
 
-static int caldac_write_insn(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn, unsigned int *data)
+static int cb_pcidas_caldac_insn_write(struct comedi_device *dev,
+				       struct comedi_subdevice *s,
+				       struct comedi_insn *insn,
+				       unsigned int *data)
 {
-	const unsigned int channel = CR_CHAN(insn->chanspec);
+	unsigned int chan = CR_CHAN(insn->chanspec);
 
-	return caldac_8800_write(dev, channel, data[0]);
-}
+	if (insn->n) {
+		unsigned int val = data[insn->n - 1];
 
-static int caldac_read_insn(struct comedi_device *dev,
-			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn, unsigned int *data)
-{
-	struct cb_pcidas_private *devpriv = dev->private;
+		if (s->readback[chan] != val) {
+			caldac_8800_write(dev, chan, val);
+			s->readback[chan] = val;
+		}
+	}
 
-	data[0] = devpriv->caldac_value[CR_CHAN(insn->chanspec)];
-
-	return 1;
+	return insn->n;
 }
 
 /* 1602/16 pregain offset */
 static void dac08_write(struct comedi_device *dev, unsigned int value)
 {
 	struct cb_pcidas_private *devpriv = dev->private;
-	unsigned long cal_reg;
 
-	if (devpriv->dac08_value != value) {
-		devpriv->dac08_value = value;
+	value &= 0xff;
+	value |= cal_enable_bits(dev);
 
-		cal_reg = devpriv->control_status + CALIBRATION_REG;
-
-		value &= 0xff;
-		value |= cal_enable_bits(dev);
-
-		/* latch the new value into the caldac */
-		outw(value, cal_reg);
-		udelay(1);
-		outw(value | SELECT_DAC08_BIT, cal_reg);
-		udelay(1);
-		outw(value, cal_reg);
-		udelay(1);
-	}
+	/* latch the new value into the caldac */
+	outw(value, devpriv->control_status + CALIBRATION_REG);
+	udelay(1);
+	outw(value | SELECT_DAC08_BIT,
+	     devpriv->control_status + CALIBRATION_REG);
+	udelay(1);
+	outw(value, devpriv->control_status + CALIBRATION_REG);
+	udelay(1);
 }
 
-static int dac08_write_insn(struct comedi_device *dev,
-			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn, unsigned int *data)
+static int cb_pcidas_dac08_insn_write(struct comedi_device *dev,
+				      struct comedi_subdevice *s,
+				      struct comedi_insn *insn,
+				      unsigned int *data)
 {
-	int i;
+	unsigned int chan = CR_CHAN(insn->chanspec);
 
-	for (i = 0; i < insn->n; i++)
-		dac08_write(dev, data[i]);
+	if (insn->n) {
+		unsigned int val = data[insn->n - 1];
+
+		if (s->readback[chan] != val) {
+			dac08_write(dev, val);
+			s->readback[chan] = val;
+		}
+	}
 
 	return insn->n;
-}
-
-static int dac08_read_insn(struct comedi_device *dev,
-			   struct comedi_subdevice *s, struct comedi_insn *insn,
-			   unsigned int *data)
-{
-	struct cb_pcidas_private *devpriv = dev->private;
-
-	data[0] = devpriv->dac08_value;
-
-	return 1;
 }
 
 static int trimpot_7376_write(struct comedi_device *dev, uint8_t value)
@@ -736,50 +709,41 @@ static int trimpot_8402_write(struct comedi_device *dev, unsigned int channel,
 	return 0;
 }
 
-static int cb_pcidas_trimpot_write(struct comedi_device *dev,
-				   unsigned int channel, unsigned int value)
+static void cb_pcidas_trimpot_write(struct comedi_device *dev,
+				    unsigned int chan, unsigned int val)
 {
 	const struct cb_pcidas_board *thisboard = dev->board_ptr;
-	struct cb_pcidas_private *devpriv = dev->private;
 
-	if (devpriv->trimpot_value[channel] == value)
-		return 1;
-
-	devpriv->trimpot_value[channel] = value;
 	switch (thisboard->trimpot) {
 	case AD7376:
-		trimpot_7376_write(dev, value);
+		trimpot_7376_write(dev, val);
 		break;
 	case AD8402:
-		trimpot_8402_write(dev, channel, value);
+		trimpot_8402_write(dev, chan, val);
 		break;
 	default:
 		dev_err(dev->class_dev, "driver bug?\n");
-		return -1;
+		break;
+	}
+}
+
+static int cb_pcidas_trimpot_insn_write(struct comedi_device *dev,
+					struct comedi_subdevice *s,
+					struct comedi_insn *insn,
+					unsigned int *data)
+{
+	unsigned int chan = CR_CHAN(insn->chanspec);
+
+	if (insn->n) {
+		unsigned int val = data[insn->n - 1];
+
+		if (s->readback[chan] != val) {
+			cb_pcidas_trimpot_write(dev, chan, val);
+			s->readback[chan] = val;
+		}
 	}
 
-	return 1;
-}
-
-static int trimpot_write_insn(struct comedi_device *dev,
-			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn, unsigned int *data)
-{
-	unsigned int channel = CR_CHAN(insn->chanspec);
-
-	return cb_pcidas_trimpot_write(dev, channel, data[0]);
-}
-
-static int trimpot_read_insn(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn, unsigned int *data)
-{
-	struct cb_pcidas_private *devpriv = dev->private;
-	unsigned int channel = CR_CHAN(insn->chanspec);
-
-	data[0] = devpriv->trimpot_value[channel];
-
-	return 1;
+	return insn->n;
 }
 
 static int cb_pcidas_ai_check_chanlist(struct comedi_device *dev,
@@ -1478,7 +1442,6 @@ static int cb_pcidas_auto_attach(struct comedi_device *dev,
 		s->range_table = &cb_pcidas_ao_ranges;
 		/* default to no fifo (*insn_write) */
 		s->insn_write = cb_pcidas_ao_nofifo_winsn;
-		s->insn_read = comedi_readback_insn_read;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -1517,10 +1480,16 @@ static int cb_pcidas_auto_attach(struct comedi_device *dev,
 	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
 	s->n_chan = NUM_CHANNELS_8800;
 	s->maxdata = 0xff;
-	s->insn_read = caldac_read_insn;
-	s->insn_write = caldac_write_insn;
-	for (i = 0; i < s->n_chan; i++)
+	s->insn_write = cb_pcidas_caldac_insn_write;
+
+	ret = comedi_alloc_subdev_readback(s);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < s->n_chan; i++) {
 		caldac_8800_write(dev, i, s->maxdata / 2);
+		s->readback[i] = s->maxdata / 2;
+	}
 
 	/*  trim potentiometer */
 	s = &dev->subdevices[5];
@@ -1533,10 +1502,16 @@ static int cb_pcidas_auto_attach(struct comedi_device *dev,
 		s->n_chan = NUM_CHANNELS_8402;
 		s->maxdata = 0xff;
 	}
-	s->insn_read = trimpot_read_insn;
-	s->insn_write = trimpot_write_insn;
-	for (i = 0; i < s->n_chan; i++)
+	s->insn_write = cb_pcidas_trimpot_insn_write;
+
+	ret = comedi_alloc_subdev_readback(s);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < s->n_chan; i++) {
 		cb_pcidas_trimpot_write(dev, i, s->maxdata / 2);
+		s->readback[i] = s->maxdata / 2;
+	}
 
 	/*  dac08 caldac */
 	s = &dev->subdevices[6];
@@ -1544,10 +1519,17 @@ static int cb_pcidas_auto_attach(struct comedi_device *dev,
 		s->type = COMEDI_SUBD_CALIB;
 		s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
 		s->n_chan = NUM_CHANNELS_DAC08;
-		s->insn_read = dac08_read_insn;
-		s->insn_write = dac08_write_insn;
 		s->maxdata = 0xff;
-		dac08_write(dev, s->maxdata / 2);
+		s->insn_write = cb_pcidas_dac08_insn_write;
+
+		ret = comedi_alloc_subdev_readback(s);
+		if (ret)
+			return ret;
+
+		for (i = 0; i < s->n_chan; i++) {
+			dac08_write(dev, s->maxdata / 2);
+			s->readback[i] = s->maxdata / 2;
+		}
 	} else
 		s->type = COMEDI_SUBD_UNUSED;
 

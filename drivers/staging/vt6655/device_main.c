@@ -226,7 +226,7 @@ device_set_options(struct vnt_private *pDevice)
 	pDevice->byLongRetryLimit = pDevice->sOpts.long_retry;
 	pDevice->bDiversityRegCtlON = (pDevice->sOpts.flags & DEVICE_FLAGS_DiversityANT) ? 1 : 0;
 	pDevice->byBBType = pDevice->sOpts.bbp_type;
-	pDevice->byPacketType = (VIA_PKT_TYPE)pDevice->byBBType;
+	pDevice->byPacketType = pDevice->byBBType;
 	pDevice->byAutoFBCtrl = AUTO_FB_0;
 	pDevice->bUpdateBBVGA = true;
 	pDevice->byPreambleType = 0;
@@ -1425,8 +1425,7 @@ static int vnt_config(struct ieee80211_hw *hw, u32 changed)
 		if (priv->byBBType != bb_type) {
 			priv->byBBType = bb_type;
 
-			CARDbSetPhyParameter(priv,
-					     priv->byBBType, 0, 0, NULL, NULL);
+			CARDbSetPhyParameter(priv, priv->byBBType);
 		}
 	}
 
@@ -1486,8 +1485,7 @@ static void vnt_bss_info_changed(struct ieee80211_hw *hw,
 		else
 			priv->bShortSlotTime = false;
 
-		vUpdateIFS(priv);
-		CARDbSetPhyParameter(priv, priv->byBBType, 0, 0, NULL, NULL);
+		CARDbSetPhyParameter(priv, priv->byBBType);
 		BBvSetVGAGainOffset(priv, priv->abyBBVGA[0]);
 	}
 
@@ -1515,8 +1513,7 @@ static void vnt_bss_info_changed(struct ieee80211_hw *hw,
 
 			CARDbSetBeaconPeriod(priv, conf->beacon_int);
 
-			CARDvSetFirstNextTBTT(priv->PortOffset,
-					      conf->beacon_int);
+			CARDvSetFirstNextTBTT(priv, conf->beacon_int);
 		} else {
 			VNSvOutPortB(priv->PortOffset + MAC_REG_TFTCTL,
 				     TFTCTL_TSFCNTRST);
@@ -1635,7 +1632,7 @@ static u64 vnt_get_tsf(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 	struct vnt_private *priv = hw->priv;
 	u64 tsf;
 
-	CARDbGetCurrentTSF(priv->PortOffset, &tsf);
+	CARDbGetCurrentTSF(priv, &tsf);
 
 	return tsf;
 }
@@ -1645,7 +1642,7 @@ static void vnt_set_tsf(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 {
 	struct vnt_private *priv = hw->priv;
 
-	CARDvUpdateNextTBTT(priv->PortOffset, tsf, vif->bss_conf.beacon_int);
+	CARDvUpdateNextTBTT(priv, tsf, vif->bss_conf.beacon_int);
 }
 
 static void vnt_reset_tsf(struct ieee80211_hw *hw, struct ieee80211_vif *vif)

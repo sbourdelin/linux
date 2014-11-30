@@ -416,7 +416,7 @@ static void me4000_reset(struct comedi_device *dev)
 	val |= PLX9052_CNTRL_PCI_RESET;
 	outl(val, info->plx_regbase + PLX9052_CNTRL);
 	val &= ~PLX9052_CNTRL_PCI_RESET;
-	outl(val , info->plx_regbase + PLX9052_CNTRL);
+	outl(val, info->plx_regbase + PLX9052_CNTRL);
 
 	/* 0x8000 to the DACs means an output voltage of 0V */
 	for (chan = 0; chan < 4; chan++)
@@ -1426,7 +1426,6 @@ static int me4000_auto_attach(struct comedi_device *dev,
 		s->maxdata = 0xFFFF;	/*  16 bit DAC */
 		s->range_table = &range_bipolar10;
 		s->insn_write = me4000_ao_insn_write;
-		s->insn_read = comedi_readback_insn_read;
 
 		result = comedi_alloc_subdev_readback(s);
 		if (result)

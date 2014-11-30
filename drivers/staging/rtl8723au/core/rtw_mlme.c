@@ -815,8 +815,6 @@ void rtw_indicate_connect23a(struct rtw_adapter *padapter)
 	if (!check_fwstate(&padapter->mlmepriv, _FW_LINKED)) {
 		set_fwstate(pmlmepriv, _FW_LINKED);
 
-		rtw_led_control(padapter, LED_CTL_LINK);
-
 		rtw_cfg80211_indicate_connect(padapter);
 
 		netif_carrier_on(padapter->pnetdev);
@@ -861,10 +859,7 @@ void rtw_indicate_disconnect23a(struct rtw_adapter *padapter)
 
 		_clr_fwstate_(pmlmepriv, _FW_LINKED);
 
-		rtw_led_control(padapter, LED_CTL_NO_LINK);
-
 		rtw_clear_scan_deny(padapter);
-
 	}
 
 	rtw_lps_ctrl_wk_cmd23a(padapter, LPS_CTRL_DISCONNECT, 1);
@@ -2158,9 +2153,9 @@ bool rtw_restructure_ht_ie23a(struct rtw_adapter *padapter, u8 *in_ie,
 
 		memset(&ht_capie, 0, sizeof(struct ieee80211_ht_cap));
 
-		ht_capie.cap_info = IEEE80211_HT_CAP_SUP_WIDTH_20_40 |
+		ht_capie.cap_info = cpu_to_le16(IEEE80211_HT_CAP_SUP_WIDTH_20_40 |
 			IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40 |
-			IEEE80211_HT_CAP_TX_STBC | IEEE80211_HT_CAP_DSSSCCK40;
+			IEEE80211_HT_CAP_TX_STBC | IEEE80211_HT_CAP_DSSSCCK40);
 
 		GetHalDefVar8192CUsb(padapter, HAL_DEF_RX_PACKET_OFFSET,
 				     &rx_packet_offset);

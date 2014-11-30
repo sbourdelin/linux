@@ -340,7 +340,6 @@ s32 rtw_free_xmitbuf23a(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 void rtw_count_tx_stats23a(struct rtw_adapter *padapter,
 			struct xmit_frame *pxmitframe, int sz);
 void rtw_update_protection23a(struct rtw_adapter *padapter, u8 *ie, uint ie_len);
-s32 rtw_put_snap23a(u8 *data, u16 h_proto);
 struct xmit_frame *rtw_alloc_xmitframe23a_ext(struct xmit_priv *pxmitpriv);
 struct xmit_frame *rtw_alloc_xmitframe23a_once(struct xmit_priv *pxmitpriv);
 s32 rtw_free_xmitframe23a(struct xmit_priv *pxmitpriv,
@@ -354,8 +353,6 @@ struct xmit_frame *rtw_dequeue_xframe23a(struct xmit_priv *pxmitpriv,
 				      struct hw_xmit *phwxmit_i, int entry);
 s32 rtw_xmit23a_classifier(struct rtw_adapter *padapter,
 			struct xmit_frame *pxmitframe);
-u32 rtw_calculate_wlan_pkt_size_by_attribue23a(struct pkt_attrib *pattrib);
-#define rtw_wlan_pkt_size(f) rtw_calculate_wlan_pkt_size_by_attribue23a(&f->attrib)
 s32 rtw_xmitframe_coalesce23a(struct rtw_adapter *padapter, struct sk_buff *pkt,
 			      struct xmit_frame *pxmitframe);
 s32 _rtw_init_hw_txqueue(struct hw_txqueue *phw_txqueue, u8 ac_tag);

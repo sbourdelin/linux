@@ -148,21 +148,15 @@
 #define	NUM				64
 
 /* 0:11A 1:11B 2:11G */
-typedef enum _VIA_BB_TYPE
-{
-	BB_TYPE_11A = 0,
-	BB_TYPE_11B,
-	BB_TYPE_11G
-} VIA_BB_TYPE, *PVIA_BB_TYPE;
+#define BB_TYPE_11A    0
+#define BB_TYPE_11B    1
+#define BB_TYPE_11G    2
 
-/* 0:11a,1:11b,2:11gb(only CCK in BasicRate),3:11ga(OFDM in Basic Rate) */
-typedef enum _VIA_PKT_TYPE
-{
-	PK_TYPE_11A = 0,
-	PK_TYPE_11B,
-	PK_TYPE_11GB,
-	PK_TYPE_11GA
-} VIA_PKT_TYPE, *PVIA_PKT_TYPE;
+/* 0:11a, 1:11b, 2:11gb (only CCK in BasicRate), 3:11ga (OFDM in BasicRate) */
+#define PK_TYPE_11A     0
+#define PK_TYPE_11B     1
+#define PK_TYPE_11GB    2
+#define PK_TYPE_11GA    3
 
 typedef struct __chip_info_tbl {
 	CHIP_TYPE   chip_id;
@@ -289,7 +283,7 @@ struct vnt_private {
 	bool bZoneRegExist;
 	unsigned char byOriginalZonetype;
 
-	unsigned char abyCurrentNetAddr[ETH_ALEN];
+	unsigned char abyCurrentNetAddr[ETH_ALEN]; __aligned(2)
 	bool bLinkPass;          /* link status: OK or fail */
 
 	/* Adapter statistics */
@@ -320,14 +314,13 @@ struct vnt_private {
 	unsigned char byEIFS;
 	unsigned char bySlot;
 	unsigned char byCWMaxMin;
-	CARD_PHY_TYPE		eCurrentPHYType;
 
-	VIA_BB_TYPE		byBBType; /* 0:11A, 1:11B, 2:11G */
-	VIA_PKT_TYPE            byPacketType; /*
-					       * 0:11a,1:11b,2:11gb (only CCK
-					       * in BasicRate), 3:11ga (OFDM in
-					       * Basic Rate)
-					       */
+	u8		byBBType; /* 0:11A, 1:11B, 2:11G */
+	u8		byPacketType; /*
+				       * 0:11a,1:11b,2:11gb (only CCK
+				       * in BasicRate), 3:11ga (OFDM in
+				       * Basic Rate)
+				       */
 	unsigned short wBasicRate;
 	unsigned char byACKRate;
 	unsigned char byTopOFDMBasicRate;
