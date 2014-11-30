@@ -1310,28 +1310,13 @@ static int rtlmac_download_firmware(struct rtlmac_priv *priv)
 	u32 val32;
 	u8 *fwptr;
 
-	printk(KERN_DEBUG "%s: %04x, 1-%02x 2-%02x\n", __func__,
-	       rtl8723au_read16(priv, REG_SYS_FUNC),
-	       rtl8723au_read8(priv, REG_SYS_FUNC),
-	       rtl8723au_read8(priv, REG_SYS_FUNC + 1));
-
 	val8 = rtl8723au_read8(priv, REG_SYS_FUNC + 1);
 	val8 |= 4;
 	rtl8723au_write8(priv, REG_SYS_FUNC + 1, val8);
 
-	printk(KERN_DEBUG "%s: %04x, 1-%02x 2-%02x\n", __func__,
-	       rtl8723au_read16(priv, REG_SYS_FUNC),
-	       rtl8723au_read8(priv, REG_SYS_FUNC),
-	       rtl8723au_read8(priv, REG_SYS_FUNC + 1));
-
 	/* 8051 enable */
 	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
 	rtl8723au_write16(priv, REG_SYS_FUNC, val16 | SYS_FUNC_CPU_ENABLE);
-
-	printk(KERN_DEBUG "%s: %04x, 1-%02x 2-%02x\n", __func__,
-	       rtl8723au_read16(priv, REG_SYS_FUNC),
-	       rtl8723au_read8(priv, REG_SYS_FUNC),
-	       rtl8723au_read8(priv, REG_SYS_FUNC + 1));
 
 	/* MCU firmware download enable */
 	val8 = rtl8723au_read8(priv, REG_MCU_FW_DL);
