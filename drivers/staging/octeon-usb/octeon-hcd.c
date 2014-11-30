@@ -456,6 +456,16 @@ struct octeon_temp_buffer {
 	u8 data[0];
 };
 
+static inline struct octeon_hcd *cvmx_usb_to_octeon(struct cvmx_usb_state *p)
+{
+	return container_of(p, struct octeon_hcd, usb);
+}
+
+static inline struct usb_hcd *octeon_to_hcd(struct octeon_hcd *p)
+{
+	return container_of((void *)p, struct usb_hcd, hcd_priv);
+}
+
 /**
  * octeon_alloc_temp_buffer - allocate a temporary buffer for USB transfer
  *                            (if needed)
@@ -1502,6 +1512,9 @@ static void __cvmx_usb_start_channel_control(struct cvmx_usb_state *usb,
 					     int channel,
 					     struct cvmx_usb_pipe *pipe)
 {
+	struct octeon_hcd *priv = cvmx_usb_to_octeon(usb);
+	struct usb_hcd *hcd = octeon_to_hcd(priv);
+	struct device *dev = hcd->self.controller;
 	struct cvmx_usb_transaction *transaction =
 		list_first_entry(&pipe->transactions, typeof(*transaction),
 				 node);
@@ -1518,7 +1531,7 @@ static void __cvmx_usb_start_channel_control(struct cvmx_usb_state *usb,
 	switch (transaction->stage) {
 	case CVMX_USB_STAGE_NON_CONTROL:
 	case CVMX_USB_STAGE_NON_CONTROL_SPLIT_COMPLETE:
-		cvmx_dprintf("%s: ERROR - Non control stage\n", __func__);
+		dev_err(dev, "%s: ERROR - Non control stage\n", __func__);
 		break;
 	case CVMX_USB_STAGE_SETUP:
 		usbc_hctsiz.s.pid = 3; /* Setup */
@@ -2112,16 +2125,6 @@ done:
 			union cvmx_usbcx_gintmsk, sofmsk, need_sof);
 }
 
-static inline struct octeon_hcd *cvmx_usb_to_octeon(struct cvmx_usb_state *p)
-{
-	return container_of(p, struct octeon_hcd, usb);
-}
-
-static inline struct usb_hcd *octeon_to_hcd(struct octeon_hcd *p)
-{
-	return container_of((void *)p, struct usb_hcd, hcd_priv);
-}
-
 static void octeon_usb_urb_complete_callback(struct cvmx_usb_state *usb,
 					     enum cvmx_usb_complete status,
 					     struct cvmx_usb_pipe *pipe,
@@ -2585,6 +2588,9 @@ static int cvmx_usb_get_frame_number(struct cvmx_usb_state *usb)
  */
 static int __cvmx_usb_poll_channel(struct cvmx_usb_state *usb, int channel)
 {
+	struct octeon_hcd *priv = cvmx_usb_to_octeon(usb);
+	struct usb_hcd *hcd = octeon_to_hcd(priv);
+	struct device *dev = hcd->self.controller;
 	union cvmx_usbcx_hcintx usbc_hcint;
 	union cvmx_usbcx_hctsizx usbc_hctsiz;
 	union cvmx_usbcx_hccharx usbc_hcchar;
@@ -2642,8 +2648,8 @@ static int __cvmx_usb_poll_channel(struct cvmx_usb_state *usb, int channel)
 				 * Channel halt isn't needed.
 				 */
 			} else {
-				cvmx_dprintf("USB%d: Channel %d interrupt without halt\n",
-						usb->index, channel);
+				dev_err(dev, "USB%d: Channel %d interrupt without halt\n",
+					usb->index, channel);
 				return 0;
 			}
 		}
