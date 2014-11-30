@@ -906,8 +906,6 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	printk(KERN_DEBUG "%s: Setting TX power CCK A: %02x, CCK B: %02x, "
 	       "OFDM A: %02x, OFDM B: %02x\n", DRIVER_NAME,
 	       cck[0], cck[1], ofdm[0], ofdm[1]);
-	printk(KERN_DEBUG "%s: Regulatory 0x%02x\n",
-	       DRIVER_NAME, efuse->rf_regulatory);
 
 	for (i = 0; i < RTL8723A_MAX_RF_PATHS; i++) {
 		if (cck[i] > RF6052_MAX_TX_PWR)
@@ -3373,8 +3371,10 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		printk(KERN_DEBUG "%s: data qos frame\n", __func__);
 #endif
 
+#if 0
 	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
 	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
+#endif
 
 	tx_desc = (struct rtlmac_tx_desc *)
 		skb_push(skb, sizeof(struct rtlmac_tx_desc));
