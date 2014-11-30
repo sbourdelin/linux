@@ -3261,8 +3261,6 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			val16 &= ~CR_SW_BEACON_ENABLE;
 			rtl8723au_read16(priv, REG_CR, val16);
 #endif
-
-
 		} else {
 			/* Disable RX of data frames */
 			rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
