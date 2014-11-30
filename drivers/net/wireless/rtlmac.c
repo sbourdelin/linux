@@ -60,18 +60,18 @@ static struct usb_device_id dev_table[] = {
 MODULE_DEVICE_TABLE(usb, dev_table);
 
 static struct ieee80211_rate rtlmac_rates[] = {
-	{ .bitrate = 10, .hw_value = TXDESC_RATE_1M, .flags = 0 },
-	{ .bitrate = 20, .hw_value = TXDESC_RATE_2M, .flags = 0 },
-	{ .bitrate = 55, .hw_value = TXDESC_RATE_5_5M, .flags = 0 },
-	{ .bitrate = 110, .hw_value = TXDESC_RATE_11M, .flags = 0 },
-	{ .bitrate = 60, .hw_value = TXDESC_RATE_6M, .flags = 0 },
-	{ .bitrate = 90, .hw_value = TXDESC_RATE_9M, .flags = 0 },
-	{ .bitrate = 120, .hw_value = TXDESC_RATE_12M, .flags = 0 },
-	{ .bitrate = 180, .hw_value = TXDESC_RATE_18M, .flags = 0 },
-	{ .bitrate = 240, .hw_value = TXDESC_RATE_24M, .flags = 0 },
-	{ .bitrate = 360, .hw_value = TXDESC_RATE_36M, .flags = 0 },
-	{ .bitrate = 480, .hw_value = TXDESC_RATE_48M, .flags = 0 },
-	{ .bitrate = 540, .hw_value = TXDESC_RATE_54M, .flags = 0 },
+	{ .bitrate = 10, .hw_value = DESC_RATE_1M, .flags = 0 },
+	{ .bitrate = 20, .hw_value = DESC_RATE_2M, .flags = 0 },
+	{ .bitrate = 55, .hw_value = DESC_RATE_5_5M, .flags = 0 },
+	{ .bitrate = 110, .hw_value = DESC_RATE_11M, .flags = 0 },
+	{ .bitrate = 60, .hw_value = DESC_RATE_6M, .flags = 0 },
+	{ .bitrate = 90, .hw_value = DESC_RATE_9M, .flags = 0 },
+	{ .bitrate = 120, .hw_value = DESC_RATE_12M, .flags = 0 },
+	{ .bitrate = 180, .hw_value = DESC_RATE_18M, .flags = 0 },
+	{ .bitrate = 240, .hw_value = DESC_RATE_24M, .flags = 0 },
+	{ .bitrate = 360, .hw_value = DESC_RATE_36M, .flags = 0 },
+	{ .bitrate = 480, .hw_value = DESC_RATE_48M, .flags = 0 },
+	{ .bitrate = 540, .hw_value = DESC_RATE_54M, .flags = 0 },
 };
 
 static struct ieee80211_channel rtlmac_channels_2g[] = {
@@ -3527,7 +3527,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 		rx_status->band = hw->conf.chandef.chan->band;
 
 		if (rx_desc->rxht)
-			rx_status->rate_idx = rx_desc->rxmcs - TXDESC_RATE_MCS0;
+			rx_status->rate_idx = rx_desc->rxmcs - DESC_RATE_MCS0;
 		else
 			rx_status->rate_idx = rx_desc->rxmcs;
 

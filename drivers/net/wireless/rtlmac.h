@@ -138,40 +138,40 @@ struct rtlmac_tx_desc {
 };
 
 /*  CCK Rates, TxHT = 0 */
-#define TXDESC_RATE_1M			0x00
-#define TXDESC_RATE_2M			0x01
-#define TXDESC_RATE_5_5M		0x02
-#define TXDESC_RATE_11M			0x03
+#define DESC_RATE_1M			0x00
+#define DESC_RATE_2M			0x01
+#define DESC_RATE_5_5M			0x02
+#define DESC_RATE_11M			0x03
 
 /*  OFDM Rates, TxHT = 0 */
-#define TXDESC_RATE_6M			0x04
-#define TXDESC_RATE_9M			0x05
-#define TXDESC_RATE_12M			0x06
-#define TXDESC_RATE_18M			0x07
-#define TXDESC_RATE_24M			0x08
-#define TXDESC_RATE_36M			0x09
-#define TXDESC_RATE_48M			0x0a
-#define TXDESC_RATE_54M			0x0b
+#define DESC_RATE_6M			0x04
+#define DESC_RATE_9M			0x05
+#define DESC_RATE_12M			0x06
+#define DESC_RATE_18M			0x07
+#define DESC_RATE_24M			0x08
+#define DESC_RATE_36M			0x09
+#define DESC_RATE_48M			0x0a
+#define DESC_RATE_54M			0x0b
 
 /*  MCS Rates, TxHT = 1 */
-#define TXDESC_RATE_MCS0		0x0c
-#define TXDESC_RATE_MCS1		0x0d
-#define TXDESC_RATE_MCS2		0x0e
-#define TXDESC_RATE_MCS3		0x0f
-#define TXDESC_RATE_MCS4		0x10
-#define TXDESC_RATE_MCS5		0x11
-#define TXDESC_RATE_MCS6		0x12
-#define TXDESC_RATE_MCS7		0x13
-#define TXDESC_RATE_MCS8		0x14
-#define TXDESC_RATE_MCS9		0x15
-#define TXDESC_RATE_MCS10		0x16
-#define TXDESC_RATE_MCS11		0x17
-#define TXDESC_RATE_MCS12		0x18
-#define TXDESC_RATE_MCS13		0x19
-#define TXDESC_RATE_MCS14		0x1a
-#define TXDESC_RATE_MCS15		0x1b
-#define TXDESC_RATE_MCS15_SG		0x1c
-#define TXDESC_RATE_MCS32		0x20
+#define DESC_RATE_MCS0			0x0c
+#define DESC_RATE_MCS1			0x0d
+#define DESC_RATE_MCS2			0x0e
+#define DESC_RATE_MCS3			0x0f
+#define DESC_RATE_MCS4			0x10
+#define DESC_RATE_MCS5			0x11
+#define DESC_RATE_MCS6			0x12
+#define DESC_RATE_MCS7			0x13
+#define DESC_RATE_MCS8			0x14
+#define DESC_RATE_MCS9			0x15
+#define DESC_RATE_MCS10			0x16
+#define DESC_RATE_MCS11			0x17
+#define DESC_RATE_MCS12			0x18
+#define DESC_RATE_MCS13			0x19
+#define DESC_RATE_MCS14			0x1a
+#define DESC_RATE_MCS15			0x1b
+#define DESC_RATE_MCS15_SG		0x1c
+#define DESC_RATE_MCS32			0x20
 
 #define TXDESC_OFFSET_SZ		0
 #define TXDESC_OFFSET_SHT		16
@@ -202,8 +202,8 @@ struct rtlmac_tx_desc {
 #define TXDESC_QUEUE_CMD		0x13
 #define TXDESC_QUEUE_MAX		(TXDESC_QUEUE_CMD + 1)
 
-#define TXDESC_RATE_ID_SHIFT		16
-#define TXDESC_RATE_ID_MASK		0xf
+#define DESC_RATE_ID_SHIFT		16
+#define DESC_RATE_ID_MASK		0xf
 #define TXDESC_NAVUSEHDR		BIT(20)
 #define TXDESC_PKT_OFFSET_SHIFT		26
 #define TXDESC_HWPC			BIT(31)
@@ -224,8 +224,8 @@ struct rtlmac_tx_desc {
 #define TXDESC_DATA_BW			BIT(25)
 
 /* Word 5 */
-#define TXDESC_RATE_SHIFT		0
-#define TXDESC_RATE_MASK		0x3f
+#define DESC_RATE_SHIFT			0
+#define DESC_RATE_MASK			0x3f
 #define TXDESC_SHORT_GI			BIT(6)
 #define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
 #define TXDESC_RETRY_LIMIT_SHIFT	18
