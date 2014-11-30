@@ -3526,6 +3526,11 @@ static void rtlmac_rx_complete(struct urb *urb)
 		rx_status->freq = hw->conf.chandef.chan->center_freq;
 		rx_status->band = hw->conf.chandef.chan->band;
 
+		if (rx_desc->rxht)
+			rx_status->rate_idx = rx_desc->rxmcs - TXDESC_RATE_MCS0;
+		else
+			rx_status->rate_idx = rx_desc->rxmcs;
+
 		ieee80211_rx_irqsafe(hw, skb);
 		skb_size = sizeof(struct rtlmac_rx_desc) +
 			IEEE80211_MAX_FRAME_LEN;
