@@ -91,7 +91,8 @@ static inline int ldlm_ns_empty(struct ldlm_namespace *ns)
 }
 
 void ldlm_namespace_move_to_active_locked(struct ldlm_namespace *, ldlm_side_t);
-void ldlm_namespace_move_to_inactive_locked(struct ldlm_namespace *, ldlm_side_t);
+void ldlm_namespace_move_to_inactive_locked(struct ldlm_namespace *,
+					    ldlm_side_t);
 struct ldlm_namespace *ldlm_namespace_first_locked(ldlm_side_t);
 
 /* ldlm_request.c */
@@ -214,6 +215,7 @@ static inline struct ldlm_extent *
 ldlm_interval_extent(struct ldlm_interval *node)
 {
 	struct ldlm_lock *lock;
+
 	LASSERT(!list_empty(&node->li_group));
 
 	lock = list_entry(node->li_group.next, struct ldlm_lock,

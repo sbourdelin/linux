@@ -51,13 +51,6 @@
 #define CB_MAX_CHANNEL_5G       42
 #define CB_MAX_CHANNEL          (CB_MAX_CHANNEL_24G+CB_MAX_CHANNEL_5G)
 
-typedef enum _CARD_PHY_TYPE {
-	PHY_TYPE_11A = 0,
-	PHY_TYPE_11B,
-	PHY_TYPE_11G,
-	PHY_TYPE_AUTO
-} CARD_PHY_TYPE, *PCARD_PHY_TYPE;
-
 typedef enum _CARD_PKT_TYPE {
 	PKT_TYPE_802_11_BCN,
 	PKT_TYPE_802_11_MNG,
@@ -73,16 +66,14 @@ typedef enum _CARD_STATUS_TYPE {
 
 struct vnt_private;
 
-void CARDvSetRSPINF(struct vnt_private *, CARD_PHY_TYPE ePHYType);
-void vUpdateIFS(struct vnt_private *);
+void CARDvSetRSPINF(struct vnt_private *, u8);
 void CARDvUpdateBasicTopRate(struct vnt_private *);
-bool CARDbAddBasicRate(struct vnt_private *, unsigned short wRateIdx);
 bool CARDbIsOFDMinBasicRate(struct vnt_private *);
-void CARDvSetLoopbackMode(void __iomem *dwIoBase, unsigned short wLoopbackMode);
+void CARDvSetLoopbackMode(struct vnt_private *, unsigned short wLoopbackMode);
 bool CARDbSoftwareReset(struct vnt_private *);
-void CARDvSetFirstNextTBTT(void __iomem *dwIoBase, unsigned short wBeaconInterval);
-void CARDvUpdateNextTBTT(void __iomem *dwIoBase, u64 qwTSF, unsigned short wBeaconInterval);
-bool CARDbGetCurrentTSF(void __iomem *dwIoBase, u64 *pqwCurrTSF);
+void CARDvSetFirstNextTBTT(struct vnt_private *, unsigned short wBeaconInterval);
+void CARDvUpdateNextTBTT(struct vnt_private *, u64 qwTSF, unsigned short wBeaconInterval);
+bool CARDbGetCurrentTSF(struct vnt_private *, u64 *pqwCurrTSF);
 u64 CARDqGetNextTBTT(u64 qwTSF, unsigned short wBeaconInterval);
 u64 CARDqGetTSFOffset(unsigned char byRxRate, u64 qwTSF1, u64 qwTSF2);
 unsigned char CARDbyGetPktType(struct vnt_private *);
@@ -90,9 +81,7 @@ void CARDvSafeResetTx(struct vnt_private *);
 void CARDvSafeResetRx(struct vnt_private *);
 bool CARDbRadioPowerOff(struct vnt_private *);
 bool CARDbRadioPowerOn(struct vnt_private *);
-bool CARDbSetPhyParameter(struct vnt_private *, CARD_PHY_TYPE ePHYType,
-			  unsigned short wCapInfo, unsigned char byERPField,
-			  void *pvSupportRateIEs, void *pvExtSupportRateIEs);
+bool CARDbSetPhyParameter(struct vnt_private *, u8);
 bool CARDbUpdateTSF(struct vnt_private *, unsigned char byRxRate,
 		    u64 qwBSSTimestamp, u64 qwLocalTSF);
 bool CARDbSetBeaconPeriod(struct vnt_private *, unsigned short wBeaconInterval);
