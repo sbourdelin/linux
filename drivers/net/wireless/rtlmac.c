@@ -3158,11 +3158,26 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
 }
 
+static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
+				     struct ieee80211_sta *sta)
+{
+}
+
+static void rtlmac_set_basic_rates(struct rtlmac_priv *priv,
+				   struct ieee80211_sta *sta)
+{
+	u32 rate_cfg = 0;
+
+	rate_cfg = sta->supp_rates[0];
+	printk(KERN_DEBUG "%s: rates %08x\n", __func__, rate_cfg);
+}
+
 static void
 rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			struct ieee80211_bss_conf *bss_conf, u32 changed)
 {
 	struct rtlmac_priv *priv = hw->priv;
+	struct ieee80211_sta *sta;
 	u32 val32;
 	u16 val16;
 	u8 val8;
@@ -3173,7 +3188,20 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtlmac_set_linktype(priv, vif->type);
 
 		if (bss_conf->assoc) {
-			rtlmac_set_bssid(priv, bss_conf->bssid);
+			rcu_read_lock();
+			sta = ieee80211_find_sta(vif, bss_conf->bssid);
+			if (!sta) {
+				rcu_read_unlock();
+				goto error;
+			}
+			if (sta->ht_cap.ht_supported)
+				printk(KERN_DEBUG "%s: HT supported\n",
+				       __func__);
+			if (sta->vht_cap.vht_supported)
+				printk(KERN_DEBUG "%s: VHT supported\n",
+				       __func__);
+			rtlmac_update_rate_table(priv, sta);
+			rcu_read_unlock();
 
 			val32 = rtl8723au_read32(priv, REG_RCR);
 			val32 |= /* RCR_CHECK_BSSID_MATCH |*/ RCR_CHECK_BSSID_BEACON;
@@ -3233,11 +3261,32 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			val16 &= ~CR_SW_BEACON_ENABLE;
 			rtl8723au_read16(priv, REG_CR, val16);
 #endif
+
+
 		} else {
 			/* Disable RX of data frames */
 			rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 		}
 	}
+
+	if (changed & BSS_CHANGED_BSSID) {
+		printk(KERN_DEBUG "Changed BSSID!\n");
+		rtlmac_set_bssid(priv, bss_conf->bssid);
+	}
+
+	if (changed & BSS_CHANGED_BASIC_RATES) {
+		printk(KERN_DEBUG "Changed basic rates!\n");
+		rcu_read_lock();
+		sta = ieee80211_find_sta(vif, bss_conf->bssid);
+		if (!sta) {
+			rcu_read_unlock();
+			goto error;
+		}
+		rtlmac_set_basic_rates(priv, sta);
+		rcu_read_unlock();
+	}
+error:
+	return;
 }
 
 static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
