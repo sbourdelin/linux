@@ -260,38 +260,38 @@ static struct rtlmac_reg32val rtl8723a_phy_1t_init_table[] = {
 };
 
 static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
-	{0xc78, 0x7B000001},
-	{0xc78, 0x7B010001},
-	{0xc78, 0x7B020001},
-	{0xc78, 0x7B030001},
-	{0xc78, 0x7B040001},
-	{0xc78, 0x7B050001},
-	{0xc78, 0x7A060001},
+	{0xc78, 0x7b000001},
+	{0xc78, 0x7b010001},
+	{0xc78, 0x7b020001},
+	{0xc78, 0x7b030001},
+	{0xc78, 0x7b040001},
+	{0xc78, 0x7b050001},
+	{0xc78, 0x7a060001},
 	{0xc78, 0x79070001},
 	{0xc78, 0x78080001},
 	{0xc78, 0x77090001},
-	{0xc78, 0x760A0001},
-	{0xc78, 0x750B0001},
-	{0xc78, 0x740C0001},
-	{0xc78, 0x730D0001},
-	{0xc78, 0x720E0001},
-	{0xc78, 0x710F0001},
+	{0xc78, 0x760a0001},
+	{0xc78, 0x750b0001},
+	{0xc78, 0x740c0001},
+	{0xc78, 0x730d0001},
+	{0xc78, 0x720e0001},
+	{0xc78, 0x710f0001},
 	{0xc78, 0x70100001},
-	{0xc78, 0x6F110001},
-	{0xc78, 0x6E120001},
-	{0xc78, 0x6D130001},
-	{0xc78, 0x6C140001},
-	{0xc78, 0x6B150001},
-	{0xc78, 0x6A160001},
+	{0xc78, 0x6f110001},
+	{0xc78, 0x6e120001},
+	{0xc78, 0x6d130001},
+	{0xc78, 0x6c140001},
+	{0xc78, 0x6b150001},
+	{0xc78, 0x6a160001},
 	{0xc78, 0x69170001},
 	{0xc78, 0x68180001},
 	{0xc78, 0x67190001},
-	{0xc78, 0x661A0001},
-	{0xc78, 0x651B0001},
-	{0xc78, 0x641C0001},
-	{0xc78, 0x631D0001},
-	{0xc78, 0x621E0001},
-	{0xc78, 0x611F0001},
+	{0xc78, 0x661a0001},
+	{0xc78, 0x651b0001},
+	{0xc78, 0x641c0001},
+	{0xc78, 0x631d0001},
+	{0xc78, 0x621e0001},
+	{0xc78, 0x611f0001},
 	{0xc78, 0x60200001},
 	{0xc78, 0x49210001},
 	{0xc78, 0x48220001},
@@ -302,12 +302,12 @@ static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xc78, 0x43270001},
 	{0xc78, 0x42280001},
 	{0xc78, 0x41290001},
-	{0xc78, 0x402A0001},
-	{0xc78, 0x262B0001},
-	{0xc78, 0x252C0001},
-	{0xc78, 0x242D0001},
-	{0xc78, 0x232E0001},
-	{0xc78, 0x222F0001},
+	{0xc78, 0x402a0001},
+	{0xc78, 0x262b0001},
+	{0xc78, 0x252c0001},
+	{0xc78, 0x242d0001},
+	{0xc78, 0x232e0001},
+	{0xc78, 0x222f0001},
 	{0xc78, 0x21300001},
 	{0xc78, 0x20310001},
 	{0xc78, 0x06320001},
@@ -318,44 +318,44 @@ static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xc78, 0x01370001},
 	{0xc78, 0x00380001},
 	{0xc78, 0x00390001},
-	{0xc78, 0x003A0001},
-	{0xc78, 0x003B0001},
-	{0xc78, 0x003C0001},
-	{0xc78, 0x003D0001},
-	{0xc78, 0x003E0001},
-	{0xc78, 0x003F0001},
-	{0xc78, 0x7B400001},
-	{0xc78, 0x7B410001},
-	{0xc78, 0x7B420001},
-	{0xc78, 0x7B430001},
-	{0xc78, 0x7B440001},
-	{0xc78, 0x7B450001},
-	{0xc78, 0x7A460001},
+	{0xc78, 0x003a0001},
+	{0xc78, 0x003b0001},
+	{0xc78, 0x003c0001},
+	{0xc78, 0x003d0001},
+	{0xc78, 0x003e0001},
+	{0xc78, 0x003f0001},
+	{0xc78, 0x7b400001},
+	{0xc78, 0x7b410001},
+	{0xc78, 0x7b420001},
+	{0xc78, 0x7b430001},
+	{0xc78, 0x7b440001},
+	{0xc78, 0x7b450001},
+	{0xc78, 0x7a460001},
 	{0xc78, 0x79470001},
 	{0xc78, 0x78480001},
 	{0xc78, 0x77490001},
-	{0xc78, 0x764A0001},
-	{0xc78, 0x754B0001},
-	{0xc78, 0x744C0001},
-	{0xc78, 0x734D0001},
-	{0xc78, 0x724E0001},
-	{0xc78, 0x714F0001},
+	{0xc78, 0x764a0001},
+	{0xc78, 0x754b0001},
+	{0xc78, 0x744c0001},
+	{0xc78, 0x734d0001},
+	{0xc78, 0x724e0001},
+	{0xc78, 0x714f0001},
 	{0xc78, 0x70500001},
-	{0xc78, 0x6F510001},
-	{0xc78, 0x6E520001},
-	{0xc78, 0x6D530001},
-	{0xc78, 0x6C540001},
-	{0xc78, 0x6B550001},
-	{0xc78, 0x6A560001},
+	{0xc78, 0x6f510001},
+	{0xc78, 0x6e520001},
+	{0xc78, 0x6d530001},
+	{0xc78, 0x6c540001},
+	{0xc78, 0x6b550001},
+	{0xc78, 0x6a560001},
 	{0xc78, 0x69570001},
 	{0xc78, 0x68580001},
 	{0xc78, 0x67590001},
-	{0xc78, 0x665A0001},
-	{0xc78, 0x655B0001},
-	{0xc78, 0x645C0001},
-	{0xc78, 0x635D0001},
-	{0xc78, 0x625E0001},
-	{0xc78, 0x615F0001},
+	{0xc78, 0x665a0001},
+	{0xc78, 0x655b0001},
+	{0xc78, 0x645c0001},
+	{0xc78, 0x635d0001},
+	{0xc78, 0x625e0001},
+	{0xc78, 0x615f0001},
 	{0xc78, 0x60600001},
 	{0xc78, 0x49610001},
 	{0xc78, 0x48620001},
@@ -366,12 +366,12 @@ static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xc78, 0x43670001},
 	{0xc78, 0x42680001},
 	{0xc78, 0x41690001},
-	{0xc78, 0x406A0001},
-	{0xc78, 0x266B0001},
-	{0xc78, 0x256C0001},
-	{0xc78, 0x246D0001},
-	{0xc78, 0x236E0001},
-	{0xc78, 0x226F0001},
+	{0xc78, 0x406a0001},
+	{0xc78, 0x266b0001},
+	{0xc78, 0x256c0001},
+	{0xc78, 0x246d0001},
+	{0xc78, 0x236e0001},
+	{0xc78, 0x226f0001},
 	{0xc78, 0x21700001},
 	{0xc78, 0x20710001},
 	{0xc78, 0x06720001},
@@ -382,12 +382,12 @@ static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xc78, 0x01770001},
 	{0xc78, 0x00780001},
 	{0xc78, 0x00790001},
-	{0xc78, 0x007A0001},
-	{0xc78, 0x007B0001},
-	{0xc78, 0x007C0001},
-	{0xc78, 0x007D0001},
-	{0xc78, 0x007E0001},
-	{0xc78, 0x007F0001},
+	{0xc78, 0x007a0001},
+	{0xc78, 0x007b0001},
+	{0xc78, 0x007c0001},
+	{0xc78, 0x007d0001},
+	{0xc78, 0x007e0001},
+	{0xc78, 0x007f0001},
 	{0xc78, 0x3800001e},
 	{0xc78, 0x3801001e},
 	{0xc78, 0x3802001e},
@@ -397,29 +397,29 @@ static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xc78, 0x3806001e},
 	{0xc78, 0x3807001e},
 	{0xc78, 0x3808001e},
-	{0xc78, 0x3C09001e},
-	{0xc78, 0x3E0A001e},
-	{0xc78, 0x400B001e},
-	{0xc78, 0x440C001e},
-	{0xc78, 0x480D001e},
-	{0xc78, 0x4C0E001e},
-	{0xc78, 0x500F001e},
+	{0xc78, 0x3c09001e},
+	{0xc78, 0x3e0a001e},
+	{0xc78, 0x400b001e},
+	{0xc78, 0x440c001e},
+	{0xc78, 0x480d001e},
+	{0xc78, 0x4c0e001e},
+	{0xc78, 0x500f001e},
 	{0xc78, 0x5210001e},
 	{0xc78, 0x5611001e},
-	{0xc78, 0x5A12001e},
-	{0xc78, 0x5E13001e},
+	{0xc78, 0x5a12001e},
+	{0xc78, 0x5e13001e},
 	{0xc78, 0x6014001e},
 	{0xc78, 0x6015001e},
 	{0xc78, 0x6016001e},
 	{0xc78, 0x6217001e},
 	{0xc78, 0x6218001e},
 	{0xc78, 0x6219001e},
-	{0xc78, 0x621A001e},
-	{0xc78, 0x621B001e},
-	{0xc78, 0x621C001e},
-	{0xc78, 0x621D001e},
-	{0xc78, 0x621E001e},
-	{0xc78, 0x621F001e},
+	{0xc78, 0x621a001e},
+	{0xc78, 0x621b001e},
+	{0xc78, 0x621c001e},
+	{0xc78, 0x621d001e},
+	{0xc78, 0x621e001e},
+	{0xc78, 0x621f001e},
 	{0xffff, 0xffffffff}
 };
 
@@ -1828,7 +1828,7 @@ static void rtlmac_fill_iqk_matrix_a(struct rtlmac_priv *priv,
 
 		X = result[final_candidate][0];
 		if ((X & 0x00000200) != 0)
-			X = X | 0xFFFFFC00;
+			X = X | 0xfffffc00;
 		TX0_A = (X * Oldval_0) >> 8;
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
@@ -1853,7 +1853,7 @@ static void rtlmac_fill_iqk_matrix_a(struct rtlmac_priv *priv,
 		rtl8723au_write32(priv, REG_OFDM0_XC_TX_AFE, val32);
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
-		val32 &= ~0x003F0000;
+		val32 &= ~0x003f0000;
 		val32 |= ((TX0_C & 0x3f) << 16);
 		rtl8723au_write32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE, val32);
 
@@ -1897,7 +1897,7 @@ static bool rtlmac_simularity_compare(struct rtlmac_priv *priv,
 				      int result[][8], u8 c1, u8 c2)
 {
 	u32 i, j, diff, SimularityBitMap, bound = 0;
-	u8 final_candidate[2] = {0xFF, 0xFF};	/* for path A and path B */
+	u8 final_candidate[2] = {0xff, 0xff};	/* for path A and path B */
 	bool bResult = true, is2T = false;
 
 	if (is2T)
@@ -1928,7 +1928,7 @@ static bool rtlmac_simularity_compare(struct rtlmac_priv *priv,
 
 	if (SimularityBitMap == 0) {
 		for (i = 0; i < (bound/4); i++) {
-			if (final_candidate[i] != 0xFF) {
+			if (final_candidate[i] != 0xff) {
 				for (j = i*4; j < (i+1)*4-2; j++)
 					result[3][j] =
 						result[final_candidate[i]][j];
@@ -1936,12 +1936,12 @@ static bool rtlmac_simularity_compare(struct rtlmac_priv *priv,
 			}
 		}
 		return bResult;
-	} else if (!(SimularityBitMap & 0x0F)) {
+	} else if (!(SimularityBitMap & 0x0f)) {
 		/* path A OK */
 		for (i = 0; i < 4; i++)
 			result[3][i] = result[c1][i];
 		return false;
-	} else if (!(SimularityBitMap & 0xF0) && is2T) {
+	} else if (!(SimularityBitMap & 0xf0) && is2T) {
 		/* path B OK */
 		for (i = 4; i < 8; i++)
 			result[3][i] = result[c1][i];
@@ -2015,7 +2015,7 @@ static void rtlmac_mac_calibration(struct rtlmac_priv *priv, u32 *regs,
 {
 	int i = 0;
 
-	rtl8723au_write8(priv, regs[i], 0x3F);
+	rtl8723au_write8(priv, regs[i], 0x3f);
 
 	for (i = 1 ; i < (RTLMAC_MAC_REGS - 1); i++) {
 		rtl8723au_write8(priv, regs[i],
@@ -2179,16 +2179,16 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 			printk(KERN_DEBUG "Path A IQK Success!!\n");
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
-			result[t][0] = (val32 & 0x3FF0000) >> 16;
+			result[t][0] = (val32 & 0x3ff0000) >> 16;
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_AFTER_IQK_A);
-			result[t][1] = (val32 & 0x3FF0000) >> 16;
+			result[t][1] = (val32 & 0x3ff0000) >> 16;
 			val32 = rtl8723au_read32(priv,
 						 REG_RX_POWER_BEFORE_IQK_A_2);
-			result[t][2] = (val32 & 0x3FF0000) >> 16;
+			result[t][2] = (val32 & 0x3ff0000) >> 16;
 			val32 = rtl8723au_read32(priv,
 						 REG_RX_POWER_AFTER_IQK_A_2);
-			result[t][3] = (val32 & 0x3FF0000) >> 16;
+			result[t][3] = (val32 & 0x3ff0000) >> 16;
 			break;
 		} else if (i == (retryCount - 1) && PathAOK == 0x01) {
 			/* Tx IQK OK */
@@ -2196,10 +2196,10 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
-			result[t][0] = (val32 & 0x3FF0000) >> 16;
+			result[t][0] = (val32 & 0x3ff0000) >> 16;
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_AFTER_IQK_A);
-			result[t][1] = (val32 & 0x3FF0000) >> 16;
+			result[t][1] = (val32 & 0x3ff0000) >> 16;
 		}
 	}
 
@@ -2218,16 +2218,16 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 			PathBOK = _PHY_PathB_IQK(priv);
 			if (PathBOK == 0x03) {
 				printk(KERN_DEBUG "Path B IQK Success!!\n");
-				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B)&0x3FF0000)>>16;
-				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B)&0x3FF0000)>>16;
-				result[t][6] = (rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2)&0x3FF0000)>>16;
-				result[t][7] = (rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2)&0x3FF0000)>>16;
+				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B) & 0x3ff0000) >> 16;
+				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B) & 0x3ff0000) >> 16;
+				result[t][6] = (rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2) &0x3ff0000) >> 16;
+				result[t][7] = (rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2) & 0x3ff0000) >> 16;
 				break;
 			} else if (i == (retryCount - 1) && PathBOK == 0x01) {
 				/* Tx IQK OK */
 				DBG_8723A("Path B Only Tx IQK Success!!\n");
-				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B)&0x3FF0000)>>16;
-				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B)&0x3FF0000)>>16;
+				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B) & 0x3ff0000) >> 16;
+				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B) & 0x3ff0000) >> 16;
 			}
 		}
 
@@ -2344,7 +2344,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 				if (RegTmp != 0)
 					final_candidate = 3;
 				else
-					final_candidate = 0xFF;
+					final_candidate = 0xff;
 			}
 		}
 	}
@@ -2426,7 +2426,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 		/* Path-B */
 		if (is2T)
 			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
-				     (RF_Bmode & 0x8FFFF) | 0x10000);
+				     (RF_Bmode & 0x8ffff) | 0x10000);
 #endif
 	} else {
 		/*  Deal with Packet TX case */
