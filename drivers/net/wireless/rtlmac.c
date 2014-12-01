@@ -2300,12 +2300,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 		return;
 	}
 
-	for (i = 0; i < 8; i++) {
-		result[0][i] = 0;
-		result[1][i] = 0;
-		result[2][i] = 0;
-		result[3][i] = 0;
-	}
+	memset(result, 0, sizeof(result));
 	final_candidate = 0xff;
 
 	bPathAOK = false;
