@@ -1999,7 +1999,7 @@ static void rtlmac_path_adda_on(struct rtlmac_priv *priv, u32 *regs,
 	u32 i;
 
 	pathOn = isPathAOn ? 0x04db25a4 : 0x0b1b25a4;
-	if (false == is2T) {
+	if (!is2T) {
 		pathOn = 0x0bdb25a0;
 		rtl8723au_write32(priv, regs[0], 0x0b1b25a0);
 	} else {
