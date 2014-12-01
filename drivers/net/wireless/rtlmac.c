@@ -2061,16 +2061,16 @@ static u8 rtlmac_iqk_path_a(struct rtlmac_priv *priv, bool configPathB)
 	regEA4 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_A_2);
 
 	if (!(regEAC & BIT(28)) &&
-	    (((regE94 & 0x03FF0000) >> 16) != 0x142) &&
-	    (((regE9C & 0x03FF0000) >> 16) != 0x42))
+	    ((regE94 & 0x03ff0000) != 0x01420000) &&
+	    ((regE9C & 0x03ff0000) != 0x00420000))
 		result |= 0x01;
 	else			/* if Tx not OK, ignore Rx */
 		return result;
 
 	/* if Tx is OK, check whether Rx is OK */
 	if (!(regEAC & BIT(27)) &&
-	    (((regEA4 & 0x03FF0000) >> 16) != 0x132) &&
-	    (((regEAC & 0x03FF0000) >> 16) != 0x36))
+	    ((regEA4 & 0x03ff0000) != 0x01320000) &&
+	    ((regEAC & 0x03ff0000) != 0x00360000))
 		result |= 0x02;
 	else
 		printk(KERN_WARNING "Path A Rx IQK fail!!\n");
