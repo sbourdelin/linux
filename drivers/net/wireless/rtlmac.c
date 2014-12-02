@@ -2820,18 +2820,12 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	ret = rtlmac_init_phy_rf(priv);
 	if (ret)
 		goto exit;
-#if 0
-	/*
-	 * The RTL driver does this, but it cannot be correct since
-	 * RF_T_METER is an RF register, and should be written with
-	 * rtl8723au_write_rfreg() not rtl8723au_write32()
-	 */
-	/* reducing 80M spur */
-	rtl8723au_write32(priv, RF_T_METER, 0x0381808d);
-	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
-	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff82);
-	rtl8723au_write32(priv, RF_SYN_G4, 0xf2ffff83);
-#endif
+
+	/* Reduce 80M spur */
+	rtl8723au_write32(priv, REG_AFE_XTAL_CTRL, 0x0381808d);
+	rtl8723au_write32(priv, REG_AFE_PLL_CTRL, 0xf0ffff83);
+	rtl8723au_write32(priv, REG_AFE_PLL_CTRL, 0xf0ffff82);
+	rtl8723au_write32(priv, REG_AFE_PLL_CTRL, 0xf0ffff83);
 
 	/* RFSW Control - clear bit 14 ?? */
 	rtl8723au_write32(priv, REG_FPGA0_TXINFO, 0x00000003);
