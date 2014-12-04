@@ -129,10 +129,9 @@ s_vGenerateTxParameter(
 
 static unsigned int
 s_cbFillTxBufHead(struct vnt_private *pDevice, unsigned char byPktType,
-		  unsigned char *pbyTxBufferAddr, unsigned int cbFrameBodySize,
+		  unsigned char *pbyTxBufferAddr,
 		  unsigned int uDMAIdx, PSTxDesc pHeadTD,
-		  unsigned char *pPacket, unsigned int uNodeIndex,
-		  unsigned int *puMACfragNum);
+		  unsigned int uNodeIndex);
 
 static
 __le16
@@ -1031,10 +1030,9 @@ s_vGenerateTxParameter(
 
 static unsigned int
 s_cbFillTxBufHead(struct vnt_private *pDevice, unsigned char byPktType,
-		  unsigned char *pbyTxBufferAddr, unsigned int cbFrameBodySize,
+		  unsigned char *pbyTxBufferAddr,
 		  unsigned int uDMAIdx, PSTxDesc pHeadTD,
-		  unsigned char *pPacket, unsigned int is_pspoll,
-		  unsigned int *puMACfragNum)
+		  unsigned int is_pspoll)
 {
 	PDEVICE_TD_INFO td_info = pHeadTD->pTDInfo;
 	struct sk_buff *skb = td_info->skb;
@@ -1197,12 +1195,12 @@ s_cbFillTxBufHead(struct vnt_private *pDevice, unsigned char byPktType,
 
 	hdr->duration_id = uDuration;
 
-	cbReqCount = cbHeaderLength + uPadding + cbFrameBodySize;
+	cbReqCount = cbHeaderLength + uPadding + skb->len;
 	pbyBuffer = (unsigned char *)pHeadTD->pTDInfo->buf;
 	uLength = cbHeaderLength + uPadding;
 
 	/* Copy the Packet into a tx Buffer */
-	memcpy((pbyBuffer + uLength), pPacket, cbFrameBodySize);
+	memcpy((pbyBuffer + uLength), skb->data, skb->len);
 
 	ptdCurr = (PSTxDesc)pHeadTD;
 
@@ -1213,8 +1211,6 @@ s_cbFillTxBufHead(struct vnt_private *pDevice, unsigned char byPktType,
 	/* Set TSR1 & ReqCount in TxDescHead */
 	ptdCurr->m_td1TD1.byTCR |= (TCR_STP | TCR_EDP | EDMSDU);
 	ptdCurr->m_td1TD1.wReqCount = cpu_to_le16((unsigned short)(cbReqCount));
-
-	*puMACfragNum = uMACfragNum;
 
 	return cbHeaderLength;
 }
@@ -1297,7 +1293,6 @@ int vnt_generate_fifo_header(struct vnt_private *priv, u32 dma_idx,
 	struct ieee80211_hdr *hdr;
 	struct vnt_tx_fifo_head *tx_buffer_head =
 			(struct vnt_tx_fifo_head *)td_info->buf;
-	u32 frag;
 	u16 tx_body_size = skb->len, current_rate;
 	u8 pkt_type;
 	bool is_pspoll = false;
@@ -1403,9 +1398,8 @@ int vnt_generate_fifo_header(struct vnt_private *priv, u32 dma_idx,
 
 	tx_buffer_head->frag_ctl |= cpu_to_le16(FRAGCTL_NONFRAG);
 
-	s_cbFillTxBufHead(priv, pkt_type, (u8 *)tx_buffer_head, skb->len,
-			  dma_idx, head_td, (u8 *)skb->data,
-			  is_pspoll, &frag);
+	s_cbFillTxBufHead(priv, pkt_type, (u8 *)tx_buffer_head,
+			  dma_idx, head_td, is_pspoll);
 
 	if (info->control.hw_key) {
 		tx_key = info->control.hw_key;
