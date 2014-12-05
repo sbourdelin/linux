@@ -723,16 +723,16 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 {
 	u8 val8;
-	u16 val16;
+	u32 val32;
 
 	val8 = rtl8723au_read8(priv, REG_SPS0_CTRL);
 	val8 |= BIT(0) | BIT(3);
 	rtl8723au_write8(priv, REG_SPS0_CTRL, val8);
 
-	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_PARM);
-	val16 &= ~(BIT(4) | BIT(5));
-	val16 |= BIT(3);
-	rtl8723au_write16(priv, REG_FPGA0_XA_RF_PARM, val16);
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_PARM);
+	val32 &= ~(BIT(4) | BIT(5));
+	val32 |= BIT(3);
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_PARM, val32);
 
 	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0x32d95);
 
