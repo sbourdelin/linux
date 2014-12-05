@@ -3825,6 +3825,11 @@ static void rtlmac_stop(struct ieee80211_hw *hw)
 	usb_kill_anchored_urbs(&priv->int_anchor);
 
 	rtl8723a_disable_rf(priv);
+
+	/*
+	 * Disable interrupts
+	 */
+	rtl8723au_write32(priv, REG_USB_HIMR, 0);
 }
 
 static const struct ieee80211_ops rtlmac_ops = {
