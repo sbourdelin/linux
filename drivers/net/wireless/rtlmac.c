@@ -755,14 +755,16 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_APSD_CTRL, 0x00);
 	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE2);
 	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
-	rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 #endif
+	rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 }
 
 static void rtl8723a_disable_rf(struct rtlmac_priv *priv)
 {
 	u8 sps0;
 	u32 val32;
+
+	rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
 
 	sps0 = rtl8723au_read8(priv, REG_SPS0_CTRL);
 
