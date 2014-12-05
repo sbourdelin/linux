@@ -3435,7 +3435,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 	struct ieee80211_mgmt *mgmt;
 	__le32 *_rx_desc_le = (__le32 *)skb->data;
 	u32 *_rx_desc = (u32 *)skb->data;
-	int cnt, len, skb_size, drvinfo_sz, desc_shift, i;
+	int cnt, len, skb_size, drvinfo_sz, desc_shift, i, ret;
 
 	for (i = 0; i < (sizeof(struct rtlmac_rx_desc) / sizeof(u32)); i++)
 		_rx_desc[i] = le32_to_cpu(_rx_desc_le[i]);
@@ -3524,23 +3524,31 @@ static void rtlmac_rx_complete(struct urb *urb)
 		skb_size = sizeof(struct rtlmac_rx_desc) +
 			IEEE80211_MAX_FRAME_LEN;
 		skb = dev_alloc_skb(skb_size);
-		if (skb) {
-			memset(skb->data, 0, sizeof(struct rtlmac_rx_desc));
-			usb_fill_bulk_urb(&rx_urb->urb, priv->udev,
-					  priv->pipe_in, skb->data,
-					  skb_size, rtlmac_rx_complete, skb);
-
-			usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
-			usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
-		} else {
+		if (!skb) {
 			printk(KERN_WARNING "%s: Out of memory\n", __func__);
-			usb_free_urb(urb);
+			goto cleanup;
+		}
+
+		memset(skb->data, 0, sizeof(struct rtlmac_rx_desc));
+		usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in,
+				  skb->data, skb_size, rtlmac_rx_complete, skb);
+
+		usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
+		ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
+		if (ret) {
+			usb_unanchor_urb(&rx_urb->urb);
+			goto cleanup;
 		}
 	} else {
 		printk(KERN_DEBUG "%s: status %i\n", __func__, urb->status);
-		usb_free_urb(urb);
-		dev_kfree_skb(skb);
+		goto cleanup;
 	}
+	return;
+
+cleanup:
+	usb_free_urb(urb);
+	dev_kfree_skb(skb);
+	return;
 }
 
 static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
