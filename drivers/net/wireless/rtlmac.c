@@ -757,14 +757,6 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
 	rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 #endif
-
-	rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, 0x00);
-	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 1, 0x64);
-	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, 0x00);
-	rtl8723au_write8(priv, REG_BEACON_CTRL,
-			 BEACON_ATIM | BEACON_FUNCTION_ENABLE |
-			 BEACON_DISABLE_TSF_UPDATE);
-	rtl8723au_write8(priv, REG_MSR, MSR_LINKTYPE_STATION);
 }
 
 static void rtl8723a_disable_rf(struct rtlmac_priv *priv)
@@ -798,6 +790,24 @@ static void rtl8723a_disable_rf(struct rtlmac_priv *priv)
 	sps0 &= ~(BIT(0) | BIT(3));
 	rtl8723au_write8(priv, REG_SPS0_CTRL, sps0);
 }
+
+
+static void rtl8723a_stop_tx_beacon(struct rtlmac_priv *priv)
+{
+	u8 val8;
+
+	val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL + 2);
+	val8 &= ~BIT(6);
+	val8 = 0x00; /* FIXME */
+	rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, val8);
+
+	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 1, 0x64);
+	val8 = rtl8723au_read8(priv, REG_TBTT_PROHIBIT + 2);
+	val8 &= ~BIT(0);
+	val8 = 0x00; /* FIXME */
+	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, val8);
+}
+
 
 /*
  * The rtl8723a has 3 channel groups for it's efuse settings. It only
@@ -3683,15 +3693,25 @@ error:
 static int rtlmac_add_interface(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif)
 {
+	struct rtlmac_priv *priv = hw->priv;
 	int ret;
+	u8 val8;
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_STATION:
+		rtl8723a_stop_tx_beacon(priv);
+
+		val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
+		val8 |= BEACON_ATIM | BEACON_FUNCTION_ENABLE |
+			BEACON_DISABLE_TSF_UPDATE;
+		rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
 		ret = 0;
 		break;
 	default:
 		ret = -EOPNOTSUPP;
 	}
+
+	rtlmac_set_linktype(priv, vif->type);
 
 	printk(KERN_DEBUG "%s = %i\n", __func__, ret);
 	return ret;
