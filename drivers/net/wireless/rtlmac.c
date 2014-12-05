@@ -767,6 +767,38 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_MSR, MSR_LINKTYPE_STATION);
 }
 
+static void rtl8723a_disable_rf(struct rtlmac_priv *priv)
+{
+	u8 sps0;
+	u32 val32;
+
+	sps0 = rtl8723au_read8(priv, REG_SPS0_CTRL);
+
+	/* RF RX code for preamble power saving */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_PARM);
+	val32 &= ~(BIT(3) | BIT(4) | BIT(5));
+	rtl8723au_write32(priv, REG_FPGA0_XA_RF_PARM, val32);
+
+	/* Disable all packet detection for all four paths */
+	val32 = rtl8723au_read32(priv, REG_OFDM0_TRX_PATH_ENABLE);
+	val32 &= ~(BIT(4) | BIT(5) | BIT(6) | BIT(7));
+	rtl8723au_write32(priv, REG_OFDM0_TRX_PATH_ENABLE, val32);
+
+	/* Enable power saving */
+	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+	val32 |= FPGA_RF_MODE_JAPAN;
+	rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
+
+	/* AFE control register to power down bits [30:22] */
+	rtl8723au_write32(priv, REG_RX_WAIT_CCA, 0x001b25a0);
+
+	/* Power down RF module */
+	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0);
+
+	sps0 &= ~(BIT(0) | BIT(3));
+	rtl8723au_write8(priv, REG_SPS0_CTRL, sps0);
+}
+
 /*
  * The rtl8723a has 3 channel groups for it's efuse settings. It only
  * supports the 2.4GHz band, so channels 1 - 14:
