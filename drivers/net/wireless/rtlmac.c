@@ -1404,6 +1404,33 @@ exit:
 	return ret;
 }
 
+static void rtlmac_firmware_self_reset(struct rtlmac_priv *priv)
+{
+	u16 val16;
+	int i = 100;
+
+	/* Inform 8051 to perform reset */
+	rtl8723au_write8(priv, REG_HMETFR + 3, 0x20);
+
+	for (i = 100; i > 0; i--) {
+		val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
+
+		if (!(val16 & SYS_FUNC_CPU_ENABLE)) {
+			printk(KERN_DEBUG "%s: Firmware self reset success!\n",
+			       __func__);
+			break;
+		}
+		udelay(50);
+	}
+
+	if (!i) {
+		/* Force firmware reset */
+		val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
+		val16 &= ~SYS_FUNC_CPU_ENABLE;
+		rtl8723au_write16(priv, REG_SYS_FUNC, val16);
+	}
+}
+
 static int rtlmac_init_mac(struct rtlmac_priv *priv,
 			   struct rtlmac_reg8val *array)
 {
@@ -2463,53 +2490,6 @@ static int rtlmac_set_bssid(struct rtlmac_priv *priv, const u8 *bssid)
 	return 0;
 }
 
-static int rtlmac_low_power_flow(struct rtlmac_priv *priv)
-{
-	u8 val8;
-	u32 val32;
-	int count, ret = -EBUSY;
-
-	/* Active to Low Power sequence */
-	rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
-
-	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
-		val32 = rtl8723au_read32(priv, 0x05f8);
-		if (val32 == 0x00) {
-			ret = 0;
-			break;
-		}
-		udelay(10);
-	}
-
-	/* CCK and OFDM are disabled, and clock are gated */
-	val8 = rtl8723au_read8(priv, REG_SYS_FUNC);
-	val8 &= ~BIT(0);
-	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
-
-	udelay(2);
-
-	/*Whole BB is reset*/
-	val8 = rtl8723au_read8(priv, REG_SYS_FUNC);
-	val8 &= ~BIT(1);
-	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
-
-	/* Reset MAC T/RX */
-	rtl8723au_write8(priv, REG_CR,
-			 CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE);
-
-	/* Disable security - BIT(9) */
-	val8 = rtl8723au_read8(priv, REG_CR + 1);
-	val8 &= ~BIT(1);
-	rtl8723au_write8(priv, REG_CR + 1, val8);
-
-	/* Respond TxOK to scheduler */
-	val8 = rtl8723au_read8(priv, REG_DUAL_TSF_RST);
-	val8 |= BIT(5);
-	rtl8723au_write8(priv, REG_DUAL_TSF_RST, val8);
-
-	return ret;
-}
-
 static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -2526,12 +2506,12 @@ static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_LEDCFG2, val8);
 
 	/* 0x0005[1] = 1 turn off MAC by HW state machine*/
-	val8 = rtl8723au_read8(priv, 0x05);
+	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 	val8 |= BIT(1);
-	rtl8723au_write8(priv, 0x05, val8);
+	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
 	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
-		val8 = rtl8723au_read8(priv, 0x05);
+		val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 		if ((val8 & BIT(1)) == 0)
 			break;
 		udelay(10);
@@ -2545,13 +2525,68 @@ static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
 
 	/* 0x0000[5] = 1 analog Ips to digital, 1:isolation */
 	val8 = rtl8723au_read8(priv, REG_SYS_ISO_CTRL);
-	val8 |= BIT(5);
+	val8 |= SYS_ISO_ANALOG_IPS;
 	rtl8723au_write8(priv, REG_SYS_ISO_CTRL, val8);
 
 	/* 0x0020[0] = 0 disable LDOA12 MACRO block*/
 	val8 = rtl8723au_read8(priv, REG_LDOA15_CTRL);
-	val8 &= ~BIT(0);
+	val8 &= ~LDOA15_ENABLE;
 	rtl8723au_write8(priv, REG_LDOA15_CTRL, val8);
+
+exit:
+	return ret;
+}
+
+static int rtlmac_active_to_lps(struct rtlmac_priv *priv)
+{
+	u8 val8;
+	u8 val32;
+	int count, ret;
+
+	rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
+
+	/*
+	 * Poll - wait for RX packet to complete
+	 */
+	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
+		val32 = rtl8723au_read8(priv, 0x5f8);
+		if (!val32)
+			break;
+		udelay(10);
+	}
+
+	if (count == RTLMAC_MAX_REG_POLL) {
+		printk(KERN_WARNING "%s: Turn RX poll timed out\n", __func__);
+		ret = -EBUSY;
+		goto exit;
+	}
+
+	/* Disable CCK and OFDM, clock gated */
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC);
+	val8 &= ~SYS_FUNC_BBRSTB;
+	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
+
+	udelay(2);
+
+	/* Reset baseband */
+	val8 = rtl8723au_read8(priv, REG_SYS_FUNC);
+	val8 &= ~SYS_FUNC_BB_GLB_RSTN;
+	rtl8723au_write8(priv, REG_SYS_FUNC, val8);
+
+	/* Reset MAC TRX */
+	val8 = rtl8723au_read8(priv, REG_CR);
+	val8 = CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE;
+	rtl8723au_write8(priv, REG_CR, val8);
+
+	/* Reset MAC TRX */
+	val8 = rtl8723au_read8(priv, REG_CR + 1);
+	val8 &= ~BIT(1); /* CR_SECURITY_ENABLE */
+	rtl8723au_write8(priv, REG_CR + 1, val8);
+
+	/* Respond TX OK to scheduler */
+	val8 = rtl8723au_read8(priv, REG_DUAL_TSF_RST);
+	val8 |= BIT(5);
+	rtl8723au_write8(priv, REG_DUAL_TSF_RST, val8);
 
 exit:
 	return ret;
@@ -2672,20 +2707,27 @@ exit:
 	return ret;
 }
 
-static int rtlmac_emu_to_powerdown(struct rtlmac_priv *priv)
+static int rtlmac_emu_to_disabled(struct rtlmac_priv *priv)
 {
 	u8 val8;
 
-	/* 0x0007[7:0] = 0x20 SOP option to disable BG/MB/ACK/SWR*/
+	/* 0x0007[7:0] = 0x20 SOP option to disable BG/MB */
 	rtl8723au_write8(priv, REG_APS_FSMCO + 3, 0x20);
 
-	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 2);
-	val8 &= ~BIT(0);
-	rtl8723au_write8(priv, REG_APS_FSMCO + 2, val8);
+	/* 0x04[12:11] = 01 enable WL suspend */
+	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
+	val8 &= ~BIT(4);
+	val8 |= BIT(3);
+	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
 	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 	val8 |= BIT(7);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
+
+	/* 0x48[16] = 1 to enable GPIO9 as EXT wakeup */
+	val8 = rtl8723au_read8(priv, REG_GPIO_INTM + 2);
+	val8 |= BIT(0);
+	rtl8723au_write8(priv, REG_GPIO_INTM + 2, val8);
 
 	return 0;
 }
@@ -2736,9 +2778,40 @@ exit:
 static int rtlmac_power_off(struct rtlmac_priv *priv)
 {
 	int ret = 0;
+	u8 val8;
+	u16 val16;
 
-	rtlmac_low_power_flow(priv);
+	rtlmac_active_to_lps(priv);
 
+	/* Turn off RF */
+	rtl8723au_write8(priv, REG_RF_CTRL, 0x00);
+
+	/* Reset Firmware if running in RAM */
+	if (rtl8723au_read8(priv, REG_MCU_FW_DL) & MCU_FW_RAM_SEL)
+		rtlmac_firmware_self_reset(priv);
+
+	/* Reset MCU */
+	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
+	val16 &= ~SYS_FUNC_CPU_ENABLE;
+	rtl8723au_write16(priv, REG_SYS_FUNC, val16);
+
+	/* Reset MCU ready status */
+	rtl8723au_write8(priv, REG_MCU_FW_DL, 0x00);
+
+	rtlmac_active_to_emu(priv);	
+	rtlmac_emu_to_disabled(priv);
+
+	/* Reset MCU IO Wrapper */
+	val8 = rtl8723au_read8(priv, REG_RSV_CTRL + 1);
+	val8 &= ~BIT(0);
+	rtl8723au_write8(priv, REG_RSV_CTRL + 1, val8);
+
+	val8 = rtl8723au_read8(priv, REG_RSV_CTRL + 1);
+	val8 |= BIT(0);
+	rtl8723au_write8(priv, REG_RSV_CTRL + 1, val8);
+
+	/* RSV_CTRL 0x1C[7:0] = 0x0e  lock ISO/CLK/Power control register */
+	rtl8723au_write8(priv, REG_RSV_CTRL, 0x0e);
 	return ret;
 }
 
