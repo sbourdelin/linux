@@ -417,6 +417,7 @@ struct rtlmac_priv {
 
 	struct usb_anchor rx_anchor;
 	struct usb_anchor tx_anchor;
+	struct usb_anchor int_anchor;
 	struct rtlmac_firmware_header *fw_data;
 	size_t fw_size;
 	struct mutex usb_buf_mutex;

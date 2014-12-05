@@ -3580,7 +3580,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 static void rtlmac_int_complete(struct urb *urb)
 {
 	struct rtlmac_priv *priv = (struct rtlmac_priv *)urb->context;
-	int i;
+	int i, ret;
 
 	if (urb->status == 0) {
 		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
@@ -3589,7 +3589,10 @@ static void rtlmac_int_complete(struct urb *urb)
 				printk("\n");
 		}
 
-		usb_submit_urb(urb, GFP_ATOMIC);
+		usb_anchor_urb(urb, &priv->int_anchor);
+		ret = usb_submit_urb(urb, GFP_ATOMIC);
+		if (ret)
+			usb_unanchor_urb(urb);
 	} else {
 		printk(KERN_DEBUG "%s: Error %i\n", __func__, urb->status);
 	}
@@ -3611,11 +3614,18 @@ static int rtlmac_submit_int_urb(struct ieee80211_hw *hw)
 
 	usb_fill_int_urb(urb, priv->udev, priv->pipe_interrupt, priv->int_buf,
 			 USB_INTR_CONTENT_LENGTH, rtlmac_int_complete, priv, 1);
+	usb_anchor_urb(urb, &priv->int_anchor);
 	ret = usb_submit_urb(urb, GFP_KERNEL);
+	if (ret) {
+		usb_unanchor_urb(urb);
+		goto error;
+	}
 
 	val32 = rtl8723au_read32(priv, REG_USB_HIMR);
 	val32 |= USB_HIMR_CPWM;
 	rtl8723au_write32(priv, REG_USB_HIMR, val32);
+
+error:
 	return ret;
 }
 
@@ -3694,13 +3704,14 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 
 	ret = 0;
 
+	init_usb_anchor(&priv->rx_anchor);
+	init_usb_anchor(&priv->tx_anchor);
+	init_usb_anchor(&priv->int_anchor);
+
 	rtl8723a_enable_rf(priv);
 	ret = rtlmac_submit_int_urb(hw);
 	if (ret)
 		goto exit;
-
-	init_usb_anchor(&priv->rx_anchor);
-	init_usb_anchor(&priv->tx_anchor);
 
 	for (i = 0; i < 8; i++)
 		ret = rtlmac_submit_rx_urb(hw);
@@ -3738,6 +3749,7 @@ static void rtlmac_stop(struct ieee80211_hw *hw)
 
 	usb_kill_anchored_urbs(&priv->rx_anchor);
 	usb_kill_anchored_urbs(&priv->tx_anchor);
+	usb_kill_anchored_urbs(&priv->int_anchor);
 }
 
 static const struct ieee80211_ops rtlmac_ops = {
