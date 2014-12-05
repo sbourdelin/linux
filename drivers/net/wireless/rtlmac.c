@@ -734,6 +734,17 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	val32 |= BIT(3);
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_PARM, val32);
 
+	val32 = rtl8723au_read32(priv, REG_OFDM0_TRX_PATH_ENABLE);
+	val32 &= ~(BIT(4) | BIT(5) | BIT(6) | BIT(7));
+	val32 |= BIT(4);
+	rtl8723au_write32(priv, REG_OFDM0_TRX_PATH_ENABLE, val32);
+
+	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
+	val32 &= ~FPGA_RF_MODE_JAPAN;
+	rtl8723au_write32(priv, REG_FPGA0_RF_MODE, val32);
+
+	rtl8723au_write32(priv, REG_RX_WAIT_CCA, 0x631B25A0);
+
 	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0x32d95);
 
 	val8 = rtl8723au_read8(priv, REG_TXPAUSE);
