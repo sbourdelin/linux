@@ -3821,6 +3821,8 @@ static void rtlmac_stop(struct ieee80211_hw *hw)
 	usb_kill_anchored_urbs(&priv->rx_anchor);
 	usb_kill_anchored_urbs(&priv->tx_anchor);
 	usb_kill_anchored_urbs(&priv->int_anchor);
+
+	rtl8723a_disable_rf(priv);
 }
 
 static const struct ieee80211_ops rtlmac_ops = {
