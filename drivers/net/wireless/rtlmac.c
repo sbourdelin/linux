@@ -2588,7 +2588,7 @@ static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
 
 	/* 0x20[0] = 1 enable LDOA12 MACRO block for all interface*/
 	val8 = rtl8723au_read8(priv, REG_LDOA15_CTRL);
-	val8 |= BIT(0);
+	val8 |= LDOA15_ENABLE;
 	rtl8723au_write8(priv, REG_LDOA15_CTRL, val8);
 
 	/* 0x67[0] = 0 to disable BT_GPS_SEL pins*/
