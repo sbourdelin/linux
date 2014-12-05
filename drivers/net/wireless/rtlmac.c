@@ -3706,18 +3706,15 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 		ret = rtlmac_submit_rx_urb(hw);
 
 exit:
-	printk(KERN_DEBUG "%s, %i, RCR %08x MSR %04x, RXFLTMAP2 %04x\n",
+	printk(KERN_DEBUG "%s, %i, RCR %08x MSR %04x\n",
 	       __func__, ret,
 	       rtl8723au_read32(priv, REG_RCR),
-	       rtl8723au_read16(priv, REG_MSR),
-	       rtl8723au_read16(priv, REG_RXFLTMAP2));
+	       rtl8723au_read16(priv, REG_MSR));
 
-#if 0
 	/*
-	 * Accept all data frames
+	 * Disable all data frames
 	 */
-	rtl8723au_write16(priv, REG_RXFLTMAP2, 0xffff);
-#endif
+	rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 	/*
 	 * Accept all mgmt frames
 	 */
