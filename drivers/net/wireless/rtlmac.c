@@ -2947,7 +2947,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	 * Configure initial WMAC settings
 	 */
 	val32 = RCR_ACCEPT_PHYS_MATCH | RCR_ACCEPT_MCAST | RCR_ACCEPT_BCAST |
-		RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON |
+		/* RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON | */
 		RCR_ACCEPT_MGMT_FRAME | RCR_HTC_LOC_CTRL |
 		RCR_APPEND_PHYSTAT | RCR_APPEND_ICV | RCR_APPEND_MIC;
 	rtl8723au_write32(priv, REG_RCR, val32);
@@ -3153,10 +3153,9 @@ static void rtlmac_disable_device(struct ieee80211_hw *hw)
 
 static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 {
+#if 0
 	struct rtlmac_priv *priv = hw->priv;
 	u32 val32;
-
-	printk(KERN_DEBUG "%s\n", __func__);
 
 	val32 = rtl8723au_read32(priv, REG_RCR);
 	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
@@ -3164,6 +3163,9 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
 			 BEACON_FUNCTION_ENABLE | BEACON_DISABLE_TSF_UPDATE);
+#endif
+
+	printk(KERN_DEBUG "%s\n", __func__);
 }
 
 static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
@@ -3282,6 +3284,15 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			rtl8723au_read16(priv, REG_CR, val16);
 #endif
 		} else {
+			val32 = rtl8723au_read32(priv, REG_RCR);
+			val32 &= ~(RCR_CHECK_BSSID_MATCH |
+				   RCR_CHECK_BSSID_BEACON);
+			rtl8723au_write32(priv, REG_RCR, val32);
+
+			val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
+			val8 |= BEACON_DISABLE_TSF_UPDATE;
+			rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
+
 			/* Disable RX of data frames */
 			rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
 		}
