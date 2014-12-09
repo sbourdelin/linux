@@ -3205,8 +3205,6 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	u16 val16;
 	u8 val8;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	if (changed & BSS_CHANGED_ASSOC) {
 		rtlmac_set_linktype(priv, vif->type);
 
