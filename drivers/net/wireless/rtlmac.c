@@ -3785,6 +3785,14 @@ static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 	*total_flags &= (FIF_ALLMULTI | FIF_CONTROL | FIF_BCN_PRBRESP_PROMISC);
 }
 
+static int rtlmac_set_rts_threshold(struct ieee80211_hw *hw, u32 rts)
+{
+	if (rts > 2347)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int rtlmac_start(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
@@ -3854,6 +3862,7 @@ static const struct ieee80211_ops rtlmac_ops = {
 	.config = rtlmac_config,
 	.bss_info_changed = rtlmac_bss_info_changed,
 	.configure_filter = rtlmac_configure_filter,
+	.set_rts_threshold = rtlmac_set_rts_threshold,
 	.start = rtlmac_start,
 	.stop = rtlmac_stop,
 	.sw_scan_start = rtlmac_sw_scan_start,
@@ -3999,7 +4008,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	/*
 	 * The firmware can handle rate control, but we need callbacks
 	 */
-/*	hw->flags |= IEEE80211_HW_HAS_RATE_CONTROL; */
+	hw->flags |= IEEE80211_HW_HAS_RATE_CONTROL;
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
