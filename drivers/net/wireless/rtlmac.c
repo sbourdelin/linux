@@ -3369,9 +3369,20 @@ static void rtlmac_calc_tx_desc_csum(struct rtlmac_tx_desc *tx_desc)
 static void rtlmac_tx_complete(struct urb *urb)
 {
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
+	struct ieee80211_tx_info *tx_info;
+	struct ieee80211_hw *hw;
+
+	tx_info = IEEE80211_SKB_CB(skb);
+	hw = tx_info->rate_driver_data[0];
+
+	skb_pull(skb, sizeof(struct rtlmac_tx_desc));
+
+	ieee80211_tx_info_clear_status(tx_info);
+	tx_info->flags |= IEEE80211_TX_STAT_ACK;
+
+	ieee80211_tx_status_irqsafe(hw, skb);
 
 	usb_free_urb(urb);
-	dev_kfree_skb(skb);
 }
 
 static int tx_count = 5;
@@ -3424,6 +3435,8 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
 	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
 #endif
+
+	tx_info->rate_driver_data[0] = hw;
 
 	tx_desc = (struct rtlmac_tx_desc *)
 		skb_push(skb, sizeof(struct rtlmac_tx_desc));
