@@ -3518,7 +3518,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 	desc_shift = rx_desc->shift;
 	skb_put(skb, urb->actual_length);
 
-	if (rx_count)
+	if (rtlmac_debug & RTLMAC_DEBUG_RX && rx_count)
 		printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb "
 		       "size %i cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
 		       __func__, skb, urb->status, skb->len, cnt, len,
@@ -3548,7 +3548,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 		}
 #endif
 
-		if (rx_count) {
+		if (rtlmac_debug & RTLMAC_DEBUG_RX_DUMP && rx_count) {
 			for (i = 0; i < min_t(int, 128, skb->len); i++) {
 				printk("%02x ", skb->data[i]);
 				if ((i & 0xf) == 0xf)
