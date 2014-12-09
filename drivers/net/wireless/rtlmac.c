@@ -3225,7 +3225,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			rcu_read_unlock();
 
 			val32 = rtl8723au_read32(priv, REG_RCR);
-			val32 |= /* RCR_CHECK_BSSID_MATCH |*/ RCR_CHECK_BSSID_BEACON;
+			val32 |= RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON;
 			rtl8723au_write32(priv, REG_RCR, val32);
 
 			/* Enable RX of data frames */
