@@ -3973,6 +3973,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->max_remain_on_channel_duration = 65535; /* ms */
 	hw->wiphy->cipher_suites = rtlmac_cipher_suites;
 	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtlmac_cipher_suites);
+	hw->wiphy->rts_threshold = 2347;
 
 	/*
 	 * Let the stack do crypto for now
@@ -3985,6 +3986,10 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	hw->extra_tx_headroom = sizeof(struct rtlmac_tx_desc);
 	hw->flags = IEEE80211_HW_SIGNAL_DBM;
+	/*
+	 * The firmware can handle rate control, but we need callbacks
+	 */
+/*	hw->flags |= IEEE80211_HW_HAS_RATE_CONTROL; */
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
