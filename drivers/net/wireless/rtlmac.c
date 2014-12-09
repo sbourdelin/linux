@@ -878,9 +878,10 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 		ofdm[1] = 0;
 	}
 
-	printk(KERN_DEBUG "%s: Setting TX power CCK A: %02x, CCK B: %02x, "
-	       "OFDM A: %02x, OFDM B: %02x\n", DRIVER_NAME,
-	       cck[0], cck[1], ofdm[0], ofdm[1]);
+	if (rtlmac_debug & RTLMAC_DEBUG_CHANNEL)
+		printk(KERN_DEBUG "%s: Setting TX power CCK A: %02x, "
+		       "CCK B: %02x, OFDM A: %02x, OFDM B: %02x\n",
+		       DRIVER_NAME, cck[0], cck[1], ofdm[0], ofdm[1]);
 
 	for (i = 0; i < RTL8723A_MAX_RF_PATHS; i++) {
 		if (cck[i] > RF6052_MAX_TX_PWR)
