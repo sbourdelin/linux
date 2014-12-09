@@ -3431,10 +3431,9 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		printk(KERN_DEBUG "%s: data qos frame\n", __func__);
 #endif
 
-#if 0
-	printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
-	       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
-#endif
+	if (rtlmac_debug & RTLMAC_DEBUG_TX)
+		printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
+		       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
 
 	tx_info->rate_driver_data[0] = hw;
 
@@ -3473,7 +3472,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
 			  skb->len, rtlmac_tx_complete, skb);
 
-	if (tx_count) {
+	if (rtlmac_debug & RTLMAC_DEBUG_TX_DUMP && tx_count) {
 		for (i = 0; i < min_t(int, 128, skb->len); i++) {
 			printk("%02x ", skb->data[i]);
 			if ((i & 0xf) == 0xf)
