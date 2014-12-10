@@ -3184,6 +3184,16 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
 static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 				     struct ieee80211_sta *sta)
 {
+	u32 ratr;
+
+	ratr = sta->supp_rates[0] |
+		sta->ht_cap.mcs.rx_mask[0] << 12 |
+		sta->ht_cap.mcs.rx_mask[1] << 20;
+
+//	ratr &= 0x000ff005;
+	printk(KERN_DEBUG "%s: Setting ARFR0 %08x\n", __func__, ratr);
+
+	rtl8723au_write32(priv, REG_ARFR0, ratr);
 }
 
 static void rtlmac_set_basic_rates(struct rtlmac_priv *priv,
@@ -3212,9 +3222,12 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			rcu_read_lock();
 			sta = ieee80211_find_sta(vif, bss_conf->bssid);
 			if (!sta) {
+				printk(KERN_DEBUG "%s: ASSOC no sta found\n",
+				       __func__);
 				rcu_read_unlock();
 				goto error;
 			}
+			printk(KERN_DEBUG "%s: ASSOC sta found\n", __func__);
 			if (sta->ht_cap.ht_supported)
 				printk(KERN_DEBUG "%s: HT supported\n",
 				       __func__);
@@ -3300,6 +3313,15 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	if (changed & BSS_CHANGED_BSSID) {
 		printk(KERN_DEBUG "Changed BSSID!\n");
 		rtlmac_set_bssid(priv, bss_conf->bssid);
+
+		rcu_read_lock();
+		sta = ieee80211_find_sta(vif, bss_conf->bssid);
+		if (!sta) {
+			printk(KERN_DEBUG "No bssid sta found!\n");
+			rcu_read_unlock();
+			goto error;
+		}
+		rcu_read_unlock();
 	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
@@ -3307,6 +3329,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (!sta) {
+			printk(KERN_DEBUG "No sta found!\n");
 			rcu_read_unlock();
 			goto error;
 		}
@@ -3947,6 +3970,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	struct rtlmac_priv *priv;
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
+	struct ieee80211_supported_band *sband;
 	int ret = 0;
 
 	udev = usb_get_dev(interface_to_usbdev(interface));
@@ -3988,7 +4012,20 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->max_scan_ssids = 1;
 	hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
-	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &rtlmac_supported_band;
+	sband = &rtlmac_supported_band;
+	sband->ht_cap.ht_supported = true;
+	memset(&sband->ht_cap.mcs, 0, sizeof(sband->ht_cap.mcs));
+	sband->ht_cap.mcs.rx_mask[0] = 0xff;
+	if (priv->rf_paths > 1) {
+		sband->ht_cap.mcs.rx_mask[1] = 0xff;
+		sband->ht_cap.mcs.rx_highest = cpu_to_le16(300);
+	} else {
+		sband->ht_cap.mcs.rx_mask[1] = 0x00;
+		sband->ht_cap.mcs.rx_highest = cpu_to_le16(150);
+	}
+	sband->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
+	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = sband;
+
 	hw->wiphy->max_remain_on_channel_duration = 65535; /* ms */
 	hw->wiphy->cipher_suites = rtlmac_cipher_suites;
 	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtlmac_cipher_suites);
