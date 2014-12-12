@@ -3755,7 +3755,6 @@ static int rtlmac_add_interface(struct ieee80211_hw *hw,
 
 	rtlmac_set_linktype(priv, vif->type);
 
-	printk(KERN_DEBUG "%s = %i\n", __func__, ret);
 	return ret;
 }
 
@@ -3838,11 +3837,6 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 		ret = rtlmac_submit_rx_urb(hw);
 
 exit:
-	printk(KERN_DEBUG "%s, %i, RCR %08x MSR %04x\n",
-	       __func__, ret,
-	       rtl8723au_read32(priv, REG_RCR),
-	       rtl8723au_read16(priv, REG_MSR));
-
 	/*
 	 * Disable all data frames
 	 */
