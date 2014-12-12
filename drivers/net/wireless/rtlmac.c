@@ -3399,6 +3399,9 @@ static void rtlmac_tx_complete(struct urb *urb)
 	skb_pull(skb, sizeof(struct rtlmac_tx_desc));
 
 	ieee80211_tx_info_clear_status(tx_info);
+	tx_info->status.rates[0].idx = -1;
+	tx_info->status.rates[0].count = 0;
+
 	tx_info->flags |= IEEE80211_TX_STAT_ACK;
 
 	ieee80211_tx_status_irqsafe(hw, skb);
