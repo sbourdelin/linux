@@ -3023,7 +3023,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	/*
 	 * Invalidate all CAM entries - bit 30 is undocumented
 	 */
-	rtl8723au_write32(priv, REG_CAMCMD, CAM_CMD_POLLINIG | BIT(30));
+	rtl8723au_write32(priv, REG_CAM_CMD, CAM_CMD_POLLING | BIT(30));
 
 	/*
 	 * Start out with default power levels for channel 6, 20MHz
@@ -3147,6 +3147,38 @@ static void rtlmac_disable_device(struct ieee80211_hw *hw)
 	struct rtlmac_priv *priv = hw->priv;
 
 	rtlmac_power_off(priv);
+}
+
+static void rtlmac_cam_write(struct rtlmac_priv *priv,
+			     struct ieee80211_key_conf *key,
+			     u16 ctrl, const u8 *mac)
+{
+	u32 cmd, val32, addr;
+	int j, i;
+
+	addr = key->keyidx << CAM_CMD_KEY_SHIFT;
+	ctrl |= key->keyidx;
+
+	for (j = 5; j >= 0; j--) {
+		switch (j) {
+		case 0:
+			val32 = ctrl | (mac[0] << 16) | (mac[1] << 24);
+			break;
+		case 1:
+			val32 = mac[2] | (mac[3] << 8) |
+				(mac[4] << 16) | (mac[5] << 24);
+			break;
+		default:
+			i = (j - 2) << 2;
+			val32 = key->key[i] | (key->key[i + 1] << 8) |
+				key->key[i + 2] << 16 | key->key[i + 3] << 24;
+			break;
+		}
+
+		rtl8723au_write32(priv, REG_CAM_WRITE, val32);
+		cmd = CAM_CMD_POLLING | CAM_CMD_WRITE | (addr + j);
+		rtl8723au_write32(priv, REG_CAM_CMD, cmd);
+	}
 }
 
 static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
@@ -3817,6 +3849,68 @@ static int rtlmac_set_rts_threshold(struct ieee80211_hw *hw, u32 rts)
 	return 0;
 }
 
+static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+			  struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+			  struct ieee80211_key_conf *key)
+{
+	struct rtlmac_priv *priv = hw->priv;
+	u8 mac_addr[ETH_ALEN];
+	u32 val32;
+	int retval = -EOPNOTSUPP;
+
+	printk(KERN_DEBUG "%s: cmd %02x, cipher %08x\n",
+	       __func__, cmd, key->cipher);
+
+	if (vif->type != NL80211_IFTYPE_STATION)
+		return -EOPNOTSUPP;
+
+	if (key->keyidx > 3)
+		return -EOPNOTSUPP;
+
+	switch (key->cipher) {
+	case WLAN_CIPHER_SUITE_CCMP:
+		break;
+	case WLAN_CIPHER_SUITE_TKIP:
+		key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE) {
+		printk(KERN_DEBUG "%s: pairwise key\n", __func__);
+		ether_addr_copy(mac_addr, sta->addr);
+	} else {
+		printk(KERN_DEBUG "%s: group key\n", __func__);
+		eth_broadcast_addr(mac_addr);
+	}
+
+	switch(cmd) {
+	case SET_KEY:
+		/*
+		 * This is a bit of a hack - the lower bits of the cipher
+		 * suite selector happens to match the cipher index in the
+		 * CAM
+		 */
+		key->hw_key_idx = key->keyidx;
+		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
+		rtlmac_cam_write(priv, key,
+				 (key->cipher & 0x0f) << 2, mac_addr);
+		break;
+	case DISABLE_KEY:
+		rtl8723au_write32(priv, REG_CAM_WRITE, 0x00000000);
+		val32 = CAM_CMD_POLLING | CAM_CMD_WRITE |
+			key->keyidx << CAM_CMD_KEY_SHIFT;
+		rtl8723au_write32(priv, REG_CAM_CMD, val32);
+		retval = 0;
+		break;
+	default:
+		printk(KERN_DEBUG "%s: Unsupported command %02x\n",
+		       __func__, cmd);
+	}
+
+	return retval;
+}
+
 static int rtlmac_start(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
@@ -3886,9 +3980,7 @@ static const struct ieee80211_ops rtlmac_ops = {
 	.stop = rtlmac_stop,
 	.sw_scan_start = rtlmac_sw_scan_start,
 	.sw_scan_complete = rtlmac_sw_scan_complete,
-#if 0
 	.set_key = rtlmac_set_key,
-#endif
 };
 
 static int rtlmac_parse_usb(struct rtlmac_priv *priv,

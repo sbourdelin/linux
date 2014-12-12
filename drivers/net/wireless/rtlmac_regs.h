@@ -589,8 +589,10 @@
 
 
 /*  Security */
-#define REG_CAMCMD			0x0670
-#define	 CAM_CMD_POLLINIG		BIT(31)
+#define REG_CAM_CMD			0x0670
+#define	 CAM_CMD_POLLING		BIT(31)
+#define	 CAM_CMD_WRITE			BIT(16)
+#define  CAM_CMD_KEY_SHIFT		3
 #define REG_CAM_WRITE			0x0674
 #define REG_CAM_READ			0x0678
 #define REG_CAM_DEBUG			0x067c
