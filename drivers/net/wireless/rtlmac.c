@@ -3920,12 +3920,14 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 		dir = endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK;
 		num = usb_endpoint_num(endpoint);
 		xtype = usb_endpoint_type(endpoint);
-		printk(KERN_DEBUG "%s: endpoint: dir %02x, num %02x, "
-		       "type %02x\n", __func__, dir, num, xtype);
+		if (rtlmac_debug & RTLMAC_DEBUG_USB)
+			printk(KERN_DEBUG "%s: endpoint: dir %02x, num %02x, "
+			       "type %02x\n", __func__, dir, num, xtype);
 		if (usb_endpoint_dir_in(endpoint) &&
 		    usb_endpoint_xfer_bulk(endpoint)) {
-			printk(KERN_DEBUG "%s: in endpoint num %i\n",
-			       __func__, num);
+			if (rtlmac_debug & RTLMAC_DEBUG_USB)
+				printk(KERN_DEBUG "%s: in endpoint num %i\n",
+				       __func__, num);
 
 			if (priv->pipe_in) {
 				printk(KERN_WARNING "%s: Too many IN pipes\n",
@@ -3939,8 +3941,9 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 
 		if (usb_endpoint_dir_in(endpoint) &&
 		    usb_endpoint_xfer_int(endpoint)) {
-			printk(KERN_DEBUG "%s: interrupt endpoint num %i\n",
-			       __func__, num);
+			if (rtlmac_debug & RTLMAC_DEBUG_USB)
+				printk(KERN_DEBUG "%s: interrupt endpoint num "
+				       "%i\n", __func__, num);
 
 			if (priv->pipe_interrupt) {
 				printk(KERN_WARNING "%s: Too many INTERRUPT "
@@ -3954,8 +3957,9 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 
 		if (usb_endpoint_dir_out(endpoint) &&
 		    usb_endpoint_xfer_bulk(endpoint)) {
-			printk(KERN_DEBUG "%s: out endpoint num %i\n",
-			       __func__, num);
+			if (rtlmac_debug & RTLMAC_DEBUG_USB)
+				printk(KERN_DEBUG "%s: out endpoint num %i\n",
+				       __func__, num);
 			if (j >= RTLMAC_OUT_ENDPOINTS) {
 				printk(KERN_WARNING "%s: Unsupported number "
 				       "of OUT pipes\n", __func__);
