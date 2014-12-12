@@ -4005,7 +4005,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	rtlmac_read_efuse(priv);
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
-	printk(KERN_INFO "%s: RTL8723au %02x:%02x:%02x:%02x:%02x:%02x\n",
+	printk(KERN_INFO "%s: RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
 	       DRIVER_NAME,
 	       priv->efuse_wifi.efuse.mac_addr[0],
 	       priv->efuse_wifi.efuse.mac_addr[1],
