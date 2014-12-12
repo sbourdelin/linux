@@ -667,9 +667,6 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 
 	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0x32d95);
 
-	val8 = rtl8723au_read8(priv, REG_TXPAUSE);
-
-	printk(KERN_DEBUG "TX_PAUSE %02x\n", val8);
 #if 0
 	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
 	rtl8723au_write8(priv, REG_APSD_CTRL, 0x00);
