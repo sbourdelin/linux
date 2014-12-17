@@ -625,10 +625,10 @@ int rtl8723au_hal_init(struct rtw_adapter *Adapter)
 	}
 
 	/* reducing 80M spur */
-	PHY_SetBBReg(Adapter, RF_T_METER, bMaskDWord, 0x0381808d);
-	PHY_SetBBReg(Adapter, RF_SYN_G4, bMaskDWord, 0xf2ffff83);
-	PHY_SetBBReg(Adapter, RF_SYN_G4, bMaskDWord, 0xf2ffff82);
-	PHY_SetBBReg(Adapter, RF_SYN_G4, bMaskDWord, 0xf2ffff83);
+	PHY_SetBBReg(Adapter, REG_AFE_XTAL_CTRL, bMaskDWord, 0x0381808d);
+	PHY_SetBBReg(Adapter, REG_AFE_PLL_CTRL, bMaskDWord, 0xf0ffff83);
+	PHY_SetBBReg(Adapter, REG_AFE_PLL_CTRL, bMaskDWord, 0xf0ffff82);
+	PHY_SetBBReg(Adapter, REG_AFE_PLL_CTRL, bMaskDWord, 0xf0ffff83);
 
 	/* RFSW Control */
 	PHY_SetBBReg(Adapter, rFPGA0_TxInfo, bMaskDWord, 0x00000003);	/* 0x804[14]= 0 */
@@ -640,8 +640,10 @@ int rtl8723au_hal_init(struct rtw_adapter *Adapter)
 	/*  */
 	/*  Joseph Note: Keep RfRegChnlVal for later use. */
 	/*  */
-	pHalData->RfRegChnlVal[0] = PHY_QueryRFReg(Adapter, (enum RF_RADIO_PATH)0, RF_CHNLBW, bRFRegOffsetMask);
-	pHalData->RfRegChnlVal[1] = PHY_QueryRFReg(Adapter, (enum RF_RADIO_PATH)1, RF_CHNLBW, bRFRegOffsetMask);
+	pHalData->RfRegChnlVal[0] = PHY_QueryRFReg(Adapter, RF_PATH_A,
+						   RF_CHNLBW, bRFRegOffsetMask);
+	pHalData->RfRegChnlVal[1] = PHY_QueryRFReg(Adapter, RF_PATH_B,
+						   RF_CHNLBW, bRFRegOffsetMask);
 
 	if (!mac_on) {
 		_InitQueueReservedPage(Adapter);
@@ -814,9 +816,10 @@ static void phy_SsPwrSwitch92CU(struct rtw_adapter *Adapter,
 		    mode. This is used to re-write the RX idle mode. */
 		/*  We can only prvide a usual value instead and then
 		    HW will modify the value by itself. */
-		PHY_SetRFReg(Adapter, RF_PATH_A, 0, bRFRegOffsetMask, 0x32D95);
+		PHY_SetRFReg(Adapter, RF_PATH_A, RF_AC,
+			     bRFRegOffsetMask, 0x32D95);
 		if (pHalData->rf_type ==  RF_2T2R) {
-			PHY_SetRFReg(Adapter, RF_PATH_B, 0,
+			PHY_SetRFReg(Adapter, RF_PATH_B, RF_AC,
 				     bRFRegOffsetMask, 0x32D95);
 		}
 		break;
@@ -865,9 +868,9 @@ static void phy_SsPwrSwitch92CU(struct rtw_adapter *Adapter,
 				     0x001B25A0);
 
 		/*  3. issue 3-wire command that RF set to power down.*/
-		PHY_SetRFReg(Adapter, RF_PATH_A, 0, bRFRegOffsetMask, 0);
+		PHY_SetRFReg(Adapter, RF_PATH_A, RF_AC, bRFRegOffsetMask, 0);
 		if (pHalData->rf_type ==  RF_2T2R)
-			PHY_SetRFReg(Adapter, RF_PATH_B, 0,
+			PHY_SetRFReg(Adapter, RF_PATH_B, RF_AC,
 				     bRFRegOffsetMask, 0);
 
 		/*  4. Force PFM , disable SPS18_LDO_Marco_Block */
