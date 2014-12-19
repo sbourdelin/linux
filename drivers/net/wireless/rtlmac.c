@@ -3506,6 +3506,20 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 
 	queue = rtlmac_queue_select(hw, skb);
 	tx_desc->txdw1 = cpu_to_le32(queue << TXDESC_QUEUE_SHIFT);
+	if (tx_info->control.hw_key) {
+		switch (tx_info->control.hw_key->cipher) {
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104:
+		case WLAN_CIPHER_SUITE_TKIP:
+			tx_desc->txdw1 |= cpu_to_le32(TXDESC_SEC_RC4);
+			break;
+		case WLAN_CIPHER_SUITE_CCMP:
+			tx_desc->txdw1 |= cpu_to_le32(TXDESC_SEC_AES);
+			break;
+		default:
+			break;
+		}
+	}
 
 	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);

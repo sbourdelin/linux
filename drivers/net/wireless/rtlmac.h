@@ -211,6 +211,8 @@ struct rtlmac_tx_desc {
 #define DESC_RATE_ID_SHIFT		16
 #define DESC_RATE_ID_MASK		0xf
 #define TXDESC_NAVUSEHDR		BIT(20)
+#define TXDESC_SEC_RC4			0x00400000
+#define TXDESC_SEC_AES			0x00c00000
 #define TXDESC_PKT_OFFSET_SHIFT		26
 #define TXDESC_HWPC			BIT(31)
 
