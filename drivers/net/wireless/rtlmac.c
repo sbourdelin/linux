@@ -3181,7 +3181,8 @@ static void rtlmac_cam_write(struct rtlmac_priv *priv,
 	}
 }
 
-static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
+static void rtlmac_sw_scan_start(struct ieee80211_hw *hw,
+				 struct ieee80211_vif *vif, const u8 *mac)
 {
 #if 0
 	struct rtlmac_priv *priv = hw->priv;
@@ -3198,7 +3199,8 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw)
 	printk(KERN_DEBUG "%s\n", __func__);
 }
 
-static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw)
+static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw,
+				    struct ieee80211_vif *vif)
 {
 	struct rtlmac_priv *priv = hw->priv;
 	u8 val8;
