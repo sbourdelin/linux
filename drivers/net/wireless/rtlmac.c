@@ -3642,10 +3642,17 @@ static void rtlmac_rx_complete(struct urb *urb)
 		rx_status->freq = hw->conf.chandef.chan->center_freq;
 		rx_status->band = hw->conf.chandef.chan->band;
 
-		if (rx_desc->rxht)
+		if (rx_desc->crc32)
+			rx_status->flag |= RX_FLAG_FAILED_FCS_CRC;
+		if (rx_desc->bw)
+			rx_status->flag |= RX_FLAG_40MHZ;
+
+		if (rx_desc->rxht) {
+			rx_status->flag |= RX_FLAG_HT;
 			rx_status->rate_idx = rx_desc->rxmcs - DESC_RATE_MCS0;
-		else
+		} else {
 			rx_status->rate_idx = rx_desc->rxmcs;
+		}
 
 		ieee80211_rx_irqsafe(hw, skb);
 		skb_size = sizeof(struct rtlmac_rx_desc) +
