@@ -3728,8 +3728,6 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	int skb_size;
 	int ret;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	skb_size = sizeof(struct rtlmac_rx_desc) + IEEE80211_MAX_FRAME_LEN;
 	skb = dev_alloc_skb(skb_size);
 	if (!skb)
