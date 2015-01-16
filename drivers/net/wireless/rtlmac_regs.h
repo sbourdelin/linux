@@ -594,9 +594,18 @@
 #define	 CAM_CMD_WRITE			BIT(16)
 #define  CAM_CMD_KEY_SHIFT		3
 #define REG_CAM_WRITE			0x0674
+#define	 CAM_WRITE_VALID		BIT(15)
 #define REG_CAM_READ			0x0678
 #define REG_CAM_DEBUG			0x067c
 #define REG_SECURITY_CFG		0x0680
+#define  SEC_CFG_TX_USE_DEFKEY		BIT(0)
+#define  SEC_CFG_RX_USE_DEFKEY		BIT(1)
+#define  SEC_CFG_TX_SEC_ENABLE		BIT(2)
+#define  SEC_CFG_RX_SEC_ENABLE		BIT(3)
+#define	 SEC_CFG_SKByA2			BIT(4)
+#define	 SEC_CFG_NO_SKMC		BIT(5)
+#define  SEC_CFG_TXBC_USE_DEFKEY	BIT(6)
+#define  SEC_CFG_RXBC_USE_DEFKEY	BIT(7)
 
 /*  Power */
 #define REG_WOW_CTRL			0x0690

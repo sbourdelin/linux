@@ -3150,14 +3150,16 @@ static void rtlmac_disable_device(struct ieee80211_hw *hw)
 }
 
 static void rtlmac_cam_write(struct rtlmac_priv *priv,
-			     struct ieee80211_key_conf *key,
-			     u16 ctrl, const u8 *mac)
+			     struct ieee80211_key_conf *key, const u8 *mac)
 {
-	u32 cmd, val32, addr;
-	int j, i;
+	u32 cmd, val32, addr, ctrl;
+	int j, i, tmp_debug;
+
+	tmp_debug = rtlmac_debug;
+	rtlmac_debug = RTLMAC_DEBUG_REG_WRITE;
 
 	addr = key->keyidx << CAM_CMD_KEY_SHIFT;
-	ctrl |= key->keyidx;
+	ctrl = (key->cipher & 0x0f) << 2 | key->keyidx | CAM_WRITE_VALID;
 
 	for (j = 5; j >= 0; j--) {
 		switch (j) {
@@ -3178,7 +3180,10 @@ static void rtlmac_cam_write(struct rtlmac_priv *priv,
 		rtl8723au_write32(priv, REG_CAM_WRITE, val32);
 		cmd = CAM_CMD_POLLING | CAM_CMD_WRITE | (addr + j);
 		rtl8723au_write32(priv, REG_CAM_CMD, cmd);
+		udelay(100);
 	}
+
+	rtlmac_debug = tmp_debug;
 }
 
 static void rtlmac_sw_scan_start(struct ieee80211_hw *hw,
@@ -3499,7 +3504,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	tx_desc->pkt_size = cpu_to_le16(pktlen);
 	tx_desc->pkt_offset = sizeof(struct rtlmac_tx_desc);
 
-	tx_desc->txdw0 = TXDESC_OWN | TXDESC_FSG| TXDESC_LSG;
+	tx_desc->txdw0 = TXDESC_OWN | TXDESC_FSG | TXDESC_LSG;
 	if (is_multicast_ether_addr(ieee80211_get_DA(hdr)) ||
 	    is_broadcast_ether_addr(ieee80211_get_DA(hdr)))
 		tx_desc->txdw0 |= TXDESC_BROADMULTICAST;
@@ -3521,11 +3526,18 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		}
 	}
 
+	/* Why??? What is BK? */
+	tx_desc->txdw1 |= cpu_to_le32(BIT(6));
+
 	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
 
 	tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
-
+	/*
+	 * Black magic!
+	 */
+	if (ieee80211_is_data(hdr->frame_control))
+		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
 	if (ieee80211_is_data_qos(hdr->frame_control))
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
 	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
@@ -3878,6 +3890,8 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 {
 	struct rtlmac_priv *priv = hw->priv;
 	u8 mac_addr[ETH_ALEN];
+	u8 val8;
+	u16 val16;
 	u32 val32;
 	int retval = -EOPNOTSUPP;
 
@@ -3891,7 +3905,14 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		return -EOPNOTSUPP;
 
 	switch (key->cipher) {
+#if 0
+	case WLAN_CIPHER_SUITE_WEP40:
+	case WLAN_CIPHER_SUITE_WEP128:
+
+		break;
+#endif
 	case WLAN_CIPHER_SUITE_CCMP:
+		key->flags |= IEEE80211_KEY_FLAG_SW_MGMT_TX;
 		break;
 	case WLAN_CIPHER_SUITE_TKIP:
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC;
@@ -3907,6 +3928,13 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		eth_broadcast_addr(mac_addr);
 	}
 
+	val16 = rtl8723au_read16(priv, REG_CR);
+	val16 |= CR_SECURITY_ENABLE;
+	rtl8723au_write16(priv, REG_CR, val16);
+	val8 = SEC_CFG_TX_USE_DEFKEY | SEC_CFG_TX_SEC_ENABLE |
+		SEC_CFG_TXBC_USE_DEFKEY;
+	rtl8723au_write8(priv, REG_SECURITY_CFG, val8);
+
 	switch(cmd) {
 	case SET_KEY:
 		/*
@@ -3916,8 +3944,8 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		 */
 		key->hw_key_idx = key->keyidx;
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
-		rtlmac_cam_write(priv, key,
-				 (key->cipher & 0x0f) << 2, mac_addr);
+		rtlmac_cam_write(priv, key, mac_addr);
+		retval = 0;
 		break;
 	case DISABLE_KEY:
 		rtl8723au_write32(priv, REG_CAM_WRITE, 0x00000000);
