@@ -3550,6 +3550,13 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw5 |= cpu_to_le32(TXDESC_RETRY_LIMIT_ENABLE);
 	}
 
+	if (rate_flag & IEEE80211_TX_RC_USE_RTS_CTS) {
+		/* Use RTS rate 24M - does the mac80211 tell us which to use? */
+		tx_desc->txdw4 |= cpu_to_le32(DESC_RATE_24M);
+		tx_desc->txdw4 |= cpu_to_le32(TXDESC_RTS_ENABLE);
+	
+	}
+
 	rtlmac_calc_tx_desc_csum(tx_desc);
 
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,

@@ -232,9 +232,10 @@ struct rtlmac_tx_desc {
 #define TXDESC_DATA_BW			BIT(25)
 
 /* Word 5 */
-#define DESC_RATE_SHIFT			0
-#define DESC_RATE_MASK			0x3f
+#define TXDESC_RTS_RATE_SHIFT		0
+#define TXDESC_RTS_RATE_MASK		0x3f
 #define TXDESC_SHORT_GI			BIT(6)
+#define TXDESC_RTS_ENABLE		BIT(12)
 #define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
 #define TXDESC_RETRY_LIMIT_SHIFT	18
 #define TXDESC_RETRY_LIMIT_MASK		0x00ff0000
