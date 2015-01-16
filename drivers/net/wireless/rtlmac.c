@@ -3670,13 +3670,12 @@ static void rtlmac_rx_complete(struct urb *urb)
 				break;
 			}
 		}
-#if 0
-		rx_status->flag |= RX_FLAG_DECRYPTED;
-		rx_status->flag |= RX_FLAG_IV_STRIPPED;
-#endif
+
 		rx_status->freq = hw->conf.chandef.chan->center_freq;
 		rx_status->band = hw->conf.chandef.chan->band;
 
+		if (!rx_desc->swdec)
+			rx_status->flag |= RX_FLAG_DECRYPTED;
 		if (rx_desc->crc32)
 			rx_status->flag |= RX_FLAG_FAILED_FCS_CRC;
 		if (rx_desc->bw)
@@ -3938,8 +3937,10 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	val16 = rtl8723au_read16(priv, REG_CR);
 	val16 |= CR_SECURITY_ENABLE;
 	rtl8723au_write16(priv, REG_CR, val16);
-	val8 = SEC_CFG_TX_USE_DEFKEY | SEC_CFG_TX_SEC_ENABLE |
-		SEC_CFG_TXBC_USE_DEFKEY;
+
+	val8 = SEC_CFG_TX_SEC_ENABLE | SEC_CFG_TXBC_USE_DEFKEY |
+		SEC_CFG_RX_SEC_ENABLE | SEC_CFG_RXBC_USE_DEFKEY;
+	val8 |= SEC_CFG_TX_USE_DEFKEY | SEC_CFG_RX_USE_DEFKEY;
 	rtl8723au_write8(priv, REG_SECURITY_CFG, val8);
 
 	switch(cmd) {
