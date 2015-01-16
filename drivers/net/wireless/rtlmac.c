@@ -3843,9 +3843,10 @@ static int rtlmac_config(struct ieee80211_hw *hw, u32 changed)
 	int ret = 0, channel;
 	bool ht40;
 
-	printk(KERN_DEBUG "%s: channel: %i (changed %08x chandef.width %02x)\n",
-	       __func__, hw->conf.chandef.chan->hw_value, changed,
-	       hw->conf.chandef.width);
+	if (rtlmac_debug & RTLMAC_DEBUG_CHANNEL)
+		printk(KERN_DEBUG "%s: channel: %i (changed %08x chandef.width "
+		       "%02x)\n", __func__, hw->conf.chandef.chan->hw_value,
+		       changed, hw->conf.chandef.width);
 
 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
 		switch (hw->conf.chandef.width) {
