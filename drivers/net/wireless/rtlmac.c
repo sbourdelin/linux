@@ -3156,7 +3156,8 @@ static void rtlmac_cam_write(struct rtlmac_priv *priv,
 	int j, i, tmp_debug;
 
 	tmp_debug = rtlmac_debug;
-	rtlmac_debug = RTLMAC_DEBUG_REG_WRITE;
+	if (rtlmac_debug & RTLMAC_DEBUG_KEY)
+		rtlmac_debug |= RTLMAC_DEBUG_REG_WRITE;
 
 	addr = key->keyidx << CAM_CMD_KEY_SHIFT;
 	ctrl = (key->cipher & 0x0f) << 2 | key->keyidx | CAM_WRITE_VALID;
@@ -3902,8 +3903,8 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	u32 val32;
 	int retval = -EOPNOTSUPP;
 
-	printk(KERN_DEBUG "%s: cmd %02x, cipher %08x\n",
-	       __func__, cmd, key->cipher);
+	printk(KERN_DEBUG "%s: cmd %02x, cipher %08x, index %i\n",
+	       __func__, cmd, key->cipher, key->keyidx);
 
 	if (vif->type != NL80211_IFTYPE_STATION)
 		return -EOPNOTSUPP;
