@@ -3911,12 +3911,10 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		return -EOPNOTSUPP;
 
 	switch (key->cipher) {
-#if 0
 	case WLAN_CIPHER_SUITE_WEP40:
-	case WLAN_CIPHER_SUITE_WEP128:
+	case WLAN_CIPHER_SUITE_WEP104:
 
 		break;
-#endif
 	case WLAN_CIPHER_SUITE_CCMP:
 		key->flags |= IEEE80211_KEY_FLAG_SW_MGMT_TX;
 		break;
