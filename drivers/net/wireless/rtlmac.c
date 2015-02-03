@@ -3237,7 +3237,10 @@ static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 
 	ratr = sta->supp_rates[0] |
 		sta->ht_cap.mcs.rx_mask[0] << 12 |
-		sta->ht_cap.mcs.rx_mask[1] << 20;
+		sta->ht_cap.mcs.rx_mask[1] << 20 | 0x80000000;
+	if (sta->ht_cap.cap &
+	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
+		ratr |= 0x20000000;
 
 //	ratr &= 0x000ff005;
 	printk(KERN_DEBUG "%s: Setting ARFR0 %08x\n", __func__, ratr);
