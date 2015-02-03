@@ -4225,7 +4225,8 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
 	sband = &rtlmac_supported_band;
 	sband->ht_cap.ht_supported = true;
-	sband->ht_cap.cap = IEEE80211_HT_CAP_SGI_20;
+	sband->ht_cap.cap = IEEE80211_HT_CAP_SUP_WIDTH_20_40 |
+		IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40;
 	memset(&sband->ht_cap.mcs, 0, sizeof(sband->ht_cap.mcs));
 	sband->ht_cap.mcs.rx_mask[0] = 0xff;
 	sband->ht_cap.mcs.rx_mask[4] = 0x01;
