@@ -3370,6 +3370,16 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
 	}
 
+	if (changed & BSS_CHANGED_ERP_SLOT) {
+		printk(KERN_DEBUG "Changed ERP_SLOT!\n");
+
+		if (bss_conf->use_short_slot)
+			val8 = 9;
+		else
+			val8 = 20;
+		rtl8723au_write8(priv, REG_SLOT, val8);
+	}
+
 	if (changed & BSS_CHANGED_BSSID) {
 		printk(KERN_DEBUG "Changed BSSID!\n");
 		rtlmac_set_bssid(priv, bss_conf->bssid);
