@@ -3248,10 +3248,25 @@ static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 static void rtlmac_set_basic_rates(struct rtlmac_priv *priv,
 				   struct ieee80211_sta *sta)
 {
-	u32 rate_cfg = 0;
+	u32 rate_cfg, val32;
+	u8 rate_idx = 0;
 
 	rate_cfg = sta->supp_rates[0];
-	printk(KERN_DEBUG "%s: rates %08x\n", __func__, rate_cfg);
+	rate_cfg &= 0x15f;
+	rate_cfg |= 1;
+	val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
+	val32 &= ~RESPONSE_RATE_BITMAP_ALL;
+	val32 |= rate_cfg;
+	rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
+
+	printk(KERN_DEBUG "%s: supp_rates %08x rates %08x\n", __func__,
+	       sta->supp_rates[0], rate_cfg);
+
+	while(rate_cfg) {
+		rate_cfg = (rate_cfg >> 1);
+		rate_idx++;
+	}
+	rtl8723au_write8(priv, REG_INIRTS_RATE_SEL, rate_idx);
 }
 
 static void
@@ -3395,15 +3410,14 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
-		printk(KERN_DEBUG "Changed basic rates!\n");
+		printk(KERN_DEBUG "Changed BASIC_RATES!\n");
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
-		if (!sta) {
+		if (sta)
+			rtlmac_set_basic_rates(priv, sta);
+		else 
 			printk(KERN_DEBUG "No sta found!\n");
-			rcu_read_unlock();
-			goto error;
-		}
-		rtlmac_set_basic_rates(priv, sta);
+
 		rcu_read_unlock();
 	}
 error:
