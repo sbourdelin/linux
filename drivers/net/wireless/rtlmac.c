@@ -754,9 +754,9 @@ static int rtl8723a_channel_to_group(int channel)
 static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 {
 	struct rtlmac_priv *priv = hw->priv;
-	u32 val32;
-	u8 opmode;
-	u32 rsr;
+	u32 val32, rsr;
+	u8 val8, opmode;
+	bool ht = true;
 	int sec_ch_above;
 
 	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
@@ -769,6 +769,7 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 
 	switch (hw->conf.chandef.width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
+		ht = false;
 	case NL80211_CHAN_WIDTH_20:
 		opmode |= BW_OPMODE_20MHZ;
 		rtl8723au_write8(priv, REG_BW_OPMODE, opmode);
@@ -841,6 +842,17 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 	default:
 		break;
 	}
+
+	if (ht)
+		val8 = 0x0e;
+	else
+		val8 = 0x0a;
+
+	rtl8723au_write8(priv, REG_SIFS_CCK + 1, val8);
+	rtl8723au_write8(priv, REG_SIFS_OFDM + 1, val8);
+
+	rtl8723au_write16(priv, REG_R2T_SIFS, 0x0808);
+	rtl8723au_write16(priv, REG_T2T_SIFS, 0x0a0a);
 
 	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
 	if (hw->conf.chandef.width == NL80211_CHAN_WIDTH_40)
