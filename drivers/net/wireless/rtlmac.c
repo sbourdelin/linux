@@ -3483,7 +3483,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	u32 queue;
 	u16 pktlen = skb->len;
 	u16 seq_number;
-	u8 rate_flag = tx_info->control.rates[0].flags;
+	u16 rate_flag = tx_info->control.rates[0].flags;
 	int ret, i;
 
 	if (skb_headroom(skb) < sizeof(struct rtlmac_tx_desc)) {
