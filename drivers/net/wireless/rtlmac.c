@@ -4198,6 +4198,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	sband->ht_cap.cap = IEEE80211_HT_CAP_SGI_20;
 	memset(&sband->ht_cap.mcs, 0, sizeof(sband->ht_cap.mcs));
 	sband->ht_cap.mcs.rx_mask[0] = 0xff;
+	sband->ht_cap.mcs.rx_mask[4] = 0x01;
 	if (priv->rf_paths > 1) {
 		sband->ht_cap.mcs.rx_mask[1] = 0xff;
 		sband->ht_cap.mcs.rx_highest = cpu_to_le16(300);
