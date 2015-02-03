@@ -2230,16 +2230,22 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 			PathBOK = _PHY_PathB_IQK(priv);
 			if (PathBOK == 0x03) {
 				printk(KERN_DEBUG "Path B IQK Success!!\n");
-				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B) & 0x3ff0000) >> 16;
-				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B) & 0x3ff0000) >> 16;
-				result[t][6] = (rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2) &0x3ff0000) >> 16;
-				result[t][7] = (rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2) & 0x3ff0000) >> 16;
+				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
+				result[t][4] = (val32 & 0x3ff0000) >> 16;
+				val32 = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B);
+				result[t][5] = (val32 & 0x3ff0000) >> 16;
+				val32 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2)
+				result[t][6] = (val32 & 0x3ff0000) >> 16;
+				val32 = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2)
+				result[t][7] = (val32 & 0x3ff0000) >> 16;
 				break;
 			} else if (i == (retryCount - 1) && PathBOK == 0x01) {
 				/* Tx IQK OK */
 				DBG_8723A("Path B Only Tx IQK Success!!\n");
-				result[t][4] = (rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B) & 0x3ff0000) >> 16;
-				result[t][5] = (rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B) & 0x3ff0000) >> 16;
+				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
+				result[t][4] = (val32 & 0x3ff0000) >> 16;
+				val32 = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B);
+				result[t][5] = (val32 & 0x3ff0000) >> 16;
 			}
 		}
 
