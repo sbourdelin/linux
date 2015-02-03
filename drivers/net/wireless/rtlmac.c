@@ -2283,12 +2283,11 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 
 		/*  Restore RX initial gain */
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
-#if 0
+
 		if (is2T) {
-			rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM,
+			rtl8723au_write32(priv, REG_FPGA0_XB_LSSI_PARM,
 					  0x00032ed3);
 		}
-#endif
 
 		/* load 0xe30 IQC default value */
 		rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x01008c00);
