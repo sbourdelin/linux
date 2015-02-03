@@ -3359,6 +3359,17 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		}
 	}
 
+	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
+		printk(KERN_DEBUG "Changed ERP_PREAMBLE: Use short preamble "
+		       "%02x\n", bss_conf->use_short_preamble);
+		val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
+		if (bss_conf->use_short_preamble)
+			val32 |= RSR_ACK_SHORT_PREAMBLE;
+		else
+			val32 &= ~RSR_ACK_SHORT_PREAMBLE;
+		rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
+	}
+
 	if (changed & BSS_CHANGED_BSSID) {
 		printk(KERN_DEBUG "Changed BSSID!\n");
 		rtlmac_set_bssid(priv, bss_conf->bssid);
