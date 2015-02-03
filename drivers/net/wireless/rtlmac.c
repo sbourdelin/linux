@@ -2991,10 +2991,10 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write16(priv, REG_MAC_SPEC_SIFS, 0x100a);
 
 	/* Set CCK SIFS */
-	rtl8723au_write16(priv, REG_SIFS_CTX, 0x100a);
+	rtl8723au_write16(priv, REG_SIFS_CCK, 0x100a);
 
 	/* Set OFDM SIFS */
-	rtl8723au_write16(priv, REG_SIFS_TRX, 0x100a);
+	rtl8723au_write16(priv, REG_SIFS_OFDM, 0x100a);
 
 	/* TXOP */
 	rtl8723au_write32(priv, REG_EDCA_BE_PARAM, 0x005ea42b);

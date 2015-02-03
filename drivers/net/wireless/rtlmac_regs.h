@@ -458,8 +458,6 @@
 #define REG_RDG_PIFS			0x0513
 #define REG_SIFS_CCK			0x0514
 #define REG_SIFS_OFDM			0x0516
-#define REG_SIFS_CTX			0x0514
-#define REG_SIFS_TRX			0x0516
 #define REG_TSFTR_SYN_OFFSET		0x0518
 #define REG_AGGR_BREAK_TIME		0x051a
 #define REG_SLOT			0x051b
