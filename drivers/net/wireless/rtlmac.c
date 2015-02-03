@@ -2416,7 +2416,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 {
 	u32 val32;
-	u32 RF_Amode, LC_Cal, lstf;
+	u32 rf_amode, lstf;
 
 	/* Check continuous TX and Packet TX */
 	lstf = rtl8723au_read32(priv, REG_OFDM1_LSTF);
@@ -2427,7 +2427,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 		rtl8723au_write32(priv, REG_OFDM1_LSTF, val32);
 
 		/* Read original RF mode Path A */
-		RF_Amode = rtl8723au_read_rfreg(priv, RF6052_REG_AC);
+		rf_amode = rtl8723au_read_rfreg(priv, RF6052_REG_AC);
 
 #if 0
 		/* Path-B */
@@ -2437,7 +2437,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 
 		/* Set RF mode to standby Path A */
 		rtl8723au_write_rfreg(priv, RF6052_REG_AC,
-				      (RF_Amode & 0xfff) | 0x10000);
+				      (rf_amode & 0xfff) | 0x10000);
 
 #if 0
 		/* Path-B */
@@ -2451,12 +2451,10 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 		rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
 	}
 
-	/* Read RF reg18 */
-	LC_Cal = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
-	LC_Cal |= 0x08000;
-
 	/* Start LC calibration */
-	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, LC_Cal);
+	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	val32 |= 0x08000;
+	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, val32);
 
 	msleep(100);
 
@@ -2464,7 +2462,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 	if (lstf & OFDM_LSTF_MASK) {
 		/* Path-A */
 		rtl8723au_write32(priv, REG_OFDM1_LSTF, lstf);
-		rtl8723au_write_rfreg(priv, RF6052_REG_AC, RF_Amode);
+		rtl8723au_write_rfreg(priv, RF6052_REG_AC, rf_amode);
 
 #if 0
 		/* Path-B */
