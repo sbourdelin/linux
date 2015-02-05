@@ -3256,9 +3256,9 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw,
 
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
 			 BEACON_FUNCTION_ENABLE | BEACON_DISABLE_TSF_UPDATE);
-#endif
 
 	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 }
 
 static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw,
@@ -3267,8 +3267,10 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw,
 	struct rtlmac_priv *priv = hw->priv;
 	u8 val8;
 
+#if 0
 	printk(KERN_DEBUG "%s\n", __func__);
-
+#endif
+	
 	val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
 	val8 &= ~BEACON_DISABLE_TSF_UPDATE;
 	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
