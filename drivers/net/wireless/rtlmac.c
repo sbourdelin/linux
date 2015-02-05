@@ -3893,8 +3893,6 @@ static int rtlmac_submit_int_urb(struct ieee80211_hw *hw)
 	u32 val32;
 	int ret;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb)
 		return -ENOMEM;
