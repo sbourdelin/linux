@@ -643,11 +643,13 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 {
 	int mbox_nr, retry, retval = 0;
+	int mbox_reg, mbox_ext_reg, i;
 	u8 val8;
-	u16 val16;
-	u32 val32;
 
 	mbox_nr = priv->next_mbox;
+
+	mbox_reg = REG_HMBOX_0 + (mbox_nr * 4);
+	mbox_ext_reg = REG_HMBOX_EXT_0 + (mbox_nr * 2);
 
 	/*
 	 * MBOX ready?
@@ -668,12 +670,17 @@ static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 	/*
 	 * Need to swap as it's being swapped again by rtl8723au_write16/32()
 	 */
-	if (h2c->raw.data[0] & H2C_EXT) {
-		val16 = le16_to_cpup((__le16 *)&h2c->raw.data[4]);
-		rtl8723au_write16(priv, REG_HMBOX_EXT_0 + (mbox_nr * 2), val16);
+	if (h2c->cmd.cmd & H2C_EXT) {
+		for (i = 0; i < 2; i++) {
+			rtl8723au_write8(priv, mbox_ext_reg + i,
+					 h2c->cmd.data[i + 3]);
+		}
 	}
-	val32 = le32_to_cpup((__le32 *)&h2c->raw.data[0]);
-	rtl8723au_write32(priv, REG_HMBOX_0 + (mbox_nr * 4), val32);
+	
+	rtl8723au_write8(priv, mbox_reg, h2c->cmd.cmd);
+
+	for (i = 1; i < 4; i++)
+		rtl8723au_write8(priv, mbox_reg + i, h2c->cmd.data[i - 1]);
 
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
