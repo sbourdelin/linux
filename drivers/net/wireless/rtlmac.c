@@ -643,7 +643,7 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 {
 	int mbox_nr, retry, retval = 0;
-	int mbox_reg, mbox_ext_reg, i;
+	int mbox_reg, mbox_ext_reg;
 	u8 val8;
 
 	mbox_nr = priv->next_mbox;
@@ -670,17 +670,11 @@ static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 	/*
 	 * Need to swap as it's being swapped again by rtl8723au_write16/32()
 	 */
-	if (h2c->cmd.cmd & H2C_EXT) {
-		for (i = 0; i < 2; i++) {
-			rtl8723au_write8(priv, mbox_ext_reg + i,
-					 h2c->cmd.data[i + 3]);
-		}
-	}
-	
-	rtl8723au_write8(priv, mbox_reg, h2c->cmd.cmd);
+	if (h2c->cmd.cmd & H2C_EXT)
+		rtl8723au_write16(priv, mbox_ext_reg,
+				  le16_to_cpu(h2c->raw.ext));
 
-	for (i = 1; i < 4; i++)
-		rtl8723au_write8(priv, mbox_reg + i, h2c->cmd.data[i - 1]);
+	rtl8723au_write32(priv, mbox_reg, le32_to_cpu(h2c->raw.data));
 
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
@@ -3295,7 +3289,8 @@ static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 		sta->ht_cap.mcs.rx_mask[1] << 20;
 
 	h2c.ramask.cmd = H2C_SET_RATE_MASK;
-	put_unaligned_le32(ramask, &h2c.ramask.mask);
+	put_unaligned_le16(ramask & 0xffff, &h2c.ramask.mask_lo);
+	put_unaligned_le16(ramask >> 16, &h2c.ramask.mask_hi);
 
 	h2c.ramask.arg = 0x80;
 	if (sta->ht_cap.cap &
