@@ -177,10 +177,10 @@
 #define  MCU_FW_RAM_SEL			BIT(7)	/* 1: RAM, 0:ROM */
 #define  MCU_CP_RESET			BIT(23)
 
-#define REG_HMEBOX_EXT_0		0x0088
-#define REG_HMEBOX_EXT_1		0x008a
-#define REG_HMEBOX_EXT_2		0x008c
-#define REG_HMEBOX_EXT_3		0x008e
+#define REG_HMBOX_EXT_0			0x0088
+#define REG_HMBOX_EXT_1			0x008a
+#define REG_HMBOX_EXT_2			0x008c
+#define REG_HMBOX_EXT_3			0x008e
 /*  Host suspend counter on FPGA platform */
 #define REG_HOST_SUSP_CNT		0x00bc
 /*  Efuse access protection for RTL8723 */
@@ -313,12 +313,12 @@
 #define REG_C2HEVT_CLEAR		0x01af
 #define REG_C2HEVT_MSG_TEST		0x01b8
 #define REG_MCUTST_1			0x01c0
-#define REG_FMETHR			0x01c8
-#define REG_HMETFR			0x01cc
-#define REG_HMEBOX_0			0x01d0
-#define REG_HMEBOX_1			0x01d4
-#define REG_HMEBOX_2			0x01d8
-#define REG_HMEBOX_3			0x01dc
+#define REG_FMTHR			0x01c8
+#define REG_HMTFR			0x01cc
+#define REG_HMBOX_0			0x01d0
+#define REG_HMBOX_1			0x01d4
+#define REG_HMBOX_2			0x01d8
+#define REG_HMBOX_3			0x01dc
 
 #define REG_LLT_INIT			0x01e0
 #define  LLT_OP_INACTIVE		0x0

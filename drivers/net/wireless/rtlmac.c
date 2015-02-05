@@ -640,6 +640,47 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 	return retval;
 }
 
+static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
+{
+	int mbox_nr, retry, retval = 0;
+	u8 val8;
+	u16 val16;
+	u32 val32;
+
+	mbox_nr = priv->next_mbox;
+
+	/*
+	 * MBOX ready?
+	 */
+	retry = 100;
+	do {
+		val8 = rtl8723au_read8(priv, REG_HMTFR);
+		if (!(val8 & BIT(mbox_nr)))
+			break;
+	} while (retry--);
+
+	if (!retry) {
+		printk(KERN_DEBUG "%s: Mailbox busy\n", __func__);
+		retval = -EBUSY;
+		goto error;
+	}
+
+	/*
+	 * Need to swap as it's being swapped again by rtl8723au_write16/32()
+	 */
+	if (h2c->raw.data[0] & H2C_EXT) {
+		val16 = le16_to_cpup((__le16 *)&h2c->raw.data[4]);
+		rtl8723au_write16(priv, REG_HMBOX_EXT_0 + (mbox_nr * 2), val16);
+	}
+	val32 = le32_to_cpup((__le32 *)&h2c->raw.data[0]);
+	rtl8723au_write32(priv, REG_HMBOX_0 + (mbox_nr * 4), val32);
+
+	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
+
+error:
+	return retval;
+}
+
 static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -1420,7 +1461,7 @@ static void rtlmac_firmware_self_reset(struct rtlmac_priv *priv)
 	int i = 100;
 
 	/* Inform 8051 to perform reset */
-	rtl8723au_write8(priv, REG_HMETFR + 3, 0x20);
+	rtl8723au_write8(priv, REG_HMTFR + 3, 0x20);
 
 	for (i = 100; i > 0; i--) {
 		val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
@@ -3236,19 +3277,25 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw,
 static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 				     struct ieee80211_sta *sta)
 {
+	struct h2c_cmd h2c;
 	u32 ratr;
 
-	ratr = sta->supp_rates[0] |
+	/* TODO: Set bits 28-31 for rate adaptive id */
+	ratr = (sta->supp_rates[0] & 0xfff) |
 		sta->ht_cap.mcs.rx_mask[0] << 12 |
-		sta->ht_cap.mcs.rx_mask[1] << 20 | 0x80000000;
+		sta->ht_cap.mcs.rx_mask[1] << 20;
+
+	h2c.cmd.cmd = H2C_SET_RATE_MASK;
+	memcpy(h2c.cmd.data, &ratr, sizeof(u32));
+
+	h2c.cmd.data[4] = 0x80;
 	if (sta->ht_cap.cap &
 	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
-		ratr |= 0x20000000;
+		h2c.cmd.data[4] |= 0x20;
 
-//	ratr &= 0x000ff005;
-	printk(KERN_DEBUG "%s: Setting ARFR0 %08x\n", __func__, ratr);
-
-	rtl8723au_write32(priv, REG_ARFR0, ratr);
+	printk(KERN_DEBUG "%s: ratr %08x, ext %02x\n", __func__,
+	       ratr, h2c.cmd.data[4]);
+	rtl8723a_h2c_cmd(priv, &h2c);
 }
 
 static void rtlmac_set_basic_rates(struct rtlmac_priv *priv,

@@ -393,6 +393,22 @@ struct rtlmac_rfregval {
 	u32 val;
 };
 
+#define H2C_MAX_MBOX		4
+#define H2C_EXT			BIT(7)
+#define H2C_SET_RATE_MASK	(6 | H2C_EXT)
+
+struct h2c_cmd {
+	union {
+		struct {
+			u8 cmd;
+			u8 data[5];
+		} cmd;
+		struct {
+			u8 data[6];
+		} raw;
+	};
+};
+
 struct rtlmac_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
@@ -424,6 +440,7 @@ struct rtlmac_priv {
 	u32 rege9c;
 	u32 regeb4;
 	u32 regebc;
+	int next_mbox;
 
 	struct usb_anchor rx_anchor;
 	struct usb_anchor tx_anchor;
