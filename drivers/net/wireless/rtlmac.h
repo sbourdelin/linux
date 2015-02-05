@@ -406,6 +406,11 @@ struct h2c_cmd {
 		struct {
 			u8 data[6];
 		} raw;
+		struct {
+			u8 cmd;
+			__le32 mask;
+			u8 arg;
+		} __packed ramask;
 	};
 };
 

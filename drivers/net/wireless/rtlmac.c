@@ -3280,23 +3280,23 @@ static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 				     struct ieee80211_sta *sta)
 {
 	struct h2c_cmd h2c;
-	u32 ratr;
+	u32 ramask;
 
 	/* TODO: Set bits 28-31 for rate adaptive id */
-	ratr = (sta->supp_rates[0] & 0xfff) |
+	ramask = (sta->supp_rates[0] & 0xfff) |
 		sta->ht_cap.mcs.rx_mask[0] << 12 |
 		sta->ht_cap.mcs.rx_mask[1] << 20;
 
-	h2c.cmd.cmd = H2C_SET_RATE_MASK;
-	memcpy(h2c.cmd.data, &ratr, sizeof(u32));
+	h2c.ramask.cmd = H2C_SET_RATE_MASK;
+	put_unaligned_le32(ramask, &h2c.ramask.mask);
 
-	h2c.cmd.data[4] = 0x80;
+	h2c.ramask.arg = 0x80;
 	if (sta->ht_cap.cap &
 	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
-		h2c.cmd.data[4] |= 0x20;
+		h2c.ramask.arg |= 0x20;
 
-	printk(KERN_DEBUG "%s: ratr %08x, ext %02x\n", __func__,
-	       ratr, h2c.cmd.data[4]);
+	printk(KERN_DEBUG "%s: rate mask %08x, arg %02x\n", __func__,
+	       ramask, h2c.ramask.arg);
 	rtl8723a_h2c_cmd(priv, &h2c);
 }
 
@@ -3861,6 +3861,7 @@ static void rtlmac_int_complete(struct urb *urb)
 	struct rtlmac_priv *priv = (struct rtlmac_priv *)urb->context;
 	int i, ret;
 
+	printk(KERN_DEBUG "%s: status %i\n", __func__, urb->status);
 	if (urb->status == 0) {
 		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
 			printk("%02x ", priv->int_buf[i]);
