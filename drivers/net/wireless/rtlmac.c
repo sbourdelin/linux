@@ -4270,6 +4270,8 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->max_scan_ssids = 1;
 	hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
+	hw->queues = 4;
+
 	sband = &rtlmac_supported_band;
 	sband->ht_cap.ht_supported = true;
 	sband->ht_cap.cap = IEEE80211_HT_CAP_SUP_WIDTH_20_40 |
