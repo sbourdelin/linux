@@ -3331,7 +3331,9 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	struct rtlmac_priv *priv = hw->priv;
 	struct ieee80211_sta *sta;
 	u32 val32;
+#if 0
 	u16 val16;
+#endif
 	u8 val8;
 
 	if (changed & BSS_CHANGED_ASSOC) {
