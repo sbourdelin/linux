@@ -653,6 +653,7 @@ static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 	mbox_reg = REG_HMBOX_0 + (mbox_nr * 4);
 	mbox_ext_reg = REG_HMBOX_EXT_0 + (mbox_nr * 2);
 
+	mutex_lock(&priv->h2c_mutex);
 	/*
 	 * MBOX ready?
 	 */
@@ -687,6 +688,7 @@ static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
 error:
+	mutex_unlock(&priv->h2c_mutex);
 	return retval;
 }
 
@@ -4385,6 +4387,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 	priv->hw = hw;
 	priv->udev = udev;
 	mutex_init(&priv->usb_buf_mutex);
+	mutex_init(&priv->h2c_mutex);
 
 	usb_set_intfdata(interface, hw);
 
@@ -4477,6 +4480,7 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 
 	kfree(priv->fw_data);
 	mutex_destroy(&priv->usb_buf_mutex);
+	mutex_destroy(&priv->h2c_mutex);
 
 	usb_put_dev(priv->udev);
 	ieee80211_free_hw(hw);

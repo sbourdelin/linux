@@ -461,6 +461,8 @@ struct rtlmac_priv {
 	u32 regebc;
 	int next_mbox;
 
+	struct mutex h2c_mutex;
+
 	struct usb_anchor rx_anchor;
 	struct usb_anchor tx_anchor;
 	struct usb_anchor int_anchor;
