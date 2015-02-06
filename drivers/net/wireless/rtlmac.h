@@ -196,6 +196,7 @@ struct rtlmac_tx_desc {
 
 /* Word 1 */
 #define TXDESC_PKT_OFFSET_SZ		0
+#define TXDESC_AGG_ENABLE		BIT(5)
 #define TXDESC_BK			BIT(6)
 #define TXDESC_QUEUE_SHIFT		8
 #define TXDESC_QUEUE_MASK		0x1f00

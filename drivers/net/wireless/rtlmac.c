@@ -3621,14 +3621,6 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	queue = rtlmac_queue_select(hw, skb);
 	tx_desc->txdw1 = cpu_to_le32(queue << TXDESC_QUEUE_SHIFT);
 
-	if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&  */
-	    control && control->sta) {
-		u8 ampdu = control->sta->ht_cap.ampdu_density;
-		tx_desc->txdw2 |=
-			cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
-//		printk(KERN_DEBUG "ampdu me harder! %02x\n", ampdu);
-	}
-
 	if (tx_info->control.hw_key) {
 		switch (tx_info->control.hw_key->cipher) {
 		case WLAN_CIPHER_SUITE_WEP40:
@@ -3644,9 +3636,6 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		}
 	}
 
-	/* Why??? What is BK? */
-	tx_desc->txdw1 |= cpu_to_le32(BIT(6));
-
 	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
 
@@ -3654,8 +3643,19 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	/*
 	 * Black magic!
 	 */
-	if (ieee80211_is_data(hdr->frame_control))
+	if (ieee80211_is_data(hdr->frame_control)) {
 		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
+		if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&  */
+			control && control->sta) {
+			u8 ampdu = control->sta->ht_cap.ampdu_density;
+			tx_desc->txdw2 |=
+				cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
+//		printk(KERN_DEBUG "ampdu me harder! %02x\n", ampdu);
+			tx_desc->txdw1 |= cpu_to_le32(TXDESC_AGG_ENABLE);
+		} else
+			tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
+	} else
+		tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
 	if (ieee80211_is_data_qos(hdr->frame_control))
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
 	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
