@@ -4061,7 +4061,7 @@ static int rtlmac_conf_tx(struct ieee80211_hw *hw,
 	struct rtlmac_priv *priv = hw->priv;
 	u32 val32;
 	u16 cw_min, cw_max, txop;
-	u8 aifs;
+	u8 aifs, acm_ctrl, acm_bit;
 
 	aifs = param->aifs;
 	cw_min = cpu_to_le16(param->cw_min);
@@ -4073,23 +4073,38 @@ static int rtlmac_conf_tx(struct ieee80211_hw *hw,
 		(cw_max & 0xf) << EDCA_PARAM_ECW_MAX_SHIFT |
 		txop << EDCA_PARAM_TXOP_SHIFT;
 
-	printk(KERN_DEBUG "%s: IEEE80211 queue %02x val %08x\n",
-	       __func__, queue, val32);
+	acm_ctrl = rtl8723au_read8(priv, REG_ACM_HW_CTRL);
+	printk(KERN_DEBUG "%s: IEEE80211 queue %02x val %08x, acm %i, "
+	       "acm_ctrl %02x\n",
+	       __func__, queue, val32, param->acm, acm_ctrl);
 
 	switch(queue) {
 	case IEEE80211_AC_VO:
+		acm_bit = ACM_HW_CTRL_VO;
 		rtl8723au_write32(priv, REG_EDCA_VO_PARAM, val32);
 		break;
 	case IEEE80211_AC_VI:
+		acm_bit = ACM_HW_CTRL_VI;
 		rtl8723au_write32(priv, REG_EDCA_VI_PARAM, val32);
 		break;
 	case IEEE80211_AC_BE:
+		acm_bit = ACM_HW_CTRL_BE;
 		rtl8723au_write32(priv, REG_EDCA_BE_PARAM, val32);
 		break;
 	case IEEE80211_AC_BK:
+		acm_bit = ACM_HW_CTRL_BK;
 		rtl8723au_write32(priv, REG_EDCA_BK_PARAM, val32);
 		break;
+	default:
+		acm_bit = 0;
+		break;
 	}
+
+	if (param->acm)
+		acm_ctrl |= acm_bit;
+	else
+		acm_ctrl &= ~acm_bit;
+	rtl8723au_write8(priv, REG_ACM_HW_CTRL, acm_ctrl);
 
 	return 0;
 }

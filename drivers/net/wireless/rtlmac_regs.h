@@ -503,8 +503,12 @@
 #define REG_PSTIMER			0x0580
 #define REG_TIMER0			0x0584
 #define REG_TIMER1			0x0588
-#define REG_ACMHWCTRL			0x05c0
-#define REG_ACMRSTCTRL			0x05c1
+#define REG_ACM_HW_CTRL			0x05c0
+#define  ACM_HW_CTRL_BK			BIT(0)
+#define  ACM_HW_CTRL_BE			BIT(1)
+#define  ACM_HW_CTRL_VI			BIT(2)
+#define  ACM_HW_CTRL_VO			BIT(3)
+#define REG_ACM_RST_CTRL		0x05c1
 #define REG_ACMAVG			0x05c2
 #define REG_VO_ADMTIME			0x05c4
 #define REG_VI_ADMTIME			0x05c6
