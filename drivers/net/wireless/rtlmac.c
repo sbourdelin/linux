@@ -4098,7 +4098,7 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
-	for (i = 0; i < 8; i++)
+	for (i = 0; i < 32; i++)
 		ret = rtlmac_submit_rx_urb(hw);
 
 exit:
