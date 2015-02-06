@@ -218,6 +218,7 @@ struct rtlmac_tx_desc {
 #define TXDESC_HWPC			BIT(31)
 
 /* Word 2 */
+#define TXDESC_AMPDU_DENSITY_SHIFT	20
 #define TXDESC_AGG_EN			BIT(29)
 
 /* Word 3 */

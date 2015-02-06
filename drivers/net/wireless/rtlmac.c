@@ -46,6 +46,8 @@ MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B.bin");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B_NoBT.bin");
 
 #define USB_VENDER_ID_REALTEK		0x0BDA
+/* Minimum IEEE80211_MAX_FRAME_LEN */
+#define RTL_RX_BUFFER_SIZE		15360
 
 static struct usb_device_id dev_table[] = {
 	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDER_ID_REALTEK, 0x8724,
@@ -3618,6 +3620,15 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 
 	queue = rtlmac_queue_select(hw, skb);
 	tx_desc->txdw1 = cpu_to_le32(queue << TXDESC_QUEUE_SHIFT);
+
+	if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&  */
+	    control && control->sta) {
+		u8 ampdu = control->sta->ht_cap.ampdu_density;
+		tx_desc->txdw2 |=
+			cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
+//		printk(KERN_DEBUG "ampdu me harder! %02x\n", ampdu);
+	}
+
 	if (tx_info->control.hw_key) {
 		switch (tx_info->control.hw_key->cipher) {
 		case WLAN_CIPHER_SUITE_WEP40:
@@ -3797,7 +3808,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 
 		ieee80211_rx_irqsafe(hw, skb);
 		skb_size = sizeof(struct rtlmac_rx_desc) +
-			IEEE80211_MAX_FRAME_LEN;
+			RTL_RX_BUFFER_SIZE;
 		skb = dev_alloc_skb(skb_size);
 		if (!skb) {
 			printk(KERN_WARNING "%s: Out of memory\n", __func__);
@@ -3834,7 +3845,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	int skb_size;
 	int ret;
 
-	skb_size = sizeof(struct rtlmac_rx_desc) + IEEE80211_MAX_FRAME_LEN;
+	skb_size = sizeof(struct rtlmac_rx_desc) + RTL_RX_BUFFER_SIZE;
 	skb = dev_alloc_skb(skb_size);
 	if (!skb)
 		return -ENOMEM;
@@ -4279,6 +4290,8 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	sband = &rtlmac_supported_band;
 	sband->ht_cap.ht_supported = true;
+	sband->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_8K;
+	sband->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_16;
 	sband->ht_cap.cap = /* IEEE80211_HT_CAP_SUP_WIDTH_20_40 | */
 		IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40;
 	memset(&sband->ht_cap.mcs, 0, sizeof(sband->ht_cap.mcs));
