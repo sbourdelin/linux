@@ -2547,6 +2547,37 @@ static int rtlmac_set_bssid(struct rtlmac_priv *priv, const u8 *bssid)
 	return 0;
 }
 
+void rtlmac_set_ampdu_factor(struct rtlmac_priv *priv, u8 ampdu_factor)
+{
+	u8 vals[4] = { 0x41, 0xa8, 0x72, 0xb9 };
+	u8 max_agg = 0xf;
+	int i;
+
+	ampdu_factor = 1 << (ampdu_factor + 2);
+	if (ampdu_factor > max_agg)
+		ampdu_factor = max_agg;
+
+	for (i = 0; i < 4; i++) {
+		if ((vals[i] & 0xf0) > (ampdu_factor << 4))
+			vals[i] = (vals[i] & 0x0f) | (ampdu_factor << 4);
+
+			if ((vals[i] & 0x0f) > ampdu_factor)
+				vals[i] = (vals[i] & 0xf0) | ampdu_factor;
+
+			rtl8723au_write8(priv, REG_AGGLEN_LMT + i, vals[i]);
+	}
+}
+
+void rtlmac_set_ampdu_min_space(struct rtlmac_priv *priv, u8 density)
+{
+	u8 val8;
+
+	val8 = rtl8723au_read8(priv, REG_AMPDU_MIN_SPACE);
+	val8 &= 0xf8;
+	val8 |= density;
+	rtl8723au_write8(priv, REG_AMPDU_MIN_SPACE, val8);
+}
+
 static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
 {
 	u8 val8;
@@ -3454,6 +3485,25 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		else
 			val8 = 20;
 		rtl8723au_write8(priv, REG_SLOT, val8);
+	}
+
+	if (changed & BSS_CHANGED_HT) {
+		u8 ampdu_factor, ampdu_density;
+
+		rcu_read_lock();
+		sta = ieee80211_find_sta(vif, bss_conf->bssid);
+		if (!sta) {
+			printk(KERN_DEBUG "No HT sta found!\n");
+			rcu_read_unlock();
+			goto error;
+		}
+		ampdu_factor = sta->ht_cap.ampdu_factor;
+		ampdu_density = sta->ht_cap.ampdu_density;
+		rcu_read_unlock();
+		printk(KERN_DEBUG "Changed HT! ampdu_factor %02x, "
+		       "ampdu_density %02x\n", ampdu_factor, ampdu_density);
+		rtlmac_set_ampdu_factor(priv, ampdu_factor);
+		rtlmac_set_ampdu_min_space(priv, ampdu_density);
 	}
 
 	if (changed & BSS_CHANGED_BSSID) {
