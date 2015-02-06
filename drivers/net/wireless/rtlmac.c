@@ -672,11 +672,17 @@ static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 	/*
 	 * Need to swap as it's being swapped again by rtl8723au_write16/32()
 	 */
-	if (h2c->cmd.cmd & H2C_EXT)
+	if (h2c->cmd.cmd & H2C_EXT) {
 		rtl8723au_write16(priv, mbox_ext_reg,
 				  le16_to_cpu(h2c->raw.ext));
-
+		if (rtlmac_debug & RTLMAC_DEBUG_H2C)
+			printk(KERN_DEBUG "H2C_EXT %04x\n",
+			       le16_to_cpu(h2c->raw.ext));
+	}
 	rtl8723au_write32(priv, mbox_reg, le32_to_cpu(h2c->raw.data));
+		if (rtlmac_debug & RTLMAC_DEBUG_H2C)
+			printk(KERN_DEBUG "H2C %08x\n",
+			       le16_to_cpu(h2c->raw.data));
 
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
@@ -3372,6 +3378,9 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	u8 val8;
 
 	if (changed & BSS_CHANGED_ASSOC) {
+		struct h2c_cmd h2c;
+
+		memset(&h2c, 0, sizeof(struct h2c_cmd));
 		rtlmac_set_linktype(priv, vif->type);
 
 		if (bss_conf->assoc) {
@@ -3451,6 +3460,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			val16 &= ~CR_SW_BEACON_ENABLE;
 			rtl8723au_read16(priv, REG_CR, val16);
 #endif
+			h2c.joinbss.data = H2C_JOIN_BSS_CONNECT;
 		} else {
 			val32 = rtl8723au_read32(priv, REG_RCR);
 			val32 &= ~(RCR_CHECK_BSSID_MATCH |
@@ -3463,7 +3473,10 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 			/* Disable RX of data frames */
 			rtl8723au_write16(priv, REG_RXFLTMAP2, 0x0000);
+			h2c.joinbss.data = H2C_JOIN_BSS_DISCONNECT;
 		}
+		h2c.joinbss.cmd = H2C_JOIN_BSS_REPORT;
+		rtl8723a_h2c_cmd(priv, &h2c);
 	}
 
 	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
