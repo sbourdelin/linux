@@ -236,10 +236,11 @@ struct rtlmac_tx_desc {
 #define TXDESC_RTS_RATE_SHIFT		0
 #define TXDESC_RTS_RATE_MASK		0x3f
 #define TXDESC_SHORT_GI			BIT(6)
+#define TXDESC_CCX_TAG			BIT(7)
 #define TXDESC_RTS_ENABLE		BIT(12)
 #define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
 #define TXDESC_RETRY_LIMIT_SHIFT	18
-#define TXDESC_RETRY_LIMIT_MASK		0x00ff0000
+#define TXDESC_RETRY_LIMIT_MASK		0x003f0000
 
 struct phy_rx_agc_info {
 #ifdef __LITTLE_ENDIAN
