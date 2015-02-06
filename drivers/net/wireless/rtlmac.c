@@ -4054,6 +4054,46 @@ exit:
 	return ret;
 }
 
+static int rtlmac_conf_tx(struct ieee80211_hw *hw,
+			  struct ieee80211_vif *vif, u16 queue,
+			  const struct ieee80211_tx_queue_params *param)
+{
+	struct rtlmac_priv *priv = hw->priv;
+	u32 val32;
+	u16 cw_min, cw_max, txop;
+	u8 aifs;
+
+	aifs = param->aifs;
+	cw_min = cpu_to_le16(param->cw_min);
+	cw_max = cpu_to_le16(param->cw_max);
+	txop = cpu_to_le16(param->txop);
+
+	val32 = aifs |
+		(cw_min & 0xf) << EDCA_PARAM_ECW_MIN_SHIFT |
+		(cw_max & 0xf) << EDCA_PARAM_ECW_MAX_SHIFT |
+		txop << EDCA_PARAM_TXOP_SHIFT;
+
+	printk(KERN_DEBUG "%s: IEEE80211 queue %02x val %08x\n",
+	       __func__, queue, val32);
+
+	switch(queue) {
+	case IEEE80211_AC_VO:
+		rtl8723au_write32(priv, REG_EDCA_VO_PARAM, val32);
+		break;
+	case IEEE80211_AC_VI:
+		rtl8723au_write32(priv, REG_EDCA_VI_PARAM, val32);
+		break;
+	case IEEE80211_AC_BE:
+		rtl8723au_write32(priv, REG_EDCA_BE_PARAM, val32);
+		break;
+	case IEEE80211_AC_BK:
+		rtl8723au_write32(priv, REG_EDCA_BK_PARAM, val32);
+		break;
+	}
+
+	return 0;
+}
+
 static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 				    unsigned int changed_flags,
 				    unsigned int *total_flags, u64 multicast)
@@ -4212,6 +4252,7 @@ static const struct ieee80211_ops rtlmac_ops = {
 	.add_interface = rtlmac_add_interface,
 	.remove_interface = rtlmac_remove_interface,
 	.config = rtlmac_config,
+	.conf_tx = rtlmac_conf_tx,
 	.bss_info_changed = rtlmac_bss_info_changed,
 	.configure_filter = rtlmac_configure_filter,
 	.set_rts_threshold = rtlmac_set_rts_threshold,
