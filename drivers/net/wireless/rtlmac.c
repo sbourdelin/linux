@@ -3535,6 +3535,30 @@ error:
 	return;
 }
 
+static u32 rtlmac_80211_to_rtl_queue(u32 queue)
+{
+	u32 rtlqueue;
+
+	switch(queue) {
+	case IEEE80211_AC_VO:
+		rtlqueue = TXDESC_QUEUE_VO;
+		break;
+	case IEEE80211_AC_VI:
+		rtlqueue = TXDESC_QUEUE_VI;
+		break;
+	case IEEE80211_AC_BE:
+		rtlqueue = TXDESC_QUEUE_BE;
+		break;
+	case IEEE80211_AC_BK:
+		rtlqueue = TXDESC_QUEUE_BK;
+		break;
+	default:
+		rtlqueue = TXDESC_QUEUE_BE;
+	}
+
+	return rtlqueue;
+}
+
 static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
@@ -3543,27 +3567,10 @@ static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 	if (unlikely(ieee80211_is_beacon(hdr->frame_control))) {
 		queue = TXDESC_QUEUE_BEACON;
 	}
-	if (ieee80211_is_mgmt(hdr->frame_control)) {
+	if (ieee80211_is_mgmt(hdr->frame_control))
 		queue = TXDESC_QUEUE_MGNT;
-	} else {
-		switch (skb_get_queue_mapping(skb)) {
-		case IEEE80211_AC_VO:
-			queue = TXDESC_QUEUE_VO;
-			break;
-		case IEEE80211_AC_VI:
-			queue = TXDESC_QUEUE_VI;
-			break;
-		case IEEE80211_AC_BE:
-			queue = TXDESC_QUEUE_BE;
-			break;
-		case IEEE80211_AC_BK:
-			queue = TXDESC_QUEUE_BK;
-			break;
-		default:
-			queue = TXDESC_QUEUE_BE;
-		break;
-		}
-	}
+	else
+		queue = rtlmac_80211_to_rtl_queue(skb_get_queue_mapping(skb));
 
 	return queue;
 }
