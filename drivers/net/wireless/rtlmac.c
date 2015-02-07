@@ -3509,6 +3509,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	if (changed & BSS_CHANGED_HT) {
 		u8 ampdu_factor, ampdu_density;
+		u8 sifs;
 
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
@@ -3517,13 +3518,27 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			rcu_read_unlock();
 			goto error;
 		}
-		ampdu_factor = sta->ht_cap.ampdu_factor;
-		ampdu_density = sta->ht_cap.ampdu_density;
+		if (sta->ht_cap.ht_supported) {
+			ampdu_factor = sta->ht_cap.ampdu_factor;
+			ampdu_density = sta->ht_cap.ampdu_density;
+			sifs = 0x0e;
+		} else {
+			ampdu_factor = 0;
+			ampdu_density = 0;
+			sifs = 0x0a;
+		}
 		rcu_read_unlock();
 		printk(KERN_DEBUG "Changed HT! ampdu_factor %02x, "
 		       "ampdu_density %02x\n", ampdu_factor, ampdu_density);
 		rtlmac_set_ampdu_factor(priv, ampdu_factor);
 		rtlmac_set_ampdu_min_space(priv, ampdu_density);
+
+		rtl8723au_write8(priv, REG_SIFS_CCK + 1, sifs);
+		rtl8723au_write8(priv, REG_SIFS_OFDM + 1, sifs);
+		rtl8723au_write8(priv, REG_SPEC_SIFS + 1, sifs);
+		rtl8723au_write8(priv, REG_MAC_SPEC_SIFS + 1, sifs);
+		rtl8723au_write8(priv, REG_R2T_SIFS + 1, sifs);
+		rtl8723au_write8(priv, REG_T2T_SIFS + 1, sifs);
 	}
 
 	if (changed & BSS_CHANGED_BSSID) {
