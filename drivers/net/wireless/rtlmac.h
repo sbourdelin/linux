@@ -487,6 +487,7 @@ struct rtlmac_priv {
 	u8 pi_enabled:1;
 	u8 iqk_initialized:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
+	bool use_shortgi;
 };
 
 struct rtlmac_rx_urb

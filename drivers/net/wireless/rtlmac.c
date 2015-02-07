@@ -3335,8 +3335,12 @@ static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 
 	h2c.ramask.arg = 0x80;
 	if (sta->ht_cap.cap &
-	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
+	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20)) {
 		h2c.ramask.arg |= 0x20;
+		priv->use_shortgi = true;
+	} else {
+		priv->use_shortgi = false;
+	}
 
 	printk(KERN_DEBUG "%s: rate mask %08x, arg %02x\n", __func__,
 	       ramask, h2c.ramask.arg);
@@ -3493,7 +3497,8 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_SLOT) {
-		printk(KERN_DEBUG "Changed ERP_SLOT!\n");
+		printk(KERN_DEBUG "Changed ERP_SLOT! short_slot_time %i\n",
+			bss_conf->use_short_slot);
 
 		if (bss_conf->use_short_slot)
 			val8 = 9;
@@ -3637,7 +3642,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	struct rtlmac_priv *priv = hw->priv;
 	struct rtlmac_tx_desc *tx_desc;
 	struct urb *urb;
-	u32 queue;
+	u32 queue, rate;
 	u16 pktlen = skb->len;
 	u16 seq_number;
 	u16 rate_flag = tx_info->control.rates[0].flags;
@@ -3711,17 +3716,24 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
 
+	if (rate_flag & IEEE80211_TX_RC_MCS)
+		rate = tx_info->control.rates[0].idx + DESC_RATE_MCS0;
+	else
+		rate = tx_rate->hw_value;
+	tx_desc->txdw5 = cpu_to_le32(rate);
+
 	/*
 	 * Black magic!
 	 */
 	if (ieee80211_is_data(hdr->frame_control)) {
 		tx_desc->txdw5 = cpu_to_le32(0x0001ff00);
-		if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&  */
+
+		if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
+			control->sta->ht_cap.ht_supported &&
 			control && control->sta) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
 			tx_desc->txdw2 |=
 				cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
-//		printk(KERN_DEBUG "ampdu me harder! %02x\n", ampdu);
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_AGG_ENABLE);
 		} else
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
@@ -3731,8 +3743,8 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
 	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_SHORT_PREAMBLE);
-	if (rate_flag & IEEE80211_TX_RC_SHORT_GI)
-		tx_desc->txdw5 = cpu_to_le32(TXDESC_SHORT_GI);
+	if (rate_flag & IEEE80211_TX_RC_SHORT_GI || priv->use_shortgi)
+		tx_desc->txdw5 |= cpu_to_le32(TXDESC_SHORT_GI);
 	if (ieee80211_is_mgmt(hdr->frame_control)) {
 		tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_USE_DRIVER_RATE);
