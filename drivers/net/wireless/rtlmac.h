@@ -399,9 +399,11 @@ struct rtlmac_rfregval {
 
 #define H2C_MAX_MBOX			4
 #define H2C_EXT				BIT(7)
+#define H2C_SET_POWER_MODE		1
 #define H2C_JOIN_BSS_REPORT		2
 #define  H2C_JOIN_BSS_DISCONNECT	0
 #define  H2C_JOIN_BSS_CONNECT		1
+#define H2C_SET_RSSI			5
 #define H2C_SET_RATE_MASK		(6 | H2C_EXT)
 
 struct h2c_cmd {
