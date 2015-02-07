@@ -3711,12 +3711,11 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	seq_number = IEEE80211_SEQ_TO_SN(le16_to_cpu(hdr->seq_ctrl));
 	tx_desc->txdw3 = cpu_to_le32((u32)seq_number << TXDESC_SEQ_SHIFT);
 
-	tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
 	/*
 	 * Black magic!
 	 */
 	if (ieee80211_is_data(hdr->frame_control)) {
-		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
+		tx_desc->txdw5 = cpu_to_le32(0x0001ff00);
 		if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&  */
 			control && control->sta) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
@@ -3733,8 +3732,9 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_SHORT_PREAMBLE);
 	if (rate_flag & IEEE80211_TX_RC_SHORT_GI)
-		tx_desc->txdw5 |= cpu_to_le32(TXDESC_SHORT_GI);
+		tx_desc->txdw5 = cpu_to_le32(TXDESC_SHORT_GI);
 	if (ieee80211_is_mgmt(hdr->frame_control)) {
+		tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_USE_DRIVER_RATE);
 		tx_desc->txdw5 |= cpu_to_le32(6 << TXDESC_RETRY_LIMIT_SHIFT);
 		tx_desc->txdw5 |= cpu_to_le32(TXDESC_RETRY_LIMIT_ENABLE);
