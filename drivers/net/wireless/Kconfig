@@ -244,11 +244,22 @@ config ADM8211
 	  Thanks to Infineon-ADMtek for their support of this driver.
 
 config RTL8XXXU
-	tristate "RTL8723AU (mac80211) support"
+	tristate "RTL8723AU (mac80211) support (EXPERIMENTAL)"
 	depends on MAC80211 && USB
 	---help---
-	  This is an alternate driver for the RTL8723au using the
-	  MAC80211 stack.
+	  This is an alternative driver for the RTL8723AU, written for
+	  the Linux mac80211 stack.
+
+	  It is currently under development and has a limited feature
+	  set. In particular it does not yet support 40MHz channels,
+	  AMPDU, and power management. However it should have a
+	  smaller memory footprint and benetifs from the Linux mac80211.
+
+	  It can coexist with the driver from drivers/staging/rtl8723au, 
+	  but you will need to control which module you wants to load.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called r8xxxu.  If unsure, say N.
 
 config MAC80211_HWSIM
 	tristate "Simulated radio testing tool for mac80211"
