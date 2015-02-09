@@ -524,8 +524,7 @@ static int rtl8723au_write8(struct rtl8xxxu_priv *priv, u16 addr, u8 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		printk(KERN_DEBUG "%s(%04x) = 0x%02x\n",
-		       __func__, addr, val);
+		printk(KERN_DEBUG "%s(%04x) = 0x%02x\n", __func__, addr, val);
 	return ret;
 }
 
@@ -543,8 +542,7 @@ static int rtl8723au_write16(struct rtl8xxxu_priv *priv, u16 addr, u16 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		printk(KERN_DEBUG "%s(%04x) = 0x%04x\n",
-		       __func__, addr, val);
+		printk(KERN_DEBUG "%s(%04x) = 0x%04x\n", __func__, addr, val);
 	return ret;
 }
 
@@ -562,8 +560,7 @@ static int rtl8723au_write32(struct rtl8xxxu_priv *priv, u16 addr, u32 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		printk(KERN_DEBUG "%s(%04x) = 0x%08x\n",
-		       __func__, addr, val);
+		printk(KERN_DEBUG "%s(%04x) = 0x%08x\n", __func__, addr, val);
 	return ret;
 }
 
