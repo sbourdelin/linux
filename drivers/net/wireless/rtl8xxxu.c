@@ -1024,7 +1024,7 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 }
 
 static void rtl8xxxu_set_linktype(struct rtl8xxxu_priv *priv,
-				enum nl80211_iftype linktype)
+				  enum nl80211_iftype linktype)
 {
 	u16 val8;
 
@@ -1066,7 +1066,8 @@ rtl8xxxu_set_retry(struct rtl8xxxu_priv *priv, u16 short_retry, u16 long_retry)
 	rtl8723au_write16(priv, REG_RETRY_LIMIT, val16);
 }
 
-static void rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
+static void
+rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 {
 	u16 val16;
 
@@ -1141,7 +1142,8 @@ static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 	return ret;
 }
 
-static int rtl8xxxu_read_efuse8(struct rtl8xxxu_priv *priv, u16 offset, u8 *data)
+static int
+rtl8xxxu_read_efuse8(struct rtl8xxxu_priv *priv, u16 offset, u8 *data)
 {
 	int i;
 	u8 val8;
@@ -1493,8 +1495,8 @@ static void rtl8xxxu_firmware_self_reset(struct rtl8xxxu_priv *priv)
 	}
 }
 
-static int rtl8xxxu_init_mac(struct rtl8xxxu_priv *priv,
-			   struct rtl8xxxu_reg8val *array)
+static int
+rtl8xxxu_init_mac(struct rtl8xxxu_priv *priv, struct rtl8xxxu_reg8val *array)
 {
 	int i, ret;
 	u16 reg;
@@ -1521,7 +1523,7 @@ static int rtl8xxxu_init_mac(struct rtl8xxxu_priv *priv,
 }
 
 static int rtl8xxxu_init_phy_regs(struct rtl8xxxu_priv *priv,
-				struct rtl8xxxu_reg32val *array)
+				  struct rtl8xxxu_reg32val *array)
 {
 	int i, ret;
 	u16 reg;
@@ -1611,7 +1613,7 @@ static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 }
 
 static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
-			       struct rtl8xxxu_rfregval *array)
+				 struct rtl8xxxu_rfregval *array)
 {
 	int i, ret;
 	u8 reg;
@@ -1877,8 +1879,8 @@ static int rtl8xxxu_init_queue_priority(struct rtl8xxxu_priv *priv)
 }
 
 static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
-				     bool bIQKOK, int result[][8],
-				     u8 final_candidate, bool bTxOnly)
+				       bool bIQKOK, int result[][8],
+				       u8 final_candidate, bool bTxOnly)
 {
 	u32 Oldval_0, X, TX0_A, reg;
 	s32 Y, TX0_C;
@@ -1958,7 +1960,7 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 #define MAX_TOLERANCE		5
 
 static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
-				      int result[][8], u8 c1, u8 c2)
+					int result[][8], u8 c1, u8 c2)
 {
 	u32 i, j, diff, SimularityBitMap, bound = 0;
 	u8 final_candidate[2] = {0xff, 0xff};	/* for path A and path B */
@@ -2015,8 +2017,8 @@ static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 	}
 }
 
-static void rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv,
-				 u32 *reg, u32 *backup)
+static void
+rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 {
 	int i;
 
@@ -2026,8 +2028,8 @@ static void rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv,
 	backup[i] = rtl8723au_read32(priv, reg[i]);
 }
 
-static void rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv,
-				    u32 *reg, u32 *backup)
+static void
+rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 {
 	int i;
 
@@ -2038,7 +2040,7 @@ static void rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv,
 }
 
 static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, u32 *regs,
-			     u32 *backup, int count)
+			       u32 *backup, int count)
 {
 	int i;
 
@@ -2047,7 +2049,7 @@ static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 }
 
 static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
-				u32 *backup, int count)
+				  u32 *backup, int count)
 {
 	int i;
 
@@ -2057,7 +2059,7 @@ static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 
 
 static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, u32 *regs,
-				bool isPathAOn, bool is2T)
+				  bool isPathAOn, bool is2T)
 {
 	u32 pathOn;
 	u32 i;
@@ -2074,8 +2076,8 @@ static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, u32 *regs,
 		rtl8723au_write32(priv, regs[i], pathOn);
 }
 
-static void rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs,
-				   u32 *backup)
+static void
+rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs, u32 *backup)
 {
 	int i = 0;
 
@@ -2484,7 +2486,8 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 #if 0
 		/* Path-B */
 		if (is2T)
-			RF_Bmode = PHY_QueryRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits);
+			RF_Bmode = PHY_QueryRFReg(priv, RF_PATH_B, RF_AC,
+						  bMask12Bits);
 #endif
 
 		/* Set RF mode to standby Path A */
@@ -2835,8 +2838,8 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	u32 val32;
 	int ret = 0;
 
-	/*  RSV_CTRL 0x001C[7:0] = 0x00
-	    unlock ISO/CLK/Power control register */
+	/* RSV_CTRL 0x001C[7:0] = 0x00
+	   unlock ISO/CLK/Power control register */
 	rtl8723au_write8(priv, REG_RSV_CTRL, 0x0);
 
 	ret = rtl8xxxu_disabled_to_emu(priv);
@@ -2847,13 +2850,13 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	if (ret)
 		goto exit;
 
-	/*  0x0004[19] = 1, reset 8051 */
+	/* 0x0004[19] = 1, reset 8051 */
 	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 2);
 	val8 |= BIT(3);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 2, val8);
 
-	/*  Enable MAC DMA/WMAC/SCHEDULE/SEC block */
-	/*  Set CR bit10 to enable 32k calibration. */
+	/* Enable MAC DMA/WMAC/SCHEDULE/SEC block */
+	/* Set CR bit10 to enable 32k calibration. */
 	val16 = rtl8723au_read16(priv, REG_CR);
 	val16 |= (CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE |
 		  CR_TXDMA_ENABLE | CR_RXDMA_ENABLE |
@@ -3139,7 +3142,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_BAR_MODE_CTRL, 0x0201ffff);
 
 #if 0
-	if (pregistrypriv->wifi_spec)
+	if (priv->wifi_spec)
 		rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
 #endif
 
@@ -3153,7 +3156,6 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, val32);
 #endif
 
-#if 1
 	/*
 	 * Not sure if we should get into this at all
 	 */
@@ -3163,11 +3165,6 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 		rtl8723a_phy_iq_calibrate(priv, false);
 		priv->iqk_initialized = true;
 	}
-#else
-	rtl8723au_write32(priv, REG_FPGA0_IQK, 0);
-	rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x01008c00);
-	rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x01008c00);
-#endif
 
 	/*
 	 * This should enable thermal meter
@@ -3201,8 +3198,8 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write8(priv, 0xfe42, 0x80);
 
 #if 0
-	/*  Init BT hw config. */
-	rtl8723a_BT_init_hwconfig(Adapter);
+	/* Init BT hw config. */
+	rtl8723a_init_bt(priv);
 #endif
 
 	/*
@@ -3648,10 +3645,10 @@ static void rtl8xxxu_tx_complete(struct urb *urb)
 	usb_free_urb(urb);
 }
 
-static int tx_count = 5;
 
 static void rtl8xxxu_tx(struct ieee80211_hw *hw,
-		      struct ieee80211_tx_control *control, struct sk_buff *skb)
+			struct ieee80211_tx_control *control,
+			struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
@@ -3663,7 +3660,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	u16 pktlen = skb->len;
 	u16 seq_number;
 	u16 rate_flag = tx_info->control.rates[0].flags;
-	int ret, i;
+	int ret;
 
 	if (skb_headroom(skb) < sizeof(struct rtl8xxxu_tx_desc)) {
 		printk(KERN_DEBUG "%s: Not enough skb headroom space (%i) for "
@@ -3775,22 +3772,12 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		/* Use RTS rate 24M - does the mac80211 tell us which to use? */
 		tx_desc->txdw4 |= cpu_to_le32(DESC_RATE_24M);
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_RTS_ENABLE);
-	
 	}
 
 	rtl8xxxu_calc_tx_desc_csum(tx_desc);
 
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
 			  skb->len, rtl8xxxu_tx_complete, skb);
-
-	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_TX_DUMP && tx_count) {
-		for (i = 0; i < min_t(int, 128, skb->len); i++) {
-			printk("%02x ", skb->data[i]);
-			if ((i & 0xf) == 0xf)
-				printk("\n");
-		}
-		tx_count--;
-	}
 
 	usb_anchor_urb(urb, &priv->tx_anchor);
 	ret = usb_submit_urb(urb, GFP_KERNEL);
@@ -3803,12 +3790,11 @@ error:
 	dev_kfree_skb(skb);
 }
 
-static int rx_count = 10;
 
 static void rtl8xxxu_rx_complete(struct urb *urb)
 {
-	struct rtl8xxxu_rx_urb *rx_urb = container_of(urb,
-						    struct rtl8xxxu_rx_urb, urb);
+	struct rtl8xxxu_rx_urb *rx_urb =
+		container_of(urb, struct rtl8xxxu_rx_urb, urb);
 	struct ieee80211_hw *hw = rx_urb->hw;
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
@@ -3828,12 +3814,6 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 	drvinfo_sz = rx_desc->drvinfo_sz * 8;
 	desc_shift = rx_desc->shift;
 	skb_put(skb, urb->actual_length);
-
-	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RX && rx_count)
-		printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb "
-		       "size %i cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
-		       __func__, skb, urb->status, skb->len, cnt, len,
-		       drvinfo_sz, desc_shift);
 
 	if (urb->status == 0) {
 		skb_pull(skb, sizeof(struct rtl8xxxu_rx_desc));
@@ -3858,15 +3838,6 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 			printk(KERN_DEBUG "Received something else\n");
 		}
 #endif
-
-		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RX_DUMP && rx_count) {
-			for (i = 0; i < min_t(int, 128, skb->len); i++) {
-				printk("%02x ", skb->data[i]);
-				if ((i & 0xf) == 0xf)
-					printk("\n");
-			}
-			rx_count--;
-		}
 
 		memset(rx_status, 0, sizeof(struct ieee80211_rx_status));
 
@@ -4006,8 +3977,9 @@ static int rtl8xxxu_submit_int_urb(struct ieee80211_hw *hw)
 	if (!urb)
 		return -ENOMEM;
 
-	usb_fill_int_urb(urb, priv->udev, priv->pipe_interrupt, priv->int_buf,
-			 USB_INTR_CONTENT_LENGTH, rtl8xxxu_int_complete, priv, 1);
+	usb_fill_int_urb(urb, priv->udev, priv->pipe_interrupt,
+			 priv->int_buf, USB_INTR_CONTENT_LENGTH,
+			 rtl8xxxu_int_complete, priv, 1);
 	usb_anchor_urb(urb, &priv->int_anchor);
 	ret = usb_submit_urb(urb, GFP_KERNEL);
 	if (ret) {
@@ -4024,7 +3996,7 @@ error:
 }
 
 static int rtl8xxxu_add_interface(struct ieee80211_hw *hw,
-				struct ieee80211_vif *vif)
+				  struct ieee80211_vif *vif)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	int ret;
@@ -4050,7 +4022,7 @@ static int rtl8xxxu_add_interface(struct ieee80211_hw *hw,
 }
 
 static void rtl8xxxu_remove_interface(struct ieee80211_hw *hw,
-				    struct ieee80211_vif *vif)
+				      struct ieee80211_vif *vif)
 {
 	printk(KERN_DEBUG "%s\n", __func__);
 }
@@ -4101,8 +4073,8 @@ exit:
 }
 
 static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
-			  struct ieee80211_vif *vif, u16 queue,
-			  const struct ieee80211_tx_queue_params *param)
+			    struct ieee80211_vif *vif, u16 queue,
+			    const struct ieee80211_tx_queue_params *param)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	u32 val32;
@@ -4156,8 +4128,8 @@ static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
 }
 
 static void rtl8xxxu_configure_filter(struct ieee80211_hw *hw,
-				    unsigned int changed_flags,
-				    unsigned int *total_flags, u64 multicast)
+				      unsigned int changed_flags,
+				      unsigned int *total_flags, u64 multicast)
 {
 	printk(KERN_DEBUG "%s: changed_flags %08x, total_flags %08x\n",
 	       __func__, changed_flags, *total_flags);
@@ -4174,8 +4146,9 @@ static int rtl8xxxu_set_rts_threshold(struct ieee80211_hw *hw, u32 rts)
 }
 
 static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
-			  struct ieee80211_vif *vif, struct ieee80211_sta *sta,
-			  struct ieee80211_key_conf *key)
+			    struct ieee80211_vif *vif,
+			    struct ieee80211_sta *sta,
+			    struct ieee80211_key_conf *key)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	u8 mac_addr[ETH_ALEN];
@@ -4325,7 +4298,7 @@ static const struct ieee80211_ops rtl8xxxu_ops = {
 };
 
 static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
-			    struct usb_interface *interface)
+			      struct usb_interface *interface)
 {
 	struct usb_interface_descriptor *interface_desc;
 	struct usb_host_interface *host_interface;
@@ -4398,7 +4371,7 @@ exit:
 }
 
 static int rtl8xxxu_probe(struct usb_interface *interface,
-			const struct usb_device_id *id)
+			  const struct usb_device_id *id)
 {
 	struct rtl8xxxu_priv *priv;
 	struct ieee80211_hw *hw;
