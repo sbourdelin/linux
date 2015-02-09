@@ -2652,7 +2652,8 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 	}
 
 	if (count == RTL8XXXU_MAX_REG_POLL) {
-		printk(KERN_WARNING "%s: Turn RX poll timed out\n", __func__);
+		printk(KERN_WARNING "%s: RX poll timed out (0x05f8)\n",
+		       __func__);
 		ret = -EBUSY;
 		goto exit;
 	}
