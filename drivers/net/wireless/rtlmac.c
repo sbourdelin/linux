@@ -3528,11 +3528,13 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			sifs = 0x0a;
 		}
 		rcu_read_unlock();
+#if 0
 		printk(KERN_DEBUG "Changed HT! ampdu_factor %02x, "
 		       "ampdu_density %02x\n", ampdu_factor, ampdu_density);
 		rtlmac_set_ampdu_factor(priv, ampdu_factor);
 		rtlmac_set_ampdu_min_space(priv, ampdu_density);
-
+#endif
+	
 		rtl8723au_write8(priv, REG_SIFS_CCK + 1, sifs);
 		rtl8723au_write8(priv, REG_SIFS_OFDM + 1, sifs);
 		rtl8723au_write8(priv, REG_SPEC_SIFS + 1, sifs);
@@ -3740,10 +3742,11 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	/*
 	 * Black magic!
 	 */
+#if 0
 	if (ieee80211_is_data(hdr->frame_control)) {
 		tx_desc->txdw5 = cpu_to_le32(0x0001ff00);
 
-		if (/*(tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
+		if ((tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&
 			control->sta->ht_cap.ht_supported &&
 			control && control->sta) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
@@ -3753,6 +3756,7 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		} else
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
 	} else
+#endif
 		tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
 	if (ieee80211_is_data_qos(hdr->frame_control))
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
@@ -4446,8 +4450,10 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	sband = &rtlmac_supported_band;
 	sband->ht_cap.ht_supported = true;
+#if 0
 	sband->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_8K;
 	sband->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_16;
+#endif
 	sband->ht_cap.cap = /* IEEE80211_HT_CAP_SUP_WIDTH_20_40 | */
 		IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40;
 	memset(&sband->ht_cap.mcs, 0, sizeof(sband->ht_cap.mcs));
