@@ -3509,7 +3509,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (!sta) {
-			printk(KERN_DEBUG "No HT sta found!\n");
+			printk(KERN_DEBUG "BSS_CHANGED_HT: No HT sta found!\n");
 			rcu_read_unlock();
 			goto error;
 		}
@@ -3524,7 +3524,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		}
 		rcu_read_unlock();
 #if 0
-		printk(KERN_DEBUG "Changed HT! ampdu_factor %02x, "
+		printk(KERN_DEBUG "Changed HT: ampdu_factor %02x, "
 		       "ampdu_density %02x\n", ampdu_factor, ampdu_density);
 		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
 		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
@@ -3559,7 +3559,8 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		if (sta)
 			rtl8xxxu_set_basic_rates(priv, sta);
 		else 
-			printk(KERN_DEBUG "No sta found!\n");
+			printk(KERN_DEBUG "BSS_CHANGED_BASIC_RATES: "
+			       "No sta found!\n");
 
 		rcu_read_unlock();
 	}
@@ -3667,7 +3668,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	}
 
 	if (unlikely(skb->len > (65535 - sizeof(struct rtl8xxxu_tx_desc)))) {
-		printk(KERN_DEBUG "%s: Trying to send over sized skb (%i)\n",
+		printk(KERN_DEBUG "%s: Trying to send over-sized skb (%i)\n",
 		       __func__, skb->len);
 		goto error;
 	}
@@ -3677,17 +3678,6 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		printk(KERN_DEBUG "%s: Unable to allocate urb\n", __func__);
 		goto error;
 	}
-
-#if 0
-	if (ieee80211_is_mgmt(hdr->frame_control))
-		printk(KERN_DEBUG "%s: mgmt frame\n", __func__);
-	else if (ieee80211_is_ctl(hdr->frame_control))
-		printk(KERN_DEBUG "%s: ctl frame\n", __func__);
-	else if (ieee80211_is_data(hdr->frame_control))
-		printk(KERN_DEBUG "%s: data frame\n", __func__);
-	else if (ieee80211_is_data_qos(hdr->frame_control))
-		printk(KERN_DEBUG "%s: data qos frame\n", __func__);
-#endif
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_TX)
 		printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
@@ -4262,8 +4252,6 @@ static void rtl8xxxu_stop(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	rtl8723au_write8(priv, REG_TXPAUSE, 0xff);
 
 	rtl8723au_write16(priv, REG_RXFLTMAP0, 0x0000);
@@ -4460,7 +4448,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
-		printk(KERN_ERR "%s: RTL8723au failed to register: %is\n",
+		printk(KERN_ERR "%s: Failed to register: %i\n",
 		       DRIVER_NAME, ret);
 		goto exit;
 	}
