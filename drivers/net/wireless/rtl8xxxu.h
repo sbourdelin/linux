@@ -15,24 +15,24 @@
 
 #include <asm/byteorder.h>
 
-#define RTLMAC_DEBUG_REG_WRITE		0x01
-#define RTLMAC_DEBUG_REG_READ		0x02
-#define RTLMAC_DEBUG_RFREG_WRITE	0x04
-#define RTLMAC_DEBUG_RFREG_READ		0x08
-#define RTLMAC_DEBUG_CHANNEL		0x10
-#define RTLMAC_DEBUG_TX			0x20
-#define RTLMAC_DEBUG_TX_DUMP		0x40
-#define RTLMAC_DEBUG_RX			0x80
-#define RTLMAC_DEBUG_RX_DUMP		0x100
-#define RTLMAC_DEBUG_USB		0x200
-#define RTLMAC_DEBUG_KEY		0x400
-#define RTLMAC_DEBUG_H2C		0x800
+#define RTL8XXXU_DEBUG_REG_WRITE		0x01
+#define RTL8XXXU_DEBUG_REG_READ		0x02
+#define RTL8XXXU_DEBUG_RFREG_WRITE	0x04
+#define RTL8XXXU_DEBUG_RFREG_READ		0x08
+#define RTL8XXXU_DEBUG_CHANNEL		0x10
+#define RTL8XXXU_DEBUG_TX			0x20
+#define RTL8XXXU_DEBUG_TX_DUMP		0x40
+#define RTL8XXXU_DEBUG_RX			0x80
+#define RTL8XXXU_DEBUG_RX_DUMP		0x100
+#define RTL8XXXU_DEBUG_USB		0x200
+#define RTL8XXXU_DEBUG_KEY		0x400
+#define RTL8XXXU_DEBUG_H2C		0x800
 
 #define RTW_USB_CONTROL_MSG_TIMEOUT	500
-#define RTLMAC_MAX_REG_POLL		500
+#define RTL8XXXU_MAX_REG_POLL		500
 #define	USB_INTR_CONTENT_LENGTH		56
 
-#define RTLMAC_OUT_ENDPOINTS		3
+#define RTL8XXXU_OUT_ENDPOINTS		3
 
 #define REALTEK_USB_READ		0xc0
 #define REALTEK_USB_WRITE		0x40
@@ -47,7 +47,7 @@
 #define TX_PAGE_NUM_NORM_PQ		0x02
 
 #define RTL_FW_PAGE_SIZE		4096
-#define RTLMAC_FIRMWARE_POLL_MAX	1000
+#define RTL8XXXU_FIRMWARE_POLL_MAX	1000
 
 #define RTL8723A_CHANNEL_GROUPS		3
 #define RTL8723A_MAX_RF_PATHS		2
@@ -59,7 +59,7 @@
 #define EFUSE_BT_MAP_LEN_8723A		1024
 #define EFUSE_MAX_WORD_UNIT		4
 
-struct rtlmac_rx_desc {
+struct rtl8xxxu_rx_desc {
 	u32 pktlen:14;
 	u32 crc32:1;
 	u32 icverr:1;
@@ -131,7 +131,7 @@ struct rtlmac_rx_desc {
 #endif
 };
 
-struct rtlmac_tx_desc {
+struct rtl8xxxu_tx_desc {
 	__le16 pkt_size;
 	u8 pkt_offset;
 	u8 txdw0;
@@ -294,11 +294,11 @@ struct rtl8723au_phy_stats {
 /*
  * Regs to backup
  */
-#define RTLMAC_ADDA_REGS	16
-#define RTLMAC_MAC_REGS		4
-#define RTLMAC_BB_REGS		9
+#define RTL8XXXU_ADDA_REGS	16
+#define RTL8XXXU_MAC_REGS		4
+#define RTL8XXXU_BB_REGS		9
 
-struct rtlmac_firmware_header {
+struct rtl8xxxu_firmware_header {
 	__le16	signature;		/*  92C0: test chip; 92C,
 					    88C0: test chip;
 					    88C1: MP A-cut;
@@ -382,17 +382,17 @@ struct rtl8723au_efuse {
 	u8 device_name[0x29];		/* 0xd7 */
 };
 
-struct rtlmac_reg8val {
+struct rtl8xxxu_reg8val {
 	u16 reg;
 	u8 val;
 };
 
-struct rtlmac_reg32val {
+struct rtl8xxxu_reg32val {
 	u16 reg;
 	u32 val;
 };
 
-struct rtlmac_rfregval {
+struct rtl8xxxu_rfregval {
 	u8 reg;
 	u32 val;
 };
@@ -430,7 +430,7 @@ struct h2c_cmd {
 	};
 };
 
-struct rtlmac_priv {
+struct rtl8xxxu_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	u8 mac_addr[ETH_ALEN];
@@ -452,7 +452,7 @@ struct rtlmac_priv {
 	unsigned int pipe_interrupt;
 	unsigned int pipe_in;
 	unsigned int pipe_out[TXDESC_QUEUE_MAX];
-	u8 out_ep[RTLMAC_OUT_ENDPOINTS];
+	u8 out_ep[RTL8XXXU_OUT_ENDPOINTS];
 	u8 path_a_ig_value;
 	int ep_tx_count;
 	int rf_paths;
@@ -468,7 +468,7 @@ struct rtlmac_priv {
 	struct usb_anchor rx_anchor;
 	struct usb_anchor tx_anchor;
 	struct usb_anchor int_anchor;
-	struct rtlmac_firmware_header *fw_data;
+	struct rtl8xxxu_firmware_header *fw_data;
 	size_t fw_size;
 	struct mutex usb_buf_mutex;
 	union {
@@ -480,17 +480,17 @@ struct rtlmac_priv {
 		u8 raw[EFUSE_MAP_LEN_8723A];
 		struct rtl8723au_efuse efuse;
 	} efuse_wifi;
-	u32 adda_backup[RTLMAC_ADDA_REGS];
-	u32 mac_backup[RTLMAC_MAC_REGS];
-	u32 bb_backup[RTLMAC_BB_REGS];
-	u32 bb_recovery_backup[RTLMAC_BB_REGS];
+	u32 adda_backup[RTL8XXXU_ADDA_REGS];
+	u32 mac_backup[RTL8XXXU_MAC_REGS];
+	u32 bb_backup[RTL8XXXU_BB_REGS];
+	u32 bb_recovery_backup[RTL8XXXU_BB_REGS];
 	u8 pi_enabled:1;
 	u8 iqk_initialized:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
 	bool use_shortgi;
 };
 
-struct rtlmac_rx_urb
+struct rtl8xxxu_rx_urb
 {
 	struct urb urb;
 	struct ieee80211_hw *hw;

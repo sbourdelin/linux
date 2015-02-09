@@ -31,12 +31,12 @@
 #include <linux/wireless.h>
 #include <linux/firmware.h>
 #include <net/mac80211.h>
-#include "rtlmac.h"
-#include "rtlmac_regs.h"
+#include "rtl8xxxu.h"
+#include "rtl8xxxu_regs.h"
 
-#define DRIVER_NAME "rtlmac"
+#define DRIVER_NAME "rtl8xxxu"
 
-static int rtlmac_debug = 0 /*RTLMAC_DEBUG_REG_WRITE*/;
+static int rtl8xxxu_debug = 0 /*RTL8XXXU_DEBUG_REG_WRITE*/;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
@@ -61,7 +61,7 @@ static struct usb_device_id dev_table[] = {
 
 MODULE_DEVICE_TABLE(usb, dev_table);
 
-static struct ieee80211_rate rtlmac_rates[] = {
+static struct ieee80211_rate rtl8xxxu_rates[] = {
 	{ .bitrate = 10, .hw_value = DESC_RATE_1M, .flags = 0 },
 	{ .bitrate = 20, .hw_value = DESC_RATE_2M, .flags = 0 },
 	{ .bitrate = 55, .hw_value = DESC_RATE_5_5M, .flags = 0 },
@@ -76,7 +76,7 @@ static struct ieee80211_rate rtlmac_rates[] = {
 	{ .bitrate = 540, .hw_value = DESC_RATE_54M, .flags = 0 },
 };
 
-static struct ieee80211_channel rtlmac_channels_2g[] = {
+static struct ieee80211_channel rtl8xxxu_channels_2g[] = {
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2412,
 	  .hw_value = 1, .max_power = 30 },
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2417,
@@ -107,21 +107,21 @@ static struct ieee80211_channel rtlmac_channels_2g[] = {
 	  .hw_value = 14, .max_power = 30 }
 };
 
-static struct ieee80211_supported_band rtlmac_supported_band = {
-	.channels = rtlmac_channels_2g,
-	.n_channels = ARRAY_SIZE(rtlmac_channels_2g),
-	.bitrates = rtlmac_rates,
-	.n_bitrates = ARRAY_SIZE(rtlmac_rates),
+static struct ieee80211_supported_band rtl8xxxu_supported_band = {
+	.channels = rtl8xxxu_channels_2g,
+	.n_channels = ARRAY_SIZE(rtl8xxxu_channels_2g),
+	.bitrates = rtl8xxxu_rates,
+	.n_bitrates = ARRAY_SIZE(rtl8xxxu_rates),
 };
 
-static const u32 rtlmac_cipher_suites[] = {
+static const u32 rtl8xxxu_cipher_suites[] = {
 	WLAN_CIPHER_SUITE_WEP40,
 	WLAN_CIPHER_SUITE_WEP104,
 	WLAN_CIPHER_SUITE_TKIP,
 	WLAN_CIPHER_SUITE_CCMP,
 };
 
-static struct rtlmac_reg8val rtl8723a_mac_init_table[] = {
+static struct rtl8xxxu_reg8val rtl8723a_mac_init_table[] = {
 	{0x420, 0x80}, {0x423, 0x00}, {0x430, 0x00}, {0x431, 0x00},
 	{0x432, 0x00}, {0x433, 0x01}, {0x434, 0x04}, {0x435, 0x05},
 	{0x436, 0x06}, {0x437, 0x07}, {0x438, 0x00}, {0x439, 0x00},
@@ -146,7 +146,7 @@ static struct rtlmac_reg8val rtl8723a_mac_init_table[] = {
 	{0x70a, 0x65}, {0x70b, 0x87}, {0xffff, 0xff},
 };
 
-static struct rtlmac_reg32val rtl8723a_phy_1t_init_table[] = {
+static struct rtl8xxxu_reg32val rtl8723a_phy_1t_init_table[] = {
 	{0x800, 0x80040000}, {0x804, 0x00000003},
 	{0x808, 0x0000fc00}, {0x80c, 0x0000000a},
 	{0x810, 0x10001331}, {0x814, 0x020c3d10},
@@ -261,7 +261,7 @@ static struct rtlmac_reg32val rtl8723a_phy_1t_init_table[] = {
 	{0xffff, 0xffffffff},
 };
 
-static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
+static struct rtl8xxxu_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xc78, 0x7b000001}, {0xc78, 0x7b010001},
 	{0xc78, 0x7b020001}, {0xc78, 0x7b030001},
 	{0xc78, 0x7b040001}, {0xc78, 0x7b050001},
@@ -345,7 +345,7 @@ static struct rtlmac_reg32val rtl8723a_agc_1t_init_table[] = {
 	{0xffff, 0xffffffff}
 };
 
-static struct rtlmac_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
+static struct rtl8xxxu_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
 	{0x00, 0x00030159}, {0x01, 0x00031284},
 	{0x02, 0x00098000},
 #if 0	/* Only for PCIE */
@@ -449,7 +449,7 @@ static struct rtlmac_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
 	{0xff, 0xffffffff}
 };
 
-static u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
+static u8 rtl8723au_read8(struct rtl8xxxu_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
@@ -463,13 +463,13 @@ static u8 rtl8723au_read8(struct rtlmac_priv *priv, u16 addr)
 	data = priv->usb_buf.val8;
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_READ)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_READ)
 		printk(KERN_DEBUG "%s(%04x)   = 0x%02x, len %i\n",
 		       __func__, addr, data, len);
 	return data;
 }
 
-static u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
+static u16 rtl8723au_read16(struct rtl8xxxu_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
@@ -483,13 +483,13 @@ static u16 rtl8723au_read16(struct rtlmac_priv *priv, u16 addr)
 	data = le16_to_cpu(priv->usb_buf.val16);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_READ)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_READ)
 		printk(KERN_DEBUG "%s(%04x)  = 0x%04x, len %i\n",
 		       __func__, addr, data, len);
 	return data;
 }
 
-static u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
+static u32 rtl8723au_read32(struct rtl8xxxu_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
 	int len;
@@ -503,13 +503,13 @@ static u32 rtl8723au_read32(struct rtlmac_priv *priv, u16 addr)
 	data = le32_to_cpu(priv->usb_buf.val32);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_READ)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_READ)
 		printk(KERN_DEBUG "%s(%04x)  = 0x%08x, len %i\n",
 		       __func__, addr, data, len);
 	return data;
 }
 
-static int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
+static int rtl8723au_write8(struct rtl8xxxu_priv *priv, u16 addr, u8 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -523,13 +523,13 @@ static int rtl8723au_write8(struct rtlmac_priv *priv, u16 addr, u8 val)
 
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
 		printk(KERN_DEBUG "%s(%04x) = 0x%02x\n",
 		       __func__, addr, val);
 	return ret;
 }
 
-static int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
+static int rtl8723au_write16(struct rtl8xxxu_priv *priv, u16 addr, u16 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -542,13 +542,13 @@ static int rtl8723au_write16(struct rtlmac_priv *priv, u16 addr, u16 val)
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
 		printk(KERN_DEBUG "%s(%04x) = 0x%04x\n",
 		       __func__, addr, val);
 	return ret;
 }
 
-static int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
+static int rtl8723au_write32(struct rtl8xxxu_priv *priv, u16 addr, u32 val)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -561,14 +561,14 @@ static int rtl8723au_write32(struct rtlmac_priv *priv, u16 addr, u32 val)
 			      RTW_USB_CONTROL_MSG_TIMEOUT);
 	mutex_unlock(&priv->usb_buf_mutex);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
 		printk(KERN_DEBUG "%s(%04x) = 0x%08x\n",
 		       __func__, addr, val);
 	return ret;
 }
 
 static int
-rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
+rtl8723au_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
 {
 	struct usb_device *udev = priv->udev;
 	int ret;
@@ -577,13 +577,13 @@ rtl8723au_writeN(struct rtlmac_priv *priv, u16 addr, u8 *buf, u16 len)
 			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
 			      addr, 0, buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_REG_WRITE)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
 		printk(KERN_DEBUG "%s(%04x) = %p, len 0x%02x\n",
 		       __func__, addr, buf, len);
 	return ret;
 }
 
-static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
+static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv, u8 reg)
 {
 	u32 hssia, val32, retval;
 
@@ -614,17 +614,17 @@ static u32 rtl8723au_read_rfreg(struct rtlmac_priv *priv, u8 reg)
 
 	retval &= 0xfffff;
 
-	if (rtlmac_debug & RTLMAC_DEBUG_RFREG_READ)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RFREG_READ)
 		printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, retval);
 	return retval;
 }
 
-static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
+static int rtl8723au_write_rfreg(struct rtl8xxxu_priv *priv, u8 reg, u32 data)
 {
 	int ret, retval;
 	u32 dataaddr;
 
-	if (rtlmac_debug & RTLMAC_DEBUG_RFREG_WRITE)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RFREG_WRITE)
 		printk(KERN_DEBUG "%s(%02x) = 0x%06x\n", __func__, reg, data);
 
 	data &= FPGA0_LSSI_PARM_DATA_MASK;
@@ -642,7 +642,7 @@ static int rtl8723au_write_rfreg(struct rtlmac_priv *priv, u8 reg, u32 data)
 	return retval;
 }
 
-static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
+static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 {
 	int mbox_nr, retry, retval = 0;
 	int mbox_reg, mbox_ext_reg;
@@ -676,12 +676,12 @@ static int rtl8723a_h2c_cmd(struct rtlmac_priv *priv, struct h2c_cmd *h2c)
 	if (h2c->cmd.cmd & H2C_EXT) {
 		rtl8723au_write16(priv, mbox_ext_reg,
 				  le16_to_cpu(h2c->raw.ext));
-		if (rtlmac_debug & RTLMAC_DEBUG_H2C)
+		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
 			printk(KERN_DEBUG "H2C_EXT %04x\n",
 			       le16_to_cpu(h2c->raw.ext));
 	}
 	rtl8723au_write32(priv, mbox_reg, le32_to_cpu(h2c->raw.data));
-		if (rtlmac_debug & RTLMAC_DEBUG_H2C)
+		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
 			printk(KERN_DEBUG "H2C %08x\n",
 			       le16_to_cpu(h2c->raw.data));
 
@@ -692,7 +692,7 @@ error:
 	return retval;
 }
 
-static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
+static void rtl8723a_enable_rf(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u32 val32;
@@ -728,7 +728,7 @@ static void rtl8723a_enable_rf(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 }
 
-static void rtl8723a_disable_rf(struct rtlmac_priv *priv)
+static void rtl8723a_disable_rf(struct rtl8xxxu_priv *priv)
 {
 	u8 sps0;
 	u32 val32;
@@ -763,7 +763,7 @@ static void rtl8723a_disable_rf(struct rtlmac_priv *priv)
 }
 
 
-static void rtl8723a_stop_tx_beacon(struct rtlmac_priv *priv)
+static void rtl8723a_stop_tx_beacon(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 
@@ -805,7 +805,7 @@ static int rtl8723a_channel_to_group(int channel)
 
 static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	u32 val32, rsr;
 	u8 val8, opmode;
 	bool ht = true;
@@ -915,7 +915,7 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 }
 
 static void
-rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
+rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 {
 	struct rtl8723au_efuse *efuse;
 	u8 cck[RTL8723A_MAX_RF_PATHS], ofdm[RTL8723A_MAX_RF_PATHS];
@@ -939,7 +939,7 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 		ofdm[1] = 0;
 	}
 
-	if (rtlmac_debug & RTLMAC_DEBUG_CHANNEL)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_CHANNEL)
 		printk(KERN_DEBUG "%s: Setting TX power CCK A: %02x, "
 		       "CCK B: %02x, OFDM A: %02x, OFDM B: %02x\n",
 		       DRIVER_NAME, cck[0], cck[1], ofdm[0], ofdm[1]);
@@ -1023,7 +1023,7 @@ rtl8723a_set_tx_power(struct rtlmac_priv *priv, int channel, bool ht40)
 	}
 }
 
-static void rtlmac_set_linktype(struct rtlmac_priv *priv,
+static void rtl8xxxu_set_linktype(struct rtl8xxxu_priv *priv,
 				enum nl80211_iftype linktype)
 {
 	u16 val8;
@@ -1054,7 +1054,7 @@ out:
 }
 
 static void
-rtlmac_set_retry(struct rtlmac_priv *priv, u16 short_retry, u16 long_retry)
+rtl8xxxu_set_retry(struct rtl8xxxu_priv *priv, u16 short_retry, u16 long_retry)
 {
 	u16 val16;
 
@@ -1066,7 +1066,7 @@ rtlmac_set_retry(struct rtlmac_priv *priv, u16 short_retry, u16 long_retry)
 	rtl8723au_write16(priv, REG_RETRY_LIMIT, val16);
 }
 
-static void rtlmac_set_spec_sifs(struct rtlmac_priv *priv, u16 cck, u16 ofdm)
+static void rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 {
 	u16 val16;
 
@@ -1076,7 +1076,7 @@ static void rtlmac_set_spec_sifs(struct rtlmac_priv *priv, u16 cck, u16 ofdm)
 	rtl8723au_write16(priv, REG_SPEC_SIFS, val16);
 }
 
-static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
+static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 {
 	u32 val32;
 	u16 val16;
@@ -1141,7 +1141,7 @@ static int rtlmac_8723au_identify_chip(struct rtlmac_priv *priv)
 	return ret;
 }
 
-static int rtlmac_read_efuse8(struct rtlmac_priv *priv, u16 offset, u8 *data)
+static int rtl8xxxu_read_efuse8(struct rtl8xxxu_priv *priv, u16 offset, u8 *data)
 {
 	int i;
 	u8 val8;
@@ -1159,13 +1159,13 @@ static int rtlmac_read_efuse8(struct rtlmac_priv *priv, u16 offset, u8 *data)
 
 	/* Poll for data read */
 	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
-	for (i = 0; i < RTLMAC_MAX_REG_POLL; i++) {
+	for (i = 0; i < RTL8XXXU_MAX_REG_POLL; i++) {
 		val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
 		if (val32 & BIT(31))
 			break;
 	}
 
-	if (i == RTLMAC_MAX_REG_POLL)
+	if (i == RTL8XXXU_MAX_REG_POLL)
 		return -EIO;
 
 	udelay(50);
@@ -1175,7 +1175,7 @@ static int rtlmac_read_efuse8(struct rtlmac_priv *priv, u16 offset, u8 *data)
 	return 0;
 }
 
-static int rtlmac_read_efuse(struct rtlmac_priv *priv)
+static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 {
 	int i, ret = 0;
 	u8 val8, word_mask, header, extheader;
@@ -1223,14 +1223,14 @@ static int rtlmac_read_efuse(struct rtlmac_priv *priv)
 
 	efuse_addr = 0;
 	while (efuse_addr < EFUSE_REAL_CONTENT_LEN_8723A) {
-		ret = rtlmac_read_efuse8(priv, efuse_addr++, &header);
+		ret = rtl8xxxu_read_efuse8(priv, efuse_addr++, &header);
 		if (ret || header == 0xff)
 			goto exit;
 
 		if ((header & 0x1f) == 0x0f) {	/* extended header */
 			offset = (header & 0xe0) >> 5;
 
-			ret = rtlmac_read_efuse8(priv, efuse_addr++,
+			ret = rtl8xxxu_read_efuse8(priv, efuse_addr++,
 						 &extheader);
 			if (ret)
 				goto exit;
@@ -1263,12 +1263,12 @@ static int rtlmac_read_efuse(struct rtlmac_priv *priv)
 			for (i = 0; i < EFUSE_MAX_WORD_UNIT; i++) {
 				/* Check word enable condition in the section */
 				if (!(word_mask & BIT(i))) {
-					ret = rtlmac_read_efuse8(priv,
+					ret = rtl8xxxu_read_efuse8(priv,
 								 efuse_addr++,
 								 &val8);
 					priv->efuse_wifi.raw[map_addr++] = val8;
 
-					ret = rtlmac_read_efuse8(priv,
+					ret = rtl8xxxu_read_efuse8(priv,
 								 efuse_addr++,
 								 &val8);
 					priv->efuse_wifi.raw[map_addr++] = val8;
@@ -1293,19 +1293,19 @@ exit:
 	return ret;
 }
 
-static int rtlmac_start_firmware(struct rtlmac_priv *priv)
+static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 {
 	int ret = 0, i;
 	u32 val32;
 
 	/* Poll checksum report */
-	for (i = 0; i < RTLMAC_FIRMWARE_POLL_MAX; i++) {
+	for (i = 0; i < RTL8XXXU_FIRMWARE_POLL_MAX; i++) {
 		val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
 		if (val32 & MCU_FW_DL_CSUM_REPORT)
 			break;
 	}
 
-	if (i == RTLMAC_FIRMWARE_POLL_MAX) {
+	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
 		printk(KERN_WARNING "%s: Firmware checksum poll timed out\n",
 		       DRIVER_NAME);
 		ret = -EAGAIN;
@@ -1318,7 +1318,7 @@ static int rtlmac_start_firmware(struct rtlmac_priv *priv)
 	rtl8723au_write32(priv, REG_MCU_FW_DL, val32);
 
 	/* Wait for firmware to become ready */
-	for (i = 0; i < RTLMAC_FIRMWARE_POLL_MAX; i++) {
+	for (i = 0; i < RTL8XXXU_FIRMWARE_POLL_MAX; i++) {
 		val32 = rtl8723au_read32(priv, REG_MCU_FW_DL);
 		if (val32 & MCU_WINT_INIT_READY)
 			break;
@@ -1326,7 +1326,7 @@ static int rtlmac_start_firmware(struct rtlmac_priv *priv)
 		udelay(100);
 	}
 
-	if (i == RTLMAC_FIRMWARE_POLL_MAX) {
+	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
 		printk(KERN_WARNING "%s: Firmware failed to start\n",
 		       DRIVER_NAME);
 		ret = -EAGAIN;
@@ -1337,7 +1337,7 @@ exit:
 	return ret;
 }
 
-static int rtlmac_download_firmware(struct rtlmac_priv *priv)
+static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 {
 	int pages, remainder, i, ret;
 	u8 val8;
@@ -1406,7 +1406,7 @@ fw_abort:
 	return ret;
 }
 
-static int rtlmac_load_firmware(struct rtlmac_priv *priv)
+static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 {
 	const struct firmware *fw;
 	char *fw_name;
@@ -1443,7 +1443,7 @@ static int rtlmac_load_firmware(struct rtlmac_priv *priv)
 	}
 
 	priv->fw_data = kmemdup(fw->data, fw->size, GFP_KERNEL);
-	priv->fw_size = fw->size - sizeof(struct rtlmac_firmware_header);
+	priv->fw_size = fw->size - sizeof(struct rtl8xxxu_firmware_header);
 
 	signature = le16_to_cpu(priv->fw_data->signature);
 	switch(signature & 0xfff0) {
@@ -1466,7 +1466,7 @@ exit:
 	return ret;
 }
 
-static void rtlmac_firmware_self_reset(struct rtlmac_priv *priv)
+static void rtl8xxxu_firmware_self_reset(struct rtl8xxxu_priv *priv)
 {
 	u16 val16;
 	int i = 100;
@@ -1493,8 +1493,8 @@ static void rtlmac_firmware_self_reset(struct rtlmac_priv *priv)
 	}
 }
 
-static int rtlmac_init_mac(struct rtlmac_priv *priv,
-			   struct rtlmac_reg8val *array)
+static int rtl8xxxu_init_mac(struct rtl8xxxu_priv *priv,
+			   struct rtl8xxxu_reg8val *array)
 {
 	int i, ret;
 	u16 reg;
@@ -1520,8 +1520,8 @@ static int rtlmac_init_mac(struct rtlmac_priv *priv,
 	return 0;
 }
 
-static int rtlmac_init_phy_regs(struct rtlmac_priv *priv,
-				struct rtlmac_reg32val *array)
+static int rtl8xxxu_init_phy_regs(struct rtl8xxxu_priv *priv,
+				struct rtl8xxxu_reg32val *array)
 {
 	int i, ret;
 	u16 reg;
@@ -1549,7 +1549,7 @@ static int rtlmac_init_phy_regs(struct rtlmac_priv *priv,
 /*
  * Most of this is black magic retrieved from the old rtl8723au driver
  */
-static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
+static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 {
 	u8 val8, ldoa15, ldov12d, lpldo, ldohci12;
 	u32 val32;
@@ -1586,9 +1586,9 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	val8 = RF_ENABLE | RF_RSTB | RF_SDMRSTB;
 	rtl8723au_write8(priv, REG_RF_CTRL, val8);
 
-	rtlmac_init_phy_regs(priv, rtl8723a_phy_1t_init_table);
+	rtl8xxxu_init_phy_regs(priv, rtl8723a_phy_1t_init_table);
 
-	rtlmac_init_phy_regs(priv, rtl8723a_agc_1t_init_table);
+	rtl8xxxu_init_phy_regs(priv, rtl8723a_agc_1t_init_table);
 	if (priv->efuse_wifi.efuse.version >= 0x01) {
 		val32 = rtl8723au_read32(priv, REG_MAC_PHY_CTRL);
 
@@ -1610,8 +1610,8 @@ static int rtlmac_init_phy_bb(struct rtlmac_priv *priv)
 	return 0;
 }
 
-static int rtlmac_init_rf_regs(struct rtlmac_priv *priv,
-			       struct rtlmac_rfregval *array)
+static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
+			       struct rtl8xxxu_rfregval *array)
 {
 	int i, ret;
 	u8 reg;
@@ -1659,7 +1659,7 @@ static int rtlmac_init_rf_regs(struct rtlmac_priv *priv,
 	return 0;
 }
 
-static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
+static int rtl8xxxu_init_phy_rf(struct rtl8xxxu_priv *priv)
 {
 	u32 val32;
 	u16 val16, rfsi_rfenv;
@@ -1694,7 +1694,7 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
 	udelay(1);
 
-	rtlmac_init_rf_regs(priv, rtl8723au_radioa_rf6052_1t_init_table);
+	rtl8xxxu_init_rf_regs(priv, rtl8723au_radioa_rf6052_1t_init_table);
 
 	/* For path B, use XB */
 	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
@@ -1705,7 +1705,7 @@ static int rtlmac_init_phy_rf(struct rtlmac_priv *priv)
 	return 0;
 }
 
-static int rtlmac_llt_write(struct rtlmac_priv *priv, u8 address, u8 data)
+static int rtl8xxxu_llt_write(struct rtl8xxxu_priv *priv, u8 address, u8 data)
 {
 	int ret = -EBUSY;
 	int count = 0;
@@ -1726,30 +1726,30 @@ static int rtlmac_llt_write(struct rtlmac_priv *priv, u8 address, u8 data)
 	return ret;
 }
 
-static int rtlmac_init_llt_table(struct rtlmac_priv *priv, u8 last_tx_page)
+static int rtl8xxxu_init_llt_table(struct rtl8xxxu_priv *priv, u8 last_tx_page)
 {
 	int ret;
 	int i;
 
 	for (i = 0; i < last_tx_page; i++) {
-		ret = rtlmac_llt_write(priv, i, i + 1);
+		ret = rtl8xxxu_llt_write(priv, i, i + 1);
 		if (ret)
 			goto exit;
 	}
 
-	ret = rtlmac_llt_write(priv, last_tx_page, 0xff);
+	ret = rtl8xxxu_llt_write(priv, last_tx_page, 0xff);
 	if (ret)
 		goto exit;
 
 	/* Mark remaining pages as a ring buffer */
 	for (i = last_tx_page + 1; i < 0xff; i++) {
-		ret = rtlmac_llt_write(priv, i, (i + 1));
+		ret = rtl8xxxu_llt_write(priv, i, (i + 1));
 		if (ret)
 			goto exit;
 	}
 
 	/*  Let last entry point to the start entry of ring buffer */
-	ret = rtlmac_llt_write(priv, 0xff, last_tx_page + 1);
+	ret = rtl8xxxu_llt_write(priv, 0xff, last_tx_page + 1);
 	if (ret)
 		goto exit;
 
@@ -1757,7 +1757,7 @@ exit:
 	return ret;
 }
 
-static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
+static int rtl8xxxu_init_queue_priority(struct rtl8xxxu_priv *priv)
 {
 	u16 val16, hi, lo;
 	u16 hiq, mgq, bkq, beq, viq, voq;
@@ -1876,7 +1876,7 @@ static int rtlmac_init_queue_priority(struct rtlmac_priv *priv)
 	return ret;
 }
 
-static void rtlmac_fill_iqk_matrix_a(struct rtlmac_priv *priv,
+static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 				     bool bIQKOK, int result[][8],
 				     u8 final_candidate, bool bTxOnly)
 {
@@ -1957,7 +1957,7 @@ static void rtlmac_fill_iqk_matrix_a(struct rtlmac_priv *priv,
 
 #define MAX_TOLERANCE		5
 
-static bool rtlmac_simularity_compare(struct rtlmac_priv *priv,
+static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 				      int result[][8], u8 c1, u8 c2)
 {
 	u32 i, j, diff, SimularityBitMap, bound = 0;
@@ -2015,29 +2015,29 @@ static bool rtlmac_simularity_compare(struct rtlmac_priv *priv,
 	}
 }
 
-static void rtlmac_save_mac_regs(struct rtlmac_priv *priv,
+static void rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv,
 				 u32 *reg, u32 *backup)
 {
 	int i;
 
-	for (i = 0 ; i < (RTLMAC_MAC_REGS - 1); i++) {
+	for (i = 0 ; i < (RTL8XXXU_MAC_REGS - 1); i++) {
 		backup[i] = rtl8723au_read8(priv, reg[i]);
 	}
 	backup[i] = rtl8723au_read32(priv, reg[i]);
 }
 
-static void rtlmac_restore_mac_regs(struct rtlmac_priv *priv,
+static void rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv,
 				    u32 *reg, u32 *backup)
 {
 	int i;
 
-	for (i = 0 ; i < (RTLMAC_MAC_REGS - 1); i++) {
+	for (i = 0 ; i < (RTL8XXXU_MAC_REGS - 1); i++) {
 		rtl8723au_write8(priv, reg[i], backup[i]);
 	}
 	rtl8723au_write32(priv, reg[i], backup[i]);
 }
 
-static void rtlmac_save_regs(struct rtlmac_priv *priv, u32 *regs,
+static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 			     u32 *backup, int count)
 {
 	int i;
@@ -2046,7 +2046,7 @@ static void rtlmac_save_regs(struct rtlmac_priv *priv, u32 *regs,
 		backup[i] = rtl8723au_read32(priv, regs[i]);
 }
 
-static void rtlmac_restore_regs(struct rtlmac_priv *priv, u32 *regs,
+static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 				u32 *backup, int count)
 {
 	int i;
@@ -2056,7 +2056,7 @@ static void rtlmac_restore_regs(struct rtlmac_priv *priv, u32 *regs,
 }
 
 
-static void rtlmac_path_adda_on(struct rtlmac_priv *priv, u32 *regs,
+static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, u32 *regs,
 				bool isPathAOn, bool is2T)
 {
 	u32 pathOn;
@@ -2070,25 +2070,25 @@ static void rtlmac_path_adda_on(struct rtlmac_priv *priv, u32 *regs,
 		rtl8723au_write32(priv, regs[0], pathOn);
 	}
 
-	for (i = 1 ; i < RTLMAC_ADDA_REGS ; i++)
+	for (i = 1 ; i < RTL8XXXU_ADDA_REGS ; i++)
 		rtl8723au_write32(priv, regs[i], pathOn);
 }
 
-static void rtlmac_mac_calibration(struct rtlmac_priv *priv, u32 *regs,
+static void rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs,
 				   u32 *backup)
 {
 	int i = 0;
 
 	rtl8723au_write8(priv, regs[i], 0x3f);
 
-	for (i = 1 ; i < (RTLMAC_MAC_REGS - 1); i++) {
+	for (i = 1 ; i < (RTL8XXXU_MAC_REGS - 1); i++) {
 		rtl8723au_write8(priv, regs[i],
 				 (u8)(backup[i] & ~BIT(3)));
 	}
 	rtl8723au_write8(priv, regs[i], (u8)(backup[i] & ~BIT(5)));
 }
 
-static u8 rtlmac_iqk_path_a(struct rtlmac_priv *priv, bool configPathB)
+static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configPathB)
 {
 	u32 regEAC, regE94, regE9C, regEA4;
 	u8 result = 0;
@@ -2141,12 +2141,12 @@ static u8 rtlmac_iqk_path_a(struct rtlmac_priv *priv, bool configPathB)
 	return result;
 }
 
-static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
+static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 			     int result[][8], u8 t, bool is2T)
 {
 	u32 i, val32;
 	u8 PathAOK/*, PathBOK*/;
-	u32 ADDA_REG[RTLMAC_ADDA_REGS] = {
+	u32 ADDA_REG[RTL8XXXU_ADDA_REGS] = {
 		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
 		REG_RX_WAIT_CCA, REG_TX_CCK_RFON,
 		REG_TX_CCK_BBON, REG_TX_OFDM_RFON,
@@ -2157,12 +2157,12 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 		REG_SLEEP, REG_PMPD_ANAEN
 	};
 
-	u32 IQK_MAC_REG[RTLMAC_MAC_REGS] = {
+	u32 IQK_MAC_REG[RTL8XXXU_MAC_REGS] = {
 		REG_TXPAUSE, REG_BEACON_CTRL,
 		REG_BEACON_CTRL_1, REG_GPIO_MUXCFG
 	};
 
-	u32 IQK_BB_REG_92C[RTLMAC_BB_REGS] = {
+	u32 IQK_BB_REG_92C[RTL8XXXU_BB_REGS] = {
 		REG_OFDM0_TRX_PATH_ENABLE, REG_OFDM0_TR_MUX_PAR,
 		REG_FPGA0_XCD_RF_SW_CTRL, REG_CONFIG_ANT_A, REG_CONFIG_ANT_B,
 		REG_FPGA0_XAB_RF_SW_CTRL, REG_FPGA0_XA_RF_INT_OE,
@@ -2176,14 +2176,14 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 
 	if (t == 0) {
 		/*  Save ADDA parameters, turn Path A ADDA on */
-		rtlmac_save_regs(priv, ADDA_REG, priv->adda_backup,
-				 RTLMAC_ADDA_REGS);
-		rtlmac_save_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
-		rtlmac_save_regs(priv, IQK_BB_REG_92C,
-				 priv->bb_backup, RTLMAC_BB_REGS);
+		rtl8xxxu_save_regs(priv, ADDA_REG, priv->adda_backup,
+				 RTL8XXXU_ADDA_REGS);
+		rtl8xxxu_save_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
+		rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
+				 priv->bb_backup, RTL8XXXU_BB_REGS);
 	}
 
-	rtlmac_path_adda_on(priv, ADDA_REG, true, is2T);
+	rtl8xxxu_path_adda_on(priv, ADDA_REG, true, is2T);
 
 	if (t == 0) {
 		val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
@@ -2224,7 +2224,7 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 	}
 
 	/* MAC settings */
-	rtlmac_mac_calibration(priv, IQK_MAC_REG, priv->mac_backup);
+	rtl8xxxu_mac_calibration(priv, IQK_MAC_REG, priv->mac_backup);
 
 	/* Page B init */
 	rtl8723au_write32(priv, REG_CONFIG_ANT_A, 0x00080000);
@@ -2238,7 +2238,7 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
 
 	for (i = 0 ; i < retryCount ; i++) {
-		PathAOK = rtlmac_iqk_path_a(priv, is2T);
+		PathAOK = rtl8xxxu_iqk_path_a(priv, is2T);
 		if (PathAOK == 0x03) {
 			printk(KERN_DEBUG "Path A IQK Success!!\n");
 			val32 = rtl8723au_read32(priv,
@@ -2323,15 +2323,15 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 		}
 
 		/*  Reload ADDA power saving parameters */
-		rtlmac_restore_regs(priv, ADDA_REG, priv->adda_backup,
-				    RTLMAC_ADDA_REGS);
+		rtl8xxxu_restore_regs(priv, ADDA_REG, priv->adda_backup,
+				    RTL8XXXU_ADDA_REGS);
 
 		/*  Reload MAC parameters */
-		rtlmac_restore_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
+		rtl8xxxu_restore_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
 
 		/*  Reload BB parameters */
-		rtlmac_restore_regs(priv, IQK_BB_REG_92C,
-				    priv->bb_backup, RTLMAC_BB_REGS);
+		rtl8xxxu_restore_regs(priv, IQK_BB_REG_92C,
+				    priv->bb_backup, RTL8XXXU_BB_REGS);
 
 		/*  Restore RX initial gain */
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
@@ -2347,7 +2347,7 @@ static void _PHY_IQCalibrate(struct rtlmac_priv *priv,
 	}
 }
 
-static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
+static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 {
 	int result[4][8];	/* last is final result */
 	u8 i, final_candidate;
@@ -2355,7 +2355,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 	s32 RegE94, RegE9C, RegEA4, RegEAC, RegEB4, RegEBC, RegEC4;
 	s32 RegECC, RegTmp = 0;
 	bool is12simular, is13simular, is23simular;
-	u32 IQK_BB_REG_92C[RTLMAC_BB_REGS] = {
+	u32 IQK_BB_REG_92C[RTL8XXXU_BB_REGS] = {
 		REG_OFDM0_XA_RX_IQ_IMBALANCE, REG_OFDM0_XB_RX_IQ_IMBALANCE,
 		REG_OFDM0_ENERGY_CCA_THRES, REG_OFDM0_AGCR_SSI_TABLE,
 		REG_OFDM0_XA_TX_IQ_IMBALANCE, REG_OFDM0_XB_TX_IQ_IMBALANCE,
@@ -2364,8 +2364,8 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 	};
 
 	if (recovery) {
-		rtlmac_restore_regs(priv, IQK_BB_REG_92C,
-				    priv->bb_recovery_backup, RTLMAC_BB_REGS);
+		rtl8xxxu_restore_regs(priv, IQK_BB_REG_92C,
+				    priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
 		return;
 	}
 
@@ -2387,7 +2387,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 
 		if (i == 1) {
 			is12simular =
-				rtlmac_simularity_compare(priv, result, 0, 1);
+				rtl8xxxu_simularity_compare(priv, result, 0, 1);
 			if (is12simular) {
 				final_candidate = 0;
 				break;
@@ -2396,14 +2396,14 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 
 		if (i == 2) {
 			is13simular =
-				rtlmac_simularity_compare(priv, result, 0, 2);
+				rtl8xxxu_simularity_compare(priv, result, 0, 2);
 			if (is13simular) {
 				final_candidate = 0;
 				break;
 			}
 
 			is23simular =
-				rtlmac_simularity_compare(priv, result, 1, 2);
+				rtl8xxxu_simularity_compare(priv, result, 1, 2);
 			if (is23simular) {
 				final_candidate = 1;
 			} else {
@@ -2458,14 +2458,14 @@ static void rtl8723a_phy_iq_calibrate(struct rtlmac_priv *priv, bool recovery)
 	}
 
 	if (RegE94 && final_candidate != 0xff)
-		rtlmac_fill_iqk_matrix_a(priv, bPathAOK, result,
+		rtl8xxxu_fill_iqk_matrix_a(priv, bPathAOK, result,
 					 final_candidate, (RegEA4 == 0));
 
-	rtlmac_save_regs(priv, IQK_BB_REG_92C,
-			 priv->bb_recovery_backup, RTLMAC_BB_REGS);
+	rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
+			 priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
 }
 
-static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
+static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 {
 	u32 val32;
 	u32 rf_amode, lstf;
@@ -2526,7 +2526,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtlmac_priv *priv)
 		rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 }
 
-static int rtlmac_set_mac(struct rtlmac_priv *priv)
+static int rtl8xxxu_set_mac(struct rtl8xxxu_priv *priv)
 {
 	int i;
 	u16 reg;
@@ -2539,7 +2539,7 @@ static int rtlmac_set_mac(struct rtlmac_priv *priv)
 	return 0;
 }
 
-static int rtlmac_set_bssid(struct rtlmac_priv *priv, const u8 *bssid)
+static int rtl8xxxu_set_bssid(struct rtl8xxxu_priv *priv, const u8 *bssid)
 {
 	int i;
 	u16 reg;
@@ -2555,7 +2555,7 @@ static int rtlmac_set_bssid(struct rtlmac_priv *priv, const u8 *bssid)
 	return 0;
 }
 
-void rtlmac_set_ampdu_factor(struct rtlmac_priv *priv, u8 ampdu_factor)
+void rtl8xxxu_set_ampdu_factor(struct rtl8xxxu_priv *priv, u8 ampdu_factor)
 {
 	u8 vals[4] = { 0x41, 0xa8, 0x72, 0xb9 };
 	u8 max_agg = 0xf;
@@ -2576,7 +2576,7 @@ void rtlmac_set_ampdu_factor(struct rtlmac_priv *priv, u8 ampdu_factor)
 	}
 }
 
-void rtlmac_set_ampdu_min_space(struct rtlmac_priv *priv, u8 density)
+void rtl8xxxu_set_ampdu_min_space(struct rtl8xxxu_priv *priv, u8 density)
 {
 	u8 val8;
 
@@ -2586,7 +2586,7 @@ void rtlmac_set_ampdu_min_space(struct rtlmac_priv *priv, u8 density)
 	rtl8723au_write8(priv, REG_AMPDU_MIN_SPACE, val8);
 }
 
-static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
+static int rtl8xxxu_active_to_emu(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	int count, ret;
@@ -2606,14 +2606,14 @@ static int rtlmac_active_to_emu(struct rtlmac_priv *priv)
 	val8 |= BIT(1);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
-	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
+	for (count = 0 ; count < RTL8XXXU_MAX_REG_POLL; count ++) {
 		val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 		if ((val8 & BIT(1)) == 0)
 			break;
 		udelay(10);
 	}
 
-	if (count == RTLMAC_MAX_REG_POLL) {
+	if (count == RTL8XXXU_MAX_REG_POLL) {
 		printk(KERN_WARNING "%s: Turn off MAC timed out\n", __func__);
 		ret = -EBUSY;
 		goto exit;
@@ -2633,7 +2633,7 @@ exit:
 	return ret;
 }
 
-static int rtlmac_active_to_lps(struct rtlmac_priv *priv)
+static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u8 val32;
@@ -2644,14 +2644,14 @@ static int rtlmac_active_to_lps(struct rtlmac_priv *priv)
 	/*
 	 * Poll - wait for RX packet to complete
 	 */
-	for (count = 0 ; count < RTLMAC_MAX_REG_POLL; count ++) {
+	for (count = 0 ; count < RTL8XXXU_MAX_REG_POLL; count ++) {
 		val32 = rtl8723au_read8(priv, 0x5f8);
 		if (!val32)
 			break;
 		udelay(10);
 	}
 
-	if (count == RTLMAC_MAX_REG_POLL) {
+	if (count == RTL8XXXU_MAX_REG_POLL) {
 		printk(KERN_WARNING "%s: Turn RX poll timed out\n", __func__);
 		ret = -EBUSY;
 		goto exit;
@@ -2688,7 +2688,7 @@ exit:
 	return ret;
 }
 
-static int rtlmac_disabled_to_emu(struct rtlmac_priv *priv)
+static int rtl8xxxu_disabled_to_emu(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	int ret = 0;
@@ -2711,7 +2711,7 @@ static int rtlmac_disabled_to_emu(struct rtlmac_priv *priv)
 	return ret;
 }
 
-static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
+static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u32 val32;
@@ -2740,7 +2740,7 @@ static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
 	/* wait till 0x04[17] = 1 power ready*/
-	for (count = 0; count < RTLMAC_MAX_REG_POLL; count ++) {
+	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count ++) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
 		if (val32 & BIT(17)) {
 			break;
@@ -2748,7 +2748,7 @@ static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
 		udelay(10);
 	}
 
-	if (count == RTLMAC_MAX_REG_POLL) {
+	if (count == RTL8XXXU_MAX_REG_POLL) {
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2775,7 +2775,7 @@ static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
 	val8 |= BIT(0);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
-	for (count = 0; count < RTLMAC_MAX_REG_POLL; count ++) {
+	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count ++) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
 		if ((val32 & BIT(8)) == 0) {
 			ret = 0;
@@ -2784,7 +2784,7 @@ static int rtlmac_emu_to_active(struct rtlmac_priv *priv)
 		udelay(10);
 	}
 
-	if (count == RTLMAC_MAX_REG_POLL) {
+	if (count == RTL8XXXU_MAX_REG_POLL) {
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2803,7 +2803,7 @@ exit:
 	return ret;
 }
 
-static int rtlmac_emu_to_disabled(struct rtlmac_priv *priv)
+static int rtl8xxxu_emu_to_disabled(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 
@@ -2828,7 +2828,7 @@ static int rtlmac_emu_to_disabled(struct rtlmac_priv *priv)
 	return 0;
 }
 
-static int rtlmac_power_on(struct rtlmac_priv *priv)
+static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u16 val16;
@@ -2839,11 +2839,11 @@ static int rtlmac_power_on(struct rtlmac_priv *priv)
 	    unlock ISO/CLK/Power control register */
 	rtl8723au_write8(priv, REG_RSV_CTRL, 0x0);
 
-	ret = rtlmac_disabled_to_emu(priv);
+	ret = rtl8xxxu_disabled_to_emu(priv);
 	if (ret)
 		goto exit;
 
-	ret = rtlmac_emu_to_active(priv);
+	ret = rtl8xxxu_emu_to_active(priv);
 	if (ret)
 		goto exit;
 
@@ -2871,20 +2871,20 @@ exit:
 	return ret;
 }
 
-static int rtlmac_power_off(struct rtlmac_priv *priv)
+static int rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 {
 	int ret = 0;
 	u8 val8;
 	u16 val16;
 
-	rtlmac_active_to_lps(priv);
+	rtl8xxxu_active_to_lps(priv);
 
 	/* Turn off RF */
 	rtl8723au_write8(priv, REG_RF_CTRL, 0x00);
 
 	/* Reset Firmware if running in RAM */
 	if (rtl8723au_read8(priv, REG_MCU_FW_DL) & MCU_FW_RAM_SEL)
-		rtlmac_firmware_self_reset(priv);
+		rtl8xxxu_firmware_self_reset(priv);
 
 	/* Reset MCU */
 	val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
@@ -2894,8 +2894,8 @@ static int rtlmac_power_off(struct rtlmac_priv *priv)
 	/* Reset MCU ready status */
 	rtl8723au_write8(priv, REG_MCU_FW_DL, 0x00);
 
-	rtlmac_active_to_emu(priv);	
-	rtlmac_emu_to_disabled(priv);
+	rtl8xxxu_active_to_emu(priv);	
+	rtl8xxxu_emu_to_disabled(priv);
 
 	/* Reset MCU IO Wrapper */
 	val8 = rtl8723au_read8(priv, REG_RSV_CTRL + 1);
@@ -2911,9 +2911,9 @@ static int rtlmac_power_off(struct rtlmac_priv *priv)
 	return ret;
 }
 
-static int rtlmac_init_device(struct ieee80211_hw *hw)
+static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	bool macpower;
 	int ret = 0;
 	u8 val8;
@@ -2930,7 +2930,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	else
 		macpower = true;
 
-	ret = rtlmac_power_on(priv);
+	ret = rtl8xxxu_power_on(priv);
 	if (ret < 0) {
 		printk(KERN_WARNING "%s: Failed power on\n", __func__);
 		goto exit;
@@ -2938,7 +2938,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 	printk(KERN_DEBUG "macpower %i\n", macpower);
 	if (!macpower) {
-		ret = rtlmac_init_llt_table(priv, TX_TOTAL_PAGE_NUM);
+		ret = rtl8xxxu_init_llt_table(priv, TX_TOTAL_PAGE_NUM);
 		if (ret) {
 			printk(KERN_DEBUG "%s: LLT table init failed\n",
 			       __func__);
@@ -2946,22 +2946,22 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		}
 	}
 
-	ret = rtlmac_download_firmware(priv);
+	ret = rtl8xxxu_download_firmware(priv);
 	if (ret)
 		goto exit;
-	ret = rtlmac_start_firmware(priv);
-	if (ret)
-		goto exit;
-
-	ret = rtlmac_init_mac(priv, rtl8723a_mac_init_table);
+	ret = rtl8xxxu_start_firmware(priv);
 	if (ret)
 		goto exit;
 
-	ret = rtlmac_init_phy_bb(priv);
+	ret = rtl8xxxu_init_mac(priv, rtl8723a_mac_init_table);
 	if (ret)
 		goto exit;
 
-	ret = rtlmac_init_phy_rf(priv);
+	ret = rtl8xxxu_init_phy_bb(priv);
+	if (ret)
+		goto exit;
+
+	ret = rtl8xxxu_init_phy_rf(priv);
 	if (ret)
 		goto exit;
 
@@ -3010,7 +3010,7 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 		rtl8723au_write8(priv, REG_TDECTRL + 1, val8);
 	}
 
-	ret = rtlmac_init_queue_priority(priv);
+	ret = rtl8xxxu_init_queue_priority(priv);
 	if (ret)
 		goto exit;
 
@@ -3036,8 +3036,8 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_HISR, 0xffffffff);
 	rtl8723au_write32(priv, REG_HIMR, 0xffffffff);
 
-	rtlmac_set_mac(priv);
-	rtlmac_set_linktype(priv, NL80211_IFTYPE_STATION);
+	rtl8xxxu_set_mac(priv);
+	rtl8xxxu_set_linktype(priv, NL80211_IFTYPE_STATION);
 
 	/*
 	 * Configure initial WMAC settings
@@ -3064,12 +3064,12 @@ static int rtlmac_init_device(struct ieee80211_hw *hw)
 
 	/* CCK = 0x0a, OFDM = 0x10 */
 #if 0
-	rtlmac_set_spec_sifs(priv, 0x0a, 0x10);
+	rtl8xxxu_set_spec_sifs(priv, 0x0a, 0x10);
 #else
-	rtlmac_set_spec_sifs(priv, 0x10, 0x10);
+	rtl8xxxu_set_spec_sifs(priv, 0x10, 0x10);
 #endif
-	rtlmac_set_retry(priv, 0x30, 0x30);
-	rtlmac_set_spec_sifs(priv, 0x0a, 0x10);
+	rtl8xxxu_set_retry(priv, 0x30, 0x30);
+	rtl8xxxu_set_spec_sifs(priv, 0x0a, 0x10);
 
 	/*
 	 * Init EDCA
@@ -3240,22 +3240,22 @@ exit:
 	return ret;
 }
 
-static void rtlmac_disable_device(struct ieee80211_hw *hw)
+static void rtl8xxxu_disable_device(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 
-	rtlmac_power_off(priv);
+	rtl8xxxu_power_off(priv);
 }
 
-static void rtlmac_cam_write(struct rtlmac_priv *priv,
+static void rtl8xxxu_cam_write(struct rtl8xxxu_priv *priv,
 			     struct ieee80211_key_conf *key, const u8 *mac)
 {
 	u32 cmd, val32, addr, ctrl;
 	int j, i, tmp_debug;
 
-	tmp_debug = rtlmac_debug;
-	if (rtlmac_debug & RTLMAC_DEBUG_KEY)
-		rtlmac_debug |= RTLMAC_DEBUG_REG_WRITE;
+	tmp_debug = rtl8xxxu_debug;
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_KEY)
+		rtl8xxxu_debug |= RTL8XXXU_DEBUG_REG_WRITE;
 
 	addr = key->keyidx << CAM_CMD_KEY_SHIFT;
 	ctrl = (key->cipher & 0x0f) << 2 | key->keyidx | CAM_WRITE_VALID;
@@ -3282,14 +3282,14 @@ static void rtlmac_cam_write(struct rtlmac_priv *priv,
 		udelay(100);
 	}
 
-	rtlmac_debug = tmp_debug;
+	rtl8xxxu_debug = tmp_debug;
 }
 
-static void rtlmac_sw_scan_start(struct ieee80211_hw *hw,
+static void rtl8xxxu_sw_scan_start(struct ieee80211_hw *hw,
 				 struct ieee80211_vif *vif, const u8 *mac)
 {
 #if 0
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	u32 val32;
 
 	val32 = rtl8723au_read32(priv, REG_RCR);
@@ -3303,10 +3303,10 @@ static void rtlmac_sw_scan_start(struct ieee80211_hw *hw,
 #endif
 }
 
-static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw,
+static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	u8 val8;
 
 #if 0
@@ -3318,7 +3318,7 @@ static void rtlmac_sw_scan_complete(struct ieee80211_hw *hw,
 	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
 }
 
-static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
+static void rtl8xxxu_update_rate_table(struct rtl8xxxu_priv *priv,
 				     struct ieee80211_sta *sta)
 {
 	struct h2c_cmd h2c;
@@ -3347,7 +3347,7 @@ static void rtlmac_update_rate_table(struct rtlmac_priv *priv,
 	rtl8723a_h2c_cmd(priv, &h2c);
 }
 
-static void rtlmac_set_basic_rates(struct rtlmac_priv *priv,
+static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv,
 				   struct ieee80211_sta *sta)
 {
 	u32 rate_cfg, val32;
@@ -3372,10 +3372,10 @@ static void rtlmac_set_basic_rates(struct rtlmac_priv *priv,
 }
 
 static void
-rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			struct ieee80211_bss_conf *bss_conf, u32 changed)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	struct ieee80211_sta *sta;
 	u32 val32;
 #if 0
@@ -3387,7 +3387,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		struct h2c_cmd h2c;
 
 		memset(&h2c, 0, sizeof(struct h2c_cmd));
-		rtlmac_set_linktype(priv, vif->type);
+		rtl8xxxu_set_linktype(priv, vif->type);
 
 		if (bss_conf->assoc) {
 			rcu_read_lock();
@@ -3405,7 +3405,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			if (sta->vht_cap.vht_supported)
 				printk(KERN_DEBUG "%s: VHT supported\n",
 				       __func__);
-			rtlmac_update_rate_table(priv, sta);
+			rtl8xxxu_update_rate_table(priv, sta);
 			rcu_read_unlock();
 
 			val32 = rtl8723au_read32(priv, REG_RCR);
@@ -3531,8 +3531,8 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 #if 0
 		printk(KERN_DEBUG "Changed HT! ampdu_factor %02x, "
 		       "ampdu_density %02x\n", ampdu_factor, ampdu_density);
-		rtlmac_set_ampdu_factor(priv, ampdu_factor);
-		rtlmac_set_ampdu_min_space(priv, ampdu_density);
+		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
+		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
 #endif
 	
 		rtl8723au_write8(priv, REG_SIFS_CCK + 1, sifs);
@@ -3545,7 +3545,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	if (changed & BSS_CHANGED_BSSID) {
 		printk(KERN_DEBUG "Changed BSSID!\n");
-		rtlmac_set_bssid(priv, bss_conf->bssid);
+		rtl8xxxu_set_bssid(priv, bss_conf->bssid);
 
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
@@ -3562,7 +3562,7 @@ rtlmac_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (sta)
-			rtlmac_set_basic_rates(priv, sta);
+			rtl8xxxu_set_basic_rates(priv, sta);
 		else 
 			printk(KERN_DEBUG "No sta found!\n");
 
@@ -3572,7 +3572,7 @@ error:
 	return;
 }
 
-static u32 rtlmac_80211_to_rtl_queue(u32 queue)
+static u32 rtl8xxxu_80211_to_rtl_queue(u32 queue)
 {
 	u32 rtlqueue;
 
@@ -3596,7 +3596,7 @@ static u32 rtlmac_80211_to_rtl_queue(u32 queue)
 	return rtlqueue;
 }
 
-static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
+static u32 rtl8xxxu_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	u32 queue;
@@ -3607,12 +3607,12 @@ static u32 rtlmac_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 	if (ieee80211_is_mgmt(hdr->frame_control))
 		queue = TXDESC_QUEUE_MGNT;
 	else
-		queue = rtlmac_80211_to_rtl_queue(skb_get_queue_mapping(skb));
+		queue = rtl8xxxu_80211_to_rtl_queue(skb_get_queue_mapping(skb));
 
 	return queue;
 }
 
-static void rtlmac_calc_tx_desc_csum(struct rtlmac_tx_desc *tx_desc)
+static void rtl8xxxu_calc_tx_desc_csum(struct rtl8xxxu_tx_desc *tx_desc)
 {
 	u16 *ptr = (u16 *)tx_desc;
 	u16 csum = 0;
@@ -3620,13 +3620,13 @@ static void rtlmac_calc_tx_desc_csum(struct rtlmac_tx_desc *tx_desc)
 
 	tx_desc->csum = cpu_to_le32(0);
 
-	for (i = 0 ; i < (sizeof(struct rtlmac_tx_desc) / sizeof(u16)); i++)
+	for (i = 0 ; i < (sizeof(struct rtl8xxxu_tx_desc) / sizeof(u16)); i++)
 		csum = csum ^ le16_to_cpu(ptr[i]);
 
 	tx_desc->csum |= cpu_to_le32(csum);
 }
 
-static void rtlmac_tx_complete(struct urb *urb)
+static void rtl8xxxu_tx_complete(struct urb *urb)
 {
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
 	struct ieee80211_tx_info *tx_info;
@@ -3635,7 +3635,7 @@ static void rtlmac_tx_complete(struct urb *urb)
 	tx_info = IEEE80211_SKB_CB(skb);
 	hw = tx_info->rate_driver_data[0];
 
-	skb_pull(skb, sizeof(struct rtlmac_tx_desc));
+	skb_pull(skb, sizeof(struct rtl8xxxu_tx_desc));
 
 	ieee80211_tx_info_clear_status(tx_info);
 	tx_info->status.rates[0].idx = -1;
@@ -3650,14 +3650,14 @@ static void rtlmac_tx_complete(struct urb *urb)
 
 static int tx_count = 5;
 
-static void rtlmac_tx(struct ieee80211_hw *hw,
+static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control, struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
-	struct rtlmac_priv *priv = hw->priv;
-	struct rtlmac_tx_desc *tx_desc;
+	struct rtl8xxxu_priv *priv = hw->priv;
+	struct rtl8xxxu_tx_desc *tx_desc;
 	struct urb *urb;
 	u32 queue, rate;
 	u16 pktlen = skb->len;
@@ -3665,13 +3665,13 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	u16 rate_flag = tx_info->control.rates[0].flags;
 	int ret, i;
 
-	if (skb_headroom(skb) < sizeof(struct rtlmac_tx_desc)) {
+	if (skb_headroom(skb) < sizeof(struct rtl8xxxu_tx_desc)) {
 		printk(KERN_DEBUG "%s: Not enough skb headroom space (%i) for "
 		       "tx descriptor\n", __func__, skb_headroom(skb));
 		goto error;
 	}
 
-	if (unlikely(skb->len > (65535 - sizeof(struct rtlmac_tx_desc)))) {
+	if (unlikely(skb->len > (65535 - sizeof(struct rtl8xxxu_tx_desc)))) {
 		printk(KERN_DEBUG "%s: Trying to send over sized skb (%i)\n",
 		       __func__, skb->len);
 		goto error;
@@ -3694,25 +3694,25 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 		printk(KERN_DEBUG "%s: data qos frame\n", __func__);
 #endif
 
-	if (rtlmac_debug & RTLMAC_DEBUG_TX)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_TX)
 		printk(KERN_DEBUG "%s: TX rate: %d (%d), pkt size %d\n",
 		       __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
 
 	tx_info->rate_driver_data[0] = hw;
 
-	tx_desc = (struct rtlmac_tx_desc *)
-		skb_push(skb, sizeof(struct rtlmac_tx_desc));
+	tx_desc = (struct rtl8xxxu_tx_desc *)
+		skb_push(skb, sizeof(struct rtl8xxxu_tx_desc));
 
-	memset(tx_desc, 0, sizeof(struct rtlmac_tx_desc));
+	memset(tx_desc, 0, sizeof(struct rtl8xxxu_tx_desc));
 	tx_desc->pkt_size = cpu_to_le16(pktlen);
-	tx_desc->pkt_offset = sizeof(struct rtlmac_tx_desc);
+	tx_desc->pkt_offset = sizeof(struct rtl8xxxu_tx_desc);
 
 	tx_desc->txdw0 = TXDESC_OWN | TXDESC_FSG | TXDESC_LSG;
 	if (is_multicast_ether_addr(ieee80211_get_DA(hdr)) ||
 	    is_broadcast_ether_addr(ieee80211_get_DA(hdr)))
 		tx_desc->txdw0 |= TXDESC_BROADMULTICAST;
 
-	queue = rtlmac_queue_select(hw, skb);
+	queue = rtl8xxxu_queue_select(hw, skb);
 	tx_desc->txdw1 = cpu_to_le32(queue << TXDESC_QUEUE_SHIFT);
 
 	if (tx_info->control.hw_key) {
@@ -3778,12 +3778,12 @@ static void rtlmac_tx(struct ieee80211_hw *hw,
 	
 	}
 
-	rtlmac_calc_tx_desc_csum(tx_desc);
+	rtl8xxxu_calc_tx_desc_csum(tx_desc);
 
 	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
-			  skb->len, rtlmac_tx_complete, skb);
+			  skb->len, rtl8xxxu_tx_complete, skb);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_TX_DUMP && tx_count) {
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_TX_DUMP && tx_count) {
 		for (i = 0; i < min_t(int, 128, skb->len); i++) {
 			printk("%02x ", skb->data[i]);
 			if ((i & 0xf) == 0xf)
@@ -3805,14 +3805,14 @@ error:
 
 static int rx_count = 10;
 
-static void rtlmac_rx_complete(struct urb *urb)
+static void rtl8xxxu_rx_complete(struct urb *urb)
 {
-	struct rtlmac_rx_urb *rx_urb = container_of(urb,
-						    struct rtlmac_rx_urb, urb);
+	struct rtl8xxxu_rx_urb *rx_urb = container_of(urb,
+						    struct rtl8xxxu_rx_urb, urb);
 	struct ieee80211_hw *hw = rx_urb->hw;
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
-	struct rtlmac_rx_desc *rx_desc = (struct rtlmac_rx_desc *)skb->data;
+	struct rtl8xxxu_rx_desc *rx_desc = (struct rtl8xxxu_rx_desc *)skb->data;
 	struct rtl8723au_phy_stats *phy_stats;
 	struct ieee80211_rx_status *rx_status = IEEE80211_SKB_RXCB(skb);
 	struct ieee80211_mgmt *mgmt;
@@ -3820,7 +3820,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 	u32 *_rx_desc = (u32 *)skb->data;
 	int cnt, len, skb_size, drvinfo_sz, desc_shift, i, ret;
 
-	for (i = 0; i < (sizeof(struct rtlmac_rx_desc) / sizeof(u32)); i++)
+	for (i = 0; i < (sizeof(struct rtl8xxxu_rx_desc) / sizeof(u32)); i++)
 		_rx_desc[i] = le32_to_cpu(_rx_desc_le[i]);
 
 	cnt = rx_desc->frag;
@@ -3829,14 +3829,14 @@ static void rtlmac_rx_complete(struct urb *urb)
 	desc_shift = rx_desc->shift;
 	skb_put(skb, urb->actual_length);
 
-	if (rtlmac_debug & RTLMAC_DEBUG_RX && rx_count)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RX && rx_count)
 		printk(KERN_DEBUG "%s: Completing skb %p (status %i), urb "
 		       "size %i cnt %i size %i, drvinfo_sz %i, desc_shift %i\n",
 		       __func__, skb, urb->status, skb->len, cnt, len,
 		       drvinfo_sz, desc_shift);
 
 	if (urb->status == 0) {
-		skb_pull(skb, sizeof(struct rtlmac_rx_desc));
+		skb_pull(skb, sizeof(struct rtl8xxxu_rx_desc));
 		phy_stats = (struct rtl8723au_phy_stats *)skb->data;
 
 		skb_pull(skb, drvinfo_sz + desc_shift);
@@ -3859,7 +3859,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 		}
 #endif
 
-		if (rtlmac_debug & RTLMAC_DEBUG_RX_DUMP && rx_count) {
+		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RX_DUMP && rx_count) {
 			for (i = 0; i < min_t(int, 128, skb->len); i++) {
 				printk("%02x ", skb->data[i]);
 				if ((i & 0xf) == 0xf)
@@ -3910,7 +3910,7 @@ static void rtlmac_rx_complete(struct urb *urb)
 		}
 
 		ieee80211_rx_irqsafe(hw, skb);
-		skb_size = sizeof(struct rtlmac_rx_desc) +
+		skb_size = sizeof(struct rtl8xxxu_rx_desc) +
 			RTL_RX_BUFFER_SIZE;
 		skb = dev_alloc_skb(skb_size);
 		if (!skb) {
@@ -3918,9 +3918,9 @@ static void rtlmac_rx_complete(struct urb *urb)
 			goto cleanup;
 		}
 
-		memset(skb->data, 0, sizeof(struct rtlmac_rx_desc));
+		memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
 		usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in,
-				  skb->data, skb_size, rtlmac_rx_complete, skb);
+				  skb->data, skb_size, rtl8xxxu_rx_complete, skb);
 
 		usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
 		ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
@@ -3940,22 +3940,22 @@ cleanup:
 	return;
 }
 
-static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
+static int rtl8xxxu_submit_rx_urb(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	struct sk_buff *skb;
-	struct rtlmac_rx_urb *rx_urb;
+	struct rtl8xxxu_rx_urb *rx_urb;
 	int skb_size;
 	int ret;
 
-	skb_size = sizeof(struct rtlmac_rx_desc) + RTL_RX_BUFFER_SIZE;
+	skb_size = sizeof(struct rtl8xxxu_rx_desc) + RTL_RX_BUFFER_SIZE;
 	skb = dev_alloc_skb(skb_size);
 	if (!skb)
 		return -ENOMEM;
 
-	memset(skb->data, 0, sizeof(struct rtlmac_rx_desc));
+	memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
 
-	rx_urb = kmalloc(sizeof(struct rtlmac_rx_urb), GFP_ATOMIC);
+	rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_ATOMIC);
 	if (!rx_urb) {
 		dev_kfree_skb(skb);
 		return -ENOMEM;
@@ -3964,7 +3964,7 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	rx_urb->hw = hw;
 
 	usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in, skb->data,
-			  skb_size, rtlmac_rx_complete, skb);
+			  skb_size, rtl8xxxu_rx_complete, skb);
 	usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
 	ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
 	if (ret)
@@ -3972,9 +3972,9 @@ static int rtlmac_submit_rx_urb(struct ieee80211_hw *hw)
 	return ret;
 }
 
-static void rtlmac_int_complete(struct urb *urb)
+static void rtl8xxxu_int_complete(struct urb *urb)
 {
-	struct rtlmac_priv *priv = (struct rtlmac_priv *)urb->context;
+	struct rtl8xxxu_priv *priv = (struct rtl8xxxu_priv *)urb->context;
 	int i, ret;
 
 	printk(KERN_DEBUG "%s: status %i\n", __func__, urb->status);
@@ -3995,9 +3995,9 @@ static void rtlmac_int_complete(struct urb *urb)
 }
 
 
-static int rtlmac_submit_int_urb(struct ieee80211_hw *hw)
+static int rtl8xxxu_submit_int_urb(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	struct urb *urb;
 	u32 val32;
 	int ret;
@@ -4007,7 +4007,7 @@ static int rtlmac_submit_int_urb(struct ieee80211_hw *hw)
 		return -ENOMEM;
 
 	usb_fill_int_urb(urb, priv->udev, priv->pipe_interrupt, priv->int_buf,
-			 USB_INTR_CONTENT_LENGTH, rtlmac_int_complete, priv, 1);
+			 USB_INTR_CONTENT_LENGTH, rtl8xxxu_int_complete, priv, 1);
 	usb_anchor_urb(urb, &priv->int_anchor);
 	ret = usb_submit_urb(urb, GFP_KERNEL);
 	if (ret) {
@@ -4023,10 +4023,10 @@ error:
 	return ret;
 }
 
-static int rtlmac_add_interface(struct ieee80211_hw *hw,
+static int rtl8xxxu_add_interface(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	int ret;
 	u8 val8;
 
@@ -4044,25 +4044,25 @@ static int rtlmac_add_interface(struct ieee80211_hw *hw,
 		ret = -EOPNOTSUPP;
 	}
 
-	rtlmac_set_linktype(priv, vif->type);
+	rtl8xxxu_set_linktype(priv, vif->type);
 
 	return ret;
 }
 
-static void rtlmac_remove_interface(struct ieee80211_hw *hw,
+static void rtl8xxxu_remove_interface(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif)
 {
 	printk(KERN_DEBUG "%s\n", __func__);
 }
 
-static int rtlmac_config(struct ieee80211_hw *hw, u32 changed)
+static int rtl8xxxu_config(struct ieee80211_hw *hw, u32 changed)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	u16 val16;
 	int ret = 0, channel;
 	bool ht40;
 
-	if (rtlmac_debug & RTLMAC_DEBUG_CHANNEL)
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_CHANNEL)
 		printk(KERN_DEBUG "%s: channel: %i (changed %08x chandef.width "
 		       "%02x)\n", __func__, hw->conf.chandef.chan->hw_value,
 		       changed, hw->conf.chandef.width);
@@ -4100,11 +4100,11 @@ exit:
 	return ret;
 }
 
-static int rtlmac_conf_tx(struct ieee80211_hw *hw,
+static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
 			  struct ieee80211_vif *vif, u16 queue,
 			  const struct ieee80211_tx_queue_params *param)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	u32 val32;
 	u16 cw_min, cw_max, txop;
 	u8 aifs, acm_ctrl, acm_bit;
@@ -4155,7 +4155,7 @@ static int rtlmac_conf_tx(struct ieee80211_hw *hw,
 	return 0;
 }
 
-static void rtlmac_configure_filter(struct ieee80211_hw *hw,
+static void rtl8xxxu_configure_filter(struct ieee80211_hw *hw,
 				    unsigned int changed_flags,
 				    unsigned int *total_flags, u64 multicast)
 {
@@ -4165,7 +4165,7 @@ static void rtlmac_configure_filter(struct ieee80211_hw *hw,
 	*total_flags &= (FIF_ALLMULTI | FIF_CONTROL | FIF_BCN_PRBRESP_PROMISC);
 }
 
-static int rtlmac_set_rts_threshold(struct ieee80211_hw *hw, u32 rts)
+static int rtl8xxxu_set_rts_threshold(struct ieee80211_hw *hw, u32 rts)
 {
 	if (rts > 2347)
 		return -EINVAL;
@@ -4173,11 +4173,11 @@ static int rtlmac_set_rts_threshold(struct ieee80211_hw *hw, u32 rts)
 	return 0;
 }
 
-static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 			  struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 			  struct ieee80211_key_conf *key)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	u8 mac_addr[ETH_ALEN];
 	u8 val8;
 	u16 val16;
@@ -4233,7 +4233,7 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		 */
 		key->hw_key_idx = key->keyidx;
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
-		rtlmac_cam_write(priv, key, mac_addr);
+		rtl8xxxu_cam_write(priv, key, mac_addr);
 		retval = 0;
 		break;
 	case DISABLE_KEY:
@@ -4251,9 +4251,9 @@ static int rtlmac_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	return retval;
 }
 
-static int rtlmac_start(struct ieee80211_hw *hw)
+static int rtl8xxxu_start(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 	int ret, i;
 
 	ret = 0;
@@ -4263,12 +4263,12 @@ static int rtlmac_start(struct ieee80211_hw *hw)
 	init_usb_anchor(&priv->int_anchor);
 
 	rtl8723a_enable_rf(priv);
-	ret = rtlmac_submit_int_urb(hw);
+	ret = rtl8xxxu_submit_int_urb(hw);
 	if (ret)
 		goto exit;
 
 	for (i = 0; i < 32; i++)
-		ret = rtlmac_submit_rx_urb(hw);
+		ret = rtl8xxxu_submit_rx_urb(hw);
 
 exit:
 	/*
@@ -4285,9 +4285,9 @@ exit:
 	return ret;
 }
 
-static void rtlmac_stop(struct ieee80211_hw *hw)
+static void rtl8xxxu_stop(struct ieee80211_hw *hw)
 {
-	struct rtlmac_priv *priv = hw->priv;
+	struct rtl8xxxu_priv *priv = hw->priv;
 
 	printk(KERN_DEBUG "%s\n", __func__);
 
@@ -4308,23 +4308,23 @@ static void rtlmac_stop(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_USB_HIMR, 0);
 }
 
-static const struct ieee80211_ops rtlmac_ops = {
-	.tx = rtlmac_tx,
-	.add_interface = rtlmac_add_interface,
-	.remove_interface = rtlmac_remove_interface,
-	.config = rtlmac_config,
-	.conf_tx = rtlmac_conf_tx,
-	.bss_info_changed = rtlmac_bss_info_changed,
-	.configure_filter = rtlmac_configure_filter,
-	.set_rts_threshold = rtlmac_set_rts_threshold,
-	.start = rtlmac_start,
-	.stop = rtlmac_stop,
-	.sw_scan_start = rtlmac_sw_scan_start,
-	.sw_scan_complete = rtlmac_sw_scan_complete,
-	.set_key = rtlmac_set_key,
+static const struct ieee80211_ops rtl8xxxu_ops = {
+	.tx = rtl8xxxu_tx,
+	.add_interface = rtl8xxxu_add_interface,
+	.remove_interface = rtl8xxxu_remove_interface,
+	.config = rtl8xxxu_config,
+	.conf_tx = rtl8xxxu_conf_tx,
+	.bss_info_changed = rtl8xxxu_bss_info_changed,
+	.configure_filter = rtl8xxxu_configure_filter,
+	.set_rts_threshold = rtl8xxxu_set_rts_threshold,
+	.start = rtl8xxxu_start,
+	.stop = rtl8xxxu_stop,
+	.sw_scan_start = rtl8xxxu_sw_scan_start,
+	.sw_scan_complete = rtl8xxxu_sw_scan_complete,
+	.set_key = rtl8xxxu_set_key,
 };
 
-static int rtlmac_parse_usb(struct rtlmac_priv *priv,
+static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 			    struct usb_interface *interface)
 {
 	struct usb_interface_descriptor *interface_desc;
@@ -4344,12 +4344,12 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 		dir = endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK;
 		num = usb_endpoint_num(endpoint);
 		xtype = usb_endpoint_type(endpoint);
-		if (rtlmac_debug & RTLMAC_DEBUG_USB)
+		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
 			printk(KERN_DEBUG "%s: endpoint: dir %02x, num %02x, "
 			       "type %02x\n", __func__, dir, num, xtype);
 		if (usb_endpoint_dir_in(endpoint) &&
 		    usb_endpoint_xfer_bulk(endpoint)) {
-			if (rtlmac_debug & RTLMAC_DEBUG_USB)
+			if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
 				printk(KERN_DEBUG "%s: in endpoint num %i\n",
 				       __func__, num);
 
@@ -4365,7 +4365,7 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 
 		if (usb_endpoint_dir_in(endpoint) &&
 		    usb_endpoint_xfer_int(endpoint)) {
-			if (rtlmac_debug & RTLMAC_DEBUG_USB)
+			if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
 				printk(KERN_DEBUG "%s: interrupt endpoint num "
 				       "%i\n", __func__, num);
 
@@ -4381,10 +4381,10 @@ static int rtlmac_parse_usb(struct rtlmac_priv *priv,
 
 		if (usb_endpoint_dir_out(endpoint) &&
 		    usb_endpoint_xfer_bulk(endpoint)) {
-			if (rtlmac_debug & RTLMAC_DEBUG_USB)
+			if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
 				printk(KERN_DEBUG "%s: out endpoint num %i\n",
 				       __func__, num);
-			if (j >= RTLMAC_OUT_ENDPOINTS) {
+			if (j >= RTL8XXXU_OUT_ENDPOINTS) {
 				printk(KERN_WARNING "%s: Unsupported number "
 				       "of OUT pipes\n", __func__);
 				ret = -EINVAL;
@@ -4397,10 +4397,10 @@ exit:
 	return ret;
 }
 
-static int rtlmac_probe(struct usb_interface *interface,
+static int rtl8xxxu_probe(struct usb_interface *interface,
 			const struct usb_device_id *id)
 {
-	struct rtlmac_priv *priv;
+	struct rtl8xxxu_priv *priv;
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	struct ieee80211_supported_band *sband;
@@ -4408,7 +4408,7 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	udev = usb_get_dev(interface_to_usbdev(interface));
 
-	hw = ieee80211_alloc_hw(sizeof(struct rtlmac_priv), &rtlmac_ops);
+	hw = ieee80211_alloc_hw(sizeof(struct rtl8xxxu_priv), &rtl8xxxu_ops);
 	if (!hw) {
 		ret = -ENOMEM;
 		goto exit;
@@ -4422,12 +4422,12 @@ static int rtlmac_probe(struct usb_interface *interface,
 
 	usb_set_intfdata(interface, hw);
 
-	ret = rtlmac_parse_usb(priv, interface);
+	ret = rtl8xxxu_parse_usb(priv, interface);
 	if (ret)
 		goto exit;
 
-	rtlmac_8723au_identify_chip(priv);
-	rtlmac_read_efuse(priv);
+	rtl8xxxu_8723au_identify_chip(priv);
+	rtl8xxxu_read_efuse(priv);
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
 	printk(KERN_INFO "%s: RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -4439,16 +4439,16 @@ static int rtlmac_probe(struct usb_interface *interface,
 	       priv->efuse_wifi.efuse.mac_addr[4],
 	       priv->efuse_wifi.efuse.mac_addr[5]);
 
-	rtlmac_load_firmware(priv);
+	rtl8xxxu_load_firmware(priv);
 
-	ret = rtlmac_init_device(hw);
+	ret = rtl8xxxu_init_device(hw);
 
 	hw->wiphy->max_scan_ssids = 1;
 	hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
 	hw->queues = 4;
 
-	sband = &rtlmac_supported_band;
+	sband = &rtl8xxxu_supported_band;
 	sband->ht_cap.ht_supported = true;
 #if 0
 	sband->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_8K;
@@ -4471,14 +4471,14 @@ static int rtlmac_probe(struct usb_interface *interface,
 	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = sband;
 
 	hw->wiphy->max_remain_on_channel_duration = 65535; /* ms */
-	hw->wiphy->cipher_suites = rtlmac_cipher_suites;
-	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtlmac_cipher_suites);
+	hw->wiphy->cipher_suites = rtl8xxxu_cipher_suites;
+	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtl8xxxu_cipher_suites);
 	hw->wiphy->rts_threshold = 2347;
 
 	SET_IEEE80211_DEV(priv->hw, &interface->dev);
 	SET_IEEE80211_PERM_ADDR(hw, priv->mac_addr);
 
-	hw->extra_tx_headroom = sizeof(struct rtlmac_tx_desc);
+	hw->extra_tx_headroom = sizeof(struct rtl8xxxu_tx_desc);
 	hw->flags = IEEE80211_HW_SIGNAL_DBM;
 	/*
 	 * The firmware can handle rate control, but we need callbacks
@@ -4498,15 +4498,15 @@ exit:
 	return ret;
 }
 
-static void rtlmac_disconnect(struct usb_interface *interface)
+static void rtl8xxxu_disconnect(struct usb_interface *interface)
 {
-	struct rtlmac_priv *priv;
+	struct rtl8xxxu_priv *priv;
 	struct ieee80211_hw *hw;
 
 	hw = usb_get_intfdata(interface);
 	priv = hw->priv;
 
-	rtlmac_disable_device(hw);
+	rtl8xxxu_disable_device(hw);
 	usb_set_intfdata(interface, NULL);
 
 	ieee80211_unregister_hw(hw);
@@ -4521,19 +4521,19 @@ static void rtlmac_disconnect(struct usb_interface *interface)
 	wiphy_info(hw->wiphy, "disconnecting\n");
 }
 
-static struct usb_driver rtlmac_driver = {
+static struct usb_driver rtl8xxxu_driver = {
 	.name = DRIVER_NAME,
-	.probe = rtlmac_probe,
-	.disconnect = rtlmac_disconnect,
+	.probe = rtl8xxxu_probe,
+	.disconnect = rtl8xxxu_disconnect,
 	.id_table = dev_table,
 	.disable_hub_initiated_lpm = 1,
 };
 
-static int __init rtlmac_module_init(void)
+static int __init rtl8xxxu_module_init(void)
 {
 	int res = 0;
 
-	res = usb_register(&rtlmac_driver);
+	res = usb_register(&rtl8xxxu_driver);
 	if (res < 0)
 		printk(KERN_ERR DRIVER_NAME ": usb_register() failed (%i)\n",
 		       res);
@@ -4541,10 +4541,10 @@ static int __init rtlmac_module_init(void)
 	return res;
 }
 
-static void __exit rtlmac_module_exit(void)
+static void __exit rtl8xxxu_module_exit(void)
 {
-	usb_deregister(&rtlmac_driver);
+	usb_deregister(&rtl8xxxu_driver);
 }
 
-module_init(rtlmac_module_init);
-module_exit(rtlmac_module_exit);
+module_init(rtl8xxxu_module_init);
+module_exit(rtl8xxxu_module_exit);

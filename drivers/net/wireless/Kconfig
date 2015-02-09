@@ -243,7 +243,7 @@ config ADM8211
 
 	  Thanks to Infineon-ADMtek for their support of this driver.
 
-config RTLMAC
+config RTL8XXXU
 	tristate "RTL8723AU (mac80211) support"
 	depends on MAC80211 && USB
 	---help---
