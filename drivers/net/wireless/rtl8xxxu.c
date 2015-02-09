@@ -3491,7 +3491,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_SLOT) {
-		printk(KERN_DEBUG "Changed ERP_SLOT! short_slot_time %i\n",
+		printk(KERN_DEBUG "Changed ERP_SLOT: short_slot_time %i\n",
 			bss_conf->use_short_slot);
 
 		if (bss_conf->use_short_slot)
