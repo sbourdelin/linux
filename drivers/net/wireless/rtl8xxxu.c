@@ -3393,7 +3393,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 				rcu_read_unlock();
 				goto error;
 			}
-			printk(KERN_DEBUG "%s: ASSOC sta found\n", __func__);
+
 			if (sta->ht_cap.ht_supported)
 				printk(KERN_DEBUG "%s: HT supported\n",
 				       __func__);
