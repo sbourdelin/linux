@@ -535,7 +535,7 @@ typedef struct _T_FC_REGS {
 
 	u8 Reserved1200[0x1000-0x200];	/* Reserved */
 
-} __attribute__ ((aligned(32))) T_FC_REGS, *PT_FC_REGS;
+} __aligned(32) T_FC_REGS, *PT_FC_REGS;
 
 
 
@@ -624,7 +624,6 @@ struct nbu2ss_udc {
 	unsigned		linux_suspended:1;
 	unsigned		linux_resume:1;
 	unsigned		usb_suspended:1;
-	unsigned		self_powered:1;
 	unsigned		remote_wakeup:1;
 	unsigned		udc_enabled:1;
 
