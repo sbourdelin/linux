@@ -46,8 +46,6 @@ source "drivers/staging/rtl8723au/Kconfig"
 
 source "drivers/staging/rts5208/Kconfig"
 
-source "drivers/staging/line6/Kconfig"
-
 source "drivers/staging/octeon/Kconfig"
 
 source "drivers/staging/octeon-usb/Kconfig"
@@ -67,8 +65,6 @@ source "drivers/staging/emxx_udc/Kconfig"
 source "drivers/staging/ft1000/Kconfig"
 
 source "drivers/staging/speakup/Kconfig"
-
-source "drivers/staging/cptm1217/Kconfig"
 
 source "drivers/staging/ste_rmi4/Kconfig"
 
@@ -109,5 +105,7 @@ source "drivers/staging/unisys/Kconfig"
 source "drivers/staging/clocking-wizard/Kconfig"
 
 source "drivers/staging/fbtft/Kconfig"
+
+source "drivers/staging/i2o/Kconfig"
 
 endif # STAGING
