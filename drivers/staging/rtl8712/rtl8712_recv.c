@@ -604,12 +604,12 @@ static int recv_indicatepkt_reorder(struct _adapter *padapter,
 	 */
 	if (r8712_recv_indicatepkts_in_order(padapter, preorder_ctrl, false) ==
 	    true) {
-		_set_timer(&preorder_ctrl->reordering_ctrl_timer,
-			   REORDER_WAIT_TIME);
+		mod_timer(&preorder_ctrl->reordering_ctrl_timer,
+			  jiffies + msecs_to_jiffies(REORDER_WAIT_TIME));
 		spin_unlock_irqrestore(&ppending_recvframe_queue->lock, irql);
 	} else {
 		spin_unlock_irqrestore(&ppending_recvframe_queue->lock, irql);
-		_cancel_timer_ex(&preorder_ctrl->reordering_ctrl_timer);
+		del_timer(&preorder_ctrl->reordering_ctrl_timer);
 	}
 	return _SUCCESS;
 _err_exit:

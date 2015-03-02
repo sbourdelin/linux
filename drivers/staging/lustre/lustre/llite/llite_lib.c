@@ -977,19 +977,17 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
 	CDEBUG(D_CONFIG, "Found profile %s: mdc=%s osc=%s\n", profilenm,
 	       lprof->lp_md, lprof->lp_dt);
 
-	dt = kzalloc(strlen(lprof->lp_dt) + instlen + 2, GFP_NOFS);
+	dt = kasprintf(GFP_NOFS, "%s-%p", lprof->lp_dt, cfg->cfg_instance);
 	if (!dt) {
 		err = -ENOMEM;
 		goto out_free;
 	}
-	sprintf(dt, "%s-%p", lprof->lp_dt, cfg->cfg_instance);
 
-	md = kzalloc(strlen(lprof->lp_md) + instlen + 2, GFP_NOFS);
+	md = kasprintf(GFP_NOFS, "%s-%p", lprof->lp_dt, cfg->cfg_instance);
 	if (!md) {
 		err = -ENOMEM;
 		goto out_free;
 	}
-	sprintf(md, "%s-%p", lprof->lp_md, cfg->cfg_instance);
 
 	/* connections, registrations, sb setup */
 	err = client_common_fill_super(sb, md, dt, mnt);
@@ -1431,7 +1429,7 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
 
 	if (attr->ia_valid & (ATTR_SIZE |
 			      ATTR_ATIME | ATTR_ATIME_SET |
-			      ATTR_MTIME | ATTR_MTIME_SET))
+			      ATTR_MTIME | ATTR_MTIME_SET)) {
 		/* For truncate and utimes sending attributes to OSTs, setting
 		 * mtime/atime to the past will be performed under PW [0:EOF]
 		 * extent lock (new_size:EOF for truncate).  It may seem
@@ -1443,6 +1441,7 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
 		rc = ll_setattr_ost(inode, attr);
 		if (attr->ia_valid & ATTR_SIZE)
 			up_write(&lli->lli_trunc_sem);
+	}
 out:
 	if (op_data) {
 		if (op_data->op_ioepoch) {
@@ -1607,7 +1606,7 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
 	struct lov_stripe_md *lsm = md->lsm;
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 
-	LASSERT ((lsm != NULL) == ((body->valid & OBD_MD_FLEASIZE) != 0));
+	LASSERT((lsm != NULL) == ((body->valid & OBD_MD_FLEASIZE) != 0));
 	if (lsm != NULL) {
 		if (!lli->lli_has_smd &&
 		    !(sbi->ll_flags & LL_SBI_LAYOUT_LOCK))
