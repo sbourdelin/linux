@@ -2141,7 +2141,7 @@ static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configPathB)
 }
 
 static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
-			     int result[][8], u8 t, bool is2T)
+			     int result[][8], int t, bool is2T)
 {
 	u32 i, val32;
 	int path_a_ok /*, path_b_ok */;
@@ -2236,7 +2236,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_TX_IQK, 0x01007c00);
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
 
-	for (i = 0 ; i < retry; i++) {
+	for (i = 0; i < retry; i++) {
 		path_a_ok = rtl8xxxu_iqk_path_a(priv, is2T);
 		if (path_a_ok == 0x03) {
 			val32 = rtl8723au_read32(priv,
@@ -2306,7 +2306,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 	/* Back to BB mode, load original value */
 	rtl8723au_write32(priv, REG_FPGA0_IQK, 0);
 
-	if (t != 0) {
+	if (t) {
 		if (!priv->pi_enabled) {
 			/*
 			 * Switch back BB to SI mode after finishing
@@ -2346,7 +2346,8 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 {
 	int result[4][8];	/* last is final result */
-	u8 i, final_candidate;
+	u8 final_candidate;
+	int i;
 	bool path_a_ok /*, path_b_ok */;
 	u32 reg_e94, reg_e9c, reg_ea4, reg_eac;
 	u32 reg_eb4, reg_ebc, reg_ec4, reg_ecc;
