@@ -2466,8 +2466,8 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 
 #if 0
 		/* Path-B */
-		if (is2T)
-			RF_Bmode = PHY_QueryRFReg(priv, RF_PATH_B, RF_AC,
+		if (is_2t)
+			rf_bmode = PHY_QueryRFReg(priv, RF_PATH_B, RF_AC,
 						  bMask12Bits);
 #endif
 
@@ -2477,7 +2477,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 
 #if 0
 		/* Path-B */
-		if (is2T)
+		if (is_2t)
 			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
 				     (RF_Bmode & 0x8ffff) | 0x10000);
 #endif
@@ -2502,7 +2502,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 
 #if 0
 		/* Path-B */
-		if (is2T)
+		if (is_2t)
 			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
 				     RF_Bmode);
 #endif
