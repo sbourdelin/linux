@@ -2140,8 +2140,8 @@ static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configPathB)
 	return result;
 }
 
-static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
-			     int result[][8], int t, bool is2T)
+static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
+				     int result[][8], int t, bool is2T)
 {
 	u32 i, val32;
 	int path_a_ok /*, path_b_ok */;
@@ -2377,7 +2377,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
 
 	for (i = 0; i < 3; i++) {
-		_PHY_IQCalibrate(priv, result, i, false);
+		rtl8xxxu_phy_iqcalibrate(priv, result, i, false);
 
 		if (i == 1) {
 			simu = rtl8xxxu_simularity_compare(priv, result, 0, 1);
