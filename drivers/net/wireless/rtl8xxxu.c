@@ -1887,7 +1887,7 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 		return;
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
-	oldval = (val32 >> 22) & 0x3FF;
+	oldval = val32 >> 22;
 
 	x = result[final_candidate][0];
 	if ((x & 0x00000200) != 0)
