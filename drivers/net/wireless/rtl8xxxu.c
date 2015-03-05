@@ -1303,8 +1303,7 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 	}
 
 	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
-		printk(KERN_WARNING "%s: Firmware checksum poll timed out\n",
-		       DRIVER_NAME);
+		pr_warn("%s: Firmware checksum poll timed out\n", DRIVER_NAME);
 		ret = -EAGAIN;
 		goto exit;
 	}
@@ -1324,8 +1323,7 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 	}
 
 	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
-		printk(KERN_WARNING "%s: Firmware failed to start\n",
-		       DRIVER_NAME);
+		pr_warn("%s: Firmware failed to start\n", DRIVER_NAME);
 		ret = -EAGAIN;
 		goto exit;
 	}
@@ -1427,14 +1425,13 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 
 	pr_debug("%s: Loading firmware %s\n", DRIVER_NAME, fw_name);
 	if (request_firmware(&fw, fw_name, &priv->udev->dev)) {
-		printk(KERN_WARNING "%s: request_firmware(%s) failed\n",
-		       DRIVER_NAME, fw_name);
+		pr_warn("%s: request_firmware(%s) failed\n",
+			DRIVER_NAME, fw_name);
 		ret = -EAGAIN;
 		goto exit;
 	}
 	if (!fw) {
-		printk(KERN_WARNING "%s: Firmware data not available\n",
-		       DRIVER_NAME);
+		pr_warn("%s: Firmware data not available\n", DRIVER_NAME);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -1506,8 +1503,7 @@ rtl8xxxu_init_mac(struct rtl8xxxu_priv *priv, struct rtl8xxxu_reg8val *array)
 
 		ret = rtl8723au_write8(priv, reg, val);
 		if (ret != 1) {
-			printk(KERN_WARNING "%s: Failed to initialize MAC\n",
-			       DRIVER_NAME);
+			pr_warn("%s: Failed to initialize MAC\n", DRIVER_NAME);
 			return -EAGAIN;
 		}
 	}
@@ -1533,8 +1529,7 @@ static int rtl8xxxu_init_phy_regs(struct rtl8xxxu_priv *priv,
 
 		ret = rtl8723au_write32(priv, reg, val);
 		if (ret != sizeof(val)) {
-			printk(KERN_WARNING "%s: Failed to initialize PHY\n",
-			       DRIVER_NAME);
+			pr_warn("%s: Failed to initialize PHY\n", DRIVER_NAME);
 			return -EAGAIN;
 		}
 		udelay(1);
@@ -1646,8 +1641,7 @@ static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
 
 		ret = rtl8723au_write_rfreg(priv, reg, val);
 		if (ret) {
-			printk(KERN_WARNING "%s: Failed to initialize RF\n",
-			       DRIVER_NAME);
+			pr_warn("%s: Failed to initialize RF\n", DRIVER_NAME);
 			return -EAGAIN;
 		}
 		udelay(1);
@@ -2129,7 +2123,7 @@ static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 	    ((regEAC & 0x03ff0000) != 0x00360000))
 		result |= 0x02;
 	else
-		printk(KERN_WARNING "%s: Path A Rx IQK fail!\n", __func__);
+		pr_warn("%s: Path A Rx IQK fail!\n", __func__);
 	return result;
 }
 
@@ -2595,7 +2589,7 @@ static int rtl8xxxu_active_to_emu(struct rtl8xxxu_priv *priv)
 	}
 
 	if (count == RTL8XXXU_MAX_REG_POLL) {
-		printk(KERN_WARNING "%s: Turn off MAC timed out\n", __func__);
+		pr_warn("%s: Turn off MAC timed out\n", __func__);
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2633,8 +2627,7 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 	}
 
 	if (count == RTL8XXXU_MAX_REG_POLL) {
-		printk(KERN_WARNING "%s: RX poll timed out (0x05f8)\n",
-		       __func__);
+		pr_warn("%s: RX poll timed out (0x05f8)\n", __func__);
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2914,7 +2907,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 
 	ret = rtl8xxxu_power_on(priv);
 	if (ret < 0) {
-		printk(KERN_WARNING "%s: Failed power on\n", __func__);
+		pr_warn("%s: Failed power on\n", __func__);
 		goto exit;
 	}
 
@@ -3850,7 +3843,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 			RTL_RX_BUFFER_SIZE;
 		skb = dev_alloc_skb(skb_size);
 		if (!skb) {
-			printk(KERN_WARNING "%s: Out of memory\n", __func__);
+			pr_warn("%s: Out of memory\n", __func__);
 			goto cleanup;
 		}
 
@@ -4290,8 +4283,7 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 					 __func__, num);
 
 			if (priv->pipe_in) {
-				printk(KERN_WARNING "%s: Too many IN pipes\n",
-				       __func__);
+				pr_warn("%s: Too many IN pipes\n", __func__);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -4306,8 +4298,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 					 __func__, num);
 
 			if (priv->pipe_interrupt) {
-				printk(KERN_WARNING "%s: Too many INTERRUPT "
-				       "pipes\n", __func__);
+				pr_warn("%s: Too many INTERRUPT pipes\n",
+					__func__);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -4321,8 +4313,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 				pr_debug("%s: out endpoint num %i\n",
 					 __func__, num);
 			if (j >= RTL8XXXU_OUT_ENDPOINTS) {
-				printk(KERN_WARNING "%s: Unsupported number "
-				       "of OUT pipes\n", __func__);
+				pr_warn("%s: Unsupported number of OUT pipes\n",
+					__func__);
 				ret = -EINVAL;
 				goto exit;
 			}
