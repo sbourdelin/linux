@@ -3126,6 +3126,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	if (priv->wifi_spec)
 		rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
 #endif
+	rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
 
 #if 0
 	/*
