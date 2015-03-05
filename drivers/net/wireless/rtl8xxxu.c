@@ -2087,7 +2087,7 @@ rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs, u32 *backup)
 	rtl8723au_write8(priv, regs[i], (u8)(backup[i] & ~BIT(5)));
 }
 
-static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configPathB)
+static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 {
 	u32 regEAC, regE94, regE9C, regEA4;
 	u8 result = 0;
@@ -2097,11 +2097,11 @@ static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configPathB)
 	rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x10008c1f);
 	rtl8723au_write32(priv, REG_TX_IQK_PI_A, 0x82140102);
 
-	rtl8723au_write32(priv, REG_RX_IQK_PI_A, configPathB ? 0x28160202 :
+	rtl8723au_write32(priv, REG_RX_IQK_PI_A, configpathb ? 0x28160202 :
 			  /*IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID)?0x28160202: */ 0x28160502);
 
 	/* path-B IQK setting */
-	if (configPathB) {
+	if (configpathb) {
 		rtl8723au_write32(priv, REG_TX_IQK_TONE_B, 0x10008c22);
 		rtl8723au_write32(priv, REG_RX_IQK_TONE_B, 0x10008c22);
 		rtl8723au_write32(priv, REG_TX_IQK_PI_B, 0x82140102);
