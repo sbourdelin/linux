@@ -1959,59 +1959,55 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 					int result[][8], u8 c1, u8 c2)
 {
-	u32 i, j, diff, SimularityBitMap, bound = 0;
-	u8 final_candidate[2] = {0xff, 0xff};	/* for path A and path B */
-	bool bResult = true, is2T = false;
+	u32 i, j, diff, simubitmap, bound = 0;
+	u8 candidate[2] = {0xff, 0xff};	/* for path A and path B */
+	bool retval = true, is_2t = false;
 
-	if (is2T)
+	if (is_2t)
 		bound = 8;
 	else
 		bound = 4;
 
-	SimularityBitMap = 0;
+	simubitmap = 0;
 
 	for (i = 0; i < bound; i++) {
 		diff = (result[c1][i] > result[c2][i]) ?
 			(result[c1][i] - result[c2][i]) :
 			(result[c2][i] - result[c1][i]);
 		if (diff > MAX_TOLERANCE) {
-			if ((i == 2 || i == 6) && !SimularityBitMap) {
-				if (result[c1][i]+result[c1][i+1] == 0)
-					final_candidate[(i/4)] = c2;
-				else if (result[c2][i]+result[c2][i+1] == 0)
-					final_candidate[(i/4)] = c1;
+			if ((i == 2 || i == 6) && !simubitmap) {
+				if (result[c1][i] + result[c1][i + 1] == 0)
+					candidate[(i / 4)] = c2;
+				else if (result[c2][i] + result[c2][i + 1] == 0)
+					candidate[(i / 4)] = c1;
 				else
-					SimularityBitMap =
-						SimularityBitMap|(1<<i);
+					simubitmap = simubitmap | (1 << i);
 			} else {
-				SimularityBitMap = SimularityBitMap|(1<<i);
+				simubitmap = simubitmap | (1 << i);
 			}
 		}
 	}
 
-	if (SimularityBitMap == 0) {
-		for (i = 0; i < (bound/4); i++) {
-			if (final_candidate[i] != 0xff) {
-				for (j = i*4; j < (i+1)*4-2; j++)
-					result[3][j] =
-						result[final_candidate[i]][j];
-				bResult = false;
+	if (simubitmap == 0) {
+		for (i = 0; i < (bound / 4); i++) {
+			if (candidate[i] != 0xff) {
+				for (j = i * 4; j < (i + 1) * 4 - 2; j++)
+					result[3][j] = result[candidate[i]][j];
+				retval = false;
 			}
 		}
-		return bResult;
-	} else if (!(SimularityBitMap & 0x0f)) {
+		return retval;
+	} else if (!(simubitmap & 0x0f)) {
 		/* path A OK */
 		for (i = 0; i < 4; i++)
 			result[3][i] = result[c1][i];
-		return false;
-	} else if (!(SimularityBitMap & 0xf0) && is2T) {
+	} else if (!(simubitmap & 0xf0) && is_2t) {
 		/* path B OK */
 		for (i = 4; i < 8; i++)
 			result[3][i] = result[c1][i];
-		return false;
-	} else {
-		return false;
 	}
+
+	return false;
 }
 
 static void
@@ -2087,10 +2083,10 @@ rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs, u32 *backup)
 	rtl8723au_write8(priv, regs[i], (u8)(backup[i] & ~BIT(5)));
 }
 
-static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
+static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 {
 	u32 regEAC, regE94, regE9C, regEA4;
-	u8 result = 0;
+	int result = 0;
 
 	/* path-A IQK setting */
 	rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x10008c1f);
@@ -2117,7 +2113,7 @@ static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 
 	mdelay(1);
 
-	/*  Check failed */
+	/* Check failed */
 	regEAC = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_A_2);
 	regE94 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A);
 	regE9C = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A);
@@ -2127,16 +2123,16 @@ static u8 rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 	    ((regE94 & 0x03ff0000) != 0x01420000) &&
 	    ((regE9C & 0x03ff0000) != 0x00420000))
 		result |= 0x01;
-	else			/* if Tx not OK, ignore Rx */
+	else	/* If TX not OK, ignore RX */
 		return result;
 
-	/* if Tx is OK, check whether Rx is OK */
+	/* If TX is OK, check whether RX is OK */
 	if (!(regEAC & BIT(27)) &&
 	    ((regEA4 & 0x03ff0000) != 0x01320000) &&
 	    ((regEAC & 0x03ff0000) != 0x00360000))
 		result |= 0x02;
 	else
-		printk(KERN_WARNING "Path A Rx IQK fail!!\n");
+		printk(KERN_WARNING "%s: Path A Rx IQK fail!\n", __func__);
 	return result;
 }
 
