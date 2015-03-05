@@ -1126,10 +1126,9 @@ static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 		priv->ep_tx_count++;
 	}
 
-	printk(KERN_INFO
-	       "%s: RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
-	       DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
-	       priv->has_gps);
+	pr_info("%s: RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
+		DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
+		priv->has_gps);
 
 	pr_debug("%s: RTL8723au number of TX queues: %i\n",
 		 DRIVER_NAME, priv->ep_tx_count);
@@ -4358,14 +4357,14 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	rtl8xxxu_read_efuse(priv);
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
-	printk(KERN_INFO "%s: RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
-	       DRIVER_NAME,
-	       priv->efuse_wifi.efuse.mac_addr[0],
-	       priv->efuse_wifi.efuse.mac_addr[1],
-	       priv->efuse_wifi.efuse.mac_addr[2],
-	       priv->efuse_wifi.efuse.mac_addr[3],
-	       priv->efuse_wifi.efuse.mac_addr[4],
-	       priv->efuse_wifi.efuse.mac_addr[5]);
+	pr_info("%s: RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
+		DRIVER_NAME,
+		priv->efuse_wifi.efuse.mac_addr[0],
+		priv->efuse_wifi.efuse.mac_addr[1],
+		priv->efuse_wifi.efuse.mac_addr[2],
+		priv->efuse_wifi.efuse.mac_addr[3],
+		priv->efuse_wifi.efuse.mac_addr[4],
+		priv->efuse_wifi.efuse.mac_addr[5]);
 
 	rtl8xxxu_load_firmware(priv);
 
