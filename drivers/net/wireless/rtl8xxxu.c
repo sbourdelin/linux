@@ -2350,7 +2350,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	bool path_a_ok /*, path_b_ok */;
 	s32 RegE94, RegE9C, RegEA4, RegEAC, RegEB4, RegEBC, RegEC4;
 	s32 RegECC, RegTmp = 0;
-	bool is12simular, is13simular, is23simular;
+	bool simu;
 	u32 IQK_BB_REG_92C[RTL8XXXU_BB_REGS] = {
 		REG_OFDM0_XA_RX_IQ_IMBALANCE, REG_OFDM0_XB_RX_IQ_IMBALANCE,
 		REG_OFDM0_ENERGY_CCA_THRES, REG_OFDM0_AGCR_SSI_TABLE,
@@ -2372,35 +2372,28 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 #if 0
 	path_b_ok = false;
 #endif
-	is12simular = false;
-	is23simular = false;
-	is13simular = false;
-
 	rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
 
 	for (i = 0; i < 3; i++) {
 		_PHY_IQCalibrate(priv, result, i, false);
 
 		if (i == 1) {
-			is12simular =
-				rtl8xxxu_simularity_compare(priv, result, 0, 1);
-			if (is12simular) {
+			simu = rtl8xxxu_simularity_compare(priv, result, 0, 1);
+			if (simu) {
 				final_candidate = 0;
 				break;
 			}
 		}
 
 		if (i == 2) {
-			is13simular =
-				rtl8xxxu_simularity_compare(priv, result, 0, 2);
-			if (is13simular) {
+			simu = rtl8xxxu_simularity_compare(priv, result, 0, 2);
+			if (simu) {
 				final_candidate = 0;
 				break;
 			}
 
-			is23simular =
-				rtl8xxxu_simularity_compare(priv, result, 1, 2);
-			if (is23simular) {
+			simu = rtl8xxxu_simularity_compare(priv, result, 1, 2);
+			if (simu) {
 				final_candidate = 1;
 			} else {
 				for (i = 0; i < 8; i++)
