@@ -1876,58 +1876,56 @@ static int rtl8xxxu_init_queue_priority(struct rtl8xxxu_priv *priv)
 }
 
 static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
-				       bool bIQKOK, int result[][8],
-				       u8 final_candidate, bool bTxOnly)
+				       bool iqk_ok, int result[][8],
+				       u8 final_candidate, bool tx_only)
 {
-	u32 Oldval_0, X, TX0_A, reg;
-	s32 Y, TX0_C;
+	u32 oldval, x, tx0_a, reg;
+	int y, tx0_c;
 	u32 val32;
 
-	printk(KERN_DEBUG "%s\n", __func__);
-
-	if (bIQKOK) {
+	if (iqk_ok) {
 		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
-		Oldval_0 = (val32 >> 22) & 0x3FF;
+		oldval = (val32 >> 22) & 0x3FF;
 
-		X = result[final_candidate][0];
-		if ((X & 0x00000200) != 0)
-			X = X | 0xfffffc00;
-		TX0_A = (X * Oldval_0) >> 8;
+		x = result[final_candidate][0];
+		if ((x & 0x00000200) != 0)
+			x = x | 0xfffffc00;
+		tx0_a = (x * oldval) >> 8;
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
 		val32 &= ~0x3ff;
-		val32 |= TX0_A;
+		val32 |= tx0_a;
 		rtl8723au_write32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE, val32);
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_ENERGY_CCA_THRES);
 		val32 &= ~BIT(31);
-		if ((X * Oldval_0 >> 7) & 0x1)
+		if ((x * oldval >> 7) & 0x1)
 			val32 |= BIT(31);
 		rtl8723au_write32(priv, REG_OFDM0_ENERGY_CCA_THRES, val32);
 
-		Y = result[final_candidate][1];
-		if ((Y & 0x00000200) != 0)
-			Y = Y | 0xfffffc00;
-		TX0_C = (Y * Oldval_0) >> 8;
+		y = result[final_candidate][1];
+		if ((y & 0x00000200) != 0)
+			y = y | 0xfffffc00;
+		tx0_c = (y * oldval) >> 8;
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_XC_TX_AFE);
 		val32 &= ~0xf0000000;
-		val32 |= (((TX0_C & 0x3c0) >> 6) << 28);
+		val32 |= (((tx0_c & 0x3c0) >> 6) << 28);
 		rtl8723au_write32(priv, REG_OFDM0_XC_TX_AFE, val32);
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
 		val32 &= ~0x003f0000;
-		val32 |= ((TX0_C & 0x3f) << 16);
+		val32 |= ((tx0_c & 0x3f) << 16);
 		rtl8723au_write32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE, val32);
 
 		val32 = rtl8723au_read32(priv, REG_OFDM0_ENERGY_CCA_THRES);
 		val32 &= ~BIT(29);
-		if ((Y * Oldval_0>>7) & 0x1)
+		if ((y * oldval >> 7) & 0x1)
 			val32 |= BIT(29);
 		rtl8723au_write32(priv, REG_OFDM0_ENERGY_CCA_THRES, val32);
 
-		if (bTxOnly) {
-			printk(KERN_DEBUG "%s: only Tx\n", __func__);
+		if (tx_only) {
+			printk(KERN_DEBUG "%s: only TX\n", __func__);
 			return;
 		}
 
