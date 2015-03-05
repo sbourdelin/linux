@@ -4414,8 +4414,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
-		printk(KERN_ERR "%s: Failed to register: %i\n",
-		       DRIVER_NAME, ret);
+		pr_err("%s: Failed to register: %i\n", DRIVER_NAME, ret);
 		goto exit;
 	}
 
@@ -4462,8 +4461,7 @@ static int __init rtl8xxxu_module_init(void)
 
 	res = usb_register(&rtl8xxxu_driver);
 	if (res < 0)
-		printk(KERN_ERR DRIVER_NAME ": usb_register() failed (%i)\n",
-		       res);
+		pr_err(DRIVER_NAME ": usb_register() failed (%i)\n", res);
 
 	return res;
 }
