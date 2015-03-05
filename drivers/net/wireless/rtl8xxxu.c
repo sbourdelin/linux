@@ -2344,7 +2344,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	u32 reg_eb4, reg_ebc, reg_ec4, reg_ecc;
 	s32 reg_tmp = 0;
 	bool simu;
-	u32 IQK_BB_REG_92C[RTL8XXXU_BB_REGS] = {
+	u32 iqk_bb_reg_92c[RTL8XXXU_BB_REGS] = {
 		REG_OFDM0_XA_RX_IQ_IMBALANCE, REG_OFDM0_XB_RX_IQ_IMBALANCE,
 		REG_OFDM0_ENERGY_CCA_THRES, REG_OFDM0_AGCR_SSI_TABLE,
 		REG_OFDM0_XA_TX_IQ_IMBALANCE, REG_OFDM0_XB_TX_IQ_IMBALANCE,
@@ -2353,8 +2353,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	};
 
 	if (recovery) {
-		rtl8xxxu_restore_regs(priv, IQK_BB_REG_92C,
-				    priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
+		rtl8xxxu_restore_regs(priv, iqk_bb_reg_92c,
+				      priv->bb_recovery_backup,
+				      RTL8XXXU_BB_REGS);
 		return;
 	}
 
@@ -2442,8 +2443,8 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		rtl8xxxu_fill_iqk_matrix_a(priv, path_a_ok, result,
 					   candidate, (reg_ea4 == 0));
 
-	rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
-			 priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
+	rtl8xxxu_save_regs(priv, iqk_bb_reg_92c,
+			   priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
 }
 
 static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
