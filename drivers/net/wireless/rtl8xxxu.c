@@ -2145,6 +2145,8 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 {
 	u32 i, val32;
 	int path_a_ok /*, path_b_ok */;
+	int retry = 2;
+
 	u32 ADDA_REG[RTL8XXXU_ADDA_REGS] = {
 		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
 		REG_RX_WAIT_CCA, REG_TX_CCK_RFON,
@@ -2167,8 +2169,6 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 		REG_FPGA0_XAB_RF_SW_CTRL, REG_FPGA0_XA_RF_INT_OE,
 		REG_FPGA0_XB_RF_INT_OE, REG_FPGA0_RF_MODE
 	};
-
-	const u32 retryCount = 2;
 
 	/*  Note: IQ calibration must be performed after loading  */
 	/*		PHY_REG.txt , and radio_a, radio_b.txt	 */
@@ -2236,7 +2236,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_TX_IQK, 0x01007c00);
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
 
-	for (i = 0 ; i < retryCount ; i++) {
+	for (i = 0 ; i < retry; i++) {
 		path_a_ok = rtl8xxxu_iqk_path_a(priv, is2T);
 		if (path_a_ok == 0x03) {
 			val32 = rtl8723au_read32(priv,
@@ -2252,7 +2252,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 						 REG_RX_POWER_AFTER_IQK_A_2);
 			result[t][3] = (val32 & 0x3ff0000) >> 16;
 			break;
-		} else if (i == (retryCount - 1) && path_a_ok == 0x01) {
+		} else if (i == (retry - 1) && path_a_ok == 0x01) {
 			/* Tx IQK OK */
 			printk(KERN_DEBUG "Path A IQK Only Tx Success!!\n");
 
@@ -2275,7 +2275,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 		/*  Turn Path B ADDA on */
 		_PHY_PathADDAOn(priv, ADDA_REG, false, is2T);
 
-		for (i = 0 ; i < retryCount ; i++) {
+		for (i = 0; i < retry; i++) {
 			path_b_ok = _PHY_PathB_IQK(priv);
 			if (path_b_ok == 0x03) {
 				printk(KERN_DEBUG "Path B IQK Success!!\n");
@@ -2288,7 +2288,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 				val32 = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2)
 				result[t][7] = (val32 & 0x3ff0000) >> 16;
 				break;
-			} else if (i == (retryCount - 1) && path_b_ok == 0x01) {
+			} else if (i == (retry - 1) && path_b_ok == 0x01) {
 				/* Tx IQK OK */
 				DBG_8723A("Path B Only Tx IQK Success!!\n");
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
@@ -2320,14 +2320,14 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 
 		/*  Reload ADDA power saving parameters */
 		rtl8xxxu_restore_regs(priv, ADDA_REG, priv->adda_backup,
-				    RTL8XXXU_ADDA_REGS);
+				      RTL8XXXU_ADDA_REGS);
 
 		/*  Reload MAC parameters */
 		rtl8xxxu_restore_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
 
 		/*  Reload BB parameters */
 		rtl8xxxu_restore_regs(priv, IQK_BB_REG_92C,
-				    priv->bb_backup, RTL8XXXU_BB_REGS);
+				      priv->bb_backup, RTL8XXXU_BB_REGS);
 
 		/*  Restore RX initial gain */
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
