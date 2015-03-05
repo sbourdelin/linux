@@ -2056,21 +2056,21 @@ static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 
 
 static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, u32 *regs,
-				  bool isPathAOn, bool is2T)
+				  bool path_a_on, bool is_2t)
 {
-	u32 pathOn;
-	u32 i;
+	u32 path_on;
+	int i;
 
-	pathOn = isPathAOn ? 0x04db25a4 : 0x0b1b25a4;
-	if (!is2T) {
-		pathOn = 0x0bdb25a0;
+	path_on = path_a_on ? 0x04db25a4 : 0x0b1b25a4;
+	if (!is_2t) {
+		path_on = 0x0bdb25a0;
 		rtl8723au_write32(priv, regs[0], 0x0b1b25a0);
 	} else {
-		rtl8723au_write32(priv, regs[0], pathOn);
+		rtl8723au_write32(priv, regs[0], path_on);
 	}
 
 	for (i = 1 ; i < RTL8XXXU_ADDA_REGS ; i++)
-		rtl8723au_write32(priv, regs[i], pathOn);
+		rtl8723au_write32(priv, regs[i], path_on);
 }
 
 static void
