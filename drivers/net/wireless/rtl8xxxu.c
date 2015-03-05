@@ -2226,7 +2226,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	if (is_2t)
 		rtl8723au_write32(priv, REG_CONFIG_ANT_B, 0x00080000);
 
-	/*  IQ calibration setting */
+	/* IQ calibration setting */
 	rtl8723au_write32(priv, REG_FPGA0_IQK, 0x80800000);
 	rtl8723au_write32(priv, REG_TX_IQK, 0x01007c00);
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
@@ -2236,27 +2236,27 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		if (path_a_ok == 0x03) {
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
-			result[t][0] = (val32 & 0x3ff0000) >> 16;
+			result[t][0] = (val32 >> 16) & 0x3ff;
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_AFTER_IQK_A);
-			result[t][1] = (val32 & 0x3ff0000) >> 16;
+			result[t][1] = (val32 >> 16) & 0x3ff;
 			val32 = rtl8723au_read32(priv,
 						 REG_RX_POWER_BEFORE_IQK_A_2);
-			result[t][2] = (val32 & 0x3ff0000) >> 16;
+			result[t][2] = (val32 >> 16) & 0x3ff;
 			val32 = rtl8723au_read32(priv,
 						 REG_RX_POWER_AFTER_IQK_A_2);
-			result[t][3] = (val32 & 0x3ff0000) >> 16;
+			result[t][3] = (val32 >> 16) & 0x3ff;
 			break;
 		} else if (i == (retry - 1) && path_a_ok == 0x01) {
-			/* Tx IQK OK */
+			/* TX IQK OK */
 			printk(KERN_DEBUG "Path A IQK Only Tx Success!!\n");
 
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
-			result[t][0] = (val32 & 0x3ff0000) >> 16;
+			result[t][0] = (val32 >> 16) & 0x3ff;
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_AFTER_IQK_A);
-			result[t][1] = (val32 & 0x3ff0000) >> 16;
+			result[t][1] = (val32 >> 16) & 0x3ff;
 		}
 	}
 
@@ -2274,20 +2274,20 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 			path_b_ok = _PHY_PathB_IQK(priv);
 			if (path_b_ok == 0x03) {
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
-				result[t][4] = (val32 & 0x3ff0000) >> 16;
+				result[t][4] = (val32 >> 16) & 0x3ff;
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B);
-				result[t][5] = (val32 & 0x3ff0000) >> 16;
-				val32 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2)
-				result[t][6] = (val32 & 0x3ff0000) >> 16;
-				val32 = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2)
-				result[t][7] = (val32 & 0x3ff0000) >> 16;
+				result[t][5] = (val32 >> 16) & 0x3ff;
+				val32 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_B_2);
+				result[t][6] = (val32 >> 16) & 0x3ff;
+				val32 = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2);
+				result[t][7] = (val32 >> 16) & 0x3ff;
 				break;
 			} else if (i == (retry - 1) && path_b_ok == 0x01) {
 				/* TX IQK OK */
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
-				result[t][4] = (val32 & 0x3ff0000) >> 16;
+				result[t][4] = (val32 >> 16) & 0x3ff;
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B);
-				result[t][5] = (val32 & 0x3ff0000) >> 16;
+				result[t][5] = (val32 >> 16) & 0x3ff;
 			}
 		}
 
