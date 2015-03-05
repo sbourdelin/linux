@@ -2144,7 +2144,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 			     int result[][8], u8 t, bool is2T)
 {
 	u32 i, val32;
-	u8 PathAOK/*, PathBOK*/;
+	int path_a_ok /*, path_b_ok */;
 	u32 ADDA_REG[RTL8XXXU_ADDA_REGS] = {
 		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
 		REG_RX_WAIT_CCA, REG_TX_CCK_RFON,
@@ -2237,9 +2237,8 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
 
 	for (i = 0 ; i < retryCount ; i++) {
-		PathAOK = rtl8xxxu_iqk_path_a(priv, is2T);
-		if (PathAOK == 0x03) {
-			printk(KERN_DEBUG "Path A IQK Success!!\n");
+		path_a_ok = rtl8xxxu_iqk_path_a(priv, is2T);
+		if (path_a_ok == 0x03) {
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
 			result[t][0] = (val32 & 0x3ff0000) >> 16;
@@ -2253,7 +2252,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 						 REG_RX_POWER_AFTER_IQK_A_2);
 			result[t][3] = (val32 & 0x3ff0000) >> 16;
 			break;
-		} else if (i == (retryCount - 1) && PathAOK == 0x01) {
+		} else if (i == (retryCount - 1) && path_a_ok == 0x01) {
 			/* Tx IQK OK */
 			printk(KERN_DEBUG "Path A IQK Only Tx Success!!\n");
 
@@ -2266,9 +2265,8 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 		}
 	}
 
-	if (PathAOK == 0x00) {
-		printk(KERN_DEBUG "Path A IQK failed!!\n");
-	}
+	if (!path_a_ok)
+		printk(KERN_DEBUG "%s: Path A IQK failed!\n", __func__);
 
 #if 0
 	if (is2T) {
@@ -2278,8 +2276,8 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 		_PHY_PathADDAOn(priv, ADDA_REG, false, is2T);
 
 		for (i = 0 ; i < retryCount ; i++) {
-			PathBOK = _PHY_PathB_IQK(priv);
-			if (PathBOK == 0x03) {
+			path_b_ok = _PHY_PathB_IQK(priv);
+			if (path_b_ok == 0x03) {
 				printk(KERN_DEBUG "Path B IQK Success!!\n");
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
 				result[t][4] = (val32 & 0x3ff0000) >> 16;
@@ -2290,7 +2288,7 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 				val32 = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_B_2)
 				result[t][7] = (val32 & 0x3ff0000) >> 16;
 				break;
-			} else if (i == (retryCount - 1) && PathBOK == 0x01) {
+			} else if (i == (retryCount - 1) && path_b_ok == 0x01) {
 				/* Tx IQK OK */
 				DBG_8723A("Path B Only Tx IQK Success!!\n");
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
@@ -2300,9 +2298,8 @@ static void _PHY_IQCalibrate(struct rtl8xxxu_priv *priv,
 			}
 		}
 
-		if (0x00 == PathBOK) {
-			DBG_8723A("Path B IQK failed!!\n");
-		}
+		if (!path_b_ok)
+			printk(KERN_DEBUG "%s: Path B IQK failed!\n", __func__);
 	}
 #endif
 
@@ -2350,7 +2347,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 {
 	int result[4][8];	/* last is final result */
 	u8 i, final_candidate;
-	bool bPathAOK /*, bPathBOK */;
+	bool path_a_ok /*, path_b_ok */;
 	s32 RegE94, RegE9C, RegEA4, RegEAC, RegEB4, RegEBC, RegEC4;
 	s32 RegECC, RegTmp = 0;
 	bool is12simular, is13simular, is23simular;
@@ -2371,9 +2368,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	memset(result, 0, sizeof(result));
 	final_candidate = 0xff;
 
-	bPathAOK = false;
+	path_a_ok = false;
 #if 0
-	bPathBOK = false;
+	path_b_ok = false;
 #endif
 	is12simular = false;
 	is23simular = false;
@@ -2447,9 +2444,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		       "RegEAC =%x RegEB4 =%x RegEBC =%x RegEC4 =%x "
 		       "RegECC =%x\n ", __func__, RegE94, RegE9C,
 		       RegEA4, RegEAC, RegEB4, RegEBC, RegEC4, RegECC);
-		bPathAOK = true;
+		path_a_ok = true;
 #if 0
-		bPathBOK = true;
+		path_b_ok = true;
 #endif
 	} else {
 		RegE94 = RegEB4 = priv->rege94 = priv->regeb4 = 0x100;
@@ -2457,7 +2454,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	}
 
 	if (RegE94 && final_candidate != 0xff)
-		rtl8xxxu_fill_iqk_matrix_a(priv, bPathAOK, result,
+		rtl8xxxu_fill_iqk_matrix_a(priv, path_a_ok, result,
 					 final_candidate, (RegEA4 == 0));
 
 	rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
