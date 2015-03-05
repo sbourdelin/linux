@@ -2348,8 +2348,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	int result[4][8];	/* last is final result */
 	u8 i, final_candidate;
 	bool path_a_ok /*, path_b_ok */;
-	s32 RegE94, RegE9C, RegEA4, RegEAC, RegEB4, RegEBC, RegEC4;
-	s32 RegECC, RegTmp = 0;
+	u32 reg_e94, reg_e9c, reg_ea4, reg_eac;
+	u32 reg_eb4, reg_ebc, reg_ec4, reg_ecc;
+	s32 reg_tmp = 0;
 	bool simu;
 	u32 IQK_BB_REG_92C[RTL8XXXU_BB_REGS] = {
 		REG_OFDM0_XA_RX_IQ_IMBALANCE, REG_OFDM0_XB_RX_IQ_IMBALANCE,
@@ -2397,9 +2398,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 				final_candidate = 1;
 			} else {
 				for (i = 0; i < 8; i++)
-					RegTmp += result[3][i];
+					reg_tmp += result[3][i];
 
-				if (RegTmp != 0)
+				if (reg_tmp)
 					final_candidate = 3;
 				else
 					final_candidate = 0xff;
@@ -2408,47 +2409,47 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	}
 
 	for (i = 0; i < 4; i++) {
-		RegE94 = result[i][0];
-		RegE9C = result[i][1];
-		RegEA4 = result[i][2];
-		RegEAC = result[i][3];
-		RegEB4 = result[i][4];
-		RegEBC = result[i][5];
-		RegEC4 = result[i][6];
-		RegECC = result[i][7];
+		reg_e94 = result[i][0];
+		reg_e9c = result[i][1];
+		reg_ea4 = result[i][2];
+		reg_eac = result[i][3];
+		reg_eb4 = result[i][4];
+		reg_ebc = result[i][5];
+		reg_ec4 = result[i][6];
+		reg_ecc = result[i][7];
 	}
 
 	if (final_candidate != 0xff) {
-		RegE94 = result[final_candidate][0];
-		priv->rege94 =  RegE94;
-		RegE9C = result[final_candidate][1];
-		priv->rege9c = RegE9C;
-		RegEA4 = result[final_candidate][2];
-		RegEAC = result[final_candidate][3];
-		RegEB4 = result[final_candidate][4];
-		priv->regeb4 = RegEB4;
-		RegEBC = result[final_candidate][5];
-		priv->regebc = RegEBC;
-		RegEC4 = result[final_candidate][6];
-		RegECC = result[final_candidate][7];
+		reg_e94 = result[final_candidate][0];
+		priv->rege94 =  reg_e94;
+		reg_e9c = result[final_candidate][1];
+		priv->rege9c = reg_e9c;
+		reg_ea4 = result[final_candidate][2];
+		reg_eac = result[final_candidate][3];
+		reg_eb4 = result[final_candidate][4];
+		priv->regeb4 = reg_eb4;
+		reg_ebc = result[final_candidate][5];
+		priv->regebc = reg_ebc;
+		reg_ec4 = result[final_candidate][6];
+		reg_ecc = result[final_candidate][7];
 		printk(KERN_DEBUG "%s: final_candidate is %x\n",
 		       __func__, final_candidate);
-		printk(KERN_DEBUG "%s: RegE94 =%x RegE9C =%x RegEA4 =%x "
-		       "RegEAC =%x RegEB4 =%x RegEBC =%x RegEC4 =%x "
-		       "RegECC =%x\n ", __func__, RegE94, RegE9C,
-		       RegEA4, RegEAC, RegEB4, RegEBC, RegEC4, RegECC);
+		printk(KERN_DEBUG "%s: reg_e94 =%x reg_e9C =%x reg_eA4 =%x "
+		       "reg_eAC =%x reg_eB4 =%x reg_eBC =%x reg_eC4 =%x "
+		       "reg_eCC =%x\n ", __func__, reg_e94, reg_e9c,
+		       reg_ea4, reg_eac, reg_eb4, reg_ebc, reg_ec4, reg_ecc);
 		path_a_ok = true;
 #if 0
 		path_b_ok = true;
 #endif
 	} else {
-		RegE94 = RegEB4 = priv->rege94 = priv->regeb4 = 0x100;
-		RegE9C = RegEBC = priv->rege9c = priv->regebc = 0x0;
+		reg_e94 = reg_eb4 = priv->rege94 = priv->regeb4 = 0x100;
+		reg_e9c = reg_ebc = priv->rege9c = priv->regebc = 0x0;
 	}
 
-	if (RegE94 && final_candidate != 0xff)
+	if (reg_e94 && final_candidate != 0xff)
 		rtl8xxxu_fill_iqk_matrix_a(priv, path_a_ok, result,
-					 final_candidate, (RegEA4 == 0));
+					 final_candidate, (reg_ea4 == 0));
 
 	rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
 			 priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
