@@ -2273,7 +2273,6 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		for (i = 0; i < retry; i++) {
 			path_b_ok = _PHY_PathB_IQK(priv);
 			if (path_b_ok == 0x03) {
-				printk(KERN_DEBUG "Path B IQK Success!!\n");
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
 				result[t][4] = (val32 & 0x3ff0000) >> 16;
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B);
@@ -2284,8 +2283,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 				result[t][7] = (val32 & 0x3ff0000) >> 16;
 				break;
 			} else if (i == (retry - 1) && path_b_ok == 0x01) {
-				/* Tx IQK OK */
-				DBG_8723A("Path B Only Tx IQK Success!!\n");
+				/* TX IQK OK */
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_B);
 				result[t][4] = (val32 & 0x3ff0000) >> 16;
 				val32 = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_B);
