@@ -2136,7 +2136,7 @@ static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 }
 
 static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
-				     int result[][8], int t, bool is2T)
+				     int result[][8], int t, bool is_2t)
 {
 	u32 i, val32;
 	int path_a_ok /*, path_b_ok */;
@@ -2177,7 +2177,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 				 priv->bb_backup, RTL8XXXU_BB_REGS);
 	}
 
-	rtl8xxxu_path_adda_on(priv, ADDA_REG, true, is2T);
+	rtl8xxxu_path_adda_on(priv, ADDA_REG, true, is_2t);
 
 	if (t == 0) {
 		val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
@@ -2212,7 +2212,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	val32 &= ~BIT(10);
 	rtl8723au_write32(priv, REG_FPGA0_XB_RF_INT_OE, val32);
 
-	if (is2T) {
+	if (is_2t) {
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00010000);
 		rtl8723au_write32(priv, REG_FPGA0_XB_LSSI_PARM, 0x00010000);
 	}
@@ -2223,7 +2223,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	/* Page B init */
 	rtl8723au_write32(priv, REG_CONFIG_ANT_A, 0x00080000);
 
-	if (is2T)
+	if (is_2t)
 		rtl8723au_write32(priv, REG_CONFIG_ANT_B, 0x00080000);
 
 	/*  IQ calibration setting */
@@ -2232,7 +2232,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
 
 	for (i = 0; i < retry; i++) {
-		path_a_ok = rtl8xxxu_iqk_path_a(priv, is2T);
+		path_a_ok = rtl8xxxu_iqk_path_a(priv, is_2t);
 		if (path_a_ok == 0x03) {
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
@@ -2264,11 +2264,11 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		printk(KERN_DEBUG "%s: Path A IQK failed!\n", __func__);
 
 #if 0
-	if (is2T) {
-		_PHY_PathAStandBy(priv);
+	if (is_2t) {
+		rtl8xxxu_phy_path_a_standby(priv);
 
 		/*  Turn Path B ADDA on */
-		_PHY_PathADDAOn(priv, ADDA_REG, false, is2T);
+		rtl8xxxu_phy_path_adda_on(priv, ADDA_REG, false, is_2t);
 
 		for (i = 0; i < retry; i++) {
 			path_b_ok = _PHY_PathB_IQK(priv);
@@ -2307,10 +2307,9 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 			 * Switch back BB to SI mode after finishing
 			 * IQ Calibration
 			 */
-			rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM1,
-					  0x01000000);
-			rtl8723au_write32(priv, REG_FPGA0_XB_HSSI_PARM1,
-					  0x01000000);
+			val32 = 0x01000000;
+			rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM1, val32);
+			rtl8723au_write32(priv, REG_FPGA0_XB_HSSI_PARM1, val32);
 		}
 
 		/*  Reload ADDA power saving parameters */
@@ -2327,7 +2326,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		/*  Restore RX initial gain */
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
 
-		if (is2T) {
+		if (is_2t) {
 			rtl8723au_write32(priv, REG_FPGA0_XB_LSSI_PARM,
 					  0x00032ed3);
 		}
