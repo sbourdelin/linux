@@ -1877,7 +1877,7 @@ static int rtl8xxxu_init_queue_priority(struct rtl8xxxu_priv *priv)
 
 static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 				       bool iqk_ok, int result[][8],
-				       u8 final_candidate, bool tx_only)
+				       int candidate, bool tx_only)
 {
 	u32 oldval, x, tx0_a, reg;
 	int y, tx0_c;
@@ -1889,7 +1889,7 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 	val32 = rtl8723au_read32(priv, REG_OFDM0_XA_TX_IQ_IMBALANCE);
 	oldval = val32 >> 22;
 
-	x = result[final_candidate][0];
+	x = result[candidate][0];
 	if ((x & 0x00000200) != 0)
 		x = x | 0xfffffc00;
 	tx0_a = (x * oldval) >> 8;
@@ -1905,7 +1905,7 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 		val32 |= BIT(31);
 	rtl8723au_write32(priv, REG_OFDM0_ENERGY_CCA_THRES, val32);
 
-	y = result[final_candidate][1];
+	y = result[candidate][1];
 	if ((y & 0x00000200) != 0)
 		y = y | 0xfffffc00;
 	tx0_c = (y * oldval) >> 8;
@@ -1931,21 +1931,21 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 		return;
 	}
 
-	reg = result[final_candidate][2];
+	reg = result[candidate][2];
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE);
 	val32 &= ~0x3ff;
 	val32 |= (reg & 0x3ff);
 	rtl8723au_write32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE, val32);
 
-	reg = result[final_candidate][3] & 0x3F;
+	reg = result[candidate][3] & 0x3F;
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE);
 	val32 &= ~0xfc00;
 	val32 |= ((reg << 10) & 0xfc00);
 	rtl8723au_write32(priv, REG_OFDM0_XA_RX_IQ_IMBALANCE, val32);
 
-	reg = (result[final_candidate][3] >> 6) & 0xF;
+	reg = (result[candidate][3] >> 6) & 0xF;
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_RX_IQ_EXT_ANTA);
 	val32 &= ~0xf0000000;
@@ -1956,10 +1956,10 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 #define MAX_TOLERANCE		5
 
 static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
-					int result[][8], u8 c1, u8 c2)
+					int result[][8], int c1, int c2)
 {
 	u32 i, j, diff, simubitmap, bound = 0;
-	u8 candidate[2] = {0xff, 0xff};	/* for path A and path B */
+	int candidate[2] = {-1, -1};	/* for path A and path B */
 	bool retval = true, is_2t = false;
 
 	if (is_2t)
@@ -1989,7 +1989,7 @@ static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 
 	if (simubitmap == 0) {
 		for (i = 0; i < (bound / 4); i++) {
-			if (candidate[i] != 0xff) {
+			if (candidate[i] >= 0) {
 				for (j = i * 4; j < (i + 1) * 4 - 2; j++)
 					result[3][j] = result[candidate[i]][j];
 				retval = false;
@@ -2341,8 +2341,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 {
 	int result[4][8];	/* last is final result */
-	u8 final_candidate;
-	int i;
+	int i, candidate;
 	bool path_a_ok /*, path_b_ok */;
 	u32 reg_e94, reg_e9c, reg_ea4, reg_eac;
 	u32 reg_eb4, reg_ebc, reg_ec4, reg_ecc;
@@ -2363,7 +2362,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	}
 
 	memset(result, 0, sizeof(result));
-	final_candidate = 0xff;
+	candidate = -1;
 
 	path_a_ok = false;
 #if 0
@@ -2377,7 +2376,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		if (i == 1) {
 			simu = rtl8xxxu_simularity_compare(priv, result, 0, 1);
 			if (simu) {
-				final_candidate = 0;
+				candidate = 0;
 				break;
 			}
 		}
@@ -2385,21 +2384,21 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		if (i == 2) {
 			simu = rtl8xxxu_simularity_compare(priv, result, 0, 2);
 			if (simu) {
-				final_candidate = 0;
+				candidate = 0;
 				break;
 			}
 
 			simu = rtl8xxxu_simularity_compare(priv, result, 1, 2);
 			if (simu) {
-				final_candidate = 1;
+				candidate = 1;
 			} else {
 				for (i = 0; i < 8; i++)
 					reg_tmp += result[3][i];
 
 				if (reg_tmp)
-					final_candidate = 3;
+					candidate = 3;
 				else
-					final_candidate = 0xff;
+					candidate = -1;
 			}
 		}
 	}
@@ -2415,21 +2414,20 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		reg_ecc = result[i][7];
 	}
 
-	if (final_candidate != 0xff) {
-		reg_e94 = result[final_candidate][0];
+	if (candidate >= 0) {
+		reg_e94 = result[candidate][0];
 		priv->rege94 =  reg_e94;
-		reg_e9c = result[final_candidate][1];
+		reg_e9c = result[candidate][1];
 		priv->rege9c = reg_e9c;
-		reg_ea4 = result[final_candidate][2];
-		reg_eac = result[final_candidate][3];
-		reg_eb4 = result[final_candidate][4];
+		reg_ea4 = result[candidate][2];
+		reg_eac = result[candidate][3];
+		reg_eb4 = result[candidate][4];
 		priv->regeb4 = reg_eb4;
-		reg_ebc = result[final_candidate][5];
+		reg_ebc = result[candidate][5];
 		priv->regebc = reg_ebc;
-		reg_ec4 = result[final_candidate][6];
-		reg_ecc = result[final_candidate][7];
-		printk(KERN_DEBUG "%s: final_candidate is %x\n",
-		       __func__, final_candidate);
+		reg_ec4 = result[candidate][6];
+		reg_ecc = result[candidate][7];
+		printk(KERN_DEBUG "%s: candidate is %x\n", __func__, candidate);
 		printk(KERN_DEBUG "%s: reg_e94 =%x reg_e9C =%x reg_eA4 =%x "
 		       "reg_eAC =%x reg_eB4 =%x reg_eBC =%x reg_eC4 =%x "
 		       "reg_eCC =%x\n ", __func__, reg_e94, reg_e9c,
@@ -2443,9 +2441,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		reg_e9c = reg_ebc = priv->rege9c = priv->regebc = 0x0;
 	}
 
-	if (reg_e94 && final_candidate != 0xff)
+	if (reg_e94 && candidate >= 0)
 		rtl8xxxu_fill_iqk_matrix_a(priv, path_a_ok, result,
-					 final_candidate, (reg_ea4 == 0));
+					   candidate, (reg_ea4 == 0));
 
 	rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
 			 priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
