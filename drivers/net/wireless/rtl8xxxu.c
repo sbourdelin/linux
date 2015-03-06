@@ -2807,7 +2807,7 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	u8 val8;
 	u16 val16;
 	u32 val32;
-	int ret = 0;
+	int ret;
 
 	/* RSV_CTRL 0x001C[7:0] = 0x00
 	   unlock ISO/CLK/Power control register */
