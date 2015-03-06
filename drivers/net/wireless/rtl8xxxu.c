@@ -1072,11 +1072,10 @@ rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 	rtl8723au_write16(priv, REG_SPEC_SIFS, val16);
 }
 
-static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
+static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 {
 	u32 val32;
 	u16 val16;
-	int ret = 0;
 	char *cut;
 
 	val32 = rtl8723au_read32(priv, REG_SYS_CFG);
@@ -1132,8 +1131,6 @@ static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 
 	pr_debug("%s: RTL8723au number of TX queues: %i\n",
 		 DRIVER_NAME, priv->ep_tx_count);
-
-	return ret;
 }
 
 static int
@@ -2840,9 +2837,8 @@ exit:
 	return ret;
 }
 
-static int rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
+static void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 {
-	int ret = 0;
 	u8 val8;
 	u16 val16;
 
@@ -2877,7 +2873,6 @@ static int rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 
 	/* RSV_CTRL 0x1C[7:0] = 0x0e  lock ISO/CLK/Power control register */
 	rtl8723au_write8(priv, REG_RSV_CTRL, 0x0e);
-	return ret;
 }
 
 static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
