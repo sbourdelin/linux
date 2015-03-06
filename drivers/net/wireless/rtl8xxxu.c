@@ -2884,7 +2884,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	bool macpower;
-	int ret = 0;
+	int ret;
 	u8 val8;
 	u16 val16;
 	u32 val32;
