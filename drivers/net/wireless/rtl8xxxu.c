@@ -2662,10 +2662,9 @@ exit:
 	return ret;
 }
 
-static int rtl8xxxu_disabled_to_emu(struct rtl8xxxu_priv *priv)
+static void rtl8xxxu_disabled_to_emu(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
-	int ret = 0;
 
 	/* Clear suspend enable and power down enable*/
 	val8 = rtl8723au_read8(priv, 0x05);
@@ -2681,8 +2680,6 @@ static int rtl8xxxu_disabled_to_emu(struct rtl8xxxu_priv *priv)
 	val8 = rtl8723au_read8(priv, 0x05);
 	val8 &= ~(BIT(3) | BIT(4));
 	rtl8723au_write8(priv, 0x05, val8);
-
-	return ret;
 }
 
 static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
@@ -2813,9 +2810,7 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	   unlock ISO/CLK/Power control register */
 	rtl8723au_write8(priv, REG_RSV_CTRL, 0x0);
 
-	ret = rtl8xxxu_disabled_to_emu(priv);
-	if (ret)
-		goto exit;
+	rtl8xxxu_disabled_to_emu(priv);
 
 	ret = rtl8xxxu_emu_to_active(priv);
 	if (ret)
