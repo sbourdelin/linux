@@ -2005,7 +2005,7 @@ rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 {
 	int i;
 
-	for (i = 0 ; i < (RTL8XXXU_MAC_REGS - 1); i++) {
+	for (i = 0; i < (RTL8XXXU_MAC_REGS - 1); i++) {
 		backup[i] = rtl8723au_read8(priv, reg[i]);
 	}
 	backup[i] = rtl8723au_read32(priv, reg[i]);
@@ -2016,7 +2016,7 @@ rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 {
 	int i;
 
-	for (i = 0 ; i < (RTL8XXXU_MAC_REGS - 1); i++) {
+	for (i = 0; i < (RTL8XXXU_MAC_REGS - 1); i++) {
 		rtl8723au_write8(priv, reg[i], backup[i]);
 	}
 	rtl8723au_write32(priv, reg[i], backup[i]);
@@ -2027,7 +2027,7 @@ static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 {
 	int i;
 
-	for (i = 0 ; i < count ; i++)
+	for (i = 0; i < count; i++)
 		backup[i] = rtl8723au_read32(priv, regs[i]);
 }
 
@@ -2036,7 +2036,7 @@ static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 {
 	int i;
 
-	for (i = 0 ; i < count ; i++)
+	for (i = 0; i < count; i++)
 		rtl8723au_write32(priv, regs[i], backup[i]);
 }
 
@@ -2580,7 +2580,7 @@ static int rtl8xxxu_active_to_emu(struct rtl8xxxu_priv *priv)
 	val8 |= BIT(1);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
-	for (count = 0 ; count < RTL8XXXU_MAX_REG_POLL; count ++) {
+	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
 		val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 		if ((val8 & BIT(1)) == 0)
 			break;
@@ -2618,7 +2618,7 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 	/*
 	 * Poll - wait for RX packet to complete
 	 */
-	for (count = 0 ; count < RTL8XXXU_MAX_REG_POLL; count ++) {
+	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
 		val32 = rtl8723au_read8(priv, 0x5f8);
 		if (!val32)
 			break;
@@ -2711,7 +2711,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
 	/* wait till 0x04[17] = 1 power ready*/
-	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count ++) {
+	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
 		if (val32 & BIT(17)) {
 			break;
@@ -2746,7 +2746,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 	val8 |= BIT(0);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
-	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count ++) {
+	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
 		if ((val32 & BIT(8)) == 0) {
 			ret = 0;
@@ -3580,7 +3580,7 @@ static void rtl8xxxu_calc_tx_desc_csum(struct rtl8xxxu_tx_desc *tx_desc)
 
 	tx_desc->csum = cpu_to_le32(0);
 
-	for (i = 0 ; i < (sizeof(struct rtl8xxxu_tx_desc) / sizeof(u16)); i++)
+	for (i = 0; i < (sizeof(struct rtl8xxxu_tx_desc) / sizeof(u16)); i++)
 		csum = csum ^ le16_to_cpu(ptr[i]);
 
 	tx_desc->csum |= cpu_to_le32(csum);
