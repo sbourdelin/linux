@@ -2580,14 +2580,14 @@ static int rtl8xxxu_active_to_emu(struct rtl8xxxu_priv *priv)
 	val8 |= BIT(1);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
-	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
+	for (count = RTL8XXXU_MAX_REG_POLL; count; count--) {
 		val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 1);
 		if ((val8 & BIT(1)) == 0)
 			break;
 		udelay(10);
 	}
 
-	if (count == RTL8XXXU_MAX_REG_POLL) {
+	if (!count) {
 		pr_warn("%s: Turn off MAC timed out\n", __func__);
 		ret = -EBUSY;
 		goto exit;
@@ -2618,14 +2618,14 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 	/*
 	 * Poll - wait for RX packet to complete
 	 */
-	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
+	for (count = RTL8XXXU_MAX_REG_POLL; count; count--) {
 		val32 = rtl8723au_read8(priv, 0x5f8);
 		if (!val32)
 			break;
 		udelay(10);
 	}
 
-	if (count == RTL8XXXU_MAX_REG_POLL) {
+	if (!count) {
 		pr_warn("%s: RX poll timed out (0x05f8)\n", __func__);
 		ret = -EBUSY;
 		goto exit;
@@ -2711,7 +2711,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
 	/* wait till 0x04[17] = 1 power ready*/
-	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
+	for (count = RTL8XXXU_MAX_REG_POLL; count; count--) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
 		if (val32 & BIT(17)) {
 			break;
@@ -2719,7 +2719,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 		udelay(10);
 	}
 
-	if (count == RTL8XXXU_MAX_REG_POLL) {
+	if (!count) {
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2746,7 +2746,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 	val8 |= BIT(0);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 1, val8);
 
-	for (count = 0; count < RTL8XXXU_MAX_REG_POLL; count++) {
+	for (count = RTL8XXXU_MAX_REG_POLL; count; count--) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
 		if ((val32 & BIT(8)) == 0) {
 			ret = 0;
@@ -2755,7 +2755,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 		udelay(10);
 	}
 
-	if (count == RTL8XXXU_MAX_REG_POLL) {
+	if (!count) {
 		ret = -EBUSY;
 		goto exit;
 	}
