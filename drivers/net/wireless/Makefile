@@ -39,6 +39,8 @@ obj-$(CONFIG_LIBERTAS_THINFIRM)	+= libertas_tf/
 
 obj-$(CONFIG_ADM8211)	+= adm8211.o
 
+obj-$(CONFIG_RTL8XXXU)	+= rtl8xxxu.o
+
 obj-$(CONFIG_MWL8K)	+= mwl8k.o
 
 obj-$(CONFIG_IWLWIFI)	+= iwlwifi/
@@ -48,8 +50,6 @@ obj-$(CONFIG_RT2X00)	+= rt2x00/
 obj-$(CONFIG_P54_COMMON)	+= p54/
 
 obj-$(CONFIG_ATH_CARDS)		+= ath/
-
-obj-$(CONFIG_RTL8XXXU)	+= rtl8xxxu.o
 
 obj-$(CONFIG_MAC80211_HWSIM)	+= mac80211_hwsim.o
 

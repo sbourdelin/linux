@@ -254,9 +254,9 @@ config RTL8XXXU
 	  set. In particular it does not yet support 40MHz channels,
 	  AMPDU, and power management. However it should have a
 	  smaller memory footprint than the vendor driver and benetifs
-	  from the in kernel mac80211 stack. 
+	  from the in kernel mac80211 stack.
 
-	  It can coexist with the driver from drivers/staging/rtl8723au, 
+	  It can coexist with the driver from drivers/staging/rtl8723au,
 	  but you will need to control which module you wish to load.
 
 	  To compile this driver as a module, choose M here: the module will
