@@ -2706,9 +2706,9 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 	/* wait till 0x04[17] = 1 power ready*/
 	for (count = RTL8XXXU_MAX_REG_POLL; count; count--) {
 		val32 = rtl8723au_read32(priv, REG_APS_FSMCO);
-		if (val32 & BIT(17)) {
+		if (val32 & BIT(17))
 			break;
-		}
+
 		udelay(10);
 	}
 
@@ -3835,7 +3835,8 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 
 		memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
 		usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in,
-				  skb->data, skb_size, rtl8xxxu_rx_complete, skb);
+				  skb->data, skb_size, rtl8xxxu_rx_complete,
+				  skb);
 
 		usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
 		ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);

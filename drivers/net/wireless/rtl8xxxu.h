@@ -331,7 +331,7 @@ struct rtl8xxxu_firmware_header {
  * The 8723au has 3 channel groups: 1-3, 4-9, and 10-14
  */
 struct rtl8723au_idx {
-#if defined (__LITTLE_ENDIAN)
+#ifdef __LITTLE_ENDIAN
 	int	a:4;
 	int	b:4;
 #else
