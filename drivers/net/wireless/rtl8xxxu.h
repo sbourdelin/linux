@@ -334,11 +334,9 @@ struct rtl8723au_idx {
 #if defined (__LITTLE_ENDIAN)
 	int	a:4;
 	int	b:4;
-#elif defined (__LITTLE_ENDIAN)
+#else
 	int	b:4;
 	int	a:4;
-#else
-#error "no endianess defined"
 #endif
 } __attribute__((packed));
 
