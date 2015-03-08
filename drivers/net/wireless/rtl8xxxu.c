@@ -677,8 +677,8 @@ static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 			pr_debug("H2C_EXT %04x\n", le16_to_cpu(h2c->raw.ext));
 	}
 	rtl8723au_write32(priv, mbox_reg, le32_to_cpu(h2c->raw.data));
-		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
-			pr_debug("H2C %08x\n", le16_to_cpu(h2c->raw.data));
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
+		pr_debug("H2C %08x\n", le16_to_cpu(h2c->raw.data));
 
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
@@ -834,9 +834,9 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 		rtl8723au_write32(priv, REG_FPGA0_ANALOG2, val32);
 		break;
 	case NL80211_CHAN_WIDTH_40:
-                if (hw->conf.chandef.center_freq1 >
+		if (hw->conf.chandef.center_freq1 >
 		    hw->conf.chandef.chan->center_freq)
-                        sec_ch_above = 1;
+			sec_ch_above = 1;
 		else
 			sec_ch_above = 0;
 
@@ -977,9 +977,9 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 		mcsbase[1] += efuse->ht20_tx_power_index_diff[group].b;
 
 	ofdm_a = ofdmbase[0] | ofdmbase[0] << 8 |
-		ofdmbase[0] << 16 | ofdmbase[0] <<24;
+		ofdmbase[0] << 16 | ofdmbase[0] << 24;
 	ofdm_b = ofdmbase[1] | ofdmbase[1] << 8 |
-		ofdmbase[1] << 16 | ofdmbase[1] <<24;
+		ofdmbase[1] << 16 | ofdmbase[1] << 24;
 	rtl8723au_write32(priv, REG_TX_AGC_A_RATE18_06, ofdm_a);
 	rtl8723au_write32(priv, REG_TX_AGC_B_RATE18_06, ofdm_b);
 
@@ -987,9 +987,9 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 	rtl8723au_write32(priv, REG_TX_AGC_B_RATE54_24, ofdm_b);
 
 	mcs_a = mcsbase[0] | mcsbase[0] << 8 |
-		mcsbase[0] << 16 | mcsbase[0] <<24;
+		mcsbase[0] << 16 | mcsbase[0] << 24;
 	mcs_b = mcsbase[1] | mcsbase[1] << 8 |
-		mcsbase[1] << 16 | mcsbase[1] <<24;
+		mcsbase[1] << 16 | mcsbase[1] << 24;
 
 	rtl8723au_write32(priv, REG_TX_AGC_A_MCS03_MCS00, mcs_a);
 	rtl8723au_write32(priv, REG_TX_AGC_B_MCS03_MCS00, mcs_b);
@@ -1081,7 +1081,7 @@ static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 	val32 = rtl8723au_read32(priv, REG_SYS_CFG);
 	priv->chip_cut = (val32 & SYS_CFG_CHIP_VERSION_MASK) >>
 		SYS_CFG_CHIP_VERSION_SHIFT;
-	switch(priv->chip_cut) {
+	switch (priv->chip_cut) {
 	case 0:
 		cut = "A";
 		break;
@@ -1224,7 +1224,7 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 			offset = (header & 0xe0) >> 5;
 
 			ret = rtl8xxxu_read_efuse8(priv, efuse_addr++,
-						 &extheader);
+						   &extheader);
 			if (ret)
 				goto exit;
 			/* All words disabled */
@@ -1245,33 +1245,30 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 			/* We have 8 bits to indicate validity */
 			map_addr = offset * 8;
 			if (map_addr >= EFUSE_MAP_LEN_8723A) {
-				pr_debug("%s: %s: Illegal map_addr (%04x), "
-					 "efuse corrupt!\n", DRIVER_NAME,
+				pr_debug("%s: Illegal map_addr (%04x), "
+					 "efuse corrupt!\n",
 					 __func__, map_addr);
-			ret = -EINVAL;
-			goto exit;
-
 				ret = -EINVAL;
+				goto exit;
 			}
 			for (i = 0; i < EFUSE_MAX_WORD_UNIT; i++) {
 				/* Check word enable condition in the section */
 				if (!(word_mask & BIT(i))) {
 					ret = rtl8xxxu_read_efuse8(priv,
-								 efuse_addr++,
-								 &val8);
+								   efuse_addr++,
+								   &val8);
 					priv->efuse_wifi.raw[map_addr++] = val8;
 
 					ret = rtl8xxxu_read_efuse8(priv,
-								 efuse_addr++,
-								 &val8);
+								   efuse_addr++,
+								   &val8);
 					priv->efuse_wifi.raw[map_addr++] = val8;
 				} else
 					map_addr += 2;
 			}
 		} else {
-			pr_debug("%s: %s: Illegal offset (%04x), "
-				 "efuse corrupt!\n", DRIVER_NAME, __func__,
-			       offset);
+			pr_debug("%s: Illegal offset (%04x), efuse corrupt!\n",
+				 __func__, offset);
 			ret = -EINVAL;
 			goto exit;
 		}
@@ -1384,7 +1381,6 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 			ret = -EAGAIN;
 			goto fw_abort;
 		}
-
 	}
 
 	ret = 0;
@@ -1404,7 +1400,7 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 	int ret = 0;
 	u16 signature;
 
-	switch(priv->chip_cut) {
+	switch (priv->chip_cut) {
 	case 0:
 		fw_name = "rtlwifi/rtl8723aufw_A.bin";
 		break;
@@ -1436,7 +1432,7 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 	priv->fw_size = fw->size - sizeof(struct rtl8xxxu_firmware_header);
 
 	signature = le16_to_cpu(priv->fw_data->signature);
-	switch(signature & 0xfff0) {
+	switch (signature & 0xfff0) {
 	case 0x92c0:
 	case 0x88c0:
 	case 0x2300:
@@ -1591,7 +1587,7 @@ static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 	ldov12d = LDOV12D_ENABLE | BIT(2) | (2 << LDOV12D_VADJ_SHIFT);
 	ldohci12 = 0x57;
 	lpldo = 1;
-	val32 = (lpldo << 24) | (ldohci12 << 16) | (ldov12d << 8)| ldoa15;
+	val32 = (lpldo << 24) | (ldohci12 << 16) | (ldov12d << 8) | ldoa15;
 
 	rtl8723au_write32(priv, REG_LDOA15_CTRL, val32);
 
@@ -1612,7 +1608,7 @@ static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
 		if (reg == 0xff && val == 0xffffffff)
 			break;
 
-		switch(reg) {
+		switch (reg) {
 		case 0xfe:
 			msleep(50);
 			continue;
@@ -1751,7 +1747,7 @@ static int rtl8xxxu_init_queue_priority(struct rtl8xxxu_priv *priv)
 	int hip, mgp, bkp, bep, vip, vop;
 	int ret = 0;
 
-	switch(priv->ep_tx_count) {
+	switch (priv->ep_tx_count) {
 	case 1:
 		if (priv->ep_tx_high_queue) {
 			hi = TRXDMA_QUEUE_HIGH;
@@ -2159,10 +2155,10 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	if (t == 0) {
 		/*  Save ADDA parameters, turn Path A ADDA on */
 		rtl8xxxu_save_regs(priv, ADDA_REG, priv->adda_backup,
-				 RTL8XXXU_ADDA_REGS);
+				   RTL8XXXU_ADDA_REGS);
 		rtl8xxxu_save_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
 		rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
-				 priv->bb_backup, RTL8XXXU_BB_REGS);
+				   priv->bb_backup, RTL8XXXU_BB_REGS);
 	}
 
 	rtl8xxxu_path_adda_on(priv, ADDA_REG, true, is_2t);
@@ -2540,10 +2536,10 @@ void rtl8xxxu_set_ampdu_factor(struct rtl8xxxu_priv *priv, u8 ampdu_factor)
 		if ((vals[i] & 0xf0) > (ampdu_factor << 4))
 			vals[i] = (vals[i] & 0x0f) | (ampdu_factor << 4);
 
-			if ((vals[i] & 0x0f) > ampdu_factor)
-				vals[i] = (vals[i] & 0xf0) | ampdu_factor;
+		if ((vals[i] & 0x0f) > ampdu_factor)
+			vals[i] = (vals[i] & 0xf0) | ampdu_factor;
 
-			rtl8723au_write8(priv, REG_AGGLEN_LMT + i, vals[i]);
+		rtl8723au_write8(priv, REG_AGGLEN_LMT + i, vals[i]);
 	}
 }
 
@@ -2830,7 +2826,7 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 
 	/* for Efuse PG */
 	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
-	val32 &= ~(BIT(28)|BIT(29)|BIT(30));
+	val32 &= ~(BIT(28) | BIT(29) | BIT(30));
 	val32 |= (0x06 << 28);
 	rtl8723au_write32(priv, REG_EFUSE_CTRL, val32);
 exit:
@@ -2940,7 +2936,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	val32 = 0x07000000 | FPGA0_RF_TRSW | FPGA0_RF_TRSWB |
 		FPGA0_RF_ANTSW | FPGA0_RF_ANTSWB | FPGA0_RF_PAPE;
 	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, val32);
-	 /* 0x860[6:5]= 00 - why? - this sets antenna B */
+	/* 0x860[6:5]= 00 - why? - this sets antenna B */
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
 
 	priv->rf_mode_ag[0] = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
@@ -3057,12 +3053,12 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8723au_write32(priv, REG_RARFRC, 0x04030201);
 	rtl8723au_write32(priv, REG_RARFRC + 4, 0x08070605);
 
-        val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL);
-        val8 |= FWHW_TXQ_CTRL_AMPDU_RETRY;
-        rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL, val8);
+	val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL);
+	val8 |= FWHW_TXQ_CTRL_AMPDU_RETRY;
+	rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL, val8);
 
-        /*  Set ACK timeout */
-        rtl8723au_write8(priv, REG_ACKTO, 0x40);
+	/*  Set ACK timeout */
+	rtl8723au_write8(priv, REG_ACKTO, 0x40);
 
 	/*
 	 * Initialize beacon parameters
@@ -3206,7 +3202,7 @@ static void rtl8xxxu_disable_device(struct ieee80211_hw *hw)
 }
 
 static void rtl8xxxu_cam_write(struct rtl8xxxu_priv *priv,
-			     struct ieee80211_key_conf *key, const u8 *mac)
+			       struct ieee80211_key_conf *key, const u8 *mac)
 {
 	u32 cmd, val32, addr, ctrl;
 	int j, i, tmp_debug;
@@ -3244,7 +3240,7 @@ static void rtl8xxxu_cam_write(struct rtl8xxxu_priv *priv,
 }
 
 static void rtl8xxxu_sw_scan_start(struct ieee80211_hw *hw,
-				 struct ieee80211_vif *vif, const u8 *mac)
+				   struct ieee80211_vif *vif, const u8 *mac)
 {
 #if 0
 	struct rtl8xxxu_priv *priv = hw->priv;
@@ -3262,7 +3258,7 @@ static void rtl8xxxu_sw_scan_start(struct ieee80211_hw *hw,
 }
 
 static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
-				    struct ieee80211_vif *vif)
+				      struct ieee80211_vif *vif)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	u8 val8;
@@ -3277,7 +3273,7 @@ static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 }
 
 static void rtl8xxxu_update_rate_table(struct rtl8xxxu_priv *priv,
-				     struct ieee80211_sta *sta)
+				       struct ieee80211_sta *sta)
 {
 	struct h2c_cmd h2c;
 	u32 ramask;
@@ -3306,7 +3302,7 @@ static void rtl8xxxu_update_rate_table(struct rtl8xxxu_priv *priv,
 }
 
 static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv,
-				   struct ieee80211_sta *sta)
+				     struct ieee80211_sta *sta)
 {
 	u32 rate_cfg, val32;
 	u8 rate_idx = 0;
@@ -3322,7 +3318,7 @@ static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv,
 	pr_debug("%s: supp_rates %08x rates %08x\n", __func__,
 		 sta->supp_rates[0], rate_cfg);
 
-	while(rate_cfg) {
+	while (rate_cfg) {
 		rate_cfg = (rate_cfg >> 1);
 		rate_idx++;
 	}
@@ -3331,7 +3327,7 @@ static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv,
 
 static void
 rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-			struct ieee80211_bss_conf *bss_conf, u32 changed)
+			  struct ieee80211_bss_conf *bss_conf, u32 changed)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct ieee80211_sta *sta;
@@ -3531,7 +3527,7 @@ static u32 rtl8xxxu_80211_to_rtl_queue(u32 queue)
 {
 	u32 rtlqueue;
 
-	switch(queue) {
+	switch (queue) {
 	case IEEE80211_AC_VO:
 		rtlqueue = TXDESC_QUEUE_VO;
 		break;
@@ -3691,9 +3687,10 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw5 = cpu_to_le32(0x0001ff00);
 
 		if ((tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&
-			control->sta->ht_cap.ht_supported &&
-			control && control->sta) {
+		    control->sta->ht_cap.ht_supported &&
+		    control && control->sta) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
+
 			tx_desc->txdw2 |=
 				cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_AGG_ENABLE);
@@ -4042,7 +4039,7 @@ static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
 	pr_debug("%s: IEEE80211 queue %02x val %08x, acm %i, acm_ctrl %02x\n",
 		 __func__, queue, val32, param->acm, acm_ctrl);
 
-	switch(queue) {
+	switch (queue) {
 	case IEEE80211_AC_VO:
 		acm_bit = ACM_HW_CTRL_VO;
 		rtl8723au_write32(priv, REG_EDCA_VO_PARAM, val32);
@@ -4145,7 +4142,7 @@ static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	val8 |= SEC_CFG_TX_USE_DEFKEY | SEC_CFG_RX_USE_DEFKEY;
 	rtl8723au_write8(priv, REG_SECURITY_CFG, val8);
 
-	switch(cmd) {
+	switch (cmd) {
 	case SET_KEY:
 		/*
 		 * This is a bit of a hack - the lower bits of the cipher

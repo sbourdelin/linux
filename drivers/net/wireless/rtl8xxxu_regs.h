@@ -107,7 +107,7 @@
 #define REG_EFUSE_TEST			0x0034
 #define  EFUSE_TRPT			BIT(7)
 	/*  00: Wifi Efuse, 01: BT Efuse0, 10: BT Efuse1, 11: BT Efuse2 */
-#define  EFUSE_CELL_SEL			(BIT(8)|BIT(9))
+#define  EFUSE_CELL_SEL			(BIT(8) | BIT(9))
 #define  EFUSE_LDOE25_ENABLE		BIT(31)
 #define  EFUSE_SELECT_MASK		0x0300
 #define  EFUSE_WIFI_SELECT		0x0000
@@ -204,7 +204,7 @@
 #define  SYS_CFG_BD_MAC2		BIT(9)
 #define  SYS_CFG_BD_MAC1		BIT(10)
 #define  SYS_CFG_IC_MACPHY_MODE		BIT(11)
-#define  SYS_CFG_CHIP_VER		(BIT(12)|BIT(13)|BIT(14)|BIT(15))
+#define  SYS_CFG_CHIP_VER		(BIT(12) | BIT(13) | BIT(14) | BIT(15))
 #define  SYS_CFG_BT_FUNC		BIT(16)
 #define  SYS_CFG_VENDOR_ID		BIT(19)
 #define  SYS_CFG_PAD_HWPD_IDN		BIT(22)
@@ -222,9 +222,9 @@
 
 
 #define REG_GPIO_OUTSTS			0x00f4	/*  For RTL8723 only. */
-#define	 GPIO_EFS_HCI_SEL		(BIT(0)|BIT(1))
-#define	 GPIO_PAD_HCI_SEL		(BIT(2)|BIT(3))
-#define	 GPIO_HCI_SEL			(BIT(4)|BIT(5))
+#define	 GPIO_EFS_HCI_SEL		(BIT(0) | BIT(1))
+#define	 GPIO_PAD_HCI_SEL		(BIT(2) | BIT(3))
+#define	 GPIO_HCI_SEL			(BIT(4) | BIT(5))
 #define	 GPIO_PKG_SEL_HCI		BIT(6)
 #define	 GPIO_FEN_GPS			BIT(7)
 #define	 GPIO_FEN_BT			BIT(8)
@@ -241,7 +241,7 @@
 #define	 GPIO_UPHY_SUSB			BIT(21)
 #define	 GPIO_PCI_SUSEN			BIT(22)
 #define	 GPIO_USB_SUSEN			BIT(23)
-#define	 GPIO_RF_RL_ID			(BIT(31)|BIT(30)|BIT(29)|BIT(28))
+#define	 GPIO_RF_RL_ID			(BIT(31) | BIT(30) | BIT(29) | BIT(28))
 
 /* 0x0100 ~ 0x01FF	MACTOP General Configuration */
 #define REG_CR				0x0100
@@ -445,7 +445,6 @@
 #define REG_PKT_LOSE_RPT		0x04e1
 #define REG_PTCL_ERR_STATUS		0x04e2
 #define REG_DUMMY			0x04fc
-
 
 
 /* 0x0500 ~ 0x05FF	EDCA Configuration */

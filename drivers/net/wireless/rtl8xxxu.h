@@ -488,8 +488,7 @@ struct rtl8xxxu_priv {
 	bool use_shortgi;
 };
 
-struct rtl8xxxu_rx_urb
-{
+struct rtl8xxxu_rx_urb {
 	struct urb urb;
 	struct ieee80211_hw *hw;
 };
