@@ -2859,7 +2859,7 @@ static void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 	/* Reset MCU ready status */
 	rtl8723au_write8(priv, REG_MCU_FW_DL, 0x00);
 
-	rtl8xxxu_active_to_emu(priv);	
+	rtl8xxxu_active_to_emu(priv);
 	rtl8xxxu_emu_to_disabled(priv);
 
 	/* Reset MCU IO Wrapper */
@@ -3270,7 +3270,7 @@ static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 #if 0
 	pr_debug("%s\n", __func__);
 #endif
-	
+
 	val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
 	val8 &= ~BEACON_DISABLE_TSF_UPDATE;
 	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
@@ -3489,7 +3489,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
 		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
 #endif
-	
+
 		rtl8723au_write8(priv, REG_SIFS_CCK + 1, sifs);
 		rtl8723au_write8(priv, REG_SIFS_OFDM + 1, sifs);
 		rtl8723au_write8(priv, REG_SPEC_SIFS + 1, sifs);
@@ -3518,7 +3518,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (sta)
 			rtl8xxxu_set_basic_rates(priv, sta);
-		else 
+		else
 			pr_debug("BSS_CHANGED_BASIC_RATES: No sta found!\n");
 
 		rcu_read_unlock();
