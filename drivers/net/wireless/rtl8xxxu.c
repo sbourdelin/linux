@@ -30,13 +30,14 @@
 #include <linux/ethtool.h>
 #include <linux/wireless.h>
 #include <linux/firmware.h>
+#include <linux/moduleparam.h>
 #include <net/mac80211.h>
 #include "rtl8xxxu.h"
 #include "rtl8xxxu_regs.h"
 
 #define DRIVER_NAME "rtl8xxxu"
 
-static int rtl8xxxu_debug = 0 /*RTL8XXXU_DEBUG_REG_WRITE*/;
+static int rtl8xxxu_debug = 0;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
@@ -44,6 +45,9 @@ MODULE_LICENSE("GPL");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_A.bin");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B.bin");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B_NoBT.bin");
+
+module_param_named(debug, rtl8xxxu_debug, int, 0600);
+MODULE_PARM_DESC(debug, "Set debug mask");
 
 #define USB_VENDER_ID_REALTEK		0x0BDA
 /* Minimum IEEE80211_MAX_FRAME_LEN */
