@@ -1083,6 +1083,7 @@ rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 
 static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 {
+	struct device *dev = &priv->udev->dev;
 	u32 val32;
 	u16 val16;
 	char *cut;
@@ -1134,11 +1135,10 @@ static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 		priv->ep_tx_count++;
 	}
 
-	pr_info("%s: RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
-		DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
-		priv->has_gps);
+	dev_info(dev, "RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
+		 cut, priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
-	dev_dbg(&priv->udev->dev, "%s: RTL8723au number of TX queues: %i\n",
+	dev_dbg(dev, "%s: RTL8723au number of TX queues: %i\n",
 		__func__, priv->ep_tx_count);
 }
 
@@ -1295,6 +1295,7 @@ exit:
 
 static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 {
+	struct device *dev = &priv->udev->dev;
 	int ret = 0, i;
 	u32 val32;
 
@@ -1306,7 +1307,7 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 	}
 
 	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
-		pr_warn("%s: Firmware checksum poll timed out\n", DRIVER_NAME);
+		dev_warn(dev, "Firmware checksum poll timed out\n");
 		ret = -EAGAIN;
 		goto exit;
 	}
@@ -1326,7 +1327,7 @@ static int rtl8xxxu_start_firmware(struct rtl8xxxu_priv *priv)
 	}
 
 	if (i == RTL8XXXU_FIRMWARE_POLL_MAX) {
-		pr_warn("%s: Firmware failed to start\n", DRIVER_NAME);
+		dev_warn(dev, "Firmware failed to start\n");
 		ret = -EAGAIN;
 		goto exit;
 	}
@@ -1428,13 +1429,12 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 
 	dev_dbg(dev, "%s: Loading firmware %s\n", DRIVER_NAME, fw_name);
 	if (request_firmware(&fw, fw_name, &priv->udev->dev)) {
-		pr_warn("%s: request_firmware(%s) failed\n",
-			DRIVER_NAME, fw_name);
+		dev_warn(dev, "request_firmware(%s) failed\n", fw_name);
 		ret = -EAGAIN;
 		goto exit;
 	}
 	if (!fw) {
-		pr_warn("%s: Firmware data not available\n", DRIVER_NAME);
+		dev_warn(dev, "Firmware data not available\n");
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -1506,7 +1506,8 @@ rtl8xxxu_init_mac(struct rtl8xxxu_priv *priv, struct rtl8xxxu_reg8val *array)
 
 		ret = rtl8723au_write8(priv, reg, val);
 		if (ret != 1) {
-			pr_warn("%s: Failed to initialize MAC\n", DRIVER_NAME);
+			dev_warn(&priv->udev->dev,
+				 "Failed to initialize MAC\n");
 			return -EAGAIN;
 		}
 	}
@@ -1532,7 +1533,8 @@ static int rtl8xxxu_init_phy_regs(struct rtl8xxxu_priv *priv,
 
 		ret = rtl8723au_write32(priv, reg, val);
 		if (ret != sizeof(val)) {
-			pr_warn("%s: Failed to initialize PHY\n", DRIVER_NAME);
+			dev_warn(&priv->udev->dev,
+				 "Failed to initialize PHY\n");
 			return -EAGAIN;
 		}
 		udelay(1);
@@ -1644,7 +1646,8 @@ static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
 
 		ret = rtl8723au_write_rfreg(priv, reg, val);
 		if (ret) {
-			pr_warn("%s: Failed to initialize RF\n", DRIVER_NAME);
+			dev_warn(&priv->udev->dev,
+				 "Failed to initialize RF\n");
 			return -EAGAIN;
 		}
 		udelay(1);
@@ -2126,7 +2129,8 @@ static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 	    ((regEAC & 0x03ff0000) != 0x00360000))
 		result |= 0x02;
 	else
-		pr_warn("%s: Path A Rx IQK fail!\n", __func__);
+		dev_warn(&priv->udev->dev, "%s: Path A RX IQK failed!\n",
+			 __func__);
 	return result;
 }
 
@@ -2596,7 +2600,8 @@ static int rtl8xxxu_active_to_emu(struct rtl8xxxu_priv *priv)
 	}
 
 	if (!count) {
-		pr_warn("%s: Turn off MAC timed out\n", __func__);
+		dev_warn(&priv->udev->dev, "%s: Disabling MAC timed out\n",
+			 __func__);
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2634,7 +2639,8 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 	}
 
 	if (!count) {
-		pr_warn("%s: RX poll timed out (0x05f8)\n", __func__);
+		dev_warn(&priv->udev->dev,
+			 "%s: RX poll timed out (0x05f8)\n", __func__);
 		ret = -EBUSY;
 		goto exit;
 	}
@@ -2908,7 +2914,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 
 	ret = rtl8xxxu_power_on(priv);
 	if (ret < 0) {
-		pr_warn("%s: Failed power on\n", __func__);
+		dev_warn(dev, "%s: Failed power on\n", __func__);
 		goto exit;
 	}
 
@@ -3766,6 +3772,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 	struct rtl8723au_phy_stats *phy_stats;
 	struct ieee80211_rx_status *rx_status = IEEE80211_SKB_RXCB(skb);
 	struct ieee80211_mgmt *mgmt;
+	struct device *dev = &priv->udev->dev;
 	__le32 *_rx_desc_le = (__le32 *)skb->data;
 	u32 *_rx_desc = (u32 *)skb->data;
 	int cnt, len, skb_size, drvinfo_sz, desc_shift, i, ret;
@@ -3833,7 +3840,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 			RTL_RX_BUFFER_SIZE;
 		skb = dev_alloc_skb(skb_size);
 		if (!skb) {
-			pr_warn("%s: Out of memory\n", __func__);
+			dev_warn(dev, "%s: Unable to allocate skb\n", __func__);
 			goto cleanup;
 		}
 
@@ -3849,8 +3856,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 			goto cleanup;
 		}
 	} else {
-		dev_dbg(&priv->udev->dev, "%s: status %i\n",
-			__func__, urb->status);
+		dev_dbg(dev, "%s: status %i\n",	__func__, urb->status);
 		goto cleanup;
 	}
 	return;
@@ -4287,7 +4293,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 					__func__, num);
 
 			if (priv->pipe_in) {
-				pr_warn("%s: Too many IN pipes\n", __func__);
+				dev_warn(dev,
+					 "%s: Too many IN pipes\n", __func__);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -4302,8 +4309,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 					__func__, num);
 
 			if (priv->pipe_interrupt) {
-				pr_warn("%s: Too many INTERRUPT pipes\n",
-					__func__);
+				dev_warn(dev, "%s: Too many INTERRUPT pipes\n",
+					 __func__);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -4317,8 +4324,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 				dev_dbg(dev, "%s: out endpoint num %i\n",
 					__func__, num);
 			if (j >= RTL8XXXU_OUT_ENDPOINTS) {
-				pr_warn("%s: Unsupported number of OUT pipes\n",
-					__func__);
+				dev_warn(dev,
+					 "%s: Too many OUT pipes\n", __func__);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -4362,14 +4369,13 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	rtl8xxxu_read_efuse(priv);
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
-	pr_info("%s: RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
-		DRIVER_NAME,
-		priv->efuse_wifi.efuse.mac_addr[0],
-		priv->efuse_wifi.efuse.mac_addr[1],
-		priv->efuse_wifi.efuse.mac_addr[2],
-		priv->efuse_wifi.efuse.mac_addr[3],
-		priv->efuse_wifi.efuse.mac_addr[4],
-		priv->efuse_wifi.efuse.mac_addr[5]);
+	dev_info(&udev->dev, "RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
+		 priv->efuse_wifi.efuse.mac_addr[0],
+		 priv->efuse_wifi.efuse.mac_addr[1],
+		 priv->efuse_wifi.efuse.mac_addr[2],
+		 priv->efuse_wifi.efuse.mac_addr[3],
+		 priv->efuse_wifi.efuse.mac_addr[4],
+		 priv->efuse_wifi.efuse.mac_addr[5]);
 
 	rtl8xxxu_load_firmware(priv);
 
@@ -4419,7 +4425,8 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
-		pr_err("%s: Failed to register: %i\n", DRIVER_NAME, ret);
+		dev_err(&udev->dev, "%s: Failed to register: %i\n",
+			__func__, ret);
 		goto exit;
 	}
 
