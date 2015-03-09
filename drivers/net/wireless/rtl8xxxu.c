@@ -2082,7 +2082,7 @@ rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs, u32 *backup)
 
 static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 {
-	u32 regEAC, regE94, regE9C, regEA4;
+	u32 reg_eac, reg_e94, reg_e9c, reg_ea4;
 	int result = 0;
 
 	/* path-A IQK setting */
@@ -2111,26 +2111,27 @@ static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 	mdelay(1);
 
 	/* Check failed */
-	regEAC = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_A_2);
-	regE94 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A);
-	regE9C = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A);
-	regEA4 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_A_2);
+	reg_eac = rtl8723au_read32(priv, REG_RX_POWER_AFTER_IQK_A_2);
+	reg_e94 = rtl8723au_read32(priv, REG_TX_POWER_BEFORE_IQK_A);
+	reg_e9c = rtl8723au_read32(priv, REG_TX_POWER_AFTER_IQK_A);
+	reg_ea4 = rtl8723au_read32(priv, REG_RX_POWER_BEFORE_IQK_A_2);
 
-	if (!(regEAC & BIT(28)) &&
-	    ((regE94 & 0x03ff0000) != 0x01420000) &&
-	    ((regE9C & 0x03ff0000) != 0x00420000))
+	if (!(reg_eac & BIT(28)) &&
+	    ((reg_e94 & 0x03ff0000) != 0x01420000) &&
+	    ((reg_e9c & 0x03ff0000) != 0x00420000))
 		result |= 0x01;
 	else	/* If TX not OK, ignore RX */
-		return result;
+		goto out;
 
 	/* If TX is OK, check whether RX is OK */
-	if (!(regEAC & BIT(27)) &&
-	    ((regEA4 & 0x03ff0000) != 0x01320000) &&
-	    ((regEAC & 0x03ff0000) != 0x00360000))
+	if (!(reg_eac & BIT(27)) &&
+	    ((reg_ea4 & 0x03ff0000) != 0x01320000) &&
+	    ((reg_eac & 0x03ff0000) != 0x00360000))
 		result |= 0x02;
 	else
 		dev_warn(&priv->udev->dev, "%s: Path A RX IQK failed!\n",
 			 __func__);
+out:
 	return result;
 }
 
