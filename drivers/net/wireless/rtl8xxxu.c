@@ -37,7 +37,7 @@
 
 #define DRIVER_NAME "rtl8xxxu"
 
-static int rtl8xxxu_debug = 0;
+static int rtl8xxxu_debug = RTL8XXXU_DEBUG_REG_WRITE;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
@@ -468,8 +468,8 @@ static u8 rtl8723au_read8(struct rtl8xxxu_priv *priv, u16 addr)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_READ)
-		pr_debug("%s(%04x)   = 0x%02x, len %i\n",
-			 __func__, addr, data, len);
+		dev_dbg(&udev->dev, "%s(%04x)   = 0x%02x, len %i\n",
+			__func__, addr, data, len);
 	return data;
 }
 
@@ -488,8 +488,8 @@ static u16 rtl8723au_read16(struct rtl8xxxu_priv *priv, u16 addr)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_READ)
-		pr_debug("%s(%04x)  = 0x%04x, len %i\n",
-			 __func__, addr, data, len);
+		dev_dbg(&udev->dev, "%s(%04x)  = 0x%04x, len %i\n",
+			__func__, addr, data, len);
 	return data;
 }
 
@@ -508,8 +508,8 @@ static u32 rtl8723au_read32(struct rtl8xxxu_priv *priv, u16 addr)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_READ)
-		pr_debug("%s(%04x)  = 0x%08x, len %i\n",
-			 __func__, addr, data, len);
+		dev_dbg(&udev->dev, "%s(%04x)  = 0x%08x, len %i\n",
+			__func__, addr, data, len);
 	return data;
 }
 
@@ -528,7 +528,7 @@ static int rtl8723au_write8(struct rtl8xxxu_priv *priv, u16 addr, u8 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		pr_debug("%s(%04x) = 0x%02x\n", __func__, addr, val);
+		dev_dbg(&udev->dev, "%s(%04x) = 0x%02x\n", __func__, addr, val);
 	return ret;
 }
 
@@ -546,7 +546,7 @@ static int rtl8723au_write16(struct rtl8xxxu_priv *priv, u16 addr, u16 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		pr_debug("%s(%04x) = 0x%04x\n", __func__, addr, val);
+		dev_dbg(&udev->dev, "%s(%04x) = 0x%04x\n", __func__, addr, val);
 	return ret;
 }
 
@@ -564,7 +564,7 @@ static int rtl8723au_write32(struct rtl8xxxu_priv *priv, u16 addr, u32 val)
 	mutex_unlock(&priv->usb_buf_mutex);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		pr_debug("%s(%04x) = 0x%08x\n", __func__, addr, val);
+		dev_dbg(&udev->dev, "%s(%04x) = 0x%08x\n", __func__, addr, val);
 	return ret;
 }
 
@@ -579,7 +579,7 @@ rtl8723au_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
 			      addr, 0, buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		pr_debug("%s(%04x) = %p, len 0x%02x\n",
+		dev_dbg(&udev->dev, "%s(%04x) = %p, len 0x%02x\n",
 			 __func__, addr, buf, len);
 	return ret;
 }
@@ -616,7 +616,8 @@ static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv, u8 reg)
 	retval &= 0xfffff;
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RFREG_READ)
-		pr_debug("%s(%02x) = 0x%06x\n", __func__, reg, retval);
+		dev_dbg(&priv->udev->dev, "%s(%02x) = 0x%06x\n",
+			__func__, reg, retval);
 	return retval;
 }
 
@@ -626,7 +627,8 @@ static int rtl8723au_write_rfreg(struct rtl8xxxu_priv *priv, u8 reg, u32 data)
 	u32 dataaddr;
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_RFREG_WRITE)
-		pr_debug("%s(%02x) = 0x%06x\n", __func__, reg, data);
+		dev_dbg(&priv->udev->dev, "%s(%02x) = 0x%06x\n",
+			__func__, reg, data);
 
 	data &= FPGA0_LSSI_PARM_DATA_MASK;
 	dataaddr = (reg << FPGA0_LSSI_PARM_ADDR_SHIFT) | data;
@@ -645,6 +647,7 @@ static int rtl8723au_write_rfreg(struct rtl8xxxu_priv *priv, u8 reg, u32 data)
 
 static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 {
+	struct device *dev = &priv->udev->dev;
 	int mbox_nr, retry, retval = 0;
 	int mbox_reg, mbox_ext_reg;
 	u8 val8;
@@ -666,7 +669,7 @@ static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 	} while (retry--);
 
 	if (!retry) {
-		pr_debug("%s: Mailbox busy\n", __func__);
+		dev_dbg(dev, "%s: Mailbox busy\n", __func__);
 		retval = -EBUSY;
 		goto error;
 	}
@@ -678,11 +681,12 @@ static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 		rtl8723au_write16(priv, mbox_ext_reg,
 				  le16_to_cpu(h2c->raw.ext));
 		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
-			pr_debug("H2C_EXT %04x\n", le16_to_cpu(h2c->raw.ext));
+			dev_dbg(dev, "H2C_EXT %04x\n",
+				le16_to_cpu(h2c->raw.ext));
 	}
 	rtl8723au_write32(priv, mbox_reg, le32_to_cpu(h2c->raw.data));
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
-		pr_debug("H2C %08x\n", le16_to_cpu(h2c->raw.data));
+		dev_dbg(dev, "H2C %08x\n", le16_to_cpu(h2c->raw.data));
 
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
@@ -939,9 +943,10 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 	}
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_CHANNEL)
-		pr_debug("%s: Setting TX power CCK A: %02x, "
-			 "CCK B: %02x, OFDM A: %02x, OFDM B: %02x\n",
-			 DRIVER_NAME, cck[0], cck[1], ofdm[0], ofdm[1]);
+		dev_dbg(&priv->udev->dev,
+			"%s: Setting TX power CCK A: %02x, "
+			"CCK B: %02x, OFDM A: %02x, OFDM B: %02x\n",
+			__func__, cck[0], cck[1], ofdm[0], ofdm[1]);
 
 	for (i = 0; i < RTL8723A_MAX_RF_PATHS; i++) {
 		if (cck[i] > RF6052_MAX_TX_PWR)
@@ -1133,8 +1138,8 @@ static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 		DRIVER_NAME, cut, priv->has_wifi, priv->has_bluetooth,
 		priv->has_gps);
 
-	pr_debug("%s: RTL8723au number of TX queues: %i\n",
-		 DRIVER_NAME, priv->ep_tx_count);
+	dev_dbg(&priv->udev->dev, "%s: RTL8723au number of TX queues: %i\n",
+		__func__, priv->ep_tx_count);
 }
 
 static int
@@ -1174,6 +1179,7 @@ rtl8xxxu_read_efuse8(struct rtl8xxxu_priv *priv, u16 offset, u8 *data)
 
 static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 {
+	struct device *dev = &priv->udev->dev;
 	int i, ret = 0;
 	u8 val8, word_mask, header, extheader;
 	u16 val16, efuse_addr, offset;
@@ -1189,8 +1195,8 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 	val32 = (val32 & ~EFUSE_SELECT_MASK) | EFUSE_WIFI_SELECT;
 	rtl8723au_write32(priv, REG_EFUSE_TEST, val32);
 
-	pr_debug("%s: Booting from %s\n", DRIVER_NAME,
-		 priv->boot_eeprom ? "EEPROM" : "EFUSE");
+	dev_dbg(dev, "Booting from %s\n",
+		priv->boot_eeprom ? "EEPROM" : "EFUSE");
 
 	rtl8723au_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_ENABLE);
 
@@ -1249,9 +1255,8 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 			/* We have 8 bits to indicate validity */
 			map_addr = offset * 8;
 			if (map_addr >= EFUSE_MAP_LEN_8723A) {
-				pr_debug("%s: Illegal map_addr (%04x), "
-					 "efuse corrupt!\n",
-					 __func__, map_addr);
+				dev_dbg(dev, "%s: Illegal map_addr (%04x), "
+					"efuse corrupt!\n", __func__, map_addr);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -1271,8 +1276,9 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 					map_addr += 2;
 			}
 		} else {
-			pr_debug("%s: Illegal offset (%04x), efuse corrupt!\n",
-				 __func__, offset);
+			dev_dbg(dev,
+				"%s: Illegal offset (%04x), efuse corrupt!\n",
+				__func__, offset);
 			ret = -EINVAL;
 			goto exit;
 		}
@@ -1399,6 +1405,7 @@ fw_abort:
 
 static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 {
+	struct device *dev = &priv->udev->dev;
 	const struct firmware *fw;
 	char *fw_name;
 	int ret = 0;
@@ -1419,7 +1426,7 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 		return -EINVAL;
 	}
 
-	pr_debug("%s: Loading firmware %s\n", DRIVER_NAME, fw_name);
+	dev_dbg(dev, "%s: Loading firmware %s\n", DRIVER_NAME, fw_name);
 	if (request_firmware(&fw, fw_name, &priv->udev->dev)) {
 		pr_warn("%s: request_firmware(%s) failed\n",
 			DRIVER_NAME, fw_name);
@@ -1443,13 +1450,13 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 		break;
 	default:
 		ret = -EINVAL;
-		pr_debug("%s: Invalid firmware signature: 0x%04x\n",
-			 DRIVER_NAME, signature);
+		dev_dbg(dev, "%s: Invalid firmware signature: 0x%04x\n",
+			__func__, signature);
 	}
 
-	pr_debug("%s: Firmware revision %i.%i (signature 0x%04x)\n",
-		 DRIVER_NAME, le16_to_cpu(priv->fw_data->major_version),
-		 priv->fw_data->minor_version, signature);
+	dev_dbg(dev, "Firmware revision %i.%i (signature 0x%04x)\n",
+		le16_to_cpu(priv->fw_data->major_version),
+		priv->fw_data->minor_version, signature);
 
 exit:
 	release_firmware(fw);
@@ -1468,8 +1475,8 @@ static void rtl8xxxu_firmware_self_reset(struct rtl8xxxu_priv *priv)
 		val16 = rtl8723au_read16(priv, REG_SYS_FUNC);
 
 		if (!(val16 & SYS_FUNC_CPU_ENABLE)) {
-			pr_debug("%s: Firmware self reset success!\n",
-				 __func__);
+			dev_dbg(&priv->udev->dev,
+				"%s: Firmware self reset success!\n", __func__);
 			break;
 		}
 		udelay(50);
@@ -1915,7 +1922,7 @@ static void rtl8xxxu_fill_iqk_matrix_a(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_OFDM0_ENERGY_CCA_THRES, val32);
 
 	if (tx_only) {
-		pr_debug("%s: only TX\n", __func__);
+		dev_dbg(&priv->udev->dev, "%s: only TX\n", __func__);
 		return;
 	}
 
@@ -2126,6 +2133,7 @@ static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 				     int result[][8], int t, bool is_2t)
 {
+	struct device *dev = &priv->udev->dev;
 	u32 i, val32;
 	int path_a_ok /*, path_b_ok */;
 	int retry = 2;
@@ -2237,7 +2245,8 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 			break;
 		} else if (i == (retry - 1) && path_a_ok == 0x01) {
 			/* TX IQK OK */
-			pr_debug("Path A IQK Only Tx Success!!\n");
+			dev_dbg(dev, "%s: Path A IQK Only Tx Success!!\n",
+				__func__);
 
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
@@ -2249,7 +2258,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	}
 
 	if (!path_a_ok)
-		pr_debug("%s: Path A IQK failed!\n", __func__);
+		dev_dbg(dev, "%s: Path A IQK failed!\n", __func__);
 
 #if 0
 	if (is_2t) {
@@ -2280,7 +2289,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		}
 
 		if (!path_b_ok)
-			pr_debug("%s: Path B IQK failed!\n", __func__);
+			dev_dbg(dev, "%s: Path B IQK failed!\n", __func__);
 	}
 #endif
 
@@ -2325,6 +2334,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 
 static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 {
+	struct device *dev = &priv->udev->dev;
 	int result[4][8];	/* last is final result */
 	int i, candidate;
 	bool path_a_ok /*, path_b_ok */;
@@ -2413,11 +2423,11 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		priv->regebc = reg_ebc;
 		reg_ec4 = result[candidate][6];
 		reg_ecc = result[candidate][7];
-		pr_debug("%s: candidate is %x\n", __func__, candidate);
-		pr_debug("%s: reg_e94 =%x reg_e9C =%x reg_eA4 =%x "
-			 "reg_eAC =%x reg_eB4 =%x reg_eBC =%x reg_eC4 =%x "
-			 "reg_eCC =%x\n ", __func__, reg_e94, reg_e9c,
-			 reg_ea4, reg_eac, reg_eb4, reg_ebc, reg_ec4, reg_ecc);
+		dev_dbg(dev, "%s: candidate is %x\n", __func__, candidate);
+		dev_dbg(dev, "%s: reg_e94 =%x reg_e9C =%x reg_eA4 =%x "
+			"reg_eAC =%x reg_eB4 =%x reg_eBC =%x reg_eC4 =%x "
+			"reg_eCC =%x\n ", __func__, reg_e94, reg_e9c,
+			reg_ea4, reg_eac, reg_eb4, reg_ebc, reg_ec4, reg_ecc);
 		path_a_ok = true;
 #if 0
 		path_b_ok = true;
@@ -2515,8 +2525,9 @@ static int rtl8xxxu_set_bssid(struct rtl8xxxu_priv *priv, const u8 *bssid)
 	int i;
 	u16 reg;
 
-	pr_debug("%s (%02x:%02x:%02x:%02x:%02x:%02x)\n", __func__,
-		 bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+	dev_dbg(&priv->udev->dev,
+		"%s: (%02x:%02x:%02x:%02x:%02x:%02x)\n", __func__,
+		bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
 
 	reg = REG_BSSID;
 
@@ -2878,6 +2889,7 @@ static void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
+	struct device *dev = &priv->udev->dev;
 	bool macpower;
 	int ret;
 	u8 val8;
@@ -2900,11 +2912,11 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 		goto exit;
 	}
 
-	pr_debug("macpower %i\n", macpower);
+	dev_dbg(dev, "%s: macpower %i\n", __func__, macpower);
 	if (!macpower) {
 		ret = rtl8xxxu_init_llt_table(priv, TX_TOTAL_PAGE_NUM);
 		if (ret) {
-			pr_debug("%s: LLT table init failed\n", __func__);
+			dev_dbg(dev, "%s: LLT table init failed\n", __func__);
 			goto exit;
 		}
 	}
@@ -3257,7 +3269,7 @@ static void rtl8xxxu_sw_scan_start(struct ieee80211_hw *hw,
 	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
 			 BEACON_FUNCTION_ENABLE | BEACON_DISABLE_TSF_UPDATE);
 
-	pr_debug("%s\n", __func__);
+	dev_dbg(&priv->udev->dev, "%s\n", __func__);
 #endif
 }
 
@@ -3268,7 +3280,7 @@ static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 	u8 val8;
 
 #if 0
-	pr_debug("%s\n", __func__);
+	dev_dbg(&priv->udev->dev, "%s\n", __func__);
 #endif
 
 	val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
@@ -3300,8 +3312,8 @@ static void rtl8xxxu_update_rate_table(struct rtl8xxxu_priv *priv,
 		priv->use_shortgi = false;
 	}
 
-	pr_debug("%s: rate mask %08x, arg %02x\n", __func__,
-		 ramask, h2c.ramask.arg);
+	dev_dbg(&priv->udev->dev, "%s: rate mask %08x, arg %02x\n", __func__,
+		ramask, h2c.ramask.arg);
 	rtl8723a_h2c_cmd(priv, &h2c);
 }
 
@@ -3319,8 +3331,8 @@ static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv,
 	val32 |= rate_cfg;
 	rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
 
-	pr_debug("%s: supp_rates %08x rates %08x\n", __func__,
-		 sta->supp_rates[0], rate_cfg);
+	dev_dbg(&priv->udev->dev, "%s: supp_rates %08x rates %08x\n", __func__,
+		sta->supp_rates[0], rate_cfg);
 
 	while (rate_cfg) {
 		rate_cfg = (rate_cfg >> 1);
@@ -3334,6 +3346,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			  struct ieee80211_bss_conf *bss_conf, u32 changed)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
+	struct device *dev = &priv->udev->dev;
 	struct ieee80211_sta *sta;
 	u32 val32;
 #if 0
@@ -3351,15 +3364,16 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			rcu_read_lock();
 			sta = ieee80211_find_sta(vif, bss_conf->bssid);
 			if (!sta) {
-				pr_debug("%s: ASSOC no sta found\n", __func__);
+				dev_dbg(dev, "%s: ASSOC no sta found\n",
+					__func__);
 				rcu_read_unlock();
 				goto error;
 			}
 
 			if (sta->ht_cap.ht_supported)
-				pr_debug("%s: HT supported\n", __func__);
+				dev_dbg(dev, "%s: HT supported\n", __func__);
 			if (sta->vht_cap.vht_supported)
-				pr_debug("%s: VHT supported\n", __func__);
+				dev_dbg(dev, "%s: VHT supported\n", __func__);
 			rtl8xxxu_update_rate_table(priv, sta);
 			rcu_read_unlock();
 
@@ -3441,8 +3455,8 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
-		pr_debug("Changed ERP_PREAMBLE: Use short preamble %02x\n",
-			 bss_conf->use_short_preamble);
+		dev_dbg(dev, "Changed ERP_PREAMBLE: Use short preamble %02x\n",
+			bss_conf->use_short_preamble);
 		val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
 		if (bss_conf->use_short_preamble)
 			val32 |= RSR_ACK_SHORT_PREAMBLE;
@@ -3452,8 +3466,8 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_SLOT) {
-		pr_debug("Changed ERP_SLOT: short_slot_time %i\n",
-			 bss_conf->use_short_slot);
+		dev_dbg(dev, "Changed ERP_SLOT: short_slot_time %i\n",
+			bss_conf->use_short_slot);
 
 		if (bss_conf->use_short_slot)
 			val8 = 9;
@@ -3469,7 +3483,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (!sta) {
-			pr_debug("BSS_CHANGED_HT: No HT sta found!\n");
+			dev_dbg(dev, "BSS_CHANGED_HT: No HT sta found!\n");
 			rcu_read_unlock();
 			goto error;
 		}
@@ -3484,8 +3498,9 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		}
 		rcu_read_unlock();
 #if 0
-		pr_debug("Changed HT: ampdu_factor %02x, ampdu_density %02x\n",
-			 ampdu_factor, ampdu_density);
+		dev_dbg(dev,
+			"Changed HT: ampdu_factor %02x, ampdu_density %02x\n",
+			ampdu_factor, ampdu_density);
 		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
 		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
 #endif
@@ -3499,13 +3514,13 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_BSSID) {
-		pr_debug("Changed BSSID!\n");
+		dev_dbg(dev, "Changed BSSID!\n");
 		rtl8xxxu_set_bssid(priv, bss_conf->bssid);
 
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (!sta) {
-			pr_debug("No bssid sta found!\n");
+			dev_dbg(dev, "No bssid sta found!\n");
 			rcu_read_unlock();
 			goto error;
 		}
@@ -3513,13 +3528,14 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
-		pr_debug("Changed BASIC_RATES!\n");
+		dev_dbg(dev, "Changed BASIC_RATES!\n");
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (sta)
 			rtl8xxxu_set_basic_rates(priv, sta);
 		else
-			pr_debug("BSS_CHANGED_BASIC_RATES: No sta found!\n");
+			dev_dbg(dev,
+				"BSS_CHANGED_BASIC_RATES: No sta found!\n");
 
 		rcu_read_unlock();
 	}
@@ -3603,7 +3619,6 @@ static void rtl8xxxu_tx_complete(struct urb *urb)
 	usb_free_urb(urb);
 }
 
-
 static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 			struct ieee80211_tx_control *control,
 			struct sk_buff *skb)
@@ -3613,6 +3628,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct rtl8xxxu_tx_desc *tx_desc;
+	struct device *dev = &priv->udev->dev;
 	struct urb *urb;
 	u32 queue, rate;
 	u16 pktlen = skb->len;
@@ -3621,26 +3637,26 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	int ret;
 
 	if (skb_headroom(skb) < sizeof(struct rtl8xxxu_tx_desc)) {
-		pr_debug("%s: Not enough headroom (%i) for tx descriptor\n",
-			 __func__, skb_headroom(skb));
+		dev_dbg(dev, "%s: Not enough headroom (%i) for tx descriptor\n",
+			__func__, skb_headroom(skb));
 		goto error;
 	}
 
 	if (unlikely(skb->len > (65535 - sizeof(struct rtl8xxxu_tx_desc)))) {
-		pr_debug("%s: Trying to send over-sized skb (%i)\n",
-			 __func__, skb->len);
+		dev_dbg(dev, "%s: Trying to send over-sized skb (%i)\n",
+			__func__, skb->len);
 		goto error;
 	}
 
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
-		pr_debug("%s: Unable to allocate urb\n", __func__);
+		dev_dbg(dev, "%s: Unable to allocate urb\n", __func__);
 		goto error;
 	}
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_TX)
-		pr_debug("%s: TX rate: %d (%d), pkt size %d\n",
-			 __func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
+		dev_dbg(dev, "%s: TX rate: %d (%d), pkt size %d\n",
+			__func__, tx_rate->bitrate, tx_rate->hw_value, pktlen);
 
 	tx_info->rate_driver_data[0] = hw;
 
@@ -3771,22 +3787,6 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 
 		mgmt = (struct ieee80211_mgmt *)skb->data;
 
-#if 0
-		if (ieee80211_is_assoc_req(mgmt->frame_control)) {
-			pr_debug("Received assoc req\n");
-		} else if (ieee80211_is_assoc_resp(mgmt->frame_control)) {
-			pr_debug("Received assoc resp\n");
-		} if (ieee80211_is_probe_req(mgmt->frame_control)) {
-			pr_debug("Received probe req\n");
-		} if (ieee80211_is_probe_resp(mgmt->frame_control)) {
-			pr_debug("Received probe resp\n");
-		} if (ieee80211_is_mgmt(mgmt->frame_control)) {
-			pr_debug("Received mgmt\n");
-		} else {
-			pr_debug("Received something else\n");
-		}
-#endif
-
 		memset(rx_status, 0, sizeof(struct ieee80211_rx_status));
 
 		/*
@@ -3849,7 +3849,8 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 			goto cleanup;
 		}
 	} else {
-		pr_debug("%s: status %i\n", __func__, urb->status);
+		dev_dbg(&priv->udev->dev, "%s: status %i\n",
+			__func__, urb->status);
 		goto cleanup;
 	}
 	return;
@@ -3895,9 +3896,10 @@ static int rtl8xxxu_submit_rx_urb(struct ieee80211_hw *hw)
 static void rtl8xxxu_int_complete(struct urb *urb)
 {
 	struct rtl8xxxu_priv *priv = (struct rtl8xxxu_priv *)urb->context;
+	struct device *dev = &priv->udev->dev;
 	int i, ret;
 
-	pr_debug("%s: status %i\n", __func__, urb->status);
+	dev_dbg(dev, "%s: status %i\n", __func__, urb->status);
 	if (urb->status == 0) {
 		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
 			printk("%02x ", priv->int_buf[i]);
@@ -3910,7 +3912,7 @@ static void rtl8xxxu_int_complete(struct urb *urb)
 		if (ret)
 			usb_unanchor_urb(urb);
 	} else {
-		pr_debug("%s: Error %i\n", __func__, urb->status);
+		dev_dbg(dev, "%s: Error %i\n", __func__, urb->status);
 	}
 }
 
@@ -3973,20 +3975,24 @@ static int rtl8xxxu_add_interface(struct ieee80211_hw *hw,
 static void rtl8xxxu_remove_interface(struct ieee80211_hw *hw,
 				      struct ieee80211_vif *vif)
 {
-	pr_debug("%s\n", __func__);
+	struct rtl8xxxu_priv *priv = hw->priv;
+
+	dev_dbg(&priv->udev->dev, "%s\n", __func__);
 }
 
 static int rtl8xxxu_config(struct ieee80211_hw *hw, u32 changed)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
+	struct device *dev = &priv->udev->dev;
 	u16 val16;
 	int ret = 0, channel;
 	bool ht40;
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_CHANNEL)
-		pr_debug("%s: channel: %i (changed %08x chandef.width %02x)\n",
-			 __func__, hw->conf.chandef.chan->hw_value,
-			 changed, hw->conf.chandef.width);
+		dev_dbg(dev,
+			"%s: channel: %i (changed %08x chandef.width %02x)\n",
+			__func__, hw->conf.chandef.chan->hw_value,
+			changed, hw->conf.chandef.width);
 
 	if (changed & IEEE80211_CONF_CHANGE_RETRY_LIMITS) {
 		val16 = ((hw->conf.long_frame_max_tx_count <<
@@ -4026,6 +4032,7 @@ static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
 			    const struct ieee80211_tx_queue_params *param)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
+	struct device *dev = &priv->udev->dev;
 	u32 val32;
 	u16 cw_min, cw_max, txop;
 	u8 aifs, acm_ctrl, acm_bit;
@@ -4041,8 +4048,9 @@ static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
 		txop << EDCA_PARAM_TXOP_SHIFT;
 
 	acm_ctrl = rtl8723au_read8(priv, REG_ACM_HW_CTRL);
-	pr_debug("%s: IEEE80211 queue %02x val %08x, acm %i, acm_ctrl %02x\n",
-		 __func__, queue, val32, param->acm, acm_ctrl);
+	dev_dbg(dev,
+		"%s: IEEE80211 queue %02x val %08x, acm %i, acm_ctrl %02x\n",
+		__func__, queue, val32, param->acm, acm_ctrl);
 
 	switch (queue) {
 	case IEEE80211_AC_VO:
@@ -4080,8 +4088,10 @@ static void rtl8xxxu_configure_filter(struct ieee80211_hw *hw,
 				      unsigned int *total_flags, u64 multicast)
 {
 #if 0
-	pr_debug("%s: changed_flags %08x, total_flags %08x\n",
-		 __func__, changed_flags, *total_flags);
+	struct rtl8xxxu_priv *priv = hw->priv;
+
+	dev_dbg(&priv->udev->dev, "%s: changed_flags %08x, total_flags %08x\n",
+		__func__, changed_flags, *total_flags);
 #endif
 
 	*total_flags &= (FIF_ALLMULTI | FIF_CONTROL | FIF_BCN_PRBRESP_PROMISC);
@@ -4101,14 +4111,15 @@ static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 			    struct ieee80211_key_conf *key)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
+	struct device *dev = &priv->udev->dev;
 	u8 mac_addr[ETH_ALEN];
 	u8 val8;
 	u16 val16;
 	u32 val32;
 	int retval = -EOPNOTSUPP;
 
-	pr_debug("%s: cmd %02x, cipher %08x, index %i\n",
-		 __func__, cmd, key->cipher, key->keyidx);
+	dev_dbg(dev, "%s: cmd %02x, cipher %08x, index %i\n",
+		__func__, cmd, key->cipher, key->keyidx);
 
 	if (vif->type != NL80211_IFTYPE_STATION)
 		return -EOPNOTSUPP;
@@ -4131,10 +4142,10 @@ static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	}
 
 	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE) {
-		pr_debug("%s: pairwise key\n", __func__);
+		dev_dbg(dev, "%s: pairwise key\n", __func__);
 		ether_addr_copy(mac_addr, sta->addr);
 	} else {
-		pr_debug("%s: group key\n", __func__);
+		dev_dbg(dev, "%s: group key\n", __func__);
 		eth_broadcast_addr(mac_addr);
 	}
 
@@ -4167,7 +4178,7 @@ static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		retval = 0;
 		break;
 	default:
-		pr_debug("%s: Unsupported command %02x\n", __func__, cmd);
+		dev_dbg(dev, "%s: Unsupported command %02x\n", __func__, cmd);
 	}
 
 	return retval;
@@ -4250,6 +4261,7 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 	struct usb_interface_descriptor *interface_desc;
 	struct usb_host_interface *host_interface;
 	struct usb_endpoint_descriptor *endpoint;
+	struct device *dev = &priv->udev->dev;
 	int i, j = 0, endpoints;
 	u8 dir, xtype, num;
 	int ret = 0;
@@ -4265,13 +4277,14 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 		num = usb_endpoint_num(endpoint);
 		xtype = usb_endpoint_type(endpoint);
 		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
-			pr_debug("%s: endpoint: dir %02x, # %02x, type %02x\n",
-				 __func__, dir, num, xtype);
+			dev_dbg(dev,
+				"%s: endpoint: dir %02x, # %02x, type %02x\n",
+				__func__, dir, num, xtype);
 		if (usb_endpoint_dir_in(endpoint) &&
 		    usb_endpoint_xfer_bulk(endpoint)) {
 			if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
-				pr_debug("%s: in endpoint num %i\n",
-					 __func__, num);
+				dev_dbg(dev, "%s: in endpoint num %i\n",
+					__func__, num);
 
 			if (priv->pipe_in) {
 				pr_warn("%s: Too many IN pipes\n", __func__);
@@ -4285,8 +4298,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 		if (usb_endpoint_dir_in(endpoint) &&
 		    usb_endpoint_xfer_int(endpoint)) {
 			if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
-				pr_debug("%s: interrupt endpoint num %i\n",
-					 __func__, num);
+				dev_dbg(dev, "%s: interrupt endpoint num %i\n",
+					__func__, num);
 
 			if (priv->pipe_interrupt) {
 				pr_warn("%s: Too many INTERRUPT pipes\n",
@@ -4301,8 +4314,8 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 		if (usb_endpoint_dir_out(endpoint) &&
 		    usb_endpoint_xfer_bulk(endpoint)) {
 			if (rtl8xxxu_debug & RTL8XXXU_DEBUG_USB)
-				pr_debug("%s: out endpoint num %i\n",
-					 __func__, num);
+				dev_dbg(dev, "%s: out endpoint num %i\n",
+					__func__, num);
 			if (j >= RTL8XXXU_OUT_ENDPOINTS) {
 				pr_warn("%s: Unsupported number of OUT pipes\n",
 					__func__);
@@ -4449,7 +4462,7 @@ static struct usb_driver rtl8xxxu_driver = {
 
 static int __init rtl8xxxu_module_init(void)
 {
-	int res = 0;
+	int res;
 
 	res = usb_register(&rtl8xxxu_driver);
 	if (res < 0)
