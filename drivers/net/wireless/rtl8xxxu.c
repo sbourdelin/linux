@@ -37,7 +37,7 @@
 
 #define DRIVER_NAME "rtl8xxxu"
 
-static int rtl8xxxu_debug = RTL8XXXU_DEBUG_REG_WRITE;
+static int rtl8xxxu_debug = 0;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
