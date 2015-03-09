@@ -865,8 +865,10 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 		val32 |= FPGA_RF_MODE;
 		rtl8723au_write32(priv, REG_FPGA1_RF_MODE, val32);
 
-		/*  Set Control channel to upper or lower. These settings
-		    are required only for 40MHz */
+		/*
+		 * Set Control channel to upper or lower. These settings
+		 * are required only for 40MHz
+		 */
 		val32 = rtl8723au_read32(priv, REG_CCK0_SYSTEM);
 		val32 &= ~CCK0_SIDEBAND;
 		if (!sec_ch_above)
@@ -1213,8 +1215,9 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 		rtl8723au_write16(priv, REG_SYS_FUNC, val16);
 	}
 
-	/* Clock: Gated(0x0008[5]) 8M(0x0008[1]) clock from ANA,
-	   default valid */
+	/*
+	 * Clock: Gated(0x0008[5]) 8M(0x0008[1]) clock from ANA, default valid
+	 */
 	val16 = rtl8723au_read16(priv, REG_SYS_CLKR);
 	if (!(val16 & SYS_CLK_LOADER_ENABLE) || !(val16 & SYS_CLK_ANA8M)) {
 		val16 |= (SYS_CLK_LOADER_ENABLE | SYS_CLK_ANA8M);
@@ -2012,9 +2015,9 @@ rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 {
 	int i;
 
-	for (i = 0; i < (RTL8XXXU_MAC_REGS - 1); i++) {
+	for (i = 0; i < (RTL8XXXU_MAC_REGS - 1); i++)
 		backup[i] = rtl8723au_read8(priv, reg[i]);
-	}
+
 	backup[i] = rtl8723au_read32(priv, reg[i]);
 }
 
@@ -2023,9 +2026,9 @@ rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 {
 	int i;
 
-	for (i = 0; i < (RTL8XXXU_MAC_REGS - 1); i++) {
+	for (i = 0; i < (RTL8XXXU_MAC_REGS - 1); i++)
 		rtl8723au_write8(priv, reg[i], backup[i]);
-	}
+
 	rtl8723au_write32(priv, reg[i], backup[i]);
 }
 
@@ -2821,8 +2824,9 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	u32 val32;
 	int ret;
 
-	/* RSV_CTRL 0x001C[7:0] = 0x00
-	   unlock ISO/CLK/Power control register */
+	/*
+	 * RSV_CTRL 0x001C[7:0] = 0x00, unlock ISO/CLK/Power control register
+	 */
 	rtl8723au_write8(priv, REG_RSV_CTRL, 0x0);
 
 	rtl8xxxu_disabled_to_emu(priv);
@@ -2831,13 +2835,17 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	if (ret)
 		goto exit;
 
-	/* 0x0004[19] = 1, reset 8051 */
+	/*
+	 * 0x0004[19] = 1, reset 8051
+	 */
 	val8 = rtl8723au_read8(priv, REG_APS_FSMCO + 2);
 	val8 |= BIT(3);
 	rtl8723au_write8(priv, REG_APS_FSMCO + 2, val8);
 
-	/* Enable MAC DMA/WMAC/SCHEDULE/SEC block */
-	/* Set CR bit10 to enable 32k calibration. */
+	/*
+	 * Enable MAC DMA/WMAC/SCHEDULE/SEC block
+	 * Set CR bit10 to enable 32k calibration.
+	 */
 	val16 = rtl8723au_read16(priv, REG_CR);
 	val16 |= (CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE |
 		  CR_TXDMA_ENABLE | CR_RXDMA_ENABLE |
@@ -2846,7 +2854,7 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 		  CR_SECURITY_ENABLE | CR_CALTIMER_ENABLE);
 	rtl8723au_write16(priv, REG_CR, val16);
 
-	/* for Efuse PG */
+	/* For EFuse PG */
 	val32 = rtl8723au_read32(priv, REG_EFUSE_CTRL);
 	val32 &= ~(BIT(28) | BIT(29) | BIT(30));
 	val32 |= (0x06 << 28);
@@ -3200,8 +3208,10 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	val8 = ((30000 + NAV_UPPER_UNIT - 1) / NAV_UPPER_UNIT);
 	rtl8723au_write8(priv, REG_NAV_UPPER, val8);
 
-	/*  2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test,
-	    but we need to fin root cause. */
+	/*
+	 * 2011/03/09 MH debug only, UMC-B cut pass 2500 S5 test,
+	 * but we need to fin root cause.
+	 */
 	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
 	if ((val32 & 0xff000000) != 0x83000000) {
 		val32 |= FPGA_RF_MODE_CCK;
