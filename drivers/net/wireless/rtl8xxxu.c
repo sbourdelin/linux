@@ -2918,8 +2918,10 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	/* Check if MAC is already powered on */
 	val8 = rtl8723au_read8(priv, REG_CR);
 
-	/* Fix 92DU-VC S3 hang with the reason is that secondary mac is not
-	   initialized. First MAC returns 0xea, second MAC returns 0x00 */
+	/*
+	 * Fix 92DU-VC S3 hang with the reason is that secondary mac is not
+	 * initialized. First MAC returns 0xea, second MAC returns 0x00
+	 */
 	if (val8 == 0xea)
 		macpower = false;
 	else
