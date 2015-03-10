@@ -3311,8 +3311,8 @@ static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 	rtl8723au_write8(priv, REG_BEACON_CTRL, val8);
 }
 
-static void rtl8xxxu_update_rate_table(struct rtl8xxxu_priv *priv,
-				       struct ieee80211_sta *sta)
+static void rtl8xxxu_update_rate_mask(struct rtl8xxxu_priv *priv,
+				      struct ieee80211_sta *sta)
 {
 	struct h2c_cmd h2c;
 	u32 ramask;
@@ -3323,8 +3323,8 @@ static void rtl8xxxu_update_rate_table(struct rtl8xxxu_priv *priv,
 		sta->ht_cap.mcs.rx_mask[1] << 20;
 
 	h2c.ramask.cmd = H2C_SET_RATE_MASK;
-	put_unaligned_le16(ramask & 0xffff, &h2c.ramask.mask_lo);
-	put_unaligned_le16(ramask >> 16, &h2c.ramask.mask_hi);
+	h2c.ramask.mask_lo = cpu_to_le16(ramask & 0xffff);
+	h2c.ramask.mask_hi = cpu_to_le16(ramask >> 16);
 
 	h2c.ramask.arg = 0x80;
 	if (sta->ht_cap.cap &
@@ -3397,7 +3397,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 				dev_info(dev, "%s: HT supported\n", __func__);
 			if (sta->vht_cap.vht_supported)
 				dev_info(dev, "%s: VHT supported\n", __func__);
-			rtl8xxxu_update_rate_table(priv, sta);
+			rtl8xxxu_update_rate_mask(priv, sta);
 			rcu_read_unlock();
 
 			val32 = rtl8723au_read32(priv, REG_RCR);
