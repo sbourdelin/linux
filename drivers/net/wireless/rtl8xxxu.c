@@ -3595,8 +3595,6 @@ static u32 rtl8xxxu_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	u32 queue;
 
-	if (unlikely(ieee80211_is_beacon(hdr->frame_control)))
-		queue = TXDESC_QUEUE_BEACON;
 	if (ieee80211_is_mgmt(hdr->frame_control))
 		queue = TXDESC_QUEUE_MGNT;
 	else
