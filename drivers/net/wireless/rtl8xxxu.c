@@ -3501,8 +3501,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtl8723au_write8(priv, REG_SIFS_OFDM + 1, sifs);
 		rtl8723au_write8(priv, REG_SPEC_SIFS + 1, sifs);
 		rtl8723au_write8(priv, REG_MAC_SPEC_SIFS + 1, sifs);
-		rtl8723au_write8(priv, REG_R2T_SIFS + 1, sifs);
-		rtl8723au_write8(priv, REG_T2T_SIFS + 1, sifs);
 	}
 
 	if (changed & BSS_CHANGED_BSSID) {
