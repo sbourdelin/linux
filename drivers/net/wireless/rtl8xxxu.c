@@ -3834,21 +3834,21 @@ static int rtl8xxxu_submit_rx_urb(struct ieee80211_hw *hw)
 	int skb_size;
 	int ret;
 
-	skb_size = sizeof(struct rtl8xxxu_rx_desc) + RTL_RX_BUFFER_SIZE;
-	skb = dev_alloc_skb(skb_size);
-	if (!skb)
-		return -ENOMEM;
-
-	memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
-
 	rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_ATOMIC);
 	if (!rx_urb) {
-		dev_kfree_skb(skb);
 		return -ENOMEM;
 	}
 	usb_init_urb(&rx_urb->urb);
 	rx_urb->hw = hw;
 
+	skb_size = sizeof(struct rtl8xxxu_rx_desc) + RTL_RX_BUFFER_SIZE;
+	skb = dev_alloc_skb(skb_size);
+	if (!skb) {
+		kfree(rx_urb);
+		return -ENOMEM;
+	}
+
+	memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
 	usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in, skb->data,
 			  skb_size, rtl8xxxu_rx_complete, skb);
 	usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
