@@ -3368,6 +3368,8 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	if (changed & BSS_CHANGED_ASSOC) {
 		struct h2c_cmd h2c;
 
+		dev_dbg(dev, "Changed ASSOC: %i!\n", bss_conf->assoc);
+
 		memset(&h2c, 0, sizeof(struct h2c_cmd));
 		rtl8xxxu_set_linktype(priv, vif->type);
 
@@ -3458,8 +3460,8 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
-		dev_info(dev, "Changed ERP_PREAMBLE: Use short preamble %02x\n",
-			 bss_conf->use_short_preamble);
+		dev_dbg(dev, "Changed ERP_PREAMBLE: Use short preamble %02x\n",
+			bss_conf->use_short_preamble);
 		val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
 		if (bss_conf->use_short_preamble)
 			val32 |= RSR_ACK_SHORT_PREAMBLE;
@@ -3469,8 +3471,8 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_SLOT) {
-		dev_info(dev, "Changed ERP_SLOT: short_slot_time %i\n",
-			 bss_conf->use_short_slot);
+		dev_dbg(dev, "Changed ERP_SLOT: short_slot_time %i\n",
+			bss_conf->use_short_slot);
 
 		if (bss_conf->use_short_slot)
 			val8 = 9;
@@ -3499,9 +3501,9 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		}
 		rcu_read_unlock();
 #if 0
-		dev_info(dev,
-			 "Changed HT: ampdu_factor %02x, ampdu_density %02x\n",
-			 ampdu_factor, ampdu_density);
+		dev_dbg(dev,
+			"Changed HT: ampdu_factor %02x, ampdu_density %02x\n",
+			ampdu_factor, ampdu_density);
 		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
 		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
 #endif
@@ -3520,7 +3522,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
-		dev_info(dev, "Changed BASIC_RATES!\n");
+		dev_dbg(dev, "Changed BASIC_RATES!\n");
 		rtl8xxxu_set_basic_rates(priv, bss_conf->basic_rates);
 	}
 error:
