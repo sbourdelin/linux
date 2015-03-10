@@ -65,6 +65,9 @@ static struct usb_device_id dev_table[] = {
 
 MODULE_DEVICE_TABLE(usb, dev_table);
 
+static int rtl8xxxu_submit_rx_urb(struct rtl8xxxu_priv *priv,
+				  struct rtl8xxxu_rx_urb *rx_urb);
+
 static struct ieee80211_rate rtl8xxxu_rates[] = {
 	{ .bitrate = 10, .hw_value = DESC_RATE_1M, .flags = 0 },
 	{ .bitrate = 20, .hw_value = DESC_RATE_2M, .flags = 0 },
@@ -3714,7 +3717,6 @@ error:
 	dev_kfree_skb(skb);
 }
 
-
 static void rtl8xxxu_rx_complete(struct urb *urb)
 {
 	struct rtl8xxxu_rx_urb *rx_urb =
@@ -3729,7 +3731,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 	struct device *dev = &priv->udev->dev;
 	__le32 *_rx_desc_le = (__le32 *)skb->data;
 	u32 *_rx_desc = (u32 *)skb->data;
-	int cnt, len, skb_size, drvinfo_sz, desc_shift, i, ret;
+	int cnt, len, drvinfo_sz, desc_shift, i, ret;
 
 	for (i = 0; i < (sizeof(struct rtl8xxxu_rx_desc) / sizeof(u32)); i++)
 		_rx_desc[i] = le32_to_cpu(_rx_desc_le[i]);
@@ -3790,28 +3792,10 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 		}
 
 		ieee80211_rx_irqsafe(hw, skb);
-		/*
-		 * Recycle skb pointer variable, the old skb was
-		 * handed over in ieee80211_rx_irqsafe.
-		 */
 		skb = NULL;
-		skb_size = sizeof(struct rtl8xxxu_rx_desc) +
-			RTL_RX_BUFFER_SIZE;
-		skb = dev_alloc_skb(skb_size);
-		if (!skb) {
-			dev_warn(dev, "%s: Unable to allocate skb\n", __func__);
-			goto cleanup;
-		}
-
-		memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
-		usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in,
-				  skb->data, skb_size, rtl8xxxu_rx_complete,
-				  skb);
-
-		usb_anchor_urb(&rx_urb->urb, &priv->rx_anchor);
-		ret = usb_submit_urb(&rx_urb->urb, GFP_ATOMIC);
+		ret = rtl8xxxu_submit_rx_urb(priv, rx_urb);
 		if (ret) {
-			usb_unanchor_urb(&rx_urb->urb);
+			dev_warn(dev, "%s: Unable to allocate skb\n", __func__);
 			goto cleanup;
 		}
 	} else {
@@ -3826,27 +3810,17 @@ cleanup:
 	return;
 }
 
-static int rtl8xxxu_submit_rx_urb(struct ieee80211_hw *hw)
+static int rtl8xxxu_submit_rx_urb(struct rtl8xxxu_priv *priv,
+				  struct rtl8xxxu_rx_urb *rx_urb)
 {
-	struct rtl8xxxu_priv *priv = hw->priv;
 	struct sk_buff *skb;
-	struct rtl8xxxu_rx_urb *rx_urb;
 	int skb_size;
 	int ret;
 
-	rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_ATOMIC);
-	if (!rx_urb) {
-		return -ENOMEM;
-	}
-	usb_init_urb(&rx_urb->urb);
-	rx_urb->hw = hw;
-
 	skb_size = sizeof(struct rtl8xxxu_rx_desc) + RTL_RX_BUFFER_SIZE;
 	skb = dev_alloc_skb(skb_size);
-	if (!skb) {
-		kfree(rx_urb);
+	if (!skb)
 		return -ENOMEM;
-	}
 
 	memset(skb->data, 0, sizeof(struct rtl8xxxu_rx_desc));
 	usb_fill_bulk_urb(&rx_urb->urb, priv->udev, priv->pipe_in, skb->data,
@@ -4187,6 +4161,7 @@ rtl8xxxu_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 static int rtl8xxxu_start(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
+	struct rtl8xxxu_rx_urb *rx_urb;
 	int ret, i;
 
 	ret = 0;
@@ -4200,9 +4175,19 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
-	for (i = 0; i < 32; i++)
-		ret = rtl8xxxu_submit_rx_urb(hw);
+	for (i = 0; i < 32; i++) {
+		rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_ATOMIC);
+		if (!rx_urb) {
+			if (!i)
+				ret = -ENOMEM;
 
+			goto exit;
+		}
+		usb_init_urb(&rx_urb->urb);
+		rx_urb->hw = hw;
+
+		ret = rtl8xxxu_submit_rx_urb(priv, rx_urb);
+	}
 exit:
 	/*
 	 * Disable all data frames
