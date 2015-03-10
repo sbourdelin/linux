@@ -4427,7 +4427,6 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	sband->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
 	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = sband;
 
-	hw->wiphy->max_remain_on_channel_duration = 65535; /* ms */
 	hw->wiphy->rts_threshold = 2347;
 
 	SET_IEEE80211_DEV(priv->hw, &interface->dev);
