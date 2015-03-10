@@ -4421,8 +4421,6 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	if (priv->rf_paths > 1) {
 		sband->ht_cap.mcs.rx_mask[1] = 0xff;
 		sband->ht_cap.cap |= IEEE80211_HT_CAP_SGI_40;
-	} else {
-		sband->ht_cap.mcs.rx_mask[1] = 0x00;
 	}
 	sband->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
 	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = sband;
