@@ -3498,12 +3498,10 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 		rcu_read_lock();
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
-		if (!sta) {
+		if (!sta)
 			dev_info(dev, "BSS_CHANGED_HT: No HT sta found!\n");
-			rcu_read_unlock();
-			goto error;
-		}
-		if (sta->ht_cap.ht_supported) {
+
+		if (sta && sta->ht_cap.ht_supported) {
 			ampdu_factor = sta->ht_cap.ampdu_factor;
 			ampdu_density = sta->ht_cap.ampdu_density;
 			sifs = 0x0e;
@@ -3537,8 +3535,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		sta = ieee80211_find_sta(vif, bss_conf->bssid);
 		if (!sta) {
 			dev_info(dev, "No bssid sta found!\n");
-			rcu_read_unlock();
-			goto error;
 		}
 		rcu_read_unlock();
 	}
