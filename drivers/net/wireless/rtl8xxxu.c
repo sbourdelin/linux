@@ -2540,7 +2540,8 @@ static int rtl8xxxu_set_bssid(struct rtl8xxxu_priv *priv, const u8 *bssid)
 	return 0;
 }
 
-void rtl8xxxu_set_ampdu_factor(struct rtl8xxxu_priv *priv, u8 ampdu_factor)
+static void
+rtl8xxxu_set_ampdu_factor(struct rtl8xxxu_priv *priv, u8 ampdu_factor)
 {
 	u8 vals[4] = { 0x41, 0xa8, 0x72, 0xb9 };
 	u8 max_agg = 0xf;
@@ -2561,7 +2562,7 @@ void rtl8xxxu_set_ampdu_factor(struct rtl8xxxu_priv *priv, u8 ampdu_factor)
 	}
 }
 
-void rtl8xxxu_set_ampdu_min_space(struct rtl8xxxu_priv *priv, u8 density)
+static void rtl8xxxu_set_ampdu_min_space(struct rtl8xxxu_priv *priv, u8 density)
 {
 	u8 val8;
 
@@ -3482,7 +3483,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_HT) {
-		u8 ampdu_factor, ampdu_density;
 		u8 sifs;
 
 		rcu_read_lock();
@@ -3491,22 +3491,11 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			dev_info(dev, "BSS_CHANGED_HT: No HT sta found!\n");
 
 		if (sta && sta->ht_cap.ht_supported) {
-			ampdu_factor = sta->ht_cap.ampdu_factor;
-			ampdu_density = sta->ht_cap.ampdu_density;
 			sifs = 0x0e;
 		} else {
-			ampdu_factor = 0;
-			ampdu_density = 0;
 			sifs = 0x0a;
 		}
 		rcu_read_unlock();
-#if 0
-		dev_dbg(dev,
-			"Changed HT: ampdu_factor %02x, ampdu_density %02x\n",
-			ampdu_factor, ampdu_density);
-		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
-		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
-#endif
 
 		rtl8723au_write8(priv, REG_SIFS_CCK + 1, sifs);
 		rtl8723au_write8(priv, REG_SIFS_OFDM + 1, sifs);
@@ -4181,6 +4170,43 @@ static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	return retval;
 }
 
+static int
+rtl8xxxu_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+		      enum ieee80211_ampdu_mlme_action action,
+		      struct ieee80211_sta *sta, u16 tid, u16 *ssn, u8 buf_size)
+{
+	struct rtl8xxxu_priv *priv = hw->priv;
+	struct device *dev = &priv->udev->dev;
+	u8 ampdu_factor, ampdu_density;
+
+	switch (action) {
+	case IEEE80211_AMPDU_TX_START:
+		dev_info(dev, "%s: IEEE80211_AMPDU_TX_START\n", __func__);
+		ampdu_factor = sta->ht_cap.ampdu_factor;
+		ampdu_density = sta->ht_cap.ampdu_density;
+		rtl8xxxu_set_ampdu_factor(priv, ampdu_factor);
+		rtl8xxxu_set_ampdu_min_space(priv, ampdu_density);
+		dev_dbg(dev,
+			"Changed HT: ampdu_factor %02x, ampdu_density %02x\n",
+			ampdu_factor, ampdu_density);
+		break;
+	case IEEE80211_AMPDU_TX_STOP_FLUSH:
+		dev_info(dev, "%s: IEEE80211_AMPDU_TX_STOP_FLUSH\n", __func__);
+		rtl8xxxu_set_ampdu_factor(priv, 0);
+		rtl8xxxu_set_ampdu_min_space(priv, 0);
+		break;
+	case IEEE80211_AMPDU_TX_STOP_FLUSH_CONT:
+		dev_info(dev, "%s: IEEE80211_AMPDU_TX_STOP_FLUSH_CONT\n",
+			 __func__);
+		rtl8xxxu_set_ampdu_factor(priv, 0);
+		rtl8xxxu_set_ampdu_min_space(priv, 0);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 static int rtl8xxxu_start(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
@@ -4250,6 +4276,7 @@ static const struct ieee80211_ops rtl8xxxu_ops = {
 	.sw_scan_start = rtl8xxxu_sw_scan_start,
 	.sw_scan_complete = rtl8xxxu_sw_scan_complete,
 	.set_key = rtl8xxxu_set_key,
+	.ampdu_action = rtl8xxxu_ampdu_action,
 };
 
 static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
