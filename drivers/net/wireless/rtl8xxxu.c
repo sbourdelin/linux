@@ -3520,13 +3520,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	if (changed & BSS_CHANGED_BSSID) {
 		dev_info(dev, "Changed BSSID!\n");
 		rtl8xxxu_set_bssid(priv, bss_conf->bssid);
-
-		rcu_read_lock();
-		sta = ieee80211_find_sta(vif, bss_conf->bssid);
-		if (!sta) {
-			dev_info(dev, "No bssid sta found!\n");
-		}
-		rcu_read_unlock();
 	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
