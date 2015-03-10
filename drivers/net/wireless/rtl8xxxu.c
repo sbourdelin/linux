@@ -3861,6 +3861,11 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 		}
 
 		ieee80211_rx_irqsafe(hw, skb);
+		/*
+		 * Recycle skb pointer variable, the old skb was
+		 * handed over in ieee80211_rx_irqsafe.
+		 */
+		skb = NULL;
 		skb_size = sizeof(struct rtl8xxxu_rx_desc) +
 			RTL_RX_BUFFER_SIZE;
 		skb = dev_alloc_skb(skb_size);
