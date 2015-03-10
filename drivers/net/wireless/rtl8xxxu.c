@@ -3609,6 +3609,10 @@ static void rtl8xxxu_calc_tx_desc_csum(struct rtl8xxxu_tx_desc *tx_desc)
 	u16 csum = 0;
 	int i;
 
+	/*
+	 * Clear csum field before calculation, as the csum field is
+	 * in the middle of the struct.
+	 */
 	tx_desc->csum = cpu_to_le32(0);
 
 	for (i = 0; i < (sizeof(struct rtl8xxxu_tx_desc) / sizeof(u16)); i++)
