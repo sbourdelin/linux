@@ -3388,6 +3388,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 				dev_info(dev, "%s: HT supported\n", __func__);
 			if (sta->vht_cap.vht_supported)
 				dev_info(dev, "%s: VHT supported\n", __func__);
+			rtl8xxxu_set_basic_rates(priv, sta);
 			rtl8xxxu_update_rate_mask(priv, sta);
 			rcu_read_unlock();
 
