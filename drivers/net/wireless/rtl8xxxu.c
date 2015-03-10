@@ -768,13 +768,11 @@ static void rtl8723a_stop_tx_beacon(struct rtl8xxxu_priv *priv)
 
 	val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL + 2);
 	val8 &= ~BIT(6);
-	val8 = 0x00; /* FIXME */
 	rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, val8);
 
 	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 1, 0x64);
 	val8 = rtl8723au_read8(priv, REG_TBTT_PROHIBIT + 2);
 	val8 &= ~BIT(0);
-	val8 = 0x00; /* FIXME */
 	rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, val8);
 }
 
