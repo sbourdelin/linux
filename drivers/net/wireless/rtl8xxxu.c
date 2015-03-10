@@ -3482,27 +3482,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtl8723au_write8(priv, REG_SLOT, val8);
 	}
 
-	if (changed & BSS_CHANGED_HT) {
-		u8 sifs;
-
-		rcu_read_lock();
-		sta = ieee80211_find_sta(vif, bss_conf->bssid);
-		if (!sta)
-			dev_info(dev, "BSS_CHANGED_HT: No HT sta found!\n");
-
-		if (sta && sta->ht_cap.ht_supported) {
-			sifs = 0x0e;
-		} else {
-			sifs = 0x0a;
-		}
-		rcu_read_unlock();
-
-		rtl8723au_write8(priv, REG_SIFS_CCK + 1, sifs);
-		rtl8723au_write8(priv, REG_SIFS_OFDM + 1, sifs);
-		rtl8723au_write8(priv, REG_SPEC_SIFS + 1, sifs);
-		rtl8723au_write8(priv, REG_MAC_SPEC_SIFS + 1, sifs);
-	}
-
 	if (changed & BSS_CHANGED_BSSID) {
 		dev_dbg(dev, "Changed BSSID!\n");
 		rtl8xxxu_set_bssid(priv, bss_conf->bssid);
