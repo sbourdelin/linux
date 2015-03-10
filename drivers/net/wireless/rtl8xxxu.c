@@ -118,13 +118,6 @@ static struct ieee80211_supported_band rtl8xxxu_supported_band = {
 	.n_bitrates = ARRAY_SIZE(rtl8xxxu_rates),
 };
 
-static const u32 rtl8xxxu_cipher_suites[] = {
-	WLAN_CIPHER_SUITE_WEP40,
-	WLAN_CIPHER_SUITE_WEP104,
-	WLAN_CIPHER_SUITE_TKIP,
-	WLAN_CIPHER_SUITE_CCMP,
-};
-
 static struct rtl8xxxu_reg8val rtl8723a_mac_init_table[] = {
 	{0x420, 0x80}, {0x423, 0x00}, {0x430, 0x00}, {0x431, 0x00},
 	{0x432, 0x00}, {0x433, 0x01}, {0x434, 0x04}, {0x435, 0x05},
@@ -4437,8 +4430,6 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = sband;
 
 	hw->wiphy->max_remain_on_channel_duration = 65535; /* ms */
-	hw->wiphy->cipher_suites = rtl8xxxu_cipher_suites;
-	hw->wiphy->n_cipher_suites = ARRAY_SIZE(rtl8xxxu_cipher_suites);
 	hw->wiphy->rts_threshold = 2347;
 
 	SET_IEEE80211_DEV(priv->hw, &interface->dev);
