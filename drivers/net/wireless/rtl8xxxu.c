@@ -3636,7 +3636,13 @@ static void rtl8xxxu_tx_complete(struct urb *urb)
 	tx_info->status.rates[0].idx = -1;
 	tx_info->status.rates[0].count = 0;
 
+#if 0
+	/*
+	 * Until we figure out how to obtain the info,
+	 * do not fool the stack.
+	 */
 	tx_info->flags |= IEEE80211_TX_STAT_ACK;
+#endif
 
 	ieee80211_tx_status_irqsafe(hw, skb);
 
