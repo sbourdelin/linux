@@ -3331,22 +3331,19 @@ static void rtl8xxxu_update_rate_mask(struct rtl8xxxu_priv *priv,
 	rtl8723a_h2c_cmd(priv, &h2c);
 }
 
-static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv,
-				     struct ieee80211_sta *sta)
+static void rtl8xxxu_set_basic_rates(struct rtl8xxxu_priv *priv, u32 rate_cfg)
 {
-	u32 rate_cfg, val32;
+	u32 val32;
 	u8 rate_idx = 0;
 
-	rate_cfg = sta->supp_rates[0];
-	rate_cfg &= 0x15f;
-	rate_cfg |= 1;
+	rate_cfg &= RESPONSE_RATE_BITMAP_ALL;
+
 	val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
 	val32 &= ~RESPONSE_RATE_BITMAP_ALL;
 	val32 |= rate_cfg;
 	rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
 
-	dev_dbg(&priv->udev->dev, "%s: supp_rates %08x rates %08x\n", __func__,
-		sta->supp_rates[0], rate_cfg);
+	dev_dbg(&priv->udev->dev, "%s: rates %08x\n", __func__,	rate_cfg);
 
 	while (rate_cfg) {
 		rate_cfg = (rate_cfg >> 1);
@@ -3388,7 +3385,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 				dev_info(dev, "%s: HT supported\n", __func__);
 			if (sta->vht_cap.vht_supported)
 				dev_info(dev, "%s: VHT supported\n", __func__);
-			rtl8xxxu_set_basic_rates(priv, sta);
 			rtl8xxxu_update_rate_mask(priv, sta);
 			rcu_read_unlock();
 
@@ -3519,21 +3515,13 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_BSSID) {
-		dev_info(dev, "Changed BSSID!\n");
+		dev_dbg(dev, "Changed BSSID!\n");
 		rtl8xxxu_set_bssid(priv, bss_conf->bssid);
 	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
 		dev_info(dev, "Changed BASIC_RATES!\n");
-		rcu_read_lock();
-		sta = ieee80211_find_sta(vif, bss_conf->bssid);
-		if (sta)
-			rtl8xxxu_set_basic_rates(priv, sta);
-		else
-			dev_info(dev,
-				 "BSS_CHANGED_BASIC_RATES: No sta found!\n");
-
-		rcu_read_unlock();
+		rtl8xxxu_set_basic_rates(priv, bss_conf->basic_rates);
 	}
 error:
 	return;
