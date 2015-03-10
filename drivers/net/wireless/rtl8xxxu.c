@@ -3400,15 +3400,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 			rtl8723au_write8(priv, REG_BCN_MAX_ERR, 0xff);
 
-			/* Stop TX beacon */
-			val8 = rtl8723au_read8(priv, REG_FWHW_TXQ_CTRL + 2);
-			val8 &= ~BIT(6);
-			rtl8723au_write8(priv, REG_FWHW_TXQ_CTRL + 2, val8);
-
-			rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 1, 0x64);
-			val8 = rtl8723au_read8(priv, REG_TBTT_PROHIBIT + 2);
-			val8 &= ~BIT(0);
-			rtl8723au_write8(priv, REG_TBTT_PROHIBIT + 2, val8);
+			rtl8723a_stop_tx_beacon(priv);
 
 			/* joinbss sequence */
 			rtl8723au_write16(priv, REG_BCN_PSR_RPT,
