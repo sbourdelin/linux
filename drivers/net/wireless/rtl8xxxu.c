@@ -3662,16 +3662,12 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		rate = tx_rate->hw_value;
 	tx_desc->txdw5 = cpu_to_le32(rate);
 
-	/*
-	 * Black magic!
-	 */
-#if 0
 	if (ieee80211_is_data(hdr->frame_control)) {
-		tx_desc->txdw5 = cpu_to_le32(0x0001ff00);
+		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
 
-		if ((tx_info->flags & IEEE80211_TX_CTL_AMPDU) &&
-		    control->sta->ht_cap.ht_supported &&
-		    control && control->sta) {
+		if (/* (tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
+			control->sta->ht_cap.ht_supported &&
+			control && control->sta) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
 
 			tx_desc->txdw2 |=
@@ -3680,8 +3676,8 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		} else
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
 	} else
-#endif
 		tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
+
 	if (ieee80211_is_data_qos(hdr->frame_control))
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
 	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
@@ -4368,10 +4364,8 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	sband = &rtl8xxxu_supported_band;
 	sband->ht_cap.ht_supported = true;
-#if 0
 	sband->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_8K;
 	sband->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_16;
-#endif
 	sband->ht_cap.cap = /* IEEE80211_HT_CAP_SUP_WIDTH_20_40 | */
 		IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40;
 	memset(&sband->ht_cap.mcs, 0, sizeof(sband->ht_cap.mcs));
