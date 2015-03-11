@@ -243,7 +243,7 @@ struct rtl8xxxu_tx_desc {
 #define TXDESC_RTS_ENABLE		BIT(12)
 #define TXDESC_RETRY_LIMIT_ENABLE	BIT(17)
 #define TXDESC_RETRY_LIMIT_SHIFT	18
-#define TXDESC_RETRY_LIMIT_MASK		0x003f0000
+#define TXDESC_RETRY_LIMIT_MASK		0x00fc0000
 
 struct phy_rx_agc_info {
 #ifdef __LITTLE_ENDIAN
