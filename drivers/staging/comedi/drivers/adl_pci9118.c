@@ -633,7 +633,6 @@ static void pci9118_ai_munge(struct comedi_device *dev,
 			array[i] ^= 0x8000;
 		else
 			array[i] = (array[i] >> 4) & 0x0fff;
-
 	}
 }
 
@@ -936,7 +935,7 @@ static int Compute_and_setup_dma(struct comedi_device *dev,
 /* outl(0x02000000|AINT_WRITE_COMPL, devpriv->iobase_a+AMCC_OP_REG_INTCSR); */
 	pci9118_amcc_dma_ena(dev, true);
 	outl(inl(devpriv->iobase_a + AMCC_OP_REG_INTCSR) | EN_A2P_TRANSFERS,
-			devpriv->iobase_a + AMCC_OP_REG_INTCSR);
+	     devpriv->iobase_a + AMCC_OP_REG_INTCSR);
 						/* allow bus mastering */
 
 	return 0;

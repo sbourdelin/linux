@@ -1628,8 +1628,8 @@ void dm_change_dynamic_initgain_thresh(struct net_device *dev, u32 dm_type,
 		dm_digtable.rssi_low_thresh = dm_value;
 	} else if (dm_type == DIG_TYPE_THRESH_HIGHPWR_HIGH) {
 		dm_digtable.rssi_high_power_highthresh = dm_value;
-	} else if (dm_type == DIG_TYPE_THRESH_HIGHPWR_HIGH) {
-		dm_digtable.rssi_high_power_highthresh = dm_value;
+	} else if (dm_type == DIG_TYPE_THRESH_HIGHPWR_LOW) {
+		dm_digtable.rssi_high_power_lowthresh = dm_value;
 	} else if (dm_type == DIG_TYPE_ENABLE) {
 		dm_digtable.dig_state		= DM_STA_DIG_MAX;
 		dm_digtable.dig_enable_flag	= true;
@@ -2419,9 +2419,9 @@ void dm_rf_pathcheck_workitemcallback(struct work_struct *work)
 	/* Check Bit 0-3, it means if RF A-D is enabled. */
 	for (i = 0; i < RF90_PATH_MAX; i++) {
 		if (rfpath & (0x01<<i))
-			priv->brfpath_rxenable[i] = 1;
+			priv->brfpath_rxenable[i] = true;
 		else
-			priv->brfpath_rxenable[i] = 0;
+			priv->brfpath_rxenable[i] = false;
 	}
 	if (!DM_RxPathSelTable.Enable)
 		return;

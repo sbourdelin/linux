@@ -489,9 +489,7 @@ static void das1800_handle_fifo_not_empty(struct comedi_device *dev,
 
 	while (inb(dev->iobase + DAS1800_STATUS) & FNE) {
 		dpnt = inw(dev->iobase + DAS1800_FIFO);
-		/* convert to unsigned type if we are in a bipolar mode */
-		if (!unipolar)
-			;
+		/* convert to unsigned type */
 		dpnt = munge_bipolar_sample(dev, dpnt);
 		comedi_buf_write_samples(s, &dpnt, 1);
 
@@ -1143,7 +1141,6 @@ static int das1800_di_rbits(struct comedi_device *dev,
 			    struct comedi_subdevice *s,
 			    struct comedi_insn *insn, unsigned int *data)
 {
-
 	data[1] = inb(dev->iobase + DAS1800_DIGITAL) & 0xf;
 	data[0] = 0;
 

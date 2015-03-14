@@ -41,12 +41,7 @@
 #include <linux/of_gpio.h>
 
 #include "fbtft.h"
-
-extern void fbtft_sysfs_init(struct fbtft_par *par);
-extern void fbtft_sysfs_exit(struct fbtft_par *par);
-extern void fbtft_expand_debug_value(unsigned long *debug);
-extern int fbtft_gamma_parse_str(struct fbtft_par *par, unsigned long *curves,
-						const char *str, int size);
+#include "internal.h"
 
 static unsigned long debug;
 module_param(debug, ulong, 0);
@@ -302,12 +297,8 @@ void fbtft_register_backlight(struct fbtft_par *par)
 
 	bl_ops = devm_kzalloc(par->info->device, sizeof(struct backlight_ops),
 				GFP_KERNEL);
-	if (!bl_ops) {
-		dev_err(par->info->device,
-			"%s: could not allocate memeory for backlight operations.\n",
-			__func__);
+	if (!bl_ops)
 		return;
-	}
 
 	bl_ops->get_brightness = fbtft_backlight_get_brightness;
 	bl_ops->update_status = fbtft_backlight_update_status;
@@ -379,7 +370,7 @@ static void fbtft_update_display(struct fbtft_par *par, unsigned start_line,
 	int ret = 0;
 
 	if (unlikely(par->debug & (DEBUG_TIME_FIRST_UPDATE | DEBUG_TIME_EACH_UPDATE))) {
-		if ((par->debug & DEBUG_TIME_EACH_UPDATE) || \
+		if ((par->debug & DEBUG_TIME_EACH_UPDATE) ||
 				((par->debug & DEBUG_TIME_FIRST_UPDATE) && !par->first_update_done)) {
 			getnstimeofday(&ts_start);
 			timeit = true;
@@ -707,9 +698,8 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 
 	/* sanity check */
 	if (display->gamma_num * display->gamma_len > FBTFT_GAMMA_MAX_VALUES_TOTAL) {
-		dev_err(dev,
-			"%s: FBTFT_GAMMA_MAX_VALUES_TOTAL=%d is exceeded\n",
-			__func__, FBTFT_GAMMA_MAX_VALUES_TOTAL);
+		dev_err(dev, "FBTFT_GAMMA_MAX_VALUES_TOTAL=%d is exceeded\n",
+			FBTFT_GAMMA_MAX_VALUES_TOTAL);
 		return NULL;
 	}
 
@@ -1276,7 +1266,7 @@ static int fbtft_verify_gpios(struct fbtft_par *par)
 	fbtft_par_dbg(DEBUG_VERIFY_GPIOS, par, "%s()\n", __func__);
 
 	pdata = par->info->device->platform_data;
-	if (pdata->display.buswidth != 9 && par->startbyte == 0 && \
+	if (pdata->display.buswidth != 9 && par->startbyte == 0 &&
 							par->gpio.dc < 0) {
 		dev_err(par->info->device,
 			"Missing info about 'dc' gpio. Aborting.\n");

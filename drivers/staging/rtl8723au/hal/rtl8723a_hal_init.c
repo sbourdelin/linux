@@ -424,9 +424,8 @@ hal_ReadEFuse_WiFi(struct rtw_adapter *padapter,
 			offset = GET_HDR_OFFSET_2_0(efuseHeader);
 
 			ReadEFuseByte23a(padapter, eFuse_Addr++, &efuseExtHdr);
-			if (ALL_WORDS_DISABLED(efuseExtHdr)) {
+			if (ALL_WORDS_DISABLED(efuseExtHdr))
 				continue;
-			}
 
 			offset |= ((efuseExtHdr & 0xF0) >> 1);
 			wden = (efuseExtHdr & 0x0F);
@@ -524,9 +523,8 @@ hal_ReadEFuse_BT(struct rtw_adapter *padapter,
 
 				ReadEFuseByte23a(padapter, eFuse_Addr++,
 					      &efuseExtHdr);
-				if (ALL_WORDS_DISABLED(efuseExtHdr)) {
+				if (ALL_WORDS_DISABLED(efuseExtHdr))
 					continue;
-				}
 
 				offset |= ((efuseExtHdr & 0xF0) >> 1);
 				wden = (efuseExtHdr & 0x0F);
@@ -630,9 +628,8 @@ u16 rtl8723a_EfuseGetCurrentSize_WiFi(struct rtw_adapter *padapter)
 			hoffset = GET_HDR_OFFSET_2_0(efuse_data);
 			efuse_addr++;
 			efuse_OneByteRead23a(padapter, efuse_addr, &efuse_data);
-			if (ALL_WORDS_DISABLED(efuse_data)) {
+			if (ALL_WORDS_DISABLED(efuse_data))
 				continue;
-			}
 
 			hoffset |= ((efuse_data & 0xF0) >> 1);
 			hworden = efuse_data & 0x0F;
@@ -721,9 +718,8 @@ u16 rtl8723a_EfuseGetCurrentSize_BT(struct rtw_adapter *padapter)
 		}
 
 		/*  Check if we need to check next bank efuse */
-		if (efuse_addr < retU2) {
+		if (efuse_addr < retU2)
 			break;	/*  don't need to check next bank. */
-		}
 	}
 
 	retU2 = ((bank - 1) * EFUSE_BT_REAL_BANK_CONTENT_LEN) + efuse_addr;
@@ -755,7 +751,7 @@ void rtl8723a_read_chip_version(struct rtw_adapter *padapter)
 
 	value32 = rtl8723au_read32(padapter, REG_GPIO_OUTSTS);
 	/*  ROM code version. */
-	ChipVersion.ROMVer = ((value32 & RF_RL_ID) >> 20);
+	ChipVersion.ROMVer = (value32 & RF_RL_ID) >> 20;
 
 	/*  For multi-function consideration. Added by Roger, 2010.10.06. */
 	pHalData->MultiFunc = RT_MULTI_FUNC_NONE;
@@ -1140,9 +1136,8 @@ static int _LLTWrite(struct rtw_adapter *padapter, u32 address, u32 data)
 	/* polling */
 	do {
 		value = rtl8723au_read32(padapter, LLTReg);
-		if (_LLT_NO_ACTIVE == _LLT_OP_VALUE(value)) {
+		if (_LLT_NO_ACTIVE == _LLT_OP_VALUE(value))
 			break;
-		}
 
 		if (count > POLLING_LLT_THRESHOLD) {
 			RT_TRACE(_module_hal_init_c_, _drv_err_,
@@ -1165,16 +1160,14 @@ int InitLLTTable23a(struct rtw_adapter *padapter, u32 boundary)
 
 	for (i = 0; i < (txpktbuf_bndy - 1); i++) {
 		status = _LLTWrite(padapter, i, i + 1);
-		if (status != _SUCCESS) {
+		if (status != _SUCCESS)
 			return status;
-		}
 	}
 
 	/*  end of list */
 	status = _LLTWrite(padapter, (txpktbuf_bndy - 1), 0xFF);
-	if (status != _SUCCESS) {
+	if (status != _SUCCESS)
 		return status;
-	}
 
 	/*  Make the other pages as ring buffer */
 	/*  This ring buffer is used as beacon buffer if we config this
@@ -1182,16 +1175,14 @@ int InitLLTTable23a(struct rtw_adapter *padapter, u32 boundary)
 	/*  Otherwise used as local loopback buffer. */
 	for (i = txpktbuf_bndy; i < Last_Entry_Of_TxPktBuf; i++) {
 		status = _LLTWrite(padapter, i, (i + 1));
-		if (_SUCCESS != status) {
+		if (_SUCCESS != status)
 			return status;
-		}
 	}
 
 	/*  Let last entry point to the start entry of ring buffer */
 	status = _LLTWrite(padapter, Last_Entry_Of_TxPktBuf, txpktbuf_bndy);
-	if (status != _SUCCESS) {
+	if (status != _SUCCESS)
 		return status;
-	}
 
 	return status;
 }
@@ -1426,9 +1417,9 @@ static void _DisableAnalog(struct rtw_adapter *padapter, bool bWithoutHWSM)
 /*  HW Auto state machine */
 int CardDisableHWSM(struct rtw_adapter *padapter, u8 resetMCU)
 {
-	if (padapter->bSurpriseRemoved) {
+	if (padapter->bSurpriseRemoved)
 		return _SUCCESS;
-	}
+
 	/*  RF Off Sequence ==== */
 	_DisableRFAFEAndResetBB8192C(padapter);
 
@@ -1450,9 +1441,8 @@ int CardDisableHWSM(struct rtw_adapter *padapter, u8 resetMCU)
 /*  without HW Auto state machine */
 int CardDisableWithoutHWSM(struct rtw_adapter *padapter)
 {
-	if (padapter->bSurpriseRemoved) {
+	if (padapter->bSurpriseRemoved)
 		return _SUCCESS;
-	}
 
 	/*  RF Off Sequence ==== */
 	_DisableRFAFEAndResetBB8192C(padapter);
@@ -1738,8 +1728,8 @@ Hal_EfuseParseBTCoexistInfo_8723A(struct rtw_adapter *padapter,
 		/*  eeprom spec */
 		tempval = hwinfo[RF_OPTION4_8723A];
 		pHalData->EEPROMBluetoothAntNum = (tempval & 0x1);
-		pHalData->EEPROMBluetoothAntIsolation = ((tempval & 0x10) >> 4);
-		pHalData->EEPROMBluetoothRadioShared = ((tempval & 0x20) >> 5);
+		pHalData->EEPROMBluetoothAntIsolation = (tempval & 0x10) >> 4;
+		pHalData->EEPROMBluetoothRadioShared = (tempval & 0x20) >> 5;
 	} else {
 		pHalData->EEPROMBluetoothCoexist = 0;
 		pHalData->EEPROMBluetoothType = BT_RTL8723A;
@@ -1866,9 +1856,8 @@ static void rtl8723a_cal_txdesc_chksum(struct tx_desc *ptxdesc)
 	/*  Clear first */
 	ptxdesc->txdw7 &= cpu_to_le32(0xffff0000);
 
-	for (index = 0; index < count; index++) {
+	for (index = 0; index < count; index++)
 		checksum ^= le16_to_cpu(*(usPtr + index));
-	}
 
 	ptxdesc->txdw7 |= cpu_to_le32(checksum & 0x0000ffff);
 }
@@ -1916,9 +1905,8 @@ void rtl8723a_fill_fake_txdesc(struct rtw_adapter *padapter, u8 *pDesc,
 		ptxdesc->txdw3 |= cpu_to_le32((8 << 28));
 	}
 
-	if (true == IsBTQosNull) {
+	if (true == IsBTQosNull)
 		ptxdesc->txdw2 |= cpu_to_le32(BIT(23));	/*  BT NULL */
-	}
 
 	/* offset 16 */
 	ptxdesc->txdw4 |= cpu_to_le32(BIT(8));	/* driver uses rate */

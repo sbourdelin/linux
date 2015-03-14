@@ -446,7 +446,6 @@ static void pci224_ao_stop(struct comedi_device *dev,
 	if (!test_and_clear_bit(AO_CMD_STARTED, &devpriv->state))
 		return;
 
-
 	spin_lock_irqsave(&devpriv->ao_spinlock, flags);
 	/* Kill the interrupts. */
 	devpriv->intsce = 0;
@@ -838,7 +837,7 @@ static int pci224_ao_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	unsigned long flags;
 
 	/* Cannot handle null/empty chanlist. */
-	if (cmd->chanlist == NULL || cmd->chanlist_len == 0)
+	if (!cmd->chanlist || cmd->chanlist_len == 0)
 		return -EINVAL;
 
 	/* Determine which channels are enabled and their load order.  */
@@ -1029,13 +1028,11 @@ pci224_auto_attach(struct comedi_device *dev, unsigned long context_model)
 	if (!devpriv->ao_scan_vals)
 		return -ENOMEM;
 
-
 	/* Allocate buffer to hold AO channel scan order. */
 	devpriv->ao_scan_order = kmalloc(sizeof(devpriv->ao_scan_order[0]) *
 					 thisboard->ao_chans, GFP_KERNEL);
 	if (!devpriv->ao_scan_order)
 		return -ENOMEM;
-
 
 	/* Disable interrupt sources. */
 	devpriv->intsce = 0;

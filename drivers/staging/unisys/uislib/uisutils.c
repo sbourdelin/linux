@@ -21,7 +21,6 @@
 #include <linux/uuid.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
-#include "uniklog.h"
 #include "uisutils.h"
 #include "version.h"
 #include "vbushelper.h"
@@ -53,7 +52,6 @@ uisutil_add_proc_line_ex(int *total, char **buffer, int *buffer_remaining,
 	va_list args;
 	int len;
 
-	DBGINF("buffer = 0x%p : *buffer = 0x%p.\n", buffer, *buffer);
 	va_start(args, format);
 	len = vsnprintf(*buffer, *buffer_remaining, format, args);
 	va_end(args);
@@ -61,7 +59,6 @@ uisutil_add_proc_line_ex(int *total, char **buffer, int *buffer_remaining,
 		*buffer += *buffer_remaining;
 		*total += *buffer_remaining;
 		*buffer_remaining = 0;
-		LOGERR("bytes remaining is too small!\n");
 		return -1;
 	}
 	*buffer_remaining -= len;
@@ -75,8 +72,6 @@ int
 uisctrl_register_req_handler(int type, void *fptr,
 			     struct ultra_vbus_deviceinfo *chipset_driver_info)
 {
-	LOGINF("type = %d, fptr = 0x%p.\n", type, fptr);
-
 	switch (type) {
 	case 2:
 		if (fptr) {
@@ -91,7 +86,6 @@ uisctrl_register_req_handler(int type, void *fptr,
 		break;
 
 	default:
-		LOGERR("invalid type %d.\n", type);
 		return 0;
 	}
 	if (chipset_driver_info)
