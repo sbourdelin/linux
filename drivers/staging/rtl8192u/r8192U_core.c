@@ -2143,7 +2143,7 @@ static void rtl8192_init_priv_variable(struct net_device *dev)
 	//for silent reset
 	priv->IrpPendingCount = 1;
 	priv->ResetProgress = RESET_TYPE_NORESET;
-	priv->bForcedSilentReset = 0;
+	priv->bForcedSilentReset = false;
 	priv->bDisableNormalResetCheck = false;
 	priv->force_reset = false;
 
@@ -2310,11 +2310,11 @@ static void rtl8192_read_eeprom_info(struct net_device *dev)
 	}
 
 	if (bLoad_From_EEPOM) {
-		tmpValue = eprom_read(dev, (EEPROM_VID>>1));
+		tmpValue = eprom_read(dev, EEPROM_VID>>1);
 		priv->eeprom_vid = endian_swap(&tmpValue);
-		priv->eeprom_pid = eprom_read(dev, (EEPROM_PID>>1));
-		tmpValue = eprom_read(dev, (EEPROM_ChannelPlan>>1));
-		priv->eeprom_ChannelPlan = ((tmpValue&0xff00)>>8);
+		priv->eeprom_pid = eprom_read(dev, EEPROM_PID>>1);
+		tmpValue = eprom_read(dev, EEPROM_ChannelPlan>>1);
+		priv->eeprom_ChannelPlan = (tmpValue & 0xff00)>>8;
 		priv->btxpowerdata_readfromEEPORM = true;
 		priv->eeprom_CustomerID = eprom_read(dev, (EEPROM_Customer_ID>>1)) >>8;
 	} else {
@@ -2397,7 +2397,8 @@ static void rtl8192_read_eeprom_info(struct net_device *dev)
 			}
 		} else if (priv->EEPROM_Def_Ver == 1) {
 			if (bLoad_From_EEPOM) {
-				tmpValue = eprom_read(dev, (EEPROM_TxPwIndex_CCK_V1>>1));
+				tmpValue = eprom_read(dev,
+						EEPROM_TxPwIndex_CCK_V1 >> 1);
 				tmpValue = (tmpValue & 0xff00) >> 8;
 			} else {
 				tmpValue = 0x10;
@@ -2410,7 +2411,8 @@ static void rtl8192_read_eeprom_info(struct net_device *dev)
 				tmpValue = 0x1010;
 			*((u16 *)(&priv->EEPROMTxPowerLevelCCK_V1[1])) = tmpValue;
 			if (bLoad_From_EEPOM)
-				tmpValue = eprom_read(dev, (EEPROM_TxPwIndex_OFDM_24G_V1>>1));
+				tmpValue = eprom_read(dev,
+					EEPROM_TxPwIndex_OFDM_24G_V1 >> 1);
 			else
 				tmpValue = 0x1010;
 			*((u16 *)(&priv->EEPROMTxPowerLevelOFDM24G[0])) = tmpValue;
@@ -2453,7 +2455,7 @@ static void rtl8192_read_eeprom_info(struct net_device *dev)
 		// Antenna B gain offset to antenna A, bit0~3
 		priv->AntennaTxPwDiff[0] = (priv->EEPROMTxPowerDiff & 0xf);
 		// Antenna C gain offset to antenna A, bit4~7
-		priv->AntennaTxPwDiff[1] = ((priv->EEPROMTxPowerDiff & 0xf0)>>4);
+		priv->AntennaTxPwDiff[1] = (priv->EEPROMTxPowerDiff & 0xf0)>>4;
 		// CrystalCap, bit12~15
 		priv->CrystalCap = priv->EEPROMCrystalCap;
 		// ThermalMeter, bit0~3 for RFIC1, bit4~7 for RFIC2
@@ -4474,13 +4476,10 @@ static void query_rxdesc_status(struct sk_buff *skb,
 		skb_pull(skb, stats->RxBufShift + stats->RxDrvInfoSize);
 	}
 
-	/* for debug 2008.5.29 */
-
-	//added by vivi, for MP, 20080108
-	stats->RxIs40MHzPacket = driver_info->BW;
-	if (stats->RxDrvInfoSize != 0)
+	if (driver_info) {
+		stats->RxIs40MHzPacket = driver_info->BW;
 		TranslateRxSignalStuff819xUsb(skb, stats, driver_info);
-
+	}
 }
 
 static void rtl8192_rx_nomal(struct sk_buff *skb)

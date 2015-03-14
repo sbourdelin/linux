@@ -423,7 +423,7 @@ static void me4000_reset(struct comedi_device *dev)
 
 	/* Set both stop bits in the analog input control register */
 	outl(ME4000_AI_CTRL_BIT_IMMEDIATE_STOP | ME4000_AI_CTRL_BIT_STOP,
-		dev->iobase + ME4000_AI_CTRL_REG);
+	     dev->iobase + ME4000_AI_CTRL_REG);
 
 	/* Set both stop bits in the analog output control register */
 	val = ME4000_AO_CTRL_BIT_IMMEDIATE_STOP | ME4000_AO_CTRL_BIT_STOP;
@@ -437,7 +437,7 @@ static void me4000_reset(struct comedi_device *dev)
 
 	/* Set the adustment register for AO demux */
 	outl(ME4000_AO_DEMUX_ADJUST_VALUE,
-		    dev->iobase + ME4000_AO_DEMUX_ADJUST_REG);
+	     dev->iobase + ME4000_AO_DEMUX_ADJUST_REG);
 
 	/*
 	 * Set digital I/O direction for port 0
@@ -608,7 +608,7 @@ static int me4000_ai_check_chanlist(struct comedi_device *dev,
 
 			if (!comedi_range_is_bipolar(s, range)) {
 				dev_dbg(dev->class_dev,
-				       "Bipolar is not selected in differential mode\n");
+					"Bipolar is not selected in differential mode\n");
 				return -EINVAL;
 			}
 		}
@@ -623,7 +623,6 @@ static int ai_round_cmd_args(struct comedi_device *dev,
 			     unsigned int *init_ticks,
 			     unsigned int *scan_ticks, unsigned int *chan_ticks)
 {
-
 	int rest;
 
 	*init_ticks = 0;
@@ -730,7 +729,6 @@ static int ai_prepare(struct comedi_device *dev,
 		      unsigned int init_ticks,
 		      unsigned int scan_ticks, unsigned int chan_ticks)
 {
-
 	unsigned int tmp = 0;
 
 	/* Write timer arguments */
@@ -771,12 +769,12 @@ static int ai_prepare(struct comedi_device *dev,
 	/* Stop triggers */
 	if (cmd->stop_src == TRIG_COUNT) {
 		outl(cmd->chanlist_len * cmd->stop_arg,
-			    dev->iobase + ME4000_AI_SAMPLE_COUNTER_REG);
+		     dev->iobase + ME4000_AI_SAMPLE_COUNTER_REG);
 		tmp |= ME4000_AI_CTRL_BIT_HF_IRQ | ME4000_AI_CTRL_BIT_SC_IRQ;
 	} else if (cmd->stop_src == TRIG_NONE &&
 		   cmd->scan_end_src == TRIG_COUNT) {
 		outl(cmd->scan_end_arg,
-			    dev->iobase + ME4000_AI_SAMPLE_COUNTER_REG);
+		     dev->iobase + ME4000_AI_SAMPLE_COUNTER_REG);
 		tmp |= ME4000_AI_CTRL_BIT_HF_IRQ | ME4000_AI_CTRL_BIT_SC_IRQ;
 	} else {
 		tmp |= ME4000_AI_CTRL_BIT_HF_IRQ;
@@ -826,7 +824,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
 				 struct comedi_cmd *cmd)
 {
-
 	unsigned int init_ticks;
 	unsigned int chan_ticks;
 	unsigned int scan_ticks;
@@ -918,7 +915,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	if (cmd->start_src == TRIG_NOW &&
 	    cmd->scan_begin_src == TRIG_TIMER &&
 	    cmd->convert_src == TRIG_TIMER) {
-
 		/* Check timer arguments */
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
@@ -940,7 +936,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	} else if (cmd->start_src == TRIG_NOW &&
 		   cmd->scan_begin_src == TRIG_FOLLOW &&
 		   cmd->convert_src == TRIG_TIMER) {
-
 		/* Check timer arguments */
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
@@ -955,7 +950,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	} else if (cmd->start_src == TRIG_EXT &&
 		   cmd->scan_begin_src == TRIG_TIMER &&
 		   cmd->convert_src == TRIG_TIMER) {
-
 		/* Check timer arguments */
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
@@ -977,7 +971,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	} else if (cmd->start_src == TRIG_EXT &&
 		   cmd->scan_begin_src == TRIG_FOLLOW &&
 		   cmd->convert_src == TRIG_TIMER) {
-
 		/* Check timer arguments */
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
@@ -992,7 +985,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	} else if (cmd->start_src == TRIG_EXT &&
 		   cmd->scan_begin_src == TRIG_EXT &&
 		   cmd->convert_src == TRIG_TIMER) {
-
 		/* Check timer arguments */
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
@@ -1007,7 +999,6 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 	} else if (cmd->start_src == TRIG_EXT &&
 		   cmd->scan_begin_src == TRIG_EXT &&
 		   cmd->convert_src == TRIG_EXT) {
-
 		/* Check timer arguments */
 		if (init_ticks < ME4000_AI_MIN_TICKS) {
 			dev_err(dev->class_dev, "Invalid start arg\n");
@@ -1186,13 +1177,13 @@ static int me4000_dio_insn_bits(struct comedi_device *dev,
 {
 	if (comedi_dio_update_state(s, data)) {
 		outl((s->state >> 0) & 0xFF,
-			    dev->iobase + ME4000_DIO_PORT_0_REG);
+		     dev->iobase + ME4000_DIO_PORT_0_REG);
 		outl((s->state >> 8) & 0xFF,
-			    dev->iobase + ME4000_DIO_PORT_1_REG);
+		     dev->iobase + ME4000_DIO_PORT_1_REG);
 		outl((s->state >> 16) & 0xFF,
-			    dev->iobase + ME4000_DIO_PORT_2_REG);
+		     dev->iobase + ME4000_DIO_PORT_2_REG);
 		outl((s->state >> 24) & 0xFF,
-			    dev->iobase + ME4000_DIO_PORT_3_REG);
+		     dev->iobase + ME4000_DIO_PORT_3_REG);
 	}
 
 	data[1] = ((inl(dev->iobase + ME4000_DIO_PORT_0_REG) & 0xFF) << 0) |
@@ -1296,7 +1287,7 @@ static int me4000_auto_attach(struct comedi_device *dev,
 
 	if (pcidev->irq > 0) {
 		result = request_irq(pcidev->irq, me4000_ai_isr, IRQF_SHARED,
-				  dev->board_name, dev);
+				     dev->board_name, dev);
 		if (result == 0)
 			dev->irq = pcidev->irq;
 	}
@@ -1378,7 +1369,7 @@ static int me4000_auto_attach(struct comedi_device *dev,
 	if (!inl(dev->iobase + ME4000_DIO_DIR_REG)) {
 		s->io_bits |= 0xFF;
 		outl(ME4000_DIO_CTRL_BIT_MODE_0,
-			dev->iobase + ME4000_DIO_DIR_REG);
+		     dev->iobase + ME4000_DIO_DIR_REG);
 	}
 
 	/* Counter subdevice (8254) */

@@ -735,13 +735,13 @@ void odm_FalseAlarmCounterStatistics23a(struct dm_odm_t *pDM_Odm)
 	rtl8723au_write32(adapter, ODM_REG_OFDM_FA_RSTD_11N, val32);
 	ret_value = rtl8723au_read32(adapter, ODM_REG_OFDM_FA_TYPE1_11N);
 	FalseAlmCnt->Cnt_Fast_Fsync = (ret_value&0xffff);
-	FalseAlmCnt->Cnt_SB_Search_fail = ((ret_value&0xffff0000)>>16);
+	FalseAlmCnt->Cnt_SB_Search_fail = (ret_value & 0xffff0000)>>16;
 	ret_value = rtl8723au_read32(adapter, ODM_REG_OFDM_FA_TYPE2_11N);
 	FalseAlmCnt->Cnt_OFDM_CCA = (ret_value&0xffff);
-	FalseAlmCnt->Cnt_Parity_Fail = ((ret_value&0xffff0000)>>16);
+	FalseAlmCnt->Cnt_Parity_Fail = (ret_value & 0xffff0000)>>16;
 	ret_value = rtl8723au_read32(adapter, ODM_REG_OFDM_FA_TYPE3_11N);
 	FalseAlmCnt->Cnt_Rate_Illegal = (ret_value&0xffff);
-	FalseAlmCnt->Cnt_Crc8_fail = ((ret_value&0xffff0000)>>16);
+	FalseAlmCnt->Cnt_Crc8_fail = (ret_value & 0xffff0000)>>16;
 	ret_value = rtl8723au_read32(adapter, ODM_REG_OFDM_FA_TYPE4_11N);
 	FalseAlmCnt->Cnt_Mcs_fail = (ret_value&0xffff);
 

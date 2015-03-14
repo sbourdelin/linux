@@ -4,7 +4,7 @@
  * Author: Michal Dobes <dobes@tesnet.cz>
  *
  * Thanks to ZhenGang Shang <ZhenGang.Shang@Advantech.com.cn>
- * for testing and informations.
+ * for testing and information.
  *
  *  hardware driver for Advantech cards:
  *   card:   PCI-1710, PCI-1710HG, PCI-1711, PCI-1713, PCI-1720, PCI-1731
@@ -405,7 +405,6 @@ static int pci171x_ai_insn_read(struct comedi_device *dev,
 				unsigned int *data)
 {
 	struct pci1710_private *devpriv = dev->private;
-	unsigned int chan = CR_CHAN(insn->chanspec);
 	int ret = 0;
 	int i;
 
@@ -426,7 +425,7 @@ static int pci171x_ai_insn_read(struct comedi_device *dev,
 		if (ret)
 			break;
 
-		ret = pci171x_ai_read_sample(dev, s, chan, &val);
+		ret = pci171x_ai_read_sample(dev, s, 0, &val);
 		if (ret)
 			break;
 
