@@ -2531,9 +2531,7 @@ static int rtl8xxxu_set_bssid(struct rtl8xxxu_priv *priv, const u8 *bssid)
 	int i;
 	u16 reg;
 
-	dev_dbg(&priv->udev->dev,
-		"%s: (%02x:%02x:%02x:%02x:%02x:%02x)\n", __func__,
-		bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+	dev_dbg(&priv->udev->dev, "%s: (%pM)\n", __func__, bssid);
 
 	reg = REG_BSSID;
 
@@ -4346,13 +4344,8 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	rtl8xxxu_read_efuse(priv);
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
-	dev_info(&udev->dev, "RTL8723au MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
-		 priv->efuse_wifi.efuse.mac_addr[0],
-		 priv->efuse_wifi.efuse.mac_addr[1],
-		 priv->efuse_wifi.efuse.mac_addr[2],
-		 priv->efuse_wifi.efuse.mac_addr[3],
-		 priv->efuse_wifi.efuse.mac_addr[4],
-		 priv->efuse_wifi.efuse.mac_addr[5]);
+	dev_info(&udev->dev, "RTL8723au MAC %pM\n",
+		 priv->efuse_wifi.efuse.mac_addr);
 
 	rtl8xxxu_load_firmware(priv);
 
