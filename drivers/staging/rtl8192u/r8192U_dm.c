@@ -36,11 +36,12 @@ static u32 edca_setting_UL[HT_IOT_PEER_MAX] = {
 
 /*------------------------Define global variable-----------------------------*/
 /* Debug variable ? */
-dig_t	dm_digtable;
+struct dig dm_digtable;
 /* Store current software write register content for MAC PHY. */
 u8		dm_shadow[16][256] = { {0} };
 /* For Dynamic Rx Path Selection by Signal Strength */
-DRxPathSel	DM_RxPathSelTable;
+struct dynamic_rx_path_sel DM_RxPathSelTable;
+
 /*------------------------Define global variable-----------------------------*/
 
 
@@ -717,7 +718,7 @@ static void dm_TXPowerTrackingCallback_ThermalMeter(struct net_device *dev)
 		if (tmpCCK40Mindex >= CCK_Table_length)
 			tmpCCK40Mindex = CCK_Table_length-1;
 	} else {
-		tmpval = ((u8)tmpRegA - priv->ThermalMeter[0]);
+		tmpval = (u8)tmpRegA - priv->ThermalMeter[0];
 
 		if (tmpval >= 6) /* higher temperature */
 			tmpOFDMindex = tmpCCK20Mindex = 0; /* max to +6dB */
@@ -2270,10 +2271,10 @@ static void dm_check_edca_turbo(
 				/*  For Each time updating EDCA parameter, reset EDCA turbo mode status. */
 				dm_init_edca_turbo(dev);
 				u1bAIFS = qos_parameters->aifs[0] * ((mode&(IEEE_G|IEEE_N_24G)) ? 9 : 20) + aSifsTime;
-				u4bAcParam = ((((u32)(qos_parameters->tx_op_limit[0])) << AC_PARAM_TXOP_LIMIT_OFFSET)|
+				u4bAcParam = (((u32)(qos_parameters->tx_op_limit[0])) << AC_PARAM_TXOP_LIMIT_OFFSET)|
 					(((u32)(qos_parameters->cw_max[0])) << AC_PARAM_ECW_MAX_OFFSET)|
 					(((u32)(qos_parameters->cw_min[0])) << AC_PARAM_ECW_MIN_OFFSET)|
-					((u32)u1bAIFS << AC_PARAM_AIFS_OFFSET));
+					((u32)u1bAIFS << AC_PARAM_AIFS_OFFSET);
 				/*write_nic_dword(dev, WDCAPARA_ADD[i], u4bAcParam);*/
 				write_nic_dword(dev, EDCAPARA_BE,  u4bAcParam);
 
@@ -2681,10 +2682,8 @@ static void dm_init_fsync(struct net_device *dev)
 	priv->ieee80211->fsync_seconddiff_ratethreshold = 200;
 	priv->ieee80211->fsync_state = Default_Fsync;
 	priv->framesyncMonitor = 1;	/* current default 0xc38 monitor on */
-
-	init_timer(&priv->fsync_timer);
-	priv->fsync_timer.data = (unsigned long)dev;
-	priv->fsync_timer.function = dm_fsync_timer_callback;
+	setup_timer(&priv->fsync_timer, dm_fsync_timer_callback,
+		    (unsigned long)dev);
 }
 
 static void dm_deInit_fsync(struct net_device *dev)

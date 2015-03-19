@@ -172,7 +172,8 @@ static void delete_context(struct sasem_context *context)
 	kfree(context);
 
 	if (debug)
-		pr_info("%s: context deleted\n", __func__);
+		dev_info(&context->dev->dev, "%s: context deleted\n",
+			 __func__);
 }
 
 static void deregister_from_lirc(struct sasem_context *context)
@@ -182,10 +183,12 @@ static void deregister_from_lirc(struct sasem_context *context)
 
 	retval = lirc_unregister_driver(minor);
 	if (retval)
-		pr_err("%s: unable to deregister from lirc (%d)\n",
+		dev_err(&context->dev->dev,
+			"%s: unable to deregister from lirc (%d)\n",
 		       __func__, retval);
 	else
-		pr_info("Deregistered Sasem driver (minor:%d)\n", minor);
+		dev_info(&context->dev->dev,
+		         "Deregistered Sasem driver (minor:%d)\n", minor);
 
 }
 
@@ -331,11 +334,11 @@ static int send_packet(struct sasem_context *context)
 	context->tx_urb->actual_length = 0;
 
 	init_completion(&context->tx.finished);
-	atomic_set(&(context->tx.busy), 1);
+	atomic_set(&context->tx.busy, 1);
 
 	retval =  usb_submit_urb(context->tx_urb, GFP_KERNEL);
 	if (retval) {
-		atomic_set(&(context->tx.busy), 0);
+		atomic_set(&context->tx.busy, 0);
 		dev_err(&context->dev->dev, "error submitting urb (%d)\n",
 			retval);
 	} else {
@@ -387,7 +390,7 @@ static ssize_t vfd_write(struct file *file, const char __user *buf,
 		goto exit;
 	}
 
-	data_buf = memdup_user((void const __user *)buf, n_bytes);
+	data_buf = memdup_user(buf, n_bytes);
 	if (IS_ERR(data_buf)) {
 		retval = PTR_ERR(data_buf);
 		data_buf = NULL;

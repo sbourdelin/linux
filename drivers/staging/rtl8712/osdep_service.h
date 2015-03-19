@@ -60,12 +60,6 @@ struct	__queue	{
 #define LIST_CONTAINOR(ptr, type, member) \
 	((type *)((char *)(ptr)-(SIZE_T)(&((type *)0)->member)))
 
-static inline void _cancel_timer(struct timer_list *ptimer, u8 *bcancelled)
-{
-	del_timer(ptimer);
-	*bcancelled = true; /*true ==1; false==0*/
-}
-
 #ifndef BIT
 	#define BIT(x)	(1 << (x))
 #endif
@@ -90,11 +84,6 @@ static inline void sleep_schedulable(int ms)
 	delta = msecs_to_jiffies(ms);/*(ms)*/
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(delta);
-}
-
-static inline unsigned char _cancel_timer_ex(struct timer_list *ptimer)
-{
-	return del_timer(ptimer);
 }
 
 static inline void flush_signals_thread(void)

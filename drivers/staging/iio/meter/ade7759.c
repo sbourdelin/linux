@@ -371,7 +371,7 @@ static ssize_t ade7759_write_frequency(struct device *dev,
 
 	mutex_lock(&indio_dev->mlock);
 
-	t = (27900 / val);
+	t = 27900 / val;
 	if (t > 0)
 		t--;
 
@@ -462,11 +462,7 @@ static int ade7759_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	ret = iio_device_register(indio_dev);
-	if (ret)
-		return ret;
-
-	return 0;
+	return iio_device_register(indio_dev);
 }
 
 /* fixme, confirm ordering in this function */

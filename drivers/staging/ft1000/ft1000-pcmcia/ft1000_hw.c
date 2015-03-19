@@ -327,7 +327,7 @@ static void ft1000_reset_asic(struct net_device *dev)
 	 */
 	if (info->AsicID == MAGNEMITE_ID) {
 		ft1000_write_reg(dev, FT1000_REG_RESET,
-				 (DSP_RESET_BIT | ASIC_RESET_BIT));
+				 DSP_RESET_BIT | ASIC_RESET_BIT);
 	}
 	mdelay(1);
 	if (info->AsicID == ELECTRABUZZ_ID) {
@@ -364,6 +364,7 @@ static int ft1000_reset_card(struct net_device *dev)
 	int i;
 	unsigned long flags;
 	struct prov_record *ptr;
+	struct prov_record *tmp;
 
 	info->CardReady = 0;
 	info->ProgConStat = 0;
@@ -373,9 +374,8 @@ static int ft1000_reset_card(struct net_device *dev)
 	/* del_timer(&poll_timer); */
 
 	/* Make sure we free any memory reserve for provisioning */
-	while (list_empty(&info->prov_list) == 0) {
+	list_for_each_entry_safe(ptr, tmp, &info->prov_list, list) {
 		pr_debug("deleting provisioning record\n");
-		ptr = list_entry(info->prov_list.next, struct prov_record, list);
 		list_del(&ptr->list);
 		kfree(ptr->pprov_data);
 		kfree(ptr);
@@ -387,7 +387,7 @@ static int ft1000_reset_card(struct net_device *dev)
 	} else {
 		pr_debug("resetting ASIC and DSP\n");
 		ft1000_write_reg(dev, FT1000_REG_RESET,
-				 (DSP_RESET_BIT | ASIC_RESET_BIT));
+				 DSP_RESET_BIT | ASIC_RESET_BIT);
 	}
 
 	/* Copy DSP session record into info block if this is not a coldstart */
@@ -1127,7 +1127,9 @@ static void ft1000_proc_drvmsg(struct net_device *dev)
 				info->DSPInfoBlk[8] = 0x7200;
 				info->DSPInfoBlk[9] =
 					htons(info->DSPInfoBlklen);
-				ft1000_send_cmd(dev, (u16 *)info->DSPInfoBlk, (u16)(info->DSPInfoBlklen+4), 0);
+				ft1000_send_cmd(dev, info->DSPInfoBlk,
+						(u16)(info->DSPInfoBlklen+4),
+						0);
 			}
 
 			break;
@@ -1293,9 +1295,9 @@ static int ft1000_parse_dpram_msg(struct net_device *dev)
 					  2) >> 8) & 0xff;
 			} else {
 				portid =
-					(ft1000_read_dpram_mag_16
+					ft1000_read_dpram_mag_16
 					 (dev, FT1000_MAG_PORT_ID,
-					  FT1000_MAG_PORT_ID_INDX) & 0xff);
+					  FT1000_MAG_PORT_ID_INDX) & 0xff;
 			}
 			pr_debug("DSP_QID = 0x%x\n", portid);
 
@@ -1971,6 +1973,7 @@ void stop_ft1000_card(struct net_device *dev)
 {
 	struct ft1000_info *info = netdev_priv(dev);
 	struct prov_record *ptr;
+	struct prov_record *tmp;
 	/* int cnt; */
 
 	info->CardReady = 0;
@@ -1979,8 +1982,7 @@ void stop_ft1000_card(struct net_device *dev)
 	ft1000_disable_interrupts(dev);
 
 	/* Make sure we free any memory reserve for provisioning */
-	while (list_empty(&info->prov_list) == 0) {
-		ptr = list_entry(info->prov_list.next, struct prov_record, list);
+	list_for_each_entry_safe(ptr, tmp, &info->prov_list, list) {
 		list_del(&ptr->list);
 		kfree(ptr->pprov_data);
 		kfree(ptr);
