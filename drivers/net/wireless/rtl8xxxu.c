@@ -4189,6 +4189,12 @@ rtl8xxxu_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtl8xxxu_set_ampdu_factor(priv, 0);
 		rtl8xxxu_set_ampdu_min_space(priv, 0);
 		break;
+	case IEEE80211_AMPDU_RX_START:
+		dev_info(dev, "%s: IEEE80211_AMPDU_RX_START\n", __func__);
+		break;
+	case IEEE80211_AMPDU_RX_STOP:
+		dev_info(dev, "%s: IEEE80211_AMPDU_RX_STOP\n", __func__);
+		break;
 	default:
 		break;
 	}
