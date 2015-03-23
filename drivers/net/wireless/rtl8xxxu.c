@@ -449,6 +449,18 @@ static struct rtl8xxxu_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
 	{0xff, 0xffffffff}
 };
 
+static u32 rtl8723au_iqk_phy_iq_bb_reg[RTL8XXXU_BB_REGS] = {
+	REG_OFDM0_XA_RX_IQ_IMBALANCE,
+	REG_OFDM0_XB_RX_IQ_IMBALANCE,
+	REG_OFDM0_ENERGY_CCA_THRES,
+	REG_OFDM0_AGCR_SSI_TABLE,
+	REG_OFDM0_XA_TX_IQ_IMBALANCE,
+	REG_OFDM0_XB_TX_IQ_IMBALANCE,
+	REG_OFDM0_XC_TX_AFE,
+	REG_OFDM0_XD_TX_AFE,
+	REG_OFDM0_RX_IQ_EXT_ANTA
+};
+
 static u8 rtl8723au_read8(struct rtl8xxxu_priv *priv, u16 addr)
 {
 	struct usb_device *udev = priv->udev;
@@ -2340,7 +2352,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	}
 }
 
-static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
+static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 {
 	struct device *dev = &priv->udev->dev;
 	int result[4][8];	/* last is final result */
@@ -2350,20 +2362,6 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 	u32 reg_eb4, reg_ebc, reg_ec4, reg_ecc;
 	s32 reg_tmp = 0;
 	bool simu;
-	u32 iqk_bb_reg_92c[RTL8XXXU_BB_REGS] = {
-		REG_OFDM0_XA_RX_IQ_IMBALANCE, REG_OFDM0_XB_RX_IQ_IMBALANCE,
-		REG_OFDM0_ENERGY_CCA_THRES, REG_OFDM0_AGCR_SSI_TABLE,
-		REG_OFDM0_XA_TX_IQ_IMBALANCE, REG_OFDM0_XB_TX_IQ_IMBALANCE,
-		REG_OFDM0_XC_TX_AFE, REG_OFDM0_XD_TX_AFE,
-		REG_OFDM0_RX_IQ_EXT_ANTA
-	};
-
-	if (recovery) {
-		rtl8xxxu_restore_regs(priv, iqk_bb_reg_92c,
-				      priv->bb_recovery_backup,
-				      RTL8XXXU_BB_REGS);
-		return;
-	}
 
 	memset(result, 0, sizeof(result));
 	candidate = -1;
@@ -2449,7 +2447,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv, bool recovery)
 		rtl8xxxu_fill_iqk_matrix_a(priv, path_a_ok, result,
 					   candidate, (reg_ea4 == 0));
 
-	rtl8xxxu_save_regs(priv, iqk_bb_reg_92c,
+	rtl8xxxu_save_regs(priv, rtl8723au_iqk_phy_iq_bb_reg,
 			   priv->bb_recovery_backup, RTL8XXXU_BB_REGS);
 }
 
@@ -3149,9 +3147,11 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	 * Not sure if we should get into this at all
 	 */
 	if (priv->iqk_initialized) {
-		rtl8723a_phy_iq_calibrate(priv, true);
+		rtl8xxxu_restore_regs(priv, rtl8723au_iqk_phy_iq_bb_reg,
+				      priv->bb_recovery_backup,
+				      RTL8XXXU_BB_REGS);
 	} else {
-		rtl8723a_phy_iq_calibrate(priv, false);
+		rtl8723a_phy_iq_calibrate(priv);
 		priv->iqk_initialized = true;
 	}
 
