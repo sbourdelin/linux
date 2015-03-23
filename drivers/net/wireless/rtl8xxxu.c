@@ -3600,7 +3600,7 @@ static void rtl8xxxu_dump_action(struct device *dev,
 			 (cap & IEEE80211_ADDBA_PARAM_BUF_SIZE_MASK) >> 6,
 			 (cap >> 1) & 0x1,
 			 le16_to_cpu(mgmt->u.action.u.addba_resp.status));
-			break;
+		break;
 	case WLAN_ACTION_ADDBA_REQ:
 		cap = le16_to_cpu(mgmt->u.action.u.addba_req.capab);
 		timeout = le16_to_cpu(mgmt->u.action.u.addba_req.timeout);
