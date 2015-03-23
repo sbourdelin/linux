@@ -608,15 +608,18 @@ static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv, u8 reg)
 	val32 &= ~FPGA0_HSSI_PARM2_ADDR_MASK;
 	val32 |= (reg << FPGA0_HSSI_PARM2_ADDR_SHIFT) |
 		FPGA0_HSSI_PARM2_EDGE_READ;
-	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2,
-			  hssia &= ~FPGA0_HSSI_PARM2_EDGE_READ);
+	hssia &= ~FPGA0_HSSI_PARM2_EDGE_READ;
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, hssia);
+
 	udelay(10);
 	/* Here use XB for path B */
 	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
 	udelay(100);
-	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2,
-			  hssia |= FPGA0_HSSI_PARM2_EDGE_READ);
+
+	hssia |= FPGA0_HSSI_PARM2_EDGE_READ;
+	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, hssia);
 	udelay(10);
+
 	/* Use XB for path B */
 	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
 	if (val32 & BIT(8))	/* RF PI enabled */
