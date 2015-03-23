@@ -2215,7 +2215,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_FPGA0_XCD_RF_SW_CTRL, 0x22204000);
 
 	val32 = rtl8723au_read32(priv, REG_FPGA0_XAB_RF_SW_CTRL);
-	val32 |= (BIT(10) | BIT(26));
+	val32 |= (FPGA0_RF_PAPE | (FPGA0_RF_PAPE << FPGA0_RF_BD_CTRL_SHIFT));
 	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, val32);
 
 	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_RF_INT_OE);

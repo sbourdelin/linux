@@ -687,18 +687,19 @@
 #define REG_FPGA0_XCD_RF_SW_CTRL	0x0874
 #define REG_FPGA0_XC_RF_SW_CTRL		0x0874	/* 16 bit */
 #define REG_FPGA0_XD_RF_SW_CTRL		0x0876	/* 16 bit */
-#define  FPGA0_RF_3WIRE_DATA		0x1
-#define  FPGA0_RF_3WIRE_CLOC		0x2
-#define  FPGA0_RF_3WIRE_LOAD		0x4
-#define  FPGA0_RF_3WIRE_RW		0x8
+#define  FPGA0_RF_3WIRE_DATA		BIT(0)
+#define  FPGA0_RF_3WIRE_CLOC		BIT(1)
+#define  FPGA0_RF_3WIRE_LOAD		BIT(2)
+#define  FPGA0_RF_3WIRE_RW		BIT(3)
 #define  FPGA0_RF_3WIRE_MASK		0xf
-#define  FPGA0_RF_RFENV			0x10
-#define  FPGA0_RF_TRSW			0x20	/* Useless now */
-#define  FPGA0_RF_TRSWB			0x40
-#define  FPGA0_RF_ANTSW			0x100
-#define  FPGA0_RF_ANTSWB		0x200
-#define  FPGA0_RF_PAPE			0x400
-#define  FPGA0_RF_PAPE5G		0x800
+#define  FPGA0_RF_RFENV			BIT(4)
+#define  FPGA0_RF_TRSW			BIT(5)	/* Useless now */
+#define  FPGA0_RF_TRSWB			BIT(6)
+#define  FPGA0_RF_ANTSW			BIT(8)
+#define  FPGA0_RF_ANTSWB		BIT(9)
+#define  FPGA0_RF_PAPE			BIT(10)
+#define  FPGA0_RF_PAPE5G		BIT(11)
+#define  FPGA0_RF_BD_CTRL_SHIFT		16
 
 #define REG_FPGA0_XAB_RF_PARM		0x0878	/* Antenna select path in ODM */
 #define REG_FPGA0_XA_RF_PARM		0x0878	/* 16 bit */
