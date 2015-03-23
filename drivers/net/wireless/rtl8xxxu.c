@@ -622,7 +622,7 @@ static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv, u8 reg)
 
 	/* Use XB for path B */
 	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
-	if (val32 & BIT(8))	/* RF PI enabled */
+	if (val32 & FPGA0_HSSI_PARM1_PI)
 		retval = rtl8723au_read32(priv, REG_HSPI_XA_READBACK);
 	else
 		retval = rtl8723au_read32(priv, REG_FPGA0_XA_LSSI_READBACK);
