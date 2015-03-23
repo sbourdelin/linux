@@ -3706,8 +3706,8 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
 
 		if (/* (tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
-			control->sta->ht_cap.ht_supported &&
-			control && control->sta) {
+			control && control->sta &&
+			control->sta->ht_cap.ht_supported) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
 
 			tx_desc->txdw2 |=
