@@ -2960,8 +2960,10 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	/* RFSW Control - clear bit 14 ?? */
 	rtl8723au_write32(priv, REG_FPGA0_TXINFO, 0x00000003);
 	/* 0x07000760 */
-	val32 = 0x07000000 | FPGA0_RF_TRSW | FPGA0_RF_TRSWB |
-		FPGA0_RF_ANTSW | FPGA0_RF_ANTSWB | FPGA0_RF_PAPE;
+	val32 = FPGA0_RF_TRSW | FPGA0_RF_TRSWB | FPGA0_RF_ANTSW |
+		FPGA0_RF_ANTSWB | FPGA0_RF_PAPE |
+		((FPGA0_RF_ANTSW | FPGA0_RF_ANTSWB | FPGA0_RF_PAPE) <<
+		 FPGA0_RF_BD_CTRL_SHIFT);
 	rtl8723au_write32(priv, REG_FPGA0_XAB_RF_SW_CTRL, val32);
 	/* 0x860[6:5]= 00 - why? - this sets antenna B */
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
