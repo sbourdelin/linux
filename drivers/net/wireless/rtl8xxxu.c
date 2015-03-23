@@ -2167,11 +2167,13 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		REG_FPGA0_XB_RF_INT_OE, REG_FPGA0_RF_MODE
 	};
 
-	/*  Note: IQ calibration must be performed after loading  */
-	/*		PHY_REG.txt , and radio_a, radio_b.txt	 */
+	/*
+	 * Note: IQ calibration must be performed after loading
+	 *       PHY_REG.txt , and radio_a, radio_b.txt
+	 */
 
 	if (t == 0) {
-		/*  Save ADDA parameters, turn Path A ADDA on */
+		/* Save ADDA parameters, turn Path A ADDA on */
 		rtl8xxxu_save_regs(priv, ADDA_REG, priv->adda_backup,
 				   RTL8XXXU_ADDA_REGS);
 		rtl8xxxu_save_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
@@ -2188,7 +2190,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	}
 
 	if (!priv->pi_enabled) {
-		/*  Switch BB to PI mode to do IQ Calibration. */
+		/* Switch BB to PI mode to do IQ Calibration. */
 		rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM1,
 				  0x01000100);
 		rtl8723au_write32(priv, REG_FPGA0_XB_HSSI_PARM1,
@@ -2270,7 +2272,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	if (is_2t) {
 		rtl8xxxu_phy_path_a_standby(priv);
 
-		/*  Turn Path B ADDA on */
+		/* Turn Path B ADDA on */
 		rtl8xxxu_phy_path_adda_on(priv, ADDA_REG, false, is_2t);
 
 		for (i = 0; i < retry; i++) {
@@ -2313,18 +2315,18 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 			rtl8723au_write32(priv, REG_FPGA0_XB_HSSI_PARM1, val32);
 		}
 
-		/*  Reload ADDA power saving parameters */
+		/* Reload ADDA power saving parameters */
 		rtl8xxxu_restore_regs(priv, ADDA_REG, priv->adda_backup,
 				      RTL8XXXU_ADDA_REGS);
 
-		/*  Reload MAC parameters */
+		/* Reload MAC parameters */
 		rtl8xxxu_restore_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
 
-		/*  Reload BB parameters */
+		/* Reload BB parameters */
 		rtl8xxxu_restore_regs(priv, IQK_BB_REG_92C,
 				      priv->bb_backup, RTL8XXXU_BB_REGS);
 
-		/*  Restore RX initial gain */
+		/* Restore RX initial gain */
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
 
 		if (is_2t) {
@@ -2332,7 +2334,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 					  0x00032ed3);
 		}
 
-		/* load 0xe30 IQC default value */
+		/* Load 0xe30 IQC default value */
 		rtl8723au_write32(priv, REG_TX_IQK_TONE_A, 0x01008c00);
 		rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x01008c00);
 	}
