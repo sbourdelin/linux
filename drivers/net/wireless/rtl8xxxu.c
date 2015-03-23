@@ -4410,7 +4410,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	sband = &rtl8xxxu_supported_band;
 	sband->ht_cap.ht_supported = true;
-	sband->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_8K;
+	sband->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
 	sband->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_16;
 	sband->ht_cap.cap = /* IEEE80211_HT_CAP_SUP_WIDTH_20_40 | */
 		IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40;
