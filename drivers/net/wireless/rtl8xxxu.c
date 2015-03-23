@@ -449,7 +449,7 @@ static struct rtl8xxxu_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
 	{0xff, 0xffffffff}
 };
 
-static u32 rtl8723au_iqk_phy_iq_bb_reg[RTL8XXXU_BB_REGS] = {
+static const u32 rtl8723au_iqk_phy_iq_bb_reg[RTL8XXXU_BB_REGS] = {
 	REG_OFDM0_XA_RX_IQ_IMBALANCE,
 	REG_OFDM0_XB_RX_IQ_IMBALANCE,
 	REG_OFDM0_ENERGY_CCA_THRES,
@@ -2021,7 +2021,7 @@ static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 }
 
 static void
-rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
+rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv, const u32 *reg, u32 *backup)
 {
 	int i;
 
@@ -2031,8 +2031,8 @@ rtl8xxxu_save_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 	backup[i] = rtl8723au_read32(priv, reg[i]);
 }
 
-static void
-rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
+static void rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv,
+				      const u32 *reg, u32 *backup)
 {
 	int i;
 
@@ -2042,7 +2042,7 @@ rtl8xxxu_restore_mac_regs(struct rtl8xxxu_priv *priv, u32 *reg, u32 *backup)
 	rtl8723au_write32(priv, reg[i], backup[i]);
 }
 
-static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, u32 *regs,
+static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, const u32 *regs,
 			       u32 *backup, int count)
 {
 	int i;
@@ -2051,7 +2051,7 @@ static void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 		backup[i] = rtl8723au_read32(priv, regs[i]);
 }
 
-static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
+static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, const u32 *regs,
 				  u32 *backup, int count)
 {
 	int i;
@@ -2061,7 +2061,7 @@ static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, u32 *regs,
 }
 
 
-static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, u32 *regs,
+static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, const u32 *regs,
 				  bool path_a_on, bool is_2t)
 {
 	u32 path_on;
@@ -2079,8 +2079,8 @@ static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, u32 *regs,
 		rtl8723au_write32(priv, regs[i], path_on);
 }
 
-static void
-rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv, u32 *regs, u32 *backup)
+static void rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv,
+				     const u32 *regs, u32 *backup)
 {
 	int i = 0;
 
@@ -2155,8 +2155,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	u32 i, val32;
 	int path_a_ok /*, path_b_ok */;
 	int retry = 2;
-
-	u32 ADDA_REG[RTL8XXXU_ADDA_REGS] = {
+	const u32 adda_regs[RTL8XXXU_ADDA_REGS] = {
 		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
 		REG_RX_WAIT_CCA, REG_TX_CCK_RFON,
 		REG_TX_CCK_BBON, REG_TX_OFDM_RFON,
@@ -2166,13 +2165,11 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		REG_RX_TO_RX, REG_STANDBY,
 		REG_SLEEP, REG_PMPD_ANAEN
 	};
-
-	u32 IQK_MAC_REG[RTL8XXXU_MAC_REGS] = {
+	const u32 iqk_mac_regs[RTL8XXXU_MAC_REGS] = {
 		REG_TXPAUSE, REG_BEACON_CTRL,
 		REG_BEACON_CTRL_1, REG_GPIO_MUXCFG
 	};
-
-	u32 IQK_BB_REG_92C[RTL8XXXU_BB_REGS] = {
+	const u32 iqk_bb_regs[RTL8XXXU_BB_REGS] = {
 		REG_OFDM0_TRX_PATH_ENABLE, REG_OFDM0_TR_MUX_PAR,
 		REG_FPGA0_XCD_RF_SW_CTRL, REG_CONFIG_ANT_A, REG_CONFIG_ANT_B,
 		REG_FPGA0_XAB_RF_SW_CTRL, REG_FPGA0_XA_RF_INT_OE,
@@ -2186,14 +2183,14 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 
 	if (t == 0) {
 		/* Save ADDA parameters, turn Path A ADDA on */
-		rtl8xxxu_save_regs(priv, ADDA_REG, priv->adda_backup,
+		rtl8xxxu_save_regs(priv, adda_regs, priv->adda_backup,
 				   RTL8XXXU_ADDA_REGS);
-		rtl8xxxu_save_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
-		rtl8xxxu_save_regs(priv, IQK_BB_REG_92C,
+		rtl8xxxu_save_mac_regs(priv, iqk_mac_regs, priv->mac_backup);
+		rtl8xxxu_save_regs(priv, iqk_bb_regs,
 				   priv->bb_backup, RTL8XXXU_BB_REGS);
 	}
 
-	rtl8xxxu_path_adda_on(priv, ADDA_REG, true, is_2t);
+	rtl8xxxu_path_adda_on(priv, adda_regs, true, is_2t);
 
 	if (t == 0) {
 		val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
@@ -2234,7 +2231,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	}
 
 	/* MAC settings */
-	rtl8xxxu_mac_calibration(priv, IQK_MAC_REG, priv->mac_backup);
+	rtl8xxxu_mac_calibration(priv, iqk_mac_regs, priv->mac_backup);
 
 	/* Page B init */
 	rtl8723au_write32(priv, REG_CONFIG_ANT_A, 0x00080000);
@@ -2328,14 +2325,14 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		}
 
 		/* Reload ADDA power saving parameters */
-		rtl8xxxu_restore_regs(priv, ADDA_REG, priv->adda_backup,
+		rtl8xxxu_restore_regs(priv, adda_regs, priv->adda_backup,
 				      RTL8XXXU_ADDA_REGS);
 
 		/* Reload MAC parameters */
-		rtl8xxxu_restore_mac_regs(priv, IQK_MAC_REG, priv->mac_backup);
+		rtl8xxxu_restore_mac_regs(priv, iqk_mac_regs, priv->mac_backup);
 
 		/* Reload BB parameters */
-		rtl8xxxu_restore_regs(priv, IQK_BB_REG_92C,
+		rtl8xxxu_restore_regs(priv, iqk_bb_regs,
 				      priv->bb_backup, RTL8XXXU_BB_REGS);
 
 		/* Restore RX initial gain */
