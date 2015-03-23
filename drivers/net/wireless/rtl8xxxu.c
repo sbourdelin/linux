@@ -4432,7 +4432,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	hw->extra_tx_headroom = sizeof(struct rtl8xxxu_tx_desc);
 	hw->flags = IEEE80211_HW_SIGNAL_DBM;
 	/*
-	 * The firmware can handle rate control, but we need callbacks
+	 * The firmware handles rate control
 	 */
 	hw->flags |= IEEE80211_HW_HAS_RATE_CONTROL;
 
