@@ -1304,7 +1304,7 @@ exit:
 	rtl8723au_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_DISABLE);
 
 	if (priv->efuse_wifi.efuse.rtl_id != cpu_to_le16(0x8129))
-		ret = EINVAL;
+		ret = -EINVAL;
 
 	return ret;
 }
