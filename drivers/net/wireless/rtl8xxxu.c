@@ -1282,11 +1282,15 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 					ret = rtl8xxxu_read_efuse8(priv,
 								   efuse_addr++,
 								   &val8);
+					if (ret)
+						goto exit;
 					priv->efuse_wifi.raw[map_addr++] = val8;
 
 					ret = rtl8xxxu_read_efuse8(priv,
 								   efuse_addr++,
 								   &val8);
+					if (ret)
+						goto exit;
 					priv->efuse_wifi.raw[map_addr++] = val8;
 				} else
 					map_addr += 2;
@@ -4393,7 +4397,11 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		goto exit;
 
 	rtl8xxxu_8723au_identify_chip(priv);
-	rtl8xxxu_read_efuse(priv);
+	ret = rtl8xxxu_read_efuse(priv);
+	if (ret) {
+		dev_err(&udev->dev, "Fatal - failed to read EFuse\n");
+		goto exit;
+	}
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
 	dev_info(&udev->dev, "RTL8723au MAC %pM\n",
