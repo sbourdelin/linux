@@ -1152,8 +1152,7 @@ static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 	dev_info(dev, "RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
 		 cut, priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
-	dev_info(dev, "%s: RTL8723au number of TX queues: %i\n",
-		 __func__, priv->ep_tx_count);
+	dev_info(dev, "RTL8723au number of TX queues: %i\n", priv->ep_tx_count);
 }
 
 static int
