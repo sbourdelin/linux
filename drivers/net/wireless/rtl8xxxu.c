@@ -3642,6 +3642,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct rtl8xxxu_tx_desc *tx_desc;
+	struct ieee80211_sta *sta = NULL;
 	struct rtl8xxxu_sta_priv *sta_priv = NULL;
 	struct device *dev = &priv->udev->dev;
 	struct urb *urb;
@@ -3679,8 +3680,10 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 
 	tx_info->rate_driver_data[0] = hw;
 
-	if (control && control->sta)
-		sta_priv = (struct rtl8xxxu_sta_priv *)control->sta->drv_priv;
+	if (control && control->sta) {
+		sta = control->sta;
+		sta_priv = (struct rtl8xxxu_sta_priv *)sta->drv_priv;
+	}
 
 	tx_desc = (struct rtl8xxxu_tx_desc *)
 		skb_push(skb, sizeof(struct rtl8xxxu_tx_desc));
@@ -3725,10 +3728,9 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
 
 	/* (tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
-	if (ieee80211_is_data_qos(hdr->frame_control) &&
-	    control && control->sta) {
-		if (control->sta->ht_cap.ht_supported) {
-			u8 ampdu = control->sta->ht_cap.ampdu_density;
+	if (ieee80211_is_data_qos(hdr->frame_control) && sta) {
+		if (sta->ht_cap.ht_supported) {
+			u8 ampdu = sta->ht_cap.ampdu_density;
 
 			tx_desc->txdw2 |=
 				cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
@@ -3745,8 +3747,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_SHORT_PREAMBLE);
 	if (rate_flag & IEEE80211_TX_RC_SHORT_GI ||
 	    (ieee80211_is_data_qos(hdr->frame_control) &&
-	     control && control->sta &&
-	     control->sta->ht_cap.cap &
+	     sta && sta->ht_cap.cap &
 	     (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))) {
 		tx_desc->txdw5 |= cpu_to_le32(TXDESC_SHORT_GI);
 	}
