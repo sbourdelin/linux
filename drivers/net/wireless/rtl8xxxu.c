@@ -3692,7 +3692,8 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	tx_desc->pkt_size = cpu_to_le16(pktlen);
 	tx_desc->pkt_offset = sizeof(struct rtl8xxxu_tx_desc);
 
-	tx_desc->txdw0 = TXDESC_OWN | TXDESC_FSG | TXDESC_LSG;
+	tx_desc->txdw0 =
+		TXDESC_OWN | TXDESC_FIRST_SEGMENT | TXDESC_LAST_SEGMENT;
 	if (is_multicast_ether_addr(ieee80211_get_DA(hdr)) ||
 	    is_broadcast_ether_addr(ieee80211_get_DA(hdr)))
 		tx_desc->txdw0 |= TXDESC_BROADMULTICAST;

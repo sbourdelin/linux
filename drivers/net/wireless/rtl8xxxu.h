@@ -191,8 +191,8 @@ struct rtl8xxxu_tx_desc {
 #define TXDESC_OWN			BIT(31)
 #else
 #define TXDESC_BROADMULTICAST		BIT(0)
-#define TXDESC_LSG			BIT(2)
-#define TXDESC_FSG			BIT(3)
+#define TXDESC_LAST_SEGMENT		BIT(2)
+#define TXDESC_FIRST_SEGMENT		BIT(3)
 #define TXDESC_OWN			BIT(7)
 #endif
 
