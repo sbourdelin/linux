@@ -495,3 +495,8 @@ struct rtl8xxxu_rx_urb {
 	struct urb urb;
 	struct ieee80211_hw *hw;
 };
+
+struct rtl8xxxu_sta_priv {
+	bool sgi;
+	bool short_preamble;
+};
