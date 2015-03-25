@@ -222,11 +222,12 @@ struct rtl8xxxu_tx_desc {
 #define TXDESC_HWPC			BIT(31)
 
 /* Word 2 */
+#define TXDESC_ACK_REPORT		BIT(19)
 #define TXDESC_AMPDU_DENSITY_SHIFT	20
 
 /* Word 3 */
 #define TXDESC_SEQ_SHIFT		16
-#define TXDESC_SEQ_MASK			0x000fff0000
+#define TXDESC_SEQ_MASK			0x0fff0000
 
 /* Word 4 */
 #define TXDESC_QOS			BIT(6)
