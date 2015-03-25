@@ -29,6 +29,7 @@
 #include <linux/ctype.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
+#include <linux/types.h>
 #include <linux/serial_reg.h>
 #include <linux/slab.h>
 #include <linux/delay.h>	/* For udelay */
@@ -36,10 +37,8 @@
 #include <linux/pci.h>
 #include "dgnc_driver.h"
 #include "dgnc_tty.h"
-#include "dgnc_types.h"
 #include "dgnc_neo.h"
 #include "dgnc_cls.h"
-#include "dpacompat.h"
 #include "dgnc_sysfs.h"
 #include "dgnc_utils.h"
 
@@ -221,7 +220,7 @@ int dgnc_tty_register(struct dgnc_board *brd)
 				"Can't register tty device (%d)\n", rc);
 			return rc;
 		}
-		brd->dgnc_Major_Serial_Registered = TRUE;
+		brd->dgnc_Major_Serial_Registered = true;
 	}
 
 	/*
@@ -271,7 +270,7 @@ int dgnc_tty_register(struct dgnc_board *brd)
 				rc);
 			return rc;
 		}
-		brd->dgnc_Major_TransparentPrint_Registered = TRUE;
+		brd->dgnc_Major_TransparentPrint_Registered = true;
 	}
 
 	dgnc_BoardsByMajor[brd->SerialDriver.major] = brd;
@@ -409,7 +408,7 @@ void dgnc_tty_uninit(struct dgnc_board *brd)
 			tty_unregister_device(&brd->SerialDriver, i);
 		}
 		tty_unregister_driver(&brd->SerialDriver);
-		brd->dgnc_Major_Serial_Registered = FALSE;
+		brd->dgnc_Major_Serial_Registered = false;
 	}
 
 	if (brd->dgnc_Major_TransparentPrint_Registered) {
@@ -420,7 +419,7 @@ void dgnc_tty_uninit(struct dgnc_board *brd)
 			tty_unregister_device(&brd->PrintDriver, i);
 		}
 		tty_unregister_driver(&brd->PrintDriver);
-		brd->dgnc_Major_TransparentPrint_Registered = FALSE;
+		brd->dgnc_Major_TransparentPrint_Registered = false;
 	}
 
 	kfree(brd->SerialDriver.ttys);
@@ -1042,7 +1041,7 @@ static int dgnc_tty_open(struct tty_struct *tty, struct file *file)
 	spin_lock_irqsave(&brd->bd_lock, flags);
 
 	/* If opened device is greater than our number of ports, bail. */
-	if (PORT_NUM(minor) > brd->nasync) {
+	if (PORT_NUM(minor) >= brd->nasync) {
 		spin_unlock_irqrestore(&brd->bd_lock, flags);
 		return -ENXIO;
 	}

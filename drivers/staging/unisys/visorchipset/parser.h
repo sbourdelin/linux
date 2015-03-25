@@ -32,15 +32,15 @@ typedef enum {
 
 struct parser_context *parser_init(u64 addr, u32 bytes, BOOL isLocal,
 				   BOOL *tryAgain);
-struct parser_context *parser_init_byteStream(u64 addr, u32 bytes, BOOL isLocal,
-				       BOOL *tryAgain);
+struct parser_context *parser_init_byte_stream(u64 addr, u32 bytes, BOOL local,
+				       BOOL *retry);
 void parser_param_start(struct parser_context *ctx,
 			PARSER_WHICH_STRING which_string);
 void *parser_param_get(struct parser_context *ctx, char *nam, int namesize);
 void *parser_string_get(struct parser_context *ctx);
 uuid_le parser_id_get(struct parser_context *ctx);
 char *parser_simpleString_get(struct parser_context *ctx);
-void *parser_byteStream_get(struct parser_context *ctx, ulong *nbytes);
+void *parser_byte_stream_get(struct parser_context *ctx, ulong *nbytes);
 void parser_done(struct parser_context *ctx);
 
 #endif
