@@ -473,8 +473,6 @@ static struct pardevice *pprt;
 
 static int keypad_initialized;
 
-static char init_in_progress;
-
 static void (*lcd_write_cmd)(int);
 static void (*lcd_write_data)(int);
 static void (*lcd_clear_fast)(void);
@@ -1718,9 +1716,6 @@ static struct miscdevice keypad_dev = {
 
 static void keypad_send_key(const char *string, int max_len)
 {
-	if (init_in_progress)
-		return;
-
 	/* send the key to the device only if a process is attached to it. */
 	if (!atomic_read(&keypad_available)) {
 		while (max_len-- && keypad_buflen < KEYPAD_BUFFER && *string) {
@@ -2234,6 +2229,7 @@ static void panel_attach(struct parport *port)
 		if (misc_register(&keypad_dev))
 			goto err_lcd_unreg;
 	}
+	register_reboot_notifier(&panel_notifier);
 	return;
 
 err_lcd_unreg:
@@ -2254,6 +2250,8 @@ static void panel_detach(struct parport *port)
 		       __func__, port->number, parport);
 		return;
 	}
+
+	unregister_reboot_notifier(&panel_notifier);
 
 	if (keypad.enabled && keypad_initialized) {
 		misc_deregister(&keypad_dev);
@@ -2279,7 +2277,7 @@ static struct parport_driver panel_driver = {
 /* init function */
 static int __init panel_init_module(void)
 {
-	int selected_keypad_type = NOT_SET;
+	int selected_keypad_type = NOT_SET, err;
 
 	/* take care of an eventual profile */
 	switch (profile) {
@@ -2320,7 +2318,6 @@ static int __init panel_init_module(void)
 		selected_lcd_type = LCD_TYPE_OLD;
 		break;
 	}
-
 
 	/*
 	 * Overwrite selection with module param values (both keypad and lcd),
@@ -2377,21 +2374,17 @@ static int __init panel_init_module(void)
 		break;
 	}
 
-	/* tells various subsystems about the fact that we are initializing */
-	init_in_progress = 1;
-
 	if (!lcd.enabled && !keypad.enabled) {
 		/* no device enabled, let's exit */
 		pr_err("driver version " PANEL_VERSION " disabled.\n");
 		return -ENODEV;
 	}
 
-	if (parport_register_driver(&panel_driver)) {
+	err = parport_register_driver(&panel_driver);
+	if (err) {
 		pr_err("could not register with parport. Aborting.\n");
-		return -EIO;
+		return err;
 	}
-
-	register_reboot_notifier(&panel_notifier);
 
 	if (pprt)
 		pr_info("driver version " PANEL_VERSION
@@ -2400,15 +2393,11 @@ static int __init panel_init_module(void)
 	else
 		pr_info("driver version " PANEL_VERSION
 			" not yet registered\n");
-	/* tells various subsystems about the fact that initialization
-	   is finished */
-	init_in_progress = 0;
 	return 0;
 }
 
 static void __exit panel_cleanup_module(void)
 {
-	unregister_reboot_notifier(&panel_notifier);
 
 	if (scan_timer.function != NULL)
 		del_timer_sync(&scan_timer);

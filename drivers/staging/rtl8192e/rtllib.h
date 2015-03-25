@@ -66,20 +66,6 @@
 #define IW_CUSTOM_MAX	256	/* In bytes */
 #endif
 
-#ifndef container_of
-/**
- * container_of - cast a member of a structure out to the containing structure
- *
- * @ptr:	the pointer to the member.
- * @type:       the type of the container struct this is embedded in.
- * @member:     the name of the member within the struct.
- *
- */
-#define container_of(ptr, type, member) ({		      \
-	const typeof(((type *)0)->member)*__mptr = (ptr);    \
-	(type *)((char *)__mptr - offsetof(type, member)); })
-#endif
-
 #define skb_tail_pointer_rsl(skb) skb_tail_pointer(skb)
 
 #define EXPORT_SYMBOL_RSL(x) EXPORT_SYMBOL(x)
@@ -482,9 +468,6 @@ enum rt_op_mode {
 #define	IEEE_CRYPT_ALG_NAME_LEN			16
 
 #define MAX_IE_LEN  0xff
-#define RT_ASSERT_RET(_Exp) do {} while (0)
-#define RT_ASSERT_RET_VALUE(_Exp, Ret)		\
-	do {} while (0)
 
 struct ieee_param {
 	u32 cmd;
@@ -768,8 +751,8 @@ do {								\
 #define RTLLIB_DL_TRACE	   (1<<29)
 #define RTLLIB_DL_DATA	   (1<<30)
 #define RTLLIB_DL_ERR	   (1<<31)
-#define RTLLIB_ERROR(f, a...) printk(KERN_ERR "rtllib: " f, ## a)
-#define RTLLIB_WARNING(f, a...) printk(KERN_WARNING "rtllib: " f, ## a)
+#define RTLLIB_ERROR(f, a...) pr_err("rtllib: " f, ## a)
+#define RTLLIB_WARNING(f, a...) pr_warn("rtllib: " f, ## a)
 #define RTLLIB_DEBUG_INFO(f, a...)   RTLLIB_DEBUG(RTLLIB_DL_INFO, f, ## a)
 
 #define RTLLIB_DEBUG_WX(f, a...)     RTLLIB_DEBUG(RTLLIB_DL_WX, f, ## a)
@@ -1649,7 +1632,6 @@ struct rtllib_network {
 	struct list_head list;
 };
 
-#if 1
 enum rtllib_state {
 
 	/* the card is not linked at all */
@@ -1687,17 +1669,6 @@ enum rtllib_state {
 	 */
 	RTLLIB_LINKED_SCANNING,
 };
-#else
-enum rtllib_state {
-	RTLLIB_UNINITIALIZED = 0,
-	RTLLIB_INITIALIZED,
-	RTLLIB_ASSOCIATING,
-	RTLLIB_ASSOCIATED,
-	RTLLIB_AUTHENTICATING,
-	RTLLIB_AUTHENTICATED,
-	RTLLIB_SHUTDOWN
-};
-#endif
 
 #define DEFAULT_MAX_SCAN_AGE (15 * HZ)
 #define DEFAULT_FTS 2346
@@ -1715,11 +1686,6 @@ enum rtllib_state {
 #define RTLLIB_52GHZ_MAX_CHANNEL 165
 #define RTLLIB_52GHZ_CHANNELS (RTLLIB_52GHZ_MAX_CHANNEL - \
 				  RTLLIB_52GHZ_MIN_CHANNEL + 1)
-#ifndef eqMacAddr
-#define eqMacAddr(a, b)					\
-	(((a)[0] == (b)[0] && (a)[1] == (b)[1] && (a)[2] == (b)[2] &&	\
-	(a)[3] == (b)[3] && (a)[4] == (b)[4] && (a)[5] == (b)[5]) ? 1 : 0)
-#endif
 struct tx_pending {
 	int frag;
 	struct rtllib_txb *txb;
@@ -2255,7 +2221,7 @@ struct rtllib_device {
 	short raw_tx;
 	/* used if IEEE_SOFTMAC_TX_QUEUE is set */
 	short queue_stop;
-	short scanning_continue ;
+	short scanning_continue;
 	short proto_started;
 	short proto_stoppping;
 
@@ -2883,7 +2849,7 @@ extern void HT_update_self_and_peer_setting(struct rtllib_device *ieee,
 extern u8 HTGetHighestMCSRate(struct rtllib_device *ieee, u8 *pMCSRateSet,
 			      u8 *pMCSFilter);
 extern u8 MCS_FILTER_ALL[];
-extern u16 MCS_DATA_RATE[2][2][77] ;
+extern u16 MCS_DATA_RATE[2][2][77];
 extern u8 HTCCheck(struct rtllib_device *ieee, u8 *pFrame);
 extern void HTResetIOTSetting(struct rt_hi_throughput *pHTInfo);
 extern bool IsHTHalfNmodeAPs(struct rtllib_device *ieee);

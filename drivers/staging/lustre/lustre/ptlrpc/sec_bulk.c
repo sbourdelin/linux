@@ -363,8 +363,8 @@ static void enc_pools_insert(struct page ***pools, int npools, int npages)
 	 */
 	cur_npools = (page_pools.epp_total_pages + PAGES_PER_POOL - 1) /
 		     PAGES_PER_POOL;
-	end_npools = (page_pools.epp_total_pages + npages + PAGES_PER_POOL - 1) /
-		     PAGES_PER_POOL;
+	end_npools = (page_pools.epp_total_pages + npages + PAGES_PER_POOL - 1)
+		     / PAGES_PER_POOL;
 	LASSERT(end_npools <= page_pools.epp_max_pools);
 
 	np_idx = 0;
@@ -814,9 +814,8 @@ int bulk_sec_desc_unpack(struct lustre_msg *msg, int offset, int swabbed)
 		return -EINVAL;
 	}
 
-	if (swabbed) {
+	if (swabbed)
 		__swab32s(&bsd->bsd_nob);
-	}
 
 	if (unlikely(bsd->bsd_version != 0)) {
 		CERROR("Unexpected version %u\n", bsd->bsd_version);

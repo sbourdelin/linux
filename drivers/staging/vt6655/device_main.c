@@ -330,16 +330,6 @@ static void device_init_registers(struct vnt_private *pDevice)
 	/* zonetype initial */
 	pDevice->byOriginalZonetype = pDevice->abyEEPROM[EEP_OFS_ZONETYPE];
 
-	/* Get RFType */
-	pDevice->byRFType = SROMbyReadEmbedded(pDevice->PortOffset, EEP_OFS_RFTYPE);
-
-	/* force change RevID for VT3253 emu */
-	if ((pDevice->byRFType & RF_EMU) != 0)
-			pDevice->byRevId = 0x80;
-
-	pDevice->byRFType &= RF_MASK;
-	pr_debug("pDevice->byRFType = %x\n", pDevice->byRFType);
-
 	if (!pDevice->bZoneRegExist)
 		pDevice->byZoneType = pDevice->abyEEPROM[EEP_OFS_ZONETYPE];
 
@@ -540,12 +530,12 @@ static bool device_init_rings(struct vnt_private *pDevice)
 	void *vir_pool;
 
 	/*allocate all RD/TD rings a single pool*/
-	vir_pool = pci_zalloc_consistent(pDevice->pcid,
+	vir_pool = dma_zalloc_coherent(&pDevice->pcid->dev,
 					 pDevice->sOpts.nRxDescs0 * sizeof(SRxDesc) +
 					 pDevice->sOpts.nRxDescs1 * sizeof(SRxDesc) +
 					 pDevice->sOpts.nTxDescs[0] * sizeof(STxDesc) +
 					 pDevice->sOpts.nTxDescs[1] * sizeof(STxDesc),
-					 &pDevice->pool_dma);
+					 &pDevice->pool_dma, GFP_ATOMIC);
 	if (vir_pool == NULL) {
 		dev_err(&pDevice->pcid->dev, "allocate desc dma memory failed\n");
 		return false;
@@ -559,16 +549,17 @@ static bool device_init_rings(struct vnt_private *pDevice)
 	pDevice->rd1_pool_dma = pDevice->rd0_pool_dma +
 		pDevice->sOpts.nRxDescs0 * sizeof(SRxDesc);
 
-	pDevice->tx0_bufs = pci_zalloc_consistent(pDevice->pcid,
+	pDevice->tx0_bufs = dma_zalloc_coherent(&pDevice->pcid->dev,
 						  pDevice->sOpts.nTxDescs[0] * PKT_BUF_SZ +
 						  pDevice->sOpts.nTxDescs[1] * PKT_BUF_SZ +
 						  CB_BEACON_BUF_SIZE +
 						  CB_MAX_BUF_SIZE,
-						  &pDevice->tx_bufs_dma0);
+						  &pDevice->tx_bufs_dma0,
+						  GFP_ATOMIC);
 	if (pDevice->tx0_bufs == NULL) {
 		dev_err(&pDevice->pcid->dev, "allocate buf dma memory failed\n");
 
-		pci_free_consistent(pDevice->pcid,
+		dma_free_coherent(&pDevice->pcid->dev,
 				    pDevice->sOpts.nRxDescs0 * sizeof(SRxDesc) +
 				    pDevice->sOpts.nRxDescs1 * sizeof(SRxDesc) +
 				    pDevice->sOpts.nTxDescs[0] * sizeof(STxDesc) +
@@ -614,7 +605,7 @@ static bool device_init_rings(struct vnt_private *pDevice)
 
 static void device_free_rings(struct vnt_private *pDevice)
 {
-	pci_free_consistent(pDevice->pcid,
+	dma_free_coherent(&pDevice->pcid->dev,
 			    pDevice->sOpts.nRxDescs0 * sizeof(SRxDesc) +
 			    pDevice->sOpts.nRxDescs1 * sizeof(SRxDesc) +
 			    pDevice->sOpts.nTxDescs[0] * sizeof(STxDesc) +
@@ -624,7 +615,7 @@ static void device_free_rings(struct vnt_private *pDevice)
 		);
 
 	if (pDevice->tx0_bufs)
-		pci_free_consistent(pDevice->pcid,
+		dma_free_coherent(&pDevice->pcid->dev,
 				    pDevice->sOpts.nTxDescs[0] * PKT_BUF_SZ +
 				    pDevice->sOpts.nTxDescs[1] * PKT_BUF_SZ +
 				    CB_BEACON_BUF_SIZE +
@@ -689,8 +680,8 @@ static void device_free_rd0_ring(struct vnt_private *pDevice)
 		PSRxDesc        pDesc = &(pDevice->aRD0Ring[i]);
 		PDEVICE_RD_INFO  pRDInfo = pDesc->pRDInfo;
 
-		pci_unmap_single(pDevice->pcid, pRDInfo->skb_dma,
-				 pDevice->rx_buf_sz, PCI_DMA_FROMDEVICE);
+		dma_unmap_single(&pDevice->pcid->dev, pRDInfo->skb_dma,
+				 pDevice->rx_buf_sz, DMA_FROM_DEVICE);
 
 		dev_kfree_skb(pRDInfo->skb);
 
@@ -706,8 +697,8 @@ static void device_free_rd1_ring(struct vnt_private *pDevice)
 		PSRxDesc        pDesc = &(pDevice->aRD1Ring[i]);
 		PDEVICE_RD_INFO  pRDInfo = pDesc->pRDInfo;
 
-		pci_unmap_single(pDevice->pcid, pRDInfo->skb_dma,
-				 pDevice->rx_buf_sz, PCI_DMA_FROMDEVICE);
+		dma_unmap_single(&pDevice->pcid->dev, pRDInfo->skb_dma,
+				 pDevice->rx_buf_sz, DMA_FROM_DEVICE);
 
 		dev_kfree_skb(pRDInfo->skb);
 
@@ -775,8 +766,8 @@ static void device_free_td0_ring(struct vnt_private *pDevice)
 		PDEVICE_TD_INFO  pTDInfo = pDesc->pTDInfo;
 
 		if (pTDInfo->skb_dma && (pTDInfo->skb_dma != pTDInfo->buf_dma))
-			pci_unmap_single(pDevice->pcid, pTDInfo->skb_dma,
-					 pTDInfo->skb->len, PCI_DMA_TODEVICE);
+			dma_unmap_single(&pDevice->pcid->dev, pTDInfo->skb_dma,
+					 pTDInfo->skb->len, DMA_TO_DEVICE);
 
 		if (pTDInfo->skb)
 			dev_kfree_skb(pTDInfo->skb);
@@ -794,8 +785,8 @@ static void device_free_td1_ring(struct vnt_private *pDevice)
 		PDEVICE_TD_INFO  pTDInfo = pDesc->pTDInfo;
 
 		if (pTDInfo->skb_dma && (pTDInfo->skb_dma != pTDInfo->buf_dma))
-			pci_unmap_single(pDevice->pcid, pTDInfo->skb_dma,
-					 pTDInfo->skb->len, PCI_DMA_TODEVICE);
+			dma_unmap_single(&pDevice->pcid->dev, pTDInfo->skb_dma,
+					 pTDInfo->skb->len, DMA_TO_DEVICE);
 
 		if (pTDInfo->skb)
 			dev_kfree_skb(pTDInfo->skb);
@@ -841,9 +832,9 @@ static bool device_alloc_rx_buf(struct vnt_private *pDevice, PSRxDesc pRD)
 	ASSERT(pRDInfo->skb);
 
 	pRDInfo->skb_dma =
-		pci_map_single(pDevice->pcid,
+		dma_map_single(&pDevice->pcid->dev,
 			       skb_put(pRDInfo->skb, skb_tailroom(pRDInfo->skb)),
-			       pDevice->rx_buf_sz, PCI_DMA_FROMDEVICE);
+			       pDevice->rx_buf_sz, DMA_FROM_DEVICE);
 
 	*((unsigned int *)&(pRD->m_rd0RD0)) = 0; /* FIX cast */
 
@@ -994,8 +985,8 @@ static void device_free_tx_buf(struct vnt_private *pDevice, PSTxDesc pDesc)
 
 	/* pre-allocated buf_dma can't be unmapped. */
 	if (pTDInfo->skb_dma && (pTDInfo->skb_dma != pTDInfo->buf_dma)) {
-		pci_unmap_single(pDevice->pcid, pTDInfo->skb_dma, skb->len,
-				 PCI_DMA_TODEVICE);
+		dma_unmap_single(&pDevice->pcid->dev, pTDInfo->skb_dma,
+				 skb->len, DMA_TO_DEVICE);
 	}
 
 	if (pTDInfo->byFlags & TD_FLAGS_NETIF_SKB)
@@ -1189,12 +1180,14 @@ static int vnt_tx_packet(struct vnt_private *priv, struct sk_buff *skb)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	PSTxDesc head_td;
-	u32 dma_idx = TYPE_AC0DMA;
+	u32 dma_idx;
 	unsigned long flags;
 
 	spin_lock_irqsave(&priv->lock, flags);
 
-	if (!ieee80211_is_data(hdr->frame_control))
+	if (ieee80211_is_data(hdr->frame_control))
+		dma_idx = TYPE_AC0DMA;
+	else
 		dma_idx = TYPE_TXDMA0;
 
 	if (AVAIL_TD(priv, dma_idx) < 1) {
@@ -1207,6 +1200,9 @@ static int vnt_tx_packet(struct vnt_private *priv, struct sk_buff *skb)
 	head_td->m_td1TD1.byTCR = 0;
 
 	head_td->pTDInfo->skb = skb;
+
+	if (dma_idx == TYPE_AC0DMA)
+		head_td->pTDInfo->byFlags = TD_FLAGS_NETIF_SKB;
 
 	priv->iTDUsed[dma_idx]++;
 
@@ -1236,13 +1232,10 @@ static int vnt_tx_packet(struct vnt_private *priv, struct sk_buff *skb)
 
 	head_td->buff_addr = cpu_to_le32(head_td->pTDInfo->skb_dma);
 
-	if (dma_idx == TYPE_AC0DMA) {
-		head_td->pTDInfo->byFlags = TD_FLAGS_NETIF_SKB;
-
+	if (head_td->pTDInfo->byFlags & TD_FLAGS_NETIF_SKB)
 		MACvTransmitAC0(priv->PortOffset);
-	} else {
+	else
 		MACvTransmit0(priv->PortOffset);
-	}
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
@@ -1779,6 +1772,12 @@ vt6655_probe(struct pci_dev *pcid, const struct pci_device_id *ent)
 	/* initial to reload eeprom */
 	MACvInitialize(priv->PortOffset);
 	MACvReadEtherAddress(priv->PortOffset, priv->abyCurrentNetAddr);
+
+	/* Get RFType */
+	priv->byRFType = SROMbyReadEmbedded(priv->PortOffset, EEP_OFS_RFTYPE);
+	priv->byRFType &= RF_MASK;
+
+	dev_dbg(&pcid->dev, "RF Type = %x\n", priv->byRFType);
 
 	device_get_options(priv);
 	device_set_options(priv);

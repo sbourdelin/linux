@@ -282,8 +282,7 @@ int rtllib_wx_get_scan(struct rtllib_device *ieee,
 			ev = rtl819x_translate_scan(ieee, ev, stop, network,
 						    info);
 		else
-			RTLLIB_DEBUG_SCAN("Not showing network '%s ("
-				" %pM)' due to age (%lums).\n",
+			RTLLIB_DEBUG_SCAN("Not showing network '%s ( %pM)' due to age (%lums).\n",
 				escape_essid(network->ssid,
 					     network->ssid_len),
 				network->bssid,
@@ -390,9 +389,9 @@ int rtllib_wx_set_encode(struct rtllib_device *ieee,
 			kfree(new_crypt);
 			new_crypt = NULL;
 
-			netdev_warn(dev, "%s: could not initialize WEP: "
-			       "load module rtllib_crypt_wep\n",
-			       dev->name);
+			netdev_warn(dev,
+				    "%s: could not initialize WEP: load module rtllib_crypt_wep\n",
+				    dev->name);
 			return -EOPNOTSUPP;
 		}
 		*crypt = new_crypt;
@@ -426,8 +425,6 @@ int rtllib_wx_set_encode(struct rtllib_device *ieee,
 			netdev_info(ieee->dev, "Setting key %d to all zero.\n",
 					   key);
 
-			RTLLIB_DEBUG_WX("Setting key %d to all zero.\n",
-					   key);
 			memset(sec.keys[key], 0, 13);
 			(*crypt)->ops->set_key(sec.keys[key], 13, NULL,
 					       (*crypt)->priv);
@@ -437,8 +434,8 @@ int rtllib_wx_set_encode(struct rtllib_device *ieee,
 
 		/* No key data - just set the default TX key index */
 		if (key_provided) {
-			RTLLIB_DEBUG_WX(
-				"Setting key %d to default Tx key.\n", key);
+			RTLLIB_DEBUG_WX("Setting key %d to default Tx key.\n",
+					key);
 			ieee->crypt_info.tx_keyidx = key;
 			sec.active_key = key;
 			sec.flags |= SEC_ACTIVE_KEY;
@@ -608,8 +605,6 @@ int rtllib_wx_set_encode_ext(struct rtllib_device *ieee,
 		ops = lib80211_get_crypto_ops(alg);
 	}
 	if (ops == NULL) {
-		RTLLIB_DEBUG_WX("%s: unknown crypto alg %d\n",
-				   dev->name, ext->alg);
 		netdev_info(dev, "========>unknown crypto alg %d\n", ext->alg);
 		ret = -EINVAL;
 		goto done;
@@ -641,7 +636,6 @@ int rtllib_wx_set_encode_ext(struct rtllib_device *ieee,
 	if (ext->key_len > 0 && (*crypt)->ops->set_key &&
 	    (*crypt)->ops->set_key(ext->key, ext->key_len, ext->rx_seq,
 				   (*crypt)->priv) < 0) {
-		RTLLIB_DEBUG_WX("%s: key setting failed\n", dev->name);
 		netdev_info(dev, "key setting failed\n");
 		ret = -EINVAL;
 		goto done;

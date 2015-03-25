@@ -29,9 +29,9 @@
  * incoming payloads.  This serves as a throttling mechanism.
  */
 #define MAX_CONTROLVM_PAYLOAD_BYTES (1024*128)
-static ulong Controlvm_Payload_Bytes_Buffered;
+static ulong controlvm_payload_bytes_buffered;
 
-struct PARSER_CONTEXT_Tag {
+struct parser_context {
 	ulong allocbytes;
 	ulong param_bytes;
 	u8 *curr;
@@ -40,36 +40,36 @@ struct PARSER_CONTEXT_Tag {
 	char data[0];
 };
 
-static PARSER_CONTEXT *
-parser_init_guts(u64 addr, u32 bytes, BOOL isLocal,
-		 BOOL hasStandardPayloadHeader, BOOL *tryAgain)
+static struct parser_context *
+parser_init_guts(u64 addr, u32 bytes, BOOL local,
+		 BOOL standard_payload_header, BOOL *retry)
 {
-	int allocbytes = sizeof(PARSER_CONTEXT) + bytes;
-	PARSER_CONTEXT *rc = NULL;
-	PARSER_CONTEXT *ctx = NULL;
+	int allocbytes = sizeof(struct parser_context) + bytes;
+	struct parser_context *rc = NULL;
+	struct parser_context *ctx = NULL;
 	struct memregion *rgn = NULL;
 	struct spar_controlvm_parameters_header *phdr = NULL;
 
-	if (tryAgain)
-		*tryAgain = FALSE;
-	if (!hasStandardPayloadHeader)
+	if (retry)
+		*retry = FALSE;
+	if (!standard_payload_header)
 		/* alloc and 0 extra byte to ensure payload is
 		 * '\0'-terminated
 		 */
 		allocbytes++;
-	if ((Controlvm_Payload_Bytes_Buffered + bytes)
+	if ((controlvm_payload_bytes_buffered + bytes)
 	    > MAX_CONTROLVM_PAYLOAD_BYTES) {
-		if (tryAgain)
-			*tryAgain = TRUE;
+		if (retry)
+			*retry = TRUE;
 		rc = NULL;
-		goto Away;
+		goto cleanup;
 	}
 	ctx = kzalloc(allocbytes, GFP_KERNEL|__GFP_NORETRY);
-	if (ctx == NULL) {
-		if (tryAgain)
-			*tryAgain = TRUE;
+	if (!ctx) {
+		if (retry)
+			*retry = TRUE;
 		rc = NULL;
-		goto Away;
+		goto cleanup;
 	}
 
 	ctx->allocbytes = allocbytes;
@@ -77,12 +77,12 @@ parser_init_guts(u64 addr, u32 bytes, BOOL isLocal,
 	ctx->curr = NULL;
 	ctx->bytes_remaining = 0;
 	ctx->byte_stream = FALSE;
-	if (isLocal) {
+	if (local) {
 		void *p;
 
 		if (addr > virt_to_phys(high_memory - 1)) {
 			rc = NULL;
-			goto Away;
+			goto cleanup;
 		}
 		p = __va((ulong) (addr));
 		memcpy(ctx->data, p, bytes);
@@ -90,42 +90,42 @@ parser_init_guts(u64 addr, u32 bytes, BOOL isLocal,
 		rgn = visor_memregion_create(addr, bytes);
 		if (!rgn) {
 			rc = NULL;
-			goto Away;
+			goto cleanup;
 		}
 		if (visor_memregion_read(rgn, 0, ctx->data, bytes) < 0) {
 			rc = NULL;
-			goto Away;
+			goto cleanup;
 		}
 	}
-	if (!hasStandardPayloadHeader) {
+	if (!standard_payload_header) {
 		ctx->byte_stream = TRUE;
 		rc = ctx;
-		goto Away;
+		goto cleanup;
 	}
 	phdr = (struct spar_controlvm_parameters_header *)(ctx->data);
 	if (phdr->total_length != bytes) {
 		rc = NULL;
-		goto Away;
+		goto cleanup;
 	}
 	if (phdr->total_length < phdr->header_length) {
 		rc = NULL;
-		goto Away;
+		goto cleanup;
 	}
 	if (phdr->header_length <
 	    sizeof(struct spar_controlvm_parameters_header)) {
 		rc = NULL;
-		goto Away;
+		goto cleanup;
 	}
 
 	rc = ctx;
-Away:
+cleanup:
 	if (rgn) {
 		visor_memregion_destroy(rgn);
 		rgn = NULL;
 	}
-	if (rc)
-		Controlvm_Payload_Bytes_Buffered += ctx->param_bytes;
-	else {
+	if (rc) {
+		controlvm_payload_bytes_buffered += ctx->param_bytes;
+	} else {
 		if (ctx) {
 			parser_done(ctx);
 			ctx = NULL;
@@ -134,10 +134,10 @@ Away:
 	return rc;
 }
 
-PARSER_CONTEXT *
-parser_init(u64 addr, u32 bytes, BOOL isLocal, BOOL *tryAgain)
+struct parser_context *
+parser_init(u64 addr, u32 bytes, BOOL local, BOOL *retry)
 {
-	return parser_init_guts(addr, bytes, isLocal, TRUE, tryAgain);
+	return parser_init_guts(addr, bytes, local, TRUE, retry);
 }
 
 /* Call this instead of parser_init() if the payload area consists of just
@@ -145,7 +145,7 @@ parser_init(u64 addr, u32 bytes, BOOL isLocal, BOOL *tryAgain)
  * structures.  Afterwards, you can call parser_simpleString_get() or
  * parser_byteStream_get() to obtain the data.
  */
-PARSER_CONTEXT *
+struct parser_context *
 parser_init_byteStream(u64 addr, u32 bytes, BOOL isLocal, BOOL *tryAgain)
 {
 	return parser_init_guts(addr, bytes, isLocal, FALSE, tryAgain);
@@ -154,7 +154,7 @@ parser_init_byteStream(u64 addr, u32 bytes, BOOL isLocal, BOOL *tryAgain)
 /* Obtain '\0'-terminated copy of string in payload area.
  */
 char *
-parser_simpleString_get(PARSER_CONTEXT *ctx)
+parser_simpleString_get(struct parser_context *ctx)
 {
 	if (!ctx->byte_stream)
 		return NULL;
@@ -166,7 +166,7 @@ parser_simpleString_get(PARSER_CONTEXT *ctx)
 /* Obtain a copy of the buffer in the payload area.
  */
 void *
-parser_byteStream_get(PARSER_CONTEXT *ctx, ulong *nbytes)
+parser_byteStream_get(struct parser_context *ctx, ulong *nbytes)
 {
 	if (!ctx->byte_stream)
 		return NULL;
@@ -176,7 +176,7 @@ parser_byteStream_get(PARSER_CONTEXT *ctx, ulong *nbytes)
 }
 
 uuid_le
-parser_id_get(PARSER_CONTEXT *ctx)
+parser_id_get(struct parser_context *ctx)
 {
 	struct spar_controlvm_parameters_header *phdr = NULL;
 
@@ -187,7 +187,7 @@ parser_id_get(PARSER_CONTEXT *ctx)
 }
 
 void
-parser_param_start(PARSER_CONTEXT *ctx, PARSER_WHICH_STRING which_string)
+parser_param_start(struct parser_context *ctx, PARSER_WHICH_STRING which_string)
 {
 	struct spar_controlvm_parameters_header *phdr = NULL;
 
@@ -220,11 +220,11 @@ Away:
 }
 
 void
-parser_done(PARSER_CONTEXT *ctx)
+parser_done(struct parser_context *ctx)
 {
 	if (!ctx)
 		return;
-	Controlvm_Payload_Bytes_Buffered -= ctx->param_bytes;
+	controlvm_payload_bytes_buffered -= ctx->param_bytes;
 	kfree(ctx);
 }
 
@@ -263,7 +263,7 @@ string_length_no_trail(char *s, int len)
  *    parameter
  */
 void *
-parser_param_get(PARSER_CONTEXT *ctx, char *nam, int namesize)
+parser_param_get(struct parser_context *ctx, char *nam, int namesize)
 {
 	u8 *pscan, *pnam = nam;
 	ulong nscan;
@@ -398,7 +398,7 @@ parser_param_get(PARSER_CONTEXT *ctx, char *nam, int namesize)
 }
 
 void *
-parser_string_get(PARSER_CONTEXT *ctx)
+parser_string_get(struct parser_context *ctx)
 {
 	u8 *pscan;
 	ulong nscan;
