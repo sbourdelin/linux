@@ -3368,6 +3368,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct device *dev = &priv->udev->dev;
 	struct ieee80211_sta *sta;
+	struct rtl8xxxu_sta_priv *sta_priv;
 	u32 val32;
 #if 0
 	u16 val16;
@@ -3469,7 +3470,7 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
-		dev_dbg(dev, "Changed ERP_PREAMBLE: Use short preamble %02x\n",
+		dev_dbg(dev, "Changed ERP_PREAMBLE: Use short preamble %i\n",
 			bss_conf->use_short_preamble);
 		val32 = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
 		if (bss_conf->use_short_preamble)
@@ -3477,6 +3478,17 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		else
 			val32 &= ~RSR_ACK_SHORT_PREAMBLE;
 		rtl8723au_write32(priv, REG_RESPONSE_RATE_SET, val32);
+
+		rcu_read_lock();
+		sta = ieee80211_find_sta(vif, bss_conf->bssid);
+		if (sta) {
+			sta_priv = (struct rtl8xxxu_sta_priv *)sta->drv_priv;
+			if (bss_conf->use_short_preamble)
+				sta_priv->short_preamble = true;
+			else
+				sta_priv->short_preamble = false;
+		}
+		rcu_read_unlock();
 	}
 
 	if (changed & BSS_CHANGED_ERP_SLOT) {
@@ -3709,12 +3721,13 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		rate = tx_rate->hw_value;
 	tx_desc->txdw5 = cpu_to_le32(rate);
 
-	if (ieee80211_is_data(hdr->frame_control)) {
+	if (ieee80211_is_data(hdr->frame_control))
 		tx_desc->txdw5 |= cpu_to_le32(0x0001ff00);
 
-		if (/* (tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
-			control && control->sta &&
-			control->sta->ht_cap.ht_supported) {
+	/* (tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
+	if (ieee80211_is_data_qos(hdr->frame_control) &&
+	    control && control->sta) {
+		if (control->sta->ht_cap.ht_supported) {
 			u8 ampdu = control->sta->ht_cap.ampdu_density;
 
 			tx_desc->txdw2 |=
