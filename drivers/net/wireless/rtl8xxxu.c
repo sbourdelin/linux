@@ -3328,12 +3328,8 @@ static void rtl8xxxu_update_rate_mask(struct rtl8xxxu_priv *priv,
 
 	h2c.ramask.arg = 0x80;
 	if (sta->ht_cap.cap &
-	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20)) {
+	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
 		h2c.ramask.arg |= 0x20;
-		priv->use_shortgi = true;
-	} else {
-		priv->use_shortgi = false;
-	}
 
 	dev_dbg(&priv->udev->dev, "%s: rate mask %08x, arg %02x\n", __func__,
 		ramask, h2c.ramask.arg);
@@ -3646,6 +3642,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct rtl8xxxu_tx_desc *tx_desc;
+	struct rtl8xxxu_sta_priv *sta_priv = NULL;
 	struct device *dev = &priv->udev->dev;
 	struct urb *urb;
 	u32 queue, rate;
@@ -3681,6 +3678,9 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		rtl8xxxu_dump_action(dev, hdr);
 
 	tx_info->rate_driver_data[0] = hw;
+
+	if (control && control->sta)
+		sta_priv = (struct rtl8xxxu_sta_priv *)control->sta->drv_priv;
 
 	tx_desc = (struct rtl8xxxu_tx_desc *)
 		skb_push(skb, sizeof(struct rtl8xxxu_tx_desc));
@@ -3740,10 +3740,16 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 
 	if (ieee80211_is_data_qos(hdr->frame_control))
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_QOS);
-	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
+	if (rate_flag & IEEE80211_TX_RC_USE_SHORT_PREAMBLE ||
+	    (sta_priv && sta_priv->short_preamble))
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_SHORT_PREAMBLE);
-	if (rate_flag & IEEE80211_TX_RC_SHORT_GI || priv->use_shortgi)
+	if (rate_flag & IEEE80211_TX_RC_SHORT_GI ||
+	    (ieee80211_is_data_qos(hdr->frame_control) &&
+	     control && control->sta &&
+	     control->sta->ht_cap.cap &
+	     (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))) {
 		tx_desc->txdw5 |= cpu_to_le32(TXDESC_SHORT_GI);
+	}
 	if (ieee80211_is_mgmt(hdr->frame_control)) {
 		tx_desc->txdw5 = cpu_to_le32(tx_rate->hw_value);
 		tx_desc->txdw4 |= cpu_to_le32(TXDESC_USE_DRIVER_RATE);
@@ -4229,7 +4235,6 @@ static int rtl8xxxu_sta_add(struct ieee80211_hw *hw,
 
 	sta_priv = (struct rtl8xxxu_sta_priv *)sta->drv_priv;
 
-	sta_priv->sgi = false;
 	sta_priv->short_preamble = false;
 	return 0;
 };

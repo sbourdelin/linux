@@ -488,7 +488,6 @@ struct rtl8xxxu_priv {
 	u8 pi_enabled:1;
 	u8 iqk_initialized:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
-	bool use_shortgi;
 };
 
 struct rtl8xxxu_rx_urb {
@@ -497,6 +496,5 @@ struct rtl8xxxu_rx_urb {
 };
 
 struct rtl8xxxu_sta_priv {
-	bool sgi;
 	bool short_preamble;
 };
