@@ -218,11 +218,11 @@ struct rtl8xxxu_tx_desc {
 #define TXDESC_SEC_RC4			0x00400000
 #define TXDESC_SEC_AES			0x00c00000
 #define TXDESC_PKT_OFFSET_SHIFT		26
+#define TXDESC_AGG_EN			BIT(29)
 #define TXDESC_HWPC			BIT(31)
 
 /* Word 2 */
 #define TXDESC_AMPDU_DENSITY_SHIFT	20
-#define TXDESC_AGG_EN			BIT(29)
 
 /* Word 3 */
 #define TXDESC_SEQ_SHIFT		16
