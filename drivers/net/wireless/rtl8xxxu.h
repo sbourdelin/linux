@@ -254,6 +254,9 @@ struct rtl8xxxu_tx_desc {
 #define TXDESC_RETRY_LIMIT_SHIFT	18
 #define TXDESC_RETRY_LIMIT_MASK		0x00fc0000
 
+/* Word 6 */
+#define TXDESC_MAX_AGG_SHIFT		11
+
 struct phy_rx_agc_info {
 #ifdef __LITTLE_ENDIAN
 	u8	gain:7, trsw:1;
