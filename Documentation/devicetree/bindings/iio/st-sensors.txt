@@ -23,6 +23,7 @@ standard bindings from pinctrl/pinctrl-bindings.txt.
 Valid compatible strings:
 
 Accelerometers:
+- st,lis3lv02dl-accel
 - st,lsm303dlh-accel
 - st,lsm303dlhc-accel
 - st,lis3dh-accel
@@ -44,6 +45,7 @@ Gyroscopes:
 - st,lsm330-gyro
 
 Magnetometers:
+- st,lsm303dlh-magn
 - st,lsm303dlhc-magn
 - st,lsm303dlm-magn
 - st,lis3mdl-magn

@@ -918,8 +918,7 @@ start:
 			tmpRegC = rtl8192_QueryBBReg(dev,
 				  rOFDM0_XCTxIQImbalance, bMaskDWord);
 			for (i = 0; i < TxBBGainTableLength; i++) {
-				if (tmpRegA ==
-				    priv->txbbgain_table[i].txbbgain_value) {
+				if (tmpRegA == dm_tx_bb_gain[i]) {
 					priv->rfa_txpowertrackingindex = (u8)i;
 					priv->rfa_txpowertrackingindex_real =
 						 (u8)i;
@@ -933,7 +932,7 @@ start:
 				  rCCK0_TxFilter1, bMaskByte2);
 
 			for (i = 0; i < CCKTxBBGainTableLength; i++) {
-				if (TempCCk == priv->cck_txbbgain_table[i].ccktxbb_valuearray[0]) {
+				if (TempCCk == dm_cck_tx_bb_gain[i][0]) {
 					priv->CCKPresentAttentuation_20Mdefault = (u8)i;
 					break;
 				}
@@ -2025,6 +2024,7 @@ bool rtl8192_rx_query_status_desc(struct net_device *dev,
 				  struct sk_buff *skb)
 {
 	struct r8192_priv *priv = rtllib_priv(dev);
+	struct rx_fwinfo *pDrvInfo = NULL;
 
 	stats->bICV = pdesc->ICV;
 	stats->bCRC = pdesc->CRC32;
@@ -2046,51 +2046,49 @@ bool rtl8192_rx_query_status_desc(struct net_device *dev,
 				priv->stats.rxcrcerrmid++;
 		}
 		return false;
-	} else {
-		struct rx_fwinfo *pDrvInfo = NULL;
-
-		stats->RxDrvInfoSize = pdesc->RxDrvInfoSize;
-		stats->RxBufShift = ((pdesc->Shift)&0x03);
-		stats->Decrypted = !pdesc->SWDec;
-
-		pDrvInfo = (struct rx_fwinfo *)(skb->data + stats->RxBufShift);
-
-		stats->rate = HwRateToMRate90((bool)pDrvInfo->RxHT,
-					     (u8)pDrvInfo->RxRate);
-		stats->bShortPreamble = pDrvInfo->SPLCP;
-
-		rtl8192_UpdateReceivedRateHistogramStatistics(dev, stats);
-
-		stats->bIsAMPDU = (pDrvInfo->PartAggr == 1);
-		stats->bFirstMPDU = (pDrvInfo->PartAggr == 1) &&
-				    (pDrvInfo->FirstAGGR == 1);
-
-		stats->TimeStampLow = pDrvInfo->TSFL;
-		stats->TimeStampHigh = read_nic_dword(dev, TSFR+4);
-
-		rtl819x_UpdateRxPktTimeStamp(dev, stats);
-
-		if ((stats->RxBufShift + stats->RxDrvInfoSize) > 0)
-			stats->bShift = 1;
-
-		stats->RxIs40MHzPacket = pDrvInfo->BW;
-
-		rtl8192_TranslateRxSignalStuff(dev, skb, stats, pdesc,
-					       pDrvInfo);
-
-		if (pDrvInfo->FirstAGGR == 1 || pDrvInfo->PartAggr == 1)
-			RT_TRACE(COMP_RXDESC,
-				 "pDrvInfo->FirstAGGR = %d, pDrvInfo->PartAggr = %d\n",
-				 pDrvInfo->FirstAGGR, pDrvInfo->PartAggr);
-		skb_trim(skb, skb->len - 4/*sCrcLng*/);
-
-
-		stats->packetlength = stats->Length-4;
-		stats->fraglength = stats->packetlength;
-		stats->fragoffset = 0;
-		stats->ntotalfrag = 1;
-		return true;
 	}
+
+	stats->RxDrvInfoSize = pdesc->RxDrvInfoSize;
+	stats->RxBufShift = ((pdesc->Shift)&0x03);
+	stats->Decrypted = !pdesc->SWDec;
+
+	pDrvInfo = (struct rx_fwinfo *)(skb->data + stats->RxBufShift);
+
+	stats->rate = HwRateToMRate90((bool)pDrvInfo->RxHT,
+				     (u8)pDrvInfo->RxRate);
+	stats->bShortPreamble = pDrvInfo->SPLCP;
+
+	rtl8192_UpdateReceivedRateHistogramStatistics(dev, stats);
+
+	stats->bIsAMPDU = (pDrvInfo->PartAggr == 1);
+	stats->bFirstMPDU = (pDrvInfo->PartAggr == 1) &&
+			    (pDrvInfo->FirstAGGR == 1);
+
+	stats->TimeStampLow = pDrvInfo->TSFL;
+	stats->TimeStampHigh = read_nic_dword(dev, TSFR+4);
+
+	rtl819x_UpdateRxPktTimeStamp(dev, stats);
+
+	if ((stats->RxBufShift + stats->RxDrvInfoSize) > 0)
+		stats->bShift = 1;
+
+	stats->RxIs40MHzPacket = pDrvInfo->BW;
+
+	rtl8192_TranslateRxSignalStuff(dev, skb, stats, pdesc,
+				       pDrvInfo);
+
+	if (pDrvInfo->FirstAGGR == 1 || pDrvInfo->PartAggr == 1)
+		RT_TRACE(COMP_RXDESC,
+			 "pDrvInfo->FirstAGGR = %d, pDrvInfo->PartAggr = %d\n",
+			 pDrvInfo->FirstAGGR, pDrvInfo->PartAggr);
+	skb_trim(skb, skb->len - 4/*sCrcLng*/);
+
+
+	stats->packetlength = stats->Length-4;
+	stats->fraglength = stats->packetlength;
+	stats->fragoffset = 0;
+	stats->ntotalfrag = 1;
+	return true;
 }
 
 void rtl8192_halt_adapter(struct net_device *dev, bool reset)
@@ -2138,7 +2136,6 @@ void rtl8192_halt_adapter(struct net_device *dev, bool reset)
 		skb_queue_purge(&priv->rtllib->skb_aggQ[i]);
 
 	skb_queue_purge(&priv->skb_queue);
-	return;
 }
 
 void rtl8192_update_ratr_table(struct net_device *dev)
@@ -2197,8 +2194,7 @@ rtl8192_InitializeVariables(struct net_device  *dev)
 
 	priv->rtllib->softmac_features  = IEEE_SOFTMAC_SCAN |
 		IEEE_SOFTMAC_ASSOCIATE | IEEE_SOFTMAC_PROBERQ |
-		IEEE_SOFTMAC_PROBERS | IEEE_SOFTMAC_TX_QUEUE /* |
-		IEEE_SOFTMAC_BEACONS*/;
+		IEEE_SOFTMAC_PROBERS | IEEE_SOFTMAC_TX_QUEUE;
 
 	priv->rtllib->tx_headroom = sizeof(struct tx_fwinfo_8190pci);
 
@@ -2314,8 +2310,7 @@ bool rtl8192_HalRxCheckStuck(struct net_device *dev)
 	  (priv->undecorated_smoothed_pwdb >= RateAdaptiveTH_Low_20M)))) {
 		if (rx_chk_cnt < 2)
 			return bStuck;
-		else
-			rx_chk_cnt = 0;
+		rx_chk_cnt = 0;
 	} else if ((((priv->CurrentChannelBW != HT_CHANNEL_WIDTH_20) &&
 		  (priv->undecorated_smoothed_pwdb < RateAdaptiveTH_Low_40M)) ||
 		((priv->CurrentChannelBW == HT_CHANNEL_WIDTH_20) &&
@@ -2323,13 +2318,11 @@ bool rtl8192_HalRxCheckStuck(struct net_device *dev)
 		priv->undecorated_smoothed_pwdb >= VeryLowRSSI) {
 		if (rx_chk_cnt < 4)
 			return bStuck;
-		else
-			rx_chk_cnt = 0;
+		rx_chk_cnt = 0;
 	} else {
 		if (rx_chk_cnt < 8)
 			return bStuck;
-		else
-			rx_chk_cnt = 0;
+		rx_chk_cnt = 0;
 	}
 
 
@@ -2419,5 +2412,4 @@ void ActUpdateChannelAccessSetting(struct net_device *dev,
 	enum wireless_mode WirelessMode,
 	struct channel_access_setting *ChnlAccessSetting)
 {
-	return;
 }

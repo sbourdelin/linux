@@ -94,7 +94,6 @@ void rtl8192_setBBreg(struct net_device *dev, u32 dwRegAddr, u32 dwBitMask,
 		write_nic_dword(dev, dwRegAddr, NewValue);
 	} else
 		write_nic_dword(dev, dwRegAddr, dwData);
-	return;
 }
 
 u32 rtl8192_QueryBBReg(struct net_device *dev, u32 dwRegAddr, u32 dwBitMask)
@@ -215,7 +214,6 @@ static void rtl8192_phy_RFSerialWrite(struct net_device *dev,
 		}
 		rtl8192_setBBreg(dev, rFPGA0_AnalogParameter4, 0x300, 0x3);
 	}
-	return;
 }
 
 void rtl8192_phy_SetRFReg(struct net_device *dev, enum rf90_radio_path eRFPath,
@@ -256,7 +254,6 @@ void rtl8192_phy_SetRFReg(struct net_device *dev, enum rf90_radio_path eRFPath,
 		} else
 			rtl8192_phy_RFSerialWrite(dev, eRFPath, RegAddr, Data);
 	}
-	return;
 }
 
 u32 rtl8192_phy_QueryRFReg(struct net_device *dev, enum rf90_radio_path eRFPath,
@@ -307,7 +304,7 @@ static u32 phy_FwRFSerialRead(struct net_device *dev,
 	}
 	return read_nic_dword(dev, RF_DATA);
 
-}	/* phy_FwRFSerialRead */
+}
 
 static void phy_FwRFSerialWrite(struct net_device *dev,
 				enum rf90_radio_path eRFPath,
@@ -328,7 +325,7 @@ static void phy_FwRFSerialWrite(struct net_device *dev,
 	}
 	write_nic_dword(dev, QPNR, Data);
 
-}	/* phy_FwRFSerialWrite */
+}
 
 
 void rtl8192_phy_configmac(struct net_device *dev)
@@ -399,7 +396,6 @@ void rtl8192_phyConfigBB(struct net_device *dev, u8 ConfigType)
 				 Rtl819XAGCTAB_Array_Table[i+1]);
 		}
 	}
-	return;
 }
 
 static void rtl8192_InitBBRFRegDef(struct net_device *dev)
@@ -640,7 +636,6 @@ void rtl8192_phy_getTxPower(struct net_device *dev)
 	RT_TRACE(COMP_INIT, "Default framesync (0x%x) = 0x%x\n",
 		rOFDM0_RxDetector3, priv->framesync);
 	priv->SifsTime = read_nic_word(dev, SIFS);
-	return;
 }
 
 void rtl8192_phy_setTxPower(struct net_device *dev, u8 channel)
@@ -694,7 +689,6 @@ void rtl8192_phy_setTxPower(struct net_device *dev, u8 channel)
 			 __func__);
 		break;
 	}
-	return;
 }
 
 bool rtl8192_phy_RFConfig(struct net_device *dev)
@@ -723,7 +717,6 @@ bool rtl8192_phy_RFConfig(struct net_device *dev)
 
 void rtl8192_phy_updateInitGain(struct net_device *dev)
 {
-	return;
 }
 
 u8 rtl8192_phy_ConfigRFWithHeaderFile(struct net_device *dev,
@@ -813,7 +806,6 @@ static void rtl8192_SetTxPowerLevel(struct net_device *dev, u8 channel)
 			 "unknown rf chip ID in rtl8192_SetTxPowerLevel()\n");
 		break;
 	}
-	return;
 }
 
 static u8 rtl8192_phy_SetSwChnlCmdArray(struct sw_chnl_cmd *CmdTable,
@@ -940,13 +932,11 @@ static u8 rtl8192_phy_SwChnlStepByStep(struct net_device *dev, u8 channel,
 			}
 
 			if (CurrentCmd && CurrentCmd->CmdID == CmdID_End) {
-				if ((*stage) == 2) {
+				if ((*stage) == 2)
 					return true;
-				} else {
-					(*stage)++;
-					(*step) = 0;
-					continue;
-				}
+				(*stage)++;
+				(*step) = 0;
+				continue;
 			}
 
 			if (!CurrentCmd)
@@ -1012,7 +1002,7 @@ void rtl8192_SwChnl_WorkItem(struct net_device *dev)
 	RT_TRACE(COMP_TRACE, "=====>--%s(), set chan:%d, priv:%p\n", __func__,
 		 priv->chan, priv);
 
-	rtl8192_phy_FinishSwChnlNow(dev , priv->chan);
+	rtl8192_phy_FinishSwChnlNow(dev, priv->chan);
 
 	RT_TRACE(COMP_TRACE, "<== SwChnlCallback819xUsbWorkItem()\n");
 }

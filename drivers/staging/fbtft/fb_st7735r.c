@@ -25,8 +25,8 @@
 #include "fbtft.h"
 
 #define DRVNAME "fb_st7735r"
-#define DEFAULT_GAMMA "0F 1A 0F 18 2F 28 20 22 1F 1B 23 37 00 07 02 10\n" \
-                      "0F 1B 0F 17 33 2C 29 2E 30 30 39 3F 00 07 03 10"
+#define DEFAULT_GAMMA   "0F 1A 0F 18 2F 28 20 22 1F 1B 23 37 00 07 02 10\n" \
+			"0F 1B 0F 17 33 2C 29 2E 30 30 39 3F 00 07 03 10"
 
 
 static int default_init_sequence[] = {
@@ -102,7 +102,7 @@ static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 	/* Column address */
 	write_reg(par, 0x2A, xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
 
-	/* Row adress */
+	/* Row address */
 	write_reg(par, 0x2B, ys >> 8, ys & 0xFF, ye >> 8, ye & 0xFF);
 
 	/* Memory write */
@@ -119,9 +119,9 @@ static int set_var(struct fbtft_par *par)
 	/* MADCTL - Memory data access control
 	     RGB/BGR:
 	     1. Mode selection pin SRGB
-	        RGB H/W pin for color filter setting: 0=RGB, 1=BGR
+		RGB H/W pin for color filter setting: 0=RGB, 1=BGR
 	     2. MADCTL RGB bit
-	        RGB-BGR ORDER color filter panel: 0=RGB, 1=BGR */
+		RGB-BGR ORDER color filter panel: 0=RGB, 1=BGR */
 	switch (par->info->var.rotate) {
 	case 0:
 		write_reg(par, 0x36, MX | MY | (par->bgr << 3));
@@ -155,7 +155,7 @@ static int set_gamma(struct fbtft_par *par, unsigned long *curves)
 	/* apply mask */
 	for (i = 0; i < par->gamma.num_curves; i++)
 		for (j = 0; j < par->gamma.num_values; j++)
-			CURVE(i, j) &= 0b111111;
+			CURVE(i, j) &= 0x3f;
 
 	for (i = 0; i < par->gamma.num_curves; i++)
 		write_reg(par, 0xE0 + i,

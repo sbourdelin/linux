@@ -303,26 +303,10 @@ void comedi_event(struct comedi_device *dev, struct comedi_subdevice *s);
 struct comedi_device *comedi_dev_get_from_minor(unsigned minor);
 int comedi_dev_put(struct comedi_device *dev);
 
-/**
- * comedi_subdevice "runflags"
- * @COMEDI_SRF_RT:		DEPRECATED: command is running real-time
- * @COMEDI_SRF_ERROR:		indicates an COMEDI_CB_ERROR event has occurred
- *				since the last command was started
- * @COMEDI_SRF_RUNNING:		command is running
- * @COMEDI_SRF_FREE_SPRIV:	free s->private on detach
- *
- * @COMEDI_SRF_BUSY_MASK:	runflags that indicate the subdevice is "busy"
- */
-#define COMEDI_SRF_RT		BIT(1)
-#define COMEDI_SRF_ERROR	BIT(2)
-#define COMEDI_SRF_RUNNING	BIT(27)
-#define COMEDI_SRF_FREE_SPRIV	BIT(31)
-
-#define COMEDI_SRF_BUSY_MASK	(COMEDI_SRF_ERROR | COMEDI_SRF_RUNNING)
-
 bool comedi_is_subdevice_running(struct comedi_subdevice *s);
 
 void *comedi_alloc_spriv(struct comedi_subdevice *s, size_t size);
+void comedi_set_spriv_auto_free(struct comedi_subdevice *s);
 
 int comedi_check_chanlist(struct comedi_subdevice *s,
 			  int n,
@@ -462,6 +446,84 @@ static inline unsigned int comedi_samples_to_bytes(struct comedi_subdevice *s,
 						   unsigned int nsamples)
 {
 	return nsamples << comedi_sample_shift(s);
+}
+
+/**
+ * comedi_check_trigger_src() - trivially validate a comedi_cmd trigger source
+ * @src: pointer to the trigger source to validate
+ * @flags: bitmask of valid TRIG_* for the trigger
+ *
+ * This is used in "step 1" of the do_cmdtest functions of comedi drivers
+ * to vaildate the comedi_cmd triggers. The mask of the @src against the
+ * @flags allows the userspace comedilib to pass all the comedi_cmd
+ * triggers as TRIG_ANY and get back a bitmask of the valid trigger sources.
+ */
+static inline int comedi_check_trigger_src(unsigned int *src,
+					   unsigned int flags)
+{
+	unsigned int orig_src = *src;
+
+	*src = orig_src & flags;
+	if (*src == TRIG_INVALID || *src != orig_src)
+		return -EINVAL;
+	return 0;
+}
+
+/**
+ * comedi_check_trigger_is_unique() - make sure a trigger source is unique
+ * @src: the trigger source to check
+ */
+static inline int comedi_check_trigger_is_unique(unsigned int src)
+{
+	/* this test is true if more than one _src bit is set */
+	if ((src & (src - 1)) != 0)
+		return -EINVAL;
+	return 0;
+}
+
+/**
+ * comedi_check_trigger_arg_is() - trivially validate a trigger argument
+ * @arg: pointer to the trigger arg to validate
+ * @val: the value the argument should be
+ */
+static inline int comedi_check_trigger_arg_is(unsigned int *arg,
+					      unsigned int val)
+{
+	if (*arg != val) {
+		*arg = val;
+		return -EINVAL;
+	}
+	return 0;
+}
+
+/**
+ * comedi_check_trigger_arg_min() - trivially validate a trigger argument
+ * @arg: pointer to the trigger arg to validate
+ * @val: the minimum value the argument should be
+ */
+static inline int comedi_check_trigger_arg_min(unsigned int *arg,
+					       unsigned int val)
+{
+	if (*arg < val) {
+		*arg = val;
+		return -EINVAL;
+	}
+	return 0;
+}
+
+/**
+ * comedi_check_trigger_arg_max() - trivially validate a trigger argument
+ * @arg: pointer to the trigger arg to validate
+ * @val: the maximum value the argument should be
+ */
+static inline int comedi_check_trigger_arg_max(unsigned int *arg,
+					       unsigned int val)
+{
+	if (*arg > val) {
+		*arg = val;
+		return -EINVAL;
+	}
+	return 0;
 }
 
 /*

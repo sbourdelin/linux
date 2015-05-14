@@ -489,7 +489,7 @@ static struct fbtft_device_display displays[] = {
 					.buswidth = 8,
 					.backlight = 1,
 				},
-				.startbyte = 0b01110000,
+				.startbyte = 0x70,
 				.bgr = true,
 				.gpios = (const struct fbtft_gpio []) {
 					{ "reset", 25 },
@@ -510,7 +510,7 @@ static struct fbtft_device_display displays[] = {
 					.backlight = 1,
 					.init_sequence = hy28b_init_sequence,
 				},
-				.startbyte = 0b01110000,
+				.startbyte = 0x70,
 				.bgr = true,
 				.fps = 50,
 				.gpios = (const struct fbtft_gpio []) {
@@ -623,7 +623,7 @@ static struct fbtft_device_display displays[] = {
 					.buswidth = 8,
 					.backlight = 1,
 				},
-				.startbyte = 0b01110000,
+				.startbyte = 0x70,
 				.bgr = true,
 				.gpios = (const struct fbtft_gpio []) {
 					{ "reset", 25 },
@@ -702,6 +702,24 @@ static struct fbtft_device_display displays[] = {
 			}
 		}
 	}, {
+		.name = "nokia5110",
+		.spi = &(struct spi_board_info) {
+			.modalias = "fb_ili9163",
+			.max_speed_hz = 12000000,
+			.mode = SPI_MODE_0,
+			.platform_data = &(struct fbtft_platform_data) {
+				.display = {
+					.buswidth = 8,
+					.backlight = 1,
+				},
+				.bgr = true,
+				.gpios = (const struct fbtft_gpio []) {
+					{},
+				},
+			}
+		}
+	}, {
+
 		.name = "piscreen",
 		.spi = &(struct spi_board_info) {
 			.modalias = "fb_ili9486",

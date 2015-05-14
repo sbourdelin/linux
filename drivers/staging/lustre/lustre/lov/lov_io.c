@@ -70,7 +70,7 @@ static void lov_io_sub_fini(const struct lu_env *env, struct lov_io *lio,
 		if (sub->sub_stripe == lio->lis_single_subio_index)
 			lio->lis_single_subio_index = -1;
 		else if (!sub->sub_borrowed)
-			OBD_FREE_PTR(sub->sub_io);
+			kfree(sub->sub_io);
 		sub->sub_io = NULL;
 	}
 	if (sub->sub_env != NULL && !IS_ERR(sub->sub_env)) {
@@ -148,6 +148,9 @@ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
 	LASSERT(sub->sub_env == NULL);
 	LASSERT(sub->sub_stripe < lio->lis_stripe_count);
 
+	if (unlikely(lov_r0(lov)->lo_sub[stripe] == NULL))
+		return -EIO;
+
 	result = 0;
 	sub->sub_io_initialized = 0;
 	sub->sub_borrowed = 0;
@@ -176,7 +179,8 @@ static int lov_io_sub_init(const struct lu_env *env, struct lov_io *lio,
 				sub->sub_io = &lio->lis_single_subio;
 				lio->lis_single_subio_index = stripe;
 			} else {
-				OBD_ALLOC_PTR(sub->sub_io);
+				sub->sub_io = kzalloc(sizeof(*sub->sub_io),
+						      GFP_NOFS);
 				if (sub->sub_io == NULL)
 					result = -ENOMEM;
 			}
@@ -391,7 +395,16 @@ static int lov_io_iter_init(const struct lu_env *env,
 					   endpos, &start, &end))
 			continue;
 
-		end = lov_offset_mod(end, +1);
+		if (unlikely(lov_r0(lio->lis_object)->lo_sub[stripe] == NULL)) {
+			if (ios->cis_io->ci_type == CIT_READ ||
+			    ios->cis_io->ci_type == CIT_WRITE ||
+			    ios->cis_io->ci_type == CIT_FAULT)
+				return -EIO;
+
+			continue;
+		}
+
+		end = lov_offset_mod(end, 1);
 		sub = lov_sub_get(env, lio, stripe);
 		if (!IS_ERR(sub)) {
 			lov_io_sub_inherit(sub->sub_io, lio, stripe,
@@ -913,7 +926,7 @@ int lov_io_init_empty(const struct lu_env *env, struct cl_object *obj,
 		break;
 	case CIT_FSYNC:
 	case CIT_SETATTR:
-		result = +1;
+		result = 1;
 		break;
 	case CIT_WRITE:
 		result = -EBADF;

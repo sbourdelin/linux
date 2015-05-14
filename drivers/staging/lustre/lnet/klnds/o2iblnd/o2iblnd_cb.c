@@ -154,8 +154,8 @@ kiblnd_post_rx(kib_rx_t *rx, int credit)
 	LASSERT(net != NULL);
 	LASSERT(!in_interrupt());
 	LASSERT(credit == IBLND_POSTRX_NO_CREDIT ||
-		 credit == IBLND_POSTRX_PEER_CREDIT ||
-		 credit == IBLND_POSTRX_RSRVD_CREDIT);
+		credit == IBLND_POSTRX_PEER_CREDIT ||
+		credit == IBLND_POSTRX_RSRVD_CREDIT);
 
 	mr = kiblnd_find_dma_mr(conn->ibc_hdev, rx->rx_msgaddr, IBLND_MSG_SIZE);
 	LASSERT(mr != NULL);
@@ -307,8 +307,8 @@ kiblnd_handle_rx(kib_rx_t *rx)
 	LASSERT(conn->ibc_state >= IBLND_CONN_ESTABLISHED);
 
 	CDEBUG(D_NET, "Received %x[%d] from %s\n",
-		msg->ibm_type, credits,
-		libcfs_nid2str(conn->ibc_peer->ibp_nid));
+	       msg->ibm_type, credits,
+	       libcfs_nid2str(conn->ibc_peer->ibp_nid));
 
 	if (credits != 0) {
 		/* Have I received credits that will let me send? */
@@ -378,7 +378,7 @@ kiblnd_handle_rx(kib_rx_t *rx)
 
 	case IBLND_MSG_PUT_NAK:
 		CWARN("PUT_NACK from %s\n",
-		       libcfs_nid2str(conn->ibc_peer->ibp_nid));
+		      libcfs_nid2str(conn->ibc_peer->ibp_nid));
 		post_credit = IBLND_POSTRX_RSRVD_CREDIT;
 		kiblnd_handle_completion(conn, IBLND_MSG_PUT_REQ,
 					 msg->ibm_u.completion.ibcm_status,
@@ -567,7 +567,7 @@ kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, int nob)
 	for (i = 0, npages = 0; i < rd->rd_nfrags; i++) {
 		for (size = 0; size <  rd->rd_frags[i].rf_nob;
 			       size += hdev->ibh_page_size) {
-			pages[npages ++] = (rd->rd_frags[i].rf_addr &
+			pages[npages++] = (rd->rd_frags[i].rf_addr &
 					    hdev->ibh_page_mask) + size;
 		}
 	}
@@ -2503,9 +2503,9 @@ kiblnd_reconnect(kib_conn_t *conn, int version,
 	CNETERR("%s: retrying (%s), %x, %x, queue_dep: %d, max_frag: %d, msg_size: %d\n",
 		libcfs_nid2str(peer->ibp_nid),
 		reason, IBLND_MSG_VERSION, version,
-		cp != NULL? cp->ibcp_queue_depth :IBLND_MSG_QUEUE_SIZE(version),
-		cp != NULL? cp->ibcp_max_frags   : IBLND_RDMA_FRAGS(version),
-		cp != NULL? cp->ibcp_max_msg_size: IBLND_MSG_SIZE);
+		cp != NULL ? cp->ibcp_queue_depth  : IBLND_MSG_QUEUE_SIZE(version),
+		cp != NULL ? cp->ibcp_max_frags    : IBLND_RDMA_FRAGS(version),
+		cp != NULL ? cp->ibcp_max_msg_size : IBLND_MSG_SIZE);
 
 	kiblnd_connect_peer(peer);
 }

@@ -213,7 +213,7 @@ out:
 		md_clear_open_replay_data(md_exp, och);
 		/* Free @och if it is not waiting for DONE_WRITING. */
 		och->och_fh.cookie = DEAD_HANDLE_MAGIC;
-		OBD_FREE_PTR(och);
+		kfree(och);
 	}
 	if (req) /* This is close request */
 		ptlrpc_req_finished(req);
@@ -388,7 +388,7 @@ int ll_file_release(struct inode *inode, struct file *file)
 static int ll_intent_file_open(struct dentry *dentry, void *lmm,
 			       int lmmsize, struct lookup_intent *itp)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 	struct dentry *parent = dentry->d_parent;
 	const char *name = dentry->d_name.name;
@@ -413,7 +413,7 @@ static int ll_intent_file_open(struct dentry *dentry, void *lmm,
 			opc = LUSTRE_OPC_CREATE;
 	}
 
-	op_data  = ll_prep_md_op_data(NULL, parent->d_inode,
+	op_data  = ll_prep_md_op_data(NULL, d_inode(parent),
 				      inode, name, len,
 				      O_RDWR, opc, NULL);
 	if (IS_ERR(op_data))
@@ -693,7 +693,7 @@ restart:
 out_och_free:
 	if (rc) {
 		if (och_p && *och_p) {
-			OBD_FREE(*och_p, sizeof(struct obd_client_handle));
+			kfree(*och_p);
 			*och_p = NULL; /* OBD_FREE writes some magic there */
 			(*och_usecount)--;
 		}
@@ -875,7 +875,7 @@ out_close:
 out_release_it:
 	ll_intent_release(&it);
 out:
-	OBD_FREE_PTR(och);
+	kfree(och);
 	return ERR_PTR(rc);
 }
 
@@ -1712,6 +1712,12 @@ static int ll_do_fiemap(struct inode *inode, struct ll_user_fiemap *fiemap,
 	fm_key.oa.o_oi = lsm->lsm_oi;
 	fm_key.oa.o_valid = OBD_MD_FLID | OBD_MD_FLGROUP;
 
+	if (i_size_read(inode) == 0) {
+		rc = ll_glimpse_size(inode);
+		if (rc)
+			goto out;
+	}
+
 	obdo_from_inode(&fm_key.oa, inode, OBD_MD_FLSIZE);
 	obdo_set_parent_fid(&fm_key.oa, &ll_i2info(inode)->lli_fid);
 	/* If filesize is 0, then there would be no objects for mapping */
@@ -1773,7 +1779,7 @@ int ll_fid2path(struct inode *inode, void __user *arg)
 		rc = -EFAULT;
 
 gf_free:
-	OBD_FREE(gfout, outsize);
+	kfree(gfout);
 	return rc;
 }
 
@@ -1877,7 +1883,7 @@ int ll_data_version(struct inode *inode, __u64 *data_version,
 			*data_version = obdo->o_data_version;
 	}
 
-	OBD_FREE_PTR(obdo);
+	kfree(obdo);
 out:
 	ccc_inode_lsm_put(inode, lsm);
 	return rc;
@@ -2103,8 +2109,7 @@ putgl:
 	}
 
 free:
-	if (llss != NULL)
-		OBD_FREE_PTR(llss);
+	kfree(llss);
 
 	return rc;
 }
@@ -2146,22 +2151,20 @@ static int ll_hsm_import(struct inode *inode, struct file *file,
 
 	/* set HSM flags */
 	hss = kzalloc(sizeof(*hss), GFP_NOFS);
-	if (!hss) {
-		rc = -ENOMEM;
-		goto out;
-	}
+	if (!hss)
+		return -ENOMEM;
 
 	hss->hss_valid = HSS_SETMASK | HSS_ARCHIVE_ID;
 	hss->hss_archive_id = hui->hui_archive_id;
 	hss->hss_setmask = HS_ARCHIVED | HS_EXISTS | HS_RELEASED;
 	rc = ll_hsm_state_set(inode, hss);
 	if (rc != 0)
-		goto out;
+		goto free_hss;
 
 	attr = kzalloc(sizeof(*attr), GFP_NOFS);
 	if (!attr) {
 		rc = -ENOMEM;
-		goto out;
+		goto free_hss;
 	}
 
 	attr->ia_mode = hui->hui_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
@@ -2187,13 +2190,9 @@ static int ll_hsm_import(struct inode *inode, struct file *file,
 
 	mutex_unlock(&inode->i_mutex);
 
-out:
-	if (hss != NULL)
-		OBD_FREE_PTR(hss);
-
-	if (attr != NULL)
-		OBD_FREE_PTR(attr);
-
+	kfree(attr);
+free_hss:
+	kfree(hss);
 	return rc;
 }
 
@@ -2344,7 +2343,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		op_data = ll_prep_md_op_data(NULL, inode, NULL, NULL, 0, 0,
 					     LUSTRE_OPC_ANY, hus);
 		if (IS_ERR(op_data)) {
-			OBD_FREE_PTR(hus);
+			kfree(hus);
 			return PTR_ERR(op_data);
 		}
 
@@ -2355,7 +2354,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 
 		ll_finish_md_op_data(op_data);
-		OBD_FREE_PTR(hus);
+		kfree(hus);
 		return rc;
 	}
 	case LL_IOC_HSM_STATE_SET: {
@@ -2367,13 +2366,13 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -ENOMEM;
 
 		if (copy_from_user(hss, (char *)arg, sizeof(*hss))) {
-			OBD_FREE_PTR(hss);
+			kfree(hss);
 			return -EFAULT;
 		}
 
 		rc = ll_hsm_state_set(inode, hss);
 
-		OBD_FREE_PTR(hss);
+		kfree(hss);
 		return rc;
 	}
 	case LL_IOC_HSM_ACTION: {
@@ -2388,7 +2387,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		op_data = ll_prep_md_op_data(NULL, inode, NULL, NULL, 0, 0,
 					     LUSTRE_OPC_ANY, hca);
 		if (IS_ERR(op_data)) {
-			OBD_FREE_PTR(hca);
+			kfree(hca);
 			return PTR_ERR(op_data);
 		}
 
@@ -2399,7 +2398,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 
 		ll_finish_md_op_data(op_data);
-		OBD_FREE_PTR(hca);
+		kfree(hca);
 		return rc;
 	}
 	case LL_IOC_SET_LEASE: {
@@ -2494,13 +2493,13 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -ENOMEM;
 
 		if (copy_from_user(hui, (void *)arg, sizeof(*hui))) {
-			OBD_FREE_PTR(hui);
+			kfree(hui);
 			return -EFAULT;
 		}
 
 		rc = ll_hsm_import(inode, file, hui);
 
-		OBD_FREE_PTR(hui);
+		kfree(hui);
 		return rc;
 	}
 	default: {
@@ -2890,7 +2889,7 @@ static int ll_inode_revalidate_fini(struct inode *inode, int rc)
 
 static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	struct ptlrpc_request *req = NULL;
 	struct obd_export *exp;
 	int rc = 0;
@@ -2942,12 +2941,12 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
 		   do_lookup() -> ll_revalidate_it(). We cannot use d_drop
 		   here to preserve get_cwd functionality on 2.6.
 		   Bug 10503 */
-		if (!dentry->d_inode->i_nlink)
+		if (!d_inode(dentry)->i_nlink)
 			d_lustre_invalidate(dentry, 0);
 
 		ll_lookup_finish_locks(&oit, inode);
-	} else if (!ll_have_md_lock(dentry->d_inode, &ibits, LCK_MINMODE)) {
-		struct ll_sb_info *sbi = ll_i2sbi(dentry->d_inode);
+	} else if (!ll_have_md_lock(d_inode(dentry), &ibits, LCK_MINMODE)) {
+		struct ll_sb_info *sbi = ll_i2sbi(d_inode(dentry));
 		u64 valid = OBD_MD_FLGETATTR;
 		struct md_op_data *op_data;
 		int ealen = 0;
@@ -2985,7 +2984,7 @@ out:
 
 static int ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	int rc;
 
 	rc = __ll_inode_revalidate(dentry, ibits);
@@ -3013,7 +3012,7 @@ static int ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
 
 int ll_getattr(struct vfsmount *mnt, struct dentry *de, struct kstat *stat)
 {
-	struct inode *inode = de->d_inode;
+	struct inode *inode = d_inode(de);
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 	struct ll_inode_info *lli = ll_i2info(inode);
 	int res = 0;
@@ -3129,9 +3128,7 @@ int ll_inode_permission(struct inode *inode, int mask)
 
 /* -o localflock - only provides locally consistent flock locks */
 struct file_operations ll_file_operations = {
-	.read	   = new_sync_read,
 	.read_iter = ll_file_read_iter,
-	.write	  = new_sync_write,
 	.write_iter = ll_file_write_iter,
 	.unlocked_ioctl = ll_file_ioctl,
 	.open	   = ll_file_open,
@@ -3144,9 +3141,7 @@ struct file_operations ll_file_operations = {
 };
 
 struct file_operations ll_file_operations_flock = {
-	.read	   = new_sync_read,
 	.read_iter    = ll_file_read_iter,
-	.write	  = new_sync_write,
 	.write_iter   = ll_file_write_iter,
 	.unlocked_ioctl = ll_file_ioctl,
 	.open	   = ll_file_open,
@@ -3162,9 +3157,7 @@ struct file_operations ll_file_operations_flock = {
 
 /* These are for -o noflock - to return ENOSYS on flock calls */
 struct file_operations ll_file_operations_noflock = {
-	.read	   = new_sync_read,
 	.read_iter    = ll_file_read_iter,
-	.write	  = new_sync_write,
 	.write_iter   = ll_file_write_iter,
 	.unlocked_ioctl = ll_file_ioctl,
 	.open	   = ll_file_open,
@@ -3246,12 +3239,10 @@ void ll_iocontrol_unregister(void *magic)
 	down_write(&llioc.ioc_sem);
 	list_for_each_entry(tmp, &llioc.ioc_head, iocd_list) {
 		if (tmp == magic) {
-			unsigned int size = tmp->iocd_size;
-
 			list_del(&tmp->iocd_list);
 			up_write(&llioc.ioc_sem);
 
-			OBD_FREE(tmp, size);
+			kfree(tmp);
 			return;
 		}
 	}
@@ -3619,6 +3610,6 @@ int ll_layout_restore(struct inode *inode)
 	hur->hur_request.hr_itemcount = 1;
 	rc = obd_iocontrol(LL_IOC_HSM_REQUEST, cl_i2sbi(inode)->ll_md_exp,
 			   len, hur, NULL);
-	OBD_FREE(hur, len);
+	kfree(hur);
 	return rc;
 }

@@ -346,14 +346,12 @@ static int r8192_wx_set_mode(struct net_device *dev, struct iw_request_info *a,
 						 __func__);
 					up(&priv->wx_sem);
 					return -1;
-				} else {
-					netdev_info(dev,
-						    "=========>%s(): IPSLeave\n",
-						    __func__);
-					down(&priv->rtllib->ips_sem);
-					IPSLeave(dev);
-					up(&priv->rtllib->ips_sem);
 				}
+				netdev_info(dev,  "=========>%s(): IPSLeave\n",
+					    __func__);
+				down(&priv->rtllib->ips_sem);
+				IPSLeave(dev);
+				up(&priv->rtllib->ips_sem);
 			}
 		}
 	}
@@ -509,14 +507,12 @@ static int r8192_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 						 __func__);
 					up(&priv->wx_sem);
 					return -1;
-				} else {
-					RT_TRACE(COMP_PS,
-						 "=========>%s(): IPSLeave\n",
-						 __func__);
-					down(&priv->rtllib->ips_sem);
-					IPSLeave(dev);
-					up(&priv->rtllib->ips_sem);
 				}
+				RT_TRACE(COMP_PS, "=========>%s(): IPSLeave\n",
+					 __func__);
+				down(&priv->rtllib->ips_sem);
+				IPSLeave(dev);
+				up(&priv->rtllib->ips_sem);
 			}
 		}
 		rtllib_stop_scan(priv->rtllib);
@@ -1225,11 +1221,10 @@ static iw_handler r8192_wx_handlers[] = {
 	IW_IOCTL(SIOCSIWENCODEEXT) = r8192_wx_set_enc_ext,
 };
 
-/*
- * the following rule need to be following,
+/* the following rule need to be following,
  * Odd : get (world access),
  * even : set (root access)
- * */
+ */
 static const struct iw_priv_args r8192_private_args[] = {
 	{
 		SIOCIWFIRSTPRIV + 0x0,

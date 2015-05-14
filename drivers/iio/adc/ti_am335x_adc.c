@@ -188,12 +188,11 @@ static int tiadc_buffer_preenable(struct iio_dev *indio_dev)
 static int tiadc_buffer_postenable(struct iio_dev *indio_dev)
 {
 	struct tiadc_device *adc_dev = iio_priv(indio_dev);
-	struct iio_buffer *buffer = indio_dev->buffer;
 	unsigned int enb = 0;
 	u8 bit;
 
 	tiadc_step_config(indio_dev);
-	for_each_set_bit(bit, buffer->scan_mask, adc_dev->channels)
+	for_each_set_bit(bit, indio_dev->active_scan_mask, adc_dev->channels)
 		enb |= (get_adc_step_bit(adc_dev, bit) << 1);
 	adc_dev->buffer_en_ch_steps = enb;
 
@@ -396,16 +395,30 @@ static const struct iio_info tiadc_info = {
 	.driver_module = THIS_MODULE,
 };
 
+static int tiadc_parse_dt(struct platform_device *pdev,
+			  struct tiadc_device *adc_dev)
+{
+	struct device_node *node = pdev->dev.of_node;
+	struct property *prop;
+	const __be32 *cur;
+	int channels = 0;
+	u32 val;
+
+	of_property_for_each_u32(node, "ti,adc-channels", prop, cur, val) {
+		adc_dev->channel_line[channels] = val;
+		channels++;
+	}
+
+	adc_dev->channels = channels;
+	return 0;
+}
+
 static int tiadc_probe(struct platform_device *pdev)
 {
 	struct iio_dev		*indio_dev;
 	struct tiadc_device	*adc_dev;
 	struct device_node	*node = pdev->dev.of_node;
-	struct property		*prop;
-	const __be32		*cur;
 	int			err;
-	u32			val;
-	int			channels = 0;
 
 	if (!node) {
 		dev_err(&pdev->dev, "Could not find valid DT data.\n");
@@ -421,12 +434,7 @@ static int tiadc_probe(struct platform_device *pdev)
 	adc_dev = iio_priv(indio_dev);
 
 	adc_dev->mfd_tscadc = ti_tscadc_dev_get(pdev);
-
-	of_property_for_each_u32(node, "ti,adc-channels", prop, cur, val) {
-		adc_dev->channel_line[channels] = val;
-		channels++;
-	}
-	adc_dev->channels = channels;
+	tiadc_parse_dt(pdev, adc_dev);
 
 	indio_dev->dev.parent = &pdev->dev;
 	indio_dev->name = dev_name(&pdev->dev);

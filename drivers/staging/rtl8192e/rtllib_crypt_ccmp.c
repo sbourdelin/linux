@@ -120,10 +120,7 @@ static void ccmp_init_blocks(struct crypto_tfm *tfm,
 	fc = le16_to_cpu(hdr->frame_ctl);
 	a4_included = ((fc & (RTLLIB_FCTL_TODS | RTLLIB_FCTL_FROMDS)) ==
 		       (RTLLIB_FCTL_TODS | RTLLIB_FCTL_FROMDS));
-	/*
-	qc_included = ((WLAN_FC_GET_TYPE(fc) == RTLLIB_FTYPE_DATA) &&
-		       (WLAN_FC_GET_STYPE(fc) & 0x08));
-	*/
+
 	qc_included = ((WLAN_FC_GET_TYPE(fc) == RTLLIB_FTYPE_DATA) &&
 		       (WLAN_FC_GET_STYPE(fc) & 0x80));
 	aad_len = 22;
@@ -140,7 +137,8 @@ static void ccmp_init_blocks(struct crypto_tfm *tfm,
 	 * Flag (Include authentication header, M=3 (8-octet MIC),
 	 *       L=1 (2-octet Dlen))
 	 * Nonce: 0x00 | A2 | PN
-	 * Dlen */
+	 * Dlen
+	 */
 	b0[0] = 0x59;
 	b0[1] = qc;
 	memcpy(b0 + 2, hdr->addr2, ETH_ALEN);
