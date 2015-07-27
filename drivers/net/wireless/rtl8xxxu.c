@@ -4480,11 +4480,11 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	hw->extra_tx_headroom = sizeof(struct rtl8xxxu_tx_desc);
 	hw->sta_data_size = sizeof(struct rtl8xxxu_sta_priv);
-	hw->flags = IEEE80211_HW_SIGNAL_DBM;
+	ieee80211_hw_set(hw, SIGNAL_DBM);
 	/*
 	 * The firmware handles rate control
 	 */
-	hw->flags |= IEEE80211_HW_HAS_RATE_CONTROL;
+	ieee80211_hw_set(hw, HAS_RATE_CONTROL);
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
