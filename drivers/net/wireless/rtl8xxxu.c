@@ -4485,6 +4485,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	 * The firmware handles rate control
 	 */
 	ieee80211_hw_set(hw, HAS_RATE_CONTROL);
+	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {
