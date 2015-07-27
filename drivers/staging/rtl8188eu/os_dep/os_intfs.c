@@ -185,17 +185,20 @@ MODULE_PARM_DESC(rtw_notch_filter, "0:Disable, 1:Enable, 2:Enable only for P2P")
 module_param_named(debug, rtw_debug, int, 0444);
 MODULE_PARM_DESC(debug, "Set debug level (1-9) (default 1)");
 
+static int netdev_open(struct net_device *pnetdev);
+static int netdev_close(struct net_device *pnetdev);
+
 /* dummy routines */
 void rtw_proc_remove_one(struct net_device *dev)
 {
 }
 
-void rtw_proc_init_one(struct net_device *dev)
+static void rtw_proc_init_one(struct net_device *dev)
 {
 }
 
 #if 0	/* TODO: Convert these to /sys */
-void rtw_proc_init_one(struct net_device *dev)
+static void rtw_proc_init_one(struct net_device *dev)
 {
 	struct proc_dir_entry *dir_dev = NULL;
 	struct proc_dir_entry *entry = NULL;
@@ -531,10 +534,9 @@ void rtw_proc_remove_one(struct net_device *dev)
 }
 #endif
 
-static uint loadparam(struct adapter *padapter,  struct  net_device *pnetdev)
+static void loadparam(struct adapter *padapter, struct net_device *pnetdev)
 {
 	struct registry_priv  *registry_par = &padapter->registrypriv;
-
 
 	GlobalDebugLevel = rtw_debug;
 	registry_par->chip_version = (u8)rtw_chip_version;
@@ -602,7 +604,6 @@ static uint loadparam(struct adapter *padapter,  struct  net_device *pnetdev)
 	snprintf(registry_par->ifname, 16, "%s", ifname);
 	snprintf(registry_par->if2name, 16, "%s", if2name);
 	registry_par->notch_filter = (u8)rtw_notch_filter;
-	return _SUCCESS;
 }
 
 static int rtw_net_set_mac_address(struct net_device *pnetdev, void *p)
@@ -751,28 +752,28 @@ struct net_device *rtw_init_netdev(struct adapter *old_padapter)
 	return pnetdev;
 }
 
-u32 rtw_start_drv_threads(struct adapter *padapter)
+static int rtw_start_drv_threads(struct adapter *padapter)
 {
-	u32 _status = _SUCCESS;
+	int err = 0;
 
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("+rtw_start_drv_threads\n"));
 
 	padapter->cmdThread = kthread_run(rtw_cmd_thread, padapter,
 					  "RTW_CMD_THREAD");
 	if (IS_ERR(padapter->cmdThread))
-		_status = _FAIL;
+		err = PTR_ERR(padapter->cmdThread);
 	else
 		/* wait for cmd_thread to run */
 		_rtw_down_sema(&padapter->cmdpriv.terminate_cmdthread_sema);
 
-	return _status;
+	return err;
 }
 
 void rtw_stop_drv_threads(struct adapter *padapter)
 {
 	RT_TRACE(_module_os_intfs_c_, _drv_info_, ("+rtw_stop_drv_threads\n"));
 
-	/* Below is to termindate rtw_cmd_thread & event_thread... */
+	/* Below is to terminate rtw_cmd_thread & event_thread... */
 	up(&padapter->cmdpriv.cmd_queue_sema);
 	if (padapter->cmdThread)
 		_rtw_down_sema(&padapter->cmdpriv.terminate_cmdthread_sema);
@@ -975,9 +976,10 @@ u8 rtw_free_drv_sw(struct adapter *padapter)
 	return _SUCCESS;
 }
 
-int _netdev_open(struct net_device *pnetdev)
+static int _netdev_open(struct net_device *pnetdev)
 {
 	uint status;
+	int err;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(pnetdev);
 	struct pwrctrl_priv *pwrctrlpriv = &padapter->pwrctrlpriv;
 
@@ -1001,8 +1003,8 @@ int _netdev_open(struct net_device *pnetdev)
 
 		pr_info("MAC Address = %pM\n", pnetdev->dev_addr);
 
-		status = rtw_start_drv_threads(padapter);
-		if (status == _FAIL) {
+		err = rtw_start_drv_threads(padapter);
+		if (err) {
 			pr_info("Initialize driver software resource Failed!\n");
 			goto netdev_open_error;
 		}
@@ -1046,7 +1048,7 @@ netdev_open_error:
 	return -1;
 }
 
-int netdev_open(struct net_device *pnetdev)
+static int netdev_open(struct net_device *pnetdev)
 {
 	int ret;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(pnetdev);
@@ -1060,6 +1062,7 @@ int netdev_open(struct net_device *pnetdev)
 static int  ips_netdrv_open(struct adapter *padapter)
 {
 	int status = _SUCCESS;
+
 	padapter->net_closed = false;
 	DBG_88E("===> %s.........\n", __func__);
 
@@ -1092,6 +1095,7 @@ int rtw_ips_pwr_up(struct adapter *padapter)
 {
 	int result;
 	u32 start_time = jiffies;
+
 	DBG_88E("===>  rtw_ips_pwr_up..............\n");
 	rtw_reset_drv_sw(padapter);
 
@@ -1106,6 +1110,7 @@ int rtw_ips_pwr_up(struct adapter *padapter)
 void rtw_ips_pwr_down(struct adapter *padapter)
 {
 	u32 start_time = jiffies;
+
 	DBG_88E("===> rtw_ips_pwr_down...................\n");
 
 	padapter->net_closed = true;
@@ -1141,7 +1146,7 @@ int pm_netdev_open(struct net_device *pnetdev, u8 bnormal)
 	return status;
 }
 
-int netdev_close(struct net_device *pnetdev)
+static int netdev_close(struct net_device *pnetdev)
 {
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(pnetdev);
 	struct hal_data_8188e *rtlhal = GET_HAL_DATA(padapter);

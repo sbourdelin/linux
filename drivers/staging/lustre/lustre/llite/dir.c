@@ -1213,29 +1213,34 @@ out:
 	return rc;
 }
 
-static char *
-ll_getname(const char __user *filename)
+/* This function tries to get a single name component,
+ * to send to the server. No actual path traversal involved,
+ * so we limit to NAME_MAX */
+static char *ll_getname(const char __user *filename)
 {
 	int ret = 0, len;
-	char *tmp = __getname();
+	char *tmp;
 
+	tmp = kzalloc(NAME_MAX + 1, GFP_KERNEL);
 	if (!tmp)
 		return ERR_PTR(-ENOMEM);
 
-	len = strncpy_from_user(tmp, filename, PATH_MAX);
-	if (len == 0)
+	len = strncpy_from_user(tmp, filename, NAME_MAX + 1);
+	if (len < 0)
+		ret = len;
+	else if (len == 0)
 		ret = -ENOENT;
-	else if (len > PATH_MAX)
+	else if (len > NAME_MAX && tmp[NAME_MAX] != 0)
 		ret = -ENAMETOOLONG;
 
 	if (ret) {
-		__putname(tmp);
+		kfree(tmp);
 		tmp =  ERR_PTR(ret);
 	}
 	return tmp;
 }
 
-#define ll_putname(filename) __putname(filename)
+#define ll_putname(filename) kfree(filename)
 
 static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -1436,35 +1441,6 @@ free_lmv:
 		kfree(tmp);
 		return rc;
 	}
-	case LL_IOC_REMOVE_ENTRY: {
-		char		*filename = NULL;
-		int		 namelen = 0;
-		int		 rc;
-
-		/* Here is a little hack to avoid sending REINT_RMENTRY to
-		 * unsupported server, which might crash the server(LU-2730),
-		 * Because both LVB_TYPE and REINT_RMENTRY will be supported
-		 * on 2.4, we use OBD_CONNECT_LVB_TYPE to detect whether the
-		 * server will support REINT_RMENTRY XXX*/
-		if (!(exp_connect_flags(sbi->ll_md_exp) & OBD_CONNECT_LVB_TYPE))
-			return -ENOTSUPP;
-
-		filename = ll_getname((const char *)arg);
-		if (IS_ERR(filename))
-			return PTR_ERR(filename);
-
-		namelen = strlen(filename);
-		if (namelen < 1) {
-			rc = -EINVAL;
-			goto out_rmdir;
-		}
-
-		rc = ll_rmdir_entry(inode, filename, namelen);
-out_rmdir:
-		if (filename)
-			ll_putname(filename);
-		return rc;
-	}
 	case LL_IOC_LOV_SWAP_LAYOUTS:
 		return -EPERM;
 	case LL_IOC_OBD_STATFS:
@@ -1572,7 +1548,7 @@ out_req:
 		if (rc)
 			return rc;
 
-		OBD_ALLOC_LARGE(lmm, lmmsize);
+		lmm = libcfs_kvzalloc(lmmsize, GFP_NOFS);
 		if (lmm == NULL)
 			return -ENOMEM;
 		if (copy_from_user(lmm, lum, lmmsize)) {
@@ -1625,7 +1601,7 @@ out_req:
 free_lsm:
 		obd_free_memmd(sbi->ll_dt_exp, &lsm);
 free_lmm:
-		OBD_FREE_LARGE(lmm, lmmsize);
+		kvfree(lmm);
 		return rc;
 	}
 	case OBD_IOC_LLOG_CATINFO: {
@@ -1771,15 +1747,9 @@ out_quotactl:
 		struct hsm_user_request	*hur;
 		ssize_t			 totalsize;
 
-		hur = kzalloc(sizeof(*hur), GFP_NOFS);
-		if (!hur)
-			return -ENOMEM;
-
-		/* We don't know the true size yet; copy the fixed-size part */
-		if (copy_from_user(hur, (void *)arg, sizeof(*hur))) {
-			kfree(hur);
-			return -EFAULT;
-		}
+		hur = memdup_user((void *)arg, sizeof(*hur));
+		if (IS_ERR(hur))
+			return PTR_ERR(hur);
 
 		/* Compute the whole struct size */
 		totalsize = hur_len(hur);
@@ -1791,13 +1761,13 @@ out_quotactl:
 		if (totalsize >= MDS_MAXREQSIZE / 3)
 			return -E2BIG;
 
-		OBD_ALLOC_LARGE(hur, totalsize);
+		hur = libcfs_kvzalloc(totalsize, GFP_NOFS);
 		if (hur == NULL)
 			return -ENOMEM;
 
 		/* Copy the whole struct */
 		if (copy_from_user(hur, (void *)arg, totalsize)) {
-			OBD_FREE_LARGE(hur, totalsize);
+			kvfree(hur);
 			return -EFAULT;
 		}
 
@@ -1824,7 +1794,7 @@ out_quotactl:
 					   hur, NULL);
 		}
 
-		OBD_FREE_LARGE(hur, totalsize);
+		kvfree(hur);
 
 		return rc;
 	}
@@ -1857,13 +1827,9 @@ out_quotactl:
 		struct hsm_copy	*copy;
 		int		 rc;
 
-		copy = kzalloc(sizeof(*copy), GFP_NOFS);
-		if (!copy)
-			return -ENOMEM;
-		if (copy_from_user(copy, (char *)arg, sizeof(*copy))) {
-			kfree(copy);
-			return -EFAULT;
-		}
+		copy = memdup_user((char *)arg, sizeof(*copy));
+		if (IS_ERR(copy))
+			return PTR_ERR(copy);
 
 		rc = ll_ioc_copy_start(inode->i_sb, copy);
 		if (copy_to_user((char *)arg, copy, sizeof(*copy)))
@@ -1876,13 +1842,9 @@ out_quotactl:
 		struct hsm_copy	*copy;
 		int		 rc;
 
-		copy = kzalloc(sizeof(*copy), GFP_NOFS);
-		if (!copy)
-			return -ENOMEM;
-		if (copy_from_user(copy, (char *)arg, sizeof(*copy))) {
-			kfree(copy);
-			return -EFAULT;
-		}
+		copy = memdup_user((char *)arg, sizeof(*copy));
+		if (IS_ERR(copy))
+			return PTR_ERR(copy);
 
 		rc = ll_ioc_copy_end(inode->i_sb, copy);
 		if (copy_to_user((char *)arg, copy, sizeof(*copy)))

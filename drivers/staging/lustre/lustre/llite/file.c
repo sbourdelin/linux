@@ -702,8 +702,7 @@ out_och_free:
 out_openerr:
 		if (opendir_set != 0)
 			ll_stop_statahead(inode, lli->lli_opendir_key);
-		if (fd != NULL)
-			ll_file_data_put(fd);
+		ll_file_data_put(fd);
 	} else {
 		ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_OPEN, 1);
 	}
@@ -1282,7 +1281,7 @@ static int ll_lov_recreate(struct inode *inode, struct ost_id *oi, u32 ost_idx)
 	lsm_size = sizeof(*lsm) + (sizeof(struct lov_oinfo) *
 		   (lsm->lsm_stripe_count));
 
-	OBD_ALLOC_LARGE(lsm2, lsm_size);
+	lsm2 = libcfs_kvzalloc(lsm_size, GFP_NOFS);
 	if (lsm2 == NULL) {
 		rc = -ENOMEM;
 		goto out;
@@ -1300,7 +1299,7 @@ static int ll_lov_recreate(struct inode *inode, struct ost_id *oi, u32 ost_idx)
 	rc = obd_create(NULL, exp, oa, &lsm2, &oti);
 	ll_inode_size_unlock(inode);
 
-	OBD_FREE_LARGE(lsm2, lsm_size);
+	kvfree(lsm2);
 	goto out;
 out:
 	ccc_inode_lsm_put(inode, lsm);
@@ -1477,12 +1476,12 @@ static int ll_lov_setea(struct inode *inode, struct file *file,
 	if (!capable(CFS_CAP_SYS_ADMIN))
 		return -EPERM;
 
-	OBD_ALLOC_LARGE(lump, lum_size);
+	lump = libcfs_kvzalloc(lum_size, GFP_NOFS);
 	if (lump == NULL)
 		return -ENOMEM;
 
 	if (copy_from_user(lump, (struct lov_user_md *)arg, lum_size)) {
-		OBD_FREE_LARGE(lump, lum_size);
+		kvfree(lump);
 		return -EFAULT;
 	}
 
@@ -1490,7 +1489,7 @@ static int ll_lov_setea(struct inode *inode, struct file *file,
 				     lum_size);
 	cl_lov_delay_create_clear(&file->f_flags);
 
-	OBD_FREE_LARGE(lump, lum_size);
+	kvfree(lump);
 	return rc;
 }
 
@@ -1802,7 +1801,7 @@ static int ll_ioctl_fiemap(struct inode *inode, unsigned long arg)
 	num_bytes = sizeof(*fiemap_s) + (extent_count *
 					 sizeof(struct ll_fiemap_extent));
 
-	OBD_ALLOC_LARGE(fiemap_s, num_bytes);
+	fiemap_s = libcfs_kvzalloc(num_bytes, GFP_NOFS);
 	if (fiemap_s == NULL)
 		return -ENOMEM;
 
@@ -1839,7 +1838,7 @@ static int ll_ioctl_fiemap(struct inode *inode, unsigned long arg)
 		rc = -EFAULT;
 
 error:
-	OBD_FREE_LARGE(fiemap_s, num_bytes);
+	kvfree(fiemap_s);
 	return rc;
 }
 
@@ -2361,14 +2360,9 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		struct hsm_state_set	*hss;
 		int			 rc;
 
-		hss = kzalloc(sizeof(*hss), GFP_NOFS);
-		if (!hss)
-			return -ENOMEM;
-
-		if (copy_from_user(hss, (char *)arg, sizeof(*hss))) {
-			kfree(hss);
-			return -EFAULT;
-		}
+		hss = memdup_user((char *)arg, sizeof(*hss));
+		if (IS_ERR(hss))
+			return PTR_ERR(hss);
 
 		rc = ll_hsm_state_set(inode, hss);
 
@@ -2488,14 +2482,9 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case LL_IOC_HSM_IMPORT: {
 		struct hsm_user_import *hui;
 
-		hui = kzalloc(sizeof(*hui), GFP_NOFS);
-		if (!hui)
-			return -ENOMEM;
-
-		if (copy_from_user(hui, (void *)arg, sizeof(*hui))) {
-			kfree(hui);
-			return -EFAULT;
-		}
+		hui = memdup_user((void *)arg, sizeof(*hui));
+		if (IS_ERR(hui))
+			return PTR_ERR(hui);
 
 		rc = ll_hsm_import(inode, file, hui);
 
@@ -3015,7 +3004,7 @@ int ll_getattr(struct vfsmount *mnt, struct dentry *de, struct kstat *stat)
 	struct inode *inode = d_inode(de);
 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 	struct ll_inode_info *lli = ll_i2info(inode);
-	int res = 0;
+	int res;
 
 	res = ll_inode_revalidate(de, MDS_INODELOCK_UPDATE |
 				      MDS_INODELOCK_LOOKUP);
@@ -3055,7 +3044,7 @@ static int ll_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 
 	num_bytes = sizeof(*fiemap) + (extent_count *
 				       sizeof(struct ll_fiemap_extent));
-	OBD_ALLOC_LARGE(fiemap, num_bytes);
+	fiemap = libcfs_kvzalloc(num_bytes, GFP_NOFS);
 
 	if (fiemap == NULL)
 		return -ENOMEM;
@@ -3077,7 +3066,7 @@ static int ll_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		       fiemap->fm_mapped_extents *
 		       sizeof(struct ll_fiemap_extent));
 
-	OBD_FREE_LARGE(fiemap, num_bytes);
+	kvfree(fiemap);
 	return rc;
 }
 
@@ -3366,7 +3355,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
 		goto out;
 	}
 
-	OBD_ALLOC_LARGE(lvbdata, lmmsize);
+	lvbdata = libcfs_kvzalloc(lmmsize, GFP_NOFS);
 	if (lvbdata == NULL) {
 		rc = -ENOMEM;
 		goto out;
@@ -3375,7 +3364,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
 	memcpy(lvbdata, lmm, lmmsize);
 	lock_res_and_lock(lock);
 	if (lock->l_lvb_data != NULL)
-		OBD_FREE_LARGE(lock->l_lvb_data, lock->l_lvb_len);
+		kvfree(lock->l_lvb_data);
 
 	lock->l_lvb_data = lvbdata;
 	lock->l_lvb_len = lmmsize;

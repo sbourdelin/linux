@@ -1,12 +1,11 @@
 /* visorchannel_funcs.c
  *
- * Copyright (C) 2010 - 2013 UNISYS CORPORATION
+ * Copyright (C) 2010 - 2015 UNISYS CORPORATION
  * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or (at
- * your option) any later version.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,16 +19,24 @@
  *  independent of the mechanism used to access the channel data.
  */
 
-#include "version.h"
-#include "visorbus.h"
 #include <linux/uuid.h>
 
+#include "version.h"
+#include "visorbus.h"
+#include "controlvmchannel.h"
+
 #define MYDRVNAME "visorchannel"
+
+#define SPAR_CONSOLEVIDEO_CHANNEL_PROTOCOL_GUID \
+	UUID_LE(0x3cd6e705, 0xd6a2, 0x4aa5,           \
+		0xad, 0x5c, 0x7b, 0x8, 0x88, 0x9d, 0xff, 0xe2)
+static const uuid_le spar_video_guid = SPAR_CONSOLEVIDEO_CHANNEL_PROTOCOL_GUID;
 
 struct visorchannel {
 	u64 physaddr;
 	ulong nbytes;
 	void __iomem *mapped;
+	bool requested;
 	struct channel_header chan_hdr;
 	uuid_le guid;
 	ulong size;
@@ -44,6 +51,8 @@ struct visorchannel {
 		struct signal_queue_header event_queue;
 		struct signal_queue_header ack_queue;
 	} safe_uis_queue;
+	uuid_le type;
+	uuid_le inst;
 };
 
 /* Creates the struct visorchannel abstraction for a data area in memory,
@@ -58,6 +67,9 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 	int err;
 	size_t size = sizeof(struct channel_header);
 
+	if (physaddr == 0)
+		return NULL;
+
 	channel = kzalloc(sizeof(*channel), gfp);
 	if (!channel)
 		goto cleanup;
@@ -66,8 +78,19 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 	spin_lock_init(&channel->insert_lock);
 	spin_lock_init(&channel->remove_lock);
 
-	if (!request_mem_region(physaddr, size, MYDRVNAME))
-		goto cleanup;
+	/* Video driver constains the efi framebuffer so it will get a
+	 * conflict resource when requesting its full mem region. Since
+	 * we are only using the efi framebuffer for video we can ignore
+	 * this. Remember that we haven't requested it so we don't try to
+	 * release later on.
+	 */
+	channel->requested = request_mem_region(physaddr, size, MYDRVNAME);
+	if (!channel->requested) {
+		if (uuid_le_cmp(guid, spar_video_guid)) {
+			/* Not the video channel we care about this */
+			goto cleanup;
+		}
+	}
 
 	channel->mapped = ioremap_cache(physaddr, size);
 	if (!channel->mapped) {
@@ -90,10 +113,17 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 		guid = channel->chan_hdr.chtype;
 
 	iounmap(channel->mapped);
-	release_mem_region(channel->physaddr, channel->nbytes);
+	if (channel->requested)
+		release_mem_region(channel->physaddr, channel->nbytes);
 	channel->mapped = NULL;
-	if (!request_mem_region(channel->physaddr, channel_bytes, MYDRVNAME))
-		goto cleanup;
+	channel->requested = request_mem_region(channel->physaddr,
+						channel_bytes, MYDRVNAME);
+	if (!channel->requested) {
+		if (uuid_le_cmp(guid, spar_video_guid)) {
+			/* Different we care about this */
+			goto cleanup;
+		}
+	}
 
 	channel->mapped = ioremap_cache(channel->physaddr, channel_bytes);
 	if (!channel->mapped) {
@@ -137,7 +167,8 @@ visorchannel_destroy(struct visorchannel *channel)
 		return;
 	if (channel->mapped) {
 		iounmap(channel->mapped);
-		release_mem_region(channel->physaddr, channel->nbytes);
+		if (channel->requested)
+			release_mem_region(channel->physaddr, channel->nbytes);
 	}
 	kfree(channel);
 }
@@ -186,6 +217,15 @@ visorchannel_get_clientpartition(struct visorchannel *channel)
 }
 EXPORT_SYMBOL_GPL(visorchannel_get_clientpartition);
 
+int
+visorchannel_set_clientpartition(struct visorchannel *channel,
+				 u64 partition_handle)
+{
+	channel->chan_hdr.partition_handle = partition_handle;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(visorchannel_set_clientpartition);
+
 uuid_le
 visorchannel_get_uuid(struct visorchannel *channel)
 {
@@ -217,8 +257,9 @@ visorchannel_write(struct visorchannel *channel, ulong offset,
 		return -EIO;
 
 	if (offset < chdr_size) {
-		copy_size = min(chdr_size, nbytes) - offset;
-		memcpy(&channel->chan_hdr + offset, local, copy_size);
+		copy_size = min(chdr_size - offset, nbytes);
+		memcpy(((char *)(&channel->chan_hdr)) + offset,
+		       local, copy_size);
 	}
 
 	memcpy_toio(channel->mapped + offset, local, nbytes);
@@ -375,11 +416,12 @@ bool
 visorchannel_signalremove(struct visorchannel *channel, u32 queue, void *msg)
 {
 	bool rc;
+	unsigned long flags;
 
 	if (channel->needs_lock) {
-		spin_lock(&channel->remove_lock);
+		spin_lock_irqsave(&channel->remove_lock, flags);
 		rc = signalremove_inner(channel, queue, msg);
-		spin_unlock(&channel->remove_lock);
+		spin_unlock_irqrestore(&channel->remove_lock, flags);
 	} else {
 		rc = signalremove_inner(channel, queue, msg);
 	}
@@ -429,11 +471,12 @@ bool
 visorchannel_signalinsert(struct visorchannel *channel, u32 queue, void *msg)
 {
 	bool rc;
+	unsigned long flags;
 
 	if (channel->needs_lock) {
-		spin_lock(&channel->insert_lock);
+		spin_lock_irqsave(&channel->insert_lock, flags);
 		rc = signalinsert_inner(channel, queue, msg);
-		spin_unlock(&channel->insert_lock);
+		spin_unlock_irqrestore(&channel->insert_lock, flags);
 	} else {
 		rc = signalinsert_inner(channel, queue, msg);
 	}

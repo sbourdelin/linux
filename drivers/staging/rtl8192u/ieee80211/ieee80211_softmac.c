@@ -660,10 +660,13 @@ inline struct sk_buff *ieee80211_authentication_req(struct ieee80211_network *be
 	auth = (struct ieee80211_authentication *)
 		skb_put(skb, sizeof(struct ieee80211_authentication));
 
-	auth->header.frame_ctl = IEEE80211_STYPE_AUTH;
-	if (challengelen) auth->header.frame_ctl |= IEEE80211_FCTL_WEP;
+	if (challengelen)
+		auth->header.frame_ctl = cpu_to_le16(IEEE80211_STYPE_AUTH
+				| IEEE80211_FCTL_WEP);
+	else
+		auth->header.frame_ctl = cpu_to_le16(IEEE80211_STYPE_AUTH);
 
-	auth->header.duration_id = 0x013a; //FIXME
+	auth->header.duration_id = cpu_to_le16(0x013a);
 
 	memcpy(auth->header.addr1, beacon->bssid, ETH_ALEN);
 	memcpy(auth->header.addr2, ieee->dev->dev_addr, ETH_ALEN);
@@ -673,7 +676,7 @@ inline struct sk_buff *ieee80211_authentication_req(struct ieee80211_network *be
 	if(ieee->auth_mode == 0)
 		auth->algorithm = WLAN_AUTH_OPEN;
 	else if(ieee->auth_mode == 1)
-		auth->algorithm = WLAN_AUTH_SHARED_KEY;
+		auth->algorithm = cpu_to_le16(WLAN_AUTH_SHARED_KEY);
 	else if(ieee->auth_mode == 2)
 		auth->algorithm = WLAN_AUTH_OPEN;//0x80;
 	printk("=================>%s():auth->algorithm is %d\n",__func__,auth->algorithm);
@@ -1084,7 +1087,7 @@ inline struct sk_buff *ieee80211_association_req(struct ieee80211_network *beaco
 
 
 	hdr->header.frame_ctl = IEEE80211_STYPE_ASSOC_REQ;
-	hdr->header.duration_id= 37; //FIXME
+	hdr->header.duration_id = cpu_to_le16(37);
 	memcpy(hdr->header.addr1, beacon->bssid, ETH_ALEN);
 	memcpy(hdr->header.addr2, ieee->dev->dev_addr, ETH_ALEN);
 	memcpy(hdr->header.addr3, beacon->bssid, ETH_ALEN);
@@ -1103,7 +1106,7 @@ inline struct sk_buff *ieee80211_association_req(struct ieee80211_network *beaco
 	if (wmm_info_len) //QOS
 		hdr->capability |= cpu_to_le16(WLAN_CAPABILITY_QOS);
 
-	hdr->listen_interval = 0xa; //FIXME
+	hdr->listen_interval = cpu_to_le16(0xa);
 
 	hdr->info_element[0].id = MFIE_TYPE_SSID;
 
@@ -1174,7 +1177,7 @@ inline struct sk_buff *ieee80211_association_req(struct ieee80211_network *beaco
 			tag = skb_put(skb, ht_cap_len);
 			*tag++ = MFIE_TYPE_HT_CAP;
 			*tag++ = ht_cap_len - 2;
-			memcpy(tag, ht_cap_buf,ht_cap_len -2);
+			memcpy(tag, ht_cap_buf, ht_cap_len - 2);
 			tag += ht_cap_len -2;
 		}
 	}
@@ -1211,7 +1214,7 @@ inline struct sk_buff *ieee80211_association_req(struct ieee80211_network *beaco
 			tag = skb_put(skb, realtek_ie_len);
 			*tag++ = MFIE_TYPE_GENERIC;
 			*tag++ = realtek_ie_len - 2;
-			memcpy(tag, realtek_ie_buf,realtek_ie_len -2 );
+			memcpy(tag, realtek_ie_buf, realtek_ie_len - 2);
 		}
 	}
 //	printk("<=====%s(), %p, %p\n", __func__, ieee->dev, ieee->dev->dev_addr);
@@ -1364,12 +1367,10 @@ static void ieee80211_associate_complete_wq(struct work_struct *work)
 		ieee->LinkDetectInfo.NumRecvDataInPeriod= 1;
 	}
 	ieee->link_change(ieee->dev);
-	if(ieee->is_silent_reset == 0){
+	if (!ieee->is_silent_reset) {
 		printk("============>normal associate\n");
-	notify_wx_assoc_event(ieee);
-	}
-	else if(ieee->is_silent_reset == 1)
-	{
+		notify_wx_assoc_event(ieee);
+	} else {
 		printk("==================>silent reset associate\n");
 		ieee->is_silent_reset = false;
 	}
@@ -1558,7 +1559,7 @@ static inline u16 auth_parse(struct sk_buff *skb, u8 **challenge, int *chlen)
 		}
 	}
 
-	return cpu_to_le16(a->status);
+	return le16_to_cpu(a->status);
 
 }
 
@@ -1963,7 +1964,7 @@ static void ieee80211_check_auth_response(struct ieee80211_device *ieee,
 			}
 
 			if (ieee->current_network.mode == IEEE_N_24G &&
-					bHalfSupportNmode == true) {
+					bHalfSupportNmode) {
 				netdev_dbg(ieee->dev, "enter half N mode\n");
 				ieee->bHalfWirelessN24GMode = true;
 			} else
@@ -2153,7 +2154,7 @@ void ieee80211_softmac_xmit(struct ieee80211_txb *txb, struct ieee80211_device *
 	ieee80211_sta_wakeup(ieee, 0);
 
 	/* update the tx status */
-	ieee->stats.tx_bytes += txb->payload_size;
+	ieee->stats.tx_bytes += le16_to_cpu(txb->payload_size);
 	ieee->stats.tx_packets++;
 	tcb_desc = (cb_desc *)(txb->fragments[0]->cb + MAX_DEV_ADDR_SIZE);
 	if (tcb_desc->bMulticast) {
@@ -3126,7 +3127,7 @@ inline struct sk_buff *ieee80211_disassociate_skb(
 	memcpy(disass->header.addr2, ieee->dev->dev_addr, ETH_ALEN);
 	memcpy(disass->header.addr3, beacon->bssid, ETH_ALEN);
 
-	disass->reason = asRsn;
+	disass->reason = cpu_to_le16(asRsn);
 	return skb;
 }
 

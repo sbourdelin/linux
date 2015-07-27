@@ -64,7 +64,7 @@ void lov_pool_putref(struct pool_desc *pool)
 	if (atomic_dec_and_test(&pool->pool_refcount)) {
 		LASSERT(hlist_unhashed(&pool->pool_hash));
 		LASSERT(list_empty(&pool->pool_list));
-		LASSERT(pool->pool_proc_entry == NULL);
+		LASSERT(pool->pool_debugfs_entry == NULL);
 		lov_ost_pool_free(&(pool->pool_rr.lqr_pool));
 		lov_ost_pool_free(&(pool->pool_obds));
 		kfree(pool);
@@ -152,7 +152,6 @@ cfs_hash_ops_t pool_hash_operations = {
 
 };
 
-#if defined (CONFIG_PROC_FS)
 /* ifdef needed for liblustre support */
 /*
  * pool /proc seq_file methods
@@ -269,7 +268,7 @@ static int pool_proc_show(struct seq_file *s, void *v)
 	return 0;
 }
 
-static struct seq_operations pool_proc_ops = {
+static const struct seq_operations pool_proc_ops = {
 	.start	  = pool_proc_start,
 	.next	   = pool_proc_next,
 	.stop	   = pool_proc_stop,
@@ -283,7 +282,7 @@ static int pool_proc_open(struct inode *inode, struct file *file)
 	rc = seq_open(file, &pool_proc_ops);
 	if (!rc) {
 		struct seq_file *s = file->private_data;
-		s->private = PDE_DATA(inode);
+		s->private = inode->i_private;
 	}
 	return rc;
 }
@@ -294,7 +293,6 @@ static struct file_operations pool_proc_operations = {
 	.llseek	 = seq_lseek,
 	.release	= seq_release,
 };
-#endif /* CONFIG_PROC_FS */
 
 void lov_dump_pool(int level, struct pool_desc *pool)
 {
@@ -433,7 +431,7 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
 		return -ENAMETOOLONG;
 
 	new_pool = kzalloc(sizeof(*new_pool), GFP_NOFS);
-	if (new_pool == NULL)
+	if (!new_pool)
 		return -ENOMEM;
 
 	strncpy(new_pool->pool_name, poolname, LOV_MAXPOOLNAME);
@@ -454,20 +452,21 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
 
 	INIT_HLIST_NODE(&new_pool->pool_hash);
 
-#if defined (CONFIG_PROC_FS)
 	/* we need this assert seq_file is not implemented for liblustre */
 	/* get ref for /proc file */
 	lov_pool_getref(new_pool);
-	new_pool->pool_proc_entry = lprocfs_add_simple(lov->lov_pool_proc_entry,
-						       poolname, new_pool,
-						       &pool_proc_operations);
-	if (IS_ERR(new_pool->pool_proc_entry)) {
-		CWARN("Cannot add proc pool entry "LOV_POOLNAMEF"\n", poolname);
-		new_pool->pool_proc_entry = NULL;
+	new_pool->pool_debugfs_entry = ldebugfs_add_simple(
+						lov->lov_pool_debugfs_entry,
+						poolname, new_pool,
+						&pool_proc_operations);
+	if (IS_ERR_OR_NULL(new_pool->pool_debugfs_entry)) {
+		CWARN("Cannot add debugfs pool entry "LOV_POOLNAMEF"\n",
+		      poolname);
+		new_pool->pool_debugfs_entry = NULL;
 		lov_pool_putref(new_pool);
 	}
-	CDEBUG(D_INFO, "pool %p - proc %p\n", new_pool, new_pool->pool_proc_entry);
-#endif
+	CDEBUG(D_INFO, "pool %p - proc %p\n",
+		new_pool, new_pool->pool_debugfs_entry);
 
 	spin_lock(&obd->obd_dev_lock);
 	list_add_tail(&new_pool->pool_list, &lov->lov_pool_list);
@@ -493,7 +492,7 @@ out_err:
 	lov->lov_pool_count--;
 	spin_unlock(&obd->obd_dev_lock);
 
-	lprocfs_remove(&new_pool->pool_proc_entry);
+	ldebugfs_remove(&new_pool->pool_debugfs_entry);
 
 	lov_ost_pool_free(&new_pool->pool_rr.lqr_pool);
 out_free_pool_obds:
@@ -514,9 +513,9 @@ int lov_pool_del(struct obd_device *obd, char *poolname)
 	if (pool == NULL)
 		return -ENOENT;
 
-	if (pool->pool_proc_entry != NULL) {
-		CDEBUG(D_INFO, "proc entry %p\n", pool->pool_proc_entry);
-		lprocfs_remove(&pool->pool_proc_entry);
+	if (!IS_ERR_OR_NULL(pool->pool_debugfs_entry)) {
+		CDEBUG(D_INFO, "proc entry %p\n", pool->pool_debugfs_entry);
+		ldebugfs_remove(&pool->pool_debugfs_entry);
 		lov_pool_putref(pool);
 	}
 

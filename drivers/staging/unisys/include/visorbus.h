@@ -40,9 +40,18 @@
 
 struct visor_driver;
 struct visor_device;
+extern struct bus_type visorbus_type;
 
 typedef void (*visorbus_state_complete_func) (struct visor_device *dev,
 					      int status);
+struct visorchipset_state {
+	u32 created:1;
+	u32 attached:1;
+	u32 configured:1;
+	u32 running:1;
+	/* Add new fields above. */
+	/* Remaining bits in this 32-bit word are unused. */
+};
 
 /** This struct describes a specific Supervisor channel, by providing its
  *  GUID, name, and sizes.
@@ -50,8 +59,6 @@ typedef void (*visorbus_state_complete_func) (struct visor_device *dev,
 struct visor_channeltype_descriptor {
 	const uuid_le guid;
 	const char *name;
-	unsigned long min_size;
-	unsigned long max_size;
 };
 
 /** Information provided by each visor driver when it registers with the
@@ -106,7 +113,8 @@ struct visor_driver {
 	struct driver_attribute version_attr;
 };
 
-#define to_visor_driver(x) container_of(x, struct visor_driver, driver)
+#define to_visor_driver(x) ((x) ? \
+	(container_of(x, struct visor_driver, driver)) : (NULL))
 
 /** A device type for things "plugged" into the visorbus bus */
 
@@ -128,7 +136,6 @@ struct visor_device {
 	struct periodic_work *periodic_work;
 	bool being_removed;
 	bool responded_to_device_create;
-	struct kobject kobjchannel;	/* visorbus<x>/dev<y>/channel/ */
 	struct kobject kobjdevmajorminor; /* visorbus<x>/dev<y>/devmajorminor/*/
 	struct {
 		int major, minor;
@@ -140,8 +147,18 @@ struct visor_device {
 	struct semaphore visordriver_callback_lock;
 	bool pausing;
 	bool resuming;
-	unsigned long chipset_bus_no;
-	unsigned long chipset_dev_no;
+	u32 chipset_bus_no;
+	u32 chipset_dev_no;
+	struct visorchipset_state state;
+	uuid_le type;
+	uuid_le inst;
+	u8 *name;
+	u8 *description;
+	struct controlvm_message_header *pending_msg_hdr;
+	void *vbus_hdr_info;
+	u32 switch_no;
+	u32 internal_port_no;
+	uuid_le partition_uuid;
 };
 
 #define to_visor_device(x) container_of(x, struct visor_device, device)
@@ -192,10 +209,15 @@ ulong visorchannel_get_nbytes(struct visorchannel *channel);
 char *visorchannel_id(struct visorchannel *channel, char *s);
 char *visorchannel_zoneid(struct visorchannel *channel, char *s);
 u64 visorchannel_get_clientpartition(struct visorchannel *channel);
+int visorchannel_set_clientpartition(struct visorchannel *channel,
+				     u64 partition_handle);
 uuid_le visorchannel_get_uuid(struct visorchannel *channel);
 char *visorchannel_uuid_id(uuid_le *guid, char *s);
 void visorchannel_debug(struct visorchannel *channel, int num_queues,
 			struct seq_file *seq, u32 off);
 void __iomem *visorchannel_get_header(struct visorchannel *channel);
 
+#define BUS_ROOT_DEVICE		UINT_MAX
+struct visor_device *visorbus_get_device_by_id(u32 bus_no, u32 dev_no,
+					       struct visor_device *from);
 #endif

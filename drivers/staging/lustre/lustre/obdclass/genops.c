@@ -45,7 +45,7 @@
 
 spinlock_t obd_types_lock;
 
-struct kmem_cache *obd_device_cachep;
+static struct kmem_cache *obd_device_cachep;
 struct kmem_cache *obdo_cachep;
 EXPORT_SYMBOL(obdo_cachep);
 static struct kmem_cache *import_cachep;
@@ -71,9 +71,8 @@ static struct obd_device *obd_device_alloc(void)
 	struct obd_device *obd;
 
 	OBD_SLAB_ALLOC_PTR_GFP(obd, obd_device_cachep, GFP_NOFS);
-	if (obd != NULL) {
+	if (obd != NULL)
 		obd->obd_magic = OBD_DEVICE_MAGIC;
-	}
 	return obd;
 }
 
@@ -156,7 +155,7 @@ EXPORT_SYMBOL(class_put_type);
 #define CLASS_MAX_NAME 1024
 
 int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
-			struct lprocfs_vars *vars, const char *name,
+			const char *name,
 			struct lu_device_type *ldt)
 {
 	struct obd_type *type;
@@ -172,7 +171,7 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 
 	rc = -ENOMEM;
 	type = kzalloc(sizeof(*type), GFP_NOFS);
-	if (type == NULL)
+	if (!type)
 		return rc;
 
 	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
@@ -191,11 +190,19 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 	strcpy(type->typ_name, name);
 	spin_lock_init(&type->obd_type_lock);
 
-	type->typ_procroot = lprocfs_register(type->typ_name, proc_lustre_root,
-					      vars, type);
-	if (IS_ERR(type->typ_procroot)) {
-		rc = PTR_ERR(type->typ_procroot);
-		type->typ_procroot = NULL;
+	type->typ_debugfs_entry = ldebugfs_register(type->typ_name,
+						    debugfs_lustre_root,
+						    NULL, type);
+	if (IS_ERR_OR_NULL(type->typ_debugfs_entry)) {
+		rc = type->typ_debugfs_entry ? PTR_ERR(type->typ_debugfs_entry)
+					     : -ENOMEM;
+		type->typ_debugfs_entry = NULL;
+		goto failed;
+	}
+
+	type->typ_kobj = kobject_create_and_add(type->typ_name, lustre_kobj);
+	if (!type->typ_kobj) {
+		rc = -ENOMEM;
 		goto failed;
 	}
 
@@ -213,6 +220,8 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 	return 0;
 
  failed:
+	if (type->typ_kobj)
+		kobject_put(type->typ_kobj);
 	kfree(type->typ_name);
 	kfree(type->typ_md_ops);
 	kfree(type->typ_dt_ops);
@@ -239,9 +248,11 @@ int class_unregister_type(const char *name)
 		return -EBUSY;
 	}
 
-	if (type->typ_procroot) {
-		lprocfs_remove(&type->typ_procroot);
-	}
+	if (type->typ_kobj)
+		kobject_put(type->typ_kobj);
+
+	if (!IS_ERR_OR_NULL(type->typ_debugfs_entry))
+		ldebugfs_remove(&type->typ_debugfs_entry);
 
 	if (type->typ_lu)
 		lu_device_type_fini(type->typ_lu);
@@ -282,7 +293,7 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
 	}
 
 	type = class_get_type(type_name);
-	if (type == NULL){
+	if (type == NULL) {
 		CERROR("OBD: unknown type: %s\n", type_name);
 		return ERR_PTR(-ENODEV);
 	}
@@ -987,7 +998,8 @@ void class_import_put(struct obd_import *imp)
 }
 EXPORT_SYMBOL(class_import_put);
 
-static void init_imp_at(struct imp_at *at) {
+static void init_imp_at(struct imp_at *at)
+{
 	int i;
 	at_init(&at->iat_net_latency, 0, 0);
 	for (i = 0; i < IMP_AT_MAX_PORTALS; i++) {
@@ -1004,7 +1016,7 @@ struct obd_import *class_new_import(struct obd_device *obd)
 	struct obd_import *imp;
 
 	imp = kzalloc(sizeof(*imp), GFP_NOFS);
-	if (imp == NULL)
+	if (!imp)
 		return NULL;
 
 	INIT_LIST_HEAD(&imp->imp_pinger_chain);
@@ -1630,7 +1642,8 @@ static int obd_zombie_impexp_check(void *arg)
 /**
  * Add export to the obd_zombie thread and notify it.
  */
-static void obd_zombie_export_add(struct obd_export *exp) {
+static void obd_zombie_export_add(struct obd_export *exp)
+{
 	spin_lock(&exp->exp_obd->obd_dev_lock);
 	LASSERT(!list_empty(&exp->exp_obd_chain));
 	list_del_init(&exp->exp_obd_chain);
@@ -1646,7 +1659,8 @@ static void obd_zombie_export_add(struct obd_export *exp) {
 /**
  * Add import to the obd_zombie thread and notify it.
  */
-static void obd_zombie_import_add(struct obd_import *imp) {
+static void obd_zombie_import_add(struct obd_import *imp)
+{
 	LASSERT(imp->imp_sec == NULL);
 	LASSERT(imp->imp_rq_pool == NULL);
 	spin_lock(&obd_zombie_impexp_lock);
@@ -1807,7 +1821,7 @@ void *kuc_alloc(int payload_len, int transport, int type)
 	int len = kuc_len(payload_len);
 
 	lh = kzalloc(len, GFP_NOFS);
-	if (lh == NULL)
+	if (!lh)
 		return ERR_PTR(-ENOMEM);
 
 	lh->kuc_magic = KUC_MAGIC;

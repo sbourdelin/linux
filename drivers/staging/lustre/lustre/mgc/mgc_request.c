@@ -448,7 +448,6 @@ static int config_log_end(char *logname, struct config_llog_instance *cfg)
 	return rc;
 }
 
-#if defined (CONFIG_PROC_FS)
 int lprocfs_mgc_rd_ir_state(struct seq_file *m, void *data)
 {
 	struct obd_device       *obd = data;
@@ -477,7 +476,6 @@ int lprocfs_mgc_rd_ir_state(struct seq_file *m, void *data)
 	LPROCFS_CLIMP_EXIT(obd);
 	return 0;
 }
-#endif
 
 /* reenqueue any lost locks */
 #define RQ_RUNNING 0x1
@@ -722,7 +720,7 @@ static int mgc_cleanup(struct obd_device *obd)
 
 static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
 {
-	struct lprocfs_static_vars lvars;
+	struct lprocfs_static_vars lvars = { NULL };
 	int rc;
 
 	ptlrpcd_addref();
@@ -738,7 +736,7 @@ static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
 	}
 
 	lprocfs_mgc_init_vars(&lvars);
-	lprocfs_obd_setup(obd, lvars.obd_vars);
+	lprocfs_obd_setup(obd, lvars.obd_vars, lvars.sysfs_vars);
 	sptlrpc_lprocfs_cliobd_attach(obd);
 
 	if (atomic_inc_return(&mgc_count) == 1) {
@@ -1130,7 +1128,7 @@ static int mgc_apply_recover_logs(struct obd_device *mgc,
 	LASSERT(cfg->cfg_sb == cfg->cfg_instance);
 
 	inst = kzalloc(PAGE_CACHE_SIZE, GFP_NOFS);
-	if (inst == NULL)
+	if (!inst)
 		return -ENOMEM;
 
 	if (!IS_SERVER(lsi)) {
@@ -1495,7 +1493,7 @@ static int mgc_process_cfg_log(struct obd_device *mgc,
 		lsi = s2lsi(cld->cld_cfg.cfg_sb);
 
 	env = kzalloc(sizeof(*env), GFP_NOFS);
-	if (env == NULL)
+	if (!env)
 		return -ENOMEM;
 
 	rc = lu_env_init(env, LCT_MG_THREAD);
@@ -1745,7 +1743,7 @@ struct obd_ops mgc_obd_ops = {
 
 static int __init mgc_init(void)
 {
-	return class_register_type(&mgc_obd_ops, NULL, NULL,
+	return class_register_type(&mgc_obd_ops, NULL,
 				   LUSTRE_MGC_NAME, NULL);
 }
 

@@ -480,11 +480,11 @@ static int echo_alloc_memmd(struct echo_device *ed,
 
 	LASSERT(*lsmp == NULL);
 	*lsmp = kzalloc(lsm_size, GFP_NOFS);
-	if (*lsmp == NULL)
+	if (!*lsmp)
 		return -ENOMEM;
 
 	(*lsmp)->lsm_oinfo[0] = kzalloc(sizeof(struct lov_oinfo), GFP_NOFS);
-	if ((*lsmp)->lsm_oinfo[0] == NULL) {
+	if (!(*lsmp)->lsm_oinfo[0]) {
 		kfree(*lsmp);
 		return -ENOMEM;
 	}
@@ -701,7 +701,7 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
 	int cleanup = 0;
 
 	ed = kzalloc(sizeof(*ed), GFP_NOFS);
-	if (ed == NULL) {
+	if (!ed) {
 		rc = -ENOMEM;
 		goto out;
 	}
@@ -1878,7 +1878,7 @@ echo_client_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		return rc;
 
 	env = kzalloc(sizeof(*env), GFP_NOFS);
-	if (env == NULL)
+	if (!env)
 		return -ENOMEM;
 
 	rc = lu_env_init(env, LCT_DT_THREAD);
@@ -2049,7 +2049,7 @@ static int echo_client_setup(const struct lu_env *env,
 	ec->ec_nstripes = 0;
 
 	ocd = kzalloc(sizeof(*ocd), GFP_NOFS);
-	if (ocd == NULL) {
+	if (!ocd) {
 		CERROR("Can't alloc ocd connecting to %s\n",
 		       lustre_cfg_string(lcfg, 1));
 		return -ENOMEM;
@@ -2141,15 +2141,11 @@ static struct obd_ops echo_client_obd_ops = {
 
 int echo_client_init(void)
 {
-	struct lprocfs_static_vars lvars = { NULL };
 	int rc;
-
-	lprocfs_echo_init_vars(&lvars);
 
 	rc = lu_kmem_init(echo_caches);
 	if (rc == 0) {
 		rc = class_register_type(&echo_client_obd_ops, NULL,
-					 lvars.module_vars,
 					 LUSTRE_ECHO_CLIENT_NAME,
 					 &echo_device_type);
 		if (rc)
@@ -2166,14 +2162,9 @@ void echo_client_exit(void)
 
 static int __init obdecho_init(void)
 {
-	struct lprocfs_static_vars lvars;
-
 	LCONSOLE_INFO("Echo OBD driver; http://www.lustre.org/\n");
 
 	LASSERT(PAGE_CACHE_SIZE % OBD_ECHO_BLOCK_SIZE == 0);
-
-	lprocfs_echo_init_vars(&lvars);
-
 
 	return echo_client_init();
 }
