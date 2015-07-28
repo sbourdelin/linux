@@ -4038,16 +4038,13 @@ static int rtl8xxxu_conf_tx(struct ieee80211_hw *hw,
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct device *dev = &priv->udev->dev;
 	u32 val32;
-	u16 cw_min, cw_max;
 	u8 aifs, acm_ctrl, acm_bit;
 
 	aifs = param->aifs;
-	cw_min = cpu_to_le16(param->cw_min);
-	cw_max = cpu_to_le16(param->cw_max);
 
 	val32 = aifs |
-		(cw_min & 0xf) << EDCA_PARAM_ECW_MIN_SHIFT |
-		(cw_max & 0xf) << EDCA_PARAM_ECW_MAX_SHIFT |
+		fls(param->cw_min) << EDCA_PARAM_ECW_MIN_SHIFT |
+		fls(param->cw_max) << EDCA_PARAM_ECW_MAX_SHIFT |
 		(u32)param->txop << EDCA_PARAM_TXOP_SHIFT;
 
 	acm_ctrl = rtl8723au_read8(priv, REG_ACM_HW_CTRL);
