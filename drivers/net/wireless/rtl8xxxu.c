@@ -700,7 +700,7 @@ static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 	}
 	rtl8723au_write32(priv, mbox_reg, le32_to_cpu(h2c->raw.data));
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
-		dev_info(dev, "H2C %08x\n", le16_to_cpu(h2c->raw.data));
+		dev_info(dev, "H2C %08x\n", le32_to_cpu(h2c->raw.data));
 
 	priv->next_mbox = (mbox_nr + 1) % H2C_MAX_MBOX;
 
