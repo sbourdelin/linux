@@ -3550,7 +3550,7 @@ static u32 rtl8xxxu_queue_select(struct ieee80211_hw *hw, struct sk_buff *skb)
 
 static void rtl8xxxu_calc_tx_desc_csum(struct rtl8xxxu_tx_desc *tx_desc)
 {
-	u16 *ptr = (u16 *)tx_desc;
+	__le16 *ptr = (__le16 *)tx_desc;
 	u16 csum = 0;
 	int i;
 
