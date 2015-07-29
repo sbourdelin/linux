@@ -407,6 +407,11 @@ struct rtl8xxxu_rfregval {
 	u32 val;
 };
 
+enum rtl8xxxu_rfpath {
+	RF_A,
+	RF_B,
+};
+
 #define H2C_MAX_MBOX			4
 #define H2C_EXT				BIT(7)
 #define H2C_SET_POWER_MODE		1

@@ -552,7 +552,8 @@ rtl8723au_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
 	return ret;
 }
 
-static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv, u8 reg)
+static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv,
+				enum rtl8xxxu_rfpath path, u8 reg)
 {
 	u32 hssia, val32, retval;
 
@@ -592,7 +593,8 @@ static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv, u8 reg)
 	return retval;
 }
 
-static int rtl8723au_write_rfreg(struct rtl8xxxu_priv *priv, u8 reg, u32 data)
+static int rtl8723au_write_rfreg(struct rtl8xxxu_priv *priv,
+				 enum rtl8xxxu_rfpath path, u8 reg, u32 data)
 {
 	int ret, retval;
 	u32 dataaddr;
@@ -691,7 +693,7 @@ static void rtl8723a_enable_rf(struct rtl8xxxu_priv *priv)
 
 	rtl8723au_write32(priv, REG_RX_WAIT_CCA, 0x631B25A0);
 
-	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0x32d95);
+	rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_AC, 0x32d95);
 
 #if 0
 	rtl8723au_write8(priv, REG_SYS_FUNC, 0xE3);
@@ -730,7 +732,7 @@ static void rtl8723a_disable_rf(struct rtl8xxxu_priv *priv)
 	rtl8723au_write32(priv, REG_RX_WAIT_CCA, 0x001b25a0);
 
 	/* Power down RF module */
-	rtl8723au_write_rfreg(priv, RF6052_REG_AC, 0);
+	rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_AC, 0);
 
 	sps0 &= ~(BIT(0) | BIT(3));
 	rtl8723au_write8(priv, REG_SPS0_CTRL, sps0);
@@ -783,10 +785,10 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 	bool ht = true;
 	int sec_ch_above;
 
-	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	val32 = rtl8723au_read_rfreg(priv, RF_A, RF6052_REG_MODE_AG);
 	val32 &= ~MODE_AG_CHANNEL_MASK;
 	val32 |= hw->conf.chandef.chan->hw_value;
-	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, val32);
+	rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_MODE_AG, val32);
 
 	opmode = rtl8723au_read8(priv, REG_BW_OPMODE);
 	rsr = rtl8723au_read32(priv, REG_RESPONSE_RATE_SET);
@@ -880,12 +882,12 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 	rtl8723au_write16(priv, REG_R2T_SIFS, 0x0808);
 	rtl8723au_write16(priv, REG_T2T_SIFS, 0x0a0a);
 
-	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	val32 = rtl8723au_read_rfreg(priv, RF_A, RF6052_REG_MODE_AG);
 	if (hw->conf.chandef.width == NL80211_CHAN_WIDTH_40)
 		val32 &= ~MODE_AG_CHANNEL_20MHZ;
 	else
 		val32 |= MODE_AG_CHANNEL_20MHZ;
-	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, val32);
+	rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_MODE_AG, val32);
 }
 
 static void
@@ -1584,7 +1586,8 @@ static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 }
 
 static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
-				 struct rtl8xxxu_rfregval *array)
+				 struct rtl8xxxu_rfregval *array,
+				 enum rtl8xxxu_rfpath path)
 {
 	int i, ret;
 	u8 reg;
@@ -1620,7 +1623,7 @@ static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
 
 		reg &= 0x3f;
 
-		ret = rtl8723au_write_rfreg(priv, reg, val);
+		ret = rtl8723au_write_rfreg(priv, path, reg, val);
 		if (ret) {
 			dev_warn(&priv->udev->dev,
 				 "Failed to initialize RF\n");
@@ -1667,7 +1670,8 @@ static int rtl8xxxu_init_phy_rf(struct rtl8xxxu_priv *priv)
 	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
 	udelay(1);
 
-	rtl8xxxu_init_rf_regs(priv, rtl8723au_radioa_rf6052_1t_init_table);
+	rtl8xxxu_init_rf_regs(priv,
+			      rtl8723au_radioa_rf6052_1t_init_table, RF_A);
 
 	/* For path B, use XB */
 	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
@@ -2425,24 +2429,24 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 		rtl8723au_write32(priv, REG_OFDM1_LSTF, val32);
 
 		/* Read original RF mode Path A */
-		rf_amode = rtl8723au_read_rfreg(priv, RF6052_REG_AC);
+		rf_amode = rtl8723au_read_rfreg(priv, RF_A, RF6052_REG_AC);
 
 #if 0
 		/* Path-B */
 		if (is_2t)
-			rf_bmode = PHY_QueryRFReg(priv, RF_PATH_B, RF_AC,
-						  bMask12Bits);
+			rf_bmode = rtl8723au_read_rfreg(priv, RF_B,
+							RF6052_REG_AC);
 #endif
 
 		/* Set RF mode to standby Path A */
-		rtl8723au_write_rfreg(priv, RF6052_REG_AC,
+		rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_AC,
 				      (rf_amode & 0xfff) | 0x10000);
 
 #if 0
 		/* Path-B */
 		if (is_2t)
-			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
-				     (RF_Bmode & 0x8ffff) | 0x10000);
+			rtl8723au_write_rfreg(priv, RF_B, RF6052_REG_AC,,
+					      (RF_Bmode & 0x8ffff) | 0x10000);
 #endif
 	} else {
 		/*  Deal with Packet TX case */
@@ -2451,9 +2455,9 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 	}
 
 	/* Start LC calibration */
-	val32 = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	val32 = rtl8723au_read_rfreg(priv, RF_A, RF6052_REG_MODE_AG);
 	val32 |= 0x08000;
-	rtl8723au_write_rfreg(priv, RF6052_REG_MODE_AG, val32);
+	rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_MODE_AG, val32);
 
 	msleep(100);
 
@@ -2461,13 +2465,13 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 	if (lstf & OFDM_LSTF_MASK) {
 		/* Path-A */
 		rtl8723au_write32(priv, REG_OFDM1_LSTF, lstf);
-		rtl8723au_write_rfreg(priv, RF6052_REG_AC, rf_amode);
+		rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_AC, rf_amode);
 
 #if 0
 		/* Path-B */
 		if (is_2t)
-			PHY_SetRFReg(priv, RF_PATH_B, RF_AC, bMask12Bits,
-				     RF_Bmode);
+			rtl8723au_write_rfreg(priv, RF_B, RF6052_REG_AC,
+					      rf_bmode);
 #endif
 	} else /*  Deal with Packet TX case */
 		rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
@@ -2931,7 +2935,8 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	/* 0x860[6:5]= 00 - why? - this sets antenna B */
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_INT_OE, 0x66F60210);
 
-	priv->rf_mode_ag[0] = rtl8723au_read_rfreg(priv, RF6052_REG_MODE_AG);
+	priv->rf_mode_ag[0] = rtl8723au_read_rfreg(priv, RF_A,
+						   RF6052_REG_MODE_AG);
 
 	if (!macpower) {
 		if (priv->ep_tx_normal_queue)
@@ -3116,7 +3121,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	/*
 	 * This should enable thermal meter
 	 */
-	rtl8723au_write_rfreg(priv, RF6052_REG_T_METER, 0x60);
+	rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_T_METER, 0x60);
 
 	rtl8723a_phy_lc_calibrate(priv);
 
