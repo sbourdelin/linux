@@ -1959,9 +1959,9 @@ static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 {
 	u32 i, j, diff, simubitmap, bound = 0;
 	int candidate[2] = {-1, -1};	/* for path A and path B */
-	bool retval = true, is_2t = false;
+	bool retval = true;
 
-	if (is_2t)
+	if (priv->tx_paths > 1)
 		bound = 8;
 	else
 		bound = 4;
@@ -1999,7 +1999,7 @@ static bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 		/* path A OK */
 		for (i = 0; i < 4; i++)
 			result[3][i] = result[c1][i];
-	} else if (!(simubitmap & 0xf0) && is_2t) {
+	} else if (!(simubitmap & 0xf0) && priv->tx_paths > 1) {
 		/* path B OK */
 		for (i = 4; i < 8; i++)
 			result[3][i] = result[c1][i];
@@ -2050,13 +2050,13 @@ static void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, const u32 *regs,
 
 
 static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, const u32 *regs,
-				  bool path_a_on, bool is_2t)
+				  bool path_a_on)
 {
 	u32 path_on;
 	int i;
 
 	path_on = path_a_on ? 0x04db25a4 : 0x0b1b25a4;
-	if (!is_2t) {
+	if (!priv->tx_paths == 1) {
 		path_on = 0x0bdb25a0;
 		rtl8723au_write32(priv, regs[0], 0x0b1b25a0);
 	} else {
@@ -2081,9 +2081,9 @@ static void rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv,
 	rtl8723au_write8(priv, regs[i], (u8)(backup[i] & ~BIT(5)));
 }
 
-static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
+static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv)
 {
-	u32 reg_eac, reg_e94, reg_e9c, reg_ea4;
+	u32 reg_eac, reg_e94, reg_e9c, reg_ea4, val32;
 	int result = 0;
 
 	/* path-A IQK setting */
@@ -2091,11 +2091,14 @@ static int rtl8xxxu_iqk_path_a(struct rtl8xxxu_priv *priv, bool configpathb)
 	rtl8723au_write32(priv, REG_RX_IQK_TONE_A, 0x10008c1f);
 	rtl8723au_write32(priv, REG_TX_IQK_PI_A, 0x82140102);
 
-	rtl8723au_write32(priv, REG_RX_IQK_PI_A, configpathb ? 0x28160202 :
-			  /*IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID)?0x28160202: */ 0x28160502);
+
+	val32 = (priv->rf_paths > 1) ? 0x28160202 :
+		/*IS_81xxC_VENDOR_UMC_B_CUT(pHalData->VersionID)?0x28160202: */
+		0x28160502;
+	rtl8723au_write32(priv, REG_RX_IQK_PI_A, val32);
 
 	/* path-B IQK setting */
-	if (configpathb) {
+	if (priv->rf_paths > 1) {
 		rtl8723au_write32(priv, REG_TX_IQK_TONE_B, 0x10008c22);
 		rtl8723au_write32(priv, REG_RX_IQK_TONE_B, 0x10008c22);
 		rtl8723au_write32(priv, REG_TX_IQK_PI_B, 0x82140102);
@@ -2137,7 +2140,7 @@ out:
 }
 
 static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
-				     int result[][8], int t, bool is_2t)
+				     int result[][8], int t)
 {
 	struct device *dev = &priv->udev->dev;
 	u32 i, val32;
@@ -2178,7 +2181,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 				   priv->bb_backup, RTL8XXXU_BB_REGS);
 	}
 
-	rtl8xxxu_path_adda_on(priv, adda_regs, true, is_2t);
+	rtl8xxxu_path_adda_on(priv, adda_regs, true);
 
 	if (t == 0) {
 		val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
@@ -2213,7 +2216,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	val32 &= ~BIT(10);
 	rtl8723au_write32(priv, REG_FPGA0_XB_RF_INT_OE, val32);
 
-	if (is_2t) {
+	if (priv->tx_paths > 1) {
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00010000);
 		rtl8723au_write32(priv, REG_FPGA0_XB_LSSI_PARM, 0x00010000);
 	}
@@ -2224,7 +2227,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	/* Page B init */
 	rtl8723au_write32(priv, REG_CONFIG_ANT_A, 0x00080000);
 
-	if (is_2t)
+	if (priv->tx_paths > 1)
 		rtl8723au_write32(priv, REG_CONFIG_ANT_B, 0x00080000);
 
 	/* IQ calibration setting */
@@ -2233,7 +2236,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 	rtl8723au_write32(priv, REG_RX_IQK, 0x01004800);
 
 	for (i = 0; i < retry; i++) {
-		path_a_ok = rtl8xxxu_iqk_path_a(priv, is_2t);
+		path_a_ok = rtl8xxxu_iqk_path_a(priv);
 		if (path_a_ok == 0x03) {
 			val32 = rtl8723au_read32(priv,
 						 REG_TX_POWER_BEFORE_IQK_A);
@@ -2266,11 +2269,11 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		dev_dbg(dev, "%s: Path A IQK failed!\n", __func__);
 
 #if 0
-	if (is_2t) {
+	if (priv->tx_paths > 1) {
 		rtl8xxxu_phy_path_a_standby(priv);
 
 		/* Turn Path B ADDA on */
-		rtl8xxxu_phy_path_adda_on(priv, adda_regs, false, is_2t);
+		rtl8xxxu_phy_path_adda_on(priv, adda_regs, false);
 
 		for (i = 0; i < retry; i++) {
 			path_b_ok = _PHY_PathB_IQK(priv);
@@ -2326,7 +2329,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		/* Restore RX initial gain */
 		rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
 
-		if (is_2t) {
+		if (priv->rx_paths > 1) {
 			rtl8723au_write32(priv, REG_FPGA0_XB_LSSI_PARM,
 					  0x00032ed3);
 		}
@@ -2358,7 +2361,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 	rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
 
 	for (i = 0; i < 3; i++) {
-		rtl8xxxu_phy_iqcalibrate(priv, result, i, false);
+		rtl8xxxu_phy_iqcalibrate(priv, result, i);
 
 		if (i == 1) {
 			simu = rtl8xxxu_simularity_compare(priv, result, 0, 1);
@@ -2439,7 +2442,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 {
 	u32 val32;
-	u32 rf_amode, lstf;
+	u32 rf_amode, rf_bmode = 0, lstf;
 
 	/* Check continuous TX and Packet TX */
 	lstf = rtl8723au_read32(priv, REG_OFDM1_LSTF);
@@ -2452,23 +2455,18 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 		/* Read original RF mode Path A */
 		rf_amode = rtl8723au_read_rfreg(priv, RF_A, RF6052_REG_AC);
 
-#if 0
-		/* Path-B */
-		if (is_2t)
-			rf_bmode = rtl8723au_read_rfreg(priv, RF_B,
-							RF6052_REG_AC);
-#endif
-
 		/* Set RF mode to standby Path A */
 		rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_AC,
 				      (rf_amode & 0xfff) | 0x10000);
 
-#if 0
 		/* Path-B */
-		if (is_2t)
-			rtl8723au_write_rfreg(priv, RF_B, RF6052_REG_AC,,
-					      (RF_Bmode & 0x8ffff) | 0x10000);
-#endif
+		if (priv->rf_paths > 1) {
+			rf_bmode = rtl8723au_read_rfreg(priv, RF_B,
+							RF6052_REG_AC);
+
+			rtl8723au_write_rfreg(priv, RF_B, RF6052_REG_AC,
+					      (rf_bmode & 0x8ffff) | 0x10000);
+		}
 	} else {
 		/*  Deal with Packet TX case */
 		/*  block all queues */
@@ -2488,12 +2486,10 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 		rtl8723au_write32(priv, REG_OFDM1_LSTF, lstf);
 		rtl8723au_write_rfreg(priv, RF_A, RF6052_REG_AC, rf_amode);
 
-#if 0
 		/* Path-B */
-		if (is_2t)
+		if (priv->rf_paths > 1)
 			rtl8723au_write_rfreg(priv, RF_B, RF6052_REG_AC,
 					      rf_bmode);
-#endif
 	} else /*  Deal with Packet TX case */
 		rtl8723au_write8(priv, REG_TXPAUSE, 0x00);
 }
