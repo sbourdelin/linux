@@ -1635,7 +1635,8 @@ static int rtl8xxxu_init_rf_regs(struct rtl8xxxu_priv *priv,
 	return 0;
 }
 
-static int rtl8xxxu_init_phy_rf(struct rtl8xxxu_priv *priv)
+static int rtl8xxxu_init_phy_rf(struct rtl8xxxu_priv *priv,
+				enum rtl8xxxu_rfpath path)
 {
 	u32 val32;
 	u16 val16, rfsi_rfenv;
@@ -1671,7 +1672,7 @@ static int rtl8xxxu_init_phy_rf(struct rtl8xxxu_priv *priv)
 	udelay(1);
 
 	rtl8xxxu_init_rf_regs(priv,
-			      rtl8723au_radioa_rf6052_1t_init_table, RF_A);
+			      rtl8723au_radioa_rf6052_1t_init_table, path);
 
 	/* For path B, use XB */
 	val16 = rtl8723au_read16(priv, REG_FPGA0_XA_RF_SW_CTRL);
@@ -2914,7 +2915,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
-	ret = rtl8xxxu_init_phy_rf(priv);
+	ret = rtl8xxxu_init_phy_rf(priv, RF_A);
 	if (ret)
 		goto exit;
 
