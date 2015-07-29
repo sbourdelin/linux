@@ -3089,10 +3089,6 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	/* Disable BAR - not sure if this has any effect on USB */
 	rtl8723au_write32(priv, REG_BAR_MODE_CTRL, 0x0201ffff);
 
-#if 0
-	if (priv->wifi_spec)
-		rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
-#endif
 	rtl8723au_write16(priv, REG_FAST_EDCA_CTRL, 0);
 
 #if 0
@@ -3258,10 +3254,6 @@ static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	u8 val8;
-
-#if 0
-	dev_dbg(&priv->udev->dev, "%s\n", __func__);
-#endif
 
 	val8 = rtl8723au_read8(priv, REG_BEACON_CTRL);
 	val8 &= ~BEACON_DISABLE_TSF_UPDATE;
