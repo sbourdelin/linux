@@ -581,10 +581,7 @@ static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv,
 		val32 = rtl8723au_read32(priv, rtl8xxxu_rfregs[path].hssiparm2);
 	else
 		val32 = hssia;
-	/*
-	 * For path B it seems we should be reading REG_FPGA0_XB_HSSI_PARM1
-	 * into val32
-	 */
+
 	val32 &= ~FPGA0_HSSI_PARM2_ADDR_MASK;
 	val32 |= (reg << FPGA0_HSSI_PARM2_ADDR_SHIFT);
 	val32 |= FPGA0_HSSI_PARM2_EDGE_READ;
@@ -628,7 +625,7 @@ static int rtl8723au_write_rfreg(struct rtl8xxxu_priv *priv,
 	dataaddr = (reg << FPGA0_LSSI_PARM_ADDR_SHIFT) | data;
 
 	/* Use XB for path B */
-	ret = rtl8723au_write32(priv, REG_FPGA0_XA_LSSI_PARM, dataaddr);
+	ret = rtl8723au_write32(priv, rtl8xxxu_rfregs[path].lssiparm, dataaddr);
 	if (ret != sizeof(dataaddr))
 		retval = -EIO;
 	else
