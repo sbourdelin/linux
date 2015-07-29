@@ -478,8 +478,10 @@ struct rtl8xxxu_priv {
 	unsigned int pipe_out[TXDESC_QUEUE_MAX];
 	u8 out_ep[RTL8XXXU_OUT_ENDPOINTS];
 	u8 path_a_ig_value;
-	int ep_tx_count;
-	int rf_paths;
+	u8 ep_tx_count;
+	u8 rf_paths;
+	u8 rx_paths;
+	u8 tx_paths;
 	u32 rf_mode_ag[2];
 	u32 rege94;
 	u32 rege9c;

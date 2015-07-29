@@ -1109,6 +1109,8 @@ static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 
 	/* The rtl8192 presumably can have 2 */
 	priv->rf_paths = 1;
+	priv->rx_paths = 1;
+	priv->tx_paths = 1;
 
 	val16 = rtl8723au_read16(priv, REG_NORMAL_SIE_EP_TX);
 	if (val16 & NORMAL_SIE_EP_TX_HIGH_MASK) {
