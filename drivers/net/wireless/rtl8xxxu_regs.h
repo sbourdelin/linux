@@ -727,7 +727,16 @@
 #define REG_CONFIG_ANT_B		0x0b6c
 
 #define REG_OFDM0_TRX_PATH_ENABLE	0x0c04
-#define OFDM0_RF_PATH_RX_MASK		0x0f
+#define OFDM_RF_PATH_RX_MASK		0x0f
+#define OFDM_RF_PATH_RX_A		BIT(0)
+#define OFDM_RF_PATH_RX_B		BIT(1)
+#define OFDM_RF_PATH_RX_C		BIT(2)
+#define OFDM_RF_PATH_RX_D		BIT(3)
+#define OFDM_RF_PATH_TX_MASK		0xf0
+#define OFDM_RF_PATH_TX_A		BIT(4)
+#define OFDM_RF_PATH_TX_B		BIT(5)
+#define OFDM_RF_PATH_TX_C		BIT(6)
+#define OFDM_RF_PATH_TX_D		BIT(7)
 
 #define REG_OFDM0_TR_MUX_PAR		0x0c08
 

@@ -683,8 +683,8 @@ static void rtl8723a_enable_rf(struct rtl8xxxu_priv *priv)
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_PARM, val32);
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_TRX_PATH_ENABLE);
-	val32 &= ~(BIT(4) | BIT(5) | BIT(6) | BIT(7));
-	val32 |= BIT(4);
+	val32 &= ~OFDM_RF_PATH_TX_MASK;
+	val32 |= OFDM_RF_PATH_TX_A;
 	rtl8723au_write32(priv, REG_OFDM0_TRX_PATH_ENABLE, val32);
 
 	val32 = rtl8723au_read32(priv, REG_FPGA0_RF_MODE);
@@ -718,9 +718,9 @@ static void rtl8723a_disable_rf(struct rtl8xxxu_priv *priv)
 	val32 &= ~(BIT(3) | BIT(4) | BIT(5));
 	rtl8723au_write32(priv, REG_FPGA0_XA_RF_PARM, val32);
 
-	/* Disable all packet detection for all four paths */
+	/* Disable TX for four paths */
 	val32 = rtl8723au_read32(priv, REG_OFDM0_TRX_PATH_ENABLE);
-	val32 &= ~(BIT(4) | BIT(5) | BIT(6) | BIT(7));
+	val32 &= ~OFDM_RF_PATH_TX_MASK;
 	rtl8723au_write32(priv, REG_OFDM0_TRX_PATH_ENABLE, val32);
 
 	/* Enable power saving */
@@ -3164,7 +3164,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 		priv->path_a_hi_power = 1;
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_TRX_PATH_ENABLE);
-	priv->path_a_rf_paths = val32 & OFDM0_RF_PATH_RX_MASK;
+	priv->path_a_rf_paths = val32 & OFDM_RF_PATH_RX_MASK;
 
 	val32 = rtl8723au_read32(priv, REG_OFDM0_XA_AGC_CORE1);
 	priv->path_a_ig_value = val32 & OFDM0_X_AGC_CORE1_IGI_MASK;
