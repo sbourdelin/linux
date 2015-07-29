@@ -2250,7 +2250,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		rtl8xxxu_phy_path_a_standby(priv);
 
 		/* Turn Path B ADDA on */
-		rtl8xxxu_phy_path_adda_on(priv, ADDA_REG, false, is_2t);
+		rtl8xxxu_phy_path_adda_on(priv, adda_regs, false, is_2t);
 
 		for (i = 0; i < retry; i++) {
 			path_b_ok = _PHY_PathB_IQK(priv);
