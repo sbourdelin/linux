@@ -3258,19 +3258,6 @@ static void rtl8xxxu_cam_write(struct rtl8xxxu_priv *priv,
 static void rtl8xxxu_sw_scan_start(struct ieee80211_hw *hw,
 				   struct ieee80211_vif *vif, const u8 *mac)
 {
-#if 0
-	struct rtl8xxxu_priv *priv = hw->priv;
-	u32 val32;
-
-	val32 = rtl8723au_read32(priv, REG_RCR);
-	val32 &= ~(RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON);
-	rtl8723au_write32(priv, REG_RCR, val32);
-
-	rtl8723au_write8(priv, REG_BEACON_CTRL, BEACON_ATIM |
-			 BEACON_FUNCTION_ENABLE | BEACON_DISABLE_TSF_UPDATE);
-
-	dev_dbg(&priv->udev->dev, "%s\n", __func__);
-#endif
 }
 
 static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
