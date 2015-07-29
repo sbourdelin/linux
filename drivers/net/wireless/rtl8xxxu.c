@@ -406,6 +406,25 @@ static struct rtl8xxxu_rfregval rtl8723au_radioa_rf6052_1t_init_table[] = {
 	{0xff, 0xffffffff}
 };
 
+static struct rtl8xxxu_rfregs rtl8xxxu_rfregs[] = {
+	{	/* RF_A */
+		.hssiparm1 = REG_FPGA0_XA_HSSI_PARM1,
+		.hssiparm2 = REG_FPGA0_XA_HSSI_PARM2,
+		.lssiparm = REG_FPGA0_XA_LSSI_PARM,
+		.hspiread = REG_HSPI_XA_READBACK,
+		.lssiread = REG_FPGA0_XA_LSSI_READBACK,
+		.rf_sw_ctrl = REG_FPGA0_XA_RF_SW_CTRL,
+	},
+	{	/* RF_B */
+		.hssiparm1 = REG_FPGA0_XB_HSSI_PARM1,
+		.hssiparm2 = REG_FPGA0_XB_HSSI_PARM2,
+		.lssiparm = REG_FPGA0_XB_LSSI_PARM,
+		.hspiread = REG_HSPI_XB_READBACK,
+		.lssiread = REG_FPGA0_XB_LSSI_READBACK,
+		.rf_sw_ctrl = REG_FPGA0_XB_RF_SW_CTRL,
+	},
+};
+
 static const u32 rtl8723au_iqk_phy_iq_bb_reg[RTL8XXXU_BB_REGS] = {
 	REG_OFDM0_XA_RX_IQ_IMBALANCE,
 	REG_OFDM0_XB_RX_IQ_IMBALANCE,
@@ -558,32 +577,34 @@ static u32 rtl8723au_read_rfreg(struct rtl8xxxu_priv *priv,
 	u32 hssia, val32, retval;
 
 	hssia = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM2);
+	if (path != RF_A)
+		val32 = rtl8723au_read32(priv, rtl8xxxu_rfregs[path].hssiparm2);
+	else
+		val32 = hssia;
 	/*
 	 * For path B it seems we should be reading REG_FPGA0_XB_HSSI_PARM1
 	 * into val32
 	 */
-	val32 = hssia;
 	val32 &= ~FPGA0_HSSI_PARM2_ADDR_MASK;
-	val32 |= (reg << FPGA0_HSSI_PARM2_ADDR_SHIFT) |
-		FPGA0_HSSI_PARM2_EDGE_READ;
+	val32 |= (reg << FPGA0_HSSI_PARM2_ADDR_SHIFT);
+	val32 |= FPGA0_HSSI_PARM2_EDGE_READ;
 	hssia &= ~FPGA0_HSSI_PARM2_EDGE_READ;
 	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, hssia);
 
 	udelay(10);
-	/* Here use XB for path B */
-	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, val32);
+
+	rtl8723au_write32(priv, rtl8xxxu_rfregs[path].hssiparm2, val32);
 	udelay(100);
 
 	hssia |= FPGA0_HSSI_PARM2_EDGE_READ;
 	rtl8723au_write32(priv, REG_FPGA0_XA_HSSI_PARM2, hssia);
 	udelay(10);
 
-	/* Use XB for path B */
-	val32 = rtl8723au_read32(priv, REG_FPGA0_XA_HSSI_PARM1);
+	val32 = rtl8723au_read32(priv, rtl8xxxu_rfregs[path].hssiparm1);
 	if (val32 & FPGA0_HSSI_PARM1_PI)
-		retval = rtl8723au_read32(priv, REG_HSPI_XA_READBACK);
+		retval = rtl8723au_read32(priv, rtl8xxxu_rfregs[path].hspiread);
 	else
-		retval = rtl8723au_read32(priv, REG_FPGA0_XA_LSSI_READBACK);
+		retval = rtl8723au_read32(priv, rtl8xxxu_rfregs[path].lssiread);
 
 	retval &= 0xfffff;
 

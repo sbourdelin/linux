@@ -408,8 +408,17 @@ struct rtl8xxxu_rfregval {
 };
 
 enum rtl8xxxu_rfpath {
-	RF_A,
-	RF_B,
+	RF_A = 0,
+	RF_B = 1,
+};
+
+struct rtl8xxxu_rfregs {
+	u16 hssiparm1;
+	u16 hssiparm2;
+	u16 lssiparm;
+	u16 hspiread;
+	u16 lssiread;
+	u16 rf_sw_ctrl;
 };
 
 #define H2C_MAX_MBOX			4
