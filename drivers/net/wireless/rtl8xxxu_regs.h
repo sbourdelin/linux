@@ -192,6 +192,8 @@
 #define REG_PCIE_MIO_INTF		0x00e4
 #define REG_PCIE_MIO_INTD		0x00e8
 #define REG_HPON_FSM			0x00ec
+#define  HPON_FSM_BONDING_MASK		(BIT(22) | BIT(23))
+#define  HPON_FSM_BONDING_1T2R		BIT(22)
 #define REG_SYS_CFG			0x00f0
 #define  SYS_CFG_XCLK_VLD		BIT(0)
 #define  SYS_CFG_ACLK_VLD		BIT(1)

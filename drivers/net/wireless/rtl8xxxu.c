@@ -1060,16 +1060,54 @@ rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 	rtl8xxxu_write16(priv, REG_SPEC_SIFS, val16);
 }
 
-static int rtl8723au_identify_chip(struct rtl8xxxu_priv *priv)
+static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 {
 	struct device *dev = &priv->udev->dev;
-	u32 val32;
+	u32 val32, bonding;
 	u16 val16;
 	char *cut;
+	char *chip;
+	int retval = -ENODEV;
 
 	val32 = rtl8xxxu_read32(priv, REG_SYS_CFG);
 	priv->chip_cut = (val32 & SYS_CFG_CHIP_VERSION_MASK) >>
 		SYS_CFG_CHIP_VERSION_SHIFT;
+	if (val32 & SYS_CFG_TRP_VAUX_EN) {
+		dev_info(dev, "RTL8192cu unsupported test chip\n");
+		return -ENOTSUPP;
+	}
+
+	if (val32 & SYS_CFG_BT_FUNC) {
+		chip = "8723AU";
+		priv->rf_paths = 1;
+		priv->rx_paths = 1;
+		priv->tx_paths = 1;
+
+		retval = 0;
+	} else if (val32 & SYS_CFG_TYPE_ID) {
+		bonding = rtl8xxxu_read32(priv, REG_HPON_FSM);
+		bonding &= HPON_FSM_BONDING_MASK;
+		if (bonding == HPON_FSM_BONDING_1T2R) {
+			chip = "8191SU";
+			priv->rf_paths = 2;
+			priv->rx_paths = 2;
+			priv->tx_paths = 1;
+		} else {
+			chip = "8192SU";
+			priv->rf_paths = 2;
+			priv->rx_paths = 2;
+			priv->tx_paths = 2;
+		}
+	} else {
+		chip = "8188CUS";
+		priv->rf_paths = 1;
+		priv->rx_paths = 1;
+		priv->tx_paths = 1;
+	}
+
+	if (val32 & SYS_CFG_VENDOR_ID)
+		priv->vendor_umc = 1;
+
 	switch (priv->chip_cut) {
 	case 0:
 		cut = "A";
@@ -1092,14 +1130,6 @@ static int rtl8723au_identify_chip(struct rtl8xxxu_priv *priv)
 	if (val32 & MULTI_GPS_FUNC_EN)
 		priv->has_gps = 1;
 
-	if (val32 & SYS_CFG_VENDOR_ID)
-		priv->vendor_umc = 1;
-
-	/* The rtl8192 presumably can have 2 */
-	priv->rf_paths = 1;
-	priv->rx_paths = 1;
-	priv->tx_paths = 1;
-
 	val16 = rtl8xxxu_read16(priv, REG_NORMAL_SIE_EP_TX);
 	if (val16 & NORMAL_SIE_EP_TX_HIGH_MASK) {
 		priv->ep_tx_high_queue = 1;
@@ -1116,12 +1146,18 @@ static int rtl8723au_identify_chip(struct rtl8xxxu_priv *priv)
 		priv->ep_tx_count++;
 	}
 
-	dev_info(dev, "RTL8723au rev %s, features: WiFi=%i, BT=%i, GPS=%i\n",
-		 cut, priv->has_wifi, priv->has_bluetooth, priv->has_gps);
+	dev_info(dev,
+		 "RTL%s rev %s (%s) %iT%iR, TX queues %i, WiFi=%i, BT=%i, GPS=%i\n",
+		 chip, cut, priv->vendor_umc ? "UMC" : "TSMC",
+		 priv->tx_paths, priv->rx_paths, priv->ep_tx_count,
+		 priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
-	dev_info(dev, "RTL8723au number of TX queues: %i\n", priv->ep_tx_count);
+	/* XXX - hard-code to single RX/TX path for now */
+	priv->rf_paths = 1;
+	priv->rx_paths = 1;
+	priv->tx_paths = 1;
 
-	return 0;
+	return retval;
 }
 
 static int
@@ -4471,7 +4507,11 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 }
 
 static struct rtl8xxxu_fileops rtl8723au_fops = {
-	.identify = rtl8723au_identify_chip,
+	.identify = rtl8xxxu_identify_chip,
+};
+
+static struct rtl8xxxu_fileops rtl8192cu_fops = {
+	.identify = rtl8xxxu_identify_chip,
 };
 
 static struct usb_device_id dev_table[] = {
@@ -4481,6 +4521,8 @@ static struct usb_device_id dev_table[] = {
 	.driver_info = (unsigned long)&rtl8723au_fops},
 {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x0724, 0xff, 0xff, 0xff),
 	.driver_info = (unsigned long)&rtl8723au_fops},
+{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8176, 0xff, 0xff, 0xff),
+	.driver_info = (unsigned long)&rtl8192cu_fops},
 { }
 };
 
