@@ -53,18 +53,6 @@ MODULE_PARM_DESC(debug, "Set debug mask");
 /* Minimum IEEE80211_MAX_FRAME_LEN */
 #define RTL_RX_BUFFER_SIZE		IEEE80211_MAX_FRAME_LEN
 
-static struct usb_device_id dev_table[] = {
-	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8724,
-				       0xff, 0xff, 0xff)},
-	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x1724,
-				       0xff, 0xff, 0xff)},
-	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x0724,
-				       0xff, 0xff, 0xff)},
-	{ }
-};
-
-MODULE_DEVICE_TABLE(usb, dev_table);
-
 static int rtl8xxxu_submit_rx_urb(struct rtl8xxxu_priv *priv,
 				  struct rtl8xxxu_rx_urb *rx_urb);
 
@@ -1072,7 +1060,7 @@ rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 	rtl8723au_write16(priv, REG_SPEC_SIFS, val16);
 }
 
-static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
+static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 {
 	struct device *dev = &priv->udev->dev;
 	u32 val32;
@@ -1132,6 +1120,8 @@ static void rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
 		 cut, priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
 	dev_info(dev, "RTL8723au number of TX queues: %i\n", priv->ep_tx_count);
+
+	return 0;
 }
 
 static int
@@ -4369,6 +4359,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	struct ieee80211_supported_band *sband;
+	struct rtl8xxxu_fileops *fops;
 	int ret = 0;
 
 	udev = usb_get_dev(interface_to_usbdev(interface));
@@ -4386,12 +4377,18 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	mutex_init(&priv->h2c_mutex);
 
 	usb_set_intfdata(interface, hw);
+	fops = (struct rtl8xxxu_fileops *)id->driver_info;
 
 	ret = rtl8xxxu_parse_usb(priv, interface);
 	if (ret)
 		goto exit;
 
-	rtl8xxxu_8723au_identify_chip(priv);
+	ret = fops->identify(priv);
+	if (ret) {
+		dev_err(&udev->dev, "Fatal - failed to identify chip\n");
+		goto exit;
+	}
+
 	ret = rtl8xxxu_read_efuse(priv);
 	if (ret) {
 		dev_err(&udev->dev, "Fatal - failed to read EFuse\n");
@@ -4477,6 +4474,20 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 	wiphy_info(hw->wiphy, "disconnecting\n");
 }
 
+static struct rtl8xxxu_fileops rtl8723au_fops = {
+	.identify = rtl8xxxu_8723au_identify_chip,
+};
+
+static struct usb_device_id dev_table[] = {
+{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8724, 0xff, 0xff, 0xff),
+	.driver_info = (unsigned long)&rtl8723au_fops},
+{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x1724, 0xff, 0xff, 0xff),
+	.driver_info = (unsigned long)&rtl8723au_fops},
+{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x0724, 0xff, 0xff, 0xff),
+	.driver_info = (unsigned long)&rtl8723au_fops},
+{ }
+};
+
 static struct usb_driver rtl8xxxu_driver = {
 	.name = DRIVER_NAME,
 	.probe = rtl8xxxu_probe,
@@ -4500,6 +4511,9 @@ static void __exit rtl8xxxu_module_exit(void)
 {
 	usb_deregister(&rtl8xxxu_driver);
 }
+
+
+MODULE_DEVICE_TABLE(usb, dev_table);
 
 module_init(rtl8xxxu_module_init);
 module_exit(rtl8xxxu_module_exit);

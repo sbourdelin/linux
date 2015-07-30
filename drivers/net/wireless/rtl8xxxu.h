@@ -523,3 +523,7 @@ struct rtl8xxxu_rx_urb {
 struct rtl8xxxu_sta_priv {
 	bool short_preamble;
 };
+
+struct rtl8xxxu_fileops {
+	int (*identify) (struct rtl8xxxu_priv *priv);
+};
