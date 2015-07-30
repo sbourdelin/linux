@@ -1060,7 +1060,7 @@ rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 	rtl8723au_write16(priv, REG_SPEC_SIFS, val16);
 }
 
-static int rtl8xxxu_8723au_identify_chip(struct rtl8xxxu_priv *priv)
+static int rtl8723au_identify_chip(struct rtl8xxxu_priv *priv)
 {
 	struct device *dev = &priv->udev->dev;
 	u32 val32;
@@ -4475,7 +4475,7 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 }
 
 static struct rtl8xxxu_fileops rtl8723au_fops = {
-	.identify = rtl8xxxu_8723au_identify_chip,
+	.identify = rtl8723au_identify_chip,
 };
 
 static struct usb_device_id dev_table[] = {
