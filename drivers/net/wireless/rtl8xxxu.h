@@ -392,6 +392,50 @@ struct rtl8723au_efuse {
 	u8 device_name[0x29];		/* 0xd7 */
 };
 
+struct rtl8192cu_efuse {
+	__le16 rtl_id;
+	__le16 hpon;
+	u8 res0[2];
+	__le16 clk;
+	__le16 testr;
+	__le16 vid;
+	__le16 did;
+	__le16 svid;
+	__le16 smid;						/* 0x10 */
+	u8 res1[4];
+	u8 mac_addr[ETH_ALEN];					/* 0x16 */
+	u8 res2[2];
+	u8 vendor_name[7];
+	u8 res3[3];
+	u8 device_name[0x14];					/* 0x28 */
+	u8 res4[0x1e];						/* 0x3c */
+	u8 cck_tx_power_index_A[3];				/* 0x5a */
+	u8 cck_tx_power_index_B[3];
+	u8 ht40_1s_tx_power_index_A[3];				/* 0x60 */
+	u8 ht40_1s_tx_power_index_B[3];
+	u8 ht40_2s_tx_power_index_diff[3];
+	/*
+	 * The following entries are half-bytes split as:
+	 * bits 0-3: path A, bits 4-7: path B, all values 4 bits signed
+	 */
+	struct rtl8723au_idx ht20_tx_power_index_diff[3];	/* 0x69 */
+	u8 res5[1];						/* 0x6b */
+	struct rtl8723au_idx ofdm_tx_power_index_diff[3];
+	struct rtl8723au_idx ht40_max_power_offset[3];		/* 0x6f */
+	struct rtl8723au_idx ht20_max_power_offset[3];
+	u8 channel_plan;					/* 0x75 */
+	u8 tssi_a;
+	u8 tssi_b;
+	u8 thermal_meter;	/* xtal_k */			/* 0x78 */
+	u8 rf_regulatory;
+	u8 rf_option_2;
+	u8 rf_option_3;
+	u8 rf_option_4;
+	u8 res6[1];						/* 0x7d */
+	u8 version;
+	u8 customer_id;
+};
+
 struct rtl8xxxu_reg8val {
 	u16 reg;
 	u8 val;
@@ -458,6 +502,7 @@ struct rtl8xxxu_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	u8 mac_addr[ETH_ALEN];
+	char chip_name[8];
 	u32 chip_cut:4;
 	u32 rom_rev:4;
 	u32 has_wifi:1;
@@ -505,6 +550,7 @@ struct rtl8xxxu_priv {
 	union {
 		u8 raw[EFUSE_MAP_LEN_8723A];
 		struct rtl8723au_efuse efuse;
+		struct rtl8192cu_efuse efuse8192;
 	} efuse_wifi;
 	u32 adda_backup[RTL8XXXU_ADDA_REGS];
 	u32 mac_backup[RTL8XXXU_MAC_REGS];
@@ -525,5 +571,5 @@ struct rtl8xxxu_sta_priv {
 };
 
 struct rtl8xxxu_fileops {
-	int (*identify) (struct rtl8xxxu_priv *priv);
+	int (*parse_efuse) (struct rtl8xxxu_priv *priv);
 };

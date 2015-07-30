@@ -1066,40 +1066,36 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 	u32 val32, bonding;
 	u16 val16;
 	char *cut;
-	char *chip;
-	int retval = -ENODEV;
 
 	val32 = rtl8xxxu_read32(priv, REG_SYS_CFG);
 	priv->chip_cut = (val32 & SYS_CFG_CHIP_VERSION_MASK) >>
 		SYS_CFG_CHIP_VERSION_SHIFT;
 	if (val32 & SYS_CFG_TRP_VAUX_EN) {
-		dev_info(dev, "RTL8192cu unsupported test chip\n");
+		dev_info(dev, "Unsupported test chip\n");
 		return -ENOTSUPP;
 	}
 
 	if (val32 & SYS_CFG_BT_FUNC) {
-		chip = "8723AU";
+		sprintf(priv->chip_name, "8723AU");
 		priv->rf_paths = 1;
 		priv->rx_paths = 1;
 		priv->tx_paths = 1;
-
-		retval = 0;
 	} else if (val32 & SYS_CFG_TYPE_ID) {
 		bonding = rtl8xxxu_read32(priv, REG_HPON_FSM);
 		bonding &= HPON_FSM_BONDING_MASK;
 		if (bonding == HPON_FSM_BONDING_1T2R) {
-			chip = "8191SU";
+			sprintf(priv->chip_name, "8191SU");
 			priv->rf_paths = 2;
 			priv->rx_paths = 2;
 			priv->tx_paths = 1;
 		} else {
-			chip = "8192SU";
+			sprintf(priv->chip_name, "8192SU");
 			priv->rf_paths = 2;
 			priv->rx_paths = 2;
 			priv->tx_paths = 2;
 		}
 	} else {
-		chip = "8188CUS";
+		sprintf(priv->chip_name, "8188CUS");
 		priv->rf_paths = 1;
 		priv->rx_paths = 1;
 		priv->tx_paths = 1;
@@ -1148,7 +1144,7 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 
 	dev_info(dev,
 		 "RTL%s rev %s (%s) %iT%iR, TX queues %i, WiFi=%i, BT=%i, GPS=%i\n",
-		 chip, cut, priv->vendor_umc ? "UMC" : "TSMC",
+		 priv->chip_name, cut, priv->vendor_umc ? "UMC" : "TSMC",
 		 priv->tx_paths, priv->rx_paths, priv->ep_tx_count,
 		 priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
@@ -1157,7 +1153,42 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 	priv->rx_paths = 1;
 	priv->tx_paths = 1;
 
-	return retval;
+	return 0;
+}
+
+static int rtl8723au_parse_efuse(struct rtl8xxxu_priv *priv)
+{
+	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
+
+	dev_info(&priv->udev->dev, "Vendor: %.7s\n",
+		 priv->efuse_wifi.efuse.vendor_name);
+	dev_info(&priv->udev->dev, "Product: %.41s\n",
+		 priv->efuse_wifi.efuse.device_name);
+	return 0;
+}
+
+static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
+{
+	int i;
+
+	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse8192.mac_addr);
+
+	dev_info(&priv->udev->dev, "RTL%s MAC %pM\n",
+		 priv->chip_name, priv->mac_addr);
+	dev_info(&priv->udev->dev, "Vendor: %.7s\n",
+		 priv->efuse_wifi.efuse8192.vendor_name);
+	dev_info(&priv->udev->dev, "Product: %.20s\n",
+		 priv->efuse_wifi.efuse8192.device_name);
+
+	pr_info("%s\n", __func__);
+	for (i = 0; i < EFUSE_MAP_LEN_8723A; i++) {
+		if ((i & 7) == 0)
+			pr_info("%02x: ", i);
+		printk("%02x ", priv->efuse_wifi.raw[i]);
+		if ((i & 7) == 7)
+			printk("\n");
+	}
+	return -ENOTSUPP;
 }
 
 static int
@@ -4415,7 +4446,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	if (ret)
 		goto exit;
 
-	ret = fops->identify(priv);
+	ret = rtl8xxxu_identify_chip(priv);
 	if (ret) {
 		dev_err(&udev->dev, "Fatal - failed to identify chip\n");
 		goto exit;
@@ -4426,10 +4457,15 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		dev_err(&udev->dev, "Fatal - failed to read EFuse\n");
 		goto exit;
 	}
-	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
 
-	dev_info(&udev->dev, "RTL8723au MAC %pM\n",
-		 priv->efuse_wifi.efuse.mac_addr);
+	ret = fops->parse_efuse(priv);
+	if (ret) {
+		dev_err(&udev->dev, "Fatal - failed to parse EFuse\n");
+		goto exit;
+	}
+
+	dev_info(&udev->dev, "RTL%s MAC %pM\n",
+		 priv->chip_name, priv->mac_addr);
 
 	rtl8xxxu_load_firmware(priv);
 
@@ -4507,11 +4543,11 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 }
 
 static struct rtl8xxxu_fileops rtl8723au_fops = {
-	.identify = rtl8xxxu_identify_chip,
+	.parse_efuse = rtl8723au_parse_efuse,
 };
 
 static struct rtl8xxxu_fileops rtl8192cu_fops = {
-	.identify = rtl8xxxu_identify_chip,
+	.parse_efuse = rtl8192cu_parse_efuse,
 };
 
 static struct usb_device_id dev_table[] = {
