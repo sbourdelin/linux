@@ -835,7 +835,7 @@
 #define REG_SLEEP			0x0ee0
 #define REG_PMPD_ANAEN			0x0eec
 
-#define REG_8723A_FW_START_ADDRESS	0x1000
+#define REG_FW_START_ADDRESS		0x1000
 
 #define REG_USB_INFO			0xfe17
 #define REG_USB_HIMR			0xfe38

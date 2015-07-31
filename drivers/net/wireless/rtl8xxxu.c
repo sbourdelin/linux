@@ -1428,7 +1428,7 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 		val8 = rtl8xxxu_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
 		rtl8xxxu_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
 
-		ret = rtl8xxxu_writeN(priv, REG_8723A_FW_START_ADDRESS,
+		ret = rtl8xxxu_writeN(priv, REG_FW_START_ADDRESS,
 				      fwptr, RTL_FW_PAGE_SIZE);
 		if (ret != RTL_FW_PAGE_SIZE) {
 			ret = -EAGAIN;
@@ -1441,7 +1441,7 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 	if (remainder) {
 		val8 = rtl8xxxu_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
 		rtl8xxxu_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
-		ret = rtl8xxxu_writeN(priv, REG_8723A_FW_START_ADDRESS,
+		ret = rtl8xxxu_writeN(priv, REG_FW_START_ADDRESS,
 				      fwptr, remainder);
 		if (ret != remainder) {
 			ret = -EAGAIN;
