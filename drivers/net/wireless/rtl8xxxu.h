@@ -556,6 +556,7 @@ struct rtl8xxxu_priv {
 	u32 mac_backup[RTL8XXXU_MAC_REGS];
 	u32 bb_backup[RTL8XXXU_BB_REGS];
 	u32 bb_recovery_backup[RTL8XXXU_BB_REGS];
+	u16 chip;
 	u8 pi_enabled:1;
 	u8 iqk_initialized:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
@@ -572,4 +573,5 @@ struct rtl8xxxu_sta_priv {
 
 struct rtl8xxxu_fileops {
 	int (*parse_efuse) (struct rtl8xxxu_priv *priv);
+	int (*load_firmware) (struct rtl8xxxu_priv *priv);
 };

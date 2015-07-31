@@ -45,6 +45,9 @@ MODULE_LICENSE("GPL");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_A.bin");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B.bin");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B_NoBT.bin");
+MODULE_FIRMWARE("rtlwifi/rtl8192cufw_A.bin");
+MODULE_FIRMWARE("rtlwifi/rtl8192cufw_B.bin");
+MODULE_FIRMWARE("rtlwifi/rtl8192cufw_TMSC.bin");
 
 module_param_named(debug, rtl8xxxu_debug, int, 0600);
 MODULE_PARM_DESC(debug, "Set debug mask");
@@ -1080,6 +1083,7 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 		priv->rf_paths = 1;
 		priv->rx_paths = 1;
 		priv->tx_paths = 1;
+		priv->chip = 8723;
 	} else if (val32 & SYS_CFG_TYPE_ID) {
 		bonding = rtl8xxxu_read32(priv, REG_HPON_FSM);
 		bonding &= HPON_FSM_BONDING_MASK;
@@ -1088,17 +1092,20 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 			priv->rf_paths = 2;
 			priv->rx_paths = 2;
 			priv->tx_paths = 1;
+			priv->chip = 8191;
 		} else {
 			sprintf(priv->chip_name, "8192SU");
 			priv->rf_paths = 2;
 			priv->rx_paths = 2;
 			priv->tx_paths = 2;
+			priv->chip = 8192;
 		}
 	} else {
 		sprintf(priv->chip_name, "8188CUS");
 		priv->rf_paths = 1;
 		priv->rx_paths = 1;
 		priv->tx_paths = 1;
+		priv->chip = 8188;
 	}
 
 	if (val32 & SYS_CFG_VENDOR_ID)
@@ -1188,7 +1195,7 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 		if ((i & 7) == 7)
 			printk("\n");
 	}
-	return -ENOTSUPP;
+	return 0;
 }
 
 static int
@@ -1459,28 +1466,12 @@ fw_abort:
 	return ret;
 }
 
-static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
+static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv, char *fw_name)
 {
 	struct device *dev = &priv->udev->dev;
 	const struct firmware *fw;
-	char *fw_name;
 	int ret = 0;
 	u16 signature;
-
-	switch (priv->chip_cut) {
-	case 0:
-		fw_name = "rtlwifi/rtl8723aufw_A.bin";
-		break;
-	case 1:
-		if (priv->enable_bluetooth)
-			fw_name = "rtlwifi/rtl8723aufw_B.bin";
-		else
-			fw_name = "rtlwifi/rtl8723aufw_B_NoBT.bin";
-
-		break;
-	default:
-		return -EINVAL;
-	}
 
 	dev_info(dev, "%s: Loading firmware %s\n", DRIVER_NAME, fw_name);
 	if (request_firmware(&fw, fw_name, &priv->udev->dev)) {
@@ -1515,6 +1506,49 @@ static int rtl8xxxu_load_firmware(struct rtl8xxxu_priv *priv)
 
 exit:
 	release_firmware(fw);
+	return ret;
+}
+
+static int rtl8723au_load_firmware(struct rtl8xxxu_priv *priv)
+{
+	char *fw_name;
+	int ret;
+
+	switch (priv->chip_cut) {
+	case 0:
+		fw_name = "rtlwifi/rtl8723aufw_A.bin";
+		break;
+	case 1:
+		if (priv->enable_bluetooth)
+			fw_name = "rtlwifi/rtl8723aufw_B.bin";
+		else
+			fw_name = "rtlwifi/rtl8723aufw_B_NoBT.bin";
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ret = rtl8xxxu_load_firmware(priv, fw_name);
+	return ret;
+}
+
+static int rtl8192cu_load_firmware(struct rtl8xxxu_priv *priv)
+{
+	char *fw_name;
+	int ret;
+
+	if (!priv->vendor_umc)
+		fw_name = "rtlwifi/rtl8192cufw_TMSC.bin";
+	else if (priv->chip_cut || priv->chip == 8192)
+		fw_name = "rtlwifi/rtl8192cufw_B.bin";
+	else
+		fw_name = "rtlwifi/rtl8192cufw_A.bin";
+
+	ret = rtl8xxxu_load_firmware(priv, fw_name);
+
+	pr_info("load_firmware returns %i\n", ret);
+	ret = -EINVAL;
 	return ret;
 }
 
@@ -4467,7 +4501,11 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	dev_info(&udev->dev, "RTL%s MAC %pM\n",
 		 priv->chip_name, priv->mac_addr);
 
-	rtl8xxxu_load_firmware(priv);
+	ret = fops->load_firmware(priv);
+	if (ret) {
+		dev_err(&udev->dev, "Fatal - failed to load firmware\n");
+		goto exit;
+	}
 
 	ret = rtl8xxxu_init_device(hw);
 
@@ -4544,10 +4582,12 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 
 static struct rtl8xxxu_fileops rtl8723au_fops = {
 	.parse_efuse = rtl8723au_parse_efuse,
+	.load_firmware = rtl8723au_load_firmware,
 };
 
 static struct rtl8xxxu_fileops rtl8192cu_fops = {
 	.parse_efuse = rtl8192cu_parse_efuse,
+	.load_firmware = rtl8192cu_load_firmware,
 };
 
 static struct usb_device_id dev_table[] = {
@@ -4558,6 +4598,8 @@ static struct usb_device_id dev_table[] = {
 {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x0724, 0xff, 0xff, 0xff),
 	.driver_info = (unsigned long)&rtl8723au_fops},
 {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8176, 0xff, 0xff, 0xff),
+	.driver_info = (unsigned long)&rtl8192cu_fops},
+{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8178, 0xff, 0xff, 0xff),
 	.driver_info = (unsigned long)&rtl8192cu_fops},
 { }
 };
