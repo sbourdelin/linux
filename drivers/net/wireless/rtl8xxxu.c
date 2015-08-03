@@ -2882,7 +2882,7 @@ static int rtl8xxxu_emu_to_disabled(struct rtl8xxxu_priv *priv)
 	return 0;
 }
 
-static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
+static int rtl8723au_power_on(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u16 val16;
@@ -2926,6 +2926,86 @@ static int rtl8xxxu_power_on(struct rtl8xxxu_priv *priv)
 	rtl8xxxu_write32(priv, REG_EFUSE_CTRL, val32);
 exit:
 	return ret;
+}
+
+static int rtl8192cu_power_on(struct rtl8xxxu_priv *priv)
+{
+	u8 val8;
+	u16 val16;
+	int i;
+
+	for (i = 100; i; i--) {
+		val8 = rtl8xxxu_read8(priv, REG_APS_FSMCO);
+		if (val8 & APS_FSMCO_PFM_ALDN)
+			break;
+	}
+
+	if (!i) {
+		pr_info("%s: Poll failed\n", __func__);
+		return -ENODEV;
+	}
+
+	/*
+	 * RSV_CTRL 0x001C[7:0] = 0x00, unlock ISO/CLK/Power control register
+	 */
+	rtl8xxxu_write8(priv, REG_RSV_CTRL, 0x0);
+	rtl8xxxu_write8(priv, REG_SPS0_CTRL, 0x2b);
+	udelay(100);
+
+	val8 = rtl8xxxu_read8(priv, REG_LDOV12D_CTRL);
+	if (!(val8 & LDOV12D_ENABLE)) {
+		pr_info("%s: Enabling LDOV12D (%02x)\n", __func__, val8);
+		val8 |= LDOV12D_ENABLE;
+		rtl8xxxu_write8(priv, REG_LDOV12D_CTRL, val8);
+
+		udelay(100);
+
+		val8 = rtl8xxxu_read8(priv, REG_SYS_ISO_CTRL);
+		val8 &= ~SYS_ISO_MD2PP;
+		rtl8xxxu_write8(priv, REG_SYS_ISO_CTRL, val8);
+	}
+
+	/*
+	 * Auto enable WLAN
+	 */
+	val16 = rtl8xxxu_read16(priv, REG_APS_FSMCO);
+	val16 |= APS_FSMCO_MAC_ENABLE;
+	rtl8xxxu_write16(priv, REG_APS_FSMCO, val16);
+
+	for (i = 1000; i; i--) {
+		val16 = rtl8xxxu_read8(priv, REG_APS_FSMCO);
+		if (!(val16 & APS_FSMCO_MAC_ENABLE))
+			break;
+	}
+	if (!i) {
+		pr_info("%s: FSMCO_MAC_ENABLE poll failed\n", __func__);
+		return -EBUSY;
+	}
+
+	/*
+	 * Enable radio, GPIO, LED
+	 */
+	val16 = APS_FSMCO_HW_SUSPEND | APS_FSMCO_ENABLE_POWERDOWN |
+		APS_FSMCO_PFM_ALDN;
+	rtl8xxxu_write16(priv, REG_APS_FSMCO, val16);
+
+	/*
+	 * Release RF digital isolation
+	 */
+	val16 = rtl8xxxu_read16(priv, REG_SYS_ISO_CTRL);
+	val16 &= ~SYS_ISO_DIOR;
+	rtl8xxxu_write16(priv, REG_SYS_ISO_CTRL, val16);
+
+	/*
+	 * Enable MAC DMA/WMAC/SCHEDULE/SEC block
+	 */
+	val16 = rtl8xxxu_read16(priv, REG_CR);
+	val16 |= CR_HCI_TXDMA_ENABLE | CR_HCI_RXDMA_ENABLE |
+		CR_TXDMA_ENABLE | CR_RXDMA_ENABLE | CR_PROTOCOL_ENABLE |
+		CR_SCHEDULE_ENABLE | CR_MAC_TX_ENABLE | CR_MAC_RX_ENABLE;
+	rtl8xxxu_write16(priv, REG_CR, val16);
+
+	return 0;
 }
 
 static void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
@@ -2988,7 +3068,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	else
 		macpower = true;
 
-	ret = rtl8xxxu_power_on(priv);
+	ret = priv->fops->power_on(priv);
 	if (ret < 0) {
 		dev_warn(dev, "%s: Failed power on\n", __func__);
 		goto exit;
@@ -4456,7 +4536,6 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	struct ieee80211_supported_band *sband;
-	struct rtl8xxxu_fileops *fops;
 	int ret = 0;
 
 	udev = usb_get_dev(interface_to_usbdev(interface));
@@ -4470,11 +4549,11 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	priv = hw->priv;
 	priv->hw = hw;
 	priv->udev = udev;
+	priv->fops = (struct rtl8xxxu_fileops *)id->driver_info;
 	mutex_init(&priv->usb_buf_mutex);
 	mutex_init(&priv->h2c_mutex);
 
 	usb_set_intfdata(interface, hw);
-	fops = (struct rtl8xxxu_fileops *)id->driver_info;
 
 	ret = rtl8xxxu_parse_usb(priv, interface);
 	if (ret)
@@ -4492,7 +4571,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		goto exit;
 	}
 
-	ret = fops->parse_efuse(priv);
+	ret = priv->fops->parse_efuse(priv);
 	if (ret) {
 		dev_err(&udev->dev, "Fatal - failed to parse EFuse\n");
 		goto exit;
@@ -4501,7 +4580,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	dev_info(&udev->dev, "RTL%s MAC %pM\n",
 		 priv->chip_name, priv->mac_addr);
 
-	ret = fops->load_firmware(priv);
+	ret = priv->fops->load_firmware(priv);
 	if (ret) {
 		dev_err(&udev->dev, "Fatal - failed to load firmware\n");
 		goto exit;
@@ -4583,11 +4662,13 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 static struct rtl8xxxu_fileops rtl8723au_fops = {
 	.parse_efuse = rtl8723au_parse_efuse,
 	.load_firmware = rtl8723au_load_firmware,
+	.power_on = rtl8723au_power_on,
 };
 
 static struct rtl8xxxu_fileops rtl8192cu_fops = {
 	.parse_efuse = rtl8192cu_parse_efuse,
 	.load_firmware = rtl8192cu_load_firmware,
+	.power_on = rtl8192cu_power_on,
 };
 
 static struct usb_device_id dev_table[] = {

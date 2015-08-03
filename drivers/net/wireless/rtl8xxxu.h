@@ -498,9 +498,12 @@ struct h2c_cmd {
 	};
 };
 
+struct rtl8xxxu_fileops;
+
 struct rtl8xxxu_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
+	struct rtl8xxxu_fileops *fops;
 	u8 mac_addr[ETH_ALEN];
 	char chip_name[8];
 	u32 chip_cut:4;
@@ -574,4 +577,5 @@ struct rtl8xxxu_sta_priv {
 struct rtl8xxxu_fileops {
 	int (*parse_efuse) (struct rtl8xxxu_priv *priv);
 	int (*load_firmware) (struct rtl8xxxu_priv *priv);
+	int (*power_on) (struct rtl8xxxu_priv *priv);
 };

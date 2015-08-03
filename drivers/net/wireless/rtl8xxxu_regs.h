@@ -15,9 +15,11 @@
 
 /* 0x0000 ~ 0x00FF	System Configuration */
 #define REG_SYS_ISO_CTRL		0x0000
+#define  SYS_ISO_MD2PP			BIT(0)
+#define  SYS_ISO_ANALOG_IPS		BIT(5)
+#define  SYS_ISO_DIOR			BIT(9)
 #define  SYS_ISO_PWC_EV25V		BIT(14)
 #define  SYS_ISO_PWC_EV12V		BIT(15)
-#define  SYS_ISO_ANALOG_IPS		BIT(5)
 
 #define REG_SYS_FUNC			0x0002
 #define  SYS_FUNC_BBRSTB		BIT(0)
