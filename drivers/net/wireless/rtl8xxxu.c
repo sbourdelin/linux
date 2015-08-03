@@ -562,6 +562,34 @@ rtl8xxxu_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
 	return ret;
 }
 
+static int
+rtl8xxxu_slow_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
+{
+	u32 blocksize = sizeof(u32);
+	u32 *buf4 = (u32 *)buf;
+	int i, offset, count, remainder;
+
+	count = len / blocksize;
+	remainder = len % blocksize;
+
+	for (i = 0; i < count; i++) {
+		offset = i * blocksize;
+		rtl8xxxu_write32(priv, (REG_FW_START_ADDRESS + offset),
+				 buf4[i]);
+	}
+
+	if (remainder) {
+		offset = count * blocksize;
+		buf += offset;
+		for (i = 0; i < remainder; i++) {
+			rtl8xxxu_write8(priv, (REG_FW_START_ADDRESS +
+					       offset + i), *(buf + i));
+		}
+	}
+
+	return len;
+}
+
 static u32 rtl8xxxu_read_rfreg(struct rtl8xxxu_priv *priv,
 			       enum rtl8xxxu_rfpath path, u8 reg)
 {
@@ -1435,8 +1463,8 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 		val8 = rtl8xxxu_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
 		rtl8xxxu_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
 
-		ret = rtl8xxxu_writeN(priv, REG_FW_START_ADDRESS,
-				      fwptr, RTL_FW_PAGE_SIZE);
+		ret = priv->fops->writeN(priv, REG_FW_START_ADDRESS,
+					 fwptr, RTL_FW_PAGE_SIZE);
 		if (ret != RTL_FW_PAGE_SIZE) {
 			ret = -EAGAIN;
 			goto fw_abort;
@@ -1448,8 +1476,8 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 	if (remainder) {
 		val8 = rtl8xxxu_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
 		rtl8xxxu_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
-		ret = rtl8xxxu_writeN(priv, REG_FW_START_ADDRESS,
-				      fwptr, remainder);
+		ret = priv->fops->writeN(priv, REG_FW_START_ADDRESS,
+					 fwptr, remainder);
 		if (ret != remainder) {
 			ret = -EAGAIN;
 			goto fw_abort;
@@ -3084,9 +3112,11 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	}
 
 	ret = rtl8xxxu_download_firmware(priv);
+	dev_info(dev, "%s: download_fiwmare %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 	ret = rtl8xxxu_start_firmware(priv);
+	dev_info(dev, "%s: start_fiwmare %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 
@@ -4030,12 +4060,13 @@ static void rtl8xxxu_int_complete(struct urb *urb)
 
 	dev_dbg(dev, "%s: status %i\n", __func__, urb->status);
 	if (urb->status == 0) {
+#if 0
 		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
 			printk("%02x ", priv->int_buf[i]);
 			if ((i & 0x0f) == 0x0f)
 				printk("\n");
 		}
-
+#endif
 		usb_anchor_urb(urb, &priv->int_anchor);
 		ret = usb_submit_urb(urb, GFP_ATOMIC);
 		if (ret)
@@ -4663,12 +4694,14 @@ static struct rtl8xxxu_fileops rtl8723au_fops = {
 	.parse_efuse = rtl8723au_parse_efuse,
 	.load_firmware = rtl8723au_load_firmware,
 	.power_on = rtl8723au_power_on,
+	.writeN = rtl8xxxu_writeN,
 };
 
 static struct rtl8xxxu_fileops rtl8192cu_fops = {
 	.parse_efuse = rtl8192cu_parse_efuse,
 	.load_firmware = rtl8192cu_load_firmware,
 	.power_on = rtl8192cu_power_on,
+	.writeN = rtl8xxxu_slow_writeN,
 };
 
 static struct usb_device_id dev_table[] = {
