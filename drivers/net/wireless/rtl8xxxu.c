@@ -930,23 +930,20 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 static void
 rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 {
-	struct rtl8723au_efuse *efuse;
 	u8 cck[RTL8723A_MAX_RF_PATHS], ofdm[RTL8723A_MAX_RF_PATHS];
 	u8 ofdmbase[RTL8723A_MAX_RF_PATHS], mcsbase[RTL8723A_MAX_RF_PATHS];
 	u32 val32, ofdm_a, ofdm_b, mcs_a, mcs_b;
 	u8 val8;
 	int group, i;
 
-	efuse = &priv->efuse_wifi.efuse;
-
 	group = rtl8723a_channel_to_group(channel);
 
-	cck[0] = efuse->cck_tx_power_index_A[group];
-	ofdm[0] = efuse->ht40_1s_tx_power_index_A[group];
+	cck[0] = priv->cck_tx_power_index_A[group];
+	ofdm[0] = priv->ht40_1s_tx_power_index_A[group];
 
 	if (priv->rf_paths > 1) {
-		cck[1] = efuse->cck_tx_power_index_B[group];
-		ofdm[1] = efuse->ht40_1s_tx_power_index_B[group];
+		cck[1] = priv->cck_tx_power_index_B[group];
+		ofdm[1] = priv->ht40_1s_tx_power_index_B[group];
 	} else {
 		cck[1] = 0;
 		ofdm[1] = 0;
@@ -985,15 +982,15 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 	val32 |= ((cck[1] << 8) | (cck[1] << 16) | (cck[1] << 24));
 	rtl8xxxu_write32(priv, REG_TX_AGC_B_CCK1_55_MCS32, val32);
 
-	ofdmbase[0] = ofdm[0] +	efuse->ofdm_tx_power_index_diff[group].a;
+	ofdmbase[0] = ofdm[0] +	priv->ofdm_tx_power_index_diff[group].a;
 	mcsbase[0] = ofdm[0];
 	if (!ht40)
-		mcsbase[0] += efuse->ht20_tx_power_index_diff[group].a;
+		mcsbase[0] += priv->ht20_tx_power_index_diff[group].a;
 
-	ofdmbase[1] = ofdm[1] +	efuse->ofdm_tx_power_index_diff[group].b;
+	ofdmbase[1] = ofdm[1] +	priv->ofdm_tx_power_index_diff[group].b;
 	mcsbase[1] = ofdm[1];
 	if (!ht40)
-		mcsbase[1] += efuse->ht20_tx_power_index_diff[group].b;
+		mcsbase[1] += priv->ht20_tx_power_index_diff[group].b;
 
 	ofdm_a = ofdmbase[0] | ofdmbase[0] << 8 |
 		ofdmbase[0] << 16 | ofdmbase[0] << 24;
@@ -1193,12 +1190,43 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 
 static int rtl8723au_parse_efuse(struct rtl8xxxu_priv *priv)
 {
-	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse.mac_addr);
+	if (priv->efuse_wifi.efuse8723.rtl_id != cpu_to_le16(0x8129))
+		return -EINVAL;
+
+	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse8723.mac_addr);
+
+	memcpy(priv->cck_tx_power_index_A,
+	       priv->efuse_wifi.efuse8723.cck_tx_power_index_A,
+	       sizeof(priv->cck_tx_power_index_A));
+	memcpy(priv->cck_tx_power_index_B,
+	       priv->efuse_wifi.efuse8723.cck_tx_power_index_B,
+	       sizeof(priv->cck_tx_power_index_B));
+
+	memcpy(priv->ht40_1s_tx_power_index_A,
+	       priv->efuse_wifi.efuse8723.ht40_1s_tx_power_index_A,
+	       sizeof(priv->ht40_1s_tx_power_index_A));
+	memcpy(priv->ht40_1s_tx_power_index_B,
+	       priv->efuse_wifi.efuse8723.ht40_1s_tx_power_index_B,
+	       sizeof(priv->ht40_1s_tx_power_index_B));
+
+	memcpy(priv->ht20_tx_power_index_diff,
+	       priv->efuse_wifi.efuse8723.ht20_tx_power_index_diff,
+	       sizeof(priv->ht20_tx_power_index_diff));
+	memcpy(priv->ofdm_tx_power_index_diff,
+	       priv->efuse_wifi.efuse8723.ofdm_tx_power_index_diff,
+	       sizeof(priv->ofdm_tx_power_index_diff));
+
+	memcpy(priv->ht40_max_power_offset,
+	       priv->efuse_wifi.efuse8723.ht40_max_power_offset,
+	       sizeof(priv->ht40_max_power_offset));
+	memcpy(priv->ht20_max_power_offset,
+	       priv->efuse_wifi.efuse8723.ht20_max_power_offset,
+	       sizeof(priv->ht20_max_power_offset));
 
 	dev_info(&priv->udev->dev, "Vendor: %.7s\n",
-		 priv->efuse_wifi.efuse.vendor_name);
+		 priv->efuse_wifi.efuse8723.vendor_name);
 	dev_info(&priv->udev->dev, "Product: %.41s\n",
-		 priv->efuse_wifi.efuse.device_name);
+		 priv->efuse_wifi.efuse8723.device_name);
 	return 0;
 }
 
@@ -1206,10 +1234,42 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 {
 	int i;
 
+	if (priv->efuse_wifi.efuse8192.rtl_id != cpu_to_le16(0x8129))
+		return -EINVAL;
+
 	ether_addr_copy(priv->mac_addr, priv->efuse_wifi.efuse8192.mac_addr);
 
-	dev_info(&priv->udev->dev, "RTL%s MAC %pM\n",
-		 priv->chip_name, priv->mac_addr);
+	memcpy(priv->cck_tx_power_index_A,
+	       priv->efuse_wifi.efuse8192.cck_tx_power_index_A,
+	       sizeof(priv->cck_tx_power_index_A));
+	memcpy(priv->cck_tx_power_index_B,
+	       priv->efuse_wifi.efuse8192.cck_tx_power_index_B,
+	       sizeof(priv->cck_tx_power_index_B));
+
+	memcpy(priv->ht40_1s_tx_power_index_A,
+	       priv->efuse_wifi.efuse8192.ht40_1s_tx_power_index_A,
+	       sizeof(priv->ht40_1s_tx_power_index_A));
+	memcpy(priv->ht40_1s_tx_power_index_B,
+	       priv->efuse_wifi.efuse8192.ht40_1s_tx_power_index_B,
+	       sizeof(priv->ht40_1s_tx_power_index_B));
+	memcpy(priv->ht40_2s_tx_power_index_diff,
+	       priv->efuse_wifi.efuse8192.ht40_2s_tx_power_index_diff,
+	       sizeof(priv->ht40_2s_tx_power_index_diff));
+
+	memcpy(priv->ht20_tx_power_index_diff,
+	       priv->efuse_wifi.efuse8192.ht20_tx_power_index_diff,
+	       sizeof(priv->ht20_tx_power_index_diff));
+	memcpy(priv->ofdm_tx_power_index_diff,
+	       priv->efuse_wifi.efuse8192.ofdm_tx_power_index_diff,
+	       sizeof(priv->ofdm_tx_power_index_diff));
+
+	memcpy(priv->ht40_max_power_offset,
+	       priv->efuse_wifi.efuse8192.ht40_max_power_offset,
+	       sizeof(priv->ht40_max_power_offset));
+	memcpy(priv->ht20_max_power_offset,
+	       priv->efuse_wifi.efuse8192.ht20_max_power_offset,
+	       sizeof(priv->ht20_max_power_offset));
+
 	dev_info(&priv->udev->dev, "Vendor: %.7s\n",
 		 priv->efuse_wifi.efuse8192.vendor_name);
 	dev_info(&priv->udev->dev, "Product: %.20s\n",
@@ -1376,9 +1436,6 @@ static int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv)
 
 exit:
 	rtl8xxxu_write8(priv, REG_EFUSE_ACCESS, EFUSE_ACCESS_DISABLE);
-
-	if (priv->efuse_wifi.efuse.rtl_id != cpu_to_le16(0x8129))
-		ret = -EINVAL;
 
 	return ret;
 }
@@ -1703,10 +1760,10 @@ static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 	rtl8xxxu_init_phy_regs(priv, rtl8723a_phy_1t_init_table);
 
 	rtl8xxxu_init_phy_regs(priv, rtl8723a_agc_1t_init_table);
-	if (priv->efuse_wifi.efuse.version >= 0x01) {
+	if (priv->chip == 8723 && priv->efuse_wifi.efuse8723.version >= 0x01) {
 		val32 = rtl8xxxu_read32(priv, REG_MAC_PHY_CTRL);
 
-		val8 = priv->efuse_wifi.efuse.xtal_k & 0x3f;
+		val8 = priv->efuse_wifi.efuse8723.xtal_k & 0x3f;
 		val32 &= 0xff000fff;
 		val32 |= ((val8 | (val8 << 6)) << 12);
 

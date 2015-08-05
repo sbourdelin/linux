@@ -506,6 +506,19 @@ struct rtl8xxxu_priv {
 	struct rtl8xxxu_fileops *fops;
 	u8 mac_addr[ETH_ALEN];
 	char chip_name[8];
+	u8 cck_tx_power_index_A[3];	/* 0x10 */
+	u8 cck_tx_power_index_B[3];
+	u8 ht40_1s_tx_power_index_A[3];	/* 0x16 */
+	u8 ht40_1s_tx_power_index_B[3];
+	u8 ht40_2s_tx_power_index_diff[3];
+	/*
+	 * The following entries are half-bytes split as:
+	 * bits 0-3: path A, bits 4-7: path B, all values 4 bits signed
+	 */
+	struct rtl8723au_idx ht20_tx_power_index_diff[3];
+	struct rtl8723au_idx ofdm_tx_power_index_diff[3];
+	struct rtl8723au_idx ht40_max_power_offset[3];
+	struct rtl8723au_idx ht20_max_power_offset[3];
 	u32 chip_cut:4;
 	u32 rom_rev:4;
 	u32 has_wifi:1;
@@ -552,7 +565,7 @@ struct rtl8xxxu_priv {
 	} usb_buf;
 	union {
 		u8 raw[EFUSE_MAP_LEN_8723A];
-		struct rtl8723au_efuse efuse;
+		struct rtl8723au_efuse efuse8723;
 		struct rtl8192cu_efuse efuse8192;
 	} efuse_wifi;
 	u32 adda_backup[RTL8XXXU_ADDA_REGS];
