@@ -1632,8 +1632,6 @@ static int rtl8192cu_load_firmware(struct rtl8xxxu_priv *priv)
 
 	ret = rtl8xxxu_load_firmware(priv, fw_name);
 
-	pr_info("load_firmware returns %i\n", ret);
-
 	return ret;
 }
 
