@@ -1275,7 +1275,7 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 	dev_info(&priv->udev->dev, "Product: %.20s\n",
 		 priv->efuse_wifi.efuse8192.device_name);
 
-	pr_info("%s\n", __func__);
+	dev_info(&priv->udev->dev, "%s\n", __func__);
 	for (i = 0; i < EFUSE_MAP_LEN_8723A; i++) {
 		if ((i & 7) == 0)
 			pr_info("%02x: ", i);
@@ -3167,23 +3167,26 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	}
 
 	ret = rtl8xxxu_download_firmware(priv);
-	dev_info(dev, "%s: download_fiwmare %i\n", __func__, ret);
+	dev_dbg(dev, "%s: download_fiwmare %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 	ret = rtl8xxxu_start_firmware(priv);
-	dev_info(dev, "%s: start_fiwmare %i\n", __func__, ret);
+	dev_dbg(dev, "%s: start_fiwmare %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 
 	ret = rtl8xxxu_init_mac(priv, rtl8723a_mac_init_table);
+	dev_dbg(dev, "%s: init_mac %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 
 	ret = rtl8xxxu_init_phy_bb(priv);
+	dev_dbg(dev, "%s: init_phy_bb %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 
 	ret = rtl8xxxu_init_phy_rf(priv, RF_A);
+	dev_dbg(dev, "%s: init_phy_rf %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 
@@ -3207,6 +3210,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	priv->rf_mode_ag[0] = rtl8xxxu_read_rfreg(priv, RF_A,
 						  RF6052_REG_MODE_AG);
 
+	dev_dbg(dev, "%s: macpower %i\n", __func__, macpower);
 	if (!macpower) {
 		if (priv->ep_tx_normal_queue)
 			val8 = TX_PAGE_NUM_NORM_PQ;
@@ -3236,6 +3240,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	}
 
 	ret = rtl8xxxu_init_queue_priority(priv);
+	dev_dbg(dev, "%s: init_queue_priority %i\n", __func__, ret);
 	if (ret)
 		goto exit;
 
