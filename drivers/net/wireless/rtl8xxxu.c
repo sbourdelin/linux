@@ -1,10 +1,15 @@
 /*
- * RTL8723au mac80211 USB driver
+ * RTL8XXXU mac80211 USB driver
  *
  * Copyright (c) 2014 - 2015 Jes Sorensen <Jes.Sorensen@redhat.com>
  *
  * Portions, notably calibration code:
  * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ *
+ * This driver was written as a replacement for the vendor provided
+ * rtl8723au driver. As the Realtek 8xxx chips are very similar in
+ * their programming interface, I have started adding support for
+ * additional 8xxx chips like the 8192cu, 8188cus, etc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -40,7 +45,7 @@
 static int rtl8xxxu_debug = 0;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
-MODULE_DESCRIPTION("RTL8723au USB mac80211 Wireless LAN Driver");
+MODULE_DESCRIPTION("RTL8XXXu USB mac80211 Wireless LAN Driver");
 MODULE_LICENSE("GPL");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_A.bin");
 MODULE_FIRMWARE("rtlwifi/rtl8723aufw_B.bin");
