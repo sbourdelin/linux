@@ -4121,11 +4121,12 @@ static void rtl8xxxu_int_complete(struct urb *urb)
 {
 	struct rtl8xxxu_priv *priv = (struct rtl8xxxu_priv *)urb->context;
 	struct device *dev = &priv->udev->dev;
-	int i, ret;
+	int ret;
 
 	dev_dbg(dev, "%s: status %i\n", __func__, urb->status);
 	if (urb->status == 0) {
 #if 0
+		int i;
 		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
 			printk("%02x ", priv->int_buf[i]);
 			if ((i & 0x0f) == 0x0f)
