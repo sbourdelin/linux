@@ -4928,7 +4928,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		goto exit;
 	}
 
-	dev_info(&udev->dev, "RTL%s MAC %pM\n",
+	dev_info(&udev->dev, "RTL%s MAC: %pM\n",
 		 priv->chip_name, priv->mac_addr);
 
 	ret = priv->fops->load_firmware(priv);
