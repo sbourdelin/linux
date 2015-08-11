@@ -42,7 +42,7 @@
 
 #define DRIVER_NAME "rtl8xxxu"
 
-static int rtl8xxxu_debug = 0;
+static int rtl8xxxu_debug = RTL8XXXU_DEBUG_EFUSE;
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8XXXu USB mac80211 Wireless LAN Driver");
@@ -1466,13 +1466,17 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 	dev_info(&priv->udev->dev, "Product: %.20s\n",
 		 priv->efuse_wifi.efuse8192.device_name);
 
-	dev_info(&priv->udev->dev, "%s\n", __func__);
-	for (i = 0; i < EFUSE_MAP_LEN_8723A; i++) {
-		if ((i & 7) == 0)
-			pr_info("%02x: ", i);
-		printk("%02x ", priv->efuse_wifi.raw[i]);
-		if ((i & 7) == 7)
-			printk("\n");
+	dev_info(&priv->udev->dev, "%s: dumping efuse:\n", __func__);
+	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_EFUSE) {
+		for (i = 0; i < EFUSE_MAP_LEN_8723A; i++) {
+			if ((i & 7) == 0)
+				pr_info("%s %s: %02x: ",
+					dev_driver_string(&priv->udev->dev),
+					dev_name(&priv->udev->dev), i);
+			printk("%02x ", priv->efuse_wifi.raw[i]);
+			if ((i & 7) == 7)
+				printk("\n");
+		}
 	}
 	return 0;
 }
