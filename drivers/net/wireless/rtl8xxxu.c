@@ -1468,14 +1468,13 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 
 	dev_info(&priv->udev->dev, "%s: dumping efuse:\n", __func__);
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_EFUSE) {
-		for (i = 0; i < EFUSE_MAP_LEN_8723A; i++) {
-			if ((i & 7) == 0)
-				pr_info("%s %s: %02x: ",
-					dev_driver_string(&priv->udev->dev),
-					dev_name(&priv->udev->dev), i);
-			printk("%02x ", priv->efuse_wifi.raw[i]);
-			if ((i & 7) == 7)
-				printk("\n");
+		unsigned char *raw = priv->efuse_wifi.raw;
+		for (i = 0; i < EFUSE_MAP_LEN_8723A; i += 8) {
+			dev_info(&priv->udev->dev, "%02x: "
+				 "%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
+				 raw[i], raw[i + 1], raw[i + 2],
+				 raw[i + 3], raw[i + 4], raw[i + 5],
+				 raw[i + 6], raw[i + 7]);
 		}
 	}
 	return 0;
