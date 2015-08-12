@@ -3122,7 +3122,7 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 	 * Poll - wait for RX packet to complete
 	 */
 	for (count = RTL8XXXU_MAX_REG_POLL; count; count--) {
-		val32 = rtl8xxxu_read8(priv, 0x5f8);
+		val32 = rtl8xxxu_read32(priv, 0x5f8);
 		if (!val32)
 			break;
 		udelay(10);
