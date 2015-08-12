@@ -3539,22 +3539,17 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
 		break;
 	case 8188:
+	case 8191:
 		rftable = rtl8192cu_radioa_1t_init_table;
 		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
 		break;
-	case 8191:
 	case 8192:
-		if (priv->rf_paths == 1) {
-			rftable = rtl8192cu_radioa_1t_init_table;
-			ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
-		} else if (priv->rf_paths == 2) {
-			rftable = rtl8192cu_radioa_2t_init_table;
-			ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
-			if (ret)
-				break;
-			rftable = rtl8192cu_radiob_2t_init_table;
-			ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_B);
-		}
+		rftable = rtl8192cu_radioa_2t_init_table;
+		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
+		if (ret)
+			break;
+		rftable = rtl8192cu_radiob_2t_init_table;
+		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_B);
 	default:
 		ret = -EINVAL;
 	}
