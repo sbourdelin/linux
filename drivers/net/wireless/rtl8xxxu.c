@@ -3394,7 +3394,7 @@ static int rtl8192cu_power_on(struct rtl8xxxu_priv *priv)
 	rtl8xxxu_write16(priv, REG_APS_FSMCO, val16);
 
 	for (i = 1000; i; i--) {
-		val16 = rtl8xxxu_read8(priv, REG_APS_FSMCO);
+		val16 = rtl8xxxu_read16(priv, REG_APS_FSMCO);
 		if (!(val16 & APS_FSMCO_MAC_ENABLE))
 			break;
 	}
