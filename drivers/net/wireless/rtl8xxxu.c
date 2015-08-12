@@ -3417,6 +3417,20 @@ static int rtl8192cu_power_on(struct rtl8xxxu_priv *priv)
 	val16 &= ~SYS_ISO_DIOR;
 	rtl8xxxu_write16(priv, REG_SYS_ISO_CTRL, val16);
 
+	val8 = rtl8xxxu_read8(priv, REG_APSD_CTRL);
+	val8 &= ~APSD_CTRL_OFF;
+	rtl8xxxu_write8(priv, REG_APSD_CTRL, val8);
+	for (i = 200; i; i--) {
+		val8 = rtl8xxxu_read8(priv, REG_APSD_CTRL);
+		if (!(val8 & APSD_CTRL_OFF_STATUS))
+			break;
+	}
+
+	if (!i) {
+		pr_info("%s: APSD_CTRL poll failed\n", __func__);
+		return -EBUSY;
+	}
+
 	/*
 	 * Enable MAC DMA/WMAC/SCHEDULE/SEC block
 	 */

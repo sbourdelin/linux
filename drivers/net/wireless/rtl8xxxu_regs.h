@@ -533,6 +533,8 @@
 
 /* 0x0600 ~ 0x07FF  WMAC Configuration */
 #define REG_APSD_CTRL			0x0600
+#define  APSD_CTRL_OFF			BIT(6)
+#define  APSD_CTRL_OFF_STATUS		BIT(7)
 #define REG_BW_OPMODE			0x0603
 #define	 BW_OPMODE_20MHZ		BIT(2)
 #define	 BW_OPMODE_5G			BIT(1)
