@@ -1458,11 +1458,6 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 		 priv->tx_paths, priv->rx_paths, priv->ep_tx_count,
 		 priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
-	/* XXX - hard-code to single RX/TX path for now */
-	priv->rf_paths = 1;
-	priv->rx_paths = 1;
-	priv->tx_paths = 1;
-
 	return 0;
 }
 
