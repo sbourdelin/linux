@@ -2876,7 +2876,7 @@ static void rtl8xxxu_phy_iqcalibrate(struct rtl8xxxu_priv *priv,
 		/* Restore RX initial gain */
 		rtl8xxxu_write32(priv, REG_FPGA0_XA_LSSI_PARM, 0x00032ed3);
 
-		if (priv->rx_paths > 1) {
+		if (priv->tx_paths > 1) {
 			rtl8xxxu_write32(priv, REG_FPGA0_XB_LSSI_PARM,
 					 0x00032ed3);
 		}
