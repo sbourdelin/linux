@@ -3086,7 +3086,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 				     (rf_amode & 0xfff) | 0x10000);
 
 		/* Path-B */
-		if (priv->rf_paths > 1) {
+		if (priv->tx_paths > 1) {
 			rf_bmode = rtl8xxxu_read_rfreg(priv, RF_B,
 						       RF6052_REG_AC);
 
