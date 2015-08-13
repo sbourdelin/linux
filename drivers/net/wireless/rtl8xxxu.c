@@ -2682,8 +2682,6 @@ static int rtl8xxxu_iqk_path_b(struct rtl8xxxu_priv *priv)
 		dev_warn(&priv->udev->dev, "%s: Path B RX IQK failed!\n",
 			 __func__);
 out:
-	dev_info(&priv->udev->dev, "%s: returns %i!\n",
-		 __func__, result);
 	return result;
 }
 
