@@ -3598,6 +3598,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 			break;
 		rftable = rtl8192cu_radiob_2t_init_table;
 		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_B);
+		break;
 	default:
 		ret = -EINVAL;
 	}
