@@ -3602,7 +3602,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	default:
 		ret = -EINVAL;
 	}
-	dev_dbg(dev, "%s: init_phy_rf %i\n", __func__, ret);
+
 	if (ret)
 		goto exit;
 
