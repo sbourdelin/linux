@@ -2894,7 +2894,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 	struct device *dev = &priv->udev->dev;
 	int result[4][8];	/* last is final result */
 	int i, candidate;
-	bool path_a_ok /*, path_b_ok */;
+	bool path_a_ok, path_b_ok;
 	u32 reg_e94, reg_e9c, reg_ea4, reg_eac;
 	u32 reg_eb4, reg_ebc, reg_ec4, reg_ecc;
 	s32 reg_tmp = 0;
@@ -2904,9 +2904,8 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 	candidate = -1;
 
 	path_a_ok = false;
-#if 0
 	path_b_ok = false;
-#endif
+
 	rtl8xxxu_read32(priv, REG_FPGA0_RF_MODE);
 
 	for (i = 0; i < 3; i++) {
@@ -2972,9 +2971,7 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 			"reg_eCC =%x\n ", __func__, reg_e94, reg_e9c,
 			reg_ea4, reg_eac, reg_eb4, reg_ebc, reg_ec4, reg_ecc);
 		path_a_ok = true;
-#if 0
 		path_b_ok = true;
-#endif
 	} else {
 		reg_e94 = reg_eb4 = priv->rege94 = priv->regeb4 = 0x100;
 		reg_e9c = reg_ebc = priv->rege9c = priv->regebc = 0x0;
