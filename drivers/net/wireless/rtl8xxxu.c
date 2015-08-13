@@ -3083,7 +3083,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 
 		/* Set RF mode to standby Path A */
 		rtl8xxxu_write_rfreg(priv, RF_A, RF6052_REG_AC,
-				     (rf_amode & 0xfff) | 0x10000);
+				     (rf_amode & 0x8ffff) | 0x10000);
 
 		/* Path-B */
 		if (priv->tx_paths > 1) {
@@ -3113,7 +3113,7 @@ static void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv)
 		rtl8xxxu_write_rfreg(priv, RF_A, RF6052_REG_AC, rf_amode);
 
 		/* Path-B */
-		if (priv->rf_paths > 1)
+		if (priv->tx_paths > 1)
 			rtl8xxxu_write_rfreg(priv, RF_B, RF6052_REG_AC,
 					     rf_bmode);
 	} else /*  Deal with Packet TX case */
