@@ -2568,7 +2568,7 @@ static void rtl8xxxu_path_adda_on(struct rtl8xxxu_priv *priv, const u32 *regs,
 	int i;
 
 	path_on = path_a_on ? 0x04db25a4 : 0x0b1b25a4;
-	if (!priv->tx_paths == 1) {
+	if (priv->tx_paths == 1) {
 		path_on = 0x0bdb25a0;
 		rtl8xxxu_write32(priv, regs[0], 0x0b1b25a0);
 	} else {
