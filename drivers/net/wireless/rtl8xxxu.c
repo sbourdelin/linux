@@ -1454,6 +1454,26 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 		priv->ep_tx_count++;
 	}
 
+	/*
+	 * Fallback for devices that do not provide REG_NORMAL_SIE_EP_TX
+	 */
+	if (!priv->ep_tx_count) {
+		switch (priv->nr_out_eps) {
+		case 3:
+			priv->ep_tx_low_queue = 1;
+			priv->ep_tx_count++;
+		case 2:
+			priv->ep_tx_normal_queue = 1;
+			priv->ep_tx_count++;
+		case 1:
+			priv->ep_tx_high_queue = 1;
+			priv->ep_tx_count++;
+			break;
+		default:
+			dev_info(dev, "Unsupported USB TX end-points\n");
+			return -ENOTSUPP;
+		}
+	}
 	dev_info(dev,
 		 "RTL%s rev %s (%s) %iT%iR, TX queues %i, WiFi=%i, BT=%i, GPS=%i\n",
 		 priv->chip_name, cut, priv->vendor_umc ? "UMC" : "TSMC",
@@ -5113,6 +5133,7 @@ static int rtl8xxxu_parse_usb(struct rtl8xxxu_priv *priv,
 		}
 	}
 exit:
+	priv->nr_out_eps = j;
 	return ret;
 }
 

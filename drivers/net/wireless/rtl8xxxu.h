@@ -550,6 +550,7 @@ struct rtl8xxxu_priv {
 	u32 regeb4;
 	u32 regebc;
 	int next_mbox;
+	int nr_out_eps;
 
 	struct mutex h2c_mutex;
 
