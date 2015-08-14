@@ -420,7 +420,6 @@ struct rtl8192cu_efuse {
 	 * bits 0-3: path A, bits 4-7: path B, all values 4 bits signed
 	 */
 	struct rtl8723au_idx ht20_tx_power_index_diff[3];	/* 0x69 */
-	u8 res5[1];						/* 0x6b */
 	struct rtl8723au_idx ofdm_tx_power_index_diff[3];
 	struct rtl8723au_idx ht40_max_power_offset[3];		/* 0x6f */
 	struct rtl8723au_idx ht20_max_power_offset[3];
@@ -432,7 +431,7 @@ struct rtl8192cu_efuse {
 	u8 rf_option_2;
 	u8 rf_option_3;
 	u8 rf_option_4;
-	u8 res6[1];						/* 0x7d */
+	u8 res5[1];						/* 0x7d */
 	u8 version;
 	u8 customer_id;
 };
