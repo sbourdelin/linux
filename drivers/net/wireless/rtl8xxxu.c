@@ -996,7 +996,7 @@ static void rtl8723a_enable_rf(struct rtl8xxxu_priv *priv)
 	val32 &= ~OFDM_RF_PATH_TX_MASK;
 	if (priv->tx_paths == 2)
 		val32 |= OFDM_RF_PATH_TX_A | OFDM_RF_PATH_TX_B;
-	else if (priv->chip == 8192 || priv->chip == 8191)
+	else if (priv->rtlchip == 0x8192c || priv->rtlchip == 0x8191c)
 		val32 |= OFDM_RF_PATH_TX_B;
 	else
 		val32 |= OFDM_RF_PATH_TX_A;
@@ -1386,7 +1386,7 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 		priv->rf_paths = 1;
 		priv->rx_paths = 1;
 		priv->tx_paths = 1;
-		priv->chip = 8723;
+		priv->rtlchip = 0x8723a;
 
 		val32 = rtl8xxxu_read32(priv, REG_MULTI_FUNC_CTRL);
 		if (val32 & MULTI_WIFI_FUNC_EN)
@@ -1399,25 +1399,25 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 		bonding = rtl8xxxu_read32(priv, REG_HPON_FSM);
 		bonding &= HPON_FSM_BONDING_MASK;
 		if (bonding == HPON_FSM_BONDING_1T2R) {
-			sprintf(priv->chip_name, "8191SU");
+			sprintf(priv->chip_name, "8191CU");
 			priv->rf_paths = 2;
 			priv->rx_paths = 2;
 			priv->tx_paths = 1;
-			priv->chip = 8191;
+			priv->rtlchip = 0x8191c;
 		} else {
-			sprintf(priv->chip_name, "8192SU");
+			sprintf(priv->chip_name, "8192CU");
 			priv->rf_paths = 2;
 			priv->rx_paths = 2;
 			priv->tx_paths = 2;
-			priv->chip = 8192;
+			priv->rtlchip = 0x8192c;
 		}
 		priv->has_wifi = 1;
 	} else {
-		sprintf(priv->chip_name, "8188CUS");
+		sprintf(priv->chip_name, "8188CU");
 		priv->rf_paths = 1;
 		priv->rx_paths = 1;
 		priv->tx_paths = 1;
-		priv->chip = 8188;
+		priv->rtlchip = 0x8188c;
 		priv->has_wifi = 1;
 	}
 
@@ -1923,7 +1923,7 @@ static int rtl8192cu_load_firmware(struct rtl8xxxu_priv *priv)
 
 	if (!priv->vendor_umc)
 		fw_name = "rtlwifi/rtl8192cufw_TMSC.bin";
-	else if (priv->chip_cut || priv->chip == 8192)
+	else if (priv->chip_cut || priv->rtlchip == 0x8192c)
 		fw_name = "rtlwifi/rtl8192cufw_B.bin";
 	else
 		fw_name = "rtlwifi/rtl8192cufw_A.bin";
@@ -2118,7 +2118,8 @@ static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 
 	rtl8xxxu_init_phy_regs(priv, rtl8723a_agc_1t_init_table);
 
-	if (priv->chip == 8723 && priv->efuse_wifi.efuse8723.version >= 0x01) {
+	if (priv->rtlchip == 0x8723a &&
+	    priv->efuse_wifi.efuse8723.version >= 0x01) {
 		val32 = rtl8xxxu_read32(priv, REG_MAC_PHY_CTRL);
 
 		val8 = priv->efuse_wifi.efuse8723.xtal_k & 0x3f;
@@ -3678,19 +3679,19 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
-	dev_info(dev, "%s: init_phy_rf chip %i paths %i\n",
-		 __func__, priv->chip, priv->rf_paths);
-	switch(priv->chip) {
-	case 8723:
+	dev_info(dev, "%s: init_phy_rf chip %05x paths %i\n",
+		 __func__, priv->rtlchip, priv->rf_paths);
+	switch(priv->rtlchip) {
+	case 0x8723a:
 		rftable = rtl8723au_radioa_1t_init_table;
 		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
 		break;
-	case 8188:
-	case 8191:
+	case 0x8188c:
+	case 0x8191c:
 		rftable = rtl8192cu_radioa_1t_init_table;
 		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
 		break;
-	case 8192:
+	case 0x8192c:
 		rftable = rtl8192cu_radioa_2t_init_table;
 		ret = rtl8xxxu_init_phy_rf(priv, rftable, RF_A);
 		if (ret)
