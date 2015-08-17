@@ -5273,7 +5273,7 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 	rtl8xxxu_disable_device(hw);
 	usb_set_intfdata(interface, NULL);
 
-	wiphy_info(hw->wiphy, "disconnecting\n");
+	dev_info(&priv->udev->dev, "disconnecting\n");
 
 	ieee80211_unregister_hw(hw);
 
