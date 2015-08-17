@@ -5273,6 +5273,8 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 	rtl8xxxu_disable_device(hw);
 	usb_set_intfdata(interface, NULL);
 
+	wiphy_info(hw->wiphy, "disconnecting\n");
+
 	ieee80211_unregister_hw(hw);
 
 	kfree(priv->fw_data);
@@ -5281,8 +5283,6 @@ static void rtl8xxxu_disconnect(struct usb_interface *interface)
 
 	usb_put_dev(priv->udev);
 	ieee80211_free_hw(hw);
-
-	wiphy_info(hw->wiphy, "disconnecting\n");
 }
 
 static struct rtl8xxxu_fileops rtl8723au_fops = {
