@@ -125,7 +125,7 @@ struct rtl8xxxu_rx_desc {
 	u32 patterncmatch:1;
 	u32 reserved2:19;
 
-	u32 tsfl;
+	__le32 tsfl;
 #if 0
 	u32 bassn:12;
 	u32 bavld:1;

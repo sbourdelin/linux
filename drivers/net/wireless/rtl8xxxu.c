@@ -4590,6 +4590,8 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 		rx_status->freq = hw->conf.chandef.chan->center_freq;
 		rx_status->band = hw->conf.chandef.chan->band;
 
+		rx_status->mactime = le32_to_cpu(rx_desc->tsfl);
+
 		if (!rx_desc->swdec)
 			rx_status->flag |= RX_FLAG_DECRYPTED;
 		if (rx_desc->crc32)
