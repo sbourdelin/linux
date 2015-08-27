@@ -1387,12 +1387,38 @@ rtl8xxxu_set_spec_sifs(struct rtl8xxxu_priv *priv, u16 cck, u16 ofdm)
 	rtl8xxxu_write16(priv, REG_SPEC_SIFS, val16);
 }
 
+static void rtl8xxxu_print_chipinfo(struct rtl8xxxu_priv *priv)
+{
+	struct device *dev = &priv->udev->dev;
+	char *cut;
+	switch (priv->chip_cut) {
+	case 0:
+		cut = "A";
+		break;
+	case 1:
+		cut = "B";
+		break;
+	default:
+		cut = "unknown";
+	}
+
+	dev_info(dev,
+		 "RTL%s rev %s (%s) %iT%iR, TX queues %i, WiFi=%i, BT=%i, GPS=%i, HI PA=%i\n",
+		 priv->chip_name, cut, priv->vendor_umc ? "UMC" : "TSMC",
+		 priv->tx_paths, priv->rx_paths, priv->ep_tx_count,
+		 priv->has_wifi, priv->has_bluetooth, priv->has_gps,
+		 priv->hi_pa);
+
+	dev_info(dev, "RTL%s MAC: %pM\n", priv->chip_name, priv->mac_addr);
+
+	return;
+}
+
 static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 {
 	struct device *dev = &priv->udev->dev;
 	u32 val32, bonding;
 	u16 val16;
-	char *cut;
 
 	val32 = rtl8xxxu_read32(priv, REG_SYS_CFG);
 	priv->chip_cut = (val32 & SYS_CFG_CHIP_VERSION_MASK) >>
@@ -1445,17 +1471,6 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 	if (val32 & SYS_CFG_VENDOR_ID)
 		priv->vendor_umc = 1;
 
-	switch (priv->chip_cut) {
-	case 0:
-		cut = "A";
-		break;
-	case 1:
-		cut = "B";
-		break;
-	default:
-		cut = "unknown";
-	}
-
 	val32 = rtl8xxxu_read32(priv, REG_GPIO_OUTSTS);
 	priv->rom_rev = (val32 & GPIO_RF_RL_ID) >> 28;
 
@@ -1495,11 +1510,6 @@ static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
 			return -ENOTSUPP;
 		}
 	}
-	dev_info(dev,
-		 "RTL%s rev %s (%s) %iT%iR, TX queues %i, WiFi=%i, BT=%i, GPS=%i\n",
-		 priv->chip_name, cut, priv->vendor_umc ? "UMC" : "TSMC",
-		 priv->tx_paths, priv->rx_paths, priv->ep_tx_count,
-		 priv->has_wifi, priv->has_bluetooth, priv->has_gps);
 
 	return 0;
 }
@@ -1590,6 +1600,11 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 		 priv->efuse_wifi.efuse8192.vendor_name);
 	dev_info(&priv->udev->dev, "Product: %.20s\n",
 		 priv->efuse_wifi.efuse8192.device_name);
+
+	if (priv->efuse_wifi.efuse8192.rf_regulatory & 0x20) {
+		sprintf(priv->chip_name, "8188RU");
+		priv->hi_pa = 1;
+	}
 
 	dev_info(&priv->udev->dev, "%s: dumping efuse (0x%02lx bytes):\n",
 		 __func__, sizeof(struct rtl8192cu_efuse));
@@ -5227,8 +5242,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 		goto exit;
 	}
 
-	dev_info(&udev->dev, "RTL%s MAC: %pM\n",
-		 priv->chip_name, priv->mac_addr);
+	rtl8xxxu_print_chipinfo(priv);
 
 	ret = priv->fops->load_firmware(priv);
 	if (ret) {
@@ -5333,6 +5347,8 @@ static struct usb_device_id dev_table[] = {
 {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8176, 0xff, 0xff, 0xff),
 	.driver_info = (unsigned long)&rtl8192cu_fops},
 {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8178, 0xff, 0xff, 0xff),
+	.driver_info = (unsigned long)&rtl8192cu_fops},
+{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x817f, 0xff, 0xff, 0xff),
 	.driver_info = (unsigned long)&rtl8192cu_fops},
 { }
 };
