@@ -78,6 +78,10 @@ void rtl92e_set_swcam(struct net_device *dev, u8 EntryNo, u8 KeyIndex,
 	RT_TRACE(COMP_DBG,
 		 "===========>%s():EntryNo is %d,KeyIndex is %d,KeyType is %d,is_mesh is %d\n",
 		 __func__, EntryNo, KeyIndex, KeyType, is_mesh);
+
+	if (EntryNo >= TOTAL_CAM_ENTRY)
+		return;
+
 	if (!is_mesh) {
 		ieee->swcamtable[EntryNo].bused = true;
 		ieee->swcamtable[EntryNo].key_index = KeyIndex;
@@ -113,8 +117,10 @@ void rtl92e_set_key(struct net_device *dev, u8 EntryNo, u8 KeyIndex,
 		}
 	}
 	priv->rtllib->is_set_key = true;
-	if (EntryNo >= TOTAL_CAM_ENTRY)
+	if (EntryNo >= TOTAL_CAM_ENTRY) {
 		netdev_info(dev, "%s(): Invalid CAM entry\n", __func__);
+		return;
+	}
 
 	RT_TRACE(COMP_SEC,
 		 "====>to rtl92e_set_key(), dev:%p, EntryNo:%d, KeyIndex:%d,KeyType:%d, MacAddr %pM\n",

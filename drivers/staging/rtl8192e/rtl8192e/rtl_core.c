@@ -90,8 +90,6 @@ static struct pci_driver rtl8192_pci_driver = {
 static short rtl8192_is_tx_queue_empty(struct net_device *dev);
 static void rtl819x_watchdog_wqcallback(void *data);
 static void watch_dog_timer_callback(unsigned long data);
-static void rtl8192_data_hard_stop(struct net_device *dev);
-static void rtl8192_data_hard_resume(struct net_device *dev);
 static void rtl8192_hard_data_xmit(struct sk_buff *skb, struct net_device *dev,
 				   int rate);
 static int rtl8192_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
@@ -151,8 +149,7 @@ void rtl92e_writew(struct net_device *dev, int x, u16 y)
 *****************************************************************************/
 bool rtl92e_set_rf_state(struct net_device *dev,
 			 enum rt_rf_power_state StateToSet,
-			 RT_RF_CHANGE_SOURCE ChangeSource,
-			 bool	ProtectOrNot)
+			 RT_RF_CHANGE_SOURCE ChangeSource)
 {
 	struct r8192_priv *priv = rtllib_priv(dev);
 	struct rtllib_device *ieee = priv->rtllib;
@@ -165,37 +162,32 @@ bool rtl92e_set_rf_state(struct net_device *dev,
 	RT_TRACE((COMP_PS | COMP_RF),
 		 "===>rtl92e_set_rf_state(): StateToSet(%d)\n", StateToSet);
 
-	ProtectOrNot = false;
+	while (true) {
+		spin_lock_irqsave(&priv->rf_ps_lock, flag);
+		if (priv->RFChangeInProgress) {
+			spin_unlock_irqrestore(&priv->rf_ps_lock, flag);
+			RT_TRACE((COMP_PS | COMP_RF),
+				 "rtl92e_set_rf_state(): RF Change in progress! Wait to set..StateToSet(%d).\n",
+				 StateToSet);
 
-
-	if (!ProtectOrNot) {
-		while (true) {
-			spin_lock_irqsave(&priv->rf_ps_lock, flag);
-			if (priv->RFChangeInProgress) {
-				spin_unlock_irqrestore(&priv->rf_ps_lock, flag);
+			while (priv->RFChangeInProgress) {
+				RFWaitCounter++;
 				RT_TRACE((COMP_PS | COMP_RF),
-					 "rtl92e_set_rf_state(): RF Change in progress! Wait to set..StateToSet(%d).\n",
-					 StateToSet);
+					 "rtl92e_set_rf_state(): Wait 1 ms (%d times)...\n",
+					 RFWaitCounter);
+				mdelay(1);
 
-				while (priv->RFChangeInProgress) {
-					RFWaitCounter++;
-					RT_TRACE((COMP_PS | COMP_RF),
-						 "rtl92e_set_rf_state(): Wait 1 ms (%d times)...\n",
-						 RFWaitCounter);
-					mdelay(1);
-
-					if (RFWaitCounter > 100) {
-						netdev_warn(dev,
-							    "%s(): Timeout waiting for RF change.\n",
-							    __func__);
-						return false;
-					}
+				if (RFWaitCounter > 100) {
+					netdev_warn(dev,
+						    "%s(): Timeout waiting for RF change.\n",
+						    __func__);
+					return false;
 				}
-			} else {
-				priv->RFChangeInProgress = true;
-				spin_unlock_irqrestore(&priv->rf_ps_lock, flag);
-				break;
 			}
+		} else {
+			priv->RFChangeInProgress = true;
+			spin_unlock_irqrestore(&priv->rf_ps_lock, flag);
+			break;
 		}
 	}
 
@@ -272,11 +264,9 @@ bool rtl92e_set_rf_state(struct net_device *dev,
 			 StateToSet, ChangeSource, priv->rtllib->RfOffReason);
 	}
 
-	if (!ProtectOrNot) {
-		spin_lock_irqsave(&priv->rf_ps_lock, flag);
-		priv->RFChangeInProgress = false;
-		spin_unlock_irqrestore(&priv->rf_ps_lock, flag);
-	}
+	spin_lock_irqsave(&priv->rf_ps_lock, flag);
+	priv->RFChangeInProgress = false;
+	spin_unlock_irqrestore(&priv->rf_ps_lock, flag);
 
 	RT_TRACE((COMP_PS | COMP_RF), "<===rtl92e_set_rf_state()\n");
 	return bActionAllowed;
@@ -737,9 +727,6 @@ void rtl92e_set_wireless_mode(struct net_device *dev, u8 wireless_mode)
 
 	priv->rtllib->mode = wireless_mode;
 
-	ActUpdateChannelAccessSetting(dev, wireless_mode,
-				      &priv->ChannelAccessSetting);
-
 	if ((wireless_mode == WIRELESS_MODE_N_24G) ||
 	    (wireless_mode == WIRELESS_MODE_N_5G)) {
 		priv->rtllib->pHTInfo->bEnableHT = 1;
@@ -869,8 +856,6 @@ static void rtl8192_init_priv_handler(struct net_device *dev)
 	priv->rtllib->set_chan			= rtl8192_set_chan;
 	priv->rtllib->link_change		= priv->ops->link_change;
 	priv->rtllib->softmac_data_hard_start_xmit = rtl8192_hard_data_xmit;
-	priv->rtllib->data_hard_stop		= rtl8192_data_hard_stop;
-	priv->rtllib->data_hard_resume		= rtl8192_data_hard_resume;
 	priv->rtllib->check_nic_enough_desc	= rtl8192_check_nic_enough_desc;
 	priv->rtllib->handle_assoc_response	= rtl8192_handle_assoc_response;
 	priv->rtllib->handle_beacon		= rtl8192_handle_beacon;
@@ -1370,8 +1355,6 @@ RESET_START:
 
 			rtllib_start_send_beacons(ieee);
 
-			if (ieee->data_hard_resume)
-				ieee->data_hard_resume(ieee->dev);
 			netif_carrier_on(ieee->dev);
 		} else if (ieee->iw_mode == IW_MODE_MESH) {
 			rtl819x_silentreset_mesh_bk(dev, IsPortal);
@@ -1644,14 +1627,6 @@ static void rtl8192_free_tx_ring(struct net_device *dev, unsigned int prio)
 	ring->desc = NULL;
 }
 
-static void rtl8192_data_hard_stop(struct net_device *dev)
-{
-}
-
-static void rtl8192_data_hard_resume(struct net_device *dev)
-{
-}
-
 static void rtl8192_hard_data_xmit(struct sk_buff *skb, struct net_device *dev,
 			    int rate)
 {
@@ -1667,8 +1642,8 @@ static void rtl8192_hard_data_xmit(struct sk_buff *skb, struct net_device *dev,
 		return;
 	}
 
-	if (queue_index != TXCMD_QUEUE)
-		netdev_warn(dev, "%s(): queue index != TXCMD_QUEUE\n",
+	if (queue_index == TXCMD_QUEUE)
+		netdev_warn(dev, "%s(): queue index == TXCMD_QUEUE\n",
 			    __func__);
 
 	memcpy((unsigned char *)(skb->cb), &dev, sizeof(dev));
@@ -2667,12 +2642,12 @@ static int rtl8192_pci_probe(struct pci_dev *pdev,
 	pci_read_config_byte(pdev, 0x08, &revision_id);
 	/* If the revisionid is 0x10, the device uses rtl8192se. */
 	if (pdev->device == 0x8192 && revision_id == 0x10)
-		goto err_rel_mem;
+		goto err_unmap;
 
 	priv->ops = ops;
 
 	if (rtl92e_check_adapter(pdev, dev) == false)
-		goto err_rel_mem;
+		goto err_unmap;
 
 	dev->irq = pdev->irq;
 	priv->irq = 0;
@@ -2713,6 +2688,8 @@ static int rtl8192_pci_probe(struct pci_dev *pdev,
 err_free_irq:
 	free_irq(dev->irq, dev);
 	priv->irq = 0;
+err_unmap:
+	iounmap((void __iomem *)ioaddr);
 err_rel_mem:
 	release_mem_region(pmem_start, pmem_len);
 err_rel_rtllib:

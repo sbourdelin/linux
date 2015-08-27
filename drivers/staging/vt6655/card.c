@@ -514,7 +514,7 @@ CARDvSafeResetTx(
 )
 {
 	unsigned int uu;
-	PSTxDesc    pCurrTD;
+	struct vnt_tx_desc *pCurrTD;
 
 	/* initialize TD index */
 	pDevice->apTailTD[0] = pDevice->apCurrTD[0] = &(pDevice->apTD0Rings[0]);
@@ -525,12 +525,12 @@ CARDvSafeResetTx(
 
 	for (uu = 0; uu < pDevice->sOpts.nTxDescs[0]; uu++) {
 		pCurrTD = &(pDevice->apTD0Rings[uu]);
-		pCurrTD->m_td0TD0.f1Owner = OWNED_BY_HOST;
+		pCurrTD->td0.owner = OWNED_BY_HOST;
 		/* init all Tx Packet pointer to NULL */
 	}
 	for (uu = 0; uu < pDevice->sOpts.nTxDescs[1]; uu++) {
 		pCurrTD = &(pDevice->apTD1Rings[uu]);
-		pCurrTD->m_td0TD0.f1Owner = OWNED_BY_HOST;
+		pCurrTD->td0.owner = OWNED_BY_HOST;
 		/* init all Tx Packet pointer to NULL */
 	}
 

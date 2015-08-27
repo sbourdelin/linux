@@ -216,62 +216,48 @@ typedef struct tagSRxDesc {
 SRxDesc, *PSRxDesc;
 typedef const SRxDesc *PCSRxDesc;
 
+struct vnt_tdes0 {
+	volatile u8 tsr0;
+	volatile u8 tsr1;
 #ifdef __BIG_ENDIAN
-
-typedef struct tagTDES0 {
-	volatile    unsigned char byTSR0;
-	volatile    unsigned char byTSR1;
 	union {
-		volatile u16    f15Txtime;
+		volatile u16 f15_txtime;
 		struct {
-			volatile u8 f8Reserved1;
-			volatile u8 f1Owner:1;
-			volatile u8 f7Reserved:7;
-		} __attribute__ ((__packed__));
-	} __attribute__ ((__packed__));
-} __attribute__ ((__packed__))
-STDES0, PSTDES0;
-
+			volatile u8 f8_reserved;
+			volatile u8 owner:1;
+			volatile u8 f7_reserved:7;
+		} __packed;
+	} __packed;
 #else
-
-typedef struct tagTDES0 {
-	volatile    unsigned char byTSR0;
-	volatile    unsigned char byTSR1;
-	volatile    unsigned short f15Txtime:15;
-	volatile    unsigned short f1Owner:1;
-} __attribute__ ((__packed__))
-STDES0;
-
+	volatile u16 f15_txtime:15;
+	volatile u16 owner:1;
 #endif
+} __packed;
 
-typedef struct tagTDES1 {
-	volatile    __le16        wReqCount;
-	volatile    unsigned char byTCR;
-	volatile    unsigned char byReserved;
-} __attribute__ ((__packed__))
-STDES1;
+struct vnt_tdes1 {
+	volatile __le16 req_count;
+	volatile u8 tcr;
+	volatile u8 reserved;
+} __packed;
 
-typedef struct tagDEVICE_TD_INFO {
+struct vnt_td_info {
 	void *mic_hdr;
 	struct sk_buff *skb;
 	unsigned char *buf;
-	dma_addr_t          buf_dma;
-	unsigned long dwReqCount;
-	unsigned long dwHeaderLength;
-	unsigned char byFlags;
-} DEVICE_TD_INFO,    *PDEVICE_TD_INFO;
+	dma_addr_t buf_dma;
+	u16 req_count;
+	u8 flags;
+};
 
 /* transmit descriptor */
-typedef struct tagSTxDesc {
-	volatile    STDES0  m_td0TD0;
-	volatile    STDES1  m_td1TD1;
-	volatile    __le32  buff_addr;
-	volatile    __le32  next_desc;
-	struct tagSTxDesc *next __aligned(8);
-	volatile    PDEVICE_TD_INFO pTDInfo __aligned(8);
-} __attribute__ ((__packed__))
-STxDesc, *PSTxDesc;
-typedef const STxDesc *PCSTxDesc;
+struct vnt_tx_desc {
+	volatile struct vnt_tdes0 td0;
+	volatile struct vnt_tdes1 td1;
+	volatile __le32 buff_addr;
+	volatile __le32 next_desc;
+	struct vnt_tx_desc *next __aligned(8);
+	struct vnt_td_info *td_info __aligned(8);
+} __packed;
 
 /* Length, Service, and Signal fields of Phy for Tx */
 struct vnt_phy_field {

@@ -49,7 +49,7 @@ static struct list_head channel_list;
 static spinlock_t ch_list_lock;
 
 
-struct aim_channel *get_channel(struct most_interface *iface, int id)
+static struct aim_channel *get_channel(struct most_interface *iface, int id)
 {
 	struct aim_channel *channel, *tmp;
 	unsigned long flags;
@@ -124,9 +124,9 @@ static int aim_close(struct inode *inode, struct file *filp)
 		cdev_del(&channel->cdev);
 		kfifo_free(&channel->fifo);
 		list_del(&channel->list);
-		kfree(channel);
 		ida_simple_remove(&minor_id, MINOR(channel->devno));
 		wake_up_interruptible(&channel->wq);
+		kfree(channel);
 		return 0;
 	}
 	mutex_unlock(&channel->io_mutex);
@@ -204,7 +204,8 @@ static ssize_t aim_write(struct file *filp, const char __user *buf,
 	}
 	return actual_len - retval;
 error:
-	most_put_mbo(mbo);
+	if (mbo)
+		most_put_mbo(mbo);
 	return err;
 }
 
@@ -288,7 +289,7 @@ static const struct file_operations channel_fops = {
  * This frees allocated memory and removes the cdev that represents this
  * channel in user space.
  */
-int aim_disconnect_channel(struct most_interface *iface, int channel_id)
+static int aim_disconnect_channel(struct most_interface *iface, int channel_id)
 {
 	struct aim_channel *channel;
 	unsigned long flags;
@@ -328,7 +329,7 @@ int aim_disconnect_channel(struct most_interface *iface, int channel_id)
  * This searches for the channel linked to this MBO and stores it in the local
  * fifo buffer.
  */
-int aim_rx_completion(struct mbo *mbo)
+static int aim_rx_completion(struct mbo *mbo)
 {
 	struct aim_channel *channel;
 
@@ -355,7 +356,7 @@ int aim_rx_completion(struct mbo *mbo)
  *
  * This wakes sleeping processes in the wait-queue.
  */
-int aim_tx_completion(struct most_interface *iface, int channel_id)
+static int aim_tx_completion(struct most_interface *iface, int channel_id)
 {
 	struct aim_channel *channel;
 
@@ -375,7 +376,7 @@ int aim_tx_completion(struct most_interface *iface, int channel_id)
 	return 0;
 }
 
-struct most_aim cdev_aim;
+static struct most_aim cdev_aim;
 
 /**
  * aim_probe - probe function of the driver module
@@ -389,9 +390,9 @@ struct most_aim cdev_aim;
  *
  * Returns 0 on success or error code otherwise.
  */
-int aim_probe(struct most_interface *iface, int channel_id,
-	      struct most_channel_config *cfg,
-	      struct kobject *parent, char *name)
+static int aim_probe(struct most_interface *iface, int channel_id,
+		     struct most_channel_config *cfg,
+		     struct kobject *parent, char *name)
 {
 	struct aim_channel *channel;
 	unsigned long cl_flags;
@@ -462,7 +463,7 @@ error_alloc_channel:
 	return retval;
 }
 
-struct most_aim cdev_aim = {
+static struct most_aim cdev_aim = {
 	.name = "cdev",
 	.probe_channel = aim_probe,
 	.disconnect_channel = aim_disconnect_channel,

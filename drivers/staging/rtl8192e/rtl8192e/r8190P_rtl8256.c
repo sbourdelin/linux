@@ -28,49 +28,32 @@ void rtl92e_set_bandwidth(struct net_device *dev,
 	u8	eRFPath;
 	struct r8192_priv *priv = rtllib_priv(dev);
 
+	if (priv->card_8192_version != VERSION_8190_BD &&
+	    priv->card_8192_version != VERSION_8190_BE) {
+		netdev_warn(dev, "%s(): Unknown HW version.\n", __func__);
+		return;
+	}
+
 	for (eRFPath = 0; eRFPath < priv->NumTotalRFPath; eRFPath++) {
 		if (!rtl92e_is_legal_rf_path(dev, eRFPath))
 				continue;
 
 		switch (Bandwidth) {
 		case HT_CHANNEL_WIDTH_20:
-			if (priv->card_8192_version == VERSION_8190_BD ||
-			    priv->card_8192_version == VERSION_8190_BE) {
-				rtl92e_set_rf_reg(dev,
-						  (enum rf90_radio_path)eRFPath,
-						  0x0b, bMask12Bits, 0x100);
-				rtl92e_set_rf_reg(dev,
-						  (enum rf90_radio_path)eRFPath,
-						  0x2c, bMask12Bits, 0x3d7);
-				rtl92e_set_rf_reg(dev,
-						  (enum rf90_radio_path)eRFPath,
-						  0x0e, bMask12Bits, 0x021);
-
-			} else {
-				netdev_warn(dev, "%s(): Unknown HW version.\n",
-					    __func__);
-			}
-
+			rtl92e_set_rf_reg(dev, (enum rf90_radio_path)eRFPath,
+					  0x0b, bMask12Bits, 0x100);
+			rtl92e_set_rf_reg(dev, (enum rf90_radio_path)eRFPath,
+					  0x2c, bMask12Bits, 0x3d7);
+			rtl92e_set_rf_reg(dev, (enum rf90_radio_path)eRFPath,
+					  0x0e, bMask12Bits, 0x021);
 			break;
 		case HT_CHANNEL_WIDTH_20_40:
-			if (priv->card_8192_version == VERSION_8190_BD ||
-			    priv->card_8192_version == VERSION_8190_BE) {
-				rtl92e_set_rf_reg(dev,
-						  (enum rf90_radio_path)eRFPath,
-						  0x0b, bMask12Bits, 0x300);
-				rtl92e_set_rf_reg(dev,
-						  (enum rf90_radio_path)eRFPath,
-						  0x2c, bMask12Bits, 0x3ff);
-				rtl92e_set_rf_reg(dev,
-						  (enum rf90_radio_path)eRFPath,
-						  0x0e, bMask12Bits, 0x0e1);
-
-			} else {
-				netdev_warn(dev, "%s(): Unknown HW version.\n",
-					    __func__);
-			}
-
-
+			rtl92e_set_rf_reg(dev, (enum rf90_radio_path)eRFPath,
+					  0x0b, bMask12Bits, 0x300);
+			rtl92e_set_rf_reg(dev, (enum rf90_radio_path)eRFPath,
+					  0x2c, bMask12Bits, 0x3ff);
+			rtl92e_set_rf_reg(dev, (enum rf90_radio_path)eRFPath,
+					  0x0e, bMask12Bits, 0x0e1);
 			break;
 		default:
 			netdev_err(dev, "%s(): Unknown bandwidth: %#X\n",
@@ -81,7 +64,7 @@ void rtl92e_set_bandwidth(struct net_device *dev,
 	}
 }
 
-static bool phy_RF8256_Config_ParaFile(struct net_device *dev)
+bool rtl92e_config_rf(struct net_device *dev)
 {
 	u32	u4RegValue = 0;
 	u8	eRFPath;
@@ -93,6 +76,8 @@ static bool phy_RF8256_Config_ParaFile(struct net_device *dev)
 	u32	RF3_Final_Value = 0;
 	u8	ConstRetryTimes = 5, RetryTimes = 5;
 	u8 ret = 0;
+
+	priv->NumTotalRFPath = RTL819X_TOTAL_RF_PATH;
 
 	for (eRFPath = (enum rf90_radio_path)RF90_PATH_A;
 	     eRFPath < priv->NumTotalRFPath; eRFPath++) {
@@ -132,75 +117,24 @@ static bool phy_RF8256_Config_ParaFile(struct net_device *dev)
 		if (!rtStatus) {
 			netdev_err(dev, "%s(): Failed to check RF Path %d.\n",
 				   __func__, eRFPath);
-			goto phy_RF8256_Config_ParaFile_Fail;
+			goto fail;
 		}
 
 		RetryTimes = ConstRetryTimes;
 		RF3_Final_Value = 0;
-		switch (eRFPath) {
-		case RF90_PATH_A:
-			while (RF3_Final_Value != RegValueToBeCheck &&
-			       RetryTimes != 0) {
-				ret = rtl92e_config_rf_path(dev,
+		while (RF3_Final_Value != RegValueToBeCheck &&
+		       RetryTimes != 0) {
+			ret = rtl92e_config_rf_path(dev,
 						(enum rf90_radio_path)eRFPath);
-				RF3_Final_Value = rtl92e_get_rf_reg(dev,
-						 (enum rf90_radio_path)eRFPath,
-						 RegOffSetToBeCheck,
-						 bMask12Bits);
-				RT_TRACE(COMP_RF,
-					 "RF %d %d register final value: %x\n",
-					 eRFPath, RegOffSetToBeCheck,
-					 RF3_Final_Value);
-				RetryTimes--;
-			}
-			break;
-		case RF90_PATH_B:
-			while (RF3_Final_Value != RegValueToBeCheck &&
-			       RetryTimes != 0) {
-				ret = rtl92e_config_rf_path(dev,
-						(enum rf90_radio_path)eRFPath);
-				RF3_Final_Value = rtl92e_get_rf_reg(dev,
-						 (enum rf90_radio_path)eRFPath,
-						 RegOffSetToBeCheck,
-						 bMask12Bits);
-				RT_TRACE(COMP_RF,
-					 "RF %d %d register final value: %x\n",
-					 eRFPath, RegOffSetToBeCheck,
-					 RF3_Final_Value);
-				RetryTimes--;
-			}
-			break;
-		case RF90_PATH_C:
-			while (RF3_Final_Value != RegValueToBeCheck &&
-			       RetryTimes != 0) {
-				ret = rtl92e_config_rf_path(dev,
-						(enum rf90_radio_path)eRFPath);
-				RF3_Final_Value = rtl92e_get_rf_reg(dev,
+			RF3_Final_Value = rtl92e_get_rf_reg(dev,
 						(enum rf90_radio_path)eRFPath,
 						RegOffSetToBeCheck,
 						bMask12Bits);
-				RT_TRACE(COMP_RF,
-					 "RF %d %d register final value: %x\n",
-					 eRFPath, RegOffSetToBeCheck,
-					 RF3_Final_Value);
-				RetryTimes--;
-			}
-			break;
-		case RF90_PATH_D:
-			while (RF3_Final_Value != RegValueToBeCheck &&
-			       RetryTimes != 0) {
-				ret = rtl92e_config_rf_path(dev,
-					       (enum rf90_radio_path)eRFPath);
-				RF3_Final_Value = rtl92e_get_rf_reg(dev,
-					       (enum rf90_radio_path)eRFPath,
-					       RegOffSetToBeCheck, bMask12Bits);
-				RT_TRACE(COMP_RF,
-					 "RF %d %d register final value: %x\n",
-					 eRFPath, RegOffSetToBeCheck,
-					 RF3_Final_Value);
-				RetryTimes--;
-			}
-			break;
+			RT_TRACE(COMP_RF,
+				 "RF %d %d register final value: %x\n",
+				 eRFPath, RegOffSetToBeCheck,
+				 RF3_Final_Value);
+			RetryTimes--;
 		}
 
 		switch (eRFPath) {
@@ -220,7 +154,7 @@ static bool phy_RF8256_Config_ParaFile(struct net_device *dev)
 			netdev_err(dev,
 				   "%s(): Failed to initialize RF Path %d.\n",
 				   __func__, eRFPath);
-			goto phy_RF8256_Config_ParaFile_Fail;
+			goto fail;
 		}
 
 	}
@@ -228,16 +162,8 @@ static bool phy_RF8256_Config_ParaFile(struct net_device *dev)
 	RT_TRACE(COMP_PHY, "PHY Initialization Success\n");
 	return true;
 
-phy_RF8256_Config_ParaFile_Fail:
+fail:
 	return false;
-}
-
-bool rtl92e_config_rf(struct net_device *dev)
-{
-	struct r8192_priv *priv = rtllib_priv(dev);
-
-	priv->NumTotalRFPath = RTL819X_TOTAL_RF_PATH;
-	return phy_RF8256_Config_ParaFile(dev);
 }
 
 void rtl92e_set_cck_tx_power(struct net_device *dev, u8 powerlevel)
