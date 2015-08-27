@@ -1591,10 +1591,11 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 	dev_info(&priv->udev->dev, "Product: %.20s\n",
 		 priv->efuse_wifi.efuse8192.device_name);
 
-	dev_info(&priv->udev->dev, "%s: dumping efuse:\n", __func__);
+	dev_info(&priv->udev->dev, "%s: dumping efuse (0x%02lx bytes):\n",
+		 __func__, sizeof(struct rtl8192cu_efuse));
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_EFUSE) {
 		unsigned char *raw = priv->efuse_wifi.raw;
-		for (i = 0; i < EFUSE_MAP_LEN_8723A; i += 8) {
+		for (i = 0; i < sizeof(struct rtl8192cu_efuse); i += 8) {
 			dev_info(&priv->udev->dev, "%02x: "
 				 "%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
 				 raw[i], raw[i + 1], raw[i + 2],
