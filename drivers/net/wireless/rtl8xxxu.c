@@ -1099,11 +1099,14 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 	u8 val8, opmode;
 	bool ht = true;
 	int sec_ch_above;
+	int i;
 
-	val32 = rtl8xxxu_read_rfreg(priv, RF_A, RF6052_REG_MODE_AG);
-	val32 &= ~MODE_AG_CHANNEL_MASK;
-	val32 |= hw->conf.chandef.chan->hw_value;
-	rtl8xxxu_write_rfreg(priv, RF_A, RF6052_REG_MODE_AG, val32);
+	for (i = RF_A; i < priv->rf_paths; i++) {
+		val32 = rtl8xxxu_read_rfreg(priv, i, RF6052_REG_MODE_AG);
+		val32 &= ~MODE_AG_CHANNEL_MASK;
+		val32 |= hw->conf.chandef.chan->hw_value;
+		rtl8xxxu_write_rfreg(priv, i, RF6052_REG_MODE_AG, val32);
+	}
 
 	opmode = rtl8xxxu_read8(priv, REG_BW_OPMODE);
 	rsr = rtl8xxxu_read32(priv, REG_RESPONSE_RATE_SET);
@@ -1197,12 +1200,14 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 	rtl8xxxu_write16(priv, REG_R2T_SIFS, 0x0808);
 	rtl8xxxu_write16(priv, REG_T2T_SIFS, 0x0a0a);
 
-	val32 = rtl8xxxu_read_rfreg(priv, RF_A, RF6052_REG_MODE_AG);
-	if (hw->conf.chandef.width == NL80211_CHAN_WIDTH_40)
-		val32 &= ~MODE_AG_CHANNEL_20MHZ;
-	else
-		val32 |= MODE_AG_CHANNEL_20MHZ;
-	rtl8xxxu_write_rfreg(priv, RF_A, RF6052_REG_MODE_AG, val32);
+	for (i = RF_A; i < priv->rf_paths; i++) {
+		val32 = rtl8xxxu_read_rfreg(priv, i, RF6052_REG_MODE_AG);
+		if (hw->conf.chandef.width == NL80211_CHAN_WIDTH_40)
+			val32 &= ~MODE_AG_CHANNEL_20MHZ;
+		else
+			val32 |= MODE_AG_CHANNEL_20MHZ;
+		rtl8xxxu_write_rfreg(priv, i, RF6052_REG_MODE_AG, val32);
+	}
 }
 
 static void
