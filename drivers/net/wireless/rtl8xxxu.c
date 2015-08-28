@@ -4002,8 +4002,6 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
-	dev_info(dev, "%s: init_phy_rf chip %05x paths %i\n",
-		 __func__, priv->rtlchip, priv->rf_paths);
 	switch(priv->rtlchip) {
 	case 0x8723a:
 		rftable = rtl8723au_radioa_1t_init_table;
