@@ -3623,7 +3623,7 @@ static int rtl8xxxu_active_to_lps(struct rtl8xxxu_priv *priv)
 
 	/* Respond TX OK to scheduler */
 	val8 = rtl8xxxu_read8(priv, REG_DUAL_TSF_RST);
-	val8 |= BIT(5);
+	val8 |= DUAL_TSF_TX_OK;
 	rtl8xxxu_write8(priv, REG_DUAL_TSF_RST, val8);
 
 exit:

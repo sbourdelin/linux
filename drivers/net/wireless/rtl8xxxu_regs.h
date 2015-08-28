@@ -492,7 +492,12 @@
 
 #define REG_MBID_NUM			0x0552
 #define REG_DUAL_TSF_RST		0x0553
-	/*  The same as REG_MBSSID_BCN_SPACE */
+#define  DUAL_TSF_RESET_TSF0		BIT(0)
+#define  DUAL_TSF_RESET_TSF1		BIT(1)
+#define  DUAL_TSF_RESET_P2P		BIT(4)
+#define  DUAL_TSF_TX_OK			BIT(5)
+
+/*  The same as REG_MBSSID_BCN_SPACE */
 #define REG_BCN_INTERVAL		0x0554
 #define REG_MBSSID_BCN_SPACE		0x0554
 
