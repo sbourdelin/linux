@@ -99,7 +99,10 @@
 #define REG_AFE_XTAL_CTRL		0x0024
 #define  AFE_XTAL_ENABLE		BIT(0)
 #define  AFE_XTAL_B_SELECT		BIT(1)
+#define  AFE_XTAL_GATE_USB		BIT(8)
+#define  AFE_XTAL_GATE_AFE		BIT(11)
 #define  AFE_XTAL_RF_GATE		BIT(14)
+#define  AFE_XTAL_GATE_DIG		BIT(17)
 #define  AFE_XTAL_BT_GATE		BIT(20)
 
 #define REG_AFE_PLL_CTRL		0x0028

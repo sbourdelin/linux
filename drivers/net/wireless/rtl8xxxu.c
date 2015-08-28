@@ -2336,14 +2336,11 @@ static int rtl8xxxu_init_phy_bb(struct rtl8xxxu_priv *priv)
 	rtl8xxxu_write8(priv, REG_SYS_FUNC, val8);
 
 	/* AFE_XTAL_RF_GATE (bit 14) if addressing as 32 bit register */
-	val8 = rtl8xxxu_read8(priv, REG_AFE_XTAL_CTRL + 1);
-	val8 &= ~BIT(6);
-	rtl8xxxu_write8(priv, REG_AFE_XTAL_CTRL + 1, val8);
-
-	/* AFE_XTAL_BT_GATE (bit 20) if addressing as 32 bit register */
-	val8 = rtl8xxxu_read8(priv, REG_AFE_XTAL_CTRL + 2);
-	val8 &= ~BIT(4);
-	rtl8xxxu_write8(priv, REG_AFE_XTAL_CTRL + 2, val8);
+	val32 = rtl8xxxu_read32(priv, REG_AFE_XTAL_CTRL);
+	val32 &= ~AFE_XTAL_RF_GATE;
+	if (priv->has_bluetooth)
+		val32 &= ~AFE_XTAL_BT_GATE;
+	rtl8xxxu_write32(priv, REG_AFE_XTAL_CTRL, val32);
 
 	/* 6. 0x1f[7:0] = 0x07 */
 	val8 = RF_ENABLE | RF_RSTB | RF_SDMRSTB;
