@@ -1402,7 +1402,7 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 		rtl8xxxu_write32(priv, REG_FPGA1_RF_MODE, val32);
 
 		val32 = rtl8xxxu_read32(priv, REG_FPGA0_ANALOG2);
-		val32 |= BIT(10);
+		val32 |= FPGA0_ANALOG2_20MHZ;
 		rtl8xxxu_write32(priv, REG_FPGA0_ANALOG2, val32);
 		break;
 	case NL80211_CHAN_WIDTH_40:
@@ -1440,15 +1440,15 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 		rtl8xxxu_write32(priv, REG_CCK0_SYSTEM, val32);
 
 		val32 = rtl8xxxu_read32(priv, REG_OFDM1_LSTF);
-		val32 &= ~(BIT(10) | BIT(11)); /* 0xc00 */
+		val32 &= ~OFDM_LSTF_PRIME_CH_MASK; /* 0xc00 */
 		if (sec_ch_above)
-			val32 |= BIT(10);
+			val32 |= OFDM_LSTF_PRIME_CH_LOW;
 		else
-			val32 |= BIT(11);
+			val32 |= OFDM_LSTF_PRIME_CH_HIGH;
 		rtl8xxxu_write32(priv, REG_OFDM1_LSTF, val32);
 
 		val32 = rtl8xxxu_read32(priv, REG_FPGA0_ANALOG2);
-		val32 &= ~BIT(10);
+		val32 &= ~FPGA0_ANALOG2_20MHZ;
 		rtl8xxxu_write32(priv, REG_FPGA0_ANALOG2, val32);
 
 		val32 = rtl8xxxu_read32(priv, REG_FPGA0_POWER_SAVE);
