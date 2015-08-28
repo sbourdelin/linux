@@ -3817,6 +3817,7 @@ static int rtl8192cu_power_on(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u16 val16;
+	u32 val32;
 	int i;
 
 	for (i = 100; i; i--) {
@@ -3904,6 +3905,14 @@ static int rtl8192cu_power_on(struct rtl8xxxu_priv *priv)
 		CR_SCHEDULE_ENABLE | CR_MAC_TX_ENABLE | CR_MAC_RX_ENABLE;
 	rtl8xxxu_write16(priv, REG_CR, val16);
 
+	/*
+	 * Workaround for 8188RU LNA power leakage problem.
+	 */
+	if (priv->rtlchip == 0x8188c && priv->hi_pa) {
+		val32 = rtl8xxxu_read32(priv, REG_FPGA0_XCD_RF_PARM);
+		val32 &= ~BIT(1);
+		rtl8xxxu_write32(priv, REG_FPGA0_XCD_RF_PARM, val32);
+	}
 	return 0;
 }
 
@@ -3911,6 +3920,16 @@ static void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 {
 	u8 val8;
 	u16 val16;
+	u32 val32;
+
+	/*
+	 * Workaround for 8188RU LNA power leakage problem.
+	 */
+	if (priv->rtlchip == 0x8188c && priv->hi_pa) {
+		val32 = rtl8xxxu_read32(priv, REG_FPGA0_XCD_RF_PARM);
+		val32 |= BIT(1);
+		rtl8xxxu_write32(priv, REG_FPGA0_XCD_RF_PARM, val32);
+	}
 
 	rtl8xxxu_active_to_lps(priv);
 
