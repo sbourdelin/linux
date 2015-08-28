@@ -3670,7 +3670,7 @@ static int rtl8xxxu_emu_to_active(struct rtl8xxxu_priv *priv)
 
 	/* 0x00[5] = 0 release analog Ips to digital, 1:isolation */
 	val8 = rtl8xxxu_read8(priv, REG_SYS_ISO_CTRL);
-	val8 &= ~BIT(5);
+	val8 &= ~SYS_ISO_ANALOG_IPS;
 	rtl8xxxu_write8(priv, REG_SYS_ISO_CTRL, val8);
 
 	/* disable SW LPS 0x04[10]= 0 */
