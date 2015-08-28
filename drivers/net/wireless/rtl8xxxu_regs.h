@@ -722,6 +722,7 @@
 #define REG_FPGA0_XCD_RF_PARM		0x087c
 #define REG_FPGA0_XC_RF_PARM		0x087c	/* 16 bit */
 #define REG_FPGA0_XD_RF_PARM		0x087e	/* 16 bit */
+#define  FPGA0_RF_PARM_CLK_GATE		BIT(31)
 
 #define REG_FPGA0_ANALOG1		0x0880
 #define REG_FPGA0_ANALOG2		0x0884
