@@ -1221,7 +1221,7 @@ static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 	 */
 	if (h2c->cmd.cmd & H2C_EXT) {
 		rtl8xxxu_write16(priv, mbox_ext_reg,
-				  le16_to_cpu(h2c->raw.ext));
+				 le16_to_cpu(h2c->raw.ext));
 		if (rtl8xxxu_debug & RTL8XXXU_DEBUG_H2C)
 			dev_info(dev, "H2C_EXT %04x\n",
 				 le16_to_cpu(h2c->raw.ext));
@@ -1650,6 +1650,7 @@ static void rtl8xxxu_print_chipinfo(struct rtl8xxxu_priv *priv)
 {
 	struct device *dev = &priv->udev->dev;
 	char *cut;
+
 	switch (priv->chip_cut) {
 	case 0:
 		cut = "A";
@@ -1669,8 +1670,6 @@ static void rtl8xxxu_print_chipinfo(struct rtl8xxxu_priv *priv)
 		 priv->hi_pa);
 
 	dev_info(dev, "RTL%s MAC: %pM\n", priv->chip_name, priv->mac_addr);
-
-	return;
 }
 
 static int rtl8xxxu_identify_chip(struct rtl8xxxu_priv *priv)
@@ -1869,6 +1868,7 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 		 __func__, sizeof(struct rtl8192cu_efuse));
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_EFUSE) {
 		unsigned char *raw = priv->efuse_wifi.raw;
+
 		for (i = 0; i < sizeof(struct rtl8192cu_efuse); i += 8) {
 			dev_info(&priv->udev->dev, "%02x: "
 				 "%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
@@ -3007,9 +3007,9 @@ static void rtl8xxxu_mac_calibration(struct rtl8xxxu_priv *priv,
 
 	rtl8xxxu_write8(priv, regs[i], 0x3f);
 
-	for (i = 1 ; i < (RTL8XXXU_MAC_REGS - 1); i++) {
+	for (i = 1 ; i < (RTL8XXXU_MAC_REGS - 1); i++)
 		rtl8xxxu_write8(priv, regs[i], (u8)(backup[i] & ~BIT(3)));
-	}
+
 	rtl8xxxu_write8(priv, regs[i], (u8)(backup[i] & ~BIT(5)));
 }
 
@@ -3385,9 +3385,9 @@ static void rtl8723a_phy_iq_calibrate(struct rtl8xxxu_priv *priv)
 		reg_ec4 = result[candidate][6];
 		reg_ecc = result[candidate][7];
 		dev_dbg(dev, "%s: candidate is %x\n", __func__, candidate);
-		dev_dbg(dev, "%s: reg_e94 =%x reg_e9C =%x reg_eA4 =%x "
-			"reg_eAC =%x reg_eB4 =%x reg_eBC =%x reg_eC4 =%x "
-			"reg_eCC =%x\n ", __func__, reg_e94, reg_e9c,
+		dev_dbg(dev,
+			"%s: e94 =%x e9c=%x ea4=%x eac=%x eb4=%x ebc=%x ec4=%x "
+			"ecc=%x\n ", __func__, reg_e94, reg_e9c,
 			reg_ea4, reg_eac, reg_eb4, reg_ebc, reg_ec4, reg_ecc);
 		path_a_ok = true;
 		path_b_ok = true;
@@ -4805,10 +4805,11 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	/* (tx_info->flags & IEEE80211_TX_CTL_AMPDU) && */
 	if (ieee80211_is_data_qos(hdr->frame_control) && sta) {
 		if (sta->ht_cap.ht_supported) {
-			u8 ampdu = sta->ht_cap.ampdu_density;
+			u32 ampdu, val32;
 
-			tx_desc->txdw2 |=
-				cpu_to_le32(ampdu << TXDESC_AMPDU_DENSITY_SHIFT);
+			ampdu = (u32)sta->ht_cap.ampdu_density;
+			val32 = ampdu << TXDESC_AMPDU_DENSITY_SHIFT;
+			tx_desc->txdw2 |= cpu_to_le32(val32);
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_AGG_ENABLE);
 		} else
 			tx_desc->txdw1 |= cpu_to_le32(TXDESC_BK);
@@ -4981,14 +4982,6 @@ static void rtl8xxxu_int_complete(struct urb *urb)
 
 	dev_dbg(dev, "%s: status %i\n", __func__, urb->status);
 	if (urb->status == 0) {
-#if 0
-		int i;
-		for (i = 0; i < USB_INTR_CONTENT_LENGTH; i++) {
-			printk("%02x ", priv->int_buf[i]);
-			if ((i & 0x0f) == 0x0f)
-				printk("\n");
-		}
-#endif
 		usb_anchor_urb(urb, &priv->int_anchor);
 		ret = usb_submit_urb(urb, GFP_ATOMIC);
 		if (ret)
