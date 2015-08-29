@@ -64,8 +64,8 @@
 #define  SYS_CLK_RING_CLK_ENABLE	BIT(13)
 
 #define REG_9346CR			0x000a
-#define	 EEPROM_BOOT			BIT(4)
-#define	 EEPROM_ENABLE			BIT(5)
+#define  EEPROM_BOOT			BIT(4)
+#define  EEPROM_ENABLE			BIT(5)
 
 #define REG_EE_VPD			0x000c
 #define REG_AFE_MISC			0x0010
@@ -156,26 +156,26 @@
 /*  RTL8723 only WIFI/BT/GPS Multi-Function control source. */
 #define REG_MULTI_FUNC_CTRL		0x0068
 
-#define	 MULTI_FN_WIFI_HW_PWRDOWN_EN	BIT(0)	/* Enable GPIO[9] as WiFi HW
+#define  MULTI_FN_WIFI_HW_PWRDOWN_EN	BIT(0)	/* Enable GPIO[9] as WiFi HW
 						   powerdown source */
-#define	 MULTI_FN_WIFI_HW_PWRDOWN_SL	BIT(1)	/* WiFi HW powerdown polarity
+#define  MULTI_FN_WIFI_HW_PWRDOWN_SL	BIT(1)	/* WiFi HW powerdown polarity
 						   control */
-#define	 MULTI_WIFI_FUNC_EN		BIT(2)	/* WiFi function enable */
+#define  MULTI_WIFI_FUNC_EN		BIT(2)	/* WiFi function enable */
 
-#define	 MULTI_WIFI_HW_ROF_EN		BIT(3)	/* Enable GPIO[9] as WiFi RF HW
+#define  MULTI_WIFI_HW_ROF_EN		BIT(3)	/* Enable GPIO[9] as WiFi RF HW
 						   powerdown source */
-#define	 MULTI_BT_HW_PWRDOWN_EN		BIT(16)	/* Enable GPIO[11] as BT HW
+#define  MULTI_BT_HW_PWRDOWN_EN		BIT(16)	/* Enable GPIO[11] as BT HW
 						   powerdown source */
-#define	 MULTI_BT_HW_PWRDOWN_SL		BIT(17)	/* BT HW powerdown polarity
+#define  MULTI_BT_HW_PWRDOWN_SL		BIT(17)	/* BT HW powerdown polarity
 						   control */
-#define	 MULTI_BT_FUNC_EN		BIT(18)	/* BT function enable */
-#define	 MULTI_BT_HW_ROF_EN		BIT(19)	/* Enable GPIO[11] as BT/GPS
+#define  MULTI_BT_FUNC_EN		BIT(18)	/* BT function enable */
+#define  MULTI_BT_HW_ROF_EN		BIT(19)	/* Enable GPIO[11] as BT/GPS
 						   RF HW powerdown source */
-#define	 MULTI_GPS_HW_PWRDOWN_EN	BIT(20)	/* Enable GPIO[10] as GPS HW
+#define  MULTI_GPS_HW_PWRDOWN_EN	BIT(20)	/* Enable GPIO[10] as GPS HW
 						   powerdown source */
-#define	 MULTI_GPS_HW_PWRDOWN_SL	BIT(21)	/* GPS HW powerdown polarity
+#define  MULTI_GPS_HW_PWRDOWN_SL	BIT(21)	/* GPS HW powerdown polarity
 						   control */
-#define	 MULTI_GPS_FUNC_EN		BIT(22)	/* GPS function enable */
+#define  MULTI_GPS_FUNC_EN		BIT(22)	/* GPS function enable */
 
 #define REG_MCU_FW_DL			0x0080
 #define  MCU_FW_DL_ENABLE		BIT(0)
@@ -234,26 +234,26 @@
 #define  SYS_CFG_CHIP_VERSION_SHIFT	12
 
 #define REG_GPIO_OUTSTS			0x00f4	/*  For RTL8723 only. */
-#define	 GPIO_EFS_HCI_SEL		(BIT(0) | BIT(1))
-#define	 GPIO_PAD_HCI_SEL		(BIT(2) | BIT(3))
-#define	 GPIO_HCI_SEL			(BIT(4) | BIT(5))
-#define	 GPIO_PKG_SEL_HCI		BIT(6)
-#define	 GPIO_FEN_GPS			BIT(7)
-#define	 GPIO_FEN_BT			BIT(8)
-#define	 GPIO_FEN_WL			BIT(9)
-#define	 GPIO_FEN_PCI			BIT(10)
-#define	 GPIO_FEN_USB			BIT(11)
-#define	 GPIO_BTRF_HWPDN_N		BIT(12)
-#define	 GPIO_WLRF_HWPDN_N		BIT(13)
-#define	 GPIO_PDN_BT_N			BIT(14)
-#define	 GPIO_PDN_GPS_N			BIT(15)
-#define	 GPIO_BT_CTL_HWPDN		BIT(16)
-#define	 GPIO_GPS_CTL_HWPDN		BIT(17)
-#define	 GPIO_PPHY_SUSB			BIT(20)
-#define	 GPIO_UPHY_SUSB			BIT(21)
-#define	 GPIO_PCI_SUSEN			BIT(22)
-#define	 GPIO_USB_SUSEN			BIT(23)
-#define	 GPIO_RF_RL_ID			(BIT(31) | BIT(30) | BIT(29) | BIT(28))
+#define  GPIO_EFS_HCI_SEL		(BIT(0) | BIT(1))
+#define  GPIO_PAD_HCI_SEL		(BIT(2) | BIT(3))
+#define  GPIO_HCI_SEL			(BIT(4) | BIT(5))
+#define  GPIO_PKG_SEL_HCI		BIT(6)
+#define  GPIO_FEN_GPS			BIT(7)
+#define  GPIO_FEN_BT			BIT(8)
+#define  GPIO_FEN_WL			BIT(9)
+#define  GPIO_FEN_PCI			BIT(10)
+#define  GPIO_FEN_USB			BIT(11)
+#define  GPIO_BTRF_HWPDN_N		BIT(12)
+#define  GPIO_WLRF_HWPDN_N		BIT(13)
+#define  GPIO_PDN_BT_N			BIT(14)
+#define  GPIO_PDN_GPS_N			BIT(15)
+#define  GPIO_BT_CTL_HWPDN		BIT(16)
+#define  GPIO_GPS_CTL_HWPDN		BIT(17)
+#define  GPIO_PPHY_SUSB			BIT(20)
+#define  GPIO_UPHY_SUSB			BIT(21)
+#define  GPIO_PCI_SUSEN			BIT(22)
+#define  GPIO_USB_SUSEN			BIT(23)
+#define  GPIO_RF_RL_ID			(BIT(31) | BIT(30) | BIT(29) | BIT(28))
 
 /* 0x0100 ~ 0x01FF	MACTOP General Configuration */
 #define REG_CR				0x0100
@@ -389,10 +389,10 @@
 #define  SPEC_SIFS_OFDM_SHIFT		8
 
 #define REG_RETRY_LIMIT			0x042a
-#define	 RETRY_LIMIT_LONG_SHIFT		0
-#define	 RETRY_LIMIT_LONG_MASK		0x003f
-#define	 RETRY_LIMIT_SHORT_SHIFT	8
-#define	 RETRY_LIMIT_SHORT_MASK		0x3f00
+#define  RETRY_LIMIT_LONG_SHIFT		0
+#define  RETRY_LIMIT_LONG_MASK		0x003f
+#define  RETRY_LIMIT_SHORT_SHIFT	8
+#define  RETRY_LIMIT_SHORT_MASK		0x3f00
 
 #define REG_DARFRC			0x0430
 #define REG_RARFRC			0x0438
@@ -484,8 +484,8 @@
 #define  BEACON_ATIM			BIT(0)
 #define  BEACON_CTRL_MBSSID		BIT(1)
 #define  BEACON_CTRL_TX_BEACON_RPT	BIT(2)
-#define	 BEACON_FUNCTION_ENABLE		BIT(3)
-#define	 BEACON_DISABLE_TSF_UPDATE	BIT(4)
+#define  BEACON_FUNCTION_ENABLE		BIT(3)
+#define  BEACON_DISABLE_TSF_UPDATE	BIT(4)
 
 #define REG_MBID_NUM			0x0552
 #define REG_DUAL_TSF_RST		0x0553
@@ -538,9 +538,9 @@
 #define  APSD_CTRL_OFF			BIT(6)
 #define  APSD_CTRL_OFF_STATUS		BIT(7)
 #define REG_BW_OPMODE			0x0603
-#define	 BW_OPMODE_20MHZ		BIT(2)
-#define	 BW_OPMODE_5G			BIT(1)
-#define	 BW_OPMODE_11J			BIT(0)
+#define  BW_OPMODE_20MHZ		BIT(2)
+#define  BW_OPMODE_5G			BIT(1)
+#define  BW_OPMODE_11J			BIT(0)
 
 #define REG_TCR				0x0604
 
@@ -608,11 +608,11 @@
 
 /*  Security */
 #define REG_CAM_CMD			0x0670
-#define	 CAM_CMD_POLLING		BIT(31)
-#define	 CAM_CMD_WRITE			BIT(16)
+#define  CAM_CMD_POLLING		BIT(31)
+#define  CAM_CMD_WRITE			BIT(16)
 #define  CAM_CMD_KEY_SHIFT		3
 #define REG_CAM_WRITE			0x0674
-#define	 CAM_WRITE_VALID		BIT(15)
+#define  CAM_WRITE_VALID		BIT(15)
 #define REG_CAM_READ			0x0678
 #define REG_CAM_DEBUG			0x067c
 #define REG_SECURITY_CFG		0x0680
@@ -620,8 +620,8 @@
 #define  SEC_CFG_RX_USE_DEFKEY		BIT(1)
 #define  SEC_CFG_TX_SEC_ENABLE		BIT(2)
 #define  SEC_CFG_RX_SEC_ENABLE		BIT(3)
-#define	 SEC_CFG_SKBYA2			BIT(4)
-#define	 SEC_CFG_NO_SKMC		BIT(5)
+#define  SEC_CFG_SKBYA2			BIT(4)
+#define  SEC_CFG_NO_SKMC		BIT(5)
 #define  SEC_CFG_TXBC_USE_DEFKEY	BIT(6)
 #define  SEC_CFG_RXBC_USE_DEFKEY	BIT(7)
 
