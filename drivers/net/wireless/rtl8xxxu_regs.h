@@ -177,7 +177,6 @@
 						   control */
 #define	 MULTI_GPS_FUNC_EN		BIT(22)	/* GPS function enable */
 
-
 #define REG_MCU_FW_DL			0x0080
 #define  MCU_FW_DL_ENABLE		BIT(0)
 #define  MCU_FW_DL_READY		BIT(1)
@@ -233,7 +232,6 @@
 						    0:Switching regulator mode*/
 #define  SYS_CFG_CHIP_VERSION_MASK	0xf000	/* Bit 12 - 15 */
 #define  SYS_CFG_CHIP_VERSION_SHIFT	12
-
 
 #define REG_GPIO_OUTSTS			0x00f4	/*  For RTL8723 only. */
 #define	 GPIO_EFS_HCI_SEL		(BIT(0) | BIT(1))
@@ -298,7 +296,6 @@
 #define  TRXDMA_QUEUE_LOW		1
 #define  TRXDMA_QUEUE_NORMAL		2
 #define  TRXDMA_QUEUE_HIGH		3
-
 
 #define REG_TRXFF_BNDY			0x0114
 #define REG_TRXFF_STATUS		0x0118
@@ -374,7 +371,6 @@
 #define REG_HGQ_INFORMATION		0x0414
 #define REG_BCNQ_INFORMATION		0x0418
 
-
 #define REG_CPU_MGQ_INFORMATION		0x041c
 #define REG_FWHW_TXQ_CTRL		0x0420
 #define  FWHW_TXQ_CTRL_AMPDU_RETRY	BIT(7)
@@ -441,7 +437,6 @@
 #define REG_INIRTS_RATE_SEL		0x0480
 #define REG_INIDATA_RATE_SEL		0x0484
 
-
 #define REG_POWER_STATUS		0x04a4
 #define REG_POWER_STAGE1		0x04b4
 #define REG_POWER_STAGE2		0x04b8
@@ -459,7 +454,6 @@
 #define REG_PKT_LOSE_RPT		0x04e1
 #define REG_PTCL_ERR_STATUS		0x04e2
 #define REG_DUMMY			0x04fc
-
 
 /* 0x0500 ~ 0x05FF	EDCA Configuration */
 #define REG_EDCA_VO_PARAM		0x0500
@@ -612,7 +606,6 @@
 #define REG_RXERR_RPT			0x0664
 #define REG_WMAC_TRXPTCL_CTL		0x0668
 
-
 /*  Security */
 #define REG_CAM_CMD			0x0670
 #define	 CAM_CMD_POLLING		BIT(31)
@@ -627,7 +620,7 @@
 #define  SEC_CFG_RX_USE_DEFKEY		BIT(1)
 #define  SEC_CFG_TX_SEC_ENABLE		BIT(2)
 #define  SEC_CFG_RX_SEC_ENABLE		BIT(3)
-#define	 SEC_CFG_SKByA2			BIT(4)
+#define	 SEC_CFG_SKBYA2			BIT(4)
 #define	 SEC_CFG_NO_SKMC		BIT(5)
 #define  SEC_CFG_TXBC_USE_DEFKEY	BIT(6)
 #define  SEC_CFG_RXBC_USE_DEFKEY	BIT(7)

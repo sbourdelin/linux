@@ -5488,7 +5488,7 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 
 	udev = usb_get_dev(interface_to_usbdev(interface));
 
-	switch(id->idVendor) {
+	switch (id->idVendor) {
 	case USB_VENDOR_ID_REALTEK:
 		switch(id->idProduct) {
 		case 0x1724:
