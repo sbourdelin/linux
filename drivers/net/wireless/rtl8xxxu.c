@@ -4739,7 +4739,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		goto error;
 	}
 
-	urb = usb_alloc_urb(0, GFP_KERNEL);
+	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
 		dev_warn(dev, "%s: Unable to allocate urb\n", __func__);
 		goto error;
@@ -4847,7 +4847,7 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 			  skb->len, rtl8xxxu_tx_complete, skb);
 
 	usb_anchor_urb(urb, &priv->tx_anchor);
-	ret = usb_submit_urb(urb, GFP_KERNEL);
+	ret = usb_submit_urb(urb, GFP_ATOMIC);
 	if (ret) {
 		usb_unanchor_urb(urb);
 		goto error;
