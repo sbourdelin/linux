@@ -1864,8 +1864,8 @@ static int rtl8192cu_parse_efuse(struct rtl8xxxu_priv *priv)
 		priv->hi_pa = 1;
 	}
 
-	dev_info(&priv->udev->dev, "%s: dumping efuse (0x%02lx bytes):\n",
-		 __func__, sizeof(struct rtl8192cu_efuse));
+	dev_info(&priv->udev->dev, "%s: dumping efuse (0x%02x bytes):\n",
+		 __func__, (int)sizeof(struct rtl8192cu_efuse));
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_EFUSE) {
 		unsigned char *raw = priv->efuse_wifi.raw;
 
