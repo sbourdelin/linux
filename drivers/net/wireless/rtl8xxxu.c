@@ -1194,12 +1194,12 @@ static int rtl8723a_h2c_cmd(struct rtl8xxxu_priv *priv, struct h2c_cmd *h2c)
 	int mbox_reg, mbox_ext_reg;
 	u8 val8;
 
-	mbox_nr = priv->next_mbox;
+	mutex_lock(&priv->h2c_mutex);
 
+	mbox_nr = priv->next_mbox;
 	mbox_reg = REG_HMBOX_0 + (mbox_nr * 4);
 	mbox_ext_reg = REG_HMBOX_EXT_0 + (mbox_nr * 2);
 
-	mutex_lock(&priv->h2c_mutex);
 	/*
 	 * MBOX ready?
 	 */
