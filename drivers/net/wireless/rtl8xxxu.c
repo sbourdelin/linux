@@ -42,7 +42,7 @@
 
 #define DRIVER_NAME "rtl8xxxu"
 
-static int rtl8xxxu_debug = 0;
+static int rtl8xxxu_debug /* = 0 */; /* Avoid pointless checkpatch noise */
 
 MODULE_AUTHOR("Jes Sorensen <Jes.Sorensen@redhat.com>");
 MODULE_DESCRIPTION("RTL8XXXu USB mac80211 Wireless LAN Driver");
