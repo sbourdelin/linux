@@ -60,6 +60,7 @@ MODULE_PARM_DESC(debug, "Set debug mask");
 #define USB_VENDOR_ID_REALTEK		0x0bda
 /* Minimum IEEE80211_MAX_FRAME_LEN */
 #define RTL_RX_BUFFER_SIZE		IEEE80211_MAX_FRAME_LEN
+#define RTL8XXXU_TX_URBS		32
 
 static int rtl8xxxu_submit_rx_urb(struct rtl8xxxu_priv *priv,
 				  struct rtl8xxxu_rx_urb *rx_urb);
@@ -4640,11 +4641,54 @@ static void rtl8xxxu_calc_tx_desc_csum(struct rtl8xxxu_tx_desc *tx_desc)
 	tx_desc->csum |= cpu_to_le16(csum);
 }
 
+static void rtl8xxxu_free_tx_resources(struct rtl8xxxu_priv *priv)
+{
+	struct rtl8xxxu_tx_urb *entry, *tmp;
+	unsigned long flags;
+
+	spin_lock_irqsave(&priv->tx_urb_lock, flags);
+	list_for_each_entry_safe(entry, tmp, &priv->tx_urb_free_list, list) {
+		list_del(&entry->list);
+		kfree(entry);
+	}
+	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
+}
+
+static struct rtl8xxxu_tx_urb *
+rtl8xxxu_alloc_tx_urb(struct rtl8xxxu_priv *priv)
+{
+	struct rtl8xxxu_tx_urb *tx_urb;
+	unsigned long flags;
+
+	spin_lock_irqsave(&priv->tx_urb_lock, flags);
+	tx_urb = list_first_entry_or_null(&priv->tx_urb_free_list,
+					  struct rtl8xxxu_tx_urb, list);
+	if (tx_urb)
+		list_del(&tx_urb->list);
+
+	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
+	return tx_urb;
+}
+
+static void rtl8xxxu_free_tx_urb(struct rtl8xxxu_priv *priv,
+				 struct rtl8xxxu_tx_urb *tx_urb)
+{
+	unsigned long flags;
+
+	INIT_LIST_HEAD(&tx_urb->list);
+
+	spin_lock_irqsave(&priv->tx_urb_lock, flags);
+	list_add(&tx_urb->list, &priv->tx_urb_free_list);
+	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
+}
+
 static void rtl8xxxu_tx_complete(struct urb *urb)
 {
 	struct sk_buff *skb = (struct sk_buff *)urb->context;
 	struct ieee80211_tx_info *tx_info;
 	struct ieee80211_hw *hw;
+	struct rtl8xxxu_tx_urb *tx_urb =
+		container_of(urb, struct rtl8xxxu_tx_urb, urb);
 
 	tx_info = IEEE80211_SKB_CB(skb);
 	hw = tx_info->rate_driver_data[0];
@@ -4665,7 +4709,7 @@ static void rtl8xxxu_tx_complete(struct urb *urb)
 
 	ieee80211_tx_status_irqsafe(hw, skb);
 
-	usb_free_urb(urb);
+	rtl8xxxu_free_tx_urb(hw->priv, tx_urb);
 }
 
 static void rtl8xxxu_dump_action(struct device *dev,
@@ -4716,10 +4760,10 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 	struct ieee80211_rate *tx_rate = ieee80211_get_tx_rate(hw, tx_info);
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct rtl8xxxu_tx_desc *tx_desc;
+	struct rtl8xxxu_tx_urb *tx_urb;
 	struct ieee80211_sta *sta = NULL;
 	struct rtl8xxxu_sta_priv *sta_priv = NULL;
 	struct device *dev = &priv->udev->dev;
-	struct urb *urb;
 	u32 queue, rate;
 	u16 pktlen = skb->len;
 	u16 seq_number;
@@ -4739,9 +4783,9 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 		goto error;
 	}
 
-	urb = usb_alloc_urb(0, GFP_ATOMIC);
-	if (!urb) {
-		dev_warn(dev, "%s: Unable to allocate urb\n", __func__);
+	tx_urb = rtl8xxxu_alloc_tx_urb(priv);
+	if (!tx_urb) {
+		dev_warn(dev, "%s: Unable to allocate tx urb\n", __func__);
 		goto error;
 	}
 
@@ -4843,13 +4887,14 @@ static void rtl8xxxu_tx(struct ieee80211_hw *hw,
 
 	rtl8xxxu_calc_tx_desc_csum(tx_desc);
 
-	usb_fill_bulk_urb(urb, priv->udev, priv->pipe_out[queue], skb->data,
-			  skb->len, rtl8xxxu_tx_complete, skb);
+	usb_fill_bulk_urb(&tx_urb->urb, priv->udev, priv->pipe_out[queue],
+			  skb->data, skb->len, rtl8xxxu_tx_complete, skb);
 
-	usb_anchor_urb(urb, &priv->tx_anchor);
-	ret = usb_submit_urb(urb, GFP_ATOMIC);
+	usb_anchor_urb(&tx_urb->urb, &priv->tx_anchor);
+	ret = usb_submit_urb(&tx_urb->urb, GFP_ATOMIC);
 	if (ret) {
-		usb_unanchor_urb(urb);
+		usb_unanchor_urb(&tx_urb->urb);
+		rtl8xxxu_free_tx_urb(priv, tx_urb);
 		goto error;
 	}
 	return;
@@ -5319,6 +5364,7 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
 	struct rtl8xxxu_rx_urb *rx_urb;
+	struct rtl8xxxu_tx_urb *tx_urb;
 	int ret, i;
 
 	ret = 0;
@@ -5332,13 +5378,27 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 	if (ret)
 		goto exit;
 
+	for (i = 0; i < RTL8XXXU_TX_URBS; i++) {
+		tx_urb = kmalloc(sizeof(struct rtl8xxxu_tx_urb), GFP_KERNEL);
+		if (!tx_urb) {
+			if (!i)
+				ret = -ENOMEM;
+
+			goto error_out;
+		}
+		usb_init_urb(&tx_urb->urb);
+		INIT_LIST_HEAD(&tx_urb->list);
+		tx_urb->hw = hw;
+		list_add(&tx_urb->list, &priv->tx_urb_free_list);
+	}
+
 	for (i = 0; i < 32; i++) {
 		rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_ATOMIC);
 		if (!rx_urb) {
 			if (!i)
 				ret = -ENOMEM;
 
-			goto exit;
+			goto error_out;
 		}
 		usb_init_urb(&rx_urb->urb);
 		rx_urb->hw = hw;
@@ -5356,6 +5416,16 @@ exit:
 	rtl8xxxu_write16(priv, REG_RXFLTMAP0, 0xffff);
 
 	rtl8xxxu_write32(priv, REG_OFDM0_XA_AGC_CORE1, 0x6954341e);
+
+	return ret;
+
+error_out:
+	rtl8xxxu_free_tx_resources(priv);
+	/*
+	 * Disable all data and mgmt frames
+	 */
+	rtl8xxxu_write16(priv, REG_RXFLTMAP2, 0x0000);
+	rtl8xxxu_write16(priv, REG_RXFLTMAP0, 0x0000);
 
 	return ret;
 }
@@ -5379,6 +5449,8 @@ static void rtl8xxxu_stop(struct ieee80211_hw *hw)
 	 * Disable interrupts
 	 */
 	rtl8xxxu_write32(priv, REG_USB_HIMR, 0);
+
+	rtl8xxxu_free_tx_resources(priv);
 }
 
 static const struct ieee80211_ops rtl8xxxu_ops = {
@@ -5524,6 +5596,8 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	priv->fops = (struct rtl8xxxu_fileops *)id->driver_info;
 	mutex_init(&priv->usb_buf_mutex);
 	mutex_init(&priv->h2c_mutex);
+	INIT_LIST_HEAD(&priv->tx_urb_free_list);
+	spin_lock_init(&priv->tx_urb_lock);
 
 	usb_set_intfdata(interface, hw);
 

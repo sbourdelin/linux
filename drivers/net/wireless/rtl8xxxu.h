@@ -504,6 +504,10 @@ struct rtl8xxxu_priv {
 	struct ieee80211_hw *hw;
 	struct usb_device *udev;
 	struct rtl8xxxu_fileops *fops;
+
+	spinlock_t tx_urb_lock;
+	struct list_head tx_urb_free_list;
+
 	u8 mac_addr[ETH_ALEN];
 	char chip_name[8];
 	u8 cck_tx_power_index_A[3];	/* 0x10 */
@@ -583,6 +587,12 @@ struct rtl8xxxu_priv {
 struct rtl8xxxu_rx_urb {
 	struct urb urb;
 	struct ieee80211_hw *hw;
+};
+
+struct rtl8xxxu_tx_urb {
+	struct urb urb;
+	struct ieee80211_hw *hw;
+	struct list_head list;
 };
 
 struct rtl8xxxu_sta_priv {
