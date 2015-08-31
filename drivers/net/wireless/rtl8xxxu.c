@@ -60,6 +60,7 @@ MODULE_PARM_DESC(debug, "Set debug mask");
 #define USB_VENDOR_ID_REALTEK		0x0bda
 /* Minimum IEEE80211_MAX_FRAME_LEN */
 #define RTL_RX_BUFFER_SIZE		IEEE80211_MAX_FRAME_LEN
+#define RTL8XXXU_RX_URBS		32
 #define RTL8XXXU_TX_URBS		32
 
 static int rtl8xxxu_submit_rx_urb(struct rtl8xxxu_priv *priv,
@@ -5392,8 +5393,8 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 		list_add(&tx_urb->list, &priv->tx_urb_free_list);
 	}
 
-	for (i = 0; i < 32; i++) {
-		rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_ATOMIC);
+	for (i = 0; i < RTL8XXXU_RX_URBS; i++) {
+		rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_KERNEL);
 		if (!rx_urb) {
 			if (!i)
 				ret = -ENOMEM;
