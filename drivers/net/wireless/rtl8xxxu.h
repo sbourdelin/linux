@@ -603,5 +603,5 @@ struct rtl8xxxu_fileops {
 	int (*parse_efuse) (struct rtl8xxxu_priv *priv);
 	int (*load_firmware) (struct rtl8xxxu_priv *priv);
 	int (*power_on) (struct rtl8xxxu_priv *priv);
-	int (*writeN) (struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len);
+	int writeN_block_size;
 };

@@ -1084,44 +1084,40 @@ static int
 rtl8xxxu_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
 {
 	struct usb_device *udev = priv->udev;
-	int ret;
-
-	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
-			      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
-			      addr, 0, buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
-
-	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_REG_WRITE)
-		dev_info(&udev->dev, "%s(%04x) = %p, len 0x%02x\n",
-			 __func__, addr, buf, len);
-	return ret;
-}
-
-static int
-rtl8xxxu_slow_writeN(struct rtl8xxxu_priv *priv, u16 addr, u8 *buf, u16 len)
-{
-	u32 blocksize = sizeof(u32);
-	u32 *buf4 = (u32 *)buf;
-	int i, offset, count, remainder;
+	int blocksize = priv->fops->writeN_block_size;
+	int ret, i, count, remainder;
 
 	count = len / blocksize;
 	remainder = len % blocksize;
 
 	for (i = 0; i < count; i++) {
-		offset = i * blocksize;
-		rtl8xxxu_write32(priv, (REG_FW_START_ADDRESS + offset),
-				 buf4[i]);
+		ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
+				      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
+				      addr, 0, buf, blocksize,
+				      RTW_USB_CONTROL_MSG_TIMEOUT);
+		if (ret != blocksize)
+			goto write_error;
+
+		addr += blocksize;
+		buf += blocksize;
 	}
 
 	if (remainder) {
-		offset = count * blocksize;
-		buf += offset;
-		for (i = 0; i < remainder; i++) {
-			rtl8xxxu_write8(priv, (REG_FW_START_ADDRESS +
-					       offset + i), *(buf + i));
-		}
+		ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
+				      REALTEK_USB_CMD_REQ, REALTEK_USB_WRITE,
+				      addr, 0, buf, remainder,
+				      RTW_USB_CONTROL_MSG_TIMEOUT);
+		if (ret != remainder)
+			goto write_error;
 	}
 
 	return len;
+
+write_error:
+	dev_info(&udev->dev,
+		 "%s: Failed to write block at addr: %04x size: %04x\n",
+		 __func__, addr, blocksize);
+	return -EAGAIN;
 }
 
 static u32 rtl8xxxu_read_rfreg(struct rtl8xxxu_priv *priv,
@@ -2117,8 +2113,8 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 		val8 = rtl8xxxu_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
 		rtl8xxxu_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
 
-		ret = priv->fops->writeN(priv, REG_FW_START_ADDRESS,
-					 fwptr, RTL_FW_PAGE_SIZE);
+		ret = rtl8xxxu_writeN(priv, REG_FW_START_ADDRESS,
+				      fwptr, RTL_FW_PAGE_SIZE);
 		if (ret != RTL_FW_PAGE_SIZE) {
 			ret = -EAGAIN;
 			goto fw_abort;
@@ -2130,8 +2126,8 @@ static int rtl8xxxu_download_firmware(struct rtl8xxxu_priv *priv)
 	if (remainder) {
 		val8 = rtl8xxxu_read8(priv, REG_MCU_FW_DL + 2) & 0xF8;
 		rtl8xxxu_write8(priv, REG_MCU_FW_DL + 2, val8 | i);
-		ret = priv->fops->writeN(priv, REG_FW_START_ADDRESS,
-					 fwptr, remainder);
+		ret = rtl8xxxu_writeN(priv, REG_FW_START_ADDRESS,
+				      fwptr, remainder);
 		if (ret != remainder) {
 			ret = -EAGAIN;
 			goto fw_abort;
@@ -5704,14 +5700,14 @@ static struct rtl8xxxu_fileops rtl8723au_fops = {
 	.parse_efuse = rtl8723au_parse_efuse,
 	.load_firmware = rtl8723au_load_firmware,
 	.power_on = rtl8723au_power_on,
-	.writeN = rtl8xxxu_writeN,
+	.writeN_block_size = 1024,
 };
 
 static struct rtl8xxxu_fileops rtl8192cu_fops = {
 	.parse_efuse = rtl8192cu_parse_efuse,
 	.load_firmware = rtl8192cu_load_firmware,
 	.power_on = rtl8192cu_power_on,
-	.writeN = rtl8xxxu_slow_writeN,
+	.writeN_block_size = 64,
 };
 
 static struct usb_device_id dev_table[] = {
