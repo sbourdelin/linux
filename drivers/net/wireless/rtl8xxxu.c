@@ -4372,11 +4372,6 @@ static void rtl8xxxu_cam_write(struct rtl8xxxu_priv *priv,
 	rtl8xxxu_debug = tmp_debug;
 }
 
-static void rtl8xxxu_sw_scan_start(struct ieee80211_hw *hw,
-				   struct ieee80211_vif *vif, const u8 *mac)
-{
-}
-
 static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 				      struct ieee80211_vif *vif)
 {
@@ -5466,7 +5461,6 @@ static const struct ieee80211_ops rtl8xxxu_ops = {
 	.set_rts_threshold = rtl8xxxu_set_rts_threshold,
 	.start = rtl8xxxu_start,
 	.stop = rtl8xxxu_stop,
-	.sw_scan_start = rtl8xxxu_sw_scan_start,
 	.sw_scan_complete = rtl8xxxu_sw_scan_complete,
 	.set_key = rtl8xxxu_set_key,
 	.ampdu_action = rtl8xxxu_ampdu_action,
