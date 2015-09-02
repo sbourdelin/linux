@@ -5720,7 +5720,7 @@ static struct rtl8xxxu_fileops rtl8192cu_fops = {
 	.parse_efuse = rtl8192cu_parse_efuse,
 	.load_firmware = rtl8192cu_load_firmware,
 	.power_on = rtl8192cu_power_on,
-	.writeN_block_size = 64,
+	.writeN_block_size = 128,
 };
 
 static struct usb_device_id dev_table[] = {
