@@ -4660,6 +4660,15 @@ rtl8xxxu_alloc_tx_urb(struct rtl8xxxu_priv *priv)
 		list_del(&tx_urb->list);
 
 	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
+
+	if (!tx_urb) {
+		tx_urb = kmalloc(sizeof(struct rtl8xxxu_tx_urb), GFP_ATOMIC);
+		if (tx_urb) {
+			usb_init_urb(&tx_urb->urb);
+			tx_urb->hw = priv->hw;
+		}
+	}
+
 	return tx_urb;
 }
 
