@@ -5563,6 +5563,10 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 			break;
 		}
 		break;
+	case 0x7392:
+		if (id->idProduct == 0x7811)
+			untested = 0;
+		break;
 	default:
 		break;
 	}
