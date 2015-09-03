@@ -4975,6 +4975,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 		rx_status->band = hw->conf.chandef.chan->band;
 
 		rx_status->mactime = le32_to_cpu(rx_desc->tsfl);
+		rx_status->flag |= RX_FLAG_MACTIME_START;
 
 		if (!rx_desc->swdec)
 			rx_status->flag |= RX_FLAG_DECRYPTED;
