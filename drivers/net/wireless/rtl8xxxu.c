@@ -4340,6 +4340,10 @@ static void rtl8xxxu_cam_write(struct rtl8xxxu_priv *priv,
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_KEY)
 		rtl8xxxu_debug |= RTL8XXXU_DEBUG_REG_WRITE;
 
+	/*
+	 * This is a bit of a hack - the lower bits of the cipher
+	 * suite selector happens to match the cipher index in the CAM
+	 */
 	addr = key->keyidx << CAM_CMD_KEY_SHIFT;
 	ctrl = (key->cipher & 0x0f) << 2 | key->keyidx | CAM_WRITE_VALID;
 
@@ -5276,11 +5280,6 @@ static int rtl8xxxu_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	switch (cmd) {
 	case SET_KEY:
-		/*
-		 * This is a bit of a hack - the lower bits of the cipher
-		 * suite selector happens to match the cipher index in the
-		 * CAM
-		 */
 		key->hw_key_idx = key->keyidx;
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
 		rtl8xxxu_cam_write(priv, key, mac_addr);
