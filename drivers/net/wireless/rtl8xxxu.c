@@ -4955,6 +4955,9 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 		if (rx_desc->phy_stats) {
 			u8 cck_agc_rpt = phy_stats->cck_agc_rpt_ofdm_cfosho_a;
 
+			if (phy_stats->sgi_en)
+				rx_status->flag |= RX_FLAG_SHORT_GI;
+
 			switch (cck_agc_rpt & 0xc0) {
 			case 0xc0:
 				rx_status->signal = -46 - (cck_agc_rpt & 0x3e);
