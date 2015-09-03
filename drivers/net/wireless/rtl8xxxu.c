@@ -5353,14 +5353,14 @@ static int rtl8xxxu_sta_add(struct ieee80211_hw *hw,
 
 	sta_priv->short_preamble = false;
 	return 0;
-};
+}
 
 static int rtl8xxxu_sta_remove(struct ieee80211_hw *hw,
 			       struct ieee80211_vif *vif,
 			       struct ieee80211_sta *sta)
 {
 	return 0;
-};
+}
 
 static int rtl8xxxu_start(struct ieee80211_hw *hw)
 {
