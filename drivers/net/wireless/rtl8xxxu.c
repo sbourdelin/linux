@@ -5365,6 +5365,12 @@ rtl8xxxu_ampdu_action(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	return 0;
 }
 
+/*
+ * The driver uses IEEE80211_HW_HAS_RATE_CONTROL, which means flags for
+ * things like short preamble are not provided to rtl8xxxu_tx(). To keep
+ * track of this for rtl8xxxu_tx(), add a private sta and store the
+ * information there.
+ */
 static int rtl8xxxu_sta_add(struct ieee80211_hw *hw,
 			    struct ieee80211_vif *vif,
 			    struct ieee80211_sta *sta)
