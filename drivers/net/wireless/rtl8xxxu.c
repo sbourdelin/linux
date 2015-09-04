@@ -4395,23 +4395,16 @@ static void rtl8xxxu_sw_scan_complete(struct ieee80211_hw *hw,
 }
 
 static void rtl8xxxu_update_rate_mask(struct rtl8xxxu_priv *priv,
-				      struct ieee80211_sta *sta)
+				      u32 ramask, int sgi)
 {
 	struct h2c_cmd h2c;
-	u32 ramask;
-
-	/* TODO: Set bits 28-31 for rate adaptive id */
-	ramask = (sta->supp_rates[0] & 0xfff) |
-		sta->ht_cap.mcs.rx_mask[0] << 12 |
-		sta->ht_cap.mcs.rx_mask[1] << 20;
 
 	h2c.ramask.cmd = H2C_SET_RATE_MASK;
 	h2c.ramask.mask_lo = cpu_to_le16(ramask & 0xffff);
 	h2c.ramask.mask_hi = cpu_to_le16(ramask >> 16);
 
 	h2c.ramask.arg = 0x80;
-	if (sta->ht_cap.cap &
-	    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
+	if (sgi)
 		h2c.ramask.arg |= 0x20;
 
 	dev_dbg(&priv->udev->dev, "%s: rate mask %08x, arg %02x\n", __func__,
@@ -4463,6 +4456,9 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		rtl8xxxu_set_linktype(priv, vif->type);
 
 		if (bss_conf->assoc) {
+			u32 ramask;
+			int sgi = 0;
+
 			rcu_read_lock();
 			sta = ieee80211_find_sta(vif, bss_conf->bssid);
 			if (!sta) {
@@ -4476,8 +4472,17 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 				dev_info(dev, "%s: HT supported\n", __func__);
 			if (sta->vht_cap.vht_supported)
 				dev_info(dev, "%s: VHT supported\n", __func__);
-			rtl8xxxu_update_rate_mask(priv, sta);
+
+			/* TODO: Set bits 28-31 for rate adaptive id */
+			ramask = (sta->supp_rates[0] & 0xfff) |
+				sta->ht_cap.mcs.rx_mask[0] << 12 |
+				sta->ht_cap.mcs.rx_mask[1] << 20;
+			if (sta->ht_cap.cap &
+			    (IEEE80211_HT_CAP_SGI_40 | IEEE80211_HT_CAP_SGI_20))
+				sgi = 1;
 			rcu_read_unlock();
+
+			rtl8xxxu_update_rate_mask(priv, ramask, sgi);
 
 			val32 = rtl8xxxu_read32(priv, REG_RCR);
 			val32 |= RCR_CHECK_BSSID_MATCH | RCR_CHECK_BSSID_BEACON;
