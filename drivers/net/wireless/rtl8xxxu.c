@@ -4277,7 +4277,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8xxxu_write8(priv, 0xfe41, 0x81);
 	rtl8xxxu_write8(priv, 0xfe42, 0x80);
 
-#if 0
+#ifdef CONFIG_RTL8XXXU_BT
 	/* Init BT hw config. */
 	rtl8723a_init_bt(priv);
 #endif
