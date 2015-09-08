@@ -4224,16 +4224,6 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 
 	rtl8xxxu_write16(priv, REG_FAST_EDCA_CTRL, 0);
 
-#if 0
-	/*
-	 * From 8192cu driver
-	 */
-	val32 = rtl8xxxu_read32(priv, REG_FPGA0_XA_RF_INT_OE);
-	val32 &= ~BIT(6);
-	val32 |= BIT(5);
-	rtl8xxxu_write32(priv, REG_FPGA0_XA_RF_INT_OE, val32);
-#endif
-
 	/*
 	 * Not sure if we should get into this at all
 	 */
