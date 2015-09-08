@@ -61,7 +61,9 @@ MODULE_PARM_DESC(debug, "Set debug mask");
 /* Minimum IEEE80211_MAX_FRAME_LEN */
 #define RTL_RX_BUFFER_SIZE		IEEE80211_MAX_FRAME_LEN
 #define RTL8XXXU_RX_URBS		32
-#define RTL8XXXU_TX_URBS		32
+#define RTL8XXXU_TX_URBS		64
+#define RTL8XXXU_TX_URB_LOW_WATER	25
+#define RTL8XXXU_TX_URB_HIGH_WATER	32
 
 static int rtl8xxxu_submit_rx_urb(struct rtl8xxxu_priv *priv,
 				  struct rtl8xxxu_rx_urb *rx_urb);
@@ -4608,6 +4610,7 @@ static void rtl8xxxu_free_tx_resources(struct rtl8xxxu_priv *priv)
 	spin_lock_irqsave(&priv->tx_urb_lock, flags);
 	list_for_each_entry_safe(entry, tmp, &priv->tx_urb_free_list, list) {
 		list_del(&entry->list);
+		priv->tx_urb_free_count--;
 		kfree(entry);
 	}
 	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
@@ -4622,18 +4625,17 @@ rtl8xxxu_alloc_tx_urb(struct rtl8xxxu_priv *priv)
 	spin_lock_irqsave(&priv->tx_urb_lock, flags);
 	tx_urb = list_first_entry_or_null(&priv->tx_urb_free_list,
 					  struct rtl8xxxu_tx_urb, list);
-	if (tx_urb)
+	if (tx_urb) {
 		list_del(&tx_urb->list);
-
-	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
-
-	if (!tx_urb) {
-		tx_urb = kmalloc(sizeof(struct rtl8xxxu_tx_urb), GFP_ATOMIC);
-		if (tx_urb) {
-			usb_init_urb(&tx_urb->urb);
-			tx_urb->hw = priv->hw;
+		priv->tx_urb_free_count--;
+		if (priv->tx_urb_free_count < RTL8XXXU_TX_URB_LOW_WATER &&
+		    !priv->tx_stopped) {
+			priv->tx_stopped = true;
+			ieee80211_stop_queues(priv->hw);
 		}
 	}
+
+	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
 
 	return tx_urb;
 }
@@ -4646,7 +4648,15 @@ static void rtl8xxxu_free_tx_urb(struct rtl8xxxu_priv *priv,
 	INIT_LIST_HEAD(&tx_urb->list);
 
 	spin_lock_irqsave(&priv->tx_urb_lock, flags);
+
 	list_add(&tx_urb->list, &priv->tx_urb_free_list);
+	priv->tx_urb_free_count++;
+	if (priv->tx_urb_free_count > RTL8XXXU_TX_URB_HIGH_WATER &&
+	    priv->tx_stopped) {
+		priv->tx_stopped = false;
+		ieee80211_wake_queues(priv->hw);
+	}
+
 	spin_unlock_irqrestore(&priv->tx_urb_lock, flags);
 }
 
@@ -5371,7 +5381,10 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 		INIT_LIST_HEAD(&tx_urb->list);
 		tx_urb->hw = hw;
 		list_add(&tx_urb->list, &priv->tx_urb_free_list);
+		priv->tx_urb_free_count++;
 	}
+
+	priv->tx_stopped = false;
 
 	for (i = 0; i < RTL8XXXU_RX_URBS; i++) {
 		rx_urb = kmalloc(sizeof(struct rtl8xxxu_rx_urb), GFP_KERNEL);

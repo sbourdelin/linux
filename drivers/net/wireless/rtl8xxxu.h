@@ -571,6 +571,8 @@ struct rtl8xxxu_priv {
 
 	spinlock_t tx_urb_lock;
 	struct list_head tx_urb_free_list;
+	int tx_urb_free_count;
+	bool tx_stopped;
 
 	u8 mac_addr[ETH_ALEN];
 	char chip_name[8];
