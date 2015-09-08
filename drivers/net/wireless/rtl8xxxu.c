@@ -3960,6 +3960,12 @@ static void rtl8xxxu_power_off(struct rtl8xxxu_priv *priv)
 	rtl8xxxu_write8(priv, REG_RSV_CTRL, 0x0e);
 }
 
+static void rtl8xxxu_init_bt(struct rtl8xxxu_priv *priv)
+{
+	if (!priv->has_bluetooth)
+		return;
+}
+
 static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 {
 	struct rtl8xxxu_priv *priv = hw->priv;
@@ -4277,10 +4283,8 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8xxxu_write8(priv, 0xfe41, 0x81);
 	rtl8xxxu_write8(priv, 0xfe42, 0x80);
 
-#ifdef CONFIG_RTL8XXXU_BT
 	/* Init BT hw config. */
-	rtl8723a_init_bt(priv);
-#endif
+	rtl8xxxu_init_bt(priv);
 
 	/*
 	 * Not sure if we really need to save these parameters, but the
