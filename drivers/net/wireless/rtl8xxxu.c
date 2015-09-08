@@ -1276,12 +1276,6 @@ static void rtl8723a_enable_rf(struct rtl8xxxu_priv *priv)
 	if (priv->rf_paths == 2)
 		rtl8xxxu_write_rfreg(priv, RF_B, RF6052_REG_AC, 0x32d95);
 
-#if 0
-	rtl8xxxu_write8(priv, REG_SYS_FUNC, 0xE3);
-	rtl8xxxu_write8(priv, REG_APSD_CTRL, 0x00);
-	rtl8xxxu_write8(priv, REG_SYS_FUNC, 0xE2);
-	rtl8xxxu_write8(priv, REG_SYS_FUNC, 0xE3);
-#endif
 	rtl8xxxu_write8(priv, REG_TXPAUSE, 0x00);
 }
 
