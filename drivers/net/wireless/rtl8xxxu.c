@@ -4442,9 +4442,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	struct ieee80211_sta *sta;
 	struct rtl8xxxu_sta_priv *sta_priv;
 	u32 val32;
-#if 0
-	u16 val16;
-#endif
 	u8 val8;
 
 	if (changed & BSS_CHANGED_ASSOC) {
@@ -4499,41 +4496,6 @@ rtl8xxxu_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			rtl8xxxu_write16(priv, REG_BCN_PSR_RPT,
 					 0xc000 | bss_conf->aid);
 
-#if 0
-			val16 = rtl8xxxu_read16(priv, REG_CR);
-			val16 |= CR_SW_BEACON_ENABLE;
-			rtl8xxxu_read16(priv, REG_CR, val16);
-
-			val8 = rtl8xxxu_read8(priv, REG_BEACON_CTRL);
-			val8 &= ~BEACON_FUNCTION_ENABLE;
-			val8 |= BEACON_DISABLE_TSF_UPDATE;
-			rtl8xxxu_write8(priv, REG_BEACON_CTRL, val8);
-
-			val8 = rtl8xxxu_read8(priv, REG_FWHW_TXQ_CTRL + 2);
-			if (val8 & BIT(6))
-				recover = true;
-
-			val8 &= ~BIT(6);
-			rtl8xxxu_write8(priv, REG_FWHW_TXQ_CTRL + 2, val8);
-
-			/* build fake beacon */
-
-			val8 = rtl8xxxu_read8(priv, REG_BEACON_CTRL);
-			val8 |= BEACON_FUNCTION_ENABLE;
-			val8 &= ~BEACON_DISABLE_TSF_UPDATE;
-			rtl8xxxu_write8(priv, REG_BEACON_CTRL, val8);
-
-			if (recover) {
-				val8 = rtl8xxxu_read8(priv,
-						      REG_FWHW_TXQ_CTRL + 2);
-				val8 |= BIT(6);
-				rtl8xxxu_write8(priv, REG_FWHW_TXQ_CTRL + 2,
-						val8);
-			}
-			val16 = rtl8xxxu_read16(priv, REG_CR);
-			val16 &= ~CR_SW_BEACON_ENABLE;
-			rtl8xxxu_read16(priv, REG_CR, val16);
-#endif
 			h2c.joinbss.data = H2C_JOIN_BSS_CONNECT;
 		} else {
 			val32 = rtl8xxxu_read32(priv, REG_RCR);
