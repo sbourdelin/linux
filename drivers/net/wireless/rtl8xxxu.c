@@ -4151,11 +4151,7 @@ static int rtl8xxxu_init_device(struct ieee80211_hw *hw)
 	rtl8xxxu_write32(priv, REG_RESPONSE_RATE_SET, val32);
 
 	/* CCK = 0x0a, OFDM = 0x10 */
-#if 0
-	rtl8xxxu_set_spec_sifs(priv, 0x0a, 0x10);
-#else
 	rtl8xxxu_set_spec_sifs(priv, 0x10, 0x10);
-#endif
 	rtl8xxxu_set_retry(priv, 0x30, 0x30);
 	rtl8xxxu_set_spec_sifs(priv, 0x0a, 0x10);
 
