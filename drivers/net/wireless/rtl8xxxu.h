@@ -574,6 +574,10 @@ struct rtl8xxxu_priv {
 	int tx_urb_free_count;
 	bool tx_stopped;
 
+	spinlock_t rx_urb_lock;
+	struct list_head rx_urb_pending_list;
+	bool rx_urb_pending;
+
 	u8 mac_addr[ETH_ALEN];
 	char chip_name[8];
 	u8 cck_tx_power_index_A[3];	/* 0x10 */
@@ -653,6 +657,7 @@ struct rtl8xxxu_priv {
 struct rtl8xxxu_rx_urb {
 	struct urb urb;
 	struct ieee80211_hw *hw;
+	struct list_head list;
 };
 
 struct rtl8xxxu_tx_urb {

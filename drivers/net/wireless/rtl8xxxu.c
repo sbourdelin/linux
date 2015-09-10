@@ -5396,6 +5396,7 @@ static int rtl8xxxu_start(struct ieee80211_hw *hw)
 			goto error_out;
 		}
 		usb_init_urb(&rx_urb->urb);
+		INIT_LIST_HEAD(&rx_urb->list);
 		rx_urb->hw = hw;
 
 		ret = rtl8xxxu_submit_rx_urb(priv, rx_urb);
@@ -5597,6 +5598,8 @@ static int rtl8xxxu_probe(struct usb_interface *interface,
 	mutex_init(&priv->h2c_mutex);
 	INIT_LIST_HEAD(&priv->tx_urb_free_list);
 	spin_lock_init(&priv->tx_urb_lock);
+	INIT_LIST_HEAD(&priv->rx_urb_pending_list);
+	spin_lock_init(&priv->rx_urb_lock);
 
 	usb_set_intfdata(interface, hw);
 
