@@ -4970,6 +4970,7 @@ static void rtl8xxxu_rx_complete(struct urb *urb)
 
 		ieee80211_rx_irqsafe(hw, skb);
 		skb = NULL;
+		rx_urb->urb.context = NULL;
 		ret = rtl8xxxu_submit_rx_urb(priv, rx_urb);
 		if (ret) {
 			dev_warn(dev, "%s: Unable to allocate skb\n", __func__);
