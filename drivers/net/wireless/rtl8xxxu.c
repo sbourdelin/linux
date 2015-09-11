@@ -1368,18 +1368,12 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 	u32 val32, rsr;
 	u8 val8, opmode;
 	bool ht = true;
-	int sec_ch_above;
+	int sec_ch_above, channel;
 	int i;
-
-	for (i = RF_A; i < priv->rf_paths; i++) {
-		val32 = rtl8xxxu_read_rfreg(priv, i, RF6052_REG_MODE_AG);
-		val32 &= ~MODE_AG_CHANNEL_MASK;
-		val32 |= hw->conf.chandef.chan->hw_value;
-		rtl8xxxu_write_rfreg(priv, i, RF6052_REG_MODE_AG, val32);
-	}
 
 	opmode = rtl8xxxu_read8(priv, REG_BW_OPMODE);
 	rsr = rtl8xxxu_read32(priv, REG_RESPONSE_RATE_SET);
+	channel = hw->conf.chandef.chan->hw_value;
 
 	switch (hw->conf.chandef.width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
@@ -1457,6 +1451,13 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 
 	default:
 		break;
+	}
+
+	for (i = RF_A; i < priv->rf_paths; i++) {
+		val32 = rtl8xxxu_read_rfreg(priv, i, RF6052_REG_MODE_AG);
+		val32 &= ~MODE_AG_CHANNEL_MASK;
+		val32 |= channel;
+		rtl8xxxu_write_rfreg(priv, i, RF6052_REG_MODE_AG, val32);
 	}
 
 	if (ht)
