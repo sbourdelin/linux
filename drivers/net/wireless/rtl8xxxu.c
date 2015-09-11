@@ -1396,10 +1396,13 @@ static void rtl8723au_config_channel(struct ieee80211_hw *hw)
 		break;
 	case NL80211_CHAN_WIDTH_40:
 		if (hw->conf.chandef.center_freq1 >
-		    hw->conf.chandef.chan->center_freq)
+		    hw->conf.chandef.chan->center_freq) {
 			sec_ch_above = 1;
-		else
+			channel += 2;
+		} else {
 			sec_ch_above = 0;
+			channel -= 2;
+		}
 
 		opmode &= ~BW_OPMODE_20MHZ;
 		rtl8xxxu_write8(priv, REG_BW_OPMODE, opmode);
