@@ -1501,6 +1501,16 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 	ofdm[0] = priv->ht40_1s_tx_power_index_A[group];
 	ofdm[1] = priv->ht40_1s_tx_power_index_B[group];
 
+	ofdmbase[0] = ofdm[0] +	priv->ofdm_tx_power_index_diff[group].a;
+	ofdmbase[1] = ofdm[1] +	priv->ofdm_tx_power_index_diff[group].b;
+
+	mcsbase[0] = ofdm[0];
+	mcsbase[1] = ofdm[1];
+	if (!ht40) {
+		mcsbase[0] += priv->ht20_tx_power_index_diff[group].a;
+		mcsbase[1] += priv->ht20_tx_power_index_diff[group].b;
+	}
+
 	if (priv->tx_paths > 1) {
 		if (ofdm[0] > priv->ht40_2s_tx_power_index_diff[group].a)
 			ofdm[0] -=  priv->ht40_2s_tx_power_index_diff[group].a;
@@ -1540,16 +1550,6 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 	val32 &= 0xff;
 	val32 |= ((cck[1] << 8) | (cck[1] << 16) | (cck[1] << 24));
 	rtl8xxxu_write32(priv, REG_TX_AGC_B_CCK1_55_MCS32, val32);
-
-	ofdmbase[0] = ofdm[0] +	priv->ofdm_tx_power_index_diff[group].a;
-	mcsbase[0] = ofdm[0];
-	if (!ht40)
-		mcsbase[0] += priv->ht20_tx_power_index_diff[group].a;
-
-	ofdmbase[1] = ofdm[1] +	priv->ofdm_tx_power_index_diff[group].b;
-	mcsbase[1] = ofdm[1];
-	if (!ht40)
-		mcsbase[1] += priv->ht20_tx_power_index_diff[group].b;
 
 	ofdm_a = ofdmbase[0] | ofdmbase[0] << 8 |
 		ofdmbase[0] << 16 | ofdmbase[0] << 24;
