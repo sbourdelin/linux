@@ -1502,10 +1502,10 @@ rtl8723a_set_tx_power(struct rtl8xxxu_priv *priv, int channel, bool ht40)
 	ofdm[1] = priv->ht40_1s_tx_power_index_B[group];
 
 	if (priv->tx_paths > 1) {
-		if (ofdm[0] > priv->ht40_2s_tx_power_index_diff[group])
-			ofdm[0] -=  priv->ht40_2s_tx_power_index_diff[group];
-		if (ofdm[1] > priv->ht40_2s_tx_power_index_diff[group])
-			ofdm[1] -=  priv->ht40_2s_tx_power_index_diff[group];
+		if (ofdm[0] > priv->ht40_2s_tx_power_index_diff[group].a)
+			ofdm[0] -=  priv->ht40_2s_tx_power_index_diff[group].a;
+		if (ofdm[1] > priv->ht40_2s_tx_power_index_diff[group].b)
+			ofdm[1] -=  priv->ht40_2s_tx_power_index_diff[group].b;
 	}
 
 	if (rtl8xxxu_debug & RTL8XXXU_DEBUG_CHANNEL)
