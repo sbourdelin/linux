@@ -20,6 +20,10 @@ D: One of assisting postmasters for vger.kernel.org's lists
 S: (ask for current address)
 S: Finland
 
+N: Thomas Abraham
+E: thomas.ab@samsung.com
+D: Samsung pin controller driver
+
 N: Dragos Acostachioaie
 E: dragos@iname.com
 W: http://www.arbornet.org/~dragos
@@ -2987,6 +2991,10 @@ D: Linux/IA-64
 S: 2200 Mission College Blvd
 S: Santa Clara, CA 95052
 S: USA
+
+N: Anil Ravindranath
+E: anil_ravindranath@pmc-sierra.com
+D: PMC-Sierra MaxRAID driver
 
 N: Eric S. Raymond
 E: esr@thyrsus.com
