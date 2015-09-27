@@ -1425,11 +1425,14 @@ static struct se_portal_group *usbg_make_tpg(
 	return &tpg->se_tpg;
 }
 
+static int tcm_usbg_drop_nexus(struct usbg_tpg *);
+
 static void usbg_drop_tpg(struct se_portal_group *se_tpg)
 {
 	struct usbg_tpg *tpg = container_of(se_tpg,
 				struct usbg_tpg, se_tpg);
 
+	tcm_usbg_drop_nexus(tpg);
 	core_tpg_deregister(se_tpg);
 	destroy_workqueue(tpg->workqueue);
 	kfree(tpg);
@@ -1507,10 +1510,14 @@ static ssize_t tcm_usbg_tpg_store_enable(
 	if (op > 1)
 		return -EINVAL;
 
-	if (op && tpg->gadget_connect)
+	if (op && tpg->gadget_connect) {
+		ret = -EINVAL;
 		goto out;
-	if (!op && !tpg->gadget_connect)
+	}
+	if (!op && !tpg->gadget_connect) {
+		ret = -EINVAL;
 		goto out;
+	}
 
 	if (op) {
 		ret = usbg_attach(tpg);
@@ -1520,8 +1527,10 @@ static ssize_t tcm_usbg_tpg_store_enable(
 		usbg_detach(tpg);
 	}
 	tpg->gadget_connect = op;
-out:
+
 	return count;
+out:
+	return ret;
 }
 TF_TPG_BASE_ATTR(tcm_usbg, enable, S_IRUGO | S_IWUSR);
 
