@@ -669,7 +669,6 @@ struct rtl8xxxu_tx_urb {
 };
 
 struct rtl8xxxu_sta_priv {
-	bool short_preamble;
 };
 
 struct rtl8xxxu_fileops {
