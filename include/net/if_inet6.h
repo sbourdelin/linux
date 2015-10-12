@@ -72,6 +72,7 @@ struct inet6_ifaddr {
 	int			regen_count;
 
 	bool			tokenized;
+	bool			user_managed;
 
 	struct rcu_head		rcu;
 	struct in6_addr		peer_addr;

@@ -1432,6 +1432,12 @@ dad_transmits - INTEGER
 	The amount of Duplicate Address Detection probes to send.
 	Default: 1
 
+flush_addr_on_down - BOOLEAN
+	Flush all IPv6 addresses on an interface down event. If disabled
+	static global addresses with no expiration time are not flushed.
+
+	Default: enabled
+
 forwarding - INTEGER
 	Configure interface-specific Host/Router behaviour.
 
