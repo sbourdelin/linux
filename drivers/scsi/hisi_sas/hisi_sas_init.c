@@ -34,8 +34,10 @@ static struct scsi_host_template hisi_sas_sht = {
 
 static struct sas_domain_function_template hisi_sas_transport_ops = {
 	.lldd_dev_found		= hisi_sas_dev_found,
+	.lldd_dev_gone		= hisi_sas_dev_gone,
 	.lldd_execute_task	= hisi_sas_queue_command,
 	.lldd_port_formed	= hisi_sas_port_formed,
+	.lldd_port_deformed	= hisi_sas_port_deformed,
 };
 
 static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)

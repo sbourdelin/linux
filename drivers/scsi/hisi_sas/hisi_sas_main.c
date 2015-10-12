@@ -514,10 +514,84 @@ void hisi_sas_port_notify_formed(struct asd_sas_phy *sas_phy, int lock)
 		spin_unlock_irqrestore(&hisi_hba->lock, flags);
 }
 
+void hisi_sas_do_release_task(struct hisi_hba *hisi_hba,
+		int phy_no, struct domain_device *device)
+{
+	struct hisi_sas_phy *phy;
+	struct hisi_sas_port *port;
+	struct hisi_sas_slot *slot, *slot2;
+	struct device *dev = &hisi_hba->pdev->dev;
+
+	phy = &hisi_hba->phy[phy_no];
+	port = phy->port;
+	if (!port)
+		return;
+
+	list_for_each_entry_safe(slot, slot2, &port->list, entry) {
+		struct sas_task *task;
+
+		task = slot->task;
+		if (device && task->dev != device)
+			continue;
+
+		dev_info(dev, "Release slot [%d:%d], task [%p]:\n",
+			 slot->dlvry_queue, slot->dlvry_queue_slot, task);
+		slot_complete_v1_hw(hisi_hba, slot, 1);
+	}
+}
+
+static void hisi_sas_port_notify_deformed(struct asd_sas_phy *sas_phy,
+					  int lock)
+{
+	struct domain_device *device;
+	struct hisi_sas_phy *phy = sas_phy->lldd_phy;
+	struct hisi_hba *hisi_hba = phy->hisi_hba;
+	struct asd_sas_port *sas_port = sas_phy->port;
+	struct hisi_sas_port *port = sas_port->lldd_port;
+	int phy_no = 0;
+
+	port->port_attached = 0;
+	port->id = -1;
+
+	while (phy != &hisi_hba->phy[phy_no]) {
+		phy_no++;
+
+		if (phy_no >= hisi_hba->n_phy)
+			return;
+	}
+	list_for_each_entry(device, &sas_port->dev_list, dev_list_node)
+		hisi_sas_do_release_task(phy->hisi_hba, phy_no, device);
+}
 
 int hisi_sas_dev_found(struct domain_device *device)
 {
 	return hisi_sas_dev_found_notify(device, 1);
+}
+
+
+static void hisi_sas_dev_gone_notify(struct domain_device *device)
+{
+	struct hisi_sas_device *sas_dev = device->lldd_dev;
+	struct hisi_hba *hisi_hba = dev_to_hisi_hba(device);
+	struct device *dev = &hisi_hba->pdev->dev;
+
+	if (!sas_dev) {
+		pr_warn("%s: found dev has gone\n", __func__);
+		return;
+	}
+
+	dev_info(dev, "found dev[%lld:%x] is gone\n",
+		 sas_dev->device_id, sas_dev->dev_type);
+
+	free_device_v1_hw(hisi_hba, sas_dev);
+
+	device->lldd_dev = NULL;
+	sas_dev->sas_device = NULL;
+}
+
+void hisi_sas_dev_gone(struct domain_device *device)
+{
+	hisi_sas_dev_gone_notify(device);
 }
 
 int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags)
@@ -529,6 +603,12 @@ void hisi_sas_port_formed(struct asd_sas_phy *sas_phy)
 {
 	hisi_sas_port_notify_formed(sas_phy, 1);
 }
+
+void hisi_sas_port_deformed(struct asd_sas_phy *sas_phy)
+{
+	hisi_sas_port_notify_deformed(sas_phy, 1);
+}
+
 static void hisi_sas_phy_disconnected(struct hisi_sas_phy *phy)
 {
 	phy->phy_attached = 0;

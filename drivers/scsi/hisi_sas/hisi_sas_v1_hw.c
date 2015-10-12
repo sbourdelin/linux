@@ -534,6 +534,34 @@ void setup_itct_v1_hw(struct hisi_hba *hisi_hba,
 				(0xff00 < ITCT_HDR_REJ_OPEN_TL_OFF));
 }
 
+int free_device_v1_hw(struct hisi_hba *hisi_hba,
+		      struct hisi_sas_device *sas_dev)
+{
+	u64 dev_id = sas_dev->device_id;
+	struct hisi_sas_itct *itct = &hisi_hba->itct[dev_id];
+	u32 qw0, reg_val = hisi_sas_read32(hisi_hba, CFG_AGING_TIME);
+
+	reg_val |= CFG_AGING_TIME_ITCT_REL_MSK;
+	hisi_sas_write32(hisi_hba, CFG_AGING_TIME, reg_val);
+
+	/* free itct */
+	udelay(1);
+	reg_val = hisi_sas_read32(hisi_hba, CFG_AGING_TIME);
+	reg_val &= ~CFG_AGING_TIME_ITCT_REL_MSK;
+	hisi_sas_write32(hisi_hba, CFG_AGING_TIME, reg_val);
+
+	qw0 = cpu_to_le64(itct->qw0);
+	qw0 &= ~ITCT_HDR_VALID_MSK;
+	itct->qw0 = cpu_to_le64(qw0);
+
+	memset(sas_dev, 0, sizeof(*sas_dev));
+	sas_dev->device_id = dev_id;
+	sas_dev->dev_type = SAS_PHY_UNUSED;
+	sas_dev->dev_status = HISI_SAS_DEV_NORMAL;
+
+	return 0;
+}
+
 static int reset_hw_v1_hw(struct hisi_hba *hisi_hba)
 {
 	int i;
