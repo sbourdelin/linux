@@ -493,6 +493,47 @@ static void init_id_frame_v1_hw(struct hisi_hba *hisi_hba)
 		config_id_frame_v1_hw(hisi_hba, i);
 }
 
+void setup_itct_v1_hw(struct hisi_hba *hisi_hba,
+		      struct hisi_sas_device *sas_dev)
+{
+	struct domain_device *device = sas_dev->sas_device;
+	struct device *dev = &hisi_hba->pdev->dev;
+	u64 qw0, device_id = sas_dev->device_id;
+	struct hisi_sas_itct *itct = &hisi_hba->itct[device_id];
+
+	memset(itct, 0, sizeof(*itct));
+
+	/* qw0 */
+	qw0 = 0;
+	switch (sas_dev->dev_type) {
+	case SAS_END_DEVICE:
+	case SAS_EDGE_EXPANDER_DEVICE:
+	case SAS_FANOUT_EXPANDER_DEVICE:
+		qw0 = HISI_SAS_DEV_TYPE_SSP << ITCT_HDR_DEV_TYPE_OFF;
+		break;
+	default:
+		dev_warn(dev, "setup itct: unsupported dev type (%d)\n",
+			 sas_dev->dev_type);
+	}
+
+	qw0 |= ((1 << ITCT_HDR_VALID_OFF) |
+		(1 << ITCT_HDR_AWT_CONTROL_OFF) |
+		(device->max_linkrate << ITCT_HDR_MAX_CONN_RATE_OFF) |
+		(1 << ITCT_HDR_VALID_LINK_NUM_OFF) |
+		(device->port->id << ITCT_HDR_PORT_ID_OFF));
+	itct->qw0 = cpu_to_le64(qw0);
+
+	/* qw1 */
+	memcpy(&itct->sas_addr, device->sas_addr, SAS_ADDR_SIZE);
+	itct->sas_addr = __swab64(itct->sas_addr);
+
+	/* qw2 */
+	itct->qw2 = cpu_to_le64((500 < ITCT_HDR_IT_NEXUS_LOSS_TL_OFF) |
+				(0xff00 < ITCT_HDR_BUS_INACTIVE_TL_OFF) |
+				(0xff00 < ITCT_HDR_MAX_CONN_TL_OFF) |
+				(0xff00 < ITCT_HDR_REJ_OPEN_TL_OFF));
+}
+
 static int reset_hw_v1_hw(struct hisi_hba *hisi_hba)
 {
 	int i;

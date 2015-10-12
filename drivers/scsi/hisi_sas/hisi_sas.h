@@ -47,6 +47,12 @@ enum dev_status {
 	HISI_SAS_DEV_EH,
 };
 
+enum hisi_sas_dev_type {
+	HISI_SAS_DEV_TYPE_STP = 0,
+	HISI_SAS_DEV_TYPE_SSP,
+	HISI_SAS_DEV_TYPE_SATA,
+};
+
 struct hisi_sas_phy {
 	struct hisi_hba	*hisi_hba;
 	struct hisi_sas_port	*port;
@@ -345,12 +351,16 @@ union hisi_sas_command_table {
 
 void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
 void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
+int hisi_sas_dev_found(struct domain_device *dev);
 int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags);
+void hisi_sas_port_formed(struct asd_sas_phy *sas_phy);
 void hisi_sas_wq_process(struct work_struct *work);
 void hisi_sas_slot_task_free(struct hisi_hba *hisi_hba, struct sas_task *task,
 			struct hisi_sas_slot *slot);
 
 /* hw specific functions */
+extern void hisi_sas_setup_itct_v1_hw(struct hisi_hba *hisi_hba,
+				      struct hisi_sas_device *device);
 extern void start_delivery_v1_hw(struct hisi_hba *hisi_hba);
 extern int get_free_slot_v1_hw(struct hisi_hba *hisi_hba, int *q, int *s);
 extern int prep_ssp_v1_hw(struct hisi_hba *hisi_hba,
@@ -361,4 +371,6 @@ extern int interrupt_openall_v1_hw(struct hisi_hba *hisi_hba);
 extern int hw_init_v1_hw(struct hisi_hba *hisi_hba);
 extern int phys_init_v1_hw(struct hisi_hba *hisi_hba);
 extern void sl_notify_v1_hw(struct hisi_hba *hisi_hba, int phy_no);
+extern void setup_itct_v1_hw(struct hisi_hba *hisi_hba,
+			     struct hisi_sas_device *device);
 #endif

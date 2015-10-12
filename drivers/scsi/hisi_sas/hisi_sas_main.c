@@ -11,6 +11,9 @@
 
 #include "hisi_sas.h"
 
+#define DEV_IS_EXPANDER(type) \
+	((type == SAS_EDGE_EXPANDER_DEVICE) || \
+	(type == SAS_FANOUT_EXPANDER_DEVICE))
 
 #define DEV_IS_GONE(dev) \
 	((!dev) || (dev->dev_type == SAS_PHY_UNUSED))
@@ -352,6 +355,79 @@ void hisi_sas_bytes_dmaed(struct hisi_hba *hisi_hba, int phy_no)
 	sas_ha->notify_port_event(sas_phy, PORTE_BYTES_DMAED);
 }
 
+struct hisi_sas_device *hisi_sas_alloc_dev(struct hisi_hba *hisi_hba)
+{
+	int dev_id;
+	struct device *dev = &hisi_hba->pdev->dev;
+
+	for (dev_id = 0; dev_id < HISI_SAS_MAX_DEVICES; dev_id++) {
+		if (hisi_hba->devices[dev_id].dev_type == SAS_PHY_UNUSED) {
+			hisi_hba->devices[dev_id].device_id = dev_id;
+			return &hisi_hba->devices[dev_id];
+		}
+	}
+
+	dev_err(dev, "alloc dev: max support %d devices - could not alloc\n",
+		HISI_SAS_MAX_DEVICES);
+
+	return NULL;
+}
+
+int hisi_sas_dev_found_notify(struct domain_device *device, int lock)
+{
+	unsigned long flags = 0;
+	int res = 0;
+	struct hisi_hba *hisi_hba = dev_to_hisi_hba(device);
+	struct domain_device *parent_dev = device->parent;
+	struct hisi_sas_device *sas_dev;
+	struct device *dev = &hisi_hba->pdev->dev;
+
+	if (lock)
+		spin_lock_irqsave(&hisi_hba->lock, flags);
+
+	sas_dev = hisi_sas_alloc_dev(hisi_hba);
+	if (!sas_dev) {
+		res = -EINVAL;
+		goto found_out;
+	}
+
+	device->lldd_dev = sas_dev;
+	sas_dev->dev_status = HISI_SAS_DEV_NORMAL;
+	sas_dev->dev_type = device->dev_type;
+	sas_dev->hisi_hba = hisi_hba;
+	sas_dev->sas_device = device;
+	setup_itct_v1_hw(hisi_hba, sas_dev);
+
+	if (parent_dev && DEV_IS_EXPANDER(parent_dev->dev_type)) {
+		int phy_no;
+		u8 phy_num = parent_dev->ex_dev.num_phys;
+		struct ex_phy *phy;
+
+		for (phy_no = 0; phy_no < phy_num; phy_no++) {
+			phy = &parent_dev->ex_dev.ex_phy[phy_no];
+			if (SAS_ADDR(phy->attached_sas_addr) ==
+				SAS_ADDR(device->sas_addr)) {
+				sas_dev->attached_phy = phy_no;
+				break;
+			}
+		}
+
+		if (phy_no == phy_num) {
+			dev_info(dev,
+				 "dev found: no attached "
+				 "dev:%016llx at ex:%016llx\n",
+				 SAS_ADDR(device->sas_addr),
+				SAS_ADDR(parent_dev->sas_addr));
+			res = -EINVAL;
+		}
+	}
+
+found_out:
+	if (lock)
+		spin_unlock_irqrestore(&hisi_hba->lock, flags);
+	return res;
+}
+
 
 static void hisi_sas_phyup_work(struct hisi_hba *hisi_hba,
 				      int phy_no)
@@ -400,7 +476,56 @@ void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int phy_no)
 	sas_phy->lldd_phy = phy;
 }
 
+void hisi_sas_port_notify_formed(struct asd_sas_phy *sas_phy, int lock)
+{
+	struct sas_ha_struct *sas_ha = sas_phy->ha;
+	struct hisi_hba *hisi_hba = NULL;
+	int i = 0;
+	struct hisi_sas_phy *phy = sas_phy->lldd_phy;
+	struct asd_sas_port *sas_port = sas_phy->port;
+	struct hisi_sas_port *port;
+	unsigned long flags = 0;
+
+	if (!sas_port)
+		return;
+
+	while (sas_ha->sas_phy[i]) {
+		if (sas_ha->sas_phy[i] == sas_phy) {
+			hisi_hba = (struct hisi_hba *)sas_ha->lldd_ha;
+			port = &hisi_hba->port[i];
+			break;
+		}
+		i++;
+	}
+
+	if (hisi_hba == NULL) {
+		pr_err("%s: could not find hba\n", __func__);
+		return;
+	}
+
+	if (lock)
+		spin_lock_irqsave(&hisi_hba->lock, flags);
+	port->port_attached = 1;
+	port->id = phy->port_id;
+	phy->port = port;
+	sas_port->lldd_port = port;
+
+	if (lock)
+		spin_unlock_irqrestore(&hisi_hba->lock, flags);
+}
+
+
+int hisi_sas_dev_found(struct domain_device *device)
+{
+	return hisi_sas_dev_found_notify(device, 1);
+}
+
 int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags)
 {
 	return hisi_sas_task_exec(task, gfp_flags, NULL, 0, NULL);
+}
+
+void hisi_sas_port_formed(struct asd_sas_phy *sas_phy)
+{
+	hisi_sas_port_notify_formed(sas_phy, 1);
 }
