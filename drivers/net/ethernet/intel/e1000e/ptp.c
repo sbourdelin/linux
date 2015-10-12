@@ -25,6 +25,8 @@
  */
 
 #include "e1000.h"
+#include <asm/tsc.h>
+#include <linux/timekeeping.h>
 
 /**
  * e1000e_phc_adjfreq - adjust the frequency of the hardware clock
@@ -93,6 +95,77 @@ static int e1000e_phc_adjtime(struct ptp_clock_info *ptp, s64 delta)
 
 	spin_lock_irqsave(&adapter->systim_lock, flags);
 	timecounter_adjtime(&adapter->tc, delta);
+	spin_unlock_irqrestore(&adapter->systim_lock, flags);
+
+	return 0;
+}
+
+#define MAX_HW_WAIT_COUNT (3)
+
+static int e1000e_phc_get_ts(struct correlated_ts *cts)
+{
+	struct e1000_adapter *adapter = (struct e1000_adapter *)cts->private;
+	struct e1000_hw *hw = &adapter->hw;
+	int i;
+	u32 tsync_ctrl;
+	int ret;
+
+	tsync_ctrl = er32(TSYNCTXCTL);
+	tsync_ctrl |= E1000_TSYNCTXCTL_START_SYNC |
+		E1000_TSYNCTXCTL_MAX_ALLOWED_DLY_MASK;
+	ew32(TSYNCTXCTL, tsync_ctrl);
+	for (i = 0; i < MAX_HW_WAIT_COUNT; ++i) {
+		udelay(1);
+		tsync_ctrl = er32(TSYNCTXCTL);
+		if (tsync_ctrl & E1000_TSYNCTXCTL_SYNC_COMP)
+			break;
+	}
+
+	if (i == MAX_HW_WAIT_COUNT) {
+		ret = -ETIMEDOUT;
+	} else {
+		ret = 0;
+		cts->system_ts = er32(PLTSTMPH);
+		cts->system_ts <<= 32;
+		cts->system_ts |= er32(PLTSTMPL);
+		cts->device_ts = er32(SYSSTMPH);
+		cts->device_ts <<= 32;
+		cts->device_ts |= er32(SYSSTMPL);
+	}
+
+	return ret;
+}
+
+/**
+ * e1000e_phc_getsynctime - Reads the current time from the hardware clock and
+ * correlated system time
+ * @ptp: ptp clock structure
+ * @devts: timespec structure to hold the current device time value
+ * @systs: timespec structure to hold the current system time value
+ *
+ * Read device and system (ART) clock simultaneously and return the correct
+ * clock values in ns after converting into a struct timespec.
+ **/
+static int e1000e_phc_getsynctime(struct ptp_clock_info *ptp, u64 *dev,
+				  u64 *sys )
+{
+	struct e1000_adapter *adapter = container_of(ptp, struct e1000_adapter,
+						     ptp_clock_info);
+	unsigned long flags;
+	struct correlated_ts art_correlated_ts;
+	int ret;
+
+	art_correlated_ts.get_ts = e1000e_phc_get_ts;
+	art_correlated_ts.private = adapter;
+	ret = get_correlated_timestamp(&art_correlated_ts,
+				       &art_timestamper);
+	if (ret != 0)
+		return ret;
+
+	*sys = art_correlated_ts.system_real.tv64;
+
+	spin_lock_irqsave(&adapter->systim_lock, flags);
+	*dev = timecounter_cyc2time(&adapter->tc, art_correlated_ts.device_ts);
 	spin_unlock_irqrestore(&adapter->systim_lock, flags);
 
 	return 0;
@@ -235,6 +308,10 @@ void e1000e_ptp_init(struct e1000_adapter *adapter)
 	default:
 		break;
 	}
+
+	/* CPU must have ART and GBe must be from Sunrise Point or greater */
+	if (hw->mac.type >= e1000_pch_spt && boot_cpu_has(X86_FEATURE_ART))
+		adapter->ptp_clock_info.getsynctime = e1000e_phc_getsynctime;
 
 	INIT_DELAYED_WORK(&adapter->systim_overflow_work,
 			  e1000e_systim_overflow_work);
