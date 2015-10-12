@@ -7711,6 +7711,9 @@ static void intel_get_pipe_timings(struct intel_crtc *crtc,
 	bool is_dsi = intel_pipe_has_type(crtc, INTEL_OUTPUT_DSI);
 	uint32_t tmp;
 
+	if (dev_priv->dsi_enumerating && dev_priv->vbt.has_mipi)
+		is_dsi = true;
+
 	tmp = I915_READ(HTOTAL(cpu_transcoder));
 	pipe_config->base.adjusted_mode.crtc_hdisplay = (tmp & 0xffff) + 1;
 	pipe_config->base.adjusted_mode.crtc_htotal = ((tmp >> 16) & 0xffff) + 1;
@@ -9825,10 +9828,20 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 	is_dsi = intel_pipe_has_type(crtc, INTEL_OUTPUT_DSI);
 
 	/*
-	 * Check if encoder is enabled or not
+	 * Check if encoder is enabled or not.
 	 * Separate implementation for DSI and DDI encoders.
+	 * For first time during driver init, encoder association
+	 * would not have happened and this function will return
+	 * false. This will cause encoder to be disabled causing
+	 * a blank, till user space does a modeset. In order to avoid
+	 * this, if DSI is enabled in VBT, for first iteration, this
+	 * will return true since BIOS would have initialized MIPI.
+	 * This is needed for seamless booting without blanking and
+	 * for Charging OS scenario. Since DSI is the first display in
+	 * setup_outputs, hence first crtc will be associated with mipi
+	 * display
 	 */
-	if (is_dsi) {
+	if (is_dsi || (dev_priv->dsi_enumerating && dev_priv->vbt.has_mipi)) {
 		struct intel_encoder *encoder;
 
 		for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
@@ -9852,8 +9865,11 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 			if (dsi_enc_enabled)
 				break;
 		}
-		if (!dsi_enc_enabled)
-			return false;
+
+		 if (!dsi_enc_enabled) {
+			if (!dev_priv->dsi_enumerating)
+				return false;
+		}
 	} else {
 
 		tmp = I915_READ(TRANS_DDI_FUNC_CTL(TRANSCODER_EDP));
@@ -9920,6 +9936,8 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 	} else {
 		pipe_config->pixel_multiplier = 1;
 	}
+
+	dev_priv->dsi_enumerating = false;
 
 	return true;
 }
@@ -14877,6 +14895,7 @@ void intel_modeset_init(struct drm_device *dev)
 	enum pipe pipe;
 	struct intel_crtc *crtc;
 
+	dev_priv->dsi_enumerating = true;
 	drm_mode_config_init(dev);
 
 	dev->mode_config.min_width = 0;
