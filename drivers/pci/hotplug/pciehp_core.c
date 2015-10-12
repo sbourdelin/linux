@@ -38,6 +38,7 @@
 #include <linux/time.h>
 
 /* Global variables */
+bool pciehp_poweron_delay;
 bool pciehp_debug;
 bool pciehp_poll_mode;
 int pciehp_poll_time;
@@ -51,10 +52,12 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
+module_param(pciehp_poweron_delay, bool, 0644);
 module_param(pciehp_debug, bool, 0644);
 module_param(pciehp_poll_mode, bool, 0644);
 module_param(pciehp_poll_time, int, 0644);
 module_param(pciehp_force, bool, 0644);
+MODULE_PARM_DESC(pciehp_poweron_delay, "Delay port power-on");
 MODULE_PARM_DESC(pciehp_debug, "Debugging mode enabled or not");
 MODULE_PARM_DESC(pciehp_poll_mode, "Using polling mechanism for hot-plug events or not");
 MODULE_PARM_DESC(pciehp_poll_time, "Polling mechanism frequency, in seconds");

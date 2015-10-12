@@ -809,6 +809,8 @@ struct controller *pcie_init(struct pcie_device *dev)
 	pcie_capability_read_dword(pdev, PCI_EXP_LNKCAP, &link_cap);
 	if (link_cap & PCI_EXP_LNKCAP_DLLLARC)
 		ctrl->link_active_reporting = 1;
+	if (pciehp_poweron_delay || dev->port->poweron_delay)
+		ctrl->poweron_delay = 1;
 
 	/* Clear all remaining event bits in Slot Status register */
 	pcie_capability_write_word(pdev, PCI_EXP_SLTSTA,
