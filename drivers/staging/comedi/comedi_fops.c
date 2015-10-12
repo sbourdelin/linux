@@ -2477,8 +2477,12 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 	}
 
 	async = s->async;
-	if (!s->busy || !nbytes)
+	if (!nbytes)
 		goto out;
+	if (!s->busy) {
+		retval = -EINVAL;
+		goto out;
+	}
 	if (s->busy != file) {
 		retval = -EACCES;
 		goto out;
@@ -2516,6 +2520,7 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 				break;
 			}
 			if (!s->busy) {
+				retval = -EINVAL;
 				break;
 			}
 			if (s->busy != file) {
