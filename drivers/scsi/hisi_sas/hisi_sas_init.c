@@ -195,6 +195,28 @@ static void hisi_sas_free(struct hisi_hba *hisi_hba)
 				  hisi_hba->sata_breakpoint_dma);
 }
 
+int hisi_sas_ioremap(struct hisi_hba *hisi_hba)
+{
+	struct platform_device *pdev = hisi_hba->pdev;
+	struct device *dev = &pdev->dev;
+	struct resource *res;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	hisi_hba->regs = devm_ioremap(dev,
+				      res->start,
+				      resource_size(res));
+	if (!hisi_hba->regs)
+		return -ENOMEM;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	hisi_hba->ctrl_regs = devm_ioremap(dev,
+					   res->start,
+					   resource_size(res));
+	if (!hisi_hba->ctrl_regs)
+		return -ENOMEM;
+
+	return 0;
+}
 
 static const struct of_device_id sas_of_match[] = {
 	{ .compatible = "hisilicon,sas-controller-v1",},
@@ -240,6 +262,9 @@ static struct hisi_hba *hisi_sas_hba_alloc(
 		goto err_out;
 
 	hisi_hba->shost = shost;
+
+	if (hisi_sas_ioremap(hisi_hba))
+		goto err_out;
 
 	if (hisi_sas_alloc(hisi_hba, shost)) {
 		hisi_sas_free(hisi_hba);

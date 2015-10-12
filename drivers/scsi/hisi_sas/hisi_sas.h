@@ -69,6 +69,8 @@ struct hisi_hba {
 
 	struct platform_device *pdev;
 
+	void __iomem *regs;
+	void __iomem *ctrl_regs;
 
 	u8 sas_addr[SAS_ADDR_SIZE];
 
