@@ -23,6 +23,9 @@ OMAP MUSB GLUE
 Optional properties:
  - ctrl-module : phandle of the control module this glue uses to write to
    mailbox
+ - ti,ohci-needs-120m-fck : bool, enable the 120m ehci clock even if just
+   using ohci. Needed for AM3517 in OHCI only mode.
+
 
 SOC specific device node entry
 usb_otg_hs: usb_otg_hs@4a0ab000 {

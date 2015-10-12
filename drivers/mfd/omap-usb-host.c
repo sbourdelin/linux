@@ -680,6 +680,10 @@ static int usbhs_omap_probe(struct platform_device *pdev)
 				need_logic_fck |= true;
 		}
 
+		/* The AM3517 requries the 120m-fck active to allow the OHCI to work */
+		if (of_property_read_bool(dev->of_node, "ti,ohci-needs-120m-fck"))
+			need_logic_fck |= true;
+
 		if (need_logic_fck) {
 			omap->ehci_logic_fck = devm_clk_get(dev,
 							    "usbhost_120m_fck");
