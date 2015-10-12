@@ -44,6 +44,7 @@
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_rect.h>
 #include <linux/dma_remapping.h>
+#include "intel_dsi.h"
 
 /* Primary plane formats for gen <= 3 */
 static const uint32_t i8xx_primary_formats[] = {
@@ -9788,46 +9789,85 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum intel_display_power_domain pfit_domain;
-	uint32_t tmp;
+	uint32_t tmp = 0;
+	bool is_dsi = false;
+	bool dsi_enc_enabled = false;
+	u32 port_ctrl = 0;
 
 	if (!intel_display_power_is_enabled(dev_priv,
-					 POWER_DOMAIN_PIPE(crtc->pipe)))
+				POWER_DOMAIN_PIPE(crtc->pipe)))
 		return false;
 
 	pipe_config->cpu_transcoder = (enum transcoder) crtc->pipe;
 	pipe_config->shared_dpll = DPLL_ID_PRIVATE;
 
-	tmp = I915_READ(TRANS_DDI_FUNC_CTL(TRANSCODER_EDP));
-	if (tmp & TRANS_DDI_FUNC_ENABLE) {
-		enum pipe trans_edp_pipe;
-		switch (tmp & TRANS_DDI_EDP_INPUT_MASK) {
-		default:
-			WARN(1, "unknown pipe linked to edp transcoder\n");
-		case TRANS_DDI_EDP_INPUT_A_ONOFF:
-		case TRANS_DDI_EDP_INPUT_A_ON:
-			trans_edp_pipe = PIPE_A;
-			break;
-		case TRANS_DDI_EDP_INPUT_B_ONOFF:
-			trans_edp_pipe = PIPE_B;
-			break;
-		case TRANS_DDI_EDP_INPUT_C_ONOFF:
-			trans_edp_pipe = PIPE_C;
-			break;
+	is_dsi = intel_pipe_has_type(crtc, INTEL_OUTPUT_DSI);
+
+	/*
+	 * Check if encoder is enabled or not
+	 * Separate implementation for DSI and DDI encoders.
+	 */
+	if (is_dsi) {
+		struct intel_encoder *encoder;
+
+		for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
+			struct intel_dsi *intel_dsi =
+				enc_to_intel_dsi(&encoder->base);
+			enum port port;
+
+			for_each_dsi_port(port, intel_dsi->ports) {
+				if (IS_BROXTON(dev))
+					port_ctrl = BXT_MIPI_PORT_CTRL(port);
+				else if (IS_VALLEYVIEW(dev))
+					port_ctrl = MIPI_PORT_CTRL(port);
+
+				tmp = I915_READ(port_ctrl);
+				if (tmp & DPI_ENABLE) {
+					dsi_enc_enabled = true;
+					break;
+				}
+			}
+
+			if (dsi_enc_enabled)
+				break;
+		}
+		if (!dsi_enc_enabled)
+			return false;
+	} else {
+
+		tmp = I915_READ(TRANS_DDI_FUNC_CTL(TRANSCODER_EDP));
+		if (tmp & TRANS_DDI_FUNC_ENABLE) {
+			enum pipe trans_edp_pipe;
+
+			switch (tmp & TRANS_DDI_EDP_INPUT_MASK) {
+			default:
+				WARN(1, "unknown pipe linked to edp transcoder\n");
+			case TRANS_DDI_EDP_INPUT_A_ONOFF:
+			case TRANS_DDI_EDP_INPUT_A_ON:
+				trans_edp_pipe = PIPE_A;
+				break;
+			case TRANS_DDI_EDP_INPUT_B_ONOFF:
+				trans_edp_pipe = PIPE_B;
+				break;
+			case TRANS_DDI_EDP_INPUT_C_ONOFF:
+				trans_edp_pipe = PIPE_C;
+				break;
+			}
+
+			if (trans_edp_pipe == crtc->pipe)
+				pipe_config->cpu_transcoder = TRANSCODER_EDP;
 		}
 
-		if (trans_edp_pipe == crtc->pipe)
-			pipe_config->cpu_transcoder = TRANSCODER_EDP;
-	}
-
-	if (!intel_display_power_is_enabled(dev_priv,
+		if (!intel_display_power_is_enabled(dev_priv,
 			POWER_DOMAIN_TRANSCODER(pipe_config->cpu_transcoder)))
-		return false;
+			return false;
 
-	tmp = I915_READ(PIPECONF(pipe_config->cpu_transcoder));
-	if (!(tmp & PIPECONF_ENABLE))
-		return false;
+		tmp = I915_READ(PIPECONF(pipe_config->cpu_transcoder));
+		if (!(tmp & PIPECONF_ENABLE))
+			return false;
 
-	haswell_get_ddi_port_state(crtc, pipe_config);
+		haswell_get_ddi_port_state(crtc, pipe_config);
+	}
 
 	intel_get_pipe_timings(crtc, pipe_config);
 
