@@ -270,6 +270,11 @@ static struct hisi_hba *hisi_sas_hba_alloc(
 
 	init_timer(&hisi_hba->timer);
 
+	if (of_property_read_u32_array(np, "reset-reg",
+				       (u32 *) &hisi_hba->reset_reg,
+				       HISI_SAS_RESET_REG_CNT))
+		goto err_out;
+
 	if (of_property_read_u32(np, "phy-count", &hisi_hba->n_phy))
 		goto err_out;
 
@@ -387,6 +392,21 @@ static int hisi_sas_probe(struct platform_device *pdev)
 	}
 
 	hisi_sas_init_add(hisi_hba);
+
+	rc = hw_init_v1_hw(hisi_hba);
+	if (rc)
+		goto err_out_ha;
+
+	rc = interrupt_init_v1_hw(hisi_hba);
+	if (rc)
+		goto err_out_ha;
+
+	rc = interrupt_openall_v1_hw(hisi_hba);
+	if (rc)
+		goto err_out_ha;
+
+	phys_init_v1_hw(hisi_hba);
+
 	rc = scsi_add_host(shost, &pdev->dev);
 	if (rc)
 		goto err_out_ha;

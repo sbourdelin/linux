@@ -34,7 +34,12 @@
 		(((sizeof(union hisi_sas_command_table)+3)/4)*4)
 
 #define HISI_SAS_NAME_LEN 32
+#define HISI_SAS_RESET_REG_CNT 5
 
+enum {
+	PORT_TYPE_SAS = (1U << 1),
+	PORT_TYPE_SATA = (1U << 0),
+};
 
 enum dev_status {
 	HISI_SAS_DEV_NORMAL,
@@ -123,6 +128,7 @@ struct hisi_hba {
 
 	void __iomem *regs;
 	void __iomem *ctrl_regs;
+	u32 reset_reg[HISI_SAS_RESET_REG_CNT];
 
 	u8 sas_addr[SAS_ADDR_SIZE];
 
@@ -323,4 +329,8 @@ union hisi_sas_command_table {
 void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
 void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
 void hisi_sas_wq_process(struct work_struct *work);
+extern int interrupt_init_v1_hw(struct hisi_hba *hisi_hba);
+extern int interrupt_openall_v1_hw(struct hisi_hba *hisi_hba);
+extern int hw_init_v1_hw(struct hisi_hba *hisi_hba);
+extern int phys_init_v1_hw(struct hisi_hba *hisi_hba);
 #endif
