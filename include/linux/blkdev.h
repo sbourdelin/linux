@@ -401,7 +401,10 @@ struct request_queue {
 	unsigned int		request_fn_active;
 
 	unsigned int		rq_timeout;
-	struct timer_list	timeout;
+	union {
+		struct timer_list	timeout;	/* legacy */
+		struct delayed_work	timeout_work;	/* blk-mq */
+	};
 	struct list_head	timeout_list;
 
 	struct list_head	icq_list;

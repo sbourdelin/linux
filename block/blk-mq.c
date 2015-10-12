@@ -635,9 +635,10 @@ static void blk_mq_check_expired(struct blk_mq_hw_ctx *hctx,
 	}
 }
 
-static void blk_mq_rq_timer(unsigned long priv)
+static void blk_mq_rq_timer_work(struct work_struct *work)
 {
-	struct request_queue *q = (struct request_queue *)priv;
+	struct request_queue *q =
+		container_of(work, struct request_queue, timeout_work.work);
 	struct blk_mq_timeout_data data = {
 		.next		= 0,
 		.next_set	= 0,
@@ -648,7 +649,7 @@ static void blk_mq_rq_timer(unsigned long priv)
 
 	if (data.next_set) {
 		data.next = blk_rq_timeout(round_jiffies_up(data.next));
-		mod_timer(&q->timeout, data.next);
+		mod_delayed_work(system_wq, &q->timeout_work, data.next);
 	} else {
 		struct blk_mq_hw_ctx *hctx;
 
@@ -2008,7 +2009,7 @@ struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 			    PERCPU_REF_INIT_ATOMIC, GFP_KERNEL))
 		goto err_hctxs;
 
-	setup_timer(&q->timeout, blk_mq_rq_timer, (unsigned long) q);
+	INIT_DELAYED_WORK(&q->timeout_work, blk_mq_rq_timer_work);
 	blk_queue_rq_timeout(q, set->timeout ? set->timeout : 30 * HZ);
 
 	q->nr_queues = nr_cpu_ids;
@@ -2173,7 +2174,7 @@ static int blk_mq_queue_reinit_notify(struct notifier_block *nb,
 		 * timeout handler can't touch hw queue during the
 		 * reinitialization
 		 */
-		del_timer_sync(&q->timeout);
+		cancel_delayed_work_sync(&q->timeout_work);
 	}
 
 	list_for_each_entry(q, &all_q_list, all_q_node)
