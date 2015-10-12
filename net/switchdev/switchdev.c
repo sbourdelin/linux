@@ -366,6 +366,8 @@ EXPORT_SYMBOL_GPL(switchdev_port_obj_add);
  *	@dev: port device
  *	@id: object ID
  *	@obj: object to delete
+ *
+ *	rtnl_lock must be held.
  */
 int switchdev_port_obj_del(struct net_device *dev,
 			   const struct switchdev_obj *obj)
@@ -374,6 +376,8 @@ int switchdev_port_obj_del(struct net_device *dev,
 	struct net_device *lower_dev;
 	struct list_head *iter;
 	int err = -EOPNOTSUPP;
+
+	ASSERT_RTNL();
 
 	if (ops && ops->switchdev_port_obj_del)
 		return ops->switchdev_port_obj_del(dev, obj);
