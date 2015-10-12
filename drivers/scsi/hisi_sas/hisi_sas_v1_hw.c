@@ -738,6 +738,19 @@ int phys_init_v1_hw(struct hisi_hba *hisi_hba)
 	return 0;
 }
 
+void sl_notify_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
+{
+	u32 sl_control;
+
+	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
+	sl_control |= SL_CONTROL_NOTIFY_EN_MSK;
+	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);
+	msleep(1);
+	sl_control = hisi_sas_phy_read32(hisi_hba, phy_no, SL_CONTROL);
+	sl_control &= ~SL_CONTROL_NOTIFY_EN_MSK;
+	hisi_sas_phy_write32(hisi_hba, phy_no, SL_CONTROL, sl_control);
+}
+
 /* Interrupts */
 static irqreturn_t int_phyup_v1_hw(int irq_no, void *p)
 {
@@ -750,6 +763,7 @@ static irqreturn_t int_phyup_v1_hw(int irq_no, void *p)
 	struct sas_identify_frame *id = (struct sas_identify_frame *)frame_rcvd;
 	u32 irq_value, context, port_id, link_rate;
 	int i;
+	struct hisi_sas_wq *wq = NULL;
 	irqreturn_t res = IRQ_HANDLED;
 
 	irq_value = hisi_sas_phy_read32(hisi_hba, phy_no, CHL_INT2);
@@ -804,6 +818,16 @@ static irqreturn_t int_phyup_v1_hw(int irq_no, void *p)
 		phy->identify.target_port_protocols =
 			SAS_PROTOCOL_SMP;
 
+	wq = kmalloc(sizeof(*wq), GFP_ATOMIC);
+	if (!wq)
+		goto end;
+
+	wq->event = PHYUP;
+	wq->hisi_hba = hisi_hba;
+	wq->phy_no = phy_no;
+
+	INIT_WORK(&wq->work_struct, hisi_sas_wq_process);
+	queue_work(hisi_hba->wq, &wq->work_struct);
 
 end:
 	hisi_sas_phy_write32(hisi_hba, phy_no, CHL_INT2,

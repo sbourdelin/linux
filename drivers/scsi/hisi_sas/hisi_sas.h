@@ -333,4 +333,5 @@ extern int interrupt_init_v1_hw(struct hisi_hba *hisi_hba);
 extern int interrupt_openall_v1_hw(struct hisi_hba *hisi_hba);
 extern int hw_init_v1_hw(struct hisi_hba *hisi_hba);
 extern int phys_init_v1_hw(struct hisi_hba *hisi_hba);
+extern void sl_notify_v1_hw(struct hisi_hba *hisi_hba, int phy_no);
 #endif

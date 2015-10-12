@@ -27,10 +27,65 @@ void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba)
 		hisi_sas_slot_index_clear(hisi_hba, i);
 }
 
+
+void hisi_sas_bytes_dmaed(struct hisi_hba *hisi_hba, int phy_no)
+{
+	struct hisi_sas_phy *phy = &hisi_hba->phy[phy_no];
+	struct asd_sas_phy *sas_phy = &phy->sas_phy;
+	struct sas_ha_struct *sas_ha;
+
+	if (!phy->phy_attached)
+		return;
+
+	sas_ha = &hisi_hba->sha;
+	sas_ha->notify_phy_event(sas_phy, PHYE_OOB_DONE);
+
+	if (sas_phy->phy) {
+		struct sas_phy *sphy = sas_phy->phy;
+
+		sphy->negotiated_linkrate = sas_phy->linkrate;
+		sphy->minimum_linkrate = phy->minimum_linkrate;
+		sphy->minimum_linkrate_hw = SAS_LINK_RATE_1_5_GBPS;
+		sphy->maximum_linkrate = phy->maximum_linkrate;
+	}
+
+	if (phy->phy_type & PORT_TYPE_SAS) {
+		struct sas_identify_frame *id;
+
+		id = (struct sas_identify_frame *)phy->frame_rcvd;
+		id->dev_type = phy->identify.device_type;
+		id->initiator_bits = SAS_PROTOCOL_ALL;
+		id->target_bits = phy->identify.target_port_protocols;
+	} else if (phy->phy_type & PORT_TYPE_SATA) {
+		/*Nothing*/
+	}
+
+	sas_phy->frame_rcvd_size = phy->frame_rcvd_size;
+
+	sas_ha->notify_port_event(sas_phy, PORTE_BYTES_DMAED);
+}
+
+
+static void hisi_sas_phyup_work(struct hisi_hba *hisi_hba,
+				      int phy_no)
+{
+	sl_notify_v1_hw(hisi_hba, phy_no); /* This requires a sleep */
+	hisi_sas_bytes_dmaed(hisi_hba, phy_no);
+}
+
 void hisi_sas_wq_process(struct work_struct *work)
 {
 	struct hisi_sas_wq *wq =
 		container_of(work, struct hisi_sas_wq, work_struct);
+	struct hisi_hba *hisi_hba = wq->hisi_hba;
+	int event = wq->event;
+	int phy_no = wq->phy_no;
+
+	switch (event) {
+	case PHYUP:
+		hisi_sas_phyup_work(hisi_hba, phy_no);
+		break;
+	}
 
 	kfree(wq);
 }
