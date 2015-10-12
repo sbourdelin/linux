@@ -107,7 +107,7 @@ found:
 	}
 	/* proceed reading data after header */
 	__ioread32_copy(nvram_buf + sizeof(*header), header + 1,
-			DIV_ROUND_UP(nvram_len / 4));
+			DIV_ROUND_UP(nvram_len, 4));
 	nvram_buf[NVRAM_SPACE - 1] = '\0';
 
 	return 0;
