@@ -102,6 +102,8 @@ MODULE_PARM_DESC(write_timeout, "Time (in ms) to try writes (default 25)");
 
 #define AT24_BITMASK(x) (BIT(x) - 1)
 
+#define AT24CS_SERIAL_ADDR(addr) (addr + 0x08)
+
 /* create non-zero magic value for given eeprom parameters */
 #define AT24_DEVICE_MAGIC(_len, _flags) 		\
 	((1 << AT24_SIZE_FLAGS | (_flags)) 		\
@@ -543,6 +545,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	if (chip.flags & AT24_FLAG_TAKE8ADDR)
 		num_addresses = 8;
+	else if (chip.flags & AT24_FLAG_SERIAL)
+		num_addresses = 2;
 	else
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
@@ -601,12 +605,30 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	at24->client[0] = client;
 
 	/* use dummy devices for multiple-address chips */
-	for (i = 1; i < num_addresses; i++) {
-		at24->client[i] = i2c_new_dummy(client->adapter,
+	if (at24->chip.flags & AT24_FLAG_TAKE8ADDR) {
+		for (i = 1; i < num_addresses; i++) {
+			at24->client[i] = i2c_new_dummy(client->adapter,
+							client->addr + i);
+			if (!at24->client[i]) {
+				dev_err(&client->dev,
+					"address 0x%02x unavailable\n",
 					client->addr + i);
-		if (!at24->client[i]) {
+				err = -EADDRINUSE;
+				goto err_clients;
+			}
+		}
+	}
+
+	/*
+	 * at24cs series tie up an additional address for the memory area
+	 * contining the serial number
+	 */
+	if (at24->chip.flags & AT24_FLAG_SERIAL) {
+		at24->client[1] = i2c_new_dummy(client->adapter,
+					AT24CS_SERIAL_ADDR(client->addr));
+		if (!at24->client[1]) {
 			dev_err(&client->dev, "address 0x%02x unavailable\n",
-					client->addr + i);
+				AT24CS_SERIAL_ADDR(client->addr));
 			err = -EADDRINUSE;
 			goto err_clients;
 		}
