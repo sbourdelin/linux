@@ -682,7 +682,7 @@ struct sk_buff *br_handle_vlan(struct net_bridge *br,
 			       struct sk_buff *skb);
 int br_vlan_add(struct net_bridge *br, u16 vid, u16 flags);
 int br_vlan_delete(struct net_bridge *br, u16 vid);
-void br_vlan_flush(struct net_bridge *br, bool free_rht);
+void br_vlan_flush(struct net_bridge_vlan_group *vg, bool free_rht);
 struct net_bridge_vlan *br_vlan_find(struct net_bridge_vlan_group *vg, u16 vid);
 void br_recalculate_fwd_mask(struct net_bridge *br);
 int __br_vlan_filter_toggle(struct net_bridge *br, unsigned long val);
@@ -694,7 +694,6 @@ int br_vlan_set_default_pvid(struct net_bridge *br, unsigned long val);
 int __br_vlan_set_default_pvid(struct net_bridge *br, u16 pvid);
 int nbp_vlan_add(struct net_bridge_port *port, u16 vid, u16 flags);
 int nbp_vlan_delete(struct net_bridge_port *port, u16 vid);
-void nbp_vlan_flush(struct net_bridge_port *port, bool free_rht);
 int nbp_vlan_init(struct net_bridge_port *port);
 int nbp_get_num_vlan_infos(struct net_bridge_port *p, u32 filter_mask);
 
@@ -790,7 +789,7 @@ static inline int br_vlan_delete(struct net_bridge *br, u16 vid)
 	return -EOPNOTSUPP;
 }
 
-static inline void br_vlan_flush(struct net_bridge *br, bool free_rht)
+static inline void br_vlan_flush(struct net_bridge_vlan_group *vg, bool free_rht)
 {
 }
 
@@ -811,10 +810,6 @@ static inline int nbp_vlan_add(struct net_bridge_port *port, u16 vid, u16 flags)
 static inline int nbp_vlan_delete(struct net_bridge_port *port, u16 vid)
 {
 	return -EOPNOTSUPP;
-}
-
-static inline void nbp_vlan_flush(struct net_bridge_port *port, bool free_rht)
-{
 }
 
 static inline struct net_bridge_vlan *br_vlan_find(struct net_bridge_vlan_group *vg,
