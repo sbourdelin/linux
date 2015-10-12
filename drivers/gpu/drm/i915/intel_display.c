@@ -7708,6 +7708,7 @@ static void intel_get_pipe_timings(struct intel_crtc *crtc,
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum transcoder cpu_transcoder = pipe_config->cpu_transcoder;
+	bool is_dsi = intel_pipe_has_type(crtc, INTEL_OUTPUT_DSI);
 	uint32_t tmp;
 
 	tmp = I915_READ(HTOTAL(cpu_transcoder));
@@ -7734,6 +7735,26 @@ static void intel_get_pipe_timings(struct intel_crtc *crtc,
 		pipe_config->base.adjusted_mode.flags |= DRM_MODE_FLAG_INTERLACE;
 		pipe_config->base.adjusted_mode.crtc_vtotal += 1;
 		pipe_config->base.adjusted_mode.crtc_vblank_end += 1;
+	}
+
+	if (IS_BROXTON(dev) && is_dsi) {
+		struct intel_encoder *encoder;
+
+		for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
+			struct intel_dsi *intel_dsi =
+				enc_to_intel_dsi(&encoder->base);
+			enum port port;
+
+			for_each_dsi_port(port, intel_dsi->ports) {
+				pipe_config->base.adjusted_mode.crtc_hdisplay =
+					I915_READ(BXT_MIPI_TRANS_HACTIVE(port));
+				pipe_config->base.adjusted_mode.crtc_vdisplay =
+					I915_READ(BXT_MIPI_TRANS_VACTIVE(port));
+				pipe_config->base.adjusted_mode.crtc_vtotal =
+					I915_READ(BXT_MIPI_TRANS_VTOTAL(port));
+			}
+		}
+
 	}
 
 	tmp = I915_READ(PIPESRC(crtc->pipe));
@@ -10664,6 +10685,7 @@ struct drm_display_mode *intel_crtc_mode_get(struct drm_device *dev,
 	int vtot = I915_READ(VTOTAL(cpu_transcoder));
 	int vsync = I915_READ(VSYNC(cpu_transcoder));
 	enum pipe pipe = intel_crtc->pipe;
+	bool is_dsi = intel_pipe_has_type(intel_crtc, INTEL_OUTPUT_DSI);
 
 	mode = kzalloc(sizeof(*mode), GFP_KERNEL);
 	if (!mode)
@@ -10684,14 +10706,34 @@ struct drm_display_mode *intel_crtc_mode_get(struct drm_device *dev,
 	i9xx_crtc_clock_get(intel_crtc, &pipe_config);
 
 	mode->clock = pipe_config.port_clock / pipe_config.pixel_multiplier;
-	mode->hdisplay = (htot & 0xffff) + 1;
 	mode->htotal = ((htot & 0xffff0000) >> 16) + 1;
 	mode->hsync_start = (hsync & 0xffff) + 1;
 	mode->hsync_end = ((hsync & 0xffff0000) >> 16) + 1;
-	mode->vdisplay = (vtot & 0xffff) + 1;
-	mode->vtotal = ((vtot & 0xffff0000) >> 16) + 1;
 	mode->vsync_start = (vsync & 0xffff) + 1;
 	mode->vsync_end = ((vsync & 0xffff0000) >> 16) + 1;
+
+	if (IS_BROXTON(dev) && is_dsi) {
+		struct intel_encoder *encoder;
+
+		for_each_encoder_on_crtc(dev, &intel_crtc->base, encoder) {
+			struct intel_dsi *intel_dsi =
+				enc_to_intel_dsi(&encoder->base);
+			enum port port;
+
+			for_each_dsi_port(port, intel_dsi->ports) {
+				mode->vtotal =
+					I915_READ(BXT_MIPI_TRANS_VTOTAL(port));
+				mode->hdisplay =
+					I915_READ(BXT_MIPI_TRANS_HACTIVE(port));
+				mode->vdisplay =
+					I915_READ(BXT_MIPI_TRANS_VACTIVE(port));
+			}
+		}
+	} else {
+		mode->vtotal = ((vtot & 0xffff0000) >> 16) + 1;
+		mode->hdisplay = (htot & 0xffff) + 1;
+		mode->vdisplay = (vtot & 0xffff) + 1;
+	}
 
 	drm_mode_set_name(mode);
 
