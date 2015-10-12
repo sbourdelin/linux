@@ -192,6 +192,8 @@ extern const struct bpf_func_proto bpf_map_update_elem_proto;
 extern const struct bpf_func_proto bpf_map_delete_elem_proto;
 
 extern const struct bpf_func_proto bpf_perf_event_read_proto;
+extern const struct bpf_func_proto bpf_perf_event_sample_enable_proto;
+extern const struct bpf_func_proto bpf_perf_event_sample_disable_proto;
 extern const struct bpf_func_proto bpf_get_prandom_u32_proto;
 extern const struct bpf_func_proto bpf_get_smp_processor_id_proto;
 extern const struct bpf_func_proto bpf_tail_call_proto;
