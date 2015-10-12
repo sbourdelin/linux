@@ -257,4 +257,6 @@ union hisi_sas_command_table {
 	struct hisi_sas_command_table_smp smp;
 	struct hisi_sas_command_table_stp stp;
 };
+
+void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
 #endif

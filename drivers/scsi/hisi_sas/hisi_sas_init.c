@@ -131,6 +131,8 @@ static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
 		goto err_out;
 	memset(hisi_hba->sata_breakpoint, 0, s);
 
+	hisi_sas_slot_index_init(hisi_hba);
+
 	return 0;
 err_out:
 	return -ENOMEM;
