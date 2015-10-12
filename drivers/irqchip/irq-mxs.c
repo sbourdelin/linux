@@ -97,7 +97,8 @@ static int __init icoll_of_init(struct device_node *np,
 			  struct device_node *interrupt_parent)
 {
 	icoll_base = of_iomap(np, 0);
-	WARN_ON(!icoll_base);
+	if (!icoll_base)
+		panic("%s: unable to map resource", np->full_name);
 
 	/*
 	 * Interrupt Collector reset, which initializes the priority
