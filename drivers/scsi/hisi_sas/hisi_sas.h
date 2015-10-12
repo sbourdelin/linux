@@ -33,6 +33,7 @@
 #define HISI_SAS_COMMAND_TABLE_SZ \
 		(((sizeof(union hisi_sas_command_table)+3)/4)*4)
 
+#define HISI_SAS_MAX_SSP_RESP_SZ (sizeof(struct ssp_frame_hdr) + 1024)
 #define HISI_SAS_NAME_LEN 32
 #define HISI_SAS_RESET_REG_CNT 5
 
@@ -109,6 +110,20 @@ struct hisi_sas_slot {
 	dma_addr_t sge_page_dma;
 };
 
+struct hisi_sas_tmf_task {
+	u8 tmf;
+	u16 tag_of_task_to_be_managed;
+};
+
+struct hisi_sas_tei {
+	struct sas_task	*task;
+	struct hisi_sas_cmd_hdr	*hdr;
+	struct hisi_sas_port	*port;
+	struct hisi_sas_slot	*slot;
+	int	n_elem;
+	int	iptt;
+};
+
 enum hisi_sas_wq_event {
 	PHYUP,
 };
@@ -158,9 +173,11 @@ struct hisi_hba {
 	struct hisi_sas_cq cq[HISI_SAS_MAX_QUEUES];
 	struct hisi_sas_phy phy[HISI_SAS_MAX_PHYS];
 	struct hisi_sas_port port[HISI_SAS_MAX_PHYS];
+
 	int	id;
 	int	queue_count;
 	char	*int_names;
+	struct hisi_sas_slot	*slot_prep;
 
 	struct hisi_sas_device	devices[HISI_SAS_MAX_DEVICES];
 	struct dma_pool *command_table_pool;
@@ -328,7 +345,13 @@ union hisi_sas_command_table {
 
 void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
 void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
+int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags);
 void hisi_sas_wq_process(struct work_struct *work);
+extern void start_delivery_v1_hw(struct hisi_hba *hisi_hba);
+extern int get_free_slot_v1_hw(struct hisi_hba *hisi_hba, int *q, int *s);
+extern int prep_ssp_v1_hw(struct hisi_hba *hisi_hba,
+			  struct hisi_sas_tei *tei, int is_tmf,
+			  struct hisi_sas_tmf_task *tmf);
 extern int interrupt_init_v1_hw(struct hisi_hba *hisi_hba);
 extern int interrupt_openall_v1_hw(struct hisi_hba *hisi_hba);
 extern int hw_init_v1_hw(struct hisi_hba *hisi_hba);
