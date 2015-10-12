@@ -1,2 +1,1 @@
-
-obj-m += configfs_sample.o
+obj-$(CONFIG_SAMPLE_CONFIGFS) += configfs_sample.o

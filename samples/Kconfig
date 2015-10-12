@@ -5,6 +5,12 @@ menuconfig SAMPLES
 
 if SAMPLES
 
+config SAMPLE_CONFIGFS
+	tristate "Build configfs sample -- loadable modules only"
+	depends on CONFIGFS_FS && m
+	help
+	  This builds the same for configfs
+
 config SAMPLE_TRACE_EVENTS
 	tristate "Build trace_events examples -- loadable modules only"
 	depends on EVENT_TRACING && m
