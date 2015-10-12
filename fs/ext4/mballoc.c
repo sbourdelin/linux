@@ -874,17 +874,21 @@ static int ext4_mb_init_cache(struct page *page, char *incore)
 			bh[i] = NULL;
 			continue;
 		}
-		if (!(bh[i] = ext4_read_block_bitmap_nowait(sb, group))) {
-			err = -ENOMEM;
+		err = ext4_read_block_bitmap_nowait(sb, group, &bh[i]);
+		if (err)
 			goto out;
-		}
 		mb_debug(1, "read bitmap for group %u\n", group);
 	}
 
 	/* wait for I/O completion */
 	for (i = 0, group = first_group; i < groups_per_page; i++, group++) {
-		if (bh[i] && ext4_wait_block_bitmap(sb, group, bh[i]))
-			err = -EIO;
+		int err2;
+
+		if (!bh[i])
+			continue;
+		err2 = ext4_wait_block_bitmap(sb, group, bh[i]);
+		if (!err)
+			err = err2;
 	}
 
 	first_block = page->index * blocks_per_page;
@@ -2446,8 +2450,8 @@ int ext4_mb_add_groupinfo(struct super_block *sb, ext4_group_t group,
 		meta_group_info[i]->bb_bitmap =
 			kmalloc(sb->s_blocksize, GFP_NOFS);
 		BUG_ON(meta_group_info[i]->bb_bitmap == NULL);
-		bh = ext4_read_block_bitmap(sb, group);
-		BUG_ON(bh == NULL);
+		err = ext4_read_block_bitmap(sb, group, &bh);
+		BUG_ON(err);
 		memcpy(meta_group_info[i]->bb_bitmap, bh->b_data,
 			sb->s_blocksize);
 		put_bh(bh);
@@ -2896,9 +2900,8 @@ ext4_mb_mark_diskspace_used(struct ext4_allocation_context *ac,
 	sb = ac->ac_sb;
 	sbi = EXT4_SB(sb);
 
-	err = -EIO;
-	bitmap_bh = ext4_read_block_bitmap(sb, ac->ac_b_ex.fe_group);
-	if (!bitmap_bh)
+	err = ext4_read_block_bitmap(sb, ac->ac_b_ex.fe_group, &bitmap_bh);
+	if (err)
 		goto out_err;
 
 	BUFFER_TRACE(bitmap_bh, "getting write access");
@@ -3842,9 +3845,10 @@ ext4_mb_discard_group_preallocations(struct super_block *sb,
 	if (list_empty(&grp->bb_prealloc_list))
 		return 0;
 
-	bitmap_bh = ext4_read_block_bitmap(sb, group);
-	if (bitmap_bh == NULL) {
-		ext4_error(sb, "Error reading block bitmap for %u", group);
+	err = ext4_read_block_bitmap(sb, group, &bitmap_bh);
+	if (err) {
+		ext4_error(sb, "Error %d reading block bitmap for %u",
+			   err, group);
 		return 0;
 	}
 
@@ -4014,10 +4018,10 @@ repeat:
 			continue;
 		}
 
-		bitmap_bh = ext4_read_block_bitmap(sb, group);
-		if (bitmap_bh == NULL) {
-			ext4_error(sb, "Error reading block bitmap for %u",
-					group);
+		err = ext4_read_block_bitmap(sb, group, &bitmap_bh);
+		if (err) {
+			ext4_error(sb, "Error %d reading block bitmap for %u",
+					err, group);
 			ext4_mb_unload_buddy(&e4b);
 			continue;
 		}
@@ -4760,11 +4764,9 @@ do_more:
 		count -= overflow;
 	}
 	count_clusters = EXT4_NUM_B2C(sbi, count);
-	bitmap_bh = ext4_read_block_bitmap(sb, block_group);
-	if (!bitmap_bh) {
-		err = -EIO;
+	err = ext4_read_block_bitmap(sb, block_group, &bitmap_bh);
+	if (err)
 		goto error_return;
-	}
 	gdp = ext4_get_group_desc(sb, block_group, &gd_bh);
 	if (!gdp) {
 		err = -EIO;
@@ -4930,11 +4932,9 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 		goto error_return;
 	}
 
-	bitmap_bh = ext4_read_block_bitmap(sb, block_group);
-	if (!bitmap_bh) {
-		err = -EIO;
+	err = ext4_read_block_bitmap(sb, block_group, &bitmap_bh);
+	if (err)
 		goto error_return;
-	}
 
 	desc = ext4_get_group_desc(sb, block_group, &gd_bh);
 	if (!desc) {

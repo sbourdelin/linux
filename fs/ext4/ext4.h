@@ -2033,13 +2033,15 @@ extern struct ext4_group_desc * ext4_get_group_desc(struct super_block * sb,
 						    struct buffer_head ** bh);
 extern int ext4_should_retry_alloc(struct super_block *sb, int *retries);
 
-extern struct buffer_head *ext4_read_block_bitmap_nowait(struct super_block *sb,
-						ext4_group_t block_group);
+extern int ext4_read_block_bitmap_nowait(struct super_block *sb,
+					 ext4_group_t block_group,
+					 struct buffer_head **bbh);
 extern int ext4_wait_block_bitmap(struct super_block *sb,
 				  ext4_group_t block_group,
 				  struct buffer_head *bh);
-extern struct buffer_head *ext4_read_block_bitmap(struct super_block *sb,
-						  ext4_group_t block_group);
+extern int ext4_read_block_bitmap(struct super_block *sb,
+				  ext4_group_t block_group,
+				  struct buffer_head **bbh);
 extern unsigned ext4_free_clusters_after_init(struct super_block *sb,
 					      ext4_group_t block_group,
 					      struct ext4_group_desc *gdp);
