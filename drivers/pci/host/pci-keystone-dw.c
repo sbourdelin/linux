@@ -25,7 +25,6 @@
 
 /* Application register defines */
 #define LTSSM_EN_VAL		        1
-#define LTSSM_STATE_MASK		0x1f
 #define LTSSM_STATE_L0			0x11
 #define DBI_CS2_EN_VAL			0x20
 #define OB_XLAT_EN_VAL		        2
