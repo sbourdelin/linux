@@ -387,6 +387,8 @@ static int fanotify_release(struct inode *ignored, struct file *file)
 	 */
 	wake_up(&group->fanotify_data.access_waitq);
 #endif
+	/* Get rid of reference held since fanotify_init */
+	put_pid(group->fanotify_data.pid);
 
 	/* matches the fanotify_init->fsnotify_alloc_group */
 	fsnotify_destroy_group(group);
@@ -740,6 +742,7 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 
 	group->fanotify_data.user = user;
 	atomic_inc(&user->fanotify_listeners);
+	group->fanotify_data.pid = get_pid(task_tgid(current));
 
 	oevent = fanotify_alloc_event(NULL, FS_Q_OVERFLOW, NULL);
 	if (unlikely(!oevent)) {

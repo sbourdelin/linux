@@ -105,6 +105,7 @@ static bool fanotify_should_send_event(struct fsnotify_mark *inode_mark,
 {
 	__u32 marks_mask, marks_ignored_mask;
 	struct path *path = data;
+	struct pid *cur_pid;
 
 	pr_debug("%s: inode_mark=%p vfsmnt_mark=%p mask=%x data=%p"
 		 " data_type=%d\n", __func__, inode_mark, vfsmnt_mark,
@@ -138,6 +139,14 @@ static bool fanotify_should_send_event(struct fsnotify_mark *inode_mark,
 	} else {
 		BUG();
 	}
+
+	/* Assume the listening process will approve its own requests */
+	cur_pid = get_pid(task_tgid(current));
+	if (pid_nr(vfsmnt_mark->group->fanotify_data.pid) == pid_nr(cur_pid)) {
+		put_pid(cur_pid);
+		return false;
+	}
+	put_pid(cur_pid);
 
 	if (d_is_dir(path->dentry) &&
 	    !(marks_mask & FS_ISDIR & ~marks_ignored_mask))
