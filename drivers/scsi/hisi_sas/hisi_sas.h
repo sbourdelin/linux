@@ -354,6 +354,7 @@ void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
 int hisi_sas_dev_found(struct domain_device *dev);
 int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags);
 void hisi_sas_port_formed(struct asd_sas_phy *sas_phy);
+void hisi_sas_phy_down(struct hisi_hba *hisi_hba, int phy_no, int rdy);
 void hisi_sas_wq_process(struct work_struct *work);
 void hisi_sas_slot_task_free(struct hisi_hba *hisi_hba, struct sas_task *task,
 			struct hisi_sas_slot *slot);

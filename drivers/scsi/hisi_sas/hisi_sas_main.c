@@ -529,3 +529,27 @@ void hisi_sas_port_formed(struct asd_sas_phy *sas_phy)
 {
 	hisi_sas_port_notify_formed(sas_phy, 1);
 }
+static void hisi_sas_phy_disconnected(struct hisi_sas_phy *phy)
+{
+	phy->phy_attached = 0;
+	phy->phy_type = 0;
+}
+
+void hisi_sas_phy_down(struct hisi_hba *hisi_hba, int phy_no, int rdy)
+{
+	struct hisi_sas_phy *phy = &hisi_hba->phy[phy_no];
+	struct asd_sas_phy *sas_phy = &phy->sas_phy;
+	struct sas_ha_struct *sas_ha = &hisi_hba->sha;
+
+	if (rdy) {
+		/* Phy down but ready */
+		hisi_sas_bytes_dmaed(hisi_hba, phy_no);
+		hisi_sas_port_notify_formed(sas_phy, 0);
+	} else {
+		/* Phy down and not ready */
+		sas_ha->notify_phy_event(sas_phy, PHYE_LOSS_OF_SIGNAL);
+		phy->phy_attached = 0;
+		sas_phy_disconnected(sas_phy);
+		hisi_sas_phy_disconnected(phy);
+	}
+}
