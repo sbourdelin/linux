@@ -896,6 +896,14 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 * previously didn't change the revision level when setting the flags,
 	 * so there is a chance incompat flags are set on a rev 0 filesystem.
 	 */
+#ifdef CONFIG_EXT4_FS
+	/* Journalled FS should mount with ext4 if it's available */
+	if (EXT2_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_HAS_JOURNAL)) {
+		ext2_msg(sb, KERN_ERR,	"warning: journal detected; cowardly "
+			"refusing to mount read-write.  Try ext4.");
+		sb->s_flags |= MS_RDONLY;
+	}
+#endif
 	features = EXT2_HAS_INCOMPAT_FEATURE(sb, ~EXT2_FEATURE_INCOMPAT_SUPP);
 	if (features) {
 		ext2_msg(sb, KERN_ERR,	"error: couldn't mount because of "
@@ -1336,6 +1344,17 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 			err = -EROFS;
 			goto restore_opts;
 		}
+#ifdef CONFIG_EXT4_FS
+		/* Journalled FS should mount with ext4 if it's available */
+		if (EXT2_HAS_COMPAT_FEATURE(sb,
+					    EXT3_FEATURE_COMPAT_HAS_JOURNAL)) {
+			ext2_msg(sb, KERN_ERR,	"warning: journal detected; "
+				"cowardly refusing to remount read-write.  "
+				"Try ext4.");
+			err = -EROFS;
+			goto restore_opts;
+		}
+#endif
 		/*
 		 * Mounting a RDONLY partition read-write, so reread and
 		 * store the current valid flag.  (It may have been changed
