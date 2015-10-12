@@ -569,6 +569,8 @@ struct perf_event {
 	perf_overflow_handler_t		overflow_handler;
 	void				*overflow_handler_context;
 
+	atomic_t			*sample_disable;
+
 #ifdef CONFIG_EVENT_TRACING
 	struct trace_event_call		*tp_event;
 	struct event_filter		*filter;

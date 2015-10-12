@@ -6426,6 +6426,9 @@ static int __perf_event_overflow(struct perf_event *event,
 		irq_work_queue(&event->pending);
 	}
 
+	if ((event->sample_disable) && atomic_read(event->sample_disable))
+		return ret;
+
 	if (event->overflow_handler)
 		event->overflow_handler(event, data, regs);
 	else

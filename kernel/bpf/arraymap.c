@@ -51,6 +51,9 @@ static struct bpf_map *array_map_alloc(union bpf_attr *attr)
 
 	array->elem_size = elem_size;
 
+	if (attr->map_type == BPF_MAP_TYPE_PERF_EVENT_ARRAY)
+		atomic_set(&array->map.perf_sample_disable, 1);
+
 	return &array->map;
 }
 
@@ -298,6 +301,8 @@ static void *perf_event_fd_array_get_ptr(struct bpf_map *map, int fd)
 		perf_event_release_kernel(event);
 		return ERR_PTR(-EINVAL);
 	}
+
+	event->sample_disable = &map->perf_sample_disable;
 	return event;
 }
 
