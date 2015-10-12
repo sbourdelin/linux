@@ -699,6 +699,8 @@ static int i2c_device_probe(struct device *dev)
 					client));
 		if (status)
 			goto err_detach_pm_domain;
+	} else {
+		goto err_clear_wakeup_irq;
 	}
 
 	return 0;
