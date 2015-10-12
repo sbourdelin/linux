@@ -435,6 +435,30 @@ found_out:
 	return res;
 }
 
+void hisi_sas_scan_start(struct Scsi_Host *shost)
+{
+	struct sas_ha_struct *sha = SHOST_TO_SAS_HA(shost);
+	struct hisi_hba *hisi_hba = sha->lldd_ha;
+	int i;
+
+	for (i = 0; i < hisi_hba->n_phy; ++i)
+		hisi_sas_bytes_dmaed(hisi_hba, i);
+
+	hisi_hba->scan_finished = 1;
+}
+
+int hisi_sas_scan_finished(struct Scsi_Host *shost, unsigned long time)
+{
+	struct sas_ha_struct *sha = SHOST_TO_SAS_HA(shost);
+	struct hisi_hba *hisi_hba = sha->lldd_ha;
+
+	if (hisi_hba->scan_finished == 0)
+		return 0;
+
+	sas_drain_work(sha);
+	return 1;
+}
+
 
 static void hisi_sas_phyup_work(struct hisi_hba *hisi_hba,
 				      int phy_no)

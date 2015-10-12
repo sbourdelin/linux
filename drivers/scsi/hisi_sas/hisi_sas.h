@@ -165,6 +165,7 @@ struct hisi_hba {
 
 	int	n_phy;
 
+	int scan_finished;
 
 	struct timer_list timer;
 	struct workqueue_struct *wq;
@@ -350,6 +351,9 @@ union hisi_sas_command_table {
 	struct hisi_sas_command_table_smp smp;
 	struct hisi_sas_command_table_stp stp;
 };
+
+int hisi_sas_scan_finished(struct Scsi_Host *shost, unsigned long time);
+void hisi_sas_scan_start(struct Scsi_Host *shost);
 
 void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
 void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
