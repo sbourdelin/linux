@@ -330,7 +330,8 @@ static inline int crypto_akcipher_verify(struct akcipher_request *req)
  *
  * Return: zero on success; error code in case of error
  */
-static inline int crypto_akcipher_setkey(struct crypto_akcipher *tfm, void *key,
+static inline int crypto_akcipher_setkey(struct crypto_akcipher *tfm,
+					 const u8 *key,
 					 unsigned int keylen)
 {
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
