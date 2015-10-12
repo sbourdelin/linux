@@ -120,11 +120,14 @@ long ptp_ioctl(struct posix_clock *pc, unsigned int cmd, unsigned long arg)
 	struct ptp_clock_caps caps;
 	struct ptp_clock_request req;
 	struct ptp_sys_offset *sysoff = NULL;
+	struct ptp_sys_offset_precise precise_offset;
 	struct ptp_pin_desc pd;
 	struct ptp_clock *ptp = container_of(pc, struct ptp_clock, clock);
 	struct ptp_clock_info *ops = ptp->info;
 	struct ptp_clock_time *pct;
 	struct timespec64 ts;
+	u64 cross_dev, cross_sys;
+	u32 rem;
 	int enable, err = 0;
 	unsigned int i, pin_index;
 
@@ -138,6 +141,7 @@ long ptp_ioctl(struct posix_clock *pc, unsigned int cmd, unsigned long arg)
 		caps.n_per_out = ptp->info->n_per_out;
 		caps.pps = ptp->info->pps;
 		caps.n_pins = ptp->info->n_pins;
+		caps.cross_timestamping = ptp->info->getsynctime != NULL;
 		if (copy_to_user((void __user *)arg, &caps, sizeof(caps)))
 			err = -EFAULT;
 		break;
@@ -178,6 +182,28 @@ long ptp_ioctl(struct posix_clock *pc, unsigned int cmd, unsigned long arg)
 		req.type = PTP_CLK_REQ_PPS;
 		enable = arg ? 1 : 0;
 		err = ops->enable(ops, &req, enable);
+		break;
+
+	case PTP_SYS_OFFSET_PRECISE:
+		if (!ptp->info->getsynctime || ptp->info->getsynctime(
+			    ptp->info, &cross_dev, &cross_sys)) {
+			err = -ENOSYS;
+			break;
+		}
+		if (copy_from_user(&precise_offset, (void __user *)arg,
+				   sizeof(precise_offset))) {
+			err = -EFAULT;
+			break;
+		}
+		precise_offset.dev.sec =
+			div_u64_rem(cross_dev, NSEC_PER_SEC, &rem);
+		precise_offset.dev.nsec = rem;
+		precise_offset.sys.sec =
+			div_u64_rem(cross_sys, NSEC_PER_SEC, &rem);
+		precise_offset.sys.nsec = rem;
+		if (copy_to_user((void __user *)arg, &precise_offset,
+				 sizeof(precise_offset)))
+			err = -EFAULT;
 		break;
 
 	case PTP_SYS_OFFSET:

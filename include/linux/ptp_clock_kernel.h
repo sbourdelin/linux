@@ -67,6 +67,11 @@ struct ptp_clock_request {
  * @gettime64:  Reads the current time from the hardware clock.
  *              parameter ts: Holds the result.
  *
+ * @getsynctime:  Reads the current time from the hardware clock and
+ *                system clock simultaneously.
+ *                parameter dev: Holds the device time
+ *                parameter sys: Holds the system time
+ *
  * @settime64:  Set the current time on the hardware clock.
  *              parameter ts: Time value to set.
  *
@@ -105,6 +110,7 @@ struct ptp_clock_info {
 	int (*adjfreq)(struct ptp_clock_info *ptp, s32 delta);
 	int (*adjtime)(struct ptp_clock_info *ptp, s64 delta);
 	int (*gettime64)(struct ptp_clock_info *ptp, struct timespec64 *ts);
+	int (*getsynctime)(struct ptp_clock_info *ptp, u64 *dev, u64 *sys);
 	int (*settime64)(struct ptp_clock_info *p, const struct timespec64 *ts);
 	int (*enable)(struct ptp_clock_info *ptp,
 		      struct ptp_clock_request *request, int on);
