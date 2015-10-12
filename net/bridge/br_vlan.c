@@ -321,15 +321,18 @@ out:
 	return err;
 }
 
-static void __vlan_flush(struct net_bridge_vlan_group *vlgrp)
+static void __vlan_flush(struct net_bridge_vlan_group *vlgrp, bool free_rht)
 {
 	struct net_bridge_vlan *vlan, *tmp;
 
 	__vlan_delete_pvid(vlgrp, vlgrp->pvid);
 	list_for_each_entry_safe(vlan, tmp, &vlgrp->vlan_list, vlist)
 		__vlan_del(vlan);
-	rhashtable_destroy(&vlgrp->vlan_hash);
-	kfree_rcu(vlgrp, rcu);
+
+	if (free_rht) {
+		rhashtable_destroy(&vlgrp->vlan_hash);
+		kfree_rcu(vlgrp, rcu);
+	}
 }
 
 struct sk_buff *br_handle_vlan(struct net_bridge *br,
@@ -582,11 +585,11 @@ int br_vlan_delete(struct net_bridge *br, u16 vid)
 	return __vlan_del(v);
 }
 
-void br_vlan_flush(struct net_bridge *br)
+void br_vlan_flush(struct net_bridge *br, bool free_rht)
 {
 	ASSERT_RTNL();
 
-	__vlan_flush(br_vlan_group(br));
+	__vlan_flush(br_vlan_group(br), free_rht);
 }
 
 struct net_bridge_vlan *br_vlan_find(struct net_bridge_vlan_group *vg, u16 vid)
@@ -970,7 +973,7 @@ int nbp_vlan_delete(struct net_bridge_port *port, u16 vid)
 	return __vlan_del(v);
 }
 
-void nbp_vlan_flush(struct net_bridge_port *port)
+void nbp_vlan_flush(struct net_bridge_port *port, bool free_rht)
 {
 	struct net_bridge_vlan_group *vg;
 	struct net_bridge_vlan *vlan;
@@ -981,5 +984,5 @@ void nbp_vlan_flush(struct net_bridge_port *port)
 	list_for_each_entry(vlan, &vg->vlan_list, vlist)
 		vlan_vid_del(port->dev, port->br->vlan_proto, vlan->vid);
 
-	__vlan_flush(vg);
+	__vlan_flush(vg, free_rht);
 }

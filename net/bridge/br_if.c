@@ -248,6 +248,8 @@ static void del_nbp(struct net_bridge_port *p)
 
 	list_del_rcu(&p->list);
 
+	/* vlan_flush phase I: remove vlans */
+	nbp_vlan_flush(p, false);
 	br_fdb_delete_by_port(br, p, 0, 1);
 	nbp_update_port_count(br);
 
@@ -256,8 +258,10 @@ static void del_nbp(struct net_bridge_port *p)
 	dev->priv_flags &= ~IFF_BRIDGE_PORT;
 
 	netdev_rx_handler_unregister(dev);
-	/* use the synchronize_rcu done by netdev_rx_handler_unregister */
-	nbp_vlan_flush(p);
+	/* use the synchronize_rcu done by netdev_rx_handler_unregister
+	 * vlan_flush phase II: free rht and vlgrp
+	 */
+	nbp_vlan_flush(p, true);
 
 	br_multicast_del_port(p);
 
@@ -281,7 +285,8 @@ void br_dev_delete(struct net_device *dev, struct list_head *head)
 
 	br_fdb_delete_by_port(br, NULL, 0, 1);
 
-	br_vlan_flush(br);
+	/* vlan_flush execute both phases (see del_nbp) */
+	br_vlan_flush(br, true);
 	br_multicast_dev_del(br);
 	del_timer_sync(&br->gc_timer);
 
