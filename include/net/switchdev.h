@@ -205,6 +205,7 @@ int switchdev_port_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 void switchdev_port_fwd_mark_set(struct net_device *dev,
 				 struct net_device *group_dev,
 				 bool joining);
+void switchdev_flush_deferred(void);
 
 #else
 
@@ -323,6 +324,10 @@ static inline int switchdev_port_fdb_dump(struct sk_buff *skb,
 static inline void switchdev_port_fwd_mark_set(struct net_device *dev,
 					       struct net_device *group_dev,
 					       bool joining)
+{
+}
+
+static inline void switchdev_flush_deferred(void)
 {
 }
 

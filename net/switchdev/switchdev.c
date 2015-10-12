@@ -17,8 +17,11 @@
 #include <linux/netdevice.h>
 #include <linux/if_bridge.h>
 #include <linux/list.h>
+#include <linux/workqueue.h>
 #include <net/ip_fib.h>
 #include <net/switchdev.h>
+
+static struct workqueue_struct *switchdev_wq;
 
 /**
  *	switchdev_trans_item_enqueue - Enqueue data item to transaction queue
@@ -1221,3 +1224,20 @@ void switchdev_port_fwd_mark_set(struct net_device *dev,
 	dev->offload_fwd_mark = mark;
 }
 EXPORT_SYMBOL_GPL(switchdev_port_fwd_mark_set);
+
+void switchdev_flush_deferred(void)
+{
+	flush_workqueue(switchdev_wq);
+}
+
+EXPORT_SYMBOL_GPL(switchdev_flush_deferred);
+
+static int __init switchdev_init(void)
+{
+	switchdev_wq = create_workqueue("switchdev");
+	if (!switchdev_wq)
+		return -ENOMEM;
+	return 0;
+}
+
+subsys_initcall(switchdev_init);
