@@ -347,6 +347,10 @@ void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
 void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
 int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags);
 void hisi_sas_wq_process(struct work_struct *work);
+void hisi_sas_slot_task_free(struct hisi_hba *hisi_hba, struct sas_task *task,
+			struct hisi_sas_slot *slot);
+
+/* hw specific functions */
 extern void start_delivery_v1_hw(struct hisi_hba *hisi_hba);
 extern int get_free_slot_v1_hw(struct hisi_hba *hisi_hba, int *q, int *s);
 extern int prep_ssp_v1_hw(struct hisi_hba *hisi_hba,
