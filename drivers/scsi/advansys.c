@@ -2883,9 +2883,9 @@ static void asc_prt_asc_board_eeprom(struct seq_file *m, struct Scsi_Host *shost
 	ASC_DVC_VAR *asc_dvc_varp;
 	ASCEEP_CONFIG *ep;
 	int i;
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 	int isa_dma_speed[] = { 10, 8, 7, 6, 5, 4, 3, 2 };
-#endif /* CONFIG_ISA */
+#endif /* ISA */
 	uchar serialstr[13];
 
 	asc_dvc_varp = &boardp->dvc_var.asc_dvc_var;
@@ -2937,13 +2937,13 @@ static void asc_prt_asc_board_eeprom(struct seq_file *m, struct Scsi_Host *shost
 			   (ep->init_sdtr & ADV_TID_TO_TIDMASK(i)) ? 'Y' : 'N');
 	seq_putc(m, '\n');
 
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 	if (asc_dvc_varp->bus_type & ASC_IS_ISA) {
 		seq_printf(m,
 			   " Host ISA DMA speed:   %d MB/S\n",
 			   isa_dma_speed[ASC_EEP_GET_DMA_SPD(ep)]);
 	}
-#endif /* CONFIG_ISA */
+#endif /* ISA */
 }
 
 /*
@@ -8664,7 +8664,7 @@ static unsigned char AscGetChipVersion(PortAddr iop_base,
 	return AscGetChipVerNo(iop_base);
 }
 
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 static void AscEnableIsaDma(uchar dma_channel)
 {
 	if (dma_channel < 4) {
@@ -8675,7 +8675,7 @@ static void AscEnableIsaDma(uchar dma_channel)
 		outp(0x00D4, (ushort)(dma_channel - 4));
 	}
 }
-#endif /* CONFIG_ISA */
+#endif /* ISA */
 
 static int AscStopQueueExe(PortAddr iop_base)
 {
@@ -8704,7 +8704,7 @@ static unsigned int AscGetMaxDmaCount(ushort bus_type)
 	return ASC_MAX_PCI_DMA_COUNT;
 }
 
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 static ushort AscGetIsaDmaChannel(PortAddr iop_base)
 {
 	ushort channel;
@@ -8754,7 +8754,7 @@ static uchar AscSetIsaDmaSpeed(PortAddr iop_base, uchar speed_value)
 	AscSetBank(iop_base, 0);
 	return AscGetIsaDmaSpeed(iop_base);
 }
-#endif /* CONFIG_ISA */
+#endif /* ISA */
 
 static void AscInitAscDvcVar(ASC_DVC_VAR *asc_dvc)
 {
@@ -8821,16 +8821,18 @@ static void AscInitAscDvcVar(ASC_DVC_VAR *asc_dvc)
 	}
 
 	asc_dvc->cfg->isa_dma_speed = ASC_DEF_ISA_DMA_SPEED;
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA)
 	if ((asc_dvc->bus_type & ASC_IS_ISA) != 0) {
 		if (chip_version >= ASC_CHIP_MIN_VER_ISA_PNP) {
 			AscSetChipIFC(iop_base, IFC_INIT_DEFAULT);
 			asc_dvc->bus_type = ASC_IS_ISAPNP;
 		}
+#if defined(CONFIG_ISA_DMA_API)
 		asc_dvc->cfg->isa_dma_channel =
 		    (uchar)AscGetIsaDmaChannel(iop_base);
+#endif /* ISA DMA */
 	}
-#endif /* CONFIG_ISA */
+#endif /* ISA */
 	for (i = 0; i <= ASC_MAX_TID; i++) {
 		asc_dvc->cur_dvc_qng[i] = 0;
 		asc_dvc->max_dvc_qng[i] = ASC_MAX_SCSI1_QNG;
@@ -9377,7 +9379,7 @@ static int AscInitSetConfig(struct pci_dev *pdev, struct Scsi_Host *shost)
 	    asc_dvc->cfg->chip_scsi_id) {
 		asc_dvc->err_code |= ASC_IERR_SET_SCSI_ID;
 	}
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 	if (asc_dvc->bus_type & ASC_IS_ISA) {
 		AscSetIsaDmaChannel(iop_base, asc_dvc->cfg->isa_dma_channel);
 		AscSetIsaDmaSpeed(iop_base, asc_dvc->cfg->isa_dma_speed);
@@ -10986,7 +10988,11 @@ static int advansys_board_found(struct Scsi_Host *shost, unsigned int iop,
 		switch (asc_dvc_varp->bus_type) {
 #ifdef CONFIG_ISA
 		case ASC_IS_ISA:
+#if defined(CONFIG_ISA_DMA_API)
 			shost->unchecked_isa_dma = true;
+#else
+			shost->unchecked_isa_dma = false;
+#endif
 			share_irq = 0;
 			break;
 		case ASC_IS_VL:
@@ -11292,7 +11298,7 @@ static int advansys_board_found(struct Scsi_Host *shost, unsigned int iop,
 
 	/* Register DMA Channel for Narrow boards. */
 	shost->dma_channel = NO_ISA_DMA;	/* Default to no ISA DMA. */
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 	if (ASC_NARROW_BOARD(boardp)) {
 		/* Register DMA channel for ISA bus. */
 		if (asc_dvc_varp->bus_type & ASC_IS_ISA) {
@@ -11379,7 +11385,7 @@ static int advansys_board_found(struct Scsi_Host *shost, unsigned int iop,
  err_free_irq:
 	free_irq(boardp->irq, shost);
  err_free_dma:
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 	if (shost->dma_channel != NO_ISA_DMA)
 		free_dma(shost->dma_channel);
 #endif
@@ -11403,7 +11409,7 @@ static int advansys_release(struct Scsi_Host *shost)
 	ASC_DBG(1, "begin\n");
 	scsi_remove_host(shost);
 	free_irq(board->irq, shost);
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && defined(CONFIG_ISA_DMA_API)
 	if (shost->dma_channel != NO_ISA_DMA) {
 		ASC_DBG(1, "free_dma()\n");
 		free_dma(shost->dma_channel);
