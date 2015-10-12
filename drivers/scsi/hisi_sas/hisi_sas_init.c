@@ -41,6 +41,20 @@ static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
 	char name[32];
 	struct device *dev = &hisi_hba->pdev->dev;
 
+	spin_lock_init(&hisi_hba->lock);
+	for (i = 0; i < hisi_hba->n_phy; i++) {
+		hisi_sas_phy_init(hisi_hba, i);
+		hisi_hba->port[i].port_attached = 0;
+		hisi_hba->port[i].id = -1;
+		INIT_LIST_HEAD(&hisi_hba->port[i].list);
+	}
+
+	for (i = 0; i < HISI_SAS_MAX_DEVICES; i++) {
+		hisi_hba->devices[i].dev_type = SAS_PHY_UNUSED;
+		hisi_hba->devices[i].device_id = i;
+		hisi_hba->devices[i].dev_status = HISI_SAS_DEV_NORMAL;
+	}
+
 	for (i = 0; i < hisi_hba->queue_count; i++) {
 		struct hisi_sas_cq *cq = &hisi_hba->cq[i];
 
@@ -139,6 +153,13 @@ static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
 
 	hisi_sas_slot_index_init(hisi_hba);
 
+	sprintf(name, "%s%d", "hisi_sas", hisi_hba->id);
+	hisi_hba->wq = create_singlethread_workqueue(name);
+	if (!hisi_hba->wq) {
+		dev_err(dev, "sas_alloc: failed to create workqueue\n");
+		goto err_out;
+	}
+
 	return 0;
 err_out:
 	return -ENOMEM;
@@ -199,6 +220,9 @@ static void hisi_sas_free(struct hisi_hba *hisi_hba)
 		dma_free_coherent(dev, s,
 				  hisi_hba->sata_breakpoint,
 				  hisi_hba->sata_breakpoint_dma);
+
+	if (hisi_hba->wq)
+		destroy_workqueue(hisi_hba->wq);
 }
 
 int hisi_sas_ioremap(struct hisi_hba *hisi_hba)
@@ -243,6 +267,8 @@ static struct hisi_hba *hisi_sas_hba_alloc(
 		goto err_out;
 
 	hisi_hba->pdev = pdev;
+
+	init_timer(&hisi_hba->timer);
 
 	if (of_property_read_u32(np, "phy-count", &hisi_hba->n_phy))
 		goto err_out;
@@ -320,6 +346,13 @@ static int hisi_sas_probe(struct platform_device *pdev)
 	sha = SHOST_TO_SAS_HA(shost) = &hisi_hba->sha;
 	platform_set_drvdata(pdev, sha);
 
+	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)) &&
+	    dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32))) {
+		dev_err(dev, "No usable DMA addressing method\n");
+		rc = -EIO;
+		goto err_out_ha;
+	}
+
 	phy_nr = port_nr = hisi_hba->n_phy;
 
 	arr_phy = devm_kcalloc(dev, phy_nr, sizeof(void *), GFP_KERNEL);
@@ -361,6 +394,8 @@ static int hisi_sas_probe(struct platform_device *pdev)
 	rc = sas_register_ha(SHOST_TO_SAS_HA(shost));
 	if (rc)
 		goto err_out_register_ha;
+
+	scsi_scan_host(shost);
 
 	return 0;
 

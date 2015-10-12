@@ -35,18 +35,53 @@
 
 #define HISI_SAS_NAME_LEN 32
 
+
+enum dev_status {
+	HISI_SAS_DEV_NORMAL,
+	HISI_SAS_DEV_EH,
+};
+
 struct hisi_sas_phy {
+	struct hisi_hba	*hisi_hba;
 	struct hisi_sas_port	*port;
 	struct asd_sas_phy	sas_phy;
+	struct sas_identify	identify;
+	struct timer_list	timer;
+	u64		port_id; /* from hw */
+	u64		dev_sas_addr;
+	u64		phy_type;
+	u64		frame_rcvd_size;
+	u8		frame_rcvd[32];
+	u8		phy_attached;
+	u8		reserved[3];
+	u64		phy_event;
+	int		eye_diag_done;
+	enum sas_linkrate	minimum_linkrate;
+	enum sas_linkrate	maximum_linkrate;
 };
 
 struct hisi_sas_port {
 	struct asd_sas_port	sas_port;
+	u8	port_attached;
+	u8	id; /* from hw */
+	struct list_head	list;
 };
 
 struct hisi_sas_cq {
 	struct hisi_hba *hisi_hba;
 	int	id;
+};
+
+struct hisi_sas_device {
+	enum sas_device_type	dev_type;
+	struct hisi_hba		*hisi_hba;
+	struct domain_device	*sas_device;
+	u64 attached_phy;
+	u64 device_id;
+	u64 running_req;
+	struct hisi_sas_itct *itct;
+	u8 dev_status;
+	u64 reserved;
 };
 
 struct hisi_sas_slot {
@@ -68,6 +103,19 @@ struct hisi_sas_slot {
 	struct hisi_sas_sge_page *sge_page;
 	dma_addr_t sge_page_dma;
 };
+
+enum hisi_sas_wq_event {
+	PHYUP,
+};
+
+struct hisi_sas_wq {
+	struct work_struct	work_struct;
+	struct hisi_hba *hisi_hba;
+	int phy_no;
+	int event;
+	int data;
+};
+
 struct hisi_hba {
 	spinlock_t	lock;
 
@@ -88,6 +136,10 @@ struct hisi_hba {
 
 	int	n_phy;
 
+
+	struct timer_list timer;
+	struct workqueue_struct *wq;
+
 	int slot_index_count;
 	unsigned long *slot_index_tags;
 
@@ -103,6 +155,8 @@ struct hisi_hba {
 	int	id;
 	int	queue_count;
 	char	*int_names;
+
+	struct hisi_sas_device	devices[HISI_SAS_MAX_DEVICES];
 	struct dma_pool *command_table_pool;
 	struct dma_pool *status_buffer_pool;
 	struct hisi_sas_itct *itct;
@@ -267,4 +321,6 @@ union hisi_sas_command_table {
 };
 
 void hisi_sas_slot_index_init(struct hisi_hba *hisi_hba);
+void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
+void hisi_sas_wq_process(struct work_struct *work);
 #endif
