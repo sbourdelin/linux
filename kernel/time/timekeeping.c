@@ -41,8 +41,13 @@ static struct {
 	struct timekeeper	timekeeper;
 } tk_core ____cacheline_aligned;
 
+/* This needs to be 3 or greater for backtracking to be useful */
+#define SHADOW_HISTORY_DEPTH 7
+
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
-static struct timekeeper shadow_timekeeper;
+static struct timekeeper shadow_timekeeper[SHADOW_HISTORY_DEPTH];
+static int shadow_index = -1; /* incremented to zero in timekeeping_init() */
+static bool shadow_timekeeper_full;
 
 /**
  * struct tk_fast - NMI safe timekeeper
@@ -312,6 +317,19 @@ static inline s64 timekeeping_get_ns(struct tk_read_base *tkr)
 	return nsec + arch_gettimeoffset();
 }
 
+static inline s64 timekeeping_convert_to_ns(struct tk_read_base *tkr,
+					    cycle_t cycles)
+{
+	cycle_t delta;
+	s64 nsec;
+
+	/* calculate the delta since the last update_wall_time */
+	delta = clocksource_delta(cycles, tkr->cycle_last, tkr->mask);
+
+	nsec = delta * tkr->mult + tkr->xtime_nsec;
+	return nsec >> tkr->shift;
+}
+
 /**
  * update_fast_timekeeper - Update the fast and NMI safe monotonic timekeeper.
  * @tkr: Timekeeping readout base from which we take the update
@@ -558,6 +576,21 @@ static inline void tk_update_ktime_data(struct timekeeper *tk)
 	tk->ktime_sec = seconds;
 }
 
+/*
+ * Modifies shadow index argument to point to the next array element
+ * Returns bool indicating shadow array fullness after the update
+ */
+static bool get_next_shadow_index(int *shadow_index_out)
+{
+	*shadow_index_out = (shadow_index + 1) % SHADOW_HISTORY_DEPTH;
+	/*
+	 * If shadow timekeeper is full it stays full, otherwise compute
+	 * the next value based on whether the index rolls over
+	 */
+	return shadow_timekeeper_full ?
+		true : *shadow_index_out < shadow_index;
+}
+
 /* must hold timekeeper_lock */
 static void timekeeping_update(struct timekeeper *tk, unsigned int action)
 {
@@ -582,9 +615,15 @@ static void timekeeping_update(struct timekeeper *tk, unsigned int action)
 	 * to happen last here to ensure we don't over-write the
 	 * timekeeper structure on the next update with stale data
 	 */
-	if (action & TK_MIRROR)
-		memcpy(&shadow_timekeeper, &tk_core.timekeeper,
-		       sizeof(tk_core.timekeeper));
+	if (action & TK_MIRROR) {
+		int next_shadow_index;
+		bool next_shadow_full =
+			get_next_shadow_index(&next_shadow_index);
+		memcpy(shadow_timekeeper+next_shadow_index,
+		       &tk_core.timekeeper, sizeof(tk_core.timekeeper));
+		shadow_index = next_shadow_index;
+		shadow_timekeeper_full = next_shadow_full;
+	}
 }
 
 /**
@@ -883,6 +922,142 @@ void getnstime_raw_and_real(struct timespec *ts_raw, struct timespec *ts_real)
 EXPORT_SYMBOL(getnstime_raw_and_real);
 
 #endif /* CONFIG_NTP_PPS */
+
+/*
+ * Iterator-like function which can be called multiple times to return the
+ * previous shadow_index
+ * Returns false when finding previous is not possible because:
+ * - The array is not full
+ * - The previous shadow_index refers to an entry that may be in-flight
+ */
+static bool get_prev_shadow_index(int *shadow_index_io)
+{
+	int guard_index;
+	int ret = (*shadow_index_io - 1) % SHADOW_HISTORY_DEPTH;
+
+	ret += ret < 0 ? SHADOW_HISTORY_DEPTH : 0;
+	/*
+	 * guard_index references the next shadow entry, assume that this
+	 * isn't valid since its not protected by sequence lock
+	 */
+	get_next_shadow_index(&guard_index);
+	/* if the array isn't full and index references top (invalid) entry */
+	if (!shadow_timekeeper_full && ret > *shadow_index_io)
+		return false;
+	/* the next entry may be in-flight and may be invalid  */
+	if (ret == guard_index)
+		return false;
+	/* Also make sure that entry is valid based on current shadow_index */
+	*shadow_index_io = ret;
+	return true;
+}
+
+/*
+ * cycle_between - true if test occurs chronologically between before and after
+ */
+
+static bool cycle_between(cycles_t after, cycles_t test, cycles_t before)
+{
+	if (test < before && before > after)
+		return true;
+	if (test > before && test < after)
+		return true;
+	return false;
+}
+
+/**
+ * get_correlated_timestamp - Get a correlated timestamp
+ * @crs: conversion between correlated clock and system clock
+ * @crt: callback to get simultaneous device and correlated clock value *or*
+ *	contains a valid correlated clock value and NULL callback
+ *
+ * Reads a timestamp from a device and correlates it to system time.  This
+ * function can be used in two ways.  If a non-NULL get_ts function pointer is
+ * supplied in @crt, this function is called within the retry loop to
+ * read the current correlated clock value and associated device time.
+ * Otherwise (get_ts is NULL) a correlated clock value is supplied and
+ * the history in shadow_timekeeper is consulted if necessary.
+ */
+int get_correlated_timestamp(struct correlated_ts *crt,
+			     struct correlated_cs *crs)
+{
+	struct timekeeper *tk = &tk_core.timekeeper;
+	unsigned long seq;
+	cycles_t cycles, cycles_now, cycles_last;
+	ktime_t base;
+	s64 nsecs;
+	int ret;
+
+	do {
+		seq = read_seqcount_begin(&tk_core.seq);
+		/*
+		 * Verify that the correlated clocksoure is related to
+		 * the currently installed timekeeper clocksoure
+		 */
+		if (tk->tkr_mono.clock != crs->related_cs)
+			return -ENODEV;
+
+		/*
+		 * Get a timestamp from the device if get_ts is non-NULL
+		 */
+		if( crt->get_ts ) {
+			ret = crt->get_ts(crt);
+			if (ret)
+				return ret;
+		}
+
+		/*
+		 * Convert the timestamp to timekeeper clock cycles
+		 */
+		cycles = crs->convert(crs, crt->system_ts);
+
+		/*
+		 * If we have get_ts is valid, we know the cycles value
+		 * value is up to date and we can just do the conversion
+		 */
+		if( crt->get_ts )
+			goto do_convert;
+
+		/*
+		 * Since the cycles value is supplied outside of the loop,
+		 * there is no guarantee that it represents a time *after*
+		 * cycle_last do some checks to figure out whether it's
+		 * represents the past or the future taking rollover
+		 * into account. If the value is in the past, try to backtrack
+		 */
+		cycles_now = tk->tkr_mono.read(tk->tkr_mono.clock);
+		cycles_last = tk->tkr_mono.cycle_last;
+		if ((cycles >= cycles_last && cycles_now < cycles) ||
+		    (cycles < cycles_last && cycles_now >= cycles_last)) {
+			/* cycles is in the past try to backtrack */
+			int backtrack_index = shadow_index;
+
+			while (get_prev_shadow_index(&backtrack_index)) {
+				tk = shadow_timekeeper+backtrack_index;
+				if (cycle_between(cycles_last, cycles,
+						  tk->tkr_mono.cycle_last))
+					goto do_convert;
+				cycles_last = tk->tkr_mono.cycle_last;
+			}
+			return -EAGAIN;
+		}
+
+do_convert:
+		/* Convert to clock realtime */
+		base = ktime_add(tk->tkr_mono.base,
+				 tk_core.timekeeper.offs_real);
+		nsecs = timekeeping_convert_to_ns(&tk->tkr_mono, cycles);
+		crt->system_real = ktime_add_ns(base, nsecs);
+
+		/* Convert to clock raw monotonic */
+		base = tk->tkr_raw.base;
+		nsecs = timekeeping_convert_to_ns(&tk->tkr_raw, cycles);
+		crt->system_raw = ktime_add_ns(base, nsecs);
+
+	} while (read_seqcount_retry(&tk_core.seq, seq));
+	return 0;
+}
+EXPORT_SYMBOL_GPL(get_correlated_timestamp);
 
 /**
  * do_gettimeofday - Returns the time of day in a timeval
@@ -1763,7 +1938,9 @@ static cycle_t logarithmic_accumulation(struct timekeeper *tk, cycle_t offset,
 void update_wall_time(void)
 {
 	struct timekeeper *real_tk = &tk_core.timekeeper;
-	struct timekeeper *tk = &shadow_timekeeper;
+	struct timekeeper *tk;
+	int next_shadow_index;
+	bool next_shadow_full;
 	cycle_t offset;
 	int shift = 0, maxshift;
 	unsigned int clock_set = 0;
@@ -1775,6 +1952,9 @@ void update_wall_time(void)
 	if (unlikely(timekeeping_suspended))
 		goto out;
 
+	/* Make sure we're inside the lock */
+	tk = shadow_timekeeper+shadow_index;
+
 #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
 	offset = real_tk->cycle_interval;
 #else
@@ -1785,6 +1965,13 @@ void update_wall_time(void)
 	/* Check if there's really nothing to do */
 	if (offset < real_tk->cycle_interval)
 		goto out;
+
+	/* Copy the current shadow timekeeper to the 'next' and point to it */
+	next_shadow_index = shadow_index;
+	next_shadow_full = get_next_shadow_index(&next_shadow_index);
+	memcpy(shadow_timekeeper+next_shadow_index,
+	       shadow_timekeeper+shadow_index, sizeof(*shadow_timekeeper));
+	tk = shadow_timekeeper+next_shadow_index;
 
 	/* Do some additional sanity checking */
 	timekeeping_check_update(real_tk, offset);
@@ -1834,8 +2021,14 @@ void update_wall_time(void)
 	 * spinlocked/seqcount protected sections. And we trade this
 	 * memcpy under the tk_core.seq against one before we start
 	 * updating.
+	 *
+	 * Update the shadow index inside here forcing any backtracking
+	 * operations inside get_correlated_timestamp() to restart with
+	 * valid values
 	 */
 	timekeeping_update(tk, clock_set);
+	shadow_index = next_shadow_index;
+	shadow_timekeeper_full = next_shadow_full;
 	memcpy(real_tk, tk, sizeof(*tk));
 	/* The memcpy must come last. Do not put anything here! */
 	write_seqcount_end(&tk_core.seq);

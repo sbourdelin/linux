@@ -258,4 +258,37 @@ void acpi_generic_timer_init(void);
 static inline void acpi_generic_timer_init(void) { }
 #endif
 
+/*
+ * struct correlated_cs - Descriptor for a clocksource correlated to another
+ *	clocksource
+ * @related_cs:		Pointer to the related timekeeping clocksource
+ * @convert:		Conversion function to convert a timestamp from
+ *			the correlated clocksource to cycles of the related
+ *			timekeeping clocksource
+ */
+struct correlated_cs {
+	struct clocksource	*related_cs;
+	u64			(*convert)(struct correlated_cs *cs,
+					   u64 cycles);
+};
+
+struct correlated_ts;
+
+/**
+ * struct correlated_ts - Descriptor for taking a correlated time stamp
+ * @get_ts:		Function to read out a synced system and device
+ *			timestamp
+ * @system_ts:		The raw system clock timestamp
+ * @device_ts:		The raw device timestamp
+ * @system_real:	@system_ts converted to CLOCK_REALTIME
+ * @system_raw:		@system_ts converted to CLOCK_MONOTONIC_RAW
+ */
+struct correlated_ts {
+	int			(*get_ts)(struct correlated_ts *ts);
+	u64			system_ts;
+	u64			device_ts;
+	ktime_t			system_real;
+	ktime_t			system_raw;
+	void			*private;
+};
 #endif /* _LINUX_CLOCKSOURCE_H */

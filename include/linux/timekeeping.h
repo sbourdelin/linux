@@ -265,6 +265,10 @@ extern void timekeeping_inject_sleeptime64(struct timespec64 *delta);
  */
 extern void getnstime_raw_and_real(struct timespec *ts_raw,
 				   struct timespec *ts_real);
+struct correlated_ts;
+struct correlated_cs;
+extern int get_correlated_timestamp(struct correlated_ts *crt,
+				    struct correlated_cs *crs);
 
 /*
  * Persistent clock related interfaces
