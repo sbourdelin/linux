@@ -1621,6 +1621,91 @@ static irqreturn_t cq_interrupt_v1_hw(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t fatal_ecc_int_v1_hw(int irq, void *p)
+{
+	struct hisi_hba *hisi_hba = p;
+	u32 ecc_int = hisi_sas_read32(hisi_hba, SAS_ECC_INTR);
+
+	if (ecc_int & SAS_ECC_INTR_DQ_ECC1B_MSK) {
+		u32 ecc_err = hisi_sas_read32(hisi_hba, HGC_ECC_ERR);
+
+		panic("Fatal DQ 1b ECC interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, ecc_err);
+	}
+
+	if (ecc_int & SAS_ECC_INTR_DQ_ECCBAD_MSK) {
+		u32 addr = (hisi_sas_read32(hisi_hba, HGC_DQ_ECC_ADDR) &
+				HGC_DQ_ECC_ADDR_BAD_MSK) >>
+				HGC_DQ_ECC_ADDR_BAD_OFF;
+
+		panic("Fatal DQ RAM ECC interrupt on controller %d @ 0x%08x\n",
+			hisi_hba->id, addr);
+	}
+
+	if (ecc_int & SAS_ECC_INTR_IOST_ECC1B_MSK) {
+		u32 ecc_err = hisi_sas_read32(hisi_hba, HGC_ECC_ERR);
+
+		panic("Fatal IOST 1b ECC interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, ecc_err);
+	}
+
+	if (ecc_int & SAS_ECC_INTR_IOST_ECCBAD_MSK) {
+		u32 addr = (hisi_sas_read32(hisi_hba, HGC_IOST_ECC_ADDR) &
+				HGC_IOST_ECC_ADDR_BAD_MSK) >>
+				HGC_IOST_ECC_ADDR_BAD_OFF;
+
+		panic("Fatal IOST RAM ECC interrupt on controller %d @ 0x%08x\n",
+			hisi_hba->id, addr);
+	}
+
+	if (ecc_int & SAS_ECC_INTR_ITCT_ECCBAD_MSK) {
+		u32 addr = (hisi_sas_read32(hisi_hba, HGC_ITCT_ECC_ADDR) &
+				HGC_ITCT_ECC_ADDR_BAD_MSK) >>
+				HGC_ITCT_ECC_ADDR_BAD_OFF;
+
+		panic("Fatal TCT RAM ECC interrupt on controller %d @ 0x%08x\n",
+			hisi_hba->id, addr);
+	}
+
+	if (ecc_int & SAS_ECC_INTR_ITCT_ECC1B_MSK) {
+		u32 ecc_err = hisi_sas_read32(hisi_hba, HGC_ECC_ERR);
+
+		panic("Fatal ITCT 1b ECC interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, ecc_err);
+	}
+
+	hisi_sas_write32(hisi_hba, SAS_ECC_INTR, ecc_int | 0x3f);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t fatal_axi_int_v1_hw(int irq, void *p)
+{
+	struct hisi_hba *hisi_hba = p;
+	u32 axi_int = hisi_sas_read32(hisi_hba, ENT_INT_SRC2);
+	u32 axi_info = hisi_sas_read32(hisi_hba, HGC_AXI_FIFO_ERR_INFO);
+
+	if (axi_int & ENT_INT_SRC2_DQ_CFG_ERR_MSK)
+		panic("Fatal DQ_CFG_ERR interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, axi_info);
+
+	if (axi_int & ENT_INT_SRC2_CQ_CFG_ERR_MSK)
+		panic("Fatal CQ_CFG_ERR interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, axi_info);
+
+	if (axi_int & ENT_INT_SRC2_AXI_WRONG_INT_MSK)
+		panic("Fatal AXI_WRONG_INT interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, axi_info);
+
+	if (axi_int & ENT_INT_SRC2_AXI_OVERLF_INT_MSK)
+		panic("Fatal AXI_OVERLF_INT incorrect interrupt on controller %d (0x%x)\n",
+			hisi_hba->id, axi_info);
+
+	hisi_sas_write32(hisi_hba, ENT_INT_SRC2, axi_int | 0x30000000);
+
+	return IRQ_HANDLED;
+}
+
 static const char phy_int_names[HISI_SAS_PHY_INT_NR][32] = {
 	{"Bcast"},
 	{"Phy Up"},
@@ -1628,11 +1713,20 @@ static const char phy_int_names[HISI_SAS_PHY_INT_NR][32] = {
 };
 
 static const char cq_int_name[32] = "cq";
+static const char fatal_int_name[HISI_SAS_FATAL_INT_NR][32] = {
+	"fatal ecc",
+	"fatal axi"
+};
 
 static irq_handler_t phy_interrupts[HISI_SAS_PHY_INT_NR] = {
 	int_bcast_v1_hw,
 	int_phyup_v1_hw,
 	int_abnormal_v1_hw
+};
+
+static irq_handler_t fatal_interrupts[HISI_SAS_MAX_QUEUES] = {
+	fatal_ecc_int_v1_hw,
+	fatal_axi_int_v1_hw
 };
 
 int interrupt_init_v1_hw(struct hisi_hba *hisi_hba)
@@ -1697,6 +1791,30 @@ int interrupt_init_v1_hw(struct hisi_hba *hisi_hba)
 		idx++;
 	}
 
+	for (i = 0; i < HISI_SAS_FATAL_INT_NR; i++) {
+		int idx = (hisi_hba->n_phy * HISI_SAS_PHY_INT_NR) +
+				hisi_hba->queue_count + i;
+
+		irq = irq_of_parse_and_map(np, idx);
+		if (!irq) {
+			dev_err(dev, "irq init: [%d] could not map fatal interrupt %d\n",
+				hisi_hba->id, idx);
+			return -ENOENT;
+		}
+		(void)snprintf(&int_names[idx * HISI_SAS_NAME_LEN],
+				HISI_SAS_NAME_LEN,
+				DRV_NAME" %s [%d]", fatal_int_name[i], id);
+		rc = devm_request_irq(dev, irq, fatal_interrupts[i], 0,
+				&int_names[idx * HISI_SAS_NAME_LEN],
+				hisi_hba);
+		if (rc) {
+			dev_err(dev,
+				"irq init: [%d] could not request fatal interrupt %d, rc=%d\n",
+				hisi_hba->id, irq, rc);
+			return -ENOENT;
+		}
+		idx++;
+	}
 
 	return 0;
 }
