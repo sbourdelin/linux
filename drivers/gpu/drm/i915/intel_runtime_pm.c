@@ -49,8 +49,8 @@
  * present for a given platform.
  */
 
-#define GEN9_ENABLE_DC5(dev) 0
-#define SKL_ENABLE_DC6(dev) IS_SKYLAKE(dev)
+#define GEN9_ENABLE_DC5(dev) IS_SKYLAKE(dev)
+#define SKL_ENABLE_DC6(dev) 0
 
 #define for_each_power_well(i, power_well, domain_mask, power_domains)	\
 	for (i = 0;							\
