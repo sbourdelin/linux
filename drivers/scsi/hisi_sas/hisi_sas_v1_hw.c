@@ -913,6 +913,80 @@ static int prep_prd_sge_v1_hw(struct hisi_hba *hisi_hba,
 	return 0;
 }
 
+int prep_smp_v1_hw(struct hisi_hba *hisi_hba,
+		   struct hisi_sas_tei *tei)
+{
+	struct sas_task *task = tei->task;
+	struct hisi_sas_cmd_hdr *hdr = tei->hdr;
+	struct domain_device *device = task->dev;
+	struct device *dev = &hisi_hba->pdev->dev;
+	struct hisi_sas_port *port = tei->port;
+	struct scatterlist *sg_req, *sg_resp;
+	struct hisi_sas_device *sas_dev = device->lldd_dev;
+	dma_addr_t req_dma_addr;
+	unsigned int req_len, resp_len;
+	int elem, rc;
+	struct hisi_sas_slot *slot = tei->slot;
+
+	/*
+	* DMA-map SMP request, response buffers
+	*/
+	/* req */
+	sg_req = &task->smp_task.smp_req;
+	elem = dma_map_sg(dev, sg_req, 1, DMA_TO_DEVICE);
+	if (!elem)
+		return -ENOMEM;
+	req_len = sg_dma_len(sg_req);
+	req_dma_addr = sg_dma_address(sg_req);
+
+	/* resp */
+	sg_resp = &task->smp_task.smp_resp;
+	elem = dma_map_sg(dev, sg_resp, 1, DMA_FROM_DEVICE);
+	if (!elem) {
+		rc = -ENOMEM;
+		goto err_out_req;
+	}
+	resp_len = sg_dma_len(sg_resp);
+	if ((req_len & 0x3) || (resp_len & 0x3)) {
+		rc = -EINVAL;
+		goto err_out_resp;
+	}
+
+	/* create header */
+	/* dw0 */
+	hdr->dw0 = cpu_to_le32((port->id << CMD_HDR_PORT_OFF) |
+			       (1 << CMD_HDR_PRIORITY_OFF) | /* high pri */
+			       (1 << CMD_HDR_MODE_OFF) | /* ini mode */
+			       (2 << CMD_HDR_CMD_OFF)); /* smp */
+
+	/* map itct entry */
+	hdr->dw1 = cpu_to_le32(sas_dev->device_id << CMD_HDR_DEVICE_ID_OFF);
+
+	/* dw2 */
+	hdr->dw2 = cpu_to_le32((((req_len-4)/4) << CMD_HDR_CFL_OFF) |
+			       (HISI_SAS_MAX_SMP_RESP_SZ/4 <<
+			       CMD_HDR_MRFL_OFF));
+
+	hdr->transfer_tags = cpu_to_le32(tei->iptt << CMD_HDR_IPTT_OFF);
+
+	hdr->cmd_table_addr_lo = cpu_to_le32(lower_32_bits(req_dma_addr));
+	hdr->cmd_table_addr_hi = cpu_to_le32(upper_32_bits(req_dma_addr));
+
+	hdr->sts_buffer_addr_lo =
+			cpu_to_le32(lower_32_bits(slot->status_buffer_dma));
+	hdr->sts_buffer_addr_hi =
+			cpu_to_le32(upper_32_bits(slot->status_buffer_dma));
+
+	return 0;
+
+err_out_resp:
+	dma_unmap_sg(dev, &tei->task->smp_task.smp_resp, 1,
+		     DMA_FROM_DEVICE);
+err_out_req:
+	dma_unmap_sg(dev, &tei->task->smp_task.smp_req, 1,
+		     DMA_TO_DEVICE);
+	return rc;
+}
 
 int prep_ssp_v1_hw(struct hisi_hba *hisi_hba,
 		   struct hisi_sas_tei *tei, int is_tmf,
@@ -1132,11 +1206,14 @@ static void slot_err_v1_hw(struct hisi_hba *hisi_hba,
 	}
 		break;
 	case SAS_PROTOCOL_SMP:
+		tstat->stat = SAM_STAT_CHECK_CONDITION;
+		break;
+
 	case SAS_PROTOCOL_SATA:
 	case SAS_PROTOCOL_STP:
 	case SAS_PROTOCOL_SATA | SAS_PROTOCOL_STP:
 	{
-		dev_err(dev, "slot err: SMP/SATA/STP not supported");
+		dev_err(dev, "slot err: SATA/STP not supported");
 	}
 		break;
 	default:
@@ -1245,8 +1322,24 @@ int slot_complete_v1_hw(struct hisi_hba *hisi_hba,
 		break;
 	}
 	case SAS_PROTOCOL_SMP:
-		dev_err(dev, "slot complete: SMP not supported");
+	{
+		void *to;
+		struct scatterlist *sg_resp = &task->smp_task.smp_resp;
+
+		tstat->stat = SAM_STAT_GOOD;
+		to = kmap_atomic(sg_page(sg_resp));
+
+		dma_unmap_sg(dev, &task->smp_task.smp_resp, 1,
+			     DMA_FROM_DEVICE);
+		dma_unmap_sg(dev, &task->smp_task.smp_req, 1,
+			     DMA_TO_DEVICE);
+		memcpy(to + sg_resp->offset,
+		       slot->status_buffer +
+		       sizeof(struct hisi_sas_err_record),
+		       sg_dma_len(sg_resp));
+		kunmap_atomic(to);
 		break;
+	}
 	case SAS_PROTOCOL_SATA:
 	case SAS_PROTOCOL_STP:
 	case SAS_PROTOCOL_SATA | SAS_PROTOCOL_STP:

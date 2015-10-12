@@ -34,6 +34,8 @@
 		(((sizeof(union hisi_sas_command_table)+3)/4)*4)
 
 #define HISI_SAS_MAX_SSP_RESP_SZ (sizeof(struct ssp_frame_hdr) + 1024)
+#define HISI_SAS_MAX_SMP_RESP_SZ 1028
+
 #define HISI_SAS_NAME_LEN 32
 #define HISI_SAS_RESET_REG_CNT 5
 
@@ -372,6 +374,8 @@ extern int get_free_slot_v1_hw(struct hisi_hba *hisi_hba, int *q, int *s);
 extern int prep_ssp_v1_hw(struct hisi_hba *hisi_hba,
 			  struct hisi_sas_tei *tei, int is_tmf,
 			  struct hisi_sas_tmf_task *tmf);
+extern int prep_smp_v1_hw(struct hisi_hba *hisi_hba,
+			  struct hisi_sas_tei *tei);
 extern int interrupt_init_v1_hw(struct hisi_hba *hisi_hba);
 extern int interrupt_openall_v1_hw(struct hisi_hba *hisi_hba);
 extern int hw_init_v1_hw(struct hisi_hba *hisi_hba);

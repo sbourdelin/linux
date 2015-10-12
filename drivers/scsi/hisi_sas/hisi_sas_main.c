@@ -109,6 +109,11 @@ void hisi_sas_slot_task_free(struct hisi_hba *hisi_hba,
 	memset(slot, 0, sizeof(*slot));
 }
 
+static int hisi_sas_task_prep_smp(struct hisi_hba *hisi_hba,
+				struct hisi_sas_tei *tei)
+{
+	return prep_smp_v1_hw(hisi_hba, tei);
+}
 
 static int hisi_sas_task_prep_ssp(struct hisi_hba *hisi_hba,
 				  struct hisi_sas_tei *tei, int is_tmf,
@@ -235,10 +240,12 @@ static int hisi_sas_task_prep(struct sas_task *task,
 	tei.n_elem = n_elem;
 	tei.slot = slot;
 	switch (task->task_proto) {
+	case SAS_PROTOCOL_SMP:
+		rc = hisi_sas_task_prep_smp(hisi_hba, &tei);
+		break;
 	case SAS_PROTOCOL_SSP:
 		rc = hisi_sas_task_prep_ssp(hisi_hba, &tei, is_tmf, tmf);
 		break;
-	case SAS_PROTOCOL_SMP:
 	case SAS_PROTOCOL_SATA:
 	case SAS_PROTOCOL_STP:
 	case SAS_PROTOCOL_SATA | SAS_PROTOCOL_STP:
