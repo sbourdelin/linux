@@ -133,6 +133,7 @@ struct hisi_sas_tei {
 };
 
 enum hisi_sas_wq_event {
+	CONTROL_PHY,
 	PHYUP,
 };
 
@@ -360,6 +361,9 @@ void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int i);
 int hisi_sas_dev_found(struct domain_device *dev);
 void hisi_sas_dev_gone(struct domain_device *dev);
 int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags);
+int hisi_sas_control_phy(struct asd_sas_phy *sas_phy,
+			enum phy_func func,
+			void *funcdata);
 int hisi_sas_abort_task(struct sas_task *task);
 int hisi_sas_abort_task_set(struct domain_device *dev, u8 *lun);
 int hisi_sas_clear_aca(struct domain_device *dev, u8 *lun);
@@ -375,6 +379,7 @@ void hisi_sas_slot_task_free(struct hisi_hba *hisi_hba, struct sas_task *task,
 			struct hisi_sas_slot *slot);
 
 /* hw specific functions */
+extern void hard_phy_reset_v1_hw(struct hisi_hba *hisi_hba, int phy_no);
 extern int slot_complete_v1_hw(struct hisi_hba *hisi_hba,
 			       struct hisi_sas_slot *slot,
 			       int abort);
@@ -392,8 +397,10 @@ extern int interrupt_openall_v1_hw(struct hisi_hba *hisi_hba);
 extern int hw_init_v1_hw(struct hisi_hba *hisi_hba);
 extern int free_device_v1_hw(struct hisi_hba *hisi_hba,
 			     struct hisi_sas_device *dev);
+extern void enable_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no);
 extern int phys_init_v1_hw(struct hisi_hba *hisi_hba);
 extern void sl_notify_v1_hw(struct hisi_hba *hisi_hba, int phy_no);
 extern void setup_itct_v1_hw(struct hisi_hba *hisi_hba,
 			     struct hisi_sas_device *device);
+extern void disable_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no);
 #endif

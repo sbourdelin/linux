@@ -766,6 +766,13 @@ void enable_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
 	hisi_sas_phy_write32(hisi_hba, phy_no, PHY_CFG, cfg);
 }
 
+void disable_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
+{
+	u32 cfg = hisi_sas_phy_read32(hisi_hba, phy_no, PHY_CFG);
+
+	cfg &= ~PHY_CFG_ENA_MSK;
+	hisi_sas_phy_write32(hisi_hba, phy_no, PHY_CFG, cfg);
+}
 
 static void start_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
 {
@@ -773,6 +780,21 @@ static void start_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
 	config_phy_opt_mode_v1_hw(hisi_hba, phy_no);
 	config_tx_tfe_autoneg_v1_hw(hisi_hba, phy_no);
 	enable_phy_v1_hw(hisi_hba, phy_no);
+}
+
+static void stop_phy_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
+{
+	disable_phy_v1_hw(hisi_hba, phy_no);
+}
+
+void hard_phy_reset_v1_hw(struct hisi_hba *hisi_hba, int phy_no)
+{
+	struct sas_ha_struct *sha = &hisi_hba->sha;
+
+	stop_phy_v1_hw(hisi_hba, phy_no);
+	sas_drain_work(sha);
+	msleep(100);
+	start_phy_v1_hw(hisi_hba, phy_no);
 }
 
 static void start_phys_v1_hw(unsigned long data)

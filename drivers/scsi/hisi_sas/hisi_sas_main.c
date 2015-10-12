@@ -472,6 +472,32 @@ int hisi_sas_scan_finished(struct Scsi_Host *shost, unsigned long time)
 	return 1;
 }
 
+static void hisi_sas_control_phy_work(struct hisi_hba *hisi_hba,
+				int func,
+				int phy_no)
+{
+	struct device *dev = &hisi_hba->pdev->dev;
+
+	switch (func) {
+	case PHY_FUNC_HARD_RESET:
+		hard_phy_reset_v1_hw(hisi_hba, phy_no);
+		break;
+
+	case PHY_FUNC_LINK_RESET:
+		enable_phy_v1_hw(hisi_hba, phy_no);
+		hard_phy_reset_v1_hw(hisi_hba, phy_no);
+		break;
+
+	case PHY_FUNC_DISABLE:
+		disable_phy_v1_hw(hisi_hba, phy_no);
+		break;
+
+	case PHY_FUNC_SET_LINK_RATE:
+	case PHY_FUNC_RELEASE_SPINUP_HOLD:
+	default:
+		dev_err(dev, "Control phy func %d unsupported\n", func);
+	}
+}
 
 static void hisi_sas_phyup_work(struct hisi_hba *hisi_hba,
 				      int phy_no)
@@ -487,8 +513,12 @@ void hisi_sas_wq_process(struct work_struct *work)
 	struct hisi_hba *hisi_hba = wq->hisi_hba;
 	int event = wq->event;
 	int phy_no = wq->phy_no;
+	int func = wq->data;
 
 	switch (event) {
+	case CONTROL_PHY:
+		hisi_sas_control_phy_work(hisi_hba, func, phy_no);
+		break;
 	case PHYUP:
 		hisi_sas_phyup_work(hisi_hba, phy_no);
 		break;
@@ -681,6 +711,40 @@ int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags)
 	return hisi_sas_task_exec(task, gfp_flags, NULL, 0, NULL);
 }
 
+int hisi_sas_control_phy(struct asd_sas_phy *sas_phy,
+			enum phy_func func,
+			void *funcdata)
+{
+	struct sas_ha_struct *sas_ha = sas_phy->ha;
+	struct hisi_hba *hisi_hba = NULL;
+	struct hisi_sas_phy *phy = NULL;
+	int phy_no = 0;
+	struct hisi_sas_wq *wq = kmalloc(sizeof(*wq), GFP_ATOMIC);
+
+	if (!wq)
+		return -ENOMEM;
+
+	while (sas_ha->sas_phy[phy_no]) {
+		if (sas_ha->sas_phy[phy_no] == sas_phy) {
+			hisi_hba = (struct hisi_hba *)sas_ha->lldd_ha;
+			break;
+		}
+		phy_no++;
+	}
+
+	phy = &hisi_hba->phy[phy_no];
+
+	wq->event = CONTROL_PHY;
+	wq->data = func;
+	wq->hisi_hba = hisi_hba;
+	wq->phy_no = phy_no;
+
+	INIT_WORK(&wq->work_struct, hisi_sas_wq_process);
+
+	queue_work(hisi_hba->wq, &wq->work_struct);
+
+	return 0;
+}
 
 static void hisi_sas_task_done(struct sas_task *task)
 {
