@@ -2799,7 +2799,7 @@ static void ironlake_update_primary_plane(struct drm_crtc *crtc,
 	int pixel_size;
 
 	if (!visible || !fb) {
-		I915_WRITE(reg, 0);
+		I915_WRITE(reg, I915_READ(reg) & ~DISPLAY_PLANE_ENABLE);
 		I915_WRITE(DSPSURF(plane), 0);
 		POSTING_READ(reg);
 		return;
