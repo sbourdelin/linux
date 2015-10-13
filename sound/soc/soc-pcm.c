@@ -86,6 +86,7 @@ void snd_soc_runtime_activate(struct snd_soc_pcm_runtime *rtd, int stream)
 		rtd->codec_dais[i]->component->active++;
 	}
 }
+EXPORT_SYMBOL_GPL(snd_soc_runtime_activate);
 
 /**
  * snd_soc_runtime_deactivate() - Decrement active count for PCM runtime components
@@ -121,6 +122,7 @@ void snd_soc_runtime_deactivate(struct snd_soc_pcm_runtime *rtd, int stream)
 		rtd->codec_dais[i]->active--;
 	}
 }
+EXPORT_SYMBOL_GPL(snd_soc_runtime_deactivate);
 
 /**
  * snd_soc_runtime_ignore_pmdown_time() - Check whether to ignore the power down delay
@@ -144,6 +146,7 @@ bool snd_soc_runtime_ignore_pmdown_time(struct snd_soc_pcm_runtime *rtd)
 
 	return rtd->cpu_dai->component->ignore_pmdown_time && ignore;
 }
+EXPORT_SYMBOL_GPL(snd_soc_runtime_ignore_pmdown_time);
 
 /**
  * snd_soc_set_runtime_hwparams - set the runtime hardware parameters
@@ -188,6 +191,7 @@ int dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dpcm_dapm_stream_event);
 
 static int soc_pcm_apply_symmetry(struct snd_pcm_substream *substream,
 					struct snd_soc_dai *soc_dai)
@@ -1209,6 +1213,7 @@ void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream)
 		kfree(dpcm);
 	}
 }
+EXPORT_SYMBOL_GPL(dpcm_be_disconnect);
 
 /* get BE for DAI widget and stream */
 static struct snd_soc_pcm_runtime *dpcm_get_be(struct snd_soc_card *card,
@@ -1293,6 +1298,7 @@ int dpcm_path_get(struct snd_soc_pcm_runtime *fe,
 
 	return paths;
 }
+EXPORT_SYMBOL_GPL(dpcm_path_get);
 
 static int dpcm_prune_paths(struct snd_soc_pcm_runtime *fe, int stream,
 	struct snd_soc_dapm_widget_list **list_)
@@ -1405,6 +1411,7 @@ int dpcm_process_paths(struct snd_soc_pcm_runtime *fe,
 	else
 		return dpcm_prune_paths(fe, stream, list);
 }
+EXPORT_SYMBOL_GPL(dpcm_process_paths);
 
 void dpcm_clear_pending_state(struct snd_soc_pcm_runtime *fe, int stream)
 {
@@ -1414,6 +1421,7 @@ void dpcm_clear_pending_state(struct snd_soc_pcm_runtime *fe, int stream)
 		dpcm->be->dpcm[stream].runtime_update =
 						SND_SOC_DPCM_UPDATE_NO;
 }
+EXPORT_SYMBOL_GPL(dpcm_clear_pending_state);
 
 static void dpcm_be_dai_startup_unwind(struct snd_soc_pcm_runtime *fe,
 	int stream)
@@ -1530,6 +1538,7 @@ unwind:
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(dpcm_be_dai_startup);
 
 static void dpcm_init_runtime_hw(struct snd_pcm_runtime *runtime,
 				 struct snd_soc_pcm_stream *stream,
@@ -1693,6 +1702,7 @@ int dpcm_be_dai_shutdown(struct snd_soc_pcm_runtime *fe, int stream)
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dpcm_be_dai_shutdown);
 
 static int dpcm_fe_dai_shutdown(struct snd_pcm_substream *substream)
 {
@@ -1758,6 +1768,7 @@ int dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dpcm_be_dai_hw_free);
 
 static int dpcm_fe_dai_hw_free(struct snd_pcm_substream *substream)
 {
@@ -1865,6 +1876,7 @@ unwind:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(dpcm_be_dai_hw_params);
 
 static int dpcm_fe_dai_hw_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *params)
@@ -2134,6 +2146,7 @@ int dpcm_be_dai_prepare(struct snd_soc_pcm_runtime *fe, int stream)
 	}
 	return ret;
 }
+EXPORT_SYMBOL_GPL(dpcm_be_dai_prepare);
 
 static int dpcm_fe_dai_prepare(struct snd_pcm_substream *substream)
 {
