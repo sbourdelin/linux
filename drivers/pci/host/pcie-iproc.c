@@ -235,12 +235,13 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
  *
  * axi_addr -> iproc_pcie_address -> OARR -> OMAP -> pci_address
  */
-static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
 			       u64 pci_addr, resource_size_t size)
 {
 	struct iproc_pcie_ob *ob = &pcie->ob;
 	unsigned i;
 	u64 max_size = (u64)ob->window_size * MAX_NUM_OB_WINDOWS;
+	u64 remainder;
 
 	if (size > max_size) {
 		dev_err(pcie->dev,
@@ -249,7 +250,8 @@ static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
 		return -EINVAL;
 	}
 
-	if (size % ob->window_size) {
+	div64_u64_rem(size, ob->window_size, &remainder);
+	if (remainder) {
 		dev_err(pcie->dev,
 			"res size %pap needs to be multiple of window size %pap\n",
 			&size, &ob->window_size);
