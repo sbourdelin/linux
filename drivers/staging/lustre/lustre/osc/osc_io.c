@@ -56,13 +56,13 @@
 static struct osc_req *cl2osc_req(const struct cl_req_slice *slice)
 {
 	LINVRNT(slice->crs_dev->cd_lu_dev.ld_type == &osc_device_type);
-	return container_of0(slice, struct osc_req, or_cl);
+	return container_of(slice, struct osc_req, or_cl);
 }
 
 static struct osc_io *cl2osc_io(const struct lu_env *env,
 				const struct cl_io_slice *slice)
 {
-	struct osc_io *oio = container_of0(slice, struct osc_io, oi_cl);
+	struct osc_io *oio = container_of(slice, struct osc_io, oi_cl);
 
 	LINVRNT(oio == osc_env_io(env));
 	return oio;
