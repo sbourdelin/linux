@@ -406,8 +406,15 @@ static void finish_csr_load(const struct firmware *fw, void *context)
 out:
 	if (fw_loaded)
 		intel_runtime_pm_put(dev_priv);
-	else
+	else {
+		/*
+		* For BXT, on runtime suspend, display goes to DC9 which does not
+		* depend on CSR hence leave the RPM reference.
+		*/
+		if (IS_BROXTON(dev))
+			intel_runtime_pm_put(dev_priv);
 		intel_csr_load_status_set(dev_priv, FW_FAILED);
+	}
 
 	release_firmware(fw);
 }
