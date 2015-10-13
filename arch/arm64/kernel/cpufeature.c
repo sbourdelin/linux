@@ -19,9 +19,11 @@
 #define pr_fmt(fmt) "CPU features: " fmt
 
 #include <linux/bsearch.h>
+#include <linux/notifier.h>
 #include <linux/types.h>
 #include <asm/cpu.h>
 #include <asm/cpufeature.h>
+#include <asm/cpu_ops.h>
 #include <asm/processor.h>
 #include <asm/sysreg.h>
 
@@ -617,16 +619,82 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
 		cpus_set_cap(caps[i].capability);
 	}
 
-	/* second pass allows enable() to consider interacting capabilities */
-	for (i = 0; caps[i].desc; i++) {
-		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
-			caps[i].enable();
+	/*
+	 * For each available capability, invokes enable() on all active CPUs
+	 */
+	for (i = 0; caps[i].desc; i++)
+		if (caps[i].enable && cpus_have_cap(caps[i].capability))
+			on_each_cpu(caps[i].enable, NULL, true);
+}
+
+/*
+ * Park the CPU which doesn't have the capability as advertised
+ * by the system.
+ */
+static void fail_incapable_cpu(char *cap_type,
+				 const struct arm64_cpu_capabilities *cap)
+{
+	int cpu = smp_processor_id();
+
+	pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
+	/* Mark this CPU absent */
+	set_cpu_present(cpu, 0);
+	/* Check if we can park ourselves */
+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+		cpu_ops[cpu]->cpu_die(cpu);
+
+	asm volatile(
+			" 1:	wfe \n\t"
+			"	wfi \n\t"
+			"	b 1b\n"
+		    );
+}
+
+/*
+ * Run through the enabled system capabilities and enable() it on this CPU.
+ * The capabilities were decided based on the available CPUs at the boot time.
+ * Any new CPU should match the system wide status of the capability. If the
+ * new CPU doesn't have a capability which the system now has enabled, we
+ * cannot do anything to fix it up and could cause unexpected failures. So
+ * we hold the CPU in a black hole.
+ */
+void cpu_enable_features(void)
+{
+	int i;
+	const struct arm64_cpu_capabilities *caps = arm64_features;
+
+	for(i = 0; caps[i].desc; i++) {
+		if(!cpus_have_cap(caps[i].capability))
+			continue;
+		/*
+		 * If the new CPU misses an advertised feature, we cannot proceed
+		 * further, park the cpu.
+		 */
+		if (!caps[i].matches(&caps[i]))
+			fail_incapable_cpu("arm64_features", &caps[i]);
+		if (caps[i].enable)
+			caps[i].enable(NULL);
 	}
 }
 
-void check_local_cpu_features(void)
+static int cpu_feature_hotplug_notify(struct notifier_block *nb,
+				unsigned long action, void *hcpu)
+{
+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
+		cpu_enable_features();
+	return notifier_from_errno(0);
+}
+
+/* Run the notifier before initialising GIC CPU interface. */
+static struct notifier_block cpu_feature_notifier = {
+	.notifier_call = cpu_feature_hotplug_notify,
+	.priority = 101,
+};
+
+void check_cpu_features(void)
 {
 	check_cpu_capabilities(arm64_features, "detected feature:");
+	register_cpu_notifier(&cpu_feature_notifier);
 }
 
 void __init setup_cpu_features(void)
@@ -636,6 +704,7 @@ void __init setup_cpu_features(void)
 	u32 cwg;
 	int cls;
 
+	check_cpu_features();
 	/*
 	 * Check for sane CTR_EL0.CWG value.
 	 */
