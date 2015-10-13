@@ -51,3 +51,4 @@
 
 /* CHV */
 #define CHV_10BIT_GAMMA_MAX_VALS		257
+#define CHV_DEGAMMA_MAX_VALS                   65
