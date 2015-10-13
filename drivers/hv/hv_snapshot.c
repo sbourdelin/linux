@@ -338,6 +338,16 @@ static void vss_on_reset(void)
 int
 hv_vss_init(struct hv_util_service *srv)
 {
+	switch (vmbus_proto_version) {
+		case VERSION_WS2008:
+		case VERSION_WIN7:
+		case VERSION_WIN8:
+			pr_warn("Integration service 'Backup (volume snapshot)'"
+				" not supported on this host version.\n");
+			return -ENOTSUPP;
+		default:
+			break;
+	}
 	recv_buffer = srv->recv_buffer;
 
 	/*
