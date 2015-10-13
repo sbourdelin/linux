@@ -376,22 +376,14 @@ static int __fib_validate_source(struct sk_buff *skb, __be32 src, __be32 dst,
 	if (FIB_RES_DEV(res) == dev)
 		dev_match = true;
 #endif
-	if (dev_match) {
-		ret = FIB_RES_NH(res).nh_scope >= RT_SCOPE_HOST;
-		return ret;
-	}
+	if (dev_match)
+		return 0;
 	if (no_addr)
 		goto last_resort;
 	if (rpf == 1)
 		goto e_rpf;
-	fl4.flowi4_oif = dev->ifindex;
 
-	ret = 0;
-	if (fib_lookup(net, &fl4, &res, FIB_LOOKUP_IGNORE_LINKSTATE) == 0) {
-		if (res.type == RTN_UNICAST)
-			ret = FIB_RES_NH(res).nh_scope >= RT_SCOPE_HOST;
-	}
-	return ret;
+	return 0;
 
 last_resort:
 	if (rpf)
