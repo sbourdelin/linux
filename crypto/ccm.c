@@ -881,14 +881,13 @@ static int crypto_rfc4309_create(struct crypto_template *tmpl,
 	if (err)
 		goto out_drop_alg;
 
-out:
 	return err;
 
 out_drop_alg:
 	crypto_drop_aead(spawn);
 out_free_inst:
 	kfree(inst);
-	goto out;
+	return err;
 }
 
 static struct crypto_template crypto_rfc4309_tmpl = {
