@@ -229,6 +229,7 @@ __visible void prepare_exit_to_usermode(struct pt_regs *regs)
 	 * work to clear some of the flags can sleep.
 	 */
 	while (true) {
+		enum ctx_state prev_state;
 		u32 cached_flags =
 			READ_ONCE(pt_regs_to_thread_info(regs)->flags);
 
@@ -237,8 +238,10 @@ __visible void prepare_exit_to_usermode(struct pt_regs *regs)
 				      _TIF_USER_RETURN_NOTIFY)))
 			break;
 
+
 		/* We have work to do. */
 		local_irq_enable();
+		prev_state = exception_enter();
 
 		if (cached_flags & _TIF_NEED_RESCHED)
 			schedule();
@@ -258,10 +261,16 @@ __visible void prepare_exit_to_usermode(struct pt_regs *regs)
 		if (cached_flags & _TIF_USER_RETURN_NOTIFY)
 			fire_user_return_notifiers();
 
+		exception_exit(prev_state);
+
 		/* Disable IRQs and retry */
 		local_irq_disable();
 	}
+}
 
+__visible void prepare_exit_to_usermode_track(struct pt_regs *regs)
+{
+	prepare_exit_to_usermode(regs);
 	user_enter();
 }
 
@@ -314,5 +323,5 @@ __visible void syscall_return_slowpath(struct pt_regs *regs)
 #endif
 
 	local_irq_disable();
-	prepare_exit_to_usermode(regs);
+	prepare_exit_to_usermode_track(regs);
 }

@@ -513,10 +513,6 @@ END(irq_entries_start)
 	 * tracking that we're in kernel mode.
 	 */
 	SWAPGS
-#ifdef CONFIG_CONTEXT_TRACKING
-	call enter_from_user_mode
-#endif
-
 1:
 	/*
 	 * Save previous stack pointer, optionally switch to interrupt stack.
@@ -1123,7 +1119,12 @@ ENTRY(error_exit)
 	TRACE_IRQS_OFF
 	testl	%eax, %eax
 	jnz	retint_kernel
-	jmp	retint_user
+	/* like retint_user with the call to context tracking */
+	mov	%rsp,%rdi
+	call	prepare_exit_to_usermode_track
+	TRACE_IRQS_IRETQ
+	SWAPGS
+	jmp	restore_regs_and_iret
 END(error_exit)
 
 /* Runs on exception stack */
