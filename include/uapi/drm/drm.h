@@ -829,6 +829,32 @@ struct drm_event_vblank {
 	__u32 reserved;
 };
 
+struct drm_r32g32b32 {
+	/*
+	 * Data is in U8.24 fixed point format.
+	 * All platforms support values within [0, 1.0] range,
+	 * for Red, Green and Blue colors.
+	 */
+	__u32 r32;
+	__u32 g32;
+	__u32 b32;
+	__u32 reserved;
+};
+
+struct drm_palette {
+	/*
+	 * This has to be a supported value during get call.
+	 * Feature will be disabled if this is 0 while set
+	 */
+	__u32 num_samples;
+	/*
+	 * Starting of palette LUT in R32G32B32 format.
+	 * Each of RGB value is in U8.24 fixed point format.
+	 * Actual number of samples will depend upon num_samples
+	 */
+	struct drm_r32g32b32 lut[0];
+};
+
 /* typedef area */
 #ifndef __KERNEL__
 typedef struct drm_clip_rect drm_clip_rect_t;
