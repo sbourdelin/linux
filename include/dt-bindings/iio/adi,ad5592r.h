@@ -1,0 +1,13 @@
+
+#ifndef _DT_BINDINGS_ADI_AD5592R_H
+#define _DT_BINDINGS_ADI_AD5592R_H
+
+#define CH_MODE_UNUSED		0
+#define CH_MODE_DAC		1
+#define CH_MODE_ADC		2
+#define CH_MODE_GPIO_OUT	3
+#define CH_MODE_GPIO_IN		4
+#define CH_MODE_GPIO_OPEN_DRAIN	5
+#define CH_MODE_GPIO_TRISTATE	6
+
+#endif /* _DT_BINDINGS_ADI_AD5592R_H */
