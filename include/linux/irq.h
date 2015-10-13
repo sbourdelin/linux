@@ -157,6 +157,7 @@ struct irq_common_data {
 	void			*handler_data;
 	struct msi_desc		*msi_desc;
 	cpumask_var_t		affinity;
+	struct ipi_mask		ipi_mask;
 };
 
 /**
