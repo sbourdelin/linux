@@ -1474,4 +1474,7 @@ void intel_plane_destroy_state(struct drm_plane *plane,
 			       struct drm_plane_state *state);
 extern const struct drm_plane_helper_funcs intel_plane_helper_funcs;
 
+/* intel_color_manager.c */
+void intel_color_manager_crtc_commit(struct drm_device *dev,
+		struct drm_crtc_state *crtc_state);
 #endif /* __INTEL_DRV_H__ */
