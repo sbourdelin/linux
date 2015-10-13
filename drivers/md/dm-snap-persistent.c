@@ -879,6 +879,8 @@ static int persistent_ctr(struct dm_exception_store *store, char *options)
 			store->userspace_supports_overflow = true;
 		else {
 			DMERR("Unsupported persistent store option: %s", options);
+			destroy_workqueue(ps->metadata_wq);
+			kfree(ps);
 			return -EINVAL;
 		}
 	}
