@@ -188,6 +188,7 @@ struct isp_device {
 	u32 syscon_offset;
 	u32 phy_type;
 
+	struct device_dma_parameters dma_parms;
 	struct dma_iommu_mapping *mapping;
 
 	/* ISP Obj */

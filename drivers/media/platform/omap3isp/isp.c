@@ -2357,6 +2357,10 @@ static int isp_probe(struct platform_device *pdev)
 	if (ret)
 		goto error;
 
+	isp->dev->dma_parms = &isp->dma_parms;
+	dma_set_max_seg_size(isp->dev, DMA_BIT_MASK(32));
+	dma_set_seg_boundary(isp->dev, 0xffffffff);
+
 	platform_set_drvdata(pdev, isp);
 
 	/* Regulators */
