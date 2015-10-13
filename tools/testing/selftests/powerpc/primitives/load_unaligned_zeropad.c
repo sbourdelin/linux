@@ -29,6 +29,13 @@
 
 #include "utils.h"
 
+static inline unsigned long __fls(unsigned long x)
+{
+	int lz;
+
+	asm (PPC_CNTLZL "%0,%1" : "=r" (lz) : "r" (x));
+	return sizeof(unsigned long) - 1 - lz;
+}
 
 static int page_size;
 static char *mem_region;
