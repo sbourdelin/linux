@@ -1811,7 +1811,6 @@ static void blk_mq_map_swqueue(struct request_queue *q)
 
 		hctx = q->mq_ops->map_queue(q, i);
 		cpumask_set_cpu(i, hctx->cpumask);
-		cpumask_set_cpu(i, hctx->tags->cpumask);
 		ctx->index_hw = hctx->nr_ctx;
 		hctx->ctxs[hctx->nr_ctx++] = ctx;
 	}
@@ -1836,6 +1835,7 @@ static void blk_mq_map_swqueue(struct request_queue *q)
 		if (!set->tags[i])
 			set->tags[i] = blk_mq_init_rq_map(set, i);
 		hctx->tags = set->tags[i];
+		cpumask_copy(hctx->tags->cpumask, hctx->cpumask);
 		WARN_ON(!hctx->tags);
 
 		/*
