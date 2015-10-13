@@ -128,17 +128,6 @@ void cfs_get_random_bytes(void *buf, int size);
 #include "libcfs_fail.h"
 #include "libcfs_crypto.h"
 
-/* container_of depends on "likely" which is defined in libcfs_private.h */
-static inline void *__container_of(void *ptr, unsigned long shift)
-{
-	if (IS_ERR_OR_NULL(ptr))
-		return ptr;
-	return (char *)ptr - shift;
-}
-
-#define container_of0(ptr, type, member) \
-	((type *)__container_of((void *)(ptr), offsetof(type, member)))
-
 #define _LIBCFS_H
 
 void *libcfs_kvzalloc(size_t size, gfp_t flags);
