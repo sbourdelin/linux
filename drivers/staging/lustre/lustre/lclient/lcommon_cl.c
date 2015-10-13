@@ -917,12 +917,12 @@ struct lu_device *ccc2lu_dev(struct ccc_device *vdv)
 
 struct ccc_device *lu2ccc_dev(const struct lu_device *d)
 {
-	return container_of0(d, struct ccc_device, cdv_cl.cd_lu_dev);
+	return container_of(d, struct ccc_device, cdv_cl.cd_lu_dev);
 }
 
 struct ccc_device *cl2ccc_dev(const struct cl_device *d)
 {
-	return container_of0(d, struct ccc_device, cdv_cl);
+	return container_of(d, struct ccc_device, cdv_cl);
 }
 
 struct lu_object *ccc2lu(struct ccc_object *vob)
@@ -932,12 +932,12 @@ struct lu_object *ccc2lu(struct ccc_object *vob)
 
 struct ccc_object *lu2ccc(const struct lu_object *obj)
 {
-	return container_of0(obj, struct ccc_object, cob_cl.co_lu);
+	return container_of(obj, struct ccc_object, cob_cl.co_lu);
 }
 
 struct ccc_object *cl2ccc(const struct cl_object *obj)
 {
-	return container_of0(obj, struct ccc_object, cob_cl);
+	return container_of(obj, struct ccc_object, cob_cl);
 }
 
 struct ccc_lock *cl2ccc_lock(const struct cl_lock_slice *slice)
@@ -957,7 +957,7 @@ struct ccc_io *cl2ccc_io(const struct lu_env *env,
 
 struct ccc_req *cl2ccc_req(const struct cl_req_slice *slice)
 {
-	return container_of0(slice, struct ccc_req, crq_cl);
+	return container_of(slice, struct ccc_req, crq_cl);
 }
 
 struct page *cl2vm_page(const struct cl_page_slice *slice)
