@@ -27,7 +27,7 @@
 #include "intel_guc.h"
 
 /**
- * DOC: GuC Client
+ * DOC: GuC-based command submission
  *
  * i915_guc_client:
  * We use the term client to avoid confusion with contexts. A i915_guc_client is
