@@ -700,12 +700,21 @@ EXPORT_SYMBOL_GPL(dax_pmd_fault);
  */
 int dax_pfn_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	struct super_block *sb = file_inode(vma->vm_file)->i_sb;
+	struct inode *inode = file_inode(vma->vm_file);
+	struct super_block *sb = inode->i_sb;
+	int ret = VM_FAULT_NOPAGE;
+	loff_t size;
 
 	sb_start_pagefault(sb);
 	file_update_time(vma->vm_file);
+
+	/* check that the faulting page hasn't raced with truncate */
+	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (vmf->pgoff >= size)
+		ret = VM_FAULT_SIGBUS;
+
 	sb_end_pagefault(sb);
-	return VM_FAULT_NOPAGE;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(dax_pfn_mkwrite);
 
