@@ -2059,6 +2059,12 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	host->pbias_enabled = 0;
 	host->vqmmc_enabled = 0;
 
+	if (pdev->dev.of_node) {
+		ret = of_alias_get_id(pdev->dev.of_node, "mmcblk");
+		if (ret >= 0)
+			host->mmc->devidx = ret;
+	}
+
 	ret = omap_hsmmc_gpio_init(mmc, host, pdata);
 	if (ret)
 		goto err_gpio;

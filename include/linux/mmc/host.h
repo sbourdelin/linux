@@ -370,6 +370,9 @@ struct mmc_host {
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
 
+	/* preferred mmc block device index (mmcblkX) */
+	unsigned int		devidx;
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
