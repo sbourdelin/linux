@@ -58,6 +58,7 @@ static const char *hwcap_str[] = {
 	"sha2",
 	"crc32",
 	"atomics",
+	"cpuid",
 	NULL
 };
 
