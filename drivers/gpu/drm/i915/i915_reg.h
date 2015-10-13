@@ -8166,4 +8166,12 @@ enum skl_disp_power_wells {
 #define _PIPE_DEGAMMA_BASE(pipe) \
 	(_PIPE3(pipe, PIPEA_CGM_DEGAMMA, PIPEB_CGM_DEGAMMA, PIPEC_CGM_DEGAMMA))
 
+#define PIPEA_CGM_CSC				(VLV_DISPLAY_BASE + 0x67900)
+#define PIPEB_CGM_CSC				(VLV_DISPLAY_BASE + 0x69900)
+#define PIPEC_CGM_CSC				(VLV_DISPLAY_BASE + 0x6B900)
+#define _PIPE_CSC_BASE(pipe) \
+	(_PIPE3(pipe, PIPEA_CGM_CSC, PIPEB_CGM_CSC, PIPEC_CGM_CSC))
+
+
+
 #endif /* _I915_REG_H_ */

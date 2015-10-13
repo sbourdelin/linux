@@ -63,10 +63,29 @@
 #define CHV_GAMMA_SHIFT_GREEN                  16
 #define CHV_MAX_GAMMA                          ((1 << 24) - 1)
 
+/*
+ * CSC on CHV
+ * Fractional part is 32 bit, and we need only 12 MSBs for programming
+ * into registers. ROUNDOFF is required to minimize loss of precision.
+ */
+#define CHV_CSC_FRACT_ROUNDOFF                 (1 << 19)
+/*
+ * CSC values are 64-bit values. For CHV, the maximum CSC value that
+ * user can program is 7.99999..., which can be represented in fixed point
+ * S31.32 format like this, with all fractional bits as 1
+ */
+#define CHV_CSC_COEFF_MAX                      0x00000007FFFFFFFF
+#define CHV_CSC_COEFF_SHIFT                    32
+#define CHV_CSC_COEFF_INT_SHIFT                28
+#define CSC_COEFF_SIGN                         (1 << 31)
+#define CHV_CSC_COEFF_FRACT_SHIFT              4
+#define CSC_MAX_VALS                           9
+
 /* Degamma on CHV */
 #define CHV_DEGAMMA_MSB_SHIFT                  2
 #define CHV_DEGAMMA_GREEN_SHIFT                16
 
 /* CHV CGM Block */
 #define CGM_GAMMA_EN                           (1 << 2)
+#define CGM_CSC_EN                             (1 << 1)
 #define CGM_DEGAMMA_EN                         (1 << 0)
