@@ -197,6 +197,8 @@ struct mmc_pwrseq;
 struct mmc_supply {
 	struct regulator *vmmc;		/* Card power supply */
 	struct regulator *vqmmc;	/* Optional Vccq supply */
+	u32 vmmc_current;		/* Requested current for vmmc */
+	u32 vqmmc_current;		/* Requested current for vqmmc */
 };
 
 struct mmc_host {
