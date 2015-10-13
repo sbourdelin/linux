@@ -72,7 +72,7 @@ config KS0108_DELAY
 
 config CFAG12864B
 	tristate "CFAG12864B LCD"
-	depends on X86
+	depends on X86 || COMPILE_TEST
 	depends on FB
 	depends on KS0108
 	select FB_SYS_FILLRECT
