@@ -48,3 +48,6 @@
 			CLEAR_BITS(target, start_bit, no_bits); \
 			target |= (bit_pattern << start_bit);  \
 		} while (0)
+
+/* CHV */
+#define CHV_10BIT_GAMMA_MAX_VALS		257
