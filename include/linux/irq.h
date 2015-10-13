@@ -125,6 +125,21 @@ enum {
 struct msi_desc;
 struct irq_domain;
 
+ /**
+ * struct ipi_mask - IPI mask information
+ * @cpumask: bitmap of cpumasks
+ * @nbits: number of bits in cpumask
+ * @global: whether the mask is SMP IPI ie: subset of cpu_possible_mask or not
+ *
+ * ipi_mask is similar to cpumask, but it provides nbits that's configurable
+ * rather than fixed to NR_CPUS.
+ */
+struct ipi_mask {
+	unsigned long	*cpumask;
+	unsigned int	nbits;
+	bool		global;
+};
+
 /**
  * struct irq_common_data - per irq data shared by all irqchips
  * @state_use_accessors: status information for irq chip functions.
