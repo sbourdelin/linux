@@ -1,5 +1,6 @@
 menuconfig RAS
 	bool "Reliability, Availability and Serviceability (RAS) features"
+	depends on X86 || COMPILE_TEST
 	help
 	  Reliability, availability and serviceability (RAS) is a computer
 	  hardware engineering term. Computers designed with higher levels
