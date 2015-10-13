@@ -744,11 +744,13 @@ out:
 	return ret;
 }
 
-static struct list_head comp_idle_workspace[BTRFS_COMPRESS_TYPES];
-static spinlock_t comp_workspace_lock[BTRFS_COMPRESS_TYPES];
-static int comp_num_workspace[BTRFS_COMPRESS_TYPES];
-static atomic_t comp_alloc_workspace[BTRFS_COMPRESS_TYPES];
-static wait_queue_head_t comp_workspace_wait[BTRFS_COMPRESS_TYPES];
+static struct {
+	struct list_head idle_workspace;
+	spinlock_t workspace_lock;
+	int num_workspace;
+	atomic_t alloc_workspace;
+	wait_queue_head_t workspace_wait;
+} comp[BTRFS_COMPRESS_TYPES];
 
 static const struct btrfs_compress_op * const btrfs_compress_op[] = {
 	&btrfs_zlib_compress,
@@ -760,10 +762,10 @@ void __init btrfs_init_compress(void)
 	int i;
 
 	for (i = 0; i < BTRFS_COMPRESS_TYPES; i++) {
-		INIT_LIST_HEAD(&comp_idle_workspace[i]);
-		spin_lock_init(&comp_workspace_lock[i]);
-		atomic_set(&comp_alloc_workspace[i], 0);
-		init_waitqueue_head(&comp_workspace_wait[i]);
+		INIT_LIST_HEAD(&comp[i].idle_workspace);
+		spin_lock_init(&comp[i].workspace_lock);
+		atomic_set(&comp[i].alloc_workspace, 0);
+		init_waitqueue_head(&comp[i].workspace_wait);
 	}
 }
 
@@ -777,11 +779,11 @@ static struct list_head *find_workspace(int type)
 	int cpus = num_online_cpus();
 	int idx = type - 1;
 
-	struct list_head *idle_workspace	= &comp_idle_workspace[idx];
-	spinlock_t *workspace_lock		= &comp_workspace_lock[idx];
-	atomic_t *alloc_workspace		= &comp_alloc_workspace[idx];
-	wait_queue_head_t *workspace_wait	= &comp_workspace_wait[idx];
-	int *num_workspace			= &comp_num_workspace[idx];
+	struct list_head *idle_workspace	= &comp[idx].idle_workspace;
+	spinlock_t *workspace_lock		= &comp[idx].workspace_lock;
+	atomic_t *alloc_workspace		= &comp[idx].alloc_workspace;
+	wait_queue_head_t *workspace_wait	= &comp[idx].workspace_wait;
+	int *num_workspace			= &comp[idx].num_workspace;
 again:
 	spin_lock(workspace_lock);
 	if (!list_empty(idle_workspace)) {
@@ -820,11 +822,11 @@ again:
 static void free_workspace(int type, struct list_head *workspace)
 {
 	int idx = type - 1;
-	struct list_head *idle_workspace	= &comp_idle_workspace[idx];
-	spinlock_t *workspace_lock		= &comp_workspace_lock[idx];
-	atomic_t *alloc_workspace		= &comp_alloc_workspace[idx];
-	wait_queue_head_t *workspace_wait	= &comp_workspace_wait[idx];
-	int *num_workspace			= &comp_num_workspace[idx];
+	struct list_head *idle_workspace	= &comp[idx].idle_workspace;
+	spinlock_t *workspace_lock		= &comp[idx].workspace_lock;
+	atomic_t *alloc_workspace		= &comp[idx].alloc_workspace;
+	wait_queue_head_t *workspace_wait	= &comp[idx].workspace_wait;
+	int *num_workspace			= &comp[idx].num_workspace;
 
 	spin_lock(workspace_lock);
 	if (*num_workspace < num_online_cpus()) {
@@ -852,11 +854,11 @@ static void free_workspaces(void)
 	int i;
 
 	for (i = 0; i < BTRFS_COMPRESS_TYPES; i++) {
-		while (!list_empty(&comp_idle_workspace[i])) {
-			workspace = comp_idle_workspace[i].next;
+		while (!list_empty(&comp[i].idle_workspace)) {
+			workspace = comp[i].idle_workspace.next;
 			list_del(workspace);
 			btrfs_compress_op[i]->free_workspace(workspace);
-			atomic_dec(&comp_alloc_workspace[i]);
+			atomic_dec(&comp[i].alloc_workspace);
 		}
 	}
 }
