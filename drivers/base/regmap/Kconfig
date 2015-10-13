@@ -9,6 +9,12 @@ config REGMAP
 	select IRQ_DOMAIN if REGMAP_IRQ
 	bool
 
+config REGMAP_ALLOW_WRITE_DEBUGFS
+	bool "Make regmap debugfs writable"
+	default n
+	select REGMAP
+	select DEBUG_FS
+
 config REGMAP_AC97
 	tristate
 
