@@ -2764,6 +2764,45 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 	return ret;
 }
 
+/*
+ * Return the minimum voltage supported by a regulator that is higher or equal
+ * to a given voltage.
+ */
+static int regulator_get_voltage_floor(struct regulator *regulator, int min_uV)
+{
+	struct regulator_dev *rdev = regulator->rdev;
+	int num_voltages;
+	int best = INT_MAX;
+	int max_uV = INT_MAX;
+	int i, now, ret;
+
+	/* constraints check */
+	ret = regulator_check_voltage(rdev, &min_uV, &max_uV);
+	if (ret < 0)
+		return ret;
+
+	ret = regulator_check_consumers(rdev, &min_uV, &max_uV);
+	if (ret < 0)
+		return ret;
+
+	num_voltages = regulator_count_voltages(regulator);
+	if (num_voltages < 0)
+		return num_voltages;
+
+	for (i = 0; i < num_voltages; i++) {
+		now = _regulator_list_voltage(regulator, i, 0);
+		if (now < 0)
+			continue;
+		if (now < best && now >= min_uV)
+			best = now;
+	}
+
+	if (best > max_uV)
+		return -EINVAL;
+
+	return best;
+}
+
 static int regulator_set_voltage_unlocked(struct regulator *regulator,
 					  int min_uV, int max_uV)
 {
