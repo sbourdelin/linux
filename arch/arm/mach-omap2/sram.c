@@ -47,6 +47,28 @@
 
 #define GP_DEVICE		0x300
 
+/**
+ * Size of chunk used by secure content in the HS/EMU devices.
+ *
+ * This size is not fixed. It depends upon the implementation of PPA.
+ * May need to be modified if the size grows.
+ */
+#define AM33XX_HS_HEADER_SIZE   0x0350
+
+/**
+ * Start of public SRAM on HS/EMU devices.
+ */
+#define AM33XX_SRAM_PA		0x40300000
+#define AM33XX_SRAM_PUB_PA	(AM33XX_SRAM_PA + AM33XX_HS_HEADER_SIZE)
+
+/**
+ * Size of public SRAM available on HS/EMU devices.
+ *
+ * This size also depends upon AM33XX_HS_HEADER_SIZE.
+ * Current value is derived from nearest round-off.
+ */
+#define AM33XX_SRAM_PUB_SIZE		0xfc00	/* 63K */
+
 #define ROUND_DOWN(value,boundary)	((value) & (~((boundary)-1)))
 
 static unsigned long omap_sram_start;
@@ -99,6 +121,9 @@ static void __init omap_detect_sram(void)
 			} else {
 				omap_sram_size = 0x8000; /* 32K */
 			}
+		} else if (soc_is_am33xx()) {
+			omap_sram_start = AM33XX_SRAM_PUB_PA;
+			omap_sram_size  = AM33XX_SRAM_PUB_SIZE;
 		} else {
 			omap_sram_start = OMAP2_SRAM_PUB_PA;
 			omap_sram_size = 0x800; /* 2K */
