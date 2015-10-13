@@ -158,7 +158,10 @@ extern void mutex_lock(struct mutex *lock);
 extern int __must_check mutex_lock_interruptible(struct mutex *lock);
 extern int __must_check mutex_lock_killable(struct mutex *lock);
 
-# define mutex_lock_nested(lock, subclass) mutex_lock(lock)
+static inline void mutex_lock_nested(struct mutex *lock, unsigned int subclass)
+{
+	return mutex_lock(lock);
+}
 # define mutex_lock_interruptible_nested(lock, subclass) mutex_lock_interruptible(lock)
 # define mutex_lock_killable_nested(lock, subclass) mutex_lock_killable(lock)
 # define mutex_lock_nest_lock(lock, nest_lock) mutex_lock(lock)
