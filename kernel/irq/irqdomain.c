@@ -749,6 +749,90 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
 	return virq;
 }
 
+/**
+ * irq_reserve_ipi() - setup an IPI to destination cpumask
+ * @domain: IPI domain
+ * @dest: cpumask of cpus to receive the IPI
+ *
+ * Allocate a virq that can be used to send IPI to any CPU in dest mask.
+ *
+ * On success it'll return linux irq number and 0 on failure
+ */
+unsigned int irq_reserve_ipi(struct irq_domain *domain,
+			     const struct ipi_mask *dest)
+{
+	struct irq_data *data;
+	int virq;
+	unsigned int nr_irqs;
+
+	if (domain == NULL)
+		domain = irq_default_domain; /* need a separate ipi_default_domain? */
+
+	if (domain == NULL) {
+		pr_warn("Must provide a valid IPI domain!\n");
+		return 0;
+	}
+
+	if (!irq_domain_is_ipi(domain)) {
+		pr_warn("Not an IPI domain!\n");
+		return 0;
+	}
+
+	/* always allocate a virq per cpu */
+	nr_irqs = bitmap_weight(dest->cpumask, dest->nbits);;
+
+	virq = irq_domain_alloc_descs(-1, nr_irqs, 0, NUMA_NO_NODE);
+	if (virq <= 0) {
+		pr_warn("Can't reserve IPI, failed to alloc descs\n");
+		return 0;
+	}
+
+	/* we are reusing hierarchy alloc function, should we create another one? */
+	virq = __irq_domain_alloc_irqs(domain, virq, nr_irqs, NUMA_NO_NODE,
+					(void *) dest, true);
+	if (virq <= 0) {
+		pr_warn("Can't reserve IPI, failed to alloc irqs\n");
+		goto free_descs;
+	}
+
+	data = irq_get_irq_data(virq);
+	bitmap_copy(data->ipi_mask.cpumask, dest->cpumask, dest->nbits);
+	data->ipi_mask.nbits = dest->nbits;
+
+	return virq;
+
+free_descs:
+	irq_free_descs(virq, nr_irqs);
+	return 0;
+}
+
+/**
+ * irq_destroy_ipi() - unreserve an IPI that was previously allocated
+ * @irq: linux irq number to be destroyed
+ *
+ * Return an IPI allocated with irq_reserve_ipi() to the system.
+ */
+void irq_destroy_ipi(unsigned int irq)
+{
+	struct irq_data *data = irq_get_irq_data(irq);
+	struct irq_domain *domain;
+
+	if (!irq || !data)
+		return;
+
+	domain = data->domain;
+	if (WARN_ON(domain == NULL))
+		return;
+
+	if (!irq_domain_is_ipi(domain)) {
+		pr_warn("Not an IPI domain!\n");
+		return;
+	}
+
+	irq_domain_free_irqs(irq,
+		bitmap_weight(data->ipi_mask.cpumask, data->ipi_mask.nbits));
+}
+
 #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
 /**
  * irq_domain_add_hierarchy - Add a irqdomain into the hierarchy
