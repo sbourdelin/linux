@@ -875,6 +875,8 @@ struct intel_context {
 	struct i915_ctx_hang_stats hang_stats;
 	struct i915_hw_ppgtt *ppgtt;
 
+	int relative_constants_mode;
+
 	/* Legacy ring buffer submission */
 	struct {
 		struct drm_i915_gem_object *rcs_state;
@@ -1707,8 +1709,6 @@ struct drm_i915_private {
 	struct kmem_cache *requests;
 
 	const struct intel_device_info info;
-
-	int relative_constants_mode;
 
 	void __iomem *regs;
 

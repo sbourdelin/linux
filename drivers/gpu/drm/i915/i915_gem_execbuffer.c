@@ -1272,7 +1272,7 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
 			goto error;
 		}
 
-		if (instp_mode != dev_priv->relative_constants_mode) {
+		if (instp_mode != params->ctx->relative_constants_mode) {
 			if (INTEL_INFO(dev)->gen < 4) {
 				DRM_DEBUG("no rel constants on pre-gen4\n");
 				ret = -EINVAL;
@@ -1298,7 +1298,7 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
 	}
 
 	if (ring == &dev_priv->ring[RCS] &&
-			instp_mode != dev_priv->relative_constants_mode) {
+			instp_mode != params->ctx->relative_constants_mode) {
 		ret = intel_ring_begin(params->request, 4);
 		if (ret)
 			goto error;
@@ -1309,7 +1309,7 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
 		intel_ring_emit(ring, instp_mask << 16 | instp_mode);
 		intel_ring_advance(ring);
 
-		dev_priv->relative_constants_mode = instp_mode;
+		params->ctx->relative_constants_mode = instp_mode;
 	}
 
 	if (args->flags & I915_EXEC_GEN7_SOL_RESET) {
