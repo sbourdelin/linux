@@ -703,3 +703,4 @@ compr_err:
 	kfree(compr);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(soc_new_compress);
