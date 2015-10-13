@@ -96,7 +96,8 @@ static const char *vga_iostate_to_str(unsigned int iostate)
 static int vga_str_to_iostate(char *buf, int str_size, int *io_state)
 {
 	/* we could in theory hand out locks on IO and mem
-	 * separately to userspace but it can cause deadlocks */
+	 * separately to userspace but it can cause deadlocks
+	 */
 	if (strncmp(buf, "none", 4) == 0) {
 		*io_state = VGA_RSRC_NONE;
 		return 1;
@@ -155,13 +156,15 @@ static inline void vga_irq_set_state(struct vga_device *vgadev, bool state)
 
 
 /* If we don't ever use VGA arb we should avoid
-   turning off anything anywhere due to old X servers getting
-   confused about the boot device not being VGA */
+ *  turning off anything anywhere due to old X servers getting
+ *  confused about the boot device not being VGA
+ */
 static void vga_check_first_use(void)
 {
 	/* we should inform all GPUs in the system that
 	 * VGA arb has occurred and to try and disable resources
-	 * if they can */
+	 * if they can
+	 */
 	if (!vga_arbiter_used) {
 		vga_arbiter_used = true;
 		vga_arbiter_notify_clients();
@@ -985,11 +988,11 @@ static ssize_t vga_arb_write(struct file *file, const char __user *buf,
 				goto done;
 			}
 			/* TODO: Add this?
-			   if (io_state == VGA_RSRC_NONE) {
-			   ret_val = -EPROTO;
-			   goto done;
-			   }
-			  */
+			 *  if (io_state == VGA_RSRC_NONE) {
+			 *  ret_val = -EPROTO;
+			 *  goto done;
+			 *  }
+			 */
 		}
 
 		pdev = priv->target;
@@ -1037,10 +1040,10 @@ static ssize_t vga_arb_write(struct file *file, const char __user *buf,
 			goto done;
 		}
 		/* TODO: Add this?
-		   if (io_state == VGA_RSRC_NONE) {
-		   ret_val = -EPROTO;
-		   goto done;
-		   }
+		 *  if (io_state == VGA_RSRC_NONE) {
+		 *  ret_val = -EPROTO;
+		 *  goto done;
+		 *  }
 		 */
 
 		pdev = priv->target;
@@ -1276,7 +1279,8 @@ static int pci_notify(struct notifier_block *nb, unsigned long action,
 
 	/* For now we're only intereted in devices added and removed. I didn't
 	 * test this thing here, so someone needs to double check for the
-	 * cases of hotplugable vga cards. */
+	 * cases of hotplugable vga cards.
+	 */
 	if (action == BUS_NOTIFY_ADD_DEVICE)
 		notify = vga_arbiter_add_pci_device(pdev);
 	else if (action == BUS_NOTIFY_DEL_DEVICE)
@@ -1317,7 +1321,8 @@ static int __init vga_arb_device_init(void)
 	bus_register_notifier(&pci_bus_type, &pci_notifier);
 
 	/* We add all pci devices satisfying vga class in the arbiter by
-	 * default */
+	 * default
+	 */
 	pdev = NULL;
 	while ((pdev =
 		pci_get_subsys(PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
