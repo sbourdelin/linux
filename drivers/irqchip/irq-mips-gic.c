@@ -266,9 +266,24 @@ static void gic_bind_eic_interrupt(int irq, int set)
 		  GIC_VPE_EIC_SS(irq), set);
 }
 
-void gic_send_ipi(unsigned int intr)
+static void gic_send_ipi(struct irq_data *d, const struct ipi_mask *cpumask)
 {
-	gic_write(GIC_REG(SHARED, GIC_SH_WEDGE), GIC_SH_WEDGE_SET(intr));
+	struct ipi_mapping *map = irq_data_get_irq_chip_data(d);
+	irq_hw_number_t intr;
+	int vpe;
+
+	if (!map)
+		return;
+
+	vpe = find_first_bit(cpumask->cpumask, cpumask->nbits);
+	while (vpe != cpumask->nbits) {
+		intr = map->cpumap[vpe];
+		if (intr == INVALID_HWIRQ)
+			continue;
+		gic_write(GIC_REG(SHARED, GIC_SH_WEDGE), GIC_SH_WEDGE_SET(intr));
+
+		vpe = find_next_bit(cpumask->cpumask, cpumask->nbits, vpe + 1);
+	}
 }
 
 int gic_get_c0_compare_int(void)
@@ -476,6 +491,7 @@ static struct irq_chip gic_edge_irq_controller = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity	=	gic_set_affinity,
 #endif
+	.irq_send_ipi		=	gic_send_ipi,
 };
 
 static void gic_handle_local_int(bool chained)
