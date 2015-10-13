@@ -1983,3 +1983,47 @@ int irq_unmap_ipi(struct ipi_mapping *map,
 
 	return 0;
 }
+
+int __irq_desc_send_ipi(struct irq_desc *desc, const struct ipi_mask *dest)
+{
+	struct irq_data *data = irq_desc_get_irq_data(desc);
+	struct irq_chip *chip = irq_data_get_irq_chip(data);
+
+	if (!chip || !chip->irq_send_ipi)
+		return -EINVAL;
+
+	/*
+	 * Do not validate the mask for IPIs marked global. These are
+	 * regular IPIs so we can avoid the operation as their target
+	 * mask is the cpu_possible_mask.
+	 */
+	if (!dest->global) {
+		if (!bitmap_subset(dest->cpumask, data->ipi_mask.cpumask,
+				   dest->nbits))
+			return -EINVAL;
+	}
+
+	chip->irq_send_ipi(data, dest);
+	return 0;
+}
+
+/**
+ * irq_send_ipi() - send an IPI to target CPU(s)
+ * @irq: linux irq number from irq_reserve_ipi()
+ * @dest: dest CPU(s), must be the same or a subset of the mask passed to
+ *	  irq_reserve_ipi()
+ *
+ * Sends an IPI to all cpus in dest mask.
+ *
+ * Returns 0 on success and errno otherwise..
+ */
+int irq_send_ipi(unsigned int virq, const struct ipi_mask *dest)
+{
+	struct irq_desc *desc = irq_to_desc(virq);
+
+	if (!desc)
+		return -EINVAL;
+
+	return __irq_desc_send_ipi(desc, dest);
+}
+EXPORT_SYMBOL(irq_send_ipi);
