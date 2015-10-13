@@ -43,16 +43,30 @@ static int smsc_phy_ack_interrupt(struct phy_device *phydev)
 
 static int smsc_phy_config_init(struct phy_device *phydev)
 {
+#ifdef CONFIG_OF
+	int len;
+	struct device *dev = &phydev->dev;
+	struct device_node *of_node = dev->of_node;
+#endif
 	int rc = phy_read(phydev, MII_LAN83C185_CTRL_STATUS);
+	int enable_energy = 1;
 
 	if (rc < 0)
 		return rc;
 
-	/* Enable energy detect mode for this SMSC Transceivers */
-	rc = phy_write(phydev, MII_LAN83C185_CTRL_STATUS,
-		       rc | MII_LAN83C185_EDPWRDOWN);
-	if (rc < 0)
-		return rc;
+#ifdef CONFIG_OF
+	if (!of_node && dev->parent->of_node)
+		of_node = dev->parent->of_node;
+	if (of_find_property(of_node, "disable-energy-detect", &len))
+		enable_energy = 0;
+#endif
+	if (enable_energy) {
+		/* Enable energy detect mode for this SMSC Transceivers */
+		rc = phy_write(phydev, MII_LAN83C185_CTRL_STATUS,
+			       rc | MII_LAN83C185_EDPWRDOWN);
+		if (rc < 0)
+			return rc;
+	}
 
 	return smsc_phy_ack_interrupt(phydev);
 }
