@@ -15,6 +15,7 @@
 #define MAX_LEGACY_IRQS			4
 #define MAX_MSI_HOST_IRQS		8
 #define MAX_LEGACY_HOST_IRQS		4
+#define MAX_NUM_PCI_SERDES		1
 
 struct keystone_pcie {
 	struct	clk		*clk;
@@ -33,6 +34,7 @@ struct keystone_pcie {
 	/* Application register space */
 	void __iomem		*va_app_base;
 	struct resource		app;
+	struct phy		*serdes_phy;
 };
 
 /* Keystone DW specific MSI controller APIs/definitions */
