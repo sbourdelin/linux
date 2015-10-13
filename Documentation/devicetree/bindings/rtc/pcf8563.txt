@@ -1,0 +1,22 @@
+* Philips PCF8563/Epson RTC8564 Real Time Clock
+
+Philips PCF8563/Epson RTC8564 Real Time Clock
+
+Required properties:
+see: Documentation/devicetree/bindings/i2c/trivial-devices.txt
+
+Optional property:
+- disable-clkout:
+  disable the CLKOUT of the RTC after power-up.
+  After power-up/reset of the RTC, CLKOUT is enabled by default,
+  with CLKOUT enabled the RTC chip has 2-3 times higher power
+  consumption. If you not need CLKOUT, you can disable the CLKOUT
+  with setting this property.
+
+Example:
+
+pcf8563@51 {
+	compatible = "nxp,pcf8563";
+	reg = <0x51>;
+	disable-clkout;
+};
