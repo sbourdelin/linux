@@ -64,7 +64,8 @@ i915-y += intel_audio.o \
 	  intel_overlay.o \
 	  intel_psr.o \
 	  intel_sideband.o \
-	  intel_sprite.o
+	  intel_sprite.o \
+	  intel_color_manager.o
 i915-$(CONFIG_ACPI)		+= intel_acpi.o intel_opregion.o
 i915-$(CONFIG_DRM_FBDEV_EMULATION)	+= intel_fbdev.o
 
