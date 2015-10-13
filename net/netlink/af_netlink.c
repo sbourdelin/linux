@@ -2817,9 +2817,13 @@ static int netlink_dump(struct sock *sk)
 			skb_reserve(skb, skb_tailroom(skb) -
 					 nlk->max_recvmsg_len);
 	}
-	if (!skb)
+	if (!skb) {
 		skb = netlink_alloc_skb(sk, alloc_size, nlk->portid,
 					GFP_KERNEL);
+		/* available room should be exact amount to avoid MSG_TRUNC */
+		if (skb)
+			skb_reserve(skb, skb_tailroom(skb) - alloc_size);
+	}
 	if (!skb)
 		goto errout_skb;
 	netlink_skb_set_owner_r(skb, sk);
