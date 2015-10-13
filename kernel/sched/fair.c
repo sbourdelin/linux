@@ -2686,12 +2686,13 @@ static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
 static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 {
 	struct sched_avg *sa = &cfs_rq->avg;
-	int decayed;
+	int decayed, removed = 0;
 
 	if (atomic_long_read(&cfs_rq->removed_load_avg)) {
 		long r = atomic_long_xchg(&cfs_rq->removed_load_avg, 0);
 		sa->load_avg = max_t(long, sa->load_avg - r, 0);
 		sa->load_sum = max_t(s64, sa->load_sum - r * LOAD_AVG_MAX, 0);
+		removed = 1;
 	}
 
 	if (atomic_long_read(&cfs_rq->removed_util_avg)) {
@@ -2708,7 +2709,7 @@ static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 	cfs_rq->load_last_update_time_copy = sa->last_update_time;
 #endif
 
-	return decayed;
+	return decayed || removed;
 }
 
 /* Update task and its cfs_rq load average */
