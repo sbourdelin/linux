@@ -671,6 +671,9 @@ static bool blk_mq_attempt_merge(struct request_queue *q,
 	struct request *rq;
 	int checked = 8;
 
+	if (!bio_mergeable(bio))
+		return false;
+
 	list_for_each_entry_reverse(rq, &ctx->rq_list, queuelist) {
 		int el_ret;
 
@@ -1140,7 +1143,7 @@ static inline bool blk_mq_merge_queue_io(struct blk_mq_hw_ctx *hctx,
 					 struct blk_mq_ctx *ctx,
 					 struct request *rq, struct bio *bio)
 {
-	if (!hctx_allow_merges(hctx)) {
+	if (!hctx_allow_merges(hctx) || !bio_mergeable(bio)) {
 		blk_mq_bio_to_request(rq, bio);
 		spin_lock(&ctx->lock);
 insert_rq:
