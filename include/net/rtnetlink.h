@@ -130,6 +130,8 @@ struct rtnl_af_ops {
 						    const struct nlattr *attr);
 	int			(*set_link_af)(struct net_device *dev,
 					       const struct nlattr *attr);
+	size_t			(*get_link_af_size_filtered)(const struct net_device *dev,
+							     u32 ext_filter_mask);
 };
 
 void __rtnl_af_unregister(struct rtnl_af_ops *ops);
