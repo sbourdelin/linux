@@ -2266,8 +2266,9 @@ intel_fb_align_height(struct drm_device *dev, unsigned int height,
 }
 
 static int
-intel_fill_fb_ggtt_view(struct i915_ggtt_view *view, struct drm_framebuffer *fb,
-			const struct drm_plane_state *plane_state)
+intel_fill_fb_ggtt_view(struct i915_ggtt_view *view,
+			const struct drm_framebuffer *fb,
+			unsigned int rotation)
 {
 	struct drm_i915_private *dev_priv = to_i915(fb->dev);
 	struct intel_rotation_info *info = &view->rotation_info;
@@ -2275,10 +2276,7 @@ intel_fill_fb_ggtt_view(struct i915_ggtt_view *view, struct drm_framebuffer *fb,
 
 	*view = i915_ggtt_view_normal;
 
-	if (!plane_state)
-		return 0;
-
-	if (!intel_rotation_90_or_270(plane_state->rotation))
+	if (!intel_rotation_90_or_270(rotation))
 		return 0;
 
 	*view = i915_ggtt_view_rotated;
@@ -2345,9 +2343,8 @@ static unsigned int intel_surf_alignment(const struct drm_i915_private *dev_priv
 }
 
 int
-intel_pin_and_fence_fb_obj(struct drm_plane *plane,
-			   struct drm_framebuffer *fb,
-			   const struct drm_plane_state *plane_state,
+intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb,
+			   unsigned int rotation,
 			   struct intel_engine_cs *pipelined,
 			   struct drm_i915_gem_request **pipelined_request)
 {
@@ -2362,7 +2359,7 @@ intel_pin_and_fence_fb_obj(struct drm_plane *plane,
 
 	alignment = intel_surf_alignment(dev_priv, fb->modifier[0]);
 
-	ret = intel_fill_fb_ggtt_view(&view, fb, plane_state);
+	ret = intel_fill_fb_ggtt_view(&view, fb, rotation);
 	if (ret)
 		return ret;
 
@@ -2423,8 +2420,7 @@ err_interruptible:
 	return ret;
 }
 
-static void intel_unpin_fb_obj(struct drm_framebuffer *fb,
-			       const struct drm_plane_state *plane_state)
+static void intel_unpin_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
 {
 	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
 	struct i915_ggtt_view view;
@@ -2432,7 +2428,7 @@ static void intel_unpin_fb_obj(struct drm_framebuffer *fb,
 
 	WARN_ON(!mutex_is_locked(&obj->base.dev->struct_mutex));
 
-	ret = intel_fill_fb_ggtt_view(&view, fb, plane_state);
+	ret = intel_fill_fb_ggtt_view(&view, fb, rotation);
 	WARN_ONCE(ret, "Couldn't get view from plane state!");
 
 	i915_gem_object_unpin_fence(obj);
@@ -10771,7 +10767,7 @@ static void intel_unpin_work_fn(struct work_struct *__work)
 	struct drm_plane *primary = crtc->base.primary;
 
 	mutex_lock(&dev->struct_mutex);
-	intel_unpin_fb_obj(work->old_fb, primary->state);
+	intel_unpin_fb_obj(work->old_fb, primary->state->rotation);
 	drm_gem_object_unreference(&work->pending_flip_obj->base);
 
 	if (work->flip_queued_req)
@@ -11512,8 +11508,7 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 	 * synchronisation, so all we want here is to pin the framebuffer
 	 * into the display plane and skip any waits.
 	 */
-	ret = intel_pin_and_fence_fb_obj(crtc->primary, fb,
-					 crtc->primary->state,
+	ret = intel_pin_and_fence_fb_obj(fb, primary->state->rotation,
 					 mmio_flip ? i915_gem_request_get_ring(obj->last_write_req) : ring, &request);
 	if (ret)
 		goto cleanup_pending;
@@ -11564,7 +11559,7 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 	return 0;
 
 cleanup_unpin:
-	intel_unpin_fb_obj(fb, crtc->primary->state);
+	intel_unpin_fb_obj(fb, crtc->primary->state->rotation);
 cleanup_pending:
 	if (request)
 		i915_gem_request_cancel(request);
@@ -13448,7 +13443,8 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		if (ret)
 			DRM_DEBUG_KMS("failed to attach phys object\n");
 	} else {
-		ret = intel_pin_and_fence_fb_obj(plane, fb, new_state, NULL, NULL);
+		ret = intel_pin_and_fence_fb_obj(fb, new_state->rotation,
+						 NULL, NULL);
 	}
 
 	if (ret == 0)
@@ -13479,7 +13475,7 @@ intel_cleanup_plane_fb(struct drm_plane *plane,
 	if (plane->type != DRM_PLANE_TYPE_CURSOR ||
 	    !INTEL_INFO(dev)->cursor_needs_physical) {
 		mutex_lock(&dev->struct_mutex);
-		intel_unpin_fb_obj(old_state->fb, old_state);
+		intel_unpin_fb_obj(old_state->fb, old_state->rotation);
 		mutex_unlock(&dev->struct_mutex);
 	}
 }
@@ -15460,9 +15456,8 @@ void intel_modeset_gem_init(struct drm_device *dev)
 			continue;
 
 		mutex_lock(&dev->struct_mutex);
-		ret = intel_pin_and_fence_fb_obj(c->primary,
-						 c->primary->fb,
-						 c->primary->state,
+		ret = intel_pin_and_fence_fb_obj(c->primary->fb,
+						 c->primary->state->rotation,
 						 NULL, NULL);
 		mutex_unlock(&dev->struct_mutex);
 		if (ret) {
