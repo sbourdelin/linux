@@ -103,7 +103,6 @@ static inline int cvm_oct_check_rcv_error(cvmx_wqe_t *work)
 		gmxx_rxx_frm_ctl.u64 =
 		    cvmx_read_csr(CVMX_GMXX_RXX_FRM_CTL(index, interface));
 		if (gmxx_rxx_frm_ctl.s.pre_chk == 0) {
-
 			u8 *ptr =
 			    cvmx_phys_to_ptr(work->packet_ptr.s.addr);
 			int i = 0;
@@ -117,15 +116,15 @@ static inline int cvm_oct_check_rcv_error(cvmx_wqe_t *work)
 
 			if (*ptr == 0xd5) {
 				/*
-				  printk_ratelimited("Port %d received 0xd5 preamble\n",
-					  port);
+				 * printk_ratelimited("Port %d received 0xd5 preamble\n"
+				 *		      port);
 				 */
 				work->packet_ptr.s.addr += i + 1;
 				work->word1.len -= i + 5;
 			} else if ((*ptr & 0xf) == 0xd) {
 				/*
-				  printk_ratelimited("Port %d received 0x?d preamble\n",
-					  port);
+				 * printk_ratelimited("Port %d received 0x?d preamble\n",
+				 *		      port);
 				 */
 				work->packet_ptr.s.addr += i;
 				work->word1.len -= i + 4;
@@ -139,7 +138,7 @@ static inline int cvm_oct_check_rcv_error(cvmx_wqe_t *work)
 				printk_ratelimited("Port %d unknown preamble, packet dropped\n",
 						   port);
 				/*
-				   cvmx_helper_dump_packet(work);
+				 * cvmx_helper_dump_packet(work);
 				 */
 				cvm_oct_free_work(work);
 				return 1;
@@ -184,7 +183,7 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 	if (OCTEON_IS_MODEL(OCTEON_CN68XX)) {
 		old_group_mask = cvmx_read_csr(CVMX_SSO_PPX_GRP_MSK(coreid));
 		cvmx_write_csr(CVMX_SSO_PPX_GRP_MSK(coreid),
-				1ull << pow_receive_group);
+			       1ull << pow_receive_group);
 		cvmx_read_csr(CVMX_SSO_PPX_GRP_MSK(coreid)); /* Flush */
 	} else {
 		old_group_mask = cvmx_read_csr(CVMX_POW_PP_GRP_MSKX(coreid));
@@ -211,7 +210,7 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 
 		prefetch(work);
 		did_work_request = 0;
-		if (work == NULL) {
+		if (!work) {
 			if (OCTEON_IS_MODEL(OCTEON_CN68XX)) {
 				cvmx_write_csr(CVMX_SSO_WQ_IQ_DIS,
 					       1ull << pow_receive_group);
@@ -380,9 +379,9 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 			} else {
 				/* Drop any packet received for a device that isn't up */
 				/*
-				  printk_ratelimited("%s: Device not up, packet dropped\n",
-					   dev->name);
-				*/
+				 * printk_ratelimited("%s: Device not up, packet dropped\n",
+				 *                    dev->name);
+				 */
 #ifdef CONFIG_64BIT
 				atomic64_add(1,
 					     (atomic64_t *)&priv->stats.rx_dropped);
@@ -398,7 +397,7 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 			 * doesn't exist.
 			 */
 			printk_ratelimited("Port %d not controlled by Linux, packet dropped\n",
-				   port);
+					   port);
 			dev_kfree_skb_irq(skb);
 		}
 		/*
@@ -433,7 +432,7 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 	}
 	cvm_oct_rx_refill_pool(0);
 
-	if (rx_count < budget && napi != NULL) {
+	if (rx_count < budget && napi) {
 		/* No more work */
 		napi_complete(napi);
 		enable_irq(OCTEON_IRQ_WORKQ0 + pow_receive_group);
@@ -466,7 +465,7 @@ void cvm_oct_rx_initialize(void)
 		}
 	}
 
-	if (NULL == dev_for_napi)
+	if (!dev_for_napi)
 		panic("No net_devices were allocated.");
 
 	netif_napi_add(dev_for_napi, &cvm_oct_napi, cvm_oct_napi_poll,

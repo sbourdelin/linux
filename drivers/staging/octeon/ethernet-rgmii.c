@@ -68,7 +68,7 @@ static void cvm_oct_rgmii_poll(struct net_device *dev)
 	struct octeon_ethernet *priv = netdev_priv(dev);
 	unsigned long flags = 0;
 	cvmx_helper_link_info_t link_info;
-	int use_global_register_lock = (priv->phydev == NULL);
+	int use_global_register_lock = (!priv->phydev);
 
 	BUG_ON(in_interrupt());
 	if (use_global_register_lock) {
@@ -124,7 +124,7 @@ static void cvm_oct_rgmii_poll(struct net_device *dev)
 	 */
 	cvm_oct_set_hw_preamble(priv, true);
 
-	if (priv->phydev == NULL) {
+	if (!priv->phydev) {
 		link_info = cvmx_helper_link_autoconf(priv->port);
 		priv->link_info = link_info.u64;
 	}
@@ -134,7 +134,7 @@ static void cvm_oct_rgmii_poll(struct net_device *dev)
 	else
 		mutex_unlock(&priv->phydev->bus->mdio_lock);
 
-	if (priv->phydev == NULL) {
+	if (!priv->phydev) {
 		/* Tell core. */
 		if (link_info.s.link_up) {
 			if (!netif_carrier_ok(dev))
@@ -285,7 +285,6 @@ void cvm_oct_rgmii_uninit(struct net_device *dev)
 	    || (priv->imode == CVMX_HELPER_INTERFACE_MODE_RGMII)) {
 
 		if (!octeon_is_simulation()) {
-
 			union cvmx_gmxx_rxx_int_en gmx_rx_int_en;
 			int interface = INTERFACE(priv->port);
 			int index = INDEX(priv->port);

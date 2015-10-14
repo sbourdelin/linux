@@ -95,11 +95,10 @@ static void cvm_oct_free_tx_skbs(struct net_device *dev)
 	for (qos = 0; qos < queues_per_port; qos++) {
 		if (skb_queue_len(&priv->tx_free_list[qos]) == 0)
 			continue;
-		skb_to_free = cvmx_fau_fetch_and_add32(priv->fau+qos*4,
+		skb_to_free = cvmx_fau_fetch_and_add32(priv->fau + qos * 4,
 						       MAX_SKB_TO_FREE);
 		skb_to_free = cvm_oct_adjust_skb_to_free(skb_to_free,
-							 priv->fau+qos*4);
-
+							 priv->fau + qos * 4);
 
 		total_freed += skb_to_free;
 		if (skb_to_free > 0) {
@@ -318,37 +317,37 @@ int cvm_oct_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely
 	    ((skb_end_pointer(skb) - fpa_head) < CVMX_FPA_PACKET_POOL_SIZE)) {
 		/*
-		   printk("TX buffer isn't large enough for the FPA\n");
+		 * printk("TX buffer isn't large enough for the FPA\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
 	if (unlikely(skb_shared(skb))) {
 		/*
-		   printk("TX buffer sharing data with someone else\n");
+		 * printk("TX buffer sharing data with someone else\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
 	if (unlikely(skb_cloned(skb))) {
 		/*
-		   printk("TX buffer has been cloned\n");
+		 * printk("TX buffer has been cloned\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
 	if (unlikely(skb_header_cloned(skb))) {
 		/*
-		   printk("TX buffer header has been cloned\n");
+		 * printk("TX buffer header has been cloned\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
 	if (unlikely(skb->destructor)) {
 		/*
-		   printk("TX buffer has a destructor\n");
+		 * printk("TX buffer has a destructor\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
 	if (unlikely(skb_shinfo(skb)->nr_frags)) {
 		/*
-		   printk("TX buffer has fragments\n");
+		 * printk("TX buffer has fragments\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
@@ -356,7 +355,7 @@ int cvm_oct_xmit(struct sk_buff *skb, struct net_device *dev)
 	    (skb->truesize !=
 	     sizeof(*skb) + skb_end_offset(skb))) {
 		/*
-		   printk("TX buffer truesize has been changed\n");
+		 * printk("TX buffer truesize has been changed\n");
 		 */
 		goto dont_put_skbuff_in_hw;
 	}
@@ -430,7 +429,7 @@ dont_put_skbuff_in_hw:
 
 	if (pko_command.s.dontfree) {
 		queue_type = QUEUE_CORE;
-		pko_command.s.reg0 = priv->fau+qos*4;
+		pko_command.s.reg0 = priv->fau + qos * 4;
 	} else {
 		queue_type = QUEUE_HW;
 	}
@@ -443,7 +442,6 @@ dont_put_skbuff_in_hw:
 	/* Drop this packet if we have too many already queued to the HW */
 	if (unlikely(skb_queue_len(&priv->tx_free_list[qos]) >=
 		     MAX_OUT_QUEUE_DEPTH)) {
-
 		if (dev->tx_queue_len != 0) {
 			/* Drop the lock when notifying the core.  */
 			spin_unlock_irqrestore(&priv->tx_free_list[qos].lock,
@@ -549,7 +547,7 @@ int cvm_oct_xmit_pow(struct sk_buff *skb, struct net_device *dev)
 	/* Get a work queue entry */
 	cvmx_wqe_t *work = cvmx_fpa_alloc(CVMX_FPA_WQE_POOL);
 
-	if (unlikely(work == NULL)) {
+	if (unlikely(!work)) {
 		printk_ratelimited("%s: Failed to allocate a work queue entry\n",
 				   dev->name);
 		priv->stats.tx_dropped++;
@@ -559,7 +557,7 @@ int cvm_oct_xmit_pow(struct sk_buff *skb, struct net_device *dev)
 
 	/* Get a packet buffer */
 	packet_buffer = cvmx_fpa_alloc(CVMX_FPA_PACKET_POOL);
-	if (unlikely(packet_buffer == NULL)) {
+	if (unlikely(!packet_buffer)) {
 		printk_ratelimited("%s: Failed to allocate a packet buffer\n",
 				   dev->name);
 		cvmx_fpa_free(work, CVMX_FPA_WQE_POOL, 1);

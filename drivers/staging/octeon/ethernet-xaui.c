@@ -35,7 +35,7 @@ int cvm_oct_xaui_init(struct net_device *dev)
 	struct octeon_ethernet *priv = netdev_priv(dev);
 
 	cvm_oct_common_init(dev);
-	if (!octeon_is_simulation() && priv->phydev == NULL)
+	if (!octeon_is_simulation() && !priv->phydev)
 		priv->poll = cvm_oct_link_poll;
 
 	return 0;
