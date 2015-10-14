@@ -891,7 +891,7 @@ static void fast_csum(__sum16 *csum,
 
 /*
  * Mangle IP address.
- * 	- begin points to the start of the snmp messgae
+ *	- begin points to the start of the snmp messgae
  *      - addr points to the start of the address
  */
 static inline void mangle_address(unsigned char *begin,

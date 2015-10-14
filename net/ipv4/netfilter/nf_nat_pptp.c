@@ -16,7 +16,7 @@
  * (C) 2006-2012 Patrick McHardy <kaber@trash.net>
  *
  * TODO: - NAT to a unique tuple, not to TCP source port
- * 	   (needs netfilter tuple reservation)
+ *	   (needs netfilter tuple reservation)
  */
 
 #include <linux/module.h>

@@ -24,7 +24,7 @@ MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("Xtables: Explicit Congestion Notification (ECN) flag modification");
 
 /* set ECT codepoint from IP header.
- * 	return false if there was an error. */
+ *	return false if there was an error. */
 static inline bool
 set_ect_ip(struct sk_buff *skb, const struct ipt_ECN_info *einfo)
 {
