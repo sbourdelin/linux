@@ -2202,6 +2202,7 @@ int ipath_register_ib_device(struct ipath_devdata *dd)
 	dev->mmap = ipath_mmap;
 	dev->dma_ops = &ipath_dma_mapping_ops;
 	dev->get_port_immutable = ipath_port_immutable;
+	dev->gsi_pkey_index_in_qp = 1;
 
 	snprintf(dev->node_desc, sizeof(dev->node_desc),
 		 IPATH_IDSTR " %s", init_utsname()->nodename);

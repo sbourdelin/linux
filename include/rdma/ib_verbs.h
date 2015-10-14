@@ -1792,6 +1792,8 @@ struct ib_device {
 	__be64			     node_guid;
 	u32			     local_dma_lkey;
 	u16                          is_switch:1;
+	/* The device reads the pkey_index from the QP in GSI (QP1) QPs. */
+	u16			     gsi_pkey_index_in_qp:1;
 	u8                           node_type;
 	u8                           phys_port_cnt;
 
