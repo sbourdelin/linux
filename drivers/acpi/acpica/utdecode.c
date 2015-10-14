@@ -114,7 +114,7 @@ const char *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] = {
 	"PCC"			/* 0x0A */
 };
 
-char *acpi_ut_get_region_name(u8 space_id)
+const char *acpi_ut_get_region_name(u8 space_id)
 {
 
 	if (space_id >= ACPI_USER_REGION_BEGIN) {
@@ -127,7 +127,7 @@ char *acpi_ut_get_region_name(u8 space_id)
 		return ("InvalidSpaceId");
 	}
 
-	return (ACPI_CAST_PTR(char, acpi_gbl_region_types[space_id]));
+	return (ACPI_CAST_PTR(const char, acpi_gbl_region_types[space_id]));
 }
 
 /*******************************************************************************
@@ -152,14 +152,14 @@ static const char *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] = {
 	"RealTimeClock",
 };
 
-char *acpi_ut_get_event_name(u32 event_id)
+const char *acpi_ut_get_event_name(u32 event_id)
 {
 
 	if (event_id > ACPI_EVENT_MAX) {
 		return ("InvalidEventID");
 	}
 
-	return (ACPI_CAST_PTR(char, acpi_gbl_event_types[event_id]));
+	return (ACPI_CAST_PTR(const char, acpi_gbl_event_types[event_id]));
 }
 
 /*******************************************************************************
@@ -220,17 +220,17 @@ static const char *acpi_gbl_ns_type_names[] = {
 	/* 30 */ "Invalid"
 };
 
-char *acpi_ut_get_type_name(acpi_object_type type)
+const char *acpi_ut_get_type_name(acpi_object_type type)
 {
 
 	if (type > ACPI_TYPE_INVALID) {
-		return (ACPI_CAST_PTR(char, acpi_gbl_bad_type));
+		return (ACPI_CAST_PTR(const char, acpi_gbl_bad_type));
 	}
 
-	return (ACPI_CAST_PTR(char, acpi_gbl_ns_type_names[type]));
+	return (ACPI_CAST_PTR(const char, acpi_gbl_ns_type_names[type]));
 }
 
-char *acpi_ut_get_object_type_name(union acpi_operand_object *obj_desc)
+const char *acpi_ut_get_object_type_name(union acpi_operand_object *obj_desc)
 {
 
 	if (!obj_desc) {
@@ -318,7 +318,7 @@ static const char *acpi_gbl_desc_type_names[] = {
 	/* 15 */ "Node"
 };
 
-char *acpi_ut_get_descriptor_name(void *object)
+const char *acpi_ut_get_descriptor_name(void *object)
 {
 
 	if (!object) {
@@ -329,7 +329,7 @@ char *acpi_ut_get_descriptor_name(void *object)
 		return ("Not a Descriptor");
 	}
 
-	return (ACPI_CAST_PTR(char,
+	return (ACPI_CAST_PTR(const char,
 			      acpi_gbl_desc_type_names[ACPI_GET_DESCRIPTOR_TYPE
 						       (object)]));
 
@@ -400,7 +400,7 @@ const char *acpi_ut_get_reference_name(union acpi_operand_object *object)
 
 /* Names for internal mutex objects, used for debug output */
 
-static char *acpi_gbl_mutex_names[ACPI_NUM_MUTEX] = {
+static const char *acpi_gbl_mutex_names[ACPI_NUM_MUTEX] = {
 	"ACPI_MTX_Interpreter",
 	"ACPI_MTX_Namespace",
 	"ACPI_MTX_Tables",
@@ -411,7 +411,7 @@ static char *acpi_gbl_mutex_names[ACPI_NUM_MUTEX] = {
 	"ACPI_MTX_CommandReady"
 };
 
-char *acpi_ut_get_mutex_name(u32 mutex_id)
+const char *acpi_ut_get_mutex_name(u32 mutex_id)
 {
 
 	if (mutex_id > ACPI_MAX_MUTEX) {

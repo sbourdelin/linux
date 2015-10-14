@@ -35,8 +35,10 @@
 
 #define ACPI_MAX_TABLES		128
 
-static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
-static char *mps_inti_flags_trigger[] = { "dfl", "edge", "res", "level" };
+static const char * const mps_inti_flags_polarity[] = {
+	"dfl", "high", "res", "low" };
+static const char * const mps_inti_flags_trigger[] = {
+	"dfl", "edge", "res", "level" };
 
 static struct acpi_table_desc initial_tables[ACPI_MAX_TABLES] __initdata;
 

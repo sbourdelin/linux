@@ -48,7 +48,7 @@
 ACPI_MODULE_NAME("uthex")
 
 /* Hex to ASCII conversion table */
-static char acpi_gbl_hex_to_ascii[] = {
+static const char acpi_gbl_hex_to_ascii[] = {
 	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D',
 	    'E', 'F'
 };
@@ -67,7 +67,7 @@ static char acpi_gbl_hex_to_ascii[] = {
  *
  ******************************************************************************/
 
-char acpi_ut_hex_to_ascii_char(u64 integer, u32 position)
+const char acpi_ut_hex_to_ascii_char(u64 integer, u32 position)
 {
 
 	return (acpi_gbl_hex_to_ascii[(integer >> position) & 0xF]);
