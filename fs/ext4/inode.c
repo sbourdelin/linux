@@ -643,7 +643,7 @@ found:
 		if ((flags & EXT4_GET_BLOCKS_PRE_IO) &&
 		    ext4_es_lookup_extent(inode, map->m_lblk, &es)) {
 			if (ext4_es_is_written(&es))
-				goto has_zeroout;
+				goto out_sem;
 		}
 		status = map->m_flags & EXT4_MAP_UNWRITTEN ?
 				EXTENT_STATUS_UNWRITTEN : EXTENT_STATUS_WRITTEN;
@@ -654,11 +654,24 @@ found:
 			status |= EXTENT_STATUS_DELAYED;
 		ret = ext4_es_insert_extent(inode, map->m_lblk, map->m_len,
 					    map->m_pblk, status);
-		if (ret < 0)
+		if (ret < 0) {
 			retval = ret;
+			goto out_sem;
+		}
+
+		if (flags & EXT4_GET_BLOCKS_ZERO &&
+		    map->m_flags & EXT4_MAP_MAPPED &&
+		    map->m_flags & EXT4_MAP_NEW) {
+			ret = ext4_issue_zeroout(inode, map->m_lblk,
+						 map->m_pblk, map->m_len);
+			if (ret) {
+				retval = ret;
+				goto out_sem;
+			}
+		}
 	}
 
-has_zeroout:
+out_sem:
 	up_write((&EXT4_I(inode)->i_data_sem));
 	if (retval > 0 && map->m_flags & EXT4_MAP_MAPPED) {
 		ret = check_block_validity(inode, map);
@@ -3041,6 +3054,7 @@ int ext4_get_block_dax(struct inode *inode, sector_t iblock,
 		   struct buffer_head *bh_result, int create)
 {
 	int flags = EXT4_GET_BLOCKS_PRE_IO | EXT4_GET_BLOCKS_UNWRIT_EXT;
+
 	if (create)
 		flags |= EXT4_GET_BLOCKS_CREATE;
 	ext4_debug("ext4_get_block_dax: inode %lu, create flag %d\n",
