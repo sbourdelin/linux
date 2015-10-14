@@ -4152,6 +4152,7 @@ static int perf_event_set_output(struct perf_event *event,
 				 struct perf_event *output_event);
 static int perf_event_set_filter(struct perf_event *event, void __user *arg);
 static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
+static int perf_event_set_sample_enabler(struct perf_event *event, u32 enabler_fd);
 
 static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned long arg)
 {
@@ -4207,6 +4208,9 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
 
 	case PERF_EVENT_IOC_SET_BPF:
 		return perf_event_set_bpf_prog(event, arg);
+
+	case PERF_EVENT_IOC_SET_ENABLER:
+		return perf_event_set_sample_enabler(event, arg);
 
 	default:
 		return -ENOTTY;
@@ -6337,7 +6341,7 @@ static int __perf_event_overflow(struct perf_event *event,
 		irq_work_queue(&event->pending);
 	}
 
-	if (!atomic_read(&event->sample_disable))
+	if (!atomic_read(event->p_sample_disable))
 		return ret;
 
 	if (event->overflow_handler)
@@ -6989,6 +6993,35 @@ static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd)
 	return 0;
 }
 
+static int perf_event_set_sample_enabler(struct perf_event *event, u32 enabler_fd)
+{
+	int ret;
+	struct fd enabler;
+	struct perf_event *enabler_event;
+
+	if (enabler_fd == -1)
+		return 0;
+
+	ret = perf_fget_light(enabler_fd, &enabler);
+	if (ret)
+		return ret;
+	enabler_event = enabler.file->private_data;
+	if (event == enabler_event) {
+		fdput(enabler);
+		return 0;
+	}
+
+	/* they must be on the same PMU*/
+	if (event->pmu != enabler_event->pmu) {
+		fdput(enabler);
+		return -EINVAL;
+	}
+
+	event->p_sample_disable = &enabler_event->sample_disable;
+	fdput(enabler);
+	return 0;
+}
+
 static void perf_event_free_bpf_prog(struct perf_event *event)
 {
 	struct bpf_prog *prog;
@@ -7019,6 +7052,11 @@ static void perf_event_free_filter(struct perf_event *event)
 }
 
 static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd)
+{
+	return -ENOENT;
+}
+
+static int perf_event_set_sample_enabler(struct perf_event *event, u32 group_fd)
 {
 	return -ENOENT;
 }
@@ -7718,6 +7756,8 @@ static void perf_event_check_sample_flag(struct perf_event *event)
 		atomic_set(&event->sample_disable, 0);
 	else
 		atomic_set(&event->sample_disable, 1);
+
+	event->p_sample_disable = &event->sample_disable;
 }
 
 /*

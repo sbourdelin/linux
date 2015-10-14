@@ -221,8 +221,11 @@ static u64 bpf_perf_event_sample_control(u64 r1, u64 index, u64 flag, u64 r4, u6
 	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	struct perf_event *event;
 
-	if (unlikely(index >= array->map.max_entries))
+	if (unlikely(index > array->map.max_entries))
 		return -E2BIG;
+
+	if (index == array->map.max_entries)
+		index = 0;
 
 	event = (struct perf_event *)array->ptrs[index];
 	if (!event)

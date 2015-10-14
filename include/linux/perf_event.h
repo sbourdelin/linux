@@ -473,6 +473,7 @@ struct perf_event {
 
 	atomic_t			event_limit;
 	atomic_t			sample_disable;
+	atomic_t			*p_sample_disable;
 
 	void (*destroy)(struct perf_event *);
 	struct rcu_head			rcu_head;
