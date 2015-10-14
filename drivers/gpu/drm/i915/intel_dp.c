@@ -4785,6 +4785,35 @@ intel_dp_power_put(struct intel_dp *dp,
 	intel_display_power_put(to_i915(encoder->base.dev), power_domain);
 }
 
+static bool intel_dp_upfront_link_train(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct drm_device *dev = intel_encoder->base.dev;
+	struct intel_crtc *intel_crtc = crtc ? to_intel_crtc(crtc) : NULL;
+
+	/*
+	 * On hotplug cases, we call _upfront_link_train directly.
+	 * In connected boot scenarios (boot with {MIPI/eDP} + DP),
+	 * BIOS typically brings up DP. Hence, we disable the crtc
+	 * to do _upfront_link_training. It gets re-enabled as part of
+	 * subsequent modeset.
+	 */
+	if (intel_encoder->connectors_active && crtc && crtc->enabled) {
+		DRM_DEBUG_KMS("Disabling crtc %c for upfront link training\n",
+				pipe_name(intel_crtc->pipe));
+		intel_crtc_control(crtc, false);
+	}
+
+	if (HAS_DDI(dev))
+		return intel_ddi_upfront_link_train(dev, intel_dp, intel_crtc);
+
+	/* Not a supported platform. Assume we don't need upfront_train */
+	return true;
+}
+
+
 static enum drm_connector_status
 intel_dp_detect(struct drm_connector *connector, bool force)
 {
@@ -4794,7 +4823,7 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	struct drm_device *dev = connector->dev;
 	enum drm_connector_status status;
 	enum intel_display_power_domain power_domain;
-	bool ret;
+	bool ret, do_upfront_link_train;
 	u8 sink_irq_vector;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
@@ -4852,6 +4881,16 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
 	}
 
+	/* Do not do upfront link train, if it is a compliance request */
+	do_upfront_link_train =
+		intel_encoder->type == INTEL_OUTPUT_DISPLAYPORT &&
+		intel_dp->compliance_test_type != DP_TEST_LINK_TRAINING;
+
+	if (do_upfront_link_train) {
+		ret = intel_dp_upfront_link_train(intel_dp);
+		if (!ret)
+			status = connector_status_disconnected;
+	}
 out:
 	intel_dp_power_put(intel_dp, power_domain);
 	return status;
