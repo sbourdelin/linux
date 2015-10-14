@@ -367,8 +367,8 @@ struct net_device *GetIfHandler(u8 *pMacHeader)
 	Bssid1 = pMacHeader + 4;
 
 	for (i = 0; i < wl->vif_num; i++)
-		if (!memcmp(Bssid1, wl->vif[i].aBSSID, ETH_ALEN) ||
-		    !memcmp(Bssid, wl->vif[i].aBSSID, ETH_ALEN))
+		if (!memcmp(Bssid1, wl->vif[i].bssid, ETH_ALEN) ||
+		    !memcmp(Bssid, wl->vif[i].bssid, ETH_ALEN))
 			return wl->vif[i].wilc_netdev;
 
 	PRINT_INFO(INIT_DBG, "Invalide handle\n");
@@ -377,8 +377,8 @@ struct net_device *GetIfHandler(u8 *pMacHeader)
 	Bssid  = pMacHeader + 18;
 	Bssid1 = pMacHeader + 12;
 	for (i = 0; i < wl->vif_num; i++)
-		if (!memcmp(Bssid1, wl->vif[i].aBSSID, ETH_ALEN) ||
-		    !memcmp(Bssid, wl->vif[i].aBSSID, ETH_ALEN))
+		if (!memcmp(Bssid1, wl->vif[i].bssid, ETH_ALEN) ||
+		    !memcmp(Bssid, wl->vif[i].bssid, ETH_ALEN))
 			return wl->vif[i].wilc_netdev;
 
 	PRINT_INFO(INIT_DBG, "\n");
@@ -393,7 +393,7 @@ int linux_wlan_set_bssid(struct net_device *wilc_netdev, u8 *pBSSID)
 	PRINT_D(INIT_DBG, "set bssid on[%p]\n", wilc_netdev);
 	for (i = 0; i < wl->vif_num; i++)
 		if (wl->vif[i].wilc_netdev == wilc_netdev) {
-			memcpy(wl->vif[i].aBSSID, pBSSID, 6);
+			memcpy(wl->vif[i].bssid, pBSSID, 6);
 			ret = 0;
 			break;
 		}
@@ -409,7 +409,7 @@ int linux_wlan_get_num_conn_ifcs(void)
 	u8 ret_val = 0;
 
 	for (i = 0; i < wl->vif_num; i++)
-		if (memcmp(wl->vif[i].aBSSID, null_bssid, 6))
+		if (memcmp(wl->vif[i].bssid, null_bssid, 6))
 			ret_val++;
 
 	return ret_val;
@@ -1470,7 +1470,7 @@ int mac_xmit(struct sk_buff *skb, struct net_device *ndev)
 	PRINT_D(TX_DBG, "Adding tx packet to TX Queue\n");
 	nic->netstats.tx_packets++;
 	nic->netstats.tx_bytes += tx_data->size;
-	tx_data->pBssid = wl->vif[nic->u8IfIdx].aBSSID;
+	tx_data->pBssid = wl->vif[nic->u8IfIdx].bssid;
 	QueueCount = wilc_wlan_txq_add_net_pkt((void *)tx_data, tx_data->buff,
 					       tx_data->size,
 					       linux_wlan_tx_complete);

@@ -2572,7 +2572,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 
 		if (wl->initialized) {
 			host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
-						      wl->vif[0].aBSSID,
+						      wl->vif[0].bssid,
 						      TID);
 			/* ensure that the message Q is empty */
 			host_int_wait_msg_queue_idle();
@@ -2649,7 +2649,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		PRINT_D(HOSTAPD_DBG, "Interface type = NL80211_IFTYPE_P2P_CLIENT\n");
 
 		host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
-					      wl->vif[0].aBSSID, TID);
+					      wl->vif[0].bssid, TID);
 
 		dev->ieee80211_ptr->iftype = type;
 		priv->wdev->iftype = type;
@@ -2760,7 +2760,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		/*hWaitResponse semaphore, which allows previous config*/
 		/*packets to actually take action on old FW*/
 		host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
-					      wl->vif[0].aBSSID,
+					      wl->vif[0].bssid,
 					      TID);
 		bEnablePS = false;
 		PRINT_D(HOSTAPD_DBG, "Interface type = NL80211_IFTYPE_GO\n");
