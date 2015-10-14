@@ -1949,6 +1949,25 @@ static void dwc2_hc_chhltd_intr(struct dwc2_hsotg *hsotg,
 	}
 }
 
+/*
+ * Check if the given qtd is still the top of the list (and thus valid).
+ *
+ * If dwc2_hcd_qtd_unlink_and_free() has been called since we grabbed
+ * the qtd from the top of the list, this will return NULL.  Otherwise
+ * it will be passed back qtd.
+ */
+struct dwc2_qtd *dwc2_check_qtd_still_ok(struct dwc2_qtd *qtd,
+					    struct list_head *qtd_list)
+{
+	struct dwc2_qtd *cur_head;
+
+	cur_head = list_first_entry(qtd_list, struct dwc2_qtd, qtd_list_entry);
+	if (cur_head == qtd)
+		return qtd;
+
+	return NULL;
+}
+
 /* Handles interrupt for a specific Host Channel */
 static void dwc2_hc_n_intr(struct dwc2_hsotg *hsotg, int chnum)
 {
@@ -2031,26 +2050,67 @@ static void dwc2_hc_n_intr(struct dwc2_hsotg *hsotg, int chnum)
 		 */
 		hcint &= ~HCINTMSK_NYET;
 	}
-	if (hcint & HCINTMSK_CHHLTD)
+
+	if (hcint & HCINTMSK_CHHLTD) {
+		hcint &= ~HCINTMSK_CHHLTD;
 		dwc2_hc_chhltd_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_AHBERR)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_AHBERR) {
+		hcint &= ~HCINTMSK_AHBERR;
 		dwc2_hc_ahberr_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_STALL)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_STALL) {
+		hcint &= ~HCINTMSK_STALL;
 		dwc2_hc_stall_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_NAK)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_NAK) {
+		hcint &= ~HCINTMSK_NAK;
 		dwc2_hc_nak_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_ACK)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_ACK) {
+		hcint &= ~HCINTMSK_ACK;
 		dwc2_hc_ack_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_NYET)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_NYET) {
+		hcint &= ~HCINTMSK_NYET;
 		dwc2_hc_nyet_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_XACTERR)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_XACTERR) {
+		hcint &= ~HCINTMSK_XACTERR;
 		dwc2_hc_xacterr_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_BBLERR)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_BBLERR) {
+		hcint &= ~HCINTMSK_BBLERR;
 		dwc2_hc_babble_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_FRMOVRUN)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_FRMOVRUN) {
+		hcint &= ~HCINTMSK_FRMOVRUN;
 		dwc2_hc_frmovrun_intr(hsotg, chan, chnum, qtd);
-	if (hcint & HCINTMSK_DATATGLERR)
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
+	if (hcint & HCINTMSK_DATATGLERR) {
+		hcint &= ~HCINTMSK_DATATGLERR;
 		dwc2_hc_datatglerr_intr(hsotg, chan, chnum, qtd);
+		if (hcint)
+			qtd = dwc2_check_qtd_still_ok(qtd, &chan->qh->qtd_list);
+	}
 
 	chan->hcint = 0;
 }
