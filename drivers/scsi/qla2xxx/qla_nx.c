@@ -347,31 +347,33 @@ char *qdev_state(uint32_t dev_state)
 }
 
 /*
- * In: 'off_in' is offset from CRB space in 128M pci map
- * Out: 'off_out' is 2M pci map addr
+ * In: 'off' is offset from CRB space in 128M pci map
+ * Out: 'off' is 2M pci map addr
  * side effect: lock crb window
  */
 static void
-qla82xx_pci_set_crbwindow_2M(struct qla_hw_data *ha, ulong off_in,
-			     void __iomem **off_out)
+qla82xx_pci_set_crbwindow_2M(struct qla_hw_data *ha, ulong *off)
 {
 	u32 win_read;
 	scsi_qla_host_t *vha = pci_get_drvdata(ha->pdev);
 
-	ha->crb_win = CRB_HI(off_in);
-	writel(ha->crb_win, CRB_WINDOW_2M + ha->nx_pcibase);
+	ha->crb_win = CRB_HI(*off);
+	writel(ha->crb_win,
+	    (void __iomem *)(CRB_WINDOW_2M + ha->nx_pcibase));
 
 	/* Read back value to make sure write has gone through before trying
 	 * to use it.
 	 */
-	win_read = RD_REG_DWORD(CRB_WINDOW_2M + ha->nx_pcibase);
+	win_read = RD_REG_DWORD((void __iomem *)
+	    (CRB_WINDOW_2M + ha->nx_pcibase));
 	if (win_read != ha->crb_win) {
 		ql_dbg(ql_dbg_p3p, vha, 0xb000,
 		    "%s: Written crbwin (0x%x) "
 		    "!= Read crbwin (0x%x), off=0x%lx.\n",
-		    __func__, ha->crb_win, win_read, off_in);
+		    __func__, ha->crb_win, win_read, *off);
 	}
-	*off_out = (off_in & MASK(16)) + CRB_INDIRECT_2M + ha->nx_pcibase;
+	*off = (*off & MASK(16)) + CRB_INDIRECT_2M +
+	    (unsigned long)ha->nx_pcibase;
 }
 
 static inline unsigned long
@@ -416,30 +418,30 @@ qla82xx_pci_set_crbwindow(struct qla_hw_data *ha, u64 off)
 }
 
 static int
-qla82xx_pci_get_crb_addr_2M(struct qla_hw_data *ha, ulong off_in,
-			    void __iomem **off_out)
+qla82xx_pci_get_crb_addr_2M(struct qla_hw_data *ha, ulong *off)
 {
 	struct crb_128M_2M_sub_block_map *m;
 
-	if (off_in >= QLA82XX_CRB_MAX)
+	if (*off >= QLA82XX_CRB_MAX)
 		return -1;
 
-	if (off_in >= QLA82XX_PCI_CAMQM && off_in < QLA82XX_PCI_CAMQM_2M_END) {
-		*off_out = (off_in - QLA82XX_PCI_CAMQM) +
-		    QLA82XX_PCI_CAMQM_2M_BASE + ha->nx_pcibase;
+	if (*off >= QLA82XX_PCI_CAMQM && (*off < QLA82XX_PCI_CAMQM_2M_END)) {
+		*off = (*off - QLA82XX_PCI_CAMQM) +
+		    QLA82XX_PCI_CAMQM_2M_BASE + (unsigned long)ha->nx_pcibase;
 		return 0;
 	}
 
-	if (off_in < QLA82XX_PCI_CRBSPACE)
+	if (*off < QLA82XX_PCI_CRBSPACE)
 		return -1;
 
-	*off_out = (void __iomem *)(off_in - QLA82XX_PCI_CRBSPACE);
+	*off -= QLA82XX_PCI_CRBSPACE;
 
 	/* Try direct map */
-	m = &crb_128M_2M_map[CRB_BLK(off_in)].sub_block[CRB_SUBBLK(off_in)];
+	m = &crb_128M_2M_map[CRB_BLK(*off)].sub_block[CRB_SUBBLK(*off)];
 
-	if (m->valid && (m->start_128M <= off_in) && (m->end_128M > off_in)) {
-		*off_out = off_in + m->start_2M - m->start_128M + ha->nx_pcibase;
+	if (m->valid && (m->start_128M <= *off) && (m->end_128M > *off)) {
+		*off = *off + m->start_2M - m->start_128M +
+		    (unsigned long) ha->nx_pcibase;
 		return 0;
 	}
 	/* Not in direct map, use crb window */
@@ -465,13 +467,12 @@ static int qla82xx_crb_win_lock(struct qla_hw_data *ha)
 }
 
 int
-qla82xx_wr_32(struct qla_hw_data *ha, ulong off_in, u32 data)
+qla82xx_wr_32(struct qla_hw_data *ha, ulong off, u32 data)
 {
-	void __iomem *off;
 	unsigned long flags = 0;
 	int rv;
 
-	rv = qla82xx_pci_get_crb_addr_2M(ha, off_in, &off);
+	rv = qla82xx_pci_get_crb_addr_2M(ha, &off);
 
 	BUG_ON(rv == -1);
 
@@ -480,7 +481,7 @@ qla82xx_wr_32(struct qla_hw_data *ha, ulong off_in, u32 data)
 		write_lock_irqsave(&ha->hw_lock, flags);
 #endif
 		qla82xx_crb_win_lock(ha);
-		qla82xx_pci_set_crbwindow_2M(ha, off_in, &off);
+		qla82xx_pci_set_crbwindow_2M(ha, &off);
 	}
 
 	writel(data, (void __iomem *)off);
@@ -495,14 +496,13 @@ qla82xx_wr_32(struct qla_hw_data *ha, ulong off_in, u32 data)
 }
 
 int
-qla82xx_rd_32(struct qla_hw_data *ha, ulong off_in)
+qla82xx_rd_32(struct qla_hw_data *ha, ulong off)
 {
-	void __iomem *off;
 	unsigned long flags = 0;
 	int rv;
 	u32 data;
 
-	rv = qla82xx_pci_get_crb_addr_2M(ha, off_in, &off);
+	rv = qla82xx_pci_get_crb_addr_2M(ha, &off);
 
 	BUG_ON(rv == -1);
 
@@ -511,9 +511,9 @@ qla82xx_rd_32(struct qla_hw_data *ha, ulong off_in)
 		write_lock_irqsave(&ha->hw_lock, flags);
 #endif
 		qla82xx_crb_win_lock(ha);
-		qla82xx_pci_set_crbwindow_2M(ha, off_in, &off);
+		qla82xx_pci_set_crbwindow_2M(ha, &off);
 	}
-	data = RD_REG_DWORD(off);
+	data = RD_REG_DWORD((void __iomem *)off);
 
 	if (rv == 1) {
 		qla82xx_rd_32(ha, QLA82XX_PCIE_REG(PCIE_SEM7_UNLOCK));
