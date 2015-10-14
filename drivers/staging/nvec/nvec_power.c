@@ -208,7 +208,8 @@ static int nvec_power_bat_notifier(struct notifier_block *nb,
 		memcpy(power->bat_type, &res->plc, res->length - 2);
 		power->bat_type[res->length - 2] = '\0';
 		/* this differs a little from the spec
-		   fill in more if you find some */
+		 * fill in more if you find some
+		 */
 		if (!strncmp(power->bat_type, "Li", 30))
 			power->bat_type_enum = POWER_SUPPLY_TECHNOLOGY_LION;
 		else
@@ -361,7 +362,8 @@ static void nvec_power_poll(struct work_struct *work)
 	msleep(100);
 
 /* select a battery request function via round robin
-   doing it all at once seems to overload the power supply */
+ * doing it all at once seems to overload the power supply
+ */
 	buf[0] = NVEC_BAT;
 	buf[1] = bat_iter[counter++];
 	nvec_write_async(power->nvec, buf, 2);
