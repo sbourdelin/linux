@@ -1482,9 +1482,6 @@ int of_cpumask_init_opp_table(cpumask_var_t cpumask)
 
 		ret = of_init_opp_table(cpu_dev);
 		if (ret) {
-			pr_err("%s: couldn't find opp table for cpu:%d, %d\n",
-			       __func__, cpu, ret);
-
 			/* Free all other OPPs */
 			of_cpumask_free_opp_table(cpumask);
 			break;
