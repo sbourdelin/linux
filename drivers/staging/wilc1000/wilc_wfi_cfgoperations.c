@@ -2419,7 +2419,7 @@ void wilc_mgmt_frame_register(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	}
 	/*If mac is closed, then return*/
-	if (!wl->wilc1000_initialized) {
+	if (!wl->initialized) {
 		PRINT_D(GENERIC_DBG, "Return since mac is closed\n");
 		return;
 	}
@@ -2572,7 +2572,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		interface_type = nic->iftype;
 		nic->iftype = STATION_MODE;
 
-		if (wl->wilc1000_initialized) {
+		if (wl->initialized) {
 			host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
 						      wl->strInterfaceInfo[0].aBSSID,
 						      TID);
@@ -2630,7 +2630,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 					(struct key_params *)(&g_key_gtk_params));
 			}
 
-			if (wl->wilc1000_initialized)
+			if (wl->initialized)
 				for (i = 0; i < num_reg_frame; i++) {
 					PRINT_D(INIT_DBG, "Frame registering Type: %x - Reg: %d\n", nic->g_struct_frame_reg[i].frame_type,
 						nic->g_struct_frame_reg[i].reg);
@@ -2660,7 +2660,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		PRINT_D(HOSTAPD_DBG, "Downloading P2P_CONCURRENCY_FIRMWARE\n");
 		nic->iftype = CLIENT_MODE;
 
-		if (wl->wilc1000_initialized) {
+		if (wl->initialized) {
 			/* ensure that the message Q is empty */
 			host_int_wait_msg_queue_idle();
 
@@ -2714,7 +2714,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 			refresh_scan(priv, 1, true);
 			Set_machw_change_vir_if(false);
 
-			if (wl->wilc1000_initialized)
+			if (wl->initialized)
 				for (i = 0; i < num_reg_frame; i++) {
 					PRINT_D(INIT_DBG, "Frame registering Type: %x - Reg: %d\n", nic->g_struct_frame_reg[i].frame_type,
 						nic->g_struct_frame_reg[i].reg);
@@ -2736,9 +2736,8 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		PRINT_D(HOSTAPD_DBG, "Downloading AP firmware\n");
 		linux_wlan_get_firmware(nic);
 		/*If wilc is running, then close-open to actually get new firmware running (serves P2P)*/
-		if (wl->wilc1000_initialized) {
+		if (wl->initialized) {
 			nic->iftype = AP_MODE;
-			wl->wilc1000_initialized = 1;
 			mac_close(dev);
 			mac_open(dev);
 
@@ -2829,7 +2828,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 				(struct key_params *)(&g_key_gtk_params));
 		}
 
-		if (wl->wilc1000_initialized)
+		if (wl->initialized)
 			for (i = 0; i < num_reg_frame; i++) {
 				PRINT_D(INIT_DBG, "Frame registering Type: %x - Reg: %d\n", nic->g_struct_frame_reg[i].frame_type,
 					nic->g_struct_frame_reg[i].reg);
