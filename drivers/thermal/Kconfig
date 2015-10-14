@@ -252,7 +252,7 @@ config TEGRA_SOCTHERM
 
 config DB8500_CPUFREQ_COOLING
 	tristate "DB8500 cpufreq cooling"
-	depends on ARCH_U8500
+	depends on ARCH_U8500 || COMPILE_TEST
 	depends on CPU_THERMAL
 	default y
 	help
@@ -309,7 +309,7 @@ config INTEL_SOC_DTS_THERMAL
 
 config INTEL_QUARK_DTS_THERMAL
 	tristate "Intel Quark DTS thermal driver"
-	depends on X86_INTEL_QUARK
+	depends on X86_INTEL_QUARK || COMPILE_TEST
 	help
 	  Enable this to register Intel Quark SoC (e.g. X1000) platform digital
 	  temperature sensor (DTS). For X1000 SoC, it has one on-die DTS.
