@@ -11,6 +11,7 @@
 #define _ZCOMP_H_
 
 #include <linux/mutex.h>
+#include <crypto/compress.h>
 
 struct zcomp_strm {
 	/* compression/decompression buffer */
@@ -25,24 +26,10 @@ struct zcomp_strm {
 	struct list_head list;
 };
 
-/* static compression backend */
-struct zcomp_backend {
-	int (*compress)(const unsigned char *src, unsigned char *dst,
-			size_t *dst_len, void *private);
-
-	int (*decompress)(const unsigned char *src, size_t src_len,
-			unsigned char *dst);
-
-	void *(*create)(void);
-	void (*destroy)(void *private);
-
-	const char *name;
-};
-
 /* dynamic per-device compression frontend */
 struct zcomp {
 	void *stream;
-	struct zcomp_backend *backend;
+	struct crypto_ccomp *tfm;
 
 	struct zcomp_strm *(*strm_find)(struct zcomp *comp);
 	void (*strm_release)(struct zcomp *comp, struct zcomp_strm *zstrm);
@@ -61,14 +48,14 @@ struct zcomp_strm *zcomp_compress_begin(struct zcomp *comp);
 void zcomp_compress_end(struct zcomp *comp, struct zcomp_strm *zstrm);
 
 int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
-		const unsigned char *src, size_t *dst_len);
+		const unsigned char *src, unsigned int *dst_len);
 
 struct zcomp_strm *zcomp_decompress_begin(struct zcomp *comp);
 void zcomp_decompress_end(struct zcomp *comp, struct zcomp_strm *zstrm);
 
 int zcomp_decompress(struct zcomp *comp, struct zcomp_strm *zstrm,
 		const unsigned char *src,
-		size_t src_len, unsigned char *dst);
+		unsigned int src_len, unsigned char *dst);
 
 bool zcomp_set_max_streams(struct zcomp *comp, int num_strm);
 #endif /* _ZCOMP_H_ */

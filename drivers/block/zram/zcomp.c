@@ -15,10 +15,6 @@
 #include <linux/sched.h>
 
 #include "zcomp.h"
-#include "zcomp_lzo.h"
-#ifdef CONFIG_ZRAM_LZ4_COMPRESS
-#include "zcomp_lz4.h"
-#endif
 
 /*
  * single zcomp_strm backend
@@ -43,19 +39,20 @@ struct zcomp_strm_multi {
 	wait_queue_head_t strm_wait;
 };
 
-static struct zcomp_backend *backends[] = {
-	&zcomp_lzo,
+static const char * const backends[] = {
+	"lzo",
 #ifdef CONFIG_ZRAM_LZ4_COMPRESS
-	&zcomp_lz4,
+	"lz4",
 #endif
 	NULL
 };
 
-static struct zcomp_backend *find_backend(const char *compress)
+static const char *find_backend(const char *compress)
 {
 	int i = 0;
 	while (backends[i]) {
-		if (sysfs_streq(compress, backends[i]->name))
+		if (sysfs_streq(compress, backends[i]) &&
+			crypto_has_comp(backends[i], 0, 0))
 			break;
 		i++;
 	}
@@ -65,7 +62,7 @@ static struct zcomp_backend *find_backend(const char *compress)
 static void zcomp_strm_free(struct zcomp *comp, struct zcomp_strm *zstrm)
 {
 	if (zstrm->private)
-		comp->backend->destroy(zstrm->private);
+		crypto_ccomp_free_context(comp->tfm, zstrm->private);
 	free_pages((unsigned long)zstrm->buffer, 1);
 	kfree(zstrm);
 }
@@ -80,7 +77,13 @@ static struct zcomp_strm *zcomp_strm_alloc(struct zcomp *comp)
 	if (!zstrm)
 		return NULL;
 
-	zstrm->private = comp->backend->create();
+	zstrm->private = crypto_ccomp_alloc_context(comp->tfm);
+	if (IS_ERR(zstrm->private)) {
+		zstrm->private = NULL;
+		zcomp_strm_free(comp, zstrm);
+		return NULL;
+	}
+
 	/*
 	 * allocate 2 pages. 1 for compressed data, plus 1 extra for the
 	 * case when compressed size is larger than the original one
@@ -274,12 +277,12 @@ ssize_t zcomp_available_show(const char *comp, char *buf)
 	int i = 0;
 
 	while (backends[i]) {
-		if (!strcmp(comp, backends[i]->name))
+		if (!strcmp(comp, backends[i]))
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
-					"[%s] ", backends[i]->name);
+					"[%s] ", backends[i]);
 		else
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
-					"%s ", backends[i]->name);
+					"%s ", backends[i]);
 		i++;
 	}
 	sz += scnprintf(buf + sz, PAGE_SIZE - sz, "\n");
@@ -320,7 +323,10 @@ void zcomp_compress_end(struct zcomp *comp, struct zcomp_strm *zstrm)
 /* May return NULL, may sleep */
 struct zcomp_strm *zcomp_decompress_begin(struct zcomp *comp)
 {
-	return NULL;
+	if (crypto_ccomp_decomp_noctx(comp->tfm))
+		return NULL;
+
+	return zcomp_strm_find(comp);
 }
 
 void zcomp_decompress_end(struct zcomp *comp, struct zcomp_strm *zstrm)
@@ -330,22 +336,29 @@ void zcomp_decompress_end(struct zcomp *comp, struct zcomp_strm *zstrm)
 }
 
 int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
-		const unsigned char *src, size_t *dst_len)
+		const unsigned char *src, unsigned int *dst_len)
 {
-	return comp->backend->compress(src, zstrm->buffer, dst_len,
-			zstrm->private);
+	*dst_len = PAGE_SIZE << 1;
+
+	return crypto_ccomp_compress(comp->tfm, src, PAGE_SIZE,
+			zstrm->buffer, dst_len, zstrm->private);
 }
 
 int zcomp_decompress(struct zcomp *comp, struct zcomp_strm *zstrm,
 		const unsigned char *src,
-		size_t src_len, unsigned char *dst)
+		unsigned int src_len, unsigned char *dst)
 {
-	return comp->backend->decompress(src, src_len, dst);
+	unsigned int size = PAGE_SIZE;
+	void *private = zstrm ? zstrm->private : NULL;
+
+	return crypto_ccomp_decompress(comp->tfm, src, src_len,
+					dst, &size, private);
 }
 
 void zcomp_destroy(struct zcomp *comp)
 {
 	comp->destroy(comp);
+	crypto_free_ccomp(comp->tfm);
 	kfree(comp);
 }
 
@@ -360,7 +373,7 @@ void zcomp_destroy(struct zcomp *comp)
 struct zcomp *zcomp_create(const char *compress, int max_strm)
 {
 	struct zcomp *comp;
-	struct zcomp_backend *backend;
+	const char *backend;
 	int error;
 
 	backend = find_backend(compress);
@@ -371,12 +384,18 @@ struct zcomp *zcomp_create(const char *compress, int max_strm)
 	if (!comp)
 		return ERR_PTR(-ENOMEM);
 
-	comp->backend = backend;
+	comp->tfm = crypto_alloc_ccomp(backend, 0, 0);
+	if (IS_ERR(comp->tfm)) {
+		kfree(comp);
+		return ERR_CAST(comp->tfm);
+	}
+
 	if (max_strm > 1)
 		error = zcomp_strm_multi_create(comp, max_strm);
 	else
 		error = zcomp_strm_single_create(comp);
 	if (error) {
+		crypto_free_ccomp(comp->tfm);
 		kfree(comp);
 		return ERR_PTR(error);
 	}
