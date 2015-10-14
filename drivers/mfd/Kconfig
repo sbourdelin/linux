@@ -95,6 +95,7 @@ config MFD_BCM590XX
 config MFD_AXP20X
 	bool "X-Powers AXP series PMICs"
 	select MFD_AXP20X_I2C
+	select MFD_AXP20X_RSB
 
 config MFD_AXP20X_CORE
 	bool
@@ -108,6 +109,17 @@ config MFD_AXP20X_I2C
 	depends on I2C=y
 	help
 	  If you say Y here you get support for the X-Powers AXP series I2C
+	  based power management ICs (PMICs).
+	  This driver include only the core APIs. You have to select individual
+	  components like regulators or the PEK (Power Enable Key) under the
+	  corresponding menus.
+
+config MFD_AXP20X_RSB
+	bool "X-Powers AXP series RSB PMICs"
+	select MFD_AXP20X_CORE
+	depends on SUNXI_RSB=y
+	help
+	  If you say Y here you get support for the X-Powers AXP series RSB
 	  based power management ICs (PMICs).
 	  This driver include only the core APIs. You have to select individual
 	  components like regulators or the PEK (Power Enable Key) under the
