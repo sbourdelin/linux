@@ -1694,6 +1694,46 @@ void WILC_WFI_mgmt_rx(u8 *buff, u32 size)
 		WILC_WFI_p2p_rx(wl->vif[1].ndev, buff, size);
 }
 
+void wl_wlan_cleanup(void)
+{
+	int i = 0;
+	perInterface_wlan_t *nic[NUM_CONCURRENT_IFC];
+
+	if (wl && (wl->vif[0].ndev || wl->vif[1].ndev)) {
+		unregister_inetaddr_notifier(&g_dev_notifier);
+
+		for (i = 0; i < NUM_CONCURRENT_IFC; i++)
+			nic[i] = netdev_priv(wl->vif[i].ndev);
+	}
+
+	if (wl && wl->wilc_firmware)
+		release_firmware(wl->wilc_firmware);
+
+	if (wl && (wl->vif[0].ndev || wl->vif[1].ndev)) {
+		linux_wlan_lock_timeout(&close_exit_sync, 12 * 1000);
+
+		for (i = 0; i < NUM_CONCURRENT_IFC; i++)
+			if (wl->vif[i].ndev)
+				if (nic[i]->mac_opened)
+					mac_close(wl->vif[i].ndev);
+
+		for (i = 0; i < NUM_CONCURRENT_IFC; i++) {
+			unregister_netdev(wl->vif[i].ndev);
+			wilc_free_wiphy(wl->vif[i].ndev);
+			free_netdev(wl->vif[i].ndev);
+		}
+	}
+
+	if (wl)
+		kfree(wl);
+
+#if defined(WILC_DEBUGFS)
+	wilc_debugfs_remove();
+#endif
+	linux_wlan_device_detection(0);
+	linux_wlan_device_power(0);
+}
+
 int wilc_netdev_init(void)
 {
 
@@ -1826,44 +1866,6 @@ late_initcall(init_wilc_driver);
 
 static void __exit exit_wilc_driver(void)
 {
-	int i = 0;
-	perInterface_wlan_t *nic[NUM_CONCURRENT_IFC] = {NULL,};
-	#define CLOSE_TIMEOUT (12 * 1000)
-
-	if (wl && (wl->vif[0].ndev || wl->vif[1].ndev)) {
-		unregister_inetaddr_notifier(&g_dev_notifier);
-
-		for (i = 0; i < NUM_CONCURRENT_IFC; i++)
-			nic[i] = netdev_priv(wl->vif[i].ndev);
-	}
-
-	if (wl && wl->wilc_firmware) {
-		release_firmware(wl->wilc_firmware);
-		wl->wilc_firmware = NULL;
-	}
-
-	if (wl && (wl->vif[0].ndev || wl->vif[1].ndev)) {
-		PRINT_D(INIT_DBG, "Waiting for mac_close ....\n");
-
-		if (linux_wlan_lock_timeout(&close_exit_sync, CLOSE_TIMEOUT) < 0)
-			PRINT_D(INIT_DBG, "Closed TimedOUT\n");
-		else
-			PRINT_D(INIT_DBG, "mac_closed\n");
-
-		for (i = 0; i < NUM_CONCURRENT_IFC; i++)
-			if (wl->vif[i].ndev)
-				if (nic[i]->mac_opened)
-					mac_close(wl->vif[i].ndev);
-
-		for (i = 0; i < NUM_CONCURRENT_IFC; i++) {
-			unregister_netdev(wl->vif[i].ndev);
-			PRINT_D(INIT_DBG, "Freeing Wiphy...\n");
-			wilc_free_wiphy(wl->vif[i].ndev);
-			PRINT_D(INIT_DBG, "Freeing netdev...\n");
-			free_netdev(wl->vif[i].ndev);
-		}
-	}
-
 #ifndef WILC_SDIO
 	PRINT_D(INIT_DBG, "SPI unregsiter...\n");
 	spi_unregister_driver(&wilc_bus);
@@ -1871,15 +1873,6 @@ static void __exit exit_wilc_driver(void)
 	PRINT_D(INIT_DBG, "SDIO unregsiter...\n");
 	sdio_unregister_driver(&wilc_bus);
 #endif
-	kfree(wl);
-	printk("Module_exit Done.\n");
-
-#if defined(WILC_DEBUGFS)
-	wilc_debugfs_remove();
-#endif
-
-	linux_wlan_device_detection(0);
-	linux_wlan_device_power(0);
 }
 module_exit(exit_wilc_driver);
 
