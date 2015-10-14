@@ -211,6 +211,8 @@ struct ib_mad_port_private {
 	struct workqueue_struct *wq;
 	struct work_struct work;
 	struct ib_mad_qp_info qp_info[IB_MAD_QPS_CORE];
+	struct ib_event_handler event_handler;
+	struct work_struct pkey_change_work;
 };
 
 int ib_send_mad(struct ib_mad_send_wr_private *mad_send_wr);
