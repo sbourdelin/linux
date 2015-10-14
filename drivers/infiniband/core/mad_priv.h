@@ -184,6 +184,7 @@ struct ib_mad_queue {
 struct ib_mad_qp_info {
 	struct ib_mad_port_private *port_priv;
 	struct ib_qp *qp;
+	struct ib_srq *srq;
 	struct ib_mad_queue send_queue;
 	struct ib_mad_queue recv_queue;
 	struct list_head overflow_list;
