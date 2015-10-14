@@ -1312,13 +1312,13 @@ int mac_open(struct net_device *ndev)
 	/* loop through the NUM of supported devices and set the MAC address */
 	for (i = 0; i < wl->vif_num; i++)
 		if (ndev == wl->vif[i].wilc_netdev) {
-			memcpy(wl->vif[i].aSrcAddress, mac_add, ETH_ALEN);
+			memcpy(wl->vif[i].src_addr, mac_add, ETH_ALEN);
 			wl->vif[i].drvHandler = priv->hWILCWFIDrv;
 			break;
 		}
 
 	/* TODO: get MAC address whenever the source is EPROM - hardcoded and copy it to ndev*/
-	memcpy(ndev->dev_addr, wl->vif[i].aSrcAddress, ETH_ALEN);
+	memcpy(ndev->dev_addr, wl->vif[i].src_addr, ETH_ALEN);
 
 	if (!is_valid_ether_addr(ndev->dev_addr)) {
 		PRINT_ER("Error: Wrong MAC address\n");
