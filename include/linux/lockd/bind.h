@@ -18,6 +18,7 @@
 
 /* Dummy declarations */
 struct svc_rqst;
+struct nfs_open_context;
 
 /*
  * This is the set of functions for lockd->nfsd communication
@@ -52,7 +53,7 @@ struct nlmclnt_initdata {
 extern struct nlm_host *nlmclnt_init(const struct nlmclnt_initdata *nlm_init);
 extern void	nlmclnt_done(struct nlm_host *host);
 
-extern int	nlmclnt_proc(struct nlm_host *host, int cmd,
+extern int	nlmclnt_proc(struct nfs_open_context *ctx, int cmd,
 					struct file_lock *fl);
 extern int	lockd_up(struct net *net);
 extern void	lockd_down(struct net *net);
