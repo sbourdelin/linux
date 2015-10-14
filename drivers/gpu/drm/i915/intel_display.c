@@ -2798,8 +2798,17 @@ static void ironlake_update_primary_plane(struct drm_crtc *crtc,
 	u32 reg = DSPCNTR(plane);
 	int pixel_size;
 
+	dspcntr = DISPPLANE_GAMMA_ENABLE;
+
+	if (IS_HASWELL(dev) || IS_BROADWELL(dev))
+		dspcntr |= DISPPLANE_PIPE_CSC_ENABLE;
+
 	if (!visible || !fb) {
-		I915_WRITE(reg, 0);
+		if (IS_HASWELL(dev)) {
+			I915_WRITE(reg, dspcntr);
+		} else {
+			I915_WRITE(reg, 0);
+		}
 		I915_WRITE(DSPSURF(plane), 0);
 		POSTING_READ(reg);
 		return;
@@ -2811,12 +2820,7 @@ static void ironlake_update_primary_plane(struct drm_crtc *crtc,
 
 	pixel_size = drm_format_plane_cpp(fb->pixel_format, 0);
 
-	dspcntr = DISPPLANE_GAMMA_ENABLE;
-
 	dspcntr |= DISPLAY_PLANE_ENABLE;
-
-	if (IS_HASWELL(dev) || IS_BROADWELL(dev))
-		dspcntr |= DISPPLANE_PIPE_CSC_ENABLE;
 
 	switch (fb->pixel_format) {
 	case DRM_FORMAT_C8:
