@@ -132,8 +132,6 @@ typedef union compat_sigval {
 
 /* We can't use generic compat_siginfo_t because our si_code and si_errno are swapped */
 #define HAVE_ARCH_COMPAT_SIGINFO_T
-#define HAVE_ARCH_COPY_SIGINFO_TO_USER32
-#define HAVE_ARCH_COPY_SIGINFO_FROM_USER32
 
 typedef struct compat_siginfo {
 	int si_signo;
