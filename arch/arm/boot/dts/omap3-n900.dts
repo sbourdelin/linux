@@ -949,6 +949,7 @@
 };
 
 &ssi_port1 {
+	status = "ok";
 	pinctrl-names = "default";
 	pinctrl-0 = <&ssi_pins>;
 

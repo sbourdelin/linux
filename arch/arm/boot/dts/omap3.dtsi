@@ -815,6 +815,7 @@
 				interrupt-parent = <&intc>;
 				interrupts = <67>,
 					     <68>;
+				status = "disabled";
 			};
 
 			ssi_port2: ssi-port@4805b000 {
@@ -828,6 +829,7 @@
 				interrupt-parent = <&intc>;
 				interrupts = <69>,
 					     <70>;
+				status = "disabled";
 			};
 		};
 	};
