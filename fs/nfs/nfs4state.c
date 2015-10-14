@@ -827,6 +827,7 @@ static struct nfs4_lock_state *nfs4_alloc_lock_state(struct nfs4_state *state, f
 		return NULL;
 	nfs4_init_seqid_counter(&lsp->ls_seqid);
 	atomic_set(&lsp->ls_count, 1);
+	atomic_inc(&state->count);
 	lsp->ls_state = state;
 	lsp->ls_owner = fl_owner;
 	lsp->ls_seqid.owner_id = ida_simple_get(&server->lockowner_id, 0, 0, GFP_NOFS);
@@ -903,6 +904,7 @@ void nfs4_put_lock_state(struct nfs4_lock_state *lsp)
 		clp->cl_mvops->free_lock_state(server, lsp);
 	} else
 		nfs4_free_lock_state(server, lsp);
+	nfs4_put_open_state(state);
 }
 
 static void nfs4_fl_copy_lock(struct file_lock *dst, struct file_lock *src)
