@@ -449,8 +449,7 @@ typedef void (*ib_mad_recv_handler)(struct ib_mad_agent *mad_agent,
 
 /**
  * ib_mad_agent - Used to track MAD registration with the access layer.
- * @device: Reference to device registration is on.
- * @qp: Reference to QP used for sending and receiving MADs.
+ * @pd: Reference to PD used for sending and receiving MADs.
  * @mr: Memory region for system memory usable for DMA.
  * @recv_handler: Callback handler for a received MAD.
  * @send_handler: Callback handler for a sent MAD.
@@ -467,8 +466,7 @@ enum {
 	IB_MAD_USER_RMPP = IB_USER_MAD_USER_RMPP,
 };
 struct ib_mad_agent {
-	struct ib_device	*device;
-	struct ib_qp		*qp;
+	struct ib_pd		*pd;
 	ib_mad_recv_handler	recv_handler;
 	ib_mad_send_handler	send_handler;
 	ib_mad_snoop_handler	snoop_handler;
@@ -478,6 +476,16 @@ struct ib_mad_agent {
 	u8			port_num;
 	u8			rmpp_version;
 };
+
+static inline struct ib_pd *ib_mad_agent_pd(struct ib_mad_agent *agent)
+{
+	return agent->pd;
+}
+
+static inline struct ib_device *ib_mad_agent_device(struct ib_mad_agent *agent)
+{
+	return agent->pd->device;
+}
 
 /**
  * ib_mad_send_wc - MAD send completion information.

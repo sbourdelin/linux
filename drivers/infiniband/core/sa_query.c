@@ -443,7 +443,8 @@ static void ib_nl_set_path_rec_attrs(struct sk_buff *skb,
 	/* Construct the family header first */
 	header = (struct rdma_ls_resolve_header *)
 		skb_put(skb, NLMSG_ALIGN(sizeof(*header)));
-	memcpy(header->device_name, query->port->agent->device->name,
+	memcpy(header->device_name,
+	       ib_mad_agent_device(query->port->agent)->name,
 	       LS_DEVICE_NAME_MAX);
 	header->port_num = query->port->port_num;
 
@@ -855,7 +856,8 @@ static void update_sm_ah(struct work_struct *work)
 	struct ib_port_attr port_attr;
 	struct ib_ah_attr   ah_attr;
 
-	if (ib_query_port(port->agent->device, port->port_num, &port_attr)) {
+	if (ib_query_port(ib_mad_agent_device(port->agent), port->port_num,
+			  &port_attr)) {
 		printk(KERN_WARNING "Couldn't query port\n");
 		return;
 	}
@@ -870,7 +872,7 @@ static void update_sm_ah(struct work_struct *work)
 	new_ah->src_path_mask = (1 << port_attr.lmc) - 1;
 
 	new_ah->pkey_index = 0;
-	if (ib_find_pkey(port->agent->device, port->port_num,
+	if (ib_find_pkey(ib_mad_agent_device(port->agent), port->port_num,
 			 IB_DEFAULT_PKEY_FULL, &new_ah->pkey_index))
 		printk(KERN_ERR "Couldn't find index for default PKey\n");
 
@@ -879,7 +881,7 @@ static void update_sm_ah(struct work_struct *work)
 	ah_attr.sl       = port_attr.sm_sl;
 	ah_attr.port_num = port->port_num;
 
-	new_ah->ah = ib_create_ah(port->agent->qp->pd, &ah_attr);
+	new_ah->ah = ib_create_ah(ib_mad_agent_pd(port->agent), &ah_attr);
 	if (IS_ERR(new_ah->ah)) {
 		printk(KERN_WARNING "Couldn't create new SM AH\n");
 		kfree(new_ah);

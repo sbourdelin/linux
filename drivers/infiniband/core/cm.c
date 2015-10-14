@@ -263,7 +263,7 @@ static int cm_alloc_msg(struct cm_id_private *cm_id_priv,
 	struct ib_ah *ah;
 
 	mad_agent = cm_id_priv->av.port->mad_agent;
-	ah = ib_create_ah(mad_agent->qp->pd, &cm_id_priv->av.ah_attr);
+	ah = ib_create_ah(ib_mad_agent_pd(mad_agent), &cm_id_priv->av.ah_attr);
 	if (IS_ERR(ah))
 		return PTR_ERR(ah);
 
@@ -294,7 +294,8 @@ static int cm_alloc_response_msg(struct cm_port *port,
 	struct ib_mad_send_buf *m;
 	struct ib_ah *ah;
 
-	ah = ib_create_ah_from_wc(port->mad_agent->qp->pd, mad_recv_wc->wc,
+	ah = ib_create_ah_from_wc(ib_mad_agent_pd(port->mad_agent),
+				  mad_recv_wc->wc,
 				  mad_recv_wc->recv_buf.grh, port->port_num);
 	if (IS_ERR(ah))
 		return PTR_ERR(ah);

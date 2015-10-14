@@ -160,7 +160,7 @@ static struct ib_mad_send_buf *alloc_response_msg(struct ib_mad_agent *agent,
 	struct ib_ah *ah;
 	int hdr_len;
 
-	ah = ib_create_ah_from_wc(agent->qp->pd, recv_wc->wc,
+	ah = ib_create_ah_from_wc(ib_mad_agent_pd(agent), recv_wc->wc,
 				  recv_wc->recv_buf.grh, agent->port_num);
 	if (IS_ERR(ah))
 		return (void *) ah;
@@ -291,7 +291,7 @@ create_rmpp_recv(struct ib_mad_agent_private *agent,
 	if (!rmpp_recv)
 		return NULL;
 
-	rmpp_recv->ah = ib_create_ah_from_wc(agent->agent.qp->pd,
+	rmpp_recv->ah = ib_create_ah_from_wc(ib_mad_agent_pd(&agent->agent),
 					     mad_recv_wc->wc,
 					     mad_recv_wc->recv_buf.grh,
 					     agent->agent.port_num);

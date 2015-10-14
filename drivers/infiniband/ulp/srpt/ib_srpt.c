@@ -465,7 +465,7 @@ static void srpt_mad_recv_handler(struct ib_mad_agent *mad_agent,
 	if (!mad_wc || !mad_wc->recv_buf.mad)
 		return;
 
-	ah = ib_create_ah_from_wc(mad_agent->qp->pd, mad_wc->wc,
+	ah = ib_create_ah_from_wc(ib_mad_agent_pd(mad_agent), mad_wc->wc,
 				  mad_wc->recv_buf.grh, mad_agent->port_num);
 	if (IS_ERR(ah))
 		goto err;
