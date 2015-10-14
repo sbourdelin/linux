@@ -292,7 +292,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
  * GICD                  0xc                         24    24    24
  * GICv2m MSI            0xd                               24    24
  * GICR                  0xe                               16    16
- * GIC ITS               0xf                                     16
+ * GIC ITS               0xf                                     20
  *
  * In the table, each length entry is what should be in the length
  * field of the subtable, and -- in general -- it should match the
@@ -366,7 +366,7 @@ static struct acpi_madt_subtable_lengths spec_info[] = {
 		.madt_version = 3,
 		.num_types = 16,
 		.lengths = { 8, 12, 10, 8, 6, 12, 16, SUBTABLE_VARIABLE,
-			     16, 16, 12, 80, 24, 24, 16, 16 }
+			     16, 16, 12, 80, 24, 24, 16, 20 }
 	},
 	{ /* terminator */
 		.major_version = 0,
@@ -407,23 +407,63 @@ static int __init bad_madt_entry(struct acpi_table_header *table,
 		ms++;
 	}
 	if (!ms->num_types) {
-		pr_err("undefined version for either FADT %d.%d or MADT %d\n",
-		       major, minor, madt->header.revision);
-		return 1;
+		if (IS_ENABLED(CONFIG_ARM64)) {
+			/* Enforce this stricture on arm64... */
+			pr_err("undefined version for either FADT %d.%d or MADT %d\n",
+			       major, minor, madt->header.revision);
+			return 1;
+		} else {
+			/* ... but relax it on legacy systems so they boot */
+			pr_warn("undefined version for either FADT %d.%d or MADT %d\n",
+			        major, minor, madt->header.revision);
+		}
 	}
 
 	if (entry->type >= ms->num_types) {
-		pr_err("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
-		       major, minor, entry->type, entry->length);
-		return 1;
+		if (IS_ENABLED(CONFIG_ARM64)) {
+			/* Enforce this stricture on arm64... */
+			pr_err("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
+			       major, minor, entry->type, entry->length);
+			return 1;
+		} else {
+			/* ... but relax it on legacy systems so they boot */
+			pr_warn("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
+			         major, minor, entry->type, entry->length);
+		}
 	}
 
 	/* verify that the table is allowed for this version of the spec */
 	len = ms->lengths[entry->type];
 	if (!len) {
-		pr_err("MADT subtable %d not defined for FADT %d.%d\n",
-			 entry->type, major, minor);
-		return 1;
+		if (IS_ENABLED(CONFIG_ARM64)) {
+			pr_err("MADT subtable %d not defined for FADT %d.%d\n",
+			       entry->type, major, minor);
+			return 1;
+		} else {
+			pr_warn("MADT subtable %d not defined for FADT %d.%d\n",
+			        entry->type, major, minor);
+		}
+	}
+
+	/*
+	 * When we get this far, we may have issued warnings on either
+	 * a mismatch in FADT/MADT revisions, or have noted that the subtable
+	 * ID is not defined for the MADT revision we're using.  On some
+	 * architectures, this is an error, but for legacy systems, we need
+	 * to push on with other checks of the subtable.
+	 *
+	 * In fact, there are environments where the *only* value the FADT
+	 * revision will ever have is 2, regardless of anything else.  So,
+	 * for those systems to boot, we have to pretend the MADT is the
+	 * latest version to allow all known subtables since we have no way
+	 * to determine what revision it should be.
+	 */
+	if (!IS_ENABLED(CONFIG_ARM64) && major == 2) {
+		ms = spec_info;
+		while (ms->num_types != 0)
+			ms++;
+		ms--;
+		len = ms->lengths[entry->type];
 	}
 
 	/* verify that the length is what we expect */
