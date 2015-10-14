@@ -23,6 +23,8 @@ struct rt5645_platform_data {
 	unsigned int jd_mode;
 	/* Invert JD when jack insert */
 	bool jd_invert;
+	/* Speaker HWEQ */
+	bool hweq;
 };
 
 #endif
