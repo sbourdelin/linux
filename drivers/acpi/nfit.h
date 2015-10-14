@@ -97,6 +97,7 @@ struct acpi_nfit_desc {
 	struct nvdimm_bus_descriptor nd_desc;
 	struct acpi_table_nfit *nfit;
 	struct mutex spa_map_mutex;
+	struct mutex init_mutex;
 	struct list_head spa_maps;
 	struct list_head memdevs;
 	struct list_head flushes;
@@ -105,6 +106,7 @@ struct acpi_nfit_desc {
 	struct list_head dcrs;
 	struct list_head bdws;
 	struct list_head idts;
+	struct nfit_spa *last_init_spa;
 	struct nvdimm_bus *nvdimm_bus;
 	struct device *dev;
 	unsigned long dimm_dsm_force_en;
