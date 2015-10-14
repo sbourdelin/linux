@@ -41,6 +41,10 @@
 #include <asm/setup.h>
 #include <asm/vdso.h>
 
+#ifdef CONFIG_PPC_SPLPAR
+static int vphn_get_node(unsigned int cpu);
+#endif
+
 static int numa_enabled = 1;
 
 static char *cmdline __initdata;
@@ -552,6 +556,17 @@ static int numa_setup_cpu(unsigned long lcpu)
 	}
 
 	nid = of_node_to_nid_single(cpu);
+
+	/*
+	 * Override the OF device tree fetched node number
+	 * with VPHN based node number in case of a shared
+	 * processor LPAR on PHYP platform.
+	 */
+#ifdef CONFIG_PPC_SPLPAR
+	if (lppaca_shared_proc(get_lppaca())) {
+		nid = vphn_get_node(lcpu);
+	}
+#endif
 
 out_present:
 	if (nid < 0 || !node_online(nid))
@@ -1364,6 +1379,14 @@ static int update_lookup_table(void *data)
 	return 0;
 }
 
+static int vphn_get_node(unsigned int cpu)
+{
+	__be32 associativity[VPHN_ASSOC_BUFSIZE] = {0};
+
+	vphn_get_associativity(cpu, associativity);
+	return associativity_to_nid(associativity);
+}
+
 /*
  * Update the node maps and sysfs entries for each cpu whose home node
  * has changed. Returns 1 when the topology has changed, and 0 otherwise.
@@ -1372,7 +1395,6 @@ int arch_update_cpu_topology(void)
 {
 	unsigned int cpu, sibling, changed = 0;
 	struct topology_update_data *updates, *ud;
-	__be32 associativity[VPHN_ASSOC_BUFSIZE] = {0};
 	cpumask_t updated_cpus;
 	struct device *dev;
 	int weight, new_nid, i = 0;
@@ -1408,8 +1430,7 @@ int arch_update_cpu_topology(void)
 		}
 
 		/* Use associativity from first thread for all siblings */
-		vphn_get_associativity(cpu, associativity);
-		new_nid = associativity_to_nid(associativity);
+		new_nid = vphn_get_node(cpu);
 		if (new_nid < 0 || !node_online(new_nid))
 			new_nid = first_online_node;
 
