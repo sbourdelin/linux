@@ -11,6 +11,7 @@ config NIOS2
 	select HAVE_ARCH_KGDB
 	select IRQ_DOMAIN
 	select MODULES_USE_ELF_RELA
+	select MIGHT_HAVE_PCI
 	select OF
 	select OF_EARLY_FLATTREE
 	select SOC_BUS
@@ -191,6 +192,26 @@ config NIOS2_IO_REGION_BASE_BOOL
 config NIOS2_IO_REGION_BASE
 	hex "Virtual base address of the I/O region" if NIOS2_IO_REGION_BASE_BOOL
 	default "0xe0000000"
+
+endmenu
+
+menu "Bus support"
+config PCI
+	bool "PCI support"
+	select GENERIC_PCI_IOMAP
+	help
+	  This feature enables support for PCIe bus system. If you say Y
+	  here, the kernel will include drivers and infrastructure code
+	  to support PCIe bus devices.
+
+config PCI_DOMAINS
+	def_bool PCI
+
+config PCI_DOMAINS_GENERIC
+	def_bool PCI
+
+source "drivers/pci/Kconfig"
+source "drivers/pci/pcie/Kconfig"
 
 endmenu
 

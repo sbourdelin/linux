@@ -10,6 +10,7 @@ obj-y	+= entry.o
 obj-y	+= insnemu.o
 obj-y	+= irq.o
 obj-y	+= nios2_ksyms.o
+obj-y	+= pci.o
 obj-y	+= process.o
 obj-y	+= prom.o
 obj-y	+= ptrace.o

@@ -14,8 +14,7 @@
 #include <linux/types.h>
 #include <asm/pgtable-bits.h>
 
-/* PCI is not supported in nios2, set this to 0. */
-#define IO_SPACE_LIMIT 0
+#define IO_SPACE_LIMIT 0xffff
 
 #define readb_relaxed(addr)	readb(addr)
 #define readw_relaxed(addr)	readw(addr)
@@ -43,6 +42,15 @@ static inline void __iomem *ioremap_nocache(unsigned long physaddr,
 static inline void iounmap(void __iomem *addr)
 {
 	__iounmap(addr);
+}
+
+static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+{
+	return NULL;
+}
+
+static inline void ioport_unmap(void __iomem *p)
+{
 }
 
 #define ioremap_wc ioremap_nocache
