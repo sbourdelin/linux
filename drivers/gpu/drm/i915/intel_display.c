@@ -15707,3 +15707,138 @@ void intel_modeset_preclose(struct drm_device *dev, struct drm_file *file)
 		spin_unlock_irq(&dev->event_lock);
 	}
 }
+
+bool chv_upfront_link_train(struct drm_device *dev,
+		struct intel_dp *intel_dp, struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_connector *connector = intel_dp->attached_connector;
+	struct intel_encoder *tmp_encoder, *encoder = connector->encoder;
+	struct intel_crtc *tmp_crtc;
+	struct drm_crtc *tmp_drm_crtc;
+	bool found = false, valid_crtc = false;
+	uint8_t tmp_lane_count, tmp_link_bw;
+
+	if (!connector || !encoder) {
+		DRM_DEBUG_KMS("dp connector/encoder is NULL\n");
+		return false;
+	}
+
+	/* If we already have a crtc, start link training directly */
+	if (crtc) {
+		valid_crtc = true;
+		goto start_link_train;
+	}
+
+	/* Find an unused crtc and use it for link training */
+	for_each_intel_crtc(dev, crtc) {
+		if (intel_crtc_active(&crtc->base))
+			continue;
+
+		/* Make sure the new crtc will work with the encoder */
+		if (drm_encoder_crtc_ok(&encoder->base, &crtc->base)) {
+			/* Save the existing values */
+			tmp_encoder = connector->new_encoder;
+			tmp_crtc = encoder->new_crtc;
+			tmp_drm_crtc = encoder->base.crtc;
+
+			connector->new_encoder = encoder;
+			encoder->new_crtc = crtc;
+			encoder->base.crtc = &crtc->base;
+
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		DRM_ERROR("Could not find crtc for upfront link training\n");
+		return false;
+	}
+
+start_link_train:
+
+	DRM_DEBUG_KMS("upfront link training on pipe:%c\n",
+					pipe_name(crtc->pipe));
+	found = false;
+
+	/* Save the existing lane_count and link_bw values */
+	tmp_lane_count = intel_dp->lane_count;
+	tmp_link_bw = intel_dp->link_bw;
+
+	/* Initialize with Max Link rate & lane count supported by panel */
+	intel_dp->link_bw =  intel_dp->dpcd[DP_MAX_LINK_RATE];
+	intel_dp->lane_count = intel_dp->dpcd[DP_MAX_LANE_COUNT] &
+					DP_MAX_LANE_COUNT_MASK;
+
+	/* CHV does not support HBR2 */
+	if (intel_dp->link_bw == DP_LINK_BW_5_4)
+		intel_dp->link_bw = DP_LINK_BW_2_7;
+
+	do {
+		/* Find port clock from link_bw */
+		crtc->config.port_clock =
+				drm_dp_bw_code_to_link_rate(intel_dp->link_bw);
+
+		/* Enable PLL followed by port */
+		intel_dp_set_clock(encoder, &crtc->config, intel_dp->link_bw);
+		chv_update_pll(crtc);
+		encoder->pre_pll_enable(encoder);
+		chv_enable_pll(crtc);
+		encoder->pre_enable(encoder);
+
+		/* Check if link training passed; if so update lane count */
+		/* TODO: Newer code has this variable as 'train_set_valid */
+		if (intel_dp->has_fast_link_train) {
+			intel_dp->dpcd[DP_MAX_LANE_COUNT] &=
+						~DP_MAX_LANE_COUNT_MASK;
+			intel_dp->dpcd[DP_MAX_LANE_COUNT] |=
+				intel_dp->lane_count & DP_MAX_LANE_COUNT_MASK;
+
+			found = true;
+		}
+
+		/* Reset encoder for next retry or for clean up */
+		encoder->disable(encoder);
+		encoder->post_disable(encoder);
+		chv_disable_pll(dev_priv, crtc->pipe);
+
+		if (found)
+			goto exit;
+
+		DRM_DEBUG_KMS("upfront link training failed. lanes:%d bw:%d\n",
+				intel_dp->lane_count, intel_dp->link_bw);
+
+		/* Go down to the next level and retry link training */
+		if (intel_dp->lane_count == 4) {
+			intel_dp->lane_count = 2;
+		} else if (intel_dp->lane_count == 2) {
+			intel_dp->lane_count = 1;
+		} else if (intel_dp->link_bw == DP_LINK_BW_2_7) {
+			intel_dp->link_bw = DP_LINK_BW_1_62;
+			intel_dp->lane_count = 4;
+		} else {
+			/* Tried all combinations, so exit */
+			break;
+		}
+
+	} while (1);
+
+exit:
+	/* Clear local associations made */
+	if (!valid_crtc) {
+		connector->new_encoder = tmp_encoder;
+		encoder->new_crtc = tmp_crtc;
+		encoder->base.crtc = tmp_drm_crtc;
+	}
+
+	if (found)
+		DRM_DEBUG_KMS("upfront link training passed. lanes:%d bw:%d\n",
+				intel_dp->lane_count, intel_dp->link_bw);
+
+	/* Restore lane_count and link_bw values */
+	intel_dp->lane_count = tmp_lane_count;
+	intel_dp->link_bw = tmp_link_bw;
+
+	return found;
+}

@@ -4808,6 +4808,8 @@ static bool intel_dp_upfront_link_train(struct intel_dp *intel_dp)
 
 	if (HAS_DDI(dev))
 		return intel_ddi_upfront_link_train(dev, intel_dp, intel_crtc);
+	else if (IS_CHERRYVIEW(dev))
+		return intel_chv_upfront_link_train(dev, intel_dp, intel_crtc);
 
 	/* Not a supported platform. Assume we don't need upfront_train */
 	return true;
