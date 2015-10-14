@@ -124,7 +124,7 @@ choice
 		    0x80024000      | 0xf0024000     | UART9
 
 	config DEBUG_AT91_UART
-		bool "Kernel low-level debugging on Atmel SoCs"
+		bool "Kernel low-level debugging on Atmel SoCs (read help!)"
 		depends on ARCH_AT91
 		help
 		  Say Y here if you want the debug print routines to direct
