@@ -497,7 +497,8 @@ void rtnl_af_unregister(struct rtnl_af_ops *ops)
 }
 EXPORT_SYMBOL_GPL(rtnl_af_unregister);
 
-static size_t rtnl_link_get_af_size(const struct net_device *dev)
+static size_t rtnl_link_get_af_size(const struct net_device *dev,
+				    u32 ext_filter_mask)
 {
 	struct rtnl_af_ops *af_ops;
 	size_t size;
@@ -506,7 +507,12 @@ static size_t rtnl_link_get_af_size(const struct net_device *dev)
 	size = nla_total_size(sizeof(struct nlattr));
 
 	list_for_each_entry(af_ops, &rtnl_af_ops, list) {
-		if (af_ops->get_link_af_size) {
+		/* Prefer filtering-aware af sizing when available */
+		if (af_ops->get_link_af_size_filtered) {
+			/* AF_* + nested data */
+			size += nla_total_size(sizeof(struct nlattr)) +
+				af_ops->get_link_af_size_filtered(dev, ext_filter_mask);
+		} else if (af_ops->get_link_af_size) {
 			/* AF_* + nested data */
 			size += nla_total_size(sizeof(struct nlattr)) +
 				af_ops->get_link_af_size(dev);
@@ -900,7 +906,7 @@ static noinline size_t if_nlmsg_size(const struct net_device *dev,
 	       + rtnl_vfinfo_size(dev, ext_filter_mask) /* IFLA_VFINFO_LIST */
 	       + rtnl_port_size(dev, ext_filter_mask) /* IFLA_VF_PORTS + IFLA_PORT_SELF */
 	       + rtnl_link_get_size(dev) /* IFLA_LINKINFO */
-	       + rtnl_link_get_af_size(dev) /* IFLA_AF_SPEC */
+	       + rtnl_link_get_af_size(dev, ext_filter_mask) /* IFLA_AF_SPEC */
 	       + nla_total_size(MAX_PHYS_ITEM_ID_LEN) /* IFLA_PHYS_PORT_ID */
 	       + nla_total_size(MAX_PHYS_ITEM_ID_LEN) /* IFLA_PHYS_SWITCH_ID */
 	       + nla_total_size(1); /* IFLA_PROTO_DOWN */
