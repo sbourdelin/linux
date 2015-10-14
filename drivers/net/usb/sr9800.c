@@ -477,7 +477,6 @@ static void sr_get_drvinfo(struct net_device *net,
 	usbnet_get_drvinfo(net, info);
 	strncpy(info->driver, DRIVER_NAME, sizeof(info->driver));
 	strncpy(info->version, DRIVER_VERSION, sizeof(info->version));
-	info->eedump_len = data->eeprom_len;
 }
 
 static u32 sr_get_link(struct net_device *net)
