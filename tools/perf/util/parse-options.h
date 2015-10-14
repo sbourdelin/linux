@@ -161,6 +161,9 @@ extern int parse_options_subcommand(int argc, const char **argv,
 extern NORETURN void usage_with_options(const char * const *usagestr,
                                         const struct option *options);
 
+extern void usage_with_options_return(const char * const *usagestr,
+                                      const struct option *options);
+
 /*----- incremantal advanced APIs -----*/
 
 enum {

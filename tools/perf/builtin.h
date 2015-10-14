@@ -3,9 +3,12 @@
 
 #include "util/util.h"
 #include "util/strbuf.h"
+#include "util/parse-options.h"
 
 extern const char perf_usage_string[];
 extern const char perf_more_info_string[];
+extern const char * const perf_usage[];
+extern struct option perf_options[];
 
 extern void list_common_cmds_help(void);
 extern const char *help_unknown_cmd(const char *cmd);

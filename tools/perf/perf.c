@@ -21,6 +21,10 @@
 
 const char perf_usage_string[] =
 	"perf [--version] [--help] [OPTIONS] COMMAND [ARGS]";
+const char * const perf_usage[] = {
+	perf_usage_string,
+	NULL
+};
 
 const char perf_more_info_string[] =
 	"See 'perf help COMMAND' for more information on a specific command.";
@@ -127,7 +131,7 @@ static void commit_pager_choice(void)
 	}
 }
 
-struct option options[] = {
+struct option perf_options[] = {
 	OPT_ARGUMENT("help", "help"),
 	OPT_ARGUMENT("version", "version"),
 	OPT_ARGUMENT("exec-path", "exec-path"),
@@ -261,8 +265,8 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 		} else if (!strcmp(cmd, "--list-opts")) {
 			unsigned int i;
 
-			for (i = 0; i < ARRAY_SIZE(options)-1; i++) {
-				struct option *p = options+i;
+			for (i = 0; i < ARRAY_SIZE(perf_options)-1; i++) {
+				struct option *p = perf_options+i;
 				printf("--%s ", p->long_name);
 			}
 			putchar('\n');
@@ -578,7 +582,7 @@ int main(int argc, const char **argv)
 			argv[0] += 2;
 	} else {
 		/* The user didn't specify a command; give them help */
-		printf("\n usage: %s\n\n", perf_usage_string);
+		usage_with_options_return(perf_usage, perf_options);
 		list_common_cmds_help();
 		printf("\n %s\n\n", perf_more_info_string);
 		goto out;

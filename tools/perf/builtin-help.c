@@ -470,7 +470,7 @@ int cmd_help(int argc, const char **argv, const char *prefix __maybe_unused)
 	}
 
 	if (!argv[0]) {
-		printf("\n usage: %s\n\n", perf_usage_string);
+		usage_with_options_return(perf_usage, perf_options);
 		list_common_cmds_help();
 		printf("\n %s\n\n", perf_more_info_string);
 		return 0;
