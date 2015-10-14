@@ -737,22 +737,6 @@ out_noconflict:
 	goto out;
 }
 
-static int do_vfs_lock(struct file *file, struct file_lock *fl)
-{
-	int res = 0;
-	switch (fl->fl_flags & (FL_POSIX|FL_FLOCK)) {
-		case FL_POSIX:
-			res = posix_lock_file_wait(file, fl);
-			break;
-		case FL_FLOCK:
-			res = flock_lock_file_wait(file, fl);
-			break;
-		default:
-			BUG();
-	}
-	return res;
-}
-
 static int
 do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
@@ -786,7 +770,7 @@ do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	if (!is_local)
 		status = NFS_PROTO(inode)->lock(ctx, cmd, fl);
 	else
-		status = do_vfs_lock(filp, fl);
+		status = do_vfs_lock(inode, fl);
 	return status;
 }
 
@@ -817,7 +801,7 @@ do_setlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	if (!is_local)
 		status = NFS_PROTO(inode)->lock(ctx, cmd, fl);
 	else
-		status = do_vfs_lock(filp, fl);
+		status = do_vfs_lock(inode, fl);
 	if (status < 0)
 		goto out;
 
