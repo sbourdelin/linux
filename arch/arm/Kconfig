@@ -985,6 +985,7 @@ config ARCH_STM32
 	select ARMV7M_SYSTICK
 	select CLKSRC_STM32
 	select RESET_CONTROLLER
+	select PINCTRL
 	help
 	  Support for STMicroelectronics STM32 processors.
 

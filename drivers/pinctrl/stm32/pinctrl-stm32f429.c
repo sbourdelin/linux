@@ -1564,7 +1564,7 @@ static const struct stm32_desc_pin stm32f429_pins[] = {
 	),
 };
 
-struct stm32_pinctrl_match_data stm32f429_match_data = {
+static struct stm32_pinctrl_match_data stm32f429_match_data = {
 	.pins = stm32f429_pins,
 	.npins = ARRAY_SIZE(stm32f429_pins),
 };
