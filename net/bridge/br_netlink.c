@@ -1235,8 +1235,9 @@ static size_t br_get_link_af_size(const struct net_device *dev)
 }
 
 static struct rtnl_af_ops br_af_ops __read_mostly = {
-	.family			= AF_BRIDGE,
-	.get_link_af_size	= br_get_link_af_size,
+	.family				= AF_BRIDGE,
+	.get_link_af_size		= br_get_link_af_size,
+	.get_link_af_size_filtered	= br_get_link_af_size_filtered,
 };
 
 struct rtnl_link_ops br_link_ops __read_mostly = {
