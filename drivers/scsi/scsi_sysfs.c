@@ -1129,20 +1129,24 @@ static void __scsi_remove_target(struct scsi_target *starget)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 	unsigned long flags;
-	struct scsi_device *sdev;
+	struct scsi_device *sdev, *tmp;
+	LIST_HEAD(reap_list);
 
 	spin_lock_irqsave(&shost->device_lock, flags);
  restart:
-	list_for_each_entry(sdev, &shost->__devices, siblings) {
+	list_for_each_entry_safe(sdev, tmp, &shost->__devices, siblings) {
 		if (sdev->channel != starget->channel ||
 		    sdev->id != starget->id ||
 		    scsi_device_get(sdev))
 			continue;
-		scsi_remove_device(sdev);
+		list_move_tail(&sdev->siblings, &reap_list);
 		scsi_device_put(sdev);
 		goto restart;
 	}
 	spin_unlock_irqrestore(&shost->device_lock, flags);
+
+	list_for_each_entry_safe(sdev, tmp, &reap_list, siblings)
+		scsi_remove_device(sdev);
 }
 
 /**
