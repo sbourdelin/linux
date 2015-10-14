@@ -363,7 +363,7 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 				|| w_index != acm->ctrl_id)
 			goto invalid;
 
-		value = w_length;
+		value = 0;
 		cdev->gadget->ep0->driver_data = acm;
 		req->complete = acm_complete_set_line_coding;
 		break;
