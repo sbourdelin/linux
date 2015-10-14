@@ -81,15 +81,32 @@ dynamic max_comp_streams. Only multi stream backend supports dynamic
 max_comp_streams adjustment.
 
 3) Select compression algorithm
-	Using comp_algorithm device attribute one can see available and
-	currently selected (shown in square brackets) compression algorithms,
-	change selected compression algorithm (once the device is initialised
-	there is no way to change compression algorithm).
+	You can find available compression algorithms by searching contextless
+	compression algorithm (type: ccomp) in /proc/crypto.
+	Using comp_algorithm device attribute one can change selected
+	compression algorithm (once the device is initialised there is no way
+	to change compression algorithm).
 
 	Examples:
 	#show supported compression algorithms
-	cat /sys/block/zram0/comp_algorithm
-	lzo [lz4]
+	cat /proc/crypto | grep ccomp -B 7
+	name         : lz4
+	driver       : lz4-generic
+	module       : kernel
+	priority     : 0
+	refcnt       : 1
+	selftest     : passed
+	internal     : no
+	type         : ccomp
+	--
+	name         : lzo
+	driver       : lzo-generic
+	module       : kernel
+	priority     : 0
+	refcnt       : 1
+	selftest     : passed
+	internal     : no
+	type         : ccomp
 
 	#select lzo compression algorithm
 	echo lzo > /sys/block/zram0/comp_algorithm

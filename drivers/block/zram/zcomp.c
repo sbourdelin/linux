@@ -41,22 +41,16 @@ struct zcomp_strm_multi {
 
 static const char * const backends[] = {
 	"lzo",
-#ifdef CONFIG_ZRAM_LZ4_COMPRESS
 	"lz4",
-#endif
 	NULL
 };
 
 static const char *find_backend(const char *compress)
 {
-	int i = 0;
-	while (backends[i]) {
-		if (sysfs_streq(compress, backends[i]) &&
-			crypto_has_comp(backends[i], 0, 0))
-			break;
-		i++;
-	}
-	return backends[i];
+	if (crypto_has_comp(compress, 0, 0))
+		return compress;
+
+	return NULL;
 }
 
 static void zcomp_strm_free(struct zcomp *comp, struct zcomp_strm *zstrm)
@@ -277,6 +271,9 @@ ssize_t zcomp_available_show(const char *comp, char *buf)
 	int i = 0;
 
 	while (backends[i]) {
+		if (!crypto_has_comp(backends[i], 0, 0))
+			continue;
+
 		if (!strcmp(comp, backends[i]))
 			sz += scnprintf(buf + sz, PAGE_SIZE - sz - 2,
 					"[%s] ", backends[i]);

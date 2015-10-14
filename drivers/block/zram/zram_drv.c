@@ -352,6 +352,7 @@ static ssize_t comp_algorithm_show(struct device *dev,
 	size_t sz;
 	struct zram *zram = dev_to_zram(dev);
 
+	deprecated_attr_warn("comp_algorithm");
 	down_read(&zram->init_lock);
 	sz = zcomp_available_show(zram->compressor, buf);
 	up_read(&zram->init_lock);
