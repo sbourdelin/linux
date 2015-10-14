@@ -55,8 +55,10 @@ enum fixed_addresses {
 	 * Temporary boot-time mappings, used by early_ioremap(),
 	 * before ioremap() is functional.
 	 */
-#ifdef CONFIG_ARM64_64K_PAGES
+#if	defined(CONFIG_ARM64_64K_PAGES)
 #define NR_FIX_BTMAPS		4
+#elif	defined (CONFIG_ARM64_16K_PAGES)
+#define NR_FIX_BTMAPS		16
 #else
 #define NR_FIX_BTMAPS		64
 #endif

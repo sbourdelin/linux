@@ -624,7 +624,12 @@ ENDPROC(__secondary_switched)
 #define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN64_SHIFT
 #define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN64_ON
 
-#else
+#elif	defined(CONFIG_ARM64_16K_PAGES)
+
+#define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN16_SHIFT
+#define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN16_ON
+
+#elif	defined(CONFIG_ARM64_4K_PAGES)
 
 #define id_aa64mmfr0_tgran_shift	ID_AA64MMFR0_TGRAN4_SHIFT
 #define id_aa64mmfr0_tgran_on		ID_AA64MMFR0_TGRAN4_ON
