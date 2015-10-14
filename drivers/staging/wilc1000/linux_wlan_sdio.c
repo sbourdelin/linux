@@ -49,7 +49,7 @@ static void wilc_sdio_interrupt(struct sdio_func *func)
 
 int linux_sdio_cmd52(sdio_cmd52_t *cmd)
 {
-	struct sdio_func *func = g_linux_wlan->wilc_sdio_func;
+	struct sdio_func *func = wl->wilc_sdio_func;
 	int ret;
 	u8 data;
 
@@ -81,7 +81,7 @@ int linux_sdio_cmd52(sdio_cmd52_t *cmd)
 
 int linux_sdio_cmd53(sdio_cmd53_t *cmd)
 {
-	struct sdio_func *func = g_linux_wlan->wilc_sdio_func;
+	struct sdio_func *func = wl->wilc_sdio_func;
 	int size, ret;
 
 	sdio_claim_host(func);
