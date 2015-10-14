@@ -196,6 +196,55 @@ static const struct file_operations btmrvl_fwdump_fops = {
 	.llseek = default_llseek,
 };
 
+/* Proc debug_mask file read handler.
+ * This function is called when the 'debug_mask' file is opened for reading
+ * This function can be used read driver debugging mask value.
+ */
+static ssize_t btmrvl_debug_mask_read(struct file *file, char __user *ubuf,
+				      size_t count, loff_t *ppos)
+{
+	struct btmrvl_private *priv = file->private_data;
+	char buf[32];
+	int ret;
+
+	ret = snprintf(buf, sizeof(buf) - 1, "debug mask=0x%08x\n",
+		       priv->adapter->debug_mask);
+
+	return simple_read_from_buffer(ubuf, count, ppos, buf, ret);
+}
+
+/* Proc debug_mask file read handler.
+ * This function is called when the 'debug_mask' file is opened for reading
+ * This function can be used read driver debugging mask value.
+ */
+static ssize_t btmrvl_debug_mask_write(struct file *file,
+				       const char __user *ubuf,
+				       size_t count, loff_t *ppos)
+{
+	struct btmrvl_private *priv = file->private_data;
+	char buf[32];
+	unsigned long dbg_mask;
+
+	memset(buf, 0, sizeof(buf));
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtol(buf, 0, &dbg_mask))
+		return -EINVAL;
+
+	priv->adapter->debug_mask = dbg_mask;
+
+	return count;
+}
+
+static const struct file_operations btmrvl_debug_mask_fops = {
+	.read	= btmrvl_debug_mask_read,
+	.write	= btmrvl_debug_mask_write,
+	.open	= simple_open,
+	.llseek	= default_llseek,
+};
+
 void btmrvl_debugfs_init(struct hci_dev *hdev)
 {
 	struct btmrvl_private *priv = hci_get_drvdata(hdev);
@@ -228,6 +277,8 @@ void btmrvl_debugfs_init(struct hci_dev *hdev)
 			    priv, &btmrvl_hscfgcmd_fops);
 	debugfs_create_file("fw_dump", 0200, dbg->config_dir,
 			    priv, &btmrvl_fwdump_fops);
+	debugfs_create_file("debug_mask", 0644, dbg->config_dir,
+			    priv, &btmrvl_debug_mask_fops);
 
 	dbg->status_dir = debugfs_create_dir("status", hdev->debugfs);
 	debugfs_create_u8("curpsmode", 0444, dbg->status_dir,
