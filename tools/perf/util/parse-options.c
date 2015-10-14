@@ -563,9 +563,9 @@ static void print_option_help(const struct option *opts, int full)
 	int pad;
 
 	if (opts->type == OPTION_GROUP) {
-		fputc('\n', stderr);
+		fputc('\n', stdout);
 		if (*opts->help)
-			fprintf(stderr, "%s\n", opts->help);
+			fprintf(stdout, "%s\n", opts->help);
 		return;
 	}
 	if (!full && (opts->flags & PARSE_OPT_HIDDEN))
@@ -573,16 +573,16 @@ static void print_option_help(const struct option *opts, int full)
 	if (opts->flags & PARSE_OPT_DISABLED)
 		return;
 
-	pos = fprintf(stderr, "    ");
+	pos = fprintf(stdout, "    ");
 	if (opts->short_name)
-		pos += fprintf(stderr, "-%c", opts->short_name);
+		pos += fprintf(stdout, "-%c", opts->short_name);
 	else
-		pos += fprintf(stderr, "    ");
+		pos += fprintf(stdout, "    ");
 
 	if (opts->long_name && opts->short_name)
-		pos += fprintf(stderr, ", ");
+		pos += fprintf(stdout, ", ");
 	if (opts->long_name)
-		pos += fprintf(stderr, "--%s", opts->long_name);
+		pos += fprintf(stdout, "--%s", opts->long_name);
 
 	switch (opts->type) {
 	case OPTION_ARGUMENT:
@@ -593,11 +593,11 @@ static void print_option_help(const struct option *opts, int full)
 	case OPTION_UINTEGER:
 		if (opts->flags & PARSE_OPT_OPTARG)
 			if (opts->long_name)
-				pos += fprintf(stderr, "[=<n>]");
+				pos += fprintf(stdout, "[=<n>]");
 			else
-				pos += fprintf(stderr, "[<n>]");
+				pos += fprintf(stdout, "[<n>]");
 		else
-			pos += fprintf(stderr, " <n>");
+			pos += fprintf(stdout, " <n>");
 		break;
 	case OPTION_CALLBACK:
 		if (opts->flags & PARSE_OPT_NOARG)
@@ -607,19 +607,19 @@ static void print_option_help(const struct option *opts, int full)
 		if (opts->argh) {
 			if (opts->flags & PARSE_OPT_OPTARG)
 				if (opts->long_name)
-					pos += fprintf(stderr, "[=<%s>]", opts->argh);
+					pos += fprintf(stdout, "[=<%s>]", opts->argh);
 				else
-					pos += fprintf(stderr, "[<%s>]", opts->argh);
+					pos += fprintf(stdout, "[<%s>]", opts->argh);
 			else
-				pos += fprintf(stderr, " <%s>", opts->argh);
+				pos += fprintf(stdout, " <%s>", opts->argh);
 		} else {
 			if (opts->flags & PARSE_OPT_OPTARG)
 				if (opts->long_name)
-					pos += fprintf(stderr, "[=...]");
+					pos += fprintf(stdout, "[=...]");
 				else
-					pos += fprintf(stderr, "[...]");
+					pos += fprintf(stdout, "[...]");
 			else
-				pos += fprintf(stderr, " ...");
+				pos += fprintf(stdout, " ...");
 		}
 		break;
 	default: /* OPTION_{BIT,BOOLEAN,SET_UINT,SET_PTR} */
@@ -636,10 +636,10 @@ static void print_option_help(const struct option *opts, int full)
 	if (pos <= USAGE_OPTS_WIDTH)
 		pad = USAGE_OPTS_WIDTH - pos;
 	else {
-		fputc('\n', stderr);
+		fputc('\n', stdout);
 		pad = USAGE_OPTS_WIDTH;
 	}
-	fprintf(stderr, "%*s%s\n", pad + USAGE_GAP, "", opts->help);
+	fprintf(stdout, "%*s%s\n", pad + USAGE_GAP, "", opts->help);
 }
 
 int usage_with_options_internal(const char * const *usagestr,
@@ -648,23 +648,23 @@ int usage_with_options_internal(const char * const *usagestr,
 	if (!usagestr)
 		return PARSE_OPT_HELP;
 
-	fprintf(stderr, "\n usage: %s\n", *usagestr++);
+	fprintf(stdout, "\n usage: %s\n", *usagestr++);
 	while (*usagestr && **usagestr)
-		fprintf(stderr, "    or: %s\n", *usagestr++);
+		fprintf(stdout, "    or: %s\n", *usagestr++);
 	while (*usagestr) {
-		fprintf(stderr, "%s%s\n",
+		fprintf(stdout, "%s%s\n",
 				**usagestr ? "    " : "",
 				*usagestr);
 		usagestr++;
 	}
 
 	if (opts->type != OPTION_GROUP)
-		fputc('\n', stderr);
+		fputc('\n', stdout);
 
 	for (  ; opts->type != OPTION_END; opts++)
 		print_option_help(opts, full);
 
-	fputc('\n', stderr);
+	fputc('\n', stdout);
 
 	return PARSE_OPT_HELP;
 }
@@ -684,16 +684,16 @@ int parse_options_usage(const char * const *usagestr,
 	if (!usagestr)
 		goto opt;
 
-	fprintf(stderr, "\n usage: %s\n", *usagestr++);
+	fprintf(stdout, "\n usage: %s\n", *usagestr++);
 	while (*usagestr && **usagestr)
-		fprintf(stderr, "    or: %s\n", *usagestr++);
+		fprintf(stdout, "    or: %s\n", *usagestr++);
 	while (*usagestr) {
-		fprintf(stderr, "%s%s\n",
+		fprintf(stdout, "%s%s\n",
 				**usagestr ? "    " : "",
 				*usagestr);
 		usagestr++;
 	}
-	fputc('\n', stderr);
+	fputc('\n', stdout);
 
 opt:
 	for (  ; opts->type != OPTION_END; opts++) {
