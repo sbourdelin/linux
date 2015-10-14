@@ -440,10 +440,17 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 		      const struct ip_tunnel_info *tun_info)
 {
 	struct sw_flow_key key;
+	u32 mark = skb->mark;
 	int error;
 
 	OVS_CB(skb)->input_vport = vport;
 	OVS_CB(skb)->mru = 0;
+	if (dev_net(skb->dev) != ovs_dp_get_net(vport->dp)) {
+		skb_scrub_packet(skb, true);
+		tun_info = NULL;
+	}
+	skb->mark = mark;
+
 	/* Extract flow from 'skb' into 'key'. */
 	error = ovs_flow_key_extract(tun_info, skb, &key);
 	if (unlikely(error)) {
