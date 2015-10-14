@@ -407,9 +407,17 @@ static int __init bad_madt_entry(struct acpi_table_header *table,
 		ms++;
 	}
 	if (!ms->num_types) {
-		pr_err("undefined version for either FADT %d.%d or MADT %d\n",
-		       major, minor, madt->header.revision);
-		return 1;
+		if (IS_ENABLED(CONFIG_ARM64)) {
+			/* Enforce this stricture on arm64... */
+			pr_err("undefined version for either FADT %d.%d or MADT %d\n",
+			       major, minor, madt->header.revision);
+			return 1;
+		} else {
+			/* ... but relax it on legacy systems so they boot */
+			pr_warn("undefined version for either FADT %d.%d or MADT %d\n",
+			        major, minor, madt->header.revision);
+			return 0;
+		}
 	}
 
 	if (entry->type >= ms->num_types) {
