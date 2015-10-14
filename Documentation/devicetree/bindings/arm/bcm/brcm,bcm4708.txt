@@ -5,4 +5,11 @@ Boards with the BCM4708 SoC shall have the following properties:
 
 Required root node property:
 
+bcm94708
 compatible = "brcm,bcm4708";
+
+bcm94709
+compatible = "brcm,bcm4709";
+
+bcm953012
+compatible = "brcm,bcm53012";
