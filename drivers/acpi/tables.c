@@ -413,9 +413,17 @@ static int __init bad_madt_entry(struct acpi_table_header *table,
 	}
 
 	if (entry->type >= ms->num_types) {
-		pr_err("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
-		       major, minor, entry->type, entry->length);
-		return 1;
+		if (IS_ENABLED(CONFIG_ARM64)) {
+			/* Enforce this stricture on arm64... */
+			pr_err("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
+			       major, minor, entry->type, entry->length);
+			return 1;
+		} else {
+			/* ... but relax it on legacy systems so they boot */
+			pr_warn("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
+			         major, minor, entry->type, entry->length);
+			return 0;
+		}
 	}
 
 	/* verify that the table is allowed for this version of the spec */
