@@ -41,6 +41,7 @@
 	"1:	strex"B"	%0, %2, [%3]\n"			\
 	"	cmp		%0, #0\n"			\
 	"	movne		%0, %4\n"			\
+	"	movne		%1, %2\n"			\
 	"2:\n"							\
 	"	.section	 .text.fixup,\"ax\"\n"		\
 	"	.align		2\n"				\
