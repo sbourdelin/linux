@@ -712,16 +712,12 @@ struct btmrvl_private *btmrvl_add_card(void *card)
 	struct btmrvl_private *priv;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv) {
-		BT_ERR("Can not allocate priv");
+	if (!priv)
 		goto err_priv;
-	}
 
 	priv->adapter = kzalloc(sizeof(*priv->adapter), GFP_KERNEL);
-	if (!priv->adapter) {
-		BT_ERR("Allocate buffer for btmrvl_adapter failed!");
+	if (!priv->adapter)
 		goto err_adapter;
-	}
 
 	btmrvl_init_adapter(priv);
 

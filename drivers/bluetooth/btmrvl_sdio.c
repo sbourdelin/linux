@@ -1382,10 +1382,9 @@ done:
 		return;
 
 	fw_dump_data = vzalloc(fw_dump_len+1);
-	if (!fw_dump_data) {
-		BT_ERR("Vzalloc fw_dump_data fail!");
+	if (!fw_dump_data)
 		return;
-	}
+
 	fw_dump_ptr = fw_dump_data;
 
 	/* Dump all the memory data into single file, a userspace script will
