@@ -375,6 +375,23 @@
 	wp-gpios = <&gpio3 18 0>;
 };
 
+&usb {
+	status = "okay";
+};
+
+&usb_ctrl_mod {
+	status = "okay";
+};
+
+&usb0_phy {
+	status = "okay";
+};
+
+&usb0 {
+	status = "okay";
+	dr_mode = "host";
+};
+
 #include "tps65217.dtsi"
 
 &tps {
