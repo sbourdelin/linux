@@ -531,7 +531,8 @@ static int __debugfs_remove(struct dentry *dentry, struct dentry *parent)
 }
 
 /**
- * debugfs_remove - removes a file or directory from the debugfs filesystem
+ * debugfs_remove - removes a file or an empty directory from the debugfs
+ *		    filesystem
  * @dentry: a pointer to a the dentry of the file or directory to be
  *          removed.
  *
@@ -542,6 +543,9 @@ static int __debugfs_remove(struct dentry *dentry, struct dentry *parent)
  * This function is required to be called in order for the file to be
  * removed, no automatic cleanup of files will happen when a module is
  * removed, you are responsible here.
+ *
+ * For removing directory, if you are not sure it is empty or not, use
+ * debugfs_remove_recursive instead.
  */
 void debugfs_remove(struct dentry *dentry)
 {
