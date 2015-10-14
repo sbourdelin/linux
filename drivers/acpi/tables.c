@@ -416,7 +416,6 @@ static int __init bad_madt_entry(struct acpi_table_header *table,
 			/* ... but relax it on legacy systems so they boot */
 			pr_warn("undefined version for either FADT %d.%d or MADT %d\n",
 			        major, minor, madt->header.revision);
-			return 0;
 		}
 	}
 
@@ -430,16 +429,41 @@ static int __init bad_madt_entry(struct acpi_table_header *table,
 			/* ... but relax it on legacy systems so they boot */
 			pr_warn("undefined MADT subtable type for FADT %d.%d: %d (length %d)\n",
 			         major, minor, entry->type, entry->length);
-			return 0;
 		}
 	}
 
 	/* verify that the table is allowed for this version of the spec */
 	len = ms->lengths[entry->type];
 	if (!len) {
-		pr_err("MADT subtable %d not defined for FADT %d.%d\n",
-			 entry->type, major, minor);
-		return 1;
+		if (IS_ENABLED(CONFIG_ARM64)) {
+			pr_err("MADT subtable %d not defined for FADT %d.%d\n",
+			       entry->type, major, minor);
+			return 1;
+		} else {
+			pr_warn("MADT subtable %d not defined for FADT %d.%d\n",
+			        entry->type, major, minor);
+		}
+	}
+
+	/*
+	 * When we get this far, we may have issued warnings on either
+	 * a mismatch in FADT/MADT revisions, or have noted that the subtable
+	 * ID is not defined for the MADT revision we're using.  On some
+	 * architectures, this is an error, but for legacy systems, we need
+	 * to push on with other checks of the subtable.
+	 *
+	 * In fact, there are environments where the *only* value the FADT
+	 * revision will ever have is 2, regardless of anything else.  So,
+	 * for those systems to boot, we have to pretend the MADT is the
+	 * latest version to allow all known subtables since we have no way
+	 * to determine what revision it should be.
+	 */
+	if (!IS_ENABLED(CONFIG_ARM64) && major == 2) {
+		ms = spec_info;
+		while (ms->num_types != 0)
+			ms++;
+		ms--;
+		len = ms->lengths[entry->type];
 	}
 
 	/* verify that the length is what we expect */
