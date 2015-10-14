@@ -296,14 +296,37 @@ bool zcomp_set_max_streams(struct zcomp *comp, int num_strm)
 	return comp->set_max_streams(comp, num_strm);
 }
 
-struct zcomp_strm *zcomp_strm_find(struct zcomp *comp)
+static struct zcomp_strm *zcomp_strm_find(struct zcomp *comp)
 {
 	return comp->strm_find(comp);
 }
 
-void zcomp_strm_release(struct zcomp *comp, struct zcomp_strm *zstrm)
+static void zcomp_strm_release(struct zcomp *comp, struct zcomp_strm *zstrm)
 {
 	comp->strm_release(comp, zstrm);
+}
+
+/* Never return NULL, may sleep */
+struct zcomp_strm *zcomp_compress_begin(struct zcomp *comp)
+{
+	return zcomp_strm_find(comp);
+}
+
+void zcomp_compress_end(struct zcomp *comp, struct zcomp_strm *zstrm)
+{
+	zcomp_strm_release(comp, zstrm);
+}
+
+/* May return NULL, may sleep */
+struct zcomp_strm *zcomp_decompress_begin(struct zcomp *comp)
+{
+	return NULL;
+}
+
+void zcomp_decompress_end(struct zcomp *comp, struct zcomp_strm *zstrm)
+{
+	if (zstrm)
+		zcomp_strm_release(comp, zstrm);
 }
 
 int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
