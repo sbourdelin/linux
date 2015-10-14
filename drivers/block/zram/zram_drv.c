@@ -560,7 +560,8 @@ static void zram_free_page(struct zram *zram, size_t index)
 	zram_set_obj_size(meta, index, 0);
 }
 
-static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
+static int zram_decompress_page(struct zram *zram, struct zcomp_strm *zstrm,
+		char *mem, u32 index)
 {
 	int ret = 0;
 	unsigned char *cmem;
@@ -582,7 +583,7 @@ static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
 	if (size == PAGE_SIZE)
 		copy_page(mem, cmem);
 	else
-		ret = zcomp_decompress(zram->comp, cmem, size, mem);
+		ret = zcomp_decompress(zram->comp, zstrm, cmem, size, mem);
 	zs_unmap_object(meta->mem_pool, handle);
 	bit_spin_unlock(ZRAM_ACCESS, &meta->table[index].value);
 
@@ -602,6 +603,7 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 	struct page *page;
 	unsigned char *user_mem, *uncmem = NULL;
 	struct zram_meta *meta = zram->meta;
+	struct zcomp_strm *zstrm;
 	page = bvec->bv_page;
 
 	bit_spin_lock(ZRAM_ACCESS, &meta->table[index].value);
@@ -617,6 +619,7 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 		/* Use  a temporary buffer to decompress the page */
 		uncmem = kmalloc(PAGE_SIZE, GFP_NOIO);
 
+	zstrm = zcomp_decompress_begin(zram->comp);
 	user_mem = kmap_atomic(page);
 	if (!is_partial_io(bvec))
 		uncmem = user_mem;
@@ -627,7 +630,7 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 		goto out_cleanup;
 	}
 
-	ret = zram_decompress_page(zram, uncmem, index);
+	ret = zram_decompress_page(zram, zstrm, uncmem, index);
 	/* Should NEVER happen. Return bio error if it does. */
 	if (unlikely(ret))
 		goto out_cleanup;
@@ -636,10 +639,14 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 		memcpy(user_mem + bvec->bv_offset, uncmem + offset,
 				bvec->bv_len);
 
+	zcomp_decompress_end(zram->comp, zstrm);
+	zstrm = NULL;
+
 	flush_dcache_page(page);
 	ret = 0;
 out_cleanup:
 	kunmap_atomic(user_mem);
+	zcomp_decompress_end(zram->comp, zstrm);
 	if (is_partial_io(bvec))
 		kfree(uncmem);
 	return ret;
@@ -659,6 +666,7 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 
 	page = bvec->bv_page;
 	if (is_partial_io(bvec)) {
+		struct zcomp_strm *zstrm;
 		/*
 		 * This is a partial IO. We need to read the full page
 		 * before to write the changes.
@@ -668,7 +676,11 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 			ret = -ENOMEM;
 			goto out;
 		}
-		ret = zram_decompress_page(zram, uncmem, index);
+
+		zstrm = zcomp_decompress_begin(zram->comp);
+		ret = zram_decompress_page(zram, zstrm, uncmem, index);
+		zcomp_decompress_end(zram->comp, zstrm);
+
 		if (ret)
 			goto out;
 	}
