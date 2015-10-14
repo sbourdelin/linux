@@ -38,6 +38,7 @@
 #include <asm/mach/pci.h>
 #include <asm/fixmap.h>
 
+#include "fault.h"
 #include "mm.h"
 #include "tcm.h"
 
@@ -1259,6 +1260,20 @@ void __init arm_mm_memblock_reserve(void)
 }
 
 /*
+ * Abort handler to be used only during unmasking of imprecise aborts. This
+ * makes sure that the machine will not die if the firmware/bootloader left an
+ * imprecise abort pending for us to trip over.
+ */
+static int __init early_abort_handler(unsigned long addr, unsigned int fsr,
+				      struct pt_regs *regs)
+{
+	pr_warn("Hit pending imprecise external abort during first unmask, "
+		"this is most likely caused by a firmware/bootloader bug.\n");
+
+	return 0;
+}
+
+/*
  * Set up the device mappings.  Since we clear out the page tables for all
  * mappings above VMALLOC_START, except early fixmap, we might remove debug
  * device mappings.  This means earlycon can be used to debug this function
@@ -1269,7 +1284,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 {
 	struct map_desc map;
 	unsigned long addr;
-	void *vectors;
+	void *vectors, *saved_fault_fn;
 
 	/*
 	 * Allocate the vector page early.
@@ -1365,7 +1380,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	flush_cache_all();
 
 	/* Enable asynchronous aborts */
+	saved_fault_fn = swap_fault_function(22, early_abort_handler);
 	local_abt_enable();
+	swap_fault_function(22, saved_fault_fn);
 }
 
 static void __init kmap_init(void)

@@ -24,5 +24,7 @@ static inline int fsr_fs(unsigned int fsr)
 
 void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
 unsigned long search_exception_table(unsigned long addr);
+void *swap_fault_function(int nr,
+		int (*fn)(unsigned long, unsigned int, struct pt_regs *));
 
 #endif	/* __ARCH_ARM_FAULT_H */

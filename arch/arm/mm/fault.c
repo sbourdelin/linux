@@ -538,6 +538,21 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 	fsr_info[nr].name = name;
 }
 
+void * __init
+swap_fault_function(int nr,
+		    int (*fn)(unsigned long, unsigned int, struct pt_regs *))
+{
+	void *old_fn;
+
+	if (nr < 0 || nr >= ARRAY_SIZE(fsr_info))
+		BUG();
+
+	old_fn = fsr_info[nr].fn;
+	fsr_info[nr].fn = fn;
+
+	return old_fn;
+}
+
 /*
  * Dispatch a data abort to the relevant handler.
  */
