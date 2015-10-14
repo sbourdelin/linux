@@ -191,6 +191,8 @@ struct ib_mad_qp_info {
 	struct ib_mad_snoop_private **snoop_table;
 	int snoop_table_size;
 	atomic_t snoop_count;
+	enum ib_qp_type qp_type;
+	u32 qp_num;
 };
 
 struct ib_mad_port_private {
