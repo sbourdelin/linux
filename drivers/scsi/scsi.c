@@ -970,7 +970,7 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 	struct scsi_device *next = NULL;
 	unsigned long flags;
 
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->device_lock, flags);
 	while (list->next != &shost->__devices) {
 		next = list_entry(list->next, struct scsi_device, siblings);
 		/* skip devices that we can't get a reference to */
@@ -979,7 +979,7 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 		next = NULL;
 		list = list->next;
 	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->device_lock, flags);
 
 	if (prev)
 		scsi_device_put(prev);
@@ -1144,11 +1144,11 @@ struct scsi_device *scsi_device_lookup(struct Scsi_Host *shost,
 	struct scsi_device *sdev;
 	unsigned long flags;
 
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->device_lock, flags);
 	sdev = __scsi_device_lookup(shost, channel, id, lun);
 	if (sdev && scsi_device_get(sdev))
 		sdev = NULL;
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->device_lock, flags);
 
 	return sdev;
 }

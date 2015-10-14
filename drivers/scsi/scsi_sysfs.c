@@ -1131,20 +1131,18 @@ static void __scsi_remove_target(struct scsi_target *starget)
 	unsigned long flags;
 	struct scsi_device *sdev;
 
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->device_lock, flags);
  restart:
 	list_for_each_entry(sdev, &shost->__devices, siblings) {
 		if (sdev->channel != starget->channel ||
 		    sdev->id != starget->id ||
 		    scsi_device_get(sdev))
 			continue;
-		spin_unlock_irqrestore(shost->host_lock, flags);
 		scsi_remove_device(sdev);
 		scsi_device_put(sdev);
-		spin_lock_irqsave(shost->host_lock, flags);
 		goto restart;
 	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->device_lock, flags);
 }
 
 /**
@@ -1164,22 +1162,22 @@ void scsi_remove_target(struct device *dev)
 	/* remove targets being careful to lookup next entry before
 	 * deleting the last
 	 */
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->target_lock, flags);
 	list_for_each_entry(starget, &shost->__targets, siblings) {
 		if (starget->state == STARGET_DEL)
 			continue;
 		if (starget->dev.parent == dev || &starget->dev == dev) {
 			/* assuming new targets arrive at the end */
 			kref_get(&starget->reap_ref);
-			spin_unlock_irqrestore(shost->host_lock, flags);
+			spin_unlock_irqrestore(&shost->target_lock, flags);
 			if (last)
 				scsi_target_reap(last);
 			last = starget;
 			__scsi_remove_target(starget);
-			spin_lock_irqsave(shost->host_lock, flags);
+			spin_lock_irqsave(&shost->target_lock, flags);
 		}
 	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->target_lock, flags);
 
 	if (last)
 		scsi_target_reap(last);
@@ -1262,10 +1260,10 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 		sdev->lun_in_cdb = 1;
 
 	transport_setup_device(&sdev->sdev_gendev);
-	spin_lock_irqsave(shost->host_lock, flags);
+	spin_lock_irqsave(&shost->device_lock, flags);
 	list_add_tail(&sdev->same_target_siblings, &starget->devices);
 	list_add_tail(&sdev->siblings, &shost->__devices);
-	spin_unlock_irqrestore(shost->host_lock, flags);
+	spin_unlock_irqrestore(&shost->device_lock, flags);
 	/*
 	 * device can now only be removed via __scsi_remove_device() so hold
 	 * the target.  Target will be held in CREATED state until something

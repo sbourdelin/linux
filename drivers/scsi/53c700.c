@@ -1093,6 +1093,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, struct scsi_cmnd *SCp,
 		struct NCR_700_command_slot *slot;
 		__u8 reselection_id = hostdata->reselection_id;
 		struct scsi_device *SDp;
+		unsigned long flags;
 
 		lun = hostdata->msgin[0] & 0x1f;
 
@@ -1100,7 +1101,9 @@ process_script_interrupt(__u32 dsps, __u32 dsp, struct scsi_cmnd *SCp,
 		DEBUG(("scsi%d: (%d:%d) RESELECTED!\n",
 		       host->host_no, reselection_id, lun));
 		/* clear the reselection indicator */
+		spin_lock_irqsave(host->device_lock, flags);
 		SDp = __scsi_device_lookup(host, 0, reselection_id, lun);
+		spin_unlock_irqrestore(host->device_lock, flags);
 		if(unlikely(SDp == NULL)) {
 			printk(KERN_ERR "scsi%d: (%d:%d) HAS NO device\n",
 			       host->host_no, reselection_id, lun);

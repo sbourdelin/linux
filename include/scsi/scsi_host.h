@@ -558,6 +558,8 @@ struct Scsi_Host {
 
 	spinlock_t		default_lock;
 	spinlock_t		*host_lock;
+	spinlock_t		device_lock; /* protects the __devices list */
+	spinlock_t		target_lock; /* protects the __targets list */
 
 	struct mutex		scan_mutex;/* serialize scanning activity */
 
