@@ -624,11 +624,9 @@ static void CfgConnectResult(enum conn_event enuConnDisconnEvent,
 			u8WLANChannel = INVALID_CHANNEL;
 		/*Incase "P2P CLIENT Connected" send deauthentication reason by 3 to force the WPA_SUPPLICANT to directly change
 		 *      virtual interface to station*/
-		if (pstrWFIDrv->IFC_UP &&
-		   (dev == wl->strInterfaceInfo[1].wilc_netdev))
+		if (pstrWFIDrv->IFC_UP && (dev == wl->vif[1].wilc_netdev))
 			pstrDisconnectNotifInfo->u16reason = 3;
-		else if (!pstrWFIDrv->IFC_UP &&
-			(dev == wl->strInterfaceInfo[1].wilc_netdev))
+		else if (!pstrWFIDrv->IFC_UP && (dev == wl->vif[1].wilc_netdev))
 			pstrDisconnectNotifInfo->u16reason = 1;
 
 		cfg80211_disconnected(dev, pstrDisconnectNotifInfo->u16reason, pstrDisconnectNotifInfo->ie,
@@ -1255,7 +1253,7 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 
 				/*save keys only on interface 0 (wifi interface)*/
 				if (!g_gtk_keys_saved &&
-				    netdev == wl->strInterfaceInfo[0].wilc_netdev) {
+				    netdev == wl->vif[0].wilc_netdev) {
 					g_add_gtk_key_params.key_idx = key_index;
 					g_add_gtk_key_params.pairwise = pairwise;
 					if (!mac_addr) {
@@ -1292,7 +1290,7 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 
 				/*save keys only on interface 0 (wifi interface)*/
 				if (!g_ptk_keys_saved &&
-				    netdev == wl->strInterfaceInfo[0].wilc_netdev) {
+				    netdev == wl->vif[0].wilc_netdev) {
 					g_add_ptk_key_params.key_idx = key_index;
 					g_add_ptk_key_params.pairwise = pairwise;
 					if (!mac_addr) {
@@ -1357,7 +1355,7 @@ static int del_key(struct wiphy *wiphy, struct net_device *netdev,
 	priv = wiphy_priv(wiphy);
 
 	/*delete saved keys, if any*/
-	if (netdev == wl->strInterfaceInfo[0].wilc_netdev) {
+	if (netdev == wl->vif[0].wilc_netdev) {
 		g_ptk_keys_saved = false;
 		g_gtk_keys_saved = false;
 		g_wep_keys_saved = false;
@@ -2574,7 +2572,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 
 		if (wl->initialized) {
 			host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
-						      wl->strInterfaceInfo[0].aBSSID,
+						      wl->vif[0].aBSSID,
 						      TID);
 			/* ensure that the message Q is empty */
 			host_int_wait_msg_queue_idle();
@@ -2588,16 +2586,16 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 			nic->iftype = interface_type;
 
 			/*Setting interface 1 drv handler and mac address in newly downloaded FW*/
-			host_int_set_wfi_drv_handler(wl->strInterfaceInfo[0].drvHandler);
-			host_int_set_MacAddress(wl->strInterfaceInfo[0].drvHandler,
-						wl->strInterfaceInfo[0].aSrcAddress);
+			host_int_set_wfi_drv_handler(wl->vif[0].drvHandler);
+			host_int_set_MacAddress(wl->vif[0].drvHandler,
+						wl->vif[0].aSrcAddress);
 			host_int_set_operation_mode(priv->hWILCWFIDrv, STATION_MODE);
 
 			/*Add saved WEP keys, if any*/
 			if (g_wep_keys_saved) {
-				host_int_set_WEPDefaultKeyID(wl->strInterfaceInfo[0].drvHandler,
+				host_int_set_WEPDefaultKeyID(wl->vif[0].drvHandler,
 							     g_key_wep_params.key_idx);
-				host_int_add_wep_key_bss_sta(wl->strInterfaceInfo[0].drvHandler,
+				host_int_add_wep_key_bss_sta(wl->vif[0].drvHandler,
 							     g_key_wep_params.key,
 							     g_key_wep_params.key_len,
 							     g_key_wep_params.key_idx);
@@ -2615,15 +2613,15 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 				PRINT_D(CFG80211_DBG, "gtk %x %x %x\n", g_key_gtk_params.key[0],
 					g_key_gtk_params.key[1],
 					g_key_gtk_params.key[2]);
-				add_key(wl->strInterfaceInfo[0].wilc_netdev->ieee80211_ptr->wiphy,
-					wl->strInterfaceInfo[0].wilc_netdev,
+				add_key(wl->vif[0].wilc_netdev->ieee80211_ptr->wiphy,
+					wl->vif[0].wilc_netdev,
 					g_add_ptk_key_params.key_idx,
 					g_add_ptk_key_params.pairwise,
 					g_add_ptk_key_params.mac_addr,
 					(struct key_params *)(&g_key_ptk_params));
 
-				add_key(wl->strInterfaceInfo[0].wilc_netdev->ieee80211_ptr->wiphy,
-					wl->strInterfaceInfo[0].wilc_netdev,
+				add_key(wl->vif[0].wilc_netdev->ieee80211_ptr->wiphy,
+					wl->vif[0].wilc_netdev,
 					g_add_gtk_key_params.key_idx,
 					g_add_gtk_key_params.pairwise,
 					g_add_gtk_key_params.mac_addr,
@@ -2651,7 +2649,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		PRINT_D(HOSTAPD_DBG, "Interface type = NL80211_IFTYPE_P2P_CLIENT\n");
 
 		host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
-					      wl->strInterfaceInfo[0].aBSSID, TID);
+					      wl->vif[0].aBSSID, TID);
 
 		dev->ieee80211_ptr->iftype = type;
 		priv->wdev->iftype = type;
@@ -2668,16 +2666,16 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 			wilc1000_wlan_init(dev, nic);
 			g_wilc_initialized = 1;
 
-			host_int_set_wfi_drv_handler(wl->strInterfaceInfo[0].drvHandler);
-			host_int_set_MacAddress(wl->strInterfaceInfo[0].drvHandler,
-						wl->strInterfaceInfo[0].aSrcAddress);
+			host_int_set_wfi_drv_handler(wl->vif[0].drvHandler);
+			host_int_set_MacAddress(wl->vif[0].drvHandler,
+						wl->vif[0].aSrcAddress);
 			host_int_set_operation_mode(priv->hWILCWFIDrv, STATION_MODE);
 
 			/*Add saved WEP keys, if any*/
 			if (g_wep_keys_saved) {
-				host_int_set_WEPDefaultKeyID(wl->strInterfaceInfo[0].drvHandler,
+				host_int_set_WEPDefaultKeyID(wl->vif[0].drvHandler,
 							     g_key_wep_params.key_idx);
-				host_int_add_wep_key_bss_sta(wl->strInterfaceInfo[0].drvHandler,
+				host_int_add_wep_key_bss_sta(wl->vif[0].drvHandler,
 							     g_key_wep_params.key,
 							     g_key_wep_params.key_len,
 							     g_key_wep_params.key_idx);
@@ -2695,15 +2693,15 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 				PRINT_D(CFG80211_DBG, "gtk %x %x %x\n", g_key_gtk_params.key[0],
 					g_key_gtk_params.key[1],
 					g_key_gtk_params.key[2]);
-				add_key(wl->strInterfaceInfo[0].wilc_netdev->ieee80211_ptr->wiphy,
-					wl->strInterfaceInfo[0].wilc_netdev,
+				add_key(wl->vif[0].wilc_netdev->ieee80211_ptr->wiphy,
+					wl->vif[0].wilc_netdev,
 					g_add_ptk_key_params.key_idx,
 					g_add_ptk_key_params.pairwise,
 					g_add_ptk_key_params.mac_addr,
 					(struct key_params *)(&g_key_ptk_params));
 
-				add_key(wl->strInterfaceInfo[0].wilc_netdev->ieee80211_ptr->wiphy,
-					wl->strInterfaceInfo[0].wilc_netdev,
+				add_key(wl->vif[0].wilc_netdev->ieee80211_ptr->wiphy,
+					wl->vif[0].wilc_netdev,
 					g_add_gtk_key_params.key_idx,
 					g_add_gtk_key_params.pairwise,
 					g_add_gtk_key_params.mac_addr,
@@ -2762,7 +2760,7 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 		/*hWaitResponse semaphore, which allows previous config*/
 		/*packets to actually take action on old FW*/
 		host_int_del_All_Rx_BASession(priv->hWILCWFIDrv,
-					      wl->strInterfaceInfo[0].aBSSID,
+					      wl->vif[0].aBSSID,
 					      TID);
 		bEnablePS = false;
 		PRINT_D(HOSTAPD_DBG, "Interface type = NL80211_IFTYPE_GO\n");
@@ -2784,16 +2782,16 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 
 
 		/*Setting interface 1 drv handler and mac address in newly downloaded FW*/
-		host_int_set_wfi_drv_handler(wl->strInterfaceInfo[0].drvHandler);
-		host_int_set_MacAddress(wl->strInterfaceInfo[0].drvHandler,
-					wl->strInterfaceInfo[0].aSrcAddress);
+		host_int_set_wfi_drv_handler(wl->vif[0].drvHandler);
+		host_int_set_MacAddress(wl->vif[0].drvHandler,
+					wl->vif[0].aSrcAddress);
 		host_int_set_operation_mode(priv->hWILCWFIDrv, AP_MODE);
 
 		/*Add saved WEP keys, if any*/
 		if (g_wep_keys_saved) {
-			host_int_set_WEPDefaultKeyID(wl->strInterfaceInfo[0].drvHandler,
+			host_int_set_WEPDefaultKeyID(wl->vif[0].drvHandler,
 						     g_key_wep_params.key_idx);
-			host_int_add_wep_key_bss_sta(wl->strInterfaceInfo[0].drvHandler,
+			host_int_add_wep_key_bss_sta(wl->vif[0].drvHandler,
 						     g_key_wep_params.key,
 						     g_key_wep_params.key_len,
 						     g_key_wep_params.key_idx);
@@ -2813,15 +2811,15 @@ static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 				g_key_gtk_params.key[1],
 				g_key_gtk_params.key[2],
 				g_key_gtk_params.cipher);
-			add_key(wl->strInterfaceInfo[0].wilc_netdev->ieee80211_ptr->wiphy,
-				wl->strInterfaceInfo[0].wilc_netdev,
+			add_key(wl->vif[0].wilc_netdev->ieee80211_ptr->wiphy,
+				wl->vif[0].wilc_netdev,
 				g_add_ptk_key_params.key_idx,
 				g_add_ptk_key_params.pairwise,
 				g_add_ptk_key_params.mac_addr,
 				(struct key_params *)(&g_key_ptk_params));
 
-			add_key(wl->strInterfaceInfo[0].wilc_netdev->ieee80211_ptr->wiphy,
-				wl->strInterfaceInfo[0].wilc_netdev,
+			add_key(wl->vif[0].wilc_netdev->ieee80211_ptr->wiphy,
+				wl->vif[0].wilc_netdev,
 				g_add_gtk_key_params.key_idx,
 				g_add_gtk_key_params.pairwise,
 				g_add_gtk_key_params.mac_addr,
@@ -2890,7 +2888,7 @@ static int start_ap(struct wiphy *wiphy, struct net_device *dev,
 	if (s32Error != 0)
 		PRINT_ER("Error in setting channel\n");
 
-	linux_wlan_set_bssid(dev, wl->strInterfaceInfo[0].aSrcAddress);
+	linux_wlan_set_bssid(dev, wl->vif[0].aSrcAddress);
 
 	s32Error = host_int_add_beacon(priv->hWILCWFIDrv,
 					settings->beacon_interval,
