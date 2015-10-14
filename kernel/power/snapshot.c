@@ -1970,6 +1970,11 @@ int snapshot_read_next(struct snapshot_handle *handle)
 		error = init_header((struct swsusp_info *)buffer);
 		if (error)
 			return error;
+
+		arch_image_info_save((char *)buffer + SWSUSP_INFO_ACTUAL_SIZE,
+				     NULL,
+				     PAGE_SIZE-SWSUSP_INFO_ACTUAL_SIZE);
+
 		handle->buffer = buffer;
 		memory_bm_position_reset(&orig_bm);
 		memory_bm_position_reset(&copy_bm);
@@ -2490,6 +2495,9 @@ int snapshot_write_next(struct snapshot_handle *handle)
 		error = load_header(buffer);
 		if (error)
 			return error;
+
+		arch_image_info_check(NULL,
+				     (char *)buffer + SWSUSP_INFO_ACTUAL_SIZE);
 
 		error = memory_bm_create(&copy_bm, GFP_ATOMIC, PG_ANY);
 		if (error)

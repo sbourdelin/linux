@@ -14,6 +14,14 @@ struct swsusp_info {
 	unsigned long		size;
 } __aligned(PAGE_SIZE);
 
+/*
+ *  Since struct swsusp_info will take one page size,
+ *  some platforms save the extra data right after the
+ *  last structure element.
+ */
+#define SWSUSP_INFO_ACTUAL_SIZE \
+	(offsetof(struct swsusp_info, size) + sizeof(unsigned long))
+
 #ifdef CONFIG_HIBERNATION
 /* kernel/power/snapshot.c */
 extern void __init hibernate_reserved_size_init(void);

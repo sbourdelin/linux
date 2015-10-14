@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <linux/freezer.h>
 #include <asm/errno.h>
+#include <asm/suspend.h>
 
 #ifdef CONFIG_VT
 extern void pm_set_vt_switch(int);
@@ -360,6 +361,21 @@ static inline int hibernate(void) { return -ENOSYS; }
 static inline bool system_entering_hibernation(void) { return false; }
 static inline bool hibernation_available(void) { return false; }
 #endif /* CONFIG_HIBERNATION */
+
+#ifndef CONFIG_ARCH_RESUME_IMAGE_CHECKER
+static inline bool arch_image_info_check(const char *new,
+					 const char *old)
+{
+	return true;
+}
+
+static inline int arch_image_info_save(char *dst,
+					char *src,
+					unsigned int limit_len)
+{
+	return 0;
+}
+#endif
 
 /* Hibernation and suspend events */
 #define PM_HIBERNATION_PREPARE	0x0001 /* Going to hibernate */
