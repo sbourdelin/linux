@@ -423,7 +423,7 @@ config SCSI_ACARD
 
 config SCSI_AHA152X
 	tristate "Adaptec AHA152X/2825 support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	select SCSI_SPI_ATTRS
 	select CHECK_SIGNATURE
 	---help---
@@ -516,7 +516,7 @@ config SCSI_ADVANSYS
 
 config SCSI_IN2000
 	tristate "Always IN2000 SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	help
 	  This is support for an ISA bus SCSI host adapter.  You'll find more
 	  information in <file:Documentation/scsi/in2000.txt>. If it doesn't work
@@ -664,7 +664,7 @@ config SCSI_DMX3191D
 
 config SCSI_DTC3280
 	tristate "DTC3180/3280 SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	select SCSI_SPI_ATTRS
 	select CHECK_SIGNATURE
 	help
@@ -783,7 +783,7 @@ config SCSI_ISCI
 
 config SCSI_GENERIC_NCR5380
 	tristate "Generic NCR5380/53c400 SCSI PIO support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	select SCSI_SPI_ATTRS
 	---help---
 	  This is a driver for the old NCR 53c80 series of SCSI controllers
@@ -803,7 +803,7 @@ config SCSI_GENERIC_NCR5380
 
 config SCSI_GENERIC_NCR5380_MMIO
 	tristate "Generic NCR5380/53c400 SCSI MMIO support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	select SCSI_SPI_ATTRS
 	---help---
 	  This is a driver for the old NCR 53c80 series of SCSI controllers
@@ -977,7 +977,7 @@ config SCSI_IZIP_SLOW_CTR
 
 config SCSI_NCR53C406A
 	tristate "NCR53c406a SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	help
 	  This is support for the NCR53c406a SCSI host adapter.  For user
 	  configurable parameters, check out <file:drivers/scsi/NCR53c406a.c>
@@ -1245,7 +1245,7 @@ config SCSI_NCR53C8XX_NO_DISCONNECT
 
 config SCSI_PAS16
 	tristate "PAS16 SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	select SCSI_SPI_ATTRS
 	---help---
 	  This is support for a SCSI host adapter.  It is explained in section
@@ -1259,7 +1259,7 @@ config SCSI_PAS16
 
 config SCSI_QLOGIC_FAS
 	tristate "Qlogic FAS SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	---help---
 	  This is a driver for the ISA, VLB, and PCMCIA versions of the Qlogic
 	  FastSCSI! cards as well as any other card based on the FASXX chip
@@ -1328,7 +1328,7 @@ config SCSI_SIM710
 
 config SCSI_SYM53C416
 	tristate "Symbios 53c416 SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	---help---
 	  This is support for the sym53c416 SCSI host adapter, the SCSI
 	  adapter that comes with some HP scanners. This driver requires that
@@ -1379,7 +1379,7 @@ config SCSI_AM53C974
 
 config SCSI_T128
 	tristate "Trantor T128/T128F/T228 SCSI support"
-	depends on ISA && SCSI
+	depends on (ISA || COMPILE_TEST) && SCSI
 	select SCSI_SPI_ATTRS
 	select CHECK_SIGNATURE
 	---help---
