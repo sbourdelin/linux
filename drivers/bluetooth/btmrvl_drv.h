@@ -79,6 +79,7 @@ struct btmrvl_device {
 struct btmrvl_adapter {
 	void *hw_regs_buf;
 	u8 *hw_regs;
+	unsigned int debug_mask;
 	u32 int_count;
 	struct sk_buff_head tx_queue;
 	u8 psmode;
@@ -155,8 +156,40 @@ struct btmrvl_event {
 	u8 data[4];
 } __packed;
 
-/* Prototype of global function */
+/* marvell bluetooth driver debug level */
+enum BTMRVL_DEBUG_LEVEL {
+	BTMRVL_DBG_MSG		= 0x00000001,
+	BTMRVL_DBG_FATAL	= 0x00000002,
+	BTMRVL_DBG_ERROR	= 0x00000004,
+	BTMRVL_DBG_DATA		= 0x00000008,
+	BTMRVL_DBG_CMD		= 0x00000010,
+	BTMRVL_DBG_EVENT	= 0x00000020,
+	BTMRVL_DBG_INTR		= 0x00000040,
 
+	BTMRVL_DBG_DAT_D	= 0x00010000,
+	BTMRVL_DBG_CMD_D	= 0x00020000,
+
+	BTMRVL_DBG_ENTRY	= 0x10000000,
+	BTMRVL_DBG_WARN		= 0x20000000,
+	BTMRVL_DBG_INFO		= 0x40000000,
+
+	BTMRVL_DBG_ANY		= 0xffffffff
+};
+
+#define BTMRVL_DBG_DEFAULT_MASK		(BTMRVL_DBG_MSG | \
+					 BTMRVL_DBG_FATAL | \
+					 BTMRVL_DBG_ERROR)
+
+int btmrvl_log_allowed(struct btmrvl_adapter *adapter,
+		       enum BTMRVL_DEBUG_LEVEL level);
+
+#define btmrvl_dbg(adapter, dbg_mask, fmt, args...)		\
+do {								\
+	if (btmrvl_log_allowed(adapter, BTMRVL_DBG_##dbg_mask))	\
+		pr_info("btmrvl: " fmt "\n", ##args);		\
+} while (0)
+
+/* Prototype of global function */
 int btmrvl_register_hdev(struct btmrvl_private *priv);
 struct btmrvl_private *btmrvl_add_card(void *card);
 int btmrvl_remove_card(struct btmrvl_private *priv);

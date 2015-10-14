@@ -29,6 +29,23 @@
 
 #define VERSION "1.0"
 
+static unsigned int debug_mask = BTMRVL_DBG_DEFAULT_MASK;
+module_param(debug_mask, uint, 0);
+MODULE_PARM_DESC(debug_mask, "bitmap for debug flags");
+
+int btmrvl_log_allowed(struct btmrvl_adapter *adapter,
+		       enum BTMRVL_DEBUG_LEVEL level)
+{
+	if (!adapter && (BTMRVL_DBG_DEFAULT_MASK & level))
+		return true;
+
+	if (adapter->debug_mask & level)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL_GPL(btmrvl_log_allowed);
+
 /*
  * This function is called by interface specific interrupt handler.
  * It updates Power Save & Host Sleep states, and wakes up the main
@@ -402,6 +419,7 @@ static void btmrvl_init_adapter(struct btmrvl_private *priv)
 	skb_queue_head_init(&priv->adapter->tx_queue);
 
 	priv->adapter->ps_state = PS_AWAKE;
+	priv->adapter->debug_mask = debug_mask;
 
 	buf_size = ALIGN_SZ(SDIO_BLOCK_SIZE, BTSDIO_DMA_ALIGN);
 	priv->adapter->hw_regs_buf = kzalloc(buf_size, GFP_KERNEL);
