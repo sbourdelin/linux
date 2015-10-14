@@ -183,7 +183,9 @@ struct ib_mad_queue {
 
 struct ib_mad_qp_info {
 	struct ib_mad_port_private *port_priv;
-	struct ib_qp *qp;
+	rwlock_t qp_lock; /* Protects the contents of the qp array */
+	struct ib_qp **qp;
+	int num_qps;
 	struct ib_srq *srq;
 	struct ib_mad_queue send_queue;
 	struct ib_mad_queue recv_queue;
