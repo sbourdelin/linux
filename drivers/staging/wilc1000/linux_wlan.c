@@ -366,7 +366,7 @@ struct net_device *GetIfHandler(u8 *pMacHeader)
 	Bssid  = pMacHeader + 10;
 	Bssid1 = pMacHeader + 4;
 
-	for (i = 0; i < wl->u8NoIfcs; i++)
+	for (i = 0; i < wl->vif_num; i++)
 		if (!memcmp(Bssid1, wl->strInterfaceInfo[i].aBSSID, ETH_ALEN) ||
 		    !memcmp(Bssid, wl->strInterfaceInfo[i].aBSSID, ETH_ALEN))
 			return wl->strInterfaceInfo[i].wilc_netdev;
@@ -376,7 +376,7 @@ struct net_device *GetIfHandler(u8 *pMacHeader)
 		PRINT_D(INIT_DBG, "%02x ", pMacHeader[i]);
 	Bssid  = pMacHeader + 18;
 	Bssid1 = pMacHeader + 12;
-	for (i = 0; i < wl->u8NoIfcs; i++)
+	for (i = 0; i < wl->vif_num; i++)
 		if (!memcmp(Bssid1, wl->strInterfaceInfo[i].aBSSID, ETH_ALEN) ||
 		    !memcmp(Bssid, wl->strInterfaceInfo[i].aBSSID, ETH_ALEN))
 			return wl->strInterfaceInfo[i].wilc_netdev;
@@ -391,7 +391,7 @@ int linux_wlan_set_bssid(struct net_device *wilc_netdev, u8 *pBSSID)
 	int ret = -1;
 
 	PRINT_D(INIT_DBG, "set bssid on[%p]\n", wilc_netdev);
-	for (i = 0; i < wl->u8NoIfcs; i++)
+	for (i = 0; i < wl->vif_num; i++)
 		if (wl->strInterfaceInfo[i].wilc_netdev == wilc_netdev) {
 			memcpy(wl->strInterfaceInfo[i].aBSSID, pBSSID, 6);
 			ret = 0;
@@ -408,7 +408,7 @@ int linux_wlan_get_num_conn_ifcs(void)
 	u8 null_bssid[6] = {0};
 	u8 ret_val = 0;
 
-	for (i = 0; i < wl->u8NoIfcs; i++)
+	for (i = 0; i < wl->vif_num; i++)
 		if (memcmp(wl->strInterfaceInfo[i].aBSSID, null_bssid, 6))
 			ret_val++;
 
@@ -1310,7 +1310,7 @@ int mac_open(struct net_device *ndev)
 	PRINT_D(INIT_DBG, "Mac address: %pM\n", mac_add);
 
 	/* loop through the NUM of supported devices and set the MAC address */
-	for (i = 0; i < wl->u8NoIfcs; i++)
+	for (i = 0; i < wl->vif_num; i++)
 		if (ndev == wl->strInterfaceInfo[i].wilc_netdev) {
 			memcpy(wl->strInterfaceInfo[i].aSrcAddress, mac_add, ETH_ALEN);
 			wl->strInterfaceInfo[i].drvHandler = priv->hWILCWFIDrv;
@@ -1680,7 +1680,7 @@ void WILC_WFI_mgmt_rx(u8 *buff, u32 size)
 
 	/*Pass the frame on the monitor interface, if any.*/
 	/*Otherwise, pass it on p2p0 netdev, if registered on it*/
-	for (i = 0; i < wl->u8NoIfcs; i++) {
+	for (i = 0; i < wl->vif_num; i++) {
 		nic = netdev_priv(wl->strInterfaceInfo[i].wilc_netdev);
 		if (nic->monitor_flag) {
 			WILC_WFI_monitor_rx(buff, size);
@@ -1733,10 +1733,10 @@ int wilc_netdev_init(void)
 		} else
 			strcpy(ndev->name, "p2p%d");
 
-		nic->u8IfIdx = wl->u8NoIfcs;
+		nic->u8IfIdx = wl->vif_num;
 		nic->wilc_netdev = ndev;
-		wl->strInterfaceInfo[wl->u8NoIfcs].wilc_netdev = ndev;
-		wl->u8NoIfcs++;
+		wl->strInterfaceInfo[wl->vif_num].wilc_netdev = ndev;
+		wl->vif_num++;
 		ndev->netdev_ops = &wilc_netdev_ops;
 
 		{
