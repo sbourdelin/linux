@@ -150,7 +150,7 @@ config SSB_EMBEDDED
 
 config SSB_DRIVER_EXTIF
 	bool "SSB Broadcom EXTIF core driver"
-	depends on SSB_DRIVER_MIPS
+	depends on SSB_DRIVER_MIPS || COMPILE_TEST
 	help
 	  Driver for the Sonics Silicon Backplane attached
 	  Broadcom EXTIF core.
