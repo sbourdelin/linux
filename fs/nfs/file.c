@@ -738,6 +738,36 @@ out_noconflict:
 }
 
 static int
+defer_unlk(struct nfs_lock_context *l_ctx, int cmd, struct file_lock *fl)
+{
+	struct inode *inode = d_inode(l_ctx->open_context->dentry);
+	struct nfs_io_counter *c = &l_ctx->io_count;
+	struct nfs_deferred_unlock *dunlk;
+	int status = 0;
+
+	if (atomic_read(&c->io_count) == 0)
+		return 0;
+
+	/* free in nfs_iocounter_dec */
+	dunlk = kmalloc(sizeof(*dunlk), GFP_NOFS);
+	if (dunlk == NULL)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&dunlk->list);
+	dunlk->cmd = cmd;
+	memcpy(&dunlk->fl, fl, sizeof(dunlk->fl));
+	spin_lock(&inode->i_lock);
+	if (atomic_read(&c->io_count) != 0) {
+		list_add_tail(&dunlk->list, &l_ctx->dunlk_list);
+		status = -EINPROGRESS;
+	} else {
+		kfree(dunlk);
+	}
+	spin_unlock(&inode->i_lock);
+	return status;
+}
+
+static int
 do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
@@ -753,7 +783,11 @@ do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 
 	l_ctx = nfs_get_lock_context(nfs_file_open_context(filp));
 	if (!IS_ERR(l_ctx)) {
-		status = nfs_iocounter_wait(&l_ctx->io_count);
+		if (fl->fl_flags & FL_CLOSE)
+			status = defer_unlk(l_ctx, cmd, fl);
+		else
+			status = nfs_iocounter_wait(&l_ctx->io_count);
+
 		nfs_put_lock_context(l_ctx);
 		if (status < 0)
 			return status;

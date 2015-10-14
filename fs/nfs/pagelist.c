@@ -108,9 +108,26 @@ nfs_iocounter_inc(struct nfs_io_counter *c)
 }
 
 static void
-nfs_iocounter_dec(struct nfs_io_counter *c)
+nfs_iocounter_dec(struct nfs_lock_context *l_ctx)
 {
-	if (atomic_dec_and_test(&c->io_count)) {
+	struct nfs_io_counter *c = &l_ctx->io_count;
+	struct inode *inode = d_inode(l_ctx->open_context->dentry);
+
+	if (atomic_dec_and_lock(&c->io_count, &inode->i_lock)) {
+		if (unlikely(!list_empty(&l_ctx->dunlk_list))) {
+			struct nfs_deferred_unlock *dunlk, *tmp;
+			LIST_HEAD(dunlk_list);
+			list_replace_init(&l_ctx->dunlk_list, &dunlk_list);
+			spin_unlock(&inode->i_lock);
+
+			list_for_each_entry_safe(dunlk, tmp, &dunlk_list, list) {
+				NFS_PROTO(inode)->lock(l_ctx->open_context, dunlk->cmd, &dunlk->fl);
+				locks_release_private(&dunlk->fl);
+				kfree(dunlk);
+			}
+		} else {
+			spin_unlock(&inode->i_lock);
+		}
 		clear_bit(NFS_IO_INPROGRESS, &c->flags);
 		smp_mb__after_atomic();
 		wake_up_bit(&c->flags, NFS_IO_INPROGRESS);
@@ -431,7 +448,7 @@ static void nfs_clear_request(struct nfs_page *req)
 		req->wb_page = NULL;
 	}
 	if (l_ctx != NULL) {
-		nfs_iocounter_dec(&l_ctx->io_count);
+		nfs_iocounter_dec(l_ctx);
 		nfs_put_lock_context(l_ctx);
 		req->wb_lock_context = NULL;
 	}

@@ -696,6 +696,7 @@ static void nfs_init_lock_context(struct nfs_lock_context *l_ctx)
 	l_ctx->lockowner.l_owner = current->files;
 	l_ctx->lockowner.l_pid = current->tgid;
 	INIT_LIST_HEAD(&l_ctx->list);
+	INIT_LIST_HEAD(&l_ctx->dunlk_list);
 	nfs_iocounter_init(&l_ctx->io_count);
 }
 

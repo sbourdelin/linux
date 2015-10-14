@@ -66,12 +66,19 @@ struct nfs_io_counter {
 	atomic_t io_count;
 };
 
+struct nfs_deferred_unlock {
+	struct list_head list;
+	int cmd;
+	struct file_lock fl;
+};
+
 struct nfs_lock_context {
 	atomic_t count;
 	struct list_head list;
 	struct nfs_open_context *open_context;
 	struct nfs_lockowner lockowner;
 	struct nfs_io_counter io_count;
+	struct list_head dunlk_list;
 };
 
 struct nfs4_state;
