@@ -2,6 +2,7 @@
  * Compress: Compression algorithms under the cryptographic API.
  *
  * Copyright 2008 Sony Corporation
+ * Copyright 2015 LG Electronics Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,124 +23,77 @@
 
 #include <linux/crypto.h>
 
+#define CCOMP_TYPE_DECOMP_NOCTX 0x000000001
 
-struct comp_request {
-	const void *next_in;		/* next input byte */
-	void *next_out;			/* next output byte */
-	unsigned int avail_in;		/* bytes available at next_in */
-	unsigned int avail_out;		/* bytes available at next_out */
-};
-
-enum zlib_comp_params {
-	ZLIB_COMP_LEVEL = 1,		/* e.g. Z_DEFAULT_COMPRESSION */
-	ZLIB_COMP_METHOD,		/* e.g. Z_DEFLATED */
-	ZLIB_COMP_WINDOWBITS,		/* e.g. MAX_WBITS */
-	ZLIB_COMP_MEMLEVEL,		/* e.g. DEF_MEM_LEVEL */
-	ZLIB_COMP_STRATEGY,		/* e.g. Z_DEFAULT_STRATEGY */
-	__ZLIB_COMP_MAX,
-};
-
-#define ZLIB_COMP_MAX	(__ZLIB_COMP_MAX - 1)
-
-
-enum zlib_decomp_params {
-	ZLIB_DECOMP_WINDOWBITS = 1,	/* e.g. DEF_WBITS */
-	__ZLIB_DECOMP_MAX,
-};
-
-#define ZLIB_DECOMP_MAX	(__ZLIB_DECOMP_MAX - 1)
-
-
-struct crypto_pcomp {
+struct crypto_ccomp {
 	struct crypto_tfm base;
 };
 
-struct pcomp_alg {
-	int (*compress_setup)(struct crypto_pcomp *tfm, const void *params,
-			      unsigned int len);
-	int (*compress_init)(struct crypto_pcomp *tfm);
-	int (*compress_update)(struct crypto_pcomp *tfm,
-			       struct comp_request *req);
-	int (*compress_final)(struct crypto_pcomp *tfm,
-			      struct comp_request *req);
-	int (*decompress_setup)(struct crypto_pcomp *tfm, const void *params,
-				unsigned int len);
-	int (*decompress_init)(struct crypto_pcomp *tfm);
-	int (*decompress_update)(struct crypto_pcomp *tfm,
-				 struct comp_request *req);
-	int (*decompress_final)(struct crypto_pcomp *tfm,
-				struct comp_request *req);
+struct ccomp_alg {
+	void *(*alloc_context)(struct crypto_ccomp *tfm);
+	void (*free_context)(struct crypto_ccomp *tfm, void *ctx);
+	int (*compress)(const u8 *src, unsigned int slen, u8 *dst,
+			unsigned int *dlen, void *ctx);
+	int (*decompress)(const u8 *src, unsigned int slen, u8 *dst,
+			unsigned int *dlen, void *ctx);
 
+	unsigned long flags;
 	struct crypto_alg base;
 };
 
-extern struct crypto_pcomp *crypto_alloc_pcomp(const char *alg_name, u32 type,
+extern struct crypto_ccomp *crypto_alloc_ccomp(const char *alg_name, u32 type,
 					       u32 mask);
 
-static inline struct crypto_tfm *crypto_pcomp_tfm(struct crypto_pcomp *tfm)
+static inline struct crypto_tfm *crypto_ccomp_tfm(struct crypto_ccomp *tfm)
 {
 	return &tfm->base;
 }
 
-static inline void crypto_free_pcomp(struct crypto_pcomp *tfm)
+static inline void crypto_free_ccomp(struct crypto_ccomp *tfm)
 {
-	crypto_destroy_tfm(tfm, crypto_pcomp_tfm(tfm));
+	crypto_destroy_tfm(tfm, crypto_ccomp_tfm(tfm));
 }
 
-static inline struct pcomp_alg *__crypto_pcomp_alg(struct crypto_alg *alg)
+static inline struct ccomp_alg *__crypto_ccomp_alg(struct crypto_alg *alg)
 {
-	return container_of(alg, struct pcomp_alg, base);
+	return container_of(alg, struct ccomp_alg, base);
 }
 
-static inline struct pcomp_alg *crypto_pcomp_alg(struct crypto_pcomp *tfm)
+static inline struct ccomp_alg *crypto_ccomp_alg(struct crypto_ccomp *tfm)
 {
-	return __crypto_pcomp_alg(crypto_pcomp_tfm(tfm)->__crt_alg);
+	return __crypto_ccomp_alg(crypto_ccomp_tfm(tfm)->__crt_alg);
 }
 
-static inline int crypto_compress_setup(struct crypto_pcomp *tfm,
-					const void *params, unsigned int len)
+static inline void *crypto_ccomp_alloc_context(struct crypto_ccomp *tfm)
 {
-	return crypto_pcomp_alg(tfm)->compress_setup(tfm, params, len);
+	return crypto_ccomp_alg(tfm)->alloc_context(tfm);
 }
 
-static inline int crypto_compress_init(struct crypto_pcomp *tfm)
+static inline void crypto_ccomp_free_context(struct crypto_ccomp *tfm,
+						void *ctx)
 {
-	return crypto_pcomp_alg(tfm)->compress_init(tfm);
+	return crypto_ccomp_alg(tfm)->free_context(tfm, ctx);
 }
 
-static inline int crypto_compress_update(struct crypto_pcomp *tfm,
-					 struct comp_request *req)
+static inline int crypto_ccomp_compress(struct crypto_ccomp *tfm,
+				const u8 *src, unsigned int slen,
+				u8 *dst, unsigned int *dlen, void *ctx)
 {
-	return crypto_pcomp_alg(tfm)->compress_update(tfm, req);
+	return crypto_ccomp_alg(tfm)->compress(src, slen, dst, dlen, ctx);
 }
 
-static inline int crypto_compress_final(struct crypto_pcomp *tfm,
-					struct comp_request *req)
+static inline int crypto_ccomp_decompress(struct crypto_ccomp *tfm,
+				const u8 *src, unsigned int slen,
+				u8 *dst, unsigned int *dlen, void *ctx)
 {
-	return crypto_pcomp_alg(tfm)->compress_final(tfm, req);
+	return crypto_ccomp_alg(tfm)->decompress(src, slen, dst, dlen, ctx);
 }
 
-static inline int crypto_decompress_setup(struct crypto_pcomp *tfm,
-					  const void *params, unsigned int len)
+static inline bool crypto_ccomp_decomp_noctx(struct crypto_ccomp *tfm)
 {
-	return crypto_pcomp_alg(tfm)->decompress_setup(tfm, params, len);
+	return crypto_ccomp_alg(tfm)->flags & CCOMP_TYPE_DECOMP_NOCTX;
 }
 
-static inline int crypto_decompress_init(struct crypto_pcomp *tfm)
-{
-	return crypto_pcomp_alg(tfm)->decompress_init(tfm);
-}
-
-static inline int crypto_decompress_update(struct crypto_pcomp *tfm,
-					   struct comp_request *req)
-{
-	return crypto_pcomp_alg(tfm)->decompress_update(tfm, req);
-}
-
-static inline int crypto_decompress_final(struct crypto_pcomp *tfm,
-					  struct comp_request *req)
-{
-	return crypto_pcomp_alg(tfm)->decompress_final(tfm, req);
-}
-
+extern int crypto_register_ccomp(struct ccomp_alg *alg);
+extern int crypto_unregister_ccomp(struct ccomp_alg *alg);
 #endif	/* _CRYPTO_COMPRESS_H */
