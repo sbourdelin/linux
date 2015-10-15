@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/sockios.h>
+#include <linux/in6.h>
 
 /*
  *	Based on the MROUTING 3.5 defines primarily to keep
