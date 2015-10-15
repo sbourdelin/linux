@@ -8121,12 +8121,7 @@ static bool i9xx_get_pipe_config(struct intel_crtc *crtc,
 						     DPLL_PORTB_READY_MASK);
 	}
 
-	if (IS_CHERRYVIEW(dev))
-		chv_crtc_clock_get(crtc, pipe_config);
-	else if (IS_VALLEYVIEW(dev))
-		vlv_crtc_clock_get(crtc, pipe_config);
-	else
-		i9xx_crtc_clock_get(crtc, pipe_config);
+	dev_priv->display.crtc_clock_get(crtc, pipe_config);
 
 	/*
 	 * Normally the dotclock is filled in by the encoder .get_config()
@@ -10570,9 +10565,10 @@ static void ironlake_pch_clock_get(struct intel_crtc *crtc,
 				   struct intel_crtc_state *pipe_config)
 {
 	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	/* read out port_clock from the DPLL */
-	i9xx_crtc_clock_get(crtc, pipe_config);
+	dev_priv->display.crtc_clock_get(crtc, &pipe_config);
 
 	/*
 	 * This value does not include pixel_multiplier.
@@ -10616,7 +10612,7 @@ struct drm_display_mode *intel_crtc_mode_get(struct drm_device *dev,
 	pipe_config.dpll_hw_state.dpll = I915_READ(DPLL(pipe));
 	pipe_config.dpll_hw_state.fp0 = I915_READ(FP0(pipe));
 	pipe_config.dpll_hw_state.fp1 = I915_READ(FP1(pipe));
-	i9xx_crtc_clock_get(intel_crtc, &pipe_config);
+	dev_priv->display.crtc_clock_get(intel_crtc, &pipe_config);
 
 	mode->clock = pipe_config.port_clock / pipe_config.pixel_multiplier;
 	mode->hdisplay = (htot & 0xffff) + 1;
@@ -14399,6 +14395,7 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = haswell_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			skylake_update_primary_plane;
+		dev_priv->display.crtc_clock_get = i9xx_crtc_clock_get;
 	} else if (HAS_DDI(dev)) {
 		dev_priv->display.get_pipe_config = haswell_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -14409,6 +14406,7 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = haswell_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			ironlake_update_primary_plane;
+		dev_priv->display.crtc_clock_get = i9xx_crtc_clock_get;
 	} else if (HAS_PCH_SPLIT(dev)) {
 		dev_priv->display.get_pipe_config = ironlake_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -14419,6 +14417,7 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = ironlake_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			ironlake_update_primary_plane;
+		dev_priv->display.crtc_clock_get = i9xx_crtc_clock_get;
 	} else if (IS_VALLEYVIEW(dev)) {
 		dev_priv->display.get_pipe_config = i9xx_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -14428,6 +14427,10 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = i9xx_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			i9xx_update_primary_plane;
+		if (IS_CHERRYVIEW(dev))
+			dev_priv->display.crtc_clock_get = chv_crtc_clock_get;
+		else
+			dev_priv->display.crtc_clock_get = vlv_crtc_clock_get;
 	} else {
 		dev_priv->display.get_pipe_config = i9xx_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -14437,6 +14440,7 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = i9xx_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			i9xx_update_primary_plane;
+		dev_priv->display.crtc_clock_get = i9xx_crtc_clock_get;
 	}
 
 	/* Returns the core display clock speed */
