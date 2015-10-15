@@ -284,12 +284,12 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
 	__asm__ __volatile__(					\
 	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
 		    CONFIG_ARM64_PAN)				\
-	"	mov		%w2, %w1\n"			\
-	"0:	ldxr"B"		%w1, [%3]\n"			\
-	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
+	"0:	ldxr"B"		%w2, [%3]\n"			\
+	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
 	"	cbz		%w0, 2f\n"			\
 	"	mov		%w0, %w4\n"			\
 	"2:\n"							\
+	"	mov		%w1, %w2\n"			\
 	"	.pushsection	 .fixup,\"ax\"\n"		\
 	"	.align		2\n"				\
 	"3:	mov		%w0, %w5\n"			\
