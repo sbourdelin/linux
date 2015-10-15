@@ -23,6 +23,19 @@
 #define _Q_SLOW_VAL	(3U << _Q_LOCKED_OFFSET)
 
 /*
+ * Queue Node Adaptive Spinning
+ *
+ * A queue node vCPU will stop spinning if the vCPU in the previous node is
+ * not running. The one lock stealing attempt allowed at slowpath entry
+ * mitigates the slight slowdown for non-overcommitted guest with this
+ * aggressive wait-early mechanism.
+ *
+ * The status of the previous node will be checked at fixed interval
+ * controlled by PV_PREV_CHECK_MASK.
+ */
+#define PV_PREV_CHECK_MASK	0xff
+
+/*
  * Queue node uses: vcpu_running & vcpu_halted.
  * Queue head uses: vcpu_running & vcpu_hashed.
  */
@@ -97,6 +110,7 @@ enum pv_qlock_stat {
 	pvstat_wait_head,
 	pvstat_wait_node,
 	pvstat_wait_again,
+	pvstat_wait_early,
 	pvstat_kick_wait,
 	pvstat_kick_unlock,
 	pvstat_steal_lock,
@@ -116,6 +130,7 @@ static const char * const stat_fsnames[pvstat_num] = {
 	[pvstat_wait_head]   = "wait_head_count",
 	[pvstat_wait_node]   = "wait_node_count",
 	[pvstat_wait_again]  = "wait_again_count",
+	[pvstat_wait_early]  = "wait_early_count",
 	[pvstat_kick_wait]   = "kick_wait_count",
 	[pvstat_kick_unlock] = "kick_unlock_count",
 	[pvstat_steal_lock]  = "lock_stealing_count",
@@ -354,6 +369,20 @@ static struct pv_node *pv_unhash(struct qspinlock *lock)
 }
 
 /*
+ * Return true if when it is time to check the previous node which is not
+ * in a running state.
+ */
+static inline bool
+pv_wait_early(struct pv_node *prev, int loop)
+{
+
+	if ((loop & PV_PREV_CHECK_MASK) != 0)
+		return false;
+
+	return READ_ONCE(prev->state) != vcpu_running;
+}
+
+/*
  * Initialize the PV part of the mcs_spinlock node.
  */
 static void pv_init_node(struct mcs_spinlock *node)
@@ -371,17 +400,23 @@ static void pv_init_node(struct mcs_spinlock *node)
  * pv_kick_node() is used to set _Q_SLOW_VAL and fill in hash table on its
  * behalf.
  */
-static void pv_wait_node(struct mcs_spinlock *node)
+static void pv_wait_node(struct mcs_spinlock *node, struct mcs_spinlock *prev)
 {
 	struct pv_node *pn = (struct pv_node *)node;
+	struct pv_node *pp = (struct pv_node *)prev;
 	int waitcnt = 0;
 	int loop;
+	bool wait_early;
 
 	/* waitcnt processing will be compiled out if !QUEUED_LOCK_STAT */
 	for (;; waitcnt++) {
-		for (loop = SPIN_THRESHOLD; loop; loop--) {
+		for (wait_early = false, loop = SPIN_THRESHOLD; loop; loop--) {
 			if (READ_ONCE(node->locked))
 				return;
+			if (pv_wait_early(pp, loop)) {
+				wait_early = true;
+				break;
+			}
 			cpu_relax();
 		}
 
@@ -399,6 +434,7 @@ static void pv_wait_node(struct mcs_spinlock *node)
 		if (!READ_ONCE(node->locked)) {
 			pvstat_inc(pvstat_wait_node, true);
 			pvstat_inc(pvstat_wait_again, waitcnt);
+			pvstat_inc(pvstat_wait_early, wait_early);
 			pv_wait(&pn->state, vcpu_halted);
 		}
 
@@ -483,6 +519,12 @@ static u32 pv_wait_head_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 
 	for (;; waitcnt++) {
 		/*
+		 * Set correct vCPU state to be used by queue node wait-early
+		 * mechanism.
+		 */
+		WRITE_ONCE(pn->state, vcpu_running);
+
+		/*
 		 * Set the pending bit in the active lock spinning loop to
 		 * disable lock stealing. However, the pending bit check in
 		 * pv_queued_spin_trylock_unfair() and the setting/clearing
@@ -526,6 +568,7 @@ static u32 pv_wait_head_lock(struct qspinlock *lock, struct mcs_spinlock *node)
 				goto gotlock;
 			}
 		}
+		WRITE_ONCE(pn->state, vcpu_halted);
 		pvstat_inc(pvstat_wait_head, true);
 		pvstat_inc(pvstat_wait_again, waitcnt);
 		pv_wait(&l->locked, _Q_SLOW_VAL);
