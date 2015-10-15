@@ -22,10 +22,8 @@
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
 #include <linux/compiler.h>		/* for "__user" et al           */
-
-#define	IFNAMSIZ	16
-#define	IFALIASZ	256
-#include <linux/hdlc/ioctl.h>
+#include <linux/hdlc/ioctl.h>           /* for IFNAMSIZ                 */
+#define        IFALIASZ        256
 
 /**
  * enum net_device_flags - &struct net_device flags
