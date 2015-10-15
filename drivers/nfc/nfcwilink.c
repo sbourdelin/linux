@@ -348,7 +348,8 @@ static long nfcwilink_receive(void *priv_data, struct sk_buff *skb)
 	dev_dbg(&drv->pdev->dev, "receive entry, len %d\n", skb->len);
 
 	/* strip the ST header
-	(apart for the chnl byte, which is not received in the hdr) */
+	 * (apart for the chnl byte, which is not received in the hdr)
+	 */
 	skb_pull(skb, (NFCWILINK_HDR_LEN-1));
 
 	if (test_bit(NFCWILINK_FW_DOWNLOAD, &drv->flags)) {
