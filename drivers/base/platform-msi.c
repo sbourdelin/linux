@@ -32,6 +32,9 @@
  * and the callback to write the MSI message.
  */
 struct platform_msi_priv_data {
+	struct device		*dev;
+	void 			*host_data;
+	msi_alloc_info_t	arg;
 	irq_write_msi_msg_t	write_msg;
 	int			devid;
 };
@@ -124,8 +127,9 @@ static void platform_msi_free_descs(struct device *dev, int base, int nvec)
 	}
 }
 
-static int platform_msi_alloc_descs(struct device *dev, int nvec,
-				    struct platform_msi_priv_data *data)
+static int platform_msi_alloc_descs_with_irq(struct device *dev, int virq,
+					     int nvec,
+					     struct platform_msi_priv_data *data)
 
 {
 	struct msi_desc *desc;
@@ -145,6 +149,7 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
 		desc->platform.msi_priv_data = data;
 		desc->platform.msi_index = base + i;
 		desc->nvec_used = 1;
+		desc->irq = virq ? virq + i : 0;
 
 		list_add_tail(&desc->list, dev_to_msi_list(dev));
 	}
@@ -157,6 +162,13 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
 	}
 
 	return 0;
+}
+
+static int platform_msi_alloc_descs(struct device *dev, int nvec,
+				    struct platform_msi_priv_data *data)
+
+{
+	return platform_msi_alloc_descs_with_irq(dev, 0, nvec, data);
 }
 
 /**
@@ -225,6 +237,7 @@ static int platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
 	}
 
 	datap->write_msg = write_msi_msg;
+	datap->dev = dev;
 
 	return 0;
 }
@@ -288,3 +301,57 @@ void platform_msi_domain_free_irqs(struct device *dev)
 	msi_domain_free_irqs(dev->msi_domain, dev);
 	platform_msi_free_descs(dev, 0, MAX_DEV_MSIS);
 }
+
+void *platform_msi_get_host_data(struct irq_domain *domain)
+{
+	struct platform_msi_priv_data *data = domain->host_data;
+	return data->host_data;
+}
+
+struct irq_domain *
+platform_msi_create_device_domain(struct device *dev,
+				  unsigned int nvec,
+				  irq_write_msi_msg_t write_msi_msg,
+				  const struct irq_domain_ops *ops,
+				  void *host_data)
+{
+	struct platform_msi_priv_data *data;
+	struct irq_domain *domain;
+	int err;
+
+	err = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg, &data);
+	if (err)
+		return NULL;
+
+	data->host_data = host_data;
+	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
+					     of_node_to_fwnode(dev->of_node),
+					     ops, data);
+	if (!domain) {
+		platform_msi_free_priv_data(data);
+		return NULL;
+	}
+
+	/* FIXME: Add better error handling... */
+	err = msi_domain_prepare_irqs(domain->parent, dev, nvec, &data->arg);
+	BUG_ON(err);
+
+	return domain;
+}
+
+int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+			      unsigned int nr_irqs)
+{
+	struct platform_msi_priv_data *data = domain->host_data;
+	int err;
+
+	err = platform_msi_alloc_descs_with_irq(data->dev, virq, nr_irqs, data);
+	if (err)
+		return err;
+
+	err = msi_domain_populate_irqs(domain->parent, data->dev,
+				       virq, nr_irqs, &data->arg);
+	/* FIXME: memory leak on error */
+	return err;
+}
+
