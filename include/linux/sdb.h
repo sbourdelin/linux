@@ -3,11 +3,7 @@
  */
 #ifndef __SDB_H__
 #define __SDB_H__
-#ifdef __KERNEL__
 #include <linux/types.h>
-#else
-#include <stdint.h>
-#endif
 
 /*
  * All structures are 64 bytes long and are expected
@@ -25,12 +21,12 @@
  * and not terminated with a 0 byte.
  */
 struct sdb_product {
-	uint64_t		vendor_id;	/* 0x18..0x1f */
-	uint32_t		device_id;	/* 0x20..0x23 */
-	uint32_t		version;	/* 0x24..0x27 */
-	uint32_t		date;		/* 0x28..0x2b */
-	uint8_t			name[19];	/* 0x2c..0x3e */
-	uint8_t			record_type;	/* 0x3f */
+	__u64		vendor_id;	/* 0x18..0x1f */
+	__u32		device_id;	/* 0x20..0x23 */
+	__u32		version;	/* 0x24..0x27 */
+	__u32		date;		/* 0x28..0x2b */
+	__u8			name[19];	/* 0x2c..0x3e */
+	__u8			record_type;	/* 0x3f */
 };
 
 /*
@@ -40,8 +36,8 @@ struct sdb_product {
  * (for example 0x100000 - 0x10ffff)
  */
 struct sdb_component {
-	uint64_t		addr_first;	/* 0x08..0x0f */
-	uint64_t		addr_last;	/* 0x10..0x17 */
+	__u64		addr_first;	/* 0x08..0x0f */
+	__u64		addr_last;	/* 0x10..0x17 */
 	struct sdb_product	product;	/* 0x18..0x3f */
 };
 
@@ -63,10 +59,10 @@ enum sdb_record_type {
  */
 #define				SDB_MAGIC	0x5344422d /* "SDB-" */
 struct sdb_interconnect {
-	uint32_t		sdb_magic;	/* 0x00-0x03 */
-	uint16_t		sdb_records;	/* 0x04-0x05 */
-	uint8_t			sdb_version;	/* 0x06 */
-	uint8_t			sdb_bus_type;	/* 0x07 */
+	__u32		sdb_magic;	/* 0x00-0x03 */
+	__u16		sdb_records;	/* 0x04-0x05 */
+	__u8			sdb_version;	/* 0x06 */
+	__u8			sdb_bus_type;	/* 0x07 */
 	struct sdb_component	sdb_component;	/* 0x08-0x3f */
 };
 
@@ -77,10 +73,10 @@ struct sdb_interconnect {
  * bus-specific bits are defined by each bus (see below)
  */
 struct sdb_device {
-	uint16_t		abi_class;	/* 0x00-0x01 */
-	uint8_t			abi_ver_major;	/* 0x02 */
-	uint8_t			abi_ver_minor;	/* 0x03 */
-	uint32_t		bus_specific;	/* 0x04-0x07 */
+	__u16		abi_class;	/* 0x00-0x01 */
+	__u8			abi_ver_major;	/* 0x02 */
+	__u8			abi_ver_minor;	/* 0x03 */
+	__u32		bus_specific;	/* 0x04-0x07 */
 	struct sdb_component	sdb_component;	/* 0x08-0x3f */
 };
 
@@ -89,7 +85,7 @@ struct sdb_device {
  * child is the address of the nested SDB table
  */
 struct sdb_bridge {
-	uint64_t		sdb_child;	/* 0x00-0x07 */
+	__u64		sdb_child;	/* 0x00-0x07 */
 	struct sdb_component	sdb_component;	/* 0x08-0x3f */
 };
 
@@ -100,7 +96,7 @@ struct sdb_bridge {
  * just provide product information for an aggregate device
  */
 struct sdb_integration {
-	uint8_t			reserved[24];	/* 0x00-0x17 */
+	__u8			reserved[24];	/* 0x00-0x17 */
 	struct sdb_product	product;	/* 0x08-0x3f */
 };
 
@@ -109,8 +105,8 @@ struct sdb_integration {
  * again, an informative field that software can ignore
  */
 struct sdb_repo_url {
-	uint8_t			repo_url[63];	/* 0x00-0x3e */
-	uint8_t			record_type;	/* 0x3f */
+	__u8			repo_url[63];	/* 0x00-0x3e */
+	__u8			record_type;	/* 0x3f */
 };
 
 /* Type 0x82: Synthesis tool information
@@ -118,13 +114,13 @@ struct sdb_repo_url {
  * this informative record
  */
 struct sdb_synthesis {
-	uint8_t			syn_name[16];	/* 0x00-0x0f */
-	uint8_t			commit_id[16];	/* 0x10-0x1f */
-	uint8_t			tool_name[8];	/* 0x20-0x27 */
-	uint32_t		tool_version;	/* 0x28-0x2b */
-	uint32_t		date;		/* 0x2c-0x2f */
-	uint8_t			user_name[15];	/* 0x30-0x3e */
-	uint8_t			record_type;	/* 0x3f */
+	__u8			syn_name[16];	/* 0x00-0x0f */
+	__u8			commit_id[16];	/* 0x10-0x1f */
+	__u8			tool_name[8];	/* 0x20-0x27 */
+	__u32		tool_version;	/* 0x28-0x2b */
+	__u32		date;		/* 0x2c-0x2f */
+	__u8			user_name[15];	/* 0x30-0x3e */
+	__u8			record_type;	/* 0x3f */
 };
 
 /* Type 0xff: empty
@@ -135,8 +131,8 @@ struct sdb_synthesis {
  * It can also be used to pad a table to a desired length.
  */
 struct sdb_empty {
-	uint8_t			reserved[63];	/* 0x00-0x3e */
-	uint8_t			record_type;	/* 0x3f */
+	__u8			reserved[63];	/* 0x00-0x3e */
+	__u8			record_type;	/* 0x3f */
 };
 
 /* The type of bus, for bus-specific flags */
