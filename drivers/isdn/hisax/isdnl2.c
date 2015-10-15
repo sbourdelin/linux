@@ -1284,6 +1284,10 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 	}
 	l2->windowar[p1] = skb_clone(skb, GFP_ATOMIC);
 
+  if (!l2->windowar[p1]) {
+    return;
+  }
+
 	i = sethdraddr(&st->l2, header, CMD);
 
 	if (test_bit(FLG_MOD128, &l2->flag)) {
