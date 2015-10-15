@@ -3682,9 +3682,9 @@ int host_int_flush_join_req(struct host_if_drv *hif_drv)
 	return s32Error;
 }
 
-s32 host_int_disconnect(struct host_if_drv *hif_drv, u16 u16ReasonCode)
+int host_int_disconnect(struct host_if_drv *hif_drv, u16 u16ReasonCode)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 
 	if (!hif_drv) {
