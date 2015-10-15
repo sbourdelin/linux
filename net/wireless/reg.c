@@ -555,7 +555,7 @@ static int call_crda(const char *alpha2)
 }
 
 static enum reg_request_treatment
-reg_call_crda(struct regulatory_request *request)
+reg_query_database(struct regulatory_request *request)
 {
 	if (call_crda(request->alpha2))
 		return REG_REQ_IGNORE;
@@ -1867,7 +1867,7 @@ reg_process_hint_core(struct regulatory_request *core_request)
 
 	reg_update_last_request(core_request);
 
-	return reg_call_crda(core_request);
+	return reg_query_database(core_request);
 }
 
 static enum reg_request_treatment
@@ -1935,7 +1935,7 @@ reg_process_hint_user(struct regulatory_request *user_request)
 	user_alpha2[0] = user_request->alpha2[0];
 	user_alpha2[1] = user_request->alpha2[1];
 
-	return reg_call_crda(user_request);
+	return reg_query_database(user_request);
 }
 
 static enum reg_request_treatment
@@ -2016,7 +2016,7 @@ reg_process_hint_driver(struct wiphy *wiphy,
 		return treatment;
 	}
 
-	return reg_call_crda(driver_request);
+	return reg_query_database(driver_request);
 }
 
 static enum reg_request_treatment
@@ -2101,7 +2101,7 @@ reg_process_hint_country_ie(struct wiphy *wiphy,
 
 	reg_update_last_request(country_ie_request);
 
-	return reg_call_crda(country_ie_request);
+	return reg_query_database(country_ie_request);
 }
 
 /* This processes *all* regulatory hints */
