@@ -199,6 +199,7 @@ MODULE_DEVICE_TABLE(usb, id_table);
 
 struct cp210x_serial_private {
 	__u8			bInterfaceNumber;
+	bool			swap_get_line_ctl; /* set if CP2108 swaps bytes due to a bug */
 };
 
 static struct usb_serial_driver cp210x_device = {
@@ -342,6 +343,10 @@ static int cp210x_get_config(struct usb_serial_port *port, u8 request,
 
 		return result;
 	}
+
+	/* Workaround for swapped bytes in 16-bit value from CP210X_GET_LINE_CTL */
+	if (spriv->swap_get_line_ctl && request == CP210X_GET_LINE_CTL && size == 2)
+		swab16s((u16 *)data);
 
 	return 0;
 }
@@ -865,17 +870,52 @@ static void cp210x_break_ctl(struct tty_struct *tty, int break_state)
 
 static int cp210x_startup(struct usb_serial *serial)
 {
+	struct usb_serial_port *port;
 	struct usb_host_interface *cur_altsetting;
 	struct cp210x_serial_private *spriv;
+	unsigned int  line_ctl;
+	int           err;
+
+	/* We always expect a single port only */
+	if (serial->num_ports != 1) {
+		dev_err(&serial->dev->dev, "%s - expected 1 port, found %d\n",
+			__func__, serial->num_ports);
+		return -EINVAL;
+	}
+	port = serial->port[0];
 
 	spriv = kzalloc(sizeof(*spriv), GFP_KERNEL);
 	if (!spriv)
 		return -ENOMEM;
 
+	/* get_config and set_config rely on this spriv field */
 	cur_altsetting = serial->interface->cur_altsetting;
 	spriv->bInterfaceNumber = cur_altsetting->desc.bInterfaceNumber;
 
+	/* Detect CP2108 bug and activate workaround.
+	 * Write a known good value 0x800, read it back.
+	 * If it comes back swapped the bug is detected.
+	 */
+
+	/* The following get_config won't swap the bytes */
+	spriv->swap_get_line_ctl = false;
+
+	/* must be set before calling get_config and set_config */
 	usb_set_serial_data(serial, spriv);
+
+	line_ctl = 0x800;
+
+	err = cp210x_set_config(port, CP210X_SET_LINE_CTL, &line_ctl, 2);
+	if (err)
+		return err;
+
+	err = cp210x_get_config(port, CP210X_GET_LINE_CTL, &line_ctl, 2);
+	if (err)
+		return err;
+
+	if ((line_ctl & 0xffff) == 8)
+		/* Future get_config calls will swap the bytes */
+		spriv->swap_get_line_ctl = true;
 
 	return 0;
 }
