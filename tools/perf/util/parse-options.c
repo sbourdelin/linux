@@ -677,6 +677,13 @@ void usage_with_options(const char * const *usagestr,
 	exit(129);
 }
 
+void usage_with_options_return(const char * const *usagestr,
+			const struct option *opts)
+{
+	exit_browser(false);
+	usage_with_options_internal(usagestr, opts, 0);
+}
+
 int parse_options_usage(const char * const *usagestr,
 			const struct option *opts,
 			const char *optstr, bool short_opt)
