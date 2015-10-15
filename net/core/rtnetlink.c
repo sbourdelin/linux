@@ -61,6 +61,7 @@ struct rtnl_link {
 	rtnl_doit_func		doit;
 	rtnl_dumpit_func	dumpit;
 	rtnl_calcit_func 	calcit;
+	unsigned int		flags;
 };
 
 static DEFINE_MUTEX(rtnl_mutex);
@@ -119,7 +120,8 @@ static inline int rtm_msgindex(int msgtype)
 	return msgindex;
 }
 
-static rtnl_doit_func rtnl_get_doit(int protocol, int msgindex)
+static rtnl_doit_func rtnl_get_doit(int protocol, int msgindex,
+				    unsigned int *flags)
 {
 	struct rtnl_link *tab;
 
@@ -131,6 +133,7 @@ static rtnl_doit_func rtnl_get_doit(int protocol, int msgindex)
 	if (tab == NULL || tab[msgindex].doit == NULL)
 		tab = rtnl_msg_handlers[PF_UNSPEC];
 
+	*flags = tab[msgindex].flags;
 	return tab[msgindex].doit;
 }
 
@@ -165,12 +168,13 @@ static rtnl_calcit_func rtnl_get_calcit(int protocol, int msgindex)
 }
 
 /**
- * __rtnl_register - Register a rtnetlink message type
+ * __rtnl_register_flags - Register a rtnetlink message type
  * @protocol: Protocol family or PF_UNSPEC
  * @msgtype: rtnetlink message type
  * @doit: Function pointer called for each request message
  * @dumpit: Function pointer called for each dump request (NLM_F_DUMP) message
  * @calcit: Function pointer to calc size of dump message
+ * @flags: RTNL_F_ flags
  *
  * Registers the specified function pointers (at least one of them has
  * to be non-NULL) to be called whenever a request message for the
@@ -182,9 +186,9 @@ static rtnl_calcit_func rtnl_get_calcit(int protocol, int msgindex)
  *
  * Returns 0 on success or a negative error code.
  */
-int __rtnl_register(int protocol, int msgtype,
-		    rtnl_doit_func doit, rtnl_dumpit_func dumpit,
-		    rtnl_calcit_func calcit)
+int __rtnl_register_flags(int protocol, int msgtype,
+			  rtnl_doit_func doit, rtnl_dumpit_func dumpit,
+			  rtnl_calcit_func calcit, unsigned int flags)
 {
 	struct rtnl_link *tab;
 	int msgindex;
@@ -210,29 +214,32 @@ int __rtnl_register(int protocol, int msgtype,
 	if (calcit)
 		tab[msgindex].calcit = calcit;
 
+	tab[msgindex].flags = flags;
+
 	return 0;
 }
-EXPORT_SYMBOL_GPL(__rtnl_register);
+EXPORT_SYMBOL_GPL(__rtnl_register_flags);
 
 /**
- * rtnl_register - Register a rtnetlink message type
+ * rtnl_register_flags - Register a rtnetlink message type
  *
- * Identical to __rtnl_register() but panics on failure. This is useful
- * as failure of this function is very unlikely, it can only happen due
- * to lack of memory when allocating the chain to store all message
- * handlers for a protocol. Meant for use in init functions where lack
- * of memory implies no sense in continuing.
+ * Identical to __rtnl_register_flags() but panics on failure. This is
+ * useful as failure of this function is very unlikely, it can only happen
+ * due to lack of memory when allocating the chain to store all message
+ * handlers for a protocol. Meant for use in init functions where lack of
+ * memory implies no sense in continuing.
  */
-void rtnl_register(int protocol, int msgtype,
-		   rtnl_doit_func doit, rtnl_dumpit_func dumpit,
-		   rtnl_calcit_func calcit)
+void rtnl_register_flags(int protocol, int msgtype,
+			 rtnl_doit_func doit, rtnl_dumpit_func dumpit,
+			 rtnl_calcit_func calcit, unsigned int flags)
 {
-	if (__rtnl_register(protocol, msgtype, doit, dumpit, calcit) < 0)
+	if (__rtnl_register_flags(protocol, msgtype, doit, dumpit, calcit,
+				  flags) < 0)
 		panic("Unable to register rtnetlink message handler, "
 		      "protocol = %d, message type = %d\n",
 		      protocol, msgtype);
 }
-EXPORT_SYMBOL_GPL(rtnl_register);
+EXPORT_SYMBOL_GPL(rtnl_register_flags);
 
 /**
  * rtnl_unregister - Unregister a rtnetlink message type
@@ -3298,6 +3305,7 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	struct net *net = sock_net(skb->sk);
 	rtnl_doit_func doit;
+	unsigned int flags;
 	int sz_idx, kind;
 	int family;
 	int type;
@@ -3326,6 +3334,9 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		rtnl_calcit_func calcit;
 		u16 min_dump_alloc = 0;
 
+		if (nlh->nlmsg_flags & NLM_F_STRICT)
+			return -EPROTO;
+
 		dumpit = rtnl_get_dumpit(family, type);
 		if (dumpit == NULL)
 			return -EOPNOTSUPP;
@@ -3346,9 +3357,11 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		return err;
 	}
 
-	doit = rtnl_get_doit(family, type);
+	doit = rtnl_get_doit(family, type, &flags);
 	if (doit == NULL)
 		return -EOPNOTSUPP;
+	if (!(flags & RTNL_F_STRICT) && (nlh->nlmsg_flags & NLM_F_STRICT))
+		return -EPROTO;
 
 	return doit(skb, nlh);
 }
@@ -3356,7 +3369,7 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 static void rtnetlink_rcv(struct sk_buff *skb)
 {
 	rtnl_lock();
-	netlink_rcv_skb(skb, false, &rtnetlink_rcv_msg);
+	netlink_rcv_skb(skb, true, &rtnetlink_rcv_msg);
 	rtnl_unlock();
 }
 

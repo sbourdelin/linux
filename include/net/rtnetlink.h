@@ -8,12 +8,31 @@ typedef int (*rtnl_doit_func)(struct sk_buff *, struct nlmsghdr *);
 typedef int (*rtnl_dumpit_func)(struct sk_buff *, struct netlink_callback *);
 typedef u16 (*rtnl_calcit_func)(struct sk_buff *, struct nlmsghdr *);
 
-int __rtnl_register(int protocol, int msgtype,
-		    rtnl_doit_func, rtnl_dumpit_func, rtnl_calcit_func);
-void rtnl_register(int protocol, int msgtype,
-		   rtnl_doit_func, rtnl_dumpit_func, rtnl_calcit_func);
+#define RTNL_F_STRICT	1
+
+int __rtnl_register_flags(int protocol, int msgtype,
+			  rtnl_doit_func, rtnl_dumpit_func, rtnl_calcit_func,
+			  unsigned int flags);
+void rtnl_register_flags(int protocol, int msgtype,
+			 rtnl_doit_func, rtnl_dumpit_func, rtnl_calcit_func,
+			 unsigned int flags);
 int rtnl_unregister(int protocol, int msgtype);
 void rtnl_unregister_all(int protocol);
+
+static inline int __rtnl_register(int protocol, int msgtype,
+				  rtnl_doit_func doit, rtnl_dumpit_func dumpit,
+				  rtnl_calcit_func calcit)
+{
+	return __rtnl_register_flags(protocol, msgtype,
+				     doit, dumpit, calcit, 0);
+}
+
+static inline void rtnl_register(int protocol, int msgtype,
+				 rtnl_doit_func doit, rtnl_dumpit_func dumpit,
+				 rtnl_calcit_func calcit)
+{
+	rtnl_register_flags(protocol, msgtype, doit, dumpit, calcit, 0);
+}
 
 static inline int rtnl_msg_family(const struct nlmsghdr *nlh)
 {
