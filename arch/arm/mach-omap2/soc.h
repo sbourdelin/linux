@@ -125,6 +125,15 @@
 #define OMAP2_DEVICE_TYPE_GP		3
 #define OMAP2_DEVICE_TYPE_BAD		4
 
+/*
+ * SoC types
+ */
+
+#define DRA7XX				BIT(0)
+#define	DRA74X				BIT(1)
+#define DRA72X				BIT(2)
+
+int check_soc_version(unsigned long id);
 int omap_type(void);
 
 /*
@@ -397,9 +406,9 @@ IS_OMAP_TYPE(3430, 0x3430)
 #undef soc_is_dra7xx
 #undef soc_is_dra74x
 #undef soc_is_dra72x
-#define soc_is_dra7xx()	(of_machine_is_compatible("ti,dra7"))
-#define soc_is_dra74x()	(of_machine_is_compatible("ti,dra74"))
-#define soc_is_dra72x()	(of_machine_is_compatible("ti,dra72"))
+#define soc_is_dra7xx()			check_soc_version(DRA7XX)
+#define soc_is_dra74x()			check_soc_version(DRA74X)
+#define soc_is_dra72x()			check_soc_version(DRA72X)
 #endif
 
 /* Various silicon revisions for omap2 */

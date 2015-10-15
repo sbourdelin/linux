@@ -40,6 +40,7 @@
 #define OMAP_SOC_MAX_NAME_LENGTH		16
 
 static unsigned int omap_revision;
+static unsigned long soc_ids;
 static char soc_name[OMAP_SOC_MAX_NAME_LENGTH];
 static char soc_rev[OMAP_SOC_MAX_NAME_LENGTH];
 u32 omap_features;
@@ -49,6 +50,21 @@ unsigned int omap_rev(void)
 	return omap_revision;
 }
 EXPORT_SYMBOL(omap_rev);
+
+void init_dra_soc_id(void)
+{
+	if (of_machine_is_compatible("ti,dra7"))
+		soc_ids |= DRA7XX;
+	if (of_machine_is_compatible("ti,dra74"))
+		soc_ids |= DRA74X;
+	if (of_machine_is_compatible("ti,dra72"))
+		soc_ids |= DRA72X;
+}
+
+int check_soc_version(unsigned long id)
+{
+	return soc_ids & id;
+}
 
 int omap_type(void)
 {
@@ -643,6 +659,7 @@ void __init dra7xxx_check_revision(void)
 	u16 hawkeye;
 	u8 rev;
 
+	init_dra_soc_id();
 	idcode = read_tap_reg(OMAP_TAP_IDCODE);
 	hawkeye = (idcode >> 12) & 0xffff;
 	rev = (idcode >> 28) & 0xff;
