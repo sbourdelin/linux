@@ -1,0 +1,21 @@
+#!/bin/bash
+mnt=./huge
+mkdir $mnt
+mount -t hugetlbfs none $mnt
+
+echo 256 > /proc/sys/vm/nr_hugepages
+echo "HugeTLB vs THP"
+./hugetlb_vs_thp_test
+
+echo "Subpage Protection"
+./subpage_prot
+
+echo "Test normal page migration"
+./page-migration
+
+echo "Test huge page migration"
+./hugepage-migration
+
+#cleanup
+umount $mnt
+rm -rf $mnt
