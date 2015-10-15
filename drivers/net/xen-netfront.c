@@ -1796,7 +1796,7 @@ static int xennet_create_queues(struct netfront_info *info,
 		dev_err(&info->netdev->dev, "no queues\n");
 		return -EINVAL;
 	}
-	return 0;
+	return num_queues;
 }
 
 /* Common code used when first setting up, and when resuming. */
@@ -1838,9 +1838,12 @@ static int talk_to_netback(struct xenbus_device *dev,
 	if (info->queues)
 		xennet_destroy_queues(info);
 
-	err = xennet_create_queues(info, num_queues);
-	if (err < 0)
+	/* Update queues number to real created */
+	num_queues = xennet_create_queues(info, num_queues);
+	if (num_queues < 0) {
+		err = num_queues;
 		goto destroy_ring;
+	}
 
 	/* Create shared ring, alloc event channel -- for each queue */
 	for (i = 0; i < num_queues; ++i) {
