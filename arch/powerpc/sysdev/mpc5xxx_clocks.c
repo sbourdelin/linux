@@ -13,21 +13,17 @@
 
 unsigned long mpc5xxx_get_bus_frequency(struct device_node *node)
 {
-	struct device_node *np;
-	const unsigned int *p_bus_freq = NULL;
+	u32 bus_freq = 0;
 
 	of_node_get(node);
 	while (node) {
-		p_bus_freq = of_get_property(node, "bus-frequency", NULL);
-		if (p_bus_freq)
+		if (!of_property_read_u32(node, "bus-frequency", &bus_freq))
 			break;
 
-		np = of_get_parent(node);
-		of_node_put(node);
-		node = np;
+		node = of_get_next_parent(node);
 	}
 	of_node_put(node);
 
-	return p_bus_freq ? *p_bus_freq : 0;
+	return bus_freq;
 }
 EXPORT_SYMBOL(mpc5xxx_get_bus_frequency);
