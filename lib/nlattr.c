@@ -128,12 +128,10 @@ int nla_validate(const struct nlattr *head, int len, int maxtype,
 	nla_for_each_attr(nla, head, len, rem) {
 		err = validate_nla(nla, maxtype, policy);
 		if (err < 0)
-			goto errout;
+			return err;
 	}
 
-	err = 0;
-errout:
-	return err;
+	return 0;
 }
 EXPORT_SYMBOL(nla_validate);
 
@@ -194,7 +192,7 @@ int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 			if (policy) {
 				err = validate_nla(nla, maxtype, policy);
 				if (err < 0)
-					goto errout;
+					return err;
 			}
 
 			tb[type] = (struct nlattr *)nla;
@@ -205,9 +203,7 @@ int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 		pr_warn_ratelimited("netlink: %d bytes leftover after parsing attributes in process `%s'.\n",
 				    rem, current->comm);
 
-	err = 0;
-errout:
-	return err;
+	return 0;
 }
 EXPORT_SYMBOL(nla_parse);
 
