@@ -169,6 +169,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
 
 	if ((locked > lock_limit) && !capable(CAP_IPC_LOCK)) {
+		pr_err("locked memory quota exhausted (see ulimit -l)\n");
 		ret = -ENOMEM;
 		goto out;
 	}
