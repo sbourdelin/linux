@@ -891,6 +891,14 @@ static u32 edma_residue(struct edma_desc *edesc)
 	pos = edma_get_position(edesc->echan->slot[0], dst);
 
 	/*
+	 * "pos" may represent a transfer request that is still being
+	 * processed by the EDMACC or EDMATC. Wait until all transfer
+	 * requests on the active slot are finished before proceeding.
+	 */
+	while (edma_is_actv(edesc->echan->slot[0]))
+		cpu_relax();
+
+	/*
 	 * Cyclic is simple. Just subtract pset[0].addr from pos.
 	 *
 	 * We never update edesc->residue in the cyclic case, so we
