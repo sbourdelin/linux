@@ -3526,7 +3526,7 @@ static int nfsd4_cb_recall_done(struct nfsd4_callback *cb,
 			rpc_delay(task, 2 * HZ);
 			return 0;
 		}
-		/*FALLTHRU*/
+		return 1;
 	default:
 		return -1;
 	}
@@ -4376,8 +4376,16 @@ nfs4_laundromat(struct nfsd_net *nn)
 	while (!list_empty(&reaplist)) {
 		dp = list_first_entry(&reaplist, struct nfs4_delegation,
 					dl_recall_lru);
-		list_del_init(&dp->dl_recall_lru);
-		revoke_delegation(dp);
+		if ((dp->dl_recall.cb_status == -EBADHANDLE) ||
+			(dp->dl_recall.cb_status == -NFS4ERR_BAD_STATEID)) {
+			dprintk("nfsd: client: %.*s is losing delegations",
+				(int)dp->dl_recall.cb_clp->cl_name.len,
+				dp->dl_recall.cb_clp->cl_name.data);
+			destroy_delegation(dp);
+		} else {
+			list_del_init(&dp->dl_recall_lru);
+			revoke_delegation(dp);
+		}
 	}
 
 	spin_lock(&nn->client_lock);
