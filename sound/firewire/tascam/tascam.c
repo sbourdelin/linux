@@ -51,7 +51,7 @@ static int identify_model(struct snd_tscm *tscm)
 	}
 
 	/* Pick up model name from certain addresses. */
-	for (i = 0; i < 8; i++) {
+	for (i = 0; i < 7; i++) {
 		c = config_rom[28 + i / 4] >> (24 - 8 * (i % 4));
 		if (c == '\0')
 			break;
