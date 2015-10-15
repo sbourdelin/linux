@@ -36,7 +36,7 @@
  * fine since it simply wouldn't be able to create any sure pfns in
  * the first place.
  */
-typedef uint64_t xen_pfn_t;
+typedef __u64 xen_pfn_t;
 #define PRI_xen_pfn "llx"
 typedef uint64_t xen_ulong_t;
 #define PRI_xen_ulong "llx"
