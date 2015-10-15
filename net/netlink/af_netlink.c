@@ -2944,6 +2944,7 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 	struct nlmsgerr *errmsg;
 	size_t payload = sizeof(*errmsg);
 	struct netlink_sock *nlk = nlk_sk(NETLINK_CB(in_skb).sk);
+	unsigned int flags = 0;
 
 	/* Error messages get the original request appened, unless the user
 	 * requests to cap the error message.
@@ -2967,8 +2968,10 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 		return;
 	}
 
+	if (nlh->nlmsg_flags & NLM_F_STRICT)
+		flags |= NLM_F_STRICT;
 	rep = __nlmsg_put(skb, NETLINK_CB(in_skb).portid, nlh->nlmsg_seq,
-			  NLMSG_ERROR, payload, 0);
+			  NLMSG_ERROR, payload, flags);
 	errmsg = nlmsg_data(rep);
 	errmsg->error = err;
 	memcpy(&errmsg->msg, nlh, payload > sizeof(*errmsg) ? nlh->nlmsg_len : sizeof(*nlh));
@@ -2976,8 +2979,8 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 }
 EXPORT_SYMBOL(netlink_ack);
 
-int netlink_rcv_skb(struct sk_buff *skb, int (*cb)(struct sk_buff *,
-						     struct nlmsghdr *))
+int netlink_rcv_skb(struct sk_buff *skb, bool strict_supported,
+		    int (*cb)(struct sk_buff *, struct nlmsghdr *))
 {
 	struct nlmsghdr *nlh;
 	int err;
@@ -2994,6 +2997,11 @@ int netlink_rcv_skb(struct sk_buff *skb, int (*cb)(struct sk_buff *,
 		/* Only requests are handled by the kernel */
 		if (!(nlh->nlmsg_flags & NLM_F_REQUEST))
 			goto ack;
+
+		if (!strict_supported && (nlh->nlmsg_flags & NLM_F_STRICT)) {
+			err = -EPROTO;
+			goto ack;
+		}
 
 		/* Skip control messages */
 		if (nlh->nlmsg_type < NLMSG_MIN_TYPE)

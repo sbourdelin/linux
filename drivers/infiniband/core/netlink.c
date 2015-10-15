@@ -223,7 +223,7 @@ static void ibnl_rcv(struct sk_buff *skb)
 {
 	mutex_lock(&ibnl_mutex);
 	ibnl_rcv_reply_skb(skb);
-	netlink_rcv_skb(skb, &ibnl_rcv_msg);
+	netlink_rcv_skb(skb, false, &ibnl_rcv_msg);
 	mutex_unlock(&ibnl_mutex);
 }
 

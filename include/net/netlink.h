@@ -228,7 +228,7 @@ struct nl_info {
 	u32			portid;
 };
 
-int netlink_rcv_skb(struct sk_buff *skb,
+int netlink_rcv_skb(struct sk_buff *skb, bool strict_supported,
 		    int (*cb)(struct sk_buff *, struct nlmsghdr *));
 int nlmsg_notify(struct sock *sk, struct sk_buff *skb, u32 portid,
 		 unsigned int group, int report, gfp_t flags);

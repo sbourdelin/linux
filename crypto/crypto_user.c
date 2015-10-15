@@ -526,7 +526,7 @@ static int crypto_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 static void crypto_netlink_rcv(struct sk_buff *skb)
 {
 	mutex_lock(&crypto_cfg_mutex);
-	netlink_rcv_skb(skb, &crypto_user_rcv_msg);
+	netlink_rcv_skb(skb, false, &crypto_user_rcv_msg);
 	mutex_unlock(&crypto_cfg_mutex);
 }
 

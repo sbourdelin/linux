@@ -339,6 +339,10 @@ replay:
 			err = -EINVAL;
 			goto ack;
 		}
+		if (nlh->nlmsg_flags & NLM_F_STRICT) {
+			err = -EPROTO;
+			goto ack;
+		}
 
 		type = nlh->nlmsg_type;
 		if (type == NFNL_MSG_BATCH_BEGIN) {
@@ -476,7 +480,7 @@ static void nfnetlink_rcv(struct sk_buff *skb)
 			res_id = ntohs(nfgenmsg->res_id);
 		nfnetlink_rcv_batch(skb, nlh, res_id);
 	} else {
-		netlink_rcv_skb(skb, &nfnetlink_rcv_msg);
+		netlink_rcv_skb(skb, false, &nfnetlink_rcv_msg);
 	}
 }
 
