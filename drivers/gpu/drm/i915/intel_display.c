@@ -34,6 +34,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drmP.h>
 #include "intel_drv.h"
+#include "intel_dsi.h"
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_trace.h"
@@ -112,6 +113,15 @@ static void skl_init_scalers(struct drm_device *dev, struct intel_crtc *intel_cr
 	struct intel_crtc_state *crtc_state);
 static int i9xx_get_refclk(const struct intel_crtc_state *crtc_state,
 			   int num_connectors);
+static void bxt_get_ddi_pll(struct drm_i915_private *dev_priv,
+		enum port port,
+		struct intel_crtc_state *pipe_config);
+static void skylake_get_ddi_pll(struct drm_i915_private *dev_priv,
+		enum port port,
+		struct intel_crtc_state *pipe_config);
+static void haswell_get_ddi_pll(struct drm_i915_private *dev_priv,
+		enum port port,
+		struct intel_crtc_state *pipe_config);
 static void skylake_pfit_enable(struct intel_crtc *crtc);
 static void ironlake_pfit_disable(struct intel_crtc *crtc, bool force);
 static void ironlake_pfit_enable(struct intel_crtc *crtc);
@@ -8041,6 +8051,33 @@ static void chv_crtc_clock_get(struct intel_crtc *crtc,
 	pipe_config->port_clock = chv_calc_dpll_params(refclk, &clock);
 }
 
+static void haswell_crtc_clock_get(struct intel_crtc *crtc,
+		struct intel_crtc_state *pipe_config)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_encoder *encoder = NULL;
+	enum port port;
+	bool is_dsi = intel_pipe_has_type(crtc, INTEL_OUTPUT_DSI);
+
+	for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
+		port = intel_ddi_get_encoder_port(encoder);
+		if (IS_BROXTON(dev) && is_dsi) {
+			pipe_config->port_clock = bxt_get_dsi_pclk(encoder,
+					pipe_config->pipe_bpp);
+			break;
+		}
+		if (IS_SKYLAKE(dev))
+			skylake_get_ddi_pll(dev_priv, port, pipe_config);
+		else if (IS_BROXTON(dev))
+			bxt_get_ddi_pll(dev_priv, port, pipe_config);
+		else
+			haswell_get_ddi_pll(dev_priv, port, pipe_config);
+
+		intel_ddi_clock_get(encoder, pipe_config);
+	}
+}
+
 static bool i9xx_get_pipe_config(struct intel_crtc *crtc,
 				 struct intel_crtc_state *pipe_config)
 {
@@ -10568,7 +10605,7 @@ static void ironlake_pch_clock_get(struct intel_crtc *crtc,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	/* read out port_clock from the DPLL */
-	dev_priv->display.crtc_clock_get(crtc, &pipe_config);
+	dev_priv->display.crtc_clock_get(crtc, pipe_config);
 
 	/*
 	 * This value does not include pixel_multiplier.
@@ -14395,7 +14432,7 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = haswell_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			skylake_update_primary_plane;
-		dev_priv->display.crtc_clock_get = i9xx_crtc_clock_get;
+		dev_priv->display.crtc_clock_get = haswell_crtc_clock_get;
 	} else if (HAS_DDI(dev)) {
 		dev_priv->display.get_pipe_config = haswell_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
@@ -14406,7 +14443,7 @@ static void intel_init_display(struct drm_device *dev)
 		dev_priv->display.crtc_disable = haswell_crtc_disable;
 		dev_priv->display.update_primary_plane =
 			ironlake_update_primary_plane;
-		dev_priv->display.crtc_clock_get = i9xx_crtc_clock_get;
+		dev_priv->display.crtc_clock_get = haswell_crtc_clock_get;
 	} else if (HAS_PCH_SPLIT(dev)) {
 		dev_priv->display.get_pipe_config = ironlake_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
