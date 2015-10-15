@@ -143,9 +143,38 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
 	set_fs(fs);
 }
 
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+static void print_ftrace_graph_addr(unsigned long addr,
+					struct task_struct *tsk,
+					unsigned long sp, int *graph)
+{
+	unsigned long ret_addr;
+	int index = tsk->curr_ret_stack;
+
+	if (addr != ((unsigned long)return_to_handler - 4))
+		return;
+
+	if (!tsk->ret_stack || index < *graph)
+		return;
+
+	index -= *graph;
+	ret_addr = tsk->ret_stack[index].ret;
+
+	dump_backtrace_entry(ret_addr - 4, sp);
+
+	(*graph)++;
+}
+#else
+static inline void print_ftrace_graph_addr(unsigned long addr,
+					struct task_struct *tsk,
+					unsigned long sp, int *graph)
+{}
+#endif
+
 static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 {
 	struct stackframe frame;
+	int graph = 0;
 
 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
 
@@ -177,7 +206,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		ret = unwind_frame(&frame);
 		if (ret < 0)
 			break;
+
 		dump_backtrace_entry(where, frame.sp);
+		print_ftrace_graph_addr(where, tsk, frame.sp, &graph);
 	}
 }
 
