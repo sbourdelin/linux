@@ -302,24 +302,69 @@ static bool icmp6hdr_ok(struct sk_buff *skb)
 				  sizeof(struct icmp6hdr));
 }
 
-static int parse_vlan(struct sk_buff *skb, struct sw_flow_key *key)
+struct qtag_prefix {
+	__be16 eth_type; /* ETH_P_8021Q  or ETH_P_8021AD */
+	__be16 tci;
+};
+
+/* Parse vlan tag from vlan header.
+ * Returns ERROR on memory error.
+ * Returns 0 if it encounters a non-vlan or incomplete packet.
+ * Returns 1 after successfully parsing vlan tag.
+ */
+
+static int parse_vlan_tag(struct sk_buff *skb, __be16 vlan_proto,
+			  __be16 vlan_tci, struct vlan_head *vlan)
 {
-	struct qtag_prefix {
-		__be16 eth_type; /* ETH_P_8021Q */
-		__be16 tci;
-	};
-	struct qtag_prefix *qp;
+	if (likely(!eth_type_vlan(vlan_proto)))
+		return 0;
 
 	if (unlikely(skb->len < sizeof(struct qtag_prefix) + sizeof(__be16)))
 		return 0;
 
 	if (unlikely(!pskb_may_pull(skb, sizeof(struct qtag_prefix) +
-					 sizeof(__be16))))
+				 sizeof(__be16))))
 		return -ENOMEM;
 
-	qp = (struct qtag_prefix *) skb->data;
-	key->eth.tci = qp->tci | htons(VLAN_TAG_PRESENT);
+	vlan->tci = vlan_tci | htons(VLAN_TAG_PRESENT);
+	vlan->tpid = vlan_proto;
+
 	__skb_pull(skb, sizeof(struct qtag_prefix));
+	return 1;
+}
+
+static int parse_vlan(struct sk_buff *skb, struct sw_flow_key *key)
+{
+	struct qtag_prefix *qp = (struct qtag_prefix *)skb->data;
+	int res;
+
+	if (likely(skb_vlan_tag_present(skb))) {
+		key->eth.vlan.tci = htons(skb->vlan_tci);
+		key->eth.vlan.tpid = skb->vlan_proto;
+
+		/* Case where ingress processing has already stripped
+		 * the outer vlan tag.
+		 */
+		res = parse_vlan_tag(skb, qp->eth_type, qp->tci,
+				     &key->eth.cvlan);
+		if (res < 0)
+			return res;
+		/* For inner tag, return 0 because neither
+		 * non-existant nor partial inner tag is an error.
+		 */
+		return 0;
+	}
+	res = parse_vlan_tag(skb, qp->eth_type, qp->tci, &key->eth.vlan);
+	if (res <= 0)
+		/* This is an outer tag in the non-accelerated VLAN
+		 * case. Return error unless it is a complete vlan tag.
+		 */
+		return res;
+
+	/* Parse inner vlan tag if present for non-accelerated case. */
+	res = parse_vlan_tag(skb, qp->eth_type, qp->tci, &key->eth.cvlan);
+	if (res <= 0)
+		return res;
 
 	return 0;
 }
@@ -480,12 +525,12 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 	 * update skb->csum here.
 	 */
 
-	key->eth.tci = 0;
-	if (skb_vlan_tag_present(skb))
-		key->eth.tci = htons(skb->vlan_tci);
-	else if (eth->h_proto == htons(ETH_P_8021Q))
-		if (unlikely(parse_vlan(skb, key)))
-			return -ENOMEM;
+	key->eth.vlan.tci = 0;
+	key->eth.vlan.tpid = 0;
+	key->eth.cvlan.tci = 0;
+	key->eth.cvlan.tpid = 0;
+	if (unlikely(parse_vlan(skb, key)))
+		return -ENOMEM;
 
 	key->eth.type = parse_ethertype(skb);
 	if (unlikely(key->eth.type == htons(0)))

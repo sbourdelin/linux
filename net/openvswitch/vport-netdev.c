@@ -194,7 +194,9 @@ static unsigned int packet_length(const struct sk_buff *skb)
 {
 	unsigned int length = skb->len - ETH_HLEN;
 
-	if (skb->protocol == htons(ETH_P_8021Q))
+	if (eth_type_vlan(skb->protocol))
+		length -= VLAN_HLEN;
+	if (skb->protocol == htons(ETH_P_8021AD))
 		length -= VLAN_HLEN;
 
 	return length;
