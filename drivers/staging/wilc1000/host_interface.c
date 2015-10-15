@@ -3971,10 +3971,10 @@ int host_int_get_rssi(struct host_if_drv *hif_drv, s8 *ps8Rssi)
 	return s32Error;
 }
 
-s32 host_int_get_link_speed(struct host_if_drv *hif_drv, s8 *ps8lnkspd)
+int host_int_get_link_speed(struct host_if_drv *hif_drv, s8 *ps8lnkspd)
 {
 	struct host_if_msg msg;
-	s32 s32Error = 0;
+	int s32Error = 0;
 	memset(&msg, 0, sizeof(struct host_if_msg));
 
 	msg.id = HOST_IF_MSG_GET_LINKSPEED;
