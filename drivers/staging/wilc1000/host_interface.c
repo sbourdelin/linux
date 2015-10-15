@@ -3522,9 +3522,9 @@ int host_int_get_MacAddress(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
 	return s32Error;
 }
 
-s32 host_int_set_MacAddress(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
+int host_int_set_MacAddress(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 
 	PRINT_D(GENERIC_DBG, "mac addr = %x:%x:%x\n", pu8MacAddress[0], pu8MacAddress[1], pu8MacAddress[2]);
