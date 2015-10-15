@@ -680,7 +680,7 @@ int host_int_set_join_req(struct host_if_drv *hWFIDrv, u8 *pu8bssid,
  *  @version		8.0
  */
 
-s32 host_int_flush_join_req(struct host_if_drv *hWFIDrv);
+int host_int_flush_join_req(struct host_if_drv *hWFIDrv);
 
 
 /**

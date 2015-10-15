@@ -3653,9 +3653,9 @@ int host_int_set_join_req(struct host_if_drv *hif_drv, u8 *pu8bssid,
 	return s32Error;
 }
 
-s32 host_int_flush_join_req(struct host_if_drv *hif_drv)
+int host_int_flush_join_req(struct host_if_drv *hif_drv)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 
 	if (!gu8FlushedJoinReq)	{
