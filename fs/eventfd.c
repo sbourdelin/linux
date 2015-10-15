@@ -2,6 +2,7 @@
  *  fs/eventfd.c
  *
  *  Copyright (C) 2007  Davide Libenzi <davidel@xmailserver.org>
+ *  Copyright (C) 2013  Martin Sustrik <sustrik@250bpm.com>
  *
  */
 
@@ -22,18 +23,31 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+#define EFD_SHARED_FCNTL_FLAGS (O_CLOEXEC | O_NONBLOCK)
+#define EFD_FLAGS_SET (EFD_SHARED_FCNTL_FLAGS | EFD_SEMAPHORE | EFD_MASK)
+#define EFD_MASK_VALID_EVENTS (POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP)
+
 struct eventfd_ctx {
 	struct kref kref;
 	wait_queue_head_t wqh;
-	/*
-	 * Every time that a write(2) is performed on an eventfd, the
-	 * value of the __u64 being written is added to "count" and a
-	 * wakeup is performed on "wqh". A read(2) will return the "count"
-	 * value to userspace, and will reset "count" to zero. The kernel
-	 * side eventfd_signal() also, adds to the "count" counter and
-	 * issue a wakeup.
-	 */
-	__u64 count;
+	union {
+		/*
+		 * Every time that a write(2) is performed on an eventfd, the
+		 * value of the __u64 being written is added to "count" and a
+		 * wakeup is performed on "wqh". A read(2) will return the
+		 * "count" value to userspace, and will reset "count" to zero.
+		 * The kernel side eventfd_signal() also, adds to the "count"
+		 * counter and issue a wakeup.
+		 */
+		__u64 count;
+
+		/*
+		 * When using eventfd in EFD_MASK mode this stracture stores the
+		 * current events to be signaled on the eventfd (events member)
+		 * along with opaque user-defined data (data member).
+		 */
+		__u32 events;
+	};
 	unsigned int flags;
 };
 
@@ -132,6 +146,14 @@ static unsigned int eventfd_poll(struct file *file, poll_table *wait)
 		events |= POLLOUT;
 
 	return events;
+}
+
+static unsigned int eventfd_mask_poll(struct file *file, poll_table *wait)
+{
+	struct eventfd_ctx *ctx = file->private_data;
+
+	poll_wait(file, &ctx->wqh, wait);
+	return ctx->events;
 }
 
 static void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
@@ -239,6 +261,14 @@ static ssize_t eventfd_read(struct file *file, char __user *buf, size_t count,
 	return put_user(cnt, (__u64 __user *) buf) ? -EFAULT : sizeof(cnt);
 }
 
+static ssize_t eventfd_mask_read(struct file *file, char __user *buf,
+			    size_t count,
+			    loff_t *ppos)
+{
+	return -EINVAL;
+}
+
+
 static ssize_t eventfd_write(struct file *file, const char __user *buf, size_t count,
 			     loff_t *ppos)
 {
@@ -286,6 +316,28 @@ static ssize_t eventfd_write(struct file *file, const char __user *buf, size_t c
 	return res;
 }
 
+static ssize_t eventfd_mask_write(struct file *file, const char __user *buf,
+			     size_t count,
+			     loff_t *ppos)
+{
+	struct eventfd_ctx *ctx = file->private_data;
+	__u32 events;
+
+	if (count < sizeof(events))
+		return -EINVAL;
+	if (copy_from_user(&events, buf, sizeof(events)))
+		return -EFAULT;
+	if (events & ~EFD_MASK_VALID_EVENTS)
+		return -EINVAL;
+	spin_lock_irq(&ctx->wqh.lock);
+	memcpy(&ctx->events, &events, sizeof(ctx->events));
+	if (waitqueue_active(&ctx->wqh))
+		wake_up_locked_poll(&ctx->wqh,
+			(unsigned long)ctx->events);
+	spin_unlock_irq(&ctx->wqh.lock);
+	return sizeof(ctx->events);
+}
+
 #ifdef CONFIG_PROC_FS
 static void eventfd_show_fdinfo(struct seq_file *m, struct file *f)
 {
@@ -294,6 +346,16 @@ static void eventfd_show_fdinfo(struct seq_file *m, struct file *f)
 	spin_lock_irq(&ctx->wqh.lock);
 	seq_printf(m, "eventfd-count: %16llx\n",
 		   (unsigned long long)ctx->count);
+	spin_unlock_irq(&ctx->wqh.lock);
+}
+
+static void eventfd_mask_show_fdinfo(struct seq_file *m, struct file *f)
+{
+	struct eventfd_ctx *ctx = f->private_data;
+
+	spin_lock_irq(&ctx->wqh.lock);
+	seq_printf(m, "eventfd-mask: %x\n",
+		ctx->events);
 	spin_unlock_irq(&ctx->wqh.lock);
 }
 #endif
@@ -306,6 +368,17 @@ static const struct file_operations eventfd_fops = {
 	.poll		= eventfd_poll,
 	.read		= eventfd_read,
 	.write		= eventfd_write,
+	.llseek		= noop_llseek,
+};
+
+static const struct file_operations eventfd_mask_fops = {
+#ifdef CONFIG_PROC_FS
+	.show_fdinfo	= eventfd_mask_show_fdinfo,
+#endif
+	.release	= eventfd_release,
+	.poll		= eventfd_mask_poll,
+	.read		= eventfd_mask_read,
+	.write		= eventfd_mask_write,
 	.llseek		= noop_llseek,
 };
 
@@ -392,6 +465,7 @@ struct file *eventfd_file_create(unsigned int count, int flags)
 {
 	struct file *file;
 	struct eventfd_ctx *ctx;
+	const struct file_operations *fops;
 
 	/* Check the EFD_* constants for consistency.  */
 	BUILD_BUG_ON(EFD_CLOEXEC != O_CLOEXEC);
@@ -406,10 +480,16 @@ struct file *eventfd_file_create(unsigned int count, int flags)
 
 	kref_init(&ctx->kref);
 	init_waitqueue_head(&ctx->wqh);
-	ctx->count = count;
+	if (flags & EFD_MASK) {
+		ctx->events = 0;
+		fops = &eventfd_mask_fops;
+	} else {
+		ctx->count = count;
+		fops = &eventfd_fops;
+	}
 	ctx->flags = flags;
 
-	file = anon_inode_getfile("[eventfd]", &eventfd_fops, ctx,
+	file = anon_inode_getfile("[eventfd]", fops, ctx,
 				  O_RDWR | (flags & EFD_SHARED_FCNTL_FLAGS));
 	if (IS_ERR(file))
 		eventfd_free_ctx(ctx);
