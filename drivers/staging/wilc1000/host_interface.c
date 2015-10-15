@@ -245,9 +245,7 @@ static struct semaphore hif_sema_thread;
 struct semaphore hif_sema_driver;
 static struct semaphore hif_sema_wait_response;
 struct semaphore hif_sema_deinit;
-struct timer_list g_hPeriodicRSSI;
-
-
+struct timer_list periodic_rssi;
 
 u8 gau8MulticastMacAddrList[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
 
@@ -4207,8 +4205,8 @@ static void GetPeriodicRSSI(unsigned long arg)
 			return;
 		}
 	}
-	g_hPeriodicRSSI.data = (unsigned long)hif_drv;
-	mod_timer(&g_hPeriodicRSSI, jiffies + msecs_to_jiffies(5000));
+	periodic_rssi.data = (unsigned long)hif_drv;
+	mod_timer(&periodic_rssi, jiffies + msecs_to_jiffies(5000));
 }
 
 
@@ -4276,9 +4274,9 @@ s32 host_int_init(struct host_if_drv **hif_drv_handler)
 			result = -EFAULT;
 			goto _fail_mq_;
 		}
-		setup_timer(&g_hPeriodicRSSI, GetPeriodicRSSI,
+		setup_timer(&periodic_rssi, GetPeriodicRSSI,
 			    (unsigned long)hif_drv);
-		mod_timer(&g_hPeriodicRSSI, jiffies + msecs_to_jiffies(5000));
+		mod_timer(&periodic_rssi, jiffies + msecs_to_jiffies(5000));
 	}
 
 	setup_timer(&hif_drv->hScanTimer, TimerCB_Scan, 0);
@@ -4346,10 +4344,8 @@ s32 host_int_deinit(struct host_if_drv *hif_drv)
 		PRINT_D(HOSTINF_DBG, ">> Connect timer is active\n");
 	}
 
-
-	if (del_timer_sync(&g_hPeriodicRSSI)) {
+	if (del_timer_sync(&periodic_rssi))
 		PRINT_D(HOSTINF_DBG, ">> Connect timer is active\n");
-	}
 
 	del_timer_sync(&hif_drv->hRemainOnChannel);
 
@@ -4370,9 +4366,9 @@ s32 host_int_deinit(struct host_if_drv *hif_drv)
 	memset(&msg, 0, sizeof(struct host_if_msg));
 
 	if (clients_count == 1)	{
-		if (del_timer_sync(&g_hPeriodicRSSI)) {
+		if (del_timer_sync(&periodic_rssi))
 			PRINT_D(HOSTINF_DBG, ">> Connect timer is active\n");
-		}
+
 		msg.id = HOST_IF_MSG_EXIT;
 		msg.drv = hif_drv;
 
