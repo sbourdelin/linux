@@ -3229,13 +3229,13 @@ int host_int_set_WEPDefaultKeyID(struct host_if_drv *hif_drv, u8 u8Index)
 	return s32Error;
 }
 
-s32 host_int_add_wep_key_bss_sta(struct host_if_drv *hif_drv,
+int host_int_add_wep_key_bss_sta(struct host_if_drv *hif_drv,
 				 const u8 *pu8WepKey,
 				 u8 u8WepKeylen,
 				 u8 u8Keyidx)
 {
 
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 
 	if (!hif_drv) {
