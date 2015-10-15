@@ -584,7 +584,7 @@ int main(int argc, const char **argv)
 		/* The user didn't specify a command; give them help */
 		usage_with_options_return(perf_usage, perf_options);
 		list_common_cmds_help();
-		printf("\n %s\n\n", perf_more_info_string);
+		fprintf(stderr, "\n %s\n\n", perf_more_info_string);
 		goto out;
 	}
 	cmd = argv[0];

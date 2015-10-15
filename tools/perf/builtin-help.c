@@ -287,10 +287,11 @@ void list_common_cmds_help(void)
 			longest = strlen(common_cmds[i].name);
 	}
 
-	puts(" The most commonly used perf commands are:");
+	fputs(" The most commonly used perf commands are:\n", stderr);
 	for (i = 0; i < ARRAY_SIZE(common_cmds); i++) {
-		printf("   %-*s   ", longest, common_cmds[i].name);
-		puts(common_cmds[i].help);
+		fprintf(stderr, "   %-*s   ", longest, common_cmds[i].name);
+		fputs(common_cmds[i].help, stderr);
+		fputc('\n', stderr);
 	}
 }
 
@@ -472,7 +473,7 @@ int cmd_help(int argc, const char **argv, const char *prefix __maybe_unused)
 	if (!argv[0]) {
 		usage_with_options_return(perf_usage, perf_options);
 		list_common_cmds_help();
-		printf("\n %s\n\n", perf_more_info_string);
+		fprintf(stderr, "\n %s\n\n", perf_more_info_string);
 		return 0;
 	}
 
