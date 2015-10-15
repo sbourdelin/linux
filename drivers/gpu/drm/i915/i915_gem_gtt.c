@@ -2542,6 +2542,9 @@ static int ggtt_bind_vma(struct i915_vma *vma,
 					    cache_level, pte_flags);
 	}
 
+	if (!dev_priv->mm.aliasing_ppgtt)
+		vma->bound |= GLOBAL_BIND | LOCAL_BIND;
+
 	return 0;
 }
 
