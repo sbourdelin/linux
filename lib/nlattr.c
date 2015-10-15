@@ -163,9 +163,10 @@ nla_policy_len(const struct nla_policy *p, int n)
 EXPORT_SYMBOL(nla_policy_len);
 
 /**
- * nla_parse - Parse a stream of attributes into a tb buffer
+ * nla_strict_parse - Parse a stream of attributes into a tb buffer
  * @tb: destination array with maxtype+1 elements
  * @maxtype: maximum attribute type to be expected
+ * @strict: whether to perform strict checking
  * @head: head of attribute stream
  * @len: length of attribute stream
  * @policy: validation policy
@@ -173,12 +174,14 @@ EXPORT_SYMBOL(nla_policy_len);
  * Parses a stream of attributes and stores a pointer to each attribute in
  * the tb array accessible via the attribute type. Attributes with a type
  * exceeding maxtype will be silently ignored for backwards compatibility
- * reasons. policy may be set to NULL if no validation is required.
+ * reasons, unless strict is set. policy may be set to NULL if no validation
+ * is required.
  *
  * Returns 0 on success or a negative error code.
  */
-int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
-	      int len, const struct nla_policy *policy)
+int nla_strict_parse(struct nlattr **tb, int maxtype, bool strict,
+		     const struct nlattr *head, int len,
+		     const struct nla_policy *policy)
 {
 	const struct nlattr *nla;
 	int rem, err;
@@ -196,16 +199,21 @@ int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 			}
 
 			tb[type] = (struct nlattr *)nla;
+		} else if (strict) {
+			return -EINVAL;
 		}
 	}
 
-	if (unlikely(rem > 0))
+	if (unlikely(rem > 0)) {
 		pr_warn_ratelimited("netlink: %d bytes leftover after parsing attributes in process `%s'.\n",
 				    rem, current->comm);
+		if (strict)
+			return -EINVAL;
+	}
 
 	return 0;
 }
-EXPORT_SYMBOL(nla_parse);
+EXPORT_SYMBOL(nla_strict_parse);
 
 /**
  * nla_find - Find a specific attribute in a stream of attributes

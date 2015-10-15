@@ -235,8 +235,9 @@ int nlmsg_notify(struct sock *sk, struct sk_buff *skb, u32 portid,
 
 int nla_validate(const struct nlattr *head, int len, int maxtype,
 		 const struct nla_policy *policy);
-int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
-	      int len, const struct nla_policy *policy);
+int nla_strict_parse(struct nlattr **tb, int maxtype, bool strict,
+		     const struct nlattr *head, int len,
+		     const struct nla_policy *policy);
 int nla_policy_len(const struct nla_policy *, int);
 struct nlattr *nla_find(const struct nlattr *head, int len, int attrtype);
 size_t nla_strlcpy(char *dst, const struct nlattr *nla, size_t dstsize);
@@ -356,6 +357,30 @@ nlmsg_next(const struct nlmsghdr *nlh, int *remaining)
 }
 
 /**
+ * nlmsg_strict_parse - parse attributes of a netlink message
+ * @nlh: netlink message header
+ * @hdrlen: length of family specific header
+ * @tb: destination array with maxtype+1 elements
+ * @maxtype: maximum attribute type to be expected
+ * @strict: whether to perform strict checking
+ * @policy: validation policy
+ *
+ * See nla_strict_parse().
+ */
+static inline int nlmsg_strict_parse(const struct nlmsghdr *nlh, int hdrlen,
+				     struct nlattr *tb[], int maxtype,
+				     bool strict,
+				     const struct nla_policy *policy)
+{
+	if (nlh->nlmsg_len < nlmsg_msg_size(hdrlen))
+		return -EINVAL;
+
+	return nla_strict_parse(tb, maxtype, strict,
+				nlmsg_attrdata(nlh, hdrlen),
+				nlmsg_attrlen(nlh, hdrlen), policy);
+}
+
+/**
  * nlmsg_parse - parse attributes of a netlink message
  * @nlh: netlink message header
  * @hdrlen: length of family specific header
@@ -363,17 +388,13 @@ nlmsg_next(const struct nlmsghdr *nlh, int *remaining)
  * @maxtype: maximum attribute type to be expected
  * @policy: validation policy
  *
- * See nla_parse()
+ * See nla_strict_parse(). Strict checking is not performed.
  */
 static inline int nlmsg_parse(const struct nlmsghdr *nlh, int hdrlen,
 			      struct nlattr *tb[], int maxtype,
 			      const struct nla_policy *policy)
 {
-	if (nlh->nlmsg_len < nlmsg_msg_size(hdrlen))
-		return -EINVAL;
-
-	return nla_parse(tb, maxtype, nlmsg_attrdata(nlh, hdrlen),
-			 nlmsg_attrlen(nlh, hdrlen), policy);
+	return nlmsg_strict_parse(nlh, hdrlen, tb, maxtype, false, policy);
 }
 
 /**
@@ -722,13 +743,49 @@ nla_find_nested(const struct nlattr *nla, int attrtype)
 }
 
 /**
+ * nla_parse - Parse a stream of attributes into a tb buffer
+ * @tb: destination array with maxtype+1 elements
+ * @maxtype: maximum attribute type to be expected
+ * @head: head of attribute stream
+ * @len: length of attribute stream
+ * @policy: validation policy
+ *
+ * See nla_strict_parse(). Strict checking is not performed.
+ */
+static inline int nla_parse(struct nlattr **tb, int maxtype,
+			    const struct nlattr *head, int len,
+			    const struct nla_policy *policy)
+{
+	return nla_strict_parse(tb, maxtype, false, head, len, policy);
+}
+
+/**
+ * nla_strict_parse_nested - parse nested attributes
+ * @tb: destination array with maxtype+1 elements
+ * @maxtype: maximum attribute type to be expected
+ * @strict: whether to perform strict checking
+ * @nla: attribute containing the nested attributes
+ * @policy: validation policy
+ *
+ * See nla_strict_parse(). Strict checking is not performed.
+ */
+static inline int nla_strict_parse_nested(struct nlattr *tb[], int maxtype,
+					  bool strict,
+					  const struct nlattr *nla,
+					  const struct nla_policy *policy)
+{
+	return nla_strict_parse(tb, maxtype, strict, nla_data(nla),
+				nla_len(nla), policy);
+}
+
+/**
  * nla_parse_nested - parse nested attributes
  * @tb: destination array with maxtype+1 elements
  * @maxtype: maximum attribute type to be expected
  * @nla: attribute containing the nested attributes
  * @policy: validation policy
  *
- * See nla_parse()
+ * See nla_strict_parse()
  */
 static inline int nla_parse_nested(struct nlattr *tb[], int maxtype,
 				   const struct nlattr *nla,
