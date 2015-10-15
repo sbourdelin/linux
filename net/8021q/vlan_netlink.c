@@ -31,14 +31,16 @@ static const struct nla_policy vlan_map_policy[IFLA_VLAN_QOS_MAX + 1] = {
 };
 
 
-static inline int vlan_validate_qos_map(struct nlattr *attr)
+static inline int vlan_validate_qos_map(struct nlattr *attr, bool strict)
 {
 	if (!attr)
 		return 0;
-	return nla_validate_nested(attr, IFLA_VLAN_QOS_MAX, vlan_map_policy);
+	return nla_strict_validate_nested(attr, IFLA_VLAN_QOS_MAX, strict,
+					  vlan_map_policy);
 }
 
-static int vlan_validate(struct nlattr *tb[], struct nlattr *data[])
+static int vlan_validate(struct nlattr *tb[], struct nlattr *data[],
+			 bool strict)
 {
 	struct ifla_vlan_flags *flags;
 	u16 id;
@@ -77,10 +79,10 @@ static int vlan_validate(struct nlattr *tb[], struct nlattr *data[])
 			return -EINVAL;
 	}
 
-	err = vlan_validate_qos_map(data[IFLA_VLAN_INGRESS_QOS]);
+	err = vlan_validate_qos_map(data[IFLA_VLAN_INGRESS_QOS], strict);
 	if (err < 0)
 		return err;
-	err = vlan_validate_qos_map(data[IFLA_VLAN_EGRESS_QOS]);
+	err = vlan_validate_qos_map(data[IFLA_VLAN_EGRESS_QOS], strict);
 	if (err < 0)
 		return err;
 	return 0;

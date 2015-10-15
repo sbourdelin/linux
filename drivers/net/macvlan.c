@@ -1121,7 +1121,8 @@ static void macvlan_port_destroy(struct net_device *dev)
 	kfree_rcu(port, rcu);
 }
 
-static int macvlan_validate(struct nlattr *tb[], struct nlattr *data[])
+static int macvlan_validate(struct nlattr *tb[], struct nlattr *data[],
+			    bool strict)
 {
 	if (tb[IFLA_ADDRESS]) {
 		if (nla_len(tb[IFLA_ADDRESS]) != ETH_ALEN)

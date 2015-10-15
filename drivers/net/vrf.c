@@ -887,7 +887,8 @@ static void vrf_setup(struct net_device *dev)
 	dev->features |= NETIF_F_NETNS_LOCAL;
 }
 
-static int vrf_validate(struct nlattr *tb[], struct nlattr *data[])
+static int vrf_validate(struct nlattr *tb[], struct nlattr *data[],
+			bool strict)
 {
 	if (tb[IFLA_ADDRESS]) {
 		if (nla_len(tb[IFLA_ADDRESS]) != ETH_ALEN)

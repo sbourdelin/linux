@@ -746,7 +746,8 @@ int br_dellink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags)
 
 	return err;
 }
-static int br_validate(struct nlattr *tb[], struct nlattr *data[])
+static int br_validate(struct nlattr *tb[], struct nlattr *data[],
+		       bool strict)
 {
 	if (tb[IFLA_ADDRESS]) {
 		if (nla_len(tb[IFLA_ADDRESS]) != ETH_ALEN)

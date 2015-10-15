@@ -147,7 +147,8 @@ static void nlmon_setup(struct net_device *dev)
 	dev->mtu = NLMSG_GOODSIZE;
 }
 
-static int nlmon_validate(struct nlattr *tb[], struct nlattr *data[])
+static int nlmon_validate(struct nlattr *tb[], struct nlattr *data[],
+			  bool strict)
 {
 	if (tb[IFLA_ADDRESS])
 		return -EINVAL;

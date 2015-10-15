@@ -1424,7 +1424,8 @@ static int __net_init ipip6_fb_tunnel_init(struct net_device *dev)
 	return 0;
 }
 
-static int ipip6_validate(struct nlattr *tb[], struct nlattr *data[])
+static int ipip6_validate(struct nlattr *tb[], struct nlattr *data[],
+			  bool strict)
 {
 	u8 proto;
 

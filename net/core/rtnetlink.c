@@ -2197,7 +2197,7 @@ replay:
 				data = attr;
 			}
 			if (ops->validate) {
-				err = ops->validate(tb, data);
+				err = ops->validate(tb, data, false);
 				if (err < 0)
 					return err;
 			}
@@ -2215,7 +2215,8 @@ replay:
 				slave_data = slave_attr;
 			}
 			if (m_ops->slave_validate) {
-				err = m_ops->slave_validate(tb, slave_data);
+				err = m_ops->slave_validate(tb, slave_data,
+							    false);
 				if (err < 0)
 					return err;
 			}

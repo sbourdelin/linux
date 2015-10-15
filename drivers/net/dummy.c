@@ -152,7 +152,8 @@ static void dummy_setup(struct net_device *dev)
 	eth_hw_addr_random(dev);
 }
 
-static int dummy_validate(struct nlattr *tb[], struct nlattr *data[])
+static int dummy_validate(struct nlattr *tb[], struct nlattr *data[],
+			  bool strict)
 {
 	if (tb[IFLA_ADDRESS]) {
 		if (nla_len(tb[IFLA_ADDRESS]) != ETH_ALEN)
