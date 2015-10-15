@@ -336,6 +336,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
 {
 	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
 
+	phy_exit(ks_pcie->serdes_phy);
 	clk_disable_unprepare(ks_pcie->clk);
 
 	return 0;
@@ -343,6 +344,8 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
 
 static int __init ks_pcie_probe(struct platform_device *pdev)
 {
+	struct device_node *node = pdev->dev.of_node;
+	struct device_node *serdeses_np, *child;
 	struct device *dev = &pdev->dev;
 	struct keystone_pcie *ks_pcie;
 	struct pcie_port *pp;
@@ -350,6 +353,7 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
 	void __iomem *reg_p;
 	struct phy *phy;
 	int ret = 0;
+	u32 phy_num;
 
 	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
 				GFP_KERNEL);
@@ -357,14 +361,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pp = &ks_pcie->pp;
-
-	/* initialize SerDes Phy if present */
-	phy = devm_phy_get(dev, "pcie-phy");
-	if (!IS_ERR_OR_NULL(phy)) {
-		ret = phy_init(phy);
-		if (ret < 0)
-			return ret;
-	}
 
 	/* index 2 is to read PCI DEVICE_ID */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
@@ -386,6 +382,46 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	serdeses_np = of_get_child_by_name(node, "serdeses");
+	if (serdeses_np) {
+		for_each_available_child_of_node(serdeses_np, child) {
+			ret = of_property_read_u32(child, "reg", &phy_num);
+			if (ret) {
+				dev_err(dev, "Failed to parse device tree\n");
+				of_node_put(child);
+				of_node_put(serdeses_np);
+				goto fail_clk;
+			}
+
+			if (phy_num >= MAX_NUM_PCI_SERDES) {
+				dev_err(dev, "Invalid phy number: %u\n",
+					phy_num);
+				of_node_put(child);
+				of_node_put(serdeses_np);
+				ret = -EINVAL;
+				goto fail_clk;
+			}
+
+			phy = devm_of_phy_get(dev, child, NULL);
+			of_node_put(child);
+			ks_pcie->serdes_phy = phy;
+			if (IS_ERR(phy)) {
+				dev_err(dev, "No %s serdes driver found: %ld\n",
+					node->name, PTR_ERR(phy));
+				of_node_put(serdeses_np);
+				ret = PTR_ERR(phy);
+				goto fail_clk;
+			}
+
+			ret = phy_init(phy);
+			if (ret < 0) {
+				of_node_put(serdeses_np);
+				goto fail_clk;
+			}
+		}
+		of_node_put(serdeses_np);
+	}
+
 	ret = ks_add_pcie_port(ks_pcie, pdev);
 	if (ret < 0)
 		goto fail_clk;
@@ -393,7 +429,7 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
 	return 0;
 fail_clk:
 	clk_disable_unprepare(ks_pcie->clk);
-
+	phy_exit(ks_pcie->serdes_phy);
 	return ret;
 }
 
