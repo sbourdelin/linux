@@ -1509,6 +1509,12 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 	}
 
 	nskb = skb_clone(skb, GFP_ATOMIC);
+  if (!nskb) {
+			printk(KERN_WARNING "%s: no skb mem in %s\n",
+			       mISDNDevName4ch(&l2->ch), __func__);
+			return;
+  }
+
 	p1 = skb_headroom(nskb);
 	if (p1 >= i)
 		memcpy(skb_push(nskb, i), header, i);
