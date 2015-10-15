@@ -19,6 +19,7 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/types.h>
+#include <linux/cpu.h>
 
 #include <asm/processor.h>
 #include <asm/machdep.h>
@@ -299,10 +300,29 @@ int crash_shutdown_unregister(crash_shutdown_t handler)
 }
 EXPORT_SYMBOL(crash_shutdown_unregister);
 
+/*
+ * The next kernel will try to start all secondary CPUs and if
+ * there are not online it will fail to start them.
+ *
+ */
+static void wake_offline_cpus(void)
+{
+	int cpu = 0;
+
+	for_each_present_cpu(cpu) {
+		if (!cpu_online(cpu)) {
+			pr_info("kexec: Waking offline cpu %d.\n", cpu);
+			cpu_up(cpu);
+		}
+	}
+}
+
 void default_machine_crash_shutdown(struct pt_regs *regs)
 {
 	unsigned int i;
 	int (*old_handler)(struct pt_regs *regs);
+
+	wake_offline_cpus();
 
 	/*
 	 * This function is only called after the system
