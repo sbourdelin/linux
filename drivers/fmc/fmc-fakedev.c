@@ -282,6 +282,8 @@ static struct ff_dev *ff_dev_create(void)
 	for (i = 0; i < ff_nr_dev; i++) {
 		fmc = kmemdup(&ff_template_fmc, sizeof(ff_template_fmc),
 			      GFP_KERNEL);
+    if (!fmc)
+      goto no_memory;
 		fmc->hwdev = &ff->dev;
 		fmc->carrier_data = ff;
 		fmc->nr_slots = ff_nr_dev;
@@ -294,6 +296,12 @@ static struct ff_dev *ff_dev_create(void)
 		ff_template_fmc.device_id++;
 	}
 	return ff;
+
+no_memory:
+  for (i--; i >= 0; i--)
+    kfree(ff->fmc[i]);
+  kfree(ff);
+  return ERR_PTR(-ENOMEM);
 }
 
 /* init and exit */
