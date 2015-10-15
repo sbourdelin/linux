@@ -9,11 +9,10 @@
  */
 #ifndef __LINUX_IPMI_FRU_H__
 #define __LINUX_IPMI_FRU_H__
-#ifdef __KERNEL__
 #  include <linux/types.h>
+#ifdef __KERNEL__
 #  include <linux/string.h>
 #else
-#  include <stdint.h>
 #  include <string.h>
 #endif
 
@@ -24,14 +23,14 @@
 
 /* chapter 8, page 5 */
 struct fru_common_header {
-	uint8_t format;			/* 0x01 */
-	uint8_t internal_use_off;	/* multiple of 8 bytes */
-	uint8_t chassis_info_off;	/* multiple of 8 bytes */
-	uint8_t board_area_off;		/* multiple of 8 bytes */
-	uint8_t product_area_off;	/* multiple of 8 bytes */
-	uint8_t multirecord_off;	/* multiple of 8 bytes */
-	uint8_t pad;			/* must be 0 */
-	uint8_t checksum;		/* sum modulo 256 must be 0 */
+	__u8 format;			/* 0x01 */
+	__u8 internal_use_off;	/* multiple of 8 bytes */
+	__u8 chassis_info_off;	/* multiple of 8 bytes */
+	__u8 board_area_off;		/* multiple of 8 bytes */
+	__u8 product_area_off;	/* multiple of 8 bytes */
+	__u8 multirecord_off;	/* multiple of 8 bytes */
+	__u8 pad;			/* must be 0 */
+	__u8 checksum;		/* sum modulo 256 must be 0 */
 };
 
 /* chapter 9, page 5 -- internal_use: not used by us */
@@ -40,16 +39,16 @@ struct fru_common_header {
 
 /* chapter 13, page 9 -- used by board_info_area below */
 struct fru_type_length {
-	uint8_t type_length;
-	uint8_t data[0];
+	__u8 type_length;
+	__u8 data[0];
 };
 
 /* chapter 11, page 7 */
 struct fru_board_info_area {
-	uint8_t format;			/* 0x01 */
-	uint8_t area_len;		/* multiple of 8 bytes */
-	uint8_t language;		/* I hope it's 0 */
-	uint8_t mfg_date[3];		/* LSB, minutes since 1996-01-01 */
+	__u8 format;			/* 0x01 */
+	__u8 area_len;		/* multiple of 8 bytes */
+	__u8 language;		/* I hope it's 0 */
+	__u8 mfg_date[3];		/* LSB, minutes since 1996-01-01 */
 	struct fru_type_length tl[0];	/* type-length stuff follows */
 
 	/*
