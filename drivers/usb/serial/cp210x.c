@@ -38,6 +38,7 @@ static void cp210x_change_speed(struct tty_struct *, struct usb_serial_port *,
 							struct ktermios *);
 static void cp210x_set_termios(struct tty_struct *, struct usb_serial_port *,
 							struct ktermios*);
+static bool cp210x_tx_empty(struct usb_serial_port *port);
 static int cp210x_tiocmget(struct tty_struct *);
 static int cp210x_tiocmset(struct tty_struct *, unsigned int, unsigned int);
 static int cp210x_tiocmset_port(struct usb_serial_port *port,
@@ -214,6 +215,7 @@ static struct usb_serial_driver cp210x_device = {
 	.close			= cp210x_close,
 	.break_ctl		= cp210x_break_ctl,
 	.set_termios		= cp210x_set_termios,
+	.tx_empty		= cp210x_tx_empty,
 	.tiocmget		= cp210x_tiocmget,
 	.tiocmset		= cp210x_tiocmset,
 	.attach			= cp210x_startup,
@@ -249,6 +251,16 @@ static struct usb_serial_driver * const serial_drivers[] = {
 #define CP210X_GET_CHARS	0x0E
 #define CP210X_GET_PROPS	0x0F
 #define CP210X_GET_COMM_STATUS	0x10
+/* Data returned by CP210X_GET_COMM_STATUS -- h/w doc says it's 0x13 bytes */
+struct cp210x_comm_status {
+	u32     errors;
+	u32     hold_reasons;
+	u32     amount_in_in_queue;
+	u32     amount_in_out_queue;
+	u8      eof_received;
+	u8      wait_for_immediate;
+	u8      reserved;
+};
 #define CP210X_RESET		0x11
 #define CP210X_PURGE		0x12
 #define CP210X_SET_FLOW		0x13
@@ -477,6 +489,24 @@ static void cp210x_close(struct usb_serial_port *port)
 {
 	usb_serial_generic_close(port);
 	cp210x_set_config_single(port, CP210X_IFC_ENABLE, UART_DISABLE);
+}
+
+static bool cp210x_tx_empty(struct usb_serial_port *port)
+{
+	int err;
+
+	/* get_config needs "array of integers large enough", so pad to 0x14 bytes */
+	struct cp210x_comm_status_container {
+		struct cp210x_comm_status  sts; /* 0x13 bytes */
+		u8                         pad_to_0x14_bytes;
+	} comm_sts_cont;
+
+	err = cp210x_get_config(port, CP210X_GET_COMM_STATUS, (unsigned int *) &comm_sts_cont, 0x13);
+
+	if (!err)
+		if (comm_sts_cont.sts.amount_in_out_queue)
+			return false;
+	return true;
 }
 
 /*
