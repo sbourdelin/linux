@@ -673,6 +673,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
 	uniphier-ph1-pro4-ref.dtb \
 	uniphier-ph1-sld3-ref.dtb \
 	uniphier-ph1-sld8-ref.dtb \
+	uniphier-proxstream2-gentil.dtb \
 	uniphier-proxstream2-vodka.dtb
 dtb-$(CONFIG_ARCH_VERSATILE) += \
 	versatile-ab.dtb \
