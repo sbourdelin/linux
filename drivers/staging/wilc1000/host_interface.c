@@ -4077,11 +4077,11 @@ int host_int_scan(struct host_if_drv *hif_drv, u8 u8ScanSource,
 
 }
 
-s32 hif_set_cfg(struct host_if_drv *hif_drv,
+int hif_set_cfg(struct host_if_drv *hif_drv,
 		struct cfg_param_val *pstrCfgParamVal)
 {
 
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 
 
