@@ -38,6 +38,22 @@
  */
 
 /**
+ * struct opp_supply - Per power-supply structure
+ * @u_volt:	Target voltage in microvolts corresponding to this OPP
+ * @u_volt_min:	Minimum voltage in microvolts corresponding to this OPP
+ * @u_volt_max:	Maximum voltage in microvolts corresponding to this OPP
+ * @u_amp:	Maximum current drawn by the device in microamperes
+ *
+ * This structure stores the OPP power-supply information for a given device.
+ */
+struct opp_supply {
+	unsigned long u_volt;
+	unsigned long u_volt_min;
+	unsigned long u_volt_max;
+	unsigned long u_amp;
+};
+
+/**
  * struct dev_pm_opp - Generic OPP description structure
  * @node:	opp list node. The nodes are maintained throughout the lifetime
  *		of boot. It is expected only an optimal set of OPPs are
@@ -51,10 +67,7 @@
  * @available:	true/false - marks if this OPP as available or not
  * @turbo:	true if turbo (boost) OPP
  * @rate:	Frequency in hertz
- * @u_volt:	Target voltage in microvolts corresponding to this OPP
- * @u_volt_min:	Minimum voltage in microvolts corresponding to this OPP
- * @u_volt_max:	Maximum voltage in microvolts corresponding to this OPP
- * @u_amp:	Maximum current drawn by the device in microamperes
+ * @supplies:	Array of power-supplies for the device.
  * @clock_latency_ns: Latency (in nanoseconds) of switching to this OPP's
  *		frequency from any other OPP's frequency.
  * @dev_opp:	points back to the device_opp struct this opp belongs to
@@ -71,10 +84,8 @@ struct dev_pm_opp {
 	bool turbo;
 	unsigned long rate;
 
-	unsigned long u_volt;
-	unsigned long u_volt_min;
-	unsigned long u_volt_max;
-	unsigned long u_amp;
+	struct opp_supply *supplies;
+
 	unsigned long clock_latency_ns;
 
 	struct device_opp *dev_opp;
@@ -110,6 +121,7 @@ struct device_list_opp {
  * @dev_list:	list of devices that share these OPPs
  * @opp_list:	list of opps
  * @np:		struct device_node pointer for opp's DT node.
+ * @supply_count: Number of power-supplies
  * @shared_opp: OPP is shared between multiple devices.
  *
  * This is an internal data structure maintaining the link to opps attached to
@@ -130,6 +142,7 @@ struct device_opp {
 
 	struct device_node *np;
 	unsigned long clock_latency_ns_max;
+	unsigned int supply_count;
 	bool shared_opp;
 	struct dev_pm_opp *suspend_opp;
 };
