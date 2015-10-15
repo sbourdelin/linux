@@ -1130,7 +1130,7 @@ s32 host_int_remain_on_channel(struct host_if_drv *hWFIDrv, u32 u32SessionID, u3
  *  @date
  *  @version		1.0
  */
-s32 host_int_ListenStateExpired(struct host_if_drv *hWFIDrv, u32 u32SessionID);
+int host_int_ListenStateExpired(struct host_if_drv *hWFIDrv, u32 u32SessionID);
 
 /**
  *  @brief           host_int_frame_register
