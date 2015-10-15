@@ -495,7 +495,7 @@ static int xen_cpu_up(unsigned int cpu, struct task_struct *idle)
 	rc = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
 	BUG_ON(rc);
 
-	while (cpu_report_state(cpu) != CPU_ONLINE)
+	while (!cpu_check_online(cpu))
 		HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
 
 	return 0;
@@ -767,7 +767,7 @@ static int xen_hvm_cpu_up(unsigned int cpu, struct task_struct *tidle)
 	 * This can happen if CPU was offlined earlier and
 	 * offlining timed out in common_cpu_die().
 	 */
-	if (cpu_report_state(cpu) == CPU_DEAD_FROZEN) {
+	if (cpu_check_timeout(cpu)) {
 		xen_smp_intr_free(cpu);
 		xen_uninit_lock_cpu(cpu);
 	}
