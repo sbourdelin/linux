@@ -45,7 +45,6 @@
  * it does.
  */
 
-#include <byteswap.h>
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -58,6 +57,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#define swab16(x) \
+	((unsigned short)( \
+		(((unsigned short)(x) & (unsigned short)0x00ffU) << 8) | \
+		(((unsigned short)(x) & (unsigned short)0xff00U) >> 8)))
+
+#define swab32(x) \
+	((unsigned int)( \
+		(((unsigned int)(x) & (unsigned int)0x000000ffUL) << 24) | \
+		(((unsigned int)(x) & (unsigned int)0x0000ff00UL) <<  8) | \
+		(((unsigned int)(x) & (unsigned int)0x00ff0000UL) >>  8) | \
+		(((unsigned int)(x) & (unsigned int)0xff000000UL) >> 24)))
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define HOST_ORDER ELFDATA2LSB
@@ -104,17 +115,17 @@ static void cleanup(void)
 
 static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
 {
-	return swap ? bswap_32(word) : word;
+	return swap ? swab32(word) : word;
 }
 
 static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
 {
-	return swap ? bswap_16(half) : half;
+	return swap ? swab16(half) : half;
 }
 
 static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
 {
-	*dst = swap ? bswap_32(val) : val;
+	*dst = swap ? swab32(val) : val;
 }
 
 int main(int argc, char **argv)
