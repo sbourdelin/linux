@@ -272,6 +272,33 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
 	return 0;
 }
 
+int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
+			     int virq, int nvec, msi_alloc_info_t *arg)
+{
+	struct msi_domain_info *info = domain->host_data;
+	struct msi_domain_ops *ops = info->ops;
+	struct msi_desc *desc;
+
+	for_each_msi_entry(desc, dev) {
+		int i, ret;
+
+		if (!(desc->irq >= virq && desc->irq < (virq + nvec)))
+			continue;
+
+		ops->set_desc(arg, desc);
+		/* Assumes the domain mutex is held! */
+		ret = irq_domain_alloc_irqs_recursive(domain, virq, nvec, arg);
+		/* FIXME: Error handling */
+		if (ret)
+			return ret;
+
+		for (i = 0; i < desc->nvec_used; i++)
+			irq_set_msi_desc_off(virq, i, desc);
+	}
+
+	return 0;
+}
+
 /**
  * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
  * @domain:	The domain to allocate from
