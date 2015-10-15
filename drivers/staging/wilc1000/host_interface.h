@@ -1141,7 +1141,7 @@ s32 host_int_ListenStateExpired(struct host_if_drv *hWFIDrv, u32 u32SessionID);
  *  @date
  *  @version	1.0
  */
-s32 host_int_frame_register(struct host_if_drv *hWFIDrv, u16 u16FrameType, bool bReg);
+int host_int_frame_register(struct host_if_drv *hWFIDrv, u16 u16FrameType, bool bReg);
 /**
  *  @brief           host_int_set_wfi_drv_handler
  *  @details
