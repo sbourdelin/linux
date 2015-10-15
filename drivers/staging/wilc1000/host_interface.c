@@ -5087,9 +5087,9 @@ void host_int_freeJoinParams(void *pJoinParams)
 		PRINT_ER("Unable to FREE null pointer\n");
 }
 
-s32 host_int_delBASession(struct host_if_drv *hif_drv, char *pBSSID, char TID)
+int host_int_delBASession(struct host_if_drv *hif_drv, char *pBSSID, char TID)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 	struct ba_session_info *pBASessionInfo = &msg.body.session_info;
 
