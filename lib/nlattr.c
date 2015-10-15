@@ -27,14 +27,17 @@ static const u16 nla_attr_minlen[NLA_TYPE_MAX+1] = {
 	[NLA_S64]	= sizeof(s64),
 };
 
-static int validate_nla(const struct nlattr *nla, int maxtype,
+static int validate_nla(const struct nlattr *nla, int maxtype, bool strict,
 			const struct nla_policy *policy)
 {
 	const struct nla_policy *pt;
 	int minlen = 0, attrlen = nla_len(nla), type = nla_type(nla);
 
-	if (type <= 0 || type > maxtype)
+	if (type <= 0 || type > maxtype) {
+		if (strict)
+			return -EINVAL;
 		return 0;
+	}
 
 	pt = &policy[type];
 
@@ -107,33 +110,35 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 }
 
 /**
- * nla_validate - Validate a stream of attributes
+ * nla_strict_validate - Validate a stream of attributes
  * @head: head of attribute stream
  * @len: length of attribute stream
  * @maxtype: maximum attribute type to be expected
+ * @strict: whether to perform strict checking
  * @policy: validation policy
  *
  * Validates all attributes in the specified attribute stream against the
  * specified policy. Attributes with a type exceeding maxtype will be
- * ignored. See documenation of struct nla_policy for more details.
+ * ignored, unless strict is set. See documenation of struct nla_policy for
+ * more details.
  *
  * Returns 0 on success or a negative error code.
  */
-int nla_validate(const struct nlattr *head, int len, int maxtype,
-		 const struct nla_policy *policy)
+int nla_strict_validate(const struct nlattr *head, int len, int maxtype,
+			bool strict, const struct nla_policy *policy)
 {
 	const struct nlattr *nla;
 	int rem, err;
 
 	nla_for_each_attr(nla, head, len, rem) {
-		err = validate_nla(nla, maxtype, policy);
+		err = validate_nla(nla, maxtype, strict, policy);
 		if (err < 0)
 			return err;
 	}
 
 	return 0;
 }
-EXPORT_SYMBOL(nla_validate);
+EXPORT_SYMBOL(nla_strict_validate);
 
 /**
  * nla_policy_len - Determin the max. length of a policy
@@ -193,7 +198,8 @@ int nla_strict_parse(struct nlattr **tb, int maxtype, bool strict,
 
 		if (type > 0 && type <= maxtype) {
 			if (policy) {
-				err = validate_nla(nla, maxtype, policy);
+				err = validate_nla(nla, maxtype, strict,
+						   policy);
 				if (err < 0)
 					return err;
 			}

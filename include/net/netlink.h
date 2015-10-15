@@ -233,8 +233,8 @@ int netlink_rcv_skb(struct sk_buff *skb, bool strict_supported,
 int nlmsg_notify(struct sock *sk, struct sk_buff *skb, u32 portid,
 		 unsigned int group, int report, gfp_t flags);
 
-int nla_validate(const struct nlattr *head, int len, int maxtype,
-		 const struct nla_policy *policy);
+int nla_strict_validate(const struct nlattr *head, int len, int maxtype,
+			bool strict, const struct nla_policy *policy);
 int nla_strict_parse(struct nlattr **tb, int maxtype, bool strict,
 		     const struct nlattr *head, int len,
 		     const struct nla_policy *policy);
@@ -413,6 +413,26 @@ static inline struct nlattr *nlmsg_find_attr(const struct nlmsghdr *nlh,
 }
 
 /**
+ * nlmsg_strict_validate - validate a netlink message including attributes
+ * @nlh: netlinket message header
+ * @hdrlen: length of familiy specific header
+ * @maxtype: maximum attribute type to be expected
+ * @strict: whether to perform strict checking
+ * @policy: validation policy
+ */
+static inline int nlmsg_strict_validate(const struct nlmsghdr *nlh,
+					int hdrlen, int maxtype, bool strict,
+					const struct nla_policy *policy)
+{
+	if (nlh->nlmsg_len < nlmsg_msg_size(hdrlen))
+		return -EINVAL;
+
+	return nla_strict_validate(nlmsg_attrdata(nlh, hdrlen),
+				   nlmsg_attrlen(nlh, hdrlen), maxtype,
+				   strict, policy);
+}
+
+/**
  * nlmsg_validate - validate a netlink message including attributes
  * @nlh: netlinket message header
  * @hdrlen: length of familiy specific header
@@ -423,11 +443,7 @@ static inline int nlmsg_validate(const struct nlmsghdr *nlh,
 				 int hdrlen, int maxtype,
 				 const struct nla_policy *policy)
 {
-	if (nlh->nlmsg_len < nlmsg_msg_size(hdrlen))
-		return -EINVAL;
-
-	return nla_validate(nlmsg_attrdata(nlh, hdrlen),
-			    nlmsg_attrlen(nlh, hdrlen), maxtype, policy);
+	return nlmsg_strict_validate(nlh, hdrlen, maxtype, false, policy);
 }
 
 /**
@@ -1270,16 +1286,49 @@ static inline void nla_nest_cancel(struct sk_buff *skb, struct nlattr *start)
 }
 
 /**
+ * nla_validate - Validate a stream of attributes
+ * @head: head of attribute stream
+ * @len: length of attribute stream
+ * @maxtype: maximum attribute type to be expected
+ * @policy: validation policy
+ *
+ * See nla_strict_validate(). Strict checking is not performed.
+ */
+static inline int nla_validate(const struct nlattr *head, int len,
+			       int maxtype, const struct nla_policy *policy)
+{
+	return nla_strict_validate(head, len, maxtype, false, policy);
+}
+
+/**
+ * nla_strict_validate_nested - Validate a stream of nested attributes
+ * @start: container attribute
+ * @maxtype: maximum attribute type to be expected
+ * @strict: whether to perform strict checking
+ * @policy: validation policy
+ *
+ * Validates all attributes in the nested attribute stream against the
+ * specified policy. Attributes with a type exceeding maxtype will be
+ * ignored, unless strict is set. See documenation of struct nla_policy for
+ * more details.
+ *
+ * Returns 0 on success or a negative error code.
+ */
+static inline int nla_strict_validate_nested(const struct nlattr *start,
+					     int maxtype, bool strict,
+					     const struct nla_policy *policy)
+{
+	return nla_strict_validate(nla_data(start), nla_len(start), maxtype,
+				   strict, policy);
+}
+
+/**
  * nla_validate_nested - Validate a stream of nested attributes
  * @start: container attribute
  * @maxtype: maximum attribute type to be expected
  * @policy: validation policy
  *
- * Validates all attributes in the nested attribute stream against the
- * specified policy. Attributes with a type exceeding maxtype will be
- * ignored. See documenation of struct nla_policy for more details.
- *
- * Returns 0 on success or a negative error code.
+ * See nla_strict_validate_nested(). Strict checking is not performed.
  */
 static inline int nla_validate_nested(const struct nlattr *start, int maxtype,
 				      const struct nla_policy *policy)
