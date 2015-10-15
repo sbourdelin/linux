@@ -418,6 +418,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 	struct rk_i2s_dev *i2s;
 	struct resource *res;
 	void __iomem *regs;
+	struct dma_slave_caps *dma_caps;
 	int ret;
 
 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
@@ -459,11 +460,24 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 
 	i2s->playback_dma_data.addr = res->start + I2S_TXDR;
 	i2s->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	i2s->playback_dma_data.maxburst = 4;
 
 	i2s->capture_dma_data.addr = res->start + I2S_RXDR;
 	i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	i2s->capture_dma_data.maxburst = 4;
+
+	if (snd_dmaengine_pcm_get_caps(&pdev->dev, &dma_caps) == 0) {
+		if (dma_caps.max_burst > 4) {
+			i2s->playback_dma_data.maxburst = 4;
+			i2s->capture_dma_data.maxburst = 4;
+		} else {
+			i2s->playback_dma_data.maxburst = 1;
+			i2s->capture_dma_data.maxburst = 1;
+		}
+	} else {
+		i2s->playback_dma_data.maxburst = 1;
+		i2s->capture_dma_data.maxburst = 1;
+		dev_info(&pdev->dev,
+			 "Can't get dma caps, default limit maxburst to 1.\n");
+	}
 
 	i2s->dev = &pdev->dev;
 	dev_set_drvdata(&pdev->dev, i2s);
