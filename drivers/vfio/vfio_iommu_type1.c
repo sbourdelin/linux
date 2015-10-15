@@ -728,6 +728,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	struct vfio_group *group, *g;
 	struct vfio_domain *domain, *d;
 	struct bus_type *bus = NULL;
+	struct iommu_domain_geometry geometry;
 	int ret;
 
 	mutex_lock(&iommu->lock);
@@ -760,6 +761,17 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	if (!domain->domain) {
 		ret = -EIO;
 		goto out_free;
+	}
+
+	/*
+	 * If a domain does not force DMA within the aperture, devices are not
+	 * isolated and type1 is not an appropriate IOMMU model.
+	 */
+	ret = iommu_domain_get_attr(domain->domain,
+				    DOMAIN_ATTR_GEOMETRY, &geometry);
+	if (ret || !geometry.force_aperture) {
+		ret = -EPERM;
+		goto out_domain;
 	}
 
 	if (iommu->nesting) {
