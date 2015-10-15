@@ -776,6 +776,9 @@ static inline void intel_pstate_sample(struct cpudata *cpu)
 	local_irq_save(flags);
 	rdmsrl(MSR_IA32_APERF, aperf);
 	rdmsrl(MSR_IA32_MPERF, mperf);
+	if (cpu->prev_mperf == mperf)
+		return;
+
 	tsc = rdtsc();
 	local_irq_restore(flags);
 
