@@ -20,6 +20,12 @@
 #define _UAPI_LINUX_BTRFS_H
 #include <linux/types.h>
 #include <linux/ioctl.h>
+#include <linux/stddef.h>
+
+/* for userspace where linux/stddef.h doesn't define this */
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 
 #define BTRFS_IOCTL_MAGIC 0x94
 #define BTRFS_VOL_NAME_MAX 255
