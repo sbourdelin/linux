@@ -61,6 +61,16 @@ void init_dra_soc_id(void)
 		soc_ids |= DRA72X;
 }
 
+void init_am43_soc_id(void)
+{
+	if (of_machine_is_compatible("ti,am43"))
+		soc_ids |= AM43XX;
+	if (of_machine_is_compatible("ti,am4372"))
+		soc_ids |= AM437X;
+	if (of_machine_is_compatible("ti,am438x"))
+		soc_ids |= AM438X;
+}
+
 int check_soc_version(unsigned long id)
 {
 	return soc_ids & id;
@@ -357,6 +367,7 @@ void __init omap3xxx_check_revision(void)
 	u16 hawkeye;
 	u8 rev;
 
+	init_am43_soc_id();
 	/*
 	 * We cannot access revision registers on ES1.0.
 	 * If the processor type is Cortex-A8 and the revision is 0x0

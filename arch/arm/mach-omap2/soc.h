@@ -132,6 +132,9 @@
 #define DRA7XX				BIT(0)
 #define	DRA74X				BIT(1)
 #define DRA72X				BIT(2)
+#define AM43XX				BIT(3)
+#define AM437X				BIT(4)
+#define AM438X				BIT(5)
 
 int check_soc_version(unsigned long id);
 int omap_type(void);
@@ -247,6 +250,7 @@ IS_AM_SUBCLASS(437x, 0x437)
 #define soc_is_am335x()			0
 #define soc_is_am43xx()			0
 #define soc_is_am437x()			0
+#define soc_is_am438x()			0
 #define cpu_is_omap44xx()		0
 #define cpu_is_omap443x()		0
 #define cpu_is_omap446x()		0
@@ -380,8 +384,10 @@ IS_OMAP_TYPE(3430, 0x3430)
 #ifdef	CONFIG_SOC_AM43XX
 # undef soc_is_am43xx
 # undef soc_is_am437x
-# define soc_is_am43xx()		is_am43xx()
-# define soc_is_am437x()		is_am437x()
+# undef soc_is_am438x
+# define soc_is_am43xx()		check_soc_version(AM43XX)
+# define soc_is_am437x()		check_soc_version(AM437X)
+# define soc_is_am438x()		check_soc_version(AM438X)
 #endif
 
 # if defined(CONFIG_ARCH_OMAP4)
