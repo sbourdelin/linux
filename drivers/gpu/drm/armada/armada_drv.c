@@ -11,6 +11,7 @@
 #include <linux/of_graph.h>
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_of.h>
 #include "armada_crtc.h"
 #include "armada_drm.h"
 #include "armada_gem.h"
@@ -370,47 +371,36 @@ static void armada_add_endpoints(struct device *dev,
 	}
 }
 
-static int armada_drm_find_components(struct device *dev,
-	struct component_match **match)
+static const struct component_master_ops armada_master_ops = {
+	.bind = armada_drm_bind,
+	.unbind = armada_drm_unbind,
+};
+
+static int armada_drm_probe(struct platform_device *pdev)
 {
-	struct device_node *port;
-	int i;
+	int ret;
 
-	if (dev->of_node) {
-		struct device_node *np = dev->of_node;
+	if (!is_componentized(&pdev->dev))
+		return drm_platform_init(&armada_drm_driver, pdev);
 
-		for (i = 0; ; i++) {
-			port = of_parse_phandle(np, "ports", i);
-			if (!port)
-				break;
+	ret = drm_of_component_probe(&pdev->dev, compare_dev_name,
+				     &armada_master_ops);
+	if (ret != -EINVAL)
+		return ret;
 
-			component_match_add(dev, match, compare_of, port);
-			of_node_put(port);
-		}
-
-		if (i == 0) {
-			dev_err(dev, "missing 'ports' property\n");
-			return -ENODEV;
-		}
-
-		for (i = 0; ; i++) {
-			port = of_parse_phandle(np, "ports", i);
-			if (!port)
-				break;
-
-			armada_add_endpoints(dev, match, port);
-			of_node_put(port);
-		}
-	} else if (dev->platform_data) {
-		char **devices = dev->platform_data;
+	if (pdev->dev.platform_data) {
+		struct component_match *match = NULL;
+		char **devices = pdev->dev.platform_data;
+		struct device_node *port;
 		struct device *d;
+		int i;
 
 		for (i = 0; devices[i]; i++)
-			component_match_add(dev, match, compare_dev_name,
+			component_match_add(&pdev->dev, &match, compare_dev_name,
 					    devices[i]);
 
 		if (i == 0) {
-			dev_err(dev, "missing 'ports' property\n");
+			dev_err(&pdev->dev, "missing 'ports' property\n");
 			return -ENODEV;
 		}
 
@@ -419,35 +409,18 @@ static int armada_drm_find_components(struct device *dev,
 					devices[i]);
 			if (d && d->of_node) {
 				for_each_child_of_node(d->of_node, port)
-					armada_add_endpoints(dev, match, port);
+					armada_add_endpoints(&pdev->dev,
+							     &match, port);
 			}
 			put_device(d);
 		}
+
+		ret = component_master_add_with_match(&pdev->dev,
+						      &armada_master_ops,
+						      match);
 	}
 
-	return 0;
-}
-
-static const struct component_master_ops armada_master_ops = {
-	.bind = armada_drm_bind,
-	.unbind = armada_drm_unbind,
-};
-
-static int armada_drm_probe(struct platform_device *pdev)
-{
-	if (is_componentized(&pdev->dev)) {
-		struct component_match *match = NULL;
-		int ret;
-
-		ret = armada_drm_find_components(&pdev->dev, &match);
-		if (ret < 0)
-			return ret;
-
-		return component_master_add_with_match(&pdev->dev,
-				&armada_master_ops, match);
-	} else {
-		return drm_platform_init(&armada_drm_driver, pdev);
-	}
+	return ret;
 }
 
 static int armada_drm_remove(struct platform_device *pdev)
