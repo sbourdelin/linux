@@ -4857,11 +4857,11 @@ s32 host_int_edit_station(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_set_power_mgmt(struct host_if_drv *hif_drv,
+int host_int_set_power_mgmt(struct host_if_drv *hif_drv,
 			    bool bIsEnabled,
 			    u32 u32Timeout)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 	struct power_mgmt_param *pstrPowerMgmtParam = &msg.body.pwr_mgmt_info;
 
