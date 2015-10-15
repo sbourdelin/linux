@@ -3941,9 +3941,9 @@ s32 host_int_test_get_int_wid(struct host_if_drv *hif_drv, u32 *pu32TestMemAddr)
 	return s32Error;
 }
 
-s32 host_int_get_rssi(struct host_if_drv *hif_drv, s8 *ps8Rssi)
+int host_int_get_rssi(struct host_if_drv *hif_drv, s8 *ps8Rssi)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 	memset(&msg, 0, sizeof(struct host_if_msg));
 
