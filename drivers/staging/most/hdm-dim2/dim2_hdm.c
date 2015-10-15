@@ -381,11 +381,11 @@ static void service_done_flag(struct dim2_hdm *dev, int ch_idx)
 			if (hdm_ch->data_type == MOST_CH_CONTROL ||
 			    hdm_ch->data_type == MOST_CH_ASYNC) {
 
-				u32 const data_size =
-					(u32)data[0] * 256 + data[1] + 2;
+				u16 const data_size =
+					(u16)data[0] * 256 + data[1] + 2;
 
 				mbo->processed_length =
-					min(data_size, (u32)mbo->buffer_length);
+					min(data_size, mbo->buffer_length);
 			} else {
 				mbo->processed_length = mbo->buffer_length;
 			}
