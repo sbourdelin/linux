@@ -947,7 +947,7 @@ s32 host_int_deinit(struct host_if_drv *hWFIDrv);
  *  @version		1.0 Description
  *
  */
-s32 host_int_add_beacon(struct host_if_drv *hWFIDrv, u32 u32Interval,
+int host_int_add_beacon(struct host_if_drv *hWFIDrv, u32 u32Interval,
 				u32 u32DTIMPeriod,
 				u32 u32HeadLen, u8 *pu8Head,
 				u32 u32TailLen, u8 *pu8tail);
