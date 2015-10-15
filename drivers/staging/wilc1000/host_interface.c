@@ -5145,9 +5145,9 @@ s32 host_int_del_All_Rx_BASession(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_setup_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
+int host_int_setup_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 
 	return 0;
