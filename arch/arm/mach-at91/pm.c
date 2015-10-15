@@ -35,6 +35,11 @@
 #include "generic.h"
 #include "pm.h"
 
+#define ULP0_MODE	0x00
+#define ULP1_MODE	0x11
+
+#define SAMA5D2_PMC_VERSION	0x20540
+
 /*
  * FIXME: this is needed to communicate between the pinctrl driver and
  * the PM implementation in the machine. Possibly part of the PM
@@ -64,6 +69,23 @@ static int at91_pm_valid_state(suspend_state_t state)
 	}
 }
 
+static void at91_config_ulp1_wkup_source(void)
+{
+	if (at91_pmc_read(AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION) {
+		at91_pmc_write(AT91_PMC_FSMR, AT91_PMC_RTCAL |
+					      AT91_PMC_FSTT9 |
+					      AT91_PMC_FSTT8 |
+					      AT91_PMC_FSTT7 |
+					      AT91_PMC_FSTT6 |
+					      AT91_PMC_FSTT5 |
+					      AT91_PMC_FSTT4 |
+					      AT91_PMC_FSTT3 |
+					      AT91_PMC_FSTT2 |
+					      AT91_PMC_FSTT0);
+
+		at91_pmc_write(AT91_PMC_FSPR, 0);
+	}
+}
 
 static suspend_state_t target_state;
 
@@ -73,6 +95,9 @@ static suspend_state_t target_state;
 static int at91_pm_begin(suspend_state_t state)
 {
 	target_state = state;
+
+	at91_config_ulp1_wkup_source();
+
 	return 0;
 }
 
@@ -139,6 +164,10 @@ static void at91_pm_suspend(suspend_state_t state)
 
 	pm_data |= (state == PM_SUSPEND_MEM) ?
 				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
+
+	pm_data |= ((state == PM_SUSPEND_MEM) &&
+		    (at91_pmc_read(AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION)) ?
+		    AT91_PM_ULP(AT91_PM_ULP1_MODE) : 0;
 
 	flush_cache_all();
 	outer_disable();

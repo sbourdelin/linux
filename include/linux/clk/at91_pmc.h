@@ -59,8 +59,10 @@ extern void __iomem *at91_pmc_base;
 #define	AT91_CKGR_MOR		0x20			/* Main Oscillator Register [not on SAM9RL] */
 #define		AT91_PMC_MOSCEN		(1    <<  0)		/* Main Oscillator Enable */
 #define		AT91_PMC_OSCBYPASS	(1    <<  1)		/* Oscillator Bypass */
+#define		AT91_PMC_WAITMODE	(1    <<  2)		/* Wait Mode Command */
 #define		AT91_PMC_MOSCRCEN	(1    <<  3)		/* Main On-Chip RC Oscillator Enable [some SAM9] */
 #define		AT91_PMC_OSCOUNT	(0xff <<  8)		/* Main Oscillator Start-up Time */
+#define		AT91_PMC_KEY_MASK	(0xff << 16)
 #define		AT91_PMC_KEY		(0x37 << 16)		/* MOR Writing Key */
 #define		AT91_PMC_MOSCSEL	(1    << 24)		/* Main Oscillator Selection [some SAM9] */
 #define		AT91_PMC_CFDEN		(1    << 25)		/* Clock Failure Detector Enable [some SAM9] */
@@ -166,6 +168,38 @@ extern void __iomem *at91_pmc_base;
 #define		AT91_PMC_CFDEV		(1 << 18)		/* Clock Failure Detector Event [some SAM9] */
 #define	AT91_PMC_IMR		0x6c			/* Interrupt Mask Register */
 
+#define AT91_PMC_FSMR		0x70			/* Fast Startup Mode Register */
+#define		AT91_PMC_FSTT0		(1 << 0)		/* Fast Startup from WKUP Pin Enable */
+#define		AT91_PMC_FSTT1		(1 << 1)		/* Fast Startup from Security Module Enable */
+#define		AT91_PMC_FSTT2		(1 << 2)		/* Fast Startup from PIOBU0 Input Enable */
+#define		AT91_PMC_FSTT3		(1 << 3)		/* Fast Startup from PIOBU1 Input Enable */
+#define		AT91_PMC_FSTT4		(1 << 4)		/* Fast Startup from PIOBU2 Input Enable */
+#define		AT91_PMC_FSTT5		(1 << 5)		/* Fast Startup from PIOBU3 Input Enable */
+#define		AT91_PMC_FSTT6		(1 << 6)		/* Fast Startup from PIOBU4 Input Enable */
+#define		AT91_PMC_FSTT7		(1 << 7)		/* Fast Startup from PIOBU5 Input Enable */
+#define		AT91_PMC_FSTT8		(1 << 8)		/* Fast Startup from PIOBU6 Input Enable */
+#define		AT91_PMC_FSTT9		(1 << 9)		/* Fast Startup from PIOBU7 Input Enable */
+#define		AT91_PMC_FSTT10		(1 << 10)		/* Fast Startup from GMAC Wake-up On LAN Enable */
+#define		AT91_PMC_RTCAL		(1 << 17)		/* Fast Startup from RTC Alarm Enable */
+#define		AT91_PMC_USBAL		(1 << 18)		/* Fast Startup from USB Resume Enable */
+#define		AT91_PMC_SDMMC_CD	(1 << 19)		/* Fast Startup from SDMMC Card Detect Enable */
+#define		AT91_PMC_LPM		(1 << 20)		/* Low-power Mode */
+#define		AT91_PMC_RXLP_MCE	(1 << 24)		/* Fast Startup from Backup UART Receive Match Condition Enable */
+#define		AT91_PMC_ACC_CE		(1 << 25)		/* Fast Startup from Analog Comparator Controller Comparison Enable*/
+
+#define AT91_PMC_FSPR		0x74			/* Fast Startup Polarity Register */
+#define		AT91_PMC_FSTP0		(1 << 0)		/* WKUP Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP1		(1 << 1)		/* Security Module Polarity for Fast Startup */
+#define		AT91_PMC_FSTP2		(1 << 2)		/* PIOBU0 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP3		(1 << 3)		/* PIOBU1 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP4		(1 << 4)		/* PIOBU2 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP5		(1 << 5)		/* PIOBU3 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP6		(1 << 6)		/* PIOBU4 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP7		(1 << 7)		/* PIOBU5 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP8		(1 << 8)		/* PIOBU6 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP9		(1 << 9)		/* PIOBU7 Pin Polarity for Fast Startup */
+#define		AT91_PMC_FSTP10		(1 << 10)		/* GMAC Wake-up On LAN Polarity for Fast Startup */
+
 #define AT91_PMC_PLLICPR	0x80			/* PLL Charge Pump Current Register */
 
 #define AT91_PMC_PROT		0xe4			/* Write Protect Mode Register [some SAM9] */
@@ -176,6 +210,8 @@ extern void __iomem *at91_pmc_base;
 #define AT91_PMC_WPSR		0xe8			/* Write Protect Status Register [some SAM9] */
 #define		AT91_PMC_WPVS		(0x1  <<  0)		/* Write Protect Violation Status */
 #define		AT91_PMC_WPVSRC		(0xffff  <<  8)		/* Write Protect Violation Source */
+
+#define AT91_PMC_VERSION	0xfc
 
 #define AT91_PMC_PCER1		0x100			/* Peripheral Clock Enable Register 1 [SAMA5 only]*/
 #define AT91_PMC_PCDR1		0x104			/* Peripheral Clock Enable Register 1 */
