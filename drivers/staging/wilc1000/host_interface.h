@@ -1158,6 +1158,6 @@ static s32 Handle_ScanDone(struct host_if_drv *drvHandler, enum scan_event enuEv
 
 void host_int_freeJoinParams(void *pJoinParams);
 
-s32 host_int_get_statistics(struct host_if_drv *hWFIDrv, struct rf_info *pstrStatistics);
+int host_int_get_statistics(struct host_if_drv *hWFIDrv, struct rf_info *pstrStatistics);
 
 #endif

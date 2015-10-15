@@ -4001,9 +4001,9 @@ int host_int_get_link_speed(struct host_if_drv *hif_drv, s8 *ps8lnkspd)
 	return s32Error;
 }
 
-s32 host_int_get_statistics(struct host_if_drv *hif_drv, struct rf_info *pstrStatistics)
+int host_int_get_statistics(struct host_if_drv *hif_drv, struct rf_info *pstrStatistics)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 	memset(&msg, 0, sizeof(struct host_if_msg));
 
