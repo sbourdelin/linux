@@ -4021,13 +4021,13 @@ int host_int_get_statistics(struct host_if_drv *hif_drv, struct rf_info *pstrSta
 	return s32Error;
 }
 
-s32 host_int_scan(struct host_if_drv *hif_drv, u8 u8ScanSource,
+int host_int_scan(struct host_if_drv *hif_drv, u8 u8ScanSource,
 		  u8 u8ScanType, u8 *pu8ChnlFreqList,
 		  u8 u8ChnlListLen, const u8 *pu8IEs,
 		  size_t IEsLen, wilc_scan_result ScanResult,
 		  void *pvUserArg, struct hidden_network *pstrHiddenNetwork)
 {
-	s32 s32Error = 0;
+	int s32Error = 0;
 	struct host_if_msg msg;
 	enum scan_conn_timer enuScanConnTimer;
 
