@@ -340,6 +340,14 @@ static int veth_validate(struct nlattr *tb[], struct nlattr *data[],
 		if (!is_valid_veth_mtu(nla_get_u32(tb[IFLA_MTU])))
 			return -EINVAL;
 	}
+	if (data != NULL && data[VETH_INFO_PEER] != NULL) {
+		struct nlattr *nla_peer = data[VETH_INFO_PEER];
+
+		return rtnl_nla_validate_ifla(
+				nla_data(nla_peer) + sizeof(struct ifinfomsg),
+				nla_len(nla_peer) - sizeof(struct ifinfomsg),
+				strict);
+	}
 	return 0;
 }
 
