@@ -89,6 +89,16 @@
 			gpio,syscon-dev = <&devctrl 0x240>;
 		};
 
+		pcie1_phy: pciephy@2326000 {
+			#phy-cells = <0>;
+			compatible = "ti,keystone-serdes-pcie";
+			reg = <0x02326000 0x4000>;
+			reg-names = "serdes";
+			link-rate-kbps = <5000000>;
+			num-lanes = <2>;
+			status = "disabled";
+		};
+
 		pcie1: pcie@21020000 {
 			compatible = "ti,keystone-pcie","snps,dw-pcie";
 			clocks = <&clkpcie1>;
@@ -133,6 +143,17 @@
 					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
 					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
 			};
+
+			/* PCIE phy */
+			serdeses {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				serdes@0 {
+					reg = <0>;
+					phys = <&pcie1_phy>;
+				};
+			};
+
 		};
 
 		mdio: mdio@24200f00 {
