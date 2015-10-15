@@ -3200,9 +3200,8 @@ s32 host_int_add_wep_key_bss_sta(struct host_if_drv *hif_drv,
 	struct host_if_msg msg;
 
 	if (!hif_drv) {
-		result = -EFAULT;
 		PRINT_ER("driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 
 	memset(&msg, 0, sizeof(struct host_if_msg));
@@ -3237,9 +3236,8 @@ s32 host_int_add_wep_key_bss_ap(struct host_if_drv *hif_drv,
 	u8 i;
 
 	if (!hif_drv) {
-		result = -EFAULT;
 		PRINT_ER("driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 
 	memset(&msg, 0, sizeof(struct host_if_msg));
@@ -3279,9 +3277,8 @@ s32 host_int_add_ptk(struct host_if_drv *hif_drv, const u8 *pu8Ptk,
 	u32 i;
 
 	if (!hif_drv) {
-		result = -EFAULT;
 		PRINT_ER("driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 	if (pu8RxMic != NULL)
 		u8KeyLen += RX_MIC_KEY_LEN;
@@ -3344,9 +3341,8 @@ s32 host_int_add_rx_gtk(struct host_if_drv *hif_drv, const u8 *pu8RxGtk,
 	u8 u8KeyLen = u8GtkKeylen;
 
 	if (!hif_drv) {
-		result = -EFAULT;
 		PRINT_ER("driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 	memset(&msg, 0, sizeof(struct host_if_msg));
 
@@ -3403,9 +3399,8 @@ s32 host_int_set_pmkid_info(struct host_if_drv *hif_drv, struct host_if_pmkid_at
 
 
 	if (!hif_drv) {
-		result = -EFAULT;
 		PRINT_ER("driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 
 	memset(&msg, 0, sizeof(struct host_if_msg));
@@ -3548,9 +3543,8 @@ s32 host_int_set_join_req(struct host_if_drv *hif_drv, u8 *pu8bssid,
 	enum scan_conn_timer enuScanConnTimer;
 
 	if (!hif_drv || pfConnectResult == NULL) {
-		result = -EFAULT;
 		PRINT_ER("Driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 
 	if (pJoinParams == NULL) {
@@ -3610,16 +3604,12 @@ s32 host_int_flush_join_req(struct host_if_drv *hif_drv)
 	s32 result = 0;
 	struct host_if_msg msg;
 
-	if (!join_req) {
-		result = -EFAULT;
-		return result;
-	}
-
+	if (!join_req)
+		return -EFAULT;
 
 	if (!hif_drv) {
-		result = -EFAULT;
 		PRINT_ER("Driver is null\n");
-		return result;
+		return -EFAULT;
 	}
 
 	msg.id = HOST_IF_MSG_FLUSH_CONNECT;
