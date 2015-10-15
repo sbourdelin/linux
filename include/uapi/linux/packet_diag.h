@@ -2,6 +2,7 @@
 #define __PACKET_DIAG_H__
 
 #include <linux/types.h>
+#include <linux/netdevice.h>
 
 struct packet_diag_req {
 	__u8	sdiag_family;
