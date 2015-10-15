@@ -4876,14 +4876,16 @@ static const struct nla_policy inet6_af_policy[IFLA_INET6_MAX + 1] = {
 };
 
 static int inet6_validate_link_af(const struct net_device *dev,
-				  const struct nlattr *nla)
+				  const struct nlattr *nla,
+				  bool strict)
 {
 	struct nlattr *tb[IFLA_INET6_MAX + 1];
 
 	if (dev && !__in6_dev_get(dev))
 		return -EAFNOSUPPORT;
 
-	return nla_parse_nested(tb, IFLA_INET6_MAX, nla, inet6_af_policy);
+	return nla_strict_parse_nested(tb, IFLA_INET6_MAX, strict, nla,
+				       inet6_af_policy);
 }
 
 static int inet6_set_link_af(struct net_device *dev, const struct nlattr *nla)

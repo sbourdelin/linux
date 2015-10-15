@@ -148,7 +148,8 @@ struct rtnl_af_ops {
 	size_t			(*get_link_af_size)(const struct net_device *dev);
 
 	int			(*validate_link_af)(const struct net_device *dev,
-						    const struct nlattr *attr);
+						    const struct nlattr *attr,
+						    bool strict);
 	int			(*set_link_af)(struct net_device *dev,
 					       const struct nlattr *attr);
 };

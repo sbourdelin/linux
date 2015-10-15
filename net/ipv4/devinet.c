@@ -1679,7 +1679,8 @@ static const struct nla_policy inet_af_policy[IFLA_INET_MAX+1] = {
 };
 
 static int inet_validate_link_af(const struct net_device *dev,
-				 const struct nlattr *nla)
+				 const struct nlattr *nla,
+				 bool strict)
 {
 	struct nlattr *a, *tb[IFLA_INET_MAX+1];
 	int err, rem;
@@ -1687,7 +1688,8 @@ static int inet_validate_link_af(const struct net_device *dev,
 	if (dev && !__in_dev_get_rtnl(dev))
 		return -EAFNOSUPPORT;
 
-	err = nla_parse_nested(tb, IFLA_INET_MAX, nla, inet_af_policy);
+	err = nla_strict_parse_nested(tb, IFLA_INET_MAX, strict, nla,
+				      inet_af_policy);
 	if (err < 0)
 		return err;
 
