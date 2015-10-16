@@ -363,6 +363,117 @@ static int bdw_set_degamma(struct drm_device *dev,
 	return 0;
 }
 
+static uint32_t bdw_prepare_csc_coeff(int64_t coeff)
+{
+	uint32_t reg_val, ls_bit_pos, exponent_bits, sign_bit = 0;
+	int32_t mantissa;
+	uint64_t abs_coeff;
+
+	coeff = min_t(int64_t, coeff, BDW_CSC_COEFF_MAX_VAL);
+	coeff = max_t(int64_t, coeff, BDW_CSC_COEFF_MIN_VAL);
+
+	abs_coeff = abs(coeff);
+	if (abs_coeff < (BDW_CSC_COEFF_UNITY_VAL >> 3)) {
+		/* abs_coeff < 0.125 */
+		exponent_bits = 3;
+		ls_bit_pos = 19;
+	} else if (abs_coeff >= (BDW_CSC_COEFF_UNITY_VAL >> 3) &&
+		abs_coeff < (BDW_CSC_COEFF_UNITY_VAL >> 2)) {
+		/* abs_coeff >= 0.125 && val < 0.25 */
+		exponent_bits = 2;
+		ls_bit_pos = 20;
+	} else if (abs_coeff >= (BDW_CSC_COEFF_UNITY_VAL >> 2)
+		&& abs_coeff < (BDW_CSC_COEFF_UNITY_VAL >> 1)) {
+		/* abs_coeff >= 0.25 && val < 0.5 */
+		exponent_bits = 1;
+		ls_bit_pos = 21;
+	} else if (abs_coeff >= (BDW_CSC_COEFF_UNITY_VAL >> 1)
+		&& abs_coeff < BDW_CSC_COEFF_UNITY_VAL) {
+		/* abs_coeff >= 0.5 && val < 1.0 */
+		exponent_bits = 0;
+		ls_bit_pos = 22;
+	} else if (abs_coeff >= BDW_CSC_COEFF_UNITY_VAL &&
+		abs_coeff < (BDW_CSC_COEFF_UNITY_VAL << 1)) {
+		/* abs_coeff >= 1.0 && val < 2.0 */
+		exponent_bits = 7;
+		ls_bit_pos = 23;
+	} else {
+		/* abs_coeff >= 2.0 && val < 4.0 */
+		exponent_bits = 6;
+		ls_bit_pos = 24;
+	}
+
+	mantissa = GET_BITS_ROUNDOFF(abs_coeff, ls_bit_pos, CSC_MAX_VALS);
+	if (coeff < 0)
+		sign_bit = 1;
+
+	reg_val = 0;
+	SET_BITS(reg_val, exponent_bits, 12, 3);
+	SET_BITS(reg_val, mantissa, 3, 9);
+	SET_BITS(reg_val, sign_bit, 15, 1);
+	return reg_val;
+}
+
+static int bdw_set_csc(struct drm_device *dev, struct drm_property_blob *blob,
+		struct drm_crtc *crtc)
+{
+	enum pipe pipe;
+	enum plane plane;
+	int temp, word;
+	int count = 0;
+	u32 reg, plane_ctl, mode;
+	struct drm_ctm *csc_data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (WARN_ON(!blob))
+		return -EINVAL;
+
+	if (blob->length != sizeof(struct drm_ctm)) {
+		DRM_ERROR("Invalid length of data received\n");
+		return -EINVAL;
+	}
+
+	csc_data = (struct drm_ctm *)blob->data;
+	pipe = to_intel_crtc(crtc)->pipe;
+	plane = to_intel_crtc(crtc)->plane;
+
+	plane_ctl = I915_READ(PLANE_CTL(pipe, plane));
+	plane_ctl |= PLANE_CTL_PIPE_CSC_ENABLE;
+	I915_WRITE(PLANE_CTL(pipe, plane), plane_ctl);
+	reg = _PIPE_CSC_COEFF(pipe);
+
+	/*
+	* BDW CSC correction coefficients are written like this:
+	* first two values go in a pair, into first register(0:15 and 16:31)
+	* third one alone goes into second register (16:31). Same
+	* pattern repeats for 3 times = 3 * 3 = 9 values.
+	*/
+	while (count < CSC_MAX_VALS) {
+		word = 0;
+		temp = bdw_prepare_csc_coeff(csc_data->ctm_coeff[count++]);
+		SET_BITS(word, temp, 16, 16);
+
+		temp = bdw_prepare_csc_coeff(csc_data->ctm_coeff[count++]);
+		SET_BITS(word, temp, 0, 16);
+
+		I915_WRITE(reg, word);
+		reg += 4;
+
+		word = 0;
+		temp = bdw_prepare_csc_coeff(csc_data->ctm_coeff[count++]);
+		SET_BITS(word, temp, 16, 16);
+		I915_WRITE(reg, word);
+		reg += 4;
+	}
+
+	/* Enable CSC functionality */
+	mode = I915_READ(PIPE_CSC_MODE(pipe));
+	mode |= CSC_POSITION_BEFORE_GAMMA;
+	I915_WRITE(PIPE_CSC_MODE(pipe), mode);
+	DRM_DEBUG_DRIVER("CSC enabled on Pipe %c\n", pipe_name(pipe));
+	return 0;
+}
+
 static s32 chv_prepare_csc_coeff(s64 csc_value)
 {
 	s32 csc_int_value;
@@ -667,6 +778,8 @@ void intel_color_manager_crtc_commit(struct drm_device *dev,
 		/* CSC correction */
 		if (IS_CHERRYVIEW(dev))
 			ret = chv_set_csc(dev, blob, crtc);
+		else if (IS_BROADWELL(dev) || IS_GEN9(dev))
+			ret = bdw_set_csc(dev, blob, crtc);
 
 		if (ret)
 			DRM_ERROR("set CSC correction failed\n");

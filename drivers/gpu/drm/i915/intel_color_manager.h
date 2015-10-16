@@ -90,6 +90,14 @@
 #define CGM_CSC_EN                             (1 << 1)
 #define CGM_DEGAMMA_EN                         (1 << 0)
 
+/* BDW CSC */
+/* 1.0000000 in S31.32 format */
+#define BDW_CSC_COEFF_UNITY_VAL	0x100000000
+/* 3.9921875 in S31.32 format */
+#define BDW_CSC_COEFF_MAX_VAL	0x3FE000000
+/*-4.000000 in S31.32 format */
+#define BDW_CSC_COEFF_MIN_VAL	0xFFFFFFFC00000000
+
 /* Gamma on BDW */
 #define BDW_SPLITGAMMA_MAX_VALS                512
 #define BDW_8BIT_GAMMA_MAX_VALS		256

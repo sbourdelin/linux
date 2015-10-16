@@ -8195,4 +8195,11 @@ enum skl_disp_power_wells {
 	(_PIPE3(pipe, PAL_PREC_GCMAX_A, PAL_PREC_GCMAX_B, PAL_PREC_GCMAX_C))
 
 
+/* BDW CSC correction */
+#define CSC_COEFF_A				0x49010
+#define CSC_COEFF_B				0x49110
+#define CSC_COEFF_C				0x49210
+#define _PIPE_CSC_COEFF(pipe) \
+	(_PIPE3(pipe, CSC_COEFF_A, CSC_COEFF_B, CSC_COEFF_C))
+
 #endif /* _I915_REG_H_ */
