@@ -59,7 +59,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
 			}
 			*image_addr = *reserve_addr + TEXT_OFFSET;
 		}
-		memcpy((void *)*image_addr, old_image_addr, kernel_size);
+		memmove((void *)*image_addr, old_image_addr, kernel_size);
 		*reserve_size = kernel_memsize;
 	}
 
