@@ -3143,8 +3143,12 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 
 	case NETDEV_UP:
 	case NETDEV_CHANGE:
-		if (dev->flags & IFF_SLAVE)
+		/* If a master is set stop IPv6 on this interface */
+		if (netdev_master_upper_dev_get(dev)) {
+			if (idev)
+				addrconf_ifdown(dev, 1);
 			break;
+		}
 
 		if (idev && idev->cnf.disable_ipv6)
 			break;
