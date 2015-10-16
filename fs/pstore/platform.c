@@ -237,6 +237,12 @@ static void allocate_buf_for_compression(void)
 
 }
 
+static void free_buf_for_compression(void)
+{
+	kfree(stream.workspace);
+	kfree(big_oops_buf);
+}
+
 /*
  * Called when compression fails, since the printk buffer
  * would be fetched for compression calling it again when
@@ -358,6 +364,11 @@ static void pstore_register_kmsg(void)
 	kmsg_dump_register(&pstore_dumper);
 }
 
+static void pstore_unregister_kmsg(void)
+{
+	kmsg_dump_unregister(&pstore_dumper);
+}
+
 #ifdef CONFIG_PSTORE_CONSOLE
 static void pstore_console_write(struct console *con, const char *s, unsigned c)
 {
@@ -387,16 +398,22 @@ static void pstore_console_write(struct console *con, const char *s, unsigned c)
 static struct console pstore_console = {
 	.name	= "pstore",
 	.write	= pstore_console_write,
-	.flags	= CON_PRINTBUFFER | CON_ENABLED | CON_ANYTIME,
 	.index	= -1,
 };
 
 static void pstore_register_console(void)
 {
+	pstore_console.flags = CON_PRINTBUFFER | CON_ENABLED | CON_ANYTIME;
 	register_console(&pstore_console);
+}
+
+static void pstore_unregister_console(void)
+{
+	unregister_console(&pstore_console);
 }
 #else
 static void pstore_register_console(void) {}
+static void pstore_unregister_console(void) {}
 #endif
 
 static int pstore_write_compat(enum pstore_type_id type,
@@ -420,8 +437,6 @@ static int pstore_write_compat(enum pstore_type_id type,
  */
 int pstore_register(struct pstore_info *psi)
 {
-	struct module *owner = psi->owner;
-
 	if (backend && strcmp(backend, psi->name))
 		return -EPERM;
 
@@ -436,11 +451,6 @@ int pstore_register(struct pstore_info *psi)
 	psinfo = psi;
 	mutex_init(&psinfo->read_mutex);
 	spin_unlock(&pstore_lock);
-
-	if (owner && !try_module_get(owner)) {
-		psinfo = NULL;
-		return -EINVAL;
-	}
 
 	allocate_buf_for_compression();
 
@@ -472,6 +482,20 @@ int pstore_register(struct pstore_info *psi)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pstore_register);
+
+void pstore_unregister(void)
+{
+	pstore_unregister_pmsg();
+	pstore_unregister_ftrace();
+	pstore_unregister_console();
+	pstore_unregister_kmsg();
+
+	free_buf_for_compression();
+
+	psinfo = NULL;
+	backend = NULL;
+}
+EXPORT_SYMBOL_GPL(pstore_unregister);
 
 /*
  * Read all the records from the persistent store. Create

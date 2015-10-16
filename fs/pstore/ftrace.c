@@ -104,9 +104,10 @@ static const struct file_operations pstore_knob_fops = {
 	.write	= pstore_ftrace_knob_write,
 };
 
+static struct dentry *dir;
+
 void pstore_register_ftrace(void)
 {
-	struct dentry *dir;
 	struct dentry *file;
 
 	if (!psinfo->write_buf)
@@ -128,4 +129,16 @@ void pstore_register_ftrace(void)
 	return;
 err_file:
 	debugfs_remove(dir);
+}
+
+void pstore_unregister_ftrace(void)
+{
+	mutex_lock(&pstore_ftrace_lock);
+	if (pstore_ftrace_enabled) {
+		unregister_ftrace_function(&pstore_ftrace_ops);
+		pstore_ftrace_enabled = 0;
+	}
+	mutex_unlock(&pstore_ftrace_lock);
+
+	debugfs_remove_recursive(dir);
 }

@@ -77,12 +77,17 @@ struct pstore_info {
 
 #ifdef CONFIG_PSTORE
 extern int pstore_register(struct pstore_info *);
+extern void pstore_unregister(void);
 extern bool pstore_cannot_block_path(enum kmsg_dump_reason reason);
 #else
 static inline int
 pstore_register(struct pstore_info *psi)
 {
 	return -ENODEV;
+}
+static inline void
+pstore_unregister(void)
+{
 }
 static inline bool
 pstore_cannot_block_path(enum kmsg_dump_reason reason)
