@@ -966,7 +966,8 @@ EXPORT_SYMBOL_GPL(add_disk_randomness);
 
 static size_t account(struct entropy_store *r, size_t nbytes, int min,
 		      int reserved);
-static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE]);
+static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE],
+			bool mixback);
 
 /*
  * This utility inline function is responsible for transferring entropy
@@ -1028,10 +1029,10 @@ static void _xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
 	while (bytes) {
 		int i = min_t(int, bytes, EXTRACT_SIZE);
 
-		extract_buf(r->pull, tmp);
+		bytes -= i;
+		extract_buf(r->pull, tmp, bytes == 0);
 		mix_pool_bytes(r, tmp, i);
 		credit_entropy_bits(r, i*8);
-		bytes -= i;
 	}
 
 	memzero_explicit(tmp, sizeof(tmp));
@@ -1110,31 +1111,54 @@ retry:
  * extract_entropy_user.
  *
  * Note: we assume that .poolwords is a multiple of 16 words.
+ *
+ * The "mixback" flag enables anti-backtracking.  This need only be
+ * set on the last extract_buf in a contiguous series of requests.
+ * Ensuring distinct outputs is done by including a unique nonce
+ * (consisting of the CPU ID and a per-CPU counter that will not wrap
+ * before a mixback occurs)
+ *
+ * (FIXME: Is one ahsn's worth of mixback sufficient anti-backtracking
+ * protection?  Should we feed back more?)
  */
-static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE])
+static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE],
+	bool mixback)
 {
 	int i;
 	union {
 		__u32 w[5];
-		unsigned long l[LONGS(20)];
+		unsigned long l[LONGS(16)];
 	} hash;
+	__u32 nonce;
 	__u32 workspace[SHA_WORKSPACE_WORDS];
-	unsigned long flags;
+	static DEFINE_PER_CPU(__u32, random_nonce);
 
 	/*
 	 * If we have an architectural hardware random number
 	 * generator, use it for SHA's initial vector
 	 */
 	sha_init(hash.w);
-	for (i = 0; i < LONGS(20); i++) {
+	for (i = 0; i < LONGS(16); i++) {
 		unsigned long v;
 		if (!arch_get_random_long(&v))
 			break;
 		hash.l[i] = v;
 	}
 
+	/* Add the current CPU ID and nonce */
+	hash.w[3] += get_cpu();
+	nonce = __this_cpu_inc_return(random_nonce);
+	put_cpu();
+
+	/*
+	 * Theoretically, it's possible on a 64-bit system for someone to
+	 * request EXTRACT_SIZE << 32 bytes in one read.  So force mixback
+	 * to be true each time the nonce wraps.
+	 */
+	hash.w[4] += nonce;
+	mixback |= !nonce;
+
 	/* Generate a hash across the pool, 16 words (512 bits) at a time */
-	spin_lock_irqsave(&r->lock, flags);
 	for (i = 0; i < r->poolinfo->poolwords; i += 16)
 		sha_transform(hash.w, (__u8 *)(r->pool + i), workspace);
 
@@ -1146,9 +1170,11 @@ static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE])
 	 * mixing at least a SHA1 worth of hash data back, we make
 	 * brute-forcing the feedback as hard as brute-forcing the
 	 * hash.
+	 *
+	 * FIXME: update security analysis in light of reduced mixback.
 	 */
-	__mix_pool_bytes(r, hash.w, sizeof(hash.w));
-	spin_unlock_irqrestore(&r->lock, flags);
+	if (mixback)
+		mix_pool_bytes(r, hash.w, sizeof(hash.w));
 
 	memzero_explicit(workspace, sizeof(workspace));
 
@@ -1177,7 +1203,7 @@ static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE])
 static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 				 size_t nbytes)
 {
-	ssize_t ret = 0, i;
+	ssize_t ret = 0;
 	__u8 tmp[EXTRACT_SIZE];
 	unsigned long flags;
 
@@ -1190,7 +1216,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 			trace_extract_entropy(r->name, EXTRACT_SIZE,
 					      ENTROPY_BITS(r), _RET_IP_);
 			xfer_secondary_pool(r, EXTRACT_SIZE);
-			extract_buf(r, tmp);
+			extract_buf(r, tmp, nbytes == 0);
 			spin_lock_irqsave(&r->lock, flags);
 			memcpy(r->last_data, tmp, EXTRACT_SIZE);
 		}
@@ -1202,7 +1228,10 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 	nbytes = account(r, nbytes, 0, 0);
 
 	while (nbytes) {
-		extract_buf(r, tmp);
+		size_t i = min_t(size_t, nbytes, EXTRACT_SIZE);
+
+		nbytes -= i;
+		extract_buf(r, tmp, nbytes == 0);
 
 		if (fips_enabled) {
 			spin_lock_irqsave(&r->lock, flags);
@@ -1211,9 +1240,8 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 			memcpy(r->last_data, tmp, EXTRACT_SIZE);
 			spin_unlock_irqrestore(&r->lock, flags);
 		}
-		i = min_t(int, nbytes, EXTRACT_SIZE);
+
 		memcpy(buf, tmp, i);
-		nbytes -= i;
 		buf += i;
 		ret += i;
 	}
@@ -1231,15 +1259,17 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
 				    size_t nbytes)
 {
-	ssize_t ret = 0, i;
+	ssize_t ret = 0;
 	__u8 tmp[EXTRACT_SIZE];
-	int large_request = (nbytes > 256);
+	bool large_request = (nbytes > 256);
 
 	trace_extract_entropy_user(r->name, nbytes, ENTROPY_BITS(r), _RET_IP_);
 	xfer_secondary_pool(r, nbytes);
 	nbytes = account(r, nbytes, 0, 0);
 
 	while (nbytes) {
+		size_t i;
+
 		if (large_request && need_resched()) {
 			if (signal_pending(current)) {
 				if (ret == 0)
@@ -1249,14 +1279,14 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
 			schedule();
 		}
 
-		extract_buf(r, tmp);
-		i = min_t(int, nbytes, EXTRACT_SIZE);
+		i = min_t(size_t, nbytes, EXTRACT_SIZE);
+		nbytes -= i;
+		extract_buf(r, tmp, i == 0);
 		if (copy_to_user(buf, tmp, i)) {
 			ret = -EFAULT;
 			break;
 		}
 
-		nbytes -= i;
 		buf += i;
 		ret += i;
 	}
