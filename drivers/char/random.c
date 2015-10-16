@@ -1175,7 +1175,7 @@ static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE])
  * pool after each pull to avoid starving other readers.
  */
 static ssize_t extract_entropy(struct entropy_store *r, void *buf,
-				 size_t nbytes, int min, int reserved)
+				 size_t nbytes)
 {
 	ssize_t ret = 0, i;
 	__u8 tmp[EXTRACT_SIZE];
@@ -1199,7 +1199,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 
 	trace_extract_entropy(r->name, nbytes, ENTROPY_BITS(r), _RET_IP_);
 	xfer_secondary_pool(r, nbytes);
-	nbytes = account(r, nbytes, min, reserved);
+	nbytes = account(r, nbytes, 0, 0);
 
 	while (nbytes) {
 		extract_buf(r, tmp);
@@ -1284,7 +1284,7 @@ void get_random_bytes(void *buf, int nbytes)
 		       nonblocking_pool.entropy_total);
 #endif
 	trace_get_random_bytes(nbytes, _RET_IP_);
-	extract_entropy(&nonblocking_pool, buf, nbytes, 0, 0);
+	extract_entropy(&nonblocking_pool, buf, nbytes);
 }
 EXPORT_SYMBOL(get_random_bytes);
 
@@ -1374,7 +1374,7 @@ void get_random_bytes_arch(void *buf, int nbytes)
 	}
 
 	if (nbytes)
-		extract_entropy(&nonblocking_pool, p, nbytes, 0, 0);
+		extract_entropy(&nonblocking_pool, p, nbytes);
 }
 EXPORT_SYMBOL(get_random_bytes_arch);
 
