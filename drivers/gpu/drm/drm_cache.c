@@ -131,10 +131,13 @@ drm_clflush_virt_range(void *addr, unsigned long length)
 #if defined(CONFIG_X86)
 	if (cpu_has_clflush) {
 		const int size = boot_cpu_data.x86_clflush_size;
-		void *end = addr + length;
-		addr = (void *)(((unsigned long)addr) & -size);
+		void *end;
+
+		end = (void *)(((unsigned long)addr + length - 1) & -size);
+		addr = (void *)((unsigned long)addr & -size);
+
 		mb();
-		for (; addr < end; addr += size)
+		for (; addr <= end; addr += size)
 			clflushopt(addr);
 		mb();
 		return;
