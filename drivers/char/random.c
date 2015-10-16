@@ -964,8 +964,9 @@ EXPORT_SYMBOL_GPL(add_disk_randomness);
  *
  *********************************************************************/
 
-static ssize_t extract_entropy(struct entropy_store *r, void *buf,
-			       size_t nbytes, int min, int rsvd);
+static size_t account(struct entropy_store *r, size_t nbytes, int min,
+		      int reserved);
+static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE]);
 
 /*
  * This utility inline function is responsible for transferring entropy
@@ -994,23 +995,46 @@ static void xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
 
 static void _xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
 {
-	__u32	tmp[OUTPUT_POOL_WORDS];
-
-	/* For /dev/random's pool, always leave two wakeups' worth */
-	int rsvd_bytes = r->limit ? 0 : random_read_wakeup_bits / 4;
+	u8	tmp[EXTRACT_SIZE];
 	int bytes = nbytes;
 
 	/* pull at least as much as a wakeup */
 	bytes = max_t(int, bytes, random_read_wakeup_bits / 8);
 	/* but never more than the buffer size */
-	bytes = min_t(int, bytes, sizeof(tmp));
+	bytes = min_t(int, bytes, OUTPUT_POOL_WORDS*sizeof(u32));
 
+	/*
+	 * FIXME: Move this to after account(), so it shows the true amount
+	 * transferred?
+	 */
 	trace_xfer_secondary_pool(r->name, bytes * 8, nbytes * 8,
 				  ENTROPY_BITS(r), ENTROPY_BITS(r->pull));
-	bytes = extract_entropy(r->pull, tmp, bytes,
-				random_read_wakeup_bits / 8, rsvd_bytes);
-	mix_pool_bytes(r, tmp, bytes);
-	credit_entropy_bits(r, bytes*8);
+
+	/*
+	 * This is the only place we call account() with non-zero
+	 * "min" and "reserved" values.  The minimum is used to
+	 * enforce catastrophic reseeding: if we can't get at least
+	 * random_read_wakeup_bits of entropy, don't bother reseeding
+	 * at all, but wait until a useful amount is available.
+	 *
+	 * The "reserved" is used to prevent reads from /dev/urandom
+	 * from emptying the unput pool; leave two wakeups' worth
+	 * for /dev/random.
+	 */
+	bytes = account(r->pull, bytes, random_read_wakeup_bits / 8,
+	                r->limit ? 0 : random_read_wakeup_bits / 4);
+
+	/* Now to the actual transfer, in EXTRACT_SIZE units */
+	while (bytes) {
+		int i = min_t(int, bytes, EXTRACT_SIZE);
+
+		extract_buf(r->pull, tmp);
+		mix_pool_bytes(r, tmp, i);
+		credit_entropy_bits(r, i*8);
+		bytes -= i;
+	}
+
+	memzero_explicit(tmp, sizeof(tmp));
 }
 
 /*
@@ -1087,7 +1111,7 @@ retry:
  *
  * Note: we assume that .poolwords is a multiple of 16 words.
  */
-static void extract_buf(struct entropy_store *r, __u8 *out)
+static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE])
 {
 	int i;
 	union {
