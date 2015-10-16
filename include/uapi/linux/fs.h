@@ -207,4 +207,6 @@ struct inodes_stat_t {
 #define SYNC_FILE_RANGE_WRITE		2
 #define SYNC_FILE_RANGE_WAIT_AFTER	4
 
+#define COPY_FR_REFLINK		(1 << 0)	/* Create a reflink instead. */
+
 #endif /* _UAPI_LINUX_FS_H */
