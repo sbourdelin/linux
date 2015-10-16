@@ -1492,6 +1492,7 @@ static int tegra_dma_remove(struct platform_device *pdev)
 
 	for (i = 0; i < tdma->chip_data->nr_channels; ++i) {
 		tdc = &tdma->channels[i];
+		disable_irq(tdc->irq);
 		tasklet_kill(&tdc->tasklet);
 	}
 
