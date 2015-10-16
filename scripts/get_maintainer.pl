@@ -18,6 +18,7 @@ my $V = '0.26';
 use Getopt::Long qw(:config no_auto_abbrev);
 
 my $lk_path = "./";
+my $maintainers_path = "${lk_path}MAINTAINERS";
 my $email = 1;
 my $email_usename = 1;
 my $email_maintainer = 1;
@@ -229,6 +230,7 @@ if (!GetOptions(
 		'n!' => \$email_usename,
 		'l!' => \$email_list,
 		's!' => \$email_subscriber_list,
+		'maintainers=s' => \$maintainers_path,
 		'multiline!' => \$output_multiline,
 		'roles!' => \$output_roles,
 		'rolestats!' => \$output_rolestats,
@@ -300,8 +302,8 @@ if (!top_of_kernel_tree($lk_path)) {
 my @typevalue = ();
 my %keyword_hash;
 
-open (my $maint, '<', "${lk_path}MAINTAINERS")
-    or die "$P: Can't open MAINTAINERS: $!\n";
+open (my $maint, '<', $maintainers_path)
+    or die "$P: Can't open ${maintainers_path}: $!\n";
 while (<$maint>) {
     my $line = $_;
 
@@ -808,6 +810,7 @@ Other options:
   --keywords => scan patch for keywords (default: $keywords)
   --sections => print all of the subsystem sections with pattern matches
   --mailmap => use .mailmap file (default: $email_use_mailmap)
+  --maintainers => specify alternate MAINTAINERS file to use
   --version => show version
   --help => show this help information
 
