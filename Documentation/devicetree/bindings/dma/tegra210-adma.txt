@@ -1,0 +1,50 @@
+* NVIDIA Tegra Audio DMA (ADMA) controller
+
+Required properties:
+- compatible: Must be "nvidia,tegra210-adma".
+- reg: Should contain DMA registers location and length. This should be
+  a single entry that includes all of the per-channel registers in one
+  contiguous bank.
+- interrupt-parent: Phandle to the interrupt parent controller.
+- interrupts: Should contain all of the per-channel DMA interrupts in
+  ascending order with respect to the DMA channel index.
+- clocks: Must contain one entry for the ADMA module clock, "adma_ape".
+- clock-names: Must contain the entry "adma_ape".
+- #dma-cells : Must be 1. The first cell denotes the receive/transmit
+  request number and should be between 1 and the maximum number of
+  requests supported. This value corresponds to the RX/TX_REQUEST_SELECT
+  fields in the ADMA_CHn_CTRL register.
+
+
+Example:
+
+adma: adma@702e2000 {
+	compatible = "nvidia,tegra210-adma";
+	reg = <0x0 0x702e2000 0x0 0x2000>;
+	interrupt-parent = <&tegra_agic>;
+	interrupts = <GIC_SPI INT_ADMA_EOT0 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT1 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT2 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT3 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT4 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT5 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT6 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT7 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT8 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT9 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT10 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT11 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT12 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT13 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT14 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT15 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT16 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT17 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT18 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT19 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT20 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI INT_ADMA_EOT21 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&tegra_car TEGRA210_CLK_ADMA_APE>;
+	clock-names = "adma_ape";
+	#dma-cells = <1>;
+};
