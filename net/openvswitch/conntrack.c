@@ -86,6 +86,8 @@ static u8 ovs_ct_get_state(enum ip_conntrack_info ctinfo)
 		ct_state |= OVS_CS_F_ESTABLISHED;
 		break;
 	case IP_CT_RELATED:
+		ct_state |= OVS_CS_F_NEW;
+		/* Fall through */
 	case IP_CT_RELATED_REPLY:
 		ct_state |= OVS_CS_F_RELATED;
 		break;
