@@ -177,7 +177,7 @@ void uart_register_slave(struct uart_port *uport, void *slave)
 EXPORT_SYMBOL_GPL(uart_register_slave);
 
 void uart_register_mctrl_notification(struct uart_port *uport,
-		int (*function)(void *slave, int state))
+			int (*function)(void *slave, int state))
 {
 	uport->mctrl_notification = function;
 }
@@ -208,14 +208,14 @@ void uart_register_rx_notification(struct uart_port *uport,
 			retval = uport->ops->startup(uport);
 			if (retval == 0 && termios) {
 				int hw_stopped;
-				/*
-				 * Initialise the hardware port settings.
-				 */
+/*
+ * Initialise the hardware port settings.
+ */
 				uport->ops->set_termios(uport, termios, NULL);
 
-				/*
-				 * Set modem status enables based on termios cflag
-				 */
+/*
+ * Set modem status enables based on termios cflag
+ */
 				spin_lock_irq(&uport->lock);
 				if (termios->c_cflag & CRTSCTS)
 					uport->status |= UPSTAT_CTS_ENABLE;
@@ -227,11 +227,13 @@ void uart_register_rx_notification(struct uart_port *uport,
 				else
 					uport->status |= UPSTAT_DCD_ENABLE;
 
-				/* reset sw-assisted CTS flow control based on (possibly) new mode */
+/*
+ * reset sw-assisted CTS flow control based on (possibly) new mode
+ */
 				hw_stopped = uport->hw_stopped;
 				uport->hw_stopped = uart_softcts_mode(uport) &&
-					!(uport->ops->get_mctrl(uport)
-						& TIOCM_CTS);
+					!(uport->ops->get_mctrl(uport) &
+						TIOCM_CTS);
 				if (uport->hw_stopped) {
 					if (!hw_stopped)
 						uport->ops->stop_tx(uport);
@@ -432,7 +434,8 @@ static void uart_shutdown(struct tty_struct *tty, struct uart_state *state)
 			uart_clear_mctrl(uport, TIOCM_DTR | TIOCM_RTS);
 		/*
 		 * if we have a slave that has registered for rx_notifications
-		 * we do not shut down the uart port to be able to monitor the device
+		 * we do not shut down the uart port to be able to monitor the
+		 * device
 		 */
 		if (!uport->rx_notification)
 			uart_port_shutdown(port);
