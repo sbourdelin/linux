@@ -103,6 +103,26 @@ int bpf_prog_load(enum bpf_prog_type prog_type,
 	return syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
 }
 
+int bpf_pin_fd(int fd, const char *pathname)
+{
+	union bpf_attr attr = {
+		.fd = fd,
+		.pathname = ptr_to_u64((void *)pathname),
+	};
+
+	return syscall(__NR_bpf, BPF_PIN_FD, &attr, sizeof(attr));
+}
+
+int bpf_new_fd(const char *pathname)
+{
+	union bpf_attr attr = {
+		.fd = 0,
+		.pathname = ptr_to_u64((void *)pathname),
+	};
+
+	return syscall(__NR_bpf, BPF_NEW_FD, &attr, sizeof(attr));
+}
+
 int open_raw_sock(const char *name)
 {
 	struct sockaddr_ll sll;

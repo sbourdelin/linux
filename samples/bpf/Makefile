@@ -4,6 +4,7 @@ obj- := dummy.o
 # List of programs to build
 hostprogs-y := test_verifier test_maps
 hostprogs-y += sock_example
+hostprogs-y += fds_example
 hostprogs-y += sockex1
 hostprogs-y += sockex2
 hostprogs-y += sockex3
@@ -18,6 +19,7 @@ hostprogs-y += lathist
 test_verifier-objs := test_verifier.o libbpf.o
 test_maps-objs := test_maps.o libbpf.o
 sock_example-objs := sock_example.o libbpf.o
+fds_example-objs := fds_example.o libbpf.o
 sockex1-objs := bpf_load.o libbpf.o sockex1_user.o
 sockex2-objs := bpf_load.o libbpf.o sockex2_user.o
 sockex3-objs := bpf_load.o libbpf.o sockex3_user.o
