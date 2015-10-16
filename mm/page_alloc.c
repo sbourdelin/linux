@@ -726,6 +726,9 @@ static inline void __free_one_page(struct page *page,
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
 out:
 	zone->free_area[order].nr_free++;
+	/* If the range spans two pageblocks, reset the migratetype. */
+	if (order > pageblock_order)
+		change_pageblock_range(page, order, migratetype);
 }
 
 static inline int free_pages_check(struct page *page)
