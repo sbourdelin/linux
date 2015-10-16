@@ -4213,6 +4213,78 @@ static int truncate_space_check(struct btrfs_trans_handle *trans,
 
 }
 
+static int truncate_compressed_inline_extent(struct inode *inode,
+					     struct extent_buffer *leaf,
+					     const int slot,
+					     struct btrfs_file_extent_item *fi,
+					     const struct btrfs_key *found_key,
+					     const u32 size,
+					     unsigned long *total_out)
+{
+	struct page *pages[1] = { NULL };
+	unsigned long out_pages;
+	unsigned long total_in;
+	int ret;
+	char *page_ptr;
+	unsigned long ptr;
+
+	ret = btrfs_compress_pages(btrfs_file_extent_compression(leaf, fi),
+				   inode->i_mapping,
+				   found_key->offset, size,
+				   pages, 1, &out_pages,
+				   &total_in, total_out, size);
+	if (ret)
+		goto out;
+	ASSERT(total_in == size);
+	ASSERT(out_pages == 1);
+
+	ptr = btrfs_file_extent_inline_start(fi);
+	page_ptr = kmap_atomic(pages[0]);
+	write_extent_buffer(leaf, page_ptr, ptr, *total_out);
+	kunmap_atomic(page_ptr);
+out:
+	if (pages[0])
+		page_cache_release(pages[0]);
+
+	return ret;
+}
+
+static int truncate_inline_extent(struct inode *inode,
+				  struct btrfs_path *path,
+				  const struct btrfs_key *found_key,
+				  const u64 new_size)
+{
+	struct extent_buffer *leaf = path->nodes[0];
+	const int slot = path->slots[0];
+	struct btrfs_file_extent_item *fi;
+	u32 size = (u32)(new_size - found_key->offset);
+	struct btrfs_root *root = BTRFS_I(inode)->root;
+
+	fi = btrfs_item_ptr(leaf, slot, struct btrfs_file_extent_item);
+
+	if (btrfs_file_extent_compression(leaf, fi) == BTRFS_COMPRESS_NONE) {
+		btrfs_set_file_extent_ram_bytes(leaf, fi, size);
+		size = btrfs_file_extent_calc_inline_size(size);
+	} else {
+		int ret;
+		unsigned long total_out;
+
+		btrfs_set_path_blocking(path);
+		ret = truncate_compressed_inline_extent(inode, leaf, slot, fi,
+							found_key, size,
+							&total_out);
+		btrfs_clear_path_blocking(path, NULL, 0);
+		if (ret)
+			return ret;
+		btrfs_set_file_extent_ram_bytes(leaf, fi, size);
+		size = btrfs_file_extent_calc_inline_size(total_out);
+	}
+
+	btrfs_truncate_item(root, path, size, 1);
+
+	return 0;
+}
+
 /*
  * this can truncate away extent items, csum items and directory items.
  * It starts at a high offset and removes keys until it can't find
@@ -4407,28 +4479,20 @@ search_again:
 			 * special encodings
 			 */
 			if (!del_item &&
-			    btrfs_file_extent_compression(leaf, fi) == 0 &&
 			    btrfs_file_extent_encryption(leaf, fi) == 0 &&
 			    btrfs_file_extent_other_encoding(leaf, fi) == 0) {
-				u32 size = new_size - found_key.offset;
-
-				if (test_bit(BTRFS_ROOT_REF_COWS, &root->state))
-					inode_sub_bytes(inode, item_end + 1 -
-							new_size);
-
-				/*
-				 * update the ram bytes to properly reflect
-				 * the new size of our item
-				 */
-				btrfs_set_file_extent_ram_bytes(leaf, fi, size);
-				size =
-				    btrfs_file_extent_calc_inline_size(size);
-				btrfs_truncate_item(root, path, size, 1);
-			} else if (test_bit(BTRFS_ROOT_REF_COWS,
-					    &root->state)) {
-				inode_sub_bytes(inode, item_end + 1 -
-						found_key.offset);
+				err = truncate_inline_extent(inode, path,
+							     &found_key,
+							     new_size);
+				if (err) {
+					btrfs_abort_transaction(trans,
+								root, err);
+					goto error;
+				}
 			}
+
+			if (test_bit(BTRFS_ROOT_REF_COWS, &root->state))
+				inode_sub_bytes(inode, item_end + 1 - new_size);
 		}
 delete:
 		if (del_item) {
