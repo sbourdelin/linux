@@ -1245,6 +1245,8 @@ retry:
 
 		mode_set = &fb_helper->crtc_info[i].mode_set;
 
+		mode_set->crtc->primary->old_fb = mode_set->crtc->primary->fb;
+
 		mode_set->x = var->xoffset;
 		mode_set->y = var->yoffset;
 
@@ -1260,13 +1262,34 @@ retry:
 	info->var.xoffset = var->xoffset;
 	info->var.yoffset = var->yoffset;
 
-	return 0;
 
 fail:
+	for(i = 0; i < fb_helper->crtc_count; i++) {
+		struct drm_mode_set *mode_set;
+		struct drm_plane *plane;
+
+		mode_set = &fb_helper->crtc_info[i].mode_set;
+		plane = mode_set->crtc->primary;
+
+		if (ret == 0) {
+			struct drm_framebuffer *new_fb = plane->state->fb;
+
+			if (new_fb)
+				drm_framebuffer_reference(new_fb);
+			plane->fb = new_fb;
+			plane->crtc = plane->state->crtc;
+
+			if (plane->old_fb)
+				drm_framebuffer_unreference(plane->old_fb);
+		}
+		plane->old_fb = NULL;
+	}
+
 	if (ret == -EDEADLK)
 		goto backoff;
 
-	drm_atomic_state_free(state);
+	if (ret != 0)
+		drm_atomic_state_free(state);
 
 	return ret;
 
