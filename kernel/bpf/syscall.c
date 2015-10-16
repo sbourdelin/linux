@@ -678,6 +678,108 @@ free_prog_nouncharge:
 	return err;
 }
 
+void bpf_any_get(union bpf_any raw, enum bpf_fd_type type)
+{
+	switch (type) {
+	case BPF_FD_TYPE_PROG:
+		atomic_inc(&raw.prog->aux->refcnt);
+		break;
+	case BPF_FD_TYPE_MAP:
+		atomic_inc(&raw.map->refcnt);
+		break;
+	}
+}
+
+void bpf_any_put(union bpf_any raw, enum bpf_fd_type type)
+{
+	switch (type) {
+	case BPF_FD_TYPE_PROG:
+		bpf_prog_put(raw.prog);
+		break;
+	case BPF_FD_TYPE_MAP:
+		bpf_map_put(raw.map);
+		break;
+	}
+}
+
+#define BPF_PIN_FD_LAST_FIELD	pathname
+#define BPF_NEW_FD_LAST_FIELD	BPF_PIN_FD_LAST_FIELD
+
+static int bpf_pin_fd(const union bpf_attr *attr)
+{
+	struct filename *pathname;
+	enum bpf_fd_type type;
+	union bpf_any raw;
+	int ret;
+
+	if (CHECK_ATTR(BPF_PIN_FD))
+		return -EINVAL;
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	pathname = getname(u64_to_ptr(attr->pathname));
+	if (IS_ERR(pathname))
+		return PTR_ERR(pathname);
+
+	type = BPF_FD_TYPE_MAP;
+	raw.map = bpf_map_get(attr->fd);
+	if (IS_ERR(raw.map)) {
+		type = BPF_FD_TYPE_PROG;
+		raw.prog = bpf_prog_get(attr->fd);
+		if (IS_ERR(raw.prog)) {
+			ret = PTR_ERR(raw.raw_ptr);
+			goto out;
+		}
+	}
+
+	ret = bpf_fd_inode_add(pathname, raw, type);
+	if (ret != 0)
+		bpf_any_put(raw, type);
+out:
+	putname(pathname);
+	return ret;
+}
+
+static int bpf_new_fd(const union bpf_attr *attr)
+{
+	struct filename *pathname;
+	enum bpf_fd_type type;
+	union bpf_any raw;
+	int ret;
+
+	if ((CHECK_ATTR(BPF_NEW_FD)) || attr->fd != 0)
+		return -EINVAL;
+
+	pathname = getname(u64_to_ptr(attr->pathname));
+	if (IS_ERR(pathname))
+		return PTR_ERR(pathname);
+
+	raw = bpf_fd_inode_get(pathname, &type);
+	if (IS_ERR(raw.raw_ptr)) {
+		ret = PTR_ERR(raw.raw_ptr);
+		goto out;
+	}
+
+	switch (type) {
+	case BPF_FD_TYPE_PROG:
+		ret = bpf_prog_new_fd(raw.prog);
+		break;
+	case BPF_FD_TYPE_MAP:
+		ret = bpf_map_new_fd(raw.map);
+		break;
+	default:
+		/* Shut up gcc. */
+		ret = -ENOENT;
+		break;
+	}
+
+	if (ret < 0)
+		bpf_any_put(raw, type);
+out:
+	putname(pathname);
+	return ret;
+}
+
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	union bpf_attr attr = {};
@@ -737,6 +839,12 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		break;
 	case BPF_PROG_LOAD:
 		err = bpf_prog_load(&attr);
+		break;
+	case BPF_PIN_FD:
+		err = bpf_pin_fd(&attr);
+		break;
+	case BPF_NEW_FD:
+		err = bpf_new_fd(&attr);
 		break;
 	default:
 		err = -EINVAL;

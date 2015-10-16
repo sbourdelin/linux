@@ -8,8 +8,10 @@
 #define _LINUX_BPF_H 1
 
 #include <uapi/linux/bpf.h>
+
 #include <linux/workqueue.h>
 #include <linux/file.h>
+#include <linux/fs.h>
 
 struct bpf_map;
 
@@ -137,6 +139,17 @@ struct bpf_prog_aux {
 	};
 };
 
+enum bpf_fd_type {
+	BPF_FD_TYPE_PROG,
+	BPF_FD_TYPE_MAP,
+};
+
+union bpf_any {
+	struct bpf_map *map;
+	struct bpf_prog *prog;
+	void *raw_ptr;
+};
+
 struct bpf_array {
 	struct bpf_map map;
 	u32 elem_size;
@@ -171,6 +184,14 @@ struct bpf_map *__bpf_map_get(struct fd f);
 void bpf_map_put(struct bpf_map *map);
 
 extern int sysctl_unprivileged_bpf_disabled;
+
+void bpf_any_get(union bpf_any raw, enum bpf_fd_type type);
+void bpf_any_put(union bpf_any raw, enum bpf_fd_type type);
+
+int bpf_fd_inode_add(const struct filename *pathname,
+		     union bpf_any raw, enum bpf_fd_type type);
+union bpf_any bpf_fd_inode_get(const struct filename *pathname,
+			       enum bpf_fd_type *type);
 
 /* verify correctness of eBPF program */
 int bpf_check(struct bpf_prog **fp, union bpf_attr *attr);
