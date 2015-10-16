@@ -351,6 +351,7 @@ static const struct intel_device_info intel_cherryview_info = {
 	.need_gfx_hws = 1, .has_hotplug = 1,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING,
 	.num_samples_after_ctm = CHV_10BIT_GAMMA_MAX_VALS,
+	.num_samples_before_ctm = CHV_DEGAMMA_MAX_VALS,
 	.is_valleyview = 1,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
