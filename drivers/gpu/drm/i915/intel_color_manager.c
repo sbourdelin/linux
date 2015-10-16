@@ -291,6 +291,50 @@ static int chv_set_gamma(struct drm_device *dev, struct drm_property_blob *blob,
 	}
 }
 
+void intel_color_manager_crtc_commit(struct drm_device *dev,
+		struct drm_crtc_state *crtc_state)
+{
+	struct drm_property_blob *blob;
+	struct drm_crtc *crtc = crtc_state->crtc;
+	int ret = -EINVAL;
+
+	blob = crtc_state->palette_after_ctm_blob;
+	if (blob) {
+		/* Gamma correction is platform specific */
+		if (IS_CHERRYVIEW(dev))
+			ret = chv_set_gamma(dev, blob, crtc);
+
+		if (ret)
+			DRM_ERROR("set Gamma correction failed\n");
+		else
+			DRM_DEBUG_DRIVER("Gamma correction success\n");
+	}
+
+	blob = crtc_state->palette_before_ctm_blob;
+	if (blob) {
+		/* Degamma correction */
+		if (IS_CHERRYVIEW(dev))
+			ret = chv_set_degamma(dev, blob, crtc);
+
+		if (ret)
+			DRM_ERROR("set degamma correction failed\n");
+		else
+			DRM_DEBUG_DRIVER("degamma correction success\n");
+	}
+
+	blob = crtc_state->ctm_blob;
+	if (blob) {
+		/* CSC correction */
+		if (IS_CHERRYVIEW(dev))
+			ret = chv_set_csc(dev, blob, crtc);
+
+		if (ret)
+			DRM_ERROR("set CSC correction failed\n");
+		else
+			DRM_DEBUG_DRIVER("CSC correction success\n");
+	}
+}
+
 void intel_attach_color_properties_to_crtc(struct drm_device *dev,
 		struct drm_crtc *crtc)
 {
