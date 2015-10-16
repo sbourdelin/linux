@@ -390,6 +390,38 @@ int drm_atomic_set_mode_prop_for_crtc(struct drm_crtc_state *state,
 EXPORT_SYMBOL(drm_atomic_set_mode_prop_for_crtc);
 
 /**
+ * drm_atomic_crtc_set_blob - find and set a blob
+ * @state_blob: reference pointer to the color blob in the crtc_state
+ * @blob_id: blob_id coming from set_property() call
+ *
+ * Set a color correction blob (originating from a set blob property) on the
+ * desired CRTC state. This function will take reference of the blob property
+ * in the CRTC state, finds the blob based on blob_id (which comes from
+ * set_property call) and set the blob at the proper place.
+ *
+ * RETURNS:
+ * Zero on success, error code on failure.
+ */
+static int drm_atomic_crtc_set_blob(struct drm_device *dev,
+	struct drm_property_blob **state_blob, uint32_t blob_id)
+{
+	struct drm_property_blob *blob;
+
+	blob = drm_property_lookup_blob(dev, blob_id);
+	if (!blob) {
+		DRM_DEBUG_KMS("Invalid Blob ID\n");
+		return -EINVAL;
+	}
+
+	if (*state_blob)
+		drm_property_unreference_blob(*state_blob);
+
+	/* Attach the blob to be committed in state */
+	*state_blob = blob;
+	return 0;
+}
+
+/**
  * drm_atomic_crtc_set_property - set property on CRTC
  * @crtc: the drm CRTC to set a property on
  * @state: the state object to update with the new property value
@@ -422,8 +454,25 @@ int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		if (mode)
 			drm_property_unreference_blob(mode);
 		return ret;
-	}
-	else if (crtc->funcs->atomic_set_property)
+	} else if (property == config->cm_palette_after_ctm_property) {
+		ret = drm_atomic_crtc_set_blob(dev,
+				&state->palette_after_ctm_blob, val);
+		if (ret)
+			DRM_ERROR("Failed to load blob palette_after_ctm\n");
+		return ret;
+	} else if (property == config->cm_palette_before_ctm_property) {
+		ret = drm_atomic_crtc_set_blob(dev,
+				&state->palette_before_ctm_blob, val);
+		if (ret)
+			DRM_ERROR("Failed to load blob palette_before_ctm\n");
+		return ret;
+	} else if (property == config->cm_ctm_property) {
+		ret = drm_atomic_crtc_set_blob(dev,
+				&state->ctm_blob, val);
+		if (ret)
+			DRM_ERROR("Failed to load blob ctm\n");
+		return ret;
+	} else if (crtc->funcs->atomic_set_property)
 		return crtc->funcs->atomic_set_property(crtc, state, property, val);
 	else
 		return -EINVAL;
