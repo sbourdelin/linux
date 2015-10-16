@@ -30,4 +30,35 @@
 void intel_attach_color_properties_to_crtc(struct drm_device *dev,
 		struct drm_crtc *crtc)
 {
+	struct drm_mode_config *config = &dev->mode_config;
+	struct drm_mode_object *mode_obj = &crtc->base;
+
+	/*
+	* Register:
+	* =========
+	* Gamma correction as palette_after_ctm property
+	* Degamma correction as palette_before_ctm property
+	*
+	* Load:
+	* =====
+	* no. of coefficients supported on this platform for gamma
+	* and degamma with the query properties. A user
+	* space agent should read these query property, and prepare
+	* the color correction values accordingly. Its expected from the
+	* driver to load the right number of coefficients during the init
+	* phase.
+	*/
+	if (config->cm_coeff_after_ctm_property) {
+		drm_object_attach_property(mode_obj,
+			config->cm_coeff_after_ctm_property,
+		INTEL_INFO(dev)->num_samples_after_ctm);
+		DRM_DEBUG_DRIVER("Gamma query property initialized\n");
+	}
+
+	if (config->cm_coeff_before_ctm_property) {
+		drm_object_attach_property(mode_obj,
+			config->cm_coeff_before_ctm_property,
+		INTEL_INFO(dev)->num_samples_before_ctm);
+		DRM_DEBUG_DRIVER("Degamma query property initialized\n");
+	}
 }
