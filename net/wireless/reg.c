@@ -1020,6 +1020,10 @@ freq_reg_info_regd(struct wiphy *wiphy, u32 center_freq,
 		rr = &regd->reg_rules[i];
 		fr = &rr->freq_range;
 
+		if (!config_enabled(CONFIG_CFG80211_REG_ITSG5_BAND) &&
+			 (rr->flags & NL80211_RRF_ITSG5))
+			return ERR_PTR(-EPERM);
+
 		/*
 		 * We only need to know if one frequency rule was
 		 * was in center_freq's band, that's enough, so lets
