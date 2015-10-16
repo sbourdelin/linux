@@ -3331,6 +3331,12 @@ the userspace IOAPIC should process the EOI and retrigger the interrupt if
 it is still asserted.  Vector is the LAPIC interrupt vector for which the
 EOI was received.
 
+		/* KVM_EXIT_HYPERV */
+                struct kvm_hyperv_exit hyperv;
+Indicates that the VCPU exits into userspace to process some tasks
+related with Hyper-V emulation. Currently used to synchronize modified
+Hyper-V SynIC state with userspace.
+
 		/* Fix the size of the union. */
 		char padding[256];
 	};
