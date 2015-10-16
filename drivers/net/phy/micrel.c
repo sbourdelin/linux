@@ -25,6 +25,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/phy.h>
+#include <linux/netdevice.h>
 #include <linux/micrel_phy.h>
 #include <linux/of.h>
 #include <linux/clk.h>
@@ -340,8 +341,9 @@ static int ksz9021_config_init(struct phy_device *phydev)
 	const struct device *dev = &phydev->dev;
 	const struct device_node *of_node = dev->of_node;
 
-	if (!of_node && dev->parent->of_node)
-		of_node = dev->parent->of_node;
+	if (!of_node && phydev->attached_dev &&
+	    phydev->attached_dev->dev.of_node)
+		of_node = phydev->attached_dev->dev.of_node;
 
 	if (of_node) {
 		ksz9021_load_values_from_of(phydev, of_node,
