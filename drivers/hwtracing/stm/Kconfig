@@ -1,5 +1,6 @@
 config STM
 	tristate "System Trace Module devices"
+	depends on CONFIGFS_FS
 	help
 	  A System Trace Module (STM) is a device exporting data in System
 	  Trace Protocol (STP) format as defined by MIPI STP standards.
@@ -9,6 +10,7 @@ config STM
 
 config STM_DUMMY
 	tristate "Dummy STM driver"
+	depends on CONFIGFS_FS
 	help
 	  This is a simple dummy device that pretends to be an stm device
 	  and discards your data. Use for stm class testing.
@@ -17,6 +19,7 @@ config STM_DUMMY
 
 config STM_SOURCE_CONSOLE
 	tristate "Kernel console over STM devices"
+	depends on CONFIGFS_FS
 	help
 	  This is a kernel space trace source that sends kernel log
 	  messages to trace hosts over STM devices.
