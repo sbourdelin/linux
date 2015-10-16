@@ -172,7 +172,7 @@ static irqreturn_t edt_ft5x06_ts_isr(int irq, void *dev_id)
 	struct edt_ft5x06_ts_data *tsdata = dev_id;
 	struct device *dev = &tsdata->client->dev;
 	u8 cmd;
-	u8 rdbuf[31];
+	u8 rdbuf[61];
 	int i, type, x, y, id;
 	int offset, tplen, datalen, crclen;
 	int error;
@@ -1076,6 +1076,10 @@ MODULE_DEVICE_TABLE(i2c, edt_ft5x06_ts_id);
 
 #ifdef CONFIG_OF
 
+static const struct edt_i2c_chip_data edt_ft5506_data = {
+	.max_support_points = 10,
+};
+
 static const struct edt_i2c_chip_data edt_ft5x06_data = {
 	.max_support_points = 5,
 };
@@ -1084,6 +1088,7 @@ static const struct of_device_id edt_ft5x06_of_match[] = {
 	{ .compatible = "edt,edt-ft5206", .data = &edt_ft5x06_data},
 	{ .compatible = "edt,edt-ft5306", .data = &edt_ft5x06_data},
 	{ .compatible = "edt,edt-ft5406", .data = &edt_ft5x06_data},
+	{ .compatible = "edt,edt-ft5506", .data = &edt_ft5506_data},
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, edt_ft5x06_of_match);
