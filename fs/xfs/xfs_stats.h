@@ -213,9 +213,12 @@ struct xfsstats {
 	__uint64_t		xs_read_bytes;
 };
 
+extern struct xstats xfsstats;
+
+#ifdef CONFIG_PROC_FS
+
 int xfs_stats_format(struct xfsstats __percpu *stats, char *buf);
 void xfs_stats_clearall(struct xfsstats __percpu *stats);
-extern struct xstats xfsstats;
 
 #define XFS_STATS_INC(mp, v)					\
 do {								\
@@ -235,13 +238,22 @@ do {									\
 	per_cpu_ptr(mp->m_stats.xs_stats, current_cpu())->v += (inc);	\
 } while (0)
 
-#if defined(CONFIG_PROC_FS)
-
 extern int xfs_init_procfs(void);
 extern void xfs_cleanup_procfs(void);
 
-
 #else	/* !CONFIG_PROC_FS */
+
+static inline int xfs_stats_format(struct xfsstats __percpu *stats, char *buf)
+{
+	return 0;
+}
+static inline void xfs_stats_clearall(struct xfsstats __percpu *stats)
+{
+}
+
+#define XFS_STATS_INC(mp, v)		do { } while (0)
+#define XFS_STATS_DEC(mp, v)		do { } while (0)
+#define XFS_STATS_ADD(mp, v, inc)	do { } while (0)
 
 static inline int xfs_init_procfs(void)
 {

@@ -1475,10 +1475,12 @@ xfs_fs_fill_super(
 		goto out_destroy_workqueues;
 
 	/* Allocate stats memory before we do operations that might use it */
-	mp->m_stats.xs_stats = alloc_percpu(struct xfsstats);
-	if (!mp->m_stats.xs_stats) {
-		error = PTR_ERR(mp->m_stats.xs_stats);
-		goto out_destroy_counters;
+	if (IS_ENABLED(CONFIG_PROC_FS)) {
+		mp->m_stats.xs_stats = alloc_percpu(struct xfsstats);
+		if (!mp->m_stats.xs_stats) {
+			error = PTR_ERR(mp->m_stats.xs_stats);
+			goto out_destroy_counters;
+		}
 	}
 
 	error = xfs_readsb(mp, flags);
@@ -1851,16 +1853,18 @@ init_xfs_fs(void)
 		goto out_sysctl_unregister;
 	}
 
-	xfsstats.xs_kobj.kobject.kset = xfs_kset;
+	if (IS_ENABLED(CONFIG_PROC_FS)) {
+		xfsstats.xs_kobj.kobject.kset = xfs_kset;
 
-	xfsstats.xs_stats = alloc_percpu(struct xfsstats);
-	if (!xfsstats.xs_stats) {
-		error = -ENOMEM;
-		goto out_kset_unregister;
+		xfsstats.xs_stats = alloc_percpu(struct xfsstats);
+		if (!xfsstats.xs_stats) {
+			error = -ENOMEM;
+			goto out_kset_unregister;
+		}
+		error = xfs_sysfs_init(&xfsstats.xs_kobj, &xfs_stats_ktype,
+				       NULL, "stats");
 	}
 
-	error = xfs_sysfs_init(&xfsstats.xs_kobj, &xfs_stats_ktype, NULL,
-			       "stats");
 	if (error)
 		goto out_free_stats;
 
@@ -1887,9 +1891,11 @@ init_xfs_fs(void)
 	xfs_sysfs_del(&xfs_dbg_kobj);
  out_remove_stats_kobj:
 #endif
-	xfs_sysfs_del(&xfsstats.xs_kobj);
+	if (IS_ENABLED(CONFIG_PROC_FS))
+		xfs_sysfs_del(&xfsstats.xs_kobj);
  out_free_stats:
-	free_percpu(xfsstats.xs_stats);
+	if (IS_ENABLED(CONFIG_PROC_FS))
+		free_percpu(xfsstats.xs_stats);
  out_kset_unregister:
 	kset_unregister(xfs_kset);
  out_sysctl_unregister:
@@ -1916,8 +1922,10 @@ exit_xfs_fs(void)
 #ifdef DEBUG
 	xfs_sysfs_del(&xfs_dbg_kobj);
 #endif
-	xfs_sysfs_del(&xfsstats.xs_kobj);
-	free_percpu(xfsstats.xs_stats);
+	if (IS_ENABLED(CONFIG_PROC_FS)) {
+		xfs_sysfs_del(&xfsstats.xs_kobj);
+		free_percpu(xfsstats.xs_stats);
+	}
 	kset_unregister(xfs_kset);
 	xfs_sysctl_unregister();
 	xfs_cleanup_procfs();
