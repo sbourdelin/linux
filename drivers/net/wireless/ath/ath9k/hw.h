@@ -73,7 +73,11 @@
 
 #define ATH9K_RSSI_BAD			-128
 
-#define ATH9K_NUM_CHANNELS	38
+#ifdef CONFIG_CFG80211_REG_ITSG5_BAND
+#define ATH9K_NUM_CHANNELS		53
+#else
+#define ATH9K_NUM_CHANNELS		38
+#endif
 
 /* Register read/write primitives */
 #define REG_WRITE(_ah, _reg, _val) \
