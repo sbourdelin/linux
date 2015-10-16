@@ -6137,6 +6137,23 @@ static int dev_new_index(struct net *net)
 	}
 }
 
+/**
+ *	dev_update_index - update the ifindex used for allocation
+ *	@net: the applicable net namespace
+ *	@ifindex: the assigned ifindex
+ *
+ *	Updates the notion of currently allocated maximal ifindex to
+ *	decrease likelihood of ifindex reuse when the ifindex was assigned
+ *	by other means than calling dev_new_index (e.g. when moving
+ *	interface across net namespaces).  The caller must hold the rtnl
+ *	semaphore or the dev_base_lock.
+ */
+static void dev_update_index(struct net *net, int ifindex)
+{
+	if (ifindex > net->ifindex)
+		net->ifindex = ifindex;
+}
+
 /* Delayed registration/unregisteration */
 static LIST_HEAD(net_todo_list);
 DECLARE_WAIT_QUEUE_HEAD(netdev_unregistering_wq);
@@ -7262,6 +7279,8 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	/* If there is an ifindex conflict assign a new one */
 	if (__dev_get_by_index(net, dev->ifindex))
 		dev->ifindex = dev_new_index(net);
+	else
+		dev_update_index(net, dev->ifindex);
 
 	/* Send a netdev-add uevent to the new namespace */
 	kobject_uevent(&dev->dev.kobj, KOBJ_ADD);
