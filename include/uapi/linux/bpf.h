@@ -287,6 +287,11 @@ enum bpf_func_id {
 	 * Return: realm if != 0
 	 */
 	BPF_FUNC_get_route_realm,
+
+	/**
+	 * u64 bpf_perf_event_dump_control(&map, index, flag)
+	 */
+	BPF_FUNC_perf_event_dump_control,
 	__BPF_FUNC_MAX_ID,
 };
 
