@@ -371,7 +371,8 @@ void kvm_arch_post_irq_routing_update(struct kvm *kvm)
 	kvm_make_scan_ioapic_request(kvm);
 }
 
-void kvm_scan_ioapic_routes(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap)
+void kvm_scan_ioapic_routes(struct kvm_vcpu *vcpu,
+			    ulong *ioapic_handled_vectors)
 {
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_kernel_irq_routing_entry *entry;
@@ -398,8 +399,7 @@ void kvm_scan_ioapic_routes(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap)
 						dest_mode)) {
 				u32 vector = entry->msi.data & 0xff;
 
-				__set_bit(vector,
-					  (unsigned long *) eoi_exit_bitmap);
+				__set_bit(vector, ioapic_handled_vectors);
 			}
 		}
 	}
