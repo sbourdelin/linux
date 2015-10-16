@@ -63,5 +63,10 @@
 #define CHV_GAMMA_SHIFT_GREEN                  16
 #define CHV_MAX_GAMMA                          ((1 << 24) - 1)
 
+/* Degamma on CHV */
+#define CHV_DEGAMMA_MSB_SHIFT                  2
+#define CHV_DEGAMMA_GREEN_SHIFT                16
+
 /* CHV CGM Block */
 #define CGM_GAMMA_EN                           (1 << 2)
+#define CGM_DEGAMMA_EN                         (1 << 0)
