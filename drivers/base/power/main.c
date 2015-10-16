@@ -899,8 +899,6 @@ static void device_complete(struct device *dev, pm_message_t state)
 	if (dev->power.syscore)
 		return;
 
-	device_lock(dev);
-
 	if (dev->pm_domain) {
 		info = "completing power domain ";
 		callback = dev->pm_domain->ops.complete;
@@ -920,13 +918,15 @@ static void device_complete(struct device *dev, pm_message_t state)
 		callback = dev->driver->pm->complete;
 	}
 
-	if (callback) {
-		pm_dev_dbg(dev, state, info);
-		callback(dev);
-	}
+	if (!callback)
+		goto Complete;
 
+	device_lock(dev);
+	pm_dev_dbg(dev, state, info);
+	callback(dev);
 	device_unlock(dev);
 
+Complete:
 	pm_runtime_put(dev);
 }
 
