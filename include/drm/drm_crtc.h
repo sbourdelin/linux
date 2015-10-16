@@ -302,6 +302,11 @@ struct drm_crtc_state {
 	/* blob property to expose current mode to atomic userspace */
 	struct drm_property_blob *mode_blob;
 
+	/* blob properties to hold the color properties' blobs */
+	struct drm_property_blob *palette_before_ctm_blob;
+	struct drm_property_blob *palette_after_ctm_blob;
+	struct drm_property_blob *ctm_blob;
+
 	struct drm_pending_vblank_event *event;
 
 	struct drm_atomic_state *state;
