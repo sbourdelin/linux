@@ -229,12 +229,29 @@ static u64 bpf_perf_event_dump_control(u64 r1, u64 index, u64 flag, u64 r4, u64 
 	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
 	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	struct perf_event *event;
+	int i;
 
-	if (unlikely(index >= array->map.max_entries))
+	if (unlikely(index > array->map.max_entries))
 		return -E2BIG;
 
 	if (flag & BIT_FLAG_CHECK)
 		return -EINVAL;
+
+	if (index == array->map.max_entries) {
+		bool dump_control = flag & BIT_DUMP_CTL;
+
+		for (i = 0; i < array->map.max_entries; i++) {
+			event = (struct perf_event *)array->ptrs[i];
+			if (!event)
+				continue;
+
+			if (dump_control)
+				atomic_dec_if_positive(&event->dump_enable);
+			else
+				atomic_inc_unless_negative(&event->dump_enable);
+		}
+		return 0;
+	}
 
 	event = (struct perf_event *)array->ptrs[index];
 	if (!event)
@@ -244,7 +261,6 @@ static u64 bpf_perf_event_dump_control(u64 r1, u64 index, u64 flag, u64 r4, u64 
 		atomic_dec_if_positive(&event->dump_enable);
 	else
 		atomic_inc_unless_negative(&event->dump_enable);
-
 	return 0;
 }
 
