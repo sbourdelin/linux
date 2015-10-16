@@ -419,7 +419,6 @@ static LIST_HEAD(random_ready_list);
  *
  **********************************************************************/
 
-struct entropy_store;
 struct entropy_store {
 	/* read-only data: */
 	const struct poolinfo *poolinfo;
@@ -465,7 +464,17 @@ static struct entropy_store blocking_pool = {
 					push_to_pool),
 };
 
-static struct entropy_store nonblocking_pool = {
+/* This is a variant with some extra fields for nonblocking mixback */
+struct entropy_store_plus {
+	struct entropy_store store;
+	bool mixback_flag;
+	__u32 mixback[SHA_DIGEST_WORDS];
+	spinlock_t mixback_lock;
+};
+
+#define nonblocking_pool nonblocking_plus.store
+static struct entropy_store_plus nonblocking_plus = {
+    .store = {
 	.poolinfo = &poolinfo_table[1],
 	.name = "nonblocking",
 	.pull = &input_pool,
@@ -473,6 +482,9 @@ static struct entropy_store nonblocking_pool = {
 	.pool = nonblocking_pool_data,
 	.push_work = __WORK_INITIALIZER(nonblocking_pool.push_work,
 					push_to_pool),
+    },
+    .mixback_flag = false,
+    .mixback_lock = __SPIN_LOCK_UNLOCKED(nonblocking_plus.mixback_lock),
 };
 
 static __u32 const twist_table[8] = {
@@ -553,6 +565,83 @@ static void mix_pool_bytes(struct entropy_store *r, const void *in,
 	_mix_pool_bytes(r, in, nbytes);
 	spin_unlock_irqrestore(&r->lock, flags);
 }
+
+/*
+ * Because the /dev/urandom pool is by far the busiest, large machines
+ * with applications that hit the pool hard can fall off the locking
+ * cliff on the pool lock.  (They *should* use a private CPRNG reseeded
+ * infrequently, but there are lazy programmers in the world.)
+ *
+ * This function avoids contention on the pool's lock, by taking
+ * advantage of the fact that mixback from a given pool state is logically
+ * idempotent: if there are multiple threads wanting to mix back, only
+ * one of them has to succeed.  A non-deterministic mixture of the
+ * competing mixback data is also okay, so we use a common temporary
+ * buffer written without locking.
+ *
+ * It is also not necessary that a thread confirm that mixback has
+ * happened before returning to user space; a backtracking window a few
+ * microseconds long is not a concern, as long as it is strongly bounded.
+ * In this case, because the mixback lock is taken without disabling
+ * interrupts, the window is up to the interrupt latency long, but that's
+ * considered acceptable.
+ *
+ * What is important is that, after a mixback has started, any later
+ * pool readers will schedule an additional mixback.  That's what all
+ * the dancing around with mixback_flag and mixback_lock is about.
+ */
+static void nonblocking_mixback(struct entropy_store_plus *r,
+				const void *in, int nbytes)
+{
+	unsigned long flags;
+
+	if (!spin_trylock_irqsave(&r->store.lock, flags)) {
+		/* Someone's currently writing to the pool.  Anyone waiting? */
+		if (!spin_trylock(&r->mixback_lock)) {
+			/* Leave it for the lock holder to take care of. */
+			nbytes = min_t(int, nbytes, sizeof(r->mixback));
+			memcpy(r->mixback, in, nbytes);
+			smp_store_release(&r->mixback_flag, true);
+			smp_wmb();
+			/*
+			 * If the lock is still held, we are guaranteed that
+			 * the lock holder will promptly do the mixback for us.
+			 */
+			if (!spin_trylock(&r->mixback_lock))
+				return;
+		}
+		/*
+		 * Wait in line to do mixback.  This has to be a separate
+		 * lock because we don't want to oblige interrupt entropy
+		 * sources which also take the pool lock to do mixback.
+		 */
+		spin_lock_irqsave(&r->store.lock, flags);
+		spin_unlock(&r->mixback_lock);
+		smp_mb();	/* Between unlock and read of r->mixback flag */
+	}
+
+	__mix_pool_bytes(&r->store, in, nbytes);
+
+	/*
+	 * Do any buffered mixback.  Holding the mixback_lock obliges
+	 * us to check after dropping it, but we only have to check once.
+	 * (We aren't required to check at all if we never took the
+	 * mixback_lock, but it does no harm to.)
+	 */
+	if (READ_ONCE_CTRL(r->mixback_flag)) {
+		__u32 mixback[ARRAY_SIZE(r->mixback)];
+
+		memcpy(mixback, r->mixback, sizeof mixback);
+		memset(r->mixback, 0, sizeof r->mixback);
+		smp_store_release(&r->mixback_flag, false);
+
+		smp_wmb();	/* Ensure release is seen before mixing */
+		__mix_pool_bytes(&r->store, mixback, sizeof mixback);
+		memzero_explicit(mixback, sizeof mixback);
+	}
+	spin_unlock_irqrestore(&r->store.lock, flags);
+}
+
 
 struct fast_pool {
 	__u32		pool[4];
@@ -1173,8 +1262,15 @@ static void extract_buf(struct entropy_store *r, __u8 out[EXTRACT_SIZE],
 	 *
 	 * FIXME: update security analysis in light of reduced mixback.
 	 */
-	if (mixback)
-		mix_pool_bytes(r, hash.w, sizeof(hash.w));
+	if (mixback) {
+		if (r->limit) {
+			mix_pool_bytes(r, hash.w, sizeof(hash.w));
+		} else {
+			struct entropy_store_plus *p =
+			    container_of(r, struct entropy_store_plus, store);
+			nonblocking_mixback(p, hash.w, sizeof(hash.w));
+		}
+	}
 
 	memzero_explicit(workspace, sizeof(workspace));
 
