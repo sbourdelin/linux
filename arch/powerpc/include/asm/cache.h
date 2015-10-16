@@ -43,7 +43,7 @@ extern struct ppc64_caches ppc64_caches;
 
 static inline void logmpp(u64 x)
 {
-	asm volatile(PPC_LOGMPP(R1) : : "r" (x));
+	asm volatile(PPC_LOGMPP(%0) : : "r" (x));
 }
 
 #endif /* __powerpc64__ && ! __ASSEMBLY__ */

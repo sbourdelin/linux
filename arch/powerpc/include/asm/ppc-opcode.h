@@ -307,8 +307,8 @@
 #define PPC_LDARX(t, a, b, eh)	stringify_in_c(.long PPC_INST_LDARX | \
 					___PPC_RT(t) | ___PPC_RA(a) | \
 					___PPC_RB(b) | __PPC_EH(eh))
-#define PPC_LOGMPP(b)		stringify_in_c(.long PPC_INST_LOGMPP | \
-					__PPC_RB(b))
+#define PPC_LOGMPP(a)		stringify_in_c(.long PPC_INST_LOGMPP | \
+					___PPC_RA(a))
 #define PPC_LWARX(t, a, b, eh)	stringify_in_c(.long PPC_INST_LWARX | \
 					___PPC_RT(t) | ___PPC_RA(a) | \
 					___PPC_RB(b) | __PPC_EH(eh))
