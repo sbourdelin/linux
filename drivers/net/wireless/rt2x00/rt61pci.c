@@ -39,7 +39,7 @@
 /*
  * Allow hardware encryption to be disabled.
  */
-static bool modparam_nohwcrypt = false;
+static bool modparam_nohwcrypt;
 module_param_named(nohwcrypt, modparam_nohwcrypt, bool, S_IRUGO);
 MODULE_PARM_DESC(nohwcrypt, "Disable hardware encryption.");
 
@@ -1388,7 +1388,7 @@ static bool rt61pci_get_entry_state(struct queue_entry *entry)
 		rt2x00_desc_read(entry_priv->desc, 0, &word);
 
 		return (rt2x00_get_field32(word, TXD_W0_OWNER_NIC) ||
-		        rt2x00_get_field32(word, TXD_W0_VALID));
+		rt2x00_get_field32(word, TXD_W0_VALID));
 	}
 }
 
