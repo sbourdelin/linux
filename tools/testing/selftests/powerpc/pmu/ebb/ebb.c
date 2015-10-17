@@ -319,6 +319,19 @@ void ebb_global_disable(void)
 	mb();
 }
 
+#define PVR_VER(pvr)    (((pvr) >>  16) & 0xFFFF)
+bool ebb_is_supported(void)
+{
+	unsigned long pvr;
+
+	__asm__ __volatile__("mfpvr %0" : "=b"(pvr));
+	/* EBB requires at least POWER8 */
+	if (PVR_VER(pvr) >= 0x004D)
+		return true;
+
+	return false;
+}
+
 void event_ebb_init(struct event *e)
 {
 	e->attr.config |= (1ull << 63);
