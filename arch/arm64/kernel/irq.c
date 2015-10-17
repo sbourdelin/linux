@@ -30,6 +30,8 @@
 
 unsigned long irq_err_count;
 
+DEFINE_PER_CPU(void *, irq_stacks);
+
 int arch_show_interrupts(struct seq_file *p, int prec)
 {
 	show_ipi_list(p, prec);
@@ -47,9 +49,31 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
 	handle_arch_irq = handle_irq;
 }
 
+static char boot_irq_stack[IRQ_STACK_SIZE] __aligned(IRQ_STACK_SIZE);
+
 void __init init_IRQ(void)
 {
+	unsigned int cpu = smp_processor_id();
+
+	per_cpu(irq_stacks, cpu) = boot_irq_stack + IRQ_STACK_START_SP;
+
 	irqchip_init();
 	if (!handle_arch_irq)
 		panic("No interrupt controller found.");
+}
+
+int alloc_irq_stack(unsigned int cpu)
+{
+	void *stack;
+
+	if (per_cpu(irq_stacks, cpu))
+		return 0;
+
+	stack = __alloc_irq_stack();
+	if (!stack)
+		return -ENOMEM;
+
+	per_cpu(irq_stacks, cpu) = stack + IRQ_STACK_START_SP;
+
+	return 0;
 }

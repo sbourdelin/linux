@@ -91,11 +91,20 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 	int ret;
 
 	/*
-	 * We need to tell the secondary core where to find its stack and the
-	 * page tables.
+	 * We need to tell the secondary core where to find its process stack
+	 * and the page tables.
 	 */
 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
 	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
+
+	/*
+	 * Allocate IRQ stack to handle both hard and soft interrupts.
+	 */
+	ret = alloc_irq_stack(cpu);
+	if (ret) {
+		pr_crit("CPU%u: failed to allocate IRQ stack\n", cpu);
+		return ret;
+	}
 
 	/*
 	 * Now bring the CPU into our world.
