@@ -380,7 +380,7 @@ struct rt2x00_intf {
 	atomic_t seqno;
 };
 
-static inline struct rt2x00_intf* vif_to_intf(struct ieee80211_vif *vif)
+static inline struct rt2x00_intf *vif_to_intf(struct ieee80211_vif *vif)
 {
 	return (struct rt2x00_intf *)vif->drv_priv;
 }
@@ -507,7 +507,7 @@ struct rt2x00_sta {
 	int wcid;
 };
 
-static inline struct rt2x00_sta* sta_to_rt2x00_sta(struct ieee80211_sta *sta)
+static inline struct rt2x00_sta *sta_to_rt2x00_sta(struct ieee80211_sta *sta)
 {
 	return (struct rt2x00_sta *)sta->drv_priv;
 }
