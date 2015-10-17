@@ -1687,13 +1687,95 @@ static const struct address_space_operations def_blk_aops = {
 	.is_dirty_writeback = buffer_check_dirty_writeback,
 };
 
+#ifdef CONFIG_FS_DAX
+static int blkdev_dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct inode *bd_inode = file_bd_inode(vma->vm_file);
+	struct block_device *bdev = I_BDEV(bd_inode);
+	int ret;
+
+	mutex_lock(&bdev->bd_mutex);
+	ret = __dax_fault(vma, vmf, blkdev_get_block, NULL);
+	mutex_unlock(&bdev->bd_mutex);
+
+	return ret;
+}
+
+static int blkdev_dax_pmd_fault(struct vm_area_struct *vma, unsigned long addr,
+		pmd_t *pmd, unsigned int flags)
+{
+	struct inode *bd_inode = file_bd_inode(vma->vm_file);
+	struct block_device *bdev = I_BDEV(bd_inode);
+	int ret;
+
+	mutex_lock(&bdev->bd_mutex);
+	ret = __dax_pmd_fault(vma, addr, pmd, flags, blkdev_get_block, NULL);
+	mutex_unlock(&bdev->bd_mutex);
+
+	return ret;
+}
+
+static int blkdev_dax_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct inode *bd_inode = file_bd_inode(vma->vm_file);
+	struct block_device *bdev = I_BDEV(bd_inode);
+	int ret;
+
+	mutex_lock(&bdev->bd_mutex);
+	ret = __dax_mkwrite(vma, vmf, blkdev_get_block, NULL);
+	mutex_unlock(&bdev->bd_mutex);
+
+	return ret;
+}
+
+static int blkdev_dax_pfn_mkwrite(struct vm_area_struct *vma,
+		struct vm_fault *vmf)
+{
+	struct inode *bd_inode = file_bd_inode(vma->vm_file);
+	struct block_device *bdev = I_BDEV(bd_inode);
+	int ret = VM_FAULT_NOPAGE;
+	loff_t size;
+
+	/* check that the faulting page hasn't raced with bdev resize */
+	mutex_lock(&bdev->bd_mutex);
+	size = (i_size_read(bd_inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (vmf->pgoff >= size)
+		ret = VM_FAULT_SIGBUS;
+	mutex_unlock(&bdev->bd_mutex);
+
+	return ret;
+}
+
+static const struct vm_operations_struct blkdev_dax_vm_ops = {
+	.fault		= blkdev_dax_fault,
+	.pmd_fault	= blkdev_dax_pmd_fault,
+	.page_mkwrite	= blkdev_dax_mkwrite,
+	.pfn_mkwrite	= blkdev_dax_pfn_mkwrite,
+};
+
+static int blkdev_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct inode *bd_inode = file_bd_inode(file);
+
+	if (!IS_DAX(bd_inode))
+		return generic_file_mmap(file, vma);
+
+	file_accessed(file);
+	vma->vm_ops = &blkdev_dax_vm_ops;
+	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
+	return 0;
+}
+#else
+#define blkdev_mmap generic_file_mmap
+#endif
+
 const struct file_operations def_blk_fops = {
 	.open		= blkdev_open,
 	.release	= blkdev_close,
 	.llseek		= block_llseek,
 	.read_iter	= blkdev_read_iter,
 	.write_iter	= blkdev_write_iter,
-	.mmap		= generic_file_mmap,
+	.mmap		= blkdev_mmap,
 	.fsync		= blkdev_fsync,
 	.unlocked_ioctl	= block_ioctl,
 #ifdef CONFIG_COMPAT
