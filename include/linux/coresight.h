@@ -209,6 +209,9 @@ struct coresight_ops_link {
  *			is associated to.
  * @trace_id:		returns the value of the component's trace ID as known
 			to the HW.
+ * @perf_start:		operations to be done before a tracer can be used.
+ * @perf_stop:		operations to be done when a tracer is
+ *			no longer needed.
  * @perf_get_config:	builds the ETM configuration after event' specifics.
  * @perf_set_config:	associate a tracer with a configuration..
  * @perf_enable:	enables tracing for a source, from Perf.
@@ -219,6 +222,8 @@ struct coresight_ops_link {
 struct coresight_ops_source {
 	int (*cpu_id)(struct coresight_device *csdev);
 	int (*trace_id)(struct coresight_device *csdev);
+	int (*perf_start)(struct coresight_device *csdev);
+	int (*perf_stop)(struct coresight_device *csdev);
 	void *(*perf_get_config)(struct coresight_device *csdev,
 				 struct perf_event *event);
 	void (*perf_set_config)(struct coresight_device *csdev, void *config);

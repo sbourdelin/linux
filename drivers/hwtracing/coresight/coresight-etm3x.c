@@ -459,6 +459,16 @@ static int etm_trace_id(struct coresight_device *csdev)
 	return etm_get_trace_id(drvdata);
 }
 
+static int perf_etm_start(struct coresight_device *csdev)
+{
+	return pm_runtime_get_sync(csdev->dev.parent);
+}
+
+static int perf_etm_stop(struct coresight_device *csdev)
+{
+	return pm_runtime_put(csdev->dev.parent);
+}
+
 static void *perf_etm_get_config(struct coresight_device *csdev,
 				 struct perf_event *event)
 {
@@ -625,6 +635,8 @@ static void sysfs_etm_disable(struct coresight_device *csdev)
 static const struct coresight_ops_source etm_source_ops = {
 	.cpu_id			= etm_cpu_id,
 	.trace_id		= etm_trace_id,
+	.perf_start		= perf_etm_start,
+	.perf_stop		= perf_etm_stop,
 	.perf_get_config	= perf_etm_get_config,
 	.perf_set_config	= perf_etm_set_config,
 	.perf_enable		= perf_etm_enable,
