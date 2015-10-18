@@ -30,9 +30,10 @@
  * SOFTWARE.
  */
 
+#include <linux/export.h>
 #include <linux/mlx5/driver.h>
+#include <linux/mlx5/transobj.h>
 #include "mlx5_core.h"
-#include "transobj.h"
 
 int mlx5_alloc_transport_domain(struct mlx5_core_dev *dev, u32 *tdn)
 {
@@ -83,6 +84,7 @@ int mlx5_core_create_rq(struct mlx5_core_dev *dev, u32 *in, int inlen, u32 *rqn)
 
 	return err;
 }
+EXPORT_SYMBOL(mlx5_core_create_rq);
 
 int mlx5_core_modify_rq(struct mlx5_core_dev *dev, u32 rqn, u32 *in, int inlen)
 {
@@ -94,6 +96,7 @@ int mlx5_core_modify_rq(struct mlx5_core_dev *dev, u32 rqn, u32 *in, int inlen)
 	memset(out, 0, sizeof(out));
 	return mlx5_cmd_exec_check_status(dev, in, inlen, out, sizeof(out));
 }
+EXPORT_SYMBOL(mlx5_core_modify_rq);
 
 void mlx5_core_destroy_rq(struct mlx5_core_dev *dev, u32 rqn)
 {
@@ -107,6 +110,7 @@ void mlx5_core_destroy_rq(struct mlx5_core_dev *dev, u32 rqn)
 
 	mlx5_cmd_exec_check_status(dev, in, sizeof(in), out, sizeof(out));
 }
+EXPORT_SYMBOL(mlx5_core_destroy_rq);
 
 int mlx5_core_create_sq(struct mlx5_core_dev *dev, u32 *in, int inlen, u32 *sqn)
 {
@@ -386,6 +390,7 @@ int mlx5_core_create_rqt(struct mlx5_core_dev *dev, u32 *in, int inlen,
 
 	return err;
 }
+EXPORT_SYMBOL(mlx5_core_create_rqt);
 
 int mlx5_core_modify_rqt(struct mlx5_core_dev *dev, u32 rqtn, u32 *in,
 			 int inlen)
@@ -411,3 +416,4 @@ void mlx5_core_destroy_rqt(struct mlx5_core_dev *dev, u32 rqtn)
 
 	mlx5_cmd_exec_check_status(dev, in, sizeof(in), out, sizeof(out));
 }
+EXPORT_SYMBOL(mlx5_core_destroy_rqt);
