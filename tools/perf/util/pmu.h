@@ -35,6 +35,7 @@ struct perf_pmu_info {
 };
 
 #define UNIT_MAX_LEN	31 /* max length for event unit name */
+#define EVENT_SOURCE_DEVICE_PATH "/bus/event_source/devices/"
 
 struct perf_pmu_alias {
 	char *name;
