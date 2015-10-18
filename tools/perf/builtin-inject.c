@@ -97,7 +97,7 @@ static int perf_event__repipe_attr(struct perf_tool *tool,
 	return perf_event__repipe_synth(tool, event);
 }
 
-#ifdef HAVE_AUXTRACE_SUPPORT_X86
+#if defined(HAVE_AUXTRACE_SUPPORT_X86) || defined(HAVE_AUXTRACE_SUPPORT_ARM)
 
 static int copy_bytes(struct perf_inject *inject, int fd, off_t size)
 {

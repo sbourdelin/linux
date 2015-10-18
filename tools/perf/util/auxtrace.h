@@ -313,7 +313,7 @@ struct auxtrace_record {
 	unsigned int alignment;
 };
 
-#ifdef HAVE_AUXTRACE_SUPPORT_X86
+#if defined(HAVE_AUXTRACE_SUPPORT_X86) || defined(HAVE_AUXTRACE_SUPPORT_ARM)
 
 /*
  * In snapshot mode the mmapped page is read-only which makes using
