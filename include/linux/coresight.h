@@ -209,12 +209,17 @@ struct coresight_ops_link {
  *			is associated to.
  * @trace_id:		returns the value of the component's trace ID as known
 			to the HW.
+ * @perf_get_config:	builds the ETM configuration after event' specifics.
+ * @perf_set_config:	associate a tracer with a configuration..
  * @sysfs_enable:	enables tracing for a source, from sysFS.
  * @sysfs_disable:	disables tracing for a source, from sysFS.
  */
 struct coresight_ops_source {
 	int (*cpu_id)(struct coresight_device *csdev);
 	int (*trace_id)(struct coresight_device *csdev);
+	void *(*perf_get_config)(struct coresight_device *csdev,
+				 struct perf_event *event);
+	void (*perf_set_config)(struct coresight_device *csdev, void *config);
 	int (*sysfs_enable)(struct coresight_device *csdev);
 	void (*sysfs_disable)(struct coresight_device *csdev);
 };
