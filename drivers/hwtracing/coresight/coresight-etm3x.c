@@ -320,7 +320,7 @@ int etm_get_trace_id(struct etm_drvdata *drvdata)
 	if (!drvdata)
 		goto out;
 
-	if (!drvdata->enable)
+	if (!local_read(&drvdata->state))
 		return drvdata->traceid;
 
 	pm_runtime_get_sync(drvdata->dev);
@@ -354,6 +354,12 @@ static int sysfs_etm_enable(struct coresight_device *csdev)
 	pm_runtime_get_sync(csdev->dev.parent);
 	spin_lock(&drvdata->spinlock);
 
+	if (local_cmpxchg(&drvdata->state,
+			  ETM_STATE_DISABLED, ETM_STATE_SYSFS)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
 	/*
 	 * Configure the ETM only if the CPU is online.  If it isn't online
 	 * hw configuration will take place when 'CPU_STARTING' is received
@@ -366,17 +372,20 @@ static int sysfs_etm_enable(struct coresight_device *csdev)
 			goto err;
 	}
 
-	drvdata->enable = true;
 	drvdata->sticky_enable = true;
 
 	spin_unlock(&drvdata->spinlock);
 
 	dev_info(drvdata->dev, "ETM tracing enabled\n");
 	return 0;
-err:
+out:
 	spin_unlock(&drvdata->spinlock);
 	pm_runtime_put(csdev->dev.parent);
 	return ret;
+
+err:
+	local_set(&drvdata->state, ETM_STATE_DISABLED);
+	goto out;
 }
 
 static void etm_disable_hw(void *info)
@@ -425,7 +434,7 @@ static void sysfs_etm_disable(struct coresight_device *csdev)
 	 * ensures that register writes occur when cpu is powered.
 	 */
 	smp_call_function_single(drvdata->cpu, etm_disable_hw, drvdata, 1);
-	drvdata->enable = false;
+	local_set(&drvdata->state, ETM_STATE_DISABLED);
 
 	spin_unlock(&drvdata->spinlock);
 	put_online_cpus();
@@ -460,7 +469,7 @@ static int etm_cpu_callback(struct notifier_block *nfb, unsigned long action,
 			etmdrvdata[cpu]->os_unlock = true;
 		}
 
-		if (etmdrvdata[cpu]->enable)
+		if (local_read(&etmdrvdata[cpu]->state))
 			etm_enable_hw(etmdrvdata[cpu]);
 		spin_unlock(&etmdrvdata[cpu]->spinlock);
 		break;
@@ -473,7 +482,7 @@ static int etm_cpu_callback(struct notifier_block *nfb, unsigned long action,
 
 	case CPU_DYING:
 		spin_lock(&etmdrvdata[cpu]->spinlock);
-		if (etmdrvdata[cpu]->enable)
+		if (local_read(&etmdrvdata[cpu]->state))
 			etm_disable_hw(etmdrvdata[cpu]);
 		spin_unlock(&etmdrvdata[cpu]->spinlock);
 		break;

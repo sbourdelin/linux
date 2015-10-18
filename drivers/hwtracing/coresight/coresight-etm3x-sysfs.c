@@ -811,7 +811,7 @@ static ssize_t cntr_val_show(struct device *dev,
 	if (WARN_ON_ONCE(!config))
 		return -EINVAL;
 
-	if (!drvdata->enable) {
+	if (!local_read(&drvdata->state)) {
 		spin_lock(&drvdata->spinlock);
 		for (i = 0; i < drvdata->nr_cntr; i++)
 			ret += sprintf(buf, "counter %d: %x\n",
@@ -1072,7 +1072,7 @@ static ssize_t seq_curr_state_show(struct device *dev,
 	if (WARN_ON_ONCE(!config))
 		return -EINVAL;
 
-	if (!drvdata->enable) {
+	if (!local_read(&drvdata->state)) {
 		val = config->seq_curr_state;
 		goto out;
 	}
