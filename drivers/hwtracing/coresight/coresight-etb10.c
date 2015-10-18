@@ -84,7 +84,7 @@ struct etb_drvdata {
 	struct coresight_device	*csdev;
 	struct miscdevice	miscdev;
 	spinlock_t		spinlock;
-	atomic_t		in_use;
+	local_t			in_use;
 	u8			*buf;
 	u32			buffer_depth;
 	bool			enable;
@@ -281,7 +281,7 @@ static int etb_open(struct inode *inode, struct file *file)
 	struct etb_drvdata *drvdata = container_of(file->private_data,
 						   struct etb_drvdata, miscdev);
 
-	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
+	if (local_cmpxchg(&drvdata->in_use, 0, 1))
 		return -EBUSY;
 
 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
@@ -317,7 +317,7 @@ static int etb_release(struct inode *inode, struct file *file)
 {
 	struct etb_drvdata *drvdata = container_of(file->private_data,
 						   struct etb_drvdata, miscdev);
-	atomic_set(&drvdata->in_use, 0);
+	local_set(&drvdata->in_use, 0);
 
 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
 	return 0;
