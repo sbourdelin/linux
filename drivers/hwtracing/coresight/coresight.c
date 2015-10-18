@@ -212,8 +212,8 @@ static int coresight_enable_source(struct coresight_device *csdev)
 	}
 
 	if (!csdev->enable) {
-		if (source_ops(csdev)->enable) {
-			ret = source_ops(csdev)->enable(csdev);
+		if (source_ops(csdev)->sysfs_enable) {
+			ret = source_ops(csdev)->sysfs_enable(csdev);
 			if (ret)
 				return ret;
 		}
@@ -228,8 +228,8 @@ static int coresight_enable_source(struct coresight_device *csdev)
 static void coresight_disable_source(struct coresight_device *csdev)
 {
 	if (atomic_dec_return(csdev->refcnt) == 0) {
-		if (source_ops(csdev)->disable) {
-			source_ops(csdev)->disable(csdev);
+		if (source_ops(csdev)->sysfs_disable) {
+			source_ops(csdev)->sysfs_disable(csdev);
 			csdev->enable = false;
 		}
 	}

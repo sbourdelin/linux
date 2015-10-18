@@ -205,15 +205,15 @@ struct coresight_ops_link {
 /**
  * struct coresight_ops_source - basic operations for a source
  * Operations available for sources.
- * @trace_id:	returns the value of the component's trace ID as known
-		to the HW.
- * @enable:	enables tracing for a source.
- * @disable:	disables tracing for a source.
+ * @trace_id:		returns the value of the component's trace ID as known
+			to the HW.
+ * @sysfs_enable:	enables tracing for a source, from sysFS.
+ * @sysfs_disable:	disables tracing for a source, from sysFS.
  */
 struct coresight_ops_source {
 	int (*trace_id)(struct coresight_device *csdev);
-	int (*enable)(struct coresight_device *csdev);
-	void (*disable)(struct coresight_device *csdev);
+	int (*sysfs_enable)(struct coresight_device *csdev);
+	void (*sysfs_disable)(struct coresight_device *csdev);
 };
 
 struct coresight_ops {
