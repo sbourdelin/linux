@@ -479,5 +479,12 @@ out:
 }
 module_init(init_pstore_fs)
 
+static void __exit exit_pstore_fs(void)
+{
+	unregister_filesystem(&pstore_fs_type);
+	sysfs_remove_mount_point(fs_kobj, "pstore");
+}
+module_exit(exit_pstore_fs)
+
 MODULE_AUTHOR("Tony Luck <tony.luck@intel.com>");
 MODULE_LICENSE("GPL");
