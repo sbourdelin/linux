@@ -176,6 +176,10 @@ static ssize_t mode_store(struct device *dev,
 		config->ctrl |= ETMCR_CTXID_SIZE;
 	else
 		config->ctrl &= ~ETMCR_CTXID_SIZE;
+
+	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+		etm_config_trace_mode(drvdata, config, config->mode);
+
 	spin_unlock(&drvdata->spinlock);
 
 	return size;
