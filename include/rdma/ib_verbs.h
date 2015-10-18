@@ -1354,6 +1354,21 @@ struct ib_wq_attr {
 	enum	ib_wq_state	curr_wq_state;
 };
 
+struct ib_rwq_ind_table {
+	struct ib_device	*device;
+	struct ib_uobject      *uobject;
+	atomic_t		usecnt;
+	u32		ind_tbl_num;
+	u32		log_ind_tbl_size;
+	struct ib_wq	**ind_tbl;
+};
+
+struct ib_rwq_ind_table_init_attr {
+	u32		log_ind_tbl_size;
+	/* Each entry is a pointer to Receive Work Queue */
+	struct ib_wq	**ind_tbl;
+};
+
 struct ib_qp {
 	struct ib_device       *device;
 	struct ib_pd	       *pd;
@@ -1823,6 +1838,11 @@ struct ib_device {
 						struct ib_wq_attr *attr,
 						enum ib_wq_attr_mask attr_mask,
 						struct ib_udata *udata);
+	struct ib_rwq_ind_table *  (*create_rwq_ind_table)(struct ib_device *device,
+							   struct ib_rwq_ind_table_init_attr *init_attr,
+							   struct ib_udata *udata);
+	int			   (*destroy_rwq_ind_table)(struct ib_rwq_ind_table *wq_ind_table);
+
 
 	struct ib_dma_mapping_ops   *dma_ops;
 
@@ -3080,5 +3100,9 @@ struct ib_wq *ib_create_wq(struct ib_pd *pd,
 int ib_destroy_wq(struct ib_wq *wq);
 int ib_modify_wq(struct ib_wq *wq, struct ib_wq_attr *attr,
 		 enum ib_wq_attr_mask attr_mask);
+struct ib_rwq_ind_table *ib_create_rwq_ind_table(struct ib_device *device,
+						 struct ib_rwq_ind_table_init_attr*
+						 wq_ind_table_init_attr);
+int ib_destroy_rwq_ind_table(struct ib_rwq_ind_table *wq_ind_table);
 
 #endif /* IB_VERBS_H */
