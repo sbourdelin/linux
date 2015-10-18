@@ -187,10 +187,13 @@ struct coresight_device {
  * Operations available for sinks
  * @enable:	enables the sink.
  * @disable:	disables the sink.
+ * @setup_aux:	initialises perf's ring buffer for trace collection.
  */
 struct coresight_ops_sink {
 	int (*enable)(struct coresight_device *csdev);
 	void (*disable)(struct coresight_device *csdev);
+	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
+			   void **pages, int nr_pages, bool overwrite);
 };
 
 /**
