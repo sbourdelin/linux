@@ -74,7 +74,7 @@ static int fill_message(struct snd_rawmidi_substream *substream, u8 *buf)
 	/* On exclusive message. */
 	if (tscm->on_sysex[port]) {
 		/* Seek the end of exclusives. */
-		for (i = 1; i < 4 || i < len; ++i) {
+		for (i = 1; i < len + 1; ++i) {
 			if (buf[i] == 0xf7) {
 				tscm->on_sysex[port] = false;
 				break;
