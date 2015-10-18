@@ -88,11 +88,6 @@ APICs
 
 Timing
 
-  notsc
-  Don't use the CPU time stamp counter to read the wall time.
-  This can be used to work around timing problems on multiprocessor systems
-  with not properly synchronized CPUs.
-
   nohpet
   Don't use the HPET timer.
 
