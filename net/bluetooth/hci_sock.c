@@ -869,6 +869,18 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 		atomic_inc(&monitor_promisc);
 		break;
 
+	case HCI_CHANNEL_LOGGING:
+		if (haddr.hci_dev != HCI_DEV_NONE) {
+			err = -EINVAL;
+			goto done;
+		}
+
+		if (!capable(CAP_NET_ADMIN)) {
+			err = -EPERM;
+			goto done;
+		}
+		break;
+
 	default:
 		if (!hci_mgmt_chan_find(haddr.hci_channel)) {
 			err = -EINVAL;
@@ -993,7 +1005,10 @@ static int hci_sock_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
-	if (flags & (MSG_OOB))
+	if (flags & MSG_OOB)
+		return -EOPNOTSUPP;
+
+	if (hci_pi(sk)->channel == HCI_CHANNEL_LOGGING)
 		return -EOPNOTSUPP;
 
 	if (sk->sk_state == BT_CLOSED)
@@ -1142,6 +1157,72 @@ done:
 	return err;
 }
 
+static int hci_logging_frame(struct sock *sk, struct msghdr *msg, int len)
+{
+	struct hci_mon_hdr *hdr;
+	struct sk_buff *skb;
+	struct hci_dev *hdev;
+	u16 index;
+	int err;
+
+	if (len < sizeof(*hdr))
+		return -EINVAL;
+
+	skb = bt_skb_send_alloc(sk, len, msg->msg_flags & MSG_DONTWAIT, &err);
+	if (!skb)
+		return err;
+
+	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+		err = -EFAULT;
+		goto drop;
+	}
+
+	hdr = (void *)skb->data;
+
+	if (skb->data[len - 1] != 0x00) {
+		err = -EINVAL;
+		goto drop;
+	}
+
+	if (__le16_to_cpu(hdr->len) != len - sizeof(*hdr)) {
+		err = -EINVAL;
+		goto drop;
+	}
+
+	switch (__le16_to_cpu(hdr->opcode)) {
+	case HCI_MON_USER_DEBUG:
+	case HCI_MON_USER_INFO:
+	case HCI_MON_USER_WARN:
+	case HCI_MON_USER_ERROR:
+		break;
+	default:
+		err = -EINVAL;
+		goto drop;
+	}
+
+	index = __le16_to_cpu(hdr->index);
+
+	if (index != MGMT_INDEX_NONE) {
+		hdev = hci_dev_get(index);
+		if (!hdev) {
+			err = -ENODEV;
+			goto drop;
+		}
+	} else {
+		hdev = NULL;
+	}
+
+	hci_send_to_channel(HCI_CHANNEL_MONITOR, skb, HCI_SOCK_TRUSTED, NULL);
+	err = len;
+
+	if (hdev)
+		hci_dev_put(hdev);
+
+drop:
+	kfree_skb(skb);
+	return err;
+}
+
 static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 			    size_t len)
 {
@@ -1170,6 +1251,9 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 		break;
 	case HCI_CHANNEL_MONITOR:
 		err = -EOPNOTSUPP;
+		goto done;
+	case HCI_CHANNEL_LOGGING:
+		err = hci_logging_frame(sk, msg, len);
 		goto done;
 	default:
 		mutex_lock(&mgmt_chan_list_lock);
