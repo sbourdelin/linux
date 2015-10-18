@@ -46,11 +46,26 @@ struct perf_session;
 struct perf_event_attr;
 struct perf_pmu;
 
+#ifdef HAVE_AUXTRACE_SUPPORT_X86
 struct auxtrace_record *intel_pt_recording_init(int *err);
 
 int intel_pt_process_auxtrace_info(union perf_event *event,
 				   struct perf_session *session);
 
 struct perf_event_attr *intel_pt_pmu_default_config(struct perf_pmu *pmu);
+#else
+static inline
+struct auxtrace_record *intel_pt_recording_init(int *err __maybe_unused)
+{ return NULL; }
+
+static inline
+int intel_pt_process_auxtrace_info(union perf_event *event __maybe_unused,
+				   struct perf_session *session __maybe_unused)
+{ return -EINVAL; }
+
+static inline struct perf_event_attr
+*intel_pt_pmu_default_config(struct perf_pmu *pmu __maybe_unused)
+{ return NULL; }
+#endif
 
 #endif

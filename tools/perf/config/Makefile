@@ -635,7 +635,8 @@ ifndef NO_AUXTRACE
     NO_AUXTRACE := 1
   else
     $(call detected,CONFIG_AUXTRACE)
-    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
+    $(call detected,CONFIG_AUXTRACE_X86)
+    CFLAGS += -DHAVE_AUXTRACE_SUPPORT_X86
   endif
 endif
 

@@ -141,7 +141,7 @@ static void record__sig_exit(void)
 	raise(signr);
 }
 
-#ifdef HAVE_AUXTRACE_SUPPORT
+#ifdef HAVE_AUXTRACE_SUPPORT_X86
 
 static int record__process_auxtrace(struct perf_tool *tool,
 				    union perf_event *event, void *data1,

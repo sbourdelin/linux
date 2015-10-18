@@ -35,9 +35,20 @@ struct perf_tool;
 union perf_event;
 struct perf_session;
 
+#ifdef HAVE_AUXTRACE_SUPPORT_X86
 struct auxtrace_record *intel_bts_recording_init(int *err);
 
 int intel_bts_process_auxtrace_info(union perf_event *event,
 				    struct perf_session *session);
+#else
+static inline
+struct auxtrace_record *intel_bts_recording_init(int *err __maybe_unused)
+{ return NULL; }
+
+static inline int
+intel_bts_process_auxtrace_info(union perf_event *event __maybe_unused,
+				struct perf_session *session __maybe_unused)
+{ return -EINVAL; }
+#endif
 
 #endif
