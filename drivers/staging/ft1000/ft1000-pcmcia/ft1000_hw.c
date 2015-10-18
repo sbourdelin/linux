@@ -1531,7 +1531,7 @@ static int ft1000_copy_up_pkt(struct net_device *dev)
 			tempword = ft1000_read_reg(dev, FT1000_REG_DFIFO);
 			*pbuffer++ = (u8) (tempword >> 8);
 			*pbuffer++ = (u8)tempword;
-			if (ft1000_chkcard(dev) == false) {
+			if (!ft1000_chkcard(dev)) {
 				kfree_skb(skb);
 				return FAILURE;
 			}
@@ -1822,7 +1822,7 @@ static irqreturn_t ft1000_interrupt(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
-	if (ft1000_chkcard(dev) == false) {
+	if (!ft1000_chkcard(dev)) {
 		ft1000_disable_interrupts(dev);
 		return IRQ_HANDLED;
 	}

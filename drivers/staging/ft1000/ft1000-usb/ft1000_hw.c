@@ -1465,7 +1465,7 @@ int ft1000_poll(void *dev_id)
 	u16 modulo;
 	u16 portid;
 
-	if (ft1000_chkcard(dev) == FALSE) {
+	if (!ft1000_chkcard(dev)) {
 		pr_debug("failed\n");
 		return -1;
 	}
