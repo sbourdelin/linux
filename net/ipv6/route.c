@@ -1774,16 +1774,7 @@ int ip6_route_info_create(struct fib6_config *cfg, struct rt6_info **rt_ret)
 		cfg->fc_metric = IP6_RT_PRIO_USER;
 
 	err = -ENOBUFS;
-	if (cfg->fc_nlinfo.nlh &&
-	    !(cfg->fc_nlinfo.nlh->nlmsg_flags & NLM_F_CREATE)) {
-		table = fib6_get_table(net, cfg->fc_table);
-		if (!table) {
-			pr_warn("NLM_F_CREATE should be specified when creating new route\n");
-			table = fib6_new_table(net, cfg->fc_table);
-		}
-	} else {
-		table = fib6_new_table(net, cfg->fc_table);
-	}
+	table = fib6_new_table(net, cfg->fc_table);
 
 	if (!table)
 		goto out;
