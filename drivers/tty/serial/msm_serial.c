@@ -23,7 +23,6 @@
 #include <linux/dma-mapping.h>
 #include <linux/dmaengine.h>
 #include <linux/hrtimer.h>
-#include <linux/module.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
 #include <linux/irq.h>
@@ -1601,15 +1600,6 @@ static int msm_serial_probe(struct platform_device *pdev)
 	return uart_add_one_port(&msm_uart_driver, port);
 }
 
-static int msm_serial_remove(struct platform_device *pdev)
-{
-	struct uart_port *port = platform_get_drvdata(pdev);
-
-	uart_remove_one_port(&msm_uart_driver, port);
-
-	return 0;
-}
-
 static const struct of_device_id msm_match_table[] = {
 	{ .compatible = "qcom,msm-uart" },
 	{ .compatible = "qcom,msm-uartdm" },
@@ -1617,11 +1607,11 @@ static const struct of_device_id msm_match_table[] = {
 };
 
 static struct platform_driver msm_platform_driver = {
-	.remove = msm_serial_remove,
 	.probe = msm_serial_probe,
 	.driver = {
-		.name = "msm_serial",
-		.of_match_table = msm_match_table,
+		.name			= "msm_serial",
+		.of_match_table		= msm_match_table,
+		.suppress_bind_attrs	= true,
 	},
 };
 
@@ -1641,16 +1631,4 @@ static int __init msm_serial_init(void)
 
 	return ret;
 }
-
-static void __exit msm_serial_exit(void)
-{
-	platform_driver_unregister(&msm_platform_driver);
-	uart_unregister_driver(&msm_uart_driver);
-}
-
-module_init(msm_serial_init);
-module_exit(msm_serial_exit);
-
-MODULE_AUTHOR("Robert Love <rlove@google.com>");
-MODULE_DESCRIPTION("Driver for msm7x serial device");
-MODULE_LICENSE("GPL");
+device_initcall(msm_serial_init);
