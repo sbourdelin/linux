@@ -3693,6 +3693,62 @@ DECLARE_PCI_FIXUP_CLASS_EARLY(0x1797, 0x6869, PCI_CLASS_NOT_DEFINED, 8,
 			      quirk_tw686x_class);
 
 /*
+ * Some devices violate the PCI Specification regarding echoing the Root
+ * Port Transaction Layer Packet Request (TLP) No Snoop and Relaxed
+ * Ordering Attributes into the TLP Response.  The PCI Specification
+ * "encourages" compliant Root Port implementation to drop such malformed
+ * TLP Responses leading to device access timeouts.  Many Root Port
+ * implementations accept such malformed TLP Responses and a few more strict
+ * implementations do drop them.
+ *
+ * For devices which fail this part of the PCI Specification, we need to
+ * traverse up the PCI Chain to the Root Port and turn off the Enable No
+ * Snoop and Enable Relaxed Ordering bits in the Root Port's PCI-Express
+ * Device Control register.  This does affect all other devices which are
+ * downstream of that Root Port but since No Snoop and Relaxed ordering are
+ * "Performance Hints," we're okay with that ...
+ *
+ * Note that Configuration Space accesses are never supposed to have TLP
+ * Attributes, so we're safe waiting till after any Configuration Space
+ * accesses to do the Root Port "fixup" ...
+ */
+static void quirk_disable_root_port_attributes(struct pci_dev *pdev)
+{
+	struct pci_dev *root_port = pci_find_root_pcie_port(pdev);
+
+	if (!root_port) {
+		dev_warn(&pdev->dev, "Can't find Root Port to disable No Snoop/Relaxed Ordering\n");
+		return;
+	}
+
+	dev_info(&pdev->dev, "Disabling No Snoop/Relaxed Ordering on Root Port %s\n",
+		 dev_name(&root_port->dev));
+	pcie_capability_clear_and_set_word(root_port,
+					   PCI_EXP_DEVCTL,
+					   PCI_EXP_DEVCTL_RELAX_EN |
+					   PCI_EXP_DEVCTL_NOSNOOP_EN,
+					   0);
+}
+
+/*
+ * The Chelsio T5 chip fails to return the Root Port's TLP Attributes in
+ * its TLP responses to the Root Port.
+ */
+static void quirk_chelsio_T5_disable_root_port_attributes(struct pci_dev *pdev)
+{
+	/*
+	 * This mask/compare operation selects for Physical Function 4 on a
+	 * T5.  We only need to fix up the Root Port once for any of the
+	 * PFs.  PF[0..3] have PCI Device IDs of 0x50xx, but PF4 is uniquely
+	 * 0x54xx so we use that one,
+	 */
+	if ((pdev->device & 0xff00) == 0x5400)
+		quirk_disable_root_port_attributes(pdev);
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CHELSIO, PCI_ANY_ID,
+			 quirk_chelsio_T5_disable_root_port_attributes);
+
+/*
  * AMD has indicated that the devices below do not support peer-to-peer
  * in any system where they are found in the southbridge with an AMD
  * IOMMU in the system.  Multifunction devices that do not support

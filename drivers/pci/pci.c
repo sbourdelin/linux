@@ -459,6 +459,34 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev,
 EXPORT_SYMBOL(pci_find_parent_resource);
 
 /**
+ * pci_find_root_pcie_port - return PCI-E Root Port
+ * @dev: PCI device to query
+ *
+ * Traverses up the parent chain and return the PCI-E Root Port PCI Device
+ * for a given PCI Device.
+ */
+struct pci_dev *pci_find_root_pcie_port(const struct pci_dev *dev)
+{
+	struct pci_bus *bus = dev->bus;
+	struct pci_dev *highest_pcie_bridge = NULL;
+
+	while (bus) {
+		struct pci_dev *bridge = bus->self;
+
+		if (!bridge || !bridge->pcie_cap)
+			break;
+		highest_pcie_bridge = bridge;
+		bus = bus->parent;
+	}
+
+	if (!highest_pcie_bridge)
+		dev_warn(&dev->dev, "Can't find Root Port\n");
+
+	return highest_pcie_bridge;
+}
+EXPORT_SYMBOL(pci_find_root_pcie_port);
+
+/**
  * pci_wait_for_pending - wait for @mask bit(s) to clear in status word @pos
  * @dev: the PCI device to operate on
  * @pos: config space offset of status word
