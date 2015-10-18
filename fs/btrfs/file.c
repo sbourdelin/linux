@@ -1316,6 +1316,7 @@ static noinline int prepare_pages(struct inode *inode, struct page **pages,
 	int faili;
 
 	for (i = 0; i < num_pages; i++) {
+again:
 		pages[i] = find_or_create_page(inode->i_mapping, index + i,
 					       mask | __GFP_WRITE);
 		if (!pages[i]) {
@@ -1330,6 +1331,21 @@ static noinline int prepare_pages(struct inode *inode, struct page **pages,
 		if (i == num_pages - 1)
 			err = prepare_uptodate_page(pages[i],
 						    pos + write_bytes, false);
+
+		/*
+		 * When reading the page from the disk, we can race
+		 * with direct i/o which can get the page lock (before
+		 * prepare_uptodate_page() gets it) and can go ahead
+		 * and invalidate the page. Hence if the page is found
+		 * to be not belonging to the inode's address space,
+		 * retry the operation of getting a page.
+		 */
+		if (unlikely(pages[i]->mapping != inode->i_mapping)) {
+			unlock_page(pages[i]);
+			page_cache_release(pages[i]);
+			goto again;
+		}
+
 		if (err) {
 			page_cache_release(pages[i]);
 			faili = i - 1;
