@@ -15,6 +15,7 @@
 
 #include <linux/device.h>
 #include <linux/sched.h>
+#include <linux/perf_event.h>
 
 /* Peripheral id registers (0xFD0-0xFEC) */
 #define CORESIGHT_PERIPHIDR4	0xfd0
@@ -188,12 +189,20 @@ struct coresight_device {
  * @enable:	enables the sink.
  * @disable:	disables the sink.
  * @setup_aux:	initialises perf's ring buffer for trace collection.
+ * @set_buffer:	initialises buffer mechanic before a trace session.
+ * @reset_buffer: finalises buffer mechanic after a trace session.
  */
 struct coresight_ops_sink {
 	int (*enable)(struct coresight_device *csdev);
 	void (*disable)(struct coresight_device *csdev);
 	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
 			   void **pages, int nr_pages, bool overwrite);
+	int (*set_buffer)(struct coresight_device *csdev,
+			  struct perf_output_handle *handle,
+			  void *sink_config);
+	void (*reset_buffer)(struct coresight_device *csdev,
+			     struct perf_output_handle *handle,
+			     void *sink_config);
 };
 
 /**

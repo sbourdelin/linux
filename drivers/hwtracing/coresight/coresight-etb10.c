@@ -28,6 +28,7 @@
 #include <linux/amba/bus.h>
 #include <linux/clk.h>
 #include <linux/mm.h>
+#include <linux/perf_event.h>
 
 #include <asm/local.h>
 
@@ -306,10 +307,67 @@ static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
 	return buf;
 }
 
+static int etb_set_buffer(struct coresight_device *csdev,
+			  struct perf_output_handle *handle,
+			  void *sink_config)
+{
+	int ret = 0;
+	unsigned long head;
+	struct cs_buffers *buf = sink_config;
+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	/* This sink can only be used by a single session */
+	if (local_xchg(&drvdata->in_use, 1))
+		return -EBUSY;
+
+	/* how much space do we have in this session */
+	buf->size = handle->size;
+
+	/* wrap head around to the amount of space we have */
+	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
+
+	/* find the page to write to */
+	buf->cur = head / PAGE_SIZE;
+
+	/* and offset within that page */
+	buf->offset = head % PAGE_SIZE;
+
+	local_set(&buf->head, head);
+	local_set(&buf->data_size, 0);
+
+	return ret;
+}
+
+static void etb_reset_buffer(struct coresight_device *csdev,
+			     struct perf_output_handle *handle,
+			     void *sink_config)
+{
+	struct cs_buffers *buf = sink_config;
+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	if (buf) {
+		/*
+		 * In snapshot mode ->data_size holds the new address of the
+		 * ring buffer's head.  The size itself is the whole address
+		 * range since we want the latest information.
+		 */
+		if (buf->snapshot)
+			handle->head = local_xchg(&buf->data_size,
+						  buf->nr_pages << PAGE_SHIFT);
+
+		perf_aux_output_end(handle, local_xchg(&buf->data_size, 0),
+				    local_xchg(&buf->lost, 0));
+	}
+
+	local_set(&drvdata->in_use, 0);
+}
+
 static const struct coresight_ops_sink etb_sink_ops = {
 	.enable		= etb_enable,
 	.disable	= etb_disable,
 	.setup_aux	= etb_setup_aux,
+	.set_buffer	= etb_set_buffer,
+	.reset_buffer	= etb_reset_buffer,
 };
 
 static const struct coresight_ops etb_cs_ops = {
