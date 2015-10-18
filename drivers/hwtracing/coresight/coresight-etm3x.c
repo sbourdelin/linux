@@ -312,6 +312,13 @@ static void etm_enable_hw(void *info)
 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
 }
 
+static int etm_cpu_id(struct coresight_device *csdev)
+{
+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	return drvdata->cpu;
+}
+
 int etm_get_trace_id(struct etm_drvdata *drvdata)
 {
 	unsigned long flags;
@@ -444,6 +451,7 @@ static void sysfs_etm_disable(struct coresight_device *csdev)
 }
 
 static const struct coresight_ops_source etm_source_ops = {
+	.cpu_id		= etm_cpu_id,
 	.trace_id	= etm_trace_id,
 	.sysfs_enable	= sysfs_etm_enable,
 	.sysfs_disable	= sysfs_etm_disable,
