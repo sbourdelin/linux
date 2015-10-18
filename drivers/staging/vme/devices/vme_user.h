@@ -48,11 +48,22 @@ struct vme_irq_id {
 	__u8 statid;
 };
 
+struct vme_dma_op {
+	__u64 vme_addr;		/* Starting Address on the VMEbus */
+	__u64 buf_vaddr;	/* Pointer to userspace memory */
+	__u32 count;		/* Count of bytes to copy */
+	__u32 aspace;		/* Address Space */
+	__u32 cycle;		/* Cycle properties */
+	__u32 dwidth;		/* Data transfer width */
+	__u32 dir;		/* Transfer Direction */
+};
+
 #define VME_GET_SLAVE _IOR(VME_IOC_MAGIC, 1, struct vme_slave)
 #define VME_SET_SLAVE _IOW(VME_IOC_MAGIC, 2, struct vme_slave)
 #define VME_GET_MASTER _IOR(VME_IOC_MAGIC, 3, struct vme_master)
 #define VME_SET_MASTER _IOW(VME_IOC_MAGIC, 4, struct vme_master)
 #define VME_IRQ_GEN _IOW(VME_IOC_MAGIC, 5, struct vme_irq_id)
+#define VME_DO_DMA _IOW(VME_IOC_MAGIC, 6, struct vme_dma_op)
 
 #endif /* _VME_USER_H_ */
 

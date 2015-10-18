@@ -79,15 +79,18 @@ static unsigned int bus_num;
  * We shall support 4 masters and 4 slaves with this driver.
  */
 #define VME_MAJOR	221	/* VME Major Device Number */
-#define VME_DEVS	9	/* Number of dev entries */
+#define VME_DEVS	10	/* Number of dev entries */
 
 #define MASTER_MINOR	0
 #define MASTER_MAX	3
 #define SLAVE_MINOR	4
 #define SLAVE_MAX	7
 #define CONTROL_MINOR	8
+#define DMA_MINOR	9
 
-#define PCI_BUF_SIZE  0x20000	/* Size of one slave image buffer */
+#define PCI_BUF_SIZE	0x20000		/* Size of one slave image buffer */
+
+#define VME_MAX_DMA_LEN	0x4000000	/* Maximal DMA transfer length */
 
 /*
  * Structure to handle image related parameters.
@@ -112,7 +115,7 @@ static const int type[VME_DEVS] = {	MASTER_MINOR,	MASTER_MINOR,
 					MASTER_MINOR,	MASTER_MINOR,
 					SLAVE_MINOR,	SLAVE_MINOR,
 					SLAVE_MINOR,	SLAVE_MINOR,
-					CONTROL_MINOR
+					CONTROL_MINOR,	DMA_MINOR
 				};
 
 struct vme_user_vma_priv {
@@ -281,6 +284,172 @@ static loff_t vme_user_llseek(struct file *file, loff_t off, int whence)
 	return -EINVAL;
 }
 
+static int vme_user_sg_to_dma_list(const struct vme_dma_op *dma_op,
+				   struct sg_table *sgt,
+				   int sg_count, struct vme_dma_list *dma_list)
+{
+	ssize_t pos = 0;
+	struct scatterlist *sg;
+	int i, ret;
+
+	if ((dma_op->dir != VME_DMA_MEM_TO_VME) &&
+	    (dma_op->dir != VME_DMA_VME_TO_MEM))
+		return -EINVAL;
+
+	for_each_sg(sgt->sgl, sg, sg_count, i) {
+		struct vme_dma_attr *pci_attr, *vme_attr, *src, *dest;
+		dma_addr_t hw_address = sg_dma_address(sg);
+		unsigned int hw_len = sg_dma_len(sg);
+
+		vme_attr = vme_dma_vme_attribute(dma_op->vme_addr + pos,
+						 dma_op->aspace,
+						 dma_op->cycle,
+						 dma_op->dwidth);
+		if (!vme_attr)
+			return -ENOMEM;
+
+		pci_attr = vme_dma_pci_attribute(hw_address);
+		if (!pci_attr) {
+			vme_dma_free_attribute(vme_attr);
+			return -ENOMEM;
+		}
+
+		switch (dma_op->dir) {
+		case VME_DMA_MEM_TO_VME:
+			src = pci_attr;
+			dest = vme_attr;
+			break;
+		case VME_DMA_VME_TO_MEM:
+			src = vme_attr;
+			dest = pci_attr;
+			break;
+		}
+
+		ret = vme_dma_list_add(dma_list, src, dest, hw_len);
+
+		/*
+		 * XXX VME API doesn't mention whether we should keep
+		 * attributes around
+		 */
+		vme_dma_free_attribute(vme_attr);
+		vme_dma_free_attribute(pci_attr);
+
+		if (ret)
+			return ret;
+
+		pos += hw_len;
+	}
+
+	return 0;
+}
+
+static enum dma_data_direction vme_dir_to_dma_dir(unsigned vme_dir)
+{
+	switch (vme_dir) {
+	case VME_DMA_VME_TO_MEM:
+		return DMA_FROM_DEVICE;
+	case VME_DMA_MEM_TO_VME:
+		return DMA_TO_DEVICE;
+	}
+
+	return DMA_NONE;
+}
+
+static ssize_t vme_user_dma_ioctl(unsigned int minor,
+				  const struct vme_dma_op *dma_op)
+{
+	unsigned int offset = offset_in_page(dma_op->buf_vaddr);
+	unsigned long nr_pages;
+	enum dma_data_direction dir;
+	struct vme_dma_list *dma_list;
+	struct sg_table *sgt = NULL;
+	struct page **pages = NULL;
+	long got_pages;
+	ssize_t count;
+	int retval, sg_count;
+
+	/* Prevent WARN from dma_map_sg */
+	if (dma_op->count == 0)
+		return 0;
+
+	/*
+	 * This is a voluntary limit to prevent huge allocation for pages
+	 * array. VME_MAX_DMA_LEN is not a fundamental VME constraint.
+	 */
+	count = min_t(size_t, dma_op->count, VME_MAX_DMA_LEN);
+	nr_pages = (offset + count + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+	dir = vme_dir_to_dma_dir(dma_op->dir);
+	if (dir == DMA_NONE)
+		return -EINVAL;
+
+	pages = kmalloc_array(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+	if (!pages) {
+		retval = -ENOMEM;
+		goto free;
+	}
+
+	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
+	if (!sgt) {
+		retval = -ENOMEM;
+		goto free;
+	}
+
+	dma_list = vme_new_dma_list(image[minor].resource);
+	if (!dma_list) {
+		retval = -ENOMEM;
+		goto free;
+	}
+
+	got_pages = get_user_pages_fast(dma_op->buf_vaddr, nr_pages,
+					dir == DMA_FROM_DEVICE, pages);
+	if (got_pages != nr_pages) {
+		pr_debug("Not all pages were pinned\n");
+		retval = (got_pages < 0) ? got_pages : -EFAULT;
+		goto release_pages;
+	}
+
+	retval = sg_alloc_table_from_pages(sgt, pages, nr_pages,
+					   offset, count, GFP_KERNEL);
+	if (retval)
+		goto release_pages;
+
+	sg_count = dma_map_sg(vme_user_bridge->dev.parent,
+			      sgt->sgl, sgt->nents, dir);
+	if (!sg_count) {
+		pr_debug("DMA mapping error\n");
+		retval = -EFAULT;
+		goto free_sgt;
+	}
+
+	retval = vme_user_sg_to_dma_list(dma_op, sgt, sg_count, dma_list);
+	if (retval)
+		goto dma_unmap;
+
+	retval = vme_dma_list_exec(dma_list);
+
+dma_unmap:
+	dma_unmap_sg(vme_user_bridge->dev.parent, sgt->sgl, sgt->nents, dir);
+
+free_sgt:
+	sg_free_table(sgt);
+
+release_pages:
+	if (got_pages > 0)
+		release_pages(pages, got_pages, 0);
+
+	vme_dma_list_free(dma_list);
+
+free:
+	kfree(sgt);
+	kfree(pages);
+
+	if (retval)
+		return retval;
+
+	return count;
+}
+
 /*
  * The ioctls provided by the old VME access method (the one at vmelinux.org)
  * are most certainly wrong as the effectively push the registers layout
@@ -297,6 +466,7 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 	struct vme_master master;
 	struct vme_slave slave;
 	struct vme_irq_id irq_req;
+	struct vme_dma_op dma_op;
 	unsigned long copied;
 	unsigned int minor = MINOR(inode->i_rdev);
 	int retval;
@@ -404,6 +574,19 @@ static int vme_user_ioctl(struct inode *inode, struct file *file,
 				slave.cycle);
 
 			break;
+		}
+		break;
+	case DMA_MINOR:
+		switch (cmd) {
+		case VME_DO_DMA:
+			copied = copy_from_user(&dma_op, argp,
+						sizeof(dma_op));
+			if (copied != 0) {
+				pr_warn("Partial copy from userspace\n");
+				return -EFAULT;
+			}
+
+			return vme_user_dma_ioctl(minor, &dma_op);
 		}
 		break;
 	}
@@ -615,6 +798,15 @@ static int vme_user_probe(struct vme_dev *vdev)
 		}
 	}
 
+	image[DMA_MINOR].resource = vme_dma_request(vme_user_bridge,
+		VME_DMA_VME_TO_MEM | VME_DMA_MEM_TO_VME);
+	if (!image[DMA_MINOR].resource) {
+		dev_warn(&vdev->dev,
+			 "Unable to allocate dma resource\n");
+		err = -ENOMEM;
+		goto err_master;
+	}
+
 	/* Create sysfs entries - on udev systems this creates the dev files */
 	vme_user_sysfs_class = class_create(THIS_MODULE, driver_name);
 	if (IS_ERR(vme_user_sysfs_class)) {
@@ -636,6 +828,9 @@ static int vme_user_probe(struct vme_dev *vdev)
 			break;
 		case SLAVE_MINOR:
 			name = "bus/vme/s%d";
+			break;
+		case DMA_MINOR:
+			name = "bus/vme/dma0";
 			break;
 		default:
 			err = -EINVAL;
@@ -660,6 +855,8 @@ err_sysfs:
 		device_destroy(vme_user_sysfs_class, MKDEV(VME_MAJOR, i));
 	}
 	class_destroy(vme_user_sysfs_class);
+
+	vme_dma_free(image[DMA_MINOR].resource);
 
 	/* Ensure counter set correcty to unalloc all master windows */
 	i = MASTER_MAX + 1;
@@ -700,6 +897,8 @@ static int vme_user_remove(struct vme_dev *dev)
 		device_destroy(vme_user_sysfs_class, MKDEV(VME_MAJOR, i));
 	}
 	class_destroy(vme_user_sysfs_class);
+
+	vme_dma_free(image[DMA_MINOR].resource);
 
 	for (i = MASTER_MINOR; i < (MASTER_MAX + 1); i++) {
 		kfree(image[i].kern_buf);
