@@ -369,8 +369,10 @@ static void etm_enable_hw(void *info)
 	etm_set_prog(drvdata);
 
 	etmcr = etm_readl(drvdata, ETMCR);
-	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
+	/* Clear setting from a previous run if need be */
+	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
 	etmcr |= drvdata->port_size;
+	etmcr |= ETMCR_ETM_EN;
 	etm_writel(drvdata, config->ctrl | etmcr, ETMCR);
 	etm_writel(drvdata, config->trigger_event, ETMTRIGGER);
 	etm_writel(drvdata, config->startstop_ctrl, ETMTSSCR);
@@ -409,9 +411,6 @@ static void etm_enable_hw(void *info)
 	etm_writel(drvdata, drvdata->traceid, ETMTRACEIDR);
 	/* No VMID comparator value selected */
 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
-
-	/* Ensures trace output is enabled from this ETM */
-	etm_writel(drvdata, config->ctrl | ETMCR_ETM_EN | etmcr, ETMCR);
 
 	etm_clr_prog(drvdata);
 	CS_LOCK(drvdata->base);
@@ -483,6 +482,47 @@ static void perf_etm_set_config(struct coresight_device *csdev, void *config)
 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 
 	drvdata->config = config;
+}
+
+static int perf_etm_enable(struct coresight_device *csdev)
+{
+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
+		return -EINVAL;
+
+	if (local_cmpxchg(&drvdata->state,
+			  ETM_STATE_DISABLED, ETM_STATE_PERF))
+		return -EBUSY;
+
+	etm_enable_hw(drvdata);
+
+	return 0;
+}
+
+static int perf_etm_disable(struct coresight_device *csdev)
+{
+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
+		return -EINVAL;
+
+	CS_UNLOCK(drvdata->base);
+
+	/* setting the prog bit disables tracing immediately */
+	etm_set_prog(drvdata);
+	/* Get ready for another session */
+	drvdata->config = NULL;
+	/*
+	 * There is no way to know when the tracer will be used again so
+	 * power down the tracer.
+	 */
+	etm_set_pwrdwn(drvdata);
+	local_set(&drvdata->state, ETM_STATE_DISABLED);
+
+	CS_LOCK(drvdata->base);
+
+	return 0;
 }
 
 static int sysfs_etm_enable(struct coresight_device *csdev)
@@ -587,6 +627,8 @@ static const struct coresight_ops_source etm_source_ops = {
 	.trace_id		= etm_trace_id,
 	.perf_get_config	= perf_etm_get_config,
 	.perf_set_config	= perf_etm_set_config,
+	.perf_enable		= perf_etm_enable,
+	.perf_disable		= perf_etm_disable,
 	.sysfs_enable		= sysfs_etm_enable,
 	.sysfs_disable		= sysfs_etm_disable,
 };

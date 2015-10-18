@@ -211,6 +211,8 @@ struct coresight_ops_link {
 			to the HW.
  * @perf_get_config:	builds the ETM configuration after event' specifics.
  * @perf_set_config:	associate a tracer with a configuration..
+ * @perf_enable:	enables tracing for a source, from Perf.
+ * @perf_disable:	disables tracing for a source, from Perf.
  * @sysfs_enable:	enables tracing for a source, from sysFS.
  * @sysfs_disable:	disables tracing for a source, from sysFS.
  */
@@ -220,6 +222,8 @@ struct coresight_ops_source {
 	void *(*perf_get_config)(struct coresight_device *csdev,
 				 struct perf_event *event);
 	void (*perf_set_config)(struct coresight_device *csdev, void *config);
+	int (*perf_enable)(struct coresight_device *csdev);
+	int (*perf_disable)(struct coresight_device *csdev);
 	int (*sysfs_enable)(struct coresight_device *csdev);
 	void (*sysfs_disable)(struct coresight_device *csdev);
 };
