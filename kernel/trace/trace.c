@@ -6706,6 +6706,8 @@ static struct vfsmount *trace_automount(void *ingore)
 	return mnt;
 }
 
+#define TRACE_TOP_DIR_ENTRY	((struct dentry *)1)
+
 /**
  * tracing_init_dentry - initialize top level trace array
  *
@@ -6716,26 +6718,29 @@ static struct vfsmount *trace_automount(void *ingore)
 struct dentry *tracing_init_dentry(void)
 {
 	struct trace_array *tr = &global_trace;
+	struct dentry *traced;
 
 	/* The top level trace array uses  NULL as parent */
 	if (tr->dir)
 		return NULL;
 
-	if (WARN_ON(!debugfs_initialized()))
+	if (WARN_ON(!tracefs_initialized()))
 		return ERR_PTR(-ENODEV);
 
-	/*
-	 * As there may still be users that expect the tracing
-	 * files to exist in debugfs/tracing, we must automount
-	 * the tracefs file system there, so older tools still
-	 * work with the newer kerenl.
-	 */
-	tr->dir = debugfs_create_automount("tracing", NULL,
-					   trace_automount, NULL);
-	if (!tr->dir) {
-		pr_warn_once("Could not create debugfs directory 'tracing'\n");
-		return ERR_PTR(-ENOMEM);
+	if (debugfs_initialized()) {
+		/*
+		 * As there may still be users that expect the tracing
+		 * files to exist in debugfs/tracing, we must automount
+		 * the tracefs file system there, so older tools still
+		 * work with the newer kerenl.
+		 */
+		traced = debugfs_create_automount("tracing", NULL,
+						   trace_automount, NULL);
+		if (!traced)
+			pr_warn_once("Could not create debugfs directory 'tracing'\n");
 	}
+
+	tr->dir = TRACE_TOP_DIR_ENTRY;
 
 	return NULL;
 }
