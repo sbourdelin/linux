@@ -1204,13 +1204,15 @@ static inline int run_tracer_selftest(struct tracer *type)
 }
 #endif /* CONFIG_FTRACE_STARTUP_TEST */
 
+static int __init apply_trace_boot_options(void);
+
 /**
  * register_tracer - register a tracer with the ftrace system.
  * @type - the plugin for the tracer
  *
  * Register a new plugin tracer.
  */
-int register_tracer(struct tracer *type)
+int __init register_tracer(struct tracer *type)
 {
 	struct tracer *t;
 	int ret = 0;
@@ -1268,6 +1270,9 @@ int register_tracer(struct tracer *type)
 	/* Do we want this tracer to start on bootup? */
 	tracing_set_tracer(&global_trace, type->name);
 	default_bootup_tracer = NULL;
+
+	apply_trace_boot_options();
+
 	/* disable other selftests, since this will break it. */
 	tracing_selftest_disabled = true;
 #ifdef CONFIG_FTRACE_STARTUP_TEST
@@ -3601,6 +3606,33 @@ static int trace_set_options(struct trace_array *tr, char *option)
 	mutex_unlock(&trace_types_lock);
 
 	return ret;
+}
+
+static int __init apply_trace_boot_options(void)
+{
+	char *option;
+	char *buf;
+	char *str;
+	size_t len;
+
+	if (trace_boot_options) {
+		len = strlen(trace_boot_options);
+
+		buf = str = kmalloc(len + 1, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+
+		memcpy(buf, trace_boot_options, len + 1);
+
+		while (str) {
+			option = strsep(&str, ",");
+			trace_set_options(&global_trace, option);
+		}
+
+		kfree(buf);
+	}
+
+	return 0;
 }
 
 static ssize_t
@@ -7153,12 +7185,7 @@ __init static int tracer_alloc_buffers(void)
 	INIT_LIST_HEAD(&global_trace.events);
 	list_add(&global_trace.list, &ftrace_trace_arrays);
 
-	while (trace_boot_options) {
-		char *option;
-
-		option = strsep(&trace_boot_options, ",");
-		trace_set_options(&global_trace, option);
-	}
+	apply_trace_boot_options();
 
 	register_snapshot_cmd();
 
