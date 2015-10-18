@@ -52,6 +52,9 @@ static inline void CS_UNLOCK(void __iomem *addr)
 	} while (0);
 }
 
+int coresight_build_paths(struct coresight_device *csdev,
+			  struct list_head *path, bool enable);
+
 #ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
 extern int etm_readl_cp14(u32 off, unsigned int *val);
 extern int etm_writel_cp14(u32 off, u32 val);

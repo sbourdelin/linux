@@ -301,9 +301,8 @@ static int coresight_disable_path(struct list_head *path)
 	return 0;
 }
 
-static int coresight_build_paths(struct coresight_device *csdev,
-				 struct list_head *path,
-				 bool enable)
+int coresight_build_paths(struct coresight_device *csdev,
+			  struct list_head *path, bool enable)
 {
 	int i, ret = -EINVAL;
 	struct coresight_connection *conn;
