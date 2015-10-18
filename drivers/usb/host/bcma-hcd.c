@@ -231,17 +231,22 @@ static void bcma_hcd_init_chip_arm(struct bcma_device *dev)
 
 static void bcma_hci_platform_power_gpio(struct bcma_device *dev, bool val)
 {
+	enum of_gpio_flags of_flags;
 	int gpio;
 
-	gpio = of_get_named_gpio(dev->dev.of_node, "vcc-gpio", 0);
+	gpio = of_get_named_gpio_flags(dev->dev.of_node, "vcc-gpio", 0, &of_flags);
 	if (!gpio_is_valid(gpio))
 		return;
 
 	if (val) {
-		gpio_request(gpio, "bcma-hcd-gpio");
-		gpio_set_value(gpio, 1);
+		unsigned long flags = 0;
+		bool active_low = !!(of_flags & OF_GPIO_ACTIVE_LOW);
+
+		flags |= active_low ? GPIOF_ACTIVE_LOW : 0;
+		flags |= active_low ? GPIOF_INIT_LOW : GPIOF_INIT_HIGH;
+		gpio_request_one(gpio, flags, "bcma-hcd-gpio");
 	} else {
-		gpio_set_value(gpio, 0);
+		gpiod_set_value(gpio_to_desc(gpio), 0);
 		gpio_free(gpio);
 	}
 }
