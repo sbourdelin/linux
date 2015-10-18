@@ -274,14 +274,14 @@ static int hilse_match(hil_mlc *mlc, int unused)
 /* An LCV used to prevent runaway loops, forces 5 second sleep when reset. */
 static int hilse_init_lcv(hil_mlc *mlc, int unused)
 {
-	struct timeval tv;
+	struct timespec64 ts64;
 
-	do_gettimeofday(&tv);
+	ktime_get_ts64(&ts64);
 
-	if (mlc->lcv && (tv.tv_sec - mlc->lcv_tv.tv_sec) < 5)
+	if (mlc->lcv && (ts64.tv_sec - mlc->lcv_ts64.tv_sec) < 5)
 		return -1;
 
-	mlc->lcv_tv = tv;
+	mlc->lcv_ts64 = ts64;
 	mlc->lcv = 0;
 
 	return 0;
@@ -605,7 +605,7 @@ static inline void hilse_setup_input(hil_mlc *mlc, const struct hilse_node *node
 	}
 	mlc->istarted = 1;
 	mlc->intimeout = node->arg;
-	do_gettimeofday(&(mlc->instart));
+	ktime_get_ts64(&(mlc->instart));
 	mlc->icount = 15;
 	memset(mlc->ipacket, 0, 16 * sizeof(hil_packet));
 	BUG_ON(down_trylock(&mlc->isem));
@@ -710,7 +710,7 @@ static int hilse_donode(hil_mlc *mlc)
 			break;
 		}
 		mlc->ostarted = 0;
-		do_gettimeofday(&(mlc->instart));
+		ktime_get_ts64(&(mlc->instart));
 		write_unlock_irqrestore(&mlc->lock, flags);
 		nextidx = HILSEN_NEXT;
 		break;
@@ -731,18 +731,21 @@ static int hilse_donode(hil_mlc *mlc)
 #endif
 
 	while (nextidx & HILSEN_SCHED) {
-		struct timeval tv;
+		struct timespec64 ts64;
 
 		if (!sched_long)
 			goto sched;
 
-		do_gettimeofday(&tv);
-		tv.tv_usec += USEC_PER_SEC * (tv.tv_sec - mlc->instart.tv_sec);
-		tv.tv_usec -= mlc->instart.tv_usec;
-		if (tv.tv_usec >= mlc->intimeout) goto sched;
-		tv.tv_usec = (mlc->intimeout - tv.tv_usec) * HZ / USEC_PER_SEC;
-		if (!tv.tv_usec) goto sched;
-		mod_timer(&hil_mlcs_kicker, jiffies + tv.tv_usec);
+		ktime_get_ts64(&ts64);
+		ts64.tv_nsec += NSEC_PER_SEC *
+			(ts64.tv_sec - mlc->instart.tv_sec);
+		ts64.tv_nsec -= mlc->instart.tv_nsec;
+		if (ts64.tv_nsec >= (mlc->intimeout * NSEC_PER_USEC))
+			goto sched;
+		ts64.tv_nsec = mlc->intimeout * NSEC_PER_USEC - ts64.tv_nsec;
+		if (!ts64.tv_nsec) goto sched;
+		mod_timer(&hil_mlcs_kicker,
+				jiffies + nsecs_to_jiffies(ts64.tv_nsec));
 		break;
 	sched:
 		tasklet_schedule(&hil_mlcs_tasklet);
