@@ -302,7 +302,8 @@ static int coresight_disable_path(struct list_head *path)
 }
 
 int coresight_build_paths(struct coresight_device *csdev,
-			  struct list_head *path, bool enable)
+			  struct list_head *path,
+			  struct list_head *sinks, bool enable)
 {
 	int i, ret = -EINVAL;
 	struct coresight_connection *conn;
@@ -312,15 +313,18 @@ int coresight_build_paths(struct coresight_device *csdev,
 	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
 	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
 	    csdev->activated) {
-		if (enable)
+		if (enable) {
 			ret = coresight_enable_path(path);
-		else
+			if (!ret && sinks)
+				list_add(&csdev->sinks, sinks);
+		} else {
 			ret = coresight_disable_path(path);
+		}
 	} else {
 		for (i = 0; i < csdev->nr_outport; i++) {
 			conn = &csdev->conns[i];
 			if (coresight_build_paths(conn->child_dev,
-						    path, enable) == 0)
+						  path, sinks, enable) == 0)
 				ret = 0;
 		}
 	}
@@ -347,7 +351,7 @@ int coresight_enable(struct coresight_device *csdev)
 	if (csdev->enable)
 		goto out;
 
-	if (coresight_build_paths(csdev, &path, true)) {
+	if (coresight_build_paths(csdev, &path, NULL, true)) {
 		dev_err(&csdev->dev, "building path(s) failed\n");
 		goto out;
 	}
@@ -373,7 +377,7 @@ void coresight_disable(struct coresight_device *csdev)
 		goto out;
 
 	coresight_disable_source(csdev);
-	if (coresight_build_paths(csdev, &path, false))
+	if (coresight_build_paths(csdev, &path, NULL, false))
 		dev_err(&csdev->dev, "releasing path(s) failed\n");
 
 out:
