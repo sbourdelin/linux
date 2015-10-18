@@ -130,6 +130,9 @@ static int fill_message(struct snd_rawmidi_substream *substream, u8 *buf)
 		buf[0] = (port << 4) | (buf[1] >> 4);
 	}
 
+	if (len < 3)
+		memset(buf + 1, 0, 3 - len);
+
 	return len;
 }
 
