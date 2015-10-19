@@ -5,6 +5,7 @@
 #include <linux/spinlock_types.h>
 #include <linux/types.h>
 #include <linux/wait.h>
+#include <linux/kref.h>
 
 #define PREFIX_MAX		32
 #define LOG_LINE_MAX		(1024 - PREFIX_MAX)
@@ -99,6 +100,7 @@ struct log_buffer {
 	char *buf;		/* cyclic log buffer */
 	u32 len;		/* buffer length */
 	wait_queue_head_t wait;	/* wait queue for kmsg buffer */
+	struct kref refcount;	/* refcount for kmsg_sys buffers */
 #endif
 /*
  * The lock protects kmsg buffer, indices, counters. This can be taken within
@@ -126,6 +128,8 @@ struct log_buffer {
 #ifdef CONFIG_PRINTK
 
 extern struct log_buffer log_buf;
+
+void log_buf_release(struct kref *ref);
 
 ssize_t msg_print_ext_header(char *buf, size_t size,
 				    struct printk_log *msg, u64 seq,
