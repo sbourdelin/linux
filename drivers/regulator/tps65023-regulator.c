@@ -25,6 +25,10 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/regmap.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/of_gpio.h>
+#include <linux/regulator/of_regulator.h>
 
 /* Register definitions */
 #define	TPS65023_REG_VERSION		0
@@ -140,8 +144,15 @@ struct tps_pmic {
 	u8 core_regulator;
 };
 
+enum tps6502x_id {
+	TPS65020,
+	TPS65021,
+	TPS65023,
+};
+
 /* Struct passed as driver data */
 struct tps_driver_data {
+	enum tps6502x_id id;
 	const struct tps_info *info;
 	u8 core_regulator;
 };
@@ -198,103 +209,6 @@ static const struct regmap_config tps65023_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 };
-
-static int tps_65023_probe(struct i2c_client *client,
-				     const struct i2c_device_id *id)
-{
-	const struct tps_driver_data *drv_data = (void *)id->driver_data;
-	const struct tps_info *info = drv_data->info;
-	struct regulator_config config = { };
-	struct regulator_init_data *init_data;
-	struct regulator_dev *rdev;
-	struct tps_pmic *tps;
-	int i;
-	int error;
-
-	/**
-	 * init_data points to array of regulator_init structures
-	 * coming from the board-evm file.
-	 */
-	init_data = dev_get_platdata(&client->dev);
-	if (!init_data)
-		return -EIO;
-
-	tps = devm_kzalloc(&client->dev, sizeof(*tps), GFP_KERNEL);
-	if (!tps)
-		return -ENOMEM;
-
-	tps->regmap = devm_regmap_init_i2c(client, &tps65023_regmap_config);
-	if (IS_ERR(tps->regmap)) {
-		error = PTR_ERR(tps->regmap);
-		dev_err(&client->dev, "Failed to allocate register map: %d\n",
-			error);
-		return error;
-	}
-
-	/* common for all regulators */
-	tps->core_regulator = drv_data->core_regulator;
-
-	for (i = 0; i < TPS65023_NUM_REGULATOR; i++, info++, init_data++) {
-		/* Store regulator specific information */
-		tps->info[i] = info;
-
-		tps->desc[i].name = info->name;
-		tps->desc[i].id = i;
-		tps->desc[i].n_voltages = info->table_len;
-		tps->desc[i].volt_table = info->table;
-		tps->desc[i].ops = (i > TPS65023_DCDC_3 ?
-					&tps65023_ldo_ops : &tps65023_dcdc_ops);
-		tps->desc[i].type = REGULATOR_VOLTAGE;
-		tps->desc[i].owner = THIS_MODULE;
-
-		tps->desc[i].enable_reg = TPS65023_REG_REG_CTRL;
-		switch (i) {
-		case TPS65023_LDO_1:
-			tps->desc[i].vsel_reg = TPS65023_REG_LDO_CTRL;
-			tps->desc[i].vsel_mask = 0x07;
-			tps->desc[i].enable_mask = 1 << 1;
-			break;
-		case TPS65023_LDO_2:
-			tps->desc[i].vsel_reg = TPS65023_REG_LDO_CTRL;
-			tps->desc[i].vsel_mask = 0x70;
-			tps->desc[i].enable_mask = 1 << 2;
-			break;
-		default: /* DCDCx */
-			tps->desc[i].enable_mask =
-					1 << (TPS65023_NUM_REGULATOR - i);
-			tps->desc[i].vsel_reg = TPS65023_REG_DEF_CORE;
-			tps->desc[i].vsel_mask = info->table_len - 1;
-			tps->desc[i].apply_reg = TPS65023_REG_CON_CTRL2;
-			tps->desc[i].apply_bit = TPS65023_REG_CTRL2_GO;
-		}
-
-		config.dev = &client->dev;
-		config.init_data = init_data;
-		config.driver_data = tps;
-		config.regmap = tps->regmap;
-
-		/* Register the regulators */
-		rdev = devm_regulator_register(&client->dev, &tps->desc[i],
-					       &config);
-		if (IS_ERR(rdev)) {
-			dev_err(&client->dev, "failed to register %s\n",
-				id->name);
-			return PTR_ERR(rdev);
-		}
-
-		/* Save regulator for cleanup */
-		tps->rdev[i] = rdev;
-	}
-
-	i2c_set_clientdata(client, tps);
-
-	/* Enable setting output voltage by I2C */
-	regmap_update_bits(tps->regmap, TPS65023_REG_CON_CTRL2,
-					TPS65023_REG_CTRL2_CORE_ADJ,
-					TPS65023_REG_CTRL2_CORE_ADJ);
-
-	return 0;
-}
 
 static const struct tps_info tps65020_regs[] = {
 	{
@@ -381,16 +295,19 @@ static const struct tps_info tps65023_regs[] = {
 };
 
 static struct tps_driver_data tps65020_drv_data = {
+	.id = TPS65020,
 	.info = tps65020_regs,
 	.core_regulator = TPS65023_DCDC_3,
 };
 
 static struct tps_driver_data tps65021_drv_data = {
+	.id = TPS65021,
 	.info = tps65021_regs,
 	.core_regulator = TPS65023_DCDC_3,
 };
 
 static struct tps_driver_data tps65023_drv_data = {
+	.id = TPS65023,
 	.info = tps65023_regs,
 	.core_regulator = TPS65023_DCDC_1,
 };
@@ -407,9 +324,224 @@ static const struct i2c_device_id tps_65023_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, tps_65023_id);
 
+#if defined(CONFIG_OF)
+static const struct of_device_id tps6502x_of_match[] = {
+	 { .compatible = "ti,tps65023", .data = (void *)&tps65023_drv_data},
+	 { .compatible = "ti,tps65021", .data = (void *)&tps65021_drv_data},
+	 { .compatible = "ti,tps65020", .data = (void *)&tps65020_drv_data},
+	{},
+};
+MODULE_DEVICE_TABLE(of, tps6502x_of_match);
+#endif
+
+#if defined(CONFIG_OF)
+static struct of_regulator_match tps65020_matches[] = {
+	{ .name = "vdcdc1",	.driver_data = (void *) &tps65020_regs[0] },
+	{ .name = "vdcdc2",	.driver_data = (void *) &tps65020_regs[1] },
+	{ .name = "vdcdc3",	.driver_data = (void *) &tps65020_regs[2] },
+	{ .name = "ldo1",	.driver_data = (void *) &tps65020_regs[3] },
+	{ .name = "ldo2",	.driver_data = (void *) &tps65020_regs[4] },
+};
+
+static struct of_regulator_match tps65021_matches[] = {
+	{ .name = "vdcdc1",	.driver_data = (void *) &tps65021_regs[0] },
+	{ .name = "vdcdc2",	.driver_data = (void *) &tps65021_regs[1] },
+	{ .name = "vdcdc3",	.driver_data = (void *) &tps65021_regs[2] },
+	{ .name = "ldo1",	.driver_data = (void *) &tps65021_regs[3] },
+	{ .name = "ldo2",	.driver_data = (void *) &tps65021_regs[4] },
+};
+
+static struct of_regulator_match tps65023_matches[] = {
+	{ .name = "vdcdc1",	.driver_data = (void *) &tps65023_regs[0] },
+	{ .name = "vdcdc2",	.driver_data = (void *) &tps65023_regs[1] },
+	{ .name = "vdcdc3",	.driver_data = (void *) &tps65023_regs[2] },
+	{ .name = "ldo1",	.driver_data = (void *) &tps65023_regs[3] },
+	{ .name = "ldo2",	.driver_data = (void *) &tps65023_regs[4] },
+};
+
+struct regulator_init_data
+*tps6502x_parse_dt_data(struct device *dev,
+			  const struct tps_driver_data *drv_data,
+			  struct of_regulator_match **tps6502x_reg_matches)
+{
+	struct device_node *np = dev->of_node;
+	struct regulator_init_data *init_data;
+	struct device_node *regulators;
+	struct of_regulator_match *matches;
+	int i, count, ret;
+
+	init_data = devm_kzalloc(dev, TPS65023_NUM_REGULATOR *
+				 sizeof(struct regulator_init_data),
+				 GFP_KERNEL);
+	if (!init_data)
+		return NULL;
+
+	regulators = of_get_child_by_name(np, "regulators");
+	if (!regulators) {
+		dev_err(dev, "regulator node not found\n");
+		return NULL;
+	}
+
+	switch (drv_data->id) {
+	case TPS65020:
+		count = ARRAY_SIZE(tps65020_matches);
+		matches = tps65020_matches;
+		break;
+	case TPS65021:
+		count = ARRAY_SIZE(tps65021_matches);
+		matches = tps65021_matches;
+		break;
+	case TPS65023:
+		count = ARRAY_SIZE(tps65023_matches);
+		matches = tps65023_matches;
+		break;
+	default:
+		of_node_put(regulators);
+		dev_err(dev, "Invalid tps chip version\n");
+		return NULL;
+	}
+
+	ret = of_regulator_match(dev, regulators, matches, count);
+	of_node_put(regulators);
+	if (ret < 0) {
+		dev_err(dev, "Error parsing regulator init data: %d\n", ret);
+		return NULL;
+	}
+
+	*tps6502x_reg_matches = matches;
+
+	for (i = 0; i < count; i++) {
+		if (!matches[i].of_node)
+			continue;
+
+		memcpy(&init_data[i], matches[i].init_data,
+		       sizeof(struct regulator_init_data));
+	}
+
+	return init_data;
+}
+#else
+struct regulator_init_data
+*tps6502x_parse_dt_data(struct device *dev,
+			  const struct tps_driver_data *drv_data,
+			  struct of_regulator_match **tps6502x_reg_matches)
+{
+	*tps6502x_reg_matches = NULL;
+	return NULL;
+}
+
+#endif
+
+static int tps_65023_probe(struct i2c_client *client,
+				     const struct i2c_device_id *id)
+{
+	const struct tps_driver_data *drv_data = (void *)id->driver_data;
+	const struct tps_info *info = drv_data->info;
+	struct regulator_config config = { };
+	struct regulator_init_data *init_data;
+	struct regulator_dev *rdev;
+	struct of_regulator_match *tps6502x_reg_matches = NULL;
+	struct tps_pmic *tps;
+	int i;
+	int error;
+
+	if (client->dev.of_node) {
+		init_data = tps6502x_parse_dt_data(&client->dev, drv_data,
+						     &tps6502x_reg_matches);
+	} else {
+		/**
+		 * init_data points to array of regulator_init structures
+		 * coming from the board-evm file.
+		 */
+		init_data = dev_get_platdata(&client->dev);
+	}
+	if (!init_data)
+		return -EIO;
+
+	tps = devm_kzalloc(&client->dev, sizeof(*tps), GFP_KERNEL);
+	if (!tps)
+		return -ENOMEM;
+
+	tps->regmap = devm_regmap_init_i2c(client, &tps65023_regmap_config);
+	if (IS_ERR(tps->regmap)) {
+		error = PTR_ERR(tps->regmap);
+		dev_err(&client->dev, "Failed to allocate register map: %d\n",
+			error);
+		return error;
+	}
+
+	/* common for all regulators */
+	tps->core_regulator = drv_data->core_regulator;
+
+	for (i = 0; i < TPS65023_NUM_REGULATOR; i++, info++, init_data++) {
+		/* Store regulator specific information */
+		tps->info[i] = info;
+
+		tps->desc[i].name = info->name;
+		tps->desc[i].id = i;
+		tps->desc[i].n_voltages = info->table_len;
+		tps->desc[i].volt_table = info->table;
+		tps->desc[i].ops = (i > TPS65023_DCDC_3 ?
+					&tps65023_ldo_ops : &tps65023_dcdc_ops);
+		tps->desc[i].type = REGULATOR_VOLTAGE;
+		tps->desc[i].owner = THIS_MODULE;
+
+		tps->desc[i].enable_reg = TPS65023_REG_REG_CTRL;
+		switch (i) {
+		case TPS65023_LDO_1:
+			tps->desc[i].vsel_reg = TPS65023_REG_LDO_CTRL;
+			tps->desc[i].vsel_mask = 0x07;
+			tps->desc[i].enable_mask = 1 << 1;
+			break;
+		case TPS65023_LDO_2:
+			tps->desc[i].vsel_reg = TPS65023_REG_LDO_CTRL;
+			tps->desc[i].vsel_mask = 0x70;
+			tps->desc[i].enable_mask = 1 << 2;
+			break;
+		default: /* DCDCx */
+			tps->desc[i].enable_mask =
+					1 << (TPS65023_NUM_REGULATOR - i);
+			tps->desc[i].vsel_reg = TPS65023_REG_DEF_CORE;
+			tps->desc[i].vsel_mask = info->table_len - 1;
+			tps->desc[i].apply_reg = TPS65023_REG_CON_CTRL2;
+			tps->desc[i].apply_bit = TPS65023_REG_CTRL2_GO;
+		}
+
+		config.dev = &client->dev;
+		config.init_data = init_data;
+		config.driver_data = tps;
+		config.regmap = tps->regmap;
+		if (tps6502x_reg_matches)
+			config.of_node = tps6502x_reg_matches[i].of_node;
+
+		/* Register the regulators */
+		rdev = devm_regulator_register(&client->dev, &tps->desc[i],
+					       &config);
+		if (IS_ERR(rdev)) {
+			dev_err(&client->dev, "failed to register %s\n",
+				id->name);
+			return PTR_ERR(rdev);
+		}
+
+		/* Save regulator for cleanup */
+		tps->rdev[i] = rdev;
+	}
+
+	i2c_set_clientdata(client, tps);
+
+	/* Enable setting output voltage by I2C */
+	regmap_update_bits(tps->regmap, TPS65023_REG_CON_CTRL2,
+					TPS65023_REG_CTRL2_CORE_ADJ,
+					TPS65023_REG_CTRL2_CORE_ADJ);
+
+	return 0;
+}
+
 static struct i2c_driver tps_65023_i2c_driver = {
 	.driver = {
 		.name = "tps65023",
+		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(tps6502x_of_match),
 	},
 	.probe = tps_65023_probe,
 	.id_table = tps_65023_id,
