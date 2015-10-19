@@ -260,7 +260,7 @@ config USB_NET_CDC_NCM
 
 config USB_NET_HUAWEI_CDC_NCM
 	tristate "Huawei NCM embedded AT channel support"
-	depends on USB_USBNET
+	select USB_USBNET
 	select USB_WDM
 	select USB_NET_CDC_NCM
 	help
@@ -275,7 +275,7 @@ config USB_NET_HUAWEI_CDC_NCM
 
 config USB_NET_CDC_MBIM
 	tristate "CDC MBIM support"
-	depends on USB_USBNET
+	select USB_USBNET
 	select USB_WDM
 	select USB_NET_CDC_NCM
 	help
@@ -379,7 +379,7 @@ config USB_NET_MCS7830
 
 config USB_NET_RNDIS_HOST
 	tristate "Host for RNDIS and ActiveSync devices"
-	depends on USB_USBNET
+	select USB_USBNET
 	select USB_NET_CDCETHER
 	help
 	  This option enables hosting "Remote NDIS" USB networking links,
@@ -464,7 +464,7 @@ config USB_KC2190
 
 config USB_NET_ZAURUS
 	tristate "Sharp Zaurus (stock ROMs) and compatible"
-	depends on USB_USBNET
+	select USB_USBNET
 	select USB_NET_CDCETHER
 	select CRC32
 	default y
@@ -500,7 +500,7 @@ config USB_NET_KALMIA
 
 config USB_NET_QMI_WWAN
 	tristate "QMI WWAN driver for Qualcomm MSM based 3G and LTE modems"
-	depends on USB_USBNET
+	select USB_USBNET
 	select USB_WDM
 	help
 	  Support WWAN LTE/3G devices based on Qualcomm Mobile Data Modem
