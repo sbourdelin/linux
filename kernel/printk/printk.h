@@ -102,28 +102,38 @@ struct printk_log {
 	u8 level:3;		/* syslog level */
 };
 
+struct log_buffer {
+#ifdef CONFIG_PRINTK
+	struct list_head list;	/* kmsg as head of the list */
+	char *buf;		/* cyclic log buffer */
+	u32 len;		/* buffer length */
+	wait_queue_head_t wait;	/* wait queue for kmsg buffer */
+#endif
 /*
- * The logbuf_lock protects kmsg buffer, indices, counters.  This can be taken
- * within the scheduler's rq lock. It must be released before calling
- * console_unlock() or anything else that might wake up a process.
+ * The lock protects kmsg buffer, indices, counters. This can be taken within
+ * the scheduler's rq lock. It must be released before calling console_unlock()
+ * or anything else that might wake up a process.
  */
-extern raw_spinlock_t logbuf_lock;
+	raw_spinlock_t lock;
+
+	u64 first_seq;		/* sequence number of the first record stored */
+	u32 first_idx;		/* index of the first record stored */
+
+	u64 next_seq;		/* sequence number of next record to store */
+#ifdef CONFIG_PRINTK
+	u32 next_idx;		/* index of the next record to store */
+
+	/* the next printk record to read after the last 'clear' command */
+	u64 clear_seq;
+	u32 clear_idx;
+
+	int minor;		/* minor representing buffer device */
+#endif
+};
 
 #ifdef CONFIG_PRINTK
 
-extern wait_queue_head_t log_wait;
-
-/* index and sequence number of the first record stored in the buffer */
-extern u64 log_first_seq;
-extern u32 log_first_idx;
-
-/* index and sequence number of the next record to store in the buffer */
-extern u64 log_next_seq;
-extern u32 log_next_idx;
-
-/* the next printk record to read after the last 'clear' command */
-extern u64 clear_seq;
-extern u32 clear_idx;
+extern struct log_buffer log_buf;
 
 ssize_t msg_print_ext_header(char *buf, size_t size,
 				    struct printk_log *msg, u64 seq,
@@ -137,10 +147,9 @@ size_t msg_print_text(const struct printk_log *msg, enum log_flags prev,
 			bool syslog, char *buf, size_t size);
 
 /* get next record; idx must point to valid msg */
-static inline u32 log_next(u32 idx)
+static inline u32 log_next(struct log_buffer *log_b, u32 idx)
 {
-	char *log_buf = log_buf_addr_get();
-	struct printk_log *msg = (struct printk_log *)(log_buf + idx);
+	struct printk_log *msg = (struct printk_log *)(log_b->buf + idx);
 
 	/* length == 0 indicates the end of the buffer; wrap */
 	/*
@@ -149,24 +158,23 @@ static inline u32 log_next(u32 idx)
 	 * return the one after that.
 	 */
 	if (!msg->len) {
-		msg = (struct printk_log *)log_buf;
+		msg = (struct printk_log *)log_b->buf;
 		return msg->len;
 	}
 	return idx + msg->len;
 }
 
 /* get record by index; idx must point to valid msg */
-static inline struct printk_log *log_from_idx(u32 idx)
+static inline struct printk_log *log_from_idx(struct log_buffer *log_b, u32 idx)
 {
-	char *log_buf = log_buf_addr_get();
-	struct printk_log *msg = (struct printk_log *)(log_buf + idx);
+	struct printk_log *msg = (struct printk_log *)(log_b->buf + idx);
 
 	/*
 	 * A length == 0 record is the end of buffer marker. Wrap around and
 	 * read the message at the start of the buffer.
 	 */
 	if (!msg->len)
-		return (struct printk_log *)log_buf;
+		return (struct printk_log *)log_b->buf;
 	return msg;
 }
 
@@ -181,6 +189,11 @@ static inline char *log_dict(const struct printk_log *msg)
 {
 	return (char *)msg + sizeof(struct printk_log) + msg->text_len;
 }
+
+int log_format_and_store(struct log_buffer *log_b,
+			 int facility, int level,
+			 const char *dict, size_t dictlen,
+			 const char *fmt, va_list args);
 
 #else
 
@@ -205,12 +218,12 @@ static inline size_t msg_print_text(const struct printk_log *msg,
 	return 0;
 }
 
-static inline u32 log_next(u32 idx)
+static inline u32 log_next(struct log_buffer *log_b, u32 idx)
 {
 	return 0;
 }
 
-static inline struct printk_log *log_from_idx(u32 idx)
+static inline struct printk_log *log_from_idx(struct log_buffer *log_b, u32 idx)
 {
 	return NULL;
 }
@@ -223,6 +236,14 @@ static inline char *log_text(const struct printk_log *msg)
 static inline char *log_dict(const struct printk_log *msg)
 {
 	return NULL;
+}
+
+static inline int log_format_and_store(struct log_buffer *log_b,
+					int facility, int level,
+					const char *dict, size_t dictlen,
+					const char *fmt, va_list args)
+{
+	return 0;
 }
 
 #endif
