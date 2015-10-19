@@ -16,18 +16,10 @@
 #include <linux/mm.h>
 #include <linux/filter.h>
 
-/* Called from syscall */
-static struct bpf_map *array_map_alloc(union bpf_attr *attr)
+static struct bpf_map *__array_map_alloc(union bpf_attr *attr, u32 elem_size)
 {
 	struct bpf_array *array;
-	u32 elem_size, array_size;
-
-	/* check sanity of attributes */
-	if (attr->max_entries == 0 || attr->key_size != 4 ||
-	    attr->value_size == 0)
-		return ERR_PTR(-EINVAL);
-
-	elem_size = round_up(attr->value_size, 8);
+	u32 array_size;
 
 	/* check round_up into zero and u32 overflow */
 	if (elem_size == 0 ||
@@ -52,6 +44,20 @@ static struct bpf_map *array_map_alloc(union bpf_attr *attr)
 	array->elem_size = elem_size;
 
 	return &array->map;
+}
+
+/* Called from syscall */
+static struct bpf_map *array_map_alloc(union bpf_attr *attr)
+{
+	u32 elem_size;
+
+	/* check sanity of attributes */
+	if (attr->max_entries == 0 || attr->key_size != 4 ||
+	    attr->value_size == 0)
+		return ERR_PTR(-EINVAL);
+
+	elem_size = round_up(attr->value_size, 8);
+	return __array_map_alloc(attr, elem_size);
 }
 
 /* Called from syscall or from eBPF program */
@@ -171,7 +177,7 @@ static void fd_array_map_free(struct bpf_map *map)
 	kvfree(array);
 }
 
-static void *fd_array_map_lookup_elem(struct bpf_map *map, void *key)
+static void *empty_array_map_lookup_elem(struct bpf_map *map, void *key)
 {
 	return NULL;
 }
@@ -255,7 +261,7 @@ static const struct bpf_map_ops prog_array_ops = {
 	.map_alloc = fd_array_map_alloc,
 	.map_free = fd_array_map_free,
 	.map_get_next_key = array_map_get_next_key,
-	.map_lookup_elem = fd_array_map_lookup_elem,
+	.map_lookup_elem = empty_array_map_lookup_elem,
 	.map_update_elem = fd_array_map_update_elem,
 	.map_delete_elem = fd_array_map_delete_elem,
 	.map_fd_get_ptr = prog_fd_array_get_ptr,
@@ -312,7 +318,7 @@ static const struct bpf_map_ops perf_event_array_ops = {
 	.map_alloc = fd_array_map_alloc,
 	.map_free = perf_event_array_map_free,
 	.map_get_next_key = array_map_get_next_key,
-	.map_lookup_elem = fd_array_map_lookup_elem,
+	.map_lookup_elem = empty_array_map_lookup_elem,
 	.map_update_elem = fd_array_map_update_elem,
 	.map_delete_elem = fd_array_map_delete_elem,
 	.map_fd_get_ptr = perf_event_fd_array_get_ptr,
@@ -330,3 +336,132 @@ static int __init register_perf_event_array_map(void)
 	return 0;
 }
 late_initcall(register_perf_event_array_map);
+
+/* Intended empty function as ebpf stub */
+enum hrtimer_restart bpf_timer_callback(struct hrtimer *timer __maybe_unused)
+{
+	return HRTIMER_NORESTART;
+}
+
+static void timer_array_map_init_timers(struct bpf_map *map)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	int i;
+	struct hrtimer *timer;
+
+	/* init all timer */
+	for (i = 0; i < array->map.max_entries; i++) {
+		timer = (struct hrtimer *)(array->value +
+					   array->elem_size * i);
+		hrtimer_init(timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		timer->function = bpf_timer_callback;
+	}
+}
+
+static struct bpf_map *timer_array_map_alloc(union bpf_attr *attr)
+{
+	u32 elem_size;
+	struct bpf_map *map;
+
+	if (attr->value_size != sizeof(u64))
+		return ERR_PTR(-EINVAL);
+
+	/* check sanity of attributes */
+	if (attr->max_entries == 0 || attr->key_size != 4 ||
+	    attr->value_size == 0)
+		return ERR_PTR(-EINVAL);
+
+	elem_size = round_up(sizeof(struct hrtimer), 8);
+	map = __array_map_alloc(attr, elem_size);
+	if (IS_ERR(map))
+		return map;
+
+	timer_array_map_init_timers(map);
+
+	return map;
+}
+
+static void timer_array_map_free(struct bpf_map *map)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	int i;
+	struct hrtimer *timer;
+
+	synchronize_rcu();
+
+	/* cancel all untriggered timer */
+	for (i = 0; i < array->map.max_entries; i++) {
+		timer = (struct hrtimer *)(array->value +
+					   array->elem_size * i);
+		hrtimer_cancel(timer);
+	}
+	kvfree(array);
+}
+
+/* Timer activate */
+static int timer_array_map_update_elem(struct bpf_map *map, void *key,
+				       void *value, u64 map_flags)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	u32 index = *(u32 *)key;
+	struct hrtimer *timer;
+	int delay_ns = *(u64 *)value;
+	ktime_t kt;
+
+	if (map_flags > BPF_EXIST)
+		/* unknown flags */
+		return -EINVAL;
+
+	if (index >= array->map.max_entries)
+		/* all elements were pre-allocated, cannot insert a new one */
+		return -E2BIG;
+
+	if (map_flags == BPF_NOEXIST)
+		/* all elements already exist */
+		return -EEXIST;
+
+	timer = (struct hrtimer *)(array->value + array->elem_size * index);
+	kt = ktime_set(0, delay_ns);
+	hrtimer_start(timer, kt, HRTIMER_MODE_REL);
+
+	return 0;
+}
+
+/* Timer inactivate */
+static int timer_array_map_delete_elem(struct bpf_map *map, void *key)
+{
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	u32 index = *(u32 *)key;
+	struct hrtimer *timer;
+
+	if (index >= array->map.max_entries)
+		return -E2BIG;
+
+	timer = (struct hrtimer *)(array->value + array->elem_size * index);
+
+	if (hrtimer_try_to_cancel(timer) >= 0)
+		return 0;
+	else
+		return -EBUSY;
+}
+
+static const struct bpf_map_ops timer_array_ops = {
+	.map_alloc = timer_array_map_alloc,
+	.map_free = timer_array_map_free,
+	.map_get_next_key = array_map_get_next_key,
+	.map_lookup_elem = empty_array_map_lookup_elem,
+	.map_update_elem = timer_array_map_update_elem,
+	.map_delete_elem = timer_array_map_delete_elem,
+};
+
+static struct bpf_map_type_list timer_array_type __read_mostly = {
+	.ops = &timer_array_ops,
+	.type = BPF_MAP_TYPE_TIMER_ARRAY,
+};
+
+static int __init register_timer_array_map(void)
+{
+	bpf_register_map_type(&timer_array_type);
+	return 0;
+}
+late_initcall(register_timer_array_map);
