@@ -917,7 +917,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ci);
 	ret = devm_request_irq(dev, ci->irq, ci_irq, IRQF_SHARED,
-			ci->platdata->name, ci);
+			       dev_name(dev), ci);
 	if (ret)
 		goto stop;
 
