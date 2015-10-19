@@ -1169,7 +1169,7 @@ struct ieee80211_vendor_radiotap {
  * @IEEE80211_CONF_PS: Enable 802.11 power save mode (managed mode only).
  *	This is the power save mode defined by IEEE 802.11-2007 section 11.2,
  *	meaning that the hardware still wakes up for beacons, is able to
- *	transmit frames and receive the possible acknowledgment frames.
+ *	transmit frames and receive the possible acknowledgement frames.
  *	Not to be confused with hardware specific wakeup/sleep states,
  *	driver is responsible for that. See the section "Powersave support"
  *	for more.
@@ -1460,7 +1460,7 @@ struct wireless_dev *ieee80211_vif_to_wdev(struct ieee80211_vif *vif);
  *	%IEEE80211_KEY_FLAG_SW_MGMT_TX flag to encrypt such frames in SW.
  * @IEEE80211_KEY_FLAG_GENERATE_IV_MGMT: This flag should be set by the
  *	driver for a CCMP/GCMP key to indicate that is requires IV generation
- *	only for managment frames (MFP).
+ *	only for management frames (MFP).
  * @IEEE80211_KEY_FLAG_RESERVE_TAILROOM: This flag should be set by the
  *	driver for a key to indicate that sufficient tailroom must always
  *	be reserved for ICV or MIC, even when HW encryption is enabled.
@@ -5198,7 +5198,7 @@ static inline int rate_supported(struct ieee80211_sta *sta,
  * @sta: &struct ieee80211_sta pointer to the target destination. Note
  * 	that this may be null.
  * @priv_sta: private rate control structure. This may be null.
- * @txrc: rate control information we sholud populate for mac80211.
+ * @txrc: rate control information we should populate for mac80211.
  */
 bool rate_control_send_low(struct ieee80211_sta *sta,
 			   void *priv_sta,

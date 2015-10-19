@@ -2417,7 +2417,7 @@ struct cfg80211_qos_map {
  * @set_coalesce: Set coalesce parameters.
  *
  * @channel_switch: initiate channel-switch procedure (with CSA). Driver is
- *	responsible for veryfing if the switch is possible. Since this is
+ *	responsible for verifying if the switch is possible. Since this is
  *	inherently tricky driver may decide to disconnect an interface later
  *	with cfg80211_stop_iface(). This doesn't mean driver can accept
  *	everything. It should do it's best to verify requests and reject them

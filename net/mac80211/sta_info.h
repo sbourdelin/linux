@@ -133,7 +133,7 @@ enum ieee80211_agg_stop_reason {
  * @buf_size: reorder buffer size at receiver
  * @failed_bar_ssn: ssn of the last failed BAR tx attempt
  * @bar_pending: BAR needs to be re-sent
- * @amsdu: support A-MSDU withing A-MDPU
+ * @amsdu: support A-MSDU within A-MDPU
  *
  * This structure's lifetime is managed by RCU, assignments to
  * the array holding it must hold the aggregation mutex.
