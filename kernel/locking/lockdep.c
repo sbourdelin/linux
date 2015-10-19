@@ -3428,6 +3428,8 @@ found_it:
 	curr->curr_chain_key = hlock->prev_chain_key;
 
 	for (i++; i < depth; i++) {
+		int tmp = curr->lockdep_depth;
+
 		hlock = curr->held_locks + i;
 		if (!__lock_acquire(hlock->instance,
 			hlock_class(hlock)->subclass, hlock->trylock,
@@ -3435,6 +3437,13 @@ found_it:
 				hlock->nest_lock, hlock->acquire_ip,
 				hlock->references, hlock->pin_count))
 			return 0;
+		/*
+		 * If nest_lock is true and the lock we just removed allow two
+		 * lock of same class to be consolidated in only one held_lock
+		 * then the lockdep_depth count will not increase as we expect
+		 * it to. So adjust the expected depth value accordingly.
+		 */
+		depth -= (curr->lockdep_depth == tmp);
 	}
 
 	/*
