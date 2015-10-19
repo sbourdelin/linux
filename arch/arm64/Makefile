@@ -28,6 +28,11 @@ endif
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
 KBUILD_AFLAGS	+= $(lseinstr)
+ifdef CONFIG_STACK_TRACER
+ifdef CONFIG_FRAME_POINTER
+KBUILD_CFLAGS	+= -mno-omit-leaf-frame-pointer
+endif
+endif
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
