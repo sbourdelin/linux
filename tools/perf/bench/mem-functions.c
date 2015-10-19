@@ -273,7 +273,7 @@ static double do_memcpy_gettimeofday(const struct routine *r, size_t len)
 	return (double)(((double)len * iterations) / timeval2double(&tv_diff));
 }
 
-int bench_mem_memcpy(int argc, const char **argv, const char *prefix __unused)
+int bench_mem_memcpy(int argc, const char **argv, const char *prefix __maybe_unused)
 {
 	struct bench_mem_info info = {
 		.routines		= memcpy_routines,
@@ -361,7 +361,7 @@ static const struct routine memset_routines[] = {
 	{ NULL, }
 };
 
-int bench_mem_memset(int argc, const char **argv, const char *prefix __unused)
+int bench_mem_memset(int argc, const char **argv, const char *prefix __maybe_unused)
 {
 	struct bench_mem_info info = {
 		.routines		= memset_routines,
