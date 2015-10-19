@@ -2661,7 +2661,7 @@ static int xfrm_notify_sa(struct xfrm_state *x, const struct km_event *c)
 		if (attr == NULL)
 			goto out_free_skb;
 
-		p = nla_data(attr);
+		p = PTR_ALIGN(nla_data(attr), __alignof__(*p));
 	}
 	err = copy_to_user_state_extra(x, p, skb);
 	if (err)
