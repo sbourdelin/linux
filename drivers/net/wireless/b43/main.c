@@ -365,7 +365,7 @@ static struct ieee80211_supported_band b43_band_2ghz_limited = {
 
 static void b43_wireless_core_exit(struct b43_wldev *dev);
 static int b43_wireless_core_init(struct b43_wldev *dev);
-static struct b43_wldev * b43_wireless_core_stop(struct b43_wldev *dev);
+static struct b43_wldev *b43_wireless_core_stop(struct b43_wldev *dev);
 static int b43_wireless_core_start(struct b43_wldev *dev);
 static void b43_op_bss_info_changed(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif,
@@ -990,7 +990,7 @@ static void do_key_write(struct b43_wldev *dev,
 		 * 0xffffffff and let's b43_op_update_tkip_key provide a
 		 * correct pair.
 		 */
-		rx_tkip_phase1_write(dev, index, 0xffffffff, (u16*)buf);
+		rx_tkip_phase1_write(dev, index, 0xffffffff, (u16 *)buf);
 	} else if (index >= pairwise_keys_start) /* clear it */
 		rx_tkip_phase1_write(dev, index, 0, NULL);
 	if (key)
@@ -4335,7 +4335,7 @@ out_unlock:
 /* Locking: wl->mutex
  * Returns the current dev. This might be different from the passed in dev,
  * because the core might be gone away while we unlocked the mutex. */
-static struct b43_wldev * b43_wireless_core_stop(struct b43_wldev *dev)
+static struct b43_wldev *b43_wireless_core_stop(struct b43_wldev *dev)
 {
 	struct b43_wl *wl;
 	struct b43_wldev *orig_dev;

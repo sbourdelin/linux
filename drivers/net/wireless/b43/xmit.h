@@ -203,7 +203,7 @@ size_t b43_txhdr_size(struct b43_wldev *dev)
 
 
 int b43_generate_txhdr(struct b43_wldev *dev,
-		       u8 * txhdr,
+		       u8 *txhdr,
 		       struct sk_buff *skb_frag,
 		       struct ieee80211_tx_info *txctl, u16 cookie);
 
