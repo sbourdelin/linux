@@ -25,6 +25,19 @@
 			interrupt-names = "mc";
 		};
 
+		can0: hecc@5c050000 {
+			compatible = "ti,hecc";
+			reg = <0x5c050000 0x4000>;
+			interrupts = <24>;
+			ti,hecc_scc_offset = <0>;
+			ti,hecc_scc_ram_offset = <0x3000>;
+			ti,hecc_ram_offset = <0x3000>;
+			ti,hecc_mbx_offset = <0x2000>;
+			ti,hecc_int_line = <0>;
+			ti,hecc_version = <1>;
+			status = "disabled";
+		};
+
 		davinci_emac: ethernet@0x5c000000 {
 			compatible = "ti,am3517-emac";
 			ti,hwmods = "davinci_emac";

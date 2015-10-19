@@ -875,16 +875,56 @@ static const struct net_device_ops ti_hecc_netdev_ops = {
 	.ndo_change_mtu		= can_change_mtu,
 };
 
+#if defined(CONFIG_OF)
+static const struct of_device_id ti_hecc_can_dt_ids[] = {
+	{
+		.compatible = "ti,hecc",
+	}, {
+		/* sentinel */
+	}
+};
+MODULE_DEVICE_TABLE(of, ti_hecc_can_dt_ids);
+#endif
+
+static const struct ti_hecc_platform_data
+*ti_hecc_can_get_driver_data(struct platform_device *pdev)
+{
+	if (pdev->dev.of_node) {
+		struct ti_hecc_platform_data *data;
+		struct device_node *np = pdev->dev.of_node;
+
+		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+		if (!data)
+			return NULL;
+
+		of_property_read_u32(np, "ti,hecc_scc_offset",
+				     &data->scc_hecc_offset);
+		of_property_read_u32(np, "ti,hecc_scc_ram_offset",
+				     &data->scc_ram_offset);
+		of_property_read_u32(np, "ti,hecc_ram_offset",
+				     &data->hecc_ram_offset);
+		of_property_read_u32(np, "ti,hecc_mbx_offset",
+				     &data->mbx_offset);
+		of_property_read_u32(np, "ti,hecc_int_line",
+				     &data->int_line);
+		of_property_read_u32(np, "ti,hecc_version",
+				     &data->version);
+		return data;
+	}
+	return (const struct ti_hecc_platform_data *)
+		dev_get_platdata(&pdev->dev);
+}
+
 static int ti_hecc_probe(struct platform_device *pdev)
 {
 	struct net_device *ndev = (struct net_device *)0;
 	struct ti_hecc_priv *priv;
-	struct ti_hecc_platform_data *pdata;
+	const struct ti_hecc_platform_data *pdata;
 	struct resource *mem, *irq;
 	void __iomem *addr;
 	int err = -ENODEV;
 
-	pdata = dev_get_platdata(&pdev->dev);
+	pdata = ti_hecc_can_get_driver_data(pdev);
 	if (!pdata) {
 		dev_err(&pdev->dev, "No platform data\n");
 		goto probe_exit;
@@ -1040,6 +1080,7 @@ static int ti_hecc_resume(struct platform_device *pdev)
 static struct platform_driver ti_hecc_driver = {
 	.driver = {
 		.name    = DRV_NAME,
+		.of_match_table = of_match_ptr(ti_hecc_can_dt_ids),
 	},
 	.probe = ti_hecc_probe,
 	.remove = ti_hecc_remove,
