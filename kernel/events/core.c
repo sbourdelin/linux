@@ -6337,6 +6337,9 @@ static int __perf_event_overflow(struct perf_event *event,
 		irq_work_queue(&event->pending);
 	}
 
+	if (unlikely(!atomic_read(&event->soft_enable)))
+		return 0;
+
 	if (event->overflow_handler)
 		event->overflow_handler(event, data, regs);
 	else
@@ -7709,6 +7712,14 @@ static void account_event(struct perf_event *event)
 	account_event_cpu(event, event->cpu);
 }
 
+static void perf_event_check_dump_flag(struct perf_event *event)
+{
+	if (event->attr.soft_disable == 1)
+		atomic_set(&event->soft_enable, 0);
+	else
+		atomic_set(&event->soft_enable, 1);
+}
+
 /*
  * Allocate and initialize a event structure
  */
@@ -7839,6 +7850,8 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 				goto err_per_task;
 		}
 	}
+
+	perf_event_check_dump_flag(event);
 
 	return event;
 

@@ -132,6 +132,20 @@ enum bpf_prog_type {
 #define BPF_NOEXIST	1 /* create new element if it didn't exist */
 #define BPF_EXIST	2 /* update existing element */
 
+/* flags for PERF_EVENT_ARRAY maps*/
+enum {
+	BPF_EVENT_CTL_BIT_CUR = 0,
+	BPF_EVENT_CTL_BIT_ALL = 1,
+	__NR_BPF_EVENT_CTL_BITS,
+};
+
+#define	BPF_CTL_BIT_FLAG_MASK \
+	((1ULL << __NR_BPF_EVENT_CTL_BITS) - 1)
+#define	BPF_CTL_BIT_DUMP_CUR \
+	(1ULL << BPF_EVENT_CTL_BIT_CUR)
+#define	BPF_CTL_BIT_DUMP_ALL \
+	(1ULL << BPF_EVENT_CTL_BIT_ALL)
+
 union bpf_attr {
 	struct { /* anonymous struct used by BPF_MAP_CREATE command */
 		__u32	map_type;	/* one of enum bpf_map_type */
@@ -287,6 +301,11 @@ enum bpf_func_id {
 	 * Return: realm if != 0
 	 */
 	BPF_FUNC_get_route_realm,
+
+	/**
+	 * u64 bpf_perf_event_control(&map, index, flag)
+	 */
+	BPF_FUNC_perf_event_control,
 	__BPF_FUNC_MAX_ID,
 };
 
