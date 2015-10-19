@@ -1461,6 +1461,8 @@ static int hci_dev_do_open(struct hci_dev *hdev)
 	set_bit(HCI_INIT, &hdev->flags);
 
 	if (hci_dev_test_flag(hdev, HCI_SETUP)) {
+		hci_sock_dev_event(hdev, HCI_DEV_SETUP);
+
 		if (hdev->setup)
 			ret = hdev->setup(hdev);
 
@@ -3256,6 +3258,8 @@ struct hci_dev *hci_alloc_dev(void)
 	hdev = kzalloc(sizeof(*hdev), GFP_KERNEL);
 	if (!hdev)
 		return NULL;
+
+	hdev->dev_manufacturer = 0xffff;	/* Set to internal use */
 
 	hdev->pkt_type  = (HCI_DM1 | HCI_DH1 | HCI_HV1);
 	hdev->esco_type = (ESCO_HV1);

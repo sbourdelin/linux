@@ -200,6 +200,7 @@ struct hci_dev {
 	__u16		id;
 	__u8		bus;
 	__u8		dev_type;
+	__u16		dev_manufacturer;
 	bdaddr_t	bdaddr;
 	bdaddr_t	setup_addr;
 	bdaddr_t	public_addr;
