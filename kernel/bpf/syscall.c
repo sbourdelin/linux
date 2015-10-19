@@ -156,7 +156,8 @@ static int map_lookup_elem(union bpf_attr *attr)
 	void __user *uvalue = u64_to_ptr(attr->value);
 	int ufd = attr->map_fd;
 	struct bpf_map *map;
-	void *key, *value, *ptr;
+	u64 key_buf, value_buf;
+	void *key = &key_buf, *value = &value_buf, *ptr;
 	struct fd f;
 	int err;
 
@@ -178,7 +179,8 @@ static int map_lookup_elem(union bpf_attr *attr)
 		goto free_key;
 
 	err = -ENOMEM;
-	value = kmalloc(map->value_size, GFP_USER);
+	if (map->value_size > sizeof(u64))
+		value = kmalloc(map->value_size, GFP_USER);
 	if (!value)
 		goto free_key;
 
@@ -199,9 +201,11 @@ static int map_lookup_elem(union bpf_attr *attr)
 	err = 0;
 
 free_value:
-	kfree(value);
+	if (value != &value_buf)
+		kfree(value);
 free_key:
-	kfree(key);
+	if (key != &key_buf)
+		kfree(key);
 err_put:
 	fdput(f);
 	return err;
@@ -215,7 +219,8 @@ static int map_update_elem(union bpf_attr *attr)
 	void __user *uvalue = u64_to_ptr(attr->value);
 	int ufd = attr->map_fd;
 	struct bpf_map *map;
-	void *key, *value;
+	u64 key_buf, value_buf;
+	void *key = &key_buf, *value = &value_buf;
 	struct fd f;
 	int err;
 
@@ -228,7 +233,8 @@ static int map_update_elem(union bpf_attr *attr)
 		return PTR_ERR(map);
 
 	err = -ENOMEM;
-	key = kmalloc(map->key_size, GFP_USER);
+	if (map->key_size > sizeof(u64))
+		key = kmalloc(map->key_size, GFP_USER);
 	if (!key)
 		goto err_put;
 
@@ -237,7 +243,8 @@ static int map_update_elem(union bpf_attr *attr)
 		goto free_key;
 
 	err = -ENOMEM;
-	value = kmalloc(map->value_size, GFP_USER);
+	if (map->value_size > sizeof(u64))
+		value = kmalloc(map->value_size, GFP_USER);
 	if (!value)
 		goto free_key;
 
@@ -253,9 +260,11 @@ static int map_update_elem(union bpf_attr *attr)
 	rcu_read_unlock();
 
 free_value:
-	kfree(value);
+	if (value != &value_buf)
+		kfree(value);
 free_key:
-	kfree(key);
+	if (key != &key_buf)
+		kfree(key);
 err_put:
 	fdput(f);
 	return err;
@@ -281,7 +290,8 @@ static int map_delete_elem(union bpf_attr *attr)
 		return PTR_ERR(map);
 
 	err = -ENOMEM;
-	key = kmalloc(map->key_size, GFP_USER);
+	if (map->key_size > sizeof(u64))
+		key = kmalloc(map->key_size, GFP_USER);
 	if (!key)
 		goto err_put;
 
