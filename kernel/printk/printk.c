@@ -179,6 +179,7 @@ struct log_buffer log_buf = {
 	.next_idx	= 0,
 	.clear_seq	= 0,
 	.clear_idx	= 0,
+	.mode		= 0,
 	.minor		= 0,
 };
 
