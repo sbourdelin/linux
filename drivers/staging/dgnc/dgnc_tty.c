@@ -1507,7 +1507,7 @@ static int dgnc_tty_chars_in_buffer(struct tty_struct *tty)
 	uint chars = 0;
 	unsigned long flags;
 
-	if (tty == NULL)
+	if (!tty)
 		return 0;
 
 	un = tty->driver_data;
