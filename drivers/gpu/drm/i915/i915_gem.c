@@ -2377,27 +2377,30 @@ i915_gem_object_retire__read(struct drm_i915_gem_object *obj, int ring)
 	RQ_BUG_ON(obj->last_read_req[ring] == NULL);
 	RQ_BUG_ON(!(obj->active & (1 << ring)));
 
+	obj->active &= ~(1 << ring);
+	if (!obj->active) {
+		/* Bump our place on the bound list to keep it roughly in LRU
+		 * order so that we don't steal from recently used but inactive
+		 * objects (unless we are forced to ofc!)
+		 */
+		list_move_tail(&obj->global_list,
+				&to_i915(obj->base.dev)->mm.bound_list);
+
+		list_for_each_entry(vma, &obj->vma_list, vma_link) {
+			if (!list_empty(&vma->mm_list))
+				list_move_tail(&vma->mm_list,
+						&vma->vm->inactive_list);
+		}
+	}
+
 	list_del_init(&obj->ring_list[ring]);
 	i915_gem_request_assign(&obj->last_read_req[ring], NULL);
 
 	if (obj->last_write_req && obj->last_write_req->ring->id == ring)
 		i915_gem_object_retire__write(obj);
 
-	obj->active &= ~(1 << ring);
 	if (obj->active)
 		return;
-
-	/* Bump our place on the bound list to keep it roughly in LRU order
-	 * so that we don't steal from recently used but inactive objects
-	 * (unless we are forced to ofc!)
-	 */
-	list_move_tail(&obj->global_list,
-		       &to_i915(obj->base.dev)->mm.bound_list);
-
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
-		if (!list_empty(&vma->mm_list))
-			list_move_tail(&vma->mm_list, &vma->vm->inactive_list);
-	}
 
 	i915_gem_request_assign(&obj->last_fenced_req, NULL);
 	drm_gem_object_unreference(&obj->base);
