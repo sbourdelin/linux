@@ -41,6 +41,8 @@
 #include <linux/irq_work.h>
 #include <linux/utsname.h>
 #include <linux/ctype.h>
+#include <linux/kref.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 
@@ -173,6 +175,7 @@ struct log_buffer log_buf = {
 	.len		= __LOG_BUF_K_LEN,
 	.lock		= __RAW_SPIN_LOCK_UNLOCKED(log_buf.lock),
 	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER(log_buf.wait),
+	.refcount	= { .refcount = { .counter = 0 } },
 	.first_seq	= 0,
 	.first_idx	= 0,
 	.next_seq	= 0,
@@ -216,6 +219,15 @@ char *log_buf_addr_get(void)
 u32 log_buf_len_get(void)
 {
 	return log_buf.len;
+}
+
+void log_buf_release(struct kref *ref)
+{
+	struct log_buffer *log_b = container_of(ref, struct log_buffer,
+						refcount);
+
+	kfree(log_b->buf);
+	kfree(log_b);
 }
 
 /*
