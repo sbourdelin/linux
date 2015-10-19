@@ -263,6 +263,13 @@ static inline void ftrace_kill(void) { }
 #endif /* CONFIG_FUNCTION_TRACER */
 
 #ifdef CONFIG_STACK_TRACER
+/*
+ * the offset value to add to return address from save_stack_trace()
+ */
+#ifndef FTRACE_STACK_FRAME_OFFSET
+#define FTRACE_STACK_FRAME_OFFSET 0
+#endif
+
 extern int stack_tracer_enabled;
 int
 stack_trace_sysctl(struct ctl_table *table, int write,

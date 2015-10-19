@@ -68,7 +68,7 @@ static inline void print_max_stack(void)
 static inline void
 check_stack(unsigned long ip, unsigned long *stack)
 {
-	unsigned long this_size, flags; unsigned long *p, *top, *start;
+	unsigned long this_size, flags; unsigned long *p, *top, *start, addr;
 	static int tracer_frame;
 	int frame_size = ACCESS_ONCE(tracer_frame);
 	int i, x;
@@ -105,7 +105,8 @@ check_stack(unsigned long ip, unsigned long *stack)
 
 	/* Skip over the overhead of the stack tracer itself */
 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-		if (stack_dump_trace[i] == ip)
+		addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
+		if (addr == ip)
 			break;
 	}
 
@@ -133,7 +134,8 @@ check_stack(unsigned long ip, unsigned long *stack)
 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
 			if (stack_dump_trace[i] == ULONG_MAX)
 				break;
-			if (*p == stack_dump_trace[i]) {
+			addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
+			if (*p == addr) {
 				stack_dump_trace[x] = stack_dump_trace[i++];
 				this_size = stack_dump_index[x++] =
 					(top - p) * sizeof(unsigned long);
