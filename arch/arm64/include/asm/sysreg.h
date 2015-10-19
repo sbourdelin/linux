@@ -54,6 +54,9 @@
 #define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
 #define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
 
+/* sys_reg() encoding of id is shifted by 5 for use in mrs */
+#define SYS_REG_IMM_SHIFT		5
+
 #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
 #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
 #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
@@ -187,6 +190,9 @@
 #define MVFR1_FPDNAN_SHIFT		4
 #define MVFR1_FPFTZ_SHIFT		0
 
+
+/* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:1 */
+#define SYS_MPIDR_SAFE_VAL	((1UL<<31)|(1UL<<24))
 
 #ifdef __ASSEMBLY__
 
