@@ -221,6 +221,10 @@ int s5k83a_start(struct sd *sd)
 	   to assume that there is no better way of accomplishing this */
 	sd->rotation_thread = kthread_create(rotation_thread_function,
 					     sd, "rotation thread");
+	if (IS_ERR(sd->rotation_thread)) {
+		err = PTR_ERR(sd->rotation_thread);
+		goto fail;
+	}
 	wake_up_process(sd->rotation_thread);
 
 	/* Preinit the sensor */
@@ -234,9 +238,11 @@ int s5k83a_start(struct sd *sd)
 				data[0]);
 	}
 	if (err < 0)
-		return err;
+		goto fail;
 
 	return s5k83a_set_led_indication(sd, 1);
+fail:
+	return err;
 }
 
 int s5k83a_stop(struct sd *sd)
