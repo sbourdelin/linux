@@ -63,28 +63,31 @@ int wilc_mq_send(WILC_MsgQueueHandle *pHandle,
 	if ((!pHandle) || (u32SendBufferSize == 0) || (!pvSendBuffer)) {
 		PRINT_ER("pHandle or pvSendBuffer is null\n");
 		result = -EFAULT;
-		goto ERRORHANDLER;
+		goto out;
 	}
 
 	if (pHandle->bExiting) {
 		PRINT_ER("pHandle fail\n");
 		result = -EFAULT;
-		goto ERRORHANDLER;
+		goto out;
 	}
 
 	spin_lock_irqsave(&pHandle->strCriticalSection, flags);
 
 	/* construct a new message */
 	pstrMessage = kmalloc(sizeof(Message), GFP_ATOMIC);
-	if (!pstrMessage)
-		return -ENOMEM;
+	if (!pstrMessage) {
+		result = -ENOMEM;
+		goto release_lock;
+	}
+
 	pstrMessage->u32Length = u32SendBufferSize;
 	pstrMessage->pstrNext = NULL;
 	pstrMessage->pvBuffer = kmemdup(pvSendBuffer, u32SendBufferSize,
 					GFP_ATOMIC);
 	if (!pstrMessage->pvBuffer) {
 		result = -ENOMEM;
-		goto ERRORHANDLER;
+		goto mem_free;
 	}
 
 	/* add it to the message queue */
@@ -103,13 +106,13 @@ int wilc_mq_send(WILC_MsgQueueHandle *pHandle,
 
 	up(&pHandle->hSem);
 
-ERRORHANDLER:
-	/* error occured, free any allocations */
-	if (pstrMessage) {
-		kfree(pstrMessage->pvBuffer);
-		kfree(pstrMessage);
-	}
+	return 0;
 
+mem_free:
+	kfree(pstrMessage);
+release_lock:
+	spin_unlock_irqrestore(&pHandle->strCriticalSection, flags);
+out:
 	return result;
 }
 
