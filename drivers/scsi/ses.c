@@ -641,7 +641,7 @@ static int ses_intf_add(struct device *cdev,
 	/* begin at the enclosure descriptor */
 	type_ptr = buf + 8;
 	/* skip all the enclosure descriptors */
-	for (i = 0; i < num_enclosures && type_ptr < buf + len; i++) {
+	for (i = 0; i < num_enclosures && type_ptr + 4 < buf + len; i++) {
 		types += type_ptr[2];
 		type_ptr += type_ptr[3] + 4;
 	}
@@ -649,7 +649,7 @@ static int ses_intf_add(struct device *cdev,
 	ses_dev->page1_types = type_ptr;
 	ses_dev->page1_num_types = types;
 
-	for (i = 0; i < types && type_ptr < buf + len; i++, type_ptr += 4) {
+	for (i = 0; i < types && type_ptr + 2 < buf + len; i++, type_ptr += 4) {
 		if (type_ptr[0] == ENCLOSURE_COMPONENT_DEVICE ||
 		    type_ptr[0] == ENCLOSURE_COMPONENT_ARRAY_DEVICE)
 			components += type_ptr[1];
