@@ -44,9 +44,12 @@ enum ftr_type {
 
 #define FTR_STRICT	true	/* SANITY check strict matching required */
 #define FTR_NONSTRICT	false	/* SANITY check ignored */
+#define FTR_VISIBLE	true	/* Feature visible to user space */
+#define FTR_HIDDEN	false	/* Feature not visible to user space */
 
 struct arm64_ftr_bits {
 	bool		strict;	  /* CPU Sanity check: strict matching required ? */
+	bool		visible;  /* visible to userspace ? */
 	enum ftr_type	type;
 	u8		shift;
 	u8		width;
@@ -55,13 +58,17 @@ struct arm64_ftr_bits {
 
 /*
  * @arm64_ftr_reg - Feature register
+ * @user_mask		Bits of @sys_val visible to user space.
  * @strict_mask 	Bits which should match across all CPUs for sanity.
+ * @user_val		Safe value for user invisible fields.
  * @sys_val		Safe value across the CPUs (system view)
  */
 struct arm64_ftr_reg {
 	u32			sys_id;
 	const char		*name;
+	u64			user_mask;
 	u64			strict_mask;
+	u64			user_val;
 	u64			sys_val;
 	struct arm64_ftr_bits	*ftr_bits;
 };
