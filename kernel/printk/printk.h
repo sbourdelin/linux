@@ -118,6 +118,7 @@ struct log_buffer {
 	u64 clear_seq;
 	u32 clear_idx;
 
+	int mode;		/* mode of device */
 	int minor;		/* minor representing buffer device */
 #endif
 };
