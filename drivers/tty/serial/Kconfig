@@ -1540,6 +1540,7 @@ config SERIAL_FSL_LPUART
 	depends on HAS_DMA
 	select SERIAL_CORE
 	select SERIAL_EARLYCON
+	select SERIAL_CORE_CONSOLE
 	help
 	  Support for the on-chip lpuart on some Freescale SOCs.
 
