@@ -141,3 +141,7 @@
 &sata_phy {
 	status = "okay";
 };
+
+&wdt0 {
+	status = "okay";
+};
