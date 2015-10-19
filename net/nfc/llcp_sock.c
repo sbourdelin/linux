@@ -870,7 +870,7 @@ static int llcp_sock_recvmsg(struct socket *sock, struct msghdr *msg,
 			}
 		}
 
-		kfree_skb(skb);
+		skb_free_datagram(sk, skb);
 	}
 
 	/* XXX Queue backlogged skbs */
