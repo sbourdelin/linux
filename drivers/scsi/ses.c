@@ -476,6 +476,8 @@ static void ses_enclosure_data_process(struct enclosure_device *edev,
 		goto simple_populate;
 
 	page7_len = len = (hdr_buf[2] << 8) + hdr_buf[3] + 4;
+	if (len < 12)
+		goto simple_populate;
 	/* add 1 for trailing '\0' we'll use */
 	buf = kzalloc(len + 1, GFP_KERNEL);
 	if (!buf)
@@ -504,15 +506,19 @@ static void ses_enclosure_data_process(struct enclosure_device *edev,
 			struct enclosure_component *ecomp;
 
 			if (desc_ptr) {
-				if (desc_ptr >= buf + page7_len) {
+				if (desc_ptr + 4 >= buf + page7_len) {
 					desc_ptr = NULL;
 				} else {
 					len = (desc_ptr[2] << 8) + desc_ptr[3];
 					desc_ptr += 4;
 					/* Add trailing zero - pushes into
 					 * reserved space */
-					desc_ptr[len] = '\0';
-					name = desc_ptr;
+					if (desc_ptr + len >= buf + page7_len) {
+						desc_ptr = NULL;
+					} else {
+						desc_ptr[len] = '\0';
+						name = desc_ptr;
+					}
 				}
 			}
 			if (type_ptr[0] == ENCLOSURE_COMPONENT_DEVICE ||
