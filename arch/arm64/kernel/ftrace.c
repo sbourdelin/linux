@@ -9,6 +9,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/bug.h>
 #include <linux/ftrace.h>
 #include <linux/swab.h>
 #include <linux/uaccess.h>
@@ -16,6 +17,7 @@
 #include <asm/cacheflush.h>
 #include <asm/ftrace.h>
 #include <asm/insn.h>
+#include <asm/stacktrace.h>
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 /*
@@ -173,3 +175,69 @@ int ftrace_disable_ftrace_graph_caller(void)
 }
 #endif /* CONFIG_DYNAMIC_FTRACE */
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+
+#ifdef CONFIG_STACK_TRACER
+static unsigned long stack_trace_sp[STACK_TRACE_ENTRIES];
+static unsigned long raw_stack_trace_max_size;
+
+void check_stack(unsigned long ip, unsigned long *stack)
+{
+	unsigned long this_size, flags;
+	unsigned long top;
+	int i, j;
+
+	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
+	this_size = THREAD_SIZE - this_size;
+
+	if (this_size <= raw_stack_trace_max_size)
+		return;
+
+	/* we do not handle an interrupt stack yet */
+	if (!object_is_on_stack(stack))
+		return;
+
+	local_irq_save(flags);
+	arch_spin_lock(&max_stack_lock);
+
+	/* check again */
+	if (this_size <= raw_stack_trace_max_size)
+		goto out;
+
+	/* find out stack frames */
+	stack_trace_max.nr_entries = 0;
+	stack_trace_max.skip = 0;
+	save_stack_trace_sp(&stack_trace_max, stack_trace_sp);
+	stack_trace_max.nr_entries--; /* for the last entry ('-1') */
+
+	/* calculate a stack index for each function */
+	top = ((unsigned long)stack & ~(THREAD_SIZE-1)) + THREAD_SIZE;
+	for (i = 0; i < stack_trace_max.nr_entries; i++)
+		stack_trace_index[i] = top - stack_trace_sp[i];
+	raw_stack_trace_max_size = this_size;
+
+	/* Skip over the overhead of the stack tracer itself */
+	for (i = 0; i < stack_trace_max.nr_entries; i++) {
+		unsigned long addr;
+
+		addr = stack_trace_max.entries[i] + FTRACE_STACK_FRAME_OFFSET;
+		if (addr == ip)
+			break;
+	}
+
+	stack_trace_max.nr_entries -= i;
+	for (j = 0; j < stack_trace_max.nr_entries; j++) {
+		stack_trace_index[j] = stack_trace_index[j + i];
+		stack_trace_max.entries[j] = stack_trace_max.entries[j + i];
+	}
+	stack_trace_max_size = stack_trace_index[0];
+
+	if (task_stack_end_corrupted(current)) {
+		WARN(1, "task stack is corrupted.\n");
+		stack_trace_print();
+	}
+
+ out:
+	arch_spin_unlock(&max_stack_lock);
+	local_irq_restore(flags);
+}
+#endif /* CONFIG_STACK_TRACER */
