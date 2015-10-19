@@ -1322,32 +1322,6 @@ __init void prefill_possible_map(void)
 
 #ifdef CONFIG_HOTPLUG_CPU
 
-static void remove_siblinginfo(int cpu)
-{
-	int sibling;
-	struct cpuinfo_x86 *c = &cpu_data(cpu);
-
-	for_each_cpu(sibling, topology_core_cpumask(cpu)) {
-		cpumask_clear_cpu(cpu, topology_core_cpumask(sibling));
-		/*/
-		 * last thread sibling in this cpu core going down
-		 */
-		if (cpumask_weight(topology_sibling_cpumask(cpu)) == 1)
-			cpu_data(sibling).booted_cores--;
-	}
-
-	for_each_cpu(sibling, topology_sibling_cpumask(cpu))
-		cpumask_clear_cpu(cpu, topology_sibling_cpumask(sibling));
-	for_each_cpu(sibling, cpu_llc_shared_mask(cpu))
-		cpumask_clear_cpu(cpu, cpu_llc_shared_mask(sibling));
-	cpumask_clear(cpu_llc_shared_mask(cpu));
-	cpumask_clear(topology_sibling_cpumask(cpu));
-	cpumask_clear(topology_core_cpumask(cpu));
-	c->phys_proc_id = 0;
-	c->cpu_core_id = 0;
-	cpumask_clear_cpu(cpu, cpu_sibling_setup_mask);
-}
-
 static void remove_cpu_from_maps(int cpu)
 {
 	set_cpu_online(cpu, false);
@@ -1361,8 +1335,6 @@ static void remove_cpu_from_maps(int cpu)
 void cpu_disable_common(void)
 {
 	int cpu = smp_processor_id();
-
-	remove_siblinginfo(cpu);
 
 	/* It's now safe to remove this processor from the online map */
 	lock_vector_lock();
