@@ -199,6 +199,11 @@ static inline void clflushopt(volatile void *__p)
 		       ".byte 0x66; clflush %P0",
 		       X86_FEATURE_CLFLUSHOPT,
 		       "+m" (*(volatile char __force *)__p));
+	/* GCC (4.9.1 and 5.2.1 at least) appears to be very confused when
+	 * meeting this alternative() and demonstrably miscompiles loops
+	 * iterating over clflushopts.
+	 */
+	barrier();
 }
 
 static inline void clwb(volatile void *__p)
