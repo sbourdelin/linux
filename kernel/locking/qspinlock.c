@@ -332,25 +332,14 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	if (new == _Q_LOCKED_VAL)
 		return;
 
-	/*
-	 * we're pending, wait for the owner to go away.
+	/* we're waiting, and get lock owner
 	 *
-	 * *,1,1 -> *,1,0
-	 *
-	 * this wait loop must be a load-acquire such that we match the
-	 * store-release that clears the locked bit and create lock
-	 * sequentiality; this is because not all clear_pending_set_locked()
-	 * implementations imply full barriers.
+	 * *,1,* -> *,0,1
 	 */
-	while ((val = smp_load_acquire(&lock->val.counter)) & _Q_LOCKED_MASK)
+	while (cmpxchg(&((struct __qspinlock *)lock)->locked_pending,
+		_Q_PENDING_VAL, _Q_LOCKED_VAL) != _Q_PENDING_VAL)
 		cpu_relax();
 
-	/*
-	 * take ownership and clear the pending bit.
-	 *
-	 * *,1,0 -> *,0,1
-	 */
-	clear_pending_set_locked(lock);
 	return;
 
 	/*
@@ -399,17 +388,21 @@ queue:
 	 * we're at the head of the waitqueue, wait for the owner & pending to
 	 * go away.
 	 *
-	 * *,x,y -> *,0,0
-	 *
-	 * this wait loop must use a load-acquire such that we match the
-	 * store-release that clears the locked bit and create lock
-	 * sequentiality; this is because the set_locked() function below
-	 * does not imply a full barrier.
-	 *
+	 * *,x,y -> *,0,1
 	 */
 	pv_wait_head(lock, node);
-	while ((val = smp_load_acquire(&lock->val.counter)) & _Q_LOCKED_PENDING_MASK)
+	next = READ_ONCE(node->next);
+	while (cmpxchg(&((struct __qspinlock *)lock)->locked_pending, 0,
+		_Q_LOCKED_VAL) != 0) {
+		next = READ_ONCE(node->next);
 		cpu_relax();
+	}
+
+	if (next)
+		goto next_node;
+
+	val = smp_load_acquire(&lock->val.counter);
+	tail = tail | _Q_LOCKED_VAL;
 
 	/*
 	 * claim the lock:
@@ -423,7 +416,6 @@ queue:
 	 */
 	for (;;) {
 		if (val != tail) {
-			set_locked(lock);
 			break;
 		}
 		old = atomic_cmpxchg(&lock->val, val, _Q_LOCKED_VAL);
@@ -439,6 +431,7 @@ queue:
 	while (!(next = READ_ONCE(node->next)))
 		cpu_relax();
 
+next_node:
 	arch_mcs_spin_unlock_contended(&next->locked);
 	pv_kick_node(lock, next);
 
