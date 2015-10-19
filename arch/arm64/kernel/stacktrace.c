@@ -17,6 +17,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/export.h>
+#include <linux/ftrace.h>
 #include <linux/sched.h>
 #include <linux/stacktrace.h>
 
@@ -78,6 +79,9 @@ struct stack_trace_data {
 	struct stack_trace *trace;
 	unsigned int no_sched_functions;
 	unsigned int skip;
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	unsigned int ret_stack_index;
+#endif
 };
 
 static int save_trace(struct stackframe *frame, void *d)
@@ -85,6 +89,20 @@ static int save_trace(struct stackframe *frame, void *d)
 	struct stack_trace_data *data = d;
 	struct stack_trace *trace = data->trace;
 	unsigned long addr = frame->pc;
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
+		/*
+		 * This is a case where function graph tracer has
+		 * modified a return address (LR) in a stack frame
+		 * to hook a function return.
+		 * So replace it to an original value.
+		 */
+		frame->pc = addr =
+			current->ret_stack[data->ret_stack_index--].ret
+							- AARCH64_INSN_SIZE;
+	}
+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	if (data->no_sched_functions && in_sched_functions(addr))
 		return 0;
@@ -105,6 +123,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 
 	data.trace = trace;
 	data.skip = trace->skip;
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	data.ret_stack_index = current->curr_ret_stack;
+#endif
 
 	if (tsk != current) {
 		data.no_sched_functions = 1;
