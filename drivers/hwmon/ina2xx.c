@@ -48,6 +48,8 @@
 #define INA2XX_CURRENT			0x04 /* readonly */
 #define INA2XX_CALIBRATION		0x05
 
+#define BITPOS_TO_MASK(x) (1L << x)
+
 /* INA226 register definitions */
 #define INA226_MASK_ENABLE		0x06
 #define INA226_ALERT_LIMIT		0x07
@@ -105,8 +107,13 @@ struct ina2xx_data {
 
 	struct mutex update_lock;
 	bool valid;
-	unsigned long last_updated;
 	int update_interval; /* in jiffies */
+
+	/* Last read register (slave address already set
+	 * reading out from this same register repeatedly will
+	 * be significantly faster!
+	 */
+	int last_reg;
 
 	int kind;
 	const struct attribute_group *groups[INA2XX_MAX_ATTRIBUTE_GROUPS];
@@ -203,21 +210,63 @@ static int ina2xx_init(struct ina2xx_data *data)
 	return ina2xx_calibrate(data);
 }
 
-static int ina2xx_do_update(struct device *dev)
+/*
+ * Most I2c chips will allow reading from the current register pointer
+ * w/o setting the register offset again.
+ */
+static inline s32 __i2c_read_same_word(const struct i2c_client *client)
+{
+	unsigned char msgbuf[2];
+
+	struct i2c_msg msg = {
+		.addr = client->addr,
+		.flags = client->flags | I2C_M_RD,
+		.len = 2,
+		.buf = msgbuf,
+		};
+
+	int status = i2c_transfer(client->adapter, &msg, 1);
+
+	return (status < 0) ? status : (msgbuf[1]|(msgbuf[0]<<8));
+}
+
+static int ina2xx_do_update(struct device *dev, int reg_mask)
 {
 	struct ina2xx_data *data = dev_get_drvdata(dev);
 	struct i2c_client *client = data->client;
-	int i, rv, retry;
+	int i = 0, rv, retry;
 
 	dev_dbg(&client->dev, "Starting ina2xx update\n");
 
 	for (retry = 5; retry; retry--) {
-		/* Read all registers */
-		for (i = 0; i < data->config->registers; i++) {
-			rv = i2c_smbus_read_word_swapped(client, i);
+
+		/* Try to issue a shorter i2c message */
+		if (reg_mask & (1 << data->last_reg)) {
+			rv = __i2c_read_same_word(client);
 			if (rv < 0)
 				return rv;
-			data->regs[i] = rv;
+
+			reg_mask &= ~(1 << data->last_reg);
+			data->regs[data->last_reg] = rv;
+
+			dev_dbg(&client->dev, "%d, rv = %x, (last_reg)\n",
+						data->last_reg,
+						data->regs[data->last_reg]);
+		}
+
+		/* Check for remaining registers in mask. */
+		while (reg_mask && i < data->config->registers) {
+			if (reg_mask & (1L << i)) {
+				rv = i2c_smbus_read_word_swapped(client, i);
+				if (rv < 0)
+					return rv;
+				data->regs[i] = rv;
+				data->last_reg = i;
+
+				dev_dbg(&client->dev, "%d, rv = %x\n", i,
+							data->regs[i]);
+			}
+			i++;
 		}
 
 		/*
@@ -240,8 +289,6 @@ static int ina2xx_do_update(struct device *dev)
 			msleep(INA2XX_MAX_DELAY);
 			continue;
 		}
-
-		data->last_updated = jiffies;
 		data->valid = 1;
 
 		return 0;
@@ -256,21 +303,23 @@ static int ina2xx_do_update(struct device *dev)
 	return -ENODEV;
 }
 
-static struct ina2xx_data *ina2xx_update_device(struct device *dev)
+static struct ina2xx_data *ina2xx_update_device(struct device *dev,
+						int reg_mask)
 {
 	struct ina2xx_data *data = dev_get_drvdata(dev);
 	struct ina2xx_data *ret = data;
-	unsigned long after;
 	int rv;
 
 	mutex_lock(&data->update_lock);
 
-	after = data->last_updated + data->update_interval;
-	if (time_after(jiffies, after) || !data->valid) {
-		rv = ina2xx_do_update(dev);
-		if (rv < 0)
-			ret = ERR_PTR(rv);
+	if (!data->valid) {
+		reg_mask = 0xff; /* do all regs */
+		data->last_reg = 0xff;
 	}
+
+	rv = ina2xx_do_update(dev, reg_mask);
+	if (rv < 0)
+		ret = ERR_PTR(rv);
 
 	mutex_unlock(&data->update_lock);
 	return ret;
@@ -316,7 +365,8 @@ static ssize_t ina2xx_show_value(struct device *dev,
 				 struct device_attribute *da, char *buf)
 {
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-	struct ina2xx_data *data = ina2xx_update_device(dev);
+	struct ina2xx_data *data = ina2xx_update_device(dev,
+						BITPOS_TO_MASK(attr->index));
 
 	if (IS_ERR(data))
 		return PTR_ERR(data);
@@ -329,7 +379,8 @@ static ssize_t ina2xx_set_shunt(struct device *dev,
 				struct device_attribute *da,
 				const char *buf, size_t count)
 {
-	struct ina2xx_data *data = ina2xx_update_device(dev);
+	struct ina2xx_data *data = ina2xx_update_device(dev,
+					BITPOS_TO_MASK(INA2XX_CONFIG));
 	unsigned long val;
 	int status;
 
@@ -390,7 +441,8 @@ static ssize_t ina226_set_interval(struct device *dev,
 static ssize_t ina226_show_interval(struct device *dev,
 				    struct device_attribute *da, char *buf)
 {
-	struct ina2xx_data *data = ina2xx_update_device(dev);
+	struct ina2xx_data *data = ina2xx_update_device(dev,
+						BITPOS_TO_MASK(INA2XX_CONFIG));
 
 	if (IS_ERR(data))
 		return PTR_ERR(data);
