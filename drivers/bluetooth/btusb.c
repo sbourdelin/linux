@@ -61,6 +61,7 @@ static struct usb_driver btusb_driver;
 #define BTUSB_BCM_APPLE		0x10000
 #define BTUSB_REALTEK		0x20000
 #define BTUSB_BCM2045		0x40000
+#define BTUSB_IFNUM_2		0x80000
 
 static const struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -74,7 +75,7 @@ static const struct usb_device_id btusb_table[] = {
 
 	/* Apple-specific (Broadcom) devices */
 	{ USB_VENDOR_AND_INTERFACE_INFO(0x05ac, 0xff, 0x01, 0x01),
-	  .driver_info = BTUSB_BCM_APPLE },
+	  .driver_info = BTUSB_BCM_APPLE | BTUSB_IFNUM_2 },
 
 	/* MediaTek MT76x0E */
 	{ USB_DEVICE(0x0e8d, 0x763f) },
@@ -2753,13 +2754,20 @@ static int btusb_probe(struct usb_interface *intf,
 	struct usb_endpoint_descriptor *ep_desc;
 	struct btusb_data *data;
 	struct hci_dev *hdev;
+	unsigned ifnum_base;
 	int i, err;
 
 	BT_DBG("intf %p id %p", intf, id);
 
 	/* interface numbers are hardcoded in the spec */
-	if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
-		return -ENODEV;
+	if (intf->cur_altsetting->desc.bInterfaceNumber != 0) {
+		if (!(id->driver_info & BTUSB_IFNUM_2))
+			return -ENODEV;
+		if (intf->cur_altsetting->desc.bInterfaceNumber != 2)
+			return -ENODEV;
+	}
+
+	ifnum_base = intf->cur_altsetting->desc.bInterfaceNumber;
 
 	if (!id->driver_info) {
 		const struct usb_device_id *match;
@@ -2874,7 +2882,7 @@ static int btusb_probe(struct usb_interface *intf,
 		hdev->set_bdaddr = btbcm_set_bdaddr;
 
 		/* Broadcom LM_DIAG Interface numbers are hardcoded */
-		data->diag = usb_ifnum_to_if(data->udev, 2);
+		data->diag = usb_ifnum_to_if(data->udev, ifnum_base + 2);
 	}
 
 	if (id->driver_info & BTUSB_BCM_APPLE) {
@@ -2882,7 +2890,7 @@ static int btusb_probe(struct usb_interface *intf,
 		hdev->set_diag = btusb_bcm_set_diag;
 
 		/* Broadcom LM_DIAG Interface numbers are hardcoded */
-		data->diag = usb_ifnum_to_if(data->udev, 2);
+		data->diag = usb_ifnum_to_if(data->udev, ifnum_base + 2);
 	}
 #endif
 
@@ -2944,8 +2952,8 @@ static int btusb_probe(struct usb_interface *intf,
 		/* AMP controllers do not support SCO packets */
 		data->isoc = NULL;
 	} else {
-		/* Interface numbers are hardcoded in the specification */
-		data->isoc = usb_ifnum_to_if(data->udev, 1);
+		/* Interface orders are hardcoded in the specification */
+		data->isoc = usb_ifnum_to_if(data->udev, ifnum_base + 1);
 	}
 
 	if (!reset)
