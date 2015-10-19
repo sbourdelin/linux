@@ -390,4 +390,10 @@ config EDAC_XGENE
 	  Support for error detection and correction on the
 	  APM X-Gene family of SOCs.
 
+config EDAC_SEATTLE
+	tristate "AMD Seattle EDAC"
+	depends on EDAC_MM_EDAC && ARCH_SEATTLE
+	help
+	  Support for error detection and correction on the
+	  AMD Seattle SOC.
 endif # EDAC

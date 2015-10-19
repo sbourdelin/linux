@@ -1,0 +1,15 @@
+* AMD Seattle SoC EDAC node
+
+EDAC node is defined to describe on-chip error detection and reporting.
+
+Required properties:
+- compatible: Should be "amd,arm-seattle-edac"
+- poll-delay-msec: Indicates how often the edac check callback should be called.
+  Time in msec.
+
+Example:
+	edac {
+		compatible = "amd,arm-seattle-edac";
+		poll-delay-msec = <100>;
+	};
+
