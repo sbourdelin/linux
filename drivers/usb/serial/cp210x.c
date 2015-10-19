@@ -199,6 +199,7 @@ MODULE_DEVICE_TABLE(usb, id_table);
 
 struct cp210x_serial_private {
 	__u8			bInterfaceNumber;
+	bool	cp2108_with_get_line_ctl_swap; /* set if bug is detected */
 };
 
 static struct usb_serial_driver cp210x_device = {
@@ -301,6 +302,14 @@ static struct usb_serial_driver * const serial_drivers[] = {
 #define CONTROL_WRITE_RTS	0x0200
 
 /*
+ * CP210X_PURGE - 16 bits passed in wValue of USB request.
+ * SiLabs app note AN571 gives a strange description of the 4 bits:
+ * bit 0 or bit 2 clears the transmit queue and 1 or 3 receive.
+ * writing 1 to all, however, purges cp2108 well enough to avoid the hang.
+ */
+#define PURGE_ALL		0x000f
+
+/*
  * Reads any 16-bit CP210X_ register (req).
  */
 static int cp210x_read_u16_reg(struct usb_serial *serial, u8 req, u16 *pval)
@@ -347,8 +356,47 @@ static int cp210x_write_u16_reg(struct usb_serial *serial, u8 req, u16 val)
 }
 
 /*
+ * Detect CP2108 bug and activate workaround.
+ * Write a known good value 0x800, read it back.
+ * If it comes back swapped the bug is detected.
+ */
+static int cp210x_activate_workarounds(struct usb_serial *serial,
+			struct cp210x_serial_private *spriv)
+{
+	u16 save_line_ctl; /* saves the value, to be restored in the end */
+	u16 test_line_ctl;
+	int err;
+
+	spriv->cp2108_with_get_line_ctl_swap = false;
+
+	err = cp210x_read_u16_reg(serial, CP210X_GET_LINE_CTL, &save_line_ctl);
+	if (err)
+		return err;
+
+	err = cp210x_write_u16_reg(serial, CP210X_SET_LINE_CTL, 0x800);
+	if (err)
+		return err;
+
+	err = cp210x_read_u16_reg(serial, CP210X_GET_LINE_CTL, &test_line_ctl);
+	if (err)
+		return err;
+
+	if (test_line_ctl == 8) {
+		spriv->cp2108_with_get_line_ctl_swap = true;
+		swab16s(&save_line_ctl);
+	}
+
+	return cp210x_write_u16_reg(serial, CP210X_SET_LINE_CTL, save_line_ctl);
+}
+
+/*
  * Command-specific wrappers around USB access functions
  */
+static int cp210x_purge(struct usb_serial_port *port, u16 ctrl)
+{
+	return cp210x_write_u16_reg(port->serial, CP210X_PURGE, ctrl);
+}
+
 static int cp210x_ifc_enable(struct usb_serial_port *port)
 {
 	return cp210x_write_u16_reg(port->serial,
@@ -363,7 +411,19 @@ static int cp210x_ifc_disable(struct usb_serial_port *port)
 
 static int cp210x_get_line_ctl(struct usb_serial_port *port, u16 *pctrl)
 {
-	return cp210x_read_u16_reg(port->serial, CP210X_GET_LINE_CTL, pctrl);
+	struct usb_serial *serial = port->serial;
+	struct cp210x_serial_private *spriv = usb_get_serial_data(serial);
+	int err;
+
+	err = cp210x_read_u16_reg(serial, CP210X_GET_LINE_CTL, pctrl);
+	if (err)
+		return err;
+
+	/* Workaround swapped bytes in 16-bit value from CP210X_GET_LINE_CTL */
+	if (spriv->cp2108_with_get_line_ctl_swap)
+		swab16s(pctrl);
+
+	return 0;
 }
 
 static int cp210x_set_line_ctl(struct usb_serial_port *port, u16 ctrl)
@@ -532,7 +592,15 @@ static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *port)
 
 static void cp210x_close(struct usb_serial_port *port)
 {
+	struct usb_serial *serial = port->serial;
+	struct cp210x_serial_private *spriv = usb_get_serial_data(serial);
+
 	usb_serial_generic_close(port);
+
+	/* The buggy cp2108 requires this to avoid occational hangs. */
+	if (spriv->cp2108_with_get_line_ctl_swap)
+		cp210x_purge(port, PURGE_ALL);
+
 	cp210x_ifc_disable(port);
 }
 
@@ -924,17 +992,24 @@ static int cp210x_startup(struct usb_serial *serial)
 {
 	struct usb_host_interface *cur_altsetting;
 	struct cp210x_serial_private *spriv;
+	int           err;
 
 	spriv = kzalloc(sizeof(*spriv), GFP_KERNEL);
 	if (!spriv)
 		return -ENOMEM;
 
+	/* register access functions use this spriv field */
 	cur_altsetting = serial->interface->cur_altsetting;
 	spriv->bInterfaceNumber = cur_altsetting->desc.bInterfaceNumber;
 
+	/* must be set before calling register access functions */
 	usb_set_serial_data(serial, spriv);
 
-	return 0;
+	err = cp210x_activate_workarounds(serial, spriv);
+	if (err)
+		kfree(spriv);
+
+	return err;
 }
 
 static void cp210x_release(struct usb_serial *serial)
