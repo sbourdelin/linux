@@ -326,7 +326,7 @@ endif
 
 config DELAY_DEVICE_PROBES
 	bool "Allow delaying the probe of some devices" if EXPERT
-	default y
+	default n
 	help
 	  Devices can be matched to a driver and probed from the moment they
 	  are registered, but early during boot their probes are likely to be
@@ -340,6 +340,6 @@ config DELAY_DEVICE_PROBES
 	  In some platforms there may be implicit assumptions about when some
 	  devices are probed, so enabling this option could cause problems there.
 
-	  If unsure, say Y here.
+	  If unsure, say N here.
 
 endmenu
