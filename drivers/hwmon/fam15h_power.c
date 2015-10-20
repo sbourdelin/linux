@@ -62,6 +62,8 @@ struct fam15h_power_data {
 	u64 max_cu_acc_power;
 	/* accumulated power of the compute units */
 	u64 cu_acc_power[MAX_CUS];
+	/* performance timestamp counter */
+	u64 cpu_sw_pwr_ptsc[MAX_CUS];
 };
 
 static ssize_t show_power(struct device *dev,
@@ -132,6 +134,9 @@ static void do_read_registers_on_cu(void *_data)
 
 	WARN_ON(rdmsrl_safe(MSR_F15H_CU_PWR_ACCUMULATOR,
 			    &data->cu_acc_power[cu]));
+
+	WARN_ON(rdmsrl_safe(MSR_F15H_PTSC,
+			    &data->cpu_sw_pwr_ptsc[cu]));
 }
 
 static int read_registers(struct fam15h_power_data *data)
