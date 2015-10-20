@@ -1043,6 +1043,7 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 	int oom_adj;
 	unsigned long flags;
 	int err;
+	int adjust;
 
 	memset(buffer, 0, sizeof(buffer));
 	if (count > sizeof(buffer) - 1)
@@ -1084,8 +1085,10 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 	 */
 	if (oom_adj == OOM_ADJUST_MAX)
 		oom_adj = OOM_SCORE_ADJ_MAX;
-	else
-		oom_adj = (oom_adj * OOM_SCORE_ADJ_MAX) / -OOM_DISABLE;
+	else{
+		adjust = oom_adj > 0 ? (-OOM_DISABLE-1) : -(-OOM_DISABLE-1);
+		oom_adj = (oom_adj * OOM_SCORE_ADJ_MAX + adjust) / -OOM_DISABLE;
+	}
 
 	if (oom_adj < task->signal->oom_score_adj &&
 	    !capable(CAP_SYS_RESOURCE)) {
