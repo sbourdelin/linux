@@ -98,3 +98,6 @@
 #define BDW_MAX_GAMMA                         ((1 << 24) - 1)
 #define BDW_INDEX_AUTO_INCREMENT               (1 << 15)
 #define BDW_INDEX_SPLIT_MODE                   (1 << 31)
+
+/* Degamma on BDW */
+#define BDW_DEGAMMA_MAX_VALS                   512
