@@ -37,9 +37,9 @@
 
 struct hash_testvec {
 	/* only used with keyed hash algorithms */
-	char *key;
-	char *plaintext;
-	char *digest;
+	const char *key;
+	const char *plaintext;
+	const char *digest;
 	unsigned char tap[MAX_TAP];
 	unsigned short psize;
 	unsigned char np;
@@ -65,10 +65,10 @@ struct hash_testvec {
  */
 
 struct cipher_testvec {
-	char *key;
-	char *iv;
-	char *input;
-	char *result;
+	const char *key;
+	const char *iv;
+	const char *input;
+	const char *result;
 	unsigned short tap[MAX_TAP];
 	int np;
 	unsigned char also_non_np;
@@ -80,11 +80,11 @@ struct cipher_testvec {
 };
 
 struct aead_testvec {
-	char *key;
-	char *iv;
-	char *input;
-	char *assoc;
-	char *result;
+	const char *key;
+	const char *iv;
+	const char *input;
+	const char *assoc;
+	const char *result;
 	unsigned char tap[MAX_TAP];
 	unsigned char atap[MAX_TAP];
 	int np;
@@ -99,10 +99,10 @@ struct aead_testvec {
 };
 
 struct cprng_testvec {
-	char *key;
-	char *dt;
-	char *v;
-	char *result;
+	const char *key;
+	const char *dt;
+	const char *v;
+	const char *result;
 	unsigned char klen;
 	unsigned short dtlen;
 	unsigned short vlen;
@@ -126,7 +126,7 @@ struct drbg_testvec {
 };
 
 struct akcipher_testvec {
-	unsigned char *key;
+	const unsigned char *key;
 	unsigned char *m;
 	unsigned char *c;
 	unsigned int key_len;
