@@ -1472,6 +1472,25 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.prop_mode_id = prop;
 
+	/* Color Management properties */
+	prop = drm_property_create(dev,
+			DRM_MODE_PROP_BLOB, "PALETTE_AFTER_CTM", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cm_palette_after_ctm_property = prop;
+
+	prop = drm_property_create(dev,
+			DRM_MODE_PROP_BLOB, "PALETTE_BEFORE_CTM", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cm_palette_before_ctm_property = prop;
+
+	prop = drm_property_create(dev,
+			DRM_MODE_PROP_BLOB, "CTM", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cm_ctm_property = prop;
+
 	return 0;
 }
 
