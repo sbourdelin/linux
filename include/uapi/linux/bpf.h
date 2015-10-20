@@ -287,6 +287,17 @@ enum bpf_func_id {
 	 * Return: realm if != 0
 	 */
 	BPF_FUNC_get_route_realm,
+
+	/**
+	 * u64 bpf_perf_event_control(&map, index, flags) - control perf events in maps
+	 * @map: pointer to PERF_EVENT_ARRAY maps
+	 * @index: the key of perf event
+	 * @flags: bit 0 - if true, dump event data on current cpu
+	 *	   bit 1 - if true, control all the events in maps
+	 *	   other bits - reserved
+	 * Return: 0 on success
+	 */
+	BPF_FUNC_perf_event_control,
 	__BPF_FUNC_MAX_ID,
 };
 

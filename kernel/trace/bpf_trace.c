@@ -215,6 +215,66 @@ const struct bpf_func_proto bpf_perf_event_read_proto = {
 	.arg2_type	= ARG_ANYTHING,
 };
 
+/* flags for PERF_EVENT_ARRAY maps */
+enum {
+	BPF_EVENT_CTL_BIT_CUR = 0,
+	BPF_EVENT_CTL_BIT_ALL = 1,
+	__NR_BPF_EVENT_CTL_BITS,
+};
+
+#define	BPF_CTL_BIT_FLAG_MASK	GENMASK_ULL(63, __NR_BPF_EVENT_CTL_BITS)
+#define	BPF_CTL_BIT_DUMP_CUR	BIT_ULL(BPF_EVENT_CTL_BIT_CUR)
+#define	BPF_CTL_BIT_DUMP_ALL	BIT_ULL(BPF_EVENT_CTL_BIT_ALL)
+
+static u64 bpf_perf_event_control(u64 r1, u64 index, u64 flags, u64 r4, u64 r5)
+{
+	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
+	struct bpf_array *array = container_of(map, struct bpf_array, map);
+	struct perf_event *event;
+	int i;
+
+	if (unlikely(index >= array->map.max_entries))
+		return -E2BIG;
+
+	if (flags & BPF_CTL_BIT_FLAG_MASK)
+		return -EINVAL;
+
+	if (flags & BPF_CTL_BIT_DUMP_ALL) {
+		bool dump_control = flags & BPF_CTL_BIT_DUMP_CUR;
+
+		for (i = 0; i < array->map.max_entries; i++) {
+			event = (struct perf_event *)array->ptrs[i];
+			if (!event)
+				continue;
+
+			if (dump_control)
+				atomic_inc_unless_negative(&event->soft_enable);
+			else
+				atomic_dec_if_positive(&event->soft_enable);
+		}
+		return 0;
+	}
+
+	event = (struct perf_event *)array->ptrs[index];
+	if (!event)
+		return -ENOENT;
+
+	if (flags & BPF_CTL_BIT_DUMP_CUR)
+		atomic_inc_unless_negative(&event->soft_enable);
+	else
+		atomic_dec_if_positive(&event->soft_enable);
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_perf_event_control_proto = {
+	.func		= bpf_perf_event_control,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type	= ARG_ANYTHING,
+};
+
 static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func_id)
 {
 	switch (func_id) {
@@ -242,6 +302,8 @@ static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func
 		return &bpf_get_smp_processor_id_proto;
 	case BPF_FUNC_perf_event_read:
 		return &bpf_perf_event_read_proto;
+	case BPF_FUNC_perf_event_control:
+		return &bpf_perf_event_control_proto;
 	default:
 		return NULL;
 	}

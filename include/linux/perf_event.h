@@ -472,6 +472,7 @@ struct perf_event {
 	struct irq_work			pending;
 
 	atomic_t			event_limit;
+	atomic_t			soft_enable;
 
 	void (*destroy)(struct perf_event *);
 	struct rcu_head			rcu_head;
