@@ -32,47 +32,6 @@
 #include "linux_wlan_spi.h"
 #endif
 
-#if defined(CUSTOMER_PLATFORM)
-/*
- TODO : Write power control functions as customer platform.
- */
-#else
-
- #define _linux_wlan_device_power_on()		{}
- #define _linux_wlan_device_power_off()		{}
-
- #define _linux_wlan_device_detection()		{}
- #define _linux_wlan_device_removal()		{}
-#endif
-
-static int linux_wlan_device_power(int on_off)
-{
-	PRINT_D(INIT_DBG, "linux_wlan_device_power.. (%d)\n", on_off);
-
-	if (on_off) {
-		_linux_wlan_device_power_on();
-	} else {
-		_linux_wlan_device_power_off();
-	}
-
-	return 0;
-}
-
-static int linux_wlan_device_detection(int on_off)
-{
-	PRINT_D(INIT_DBG, "linux_wlan_device_detection.. (%d)\n", on_off);
-
-#ifdef WILC_SDIO
-	if (on_off) {
-		_linux_wlan_device_detection();
-	} else {
-		_linux_wlan_device_removal();
-	}
-#endif
-
-	return 0;
-}
-
 static int dev_state_ev_handler(struct notifier_block *this, unsigned long event, void *ptr);
 
 static struct notifier_block g_dev_notifier = {
@@ -1046,12 +1005,6 @@ static u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
 		wilc_wlan_global_reset();
 		sdio_unregister_driver(&wilc_bus);
 
-		linux_wlan_device_detection(0);
-
-		mdelay(100);
-
-		linux_wlan_device_detection(1);
-
 		sdio_register_driver(&wilc_bus);
 
 		while (!wilc1000_probe)
@@ -1075,14 +1028,6 @@ static int repeat_power_cycle(perInterface_wlan_t *nic)
 	wilc_wlan_inp_t nwi;
 
 	sdio_unregister_driver(&wilc_bus);
-
-	linux_wlan_device_detection(0);
-	linux_wlan_device_power(0);
-	msleep(100);
-	linux_wlan_device_power(1);
-	msleep(80);
-	linux_wlan_device_detection(1);
-	msleep(20);
 
 	sdio_register_driver(&wilc_bus);
 
@@ -1794,10 +1739,6 @@ static int __init init_wilc_driver(void)
 	printk("IN INIT FUNCTION\n");
 	printk("*** WILC1000 driver VERSION=[10.2] FW_VER=[10.2] ***\n");
 
-	linux_wlan_device_power(1);
-	msleep(100);
-	linux_wlan_device_detection(1);
-
 #ifdef WILC_SDIO
 	{
 		int ret;
@@ -1877,9 +1818,6 @@ static void __exit exit_wilc_driver(void)
 #if defined(WILC_DEBUGFS)
 	wilc_debugfs_remove();
 #endif
-
-	linux_wlan_device_detection(0);
-	linux_wlan_device_power(0);
 }
 module_exit(exit_wilc_driver);
 
