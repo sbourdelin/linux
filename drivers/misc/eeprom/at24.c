@@ -52,6 +52,14 @@
  * which won't work on pure SMBus systems.
  */
 
+#define AT24_SIZE_BYTELEN		5
+#define AT24_SIZE_FLAGS			8
+
+#define AT24_BITMASK(x)			(BIT(x) - 1)
+
+#define AT24CS_SERIAL_SIZE		16
+#define AT24CS_SERIAL_ADDR(addr)	(addr + 0x08)
+
 struct at24_data {
 	struct at24_platform_data chip;
 	struct memory_accessor macc;
@@ -97,14 +105,6 @@ MODULE_PARM_DESC(io_limit, "Maximum bytes per I/O (default 128)");
 static unsigned write_timeout = 25;
 module_param(write_timeout, uint, 0);
 MODULE_PARM_DESC(write_timeout, "Time (in ms) to try writes (default 25)");
-
-#define AT24_SIZE_BYTELEN 5
-#define AT24_SIZE_FLAGS 8
-
-#define AT24_BITMASK(x) (BIT(x) - 1)
-
-#define AT24CS_SERIAL_SIZE 16
-#define AT24CS_SERIAL_ADDR(addr) (addr + 0x08)
 
 /* create non-zero magic value for given eeprom parameters */
 #define AT24_DEVICE_MAGIC(_len, _flags) 		\
