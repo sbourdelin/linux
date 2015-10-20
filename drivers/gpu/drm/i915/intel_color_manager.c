@@ -745,6 +745,15 @@ void intel_color_manager_crtc_commit(struct drm_device *dev,
 	struct drm_crtc *crtc = crtc_state->crtc;
 	int ret = -EINVAL;
 
+	/*
+	* CRTC level color correction, once applied on the
+	* pipe, goes on forever, until disabled, so there is no
+	* need to program all those correction registers on every
+	* commit. Do this only when a new correction applied.
+	*/
+	if (!crtc_state->color_correction_changed)
+		return;
+
 	blob = crtc_state->palette_after_ctm_blob;
 	if (blob) {
 		/* Gamma correction is platform specific */
@@ -786,6 +795,8 @@ void intel_color_manager_crtc_commit(struct drm_device *dev,
 		else
 			DRM_DEBUG_DRIVER("CSC correction success\n");
 	}
+
+	crtc_state->color_correction_changed = false;
 }
 
 void intel_attach_color_properties_to_crtc(struct drm_device *dev,
