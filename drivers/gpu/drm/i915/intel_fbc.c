@@ -82,6 +82,22 @@ static void i8xx_fbc_disable(struct drm_i915_private *dev_priv)
 	DRM_DEBUG_KMS("disabled FBC\n");
 }
 
+static void i8xx_fbc_flip_prepare(struct drm_i915_private *dev_priv)
+{
+	struct intel_crtc *crtc = dev_priv->fbc.crtc;
+	struct drm_framebuffer *fb = crtc->base.primary->fb;
+	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+	uint32_t val;
+
+	/* Although the documentation suggests we can't change DPFC_CONTROL
+	 * while compression is enabled, the hardware guys said that updating
+	 * the fence register bits during a flip is fine. */
+	val = I915_READ(FBC_CONTROL);
+	val &= ~FBC_CTL_FENCENO_MASK;
+	val |= obj->fence_reg;
+	I915_WRITE(FBC_CONTROL, val);
+}
+
 static void i8xx_fbc_enable(struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
@@ -161,6 +177,22 @@ static void g4x_fbc_enable(struct intel_crtc *crtc)
 	DRM_DEBUG_KMS("enabled fbc on plane %c\n", plane_name(crtc->plane));
 }
 
+static void g4x_fbc_flip_prepare(struct drm_i915_private *dev_priv)
+{
+	struct intel_crtc *crtc = dev_priv->fbc.crtc;
+	struct drm_framebuffer *fb = crtc->base.primary->fb;
+	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+	uint32_t val;
+
+	/* Although the documentation suggests we can't change DPFC_CONTROL
+	 * while compression is enabled, the hardware guys said that updating
+	 * the fence register bits during a flip is fine. */
+	val = I915_READ(DPFC_CONTROL);
+	val &= ~DPFC_CTL_FENCE_MASK;
+	val |= obj->fence_reg;
+	I915_WRITE(DPFC_CONTROL, val);
+}
+
 static void g4x_fbc_disable(struct drm_i915_private *dev_priv)
 {
 	u32 dpfc_ctl;
@@ -234,6 +266,31 @@ static void ilk_fbc_enable(struct intel_crtc *crtc)
 	intel_fbc_nuke(dev_priv);
 
 	DRM_DEBUG_KMS("enabled fbc on plane %c\n", plane_name(crtc->plane));
+}
+
+static void ilk_fbc_flip_prepare(struct drm_i915_private *dev_priv)
+{
+	struct intel_crtc *crtc = dev_priv->fbc.crtc;
+	struct drm_framebuffer *fb = crtc->base.primary->fb;
+	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+	uint32_t val;
+
+	/* Although the documentation suggests we can't change DPFC_CONTROL
+	 * while compression is enabled, the hardware guys said that updating
+	 * the fence register bits during a flip is fine. */
+	val = I915_READ(ILK_DPFC_CONTROL);
+	val &= ~ILK_DPFC_FENCE_MASK;
+	val |= obj->fence_reg;
+	I915_WRITE(ILK_DPFC_CONTROL, val);
+}
+
+static void snb_fbc_flip_prepare(struct drm_i915_private *dev_priv)
+{
+	struct intel_crtc *crtc = dev_priv->fbc.crtc;
+	struct drm_framebuffer *fb = crtc->base.primary->fb;
+	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
+
+	I915_WRITE(SNB_DPFC_CTL_SA, SNB_CPU_FENCE_ENABLE | obj->fence_reg);
 }
 
 static void ilk_fbc_disable(struct drm_i915_private *dev_priv)
@@ -1020,14 +1077,44 @@ void intel_fbc_flush(struct drm_i915_private *dev_priv,
 
 	if (origin == ORIGIN_GTT)
 		return;
+	if (origin == ORIGIN_FLIP && dev_priv->fbc.enabled)
+		return;
 
 	mutex_lock(&dev_priv->fbc.lock);
 
 	dev_priv->fbc.busy_bits &= ~frontbuffer_bits;
 
 	if (!dev_priv->fbc.busy_bits) {
-		__intel_fbc_disable(dev_priv);
-		__intel_fbc_update(dev_priv);
+		if (origin == ORIGIN_FLIP) {
+			__intel_fbc_update(dev_priv);
+		} else {
+			__intel_fbc_disable(dev_priv);
+			__intel_fbc_update(dev_priv);
+		}
+	}
+
+	mutex_unlock(&dev_priv->fbc.lock);
+}
+
+void intel_fbc_flip_prepare(struct drm_i915_private *dev_priv,
+			    unsigned int frontbuffer_bits)
+{
+	unsigned int fbc_bits;
+
+	if (!fbc_supported(dev_priv))
+		return;
+
+	mutex_lock(&dev_priv->fbc.lock);
+
+	if (dev_priv->fbc.enabled) {
+		fbc_bits = INTEL_FRONTBUFFER_PRIMARY(dev_priv->fbc.crtc->pipe);
+		if (fbc_bits & frontbuffer_bits)
+			dev_priv->fbc.flip_prepare(dev_priv);
+	} else if (dev_priv->fbc.fbc_work) {
+		fbc_bits = INTEL_FRONTBUFFER_PRIMARY(
+				dev_priv->fbc.fbc_work->crtc->pipe);
+		if (fbc_bits & frontbuffer_bits)
+			__intel_fbc_disable(dev_priv);
 	}
 
 	mutex_unlock(&dev_priv->fbc.lock);
@@ -1063,18 +1150,25 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 		dev_priv->fbc.fbc_enabled = ilk_fbc_enabled;
 		dev_priv->fbc.enable_fbc = gen7_fbc_enable;
 		dev_priv->fbc.disable_fbc = ilk_fbc_disable;
+		dev_priv->fbc.flip_prepare = snb_fbc_flip_prepare;
 	} else if (INTEL_INFO(dev_priv)->gen >= 5) {
 		dev_priv->fbc.fbc_enabled = ilk_fbc_enabled;
 		dev_priv->fbc.enable_fbc = ilk_fbc_enable;
 		dev_priv->fbc.disable_fbc = ilk_fbc_disable;
+		if (INTEL_INFO(dev_priv)->gen == 5)
+			dev_priv->fbc.flip_prepare = ilk_fbc_flip_prepare;
+		else
+			dev_priv->fbc.flip_prepare = snb_fbc_flip_prepare;
 	} else if (IS_GM45(dev_priv)) {
 		dev_priv->fbc.fbc_enabled = g4x_fbc_enabled;
 		dev_priv->fbc.enable_fbc = g4x_fbc_enable;
 		dev_priv->fbc.disable_fbc = g4x_fbc_disable;
+		dev_priv->fbc.flip_prepare = g4x_fbc_flip_prepare;
 	} else {
 		dev_priv->fbc.fbc_enabled = i8xx_fbc_enabled;
 		dev_priv->fbc.enable_fbc = i8xx_fbc_enable;
 		dev_priv->fbc.disable_fbc = i8xx_fbc_disable;
+		dev_priv->fbc.flip_prepare = i8xx_fbc_flip_prepare;
 
 		/* This value was pulled out of someone's hat */
 		I915_WRITE(FBC_CONTROL, 500 << FBC_CTL_INTERVAL_SHIFT);

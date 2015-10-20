@@ -1286,6 +1286,8 @@ void intel_fbc_invalidate(struct drm_i915_private *dev_priv,
 			  enum fb_op_origin origin);
 void intel_fbc_flush(struct drm_i915_private *dev_priv,
 		     unsigned int frontbuffer_bits, enum fb_op_origin origin);
+void intel_fbc_flip_prepare(struct drm_i915_private *dev_priv,
+			    unsigned int frontbuffer_bits);
 void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv);
 
 /* intel_hdmi.c */

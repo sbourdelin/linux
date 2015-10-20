@@ -930,6 +930,7 @@ struct i915_fbc {
 	bool (*fbc_enabled)(struct drm_i915_private *dev_priv);
 	void (*enable_fbc)(struct intel_crtc *crtc);
 	void (*disable_fbc)(struct drm_i915_private *dev_priv);
+	void (*flip_prepare)(struct drm_i915_private *dev_priv);
 };
 
 /**

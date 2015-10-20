@@ -2028,6 +2028,7 @@ enum skl_disp_power_wells {
 #define   FBC_CTL_C3_IDLE	(1<<13)
 #define   FBC_CTL_STRIDE_SHIFT	(5)
 #define   FBC_CTL_FENCENO_SHIFT	(0)
+#define   FBC_CTL_FENCENO_MASK	0xF
 #define FBC_COMMAND		0x0320c
 #define   FBC_CMD_COMPRESS	(1<<0)
 #define FBC_STATUS		0x03210
@@ -2064,6 +2065,7 @@ enum skl_disp_power_wells {
 #define   DPFC_CTL_LIMIT_1X	(0<<6)
 #define   DPFC_CTL_LIMIT_2X	(1<<6)
 #define   DPFC_CTL_LIMIT_4X	(2<<6)
+#define   DPFC_CTL_FENCE_MASK	0xF
 #define DPFC_RECOMP_CTL		0x320c
 #define   DPFC_RECOMP_STALL_EN	(1<<27)
 #define   DPFC_RECOMP_STALL_WM_SHIFT (16)
@@ -2086,6 +2088,7 @@ enum skl_disp_power_wells {
 #define   FBC_CTL_FALSE_COLOR	(1<<10)
 /* The bit 28-8 is reserved */
 #define   DPFC_RESERVED		(0x1FFFFF00)
+#define   ILK_DPFC_FENCE_MASK	0xF
 #define ILK_DPFC_RECOMP_CTL	0x4320c
 #define ILK_DPFC_STATUS		0x43210
 #define ILK_DPFC_FENCE_YOFF	0x43218
