@@ -29,6 +29,7 @@
 #include <trace/events/power.h>
 #include <linux/compiler.h>
 #include <linux/moduleparam.h>
+#include <linux/wait-simple.h>
 
 #include "power.h"
 
@@ -37,10 +38,10 @@ const char *pm_states[PM_SUSPEND_MAX];
 
 static const struct platform_suspend_ops *suspend_ops;
 static const struct platform_freeze_ops *freeze_ops;
-static DECLARE_WAIT_QUEUE_HEAD(suspend_freeze_wait_head);
+static DEFINE_SWAIT_HEAD(suspend_freeze_wait_head);
 
 enum freeze_state __read_mostly suspend_freeze_state;
-static DEFINE_SPINLOCK(suspend_freeze_lock);
+static DEFINE_RAW_SPINLOCK(suspend_freeze_lock);
 
 void freeze_set_ops(const struct platform_freeze_ops *ops)
 {
@@ -56,12 +57,12 @@ static void freeze_begin(void)
 
 static void freeze_enter(void)
 {
-	spin_lock_irq(&suspend_freeze_lock);
 	if (pm_wakeup_pending())
 		goto out;
 
+	raw_spin_lock_irq(&suspend_freeze_lock);
 	suspend_freeze_state = FREEZE_STATE_ENTER;
-	spin_unlock_irq(&suspend_freeze_lock);
+	raw_spin_unlock_irq(&suspend_freeze_lock);
 
 	get_online_cpus();
 	cpuidle_resume();
@@ -70,30 +71,30 @@ static void freeze_enter(void)
 	wake_up_all_idle_cpus();
 	pr_debug("PM: suspend-to-idle\n");
 	/* Make the current CPU wait so it can enter the idle loop too. */
-	wait_event(suspend_freeze_wait_head,
-		   suspend_freeze_state == FREEZE_STATE_WAKE);
+	swait_event(suspend_freeze_wait_head,
+		    suspend_freeze_state == FREEZE_STATE_WAKE);
 	pr_debug("PM: resume from suspend-to-idle\n");
 
 	cpuidle_pause();
 	put_online_cpus();
 
-	spin_lock_irq(&suspend_freeze_lock);
+	raw_spin_lock_irq(&suspend_freeze_lock);
 
  out:
 	suspend_freeze_state = FREEZE_STATE_NONE;
-	spin_unlock_irq(&suspend_freeze_lock);
+	raw_spin_unlock_irq(&suspend_freeze_lock);
 }
 
 void freeze_wake(void)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&suspend_freeze_lock, flags);
+	raw_spin_lock_irqsave(&suspend_freeze_lock, flags);
 	if (suspend_freeze_state > FREEZE_STATE_NONE) {
 		suspend_freeze_state = FREEZE_STATE_WAKE;
-		wake_up(&suspend_freeze_wait_head);
+		swait_wake(&suspend_freeze_wait_head);
 	}
-	spin_unlock_irqrestore(&suspend_freeze_lock, flags);
+	raw_spin_unlock_irqrestore(&suspend_freeze_lock, flags);
 }
 EXPORT_SYMBOL_GPL(freeze_wake);
 
