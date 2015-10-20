@@ -59,6 +59,45 @@ static unsigned int get_crtc_fence_y_offset(struct intel_crtc *crtc)
 	return crtc->base.y - crtc->adjusted_y;
 }
 
+/*
+ * For SKL+, the plane source size used by the hardware is based on the value we
+ * write to the PLANE_SIZE register. For BDW-, the hardware looks at the value
+ * we wrote to PIPESRC.
+ */
+static void intel_fbc_get_plane_source_size(struct intel_crtc *crtc,
+					    int *width, int *height)
+{
+	struct intel_plane_state *plane_state =
+			to_intel_plane_state(crtc->base.primary->state);
+	int w, h;
+
+	if (intel_rotation_90_or_270(plane_state->base.rotation)) {
+		w = drm_rect_height(&plane_state->src) >> 16;
+		h = drm_rect_width(&plane_state->src) >> 16;
+	} else {
+		w = drm_rect_width(&plane_state->src) >> 16;
+		h = drm_rect_height(&plane_state->src) >> 16;
+	}
+
+	if (width)
+		*width = w;
+	if (height)
+		*height = h;
+}
+
+static int intel_fbc_calculate_cfb_size(struct intel_crtc *crtc,
+					struct drm_framebuffer *fb)
+{
+	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
+	int lines;
+
+	intel_fbc_get_plane_source_size(crtc, NULL, &lines);
+	if (INTEL_INFO(dev_priv)->gen >= 7)
+		lines = min(lines, 2048);
+
+	return lines * fb->pitches[0];
+}
+
 static void i8xx_fbc_deactivate(struct drm_i915_private *dev_priv)
 {
 	u32 fbc_ctl;
@@ -604,11 +643,17 @@ again:
 	}
 }
 
-static int intel_fbc_alloc_cfb(struct drm_i915_private *dev_priv, int size,
-			       int fb_cpp)
+static int intel_fbc_alloc_cfb(struct intel_crtc *crtc)
 {
+	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
+	struct drm_framebuffer *fb = crtc->base.primary->state->fb;
 	struct drm_mm_node *uninitialized_var(compressed_llb);
-	int ret;
+	int size, fb_cpp, ret;
+
+	WARN_ON(dev_priv->fbc.compressed_fb.allocated);
+
+	size = intel_fbc_calculate_cfb_size(crtc, fb);
+	fb_cpp = drm_format_plane_cpp(fb->pixel_format, 0);
 
 	ret = find_compression_threshold(dev_priv, &dev_priv->fbc.compressed_fb,
 					 size, fb_cpp);
@@ -683,64 +728,6 @@ void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv)
 	mutex_lock(&dev_priv->fbc.lock);
 	__intel_fbc_cleanup_cfb(dev_priv);
 	mutex_unlock(&dev_priv->fbc.lock);
-}
-
-/*
- * For SKL+, the plane source size used by the hardware is based on the value we
- * write to the PLANE_SIZE register. For BDW-, the hardware looks at the value
- * we wrote to PIPESRC.
- */
-static void intel_fbc_get_plane_source_size(struct intel_crtc *crtc,
-					    int *width, int *height)
-{
-	struct intel_plane_state *plane_state =
-			to_intel_plane_state(crtc->base.primary->state);
-	int w, h;
-
-	if (intel_rotation_90_or_270(plane_state->base.rotation)) {
-		w = drm_rect_height(&plane_state->src) >> 16;
-		h = drm_rect_width(&plane_state->src) >> 16;
-	} else {
-		w = drm_rect_width(&plane_state->src) >> 16;
-		h = drm_rect_height(&plane_state->src) >> 16;
-	}
-
-	if (width)
-		*width = w;
-	if (height)
-		*height = h;
-}
-
-static int intel_fbc_calculate_cfb_size(struct intel_crtc *crtc)
-{
-	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
-	struct drm_framebuffer *fb = crtc->base.primary->fb;
-	int lines;
-
-	intel_fbc_get_plane_source_size(crtc, NULL, &lines);
-	if (INTEL_INFO(dev_priv)->gen >= 7)
-		lines = min(lines, 2048);
-
-	return lines * fb->pitches[0];
-}
-
-static int intel_fbc_setup_cfb(struct intel_crtc *crtc)
-{
-	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
-	struct drm_framebuffer *fb = crtc->base.primary->fb;
-	int size, cpp;
-
-	size = intel_fbc_calculate_cfb_size(crtc);
-	cpp = drm_format_plane_cpp(fb->pixel_format, 0);
-
-	if (dev_priv->fbc.compressed_fb.allocated &&
-	    size <= dev_priv->fbc.compressed_fb.size * dev_priv->fbc.threshold)
-		return 0;
-
-	/* Release any current block */
-	__intel_fbc_cleanup_cfb(dev_priv);
-
-	return intel_fbc_alloc_cfb(dev_priv, size, cpp);
 }
 
 static bool stride_is_valid(struct drm_i915_private *dev_priv,
@@ -904,8 +891,19 @@ static void __intel_fbc_update(struct intel_crtc *crtc)
 		goto out_disable;
 	}
 
-	if (intel_fbc_setup_cfb(crtc)) {
-		set_no_fbc_reason(dev_priv, "not enough stolen memory");
+	/* It is possible for the required CFB size change without a
+	 * crtc->disable + crtc->enable since it is possible to change the
+	 * stride without triggering a full modeset. Since we try to
+	 * over-allocate the CFB, there's a chance we may keep FBC enabled even
+	 * if this happens, but if we exceed the current CFB size we'll have to
+	 * disable FBC. Notice that it would be possible to disable FBC, wait
+	 * for a frame, free the stolen node, then try to reenable FBC in case
+	 * we didn't get any invalidate/deactivate calls, but this would require
+	 * a lot of tracking just for a case we expect to be uncommon, so we
+	 * just don't have this code for now. */
+	if (intel_fbc_calculate_cfb_size(crtc, fb) >
+	    dev_priv->fbc.compressed_fb.size * dev_priv->fbc.threshold) {
+		set_no_fbc_reason(dev_priv, "CFB requirements changed");
 		goto out_disable;
 	}
 
@@ -958,7 +956,6 @@ out_disable:
 		DRM_DEBUG_KMS("unsupported config, deactivating FBC\n");
 		__intel_fbc_deactivate(dev_priv);
 	}
-	__intel_fbc_cleanup_cfb(dev_priv);
 }
 
 /*
@@ -1102,6 +1099,11 @@ void intel_fbc_enable(struct intel_crtc *crtc)
 		goto out;
 	}
 
+	if (intel_fbc_alloc_cfb(crtc)) {
+		set_no_fbc_reason(dev_priv, "not enough stolen memory");
+		goto out;
+	}
+
 	DRM_DEBUG_KMS("Enabling FBC on pipe %c\n", pipe_name(crtc->pipe));
 	dev_priv->fbc.no_fbc_reason = "FBC enabled but not active yet\n";
 
@@ -1128,6 +1130,8 @@ static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 	assert_pipe_disabled(dev_priv, crtc->pipe);
 
 	DRM_DEBUG_KMS("Disabling FBC on pipe %c\n", pipe_name(crtc->pipe));
+
+	__intel_fbc_cleanup_cfb(dev_priv);
 
 	dev_priv->fbc.enabled = false;
 	dev_priv->fbc.crtc = NULL;
