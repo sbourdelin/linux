@@ -2,6 +2,7 @@
 #define WILC_WLAN_H
 
 #include <linux/types.h>
+#include <linux/netdevice.h>
 
 #define ISWILC1000(id)   (((id & 0xfffff000) == 0x100000) ? 1 : 0)
 

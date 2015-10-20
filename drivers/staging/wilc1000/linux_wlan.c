@@ -1638,7 +1638,7 @@ int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops)
 		{
 			struct wireless_dev *wdev;
 			/*Register WiFi*/
-			wdev = wilc_create_wiphy(ndev);
+			wdev = wilc_create_wiphy(ndev, wilc1000_dev->dev);
 
 			/* set netdev, tony */
 			if (dev)
