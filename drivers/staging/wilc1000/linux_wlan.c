@@ -474,19 +474,11 @@ int wilc1000_wlan_get_firmware(perInterface_wlan_t *p_nic)
 	/*	the firmare should be located in /lib/firmware in
 	 *      root file system with the name specified above */
 
-#ifdef WILC_SDIO
-	if (request_firmware(&wilc_firmware, firmware, &wilc1000_dev->wilc_sdio_func->dev) != 0) {
+	if (request_firmware(&wilc_firmware, firmware, wilc1000_dev->dev) != 0) {
 		PRINT_ER("%s - firmare not available\n", firmware);
 		ret = -1;
 		goto _fail_;
 	}
-#else
-	if (request_firmware(&wilc_firmware, firmware, &wilc1000_dev->wilc_spidev->dev) != 0) {
-		PRINT_ER("%s - firmare not available\n", firmware);
-		ret = -1;
-		goto _fail_;
-	}
-#endif
 	wilc1000_dev->wilc_firmware = wilc_firmware;
 
 _fail_:
@@ -1008,7 +1000,7 @@ static u8 wilc1000_prepare_11b_core(struct wilc *nic)
 		while (!wilc1000_probe)
 			msleep(100);
 		wilc1000_probe = 0;
-		wilc1000_dev->wilc_sdio_func = wilc1000_sdio_func;
+		wilc1000_dev->dev = &wilc1000_sdio_func->dev;
 		nic->ops = &wilc1000_sdio_ops;
 		wilc_wlan_init(nic);
 	}
@@ -1031,7 +1023,7 @@ static int repeat_power_cycle(perInterface_wlan_t *nic)
 	while (!wilc1000_probe)
 		msleep(100);
 	wilc1000_probe = 0;
-	wilc1000_dev->wilc_sdio_func = wilc1000_sdio_func;
+	wilc1000_dev->dev = &wilc1000_sdio_func->dev;
 	wilc1000_dev->ops = &wilc1000_sdio_ops;
 	ret = wilc_wlan_init(wilc1000_dev);
 
@@ -1214,12 +1206,11 @@ int wilc1000_mac_open(struct net_device *ndev)
 	int i = 0;
 	struct wilc_priv *priv;
 
-#ifdef WILC_SPI
-	if (!wilc1000_dev || !wilc1000_dev->wilc_spidev) {
+	if (!wilc1000_dev || !wilc1000_dev->dev) {
 		netdev_err(ndev, "wilc1000: SPI device not ready\n");
 		return -ENODEV;
 	}
-#endif
+
 	nic = netdev_priv(ndev);
 	priv = wiphy_priv(nic->wilc_netdev->ieee80211_ptr->wiphy);
 	PRINT_D(INIT_DBG, "MAC OPEN[%p]\n", ndev);
@@ -1711,16 +1702,6 @@ int wilc_netdev_init(void)
 		nic->mac_opened = 0;
 
 	}
-
-	#ifndef WILC_SDIO
-	if (!wilc1000_spi_init(&wilc1000_dev->wilc_spidev)) {
-		PRINT_ER("Can't initialize SPI\n");
-		return -1; /* ERROR */
-	}
-	wilc1000_dev->wilc_spidev = wilc_spi_dev;
-	#else
-	wilc1000_dev->wilc_sdio_func = wilc1000_sdio_func;
-	#endif
 
 	return 0;
 }

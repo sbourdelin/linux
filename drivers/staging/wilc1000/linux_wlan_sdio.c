@@ -46,7 +46,7 @@ static void wilc_sdio_interrupt(struct sdio_func *func)
 
 int wilc1000_sdio_cmd52(sdio_cmd52_t *cmd)
 {
-	struct sdio_func *func = wilc1000_dev->wilc_sdio_func;
+	struct sdio_func *func = container_of(wilc1000_dev->dev, struct sdio_func, dev);
 	int ret;
 	u8 data;
 
@@ -78,7 +78,7 @@ int wilc1000_sdio_cmd52(sdio_cmd52_t *cmd)
 
 int wilc1000_sdio_cmd53(sdio_cmd53_t *cmd)
 {
-	struct sdio_func *func = wilc1000_dev->wilc_sdio_func;
+	struct sdio_func *func = container_of(wilc1000_dev->dev, struct sdio_func, dev);
 	int size, ret;
 
 	sdio_claim_host(func);
@@ -126,6 +126,7 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 		PRINT_ER("Couldn't initialize netdev\n");
 		return -1;
 	}
+	wilc1000_dev->dev = &wilc1000_sdio_func->dev;
 
 	printk("Driver Initializing success\n");
 	return 0;

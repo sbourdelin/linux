@@ -9,8 +9,11 @@
 #include <linux/device.h>
 #include <linux/spi/spi.h>
 
+#include "wilc_wfi_netdevice.h"
 #include "linux_wlan_common.h"
 #include "linux_wlan_spi.h"
+#include "wilc_wlan_if.h"
+#include "wilc_wlan.h"
 
 #define USE_SPI_DMA     0       /* johnny add */
 
@@ -409,8 +412,20 @@ int wilc1000_spi_set_max_speed(void)
 
 static int __init init_wilc_spi_driver(void)
 {
+	int ret;
+
 	wilc1000_init_driver();
-	return wilc_netdev_init();
+	ret = wilc_netdev_init();
+	if (ret)
+		return ret;
+
+	if (!wilc1000_spi_init(NULL)) {
+		PRINT_ER("Can't initialize SPI\n");
+		return -ENXIO;
+	}
+	wilc1000_dev->dev = &wilc_spi_dev->dev;
+
+	return ret;
 }
 late_initcall(init_wilc_spi_driver);
 
