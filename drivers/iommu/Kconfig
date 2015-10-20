@@ -342,6 +342,14 @@ config SPAPR_TCE_IOMMU
 	  Enables bits of IOMMU API required by VFIO. The iommu_ops
 	  is not implemented as it is not necessary for VFIO.
 
+config HI6220_IOMMU
+	bool "Hi6220 IOMMU Support"
+	depends on ARM64
+	select IOMMU_API
+	select IOMMU_IOVA
+	help
+	  Enable IOMMU Driver for hi6220 SoC.
+
 # ARM IOMMU support
 config ARM_SMMU
 	bool "ARM Ltd. System MMU (SMMU) Support"
