@@ -532,17 +532,17 @@ int wilc_wlan_cfg_indicate_rx(u8 *frame, int size, wilc_cfg_rsp_t *rsp)
 		rsp->seq_no = msg_id;
 		/*call host interface info parse as well*/
 		PRINT_INFO(RX_DBG, "Info message received\n");
-		GnrlAsyncInfoReceived(frame - 4, size + 4);
+		wilc1000_egnrl_async_info_received(frame - 4, size + 4);
 		break;
 
 	case 'N':
-		NetworkInfoReceived(frame - 4, size + 4);
+		wilc1000_network_info_received(frame - 4, size + 4);
 		rsp->type = 0;
 		break;
 
 	case 'S':
 		PRINT_INFO(RX_DBG, "Scan Notification Received\n");
-		host_int_ScanCompleteReceived(frame - 4, size + 4);
+		wilc1000_scan_complete_received(frame - 4, size + 4);
 		break;
 
 	default:

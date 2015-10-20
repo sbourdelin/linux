@@ -356,7 +356,7 @@ struct add_sta_param {
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_remove_key(struct host_if_drv *hWFIDrv, const u8 *pu8StaAddress);
+s32 wilc1000_remove_key(struct host_if_drv *hWFIDrv, const u8 *pu8StaAddress);
 /**
  *  @brief              removes WEP key
  *  @details    valid only in BSS STA mode if External Supplicant support is enabled.
@@ -371,7 +371,7 @@ s32 host_int_remove_key(struct host_if_drv *hWFIDrv, const u8 *pu8StaAddress);
  *  @date		8 March 2012
  *  @version		1.0
  */
-int host_int_remove_wep_key(struct host_if_drv *wfi_drv, u8 index);
+int wilc1000_remove_wep_key(struct host_if_drv *wfi_drv, u8 index);
 /**
  *  @brief              sets WEP deafault key
  *  @details    Sets the index of the WEP encryption key in use,
@@ -384,7 +384,7 @@ int host_int_remove_wep_key(struct host_if_drv *wfi_drv, u8 index);
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_set_WEPDefaultKeyID(struct host_if_drv *hWFIDrv, u8 u8Index);
+s32 wilc1000_set_wep_default_keyid(struct host_if_drv *hWFIDrv, u8 u8Index);
 
 /**
  *  @brief              sets WEP deafault key
@@ -405,9 +405,9 @@ s32 host_int_set_WEPDefaultKeyID(struct host_if_drv *hWFIDrv, u8 u8Index);
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_add_wep_key_bss_sta(struct host_if_drv *hWFIDrv, const u8 *pu8WepKey, u8 u8WepKeylen, u8 u8Keyidx);
+s32 wilc1000_add_wep_key_bss_sta(struct host_if_drv *hWFIDrv, const u8 *pu8WepKey, u8 u8WepKeylen, u8 u8Keyidx);
 /**
- *  @brief              host_int_add_wep_key_bss_ap
+ *  @brief              wilc1000_add_wep_key_bss_ap
  *  @details    valid only in AP mode if External Supplicant support is enabled.
  *                              sets WEP key entry into MAC hardware when it receives the
  *                              corresponding request from NDIS.
@@ -420,7 +420,7 @@ s32 host_int_add_wep_key_bss_sta(struct host_if_drv *hWFIDrv, const u8 *pu8WepKe
  *  @date		28 Feb 2013
  *  @version		1.0
  */
-s32 host_int_add_wep_key_bss_ap(struct host_if_drv *hWFIDrv, const u8 *pu8WepKey, u8 u8WepKeylen, u8 u8Keyidx, u8 u8mode, enum AUTHTYPE tenuAuth_type);
+s32 wilc1000_add_wep_key_bss_ap(struct host_if_drv *hWFIDrv, const u8 *pu8WepKey, u8 u8WepKeylen, u8 u8Keyidx, u8 u8mode, enum AUTHTYPE tenuAuth_type);
 
 /**
  *  @brief              adds ptk Key
@@ -438,11 +438,11 @@ s32 host_int_add_wep_key_bss_ap(struct host_if_drv *hWFIDrv, const u8 *pu8WepKey
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_add_ptk(struct host_if_drv *hWFIDrv, const u8 *pu8Ptk, u8 u8PtkKeylen,
+s32 wilc1000_add_ptk(struct host_if_drv *hWFIDrv, const u8 *pu8Ptk, u8 u8PtkKeylen,
 			     const u8 *mac_addr, const u8 *pu8RxMic, const u8 *pu8TxMic, u8 mode, u8 u8Ciphermode, u8 u8Idx);
 
 /**
- *  @brief              host_int_get_inactive_time
+ *  @brief              wilc1000_get_inactive_time
  *  @details
  *  @param[in,out] handle to the wifi driver
  *  @param[in]  message containing inactive time
@@ -453,7 +453,7 @@ s32 host_int_add_ptk(struct host_if_drv *hWFIDrv, const u8 *pu8Ptk, u8 u8PtkKeyl
  *  @date		15 April 2013
  *  @version		1.0
  */
-s32 host_int_get_inactive_time(struct host_if_drv *hWFIDrv, const u8 *mac, u32 *pu32InactiveTime);
+s32 wilc1000_get_inactive_time(struct host_if_drv *hWFIDrv, const u8 *mac, u32 *pu32InactiveTime);
 
 /**
  *  @brief              adds Rx GTk Key
@@ -471,7 +471,7 @@ s32 host_int_get_inactive_time(struct host_if_drv *hWFIDrv, const u8 *mac, u32 *
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_add_rx_gtk(struct host_if_drv *hWFIDrv, const u8 *pu8RxGtk, u8 u8GtkKeylen,
+s32 wilc1000_add_rx_gtk(struct host_if_drv *hWFIDrv, const u8 *pu8RxGtk, u8 u8GtkKeylen,
 				u8 u8KeyIdx, u32 u32KeyRSClen, const u8 *KeyRSC,
 				const u8 *pu8RxMic, const u8 *pu8TxMic, u8 mode, u8 u8Ciphermode);
 
@@ -515,7 +515,7 @@ s32 host_int_add_tx_gtk(struct host_if_drv *hWFIDrv, u8 u8KeyLen, u8 *pu8TxGtk, 
  *  @version		1.0
  */
 
-s32 host_int_set_pmkid_info(struct host_if_drv *hWFIDrv, struct host_if_pmkid_attr *pu8PmkidInfoArray);
+s32 wilc1000_set_pmkid_info(struct host_if_drv *hWFIDrv, struct host_if_pmkid_attr *pu8PmkidInfoArray);
 /**
  *  @brief              gets mac address
  *  @details
@@ -527,7 +527,7 @@ s32 host_int_set_pmkid_info(struct host_if_drv *hWFIDrv, struct host_if_pmkid_at
  *  @date		19 April 2012
  *  @version		1.0
  */
-s32 host_int_get_MacAddress(struct host_if_drv *hWFIDrv, u8 *pu8MacAddress);
+s32 wilc1000_get_mac_address(struct host_if_drv *hWFIDrv, u8 *pu8MacAddress);
 
 /**
  *  @brief              sets mac address
@@ -540,7 +540,7 @@ s32 host_int_get_MacAddress(struct host_if_drv *hWFIDrv, u8 *pu8MacAddress);
  *  @date		16 July 2012
  *  @version		1.0
  */
-s32 host_int_set_MacAddress(struct host_if_drv *hWFIDrv, u8 *pu8MacAddress);
+s32 wilc1000_set_mac_address(struct host_if_drv *hWFIDrv, u8 *pu8MacAddress);
 
 /**
  *  @brief              wait until msg q is empty
@@ -553,7 +553,7 @@ s32 host_int_set_MacAddress(struct host_if_drv *hWFIDrv, u8 *pu8MacAddress);
  *  @date		19 march 2014
  *  @version		1.0
  */
-int host_int_wait_msg_queue_idle(void);
+int wilc1000_wait_msg_queue_idle(void);
 
 /**
  *  @brief              sets a start scan request
@@ -585,7 +585,7 @@ s32 host_int_set_start_scan_req(struct host_if_drv *hWFIDrv, u8 scanSource);
  *  @version		1.0
  */
 
-s32 host_int_set_join_req(struct host_if_drv *hWFIDrv, u8 *pu8bssid,
+s32 wilc1000_set_join_req(struct host_if_drv *hWFIDrv, u8 *pu8bssid,
 				  const u8 *pu8ssid, size_t ssidLen,
 				  const u8 *pu8IEs, size_t IEsLen,
 				  wilc_connect_result pfConnectResult, void *pvUserArg,
@@ -605,7 +605,7 @@ s32 host_int_set_join_req(struct host_if_drv *hWFIDrv, u8 *pu8bssid,
  *  @version		8.0
  */
 
-s32 host_int_flush_join_req(struct host_if_drv *hWFIDrv);
+s32 wilc1000_flush_join_req(struct host_if_drv *hWFIDrv);
 
 
 /**
@@ -619,7 +619,7 @@ s32 host_int_flush_join_req(struct host_if_drv *hWFIDrv);
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_disconnect(struct host_if_drv *hWFIDrv, u16 u16ReasonCode);
+s32 wilc1000_disconnect(struct host_if_drv *hWFIDrv, u16 u16ReasonCode);
 
 /**
  *  @brief              sets a channel
@@ -636,7 +636,7 @@ s32 host_int_disconnect(struct host_if_drv *hWFIDrv, u16 u16ReasonCode);
  *  @date		8 March 2012
  *  @version		1.0
  */
-int host_int_set_mac_chnl_num(struct host_if_drv *wfi_drv, u8 channel);
+int wilc1000_set_mac_chnl_num(struct host_if_drv *wfi_drv, u8 channel);
 
 /**
  *  @brief              gets the sta rssi
@@ -651,7 +651,7 @@ int host_int_set_mac_chnl_num(struct host_if_drv *wfi_drv, u8 channel);
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_get_rssi(struct host_if_drv *hWFIDrv, s8 *ps8Rssi);
+s32 wilc1000_get_rssi(struct host_if_drv *hWFIDrv, s8 *ps8Rssi);
 
 /**
  *  @brief              scans a set of channels
@@ -670,7 +670,7 @@ s32 host_int_get_rssi(struct host_if_drv *hWFIDrv, s8 *ps8Rssi);
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_scan(struct host_if_drv *hWFIDrv, u8 u8ScanSource,
+s32 wilc1000_scan(struct host_if_drv *hWFIDrv, u8 u8ScanSource,
 			  u8 u8ScanType, u8 *pu8ChnlFreqList,
 			  u8 u8ChnlListLen, const u8 *pu8IEs,
 			  size_t IEsLen, wilc_scan_result ScanResult,
@@ -687,7 +687,7 @@ s32 host_int_scan(struct host_if_drv *hWFIDrv, u8 u8ScanSource,
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 hif_set_cfg(struct host_if_drv *hWFIDrv, struct cfg_param_val *pstrCfgParamVal);
+s32 wilc1000_hif_set_cfg(struct host_if_drv *hWFIDrv, struct cfg_param_val *pstrCfgParamVal);
 
 /*****************************************************************************/
 /*							Notification Functions							 */
@@ -702,7 +702,7 @@ s32 hif_set_cfg(struct host_if_drv *hWFIDrv, struct cfg_param_val *pstrCfgParamV
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_init(struct host_if_drv **phWFIDrv);
+s32 wilc1000_init(struct host_if_drv **phWFIDrv);
 
 /**
  *  @brief              host interface initialization function
@@ -713,11 +713,11 @@ s32 host_int_init(struct host_if_drv **phWFIDrv);
  *  @date		8 March 2012
  *  @version		1.0
  */
-s32 host_int_deinit(struct host_if_drv *hWFIDrv);
+s32 wilc1000_deinit(struct host_if_drv *hWFIDrv);
 
 
 /*!
- *  @fn		s32 host_int_add_beacon(WILC_WFIDrvHandle hWFIDrv,u8 u8Index)
+ *  @fn		s32 wilc1000_add_beacon(WILC_WFIDrvHandle hWFIDrv,u8 u8Index)
  *  @brief		Sends a beacon to the firmware to be transmitted over the air
  *  @details
  *  @param[in,out]	hWFIDrv		handle to the wifi driver
@@ -738,14 +738,14 @@ s32 host_int_deinit(struct host_if_drv *hWFIDrv);
  *  @version		1.0 Description
  *
  */
-s32 host_int_add_beacon(struct host_if_drv *hWFIDrv, u32 u32Interval,
+s32 wilc1000_add_beacon(struct host_if_drv *hWFIDrv, u32 u32Interval,
 				u32 u32DTIMPeriod,
 				u32 u32HeadLen, u8 *pu8Head,
 				u32 u32TailLen, u8 *pu8tail);
 
 
 /*!
- *  @fn		s32 host_int_del_beacon(WILC_WFIDrvHandle hWFIDrv)
+ *  @fn		s32 wilc1000_del_beacon(WILC_WFIDrvHandle hWFIDrv)
  *  @brief		Removes the beacon and stops trawilctting it over the air
  *  @details
  *  @param[in,out]	hWFIDrv		handle to the wifi driver
@@ -756,10 +756,10 @@ s32 host_int_add_beacon(struct host_if_drv *hWFIDrv, u32 u32Interval,
  *  @date		10 Julys 2012
  *  @version		1.0 Description
  */
-s32 host_int_del_beacon(struct host_if_drv *hWFIDrv);
+s32 wilc1000_del_beacon(struct host_if_drv *hWFIDrv);
 
 /*!
- *  @fn		s32 host_int_add_station(WILC_WFIDrvHandle hWFIDrv,
+ *  @fn		s32 wilc1000_add_station(WILC_WFIDrvHandle hWFIDrv,
  *					 struct add_sta_param *pstrStaParams)
  *  @brief		Notifies the firmware with a new associated stations
  *  @details
@@ -772,11 +772,11 @@ s32 host_int_del_beacon(struct host_if_drv *hWFIDrv);
  *  @date		12 July 2012
  *  @version		1.0 Description
  */
-s32 host_int_add_station(struct host_if_drv *hWFIDrv,
+s32 wilc1000_add_station(struct host_if_drv *hWFIDrv,
 			 struct add_sta_param *pstrStaParams);
 
 /*!
- *  @fn		s32 host_int_del_allstation(WILC_WFIDrvHandle hWFIDrv, const u8* pu8MacAddr)
+ *  @fn		s32 wilc1000_del_allstation(WILC_WFIDrvHandle hWFIDrv, const u8* pu8MacAddr)
  *  @brief		Deauthenticates clients when group is terminating
  *  @details
  *  @param[in,out]	hWFIDrv		handle to the wifi driver
@@ -788,10 +788,10 @@ s32 host_int_add_station(struct host_if_drv *hWFIDrv,
  *  @date		09 April 2014
  *  @version		1.0 Description
  */
-s32 host_int_del_allstation(struct host_if_drv *hWFIDrv, u8 pu8MacAddr[][ETH_ALEN]);
+s32 wilc1000_del_allstation(struct host_if_drv *hWFIDrv, u8 pu8MacAddr[][ETH_ALEN]);
 
 /*!
- *  @fn		s32 host_int_del_station(WILC_WFIDrvHandle hWFIDrv, u8* pu8MacAddr)
+ *  @fn		s32 wilc1000_del_station(WILC_WFIDrvHandle hWFIDrv, u8* pu8MacAddr)
  *  @brief		Notifies the firmware with a new deleted station
  *  @details
  *  @param[in,out]	hWFIDrv		handle to the wifi driver
@@ -803,10 +803,10 @@ s32 host_int_del_allstation(struct host_if_drv *hWFIDrv, u8 pu8MacAddr[][ETH_ALE
  *  @date		15 July 2012
  *  @version		1.0 Description
  */
-s32 host_int_del_station(struct host_if_drv *hWFIDrv, const u8 *pu8MacAddr);
+s32 wilc1000_del_station(struct host_if_drv *hWFIDrv, const u8 *pu8MacAddr);
 
 /*!
- *  @fn		s32 host_int_edit_station(WILC_WFIDrvHandle hWFIDrv,
+ *  @fn		s32 wilc1000_edit_station(WILC_WFIDrvHandle hWFIDrv,
  *					  struct add_sta_param *pstrStaParams)
  *  @brief		Notifies the firmware with new parameters of an already associated station
  *  @details
@@ -819,11 +819,11 @@ s32 host_int_del_station(struct host_if_drv *hWFIDrv, const u8 *pu8MacAddr);
  *  @date		15 July 2012
  *  @version		1.0 Description
  */
-s32 host_int_edit_station(struct host_if_drv *hWFIDrv,
+s32 wilc1000_edit_station(struct host_if_drv *hWFIDrv,
 			  struct add_sta_param *pstrStaParams);
 
 /*!
- *  @fn		s32 host_int_set_power_mgmt(WILC_WFIDrvHandle hWFIDrv, bool bIsEnabled, u32 u32Timeout)
+ *  @fn		s32 wilc1000_set_power_mgmt(WILC_WFIDrvHandle hWFIDrv, bool bIsEnabled, u32 u32Timeout)
  *  @brief		Set the power management mode to enabled or disabled
  *  @details
  *  @param[in,out]	hWFIDrv		handle to the wifi driver
@@ -837,7 +837,7 @@ s32 host_int_edit_station(struct host_if_drv *hWFIDrv,
  *  @date		24 November 2012
  *  @version		1.0 Description
  */
-s32 host_int_set_power_mgmt(struct host_if_drv *hWFIDrv, bool bIsEnabled, u32 u32Timeout);
+s32 wilc1000_set_power_mgmt(struct host_if_drv *hWFIDrv, bool bIsEnabled, u32 u32Timeout);
 /*  @param[in,out]	hWFIDrv		handle to the wifi driver
  *  @param[in]	bIsEnabled	TRUE if enabled, FALSE otherwise
  *  @param[in]	u8count		count of mac address entries in the filter table
@@ -849,9 +849,9 @@ s32 host_int_set_power_mgmt(struct host_if_drv *hWFIDrv, bool bIsEnabled, u32 u3
  *  @date		24 November 2012
  *  @version		1.0 Description
  */
-s32 host_int_setup_multicast_filter(struct host_if_drv *hWFIDrv, bool bIsEnabled, u32 u32count);
+s32 wilc1000_setup_multicast_filter(struct host_if_drv *hWFIDrv, bool bIsEnabled, u32 u32count);
 /**
- *  @brief           host_int_setup_ipaddress
+ *  @brief           wilc1000_setup_ipaddress
  *  @details       set IP address on firmware
  *  @param[in]
  *  @return         Error code.
@@ -859,7 +859,7 @@ s32 host_int_setup_multicast_filter(struct host_if_drv *hWFIDrv, bool bIsEnabled
  *  @date
  *  @version	1.0
  */
-s32 host_int_setup_ipaddress(struct host_if_drv *hWFIDrv, u8 *pu8IPAddr, u8 idx);
+s32 wilc1000_setup_ipaddress(struct host_if_drv *hWFIDrv, u8 *pu8IPAddr, u8 idx);
 
 /**
  *  @brief           host_int_delBASession
@@ -870,10 +870,10 @@ s32 host_int_setup_ipaddress(struct host_if_drv *hWFIDrv, u8 *pu8IPAddr, u8 idx)
  *  @date
  *  @version	1.0
  */
-s32 host_int_del_All_Rx_BASession(struct host_if_drv *hWFIDrv, char *pBSSID, char TID);
+s32 wilc1000_del_all_rx_ba_session(struct host_if_drv *hWFIDrv, char *pBSSID, char TID);
 
 /**
- *  @brief           host_int_remain_on_channel
+ *  @brief           wilc1000_remain_on_channel
  *  @details
  *  @param[in]
  *  @return         Error code.
@@ -881,10 +881,10 @@ s32 host_int_del_All_Rx_BASession(struct host_if_drv *hWFIDrv, char *pBSSID, cha
  *  @date
  *  @version	1.0
  */
-s32 host_int_remain_on_channel(struct host_if_drv *hWFIDrv, u32 u32SessionID, u32 u32duration, u16 chan, wilc_remain_on_chan_expired RemainOnChanExpired, wilc_remain_on_chan_ready RemainOnChanReady, void *pvUserArg);
+s32 wilc1000_remain_on_channel(struct host_if_drv *hWFIDrv, u32 u32SessionID, u32 u32duration, u16 chan, wilc_remain_on_chan_expired RemainOnChanExpired, wilc_remain_on_chan_ready RemainOnChanReady, void *pvUserArg);
 
 /**
- *  @brief              host_int_ListenStateExpired
+ *  @brief              wilc1000_listen_state_expired
  *  @details
  *  @param[in]          Handle to wifi driver
  *                              Duration to remain on channel
@@ -897,10 +897,10 @@ s32 host_int_remain_on_channel(struct host_if_drv *hWFIDrv, u32 u32SessionID, u3
  *  @date
  *  @version		1.0
  */
-s32 host_int_ListenStateExpired(struct host_if_drv *hWFIDrv, u32 u32SessionID);
+s32 wilc1000_listen_state_expired(struct host_if_drv *hWFIDrv, u32 u32SessionID);
 
 /**
- *  @brief           host_int_frame_register
+ *  @brief           wilc1000_frame_register
  *  @details
  *  @param[in]
  *  @return         Error code.
@@ -908,9 +908,9 @@ s32 host_int_ListenStateExpired(struct host_if_drv *hWFIDrv, u32 u32SessionID);
  *  @date
  *  @version	1.0
  */
-s32 host_int_frame_register(struct host_if_drv *hWFIDrv, u16 u16FrameType, bool bReg);
+s32 wilc1000_frame_register(struct host_if_drv *hWFIDrv, u16 u16FrameType, bool bReg);
 /**
- *  @brief           host_int_set_wfi_drv_handler
+ *  @brief           wilc1000_set_wfi_drv_handler
  *  @details
  *  @param[in]
  *  @return         Error code.
@@ -918,11 +918,11 @@ s32 host_int_frame_register(struct host_if_drv *hWFIDrv, u16 u16FrameType, bool 
  *  @date
  *  @version	1.0
  */
-int host_int_set_wfi_drv_handler(struct host_if_drv *address);
-int host_int_set_operation_mode(struct host_if_drv *wfi_drv, u32 mode);
+int wilc1000_set_wfi_drv_handler(struct host_if_drv *address);
+int wilc1000_set_operation_mode(struct host_if_drv *wfi_drv, u32 mode);
 
-void host_int_freeJoinParams(void *pJoinParams);
+void wilc1000_free_join_params(void *pJoinParams);
 
-s32 host_int_get_statistics(struct host_if_drv *hWFIDrv, struct rf_info *pstrStatistics);
+s32 wilc1000_get_statistics(struct host_if_drv *hWFIDrv, struct rf_info *pstrStatistics);
 
 #endif

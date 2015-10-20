@@ -8,11 +8,11 @@
 #include "wilc_msgqueue.h"
 #include <linux/etherdevice.h>
 
-extern u8 connecting;
+extern u8 wilc1000_connecting;
 
-extern struct timer_list hDuringIpTimer;
+extern struct timer_list wilc1000_during_ip_timer;
 
-extern u8 g_wilc_initialized;
+extern u8 wilc1000_initialized;
 
 #define HOST_IF_MSG_SCAN                        0
 #define HOST_IF_MSG_CONNECT                     1
@@ -231,7 +231,7 @@ struct join_bss_param {
 
 static struct host_if_drv *wfidrv_list[NUM_CONCURRENT_IFC + 1];
 struct host_if_drv *terminated_handle;
-bool g_obtainingIP;
+bool wilc1000_optaining_ip;
 static u8 P2P_LISTEN_STATE;
 static struct task_struct *hif_thread_handler;
 static WILC_MsgQueueHandle hif_msg_q;
@@ -241,7 +241,7 @@ static struct semaphore hif_sema_wait_response;
 static struct semaphore hif_sema_deinit;
 static struct timer_list periodic_rssi;
 
-u8 gau8MulticastMacAddrList[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
+u8 wilc1000_multicast_mac_addr_list[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
 
 static u8 rcv_assoc_resp[MAX_ASSOC_RESP_FRAME_SIZE];
 
@@ -268,8 +268,8 @@ static struct host_if_drv *join_req_drv;
 
 static void *host_int_ParseJoinBssParam(tstrNetworkInfo *ptstrNetworkInfo);
 
-extern void chip_sleep_manually(u32 u32SleepTime);
-extern int linux_wlan_get_num_conn_ifcs(void);
+extern void wilc1000_chip_sleep_manually(u32 u32SleepTime);
+extern int wilc1000_wlan_get_num_conn_ifcs(void);
 
 static int add_handler_in_list(struct host_if_drv *handler)
 {
@@ -456,7 +456,7 @@ static s32 Handle_get_IPAddress(struct host_if_drv *hif_drv, u8 *pu8IPAddr, u8 i
 	kfree(strWID.val);
 
 	if (memcmp(get_ip[idx], set_ip[idx], IP_ALEN) != 0)
-		host_int_setup_ipaddress(hif_drv, set_ip[idx], idx);
+		wilc1000_setup_ipaddress(hif_drv, set_ip[idx], idx);
 
 	if (s32Error != 0) {
 		PRINT_ER("Failed to get IP address\n");
@@ -809,7 +809,7 @@ ERRORHANDLER:
 
 static s32 Handle_wait_msg_q_empty(void)
 {
-	g_wilc_initialized = 0;
+	wilc1000_initialized = 0;
 	up(&hif_sema_wait_response);
 	return 0;
 }
@@ -841,7 +841,7 @@ static s32 Handle_Scan(struct host_if_drv *hif_drv,
 		goto ERRORHANDLER;
 	}
 
-	if (g_obtainingIP || connecting) {
+	if (wilc1000_optaining_ip || wilc1000_connecting) {
 		PRINT_D(GENERIC_DBG, "[handle_scan]: Don't do obss scan until IP adresss is obtained\n");
 		PRINT_ER("Don't do obss scan\n");
 		s32Error = -EBUSY;
@@ -987,7 +987,7 @@ static s32 Handle_ScanDone(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-u8 u8ConnectedSSID[6] = {0};
+u8 wilc1000_connected_SSID[6] = {0};
 static s32 Handle_Connect(struct host_if_drv *hif_drv,
 			  struct connect_attr *pstrHostIFconnectAttr)
 {
@@ -999,7 +999,7 @@ static s32 Handle_Connect(struct host_if_drv *hif_drv,
 
 	PRINT_D(GENERIC_DBG, "Handling connect request\n");
 
-	if (memcmp(pstrHostIFconnectAttr->bssid, u8ConnectedSSID, ETH_ALEN) == 0) {
+	if (memcmp(pstrHostIFconnectAttr->bssid, wilc1000_connected_SSID, ETH_ALEN) == 0) {
 
 		s32Error = 0;
 		PRINT_ER("Trying to connect to an already connected AP, Discard connect request\n");
@@ -1210,10 +1210,10 @@ static s32 Handle_Connect(struct host_if_drv *hif_drv,
 	PRINT_D(GENERIC_DBG, "send HOST_IF_WAITING_CONN_RESP\n");
 
 	if (pstrHostIFconnectAttr->bssid != NULL) {
-		memcpy(u8ConnectedSSID, pstrHostIFconnectAttr->bssid, ETH_ALEN);
+		memcpy(wilc1000_connected_SSID, pstrHostIFconnectAttr->bssid, ETH_ALEN);
 
 		PRINT_D(GENERIC_DBG, "save Bssid = %pM\n", pstrHostIFconnectAttr->bssid);
-		PRINT_D(GENERIC_DBG, "save bssid = %pM\n", u8ConnectedSSID);
+		PRINT_D(GENERIC_DBG, "save bssid = %pM\n", wilc1000_connected_SSID);
 	}
 
 	s32Error = send_config_pkt(SET_CFG, strWIDList, u32WidsCount,
@@ -1233,7 +1233,7 @@ ERRORHANDLER:
 
 		del_timer(&hif_drv->hConnectTimer);
 
-		PRINT_D(HOSTINF_DBG, "could not start connecting to the required network\n");
+		PRINT_D(HOSTINF_DBG, "could not start wilc1000_connecting to the required network\n");
 
 		memset(&strConnectInfo, 0, sizeof(tstrConnectInfo));
 
@@ -1387,7 +1387,7 @@ static s32 Handle_ConnectTimeout(struct host_if_drv *hif_drv)
 	hif_drv->strWILC_UsrConnReq.ConnReqIEsLen = 0;
 	kfree(hif_drv->strWILC_UsrConnReq.pu8ConnReqIEs);
 
-	eth_zero_addr(u8ConnectedSSID);
+	eth_zero_addr(wilc1000_connected_SSID);
 
 	if (join_req != NULL && join_req_drv == hif_drv) {
 		kfree(join_req);
@@ -1482,7 +1482,7 @@ done:
 	pstrRcvdNetworkInfo->buffer = NULL;
 
 	if (pstrNetworkInfo != NULL) {
-		DeallocateNetworkInfo(pstrNetworkInfo);
+		wilc1000_dealloc_network_info(pstrNetworkInfo);
 		pstrNetworkInfo = NULL;
 	}
 
@@ -1562,10 +1562,10 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct host_if_drv *hif_drv,
 				if (u32RcvdAssocRespInfoLen != 0) {
 
 					PRINT_D(HOSTINF_DBG, "Parsing association response\n");
-					s32Err = ParseAssocRespInfo(rcv_assoc_resp, u32RcvdAssocRespInfoLen,
+					s32Err = wilc1000_parse_assoc_resp_info(rcv_assoc_resp, u32RcvdAssocRespInfoLen,
 								    &pstrConnectRespInfo);
 					if (s32Err) {
-						PRINT_ER("ParseAssocRespInfo() returned error %d\n", s32Err);
+						PRINT_ER("wilc1000_parse_assoc_resp_info() returned error %d\n", s32Err);
 					} else {
 						strConnectInfo.u16ConnectStatus = pstrConnectRespInfo->u16ConnectStatus;
 
@@ -1582,7 +1582,7 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct host_if_drv *hif_drv,
 						}
 
 						if (pstrConnectRespInfo != NULL) {
-							DeallocateAssocRespInfo(pstrConnectRespInfo);
+							wilc1000_dealloc_assoc_resp_info(pstrConnectRespInfo);
 							pstrConnectRespInfo = NULL;
 						}
 					}
@@ -1592,11 +1592,11 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct host_if_drv *hif_drv,
 			if ((u8MacStatus == MAC_CONNECTED) &&
 			    (strConnectInfo.u16ConnectStatus != SUCCESSFUL_STATUSCODE))	{
 				PRINT_ER("Received MAC status is MAC_CONNECTED while the received status code in Asoc Resp is not SUCCESSFUL_STATUSCODE\n");
-				eth_zero_addr(u8ConnectedSSID);
+				eth_zero_addr(wilc1000_connected_SSID);
 
 			} else if (u8MacStatus == MAC_DISCONNECTED)    {
 				PRINT_ER("Received MAC status is MAC_DISCONNECTED\n");
-				eth_zero_addr(u8ConnectedSSID);
+				eth_zero_addr(wilc1000_connected_SSID);
 			}
 
 			if (hif_drv->strWILC_UsrConnReq.pu8bssid != NULL) {
@@ -1629,14 +1629,14 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct host_if_drv *hif_drv,
 
 			if ((u8MacStatus == MAC_CONNECTED) &&
 			    (strConnectInfo.u16ConnectStatus == SUCCESSFUL_STATUSCODE))	{
-				host_int_set_power_mgmt(hif_drv, 0, 0);
+				wilc1000_set_power_mgmt(hif_drv, 0, 0);
 
 				PRINT_D(HOSTINF_DBG, "MAC status : CONNECTED and Connect Status : Successful\n");
 				hif_drv->enuHostIFstate = HOST_IF_CONNECTED;
 
 				PRINT_D(GENERIC_DBG, "Obtaining an IP, Disable Scan\n");
-				g_obtainingIP = true;
-				mod_timer(&hDuringIpTimer,
+				wilc1000_optaining_ip = true;
+				mod_timer(&wilc1000_during_ip_timer,
 					  jiffies + msecs_to_jiffies(10000));
 			} else {
 				PRINT_D(HOSTINF_DBG, "MAC status : %d and Connect Status : %d\n", u8MacStatus, strConnectInfo.u16ConnectStatus);
@@ -1671,8 +1671,8 @@ static s32 Handle_RcvdGnrlAsyncInfo(struct host_if_drv *hif_drv,
 			strDisconnectNotifInfo.ie_len = 0;
 
 			if (hif_drv->strWILC_UsrConnReq.pfUserConnectResult != NULL)	{
-				g_obtainingIP = false;
-				host_int_set_power_mgmt(hif_drv, 0, 0);
+				wilc1000_optaining_ip = false;
+				wilc1000_set_power_mgmt(hif_drv, 0, 0);
 
 				hif_drv->strWILC_UsrConnReq.pfUserConnectResult(CONN_DISCONN_EVENT_DISCONN_NOTIF,
 										   NULL,
@@ -2031,10 +2031,10 @@ static void Handle_Disconnect(struct host_if_drv *hif_drv)
 
 	PRINT_D(HOSTINF_DBG, "Sending disconnect request\n");
 
-	g_obtainingIP = false;
-	host_int_set_power_mgmt(hif_drv, 0, 0);
+	wilc1000_optaining_ip = false;
+	wilc1000_set_power_mgmt(hif_drv, 0, 0);
 
-	eth_zero_addr(u8ConnectedSSID);
+	eth_zero_addr(wilc1000_connected_SSID);
 
 	s32Error = send_config_pkt(SET_CFG, &strWID, 1,
 				   get_id_from_handler(hif_drv));
@@ -2098,13 +2098,13 @@ static void Handle_Disconnect(struct host_if_drv *hif_drv)
 }
 
 
-void resolve_disconnect_aberration(struct host_if_drv *hif_drv)
+void wilc1000_resolve_disconnect_aberration(struct host_if_drv *hif_drv)
 {
 	if (!hif_drv)
 		return;
 	if ((hif_drv->enuHostIFstate == HOST_IF_WAITING_CONN_RESP) || (hif_drv->enuHostIFstate == HOST_IF_CONNECTING)) {
 		PRINT_D(HOSTINF_DBG, "\n\n<< correcting Supplicant state machine >>\n\n");
-		host_int_disconnect(hif_drv, 1);
+		wilc1000_disconnect(hif_drv, 1);
 	}
 }
 
@@ -2569,12 +2569,12 @@ static int Handle_RemainOnChan(struct host_if_drv *hif_drv,
 		goto ERRORHANDLER;
 	}
 	if (hif_drv->enuHostIFstate == HOST_IF_WAITING_CONN_RESP) {
-		PRINT_INFO(GENERIC_DBG, "Required to remain on chan while connecting return\n");
+		PRINT_INFO(GENERIC_DBG, "Required to remain on chan while wilc1000_connecting return\n");
 		s32Error = -EBUSY;
 		goto ERRORHANDLER;
 	}
 
-	if (g_obtainingIP || connecting) {
+	if (wilc1000_optaining_ip || wilc1000_connecting) {
 		PRINT_D(GENERIC_DBG, "[handle_scan]: Don't do obss scan until IP adresss is obtained\n");
 		s32Error = -EBUSY;
 		goto ERRORHANDLER;
@@ -2768,7 +2768,7 @@ static void Handle_SetMulticastFilter(struct host_if_drv *hif_drv,
 	*pu8CurrByte++ = ((strHostIfSetMulti->cnt >> 24) & 0xFF);
 
 	if ((strHostIfSetMulti->cnt) > 0)
-		memcpy(pu8CurrByte, gau8MulticastMacAddrList, ((strHostIfSetMulti->cnt) * ETH_ALEN));
+		memcpy(pu8CurrByte, wilc1000_multicast_mac_addr_list, ((strHostIfSetMulti->cnt) * ETH_ALEN));
 
 	s32Error = send_config_pkt(SET_CFG, &strWID, 1,
 				   get_id_from_handler(hif_drv));
@@ -2903,7 +2903,7 @@ static int hostIFthread(void *pvArg)
 			break;
 		}
 
-		if ((!g_wilc_initialized)) {
+		if ((!wilc1000_initialized)) {
 			PRINT_D(GENERIC_DBG, "--WAIT--");
 			usleep_range(200 * 1000, 200 * 1000);
 			wilc_mq_send(&hif_msg_q, &msg, sizeof(struct host_if_msg));
@@ -2963,8 +2963,8 @@ static int hostIFthread(void *pvArg)
 			del_timer(&hif_drv->hScanTimer);
 			PRINT_D(HOSTINF_DBG, "scan completed successfully\n");
 
-			if (!linux_wlan_get_num_conn_ifcs())
-				chip_sleep_manually(INFINITE_SLEEP_TIME);
+			if (!wilc1000_wlan_get_num_conn_ifcs())
+				wilc1000_chip_sleep_manually(INFINITE_SLEEP_TIME);
 
 			Handle_ScanDone(msg.drv, SCAN_EVENT_DONE);
 
@@ -3121,7 +3121,7 @@ static void TimerCB_Connect(unsigned long arg)
 	wilc_mq_send(&hif_msg_q, &msg, sizeof(struct host_if_msg));
 }
 
-s32 host_int_remove_key(struct host_if_drv *hif_drv, const u8 *pu8StaAddress)
+s32 wilc1000_remove_key(struct host_if_drv *hif_drv, const u8 *pu8StaAddress)
 {
 	struct wid strWID;
 
@@ -3133,7 +3133,7 @@ s32 host_int_remove_key(struct host_if_drv *hif_drv, const u8 *pu8StaAddress)
 	return 0;
 }
 
-int host_int_remove_wep_key(struct host_if_drv *hif_drv, u8 index)
+int wilc1000_remove_wep_key(struct host_if_drv *hif_drv, u8 index)
 {
 	int result = 0;
 	struct host_if_msg msg;
@@ -3160,7 +3160,7 @@ int host_int_remove_wep_key(struct host_if_drv *hif_drv, u8 index)
 	return result;
 }
 
-s32 host_int_set_WEPDefaultKeyID(struct host_if_drv *hif_drv, u8 u8Index)
+s32 wilc1000_set_wep_default_keyid(struct host_if_drv *hif_drv, u8 u8Index)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3189,7 +3189,7 @@ s32 host_int_set_WEPDefaultKeyID(struct host_if_drv *hif_drv, u8 u8Index)
 	return s32Error;
 }
 
-s32 host_int_add_wep_key_bss_sta(struct host_if_drv *hif_drv,
+s32 wilc1000_add_wep_key_bss_sta(struct host_if_drv *hif_drv,
 				 const u8 *pu8WepKey,
 				 u8 u8WepKeylen,
 				 u8 u8Keyidx)
@@ -3225,7 +3225,7 @@ s32 host_int_add_wep_key_bss_sta(struct host_if_drv *hif_drv,
 
 }
 
-s32 host_int_add_wep_key_bss_ap(struct host_if_drv *hif_drv,
+s32 wilc1000_add_wep_key_bss_ap(struct host_if_drv *hif_drv,
 				const u8 *pu8WepKey,
 				u8 u8WepKeylen,
 				u8 u8Keyidx,
@@ -3270,7 +3270,7 @@ s32 host_int_add_wep_key_bss_ap(struct host_if_drv *hif_drv,
 
 }
 
-s32 host_int_add_ptk(struct host_if_drv *hif_drv, const u8 *pu8Ptk,
+s32 wilc1000_add_ptk(struct host_if_drv *hif_drv, const u8 *pu8Ptk,
 		     u8 u8PtkKeylen, const u8 *mac_addr,
 		     const u8 *pu8RxMic, const u8 *pu8TxMic,
 		     u8 mode, u8 u8Ciphermode, u8 u8Idx)
@@ -3335,7 +3335,7 @@ s32 host_int_add_ptk(struct host_if_drv *hif_drv, const u8 *pu8Ptk,
 	return s32Error;
 }
 
-s32 host_int_add_rx_gtk(struct host_if_drv *hif_drv, const u8 *pu8RxGtk,
+s32 wilc1000_add_rx_gtk(struct host_if_drv *hif_drv, const u8 *pu8RxGtk,
 			u8 u8GtkKeylen,	u8 u8KeyIdx,
 			u32 u32KeyRSClen, const u8 *KeyRSC,
 			const u8 *pu8RxMic, const u8 *pu8TxMic,
@@ -3397,7 +3397,7 @@ s32 host_int_add_rx_gtk(struct host_if_drv *hif_drv, const u8 *pu8RxGtk,
 	return s32Error;
 }
 
-s32 host_int_set_pmkid_info(struct host_if_drv *hif_drv, struct host_if_pmkid_attr *pu8PmkidInfoArray)
+s32 wilc1000_set_pmkid_info(struct host_if_drv *hif_drv, struct host_if_pmkid_attr *pu8PmkidInfoArray)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3431,7 +3431,7 @@ s32 host_int_set_pmkid_info(struct host_if_drv *hif_drv, struct host_if_pmkid_at
 	return s32Error;
 }
 
-s32 host_int_get_MacAddress(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
+s32 wilc1000_get_mac_address(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3452,7 +3452,7 @@ s32 host_int_get_MacAddress(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
 	return s32Error;
 }
 
-s32 host_int_set_MacAddress(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
+s32 wilc1000_set_mac_address(struct host_if_drv *hif_drv, u8 *pu8MacAddress)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3484,7 +3484,7 @@ s32 host_int_set_start_scan_req(struct host_if_drv *hif_drv, u8 scanSource)
 	return 0;
 }
 
-s32 host_int_set_join_req(struct host_if_drv *hif_drv, u8 *pu8bssid,
+s32 wilc1000_set_join_req(struct host_if_drv *hif_drv, u8 *pu8bssid,
 			  const u8 *pu8ssid, size_t ssidLen,
 			  const u8 *pu8IEs, size_t IEsLen,
 			  wilc_connect_result pfConnectResult, void *pvUserArg,
@@ -3551,7 +3551,7 @@ s32 host_int_set_join_req(struct host_if_drv *hif_drv, u8 *pu8bssid,
 	return s32Error;
 }
 
-s32 host_int_flush_join_req(struct host_if_drv *hif_drv)
+s32 wilc1000_flush_join_req(struct host_if_drv *hif_drv)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3580,7 +3580,7 @@ s32 host_int_flush_join_req(struct host_if_drv *hif_drv)
 	return s32Error;
 }
 
-s32 host_int_disconnect(struct host_if_drv *hif_drv, u16 u16ReasonCode)
+s32 wilc1000_disconnect(struct host_if_drv *hif_drv, u16 u16ReasonCode)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3633,7 +3633,7 @@ static s32 host_int_get_assoc_res_info(struct host_if_drv *hif_drv, u8 *pu8Assoc
 	return s32Error;
 }
 
-int host_int_set_mac_chnl_num(struct host_if_drv *hif_drv, u8 channel)
+int wilc1000_set_mac_chnl_num(struct host_if_drv *hif_drv, u8 channel)
 {
 	int result;
 	struct host_if_msg msg;
@@ -3657,7 +3657,7 @@ int host_int_set_mac_chnl_num(struct host_if_drv *hif_drv, u8 channel)
 	return 0;
 }
 
-int host_int_wait_msg_queue_idle(void)
+int wilc1000_wait_msg_queue_idle(void)
 {
 	int result = 0;
 
@@ -3675,7 +3675,7 @@ int host_int_wait_msg_queue_idle(void)
 	return result;
 }
 
-int host_int_set_wfi_drv_handler(struct host_if_drv *hif_drv)
+int wilc1000_set_wfi_drv_handler(struct host_if_drv *hif_drv)
 {
 	int result = 0;
 
@@ -3694,7 +3694,7 @@ int host_int_set_wfi_drv_handler(struct host_if_drv *hif_drv)
 	return result;
 }
 
-int host_int_set_operation_mode(struct host_if_drv *hif_drv, u32 mode)
+int wilc1000_set_operation_mode(struct host_if_drv *hif_drv, u32 mode)
 {
 	int result = 0;
 
@@ -3713,7 +3713,7 @@ int host_int_set_operation_mode(struct host_if_drv *hif_drv, u32 mode)
 	return result;
 }
 
-s32 host_int_get_inactive_time(struct host_if_drv *hif_drv,
+s32 wilc1000_get_inactive_time(struct host_if_drv *hif_drv,
 			       const u8 *mac, u32 *pu32InactiveTime)
 {
 	s32 s32Error = 0;
@@ -3744,7 +3744,7 @@ s32 host_int_get_inactive_time(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_get_rssi(struct host_if_drv *hif_drv, s8 *ps8Rssi)
+s32 wilc1000_get_rssi(struct host_if_drv *hif_drv, s8 *ps8Rssi)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3772,7 +3772,7 @@ s32 host_int_get_rssi(struct host_if_drv *hif_drv, s8 *ps8Rssi)
 	return s32Error;
 }
 
-s32 host_int_get_statistics(struct host_if_drv *hif_drv, struct rf_info *pstrStatistics)
+s32 wilc1000_get_statistics(struct host_if_drv *hif_drv, struct rf_info *pstrStatistics)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -3792,7 +3792,7 @@ s32 host_int_get_statistics(struct host_if_drv *hif_drv, struct rf_info *pstrSta
 	return s32Error;
 }
 
-s32 host_int_scan(struct host_if_drv *hif_drv, u8 u8ScanSource,
+s32 wilc1000_scan(struct host_if_drv *hif_drv, u8 u8ScanSource,
 		  u8 u8ScanType, u8 *pu8ChnlFreqList,
 		  u8 u8ChnlListLen, const u8 *pu8IEs,
 		  size_t IEsLen, wilc_scan_result ScanResult,
@@ -3846,7 +3846,7 @@ s32 host_int_scan(struct host_if_drv *hif_drv, u8 u8ScanSource,
 
 }
 
-s32 hif_set_cfg(struct host_if_drv *hif_drv,
+s32 wilc1000_hif_set_cfg(struct host_if_drv *hif_drv,
 		struct cfg_param_val *pstrCfgParamVal)
 {
 
@@ -3901,7 +3901,7 @@ static void GetPeriodicRSSI(unsigned long arg)
 
 static u32 clients_count;
 
-s32 host_int_init(struct host_if_drv **hif_drv_handler)
+s32 wilc1000_init(struct host_if_drv **hif_drv_handler)
 {
 	s32 result = 0;
 	struct host_if_drv *hif_drv;
@@ -3925,7 +3925,7 @@ s32 host_int_init(struct host_if_drv **hif_drv_handler)
 		goto _fail_timer_2;
 	}
 
-	g_obtainingIP = false;
+	wilc1000_optaining_ip = false;
 
 	PRINT_D(HOSTINF_DBG, "Global handle pointer value=%p\n", hif_drv);
 	if (clients_count == 0)	{
@@ -4004,7 +4004,7 @@ _fail_:
 	return result;
 }
 
-s32 host_int_deinit(struct host_if_drv *hif_drv)
+s32 wilc1000_deinit(struct host_if_drv *hif_drv)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4033,7 +4033,7 @@ s32 host_int_deinit(struct host_if_drv *hif_drv)
 
 	del_timer_sync(&hif_drv->hRemainOnChannel);
 
-	host_int_set_wfi_drv_handler(NULL);
+	wilc1000_set_wfi_drv_handler(NULL);
 	down(&hif_sema_driver);
 
 	if (hif_drv->strWILC_UsrScanReq.pfUserScanResult) {
@@ -4079,7 +4079,7 @@ s32 host_int_deinit(struct host_if_drv *hif_drv)
 	return s32Error;
 }
 
-void NetworkInfoReceived(u8 *pu8Buffer, u32 u32Length)
+void wilc1000_network_info_received(u8 *pu8Buffer, u32 u32Length)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4111,7 +4111,7 @@ void NetworkInfoReceived(u8 *pu8Buffer, u32 u32Length)
 		PRINT_ER("Error in sending network info message queue message parameters: Error(%d)\n", s32Error);
 }
 
-void GnrlAsyncInfoReceived(u8 *pu8Buffer, u32 u32Length)
+void wilc1000_egnrl_async_info_received(u8 *pu8Buffer, u32 u32Length)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4154,7 +4154,7 @@ void GnrlAsyncInfoReceived(u8 *pu8Buffer, u32 u32Length)
 	up(&hif_sema_deinit);
 }
 
-void host_int_ScanCompleteReceived(u8 *pu8Buffer, u32 u32Length)
+void wilc1000_scan_complete_received(u8 *pu8Buffer, u32 u32Length)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4186,7 +4186,7 @@ void host_int_ScanCompleteReceived(u8 *pu8Buffer, u32 u32Length)
 
 }
 
-s32 host_int_remain_on_channel(struct host_if_drv *hif_drv, u32 u32SessionID,
+s32 wilc1000_remain_on_channel(struct host_if_drv *hif_drv, u32 u32SessionID,
 			       u32 u32duration, u16 chan,
 			       wilc_remain_on_chan_expired RemainOnChanExpired,
 			       wilc_remain_on_chan_ready RemainOnChanReady,
@@ -4218,7 +4218,7 @@ s32 host_int_remain_on_channel(struct host_if_drv *hif_drv, u32 u32SessionID,
 	return s32Error;
 }
 
-s32 host_int_ListenStateExpired(struct host_if_drv *hif_drv, u32 u32SessionID)
+s32 wilc1000_listen_state_expired(struct host_if_drv *hif_drv, u32 u32SessionID)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4242,7 +4242,7 @@ s32 host_int_ListenStateExpired(struct host_if_drv *hif_drv, u32 u32SessionID)
 	return s32Error;
 }
 
-s32 host_int_frame_register(struct host_if_drv *hif_drv, u16 u16FrameType, bool bReg)
+s32 wilc1000_frame_register(struct host_if_drv *hif_drv, u16 u16FrameType, bool bReg)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4283,7 +4283,7 @@ s32 host_int_frame_register(struct host_if_drv *hif_drv, u16 u16FrameType, bool 
 
 }
 
-s32 host_int_add_beacon(struct host_if_drv *hif_drv, u32 u32Interval,
+s32 wilc1000_add_beacon(struct host_if_drv *hif_drv, u32 u32Interval,
 			u32 u32DTIMPeriod, u32 u32HeadLen, u8 *pu8Head,
 			u32 u32TailLen, u8 *pu8Tail)
 {
@@ -4338,7 +4338,7 @@ ERRORHANDLER:
 
 }
 
-s32 host_int_del_beacon(struct host_if_drv *hif_drv)
+s32 wilc1000_del_beacon(struct host_if_drv *hif_drv)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4359,7 +4359,7 @@ s32 host_int_del_beacon(struct host_if_drv *hif_drv)
 	return s32Error;
 }
 
-s32 host_int_add_station(struct host_if_drv *hif_drv,
+s32 wilc1000_add_station(struct host_if_drv *hif_drv,
 			 struct add_sta_param *pstrStaParams)
 {
 	s32 s32Error = 0;
@@ -4396,7 +4396,7 @@ s32 host_int_add_station(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_del_station(struct host_if_drv *hif_drv, const u8 *pu8MacAddr)
+s32 wilc1000_del_station(struct host_if_drv *hif_drv, const u8 *pu8MacAddr)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;
@@ -4425,7 +4425,7 @@ s32 host_int_del_station(struct host_if_drv *hif_drv, const u8 *pu8MacAddr)
 	return s32Error;
 }
 
-s32 host_int_del_allstation(struct host_if_drv *hif_drv,
+s32 wilc1000_del_allstation(struct host_if_drv *hif_drv,
 			    u8 pu8MacAddr[][ETH_ALEN])
 {
 	s32 s32Error = 0;
@@ -4478,7 +4478,7 @@ s32 host_int_del_allstation(struct host_if_drv *hif_drv,
 
 }
 
-s32 host_int_edit_station(struct host_if_drv *hif_drv,
+s32 wilc1000_edit_station(struct host_if_drv *hif_drv,
 			  struct add_sta_param *pstrStaParams)
 {
 	s32 s32Error = 0;
@@ -4515,7 +4515,7 @@ s32 host_int_edit_station(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_set_power_mgmt(struct host_if_drv *hif_drv,
+s32 wilc1000_set_power_mgmt(struct host_if_drv *hif_drv,
 			    bool bIsEnabled,
 			    u32 u32Timeout)
 {
@@ -4546,7 +4546,7 @@ s32 host_int_set_power_mgmt(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_setup_multicast_filter(struct host_if_drv *hif_drv,
+s32 wilc1000_setup_multicast_filter(struct host_if_drv *hif_drv,
 				    bool bIsEnabled,
 				    u32 u32count)
 {
@@ -4737,7 +4737,7 @@ static void *host_int_ParseJoinBssParam(tstrNetworkInfo *ptstrNetworkInfo)
 
 }
 
-void host_int_freeJoinParams(void *pJoinParams)
+void wilc1000_free_join_params(void *pJoinParams)
 {
 	if ((struct bss_param *)pJoinParams != NULL)
 		kfree((struct bss_param *)pJoinParams);
@@ -4745,7 +4745,7 @@ void host_int_freeJoinParams(void *pJoinParams)
 		PRINT_ER("Unable to FREE null pointer\n");
 }
 
-s32 host_int_del_All_Rx_BASession(struct host_if_drv *hif_drv,
+s32 wilc1000_del_all_rx_ba_session(struct host_if_drv *hif_drv,
 				  char *pBSSID,
 				  char TID)
 {
@@ -4775,7 +4775,7 @@ s32 host_int_del_All_Rx_BASession(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 host_int_setup_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
+s32 wilc1000_setup_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;

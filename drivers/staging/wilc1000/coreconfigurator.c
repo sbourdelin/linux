@@ -469,7 +469,7 @@ s32 parse_network_info(u8 *pu8MsgBuffer, tstrNetworkInfo **ppstrNetworkInfo)
  *  @date		1 Mar 2012
  *  @version		1.0
  */
-s32 DeallocateNetworkInfo(tstrNetworkInfo *pstrNetworkInfo)
+s32 wilc1000_dealloc_network_info(tstrNetworkInfo *pstrNetworkInfo)
 {
 	s32 s32Error = 0;
 
@@ -502,7 +502,7 @@ s32 DeallocateNetworkInfo(tstrNetworkInfo *pstrNetworkInfo)
  *  @date			2 Apr 2012
  *  @version		1.0
  */
-s32 ParseAssocRespInfo(u8 *pu8Buffer, u32 u32BufferLen,
+s32 wilc1000_parse_assoc_resp_info(u8 *pu8Buffer, u32 u32BufferLen,
 			       tstrConnectRespInfo **ppstrConnectRespInfo)
 {
 	s32 s32Error = 0;
@@ -554,7 +554,7 @@ s32 ParseAssocRespInfo(u8 *pu8Buffer, u32 u32BufferLen,
  *  @date			2 Apr 2012
  *  @version		1.0
  */
-s32 DeallocateAssocRespInfo(tstrConnectRespInfo *pstrConnectRespInfo)
+s32 wilc1000_dealloc_assoc_resp_info(tstrConnectRespInfo *pstrConnectRespInfo)
 {
 	s32 s32Error = 0;
 

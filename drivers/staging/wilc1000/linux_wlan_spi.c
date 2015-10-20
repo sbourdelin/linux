@@ -42,7 +42,7 @@
 static u32 SPEED = MIN_SPEED;
 
 struct spi_device *wilc_spi_dev;
-void linux_spi_deinit(void *vp);
+void wilc1000_spi_deinit(void *vp);
 
 static int __init wilc_bus_probe(struct spi_device *spi)
 {
@@ -81,7 +81,7 @@ struct spi_driver wilc_bus __refdata = {
 };
 
 
-void linux_spi_deinit(void *vp)
+void wilc1000_spi_deinit(void *vp)
 {
 
 	spi_unregister_driver(&wilc_bus);
@@ -93,7 +93,7 @@ void linux_spi_deinit(void *vp)
 
 
 
-int linux_spi_init(void *vp)
+int wilc1000_spi_init(void *vp)
 {
 	int ret = 1;
 	static int called;
@@ -116,7 +116,7 @@ int linux_spi_init(void *vp)
 
 #if defined(TXRX_PHASE_SIZE)
 
-int linux_spi_write(u8 *b, u32 len)
+int wilc1000_spi_write(u8 *b, u32 len)
 {
 	int ret;
 
@@ -193,7 +193,7 @@ int linux_spi_write(u8 *b, u32 len)
 }
 
 #else
-int linux_spi_write(u8 *b, u32 len)
+int wilc1000_spi_write(u8 *b, u32 len)
 {
 
 	int ret;
@@ -244,7 +244,7 @@ int linux_spi_write(u8 *b, u32 len)
 
 #if defined(TXRX_PHASE_SIZE)
 
-int linux_spi_read(u8 *rb, u32 rlen)
+int wilc1000_spi_read(u8 *rb, u32 rlen)
 {
 	int ret;
 
@@ -318,7 +318,7 @@ int linux_spi_read(u8 *rb, u32 rlen)
 }
 
 #else
-int linux_spi_read(u8 *rb, u32 rlen)
+int wilc1000_spi_read(u8 *rb, u32 rlen)
 {
 
 	int ret;
@@ -363,7 +363,7 @@ int linux_spi_read(u8 *rb, u32 rlen)
 
 #endif
 
-int linux_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
+int wilc1000_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 {
 
 	int ret;
@@ -400,7 +400,7 @@ int linux_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 	return ret;
 }
 
-int linux_spi_set_max_speed(void)
+int wilc1000_spi_set_max_speed(void)
 {
 	SPEED = MAX_SPEED;
 

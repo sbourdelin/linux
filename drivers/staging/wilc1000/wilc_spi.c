@@ -1031,7 +1031,7 @@ static int spi_sync_ext(int nint /*  how mant interrupts to enable. */)
  *      Global spi HIF function table
  *
  ********************************************/
-wilc_hif_func_t hif_spi = {
+wilc_hif_func_t wilc1000_hif_spi = {
 	spi_init,
 	spi_deinit,
 	spi_read_reg,
