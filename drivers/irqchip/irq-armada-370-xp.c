@@ -377,10 +377,11 @@ static void armada_mpic_send_doorbell(const struct cpumask *mask,
 static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
 					 unsigned long action, void *hcpu)
 {
-	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN) {
-		armada_xp_mpic_perf_init();
-		armada_xp_mpic_smp_cpu_init();
-	}
+	if (action != CPU_STARTING && action != CPU_STARTING_FROZEN)
+		return NOTIFY_OK;
+
+	armada_xp_mpic_perf_init();
+	armada_xp_mpic_smp_cpu_init();
 
 	return NOTIFY_OK;
 }
