@@ -815,7 +815,6 @@ static void __intel_fbc_update(struct intel_crtc *crtc)
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
 	struct drm_framebuffer *fb;
 	struct drm_i915_gem_object *obj;
-	const struct drm_display_mode *adjusted_mode;
 
 	WARN_ON(!mutex_is_locked(&dev_priv->fbc.lock));
 
@@ -834,13 +833,6 @@ static void __intel_fbc_update(struct intel_crtc *crtc)
 
 	fb = crtc->base.primary->fb;
 	obj = intel_fb_obj(fb);
-	adjusted_mode = &crtc->config->base.adjusted_mode;
-
-	if ((adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) ||
-	    (adjusted_mode->flags & DRM_MODE_FLAG_DBLSCAN)) {
-		set_no_fbc_reason(dev_priv, "incompatible mode");
-		goto out_disable;
-	}
 
 	if (!intel_fbc_hw_tracking_covers_screen(crtc)) {
 		set_no_fbc_reason(dev_priv, "mode too large for compression");
@@ -1065,6 +1057,8 @@ void intel_fbc_flip_prepare(struct drm_i915_private *dev_priv,
 void intel_fbc_enable(struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
+	const struct drm_display_mode *adjusted_mode =
+					&crtc->config->base.adjusted_mode;
 
 	if (!fbc_supported(dev_priv))
 		return;
@@ -1096,6 +1090,12 @@ void intel_fbc_enable(struct intel_crtc *crtc)
 
 	if (!crtc_can_fbc(crtc)) {
 		set_no_fbc_reason(dev_priv, "no enabled pipes can have FBC");
+		goto out;
+	}
+
+	if ((adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) ||
+	    (adjusted_mode->flags & DRM_MODE_FLAG_DBLSCAN)) {
+		set_no_fbc_reason(dev_priv, "incompatible mode");
 		goto out;
 	}
 
