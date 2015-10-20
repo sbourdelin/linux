@@ -188,7 +188,7 @@ struct wilc {
 	struct device *dev;
 };
 
-typedef struct {
+typedef struct wilc_per_interface {
 	u8 u8IfIdx;
 	u8 iftype;
 	int monitor_flag;

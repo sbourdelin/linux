@@ -338,7 +338,9 @@ void WILC_WFI_p2p_rx(struct net_device *dev, u8 *buff, u32 size);
 u8 wilc1000_core_11b_ready(void);
 
 extern bool wilc1000_enable_ps;
-extern volatile int wilc1000_probe;
+
+int wilc1000_firmware_download(struct wilc *p_nic);
+int wilc1000_start_firmware(struct wilc_per_interface *nic);
 
 void __init wilc1000_init_driver(void);
 void __exit wilc1000_exit_driver(void);

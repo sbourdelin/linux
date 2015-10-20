@@ -1,5 +1,6 @@
 #include "wilc_wfi_netdevice.h"
 #include "linux_wlan_sdio.h"
+#include "wilc_wfi_netdevice.h"
 
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/card.h>
@@ -23,7 +24,7 @@
 #endif
 
 
-struct sdio_func *wilc1000_sdio_func;
+static struct sdio_func *wilc1000_sdio_func;
 static unsigned int sdio_default_speed;
 
 #define SDIO_VENDOR_ID_WILC 0x0296
@@ -108,7 +109,83 @@ static int wilc1000_sdio_cmd53(sdio_cmd53_t *cmd)
 	return 1;
 }
 
-volatile int wilc1000_probe; /* COMPLEMENT_BOOT */
+static const struct wilc1000_ops wilc1000_sdio_ops;
+
+#ifdef COMPLEMENT_BOOT
+/* FIXME: remove all of COMPLEMENT_BOOT */
+
+static struct sdio_driver wilc_bus;
+static volatile int wilc1000_probe;
+
+#define READY_CHECK_THRESHOLD		30
+static u8 wilc1000_prepare_11b_core(struct wilc *nic)
+{
+	u8 trials = 0;
+
+	while ((wilc1000_core_11b_ready() && (READY_CHECK_THRESHOLD > (trials++)))) {
+		PRINT_D(INIT_DBG, "11b core not ready yet: %u\n", trials);
+		wilc_wlan_cleanup();
+		wilc_wlan_global_reset();
+		sdio_unregister_driver(&wilc_bus);
+
+		sdio_register_driver(&wilc_bus);
+
+		while (!wilc1000_probe)
+			msleep(100);
+		wilc1000_probe = 0;
+		wilc1000_dev->dev = &wilc1000_sdio_func->dev;
+		nic->ops = &wilc1000_sdio_ops;
+		wilc_wlan_init(nic);
+	}
+
+	if (READY_CHECK_THRESHOLD <= trials)
+		return 1;
+	else
+		return 0;
+
+}
+
+static int repeat_power_cycle(perInterface_wlan_t *nic)
+{
+	int ret = 0;
+	sdio_unregister_driver(&wilc_bus);
+
+	sdio_register_driver(&wilc_bus);
+
+	/* msleep(1000); */
+	while (!wilc1000_probe)
+		msleep(100);
+	wilc1000_probe = 0;
+	wilc1000_dev->dev = &wilc1000_sdio_func->dev;
+	wilc1000_dev->ops = &wilc1000_sdio_ops;
+	ret = wilc_wlan_init(wilc1000_dev);
+
+	wilc1000_dev->mac_status = WILC_MAC_STATUS_INIT;
+#if !defined WILC_SDIO_IRQ_GPIO
+	wilc1000_sdio_enable_interrupt();
+#endif
+
+	if (wilc1000_wlan_get_firmware(nic)) {
+		PRINT_ER("Can't get firmware\n");
+		ret = -1;
+		goto __fail__;
+	}
+
+	/*Download firmware*/
+	ret = wilc1000_firmware_download(wilc1000_dev);
+	if (ret < 0) {
+		PRINT_ER("Failed to download firmware\n");
+		goto __fail__;
+	}
+	/* Start firmware*/
+	ret = wilc1000_start_firmware(nic);
+	if (ret < 0)
+		PRINT_ER("Failed to start firmware\n");
+__fail__:
+	return ret;
+}
+#endif
+
 static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 {
 	PRINT_D(INIT_DBG, "probe function\n");
@@ -141,7 +218,7 @@ static void linux_sdio_remove(struct sdio_func *func)
 
 }
 
-struct sdio_driver wilc_bus = {
+static struct sdio_driver wilc_bus = {
 	.name		= SDIO_MODALIAS,
 	.id_table	= wilc_sdio_ids,
 	.probe		= linux_sdio_probe,
@@ -238,10 +315,14 @@ static int wilc1000_sdio_set_default_speed(void)
 	return linux_sdio_set_speed(sdio_default_speed);
 }
 
-const struct wilc1000_ops wilc1000_sdio_ops = {
+static const struct wilc1000_ops wilc1000_sdio_ops = {
 	.io_type = HIF_SDIO,
 	.io_init = wilc1000_sdio_init,
 	.io_deinit = wilc1000_sdio_deinit,
+#ifdef COMPLEMENT_BOOT
+	.repeat_power_cycle = repeat_power_cycle,
+	.prepare_11b_core = wilc1000_prepare_11b_core,
+#endif
 	.u.sdio.sdio_cmd52 = wilc1000_sdio_cmd52,
 	.u.sdio.sdio_cmd53 = wilc1000_sdio_cmd53,
 	.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed,

@@ -483,11 +483,7 @@ _fail_:
 
 }
 
-#ifdef COMPLEMENT_BOOT
-static int repeat_power_cycle(perInterface_wlan_t *nic);
-#endif
-
-static int linux_wlan_start_firmware(perInterface_wlan_t *nic)
+int wilc1000_start_firmware(perInterface_wlan_t *nic)
 {
 
 	int ret = 0;
@@ -502,19 +498,17 @@ static int linux_wlan_start_firmware(perInterface_wlan_t *nic)
 	/* wait for mac ready */
 	PRINT_D(INIT_DBG, "Waiting for Firmware to get ready ...\n");
 	ret = linux_wlan_lock_timeout(&wilc1000_dev->sync_event, 5000);
-	if (ret) {
-#ifdef COMPLEMENT_BOOT
+	if (ret && wilc1000_dev->ops->repeat_power_cycle) {
 		static int timeout = 5;
 
 		if (timeout--) {
 			PRINT_D(INIT_DBG, "repeat power cycle[%d]", timeout);
-			ret = repeat_power_cycle(nic);
+			ret = wilc1000_dev->ops->repeat_power_cycle(nic);
 		} else {
 			timeout = 5;
 			ret = -1;
 			goto _fail_;
 		}
-#endif
 		PRINT_D(INIT_DBG, "Firmware start timed out");
 		goto _fail_;
 	}
@@ -527,7 +521,8 @@ static int linux_wlan_start_firmware(perInterface_wlan_t *nic)
 _fail_:
 	return ret;
 }
-static int linux_wlan_firmware_download(struct wilc *p_nic)
+
+int wilc1000_firmware_download(struct wilc *p_nic)
 {
 
 	int ret = 0;
@@ -954,77 +949,6 @@ static void wlan_deinitialize_threads(struct wilc *nic)
 	}
 }
 
-#ifdef COMPLEMENT_BOOT
-
-#define READY_CHECK_THRESHOLD		30
-static u8 wilc1000_prepare_11b_core(struct wilc *nic)
-{
-	u8 trials = 0;
-
-	while ((wilc1000_core_11b_ready() && (READY_CHECK_THRESHOLD > (trials++)))) {
-		PRINT_D(INIT_DBG, "11b core not ready yet: %u\n", trials);
-		wilc_wlan_cleanup();
-		wilc_wlan_global_reset();
-		sdio_unregister_driver(&wilc_bus);
-
-		sdio_register_driver(&wilc_bus);
-
-		while (!wilc1000_probe)
-			msleep(100);
-		wilc1000_probe = 0;
-		wilc1000_dev->dev = &wilc1000_sdio_func->dev;
-		nic->ops = &wilc1000_sdio_ops;
-		wilc_wlan_init(nic);
-	}
-
-	if (READY_CHECK_THRESHOLD <= trials)
-		return 1;
-	else
-		return 0;
-
-}
-
-static int repeat_power_cycle(perInterface_wlan_t *nic)
-{
-	int ret = 0;
-	sdio_unregister_driver(&wilc_bus);
-
-	sdio_register_driver(&wilc_bus);
-
-	/* msleep(1000); */
-	while (!wilc1000_probe)
-		msleep(100);
-	wilc1000_probe = 0;
-	wilc1000_dev->dev = &wilc1000_sdio_func->dev;
-	wilc1000_dev->ops = &wilc1000_sdio_ops;
-	ret = wilc_wlan_init(wilc1000_dev);
-
-	wilc1000_dev->mac_status = WILC_MAC_STATUS_INIT;
-	#if (defined WILC_SDIO) && (!defined WILC_SDIO_IRQ_GPIO)
-	wilc1000_sdio_enable_interrupt();
-	#endif
-
-	if (wilc1000_wlan_get_firmware(nic)) {
-		PRINT_ER("Can't get firmware\n");
-		ret = -1;
-		goto __fail__;
-	}
-
-	/*Download firmware*/
-	ret = linux_wlan_firmware_download(wilc1000_dev);
-	if (ret < 0) {
-		PRINT_ER("Failed to download firmware\n");
-		goto __fail__;
-	}
-	/* Start firmware*/
-	ret = linux_wlan_start_firmware(nic);
-	if (ret < 0)
-		PRINT_ER("Failed to start firmware\n");
-__fail__:
-	return ret;
-}
-#endif
-
 int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 {
 	perInterface_wlan_t *nic = p_nic;
@@ -1051,13 +975,12 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 			goto _fail_wilc_wlan_;
 		}
 
-#if (defined WILC_SDIO) && (defined COMPLEMENT_BOOT)
-		if (wilc1000_prepare_11b_core(wilc1000_dev)) {
+		if (wilc1000_dev->ops->prepare_11b_core &&
+		    wilc1000_dev->ops->prepare_11b_core(wilc1000_dev)) {
 			PRINT_ER("11b Core is not ready\n");
 			ret = -EIO;
 			goto _fail_threads_;
 		}
-#endif
 
 #if (!defined WILC_SDIO) || (defined WILC_SDIO_IRQ_GPIO)
 		if (init_irq(wilc1000_dev)) {
@@ -1082,7 +1005,7 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 		}
 
 		/*Download firmware*/
-		ret = linux_wlan_firmware_download(wilc1000_dev);
+		ret = wilc1000_firmware_download(wilc1000_dev);
 		if (ret < 0) {
 			PRINT_ER("Failed to download firmware\n");
 			ret = -EIO;
@@ -1090,7 +1013,7 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 		}
 
 		/* Start firmware*/
-		ret = linux_wlan_start_firmware(nic);
+		ret = wilc1000_start_firmware(nic);
 		if (ret < 0) {
 			PRINT_ER("Failed to start firmware\n");
 			ret = -EIO;

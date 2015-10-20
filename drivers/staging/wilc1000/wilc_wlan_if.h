@@ -71,10 +71,15 @@ typedef struct {
 	u32 block_size;
 } sdio_cmd53_t;
 
+struct wilc;
+struct wilc_per_interface;
 struct wilc1000_ops {
 	int io_type;
 	int (*io_init)(void *);
 	void (*io_deinit)(void *);
+	int (*repeat_power_cycle)(struct wilc_per_interface *nic);
+	u8 (*prepare_11b_core)(struct wilc *nic);
+
 	union {
 		struct {
 			int (*sdio_cmd52)(sdio_cmd52_t *);
