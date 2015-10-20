@@ -1,5 +1,4 @@
 #include "wilc_wfi_netdevice.h"
-#include "linux_wlan_sdio.h"
 #include "wilc_wfi_netdevice.h"
 
 #include <linux/mmc/sdio_func.h>
@@ -160,7 +159,7 @@ static int repeat_power_cycle(perInterface_wlan_t *nic)
 
 	wilc1000_dev->mac_status = WILC_MAC_STATUS_INIT;
 	if (wilc1000_dev->gpio < 0)
-		wilc1000_sdio_enable_interrupt();
+		wilc1000_dev->ops->enable_interrupt(wilc1000_dev);
 
 	if (wilc1000_wlan_get_firmware(nic)) {
 		PRINT_ER("Can't get firmware\n");
@@ -232,13 +231,14 @@ static struct sdio_driver wilc_bus = {
 	.remove		= linux_sdio_remove,
 };
 
-int wilc1000_sdio_enable_interrupt(void)
+static int wilc1000_sdio_enable_interrupt(struct wilc *dev)
 {
+	struct sdio_func *func = container_of(dev->dev, struct sdio_func, dev);
 	int ret = 0;
 
-	sdio_claim_host(wilc1000_sdio_func);
-	ret = sdio_claim_irq(wilc1000_sdio_func, wilc_sdio_interrupt);
-	sdio_release_host(wilc1000_sdio_func);
+	sdio_claim_host(func);
+	ret = sdio_claim_irq(func, wilc_sdio_interrupt);
+	sdio_release_host(func);
 
 	if (ret < 0) {
 		PRINT_ER("can't claim sdio_irq, err(%d)\n", ret);
@@ -247,18 +247,19 @@ int wilc1000_sdio_enable_interrupt(void)
 	return ret;
 }
 
-void wilc1000_sdio_disable_interrupt(void)
+static void wilc1000_sdio_disable_interrupt(struct wilc *dev)
 {
+	struct sdio_func *func = container_of(dev->dev, struct sdio_func, dev);
 	int ret;
 
 	PRINT_D(INIT_DBG, "wilc1000_sdio_disable_interrupt IN\n");
 
-	sdio_claim_host(wilc1000_sdio_func);
-	ret = sdio_release_irq(wilc1000_sdio_func);
+	sdio_claim_host(func);
+	ret = sdio_release_irq(func);
 	if (ret < 0) {
 		PRINT_ER("can't release sdio_irq, err(%d)\n", ret);
 	}
-	sdio_release_host(wilc1000_sdio_func);
+	sdio_release_host(func);
 
 	PRINT_D(INIT_DBG, "wilc1000_sdio_disable_interrupt OUT\n");
 }
@@ -325,6 +326,8 @@ static const struct wilc1000_ops wilc1000_sdio_ops = {
 	.repeat_power_cycle = repeat_power_cycle,
 	.prepare_11b_core = wilc1000_prepare_11b_core,
 #endif
+	.enable_interrupt = wilc1000_sdio_enable_interrupt,
+	.disable_interrupt = wilc1000_sdio_disable_interrupt,
 	.u.sdio.sdio_cmd52 = wilc1000_sdio_cmd52,
 	.u.sdio.sdio_cmd53 = wilc1000_sdio_cmd53,
 	.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed,

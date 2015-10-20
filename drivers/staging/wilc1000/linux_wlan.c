@@ -26,8 +26,6 @@
 #include <linux/version.h>
 #include <linux/semaphore.h>
 
-#include "linux_wlan_sdio.h"
-
 static int dev_state_ev_handler(struct notifier_block *this, unsigned long event, void *ptr);
 
 static struct notifier_block g_dev_notifier = {
@@ -826,9 +824,10 @@ void wilc1000_wlan_deinit(struct wilc *nic)
 #endif
 
 		PRINT_D(INIT_DBG, "Disabling IRQ\n");
-		if (wilc1000_dev->gpio < 0) {
+		if (wilc1000_dev->gpio < 0 &&
+		    wilc1000_dev->ops->disable_interrupt) {
 			mutex_lock(&wilc1000_dev->hif_cs);
-			wilc1000_sdio_disable_interrupt();
+			wilc1000_dev->ops->disable_interrupt(wilc1000_dev);
 			mutex_unlock(&wilc1000_dev->hif_cs);
 		}
 		if (&wilc1000_dev->txq_event != NULL)
@@ -845,11 +844,12 @@ void wilc1000_wlan_deinit(struct wilc *nic)
 		PRINT_D(INIT_DBG, "Deinitializing WILC Wlan\n");
 		wilc_wlan_cleanup();
 #if defined(PLAT_ALLWINNER_A20) || defined(PLAT_ALLWINNER_A23) || defined(PLAT_ALLWINNER_A31)
-		if (wilc1000_dev->gpio < 0) {
+		if (wilc1000_dev->gpio < 0 &&
+		    wilc1000_dev->ops->disable_interrupt) {
 			PRINT_D(INIT_DBG, "Disabling IRQ 2\n");
 
 			mutex_lock(&wilc1000_dev->hif_cs);
-			wilc1000_sdio_disable_interrupt();
+			wilc1000_dev->ops->disable_interrupt(wilc1000_dev);
 			mutex_unlock(&wilc1000_dev->hif_cs);
 #endif
 
@@ -983,7 +983,9 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 			goto _fail_threads_;
 		}
 
-		if (wilc1000_dev->gpio < 0 && wilc1000_sdio_enable_interrupt()) {
+		if (wilc1000_dev->gpio < 0 &&
+		    wilc1000_dev->ops->enable_interrupt &&
+		    wilc1000_dev->ops->enable_interrupt(wilc1000_dev)) {
 			PRINT_ER("couldn't initialize IRQ\n");
 			ret = -EIO;
 			goto _fail_irq_init_;
@@ -1039,8 +1041,9 @@ _fail_fw_start_:
 		wilc_wlan_stop();
 
 _fail_irq_enable_:
-		if (wilc1000_dev->gpio < 0)
-			wilc1000_sdio_disable_interrupt();
+		if (wilc1000_dev->gpio < 0 &&
+		    wilc1000_dev->ops->disable_interrupt)
+			wilc1000_dev->ops->disable_interrupt(wilc1000_dev);
 _fail_irq_init_:
 		if (wilc1000_dev->gpio >= 0)
 			deinit_irq(wilc1000_dev);

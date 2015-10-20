@@ -79,6 +79,8 @@ struct wilc1000_ops {
 	void (*io_deinit)(void *);
 	int (*repeat_power_cycle)(struct wilc_per_interface *nic);
 	u8 (*prepare_11b_core)(struct wilc *nic);
+	int (*enable_interrupt)(struct wilc *nic);
+	void (*disable_interrupt)(struct wilc *nic);
 
 	union {
 		struct {
