@@ -881,8 +881,10 @@ struct intel_context {
 	} legacy_hw_ctx;
 
 	/* Execlists */
-	struct {
+	struct intel_context_engine {
 		struct drm_i915_gem_object *state;
+		uint32_t *reg_state;
+		struct page *page;
 		struct intel_ringbuffer *ringbuf;
 		int pin_count;
 	} engine[I915_NUM_RINGS];

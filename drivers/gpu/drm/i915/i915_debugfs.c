@@ -1970,10 +1970,9 @@ static int i915_context_status(struct seq_file *m, void *unused)
 
 static void i915_dump_lrc_obj(struct seq_file *m,
 			      struct intel_engine_cs *ring,
-			      struct drm_i915_gem_object *ctx_obj)
+			      struct drm_i915_gem_object *ctx_obj,
+			      uint32_t *reg_state)
 {
-	struct page *page;
-	uint32_t *reg_state;
 	int j;
 	unsigned long ggtt_offset = 0;
 
@@ -1996,17 +1995,13 @@ static void i915_dump_lrc_obj(struct seq_file *m,
 		return;
 	}
 
-	page = i915_gem_object_get_page(ctx_obj, LRC_STATE_PN);
-	if (!WARN_ON(page == NULL)) {
-		reg_state = kmap_atomic(page);
-
+	if (!WARN_ON(reg_state == NULL)) {
 		for (j = 0; j < 0x600 / sizeof(u32) / 4; j += 4) {
 			seq_printf(m, "\t[0x%08lx] 0x%08x 0x%08x 0x%08x 0x%08x\n",
 				   ggtt_offset + 4096 + (j * 4),
 				   reg_state[j], reg_state[j + 1],
 				   reg_state[j + 2], reg_state[j + 3]);
 		}
-		kunmap_atomic(reg_state);
 	}
 
 	seq_putc(m, '\n');
@@ -2034,7 +2029,8 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 		for_each_ring(ring, dev_priv, i) {
 			if (ring->default_context != ctx)
 				i915_dump_lrc_obj(m, ring,
-						  ctx->engine[i].state);
+						  ctx->engine[i].state,
+						  ctx->engine[i].reg_state);
 		}
 	}
 
