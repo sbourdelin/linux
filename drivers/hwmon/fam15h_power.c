@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/bitops.h>
+#include <linux/cpumask.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
 
@@ -44,7 +45,9 @@ MODULE_LICENSE("GPL");
 
 #define FAM15H_MIN_NUM_ATTRS		2
 #define FAM15H_NUM_GROUPS		2
+#define MAX_CUS				8
 
+#define MSR_F15H_CU_PWR_ACCUMULATOR	0xc001007a
 #define MSR_F15H_CU_MAX_PWR_ACCUMULATOR	0xc001007b
 
 struct fam15h_power_data {
@@ -57,6 +60,8 @@ struct fam15h_power_data {
 	struct attribute_group fam15h_power_group;
 	/* maximum accumulated power of a compute unit */
 	u64 max_cu_acc_power;
+	/* accumulated power of the compute units */
+	u64 cu_acc_power[MAX_CUS];
 };
 
 static ssize_t show_power(struct device *dev,
@@ -114,6 +119,65 @@ static ssize_t show_power_crit(struct device *dev,
 	return sprintf(buf, "%u\n", data->processor_pwr_watts);
 }
 static DEVICE_ATTR(power1_crit, S_IRUGO, show_power_crit, NULL);
+
+static void do_read_registers_on_cu(void *_data)
+{
+	struct fam15h_power_data *data = _data;
+	int cpu, cu, cores_per_cu;
+
+	cpu = smp_processor_id();
+
+	cores_per_cu = amd_get_cores_per_cu();
+	cu = cpu / cores_per_cu;
+
+	WARN_ON(rdmsrl_safe(MSR_F15H_CU_PWR_ACCUMULATOR,
+			    &data->cu_acc_power[cu]));
+}
+
+static int read_registers(struct fam15h_power_data *data)
+{
+	int this_cpu, ret;
+	int cu_num, cores_per_cu, cpu, cu;
+	cpumask_var_t mask;
+
+	cores_per_cu = amd_get_cores_per_cu();
+	cu_num = boot_cpu_data.x86_max_cores / cores_per_cu;
+
+	WARN_ON_ONCE(cu_num > MAX_CUS);
+
+	ret = zalloc_cpumask_var(&mask, GFP_KERNEL);
+	if (!ret)
+		return -ENOMEM;
+
+	this_cpu = get_cpu();
+
+	/*
+	 * Choose the first online core of each compute unit, and then
+	 * read their MSR value of power and ptsc in one time of IPI,
+	 * because the MSR value of cpu core represent the compute
+	 * unit's. This behavior can decrease IPI numbers between the
+	 * cores.
+	 */
+	cpu = cpumask_first(cpu_online_mask);
+	cu = cpu / cores_per_cu;
+	while (cpu < boot_cpu_data.x86_max_cores) {
+		if (cu <= cpu / cores_per_cu) {
+			cu = cpu / cores_per_cu + 1;
+			cpumask_set_cpu(cpu, mask);
+		}
+		cpu = cpumask_next(cu * cores_per_cu - 1, cpu_online_mask);
+	}
+
+	if (cpumask_test_cpu(this_cpu, mask))
+		do_read_registers_on_cu(data);
+
+	smp_call_function_many(mask, do_read_registers_on_cu, data, true);
+	put_cpu();
+
+	free_cpumask_var(mask);
+
+	return 0;
+}
 
 static int fam15h_power_init_attrs(struct pci_dev *pdev,
 				   struct fam15h_power_data *data)
@@ -253,7 +317,9 @@ static int fam15h_power_init_data(struct pci_dev *f4,
 
 	data->max_cu_acc_power = tmp;
 
-	return 0;
+	ret = read_registers(data);
+
+	return ret;
 }
 
 static int fam15h_power_probe(struct pci_dev *pdev,
