@@ -459,18 +459,24 @@ int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 				&state->palette_after_ctm_blob, val);
 		if (ret)
 			DRM_ERROR("Failed to load blob palette_after_ctm\n");
+		else
+			state->color_correction_changed = true;
 		return ret;
 	} else if (property == config->cm_palette_before_ctm_property) {
 		ret = drm_atomic_crtc_set_blob(dev,
 				&state->palette_before_ctm_blob, val);
 		if (ret)
 			DRM_ERROR("Failed to load blob palette_before_ctm\n");
+		else
+			state->color_correction_changed = true;
 		return ret;
 	} else if (property == config->cm_ctm_property) {
 		ret = drm_atomic_crtc_set_blob(dev,
 				&state->ctm_blob, val);
 		if (ret)
 			DRM_ERROR("Failed to load blob ctm\n");
+		else
+			state->color_correction_changed = true;
 		return ret;
 	} else if (crtc->funcs->atomic_set_property)
 		return crtc->funcs->atomic_set_property(crtc, state, property, val);
