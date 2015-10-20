@@ -52,13 +52,52 @@ enum switchdev_attr_id {
 struct switchdev_attr {
 	enum switchdev_attr_id id;
 	u32 flags;
-	union {
-		struct netdev_phys_item_id ppid;	/* PORT_PARENT_ID */
-		u8 stp_state;				/* PORT_STP_STATE */
-		unsigned long brport_flags;		/* PORT_BRIDGE_FLAGS */
-		u32 ageing_time;			/* BRIDGE_AGEING_TIME */
-	} u;
 };
+
+/* SWITCHDEV_ATTR_ID_PORT_PARENT_ID */
+struct switchdev_attr_port_parent_id {
+	struct switchdev_attr attr;
+	struct netdev_phys_item_id ppid;
+};
+
+#define SWITCHDEV_ATTR_PORT_PARENT_ID(attr) \
+	container_of(attr, struct switchdev_attr_port_parent_id, attr)
+
+/* SWITCHDEV_ATTR_ID_PORT_STP_STATE */
+struct switchdev_attr_port_stp_state {
+	struct switchdev_attr attr;
+	u8 state;
+};
+
+#define SWITCHDEV_ATTR_PORT_STP_STATE(attr) \
+	container_of(attr, struct switchdev_attr_port_stp_state, attr)
+
+/* SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS */
+struct switchdev_attr_port_bridge_flags {
+	struct switchdev_attr attr;
+	unsigned long brport_flags;
+};
+
+#define SWITCHDEV_ATTR_PORT_BRIDGE_FLAGS(attr) \
+	container_of(attr, struct switchdev_attr_port_bridge_flags, attr)
+
+/* SWITCHDEV_ATTR_ID_BRIDGE_AGEING_TIME */
+struct switchdev_attr_bridge_ageing_time {
+	struct switchdev_attr attr;
+	u32 ageing_time;
+};
+
+#define SWITCHDEV_ATTR_BRIDGE_AGEING_TIME(attr) \
+	container_of(attr, struct switchdev_attr_bridge_ageing_time, attr)
+
+/* SWITCHDEV_ATTR_ID_SWITCH_ID */
+struct switchdev_attr_switch_id {
+	struct switchdev_attr attr;
+	struct netdev_phys_item_id ppid;
+};
+
+#define SWITCHDEV_ATTR_SWITCH_ID(attr) \
+	container_of(attr, struct switchdev_attr_switch_id, attr)
 
 enum switchdev_obj_id {
 	SWITCHDEV_OBJ_ID_UNDEFINED,

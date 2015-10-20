@@ -458,15 +458,17 @@ static int dsa_slave_port_attr_set(struct net_device *dev,
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->parent;
+	struct switchdev_attr_port_stp_state *stp_state;
 	int ret;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_STP_STATE:
+		stp_state = SWITCHDEV_ATTR_PORT_STP_STATE(attr);
 		if (switchdev_trans_ph_prepare(trans))
 			ret = ds->drv->port_stp_update ? 0 : -EOPNOTSUPP;
 		else
 			ret = ds->drv->port_stp_update(ds, p->port,
-						       attr->u.stp_state);
+						       stp_state->state);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
@@ -595,11 +597,13 @@ static int dsa_slave_port_attr_get(struct net_device *dev,
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->parent;
+	struct switchdev_attr_port_parent_id *parent_id;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
-		attr->u.ppid.id_len = sizeof(ds->index);
-		memcpy(&attr->u.ppid.id, &ds->index, attr->u.ppid.id_len);
+		parent_id = SWITCHDEV_ATTR_PORT_PARENT_ID(attr);
+		parent_id->ppid.id_len = sizeof(ds->index);
+		memcpy(&parent_id->ppid.id, &ds->index, parent_id->ppid.id_len);
 		break;
 	default:
 		return -EOPNOTSUPP;

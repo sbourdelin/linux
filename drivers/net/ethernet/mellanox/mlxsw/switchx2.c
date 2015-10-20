@@ -864,11 +864,14 @@ static int mlxsw_sx_port_attr_get(struct net_device *dev,
 {
 	struct mlxsw_sx_port *mlxsw_sx_port = netdev_priv(dev);
 	struct mlxsw_sx *mlxsw_sx = mlxsw_sx_port->mlxsw_sx;
+	struct switchdev_attr_port_parent_id *parent_id;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
-		attr->u.ppid.id_len = sizeof(mlxsw_sx->hw_id);
-		memcpy(&attr->u.ppid.id, &mlxsw_sx->hw_id, attr->u.ppid.id_len);
+		parent_id = SWITCHDEV_ATTR_PORT_PARENT_ID(attr);
+		parent_id->ppid.id_len = sizeof(mlxsw_sx->hw_id);
+		memcpy(&parent_id->ppid.id, &mlxsw_sx->hw_id,
+		       parent_id->ppid.id_len);
 		break;
 	default:
 		return -EOPNOTSUPP;
