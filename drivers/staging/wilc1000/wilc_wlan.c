@@ -1238,7 +1238,10 @@ static void wilc_pllupdate_isr_ext(u32 int_stats)
 	g_wlan.hif_func.hif_clear_int_ext(PLL_INT_CLR);
 
 	/* Waiting for PLL */
-	mdelay(WILC_PLL_TO);
+	if (g_wlan.io_func->io_type == HIF_SDIO)
+		mdelay(WILC_PLL_TO_SDIO);
+	else
+		mdelay(WILC_PLL_TO_SPI);
 
 	/* poll till read a valid data */
 	while (!(ISWILC1000(wilc_get_chipid(true)) && --trials)) {
