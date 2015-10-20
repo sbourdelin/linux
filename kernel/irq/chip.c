@@ -269,6 +269,11 @@ void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu)
 	cpumask_set_cpu(cpu, desc->percpu_enabled);
 }
 
+bool irq_percpu_is_enabled(struct irq_desc *desc, unsigned int cpu)
+{
+	return cpumask_test_cpu(cpu, desc->percpu_enabled);
+}
+
 void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu)
 {
 	if (desc->irq_data.chip->irq_disable)

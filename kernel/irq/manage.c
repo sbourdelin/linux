@@ -1743,6 +1743,25 @@ out:
 }
 EXPORT_SYMBOL_GPL(enable_percpu_irq);
 
+bool is_enabled_percpu_irq(unsigned int irq)
+{
+	unsigned int cpu = smp_processor_id();
+	unsigned long flags;
+	struct irq_desc *desc =
+		irq_get_desc_lock(irq, &flags, IRQ_GET_DESC_CHECK_PERCPU);
+	bool is_enabled;
+
+	if (!desc)
+		return false;
+
+	is_enabled = irq_percpu_is_enabled(desc, cpu);
+
+	irq_put_desc_unlock(desc, flags);
+
+	return is_enabled;
+}
+EXPORT_SYMBOL_GPL(is_enabled_percpu_irq);
+
 void disable_percpu_irq(unsigned int irq)
 {
 	unsigned int cpu = smp_processor_id();
