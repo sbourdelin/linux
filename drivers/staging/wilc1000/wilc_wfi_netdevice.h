@@ -159,9 +159,8 @@ struct wilc {
 	const struct wilc1000_ops *ops;
 	int mac_status;
 	int wilc1000_initialized;
-	#if (!defined WILC_SDIO) || (defined WILC_SDIO_IRQ_GPIO)
-	unsigned short dev_irq_num;
-	#endif
+	int gpio;
+	int dev_irq_num;
 	int close;
 	u8 u8NoIfcs;
 	struct wilc_vif strInterfaceInfo[NUM_CONCURRENT_IFC];

@@ -170,7 +170,6 @@ static int dev_state_ev_handler(struct notifier_block *this, unsigned long event
 
 }
 
-#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO)
 static irqreturn_t isr_uh_routine(int irq, void *user_data)
 {
 	PRINT_D(INT_DBG, "Interrupt received UH\n");
@@ -208,16 +207,16 @@ static int init_irq(struct wilc *p_nic)
 
 	/*initialize GPIO and register IRQ num*/
 	/*GPIO request*/
-	if ((gpio_request(GPIO_NUM, "WILC_INTR") == 0) &&
-	    (gpio_direction_input(GPIO_NUM) == 0)) {
+	if ((gpio_request(nic->gpio, "WILC_INTR") == 0) &&
+	    (gpio_direction_input(nic->gpio) == 0)) {
 #if defined(CUSTOMER_PLATFORM)
 /*
  TODO : save the registerd irq number to the private wilc context in kernel.
  *
- * ex) nic->dev_irq_num = gpio_to_irq(GPIO_NUM);
+ * ex) nic->dev_irq_num = gpio_to_irq(nic->gpio);
  */
 #else
-		nic->dev_irq_num = gpio_to_irq(GPIO_NUM);
+		nic->dev_irq_num = gpio_to_irq(nic->gpio);
 #endif
 	} else {
 		ret = -1;
@@ -228,28 +227,25 @@ static int init_irq(struct wilc *p_nic)
 						  IRQF_TRIGGER_LOW | IRQF_ONESHOT,               /*Without IRQF_ONESHOT the uh will remain kicked in and dont gave a chance to bh*/
 						  "WILC_IRQ", nic)) < 0) {
 
-		PRINT_ER("Failed to request IRQ for GPIO: %d\n", GPIO_NUM);
+		PRINT_ER("Failed to request IRQ for GPIO: %d\n", nic->gpio);
 		ret = -1;
 	} else {
 
 		PRINT_D(INIT_DBG, "IRQ request succeeded IRQ-NUM= %d on GPIO: %d\n",
-			nic->dev_irq_num, GPIO_NUM);
+			nic->dev_irq_num, nic->gpio);
 	}
 
 	return ret;
 }
-#endif
 
 static void deinit_irq(struct wilc *nic)
 {
-#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO)
 	/* Deintialize IRQ */
-	if (&nic->dev_irq_num != 0) {
+	if (nic->gpio >= 0 && &nic->dev_irq_num != 0) {
 		free_irq(nic->dev_irq_num, wilc1000_dev);
 
-		gpio_free(GPIO_NUM);
+		gpio_free(nic->gpio);
 	}
-#endif
 }
 
 /*
@@ -830,11 +826,11 @@ void wilc1000_wlan_deinit(struct wilc *nic)
 #endif
 
 		PRINT_D(INIT_DBG, "Disabling IRQ\n");
-#ifdef WILC_SDIO
-		mutex_lock(&wilc1000_dev->hif_cs);
-		wilc1000_sdio_disable_interrupt();
-		mutex_unlock(&wilc1000_dev->hif_cs);
-#endif
+		if (wilc1000_dev->gpio < 0) {
+			mutex_lock(&wilc1000_dev->hif_cs);
+			wilc1000_sdio_disable_interrupt();
+			mutex_unlock(&wilc1000_dev->hif_cs);
+		}
 		if (&wilc1000_dev->txq_event != NULL)
 			up(&wilc1000_dev->txq_event);
 
@@ -848,14 +844,13 @@ void wilc1000_wlan_deinit(struct wilc *nic)
 
 		PRINT_D(INIT_DBG, "Deinitializing WILC Wlan\n");
 		wilc_wlan_cleanup();
-#if (defined WILC_SDIO) && (!defined WILC_SDIO_IRQ_GPIO)
-  #if defined(PLAT_ALLWINNER_A20) || defined(PLAT_ALLWINNER_A23) || defined(PLAT_ALLWINNER_A31)
-		PRINT_D(INIT_DBG, "Disabling IRQ 2\n");
+#if defined(PLAT_ALLWINNER_A20) || defined(PLAT_ALLWINNER_A23) || defined(PLAT_ALLWINNER_A31)
+		if (wilc1000_dev->gpio < 0) {
+			PRINT_D(INIT_DBG, "Disabling IRQ 2\n");
 
-		mutex_lock(&wilc1000_dev->hif_cs);
-		wilc1000_sdio_disable_interrupt();
-		mutex_unlock(&wilc1000_dev->hif_cs);
-  #endif
+			mutex_lock(&wilc1000_dev->hif_cs);
+			wilc1000_sdio_disable_interrupt();
+			mutex_unlock(&wilc1000_dev->hif_cs);
 #endif
 
 		/*De-Initialize locks*/
@@ -982,21 +977,17 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 			goto _fail_threads_;
 		}
 
-#if (!defined WILC_SDIO) || (defined WILC_SDIO_IRQ_GPIO)
-		if (init_irq(wilc1000_dev)) {
+		if (wilc1000_dev->gpio >= 0 && init_irq(wilc1000_dev)) {
 			PRINT_ER("couldn't initialize IRQ\n");
 			ret = -EIO;
 			goto _fail_threads_;
 		}
-#endif
 
-#if (defined WILC_SDIO) && (!defined WILC_SDIO_IRQ_GPIO)
-		if (wilc1000_sdio_enable_interrupt()) {
+		if (wilc1000_dev->gpio < 0 && wilc1000_sdio_enable_interrupt()) {
 			PRINT_ER("couldn't initialize IRQ\n");
 			ret = -EIO;
 			goto _fail_irq_init_;
 		}
-#endif
 
 		if (wilc1000_wlan_get_firmware(nic)) {
 			PRINT_ER("Can't get firmware\n");
@@ -1048,14 +1039,12 @@ _fail_fw_start_:
 		wilc_wlan_stop();
 
 _fail_irq_enable_:
-#if (defined WILC_SDIO) && (!defined WILC_SDIO_IRQ_GPIO)
-		wilc1000_sdio_disable_interrupt();
+		if (wilc1000_dev->gpio < 0)
+			wilc1000_sdio_disable_interrupt();
 _fail_irq_init_:
-#endif
-#if (!defined WILC_SDIO) || (defined WILC_SDIO_IRQ_GPIO)
-		deinit_irq(wilc1000_dev);
+		if (wilc1000_dev->gpio >= 0)
+			deinit_irq(wilc1000_dev);
 
-#endif
 _fail_threads_:
 		wlan_deinitialize_threads(wilc1000_dev);
 _fail_wilc_wlan_:
@@ -1511,7 +1500,7 @@ void WILC_WFI_mgmt_rx(u8 *buff, u32 size)
 		WILC_WFI_p2p_rx(wilc1000_dev->strInterfaceInfo[1].wilc_netdev, buff, size);
 }
 
-int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops)
+int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops, int gpio)
 {
 
 	int i;
@@ -1526,6 +1515,7 @@ int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops)
 		return -ENOMEM;
 
 	wilc1000_dev->ops = ops;
+	wilc1000_dev->gpio = gpio;
 
 	register_inetaddr_notifier(&g_dev_notifier);
 

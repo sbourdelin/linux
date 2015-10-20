@@ -424,7 +424,7 @@ static int __init init_wilc_spi_driver(void)
 	int ret;
 
 	wilc1000_init_driver();
-	ret = wilc_netdev_init(NULL, &wilc1000_spi_ops);
+	ret = wilc_netdev_init(NULL, &wilc1000_spi_ops, GPIO_NUM);
 	if (ret)
 		return ret;
 

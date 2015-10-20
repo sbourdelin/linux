@@ -7,6 +7,7 @@
 #include <linux/mmc/sdio_ids.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/host.h>
+#include <linux/of_gpio.h>
 
 
 
@@ -36,15 +37,12 @@ static const struct sdio_device_id wilc_sdio_ids[] = {
 };
 
 
-#ifndef WILC_SDIO_IRQ_GPIO
 static void wilc_sdio_interrupt(struct sdio_func *func)
 {
 	sdio_release_host(func);
 	wilc_handle_isr();
 	sdio_claim_host(func);
 }
-#endif
-
 
 static int wilc1000_sdio_cmd52(sdio_cmd52_t *cmd)
 {
@@ -161,9 +159,8 @@ static int repeat_power_cycle(perInterface_wlan_t *nic)
 	ret = wilc_wlan_init(wilc1000_dev);
 
 	wilc1000_dev->mac_status = WILC_MAC_STATUS_INIT;
-#if !defined WILC_SDIO_IRQ_GPIO
-	wilc1000_sdio_enable_interrupt();
-#endif
+	if (wilc1000_dev->gpio < 0)
+		wilc1000_sdio_enable_interrupt();
 
 	if (wilc1000_wlan_get_firmware(nic)) {
 		PRINT_ER("Can't get firmware\n");
@@ -188,6 +185,8 @@ __fail__:
 
 static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 {
+	int gpio;
+
 	PRINT_D(INIT_DBG, "probe function\n");
 
 #ifdef COMPLEMENT_BOOT
@@ -198,9 +197,17 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 		return 0;
 	}
 #endif
+
+	gpio = -1;
+	if (IS_ENABLED(CONFIG_WILC1000_HW_OOB_INTR)) {
+		gpio = of_get_gpio(func->dev.of_node, 0);
+		if (gpio < 0)
+			gpio = GPIO_NUM;
+	}
+
 	PRINT_D(INIT_DBG, "Initializing netdev\n");
 	wilc1000_sdio_func = func;
-	if (wilc_netdev_init(&func->dev, &wilc1000_sdio_ops)) {
+	if (wilc_netdev_init(&func->dev, &wilc1000_sdio_ops, gpio)) {
 		PRINT_ER("Couldn't initialize netdev\n");
 		return -1;
 	}
@@ -228,7 +235,6 @@ static struct sdio_driver wilc_bus = {
 int wilc1000_sdio_enable_interrupt(void)
 {
 	int ret = 0;
-#ifndef WILC_SDIO_IRQ_GPIO
 
 	sdio_claim_host(wilc1000_sdio_func);
 	ret = sdio_claim_irq(wilc1000_sdio_func, wilc_sdio_interrupt);
@@ -238,14 +244,11 @@ int wilc1000_sdio_enable_interrupt(void)
 		PRINT_ER("can't claim sdio_irq, err(%d)\n", ret);
 		ret = -EIO;
 	}
-#endif
 	return ret;
 }
 
 void wilc1000_sdio_disable_interrupt(void)
 {
-
-#ifndef WILC_SDIO_IRQ_GPIO
 	int ret;
 
 	PRINT_D(INIT_DBG, "wilc1000_sdio_disable_interrupt IN\n");
@@ -258,7 +261,6 @@ void wilc1000_sdio_disable_interrupt(void)
 	sdio_release_host(wilc1000_sdio_func);
 
 	PRINT_D(INIT_DBG, "wilc1000_sdio_disable_interrupt OUT\n");
-#endif
 }
 
 static int linux_sdio_set_speed(int speed)

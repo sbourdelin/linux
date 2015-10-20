@@ -1369,9 +1369,6 @@ void wilc_handle_isr(void)
 		wilc_sleeptimer_isr_ext(int_status);
 
 	if (!(int_status & (ALL_INT_EXT))) {
-#ifdef WILC_SDIO
-		PRINT_D(TX_DBG, ">> UNKNOWN_INTERRUPT - 0x%08x\n", int_status);
-#endif
 		wilc_unknown_isr_ext();
 	}
 	release_bus(RELEASE_ALLOW_SLEEP);
@@ -1481,9 +1478,8 @@ int wilc_wlan_start(void)
 		return ret;
 	}
 	reg = 0;
-#ifdef WILC_SDIO_IRQ_GPIO
-	reg |= WILC_HAVE_SDIO_IRQ_GPIO;
-#endif
+	if (p->io_func->io_type == HIF_SDIO && wilc1000_dev->gpio >= 0)
+		reg |= WILC_HAVE_SDIO_IRQ_GPIO;
 
 #ifdef WILC_DISABLE_PMU
 #else
