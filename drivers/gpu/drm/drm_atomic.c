@@ -499,6 +499,14 @@ drm_atomic_crtc_get_property(struct drm_crtc *crtc,
 		*val = state->active;
 	else if (property == config->prop_mode_id)
 		*val = (state->mode_blob) ? state->mode_blob->base.id : 0;
+	else if (property == config->cm_palette_after_ctm_property)
+		*val = (state->palette_after_ctm_blob) ?
+			state->palette_after_ctm_blob->base.id : 0;
+	else if (property == config->cm_palette_before_ctm_property)
+		*val = (state->palette_before_ctm_blob) ?
+			state->palette_before_ctm_blob->base.id : 0;
+	else if (property == config->cm_ctm_property)
+		*val = (state->ctm_blob) ? state->ctm_blob->base.id : 0;
 	else if (crtc->funcs->atomic_get_property)
 		return crtc->funcs->atomic_get_property(crtc, state, property, val);
 	else
