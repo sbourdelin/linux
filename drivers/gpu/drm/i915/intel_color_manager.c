@@ -27,6 +27,98 @@
 
 #include "intel_color_manager.h"
 
+static s32 chv_prepare_csc_coeff(s64 csc_value)
+{
+	s32 csc_int_value;
+	u32 csc_fract_value;
+	s32 csc_s3_12_format;
+
+	if (csc_value >= 0) {
+		csc_value += CHV_CSC_FRACT_ROUNDOFF;
+		if (csc_value > CHV_CSC_COEFF_MAX)
+			csc_value = CHV_CSC_COEFF_MAX;
+	} else {
+		csc_value = -csc_value;
+		csc_value += CHV_CSC_FRACT_ROUNDOFF;
+		if (csc_value > CHV_CSC_COEFF_MAX + 1)
+			csc_value = CHV_CSC_COEFF_MAX + 1;
+		csc_value = -csc_value;
+	}
+
+	csc_int_value = csc_value >> CHV_CSC_COEFF_SHIFT;
+	csc_int_value <<= CHV_CSC_COEFF_INT_SHIFT;
+	if (csc_value < 0)
+		csc_int_value |= CSC_COEFF_SIGN;
+
+	csc_fract_value = csc_value;
+	csc_fract_value >>= CHV_CSC_COEFF_FRACT_SHIFT;
+	csc_s3_12_format = csc_int_value | csc_fract_value;
+
+	return csc_s3_12_format;
+}
+
+static int chv_set_csc(struct drm_device *dev, struct drm_property_blob *blob,
+		struct drm_crtc *crtc)
+{
+	struct drm_ctm *csc_data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u32 reg;
+	enum pipe pipe;
+	s32 word = 0, temp;
+	int count = 0;
+
+	if (WARN_ON(!blob))
+		return -EINVAL;
+
+	if (blob->length != sizeof(struct drm_ctm)) {
+		DRM_ERROR("Invalid length of data received\n");
+		return -EINVAL;
+	}
+
+	csc_data = (struct drm_ctm *)blob->data;
+	pipe = to_intel_crtc(crtc)->pipe;
+
+	/* Disable CSC functionality */
+	reg = _PIPE_CGM_CONTROL(pipe);
+	I915_WRITE(reg, I915_READ(reg) & (~CGM_CSC_EN));
+
+	DRM_DEBUG_DRIVER("Disabled CSC Functionality on Pipe %c\n",
+			pipe_name(pipe));
+
+	reg = _PIPE_CSC_BASE(pipe);
+
+	/*
+	* First 8 of 9 CSC correction values go in pair, to first
+	* 4 CSC register (bit 0:15 and 16:31)
+	*/
+	while (count < CSC_MAX_VALS - 1) {
+		temp = chv_prepare_csc_coeff(
+					csc_data->ctm_coeff[count]);
+		SET_BITS(word, GET_BITS(temp, 16, 16), 0, 16);
+		count++;
+
+		temp = chv_prepare_csc_coeff(
+				csc_data->ctm_coeff[count]);
+		SET_BITS(word, GET_BITS(temp, 16, 16), 16, 16);
+		count++;
+
+		I915_WRITE(reg, word);
+		reg += 4;
+	}
+
+	/* 9th coeff goes to 5th register, bit 0:16 */
+	temp = chv_prepare_csc_coeff(
+			csc_data->ctm_coeff[count]);
+	SET_BITS(word, GET_BITS(temp, 16, 16), 0, 16);
+	I915_WRITE(reg, word);
+
+	/* Enable CSC functionality */
+	reg = _PIPE_CGM_CONTROL(pipe);
+	I915_WRITE(reg, I915_READ(reg) | CGM_CSC_EN);
+	DRM_DEBUG_DRIVER("CSC enabled on Pipe %c\n", pipe_name(pipe));
+	return 0;
+}
+
 static int chv_set_degamma(struct drm_device *dev,
 	struct drm_property_blob *blob, struct drm_crtc *crtc)
 {
@@ -246,5 +338,12 @@ void intel_attach_color_properties_to_crtc(struct drm_device *dev,
 		drm_object_attach_property(mode_obj,
 			config->cm_palette_before_ctm_property, 0);
 		DRM_DEBUG_DRIVER("degamma property attached to CRTC\n");
+	}
+
+	/* CSC */
+	if (config->cm_ctm_property) {
+		drm_object_attach_property(mode_obj,
+			config->cm_ctm_property, 0);
+		DRM_DEBUG_DRIVER("CSC property attached to CRTC\n");
 	}
 }
