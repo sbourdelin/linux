@@ -19,6 +19,56 @@
 
 #include "hns_dsaf_ppe.h"
 
+int hns_ppe_is_rss_supported(struct hns_ppe_cb *ppe_cb)
+{
+	struct ppe_common_cb *ppe_common_cb = ppe_cb->ppe_common_cb;
+	struct dsaf_device *dsaf_dev = ppe_common_cb->dsaf_dev;
+	int ret = 0;
+
+	/* Not all versions support RSS feature */
+	if (!AE_IS_VER1(dsaf_dev->dsaf_ver))
+		ret = 1;
+
+	return ret;
+}
+
+void hns_ppe_set_rss_key(struct hns_ppe_cb *ppe_cb,
+			 const u32 rss_key[HNS_PPEV2_RSS_KEY_NUM])
+{
+	int key_item = 0;
+
+	for (key_item = 0; key_item < HNS_PPEV2_RSS_KEY_NUM; key_item++)
+		dsaf_write_dev(ppe_cb, PPEV2_RSS_KEY_REG + key_item * 0x4,
+			       rss_key[key_item]);
+}
+
+void hns_ppe_set_indir_table(struct hns_ppe_cb *ppe_cb,
+				  const u32 rss_tab[HNS_PPEV2_RSS_IND_TBL_SIZE])
+{
+	int i;
+	int reg_value;
+
+	for (i = 0; i < (HNS_PPEV2_RSS_IND_TBL_SIZE / 4); i++) {
+		reg_value = dsaf_read_dev(ppe_cb,
+					  PPEV2_INDRECTION_TBL_REG + i * 0x4);
+
+		dsaf_set_field(reg_value, PPEV2_CFG_RSS_TBL_4N0_M,
+			       PPEV2_CFG_RSS_TBL_4N0_S,
+			       rss_tab[i * 4 + 0] & 0x1F);
+		dsaf_set_field(reg_value, PPEV2_CFG_RSS_TBL_4N1_M,
+			       PPEV2_CFG_RSS_TBL_4N1_S,
+				rss_tab[i * 4 + 1] & 0x1F);
+		dsaf_set_field(reg_value, PPEV2_CFG_RSS_TBL_4N2_M,
+			       PPEV2_CFG_RSS_TBL_4N2_S,
+				rss_tab[i * 4 + 2] & 0x1F);
+		dsaf_set_field(reg_value, PPEV2_CFG_RSS_TBL_4N3_M,
+			       PPEV2_CFG_RSS_TBL_4N3_S,
+				rss_tab[i * 4 + 3] & 0x1F);
+		dsaf_write_dev(
+			ppe_cb, PPEV2_INDRECTION_TBL_REG + i * 0x4, reg_value);
+	}
+}
+
 static void __iomem *hns_ppe_common_get_ioaddr(
 	struct ppe_common_cb *ppe_common)
 {
@@ -266,13 +316,26 @@ static void hns_ppe_exc_irq_en(struct hns_ppe_cb *ppe_cb, int en)
 
 /**
  * ppe_init_hw - init ppe
- * @ppe_device: ppe device
+ * @ppe_cb: ppe device
  */
 static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
 {
 	struct ppe_common_cb *ppe_common_cb = ppe_cb->ppe_common_cb;
 	u32 port = ppe_cb->port;
 	struct dsaf_device *dsaf_dev = ppe_common_cb->dsaf_dev;
+	int i;
+	/* Set default RSS key and indrection table*/
+	const u32 rss_key[HNS_PPEV2_RSS_KEY_NUM] = {
+		0x6d5a56da, 0x255b0ec2,
+		0x4167253d, 0x43a38fb0,
+		0xd0ca2bcb, 0xae7b30b4,
+		0x77cb2da3, 0x8030f20c,
+		0x6a42b73b, 0xbeac01fa,
+	};
+
+	/* set default RSS key and remember it */
+	for (i = 0; i < HNS_PPEV2_RSS_KEY_NUM; i++)
+		ppe_cb->rss_key[i]  = rss_key[i];
 
 	hns_ppe_srst_by_port(dsaf_dev, port, 0);
 	mdelay(10);
@@ -285,8 +348,17 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
 		hns_ppe_set_port_mode(ppe_cb, PPE_MODE_GE);
 	else
 		hns_ppe_set_port_mode(ppe_cb, PPE_MODE_XGE);
+
 	hns_ppe_checksum_hw(ppe_cb, 0xffffffff);
 	hns_ppe_cnt_clr_ce(ppe_cb);
+
+	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+		hns_ppe_set_rss_key(ppe_cb, rss_key);
+
+		for (i = 0; i < HNS_PPEV2_RSS_IND_TBL_SIZE; i++)
+			ppe_cb->rss_indir_table[i] = i;
+		hns_ppe_set_indir_table(ppe_cb, ppe_cb->rss_indir_table);
+	}
 }
 
 /**
