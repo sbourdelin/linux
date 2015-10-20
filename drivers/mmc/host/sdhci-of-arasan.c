@@ -30,6 +30,8 @@
 #define CLK_CTRL_TIMEOUT_MASK		(0xf << CLK_CTRL_TIMEOUT_SHIFT)
 #define CLK_CTRL_TIMEOUT_MIN_EXP	13
 
+#define ARASAN_RPM_DELAY_MS		50
+
 /**
  * struct sdhci_arasan_data
  * @clk_ahb:	Pointer to the AHB clock
@@ -183,8 +185,70 @@ static int sdhci_arasan_resume(struct device *dev)
 }
 #endif /* ! CONFIG_PM_SLEEP */
 
-static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
-			 sdhci_arasan_resume);
+
+#ifdef CONFIG_PM
+static int sdhci_arasan_runtime_suspend(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
+	int ret;
+
+	ret = sdhci_runtime_suspend_host(host);
+	if (ret)
+		return ret;
+
+	if (!IS_ERR(sdhci_arasan->phy)) {
+		ret = sdhci_arasan_suspend_phy(sdhci_arasan->phy);
+		if (ret) {
+			dev_err(dev, "Cannot suspend phy at runtime.\n");
+			sdhci_runtime_resume_host(host);
+			return ret;
+		}
+	}
+
+	clk_disable_unprepare(sdhci_arasan->clk_ahb);
+	clk_disable_unprepare(pltfm_host->clk);
+
+	return 0;
+}
+
+static int sdhci_arasan_runtime_resume(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
+	int ret;
+
+	clk_prepare_enable(pltfm_host->clk);
+	clk_prepare_enable(sdhci_arasan->clk_ahb);
+
+	if (!IS_ERR(sdhci_arasan->phy)) {
+		ret = sdhci_arasan_resume_phy(sdhci_arasan->phy);
+		if (ret) {
+			dev_err(dev, "Cannot resume phy at runtime.\n");
+			clk_disable_unprepare(sdhci_arasan->clk_ahb);
+			clk_disable_unprepare(pltfm_host->clk);
+			return ret;
+		}
+	}
+
+	return sdhci_runtime_resume_host(host);
+}
+#endif
+
+#ifdef CONFIG_PM
+static const struct dev_pm_ops sdhci_arasan_pmops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sdhci_arasan_suspend, sdhci_arasan_resume)
+	SET_RUNTIME_PM_OPS(sdhci_arasan_runtime_suspend,
+				sdhci_arasan_runtime_resume, NULL)
+};
+
+#define SDHCI_ARASAN_PMOPS (&sdhci_arasan_pmops)
+
+#else
+#define SDHCI_ARASAN_PMOPS NULL
+#endif
 
 static int sdhci_arasan_probe(struct platform_device *pdev)
 {
@@ -272,6 +336,11 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 		goto clk_disable_all;
 	}
 
+	pm_runtime_set_autosuspend_delay(&pdev->dev, ARASAN_RPM_DELAY_MS);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+	pm_suspend_ignore_children(&pdev->dev, 1);
+
 	ret = sdhci_add_host(host);
 	if (ret)
 		goto err_pltfm_free;
@@ -279,6 +348,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 	return 0;
 
 err_pltfm_free:
+	pm_runtime_disable(&pdev->dev);
 	sdhci_pltfm_free(pdev);
 clk_disable_all:
 	clk_disable_unprepare(clk_xin);
@@ -297,6 +367,10 @@ static int sdhci_arasan_remove(struct platform_device *pdev)
 	if (!IS_ERR(sdhci_arasan->phy))
 		phy_exit(sdhci_arasan->phy);
 
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_dont_use_autosuspend(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
+
 	clk_disable_unprepare(sdhci_arasan->clk_ahb);
 
 	return sdhci_pltfm_unregister(pdev);
@@ -314,7 +388,7 @@ static struct platform_driver sdhci_arasan_driver = {
 	.driver = {
 		.name = "sdhci-arasan",
 		.of_match_table = sdhci_arasan_of_match,
-		.pm = &sdhci_arasan_dev_pm_ops,
+		.pm = SDHCI_ARASAN_PMOPS,
 	},
 	.probe = sdhci_arasan_probe,
 	.remove = sdhci_arasan_remove,
