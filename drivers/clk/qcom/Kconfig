@@ -1,3 +1,6 @@
+config QCOM_CLK_SMD_RPM
+	bool
+
 config QCOM_GDSC
 	bool
 	select PM_GENERIC_DOMAINS if PM
