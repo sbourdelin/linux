@@ -2914,7 +2914,7 @@ static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req,
 
 	seqno = req->ring->get_seqno(req->ring, lazy_coherency);
 
-	return i915_seqno_passed(seqno, req->seqno);
+	return i915_seqno_passed(seqno, req->seqno) && !req->elsp_submitted;
 }
 
 int __must_check i915_gem_get_seqno(struct drm_device *dev, u32 *seqno);

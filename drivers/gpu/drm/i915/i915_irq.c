@@ -1294,10 +1294,11 @@ static __always_inline void
 		gen8_cs_irq_handler(struct intel_engine_cs *ring, u32 iir,
 				    int test_shift)
 {
-	if (iir & (GT_RENDER_USER_INTERRUPT << test_shift))
-		notify_ring(ring);
+	bool need_notify = false;
 	if (iir & (GT_CONTEXT_SWITCH_INTERRUPT << test_shift))
-		intel_lrc_irq_handler(ring);
+		need_notify = intel_lrc_irq_handler(ring);
+	if ((iir & (GT_RENDER_USER_INTERRUPT << test_shift)) || need_notify)
+		notify_ring(ring);
 }
 
 static irqreturn_t gen8_gt_irq_handler(struct drm_i915_private *dev_priv,

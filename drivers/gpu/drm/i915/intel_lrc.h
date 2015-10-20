@@ -95,7 +95,7 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 			       struct list_head *vmas);
 u32 intel_execlists_ctx_id(struct drm_i915_gem_object *ctx_obj);
 
-void intel_lrc_irq_handler(struct intel_engine_cs *ring);
+bool intel_lrc_irq_handler(struct intel_engine_cs *ring);
 void intel_execlists_retire_requests(struct intel_engine_cs *ring);
 
 #endif /* _INTEL_LRC_H_ */

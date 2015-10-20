@@ -2847,12 +2847,16 @@ i915_gem_retire_requests_ring(struct intel_engine_cs *ring)
 
 		if (!list_empty(&obj->last_read_req[ring->id]->list))
 			break;
+		if (!i915_gem_request_completed(obj->last_read_req[ring->id],
+				true))
+			break;
 
 		i915_gem_object_retire__read(obj, ring->id);
 	}
 
 	if (unlikely(ring->trace_irq_req &&
-		     i915_gem_request_completed(ring->trace_irq_req, true))) {
+		     i915_gem_request_completed(ring->trace_irq_req,
+				true))) {
 		ring->irq_put(ring);
 		i915_gem_request_assign(&ring->trace_irq_req, NULL);
 	}
@@ -2871,15 +2875,6 @@ i915_gem_retire_requests(struct drm_device *dev)
 	for_each_ring(ring, dev_priv, i) {
 		i915_gem_retire_requests_ring(ring);
 		idle &= list_empty(&ring->request_list);
-		if (i915.enable_execlists) {
-			unsigned long flags;
-
-			spin_lock_irqsave(&ring->execlist_lock, flags);
-			idle &= list_empty(&ring->execlist_queue);
-			spin_unlock_irqrestore(&ring->execlist_lock, flags);
-
-			intel_execlists_retire_requests(ring);
-		}
 	}
 
 	if (idle)
@@ -2955,12 +2950,14 @@ i915_gem_object_flush_active(struct drm_i915_gem_object *obj)
 		if (req == NULL)
 			continue;
 
-		if (list_empty(&req->list))
-			goto retire;
+		if (list_empty(&req->list)) {
+			if (i915_gem_request_completed(req, true))
+				i915_gem_object_retire__read(obj, i);
+			continue;
+		}
 
 		if (i915_gem_request_completed(req, true)) {
 			__i915_gem_request_retire__upto(req);
-retire:
 			i915_gem_object_retire__read(obj, i);
 		}
 	}

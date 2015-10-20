@@ -426,9 +426,8 @@ static void execlists_context_unqueue(struct intel_engine_cs *ring)
 			/* Same ctx: ignore first request, as second request
 			 * will update tail past first request's workload */
 			cursor->elsp_submitted = req0->elsp_submitted;
+			req0->elsp_submitted = 0;
 			list_del(&req0->execlist_link);
-			list_add_tail(&req0->execlist_link,
-				&ring->execlist_retired_req_list);
 			req0 = cursor;
 		} else {
 			req1 = cursor;
@@ -478,11 +477,8 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
 		if (intel_execlists_ctx_id(ctx_obj) == request_id) {
 			WARN(head_req->elsp_submitted == 0,
 			     "Never submitted head request\n");
-
 			if (--head_req->elsp_submitted <= 0) {
 				list_del(&head_req->execlist_link);
-				list_add_tail(&head_req->execlist_link,
-					&ring->execlist_retired_req_list);
 				return true;
 			}
 		}
@@ -497,8 +493,9 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
  *
  * Check the unread Context Status Buffers and manage the submission of new
  * contexts to the ELSP accordingly.
+ * @return whether a context completed
  */
-void intel_lrc_irq_handler(struct intel_engine_cs *ring)
+bool intel_lrc_irq_handler(struct intel_engine_cs *ring)
 {
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 	u32 status_pointer;
@@ -558,6 +555,8 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 		   _MASKED_FIELD(GEN8_CSB_PTR_MASK << 8,
 				 ((u32)ring->next_context_status_buffer &
 				  GEN8_CSB_PTR_MASK) << 8));
+
+	return (submit_contexts != 0);
 }
 
 static int execlists_context_queue(struct drm_i915_gem_request *request)
@@ -565,11 +564,6 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 	struct intel_engine_cs *ring = request->ring;
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
-
-	if (request->ctx != ring->default_context)
-		intel_lr_context_pin(request);
-
-	i915_gem_request_reference(request);
 
 	spin_lock_irq(&ring->execlist_lock);
 
@@ -588,8 +582,6 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 			WARN(tail_req->elsp_submitted != 0,
 				"More than 2 already-submitted reqs queued\n");
 			list_del(&tail_req->execlist_link);
-			list_add_tail(&tail_req->execlist_link,
-				&ring->execlist_retired_req_list);
 		}
 	}
 
@@ -941,32 +933,6 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 	i915_gem_execbuffer_retire_commands(params);
 
 	return 0;
-}
-
-void intel_execlists_retire_requests(struct intel_engine_cs *ring)
-{
-	struct drm_i915_gem_request *req, *tmp;
-	struct list_head retired_list;
-
-	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
-	if (list_empty(&ring->execlist_retired_req_list))
-		return;
-
-	INIT_LIST_HEAD(&retired_list);
-	spin_lock_irq(&ring->execlist_lock);
-	list_replace_init(&ring->execlist_retired_req_list, &retired_list);
-	spin_unlock_irq(&ring->execlist_lock);
-
-	list_for_each_entry_safe(req, tmp, &retired_list, execlist_link) {
-		struct intel_context *ctx = req->ctx;
-		struct drm_i915_gem_object *ctx_obj =
-				ctx->engine[ring->id].state;
-
-		if (ctx_obj && (ctx != ring->default_context))
-			intel_lr_context_unpin(req);
-		list_del(&req->execlist_link);
-		i915_gem_request_unreference(req);
-	}
 }
 
 void intel_logical_ring_stop(struct intel_engine_cs *ring)
@@ -1924,7 +1890,6 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 	init_waitqueue_head(&ring->irq_queue);
 
 	INIT_LIST_HEAD(&ring->execlist_queue);
-	INIT_LIST_HEAD(&ring->execlist_retired_req_list);
 	spin_lock_init(&ring->execlist_lock);
 
 	ret = i915_cmd_parser_init_ring(ring);
