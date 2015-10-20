@@ -8,6 +8,7 @@
 /* //////////////////////////////////////////////////////////////////////////// */
 
 #include <linux/string.h>
+#include "wilc_wfi_netdevice.h"
 #include "wilc_wlan_if.h"
 #include "wilc_wlan.h"
 
@@ -498,7 +499,7 @@ static int sdio_sync(void)
 	return 1;
 }
 
-static int sdio_init(wilc_wlan_inp_t *inp, wilc_debug_func func)
+static int sdio_init(struct wilc *inp, wilc_debug_func func)
 {
 	sdio_cmd52_t cmd;
 	int loop;
@@ -507,10 +508,10 @@ static int sdio_init(wilc_wlan_inp_t *inp, wilc_debug_func func)
 	memset(&g_sdio, 0, sizeof(wilc_sdio_t));
 
 	g_sdio.dPrint = func;
-	g_sdio.os_context = inp->os_context.os_private;
+	g_sdio.os_context = inp;
 
-	if (inp->io_func.io_init) {
-		if (!inp->io_func.io_init(g_sdio.os_context)) {
+	if (inp->ops->io_init) {
+		if (!inp->ops->io_init(g_sdio.os_context)) {
 			g_sdio.dPrint(N_ERR, "[wilc sdio]: Failed io init bus...\n");
 			return 0;
 		}
@@ -518,10 +519,10 @@ static int sdio_init(wilc_wlan_inp_t *inp, wilc_debug_func func)
 		return 0;
 	}
 
-	g_sdio.sdio_cmd52	= inp->io_func.u.sdio.sdio_cmd52;
-	g_sdio.sdio_cmd53	= inp->io_func.u.sdio.sdio_cmd53;
-	g_sdio.sdio_set_max_speed	= inp->io_func.u.sdio.sdio_set_max_speed;
-	g_sdio.sdio_set_default_speed	= inp->io_func.u.sdio.sdio_set_default_speed;
+	g_sdio.sdio_cmd52	= inp->ops->u.sdio.sdio_cmd52;
+	g_sdio.sdio_cmd53	= inp->ops->u.sdio.sdio_cmd53;
+	g_sdio.sdio_set_max_speed	= inp->ops->u.sdio.sdio_set_max_speed;
+	g_sdio.sdio_set_default_speed	= inp->ops->u.sdio.sdio_set_default_speed;
 
 	/**
 	 *      function 0 csa enable

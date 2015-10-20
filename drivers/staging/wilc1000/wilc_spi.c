@@ -8,6 +8,7 @@
 /* //////////////////////////////////////////////////////////////////////////// */
 
 #include <linux/string.h>
+#include "wilc_wfi_netdevice.h"
 #include "wilc_wlan_if.h"
 #include "wilc_wlan.h"
 
@@ -724,7 +725,7 @@ static int spi_sync(void)
 	return 1;
 }
 
-static int spi_init(wilc_wlan_inp_t *inp, wilc_debug_func func)
+static int spi_init(struct wilc *inp, wilc_debug_func func)
 {
 	u32 reg;
 	u32 chipid;
@@ -743,19 +744,19 @@ static int spi_init(wilc_wlan_inp_t *inp, wilc_debug_func func)
 	memset(&g_spi, 0, sizeof(wilc_spi_t));
 
 	g_spi.dPrint = func;
-	g_spi.os_context = inp->os_context.os_private;
-	if (inp->io_func.io_init) {
-		if (!inp->io_func.io_init(g_spi.os_context)) {
+	g_spi.os_context = inp;
+	if (inp->ops->io_init) {
+		if (!inp->ops->io_init(g_spi.os_context)) {
 			PRINT_ER("[wilc spi]: Failed io init bus...\n");
 			return 0;
 		}
 	} else {
 		return 0;
 	}
-	g_spi.spi_tx = inp->io_func.u.spi.spi_tx;
-	g_spi.spi_rx = inp->io_func.u.spi.spi_rx;
-	g_spi.spi_trx = inp->io_func.u.spi.spi_trx;
-	g_spi.spi_max_speed = inp->io_func.u.spi.spi_max_speed;
+	g_spi.spi_tx = inp->ops->u.spi.spi_tx;
+	g_spi.spi_rx = inp->ops->u.spi.spi_rx;
+	g_spi.spi_trx = inp->ops->u.spi.spi_trx;
+	g_spi.spi_max_speed = inp->ops->u.spi.spi_max_speed;
 
 	/**
 	 *      configure protocol

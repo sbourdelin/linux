@@ -23,7 +23,7 @@ typedef struct {
 	/**
 	 *      input interface functions
 	 **/
-	wilc_wlan_io_func_t io_func;
+	const struct wilc1000_ops *io_func;
 
 	/**
 	 *      host interface functions
@@ -651,7 +651,7 @@ static inline void chip_wakeup(void)
 	u32 reg, clk_status_reg, trials = 0;
 	u32 sleep_time;
 
-	if ((g_wlan.io_func.io_type & 0x1) == HIF_SPI) {
+	if ((g_wlan.io_func->io_type & 0x1) == HIF_SPI) {
 		do {
 			g_wlan.hif_func.hif_read_reg(1, &reg);
 			/* Set bit 1 */
@@ -671,7 +671,7 @@ static inline void chip_wakeup(void)
 			} while ((wilc_get_chipid(true) == 0) && ((++trials % 3) == 0));
 
 		} while (wilc_get_chipid(true) == 0);
-	} else if ((g_wlan.io_func.io_type & 0x1) == HIF_SDIO)	 {
+	} else if ((g_wlan.io_func->io_type & 0x1) == HIF_SDIO)	 {
 		g_wlan.hif_func.hif_read_reg(0xf0, &reg);
 		do {
 			/* Set bit 1 */
@@ -731,7 +731,7 @@ static inline void chip_wakeup(void)
 	u32 reg, trials = 0;
 
 	do {
-		if ((g_wlan.io_func.io_type & 0x1) == HIF_SPI) {
+		if ((g_wlan.io_func->io_type & 0x1) == HIF_SPI) {
 			g_wlan.hif_func.hif_read_reg(1, &reg);
 			/* Make sure bit 1 is 0 before we start. */
 			g_wlan.hif_func.hif_write_reg(1, reg & ~BIT(1));
@@ -739,7 +739,7 @@ static inline void chip_wakeup(void)
 			g_wlan.hif_func.hif_write_reg(1, reg | BIT(1));
 			/* Clear bit 1*/
 			g_wlan.hif_func.hif_write_reg(1, reg  & ~BIT(1));
-		} else if ((g_wlan.io_func.io_type & 0x1) == HIF_SDIO)	 {
+		} else if ((g_wlan.io_func->io_type & 0x1) == HIF_SDIO)	 {
 			/* Make sure bit 0 is 0 before we start. */
 			g_wlan.hif_func.hif_read_reg(0xf0, &reg);
 			g_wlan.hif_func.hif_write_reg(0xf0, reg & ~BIT(0));
@@ -1465,10 +1465,10 @@ int wilc_wlan_start(void)
 	/**
 	 *      Set the host interface
 	 **/
-	if (p->io_func.io_type == HIF_SDIO) {
+	if (p->io_func->io_type == HIF_SDIO) {
 		reg = 0;
 		reg |= BIT(3); /* bug 4456 and 4557 */
-	} else if (p->io_func.io_type == HIF_SPI) {
+	} else if (p->io_func->io_type == HIF_SPI) {
 		reg = 1;
 	}
 	acquire_bus(ACQUIRE_ONLY);
@@ -1932,7 +1932,7 @@ u8 wilc1000_core_11b_ready(void)
 }
 #endif
 
-int wilc_wlan_init(wilc_wlan_inp_t *inp)
+int wilc_wlan_init(struct wilc *inp)
 {
 
 	int ret = 0;
@@ -1944,11 +1944,11 @@ int wilc_wlan_init(wilc_wlan_inp_t *inp)
 	/**
 	 *      store the input
 	 **/
-	memcpy((void *)&g_wlan.io_func, (void *)&inp->io_func, sizeof(wilc_wlan_io_func_t));
+	g_wlan.io_func = inp->ops;
 	/***
 	 *      host interface init
 	 **/
-	if ((inp->io_func.io_type & 0x1) == HIF_SDIO) {
+	if ((inp->ops->io_type & 0x1) == HIF_SDIO) {
 		if (!wilc1000_hif_sdio.hif_init(inp, wilc_debug)) {
 			/* EIO	5 */
 			ret = -5;
@@ -1956,7 +1956,7 @@ int wilc_wlan_init(wilc_wlan_inp_t *inp)
 		}
 		memcpy((void *)&g_wlan.hif_func, &wilc1000_hif_sdio, sizeof(wilc_hif_func_t));
 	} else {
-		if ((inp->io_func.io_type & 0x1) == HIF_SPI) {
+		if ((inp->ops->io_type & 0x1) == HIF_SPI) {
 			/**
 			 *      TODO:
 			 **/

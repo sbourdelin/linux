@@ -923,31 +923,29 @@ static int wlan_deinit_locks(struct wilc *nic)
 	return 0;
 }
 
-static void linux_to_wlan(wilc_wlan_inp_t *nwi, struct wilc *nic)
-{
-
-	PRINT_D(INIT_DBG, "Linux to Wlan services ...\n");
-
-	nwi->os_context.os_private = (void *)nic;
-
 #ifdef WILC_SDIO
-	nwi->io_func.io_type = HIF_SDIO;
-	nwi->io_func.io_init = wilc1000_sdio_init;
-	nwi->io_func.io_deinit = wilc1000_sdio_deinit;
-	nwi->io_func.u.sdio.sdio_cmd52 = wilc1000_sdio_cmd52;
-	nwi->io_func.u.sdio.sdio_cmd53 = wilc1000_sdio_cmd53;
-	nwi->io_func.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed;
-	nwi->io_func.u.sdio.sdio_set_default_speed = wilc1000_sdio_set_default_speed;
-#else
-	nwi->io_func.io_type = HIF_SPI;
-	nwi->io_func.io_init = wilc1000_spi_init;
-	nwi->io_func.io_deinit = wilc1000_spi_deinit;
-	nwi->io_func.u.spi.spi_tx = wilc1000_spi_write;
-	nwi->io_func.u.spi.spi_rx = wilc1000_spi_read;
-	nwi->io_func.u.spi.spi_trx = wilc1000_spi_write_read;
-	nwi->io_func.u.spi.spi_max_speed = wilc1000_spi_set_max_speed;
+static const struct wilc1000_ops wilc1000_sdio_ops = {
+	.io_type = HIF_SDIO,
+	.io_init = wilc1000_sdio_init,
+	.io_deinit = wilc1000_sdio_deinit,
+	.u.sdio.sdio_cmd52 = wilc1000_sdio_cmd52,
+	.u.sdio.sdio_cmd53 = wilc1000_sdio_cmd53,
+	.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed,
+	.u.sdio.sdio_set_default_speed = wilc1000_sdio_set_default_speed,
+};
 #endif
-}
+
+#ifdef WILC_SPI
+static const struct wilc1000_ops wilc1000_spi_ops = {
+	.io_type = HIF_SPI,
+	.io_init = wilc1000_spi_init,
+	.io_deinit = wilc1000_spi_deinit,
+	.u.spi.spi_tx = wilc1000_spi_write,
+	.u.spi.spi_rx = wilc1000_spi_read,
+	.u.spi.spi_trx = wilc1000_spi_write_read,
+	.u.spi.spi_max_speed = wilc1000_spi_set_max_speed,
+};
+#endif
 
 static int wlan_initialize_threads(perInterface_wlan_t *nic)
 {
@@ -995,7 +993,7 @@ static void wlan_deinitialize_threads(struct wilc *nic)
 #ifdef COMPLEMENT_BOOT
 
 #define READY_CHECK_THRESHOLD		30
-static u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
+static u8 wilc1000_prepare_11b_core(struct wilc *nic)
 {
 	u8 trials = 0;
 
@@ -1011,8 +1009,8 @@ static u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
 			msleep(100);
 		wilc1000_probe = 0;
 		wilc1000_dev->wilc_sdio_func = wilc1000_sdio_func;
-		linux_to_wlan(nwi, nic);
-		wilc_wlan_init(nwi);
+		nic->ops = &wilc1000_sdio_ops;
+		wilc_wlan_init(nic);
 	}
 
 	if (READY_CHECK_THRESHOLD <= trials)
@@ -1025,8 +1023,6 @@ static u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
 static int repeat_power_cycle(perInterface_wlan_t *nic)
 {
 	int ret = 0;
-	wilc_wlan_inp_t nwi;
-
 	sdio_unregister_driver(&wilc_bus);
 
 	sdio_register_driver(&wilc_bus);
@@ -1036,8 +1032,8 @@ static int repeat_power_cycle(perInterface_wlan_t *nic)
 		msleep(100);
 	wilc1000_probe = 0;
 	wilc1000_dev->wilc_sdio_func = wilc1000_sdio_func;
-	linux_to_wlan(&nwi, wilc1000_dev);
-	ret = wilc_wlan_init(&nwi);
+	wilc1000_dev->ops = &wilc1000_sdio_ops;
+	ret = wilc_wlan_init(wilc1000_dev);
 
 	wilc1000_dev->mac_status = WILC_MAC_STATUS_INIT;
 	#if (defined WILC_SDIO) && (!defined WILC_SDIO_IRQ_GPIO)
@@ -1067,7 +1063,6 @@ __fail__:
 
 int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 {
-	wilc_wlan_inp_t nwi;
 	perInterface_wlan_t *nic = p_nic;
 	int ret = 0;
 
@@ -1078,9 +1073,13 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 
 		wlan_init_locks(wilc1000_dev);
 
-		linux_to_wlan(&nwi, wilc1000_dev);
+#ifdef WILC_SDIO
+		wilc1000_dev->ops = &wilc1000_sdio_ops;
+#else
+		wilc1000_dev->ops = &wilc1000_spi_ops;
+#endif
 
-		ret = wilc_wlan_init(&nwi);
+		ret = wilc_wlan_init(wilc1000_dev);
 		if (ret < 0) {
 			PRINT_ER("Initializing WILC_Wlan FAILED\n");
 			ret = -EIO;
@@ -1095,7 +1094,7 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 		}
 
 #if (defined WILC_SDIO) && (defined COMPLEMENT_BOOT)
-		if (wilc1000_prepare_11b_core(&nwi, wilc1000_dev)) {
+		if (wilc1000_prepare_11b_core(wilc1000_dev)) {
 			PRINT_ER("11b Core is not ready\n");
 			ret = -EIO;
 			goto _fail_threads_;

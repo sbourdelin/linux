@@ -251,8 +251,10 @@ struct rxq_entry_t {
  *
  ********************************************/
 
+struct wilc;
+
 typedef struct {
-	int (*hif_init)(wilc_wlan_inp_t *, wilc_debug_func);
+	int (*hif_init)(struct wilc *, wilc_debug_func);
 	int (*hif_deinit)(void *);
 	int (*hif_read_reg)(u32, u32 *);
 	int (*hif_write_reg)(u32, u32);
