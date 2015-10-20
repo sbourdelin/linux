@@ -284,11 +284,25 @@ static void module_assert_mutex(void)
 static void module_assert_mutex_or_preempt(void)
 {
 #ifdef CONFIG_LOCKDEP
+	static int once;
+
 	if (unlikely(!debug_locks))
 		return;
 
-	WARN_ON(!rcu_read_lock_sched_held() &&
-		!lockdep_is_held(&module_mutex));
+	/*
+	 * Would be nice to use WARN_ON_ONCE(), but the warning
+	 * that causes a stack trace may call __module_address()
+	 * which may call here, and we trigger the warning again,
+	 * before the WARN_ON_ONCE() updates its flag.
+	 * To prevent the recursion, we need to open code the
+	 * once logic.
+	 */
+	if (!once &&
+	    unlikely(!rcu_read_lock_sched_held() &&
+		     !lockdep_is_held(&module_mutex))) {
+		once++;
+		WARN_ON(1);
+	}
 #endif
 }
 
