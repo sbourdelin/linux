@@ -875,14 +875,6 @@ static void __intel_fbc_update(struct intel_crtc *crtc)
 		goto out_disable;
 	}
 
-	/* WaFbcExceedCdClockThreshold:hsw,bdw */
-	if ((IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) &&
-	    ilk_pipe_pixel_rate(crtc->config) >=
-	    dev_priv->cdclk_freq * 95 / 100) {
-		set_no_fbc_reason(dev_priv, "pixel rate is too big");
-		goto out_disable;
-	}
-
 	/* It is possible for the required CFB size change without a
 	 * crtc->disable + crtc->enable since it is possible to change the
 	 * stride without triggering a full modeset. Since we try to
@@ -1096,6 +1088,14 @@ void intel_fbc_enable(struct intel_crtc *crtc)
 	if ((adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE) ||
 	    (adjusted_mode->flags & DRM_MODE_FLAG_DBLSCAN)) {
 		set_no_fbc_reason(dev_priv, "incompatible mode");
+		goto out;
+	}
+
+	/* WaFbcExceedCdClockThreshold:hsw,bdw */
+	if ((IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) &&
+	    ilk_pipe_pixel_rate(crtc->config) >=
+	    dev_priv->cdclk_freq * 95 / 100) {
+		set_no_fbc_reason(dev_priv, "pixel rate is too big");
 		goto out;
 	}
 
