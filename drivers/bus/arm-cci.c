@@ -663,6 +663,36 @@ static u32 pmu_get_event(struct cci_pmu *cci_pmu, int idx)
 }
 
 /*
+ * Restore the status of the counters.
+ * For each counter set in the mask, enable the counter back.
+ */
+static void pmu_restore_counters_ctrl(struct cci_pmu *cci_pmu, unsigned long *mask)
+{
+	int i;
+
+	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
+		pmu_enable_counter(cci_pmu, i);
+}
+
+/*
+ * For all counters on the CCI-PMU, disable any 'enabled' counters,
+ * saving the changed counters in the mask, so that we can restore
+ * it later using pmu_restore_counters_ctrl.
+ */
+static void pmu_disable_counters_ctrl(struct cci_pmu *cci_pmu, unsigned long *mask)
+{
+	int i;
+
+	for (i = 0; i < cci_pmu->num_cntrs; i++) {
+		clear_bit(i, mask);
+		if (pmu_get_counter_ctrl(cci_pmu, i)) {
+			set_bit(i, mask);
+			pmu_disable_counter(cci_pmu, i);
+		}
+	}
+}
+
+/*
  * Returns the number of programmable counters actually implemented
  * by the cci
  */
