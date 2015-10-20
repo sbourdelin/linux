@@ -3221,6 +3221,9 @@ static int __i915_vma_unbind(struct i915_vma *vma, bool wait)
 	if (vma->pin_count)
 		return -EBUSY;
 
+	if (obj->mmap)
+		obj->mmap(obj, true);
+
 	BUG_ON(obj->pages == NULL);
 
 	if (wait) {

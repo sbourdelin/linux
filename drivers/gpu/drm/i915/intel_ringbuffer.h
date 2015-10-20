@@ -421,9 +421,6 @@ intel_write_status_page(struct intel_engine_cs *ring,
 
 struct intel_ringbuffer *
 intel_engine_create_ringbuffer(struct intel_engine_cs *engine, int size);
-int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
-				     struct intel_ringbuffer *ringbuf);
-void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf);
 void intel_ringbuffer_free(struct intel_ringbuffer *ring);
 
 void intel_stop_ring_buffer(struct intel_engine_cs *ring);

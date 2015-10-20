@@ -3517,6 +3517,14 @@ int i915_vma_bind(struct i915_vma *vma, enum i915_cache_level cache_level,
 
 	vma->bound |= bind_flags;
 
+	if (vma->obj->mmap) {
+		ret = vma->obj->mmap(vma->obj, false);
+		if (ret) {
+			i915_vma_unbind(vma);
+			return ret;
+		}
+	}
+
 	return 0;
 }
 

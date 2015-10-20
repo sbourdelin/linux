@@ -719,6 +719,18 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 
 	intel_logical_ring_advance(request->ringbuf);
 
+	/* Push the hw context on to the active list */
+	i915_vma_move_to_active(
+			i915_gem_obj_to_ggtt(
+				request->ctx->engine[ring->id].state),
+			request);
+
+	/* Push the ringbuf on to the active list */
+	i915_vma_move_to_active(
+			i915_gem_obj_to_ggtt(
+			request->ctx->engine[ring->id].ringbuf->obj),
+			request);
+
 	request->tail = request->ringbuf->tail;
 
 	if (intel_ring_stopped(ring))
@@ -987,9 +999,14 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	if (ret)
 		return ret;
 
-	ret = intel_pin_and_map_ringbuffer_obj(ring->dev, ringbuf);
+	ret = i915_gem_obj_ggtt_pin(ringbuf->obj, PAGE_SIZE,
+			PIN_MAPPABLE);
 	if (ret)
 		goto unpin_ctx_obj;
+
+	ret = i915_gem_object_set_to_gtt_domain(ringbuf->obj, true);
+	if (ret)
+		goto unpin_rb_obj;
 
 	ctx_obj->dirty = true;
 
@@ -999,6 +1016,8 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 
 	return ret;
 
+unpin_rb_obj:
+	i915_gem_object_ggtt_unpin(ringbuf->obj);
 unpin_ctx_obj:
 	i915_gem_object_ggtt_unpin(ctx_obj);
 
@@ -1033,7 +1052,7 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 	if (ctx_obj) {
 		WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
 		if (--rq->ctx->engine[ring->id].pin_count == 0) {
-			intel_unpin_ringbuffer_obj(ringbuf);
+			i915_gem_object_ggtt_unpin(ringbuf->obj);
 			i915_gem_object_ggtt_unpin(ctx_obj);
 		}
 	}
@@ -2351,7 +2370,7 @@ void intel_lr_context_free(struct intel_context *ctx)
 			struct intel_engine_cs *ring = ringbuf->ring;
 
 			if (ctx == ring->default_context) {
-				intel_unpin_ringbuffer_obj(ringbuf);
+				i915_gem_object_ggtt_unpin(ringbuf->obj);
 				i915_gem_object_ggtt_unpin(ctx_obj);
 			}
 			WARN_ON(ctx->engine[ring->id].pin_count);
@@ -2518,5 +2537,8 @@ void intel_lr_context_reset(struct drm_device *dev,
 
 		ringbuf->head = 0;
 		ringbuf->tail = 0;
+
+		i915_gem_object_ggtt_unpin(
+				ctx->engine[ring->id].state);
 	}
 }

@@ -2161,6 +2161,10 @@ struct drm_i915_gem_object {
 			struct work_struct *work;
 		} userptr;
 	};
+
+	/** Support for automatic CPU side mapping of object */
+	int (*mmap)(struct drm_i915_gem_object *obj, bool unmap);
+	void *mappable;
 };
 #define to_intel_bo(x) container_of(x, struct drm_i915_gem_object, base)
 
