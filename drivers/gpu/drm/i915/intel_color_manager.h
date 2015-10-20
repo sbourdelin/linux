@@ -89,3 +89,6 @@
 #define CGM_GAMMA_EN                           (1 << 2)
 #define CGM_CSC_EN                             (1 << 1)
 #define CGM_DEGAMMA_EN                         (1 << 0)
+
+/* Gamma on BDW */
+#define BDW_SPLITGAMMA_MAX_VALS                512
