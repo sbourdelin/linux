@@ -1,4 +1,5 @@
 #include "wilc_wfi_netdevice.h"
+#include "linux_wlan_sdio.h"
 
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/card.h>
@@ -44,7 +45,7 @@ static void wilc_sdio_interrupt(struct sdio_func *func)
 #endif
 
 
-int wilc1000_sdio_cmd52(sdio_cmd52_t *cmd)
+static int wilc1000_sdio_cmd52(sdio_cmd52_t *cmd)
 {
 	struct sdio_func *func = container_of(wilc1000_dev->dev, struct sdio_func, dev);
 	int ret;
@@ -76,7 +77,7 @@ int wilc1000_sdio_cmd52(sdio_cmd52_t *cmd)
 }
 
 
-int wilc1000_sdio_cmd53(sdio_cmd53_t *cmd)
+static int wilc1000_sdio_cmd53(sdio_cmd53_t *cmd)
 {
 	struct sdio_func *func = container_of(wilc1000_dev->dev, struct sdio_func, dev);
 	int size, ret;
@@ -122,7 +123,7 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 #endif
 	PRINT_D(INIT_DBG, "Initializing netdev\n");
 	wilc1000_sdio_func = func;
-	if (wilc_netdev_init()) {
+	if (wilc_netdev_init(&func->dev, &wilc1000_sdio_ops)) {
 		PRINT_ER("Couldn't initialize netdev\n");
 		return -1;
 	}
@@ -204,7 +205,7 @@ static int linux_sdio_get_speed(void)
 	return wilc1000_sdio_func->card->host->ios.clock;
 }
 
-int wilc1000_sdio_init(void *pv)
+static int wilc1000_sdio_init(void *pv)
 {
 
 	/**
@@ -216,7 +217,7 @@ int wilc1000_sdio_init(void *pv)
 	return 1;
 }
 
-void wilc1000_sdio_deinit(void *pv)
+static void wilc1000_sdio_deinit(void *pv)
 {
 
 	/**
@@ -227,16 +228,25 @@ void wilc1000_sdio_deinit(void *pv)
 	sdio_unregister_driver(&wilc_bus);
 }
 
-int wilc1000_sdio_set_max_speed(void)
+static int wilc1000_sdio_set_max_speed(void)
 {
 	return linux_sdio_set_speed(MAX_SPEED);
 }
 
-int wilc1000_sdio_set_default_speed(void)
+static int wilc1000_sdio_set_default_speed(void)
 {
 	return linux_sdio_set_speed(sdio_default_speed);
 }
 
+const struct wilc1000_ops wilc1000_sdio_ops = {
+	.io_type = HIF_SDIO,
+	.io_init = wilc1000_sdio_init,
+	.io_deinit = wilc1000_sdio_deinit,
+	.u.sdio.sdio_cmd52 = wilc1000_sdio_cmd52,
+	.u.sdio.sdio_cmd53 = wilc1000_sdio_cmd53,
+	.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed,
+	.u.sdio.sdio_set_default_speed = wilc1000_sdio_set_default_speed,
+};
 
 static int __init init_wilc_sdio_driver(void)
 {

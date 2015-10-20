@@ -11,7 +11,6 @@
 
 #include "wilc_wfi_netdevice.h"
 #include "linux_wlan_common.h"
-#include "linux_wlan_spi.h"
 #include "wilc_wlan_if.h"
 #include "wilc_wlan.h"
 
@@ -83,7 +82,7 @@ struct spi_driver wilc_bus __refdata = {
 };
 
 
-void wilc1000_spi_deinit(void *vp)
+static void wilc1000_spi_deinit(void *vp)
 {
 
 	spi_unregister_driver(&wilc_bus);
@@ -95,7 +94,7 @@ void wilc1000_spi_deinit(void *vp)
 
 
 
-int wilc1000_spi_init(void *vp)
+static int wilc1000_spi_init(void *vp)
 {
 	int ret = 1;
 	static int called;
@@ -118,7 +117,7 @@ int wilc1000_spi_init(void *vp)
 
 #if defined(TXRX_PHASE_SIZE)
 
-int wilc1000_spi_write(u8 *b, u32 len)
+static int wilc1000_spi_write(u8 *b, u32 len)
 {
 	int ret;
 
@@ -195,7 +194,7 @@ int wilc1000_spi_write(u8 *b, u32 len)
 }
 
 #else
-int wilc1000_spi_write(u8 *b, u32 len)
+static int wilc1000_spi_write(u8 *b, u32 len)
 {
 
 	int ret;
@@ -246,7 +245,7 @@ int wilc1000_spi_write(u8 *b, u32 len)
 
 #if defined(TXRX_PHASE_SIZE)
 
-int wilc1000_spi_read(u8 *rb, u32 rlen)
+static int wilc1000_spi_read(u8 *rb, u32 rlen)
 {
 	int ret;
 
@@ -320,7 +319,7 @@ int wilc1000_spi_read(u8 *rb, u32 rlen)
 }
 
 #else
-int wilc1000_spi_read(u8 *rb, u32 rlen)
+static int wilc1000_spi_read(u8 *rb, u32 rlen)
 {
 
 	int ret;
@@ -365,7 +364,7 @@ int wilc1000_spi_read(u8 *rb, u32 rlen)
 
 #endif
 
-int wilc1000_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
+static int wilc1000_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 {
 
 	int ret;
@@ -402,7 +401,7 @@ int wilc1000_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 	return ret;
 }
 
-int wilc1000_spi_set_max_speed(void)
+static int wilc1000_spi_set_max_speed(void)
 {
 	SPEED = MAX_SPEED;
 
@@ -410,12 +409,22 @@ int wilc1000_spi_set_max_speed(void)
 	return 1;
 }
 
+static const struct wilc1000_ops wilc1000_spi_ops = {
+	.io_type = HIF_SPI,
+	.io_init = wilc1000_spi_init,
+	.io_deinit = wilc1000_spi_deinit,
+	.u.spi.spi_tx = wilc1000_spi_write,
+	.u.spi.spi_rx = wilc1000_spi_read,
+	.u.spi.spi_trx = wilc1000_spi_write_read,
+	.u.spi.spi_max_speed = wilc1000_spi_set_max_speed,
+};
+
 static int __init init_wilc_spi_driver(void)
 {
 	int ret;
 
 	wilc1000_init_driver();
-	ret = wilc_netdev_init();
+	ret = wilc_netdev_init(NULL, &wilc1000_spi_ops);
 	if (ret)
 		return ret;
 

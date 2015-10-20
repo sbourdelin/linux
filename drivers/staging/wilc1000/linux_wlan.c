@@ -26,11 +26,7 @@
 #include <linux/version.h>
 #include <linux/semaphore.h>
 
-#ifdef WILC_SDIO
 #include "linux_wlan_sdio.h"
-#else
-#include "linux_wlan_spi.h"
-#endif
 
 static int dev_state_ev_handler(struct notifier_block *this, unsigned long event, void *ptr);
 
@@ -915,30 +911,6 @@ static int wlan_deinit_locks(struct wilc *nic)
 	return 0;
 }
 
-#ifdef WILC_SDIO
-static const struct wilc1000_ops wilc1000_sdio_ops = {
-	.io_type = HIF_SDIO,
-	.io_init = wilc1000_sdio_init,
-	.io_deinit = wilc1000_sdio_deinit,
-	.u.sdio.sdio_cmd52 = wilc1000_sdio_cmd52,
-	.u.sdio.sdio_cmd53 = wilc1000_sdio_cmd53,
-	.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed,
-	.u.sdio.sdio_set_default_speed = wilc1000_sdio_set_default_speed,
-};
-#endif
-
-#ifdef WILC_SPI
-static const struct wilc1000_ops wilc1000_spi_ops = {
-	.io_type = HIF_SPI,
-	.io_init = wilc1000_spi_init,
-	.io_deinit = wilc1000_spi_deinit,
-	.u.spi.spi_tx = wilc1000_spi_write,
-	.u.spi.spi_rx = wilc1000_spi_read,
-	.u.spi.spi_trx = wilc1000_spi_write_read,
-	.u.spi.spi_max_speed = wilc1000_spi_set_max_speed,
-};
-#endif
-
 static int wlan_initialize_threads(perInterface_wlan_t *nic)
 {
 
@@ -1064,12 +1036,6 @@ int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 		wilc1000_dev->wilc1000_initialized = 0;
 
 		wlan_init_locks(wilc1000_dev);
-
-#ifdef WILC_SDIO
-		wilc1000_dev->ops = &wilc1000_sdio_ops;
-#else
-		wilc1000_dev->ops = &wilc1000_spi_ops;
-#endif
 
 		ret = wilc_wlan_init(wilc1000_dev);
 		if (ret < 0) {
@@ -1622,7 +1588,7 @@ void WILC_WFI_mgmt_rx(u8 *buff, u32 size)
 		WILC_WFI_p2p_rx(wilc1000_dev->strInterfaceInfo[1].wilc_netdev, buff, size);
 }
 
-int wilc_netdev_init(void)
+int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops)
 {
 
 	int i;
@@ -1635,6 +1601,8 @@ int wilc_netdev_init(void)
 	wilc1000_dev = kzalloc(sizeof(*wilc1000_dev), GFP_KERNEL);
 	if (!wilc1000_dev)
 		return -ENOMEM;
+
+	wilc1000_dev->ops = ops;
 
 	register_inetaddr_notifier(&g_dev_notifier);
 
@@ -1672,10 +1640,9 @@ int wilc_netdev_init(void)
 			/*Register WiFi*/
 			wdev = wilc_create_wiphy(ndev);
 
-			#ifdef WILC_SDIO
 			/* set netdev, tony */
-			SET_NETDEV_DEV(ndev, &wilc1000_sdio_func->dev);
-			#endif
+			if (dev)
+				SET_NETDEV_DEV(ndev, dev);
 
 			if (wdev == NULL) {
 				PRINT_ER("Can't register WILC Wiphy\n");
