@@ -1317,6 +1317,7 @@ emsgsize:
 	 * sums only work when transhdrlen is set.
 	 */
 	if (transhdrlen && sk->sk_protocol == IPPROTO_UDP &&
+	    !(flags & MSG_MORE) &&
 	    length + fragheaderlen < mtu &&
 	    rt->dst.dev->features & NETIF_F_V6_CSUM &&
 	    !exthdrlen)
