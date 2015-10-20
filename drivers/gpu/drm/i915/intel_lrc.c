@@ -368,7 +368,6 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 	WARN_ON(!i915_gem_obj_is_pinned(rb_obj));
 
 	reg_state[CTX_RING_TAIL+1] = rq->tail;
-	reg_state[CTX_RING_BUFFER_START+1] = i915_gem_obj_ggtt_offset(rb_obj);
 
 	if (ppgtt && !USES_FULL_48BIT_PPGTT(ppgtt->base.dev)) {
 		/* True 32b PPGTT with dynamic page allocation: update PDP
@@ -1026,6 +1025,9 @@ static int intel_lr_context_do_pin(
 	ret = i915_gem_object_set_to_gtt_domain(ringbuf->obj, true);
 	if (ret)
 		goto unpin_rb_obj;
+
+	ctx->engine[ring->id].reg_state[CTX_RING_BUFFER_START+1] =
+			i915_gem_obj_ggtt_offset(ringbuf->obj);
 
 	ctx_obj->dirty = true;
 
