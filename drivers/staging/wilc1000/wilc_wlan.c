@@ -254,8 +254,6 @@ static int wilc_wlan_txq_add_to_head(struct txq_entry_t *tqe)
 
 }
 
-u32 Statisitcs_totalAcks = 0, Statisitcs_DroppedAcks = 0;
-
 #ifdef	TCP_ACK_FILTER
 struct Ack_session_info;
 struct Ack_session_info {
@@ -319,7 +317,6 @@ static inline int Update_TCP_track_session(u32 index, u32 Ack)
 }
 static inline int add_TCP_Pending_Ack(u32 Ack, u32 Session_index, struct txq_entry_t  *txqe)
 {
-	Statisitcs_totalAcks++;
 	if (Pending_Acks < MAX_PENDING_ACKS) {
 		Pending_Acks_info[PendingAcks_arrBase + Pending_Acks].ack_num = Ack;
 		Pending_Acks_info[PendingAcks_arrBase + Pending_Acks].txqe = txqe;
@@ -422,7 +419,6 @@ static int wilc_wlan_txq_filter_dup_tcp_ack(void)
 			tqe = Pending_Acks_info[i].txqe;
 			if (tqe) {
 				wilc_wlan_txq_remove(tqe);
-				Statisitcs_DroppedAcks++;
 				tqe->status = 1;                                /* mark the packet send */
 				if (tqe->tx_complete_func)
 					tqe->tx_complete_func(tqe->priv, tqe->status);

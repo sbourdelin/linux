@@ -517,65 +517,6 @@ s32 host_int_add_tx_gtk(struct host_if_drv *hWFIDrv, u8 u8KeyLen, u8 *pu8TxGtk, 
 
 s32 host_int_set_pmkid_info(struct host_if_drv *hWFIDrv, struct host_if_pmkid_attr *pu8PmkidInfoArray);
 /**
- *  @brief              gets the cached the pmkid info
- *  @details    valid only in BSS STA mode if External Supplicant
- *                              support is enabled. This Function sets the PMKID in firmware
- *                              when host drivr receives the corresponding request from NDIS.
- *                              The firmware then includes theset PMKID in the appropriate
- *                              management frames
- *  @param[in,out] handle to the wifi driver,
- *
- *                                message containing PMKID Info in the following format
- *|-----------------------------------------------------------------|
- *|NumEntries |	BSSID[1] | PMKID[1] |  ...	| BSSID[K] | PMKID[K] |
- *|-----------|------------|----------|-------|----------|----------|
- |	   1	|		6	 |   16		|  ...	|	 6	   |	16	  |
- ||-----------------------------------------------------------------|
- *  @param[in]
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-
-s32 host_int_get_pmkid_info(struct host_if_drv *hWFIDrv, u8 *pu8PmkidInfoArray,
-				    u32 u32PmkidInfoLen);
-
-/**
- *  @brief              sets the pass phrase
- *  @details    AP/STA mode. This function gives the pass phrase used to
- *                              generate the Pre-Shared Key when WPA/WPA2 is enabled
- *                              The length of the field can vary from 8 to 64 bytes,
- *                              the lower layer should get the
- *  @param[in,out] handle to the wifi driver,
- *  @param[in]   String containing PSK
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 host_int_set_RSNAConfigPSKPassPhrase(struct host_if_drv *hWFIDrv, u8 *pu8PassPhrase,
-						 u8 u8Psklength);
-/**
- *  @brief              gets the pass phrase
- *  @details    AP/STA mode. This function gets the pass phrase used to
- *                              generate the Pre-Shared Key when WPA/WPA2 is enabled
- *                              The length of the field can vary from 8 to 64 bytes,
- *                              the lower layer should get the
- *  @param[in,out] handle to the wifi driver,
- *                                String containing PSK
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 host_int_get_RSNAConfigPSKPassPhrase(struct host_if_drv *hWFIDrv,
-						 u8 *pu8PassPhrase, u8 u8Psklength);
-
-/**
  *  @brief              gets mac address
  *  @details
  *  @param[in,out] handle to the wifi driver,
@@ -631,22 +572,6 @@ int host_int_wait_msg_queue_idle(void);
  */
 
 s32 host_int_set_start_scan_req(struct host_if_drv *hWFIDrv, u8 scanSource);
-/**
- *  @brief              gets scan source of the last scan
- *  @details
- *  @param[in,out] handle to the wifi driver,
- *                              Scan Source one of the following values
- *                              DEFAULT_SCAN        0
- *                              USER_SCAN           BIT0
- *                              OBSS_PERIODIC_SCAN  BIT1
- *                              OBSS_ONETIME_SCAN   BIT2
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 host_int_get_start_scan_req(struct host_if_drv *hWFIDrv, u8 *pu8ScanSource);
 
 /**
  *  @brief              sets a join request
@@ -697,46 +622,6 @@ s32 host_int_flush_join_req(struct host_if_drv *hWFIDrv);
 s32 host_int_disconnect(struct host_if_drv *hWFIDrv, u16 u16ReasonCode);
 
 /**
- *  @brief              disconnects a sta
- *  @details
- *  @param[in,out] handle to the wifi driver,
- *  @param[in]	Association Id of the station to be disconnected
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 host_int_disconnect_station(struct host_if_drv *hWFIDrv, u8 assoc_id);
-/**
- *  @brief              gets a Association request info
- *  @details
- *  @param[in,out] handle to the wifi driver,
- *                              Message containg assoc. req info in the following format
- * ------------------------------------------------------------------------
- |                        Management Frame Format                    |
- ||-------------------------------------------------------------------|
- ||Frame Control|Duration|DA|SA|BSSID|Sequence Control|Frame Body|FCS |
- ||-------------|--------|--|--|-----|----------------|----------|----|
- | 2           |2       |6 |6 |6    |		2       |0 - 2312  | 4  |
- ||-------------------------------------------------------------------|
- |                                                                   |
- |             Association Request Frame - Frame Body                |
- ||-------------------------------------------------------------------|
- | Capability Information | Listen Interval | SSID | Supported Rates |
- ||------------------------|-----------------|------|-----------------|
- |			2            |		 2         | 2-34 |		3-10        |
- | ---------------------------------------------------------------------
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-
-s32 host_int_get_assoc_req_info(struct host_if_drv *hWFIDrv, u8 *pu8AssocReqInfo,
-					u32 u32AssocReqInfoLen);
-/**
  *  @brief              gets a Association Response info
  *  @details
  *  @param[in,out] handle to the wifi driver,
@@ -750,23 +635,6 @@ s32 host_int_get_assoc_req_info(struct host_if_drv *hWFIDrv, u8 *pu8AssocReqInfo
 
 s32 host_int_get_assoc_res_info(struct host_if_drv *hWFIDrv, u8 *pu8AssocRespInfo,
 					u32 u32MaxAssocRespInfoLen, u32 *pu32RcvdAssocRespInfoLen);
-/**
- *  @brief              gets a Association Response info
- *  @details    Valid only in STA mode. This function gives the RSSI
- *                              values observed in all the channels at the time of scanning.
- *                              The length of the field is 1 greater that the total number of
- *                              channels supported. Byte 0 contains the number of channels while
- *                              each of Byte N contains	the observed RSSI value for the channel index N.
- *  @param[in,out] handle to the wifi driver,
- *                              array of scanned channels' RSSI
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 host_int_get_rx_power_level(struct host_if_drv *hWFIDrv, u8 *pu8RxPowerLevel,
-					u32 u32RxPowerLevelLen);
 
 /**
  *  @brief              sets a channel
@@ -786,22 +654,6 @@ s32 host_int_get_rx_power_level(struct host_if_drv *hWFIDrv, u8 *pu8RxPowerLevel
 int host_int_set_mac_chnl_num(struct host_if_drv *wfi_drv, u8 channel);
 
 /**
- *  @brief              gets the current channel index
- *  @details
- *  @param[in,out] handle to the wifi driver,
- *                              current channel index
- *|-----------------------------------------------------------------------|
- |          CHANNEL1      CHANNEL2 ....                     CHANNEL14	|
- |  Input:         1             2                                 14	|
- ||-----------------------------------------------------------------------|
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 host_int_get_host_chnl_num(struct host_if_drv *hWFIDrv, u8 *pu8ChNo);
-/**
  *  @brief              gets the sta rssi
  *  @details    gets the currently maintained RSSI value for the station.
  *                              The received signal strength value in dB.
@@ -815,7 +667,7 @@ s32 host_int_get_host_chnl_num(struct host_if_drv *hWFIDrv, u8 *pu8ChNo);
  *  @version		1.0
  */
 s32 host_int_get_rssi(struct host_if_drv *hWFIDrv, s8 *ps8Rssi);
-s32 host_int_get_link_speed(struct host_if_drv *hWFIDrv, s8 *ps8lnkspd);
+
 /**
  *  @brief              scans a set of channels
  *  @details
@@ -852,55 +704,9 @@ s32 host_int_scan(struct host_if_drv *hWFIDrv, u8 u8ScanSource,
  */
 s32 hif_set_cfg(struct host_if_drv *hWFIDrv, struct cfg_param_val *pstrCfgParamVal);
 
-/**
- *  @brief              gets configuration wids values
- *  @details
- *  @param[in,out] handle to the wifi driver,
- *                              WID value
- *  @param[in]	WID,
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-s32 hif_get_cfg(struct host_if_drv *hWFIDrv, u16 u16WID, u16 *pu16WID_Value);
 /*****************************************************************************/
 /*							Notification Functions							 */
 /*****************************************************************************/
-/**
- *  @brief              notifies host with join and leave requests
- *  @details    This function prepares an Information frame having the
- *                              information about a joining/leaving station.
- *  @param[in,out] handle to the wifi driver,
- *  @param[in]	6 byte Sta Adress
- *                              Join or leave flag:
- *                              Join = 1,
- *                              Leave =0
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-void host_int_send_join_leave_info_to_host
-	(u16 assocId, u8 *stationAddr, bool joining);
-
-/**
- *  @brief              notifies host with stations found in scan
- *  @details    sends the beacon/probe response from scan
- *  @param[in,out] handle to the wifi driver,
- *  @param[in]	Sta Address,
- *                              Frame length,
- *                              Rssi of the Station found
- *  @return             Error code indicating success/failure
- *  @note
- *  @author		zsalah
- *  @date		8 March 2012
- *  @version		1.0
- */
-void host_int_send_network_info_to_host
-	(u8 *macStartAddress, u16 u16RxFrameLen, s8 s8Rssi);
 
 /**
  *  @brief              host interface initialization function
@@ -1069,18 +875,6 @@ s32 host_int_setup_multicast_filter(struct host_if_drv *hWFIDrv, bool bIsEnabled
  *  @version	1.0
  */
 s32 host_int_setup_ipaddress(struct host_if_drv *hWFIDrv, u8 *pu8IPAddr, u8 idx);
-
-
-/**
- *  @brief           host_int_delBASession
- *  @details       Delete single Rx BA session
- *  @param[in]
- *  @return         Error code.
- *  @author		Abdelrahman Sobhy
- *  @date
- *  @version	1.0
- */
-s32 host_int_delBASession(struct host_if_drv *hWFIDrv, char *pBSSID, char TID);
 
 /**
  *  @brief           host_int_delBASession
