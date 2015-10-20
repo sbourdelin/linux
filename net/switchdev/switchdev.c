@@ -490,7 +490,24 @@ static void switchdev_port_obj_del_deferred(struct net_device *dev,
 static int switchdev_port_obj_del_defer(struct net_device *dev,
 					const struct switchdev_obj *obj)
 {
-	return switchdev_deferred_enqueue(dev, obj, sizeof(*obj),
+	size_t size = 0;
+
+	switch (obj->id) {
+	case SWITCHDEV_OBJ_ID_PORT_VLAN:
+		size = sizeof(struct switchdev_obj_port_vlan);
+		break;
+	case SWITCHDEV_OBJ_ID_IPV4_FIB:
+		size = sizeof(struct switchdev_obj_ipv4_fib);
+		break;
+	case SWITCHDEV_OBJ_ID_PORT_FDB:
+		size = sizeof(struct switchdev_obj_port_fdb);
+		break;
+	default:
+		WARN_ON(!size);
+		return -EINVAL;
+	}
+
+	return switchdev_deferred_enqueue(dev, obj, size,
 					  switchdev_port_obj_del_deferred);
 }
 
