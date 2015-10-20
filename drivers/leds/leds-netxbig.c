@@ -299,10 +299,6 @@ static struct attribute *netxbig_led_attrs[] = {
 };
 ATTRIBUTE_GROUPS(netxbig_led);
 
-static void delete_netxbig_led(struct netxbig_led_data *led_dat)
-{
-	led_classdev_unregister(&led_dat->cdev);
-}
 
 static int
 create_netxbig_led(struct platform_device *pdev,
@@ -343,7 +339,7 @@ create_netxbig_led(struct platform_device *pdev,
 	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
 		led_dat->cdev.groups = netxbig_led_groups;
 
-	return led_classdev_register(&pdev->dev, &led_dat->cdev);
+	return devm_led_classdev_register(&pdev->dev, &led_dat->cdev);
 }
 
 static int netxbig_led_probe(struct platform_device *pdev)
@@ -367,32 +363,21 @@ static int netxbig_led_probe(struct platform_device *pdev)
 
 	for (i = 0; i < pdata->num_leds; i++) {
 		ret = create_netxbig_led(pdev, &leds_data[i], &pdata->leds[i]);
-		if (ret < 0)
-			goto err_free_leds;
+		if (ret < 0) {
+			gpio_ext_free(pdata->gpio_ext);
+			return ret;
+		}
 	}
 
 	platform_set_drvdata(pdev, leds_data);
 
 	return 0;
 
-err_free_leds:
-	for (i = i - 1; i >= 0; i--)
-		delete_netxbig_led(&leds_data[i]);
-
-	gpio_ext_free(pdata->gpio_ext);
-	return ret;
 }
 
 static int netxbig_led_remove(struct platform_device *pdev)
 {
 	struct netxbig_led_platform_data *pdata = dev_get_platdata(&pdev->dev);
-	struct netxbig_led_data *leds_data;
-	int i;
-
-	leds_data = platform_get_drvdata(pdev);
-
-	for (i = 0; i < pdata->num_leds; i++)
-		delete_netxbig_led(&leds_data[i]);
 
 	gpio_ext_free(pdata->gpio_ext);
 
