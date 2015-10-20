@@ -13852,6 +13852,7 @@ static void intel_crtc_init(struct drm_device *dev, int pipe)
 	intel_crtc->cursor_size = ~0;
 
 	intel_crtc->wm.cxsr_allowed = true;
+	intel_attach_color_properties_to_crtc(dev, &intel_crtc->base);
 
 	BUG_ON(pipe >= ARRAY_SIZE(dev_priv->plane_to_crtc_mapping) ||
 	       dev_priv->plane_to_crtc_mapping[intel_crtc->plane] != NULL);
