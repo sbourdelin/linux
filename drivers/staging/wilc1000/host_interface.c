@@ -232,7 +232,7 @@ struct join_bss_param {
 static struct host_if_drv *wfidrv_list[NUM_CONCURRENT_IFC + 1];
 struct host_if_drv *terminated_handle;
 bool g_obtainingIP;
-u8 P2P_LISTEN_STATE;
+static u8 P2P_LISTEN_STATE;
 static struct task_struct *hif_thread_handler;
 static WILC_MsgQueueHandle hif_msg_q;
 static struct semaphore hif_sema_thread;
@@ -256,10 +256,10 @@ static u32 inactive_time;
 static u8 del_beacon;
 
 static u8 *join_req;
-u8 *info_element;
+static u8 *info_element;
 static u8 mode_11i;
-u8 auth_type;
-u32 join_req_size;
+static u8 auth_type;
+static u32 join_req_size;
 static u32 info_element_size;
 static struct host_if_drv *join_req_drv;
 #define REAL_JOIN_REQ 0
@@ -398,7 +398,9 @@ static s32 Handle_SetOperationMode(struct host_if_drv *hif_drv,
 	return s32Error;
 }
 
-s32 Handle_set_IPAddress(struct host_if_drv *hif_drv, u8 *pu8IPAddr, u8 idx)
+static s32 host_int_get_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx);
+
+static s32 Handle_set_IPAddress(struct host_if_drv *hif_drv, u8 *pu8IPAddr, u8 idx)
 {
 
 	s32 s32Error = 0;
@@ -433,7 +435,7 @@ s32 Handle_set_IPAddress(struct host_if_drv *hif_drv, u8 *pu8IPAddr, u8 idx)
 	return s32Error;
 }
 
-s32 Handle_get_IPAddress(struct host_if_drv *hif_drv, u8 *pu8IPAddr, u8 idx)
+static s32 Handle_get_IPAddress(struct host_if_drv *hif_drv, u8 *pu8IPAddr, u8 idx)
 {
 
 	s32 s32Error = 0;
@@ -811,6 +813,9 @@ static s32 Handle_wait_msg_q_empty(void)
 	up(&hif_sema_wait_response);
 	return 0;
 }
+
+static s32 Handle_ScanDone(struct host_if_drv *hif_drv,
+			   enum scan_event enuEvent);
 
 static s32 Handle_Scan(struct host_if_drv *hif_drv,
 		       struct scan_attr *pstrHostIFscanAttr)
@@ -1483,6 +1488,11 @@ done:
 
 	return s32Error;
 }
+
+static s32 host_int_get_assoc_res_info(struct host_if_drv *hif_drv,
+				       u8 *pu8AssocRespInfo,
+				       u32 u32MaxAssocRespInfoLen,
+				       u32 *pu32RcvdAssocRespInfoLen);
 
 static s32 Handle_RcvdGnrlAsyncInfo(struct host_if_drv *hif_drv,
 				    struct rcvd_async_info *pstrRcvdGnrlAsyncInfo)
@@ -2178,7 +2188,7 @@ static void Handle_GetLinkspeed(struct host_if_drv *hif_drv)
 
 }
 
-s32 Handle_GetStatistics(struct host_if_drv *hif_drv, struct rf_info *pstrStatistics)
+static s32 Handle_GetStatistics(struct host_if_drv *hif_drv, struct rf_info *pstrStatistics)
 {
 	struct wid strWIDList[5];
 	u32 u32WidsCount = 0, s32Error = 0;
@@ -3594,7 +3604,7 @@ s32 host_int_disconnect(struct host_if_drv *hif_drv, u16 u16ReasonCode)
 	return s32Error;
 }
 
-s32 host_int_get_assoc_res_info(struct host_if_drv *hif_drv, u8 *pu8AssocRespInfo,
+static s32 host_int_get_assoc_res_info(struct host_if_drv *hif_drv, u8 *pu8AssocRespInfo,
 					u32 u32MaxAssocRespInfoLen, u32 *pu32RcvdAssocRespInfoLen)
 {
 	s32 s32Error = 0;
@@ -4794,7 +4804,7 @@ s32 host_int_setup_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
 
 }
 
-s32 host_int_get_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
+static s32 host_int_get_ipaddress(struct host_if_drv *hif_drv, u8 *u16ipadd, u8 idx)
 {
 	s32 s32Error = 0;
 	struct host_if_msg msg;

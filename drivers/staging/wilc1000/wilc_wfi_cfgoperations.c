@@ -27,10 +27,10 @@ extern u16 Set_machw_change_vir_if(bool bValue);
 extern int mac_open(struct net_device *ndev);
 extern int mac_close(struct net_device *ndev);
 
-tstrNetworkInfo astrLastScannedNtwrksShadow[MAX_NUM_SCANNED_NETWORKS_SHADOW];
-u32 u32LastScannedNtwrksCountShadow;
+static tstrNetworkInfo astrLastScannedNtwrksShadow[MAX_NUM_SCANNED_NETWORKS_SHADOW];
+static u32 u32LastScannedNtwrksCountShadow;
 struct timer_list hDuringIpTimer;
-struct timer_list hAgingTimer;
+static struct timer_list hAgingTimer;
 static u8 op_ifcs;
 extern u8 u8ConnectedSSID[6];
 
@@ -93,15 +93,15 @@ struct p2p_mgmt_data {
 };
 
 /*Global variable used to state the current  connected STA channel*/
-u8 u8WLANChannel = INVALID_CHANNEL;
+static u8 u8WLANChannel = INVALID_CHANNEL;
 
-u8 curr_channel;
+static u8 curr_channel;
 
-u8 u8P2P_oui[] = {0x50, 0x6f, 0x9A, 0x09};
-u8 u8P2Plocalrandom = 0x01;
-u8 u8P2Precvrandom = 0x00;
-u8 u8P2P_vendorspec[] = {0xdd, 0x05, 0x00, 0x08, 0x40, 0x03};
-bool bWilc_ie;
+static u8 u8P2P_oui[] = {0x50, 0x6f, 0x9A, 0x09};
+static u8 u8P2Plocalrandom = 0x01;
+static u8 u8P2Precvrandom = 0x00;
+static u8 u8P2P_vendorspec[] = {0xdd, 0x05, 0x00, 0x08, 0x40, 0x03};
+static bool bWilc_ie;
 
 static struct ieee80211_supported_band WILC_WFI_band_2ghz = {
 	.channels = WILC_WFI_2ghz_channels,
@@ -116,19 +116,19 @@ struct add_key_params {
 	bool pairwise;
 	u8 *mac_addr;
 };
-struct add_key_params g_add_gtk_key_params;
-struct wilc_wfi_key g_key_gtk_params;
-struct add_key_params g_add_ptk_key_params;
-struct wilc_wfi_key g_key_ptk_params;
-struct wilc_wfi_wep_key g_key_wep_params;
-bool g_ptk_keys_saved;
-bool g_gtk_keys_saved;
-bool g_wep_keys_saved;
+static struct add_key_params g_add_gtk_key_params;
+static struct wilc_wfi_key g_key_gtk_params;
+static struct add_key_params g_add_ptk_key_params;
+static struct wilc_wfi_key g_key_ptk_params;
+static struct wilc_wfi_wep_key g_key_wep_params;
+static bool g_ptk_keys_saved;
+static bool g_gtk_keys_saved;
+static bool g_wep_keys_saved;
 
 #define AGING_TIME	(9 * 1000)
 #define duringIP_TIME 15000
 
-void clear_shadow_scan(void *pUserVoid)
+static void clear_shadow_scan(void *pUserVoid)
 {
 	int i;
 
@@ -150,7 +150,7 @@ void clear_shadow_scan(void *pUserVoid)
 
 }
 
-u32 get_rssi_avg(tstrNetworkInfo *pstrNetworkInfo)
+static u32 get_rssi_avg(tstrNetworkInfo *pstrNetworkInfo)
 {
 	u8 i;
 	int rssi_v = 0;
@@ -163,7 +163,7 @@ u32 get_rssi_avg(tstrNetworkInfo *pstrNetworkInfo)
 	return rssi_v;
 }
 
-void refresh_scan(void *pUserVoid, u8 all, bool bDirectScan)
+static void refresh_scan(void *pUserVoid, u8 all, bool bDirectScan)
 {
 	struct wilc_priv *priv;
 	struct wiphy *wiphy;
@@ -203,7 +203,7 @@ void refresh_scan(void *pUserVoid, u8 all, bool bDirectScan)
 
 }
 
-void reset_shadow_found(void *pUserVoid)
+static void reset_shadow_found(void *pUserVoid)
 {
 	int i;
 
@@ -213,7 +213,7 @@ void reset_shadow_found(void *pUserVoid)
 	}
 }
 
-void update_scan_time(void *pUserVoid)
+static void update_scan_time(void *pUserVoid)
 {
 	int i;
 
@@ -259,7 +259,7 @@ static void clear_duringIP(unsigned long arg)
 	g_obtainingIP = false;
 }
 
-int is_network_in_shadow(tstrNetworkInfo *pstrNetworkInfo, void *pUserVoid)
+static int is_network_in_shadow(tstrNetworkInfo *pstrNetworkInfo, void *pUserVoid)
 {
 	int state = -1;
 	int i;
@@ -282,7 +282,7 @@ int is_network_in_shadow(tstrNetworkInfo *pstrNetworkInfo, void *pUserVoid)
 	return state;
 }
 
-void add_network_to_shadow(tstrNetworkInfo *pstrNetworkInfo, void *pUserVoid, void *pJoinParams)
+static void add_network_to_shadow(tstrNetworkInfo *pstrNetworkInfo, void *pUserVoid, void *pJoinParams)
 {
 	int ap_found = is_network_in_shadow(pstrNetworkInfo, pUserVoid);
 	u32 ap_index = 0;
@@ -1759,7 +1759,7 @@ static int flush_pmksa(struct wiphy *wiphy, struct net_device *netdev)
  *  @version
  */
 
-void WILC_WFI_CfgParseRxAction(u8 *buf, u32 len)
+static void WILC_WFI_CfgParseRxAction(u8 *buf, u32 len)
 {
 	u32 index = 0;
 	u32 i = 0, j = 0;
@@ -1811,7 +1811,7 @@ void WILC_WFI_CfgParseRxAction(u8 *buf, u32 len)
  *  @date	12 DEC 2012
  *  @version
  */
-void WILC_WFI_CfgParseTxAction(u8 *buf, u32 len, bool bOperChan, u8 iftype)
+static void WILC_WFI_CfgParseTxAction(u8 *buf, u32 len, bool bOperChan, u8 iftype)
 {
 	u32 index = 0;
 	u32 i = 0, j = 0;
@@ -2142,7 +2142,7 @@ static int cancel_remain_on_channel(struct wiphy *wiphy,
  *  @date	01 JAN 2014
  *  @version	1.0
  */
-void WILC_WFI_add_wilcvendorspec(u8 *buff)
+static void WILC_WFI_add_wilcvendorspec(u8 *buff)
 {
 	memcpy(buff, u8P2P_vendorspec, sizeof(u8P2P_vendorspec));
 }
@@ -3259,7 +3259,7 @@ int WILC_WFI_update_stats(struct wiphy *wiphy, u32 pktlen, u8 changed)
  *  @date	01 MAR 2012
  *  @version	1.0
  */
-struct wireless_dev *WILC_WFI_CfgAlloc(void)
+static struct wireless_dev *WILC_WFI_CfgAlloc(void)
 {
 
 	struct wireless_dev *wdev;

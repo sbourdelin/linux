@@ -239,9 +239,8 @@ static irqreturn_t isr_uh_routine(int irq, void *user_data)
 	}
 	return IRQ_WAKE_THREAD;
 }
-#endif
 
-irqreturn_t isr_bh_routine(int irq, void *userdata)
+static irqreturn_t isr_bh_routine(int irq, void *userdata)
 {
 	struct wilc *nic;
 
@@ -259,7 +258,6 @@ irqreturn_t isr_bh_routine(int irq, void *userdata)
 	return IRQ_HANDLED;
 }
 
-#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO)
 static int init_irq(struct wilc *p_nic)
 {
 	int ret = 0;
@@ -358,7 +356,7 @@ void linux_wlan_mac_indicate(int flag)
 
 }
 
-struct net_device *GetIfHandler(u8 *pMacHeader)
+static struct net_device *GetIfHandler(u8 *pMacHeader)
 {
 	u8 *Bssid, *Bssid1;
 	int i = 0;
@@ -551,7 +549,7 @@ _fail_:
 }
 
 #ifdef COMPLEMENT_BOOT
-int repeat_power_cycle(perInterface_wlan_t *nic);
+static int repeat_power_cycle(perInterface_wlan_t *nic);
 #endif
 
 static int linux_wlan_start_firmware(perInterface_wlan_t *nic)
@@ -944,7 +942,7 @@ void wilc1000_wlan_deinit(struct wilc *nic)
 	}
 }
 
-int wlan_init_locks(struct wilc *p_nic)
+static int wlan_init_locks(struct wilc *p_nic)
 {
 
 	PRINT_D(INIT_DBG, "Initializing Locks ...\n");
@@ -977,7 +975,8 @@ static int wlan_deinit_locks(struct wilc *nic)
 
 	return 0;
 }
-void linux_to_wlan(wilc_wlan_inp_t *nwi, struct wilc *nic)
+
+static void linux_to_wlan(wilc_wlan_inp_t *nwi, struct wilc *nic)
 {
 
 	PRINT_D(INIT_DBG, "Linux to Wlan services ...\n");
@@ -1003,7 +1002,7 @@ void linux_to_wlan(wilc_wlan_inp_t *nwi, struct wilc *nic)
 #endif
 }
 
-int wlan_initialize_threads(perInterface_wlan_t *nic)
+static int wlan_initialize_threads(perInterface_wlan_t *nic)
 {
 
 	int ret = 0;
@@ -1053,7 +1052,7 @@ extern u8 core_11b_ready(void);
 
 #define READY_CHECK_THRESHOLD		30
 extern void wilc_wlan_global_reset(void);
-u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
+static u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
 {
 	u8 trials = 0;
 
@@ -1086,7 +1085,7 @@ u8 wilc1000_prepare_11b_core(wilc_wlan_inp_t *nwi, struct wilc *nic)
 
 }
 
-int repeat_power_cycle(perInterface_wlan_t *nic)
+static int repeat_power_cycle(perInterface_wlan_t *nic)
 {
 	int ret = 0;
 	wilc_wlan_inp_t nwi;
@@ -1265,7 +1264,7 @@ _fail_locks_:
  *      - this function will be called automatically by OS when module inserted.
  */
 
-int mac_init_fn(struct net_device *ndev)
+static int mac_init_fn(struct net_device *ndev)
 {
 
 	/*Why we do this !!!*/
@@ -1351,7 +1350,7 @@ _err_:
 	return ret;
 }
 
-struct net_device_stats *mac_stats(struct net_device *dev)
+static struct net_device_stats *mac_stats(struct net_device *dev)
 {
 	perInterface_wlan_t *nic = netdev_priv(dev);
 
@@ -1554,7 +1553,7 @@ int mac_close(struct net_device *ndev)
 	return 0;
 }
 
-int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
+static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 {
 
 	u8 *buff = NULL;

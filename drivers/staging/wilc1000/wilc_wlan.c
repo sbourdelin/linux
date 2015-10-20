@@ -82,7 +82,9 @@ typedef struct {
 
 static wilc_wlan_dev_t g_wlan;
 
+#ifdef WILC_OPTIMIZE_SLEEP_INT
 static inline void chip_allow_sleep(void);
+#endif
 static inline void chip_wakeup(void);
 /********************************************
  *
@@ -138,6 +140,7 @@ static inline void release_bus(BUS_RELEASE_T release)
  *
  ********************************************/
 
+#ifdef TCP_ACK_FILTER
 static void wilc_wlan_txq_remove(struct txq_entry_t *tqe)
 {
 
@@ -160,6 +163,7 @@ static void wilc_wlan_txq_remove(struct txq_entry_t *tqe)
 	p->txq_entries -= 1;
 
 }
+#endif
 
 static struct txq_entry_t *wilc_wlan_txq_remove_from_head(void)
 {
@@ -273,19 +277,19 @@ typedef struct {
 
 
 
-struct Ack_session_info *Free_head;
-struct Ack_session_info *Alloc_head;
+static struct Ack_session_info *Free_head;
+static struct Ack_session_info *Alloc_head;
 
 #define NOT_TCP_ACK			(-1)
 
 #define MAX_TCP_SESSION		25
 #define MAX_PENDING_ACKS		256
-struct Ack_session_info Acks_keep_track_info[2 * MAX_TCP_SESSION];
-Pending_Acks_info_t Pending_Acks_info[MAX_PENDING_ACKS];
+static struct Ack_session_info Acks_keep_track_info[2 * MAX_TCP_SESSION];
+static Pending_Acks_info_t Pending_Acks_info[MAX_PENDING_ACKS];
 
-u32 PendingAcks_arrBase;
-u32 Opened_TCP_session;
-u32 Pending_Acks;
+static u32 PendingAcks_arrBase;
+static u32 Opened_TCP_session;
+static u32 Pending_Acks;
 
 
 
@@ -449,17 +453,19 @@ static int wilc_wlan_txq_filter_dup_tcp_ack(void)
 }
 #endif
 
-bool EnableTCPAckFilter = false;
+static bool EnableTCPAckFilter = false;
 
 void Enable_TCP_ACK_Filter(bool value)
 {
 	EnableTCPAckFilter = value;
 }
 
-bool is_TCP_ACK_Filter_Enabled(void)
+#ifdef TCP_ACK_FILTER
+static bool is_TCP_ACK_Filter_Enabled(void)
 {
 	return EnableTCPAckFilter;
 }
+#endif
 
 static int wilc_wlan_txq_add_cfg_pkt(u8 *buffer, u32 buffer_size)
 {
@@ -1834,7 +1840,7 @@ void wilc_bus_set_default_speed(void)
 	/* Restore bus speed to default.  */
 	g_wlan.hif_func.hif_set_default_bus_speed();
 }
-u32 init_chip(void)
+static u32 init_chip(void)
 {
 	u32 chipid;
 	u32 reg, ret = 0;

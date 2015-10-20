@@ -37,14 +37,14 @@ static const struct sdio_device_id wilc_sdio_ids[] = {
 };
 
 
+#ifndef WILC_SDIO_IRQ_GPIO
 static void wilc_sdio_interrupt(struct sdio_func *func)
 {
-#ifndef WILC_SDIO_IRQ_GPIO
 	sdio_release_host(func);
 	wilc_handle_isr();
 	sdio_claim_host(func);
-#endif
 }
+#endif
 
 
 int linux_sdio_cmd52(sdio_cmd52_t *cmd)
