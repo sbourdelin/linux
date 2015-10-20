@@ -334,12 +334,30 @@ void hns_ae_toggle_ring_irq(struct hnae_ring *ring, u32 mask)
 	else
 		flag = RCB_INT_FLAG_RX;
 
-	hns_rcb_int_clr_hw(ring->q, flag);
 	hns_rcb_int_ctrl_hw(ring->q, flag, mask);
+}
+
+void hns_aev2_toggle_ring_irq(struct hnae_ring *ring, u32 mask)
+{
+	u32 flag;
+
+	if (is_tx_ring(ring))
+		flag = RCB_INT_FLAG_TX;
+	else
+		flag = RCB_INT_FLAG_RX;
+
+	hns_rcbv2_int_ctrl_hw(ring->q, flag, mask);
 }
 
 static void hns_ae_toggle_queue_status(struct hnae_queue *queue, u32 val)
 {
+	struct dsaf_device *dsaf_dev = hns_ae_get_dsaf_dev(queue->dev);
+
+	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
+		hns_rcb_int_clr_hw(queue, RCB_INT_FLAG_TX | RCB_INT_FLAG_RX);
+	else
+		hns_rcbv2_int_clr_hw(queue, RCB_INT_FLAG_TX | RCB_INT_FLAG_RX);
+
 	hns_rcb_start(queue, val);
 }
 
@@ -771,6 +789,16 @@ int hns_dsaf_ae_init(struct dsaf_device *dsaf_dev)
 {
 	struct hnae_ae_dev *ae_dev = &dsaf_dev->ae_dev;
 
+	switch (dsaf_dev->dsaf_ver) {
+	case AE_VERSION_1:
+		hns_dsaf_ops.toggle_ring_irq = hns_ae_toggle_ring_irq;
+		break;
+	case AE_VERSION_2:
+		hns_dsaf_ops.toggle_ring_irq = hns_aev2_toggle_ring_irq;
+		break;
+	default:
+		break;
+	}
 	ae_dev->ops = &hns_dsaf_ops;
 	ae_dev->dev = dsaf_dev->dev;
 

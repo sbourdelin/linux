@@ -37,6 +37,7 @@ struct hns_mac_cb;
 
 #define DSAF_CFG_READ_CNT   (30)
 #define DSAF_SRAM_INIT_FINISH_FLAG (0xff)
+#define DSAFV2_SRAM_INIT_FINISH_FLAG (0x3ff)
 
 #define MAC_NUM_OCTETS_PER_ADDR 6
 
@@ -273,10 +274,6 @@ struct dsaf_int_stat {
 struct dsaf_device {
 	struct device *dev;
 	struct hnae_ae_dev ae_dev;
-
-	void *priv;
-
-	int virq[DSAF_IRQ_NUM];
 
 	u8 __iomem *sc_base;
 	u8 __iomem *sds_base;
