@@ -2193,6 +2193,12 @@ void __drm_atomic_helper_crtc_duplicate_state(struct drm_crtc *crtc,
 
 	if (state->mode_blob)
 		drm_property_reference_blob(state->mode_blob);
+	if (state->ctm_blob)
+		drm_property_reference_blob(state->ctm_blob);
+	if (state->palette_after_ctm_blob)
+		drm_property_reference_blob(state->palette_after_ctm_blob);
+	if (state->palette_before_ctm_blob)
+		drm_property_reference_blob(state->palette_before_ctm_blob);
 	state->mode_changed = false;
 	state->active_changed = false;
 	state->planes_changed = false;
@@ -2238,6 +2244,12 @@ void __drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
 {
 	if (state->mode_blob)
 		drm_property_unreference_blob(state->mode_blob);
+	if (state->ctm_blob)
+		drm_property_unreference_blob(state->ctm_blob);
+	if (state->palette_after_ctm_blob)
+		drm_property_unreference_blob(state->palette_after_ctm_blob);
+	if (state->palette_before_ctm_blob)
+		drm_property_unreference_blob(state->palette_before_ctm_blob);
 }
 EXPORT_SYMBOL(__drm_atomic_helper_crtc_destroy_state);
 
