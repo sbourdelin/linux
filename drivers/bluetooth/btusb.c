@@ -1788,8 +1788,7 @@ static int btusb_setup_intel(struct hci_dev *hdev)
 	BT_INFO("%s: Intel Bluetooth firmware patch completed and activated",
 		hdev->name);
 
-	btintel_check_bdaddr(hdev);
-	return 0;
+	goto complete;
 
 exit_mfg_disable:
 	/* Disable the manufacturer mode without reset */
@@ -1804,8 +1803,7 @@ exit_mfg_disable:
 
 	BT_INFO("%s: Intel Bluetooth firmware patch completed", hdev->name);
 
-	btintel_check_bdaddr(hdev);
-	return 0;
+	goto complete;
 
 exit_mfg_deactivate:
 	release_firmware(fw);
@@ -1824,6 +1822,12 @@ exit_mfg_deactivate:
 
 	BT_INFO("%s: Intel Bluetooth firmware patch completed and deactivated",
 		hdev->name);
+
+complete:
+	/* Set the event mask for Intel specific vendor events. This enables
+	 * a few extra events that are useful during general operation.
+	 */
+	btintel_set_event_mask_mfg(hdev, false);
 
 	btintel_check_bdaddr(hdev);
 	return 0;
@@ -2338,6 +2342,15 @@ done:
 	 * to load the file, no need to fail the setup.
 	 */
 	btintel_load_ddc_config(hdev, fwname);
+
+	/* Set the event mask for Intel specific vendor events. This enables
+	 * a few extra events that are useful during general operation. It
+	 * does not enable any debugging related events.
+	 *
+	 * The device will function correctly without these events enabled
+	 * and thus no need to fail the setup;
+	 */
+	btintel_set_event_mask(hdev, false);
 
 	return 0;
 }
