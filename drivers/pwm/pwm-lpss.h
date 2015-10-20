@@ -20,6 +20,7 @@ struct pwm_lpss_chip;
 
 struct pwm_lpss_boardinfo {
 	unsigned long clk_rate;
+	size_t npwm;
 };
 
 extern const struct pwm_lpss_boardinfo pwm_lpss_byt_info;
