@@ -1503,7 +1503,8 @@ void WILC_WFI_mgmt_rx(u8 *buff, u32 size)
 		WILC_WFI_p2p_rx(wilc1000_dev->strInterfaceInfo[1].wilc_netdev, buff, size);
 }
 
-int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops, int gpio)
+int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops,
+		     const struct wilc1000_hif_ops *hif_ops, int gpio)
 {
 
 	int i;
@@ -1518,6 +1519,7 @@ int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops, int gpi
 		return -ENOMEM;
 
 	wilc1000_dev->ops = ops;
+	wilc1000_dev->hif_ops = hif_ops;
 	wilc1000_dev->gpio = gpio;
 
 	register_inetaddr_notifier(&g_dev_notifier);

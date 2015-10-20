@@ -206,7 +206,8 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 
 	PRINT_D(INIT_DBG, "Initializing netdev\n");
 	wilc1000_sdio_func = func;
-	if (wilc_netdev_init(&func->dev, &wilc1000_sdio_ops, gpio)) {
+	if (wilc_netdev_init(&func->dev, &wilc1000_sdio_ops,
+	    &wilc1000_hif_sdio, gpio)) {
 		PRINT_ER("Couldn't initialize netdev\n");
 		return -1;
 	}

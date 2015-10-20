@@ -251,7 +251,7 @@ struct rxq_entry_t {
 
 struct wilc;
 
-typedef struct {
+struct wilc1000_hif_ops {
 	int (*hif_init)(struct wilc *, wilc_debug_func);
 	int (*hif_deinit)(void *);
 	int (*hif_read_reg)(u32, u32 *);
@@ -268,10 +268,10 @@ typedef struct {
 	int (*hif_sync_ext)(int);
 	void (*hif_set_max_bus_speed)(void);
 	void (*hif_set_default_bus_speed)(void);
-} wilc_hif_func_t;
+};
 
-extern wilc_hif_func_t wilc1000_hif_spi;
-extern wilc_hif_func_t wilc1000_hif_sdio;
+extern const struct wilc1000_hif_ops wilc1000_hif_spi;
+extern const struct wilc1000_hif_ops wilc1000_hif_sdio;
 
 /********************************************
  *
@@ -318,7 +318,8 @@ void wilc1000_enable_tcp_ack_filter(bool value);
 void wilc1000_chip_sleep_manually(u32 u32SleepTime);
 int wilc1000_wlan_get_num_conn_ifcs(void);
 int wilc1000_mac_xmit(struct sk_buff *skb, struct net_device *dev);
-int wilc_netdev_init(struct device *, const struct wilc1000_ops *ops, int gpio);
+int wilc_netdev_init(struct device *, const struct wilc1000_ops *ops,
+		     const struct wilc1000_hif_ops *hif_ops, int gpio);
 void __exit wilc_netdev_free(struct wilc *wilc1000_dev);
 
 void wilc_handle_isr(void);

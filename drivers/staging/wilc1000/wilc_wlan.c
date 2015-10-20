@@ -28,7 +28,7 @@ typedef struct {
 	/**
 	 *      host interface functions
 	 **/
-	wilc_hif_func_t hif_func;
+	struct wilc1000_hif_ops hif_func;
 
 	/**
 	 *      configuration interface functions
@@ -1947,29 +1947,10 @@ int wilc_wlan_init(struct wilc *inp)
 	/***
 	 *      host interface init
 	 **/
-	if ((inp->ops->io_type & 0x1) == HIF_SDIO) {
-		if (!wilc1000_hif_sdio.hif_init(inp, wilc_debug)) {
-			/* EIO	5 */
-			ret = -5;
-			goto _fail_;
-		}
-		memcpy((void *)&g_wlan.hif_func, &wilc1000_hif_sdio, sizeof(wilc_hif_func_t));
-	} else {
-		if ((inp->ops->io_type & 0x1) == HIF_SPI) {
-			/**
-			 *      TODO:
-			 **/
-			if (!wilc1000_hif_spi.hif_init(inp, wilc_debug)) {
-				/* EIO	5 */
-				ret = -5;
-				goto _fail_;
-			}
-			memcpy((void *)&g_wlan.hif_func, &wilc1000_hif_spi, sizeof(wilc_hif_func_t));
-		} else {
-			/* EIO	5 */
-			ret = -5;
-			goto _fail_;
-		}
+	g_wlan.hif_func = *inp->hif_ops;
+	if (!g_wlan.hif_func.hif_init(inp, wilc_debug))	{
+		ret = -EIO;
+		goto _fail_;
 	}
 
 	/***

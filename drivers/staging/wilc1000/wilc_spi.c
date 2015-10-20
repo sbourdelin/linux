@@ -1032,21 +1032,21 @@ static int spi_sync_ext(int nint /*  how mant interrupts to enable. */)
  *      Global spi HIF function table
  *
  ********************************************/
-wilc_hif_func_t wilc1000_hif_spi = {
-	spi_init,
-	spi_deinit,
-	spi_read_reg,
-	spi_write_reg,
-	spi_read,
-	spi_write,
-	spi_sync,
-	spi_clear_int,
-	spi_read_int,
-	spi_clear_int_ext,
-	spi_read_size,
-	spi_write,
-	spi_read,
-	spi_sync_ext,
-	spi_max_bus_speed,
-	spi_default_bus_speed,
+const struct wilc1000_hif_ops wilc1000_hif_spi = {
+	.hif_init = spi_init,
+	.hif_deinit = spi_deinit,
+	.hif_read_reg = spi_read_reg,
+	.hif_write_reg = spi_write_reg,
+	.hif_block_rx = spi_read,
+	.hif_block_tx = spi_write,
+	.hif_sync = spi_sync,
+	.hif_clear_int = spi_clear_int,
+	.hif_read_int = spi_read_int,
+	.hif_clear_int_ext = spi_clear_int_ext,
+	.hif_read_size = spi_read_size,
+	.hif_block_rx_ext = spi_write,
+	.hif_block_tx_ext = spi_read,
+	.hif_sync_ext = spi_sync_ext,
+	.hif_set_max_bus_speed = spi_max_bus_speed,
+	.hif_set_default_bus_speed = spi_default_bus_speed,
 };
