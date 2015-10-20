@@ -614,21 +614,24 @@ struct task_cputime_atomic {
  */
 #define INIT_PREEMPT_COUNT	(PREEMPT_DISABLED + PREEMPT_ACTIVE)
 
+/* struct thread_group_cputimer::state bits */
+#define CPUTIMER_STATE_RUNNING		1
+#define CPUTIMER_STATE_CHECKING		2
+
 /**
  * struct thread_group_cputimer - thread group interval timer counts
  * @cputime_atomic:	atomic thread group interval timers.
- * @running:		true when there are timers running and
- *			@cputime_atomic receives updates.
- * @checking_timer:	true when a thread in the group is in the
- *			process of checking for thread group timers.
- *
+ * @state:		flags describing the current state of the cputimer.
+ *			CPUTIMER_STATE_RUNNING bit means the timers is elapsing.
+ * 			CPUTIMER_STATE_CHECKING bit means that the cputimer has
+ *			expired and a thread in the group is checking the
+ *			callback list.
  * This structure contains the version of task_cputime, above, that is
  * used for thread group CPU timer calculations.
  */
 struct thread_group_cputimer {
-	struct task_cputime_atomic cputime_atomic;
-	bool running;
-	bool checking_timer;
+	struct task_cputime_atomic	cputime_atomic;
+	unsigned int 			state;
 };
 
 #include <linux/rwsem.h>

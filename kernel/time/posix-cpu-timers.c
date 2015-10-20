@@ -233,7 +233,7 @@ void thread_group_cputimer(struct task_struct *tsk, struct task_cputime *times)
 	struct task_cputime sum;
 
 	/* Check if cputimer isn't running. This is accessed without locking. */
-	if (!READ_ONCE(cputimer->running)) {
+	if (!READ_ONCE(cputimer->state)) {
 		/*
 		 * The POSIX timer interface allows for absolute time expiry
 		 * values through the TIMER_ABSTIME flag, therefore we have
@@ -243,13 +243,13 @@ void thread_group_cputimer(struct task_struct *tsk, struct task_cputime *times)
 		update_gt_cputime(&cputimer->cputime_atomic, &sum);
 
 		/*
-		 * We're setting cputimer->running without a lock. Ensure
+		 * We're setting cputimer->state without a lock. Ensure
 		 * this only gets written to in one operation. We set
 		 * running after update_gt_cputime() as a small optimization,
 		 * but barriers are not required because update_gt_cputime()
 		 * can handle concurrent updates.
 		 */
-		WRITE_ONCE(cputimer->running, true);
+		WRITE_ONCE(cputimer->state, CPUTIMER_STATE_RUNNING);
 	}
 	sample_cputime_atomic(times, &cputimer->cputime_atomic);
 }
@@ -606,7 +606,7 @@ bool posix_cpu_timers_can_stop_tick(struct task_struct *tsk)
 		return false;
 
 	/* Check if cputimer is running. This is accessed without locking. */
-	if (READ_ONCE(tsk->signal->cputimer.running))
+	if (READ_ONCE(tsk->signal->cputimer.state))
 		return false;
 
 	return true;
@@ -918,7 +918,7 @@ static inline void stop_process_timers(struct signal_struct *sig)
 	struct thread_group_cputimer *cputimer = &sig->cputimer;
 
 	/* Turn off cputimer->running. This is done without locking. */
-	WRITE_ONCE(cputimer->running, false);
+	WRITE_ONCE(cputimer->state, 0);
 }
 
 static u32 onecputick;
@@ -972,14 +972,17 @@ static void check_process_timers(struct task_struct *tsk,
 	 * If cputimer is not running, then there are no active
 	 * process wide timers (POSIX 1.b, itimers, RLIMIT_CPU).
 	 */
-	if (!READ_ONCE(tsk->signal->cputimer.running))
+	if (!READ_ONCE(sig->cputimer.state))
 		return;
 
+	WARN_ON_ONCE(sig->cputimer.state & CPUTIMER_STATE_CHECKING);
         /*
-	 * Signify that a thread is checking for process timers.
-	 * Write access to this field is protected by the sighand lock.
+	 * Signify that this thread is checking for process timers, in order to
+	 * avoid sighand lock contention with multiple threads in the group
+	 * checking for process timers concurrently. Write access to this field is
+	 * protected by the sighand lock.
 	 */
-	sig->cputimer.checking_timer = true;
+	sig->cputimer.state |= CPUTIMER_STATE_CHECKING;
 
 	/*
 	 * Collect the current process totals.
@@ -1036,7 +1039,8 @@ static void check_process_timers(struct task_struct *tsk,
 	if (task_cputime_zero(&sig->cputime_expires))
 		stop_process_timers(sig);
 
-	sig->cputimer.checking_timer = false;
+	/* Turn off CHECKING if stop_process_timers() hasn't done it yet */
+	sig->cputimer.state &= ~CPUTIMER_STATE_CHECKING;
 }
 
 /*
@@ -1153,19 +1157,18 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
 	/*
 	 * Check if thread group timers expired when the cputimer is
 	 * running and no other thread in the group is already checking
-	 * for thread group cputimers. These fields are read without the
+	 * for thread group cputimers. The state is read without the
 	 * sighand lock. However, this is fine because this is meant to
 	 * be a fastpath heuristic to determine whether we should try to
 	 * acquire the sighand lock to check/handle timers.
 	 *
-	 * In the worst case scenario, if 'running' or 'checking_timer' gets
+	 * In the worst case scenario, if 'RUNNING' or 'CHECKING' gets
 	 * set but the current thread doesn't see the change yet, we'll wait
 	 * until the next thread in the group gets a scheduler interrupt to
 	 * handle the timer. This isn't an issue in practice because these
 	 * types of delays with signals actually getting sent are expected.
 	 */
-	if (READ_ONCE(sig->cputimer.running) &&
-	    !READ_ONCE(sig->cputimer.checking_timer)) {
+	if (READ_ONCE(sig->cputimer.state) == CPUTIMER_STATE_RUNNING) {
 		struct task_cputime group_sample;
 
 		sample_cputime_atomic(&group_sample, &sig->cputimer.cputime_atomic);

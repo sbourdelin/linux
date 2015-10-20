@@ -175,7 +175,7 @@ static inline bool cputimer_running(struct task_struct *tsk)
 	struct thread_group_cputimer *cputimer = &tsk->signal->cputimer;
 
 	/* Check if cputimer isn't running. This is accessed without locking. */
-	if (!READ_ONCE(cputimer->running))
+	if (!READ_ONCE(cputimer->state))
 		return false;
 
 	/*
