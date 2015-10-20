@@ -24,7 +24,6 @@
 #endif
 
 
-static struct sdio_func *wilc1000_sdio_func;
 static unsigned int sdio_default_speed;
 
 #define SDIO_VENDOR_ID_WILC 0x0296
@@ -113,6 +112,7 @@ static const struct wilc1000_ops wilc1000_sdio_ops;
 
 static struct sdio_driver wilc_bus;
 static volatile int wilc1000_probe;
+static struct sdio_func *wilc1000_sdio_func;
 
 #define READY_CHECK_THRESHOLD		30
 static u8 wilc1000_prepare_11b_core(struct wilc *nic)
@@ -195,6 +195,7 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 		PRINT_D(INIT_DBG, "wilc1000_sdio_func isn't NULL\n");
 		return 0;
 	}
+	wilc1000_sdio_func = func;
 #endif
 
 	gpio = -1;
@@ -205,13 +206,13 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 	}
 
 	PRINT_D(INIT_DBG, "Initializing netdev\n");
-	wilc1000_sdio_func = func;
 	if (wilc_netdev_init(&func->dev, &wilc1000_sdio_ops,
 	    &wilc1000_hif_sdio, gpio)) {
 		PRINT_ER("Couldn't initialize netdev\n");
 		return -1;
 	}
-	wilc1000_dev->dev = &wilc1000_sdio_func->dev;
+	wilc1000_dev->dev = &func->dev;
+	sdio_set_drvdata(func, wilc1000_dev);
 
 	printk("Driver Initializing success\n");
 	return 0;
@@ -219,18 +220,17 @@ static int linux_sdio_probe(struct sdio_func *func, const struct sdio_device_id 
 
 static void linux_sdio_remove(struct sdio_func *func)
 {
-	/**
-	 *      TODO
-	 **/
-
+	wilc_netdev_free(sdio_get_drvdata(func));
 }
 
-static struct sdio_driver wilc_bus = {
+static struct sdio_driver wilc1000_sdio_driver = {
 	.name		= SDIO_MODALIAS,
 	.id_table	= wilc_sdio_ids,
 	.probe		= linux_sdio_probe,
 	.remove		= linux_sdio_remove,
 };
+module_driver(wilc1000_sdio_driver, sdio_register_driver, sdio_unregister_driver);
+MODULE_LICENSE("GPL");
 
 static int wilc1000_sdio_enable_interrupt(struct wilc *dev)
 {
@@ -268,14 +268,15 @@ static void wilc1000_sdio_disable_interrupt(struct wilc *dev)
 static int linux_sdio_set_speed(int speed)
 {
 	struct mmc_ios ios;
+	struct sdio_func *func = container_of(wilc1000_dev->dev, struct sdio_func, dev);
 
-	sdio_claim_host(wilc1000_sdio_func);
+	sdio_claim_host(func);
 
-	memcpy((void *)&ios, (void *)&wilc1000_sdio_func->card->host->ios, sizeof(struct mmc_ios));
-	wilc1000_sdio_func->card->host->ios.clock = speed;
+	memcpy((void *)&ios, (void *)&func->card->host->ios, sizeof(struct mmc_ios));
+	func->card->host->ios.clock = speed;
 	ios.clock = speed;
-	wilc1000_sdio_func->card->host->ops->set_ios(wilc1000_sdio_func->card->host, &ios);
-	sdio_release_host(wilc1000_sdio_func);
+	func->card->host->ops->set_ios(func->card->host, &ios);
+	sdio_release_host(func);
 	PRINT_INFO(INIT_DBG, "@@@@@@@@@@@@ change SDIO speed to %d @@@@@@@@@\n", speed);
 
 	return 1;
@@ -283,7 +284,8 @@ static int linux_sdio_set_speed(int speed)
 
 static int linux_sdio_get_speed(void)
 {
-	return wilc1000_sdio_func->card->host->ios.clock;
+	struct sdio_func *func = container_of(wilc1000_dev->dev, struct sdio_func, dev);
+	return func->card->host->ios.clock;
 }
 
 static int wilc1000_sdio_init(void *pv)
@@ -300,13 +302,6 @@ static int wilc1000_sdio_init(void *pv)
 
 static void wilc1000_sdio_deinit(void *pv)
 {
-
-	/**
-	 *      TODO :
-	 **/
-
-
-	sdio_unregister_driver(&wilc_bus);
 }
 
 static int wilc1000_sdio_set_max_speed(void)
@@ -334,20 +329,3 @@ static const struct wilc1000_ops wilc1000_sdio_ops = {
 	.u.sdio.sdio_set_max_speed = wilc1000_sdio_set_max_speed,
 	.u.sdio.sdio_set_default_speed = wilc1000_sdio_set_default_speed,
 };
-
-static int __init init_wilc_sdio_driver(void)
-{
-	wilc1000_init_driver();
-	return sdio_register_driver(&wilc_bus);
-}
-late_initcall(init_wilc_sdio_driver);
-
-static void __exit exit_wilc_sdio_driver(void)
-{
-	if (wilc1000_dev)
-		wilc_netdev_free(wilc1000_dev);
-	sdio_unregister_driver(&wilc_bus);
-	wilc1000_exit_driver();
-}
-module_exit(exit_wilc_sdio_driver);
-MODULE_LICENSE("GPL");

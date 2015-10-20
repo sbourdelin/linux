@@ -8,6 +8,7 @@
 #include <linux/uaccess.h>
 #include <linux/device.h>
 #include <linux/spi/spi.h>
+#include <linux/of_gpio.h>
 
 #include "wilc_wfi_netdevice.h"
 #include "linux_wlan_common.h"
@@ -43,72 +44,61 @@
 
 static u32 SPEED = MIN_SPEED;
 
-struct spi_device *wilc_spi_dev;
+static const struct wilc1000_ops wilc1000_spi_ops;
 
 static int __init wilc_bus_probe(struct spi_device *spi)
 {
+	int ret, gpio;
 
-	PRINT_D(BUS_DBG, "spiModalias: %s\n", spi->modalias);
-	PRINT_D(BUS_DBG, "spiMax-Speed: %d\n", spi->max_speed_hz);
-	wilc_spi_dev = spi;
+	gpio = of_get_gpio(spi->dev.of_node, 0);
+	if (gpio < 0)
+		gpio = GPIO_NUM;
 
-	printk("Driver Initializing success\n");
+	ret = wilc_netdev_init(&spi->dev, &wilc1000_spi_ops, &wilc1000_hif_spi,
+			       gpio);
+	if (ret)
+		return ret;
+
+	spi_set_drvdata(spi, wilc1000_dev);
+	wilc1000_dev->dev = &spi->dev;
+
 	return 0;
 }
 
-static int __exit wilc_bus_remove(struct spi_device *spi)
+static int wilc_bus_remove(struct spi_device *spi)
 {
-
+	wilc_netdev_free(spi_get_drvdata(spi));
 	return 0;
 }
 
-#ifdef CONFIG_OF
 static const struct of_device_id wilc1000_of_match[] = {
 	{ .compatible = "atmel,wilc_spi", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, wilc1000_of_match);
-#endif
 
-struct spi_driver wilc_bus __refdata = {
+struct spi_driver wilc1000_spi_driver __refdata = {
 	.driver = {
 		.name = MODALIAS,
-#ifdef CONFIG_OF
 		.of_match_table = wilc1000_of_match,
-#endif
 	},
 	.probe =  wilc_bus_probe,
-	.remove = __exit_p(wilc_bus_remove),
+	.remove = wilc_bus_remove,
 };
-
+module_spi_driver(wilc1000_spi_driver);
+MODULE_LICENSE("GPL");
 
 static void wilc1000_spi_deinit(void *vp)
 {
-
-	spi_unregister_driver(&wilc_bus);
-
 	SPEED = MIN_SPEED;
 	PRINT_ER("@@@@@@@@@@@@ restore SPI speed to %d @@@@@@@@@\n", SPEED);
-
 }
 
 
 
 static int wilc1000_spi_init(void *vp)
 {
-	int ret = 1;
-	static int called;
-
-
-	if (called == 0) {
-		called++;
-		ret = spi_register_driver(&wilc_bus);
-	}
-
-	/* change return value to match WILC interface */
-	(ret < 0) ? (ret = 0) : (ret = 1);
-
-	return ret;
+	return 1;
 }
 
 #if defined(PLAT_WMS8304)
@@ -119,6 +109,7 @@ static int wilc1000_spi_init(void *vp)
 
 static int wilc1000_spi_write(u8 *b, u32 len)
 {
+	struct spi_device *spi = to_spi_device(wilc1000_dev->dev);
 	int ret;
 
 	if (len > 0 && b != NULL) {
@@ -145,11 +136,11 @@ static int wilc1000_spi_write(u8 *b, u32 len)
 
 				memset(&msg, 0, sizeof(msg));
 				spi_message_init(&msg);
-				msg.spi = wilc_spi_dev;
+				msg.spi = spi;
 				msg.is_dma_mapped = USE_SPI_DMA;
 
 				spi_message_add_tail(&tr, &msg);
-				ret = spi_sync(wilc_spi_dev, &msg);
+				ret = spi_sync(spi, &msg);
 				if (ret < 0) {
 					PRINT_ER("SPI transaction failed\n");
 				}
@@ -170,11 +161,11 @@ static int wilc1000_spi_write(u8 *b, u32 len)
 
 			memset(&msg, 0, sizeof(msg));
 			spi_message_init(&msg);
-			msg.spi = wilc_spi_dev;
+			msg.spi = spi;
 			msg.is_dma_mapped = USE_SPI_DMA;                                /* rachel */
 
 			spi_message_add_tail(&tr, &msg);
-			ret = spi_sync(wilc_spi_dev, &msg);
+			ret = spi_sync(spi, &msg);
 			if (ret < 0) {
 				PRINT_ER("SPI transaction failed\n");
 			}
@@ -196,7 +187,7 @@ static int wilc1000_spi_write(u8 *b, u32 len)
 #else
 static int wilc1000_spi_write(u8 *b, u32 len)
 {
-
+	struct spi_device *spi = to_spi_device(wilc1000_dev->dev);
 	int ret;
 	struct spi_message msg;
 
@@ -217,12 +208,12 @@ static int wilc1000_spi_write(u8 *b, u32 len)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 /* [[johnny add */
-		msg.spi = wilc_spi_dev;
+		msg.spi = spi;
 		msg.is_dma_mapped = USE_SPI_DMA;
 /* ]] */
 		spi_message_add_tail(&tr, &msg);
 
-		ret = spi_sync(wilc_spi_dev, &msg);
+		ret = spi_sync(spi, &msg);
 		if (ret < 0) {
 			PRINT_ER("SPI transaction failed\n");
 		}
@@ -247,6 +238,7 @@ static int wilc1000_spi_write(u8 *b, u32 len)
 
 static int wilc1000_spi_read(u8 *rb, u32 rlen)
 {
+	struct spi_device *spi = to_spi_device(wilc1000_dev->dev);
 	int ret;
 
 	if (rlen > 0) {
@@ -273,11 +265,11 @@ static int wilc1000_spi_read(u8 *rb, u32 rlen)
 
 				memset(&msg, 0, sizeof(msg));
 				spi_message_init(&msg);
-				msg.spi = wilc_spi_dev;
+				msg.spi = spi;
 				msg.is_dma_mapped = USE_SPI_DMA;
 
 				spi_message_add_tail(&tr, &msg);
-				ret = spi_sync(wilc_spi_dev, &msg);
+				ret = spi_sync(spi, &msg);
 				if (ret < 0) {
 					PRINT_ER("SPI transaction failed\n");
 				}
@@ -297,11 +289,11 @@ static int wilc1000_spi_read(u8 *rb, u32 rlen)
 
 			memset(&msg, 0, sizeof(msg));
 			spi_message_init(&msg);
-			msg.spi = wilc_spi_dev;
+			msg.spi = spi;
 			msg.is_dma_mapped = USE_SPI_DMA;                                /* rachel */
 
 			spi_message_add_tail(&tr, &msg);
-			ret = spi_sync(wilc_spi_dev, &msg);
+			ret = spi_sync(spi, &msg);
 			if (ret < 0) {
 				PRINT_ER("SPI transaction failed\n");
 			}
@@ -321,7 +313,7 @@ static int wilc1000_spi_read(u8 *rb, u32 rlen)
 #else
 static int wilc1000_spi_read(u8 *rb, u32 rlen)
 {
-
+	struct spi_device *spi = to_spi_device(wilc1000_dev->dev);
 	int ret;
 
 	if (rlen > 0) {
@@ -342,12 +334,12 @@ static int wilc1000_spi_read(u8 *rb, u32 rlen)
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
 /* [[ johnny add */
-		msg.spi = wilc_spi_dev;
+		msg.spi = spi;
 		msg.is_dma_mapped = USE_SPI_DMA;
 /* ]] */
 		spi_message_add_tail(&tr, &msg);
 
-		ret = spi_sync(wilc_spi_dev, &msg);
+		ret = spi_sync(spi, &msg);
 		if (ret < 0) {
 			PRINT_ER("SPI transaction failed\n");
 		}
@@ -366,7 +358,7 @@ static int wilc1000_spi_read(u8 *rb, u32 rlen)
 
 static int wilc1000_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 {
-
+	struct spi_device *spi = to_spi_device(wilc1000_dev->dev);
 	int ret;
 
 	if (rlen > 0) {
@@ -383,11 +375,11 @@ static int wilc1000_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 
 		memset(&msg, 0, sizeof(msg));
 		spi_message_init(&msg);
-		msg.spi = wilc_spi_dev;
+		msg.spi = spi;
 		msg.is_dma_mapped = USE_SPI_DMA;
 
 		spi_message_add_tail(&tr, &msg);
-		ret = spi_sync(wilc_spi_dev, &msg);
+		ret = spi_sync(spi, &msg);
 		if (ret < 0) {
 			PRINT_ER("SPI transaction failed\n");
 		}
@@ -418,33 +410,3 @@ static const struct wilc1000_ops wilc1000_spi_ops = {
 	.u.spi.spi_trx = wilc1000_spi_write_read,
 	.u.spi.spi_max_speed = wilc1000_spi_set_max_speed,
 };
-
-static int __init init_wilc_spi_driver(void)
-{
-	int ret;
-
-	wilc1000_init_driver();
-	ret = wilc_netdev_init(NULL, &wilc1000_spi_ops, &wilc1000_hif_spi,
-			       GPIO_NUM);
-	if (ret)
-		return ret;
-
-	if (!wilc1000_spi_init(NULL)) {
-		PRINT_ER("Can't initialize SPI\n");
-		return -ENXIO;
-	}
-	wilc1000_dev->dev = &wilc_spi_dev->dev;
-
-	return ret;
-}
-late_initcall(init_wilc_spi_driver);
-
-static void __exit exit_wilc_spi_driver(void)
-{
-	if (wilc1000_dev)
-		wilc_netdev_free(wilc1000_dev);
-	spi_unregister_driver(&wilc_bus);
-	wilc1000_exit_driver();
-}
-module_exit(exit_wilc_spi_driver);
-MODULE_LICENSE("GPL");

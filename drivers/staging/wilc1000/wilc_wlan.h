@@ -320,7 +320,7 @@ int wilc1000_wlan_get_num_conn_ifcs(void);
 int wilc1000_mac_xmit(struct sk_buff *skb, struct net_device *dev);
 int wilc_netdev_init(struct device *, const struct wilc1000_ops *ops,
 		     const struct wilc1000_hif_ops *hif_ops, int gpio);
-void __exit wilc_netdev_free(struct wilc *wilc1000_dev);
+void wilc_netdev_free(struct wilc *wilc1000_dev);
 
 void wilc_handle_isr(void);
 
@@ -339,8 +339,5 @@ extern bool wilc1000_enable_ps;
 
 int wilc1000_firmware_download(struct wilc *p_nic);
 int wilc1000_start_firmware(struct wilc_per_interface *nic);
-
-void __init wilc1000_init_driver(void);
-void __exit wilc1000_exit_driver(void);
 
 #endif

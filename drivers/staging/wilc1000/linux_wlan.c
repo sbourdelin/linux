@@ -1594,19 +1594,7 @@ int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops,
 }
 EXPORT_SYMBOL_GPL(wilc_netdev_init);
 
-void __init wilc1000_init_driver(void)
-{
-#if defined(WILC_DEBUGFS)
-	if (wilc_debugfs_init() < 0)
-		PRINT_D(GENERIC_DBG, "fail to create debugfs for wilc driver\n");
-#endif
-
-	printk("IN INIT FUNCTION\n");
-	printk("*** WILC1000 driver VERSION=[10.2] FW_VER=[10.2] ***\n");
-}
-EXPORT_SYMBOL_GPL(wilc1000_init_driver);
-
-void __exit wilc_netdev_free(struct wilc *wilc1000_dev)
+void wilc_netdev_free(struct wilc *wilc1000_dev)
 {
 	int i = 0;
 	perInterface_wlan_t *nic[NUM_CONCURRENT_IFC] = {NULL,};
@@ -1653,16 +1641,28 @@ void __exit wilc_netdev_free(struct wilc *wilc1000_dev)
 }
 EXPORT_SYMBOL_GPL(wilc_netdev_free);
 
+int __init wilc1000_init_driver(void)
+{
+	int ret = 0;
+#if defined(WILC_DEBUGFS)
+	ret = wilc_debugfs_init();
+	if (ret < 0)
+		PRINT_D(GENERIC_DBG, "fail to create debugfs for wilc driver\n");
+#endif
+	return ret;
+
+}
+module_init(wilc1000_init_driver);
+
 void __exit wilc1000_exit_driver(void)
 {
 	kfree(wilc1000_dev);
 	wilc1000_dev = NULL;
-	printk("Module_exit Done.\n");
 
 #if defined(WILC_DEBUGFS)
 	wilc_debugfs_remove();
 #endif
 }
-EXPORT_SYMBOL_GPL(wilc1000_exit_driver);
+module_exit(wilc1000_exit_driver);
 
 MODULE_LICENSE("GPL");
