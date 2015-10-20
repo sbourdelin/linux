@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/thermal.h>
+#include <linux/pinctrl/consumer.h>
 
 /**
  * If the temperature over a period of time High,
@@ -79,6 +80,9 @@ struct rockchip_thermal_sensor {
 
 struct rockchip_thermal_data {
 	const struct rockchip_tsadc_chip *chip;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pins_default;
+	struct pinctrl_state *pins_otp;
 	struct platform_device *pdev;
 	struct reset_control *reset;
 
@@ -548,6 +552,28 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
 		goto err_disable_clk;
 	}
 
+	/*
+	 * We need the OTP pin is gpio state before reset the TSADC controller
+	 * since the tshut polarity will generate a high signal.
+	 */
+
+	thermal->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(thermal->pinctrl)) {
+		error = PTR_ERR(thermal->pinctrl);
+		dev_err(&pdev->dev, "failed to get thermal pinctrl: %d\n",
+			error);
+		goto err_disable_pclk;
+	}
+
+	thermal->pins_default = pinctrl_lookup_state(thermal->pinctrl,
+						     "default");
+	if (IS_ERR(thermal->pins_default))
+		dev_warn(&pdev->dev, "could not get the pinctrl default state\n");
+
+	thermal->pins_otp = pinctrl_lookup_state(thermal->pinctrl, "otp_out");
+	if (IS_ERR(thermal->pins_otp))
+		dev_warn(&pdev->dev, "could not get otp state\n");
+
 	rockchip_thermal_reset_controller(thermal->reset);
 
 	error = rockchip_configure_from_dt(&pdev->dev, np, thermal);
@@ -591,6 +617,8 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
 
 	for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
 		rockchip_thermal_toggle_sensor(&thermal->sensors[i], true);
+
+	pinctrl_select_state(thermal->pinctrl, thermal->pins_otp);
 
 	platform_set_drvdata(pdev, thermal);
 
@@ -660,6 +688,8 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
 	if (error)
 		return error;
 
+	pinctrl_select_state(thermal->pinctrl, thermal->pins_default);
+
 	rockchip_thermal_reset_controller(thermal->reset);
 
 	thermal->chip->initialize(thermal->regs, thermal->tshut_polarity);
@@ -677,6 +707,8 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
 
 	for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
 		rockchip_thermal_toggle_sensor(&thermal->sensors[i], true);
+
+	pinctrl_select_state(thermal->pinctrl, thermal->pins_otp);
 
 	return 0;
 }
