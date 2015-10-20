@@ -28,6 +28,7 @@
 #include <linux/i2c.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
+#include <linux/clkdev.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/err.h>
@@ -98,6 +99,7 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
 {
 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
 	const struct acpi_device_id *id;
+	struct clk *clk;
 
 	dev->adapter.nr = -1;
 	dev->tx_fifo_depth = 32;
@@ -117,9 +119,11 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
 	 * id->driver_data.
 	 */
 	id = acpi_match_device(pdev->dev.driver->acpi_match_table, &pdev->dev);
-	if (id && id->driver_data)
-		clk_register_fixed_rate(&pdev->dev, dev_name(&pdev->dev), NULL,
-					CLK_IS_ROOT, id->driver_data);
+	if (id && id->driver_data) {
+		clk = clk_register_fixed_rate(&pdev->dev, dev_name(&pdev->dev),
+					NULL, CLK_IS_ROOT, id->driver_data);
+		clk_register_clkdev(clk, NULL, dev_name(&pdev->dev));
+	}
 
 	return 0;
 }
