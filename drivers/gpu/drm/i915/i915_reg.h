@@ -5685,11 +5685,15 @@ enum skl_disp_power_wells {
 /* legacy palette */
 #define _LGC_PALETTE_A           0x4a000
 #define _LGC_PALETTE_B           0x4a800
-#define LGC_PALETTE(pipe, i) (_PIPE(pipe, _LGC_PALETTE_A, _LGC_PALETTE_B) + (i) * 4)
+#define _LGC_PALETTE_C           0x4b000
+#define LGC_PALETTE(pipe, i) (_PIPE3(pipe, _LGC_PALETTE_A, _LGC_PALETTE_B, \
+			 _LGC_PALETTE_C) + (i) * 4)
 
 #define _GAMMA_MODE_A		0x4a480
 #define _GAMMA_MODE_B		0x4ac80
-#define GAMMA_MODE(pipe) _PIPE(pipe, _GAMMA_MODE_A, _GAMMA_MODE_B)
+#define _GAMMA_MODE_C		0x4b480
+#define GAMMA_MODE(pipe) \
+	_PIPE3(pipe, _GAMMA_MODE_A, _GAMMA_MODE_B, _GAMMA_MODE_C)
 #define GAMMA_MODE_MODE_MASK	(3 << 0)
 #define GAMMA_MODE_MODE_8BIT	(0 << 0)
 #define GAMMA_MODE_MODE_10BIT	(1 << 0)
@@ -8172,6 +8176,23 @@ enum skl_disp_power_wells {
 #define _PIPE_CSC_BASE(pipe) \
 	(_PIPE3(pipe, PIPEA_CGM_CSC, PIPEB_CGM_CSC, PIPEC_CGM_CSC))
 
+/* BDW gamma correction */
+#define PAL_PREC_INDEX_A                       0x4A400
+#define PAL_PREC_INDEX_B                       0x4AC00
+#define PAL_PREC_INDEX_C                       0x4B400
+#define PAL_PREC_DATA_A                        0x4A404
+#define PAL_PREC_DATA_B                        0x4AC04
+#define PAL_PREC_DATA_C                        0x4B404
+#define PAL_PREC_GCMAX_A			0x4A410
+#define PAL_PREC_GCMAX_B			0x4AC10
+#define PAL_PREC_GCMAX_C			0x4B410
+
+#define _PREC_PAL_INDEX(pipe) \
+	(_PIPE3(pipe, PAL_PREC_INDEX_A, PAL_PREC_INDEX_B, PAL_PREC_INDEX_C))
+#define _PREC_PAL_DATA(pipe) \
+	(_PIPE3(pipe, PAL_PREC_DATA_A, PAL_PREC_DATA_B, PAL_PREC_DATA_C))
+#define _PREC_PAL_GCMAX(pipe) \
+	(_PIPE3(pipe, PAL_PREC_GCMAX_A, PAL_PREC_GCMAX_B, PAL_PREC_GCMAX_C))
 
 
 #endif /* _I915_REG_H_ */

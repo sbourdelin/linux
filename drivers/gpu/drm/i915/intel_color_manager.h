@@ -92,3 +92,9 @@
 
 /* Gamma on BDW */
 #define BDW_SPLITGAMMA_MAX_VALS                512
+#define BDW_8BIT_GAMMA_MAX_VALS		256
+#define BDW_10BIT_GAMMA_MAX_VALS		1024
+#define BDW_12BIT_GAMMA_MAX_VALS		513
+#define BDW_MAX_GAMMA                         ((1 << 24) - 1)
+#define BDW_INDEX_AUTO_INCREMENT               (1 << 15)
+#define BDW_INDEX_SPLIT_MODE                   (1 << 31)

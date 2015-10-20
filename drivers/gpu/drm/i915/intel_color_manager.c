@@ -27,6 +27,285 @@
 
 #include "intel_color_manager.h"
 
+static void bdw_write_8bit_gamma_legacy(struct drm_device *dev,
+	struct drm_r32g32b32 *correction_values, u32 palette)
+{
+	u16 blue_fract, green_fract, red_fract;
+	u32 blue, green, red;
+	u32 count = 0;
+	u32 word = 0;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	while (count < BDW_8BIT_GAMMA_MAX_VALS) {
+		blue = correction_values[count].b32;
+		green = correction_values[count].g32;
+		red = correction_values[count].r32;
+
+		/*
+		* Maximum possible gamma correction value supported
+		* for BDW is 0xFFFFFFFF, so clamp the values accordingly
+		*/
+		if (blue >= BDW_MAX_GAMMA)
+			blue = BDW_MAX_GAMMA;
+		if (green >= BDW_MAX_GAMMA)
+			green = BDW_MAX_GAMMA;
+		if (red >= BDW_MAX_GAMMA)
+			red = BDW_MAX_GAMMA;
+
+		blue_fract = GET_BITS(blue, 16, 8);
+		green_fract = GET_BITS(green, 16, 8);
+		red_fract = GET_BITS(red, 16, 8);
+
+		/* Blue (7:0) Green (15:8) and Red (23:16) */
+		SET_BITS(word, blue_fract, 0, 8);
+		SET_BITS(word, green_fract, 8, 8);
+		SET_BITS(word, red_fract, 16, 8);
+		I915_WRITE(palette, word);
+		palette += 4;
+		count++;
+	}
+}
+
+static void bdw_write_10bit_gamma_precision(struct drm_device *dev,
+	struct drm_r32g32b32 *correction_values, u32 pal_prec_data,
+			u32 no_of_coeff)
+{
+	u16 blue_fract, green_fract, red_fract;
+	u32 word = 0;
+	u32 count = 0;
+	u32 blue, green, red;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	while (count < no_of_coeff) {
+
+		blue = correction_values[count].b32;
+		green = correction_values[count].g32;
+		red = correction_values[count].r32;
+
+		/*
+		* Maximum possible gamma correction value supported
+		* for BDW is 0xFFFFFFFF, so clamp the values accordingly
+		*/
+		if (blue >= BDW_MAX_GAMMA)
+			blue = BDW_MAX_GAMMA;
+		if (green >= BDW_MAX_GAMMA)
+			green = BDW_MAX_GAMMA;
+		if (red >= BDW_MAX_GAMMA)
+			red = BDW_MAX_GAMMA;
+
+		/*
+		* Gamma correction values are sent in 8.24 format
+		* with 8 int and 24 fraction bits. BDW 10 bit gamma
+		* unit expects correction registers to be programmed in
+		* 0.10 format, with 0 int and 16 fraction bits. So take
+		* MSB 10 bit values(bits 23-14) from the fraction part and
+		* prepare the correction registers.
+		*/
+		blue_fract = GET_BITS(blue, 14, 10);
+		green_fract = GET_BITS(green, 14, 10);
+		red_fract = GET_BITS(red, 14, 10);
+
+		/* Arrange: Red (29:20) Green (19:10) and Blue (9:0) */
+		SET_BITS(word, red_fract, 20, 10);
+		SET_BITS(word, green_fract, 10, 10);
+		SET_BITS(word, blue_fract, 0, 10);
+		I915_WRITE(pal_prec_data, word);
+		count++;
+	}
+	DRM_DEBUG_DRIVER("Gamma correction programmed\n");
+}
+
+static void bdw_write_12bit_gamma_precision(struct drm_device *dev,
+	struct drm_r32g32b32 *correction_values, u32 pal_prec_data,
+		enum pipe pipe)
+{
+	uint16_t blue_fract, green_fract, red_fract;
+	uint32_t gcmax;
+	uint32_t word = 0;
+	uint32_t count = 0;
+	uint32_t gcmax_reg;
+	u32 blue, green, red;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	/* Program first 512 values in precision palette */
+	while (count < BDW_12BIT_GAMMA_MAX_VALS - 1) {
+
+		blue = correction_values[count].b32;
+		green = correction_values[count].g32;
+		red = correction_values[count].r32;
+
+		/*
+		* Maximum possible gamma correction value supported
+		* for BDW is 0xFFFFFFFF, so clamp the values accordingly
+		*/
+		if (blue >= BDW_MAX_GAMMA)
+			blue = BDW_MAX_GAMMA;
+		if (green >= BDW_MAX_GAMMA)
+			green = BDW_MAX_GAMMA;
+		if (red >= BDW_MAX_GAMMA)
+			red = BDW_MAX_GAMMA;
+
+		/*
+		* Framework's general gamma format is 8.24 (8 int 16 fraction)
+		* BDW Platform's supported gamma format is 16 bit correction
+		* values in 0.16 format. So extract higher 16 fraction bits
+		* from 8.24 gamma correction values.
+		*/
+		red_fract = GET_BITS(red, 8, 16);
+		green_fract = GET_BITS(green, 8, 16);
+		blue_fract = GET_BITS(blue, 8, 16);
+
+		/*
+		* From the bspec:
+		* For 12 bit gamma correction, program precision palette
+		* with 16 bits per color in a 0.16 format with 0 integer and
+		* 16 fractional bits (upper 10 bits in odd indexes, lower 6
+		* bits in even indexes)
+		*/
+
+		/* Even index: Lower 6 bits from correction should go as MSB */
+		SET_BITS(word, GET_BITS(red_fract, 0, 6), 24, 6);
+		SET_BITS(word, GET_BITS(green_fract, 0, 6), 14, 6);
+		SET_BITS(word, GET_BITS(blue_fract, 0, 6), 4, 6);
+		I915_WRITE(pal_prec_data, word);
+
+		word = 0x0;
+		/* Odd index: Upper 10 bits of correction should go as MSB */
+		SET_BITS(word, GET_BITS(red_fract, 6, 10), 20, 10);
+		SET_BITS(word, GET_BITS(green_fract, 6, 10), 10, 10);
+		SET_BITS(word, GET_BITS(blue_fract, 6, 10), 0, 10);
+
+		I915_WRITE(pal_prec_data, word);
+		count++;
+	}
+
+	/* Now program the 513th value in GCMAX regs */
+	word = 0;
+	gcmax_reg = _PREC_PAL_GCMAX(pipe);
+	gcmax = min_t(u32, GET_BITS(correction_values[count].r32, 8, 17),
+				BDW_MAX_GAMMA);
+	SET_BITS(word, gcmax, 0, 17);
+	I915_WRITE(gcmax_reg, word);
+	gcmax_reg += 4;
+
+	word = 0;
+	gcmax = min_t(u32, GET_BITS(correction_values[count].g32, 8, 17),
+				BDW_MAX_GAMMA);
+	SET_BITS(word, gcmax, 0, 17);
+	I915_WRITE(gcmax_reg, word);
+	gcmax_reg += 4;
+
+	word = 0;
+	gcmax = min_t(u32, GET_BITS(correction_values[count].b32, 8, 17),
+				BDW_MAX_GAMMA);
+	SET_BITS(word, gcmax, 0, 17);
+	I915_WRITE(gcmax_reg, word);
+}
+
+/* Apply unity gamma for gamma reset */
+static void bdw_reset_gamma(struct drm_i915_private *dev_priv,
+			enum pipe pipe)
+{
+	u16 count = 0;
+	u32 val;
+	u32 pal_prec_data = LGC_PALETTE(pipe, 0);
+
+	DRM_DEBUG_DRIVER("\n");
+
+	/* Reset the palette for unit gamma */
+	while (count < BDW_8BIT_GAMMA_MAX_VALS) {
+		/* Red (23:16) Green (15:8) and Blue (7:0) */
+		val = (count << 16) | (count << 8) | count;
+		I915_WRITE(pal_prec_data, val);
+		pal_prec_data += 4;
+		count++;
+	}
+}
+
+static int bdw_set_gamma(struct drm_device *dev, struct drm_property_blob *blob,
+			struct drm_crtc *crtc)
+{
+	enum pipe pipe;
+	int num_samples;
+	u32 mode, pal_prec_index, pal_prec_data, index;
+	u32 word = 0;
+	struct drm_palette *gamma_data;
+	struct drm_crtc_state *state = crtc->state;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_r32g32b32 *correction_values = NULL;
+
+	if (WARN_ON(!blob))
+		return -EINVAL;
+
+	gamma_data = (struct drm_palette *)blob->data;
+	pipe = to_intel_crtc(crtc)->pipe;
+	num_samples = blob->length / sizeof(struct drm_r32g32b32);
+
+	pal_prec_index = _PREC_PAL_INDEX(pipe);
+	pal_prec_data = _PREC_PAL_DATA(pipe);
+
+	correction_values = (struct drm_r32g32b32 *)&gamma_data->lut;
+	index = I915_READ(pal_prec_index);
+
+	switch (num_samples) {
+	case GAMMA_DISABLE_VALS:
+		/* Disable Gamma functionality on Pipe */
+		DRM_DEBUG_DRIVER("Disabling gamma on Pipe %c\n",
+			pipe_name(pipe));
+		mode = I915_READ(GAMMA_MODE(pipe));
+		if ((mode & GAMMA_MODE_MODE_MASK) == GAMMA_MODE_MODE_12BIT)
+			bdw_reset_gamma(dev_priv, pipe);
+		state->palette_after_ctm_blob = NULL;
+		word = GAMMA_MODE_MODE_8BIT;
+		break;
+
+	case BDW_8BIT_GAMMA_MAX_VALS:
+		/* Legacy palette */
+		bdw_write_8bit_gamma_legacy(dev, correction_values,
+				LGC_PALETTE(pipe, 0));
+		word = GAMMA_MODE_MODE_8BIT;
+		break;
+
+	case BDW_SPLITGAMMA_MAX_VALS:
+		index |= BDW_INDEX_AUTO_INCREMENT | BDW_INDEX_SPLIT_MODE;
+		I915_WRITE(pal_prec_index, index);
+		bdw_write_10bit_gamma_precision(dev, correction_values,
+			pal_prec_data, BDW_SPLITGAMMA_MAX_VALS);
+		word = GAMMA_MODE_MODE_SPLIT;
+		break;
+
+	case BDW_12BIT_GAMMA_MAX_VALS:
+		index |= BDW_INDEX_AUTO_INCREMENT;
+		index &= ~BDW_INDEX_SPLIT_MODE;
+		I915_WRITE(pal_prec_index, index);
+		bdw_write_12bit_gamma_precision(dev, correction_values,
+			pal_prec_data, pipe);
+		word = GAMMA_MODE_MODE_12BIT;
+		break;
+
+	case BDW_10BIT_GAMMA_MAX_VALS:
+		index |= BDW_INDEX_AUTO_INCREMENT;
+		index &= ~BDW_INDEX_SPLIT_MODE;
+		I915_WRITE(pal_prec_index, index);
+		bdw_write_10bit_gamma_precision(dev, correction_values,
+			pal_prec_data, BDW_10BIT_GAMMA_MAX_VALS);
+		word = GAMMA_MODE_MODE_10BIT;
+		break;
+
+	default:
+		DRM_ERROR("Invalid number of samples\n");
+		return -EINVAL;
+	}
+
+	/* Set gamma mode on pipe control reg */
+	mode = I915_READ(GAMMA_MODE(pipe));
+	mode &= ~GAMMA_MODE_MODE_MASK;
+	I915_WRITE(GAMMA_MODE(pipe), mode | word);
+	DRM_DEBUG_DRIVER("Gamma applied on pipe %c\n",
+		pipe_name(pipe));
+	return 0;
+}
+
 static s32 chv_prepare_csc_coeff(s64 csc_value)
 {
 	s32 csc_int_value;
@@ -303,6 +582,8 @@ void intel_color_manager_crtc_commit(struct drm_device *dev,
 		/* Gamma correction is platform specific */
 		if (IS_CHERRYVIEW(dev))
 			ret = chv_set_gamma(dev, blob, crtc);
+		else if (IS_BROADWELL(dev) || IS_GEN9(dev))
+			ret = bdw_set_gamma(dev, blob, crtc);
 
 		if (ret)
 			DRM_ERROR("set Gamma correction failed\n");
