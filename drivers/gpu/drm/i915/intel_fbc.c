@@ -1103,9 +1103,9 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	enum pipe pipe;
 
 	mutex_init(&dev_priv->fbc.lock);
+	dev_priv->fbc.active = false;
 
 	if (!HAS_FBC(dev_priv)) {
-		dev_priv->fbc.active = false;
 		dev_priv->fbc.no_fbc_reason = "unsupported by this chipset";
 		return;
 	}
@@ -1146,5 +1146,6 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 		I915_WRITE(FBC_CONTROL, 500 << FBC_CTL_INTERVAL_SHIFT);
 	}
 
-	dev_priv->fbc.active = dev_priv->fbc.is_active(dev_priv);
+	if (dev_priv->fbc.is_active(dev_priv))
+		dev_priv->fbc.deactivate(dev_priv);
 }
