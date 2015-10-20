@@ -572,12 +572,14 @@ static int zl10353_init(struct dvb_frontend *fe)
 	/* Do a "hard" reset if not already done */
 	if (zl10353_read_register(state, 0x50) != zl10353_reset_attach[1] ||
 	    zl10353_read_register(state, 0x51) != zl10353_reset_attach[2]) {
+		printk("zl10353: performing reset\n");
 		zl10353_write(fe, zl10353_reset_attach,
 				   sizeof(zl10353_reset_attach));
 		if (debug_regs)
 			zl10353_dump_regs(fe);
 	}
 
+	printk("zl10353: init complete\n");
 	return 0;
 }
 

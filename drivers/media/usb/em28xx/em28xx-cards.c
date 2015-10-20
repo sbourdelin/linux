@@ -1045,9 +1045,11 @@ struct em28xx_board em28xx_boards[] = {
 
 	[EM2870_BOARD_TERRATEC_XS] = {
 		.name         = "Terratec Cinergy T XS",
-		.valid        = EM28XX_BOARD_NOT_VALIDATED,
+		/*.valid        = EM28XX_BOARD_NOT_VALIDATED,*/
 		.tuner_type   = TUNER_XC2028,
 		.tuner_gpio   = default_tuner_gpio,
+		.has_dvb      = 1,
+		.dvb_gpio     = default_digital,
 	},
 	[EM2870_BOARD_TERRATEC_XS_MT2060] = {
 		.name         = "Terratec Cinergy T XS (MT2060)",
