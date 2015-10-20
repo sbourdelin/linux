@@ -1762,6 +1762,7 @@ static int ci_udc_stop(struct usb_gadget *gadget)
 	spin_lock_irqsave(&ci->lock, flags);
 
 	if (ci->vbus_active) {
+		ci->vbus_active = 0;
 		hw_device_state(ci, 0);
 		if (ci->platdata->notify_event)
 			ci->platdata->notify_event(ci,
