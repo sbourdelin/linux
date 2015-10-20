@@ -95,6 +95,13 @@ static int __init parse_options(struct earlycon_device *device, char *options)
 		length = min(strcspn(options, " ") + 1,
 			     (size_t)(sizeof(device->options)));
 		strlcpy(device->options, options, length);
+		options = strchr(options, ',');
+		if (options) {
+			options++;
+			port->uartclk = simple_strtoul(options, NULL, 0);
+		}
+		if (!port->uartclk)
+			port->uartclk = BASE_BAUD * 16;
 	}
 
 	if (port->iotype == UPIO_MEM || port->iotype == UPIO_MEM16 ||
@@ -122,7 +129,6 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
 	if (buf && !parse_options(&early_console_dev, buf))
 		buf = NULL;
 
-	port->uartclk = BASE_BAUD * 16;
 	if (port->mapbase)
 		port->membase = earlycon_map(port->mapbase, 64);
 
