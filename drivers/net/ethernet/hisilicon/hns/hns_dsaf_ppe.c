@@ -18,6 +18,10 @@
 #include <linux/of_platform.h>
 
 #include "hns_dsaf_ppe.h"
+void hns_ppe_set_tso_enable(struct hns_ppe_cb *ppe_cb, u32 value)
+{
+	dsaf_set_dev_bit(ppe_cb, PPEV2_CFG_TSO_EN_REG, 0, !!value);
+}
 
 int hns_ppe_is_rss_supported(struct hns_ppe_cb *ppe_cb)
 {
@@ -43,7 +47,7 @@ void hns_ppe_set_rss_key(struct hns_ppe_cb *ppe_cb,
 }
 
 void hns_ppe_set_indir_table(struct hns_ppe_cb *ppe_cb,
-				  const u32 rss_tab[HNS_PPEV2_RSS_IND_TBL_SIZE])
+			     const u32 rss_tab[HNS_PPEV2_RSS_IND_TBL_SIZE])
 {
 	int i;
 	int reg_value;
