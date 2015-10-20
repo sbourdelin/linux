@@ -4820,7 +4820,7 @@ static void intel_pre_plane_update(struct intel_crtc *crtc)
 		intel_crtc_wait_for_pending_flips(&crtc->base);
 
 	if (atomic->disable_fbc)
-		intel_fbc_disable_crtc(crtc);
+		intel_fbc_deactivate(crtc);
 
 	if (crtc->atomic.disable_ips)
 		hsw_disable_ips(crtc);
@@ -4921,6 +4921,8 @@ static void ironlake_crtc_enable(struct drm_crtc *crtc)
 
 	if (HAS_PCH_CPT(dev))
 		cpt_verify_modeset(dev, intel_crtc->pipe);
+
+	intel_fbc_enable(intel_crtc);
 }
 
 /* IPS only exists on ULT machines and is tied to pipe A. */
@@ -5023,6 +5025,8 @@ static void haswell_crtc_enable(struct drm_crtc *crtc)
 		intel_wait_for_vblank(dev, hsw_workaround_pipe);
 		intel_wait_for_vblank(dev, hsw_workaround_pipe);
 	}
+
+	intel_fbc_enable(intel_crtc);
 }
 
 static void ironlake_pfit_disable(struct intel_crtc *crtc, bool force)
@@ -5089,6 +5093,8 @@ static void ironlake_crtc_disable(struct drm_crtc *crtc)
 
 		ironlake_fdi_pll_disable(intel_crtc);
 	}
+
+	intel_fbc_disable_crtc(intel_crtc);
 }
 
 static void haswell_crtc_disable(struct drm_crtc *crtc)
@@ -5135,6 +5141,8 @@ static void haswell_crtc_disable(struct drm_crtc *crtc)
 	for_each_encoder_on_crtc(dev, crtc, encoder)
 		if (encoder->post_disable)
 			encoder->post_disable(encoder);
+
+	intel_fbc_disable_crtc(intel_crtc);
 }
 
 static void i9xx_pfit_enable(struct intel_crtc *crtc)
@@ -6163,6 +6171,8 @@ static void i9xx_crtc_enable(struct drm_crtc *crtc)
 
 	for_each_encoder_on_crtc(dev, crtc, encoder)
 		encoder->enable(encoder);
+
+	intel_fbc_enable(intel_crtc);
 }
 
 static void i9xx_pfit_disable(struct intel_crtc *crtc)
@@ -6225,6 +6235,8 @@ static void i9xx_crtc_disable(struct drm_crtc *crtc)
 
 	if (!IS_GEN2(dev))
 		intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, false);
+
+	intel_fbc_disable_crtc(intel_crtc);
 }
 
 static void intel_crtc_disable_noatomic(struct drm_crtc *crtc)
