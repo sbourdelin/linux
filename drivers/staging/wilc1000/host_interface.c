@@ -4,15 +4,10 @@
 #include <linux/delay.h>
 #include "host_interface.h"
 #include "coreconfigurator.h"
+#include "wilc_wlan.h"
 #include "wilc_wlan_if.h"
 #include "wilc_msgqueue.h"
 #include <linux/etherdevice.h>
-
-extern u8 wilc1000_connecting;
-
-extern struct timer_list wilc1000_during_ip_timer;
-
-extern u8 wilc1000_initialized;
 
 #define HOST_IF_MSG_SCAN                        0
 #define HOST_IF_MSG_CONNECT                     1
@@ -267,9 +262,6 @@ static struct host_if_drv *join_req_drv;
 #define FLUSHED_BYTE_POS 79
 
 static void *host_int_ParseJoinBssParam(tstrNetworkInfo *ptstrNetworkInfo);
-
-extern void wilc1000_chip_sleep_manually(u32 u32SleepTime);
-extern int wilc1000_wlan_get_num_conn_ifcs(void);
 
 static int add_handler_in_list(struct host_if_drv *handler)
 {

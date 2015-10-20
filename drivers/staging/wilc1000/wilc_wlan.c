@@ -8,6 +8,7 @@
 /* //////////////////////////////////////////////////////////////////////////// */
 
 #include "wilc_wlan_if.h"
+#include "wilc_wlan.h"
 #include "wilc_wfi_netdevice.h"
 #include "wilc_wlan_cfg.h"
 
@@ -16,14 +17,6 @@
  *      Global
  *
  ********************************************/
-extern wilc_hif_func_t wilc1000_hif_sdio;
-extern wilc_hif_func_t wilc1000_hif_spi;
-extern void WILC_WFI_mgmt_rx(u8 *buff, u32 size);
-u32 wilc_get_chipid(u8 update);
-u16 wilc1000_set_machw_change_vir_if(bool bValue);
-
-
-
 typedef struct {
 	int quit;
 

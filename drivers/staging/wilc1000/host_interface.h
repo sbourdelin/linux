@@ -925,4 +925,14 @@ void wilc1000_free_join_params(void *pJoinParams);
 
 s32 wilc1000_get_statistics(struct host_if_drv *hWFIDrv, struct rf_info *pstrStatistics);
 
+void wilc1000_resolve_disconnect_aberration(struct host_if_drv *drvHandler);
+
+extern bool wilc1000_optaining_ip;
+extern u8 wilc1000_connected_SSID[6];
+extern u8 wilc1000_multicast_mac_addr_list[WILC_MULTICAST_TABLE_SIZE][ETH_ALEN];
+
+extern int wilc1000_connecting;
+extern u8 wilc1000_initialized;
+extern struct timer_list wilc1000_during_ip_timer;
+
 #endif

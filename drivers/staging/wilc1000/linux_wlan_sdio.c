@@ -23,9 +23,6 @@
 
 
 struct sdio_func *wilc1000_sdio_func;
-extern int wilc_netdev_init(void);
-extern void wilc_handle_isr(void);
-
 static unsigned int sdio_default_speed;
 
 #define SDIO_VENDOR_ID_WILC 0x0296

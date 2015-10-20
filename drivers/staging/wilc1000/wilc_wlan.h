@@ -1,7 +1,7 @@
 #ifndef WILC_WLAN_H
 #define WILC_WLAN_H
 
-
+#include <linux/types.h>
 
 #define ISWILC1000(id)   (((id & 0xfffff000) == 0x100000) ? 1 : 0)
 
@@ -270,6 +270,9 @@ typedef struct {
 	void (*hif_set_default_bus_speed)(void);
 } wilc_hif_func_t;
 
+extern wilc_hif_func_t wilc1000_hif_spi;
+extern wilc_hif_func_t wilc1000_hif_sdio;
+
 /********************************************
  *
  *      Configuration Structure
@@ -309,4 +312,28 @@ int wilc_wlan_cfg_get(int start, u32 wid, int commit, u32 drvHandler);
 int wilc_wlan_cfg_get_val(u32 wid, u8 *buffer, u32 buffer_size);
 int wilc_wlan_txq_add_mgmt_pkt(void *priv, u8 *buffer, u32 buffer_size,
 			       wilc_tx_complete_func_t func);
+extern void wilc_wlan_global_reset(void);
+
+void wilc1000_enable_tcp_ack_filter(bool value);
+void wilc1000_chip_sleep_manually(u32 u32SleepTime);
+int wilc1000_wlan_get_num_conn_ifcs(void);
+int wilc1000_mac_xmit(struct sk_buff *skb, struct net_device *dev);
+int wilc_netdev_init(void);
+void wilc_handle_isr(void);
+
+u16 wilc1000_set_machw_change_vir_if(bool bValue);
+
+int wilc1000_mac_open(struct net_device *ndev);
+int wilc1000_mac_close(struct net_device *ndev);
+
+void WILC_WFI_mgmt_rx(u8 *buff, u32 size);
+
+int wilc1000_wlan_set_bssid(struct net_device *wilc_netdev, u8 *pBSSID);
+void WILC_WFI_p2p_rx(struct net_device *dev, u8 *buff, u32 size);
+u8 wilc1000_core_11b_ready(void);
+
+extern bool wilc1000_enable_ps;
+extern volatile int wilc1000_probe;
+
+
 #endif

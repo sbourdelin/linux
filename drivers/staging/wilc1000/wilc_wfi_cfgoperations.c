@@ -14,6 +14,7 @@
 #ifdef WILC_SDIO
 #include "linux_wlan_sdio.h"
 #endif
+#include "host_interface.h"
 #include <linux/errno.h>
 
 #define IS_MANAGMEMENT				0x100
@@ -21,21 +22,13 @@
 #define IS_MGMT_STATUS_SUCCES			0x040
 #define GET_PKT_OFFSET(a) (((a) >> 22) & 0x1ff)
 
-extern int wilc1000_wlan_get_firmware(perInterface_wlan_t *p_nic);
-extern u16 wilc1000_set_machw_change_vir_if(bool bValue);
-
-extern int wilc1000_mac_open(struct net_device *ndev);
-extern int wilc1000_mac_close(struct net_device *ndev);
-
 static tstrNetworkInfo astrLastScannedNtwrksShadow[MAX_NUM_SCANNED_NETWORKS_SHADOW];
 static u32 u32LastScannedNtwrksCountShadow;
 struct timer_list wilc1000_during_ip_timer;
 static struct timer_list hAgingTimer;
 static u8 op_ifcs;
-extern u8 wilc1000_connected_SSID[6];
 
 u8 wilc1000_initialized = 1;
-extern bool wilc1000_optaining_ip;
 
 #define CHAN2G(_channel, _freq, _flags) {	 \
 		.band             = IEEE80211_BAND_2GHZ, \
@@ -472,8 +465,6 @@ static void CfgScanResult(enum scan_event enuScanEvent, tstrNetworkInfo *pstrNet
 	}
 }
 
-
-int wilc1000_wlan_set_bssid(struct net_device *wilc_netdev, u8 *pBSSID);
 
 
 /**
@@ -2156,7 +2147,6 @@ static void WILC_WFI_add_wilcvendorspec(u8 *buff)
  *  @date	01 JUL 2012
  *  @version
  */
-extern bool wilc1000_enable_ps;
 static int mgmt_tx(struct wiphy *wiphy,
 		   struct wireless_dev *wdev,
 		   struct cfg80211_mgmt_tx_params *params,
@@ -2488,9 +2478,6 @@ static int set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
  *  @date	01 MAR 2012
  *  @version	1.0
  */
-void wilc1000_wlan_deinit(struct wilc *nic);
-int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic);
-
 static int change_virtual_intf(struct wiphy *wiphy, struct net_device *dev,
 			       enum nl80211_iftype type, u32 *flags, struct vif_params *params)
 {
