@@ -4940,6 +4940,7 @@ static void haswell_crtc_enable(struct drm_crtc *crtc)
 	struct intel_crtc_state *pipe_config =
 		to_intel_crtc_state(crtc->state);
 	bool is_dsi = intel_pipe_has_type(intel_crtc, INTEL_OUTPUT_DSI);
+	u32 bottom;
 
 	if (WARN_ON(intel_crtc->active))
 		return;
@@ -5023,6 +5024,12 @@ static void haswell_crtc_enable(struct drm_crtc *crtc)
 	if (IS_HASWELL(dev) && hsw_workaround_pipe != INVALID_PIPE) {
 		intel_wait_for_vblank(dev, hsw_workaround_pipe);
 		intel_wait_for_vblank(dev, hsw_workaround_pipe);
+	}
+
+	if (INTEL_INFO(dev)->gen >= 9) {
+		bottom = I915_READ(PIPE_BOTTOM_COLOR(pipe));
+		bottom |= (PIPE_BOTTOM_CSC_ENABLE | PIPE_BOTTOM_GAMMA_ENABLE);
+		I915_WRITE(PIPE_BOTTOM_COLOR(pipe), bottom);
 	}
 }
 
