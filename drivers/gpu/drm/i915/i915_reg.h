@@ -8148,4 +8148,16 @@ enum skl_disp_power_wells {
 #define GEN9_VEBOX_MOCS_0	0xcb00	/* Video MOCS base register*/
 #define GEN9_BLT_MOCS_0		0xcc00	/* Blitter MOCS base register*/
 
+/* Color Management */
+#define PIPEA_CGM_CONTROL			(VLV_DISPLAY_BASE + 0x67A00)
+#define PIPEB_CGM_CONTROL			(VLV_DISPLAY_BASE + 0x69A00)
+#define PIPEC_CGM_CONTROL			(VLV_DISPLAY_BASE + 0x6BA00)
+#define PIPEA_CGM_GAMMA			(VLV_DISPLAY_BASE + 0x67000)
+#define PIPEB_CGM_GAMMA			(VLV_DISPLAY_BASE + 0x69000)
+#define PIPEC_CGM_GAMMA			(VLV_DISPLAY_BASE + 0x6B000)
+#define _PIPE_CGM_CONTROL(pipe) \
+	(_PIPE3(pipe, PIPEA_CGM_CONTROL, PIPEB_CGM_CONTROL, PIPEC_CGM_CONTROL))
+#define _PIPE_GAMMA_BASE(pipe) \
+	(_PIPE3(pipe, PIPEA_CGM_GAMMA, PIPEB_CGM_GAMMA, PIPEC_CGM_GAMMA))
+
 #endif /* _I915_REG_H_ */

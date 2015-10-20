@@ -52,3 +52,16 @@
 /* CHV */
 #define CHV_10BIT_GAMMA_MAX_VALS		257
 #define CHV_DEGAMMA_MAX_VALS                   65
+
+/* No of coeff for disabling gamma is 0 */
+#define GAMMA_DISABLE_VALS			0
+
+/* Gamma on CHV */
+#define CHV_10BIT_GAMMA_MAX_VALS               257
+#define CHV_8BIT_GAMMA_MAX_VALS                256
+#define CHV_10BIT_GAMMA_MSB_SHIFT              6
+#define CHV_GAMMA_SHIFT_GREEN                  16
+#define CHV_MAX_GAMMA                          ((1 << 24) - 1)
+
+/* CHV CGM Block */
+#define CGM_GAMMA_EN                           (1 << 2)

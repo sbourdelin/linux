@@ -27,6 +27,92 @@
 
 #include "intel_color_manager.h"
 
+static int chv_set_gamma(struct drm_device *dev, struct drm_property_blob *blob,
+		struct drm_crtc *crtc)
+{
+	enum pipe pipe;
+	u16 red_fract, green_fract, blue_fract;
+	u32 red, green, blue, num_samples;
+	u32 word = 0;
+	u32 count, cgm_gamma_reg, cgm_control_reg;
+	struct drm_r32g32b32 *correction_values;
+	struct drm_palette *gamma_data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_crtc_state *state = crtc->state;
+
+	if (WARN_ON(!blob))
+		return -EINVAL;
+
+	gamma_data = (struct drm_palette *)blob->data;
+	pipe = to_intel_crtc(crtc)->pipe;
+	num_samples = blob->length / sizeof(struct drm_r32g32b32);
+
+	switch (num_samples) {
+	case GAMMA_DISABLE_VALS:
+
+		/* Disable Gamma functionality on Pipe - CGM Block */
+		cgm_control_reg = I915_READ(_PIPE_CGM_CONTROL(pipe));
+		cgm_control_reg &= ~CGM_GAMMA_EN;
+		I915_WRITE(_PIPE_CGM_CONTROL(pipe), cgm_control_reg);
+		state->palette_after_ctm_blob = NULL;
+		DRM_DEBUG_DRIVER("Gamma disabled on Pipe %c\n",
+			pipe_name(pipe));
+		return 0;
+
+	case CHV_8BIT_GAMMA_MAX_VALS:
+	case CHV_10BIT_GAMMA_MAX_VALS:
+
+		count = 0;
+		cgm_gamma_reg = _PIPE_GAMMA_BASE(pipe);
+		correction_values = gamma_data->lut;
+
+		while (count < num_samples) {
+			blue = correction_values[count].b32;
+			green = correction_values[count].g32;
+			red = correction_values[count].r32;
+
+			if (blue > CHV_MAX_GAMMA)
+				blue = CHV_MAX_GAMMA;
+
+			if (green > CHV_MAX_GAMMA)
+				green = CHV_MAX_GAMMA;
+
+			if (red > CHV_MAX_GAMMA)
+				red = CHV_MAX_GAMMA;
+
+			/* get MSB 10 bits from fraction part (14:23) */
+			blue_fract = GET_BITS(blue, 14, 10);
+			green_fract = GET_BITS(green, 14, 10);
+			red_fract = GET_BITS(red, 14, 10);
+
+			/* Green (25:16) and Blue (9:0) to be written */
+			SET_BITS(word, green_fract, 16, 10);
+			SET_BITS(word, blue_fract, 0, 10);
+			I915_WRITE(cgm_gamma_reg, word);
+			cgm_gamma_reg += 4;
+
+			/* Red (9:0) to be written */
+			word = red_fract;
+			I915_WRITE(cgm_gamma_reg, word);
+
+			cgm_gamma_reg += 4;
+			count++;
+		}
+
+		/* Enable (CGM) Gamma on Pipe */
+		I915_WRITE(_PIPE_CGM_CONTROL(pipe),
+		I915_READ(_PIPE_CGM_CONTROL(pipe)) | CGM_GAMMA_EN);
+		DRM_DEBUG_DRIVER("CGM Gamma enabled on Pipe %c\n",
+			pipe_name(pipe));
+		return 0;
+
+	default:
+		DRM_ERROR("Invalid number of samples (%u) for Gamma LUT\n",
+				num_samples);
+		return -EINVAL;
+	}
+}
+
 void intel_attach_color_properties_to_crtc(struct drm_device *dev,
 		struct drm_crtc *crtc)
 {
@@ -61,4 +147,12 @@ void intel_attach_color_properties_to_crtc(struct drm_device *dev,
 		INTEL_INFO(dev)->num_samples_before_ctm);
 		DRM_DEBUG_DRIVER("Degamma query property initialized\n");
 	}
+
+	/* Gamma correction */
+	if (config->cm_palette_after_ctm_property) {
+		drm_object_attach_property(mode_obj,
+			config->cm_palette_after_ctm_property, 0);
+		DRM_DEBUG_DRIVER("gamma property attached to CRTC\n");
+	}
+
 }
