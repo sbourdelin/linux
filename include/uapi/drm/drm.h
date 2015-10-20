@@ -849,6 +849,16 @@ struct drm_palette {
 	struct drm_r32g32b32 lut[0];
 };
 
+struct drm_ctm {
+	/*
+	 * Each value is in S31.32 format.
+	 * This is 3x3 matrix in row major format.
+	 * Integer part will be clipped to nearest
+	 * max/min boundary as supported by the HW platform.
+	 */
+	__s64 ctm_coeff[9];
+};
+
 /* typedef area */
 #ifndef __KERNEL__
 typedef struct drm_clip_rect drm_clip_rect_t;
