@@ -1088,8 +1088,10 @@ void intel_fbc_flush(struct drm_i915_private *dev_priv,
 		if (origin == ORIGIN_FLIP) {
 			__intel_fbc_update(dev_priv);
 		} else {
-			__intel_fbc_disable(dev_priv);
-			__intel_fbc_update(dev_priv);
+			if (dev_priv->fbc.enabled)
+				intel_fbc_nuke(dev_priv);
+			else
+				__intel_fbc_update(dev_priv);
 		}
 	}
 
