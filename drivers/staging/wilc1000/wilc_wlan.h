@@ -321,6 +321,8 @@ void wilc1000_chip_sleep_manually(u32 u32SleepTime);
 int wilc1000_wlan_get_num_conn_ifcs(void);
 int wilc1000_mac_xmit(struct sk_buff *skb, struct net_device *dev);
 int wilc_netdev_init(void);
+void __exit wilc_netdev_free(struct wilc *wilc1000_dev);
+
 void wilc_handle_isr(void);
 
 u16 wilc1000_set_machw_change_vir_if(bool bValue);
@@ -337,5 +339,7 @@ u8 wilc1000_core_11b_ready(void);
 extern bool wilc1000_enable_ps;
 extern volatile int wilc1000_probe;
 
+void __init wilc1000_init_driver(void);
+void __exit wilc1000_exit_driver(void);
 
 #endif

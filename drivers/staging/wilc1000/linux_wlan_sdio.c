@@ -237,4 +237,18 @@ int wilc1000_sdio_set_default_speed(void)
 }
 
 
+static int __init init_wilc_sdio_driver(void)
+{
+	wilc1000_init_driver();
+	return sdio_register_driver(&wilc_bus);
+}
+late_initcall(init_wilc_sdio_driver);
 
+static void __exit exit_wilc_sdio_driver(void)
+{
+	if (wilc1000_dev)
+		wilc_netdev_free(wilc1000_dev);
+	sdio_unregister_driver(&wilc_bus);
+	wilc1000_exit_driver();
+}
+module_exit(exit_wilc_sdio_driver);

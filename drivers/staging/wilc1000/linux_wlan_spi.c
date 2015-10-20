@@ -406,3 +406,19 @@ int wilc1000_spi_set_max_speed(void)
 	PRINT_INFO(BUS_DBG, "@@@@@@@@@@@@ change SPI speed to %d @@@@@@@@@\n", SPEED);
 	return 1;
 }
+
+static int __init init_wilc_spi_driver(void)
+{
+	wilc1000_init_driver();
+	return wilc_netdev_init();
+}
+late_initcall(init_wilc_spi_driver);
+
+static void __exit exit_wilc_spi_driver(void)
+{
+	if (wilc1000_dev)
+		wilc_netdev_free(wilc1000_dev);
+	spi_unregister_driver(&wilc_bus);
+	wilc1000_exit_driver();
+}
+module_exit(exit_wilc_spi_driver);

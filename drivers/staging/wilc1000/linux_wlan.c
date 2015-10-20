@@ -1725,59 +1725,38 @@ int wilc_netdev_init(void)
 	return 0;
 }
 
-/*The 1st function called after module inserted*/
-static int __init init_wilc_driver(void)
+void __init wilc1000_init_driver(void)
 {
 #if defined(WILC_DEBUGFS)
-	if (wilc_debugfs_init() < 0) {
+	if (wilc_debugfs_init() < 0)
 		PRINT_D(GENERIC_DBG, "fail to create debugfs for wilc driver\n");
-		return -1;
-	}
 #endif
 
 	printk("IN INIT FUNCTION\n");
 	printk("*** WILC1000 driver VERSION=[10.2] FW_VER=[10.2] ***\n");
-
-#ifdef WILC_SDIO
-	{
-		int ret;
-
-		ret = sdio_register_driver(&wilc_bus);
-		if (ret < 0)
-			PRINT_D(INIT_DBG, "init_wilc_driver: Failed register sdio driver\n");
-
-		return ret;
-	}
-#else
-	PRINT_D(INIT_DBG, "Initializing netdev\n");
-	if (wilc_netdev_init())
-		PRINT_ER("Couldn't initialize netdev\n");
-	return 0;
-#endif
 }
-late_initcall(init_wilc_driver);
 
-static void __exit exit_wilc_driver(void)
+void __exit wilc_netdev_free(struct wilc *wilc1000_dev)
 {
 	int i = 0;
 	perInterface_wlan_t *nic[NUM_CONCURRENT_IFC] = {NULL,};
 	#define CLOSE_TIMEOUT (12 * 1000)
 
-	if ((wilc1000_dev != NULL) && (((wilc1000_dev->strInterfaceInfo[0].wilc_netdev) != NULL)
-				       || ((wilc1000_dev->strInterfaceInfo[1].wilc_netdev) != NULL))) {
+	if (wilc1000_dev->strInterfaceInfo[0].wilc_netdev ||
+	    wilc1000_dev->strInterfaceInfo[1].wilc_netdev) {
 		unregister_inetaddr_notifier(&g_dev_notifier);
 
 		for (i = 0; i < NUM_CONCURRENT_IFC; i++)
 			nic[i] = netdev_priv(wilc1000_dev->strInterfaceInfo[i].wilc_netdev);
 	}
 
-	if ((wilc1000_dev != NULL) && wilc1000_dev->wilc_firmware != NULL) {
+	if (wilc1000_dev->wilc_firmware) {
 		release_firmware(wilc1000_dev->wilc_firmware);
 		wilc1000_dev->wilc_firmware = NULL;
 	}
 
-	if ((wilc1000_dev != NULL) && (((wilc1000_dev->strInterfaceInfo[0].wilc_netdev) != NULL)
-				       || ((wilc1000_dev->strInterfaceInfo[1].wilc_netdev) != NULL))) {
+	if (wilc1000_dev->strInterfaceInfo[0].wilc_netdev ||
+	    wilc1000_dev->strInterfaceInfo[1].wilc_netdev) {
 		PRINT_D(INIT_DBG, "Waiting for wilc1000_mac_close ....\n");
 
 		if (linux_wlan_lock_timeout(&close_exit_sync, CLOSE_TIMEOUT) < 0)
@@ -1801,15 +1780,10 @@ static void __exit exit_wilc_driver(void)
 			free_netdev(wilc1000_dev->strInterfaceInfo[i].wilc_netdev);
 		}
 	}
+}
 
-#ifndef WILC_SDIO
-	PRINT_D(INIT_DBG, "SPI unregsiter...\n");
-	spi_unregister_driver(&wilc_bus);
-#else
-	PRINT_D(INIT_DBG, "SDIO unregsiter...\n");
-	sdio_unregister_driver(&wilc_bus);
-#endif
-
+void __exit wilc1000_exit_driver(void)
+{
 	kfree(wilc1000_dev);
 	wilc1000_dev = NULL;
 	printk("Module_exit Done.\n");
@@ -1818,6 +1792,5 @@ static void __exit exit_wilc_driver(void)
 	wilc_debugfs_remove();
 #endif
 }
-module_exit(exit_wilc_driver);
 
 MODULE_LICENSE("GPL");
