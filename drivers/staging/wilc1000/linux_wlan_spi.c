@@ -447,3 +447,4 @@ static void __exit exit_wilc_spi_driver(void)
 	wilc1000_exit_driver();
 }
 module_exit(exit_wilc_spi_driver);
+MODULE_LICENSE("GPL");

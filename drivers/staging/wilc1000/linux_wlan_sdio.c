@@ -350,3 +350,4 @@ static void __exit exit_wilc_sdio_driver(void)
 	wilc1000_exit_driver();
 }
 module_exit(exit_wilc_sdio_driver);
+MODULE_LICENSE("GPL");

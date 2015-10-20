@@ -56,6 +56,8 @@ static void wilc_set_multicast_list(struct net_device *dev);
  * and this data should be pointer to net device
  */
 struct wilc *wilc1000_dev;
+EXPORT_SYMBOL_GPL(wilc1000_dev);
+
 bool wilc1000_enable_ps = true;
 
 static const struct net_device_ops wilc_netdev_ops = {
@@ -1590,6 +1592,7 @@ int wilc_netdev_init(struct device *dev, const struct wilc1000_ops *ops,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(wilc_netdev_init);
 
 void __init wilc1000_init_driver(void)
 {
@@ -1601,6 +1604,7 @@ void __init wilc1000_init_driver(void)
 	printk("IN INIT FUNCTION\n");
 	printk("*** WILC1000 driver VERSION=[10.2] FW_VER=[10.2] ***\n");
 }
+EXPORT_SYMBOL_GPL(wilc1000_init_driver);
 
 void __exit wilc_netdev_free(struct wilc *wilc1000_dev)
 {
@@ -1647,6 +1651,7 @@ void __exit wilc_netdev_free(struct wilc *wilc1000_dev)
 		}
 	}
 }
+EXPORT_SYMBOL_GPL(wilc_netdev_free);
 
 void __exit wilc1000_exit_driver(void)
 {
@@ -1658,5 +1663,6 @@ void __exit wilc1000_exit_driver(void)
 	wilc_debugfs_remove();
 #endif
 }
+EXPORT_SYMBOL_GPL(wilc1000_exit_driver);
 
 MODULE_LICENSE("GPL");

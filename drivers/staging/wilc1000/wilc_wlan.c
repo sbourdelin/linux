@@ -1376,6 +1376,7 @@ void wilc_handle_isr(void)
 	}
 	release_bus(RELEASE_ALLOW_SLEEP);
 }
+EXPORT_SYMBOL_GPL(wilc_handle_isr);
 
 /********************************************
  *
