@@ -326,7 +326,7 @@ static void rk_tsadcv2_tshut_mode(int chn, void __iomem *regs,
 
 static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
 	.tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
-	.tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
+	.tshut_polarity = TSHUT_HIGH_ACTIVE, /* default TSHUT HIGH ACTIVE */
 	.tshut_temp = 95000,
 
 	.initialize = rk_tsadcv2_initialize,
