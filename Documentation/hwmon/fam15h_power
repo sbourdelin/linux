@@ -10,14 +10,22 @@ Supported chips:
   Datasheets:
   BIOS and Kernel Developer's Guide (BKDG) For AMD Family 15h Processors
   BIOS and Kernel Developer's Guide (BKDG) For AMD Family 16h Processors
+  AMD64 Architecture Programmer's Manual Volume 2: System Programming
 
 Author: Andreas Herrmann <herrmann.der.user@googlemail.com>
 
 Description
 -----------
 
+1) Processor TDP (Thermal design power)
+
+Given a fixed frequency and voltage, the power consumption of a
+processor varies based on the workload being executed. Derated power
+is the power consumed when running a specific application. Thermal
+design power (TDP) is an example of derated power.
+
 This driver permits reading of registers providing power information
-of AMD Family 15h and 16h processors.
+of AMD Family 15h and 16h processors via TDP algorithm.
 
 For AMD Family 15h and 16h processors the following power values can
 be calculated using different processor northbridge function
