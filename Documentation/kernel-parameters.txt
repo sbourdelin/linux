@@ -2347,8 +2347,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	nocache		[ARM]
 
-	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
-
 	nodelayacct	[KNL] Disable per-task delay accounting
 
 	nodisconnect	[HW,SCSI,M68K] Disables SCSI disconnects.
@@ -2363,14 +2361,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			On X86-32 available only on PAE configured kernels.
 			noexec=on: enable non-executable mappings (default)
 			noexec=off: disable non-executable mappings
-
-	nosmap		[X86]
-			Disable SMAP (Supervisor Mode Access Prevention)
-			even if it is supported by processor.
-
-	nosmep		[X86]
-			Disable SMEP (Supervisor Mode Execution Prevention)
-			even if it is supported by processor.
 
 	noexec32	[X86-64]
 			This affects only 32-bit executables.

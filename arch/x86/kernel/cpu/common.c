@@ -250,25 +250,11 @@ static inline void squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 }
 #endif
 
-static __init int setup_disable_smep(char *arg)
-{
-	setup_clear_cpu_cap(X86_FEATURE_SMEP);
-	return 1;
-}
-__setup("nosmep", setup_disable_smep);
-
 static __always_inline void setup_smep(struct cpuinfo_x86 *c)
 {
 	if (cpu_has(c, X86_FEATURE_SMEP))
 		cr4_set_bits(X86_CR4_SMEP);
 }
-
-static __init int setup_disable_smap(char *arg)
-{
-	setup_clear_cpu_cap(X86_FEATURE_SMAP);
-	return 1;
-}
-__setup("nosmap", setup_disable_smap);
 
 static __always_inline void setup_smap(struct cpuinfo_x86 *c)
 {
@@ -1081,14 +1067,6 @@ static __init int setup_show_msr(char *arg)
 	return 1;
 }
 __setup("show_msr=", setup_show_msr);
-
-static __init int setup_noclflush(char *arg)
-{
-	setup_clear_cpu_cap(X86_FEATURE_CLFLUSH);
-	setup_clear_cpu_cap(X86_FEATURE_CLFLUSHOPT);
-	return 1;
-}
-__setup("noclflush", setup_noclflush);
 
 void print_cpu_info(struct cpuinfo_x86 *c)
 {
