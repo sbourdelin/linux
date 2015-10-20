@@ -1491,6 +1491,19 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.cm_ctm_property = prop;
 
+	/* DRM properties to query color capabilities */
+	prop = drm_property_create(dev, DRM_MODE_PROP_IMMUTABLE,
+			"COEFFICIENTS_BEFORE_CTM", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cm_coeff_before_ctm_property = prop;
+
+	prop = drm_property_create(dev, DRM_MODE_PROP_IMMUTABLE,
+			"COEFFICIENTS_AFTER_CTM", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cm_coeff_after_ctm_property = prop;
+
 	return 0;
 }
 

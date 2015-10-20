@@ -1151,6 +1151,10 @@ struct drm_mode_config {
 	struct drm_property *cm_palette_after_ctm_property;
 	struct drm_property *cm_ctm_property;
 
+	/* Color management capabilities query */
+	struct drm_property *cm_coeff_before_ctm_property;
+	struct drm_property *cm_coeff_after_ctm_property;
+
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;
 
