@@ -26,6 +26,9 @@
 #include <linux/pci.h>
 #include <linux/bitops.h>
 #include <linux/cpumask.h>
+#include <linux/mutex.h>
+#include <linux/time.h>
+#include <linux/sched.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
 
@@ -64,6 +67,10 @@ struct fam15h_power_data {
 	u64 cu_acc_power[MAX_CUS];
 	/* performance timestamp counter */
 	u64 cpu_sw_pwr_ptsc[MAX_CUS];
+	/* online/offline status of current compute unit */
+	int cu_on[MAX_CUS];
+	unsigned long power_period;
+	struct mutex acc_pwr_mutex;
 };
 
 static ssize_t show_power(struct device *dev,
@@ -132,11 +139,15 @@ static void do_read_registers_on_cu(void *_data)
 	cores_per_cu = amd_get_cores_per_cu();
 	cu = cpu / cores_per_cu;
 
+	mutex_lock(&data->acc_pwr_mutex);
 	WARN_ON(rdmsrl_safe(MSR_F15H_CU_PWR_ACCUMULATOR,
 			    &data->cu_acc_power[cu]));
 
 	WARN_ON(rdmsrl_safe(MSR_F15H_PTSC,
 			    &data->cpu_sw_pwr_ptsc[cu]));
+
+	data->cu_on[cu] = 1;
+	mutex_unlock(&data->acc_pwr_mutex);
 }
 
 static int read_registers(struct fam15h_power_data *data)
@@ -147,6 +158,10 @@ static int read_registers(struct fam15h_power_data *data)
 
 	cores_per_cu = amd_get_cores_per_cu();
 	cu_num = boot_cpu_data.x86_max_cores / cores_per_cu;
+
+	mutex_lock(&data->acc_pwr_mutex);
+	memset(data->cu_on, 0, sizeof(int) * MAX_CUS);
+	mutex_unlock(&data->acc_pwr_mutex);
 
 	WARN_ON_ONCE(cu_num > MAX_CUS);
 
@@ -184,17 +199,112 @@ static int read_registers(struct fam15h_power_data *data)
 	return 0;
 }
 
+static ssize_t acc_show_power(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	struct fam15h_power_data *data = dev_get_drvdata(dev);
+	u64 prev_cu_acc_power[MAX_CUS], prev_ptsc[MAX_CUS],
+	    jdelta[MAX_CUS];
+	u64 tdelta, avg_acc;
+	int cu, cu_num, cores_per_cu, ret;
+	signed long leftover;
+
+	cores_per_cu = amd_get_cores_per_cu();
+	cu_num = boot_cpu_data.x86_max_cores / cores_per_cu;
+
+	ret = read_registers(data);
+	if (ret)
+		return 0;
+
+	cu = 0;
+	while(cu++ < cu_num) {
+		prev_cu_acc_power[cu] = data->cu_acc_power[cu];
+		prev_ptsc[cu] = data->cpu_sw_pwr_ptsc[cu];
+	}
+
+	leftover = schedule_timeout_interruptible(
+			msecs_to_jiffies(data->power_period)
+		   );
+	if (leftover)
+		return 0;
+
+	ret = read_registers(data);
+	if (ret)
+		return 0;
+
+	for (cu = 0, avg_acc = 0; cu < cu_num; cu++) {
+		/* check if current compute unit is online */
+		if (data->cu_on[cu] == 0)
+			continue;
+
+		if (data->cu_acc_power[cu] < prev_cu_acc_power[cu]) {
+			jdelta[cu] = data->max_cu_acc_power + data->cu_acc_power[cu];
+			jdelta[cu] -= prev_cu_acc_power[cu];
+		} else {
+			jdelta[cu] = data->cu_acc_power[cu] - prev_cu_acc_power[cu];
+		}
+		tdelta = data->cpu_sw_pwr_ptsc[cu] - prev_ptsc[cu];
+		jdelta[cu] *= data->cpu_pwr_sample_ratio * 1000;
+		do_div(jdelta[cu], tdelta);
+
+		/* the unit is microWatt */
+		avg_acc += jdelta[cu];
+	}
+
+	return sprintf(buf, "%llu\n", (unsigned long long)avg_acc);
+}
+static DEVICE_ATTR(power1_average, S_IRUGO, acc_show_power, NULL);
+
+
+static ssize_t acc_show_power_period(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct fam15h_power_data *data = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%lu\n", data->power_period);
+}
+
+static ssize_t acc_set_power_period(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	struct fam15h_power_data *data = dev_get_drvdata(dev);
+	unsigned long temp;
+	int ret;
+
+	ret = kstrtoul(buf, 10, &temp);
+	if (ret)
+		return ret;
+
+	mutex_lock(&data->acc_pwr_mutex);
+	data->power_period = temp;
+	mutex_unlock(&data->acc_pwr_mutex);
+
+	return count;
+}
+static DEVICE_ATTR(power1_average_interval, S_IRUGO | S_IWUSR,
+		   acc_show_power_period, acc_set_power_period);
+
 static int fam15h_power_init_attrs(struct pci_dev *pdev,
 				   struct fam15h_power_data *data)
 {
 	int n = FAM15H_MIN_NUM_ATTRS;
 	struct attribute **fam15h_power_attrs;
 	struct cpuinfo_x86 *c = &boot_cpu_data;
+	u32 cpuid;
 
 	if (c->x86 == 0x15 &&
 	    ((c->x86_model <= 0xf) ||
 	     (c->x86_model >= 0x60 && c->x86_model <= 0x6f)))
 		n += 1;
+
+	cpuid = cpuid_edx(0x80000007);
+
+	/* check if processor supports accumulated power */
+	if (cpuid & BIT(12))
+		n += 2;
 
 	fam15h_power_attrs = devm_kcalloc(&pdev->dev, n,
 					  sizeof(*fam15h_power_attrs),
@@ -209,6 +319,11 @@ static int fam15h_power_init_attrs(struct pci_dev *pdev,
 	    ((c->x86_model <= 0xf) ||
 	     (c->x86_model >= 0x60 && c->x86_model <= 0x6f)))
 		fam15h_power_attrs[n++] = &dev_attr_power1_input.attr;
+
+	if (cpuid & BIT(12)) {
+		fam15h_power_attrs[n++] = &dev_attr_power1_average.attr;
+		fam15h_power_attrs[n++] = &dev_attr_power1_average_interval.attr;
+	}
 
 	data->fam15h_power_group.attrs = fam15h_power_attrs;
 
@@ -322,6 +437,9 @@ static int fam15h_power_init_data(struct pci_dev *f4,
 
 	data->max_cu_acc_power = tmp;
 
+	/* set default interval as 10 ms */
+	data->power_period = 10;
+
 	ret = read_registers(data);
 
 	return ret;
@@ -348,6 +466,8 @@ static int fam15h_power_probe(struct pci_dev *pdev,
 	data = devm_kzalloc(dev, sizeof(struct fam15h_power_data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
+
+	mutex_init(&data->acc_pwr_mutex);
 
 	ret = fam15h_power_init_data(pdev, data);
 	if (ret)
