@@ -306,6 +306,63 @@ static int bdw_set_gamma(struct drm_device *dev, struct drm_property_blob *blob,
 	return 0;
 }
 
+static int bdw_set_degamma(struct drm_device *dev,
+	struct drm_property_blob *blob, struct drm_crtc *crtc)
+{
+	enum pipe pipe;
+	int num_samples;
+	u32 index, mode;
+	u32 pal_prec_index, pal_prec_data;
+	struct drm_palette *degamma_data;
+	struct drm_crtc_state *state = crtc->state;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_r32g32b32 *correction_values = NULL;
+
+	if (WARN_ON(!blob))
+		return -EINVAL;
+
+	degamma_data = (struct drm_palette *)blob->data;
+	pipe = to_intel_crtc(crtc)->pipe;
+	num_samples = blob->length / sizeof(struct drm_r32g32b32);
+
+	switch (num_samples) {
+	case GAMMA_DISABLE_VALS:
+		/* Disable degamma on Pipe */
+		mode = I915_READ(GAMMA_MODE(pipe)) & ~GAMMA_MODE_MODE_MASK;
+		I915_WRITE(GAMMA_MODE(pipe), mode | GAMMA_MODE_MODE_8BIT);
+
+		state->palette_before_ctm_blob = NULL;
+		DRM_DEBUG_DRIVER("Disabling degamma on Pipe %c\n",
+			pipe_name(pipe));
+		break;
+
+	case BDW_SPLITGAMMA_MAX_VALS:
+		pal_prec_index = _PREC_PAL_INDEX(pipe);
+		pal_prec_data = _PREC_PAL_DATA(pipe);
+		correction_values = degamma_data->lut;
+
+		index = I915_READ(pal_prec_index);
+		index |= BDW_INDEX_AUTO_INCREMENT | BDW_INDEX_SPLIT_MODE;
+		I915_WRITE(pal_prec_index, index);
+
+		bdw_write_10bit_gamma_precision(dev, correction_values,
+		pal_prec_data, BDW_SPLITGAMMA_MAX_VALS);
+
+		/* Enable degamma on Pipe */
+		mode = I915_READ(GAMMA_MODE(pipe));
+		mode &= ~GAMMA_MODE_MODE_MASK;
+		I915_WRITE(GAMMA_MODE(pipe), mode | GAMMA_MODE_MODE_SPLIT);
+		DRM_DEBUG_DRIVER("degamma correction enabled on Pipe %c\n",
+			pipe_name(pipe));
+		break;
+
+	default:
+		DRM_ERROR("Invalid number of samples\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static s32 chv_prepare_csc_coeff(s64 csc_value)
 {
 	s32 csc_int_value;
@@ -596,6 +653,8 @@ void intel_color_manager_crtc_commit(struct drm_device *dev,
 		/* Degamma correction */
 		if (IS_CHERRYVIEW(dev))
 			ret = chv_set_degamma(dev, blob, crtc);
+		else if (IS_BROADWELL(dev) || IS_GEN9(dev))
+			ret = bdw_set_degamma(dev, blob, crtc);
 
 		if (ret)
 			DRM_ERROR("set degamma correction failed\n");
