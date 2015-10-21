@@ -4935,6 +4935,7 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	vmx_set_efer(vcpu, 0);
 	vmx_fpu_activate(vcpu);
 	update_exception_bitmap(vcpu);
+	vmx_set_rflags(vcpu, X86_EFLAGS_FIXED);
 
 	vpid_sync_context(vmx->vpid);
 }
