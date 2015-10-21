@@ -29,7 +29,6 @@
 /* PEX1/2 Misc Ports Status Register */
 #define SCFG_PEXMSCPORTSR(pex_idx)	(0x94 + (pex_idx) * 4)
 #define LTSSM_STATE_SHIFT	20
-#define LTSSM_PCIE_L0		0x11 /* L0 state */
 
 /* Symbol Timer Register and Filter Mask Register 1 */
 #define PCIE_STRFMR1 0x71c
@@ -55,7 +54,7 @@ static int ls_pcie_link_up(struct pcie_port *pp)
 	regmap_read(pcie->scfg, SCFG_PEXMSCPORTSR(pcie->index), &state);
 	state = (state >> LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
 
-	if (state < LTSSM_PCIE_L0)
+	if (state < LTSSM_STATE_L0)
 		return 0;
 
 	return 1;

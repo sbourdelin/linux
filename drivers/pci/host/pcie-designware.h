@@ -23,6 +23,7 @@
 #define MAX_MSI_CTRLS			(MAX_MSI_IRQS / 32)
 
 #define LTSSM_STATE_RCVRY_LOCK		0x0d
+#define LTSSM_STATE_L0			0x11
 #define LTSSM_STATE_MASK		0x1f
 
 struct pcie_port {
