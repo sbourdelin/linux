@@ -775,7 +775,7 @@ static u32 ath10k_pci_targ_cpu_to_ce_addr(struct ath10k *ar, u32 addr)
 	switch (ar->hw_rev) {
 	case ATH10K_HW_QCA988X:
 	case ATH10K_HW_QCA6174:
-		val = (ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS +
+		val = (ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS |
 					  CORE_CTRL_ADDRESS) &
 		       0x7ff) << 21;
 		break;
@@ -1443,10 +1443,10 @@ static void ath10k_pci_irq_msi_fw_mask(struct ath10k *ar)
 	switch (ar->hw_rev) {
 	case ATH10K_HW_QCA988X:
 	case ATH10K_HW_QCA6174:
-		val = ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS +
+		val = ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS |
 					CORE_CTRL_ADDRESS);
 		val &= ~CORE_CTRL_PCIE_REG_31_MASK;
-		ath10k_pci_write32(ar, SOC_CORE_BASE_ADDRESS +
+		ath10k_pci_write32(ar, SOC_CORE_BASE_ADDRESS |
 				   CORE_CTRL_ADDRESS, val);
 		break;
 	case ATH10K_HW_QCA99X0:
@@ -1464,10 +1464,10 @@ static void ath10k_pci_irq_msi_fw_unmask(struct ath10k *ar)
 	switch (ar->hw_rev) {
 	case ATH10K_HW_QCA988X:
 	case ATH10K_HW_QCA6174:
-		val = ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS +
+		val = ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS |
 					CORE_CTRL_ADDRESS);
 		val |= CORE_CTRL_PCIE_REG_31_MASK;
-		ath10k_pci_write32(ar, SOC_CORE_BASE_ADDRESS +
+		ath10k_pci_write32(ar, SOC_CORE_BASE_ADDRESS |
 				   CORE_CTRL_ADDRESS, val);
 		break;
 	case ATH10K_HW_QCA99X0:
