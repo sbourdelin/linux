@@ -19,14 +19,24 @@
 #define REG_PORT(p)		(8 + (p))
 #define REG_GLOBAL		0x0f
 
+/* MDIO bus access can be nested in the case of PHYs connected to the
+ * internal MDIO bus of the switch, which is accessed via MDIO bus of
+ * the Ethernet interface. Avoid lockdep false positives by using
+ * mutex_lock_nested().
+ */
 static int reg_read(struct dsa_switch *ds, int addr, int reg)
 {
+	int ret;
 	struct mii_bus *bus = dsa_host_dev_to_mii_bus(ds->master_dev);
 
 	if (bus == NULL)
 		return -EINVAL;
 
-	return mdiobus_read(bus, ds->pd->sw_addr + addr, reg);
+	mutex_lock_nested(&bus->mdio_lock, SINGLE_DEPTH_NESTING);
+	ret = bus->read(bus, ds->pd->sw_addr, reg);
+	mutex_unlock(&bus->mdio_lock);
+
+	return ret;
 }
 
 #define REG_READ(addr, reg)					\
@@ -42,12 +52,17 @@ static int reg_read(struct dsa_switch *ds, int addr, int reg)
 
 static int reg_write(struct dsa_switch *ds, int addr, int reg, u16 val)
 {
+	int ret;
 	struct mii_bus *bus = dsa_host_dev_to_mii_bus(ds->master_dev);
 
 	if (bus == NULL)
 		return -EINVAL;
 
-	return mdiobus_write(bus, ds->pd->sw_addr + addr, reg, val);
+	mutex_lock_nested(&bus->mdio_lock, SINGLE_DEPTH_NESTING);
+	ret = bus->write(bus, ds->pd->sw_addr, reg, val);
+	mutex_unlock(&bus->mdio_lock);
+
+	return ret;
 }
 
 #define REG_WRITE(addr, reg, val)				\
