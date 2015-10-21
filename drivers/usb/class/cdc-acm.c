@@ -725,6 +725,62 @@ static int acm_tty_write(struct tty_struct *tty,
 	return count;
 }
 
+static void acm_tty_flush_chars(struct tty_struct *tty)
+{
+	struct acm *acm = tty->driver_data;
+	struct acm_wb *cur = acm->putbuffer;
+	int err;
+	unsigned long flags;
+
+	acm->putbuffer = NULL;
+	err = usb_autopm_get_interface_async(acm->control);
+	spin_lock_irqsave(&acm->write_lock, flags);
+	if (err < 0) {
+		cur->use = 0;
+		goto out;
+	}
+
+	if (acm->susp_count) {
+		usb_anchor_urb(cur->urb, &acm->delayed);
+		goto out;
+	}
+
+	acm_start_wb(acm, cur);
+out:
+	spin_unlock_irqrestore(&acm->write_lock, flags);
+	return;
+}
+
+static int acm_tty_put_char(struct tty_struct *tty, unsigned char ch)
+{
+	struct acm *acm = tty->driver_data;
+	struct acm_wb *cur;
+	int wbn;
+	unsigned long flags;
+
+overflow:
+	cur = acm->putbuffer;
+	if (!cur) {
+		spin_lock_irqsave(&acm->write_lock, flags);
+		wbn = acm_wb_alloc(acm);
+		if (wbn >= 0) {
+			cur = &acm->wb[wbn];
+			acm->putbuffer = cur;
+		}
+		spin_unlock_irqrestore(&acm->write_lock, flags);
+		if (!cur)
+			return 0;
+	}
+
+	if (cur->len == acm->writesize) {
+		acm_tty_flush_chars(tty);
+		goto overflow;
+	}
+
+	cur->buf[cur->len++] = ch;
+	return 1;
+}
+
 static int acm_tty_write_room(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
@@ -1888,6 +1944,8 @@ static const struct tty_operations acm_ops = {
 	.cleanup =		acm_tty_cleanup,
 	.hangup =		acm_tty_hangup,
 	.write =		acm_tty_write,
+	.put_char =		acm_tty_put_char,
+	.flush_chars =		acm_tty_flush_chars,
 	.write_room =		acm_tty_write_room,
 	.ioctl =		acm_tty_ioctl,
 	.throttle =		acm_tty_throttle,
