@@ -794,7 +794,7 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 	uint32_t aux_clock_divider;
 	int i, ret, recv_bytes;
 	uint32_t status;
-	int try, clock = 0;
+	int clock = 0;
 	bool has_aux_irq = HAS_AUX_IRQ(dev);
 	bool vdd;
 
@@ -836,41 +836,52 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 							  send_bytes,
 							  aux_clock_divider);
 
-		/* Must try at least 3 times according to DP spec */
-		for (try = 0; try < 5; try++) {
-			/* Load the send data into the aux channel data registers */
-			for (i = 0; i < send_bytes; i += 4)
-				I915_WRITE(ch_data + i,
-					   intel_dp_pack_aux(send + i,
-							     send_bytes - i));
+		/* Load the send data into the aux channel data registers */
+		for (i = 0; i < send_bytes; i += 4)
+			I915_WRITE(ch_data + i,
+				   intel_dp_pack_aux(send + i,
+						     send_bytes - i));
 
-			/* Send the command and wait for it to complete */
-			I915_WRITE(ch_ctl, send_ctl);
+		/* Send the command and wait for it to complete */
+		I915_WRITE(ch_ctl, send_ctl);
 
-			status = intel_dp_aux_wait_done(intel_dp, has_aux_irq);
+		status = intel_dp_aux_wait_done(intel_dp, has_aux_irq);
 
-			/* Clear done status and any errors */
-			I915_WRITE(ch_ctl,
-				   status |
-				   DP_AUX_CH_CTL_DONE |
-				   DP_AUX_CH_CTL_TIME_OUT_ERROR |
-				   DP_AUX_CH_CTL_RECEIVE_ERROR);
+		/* Clear done status and any errors */
+		I915_WRITE(ch_ctl,
+			   status |
+			   DP_AUX_CH_CTL_DONE |
+			   DP_AUX_CH_CTL_TIME_OUT_ERROR |
+			   DP_AUX_CH_CTL_RECEIVE_ERROR);
 
-			if (status & DP_AUX_CH_CTL_TIME_OUT_ERROR)
-				continue;
-
-			/* DP CTS 1.2 Core Rev 1.1, 4.2.1.1 & 4.2.1.2
-			 *   400us delay required for errors and timeouts
-			 *   Timeout errors from the HW already meet this
-			 *   requirement so skip to next iteration
+		if (status & DP_AUX_CH_CTL_TIME_OUT_ERROR) {
+			/*
+			 * We don't know what caused the error, so let's
+			 * return -EBUSY so drm level takes care of
+			 * the necessary retries
 			 */
-			if (status & DP_AUX_CH_CTL_RECEIVE_ERROR) {
-				usleep_range(400, 500);
-				continue;
-			}
-			if (status & DP_AUX_CH_CTL_DONE)
-				goto done;
+			ret = -EBUSY;
+			goto out;
 		}
+
+		/* DP CTS 1.2 Core Rev 1.1, 4.2.1.1 & 4.2.1.2
+		 *   400us delay required for errors and timeouts
+		 *   Timeout errors from the HW already meet this
+		 *   requirement so skip to next iteration
+		 */
+		if (status & DP_AUX_CH_CTL_RECEIVE_ERROR) {
+			usleep_range(400, 500);
+			/*
+			 * We don't know what caused the error, so let's
+			 * return -EBUSY so drm level takes care of
+			 * the necessary retries
+			 */
+			ret = -EBUSY;
+			goto out;
+		}
+
+		if (status & DP_AUX_CH_CTL_DONE)
+			goto done;
 	}
 
 	if ((status & DP_AUX_CH_CTL_DONE) == 0) {
