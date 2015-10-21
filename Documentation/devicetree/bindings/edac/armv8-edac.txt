@@ -1,0 +1,15 @@
+* ARMv8 L1/L2 cache error reporting
+
+On ARMv8, CPU Memory Error Syndrome Register and L2 Memory Error Syndrome
+Register can be used for checking L1 and L2 memory errors.
+
+The following section describes the ARMv8 EDAC DT node binding.
+
+Required properties:
+- compatible: Should be "arm,armv8-edac"
+
+Example:
+	edac {
+		compatible = "arm,armv8-edac";
+	};
+
