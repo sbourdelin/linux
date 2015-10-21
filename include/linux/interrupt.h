@@ -670,4 +670,7 @@ extern int early_irq_init(void);
 extern int arch_probe_nr_irqs(void);
 extern int arch_early_irq_init(void);
 
+extern atomic_long_t irq_handler_change_count;
+extern wait_queue_head_t irq_handler_change_wq;
+
 #endif

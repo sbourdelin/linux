@@ -18,6 +18,7 @@
 #include <linux/sched.h>
 #include <linux/sched/rt.h>
 #include <linux/task_work.h>
+#include <linux/poll.h>
 
 #include "internals.h"
 
@@ -31,6 +32,17 @@ static int __init setup_forced_irqthreads(char *arg)
 }
 early_param("threadirqs", setup_forced_irqthreads);
 #endif
+
+atomic_long_t irq_handler_change_count = ATOMIC_LONG_INIT(0);
+DECLARE_WAIT_QUEUE_HEAD(irq_handler_change_wq);
+
+/* Bump change count and wake up anything waiting on changes to
+ * IRQ handlers */
+static void __irq_handler_change_event(void)
+{
+	atomic_long_inc(&irq_handler_change_count);
+	wake_up_poll(&irq_handler_change_wq, POLLIN);
+}
 
 static void __synchronize_hardirq(struct irq_desc *desc)
 {
@@ -1298,7 +1310,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	new->dir = NULL;
 	register_handler_proc(irq, new);
 	free_cpumask_var(mask);
-
+	__irq_handler_change_event();
 	return 0;
 
 mismatch:
@@ -1433,6 +1445,7 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
 	}
 
 	module_put(desc->owner);
+	__irq_handler_change_event();
 	return action;
 }
 
