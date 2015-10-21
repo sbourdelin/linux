@@ -361,6 +361,7 @@ static void hci_conn_timeout(struct work_struct *work)
 	struct hci_conn *conn = container_of(work, struct hci_conn,
 					     disc_work.work);
 	int refcnt = atomic_read(&conn->refcnt);
+	struct hci_dev *hdev = conn->hdev;
 
 	BT_DBG("hcon %p state %s", conn, state_to_string(conn->state));
 
@@ -375,6 +376,8 @@ static void hci_conn_timeout(struct work_struct *work)
 	 */
 	if (refcnt > 0)
 		return;
+
+	hci_dev_lock(hdev);
 
 	switch (conn->state) {
 	case BT_CONNECT:
@@ -405,6 +408,8 @@ static void hci_conn_timeout(struct work_struct *work)
 		conn->state = BT_CLOSED;
 		break;
 	}
+
+	hci_dev_unlock(hdev);
 }
 
 /* Enter sniff mode */
