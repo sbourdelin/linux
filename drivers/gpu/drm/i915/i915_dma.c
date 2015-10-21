@@ -849,10 +849,12 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 	else if (INTEL_INFO(dev)->gen >= 9)
 		gen9_sseu_info_init(dev);
 
+	DRM_DEBUG_DRIVER("slice mask: %04x\n", info->sseu.slice_mask);
 	DRM_DEBUG_DRIVER("slice total: %u\n",
 			 hweight32(info->sseu.slice_mask));
 	DRM_DEBUG_DRIVER("subslice total: %u\n",
 			 sseu_subslice_total(&info->sseu));
+	DRM_DEBUG_DRIVER("subslice mask %04x\n", info->sseu.subslice_mask);
 	DRM_DEBUG_DRIVER("subslice per slice: %u\n",
 			 hweight32(info->sseu.subslice_mask));
 	DRM_DEBUG_DRIVER("EU total: %u\n", info->sseu.eu_total);

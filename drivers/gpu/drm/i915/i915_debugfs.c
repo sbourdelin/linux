@@ -5068,10 +5068,14 @@ static void i915_print_sseu_info(struct seq_file *m, bool is_available_info,
 {
 	const char *type = is_available_info ? "Available" : "Enabled";
 
+	seq_printf(m, "  %s Slice Mask: %04x\n", type,
+		   sseu->slice_mask);
 	seq_printf(m, "  %s Slice Total: %u\n", type,
 		   hweight32(sseu->slice_mask));
 	seq_printf(m, "  %s Subslice Total: %u\n", type,
 		   sseu_subslice_total(sseu));
+	seq_printf(m, "  %s Subslice Mask: %04x\n", type,
+		   sseu->subslice_mask);
 	seq_printf(m, "  %s Subslice Per Slice: %u\n", type,
 		   hweight32(sseu->subslice_mask));
 	seq_printf(m, "  %s EU Total: %u\n", type,
