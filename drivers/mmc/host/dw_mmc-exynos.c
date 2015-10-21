@@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
 	DW_MCI_TYPE_EXYNOS5420_SMU,
 	DW_MCI_TYPE_EXYNOS7,
 	DW_MCI_TYPE_EXYNOS7_SMU,
+	DW_MCI_TYPE_EXYNOS3250,
 };
 
 /* Exynos implementation specific driver private data */
@@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
 	}, {
 		.compatible	= "samsung,exynos7-dw-mshc-smu",
 		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
+	}, {
+		.compatible	= "samsung,exynos3250-dw-mshc",
+		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
 	},
 };
 
@@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
 	} while (start_smpl != smpl);
 
 	found = dw_mci_exynos_get_best_clksmpl(candiates);
+
 	if (found >= 0) {
 		dw_mci_exynos_set_clksmpl(host, found);
 		priv->tuned_sample = found;
@@ -519,6 +524,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
 	{ .compatible = "samsung,exynos7-dw-mshc",
 			.data = &exynos_drv_data, },
 	{ .compatible = "samsung,exynos7-dw-mshc-smu",
+			.data = &exynos_drv_data, },
+	{ .compatible = "samsung,exynos3250-dw-mshc",
 			.data = &exynos_drv_data, },
 	{},
 };
