@@ -597,7 +597,8 @@ int i915_guc_submit(struct i915_guc_client *client,
 		    struct drm_i915_gem_request *rq)
 {
 	struct intel_guc *guc = client->guc;
-	enum intel_ring_id ring_id = rq->ring->id;
+	struct intel_engine_cs *ring = rq->ring;
+	enum intel_ring_id ring_id = ring->id;
 	unsigned long flags;
 	int q_ret, b_ret;
 
@@ -628,7 +629,39 @@ int i915_guc_submit(struct i915_guc_client *client,
 	guc->last_seqno[ring_id] = rq->seqno;
 	spin_unlock(&guc->host2guc_lock);
 
+	spin_lock_irq(&ring->execlist_lock);
+	list_add_tail(&rq->execlist_link, &ring->execlist_queue);
+	spin_unlock_irq(&ring->execlist_lock);
+
 	return q_ret;
+}
+
+void intel_guc_retire_requests(struct intel_engine_cs *ring)
+{
+	struct drm_i915_private *dev_priv = ring->dev->dev_private;
+
+	if (!dev_priv->guc.execbuf_client)
+		return;
+
+	spin_lock_irq(&ring->execlist_lock);
+
+	while (!list_empty(&ring->execlist_queue)) {
+		struct drm_i915_gem_request *request;
+
+		request = list_first_entry(&ring->execlist_queue,
+				struct drm_i915_gem_request,
+				execlist_link);
+
+		if (!i915_gem_request_completed(request, true))
+			break;
+
+		list_del(&request->execlist_link);
+		list_add_tail(&request->execlist_link,
+			&ring->execlist_retired_req_list);
+
+	}
+
+	spin_unlock(&ring->execlist_lock);
 }
 
 /*

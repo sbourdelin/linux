@@ -2879,6 +2879,7 @@ i915_gem_retire_requests(struct drm_device *dev)
 			idle &= list_empty(&ring->execlist_queue);
 			spin_unlock_irqrestore(&ring->execlist_lock, flags);
 
+			intel_guc_retire_requests(ring);
 			intel_execlists_retire_requests(ring);
 		}
 	}

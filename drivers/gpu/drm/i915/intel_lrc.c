@@ -564,11 +564,6 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
 
-	if (request->ctx != ring->default_context)
-		intel_lr_context_pin(request);
-
-	i915_gem_request_reference(request);
-
 	spin_lock_irq(&ring->execlist_lock);
 
 	list_for_each_entry(cursor, &ring->execlist_queue, execlist_link)
@@ -729,6 +724,11 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 
 	if (intel_ring_stopped(ring))
 		return;
+
+	if (request->ctx != ring->default_context)
+		intel_lr_context_pin(request);
+
+	i915_gem_request_reference(request);
 
 	if (dev_priv->guc.execbuf_client)
 		i915_guc_submit(dev_priv->guc.execbuf_client, request);
