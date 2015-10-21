@@ -105,11 +105,20 @@ static __always_inline int arch_spin_value_unlocked(arch_spinlock_t lock)
  */
 static __always_inline void arch_spin_lock(arch_spinlock_t *lock)
 {
-	register struct __raw_tickets inc = { .tail = TICKET_LOCK_INC };
+	register struct __raw_tickets inc;
 
+again:
+	inc = (struct __raw_tickets){ .tail = TICKET_LOCK_INC };
 	inc = xadd(&lock->tickets, inc);
 	if (likely(inc.head == inc.tail))
 		goto out;
+
+	/*
+	 * Avoid a stall when an old owner unlocked a reinitialized spinlock.
+	 * Simply ignore the superfluous increment of the head.
+	 */
+	if (unlikely(inc.head == inc.tail + TICKET_LOCK_INC))
+		goto again;
 
 	for (;;) {
 		unsigned count = SPIN_THRESHOLD;
