@@ -911,6 +911,17 @@ done:
 	/* Unload any bytes sent back from the other side */
 	recv_bytes = ((status & DP_AUX_CH_CTL_MESSAGE_SIZE_MASK) >>
 		      DP_AUX_CH_CTL_MESSAGE_SIZE_SHIFT);
+
+	/*
+	 * By BSpec: "Message sizes of 0 or >20 are not allowed."
+	 * We have no idea of what happened so we return -EBUSY so
+	 * drm layer takes care for the necessary retries.
+	 */
+	if (recv_bytes == 0 || recv_bytes > 20) {
+		ret = -EBUSY;
+		goto out;
+	}
+
 	if (recv_bytes > recv_size)
 		recv_bytes = recv_size;
 
