@@ -306,7 +306,6 @@ int brcms_c_stf_txchain_set(struct brcms_c_info *wlc, s32 int_val, bool force)
  */
 int brcms_c_stf_ss_update(struct brcms_c_info *wlc, struct brcms_band *band)
 {
-	int ret_code = 0;
 	u8 prev_stf_ss;
 	u8 upd_stf_ss;
 
@@ -325,7 +324,7 @@ int brcms_c_stf_ss_update(struct brcms_c_info *wlc, struct brcms_band *band)
 				    PHY_TXC1_MODE_SISO : PHY_TXC1_MODE_CDD;
 	} else {
 		if (wlc->band != band)
-			return ret_code;
+			return 0;
 		upd_stf_ss = (wlc->stf->txstreams == 1) ?
 				PHY_TXC1_MODE_SISO : band->band_stf_ss_mode;
 	}
@@ -334,7 +333,7 @@ int brcms_c_stf_ss_update(struct brcms_c_info *wlc, struct brcms_band *band)
 		brcms_b_band_stf_ss_set(wlc->hw, upd_stf_ss);
 	}
 
-	return ret_code;
+	return 0;
 }
 
 int brcms_c_stf_attach(struct brcms_c_info *wlc)
