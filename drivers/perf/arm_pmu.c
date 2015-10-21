@@ -619,6 +619,9 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
 			if (cpu_pmu->irq_affinity)
 				cpu = cpu_pmu->irq_affinity[i];
 
+			if (!cpu_online(cpu))
+				continue;
+
 			if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
 				continue;
 			irq = platform_get_irq(pmu_device, i);
@@ -664,6 +667,9 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
 
 			if (cpu_pmu->irq_affinity)
 				cpu = cpu_pmu->irq_affinity[i];
+
+			if (!cpu_online(cpu))
+				continue;
 
 			/*
 			 * If we have a single PMU interrupt that we can't shift,
