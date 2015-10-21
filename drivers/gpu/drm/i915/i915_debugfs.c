@@ -4966,7 +4966,7 @@ static void cherryview_sseu_device_status(struct drm_device *dev,
 			/* skip disabled subslice */
 			continue;
 
-		stat->slice_total = 1;
+		stat->slice_mask = BIT(0);
 		stat->subslice_per_slice++;
 		eu_cnt = ((sig1[ss] & CHV_EU08_PG_ENABLE) ? 0 : 2) +
 			 ((sig1[ss] & CHV_EU19_PG_ENABLE) ? 0 : 2) +
@@ -5015,7 +5015,7 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 			/* skip disabled slice */
 			continue;
 
-		stat->slice_total++;
+		stat->slice_mask |= BIT(s);
 
 		if (IS_SKYLAKE(dev))
 			ss_cnt = INTEL_INFO(dev)->sseu.subslice_per_slice;
@@ -5053,18 +5053,18 @@ static void broadwell_sseu_device_status(struct drm_device *dev,
 	int s;
 	u32 slice_info = I915_READ(GEN8_GT_SLICE_INFO);
 
-	stat->slice_total = hweight32(slice_info & GEN8_LSLICESTAT_MASK);
+	stat->slice_mask = slice_info & GEN8_LSLICESTAT_MASK;
 
-	if (stat->slice_total) {
+	if (stat->slice_mask) {
 		stat->subslice_per_slice =
 				INTEL_INFO(dev)->sseu.subslice_per_slice;
-		stat->subslice_total = stat->slice_total *
+		stat->subslice_total = hweight32(stat->slice_mask) *
 				       stat->subslice_per_slice;
 		stat->eu_per_subslice = INTEL_INFO(dev)->sseu.eu_per_subslice;
 		stat->eu_total = stat->eu_per_subslice * stat->subslice_total;
 
 		/* subtract fused off EU(s) from enabled slice(s) */
-		for (s = 0; s < stat->slice_total; s++) {
+		for (s = 0; s < hweight32(stat->slice_mask); s++) {
 			u8 subslice_7eu = INTEL_INFO(dev)->sseu.subslice_7eu[s];
 
 			stat->eu_total -= hweight8(subslice_7eu);
@@ -5078,7 +5078,7 @@ static void i915_print_sseu_info(struct seq_file *m, bool is_available_info,
 	const char *type = is_available_info ? "Available" : "Enabled";
 
 	seq_printf(m, "  %s Slice Total: %u\n", type,
-		   sseu->slice_total);
+		   hweight32(sseu->slice_mask));
 	seq_printf(m, "  %s Subslice Total: %u\n", type,
 		   sseu->subslice_total);
 	seq_printf(m, "  %s Subslice Per Slice: %u\n", type,
