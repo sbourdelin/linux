@@ -22,6 +22,8 @@
 #define MAX_MSI_IRQS			32
 #define MAX_MSI_CTRLS			(MAX_MSI_IRQS / 32)
 
+#define LTSSM_STATE_MASK		0x1f
+
 struct pcie_port {
 	struct device		*dev;
 	u8			root_bus_nr;
