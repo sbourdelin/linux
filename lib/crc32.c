@@ -242,7 +242,7 @@ static u32 __attribute_const__ crc32_generic_shift(u32 crc, size_t len,
 	u32 power = polynomial;	/* CRC of x^32 */
 	int i;
 
-	/* Shift up to 32 bits in the simple linear way */
+	/* Shift up to 24 bits in the simple linear way */
 	for (i = 0; i < 8 * (int)(len & 3); i++)
 		crc = (crc >> 1) ^ (crc & 1 ? polynomial : 0);
 
