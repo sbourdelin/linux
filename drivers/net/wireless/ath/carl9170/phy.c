@@ -966,7 +966,6 @@ static const struct carl9170_phy_freq_entry carl9170_phy_freq_params[] = {
 static int carl9170_init_rf_bank4_pwr(struct ar9170 *ar, bool band5ghz,
 				      u32 freq, enum carl9170_bw bw)
 {
-	int err;
 	u32 d0, d1, td0, td1, fd0, fd1;
 	u8 chansel;
 	u8 refsel0 = 1, refsel1 = 0;
@@ -1024,11 +1023,7 @@ static int carl9170_init_rf_bank4_pwr(struct ar9170 *ar, bool band5ghz,
 	carl9170_regwrite(0x1c58e8, fd1);
 
 	carl9170_regwrite_finish();
-	err = carl9170_regwrite_result();
-	if (err)
-		return err;
-
-	return 0;
+	return carl9170_regwrite_result();
 }
 
 static const struct carl9170_phy_freq_params *
