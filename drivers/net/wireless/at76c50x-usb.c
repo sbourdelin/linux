@@ -544,13 +544,10 @@ static void at76_ledtrig_tx_activity(void)
 static int at76_remap(struct usb_device *udev)
 {
 	int ret;
-	ret = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x0a,
+	return usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x0a,
 			      USB_TYPE_VENDOR | USB_DIR_OUT |
 			      USB_RECIP_INTERFACE, 0, 0, NULL, 0,
 			      USB_CTRL_GET_TIMEOUT);
-	if (ret < 0)
-		return ret;
-	return 0;
 }
 
 static int at76_get_op_mode(struct usb_device *udev)
