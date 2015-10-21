@@ -56,15 +56,19 @@ static int mlxsw_sp_port_attr_get(struct net_device *dev,
 {
 	struct mlxsw_sp_port *mlxsw_sp_port = netdev_priv(dev);
 	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
+	struct switchdev_attr_port_parent_id *parent_id;
+	struct switchdev_attr_port_bridge_flags *brport_flags;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
-		attr->u.ppid.id_len = sizeof(mlxsw_sp->base_mac);
-		memcpy(&attr->u.ppid.id, &mlxsw_sp->base_mac,
-		       attr->u.ppid.id_len);
+		parent_id = SWITCHDEV_ATTR_PORT_PARENT_ID(attr);
+		parent_id->ppid.id_len = sizeof(mlxsw_sp->base_mac);
+		memcpy(&parent_id->ppid.id, &mlxsw_sp->base_mac,
+		       parent_id->ppid.id_len);
 		break;
 	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
-		attr->u.brport_flags =
+		brport_flags = SWITCHDEV_ATTR_PORT_BRIDGE_FLAGS(attr);
+		brport_flags->brport_flags =
 			(mlxsw_sp_port->learning ? BR_LEARNING : 0) |
 			(mlxsw_sp_port->learning_sync ? BR_LEARNING_SYNC : 0);
 		break;
@@ -166,20 +170,26 @@ static int mlxsw_sp_port_attr_set(struct net_device *dev,
 				  struct switchdev_trans *trans)
 {
 	struct mlxsw_sp_port *mlxsw_sp_port = netdev_priv(dev);
+	struct switchdev_attr_port_stp_state *stp_state;
+	struct switchdev_attr_port_bridge_flags *brport_flags;
+	struct switchdev_attr_bridge_ageing_time *ageing_time;
 	int err = 0;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_STP_STATE:
+		stp_state = SWITCHDEV_ATTR_PORT_STP_STATE(attr);
 		err = mlxsw_sp_port_attr_stp_state_set(mlxsw_sp_port, trans,
-						       attr->u.stp_state);
+						       stp_state->state);
 		break;
 	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
+		brport_flags = SWITCHDEV_ATTR_PORT_BRIDGE_FLAGS(attr);
 		err = mlxsw_sp_port_attr_br_flags_set(mlxsw_sp_port, trans,
-						      attr->u.brport_flags);
+						      brport_flags->brport_flags);
 		break;
 	case SWITCHDEV_ATTR_ID_BRIDGE_AGEING_TIME:
+		ageing_time = SWITCHDEV_ATTR_BRIDGE_AGEING_TIME(attr);
 		err = mlxsw_sp_port_attr_br_ageing_set(mlxsw_sp_port, trans,
-						       attr->u.ageing_time);
+						       ageing_time->ageing_time);
 		break;
 	default:
 		err = -EOPNOTSUPP;

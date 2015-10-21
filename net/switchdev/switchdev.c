@@ -310,7 +310,27 @@ static void switchdev_port_attr_set_deferred(struct net_device *dev,
 static int switchdev_port_attr_set_defer(struct net_device *dev,
 					 const struct switchdev_attr *attr)
 {
-	return switchdev_deferred_enqueue(dev, attr, sizeof(*attr),
+	size_t size = 0;
+
+	switch (attr->id) {
+	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
+		size = sizeof(struct switchdev_attr_port_parent_id);
+		break;
+	case SWITCHDEV_ATTR_ID_PORT_STP_STATE:
+		size = sizeof(struct switchdev_attr_port_stp_state);
+		break;
+	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
+		size = sizeof(struct switchdev_attr_port_bridge_flags);
+		break;
+	case SWITCHDEV_ATTR_ID_BRIDGE_AGEING_TIME:
+		size = sizeof(struct switchdev_attr_bridge_ageing_time);
+		break;
+	default:
+		WARN_ON(!size);
+		return -EINVAL;
+	}
+
+	return switchdev_deferred_enqueue(dev, attr, size,
 					  switchdev_port_attr_set_deferred);
 }
 
@@ -757,19 +777,19 @@ int switchdev_port_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				  struct net_device *dev, u32 filter_mask,
 				  int nlflags)
 {
-	struct switchdev_attr attr = {
-		.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS,
+	struct switchdev_attr_port_bridge_flags attr = {
+		.attr.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS,
 	};
 	u16 mode = BRIDGE_MODE_UNDEF;
 	u32 mask = BR_LEARNING | BR_LEARNING_SYNC;
 	int err;
 
-	err = switchdev_port_attr_get(dev, &attr);
+	err = switchdev_port_attr_get(dev, &attr.attr);
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
 	return ndo_dflt_bridge_getlink(skb, pid, seq, dev, mode,
-				       attr.u.brport_flags, mask, nlflags,
+				       attr.brport_flags, mask, nlflags,
 				       filter_mask, switchdev_port_vlan_fill);
 }
 EXPORT_SYMBOL_GPL(switchdev_port_bridge_getlink);
@@ -778,22 +798,22 @@ static int switchdev_port_br_setflag(struct net_device *dev,
 				     struct nlattr *nlattr,
 				     unsigned long brport_flag)
 {
-	struct switchdev_attr attr = {
-		.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS,
+	struct switchdev_attr_port_bridge_flags attr = {
+		.attr.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS,
 	};
 	u8 flag = nla_get_u8(nlattr);
 	int err;
 
-	err = switchdev_port_attr_get(dev, &attr);
+	err = switchdev_port_attr_get(dev, &attr.attr);
 	if (err)
 		return err;
 
 	if (flag)
-		attr.u.brport_flags |= brport_flag;
+		attr.brport_flags |= brport_flag;
 	else
-		attr.u.brport_flags &= ~brport_flag;
+		attr.brport_flags &= ~brport_flag;
 
-	return switchdev_port_attr_set(dev, &attr);
+	return switchdev_port_attr_set(dev, &attr.attr);
 }
 
 static const struct nla_policy
@@ -1112,10 +1132,10 @@ static struct net_device *switchdev_get_lowest_dev(struct net_device *dev)
 
 static struct net_device *switchdev_get_dev_by_nhs(struct fib_info *fi)
 {
-	struct switchdev_attr attr = {
-		.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
+	struct switchdev_attr_port_parent_id parent_id = {
+		.attr.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
 	};
-	struct switchdev_attr prev_attr;
+	struct switchdev_attr_port_parent_id prev_parent_id;
 	struct net_device *dev = NULL;
 	int nhsel;
 
@@ -1133,14 +1153,15 @@ static struct net_device *switchdev_get_dev_by_nhs(struct fib_info *fi)
 		if (!dev)
 			return NULL;
 
-		if (switchdev_port_attr_get(dev, &attr))
+		if (switchdev_port_attr_get(dev, &parent_id.attr))
 			return NULL;
 
 		if (nhsel > 0 &&
-		    !netdev_phys_item_id_same(&prev_attr.u.ppid, &attr.u.ppid))
+		    !netdev_phys_item_id_same(&prev_parent_id.ppid,
+					      &parent_id.ppid))
 				return NULL;
 
-		prev_attr = attr;
+		prev_parent_id = parent_id;
 	}
 
 	return dev;
@@ -1267,20 +1288,24 @@ EXPORT_SYMBOL_GPL(switchdev_fib_ipv4_abort);
 static bool switchdev_port_same_parent_id(struct net_device *a,
 					  struct net_device *b)
 {
-	struct switchdev_attr a_attr = {
-		.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
-		.flags = SWITCHDEV_F_NO_RECURSE,
+	struct switchdev_attr_port_parent_id parent_a_id = {
+		.attr = {
+			.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
+			.flags = SWITCHDEV_F_NO_RECURSE,
+		},
 	};
-	struct switchdev_attr b_attr = {
-		.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
-		.flags = SWITCHDEV_F_NO_RECURSE,
+	struct switchdev_attr_port_parent_id parent_b_id = {
+		.attr = {
+			.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
+			.flags = SWITCHDEV_F_NO_RECURSE,
+		},
 	};
 
-	if (switchdev_port_attr_get(a, &a_attr) ||
-	    switchdev_port_attr_get(b, &b_attr))
+	if (switchdev_port_attr_get(a, &parent_a_id.attr) ||
+	    switchdev_port_attr_get(b, &parent_b_id.attr))
 		return false;
 
-	return netdev_phys_item_id_same(&a_attr.u.ppid, &b_attr.u.ppid);
+	return netdev_phys_item_id_same(&parent_a_id.ppid, &parent_b_id.ppid);
 }
 
 static u32 switchdev_port_fwd_mark_get(struct net_device *dev,
