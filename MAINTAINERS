@@ -1439,6 +1439,8 @@ F:	drivers/*/*s3c2410*
 F:	drivers/*/*/*s3c2410*
 F:	drivers/spi/spi-s3c*
 F:	sound/soc/samsung/*
+F:	Documentation/arm/Samsung/
+F:	Documentation/devicetree/bindings/arm/samsung/
 N:	exynos
 
 ARM/SAMSUNG MOBILE MACHINE SUPPORT
