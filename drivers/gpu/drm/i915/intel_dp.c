@@ -818,24 +818,8 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 
 	intel_aux_display_runtime_get(dev_priv);
 
-	/* Try to wait for any previous AUX channel activity */
-	for (try = 0; try < 3; try++) {
-		status = I915_READ_NOTRACE(ch_ctl);
-		if ((status & DP_AUX_CH_CTL_SEND_BUSY) == 0)
-			break;
-		msleep(1);
-	}
-
-	if (try == 3) {
-		static u32 last_status = -1;
-		const u32 status = I915_READ(ch_ctl);
-
-		if (status != last_status) {
-			WARN(1, "dp_aux_ch not started status 0x%08x\n",
-			     status);
-			last_status = status;
-		}
-
+	status = I915_READ_NOTRACE(ch_ctl);
+	if ((status & DP_AUX_CH_CTL_SEND_BUSY) != 0) {
 		ret = -EBUSY;
 		goto out;
 	}
