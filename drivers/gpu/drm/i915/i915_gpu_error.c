@@ -335,6 +335,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 	struct drm_device *dev = error_priv->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_error_state *error = error_priv->error;
+	struct intel_csr *csr = &dev_priv->csr;
 	struct drm_i915_error_object *obj;
 	int i, j, offset, elt;
 	int max_hangcheck_score;
@@ -366,6 +367,10 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 	err_printf(m, "Suspend count: %u\n", error->suspend_count);
 	err_printf(m, "PCI ID: 0x%04x\n", dev->pdev->device);
 	err_printf(m, "IOMMU enabled?: %d\n", error->iommu);
+	err_printf(m, "DMC load state: %d\n", csr->state);
+	err_printf(m, "DMC fw version: %d.%d\n",
+		   CSR_VERSION_MAJOR(csr->version),
+		   CSR_VERSION_MINOR(csr->version));
 	err_printf(m, "EIR: 0x%08x\n", error->eir);
 	err_printf(m, "IER: 0x%08x\n", error->ier);
 	if (INTEL_INFO(dev)->gen >= 8) {
