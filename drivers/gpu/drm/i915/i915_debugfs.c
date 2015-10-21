@@ -2796,6 +2796,10 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 
 	csr_state = intel_csr_load_status_get(dev_priv);
 	seq_printf(m, "status: %s\n", csr_state_str[csr_state]);
+	seq_printf(m, "path: %s\n", csr->fw_path);
+	seq_printf(m, "program base: 0x%08x\n", I915_READ(CSR_PROGRAM(0)));
+	seq_printf(m, "ssp base: 0x%08x\n", I915_READ(CSR_SSP_BASE));
+	seq_printf(m, "htp: 0x%08x\n", I915_READ(CSR_HTP_SKL));
 
 	if (csr_state != FW_LOADED)
 		return 0;

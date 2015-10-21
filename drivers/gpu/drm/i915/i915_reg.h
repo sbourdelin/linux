@@ -5697,6 +5697,9 @@ enum skl_disp_power_wells {
 #define GAMMA_MODE_MODE_SPLIT	(3 << 0)
 
 /* DMC/CSR */
+#define CSR_PROGRAM(i)		(0x80000 + (i) * 4)
+#define CSR_SSP_BASE		0x8F074
+#define CSR_HTP_SKL		0x8F004
 #define SKL_CSR_DC3_DC5_COUNT	0x80030
 #define SKL_CSR_DC5_DC6_COUNT	0x8002C
 #define BXT_CSR_DC3_DC5_COUNT	0x80038
