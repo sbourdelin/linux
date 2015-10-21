@@ -47,6 +47,9 @@
 MODULE_FIRMWARE(I915_CSR_SKL);
 MODULE_FIRMWARE(I915_CSR_BXT);
 
+#define SKL_REQUIRED_FW_MAJOR	1
+#define SKL_REQUIRED_FW_MINOR	23
+
 /*
 * SKL CSR registers for DC5 and DC6
 */
@@ -400,6 +403,14 @@ static void finish_csr_load(const struct firmware *fw, void *context)
 
 	dmc_payload = csr->dmc_payload;
 	memcpy(dmc_payload, &fw->data[readcount], nbytes);
+
+	if (IS_SKYLAKE(dev) &&
+	    (CSR_VERSION_MAJOR(csr->version) < SKL_REQUIRED_FW_MAJOR ||
+	     CSR_VERSION_MINOR(csr->version) < SKL_REQUIRED_FW_MINOR)) {
+		DRM_INFO("Outdated dmc firmware found, please upgrade to %u.%u or newer\n",
+			 SKL_REQUIRED_FW_MAJOR, SKL_REQUIRED_FW_MINOR);
+		goto out;
+	}
 
 	/* load csr program during system boot, as needed for DC states */
 	intel_csr_load_program(dev);
