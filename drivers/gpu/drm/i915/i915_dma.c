@@ -154,12 +154,12 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		value = 1;
 		break;
 	case I915_PARAM_SUBSLICE_TOTAL:
-		value = INTEL_INFO(dev)->subslice_total;
+		value = INTEL_INFO(dev)->sseu.subslice_total;
 		if (!value)
 			return -ENODEV;
 		break;
 	case I915_PARAM_EU_TOTAL:
-		value = INTEL_INFO(dev)->eu_total;
+		value = INTEL_INFO(dev)->sseu.eu_total;
 		if (!value)
 			return -ENODEV;
 		break;
@@ -582,10 +582,10 @@ static void i915_dump_device_info(struct drm_i915_private *dev_priv)
 static void cherryview_sseu_info_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_device_info *info;
+	struct sseu_dev_info *info;
 	u32 fuse, eu_dis;
 
-	info = (struct intel_device_info *)&dev_priv->info;
+	info = (struct sseu_dev_info *)&INTEL_INFO(dev_priv)->sseu;
 	fuse = I915_READ(CHV_FUSE_GT);
 
 	info->slice_total = 1;
@@ -625,13 +625,13 @@ static void cherryview_sseu_info_init(struct drm_device *dev)
 static void gen9_sseu_info_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_device_info *info;
+	struct sseu_dev_info *info;
 	int s_max = 3, ss_max = 4, eu_max = 8;
 	int s, ss;
 	u32 fuse2, s_enable, ss_disable, eu_disable;
 	u8 eu_mask = 0xff;
 
-	info = (struct intel_device_info *)&dev_priv->info;
+	info = (struct sseu_dev_info *)&INTEL_INFO(dev_priv)->sseu;
 	fuse2 = I915_READ(GEN8_FUSE2);
 	s_enable = (fuse2 & GEN8_F2_S_ENA_MASK) >>
 		   GEN8_F2_S_ENA_SHIFT;
@@ -705,7 +705,7 @@ static void gen9_sseu_info_init(struct drm_device *dev)
 static void broadwell_sseu_info_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_device_info *info;
+	struct sseu_dev_info *info;
 	const int s_max = 3, ss_max = 3, eu_max = 8;
 	int s, ss;
 	u32 fuse2, eu_disable[s_max], s_enable, ss_disable;
@@ -723,7 +723,8 @@ static void broadwell_sseu_info_init(struct drm_device *dev)
 			 (32 - GEN8_EU_DIS1_S2_SHIFT));
 
 
-	info = (struct intel_device_info *)&dev_priv->info;
+	info = (struct sseu_dev_info *)&INTEL_INFO(dev_priv)->sseu;
+
 	info->slice_total = hweight32(s_enable);
 
 	/*
@@ -853,17 +854,18 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 	else if (INTEL_INFO(dev)->gen >= 9)
 		gen9_sseu_info_init(dev);
 
-	DRM_DEBUG_DRIVER("slice total: %u\n", info->slice_total);
-	DRM_DEBUG_DRIVER("subslice total: %u\n", info->subslice_total);
-	DRM_DEBUG_DRIVER("subslice per slice: %u\n", info->subslice_per_slice);
-	DRM_DEBUG_DRIVER("EU total: %u\n", info->eu_total);
-	DRM_DEBUG_DRIVER("EU per subslice: %u\n", info->eu_per_subslice);
+	DRM_DEBUG_DRIVER("slice total: %u\n", info->sseu.slice_total);
+	DRM_DEBUG_DRIVER("subslice total: %u\n", info->sseu.subslice_total);
+	DRM_DEBUG_DRIVER("subslice per slice: %u\n",
+						info->sseu.subslice_per_slice);
+	DRM_DEBUG_DRIVER("EU total: %u\n", info->sseu.eu_total);
+	DRM_DEBUG_DRIVER("EU per subslice: %u\n", info->sseu.eu_per_subslice);
 	DRM_DEBUG_DRIVER("has slice power gating: %s\n",
-			 info->has_slice_pg ? "y" : "n");
+			 info->sseu.has_slice_pg ? "y" : "n");
 	DRM_DEBUG_DRIVER("has subslice power gating: %s\n",
-			 info->has_subslice_pg ? "y" : "n");
+			 info->sseu.has_subslice_pg ? "y" : "n");
 	DRM_DEBUG_DRIVER("has EU power gating: %s\n",
-			 info->has_eu_pg ? "y" : "n");
+			 info->sseu.has_eu_pg ? "y" : "n");
 }
 
 static void intel_init_dpio(struct drm_i915_private *dev_priv)

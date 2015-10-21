@@ -5018,7 +5018,7 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 		stat->slice_total++;
 
 		if (IS_SKYLAKE(dev))
-			ss_cnt = INTEL_INFO(dev)->subslice_per_slice;
+			ss_cnt = INTEL_INFO(dev)->sseu.subslice_per_slice;
 
 		for (ss = 0; ss < ss_max; ss++) {
 			unsigned int eu_cnt;
@@ -5056,15 +5056,16 @@ static void broadwell_sseu_device_status(struct drm_device *dev,
 	stat->slice_total = hweight32(slice_info & GEN8_LSLICESTAT_MASK);
 
 	if (stat->slice_total) {
-		stat->subslice_per_slice = INTEL_INFO(dev)->subslice_per_slice;
+		stat->subslice_per_slice =
+				INTEL_INFO(dev)->sseu.subslice_per_slice;
 		stat->subslice_total = stat->slice_total *
 				       stat->subslice_per_slice;
-		stat->eu_per_subslice = INTEL_INFO(dev)->eu_per_subslice;
+		stat->eu_per_subslice = INTEL_INFO(dev)->sseu.eu_per_subslice;
 		stat->eu_total = stat->eu_per_subslice * stat->subslice_total;
 
 		/* subtract fused off EU(s) from enabled slice(s) */
 		for (s = 0; s < stat->slice_total; s++) {
-			u8 subslice_7eu = INTEL_INFO(dev)->subslice_7eu[s];
+			u8 subslice_7eu = INTEL_INFO(dev)->sseu.subslice_7eu[s];
 
 			stat->eu_total -= hweight8(subslice_7eu);
 		}
@@ -5082,21 +5083,21 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 
 	seq_puts(m, "SSEU Device Info\n");
 	seq_printf(m, "  Available Slice Total: %u\n",
-		   INTEL_INFO(dev)->slice_total);
+		   INTEL_INFO(dev)->sseu.slice_total);
 	seq_printf(m, "  Available Subslice Total: %u\n",
-		   INTEL_INFO(dev)->subslice_total);
+		   INTEL_INFO(dev)->sseu.subslice_total);
 	seq_printf(m, "  Available Subslice Per Slice: %u\n",
-		   INTEL_INFO(dev)->subslice_per_slice);
+		   INTEL_INFO(dev)->sseu.subslice_per_slice);
 	seq_printf(m, "  Available EU Total: %u\n",
-		   INTEL_INFO(dev)->eu_total);
+		   INTEL_INFO(dev)->sseu.eu_total);
 	seq_printf(m, "  Available EU Per Subslice: %u\n",
-		   INTEL_INFO(dev)->eu_per_subslice);
+		   INTEL_INFO(dev)->sseu.eu_per_subslice);
 	seq_printf(m, "  Has Slice Power Gating: %s\n",
-		   yesno(INTEL_INFO(dev)->has_slice_pg));
+		   yesno(INTEL_INFO(dev)->sseu.has_slice_pg));
 	seq_printf(m, "  Has Subslice Power Gating: %s\n",
-		   yesno(INTEL_INFO(dev)->has_subslice_pg));
+		   yesno(INTEL_INFO(dev)->sseu.has_subslice_pg));
 	seq_printf(m, "  Has EU Power Gating: %s\n",
-		   yesno(INTEL_INFO(dev)->has_eu_pg));
+		   yesno(INTEL_INFO(dev)->sseu.has_eu_pg));
 
 	seq_puts(m, "SSEU Device Status\n");
 	memset(&stat, 0, sizeof(stat));

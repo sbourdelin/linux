@@ -788,6 +788,11 @@ struct sseu_dev_info {
 	u8 subslice_per_slice;
 	u8 eu_total;
 	u8 eu_per_subslice;
+	/* For each slice, which subslice(s) has(have) 7 EUs (bitfield)? */
+	u8 subslice_7eu[3];
+	u8 has_slice_pg:1;
+	u8 has_subslice_pg:1;
+	u8 has_eu_pg:1;
 };
 
 struct intel_device_info {
@@ -805,16 +810,7 @@ struct intel_device_info {
 	int cursor_offsets[I915_MAX_PIPES];
 
 	/* Slice/subslice/EU info */
-	u8 slice_total;
-	u8 subslice_total;
-	u8 subslice_per_slice;
-	u8 eu_total;
-	u8 eu_per_subslice;
-	/* For each slice, which subslice(s) has(have) 7 EUs (bitfield)? */
-	u8 subslice_7eu[3];
-	u8 has_slice_pg:1;
-	u8 has_subslice_pg:1;
-	u8 has_eu_pg:1;
+	struct sseu_dev_info sseu;
 };
 
 #undef DEFINE_FLAG

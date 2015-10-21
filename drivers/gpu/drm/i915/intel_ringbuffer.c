@@ -998,7 +998,7 @@ static int skl_tune_iz_hashing(struct intel_engine_cs *ring)
 		 * Only consider slices where one, and only one, subslice has 7
 		 * EUs
 		 */
-		if (hweight8(dev_priv->info.subslice_7eu[i]) != 1)
+		if (hweight8(INTEL_INFO(dev_priv)->sseu.subslice_7eu[i]) != 1)
 			continue;
 
 		/*
@@ -1007,7 +1007,7 @@ static int skl_tune_iz_hashing(struct intel_engine_cs *ring)
 		 *
 		 * ->    0 <= ss <= 3;
 		 */
-		ss = ffs(dev_priv->info.subslice_7eu[i]) - 1;
+		ss = ffs(INTEL_INFO(dev_priv)->sseu.subslice_7eu[i]) - 1;
 		vals[i] = 3 - ss;
 	}
 
