@@ -1756,7 +1756,7 @@ static int Handle_Key(struct host_if_drv *hif_drv,
 
 			if (pu8keybuf == NULL) {
 				PRINT_ER("No buffer to send Key\n");
-				return -1;
+				return -ENOMEM;
 			}
 
 			kfree(pstrHostIFkeyAttr->attr.wep.key);
@@ -1779,7 +1779,7 @@ static int Handle_Key(struct host_if_drv *hif_drv,
 			pu8keybuf = kmalloc(pstrHostIFkeyAttr->attr.wep.key_len + 2, GFP_KERNEL);
 			if (pu8keybuf == NULL) {
 				PRINT_ER("No buffer to send Key\n");
-				return -1;
+				return -ENOMEM;
 			}
 			pu8keybuf[0] = pstrHostIFkeyAttr->attr.wep.index;
 			memcpy(pu8keybuf + 1, &pstrHostIFkeyAttr->attr.wep.key_len, 1);
@@ -1826,7 +1826,7 @@ static int Handle_Key(struct host_if_drv *hif_drv,
 			pu8keybuf = kzalloc(RX_MIC_KEY_MSG_LEN, GFP_KERNEL);
 			if (pu8keybuf == NULL) {
 				PRINT_ER("No buffer to send RxGTK Key\n");
-				ret = -1;
+				ret = -ENOMEM;
 				goto _WPARxGtk_end_case_;
 			}
 
@@ -1861,7 +1861,7 @@ static int Handle_Key(struct host_if_drv *hif_drv,
 			pu8keybuf = kzalloc(RX_MIC_KEY_MSG_LEN, GFP_KERNEL);
 			if (pu8keybuf == NULL) {
 				PRINT_ER("No buffer to send RxGTK Key\n");
-				ret = -1;
+				ret = -ENOMEM;
 				goto _WPARxGtk_end_case_;
 			}
 
@@ -1890,7 +1890,7 @@ static int Handle_Key(struct host_if_drv *hif_drv,
 _WPARxGtk_end_case_:
 		kfree(pstrHostIFkeyAttr->attr.wpa.key);
 		kfree(pstrHostIFkeyAttr->attr.wpa.seq);
-		if (ret == -1)
+		if (ret)
 			return ret;
 
 		break;
@@ -1905,7 +1905,7 @@ _WPARxGtk_end_case_:
 
 			if (pu8keybuf == NULL) {
 				PRINT_ER("No buffer to send PTK Key\n");
-				ret = -1;
+				ret = -ENOMEM;
 				goto _WPAPtk_end_case_;
 
 			}
@@ -1940,7 +1940,7 @@ _WPARxGtk_end_case_:
 
 			if (pu8keybuf == NULL) {
 				PRINT_ER("No buffer to send PTK Key\n");
-				ret = -1;
+				ret = -ENOMEM;
 				goto _WPAPtk_end_case_;
 
 			}
@@ -1963,7 +1963,7 @@ _WPARxGtk_end_case_:
 
 _WPAPtk_end_case_:
 		kfree(pstrHostIFkeyAttr->attr.wpa.key);
-		if (ret == -1)
+		if (ret)
 			return ret;
 
 		break;
@@ -1976,7 +1976,7 @@ _WPAPtk_end_case_:
 		pu8keybuf = kmalloc((pstrHostIFkeyAttr->attr.pmkid.numpmkid * PMKSA_KEY_LEN) + 1, GFP_KERNEL);
 		if (pu8keybuf == NULL) {
 			PRINT_ER("No buffer to send PMKSA Key\n");
-			return -1;
+			return -ENOMEM;
 		}
 
 		pu8keybuf[0] = pstrHostIFkeyAttr->attr.pmkid.numpmkid;
