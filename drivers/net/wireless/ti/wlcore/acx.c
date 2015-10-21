@@ -162,12 +162,8 @@ int wl1271_acx_mem_map(struct wl1271 *wl, struct acx_header *mem_map,
 
 	wl1271_debug(DEBUG_ACX, "acx mem map");
 
-	ret = wl1271_cmd_interrogate(wl, ACX_MEM_MAP, mem_map,
+	return wl1271_cmd_interrogate(wl, ACX_MEM_MAP, mem_map,
 				     sizeof(struct acx_header), len);
-	if (ret < 0)
-		return ret;
-
-	return 0;
 }
 
 int wl1271_acx_rx_msdu_life_time(struct wl1271 *wl)
