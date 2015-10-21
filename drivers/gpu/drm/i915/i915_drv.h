@@ -784,8 +784,7 @@ struct intel_csr {
 
 struct sseu_dev_info {
 	u8 slice_mask;
-	u8 subslice_total;
-	u8 subslice_per_slice;
+	u8 subslice_mask;
 	u8 eu_total;
 	u8 eu_per_subslice;
 	/* For each slice, which subslice(s) has(have) 7 EUs (bitfield)? */
@@ -794,6 +793,11 @@ struct sseu_dev_info {
 	u8 has_subslice_pg:1;
 	u8 has_eu_pg:1;
 };
+
+static inline unsigned int sseu_subslice_total(const struct sseu_dev_info *sseu)
+{
+	return hweight32((sseu)->slice_mask) * hweight32((sseu)->subslice_mask);
+}
 
 struct intel_device_info {
 	u32 display_mmio_offset;

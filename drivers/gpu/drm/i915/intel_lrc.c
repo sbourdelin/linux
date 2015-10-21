@@ -2183,7 +2183,7 @@ make_rpcs(struct drm_device *dev)
 
 	if (INTEL_INFO(dev)->sseu.has_subslice_pg) {
 		rpcs |= GEN8_RPCS_SS_CNT_ENABLE;
-		rpcs |= INTEL_INFO(dev)->sseu.subslice_per_slice <<
+		rpcs |= hweight32(INTEL_INFO(dev)->sseu.subslice_mask) <<
 			GEN8_RPCS_SS_CNT_SHIFT;
 		rpcs |= GEN8_RPCS_ENABLE;
 	}

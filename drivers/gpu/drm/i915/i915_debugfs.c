@@ -4967,7 +4967,7 @@ static void cherryview_sseu_device_status(struct drm_device *dev,
 			continue;
 
 		stat->slice_mask = BIT(0);
-		stat->subslice_per_slice++;
+		stat->subslice_mask |= BIT(ss);
 		eu_cnt = ((sig1[ss] & CHV_EU08_PG_ENABLE) ? 0 : 2) +
 			 ((sig1[ss] & CHV_EU19_PG_ENABLE) ? 0 : 2) +
 			 ((sig1[ss] & CHV_EU210_PG_ENABLE) ? 0 : 2) +
@@ -4976,7 +4976,6 @@ static void cherryview_sseu_device_status(struct drm_device *dev,
 		stat->eu_per_subslice = max_t(unsigned int,
 					      stat->eu_per_subslice, eu_cnt);
 	}
-	stat->subslice_total = stat->subslice_per_slice;
 }
 
 static void gen9_sseu_device_status(struct drm_device *dev,
@@ -5009,8 +5008,6 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 		     GEN9_PGCTL_SSB_EU311_ACK;
 
 	for (s = 0; s < s_max; s++) {
-		unsigned int ss_cnt = 0;
-
 		if ((s_reg[s] & GEN9_PGCTL_SLICE_ACK) == 0)
 			/* skip disabled slice */
 			continue;
@@ -5018,18 +5015,19 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 		stat->slice_mask |= BIT(s);
 
 		if (IS_SKYLAKE(dev))
-			ss_cnt = INTEL_INFO(dev)->sseu.subslice_per_slice;
+			stat->subslice_mask =
+				INTEL_INFO(dev_priv)->sseu.subslice_mask;
 
 		for (ss = 0; ss < ss_max; ss++) {
 			unsigned int eu_cnt;
 
-			if (IS_BROXTON(dev) &&
-			    !(s_reg[s] & (GEN9_PGCTL_SS_ACK(ss))))
-				/* skip disabled subslice */
-				continue;
+			if (IS_BROXTON(dev)) {
+				if (!(s_reg[s] & (GEN9_PGCTL_SS_ACK(ss))))
+					/* skip disabled subslice */
+					continue;
 
-			if (IS_BROXTON(dev))
-				ss_cnt++;
+				stat->subslice_mask |= BIT(ss);
+			}
 
 			eu_cnt = 2 * hweight32(eu_reg[2*s + ss/2] &
 					       eu_mask[ss%2]);
@@ -5038,11 +5036,6 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 						      stat->eu_per_subslice,
 						      eu_cnt);
 		}
-
-		stat->subslice_total += ss_cnt;
-		stat->subslice_per_slice = max_t(unsigned int,
-						 stat->subslice_per_slice,
-						 ss_cnt);
 	}
 }
 
@@ -5056,12 +5049,10 @@ static void broadwell_sseu_device_status(struct drm_device *dev,
 	stat->slice_mask = slice_info & GEN8_LSLICESTAT_MASK;
 
 	if (stat->slice_mask) {
-		stat->subslice_per_slice =
-				INTEL_INFO(dev)->sseu.subslice_per_slice;
-		stat->subslice_total = hweight32(stat->slice_mask) *
-				       stat->subslice_per_slice;
+		stat->subslice_mask = INTEL_INFO(dev)->sseu.subslice_mask;
 		stat->eu_per_subslice = INTEL_INFO(dev)->sseu.eu_per_subslice;
-		stat->eu_total = stat->eu_per_subslice * stat->subslice_total;
+		stat->eu_total = stat->eu_per_subslice *
+				 sseu_subslice_total(stat);
 
 		/* subtract fused off EU(s) from enabled slice(s) */
 		for (s = 0; s < hweight32(stat->slice_mask); s++) {
@@ -5080,9 +5071,9 @@ static void i915_print_sseu_info(struct seq_file *m, bool is_available_info,
 	seq_printf(m, "  %s Slice Total: %u\n", type,
 		   hweight32(sseu->slice_mask));
 	seq_printf(m, "  %s Subslice Total: %u\n", type,
-		   sseu->subslice_total);
+		   sseu_subslice_total(sseu));
 	seq_printf(m, "  %s Subslice Per Slice: %u\n", type,
-		   sseu->subslice_per_slice);
+		   hweight32(sseu->subslice_mask));
 	seq_printf(m, "  %s EU Total: %u\n", type,
 		   sseu->eu_total);
 	seq_printf(m, "  %s EU Per Subslice: %u\n", type,
