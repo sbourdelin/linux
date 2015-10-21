@@ -2783,6 +2783,7 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 	struct drm_info_node *node = m->private;
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_csr *csr = &dev_priv->csr;
 	enum csr_state csr_state;
 	static const char * const csr_state_str[] = {
 		"unknown", "loaded", "error"
@@ -2795,6 +2796,12 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 
 	csr_state = intel_csr_load_status_get(dev_priv);
 	seq_printf(m, "status: %s\n", csr_state_str[csr_state]);
+
+	if (csr_state != FW_LOADED)
+		return 0;
+
+	seq_printf(m, "version: %d.%d\n", CSR_VERSION_MAJOR(csr->version),
+		   CSR_VERSION_MINOR(csr->version));
 
 	return 0;
 }
