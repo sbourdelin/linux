@@ -271,7 +271,7 @@ void intel_csr_load_program(struct drm_device *dev)
 	 * Unfortunately the ACPI subsystem doesn't yet give us a way to
 	 * differentiate this, hence figure it out with this hack.
 	 */
-	if (I915_READ(CSR_PROGRAM(0)))
+	if (I915_READ(CSR_PROGRAM(0)) && dev_priv->csr.state == FW_LOADED)
 		return;
 
 	mutex_lock(&dev_priv->csr_lock);
@@ -424,6 +424,8 @@ void intel_csr_ucode_init(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_csr *csr = &dev_priv->csr;
 	int ret;
+
+	intel_csr_load_status_set(dev_priv, FW_UNINITIALIZED);
 
 	if (!HAS_CSR(dev))
 		return;
