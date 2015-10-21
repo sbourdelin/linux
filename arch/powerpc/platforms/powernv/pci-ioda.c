@@ -337,6 +337,7 @@ static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
 	struct resource *res;
 	const u32 *r;
 	u64 pci_addr;
+	const __be32 *prop32;
 
 	/* FIXME: Support M64 for P7IOC */
 	if (phb->type != PNV_PHB_IODA2) {
@@ -371,7 +372,11 @@ static void __init pnv_ioda_parse_m64_window(struct pnv_phb *phb)
 			res->start, res->end, pci_addr);
 
 	/* Use last M64 BAR to cover M64 window */
-	phb->ioda.m64_bar_idx = 15;
+	prop32 = of_get_property(dn, "ibm,opal-m64-count", NULL);
+	if (prop32)
+		phb->ioda.m64_bar_idx = be32_to_cpup(prop32) - 1;
+	else
+		phb->ioda.m64_bar_idx = 15;
 	phb->init_m64 = pnv_ioda2_init_m64;
 	phb->reserve_m64_pe = pnv_ioda2_reserve_m64_pe;
 	phb->pick_m64_pe = pnv_ioda2_pick_m64_pe;
