@@ -3777,7 +3777,6 @@ static void brcms_c_set_ps_ctrl(struct brcms_c_info *wlc)
  */
 static int brcms_c_set_mac(struct brcms_bss_cfg *bsscfg)
 {
-	int err = 0;
 	struct brcms_c_info *wlc = bsscfg->wlc;
 
 	/* enter the MAC addr into the RXE match registers */
@@ -3785,7 +3784,7 @@ static int brcms_c_set_mac(struct brcms_bss_cfg *bsscfg)
 
 	brcms_c_ampdu_macaddr_upd(wlc);
 
-	return err;
+	return 0;
 }
 
 /* Write the BSS config's BSSID address to core (set_bssid in d11procs.tcl).
