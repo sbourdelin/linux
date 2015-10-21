@@ -4946,16 +4946,8 @@ DEFINE_SIMPLE_ATTRIBUTE(i915_cache_sharing_fops,
 			i915_cache_sharing_get, i915_cache_sharing_set,
 			"%llu\n");
 
-struct sseu_dev_status {
-	unsigned int slice_total;
-	unsigned int subslice_total;
-	unsigned int subslice_per_slice;
-	unsigned int eu_total;
-	unsigned int eu_per_subslice;
-};
-
 static void cherryview_sseu_device_status(struct drm_device *dev,
-					  struct sseu_dev_status *stat)
+					  struct sseu_dev_info *stat)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ss_max = 2;
@@ -4981,13 +4973,14 @@ static void cherryview_sseu_device_status(struct drm_device *dev,
 			 ((sig1[ss] & CHV_EU210_PG_ENABLE) ? 0 : 2) +
 			 ((sig2[ss] & CHV_EU311_PG_ENABLE) ? 0 : 2);
 		stat->eu_total += eu_cnt;
-		stat->eu_per_subslice = max(stat->eu_per_subslice, eu_cnt);
+		stat->eu_per_subslice = max_t(unsigned int,
+					      stat->eu_per_subslice, eu_cnt);
 	}
 	stat->subslice_total = stat->subslice_per_slice;
 }
 
 static void gen9_sseu_device_status(struct drm_device *dev,
-				    struct sseu_dev_status *stat)
+				    struct sseu_dev_info *stat)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int s_max = 3, ss_max = 4;
@@ -5041,18 +5034,20 @@ static void gen9_sseu_device_status(struct drm_device *dev,
 			eu_cnt = 2 * hweight32(eu_reg[2*s + ss/2] &
 					       eu_mask[ss%2]);
 			stat->eu_total += eu_cnt;
-			stat->eu_per_subslice = max(stat->eu_per_subslice,
-						    eu_cnt);
+			stat->eu_per_subslice = max_t(unsigned int,
+						      stat->eu_per_subslice,
+						      eu_cnt);
 		}
 
 		stat->subslice_total += ss_cnt;
-		stat->subslice_per_slice = max(stat->subslice_per_slice,
-					       ss_cnt);
+		stat->subslice_per_slice = max_t(unsigned int,
+						 stat->subslice_per_slice,
+						 ss_cnt);
 	}
 }
 
 static void broadwell_sseu_device_status(struct drm_device *dev,
-					 struct sseu_dev_status *stat)
+					 struct sseu_dev_info *stat)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int s;
@@ -5080,7 +5075,7 @@ static int i915_sseu_status(struct seq_file *m, void *unused)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
 	struct drm_device *dev = node->minor->dev;
-	struct sseu_dev_status stat;
+	struct sseu_dev_info stat;
 
 	if (INTEL_INFO(dev)->gen < 8)
 		return -ENODEV;
