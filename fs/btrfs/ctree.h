@@ -2683,6 +2683,17 @@ static inline void btrfs_item_key(struct extent_buffer *eb,
 	read_eb_member(eb, item, struct btrfs_item, key, disk_key);
 }
 
+static inline void btrfs_stack_item_key(struct btrfs_header *stack_leaf,
+					struct btrfs_disk_key *disk_key,
+					int nr)
+{
+	unsigned long item_offset = btrfs_item_nr_offset(nr);
+	struct btrfs_item *item;
+
+	item = (struct btrfs_item *)((char *)(stack_leaf) + item_offset);
+	memcpy(disk_key, &item->key, sizeof(*disk_key));
+}
+
 static inline void btrfs_set_item_key(struct extent_buffer *eb,
 			       struct btrfs_disk_key *disk_key, int nr)
 {
@@ -2782,6 +2793,15 @@ static inline void btrfs_item_key_to_cpu(struct extent_buffer *eb,
 {
 	struct btrfs_disk_key disk_key;
 	btrfs_item_key(eb, &disk_key, nr);
+	btrfs_disk_key_to_cpu(key, &disk_key);
+}
+
+static inline void btrfs_stack_item_key_to_cpu(struct btrfs_header *stack_leaf,
+					       struct btrfs_key *key,
+					       int nr)
+{
+	struct btrfs_disk_key disk_key;
+	btrfs_stack_item_key(stack_leaf, &disk_key, nr);
 	btrfs_disk_key_to_cpu(key, &disk_key);
 }
 
