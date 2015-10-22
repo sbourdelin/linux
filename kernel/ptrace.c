@@ -825,7 +825,10 @@ int ptrace_request(struct task_struct *child, long request,
 		return generic_ptrace_peekdata(child, addr, data);
 	case PTRACE_POKETEXT:
 	case PTRACE_POKEDATA:
-		return generic_ptrace_pokedata(child, addr, data);
+		/* Don't breakpoint restartable sequences */
+		if (!rseq_lookup(child, addr))
+			return generic_ptrace_pokedata(child, addr, data);
+		break;
 
 #ifdef PTRACE_OLDSETOPTIONS
 	case PTRACE_OLDSETOPTIONS:
@@ -1116,7 +1119,7 @@ int compat_ptrace_request(struct task_struct *child, compat_long_t request,
 	compat_ulong_t __user *datap = compat_ptr(data);
 	compat_ulong_t word;
 	siginfo_t siginfo;
-	int ret;
+	int ret = -EIO;
 
 	switch (request) {
 	case PTRACE_PEEKTEXT:
@@ -1130,8 +1133,12 @@ int compat_ptrace_request(struct task_struct *child, compat_long_t request,
 
 	case PTRACE_POKETEXT:
 	case PTRACE_POKEDATA:
-		ret = access_process_vm(child, addr, &data, sizeof(data), 1);
-		ret = (ret != sizeof(data) ? -EIO : 0);
+		/* Don't breakpoint restartable sequences */
+		if (!rseq_lookup(child, addr)) {
+			ret = access_process_vm(
+				child, addr, &data, sizeof(data), 1);
+			ret = (ret != sizeof(data) ? -EIO : 0);
+		}
 		break;
 
 	case PTRACE_GETEVENTMSG:

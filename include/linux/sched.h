@@ -1182,6 +1182,31 @@ struct mempolicy;
 struct pipe_inode_info;
 struct uts_namespace;
 
+#ifdef CONFIG_RESTARTABLE_SEQUENCES
+struct restartable_sequence_section {
+	/* Start and end of an address space's critical section. */
+	struct rb_node node;
+	void __user *crit_start, __user *crit_end, __user *crit_restart;
+};
+struct restartable_sequence_state {
+	struct rb_root sections;
+	/* Thread's current CPU, typically in TLS. */
+	int __user *cpu_pointer;
+	struct preempt_notifier notifier;
+};
+
+void rseq_clear_state_exec(struct task_struct *p);
+unsigned long rseq_lookup(struct task_struct *p, unsigned long ip);
+#else
+static inline void rseq_clear_state_exec(struct task_struct *p) {}
+static inline void rseq_fork(struct task_struct *p) {}
+static inline unsigned long
+rseq_lookup(struct task_struct *p, unsigned long ip)
+{
+	return 0;
+}
+#endif
+
 struct load_weight {
 	unsigned long weight;
 	u32 inv_weight;
@@ -1811,6 +1836,11 @@ struct task_struct {
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
 	unsigned long	task_state_change;
 #endif
+
+#ifdef CONFIG_RESTARTABLE_SEQUENCES
+	struct restartable_sequence_state rseq_state;
+#endif
+
 	int pagefault_disabled;
 /* CPU-specific state of this task */
 	struct thread_struct thread;
@@ -3179,5 +3209,14 @@ static inline unsigned long rlimit_max(unsigned int limit)
 {
 	return task_rlimit_max(current, limit);
 }
+
+#ifdef CONFIG_RESTARTABLE_SEQUENCES
+static inline int rseq_active(struct task_struct *p)
+{
+	return p->rseq_state.cpu_pointer != NULL;
+}
+#else
+static inline int rseq_active(struct task_struct *p) { return 0; }
+#endif
 
 #endif

@@ -248,3 +248,6 @@ cond_syscall(sys_execveat);
 
 /* membarrier */
 cond_syscall(sys_membarrier);
+
+/* restartable sequences */
+cond_syscall(sys_restartable_sequences);

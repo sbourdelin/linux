@@ -19,7 +19,7 @@
  * current->executable is only used by the procfs.  This allows a dispatch
  * table to check for several different types  of binary formats.  We keep
  * trying until we recognize the file or we run out of supported binary
- * formats. 
+ * formats.
  */
 
 #include <linux/slab.h>
@@ -1596,6 +1596,7 @@ static int do_execveat_common(int fd, struct filename *filename,
 	current->in_execve = 0;
 	acct_update_integrals(current);
 	task_numa_free(current);
+	rseq_clear_state_exec(current);
 	free_bprm(bprm);
 	kfree(pathbuf);
 	putname(filename);

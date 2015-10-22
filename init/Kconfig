@@ -2042,6 +2042,15 @@ source "block/Kconfig"
 config PREEMPT_NOTIFIERS
 	bool
 
+config RESTARTABLE_SEQUENCES
+	bool "Userspace Restartable Sequences (RSEQ)"
+	default n
+	depends on HAVE_RESTARTABLE_SEQUENCE_SUPPORT && PREEMPT_NOTIFIERS
+	help
+	  Allows binaries to define a region of user-text within which
+	  execution will be restarted in the event of signal delivery or
+	  preemption.
+
 config PADATA
 	depends on SMP
 	bool
