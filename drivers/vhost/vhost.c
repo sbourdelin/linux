@@ -245,6 +245,12 @@ void vhost_work_queue(struct vhost_dev *dev, struct vhost_work *work)
 }
 EXPORT_SYMBOL_GPL(vhost_work_queue);
 
+bool vhost_has_work(struct vhost_dev *dev)
+{
+	return !list_empty(&dev->work_list);
+}
+EXPORT_SYMBOL_GPL(vhost_has_work);
+
 void vhost_poll_queue(struct vhost_poll *poll)
 {
 	vhost_work_queue(poll->dev, &poll->work);
