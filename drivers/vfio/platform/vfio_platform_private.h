@@ -89,4 +89,11 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
 					unsigned start, unsigned count,
 					void *data);
 
+typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
+
+extern int vfio_platform_register_reset(struct module *owner,
+					const char *compat,
+					vfio_platform_reset_fn_t reset);
+extern int vfio_platform_unregister_reset(const char *compat);
+
 #endif /* VFIO_PLATFORM_PRIVATE_H */

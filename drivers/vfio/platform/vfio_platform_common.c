@@ -23,6 +23,15 @@
 
 #include "vfio_platform_private.h"
 
+struct vfio_platform_reset_node {
+	struct list_head link;
+	char *compat;
+	struct module *owner;
+	vfio_platform_reset_fn_t reset;
+};
+
+static LIST_HEAD(reset_list);
+static DEFINE_MUTEX(reset_lock);
 static DEFINE_MUTEX(driver_lock);
 
 static const struct vfio_platform_reset_combo reset_lookup_table[] = {
@@ -573,3 +582,71 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
 	return vdev;
 }
 EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
+
+int vfio_platform_register_reset(struct module *reset_owner,
+				 const char *compat,
+				 vfio_platform_reset_fn_t reset)
+{
+	struct vfio_platform_reset_node *node, *iter;
+	bool found = false;
+
+	mutex_lock(&reset_lock);
+	list_for_each_entry(iter, &reset_list, link) {
+		if (!strcmp(iter->compat, compat)) {
+			found = true;
+			break;
+		}
+	}
+	if (found) {
+		mutex_unlock(&reset_lock);
+		return -EINVAL;
+	}
+
+	node = kmalloc(sizeof(*node), GFP_KERNEL);
+	if (!node) {
+		mutex_unlock(&reset_lock);
+		return -ENOMEM;
+	}
+
+	node->compat = kstrdup(compat, GFP_KERNEL);
+	if (!node->compat) {
+		kfree(node);
+		mutex_unlock(&reset_lock);
+		return -ENOMEM;
+	}
+
+	node->owner = reset_owner;
+	node->reset = reset;
+
+	list_add(&node->link, &reset_list);
+	mutex_unlock(&reset_lock);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vfio_platform_register_reset);
+
+int vfio_platform_unregister_reset(const char *compat)
+{
+	struct vfio_platform_reset_node *iter;
+	bool found = false;
+
+	mutex_lock(&reset_lock);
+	list_for_each_entry(iter, &reset_list, link) {
+		if (!strcmp(iter->compat, compat)) {
+			found = true;
+			break;
+		}
+	}
+	if (!found) {
+		mutex_unlock(&reset_lock);
+		return -EINVAL;
+	}
+
+	list_del(&iter->link);
+	kfree(iter->compat);
+	kfree(iter);
+	mutex_unlock(&reset_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vfio_platform_unregister_reset);
+
