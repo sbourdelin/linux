@@ -105,6 +105,23 @@ PROPERTIES
                regulation must be done externally to fully comply with
                the JEITA safety guidelines if this flag is set.
 
+- usb_otg_in-supply:
+  Usage: optional
+  Value type: <phandle>
+  Description: Reference to the regulator supplying power to the USB_OTG_IN
+               pin.
+
+child nodes:
+- otg:
+  Usage: optional
+  Description: This node is used to define a regulator which is used by
+               other parts of the system to control the direction of VBUS
+               voltage - specifically: whether to supply voltage to VBUS for
+               host mode operation of the OTG port. The driver registers a
+               regulator with this name, which can be looked up by string.
+               Alternatively, you can add a DT label, which can then be
+               referenced by phandle.
+
 EXAMPLE
 charger@1000 {
        compatible = "qcom,pm8941-charger";
@@ -128,4 +145,7 @@ charger@1000 {
 
        qcom,fast-charge-current-limit = <1000000>;
        qcom,dc-charge-current-limit = <1000000>;
+       usb_otg_in-supply = <&pm8941_5vs1>;
+
+       otg {};
 };
