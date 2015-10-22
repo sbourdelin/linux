@@ -20,18 +20,23 @@
 
 #ifdef CONFIG_RESTARTABLE_SEQUENCES
 
+#include <asm/restartable_sequences.h>
 #include <linux/uaccess.h>
 #include <linux/preempt.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
 
 static void rseq_sched_in_nop(struct preempt_notifier *pn, int cpu) {}
-static void rseq_sched_out_nop(struct preempt_notifier *pn,
-			       struct task_struct *next) {}
+static void rseq_sched_out(struct preempt_notifier *pn,
+			   struct task_struct *next)
+{
+	if (arch_rseq_needs_notify_resume(current))
+		set_thread_flag(TIF_NOTIFY_RESUME);
+}
 
 static __read_mostly struct preempt_ops rseq_preempt_ops = {
 	.sched_in = rseq_sched_in_nop,
-	.sched_out = rseq_sched_out_nop,
+	.sched_out = rseq_sched_out,
 };
 
 unsigned long rseq_lookup(struct task_struct *p, unsigned long ip)

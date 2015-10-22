@@ -30,6 +30,7 @@
 #include <asm/fpu/signal.h>
 #include <asm/vdso.h>
 #include <asm/mce.h>
+#include <asm/restartable_sequences.h>
 #include <asm/sighandling.h>
 #include <asm/vm86.h>
 
@@ -377,7 +378,7 @@ static int __setup_rt_frame(int sig, struct ksignal *ksig,
 		 */
 		put_user_ex(*((u64 *)&rt_retcode), (u64 *)frame->retcode);
 	} put_user_catch(err);
-	
+
 	err |= copy_siginfo_to_user(&frame->info, &ksig->info);
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, fpstate,
 				regs, set->sig[0]);
@@ -612,6 +613,15 @@ setup_rt_frame(struct ksignal *ksig, struct pt_regs *regs)
 	int usig = ksig->sig;
 	sigset_t *set = sigmask_to_save();
 	compat_sigset_t *cset = (compat_sigset_t *) set;
+
+	/*
+	 * If we are executing in the critical section of a restartable
+	 * sequence we need to fix up the user's stack saved ip at this point
+	 * so that signal handler return does not allow us to jump back into
+	 * the block across a context switch boundary.
+	 */
+	if (rseq_active(current))
+		arch_rseq_check_critical_section(current, regs);
 
 	/* Set up the stack frame */
 	if (is_ia32_frame()) {

@@ -24,6 +24,7 @@
 
 #include <asm/desc.h>
 #include <asm/traps.h>
+#include <asm/restartable_sequences.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
@@ -253,6 +254,8 @@ __visible void prepare_exit_to_usermode(struct pt_regs *regs)
 		if (cached_flags & _TIF_NOTIFY_RESUME) {
 			clear_thread_flag(TIF_NOTIFY_RESUME);
 			tracehook_notify_resume(regs);
+			if (rseq_active(current))
+				arch_rseq_handle_notify_resume(regs);
 		}
 
 		if (cached_flags & _TIF_USER_RETURN_NOTIFY)

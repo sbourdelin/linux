@@ -1439,6 +1439,8 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
 	struct siginfo info;
 
 	fill_sigtrap_info(tsk, regs, error_code, si_code, &info);
-	/* Send us the fake SIGTRAP */
-	force_sig_info(SIGTRAP, &info, tsk);
+	/* Don't single step in to a restartable sequence */
+	if (!rseq_lookup(tsk, (unsigned long)regs->ip))
+		/* Send us the fake SIGTRAP */
+		force_sig_info(SIGTRAP, &info, tsk);
 }
