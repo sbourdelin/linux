@@ -31,7 +31,9 @@
 #include "vhost.h"
 
 static int experimental_zcopytx = 1;
+static int busyloop_timeout = 50;
 module_param(experimental_zcopytx, int, 0444);
+module_param(busyloop_timeout, int, 0444);
 MODULE_PARM_DESC(experimental_zcopytx, "Enable Zero Copy TX;"
 		                       " 1 -Enable; 0 - Disable");
 
@@ -287,12 +289,23 @@ static void vhost_zerocopy_callback(struct ubuf_info *ubuf, bool success)
 	rcu_read_unlock_bh();
 }
 
+static bool tx_can_busy_poll(struct vhost_dev *dev,
+			     unsigned long endtime)
+{
+	unsigned long now = local_clock() >> 10;
+
+	return busyloop_timeout && !need_resched() &&
+	       !time_after(now, endtime) && !vhost_has_work(dev) &&
+	       single_task_running();
+}
+
 /* Expects to be always run from workqueue - which acts as
  * read-size critical section for our kind of RCU. */
 static void handle_tx(struct vhost_net *net)
 {
 	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_TX];
 	struct vhost_virtqueue *vq = &nvq->vq;
+	unsigned long endtime;
 	unsigned out, in;
 	int head;
 	struct msghdr msg = {
@@ -331,6 +344,8 @@ static void handle_tx(struct vhost_net *net)
 			      % UIO_MAXIOV == nvq->done_idx))
 			break;
 
+		endtime  = (local_clock() >> 10) + busyloop_timeout;
+again:
 		head = vhost_get_vq_desc(vq, vq->iov,
 					 ARRAY_SIZE(vq->iov),
 					 &out, &in,
@@ -340,6 +355,10 @@ static void handle_tx(struct vhost_net *net)
 			break;
 		/* Nothing new?  Wait for eventfd to tell us they refilled. */
 		if (head == vq->num) {
+			if (tx_can_busy_poll(vq->dev, endtime)) {
+				cpu_relax();
+				goto again;
+			}
 			if (unlikely(vhost_enable_notify(&net->dev, vq))) {
 				vhost_disable_notify(&net->dev, vq);
 				continue;
