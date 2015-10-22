@@ -30,10 +30,10 @@ static inline cycles_t get_cycles(void)
 }
 
 extern void tsc_init(void);
+extern void __init early_tsc_init(void);
 extern void mark_tsc_unstable(char *reason);
 extern int unsynchronized_tsc(void);
 extern int check_tsc_unstable(void);
-extern int check_tsc_disabled(void);
 extern unsigned long native_calibrate_tsc(void);
 extern unsigned long long native_sched_clock_from_tsc(u64 tsc);
 
@@ -46,7 +46,7 @@ extern int tsc_clocksource_reliable;
 extern void check_tsc_sync_source(int cpu);
 extern void check_tsc_sync_target(void);
 
-extern int notsc_setup(char *);
+extern int notsc_setup(void);
 extern void tsc_save_sched_clock_state(void);
 extern void tsc_restore_sched_clock_state(void);
 
