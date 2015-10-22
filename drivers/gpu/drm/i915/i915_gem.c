@@ -4947,8 +4947,6 @@ i915_gem_load(struct drm_device *dev)
 			  i915_gem_idle_work_handler);
 	init_waitqueue_head(&dev_priv->gpu_error.reset_queue);
 
-	dev_priv->relative_constants_mode = I915_EXEC_CONSTANTS_REL_GENERAL;
-
 	if (INTEL_INFO(dev)->gen >= 7 && !IS_VALLEYVIEW(dev))
 		dev_priv->num_fence_regs = 32;
 	else if (INTEL_INFO(dev)->gen >= 4 || IS_I945G(dev) || IS_I945GM(dev) || IS_G33(dev))

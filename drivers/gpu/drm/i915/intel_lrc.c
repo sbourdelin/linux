@@ -887,15 +887,14 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 			return -EINVAL;
 		}
 
-		if (instp_mode != dev_priv->relative_constants_mode) {
-			if (instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
-				DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
-				return -EINVAL;
-			}
-
-			/* The HW changed the meaning on this bit on gen6 */
-			instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
+		if (instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {
+			DRM_DEBUG("rel surface constants mode invalid on gen5+\n");
+			return -EINVAL;
 		}
+
+		/* The HW changed the meaning on this bit on gen6 */
+		instp_mask &= ~I915_EXEC_CONSTANTS_REL_SURFACE;
+
 		break;
 	default:
 		DRM_DEBUG("execbuf with unknown constants: %d\n", instp_mode);
@@ -911,8 +910,7 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 	if (ret)
 		return ret;
 
-	if (ring == &dev_priv->ring[RCS] &&
-	    instp_mode != dev_priv->relative_constants_mode) {
+	if (ring == &dev_priv->ring[RCS]) {
 		ret = intel_logical_ring_begin(params->request, 4);
 		if (ret)
 			return ret;
@@ -922,8 +920,6 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 		intel_logical_ring_emit(ringbuf, INSTPM);
 		intel_logical_ring_emit(ringbuf, instp_mask << 16 | instp_mode);
 		intel_logical_ring_advance(ringbuf);
-
-		dev_priv->relative_constants_mode = instp_mode;
 	}
 
 	exec_start = params->batch_obj_vm_offset +
