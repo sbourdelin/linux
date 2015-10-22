@@ -1,0 +1,26 @@
+* Aurora VLSI AU-NB8800 Ethernet controller
+
+Required properties:
+- compatible: Should be "sigma,smp8640-ethernet", "aurora,nb8800"
+	The former indicates presence of extra features added by Sigma Designs.
+- reg: Should be MMIO address space of the device
+- interrupts: Should contain the interrupt specifier for the device
+- interrupt-parent: Should be a phandle for the interrupt controller
+- clocks: Should be a phandle for the clock for the device
+
+Common properties described in ethernet.txt:
+- local-mac-address
+- mac-address
+- max-speed
+- phy-mode
+
+Example:
+
+ethernet@26000 {
+	compatible = "aurora,nb8800";
+	reg = <0x10000 0x800>;
+	interrupts = <42>;
+	clocks = <&sys_clk>;
+	max-speed = <1000>;
+	phy-connection-type = "rgmii";
+};
