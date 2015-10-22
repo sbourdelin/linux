@@ -517,15 +517,7 @@ static struct drm_i2c_encoder_driver ch7006_driver = {
 
 /* Module initialization */
 
-static int __init ch7006_init(void)
-{
-	return drm_i2c_encoder_register(THIS_MODULE, &ch7006_driver);
-}
-
-static void __exit ch7006_exit(void)
-{
-	drm_i2c_encoder_unregister(&ch7006_driver);
-}
+module_drm_i2c_encoder_driver(ch7006_driver);
 
 int ch7006_debug;
 module_param_named(debug, ch7006_debug, int, 0600);
@@ -548,5 +540,3 @@ MODULE_AUTHOR("Francisco Jerez <currojerez@riseup.net>");
 MODULE_DESCRIPTION("Chrontel ch7006 TV encoder driver");
 MODULE_LICENSE("GPL and additional rights");
 
-module_init(ch7006_init);
-module_exit(ch7006_exit);

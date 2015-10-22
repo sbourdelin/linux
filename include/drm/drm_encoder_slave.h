@@ -138,15 +138,19 @@ static inline struct i2c_client *drm_i2c_encoder_get_client(struct drm_encoder *
 }
 
 /**
- * drm_i2c_encoder_register - Register an I2C encoder driver
+ * __drm_i2c_encoder_register - Register an I2C encoder driver
  * @owner:	Module containing the driver.
  * @driver:	Driver to be registered.
  */
-static inline int drm_i2c_encoder_register(struct module *owner,
-					   struct drm_i2c_encoder_driver *driver)
+static inline int __drm_i2c_encoder_register(struct module *owner,
+					     struct drm_i2c_encoder_driver *driver)
 {
 	return i2c_register_driver(owner, &driver->i2c_driver);
 }
+
+/* use a define to avoid include chaining to get THIS_MODULE */
+#define drm_i2c_encoder_register(driver) \
+	__drm_i2c_encoder_register(THIS_MODULE, driver)
 
 /**
  * drm_i2c_encoder_unregister - Unregister an I2C encoder driver
@@ -158,7 +162,6 @@ static inline void drm_i2c_encoder_unregister(struct drm_i2c_encoder_driver *dri
 }
 
 void drm_i2c_encoder_destroy(struct drm_encoder *encoder);
-
 
 /*
  * Wrapper fxns which can be plugged in to drm_encoder_helper_funcs:
@@ -178,5 +181,17 @@ enum drm_connector_status drm_i2c_encoder_detect(struct drm_encoder *encoder,
 void drm_i2c_encoder_save(struct drm_encoder *encoder);
 void drm_i2c_encoder_restore(struct drm_encoder *encoder);
 
+/**
+ * module_drm_i2c_encoder_driver() - Helper macro for registering a I2C
+ * Encoder driver
+ * @__drm_i2c_encoder_driver: drm_i2c_encoder_driver struct
+ *
+ * Helper macro for I2C Encoder drivers which do not do anything special in
+ * module init/exit. This eliminates a lot of boilerplate. Each module may only
+ * use this macro once, and calling it replaces module_init() and module_exit()
+ */
+#define module_drm_i2c_encoder_driver(__drm_i2c_encoder_driver) \
+	module_driver(__drm_i2c_encoder_driver, drm_i2c_encoder_register, \
+			drm_i2c_encoder_unregister)
 
 #endif

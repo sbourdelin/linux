@@ -444,21 +444,9 @@ static struct drm_i2c_encoder_driver sil164_driver = {
 
 /* Module initialization */
 
-static int __init
-sil164_init(void)
-{
-	return drm_i2c_encoder_register(THIS_MODULE, &sil164_driver);
-}
-
-static void __exit
-sil164_exit(void)
-{
-	drm_i2c_encoder_unregister(&sil164_driver);
-}
+module_drm_i2c_encoder_driver(sil164_driver);
 
 MODULE_AUTHOR("Francisco Jerez <currojerez@riseup.net>");
 MODULE_DESCRIPTION("Silicon Image sil164 TMDS transmitter driver");
 MODULE_LICENSE("GPL and additional rights");
 
-module_init(sil164_init);
-module_exit(sil164_exit);

@@ -1620,23 +1620,8 @@ static struct drm_i2c_encoder_driver tda998x_driver = {
 
 /* Module initialization */
 
-static int __init
-tda998x_init(void)
-{
-	DBG("");
-	return drm_i2c_encoder_register(THIS_MODULE, &tda998x_driver);
-}
-
-static void __exit
-tda998x_exit(void)
-{
-	DBG("");
-	drm_i2c_encoder_unregister(&tda998x_driver);
-}
+module_drm_i2c_encoder_driver(tda998x_driver);
 
 MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
 MODULE_DESCRIPTION("NXP Semiconductors TDA998X HDMI Encoder");
 MODULE_LICENSE("GPL");
-
-module_init(tda998x_init);
-module_exit(tda998x_exit);

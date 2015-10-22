@@ -997,17 +997,7 @@ static struct drm_i2c_encoder_driver adv7511_driver = {
 	.encoder_init = adv7511_encoder_init,
 };
 
-static int __init adv7511_init(void)
-{
-	return drm_i2c_encoder_register(THIS_MODULE, &adv7511_driver);
-}
-module_init(adv7511_init);
-
-static void __exit adv7511_exit(void)
-{
-	drm_i2c_encoder_unregister(&adv7511_driver);
-}
-module_exit(adv7511_exit);
+module_drm_i2c_encoder_driver(adv7511_driver);
 
 MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
 MODULE_DESCRIPTION("ADV7511 HDMI transmitter driver");
