@@ -578,7 +578,7 @@ fail_out:
 	return err;
 }
 
-static int __exit ramoops_remove(struct platform_device *pdev)
+static int ramoops_remove(struct platform_device *pdev)
 {
 	struct ramoops_context *cxt = &oops_cxt;
 
