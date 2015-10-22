@@ -102,6 +102,19 @@ init_waitqueue_func_entry(wait_queue_t *q, wait_queue_func_t func)
 	q->func		= func;
 }
 
+/*
+ * Note: When adding waitqueue_active before calling wake_up for
+ * optimization, some sort of memory barrier is required on SMP so
+ * that the waiting thread does not miss the wake up.
+ *
+ * A memory barrier is required before waitqueue_active to prevent
+ * waitqueue_active from being reordered by the CPU before any writes
+ * done prior to it.
+ *
+ * The waiting side also needs a memory barrier which pairs with the
+ * wake_up side.  If prepare_to_wait() or wait_event*() is used, they
+ * contain the memory barrier in set_current_state().
+ */
 static inline int waitqueue_active(wait_queue_head_t *q)
 {
 	return !list_empty(&q->task_list);
