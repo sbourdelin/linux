@@ -46,6 +46,7 @@
 #include <linux/utsname.h>
 #include <linux/ctype.h>
 #include <linux/uio.h>
+#include <linux/circ_buf.h>
 
 #include <asm/uaccess.h>
 
@@ -336,48 +337,6 @@ static u32 log_next(u32 idx)
 	return idx + msg->len;
 }
 
-/*
- * Check whether there is enough free space for the given message.
- *
- * The same values of first_idx and next_idx mean that the buffer
- * is either empty or full.
- *
- * If the buffer is empty, we must respect the position of the indexes.
- * They cannot be reset to the beginning of the buffer.
- */
-static int logbuf_has_space(u32 msg_size, bool empty)
-{
-	u32 free;
-
-	if (log_next_idx > log_first_idx || empty)
-		free = max(log_buf_len - log_next_idx, log_first_idx);
-	else
-		free = log_first_idx - log_next_idx;
-
-	/*
-	 * We need space also for an empty header that signalizes wrapping
-	 * of the buffer.
-	 */
-	return free >= msg_size + sizeof(struct printk_log);
-}
-
-static int log_make_free_space(u32 msg_size)
-{
-	while (log_first_seq < log_next_seq) {
-		if (logbuf_has_space(msg_size, false))
-			return 0;
-		/* drop old messages until we have enough contiguous space */
-		log_first_idx = log_next(log_first_idx);
-		log_first_seq++;
-	}
-
-	/* sequence numbers are equal, so the log buffer is empty */
-	if (logbuf_has_space(msg_size, true))
-		return 0;
-
-	return -ENOMEM;
-}
-
 /* compute the message size including the padding bytes */
 static u32 msg_used_size(u16 text_len, u16 dict_len, u32 *pad_len)
 {
@@ -423,32 +382,47 @@ static int log_store(int facility, int level,
 		     const char *text, u16 text_len)
 {
 	struct printk_log *msg;
-	u32 size, pad_len;
+	u32 size, wsize, pad_len;
 	u16 trunc_msg_len = 0;
 
 	/* number of '\0' padding bytes to next message */
 	size = msg_used_size(text_len, dict_len, &pad_len);
 
-	if (log_make_free_space(size)) {
-		/* truncate the message if it is too long for empty buffer */
-		size = truncate_msg(&text_len, &trunc_msg_len,
-				    &dict_len, &pad_len);
-		/* survive when the log buffer is too small for trunc_msg */
-		if (log_make_free_space(size))
-			return 0;
-	}
+	/* See if we have sufficient space to insert a message.  Note we also
+	 * need to keep a gap right at the end of the buffer to insert a 'wrap
+	 * here' marker.
+	 */
+	wsize = size + sizeof(struct printk_log);
 
-	if (log_next_idx + size + sizeof(struct printk_log) > log_buf_len) {
-		/*
-		 * This message + an additional empty header does not fit
-		 * at the end of the buffer. Add an empty header with len == 0
-		 * to signify a wrap around.
-		 */
-		memset(log_buf + log_next_idx, 0, sizeof(struct printk_log));
-		log_next_idx = 0;
-	}
+	if (log_first_seq != log_next_seq && log_first_idx == log_next_idx)
+		return 0; /* Buffer is completely full */
 
-	/* fill message */
+	if (CIRC_SPACE_TO_END(log_next_idx, log_first_idx, log_buf_len) >= wsize)
+		goto have_space_no_wrap;
+
+	if (CIRC_SPACE(log_next_idx, log_first_idx, log_buf_len) >= size)
+		goto have_space_wrap;
+
+	/* Try to truncate the message. */
+	size = truncate_msg(&text_len, &trunc_msg_len, &dict_len, &pad_len);
+	wsize = size + sizeof(struct printk_log);
+
+	if (CIRC_SPACE_TO_END(log_next_idx, log_first_idx, log_buf_len) >= wsize)
+		goto have_space_no_wrap;
+
+	if (CIRC_SPACE(log_next_idx, log_first_idx, log_buf_len) < size)
+		return 0;
+
+have_space_wrap:
+	/* This message plus an additional empty header does not fit at the end
+	 * of the buffer.  Insert an empty header with len == 0 as a wrap
+	 * around marker.
+	 */
+	memset(log_buf + log_next_idx, 0, sizeof(struct printk_log));
+	log_next_idx = 0;
+
+have_space_no_wrap:
+	/* Write the message into the buffer */
 	msg = (struct printk_log *)(log_buf + log_next_idx);
 	memcpy(log_text(msg), text, text_len);
 	msg->text_len = text_len;
