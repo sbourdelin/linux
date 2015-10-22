@@ -169,7 +169,7 @@ static const struct can_bittiming_const xcan_bittiming_const = {
 static void xcan_write_reg_le(const struct xcan_priv *priv, enum xcan_reg reg,
 			u32 val)
 {
-	iowrite32(val, priv->reg_base + reg);
+	writel(val, priv->reg_base + reg);
 }
 
 /**
@@ -182,7 +182,7 @@ static void xcan_write_reg_le(const struct xcan_priv *priv, enum xcan_reg reg,
  */
 static u32 xcan_read_reg_le(const struct xcan_priv *priv, enum xcan_reg reg)
 {
-	return ioread32(priv->reg_base + reg);
+	return readl(priv->reg_base + reg);
 }
 
 /**
