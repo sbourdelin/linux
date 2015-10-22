@@ -59,7 +59,7 @@ void __init efi_fake_memmap(void)
 	u64 start, end, m_start, m_end, m_attr;
 	int new_nr_map = memmap.nr_map;
 	efi_memory_desc_t *md;
-	u64 new_memmap_phy;
+	phys_addr_t new_memmap_phy;
 	void *new_memmap;
 	void *old, *new;
 	int i;
