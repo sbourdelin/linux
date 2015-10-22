@@ -16,6 +16,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/power/mt8173-power.h>
 #include <dt-bindings/reset-controller/mt8173-resets.h>
+#include <dt-bindings/thermal/mt8173.h>
 #include "mt8173-pinfunc.h"
 
 / {
@@ -54,6 +55,18 @@
 			reg = <0x000>;
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_SLEEP_0>;
+			static-power-points = <
+				859000  43
+				908000  52
+				983000  86
+				1009000 123
+				1028000 138
+				1083000 172
+				1110900 180
+				1125000 192
+			>;
+			dynamic-power-coefficient = <263>;
+			#cooling-cells = <2>;
 		};
 
 		cpu1: cpu@1 {
@@ -62,6 +75,17 @@
 			reg = <0x001>;
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_SLEEP_0>;
+			static-power-points = <
+				859000  43
+				908000  52
+				983000  86
+				1009000 123
+				1028000 138
+				1083000 172
+				1110900 180
+				1125000 192
+			>;
+			dynamic-power-coefficient = <263>;
 		};
 
 		cpu2: cpu@100 {
@@ -70,6 +94,18 @@
 			reg = <0x100>;
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_SLEEP_0>;
+			static-power-points = <
+				828000  72
+				867000  90
+				927000  156
+				968000  181
+				1007000 298
+				1049000 435
+				1089900 533
+				1125000 533
+			>;
+			dynamic-power-coefficient = <530>;
+			#cooling-cells = <2>;
 		};
 
 		cpu3: cpu@101 {
@@ -78,6 +114,17 @@
 			reg = <0x101>;
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_SLEEP_0>;
+			static-power-points = <
+				828000  72
+				867000  90
+				927000  156
+				968000  181
+				1007000 298
+				1049000 435
+				1089900 533
+				1125000 533
+			>;
+			dynamic-power-coefficient = <530>;
 		};
 
 		idle-states {
@@ -114,6 +161,49 @@
 		#clock-cells = <0>;
 		clock-frequency = <32000>;
 		clock-output-names = "clk32k";
+	};
+
+	thermal-zones {
+		cpu_thermal: cpu_thermal {
+			polling-delay-passive = <1000>; /* milliseconds */
+			polling-delay = <1000>; /* milliseconds */
+
+			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
+			sustainable-power = <1500>;
+
+			trips {
+				threshold: trip-point@0 {
+					temperature = <68000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+
+				target: trip-point@1 {
+					temperature = <85000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+
+				cpu_crit: cpu_crit@0 {
+					temperature = <115000>;
+					hysteresis = <2000>;
+					type = "critical";
+				};
+			};
+
+			cooling-maps {
+				map@0 {
+					trip = <&target>;
+					cooling-device = <&cpu0 0 0>;
+					contribution = <1024>;
+				};
+				map@1 {
+					trip = <&target>;
+					cooling-device = <&cpu2 0 0>;
+					contribution = <2048>;
+				};
+			};
+		};
 	};
 
 	timer {
