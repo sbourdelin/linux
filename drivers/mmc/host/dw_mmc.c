@@ -1482,6 +1482,10 @@ static void dw_mci_hw_reset(struct mmc_host *mmc)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
 	struct dw_mci *host = slot->host;
+	const struct dw_mci_drv_data *drv_data = host->drv_data;
+
+	if (drv_data && drv_data->hw_reset)
+		return drv_data->hw_reset(host);
 
 	if (host->use_dma == TRANS_MODE_IDMAC)
 		dw_mci_idmac_reset(host);
