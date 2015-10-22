@@ -99,8 +99,8 @@ static int sdhci_arasan_suspend(struct device *dev)
 		}
 	}
 
-	clk_disable(pltfm_host->clk);
-	clk_disable(sdhci_arasan->clk_ahb);
+	clk_disable_unprepare(pltfm_host->clk);
+	clk_disable_unprepare(sdhci_arasan->clk_ahb);
 
 	return 0;
 }
@@ -120,13 +120,13 @@ static int sdhci_arasan_resume(struct device *dev)
 	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
 	int ret;
 
-	ret = clk_enable(sdhci_arasan->clk_ahb);
+	ret = clk_prepare_enable(sdhci_arasan->clk_ahb);
 	if (ret) {
 		dev_err(dev, "Cannot enable AHB clock.\n");
 		return ret;
 	}
 
-	ret = clk_enable(pltfm_host->clk);
+	ret = clk_prepare_enable(pltfm_host->clk);
 	if (ret) {
 		dev_err(dev, "Cannot enable SD clock.\n");
 		goto err_clk_en;
@@ -143,9 +143,9 @@ static int sdhci_arasan_resume(struct device *dev)
 	return sdhci_resume_host(host);
 
 err_phy_power:
-	clk_disable(pltfm_host->clk);
+	clk_disable_unprepare(pltfm_host->clk);
 err_clk_en:
-	clk_disable(sdhci_arasan->clk_ahb);
+	clk_disable_unprepare(sdhci_arasan->clk_ahb);
 	return ret;
 }
 #endif /* ! CONFIG_PM_SLEEP */
