@@ -136,6 +136,8 @@ struct kvm_shared_msrs {
 static struct kvm_shared_msrs_global __read_mostly shared_msrs_global;
 static struct kvm_shared_msrs __percpu *shared_msrs;
 
+#define MSR_LBR_STATUS 0xd6
+
 struct kvm_stats_debugfs_item debugfs_entries[] = {
 	{ "pf_fixed", VCPU_STAT(pf_fixed) },
 	{ "pf_guest", VCPU_STAT(pf_guest) },
@@ -1917,6 +1919,7 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	bool pr = false;
 	u32 msr = msr_info->index;
 	u64 data = msr_info->data;
+	u64 supported = 0;
 
 	switch (msr) {
 	case MSR_AMD64_NB_CFG:
@@ -1948,16 +1951,25 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		}
 		break;
 	case MSR_IA32_DEBUGCTLMSR:
-		if (!data) {
-			/* We support the non-activated case already */
-			break;
-		} else if (data & ~(DEBUGCTLMSR_LBR | DEBUGCTLMSR_BTF)) {
-			/* Values other than LBR and BTF are vendor-specific,
-			   thus reserved and should throw a #GP */
+		supported = DEBUGCTLMSR_LBR | DEBUGCTLMSR_BTF |
+				DEBUGCTLMSR_FREEZE_LBRS_ON_PMI;
+
+		if (data & ~supported) {
+			/*
+			 * Values other than LBR/BTF/FREEZE_LBRS_ON_PMI
+			 * are not supported, thus reserved and should throw a #GP
+			 */
+			vcpu_unimpl(vcpu, "%s: MSR_IA32_DEBUGCTLMSR 0x%llx, nop\n",
+					__func__, data);
 			return 1;
 		}
-		vcpu_unimpl(vcpu, "%s: MSR_IA32_DEBUGCTLMSR 0x%llx, nop\n",
-			    __func__, data);
+		if (kvm_x86_ops->set_debugctlmsr) {
+			if (kvm_x86_ops->set_debugctlmsr(vcpu, data))
+				return 1;
+		}
+		else
+			return 1;
+
 		break;
 	case 0x200 ... 0x2ff:
 		return kvm_mtrr_set_msr(vcpu, msr, data);
@@ -2078,6 +2090,33 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			vcpu_unimpl(vcpu, "disabled perfctr wrmsr: "
 				    "0x%x data 0x%llx\n", msr, data);
 		break;
+	case MSR_LBR_STATUS:
+		if (kvm_x86_ops->set_debugctlmsr) {
+			vcpu->arch.lbr_status = (data == 0) ? 0 : 1;
+			if (data)
+				kvm_x86_ops->set_debugctlmsr(vcpu,
+						DEBUGCTLMSR_LBR | DEBUGCTLMSR_FREEZE_LBRS_ON_PMI);
+		} else
+			vcpu_unimpl(vcpu, "lbr is disabled, ignored wrmsr: "
+					"0x%x data 0x%llx\n", msr, data);
+		break;
+	case MSR_LBR_SELECT:
+	case MSR_LBR_TOS:
+	case MSR_PENTIUM4_LER_FROM_LIP:
+	case MSR_PENTIUM4_LER_TO_LIP:
+	case MSR_PENTIUM4_LBR_TOS:
+	case MSR_IA32_LASTINTFROMIP:
+	case MSR_IA32_LASTINTTOIP:
+	case MSR_LBR_CORE2_FROM ... MSR_LBR_CORE2_FROM + 0x7:
+	case MSR_LBR_CORE2_TO ... MSR_LBR_CORE2_TO + 0x7:
+	case MSR_LBR_NHM_FROM ... MSR_LBR_NHM_FROM + 0x1f:
+	case MSR_LBR_NHM_TO ... MSR_LBR_NHM_TO + 0x1f:
+		if (kvm_x86_ops->set_lbr_msr)
+			kvm_x86_ops->set_lbr_msr(vcpu, msr, data);
+		else
+			vcpu_unimpl(vcpu, "lbr is disabled, ignored wrmsr: "
+					"0x%x data 0x%llx\n", msr, data);
+		break;
 	case MSR_K7_CLK_CTL:
 		/*
 		 * Ignore all writes to this no longer documented MSR.
@@ -2178,13 +2217,16 @@ static int get_msr_mce(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 {
 	switch (msr_info->index) {
+	case MSR_IA32_DEBUGCTLMSR:
+		if (kvm_x86_ops->get_debugctlmsr)
+			msr_info->data = kvm_x86_ops->get_debugctlmsr();
+		else
+			msr_info->data = 0;
+		break;
 	case MSR_IA32_PLATFORM_ID:
 	case MSR_IA32_EBL_CR_POWERON:
-	case MSR_IA32_DEBUGCTLMSR:
 	case MSR_IA32_LASTBRANCHFROMIP:
 	case MSR_IA32_LASTBRANCHTOIP:
-	case MSR_IA32_LASTINTFROMIP:
-	case MSR_IA32_LASTINTTOIP:
 	case MSR_K8_SYSCFG:
 	case MSR_K8_TSEG_ADDR:
 	case MSR_K8_TSEG_MASK:
@@ -2203,6 +2245,26 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (kvm_pmu_is_valid_msr(vcpu, msr_info->index))
 			return kvm_pmu_get_msr(vcpu, msr_info->index, &msr_info->data);
 		msr_info->data = 0;
+		break;
+	case MSR_LBR_STATUS:
+		msr_info->data = vcpu->arch.lbr_status;
+		break;
+	case MSR_LBR_SELECT:
+	case MSR_LBR_TOS:
+	case MSR_PENTIUM4_LER_FROM_LIP:
+	case MSR_PENTIUM4_LER_TO_LIP:
+	case MSR_PENTIUM4_LBR_TOS:
+	case MSR_IA32_LASTINTFROMIP:
+	case MSR_IA32_LASTINTTOIP:
+	case MSR_LBR_CORE2_FROM ... MSR_LBR_CORE2_FROM + 0x7:
+	case MSR_LBR_CORE2_TO ... MSR_LBR_CORE2_TO + 0x7:
+	case MSR_LBR_SKYLAKE_FROM ... MSR_LBR_SKYLAKE_FROM + 0x1f:
+	case MSR_LBR_SKYLAKE_TO ... MSR_LBR_SKYLAKE_TO + 0x1f:
+		if (kvm_x86_ops->get_lbr_msr)
+			msr_info->data = kvm_x86_ops->get_lbr_msr(vcpu,
+					msr_info->index);
+		else
+			msr_info->data = 0;
 		break;
 	case MSR_IA32_UCODE_REV:
 		msr_info->data = 0x100000000ULL;
@@ -7375,6 +7437,10 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	kvm_async_pf_hash_reset(vcpu);
 	kvm_pmu_init(vcpu);
+
+	vcpu->arch.lbr_status = 0;
+	vcpu->arch.lbr_used = 0;
+	vcpu->arch.lbr_msr.nr = 0;
 
 	return 0;
 
