@@ -17,6 +17,13 @@ Refer to clk/clock-bindings.txt for generic clock consumer properties
 Optional properties:
 - phys: phy provider specifier
 - phy-names: shall be "usb2-phy"
+- snps,need-phy-port-reset-on-wake: if present indicates that we need to assert
+  the PHY "port reset" when we detect a wakeup due to a hardware errata.  If
+  present you must specify a "phy-port-reset" reset.
+
+Resets:
+- phy-port-reset (optional): Asserts the PHY's "port reset".
+
 Refer to phy/phy-bindings.txt for generic phy consumer properties
 - dr_mode: shall be one of "host", "peripheral" and "otg"
   Refer to usb/generic.txt
