@@ -470,15 +470,17 @@ static ssize_t phys_switch_id_show(struct device *dev,
 		return restart_syscall();
 
 	if (dev_isalive(netdev)) {
-		struct switchdev_attr attr = {
-			.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
-			.flags = SWITCHDEV_F_NO_RECURSE,
+		struct switchdev_attr_port_parent_id parent_id = {
+			.attr = {
+				.id = SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
+				.flags = SWITCHDEV_F_NO_RECURSE,
+			},
 		};
 
-		ret = switchdev_port_attr_get(netdev, &attr);
+		ret = switchdev_port_attr_get(netdev, &parent_id.attr);
 		if (!ret)
-			ret = sprintf(buf, "%*phN\n", attr.u.ppid.id_len,
-				      attr.u.ppid.id);
+			ret = sprintf(buf, "%*phN\n", parent_id.ppid.id_len,
+				      parent_id.ppid.id);
 	}
 	rtnl_unlock();
 

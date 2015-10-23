@@ -4327,14 +4327,19 @@ static int rocker_port_attr_get(struct net_device *dev,
 {
 	const struct rocker_port *rocker_port = netdev_priv(dev);
 	const struct rocker *rocker = rocker_port->rocker;
+	struct switchdev_attr_port_parent_id *parent_id;
+	struct switchdev_attr_port_bridge_flags *brport_flags;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
-		attr->u.ppid.id_len = sizeof(rocker->hw.id);
-		memcpy(&attr->u.ppid.id, &rocker->hw.id, attr->u.ppid.id_len);
+		parent_id = SWITCHDEV_ATTR_PORT_PARENT_ID(attr);
+		parent_id->ppid.id_len = sizeof(rocker->hw.id);
+		memcpy(&parent_id->ppid.id, &rocker->hw.id,
+		       parent_id->ppid.id_len);
 		break;
 	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
-		attr->u.brport_flags = rocker_port->brport_flags;
+		brport_flags = SWITCHDEV_ATTR_PORT_BRIDGE_FLAGS(attr);
+		brport_flags->brport_flags = rocker_port->brport_flags;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -4378,20 +4383,26 @@ static int rocker_port_attr_set(struct net_device *dev,
 				struct switchdev_trans *trans)
 {
 	struct rocker_port *rocker_port = netdev_priv(dev);
+	struct switchdev_attr_port_stp_state *stp_state;
+	struct switchdev_attr_port_bridge_flags *brport_flags;
+	struct switchdev_attr_bridge_ageing_time *ageing_time;
 	int err = 0;
 
 	switch (attr->id) {
 	case SWITCHDEV_ATTR_ID_PORT_STP_STATE:
+		stp_state = SWITCHDEV_ATTR_PORT_STP_STATE(attr);
 		err = rocker_port_stp_update(rocker_port, trans, 0,
-					     attr->u.stp_state);
+					     stp_state->state);
 		break;
 	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
+		brport_flags = SWITCHDEV_ATTR_PORT_BRIDGE_FLAGS(attr);
 		err = rocker_port_brport_flags_set(rocker_port, trans,
-						   attr->u.brport_flags);
+						   brport_flags->brport_flags);
 		break;
 	case SWITCHDEV_ATTR_ID_BRIDGE_AGEING_TIME:
+		ageing_time = SWITCHDEV_ATTR_BRIDGE_AGEING_TIME(attr);
 		err = rocker_port_bridge_ageing_time(rocker_port, trans,
-						     attr->u.ageing_time);
+						     ageing_time->ageing_time);
 		break;
 	default:
 		err = -EOPNOTSUPP;
