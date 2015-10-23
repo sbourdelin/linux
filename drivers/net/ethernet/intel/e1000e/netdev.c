@@ -1921,7 +1921,8 @@ static irqreturn_t e1000_msix_other(int __always_unused irq, void *data)
 
 no_link_interrupt:
 	if (!test_bit(__E1000_DOWN, &adapter->state))
-		ew32(IMS, E1000_IMS_LSC | E1000_IMS_OTHER);
+		ew32(IMS, adapter->eiac_mask | E1000_IMS_OTHER |
+		     E1000_IMS_LSC);
 
 	return IRQ_HANDLED;
 }
@@ -1939,6 +1940,9 @@ static irqreturn_t e1000_intr_msix_tx(int __always_unused irq, void *data)
 	if (!e1000_clean_tx_irq(tx_ring))
 		/* Ring was not completely cleaned, so fire another interrupt */
 		ew32(ICS, tx_ring->ims_val);
+
+	if (!test_bit(__E1000_DOWN, &adapter->state))
+		ew32(IMS, E1000_IMS_TXQ0);
 
 	return IRQ_HANDLED;
 }
@@ -2031,11 +2035,7 @@ static void e1000_configure_msix(struct e1000_adapter *adapter)
 
 	/* enable MSI-X PBA support */
 	ctrl_ext = er32(CTRL_EXT);
-	ctrl_ext |= E1000_CTRL_EXT_PBA_CLR;
-
-	/* Auto-Mask Other interrupts upon ICR read */
-	ew32(IAM, ~E1000_EIAC_MASK_82574 | E1000_IMS_OTHER);
-	ctrl_ext |= E1000_CTRL_EXT_EIAME;
+	ctrl_ext |= E1000_CTRL_EXT_PBA_CLR | E1000_CTRL_EXT_EIAME;
 	ew32(CTRL_EXT, ctrl_ext);
 	e1e_flush();
 }
