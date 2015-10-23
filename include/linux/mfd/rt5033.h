@@ -15,6 +15,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/i2c.h>
 #include <linux/regmap.h>
+#include <linux/led-class-flash.h>
 #include <linux/power_supply.h>
 
 /* RT5033 regulator IDs */
@@ -57,6 +58,18 @@ struct rt5033_charger {
 	struct power_supply	psy;
 
 	struct rt5033_charger_data	*chg;
+};
+
+/* RT5033 Flash led platform data */
+struct rt5033_led {
+	struct device		*dev;
+	struct led_classdev_flash fled_cdev;
+	struct mutex		lock;
+	struct rt5033_dev	*rt5033;
+	struct regmap		*regmap;
+	struct work_struct	work_brightness_set;
+
+	enum led_brightness	torch_brightness;
 };
 
 #endif /* __RT5033_H__ */
