@@ -618,7 +618,7 @@ static int rawv6_send_hdrinc(struct sock *sk, struct msghdr *msg, size_t length,
 	struct sk_buff *skb;
 	int err;
 	struct rt6_info *rt = (struct rt6_info *)*dstp;
-	int hlen = LL_RESERVED_SPACE(rt->dst.dev);
+	size_t hlen = LL_RESERVED_SPACE(rt->dst.dev);
 	int tlen = rt->dst.dev->needed_tailroom;
 
 	if (length > rt->dst.dev->mtu) {
@@ -674,7 +674,7 @@ error:
 
 struct raw6_frag_vec {
 	struct msghdr *msg;
-	int hlen;
+	size_t hlen;
 	char c[4];
 };
 
