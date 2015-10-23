@@ -68,7 +68,9 @@ unsigned int rx_stall_timeout_msecs = 60000;
 module_param(rx_stall_timeout_msecs, uint, 0444);
 
 unsigned int xenvif_max_queues;
-module_param_named(max_queues, xenvif_max_queues, uint, 0644);
+static int xennet_set_max_queues(const char *val, struct kernel_param *kp);
+module_param_call(max_queues, xennet_set_max_queues, param_get_int,
+		  &xenvif_max_queues, 0600);
 MODULE_PARM_DESC(max_queues,
 		 "Maximum number of queues per virtual interface");
 
@@ -106,6 +108,20 @@ static struct xen_netif_rx_response *make_rx_response(struct xenvif_queue *queue
 					     u16      offset,
 					     u16      size,
 					     u16      flags);
+
+static int xennet_set_max_queues(const char *val, struct kernel_param *kp)
+{
+	unsigned int cpus = num_online_cpus();
+	unsigned int max_queues = simple_strtoul(val, NULL, 10);
+
+	if (max_queues == 0 || max_queues > cpus) {
+		pr_info("max_queues %d is out of range [0 - %d]!\n", 
+			max_queues, cpus);
+		return -EINVAL;
+	}
+
+	return param_set_int(val, kp);
+}
 
 static inline unsigned long idx_to_pfn(struct xenvif_queue *queue,
 				       u16 idx)
@@ -2110,15 +2126,15 @@ int xenvif_dealloc_kthread(void *data)
 static int __init netback_init(void)
 {
 	int rc = 0;
+	unsigned int cpus = num_online_cpus();
 
 	if (!xen_domain())
 		return -ENODEV;
 
-	/* Allow as many queues as there are CPUs if user has not
-	 * specified a value.
-	 */
-	if (xenvif_max_queues == 0)
-		xenvif_max_queues = num_online_cpus();
+	/* Allow at most as many queues as CPUs. */
+	if (xenvif_max_queues == 0 || xenvif_max_queues > cpus)
+		xenvif_max_queues = cpus;
+	pr_info("vif max_queues: %d\n", xenvif_max_queues);
 
 	if (fatal_skb_slots < XEN_NETBK_LEGACY_SLOTS_MAX) {
 		pr_info("fatal_skb_slots too small (%d), bump it to XEN_NETBK_LEGACY_SLOTS_MAX (%d)\n",
