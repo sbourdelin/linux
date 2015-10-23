@@ -90,6 +90,9 @@ module_param(fasteoi, bool, S_IRUGO);
 static bool __read_mostly enable_apicv = 1;
 module_param(enable_apicv, bool, S_IRUGO);
 
+static bool __read_mostly lbrv = 1;
+module_param(lbrv, bool, S_IRUGO);
+
 static bool __read_mostly enable_shadow_vmcs = 1;
 module_param_named(enable_shadow_vmcs, enable_shadow_vmcs, bool, S_IRUGO);
 /*
@@ -4323,6 +4326,21 @@ static void vmx_disable_intercept_msr_write_x2apic(u32 msr)
 			msr, MSR_TYPE_W);
 }
 
+static void vmx_disable_intercept_guest_msr(struct kvm_vcpu *vcpu, u32 msr)
+{
+	if (irqchip_in_kernel(vcpu->kvm) &&
+			apic_x2apic_mode(vcpu->arch.apic)) {
+		vmx_disable_intercept_msr_read_x2apic(msr);
+		vmx_disable_intercept_msr_write_x2apic(msr);
+	}
+	else {
+		if (is_long_mode(vcpu))
+			vmx_disable_intercept_for_msr(msr, true);
+		else
+			vmx_disable_intercept_for_msr(msr, false);
+	}
+}
+
 static int vmx_vm_has_apicv(struct kvm *kvm)
 {
 	return enable_apicv && irqchip_in_kernel(kvm);
@@ -6035,6 +6053,13 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->hwapic_isr_update = NULL;
 		kvm_x86_ops->deliver_posted_interrupt = NULL;
 		kvm_x86_ops->sync_pir_to_irr = vmx_sync_pir_to_irr_dummy;
+	}
+
+	if (!lbrv) {
+		kvm_x86_ops->set_debugctlmsr = NULL;
+		kvm_x86_ops->get_debugctlmsr = NULL;
+		kvm_x86_ops->set_lbr_msr = NULL;
+		kvm_x86_ops->get_lbr_msr = NULL;
 	}
 
 	vmx_disable_intercept_for_msr(MSR_FS_BASE, false);
@@ -8258,6 +8283,215 @@ static void atomic_switch_perf_msrs(struct vcpu_vmx *vmx)
 					msrs[i].host);
 }
 
+struct lbr_info {
+	u32 base;
+	u8 count;
+} pentium4_lbr[] = {
+	{ MSR_LBR_SELECT,              1 },
+	{ MSR_PENTIUM4_LER_FROM_LIP,   1 },
+	{ MSR_PENTIUM4_LER_TO_LIP,     1 },
+	{ MSR_PENTIUM4_LBR_TOS,        1 },
+	{ MSR_LBR_PENTIUM4_FROM,       SIZE_PENTIUM4_LBR_STACK },
+	{ MSR_LBR_PENTIUM4_TO,         SIZE_PENTIUM4_LBR_STACK },
+	{ 0, 0 }
+}, core2_lbr[] = {
+	{ MSR_LBR_SELECT,               1 },
+	{ MSR_IA32_LASTINTFROMIP,       1 },
+	{ MSR_IA32_LASTINTTOIP,         1 },
+	{ MSR_LBR_TOS,                  1 },
+	{ MSR_LBR_CORE2_FROM,		SIZE_CORE2_LBR_STACK },
+	{ MSR_LBR_CORE2_TO,		SIZE_CORE2_LBR_STACK },
+	{ 0, 0 }
+}, atom_lbr[] = {
+	{ MSR_LBR_SELECT,               1 },
+	{ MSR_IA32_LASTINTFROMIP,       1 },
+	{ MSR_IA32_LASTINTTOIP,         1 },
+	{ MSR_LBR_TOS,                  1 },
+	{ MSR_LBR_ATOM_FROM,            SIZE_ATOM_LBR_STACK },
+	{ MSR_LBR_ATOM_TO,              SIZE_ATOM_LBR_STACK },
+	{ 0, 0 }
+}, nehalem_lbr[] = {
+	{ MSR_LBR_SELECT,		1 },
+	{ MSR_IA32_LASTINTFROMIP,	1 },
+	{ MSR_IA32_LASTINTTOIP,	        1 },
+	{ MSR_LBR_TOS,			1 },
+	{ MSR_LBR_NHM_FROM,		SIZE_NHM_LBR_STACK },
+	{ MSR_LBR_NHM_TO,		SIZE_NHM_LBR_STACK },
+	{ 0, 0 }
+}, skylake_lbr[] = {
+	{ MSR_LBR_SELECT,               1 },
+	{ MSR_IA32_LASTINTFROMIP,       1 },
+	{ MSR_IA32_LASTINTTOIP,         1 },
+	{ MSR_LBR_TOS,                  1 },
+	{ MSR_LBR_SKYLAKE_FROM,         SIZE_SKYLAKE_LBR_STACK },
+	{ MSR_LBR_SKYLAKE_TO,           SIZE_SKYLAKE_LBR_STACK },
+	{ 0, 0}
+};
+
+static const struct lbr_info *last_branch_msr_get(struct kvm_vcpu *vcpu)
+{
+	struct kvm_cpuid_entry2 *best = kvm_find_cpuid_entry(vcpu, 1, 0);
+	u32 eax = best->eax;
+	u8 family = (eax >> 8) & 0xf;
+	u8 model = (eax >> 4) & 0xf;
+
+	if (family == 15)
+		family += (eax >> 20) & 0xff;
+	if (family >= 6)
+		model += ((eax >> 16) & 0xf) << 4;
+
+	if (family == 6)
+	{
+		switch (model)
+		{
+			case 15: /* 65nm Core2 "Merom" */
+			case 22: /* 65nm Core2 "Merom-L" */
+			case 23: /* 45nm Core2 "Penryn" */
+			case 29: /* 45nm Core2 "Dunnington (MP) */
+				return core2_lbr;
+				break;
+			case 28: /* 45nm Atom "Pineview" */
+			case 38: /* 45nm Atom "Lincroft" */
+			case 39: /* 32nm Atom "Penwell" */
+			case 53: /* 32nm Atom "Cloverview" */
+			case 54: /* 32nm Atom "Cedarview" */
+			case 55: /* 22nm Atom "Silvermont" */
+			case 76: /* 14nm Atom "Airmont" */
+			case 77: /* 22nm Atom "Silvermont Avoton/Rangely" */
+				return atom_lbr;
+				break;
+			case 30: /* 45nm Nehalem */
+			case 26: /* 45nm Nehalem-EP */
+			case 46: /* 45nm Nehalem-EX */
+			case 37: /* 32nm Westmere */
+			case 44: /* 32nm Westmere-EP */
+			case 47: /* 32nm Westmere-EX */
+			case 42: /* 32nm SandyBridge */
+			case 45: /* 32nm SandyBridge-E/EN/EP */
+			case 58: /* 22nm IvyBridge */
+			case 62: /* 22nm IvyBridge-EP/EX */
+			case 60: /* 22nm Haswell Core */
+			case 63: /* 22nm Haswell Server */
+			case 69: /* 22nm Haswell ULT */
+			case 70: /* 22nm Haswell + GT3e */
+			case 61: /* 14nm Broadwell Core-M */
+			case 86: /* 14nm Broadwell Xeon D */
+			case 71: /* 14nm Broadwell + GT3e */
+			case 79: /* 14nm Broadwell Server */
+				return nehalem_lbr;
+				break;
+			case 78: /* 14nm Skylake Mobile */
+			case 94: /* 14nm Skylake Desktop */
+				return skylake_lbr;
+				break;
+		}
+	}
+	if (family == 15) {
+		switch (model)
+		{
+			/* Pentium4/Xeon(based on NetBurst)*/
+			case 3:
+			case 4:
+			case 6:
+				return pentium4_lbr;
+				break;
+		}
+	}
+
+	return NULL;
+}
+
+static int vmx_enable_lbrv(struct kvm_vcpu *vcpu)
+{
+	int i;
+	const struct lbr_info *lbr = last_branch_msr_get(vcpu);
+	struct lbr_msr *m = &(vcpu->arch.lbr_msr);
+
+	if (lbr == NULL)
+		return 1;
+
+	if (vcpu->arch.lbr_used) {
+		vcpu->arch.lbr_status = 1;
+		return 0;
+	}
+
+	for (; lbr->count; lbr++)
+		for (i = 0; (i < lbr->count); i++) {
+			m->host[m->nr].index = lbr->base + i;
+			m->host[m->nr].data = 0;
+			m->guest[m->nr].index = lbr->base + i;
+			m->guest[m->nr].data = 0;
+			m->nr++;
+
+			vmx_disable_intercept_guest_msr(vcpu, lbr->base + i);
+		}
+
+	vcpu->arch.lbr_status = 1;
+	vcpu->arch.lbr_used = 1;
+
+	return 0;
+}
+
+static int vmx_set_debugctlmsr(struct kvm_vcpu *vcpu, u64 value)
+{
+	if (value & DEBUGCTLMSR_LBR) {
+		if (vmx_enable_lbrv(vcpu))
+			return 1;
+	} else
+		vcpu->arch.lbr_status = 0;
+
+	vmcs_write64(GUEST_IA32_DEBUGCTL, value);
+
+	return 0;
+}
+
+static u64 vmx_get_debugctlmsr(void)
+{
+	return vmcs_read64(GUEST_IA32_DEBUGCTL);
+}
+
+static void vmx_set_lbr_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data)
+{
+	unsigned i;
+	struct lbr_msr *m = &(vcpu->arch.lbr_msr);
+
+	for (i = 0; i < m->nr; ++i)
+		if (m->guest[i].index == msr)
+			m->guest[i].data = data;
+}
+
+static u64 vmx_get_lbr_msr(struct kvm_vcpu *vcpu, u32 msr)
+{
+	unsigned i;
+	struct lbr_msr *m = &(vcpu->arch.lbr_msr);
+
+	for (i = 0; i < m->nr; ++i)
+		if (m->guest[i].index == msr)
+			break;
+
+	if (i < m->nr)
+		return m->guest[i].data;
+	else
+		return 0;
+}
+
+static void switch_lbr_msrs(struct kvm_vcpu *vcpu, int vm_exit)
+{
+	int i;
+	struct lbr_msr *m = &(vcpu->arch.lbr_msr);
+
+	for (i = 0; i < m->nr; ++i) {
+		if (vm_exit) {
+			rdmsrl(m->guest[i].index, m->guest[i].data);
+			wrmsrl(m->host[i].index, m->host[i].data);
+		}
+		else {
+			rdmsrl(m->host[i].index, m->host[i].data);
+			wrmsrl(m->guest[i].index, m->guest[i].data);
+		}
+	}
+}
+
 static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -8303,6 +8537,9 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 
 	atomic_switch_perf_msrs(vmx);
 	debugctlmsr = get_debugctlmsr();
+
+	if (vcpu->arch.lbr_used)
+		switch_lbr_msrs(vcpu, 0);
 
 	vmx->__launched = vmx->loaded_vmcs->launched;
 	asm(
@@ -8409,6 +8646,9 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		, "eax", "ebx", "edi", "esi"
 #endif
 	      );
+
+	if (vcpu->arch.lbr_used)
+		switch_lbr_msrs(vcpu, 1);
 
 	/* MSR_IA32_DEBUGCTLMSR is zeroed on vmexit. Restore it if needed */
 	if (debugctlmsr)
@@ -10395,6 +10635,11 @@ static struct kvm_x86_ops vmx_x86_ops = {
 	.enable_log_dirty_pt_masked = vmx_enable_log_dirty_pt_masked,
 
 	.pmu_ops = &intel_pmu_ops,
+
+	.set_debugctlmsr = vmx_set_debugctlmsr,
+	.get_debugctlmsr = vmx_get_debugctlmsr,
+	.set_lbr_msr = vmx_set_lbr_msr,
+	.get_lbr_msr = vmx_get_lbr_msr,
 };
 
 static int __init vmx_init(void)
