@@ -39,6 +39,16 @@ you avoid some possible charset problems.
 Email clients should generate and maintain References: or In-Reply-To:
 headers so that mail threading is not broken.
 
+When manually adding In-Reply-To: headers to a patch (e.g., using `git
+send email`), use common sense to associate the patch with previous
+relevant discussion, e.g. link a bug fix to the email with the bug report.
+For a multi-patch series, it is generally best to avoid using
+In-Reply-To: to link to older versions of the series.  This way
+multiple versions of the patch don't become an unmanageable forest of
+references in email clients.  If a link is helpful, you can use an
+"http://lkml.kernel.org/r/MESSAGEID" URL (e.g., in the cover email
+text) to link to an earlier version of the patch series.
+
 Copy-and-paste (or cut-and-paste) usually does not work for patches
 because tabs are converted to spaces.  Using xclipboard, xclip, and/or
 xcutsel may work, but it's best to test this for yourself or just avoid
