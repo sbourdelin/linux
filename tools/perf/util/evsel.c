@@ -1328,6 +1328,7 @@ retry_sample_id:
 
 		for (thread = 0; thread < nthreads; thread++) {
 			int group_fd;
+			struct perf_event_attr attr;
 
 			if (!evsel->cgrp && !evsel->system_wide)
 				pid = thread_map__pid(threads, thread);
@@ -1337,7 +1338,10 @@ retry_open:
 			pr_debug2("sys_perf_event_open: pid %d  cpu %d  group_fd %d  flags %#lx\n",
 				  pid, cpus->map[cpu], group_fd, flags);
 
-			FD(evsel, cpu, thread) = sys_perf_event_open(&evsel->attr,
+			attr = evsel->attr;
+			if (pid == -1)
+				attr.inherit = 0;
+			FD(evsel, cpu, thread) = sys_perf_event_open(&attr,
 								     pid,
 								     cpus->map[cpu],
 								     group_fd, flags);
