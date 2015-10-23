@@ -2187,7 +2187,7 @@ static int __init netif_init(void)
 	/* Allow as many queues as there are CPUs if user has not
 	 * specified a value.
 	 */
-	if (xennet_max_queues == 0)
+	if (xennet_max_queues == 0 || xennet_max_queues > num_online_cpus())
 		xennet_max_queues = num_online_cpus();
 
 	return xenbus_register_frontend(&netfront_driver);
