@@ -7562,6 +7562,16 @@ enum skl_disp_power_wells {
 #define PIPE_CSC_POSTOFF_ME(pipe) _PIPE(pipe, _PIPE_A_CSC_POSTOFF_ME, _PIPE_B_CSC_POSTOFF_ME)
 #define PIPE_CSC_POSTOFF_LO(pipe) _PIPE(pipe, _PIPE_A_CSC_POSTOFF_LO, _PIPE_B_CSC_POSTOFF_LO)
 
+/* Skylake pipe bottom color */
+#define _PIPE_BOTTOM_COLOR_A        0x70034
+#define _PIPE_BOTTOM_COLOR_B        0x71034
+#define _PIPE_BOTTOM_COLOR_C        0x72034
+#define PIPE_BOTTOM_GAMMA_ENABLE   (1 << 31)
+#define PIPE_BOTTOM_CSC_ENABLE     (1 << 30)
+#define PIPE_BOTTOM_COLOR_MASK     0x3FFFFFFF
+#define PIPE_BOTTOM_COLOR(pipe) _PIPE3(pipe, _PIPE_BOTTOM_COLOR_A, \
+	_PIPE_BOTTOM_COLOR_B, _PIPE_BOTTOM_COLOR_C)
+
 /* MIPI DSI registers */
 
 #define _MIPI_PORT(port, a, c)	_PORT3(port, a, 0, c)	/* ports A and C only */

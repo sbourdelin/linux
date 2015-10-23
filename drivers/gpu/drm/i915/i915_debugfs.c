@@ -2977,6 +2977,15 @@ static int i915_display_info(struct seq_file *m, void *unused)
 				   crtc->base.cursor->state->crtc_h,
 				   crtc->cursor_addr, yesno(active));
 		}
+		if (INTEL_INFO(dev)->gen >= 9 && pipe_config->base.active) {
+			drm_rgba_t background = pipe_config->base.background_color;
+
+			seq_printf(m, "\tbackground color (10bpc): r=%x g=%x b=%x\n",
+				   background.v,
+				   DRM_RGBA_REDBITS(background, 10),
+				   DRM_RGBA_GREENBITS(background, 10),
+				   DRM_RGBA_BLUEBITS(background, 10));
+		}
 
 		seq_printf(m, "\tunderrun reporting: cpu=%s pch=%s \n",
 			   yesno(!crtc->cpu_fifo_underrun_disabled),
