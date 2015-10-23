@@ -501,6 +501,9 @@
 		dr_mode = "host";
 		phys = <&usbphy2>;
 		phy-names = "usb2-phy";
+		resets = <&usbphy2>;
+		reset-names = "phy-port-reset";
+		snps,need-phy-port-reset-on-wake;
 		status = "disabled";
 	};
 
@@ -518,6 +521,8 @@
 		g-use-dma;
 		phys = <&usbphy0>;
 		phy-names = "usb2-phy";
+		resets = <&usbphy0>;
+		reset-names = "phy-port-reset";
 		status = "disabled";
 	};
 
