@@ -21,6 +21,11 @@ required properties:
 Optional Properties:
 - clocks : phandle + clock specifier for the phy clocks
 - clock-names: string, clock name, must be "phyclk"
+- #reset-cells: adding this property allows the phy to be
+  specified as a reset source.  Asserting this reset will
+  assert the PHY's "port reset" bit.  Always set reset-cells
+  to 0.  Each PHY only has one reset to provide so no ID is
+  needed.
 
 Example:
 
@@ -32,6 +37,7 @@ usbphy: phy {
 
 	usbphy0: usb-phy0 {
 		#phy-cells = <0>;
+		#reset-cells = <0>;
 		reg = <0x320>;
 	};
 };
