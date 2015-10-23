@@ -292,4 +292,15 @@ config SERIO_SUN4I_PS2
 	  To compile this driver as a module, choose M here: the
 	  module will be called sun4i-ps2.
 
+config USERIO
+	tristate "Virtual serio device support"
+	help
+	  Say Y here if you want to emulate serio devices using the userio
+	  kernel module.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called userio.
+
+	  If you are unsure, say N.
+
 endif
