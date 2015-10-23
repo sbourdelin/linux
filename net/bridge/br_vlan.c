@@ -208,6 +208,8 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags)
 	}
 
 	if (p) {
+		int enc_hdr_len;
+
 		/* Add VLAN to the device filter if it is supported.
 		 * This ensures tagged traffic enters the bridge when
 		 * promiscuous mode is disabled by br_manage_promisc().
@@ -228,6 +230,13 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags)
 		if (!masterv)
 			goto out_filt;
 		v->brvlan = masterv;
+
+		if (!vg->num_vlans) {
+			enc_hdr_len = VLAN_HLEN;
+			if (br->vlan_proto == htons(ETH_P_8021AD))
+				enc_hdr_len += VLAN_HLEN;
+			dev_set_enc_hdr_len(dev, enc_hdr_len);
+		}
 	}
 
 	/* Add the dev mac and count the vlan only if it's usable */
@@ -664,6 +673,15 @@ int __br_vlan_set_proto(struct net_bridge *br, __be16 proto)
 			err = vlan_vid_add(p->dev, proto, vlan->vid);
 			if (err)
 				goto err_filt;
+		}
+	}
+
+	if (proto == htons(ETH_P_8021AD)) {
+		list_for_each_entry(p, &br->port_list, list) {
+			if (!p->vlgrp->num_vlans)
+				continue;
+
+			dev_set_enc_hdr_len(p->dev, VLAN_HLEN * 2);
 		}
 	}
 
