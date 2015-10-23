@@ -15,10 +15,10 @@ config USB_ISP1760
 	  module will be called isp1760.
 
 config USB_ISP1760_HCD
-	bool
+	bool "ISP1760 HCD support"
 
 config USB_ISP1761_UDC
-	bool
+	bool "ISP1761 UDC support"
 
 if USB_ISP1760
 
