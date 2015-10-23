@@ -1300,7 +1300,6 @@ error:
 	/* rollback pgdat allocation and others */
 	if (new_pgdat)
 		rollback_node_hotadd(nid, pgdat);
-	release_memory_resource(res);
 	memblock_remove(start, size);
 
 out:
