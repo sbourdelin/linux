@@ -1882,27 +1882,26 @@ static void blk_mq_map_swqueue(struct request_queue *q,
 	}
 }
 
-static void blk_mq_update_tag_set_depth(struct blk_mq_tag_set *set)
+static void queue_set_hctx_shared(struct request_queue *q, bool shared)
 {
 	struct blk_mq_hw_ctx *hctx;
-	struct request_queue *q;
-	bool shared;
 	int i;
 
-	if (set->tag_list.next == set->tag_list.prev)
-		shared = false;
-	else
-		shared = true;
+	queue_for_each_hw_ctx(q, hctx, i) {
+		if (shared)
+			hctx->flags |= BLK_MQ_F_TAG_SHARED;
+		else
+			hctx->flags &= ~BLK_MQ_F_TAG_SHARED;
+	}
+}
+
+static void blk_mq_update_tag_set_depth(struct blk_mq_tag_set *set, bool shared)
+{
+	struct request_queue *q;
 
 	list_for_each_entry(q, &set->tag_list, tag_set_list) {
 		blk_mq_freeze_queue(q);
-
-		queue_for_each_hw_ctx(q, hctx, i) {
-			if (shared)
-				hctx->flags |= BLK_MQ_F_TAG_SHARED;
-			else
-				hctx->flags &= ~BLK_MQ_F_TAG_SHARED;
-		}
+		queue_set_hctx_shared(q, shared);
 		blk_mq_unfreeze_queue(q);
 	}
 }
@@ -1913,7 +1912,13 @@ static void blk_mq_del_queue_tag_set(struct request_queue *q)
 
 	mutex_lock(&set->tag_list_lock);
 	list_del_init(&q->tag_set_list);
-	blk_mq_update_tag_set_depth(set);
+
+	if (set->tag_list.next == set->tag_list.prev) {
+		/* just transitioned to unshared */
+		set->flags &= ~BLK_MQ_F_TAG_SHARED;
+		/* update existing queue */
+		blk_mq_update_tag_set_depth(set, false);
+	}
 	mutex_unlock(&set->tag_list_lock);
 }
 
@@ -1924,7 +1929,24 @@ static void blk_mq_add_queue_tag_set(struct blk_mq_tag_set *set,
 
 	mutex_lock(&set->tag_list_lock);
 	list_add_tail(&q->tag_set_list, &set->tag_list);
-	blk_mq_update_tag_set_depth(set);
+
+	if (set->tag_list.next != set->tag_list.prev) {
+		/*
+		 * Only update the tag set state if the state has
+		 * actually changed.
+		 */
+		if (!(set->flags & BLK_MQ_F_TAG_SHARED)) {
+			/* just transitioned to shared tags */
+			set->flags |= BLK_MQ_F_TAG_SHARED;
+			blk_mq_update_tag_set_depth(set, true);
+		} else {
+			/* ensure we didn't race with another addition */
+			struct blk_mq_hw_ctx *hctx = queue_first_hw_ctx(q);
+			if ((hctx->flags & BLK_MQ_F_TAG_SHARED) !=
+							BLK_MQ_F_TAG_SHARED)
+				queue_set_hctx_shared(q, true);
+		}
+	}
 	mutex_unlock(&set->tag_list_lock);
 }
 

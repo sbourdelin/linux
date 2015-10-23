@@ -254,6 +254,9 @@ static inline void *blk_mq_rq_to_pdu(struct request *rq)
 	for ((i) = 0; (i) < (hctx)->nr_ctx &&				\
 	     ({ ctx = (hctx)->ctxs[(i)]; 1; }); (i)++)
 
+#define queue_first_hw_ctx(q)						\
+	(q)->queue_hw_ctx[0]
+
 #define blk_ctx_sum(q, sum)						\
 ({									\
 	struct blk_mq_ctx *__x;						\
