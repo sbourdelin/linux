@@ -2827,12 +2827,12 @@ int skb_ensure_writable(struct sk_buff *skb, int write_len);
 int skb_vlan_pop(struct sk_buff *skb);
 int skb_vlan_push(struct sk_buff *skb, __be16 vlan_proto, u16 vlan_tci);
 
-static inline int memcpy_from_msg(void *data, struct msghdr *msg, int len)
+static inline int memcpy_from_msg(void *data, struct msghdr *msg, size_t len)
 {
 	return copy_from_iter(data, len, &msg->msg_iter) == len ? 0 : -EFAULT;
 }
 
-static inline int memcpy_to_msg(struct msghdr *msg, void *data, int len)
+static inline int memcpy_to_msg(struct msghdr *msg, void *data, size_t len)
 {
 	return copy_to_iter(data, len, &msg->msg_iter) == len ? 0 : -EFAULT;
 }
