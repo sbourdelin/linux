@@ -3,34 +3,35 @@
 
 [ -f kprobe_events ] || exit_unsupported # this is configurable
 grep function available_tracers || exit_unsupported # this is configurable
+FORK=`grep do_fork$ /proc/kallsyms | cut -f 3 -d" "`
 
 # prepare
 echo nop > current_tracer
-echo do_fork > set_ftrace_filter
+echo $FORK > set_ftrace_filter
 echo 0 > events/enable
 echo > kprobe_events
-echo 'p:testprobe do_fork' > kprobe_events
+echo 'p:testprobe '"$FORK" > kprobe_events
 
 # kprobe on / ftrace off
 echo 1 > events/kprobes/testprobe/enable
 echo > trace
 ( echo "forked")
 grep testprobe trace
-! grep 'do_fork <-' trace
+! grep "$FORK"' <-' trace
 
 # kprobe on / ftrace on
 echo function > current_tracer
 echo > trace
 ( echo "forked")
 grep testprobe trace
-grep 'do_fork <-' trace
+grep "$FORK"' <-' trace
 
 # kprobe off / ftrace on
 echo 0 > events/kprobes/testprobe/enable
 echo > trace
 ( echo "forked")
 ! grep testprobe trace
-grep 'do_fork <-' trace
+grep "$FORK"' <-' trace
 
 # kprobe on / ftrace on
 echo 1 > events/kprobes/testprobe/enable
@@ -38,14 +39,14 @@ echo function > current_tracer
 echo > trace
 ( echo "forked")
 grep testprobe trace
-grep 'do_fork <-' trace
+grep "$FORK"' <-' trace
 
 # kprobe on / ftrace off
 echo nop > current_tracer
 echo > trace
 ( echo "forked")
 grep testprobe trace
-! grep 'do_fork <-' trace
+! grep "$FORK"' <-' trace
 
 # cleanup
 echo nop > current_tracer

@@ -2,10 +2,11 @@
 # description: Kretprobe dynamic event with arguments
 
 [ -f kprobe_events ] || exit_unsupported # this is configurable
+FORK=`grep do_fork$ /proc/kallsyms | cut -f 3 -d" "`
 
 echo 0 > events/enable
 echo > kprobe_events
-echo 'r:testprobe2 do_fork $retval' > kprobe_events
+echo 'r:testprobe2 '$FORK' $retval' > kprobe_events
 grep testprobe2 kprobe_events
 test -d events/kprobes/testprobe2
 echo 1 > events/kprobes/testprobe2/enable
