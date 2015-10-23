@@ -891,7 +891,8 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	int noblock = flags & MSG_DONTWAIT;
 	struct sk_buff *skb;
 	size_t size = 0;
-	int rc = -EINVAL, copied = 0, hdrlen;
+	int rc = -EINVAL, hdrlen;
+	size_t copied = 0;
 
 	dprintk("%s: sending from %02X to %02X\n", __func__,
 		llc->laddr.lsap, llc->daddr.lsap);
