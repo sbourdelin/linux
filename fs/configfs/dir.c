@@ -1636,6 +1636,108 @@ const struct file_operations configfs_dir_operations = {
 	.iterate	= configfs_readdir,
 };
 
+/**
+ * configfs_alloc_group() - allocate a configfs group
+ * @name:	group name
+ * @item_type:	config_item associated with the allocated group
+ *
+ * Dynamically allocates and initialize a group specified by name and
+ * config_item_type. We need kzalloc'ed memory because default_group
+ * is empty.
+ *
+ * Return: allocated config group or ERR_PTR() on error
+ */
+struct config_group *
+configfs_alloc_group(const char *name, struct config_item_type *item_type)
+{
+	struct config_group *group;
+
+	group = kzalloc(sizeof(*group), GFP_KERNEL);
+	if (!group)
+		return ERR_PTR(-ENOMEM);
+	config_group_init_type_name(group, name, item_type);
+
+	return group;
+}
+EXPORT_SYMBOL(configfs_alloc_group);
+
+/**
+ * configfs_free_group() - frees memory for a configfs group
+ * @group:	group to be 'eliberated'
+ */
+void configfs_free_group(struct config_group *group)
+{
+	kfree(group);
+}
+EXPORT_SYMBOL(configfs_free_group);
+
+/**
+ * configfs_register_group - creates a parent-child relation between two groups
+ * @parent_group:	parent group
+ * @group:		child group
+ *
+ * link groups, creates dentry for the child and attaches it to the
+ * parent dentry.
+ *
+ * Return: 0 on success, negative errno code on error
+ */
+int configfs_register_group(struct config_group *parent_group,
+			    struct config_group *group)
+{
+	struct configfs_subsystem *subsys = parent_group->cg_subsys;
+	struct dentry *parent;
+	int ret;
+
+	mutex_lock(&subsys->su_mutex);
+	link_group(parent_group, group);
+	mutex_unlock(&subsys->su_mutex);
+
+	parent = parent_group->cg_item.ci_dentry;
+
+	mutex_lock_nested(&d_inode(parent)->i_mutex, I_MUTEX_PARENT);
+	ret = create_default_group(parent_group, group);
+	if (!ret) {
+		spin_lock(&configfs_dirent_lock);
+		configfs_dir_set_ready(group->cg_item.ci_dentry->d_fsdata);
+		spin_unlock(&configfs_dirent_lock);
+	}
+	mutex_unlock(&d_inode(parent)->i_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(configfs_register_group);
+
+/**
+ * configfs_unregister_group() - unregisters a child group from its parent
+ *
+ * @group: parent group to be unregistered
+ *
+ * Undoes condigfs_register_group()
+ */
+void configfs_unregister_group(struct config_group *group)
+{
+	struct configfs_subsystem *subsys = group->cg_subsys;
+	struct dentry *dentry = group->cg_item.ci_dentry;
+	struct dentry *parent = group->cg_item.ci_parent->ci_dentry;
+
+	mutex_lock_nested(&d_inode(parent)->i_mutex, I_MUTEX_PARENT);
+	spin_lock(&configfs_dirent_lock);
+	configfs_detach_prep(dentry, NULL);
+	spin_unlock(&configfs_dirent_lock);
+
+	configfs_detach_group(&group->cg_item);
+	d_inode(dentry)->i_flags |= S_DEAD;
+	dont_mount(dentry);
+	d_delete(dentry);
+	mutex_unlock(&d_inode(parent)->i_mutex);
+
+	dput(dentry);
+
+	mutex_lock(&subsys->su_mutex);
+	unlink_group(group);
+	mutex_unlock(&subsys->su_mutex);
+}
+EXPORT_SYMBOL(configfs_unregister_group);
+
 int configfs_register_subsystem(struct configfs_subsystem *subsys)
 {
 	int err;
