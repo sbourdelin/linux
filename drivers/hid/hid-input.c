@@ -959,7 +959,7 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 		set_bit(EV_REP, input->evbit);
 		goto ignore;
 
-	case HID_UP_LOGIVENDOR:
+	case HID_UP_LOGIVENDOR: case HID_UP_LOGIVENDOR2: case HID_UP_LOGIVENDOR3:
 		goto ignore;
 
 	case HID_UP_PID:
