@@ -719,9 +719,10 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	unsigned long used;
 	int target;	/* Read at least this many bytes */
 	long timeo;
+	int err = 0;
 
 	lock_sock(sk);
-	copied = -ENOTCONN;
+	err = -ENOTCONN;
 	if (unlikely(sk->sk_type == SOCK_STREAM && sk->sk_state == TCP_LISTEN))
 		goto out;
 
@@ -745,9 +746,8 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 		 * and move it down to the bottom of the loop
 		 */
 		if (signal_pending(current)) {
-			if (copied)
-				break;
-			copied = timeo ? sock_intr_errno(timeo) : -EAGAIN;
+			if (!copied)
+				err = timeo ? sock_intr_errno(timeo) : -EAGAIN;
 			break;
 		}
 
@@ -775,7 +775,7 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 				break;
 
 			if (sk->sk_err) {
-				copied = sock_error(sk);
+				err = sock_error(sk);
 				break;
 			}
 			if (sk->sk_shutdown & RCV_SHUTDOWN)
@@ -787,13 +787,15 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 					 * This occurs when user tries to read
 					 * from never connected socket.
 					 */
-					copied = -ENOTCONN;
+					err = -ENOTCONN;
+					copied = 0;
 					break;
 				}
 				break;
 			}
 			if (!timeo) {
-				copied = -EAGAIN;
+				err = -EAGAIN;
+				copied = 0;
 				break;
 			}
 		}
@@ -823,7 +825,7 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 			if (rc) {
 				/* Exception. Bailout! */
 				if (!copied)
-					copied = -EFAULT;
+					err = -EFAULT;
 				break;
 			}
 		}
@@ -850,6 +852,8 @@ static int llc_ui_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 
 out:
 	release_sock(sk);
+	if (err)
+		return err;
 	return copied;
 copy_uaddr:
 	if (uaddr != NULL && skb != NULL) {
