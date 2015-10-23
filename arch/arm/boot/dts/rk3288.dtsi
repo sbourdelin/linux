@@ -893,6 +893,7 @@
 
 		usbphy0: usb-phy0 {
 			#phy-cells = <0>;
+			#reset-cells = <0>;
 			reg = <0x320>;
 			clocks = <&cru SCLK_OTGPHY0>;
 			clock-names = "phyclk";
@@ -900,6 +901,7 @@
 
 		usbphy1: usb-phy1 {
 			#phy-cells = <0>;
+			#reset-cells = <0>;
 			reg = <0x334>;
 			clocks = <&cru SCLK_OTGPHY1>;
 			clock-names = "phyclk";
@@ -907,6 +909,7 @@
 
 		usbphy2: usb-phy2 {
 			#phy-cells = <0>;
+			#reset-cells = <0>;
 			reg = <0x348>;
 			clocks = <&cru SCLK_OTGPHY2>;
 			clock-names = "phyclk";
