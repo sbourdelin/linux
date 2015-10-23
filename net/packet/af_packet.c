@@ -2632,7 +2632,7 @@ static int packet_snd(struct socket *sock, struct msghdr *msg, size_t len)
 	int err, reserve = 0;
 	struct virtio_net_hdr vnet_hdr = { 0 };
 	int offset = 0;
-	int vnet_hdr_len;
+	size_t vnet_hdr_len;
 	struct packet_sock *po = pkt_sk(sk);
 	unsigned short gso_type = 0;
 	int hlen, tlen;
@@ -3106,7 +3106,7 @@ static int packet_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
 	int copied, err;
-	int vnet_hdr_len = 0;
+	size_t vnet_hdr_len = 0;
 	unsigned int origlen = 0;
 
 	err = -EINVAL;
