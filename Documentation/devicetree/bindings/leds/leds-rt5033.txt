@@ -1,0 +1,38 @@
+* Richtek Technology Corporation - RT5033 Flash LED Driver
+
+The RT5033 Flash LED Circuit is designed for one or two LEDs driving
+for torch and strobe applications, it provides an I2C software command
+to trigger the torch and strobe operation.
+
+Required properties:
+- compatible : Must be "richtek,rt5033-led".
+
+A discrete LED element connected to the device must be represented by a child
+node - see Documentation/devicetree/bindings/leds/common.txt.
+
+Required properties of the LED child node:
+  See Documentation/devicetree/bindings/leds/common.txt
+- led-max-microamp : Minimum Threshold for Timer protection
+  is defined internally (Maximum 200mA).
+- flash-max-microamp : Flash LED maximum current
+- flash-max-timeout-us : Flash LED maximum timeout
+
+Optional properties of the LED child node:
+- label : see Documentation/devicetree/bindings/leds/common.txt
+
+Example:
+
+rt5033 {
+	compatible = "richtek,rt5033";
+
+	led {
+		compatible = "richtek,rt5033-led";
+
+		flash-led {
+			label = "rt5033-flash";
+			led-max-microamp = <200000>;
+			flash-max-microamp = <800000>;
+			flash-max-timeout-us = <1216000>;
+		};
+	};
+}
