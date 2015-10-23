@@ -1,0 +1,77 @@
+Nuvoton NCT7802Y Hardware Monitoring IC
+
+Required node properties:
+
+ - "compatible": must be "nuvoton,nct7802"
+ - "reg": I2C bus address of the device
+ - #address-cells=<1>;
+ - #size-cells=<0>;
+
+Optional subnodes:
+
+Sensor subnodes properties:
+ - "reg": index in range 0..2
+ - "compatible", allowed values:
+	 - "nuvoton,nct7802"
+ - "sensor-type", allowed values:
+	"thermal-diode"
+	"thermistor"
+	"voltage"
+
+Except sensor at address 2 can't be "thermal-diode".
+
+Fan subnode:
+
+Required properties:
+ - "reg" :index of in range 0 .. 2.
+ - "compatible", should be "nuvoton,nct7802-fan"
+Optional boolean properties:
+ - "direct-current" :direct current powered fan instead default PWM
+ - "invert" :inverted polarity
+ - "open-drain" :open-drain output instead push pull
+
+Subnode "peci" properties:
+ - "reg" :index in range 0..1
+ - "compatible", should be "nuvoton,nct7802-peci"
+
+Subnode vcc properties:
+ - "compatible", should be "nuvoton,nct7802-vcc"
+
+Subnode vcore properties:
+ - "compatible", should be "nuvoton,nct7802-vcore"
+
+Not defined sensors, fans and PECI modules will be disabled.
+
+Example nct7802 node:
+
+nct7802 {
+	compatible = "nuvoton,nct7802";
+	reg = <0x2a>;
+	#address-cells=<1>;
+	#size-cells=<0>;
+	sensor@0 {
+		reg = <0>;
+		compatible = "nuvoton,nct7802";
+		sensor-type = "thermistor"
+	};
+	sensor@1 {
+		reg = <1>;
+		compatible = "nuvoton,nct7802";
+		sensor-type = "thermal-diode";
+	};
+	pwm-fan@0 {
+		reg = <0>;
+		compatible = "nuvoton,nct7802-fan";
+	};
+	dc-fan@1 {
+		reg = <1>;
+		compatible = "nuvoton,nct7802-fan";
+		dc;
+		invert;
+		open-drain;
+	};
+	peci@0 {
+		reg = <0>;
+		compatible = "nuvoton,nct7802-peci";
+	};
+};
