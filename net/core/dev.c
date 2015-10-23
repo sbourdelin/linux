@@ -6024,6 +6024,42 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
 EXPORT_SYMBOL(dev_set_mtu);
 
 /**
+ *	dev_set_enc_hdr_len - Expand encapsulation header room
+ *	@dev: device
+ *	@new_len: new length
+ */
+int dev_set_enc_hdr_len(struct net_device *dev, int new_len)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+
+	if (new_len < 0)
+		return -EINVAL;
+
+	if (!netif_device_present(dev))
+		return -ENODEV;
+
+	if (new_len <= dev->enc_hdr_len)
+		return 0;
+
+	if (ops->ndo_enc_hdr_len) {
+		int err;
+
+		/* This function can be called from child user/net namespace */
+		if (!ns_capable(dev_net(dev)->user_ns, CAP_NET_ADMIN))
+			return -EPERM;
+
+		err = ops->ndo_enc_hdr_len(dev, new_len);
+		if (err)
+			return err;
+	}
+
+	dev->enc_hdr_len = new_len;
+
+	return 0;
+}
+EXPORT_SYMBOL(dev_set_enc_hdr_len);
+
+/**
  *	dev_set_group - Change group this device belongs to
  *	@dev: device
  *	@new_group: group this device should belong to

@@ -1054,6 +1054,10 @@ typedef u16 (*select_queue_fallback_t)(struct net_device *dev,
  *	This function is used to pass protocol port error state information
  *	to the switch driver. The switch driver can react to the proto_down
  *      by doing a phys down on the associated switch port.
+ * int (*ndo_enc_hdr_len)(struct net_device *dev, int hdr_len);
+ *	Called to notify addtional encapsulation header length to reserve.
+ *	Implements should reserve hdr_len room in addition to MTU to handle
+ *	encapsulated frames.
  *
  */
 struct net_device_ops {
@@ -1227,6 +1231,8 @@ struct net_device_ops {
 	int			(*ndo_get_iflink)(const struct net_device *dev);
 	int			(*ndo_change_proto_down)(struct net_device *dev,
 							 bool proto_down);
+	int			(*ndo_enc_hdr_len)(struct net_device *dev,
+						   int hdr_len);
 };
 
 /**
@@ -1387,6 +1393,7 @@ enum netdev_priv_flags {
  *	@if_port:	Selectable AUI, TP, ...
  *	@dma:		DMA channel
  *	@mtu:		Interface MTU value
+ *	@enc_hdr_len:	Additional encapsulation header length to MTU
  *	@type:		Interface hardware type
  *	@hard_header_len: Hardware header length
  *
@@ -1607,6 +1614,7 @@ struct net_device {
 	unsigned char		dma;
 
 	unsigned int		mtu;
+	unsigned int		enc_hdr_len;
 	unsigned short		type;
 	unsigned short		hard_header_len;
 
@@ -3021,6 +3029,7 @@ int dev_change_name(struct net_device *, const char *);
 int dev_set_alias(struct net_device *, const char *, size_t);
 int dev_change_net_namespace(struct net_device *, struct net *, const char *);
 int dev_set_mtu(struct net_device *, int);
+int dev_set_enc_hdr_len(struct net_device *, int);
 void dev_set_group(struct net_device *, int);
 int dev_set_mac_address(struct net_device *, struct sockaddr *);
 int dev_change_carrier(struct net_device *, bool new_carrier);
