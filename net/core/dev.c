@@ -1999,6 +1999,8 @@ static struct xps_map *expand_xps_map(struct xps_map *map,
 	int alloc_len = XPS_MIN_MAP_ALLOC;
 	int i, pos;
 
+	BUILD_BUG_ON(XPS_MIN_MAP_ALLOC == 0);
+
 	for (pos = 0; map && pos < map->len; pos++) {
 		if (map->queues[pos] != index)
 			continue;

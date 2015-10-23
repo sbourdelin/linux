@@ -718,7 +718,7 @@ struct xps_map {
 	u16 queues[0];
 };
 #define XPS_MAP_SIZE(_num) (sizeof(struct xps_map) + ((_num) * sizeof(u16)))
-#define XPS_MIN_MAP_ALLOC ((L1_CACHE_BYTES - sizeof(struct xps_map))	\
+#define XPS_MIN_MAP_ALLOC ((L1_CACHE_BYTES * 2 - sizeof(struct xps_map)) \
     / sizeof(u16))
 
 /*
