@@ -370,7 +370,7 @@ static int caif_stream_recvmsg(struct socket *sock, struct msghdr *msg,
 	timeo = sock_rcvtimeo(sk, flags&MSG_DONTWAIT);
 
 	do {
-		int chunk;
+		size_t chunk;
 		struct sk_buff *skb;
 
 		lock_sock(sk);
@@ -595,7 +595,8 @@ static int caif_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 {
 	struct sock *sk = sock->sk;
 	struct caifsock *cf_sk = container_of(sk, struct caifsock, sk);
-	int err, size;
+	int err;
+	size_t size;
 	struct sk_buff *skb;
 	int sent = 0;
 	long timeo;
