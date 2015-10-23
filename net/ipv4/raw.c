@@ -86,7 +86,7 @@ struct raw_frag_vec {
 		struct icmphdr icmph;
 		char c[1];
 	} hdr;
-	int hlen;
+	size_t hlen;
 };
 
 static struct raw_hashinfo raw_v4_hashinfo = {
