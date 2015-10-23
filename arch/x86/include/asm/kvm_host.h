@@ -376,6 +376,12 @@ struct kvm_vcpu_hv {
 	u64 hv_vapic;
 };
 
+struct msr_data {
+	bool host_initiated;
+	u32 index;
+	u64 data;
+};
+
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -515,6 +521,15 @@ struct kvm_vcpu_arch {
 	unsigned long dr7;
 	unsigned long eff_db[KVM_NR_DB_REGS];
 	unsigned long guest_debug_dr7;
+
+	int lbr_status;
+	int lbr_used;
+
+	struct lbr_msr {
+		unsigned nr;
+		struct msr_data guest[MAX_NUM_LBR_MSRS];
+		struct msr_data host[MAX_NUM_LBR_MSRS];
+	}lbr_msr;
 
 	u64 mcg_cap;
 	u64 mcg_status;
@@ -728,12 +743,6 @@ struct kvm_vcpu_stat {
 
 struct x86_instruction_info;
 
-struct msr_data {
-	bool host_initiated;
-	u32 index;
-	u64 data;
-};
-
 struct kvm_lapic_irq {
 	u32 vector;
 	u16 delivery_mode;
@@ -887,6 +896,11 @@ struct kvm_x86_ops {
 					   gfn_t offset, unsigned long mask);
 	/* pmu operations of sub-arch */
 	const struct kvm_pmu_ops *pmu_ops;
+
+	int (*set_debugctlmsr)(struct kvm_vcpu *vcpu, u64 value);
+	u64 (*get_debugctlmsr)(void);
+	void (*set_lbr_msr)(struct kvm_vcpu *vcpu, u32 msr, u64 data);
+	u64 (*get_lbr_msr)(struct kvm_vcpu *vcpu, u32 msr);
 };
 
 struct kvm_arch_async_pf {
