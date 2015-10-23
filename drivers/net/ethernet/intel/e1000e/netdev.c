@@ -1954,6 +1954,9 @@ static irqreturn_t e1000_intr_msix_rx(int __always_unused irq, void *data)
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_ring *rx_ring = adapter->rx_ring;
+	struct e1000_hw *hw = &adapter->hw;
+
+	trace_printk("%s: rxq0 irq ims 0x%08x\n", netdev->name, er32(IMS));
 
 	/* Write the ITR value calculated at the end of the
 	 * previous interrupt.
@@ -1968,6 +1971,7 @@ static irqreturn_t e1000_intr_msix_rx(int __always_unused irq, void *data)
 		adapter->total_rx_bytes = 0;
 		adapter->total_rx_packets = 0;
 		__napi_schedule(&adapter->napi);
+		trace_printk("%s: scheduling napi\n", netdev->name);
 	}
 	return IRQ_HANDLED;
 }
@@ -2678,6 +2682,8 @@ static int e1000e_poll(struct napi_struct *napi, int weight)
 	struct net_device *poll_dev = adapter->netdev;
 	int tx_cleaned = 1, work_done = 0;
 
+	trace_printk("%s: poll starting ims 0x%08x\n", poll_dev->name,
+		     er32(IMS));
 	adapter = netdev_priv(poll_dev);
 
 	if (!adapter->msix_entries ||
@@ -2695,6 +2701,8 @@ static int e1000e_poll(struct napi_struct *napi, int weight)
 			e1000_set_itr(adapter);
 		napi_complete_done(napi, work_done);
 		if (!test_bit(__E1000_DOWN, &adapter->state)) {
+			trace_printk("%s: will enable rxq0 irq\n",
+				     poll_dev->name);
 			if (adapter->msix_entries)
 				ew32(IMS, adapter->rx_ring->ims_val);
 			else
