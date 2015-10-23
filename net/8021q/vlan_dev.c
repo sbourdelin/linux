@@ -143,17 +143,35 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 	return ret;
 }
 
-static int vlan_dev_change_mtu(struct net_device *dev, int new_mtu)
+static int vlan_dev_enc_hdr_len(struct net_device *dev, int new_len)
 {
-	/* TODO: gotta make sure the underlying layer can handle it,
-	 * maybe an IFF_VLAN_CAPABLE flag for devices?
-	 */
-	if (vlan_dev_priv(dev)->real_dev->mtu < new_mtu)
-		return -ERANGE;
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+	int mtu_room = real_dev->mtu - dev->mtu;
 
-	dev->mtu = new_mtu;
+	new_len += VLAN_HLEN;
+	if (new_len > mtu_room)
+		return dev_set_enc_hdr_len(real_dev, new_len - mtu_room);
 
 	return 0;
+}
+
+static int vlan_dev_change_mtu(struct net_device *dev, int new_mtu)
+{
+	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+	int orig_mtu;
+	int err;
+
+	if (real_dev->mtu < new_mtu)
+		return -ERANGE;
+
+	orig_mtu = dev->mtu;
+	dev->mtu = new_mtu;
+
+	err = vlan_dev_enc_hdr_len(dev, dev->enc_hdr_len);
+	if (err)
+		dev->mtu = orig_mtu;
+
+	return err;
 }
 
 void vlan_dev_set_ingress_priority(const struct net_device *dev,
@@ -532,6 +550,8 @@ static const struct net_device_ops vlan_netdev_ops;
 static int vlan_dev_init(struct net_device *dev)
 {
 	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+	int enc_hdr_len;
+	int err;
 
 	netif_carrier_off(dev);
 
@@ -582,6 +602,22 @@ static int vlan_dev_init(struct net_device *dev)
 	SET_NETDEV_DEVTYPE(dev, &vlan_type);
 
 	vlan_dev_set_lockdep_class(dev, vlan_dev_get_lock_subclass(dev));
+
+	if (vlan_dev_priv(dev)->vlan_proto == htons(ETH_P_8021AD))
+		dev->enc_hdr_len = VLAN_HLEN;
+
+	enc_hdr_len = dev->enc_hdr_len + VLAN_HLEN;
+	err = dev_set_enc_hdr_len(real_dev, enc_hdr_len);
+	if (err) {
+		int new_mtu = real_dev->mtu + real_dev->enc_hdr_len - enc_hdr_len;
+
+		if (new_mtu < 0)
+			return -ENOSPC;
+
+		netdev_warn(dev, "Failed to expand encap header room to %d on real device. Decrease MTU to %d on vlan device.\n",
+			    enc_hdr_len, new_mtu);
+		dev->mtu = new_mtu;
+	}
 
 	vlan_dev_priv(dev)->vlan_pcpu_stats = netdev_alloc_pcpu_stats(struct vlan_pcpu_stats);
 	if (!vlan_dev_priv(dev)->vlan_pcpu_stats)
@@ -776,6 +812,7 @@ static const struct net_device_ops vlan_netdev_ops = {
 	.ndo_fix_features	= vlan_dev_fix_features,
 	.ndo_get_lock_subclass  = vlan_dev_get_lock_subclass,
 	.ndo_get_iflink		= vlan_dev_get_iflink,
+	.ndo_enc_hdr_len	= vlan_dev_enc_hdr_len,
 };
 
 static void vlan_dev_free(struct net_device *dev)

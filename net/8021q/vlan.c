@@ -355,6 +355,7 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 	struct net_device *vlandev;
 	struct vlan_dev_priv *vlan;
 	bool last = false;
+	int dev_max_frame;
 	LIST_HEAD(list);
 
 	if (is_vlan_dev(dev)) {
@@ -399,11 +400,22 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 		break;
 
 	case NETDEV_CHANGEMTU:
+		dev_max_frame = dev->mtu + dev->enc_hdr_len;
 		vlan_group_for_each_dev(grp, i, vlandev) {
-			if (vlandev->mtu <= dev->mtu)
+			int enc_hdr_len = vlandev->enc_hdr_len + VLAN_HLEN;
+
+			if (vlandev->mtu <= dev->mtu &&
+			    vlandev->mtu + enc_hdr_len <= dev_max_frame)
 				continue;
 
-			dev_set_mtu(vlandev, dev->mtu);
+			if (vlandev->mtu > dev->mtu) {
+				dev_set_mtu(vlandev, dev->mtu);
+			} else {
+				int mtu_room = dev->mtu - vlandev->mtu;
+
+				dev_set_enc_hdr_len(dev,
+						    enc_hdr_len - mtu_room);
+			}
 		}
 		break;
 
