@@ -609,7 +609,7 @@ out:
 	return err;
 }
 
-static int rawv6_send_hdrinc(struct sock *sk, struct msghdr *msg, int length,
+static int rawv6_send_hdrinc(struct sock *sk, struct msghdr *msg, size_t length,
 			struct flowi6 *fl6, struct dst_entry **dstp,
 			unsigned int flags)
 {
