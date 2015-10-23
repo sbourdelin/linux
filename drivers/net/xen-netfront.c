@@ -58,7 +58,9 @@
 
 /* Module parameters */
 static unsigned int xennet_max_queues;
-module_param_named(max_queues, xennet_max_queues, uint, 0644);
+static int xennet_set_max_queues(const char *val, struct kernel_param *kp);
+module_param_call(max_queues, xennet_set_max_queues, param_get_int,
+		  &xennet_max_queues, 0600);
 MODULE_PARM_DESC(max_queues,
 		 "Maximum number of queues per virtual interface");
 
@@ -163,6 +165,19 @@ struct netfront_rx_info {
 	struct xen_netif_rx_response rx;
 	struct xen_netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
 };
+
+static int xennet_set_max_queues(const char *val, struct kernel_param *kp)
+{
+	unsigned int cpus = num_online_cpus();
+	unsigned int max_queues = simple_strtoul(val, NULL, 10);
+
+	if (max_queues == 0 || max_queues > cpus) {
+		pr_err("max_queues %d is out of range [0 - %d]!\n", 
+		       max_queues, cpus);
+		return -EINVAL;
+	}
+	return param_set_int(val, kp);
+}
 
 static void skb_entry_set_link(union skb_entry *list, unsigned short id)
 {
@@ -2126,6 +2141,8 @@ static struct xenbus_driver netfront_driver = {
 
 static int __init netif_init(void)
 {
+	unsigned int cpus = num_online_cpus();
+
 	if (!xen_domain())
 		return -ENODEV;
 
@@ -2134,11 +2151,9 @@ static int __init netif_init(void)
 
 	pr_info("Initialising Xen virtual ethernet driver\n");
 
-	/* Allow as many queues as there are CPUs if user has not
-	 * specified a value.
-	 */
-	if (xennet_max_queues == 0)
-		xennet_max_queues = num_online_cpus();
+	/* Allow at most as many queues as there are CPUs. */
+	if (xennet_max_queues == 0 || xennet_max_queues > cpus)
+		xennet_max_queues = cpus;
 
 	return xenbus_register_frontend(&netfront_driver);
 }
