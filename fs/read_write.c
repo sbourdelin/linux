@@ -1329,6 +1329,24 @@ COMPAT_SYSCALL_DEFINE4(sendfile64, int, out_fd, int, in_fd,
 }
 #endif
 
+static ssize_t vfs_copy_fr_copy(struct file *file_in, loff_t pos_in,
+				struct file *file_out, loff_t pos_out,
+				size_t len)
+{
+	ssize_t ret = rw_verify_area(READ, file_in, &pos_in, len);
+
+	if (ret >= 0) {
+		len = ret;
+		ret = rw_verify_area(WRITE, file_out, &pos_out, len);
+		if (ret >= 0)
+			len = ret;
+	}
+	if (ret < 0)
+		return ret;
+
+	return do_splice_direct(file_in, &pos_in, file_out, &pos_out, len, 0);
+}
+
 /*
  * copy_file_range() differs from regular file read and write in that it
  * specifically allows return partial success.  When it does so is up to
@@ -1345,17 +1363,10 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 	if (flags != 0)
 		return -EINVAL;
 
-	/* copy_file_range allows full ssize_t len, ignoring MAX_RW_COUNT  */
-	ret = rw_verify_area(READ, file_in, &pos_in, len);
-	if (ret >= 0)
-		ret = rw_verify_area(WRITE, file_out, &pos_out, len);
-	if (ret < 0)
-		return ret;
-
 	if (!(file_in->f_mode & FMODE_READ) ||
 	    !(file_out->f_mode & FMODE_WRITE) ||
 	    (file_out->f_flags & O_APPEND) ||
-	    !file_out->f_op || !file_out->f_op->copy_file_range)
+	    !file_out->f_op)
 		return -EBADF;
 
 	/* this could be relaxed once a method supports cross-fs copies */
@@ -1370,8 +1381,13 @@ ssize_t vfs_copy_file_range(struct file *file_in, loff_t pos_in,
 	if (ret)
 		return ret;
 
-	ret = file_out->f_op->copy_file_range(file_in, pos_in, file_out, pos_out,
-					      len, flags);
+	ret = -EOPNOTSUPP;
+	if (file_out->f_op->copy_file_range)
+		ret = file_out->f_op->copy_file_range(file_in, pos_in, file_out,
+						      pos_out, len, flags);
+	if (ret == -EOPNOTSUPP)
+		ret = vfs_copy_fr_copy(file_in, pos_in, file_out, pos_out, len);
+
 	if (ret > 0) {
 		fsnotify_access(file_in);
 		add_rchar(current, ret);
