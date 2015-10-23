@@ -388,6 +388,16 @@
 				 <&platform_clk 1>;
 		};
 
+		qdma: qdma@8389000 {
+			      compatible = "fsl,ls1021a-qdma";
+			      reg = <0x0 0x8389000 0x0 0x20000>;
+			      interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
+					 <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
+			      interrupt-names = "qdma-tx", "qdma-err";
+			      channels = <1>;
+			      big-endian;
+		};
+
 		mdio0: mdio@2d24000 {
 			compatible = "gianfar";
 			device_type = "mdio";
