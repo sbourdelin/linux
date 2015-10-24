@@ -73,21 +73,17 @@ static void __init serial8250_early_out(struct uart_port *port, int offset, int 
 
 #define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
 
-static void __init wait_for_xmitr(struct uart_port *port)
+static void __init serial_putc(struct uart_port *port, int c)
 {
 	unsigned int status;
 
 	for (;;) {
 		status = serial8250_early_in(port, UART_LSR);
 		if ((status & BOTH_EMPTY) == BOTH_EMPTY)
-			return;
+			break;
 		cpu_relax();
 	}
-}
 
-static void __init serial_putc(struct uart_port *port, int c)
-{
-	wait_for_xmitr(port);
 	serial8250_early_out(port, UART_TX, c);
 }
 
