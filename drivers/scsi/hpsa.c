@@ -3357,10 +3357,13 @@ static int hpsa_update_device_info(struct ctlr_info *h,
 
 	unsigned char *inq_buff;
 	unsigned char *obdr_sig;
+	int rc = 0;
 
 	inq_buff = kzalloc(OBDR_TAPE_INQ_SIZE, GFP_KERNEL);
-	if (!inq_buff)
+	if (!inq_buff) {
+		rc = -ENOMEM;
 		goto bail_out;
+	}
 
 	/* Do an inquiry to the device to see what it is. */
 	if (hpsa_scsi_do_inquiry(h, scsi3addr, 0, inq_buff,
@@ -3368,6 +3371,7 @@ static int hpsa_update_device_info(struct ctlr_info *h,
 		/* Inquiry failed (msg printed already) */
 		dev_err(&h->pdev->dev,
 			"hpsa_update_device_info: inquiry failed\n");
+		rc = 1;
 		goto bail_out;
 	}
 
@@ -3417,7 +3421,7 @@ static int hpsa_update_device_info(struct ctlr_info *h,
 
 bail_out:
 	kfree(inq_buff);
-	return 1;
+	return rc;
 }
 
 static void hpsa_update_device_supports_aborts(struct ctlr_info *h,
@@ -3787,6 +3791,7 @@ static void hpsa_update_scsi_devices(struct ctlr_info *h, int hostno)
 	n_ext_target_devs = 0;
 	for (i = 0; i < nphysicals + nlogicals + 1; i++) {
 		u8 *lunaddrbytes, is_OBDR = 0;
+		int rc = 0;
 
 		/* Figure out where the LUN ID info is coming from */
 		lunaddrbytes = figure_lunaddrbytes(h, raid_ctlr_position,
@@ -3799,11 +3804,20 @@ static void hpsa_update_scsi_devices(struct ctlr_info *h, int hostno)
 				continue;
 
 		/* Get device type, vendor, model, device id */
-		if (hpsa_update_device_info(h, lunaddrbytes, tmpdevice,
-							&is_OBDR)) {
+		rc = hpsa_update_device_info(h, lunaddrbytes, tmpdevice,
+							&is_OBDR);
+		if (rc == -ENOMEM) {
+			dev_warn(&h->pdev->dev,
+				"Out of memory, rescan stopped.\n");
 			h->drv_req_rescan = 1;
-			continue; /* skip it if we can't talk to it. */
+			goto out;
 		}
+		if (rc) {
+			dev_warn(&h->pdev->dev,
+				"Inquiry failed, skipping device.\n");
+			continue;
+		}
+
 		figure_bus_target_lun(h, lunaddrbytes, tmpdevice);
 		hpsa_update_device_supports_aborts(h, tmpdevice, lunaddrbytes);
 		this_device = currentsd[ncurrent];
