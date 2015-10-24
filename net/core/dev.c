@@ -6261,9 +6261,57 @@ static void rollback_registered(struct net_device *dev)
 	list_del(&single);
 }
 
+static netdev_features_t netdev_sync_upper_features(struct net_device *lower,
+	struct net_device *upper, netdev_features_t features)
+{
+	netdev_features_t want = upper->wanted_features & lower->hw_features;
+
+	if (!(upper->wanted_features & NETIF_F_LRO)
+	    && (features & NETIF_F_LRO)) {
+		netdev_info(lower, "Dropping LRO, upper dev %s has it off.\n",
+			   upper->name);
+		features &= ~NETIF_F_LRO;
+	} else if ((want & NETIF_F_LRO) && !(features & NETIF_F_LRO)) {
+		netdev_info(lower, "Keeping LRO, upper dev %s has it on.\n",
+			   upper->name);
+		features |= NETIF_F_LRO;
+	}
+
+	return features;
+}
+
+static void netdev_sync_lower_features(struct net_device *upper,
+	struct net_device *lower, netdev_features_t features)
+{
+	netdev_features_t want = features & lower->hw_features;
+
+	if (!(features & NETIF_F_LRO) && (lower->features & NETIF_F_LRO)) {
+		netdev_info(upper, "Disabling LRO on lower dev %s.\n",
+			   lower->name);
+		upper->wanted_features &= ~NETIF_F_LRO;
+		lower->wanted_features &= ~NETIF_F_LRO;
+		netdev_update_features(lower);
+		if (unlikely(lower->features & NETIF_F_LRO))
+			netdev_WARN(upper, "failed to disable LRO on %s!\n",
+				    lower->name);
+	} else if ((want & NETIF_F_LRO) && !(lower->features & NETIF_F_LRO)) {
+		netdev_info(upper, "Enabling LRO on lower dev %s.\n",
+			   lower->name);
+		upper->wanted_features |= NETIF_F_LRO;
+		lower->wanted_features |= NETIF_F_LRO;
+		netdev_update_features(lower);
+		if (unlikely(!(lower->features & NETIF_F_LRO)))
+			netdev_WARN(upper, "failed to enable LRO on %s!\n",
+				    lower->name);
+	}
+}
+
 static netdev_features_t netdev_fix_features(struct net_device *dev,
 	netdev_features_t features)
 {
+	struct net_device *upper, *lower;
+	struct list_head *iter;
+
 	/* Fix illegal checksum combinations */
 	if ((features & NETIF_F_HW_CSUM) &&
 	    (features & (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM))) {
@@ -6317,6 +6365,15 @@ static netdev_features_t netdev_fix_features(struct net_device *dev,
 			features &= ~NETIF_F_UFO;
 		}
 	}
+
+	/* some features should be kept in sync with upper devices */
+	upper = netdev_master_upper_dev_get(dev);
+	if (upper)
+		features = netdev_sync_upper_features(dev, upper, features);
+
+	/* lower devices need some features altered to match upper devices */
+	netdev_for_each_lower_dev(dev, lower, iter)
+		netdev_sync_lower_features(dev, lower, features);
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	if (dev->netdev_ops->ndo_busy_poll)
