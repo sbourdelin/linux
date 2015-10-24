@@ -29,6 +29,11 @@
 
 #define VERSION "0.1"
 
+typedef unsigned __bitwise__ lowpan_rx_result;
+#define RX_CONTINUE		((__force lowpan_rx_result) 0u)
+#define RX_DROP_UNUSABLE	((__force lowpan_rx_result) 1u)
+#define RX_QUEUE		((__force lowpan_rx_result) 3u)
+
 static struct dentry *lowpan_enable_debugfs;
 static struct dentry *lowpan_control_debugfs;
 
@@ -257,13 +262,38 @@ static struct lowpan_dev *lookup_dev(struct l2cap_conn *conn)
 
 static int give_skb_to_upper(struct sk_buff *skb, struct net_device *dev)
 {
-	struct sk_buff *skb_cp;
+	skb->protocol = htons(ETH_P_IPV6);
+	skb->pkt_type = PACKET_HOST;
 
-	skb_cp = skb_copy(skb, GFP_ATOMIC);
-	if (!skb_cp)
+	dev->stats.rx_bytes += skb->len;
+	dev->stats.rx_packets++;
+
+	return netif_rx(skb);
+}
+
+static int lowpan_rx_handlers_result(struct sk_buff *skb,
+				     struct net_device *dev,
+				     lowpan_rx_result res)
+{
+	switch (res) {
+	case RX_CONTINUE:
+		/* nobody cared about this packet */
+		net_warn_ratelimited("%s: received unknown dispatch\n",
+				     __func__);
+
+		/* fall-through */
+	case RX_DROP_UNUSABLE:
+		kfree_skb(skb);
 		return NET_RX_DROP;
+	case RX_QUEUE:
+		return give_skb_to_upper(skb, dev);
+	default:
+		/* should never occur */
+		WARN_ON_ONCE(1);
+		break;
+	}
 
-	return netif_rx(skb_cp);
+	return NET_RX_DROP;
 }
 
 static int iphc_decompress(struct sk_buff *skb, struct net_device *netdev,
@@ -287,82 +317,85 @@ static int iphc_decompress(struct sk_buff *skb, struct net_device *netdev,
 	return lowpan_header_decompress(skb, netdev, daddr, saddr);
 }
 
+static lowpan_rx_result lowpan_rx_h_iphc(struct sk_buff *skb,
+					 struct net_device *dev,
+					 struct l2cap_chan *chan)
+{
+	int ret;
+
+	if (!lowpan_is_iphc(*skb_network_header(skb)))
+		return RX_CONTINUE;
+
+	ret = iphc_decompress(skb, dev, chan);
+	if (ret < 0)
+		return RX_DROP_UNUSABLE;
+
+	return RX_QUEUE;
+}
+
+static lowpan_rx_result lowpan_rx_h_ipv6(struct sk_buff *skb,
+					 struct net_device *dev,
+					 struct l2cap_chan *chan)
+{
+	if (!lowpan_is_ipv6(*skb_network_header(skb)))
+		return RX_CONTINUE;
+
+	/* Pull off the 1-byte of 6lowpan header. */
+	skb_pull(skb, 1);
+	return RX_QUEUE;
+}
+
+static int lowpan_invoke_rx_handlers(struct sk_buff *skb,
+				     struct net_device *dev,
+				     struct l2cap_chan *chan)
+{
+	lowpan_rx_result res;
+
+#define CALL_RXH(rxh)			\
+	do {				\
+		res = rxh(skb, dev, chan); \
+		if (res != RX_CONTINUE)	\
+			goto rxh_next;	\
+	} while (0)
+
+	/* likely at first */
+	CALL_RXH(lowpan_rx_h_iphc);
+	CALL_RXH(lowpan_rx_h_ipv6);
+
+rxh_next:
+	return lowpan_rx_handlers_result(skb, dev, res);
+}
+
 static int recv_pkt(struct sk_buff *skb, struct net_device *dev,
 		    struct l2cap_chan *chan)
 {
-	struct sk_buff *local_skb;
-	int ret;
-
-	if (!netif_running(dev))
+	/* TODO check for reserved, nalp dispatch here? */
+	if (!netif_running(dev) ||
+	    dev->type != ARPHRD_6LOWPAN || !skb->len)
 		goto drop;
 
-	if (dev->type != ARPHRD_6LOWPAN || !skb->len)
-		goto drop;
-
-	skb_reset_network_header(skb);
-
+	/* we will manipulate the skb struct */
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb)
-		goto drop;
+		goto out;
 
-	/* check that it's our buffer */
-	if (lowpan_is_ipv6(*skb_network_header(skb))) {
-		/* Copy the packet so that the IPv6 header is
-		 * properly aligned.
-		 */
-		local_skb = skb_copy_expand(skb, NET_SKB_PAD - 1,
-					    skb_tailroom(skb), GFP_ATOMIC);
-		if (!local_skb)
-			goto drop;
+	/* TODO is this done by bluetooth callback, before? */
+	skb_reset_network_header(skb);
+	/* TODO really necessary? Previous did that in one branch only */
+	skb->dev = dev;
 
-		local_skb->protocol = htons(ETH_P_IPV6);
-		local_skb->pkt_type = PACKET_HOST;
-
-		skb_set_transport_header(local_skb, sizeof(struct ipv6hdr));
-
-		if (give_skb_to_upper(local_skb, dev) != NET_RX_SUCCESS) {
-			kfree_skb(local_skb);
-			goto drop;
-		}
-
-		dev->stats.rx_bytes += skb->len;
-		dev->stats.rx_packets++;
-
-		consume_skb(local_skb);
-		consume_skb(skb);
-	} else if (lowpan_is_iphc(*skb_network_header(skb))) {
-		local_skb = skb_clone(skb, GFP_ATOMIC);
-		if (!local_skb)
-			goto drop;
-
-		ret = iphc_decompress(local_skb, dev, chan);
-		if (ret < 0) {
-			kfree_skb(local_skb);
-			goto drop;
-		}
-
-		local_skb->protocol = htons(ETH_P_IPV6);
-		local_skb->pkt_type = PACKET_HOST;
-		local_skb->dev = dev;
-
-		if (give_skb_to_upper(local_skb, dev)
-				!= NET_RX_SUCCESS) {
-			kfree_skb(local_skb);
-			goto drop;
-		}
-
-		dev->stats.rx_bytes += skb->len;
-		dev->stats.rx_packets++;
-
-		consume_skb(local_skb);
-		consume_skb(skb);
-	} else {
-		goto drop;
+	/* iphc will manipulate the skb buffer, unshare it */
+	if (lowpan_is_iphc(*skb_network_header(skb))) {
+		skb = skb_unshare(skb, GFP_ATOMIC);
+		if (!skb)
+			goto out;
 	}
 
-	return NET_RX_SUCCESS;
+	return lowpan_invoke_rx_handlers(skb, dev, chan);
 
 drop:
+	kfree_skb(skb);
+out:
 	dev->stats.rx_dropped++;
 	return NET_RX_DROP;
 }
