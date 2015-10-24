@@ -1656,6 +1656,11 @@ static void adjust_hpsa_scsi_table(struct ctlr_info *h, int hostno,
 	int nadded, nremoved;
 	struct Scsi_Host *sh = NULL;
 
+	if (atomic_read(&h->reset_in_progress)) {
+		h->drv_req_rescan = 1;
+		return;
+	}
+
 	added = kzalloc(sizeof(*added) * HPSA_MAX_DEVICES, GFP_KERNEL);
 	removed = kzalloc(sizeof(*removed) * HPSA_MAX_DEVICES, GFP_KERNEL);
 
@@ -1764,8 +1769,14 @@ static void adjust_hpsa_scsi_table(struct ctlr_info *h, int hostno,
 		goto free_and_out;
 
 	sh = h->scsi_host;
+	if (sh == NULL) {
+		dev_warn(&h->pdev->dev, "%s: scsi_host is null\n", __func__);
+		return;
+	}
 	/* Notify scsi mid layer of any removed devices */
 	for (i = 0; i < nremoved; i++) {
+		if (!removed[i])
+			continue;
 		if (removed[i]->expose_state & HPSA_SCSI_ADD) {
 			struct scsi_device *sdev =
 				scsi_device_lookup(sh, removed[i]->bus,
@@ -1790,6 +1801,8 @@ static void adjust_hpsa_scsi_table(struct ctlr_info *h, int hostno,
 
 	/* Notify scsi mid layer of any added devices */
 	for (i = 0; i < nadded; i++) {
+		if (!added[i])
+			continue;
 		if (!(added[i]->expose_state & HPSA_SCSI_ADD))
 			continue;
 		if (scsi_add_device(sh, added[i]->bus,
@@ -5227,12 +5240,15 @@ static int hpsa_eh_device_reset_handler(struct scsi_cmnd *scsicmd)
 
 	hpsa_show_dev_msg(__stringify(KERN_WARNING), h, dev, "resetting");
 
+	atomic_set(&h->reset_in_progress, 1);
+
 	/* send a reset to the SCSI LUN which the command was sent to */
 	rc = hpsa_do_reset(h, dev, dev->scsi3addr, HPSA_RESET_TYPE_LUN,
 			   DEFAULT_REPLY_QUEUE);
 	snprintf(msg, sizeof(msg), "reset %s",
 		 rc == 0 ? "completed successfully" : "failed");
 	hpsa_show_dev_msg(__stringify(KERN_WARNING), h, dev, msg);
+	atomic_set(&h->reset_in_progress, 0);
 	return rc == 0 ? SUCCESS : FAILED;
 }
 

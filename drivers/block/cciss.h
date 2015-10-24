@@ -155,6 +155,7 @@ struct ctlr_info
 	size_t reply_pool_size;
 	unsigned char reply_pool_wraparound;
 	u32 *blockFetchTable;
+	atomic_t reset_in_progress;
 };
 
 /*  Defining the diffent access_methods
