@@ -710,7 +710,8 @@ enum {
 	Opt_err = -1,
 	Opt_new, Opt_load, Opt_update,
 	Opt_keyhandle, Opt_keyauth, Opt_blobauth,
-	Opt_pcrinfo, Opt_pcrlock, Opt_migratable
+	Opt_pcrinfo, Opt_pcrlock, Opt_migratable,
+	Opt_hashalg,
 };
 
 static const match_table_t key_tokens = {
@@ -723,6 +724,7 @@ static const match_table_t key_tokens = {
 	{Opt_pcrinfo, "pcrinfo=%s"},
 	{Opt_pcrlock, "pcrlock=%s"},
 	{Opt_migratable, "migratable=%s"},
+	{Opt_hashalg, "hashalg=%s"},
 	{Opt_err, NULL}
 };
 
@@ -786,6 +788,10 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 			if (res < 0)
 				return -EINVAL;
 			opt->pcrlock = lock;
+			break;
+		case Opt_hashalg:
+			strncpy(opt->hashalg, args[0].from,
+				MAX_HASHALG_SIZE - 1);
 			break;
 		default:
 			return -EINVAL;

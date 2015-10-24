@@ -104,6 +104,22 @@ struct tpm2_cmd {
 	union tpm2_cmd_params	params;
 } __packed;
 
+struct tpm2_hashalg {
+	char	name[MAX_HASHALG_SIZE];
+	u32	id;
+};
+
+struct tpm2_hashalg tpm2_hashalg_map[] = {
+	{"sha1", TPM2_ALG_SHA1},
+	{"sha256", TPM2_ALG_SHA256},
+	{"sm3_256", TPM2_ALG_SM3_256},
+	{"sha384", TPM2_ALG_SHA384},
+	{"sha512", TPM2_ALG_SHA512},
+};
+
+#define TPM2_HASHALG_COUNT \
+	(sizeof(tpm2_hashalg_map) / sizeof(tpm2_hashalg_map[1]))
+
 /*
  * Array with one entry per ordinal defining the maximum amount
  * of time the chip could take to return the result. The values
@@ -429,7 +445,25 @@ int tpm2_seal_trusted(struct tpm_chip *chip,
 {
 	unsigned int blob_len;
 	struct tpm_buf buf;
+	u32 hashalg = TPM2_ALG_SHA256;
+	int i;
 	int rc;
+
+	if (strlen(options->hashalg) > 0) {
+		for (i = 0; i < TPM2_HASHALG_COUNT; i++) {
+			if (!strcmp(options->hashalg,
+				    tpm2_hashalg_map[i].name)) {
+				hashalg = tpm2_hashalg_map[i].id;
+				dev_dbg(chip->pdev, "%s: hashalg: %s 0x%08X\n",
+					__func__, tpm2_hashalg_map[i].name,
+					hashalg);
+				break;
+			}
+		}
+
+		if (i == TPM2_HASHALG_COUNT)
+			return -EINVAL;
+	}
 
 	rc = tpm_buf_init(&buf, TPM2_ST_SESSIONS, TPM2_CC_CREATE);
 	if (rc)
