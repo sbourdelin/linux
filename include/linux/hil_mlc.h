@@ -144,7 +144,7 @@ struct hil_mlc {
 	hil_packet		ipacket[16];
 	hil_packet		imatch;
 	int			icount;
-	struct timeval		instart;
+	unsigned long		instart; /* in jiffies */
 	suseconds_t		intimeout;
 
 	int			ddi;	/* Last operational device id */
