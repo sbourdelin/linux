@@ -1071,7 +1071,7 @@ void update_beacon_info(struct adapter *padapter, u8 *pframe, uint pkt_len, stru
 
 	len = pkt_len - (_BEACON_IE_OFFSET_ + WLAN_HDR_A3_LEN);
 
-	for (i = 0; i < len;) {
+	for (i = 0; i < len; i += (pIE->Length + 2)) {
 		pIE = (struct ndis_802_11_var_ie *)(pframe + (_BEACON_IE_OFFSET_ + WLAN_HDR_A3_LEN) + i);
 
 		switch (pIE->ElementID) {
@@ -1086,8 +1086,6 @@ void update_beacon_info(struct adapter *padapter, u8 *pframe, uint pkt_len, stru
 		default:
 			break;
 		}
-
-		i += (pIE->Length + 2);
 	}
 }
 
@@ -1100,7 +1098,7 @@ unsigned int is_ap_in_tkip(struct adapter *padapter)
 	struct wlan_bssid_ex		*cur_network = &(pmlmeinfo->network);
 
 	if (rtw_get_capability((struct wlan_bssid_ex *)cur_network) & WLAN_CAPABILITY_PRIVACY) {
-		for (i = sizeof(struct ndis_802_11_fixed_ie); i < pmlmeinfo->network.IELength;) {
+		for (i = sizeof(struct ndis_802_11_fixed_ie); i < pmlmeinfo->network.IELength; i += (pIE->Length + 2)) {
 			pIE = (struct ndis_802_11_var_ie *)(pmlmeinfo->network.IEs + i);
 
 			switch (pIE->ElementID) {
@@ -1114,8 +1112,6 @@ unsigned int is_ap_in_tkip(struct adapter *padapter)
 			default:
 				break;
 			}
-
-			i += (pIE->Length + 2);
 		}
 		return false;
 	} else {
@@ -1131,7 +1127,7 @@ unsigned int should_forbid_n_rate(struct adapter *padapter)
 	struct wlan_bssid_ex  *cur_network = &pmlmepriv->cur_network.network;
 
 	if (rtw_get_capability((struct wlan_bssid_ex *)cur_network) & WLAN_CAPABILITY_PRIVACY) {
-		for (i = sizeof(struct ndis_802_11_fixed_ie); i < cur_network->IELength;) {
+		for (i = sizeof(struct ndis_802_11_fixed_ie); i < cur_network->IELength; i += (pIE->Length + 2)) {
 			pIE = (struct ndis_802_11_var_ie *)(cur_network->IEs + i);
 
 			switch (pIE->ElementID) {
@@ -1148,8 +1144,6 @@ unsigned int should_forbid_n_rate(struct adapter *padapter)
 			default:
 				break;
 			}
-
-			i += (pIE->Length + 2);
 		}
 
 		return true;
@@ -1167,7 +1161,7 @@ unsigned int is_ap_in_wep(struct adapter *padapter)
 	struct wlan_bssid_ex		*cur_network = &(pmlmeinfo->network);
 
 	if (rtw_get_capability((struct wlan_bssid_ex *)cur_network) & WLAN_CAPABILITY_PRIVACY) {
-		for (i = sizeof(struct ndis_802_11_fixed_ie); i < pmlmeinfo->network.IELength;) {
+		for (i = sizeof(struct ndis_802_11_fixed_ie); i < pmlmeinfo->network.IELength; i += (pIE->Length + 2)) {
 			pIE = (struct ndis_802_11_var_ie *)(pmlmeinfo->network.IEs + i);
 
 			switch (pIE->ElementID) {
@@ -1180,7 +1174,6 @@ unsigned int is_ap_in_wep(struct adapter *padapter)
 			default:
 				break;
 			}
-			i += (pIE->Length + 2);
 		}
 		return true;
 	} else {
