@@ -2,6 +2,7 @@
  * Copyright 2014 Emilio López <emilio@elopez.com.ar>
  * Copyright 2014 Jon Smirl <jonsmirl@gmail.com>
  * Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
+ * Copyright 2015 Adam Sampson <ats@offog.org>
  *
  * Based on the Allwinner SDK driver, released under the GPL.
  *
@@ -452,12 +453,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
 			    SUN4I_CODEC_DAC_ACTL_MIXEN, 0, NULL, 0),
 
-	/* Pre-Amplifier */
-	SND_SOC_DAPM_MIXER("Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
+	/* Headphone output power amplifier */
+	SND_SOC_DAPM_MIXER("PA", SUN4I_CODEC_ADC_ACTL,
 			   SUN4I_CODEC_ADC_ACTL_PA_EN, 0,
 			   sun4i_codec_pa_mixer_controls,
 			   ARRAY_SIZE(sun4i_codec_pa_mixer_controls)),
-	SND_SOC_DAPM_SWITCH("Pre-Amplifier Mute", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SWITCH("PA Mute", SND_SOC_NOPM, 0, 0,
 			    &sun4i_codec_pa_mute),
 
 	SND_SOC_DAPM_OUTPUT("HP Right"),
@@ -480,16 +481,16 @@ static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
 	{ "Left Mixer", NULL, "Mixer Enable" },
 	{ "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
 
-	/* Pre-Amplifier Mixer Routes */
-	{ "Pre-Amplifier", "Mixer Playback Switch", "Left Mixer" },
-	{ "Pre-Amplifier", "Mixer Playback Switch", "Right Mixer" },
-	{ "Pre-Amplifier", "DAC Playback Switch", "Left DAC" },
-	{ "Pre-Amplifier", "DAC Playback Switch", "Right DAC" },
+	/* PA Mixer Routes */
+	{ "PA", "Mixer Playback Switch", "Left Mixer" },
+	{ "PA", "Mixer Playback Switch", "Right Mixer" },
+	{ "PA", "DAC Playback Switch", "Left DAC" },
+	{ "PA", "DAC Playback Switch", "Right DAC" },
 
 	/* PA -> HP path */
-	{ "Pre-Amplifier Mute", "Switch", "Pre-Amplifier" },
-	{ "HP Right", NULL, "Pre-Amplifier Mute" },
-	{ "HP Left", NULL, "Pre-Amplifier Mute" },
+	{ "PA Mute", "Switch", "PA" },
+	{ "HP Right", NULL, "PA Mute" },
+	{ "HP Left", NULL, "PA Mute" },
 };
 
 static struct snd_soc_codec_driver sun4i_codec_codec = {
