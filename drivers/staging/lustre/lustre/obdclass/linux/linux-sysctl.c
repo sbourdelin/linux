@@ -158,11 +158,11 @@ static struct attribute_group lustre_attr_group = {
 	.attrs = lustre_attrs,
 };
 
-int obd_sysctl_init(void)
+static int obd_sysctl_init(void)
 {
 	return sysfs_create_group(lustre_kobj, &lustre_attr_group);
 }
 
-void obd_sysctl_clean(void)
+static void obd_sysctl_clean(void)
 {
 }

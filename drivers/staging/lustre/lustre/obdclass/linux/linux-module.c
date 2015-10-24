@@ -421,7 +421,7 @@ static struct attribute_group lustre_attr_group = {
 	.attrs = lustre_attrs,
 };
 
-int class_procfs_init(void)
+static int class_procfs_init(void)
 {
 	int rc = -ENOMEM;
 	struct dentry *file;
@@ -457,7 +457,7 @@ out:
 	return rc;
 }
 
-int class_procfs_clean(void)
+static int class_procfs_clean(void)
 {
 	if (debugfs_lustre_root != NULL)
 		debugfs_remove_recursive(debugfs_lustre_root);
