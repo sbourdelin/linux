@@ -446,6 +446,8 @@ static u8 Hal_GetChnlGroup88E(u8 chnl, u8 *pGroup)
 	} else {
 		bIn24G = false;
 
+		/* probably, this branch is suitable only for 5 GHz */
+
 		if (chnl <= 40)
 			*pGroup = 0;
 		else if (chnl <= 48)
