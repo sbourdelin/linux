@@ -383,10 +383,8 @@ static int chan_recv_cb(struct l2cap_chan *chan, struct sk_buff *skb)
 		return -ENOENT;
 
 	err = recv_pkt(skb, dev->netdev, chan);
-	if (err) {
+	if (err)
 		BT_DBG("recv pkt %d", err);
-		err = -EAGAIN;
-	}
 
 	return err;
 }
