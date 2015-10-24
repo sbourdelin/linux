@@ -1216,11 +1216,10 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 
 				priv->wilc_ptk[key_index]->key = kmalloc(params->key_len, GFP_KERNEL);
 
-				kfree(priv->wilc_ptk[key_index]->seq);
-
-				if ((params->seq_len) > 0)
+				if ((params->seq_len) > 0) {
+					kfree(priv->wilc_ptk[key_index]->seq);
 					priv->wilc_ptk[key_index]->seq = kmalloc(params->seq_len, GFP_KERNEL);
-
+				}
 				if (INFO) {
 					for (i = 0; i < params->key_len; i++)
 						PRINT_INFO(CFG80211_DBG, "Adding pairwise key value[%d] = %x\n", i, params->key[i]);
