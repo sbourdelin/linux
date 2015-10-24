@@ -907,7 +907,7 @@ void wilc1000_wlan_deinit(struct wilc *nic)
 		disable_sdio_interrupt();
 		mutex_unlock(&g_linux_wlan->hif_cs);
 #endif
-		if (&g_linux_wlan->txq_event != NULL)
+		if (!(&g_linux_wlan->txq_event))
 			up(&g_linux_wlan->txq_event);
 
 		PRINT_D(INIT_DBG, "Deinitializing Threads\n");
@@ -969,10 +969,10 @@ static int wlan_deinit_locks(struct wilc *nic)
 {
 	PRINT_D(INIT_DBG, "De-Initializing Locks\n");
 
-	if (&g_linux_wlan->hif_cs != NULL)
+	if (!(&g_linux_wlan->hif_cs))
 		mutex_destroy(&g_linux_wlan->hif_cs);
 
-	if (&g_linux_wlan->rxq_cs != NULL)
+	if (!(&g_linux_wlan->rxq_cs))
 		mutex_destroy(&g_linux_wlan->rxq_cs);
 
 	return 0;
@@ -1037,7 +1037,7 @@ static void wlan_deinitialize_threads(struct wilc *nic)
 	g_linux_wlan->close = 1;
 	PRINT_D(INIT_DBG, "Deinitializing Threads\n");
 
-	if (&g_linux_wlan->txq_event != NULL)
+	if (!(&g_linux_wlan->txq_event))
 		up(&g_linux_wlan->txq_event);
 
 	if (g_linux_wlan->txq_thread != NULL) {
