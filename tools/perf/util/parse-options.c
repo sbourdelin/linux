@@ -6,6 +6,8 @@
 #define OPT_SHORT 1
 #define OPT_UNSET 2
 
+static struct strbuf error_buf = STRBUF_INIT;
+
 static int opterror(const struct option *opt, const char *reason, int flags)
 {
 	if (flags & OPT_SHORT)
@@ -537,9 +539,11 @@ int parse_options_subcommand(int argc, const char **argv, const struct option *o
 		exit(130);
 	default: /* PARSE_OPT_UNKNOWN */
 		if (ctx.argv[0][1] == '-') {
-			error("unknown option `%s'", ctx.argv[0] + 2);
+			strbuf_addf(&error_buf, "unknown option `%s'",
+				    ctx.argv[0] + 2);
 		} else {
-			error("unknown switch `%c'", *ctx.opt);
+			strbuf_addf(&error_buf, "unknown switch `%c'",
+				    *ctx.opt);
 		}
 		usage_with_options(usagestr, options);
 	}
@@ -647,6 +651,13 @@ int usage_with_options_internal(const char * const *usagestr,
 {
 	if (!usagestr)
 		return PARSE_OPT_HELP;
+
+	setup_pager();
+
+	if (strbuf_avail(&error_buf)) {
+		fprintf(stderr, "  Error: %s\n", error_buf.buf);
+		strbuf_release(&error_buf);
+	}
 
 	fprintf(stderr, "\n Usage: %s\n", *usagestr++);
 	while (*usagestr && **usagestr)
