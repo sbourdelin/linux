@@ -86,6 +86,24 @@ static const struct ieee80211_tpt_blink ath9k_tpt_blink[] = {
 };
 #endif
 
+/* 9k coalesce is binary (on/off) the below rules are
+ * not being used. Only there to give default values to
+ * wiphy_coalesce_support struct fields
+ */
+#define ATH9K_COALESCE_MAX_RULES     1
+#define ATH9K_COALESCE_MAX_FILTERS   1
+#define ATH9K_MAX_COALESCING_DELAY   1     /* in msecs */
+#define ATH9K_MAX_PATTERN_LEN        1
+#define ATH9K_MAX_OFFSET_LEN         1
+static const struct wiphy_coalesce_support ath9k_coalesce_support = {
+	.n_rules = ATH9K_COALESCE_MAX_RULES,
+	.max_delay = ATH9K_MAX_COALESCING_DELAY,
+	.n_patterns = ATH9K_COALESCE_MAX_FILTERS,
+	.pattern_min_len = 1,
+	.pattern_max_len = ATH9K_MAX_PATTERN_LEN,
+	.max_pkt_offset = ATH9K_MAX_OFFSET_LEN,
+};
+
 static void ath9k_deinit_softc(struct ath_softc *sc);
 
 static void ath9k_op_ps_wakeup(struct ath_common *common)
@@ -899,6 +917,7 @@ static void ath9k_set_hw_capab(struct ath_softc *sc, struct ieee80211_hw *hw)
 		hw->wiphy->bands[IEEE80211_BAND_5GHZ] =
 			&common->sbands[IEEE80211_BAND_5GHZ];
 
+	hw->wiphy->coalesce = &ath9k_coalesce_support;
 #ifdef CONFIG_ATH9K_CHANNEL_CONTEXT
 	ath9k_set_mcc_capab(sc, hw);
 #endif

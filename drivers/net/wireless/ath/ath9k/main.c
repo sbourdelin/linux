@@ -2611,6 +2611,24 @@ static int ath9k_get_txpower(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	return 0;
 }
 
+/* ath9k coalesce support */
+static int ath9k_set_coalesce(struct ieee80211_hw *hw,
+			      struct cfg80211_coalesce *coalesce)
+{
+	struct ath_softc *sc = hw->priv;
+	struct ath_hw *ah = sc->sc_ah;
+
+	if (!coalesce) {
+		ah->config.rx_intr_mitigation = false;
+		ath9k_hw_set_interrupts(ah);
+	} else {
+		ah->config.rx_intr_mitigation = true;
+		ath9k_hw_set_interrupts(ah);
+	}
+
+	return 0;
+}
+
 struct ieee80211_ops ath9k_ops = {
 	.tx 		    = ath9k_tx,
 	.start 		    = ath9k_start,
@@ -2639,6 +2657,7 @@ struct ieee80211_ops ath9k_ops = {
 	.get_stats	    = ath9k_get_stats,
 	.set_antenna	    = ath9k_set_antenna,
 	.get_antenna	    = ath9k_get_antenna,
+	.set_coalesce       = ath9k_set_coalesce,
 
 #ifdef CONFIG_ATH9K_WOW
 	.suspend	    = ath9k_suspend,
