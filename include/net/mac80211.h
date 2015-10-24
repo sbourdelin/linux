@@ -3232,6 +3232,8 @@ enum ieee80211_reconfig_type {
  *	the function call.
  *
  * @wake_tx_queue: Called when new packets have been added to the queue.
+ *
+ * @set_coalesce: Set coalesce parameters.
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -3467,6 +3469,8 @@ struct ieee80211_ops {
 
 	void (*wake_tx_queue)(struct ieee80211_hw *hw,
 			      struct ieee80211_txq *txq);
+	int (*set_coalesce)(struct ieee80211_hw *hw,
+			    struct cfg80211_coalesce *coalesce);
 };
 
 /**

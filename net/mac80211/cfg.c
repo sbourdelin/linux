@@ -3810,6 +3810,14 @@ static int ieee80211_del_tx_ts(struct wiphy *wiphy, struct net_device *dev,
 	return -ENOENT;
 }
 
+static int ieee80211_set_coalesce(struct wiphy *wiphy,
+				  struct cfg80211_coalesce *coalesce)
+{
+	struct ieee80211_local *local = wiphy_priv(wiphy);
+
+	return drv_set_coalesce(local, coalesce);
+}
+
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
 	.del_virtual_intf = ieee80211_del_iface,
@@ -3894,4 +3902,5 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.set_ap_chanwidth = ieee80211_set_ap_chanwidth,
 	.add_tx_ts = ieee80211_add_tx_ts,
 	.del_tx_ts = ieee80211_del_tx_ts,
+	.set_coalesce = ieee80211_set_coalesce,
 };

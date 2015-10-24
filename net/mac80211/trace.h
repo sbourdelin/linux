@@ -1655,6 +1655,11 @@ TRACE_EVENT(drv_get_expected_throughput,
 	)
 );
 
+DEFINE_EVENT(local_only_evt, drv_set_coalesce,
+	     TP_PROTO(struct ieee80211_local *local),
+	     TP_ARGS(local)
+);
+
 /*
  * Tracing for API calls that drivers call.
  */

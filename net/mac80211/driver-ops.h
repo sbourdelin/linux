@@ -1355,4 +1355,16 @@ static inline void drv_wake_tx_queue(struct ieee80211_local *local,
 	local->ops->wake_tx_queue(&local->hw, &txq->txq);
 }
 
+static inline int drv_set_coalesce(struct ieee80211_local *local,
+				   struct cfg80211_coalesce *coalesce)
+{
+	u32 ret = 0;
+
+	trace_drv_set_coalesce(local);
+	if (local->ops->set_coalesce)
+		ret = local->ops->set_coalesce(&local->hw, coalesce);
+	trace_drv_return_u32(local, ret);
+	return ret;
+}
+
 #endif /* __MAC80211_DRIVER_OPS */
