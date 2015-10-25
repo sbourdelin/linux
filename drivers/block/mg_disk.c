@@ -1038,7 +1038,6 @@ static int mg_remove(struct platform_device *plat_dev)
 {
 	struct mg_drv_data *prv_data = plat_dev->dev.platform_data;
 	struct mg_host *host = prv_data->host;
-	int err = 0;
 
 	/* delete timer */
 	del_timer_sync(&host->timer);
@@ -1074,7 +1073,7 @@ static int mg_remove(struct platform_device *plat_dev)
 	/* free mg_host */
 	kfree(host);
 
-	return err;
+	return 0;
 }
 
 static struct platform_driver mg_disk_driver = {
