@@ -226,16 +226,19 @@ static struct fib6_table *fib6_alloc_table(struct net *net, u32 id)
 	return table;
 }
 
-struct fib6_table *fib6_new_table(struct net *net, u32 id)
+struct fib6_table *fib6_new_table(struct net *net, u32 id, int *exist)
 {
 	struct fib6_table *tb;
 
 	if (id == 0)
 		id = RT6_TABLE_MAIN;
 	tb = fib6_get_table(net, id);
-	if (tb)
+	if (tb) {
+		*exist = 1;
 		return tb;
+	}
 
+	*exist = 0;
 	tb = fib6_alloc_table(net, id);
 	if (tb)
 		fib6_link_table(net, tb);
@@ -272,8 +275,9 @@ static void __net_init fib6_tables_init(struct net *net)
 }
 #else
 
-struct fib6_table *fib6_new_table(struct net *net, u32 id)
+struct fib6_table *fib6_new_table(struct net *net, u32 id, int *exist)
 {
+	*exist = 1;
 	return fib6_get_table(net, id);
 }
 

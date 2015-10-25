@@ -256,7 +256,7 @@ typedef struct rt6_info *(*pol_lookup_t)(struct net *,
  */
 
 struct fib6_table *fib6_get_table(struct net *net, u32 id);
-struct fib6_table *fib6_new_table(struct net *net, u32 id);
+struct fib6_table *fib6_new_table(struct net *net, u32 id, int *exist);
 struct dst_entry *fib6_rule_lookup(struct net *net, struct flowi6 *fl6,
 				   int flags, pol_lookup_t lookup);
 

@@ -198,12 +198,13 @@ static int fib6_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 	int err = -EINVAL;
 	struct net *net = sock_net(skb->sk);
 	struct fib6_rule *rule6 = (struct fib6_rule *) rule;
+	int exist;
 
 	if (rule->action == FR_ACT_TO_TBL) {
 		if (rule->table == RT6_TABLE_UNSPEC)
 			goto errout;
 
-		if (fib6_new_table(net, rule->table) == NULL) {
+		if (fib6_new_table(net, rule->table, &exist) == NULL) {
 			err = -ENOBUFS;
 			goto errout;
 		}

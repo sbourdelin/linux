@@ -1758,6 +1758,7 @@ int ip6_route_info_create(struct fib6_config *cfg, struct rt6_info **rt_ret)
 	struct inet6_dev *idev = NULL;
 	struct fib6_table *table;
 	int addr_type;
+	int exist;
 
 	if (cfg->fc_dst_len > 128 || cfg->fc_src_len > 128)
 		return -EINVAL;
@@ -1779,16 +1780,10 @@ int ip6_route_info_create(struct fib6_config *cfg, struct rt6_info **rt_ret)
 		cfg->fc_metric = IP6_RT_PRIO_USER;
 
 	err = -ENOBUFS;
+	table = fib6_new_table(net, cfg->fc_table, &exist);
 	if (cfg->fc_nlinfo.nlh &&
-	    !(cfg->fc_nlinfo.nlh->nlmsg_flags & NLM_F_CREATE)) {
-		table = fib6_get_table(net, cfg->fc_table);
-		if (!table) {
-			pr_warn("NLM_F_CREATE should be specified when creating new route\n");
-			table = fib6_new_table(net, cfg->fc_table);
-		}
-	} else {
-		table = fib6_new_table(net, cfg->fc_table);
-	}
+	    !(cfg->fc_nlinfo.nlh->nlmsg_flags & NLM_F_CREATE) && !exist)
+		pr_warn("NLM_F_CREATE should be specified when creating new route\n");
 
 	if (!table)
 		goto out;
