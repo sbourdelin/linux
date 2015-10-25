@@ -14,6 +14,7 @@
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
 #include <linux/list.h>
+#include <linux/platform_device.h>
 #include "../include/dprc.h"
 
 #define FSL_MC_VENDOR_FREESCALE	0x1957
@@ -107,6 +108,15 @@ struct fsl_mc_resource {
  * Bit masks for a MC object device (struct fsl_mc_device) flags
  */
 #define FSL_MC_IS_DPRC	0x0001
+
+/**
+  * root dprc's parent is a platform device
+  * that platform device's bus type is platform_bus_type.
+  */
+#define is_root_dprc(dev) \
+	((to_fsl_mc_device(dev)->flags & FSL_MC_IS_DPRC) && \
+	((dev)->bus == &fsl_mc_bus_type) && \
+	((dev)->parent->bus == &platform_bus_type))
 
 /**
  * Default DMA mask for devices on a fsl-mc bus
