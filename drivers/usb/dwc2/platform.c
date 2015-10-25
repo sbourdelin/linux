@@ -228,6 +228,9 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	 */
 	phy = devm_phy_get(&dev->dev, "usb2-phy");
 	if (IS_ERR(phy)) {
+		if (PTR_ERR(phy) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+
 		hsotg->phy = NULL;
 		uphy = devm_usb_get_phy(&dev->dev, USB_PHY_TYPE_USB2);
 		if (IS_ERR(uphy))
