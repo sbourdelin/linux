@@ -32,7 +32,7 @@
  *     the FDC will otherwise wait forever when no disk is inserted...
  *
  * ++ Freddi Aschwanden (fa) 20.9.95 fixes for medusa:
- *  - MFPDELAY() after each FDC access -> atari 
+ *  - MFPDELAY() after each FDC access -> atari
  *  - more/other disk formats
  *  - DMA to the block buffer directly if we have a 32bit DMA
  *  - for medusa, the step rate is always 3ms
@@ -45,7 +45,7 @@
  * Roman 10/15/95:
  *  - implement some more ioctls
  *  - disk formatting
- *  
+ *
  * Andreas 95/12/12:
  *  - increase gap size at start of track for HD/ED disks
  *
@@ -95,39 +95,39 @@ static struct atari_disk_type {
 } atari_disk_type[] = {
 	{ "d360",  9, 720, 0, 0},	/*  0: 360kB diskette */
 	{ "D360",  9, 720, 0, 1},	/*  1: 360kb in 720k or 1.2MB drive */
-	{ "D720",  9,1440, 0, 0},	/*  2: 720kb in 720k or 1.2MB drive */
-	{ "D820", 10,1640, 0, 0},	/*  3: DD disk with 82 tracks/10 sectors */
+	{ "D720",  9, 1440, 0, 0},	/*  2: 720kb in 720k or 1.2MB drive */
+	{ "D820", 10, 1640, 0, 0},	/*  3: DD disk with 82 tracks/10 sectors */
 /* formats above are probed for type DD */
 #define	MAX_TYPE_DD 3
-	{ "h1200",15,2400, 3, 0},	/*  4: 1.2MB diskette */
-	{ "H1440",18,2880, 3, 0},	/*  5: 1.4 MB diskette (HD) */
-	{ "H1640",20,3280, 3, 0},	/*  6: 1.64MB diskette (fat HD) 82 tr 20 sec */
+	{ "h1200", 15, 2400, 3, 0},	/*  4: 1.2MB diskette */
+	{ "H1440", 18, 2880, 3, 0},	/*  5: 1.4 MB diskette (HD) */
+	{ "H1640", 20, 3280, 3, 0},	/*  6: 1.64MB diskette (fat HD) 82 tr 20 sec */
 /* formats above are probed for types DD and HD */
 #define	MAX_TYPE_HD 6
-	{ "E2880",36,5760, 3, 0},	/*  7: 2.8 MB diskette (ED) */
-	{ "E3280",40,6560, 3, 0},	/*  8: 3.2 MB diskette (fat ED) 82 tr 40 sec */
+	{ "E2880", 36, 5760, 3, 0},	/*  7: 2.8 MB diskette (ED) */
+	{ "E3280", 40, 6560, 3, 0},	/*  8: 3.2 MB diskette (fat ED) 82 tr 40 sec */
 /* formats above are probed for types DD, HD and ED */
 #define	MAX_TYPE_ED 8
 /* types below are never autoprobed */
-	{ "H1680",21,3360, 3, 0},	/*  9: 1.68MB diskette (fat HD) 80 tr 21 sec */
-	{ "h410",10,820, 0, 1},		/* 10: 410k diskette 41 tr 10 sec, stretch */
-	{ "h1476",18,2952, 3, 0},	/* 11: 1.48MB diskette 82 tr 18 sec */
-	{ "H1722",21,3444, 3, 0},	/* 12: 1.72MB diskette 82 tr 21 sec */
-	{ "h420",10,840, 0, 1},		/* 13: 420k diskette 42 tr 10 sec, stretch */
-	{ "H830",10,1660, 0, 0},	/* 14: 820k diskette 83 tr 10 sec */
-	{ "h1494",18,2952, 3, 0},	/* 15: 1.49MB diskette 83 tr 18 sec */
-	{ "H1743",21,3486, 3, 0},	/* 16: 1.74MB diskette 83 tr 21 sec */
-	{ "h880",11,1760, 0, 0},	/* 17: 880k diskette 80 tr 11 sec */
-	{ "D1040",13,2080, 0, 0},	/* 18: 1.04MB diskette 80 tr 13 sec */
-	{ "D1120",14,2240, 0, 0},	/* 19: 1.12MB diskette 80 tr 14 sec */
-	{ "h1600",20,3200, 3, 0},	/* 20: 1.60MB diskette 80 tr 20 sec */
-	{ "H1760",22,3520, 3, 0},	/* 21: 1.76MB diskette 80 tr 22 sec */
-	{ "H1920",24,3840, 3, 0},	/* 22: 1.92MB diskette 80 tr 24 sec */
-	{ "E3200",40,6400, 3, 0},	/* 23: 3.2MB diskette 80 tr 40 sec */
-	{ "E3520",44,7040, 3, 0},	/* 24: 3.52MB diskette 80 tr 44 sec */
-	{ "E3840",48,7680, 3, 0},	/* 25: 3.84MB diskette 80 tr 48 sec */
-	{ "H1840",23,3680, 3, 0},	/* 26: 1.84MB diskette 80 tr 23 sec */
-	{ "D800",10,1600, 0, 0},	/* 27: 800k diskette 80 tr 10 sec */
+	{ "H1680", 21, 3360, 3, 0},	/*  9: 1.68MB diskette (fat HD) 80 tr 21 sec */
+	{ "h410", 10, 820, 0, 1},		/* 10: 410k diskette 41 tr 10 sec, stretch */
+	{ "h1476", 18, 2952, 3, 0},	/* 11: 1.48MB diskette 82 tr 18 sec */
+	{ "H1722", 21, 3444, 3, 0},	/* 12: 1.72MB diskette 82 tr 21 sec */
+	{ "h420", 10, 840, 0, 1},		/* 13: 420k diskette 42 tr 10 sec, stretch */
+	{ "H830", 10, 1660, 0, 0},	/* 14: 820k diskette 83 tr 10 sec */
+	{ "h1494", 18, 2952, 3, 0},	/* 15: 1.49MB diskette 83 tr 18 sec */
+	{ "H1743", 21, 3486, 3, 0},	/* 16: 1.74MB diskette 83 tr 21 sec */
+	{ "h880", 11, 1760, 0, 0},	/* 17: 880k diskette 80 tr 11 sec */
+	{ "D1040", 13, 2080, 0, 0},	/* 18: 1.04MB diskette 80 tr 13 sec */
+	{ "D1120", 14, 2240, 0, 0},	/* 19: 1.12MB diskette 80 tr 14 sec */
+	{ "h1600", 20, 3200, 3, 0},	/* 20: 1.60MB diskette 80 tr 20 sec */
+	{ "H1760", 22, 3520, 3, 0},	/* 21: 1.76MB diskette 80 tr 22 sec */
+	{ "H1920", 24, 3840, 3, 0},	/* 22: 1.92MB diskette 80 tr 24 sec */
+	{ "E3200", 40, 6400, 3, 0},	/* 23: 3.2MB diskette 80 tr 40 sec */
+	{ "E3520", 44, 7040, 3, 0},	/* 24: 3.52MB diskette 80 tr 44 sec */
+	{ "E3840", 48, 7680, 3, 0},	/* 25: 3.84MB diskette 80 tr 48 sec */
+	{ "H1840", 23, 3680, 3, 0},	/* 26: 1.84MB diskette 80 tr 23 sec */
+	{ "D800", 10, 1600, 0, 0},	/* 27: 800k diskette 80 tr 10 sec */
 };
 
 static int StartDiskType[] = {
@@ -199,7 +199,7 @@ static struct atari_disk_type user_params[FD_MAX_UNITS];
 
 /*
  * User-provided permanent type information. 'drive' points to
- * the respective entry of this array.  Set by FDDEFPRM ioctls, 
+ * the respective entry of this array.  Set by FDDEFPRM ioctls,
  * restored upon disk change by floppy_revalidate() if valid (as seen by
  * default_params[].blocks > 0 - a bit in unit[].flags might be used for this?)
  */
@@ -241,7 +241,7 @@ static struct atari_floppy_struct {
     __val & 0xff;				\
 })
 
-#define FDC_WRITE(reg,val)			\
+#define FDC_WRITE(reg, val)			\
     do {					\
 	/* unsigned long __flags; */		\
 	/* local_irq_save(__flags); */		\
@@ -250,7 +250,7 @@ static struct atari_floppy_struct {
 	dma_wd.fdc_acces_seccount = (val);	\
 	MFPDELAY();				\
         /* local_irq_restore(__flags); */	\
-    } while(0)
+    } while (0)
 
 
 /* Buffering variables:
@@ -281,7 +281,7 @@ static int BufferDrive, BufferSide, BufferTrack;
 static int read_track;		/* non-zero if we are reading whole tracks */
 
 #define	SECTOR_BUFFER(sec)	(TrackBuffer + ((sec)-1)*512)
-#define	IS_BUFFERED(drive,side,track) \
+#define	IS_BUFFERED(drive, side, track) \
     (BufferDrive == (drive) && BufferSide == (side) && BufferTrack == (track))
 
 /*
@@ -339,35 +339,35 @@ static int NeedSeek = 0;
 
 /***************************** Prototypes *****************************/
 
-static void fd_select_side( int side );
-static void fd_select_drive( int drive );
-static void fd_deselect( void );
-static void fd_motor_off_timer( unsigned long dummy );
-static void check_change( unsigned long dummy );
+static void fd_select_side(int side);
+static void fd_select_drive(int drive);
+static void fd_deselect(void);
+static void fd_motor_off_timer(unsigned long dummy);
+static void check_change(unsigned long dummy);
 static irqreturn_t floppy_irq (int irq, void *dummy);
-static void fd_error( void );
+static void fd_error(void);
 static int do_format(int drive, int type, struct atari_format_descr *desc);
-static void do_fd_action( int drive );
-static void fd_calibrate( void );
-static void fd_calibrate_done( int status );
-static void fd_seek( void );
-static void fd_seek_done( int status );
-static void fd_rwsec( void );
-static void fd_readtrack_check( unsigned long dummy );
-static void fd_rwsec_done( int status );
+static void do_fd_action(int drive);
+static void fd_calibrate(void);
+static void fd_calibrate_done(int status);
+static void fd_seek(void);
+static void fd_seek_done(int status);
+static void fd_rwsec(void);
+static void fd_readtrack_check(unsigned long dummy);
+static void fd_rwsec_done(int status);
 static void fd_rwsec_done1(int status);
-static void fd_writetrack( void );
-static void fd_writetrack_done( int status );
-static void fd_times_out( unsigned long dummy );
-static void finish_fdc( void );
-static void finish_fdc_done( int dummy );
-static void setup_req_params( int drive );
-static void redo_fd_request( void);
+static void fd_writetrack(void);
+static void fd_writetrack_done(int status);
+static void fd_times_out(unsigned long dummy);
+static void finish_fdc(void);
+static void finish_fdc_done(int dummy);
+static void setup_req_params(int drive);
+static void redo_fd_request(void);
 static int fd_locked_ioctl(struct block_device *bdev, fmode_t mode, unsigned int
                      cmd, unsigned long param);
-static void fd_probe( int drive );
-static int fd_test_drive_present( int drive );
-static void config_types( void );
+static void fd_probe(int drive);
+static int fd_test_drive_present(int drive);
+static void config_types(void);
 static int floppy_open(struct block_device *bdev, fmode_t mode);
 static void floppy_release(struct gendisk *disk, fmode_t mode);
 
@@ -377,7 +377,7 @@ static DEFINE_TIMER(motor_off_timer, fd_motor_off_timer, 0, 0);
 static DEFINE_TIMER(readtrack_timer, fd_readtrack_check, 0, 0);
 static DEFINE_TIMER(timeout_timer, fd_times_out, 0, 0);
 static DEFINE_TIMER(fd_timer, check_change, 0, 0);
-	
+
 static void fd_end_request_cur(int err)
 {
 	if (!__blk_end_request_cur(fd_request, err))
@@ -390,7 +390,7 @@ static inline void start_motor_off_timer(void)
 	MotorOffTrys = 0;
 }
 
-static inline void start_check_change_timer( void )
+static inline void start_check_change_timer(void)
 {
 	mod_timer(&fd_timer, jiffies + CHECK_CHANGE_DELAY);
 }
@@ -407,13 +407,13 @@ static inline void stop_timeout(void)
 
 /* Select the side to use. */
 
-static void fd_select_side( int side )
+static void fd_select_side(int side)
 {
 	unsigned long flags;
 
 	/* protect against various other ints mucking around with the PSG */
 	local_irq_save(flags);
-  
+
 	sound_ym.rd_data_reg_sel = 14; /* Select PSG Port A */
 	sound_ym.wd_data = (side == 0) ? sound_ym.rd_data_reg_sel | 0x01 :
 	                                 sound_ym.rd_data_reg_sel & 0xfe;
@@ -426,11 +426,11 @@ static void fd_select_side( int side )
  * clock speed for this disk's type.
  */
 
-static void fd_select_drive( int drive )
+static void fd_select_drive(int drive)
 {
 	unsigned long flags;
 	unsigned char tmp;
-  
+
 	if (drive == SelectedDrive)
 	  return;
 
@@ -443,28 +443,28 @@ static void fd_select_drive( int drive )
 	local_irq_restore(flags);
 
 	/* restore track register to saved value */
-	FDC_WRITE( FDCREG_TRACK, UD.track );
+	FDC_WRITE(FDCREG_TRACK, UD.track);
 	udelay(25);
 
 	/* select 8/16 MHz */
 	if (UDT)
 		if (ATARIHW_PRESENT(FDCSPEED))
 			dma_wd.fdc_speed = UDT->fdc_speed;
-	
+
 	SelectedDrive = drive;
 }
 
 
 /* Deselect both drives. */
 
-static void fd_deselect( void )
+static void fd_deselect(void)
 {
 	unsigned long flags;
 
 	/* protect against various other ints mucking around with the PSG */
 	local_irq_save(flags);
 	atari_dont_touch_floppy_select = 0;
-	sound_ym.rd_data_reg_sel=14;	/* Select PSG Port A */
+	sound_ym.rd_data_reg_sel = 14;	/* Select PSG Port A */
 	sound_ym.wd_data = (sound_ym.rd_data_reg_sel |
 			    (MACH_IS_FALCON ? 3 : 7)); /* no drives selected */
 	/* On Falcon, the drive B select line is used on the printer port, so
@@ -479,7 +479,7 @@ static void fd_deselect( void )
  * counts the index signals, which arrive only if one drive is selected.
  */
 
-static void fd_motor_off_timer( unsigned long dummy )
+static void fd_motor_off_timer(unsigned long dummy)
 {
 	unsigned char status;
 
@@ -490,7 +490,7 @@ static void fd_motor_off_timer( unsigned long dummy )
 	if (stdma_islocked())
 		goto retry;
 
-	status = FDC_READ( FDCREG_STATUS );
+	status = FDC_READ(FDCREG_STATUS);
 
 	if (!(status & 0x80)) {
 		/* motor already turned off by FDC -> deselect drives */
@@ -515,7 +515,7 @@ static void fd_motor_off_timer( unsigned long dummy )
  * as possible) and keep track of the current state of the write protection.
  */
 
-static void check_change( unsigned long dummy )
+static void check_change(unsigned long dummy)
 {
 	static int    drive = 0;
 
@@ -534,11 +534,11 @@ static void check_change( unsigned long dummy )
 		old_porta = sound_ym.rd_data_reg_sel;
 		sound_ym.wd_data = (old_porta | DSKDRVNONE) &
 			               ~(drive == 0 ? DSKDRV0 : DSKDRV1);
-		stat = !!(FDC_READ( FDCREG_STATUS ) & FDCSTAT_WPROT);
+		stat = !!(FDC_READ(FDCREG_STATUS) & FDCSTAT_WPROT);
 		sound_ym.wd_data = old_porta;
 
 		if (stat != UD.wpstat) {
-			DPRINT(( "wpstat[%d] = %d\n", drive, stat ));
+			DPRINT(("wpstat[%d] = %d\n", drive, stat));
 			UD.wpstat = stat;
 			set_bit (drive, &changed_floppies);
 		}
@@ -548,7 +548,7 @@ static void check_change( unsigned long dummy )
 	start_check_change_timer();
 }
 
- 
+
 /* Handling of the Head Settling Flag: This flag should be set after each
  * seek operation, because we don't use seeks with verify.
  */
@@ -562,7 +562,7 @@ static inline int get_head_settle_flag(void)
 {
 	int	tmp = HeadSettleFlag;
 	HeadSettleFlag = 0;
-	return( tmp );
+	return(tmp);
 }
 
 static inline void copy_buffer(void *from, void *to)
@@ -574,25 +574,25 @@ static inline void copy_buffer(void *from, void *to)
 		*p2++ = *p1++;
 }
 
-  
-  
+
+
 
 /* General Interrupt Handling */
 
-static void (*FloppyIRQHandler)( int status ) = NULL;
+static void (*FloppyIRQHandler)(int status) = NULL;
 
 static irqreturn_t floppy_irq (int irq, void *dummy)
 {
 	unsigned char status;
-	void (*handler)( int );
+	void (*handler)(int);
 
 	handler = xchg(&FloppyIRQHandler, NULL);
 
 	if (handler) {
 		nop();
-		status = FDC_READ( FDCREG_STATUS );
-		DPRINT(("FDC irq, status = %02x handler = %08lx\n",status,(unsigned long)handler));
-		handler( status );
+		status = FDC_READ(FDCREG_STATUS);
+		DPRINT(("FDC irq, status = %02x handler = %08lx\n", status, (unsigned long)handler));
+		handler(status);
 	}
 	else {
 		DPRINT(("FDC irq, no handler\n"));
@@ -605,7 +605,7 @@ static irqreturn_t floppy_irq (int irq, void *dummy)
  * recalibrate, then try again, and fail after MAX_ERRORS.
  */
 
-static void fd_error( void )
+static void fd_error(void)
 {
 	if (IsFormatting) {
 		IsFormatting = 0;
@@ -619,11 +619,11 @@ static void fd_error( void )
 
 	fd_request->errors++;
 	if (fd_request->errors >= MAX_ERRORS) {
-		printk(KERN_ERR "fd%d: too many errors.\n", SelectedDrive );
+		printk(KERN_ERR "fd%d: too many errors.\n", SelectedDrive);
 		fd_end_request_cur(-EIO);
 	}
 	else if (fd_request->errors == RECALIBRATE_ERRORS) {
-		printk(KERN_WARNING "fd%d: recalibrating\n", SelectedDrive );
+		printk(KERN_WARNING "fd%d: recalibrating\n", SelectedDrive);
 		if (SelectedDrive != -1)
 			SUD.track = -1;
 	}
@@ -632,16 +632,16 @@ static void fd_error( void )
 
 
 
-#define	SET_IRQ_HANDLER(proc) do { FloppyIRQHandler = (proc); } while(0)
+#define	SET_IRQ_HANDLER(proc) do { FloppyIRQHandler = (proc); } while (0)
 
 
 /* ---------- Formatting ---------- */
 
-#define FILL(n,val)		\
+#define FILL(n, val)		\
     do {			\
-	memset( p, val, n );	\
+	memset(p, val, n);	\
 	p += n;			\
-    } while(0)
+    } while (0)
 
 static int do_format(int drive, int type, struct atari_format_descr *desc)
 {
@@ -650,12 +650,12 @@ static int do_format(int drive, int type, struct atari_format_descr *desc)
 	unsigned long	flags;
 
 	DPRINT(("do_format( dr=%d tr=%d he=%d offs=%d )\n",
-		drive, desc->track, desc->head, desc->sect_offset ));
+		drive, desc->track, desc->head, desc->sect_offset));
 
 	wait_event(fdc_wait, cmpxchg(&fdc_busy, 0, 1) == 0);
 	local_irq_save(flags);
 	stdma_lock(floppy_irq, NULL);
-	atari_turnon_irq( IRQ_MFP_FDC ); /* should be already, just to be sure */
+	atari_turnon_irq(IRQ_MFP_FDC); /* should be already, just to be sure */
 	local_irq_restore(flags);
 
 	if (type) {
@@ -679,38 +679,38 @@ static int do_format(int drive, int type, struct atari_format_descr *desc)
 	   contents become invalid! */
 	BufferDrive = -1;
 	/* stop deselect timer */
-	del_timer( &motor_off_timer );
+	del_timer(&motor_off_timer);
 
-	FILL( 60 * (nsect / 9), 0x4e );
-	for( sect = 0; sect < nsect; ++sect ) {
-		FILL( 12, 0 );
-		FILL( 3, 0xf5 );
+	FILL(60 * (nsect / 9), 0x4e);
+	for (sect = 0; sect < nsect; ++sect) {
+		FILL(12, 0);
+		FILL(3, 0xf5);
 		*p++ = 0xfe;
 		*p++ = desc->track;
 		*p++ = desc->head;
 		*p++ = (nsect + sect - desc->sect_offset) % nsect + 1;
 		*p++ = 2;
 		*p++ = 0xf7;
-		FILL( 22, 0x4e );
-		FILL( 12, 0 );
-		FILL( 3, 0xf5 );
+		FILL(22, 0x4e);
+		FILL(12, 0);
+		FILL(3, 0xf5);
 		*p++ = 0xfb;
-		FILL( 512, 0xe5 );
+		FILL(512, 0xe5);
 		*p++ = 0xf7;
-		FILL( 40, 0x4e );
+		FILL(40, 0x4e);
 	}
-	FILL( TrackBuffer+BUFFER_SIZE-p, 0x4e );
+	FILL(TrackBuffer+BUFFER_SIZE-p, 0x4e);
 
 	IsFormatting = 1;
 	FormatError = 0;
 	ReqTrack = desc->track;
 	ReqSide  = desc->head;
-	do_fd_action( drive );
+	do_fd_action(drive);
 
 	wait_for_completion(&format_wait);
 
 	redo_fd_request();
-	return( FormatError ? -EIO : 0 );	
+	return(FormatError ? -EIO : 0);
 }
 
 
@@ -723,18 +723,18 @@ static int do_format(int drive, int type, struct atari_format_descr *desc)
  * set function to propagate the request down to fd_rwsec_done().
  */
 
-static void do_fd_action( int drive )
+static void do_fd_action(int drive)
 {
 	DPRINT(("do_fd_action\n"));
-	
+
 	if (UseTrackbuffer && !IsFormatting) {
 	repeat:
-	    if (IS_BUFFERED( drive, ReqSide, ReqTrack )) {
+	    if (IS_BUFFERED(drive, ReqSide, ReqTrack)) {
 		if (ReqCmd == READ) {
-		    copy_buffer( SECTOR_BUFFER(ReqSector), ReqData );
+		    copy_buffer( SECTOR_BUFFER(ReqSector), ReqData);
 		    if (++ReqCnt < blk_rq_cur_sectors(fd_request)) {
 			/* read next sector */
-			setup_req_params( drive );
+			setup_req_params(drive);
 			goto repeat;
 		    }
 		    else {
@@ -847,7 +847,7 @@ static void fd_seek_done(int status)
 		dma_wd.fdc_speed = SUDT->fdc_speed;
 	if (status & FDCSTAT_RECNF) {
 		printk(KERN_ERR "fd%d: seek error (to track %d)\n",
-				SelectedDrive, ReqTrack );
+				SelectedDrive, ReqTrack);
 		/* we don't know exactly which track we are on now! */
 		SUD.track = -1;
 		fd_error();
@@ -924,7 +924,7 @@ static void fd_rwsec(void)
 		dma_wd.dma_hi = (unsigned char)paddr;
 	MFPDELAY();
 	local_irq_restore(flags);
-  
+
 	/* Clear FIFO and switch DMA to correct mode */
 	dma_wd.dma_mode_status = 0x90 | rwflag;
 	MFPDELAY();
@@ -1251,10 +1251,10 @@ static void fd_times_out(unsigned long dummy)
 	FDC_WRITE(FDCREG_CMD, FDCCMD_FORCI);
 	udelay(25);
 
-	printk(KERN_ERR "floppy timeout\n" );
+	printk(KERN_ERR "floppy timeout\n");
 	fd_error();
   end:
-	atari_enable_irq( IRQ_MFP_FDC );
+	atari_enable_irq(IRQ_MFP_FDC);
 }
 
 
@@ -1284,7 +1284,7 @@ static void finish_fdc(void)
 }
 
 
-static void finish_fdc_done( int dummy )
+static void finish_fdc_done(int dummy)
 {
 	unsigned long flags;
 
@@ -1304,7 +1304,7 @@ static void finish_fdc_done( int dummy )
 	local_irq_save(flags);
 	stdma_release();
 	fdc_busy = 0;
-	wake_up( &fdc_wait );
+	wake_up(&fdc_wait);
 	local_irq_restore(flags);
 
 	DPRINT(("finish_fdc() finished\n"));
@@ -1552,7 +1552,7 @@ static int fd_locked_ioctl(struct block_device *bdev, fmode_t mode,
 	switch (cmd) {
 	case FDSETPRM:
 	case FDDEFPRM:
-	        /* 
+	        /*
 		 * MSch 7/96: simple 'set geometry' case: just set the
 		 * 'default' device params (minor == 0).
 		 * Currently, the drive geometry is cleared after each
@@ -1566,8 +1566,8 @@ static int fd_locked_ioctl(struct block_device *bdev, fmode_t mode,
 			return -EBUSY;
 		if (copy_from_user(&setprm, argp, sizeof(setprm)))
 			return -EFAULT;
-		/* 
-		 * first of all: check for floppy change and revalidate, 
+		/*
+		 * first of all: check for floppy change and revalidate,
 		 * or the next access will revalidate - and clear UDT :-(
 		 */
 
@@ -1585,10 +1585,10 @@ static int fd_locked_ioctl(struct block_device *bdev, fmode_t mode,
 			return -EINVAL;
 		}
 
-		/* 
+		/*
 		 * type == 0: first look for a matching entry in the type list,
 		 * and set the UD.disktype field to use the perdefined entry.
-		 * TODO: add user-defined format to head of autoprobe list ? 
+		 * TODO: add user-defined format to head of autoprobe list ?
 		 * Useful to include the user-type for future autodetection!
 		 */
 
@@ -1602,9 +1602,9 @@ static int fd_locked_ioctl(struct block_device *bdev, fmode_t mode,
 			dtp = &atari_disk_type[setidx];
 
 			/* found matching entry ?? */
-			if (   dtp->blocks  == setprm.size 
+			if (dtp->blocks  == setprm.size
 			    && dtp->spt     == setprm.sect
-			    && dtp->stretch == setprm.stretch ) {
+			    && dtp->stretch == setprm.stretch) {
 				if (UD.flags & FTD_MSG)
 				    printk (KERN_INFO "floppy%d: setting %s %p!\n",
 				        drive, dtp->name, dtp);
@@ -1619,7 +1619,7 @@ static int fd_locked_ioctl(struct block_device *bdev, fmode_t mode,
 				  default_params[drive].fdc_speed = dtp->fdc_speed;
 				  default_params[drive].stretch = dtp->stretch;
 				}
-				
+
 				return 0;
 			}
 
@@ -1715,7 +1715,7 @@ static void __init fd_probe(int drive)
 
 	UD.connected = 1;
 	UD.track     = 0;
-	switch(UserSteprate[drive]) {
+	switch (UserSteprate[drive]) {
 	case 2:
 		UD.steprate = FDCSTEP_2;
 		break;
