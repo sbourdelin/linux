@@ -738,8 +738,8 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		else
 			blk_queue_flush(nbd->disk->queue, 0);
 
-		thread = kthread_run(nbd_thread_send, nbd, "%s",
-				     nbd_name(nbd));
+		thread = kthread_get_run(nbd_thread_send, nbd, "%s",
+					 nbd_name(nbd));
 		if (IS_ERR(thread)) {
 			mutex_lock(&nbd->tx_lock);
 			return PTR_ERR(thread);
@@ -749,6 +749,7 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 		error = nbd_thread_recv(nbd);
 		nbd_dev_dbg_close(nbd);
 		kthread_stop(thread);
+		put_task_struct(thread);
 
 		mutex_lock(&nbd->tx_lock);
 
