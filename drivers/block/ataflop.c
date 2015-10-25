@@ -1710,12 +1710,12 @@ static void __init fd_probe( int drive )
 	UD.connected = 0;
 	UDT  = NULL;
 
-	if (!fd_test_drive_present( drive ))
+	if (!fd_test_drive_present(drive))
 		return;
 
 	UD.connected = 1;
 	UD.track     = 0;
-	switch( UserSteprate[drive] ) {
+	switch(UserSteprate[drive]) {
 	case 2:
 		UD.steprate = FDCSTEP_2;
 		break;
@@ -1729,7 +1729,7 @@ static void __init fd_probe( int drive )
 		UD.steprate = FDCSTEP_12;
 		break;
 	default: /* should be -1 for "not set by user" */
-		if (ATARIHW_PRESENT( FDCSPEED ) || MACH_IS_MEDUSA)
+		if (ATARIHW_PRESENT(FDCSPEED) || MACH_IS_MEDUSA)
 			UD.steprate = FDCSTEP_3;
 		else
 			UD.steprate = FDCSTEP_6;
@@ -1748,46 +1748,46 @@ static void __init fd_probe( int drive )
  * declared absent.
  */
 
-static int __init fd_test_drive_present( int drive )
+static int __init fd_test_drive_present(int drive)
 {
 	unsigned long timeout;
 	unsigned char status;
 	int ok;
-	
-	if (drive >= (MACH_IS_FALCON ? 1 : 2)) return( 0 );
-	fd_select_drive( drive );
+
+	if (drive >= (MACH_IS_FALCON ? 1 : 2)) return(0);
+	fd_select_drive(drive);
 
 	/* disable interrupt temporarily */
-	atari_turnoff_irq( IRQ_MFP_FDC );
+	atari_turnoff_irq(IRQ_MFP_FDC);
 	FDC_WRITE (FDCREG_TRACK, 0xff00);
-	FDC_WRITE( FDCREG_CMD, FDCCMD_RESTORE | FDCCMDADD_H | FDCSTEP_6 );
+	FDC_WRITE(FDCREG_CMD, FDCCMD_RESTORE | FDCCMDADD_H | FDCSTEP_6);
 
 	timeout = jiffies + 2*HZ+HZ/2;
 	while (time_before(jiffies, timeout))
 		if (!(st_mfp.par_dt_reg & 0x20))
 			break;
 
-	status = FDC_READ( FDCREG_STATUS );
+	status = FDC_READ(FDCREG_STATUS);
 	ok = (status & FDCSTAT_TR00) != 0;
 
 	/* force interrupt to abort restore operation (FDC would try
 	 * about 50 seconds!) */
-	FDC_WRITE( FDCREG_CMD, FDCCMD_FORCI );
+	FDC_WRITE(FDCREG_CMD, FDCCMD_FORCI);
 	udelay(500);
-	status = FDC_READ( FDCREG_STATUS );
+	status = FDC_READ(FDCREG_STATUS);
 	udelay(20);
 
 	if (ok) {
 		/* dummy seek command to make WP bit accessible */
-		FDC_WRITE( FDCREG_DATA, 0 );
-		FDC_WRITE( FDCREG_CMD, FDCCMD_SEEK );
-		while( st_mfp.par_dt_reg & 0x20 )
+		FDC_WRITE(FDCREG_DATA, 0);
+		FDC_WRITE(FDCREG_CMD, FDCCMD_SEEK);
+		while (st_mfp.par_dt_reg & 0x20)
 			;
-		status = FDC_READ( FDCREG_STATUS );
+		status = FDC_READ(FDCREG_STATUS);
 	}
 
-	atari_turnon_irq( IRQ_MFP_FDC );
-	return( ok );
+	atari_turnon_irq(IRQ_MFP_FDC);
+	return(ok);
 }
 
 
@@ -1795,7 +1795,7 @@ static int __init fd_test_drive_present( int drive )
  * floppies, additionally start the disk-change and motor-off timers.
  */
 
-static void __init config_types( void )
+static void __init config_types(void)
 {
 	int drive, cnt = 0;
 
@@ -1804,30 +1804,30 @@ static void __init config_types( void )
 		dma_wd.fdc_speed = 0;
 
 	printk(KERN_INFO "Probing floppy drive(s):\n");
-	for( drive = 0; drive < FD_MAX_UNITS; drive++ ) {
-		fd_probe( drive );
+	for (drive = 0; drive < FD_MAX_UNITS; drive++) {
+		fd_probe(drive);
 		if (UD.connected) {
 			printk(KERN_INFO "fd%d\n", drive);
 			++cnt;
 		}
 	}
 
-	if (FDC_READ( FDCREG_STATUS ) & FDCSTAT_BUSY) {
+	if (FDC_READ(FDCREG_STATUS) & FDCSTAT_BUSY) {
 		/* If FDC is still busy from probing, give it another FORCI
 		 * command to abort the operation. If this isn't done, the FDC
 		 * will interrupt later and its IRQ line stays low, because
 		 * the status register isn't read. And this will block any
 		 * interrupts on this IRQ line :-(
 		 */
-		FDC_WRITE( FDCREG_CMD, FDCCMD_FORCI );
+		FDC_WRITE(FDCREG_CMD, FDCCMD_FORCI);
 		udelay(500);
-		FDC_READ( FDCREG_STATUS );
+		FDC_READ(FDCREG_STATUS);
 		udelay(20);
 	}
-	
+
 	if (cnt > 0) {
 		start_motor_off_timer();
-		if (cnt == 1) fd_select_drive( 0 );
+		if (cnt == 1) fd_select_drive(0);
 		start_check_change_timer();
 	}
 }
@@ -1843,7 +1843,7 @@ static int floppy_open(struct block_device *bdev, fmode_t mode)
 	struct atari_floppy_struct *p = bdev->bd_disk->private_data;
 	int type  = MINOR(bdev->bd_dev) >> 2;
 
-	DPRINT(("fd_open: type=%d\n",type));
+	DPRINT(("fd_open: type=%d\n", type));
 	if (p->ref && p->type != type)
 		return -EBUSY;
 
@@ -1900,12 +1900,12 @@ static void floppy_release(struct gendisk *disk, fmode_t mode)
 }
 
 static const struct block_device_operations floppy_fops = {
-	.owner		= THIS_MODULE,
-	.open		= floppy_unlocked_open,
-	.release	= floppy_release,
-	.ioctl		= fd_ioctl,
-	.check_events	= floppy_check_events,
-	.revalidate_disk= floppy_revalidate,
+	.owner		 = THIS_MODULE,
+	.open		 = floppy_unlocked_open,
+	.release	 = floppy_release,
+	.ioctl		 = fd_ioctl,
+	.check_events	 = floppy_check_events,
+	.revalidate_disk = floppy_revalidate,
 };
 
 static struct kobject *floppy_find(dev_t dev, int *part, void *data)
@@ -1926,7 +1926,7 @@ static int __init atari_floppy_init (void)
 		/* Amiga, Mac, ... don't have Atari-compatible floppy :-) */
 		return -ENODEV;
 
-	if (register_blkdev(FLOPPY_MAJOR,"fd"))
+	if (register_blkdev(FLOPPY_MAJOR, "fd"))
 		return -EBUSY;
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
@@ -2004,26 +2004,26 @@ static int __init atari_floppy_setup(char *str)
 		return 0;
 
 	str = get_options(str, 3 + FD_MAX_UNITS, ints);
-	
+
 	if (ints[0] < 1) {
-		printk(KERN_ERR "ataflop_setup: no arguments!\n" );
+		printk(KERN_ERR "ataflop_setup: no arguments!\n");
 		return 0;
 	}
 	else if (ints[0] > 2+FD_MAX_UNITS) {
-		printk(KERN_ERR "ataflop_setup: too many arguments\n" );
+		printk(KERN_ERR "ataflop_setup: too many arguments\n");
 	}
 
 	if (ints[1] < 0 || ints[1] > 2)
-		printk(KERN_ERR "ataflop_setup: bad drive type\n" );
+		printk(KERN_ERR "ataflop_setup: bad drive type\n");
 	else
 		DriveType = ints[1];
 
 	if (ints[0] >= 2)
 		UseTrackbuffer = (ints[2] > 0);
 
-	for( i = 3; i <= ints[0] && i-3 < FD_MAX_UNITS; ++i ) {
+	for (i = 3; i <= ints[0] && i-3 < FD_MAX_UNITS; ++i) {
 		if (ints[i] != 2 && ints[i] != 3 && ints[i] != 6 && ints[i] != 12)
-			printk(KERN_ERR "ataflop_setup: bad steprate\n" );
+			printk(KERN_ERR "ataflop_setup: bad steprate\n");
 		else
 			UserSteprate[i-3] = ints[i];
 	}
@@ -2047,7 +2047,7 @@ static void __exit atari_floppy_exit(void)
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
 
 	del_timer_sync(&fd_timer);
-	atari_stram_free( DMABuffer );
+	atari_stram_free(DMABuffer);
 }
 
 module_init(atari_floppy_init)
