@@ -131,7 +131,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 static struct pci_ops iproc_pcie_ops = {
 	.map_bus = iproc_pcie_map_cfg_bus,
 	.read = pci_generic_config_read32,
-	.write = pci_generic_config_write32,
+	.write = pci_generic_config_write,
 };
 
 static void iproc_pcie_reset(struct iproc_pcie *pcie)
