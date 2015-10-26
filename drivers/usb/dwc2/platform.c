@@ -222,12 +222,15 @@ static int dwc2_driver_probe(struct platform_device *dev)
 
 	hsotg->dr_mode = of_usb_get_dr_mode(dev->dev.of_node);
 
+	phy = devm_phy_optional_get(&dev->dev, "usb2-phy");
+	if (IS_ERR(phy))
+		return PTR_ERR(phy);
+
 	/*
 	 * Attempt to find a generic PHY, then look for an old style
 	 * USB PHY
 	 */
-	phy = devm_phy_get(&dev->dev, "usb2-phy");
-	if (IS_ERR(phy)) {
+	if (!phy) {
 		hsotg->phy = NULL;
 		uphy = devm_usb_get_phy(&dev->dev, USB_PHY_TYPE_USB2);
 		if (IS_ERR(uphy))
