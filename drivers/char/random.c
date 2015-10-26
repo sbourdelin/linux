@@ -231,7 +231,7 @@
  * not be attributed to the Phil, Colin, or any of authors of PGP.
  *
  * Further background information on this topic may be obtained from
- * RFC 1750, "Randomness Recommendations for Security", by Donald
+ * RFC 4086, "Randomness Requirements for Security", by Donald
  * Eastlake, Steve Crocker, and Jeff Schiller.
  */
 
