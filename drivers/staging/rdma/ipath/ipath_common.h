@@ -365,7 +365,7 @@ struct ipath_base_info {
  */
 #define IPATH_USER_SWMINOR 6
 
-#define IPATH_USER_SWVERSION ((IPATH_USER_SWMAJOR<<16) | IPATH_USER_SWMINOR)
+#define IPATH_USER_SWVERSION ((IPATH_USER_SWMAJOR << 16) | IPATH_USER_SWMINOR)
 
 #define IPATH_KERN_TYPE 0
 
@@ -380,7 +380,7 @@ struct ipath_base_info {
  * spi_sw_version field of ipath_base_info, so the user code can in turn
  * check for compatibility with the kernel.
 */
-#define IPATH_KERN_SWVERSION ((IPATH_KERN_TYPE<<31) | IPATH_USER_SWVERSION)
+#define IPATH_KERN_SWVERSION ((IPATH_KERN_TYPE << 31) | IPATH_USER_SWVERSION)
 
 /*
  * This structure is passed to ipath_userinit() to tell the driver where
