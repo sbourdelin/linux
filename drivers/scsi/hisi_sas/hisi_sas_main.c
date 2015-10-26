@@ -454,6 +454,89 @@ static void hisi_sas_phy_init(struct hisi_hba *hisi_hba, int phy_no)
 	INIT_WORK(&phy->phyup_ws, hisi_sas_phyup_work);
 }
 
+static void hisi_sas_port_notify_formed(struct asd_sas_phy *sas_phy, int lock)
+{
+	struct sas_ha_struct *sas_ha = sas_phy->ha;
+	struct hisi_hba *hisi_hba = NULL;
+	int i = 0;
+	struct hisi_sas_phy *phy = sas_phy->lldd_phy;
+	struct asd_sas_port *sas_port = sas_phy->port;
+	struct hisi_sas_port *port;
+	unsigned long flags = 0;
+
+	if (!sas_port)
+		return;
+
+	while (sas_ha->sas_phy[i]) {
+		if (sas_ha->sas_phy[i] == sas_phy) {
+			hisi_hba = (struct hisi_hba *)sas_ha->lldd_ha;
+			port = &hisi_hba->port[i];
+			break;
+		}
+		i++;
+	}
+
+	if (hisi_hba == NULL) {
+		pr_err("%s: could not find hba\n", __func__);
+		return;
+	}
+
+	if (lock)
+		spin_lock_irqsave(&hisi_hba->lock, flags);
+	port->port_attached = 1;
+	port->id = phy->port_id;
+	phy->port = port;
+	sas_port->lldd_port = port;
+
+	if (lock)
+		spin_unlock_irqrestore(&hisi_hba->lock, flags);
+}
+
+static void hisi_sas_do_release_task(struct hisi_hba *hisi_hba,
+		int phy_no, struct domain_device *device)
+{
+	struct hisi_sas_phy *phy;
+	struct hisi_sas_port *port;
+	struct hisi_sas_slot *slot, *slot2;
+	struct device *dev = &hisi_hba->pdev->dev;
+
+	phy = &hisi_hba->phy[phy_no];
+	port = phy->port;
+	if (!port)
+		return;
+
+	list_for_each_entry_safe(slot, slot2, &port->list, entry) {
+		struct sas_task *task;
+
+		task = slot->task;
+		if (device && task->dev != device)
+			continue;
+
+		dev_info(dev, "Release slot [%d:%d], task [%p]:\n",
+			 slot->dlvry_queue, slot->dlvry_queue_slot, task);
+		hisi_hba->hw->slot_complete(hisi_hba, slot, 1);
+	}
+}
+
+static void hisi_sas_port_notify_deformed(struct asd_sas_phy *sas_phy,
+					  int lock)
+{
+	struct domain_device *device;
+	struct hisi_sas_phy *phy = sas_phy->lldd_phy;
+	struct hisi_hba *hisi_hba = phy->hisi_hba;
+	struct asd_sas_port *sas_port = sas_phy->port;
+	int phy_no = 0;
+
+	while (phy != &hisi_hba->phy[phy_no]) {
+		phy_no++;
+
+		if (phy_no >= hisi_hba->n_phy)
+			return;
+	}
+	list_for_each_entry(device, &sas_port->dev_list, dev_list_node)
+		hisi_sas_do_release_task(phy->hisi_hba, phy_no, device);
+}
+
 static int hisi_sas_dev_found(struct domain_device *device)
 {
 	return hisi_sas_dev_found_notify(device, 1);
@@ -488,6 +571,57 @@ static int hisi_sas_queue_command(struct sas_task *task, gfp_t gfp_flags)
 	return hisi_sas_task_exec(task, gfp_flags, NULL, 0, NULL);
 }
 
+
+static void hisi_sas_port_formed(struct asd_sas_phy *sas_phy)
+{
+	hisi_sas_port_notify_formed(sas_phy, 1);
+}
+
+static void hisi_sas_port_deformed(struct asd_sas_phy *sas_phy)
+{
+	hisi_sas_port_notify_deformed(sas_phy, 1);
+}
+
+static void hisi_sas_phy_disconnected(struct hisi_sas_phy *phy)
+{
+	phy->phy_attached = 0;
+	phy->phy_type = 0;
+	phy->phy_type &= ~(PORT_TYPE_SAS | PORT_TYPE_SATA);
+	phy->port = NULL;
+}
+
+void hisi_sas_phy_down(struct hisi_hba *hisi_hba, int phy_no, int rdy)
+{
+	struct hisi_sas_phy *phy = &hisi_hba->phy[phy_no];
+	struct asd_sas_phy *sas_phy = &phy->sas_phy;
+	struct sas_ha_struct *sas_ha = &hisi_hba->sha;
+
+	if (rdy) {
+		/* Phy down but ready */
+		hisi_sas_bytes_dmaed(hisi_hba, phy_no);
+		hisi_sas_port_notify_formed(sas_phy, 0);
+	} else {
+		struct hisi_sas_port *port  = phy->port;
+
+		/* Phy down and not ready */
+		sas_ha->notify_phy_event(sas_phy, PHYE_LOSS_OF_SIGNAL);
+		sas_phy_disconnected(sas_phy);
+
+		if (port) {
+			if (phy->phy_type & PORT_TYPE_SAS) {
+				int port_id = port->id;
+
+				if (!hisi_hba->hw->get_wideport_bitmap(hisi_hba,
+								       port_id))
+					port->port_attached = 0;
+			} else if (phy->phy_type & PORT_TYPE_SATA)
+				port->port_attached = 0;
+		}
+		hisi_sas_phy_disconnected(phy);
+	}
+}
+EXPORT_SYMBOL_GPL(hisi_sas_phy_down);
+
 static struct scsi_transport_template *hisi_sas_stt;
 
 static struct scsi_host_template hisi_sas_sht = {
@@ -513,6 +647,8 @@ static struct sas_domain_function_template hisi_sas_transport_ops = {
 	.lldd_dev_found		= hisi_sas_dev_found,
 	.lldd_dev_gone		= hisi_sas_dev_gone,
 	.lldd_execute_task	= hisi_sas_queue_command,
+	.lldd_port_formed	= hisi_sas_port_formed,
+	.lldd_port_deformed	= hisi_sas_port_deformed,
 };
 
 static int hisi_sas_alloc(struct hisi_hba *hisi_hba, struct Scsi_Host *shost)
