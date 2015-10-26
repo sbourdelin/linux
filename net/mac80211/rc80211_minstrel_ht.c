@@ -906,7 +906,12 @@ minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
 		minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_prob_rate);
 	}
 
-	rates->rate[i].idx = -1;
+	/* Use lowest rate last */
+	rates->rate[i].idx = mi->lowest_rix;
+	rates->rate[i].count = mp->max_retry;
+	rates->rate[i].count_cts = mp->max_retry;
+	rates->rate[i].count_rts = mp->max_retry;
+
 	rate_control_set_rates(mp->hw, mi->sta, rates);
 }
 
@@ -1127,6 +1132,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 	memset(mi, 0, sizeof(*mi));
 
 	mi->sta = sta;
+	mi->lowest_rix = rate_lowest_index(sband, sta);
 	mi->last_stats_update = jiffies;
 
 	ack_dur = ieee80211_frame_duration(sband->band, 10, 60, 1, 1, 0);

@@ -73,6 +73,8 @@ struct minstrel_ht_sta {
 	/* ampdu length (EWMA) */
 	unsigned int avg_ampdu_len;
 
+	unsigned int lowest_rix;
+
 	/* overall sorted rate set */
 	u16 max_tp_rate[MAX_THR_RATES];
 	u16 max_prob_rate;
