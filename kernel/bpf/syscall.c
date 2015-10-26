@@ -17,6 +17,7 @@
 #include <linux/license.h>
 #include <linux/filter.h>
 #include <linux/version.h>
+#include <linux/bug.h>
 
 int sysctl_unprivileged_bpf_disabled __read_mostly;
 
@@ -574,6 +575,35 @@ struct bpf_prog *bpf_prog_get(u32 ufd)
 }
 EXPORT_SYMBOL_GPL(bpf_prog_get);
 
+static void
+bpf_prog_load_note(union bpf_attr *attr, const char *fmt, ...)
+{
+	u32 log_level, log_size;
+	char __user *log_ubuf = NULL;
+	/* 64 chars should be long enough for a one line note. */
+	char log_buf[64];
+	va_list args;
+
+	log_ubuf = (char __user *) (unsigned long) attr->log_buf;
+	log_level = attr->log_level;
+	log_size = sizeof(log_buf);
+	if (attr->log_size < log_size)
+		log_size = attr->log_size;
+
+	if (log_level == 0 || !log_size || !log_ubuf)
+		return;
+
+	va_start(args, fmt);
+	vscnprintf(log_buf, log_size, fmt, args);
+	va_end(args);
+	log_buf[sizeof(log_buf) - 1] = '\0';
+
+	/* Don't need care the copying result too much */
+	WARN(copy_to_user(log_ubuf, log_buf, log_size),
+	     KERN_WARNING "Failed to copy BPF error note '%s' to log buffer\n",
+	     log_buf);
+}
+
 /* last field in 'union bpf_attr' used by this command */
 #define	BPF_PROG_LOAD_LAST_FIELD kern_version
 
@@ -597,12 +627,19 @@ static int bpf_prog_load(union bpf_attr *attr)
 	/* eBPF programs must be GPL compatible to use GPL-ed functions */
 	is_gpl = license_is_gpl_compatible(license);
 
-	if (attr->insn_cnt >= BPF_MAXINSNS)
+	if (attr->insn_cnt >= BPF_MAXINSNS) {
+		bpf_prog_load_note(attr, "Too many instructions: %d > %d\n",
+				   attr->insn_cnt, BPF_MAXINSNS);
 		return -EINVAL;
+	}
 
 	if (type == BPF_PROG_TYPE_KPROBE &&
-	    attr->kern_version != LINUX_VERSION_CODE)
+	    attr->kern_version != LINUX_VERSION_CODE) {
+		bpf_prog_load_note(attr,
+				   "Kernel version mismatch: 0x%x != 0x%x\n",
+				   attr->kern_version, LINUX_VERSION_CODE);
 		return -EINVAL;
+	}
 
 	if (type != BPF_PROG_TYPE_SOCKET_FILTER && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
@@ -631,8 +668,10 @@ static int bpf_prog_load(union bpf_attr *attr)
 
 	/* find program type: socket_filter vs tracing_filter */
 	err = find_prog_type(type, prog);
-	if (err < 0)
+	if (err < 0) {
+		bpf_prog_load_note(attr, "Invalid program type: %d\n", type);
 		goto free_prog;
+	}
 
 	/* run eBPF verifier */
 	err = bpf_check(&prog, attr);
