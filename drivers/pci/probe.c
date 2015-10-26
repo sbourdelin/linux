@@ -2039,7 +2039,8 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
 }
 
 struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+		struct pci_ops *ops, void *sysdata, struct list_head *resources,
+		struct fwnode_handle *fwnode)
 {
 	int error;
 	struct pci_host_bridge *bridge;
@@ -2069,6 +2070,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 	if (!bridge)
 		goto err_out;
 
+	bridge->fwnode = fwnode;
 	bridge->dev.parent = parent;
 	bridge->dev.release = pci_release_host_bridge_dev;
 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
@@ -2223,7 +2225,7 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
 			break;
 		}
 
-	b = pci_create_root_bus(parent, bus, ops, sysdata, resources);
+	b = pci_create_root_bus(parent, bus, ops, sysdata, resources, NULL);
 	if (!b)
 		return NULL;
 
@@ -2261,7 +2263,7 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
 	pci_add_resource(&resources, &ioport_resource);
 	pci_add_resource(&resources, &iomem_resource);
 	pci_add_resource(&resources, &busn_resource);
-	b = pci_create_root_bus(NULL, bus, ops, sysdata, &resources);
+	b = pci_create_root_bus(NULL, bus, ops, sysdata, &resources, NULL);
 	if (b) {
 		pci_scan_child_bus(b);
 	} else {

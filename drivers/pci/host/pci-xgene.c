@@ -545,7 +545,7 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
 		return ret;
 
 	bus = pci_create_root_bus(&pdev->dev, 0,
-					&xgene_pcie_ops, port, &res);
+					&xgene_pcie_ops, port, &res, NULL);
 	if (!bus)
 		return -ENOMEM;
 
