@@ -1,6 +1,7 @@
 #ifndef __LINUX_PWM_H
 #define __LINUX_PWM_H
 
+#include <linux/bitops.h>
 #include <linux/err.h>
 #include <linux/of.h>
 
@@ -74,9 +75,9 @@ enum pwm_polarity {
 };
 
 enum {
-	PWMF_REQUESTED = 1 << 0,
-	PWMF_ENABLED = 1 << 1,
-	PWMF_EXPORTED = 1 << 2,
+	PWMF_REQUESTED = BIT(0),
+	PWMF_ENABLED = BIT(1),
+	PWMF_EXPORTED = BIT(2),
 };
 
 /**
