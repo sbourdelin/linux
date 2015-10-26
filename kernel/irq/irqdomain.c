@@ -60,6 +60,7 @@ struct fwnode_handle *irq_domain_alloc_fwnode(void *data)
 	fwid->fwnode.type = FWNODE_IRQCHIP;
 	return &fwid->fwnode;
 }
+EXPORT_SYMBOL_GPL(irq_domain_alloc_fwnode);
 
 /**
  * irq_domain_free_fwnode - Free a non-OF-backed fwnode_handle
@@ -77,6 +78,7 @@ void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
 	kfree(fwid->name);
 	kfree(fwid);
 }
+EXPORT_SYMBOL_GPL(irq_domain_free_fwnode);
 
 /**
  * __irq_domain_add() - Allocate a new irq_domain data structure
