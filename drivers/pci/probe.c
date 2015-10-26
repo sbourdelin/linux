@@ -664,12 +664,25 @@ static void pci_set_bus_speed(struct pci_bus *bus)
 static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
 {
 	struct irq_domain *d;
+	struct pci_host_bridge *host_bridge;
 
 	/*
 	 * Any firmware interface that can resolve the msi_domain
 	 * should be called from here.
 	 */
 	d = pci_host_bridge_of_msi_domain(bus);
+
+	/*
+	 * If no IRQ domain was found via the OF tree, try looking it up
+	 * directly through the fwnode_handle.
+	 */
+	if (!d) {
+		host_bridge = to_pci_host_bridge(bus->bridge);
+		if (host_bridge->fwnode) {
+			d = irq_find_matching_fwnode(host_bridge->fwnode,
+						     DOMAIN_BUS_ANY);
+		}
+	}
 
 	return d;
 }
