@@ -408,14 +408,17 @@ static int lpc18xx_pwm_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < lpc18xx_pwm->chip.npwm; i++) {
+		struct lpc18xx_pwm_data *lpc18xx_data;
+
 		pwm = &lpc18xx_pwm->chip.pwms[i];
-		pwm->chip_data = devm_kzalloc(lpc18xx_pwm->dev,
-					      sizeof(struct lpc18xx_pwm_data),
-					      GFP_KERNEL);
-		if (!pwm->chip_data) {
+		lpc18xx_data = devm_kzalloc(lpc18xx_pwm->dev,
+					    sizeof(struct lpc18xx_pwm_data),
+					    GFP_KERNEL);
+		if (!lpc18xx_data) {
 			ret = -ENOMEM;
 			goto remove_pwmchip;
 		}
+		pwm_set_chip_data(pwm, lpc18xx_data);
 	}
 
 	platform_set_drvdata(pdev, lpc18xx_pwm);
