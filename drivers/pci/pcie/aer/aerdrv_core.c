@@ -37,11 +37,40 @@ module_param(nosourceid, bool, 0);
 
 int pci_enable_pcie_error_reporting(struct pci_dev *dev)
 {
+	u8 header_type;
+	int pos;
+
 	if (pcie_aer_get_firmware_first(dev))
 		return -EIO;
 
-	if (!pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR))
+	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
+	if (!pos)
 		return -EIO;
+
+	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+
+	/* needs to be a bridge/switch */
+	if (header_type == PCI_HEADER_TYPE_BRIDGE) {
+		u32 status;
+		u16 control;
+
+		/*
+		 * A switch will not forward ERR_ messages coming from an
+		 * endpoint if SERR# forwarding is not enabled.
+		 * AER driver is checking the errors at the root only.
+		 */
+		pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &control);
+		control |= PCI_BRIDGE_CTL_SERR;
+		pci_write_config_word(dev, PCI_BRIDGE_CONTROL, control);
+
+		/*
+		 * Need to inform hardware that we support
+		 * Role-Based Error Reporting.
+		 */
+		pci_read_config_dword(dev, pos + PCI_ERR_COR_MASK, &status);
+		status &= ~PCI_ERR_COR_ADV_NFAT;
+		pci_write_config_dword(dev, pos + PCI_ERR_COR_MASK, status);
+	}
 
 	return pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_AER_FLAGS);
 }
@@ -49,8 +78,33 @@ EXPORT_SYMBOL_GPL(pci_enable_pcie_error_reporting);
 
 int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 {
+	int pos;
+	u8 header_type;
+
 	if (pcie_aer_get_firmware_first(dev))
 		return -EIO;
+
+	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
+	if (!pos)
+		return -EIO;
+
+	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+
+	/* needs to be a bridge/switch */
+	if (header_type == PCI_HEADER_TYPE_BRIDGE) {
+		u32 status;
+		u16 control;
+
+		/* clear serr forwarding */
+		pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &control);
+		control &= ~PCI_BRIDGE_CTL_SERR;
+		pci_write_config_word(dev, PCI_BRIDGE_CONTROL, control);
+
+		/* set compatibility mode */
+		pci_read_config_dword(dev, pos + PCI_ERR_COR_MASK, &status);
+		status |= PCI_ERR_COR_ADV_NFAT;
+		pci_write_config_dword(dev, pos + PCI_ERR_COR_MASK, status);
+	}
 
 	return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
 					  PCI_EXP_AER_FLAGS);
