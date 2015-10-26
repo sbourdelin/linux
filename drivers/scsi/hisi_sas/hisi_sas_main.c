@@ -110,6 +110,12 @@ void hisi_sas_slot_task_free(struct hisi_hba *hisi_hba, struct sas_task *task,
 }
 EXPORT_SYMBOL_GPL(hisi_sas_slot_task_free);
 
+static int hisi_sas_task_prep_smp(struct hisi_hba *hisi_hba,
+				  struct hisi_sas_slot *slot)
+{
+	return hisi_hba->hw->prep_smp(hisi_hba, slot);
+}
+
 static int hisi_sas_task_prep_ssp(struct hisi_hba *hisi_hba,
 				  struct hisi_sas_slot *slot, int is_tmf,
 				  struct hisi_sas_tmf_task *tmf)
@@ -228,10 +234,12 @@ static int hisi_sas_task_prep(struct sas_task *task, struct hisi_hba *hisi_hba,
 	memset(slot->cmd_hdr, 0, sizeof(struct hisi_sas_cmd_hdr));
 
 	switch (task->task_proto) {
+	case SAS_PROTOCOL_SMP:
+		rc = hisi_sas_task_prep_smp(hisi_hba, slot);
+		break;
 	case SAS_PROTOCOL_SSP:
 		rc = hisi_sas_task_prep_ssp(hisi_hba, slot, is_tmf, tmf);
 		break;
-	case SAS_PROTOCOL_SMP:
 	case SAS_PROTOCOL_SATA:
 	case SAS_PROTOCOL_STP:
 	case SAS_PROTOCOL_SATA | SAS_PROTOCOL_STP:
