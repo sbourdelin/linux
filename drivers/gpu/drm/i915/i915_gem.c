@@ -2373,19 +2373,27 @@ static void
 i915_gem_object_retire__read(struct drm_i915_gem_object *obj, int ring)
 {
 	struct i915_vma *vma;
+	struct intel_context *ctx;
 
 	RQ_BUG_ON(obj->last_read_req[ring] == NULL);
 	RQ_BUG_ON(!(obj->active & (1 << ring)));
 
 	list_del_init(&obj->ring_list[ring]);
+
+	/* Ensure context cannot be destroyed with VMAs on the active list. */
+	ctx = obj->last_read_req[ring]->ctx;
+	i915_gem_context_reference(ctx);
+
 	i915_gem_request_assign(&obj->last_read_req[ring], NULL);
 
 	if (obj->last_write_req && obj->last_write_req->ring->id == ring)
 		i915_gem_object_retire__write(obj);
 
 	obj->active &= ~(1 << ring);
-	if (obj->active)
+	if (obj->active) {
+		i915_gem_context_unreference(ctx);
 		return;
+	}
 
 	/* Bump our place on the bound list to keep it roughly in LRU order
 	 * so that we don't steal from recently used but inactive objects
@@ -2398,6 +2406,8 @@ i915_gem_object_retire__read(struct drm_i915_gem_object *obj, int ring)
 		if (!list_empty(&vma->mm_list))
 			list_move_tail(&vma->mm_list, &vma->vm->inactive_list);
 	}
+
+	i915_gem_context_unreference(ctx);
 
 	i915_gem_request_assign(&obj->last_fenced_req, NULL);
 	drm_gem_object_unreference(&obj->base);
