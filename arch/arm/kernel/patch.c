@@ -36,7 +36,9 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
 	else
 		__acquire(&patch_lock);
 
+#ifdef CONFIG_MMU
 	set_fixmap(fixmap, page_to_phys(page));
+#endif
 
 	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
 }
@@ -44,7 +46,9 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
 static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
 	__releases(&patch_lock)
 {
+#ifdef CONFIG_MMU
 	clear_fixmap(fixmap);
+#endif
 
 	if (flags)
 		spin_unlock_irqrestore(&patch_lock, *flags);
