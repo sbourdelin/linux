@@ -24,7 +24,7 @@ struct device_node *pseries_of_derive_parent(const char *path)
 		return ERR_PTR(-EINVAL);
 
 	if (tail > path + 1) {
-		parent_path = kstrndup(path, tail - path, GFP_KERNEL);
+		parent_path = kstrndup(path, (tail - 1) - path, GFP_KERNEL);
 		if (!parent_path)
 			return ERR_PTR(-ENOMEM);
 	}
