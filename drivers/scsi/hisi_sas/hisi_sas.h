@@ -99,7 +99,9 @@ struct hisi_hba {
 
 
 	int n_phy;
+	spinlock_t lock;
 
+	struct timer_list timer;
 	struct workqueue_struct *wq;
 
 	int slot_index_count;
