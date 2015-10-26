@@ -621,29 +621,18 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 		c->x86_capability[9] = ebx;
 	}
 
-	/* Extended state features: level 0x0000000d */
-	if (c->cpuid_level >= 0x0000000d) {
-		u32 eax, ebx, ecx, edx;
-
-		cpuid_count(0x0000000d, 1, &eax, &ebx, &ecx, &edx);
-
-		c->x86_capability[10] = eax;
-	}
-
 	/* Additional Intel-defined flags: level 0x0000000F */
 	if (c->cpuid_level >= 0x0000000F) {
 		u32 eax, ebx, ecx, edx;
 
 		/* QoS sub-leaf, EAX=0Fh, ECX=0 */
 		cpuid_count(0x0000000F, 0, &eax, &ebx, &ecx, &edx);
-		c->x86_capability[11] = edx;
 		if (cpu_has(c, X86_FEATURE_CQM_LLC)) {
 			/* will be overridden if occupancy monitoring exists */
 			c->x86_cache_max_rmid = ebx;
 
 			/* QoS sub-leaf, EAX=0Fh, ECX=1 */
 			cpuid_count(0x0000000F, 1, &eax, &ebx, &ecx, &edx);
-			c->x86_capability[12] = edx;
 			if (cpu_has(c, X86_FEATURE_CQM_OCCUP_LLC)) {
 				c->x86_cache_max_rmid = ecx;
 				c->x86_cache_occ_scale = ebx;
