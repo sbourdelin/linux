@@ -542,7 +542,7 @@ void WMMOnAssocRsp23a(struct rtw_adapter *padapter)
 		switch (ACI) {
 		case 0x0:
 			rtl8723a_set_ac_param_be(padapter, acParm);
-			acm_mask |= (ACM? BIT(1):0);
+			acm_mask |= (ACM ? BIT(1) : 0);
 			edca[XMIT_BE_QUEUE] = acParm;
 			break;
 		case 0x1:
@@ -552,12 +552,12 @@ void WMMOnAssocRsp23a(struct rtw_adapter *padapter)
 			break;
 		case 0x2:
 			rtl8723a_set_ac_param_vi(padapter, acParm);
-			acm_mask |= (ACM? BIT(2):0);
+			acm_mask |= (ACM ? BIT(2) : 0);
 			edca[XMIT_VI_QUEUE] = acParm;
 			break;
 		case 0x3:
 			rtl8723a_set_ac_param_vo(padapter, acParm);
-			acm_mask |= (ACM? BIT(3):0);
+			acm_mask |= (ACM ? BIT(3) : 0);
 			edca[XMIT_VO_QUEUE] = acParm;
 			break;
 		}
@@ -597,7 +597,7 @@ void WMMOnAssocRsp23a(struct rtw_adapter *padapter)
 		}
 	}
 
-	for (i = 0; i<4; i++) {
+	for (i = 0; i < 4; i++) {
 		pxmitpriv->wmm_para_seq[i] = inx[i];
 		DBG_8723A("wmm_para_seq(%d): %d\n", i,
 			  pxmitpriv->wmm_para_seq[i]);
@@ -628,7 +628,7 @@ static void bwmode_update_check(struct rtw_adapter *padapter, const u8 *p)
 	    pregistrypriv->cbw40_enable) {
 		new_bwmode = HT_CHANNEL_WIDTH_40;
 
-		switch (pHT_info->ht_param & IEEE80211_HT_PARAM_CHA_SEC_OFFSET){
+		switch (pHT_info->ht_param & IEEE80211_HT_PARAM_CHA_SEC_OFFSET) {
 		case IEEE80211_HT_PARAM_CHA_SEC_ABOVE:
 			new_ch_offset = HAL_PRIME_CHNL_OFFSET_LOWER;
 			break;
@@ -1189,7 +1189,7 @@ unsigned int update_basic_rate23a(unsigned char *ptn, unsigned int ptn_sz)
 	unsigned int i, num_of_rate;
 	unsigned int mask = 0;
 
-	num_of_rate = (ptn_sz > NumRates)? NumRates: ptn_sz;
+	num_of_rate = (ptn_sz > NumRates) ? NumRates : ptn_sz;
 
 	for (i = 0; i < num_of_rate; i++) {
 		if ((*(ptn + i)) & 0x80)
@@ -1231,7 +1231,7 @@ int support_short_GI23a(struct rtw_adapter *padapter,
 		return _FAIL;
 	if (pmlmeinfo->assoc_AP_vendor == HT_IOT_PEER_RALINK)
 		return _FAIL;
-	bit_offset = (pmlmeext->cur_bwmode & HT_CHANNEL_WIDTH_40)? 6: 5;
+	bit_offset = (pmlmeext->cur_bwmode & HT_CHANNEL_WIDTH_40) ? 6 : 5;
 
 	if (pHT_caps->cap_info & cpu_to_le16(0x1 << bit_offset))
 		return _SUCCESS;
