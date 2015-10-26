@@ -1,5 +1,5 @@
 ///
-/// A variable is dereference under a NULL test.
+/// A variable is dereferenced under a NULL test.
 /// Even though it is know to be NULL.
 ///
 // Confidence: Moderate
