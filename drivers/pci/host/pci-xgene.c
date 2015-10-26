@@ -176,7 +176,7 @@ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
 static struct pci_ops xgene_pcie_ops = {
 	.map_bus = xgene_pcie_map_bus,
 	.read = xgene_pcie_config_read32,
-	.write = pci_generic_config_write32,
+	.write = pci_generic_config_write,
 };
 
 static u64 xgene_pcie_set_ib_mask(void __iomem *csr_base, u32 addr,
