@@ -725,6 +725,7 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts)
 	int track = evsel->tracking;
 	bool per_cpu = opts->target.default_per_cpu && !opts->target.per_thread;
 
+	evsel->system_wide = opts->target.system_wide;
 	attr->sample_id_all = perf_missing_features.sample_id_all ? 0 : 1;
 	attr->inherit	    = !opts->no_inherit;
 
