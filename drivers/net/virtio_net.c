@@ -72,6 +72,9 @@ struct send_queue {
 
 	/* Name of the send queue: output.$index */
 	char name[40];
+
+	/* Name of the channel, shared with irq. */
+	char channel_name[40];
 };
 
 /* Internal representation of a receive virtqueue */
@@ -1529,6 +1532,8 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 	int ret = -ENOMEM;
 	int i, total_vqs;
 	const char **names;
+	const char **channel_names;
+	unsigned *channels;
 
 	/* We expect 1 RX virtqueue followed by 1 TX virtqueue, followed by
 	 * possible N-1 RX/TX queue pairs used in multiqueue mode, followed by
@@ -1548,6 +1553,17 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 	if (!names)
 		goto err_names;
 
+	channel_names = kmalloc_array(vi->max_queue_pairs,
+				      sizeof(*channel_names),
+				      GFP_KERNEL);
+	if (!channel_names)
+		goto err_channel_names;
+
+	channels = kmalloc_array(total_vqs, sizeof(*channels),
+				 GFP_KERNEL);
+	if (!channels)
+		goto err_channels;
+
 	/* Parameters for control virtqueue, if any */
 	if (vi->has_cvq) {
 		callbacks[total_vqs - 1] = NULL;
@@ -1562,10 +1578,15 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 		sprintf(vi->sq[i].name, "output.%d", i);
 		names[rxq2vq(i)] = vi->rq[i].name;
 		names[txq2vq(i)] = vi->sq[i].name;
+		sprintf(vi->sq[i].channel_name, "txrx.%d", i);
+		channel_names[i] = vi->sq[i].channel_name;
+		channels[rxq2vq(i)] = i;
+		channels[txq2vq(i)] = i;
 	}
 
 	ret = vi->vdev->config->find_vqs(vi->vdev, total_vqs, vqs, callbacks,
-					 names);
+					 names, channels, channel_names,
+					 vi->max_queue_pairs);
 	if (ret)
 		goto err_find;
 
@@ -1580,6 +1601,8 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 		vi->sq[i].vq = vqs[txq2vq(i)];
 	}
 
+	kfree(channels);
+	kfree(channel_names);
 	kfree(names);
 	kfree(callbacks);
 	kfree(vqs);
@@ -1587,6 +1610,10 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 	return 0;
 
 err_find:
+	kfree(channels);
+err_channels:
+	kfree(channel_names);
+err_channel_names:
 	kfree(names);
 err_names:
 	kfree(callbacks);
