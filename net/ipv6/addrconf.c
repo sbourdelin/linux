@@ -3149,6 +3149,7 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 
 	case NETDEV_UP:
 	case NETDEV_CHANGE:
+netdev_change:
 		if (dev->flags & IFF_SLAVE)
 			break;
 
@@ -3244,8 +3245,10 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 
 		if (!idev && dev->mtu >= IPV6_MIN_MTU) {
 			idev = ipv6_add_dev(dev);
-			if (!IS_ERR(idev))
-				break;
+			if (!IS_ERR(idev)) {
+				event = NETDEV_UP;
+				goto netdev_change;
+			}
 		}
 
 		/*
