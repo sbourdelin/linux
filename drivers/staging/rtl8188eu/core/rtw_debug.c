@@ -581,8 +581,8 @@ int proc_set_rx_signal(struct file *file, const char __user *buffer,
 	struct net_device *dev = data;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	char tmp[32];
-	u32 is_signal_dbg;
-	s32 signal_strength;
+	unsigned int is_signal_dbg;
+	int signal_strength;
 
 	if (count < 1)
 		return -EFAULT;
