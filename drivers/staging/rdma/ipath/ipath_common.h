@@ -431,15 +431,17 @@ struct ipath_user_info {
 
 #define IPATH_CMD_MIN		16
 
-#define __IPATH_CMD_USER_INIT	16	/* old set up userspace (for old user code) */
+/* old set up userspace (for old user code) */
+#define __IPATH_CMD_USER_INIT	16
 #define IPATH_CMD_PORT_INFO	17	/* find out what resources we got */
 #define IPATH_CMD_RECV_CTRL	18	/* control receipt of packets */
 #define IPATH_CMD_TID_UPDATE	19	/* update expected TID entries */
 #define IPATH_CMD_TID_FREE	20	/* free expected TID entries */
 #define IPATH_CMD_SET_PART_KEY	21	/* add partition key */
-#define __IPATH_CMD_SLAVE_INFO	22	/* return info on slave processes (for old user code) */
+/* return info on slave processes (for old user code) */
+#define __IPATH_CMD_SLAVE_INFO	22
 #define IPATH_CMD_ASSIGN_PORT	23	/* allocate HCA and port */
-#define IPATH_CMD_USER_INIT 	24	/* set up userspace */
+#define IPATH_CMD_USER_INIT	24/* set up userspace */
 #define IPATH_CMD_UNUSED_1	25
 #define IPATH_CMD_UNUSED_2	26
 #define IPATH_CMD_PIOAVAILUPD	27	/* force an update of PIOAvail reg */
@@ -497,7 +499,8 @@ struct ipath_cmd {
 		 */
 		__u64 sdma_complete;
 		/* address in userspace of struct ipath_port_info to
-		   write result to */
+		 *  write result to
+		 */
 		__u64 port_info;
 		/* enable/disable receipt of packets */
 		__u32 recv_ctrl;
