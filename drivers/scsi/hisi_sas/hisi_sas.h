@@ -39,6 +39,11 @@
 #define HISI_SAS_CTRL_REG_CNT 5
 
 
+enum {
+	PORT_TYPE_SAS = (1U << 1),
+	PORT_TYPE_SATA = (1U << 0),
+};
+
 enum dev_status {
 	HISI_SAS_DEV_NORMAL,
 	HISI_SAS_DEV_EH,
