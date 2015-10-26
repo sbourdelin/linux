@@ -48,6 +48,11 @@ struct virtio_pci_vq_info {
 	unsigned msix_vector;
 };
 
+struct virtio_pci_channel {
+	spinlock_t lock;
+	struct list_head virtqueues;
+};
+
 /* Our device structure */
 struct virtio_pci_device {
 	struct virtio_device vdev;
@@ -88,6 +93,10 @@ struct virtio_pci_device {
 	/* array of all queues for house-keeping */
 	struct virtio_pci_vq_info **vqs;
 
+	/* array of channels */
+	struct virtio_pci_channel *channels;
+	unsigned nchannels;
+
 	/* MSI-X support */
 	int msix_enabled;
 	int intx_enabled;
@@ -98,11 +107,8 @@ struct virtio_pci_device {
 	char (*msix_names)[256];
 	/* Number of available vectors */
 	unsigned msix_vectors;
-	/* Vectors allocated, excluding per-vq vectors if any */
+	/* Vectors allocated */
 	unsigned msix_used_vectors;
-
-	/* Whether we have vector per vq */
-	bool per_vq_vectors;
 
 	struct virtqueue *(*setup_vq)(struct virtio_pci_device *vp_dev,
 				      struct virtio_pci_vq_info *info,
@@ -137,9 +143,12 @@ bool vp_notify(struct virtqueue *vq);
 void vp_del_vqs(struct virtio_device *vdev);
 /* the config->find_vqs() implementation */
 int vp_find_vqs(struct virtio_device *vdev, unsigned nvqs,
-		       struct virtqueue *vqs[],
-		       vq_callback_t *callbacks[],
-		       const char *names[]);
+		struct virtqueue *vqs[],
+		vq_callback_t *callbacks[],
+		const char *names[],
+		unsigned channels[],
+		const char *channel_names[],
+		unsigned nchannels);
 const char *vp_bus_name(struct virtio_device *vdev);
 
 /* Setup the affinity for a virtqueue:
