@@ -40,6 +40,7 @@
 #define HISI_SAS_NAME_LEN 32
 #define HISI_SAS_CTRL_REG_CNT 5
 
+struct hisi_hba;
 
 enum {
 	PORT_TYPE_SAS = (1U << 1),
@@ -50,6 +51,13 @@ enum dev_status {
 	HISI_SAS_DEV_NORMAL,
 	HISI_SAS_DEV_EH,
 };
+
+enum hisi_sas_dev_type {
+	HISI_SAS_DEV_TYPE_STP = 0,
+	HISI_SAS_DEV_TYPE_SSP,
+	HISI_SAS_DEV_TYPE_SATA,
+};
+
 struct hisi_sas_phy {
 	struct hisi_hba	*hisi_hba;
 	struct hisi_sas_port	*port;
@@ -84,6 +92,9 @@ struct hisi_sas_cq {
 
 struct hisi_sas_device {
 	enum sas_device_type	dev_type;
+	struct hisi_hba		*hisi_hba;
+	struct domain_device	*sas_device;
+	u64 attached_phy;
 	u64 device_id;
 	u64 running_req;
 	u8 dev_status;
@@ -116,6 +127,8 @@ struct hisi_sas_tmf_task {
 
 struct hisi_sas_hw {
 	int (*hw_init)(struct hisi_hba *hisi_hba);
+	void (*setup_itct)(struct hisi_hba *hisi_hba,
+			   struct hisi_sas_device *device);
 	void (*sl_notify)(struct hisi_hba *hisi_hba, int phy_no);
 	int (*get_free_slot)(struct hisi_hba *hisi_hba, int *q, int *s);
 	void (*start_delivery)(struct hisi_hba *hisi_hba);
