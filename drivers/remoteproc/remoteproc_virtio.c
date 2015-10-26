@@ -145,9 +145,12 @@ static void rproc_virtio_del_vqs(struct virtio_device *vdev)
 }
 
 static int rproc_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
-		       struct virtqueue *vqs[],
-		       vq_callback_t *callbacks[],
-		       const char *names[])
+				 struct virtqueue *vqs[],
+				 vq_callback_t *callbacks[],
+				 const char *names[],
+				 unsigned channels[],
+				 const char *channel_names,
+				 unsigned nchannels)
 {
 	struct rproc *rproc = vdev_to_rproc(vdev);
 	int i, ret;

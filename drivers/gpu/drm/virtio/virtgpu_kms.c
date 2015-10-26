@@ -100,7 +100,8 @@ int virtio_gpu_driver_load(struct drm_device *dev, unsigned long flags)
 		  virtio_gpu_config_changed_work_func);
 
 	ret = vgdev->vdev->config->find_vqs(vgdev->vdev, 2, vqs,
-					    callbacks, names);
+					    callbacks, names,
+					    NULL, NULL, 0);
 	if (ret) {
 		DRM_ERROR("failed to find virt queues\n");
 		goto err_vqs;
