@@ -483,7 +483,7 @@ static void __iomem *tegra_pcie_conf_address(struct pci_bus *bus,
 static struct pci_ops tegra_pcie_ops = {
 	.map_bus = tegra_pcie_conf_address,
 	.read = pci_generic_config_read32,
-	.write = pci_generic_config_write32,
+	.write = pci_generic_config_write,
 };
 
 static unsigned long tegra_pcie_port_get_pex_ctrl(struct tegra_pcie_port *port)
