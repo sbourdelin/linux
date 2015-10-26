@@ -432,22 +432,29 @@ EXPORT_SYMBOL_GPL(pwm_free);
  * @pwm: PWM device
  * @duty_ns: "on" time (in nanoseconds)
  * @period_ns: duration (in nanoseconds) of one cycle
+ * @pulse_count: number of pulses (periods) to output on pwm_pulse
  *
  * Returns: 0 on success or a negative error code on failure.
  */
-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns,
+	       unsigned int pulse_count)
 {
 	int err;
 
 	if (!pwm || duty_ns < 0 || period_ns <= 0 || duty_ns > period_ns)
 		return -EINVAL;
 
-	err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
+	if (pulse_count > pwm->pulse_count_max)
+		return -EINVAL;
+
+	err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns,
+				     period_ns, pulse_count);
 	if (err)
 		return err;
 
 	pwm->duty_cycle = duty_ns;
 	pwm->period = period_ns;
+	pwm->pulse_count = pulse_count;
 
 	return 0;
 }
@@ -487,6 +494,18 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
 EXPORT_SYMBOL_GPL(pwm_set_polarity);
 
 /**
+ * pwm_pulse_done() - notify the PWM framework that pulse_count pulses are done
+ * @pwm: PWM device
+ */
+void pwm_pulse_done(struct pwm_device *pwm)
+{
+	if (pwm && !test_and_clear_bit(PWMF_ENABLED | PWMF_PULSING,
+				       &pwm->flags))
+		return pwm->chip->ops->disable(pwm->chip, pwm);
+}
+EXPORT_SYMBOL_GPL(pwm_pulse_done);
+
+/**
  * pwm_enable() - start a PWM output toggling
  * @pwm: PWM device
  *
@@ -494,7 +513,9 @@ EXPORT_SYMBOL_GPL(pwm_set_polarity);
  */
 int pwm_enable(struct pwm_device *pwm)
 {
-	if (pwm && !test_and_set_bit(PWMF_ENABLED, &pwm->flags))
+	if (pwm && !test_and_set_bit(
+			PWMF_ENABLED | !pwm->pulse_count ? : PWMF_PULSING,
+			&pwm->flags))
 		return pwm->chip->ops->enable(pwm->chip, pwm);
 
 	return pwm ? 0 : -EINVAL;
@@ -507,7 +528,8 @@ EXPORT_SYMBOL_GPL(pwm_enable);
  */
 void pwm_disable(struct pwm_device *pwm)
 {
-	if (pwm && test_and_clear_bit(PWMF_ENABLED, &pwm->flags))
+	if (pwm && test_and_clear_bit(PWMF_ENABLED | PWMF_PULSING,
+				      &pwm->flags))
 		pwm->chip->ops->disable(pwm->chip, pwm);
 }
 EXPORT_SYMBOL_GPL(pwm_disable);

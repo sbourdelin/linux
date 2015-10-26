@@ -84,7 +84,7 @@ enum hrtimer_restart gpio_pwm_timer(struct hrtimer *timer)
 }
 
 static int gpio_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-			    int duty_ns, int period_ns)
+			    int duty_ns, int period_ns, unsigned int count)
 {
 	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
 
@@ -202,6 +202,7 @@ static int gpio_pwm_probe(struct platform_device *pdev)
 			hrtimer++;
 
 		pwm_set_chip_data(&gpio_chip->chip.pwms[i], gpio_data);
+		pwm_set_pulse_count_max(&gpio_chip->chip.pwms[i], UINT_MAX);
 	}
 	if (!hrtimer)
 		dev_warn(&pdev->dev, "unable to use High-Resolution timer,");

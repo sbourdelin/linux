@@ -97,7 +97,8 @@ static inline void sun4i_pwm_writel(struct sun4i_pwm_chip *chip,
 }
 
 static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-			    int duty_ns, int period_ns)
+			    int duty_ns, int period_ns,
+			    unsigned int pulse_count)
 {
 	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
 	u32 prd, dty, val, clk_gate;

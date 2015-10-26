@@ -22,7 +22,13 @@ void pwm_free(struct pwm_device *pwm);
 /*
  * pwm_config - change a PWM device configuration
  */
-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
+int pwm_config(struct pwm_device *pwm, int duty_ns,
+	       int period_ns, unsigned int pulse_count);
+
+/*
+ * pwm_pulse_done - notify the PWM framework that pulse_count pulses are done
+ */
+void pwm_pulse_done(struct pwm_device *pwm);
 
 /*
  * pwm_enable - start a PWM output toggling
@@ -43,12 +49,18 @@ static inline void pwm_free(struct pwm_device *pwm)
 {
 }
 
-static inline int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+			     int period_ns, unsigned int pulse_count)
 {
 	return -EINVAL;
 }
 
 static inline int pwm_enable(struct pwm_device *pwm)
+{
+	return -EINVAL;
+}
+
+static inline int pwm_pulse_done(struct pwm_device *pwm)
 {
 	return -EINVAL;
 }
@@ -78,6 +90,7 @@ enum {
 	PWMF_REQUESTED = BIT(0),
 	PWMF_ENABLED = BIT(1),
 	PWMF_EXPORTED = BIT(2),
+	PWMF_PULSING = BIT(3),
 };
 
 /**
@@ -91,6 +104,8 @@ enum {
  * @period: period of the PWM signal (in nanoseconds)
  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
  * @polarity: polarity of the PWM signal
+ * @pulse_count: number of PWM pulses to toggle
+ * @pulse_count_max: maximum number of pulses that can be set to pulse
  */
 struct pwm_device {
 	const char *label;
@@ -103,11 +118,18 @@ struct pwm_device {
 	unsigned int period;
 	unsigned int duty_cycle;
 	enum pwm_polarity polarity;
+	unsigned int pulse_count;
+	unsigned int pulse_count_max;
 };
 
 static inline bool pwm_is_enabled(const struct pwm_device *pwm)
 {
 	return test_bit(PWMF_ENABLED, &pwm->flags);
+}
+
+static inline bool pwm_is_pulsing(const struct pwm_device *pwm)
+{
+	return test_bit(PWMF_ENABLED | PWMF_PULSING, &pwm->flags);
 }
 
 static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
@@ -142,6 +164,42 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
 	return pwm ? pwm->polarity : PWM_POLARITY_NORMAL;
 }
 
+/*
+ * pwm_set_pulse_count - configure the number of pulses of a pwm_pulse
+ */
+static inline void pwm_set_pulse_count(struct pwm_device *pwm,
+				       unsigned int pulse_count)
+{
+	if (pwm)
+		pwm->pulse_count = 0;
+}
+
+/*
+ * pwm_get_pulse_count - retrieve the number of pules to pulse of a pwm_pulse
+ */
+static inline unsigned int pwm_get_pulse_count(const struct pwm_device *pwm)
+{
+	return pwm ? pwm->pulse_count : 0;
+}
+
+/*
+ * pwm_get_pulse_count_max - retrieve the maximum number of pulses
+ */
+static inline unsigned int pwm_get_pulse_count_max(const struct pwm_device *pwm)
+{
+	return pwm ? pwm->pulse_count_max : 0;
+}
+
+/*
+ * pwm_set_pulse_count_max - set the maximum number of pulses
+ */
+static inline void pwm_set_pulse_count_max(struct pwm_device *pwm,
+					   unsigned int pulse_count_max)
+{
+	if (pwm)
+		pwm->pulse_count_max = pulse_count_max;
+}
+
 /**
  * struct pwm_ops - PWM controller operations
  * @request: optional hook for requesting a PWM
@@ -157,7 +215,7 @@ struct pwm_ops {
 	int (*request)(struct pwm_chip *chip, struct pwm_device *pwm);
 	void (*free)(struct pwm_chip *chip, struct pwm_device *pwm);
 	int (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-		      int duty_ns, int period_ns);
+		      int duty_ns, int period_ns, unsigned int pulse_count);
 	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
 			    enum pwm_polarity polarity);
 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);

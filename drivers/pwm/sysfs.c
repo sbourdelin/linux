@@ -61,7 +61,8 @@ static ssize_t period_store(struct device *child,
 	if (ret)
 		return ret;
 
-	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm), val);
+	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm),
+			 val, pwm_get_pulse_count(pwm));
 
 	return ret ? : size;
 }
@@ -87,7 +88,8 @@ static ssize_t duty_cycle_store(struct device *child,
 	if (ret)
 		return ret;
 
-	ret = pwm_config(pwm, val, pwm_get_period(pwm));
+	ret = pwm_config(pwm, val, pwm_get_period(pwm),
+			 pwm_get_pulse_count(pwm));
 
 	return ret ? : size;
 }
@@ -167,16 +169,68 @@ static ssize_t polarity_store(struct device *child,
 	return ret ? : size;
 }
 
+static ssize_t pulse_count_show(struct device *child,
+				struct device_attribute *attr,
+				char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+
+	return sprintf(buf, "%u\n", pwm_get_pulse_count(pwm));
+}
+
+static ssize_t pulse_count_store(struct device *child,
+				 struct device_attribute *attr,
+				 const char *buf, size_t size)
+{
+	struct pwm_device *pwm = child_to_pwm_device(child);
+	unsigned int val;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm),
+			 pwm_get_period(pwm), val);
+
+	return ret ? : size;
+
+}
+
+static ssize_t pulse_count_max_show(struct device *child,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+
+	return sprintf(buf, "%u\n", pwm_get_pulse_count_max(pwm));
+}
+
+static ssize_t pulsing_show(struct device *child,
+			    struct device_attribute *attr,
+			    char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+
+	return sprintf(buf, "%d\n", pwm_is_pulsing(pwm));
+}
+
 static DEVICE_ATTR_RW(period);
 static DEVICE_ATTR_RW(duty_cycle);
 static DEVICE_ATTR_RW(enable);
 static DEVICE_ATTR_RW(polarity);
+static DEVICE_ATTR_RW(pulse_count);
+static DEVICE_ATTR_RO(pulse_count_max);
+static DEVICE_ATTR_RO(pulsing);
 
 static struct attribute *pwm_attrs[] = {
 	&dev_attr_period.attr,
 	&dev_attr_duty_cycle.attr,
 	&dev_attr_enable.attr,
 	&dev_attr_polarity.attr,
+	&dev_attr_pulse_count.attr,
+	&dev_attr_pulse_count_max.attr,
+	&dev_attr_pulsing.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(pwm);
