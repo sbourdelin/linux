@@ -727,7 +727,7 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts)
 
 	evsel->system_wide = opts->target.system_wide;
 	attr->sample_id_all = perf_missing_features.sample_id_all ? 0 : 1;
-	attr->inherit	    = !opts->no_inherit;
+	attr->inherit	    = !opts->no_inherit && !evsel->system_wide;
 
 	perf_evsel__set_sample_bit(evsel, IP);
 	perf_evsel__set_sample_bit(evsel, TID);
