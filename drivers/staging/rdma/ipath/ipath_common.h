@@ -798,24 +798,24 @@ struct ether_header {
 
 /* functions for extracting fields from rcvhdrq entries for the driver.
  */
-static inline __u32 ipath_hdrget_err_flags(const __le32 * rbuf)
+static inline __u32 ipath_hdrget_err_flags(const __le32 *rbuf)
 {
 	return __le32_to_cpu(rbuf[1]) & INFINIPATH_RHF_H_ERR_MASK;
 }
 
-static inline __u32 ipath_hdrget_rcv_type(const __le32 * rbuf)
+static inline __u32 ipath_hdrget_rcv_type(const __le32 *rbuf)
 {
 	return (__le32_to_cpu(rbuf[0]) >> INFINIPATH_RHF_RCVTYPE_SHIFT)
 	    & INFINIPATH_RHF_RCVTYPE_MASK;
 }
 
-static inline __u32 ipath_hdrget_length_in_bytes(const __le32 * rbuf)
+static inline __u32 ipath_hdrget_length_in_bytes(const __le32 *rbuf)
 {
 	return ((__le32_to_cpu(rbuf[0]) >> INFINIPATH_RHF_LENGTH_SHIFT)
 		& INFINIPATH_RHF_LENGTH_MASK) << 2;
 }
 
-static inline __u32 ipath_hdrget_index(const __le32 * rbuf)
+static inline __u32 ipath_hdrget_index(const __le32 *rbuf)
 {
 	return (__le32_to_cpu(rbuf[0]) >> INFINIPATH_RHF_EGRINDEX_SHIFT)
 	    & INFINIPATH_RHF_EGRINDEX_MASK;
