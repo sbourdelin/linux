@@ -647,6 +647,7 @@ static struct platform_device * __init scan_one_device(struct device_node *dp,
 	sd->op = op;
 
 	op->dev.of_node = dp;
+	dp->device = &op->dev;
 
 	irq = of_get_property(dp, "interrupts", &len);
 	if (irq) {

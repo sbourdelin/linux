@@ -350,6 +350,7 @@ static struct platform_device * __init scan_one_device(struct device_node *dp,
 	sd->op = op;
 
 	op->dev.of_node = dp;
+	dp->device = &op->dev;
 
 	intr = of_get_property(dp, "intr", &len);
 	if (intr) {
