@@ -3772,9 +3772,6 @@ static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 	ath10k_check_chain_mask(ar, tx_ant, "tx");
 	ath10k_check_chain_mask(ar, rx_ant, "rx");
 
-	ar->cfg_tx_chainmask = tx_ant;
-	ar->cfg_rx_chainmask = rx_ant;
-
 	if ((ar->state != ATH10K_STATE_ON) &&
 	    (ar->state != ATH10K_STATE_RESTARTED))
 		return 0;
@@ -3794,6 +3791,9 @@ static int __ath10k_set_antenna(struct ath10k *ar, u32 tx_ant, u32 rx_ant)
 			    ret, rx_ant);
 		return ret;
 	}
+
+	ar->cfg_tx_chainmask = tx_ant;
+	ar->cfg_rx_chainmask = rx_ant;
 
 	return 0;
 }
