@@ -2896,8 +2896,6 @@ skl_allocate_pipe_ddb(struct drm_crtc *crtc,
 	alloc_size = skl_ddb_entry_size(alloc);
 	if (alloc_size == 0) {
 		memset(ddb->plane[pipe], 0, sizeof(ddb->plane[pipe]));
-		memset(&ddb->plane[pipe][PLANE_CURSOR], 0,
-		       sizeof(ddb->plane[pipe][PLANE_CURSOR]));
 		return;
 	}
 
@@ -3040,10 +3038,6 @@ static bool skl_ddb_allocation_changed(const struct skl_ddb_allocation *new_ddb,
 
 	if (memcmp(new_ddb->plane[pipe], cur_ddb->plane[pipe],
 		   sizeof(new_ddb->plane[pipe])))
-		return true;
-
-	if (memcmp(&new_ddb->plane[pipe][PLANE_CURSOR], &cur_ddb->plane[pipe][PLANE_CURSOR],
-		    sizeof(new_ddb->plane[pipe][PLANE_CURSOR])))
 		return true;
 
 	return false;
