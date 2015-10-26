@@ -158,6 +158,7 @@ struct hisi_hba {
 
 
 	int n_phy;
+	int scan_finished;
 	spinlock_t lock;
 
 	struct timer_list timer;
