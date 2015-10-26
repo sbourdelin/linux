@@ -32,7 +32,7 @@
 #define PWM_EN			BIT(4)
 #define PWM_ACT_STATE		BIT(5)
 #define PWM_CLK_GATING		BIT(6)
-#define PWM_MODE		BIT(7)
+#define PWM_MODE_PULSE		BIT(7)
 #define PWM_PULSE		BIT(8)
 #define PWM_BYPASS		BIT(9)
 
@@ -166,6 +166,8 @@ static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	spin_lock(&sun4i_pwm->ctrl_lock);
 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+	if (pulse_count)
+		val |= BIT_CH(PWM_MODE_PULSE, pwm->hwpwm);
 	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
 		ret = -EBUSY;
 		goto out;
@@ -237,7 +239,10 @@ static int sun4i_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 
 	spin_lock(&sun4i_pwm->ctrl_lock);
 	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-	val |= BIT_CH(PWM_EN, pwm->hwpwm);
+	if (pwm->pulse_count)
+		val |= BIT_CH(PWM_PULSE, pwm->hwpwm);
+	else
+		val |= BIT_CH(PWM_EN, pwm->hwpwm);
 	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
 	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
 	spin_unlock(&sun4i_pwm->ctrl_lock);
@@ -350,9 +355,12 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
 	}
 
 	val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
-	for (i = 0; i < pwm->chip.npwm; i++)
+	for (i = 0; i < pwm->chip.npwm; i++) {
 		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
 			pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
+
+		pwm_set_pulse_count_max(&pwm->chip.pwms[i], 1);
+	}
 	clk_disable_unprepare(pwm->clk);
 
 	return 0;
