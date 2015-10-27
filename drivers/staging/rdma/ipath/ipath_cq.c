@@ -63,8 +63,9 @@ void ipath_cq_enter(struct ipath_cq *cq, struct ib_wc *entry, int solicited)
 	if (head >= (unsigned)cq->ibcq.cqe) {
 		head = cq->ibcq.cqe;
 		next = 0;
-	} else
+	} else {
 		next = head + 1;
+	}
 	if (unlikely(next == wc->tail)) {
 		spin_unlock_irqrestore(&cq->lock, flags);
 		if (cq->ibcq.event_handler) {
@@ -94,8 +95,9 @@ void ipath_cq_enter(struct ipath_cq *cq, struct ib_wc *entry, int solicited)
 		wc->uqueue[head].port_num = entry->port_num;
 		/* Make sure entry is written before the head index. */
 		smp_wmb();
-	} else
+	} else {
 		wc->kqueue[head] = *entry;
+	}
 	wc->head = next;
 
 	if (cq->notify == IB_CQ_NEXT_COMP ||
@@ -261,9 +263,9 @@ struct ib_cq *ipath_create_cq(struct ib_device *ibdev,
 			ret = ERR_PTR(err);
 			goto bail_ip;
 		}
-	} else
+	} else {
 		cq->ip = NULL;
-
+	}
 	spin_lock(&dev->n_cqs_lock);
 	if (dev->n_cqs_allocated == ib_ipath_max_cqs) {
 		spin_unlock(&dev->n_cqs_lock);
