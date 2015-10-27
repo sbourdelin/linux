@@ -112,8 +112,7 @@ struct dsa_switch_tree {
 	 * Link state polling.
 	 */
 	int			link_poll_needed;
-	struct work_struct	link_poll_work;
-	struct timer_list	link_poll_timer;
+	struct delayed_work	link_poll_work;
 
 	/*
 	 * Data for the individual switch chips.
