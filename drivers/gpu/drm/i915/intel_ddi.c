@@ -2723,6 +2723,10 @@ static void broxton_phy_uninit(struct drm_i915_private *dev_priv,
 	val = I915_READ(BXT_PHY_CTL_FAMILY(phy));
 	val &= ~COMMON_RESET_DIS;
 	I915_WRITE(BXT_PHY_CTL_FAMILY(phy), val);
+
+	val = I915_READ(BXT_P_CR_GT_DISP_PWRON);
+	val &= ~GT_DISPLAY_POWER_ON(phy);
+	I915_WRITE(BXT_P_CR_GT_DISP_PWRON, val);
 }
 
 void broxton_ddi_phy_uninit(struct drm_device *dev)
@@ -2731,9 +2735,6 @@ void broxton_ddi_phy_uninit(struct drm_device *dev)
 
 	broxton_phy_uninit(dev_priv, DPIO_PHY1);
 	broxton_phy_uninit(dev_priv, DPIO_PHY0);
-
-	/* FIXME: do this in broxton_phy_uninit per phy */
-	I915_WRITE(BXT_P_CR_GT_DISP_PWRON, 0);
 }
 
 static const char * const bxt_ddi_pll_names[] = {
