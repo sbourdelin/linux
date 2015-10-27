@@ -341,7 +341,7 @@ struct ipath_base_info {
 	__u64 spi_port_rcvhdr_base;
 	__u64 spi_port_rcvhdr_tailaddr;
 
-} __attribute__ ((aligned(8)));
+} __aligned(8);
 
 /*
  * This version number is given to the driver by the user code during
@@ -425,7 +425,7 @@ struct ipath_user_info {
 	 */
 	__u64 spu_base_info;
 
-} __attribute__ ((aligned(8)));
+} __aligned(8);
 
 /* User commands. */
 
