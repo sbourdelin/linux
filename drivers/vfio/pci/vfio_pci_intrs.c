@@ -22,8 +22,12 @@
 #include <linux/vfio.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 
 #include "vfio_pci_private.h"
+
+static bool nonthread_msi = 1;
+module_param(nonthread_msi, bool, 0444);
 
 /*
  * INTx
@@ -313,6 +317,7 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 	char *name = msix ? "vfio-msix" : "vfio-msi";
 	struct eventfd_ctx *trigger;
 	int ret;
+	unsigned long irqflags = 0;
 
 	if (vector >= vdev->num_ctx)
 		return -EINVAL;
@@ -352,7 +357,10 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 		pci_write_msi_msg(irq, &msg);
 	}
 
-	ret = request_irq(irq, vfio_msihandler, 0,
+	if (nonthread_msi)
+		irqflags = IRQF_NO_THREAD;
+
+	ret = request_irq(irq, vfio_msihandler, irqflags,
 			  vdev->ctx[vector].name, trigger);
 	if (ret) {
 		kfree(vdev->ctx[vector].name);
