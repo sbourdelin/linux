@@ -1049,7 +1049,7 @@ static int srp_inv_rkey(struct srp_rdma_ch *ch, u32 rkey)
 	struct ib_send_wr *bad_wr;
 	struct ib_send_wr wr = {
 		.opcode		    = IB_WR_LOCAL_INV,
-		.wr_id		    = LOCAL_INV_WR_ID_MASK,
+		.wr_id		    = LOCAL_INV_WR_ID,
 		.next		    = NULL,
 		.num_sge	    = 0,
 		.send_flags	    = 0,
@@ -1325,7 +1325,7 @@ static int srp_map_finish_fr(struct srp_map_state *state,
 
 	memset(&wr, 0, sizeof(wr));
 	wr.opcode = IB_WR_FAST_REG_MR;
-	wr.wr_id = FAST_REG_WR_ID_MASK;
+	wr.wr_id = FAST_REG_WR_ID;
 	wr.wr.fast_reg.iova_start = state->base_dma_addr;
 	wr.wr.fast_reg.page_list = desc->frpl;
 	wr.wr.fast_reg.page_list_len = state->npages;
@@ -1940,11 +1940,11 @@ static void srp_handle_qp_err(u64 wr_id, enum ib_wc_status wc_status,
 	}
 
 	if (ch->connected && !target->qp_in_error) {
-		if (wr_id & LOCAL_INV_WR_ID_MASK) {
+		if (wr_id == LOCAL_INV_WR_ID) {
 			shost_printk(KERN_ERR, target->scsi_host, PFX
 				     "LOCAL_INV failed with status %s (%d)\n",
 				     ib_wc_status_msg(wc_status), wc_status);
-		} else if (wr_id & FAST_REG_WR_ID_MASK) {
+		} else if (wr_id == FAST_REG_WR_ID) {
 			shost_printk(KERN_ERR, target->scsi_host, PFX
 				     "FAST_REG_MR failed status %s (%d)\n",
 				     ib_wc_status_msg(wc_status), wc_status);

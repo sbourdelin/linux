@@ -67,10 +67,9 @@ enum {
 
 	SRP_MAX_PAGES_PER_MR	= 512,
 
-	LOCAL_INV_WR_ID_MASK	= 1,
-	FAST_REG_WR_ID_MASK	= 2,
-
-	SRP_LAST_WR_ID		= 0xfffffffcU,
+	LOCAL_INV_WR_ID		= 1,
+	FAST_REG_WR_ID		= 2,
+	SRP_LAST_WR_ID		= 3,
 };
 
 enum srp_target_state {
