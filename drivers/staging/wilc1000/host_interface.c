@@ -3199,7 +3199,7 @@ int host_int_add_wep_key_bss_ap(struct host_if_drv *hif_drv,
 {
 	int result = 0;
 	struct host_if_msg msg;
-	u8 i;
+	int i;
 
 	if (!hif_drv) {
 		PRINT_ER("driver is null\n");
