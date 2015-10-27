@@ -2695,6 +2695,10 @@ static const char *power_domain_str(enum intel_display_power_domain domain)
 		return "TRANSCODER_B";
 	case POWER_DOMAIN_TRANSCODER_C:
 		return "TRANSCODER_C";
+	case POWER_DOMAIN_TRANSCODER_MIPI_A:
+		return "TRANSCODER_MIPI_A";
+	case POWER_DOMAIN_TRANSCODER_MIPI_C:
+		return "TRANSCODER_MIPI_C";
 	case POWER_DOMAIN_TRANSCODER_EDP:
 		return "TRANSCODER_EDP";
 	case POWER_DOMAIN_PORT_DDI_A_2_LANES:

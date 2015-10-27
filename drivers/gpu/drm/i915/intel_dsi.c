@@ -270,6 +270,7 @@ static bool intel_dsi_compute_config(struct intel_encoder *encoder,
 	struct intel_connector *intel_connector = intel_dsi->attached_connector;
 	struct drm_display_mode *fixed_mode = intel_connector->panel.fixed_mode;
 	struct drm_display_mode *adjusted_mode = &config->base.adjusted_mode;
+	struct drm_device *dev = intel_connector->base.dev;
 
 	DRM_DEBUG_KMS("\n");
 
@@ -278,6 +279,13 @@ static bool intel_dsi_compute_config(struct intel_encoder *encoder,
 
 	/* DSI uses short packets for sync events, so clear mode flags for DSI */
 	adjusted_mode->flags = 0;
+
+	if (IS_BROXTON(dev)) {
+		if (intel_dsi->ports & (1 << PORT_A))
+			config->cpu_transcoder = TRANSCODER_MIPI_A;
+		else
+			config->cpu_transcoder = TRANSCODER_MIPI_C;
+	}
 
 	return true;
 }
