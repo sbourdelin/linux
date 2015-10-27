@@ -47,6 +47,9 @@
 MODULE_FIRMWARE(I915_CSR_SKL);
 MODULE_FIRMWARE(I915_CSR_BXT);
 
+#define SKL_REQUIRED_FW_MAJOR	1
+#define SKL_REQUIRED_FW_MINOR	23
+
 /*
 * SKL CSR registers for DC5 and DC6
 */
@@ -303,10 +306,8 @@ static void finish_csr_load(const struct firmware *fw, void *context)
 	uint32_t *dmc_payload;
 	bool fw_loaded = false;
 
-	if (!fw) {
-		i915_firmware_load_error_print(csr->fw_path, 0);
+	if (!fw)
 		goto out;
-	}
 
 	if ((stepping == -ENODATA) || (substepping == -ENODATA)) {
 		DRM_ERROR("Unknown stepping info, firmware loading failed\n");
@@ -323,6 +324,19 @@ static void finish_csr_load(const struct firmware *fw, void *context)
 	}
 
 	csr->version = css_header->version;
+
+	if (IS_SKYLAKE(dev) &&
+	    (CSR_VERSION_MAJOR(csr->version) < SKL_REQUIRED_FW_MAJOR ||
+	     CSR_VERSION_MINOR(csr->version) < SKL_REQUIRED_FW_MINOR)) {
+		DRM_INFO("Refusing to load old Skylake DMC firmware v%u.%u,"
+			 " please upgrade to v%u.%u or later"
+			 " [https://01.org/linuxgraphics/intel-linux-graphics-firmwares].\n",
+			 CSR_VERSION_MAJOR(csr->version),
+			 CSR_VERSION_MINOR(csr->version),
+			 SKL_REQUIRED_FW_MAJOR,
+			 SKL_REQUIRED_FW_MINOR);
+		goto out;
+	}
 
 	readcount += sizeof(struct intel_css_header);
 
@@ -405,16 +419,19 @@ static void finish_csr_load(const struct firmware *fw, void *context)
 	intel_csr_load_program(dev);
 	fw_loaded = true;
 
-	DRM_INFO("Finished loading %s (v%u.%u)\n",
-		 dev_priv->csr.fw_path,
-		 CSR_VERSION_MAJOR(csr->version),
-		 CSR_VERSION_MINOR(csr->version));
-
 out:
-	if (fw_loaded)
+	if (fw_loaded) {
 		intel_runtime_pm_put(dev_priv);
-	else
+
+		DRM_INFO("Finished loading %s (v%u.%u)\n",
+			 dev_priv->csr.fw_path,
+			 CSR_VERSION_MAJOR(csr->version),
+			 CSR_VERSION_MINOR(csr->version));
+	} else {
 		intel_csr_load_status_set(dev_priv, FW_FAILED);
+
+		i915_firmware_load_error_print(csr->fw_path, 0);
+	}
 
 	release_firmware(fw);
 }
