@@ -209,7 +209,7 @@ typedef enum _ipath_ureg {
  * open to get implementation-specific info, and info specific to this
  * instance.
  *
- * This struct must have explict pad fields where type sizes
+ * This struct must have explicit pad fields where type sizes
  * may result in different alignments between 32 and 64 bit
  * programs, since the 64 bit * bit kernel requires the user code
  * to have matching offsets
