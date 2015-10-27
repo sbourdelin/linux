@@ -59,20 +59,17 @@ ENTRY(cpu_do_suspend)
 	mrs	x2, tpidr_el0
 	mrs	x3, tpidrro_el0
 	mrs	x4, contextidr_el1
-	mrs	x5, mair_el1
 	mrs	x6, cpacr_el1
-	mrs	x7, ttbr1_el1
 	mrs	x8, tcr_el1
 	mrs	x9, vbar_el1
 	mrs	x10, mdscr_el1
 	mrs	x11, oslsr_el1
 	mrs	x12, sctlr_el1
 	stp	x2, x3, [x0]
-	stp	x4, x5, [x0, #16]
-	stp	x6, x7, [x0, #32]
-	stp	x8, x9, [x0, #48]
-	stp	x10, x11, [x0, #64]
-	str	x12, [x0, #80]
+	stp	x4, xzr, [x0, #16]
+	stp	x6, x8, [x0, #32]
+	stp	x9, x10, [x0, #48]
+	stp	x11, x12, [x0, #64]
 	ret
 ENDPROC(cpu_do_suspend)
 
@@ -80,29 +77,20 @@ ENDPROC(cpu_do_suspend)
  * cpu_do_resume - restore CPU register context
  *
  * x0: Physical address of context pointer
- * x1: ttbr0_el1 to be restored
  *
  * Returns:
  *	sctlr_el1 value in x0
  */
 ENTRY(cpu_do_resume)
-	/*
-	 * Invalidate local tlb entries before turning on MMU
-	 */
-	tlbi	vmalle1
 	ldp	x2, x3, [x0]
 	ldp	x4, x5, [x0, #16]
-	ldp	x6, x7, [x0, #32]
-	ldp	x8, x9, [x0, #48]
-	ldp	x10, x11, [x0, #64]
-	ldr	x12, [x0, #80]
+	ldp	x6, x8, [x0, #32]
+	ldp	x9, x10, [x0, #48]
+	ldp	x11, x12, [x0, #64]
 	msr	tpidr_el0, x2
 	msr	tpidrro_el0, x3
 	msr	contextidr_el1, x4
-	msr	mair_el1, x5
 	msr	cpacr_el1, x6
-	msr	ttbr0_el1, x1
-	msr	ttbr1_el1, x7
 	tcr_set_idmap_t0sz x8, x7
 	msr	tcr_el1, x8
 	msr	vbar_el1, x9
@@ -113,7 +101,6 @@ ENTRY(cpu_do_resume)
 	ubfx	x11, x11, #1, #1
 	msr	oslar_el1, x11
 	mov	x0, x12
-	dsb	nsh		// Make sure local tlb invalidation completed
 	isb
 	ret
 ENDPROC(cpu_do_resume)

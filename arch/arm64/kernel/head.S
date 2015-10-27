@@ -630,7 +630,7 @@ ENDPROC(__secondary_switched)
  * other registers depend on the function called upon completion
  */
 	.section	".idmap.text", "ax"
-__enable_mmu:
+ENTRY(__enable_mmu)
 	ldr	x5, =vectors
 	msr	vbar_el1, x5
 	msr	ttbr0_el1, x25			// load TTBR0
