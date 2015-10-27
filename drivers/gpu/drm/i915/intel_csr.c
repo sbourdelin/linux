@@ -190,9 +190,21 @@ static struct stepping_info bxt_stepping_info[] = {
 
 static char intel_get_stepping(struct drm_device *dev)
 {
-	if (IS_SKYLAKE(dev) && (dev->pdev->revision <
-			ARRAY_SIZE(skl_stepping_info)))
-		return skl_stepping_info[dev->pdev->revision].stepping;
+	int revid = INTEL_REVID(dev);
+
+	/*
+	 * FIXME: Kabylake derivated from Skylake H0, so SKL H0
+	 * is the right firmware for KBL A0 (revid 0).
+	 * We have no visibility yet how next KBL steppings will
+	 * be handled by firmware, so let's just add support for
+	 * the only current available KBL.
+	 */
+	if (IS_KABYLAKE(dev) && revid == 0)
+		return skl_stepping_info[7].stepping;
+
+	if (IS_SKYLAKE(dev) &&
+	    revid < ARRAY_SIZE(skl_stepping_info))
+		return skl_stepping_info[revid].stepping;
 	else if (IS_BROXTON(dev) && (dev->pdev->revision <
 				ARRAY_SIZE(bxt_stepping_info)))
 		return bxt_stepping_info[dev->pdev->revision].stepping;
@@ -202,9 +214,21 @@ static char intel_get_stepping(struct drm_device *dev)
 
 static char intel_get_substepping(struct drm_device *dev)
 {
-	if (IS_SKYLAKE(dev) && (dev->pdev->revision <
-			ARRAY_SIZE(skl_stepping_info)))
-		return skl_stepping_info[dev->pdev->revision].substepping;
+	int revid = INTEL_REVID(dev);
+
+	/*
+	 * FIXME: Kabylake derivated from Skylake H0, so SKL H0
+	 * is the right firmware for KBL A0 (revid 0).
+	 * We have no visibility yet how next KBL steppings will
+	 * be handled by firmware, so let's just add support for
+	 * the only current available KBL.
+	 */
+	if (IS_KABYLAKE(dev) && revid == 0)
+		return skl_stepping_info[7].substepping;
+
+	if (IS_SKYLAKE(dev) &&
+	    revid < ARRAY_SIZE(skl_stepping_info))
+		return skl_stepping_info[revid].substepping;
 	else if (IS_BROXTON(dev) && (dev->pdev->revision <
 			ARRAY_SIZE(bxt_stepping_info)))
 		return bxt_stepping_info[dev->pdev->revision].substepping;
