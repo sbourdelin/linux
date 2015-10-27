@@ -1327,6 +1327,12 @@ static int phy_remove(struct device *dev)
 	phydev->state = PHY_DOWN;
 	mutex_unlock(&phydev->lock);
 
+	cancel_delayed_work_sync(&phydev->state_queue);
+	flush_delayed_work(&phydev->state_queue);
+
+	cancel_work_sync(&phydev->phy_queue);
+	flush_work(&phydev->phy_queue);
+
 	if (phydev->drv->remove)
 		phydev->drv->remove(phydev);
 	phydev->drv = NULL;
