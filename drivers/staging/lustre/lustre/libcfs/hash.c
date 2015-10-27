@@ -109,6 +109,8 @@
 
 #include "../../include/linux/libcfs/libcfs.h"
 #include <linux/seq_file.h>
+#include <linux/log2.h>
+
 
 #if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
 static unsigned int warn_on_depth = 8;
@@ -1785,7 +1787,7 @@ cfs_hash_rehash_cancel_locked(struct cfs_hash *hs)
 	for (i = 2; cfs_hash_is_rehashing(hs); i++) {
 		cfs_hash_unlock(hs, 1);
 		/* raise console warning while waiting too long */
-		CDEBUG(IS_PO2(i >> 3) ? D_WARNING : D_INFO,
+		CDEBUG(is_power_of_2(i >> 3) ? D_WARNING : D_INFO,
 		       "hash %s is still rehashing, rescheded %d\n",
 		       hs->hs_name, i - 1);
 		cond_resched();
