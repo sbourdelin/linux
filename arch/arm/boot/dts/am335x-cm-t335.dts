@@ -31,6 +31,14 @@
 			linux,default-trigger = "heartbeat";
 		};
 	};
+
+	/* regulator for mmc */
+	vmmc_fixed: fixedregulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "vmmc_fixed";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
 };
 
 &am33xx_pinmux {
@@ -102,6 +110,23 @@
 			0x170 (PIN_INPUT_PULLUP | MUX_MODE0)
 			/* uart0_txd.uart0_txd */
 			0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)
+		>;
+	};
+
+	mmc1_pins: pinmux_mmc1_pins {
+		pinctrl-single,pins = <
+			/* mmc0_dat3.mmc0_dat3 */
+			0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)
+			/* mmc0_dat2.mmc0_dat2 */
+			0xf4 (PIN_INPUT_PULLUP | MUX_MODE0)
+			/* mmc0_dat1.mmc0_dat1 */
+			0xf8 (PIN_INPUT_PULLUP | MUX_MODE0)
+			/* mmc0_dat0.mmc0_dat0 */
+			0xfc (PIN_INPUT_PULLUP | MUX_MODE0)
+			/* mmc0_clk.mmc0_clk */
+			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)
+			/* mmc0_cmd.mmc0_cmd */
+			0x104 (PIN_INPUT_PULLUP | MUX_MODE0)
 		>;
 	};
 };
@@ -201,5 +226,13 @@
 
 &elm {
 	status = "okay";
+};
+
+&mmc1 {
+	status = "okay";
+	vmmc-supply = <&vmmc_fixed>;
+	bus-width = <4>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc1_pins>;
 };
 
