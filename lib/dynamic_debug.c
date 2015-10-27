@@ -880,6 +880,8 @@ static int ddebug_dyndbg_param_cb(char *param, char *val,
 	if (strcmp(param, "dyndbg"))
 		return on_err; /* determined by caller */
 
+	/* relace comma with space */
+	strreplace(val, ',', ' ');
 	ddebug_exec_queries((val ? val : "+p"), modname);
 
 	return 0; /* query failure shouldnt stop module load */
