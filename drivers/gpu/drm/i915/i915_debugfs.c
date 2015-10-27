@@ -2796,7 +2796,7 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 	seq_printf(m, "path: %s\n", csr->fw_path);
 
 	if (!csr->dmc_payload)
-		return 0;
+		goto out;
 
 	seq_printf(m, "version: %d.%d\n", CSR_VERSION_MAJOR(csr->version),
 		   CSR_VERSION_MINOR(csr->version));
@@ -2810,6 +2810,11 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 		seq_printf(m, "DC3 -> DC5 count: %d\n",
 			   I915_READ(BXT_CSR_DC3_DC5_COUNT));
 	}
+
+out:
+	seq_printf(m, "program base: 0x%08x\n", I915_READ(CSR_PROGRAM(0)));
+	seq_printf(m, "ssp base: 0x%08x\n", I915_READ(CSR_SSP_BASE));
+	seq_printf(m, "htp: 0x%08x\n", I915_READ(CSR_HTP_SKL));
 
 	return 0;
 }
