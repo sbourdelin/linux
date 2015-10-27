@@ -2389,7 +2389,8 @@ intel_pin_and_fence_fb_obj(struct drm_plane *plane,
 	 * framebuffer compression.  For simplicity, we always install
 	 * a fence as the cost is not that onerous.
 	 */
-	ret = i915_gem_object_get_fence(obj);
+	if (obj->map_and_fenceable)
+		ret = i915_gem_object_get_fence(obj);
 	if (ret == -EDEADLK) {
 		/*
 		 * -EDEADLK means there are no free fences
