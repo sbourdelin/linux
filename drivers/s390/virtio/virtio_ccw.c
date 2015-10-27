@@ -13,6 +13,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
@@ -1077,6 +1078,7 @@ static void virtio_ccw_auto_online(void *data, async_cookie_t cookie)
 	struct ccw_device *cdev = data;
 	int ret;
 
+	cdev->dev.archdata.dma_ops = &dma_noop_ops;
 	ret = ccw_device_set_online(cdev);
 	if (ret)
 		dev_warn(&cdev->dev, "Failed to set online: %d\n", ret);

@@ -13,6 +13,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
@@ -318,6 +319,7 @@ static void add_kvm_device(struct kvm_device_desc *d, unsigned int offset)
 		return;
 	}
 
+	kdev->vdev.dev.archdata.dma_ops = &dma_noop_ops;
 	kdev->vdev.dev.parent = kvm_root;
 	kdev->vdev.id.device = d->type;
 	kdev->vdev.config = &kvm_vq_configspace_ops;
