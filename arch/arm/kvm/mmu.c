@@ -213,7 +213,10 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
 			kvm_tlb_flush_vmid_ipa(kvm, addr);
 
 			/* No need to invalidate the cache for device mappings */
-			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
+			if (((pte_val(old_pte) & PAGE_S2_DEVICE)
+			     != PAGE_S2_DEVICE) &&
+			    ((pte_val(old_pte) & PAGE_HYP_DEVICE)
+			     != PAGE_HYP_DEVICE))
 				kvm_flush_dcache_pte(old_pte);
 
 			put_page(virt_to_page(pte));
