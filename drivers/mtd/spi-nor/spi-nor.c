@@ -1258,6 +1258,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 		mtd->flags |= MTD_NO_ERASE;
 
 	mtd->dev.parent = dev;
+	mtd->dev.of_node = np;
 	nor->page_size = info->page_size;
 	mtd->writebufsize = nor->page_size;
 

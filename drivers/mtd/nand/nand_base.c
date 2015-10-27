@@ -3983,6 +3983,9 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	int ret;
 
 	if (chip->flash_node) {
+		/* MTD can automatically handle DT partitions, etc. */
+		mtd->dev.of_node = chip->flash_node;
+
 		ret = nand_dt_init(mtd, chip, chip->flash_node);
 		if (ret)
 			return ret;
