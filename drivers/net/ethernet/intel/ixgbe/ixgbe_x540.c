@@ -113,7 +113,12 @@ mac_reset_top:
 
 	/* Poll for reset bit to self-clear indicating reset is complete */
 	for (i = 0; i < 10; i++) {
-		udelay(1);
+		/* sec 8.2.4.1.1 :
+		 * programmers must wait approximately 1 ms after setting before
+		 * attempting to check if the bit has cleared or to access (read
+		 * or write) any other device register.
+		 */
+		mdelay(1);
 		ctrl = IXGBE_READ_REG(hw, IXGBE_CTRL);
 		if (!(ctrl & IXGBE_CTRL_RST_MASK))
 			break;
