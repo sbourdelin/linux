@@ -35,11 +35,8 @@ static int parse_ofpart_partitions(struct mtd_info *master,
 	int nr_parts, i;
 
 
-	/*
-	 * of_node can be provided through auxiliary parser data or (preferred)
-	 * by assigning the master device
-	 */
-	node = data && data->of_node ? data->of_node : master->dev.of_node;
+	/* Pull of_node from the master device */
+	node = master->dev.of_node;
 	if (!node)
 		return 0;
 
@@ -121,11 +118,8 @@ static int parse_ofoldpart_partitions(struct mtd_info *master,
 	} *part;
 	const char *names;
 
-	/*
-	 * of_node can be provided through auxiliary parser data or (preferred)
-	 * by assigning the master device
-	 */
-	dp = data && data->of_node ? data->of_node : master->dev.of_node;
+	/* Pull of_node from the master device */
+	dp = master->dev.of_node;
 	if (!dp)
 		return 0;
 
