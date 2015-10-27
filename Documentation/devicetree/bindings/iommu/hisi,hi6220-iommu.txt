@@ -1,0 +1,56 @@
+Hi6220 SoC SMMU Device Driver devicetree document
+=======================================================================
+The Architecture of SMMU on Hi6220 SoC:
+
+   +------------------------------------------------------------------+
+   |                                                                  |
+   |         +---------+  +--------+  +-------------+   +-------+     |
+   |         |   ADE   |  |  ISP   |  |  V/J codec  |   |  G3D  |     |
+   |         +----|----+  +---|----+  +------|------+   +---|---|     |
+   |              |           |              |              |         |
+   |     ---------v-----------v--------------v--------------v-----    |
+   |                           Media Bus                              |
+   |     --------------------------------|---------------|--------    |
+   |                                     |               |            |
+   |                                 +---v---------------v--------+   |
+   |                                 |            SMMU            |   |
+   |                                 +----------|---------|-------+   |
+   |                                            |         |           |
+   +--------------------------------------------|---------|-----------+
+                                                |         |
+                                   +------------v---------v-----------+
+                                   |              DDRC                |
+                                   +----------------------------------+
+
+Note:
+The media system shared the same smmu IP to access DDR memory. And all
+media IP used the same page table.
+
+Below binding describes the system mmu for media system in hi6220 platform
+
+Required properties:
+- compatible: should contain "hisilicon,hi6220-smmu".
+- reg: A tuple of base address and size of System MMU registers.
+- clocks: a list of phandle + clock-specifier pairs, one for each entry
+  in clock-names.
+- clock-names: should contain:
+  * "smmu"
+  * "media-sc"
+  * "smmu-peri"
+- interrupts: An interrupt specifier for interrupt signal of System MMU.
+- #iommu-cells: The iommu-cells should be 0. Because no additional information
+  needs to be encoded in the specifier.
+
+Examples:
+	iommu@f4210000 {
+		compatible = "hisilicon,hi6220-smmu";
+		reg = <0x0 0xf4210000 0x0 0x1000>;
+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&sys_ctrl HI6220_MMU_CLK>,
+		         <&media_ctrl HI6220_MED_MMU>,
+		         <&sys_ctrl HI6220_MEDIA_PLL_SRC>;
+		clock-names = "smmu",
+			      "media-sc",
+			      "smmu-peri";
+		#iommu-cells = <0>;
+	};
