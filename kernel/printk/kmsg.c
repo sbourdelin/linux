@@ -247,8 +247,9 @@ static loff_t kmsg_llseek(struct log_buffer *log_b, struct file *file,
 		}
 		/*
 		 * The first record after the last SYSLOG_ACTION_CLEAR,
-		 * like issued by 'dmesg -c'. Reading /dev/kmsg itself
-		 * changes no global state, and does not clear anything.
+		 * like issued by 'dmesg -c' or KMSG_CMD_CLEAR ioctl
+		 * command. Reading /dev/kmsg itself changes no global
+		 * state, and does not clear anything.
 		 */
 		user->idx = log_b->clear_idx;
 		user->seq = log_b->clear_seq;
@@ -391,6 +392,56 @@ static int devkmsg_open(struct inode *inode, struct file *file)
 	return ret;
 }
 
+static long kmsg_ioctl(struct log_buffer *log_b, unsigned int cmd,
+		       unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
+	static const u32 read_size_max = CONSOLE_EXT_LOG_MAX;
+
+	switch (cmd) {
+	case KMSG_CMD_GET_BUF_SIZE:
+		if (copy_to_user(argp, &log_b->len, sizeof(u32)))
+			return -EFAULT;
+		break;
+	case KMSG_CMD_GET_READ_SIZE_MAX:
+		if (copy_to_user(argp, &read_size_max, sizeof(u32)))
+			return -EFAULT;
+		break;
+	case KMSG_CMD_CLEAR:
+		if (!capable(CAP_SYSLOG))
+			return -EPERM;
+		raw_spin_lock_irq(&log_b->lock);
+		log_b->clear_seq = log_b->next_seq;
+		log_b->clear_idx = log_b->next_idx;
+		raw_spin_unlock_irq(&log_b->lock);
+		break;
+	default:
+		return -ENOTTY;
+	}
+	return 0;
+}
+
+static long devkmsg_ioctl(struct file *file, unsigned int cmd,
+			  unsigned long arg)
+{
+	long ret = -ENXIO;
+	int minor = iminor(file->f_inode);
+	struct log_buffer *log_b;
+
+	if (minor == log_buf.minor)
+		return kmsg_ioctl(&log_buf, cmd, arg);
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(log_b, &log_buf.list, list) {
+		if (log_b->minor == minor) {
+			ret = kmsg_ioctl(log_b, cmd, arg);
+			break;
+		}
+	}
+	rcu_read_unlock();
+	return ret;
+}
+
 static int devkmsg_release(struct inode *inode, struct file *file)
 {
 	struct devkmsg_user *user = file->private_data;
@@ -409,6 +460,8 @@ const struct file_operations kmsg_fops = {
 	.write_iter = devkmsg_write,
 	.llseek = devkmsg_llseek,
 	.poll = devkmsg_poll,
+	.unlocked_ioctl = devkmsg_ioctl,
+	.compat_ioctl = devkmsg_ioctl,
 	.release = devkmsg_release,
 };
 
