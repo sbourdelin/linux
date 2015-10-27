@@ -31,6 +31,7 @@
 #include <linux/ktime.h>
 
 #include <asm/uaccess.h>
+#include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
 static inline void do_copy_page(long *dst, long *src)
 {
 	int n;
+	unsigned long __maybe_unused start = (unsigned long)dst;
 
 	for (n = PAGE_SIZE / sizeof(long); n; n--)
 		*dst++ = *src++;
+
+	flush_icache_range(start, start+PAGE_SIZE);
 }
 
 
