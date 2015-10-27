@@ -55,9 +55,6 @@
 #define TABLE_SHIFT	PUD_SHIFT
 #endif
 
-#define KERNEL_START	_text
-#define KERNEL_END	_end
-
 /*
  * Initial memory map attributes.
  */
