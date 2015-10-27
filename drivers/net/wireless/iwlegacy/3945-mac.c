@@ -244,9 +244,7 @@ il3945_set_dynamic_key(struct il_priv *il, struct ieee80211_key_conf *keyconf,
 static int
 il3945_remove_static_key(struct il_priv *il)
 {
-	int ret = -EOPNOTSUPP;
-
-	return ret;
+	return -EOPNOTSUPP;
 }
 
 static int
@@ -529,7 +527,6 @@ il3945_tx_skb(struct il_priv *il,
 		if (unlikely(tid >= MAX_TID_COUNT))
 			goto drop;
 	}
-
 	/* Descriptor for chosen Tx queue */
 	txq = &il->txq[txq_id];
 	q = &txq->q;
