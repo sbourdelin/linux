@@ -526,7 +526,7 @@ static int ib_nl_send_msg(struct ib_sa_query *query)
 	if (len <= 0)
 		return -EMSGSIZE;
 
-	skb = nlmsg_new(len, GFP_KERNEL);
+	skb = nlmsg_new(len, GFP_ATOMIC);
 	if (!skb)
 		return -ENOMEM;
 
@@ -544,7 +544,7 @@ static int ib_nl_send_msg(struct ib_sa_query *query)
 	/* Repair the nlmsg header length */
 	nlmsg_end(skb, nlh);
 
-	ret = ibnl_multicast(skb, nlh, RDMA_NL_GROUP_LS, GFP_KERNEL);
+	ret = ibnl_multicast(skb, nlh, RDMA_NL_GROUP_LS, GFP_ATOMIC);
 	if (!ret)
 		ret = len;
 	else
