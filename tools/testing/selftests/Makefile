@@ -7,6 +7,7 @@ TARGETS += ftrace
 TARGETS += futex
 TARGETS += kcmp
 TARGETS += kdbus
+TARGETS += kmsg
 TARGETS += lib
 TARGETS += membarrier
 TARGETS += memfd
