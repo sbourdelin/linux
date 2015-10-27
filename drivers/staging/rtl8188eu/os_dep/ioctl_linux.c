@@ -2665,8 +2665,8 @@ static int rtw_get_sta_wpaie(struct net_device *dev, struct ieee_param *param)
 	if (psta) {
 		if (psta->wpa_ie[0] == WLAN_EID_RSN ||
 		    psta->wpa_ie[0] == WLAN_EID_VENDOR_SPECIFIC) {
-			int wpa_ie_len;
-			int copy_len;
+			size_t wpa_ie_len;
+			size_t copy_len;
 
 			wpa_ie_len = psta->wpa_ie[1];
 			copy_len = ((wpa_ie_len+2) > sizeof(psta->wpa_ie)) ? (sizeof(psta->wpa_ie)) : (wpa_ie_len+2);
