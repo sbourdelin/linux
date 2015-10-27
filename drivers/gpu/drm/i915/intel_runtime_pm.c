@@ -377,72 +377,6 @@ static void hsw_set_power_well(struct drm_i915_private *dev_priv,
 	BXT_DISPLAY_POWERWELL_2_POWER_DOMAINS)) |	\
 	BIT(POWER_DOMAIN_INIT))
 
-static void assert_can_enable_dc9(struct drm_i915_private *dev_priv)
-{
-	struct drm_device *dev = dev_priv->dev;
-
-	WARN(!IS_BROXTON(dev), "Platform doesn't support DC9.\n");
-	WARN((I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
-		"DC9 already programmed to be enabled.\n");
-	WARN(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
-		"DC5 still not disabled to enable DC9.\n");
-	WARN(I915_READ(HSW_PWR_WELL_DRIVER), "Power well on.\n");
-	WARN(intel_irqs_enabled(dev_priv), "Interrupts not disabled yet.\n");
-
-	 /*
-	  * TODO: check for the following to verify the conditions to enter DC9
-	  * state are satisfied:
-	  * 1] Check relevant display engine registers to verify if mode set
-	  * disable sequence was followed.
-	  * 2] Check if display uninitialize sequence is initialized.
-	  */
-}
-
-static void assert_can_disable_dc9(struct drm_i915_private *dev_priv)
-{
-	WARN(intel_irqs_enabled(dev_priv), "Interrupts not disabled yet.\n");
-	WARN(!(I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
-		"DC9 already programmed to be disabled.\n");
-	WARN(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
-		"DC5 still not disabled.\n");
-
-	 /*
-	  * TODO: check for the following to verify DC9 state was indeed
-	  * entered before programming to disable it:
-	  * 1] Check relevant display engine registers to verify if mode
-	  *  set disable sequence was followed.
-	  * 2] Check if display uninitialize sequence is initialized.
-	  */
-}
-
-void bxt_enable_dc9(struct drm_i915_private *dev_priv)
-{
-	uint32_t val;
-
-	assert_can_enable_dc9(dev_priv);
-
-	DRM_DEBUG_KMS("Enabling DC9\n");
-
-	val = I915_READ(DC_STATE_EN);
-	val |= DC_STATE_EN_DC9;
-	I915_WRITE(DC_STATE_EN, val);
-	POSTING_READ(DC_STATE_EN);
-}
-
-void bxt_disable_dc9(struct drm_i915_private *dev_priv)
-{
-	uint32_t val;
-
-	assert_can_disable_dc9(dev_priv);
-
-	DRM_DEBUG_KMS("Disabling DC9\n");
-
-	val = I915_READ(DC_STATE_EN);
-	val &= ~DC_STATE_EN_DC9;
-	I915_WRITE(DC_STATE_EN, val);
-	POSTING_READ(DC_STATE_EN);
-}
-
 static void gen9_set_dc_state_debugmask_memory_up(
 			struct drm_i915_private *dev_priv)
 {
@@ -579,6 +513,84 @@ static void skl_disable_dc6(struct drm_i915_private *dev_priv)
 	val &= ~DC_STATE_EN_UPTO_DC6;
 	I915_WRITE(DC_STATE_EN, val);
 	POSTING_READ(DC_STATE_EN);
+}
+
+static void assert_can_enable_dc9(struct drm_i915_private *dev_priv)
+{
+	struct drm_device *dev = dev_priv->dev;
+
+	WARN(!IS_BROXTON(dev), "Platform doesn't support DC9.\n");
+	WARN((I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
+		"DC9 already programmed to be enabled.\n");
+	WARN(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
+		"DC5 still not disabled to enable DC9.\n");
+	WARN(I915_READ(HSW_PWR_WELL_DRIVER), "Power well on.\n");
+	WARN(intel_irqs_enabled(dev_priv), "Interrupts not disabled yet.\n");
+
+	 /*
+	  * TODO: check for the following to verify the conditions to enter DC9
+	  * state are satisfied:
+	  * 1] Check relevant display engine registers to verify if mode set
+	  * disable sequence was followed.
+	  * 2] Check if display uninitialize sequence is initialized.
+	  */
+}
+
+static void assert_can_disable_dc9(struct drm_i915_private *dev_priv)
+{
+	WARN(intel_irqs_enabled(dev_priv), "Interrupts not disabled yet.\n");
+	WARN(!(I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
+		"DC9 already programmed to be disabled.\n");
+	WARN(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
+		"DC5 still not disabled.\n");
+
+	 /*
+	  * TODO: check for the following to verify DC9 state was indeed
+	  * entered before programming to disable it:
+	  * 1] Check relevant display engine registers to verify if mode
+	  *  set disable sequence was followed.
+	  * 2] Check if display uninitialize sequence is initialized.
+	  */
+}
+
+void bxt_enable_dc9(struct drm_i915_private *dev_priv)
+{
+	uint32_t val;
+
+	/* Disallow DC5 if enabled*/
+	if (I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5) {
+		gen9_disable_dc5(dev_priv);
+		intel_csr_load_status_set(dev_priv, FW_FAILED);
+	}
+
+	assert_can_enable_dc9(dev_priv);
+
+	DRM_DEBUG_KMS("Enabling DC9\n");
+
+	val = I915_READ(DC_STATE_EN);
+	val |= DC_STATE_EN_DC9;
+	I915_WRITE(DC_STATE_EN, val);
+	POSTING_READ(DC_STATE_EN);
+}
+
+void bxt_disable_dc9(struct drm_i915_private *dev_priv)
+{
+	uint32_t val;
+
+	assert_can_disable_dc9(dev_priv);
+
+	DRM_DEBUG_KMS("Disabling DC9\n");
+
+	val = I915_READ(DC_STATE_EN);
+	val &= ~DC_STATE_EN_DC9;
+	I915_WRITE(DC_STATE_EN, val);
+	POSTING_READ(DC_STATE_EN);
+
+	/* Allow DC5 after resume */
+	if (intel_csr_load_status_get(dev_priv) != FW_LOADED) {
+		intel_csr_load_program(dev_priv->dev);
+		gen9_enable_dc5(dev_priv);
+	}
 }
 
 static void skl_set_power_well(struct drm_i915_private *dev_priv,
