@@ -2453,6 +2453,16 @@ static s32 ixgbe_disable_pcie_master(struct ixgbe_hw *hw)
 	/* Always set this bit to ensure any future transactions are blocked */
 	IXGBE_WRITE_REG(hw, IXGBE_CTRL, IXGBE_CTRL_GIO_DIS);
 
+	/* Spec sec 8.2.4.1.1, Master Disable bit :
+	 * "After doing any change to this bit the host must read that
+	 *  the bit has been modified as expected before reading
+	 *  STATUS.PCIe Master Enable Status bit."
+	 */
+	if (!(IXGBE_READ_REG(hw, IXGBE_CTRL) & IXGBE_CTRL_GIO_DIS)) {
+		hw_err(hw, "GIO Master Disable bit didn't set\n");
+		goto gio_dis_fail;
+	}
+
 	/* Exit if master requests are blocked */
 	if (!(IXGBE_READ_REG(hw, IXGBE_STATUS) & IXGBE_STATUS_GIO) ||
 	    ixgbe_removed(hw->hw_addr))
@@ -2467,13 +2477,14 @@ static s32 ixgbe_disable_pcie_master(struct ixgbe_hw *hw)
 
 	/*
 	 * Two consecutive resets are required via CTRL.RST per datasheet
-	 * 5.2.5.3.2 Master Disable.  We set a flag to inform the reset routine
+	 * 5.2.4.3.2 Master Disable.  We set a flag to inform the reset routine
 	 * of this need.  The first reset prevents new master requests from
 	 * being issued by our device.  We then must wait 1usec or more for any
 	 * remaining completions from the PCIe bus to trickle in, and then reset
 	 * again to clear out any effects they may have had on our device.
 	 */
 	hw_dbg(hw, "GIO Master Disable bit didn't clear - requesting resets\n");
+gio_dis_fail:
 	hw->mac.flags |= IXGBE_FLAGS_DOUBLE_RESET_REQUIRED;
 
 	/*
