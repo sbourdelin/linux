@@ -111,6 +111,13 @@ mac_reset_top:
 	IXGBE_WRITE_REG(hw, IXGBE_CTRL, ctrl);
 	IXGBE_WRITE_FLUSH(hw);
 
+	/* From the spec "General Control Registers - Device Control Register":
+	 * "...programmers must wait approximately 1 ms after setting before
+	 *  attempting to check if the bit has cleared or to access (read
+	 *  or write) any other device register."
+	 */
+	msleep(1);
+
 	/* Poll for reset bit to self-clear indicating reset is complete */
 	for (i = 0; i < 10; i++) {
 		udelay(1);
