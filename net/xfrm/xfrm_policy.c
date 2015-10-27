@@ -2899,12 +2899,32 @@ static void __net_init xfrm_dst_ops_init(struct net *net)
 
 	rcu_read_lock();
 	afinfo = rcu_dereference(xfrm_policy_afinfo[AF_INET]);
-	if (afinfo)
+	if (afinfo) {
 		net->xfrm.xfrm4_dst_ops = *afinfo->dst_ops;
+		dst_entries_init(&net->xfrm.xfrm4_dst_ops);
+	}
+#if IS_ENABLED(CONFIG_IPV6)
+	afinfo = rcu_dereference(xfrm_policy_afinfo[AF_INET6]);
+	if (afinfo) {
+		net->xfrm.xfrm6_dst_ops = *afinfo->dst_ops;
+		dst_entries_init(&net->xfrm.xfrm6_dst_ops);
+	}
+#endif
+	rcu_read_unlock();
+}
+
+static void xfrm_dst_ops_fini(struct net *net)
+{
+	struct xfrm_policy_afinfo *afinfo;
+
+	rcu_read_lock();
+	afinfo = rcu_dereference(xfrm_policy_afinfo[AF_INET]);
+	if (afinfo)
+		dst_entries_destroy(&net->xfrm.xfrm4_dst_ops);
 #if IS_ENABLED(CONFIG_IPV6)
 	afinfo = rcu_dereference(xfrm_policy_afinfo[AF_INET6]);
 	if (afinfo)
-		net->xfrm.xfrm6_dst_ops = *afinfo->dst_ops;
+		dst_entries_destroy(&net->xfrm.xfrm6_dst_ops);
 #endif
 	rcu_read_unlock();
 }
@@ -3088,6 +3108,7 @@ static void __net_exit xfrm_net_exit(struct net *net)
 {
 	flow_cache_fini(net);
 	xfrm_sysctl_fini(net);
+	xfrm_dst_ops_fini(net);
 	xfrm_policy_fini(net);
 	xfrm_state_fini(net);
 	xfrm_statistics_fini(net);

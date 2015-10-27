@@ -234,6 +234,9 @@ static void xfrm4_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
 	xfrm_dst_ifdown(dst, dev);
 }
 
+/* This is used as a template only; the dst_entries counter is not
+ * initialized for this, but must be on per-net copies of this
+ */
 static struct dst_ops xfrm4_dst_ops = {
 	.family =		AF_INET,
 	.gc =			xfrm4_garbage_collect,
@@ -324,8 +327,6 @@ static void __init xfrm4_policy_init(void)
 
 void __init xfrm4_init(void)
 {
-	dst_entries_init(&xfrm4_dst_ops);
-
 	xfrm4_state_init();
 	xfrm4_policy_init();
 	xfrm4_protocol_init();

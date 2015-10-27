@@ -280,6 +280,9 @@ static void xfrm6_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
 	xfrm_dst_ifdown(dst, dev);
 }
 
+/* This is used as a template only; the dst_entries counter is not
+ * initialized for this, but must be on per-net copies of this
+ */
 static struct dst_ops xfrm6_dst_ops = {
 	.family =		AF_INET6,
 	.gc =			xfrm6_garbage_collect,
@@ -377,13 +380,9 @@ int __init xfrm6_init(void)
 {
 	int ret;
 
-	dst_entries_init(&xfrm6_dst_ops);
-
 	ret = xfrm6_policy_init();
-	if (ret) {
-		dst_entries_destroy(&xfrm6_dst_ops);
+	if (ret)
 		goto out;
-	}
 	ret = xfrm6_state_init();
 	if (ret)
 		goto out_policy;
@@ -412,5 +411,4 @@ void xfrm6_fini(void)
 	xfrm6_protocol_fini();
 	xfrm6_policy_fini();
 	xfrm6_state_fini();
-	dst_entries_destroy(&xfrm6_dst_ops);
 }
