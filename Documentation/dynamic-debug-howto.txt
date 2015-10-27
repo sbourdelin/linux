@@ -242,7 +242,7 @@ messages in all code run after this arch_initcall via this boot
 parameter.
 
 On an x86 system for example ACPI enablement is a subsys_initcall and
-   dyndbg="file ec.c +p"
+   dyndbg="file,ec.c,+p"
 will show early Embedded Controller transactions during ACPI setup if
 your machine (typically a laptop) has an Embedded Controller.
 PCI (or other devices) initialization also is a hot candidate for using
