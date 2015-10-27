@@ -88,6 +88,53 @@ static void qcom_cc_gdsc_unregister(void *data)
 	gdsc_unregister(data);
 }
 
+int qcom_cc_register_board_clk(struct device *dev, const char *path,
+			       const char *name, unsigned long rate)
+{
+	struct device_node *node = NULL;
+	struct device_node *clocks_node;
+	struct clk_fixed_factor *factor;
+	struct clk_fixed_rate *fixed;
+	struct clk_hw *hw;
+	struct clk_init_data init_data = { .name = name };
+
+	clocks_node = of_find_node_by_path("/clocks");
+	if (clocks_node)
+		node = of_find_node_by_name(clocks_node, path);
+	of_node_put(clocks_node);
+
+	if (node) {
+		factor = devm_kzalloc(dev, sizeof(*factor), GFP_KERNEL);
+		if (!factor)
+			return -EINVAL;
+
+		factor->mult = factor->div = 1;
+		factor->hw.init = &init_data;
+
+		init_data.parent_names = &path;
+		init_data.num_parents = 1;
+		init_data.ops = &clk_fixed_factor_ops;
+
+		hw = &factor->hw;
+	} else {
+		fixed = devm_kzalloc(dev, sizeof(*fixed), GFP_KERNEL);
+		if (!fixed)
+			return -EINVAL;
+
+		fixed->fixed_rate = rate;
+		fixed->hw.init = &init_data;
+
+		init_data.flags = CLK_IS_ROOT;
+		init_data.ops = &clk_fixed_rate_ops;
+
+		hw = &fixed->hw;
+	}
+	of_node_put(node);
+
+	return PTR_ERR_OR_ZERO(devm_clk_register(dev, hw));
+}
+EXPORT_SYMBOL(qcom_cc_register_board_clk);
+
 int qcom_cc_really_probe(struct platform_device *pdev,
 			 const struct qcom_cc_desc *desc, struct regmap *regmap)
 {
