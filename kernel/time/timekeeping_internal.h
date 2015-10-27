@@ -15,7 +15,7 @@ extern void tk_debug_account_sleep_time(struct timespec64 *t);
 #ifdef CONFIG_CLOCKSOURCE_VALIDATE_LAST_CYCLE
 static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
 {
-	cycle_t ret = (now - last) & mask;
+	cycle_t ret = (now & mask) - (last & mask);
 
 	return (s64) ret > 0 ? ret : 0;
 }
