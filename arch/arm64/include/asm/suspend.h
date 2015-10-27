@@ -1,3 +1,5 @@
+#include <linux/suspend.h>
+
 #ifndef __ASM_SUSPEND_H
 #define __ASM_SUSPEND_H
 
@@ -34,6 +36,12 @@ struct sleep_stack_data {
 	unsigned long		callee_saved_regs[NR_CALLEE_SAVED_REGS];
 };
 
+extern int swsusp_arch_suspend(void);
+extern int swsusp_arch_resume(void);
+int swsusp_arch_suspend_enter(struct cpu_suspend_ctx *ptr);
+void __noreturn swsusp_arch_suspend_exit(phys_addr_t tmp_pg_dir,
+					 phys_addr_t swapper_pg_dir,
+					 void *kernel_start, void *kernel_end);
 extern int cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
 extern void cpu_resume(void);
 int __cpu_suspend_enter(struct sleep_stack_data *state);
