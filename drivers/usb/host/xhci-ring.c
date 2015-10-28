@@ -3903,7 +3903,6 @@ static int ep_ring_is_processing(struct xhci_hcd *xhci,
 	struct xhci_ring *ep_ring;
 	struct xhci_ep_ctx *ep_ctx;
 	struct xhci_virt_ep *xep;
-	dma_addr_t hw_deq;
 
 	xdev = xhci->devs[slot_id];
 	xep = &xhci->devs[slot_id]->eps[ep_index];
@@ -3913,9 +3912,7 @@ static int ep_ring_is_processing(struct xhci_hcd *xhci,
 	if ((le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK) != EP_STATE_RUNNING)
 		return 0;
 
-	hw_deq = le64_to_cpu(ep_ctx->deq) & ~EP_CTX_CYCLE_MASK;
-	return (hw_deq !=
-		xhci_trb_virt_to_dma(ep_ring->enq_seg, ep_ring->enqueue));
+	return !list_empty(&ep_ring->td_list);
 }
 
 /*
