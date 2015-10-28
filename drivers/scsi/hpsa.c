@@ -276,6 +276,7 @@ static int hpsa_scsi_ioaccel_queue_command(struct ctlr_info *h,
 static void hpsa_command_resubmit_worker(struct work_struct *work);
 static u32 lockup_detected(struct ctlr_info *h);
 static int detect_controller_lockup(struct ctlr_info *h);
+static int hpsa_luns_changed(struct ctlr_info *h);
 
 static inline struct ctlr_info *sdev_to_hba(struct scsi_device *sdev)
 {
@@ -3903,6 +3904,18 @@ static void hpsa_update_scsi_devices(struct ctlr_info *h, int hostno)
 		figure_bus_target_lun(h, lunaddrbytes, tmpdevice);
 		hpsa_update_device_supports_aborts(h, tmpdevice, lunaddrbytes);
 		this_device = currentsd[ncurrent];
+
+		/* Turn on discovery_polling if there are ext target devices.
+		 * Event-based change notification is unreliable for those.
+		 */
+		if (!h->discovery_polling) {
+			if (tmpdevice->external) {
+				h->discovery_polling = 1;
+				dev_info(&h->pdev->dev,
+					"External target, activate discovery polling.\n");
+			}
+		}
+
 
 		*this_device = *tmpdevice;
 		this_device->physical_device = physical_device;
@@ -8022,6 +8035,41 @@ static int hpsa_offline_devices_ready(struct ctlr_info *h)
 	return 0;
 }
 
+static int hpsa_luns_changed(struct ctlr_info *h)
+{
+	int rc = 1; /* assume there are changes */
+	struct ReportLUNdata *logdev = NULL;
+
+	/* if we can't find out if lun data has changed,
+	 * assume that it has.
+	 */
+
+	if (!h->lastlogicals)
+		goto out;
+
+	logdev = kzalloc(sizeof(*logdev), GFP_KERNEL);
+	if (!logdev) {
+		dev_warn(&h->pdev->dev,
+			"Out of memory, can't track lun changes.\n");
+		goto out;
+	}
+	if (hpsa_scsi_do_report_luns(h, 1, logdev, sizeof(*logdev), 0)) {
+		dev_warn(&h->pdev->dev,
+			"report luns failed, can't track lun changes.\n");
+		goto out;
+	}
+	if (memcmp(logdev, h->lastlogicals, sizeof(*logdev))) {
+		dev_info(&h->pdev->dev,
+			"Lun changes detected.\n");
+		memcpy(h->lastlogicals, logdev, sizeof(*logdev));
+		goto out;
+	} else
+		rc = 0; /* no changes detected. */
+out:
+	kfree(logdev);
+	return rc;
+}
+
 static void hpsa_rescan_ctlr_worker(struct work_struct *work)
 {
 	unsigned long flags;
@@ -8037,6 +8085,18 @@ static void hpsa_rescan_ctlr_worker(struct work_struct *work)
 		hpsa_ack_ctlr_events(h);
 		hpsa_scan_start(h->scsi_host);
 		scsi_host_put(h->scsi_host);
+	} else if (h->discovery_polling) {
+		if (hpsa_luns_changed(h)) {
+			struct Scsi_Host *sh = NULL;
+
+			dev_info(&h->pdev->dev,
+				"driver discovery polling rescan.\n");
+			sh = scsi_host_get(h->scsi_host);
+			if (sh != NULL) {
+				hpsa_scan_start(sh);
+				scsi_host_put(sh);
+			}
+		}
 	}
 	spin_lock_irqsave(&h->lock, flags);
 	if (!h->remove_in_progress)
@@ -8277,12 +8337,19 @@ reinit_after_soft_reset:
 
 	/* Enable Accelerated IO path at driver layer */
 	h->acciopath_status = 1;
+	/* Disable discovery polling.*/
+	h->discovery_polling = 0;
 
 
 	/* Turn the interrupts on so we can service requests */
 	h->access.set_intr_mask(h, HPSA_INTR_ON);
 
 	hpsa_hba_inquiry(h);
+
+	h->lastlogicals = kzalloc(sizeof(*(h->lastlogicals)), GFP_KERNEL);
+	if (!h->lastlogicals)
+		dev_info(&h->pdev->dev,
+			"Can't track change to report lun data\n");
 
 	/* Monitor the controller for firmware lockups */
 	h->heartbeat_sample_interval = HEARTBEAT_SAMPLE_INTERVAL;
@@ -8368,6 +8435,7 @@ static void hpsa_shutdown(struct pci_dev *pdev)
 	hpsa_flush_cache(h);
 	h->access.set_intr_mask(h, HPSA_INTR_OFF);
 	hpsa_free_irqs(h);			/* init_one 4 */
+	kfree(h->lastlogicals);
 	hpsa_disable_interrupt_mode(h);		/* pci_init 2 */
 }
 
