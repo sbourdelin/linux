@@ -35,6 +35,10 @@ usage() {
 	echo "  -O    dir to put generated output files.  Consider setting \$KCONFIG_CONFIG instead."
 }
 
+getval() {
+	grep -w -e "$1" "$2"
+}
+
 RUNMAKE=true
 ALLTARGET=alldefconfig
 WARNREDUN=false
@@ -116,8 +120,8 @@ for MERGE_FILE in $MERGE_LIST ; do
 
 	for CFG in $CFG_LIST ; do
 		grep -q -w $CFG $TMP_FILE || continue
-		PREV_VAL=$(grep -w $CFG $TMP_FILE)
-		NEW_VAL=$(grep -w $CFG $MERGE_FILE)
+		PREV_VAL=$(getval "$CFG" "$TMP_FILE")
+		NEW_VAL=$(getval "$CFG" "$MERGE_FILE")
 		if [ "x$PREV_VAL" != "x$NEW_VAL" ] ; then
 			echo Value of $CFG is redefined by fragment $MERGE_FILE:
 			echo Previous  value: $PREV_VAL
@@ -157,8 +161,8 @@ make KCONFIG_ALLCONFIG=$TMP_FILE $OUTPUT_ARG $ALLTARGET
 # Check all specified config values took (might have missed-dependency issues)
 for CFG in $(sed -n "$SED_CONFIG_EXP" $TMP_FILE); do
 
-	REQUESTED_VAL=$(grep -w -e "$CFG" $TMP_FILE)
-	ACTUAL_VAL=$(grep -w -e "$CFG" "$KCONFIG_CONFIG")
+	REQUESTED_VAL=$(getval "$CFG" "$TMP_FILE")
+	ACTUAL_VAL=$(getval "$CFG" "$KCONFIG_CONFIG")
 	if [ "x$REQUESTED_VAL" != "x$ACTUAL_VAL" ] ; then
 		echo "Value requested for $CFG not in final .config"
 		echo "Requested value:  $REQUESTED_VAL"
