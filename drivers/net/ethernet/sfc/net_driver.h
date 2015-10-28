@@ -419,6 +419,7 @@ enum efx_sync_events_state {
  * @sync_events_state: Current state of sync events on this channel
  * @sync_timestamp_major: Major part of the last ptp sync event
  * @sync_timestamp_minor: Minor part of the last ptp sync event
+ * @irq_node: NUMA node of interrupt
  */
 struct efx_channel {
 	struct efx_nic *efx;
@@ -464,6 +465,8 @@ struct efx_channel {
 	enum efx_sync_events_state sync_events_state;
 	u32 sync_timestamp_major;
 	u32 sync_timestamp_minor;
+
+	int irq_node;
 };
 
 #ifdef CONFIG_NET_RX_BUSY_POLL

@@ -445,6 +445,7 @@ efx_alloc_channel(struct efx_nic *efx, int i, struct efx_channel *old_channel)
 	channel->efx = efx;
 	channel->channel = i;
 	channel->type = &efx_default_channel_type;
+	channel->irq_node = NUMA_NO_NODE;
 
 	for (j = 0; j < EFX_TXQ_TYPES; j++) {
 		tx_queue = &channel->tx_queue[j];

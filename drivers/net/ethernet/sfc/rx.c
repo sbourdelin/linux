@@ -168,11 +168,15 @@ static int efx_init_rx_buffers(struct efx_rx_queue *rx_queue, bool atomic)
 			 * context in such a case.  So, use __GFP_NO_WARN
 			 * in case of atomic.
 			 */
-			page = alloc_pages(__GFP_COLD | __GFP_COMP |
-					   (atomic ?
-					    (GFP_ATOMIC | __GFP_NOWARN)
-					    : GFP_KERNEL),
-					   efx->rx_buffer_order);
+			struct efx_channel *channel;
+
+			channel = efx_rx_queue_channel(rx_queue);
+			page = alloc_pages_node(channel->irq_node, __GFP_COMP |
+						(atomic ?
+						 (GFP_ATOMIC | __GFP_NOWARN)
+						 : GFP_KERNEL),
+						efx->rx_buffer_order);
+
 			if (unlikely(page == NULL))
 				return -ENOMEM;
 			dma_addr =
