@@ -23,10 +23,12 @@
 EXITVAL=0
 
 clean_up() {
-	rm -f $TMP_FILE
+	if [ -n "$CLEAN_FILES" ] ; then
+		rm -f $CLEAN_FILES
+	fi
 	exit $EXITVAL
 }
-trap clean_up HUP INT TERM
+trap clean_up HUP INT TERM EXIT
 
 usage() {
 	echo "Usage: $0 [OPTIONS] [CONFIG [...]]"
@@ -178,4 +180,4 @@ for CFG in $(sed -n "$SED_CONFIG_EXP" $TMP_FILE); do
 	fi >&2
 done
 
-clean_up
+# Note: clean_up will run here due to EXIT being trapped
