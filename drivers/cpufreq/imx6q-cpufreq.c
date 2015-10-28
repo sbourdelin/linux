@@ -42,6 +42,27 @@ static unsigned int transition_latency;
 static u32 *imx6_soc_volt;
 static u32 soc_opp_count;
 
+static unsigned long imx6_cpufreq_flags;
+
+#define IMX6_CPUFREQ_NEED_PU_REG		(1 << 0)
+#define IMX6_CPUFREQ_NEED_SECONDARY_SEL		(1 << 1)
+
+static const struct platform_device_id imx6_cpufreq_devtype[] = {
+	{
+		.name = "imx6q-cpufreq",
+		.driver_data = IMX6_CPUFREQ_NEED_PU_REG,
+	}, {
+		.name = "imx6ul-cpufreq",
+		.driver_data = IMX6_CPUFREQ_NEED_SECONDARY_SEL,
+	}, {
+		.name = "imx6sl-cpufreq",
+		.driver_data = IMX6_CPUFREQ_NEED_PU_REG,
+	}, {
+		.name = "imx6sx-cpufreq",
+		.driver_data = IMX6_CPUFREQ_NEED_PU_REG,
+	},
+};
+
 static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 {
 	struct dev_pm_opp *opp;
@@ -102,7 +123,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
 	 *  - Disable pll2_pfd2_396m_clk
 	 */
-	if (of_machine_is_compatible("fsl,imx6ul")) {
+	if (imx6_cpufreq_flags & IMX6_CPUFREQ_NEED_SECONDARY_SEL) {
 		/*
 		 * When changing pll1_sw_clk's parent to pll1_sys_clk,
 		 * CPU may run at higher than 528MHz, this will lead to
@@ -202,7 +223,7 @@ static int imx6q_cpufreq_get_resources(void)
 	if (IS_ERR(pll2_pfd2_396m_clk))
 		return PTR_ERR(pll2_pfd2_396m_clk);
 
-	if (of_machine_is_compatible("fsl,imx6ul")) {
+	if (imx6_cpufreq_flags & IMX6_CPUFREQ_NEED_SECONDARY_SEL) {
 		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
 		if (IS_ERR(pll2_bus_clk))
 			return PTR_ERR(pll2_bus_clk);
@@ -282,6 +303,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
 	const struct property *prop;
 	const __be32 *val;
 	u32 nr, i, j;
+
+	imx6_cpufreq_flags = platform_get_device_id(pdev)->driver_data;
 
 	cpu_dev = get_cpu_device(0);
 	if (!cpu_dev) {
@@ -439,8 +462,9 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
 
 static struct platform_driver imx6q_cpufreq_platdrv = {
 	.driver = {
-		.name	= "imx6q-cpufreq",
+		.name	= "imx6-cpufreq",
 	},
+	.id_table	= imx6_cpufreq_devtype,
 	.probe		= imx6q_cpufreq_probe,
 	.remove		= imx6q_cpufreq_remove,
 };

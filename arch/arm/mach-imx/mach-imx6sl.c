@@ -39,7 +39,7 @@ static void __init imx6sl_init_late(void)
 {
 	/* imx6sl reuses imx6q cpufreq driver */
 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
-		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+		platform_device_register_simple("imx6sl-cpufreq", -1, NULL, 0);
 
 	imx6sl_cpuidle_init();
 }
