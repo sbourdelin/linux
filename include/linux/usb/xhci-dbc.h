@@ -120,7 +120,16 @@ enum xdbc_page_type {
 	XDBC_PAGE_TXIN,
 	XDBC_PAGE_TXOUT,
 	XDBC_PAGE_TABLE,
+	XDBC_PAGE_BUFFER,
 };
+
+enum xdbc_ep_state {
+	EP_DISABLED,
+	EP_RUNNING,
+	EP_HALTED,
+};
+#define	XDBC_EPID_OUT	2
+#define	XDBC_EPID_IN	1
 
 struct xdbc_state {
 	/* pci device info*/
@@ -170,13 +179,34 @@ struct xdbc_state {
 	/* bulk OUT endpoint */
 	struct xdbc_ring	out_ring;
 	struct xdbc_segment	out_seg;
+	void			*out_buf;
+	dma_addr_t		out_dma;
+	struct xdbc_trb		*out_pending;		/* IN */
+	size_t			out_length;		/* IN */
+	u32			out_complete;		/* OUT */
+	size_t			out_complete_length;	/* OUT */
+	enum xdbc_ep_state	out_ep_state;
 
 	/* bulk IN endpoint */
 	struct xdbc_ring	in_ring;
 	struct xdbc_segment	in_seg;
+	void			*in_buf;
+	dma_addr_t		in_dma;
+	struct xdbc_trb		*in_pending;		/* IN */
+	size_t			in_length;		/* IN */
+	u32			in_complete;		/* OUT */
+	size_t			in_complete_length;	/* OUT */
+	enum xdbc_ep_state	in_ep_state;
+
+	/* atomic flags */
+	unsigned long		atomic_flags;
+#define	XDBC_ATOMIC_BULKOUT	0
+#define	XDBC_ATOMIC_BULKIN	1
+#define	XDBC_ATOMIC_EVENT	2
 };
 
 #define	XDBC_MAX_PACKET		1024
+#define	XDBC_LOOPS		1000
 
 /* door bell target */
 #define	OUT_EP_DOORBELL		0
