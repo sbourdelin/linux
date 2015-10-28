@@ -131,7 +131,7 @@ for MERGE_FILE in $MERGE_LIST ; do
 			echo Value of $CFG is redundant by fragment $MERGE_FILE:
 		fi
 		sed -i "/$CFG[ =]/d" $TMP_FILE
-	done
+	done >&2
 	cat $MERGE_FILE >> $TMP_FILE
 done
 
@@ -168,7 +168,7 @@ for CFG in $(sed -n "$SED_CONFIG_EXP" $TMP_FILE); do
 		echo "Requested value:  $REQUESTED_VAL"
 		echo "Actual value:     $ACTUAL_VAL"
 		echo ""
-	fi
+	fi >&2
 done
 
 clean_up
