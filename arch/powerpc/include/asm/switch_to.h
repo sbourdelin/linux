@@ -30,21 +30,21 @@ extern void switch_booke_debug_regs(struct debug_reg *new_debug);
 #ifdef CONFIG_PPC_FPU
 extern void flush_fp_to_thread(struct task_struct *);
 extern void giveup_fpu(struct task_struct *);
+extern void __giveup_fpu(struct task_struct *);
 #else
 static inline void flush_fp_to_thread(struct task_struct *t) { }
 static inline void giveup_fpu(struct task_struct *t) { }
+static inline void __giveup_fpu(struct task_struct *t) { }
 #endif
 
 #ifdef CONFIG_ALTIVEC
 extern void flush_altivec_to_thread(struct task_struct *);
 extern void giveup_altivec(struct task_struct *);
+extern void __giveup_altivec(struct task_struct *);
 #else
-static inline void flush_altivec_to_thread(struct task_struct *t)
-{
-}
-static inline void giveup_altivec(struct task_struct *t)
-{
-}
+static inline void flush_altivec_to_thread(struct task_struct *t) { }
+static inline void giveup_altivec(struct task_struct *t) { }
+static inline void __giveup_altivec(struct task_struct *t) { }
 #endif
 
 #ifdef CONFIG_VSX
