@@ -128,7 +128,7 @@ static int cxl_pcie_config_info(struct pci_bus *bus, unsigned int devfn,
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 	addr = cxl_pcie_cfg_addr(phb, bus->number, devfn, offset);
 
-	*ioaddr = (void *)(addr & ~0x3ULL);
+	*ioaddr = (void __iomem *)(addr & ~0x3ULL);
 	*shift = ((addr & 0x3) * 8);
 	switch (len) {
 	case 1:
@@ -249,7 +249,7 @@ int cxl_pci_vphb_add(struct cxl_afu *afu)
 	/* Setup the PHB using arch provided callback */
 	phb->ops = &cxl_pcie_pci_ops;
 	phb->cfg_addr = afu->afu_desc_mmio + afu->crs_offset;
-	phb->cfg_data = (void *)(u64)afu->crs_len;
+	phb->cfg_data = (void __iomem *)afu->crs_len;
 	phb->private_data = afu;
 	phb->controller_ops = cxl_pci_controller_ops;
 
