@@ -328,6 +328,18 @@ static inline int fib_multipath_hash(__be32 saddr, __be32 daddr)
 	return jhash_2words(saddr, daddr, fib_multipath_secret) >> 1;
 }
 
+static inline int fib_multipath_output_hash(const struct flowi4 *fl4)
+{
+	if ((fl4->flowi4_proto == IPPROTO_TCP) ||
+	    (fl4->flowi4_proto == IPPROTO_UDP))
+		return jhash_3words(fl4->saddr, fl4->daddr,
+				    *((__u32 *)&fl4->uli.ports),
+				    fib_multipath_secret) >> 1;
+
+	return jhash_2words(fl4->saddr, fl4->daddr, fib_multipath_secret) >> 1;
+}
+
+
 void fib_select_multipath(struct fib_result *res, int hash);
 void fib_select_path(struct net *net, struct fib_result *res,
 		     struct flowi4 *fl4, int mp_hash);
