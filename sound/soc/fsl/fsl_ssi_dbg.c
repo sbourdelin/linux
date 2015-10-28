@@ -82,13 +82,10 @@ void fsl_ssi_dbg_isr(struct fsl_ssi_dbg *dbg, u32 sisr)
 		dbg->stats.tfe0++;
 }
 
-/* Show the statistics of a flag only if its interrupt is enabled.  The
- * compiler will optimze this code to a no-op if the interrupt is not
- * enabled.
- */
+/* Show the statistics of a flag only if its interrupt is enabled. */
 #define SIER_SHOW(flag, name) \
 	do { \
-		if (CCSR_SSI_SIER_##flag) \
+		if (CCSR_SSI_SIER_##flag & sier) \
 			seq_printf(s, #name "=%u\n", ssi_dbg->stats.name); \
 	} while (0)
 
@@ -102,6 +99,7 @@ void fsl_ssi_dbg_isr(struct fsl_ssi_dbg *dbg, u32 sisr)
 static int fsl_ssi_stats_show(struct seq_file *s, void *unused)
 {
 	struct fsl_ssi_dbg *ssi_dbg = s->private;
+	unsigned int sier = ssi_dbg->sier_ever_enabled;
 
 	SIER_SHOW(RFRC_EN, rfrc);
 	SIER_SHOW(TFRC_EN, tfrc);

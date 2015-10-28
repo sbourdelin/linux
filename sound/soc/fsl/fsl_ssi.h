@@ -237,6 +237,7 @@ struct fsl_ssi_dbg {
 		unsigned int tfe1;
 		unsigned int tfe0;
 	} stats;
+	unsigned int sier_ever_enabled;
 };
 
 void fsl_ssi_dbg_isr(struct fsl_ssi_dbg *ssi_dbg, u32 sisr);
