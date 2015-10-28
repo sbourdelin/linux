@@ -658,11 +658,6 @@ static struct drm_i915_gem_object *gem_allocate_guc_obj(struct drm_device *dev,
 	if (!obj)
 		return NULL;
 
-	if (i915_gem_object_get_pages(obj)) {
-		drm_gem_object_unreference(&obj->base);
-		return NULL;
-	}
-
 	if (i915_gem_obj_ggtt_pin(obj, PAGE_SIZE,
 			PIN_OFFSET_BIAS | GUC_WOPCM_TOP)) {
 		drm_gem_object_unreference(&obj->base);
