@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/dmi.h>
 #include <linux/dma-mapping.h>
+#include <linux/debugfs.h>
 
 #include "xhci.h"
 #include "xhci-trace.h"
@@ -651,6 +652,11 @@ int xhci_run(struct usb_hcd *hcd)
 	}
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"Finished xhci_run for USB2 roothub");
+
+#ifdef CONFIG_DEBUG_FS
+	xhci_create_debug_files(xhci);
+#endif
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(xhci_run);
@@ -668,6 +674,10 @@ void xhci_stop(struct usb_hcd *hcd)
 {
 	u32 temp;
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+
+#ifdef CONFIG_DEBUG_FS
+	xhci_remove_debug_files(xhci);
+#endif
 
 	if (xhci->xhc_state & XHCI_STATE_HALTED)
 		return;
@@ -5041,6 +5051,15 @@ static int __init xhci_hcd_init(void)
 	BUILD_BUG_ON(sizeof(struct xhci_intr_reg) != 8*32/8);
 	/* xhci_run_regs has eight fields and embeds 128 xhci_intr_regs */
 	BUILD_BUG_ON(sizeof(struct xhci_run_regs) != (8+8*128)*32/8);
+
+#ifdef CONFIG_DEBUG_FS
+	xhci_debug_root = debugfs_create_dir("xhci", usb_debug_root);
+	if (!xhci_debug_root || IS_ERR(xhci_debug_root)) {
+		debugfs_remove(xhci_debug_root);
+		xhci_debug_root = NULL;
+	}
+#endif
+
 	return 0;
 }
 
@@ -5048,7 +5067,13 @@ static int __init xhci_hcd_init(void)
  * If an init function is provided, an exit function must also be provided
  * to allow module unload.
  */
-static void __exit xhci_hcd_fini(void) { }
+static void __exit xhci_hcd_fini(void)
+{
+#ifdef CONFIG_DEBUG_FS
+	debugfs_remove(xhci_debug_root);
+	xhci_debug_root = NULL;
+#endif
+}
 
 module_init(xhci_hcd_init);
 module_exit(xhci_hcd_fini);

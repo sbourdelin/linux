@@ -1657,6 +1657,10 @@ struct xhci_hcd {
 	u32			port_status_u0;
 /* Compliance Mode Timer Triggered every 2 seconds */
 #define COMP_MODE_RCVRY_MSECS 2000
+	/* debug files */
+#ifdef CONFIG_DEBUG_FS
+	struct dentry		*debug_dir;
+#endif /* CONFIG_DEBUG_FS */
 };
 
 /* Platform specific overrides to generic XHCI hc_driver ops */
@@ -1742,6 +1746,12 @@ void xhci_dbg_ep_rings(struct xhci_hcd *xhci,
 		struct xhci_virt_ep *ep);
 void xhci_dbg_trace(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
 			const char *fmt, ...);
+
+#ifdef CONFIG_DEBUG_FS
+extern struct dentry *xhci_debug_root;
+void xhci_create_debug_files(struct xhci_hcd *xhci);
+void xhci_remove_debug_files(struct xhci_hcd *xhci);
+#endif /* CONFIG_DEBUG_FS */
 
 /* xHCI memory management */
 void xhci_mem_cleanup(struct xhci_hcd *xhci);

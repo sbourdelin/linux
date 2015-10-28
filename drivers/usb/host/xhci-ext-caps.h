@@ -49,8 +49,15 @@
 #define XHCI_EXT_CAPS_PM	3
 #define XHCI_EXT_CAPS_VIRT	4
 #define XHCI_EXT_CAPS_ROUTE	5
-/* IDs 6-9 reserved */
+#define	XHCI_EXT_CAPS_LOCALMEM	6
+/* IDs 7-9 reserved */
 #define XHCI_EXT_CAPS_DEBUG	10
+/* IDs 192-255 vendor specific */
+#define	XHCI_EXT_CAPS_VEN_START	192
+#define	XHCI_EXT_CAPS_VEN_END	255
+#define	XHCI_EXT_CAPS_VENDOR(p)	(((p) >= XHCI_EXT_CAPS_VEN_START) && \
+				((p) <= XHCI_EXT_CAPS_VEN_END))
+#define	XHCI_EXT_MAX_CAPID	XHCI_EXT_CAPS_VEN_END
 /* USB Legacy Support Capability - section 7.1.1 */
 #define XHCI_HC_BIOS_OWNED	(1 << 16)
 #define XHCI_HC_OS_OWNED	(1 << 24)

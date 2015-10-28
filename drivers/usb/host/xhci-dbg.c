@@ -20,6 +20,11 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/vmalloc.h>
+#include <linux/slab.h>
+#include <linux/debugfs.h>
+#include <linux/usb.h>
+
 #include "xhci.h"
 
 #define XHCI_INIT_VALUE 0x0
@@ -612,3 +617,210 @@ void xhci_dbg_trace(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
 	va_end(args);
 }
 EXPORT_SYMBOL_GPL(xhci_dbg_trace);
+
+#ifdef CONFIG_DEBUG_FS
+struct debug_buffer {
+	ssize_t (*fill_func)(struct debug_buffer *);
+	struct usb_bus *bus;
+	struct mutex mutex;
+	size_t count;
+	char *output_buf;
+	size_t alloc_size;
+};
+
+static const char *get_extcap_desc(u32 cap_id)
+{
+	switch (cap_id) {
+	case XHCI_EXT_CAPS_LEGACY:
+		return "USB Legacy Support";
+	case XHCI_EXT_CAPS_PROTOCOL:
+		return "Supported Protocol";
+	case XHCI_EXT_CAPS_PM:
+		return "Extended Power Management";
+	case XHCI_EXT_CAPS_VIRT:
+		return "I/O Virtualization (xHCI-IOV)";
+	case XHCI_EXT_CAPS_ROUTE:
+		return "Message Interrupt";
+	case XHCI_EXT_CAPS_LOCALMEM:
+		return "Local Memory";
+	case XHCI_EXT_CAPS_DEBUG:
+		return "USB Debug Capability";
+	default:
+		if (XHCI_EXT_CAPS_VENDOR(XHCI_EXT_CAPS_ID(cap_id)))
+			return "Vendor Defined";
+		else
+			return "Unknown";
+	}
+}
+
+static ssize_t fill_extcap_buffer(struct debug_buffer *buf)
+{
+	__le32 __iomem	*addr;
+	struct usb_hcd	*hcd;
+	struct xhci_hcd	*xhci;
+	u32		offset, cap_id;
+	char		*next;
+	int		size, temp;
+	unsigned long	flags;
+	int		time_to_leave;
+
+	hcd = bus_to_hcd(buf->bus);
+	xhci = hcd_to_xhci(hcd);
+	next = buf->output_buf;
+	size = buf->alloc_size;
+
+	spin_lock_irqsave(&xhci->lock, flags);
+
+	addr = &xhci->cap_regs->hcc_params;
+	offset = XHCI_HCC_EXT_CAPS(readl(addr));
+	if (!HCD_HW_ACCESSIBLE(hcd) || !offset) {
+		size = scnprintf(next, size,
+			"bus %s, device %s\n%s\nNo extended capabilities\n",
+			hcd->self.controller->bus->name,
+			dev_name(hcd->self.controller),
+			hcd->product_desc);
+		goto done;
+	}
+
+	temp = scnprintf(next, size, "@addr(virt)\t\tCAP_ID\tDescription\n");
+	size -= temp;
+	next += temp;
+
+	addr = &xhci->cap_regs->hc_capbase + offset;
+	time_to_leave = XHCI_EXT_MAX_CAPID;
+	while (time_to_leave--) {
+		cap_id = readl(addr);
+		temp = scnprintf(next, size, "@%p\t%02x\t%s\n",
+			addr, XHCI_EXT_CAPS_ID(cap_id),
+			get_extcap_desc(XHCI_EXT_CAPS_ID(cap_id)));
+		size -= temp;
+		next += temp;
+
+		offset = XHCI_EXT_CAPS_NEXT(cap_id);
+		if (!offset)
+			break;
+		addr += offset;
+	}
+
+done:
+	spin_unlock_irqrestore(&xhci->lock, flags);
+
+	return buf->alloc_size - size;
+}
+
+static struct debug_buffer *buffer_init(struct usb_bus *bus,
+				ssize_t (*fill_func)(struct debug_buffer *))
+{
+	struct debug_buffer *buf;
+
+	buf = kzalloc(sizeof(struct debug_buffer), GFP_KERNEL);
+	if (!buf)
+		return NULL;
+
+	buf->bus = bus;
+	buf->fill_func = fill_func;
+	mutex_init(&buf->mutex);
+
+	return buf;
+}
+
+static int fill_buffer(struct debug_buffer *buf)
+{
+	int ret;
+
+	if (buf->output_buf)
+		return -EINVAL;
+
+	buf->alloc_size = PAGE_SIZE;
+	buf->output_buf = vmalloc(buf->alloc_size);
+
+	if (!buf->output_buf)
+		return -ENOMEM;
+
+	ret = buf->fill_func(buf);
+	if (ret < 0)
+		return ret;
+
+	buf->count = ret;
+
+	return 0;
+}
+
+static ssize_t debug_output(struct file *file, char __user *user_buf,
+			    size_t len, loff_t *offset)
+{
+	struct debug_buffer *buf = file->private_data;
+	int ret = 0;
+
+	mutex_lock(&buf->mutex);
+	if (!buf->count) {
+		ret = fill_buffer(buf);
+		if (ret) {
+			mutex_unlock(&buf->mutex);
+			return ret;
+		}
+	}
+	mutex_unlock(&buf->mutex);
+
+	return simple_read_from_buffer(user_buf, len, offset,
+				      buf->output_buf, buf->count);
+}
+
+static int debug_close(struct inode *inode, struct file *file)
+{
+	struct debug_buffer *buf = file->private_data;
+
+	if (buf) {
+		vfree(buf->output_buf);
+		kfree(buf);
+	}
+
+	return 0;
+}
+
+static int debug_extcap_open(struct inode *inode, struct file *file)
+{
+	file->private_data = buffer_init(inode->i_private,
+					  fill_extcap_buffer);
+
+	return file->private_data ? 0 : -ENOMEM;
+}
+
+static const struct file_operations debug_extcap_fops = {
+	.owner		= THIS_MODULE,
+	.open		= debug_extcap_open,
+	.read		= debug_output,
+	.release	= debug_close,
+	.llseek		= default_llseek,
+};
+
+struct dentry *xhci_debug_root;
+
+void xhci_create_debug_files(struct xhci_hcd *xhci)
+{
+	struct usb_bus *bus = &xhci_to_hcd(xhci)->self;
+	struct dentry *entry;
+
+	if (!xhci_debug_root)
+		return;
+
+	entry = debugfs_create_dir(bus->bus_name, xhci_debug_root);
+	if (!entry || IS_ERR(entry)) {
+		xhci_info(xhci, "failed to create debug dir");
+		return;
+	}
+	xhci->debug_dir = entry;
+
+	if (!debugfs_create_file("extcap", S_IRUGO,
+				xhci->debug_dir, bus,
+				&debug_extcap_fops))
+		xhci_info(xhci, "failed to create extcap debug file");
+}
+
+void xhci_remove_debug_files(struct xhci_hcd *xhci)
+{
+	debugfs_remove_recursive(xhci->debug_dir);
+	xhci->debug_dir = NULL;
+}
+
+#endif /* CONFIG_DEBUG_FS */
