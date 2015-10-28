@@ -403,7 +403,7 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
 static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
 {
 	struct vfio_domain *domain;
-	unsigned long bitmap = PAGE_MASK;
+	unsigned long bitmap = ULONG_MAX;
 
 	mutex_lock(&iommu->lock);
 	list_for_each_entry(domain, &iommu->domain_list, next)
@@ -416,19 +416,17 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
 static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
 			     struct vfio_iommu_type1_dma_unmap *unmap)
 {
-	uint64_t mask;
 	struct vfio_dma *dma;
 	size_t unmapped = 0;
 	int ret = 0;
+	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
+	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
+						PAGE_SIZE : min_pagesz;
 
-	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
-
-	if (unmap->iova & mask)
+	if (!IS_ALIGNED(unmap->iova, requested_alignment))
 		return -EINVAL;
-	if (!unmap->size || unmap->size & mask)
+	if (!unmap->size || !IS_ALIGNED(unmap->size, requested_alignment))
 		return -EINVAL;
-
-	WARN_ON(mask & PAGE_MASK);
 
 	mutex_lock(&iommu->lock);
 
@@ -553,17 +551,15 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 	size_t size = map->size;
 	long npage;
 	int ret = 0, prot = 0;
-	uint64_t mask;
 	struct vfio_dma *dma;
 	unsigned long pfn;
+	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
+	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
+						PAGE_SIZE : min_pagesz;
 
 	/* Verify that none of our __u64 fields overflow */
 	if (map->size != size || map->vaddr != vaddr || map->iova != iova)
 		return -EINVAL;
-
-	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
-
-	WARN_ON(mask & PAGE_MASK);
 
 	/* READ/WRITE from device perspective */
 	if (map->flags & VFIO_DMA_MAP_FLAG_WRITE)
@@ -571,7 +567,8 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
 	if (map->flags & VFIO_DMA_MAP_FLAG_READ)
 		prot |= IOMMU_READ;
 
-	if (!prot || !size || (size | iova | vaddr) & mask)
+	if (!prot || !size ||
+		!IS_ALIGNED(size | iova | vaddr, requested_alignment))
 		return -EINVAL;
 
 	/* Don't allow IOVA or virtual address wrap */
