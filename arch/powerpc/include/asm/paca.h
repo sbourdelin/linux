@@ -132,7 +132,13 @@ struct paca_struct {
 #endif /* CONFIG_PPC_BOOK3E */
 
 #ifdef CONFIG_PPC_BOOK3S
-	mm_context_t context;
+	mm_context_id_t context_id;
+#ifdef CONFIG_PPC_MM_SLICES
+	u64 context_low_slices_psize;
+	unsigned char context_high_slices_psize[SLICE_ARRAY_SIZE];
+#else
+	u16 context_sllp;
+#endif
 #endif
 
 	/*
@@ -199,7 +205,14 @@ struct paca_struct {
 #ifdef CONFIG_PPC_BOOK3S
 static inline void copy_mm_to_paca(mm_context_t *context)
 {
-	get_paca()->context = *context;
+	get_paca()->context_id = context->id;
+#ifdef CONFIG_PPC_MM_SLICES
+	get_paca()->context_low_slices_psize = context->low_slices_psize;
+	memcpy(&get_paca()->context_high_slices_psize,
+	       &context->high_slices_psize, SLICE_ARRAY_SIZE);
+#else
+	get_paca()->context_sllp = context->sllp;
+#endif
 }
 #else
 static inline void copy_mm_to_paca(mm_context_t *context){}
