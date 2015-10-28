@@ -19,18 +19,6 @@ extern void context_tracking_exit(enum ctx_state state);
 extern void context_tracking_user_enter(void);
 extern void context_tracking_user_exit(void);
 
-static inline void user_enter(void)
-{
-	if (context_tracking_is_enabled())
-		context_tracking_enter(CONTEXT_USER);
-
-}
-static inline void user_exit(void)
-{
-	if (context_tracking_is_enabled())
-		context_tracking_exit(CONTEXT_USER);
-}
-
 static inline enum ctx_state exception_enter(void)
 {
 	enum ctx_state prev_ctx;
@@ -67,12 +55,38 @@ static inline enum ctx_state ct_state(void)
 		this_cpu_read(context_tracking.state) : CONTEXT_DISABLED;
 }
 #else
-static inline void user_enter(void) { }
-static inline void user_exit(void) { }
+static inline void __context_tracking_enter(enum ctx_state state) { }
+static inline void __context_tracking_exit(enum ctx_state state) { }
+static inline void context_tracking_enter(enum ctx_state state) { }
+static inline void context_tracking_exit(enum ctx_state state) { }
 static inline enum ctx_state exception_enter(void) { return 0; }
 static inline void exception_exit(enum ctx_state prev_ctx) { }
 static inline enum ctx_state ct_state(void) { return CONTEXT_DISABLED; }
 #endif /* !CONFIG_CONTEXT_TRACKING */
+
+static inline void __user_enter(void)
+{
+	if (context_tracking_is_enabled())
+		__context_tracking_enter(CONTEXT_USER);
+
+}
+static inline void __user_exit(void)
+{
+	if (context_tracking_is_enabled())
+		__context_tracking_exit(CONTEXT_USER);
+}
+
+static inline void user_enter(void)
+{
+	if (context_tracking_is_enabled())
+		context_tracking_enter(CONTEXT_USER);
+
+}
+static inline void user_exit(void)
+{
+	if (context_tracking_is_enabled())
+		context_tracking_exit(CONTEXT_USER);
+}
 
 #define CT_WARN_ON(cond) WARN_ON(context_tracking_is_enabled() && (cond))
 

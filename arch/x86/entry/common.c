@@ -33,7 +33,7 @@
 __visible void enter_from_user_mode(void)
 {
 	CT_WARN_ON(ct_state() != CONTEXT_USER);
-	user_exit();
+	__user_exit();
 }
 #endif
 
@@ -262,7 +262,7 @@ __visible void prepare_exit_to_usermode(struct pt_regs *regs)
 		local_irq_disable();
 	}
 
-	user_enter();
+	__user_enter();
 }
 
 /*
