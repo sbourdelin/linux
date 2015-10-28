@@ -39,7 +39,7 @@ usage() {
 }
 
 getval() {
-	grep -w -e "$1" "$2"
+	grep -w -e "$1" "$2" | sed 's/^CONFIG_\(.*\)=n$/# CONFIG_\1 is not set/g'
 }
 
 CONF_IS_ERR=false
