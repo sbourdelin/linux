@@ -26,18 +26,6 @@
 #include "intel-agp.h"
 #include <drm/intel-gtt.h>
 
-/*
- * If we have Intel graphics, we're not going to have anything other than
- * an Intel IOMMU. So make the correct use of the PCI DMA API contingent
- * on the Intel IOMMU support (CONFIG_INTEL_IOMMU).
- * Only newer chipsets need to bother with this, of course.
- */
-#ifdef CONFIG_INTEL_IOMMU
-#define USE_PCI_DMA_API 1
-#else
-#define USE_PCI_DMA_API 0
-#endif
-
 struct intel_gtt_driver {
 	unsigned int gen : 8;
 	unsigned int is_g33 : 1;
@@ -650,7 +638,7 @@ static int intel_gtt_init(void)
 
 	intel_private.stolen_size = intel_gtt_stolen_size();
 
-	intel_private.needs_dmar = USE_PCI_DMA_API && INTEL_GTT_GEN > 2;
+	intel_private.needs_dmar = INTEL_GTT_GEN > 2;
 
 	ret = intel_gtt_setup_scratch_page();
 	if (ret != 0) {
