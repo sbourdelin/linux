@@ -322,10 +322,11 @@ static unsigned long var_name_strnsize(efi_char16_t *variable_name,
  * disable the sysfs workqueue since the firmware is buggy.
  */
 static void dup_variable_bug(efi_char16_t *str16, efi_guid_t *vendor_guid,
-			     unsigned long len16)
+			     unsigned long len16, bool atomic)
 {
 	size_t i, len8 = len16 / sizeof(efi_char16_t);
 	char *str8;
+	int gfp_mask;
 
 	/*
 	 * Disable the workqueue since the algorithm it uses for
@@ -334,7 +335,12 @@ static void dup_variable_bug(efi_char16_t *str16, efi_guid_t *vendor_guid,
 	 */
 	efivar_wq_enabled = false;
 
-	str8 = kzalloc(len8, GFP_KERNEL);
+	if (atomic)
+		gfp_mask = GFP_ATOMIC;
+	else
+		gfp_mask = GFP_KERNEL;
+
+	str8 = kzalloc(len8, gfp_mask);
 	if (!str8)
 		return;
 
@@ -408,7 +414,7 @@ int efivar_init(int (*func)(efi_char16_t *, efi_guid_t, unsigned long, void *),
 			if (duplicates &&
 			    variable_is_present(variable_name, &vendor_guid, head)) {
 				dup_variable_bug(variable_name, &vendor_guid,
-						 variable_name_size);
+						 variable_name_size, atomic);
 				if (!atomic)
 					spin_lock_irq(&__efivars->lock);
 
