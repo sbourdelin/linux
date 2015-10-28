@@ -562,23 +562,25 @@ static int ib_nl_make_request(struct ib_sa_query *query)
 	INIT_LIST_HEAD(&query->list);
 	query->seq = (u32)atomic_inc_return(&ib_nl_sa_request_seq);
 
+	/* Put the request on the list first.*/
 	spin_lock_irqsave(&ib_nl_request_lock, flags);
-	ret = ib_nl_send_msg(query);
-	if (ret <= 0) {
-		ret = -EIO;
-		goto request_out;
-	} else {
-		ret = 0;
-	}
-
 	delay = msecs_to_jiffies(sa_local_svc_timeout_ms);
 	query->timeout = delay + jiffies;
 	list_add_tail(&query->list, &ib_nl_request_list);
-	/* Start the timeout if this is the only request */
-	if (ib_nl_request_list.next == &query->list)
-		queue_delayed_work(ib_nl_wq, &ib_nl_timed_work, delay);
+	spin_unlock_irqrestore(&ib_nl_request_lock, flags);
 
-request_out:
+	ret = ib_nl_send_msg(query);
+	spin_lock_irqsave(&ib_nl_request_lock, flags);
+	if (ret <= 0) {
+		ret = -EIO;
+		/* Remove the request */
+		list_del(&query->list);
+	} else {
+		ret = 0;
+		/* Start the timeout if this is the only request */
+		if (ib_nl_request_list.next == &query->list)
+			queue_delayed_work(ib_nl_wq, &ib_nl_timed_work, delay);
+	}
 	spin_unlock_irqrestore(&ib_nl_request_lock, flags);
 
 	return ret;
