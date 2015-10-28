@@ -48,13 +48,9 @@ while true; do
 	case $1 in
 	"-n")
 		ALLTARGET=allnoconfig
-		shift
-		continue
 		;;
 	"-m")
 		RUNMAKE=false
-		shift
-		continue
 		;;
 	"-h")
 		usage
@@ -62,8 +58,6 @@ while true; do
 		;;
 	"-r")
 		WARNREDUN=true
-		shift
-		continue
 		;;
 	"-O")
 		if [ -d $2 ];then
@@ -72,13 +66,14 @@ while true; do
 			echo "output directory $2 does not exist" 1>&2
 			exit 1
 		fi
-		shift 2
-		continue
+		shift
 		;;
 	*)
 		break
 		;;
 	esac
+
+	shift
 done
 
 if [ "$#" -lt 1 ] ; then
