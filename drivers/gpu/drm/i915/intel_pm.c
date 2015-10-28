@@ -4782,8 +4782,8 @@ static void gen9_enable_rc6(struct drm_device *dev)
 		I915_WRITE(GEN6_RC6_WAKE_RATE_LIMIT, 108 << 16);
 	else
 		I915_WRITE(GEN6_RC6_WAKE_RATE_LIMIT, 54 << 16);
-	I915_WRITE(GEN6_RC_EVALUATION_INTERVAL, 125000); /* 12500 * 1280ns */
-	I915_WRITE(GEN6_RC_IDLE_HYSTERSIS, 25); /* 25 * 1280ns */
+	I915_WRITE(GEN6_RC_EVALUATION_INTERVAL, GT_INTERVAL_FROM_US(dev_priv, 160000));
+	I915_WRITE(GEN6_RC_IDLE_HYSTERSIS, GT_INTERVAL_FROM_US(dev_priv, 32));
 	for_each_ring(ring, dev_priv, unused)
 		I915_WRITE(RING_MAX_IDLE(ring->mmio_base), 10);
 
@@ -4793,8 +4793,8 @@ static void gen9_enable_rc6(struct drm_device *dev)
 	I915_WRITE(GEN6_RC_SLEEP, 0);
 
 	/* 2c: Program Coarse Power Gating Policies. */
-	I915_WRITE(GEN9_MEDIA_PG_IDLE_HYSTERESIS, 25);
-	I915_WRITE(GEN9_RENDER_PG_IDLE_HYSTERESIS, 25);
+	I915_WRITE(GEN9_MEDIA_PG_IDLE_HYSTERESIS, GT_INTERVAL_FROM_US(dev_priv, 32));
+	I915_WRITE(GEN9_RENDER_PG_IDLE_HYSTERESIS, GT_INTERVAL_FROM_US(dev_priv, 32));
 
 	/* 3a: Enable RC6 */
 	if (intel_enable_rc6(dev) & INTEL_RC6_ENABLE)
@@ -4804,12 +4804,12 @@ static void gen9_enable_rc6(struct drm_device *dev)
 	/* WaRsUseTimeoutMode */
 	if ((IS_SKYLAKE(dev) && INTEL_REVID(dev) <= SKL_REVID_D0) ||
 	    (IS_BROXTON(dev) && INTEL_REVID(dev) <= BXT_REVID_A0)) {
-		I915_WRITE(GEN6_RC6_THRESHOLD, 625); /* 800us */
+		I915_WRITE(GEN6_RC6_THRESHOLD, GT_INTERVAL_FROM_US(dev_priv, 800));
 		I915_WRITE(GEN6_RC_CONTROL, GEN6_RC_CTL_HW_ENABLE |
 			   GEN7_RC_CTL_TO_MODE |
 			   rc6_mask);
 	} else {
-		I915_WRITE(GEN6_RC6_THRESHOLD, 37500); /* 37.5/125ms per EI */
+		I915_WRITE(GEN6_RC6_THRESHOLD, GT_INTERVAL_FROM_US(dev_priv, 48000));
 		I915_WRITE(GEN6_RC_CONTROL, GEN6_RC_CTL_HW_ENABLE |
 			   GEN6_RC_CTL_EI_MODE(1) |
 			   rc6_mask);
