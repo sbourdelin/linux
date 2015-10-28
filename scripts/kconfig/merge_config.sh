@@ -1,8 +1,8 @@
 #!/bin/sh
-#  merge_config.sh - Takes a list of config fragment values, and merges
-#  them one by one. Provides warnings on overridden values, and specified
-#  values that did not make it to the resulting .config file (due to missed
-#  dependencies or config symbol removal).
+#  merge_config.sh - Takes a list of config fragment filenames or configuration
+#  value, and merges them one by one. Provides warnings on overridden values,
+#  and specified values that did not make it to the resulting .config file
+#  (due to missed dependencies or config symbol removal).
 #
 #  Portions reused from kconf_check and generate_cfg:
 #  http://git.yoctoproject.org/cgit/cgit.cgi/yocto-kernel-tools/tree/tools/kconf_check
@@ -108,7 +108,26 @@ fi
 
 MERGE_LIST=$*
 SED_CONFIG_EXP="s/^\(# \)\{0,1\}\(CONFIG_[a-zA-Z0-9_]*\)[= ].*/\2/p"
-TMP_FILE=$(mktemp ./.tmp.config.XXXXXXXXXX)
+TMP_FILE=$(mktemp $OUTPUT/.tmp.config.XXXXXXXXXX)
+
+CLEAN_FILES=$TMP_FILE
+
+# Process cmdline configs into temporary fragments
+for ENTRY in $MERGE_LIST ; do
+	case $ENTRY in
+	CONFIG*)
+		FF=$(mktemp $OUTPUT/.temp.frag-cmdline.XXXXX)
+		CLEAN_FILES="$CLEAN_FILES $FF"
+		echo $ENTRY > $FF
+		NEW_LIST="$NEW_LIST $FF"
+		;;
+	*)
+		NEW_LIST="$NEW_LIST $ENTRY"
+		;;
+	esac
+done
+
+MERGE_LIST=$NEW_LIST
 
 echo "Using $INITFILE as base"
 cat $INITFILE > $TMP_FILE
