@@ -171,7 +171,8 @@ static int efx_init_rx_buffers(struct efx_rx_queue *rx_queue, bool atomic)
 			struct efx_channel *channel;
 
 			channel = efx_rx_queue_channel(rx_queue);
-			page = alloc_pages_node(channel->irq_node, __GFP_COMP |
+			page = alloc_pages_node(channel->irq_mem_node,
+						__GFP_COMP |
 						(atomic ?
 						 (GFP_ATOMIC | __GFP_NOWARN)
 						 : GFP_KERNEL),
