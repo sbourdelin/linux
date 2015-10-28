@@ -11,6 +11,7 @@
 #include <linux/auxvec.h>
 #include <linux/fs.h>
 #include <uapi/linux/elf.h>
+#include <uapi/asm/auxvec.h>
 
 #include <asm/cpu-info.h>
 #include <asm/current.h>
