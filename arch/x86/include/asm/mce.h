@@ -135,7 +135,18 @@ struct mce_vendor_flags {
 			 * in HW and deferred error interrupts.
 			 */
 			succor		: 1,
-			__reserved_0	: 62;
+
+			/*
+			 * Scalable MCA: This bit indicates support for MCAX
+			 * (MCA EXtensions) which expands the register space
+			 * for each MCA bank and also increases number of
+			 * banks. Also, to accommodate the new banks and
+			 * registers, the MCA register space is moved to a new
+			 * MSR range
+			 */
+			smca		: 1,
+
+			__reserved_0	: 61;
 };
 extern struct mce_vendor_flags mce_flags;
 
