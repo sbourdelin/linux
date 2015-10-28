@@ -1033,6 +1033,10 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 
 	qp->mqp.event = mlx5_ib_qp_event;
 
+	/* QP related debug prints go here */
+	if (qp->flags & MLX5_IB_QP_BLOCK_MULTICAST_LOOPBACK)
+		mlx5_ib_dbg(dev, "QP 0x%x will block multicast\n", qp->mqp.qpn);
+
 	return 0;
 
 err_create:
