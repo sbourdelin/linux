@@ -1,0 +1,12 @@
+Technologic Systems Watchdog
+
+Required properties:
+- compatible : must be "ts,ts4800-wdt"
+- offset : offset of the feed register from syscon base
+
+Example:
+
+wdt1: wdt@b0010000 {
+	compatible = "ts,ts4800-wdt";
+	offset = <0xe>;
+};

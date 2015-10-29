@@ -4,9 +4,17 @@ Required properties:
 - compatible : must be "ts,ts4800-syscon"
 - reg : physical base address and length of memory mapped region
 
+The driver exposes following subdevices:
+- a watchdog: see ../watchdog/ts4800-wdt.txt
+
 Example:
 
 syscon@b0010000 {
 	compatible = "ts,ts4800-syscon";
 	reg = <0xb0010000 0x3d>;
+
+	wdt@e {
+		compatible = "ts,ts4800-wdt";
+		offset = <0xe>;
+	};
 };

@@ -24,6 +24,13 @@
 #include <linux/mfd/ts4800-syscon.h>
 
 
+static const struct mfd_cell ts4800_syscon_cells[] = {
+	{
+		.name = "ts4800-watchdog",
+		.of_compatible = "ts,ts4800-wdt",
+	},
+};
+
 static const struct regmap_config ts4800_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 2,
@@ -56,11 +63,15 @@ static int ts4800_syscon_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, syscon);
 
-	return 0;
+	return mfd_add_devices(&pdev->dev, -1, ts4800_syscon_cells,
+			       ARRAY_SIZE(ts4800_syscon_cells),
+			       NULL, 0, NULL);
 }
 
 static int ts4800_syscon_remove(struct platform_device *pdev)
 {
+	mfd_remove_devices(&pdev->dev);
+
 	return 0;
 }
 
