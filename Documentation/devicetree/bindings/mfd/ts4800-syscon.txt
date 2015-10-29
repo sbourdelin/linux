@@ -1,0 +1,12 @@
+Technologic Systems Syscon
+
+Required properties:
+- compatible : must be "ts,ts4800-syscon"
+- reg : physical base address and length of memory mapped region
+
+Example:
+
+syscon@b0010000 {
+	compatible = "ts,ts4800-syscon";
+	reg = <0xb0010000 0x3d>;
+};

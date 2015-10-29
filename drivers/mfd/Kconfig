@@ -1341,6 +1341,13 @@ config MFD_TC6393XB
 	help
 	  Support for Toshiba Mobile IO Controller TC6393XB
 
+config MFD_TS4800_SYSCON
+	tristate "TS-4800 Syscon Support"
+	select REGMAP
+	select REGMAP_MMIO
+	help
+	  Support for TS-4800's FPGA Syscon registers
+
 config MFD_VX855
 	tristate "VIA VX855/VX875 integrated south bridge"
 	depends on PCI
