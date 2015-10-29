@@ -1078,36 +1078,21 @@ intel_dp_aux_init(struct intel_dp *intel_dp, struct intel_connector *connector)
 		intel_dp->aux_ch_ctl_reg = intel_dp->output_reg + 0x10;
 
 	intel_dp->aux.name = name;
-	intel_dp->aux.dev = dev->dev;
+	intel_dp->aux.dev = connector->base.kdev;
 	intel_dp->aux.transfer = intel_dp_aux_transfer;
 
 	DRM_DEBUG_KMS("registering %s bus for %s\n", name,
 		      connector->base.kdev->kobj.name);
 
 	ret = drm_dp_aux_register(&intel_dp->aux);
-	if (ret < 0) {
+	if (ret < 0)
 		DRM_ERROR("drm_dp_aux_register() for %s failed (%d)\n",
 			  name, ret);
-		return;
-	}
-
-	ret = sysfs_create_link(&connector->base.kdev->kobj,
-				&intel_dp->aux.ddc.dev.kobj,
-				intel_dp->aux.ddc.dev.kobj.name);
-	if (ret < 0) {
-		DRM_ERROR("sysfs_create_link() for %s failed (%d)\n", name, ret);
-		drm_dp_aux_unregister(&intel_dp->aux);
-	}
 }
 
 static void
 intel_dp_connector_unregister(struct intel_connector *intel_connector)
 {
-	struct intel_dp *intel_dp = intel_attached_dp(&intel_connector->base);
-
-	if (!intel_connector->mst_port)
-		sysfs_remove_link(&intel_connector->base.kdev->kobj,
-				  intel_dp->aux.ddc.dev.kobj.name);
 	intel_connector_unregister(intel_connector);
 }
 
