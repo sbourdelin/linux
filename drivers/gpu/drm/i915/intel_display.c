@@ -2389,7 +2389,8 @@ intel_pin_and_fence_fb_obj(struct drm_plane *plane,
 	 * framebuffer compression.  For simplicity, we always install
 	 * a fence as the cost is not that onerous.
 	 */
-	ret = i915_gem_object_get_fence(obj);
+	if (view.type == I915_GGTT_VIEW_NORMAL)
+		ret = i915_gem_object_get_fence(obj);
 	if (ret == -EDEADLK) {
 		/*
 		 * -EDEADLK means there are no free fences
@@ -2430,7 +2431,9 @@ static void intel_unpin_fb_obj(struct drm_framebuffer *fb,
 	ret = intel_fill_fb_ggtt_view(&view, fb, plane_state);
 	WARN_ONCE(ret, "Couldn't get view from plane state!");
 
-	i915_gem_object_unpin_fence(obj);
+	if (view.type == I915_GGTT_VIEW_NORMAL)
+		i915_gem_object_unpin_fence(obj);
+
 	i915_gem_object_unpin_from_display_plane(obj, &view);
 }
 
