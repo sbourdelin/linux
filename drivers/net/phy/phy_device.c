@@ -257,6 +257,10 @@ retry:		reg_addr = MII_ADDR_C45 | i << 16 | MDIO_DEVS2;
 				return 0;
 			}
 		}
+
+		/* stop probe when device zero was probed. */
+		if (!i)
+			break;
 	}
 
 	/* Now probe Device Identifiers for each device present. */
