@@ -16,6 +16,7 @@
  */
 
 #include "tpm.h"
+#include <crypto/hash_info.h>
 #include <keys/trusted-type.h>
 
 enum tpm2_object_attributes {
@@ -103,6 +104,21 @@ struct tpm2_cmd {
 	tpm_cmd_header		header;
 	union tpm2_cmd_params	params;
 } __packed;
+
+struct tpm2_hash {
+	unsigned int crypto_id;
+	unsigned int tpm_id;
+};
+
+static struct tpm2_hash tpm2_hash_map[] = {
+	{HASH_ALGO_SHA1, TPM2_ALG_SHA1},
+	{HASH_ALGO_SHA256, TPM2_ALG_SHA256},
+	{HASH_ALGO_SHA384, TPM2_ALG_SHA384},
+	{HASH_ALGO_SHA512, TPM2_ALG_SHA512},
+	{HASH_ALGO_SM3_256, TPM2_ALG_SM3_256},
+};
+
+#define TPM2_HASH_COUNT (sizeof(tpm2_hash_map) / sizeof(tpm2_hash_map[1]))
 
 /*
  * Array with one entry per ordinal defining the maximum amount
@@ -429,7 +445,23 @@ int tpm2_seal_trusted(struct tpm_chip *chip,
 {
 	unsigned int blob_len;
 	struct tpm_buf buf;
+	u32 hash = TPM2_ALG_SHA256;
+	int i;
 	int rc;
+
+	if (options->hash) {
+		for (i = 0; i < TPM2_HASH_COUNT; i++) {
+			if (options->hash == tpm2_hash_map[i].crypto_id) {
+				hash = tpm2_hash_map[i].tpm_id;
+				dev_dbg(chip->pdev, "%s: hash: %s 0x%08X\n",
+					__func__, hash_algo_name[i], hash);
+				break;
+			}
+		}
+
+		if (i == TPM2_HASH_COUNT)
+			return -EINVAL;
+	}
 
 	rc = tpm_buf_init(&buf, TPM2_ST_SESSIONS, TPM2_CC_CREATE);
 	if (rc)
@@ -454,7 +486,7 @@ int tpm2_seal_trusted(struct tpm_chip *chip,
 	tpm_buf_append_u16(&buf, 14);
 
 	tpm_buf_append_u16(&buf, TPM2_ALG_KEYEDHASH);
-	tpm_buf_append_u16(&buf, TPM2_ALG_SHA256);
+	tpm_buf_append_u16(&buf, hash);
 	tpm_buf_append_u32(&buf, TPM2_ATTR_USER_WITH_AUTH);
 	tpm_buf_append_u16(&buf, 0); /* policy digest size */
 	tpm_buf_append_u16(&buf, TPM2_ALG_NULL);
@@ -487,8 +519,12 @@ int tpm2_seal_trusted(struct tpm_chip *chip,
 out:
 	tpm_buf_destroy(&buf);
 
-	if (rc > 0)
-		rc = -EPERM;
+	if (rc > 0) {
+		if ((rc & TPM2_RC_HASH) == TPM2_RC_HASH)
+			rc = -EINVAL;
+		else
+			rc = -EPERM;
+	}
 
 	return rc;
 }
