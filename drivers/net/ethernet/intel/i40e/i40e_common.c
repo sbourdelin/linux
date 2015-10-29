@@ -24,10 +24,22 @@
  *
  ******************************************************************************/
 
+#include <linux/etherdevice.h>
+#ifdef CONFIG_OF
+#include <linux/of_net.h>
+#endif
+#include <linux/pci.h>
+#include "i40e.h"
+
 #include "i40e_type.h"
 #include "i40e_adminq.h"
 #include "i40e_prototype.h"
 #include "i40e_virtchnl.h"
+
+#ifdef CONFIG_SPARC
+#include <asm/idprom.h>
+#include <asm/prom.h>
+#endif
 
 /**
  * i40e_set_mac_type - Sets MAC type
@@ -1022,6 +1034,27 @@ i40e_status i40e_aq_mac_address_write(struct i40e_hw *hw,
 	return status;
 }
 
+static int i40e_get_platform_mac_addr(struct i40e_hw *hw, u8 *mac_addr)
+{
+#ifdef CONFIG_OF
+	struct i40e_pf *pf = hw->back;
+	struct device_node *dp = pci_device_to_OF_node(pf->pdev);
+	const unsigned char *addr;
+
+	addr = of_get_mac_address(dp);
+	if (addr) {
+		ether_addr_copy(mac_addr, addr);
+		return 0;
+	}
+#endif /* CONFIG_OF */
+
+#ifdef CONFIG_SPARC
+	ether_addr_copy(mac_addr, idprom->id_ethaddr);
+	return 0;
+#endif /* CONFIG_SPARC */
+	return 1;
+}
+
 /**
  * i40e_get_mac_addr - get MAC address
  * @hw: pointer to the HW structure
@@ -1034,6 +1067,9 @@ i40e_status i40e_get_mac_addr(struct i40e_hw *hw, u8 *mac_addr)
 	struct i40e_aqc_mac_address_read_data addrs;
 	i40e_status status;
 	u16 flags = 0;
+
+	if (!i40e_get_platform_mac_addr(hw, mac_addr))
+		return I40E_SUCCESS;
 
 	status = i40e_aq_mac_address_read(hw, &flags, &addrs, NULL);
 
