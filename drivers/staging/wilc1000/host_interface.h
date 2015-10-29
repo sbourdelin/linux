@@ -932,7 +932,7 @@ s32 host_int_add_beacon(struct host_if_drv *hWFIDrv, u32 u32Interval,
  *  @date		10 Julys 2012
  *  @version		1.0 Description
  */
-int host_int_del_beacon(struct host_if_drv *hWFIDrv);
+int host_int_del_beacon(struct host_if_drv *hif_drv);
 
 /*!
  *  @fn		s32 host_int_add_station(WILC_WFIDrvHandle hWFIDrv,
