@@ -2818,6 +2818,11 @@ TRACE_EVENT(cfg80211_stop_iface,
 		  WIPHY_PR_ARG, WDEV_PR_ARG)
 );
 
+DEFINE_EVENT(wiphy_netdev_evt, rdev_abort_scan,
+	TP_PROTO(struct wiphy *wiphy, struct net_device *netdev),
+	TP_ARGS(wiphy, netdev)
+);
+
 #endif /* !__RDEV_OPS_TRACE || TRACE_HEADER_MULTI_READ */
 
 #undef TRACE_INCLUDE_PATH

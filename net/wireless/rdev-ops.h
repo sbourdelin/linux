@@ -1020,4 +1020,16 @@ rdev_tdls_cancel_channel_switch(struct cfg80211_registered_device *rdev,
 	trace_rdev_return_void(&rdev->wiphy);
 }
 
+static inline int
+rdev_abort_scan(struct cfg80211_registered_device *rdev,
+		struct net_device *dev)
+{
+	int ret;
+
+	trace_rdev_abort_scan(&rdev->wiphy, dev);
+	ret = rdev->ops->abort_scan(&rdev->wiphy, dev);
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
 #endif /* __CFG80211_RDEV_OPS */
