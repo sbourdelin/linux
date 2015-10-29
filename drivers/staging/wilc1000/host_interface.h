@@ -979,7 +979,7 @@ s32 host_int_del_allstation(struct host_if_drv *hWFIDrv, u8 pu8MacAddr[][ETH_ALE
  *  @date		15 July 2012
  *  @version		1.0 Description
  */
-int host_int_del_station(struct host_if_drv *hif_drv, const u8 *pu8MacAddr);
+int host_int_del_station(struct host_if_drv *hif_drv, const u8 *mac_addr);
 
 /*!
  *  @fn		s32 host_int_edit_station(WILC_WFIDrvHandle hWFIDrv,
