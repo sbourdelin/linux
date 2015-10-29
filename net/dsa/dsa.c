@@ -454,10 +454,7 @@ static void dsa_switch_destroy(struct dsa_switch *ds)
 		if (!ds->ports[port])
 			continue;
 
-		netif_carrier_off(ds->ports[port]);
-		unregister_netdev(ds->ports[port]);
-		phy_disconnect(p->phy);
-		free_netdev(ds->ports[port]);
+		dsa_slave_destroy(ds->ports[port]);
 	}
 
 	mdiobus_unregister(ds->slave_mii_bus);
