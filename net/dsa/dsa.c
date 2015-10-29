@@ -949,6 +949,14 @@ static void dsa_remove_dst(struct dsa_switch_tree *dst)
 		flush_delayed_work(&dst->link_poll_work);
 	}
 
+	dst->master_netdev->dsa_ptr = NULL;
+
+	/* If we used a tagging format that doesn't have an ethertype
+	 * field, make sure that all packets from this point get sent
+	 * without the tag and go through the regular receive path.
+	 */
+	wmb();
+
 	for (i = 0; i < dst->pd->nr_chips; i++) {
 		struct dsa_switch *ds = dst->ds[i];
 
