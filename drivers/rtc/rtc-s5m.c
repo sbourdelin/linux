@@ -188,6 +188,7 @@ static inline int s5m_check_peding_alarm_interrupt(struct s5m_rtc_info *info,
 		ret = regmap_read(info->regmap, S5M_RTC_STATUS, &val);
 		val &= S5M_ALARM0_STATUS;
 		break;
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		ret = regmap_read(info->s5m87xx->regmap_pmic, S2MPS14_REG_ST2,
@@ -223,6 +224,9 @@ static inline int s5m8767_rtc_set_time_reg(struct s5m_rtc_info *info)
 	if (info->device_type == S5M8763X || info->device_type == S5M8767X)
 		data |= S5M_RTC_TIME_EN_MASK;
 
+	if (info->device_type == S2MPS15X)
+		data |= S2MPS15_RTC_WUDR_MASK;
+
 	ret = regmap_write(info->regmap, info->regs->rtc_udr_update, data);
 	if (ret < 0) {
 		dev_err(info->dev, "failed to write update reg(%d)\n", ret);
@@ -252,6 +256,9 @@ static inline int s5m8767_rtc_set_alarm_reg(struct s5m_rtc_info *info)
 	case S5M8767X:
 		data &= ~S5M_RTC_TIME_EN_MASK;
 		break;
+	case S2MPS15X:
+		data |= S2MPS15_RTC_AUDR_MASK;
+		break;
 	case S2MPS14X:
 		data |= S2MPS_RTC_RUDR_MASK;
 		break;
@@ -275,7 +282,6 @@ static inline int s5m8767_rtc_set_alarm_reg(struct s5m_rtc_info *info)
 	if (info->device_type == S2MPS13X)
 		regmap_update_bits(info->regmap, info->regs->rtc_udr_update,
 				   S2MPS13_RTC_AUDR_MASK, 0);
-
 	return ret;
 }
 
@@ -317,7 +323,8 @@ static int s5m_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	u8 data[info->regs->regs_count];
 	int ret;
 
-	if (info->device_type == S2MPS14X || info->device_type == S2MPS13X) {
+	if (info->device_type == S2MPS15X || info->device_type == S2MPS14X ||
+			info->device_type == S2MPS13X) {
 		ret = regmap_update_bits(info->regmap,
 				info->regs->rtc_udr_update,
 				S2MPS_RTC_RUDR_MASK, S2MPS_RTC_RUDR_MASK);
@@ -339,6 +346,7 @@ static int s5m_rtc_read_time(struct device *dev, struct rtc_time *tm)
 		break;
 
 	case S5M8767X:
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		s5m8767_data_to_tm(data, tm, info->rtc_24hr_mode);
@@ -366,6 +374,7 @@ static int s5m_rtc_set_time(struct device *dev, struct rtc_time *tm)
 		s5m8763_tm_to_data(tm, data);
 		break;
 	case S5M8767X:
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		ret = s5m8767_tm_to_data(tm, data);
@@ -414,6 +423,7 @@ static int s5m_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		break;
 
 	case S5M8767X:
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		s5m8767_data_to_tm(data, &alrm->time, info->rtc_24hr_mode);
@@ -463,6 +473,7 @@ static int s5m_rtc_stop_alarm(struct s5m_rtc_info *info)
 		break;
 
 	case S5M8767X:
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		for (i = 0; i < info->regs->regs_count; i++)
@@ -508,6 +519,7 @@ static int s5m_rtc_start_alarm(struct s5m_rtc_info *info)
 		break;
 
 	case S5M8767X:
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		data[RTC_SEC] |= ALARM_ENABLE_MASK;
@@ -548,6 +560,7 @@ static int s5m_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		break;
 
 	case S5M8767X:
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		s5m8767_tm_to_data(&alrm->time, data);
@@ -631,6 +644,7 @@ static int s5m8767_rtc_init_reg(struct s5m_rtc_info *info)
 		ret = regmap_raw_write(info->regmap, S5M_ALARM0_CONF, data, 2);
 		break;
 
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		data[0] = (0 << BCD_EN_SHIFT) | (1 << MODEL24_SHIFT);
@@ -679,6 +693,7 @@ static int s5m_rtc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	switch (platform_get_device_id(pdev)->driver_data) {
+	case S2MPS15X:
 	case S2MPS14X:
 	case S2MPS13X:
 		regmap_cfg = &s2mps14_rtc_regmap_config;
@@ -805,6 +820,7 @@ static const struct platform_device_id s5m_rtc_id[] = {
 	{ "s5m-rtc",		S5M8767X },
 	{ "s2mps13-rtc",	S2MPS13X },
 	{ "s2mps14-rtc",	S2MPS14X },
+	{ "s2mps15-rtc",	S2MPS15X },
 	{ },
 };
 MODULE_DEVICE_TABLE(platform, s5m_rtc_id);
