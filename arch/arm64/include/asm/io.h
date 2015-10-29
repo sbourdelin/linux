@@ -149,6 +149,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
 #define IO_SPACE_LIMIT		(PCI_IO_SIZE - 1)
 #define PCI_IOBASE		((void __iomem *)PCI_IO_START)
 
+extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
+
 /*
  * String version of I/O memory access operations.
  */
