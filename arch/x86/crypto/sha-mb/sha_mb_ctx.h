@@ -94,7 +94,6 @@ enum hash_ctx_error {
 
 
 /* Hash Constants and Typedefs */
-#define SHA1_DIGEST_LENGTH          5
 #define SHA1_LOG2_BLOCK_SIZE        6
 
 #define SHA1_PADLENGTHFIELD_SIZE    8

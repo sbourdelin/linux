@@ -54,10 +54,10 @@
 #ifndef __SHA_MB_MGR_H
 #define __SHA_MB_MGR_H
 
-
+#include <crypto/sha.h>
 #include <linux/types.h>
 
-#define NUM_SHA1_DIGEST_WORDS 5
+#define SHA1_DIGEST_WORDS (SHA1_DIGEST_SIZE / sizeof(u32))
 
 enum job_sts {	STS_UNKNOWN = 0,
 		STS_BEING_PROCESSED = 1,
@@ -69,7 +69,7 @@ enum job_sts {	STS_UNKNOWN = 0,
 struct job_sha1 {
 	u8	*buffer;
 	u32	len;
-	u32	result_digest[NUM_SHA1_DIGEST_WORDS] __aligned(32);
+	u32	result_digest[SHA1_DIGEST_WORDS] __aligned(32);
 	enum	job_sts status;
 	void	*user_data;
 };

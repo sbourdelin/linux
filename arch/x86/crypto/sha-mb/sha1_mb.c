@@ -104,7 +104,7 @@ static asmlinkage struct job_sha1* (*sha1_job_mgr_get_comp_job)(struct sha1_mb_m
 
 inline void sha1_init_digest(uint32_t *digest)
 {
-	static const uint32_t initial_digest[SHA1_DIGEST_LENGTH] = {SHA1_H0,
+	static const uint32_t initial_digest[SHA1_DIGEST_WORDS] = {SHA1_H0,
 					SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 };
 	memcpy(digest, initial_digest, sizeof(initial_digest));
 }
