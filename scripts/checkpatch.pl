@@ -730,6 +730,9 @@ my $fixlinenr = -1;
 my $vname;
 for my $filename (@ARGV) {
 	my $FILE;
+	if ($filename =~ /^(\.\/)/) {
+		substr($filename, 0, 2) = "";
+	}
 	if ($file) {
 		open($FILE, '-|', "diff -u /dev/null $filename") ||
 			die "$P: $filename: diff failed - $!\n";
