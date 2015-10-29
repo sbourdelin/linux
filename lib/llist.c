@@ -66,10 +66,7 @@ struct llist_node *llist_del_first(struct llist_head *head)
 {
 	struct llist_node *entry, *old_entry, *next;
 
-	entry = head->first;
-	for (;;) {
-		if (entry == NULL)
-			return NULL;
+	for (entry = head->first; entry ;) {
 		old_entry = entry;
 		next = entry->next;
 		entry = cmpxchg(&head->first, old_entry, next);
