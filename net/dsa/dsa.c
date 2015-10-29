@@ -459,6 +459,10 @@ static void dsa_switch_destroy(struct dsa_switch *ds)
 	}
 
 	mdiobus_unregister(ds->slave_mii_bus);
+
+	/* Leave a chance to the driver to cleanup */
+	if (ds->drv->remove)
+		ds->drv->remove(ds);
 }
 
 #ifdef CONFIG_PM_SLEEP
