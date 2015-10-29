@@ -513,7 +513,7 @@ static void dsa_link_poll_work(struct work_struct *ugly)
 	struct dsa_switch_tree *dst;
 	int i;
 
-	dst = container_of(ugly, struct dsa_switch_tree, link_poll_work);
+	dst = container_of(ugly, struct dsa_switch_tree, link_poll_work.work);
 
 	for (i = 0; i < dst->pd->nr_chips; i++) {
 		struct dsa_switch *ds = dst->ds[i];
@@ -522,16 +522,8 @@ static void dsa_link_poll_work(struct work_struct *ugly)
 			ds->drv->poll_link(ds);
 	}
 
-	mod_timer(&dst->link_poll_timer, round_jiffies(jiffies + HZ));
+	schedule_delayed_work(&dst->link_poll_work, round_jiffies_relative(HZ));
 }
-
-static void dsa_link_poll_timer(unsigned long _dst)
-{
-	struct dsa_switch_tree *dst = (void *)_dst;
-
-	schedule_work(&dst->link_poll_work);
-}
-
 
 /* platform driver init and cleanup *****************************************/
 static int dev_is_class(struct device *dev, void *class)
@@ -880,12 +872,8 @@ static int dsa_setup_dst(struct dsa_switch_tree *dst, struct net_device *dev,
 	dev->dsa_ptr = (void *)dst;
 
 	if (dst->link_poll_needed) {
-		INIT_WORK(&dst->link_poll_work, dsa_link_poll_work);
-		init_timer(&dst->link_poll_timer);
-		dst->link_poll_timer.data = (unsigned long)dst;
-		dst->link_poll_timer.function = dsa_link_poll_timer;
-		dst->link_poll_timer.expires = round_jiffies(jiffies + HZ);
-		add_timer(&dst->link_poll_timer);
+		INIT_DELAYED_WORK(&dst->link_poll_work, dsa_link_poll_work);
+		schedule_delayed_work(&dst->link_poll_work, round_jiffies_relative(HZ));
 	}
 
 	return 0;
@@ -954,10 +942,10 @@ static void dsa_remove_dst(struct dsa_switch_tree *dst)
 {
 	int i;
 
-	if (dst->link_poll_needed)
-		del_timer_sync(&dst->link_poll_timer);
-
-	flush_work(&dst->link_poll_work);
+	if (dst->link_poll_needed) {
+		cancel_delayed_work_sync(&dst->link_poll_work);
+		flush_delayed_work(&dst->link_poll_work);
+	}
 
 	for (i = 0; i < dst->pd->nr_chips; i++) {
 		struct dsa_switch *ds = dst->ds[i];
