@@ -4537,12 +4537,12 @@ int host_int_add_station(struct host_if_drv *hif_drv,
 
 	memcpy(add_sta_info, sta_param, sizeof(struct add_sta_param));
 	if (add_sta_info->u8NumRates > 0) {
-		u8 *rates = kmalloc(add_sta_info->u8NumRates, GFP_KERNEL);
-
+		u8 *rates = kmemdup(sta_param->pu8Rates,
+				    add_sta_info->u8NumRates,
+				    GFP_KERNEL);
 		if (!rates)
 			return -ENOMEM;
 
-		memcpy(rates, sta_param->pu8Rates, add_sta_info->u8NumRates);
 		add_sta_info->pu8Rates = rates;
 	}
 
