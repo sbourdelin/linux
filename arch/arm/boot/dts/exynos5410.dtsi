@@ -97,6 +97,15 @@
 			reg = <0x10000000 0x100>;
 		};
 
+		sromc: sromc@12250000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			compatible = "samsung,exynos-srom";
+			reg = <0x12250000 0x14>;
+		};
+
 		pmu_system_controller: system-controller@10040000 {
 			compatible = "samsung,exynos5410-pmu", "syscon";
 			reg = <0x10040000 0x5000>;
@@ -129,6 +138,12 @@
 						<10 &gic 0 130 0>,
 						<11 &gic 0 131 0>;
 			};
+
+			arch_timer {
+				compatible = "arm,armv7-timer";
+				clock-frequency = <24000000>;
+			};
+
 		};
 
 		sysram@02020000 {
