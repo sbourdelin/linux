@@ -1,0 +1,28 @@
+* TPS65912 regulator bindings
+
+Required properties:
+ - compatible: "ti,tps65912-regulator"
+ - list of regulators provided by this controller, must be named
+     after their hardware counterparts: dcdc[1-4] and ldo[1-10]
+
+Each regulator is defined using the standard binding for regulators.
+
+Example:
+
+	tps65912_regulator {
+		compatible = "ti,tps65912-regulator";
+
+		dcdc1 {
+			regulator-name = "vdd_core";
+			regulator-min-microvolt = <912000>;
+			regulator-max-microvolt = <1144000>;
+			regulator-boot-on;
+			regulator-always-on;
+		};
+
+		ldo1 {
+			regulator-name = "ldo1";
+			regulator-min-microvolt = <1900000>;
+			regulator-max-microvolt = <1900000>;
+		};
+	};
