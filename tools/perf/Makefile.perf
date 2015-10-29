@@ -92,6 +92,13 @@ ifneq ($(objtree),)
 #$(info Determined 'objtree' to be $(objtree))
 endif
 
+ifeq ($(findstring -static,${LDFLAGS}),-static)
+  ifneq ($(wildcard deps-$(ARCH)/*),)
+    LDFLAGS += -L $(PWD)/deps-$(ARCH)/lib
+    EXTRA_CFLAGS += -isystem $(PWD)/deps-$(ARCH)/include
+  endif
+endif
+
 ifneq ($(OUTPUT),)
 #$(info Determined 'OUTPUT' to be $(OUTPUT))
 # Adding $(OUTPUT) as a directory to look for source files,

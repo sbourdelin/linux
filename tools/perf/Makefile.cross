@@ -1,0 +1,154 @@
+#
+# This is a helper Makefile that downloads and builds many of the optional
+# libraries that perf can use.  This libraries built by this Makefile can be
+# subsequently used in a static build of perf.  The intented use is when cross
+# compiling perf.
+#
+# For example, assuming you have the arm-linux-gcc cross compiler in your PATH,
+# running the following two commands will result in a static ARM build of perf
+# with various features that require external libraries:
+#
+# $ make ARCH=arm CROSS_COMPILE=arm-linux- -f Makefile.cross
+# $ make ARCH=arm CROSS_COMPILE=arm-linux- LDFLAGS="-static"
+#
+
+LIBS += audit
+audit_BASENAME=audit-2.4.4
+audit_ARCHIVE=$(audit_BASENAME).tar.gz
+audit_URL=https://people.redhat.com/sgrubb/audit/$(audit_ARCHIVE)
+
+LIBS += bfd
+bfd_BASENAME=binutils-2.25.1
+bfd_ARCHIVE=$(bfd_BASENAME).tar.bz2
+bfd_URL=http://ftp.gnu.org/gnu/binutils/$(bfd_ARCHIVE)
+
+LIBS += bzip2
+bzip2_BASENAME=bzip2-1.0.6
+bzip2_ARCHIVE=$(bzip2_BASENAME).tar.gz
+bzip2_URL=http://www.bzip.org/1.0.6/$(bzip2_ARCHIVE)
+
+LIBS += elfutils
+elfutils_BASENAME=elfutils-0.163
+elfutils_ARCHIVE=$(elfutils_BASENAME).tar.bz2
+elfutils_URL=https://fedorahosted.org/releases/e/l/elfutils/0.163/$(elfutils_ARCHIVE)
+
+LIBS += lzma
+lzma_BASENAME=xz-5.2.1
+lzma_ARCHIVE=$(lzma_BASENAME).tar.gz
+lzma_URL=http://tukaani.org/xz/$(lzma_ARCHIVE)
+
+LIBS += slang
+slang_BASENAME=slang-2.1.4
+slang_ARCHIVE=$(slang_BASENAME).tar.bz2
+slang_URL=http://ftp.ntua.gr/pub/lang/slang/slang/v2.1/$(slang_ARCHIVE)
+
+LIBS += unwind
+unwind_BASENAME=libunwind-1.1
+unwind_ARCHIVE=$(unwind_BASENAME).tar.gz
+unwind_URL=http://download.savannah.gnu.org/releases/libunwind/$(unwind_ARCHIVE)
+
+LIBS += zlib
+zlib_BASENAME=zlib-1.2.8
+zlib_ARCHIVE=$(zlib_BASENAME).tar.gz
+zlib_URL=http://zlib.net/$(zlib_ARCHIVE)
+
+DLDIR=dl
+DEPSDIR=deps-$(ARCH)
+BUILDDIR=build-$(ARCH)
+HOST=$(shell echo $(CROSS_COMPILE) | sed 's/.$$//')
+PREFIX=$(realpath $(shell pwd))/$(DEPSDIR)
+MAKE1=$(MAKE) -j1
+
+CC=$(CROSS_COMPILE)gcc
+
+export CC
+
+.PHONY: all clean $(LIBS)
+
+all: $(LIBS)
+
+define LIB_template
+$1_DIR=$$(BUILDDIR)/$$($1_BASENAME)
+$1_EXTRACT=$$($1_DIR)/.extract
+$1_INSTALL=$$(DEPSDIR)/lib/.$1.install
+
+$$(DLDIR)/$$($1_ARCHIVE):
+	mkdir -p $$(DLDIR) && cd $$(DLDIR) && wget -N $$($1_URL)
+
+$$($1_EXTRACT): $$(DLDIR)/$$($1_ARCHIVE)
+	mkdir -p $$(BUILDDIR) && tar xf $$< -C $$(BUILDDIR)
+	touch $$@
+
+$1: $$($1_INSTALL)
+
+$1-clean:
+	rm -rf $$($1_DIR)
+endef
+
+$(foreach lib,$(LIBS),$(eval $(call LIB_template,$(lib))))
+
+$(audit_INSTALL): $(audit_EXTRACT)
+	cd $(audit_DIR) && ./configure --host=$(HOST) --prefix=$(PREFIX)
+	$(MAKE) -C $(audit_DIR)/lib
+	$(MAKE) -C $(audit_DIR)/lib install
+	touch $@
+
+CFLAGS=-I$(PREFIX)/include
+LDFLAGS=-L$(PREFIX)/lib
+
+$(bfd_INSTALL): $(zlib_INSTALL) $(bfd_EXTRACT)
+	cd $(bfd_DIR)/libiberty && ./configure --host=$(HOST) --prefix=$(PREFIX) --enable-install-libiberty
+	$(MAKE) -C $(bfd_DIR)/libiberty
+	$(MAKE) -C $(bfd_DIR)/libiberty install
+	cd $(bfd_DIR)/bfd && CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" ./configure --host=$(HOST) --prefix=$(PREFIX) --with-zlib
+	$(MAKE) -C $(bfd_DIR)/bfd
+	$(MAKE) -C $(bfd_DIR)/bfd install
+	touch $@
+
+$(bzip2_INSTALL): $(bzip2_EXTRACT)
+	$(MAKE) -C $(bzip2_DIR) clean
+	$(MAKE) CC="$(CC)" PREFIX=$(PREFIX) -C $(bzip2_DIR) -f Makefile-libbz2_so
+	mkdir -p $(DEPSDIR)/lib
+	cp -a $(bzip2_DIR)/libbz2.so* $(DEPSDIR)/lib/
+	@rm -f $(DEPSDIR)/lib/libbz2.so
+	# The dynamic library is required to prevent errors while building elfutils
+	cd $(DEPSDIR)/lib && ln -s libbz2.so.1.0 libbz2.so
+	$(MAKE) -C $(bzip2_DIR) clean
+	$(MAKE) CC="$(CC)" PREFIX=$(PREFIX) -C $(bzip2_DIR) install
+	touch $@
+
+elfutils_LDFLAGS=$(LDFLAGS) -Wl,-rpath-link $(PREFIX)/lib
+
+$(elfutils_INSTALL): $(zlib_INSTALL) $(lzma_INSTALL) $(bzip2_INSTALL) $(elfutils_EXTRACT)
+	cd $(elfutils_DIR) && CFLAGS="$(CFLAGS)" LDFLAGS="$(elfutils_LDFLAGS)" ./configure --host=$(HOST) --prefix=$(PREFIX) --with-zlib --with-bzlib --with-lzma
+	$(MAKE) -C $(elfutils_DIR)
+	$(MAKE) -C $(elfutils_DIR) install
+	touch $@
+
+$(lzma_INSTALL): $(lzma_EXTRACT)
+	cd $(lzma_DIR) && ./configure --host=$(HOST) --prefix=$(PREFIX)
+	$(MAKE) -C $(lzma_DIR)
+	$(MAKE) -C $(lzma_DIR) install
+	touch $@
+
+$(slang_INSTALL): $(slang_EXTRACT)
+	cd $(slang_DIR) && ./configure --host=$(HOST) --prefix=$(PREFIX)
+	$(MAKE1) -C $(slang_DIR)
+	$(MAKE1) -C $(slang_DIR) install-all
+	touch $@
+
+$(zlib_INSTALL): $(zlib_EXTRACT)
+	cd $(zlib_DIR) && ./configure --prefix=$(PREFIX)
+	$(MAKE) -C $(zlib_DIR)
+	$(MAKE) -C $(zlib_DIR) install
+	touch $@
+
+$(unwind_INSTALL): $(unwind_EXTRACT)
+	cd $(unwind_DIR) && ./configure --host=$(HOST) --prefix=$(PREFIX) --enable-debug --enable-debug-frame
+	cd $(unwind_DIR) && $(MAKE)
+	cd $(unwind_DIR) && $(MAKE) install
+	touch $@
+
+clean:
+	rm -rf $(BUILDDIR)
+	rm -rf $(DEPSDIR)
