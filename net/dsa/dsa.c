@@ -522,7 +522,8 @@ static void dsa_link_poll_work(struct work_struct *ugly)
 			ds->drv->poll_link(ds);
 	}
 
-	schedule_delayed_work(&dst->link_poll_work, round_jiffies_relative(HZ));
+	if (dst->link_poll_needed)
+		schedule_delayed_work(&dst->link_poll_work, round_jiffies_relative(HZ));
 }
 
 /* platform driver init and cleanup *****************************************/
@@ -943,6 +944,7 @@ static void dsa_remove_dst(struct dsa_switch_tree *dst)
 	int i;
 
 	if (dst->link_poll_needed) {
+		dst->link_poll_needed = 0;
 		cancel_delayed_work_sync(&dst->link_poll_work);
 		flush_delayed_work(&dst->link_poll_work);
 	}
