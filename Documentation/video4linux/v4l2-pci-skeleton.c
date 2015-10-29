@@ -163,7 +163,7 @@ static irqreturn_t skeleton_irq(int irq, void *dev_id)
  * minimum number: many DMA engines need a minimum of 2 buffers in the
  * queue and you need to have another available for userspace processing.
  */
-static int queue_setup(struct vb2_queue *vq, const void *parg,
+static int queue_setup(struct vb2_queue *vq,
 		       unsigned int *nbuffers, unsigned int *nplanes,
 		       unsigned int sizes[], void *alloc_ctxs[])
 {
@@ -183,12 +183,12 @@ static int queue_setup(struct vb2_queue *vq, const void *parg,
 
 	if (vq->num_buffers + *nbuffers < 3)
 		*nbuffers = 3 - vq->num_buffers;
-
-	if (fmt && fmt->fmt.pix.sizeimage < skel->format.sizeimage)
-		return -EINVAL;
-	*nplanes = 1;
-	sizes[0] = fmt ? fmt->fmt.pix.sizeimage : skel->format.sizeimage;
 	alloc_ctxs[0] = skel->alloc_ctx;
+
+	if (*nplanes)
+		return sizes[0] < skel->format.sizeimage ? -EINVAL : 0;
+	*nplanes = 1;
+	sizes[0] = skel->format.sizeimage;
 	return 0;
 }
 
