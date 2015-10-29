@@ -33,8 +33,7 @@ Table of Contents
   2	Modifying System Parameters
 
   3	Per-Process Parameters
-  3.1	/proc/<pid>/oom_adj & /proc/<pid>/oom_score_adj - Adjust the oom-killer
-								score
+  3.1	/proc/<pid>/oom_score_adj - Adjust the oom-killer score
   3.2	/proc/<pid>/oom_score - Display current oom-killer score
   3.3	/proc/<pid>/io - Display the IO accounting fields
   3.4	/proc/<pid>/coredump_filter - Core dump filtering settings
@@ -1427,7 +1426,7 @@ of the kernel.
 CHAPTER 3: PER-PROCESS PARAMETERS
 ------------------------------------------------------------------------------
 
-3.1 /proc/<pid>/oom_adj & /proc/<pid>/oom_score_adj- Adjust the oom-killer score
+3.1 /proc/<pid>/oom_score_adj- Adjust the oom-killer score
 --------------------------------------------------------------------------------
 
 These file can be used to adjust the badness heuristic used to select which
@@ -1467,12 +1466,6 @@ same system, cpuset, mempolicy, or memory controller resources to use at least
 50% more memory.  A value of -500, on the other hand, would be roughly
 equivalent to discounting 50% of the task's allowed memory from being considered
 as scoring against the task.
-
-For backwards compatibility with previous kernels, /proc/<pid>/oom_adj may also
-be used to tune the badness score.  Its acceptable values range from -16
-(OOM_ADJUST_MIN) to +15 (OOM_ADJUST_MAX) and a special value of -17
-(OOM_DISABLE) to disable oom killing entirely for that task.  Its value is
-scaled linearly with /proc/<pid>/oom_score_adj.
 
 The value of /proc/<pid>/oom_score_adj may be reduced no lower than the last
 value set by a CAP_SYS_RESOURCE process. To reduce the value any lower
