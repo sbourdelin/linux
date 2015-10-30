@@ -33,6 +33,7 @@
 #include <asm/insn.h>
 
 #define AARCH64_INSN_SF_BIT	BIT(31)
+#define AARCH64_INSN_S_BIT	BIT(29)
 #define AARCH64_INSN_N_BIT	BIT(22)
 
 static int aarch64_insn_encoding_class[] = {
@@ -1140,4 +1141,105 @@ u32 aarch32_insn_mcr_extract_opc2(u32 insn)
 u32 aarch32_insn_mcr_extract_crm(u32 insn)
 {
 	return insn & CRM_MASK;
+}
+
+enum aarch64_insn_register aarch64_insn_extract_reg_num(u32 insn,
+				enum aarch64_insn_register_type type)
+{
+	int shift;
+
+	switch (type) {
+	case AARCH64_INSN_REGTYPE_RT:
+	case AARCH64_INSN_REGTYPE_RD:
+		shift = 0;
+		break;
+	case AARCH64_INSN_REGTYPE_RN:
+		shift = 5;
+		break;
+	case AARCH64_INSN_REGTYPE_RT2:
+	case AARCH64_INSN_REGTYPE_RA:
+		shift = 10;
+		break;
+	case AARCH64_INSN_REGTYPE_RM:
+		shift = 16;
+		break;
+	default:
+		pr_err("%s: unknown register type decoding %d\n", __func__,
+		       type);
+		return ~0L;
+	}
+
+	return (insn & (GENMASK(4, 0) << shift)) >> shift;
+}
+
+int aarch64_insn_decode_add_sub_imm(u32 insn,
+				    enum aarch64_insn_register *dst,
+				    enum aarch64_insn_register *src,
+				    int *imm,
+				    enum aarch64_insn_variant *variant,
+				    enum aarch64_insn_adsb_type *type)
+{
+	if (aarch64_insn_is_add_imm(insn))
+		*type =	((insn) & AARCH64_INSN_S_BIT) ?
+				AARCH64_INSN_ADSB_ADD_SETFLAGS :
+				AARCH64_INSN_ADSB_ADD;
+	else if (aarch64_insn_is_sub_imm(insn))
+		*type =	((insn) & AARCH64_INSN_S_BIT) ?
+				AARCH64_INSN_ADSB_SUB_SETFLAGS :
+				AARCH64_INSN_ADSB_SUB;
+	else
+		return 0;
+
+	*variant = (insn & AARCH64_INSN_SF_BIT) ? AARCH64_INSN_VARIANT_64BIT :
+					AARCH64_INSN_VARIANT_32BIT;
+
+	*dst = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RD);
+
+	*src = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
+
+	/* TODO: ignore shilft field[23:22] */
+	*imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_12, insn);
+
+	return 1;
+}
+
+int aarch64_insn_decode_load_store_pair(u32 insn,
+					enum aarch64_insn_register *reg1,
+					enum aarch64_insn_register *reg2,
+					enum aarch64_insn_register *base,
+					int *offset,
+					enum aarch64_insn_variant *variant,
+					enum aarch64_insn_ldst_type *type)
+{
+	int imm;
+
+	if (aarch64_insn_is_stp(insn))
+		*type = AARCH64_INSN_LDST_STORE_PAIR;
+	else if (aarch64_insn_is_stp_post(insn))
+		*type = AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX;
+	else if (aarch64_insn_is_stp_pre(insn))
+		*type = AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX;
+	else if (aarch64_insn_is_ldp(insn))
+		*type = AARCH64_INSN_LDST_LOAD_PAIR;
+	else if (aarch64_insn_is_ldp_post(insn))
+		*type = AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX;
+	else if (aarch64_insn_is_ldp_pre(insn))
+		*type = AARCH64_INSN_LDST_LOAD_PAIR_PRE_INDEX;
+	else
+		return 0;
+
+	*variant = (insn & AARCH64_INSN_S_BIT) ? AARCH64_INSN_VARIANT_64BIT :
+				AARCH64_INSN_VARIANT_32BIT;
+
+	*reg1 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT);
+
+	*reg2 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT2);
+
+	*base = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
+
+	imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_7, insn);
+	asm("sbfm %0, %0, 0, 6" : "+r" (imm));
+	*offset = imm * 8;
+
+	return 1;
 }
