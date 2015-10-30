@@ -2828,10 +2828,17 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 
 	/* A frame is received from user space */
 	memset(&rx_status, 0, sizeof(rx_status));
-	/* TODO: Check ATTR_FREQ if it exists, and maybe throw away off-channel
-	 * packets?
-	 */
-	rx_status.freq = data2->channel->center_freq;
+
+	/* Check ATTR_FREQ if it exists, and throw away off-channel packets */
+	if (info->attrs[HWSIM_ATTR_FREQ])
+		rx_status.freq = nla_get_u32(info->attrs[HWSIM_ATTR_FREQ]);
+	else
+		rx_status.freq = data2->channel->center_freq;
+
+	/* Drop packet if not on the same frequency as this radio */
+	if (rx_status.freq != data2->channel->center_freq)
+		goto out;
+
 	rx_status.band = data2->channel->band;
 	rx_status.rate_idx = nla_get_u32(info->attrs[HWSIM_ATTR_RX_RATE]);
 	rx_status.signal = nla_get_u32(info->attrs[HWSIM_ATTR_SIGNAL]);
