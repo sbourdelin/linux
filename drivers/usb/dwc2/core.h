@@ -582,8 +582,11 @@ struct dwc2_hregs_backup {
  * @hcd_enabled		Host mode sub-driver initialization indicator.
  * @gadget_enabled	Peripheral mode sub-driver initialization indicator.
  * @ll_hw_enabled	Status of low-level hardware resources.
+ * @need_phy_full_reset_on_wake: Quirk saying that we should assert
+ *                               phy_full_reset on a remote wakeup.
  * @phy:                The otg phy transceiver structure for phy control.
  * @uphy:               The otg phy transceiver structure for old USB phy control.
+ * @phy_full_reset:     Reset control for the PHY's "full reset".
  * @plat:               The platform specific configuration data. This can be removed once
  *                      all SoCs support usb transceiver.
  * @supplies:           Definition of USB power supplies
@@ -710,9 +713,11 @@ struct dwc2_hsotg {
 	unsigned int hcd_enabled:1;
 	unsigned int gadget_enabled:1;
 	unsigned int ll_hw_enabled:1;
+	unsigned int need_phy_full_reset_on_wake:1;
 
 	struct phy *phy;
 	struct usb_phy *uphy;
+	struct reset_control *phy_full_reset;
 	struct dwc2_hsotg_plat *plat;
 	struct regulator_bulk_data supplies[ARRAY_SIZE(dwc2_hsotg_supply_names)];
 	u32 phyif;
