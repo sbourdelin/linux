@@ -269,6 +269,16 @@ int sysfs_add_link_to_group(struct kobject *kobj, const char *group_name,
 void sysfs_remove_link_from_group(struct kobject *kobj, const char *group_name,
 				  const char *link_name);
 
+struct device;
+int __must_check devm_sysfs_create_group(struct device *dev,
+				const struct attribute_group *grp);
+int __must_check devm_sysfs_create_groups(struct device *dev,
+				const struct attribute_group **groups);
+void devm_sysfs_remove_group(struct device *dev,
+			     const struct attribute_group *grp);
+void devm_sysfs_remove_groups(struct device *dev,
+			      const struct attribute_group **groups);
+
 void sysfs_notify(struct kobject *kobj, const char *dir, const char *attr);
 
 int __must_check sysfs_init(void);
