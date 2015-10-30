@@ -13,8 +13,9 @@
 
 #include <asm/insn.h>
 
-#define MCOUNT_ADDR		((unsigned long)_mcount)
-#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+#define MCOUNT_ADDR			((unsigned long)_mcount)
+#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
+#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
 
 #ifndef __ASSEMBLY__
 #include <linux/compat.h>
