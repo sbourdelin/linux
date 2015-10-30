@@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
 	select DW_APB_TIMER
 	select CLKSRC_OF
 
+config DW_APB_TIMER_BASED_DELAY
+	bool "DW APB timer based delay"
+	depends on ARM && DW_APB_TIMER_OF
+	default n
+	help
+	  This option enables support for using the DW APB timer to
+	  implement timer-based delay. It is useful for skiping the
+	  delay loop calibration at boot on some platforms. And the
+	  udelay() will be unaffected by CPU frequency changes.
+
 config ROCKCHIP_TIMER
 	bool
 	select CLKSRC_OF
