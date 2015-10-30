@@ -976,7 +976,7 @@ static int scsi_target_add(struct scsi_target *starget)
 {
 	int error;
 
-	if (starget->state != STARGET_CREATED)
+	if (starget->visible)
 		return 0;
 
 	error = device_add(&starget->dev);
@@ -985,7 +985,7 @@ static int scsi_target_add(struct scsi_target *starget)
 		return error;
 	}
 	transport_add_device(&starget->dev);
-	starget->state = STARGET_RUNNING;
+	starget->visible = true;
 
 	pm_runtime_set_active(&starget->dev);
 	pm_runtime_enable(&starget->dev);
@@ -1168,11 +1168,12 @@ void scsi_remove_target(struct device *dev)
 	 */
 	spin_lock_irqsave(shost->host_lock, flags);
 	list_for_each_entry(starget, &shost->__targets, siblings) {
-		if (starget->state == STARGET_DEL)
+		if (starget->reaped)
 			continue;
 		if (starget->dev.parent == dev || &starget->dev == dev) {
 			/* assuming new targets arrive at the end */
 			kref_get(&starget->reap_ref);
+			starget->reaped = true;
 			spin_unlock_irqrestore(shost->host_lock, flags);
 			if (last)
 				scsi_target_reap(last);
