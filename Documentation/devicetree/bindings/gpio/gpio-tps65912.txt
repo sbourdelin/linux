@@ -1,0 +1,16 @@
+* TPS65912 GPIO Controller bindings
+
+Required properties:
+ - compatible		: Should be "ti,tps65912-gpio".
+ - gpio-controller	: Marks the device node as a GPIO Controller.
+ - #gpio-cells		: Should be two.  The first cell is the pin number and
+			    the second cell is used to specify flags.
+			    See ../gpio/gpio.txt for more information.
+
+Example:
+
+	gpio4: gpio {
+		compatible = "ti,tps65912-gpio";
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
