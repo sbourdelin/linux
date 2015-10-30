@@ -936,7 +936,9 @@ static void ipmr_cache_resolve(struct net *net, struct mr_table *mrt,
 
 			rtnl_unicast(skb, net, NETLINK_CB(skb).portid);
 		} else {
+			preempt_disable();
 			ip_mr_forward(net, mrt, skb, c, 0);
+			preempt_enable();
 		}
 	}
 }
