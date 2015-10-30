@@ -220,6 +220,7 @@ Thermal zone device sys I/F, created once it's registered:
     |---trip_point_[0-*]_type:	Trip point type
     |---trip_point_[0-*]_hyst:	Hysteresis value for this trip point
     |---emul_temp:		Emulated temperature set node
+    |---subtz[0-*]              Slave thermal zones of this thermal zone
     |---sustainable_power:      Sustainable dissipatable power
     |---k_po:                   Proportional term during temperature overshoot
     |---k_pu:                   Proportional term during temperature undershoot
@@ -354,6 +355,10 @@ emul_temp
 	  WARNING: Be careful while enabling this option on production systems,
 	  because userland can easily disable the thermal policy by simply
 	  flooding this sysfs node with low temperature values.
+
+subtz[0-*]
+	sysfs link to the slave thermal zone device.
+        RO, Optional
 
 sustainable_power
 	An estimate of the sustained power that can be dissipated by
