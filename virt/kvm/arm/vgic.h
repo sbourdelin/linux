@@ -49,6 +49,7 @@ u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset);
 
 void vgic_dist_irq_set_pending(struct kvm_vcpu *vcpu, int irq);
 void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq);
+void vgic_dist_irq_set_cfg(struct kvm_vcpu *vcpu, int irq, bool level);
 void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq);
 void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
 			     int irq, int val);

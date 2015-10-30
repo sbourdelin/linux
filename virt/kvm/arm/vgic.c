@@ -380,6 +380,14 @@ void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq)
 	vgic_bitmap_set_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq, 0);
 }
 
+void vgic_dist_irq_set_cfg(struct kvm_vcpu *vcpu, int irq, bool level)
+{
+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+
+	vgic_bitmap_set_irq_val(&dist->irq_cfg, vcpu->vcpu_id, irq,
+				level ? VGIC_CFG_LEVEL : VGIC_CFG_EDGE);
+}
+
 static void vgic_cpu_irq_set(struct kvm_vcpu *vcpu, int irq)
 {
 	if (irq < VGIC_NR_PRIVATE_IRQS)
