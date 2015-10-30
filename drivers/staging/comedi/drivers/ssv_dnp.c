@@ -150,7 +150,8 @@ static int dnp_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* We use the I/O ports 0x22,0x23 and 0xa3-0xa9, which are always
 	 * allocated for the primary 8259, so we don't need to allocate them
-	 * ourselves. */
+	 * ourselves.
+	 */
 
 	/* configure all ports as input (default)                            */
 	outb(PAMR, CSCIR);
