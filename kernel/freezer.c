@@ -164,6 +164,7 @@ void __thaw_task(struct task_struct *p)
 bool set_freezable(void)
 {
 	might_sleep();
+	WARN_ON(current->flags & PF_KTHREAD);
 
 	/*
 	 * Modify flags while holding freezer_lock.  This ensures the

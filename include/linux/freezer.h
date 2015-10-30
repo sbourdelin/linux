@@ -59,6 +59,8 @@ static inline bool try_to_freeze_unsafe(void)
 
 static inline bool try_to_freeze(void)
 {
+	WARN_ON(current->flags & PF_KTHREAD);
+
 	if (!(current->flags & PF_NOFREEZE))
 		debug_check_no_locks_held();
 	return try_to_freeze_unsafe();
