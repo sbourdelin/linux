@@ -512,6 +512,17 @@ config QCOM_HIDMA_MGMT
 	  OS would run QCOM_HIDMA driver and the hypervisor would run
 	  the QCOM_HIDMA_MGMT driver.
 
+config QCOM_HIDMA
+	tristate "Qualcomm Technologies HIDMA support"
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Enable support for the Qualcomm Technologies HIDMA controller.
+	  The HIDMA controller supports optimized buffer copies
+	  (user to kernel, kernel to kernel, etc.).  It only supports
+	  memcpy/memset interfaces. The core is not intended for general
+	  purpose slave DMA.
+
 config XILINX_VDMA
 	tristate "Xilinx AXI VDMA Engine"
 	depends on (ARCH_ZYNQ || MICROBLAZE)
