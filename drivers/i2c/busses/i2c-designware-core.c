@@ -542,10 +542,11 @@ i2c_dw_xfer_msg(struct dw_i2c_dev *dev)
 	}
 
 	/*
-	 * If i2c_msg index search is completed, we don't need TX_EMPTY
-	 * interrupt any more.
+	 * If i2c_msg index search is completed and writing is not in progress,
+	 * we don't need TX_EMPTY interrupt any more.
 	 */
-	if (dev->msg_write_idx == dev->msgs_num)
+	if (dev->msg_write_idx == dev->msgs_num &&
+			!(dev->status & STATUS_WRITE_IN_PROGRESS))
 		intr_mask &= ~DW_IC_INTR_TX_EMPTY;
 
 	if (dev->msg_err)
