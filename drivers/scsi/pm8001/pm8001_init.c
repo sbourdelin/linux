@@ -1190,6 +1190,7 @@ static int pm8001_pci_resume(struct pci_dev *pdev)
 	int rc;
 	u8 i = 0, j;
 	u32 device_state;
+	u32 wait_count;
 	DECLARE_COMPLETION_ONSTACK(completion);
 	pm8001_ha = sha->lldd_ha;
 	device_state = pdev->current_state;
@@ -1243,6 +1244,17 @@ static int pm8001_pci_resume(struct pci_dev *pdev)
 		for (i = 1; i < pm8001_ha->number_of_intr; i++)
 			PM8001_CHIP_DISP->interrupt_enable(pm8001_ha, i);
 	}
+
+	if (pm8001_ha->chip_id == chip_8070 ||
+		pm8001_ha->chip_id == chip_8072) {
+		wait_count = 500;
+		do {
+			mdelay(1);
+		} while (--wait_count);
+	}
+
+	/* Spin up the PHYs */
+
 	pm8001_ha->flags = PM8001F_RUN_TIME;
 	for (i = 0; i < pm8001_ha->chip->n_phy; i++) {
 		pm8001_ha->phy[i].enable_completion = &completion;
