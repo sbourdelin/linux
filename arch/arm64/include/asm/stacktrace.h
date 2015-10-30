@@ -25,5 +25,9 @@ struct stackframe {
 extern int unwind_frame(struct stackframe *frame);
 extern void walk_stackframe(struct stackframe *frame,
 			    int (*fn)(struct stackframe *, void *), void *data);
+#ifdef CONFIG_STACK_TRACER
+struct stack_trace;
+extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
+#endif
 
 #endif	/* __ASM_STACKTRACE_H */
