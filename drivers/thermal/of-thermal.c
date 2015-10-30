@@ -166,6 +166,26 @@ of_thermal_get_trip_points(struct thermal_zone_device *tz)
 EXPORT_SYMBOL_GPL(of_thermal_get_trip_points);
 
 /**
+ * of_thermal_is_thermal_zone() - check that a device node corresponds to a thermal zone
+ * @np:	the device node
+ *
+ * Valid thermal zone device nodes must provide the
+ * polling-delay-passive and polling-delay properties.  If this device
+ * node provides them return true, as it's a valid device node for a
+ * thermal zone.
+ */
+static bool of_thermal_is_thermal_zone(struct device_node *np)
+{
+	u32 out;
+
+	if ((of_property_read_u32(np, "polling-delay-passive", &out)) ||
+	    (of_property_read_u32(np, "polling-delay", &out)))
+		return false;
+
+	return true;
+}
+
+/**
  * of_thermal_set_emul_temp - function to set emulated temperature
  *
  * @tz:	pointer to a thermal zone
@@ -858,6 +878,81 @@ static inline void of_thermal_free_zone(struct __thermal_zone *tz)
 }
 
 /**
+ * link_stacked_thermal_zones() - link thermal zones that are a superset of thermal zones
+ * @np:	device node for the root of the thermal zones
+ *
+ * A thermal zone can specify other thermal zones as its input using
+ * the thermal-sensors property of device tree.  This function parses
+ * all the thermal zones in dt and adds the thermal zones in their
+ * thermal-sensors as sub-thermalzones.
+ */
+static void link_stacked_thermal_zones(struct device_node *np)
+{
+	struct device_node *child;
+
+	for_each_child_of_node(np, child) {
+		int i, num_sensors;
+		struct thermal_zone_device *tz;
+
+		num_sensors = of_count_phandle_with_args(child,
+							 "thermal-sensors",
+							 "#thermal-sensor-cells");
+		if (num_sensors <= 0)
+			continue;
+
+		tz = thermal_zone_get_zone_by_name(child->name);
+		if (IS_ERR_OR_NULL(tz)) {
+			/*
+			 * If the tz is available we should have added
+			 * it in of_parse_thermal_zones()
+			 */
+			WARN(of_device_is_available(child),
+			     "Couldn't find thermal zone for %s\n",
+			     of_node_full_name(child));
+			continue;
+		}
+
+		for (i = 0; i < num_sensors; i++) {
+			struct of_phandle_args sensor_specs;
+			struct thermal_zone_device *subtz;
+			int ret;
+
+			ret = of_parse_phandle_with_args(child,
+							"thermal-sensors",
+							"#thermal-sensor-cells",
+							i, &sensor_specs);
+			if (ret) {
+				pr_warn("Failed to parse thermal-sensors of %s: %d\n",
+					of_node_full_name(child), ret);
+				of_node_put(sensor_specs.np);
+				continue;
+			}
+
+			if (!of_thermal_is_thermal_zone(sensor_specs.np)) {
+				of_node_put(sensor_specs.np);
+				continue;
+			}
+
+			subtz = thermal_zone_get_zone_by_name(
+				sensor_specs.np->name);
+			if (IS_ERR_OR_NULL(subtz)) {
+				pr_warn("Couldn't find thermal zone for %s, is it disabled?\n",
+					of_node_full_name(sensor_specs.np));
+				of_node_put(sensor_specs.np);
+				continue;
+			}
+
+			ret = thermal_zone_add_subtz(tz, subtz);
+			if (ret)
+				pr_warn("Failed to add thermal zone %s to %s: %d\n",
+					subtz->type, tz->type, ret);
+
+			of_node_put(sensor_specs.np);
+		}
+	}
+}
+
+/**
  * of_parse_thermal_zones - parse device tree thermal data
  *
  * Initialization function that can be called by machine initialization
@@ -936,6 +1031,9 @@ int __init of_parse_thermal_zones(void)
 			/* attempting to build remaining zones still */
 		}
 	}
+
+	link_stacked_thermal_zones(np);
+
 	of_node_put(np);
 
 	return 0;
