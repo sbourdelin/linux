@@ -6364,7 +6364,7 @@ static int ipr_queuecommand(struct Scsi_Host *shost,
 	ipr_cmd->done = ipr_scsi_eh_done;
 
 	if (ipr_is_gscsi(res) || ipr_is_vset_device(res)) {
-		if (scsi_cmd->underflow == 0)
+		if (scsi_cmd->underflow == 0 && !ipr_is_vset_device(res))
 			ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_NO_ULEN_CHK;
 
 		ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_NO_LINK_DESC;
