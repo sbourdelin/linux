@@ -28,6 +28,7 @@
 #include <linux/sched.h>
 #include <linux/i2c.h>
 #include <drm/drm_dp_helper.h>
+#include <drm/drm_dp_aux_dev.h>
 #include <drm/drmP.h>
 
 /**
@@ -768,6 +769,9 @@ int drm_dp_aux_register(struct drm_dp_aux *aux)
 	strlcpy(aux->ddc.name, aux->name ? aux->name : dev_name(aux->dev),
 		sizeof(aux->ddc.name));
 
+	if (drm_dp_aux_register_devnode(aux))
+		drm_err("%s: Could not register drm_dp_aux_dev.\n", __FILE__);
+
 	return i2c_add_adapter(&aux->ddc);
 }
 EXPORT_SYMBOL(drm_dp_aux_register);
@@ -778,6 +782,7 @@ EXPORT_SYMBOL(drm_dp_aux_register);
  */
 void drm_dp_aux_unregister(struct drm_dp_aux *aux)
 {
+	drm_dp_aux_unregister_devnode(aux);
 	i2c_del_adapter(&aux->ddc);
 }
 EXPORT_SYMBOL(drm_dp_aux_unregister);
