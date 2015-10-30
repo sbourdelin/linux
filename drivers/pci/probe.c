@@ -671,6 +671,17 @@ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
 	 */
 	d = pci_host_bridge_of_msi_domain(bus);
 
+#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+	/*
+	 * If no IRQ domain was found via the OF tree, try looking it up
+	 * directly through the fwnode_handle.
+	 */
+	if (!d && pci_root_bus_fwnode(bus)) {
+		d = irq_find_matching_fwnode(pci_root_bus_fwnode(bus),
+					     DOMAIN_BUS_PCI_MSI);
+	}
+#endif
+
 	return d;
 }
 

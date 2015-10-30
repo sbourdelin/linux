@@ -45,11 +45,13 @@ static inline int pci_proc_domain(struct pci_bus *bus)
 #endif
 
 #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
-static inline void *pci_fwnode(struct pci_bus *bus)
+static inline void *_pci_root_bus_fwnode(struct pci_bus *bus)
 {
 	struct pci_sysdata *sd = bus->sysdata;
 	return sd->fwnode;
 }
+
+#define pci_root_bus_fwnode	_pci_root_bus_fwnode
 #endif
 
 /* Can be used to override the logic in pci_scan_bus for skipping
