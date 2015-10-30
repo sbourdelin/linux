@@ -1865,24 +1865,9 @@ static int pcs_probe(struct platform_device *pdev)
 						  "pinctrl-single,bit-per-mux");
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(pcs->dev, "could not get resource\n");
-		return -ENODEV;
-	}
-
-	pcs->res = devm_request_mem_region(pcs->dev, res->start,
-			resource_size(res), DRIVER_NAME);
-	if (!pcs->res) {
-		dev_err(pcs->dev, "could not get mem_region\n");
-		return -EBUSY;
-	}
-
-	pcs->size = resource_size(pcs->res);
-	pcs->base = devm_ioremap(pcs->dev, pcs->res->start, pcs->size);
-	if (!pcs->base) {
-		dev_err(pcs->dev, "could not ioremap\n");
-		return -ENODEV;
-	}
+	pcs->base = devm_ioremap_resource(pcs->dev, res);
+	if (IS_ERR(pcs->base))
+		return PTR_ERR(pcs->base);
 
 	INIT_RADIX_TREE(&pcs->pgtree, GFP_KERNEL);
 	INIT_RADIX_TREE(&pcs->ftree, GFP_KERNEL);
