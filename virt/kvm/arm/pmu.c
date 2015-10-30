@@ -21,6 +21,7 @@
 #include <linux/perf_event.h>
 #include <asm/kvm_emulate.h>
 #include <kvm/arm_pmu.h>
+#include <kvm/arm_vgic.h>
 
 /**
  * kvm_pmu_get_counter_value - get PMU counter value
@@ -65,6 +66,78 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
 
 		perf_event_release_kernel(pmc->perf_event);
 		pmc->perf_event = NULL;
+	}
+}
+
+/**
+ * kvm_pmu_sync_hwstate - sync pmu state for cpu
+ * @vcpu: The vcpu pointer
+ *
+ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
+ */
+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
+{
+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+	u32 overflow;
+
+	if (!vcpu_mode_is_32bit(vcpu))
+		overflow = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
+	else
+		overflow = vcpu_cp15(vcpu, c9_PMOVSSET);
+
+	if ((pmu->irq_pending || overflow != 0) && (pmu->irq_num != -1))
+		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, 1);
+
+	pmu->irq_pending = false;
+}
+
+/**
+ * kvm_pmu_post_sync_hwstate - post sync pmu state for cpu
+ * @vcpu: The vcpu pointer
+ *
+ * Inject virtual PMU IRQ if IRQ is pending for this cpu when back from guest.
+ */
+void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu)
+{
+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+
+	if (pmu->irq_pending && (pmu->irq_num != -1))
+		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, 1);
+
+	pmu->irq_pending = false;
+}
+
+/**
+ * When perf event overflows, set irq_pending and call kvm_vcpu_kick() to inject
+ * the interrupt.
+ */
+static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
+				  struct perf_sample_data *data,
+				  struct pt_regs *regs)
+{
+	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
+	struct kvm_vcpu *vcpu = pmc->vcpu;
+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+	int idx = pmc->idx;
+
+	if (!vcpu_mode_is_32bit(vcpu)) {
+		if ((vcpu_sys_reg(vcpu, PMINTENSET_EL1) >> idx) & 0x1) {
+			__set_bit(idx,
+			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSSET_EL0));
+			__set_bit(idx,
+			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSCLR_EL0));
+			pmu->irq_pending = true;
+			kvm_vcpu_kick(vcpu);
+		}
+	} else {
+		if ((vcpu_cp15(vcpu, c9_PMINTENSET) >> idx) & 0x1) {
+			__set_bit(idx,
+				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSSET));
+			__set_bit(idx,
+				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSCLR));
+			pmu->irq_pending = true;
+			kvm_vcpu_kick(vcpu);
+		}
 	}
 }
 
@@ -293,7 +366,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
 	/* The initial sample period (overflow count) of an event. */
 	attr.sample_period = (-counter) & pmc->bitmask;
 
-	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
+	event = perf_event_create_kernel_counter(&attr, -1, current,
+						 kvm_pmu_perf_overflow, pmc);
 	if (IS_ERR(event)) {
 		printk_once("kvm: pmu event creation failed %ld\n",
 			    PTR_ERR(event));
