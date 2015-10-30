@@ -396,6 +396,7 @@ queue:
 	 * p,*,* -> n,*,*
 	 */
 	old = xchg_tail(lock, tail);
+	next = NULL;
 
 	/*
 	 * if there was a previous node; link it and wait until reaching the
@@ -407,6 +408,16 @@ queue:
 
 		pv_wait_node(node);
 		arch_mcs_spin_lock_contended(&node->locked);
+
+		/*
+		 * While waiting for the MCS lock, the next pointer may have
+		 * been set by another lock waiter. We optimistically load
+		 * the next pointer & prefetch the cacheline for writing
+		 * to reduce latency in the upcoming MCS unlock operation.
+		 */
+		next = READ_ONCE(node->next);
+		if (next)
+			prefetchw(next);
 	}
 
 	/*
@@ -424,6 +435,15 @@ queue:
 	pv_wait_head(lock, node);
 	while ((val = smp_load_acquire(&lock->val.counter)) & _Q_LOCKED_PENDING_MASK)
 		cpu_relax();
+
+	/*
+	 * If the next pointer is defined, we are not tail anymore.
+	 * In this case, claim the spinlock & release the MCS lock.
+	 */
+	if (next) {
+		set_locked(lock);
+		goto mcs_unlock;
+	}
 
 	/*
 	 * claim the lock:
@@ -458,6 +478,7 @@ queue:
 	while (!(next = READ_ONCE(node->next)))
 		cpu_relax();
 
+mcs_unlock:
 	arch_mcs_spin_unlock_contended(&next->locked);
 	pv_kick_node(lock, next);
 
