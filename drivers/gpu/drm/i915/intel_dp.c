@@ -3724,10 +3724,17 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp)
 
 	DP |= DP_PORT_EN;
 
+again:
 	/* clock recovery */
 	if (!intel_dp_reset_link_train(intel_dp, &DP,
 				       DP_TRAINING_PATTERN_1 |
 				       DP_LINK_SCRAMBLING_DISABLE)) {
+		if (intel_dp->train_set_valid) {
+			DRM_DEBUG_KMS("Sink rejected link training request, trying again with zero values\n");
+			intel_dp->train_set_valid = false;
+			goto again;
+		}
+
 		DRM_ERROR("failed to enable link training\n");
 		return;
 	}
