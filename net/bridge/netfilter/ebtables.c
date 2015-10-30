@@ -987,7 +987,7 @@ static int do_replace_finish(struct net *net, struct ebt_replace *repl,
 	   the check on the size is done later, when we have the lock */
 	if (repl->num_counters) {
 		unsigned long size = repl->num_counters * sizeof(*counterstmp);
-		counterstmp = vmalloc(size);
+		counterstmp = vzalloc(size);
 		if (!counterstmp)
 			return -ENOMEM;
 	}
@@ -1408,7 +1408,7 @@ static int copy_counters_to_user(struct ebt_table *t,
 		return -EINVAL;
 	}
 
-	counterstmp = vmalloc(nentries * sizeof(*counterstmp));
+	counterstmp = vzalloc(nentries * sizeof(*counterstmp));
 	if (!counterstmp)
 		return -ENOMEM;
 
