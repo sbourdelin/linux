@@ -1,6 +1,7 @@
 #ifndef MPOA_CACHES_H
 #define MPOA_CACHES_H
 
+#include <linux/time64.h>
 #include <linux/netdevice.h>
 #include <linux/types.h>
 #include <linux/atm.h>
@@ -14,9 +15,9 @@ void atm_mpoa_init_cache(struct mpoa_client *mpc);
 typedef struct in_cache_entry {
 	struct in_cache_entry *next;
 	struct in_cache_entry *prev;
-	struct timeval  tv;
-	struct timeval  reply_wait;
-	struct timeval  hold_down;
+	time64_t  tv;
+	time64_t  reply_wait;
+	time64_t  hold_down;
 	uint32_t  packets_fwded;
 	uint16_t  entry_state;
 	uint32_t retry_time;
@@ -51,7 +52,7 @@ struct in_cache_ops{
 typedef struct eg_cache_entry{
 	struct               eg_cache_entry *next;
 	struct               eg_cache_entry *prev;
-	struct               timeval  tv;
+	time64_t	     tv;
 	uint8_t              MPS_ctrl_ATM_addr[ATM_ESA_LEN];
 	struct atm_vcc       *shortcut;
 	uint32_t             packets_rcvd;
