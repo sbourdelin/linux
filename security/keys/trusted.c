@@ -11,6 +11,7 @@
  * See Documentation/security/keys-trusted-encrypted.txt
  */
 
+#include <crypto/hash_info.h>
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -710,7 +711,8 @@ enum {
 	Opt_err = -1,
 	Opt_new, Opt_load, Opt_update,
 	Opt_keyhandle, Opt_keyauth, Opt_blobauth,
-	Opt_pcrinfo, Opt_pcrlock, Opt_migratable
+	Opt_pcrinfo, Opt_pcrlock, Opt_migratable,
+	Opt_hash,
 };
 
 static const match_table_t key_tokens = {
@@ -723,6 +725,7 @@ static const match_table_t key_tokens = {
 	{Opt_pcrinfo, "pcrinfo=%s"},
 	{Opt_pcrlock, "pcrlock=%s"},
 	{Opt_migratable, "migratable=%s"},
+	{Opt_hash, "hash=%s"},
 	{Opt_err, NULL}
 };
 
@@ -736,6 +739,7 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 	int res;
 	unsigned long handle;
 	unsigned long lock;
+	int i;
 
 	while ((p = strsep(&c, " \t"))) {
 		if (*p == '\0' || *p == ' ' || *p == '\t')
@@ -786,6 +790,20 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 			if (res < 0)
 				return -EINVAL;
 			opt->pcrlock = lock;
+			break;
+		case Opt_hash:
+			for (i = 0; i < HASH_ALGO__LAST; i++) {
+				if (!strcmp(args[0].from, hash_algo_name[i])) {
+					opt->hash = i;
+					break;
+				}
+			}
+			res = tpm_is_tpm2(TPM_ANY_NUM);
+			if (res < 0)
+				return res;
+			if (i == HASH_ALGO__LAST ||
+			    (!res && i != HASH_ALGO_SHA1))
+				return -EINVAL;
 			break;
 		default:
 			return -EINVAL;
