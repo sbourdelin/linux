@@ -169,6 +169,22 @@
 		};
 	};
 
+	crypto: cypto-controller@ff8a0000 {
+		compatible = "rockchip,crypto";
+		reg = <0xff8a0000 0x4000>;
+		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru ACLK_CRYPTO>,
+			 <&cru HCLK_CRYPTO>,
+			 <&cru SRST_CRYPTO>,
+			 <&cru ACLK_DMAC1>;
+
+		clock-names = "aclk_crypto",
+			      "hclk_crypto",
+			      "srst_crypto",
+				  "apb_pclk";
+		status = "okay";
+	};
+
 	reserved-memory {
 		#address-cells = <1>;
 		#size-cells = <1>;
