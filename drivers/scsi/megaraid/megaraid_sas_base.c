@@ -6640,6 +6640,7 @@ megasas_aen_polling(struct work_struct *work)
 	if (doscan) {
 		dev_info(&instance->pdev->dev, "scanning for scsi%d...\n",
 		       instance->host->host_no);
+		mutex_lock(&host->scan_mutex);
 		if (megasas_get_pd_list(instance) == 0) {
 			for (i = 0; i < MEGASAS_MAX_PD_CHANNELS; i++) {
 				for (j = 0; j < MEGASAS_MAX_DEV_PER_CHANNEL; j++) {
@@ -6661,6 +6662,7 @@ megasas_aen_polling(struct work_struct *work)
 				}
 			}
 		}
+		mutex_unlock(&host->scan_mutex);
 
 		if (!instance->requestorId ||
 		    (instance->requestorId &&
