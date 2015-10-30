@@ -110,6 +110,14 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
 	vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
 }
 
+static inline void reset_unknown_cp15(struct kvm_vcpu *vcpu,
+				      const struct sys_reg_desc *r)
+{
+	BUG_ON(!r->reg);
+	BUG_ON(r->reg >= NR_COPRO_REGS);
+	vcpu_cp15(vcpu, r->reg) = 0xdecafbad;
+}
+
 static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
 {
 	BUG_ON(!r->reg);
