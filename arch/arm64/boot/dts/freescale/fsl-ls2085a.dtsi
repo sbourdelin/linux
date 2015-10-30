@@ -131,6 +131,18 @@
 		interrupts = <1 9 0x4>;
 	};
 
+	rstcr: rstcr@1E60000 {
+		compatible = "syscon";
+		reg = <0x0 0x1E60000 0x0 0x4>;
+	};
+
+	reboot {
+		compatible ="syscon-reboot";
+		regmap = <&rstcr>;
+		offset = <0x0>;
+		mask = <0x2>;
+	};
+
 	timer {
 		compatible = "arm,armv8-timer";
 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
