@@ -605,8 +605,6 @@ nfsd(void *vrqstp)
 	nfsdstats.th_cnt++;
 	mutex_unlock(&nfsd_mutex);
 
-	set_freezable();
-
 	/*
 	 * The main request loop
 	 */

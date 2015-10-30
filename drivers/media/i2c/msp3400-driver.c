@@ -339,7 +339,6 @@ int msp_sleep(struct msp_state *state, int timeout)
 	}
 
 	remove_wait_queue(&state->wq, &wait);
-	try_to_freeze();
 	return state->restart;
 }
 

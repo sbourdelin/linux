@@ -317,10 +317,8 @@ static int pt1_thread(void *data)
 	struct pt1_buffer_page *page;
 
 	pt1 = data;
-	set_freezable();
 
 	while (!kthread_should_stop()) {
-		try_to_freeze();
 
 		page = pt1->tables[pt1->table_index].bufs[pt1->buf_index].page;
 		if (!pt1_filter(pt1, page)) {

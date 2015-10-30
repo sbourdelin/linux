@@ -745,8 +745,6 @@ static int vivid_thread_vid_cap(void *data)
 
 	dprintk(dev, 1, "Video Capture Thread Start\n");
 
-	set_freezable();
-
 	/* Resets frame counters */
 	dev->cap_seq_offset = 0;
 	dev->cap_seq_count = 0;
@@ -754,7 +752,6 @@ static int vivid_thread_vid_cap(void *data)
 	dev->jiffies_vid_cap = jiffies;
 
 	for (;;) {
-		try_to_freeze();
 		if (kthread_should_stop())
 			break;
 

@@ -1415,15 +1415,11 @@ int ubi_thread(void *u)
 	ubi_msg(ubi, "background thread \"%s\" started, PID %d",
 		ubi->bgt_name, task_pid_nr(current));
 
-	set_freezable();
 	for (;;) {
 		int err;
 
 		if (kthread_should_stop())
 			break;
-
-		if (try_to_freeze())
-			continue;
 
 		spin_lock(&ubi->wl_lock);
 		if (list_empty(&ubi->works) || ubi->ro_mode ||

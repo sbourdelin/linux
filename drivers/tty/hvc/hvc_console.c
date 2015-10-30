@@ -740,11 +740,9 @@ static int khvcd(void *unused)
 	int poll_mask;
 	struct hvc_struct *hp;
 
-	set_freezable();
 	do {
 		poll_mask = 0;
 		hvc_kicked = 0;
-		try_to_freeze();
 		wmb();
 		if (!cpus_are_in_xmon()) {
 			spin_lock(&hvc_structs_lock);

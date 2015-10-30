@@ -211,7 +211,6 @@ static int ucb1x00_thread(void *_ts)
 	bool frozen, ignore = false;
 	int valid = 0;
 
-	set_freezable();
 	add_wait_queue(&ts->irq_wait, &wait);
 	while (!kthread_freezable_should_stop(&frozen)) {
 		unsigned int x, y, p;

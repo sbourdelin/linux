@@ -55,11 +55,10 @@ static struct task_struct *ecryptfs_kthread;
  */
 static int ecryptfs_threadfn(void *ignored)
 {
-	set_freezable();
 	while (1)  {
 		struct ecryptfs_open_req *req;
 
-		wait_event_freezable(
+		wait_event_interruptible(
 			ecryptfs_kthread_ctl.wait,
 			(!list_empty(&ecryptfs_kthread_ctl.req_list)
 			 || kthread_should_stop()));

@@ -843,7 +843,6 @@ static int ps3_probe_thread(void *data)
 
 	/* Loop here processing the requested notification events. */
 	do {
-		try_to_freeze();
 
 		memset(notify_event, 0, sizeof(*notify_event));
 

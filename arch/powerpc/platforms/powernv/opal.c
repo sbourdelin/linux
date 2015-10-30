@@ -662,9 +662,7 @@ static int kopald(void *unused)
 {
 	__be64 events;
 
-	set_freezable();
 	do {
-		try_to_freeze();
 		opal_poll_events(&events);
 		opal_handle_events(be64_to_cpu(events));
 		msleep_interruptible(opal_heartbeat);

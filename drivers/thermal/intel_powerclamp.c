@@ -379,7 +379,6 @@ static int clamp_thread(void *arg)
 	unsigned int target_ratio;
 
 	set_bit(cpunr, cpu_clamping_mask);
-	set_freezable();
 	init_timer_on_stack(&wakeup_timer);
 	sched_setscheduler(current, SCHED_FIFO, &param);
 
@@ -393,7 +392,6 @@ static int clamp_thread(void *arg)
 		unsigned int duration_jiffies = msecs_to_jiffies(duration);
 		unsigned int window_size_now;
 
-		try_to_freeze();
 		/*
 		 * make sure user selected ratio does not take effect until
 		 * the next round. adjust target_ratio if user has changed

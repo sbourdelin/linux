@@ -930,8 +930,6 @@ int gfs2_logd(void *data)
 
 		t = gfs2_tune_get(sdp, gt_logd_secs) * HZ;
 
-		try_to_freeze();
-
 		do {
 			prepare_to_wait(&sdp->sd_logd_waitq, &wait,
 					TASK_INTERRUPTIBLE);

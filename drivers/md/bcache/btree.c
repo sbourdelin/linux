@@ -1786,7 +1786,6 @@ again:
 
 		mutex_unlock(&c->bucket_lock);
 
-		try_to_freeze();
 		schedule();
 	}
 

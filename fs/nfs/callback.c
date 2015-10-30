@@ -75,8 +75,6 @@ nfs4_callback_svc(void *vrqstp)
 	int err;
 	struct svc_rqst *rqstp = vrqstp;
 
-	set_freezable();
-
 	while (!kthread_should_stop()) {
 		/*
 		 * Listen for a request on the socket
@@ -122,11 +120,7 @@ nfs41_callback_svc(void *vrqstp)
 	int error;
 	DEFINE_WAIT(wq);
 
-	set_freezable();
-
 	while (!kthread_should_stop()) {
-		if (try_to_freeze())
-			continue;
 
 		prepare_to_wait(&serv->sv_cb_waitq, &wq, TASK_INTERRUPTIBLE);
 		spin_lock_bh(&serv->sv_cb_lock);

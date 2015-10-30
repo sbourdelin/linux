@@ -806,7 +806,6 @@ int svc_recv(struct svc_rqst *rqstp, long timeout)
 	if (err)
 		goto out;
 
-	try_to_freeze();
 	cond_resched();
 	err = -EINTR;
 	if (signalled() || kthread_should_stop())

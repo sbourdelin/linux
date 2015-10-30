@@ -3511,8 +3511,6 @@ static int pktgen_thread_worker(void *arg)
 
 	pr_debug("starting pktgen/%d:  pid=%d\n", cpu, task_pid_nr(current));
 
-	set_freezable();
-
 	while (!kthread_should_stop()) {
 		pkt_dev = next_to_run(t);
 
@@ -3522,7 +3520,6 @@ static int pktgen_thread_worker(void *arg)
 			wait_event_interruptible_timeout(t->queue,
 							 t->control != 0,
 							 HZ/10);
-			try_to_freeze();
 			continue;
 		}
 
@@ -3554,8 +3551,6 @@ static int pktgen_thread_worker(void *arg)
 			pktgen_rem_one_if(t);
 			t->control &= ~(T_REMDEV);
 		}
-
-		try_to_freeze();
 	}
 
 	pr_debug("%s stopping all device\n", t->tsk->comm);

@@ -288,7 +288,6 @@ do {									\
 		if (kthread_should_stop())				\
 			return 0;					\
 									\
-		try_to_freeze();					\
 		schedule();						\
 		mutex_lock(&(ca)->set->bucket_lock);			\
 	}								\

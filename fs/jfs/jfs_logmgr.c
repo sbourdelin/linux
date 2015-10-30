@@ -2347,7 +2347,6 @@ int jfsIOWait(void *arg)
 
 		if (freezing(current)) {
 			spin_unlock_irq(&log_redrive_lock);
-			try_to_freeze();
 		} else {
 			set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irq(&log_redrive_lock);

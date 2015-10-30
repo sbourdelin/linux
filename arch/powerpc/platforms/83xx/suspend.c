@@ -266,7 +266,6 @@ static int agent_thread_fn(void *data)
 {
 	while (1) {
 		wait_event_interruptible(agent_wq, pci_pm_state >= 2);
-		try_to_freeze();
 
 		if (signal_pending(current) || pci_pm_state < 2)
 			continue;

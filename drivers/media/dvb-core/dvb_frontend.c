@@ -725,7 +725,6 @@ static int dvb_frontend_thread(void *data)
 
 	dvb_frontend_init(fe);
 
-	set_freezable();
 	while (1) {
 		up(&fepriv->sem);	    /* is locked when we enter the thread... */
 restart:
@@ -741,9 +740,6 @@ restart:
 			fe->exit = DVB_FE_NORMAL_EXIT;
 			break;
 		}
-
-		if (try_to_freeze())
-			goto restart;
 
 		if (down_interruptible(&fepriv->sem))
 			break;

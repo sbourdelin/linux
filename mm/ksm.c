@@ -1712,7 +1712,6 @@ static int ksmd_should_run(void)
 
 static int ksm_scan_thread(void *nothing)
 {
-	set_freezable();
 	set_user_nice(current, 5);
 
 	while (!kthread_should_stop()) {
@@ -1722,13 +1721,11 @@ static int ksm_scan_thread(void *nothing)
 			ksm_do_scan(ksm_thread_pages_to_scan);
 		mutex_unlock(&ksm_thread_mutex);
 
-		try_to_freeze();
-
 		if (ksmd_should_run()) {
 			schedule_timeout_interruptible(
 				msecs_to_jiffies(ksm_thread_sleep_millisecs));
 		} else {
-			wait_event_freezable(ksm_thread_wait,
+			wait_event_interruptible(ksm_thread_wait,
 				ksmd_should_run() || kthread_should_stop());
 		}
 	}

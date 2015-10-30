@@ -477,15 +477,12 @@ static int tvaudio_thread(void *data)
 	unsigned int i, audio, nscan;
 	int max1,max2,carrier,rx,mode,lastmode,default_carrier;
 
-	set_freezable();
-
 	for (;;) {
 		tvaudio_sleep(dev,-1);
 		if (kthread_should_stop())
 			goto done;
 
 	restart:
-		try_to_freeze();
 
 		dev->thread.scan1 = dev->thread.scan2;
 		audio_dbg(1, "tvaudio thread scan start [%d]\n",
@@ -595,8 +592,6 @@ static int tvaudio_thread(void *data)
 
 		lastmode = 42;
 		for (;;) {
-
-			try_to_freeze();
 
 			if (tvaudio_sleep(dev,5000))
 				goto restart;
@@ -774,14 +769,11 @@ static int tvaudio_thread_ddep(void *data)
 	struct saa7134_dev *dev = data;
 	u32 value, norms;
 
-	set_freezable();
 	for (;;) {
 		tvaudio_sleep(dev,-1);
 		if (kthread_should_stop())
 			goto done;
 	restart:
-		try_to_freeze();
-
 		dev->thread.scan1 = dev->thread.scan2;
 		audio_dbg(1, "tvaudio thread scan start [%d]\n",
 			  dev->thread.scan1);

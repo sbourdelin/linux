@@ -2485,8 +2485,6 @@ static int hotkey_kthread(void *data)
 	if (tpacpi_lifecycle == TPACPI_LIFE_EXITING)
 		goto exit;
 
-	set_freezable();
-
 	so = 0;
 	si = 1;
 	t = 0;

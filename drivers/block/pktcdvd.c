@@ -1466,7 +1466,6 @@ static int kcdrwd(void *foobar)
 	long min_sleep_time, residue;
 
 	set_user_nice(current, MIN_NICE);
-	set_freezable();
 
 	for (;;) {
 		DECLARE_WAITQUEUE(wait, current);
@@ -1510,9 +1509,6 @@ static int kcdrwd(void *foobar)
 			pkt_dbg(2, pd, "sleeping\n");
 			residue = schedule_timeout(min_sleep_time);
 			pkt_dbg(2, pd, "wake up\n");
-
-			/* make swsusp happy with our thread */
-			try_to_freeze();
 
 			list_for_each_entry(pkt, &pd->cdrw.pkt_active_list, list) {
 				if (!pkt->sleep_time)

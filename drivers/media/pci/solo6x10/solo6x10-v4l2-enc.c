@@ -641,7 +641,6 @@ static int solo_ring_thread(void *data)
 	struct solo_dev *solo_dev = data;
 	DECLARE_WAITQUEUE(wait, current);
 
-	set_freezable();
 	add_wait_queue(&solo_dev->ring_thread_wait, &wait);
 
 	for (;;) {
@@ -650,7 +649,6 @@ static int solo_ring_thread(void *data)
 		if (timeout == -ERESTARTSYS || kthread_should_stop())
 			break;
 		solo_handle_ring(solo_dev);
-		try_to_freeze();
 	}
 
 	remove_wait_queue(&solo_dev->ring_thread_wait, &wait);

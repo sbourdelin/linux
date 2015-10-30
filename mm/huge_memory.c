@@ -2877,7 +2877,7 @@ static void khugepaged_do_scan(void)
 
 		cond_resched();
 
-		if (unlikely(kthread_should_stop() || try_to_freeze()))
+		if (unlikely(kthread_should_stop()))
 			break;
 
 		spin_lock(&khugepaged_mm_lock);
@@ -2902,21 +2902,20 @@ static void khugepaged_wait_work(void)
 		if (!khugepaged_scan_sleep_millisecs)
 			return;
 
-		wait_event_freezable_timeout(khugepaged_wait,
+		wait_event_interruptible_timeout(khugepaged_wait,
 					     kthread_should_stop(),
 			msecs_to_jiffies(khugepaged_scan_sleep_millisecs));
 		return;
 	}
 
 	if (khugepaged_enabled())
-		wait_event_freezable(khugepaged_wait, khugepaged_wait_event());
+		wait_event_interruptible(khugepaged_wait, khugepaged_wait_event());
 }
 
 static int khugepaged(void *none)
 {
 	struct mm_slot *mm_slot;
 
-	set_freezable();
 	set_user_nice(current, MAX_NICE);
 
 	while (!kthread_should_stop()) {

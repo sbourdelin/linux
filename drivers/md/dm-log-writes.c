@@ -397,13 +397,11 @@ next:
 			continue;
 		}
 
-		if (!try_to_freeze()) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			if (!kthread_should_stop() &&
-			    !atomic_read(&lc->pending_blocks))
-				schedule();
-			__set_current_state(TASK_RUNNING);
-		}
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (!kthread_should_stop() &&
+		    !atomic_read(&lc->pending_blocks))
+			schedule();
+		__set_current_state(TASK_RUNNING);
 	}
 	return 0;
 }

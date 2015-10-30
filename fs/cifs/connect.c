@@ -384,7 +384,6 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	}
 
 	do {
-		try_to_freeze();
 
 		/* we should try only the port we connected to before */
 		mutex_lock(&server->srv_mutex);
@@ -563,7 +562,6 @@ cifs_readv_from_socket(struct TCP_Server_Info *server, struct kvec *iov_orig,
 	smb_msg.msg_controllen = 0;
 
 	for (total_read = 0; to_read; total_read += length, to_read -= length) {
-		try_to_freeze();
 
 		if (server_unresponsive(server)) {
 			total_read = -ECONNABORTED;
@@ -855,10 +853,7 @@ cifs_demultiplex_thread(void *p)
 	if (length > 1)
 		mempool_resize(cifs_req_poolp, length + cifs_min_rcv);
 
-	set_freezable();
 	while (server->tcpStatus != CifsExiting) {
-		if (try_to_freeze())
-			continue;
 
 		if (!allocate_buffers(server))
 			continue;

@@ -1269,11 +1269,7 @@ static int pxafb_smart_thread(void *arg)
 
 	pr_debug("%s(): task starting\n", __func__);
 
-	set_freezable();
 	while (!kthread_should_stop()) {
-
-		if (try_to_freeze())
-			continue;
 
 		mutex_lock(&fbi->ctrlr_lock);
 

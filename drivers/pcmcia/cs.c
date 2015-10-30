@@ -615,7 +615,6 @@ static int pccardd(void *__skt)
 	/* wait for userspace to catch up */
 	msleep(250);
 
-	set_freezable();
 	for (;;) {
 		unsigned long flags;
 		unsigned int events;
@@ -675,7 +674,6 @@ static int pccardd(void *__skt)
 		/* make sure we are running */
 		__set_current_state(TASK_RUNNING);
 
-		try_to_freeze();
 	}
 
 	/* shut down socket, if a device is still present */

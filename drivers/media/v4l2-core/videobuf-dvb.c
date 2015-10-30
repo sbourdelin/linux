@@ -48,7 +48,6 @@ static int videobuf_dvb_thread(void *data)
 	void *outp;
 
 	dprintk("dvb thread started\n");
-	set_freezable();
 	videobuf_read_start(&dvb->dvbq);
 
 	for (;;) {
@@ -63,7 +62,6 @@ static int videobuf_dvb_thread(void *data)
 			break;
 		if (kthread_should_stop())
 			break;
-		try_to_freeze();
 
 		/* feed buffer data to demux */
 		outp = videobuf_queue_to_vaddr(&dvb->dvbq, buf);

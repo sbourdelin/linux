@@ -136,8 +136,6 @@ static int vivid_thread_sdr_cap(void *data)
 
 	dprintk(dev, 1, "SDR Capture Thread Start\n");
 
-	set_freezable();
-
 	/* Resets frame counters */
 	dev->sdr_cap_seq_offset = 0;
 	if (dev->seq_wrap)
@@ -146,7 +144,6 @@ static int vivid_thread_sdr_cap(void *data)
 	dev->sdr_cap_seq_resync = false;
 
 	for (;;) {
-		try_to_freeze();
 		if (kthread_should_stop())
 			break;
 

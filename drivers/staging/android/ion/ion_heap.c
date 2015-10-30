@@ -229,7 +229,7 @@ static int ion_heap_deferred_free(void *data)
 	while (true) {
 		struct ion_buffer *buffer;
 
-		wait_event_freezable(heap->waitqueue,
+		wait_event_interruptible(heap->waitqueue,
 				     ion_heap_freelist_size(heap) > 0);
 
 		spin_lock(&heap->free_lock);

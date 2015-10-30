@@ -3212,8 +3212,6 @@ static int vb2_thread(void *data)
 			V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	}
 
-	set_freezable();
-
 	for (;;) {
 		struct vb2_buffer *vb;
 
@@ -3235,7 +3233,6 @@ static int vb2_thread(void *data)
 		}
 		if (ret || threadio->stop)
 			break;
-		try_to_freeze();
 
 		vb = q->bufs[fileio->b.index];
 		if (!(fileio->b.flags & V4L2_BUF_FLAG_ERROR))

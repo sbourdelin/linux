@@ -3314,7 +3314,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 			order = sc.order = 0;
 
 		/* Check if kswapd should be suspending */
-		if (try_to_freeze() || kthread_should_stop())
+		if (kthread_should_stop())
 			break;
 
 		/*
@@ -3445,7 +3445,6 @@ static int kswapd(void *p)
 	 * trying to free the first piece of memory in the first place).
 	 */
 	tsk->flags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD;
-	set_freezable();
 
 	order = new_order = 0;
 	balanced_order = 0;
@@ -3485,7 +3484,6 @@ static int kswapd(void *p)
 			pgdat->classzone_idx = pgdat->nr_zones - 1;
 		}
 
-		ret = try_to_freeze();
 		if (kthread_should_stop())
 			break;
 
@@ -3493,12 +3491,10 @@ static int kswapd(void *p)
 		 * We can speed up thawing tasks if we don't call balance_pgdat
 		 * after returning from the refrigerator
 		 */
-		if (!ret) {
-			trace_mm_vmscan_kswapd_wake(pgdat->node_id, order);
-			balanced_classzone_idx = classzone_idx;
-			balanced_order = balance_pgdat(pgdat, order,
-						&balanced_classzone_idx);
-		}
+		trace_mm_vmscan_kswapd_wake(pgdat->node_id, order);
+		balanced_classzone_idx = classzone_idx;
+		balanced_order = balance_pgdat(pgdat, order,
+					&balanced_classzone_idx);
 	}
 
 	tsk->flags &= ~(PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD);

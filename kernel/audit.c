@@ -498,7 +498,6 @@ static void flush_hold_queue(void)
 
 static int kauditd_thread(void *dummy)
 {
-	set_freezable();
 	while (!kthread_should_stop()) {
 		struct sk_buff *skb;
 
@@ -516,7 +515,7 @@ static int kauditd_thread(void *dummy)
 			continue;
 		}
 
-		wait_event_freezable(kauditd_wait, skb_queue_len(&audit_skb_queue));
+		wait_event(kauditd_wait, skb_queue_len(&audit_skb_queue));
 	}
 	return 0;
 }

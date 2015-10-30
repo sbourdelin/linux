@@ -130,9 +130,6 @@ lockd(void *vrqstp)
 	int		err = 0;
 	struct svc_rqst *rqstp = vrqstp;
 
-	/* try_to_freeze() is called from svc_recv() */
-	set_freezable();
-
 	/* Allow SIGKILL to tell lockd to drop all of its locks */
 	allow_signal(SIGKILL);
 

@@ -510,7 +510,6 @@ int msp3400c_thread(void *data)
 
 	v4l_dbg(1, msp_debug, client, "msp3400 daemon started\n");
 	state->detected_std = V4L2_STD_ALL;
-	set_freezable();
 	for (;;) {
 		v4l_dbg(2, msp_debug, client, "msp3400 thread: sleep\n");
 		msp_sleep(state, -1);
@@ -700,7 +699,6 @@ int msp3410d_thread(void *data)
 
 	v4l_dbg(1, msp_debug, client, "msp3410 daemon started\n");
 	state->detected_std = V4L2_STD_ALL;
-	set_freezable();
 	for (;;) {
 		v4l_dbg(2, msp_debug, client, "msp3410 thread: sleep\n");
 		msp_sleep(state, -1);
@@ -998,7 +996,6 @@ int msp34xxg_thread(void *data)
 
 	v4l_dbg(1, msp_debug, client, "msp34xxg daemon started\n");
 	state->detected_std = V4L2_STD_ALL;
-	set_freezable();
 	for (;;) {
 		v4l_dbg(2, msp_debug, client, "msp34xxg thread: sleep\n");
 		msp_sleep(state, -1);

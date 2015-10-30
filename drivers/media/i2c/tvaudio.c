@@ -314,13 +314,11 @@ static int chip_thread(void *data)
 	int mode, selected;
 
 	v4l2_dbg(1, debug, sd, "thread started\n");
-	set_freezable();
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop())
 			schedule();
 		set_current_state(TASK_RUNNING);
-		try_to_freeze();
 		if (kthread_should_stop())
 			break;
 		v4l2_dbg(1, debug, sd, "thread wakeup\n");

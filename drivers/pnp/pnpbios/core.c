@@ -153,7 +153,6 @@ static int pnp_dock_thread(void *unused)
 	static struct pnp_docking_station_info now;
 	int docked = -1, d = 0;
 
-	set_freezable();
 	while (1) {
 		int status;
 
@@ -161,9 +160,6 @@ static int pnp_dock_thread(void *unused)
 		 * Poll every 2 seconds
 		 */
 		msleep_interruptible(2000);
-
-		if (try_to_freeze())
-			continue;
 
 		status = pnp_bios_dock_station_info(&now);
 

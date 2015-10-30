@@ -88,7 +88,6 @@ static int jffs2_garbage_collect_thread(void *_c)
 
 	set_user_nice(current, 10);
 
-	set_freezable();
 	for (;;) {
 		sigprocmask(SIG_UNBLOCK, &hupmask, NULL);
 	again:
@@ -123,9 +122,6 @@ static int jffs2_garbage_collect_thread(void *_c)
 		while (signal_pending(current) || freezing(current)) {
 			siginfo_t info;
 			unsigned long signr;
-
-			if (try_to_freeze())
-				goto again;
 
 			signr = dequeue_signal_lock(current, &current->blocked, &info);
 

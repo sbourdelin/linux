@@ -3062,10 +3062,8 @@ static int airo_thread(void *data) {
 	struct airo_info *ai = dev->ml_priv;
 	int locked;
 
-	set_freezable();
 	while(1) {
 		/* make swsusp happy with our thread */
-		try_to_freeze();
 
 		if (test_bit(JOB_DIE, &ai->jobs))
 			break;

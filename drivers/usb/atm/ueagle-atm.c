@@ -1930,7 +1930,6 @@ static int uea_kthread(void *data)
 	struct uea_softc *sc = data;
 	int ret = -EAGAIN;
 
-	set_freezable();
 	uea_enters(INS_TO_USBDEV(sc));
 	while (!kthread_should_stop()) {
 		if (ret < 0 || sc->reset)
@@ -1939,7 +1938,6 @@ static int uea_kthread(void *data)
 			ret = sc->stat(sc);
 		if (ret != -EAGAIN)
 			uea_wait(sc, 0, msecs_to_jiffies(1000));
-		try_to_freeze();
 	}
 	uea_leaves(INS_TO_USBDEV(sc));
 	return ret;

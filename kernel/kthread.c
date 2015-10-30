@@ -596,7 +596,6 @@ repeat:
 	} else if (!freezing(current))
 		schedule();
 
-	try_to_freeze();
 	goto repeat;
 }
 EXPORT_SYMBOL_GPL(kthread_worker_fn);

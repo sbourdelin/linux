@@ -291,14 +291,10 @@ int ubifs_bg_thread(void *info)
 
 	ubifs_msg(c, "background thread \"%s\" started, PID %d",
 		  c->bgt_name, current->pid);
-	set_freezable();
 
 	while (1) {
 		if (kthread_should_stop())
 			break;
-
-		if (try_to_freeze())
-			continue;
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		/* Check if there is something to do */

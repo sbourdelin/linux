@@ -455,7 +455,6 @@ static int pt3_fetch_thread(void *data)
 
 	dev_dbg(adap->dvb_adap.device, "PT3: [%s] started\n",
 		adap->thread->comm);
-	set_freezable();
 	while (!kthread_freezable_should_stop(&was_frozen)) {
 		if (was_frozen)
 			adap->num_discard = PT3_INITIAL_BUF_DROPS;

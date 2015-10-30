@@ -1164,13 +1164,10 @@ static int saa7164_thread_function(void *data)
 
 	dprintk(DBGLVL_THR, "thread started\n");
 
-	set_freezable();
-
 	while (1) {
 		msleep_interruptible(100);
 		if (kthread_should_stop())
 			break;
-		try_to_freeze();
 
 		dprintk(DBGLVL_THR, "thread running\n");
 

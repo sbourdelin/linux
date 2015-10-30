@@ -350,11 +350,8 @@ static int balloon(void *_vballoon)
 	struct virtio_balloon *vb = _vballoon;
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 
-	set_freezable();
 	while (!kthread_should_stop()) {
 		s64 diff;
-
-		try_to_freeze();
 
 		add_wait_queue(&vb->config_change, &wait);
 		for (;;) {

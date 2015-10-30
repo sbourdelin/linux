@@ -39,15 +39,11 @@ static int pvr2_dvb_feed_func(struct pvr2_dvb_adapter *adap)
 	struct pvr2_stream *stream;
 
 	pvr2_trace(PVR2_TRACE_DVB_FEED, "dvb feed thread started");
-	set_freezable();
 
 	stream = adap->channel.stream->stream;
 
 	for (;;) {
 		if (kthread_should_stop()) break;
-
-		/* Not sure about this... */
-		try_to_freeze();
 
 		bp = pvr2_stream_get_ready_buffer(stream);
 		if (bp != NULL) {

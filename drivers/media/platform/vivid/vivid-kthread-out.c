@@ -132,8 +132,6 @@ static int vivid_thread_vid_out(void *data)
 
 	dprintk(dev, 1, "Video Output Thread Start\n");
 
-	set_freezable();
-
 	/* Resets frame counters */
 	dev->out_seq_offset = 0;
 	if (dev->seq_wrap)
@@ -143,7 +141,6 @@ static int vivid_thread_vid_out(void *data)
 	dev->out_seq_resync = false;
 
 	for (;;) {
-		try_to_freeze();
 		if (kthread_should_stop())
 			break;
 

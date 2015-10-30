@@ -316,7 +316,7 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
 	return error_count;
 }
 
-/* poor man's completion - we want to use wait_event_freezable() on it */
+/* poor man's completion - we want to use wait_event_interruptible() on it */
 struct dmatest_done {
 	bool			done;
 	wait_queue_head_t	*wait;
@@ -419,8 +419,6 @@ static int dmatest_func(void *data)
 	ktime_t			ktime;
 	s64			runtime = 0;
 	unsigned long long	total_len = 0;
-
-	set_freezable();
 
 	ret = -ENOMEM;
 
@@ -620,7 +618,7 @@ static int dmatest_func(void *data)
 		}
 		dma_async_issue_pending(chan);
 
-		wait_event_freezable_timeout(done_wait, done.done,
+		wait_event_interruptible_timeout(done_wait, done.done,
 					     msecs_to_jiffies(params->timeout));
 
 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
