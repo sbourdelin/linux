@@ -309,17 +309,7 @@ out:
 device_initcall(topology_sysfs_init);
 #endif
 
-static const struct attribute_group *common_cpu_attr_groups[] = {
-#ifdef CONFIG_KEXEC
-	&crash_note_cpu_attr_group,
-#endif
-#ifdef CONFIG_PERMANENT_CPU_TOPOLOGY
-	&topology_attr_group,
-#endif
-	NULL
-};
-
-static const struct attribute_group *hotplugable_cpu_attr_groups[] = {
+static const struct attribute_group *cpu_attr_groups[] = {
 #ifdef CONFIG_KEXEC
 	&crash_note_cpu_attr_group,
 #endif
@@ -502,9 +492,7 @@ int register_cpu(struct cpu *cpu, int num)
 #ifdef CONFIG_GENERIC_CPU_AUTOPROBE
 	cpu->dev.bus->uevent = cpu_uevent;
 #endif
-	cpu->dev.groups = common_cpu_attr_groups;
-	if (cpu->hotpluggable)
-		cpu->dev.groups = hotplugable_cpu_attr_groups;
+	cpu->dev.groups = cpu_attr_groups;
 	error = device_register(&cpu->dev);
 	if (!error)
 		per_cpu(cpu_sys_devices, num) = &cpu->dev;
