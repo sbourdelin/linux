@@ -1738,6 +1738,45 @@ static struct gpio_desc *of_find_gpio(struct device *dev, const char *con_id,
 	return desc;
 }
 
+struct acpi_gpio_lookup {
+	struct list_head node;
+	struct device *dev;
+	const char *con_id;
+};
+
+static DEFINE_MUTEX(acpi_gpio_lookup_lock);
+static LIST_HEAD(acpi_gpio_lookup_list);
+
+static bool acpi_can_fallback_crs(struct device *dev, const char *con_id)
+{
+	struct acpi_gpio_lookup *l, *lookup = NULL;
+
+	mutex_lock(&acpi_gpio_lookup_lock);
+
+	list_for_each_entry(l, &acpi_gpio_lookup_list, node) {
+		if (l->dev == dev) {
+			lookup = l;
+			break;
+		}
+	}
+
+	if (!lookup) {
+		lookup = kmalloc(sizeof(*lookup), GFP_KERNEL);
+		if (lookup) {
+			lookup->dev = dev;
+			lookup->con_id = con_id;
+			list_add_tail(&lookup->node, &acpi_gpio_lookup_list);
+		}
+	}
+
+	mutex_lock(&acpi_gpio_lookup_lock);
+
+	return lookup &&
+		((!lookup->con_id && !con_id) ||
+		 (lookup->con_id && con_id &&
+		  strcmp(lookup->con_id, con_id) == 0));
+}
+
 static struct gpio_desc *acpi_find_gpio(struct device *dev, const char *con_id,
 					unsigned int idx,
 					enum gpio_lookup_flags *flags)
@@ -1765,7 +1804,8 @@ static struct gpio_desc *acpi_find_gpio(struct device *dev, const char *con_id,
 
 	/* Then from plain _CRS GPIOs */
 	if (IS_ERR(desc)) {
-		desc = acpi_get_gpiod_by_index(adev, NULL, idx, &info);
+		if (acpi_can_fallback_crs(dev, con_id))
+			desc = acpi_get_gpiod_by_index(adev, NULL, idx, &info);
 		if (IS_ERR(desc))
 			return desc;
 	}
