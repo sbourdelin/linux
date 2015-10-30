@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/kmod.h>
+#include <linux/fs.h>
 #include <trace/events/power.h>
 
 /* 
@@ -140,6 +141,17 @@ int freeze_processes(void)
 	pr_cont("\n");
 	BUG_ON(in_atomic());
 
+	pr_info("Freezing filesystems ... ");
+
+	error = freeze_all_supers(true);
+	if (error) {
+		pr_cont("failed.\n");
+		thaw_processes();
+		return error;
+	}
+
+	pr_cont("done.\n");
+
 	/*
 	 * Now that the whole userspace is frozen we need to disbale
 	 * the OOM killer to disallow any further interference with
@@ -148,35 +160,10 @@ int freeze_processes(void)
 	if (!error && !oom_killer_disable())
 		error = -EBUSY;
 
-	if (error)
+	if (error) {
 		thaw_processes();
-	return error;
-}
-
-/**
- * freeze_kernel_threads - Make freezable kernel threads go to the refrigerator.
- *
- * On success, returns 0.  On failure, -errno and only the kernel threads are
- * thawed, so as to give a chance to the caller to do additional cleanups
- * (if any) before thawing the userspace tasks. So, it is the responsibility
- * of the caller to thaw the userspace tasks, when the time is right.
- */
-int freeze_kernel_threads(void)
-{
-	int error;
-
-	pr_info("Freezing remaining freezable tasks ... ");
-
-	pm_nosig_freezing = true;
-	error = try_to_freeze_tasks(false);
-	if (!error)
-		pr_cont("done.");
-
-	pr_cont("\n");
-	BUG_ON(in_atomic());
-
-	if (error)
-		thaw_kernel_threads();
+		thaw_all_supers();
+	}
 	return error;
 }
 
@@ -197,6 +184,7 @@ void thaw_processes(void)
 
 	__usermodehelper_set_disable_depth(UMH_FREEZING);
 	thaw_workqueues();
+	thaw_all_supers();
 
 	read_lock(&tasklist_lock);
 	for_each_process_thread(g, p) {
@@ -216,22 +204,3 @@ void thaw_processes(void)
 	trace_suspend_resume(TPS("thaw_processes"), 0, false);
 }
 
-void thaw_kernel_threads(void)
-{
-	struct task_struct *g, *p;
-
-	pm_nosig_freezing = false;
-	pr_info("Restarting kernel threads ... ");
-
-	thaw_workqueues();
-
-	read_lock(&tasklist_lock);
-	for_each_process_thread(g, p) {
-		if (p->flags & (PF_KTHREAD | PF_WQ_WORKER))
-			__thaw_task(p);
-	}
-	read_unlock(&tasklist_lock);
-
-	schedule();
-	pr_cont("done.\n");
-}

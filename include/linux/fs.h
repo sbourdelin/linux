@@ -2029,6 +2029,8 @@ extern int fd_statfs(int, struct kstatfs *);
 extern int vfs_ustat(dev_t, struct kstatfs *);
 extern int freeze_super(struct super_block *super);
 extern int thaw_super(struct super_block *super);
+extern int freeze_all_supers(bool);
+extern void thaw_all_supers(void);
 extern bool our_mnt(struct vfsmount *mnt);
 
 extern int current_umask(void);

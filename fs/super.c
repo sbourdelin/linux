@@ -1373,3 +1373,87 @@ out:
 	return 0;
 }
 EXPORT_SYMBOL(thaw_super);
+
+static bool super_should_freeze(struct super_block *sb, bool skip_virtual)
+{
+	if (!sb->s_root)
+		return false;
+	if (!(sb->s_flags & MS_BORN))
+		return false;
+	/* Should we freeze virtual filesystems? */
+	if (sb->s_bdi == &noop_backing_dev_info && skip_virtual)
+		return false;
+	/* No need to freeze read-only filesystems */
+	if (sb->s_flags & MS_RDONLY)
+		return false;
+	return true;
+}
+
+/**
+ * freeze_all_supers -- iterate through all filesystems and freeze them
+ * @skip_virtual: should those with no backing device be skipped?
+ *
+ * Iterate over all superblocks and call freeze_super() for them. Some
+ * use-cases (such as freezer) might want to have to skip those which
+ * don't have any backing bdev.
+ *
+ */
+int freeze_all_supers(bool skip_virtual)
+{
+	struct super_block *sb, *p = NULL;
+	int error = 0;
+
+	spin_lock(&sb_lock);
+	/*
+	 * The list of super-blocks is iterated in a reverse order so that
+	 * inter-dependencies (such as loopback devices) are handled in
+	 * a non-deadlocking order
+	 */
+	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
+		if (hlist_unhashed(&sb->s_instances))
+			continue;
+		sb->s_count++;
+
+		spin_unlock(&sb_lock);
+		if (super_should_freeze(sb, skip_virtual)) {
+			error = freeze_super(sb);
+			if (error) {
+				spin_lock(&sb_lock);
+				break;
+			}
+		}
+		spin_lock(&sb_lock);
+
+		if (p)
+			__put_super(p);
+		p = sb;
+	}
+	if (p)
+		__put_super(p);
+	spin_unlock(&sb_lock);
+
+	return error;
+}
+
+void thaw_all_supers(void)
+{
+	struct super_block *sb, *p = NULL;
+
+	spin_lock(&sb_lock);
+	list_for_each_entry(sb, &super_blocks, s_list) {
+		if (hlist_unhashed(&sb->s_instances))
+			continue;
+		sb->s_count++;
+
+		spin_unlock(&sb_lock);
+		thaw_super(sb);
+		spin_lock(&sb_lock);
+
+		if (p)
+			__put_super(p);
+		p = sb;
+	}
+	if (p)
+		__put_super(p);
+	spin_unlock(&sb_lock);
+}

@@ -348,10 +348,6 @@ int hibernation_snapshot(int platform_mode)
 	if (error)
 		goto Close;
 
-	error = freeze_kernel_threads();
-	if (error)
-		goto Cleanup;
-
 	if (hibernation_test(TEST_FREEZER)) {
 
 		/*
@@ -402,7 +398,6 @@ int hibernation_snapshot(int platform_mode)
 	return error;
 
  Thaw:
-	thaw_kernel_threads();
  Cleanup:
 	swsusp_free();
 	goto Close;

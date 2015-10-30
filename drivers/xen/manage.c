@@ -109,12 +109,6 @@ static void do_suspend(void)
 		goto out;
 	}
 
-	err = freeze_kernel_threads();
-	if (err) {
-		pr_err("%s: freeze kernel threads failed %d\n", __func__, err);
-		goto out_thaw;
-	}
-
 	err = dpm_suspend_start(PMSG_FREEZE);
 	if (err) {
 		pr_err("%s: dpm_suspend_start %d\n", __func__, err);
