@@ -1,0 +1,46 @@
+* TPS65086 Power Management Integrated Circuit bindings
+
+Required properties:
+ - compatible		: Should be "ti,tps65086".
+ - reg			: I2C slave address.
+ - interrupt-parent	: Phandle to he parent interrupt controller.
+ - interrupts		: The interrupt line the device is connected to.
+ - interrupt-controller	: Marks the device node as an interrupt controller.
+ - #interrupt-cells	: The number of cells to describe an IRQ, this
+			    should be 2. The first cell is the IRQ number,
+			    the second cell is the flags, encoded as the trigger
+			    masks from <dt-bindings/interrupt-controller/irq.h>.
+
+Additional nodes defined in:
+ - Regulators	: ../regulator/tps65086-regulator.txt
+ - GPIO		: ../gpio/gpio-tps65086.txt
+
+Example:
+
+	pmic: tps65086@5e {
+		compatible = "ti,tps65086";
+		reg = <0x5e>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+
+		regulators {
+			compatible = "ti,tps65086-regulator";
+
+			buck1 {
+				regulator-name = "vcc1";
+				regulator-min-microvolt = <1600000>;
+				regulator-max-microvolt = <1600000>;
+				regulator-boot-on;
+				ti,regulator-decay;
+				ti,regulator-step-size-25mv;
+			};
+		};
+
+		gpio4: gpio {
+			compatible = "ti,tps65086-gpio";
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+	};
