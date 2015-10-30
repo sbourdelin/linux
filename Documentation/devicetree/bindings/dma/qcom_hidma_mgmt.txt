@@ -1,0 +1,42 @@
+Qualcomm Technologies HIDMA Management interface
+
+Required properties:
+- compatible: must contain "qcom,hidma_mgmt"
+- reg: Address range for DMA device
+- interrupts: Should contain the one interrupt shared by all channels
+- nr-channels: Number of channels supported by this DMA controller.
+- max-write: Maximum write burst in bytes. A memcpy requested is
+  fragmented to multiples of this amount.
+- max-read: Maximum read burst in bytes. A memcpy request is
+  fragmented to multiples of this amount.
+- max-wxactions: Maximum write transactions to perform in a burst
+- max-rdactions: Maximum read transactions to perform in a burst
+- max-memset-limit: Maximum memset limit
+- ch-priority-#n: Priority of the channel
+- ch-weight-#n: Round robin weight of the channel
+Example:
+
+	hidma-mgmt@f9984000 = {
+		compatible = "qcom,hidma_mgmt";
+		reg = <0xf9984000 0x15000>;
+		interrupts = <0 94 0>;
+		nr-channels = 6;
+		max-write = 1024;
+		max-read = 1024;
+		max-wxactions = 31;
+		max-rdactions = 31;
+		max-memset-limit = 8;
+		ch-priority-0 = 0;
+		ch-priority-1 = 1;
+		ch-priority-2 = 1;
+		ch-priority-3 = 0;
+		ch-priority-4 = 0;
+		ch-priority-5 = 0;
+		ch-weight-0 = 1;
+		ch-weight-1 = 13;
+		ch-weight-2 = 10;
+		ch-weight-3 = 3;
+		ch-weight-4 = 4;
+		ch-weight-5 = 5;
+	};
+
