@@ -30,6 +30,7 @@
 #include "intel_drv.h"
 #include "../../../platform/x86/intel_ips.h"
 #include <linux/module.h>
+#include <linux/pm_runtime.h>
 
 /**
  * RC6 is a special power stage which allows the GPU to enter an very
@@ -4763,6 +4764,20 @@ static void gen9_enable_rc6(struct drm_device *dev)
 	struct intel_engine_cs *ring;
 	uint32_t rc6_mask = 0;
 	int unused;
+	bool hw_rc6_enabled, sw_rc6_enabled;
+	struct device *device = &dev->pdev->dev;
+
+	/* Check if BIOS has enabled HW/SW RC6. Only then enable RC6 */
+	hw_rc6_enabled = I915_READ(GEN6_RC_CONTROL) &
+				(GEN6_RC_CTL_RC6_ENABLE | GEN6_RC_CTL_HW_ENABLE);
+	sw_rc6_enabled = !(I915_READ(GEN6_RC_CONTROL) & GEN6_RC_CTL_HW_ENABLE)
+				&& (I915_READ(GEN6_RC_STATE) & 0x40000);
+	if (!(hw_rc6_enabled || sw_rc6_enabled)) {
+		i915.enable_rc6 = 0;
+		pm_runtime_forbid(device);
+		DRM_INFO("RC6 disabled by BIOS, disabled runtime PM support\n");
+	}
+
 
 	/* 1a: Software RC state - RC0 */
 	I915_WRITE(GEN6_RC_STATE, 0);
