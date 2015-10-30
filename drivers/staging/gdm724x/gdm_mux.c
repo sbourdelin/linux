@@ -660,7 +660,6 @@ static struct usb_driver gdm_mux_driver = {
 
 static int __init gdm_usb_mux_init(void)
 {
-
 	mux_rx_wq = create_workqueue("mux_rx_wq");
 	if (mux_rx_wq == NULL) {
 		pr_err("work queue create fail\n");
