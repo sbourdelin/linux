@@ -66,7 +66,7 @@ static void setup_indirect_dde(struct data_descriptor_entry *dde,
 			       unsigned int dde_count, unsigned int byte_count)
 {
 	dde->flags = 0;
-	dde->count = dde_count;
+	dde->count = cpu_to_be32(dde_count);
 	dde->index = 0;
 	dde->length = cpu_to_be32(byte_count);
 	dde->address = cpu_to_be64(nx842_get_pa(ddl));
