@@ -360,9 +360,9 @@ static int trace_graph_thresh_entry(struct ftrace_graph_ent *trace)
 		return trace_graph_entry(trace);
 }
 
-static void
-__trace_graph_function(struct trace_array *tr,
-		unsigned long ip, unsigned long flags, int pc)
+void trace_graph_function(struct trace_array *tr,
+		unsigned long ip, unsigned long parent_ip,
+		unsigned long flags, int pc)
 {
 	u64 time = trace_clock_local();
 	struct ftrace_graph_ent ent = {
@@ -378,14 +378,6 @@ __trace_graph_function(struct trace_array *tr,
 
 	__trace_graph_entry(tr, &ent, flags, pc);
 	__trace_graph_return(tr, &ret, flags, pc);
-}
-
-void
-trace_graph_function(struct trace_array *tr,
-		unsigned long ip, unsigned long parent_ip,
-		unsigned long flags, int pc)
-{
-	__trace_graph_function(tr, ip, flags, pc);
 }
 
 void __trace_graph_return(struct trace_array *tr,
