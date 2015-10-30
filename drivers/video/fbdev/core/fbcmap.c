@@ -91,7 +91,7 @@ static const struct fb_cmap default_16_colors = {
 
 int fb_alloc_cmap_gfp(struct fb_cmap *cmap, int len, int transp, gfp_t flags)
 {
-	int size = len * sizeof(u16);
+	int size;
 	int ret = -ENOMEM;
 
 	if (cmap->len != len) {
@@ -99,6 +99,7 @@ int fb_alloc_cmap_gfp(struct fb_cmap *cmap, int len, int transp, gfp_t flags)
 		if (!len)
 			return 0;
 
+		size = len * sizeof(u16);
 		cmap->red = kmalloc(size, flags);
 		if (!cmap->red)
 			goto fail;
