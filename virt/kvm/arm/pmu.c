@@ -121,6 +121,36 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val)
 }
 
 /**
+ * kvm_pmu_overflow_clear - clear PMU overflow interrupt
+ * @vcpu: The vcpu pointer
+ * @val: the value guest writes to PMOVSCLR register
+ * @reg: the current value of PMOVSCLR register
+ */
+void kvm_pmu_overflow_clear(struct kvm_vcpu *vcpu, u32 val, u32 reg)
+{
+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+
+	/* If all overflow bits are cleared, clear interrupt pending status*/
+	if (val == reg)
+		pmu->irq_pending = false;
+}
+
+/**
+ * kvm_pmu_overflow_set - set PMU overflow interrupt
+ * @vcpu: The vcpu pointer
+ * @val: the value guest writes to PMOVSSET register
+ */
+void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val)
+{
+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+
+	if (val != 0) {
+		pmu->irq_pending = true;
+		kvm_vcpu_kick(vcpu);
+	}
+}
+
+/**
  * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
  * @vcpu: The vcpu pointer
  * @data: The data guest writes to PMXEVTYPER_EL0
