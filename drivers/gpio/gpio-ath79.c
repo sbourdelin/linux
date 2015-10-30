@@ -12,129 +12,15 @@
  *  by the Free Software Foundation.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/types.h>
-#include <linux/spinlock.h>
-#include <linux/io.h>
-#include <linux/ioport.h>
-#include <linux/gpio.h>
+#include <linux/gpio/driver.h>
 #include <linux/platform_data/gpio-ath79.h>
 #include <linux/of_device.h>
+#include <linux/basic_mmio_gpio.h>
 
 #include <asm/mach-ath79/ar71xx_regs.h>
 
-static void __iomem *ath79_gpio_base;
-static u32 ath79_gpio_count;
-static DEFINE_SPINLOCK(ath79_gpio_lock);
-
-static void __ath79_gpio_set_value(unsigned gpio, int value)
-{
-	void __iomem *base = ath79_gpio_base;
-
-	if (value)
-		__raw_writel(1 << gpio, base + AR71XX_GPIO_REG_SET);
-	else
-		__raw_writel(1 << gpio, base + AR71XX_GPIO_REG_CLEAR);
-}
-
-static int __ath79_gpio_get_value(unsigned gpio)
-{
-	return (__raw_readl(ath79_gpio_base + AR71XX_GPIO_REG_IN) >> gpio) & 1;
-}
-
-static int ath79_gpio_get_value(struct gpio_chip *chip, unsigned offset)
-{
-	return __ath79_gpio_get_value(offset);
-}
-
-static void ath79_gpio_set_value(struct gpio_chip *chip,
-				  unsigned offset, int value)
-{
-	__ath79_gpio_set_value(offset, value);
-}
-
-static int ath79_gpio_direction_input(struct gpio_chip *chip,
-				       unsigned offset)
-{
-	void __iomem *base = ath79_gpio_base;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ath79_gpio_lock, flags);
-
-	__raw_writel(__raw_readl(base + AR71XX_GPIO_REG_OE) & ~(1 << offset),
-		     base + AR71XX_GPIO_REG_OE);
-
-	spin_unlock_irqrestore(&ath79_gpio_lock, flags);
-
-	return 0;
-}
-
-static int ath79_gpio_direction_output(struct gpio_chip *chip,
-					unsigned offset, int value)
-{
-	void __iomem *base = ath79_gpio_base;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ath79_gpio_lock, flags);
-
-	if (value)
-		__raw_writel(1 << offset, base + AR71XX_GPIO_REG_SET);
-	else
-		__raw_writel(1 << offset, base + AR71XX_GPIO_REG_CLEAR);
-
-	__raw_writel(__raw_readl(base + AR71XX_GPIO_REG_OE) | (1 << offset),
-		     base + AR71XX_GPIO_REG_OE);
-
-	spin_unlock_irqrestore(&ath79_gpio_lock, flags);
-
-	return 0;
-}
-
-static int ar934x_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-{
-	void __iomem *base = ath79_gpio_base;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ath79_gpio_lock, flags);
-
-	__raw_writel(__raw_readl(base + AR71XX_GPIO_REG_OE) | (1 << offset),
-		     base + AR71XX_GPIO_REG_OE);
-
-	spin_unlock_irqrestore(&ath79_gpio_lock, flags);
-
-	return 0;
-}
-
-static int ar934x_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
-					int value)
-{
-	void __iomem *base = ath79_gpio_base;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ath79_gpio_lock, flags);
-
-	if (value)
-		__raw_writel(1 << offset, base + AR71XX_GPIO_REG_SET);
-	else
-		__raw_writel(1 << offset, base + AR71XX_GPIO_REG_CLEAR);
-
-	__raw_writel(__raw_readl(base + AR71XX_GPIO_REG_OE) & ~(1 << offset),
-		     base + AR71XX_GPIO_REG_OE);
-
-	spin_unlock_irqrestore(&ath79_gpio_lock, flags);
-
-	return 0;
-}
-
-static struct gpio_chip ath79_gpio_chip = {
-	.label			= "ath79",
-	.get			= ath79_gpio_get_value,
-	.set			= ath79_gpio_set_value,
-	.direction_input	= ath79_gpio_direction_input,
-	.direction_output	= ath79_gpio_direction_output,
-	.base			= 0,
+struct ath79_gpio {
+	struct bgpio_chip bgc;
 };
 
 static const struct of_device_id ath79_gpio_of_match[] = {
@@ -147,9 +33,16 @@ static int ath79_gpio_probe(struct platform_device *pdev)
 {
 	struct ath79_gpio_platform_data *pdata = pdev->dev.platform_data;
 	struct device_node *np = pdev->dev.of_node;
+	void __iomem *ath79_gpio_base;
+	struct ath79_gpio *ctrl;
 	struct resource *res;
+	u32 ath79_gpio_count;
 	bool oe_inverted;
 	int err;
+
+	ctrl = devm_kzalloc(&pdev->dev, sizeof(*ctrl), GFP_KERNEL);
+	if (!ctrl)
+		return -ENOMEM;
 
 	if (np) {
 		err = of_property_read_u32(np, "ngpios", &ath79_gpio_count);
@@ -176,14 +69,25 @@ static int ath79_gpio_probe(struct platform_device *pdev)
 	if (!ath79_gpio_base)
 		return -ENOMEM;
 
-	ath79_gpio_chip.dev = &pdev->dev;
-	ath79_gpio_chip.ngpio = ath79_gpio_count;
-	if (oe_inverted) {
-		ath79_gpio_chip.direction_input = ar934x_gpio_direction_input;
-		ath79_gpio_chip.direction_output = ar934x_gpio_direction_output;
+	err = bgpio_init(&ctrl->bgc, &pdev->dev, 4,
+			ath79_gpio_base + AR71XX_GPIO_REG_IN,
+			ath79_gpio_base + AR71XX_GPIO_REG_SET,
+			ath79_gpio_base + AR71XX_GPIO_REG_CLEAR,
+			oe_inverted ?
+				NULL : ath79_gpio_base + AR71XX_GPIO_REG_OE,
+			oe_inverted ?
+				ath79_gpio_base + AR71XX_GPIO_REG_OE : NULL,
+			0);
+	if (err) {
+		dev_err(&pdev->dev, "bgpio_init failed\n");
+		return err;
 	}
 
-	err = gpiochip_add(&ath79_gpio_chip);
+	ctrl->bgc.gc.label = "ath79";
+	ctrl->bgc.gc.base = 0;
+	ctrl->bgc.gc.ngpio = ath79_gpio_count;
+
+	err = gpiochip_add(&ctrl->bgc.gc);
 	if (err) {
 		dev_err(&pdev->dev,
 			"cannot add AR71xx GPIO chip, error=%d", err);
