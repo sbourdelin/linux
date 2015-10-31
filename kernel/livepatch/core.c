@@ -733,7 +733,8 @@ static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 	func->state = KLP_DISABLED;
 
 	return kobject_init_and_add(&func->kobj, &klp_ktype_func,
-				    &obj->kobj, "%s", func->old_name);
+				    &obj->kobj, "%s@%p", func->old_name,
+				    (void *)func->old_addr);
 }
 
 /* parts of the initialization that is done only when the object is loaded */
