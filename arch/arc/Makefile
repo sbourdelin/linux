@@ -94,7 +94,9 @@ head-y		:= arch/arc/kernel/head.o
 core-y		+= arch/arc/
 
 # w/o this dtb won't embed into kernel binary
+ifneq ($(CONFIG_ARC_BUILTIN_DTB_NAME),"")
 core-y		+= arch/arc/boot/dts/
+endif
 
 core-$(CONFIG_ARC_PLAT_SIM)	+= arch/arc/plat-sim/
 core-$(CONFIG_ARC_PLAT_TB10X)	+= arch/arc/plat-tb10x/
