@@ -77,13 +77,16 @@ tmon: FORCE
 freefall: FORCE
 	$(call descend,laptop/$@)
 
+perf_install: FORCE
+	$(Q)$(MAKE) --no-print-directory -C perf O=$(PERF_O) subdir= install
+
 acpi_install:
 	$(call descend,power/$(@:_install=),install)
 
 cpupower_install:
 	$(call descend,power/$(@:_install=),install)
 
-cgroup_install firewire_install hv_install lguest_install perf_install usb_install virtio_install vm_install net_install:
+cgroup_install firewire_install hv_install lguest_install usb_install virtio_install vm_install net_install:
 	$(call descend,$(@:_install=),install)
 
 selftests_install:
