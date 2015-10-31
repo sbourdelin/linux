@@ -150,6 +150,19 @@ void hci_req_add_le_scan_disable(struct hci_request *req)
 	hci_req_add(req, HCI_OP_LE_SET_SCAN_ENABLE, sizeof(cp), &cp);
 }
 
+void hci_req_add_virt_le_scan_disable(struct hci_request *req)
+{
+	struct hci_cp_le_set_scan_enable cp;
+
+	memset(&cp, 0, sizeof(cp));
+	cp.enable = LE_SCAN_DISABLE;
+
+	/* Instead of sending real scan disable packet, send virtual one,
+	 * that will check and stop scan at time of running command.
+	 */
+	hci_req_add(req, HCI_OP_VIRT_LE_SCAN_DISABLE, sizeof(cp), &cp);
+}
+
 static void add_to_white_list(struct hci_request *req,
 			      struct hci_conn_params *params)
 {
@@ -257,6 +270,9 @@ void hci_req_add_le_passive_scan(struct hci_request *req)
 	struct hci_dev *hdev = req->hdev;
 	u8 own_addr_type;
 	u8 filter_policy;
+
+	/* HCI_OP_LE_SET_SCAN_PARAM must be run when scan is disabled. */
+	hci_req_add_virt_le_scan_disable(req);
 
 	/* Set require_privacy to false since no SCAN_REQ are send
 	 * during passive scanning. Not using an non-resolvable address
@@ -530,12 +546,6 @@ void __hci_update_background_scan(struct hci_request *req)
 		 */
 		if (hci_lookup_le_connect(hdev))
 			return;
-
-		/* If controller is currently scanning, we stop it to ensure we
-		 * don't miss any advertising (due to duplicates filter).
-		 */
-		if (hci_dev_test_flag(hdev, HCI_LE_SCAN))
-			hci_req_add_le_scan_disable(req);
 
 		hci_req_add_le_passive_scan(req);
 
