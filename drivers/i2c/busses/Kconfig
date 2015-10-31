@@ -992,6 +992,14 @@ config I2C_RCAR
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-rcar.
 
+config I2C_TANGOX
+	tristate "SMP86xx I2C master support"
+	depends on ARCH_TANGOX
+	help
+	  This driver supports the Sigma Designs SMP86xx built-in I2c master.
+
+	  If built as a module, it will be called i2c-tangox.
+
 comment "External I2C/SMBus adapter drivers"
 
 config I2C_DIOLAN_U2C
