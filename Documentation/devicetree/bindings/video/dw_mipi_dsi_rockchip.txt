@@ -1,0 +1,56 @@
+Rockchip specific extensions to the Synopsys Designware MIPI DSI
+================================
+
+Required properties:
+- compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
+- rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
+- ports: contain a port node with endpoint definitions as defined in [1].
+  For vopb,set the reg = <0> and set the reg = <1> for vopl.
+
+For more required properties, please refer to [2].
+
+[1] Documentation/devicetree/bindings/media/video-interfaces.txt
+[2] Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+
+Example:
+	mipi_dsi: mipi@ff960000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
+		reg = <0xff960000 0x4000>;
+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
+		clock-names = "ref", "pclk";
+		rockchip,grf = <&grf>;
+		status = "okay";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+
+			mipi_in: port {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				mipi_in_vopb: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&vopb_out_mipi>;
+				};
+				mipi_in_vopl: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&vopl_out_mipi>;
+				};
+			};
+		};
+
+		panel {
+			compatible ="boe,tv080wum-nl0";
+			reg = <0>;
+
+			enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&lcd_en>;
+			backlight = <&backlight>;
+			status = "okay";
+		};
+	};
