@@ -1947,6 +1947,8 @@ struct hci_ev_si_security {
 	__u8     incoming;
 } __packed;
 
+#define HCI_OP_VIRT_LE_SCAN_DISABLE	0xFF0b
+
 /* ---- HCI Packet structures ---- */
 #define HCI_COMMAND_HDR_SIZE 3
 #define HCI_EVENT_HDR_SIZE   2
