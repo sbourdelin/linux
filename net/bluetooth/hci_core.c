@@ -534,13 +534,20 @@ static void hci_setup_event_mask(struct hci_request *req)
 	} else {
 		/* Use a different default for LE-only devices */
 		memset(events, 0, sizeof(events));
-		events[0] |= 0x10; /* Disconnection Complete */
-		events[1] |= 0x08; /* Read Remote Version Information Complete */
 		events[1] |= 0x20; /* Command Complete */
 		events[1] |= 0x40; /* Command Status */
 		events[1] |= 0x80; /* Hardware Error */
-		events[2] |= 0x04; /* Number of Completed Packets */
-		events[3] |= 0x02; /* Data Buffer Overflow */
+
+		if (hdev->commands[0] & 0x20) {
+			events[0] |= 0x10; /* Disconnection Complete */
+			events[2] |= 0x04; /* Number of Completed Packets */
+			events[3] |= 0x02; /* Data Buffer Overflow */
+		}
+
+		if (hdev->commands[2] & 0x80)
+			events[1] |= 0x08; /* Read Remote Version Information
+					    * Complete
+					    */
 
 		if (hdev->le_features[0] & HCI_LE_ENCRYPTION) {
 			events[0] |= 0x80; /* Encryption Change */
