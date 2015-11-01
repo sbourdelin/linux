@@ -1014,11 +1014,52 @@ static void sm750fb_frambuffer_release(struct sm750_dev *sm750_dev)
 	}
 }
 
+static int sm750fb_frambuffer_alloc(struct sm750_dev *sm750_dev, int fbidx)
+{
+	struct fb_info *fb_info;
+	struct lynxfb_par *par;
+	int err;
+
+	fb_info = framebuffer_alloc(sizeof(struct lynxfb_par),
+				    &sm750_dev->pdev->dev);
+	if (!fb_info) {
+		pr_err("Could not allocate framebuffer #%d.\n", fbidx);
+		return -ENOMEM;
+	}
+
+	sm750_dev->fbinfo[fbidx] = fb_info;
+	par = fb_info->par;
+	par->dev = sm750_dev;
+
+	err = lynxfb_set_fbinfo(fb_info, fbidx);
+	if (err) {
+		pr_err("Failed to initial fb_info #%d.\n", fbidx);
+		goto fb_release;
+	}
+
+	err = register_framebuffer(fb_info);
+	if (err < 0) {
+		pr_err("Failed to register fb_info #%d. err %d\n", fbidx, err);
+		goto fb_release;
+	}
+
+	sm750_dev->fb_count++;
+
+	pr_info("Accomplished register framebuffer #%d.\n", fbidx);
+
+	return 0;
+
+fb_release:
+	framebuffer_release(fb_info);
+	return err;
+}
+
 static int lynxfb_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *ent)
 {
-	struct fb_info *info[] = {NULL, NULL};
 	struct sm750_dev *sm750_dev = NULL;
+	int err = -ENODEV;
+	int max_fb;
 	int fbidx;
 
 	/* enable device */
@@ -1083,69 +1124,21 @@ static int lynxfb_pci_probe(struct pci_dev *pdev,
 	/* call chipInit routine */
 	hw_sm750_inithw(sm750_dev, pdev);
 
-	/* allocate frame buffer info structor according to g_dualview */
-	fbidx = 0;
-ALLOC_FB:
-	info[fbidx] = framebuffer_alloc(sizeof(struct lynxfb_par), &pdev->dev);
-	if (!info[fbidx]) {
-		pr_err("Could not allocate framebuffer #%d.\n", fbidx);
-		if (fbidx == 0)
-			goto err_info0_alloc;
-		else
-			goto err_info1_alloc;
-	} else {
-		struct lynxfb_par *par;
-		int errno;
-
-		pr_info("framebuffer #%d alloc okay\n", fbidx);
-		sm750_dev->fbinfo[fbidx] = info[fbidx];
-		par = info[fbidx]->par;
-		par->dev = sm750_dev;
-
-		/* set fb_info structure */
-		if (lynxfb_set_fbinfo(info[fbidx], fbidx)) {
-			pr_err("Failed to initial fb_info #%d.\n", fbidx);
-			if (fbidx == 0)
-				goto err_info0_set;
-			else
-				goto err_info1_set;
-		}
-
-		/* register frame buffer */
-		pr_info("Ready to register framebuffer #%d.\n", fbidx);
-		errno = register_framebuffer(info[fbidx]);
-		if (errno < 0) {
-			pr_err("Failed to register fb_info #%d. err %d\n",
-			       fbidx,
-			       errno);
-			if (fbidx == 0)
-				goto err_register0;
-			else
-				goto err_register1;
-		}
-		pr_info("Accomplished register framebuffer #%d.\n", fbidx);
+	/* allocate frame buffer info structures according to g_dualview */
+	max_fb = g_dualview ? 2 : 1;
+	for (fbidx = 0; fbidx < max_fb; fbidx++) {
+		err = sm750fb_frambuffer_alloc(sm750_dev, fbidx);
+		if (err)
+			goto err_alloc_fb;
 	}
-
-	/* no dual view by far */
-	fbidx++;
-	sm750_dev->fb_count++;
-	if (g_dualview && fbidx < 2)
-		goto ALLOC_FB;
 
 	return 0;
 
-err_register1:
-err_info1_set:
-	framebuffer_release(info[1]);
-err_info1_alloc:
-	unregister_framebuffer(info[0]);
-err_register0:
-err_info0_set:
-	framebuffer_release(info[0]);
-err_info0_alloc:
+err_alloc_fb:
+	sm750fb_frambuffer_release(sm750_dev);
 err_map:
 	kfree(sm750_dev);
-	return -ENODEV;
+	return err;
 }
 
 static void lynxfb_pci_remove(struct pci_dev *pdev)
