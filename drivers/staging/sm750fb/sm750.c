@@ -1016,7 +1016,7 @@ static int lynxfb_pci_probe(struct pci_dev *pdev,
 	sm750_dev = kzalloc(sizeof(*sm750_dev), GFP_KERNEL);
 	if (!sm750_dev) {
 		pr_err("Could not allocate memory for share.\n");
-		return -ENODEV;
+		return -ENOMEM;
 	}
 
 	sm750_dev->fbinfo[0] = sm750_dev->fbinfo[1] = NULL;
