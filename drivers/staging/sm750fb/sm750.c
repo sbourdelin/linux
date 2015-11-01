@@ -1010,13 +1010,13 @@ static int lynxfb_pci_probe(struct pci_dev *pdev,
 	/* enable device */
 	if (pci_enable_device(pdev)) {
 		pr_err("can not enable device.\n");
-		goto err_enable;
+		return -ENODEV;
 	}
 
 	sm750_dev = kzalloc(sizeof(*sm750_dev), GFP_KERNEL);
 	if (!sm750_dev) {
 		pr_err("Could not allocate memory for share.\n");
-		goto err_share;
+		return -ENODEV;
 	}
 
 	sm750_dev->fbinfo[0] = sm750_dev->fbinfo[1] = NULL;
@@ -1131,8 +1131,6 @@ err_info0_set:
 err_info0_alloc:
 err_map:
 	kfree(sm750_dev);
-err_share:
-err_enable:
 	return -ENODEV;
 }
 
