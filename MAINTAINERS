@@ -814,6 +814,25 @@ S:	Maintained
 F:	drivers/net/arcnet/
 F:	include/uapi/linux/if_arcnet.h
 
+ARINC429 NETWORK LAYER
+M:	Marek Vasut <marex@denx.de>
+S:	Maintained
+F:	net/arinc429/
+F:	include/linux/arinc429/core.h
+F:	include/uapi/linux/arinc429.h
+F:	include/uapi/linux/arinc429/bcm.h
+F:	include/uapi/linux/arinc429/raw.h
+F:	include/uapi/linux/arinc429/gw.h
+
+ARINC429 NETWORK DRIVERS
+M:	Marek Vasut <marex@denx.de>
+S:	Maintained
+F:	drivers/net/arinc429/
+F:	include/linux/arinc429/dev.h
+F:	include/linux/arinc429/platform/
+F:	include/uapi/linux/arinc429/error.h
+F:	include/uapi/linux/arinc429/netlink.h
+
 ARM MFM AND FLOPPY DRIVERS
 M:	Ian Molton <spyro@f2s.com>
 S:	Maintained
