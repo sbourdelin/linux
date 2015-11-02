@@ -1,0 +1,60 @@
+LM3633 LED driver generates programmable pattern via the sysfs.
+
+LED Pattern Generator Structure
+
+                            (3)
+  (a) --------------->  ___________
+                       /           \
+                  (2) /             \ (4)
+  (b) ----> _________/               \_________  ...
+               (1)                       (5)
+
+                     |<-----   period   -----> |
+
+What:		/sys/class/leds/<led>/pattern_times
+Date:		Oct 2015
+KernelVersion:	4.3
+Contact:	Milo Kim <milo.kim@ti.com>
+Description:	read/write
+                Set pattern time dimension. There are five arguments.
+                  (1) startup delay
+                  (2) rising dimming time
+                  (3) how much time stays at high level
+                  (4) falling dimming time
+                  (5) how much time stays at low level
+                Ranges are
+                  (1), (3), (5): 0 ~ 10000. Unit is millisecond.
+                  (2), (4): 0 ~ 16000. Unit is millisecond.
+
+                Example:
+                No delay, rising 200ms, high 300ms, falling 100ms, low 400ms.
+                echo "0 200 300 100 400" > /sys/class/leds/<led>/pattern_times
+
+                cat /sys/class/leds/<led>/pattern_times
+                delay: 0, rise: 200, high: 300, fall: 100, low: 400
+
+What:		/sys/class/leds/<led>/pattern_levels
+Date:		Oct 2015
+KernelVersion:	4.3
+Contact:	Milo Kim <milo.kim@ti.com>
+Description:	read/write
+                Set pattern level(brightness). There are two arguments.
+                  (a) Low brightness level
+                  (b) High brightness level
+                Ranges are from 0 to 255.
+
+                Example:
+                Low level is 0, high level is 255.
+                echo "0 255" > /sys/class/leds/<led>/pattern_levels
+
+                cat /sys/class/leds/<led>/pattern_levels
+                low brightness: 0, high brightness: 255
+
+What:		/sys/class/leds/<led>/run_pattern
+Date:		Oct 2015
+KernelVersion:	4.3
+Contact:	Milo Kim <milo.kim@ti.com>
+Description:	write only
+                After 'pattern_times' and 'pattern_levels' are updated,
+                run the pattern by writing 1 to 'run_pattern'.
+                To stop running pattern, writes 0 to 'run_pattern'.
