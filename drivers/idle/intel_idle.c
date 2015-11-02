@@ -61,6 +61,7 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
+#include <linux/dmi.h>
 #include <asm/cpu_device_id.h>
 #include <asm/mwait.h>
 #include <asm/msr.h>
@@ -925,6 +926,25 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 };
 MODULE_DEVICE_TABLE(x86cpu, intel_idle_ids);
 
+static int intel_idle_disable_callback(const struct dmi_system_id *id)
+{
+	pr_debug(PREFIX "problematic system (%s), disabling\n", id->ident);
+	return 1;
+}
+
+static const struct dmi_system_id intel_idle_disable_dmi[] = {
+	{
+		/* Lenovo Ideapad S10-3t, hangs coming out of S3 */
+		.callback = intel_idle_disable_callback,
+		.ident = "Lenovo Ideapad S10-3t",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "Lenovo Ideapad S10-3t"),
+		},
+	},
+	{}
+};
+
 /*
  * intel_idle_probe()
  */
@@ -956,6 +976,9 @@ static int __init intel_idle_probe(void)
 	    !(ecx & CPUID5_ECX_INTERRUPT_BREAK) ||
 	    !mwait_substates)
 			return -ENODEV;
+
+	if (dmi_check_system(intel_idle_disable_dmi))
+		return -ENODEV;
 
 	pr_debug(PREFIX "MWAIT substates: 0x%x\n", mwait_substates);
 
