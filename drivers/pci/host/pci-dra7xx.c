@@ -219,7 +219,8 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
 	case INTB:
 	case INTC:
 	case INTD:
-		generic_handle_irq(irq_find_mapping(pp->irq_domain, ffs(reg)));
+		generic_handle_irq_rt_wa(irq_find_mapping(pp->irq_domain,
+					 ffs(reg)));
 		break;
 	}
 

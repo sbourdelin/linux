@@ -193,7 +193,7 @@ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
 				dw_pcie_wr_own_conf(pp,
 						PCIE_MSI_INTR0_STATUS + i * 12,
 						4, 1 << pos);
-				generic_handle_irq(irq);
+				generic_handle_irq_rt_wa(irq);
 				pos++;
 			}
 		}
