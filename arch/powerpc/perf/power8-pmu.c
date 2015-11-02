@@ -552,11 +552,11 @@ static int power8_get_alternatives(u64 event, unsigned int flags, u64 alt[])
 			case 0x600f4:	/* PM_RUN_CYC */
 				alt[j++] = 0x1e;
 				break;
-			case 0x2:	/* PM_PPC_CMPL */
+			case 0x2:	/* PM_INST_CMPL */
 				alt[j++] = 0x500fa;	/* PM_RUN_INST_CMPL */
 				break;
 			case 0x500fa:	/* PM_RUN_INST_CMPL */
-				alt[j++] = 0x2;	/* PM_PPC_CMPL */
+				alt[j++] = 0x2;	/* PM_INST_CMPL */
 				break;
 			}
 		}
@@ -709,7 +709,7 @@ static int power8_cache_events[C(MAX)][C(OP_MAX)][C(RESULT_MAX)] = {
 			[ C(RESULT_MISS)   ] = PM_ST_MISS_L1,
 		},
 		[ C(OP_PREFETCH) ] = {
-			[ C(RESULT_ACCESS) ] = PM_L1_PREF,
+			[ C(RESULT_ACCESS) ] = PM_LSU_L1_PREF,
 			[ C(RESULT_MISS)   ] = 0,
 		},
 	},
