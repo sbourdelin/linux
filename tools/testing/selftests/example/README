@@ -1,0 +1,50 @@
+Selftest examples
+=================
+
+This directory contains two examples of how to add a new selftest.
+
+The first is a simple example. You should be able to use this if your test is
+just a few simple binaries built from C files.
+
+To use this example for your test, create a directory named after your test and
+copy Makefile.simple to it, eg:
+
+  $ cd tools/testing/selftests
+  $ mkdir footest
+  $ cp example/Makefile.simple footest/Makefile
+
+Then add your directory to the top-level selftest Makefile by adding a line
+like:
+
+  TARGETS += footest
+
+(Please keep the list of targets alphabetically sorted)
+
+Then update footest/Makefile to build your test program by changing the
+TEST_PROGS line appropriately, eg:
+
+  TEST_PROGS := testfoo
+
+And copy your testfoo.c file into footest.
+
+Finally create footest/.gitignore to ignore the test binary:
+
+  $ echo "testfoo" > footest/.gitignore
+
+Then you should be able to see your test built by running:
+
+  $ make TARGETS=footest
+
+You should also test that install works, eith:
+
+  $ make TARGETS=footest install
+
+And then check the result with:
+
+  $ find install/
+  $ cat install/run_kselftest.sh
+
+
+To use the verbose example, you can either do as above but copy
+Makefile.verbose instead of Makefile.simple, or copy the whole directory and
+delete the parts you don't need.

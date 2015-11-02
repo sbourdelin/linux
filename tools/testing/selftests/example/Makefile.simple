@@ -1,0 +1,12 @@
+# This is an example for a dead simple binary test case with no extra
+# frills. This should work for many tests, see Makefile.verbose for a fuller
+# description of all the options.
+
+TEST_PROGS := hello saymessage
+
+all: $(TEST_PROGS)
+
+include ../lib.mk
+
+clean:
+	$(RM) $(TEST_PROGS)

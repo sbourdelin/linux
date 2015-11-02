@@ -1,0 +1,91 @@
+# Verbose example selftest test case.
+
+# It's often neat to have a variable that holds all your generated binaries.
+# The name PROGS here is not special. If all your tests are generated binaries
+# then you can just use TEST_PROGS in place of PROGS, in this example we also
+# have a shell script in TEST_PROGS so we need to separate PROGS.
+PROGS := hello saymessage
+
+# TEST_PROGS defines a list of tests that should be run.
+# It can include either binaries or shell scripts.
+TEST_PROGS := $(PROGS) hello.sh
+
+# If you need other files installed that aren't tests, you can list them in
+# TEST_FILES.
+TEST_FILES := message.txt
+
+# TEST_FILES can also include binaries but they won't be run by default. This
+# can be useful if for example you have a destructive test which you want to
+# build and install, but not run by default. The test will be there for people
+# to run if they choose to.
+
+# The upper level Makefile will call the first target in your Makefile,
+# typically it's called "all", but doesn't have to be.
+all: $(PROGS)
+
+$(PROGS): hello.h
+
+# CC is already defined for you to include CROSS_COMPILE, if that's defined, so
+# you shouldn't need to modify CC.
+
+# The normal Make implicit rules are available, so you do not need to define
+# how to build a binary from a .c file. For example we don't have an explicit
+# rule here for hello.
+
+# You can add to CFLAGS, don't override it unless you absolutely must.
+CFLAGS += -Wall
+
+# You can add flags for only a particular file, this works with CFLAGS, LDLIBS,
+# LDFLAGS etc.
+saymessage: CFLAGS += -Werror -DHAVE_MESSAGE_TXT
+
+# If you need extra libs you should append to LDLIBS.
+LDLIBS += -lc
+
+# Similarly you can append to LDFLAGS for linker flags.
+LDFLAGS += -g
+
+# Then include lib.mk, it provides the run_test and install logic for you.
+# You need to define the top-level target, ie. "all" above, before you include
+# lib.mk.
+include ../lib.mk
+
+# If for some reason it's tricky to define your "all" target before including
+# lib.mk, you can define it initially as having no dependencies, and then add
+# dependencies later, eg:
+#
+# all:
+#
+# include ../lib.mk
+#
+# all: $(SOMETHING_COMPLICATED)
+#
+# ifeq ($(SOMETHING_ELSE),1)
+# all: $(MORE_STUFF)
+# endif
+
+# If you need custom logic for running tests, you can override RUN_TESTS.
+# This can be used to pass arguments etc.
+# HOWEVER it's much more preferable if your test just does something sane with
+# no arguments or extra logic.
+# If you do define your own rule you are responsible for printing a failure
+# message. You can do that in your test program itself, or in the shell as
+# below.
+override define RUN_TESTS
+./hello || echo "selftests: hello [FAIL]" ; \
+./saymessage || echo "selftests: saymessage [FAIL]" ; \
+./hello.sh "world" || echo "selftests: hello.sh [FAIL]"
+endef
+
+# If you override RUN_TESTS you probably also need to override EMIT_TESTS. This
+# rule is used by the install logic to emit a shell script fragment that is
+# added to the installed script that runs the tests.
+# You can often just echo your RUN_TESTS definition, though you may need to be
+# careful of shell quoting etc.
+override define EMIT_TESTS
+	echo "$(RUN_TESTS)"
+endef
+
+# You need to define your own clean rule.
+clean:
+	$(RM) $(PROGS)
