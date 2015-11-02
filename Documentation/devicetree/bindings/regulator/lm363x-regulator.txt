@@ -1,0 +1,28 @@
+TI LMU LM363x regulator device tree bindings
+
+LM363x regulator driver supports LM3631 and LM3632.
+LM3631 has five regulators and LM3632 supports three regulators.
+
+Required properties:
+  - compatible: "ti,lm363x-regulator"
+
+Child nodes:
+  LM3631
+  - vboost
+  - vcont
+  - voref
+  - vpos
+  - vneg
+
+  LM3632
+  - vboost
+  - vpos
+  - vneg
+
+  Optional properties of each node:
+  Please refer to [1].
+
+Examples: Please refer to ti-lmu dt-bindings [2].
+
+[1] Documentation/devicetree/bindings/regulator/regulator.txt
+[2] Documentation/devicetree/bindings/mfd/ti-lmu.txt
