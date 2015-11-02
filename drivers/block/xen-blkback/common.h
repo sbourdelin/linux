@@ -260,47 +260,20 @@ struct persistent_gnt {
 	struct list_head remove_node;
 };
 
-struct xen_blkif {
-	/* Unique identifier for this interface. */
-	domid_t			domid;
-	unsigned int		handle;
+/* Per-ring information */
+struct xen_blkif_ring {
 	/* Physical parameters of the comms window. */
 	unsigned int		irq;
-	/* Comms information. */
-	enum blkif_protocol	blk_protocol;
 	union blkif_back_rings	blk_rings;
 	void			*blk_ring;
-	/* The VBD attached to this interface. */
-	struct xen_vbd		vbd;
-	/* Back pointer to the backend_info. */
-	struct backend_info	*be;
 	/* Private fields. */
 	spinlock_t		blk_ring_lock;
-	atomic_t		refcnt;
 
 	wait_queue_head_t	wq;
-	/* for barrier (drain) requests */
-	struct completion	drain_complete;
-	atomic_t		drain;
 	atomic_t		inflight;
-	/* One thread per one blkif. */
+	/* One thread per blkif ring. */
 	struct task_struct	*xenblkd;
 	unsigned int		waiting_reqs;
-
-	/* tree to store persistent grants */
-	struct rb_root		persistent_gnts;
-	unsigned int		persistent_gnt_c;
-	atomic_t		persistent_gnt_in_use;
-	unsigned long           next_lru;
-
-	/* used by the kworker that offload work from the persistent purge */
-	struct list_head	persistent_purge_list;
-	struct work_struct	persistent_purge_work;
-
-	/* buffer of free pages to map grant refs */
-	spinlock_t		free_pages_lock;
-	int			free_pages_num;
-	struct list_head	free_pages;
 
 	/* List of all 'pending_req' available */
 	struct list_head	pending_free;
@@ -321,7 +294,54 @@ struct xen_blkif {
 	struct work_struct	free_work;
 	/* Thread shutdown wait queue. */
 	wait_queue_head_t	shutdown_wq;
+	struct xen_blkif *blkif;
+};
+
+struct xen_blkif {
+	/* Unique identifier for this interface. */
+	domid_t			domid;
+	unsigned int		handle;
+	/* Comms information. */
+	enum blkif_protocol	blk_protocol;
+	/* The VBD attached to this interface. */
+	struct xen_vbd		vbd;
+	/* Back pointer to the backend_info. */
+	struct backend_info	*be;
+	atomic_t		refcnt;
+	/* for barrier (drain) requests */
+	struct completion	drain_complete;
+	atomic_t		drain;
+
+	/* tree to store persistent grants */
+	spinlock_t		pers_gnts_lock;
+	struct rb_root		persistent_gnts;
+	unsigned int		persistent_gnt_c;
+	atomic_t		persistent_gnt_in_use;
+	unsigned long           next_lru;
+
+	/* used by the kworker that offload work from the persistent purge */
+	struct list_head	persistent_purge_list;
+	struct work_struct	persistent_purge_work;
+
+	/* buffer of free pages to map grant refs */
+	spinlock_t		free_pages_lock;
+	int			free_pages_num;
+	struct list_head	free_pages;
+
+	/* statistics */
+	unsigned long		st_print;
+	unsigned long long			st_rd_req;
+	unsigned long long			st_wr_req;
+	unsigned long long			st_oo_req;
+	unsigned long long			st_f_req;
+	unsigned long long			st_ds_req;
+	unsigned long long			st_rd_sect;
+	unsigned long long			st_wr_sect;
+
+	struct work_struct	free_work;
 	unsigned int nr_ring_pages;
+	/* All rings for this device */
+	struct xen_blkif_ring ring;
 };
 
 struct seg_buf {
@@ -343,7 +363,7 @@ struct grant_page {
  * response queued for it, with the saved 'id' passed back.
  */
 struct pending_req {
-	struct xen_blkif	*blkif;
+	struct xen_blkif_ring   *ring;
 	u64			id;
 	int			nr_segs;
 	atomic_t		pendcnt;
@@ -385,7 +405,7 @@ int xen_blkif_xenbus_init(void);
 irqreturn_t xen_blkif_be_int(int irq, void *dev_id);
 int xen_blkif_schedule(void *arg);
 int xen_blkif_purge_persistent(void *arg);
-void xen_blkbk_free_caches(struct xen_blkif *blkif);
+void xen_blkbk_free_caches(struct xen_blkif_ring *ring);
 
 int xen_blkbk_flush_diskcache(struct xenbus_transaction xbt,
 			      struct backend_info *be, int state);
