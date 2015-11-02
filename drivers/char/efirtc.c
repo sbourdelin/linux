@@ -83,8 +83,9 @@ compute_wday(efi_time_t *eft)
 	int y;
 	int ndays = 0;
 
-	if ( eft->year < 1998 ) {
-		printk(KERN_ERR "efirtc: EFI year < 1998, invalid date\n");
+	if ( eft->year < EFI_RTC_EPOCH ) {
+		printk(KERN_ERR "efirtc: EFI year < %d, invalid date\n",
+				EFI_RTC_EPOCH);
 		return -1;
 	}
 
