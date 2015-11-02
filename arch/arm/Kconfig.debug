@@ -1168,6 +1168,28 @@ choice
 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
 		  devices, including VT8500, WM8505, WM8650 and WM8850.
 
+	config DEBUG_VIRT_UART_QEMU
+		bool "Kernel low-level debugging on QEMU Virtual Platform"
+		depends on ARCH_VIRT
+		select DEBUG_UART_PL01X
+		help
+		  Say Y here if you want the debug print routines to direct
+		  their output to PL011 UART port on QEMU Virtual Platform.
+		  Appropriate address values are:
+			PHYS		VIRT
+			0x9000000	0xf8090000
+
+	config DEBUG_VIRT_UART_KVMTOOL
+		bool "Kernel low-level debugging on Kvmtool Virtual Platform"
+		depends on ARCH_VIRT
+		select DEBUG_UART_8250
+		help
+		  Say Y here if you want the debug print routines to direct
+		  their output to 8250 UART port on Kvmtool Virtual
+		  Platform. Appropriate address values are:
+			PHYS		VIRT
+			0x3f8		0xf80903f8
+
 	config DEBUG_ICEDCC
 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
 		help
