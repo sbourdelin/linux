@@ -587,7 +587,7 @@ EXPORT_SYMBOL_GPL(klp_enable_patch);
  * /sys/kernel/livepatch/<patch>
  * /sys/kernel/livepatch/<patch>/enabled
  * /sys/kernel/livepatch/<patch>/<object>
- * /sys/kernel/livepatch/<patch>/<object>/<func>
+ * /sys/kernel/livepatch/<patch>/<object>/<func.number>
  */
 
 static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -727,13 +727,54 @@ static void klp_free_patch(struct klp_patch *patch)
 	kobject_put(&patch->kobj);
 }
 
+static int klp_get_func_pos_callback(void *data, const char *name,
+				      struct module *mod, unsigned long addr)
+{
+	struct klp_find_arg *args = data;
+
+	if ((mod && !args->objname) || (!mod && args->objname))
+		return 0;
+
+	if (strcmp(args->name, name))
+		return 0;
+
+	if (args->objname && strcmp(args->objname, mod->name))
+		return 0;
+
+	/* on address match, return 1 to break kallsyms_on_each_symbol loop */
+	if (args->addr == addr)
+		return 1;
+
+	/* if we don't match addr, count instance of named symbol */
+	args->count++;
+
+	return 0;
+}
+
+static int klp_get_func_pos(struct klp_object *obj, struct klp_func *func)
+{
+	struct klp_find_arg args = {
+		.objname = obj->name,
+		.name = func->old_name,
+		.addr = func->old_addr,
+		.count = 0,
+	};
+
+	mutex_lock(&module_mutex);
+	kallsyms_on_each_symbol(klp_get_func_pos_callback, &args);
+	mutex_unlock(&module_mutex);
+
+	return args.count;
+}
+
 static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 {
 	INIT_LIST_HEAD(&func->stack_node);
 	func->state = KLP_DISABLED;
 
 	return kobject_init_and_add(&func->kobj, &klp_ktype_func,
-				    &obj->kobj, "%s", func->old_name);
+				    &obj->kobj, "%s,%d", func->old_name,
+				    klp_get_func_pos(obj, func));
 }
 
 /* parts of the initialization that is done only when the object is loaded */
