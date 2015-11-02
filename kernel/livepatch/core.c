@@ -587,7 +587,7 @@ EXPORT_SYMBOL_GPL(klp_enable_patch);
  * /sys/kernel/livepatch/<patch>
  * /sys/kernel/livepatch/<patch>/enabled
  * /sys/kernel/livepatch/<patch>/<object>
- * /sys/kernel/livepatch/<patch>/<object>/<func>
+ * /sys/kernel/livepatch/<patch>/<object>/<func.number>
  */
 
 static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -727,13 +727,29 @@ static void klp_free_patch(struct klp_patch *patch)
 	kobject_put(&patch->kobj);
 }
 
+static int klp_count_sysfs_funcs(struct klp_object *obj, const char *name)
+{
+	struct klp_func *func;
+	int n = 0;
+
+	/* count the times a function name occurs and is initialized */
+	klp_for_each_func(obj, func) {
+		if ((!strcmp(func->old_name, name) &&
+		    func->kobj.state_initialized))
+			n++;
+	}
+
+	return n;
+}
+
 static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 {
 	INIT_LIST_HEAD(&func->stack_node);
 	func->state = KLP_DISABLED;
 
 	return kobject_init_and_add(&func->kobj, &klp_ktype_func,
-				    &obj->kobj, "%s", func->old_name);
+				    &obj->kobj, "%s.%d", func->old_name,
+				    klp_count_sysfs_funcs(obj, func->old_name));
 }
 
 /* parts of the initialization that is done only when the object is loaded */
