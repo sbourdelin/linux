@@ -22,6 +22,68 @@
 		nvidia,model = "GoogleNyanBlaze";
 	};
 
+	padctl@0,7009f000 {
+		pinctrl-0 = <&padctl_default>;
+		pinctrl-names = "default";
+
+		vbus-0-supply = <&vdd_usb1_vbus>;
+		vbus-1-supply = <&vdd_run_cam>;
+		vbus-2-supply = <&vdd_usb3_vbus>;
+
+		phys {
+			pcie-0 {
+				status = "disabled";
+			};
+
+			sata-0 {
+				status = "disabled";
+			};
+
+			usb3-0 {
+				status = "ok";
+				nvidia,lanes = "pcie-0";
+				nvidia,function = "usb3";
+				nvidia,port = <0>;
+			};
+
+			usb3-1 {
+				status = "ok";
+				nvidia,lanes = "pcie-1";
+				nvidia,function = "usb3";
+				nvidia,port = <1>;
+			};
+
+			utmi-0 {
+				status = "ok";
+			};
+
+			utmi-1 {
+				status = "ok";
+			};
+
+			utmi-2 {
+				status = "ok";
+			};
+		};
+
+		padctl_default: pinmux {
+/*
+			otg {
+				nvidia,lanes = "otg-0", "otg-1", "otg-2";
+				nvidia,function = "xusb";
+			};
+*/
+			usb3 {
+				nvidia,lanes = "pcie-0";
+				nvidia,function = "usb3";
+				nvidia,iddq = <0>;
+				nvidia,usb2-port = <0>;
+				nvidia,usb3-port = <0>;
+			};
+		};
+
+	};
+
 	pinmux@0,70000868 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinmux_default>;

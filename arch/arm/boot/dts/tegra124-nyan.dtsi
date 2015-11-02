@@ -220,7 +220,7 @@
 					regulator-always-on;
 				};
 
-				ldo0 {
+				avdd_1v05_run: ldo0 {
 					regulator-name = "+1.05V_RUN_AVDD";
 					regulator-min-microvolt = <1050000>;
 					regulator-max-microvolt = <1050000>;
@@ -362,6 +362,51 @@
 
 	hda@0,70030000 {
 		status = "okay";
+	};
+
+	xusb_usb:usb-host@0,70090000 {
+		compatible = "nvidia,tegra124-xusb";
+		reg = <0x0 0x70090000 0x0 0x8000>,
+		      <0x0 0x70099000 0x0 0x1000>,
+		      <0x0 0x70098000 0x0 0x1000>;
+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&tegra_car TEGRA124_CLK_XUSB_HOST>,
+			 <&tegra_car TEGRA124_CLK_XUSB_HOST_SRC>,
+			 <&tegra_car TEGRA124_CLK_XUSB_FALCON_SRC>,
+			 <&tegra_car TEGRA124_CLK_XUSB_SS>,
+			 <&tegra_car TEGRA124_CLK_XUSB_SS_DIV2>,
+			 <&tegra_car TEGRA124_CLK_XUSB_SS_SRC>,
+			 <&tegra_car TEGRA124_CLK_XUSB_HS_SRC>,
+			 <&tegra_car TEGRA124_CLK_XUSB_FS_SRC>,
+			 <&tegra_car TEGRA124_CLK_PLL_U_480M>,
+			 <&tegra_car TEGRA124_CLK_CLK_M>,
+			 <&tegra_car TEGRA124_CLK_PLL_E>;
+		clock-names = "xusb_host", "xusb_host_src", "xusb_falcon_src",
+			      "xusb_ss", "xusb_ss_div2", "xusb_ss_src",
+			      "xusb_hs_src", "xusb_fs_src", "pll_u_480m",
+			      "clk_m", "pll_e";
+		resets = <&tegra_car 89>, <&tegra_car 156>, <&tegra_car 143>;
+		reset-names = "xusb_host", "xusb_ss", "xusb_src";
+		phys = <&padctl TEGRA_XUSB_PADCTL_UTMI_P0>,
+		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P1>,
+		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P2>,
+		       <&padctl TEGRA_XUSB_PADCTL_USB3_P0>,
+		       <&padctl TEGRA_XUSB_PADCTL_USB3_P1>,
+		       <&padctl TEGRA_XUSB_PADCTL_HSIC_P0>,
+		       <&padctl TEGRA_XUSB_PADCTL_HSIC_P1>;
+		phy-names = "utmi-0", "utmi-1", "utmi-2", "usb3-0", "usb3-1", "hsic-0", "hsic-1";
+		mboxes = <&xusb_usb>;
+		mbox-names = "xusb";
+		#mbox-cells = <0>;
+		avddio-pex-supply = <&vdd_1v05_run>;
+		dvddio-pex-supply = <&vdd_1v05_run>;
+		avdd-usb-supply = <&vdd_3v3_lp0>;
+		avdd-pll-utmip-supply = <&vddio_1v8>;
+		avdd-pll-erefe-supply = <&avdd_1v05_run>;
+		avdd-usb-ss-pll-supply = <&vdd_1v05_run>;
+		hvdd-usb-ss-supply = <&vdd_3v3_lp0>;
+		hvdd-usb-ss-pll-e-supply = <&vdd_3v3_lp0>;
 	};
 
 	sdhci0_pwrseq: sdhci0_pwrseq {

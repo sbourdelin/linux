@@ -653,7 +653,8 @@
 		reg = <0x0 0x7009f000 0x0 0x1000>;
 		resets = <&tegra_car 142>;
 		reset-names = "padctl";
-
+		mboxes = <&xusb_usb>;
+		mbox-names = "xusb";
 		#phy-cells = <1>;
 	};
 
