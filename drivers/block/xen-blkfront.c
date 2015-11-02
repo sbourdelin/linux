@@ -121,6 +121,7 @@ MODULE_PARM_DESC(max_ring_page_order, "Maximum order of pages to be used for the
  */
 struct blkfront_ring_info {
 	struct blkif_front_ring ring;
+	spinlock_t ring_lock;
 	unsigned int ring_ref[XENBUS_MAX_RING_PAGES];
 	unsigned int evtchn, irq;
 	struct work_struct work;
@@ -138,7 +139,8 @@ struct blkfront_ring_info {
  */
 struct blkfront_info
 {
-	spinlock_t io_lock;
+	/* Lock to proect info->grants list shared by multi rings */
+	spinlock_t dev_lock;
 	struct mutex mutex;
 	struct xenbus_device *xbdev;
 	struct gendisk *gd;
@@ -224,6 +226,7 @@ static int fill_grant_buffer(struct blkfront_ring_info *rinfo, int num)
 	struct grant *gnt_list_entry, *n;
 	int i = 0;
 
+	spin_lock_irq(&info->dev_lock);
 	while(i < num) {
 		gnt_list_entry = kzalloc(sizeof(struct grant), GFP_NOIO);
 		if (!gnt_list_entry)
@@ -242,6 +245,7 @@ static int fill_grant_buffer(struct blkfront_ring_info *rinfo, int num)
 		list_add(&gnt_list_entry->node, &info->grants);
 		i++;
 	}
+	spin_unlock_irq(&info->dev_lock);
 
 	return 0;
 
@@ -254,6 +258,7 @@ out_of_memory:
 		kfree(gnt_list_entry);
 		i--;
 	}
+	spin_unlock_irq(&info->dev_lock);
 	BUG_ON(i != 0);
 	return -ENOMEM;
 }
@@ -265,6 +270,7 @@ static struct grant *get_grant(grant_ref_t *gref_head,
 	struct grant *gnt_list_entry;
 	unsigned long buffer_gfn;
 
+	spin_lock(&info->dev_lock);
 	BUG_ON(list_empty(&info->grants));
 	gnt_list_entry = list_first_entry(&info->grants, struct grant,
 	                                  node);
@@ -272,8 +278,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
 
 	if (gnt_list_entry->gref != GRANT_INVALID_REF) {
 		info->persistent_gnts_c--;
+		spin_unlock(&info->dev_lock);
 		return gnt_list_entry;
 	}
+	spin_unlock(&info->dev_lock);
 
 	/* Assign a gref to this page */
 	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
@@ -639,7 +647,7 @@ static int blkif_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct blkfront_ring_info *rinfo = (struct blkfront_ring_info *)hctx->driver_data;
 
 	blk_mq_start_request(qd->rq);
-	spin_lock_irq(&info->io_lock);
+	spin_lock_irq(&rinfo->ring_lock);
 	if (RING_FULL(&rinfo->ring))
 		goto out_busy;
 
@@ -650,15 +658,15 @@ static int blkif_queue_rq(struct blk_mq_hw_ctx *hctx,
 		goto out_busy;
 
 	flush_requests(rinfo);
-	spin_unlock_irq(&info->io_lock);
+	spin_unlock_irq(&rinfo->ring_lock);
 	return BLK_MQ_RQ_QUEUE_OK;
 
 out_err:
-	spin_unlock_irq(&info->io_lock);
+	spin_unlock_irq(&rinfo->ring_lock);
 	return BLK_MQ_RQ_QUEUE_ERROR;
 
 out_busy:
-	spin_unlock_irq(&info->io_lock);
+	spin_unlock_irq(&rinfo->ring_lock);
 	blk_mq_stop_hw_queue(hctx);
 	return BLK_MQ_RQ_QUEUE_BUSY;
 }
@@ -959,21 +967,22 @@ static void xlvbd_release_gendisk(struct blkfront_info *info)
 	info->gd = NULL;
 }
 
-/* Must be called with io_lock holded */
 static void kick_pending_request_queues(struct blkfront_ring_info *rinfo)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&rinfo->ring_lock, flags);
 	if (!RING_FULL(&rinfo->ring))
 		blk_mq_start_stopped_hw_queues(rinfo->dev_info->rq, true);
+	spin_unlock_irqrestore(&rinfo->ring_lock, flags);
 }
 
 static void blkif_restart_queue(struct work_struct *work)
 {
 	struct blkfront_ring_info *rinfo = container_of(work, struct blkfront_ring_info, work);
 
-	spin_lock_irq(&rinfo->dev_info->io_lock);
 	if (rinfo->dev_info->connected == BLKIF_STATE_CONNECTED)
 		kick_pending_request_queues(rinfo);
-	spin_unlock_irq(&rinfo->dev_info->io_lock);
 }
 
 static void blkif_free_ring(struct blkfront_ring_info *rinfo)
@@ -1065,7 +1074,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	int i;
 
 	/* Prevent new requests being issued until we fix things up. */
-	spin_lock_irq(&info->io_lock);
+	spin_lock_irq(&info->dev_lock);
 	info->connected = suspend ?
 		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED;
 	/* No more blkif_request(). */
@@ -1091,7 +1100,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 
 	for (i = 0; i < info->nr_rings; i++)
 		blkif_free_ring(&info->rinfo[i]);
-	spin_unlock_irq(&info->io_lock);
+	spin_unlock_irq(&info->dev_lock);
 }
 
 static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *rinfo,
@@ -1103,6 +1112,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *ri
 	void *shared_data;
 	int nseg;
 	struct blkfront_info *info = rinfo->dev_info;
+	unsigned long flags;
 
 	nseg = s->req.operation == BLKIF_OP_INDIRECT ?
 		s->req.u.indirect.nr_segments : s->req.u.rw.nr_segments;
@@ -1120,6 +1130,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *ri
 			kunmap_atomic(shared_data);
 		}
 	}
+
 	/* Add the persistent grant into the list of free grants */
 	for (i = 0; i < nseg; i++) {
 		if (gnttab_query_foreign_access(s->grants_used[i]->gref)) {
@@ -1132,8 +1143,10 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *ri
 			if (!info->feature_persistent)
 				pr_alert_ratelimited("backed has not unmapped grant: %u\n",
 						     s->grants_used[i]->gref);
+			spin_lock_irqsave(&info->dev_lock, flags);
 			list_add(&s->grants_used[i]->node, &info->grants);
 			info->persistent_gnts_c++;
+			spin_unlock_irqrestore(&info->dev_lock, flags);
 		} else {
 			/*
 			 * If the grant is not mapped by the backend we end the
@@ -1143,7 +1156,9 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *ri
 			 */
 			gnttab_end_foreign_access(s->grants_used[i]->gref, 0, 0UL);
 			s->grants_used[i]->gref = GRANT_INVALID_REF;
+			spin_lock_irqsave(&info->dev_lock, flags);
 			list_add_tail(&s->grants_used[i]->node, &info->grants);
+			spin_unlock_irqrestore(&info->dev_lock, flags);
 		}
 	}
 	if (s->req.operation == BLKIF_OP_INDIRECT) {
@@ -1152,8 +1167,10 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *ri
 				if (!info->feature_persistent)
 					pr_alert_ratelimited("backed has not unmapped grant: %u\n",
 							     s->indirect_grants[i]->gref);
+				spin_lock_irqsave(&info->dev_lock, flags);
 				list_add(&s->indirect_grants[i]->node, &info->grants);
 				info->persistent_gnts_c++;
+				spin_unlock_irqrestore(&info->dev_lock, flags);
 			} else {
 				struct page *indirect_page;
 
@@ -1162,12 +1179,14 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_ring_info *ri
 				 * Add the used indirect page back to the list of
 				 * available pages for indirect grefs.
 				 */
+				spin_lock_irqsave(&info->dev_lock, flags);
 				if (!info->feature_persistent) {
 					indirect_page = pfn_to_page(s->indirect_grants[i]->pfn);
 					list_add(&indirect_page->lru, &rinfo->indirect_pages);
 				}
 				s->indirect_grants[i]->gref = GRANT_INVALID_REF;
 				list_add_tail(&s->indirect_grants[i]->node, &info->grants);
+				spin_unlock_irqrestore(&info->dev_lock, flags);
 			}
 		}
 	}
@@ -1183,13 +1202,10 @@ static irqreturn_t blkif_interrupt(int irq, void *dev_id)
 	struct blkfront_info *info = rinfo->dev_info;
 	int error;
 
-	spin_lock_irqsave(&info->io_lock, flags);
-
-	if (unlikely(info->connected != BLKIF_STATE_CONNECTED)) {
-		spin_unlock_irqrestore(&info->io_lock, flags);
+	if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
 		return IRQ_HANDLED;
-	}
 
+	spin_lock_irqsave(&rinfo->ring_lock, flags);
  again:
 	rp = rinfo->ring.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
@@ -1280,9 +1296,8 @@ static irqreturn_t blkif_interrupt(int irq, void *dev_id)
 	} else
 		rinfo->ring.sring->rsp_event = i + 1;
 
+	spin_unlock_irqrestore(&rinfo->ring_lock, flags);
 	kick_pending_request_queues(rinfo);
-
-	spin_unlock_irqrestore(&info->io_lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -1529,10 +1544,11 @@ static int blkfront_probe(struct xenbus_device *dev,
 		INIT_LIST_HEAD(&rinfo->indirect_pages);
 		rinfo->dev_info = info;
 		INIT_WORK(&rinfo->work, blkif_restart_queue);
+		spin_lock_init(&rinfo->ring_lock);
 	}
 
 	mutex_init(&info->mutex);
-	spin_lock_init(&info->io_lock);
+	spin_lock_init(&info->dev_lock);
 	info->xbdev = dev;
 	info->vdevice = vdevice;
 	INIT_LIST_HEAD(&info->grants);
@@ -1629,8 +1645,6 @@ static int blkif_recover(struct blkfront_info *info)
 	}
 	xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
-	spin_lock_irq(&info->io_lock);
-
 	/* Now safe for us to use the shared ring */
 	info->connected = BLKIF_STATE_CONNECTED;
 
@@ -1648,7 +1662,6 @@ static int blkif_recover(struct blkfront_info *info)
 		BUG_ON(req->nr_phys_segments > segs);
 		blk_mq_requeue_request(req);
 	}
-	spin_unlock_irq(&info->io_lock);
 	blk_mq_kick_requeue_list(info->rq);
 
 	while ((bio = bio_list_pop(&bio_list)) != NULL) {
@@ -1994,11 +2007,9 @@ static void blkfront_connect(struct blkfront_info *info)
 	xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
 	/* Kick pending requests. */
-	spin_lock_irq(&info->io_lock);
 	info->connected = BLKIF_STATE_CONNECTED;
 	for (i = 0; i < info->nr_rings; i++)
 		kick_pending_request_queues(&info->rinfo[i]);
-	spin_unlock_irq(&info->io_lock);
 
 	add_disk(info->gd);
 
