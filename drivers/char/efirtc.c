@@ -379,6 +379,9 @@ efi_rtc_init(void)
 	int ret;
 	struct proc_dir_entry *dir;
 
+	if (!efi_enabled(EFI_RUNTIME_SERVICES))
+		return 0;
+
 	printk(KERN_INFO "EFI Time Services Driver v%s\n", EFI_RTC_VERSION);
 
 	ret = misc_register(&efi_rtc_dev);
