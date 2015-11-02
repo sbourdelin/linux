@@ -5827,9 +5827,6 @@ static void b43_print_driverinfo(void)
 #ifdef CONFIG_B43_PCI_AUTOSELECT
 	feat_pci = "P";
 #endif
-#ifdef CONFIG_B43_PCMCIA
-	feat_pcmcia = "M";
-#endif
 #ifdef CONFIG_B43_PHY_N
 	feat_nphy = "N";
 #endif
