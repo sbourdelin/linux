@@ -827,7 +827,7 @@ cfs_hash_djb2_hash(const void *key, size_t size, unsigned mask)
 {
 	unsigned i, hash = 5381;
 
-	LASSERT(key != NULL);
+	LASSERT(key);
 
 	for (i = 0; i < size; i++)
 		hash = hash * 33 + ((char *)key)[i];
@@ -855,7 +855,7 @@ cfs_hash_u64_hash(const __u64 key, unsigned mask)
 
 /** iterate over all buckets in @bds (array of struct cfs_hash_bd) */
 #define cfs_hash_for_each_bd(bds, n, i)	\
-	for (i = 0; i < n && (bds)[i].bd_bucket != NULL; i++)
+	for (i = 0; i < n && (bds)[i].bd_bucket; i++)
 
 /** iterate over all buckets of @hs */
 #define cfs_hash_for_each_bucket(hs, bd, pos)			\
