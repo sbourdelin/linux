@@ -41,7 +41,12 @@ extern uint32_t __div64_32(uint64_t *dividend, uint32_t divisor);
 	uint32_t __base = (base);			\
 	uint32_t __rem;					\
 	(void)(((typeof((n)) *)0) == ((uint64_t *)0));	\
-	if (likely(((n) >> 32) == 0)) {			\
+	if (__builtin_constant_p(__base) &&		\
+	    (__base & (__base - 1)) == 0) {		\
+		/* constant power of 2: gcc is fine */	\
+		__rem = (n) & (__base - 1);		\
+		(n) /= __base;				\
+	} else if (likely(((n) >> 32) == 0)) {		\
 		__rem = (uint32_t)(n) % __base;		\
 		(n) = (uint32_t)(n) / __base;		\
 	} else 						\
