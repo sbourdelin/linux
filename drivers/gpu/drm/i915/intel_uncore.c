@@ -1505,7 +1505,14 @@ not_ready:
 		I915_WRITE(RING_RESET_CTL(engine->mmio_base),
 			   _MASKED_BIT_DISABLE(RESET_CTL_REQUEST_RESET));
 
-	return -EIO;
+	if (INTEL_INFO(dev)->gen == 9) {
+		DRM_ERROR("Reset would risk system stability, bailing out\n");
+		return -EIO;
+	}
+
+	DRM_ERROR("Forcing non ready gpu into reset\n");
+
+	return gen6_do_reset(dev);
 }
 
 static int (*intel_get_gpu_reset(struct drm_device *dev))(struct drm_device *)
