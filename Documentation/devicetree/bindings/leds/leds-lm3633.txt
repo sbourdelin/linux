@@ -1,0 +1,28 @@
+TI LMU LM3633 LED device tree bindings
+
+Required properties:
+  - compatible: "ti,lm3633-leds"
+
+Child nodes:
+  Each node matches with LED control bank.
+  Please refer to the datasheet [1].
+
+  Required properties of a child node:
+  - lvled1-used, lvled2-used, lvled3-used,
+    lvled4-used, lvled5-used, lvled6-used:
+    Low voltage LED string configuration. Type is <boolean>.
+    Please describe which output LED string is used.
+
+  Optional properties of a child node:
+  - channel-name: Name string for LED channel identification
+                  It is used for creating LED sysfs,
+                  /sys/class/leds/<channel-name>/.
+                  If this property is empty, then default name is set to
+                  "indicator:<id>" by the driver.
+  - led-max-microamp: Max current setting. Type is <u32>.
+                      Unit is microampere. Range is from 5000 to 30000.
+
+Examples: Please refer to ti-lmu dt-bindings [2].
+
+[1] http://www.ti.com/product/LM3633/datasheet
+[2] Documentation/devicetree/bindings/mfd/ti-lmu.txt
