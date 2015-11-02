@@ -895,7 +895,7 @@ static int relay_file_mmap(struct file *filp, struct vm_area_struct *vma)
  *	@filp: the file
  *	@wait: poll table
  *
- *	Poll implemention.
+ *	Poll implementation.
  */
 static unsigned int relay_file_poll(struct file *filp, poll_table *wait)
 {
