@@ -230,7 +230,9 @@ $(obj)/.tmp_qtcheck: $(src)/Makefile
 # Qt needs some extra effort...
 $(obj)/.tmp_qtcheck:
 	@set -e; $(kecho) "  CHECK   qt"; \
-	qtver=`qmake -query QT_VERSION` || { \
+	qtver=`qmake -query QT_VERSION` || \
+	qtver=`qmake-qt5 -query QT_VERSION` || \
+	qtver=`qmake-qt4 -query QT_VERSION` || { \
 	    echo >&2 "*"; \
 	    echo >&2 "* qmake failed."; \
 	    echo >&2 "*"; \
