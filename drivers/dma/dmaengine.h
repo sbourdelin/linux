@@ -86,4 +86,6 @@ static inline void dma_set_residue(struct dma_tx_state *state, u32 residue)
 		state->residue = residue;
 }
 
+int dma_selftest_memcpy(struct dma_device *dmadev);
+
 #endif
