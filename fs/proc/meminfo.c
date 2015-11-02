@@ -11,7 +11,6 @@
 #include <linux/swap.h>
 #include <linux/vmstat.h>
 #include <linux/atomic.h>
-#include <linux/vmalloc.h>
 #ifdef CONFIG_CMA
 #include <linux/cma.h>
 #endif
@@ -27,7 +26,6 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 {
 	struct sysinfo i;
 	unsigned long committed;
-	struct vmalloc_info vmi;
 	long cached;
 	long available;
 	unsigned long pagecache;
@@ -48,8 +46,6 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 			total_swapcache_pages() - i.bufferram;
 	if (cached < 0)
 		cached = 0;
-
-	get_vmalloc_info(&vmi);
 
 	for (lru = LRU_BASE; lru < NR_LRU_LISTS; lru++)
 		pages[lru] = global_page_state(NR_LRU_BASE + lru);
@@ -132,9 +128,6 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		"WritebackTmp:   %8lu kB\n"
 		"CommitLimit:    %8lu kB\n"
 		"Committed_AS:   %8lu kB\n"
-		"VmallocTotal:   %8lu kB\n"
-		"VmallocUsed:    %8lu kB\n"
-		"VmallocChunk:   %8lu kB\n"
 #ifdef CONFIG_MEMORY_FAILURE
 		"HardwareCorrupted: %5lu kB\n"
 #endif
@@ -189,10 +182,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		K(global_page_state(NR_BOUNCE)),
 		K(global_page_state(NR_WRITEBACK_TEMP)),
 		K(vm_commit_limit()),
-		K(committed),
-		(unsigned long)VMALLOC_TOTAL >> 10,
-		vmi.used >> 10,
-		vmi.largest_chunk >> 10
+		K(committed)
 #ifdef CONFIG_MEMORY_FAILURE
 		, atomic_long_read(&num_poisoned_pages) << (PAGE_SHIFT - 10)
 #endif
