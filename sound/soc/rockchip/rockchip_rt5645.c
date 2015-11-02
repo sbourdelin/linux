@@ -74,7 +74,24 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	int dai_fmt = rtd->card->dai_link->dai_fmt;
 	int mclk;
+
+	/* set codec DAI configuration */
+	ret = snd_soc_dai_set_fmt(codec_dai, dai_fmt);
+	if (ret < 0) {
+		dev_err(codec_dai->dev,
+			"failed to set the format for codec side\n");
+		return ret;
+	}
+
+	/* set cpu DAI configuration */
+	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
+	if (ret < 0) {
+		dev_err(codec_dai->dev,
+			"failed to set the format for cpu side\n");
+		return ret;
+	}
 
 	switch (params_rate(params)) {
 	case 8000:
@@ -103,6 +120,21 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
 		dev_err(codec_dai->dev, "Can't set codec clock %d\n", ret);
 		return ret;
 	}
+
+	/* The codec is master mode, that's not needed set clkdiv for cpu */
+	if ((dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) == SND_SOC_DAIFMT_CBM_CFM)
+		return ret;
+
+	/* the LRCK clock for cpu */
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, ROCKCHIP_DIV_BCLK,
+				     (mclk / 4) / params_rate(params));
+	if (ret < 0)
+		return ret;
+
+	/* the SCLK clock for cpu */
+	snd_soc_dai_set_clkdiv(cpu_dai, ROCKCHIP_DIV_MCLK, 4);
+	if (ret < 0)
+		return ret;
 
 	return ret;
 }
