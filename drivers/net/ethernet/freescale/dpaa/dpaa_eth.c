@@ -57,6 +57,12 @@
 #include "dpaa_eth.h"
 #include "dpaa_eth_common.h"
 
+/* CREATE_TRACE_POINTS only needs to be defined once. Other dpa files
+ * using trace events only need to #include <trace/events/sched.h>
+ */
+#define CREATE_TRACE_POINTS
+#include "dpaa_eth_trace.h"
+
 /* Valid checksum indication */
 #define DPA_CSUM_VALID		0xFFFF
 
@@ -229,6 +235,9 @@ priv_rx_default_dqrr(struct qman_portal *portal,
 	priv = netdev_priv(net_dev);
 	dpa_bp = priv->dpa_bp;
 
+	/* Trace the Rx fd */
+	trace_dpa_rx_fd(net_dev, fq, &dq->fd);
+
 	/* IRQ handler, non-migratable; safe to use raw_cpu_ptr here */
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
 	count_ptr = raw_cpu_ptr(dpa_bp->percpu_count);
@@ -284,6 +293,9 @@ priv_tx_conf_default_dqrr(struct qman_portal *portal,
 
 	net_dev = ((struct dpa_fq *)fq)->net_dev;
 	priv = netdev_priv(net_dev);
+
+	/* Trace the fd */
+	trace_dpa_tx_conf_fd(net_dev, fq, &dq->fd);
 
 	/* Non-migratable context, safe to use raw_cpu_ptr */
 	percpu_priv = raw_cpu_ptr(priv->percpu_priv);
