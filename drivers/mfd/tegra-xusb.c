@@ -32,11 +32,6 @@ static struct regmap_config tegra_fpci_regmap_config = {
 	.reg_stride = 4,
 };
 
-struct tegra_xusb_priv {
-	struct platform_device *mbox_pdev;
-	struct platform_device *xhci_pdev;
-};
-
 static struct platform_device *tegra_xusb_add_device(struct device *parent,
 	const char *name, int id, const struct resource *res,
 	unsigned int num_res, const void *data, size_t size_data)

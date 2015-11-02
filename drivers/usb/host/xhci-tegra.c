@@ -552,7 +552,8 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 
 static void tegra_xhci_mbox_rx(struct mbox_client *cl, void *data)
 {
-	struct tegra_xhci_hcd *tegra = dev_get_drvdata(cl->dev);
+	struct tegra_xusb_priv *priv = dev_get_drvdata(cl->dev);
+	struct tegra_xhci_hcd *tegra = dev_get_drvdata(&priv->xhci_pdev->dev);
 	struct tegra_xusb_mbox_msg *msg = data;
 
 	if (is_host_mbox_message(msg->cmd)) {
@@ -694,7 +695,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	tegra->dev = &pdev->dev;
 	platform_set_drvdata(pdev, tegra);
-
 	match = of_match_device(tegra_xhci_of_match, pdev->dev.parent);
 	if(!match)
 		return -ENODEV;
@@ -811,7 +811,7 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		goto disable_clk;
 
 	INIT_WORK(&tegra->mbox_req_work, tegra_xhci_mbox_work);
-	tegra->mbox_client.dev = &pdev->dev;
+	tegra->mbox_client.dev = pdev->dev.parent;
 	tegra->mbox_client.tx_block = true;
 	tegra->mbox_client.tx_tout = 0;
 	tegra->mbox_client.rx_callback = tegra_xhci_mbox_rx;

@@ -235,7 +235,7 @@ static int tegra_xusb_mbox_probe(struct platform_device *pdev)
 	sregs = pdev->dev.platform_data;
 	mbox->fpci_regs = sregs->fpci_regs;
 
-	mbox->mbox.dev = &pdev->dev;
+	mbox->mbox.dev = pdev->dev.parent;
 	mbox->mbox.chans = devm_kcalloc(&pdev->dev, XUSB_MBOX_NUM_CHANS,
 					sizeof(*mbox->mbox.chans), GFP_KERNEL);
 	if (!mbox->mbox.chans)
