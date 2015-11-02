@@ -49,9 +49,6 @@
 
 static DEFINE_SPINLOCK(efi_rtc_lock);
 
-static long efi_rtc_ioctl(struct file *file, unsigned int cmd,
-							unsigned long arg);
-
 #define is_leap(year) \
           ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
 
