@@ -47,4 +47,8 @@ struct tegra_xusb_mbox_msg {
 	u32 data;
 };
 
+struct tegra_xusb_shared_regs {
+	struct regmap *fpci_regs;
+};
+
 #endif /* __SOC_TEGRA_XUSB_H__ */

@@ -598,7 +598,7 @@ static const struct tegra_xhci_soc_data tegra124_soc_data = {
 MODULE_FIRMWARE("nvidia/tegra124/xusb.bin");
 
 static const struct of_device_id tegra_xhci_of_match[] = {
-	{ .compatible = "nvidia,tegra124-xhci", .data = &tegra124_soc_data },
+	{ .compatible = "nvidia,tegra124-xusb", .data = &tegra124_soc_data },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_xhci_of_match);
@@ -682,6 +682,8 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct usb_hcd *hcd;
 	struct phy *phy;
+	struct platform_device *parent;
+	struct tegra_xusb_shared_regs *sregs;
 	unsigned int i, j, k;
 	int ret;
 
@@ -693,7 +695,10 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	tegra->dev = &pdev->dev;
 	platform_set_drvdata(pdev, tegra);
 
-	match = of_match_device(tegra_xhci_of_match, &pdev->dev);
+	match = of_match_device(tegra_xhci_of_match, pdev->dev.parent);
+	if(!match)
+		return -ENODEV;
+
 	tegra->soc = match->data;
 
 	hcd = usb_create_hcd(&tegra_xhci_hc_driver, &pdev->dev,
@@ -702,9 +707,9 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	tegra->hcd = hcd;
 
-	tegra->fpci_regs = dev_get_drvdata(pdev->dev.parent);
+	parent = to_platform_device(pdev->dev.parent);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	res = platform_get_resource(parent, IORESOURCE_MEM, 0);
 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(hcd->regs)) {
 		ret = PTR_ERR(hcd->regs);
@@ -713,71 +718,74 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	res = platform_get_resource(parent, IORESOURCE_MEM, 1);
 	tegra->ipfs_base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(tegra->ipfs_base)) {
 		ret = PTR_ERR(tegra->ipfs_base);
 		goto put_hcd;
 	}
 
-	tegra->irq = platform_get_irq(pdev, 0);
+	sregs = pdev->dev.platform_data;
+	tegra->fpci_regs = sregs->fpci_regs;
+
+	tegra->irq = platform_get_irq(parent, 0);
 	if (tegra->irq < 0) {
 		ret = tegra->irq;
 		goto put_hcd;
 	}
 
-	tegra->host_rst = devm_reset_control_get(&pdev->dev, "xusb_host");
+	tegra->host_rst = devm_reset_control_get(pdev->dev.parent, "xusb_host");
 	if (IS_ERR(tegra->host_rst)) {
 		ret = PTR_ERR(tegra->host_rst);
 		goto put_hcd;
 	}
-	tegra->ss_rst = devm_reset_control_get(&pdev->dev, "xusb_ss");
+	tegra->ss_rst = devm_reset_control_get(pdev->dev.parent, "xusb_ss");
 	if (IS_ERR(tegra->ss_rst)) {
 		ret = PTR_ERR(tegra->ss_rst);
 		goto put_hcd;
 	}
 
-	tegra->host_clk = devm_clk_get(&pdev->dev, "xusb_host");
+	tegra->host_clk = devm_clk_get(pdev->dev.parent, "xusb_host");
 	if (IS_ERR(tegra->host_clk)) {
 		ret = PTR_ERR(tegra->host_clk);
 		goto put_hcd;
 	}
-	tegra->falc_clk = devm_clk_get(&pdev->dev, "xusb_falcon_src");
+	tegra->falc_clk = devm_clk_get(pdev->dev.parent, "xusb_falcon_src");
 	if (IS_ERR(tegra->falc_clk)) {
 		ret = PTR_ERR(tegra->falc_clk);
 		goto put_hcd;
 	}
-	tegra->ss_clk = devm_clk_get(&pdev->dev, "xusb_ss");
+	tegra->ss_clk = devm_clk_get(pdev->dev.parent, "xusb_ss");
 	if (IS_ERR(tegra->ss_clk)) {
 		ret = PTR_ERR(tegra->ss_clk);
 		goto put_hcd;
 	}
-	tegra->ss_src_clk = devm_clk_get(&pdev->dev, "xusb_ss_src");
+	tegra->ss_src_clk = devm_clk_get(pdev->dev.parent, "xusb_ss_src");
 	if (IS_ERR(tegra->ss_src_clk)) {
 		ret = PTR_ERR(tegra->ss_src_clk);
 		goto put_hcd;
 	}
-	tegra->hs_src_clk = devm_clk_get(&pdev->dev, "xusb_hs_src");
+	tegra->hs_src_clk = devm_clk_get(pdev->dev.parent, "xusb_hs_src");
 	if (IS_ERR(tegra->hs_src_clk)) {
 		ret = PTR_ERR(tegra->hs_src_clk);
 		goto put_hcd;
 	}
-	tegra->fs_src_clk = devm_clk_get(&pdev->dev, "xusb_fs_src");
+	tegra->fs_src_clk = devm_clk_get(pdev->dev.parent, "xusb_fs_src");
 	if (IS_ERR(tegra->fs_src_clk)) {
 		ret = PTR_ERR(tegra->fs_src_clk);
 		goto put_hcd;
 	}
-	tegra->pll_u_480m = devm_clk_get(&pdev->dev, "pll_u_480m");
+	tegra->pll_u_480m = devm_clk_get(pdev->dev.parent, "pll_u_480m");
 	if (IS_ERR(tegra->pll_u_480m)) {
 		ret = PTR_ERR(tegra->pll_u_480m);
 		goto put_hcd;
 	}
-	tegra->clk_m = devm_clk_get(&pdev->dev, "clk_m");
+	tegra->clk_m = devm_clk_get(pdev->dev.parent, "clk_m");
 	if (IS_ERR(tegra->clk_m)) {
 		ret = PTR_ERR(tegra->clk_m);
 		goto put_hcd;
 	}
-	tegra->pll_e = devm_clk_get(&pdev->dev, "pll_e");
+	tegra->pll_e = devm_clk_get(pdev->dev.parent, "pll_e");
 	if (IS_ERR(tegra->pll_e)) {
 		ret = PTR_ERR(tegra->pll_e);
 		goto put_hcd;
@@ -812,7 +820,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		ret = PTR_ERR(tegra->mbox_chan);
 		goto disable_regulator;
 	}
-
 	for (i = 0; i < tegra->soc->num_types; i++)
 		tegra->num_phys += tegra->soc->phy_types[i].num;
 	tegra->phys = devm_kcalloc(&pdev->dev, tegra->num_phys,
@@ -821,6 +828,7 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto put_mbox;
 	}
+
 	for (i = 0, k = 0; i < tegra->soc->num_types; i++) {
 		char prop[8];
 
@@ -925,13 +933,17 @@ static struct platform_driver tegra_xhci_driver = {
 	.driver = {
 		.name = "tegra-xhci",
 		.pm = &tegra_xhci_pm_ops,
-		.of_match_table = tegra_xhci_of_match,
 	},
+};
+
+static const struct xhci_driver_overrides tegra_xhci_overrides __initconst = {
+	.extra_priv_size = sizeof(struct xhci_hcd),
+	.reset = tegra_xhci_setup,
 };
 
 static int __init tegra_xhci_init(void)
 {
-	xhci_init_driver(&tegra_xhci_hc_driver, tegra_xhci_setup);
+	xhci_init_driver(&tegra_xhci_hc_driver, &tegra_xhci_overrides);
 	return platform_driver_register(&tegra_xhci_driver);
 }
 module_init(tegra_xhci_init);

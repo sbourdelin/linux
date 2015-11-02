@@ -220,15 +220,11 @@ static struct mbox_chan *tegra_xusb_mbox_of_xlate(struct mbox_controller *ctlr,
 	return chan;
 }
 
-static const struct of_device_id tegra_xusb_mbox_of_match[] = {
-	{ .compatible = "nvidia,tegra124-xusb-mbox" },
-	{ },
-};
-MODULE_DEVICE_TABLE(of, tegra_xusb_mbox_of_match);
-
 static int tegra_xusb_mbox_probe(struct platform_device *pdev)
 {
 	struct tegra_xusb_mbox *mbox;
+	struct platform_device *parent;
+	struct tegra_xusb_shared_regs *sregs;
 	int ret;
 
 	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
@@ -236,7 +232,8 @@ static int tegra_xusb_mbox_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, mbox);
 	spin_lock_init(&mbox->lock);
-	mbox->fpci_regs = dev_get_drvdata(pdev->dev.parent);
+	sregs = pdev->dev.platform_data;
+	mbox->fpci_regs = sregs->fpci_regs;
 
 	mbox->mbox.dev = &pdev->dev;
 	mbox->mbox.chans = devm_kcalloc(&pdev->dev, XUSB_MBOX_NUM_CHANS,
@@ -249,7 +246,9 @@ static int tegra_xusb_mbox_probe(struct platform_device *pdev)
 	mbox->mbox.txpoll_period = 1;
 	mbox->mbox.of_xlate = tegra_xusb_mbox_of_xlate;
 
-	mbox->irq = platform_get_irq(pdev, 0);
+	parent = to_platform_device(pdev->dev.parent);
+
+	mbox->irq = platform_get_irq(parent, 1);
 	if (mbox->irq < 0)
 		return mbox->irq;
 	ret = devm_request_irq(&pdev->dev, mbox->irq, tegra_xusb_mbox_irq, 0,
@@ -280,7 +279,6 @@ static struct platform_driver tegra_xusb_mbox_driver = {
 	.remove = tegra_xusb_mbox_remove,
 	.driver = {
 		.name = "tegra-xusb-mbox",
-		.of_match_table = tegra_xusb_mbox_of_match,
 	},
 };
 module_platform_driver(tegra_xusb_mbox_driver);
