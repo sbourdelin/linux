@@ -1162,6 +1162,8 @@ static int rtm_to_route_config(struct sk_buff *skb,  struct nlmsghdr *nlh,
 		{
 			cfg->rc_mp = nla_data(nla);
 			cfg->rc_mp_len = nla_len(nla);
+			/* Fail until multipath support is complete */
+			goto errout;
 			break;
 		}
 		default:
