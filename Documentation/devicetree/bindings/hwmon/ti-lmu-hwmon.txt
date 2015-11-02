@@ -1,0 +1,12 @@
+TI LMU Hardware Monotoring device tree bindings
+
+LMU HWON driver monitors hardware fault situation of LMU devices,
+LM3633 and LM3697.
+
+Required properties:
+  - compatible: Should be one of lists below.
+                "ti,lm3633-hwmon"
+                "ti,lm3697-hwmon"
+
+Examples: Please refer to ti-lmu dt-bindings.
+          Documentation/devicetree/bindings/mfd/ti-lmu.txt
