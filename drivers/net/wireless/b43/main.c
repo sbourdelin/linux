@@ -5821,14 +5821,11 @@ void b43_controller_restart(struct b43_wldev *dev, const char *reason)
 
 static void b43_print_driverinfo(void)
 {
-	const char *feat_pci = "", *feat_pcmcia = "", *feat_nphy = "",
-		   *feat_leds = "", *feat_sdio = "";
+	const char *feat_pci = "", *feat_nphy = "", *feat_leds = "",
+		   *feat_sdio = "";
 
 #ifdef CONFIG_B43_PCI_AUTOSELECT
 	feat_pci = "P";
-#endif
-#ifdef CONFIG_B43_PCMCIA
-	feat_pcmcia = "M";
 #endif
 #ifdef CONFIG_B43_PHY_N
 	feat_nphy = "N";
@@ -5839,10 +5836,8 @@ static void b43_print_driverinfo(void)
 #ifdef CONFIG_B43_SDIO
 	feat_sdio = "S";
 #endif
-	printk(KERN_INFO "Broadcom 43xx driver loaded "
-	       "[ Features: %s%s%s%s%s ]\n",
-	       feat_pci, feat_pcmcia, feat_nphy,
-	       feat_leds, feat_sdio);
+	printk(KERN_INFO "Broadcom 43xx driver loaded [ Features: %s%s%s%s ]\n",
+	       feat_pci, feat_nphy, feat_leds, feat_sdio);
 }
 
 static int __init b43_init(void)
