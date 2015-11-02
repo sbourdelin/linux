@@ -83,6 +83,11 @@ module_param_named(max_persistent_grants, xen_blkif_max_pgrants, int, 0644);
 MODULE_PARM_DESC(max_persistent_grants,
                  "Maximum number of grants to map persistently");
 
+unsigned int xenblk_max_queues;
+module_param_named(max_queues, xenblk_max_queues, uint, 0644);
+MODULE_PARM_DESC(max_queues,
+		 "Maximum number of hardware queues per virtual disk");
+
 /*
  * Maximum order of pages to be used for the shared ring between front and
  * backend, 4KB page granularity is used.
@@ -1477,6 +1482,12 @@ static int __init xen_blkif_init(void)
 			xen_blkif_max_ring_order, XENBUS_MAX_RING_PAGE_ORDER);
 		xen_blkif_max_ring_order = XENBUS_MAX_RING_PAGE_ORDER;
 	}
+
+	/* Allow as many queues as there are CPUs if user has not
+	 * specified a value.
+	 */
+	if (xenblk_max_queues == 0)
+		xenblk_max_queues = num_online_cpus();
 
 	rc = xen_blkif_interface_init();
 	if (rc)
