@@ -117,6 +117,8 @@ struct nvm_tgt_instance {
 	struct nvm_tgt_type *tt;
 };
 
+typedef u64 ppa_t;
+
 #define ADDR_EMPTY (~0ULL)
 
 #define NVM_VERSION_MAJOR 1
@@ -134,26 +136,26 @@ struct ppa_addr {
 	union {
 		/* Channel-based PPA format in nand 4x2x2x2x8x10 */
 		struct {
-			sector_t ch		: 4;
-			sector_t sec		: 2; /* 4 sectors per page */
-			sector_t pl		: 2; /* 4 planes per LUN */
-			sector_t lun		: 2; /* 4 LUNs per channel */
-			sector_t pg		: 8; /* 256 pages per block */
-			sector_t blk		: 10;/* 1024 blocks per plane */
-			sector_t resved		: 36;
+			ppa_t ch		: 4;
+			ppa_t sec		: 2; /* 4 sectors per page */
+			ppa_t pl		: 2; /* 4 planes per LUN */
+			ppa_t lun		: 2; /* 4 LUNs per channel */
+			ppa_t pg		: 8; /* 256 pages per block */
+			ppa_t blk		: 10;/* 1024 blocks per plane */
+			ppa_t resved		: 36;
 		} chnl;
 
 		/* Generic structure for all addresses */
 		struct {
-			sector_t sec		: NVM_SEC_BITS;
-			sector_t pl		: NVM_PL_BITS;
-			sector_t pg		: NVM_PG_BITS;
-			sector_t blk		: NVM_BLK_BITS;
-			sector_t lun		: NVM_LUN_BITS;
-			sector_t ch		: NVM_CH_BITS;
+			ppa_t sec		: NVM_SEC_BITS;
+			ppa_t pl		: NVM_PL_BITS;
+			ppa_t pg		: NVM_PG_BITS;
+			ppa_t blk		: NVM_BLK_BITS;
+			ppa_t lun		: NVM_LUN_BITS;
+			ppa_t ch		: NVM_CH_BITS;
 		} g;
 
-		sector_t ppa;
+		ppa_t ppa;
 	};
 } __packed;
 

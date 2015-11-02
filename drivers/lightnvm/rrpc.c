@@ -116,15 +116,14 @@ static int block_is_full(struct rrpc *rrpc, struct rrpc_block *rblk)
 	return (rblk->next_page == rrpc->dev->pgs_per_blk);
 }
 
-static sector_t block_to_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
+static ppa_t block_to_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
 {
 	struct nvm_block *blk = rblk->parent;
 
 	return blk->id * rrpc->dev->pgs_per_blk;
 }
 
-static struct ppa_addr rrpc_ppa_to_gaddr(struct nvm_dev *dev,
-								sector_t addr)
+static struct ppa_addr rrpc_ppa_to_gaddr(struct nvm_dev *dev, ppa_t addr)
 {
 	struct ppa_addr paddr;
 
@@ -231,7 +230,7 @@ static int rrpc_move_valid_pages(struct rrpc *rrpc, struct rrpc_block *rblk)
 	struct page *page;
 	int slot;
 	int nr_pgs_per_blk = rrpc->dev->pgs_per_blk;
-	sector_t phys_addr;
+	ppa_t phys_addr;
 	DECLARE_COMPLETION_ONSTACK(wait);
 
 	if (bitmap_full(rblk->invalid_pages, nr_pgs_per_blk))
@@ -464,7 +463,7 @@ static struct rrpc_lun *rrpc_get_lun_rr(struct rrpc *rrpc, int is_gc)
 }
 
 static struct rrpc_addr *rrpc_update_map(struct rrpc *rrpc, sector_t laddr,
-					struct rrpc_block *rblk, sector_t paddr)
+					struct rrpc_block *rblk, ppa_t paddr)
 {
 	struct rrpc_addr *gp;
 	struct rrpc_rev_addr *rev;
@@ -486,9 +485,9 @@ static struct rrpc_addr *rrpc_update_map(struct rrpc *rrpc, sector_t laddr,
 	return gp;
 }
 
-static sector_t rrpc_alloc_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
+static ppa_t rrpc_alloc_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
 {
-	sector_t addr = ADDR_EMPTY;
+	ppa_t addr = ADDR_EMPTY;
 
 	spin_lock(&rblk->lock);
 	if (block_is_full(rrpc, rblk))
@@ -516,7 +515,7 @@ static struct rrpc_addr *rrpc_map_page(struct rrpc *rrpc, sector_t laddr,
 	struct rrpc_lun *rlun;
 	struct rrpc_block *rblk;
 	struct nvm_lun *lun;
-	sector_t paddr;
+	ppa_t paddr;
 
 	rlun = rrpc_get_lun_rr(rrpc, is_gc);
 	lun = rlun->parent;
@@ -1144,7 +1143,7 @@ static void rrpc_block_map_update(struct rrpc *rrpc, struct rrpc_block *rblk)
 	struct nvm_dev *dev = rrpc->dev;
 	int offset;
 	struct rrpc_addr *laddr;
-	sector_t paddr, pladdr;
+	ppa_t paddr, pladdr;
 
 	for (offset = 0; offset < dev->pgs_per_blk; offset++) {
 		paddr = block_to_addr(rrpc, rblk) + offset;
