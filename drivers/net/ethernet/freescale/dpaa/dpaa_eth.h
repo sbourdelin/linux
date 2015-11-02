@@ -347,7 +347,7 @@ static inline void clear_fd(struct qm_fd *fd)
 }
 
 static inline int _dpa_tx_fq_to_id(const struct dpa_priv_s *priv,
-				   struct qman_fq *tx_fq)
+		struct qman_fq *tx_fq)
 {
 	int i;
 
