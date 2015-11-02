@@ -360,6 +360,9 @@ int __init arch_probe_nr_irqs(void)
 	if (nr < nr_irqs)
 		nr_irqs = nr;
 
+	/* nr_legecy_irqs() depends on the PIC presence */
+	legacy_pic->probe();
+
 	return nr_legacy_irqs();
 }
 
