@@ -348,6 +348,25 @@ int generic_handle_irq(unsigned int irq)
 }
 EXPORT_SYMBOL_GPL(generic_handle_irq);
 
+#ifdef CONFIG_PREEMPT_RT_FULL
+int generic_handle_irq_rt_wa(unsigned int irq)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	DEFINE_RAW_SPINLOCK(wa_lock);
+	unsigned long wa_lock_flags;
+
+	if (!desc)
+		return -EINVAL;
+
+	raw_spin_lock_irqsave(&wa_lock, wa_lock_flags);
+	generic_handle_irq_desc(irq, desc);
+	raw_spin_unlock_irqrestore(&wa_lock, wa_lock_flags);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(generic_handle_irq_rt_wa);
+#endif
+
 #ifdef CONFIG_HANDLE_DOMAIN_IRQ
 /**
  * __handle_domain_irq - Invoke the handler for a HW irq belonging to a domain

@@ -147,6 +147,11 @@ static inline void generic_handle_irq_desc(unsigned int irq, struct irq_desc *de
 }
 
 int generic_handle_irq(unsigned int irq);
+#ifdef CONFIG_PREEMPT_RT_FULL
+int generic_handle_irq_rt_wa(unsigned int irq);
+#else
+#define generic_handle_irq_rt_wa generic_handle_irq
+#endif
 
 #ifdef CONFIG_HANDLE_DOMAIN_IRQ
 /*
