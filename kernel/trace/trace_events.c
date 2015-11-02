@@ -506,7 +506,7 @@ check_ignore_pid(struct trace_pid_list *filtered_pids, struct task_struct *task)
 }
 
 static void
-event_filter_pid_sched_switch_probe_pre(void *data,
+event_filter_pid_sched_switch_probe_pre(void *data, bool preempt,
 		    struct task_struct *prev, struct task_struct *next)
 {
 	struct trace_array *tr = data;
@@ -520,7 +520,7 @@ event_filter_pid_sched_switch_probe_pre(void *data,
 }
 
 static void
-event_filter_pid_sched_switch_probe_post(void *data,
+event_filter_pid_sched_switch_probe_post(void *data, bool preempt,
 		    struct task_struct *prev, struct task_struct *next)
 {
 	struct trace_array *tr = data;
