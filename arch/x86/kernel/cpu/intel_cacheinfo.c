@@ -636,6 +636,9 @@ static int find_num_cache_leaves(struct cpuinfo_x86 *c)
 
 void init_amd_cacheinfo(struct cpuinfo_x86 *c)
 {
+	unsigned int cpu = c->cpu_index;
+	unsigned int apicid = c->apicid;
+	unsigned int socket_id, core_complex_id;
 
 	if (cpu_has_topoext) {
 		num_cache_leaves = find_num_cache_leaves(c);
@@ -645,6 +648,17 @@ void init_amd_cacheinfo(struct cpuinfo_x86 *c)
 		else
 			num_cache_leaves = 3;
 	}
+
+	/*
+	 * Fix percpu cpu_llc_id here as LLC topology is different
+	 * for Fam17h systems.
+	 */
+	 if (c->x86 != 0x17 || !cpuid_edx(0x80000006))
+		return;
+
+	socket_id = (apicid >> c->x86_coreid_bits) - 1;
+	core_complex_id = (apicid & ((1 << c->x86_coreid_bits) - 1)) >> 3;
+	per_cpu(cpu_llc_id, cpu) = (socket_id << 3) | core_complex_id;
 }
 
 unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
