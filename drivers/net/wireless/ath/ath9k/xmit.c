@@ -147,7 +147,12 @@ static void ath_txq_skb_done(struct ath_softc *sc, struct ath_txq *txq,
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ath_frame_info *fi = get_frame_info(skb);
-	int q = fi->txq;
+	int q;
+
+	if (ath9k_is_chanctx_enabled())
+		q = fi->txq;
+	else
+		q = info->hw_queue;
 
 	if (q < 0)
 		return;
@@ -158,10 +163,7 @@ static void ath_txq_skb_done(struct ath_softc *sc, struct ath_txq *txq,
 
 	if (txq->stopped &&
 	    txq->pending_frames < sc->tx.txq_max_pending[q]) {
-		if (ath9k_is_chanctx_enabled())
-			ieee80211_wake_queue(sc->hw, info->hw_queue);
-		else
-			ieee80211_wake_queue(sc->hw, q);
+		ieee80211_wake_queue(sc->hw, q);
 		txq->stopped = false;
 	}
 }
@@ -2299,17 +2301,17 @@ int ath_tx_start(struct ieee80211_hw *hw, struct sk_buff *skb,
 	 * info are no longer valid (overwritten by the ath_frame_info data.
 	 */
 
-	q = skb_get_queue_mapping(skb);
+	if (ath9k_is_chanctx_enabled())
+		q = skb_get_queue_mapping(skb);
+	else
+		q = info->hw_queue;
 
 	ath_txq_lock(sc, txq);
 	if (txq == sc->tx.txq_map[q]) {
 		fi->txq = q;
 		if (++txq->pending_frames > sc->tx.txq_max_pending[q] &&
 		    !txq->stopped) {
-			if (ath9k_is_chanctx_enabled())
-				ieee80211_stop_queue(sc->hw, info->hw_queue);
-			else
-				ieee80211_stop_queue(sc->hw, q);
+			ieee80211_stop_queue(sc->hw, q);
 			txq->stopped = true;
 		}
 	}
