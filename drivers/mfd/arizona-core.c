@@ -852,6 +852,11 @@ static int arizona_of_get_core_pdata(struct arizona *arizona)
 		count++;
 	}
 
+	arizona->pdata.irq_gpio = of_get_named_gpio(arizona->dev->of_node,
+							"wlf,irq_gpio", 0);
+	if (arizona->pdata.irq_gpio < 0)
+		arizona->pdata.irq_gpio = 0;
+
 	return 0;
 }
 
