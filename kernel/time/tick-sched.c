@@ -606,7 +606,7 @@ static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
 	 * restart it proper.
 	 */
 	delta = next_tick - basemono;
-	if (delta <= (u64)TICK_NSEC) {
+	if (delta < (u64)TICK_NSEC) {
 		tick.tv64 = 0;
 		if (!ts->tick_stopped)
 			goto out;
