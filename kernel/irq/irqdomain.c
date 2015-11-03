@@ -852,6 +852,104 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
 	return virq;
 }
 
+/**
+ * irq_reserve_ipi() - setup an IPI to destination cpumask
+ * @domain: IPI domain
+ * @dest: cpumask of cpus to receive the IPI
+ *
+ * Allocate a virq that can be used to send IPI to any CPU in dest mask.
+ *
+ * On success it'll return linux irq number and 0 on failure
+ */
+unsigned int irq_reserve_ipi(struct irq_domain *domain,
+			     const struct ipi_mask *dest)
+{
+	struct irq_data *data;
+	unsigned int nr_irqs;
+	int virq, i;
+
+	if (domain == NULL) {
+		pr_warn("Must provide a valid IPI domain!\n");
+		return 0;
+	}
+
+	if (!irq_domain_is_ipi(domain)) {
+		pr_warn("Not an IPI domain!\n");
+		return 0;
+	}
+
+	/* always allocate a virq per cpu */
+	nr_irqs = ipi_mask_weight(dest);
+
+	virq = irq_domain_alloc_descs(-1, nr_irqs, 0, NUMA_NO_NODE);
+	if (virq <= 0) {
+		pr_warn("Can't reserve IPI, failed to alloc descs\n");
+		return 0;
+	}
+
+	virq = __irq_domain_alloc_irqs(domain, virq, nr_irqs, NUMA_NO_NODE,
+					(void *) dest, true);
+	if (virq <= 0) {
+		pr_warn("Can't reserve IPI, failed to alloc irqs\n");
+		goto free_descs;
+	}
+
+	for (i = virq; i < virq + nr_irqs; i++) {
+		data = irq_get_irq_data(i);
+		data->common->ipi_mask = ipi_mask_alloc(dest->nbits);
+		if (!data->common->ipi_mask)
+			goto free_ipi_mask;
+		ipi_mask_copy(data->common->ipi_mask, dest);
+	}
+
+	return virq;
+
+free_ipi_mask:
+	for (i = virq; i < virq + nr_irqs; i++) {
+		data = irq_get_irq_data(i);
+		ipi_mask_free(data->common->ipi_mask);
+	}
+free_descs:
+	irq_free_descs(virq, nr_irqs);
+	return 0;
+}
+
+/**
+ * irq_destroy_ipi() - unreserve an IPI that was previously allocated
+ * @irq: linux irq number to be destroyed
+ *
+ * Return the IPIs allocated with irq_reserve_ipi() to the system destroying all
+ * virqs associated with them.
+ */
+void irq_destroy_ipi(unsigned int irq)
+{
+	struct irq_data *data = irq_get_irq_data(irq);
+	struct irq_domain *domain;
+	unsigned int nr_irqs, i;
+
+	if (!irq || !data)
+		return;
+
+	domain = data->domain;
+	if (WARN_ON(domain == NULL))
+		return;
+
+	if (!irq_domain_is_ipi(domain)) {
+		pr_warn("Not an IPI domain!\n");
+		return;
+	}
+
+	nr_irqs = ipi_mask_weight(data->common->ipi_mask);
+	ipi_mask_free(data->common->ipi_mask);
+
+	for (i = irq + 1; i < irq + nr_irqs; i++) {
+		data = irq_get_irq_data(i);
+		ipi_mask_free(data->common->ipi_mask);
+	}
+
+	irq_domain_free_irqs(irq, nr_irqs);
+}
+
 #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
 /**
  * irq_domain_create_hierarchy - Add a irqdomain into the hierarchy
