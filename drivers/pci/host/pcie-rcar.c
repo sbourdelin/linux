@@ -711,7 +711,7 @@ static int rcar_pcie_enable_msi(struct rcar_pcie *pcie)
 	msi->chip.setup_irq = rcar_msi_setup_irq;
 	msi->chip.teardown_irq = rcar_msi_teardown_irq;
 
-	msi->domain = irq_domain_add_linear(pcie->dev->of_node, INT_PCI_MSI_NR,
+	msi->domain = irq_domain_add_linear(NULL, INT_PCI_MSI_NR,
 					    &msi_domain_ops, &msi->chip);
 	if (!msi->domain) {
 		dev_err(&pdev->dev, "failed to create IRQ domain\n");
