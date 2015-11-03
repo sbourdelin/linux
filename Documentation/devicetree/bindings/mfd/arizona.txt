@@ -46,6 +46,8 @@ Optional properties:
   - wlf,reset : GPIO specifier for the GPIO controlling /RESET
   - wlf,ldoena : GPIO specifier for the GPIO controlling LDOENA
 
+  - irq-gpios : GPIO specifier for the GPIO connected to /IRQ
+
   - wlf,gpio-defaults : A list of GPIO configuration register values. Defines
     for the appropriate values can found in <dt-bindings/mfd/arizona.txt>. If
     absent, no configuration of these registers is performed. If any entry has
