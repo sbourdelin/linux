@@ -30,6 +30,7 @@
 #include <linux/mempolicy.h>
 #include <linux/migrate.h>
 #include <linux/task_work.h>
+#include <linux/suspend.h>
 
 #include <trace/events/sched.h>
 
@@ -112,6 +113,17 @@ unsigned int __read_mostly sysctl_sched_shares_window = 10000000UL;
  * default: 5 msec, units: microseconds
   */
 unsigned int sysctl_sched_cfs_bandwidth_slice = 5000UL;
+#endif
+
+/*
+ * Knobs for controlling percentage of time when idle is forced across all
+ * CPUs. This is a power management feature intended for achieving deepest
+ * and broadest idle without lower CPU frequencies to less optimal level.
+ * No action is taken if CPUs are natually idle.
+ */
+#ifdef CONFIG_CFS_IDLE_INJECT
+unsigned int sysctl_sched_cfs_idle_inject_pct;
+unsigned int sysctl_sched_cfs_idle_inject_duration = 10UL;
 #endif
 
 static inline void update_load_add(struct load_weight *lw, unsigned long inc)
@@ -5202,6 +5214,16 @@ pick_next_task_fair(struct rq *rq, struct task_struct *prev)
 	struct task_struct *p;
 	int new_tasks;
 
+#ifdef CONFIG_CFS_IDLE_INJECT
+	if (cfs_rq->force_throttled &&
+		!idle_cpu(cpu_of(rq)) &&
+		!unlikely(local_softirq_pending())) {
+		/* forced idle, pick no task */
+		trace_sched_cfs_idle_inject(cpu_of(rq), 1);
+		update_curr(cfs_rq);
+		return NULL;
+	}
+#endif
 again:
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	if (!cfs_rq->nr_running)
@@ -8355,3 +8377,326 @@ __init void init_sched_fair_class(void)
 #endif /* SMP */
 
 }
+
+#ifdef CONFIG_CFS_IDLE_INJECT
+static atomic_t idle_inject_active;
+static DEFINE_PER_CPU(struct hrtimer, idle_inject_timer);
+static DEFINE_PER_CPU(bool, idle_injected);
+/* protect injection parameters from runtime changes */
+static DEFINE_SPINLOCK(idle_inject_lock);
+
+/* Track which CPUs are being injected with idle period */
+static unsigned long *idle_inject_cpumask;
+
+/* Default idle injection duration for each period. */
+#define DEFAULT_DURATION_MSECS (10)
+
+static unsigned int duration; /* idle inject duration in msec. */
+static unsigned int inject_interval; /* idle inject duration in msec. */
+static unsigned int idle_pct; /* percentage of time idle is forced */
+/* starting reference time for all CPUs to align idle period */
+static ktime_t inject_start_time;
+static int prepare_idle_inject(void);
+
+static void throttle_rq(int cpu, int throttle)
+{
+	struct rq *rq = cpu_rq(cpu);
+
+	rq->cfs.force_throttled = throttle;
+}
+
+static enum hrtimer_restart idle_inject_timer_fn(struct hrtimer *hrtimer)
+{
+	int cpu = smp_processor_id();
+	struct hrtimer *hrt = this_cpu_ptr(&idle_inject_timer);
+	ktime_t now, delta, period;
+	bool status;
+
+	now = hrtimer_cb_get_time(hrt);
+
+	status = raw_cpu_read(idle_injected);
+	if (status) {
+		/*
+		 * We were injecting idle in the last phase, let's forward the
+		 * timer to the next period
+		 *
+		 * status: 1             0                1        0
+		 * ____          ____________________           _______
+		 *     |________|                    |_________|
+		 *
+		 *     |duration|      interval      |
+		 *
+		 *              ^ we are here
+		 *                  forward to here: ^
+		 */
+		delta = ktime_sub(now, inject_start_time);
+		period = ktime_add(ms_to_ktime(duration),
+				ms_to_ktime(inject_interval));
+		delta = ktime_roundup(delta, period);
+		hrtimer_set_expires(hrt, ktime_add(delta, inject_start_time));
+	} else {
+		/*
+		 * We were not injecting idle in the last phase, let's forward
+		 * timer after forced idle duration
+		 * ____          ____________________           _______
+		 *     |________|                    |_________|
+		 *
+		 *     |duration|      interval      |
+		 *
+		 *     ^ we are here
+		 *              ^ forward timer to here
+		 */
+		hrtimer_set_expires(hrt, ktime_add(ms_to_ktime(duration), now));
+	}
+	raw_cpu_write(idle_injected, !status);
+	throttle_rq(cpu, !status);
+	trace_sched_cfs_idle_inject(cpu, status);
+	/* call scheduler to check rq */
+	resched_cpu(cpu);
+
+	return HRTIMER_RESTART;
+}
+
+static void idle_inject_timer_start(void *info)
+{
+	int cpu = smp_processor_id();
+	struct hrtimer *hrt = this_cpu_ptr(&idle_inject_timer);
+
+	this_cpu_write(idle_injected, true);
+	set_bit(cpu, idle_inject_cpumask);
+	hrtimer_start(hrt, ms_to_ktime(duration), HRTIMER_MODE_ABS_PINNED);
+	hrtimer_set_expires(hrt, *(ktime_t *)info);
+}
+
+static int start_idle_inject(void)
+{
+	int ret;
+	ktime_t now = ktime_get();
+
+	if (!atomic_read(&idle_inject_active)) {
+		/* called once per activation of idle injection */
+		ret = prepare_idle_inject();
+		if (ret)
+			return ret;
+	}
+	/* prevent cpu hotplug */
+	get_online_cpus();
+
+	/* set a future time to let all per cpu timers expires the same time */
+	now = ktime_roundup(now, ms_to_ktime(duration));
+
+	/* start one timer per online cpu */
+	inject_start_time = now;
+	on_each_cpu(idle_inject_timer_start, &now, 1);
+	atomic_set(&idle_inject_active, 1);
+
+	put_online_cpus();
+
+	return 0;
+}
+
+static void stop_idle_inject(void)
+{
+	int i;
+	struct hrtimer *hrt;
+
+	if (bitmap_weight(idle_inject_cpumask, num_possible_cpus())) {
+		for_each_set_bit(i, idle_inject_cpumask, num_possible_cpus()) {
+			hrt = &per_cpu(idle_inject_timer, i);
+			hrtimer_cancel(hrt);
+			throttle_rq(i, 0);
+		}
+	}
+}
+
+static int idle_inject_cpu_callback(struct notifier_block *nfb,
+				unsigned long action, void *hcpu)
+{
+	unsigned long cpu = (unsigned long)hcpu;
+	struct hrtimer *hrt = &per_cpu(idle_inject_timer, cpu);
+	ktime_t now, delta, period;
+
+	if (!atomic_read(&idle_inject_active))
+		goto exit_ok;
+
+	switch (action) {
+	case CPU_STARTING:
+		raw_cpu_write(idle_injected, true);
+
+		hrtimer_init(hrt, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_PINNED);
+		hrt->function = idle_inject_timer_fn;
+		set_bit(cpu, idle_inject_cpumask);
+
+		now = hrtimer_cb_get_time(hrt);
+		hrtimer_start(hrt, ms_to_ktime(duration),
+			HRTIMER_MODE_ABS_PINNED);
+		/*
+		 * When a new CPU comes online, we need to make sure it aligns
+		 * its phase with the rest of the CPUs. So we set the
+		 * timer to the next period based on the common starting time,
+		 * then start injecting idle time.
+		 */
+		spin_lock_irq(&idle_inject_lock);
+		delta = ktime_sub(now, inject_start_time);
+		period = ktime_add(ms_to_ktime(duration),
+				ms_to_ktime(inject_interval));
+		delta = ktime_roundup(delta, period);
+		spin_unlock_irq(&idle_inject_lock);
+		hrtimer_set_expires(hrt, ktime_add(delta, inject_start_time));
+		break;
+	case CPU_DYING:
+		clear_bit(cpu, idle_inject_cpumask);
+		hrtimer_cancel(hrt);
+		raw_cpu_write(idle_injected, false);
+		throttle_rq(cpu, 0);
+		break;
+	default:
+		return NOTIFY_DONE;
+	}
+exit_ok:
+	return NOTIFY_OK;
+}
+
+static int idle_inject_pm_callback(struct notifier_block *self,
+				unsigned long action, void *hcpu)
+{
+	switch (action) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_SUSPEND_PREPARE:
+		if (atomic_read(&idle_inject_active))
+			stop_idle_inject();
+		break;
+	case PM_POST_HIBERNATION:
+	case PM_POST_SUSPEND:
+		printk("POST SUSPEND restart idle injection\n");
+		start_idle_inject();
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block idle_inject_pm_notifier = {
+	.notifier_call = idle_inject_pm_callback,
+};
+
+static struct notifier_block idle_inject_cpu_notifier = {
+	.notifier_call = idle_inject_cpu_callback,
+};
+
+static void end_idle_inject(void) {
+	unregister_hotcpu_notifier(&idle_inject_cpu_notifier);
+	unregister_pm_notifier(&idle_inject_pm_notifier);
+	atomic_set(&idle_inject_active, 0);
+	kfree(idle_inject_cpumask);
+}
+
+static int prepare_idle_inject(void)
+{
+	int retval = 0;
+	int bitmap_size;
+	int cpu;
+	struct hrtimer *hrt;
+
+	bitmap_size = BITS_TO_LONGS(num_possible_cpus()) * sizeof(long);
+	idle_inject_cpumask = kzalloc(bitmap_size, GFP_KERNEL);
+	if (!idle_inject_cpumask)
+		return -ENOMEM;
+
+	retval = register_pm_notifier(&idle_inject_pm_notifier);
+	if (retval)
+		goto exit_free;
+	retval = register_hotcpu_notifier(&idle_inject_cpu_notifier);
+	if (retval)
+		goto exit_unregister_pm;
+	get_online_cpus();
+	for_each_online_cpu(cpu) {
+		hrt = &per_cpu(idle_inject_timer, cpu);
+		hrtimer_init(hrt, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_PINNED);
+		hrt->function = idle_inject_timer_fn;
+	}
+	put_online_cpus();
+
+	if (!duration)
+		duration = DEFAULT_DURATION_MSECS;
+
+	return 0;
+exit_unregister_pm:
+	unregister_pm_notifier(&idle_inject_pm_notifier);
+exit_free:
+	kfree(idle_inject_cpumask);
+	return retval;
+}
+
+int proc_sched_cfs_idle_inject_pct_handler(struct ctl_table *table,
+					int write,
+					void __user *buffer,
+					size_t *length,	loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, buffer, length, ppos);
+	if (ret)
+		goto out;
+
+	if (idle_pct != sysctl_sched_cfs_idle_inject_pct) {
+		if (!idle_pct)
+			start_idle_inject();
+		else if (!sysctl_sched_cfs_idle_inject_pct) {
+			stop_idle_inject();
+			end_idle_inject();
+		}
+
+		/* recompute injection parameters */
+		spin_lock_irq(&idle_inject_lock);
+		idle_pct = sysctl_sched_cfs_idle_inject_pct;
+		/*
+		 * duration is fixed for each injection period, we adjust
+		 * non idle interval to satisfy the idle percentage set
+		 * by the user. e.g. if duration is 10 and we want 33% idle
+		 * then interval is 20.
+		 * 33% idle
+		 * ____          ___________________          _________
+		 *     |________|                   |________| 33% idle
+		 * ____          ________          _______
+		 *     |________|        |________|  50% idle
+		 *
+		 *     |duration|interval|
+		 */
+		if (idle_pct)
+			inject_interval = (duration * (100 - idle_pct))
+				/ idle_pct;
+
+		spin_unlock_irq(&idle_inject_lock);
+
+	}
+out:
+	return ret;
+}
+
+int proc_sched_cfs_idle_inject_duration_handler(struct ctl_table *table,
+						int write,
+						void __user *buffer,
+						size_t *length,	loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, buffer, length, ppos);
+	if (ret)
+		goto out;
+
+	if (duration == sysctl_sched_cfs_idle_inject_duration)
+		goto out;
+	/* recompute injection parameters */
+	spin_lock_irq(&idle_inject_lock);
+	duration = jiffies_to_msecs(sysctl_sched_cfs_idle_inject_duration);
+	if (idle_pct)
+		inject_interval = (duration * (100 - idle_pct)) / idle_pct;
+
+	spin_unlock_irq(&idle_inject_lock);
+out:
+	return ret;
+}
+
+#endif /* CONFIG_CFS_IDLE_INJECT */

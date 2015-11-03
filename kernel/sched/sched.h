@@ -421,6 +421,9 @@ struct cfs_rq {
 	struct list_head throttled_list;
 #endif /* CONFIG_CFS_BANDWIDTH */
 #endif /* CONFIG_FAIR_GROUP_SCHED */
+#ifdef CONFIG_CFS_IDLE_INJECT
+	int force_throttled;
+#endif
 };
 
 static inline int rt_bandwidth_enabled(void)

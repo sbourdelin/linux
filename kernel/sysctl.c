@@ -433,6 +433,26 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &one,
 	},
 #endif
+#ifdef CONFIG_CFS_IDLE_INJECT
+	{
+		.procname	= "sched_cfs_idle_inject_pct",
+		.data		= &sysctl_sched_cfs_idle_inject_pct,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_sched_cfs_idle_inject_pct_handler,
+		.extra1		= &zero,
+		.extra2		= &one_hundred,
+	},
+	{
+		.procname	= "sched_cfs_idle_inject_duration",
+		.data		= &sysctl_sched_cfs_idle_inject_duration,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_sched_cfs_idle_inject_duration_handler,
+		.extra1		= &four,
+		.extra2		= &one_hundred,
+	},
+#endif
 #ifdef CONFIG_PROVE_LOCKING
 	{
 		.procname	= "prove_locking",

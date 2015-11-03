@@ -81,6 +81,11 @@ extern unsigned int sysctl_sched_cfs_bandwidth_slice;
 extern unsigned int sysctl_sched_autogroup_enabled;
 #endif
 
+#ifdef CONFIG_CFS_IDLE_INJECT
+extern unsigned int sysctl_sched_cfs_idle_inject_pct;
+extern unsigned int sysctl_sched_cfs_idle_inject_duration;
+#endif
+
 extern int sched_rr_timeslice;
 
 extern int sched_rr_handler(struct ctl_table *table, int write,
