@@ -305,6 +305,22 @@ static inline void list_splice_init_rcu(struct list_head *list,
 		pos = list_entry_rcu(pos->member.next, typeof(*pos), member))
 
 /**
+ * list_for_each_entry_lockless - iterate over rcu list of given type
+ * @pos:	the type * to use as a loop cursor.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ *
+ * This list-traversal primitive may safely run concurrently
+ */
+#define list_entry_lockless(ptr, type, member) \
+	container_of((typeof(ptr))lockless_dereference(ptr), type, member)
+
+#define list_for_each_entry_lockless(pos, head, member) \
+	for (pos = list_entry_lockless((head)->next, typeof(*pos), member); \
+		&pos->member != (head); \
+		pos = list_entry_lockless(pos->member.next, typeof(*pos), member))
+
+/**
  * list_for_each_entry_continue_rcu - continue iteration over list of given type
  * @pos:	the type * to use as a loop cursor.
  * @head:	the head for your list.
