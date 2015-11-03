@@ -156,13 +156,9 @@ static int remove_board(struct slot *p_slot)
 	return 0;
 }
 
-struct power_work_info {
-	struct slot *p_slot;
-	struct work_struct work;
-	unsigned int req;
-#define DISABLE_REQ 0
-#define ENABLE_REQ  1
-};
+/* Hotplug work requests */
+#define DISABLE_REQ	0
+#define ENABLE_REQ	1
 
 /**
  * pciehp_power_thread - handle pushbutton events
@@ -171,14 +167,19 @@ struct power_work_info {
  * Scheduled procedure to handle blocking stuff for the pushbuttons.
  * Handles all pending events and exits.
  */
-static void pciehp_power_thread(struct work_struct *work)
+void pciehp_power_thread(struct work_struct *work)
 {
-	struct power_work_info *info =
-		container_of(work, struct power_work_info, work);
-	struct slot *p_slot = info->p_slot;
-	int ret;
+	struct slot *p_slot = container_of(work, struct slot, hotplug_work);
+	int ret, req;
+	bool disable;
 
-	switch (info->req) {
+	mutex_lock(&p_slot->lock);
+	req = p_slot->hotplug_req;
+	disable = p_slot->disable;
+	p_slot->disable = false;
+	mutex_unlock(&p_slot->lock);
+
+	switch (req) {
 	case DISABLE_REQ:
 		mutex_lock(&p_slot->hotplug_lock);
 		pciehp_disable_slot(p_slot);
@@ -189,6 +190,8 @@ static void pciehp_power_thread(struct work_struct *work)
 		break;
 	case ENABLE_REQ:
 		mutex_lock(&p_slot->hotplug_lock);
+		if (disable)
+			pciehp_disable_slot(p_slot);
 		ret = pciehp_enable_slot(p_slot);
 		mutex_unlock(&p_slot->hotplug_lock);
 		if (ret)
@@ -200,26 +203,19 @@ static void pciehp_power_thread(struct work_struct *work)
 	default:
 		break;
 	}
-
-	kfree(info);
 }
 
 static void pciehp_queue_power_work(struct slot *p_slot, int req)
 {
-	struct power_work_info *info;
-
-	p_slot->state = (req == ENABLE_REQ) ? POWERON_STATE : POWEROFF_STATE;
-
-	info = kmalloc(sizeof(*info), GFP_KERNEL);
-	if (!info) {
-		ctrl_err(p_slot->ctrl, "no memory to queue %s request\n",
-			 (req == ENABLE_REQ) ? "poweron" : "poweroff");
-		return;
+	if (req == ENABLE_REQ) {
+		p_slot->state = POWERON_STATE;
+	} else {
+		p_slot->state = POWEROFF_STATE;
+		p_slot->disable = true;
 	}
-	info->p_slot = p_slot;
-	INIT_WORK(&info->work, pciehp_power_thread);
-	info->req = req;
-	queue_work(p_slot->wq, &info->work);
+	p_slot->hotplug_req = req;
+
+	queue_work(p_slot->wq, &p_slot->hotplug_work);
 }
 
 void pciehp_queue_pushbutton_work(struct work_struct *work)

@@ -78,6 +78,9 @@ struct slot {
 	struct mutex lock;
 	struct mutex hotplug_lock;
 	struct workqueue_struct *wq;
+	struct work_struct hotplug_work;
+	u32 hotplug_req;
+	bool disable;			/* true to disable before enable */
 };
 
 struct event_info {
@@ -130,6 +133,7 @@ void pciehp_queue_interrupt_event(struct slot *slot, u32 event_type);
 int pciehp_configure_device(struct slot *p_slot);
 int pciehp_unconfigure_device(struct slot *p_slot);
 void pciehp_queue_pushbutton_work(struct work_struct *work);
+void pciehp_power_thread(struct work_struct *work);
 struct controller *pcie_init(struct pcie_device *dev);
 int pcie_init_notification(struct controller *ctrl);
 int pciehp_enable_slot(struct slot *p_slot);

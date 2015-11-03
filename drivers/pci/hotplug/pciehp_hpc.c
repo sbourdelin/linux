@@ -755,6 +755,7 @@ static int pcie_init_slot(struct controller *ctrl)
 	mutex_init(&slot->lock);
 	mutex_init(&slot->hotplug_lock);
 	INIT_DELAYED_WORK(&slot->work, pciehp_queue_pushbutton_work);
+	INIT_WORK(&slot->hotplug_work, pciehp_power_thread);
 	ctrl->slot = slot;
 	return 0;
 abort:
