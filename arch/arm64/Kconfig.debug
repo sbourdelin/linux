@@ -89,6 +89,17 @@ config DEBUG_ALIGN_RODATA
 
 	  If in doubt, say N
 
+config DEBUG_CHANGE_PAGEATTR
+	bool "Allow all kernel memory to have attributes changed"
+	help
+	  If this option is selected, APIs that change page attributes
+	  (RW <-> RO, X <-> NX) will be valid for all memory mapped in
+	  the kernel space. The trade off is that there may be increased
+	  TLB pressure from finer grained page mapping. Turn on this option
+	  if performance is more important than security
+
+	  If in doubt, say N
+
 source "drivers/hwtracing/coresight/Kconfig"
 
 endmenu

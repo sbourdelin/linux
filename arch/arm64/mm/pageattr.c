@@ -15,8 +15,11 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 
+#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+
+#include "mm.h"
 
 struct page_change_data {
 	pgprot_t set_mask;
@@ -36,6 +39,66 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_CHANGE_PAGEATTR
+static int check_address(unsigned long addr)
+{
+	pgd_t *pgd = pgd_offset_k(addr);
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	int ret = -EFAULT;
+
+	if (pgd_none(*pgd))
+		goto out;
+
+	pud = pud_offset(pgd, addr);
+	if (pud_none(*pud))
+		goto out;
+
+	if (pud_sect(*pud)) {
+		pmd = pmd_alloc_one(&init_mm, addr);
+		if (!pmd) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		split_pud(pud, pmd);
+		pud_populate(&init_mm, pud, pmd);
+	}
+
+	pmd = pmd_offset(pud, addr);
+	if (pmd_none(*pmd))
+		goto out;
+
+	if (pmd_sect(*pmd)) {
+		pte = pte_alloc_one_kernel(&init_mm, addr);
+		if (!pte) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		split_pmd(pmd, pte);
+		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
+	}
+
+	pte = pte_offset_kernel(pmd, addr);
+	if (pte_none(*pte))
+		goto out;
+
+	flush_tlb_all();
+	ret = 0;
+
+out:
+	return ret;
+}
+#else
+static int check_address(unsigned long addr)
+{
+	if (addr < MODULES_VADDR || addr >= MODULES_END)
+		return -EINVAL;
+
+	return 0;
+}
+#endif
+
 static int change_memory_common(unsigned long addr, int numpages,
 				pgprot_t set_mask, pgprot_t clear_mask)
 {
@@ -45,17 +108,18 @@ static int change_memory_common(unsigned long addr, int numpages,
 	int ret;
 	struct page_change_data data;
 
+	if (addr < PAGE_OFFSET && !is_vmalloc_addr((void *)addr))
+		return -EINVAL;
+
 	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
 		start &= PAGE_MASK;
 		end = start + size;
 		WARN_ON_ONCE(1);
 	}
 
-	if (start < MODULES_VADDR || start >= MODULES_END)
-		return -EINVAL;
-
-	if (end < MODULES_VADDR || end >= MODULES_END)
-		return -EINVAL;
+	ret = check_address(addr);
+	if (ret)
+		return ret;
 
 	data.set_mask = set_mask;
 	data.clear_mask = clear_mask;
