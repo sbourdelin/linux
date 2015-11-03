@@ -105,9 +105,9 @@ MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(IBMVSCSI_VERSION);
 
-module_param_named(max_id, max_id, int, S_IRUGO | S_IWUSR);
+module_param_named(max_id, max_id, int, S_IRUGO);
 MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
-module_param_named(max_channel, max_channel, int, S_IRUGO | S_IWUSR);
+module_param_named(max_channel, max_channel, int, S_IRUGO);
 MODULE_PARM_DESC(max_channel, "Largest channel value");
 module_param_named(init_timeout, init_timeout, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(init_timeout, "Initialization timeout in seconds");
