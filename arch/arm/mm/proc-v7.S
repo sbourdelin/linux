@@ -351,6 +351,17 @@ __ca9_errata:
 #endif
 	b	__errata_finish
 
+__ca12_errata:
+#ifdef CONFIG_ARM_ERRATA_818325
+	teq	r6, #0x00			@ present in r0p0
+	teqne	r6, #0x01			@ present in r0p1-00lac0-rc11
+	mrceq	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orreq	r10, r10, #1 << 12		@ set bit #12
+	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+	isb
+#endif
+	b	__errata_finish
+
 __ca15_errata:
 #ifdef CONFIG_ARM_ERRATA_773022
 	cmp	r6, #0x4			@ only present up to r0p4
@@ -438,6 +449,11 @@ __v7_setup_cont:
 	ldr	r10, =0x00000c09		@ Cortex-A9 primary part number
 	teq	r0, r10
 	beq	__ca9_errata
+
+	/* Cortex-A12 Errata */
+	ldr	r10, =0x00000c0d		@ Cortex-A12 primary part number
+	teq	r0, r10
+	beq	__ca12_errata
 
 	/* Cortex-A15 Errata */
 	ldr	r10, =0x00000c0f		@ Cortex-A15 primary part number
