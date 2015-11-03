@@ -7872,7 +7872,7 @@ static void nfs4_layoutget_done(struct rpc_task *task, void *calldata)
 			spin_unlock(&inode->i_lock);
 		goto out_restart;
 	}
-	if (nfs4_async_handle_error(task, server, state, NULL) == -EAGAIN)
+	if (nfs4_async_handle_error(task, server, state, &lgp->timeout) == -EAGAIN)
 		goto out_restart;
 out:
 	dprintk("<-- %s\n", __func__);
@@ -7990,6 +7990,7 @@ nfs4_proc_layoutget(struct nfs4_layoutget *lgp, gfp_t gfp_flags)
 	lgp->res.layoutp = &lgp->args.layout;
 	lgp->res.seq_res.sr_slot = NULL;
 	nfs4_init_sequence(&lgp->args.seq_args, &lgp->res.seq_res, 0);
+	lgp->timeout = 0;
 
 	task = rpc_run_task(&task_setup_data);
 	if (IS_ERR(task))
