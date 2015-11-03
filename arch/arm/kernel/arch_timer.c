@@ -28,6 +28,7 @@ static void __init arch_timer_delay_timer_register(void)
 	/* Use the architected timer for the delay loop. */
 	arch_delay_timer.read_current_timer = arch_timer_read_counter_long;
 	arch_delay_timer.freq = arch_timer_get_rate();
+	arch_delay_timer.rating = 400;
 	register_current_timer_delay(&arch_delay_timer);
 }
 
