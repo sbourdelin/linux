@@ -51,7 +51,7 @@ accompanied by a corresponding "operating-points-names" property, to uniquely
 identify the OPP tables.
 
 If required, this can be extended for SoC vendor specfic bindings. Such bindings
-should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
+should be documented as Documentation/devicetree/bindings/opp/<vendor>-opp.txt
 and should have a compatible description like: "operating-points-v2-<vendor>".
 
 Optional properties:
