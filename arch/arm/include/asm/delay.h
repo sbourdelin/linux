@@ -18,6 +18,7 @@
 struct delay_timer {
 	unsigned long (*read_current_timer)(void);
 	unsigned long freq;
+	int rating;
 };
 
 extern struct arm_delay_ops {

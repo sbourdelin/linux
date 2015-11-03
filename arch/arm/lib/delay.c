@@ -38,6 +38,7 @@ struct arm_delay_ops arm_delay_ops = {
 static const struct delay_timer *delay_timer;
 static bool delay_calibrated;
 static u64 delay_res;
+static int delay_rating;
 
 int read_current_timer(unsigned long *timer_val)
 {
@@ -78,6 +79,7 @@ void __init register_current_timer_delay(const struct delay_timer *timer)
 {
 	u32 new_mult, new_shift;
 	u64 res;
+	bool update_delay_ops = false;
 
 	clocks_calc_mult_shift(&new_mult, &new_shift, timer->freq,
 			       NSEC_PER_SEC, 3600);
@@ -89,11 +91,23 @@ void __init register_current_timer_delay(const struct delay_timer *timer)
 		return;
 	}
 
-	if (!delay_calibrated && (!delay_res || (res < delay_res))) {
+	if (!delay_calibrated) {
+		if (delay_rating && timer->rating &&
+				delay_rating != timer->rating) {
+			if (timer->rating > delay_rating)
+				update_delay_ops = true;
+		} else {
+			if (!delay_res || (res < delay_res))
+				update_delay_ops = true;
+		}
+	}
+
+	if (update_delay_ops) {
 		pr_info("Switching to timer-based delay loop, resolution %lluns\n", res);
 		delay_timer			= timer;
 		lpj_fine			= timer->freq / HZ;
 		delay_res			= res;
+		delay_rating			= timer->rating;
 
 		/* cpufreq may scale loops_per_jiffy, so keep a private copy */
 		arm_delay_ops.ticks_per_jiffy	= lpj_fine;
