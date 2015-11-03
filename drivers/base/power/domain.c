@@ -1730,6 +1730,21 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 }
 EXPORT_SYMBOL_GPL(pm_genpd_init);
 
+/**
+ * pm_genpd_uninit - Uninitialize a generic I/O PM domain object.
+ * @genpd: PM domain object to initialize.
+ */
+void pm_genpd_uninit(struct generic_pm_domain *genpd)
+{
+	if (IS_ERR_OR_NULL(genpd))
+		return;
+
+	mutex_lock(&gpd_list_lock);
+	list_del(&genpd->gpd_list_node);
+	mutex_unlock(&gpd_list_lock);
+}
+EXPORT_SYMBOL_GPL(pm_genpd_uninit);
+
 #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
 /*
  * Device Tree based PM domain providers.

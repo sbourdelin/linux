@@ -143,6 +143,7 @@ extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
 extern int pm_genpd_name_detach_cpuidle(const char *name);
 extern void pm_genpd_init(struct generic_pm_domain *genpd,
 			  struct dev_power_governor *gov, bool is_off);
+extern void pm_genpd_uninit(struct generic_pm_domain *genpd);
 
 extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
 extern int pm_genpd_name_poweron(const char *domain_name);
@@ -210,6 +211,9 @@ static inline int pm_genpd_name_detach_cpuidle(const char *name)
 }
 static inline void pm_genpd_init(struct generic_pm_domain *genpd,
 				 struct dev_power_governor *gov, bool is_off)
+{
+}
+static inline void pm_genpd_uninit(struct generic_pm_domain *genpd)
 {
 }
 static inline int pm_genpd_poweron(struct generic_pm_domain *genpd)
