@@ -6,8 +6,7 @@ targets := vmlinux.bin vmlinux.bin.gz uImage
 
 OBJCOPYFLAGS= -O binary -R .note -R .note.gnu.build-id -R .comment -S
 
-LINUX_START_TEXT = $$(readelf -h vmlinux | \
-			grep "Entry point address" | grep -o 0x.*)
+LINUX_START_TEXT = $$(readelf -s vmlinux | grep _stext | awk '{print $$2}')
 
 UIMAGE_LOADADDR    = $(CONFIG_LINUX_LINK_BASE)
 UIMAGE_ENTRYADDR   = $(LINUX_START_TEXT)
