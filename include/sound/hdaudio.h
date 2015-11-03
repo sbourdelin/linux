@@ -15,6 +15,7 @@
 
 /* codec node id */
 typedef u16 hda_nid_t;
+typedef u8 hda_dev_t;
 
 struct hdac_bus;
 struct hdac_stream;
