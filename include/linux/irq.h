@@ -19,6 +19,7 @@
 #include <linux/irqreturn.h>
 #include <linux/irqnr.h>
 #include <linux/errno.h>
+#include <linux/slab.h>
 #include <linux/topology.h>
 #include <linux/wait.h>
 #include <linux/io.h>
@@ -126,6 +127,25 @@ enum {
 
 struct msi_desc;
 struct irq_domain;
+
+/**
+ * struct ipi_mask - IPI mask information
+ * @nbits: number of bits in cpumask
+ * @global: whether the mask is SMP IPI ie: subset of cpu_possible_mask or not
+ * @cpumask: cpumask to be used when the ipi_mask is global
+ * @cpu_bitmap: the cpu bitmap to use when the ipi_mask is not global
+ *
+ * ipi_mask is similar to cpumask, but it provides nbits that's configurable
+ * rather than fixed to NR_CPUS.
+ */
+struct ipi_mask {
+	unsigned int	nbits;
+	bool		global;
+	union {
+		struct cpumask	cpumask;
+		unsigned long	cpu_bitmap[0];
+	};
+};
 
 /**
  * struct irq_common_data - per irq data shared by all irqchips
@@ -932,6 +952,54 @@ static inline u32 irq_reg_readl(struct irq_chip_generic *gc,
 		return gc->reg_readl(gc->reg_base + reg_offset);
 	else
 		return readl(gc->reg_base + reg_offset);
+}
+
+static inline const unsigned long *ipi_mask_bits(const struct ipi_mask *ipimask)
+{
+	if (ipimask->global)
+		return cpumask_bits(&ipimask->cpumask);
+	else
+		return ipimask->cpu_bitmap;
+}
+
+static inline unsigned int ipi_mask_weight(const struct ipi_mask *ipimask)
+{
+	if (ipimask->global)
+		return cpumask_weight(&ipimask->cpumask);
+	else
+		return bitmap_weight(ipimask->cpu_bitmap, ipimask->nbits);
+}
+
+static inline void ipi_mask_copy(struct ipi_mask *dst,
+				 const struct ipi_mask *src)
+{
+	dst->nbits = src->nbits;
+	dst->global = src->global;
+
+	if (src->global)
+		return cpumask_copy(&dst->cpumask, &src->cpumask);
+	else
+		return bitmap_copy(dst->cpu_bitmap,
+					src->cpu_bitmap, src->nbits);
+}
+
+static inline struct ipi_mask *ipi_mask_alloc(unsigned int nbits)
+{
+	size_t size = sizeof(struct ipi_mask) + BITS_TO_LONGS(nbits);
+	return kzalloc(size, GFP_KERNEL);
+}
+
+static inline void ipi_mask_free(struct ipi_mask *ipimask)
+{
+	kfree(ipimask);
+}
+
+static inline void ipi_mask_set_cpumask(struct ipi_mask *ipimask,
+					const struct cpumask *cpumask)
+{
+	ipimask->nbits = NR_CPUS;
+	ipimask->global = true;
+	cpumask_copy(&ipimask->cpumask, cpumask);
 }
 
 #endif /* _LINUX_IRQ_H */
