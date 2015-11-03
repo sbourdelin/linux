@@ -295,9 +295,6 @@ struct vgic_v3_cpu_if {
 };
 
 struct vgic_cpu {
-	/* per IRQ to LR mapping */
-	u8		*vgic_irq_lr_map;
-
 	/* Pending/active/both interrupts on this VCPU */
 	DECLARE_BITMAP(pending_percpu, VGIC_NR_PRIVATE_IRQS);
 	DECLARE_BITMAP(active_percpu, VGIC_NR_PRIVATE_IRQS);
