@@ -73,6 +73,7 @@ xfs_xattr_set(struct dentry *dentry, const char *name, const void *value,
 		return xfs_attr_remove(ip, (unsigned char *)name, xflags);
 	error = xfs_attr_set(ip, (unsigned char *)name,
 				(void *)value, size, xflags);
+#ifdef CONFIG_XFS_POSIX_ACL
 	/*
 	 * Invalidate any cached ACLs if the user has bypassed the ACL
 	 * interface. We don't validate the content whatsoever so it is caller
@@ -85,6 +86,7 @@ xfs_xattr_set(struct dentry *dentry, const char *name, const void *value,
 		else if (!strncmp(name, SGI_ACL_DEFAULT, strlen(name)))
 			forget_cached_acl(VFS_I(ip), ACL_TYPE_DEFAULT);
 	}
+#endif
 
 	return error;
 }
