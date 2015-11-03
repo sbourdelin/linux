@@ -8902,7 +8902,7 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
-	u32 secondary_exec_ctl = vmx_secondary_exec_control(vmx);
+	u32 secondary_exec_ctl = vmcs_read32(SECONDARY_VM_EXEC_CONTROL);
 
 	if (vmx_rdtscp_supported()) {
 		bool rdtscp_enabled = guest_cpuid_has_rdtscp(vcpu);
