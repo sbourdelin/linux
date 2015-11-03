@@ -51,6 +51,7 @@ struct watchdog_device {
 	const struct watchdog_ops *ops;
 	unsigned int bootstatus;
 	unsigned int timeout;
+	unsigned int pretimeout;
 	unsigned int min_timeout;
 	unsigned int max_timeout;
 	void *driver_data;
@@ -73,6 +74,7 @@ It contains following fields:
   additional information about the watchdog timer itself. (Like it's unique name)
 * ops: a pointer to the list of watchdog operations that the watchdog supports.
 * timeout: the watchdog timer's timeout value (in seconds).
+* pretimeout:	The watchdog devices pre_timeout value.
 * min_timeout: the watchdog timer's minimum timeout value (in seconds).
 * max_timeout: the watchdog timer's maximum timeout value (in seconds).
 * bootstatus: status of the device after booting (reported with watchdog
@@ -99,6 +101,7 @@ struct watchdog_ops {
 	int (*ping)(struct watchdog_device *);
 	unsigned int (*status)(struct watchdog_device *);
 	int (*set_timeout)(struct watchdog_device *, unsigned int);
+	int (*set_pretimeout)(struct watchdog_device *, unsigned int);
 	unsigned int (*get_timeleft)(struct watchdog_device *);
 	void (*ref)(struct watchdog_device *);
 	void (*unref)(struct watchdog_device *);
@@ -162,6 +165,15 @@ they are supported. These optional routines/operations are:
   achieved timeout value (which may be different from the requested one
   because the watchdog does not necessarily has a 1 second resolution).
   (Note: the WDIOF_SETTIMEOUT needs to be set in the options field of the
+  watchdog's info structure).
+* set_pretimeout: this routine check and changes the pre_timeout value of
+  the watchdog, because some watchdog device can trigger the pre_timeout
+  interrupt before watchdog timeout event happened, so that we have chance
+  to save some critical information or something else before watchdog
+  triggered. The pre_timeout value means the number of seconds before
+  watchdog timeout.It returns 0 on success, -EINVAL for "parameter out
+  of range" and and -EIO for "could not write value to the watchdog".
+  (Note: the WDIOF_SETPRETIMEOUT needs to be set in the options field of the
   watchdog's info structure).
 * get_timeleft: this routines returns the time that's left before a reset.
 * ref: the operation that calls kref_get on the kref of a dynamically
