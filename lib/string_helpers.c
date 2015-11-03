@@ -43,38 +43,40 @@ void string_get_size(u64 size, u64 blk_size, const enum string_size_units units,
 		[STRING_UNITS_10] = 1000,
 		[STRING_UNITS_2] = 1024,
 	};
-	int i, j;
-	u32 remainder = 0, sf_cap, exp;
+	static const unsigned int rounding[] = { 500, 50, 5, 0};
+	int i = 0, j;
+	u32 remainder = 0, sf_cap;
 	char tmp[8];
 	const char *unit;
 
 	tmp[0] = '\0';
-	i = 0;
-	if (!size)
+
+	if (blk_size == 0)
+		size = 0;
+	if (size == 0)
 		goto out;
 
-	while (blk_size >= divisor[units]) {
-		remainder = do_div(blk_size, divisor[units]);
-		i++;
-	}
-
-	exp = divisor[units] / (u32)blk_size;
-	/*
-	 * size must be strictly greater than exp here to ensure that remainder
-	 * is greater than divisor[units] coming out of the if below.
+	/* This is napier's algorithm.  Reduce the original block size to
+	 *
+	 * coefficient * divisor[units]^i
+	 *
+	 * we do the reduction so both coefficients are just under 32 bits so
+	 * that multiplying them together won't overflow 64 bits and we keep
+	 * as much precision as possible in the numbers
 	 */
-	if (size > exp) {
-		remainder = do_div(size, divisor[units]);
-		remainder *= blk_size;
+
+	while (blk_size >= UINT_MAX)
 		i++;
-	} else {
-		remainder *= size;
-	}
+
+	while (size >= UINT_MAX)
+		i++;
+
+	/* now perform the actual multiplication keeping i as the sum of the
+	 * two logarithms */
 
 	size *= blk_size;
-	size += remainder / divisor[units];
-	remainder %= divisor[units];
 
+	/* and logarithmically reduce it until it's just under the divisor */
 	while (size >= divisor[units]) {
 		remainder = do_div(size, divisor[units]);
 		i++;
@@ -84,9 +86,20 @@ void string_get_size(u64 size, u64 blk_size, const enum string_size_units units,
 	for (j = 0; sf_cap*10 < 1000; j++)
 		sf_cap *= 10;
 
+	/* express the remainder as a decimal (it's currently the numerator of
+	 * a fraction whose denominator is divisor[units]) */
+	remainder *= 1000;
+	remainder /= divisor[units];
+
+	/* add a 5 to the digit below what will be printed to ensure
+	 * an arithmetical round up and carry it through to size */
+	remainder += rounding[j];
+	if (remainder >= 1000) {
+		remainder -= 1000;
+		size += 1;
+	}
+
 	if (j) {
-		remainder *= 1000;
-		remainder /= divisor[units];
 		snprintf(tmp, sizeof(tmp), ".%03u", remainder);
 		tmp[j+1] = '\0';
 	}
