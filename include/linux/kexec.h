@@ -63,7 +63,11 @@
 #define KEXEC_NOTE_HEAD_BYTES ALIGN(sizeof(struct elf_note), 4)
 #define KEXEC_CORE_NOTE_NAME "CORE"
 #define KEXEC_CORE_NOTE_NAME_BYTES ALIGN(sizeof(KEXEC_CORE_NOTE_NAME), 4)
+#ifdef CONFIG_BINFMT_ELF_FDPIC
+#define KEXEC_CORE_NOTE_DESC_BYTES ALIGN(sizeof(struct elf_fdpic_prstatus), 4)
+#else
 #define KEXEC_CORE_NOTE_DESC_BYTES ALIGN(sizeof(struct elf_prstatus), 4)
+#endif
 /*
  * The per-cpu notes area is a list of notes terminated by a "NULL"
  * note header.  For kdump, the code in vmcore.c runs in the context
