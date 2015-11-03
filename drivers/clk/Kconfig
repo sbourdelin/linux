@@ -93,6 +93,14 @@ config COMMON_CLK_CDCE925
 	  Given a target output frequency, the driver will set the PLL and
 	  divider to best approximate the desired output.
 
+config COMMON_CLK_CDCE706
+	tristate "Clock driver for TI CDCE706 clock synthesizer"
+	depends on I2C
+	select REGMAP_I2C
+	select RATIONAL
+	help
+	  This driver supports TI CDCE706 programmable 3-PLL clock synthesizer.
+
 config COMMON_CLK_S2MPS11
 	tristate "Clock driver for S2MPS1X/S5M8767 MFD"
 	depends on MFD_SEC_CORE
@@ -155,14 +163,6 @@ config COMMON_CLK_PXA
 	def_bool COMMON_CLK && ARCH_PXA
 	help
 	  Support for the Marvell PXA SoC.
-
-config COMMON_CLK_CDCE706
-	tristate "Clock driver for TI CDCE706 clock synthesizer"
-	depends on I2C
-	select REGMAP_I2C
-	select RATIONAL
-	help
-	  This driver supports TI CDCE706 programmable 3-PLL clock synthesizer.
 
 source "drivers/clk/bcm/Kconfig"
 source "drivers/clk/hisilicon/Kconfig"
