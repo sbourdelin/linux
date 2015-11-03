@@ -1344,6 +1344,7 @@ static int arm_smmu_add_platform_device(struct device *dev)
 	struct iommu_group *group;
 	struct arm_smmu_master *master;
 	struct arm_smmu_device *smmu = find_smmu_for_device(dev);
+	int ret;
 
 	if (!smmu)
 		return -ENODEV;
@@ -1358,7 +1359,11 @@ static int arm_smmu_add_platform_device(struct device *dev)
 		return PTR_ERR(group);
 
 	iommu_group_set_iommudata(group, &master->cfg, NULL);
-	return iommu_group_add_device(group, dev);
+
+	ret = iommu_group_add_device(group, dev);
+	iommu_group_put(group);
+
+	return ret;
 }
 
 static int arm_smmu_add_device(struct device *dev)
