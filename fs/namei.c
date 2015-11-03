@@ -913,18 +913,19 @@ static inline int may_follow_link(struct nameidata *nd)
 }
 
 /**
- * safe_hardlink_source - Check for safe hardlink conditions
+ * safe_hardlink_source_uid - Check for safe hardlink conditions not dependent
+ * on the inode's group. These conditions may be overridden by inode ownership
+ * or CAP_FOWNER with respect to the inode's uid
  * @inode: the source inode to hardlink from
  *
  * Return false if at least one of the following conditions:
  *    - inode is not a regular file
  *    - inode is setuid
- *    - inode is setgid and group-exec
  *    - access failure for read and write
  *
  * Otherwise returns true.
  */
-static bool safe_hardlink_source(struct inode *inode)
+static bool safe_hardlink_source_uid(struct inode *inode)
 {
 	umode_t mode = inode->i_mode;
 
@@ -936,12 +937,29 @@ static bool safe_hardlink_source(struct inode *inode)
 	if (mode & S_ISUID)
 		return false;
 
-	/* Executable setgid files should not get pinned to the filesystem. */
-	if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP))
-		return false;
-
 	/* Hardlinking to unreadable or unwritable sources is dangerous. */
 	if (inode_permission(inode, MAY_READ | MAY_WRITE))
+		return false;
+
+	return true;
+}
+
+/**
+ * safe_hardlink_source_gid - Check for safe hardlink conditions dependent
+ * on the inode's group. These conditions may be overridden by inode ownership
+ * or CAP_FOWNER with respect to the inode's gid
+ * @inode: the source inode to hardlink from
+ *
+ * Return false if inode is setgid and group-exec
+ *
+ * Otherwise returns true.
+ */
+static bool safe_hardlink_source_gid(struct inode *inode)
+{
+	umode_t mode = inode->i_mode;
+
+	/* Executable setgid files should not get pinned to the filesystem. */
+	if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP))
 		return false;
 
 	return true;
@@ -954,24 +972,35 @@ static bool safe_hardlink_source(struct inode *inode)
  * Block hardlink when all of:
  *  - sysctl_protected_hardlinks enabled
  *  - fsuid does not match inode
- *  - hardlink source is unsafe (see safe_hardlink_source() above)
+ *  - hardlink source is unsafe (see safe_hardlink_source_*() above)
  *  - not CAP_FOWNER in a namespace with the inode owner uid mapped
+ *    (and inode gid mapped, if hardlink conditions depending on the inode's
+ *    group are not satisfied)
  *
  * Returns 0 if successful, -ve on error.
  */
 static int may_linkat(struct path *link)
 {
 	struct inode *inode;
+	struct user_namespace *ns;
+	bool owner;
+	bool safe_uid;
+	bool safe_gid;
 
 	if (!sysctl_protected_hardlinks)
 		return 0;
 
 	inode = link->dentry->d_inode;
+	ns = current_user_ns();
 
 	/* Source inode owner (or CAP_FOWNER) can hardlink all they like,
 	 * otherwise, it must be a safe source.
 	 */
-	if (inode_owner_or_capable(inode) || safe_hardlink_source(inode))
+	owner = inode_owner_or_capable(inode);
+	safe_uid = safe_hardlink_source_uid(inode) || owner;
+	safe_gid = safe_hardlink_source_gid(inode) ||
+			(owner && kgid_has_mapping(ns, inode->i_gid));
+	if (safe_uid && safe_gid)
 		return 0;
 
 	audit_log_link_denied("linkat", link);
