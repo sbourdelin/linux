@@ -10,6 +10,18 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <linux/err.h>
+
+#define LIBBPF_ERRNO__START	4000
+#define LIBBPF_ERRNO__ELIBELF	4000	/* Something wrong in libelf */
+#define LIBBPF_ERRNO__EFORMAT	4001	/* BPF object format invalid */
+#define LIBBPF_ERRNO__EKVERSION	4002	/* Incorrect or no 'version' section */
+#define LIBBPF_ERRNO__EENDIAN	4003	/* Endian missmatch */
+#define LIBBPF_ERRNO__EINTERNAL	4004	/* Internal error in libbpf */
+#define LIBBPF_ERRNO__ERELOC	4005	/* Relocation failed */
+#define LIBBPF_ERRNO__ELOAD	4006	/* Failed to load program */
+
+int libbpf_strerror(int err, char *buf, size_t size);
 
 /*
  * In include/linux/compiler-gcc.h, __printf is defined. However
