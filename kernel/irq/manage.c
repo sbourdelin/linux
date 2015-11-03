@@ -2001,3 +2001,89 @@ int irq_set_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
 	return err;
 }
 EXPORT_SYMBOL_GPL(irq_set_irqchip_state);
+
+/**
+ *	irq_alloc_ipi_mapping - allocate memory for struct ipi_mapping
+ *	@nr_cpus: number of CPUs the mapping will have
+ *
+ *	Will allocate and setup ipi_mapping structure.
+ *
+ *	Returns a valid ipi_mapping pointer on success and NULL on error.
+ */
+struct ipi_mapping *irq_alloc_ipi_mapping(unsigned int nr_cpus)
+{
+	struct ipi_mapping *map;
+	int i;
+
+	map = kzalloc(sizeof(struct ipi_mapping) +
+			BITS_TO_LONGS(nr_cpus), GFP_KERNEL);
+	if (!map)
+		return NULL;
+
+	map->nr_cpus = nr_cpus;
+
+	memset(map->cpumap, INVALID_HWIRQ, nr_cpus);
+
+	return map;
+}
+
+/**
+ *	irq_free_ipi_mapping - release mempry associated with ipi_mapping struct
+ *	@map: pointer to struct ipi_mapping to be freed
+ *
+ *	Release the memory allocated for sturct ipi_mapping to the system.
+ */
+void irq_free_ipi_mapping(struct ipi_mapping *map)
+{
+	kfree(map);
+}
+
+/**
+ *	irq_map_ipi - create a CPU to HWIRQ mapping for an IPI
+ *	@map: pointer to the mapping structure
+ *	@cpu: the CPU to map
+ *	@hwirq: the HWIRQ to associate with @cpu
+ *
+ *	Returns zero on success and negative error number on failure.
+ */
+int irq_map_ipi(struct ipi_mapping *map,
+		unsigned int cpu, irq_hw_number_t hwirq)
+{
+	if (cpu >= map->nr_cpus)
+		return -EINVAL;
+
+	map->cpumap[cpu] = hwirq;
+	map->nr_hwirqs++;
+
+	return 0;
+}
+
+/**
+ *	irq_unmap_ipi - remove the CPU mapping of an IPI
+ *	@map: pointer to the mapping structure
+ *	@cpu: the CPU to be unmapped
+ *	@hwirq: pointer to HWIRQ to be filled with old value before unampping
+ *
+ *	Mark the IPI mapping of a CPU to INVALID_HWIRQ setting @hwirq to the
+ *	old value before unamapping. This old value might be required by the
+ *	caller to return it to the pool of IPIs in a dynamic system.
+ *
+ *	Returns zero on success and negative error number on failure.
+ */
+int irq_unmap_ipi(struct ipi_mapping *map,
+		  unsigned int cpu, irq_hw_number_t *hwirq)
+{
+	if (cpu >= map->nr_cpus)
+		return -EINVAL;
+
+	if (map->cpumap[cpu] == INVALID_HWIRQ)
+		return -EINVAL;
+
+	if (hwirq)
+		*hwirq = map->cpumap[cpu];
+
+	map->cpumap[cpu] = INVALID_HWIRQ;
+	map->nr_hwirqs--;
+
+	return 0;
+}

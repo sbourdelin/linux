@@ -1008,4 +1008,25 @@ static inline void ipi_mask_set_cpumask(struct ipi_mask *ipimask,
 	cpumask_copy(&ipimask->cpumask, cpumask);
 }
 
+#define INVALID_HWIRQ	-1
+
+/**
+ * struct ipi_mapping - IPI mapping information object
+ * @nr_hwirqs: number of hwirqs mapped
+ * @nr_cpus: number of cpus the controller can talk to
+ * @cpumap: per cpu hwirq mapping table
+ */
+struct ipi_mapping {
+	unsigned int nr_hwirqs;
+	unsigned int nr_cpus;
+	unsigned int cpumap[];
+};
+
+struct ipi_mapping *irq_alloc_ipi_mapping(unsigned int nr_cpus);
+void irq_free_ipi_mapping(struct ipi_mapping *map);
+int irq_map_ipi(struct ipi_mapping *map,
+		unsigned int cpu, irq_hw_number_t hwirq);
+int irq_unmap_ipi(struct ipi_mapping *map,
+		  unsigned int cpu, irq_hw_number_t *hwirq);
+
 #endif /* _LINUX_IRQ_H */
