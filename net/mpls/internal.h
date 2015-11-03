@@ -41,6 +41,7 @@ enum mpls_payload_type {
 
 struct mpls_nh { /* next hop label forwarding entry */
 	struct net_device __rcu *nh_dev;
+	unsigned int		nh_flags;
 	u32			nh_label[MAX_NEW_LABELS];
 	u8			nh_labels;
 	u8			nh_via_alen;
@@ -70,10 +71,12 @@ struct mpls_nh { /* next hop label forwarding entry */
  */
 struct mpls_route { /* next hop label forwarding entry */
 	struct rcu_head		rt_rcu;
+	unsigned int		rt_flags;
 	u8			rt_protocol;
 	u8			rt_payload_type;
 	u8			rt_max_alen;
 	unsigned int		rt_nhn;
+	unsigned int		rt_nhn_alive;
 	struct mpls_nh		rt_nh[0];
 };
 
