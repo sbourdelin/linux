@@ -3584,6 +3584,12 @@ int btrfs_balance(struct btrfs_balance_control *bctl,
 		}
 	} while (read_seqretry(&fs_info->profiles_lock, seq));
 
+	if (btrfs_get_num_tolerated_disk_barrier_failures(bctl->meta.target) <
+		btrfs_get_num_tolerated_disk_barrier_failures(bctl->data.target)) {
+		btrfs_info(fs_info,
+			"Warning: metatdata has lower redundancy than data\n");
+	}
+
 	if (bctl->sys.flags & BTRFS_BALANCE_ARGS_CONVERT) {
 		fs_info->num_tolerated_disk_barrier_failures = min(
 			btrfs_calc_num_tolerated_disk_barrier_failures(fs_info),
