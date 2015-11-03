@@ -164,6 +164,7 @@ struct irq_common_data {
 	void			*handler_data;
 	struct msi_desc		*msi_desc;
 	cpumask_var_t		affinity;
+	struct ipi_mask		*ipi_mask;
 };
 
 /**
@@ -687,6 +688,11 @@ static inline int irq_common_data_get_node(struct irq_common_data *d)
 static inline int irq_data_get_node(struct irq_data *d)
 {
 	return irq_common_data_get_node(d->common);
+}
+
+static inline struct cpumask *irq_data_get_ipi_mask(struct irq_data *d)
+{
+	return &d->common->ipi_mask->cpumask;
 }
 
 static inline struct cpumask *irq_get_affinity_mask(int irq)
