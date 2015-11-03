@@ -1032,4 +1032,7 @@ int irq_map_ipi(struct ipi_mapping *map,
 int irq_unmap_ipi(struct ipi_mapping *map,
 		  unsigned int cpu, irq_hw_number_t *hwirq);
 
+int __irq_desc_send_ipi(struct irq_desc *desc, const struct ipi_mask *dest);
+int irq_send_ipi(unsigned int virq, const struct ipi_mask *dest);
+
 #endif /* _LINUX_IRQ_H */

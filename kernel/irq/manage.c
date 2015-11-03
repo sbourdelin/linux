@@ -2013,7 +2013,6 @@ EXPORT_SYMBOL_GPL(irq_set_irqchip_state);
 struct ipi_mapping *irq_alloc_ipi_mapping(unsigned int nr_cpus)
 {
 	struct ipi_mapping *map;
-	int i;
 
 	map = kzalloc(sizeof(struct ipi_mapping) +
 			BITS_TO_LONGS(nr_cpus), GFP_KERNEL);
@@ -2087,3 +2086,69 @@ int irq_unmap_ipi(struct ipi_mapping *map,
 
 	return 0;
 }
+
+/**
+ *	__irq_desc_send_ipi - send an IPI to target CPU(s)
+ *	@irq_desc: pointer to irq_desc of the IRQ
+ *	@dest: dest CPU(s), must be the same or a subset of the mask passed to
+ *	       irq_reserve_ipi()
+ *
+ *	Sends an IPI to all cpus in dest mask.
+ *	This function is meant to be used from arch code to save the need to do
+ *	desc lookup that happens in the generic irq_send_ipi().
+ *
+ *	Returns zero on success and negative error number on failure.
+ */
+int __irq_desc_send_ipi(struct irq_desc *desc, const struct ipi_mask *dest)
+{
+	struct irq_data *data = irq_desc_get_irq_data(desc);
+	struct irq_chip *chip = irq_data_get_irq_chip(data);
+
+	if (!chip || !chip->irq_send_ipi)
+		return -EINVAL;
+
+	if (dest->nbits > data->common->ipi_mask->nbits)
+		return -EINVAL;
+
+	/*
+	 * Do not validate the mask for IPIs marked global. These are
+	 * regular IPIs so we can avoid the operation as their target
+	 * mask is the cpu_possible_mask.
+	 */
+	if (!data->common->ipi_mask->global) {
+		if (dest->global)
+			return -EINVAL;
+
+		if (!bitmap_subset(dest->cpu_bitmap,
+				   data->common->ipi_mask->cpu_bitmap,
+				   dest->nbits))
+			return -EINVAL;
+	} else {
+		if (!dest->global)
+			return -EINVAL;
+	}
+
+	chip->irq_send_ipi(data, dest);
+	return 0;
+}
+
+/**
+ *	irq_send_ipi - send an IPI to target CPU(s)
+ *	@irq: linux irq number from irq_reserve_ipi()
+ *	@dest: dest CPU(s), must be the same or a subset of the mask passed to
+ *	       irq_reserve_ipi()
+ *
+ *	Sends an IPI to all cpus in dest mask.
+ *
+ *	Returns zero on success and negative error number on failure.
+ */
+int irq_send_ipi(unsigned int virq, const struct ipi_mask *dest)
+{
+	struct irq_desc *desc = irq_to_desc(virq);
+
+	if (!desc)
+		return -EINVAL;
+
+	return __irq_desc_send_ipi(desc, dest);
+}
+EXPORT_SYMBOL_GPL(irq_send_ipi);
