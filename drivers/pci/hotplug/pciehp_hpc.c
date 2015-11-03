@@ -755,7 +755,7 @@ static int pcie_init_slot(struct controller *ctrl)
 	mutex_init(&slot->lock);
 	mutex_init(&slot->hotplug_lock);
 	INIT_DELAYED_WORK(&slot->work, pciehp_queue_pushbutton_work);
-	INIT_WORK(&slot->hotplug_work, pciehp_power_thread);
+	INIT_DELAYED_WORK(&slot->hotplug_work, pciehp_power_thread);
 	ctrl->slot = slot;
 	return 0;
 abort:
@@ -767,6 +767,7 @@ static void pcie_cleanup_slot(struct controller *ctrl)
 {
 	struct slot *slot = ctrl->slot;
 	cancel_delayed_work(&slot->work);
+	cancel_delayed_work(&slot->hotplug_work);
 	destroy_workqueue(slot->wq);
 	kfree(slot);
 }
@@ -810,6 +811,8 @@ struct controller *pcie_init(struct pcie_device *dev)
 	pcie_capability_read_dword(pdev, PCI_EXP_LNKCAP, &link_cap);
 	if (link_cap & PCI_EXP_LNKCAP_DLLLARC)
 		ctrl->link_active_reporting = 1;
+	if (pciehp_poweron_delay || dev->port->poweron_delay)
+		ctrl->poweron_delay = 1;
 
 	/* Clear all remaining event bits in Slot Status register */
 	pcie_capability_write_word(pdev, PCI_EXP_SLTSTA,

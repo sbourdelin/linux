@@ -40,6 +40,7 @@
 
 #define MY_NAME	"pciehp"
 
+extern bool pciehp_poweron_delay;
 extern bool pciehp_poll_mode;
 extern int pciehp_poll_time;
 extern bool pciehp_debug;
@@ -78,7 +79,7 @@ struct slot {
 	struct mutex lock;
 	struct mutex hotplug_lock;
 	struct workqueue_struct *wq;
-	struct work_struct hotplug_work;
+	struct delayed_work hotplug_work;
 	u32 hotplug_req;
 	bool disable;			/* true to disable before enable */
 };
@@ -101,6 +102,7 @@ struct controller {
 	unsigned int cmd_busy:1;
 	unsigned int link_active_reporting:1;
 	unsigned int notification_enabled:1;
+	unsigned int poweron_delay:1;
 	unsigned int power_fault_detected;
 };
 

@@ -169,7 +169,8 @@ static int remove_board(struct slot *p_slot)
  */
 void pciehp_power_thread(struct work_struct *work)
 {
-	struct slot *p_slot = container_of(work, struct slot, hotplug_work);
+	struct slot *p_slot = container_of(work, struct slot,
+					   hotplug_work.work);
 	int ret, req;
 	bool disable;
 
@@ -205,17 +206,21 @@ void pciehp_power_thread(struct work_struct *work)
 	}
 }
 
-static void pciehp_queue_power_work(struct slot *p_slot, int req)
+static void pciehp_queue_power_work(struct slot *p_slot, int req, bool delay)
 {
+	int delay_hz = 0;
+
 	if (req == ENABLE_REQ) {
 		p_slot->state = POWERON_STATE;
+		if (delay)
+			delay_hz = HZ;
 	} else {
 		p_slot->state = POWEROFF_STATE;
 		p_slot->disable = true;
 	}
 	p_slot->hotplug_req = req;
 
-	queue_work(p_slot->wq, &p_slot->hotplug_work);
+	mod_delayed_work(p_slot->wq, &p_slot->hotplug_work, delay_hz);
 }
 
 void pciehp_queue_pushbutton_work(struct work_struct *work)
@@ -225,10 +230,10 @@ void pciehp_queue_pushbutton_work(struct work_struct *work)
 	mutex_lock(&p_slot->lock);
 	switch (p_slot->state) {
 	case BLINKINGOFF_STATE:
-		pciehp_queue_power_work(p_slot, DISABLE_REQ);
+		pciehp_queue_power_work(p_slot, DISABLE_REQ, false);
 		break;
 	case BLINKINGON_STATE:
-		pciehp_queue_power_work(p_slot, ENABLE_REQ);
+		pciehp_queue_power_work(p_slot, ENABLE_REQ, false);
 		break;
 	default:
 		break;
@@ -259,7 +264,7 @@ static void handle_button_press_event(struct slot *p_slot)
 		/* blink green LED and turn off amber */
 		pciehp_green_led_blink(p_slot);
 		pciehp_set_attention_status(p_slot, 0);
-		queue_delayed_work(p_slot->wq, &p_slot->work, 5*HZ);
+		mod_delayed_work(p_slot->wq, &p_slot->work, 5*HZ);
 		break;
 	case BLINKINGOFF_STATE:
 	case BLINKINGON_STATE:
@@ -303,9 +308,10 @@ static void handle_surprise_event(struct slot *p_slot)
 
 	pciehp_get_adapter_status(p_slot, &getstatus);
 	if (!getstatus)
-		pciehp_queue_power_work(p_slot, DISABLE_REQ);
+		pciehp_queue_power_work(p_slot, DISABLE_REQ, false);
 	else
-		pciehp_queue_power_work(p_slot, ENABLE_REQ);
+		pciehp_queue_power_work(p_slot, ENABLE_REQ,
+					p_slot->ctrl->poweron_delay);
 }
 
 /*
@@ -322,7 +328,8 @@ static void handle_link_event(struct slot *p_slot, u32 event)
 		/* Fall through */
 	case STATIC_STATE:
 		pciehp_queue_power_work(p_slot, event == INT_LINK_UP ?
-					ENABLE_REQ : DISABLE_REQ);
+					ENABLE_REQ : DISABLE_REQ,
+					ctrl->poweron_delay);
 		break;
 	case POWERON_STATE:
 		if (event == INT_LINK_UP) {
@@ -333,7 +340,7 @@ static void handle_link_event(struct slot *p_slot, u32 event)
 			ctrl_info(ctrl,
 				  "Link Down event queued on slot(%s): currently getting powered on\n",
 				  slot_name(p_slot));
-			pciehp_queue_power_work(p_slot, DISABLE_REQ);
+			pciehp_queue_power_work(p_slot, DISABLE_REQ, false);
 		}
 		break;
 	case POWEROFF_STATE:
@@ -341,7 +348,8 @@ static void handle_link_event(struct slot *p_slot, u32 event)
 			ctrl_info(ctrl,
 				  "Link Up event queued on slot(%s): currently getting powered off\n",
 				  slot_name(p_slot));
-			pciehp_queue_power_work(p_slot, ENABLE_REQ);
+			pciehp_queue_power_work(p_slot, ENABLE_REQ,
+						ctrl->poweron_delay);
 		} else {
 			ctrl_info(ctrl,
 				  "Link Down event ignored on slot(%s): already powering off\n",
