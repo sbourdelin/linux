@@ -11,6 +11,14 @@
 #include "probe-event.h"
 #include "debug.h"
 
+#define BPF_LOADER_ERRNO__START		3900
+#define BPF_LOADER_ERRNO__ECONFIG 	3900 /* Invalid config string */
+#define BPF_LOADER_ERRNO__EGROUP 	3901 /* Invalid group name */
+#define BPF_LOADER_ERRNO__EEVENTNAME	3902 /* Event name is missing */
+#define BPF_LOADER_ERRNO__EINTERNAL	3903 /* BPF loader internal error */
+#define BPF_LOADER_ERRNO__ECOMPILE	3904 /* Error when compiling BPF scriptlet */
+#define BPF_LOADER_ERRNO__END		3905
+
 struct bpf_object;
 #define PERF_BPF_PROBE_GROUP "perf_bpf_probe"
 
@@ -19,6 +27,8 @@ typedef int (*bpf_prog_iter_callback_t)(struct probe_trace_event *tev,
 
 #ifdef HAVE_LIBBPF_SUPPORT
 struct bpf_object *bpf__prepare_load(const char *filename, bool source);
+int bpf__strerror_prepare_load(const char *filename, bool source,
+			       int err, char *buf, size_t size);
 
 void bpf__clear(void);
 
@@ -65,6 +75,14 @@ __bpf_strerror(char *buf, size_t size)
 		size);
 	buf[size - 1] = '\0';
 	return 0;
+}
+
+int bpf__strerror_prepare_load(const char *filename __maybe_unused,
+			       bool source __maybe_unused,
+			       int err __maybe_unused,
+			       char *buf, size_t size)
+{
+	return __bpf_strerror(buf, size);
 }
 
 static inline int
