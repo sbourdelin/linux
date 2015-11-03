@@ -231,7 +231,8 @@ repeat:
 
 static inline void __set_close_on_exec(int fd, struct fdtable *fdt)
 {
-	__set_bit(fd, fdt->close_on_exec);
+	if (!test_bit(fd, fdt->close_on_exec))
+		__set_bit(fd, fdt->close_on_exec);
 }
 
 static inline void __clear_close_on_exec(int fd, struct fdtable *fdt)
@@ -644,7 +645,6 @@ int __close_fd(struct files_struct *files, unsigned fd)
 	if (!file)
 		goto out_unlock;
 	rcu_assign_pointer(fdt->fd[fd], NULL);
-	__clear_close_on_exec(fd, fdt);
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
 	return filp_close(file, files);
@@ -667,7 +667,7 @@ void do_close_on_exec(struct files_struct *files)
 		fdt = files_fdtable(files);
 		if (fd >= fdt->max_fds)
 			break;
-		set = fdt->close_on_exec[i];
+		set = fdt->close_on_exec[i] & fdt->open_fds[i];
 		if (!set)
 			continue;
 		fdt->close_on_exec[i] = 0;
