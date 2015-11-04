@@ -199,12 +199,19 @@ void nfs_inode_reclaim_delegation(struct inode *inode, struct rpc_cred *cred,
 static int nfs_do_return_delegation(struct inode *inode, struct nfs_delegation *delegation, int issync)
 {
 	int res = 0;
+	struct rpc_cred *cred = delegation->cred;
+	struct nfs_server *server = NFS_SERVER(inode);
 
 	if (!test_bit(NFS_DELEGATION_REVOKED, &delegation->flags))
 		res = nfs4_proc_delegreturn(inode,
 				delegation->cred,
 				&delegation->stateid,
 				issync);
+#if defined(CONFIG_NFS_V4_1)
+	else if (server->nfs_client->cl_minorversion)
+		res = nfs41_free_stateid(server, &delegation->stateid,
+					cred, issync);
+#endif /* CONFIG_NFS_V4_1 */
 	nfs_free_delegation(delegation);
 	return res;
 }
