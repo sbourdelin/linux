@@ -85,16 +85,6 @@
 
 static struct spi_driver pcf2123_driver;
 
-struct pcf2123_sysfs_reg {
-	struct device_attribute attr;
-	char name[2];
-};
-
-struct pcf2123_plat_data {
-	struct rtc_device *rtc;
-	struct pcf2123_sysfs_reg regs[16];
-};
-
 /*
  * Causes a 30 nanosecond delay to ensure that the PCF2123 chip select
  * is released properly after an SPI write.  This function should be
@@ -147,17 +137,11 @@ static int pcf2123_write_reg(struct device *dev, u8 reg, u8 val)
 static ssize_t pcf2123_show(struct device *dev, struct device_attribute *attr,
 			    char *buffer)
 {
-	struct pcf2123_sysfs_reg *r;
 	u8 rxbuf[1];
 	unsigned long reg;
 	int ret;
 
-	r = container_of(attr, struct pcf2123_sysfs_reg, attr);
-
-	ret = kstrtoul(r->name, 16, &reg);
-	if (ret)
-		return ret;
-
+	reg = hex_to_bin(attr->attr.name[0]);
 	ret = pcf2123_read(dev, reg, rxbuf, 1);
 	if (ret < 0)
 		return -EIO;
@@ -167,25 +151,19 @@ static ssize_t pcf2123_show(struct device *dev, struct device_attribute *attr,
 
 static ssize_t pcf2123_store(struct device *dev, struct device_attribute *attr,
 			     const char *buffer, size_t count) {
-	struct pcf2123_sysfs_reg *r;
 	unsigned long reg;
 	unsigned long val;
-
 	int ret;
-
-	r = container_of(attr, struct pcf2123_sysfs_reg, attr);
-
-	ret = kstrtoul(r->name, 16, &reg);
-	if (ret)
-		return ret;
 
 	ret = kstrtoul(buffer, 0, &val);
 	if (ret)
 		return ret;
 
+	reg = hex_to_bin(attr->attr.name[0]);
 	pcf2123_write_reg(dev, reg, val);
 	if (ret < 0)
 		return -EIO;
+
 	return count;
 }
 
@@ -321,17 +299,56 @@ static const struct rtc_class_ops pcf2123_rtc_ops = {
 	.set_time	= pcf2123_rtc_set_time,
 };
 
+static DEVICE_ATTR(0, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(1, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(2, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(3, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(4, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(5, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(6, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(7, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(8, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(9, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(a, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(b, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(c, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(d, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(e, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(f, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+
+static struct attribute *pcf2123_attrs[] = {
+	&dev_attr_0.attr,
+	&dev_attr_1.attr,
+	&dev_attr_2.attr,
+	&dev_attr_3.attr,
+	&dev_attr_4.attr,
+	&dev_attr_5.attr,
+	&dev_attr_6.attr,
+	&dev_attr_7.attr,
+	&dev_attr_8.attr,
+	&dev_attr_9.attr,
+	&dev_attr_a.attr,
+	&dev_attr_b.attr,
+	&dev_attr_c.attr,
+	&dev_attr_d.attr,
+	&dev_attr_e.attr,
+	&dev_attr_f.attr,
+	NULL
+};
+
+static const struct attribute_group pcf2123_group = {
+	.attrs = pcf2123_attrs,
+};
+
+static const struct attribute_group *pcf2123_groups[] = {
+	&pcf2123_group,
+	NULL
+};
+
 static int pcf2123_probe(struct spi_device *spi)
 {
 	struct rtc_device *rtc;
-	struct pcf2123_plat_data *pdata;
-	int ret, i;
-
-	pdata = devm_kzalloc(&spi->dev, sizeof(struct pcf2123_plat_data),
-				GFP_KERNEL);
-	if (!pdata)
-		return -ENOMEM;
-	spi->dev.platform_data = pdata;
+	int ret;
 
 	if (!pcf2123_time_valid(&spi->dev)) {
 		ret = pcf2123_reset(&spi->dev);
@@ -355,29 +372,13 @@ static int pcf2123_probe(struct spi_device *spi)
 		goto kfree_exit;
 	}
 
-	pdata->rtc = rtc;
-
-	for (i = 0; i < 16; i++) {
-		sysfs_attr_init(&pdata->regs[i].attr.attr);
-		sprintf(pdata->regs[i].name, "%1x", i);
-		pdata->regs[i].attr.attr.mode = S_IRUGO | S_IWUSR;
-		pdata->regs[i].attr.attr.name = pdata->regs[i].name;
-		pdata->regs[i].attr.show = pcf2123_show;
-		pdata->regs[i].attr.store = pcf2123_store;
-		ret = device_create_file(&spi->dev, &pdata->regs[i].attr);
-		if (ret) {
-			dev_err(&spi->dev, "Unable to create sysfs %s\n",
-				pdata->regs[i].name);
-			goto sysfs_exit;
-		}
-	}
+	ret = sysfs_create_groups(&spi->dev.kobj, pcf2123_groups);
+	if (ret)
+		goto sysfs_exit;
 
 	return 0;
-
 sysfs_exit:
-	for (i--; i >= 0; i--)
-		device_remove_file(&spi->dev, &pdata->regs[i].attr);
-
+	sysfs_remove_groups(&spi->dev.kobj, pcf2123_groups);
 kfree_exit:
 	spi->dev.platform_data = NULL;
 	return ret;
@@ -385,16 +386,7 @@ kfree_exit:
 
 static int pcf2123_remove(struct spi_device *spi)
 {
-	struct pcf2123_plat_data *pdata = dev_get_platdata(&spi->dev);
-	int i;
-
-	if (pdata) {
-		for (i = 0; i < 16; i++)
-			if (pdata->regs[i].name[0])
-				device_remove_file(&spi->dev,
-						   &pdata->regs[i].attr);
-	}
-
+	sysfs_remove_groups(&spi->dev.kobj, pcf2123_groups);
 	return 0;
 }
 
