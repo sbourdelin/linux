@@ -1006,17 +1006,18 @@ static int lynxfb_pci_probe(struct pci_dev *pdev,
 	struct fb_info *info[] = {NULL, NULL};
 	struct sm750_dev *sm750_dev = NULL;
 	int fbidx;
+	int err = -ENOMEM;
 
 	/* enable device */
 	if (pci_enable_device(pdev)) {
 		pr_err("can not enable device.\n");
-		goto err_enable;
+		return -ENODEV;
 	}
 
 	sm750_dev = kzalloc(sizeof(*sm750_dev), GFP_KERNEL);
 	if (!sm750_dev) {
 		pr_err("Could not allocate memory for share.\n");
-		goto err_share;
+		goto err_alloc_dev;
 	}
 
 	sm750_dev->fbinfo[0] = sm750_dev->fbinfo[1] = NULL;
@@ -1051,7 +1052,8 @@ static int lynxfb_pci_probe(struct pci_dev *pdev,
 	sm750fb_setup(sm750_dev, g_settings);
 
 	/* call chip specific mmap routine */
-	if (hw_sm750_map(sm750_dev, pdev)) {
+	err = hw_sm750_map(sm750_dev, pdev);
+	if (err) {
 		pr_err("Memory map failed\n");
 		goto err_map;
 	}
@@ -1082,7 +1084,6 @@ ALLOC_FB:
 			goto err_info1_alloc;
 	} else {
 		struct lynxfb_par *par;
-		int errno;
 
 		pr_info("framebuffer #%d alloc okay\n", fbidx);
 		sm750_dev->fbinfo[fbidx] = info[fbidx];
@@ -1100,11 +1101,11 @@ ALLOC_FB:
 
 		/* register frame buffer */
 		pr_info("Ready to register framebuffer #%d.\n", fbidx);
-		errno = register_framebuffer(info[fbidx]);
-		if (errno < 0) {
+		err = register_framebuffer(info[fbidx]);
+		if (err < 0) {
 			pr_err("Failed to register fb_info #%d. err %d\n",
 			       fbidx,
-			       errno);
+			       err);
 			if (fbidx == 0)
 				goto err_register0;
 			else
@@ -1131,10 +1132,9 @@ err_info0_set:
 err_info0_alloc:
 err_map:
 	kfree(sm750_dev);
-err_share:
+err_alloc_dev:
 	pci_disable_device(pdev);
-err_enable:
-	return -ENODEV;
+	return err;
 }
 
 static void lynxfb_pci_remove(struct pci_dev *pdev)
