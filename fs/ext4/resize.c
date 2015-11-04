@@ -1942,10 +1942,10 @@ retry:
 		err = ext4_convert_meta_bg(sb, resize_inode);
 		if (err)
 			goto out;
-		if (resize_inode) {
-			iput(resize_inode);
-			resize_inode = NULL;
-		}
+
+		iput(resize_inode);
+		resize_inode = NULL;
+
 		if (n_blocks_count_retry) {
 			n_blocks_count = n_blocks_count_retry;
 			n_blocks_count_retry = 0;
@@ -2011,8 +2011,7 @@ retry:
 out:
 	if (flex_gd)
 		free_flex_gd(flex_gd);
-	if (resize_inode != NULL)
-		iput(resize_inode);
+	iput(resize_inode);
 	ext4_msg(sb, KERN_INFO, "resized filesystem to %llu", n_blocks_count);
 	return err;
 }
