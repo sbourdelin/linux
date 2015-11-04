@@ -770,6 +770,9 @@ usage: $P [options] patchfile
        $P [options] -f file|directory
 version: $V
 
+Most options have both positive and negative forms. The negative form of --foo
+is --nofoo.
+
 MAINTAINER field selection options:
   --email => print email address(es) if any
     --git => include recent git \*-by: signers
