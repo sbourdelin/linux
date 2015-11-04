@@ -229,7 +229,7 @@ static int pcf2123_rtc_set_time(struct device *dev, struct rtc_time *tm)
 			tm->tm_mday, tm->tm_mon, tm->tm_year, tm->tm_wday);
 
 	/* Stop the counter first */
-	ret = pcf2123_write_reg(dev, PCF2123_REG_CTRL1, 0x20);
+	ret = pcf2123_write_reg(dev, PCF2123_REG_CTRL1, CTRL1_STOP);
 	if (ret < 0)
 		return ret;
 
@@ -248,7 +248,7 @@ static int pcf2123_rtc_set_time(struct device *dev, struct rtc_time *tm)
 		return ret;
 
 	/* Start the counter */
-	ret = pcf2123_write_reg(dev, PCF2123_REG_CTRL1, 0x00);
+	ret = pcf2123_write_reg(dev, PCF2123_REG_CTRL1, CTRL1_CLEAR);
 	if (ret < 0)
 		return ret;
 
@@ -275,13 +275,13 @@ static int pcf2123_probe(struct spi_device *spi)
 
 	/* Send a software reset command */
 	dev_dbg(&spi->dev, "resetting RTC\n");
-	ret = pcf2123_write_reg(&spi->dev, PCF2123_REG_CTRL1, 0x58);
+	ret = pcf2123_write_reg(&spi->dev, PCF2123_REG_CTRL1, CTRL1_SW_RESET);
 	if (ret < 0)
 		goto kfree_exit;
 
 	/* Stop the counter */
 	dev_dbg(&spi->dev, "stopping RTC\n");
-	ret = pcf2123_write_reg(&spi->dev, PCF2123_REG_CTRL1, 0x20);
+	ret = pcf2123_write_reg(&spi->dev, PCF2123_REG_CTRL1, CTRL1_STOP);
 	if (ret < 0)
 		goto kfree_exit;
 
@@ -293,7 +293,7 @@ static int pcf2123_probe(struct spi_device *spi)
 	if (ret < 0)
 		goto kfree_exit;
 
-	if (!(rxbuf[0] & 0x20)) {
+	if (!(rxbuf[0] & CTRL1_STOP)) {
 		dev_err(&spi->dev, "chip not found\n");
 		ret = -ENODEV;
 		goto kfree_exit;
@@ -304,7 +304,7 @@ static int pcf2123_probe(struct spi_device *spi)
 			(spi->max_speed_hz + 500) / 1000);
 
 	/* Start the counter */
-	ret = pcf2123_write_reg(&spi->dev, PCF2123_REG_CTRL1, 0x00);
+	ret = pcf2123_write_reg(&spi->dev, PCF2123_REG_CTRL1, CTRL1_CLEAR);
 	if (ret < 0)
 		goto kfree_exit;
 
