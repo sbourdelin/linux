@@ -343,6 +343,11 @@ err_out:
 	return ret;
 }
 
+static inline void ipu_crtc_set_primary_plane(struct ipu_crtc *ipu_crtc)
+{
+	ipu_crtc->base.primary = &ipu_crtc->plane[0]->base;
+}
+
 static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
 	struct ipu_client_platformdata *pdata, struct drm_device *drm)
 {
@@ -380,6 +385,7 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
 			ret);
 		goto err_remove_crtc;
 	}
+	ipu_crtc_set_primary_plane(ipu_crtc);
 
 	/* If this crtc is using the DP, add an overlay plane */
 	if (pdata->dp >= 0 && pdata->dma[1] > 0) {

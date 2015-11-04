@@ -379,7 +379,8 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
 	drm_crtc_helper_add(crtc,
 			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
 
-	drm_crtc_init(drm, crtc,
+	/* The related primary plane will be created in ipu_plane_init(). */
+	drm_crtc_init_with_planes(drm, crtc, NULL, NULL,
 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
 
 	return 0;
