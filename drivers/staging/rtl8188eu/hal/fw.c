@@ -83,9 +83,9 @@ static void _rtl88e_fw_block_write(struct adapter *adapt,
 
 static void _rtl88e_fill_dummy(u8 *pfwbuf, u32 *pfwlen)
 {
-	u32 fwlen = *pfwlen;
+	u32 fwlen;
 
-	for (; fwlen < roundup(*pfwlen, 4); fwlen++) {
+	for (fwlen = *pfwlen; fwlen < roundup(*pfwlen, 4); fwlen++) {
 		pfwbuf[fwlen] = 0;
 	}
 
