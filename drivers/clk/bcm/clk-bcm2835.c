@@ -39,6 +39,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
+#include <linux/clk.h>
 #include <linux/clk/bcm2835.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -625,6 +626,8 @@ struct bcm2835_clock_data {
 	const char *const *parents;
 	int num_mux_parents;
 
+	unsigned long dft_rate;
+
 	u32 ctl_reg;
 	u32 div_reg;
 
@@ -805,6 +808,17 @@ static const struct bcm2835_clock_data bcm2835_clock_emmc_data = {
 	.div_reg = CM_EMMCDIV,
 	.int_bits = 4,
 	.frac_bits = 8,
+};
+
+static const struct bcm2835_clock_data bcm2835_clock_pwm_data = {
+	.name = "pwm",
+	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
+	.parents = bcm2835_clock_per_parents,
+	.dft_rate = 9600000,
+	.ctl_reg = CM_PWMCTL,
+	.div_reg = CM_PWMDIV,
+	.int_bits = 12,
+	.frac_bits = 12,
 };
 
 struct bcm2835_pll {
@@ -1440,6 +1454,7 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
 static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
 					  const struct bcm2835_clock_data *data)
 {
+	struct clk *ret;
 	struct bcm2835_clock *clock;
 	struct clk_init_data init;
 	const char *parents[1 << CM_SRC_BITS];
@@ -1477,7 +1492,15 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
 	clock->data = data;
 	clock->hw.init = &init;
 
-	return devm_clk_register(cprman->dev, &clock->hw);
+	ret = devm_clk_register(cprman->dev, &clock->hw);
+	if (IS_ERR(ret))
+		goto out;
+
+	if (data->dft_rate)
+		clk_set_rate(ret, data->dft_rate);
+
+out:
+	return ret;
 }
 
 static int bcm2835_clk_probe(struct platform_device *pdev)
@@ -1575,6 +1598,9 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 				  CLK_IGNORE_UNUSED | CLK_SET_RATE_GATE,
 				  cprman->regs + CM_PERIICTL, CM_GATE_BIT,
 				  0, &cprman->regs_lock);
+
+	clks[BCM2835_CLOCK_PWM] =
+		bcm2835_register_clock(cprman, &bcm2835_clock_pwm_data);
 
 	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
 				   &cprman->onecell);
