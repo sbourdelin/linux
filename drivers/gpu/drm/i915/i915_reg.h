@@ -4883,7 +4883,7 @@ enum skl_disp_power_wells {
 #define   CURSOR_TRICKLE_FEED_DISABLE	(1 << 14)
 #define _CURABASE		0x70084
 #define _CURAPOS		0x70088
-#define   CURSOR_POS_MASK       0x007FF
+#define   CURSOR_POS_MASK       0x01FFF
 #define   CURSOR_POS_SIGN       0x8000
 #define   CURSOR_X_SHIFT        0
 #define   CURSOR_Y_SHIFT        16
