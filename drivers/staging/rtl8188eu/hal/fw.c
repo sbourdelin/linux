@@ -83,13 +83,13 @@ static void _rtl88e_fw_block_write(struct adapter *adapt,
 
 static void _rtl88e_fill_dummy(u8 *pfwbuf, u32 *pfwlen)
 {
-	u32 fwlen;
+	u32 i;
 
-	for (fwlen = *pfwlen; fwlen < roundup(*pfwlen, 4); fwlen++) {
-		pfwbuf[fwlen] = 0;
+	for (i = *pfwlen; i < roundup(*pfwlen, 4); i++) {
+		pfwbuf[i] = 0;
 	}
 
-	*pfwlen = fwlen;
+	*pfwlen = i;
 }
 
 static void _rtl88e_fw_page_write(struct adapter *adapt,
