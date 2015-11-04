@@ -388,8 +388,7 @@ int __compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
 	 */
 	spin_lock(&sysfs_symlink_target_lock);
 	target = target_kobj->sd;
-	if (target)
-		kernfs_get(target);
+	kernfs_get(target);
 	spin_unlock(&sysfs_symlink_target_lock);
 	if (!target)
 		return -ENOENT;
