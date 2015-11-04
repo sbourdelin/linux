@@ -376,8 +376,35 @@ void intel_uncore_early_sanitize(struct drm_device *dev, bool restore_forcewake)
 	i915_check_and_clear_faults(dev);
 }
 
+static void sanitize_bios_rc6_setup(const struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	bool hw_rc6_enabled = false, sw_rc6_enabled = false;
+
+	if (IS_BROXTON(dev)) {
+		/* Get forcewake during program sequence. Although the driver
+		 * hasn't enabled a state yet where we need forcewake, BIOS may have.*/
+		intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+		/* Check if BIOS has enabled HW/SW RC6. Only then enable RC6 */
+		hw_rc6_enabled = I915_READ(GEN6_RC_CONTROL) &
+					(GEN6_RC_CTL_RC6_ENABLE | GEN6_RC_CTL_HW_ENABLE);
+		sw_rc6_enabled = !(I915_READ(GEN6_RC_CONTROL) & GEN6_RC_CTL_HW_ENABLE)
+					&& (I915_READ(GEN6_RC_STATE) & RC6_STATE);
+
+		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
+		if (!hw_rc6_enabled && !sw_rc6_enabled) {
+			i915.enable_rc6 = 0;
+			DRM_INFO("RC6 disabled by BIOS\n");
+		}
+	}
+}
+
 void intel_uncore_sanitize(struct drm_device *dev)
 {
+	sanitize_bios_rc6_setup(dev);
+
 	/* BIOS often leaves RC6 enabled, but disable it for hw init */
 	intel_disable_gt_powersave(dev);
 }

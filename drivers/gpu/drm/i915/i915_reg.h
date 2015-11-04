@@ -6823,6 +6823,7 @@ enum skl_disp_power_wells {
 #define GEN6_RPDEUC				0xA084
 #define GEN6_RPDEUCSW				0xA088
 #define GEN6_RC_STATE				0xA094
+#define RC6_STATE				(1<<18)
 #define GEN6_RC1_WAKE_RATE_LIMIT		0xA098
 #define GEN6_RC6_WAKE_RATE_LIMIT		0xA09C
 #define GEN6_RC6pp_WAKE_RATE_LIMIT		0xA0A0
