@@ -5057,15 +5057,21 @@ nfsd4_delegreturn(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if ((status = fh_verify(rqstp, &cstate->current_fh, S_IFREG, 0)))
 		return status;
 
-	status = nfsd4_lookup_stateid(cstate, stateid, NFS4_DELEG_STID, &s, nn);
+	status = nfsd4_lookup_stateid(cstate, stateid,
+				NFS4_DELEG_STID|NFS4_REVOKED_DELEG_STID,
+				&s, nn);
 	if (status)
 		goto out;
 	dp = delegstateid(s);
 	status = check_stateid_generation(stateid, &dp->dl_stid.sc_stateid, nfsd4_has_session(cstate));
 	if (status)
 		goto put_stateid;
-
-	destroy_delegation(dp);
+	if (dp->dl_stid.sc_type == NFS4_DELEG_STID)
+		destroy_delegation(dp);
+	if (dp->dl_stid.sc_type == NFS4_REVOKED_DELEG_STID)
+		status = nfserr_bad_stateid;
+		if (cstate->minorversion)
+			status = nfserr_deleg_revoked;
 put_stateid:
 	nfs4_put_stid(&dp->dl_stid);
 out:
