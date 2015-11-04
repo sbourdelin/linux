@@ -79,7 +79,6 @@ static void copy_fdtable(struct fdtable *nfdt, struct fdtable *ofdt)
 	memcpy(nfdt->open_fds, ofdt->open_fds, cpy);
 	memset((char *)(nfdt->open_fds) + cpy, 0, set);
 	memcpy(nfdt->close_on_exec, ofdt->close_on_exec, cpy);
-	memset((char *)(nfdt->close_on_exec) + cpy, 0, set);
 
 	cpy = BITBIT_SIZE(ofdt->max_fds);
 	set = BITBIT_SIZE(nfdt->max_fds) - cpy;
@@ -231,7 +230,8 @@ repeat:
 
 static inline void __set_close_on_exec(int fd, struct fdtable *fdt)
 {
-	__set_bit(fd, fdt->close_on_exec);
+	if (!test_bit(fd, fdt->close_on_exec))
+		__set_bit(fd, fdt->close_on_exec);
 }
 
 static inline void __clear_close_on_exec(int fd, struct fdtable *fdt)
@@ -369,7 +369,6 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 		int start = open_files / BITS_PER_LONG;
 
 		memset(&new_fdt->open_fds[start], 0, left);
-		memset(&new_fdt->close_on_exec[start], 0, left);
 	}
 
 	rcu_assign_pointer(newf->fdt, new_fdt);
@@ -644,7 +643,6 @@ int __close_fd(struct files_struct *files, unsigned fd)
 	if (!file)
 		goto out_unlock;
 	rcu_assign_pointer(fdt->fd[fd], NULL);
-	__clear_close_on_exec(fd, fdt);
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
 	return filp_close(file, files);
@@ -667,10 +665,9 @@ void do_close_on_exec(struct files_struct *files)
 		fdt = files_fdtable(files);
 		if (fd >= fdt->max_fds)
 			break;
-		set = fdt->close_on_exec[i];
+		set = fdt->close_on_exec[i] & fdt->open_fds[i];
 		if (!set)
 			continue;
-		fdt->close_on_exec[i] = 0;
 		for ( ; set ; fd++, set >>= 1) {
 			struct file *file;
 			if (!(set & 1))
