@@ -81,14 +81,14 @@ static void _rtl88e_fw_block_write(struct adapter *adapt,
 	}
 }
 
-static void _rtl88e_fill_dummy(u8 *pfwbuf, u32 *pfwlen)
+static u32 _rtl88e_fill_dummy(u8 *pfwbuf, u32 pfwlen)
 {
 	u32 i;
 
-	for (i = *pfwlen; i < roundup(*pfwlen, 4); i++)
+	for (i = pfwlen; i < roundup(pfwlen, 4); i++)
 		pfwbuf[i] = 0;
 
-	*pfwlen = i;
+	return i;
 }
 
 static void _rtl88e_fw_page_write(struct adapter *adapt,
@@ -109,7 +109,7 @@ static void _rtl88e_write_fw(struct adapter *adapt, u8 *buffer, u32 size)
 	u32 page_no, remain;
 	u32 page, offset;
 
-	_rtl88e_fill_dummy(buf_ptr, &size);
+	size = _rtl88e_fill_dummy(buf_ptr, size);
 
 	page_no = size / FW_8192C_PAGE_SIZE;
 	remain = size % FW_8192C_PAGE_SIZE;
