@@ -59,9 +59,9 @@ struct bpf_object *bpf__prepare_load(const char *filename, bool source)
 	} else
 		obj = bpf_object__open(filename);
 
-	if (!obj) {
+	if (IS_ERR(obj)) {
 		pr_debug("bpf: failed to load %s\n", filename);
-		return ERR_PTR(-EINVAL);
+		return obj;
 	}
 
 	return obj;
@@ -96,9 +96,9 @@ config_bpf_program(struct bpf_program *prog)
 	int err;
 
 	config_str = bpf_program__title(prog, false);
-	if (!config_str) {
+	if (IS_ERR(config_str)) {
 		pr_debug("bpf: unable to get title for program\n");
-		return -EINVAL;
+		return PTR_ERR(config_str);
 	}
 
 	priv = calloc(sizeof(*priv), 1);
