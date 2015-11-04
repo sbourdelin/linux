@@ -61,6 +61,13 @@ int blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 	if (!blk_queue_discard(q))
 		return -EOPNOTSUPP;
 
+	if (q->limits.discard_granularity) {
+		unsigned int gran_sect = q->limits.discard_granularity >> 9;
+
+		if (sector % gran_sect || nr_sects % gran_sect)
+			return -EINVAL;
+	}
+
 	if (flags & BLKDEV_DISCARD_SECURE) {
 		if (!blk_queue_secdiscard(q))
 			return -EOPNOTSUPP;
