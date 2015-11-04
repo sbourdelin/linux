@@ -72,6 +72,41 @@ temperature) and throttle appropriate devices.
     It deletes the corresponding entry form /sys/class/thermal folder and
     unbind all the thermal cooling devices it uses.
 
+
+1.1.3 int thermal_zone_add_subtz(struct thermal_zone_device *tz,
+                                 struct thermal_zone_device *subtz)
+
+    Add subtz to the list of slaves of tz.  When calculating the
+    temperature of thermal zone tz, report the maximum of the slave
+    thermal zones.  This lets you create a hierarchy of thermal zones.
+    The hierarchy must be a Direct Acyclic Graph (DAG).  If a loop is
+    detected, thermal_zone_get_temp() will return -EDEADLK to prevent
+    the deadlock.  thermal_zone_add_subtz() does not affect subtz.
+
+    For example, if you have an SoC with a thermal sensor in each cpu
+    of the two cpus you could have a thermal zone to monitor each
+    sensor, let's call them cpu0_tz and cpu1_tz.  You could then have a
+    a SoC thermal zone (soc_tz) without a get_temp() op which can be
+    configured like this:
+
+    thermal_zone_add_subtz(soc_tz, cpu0_tz);
+    thermal_zone_add_subtz(soc_tz, cpu1_tz);
+
+    Now soc_tz's temperature is the maximum of cpu0_tz and cpu1_tz.
+    Furthermore, soc_tz could be combined with other thermal zones to
+    create a "device" thermal zone.
+
+
+1.1.4 int thermal_zone_del_subtz(struct thermal_zone_device *tz,
+                                 struct thermal_zone_device *subtz)
+
+    Delete subtz from the slave thermal zones of tz.  This basically
+    reverses what thermal_zone_add_subtz() does.  If tz still has
+    other slave thermal zones, its temperature would be the maximum of
+    the remaining slave thermal zones.  If tz no longer has slave
+    thermal zones, thermal_zone_get_temp() will return -EINVAL.
+
+
 1.2 thermal cooling device interface
 1.2.1 struct thermal_cooling_device *thermal_cooling_device_register(char *name,
 		void *devdata, struct thermal_cooling_device_ops *)
