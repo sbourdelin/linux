@@ -46,7 +46,7 @@
  *   0: Removed from the user visible capability list
  *   FF: Variable length
  */
-static u8 pci_cap_length[] = {
+static u8 pci_cap_length[PCI_CAP_ID_MAX + 1] = {
 	[PCI_CAP_ID_BASIC]	= PCI_STD_HEADER_SIZEOF, /* pci config header */
 	[PCI_CAP_ID_PM]		= PCI_PM_SIZEOF,
 	[PCI_CAP_ID_AGP]	= PCI_AGP_SIZEOF,
