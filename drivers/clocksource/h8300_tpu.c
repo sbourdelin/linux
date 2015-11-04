@@ -1,5 +1,5 @@
 /*
- *  H8/300 TPU Driver
+ *  H8S TPU Driver
  *
  *  Copyright 2015 Yoshinori Sato <ysato@users.sourcefoge.jp>
  *
@@ -17,6 +17,8 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
+#include <linux/of_irq.h>
 
 #include <asm/irq.h>
 
@@ -32,7 +34,6 @@
 #define TGRD	14
 
 struct tpu_priv {
-	struct platform_device *pdev;
 	struct clocksource cs;
 	struct clk *clk;
 	unsigned long mapbase1;
@@ -119,30 +120,39 @@ static void tpu_clocksource_disable(struct clocksource *cs)
 #define CH_L 0
 #define CH_H 1
 
-static int __init tpu_setup(struct tpu_priv *p, struct platform_device *pdev)
+static void __init h8300_tpu_init(struct device_node *node)
 {
-	struct resource *res[2];
+	void __iomem *base[2];
+	struct tpu_priv *p;
+	struct clk *clk;
 
-	memset(p, 0, sizeof(*p));
-	p->pdev = pdev;
-
-	res[CH_L] = platform_get_resource(p->pdev, IORESOURCE_MEM, CH_L);
-	res[CH_H] = platform_get_resource(p->pdev, IORESOURCE_MEM, CH_H);
-	if (!res[CH_L] || !res[CH_H]) {
-		dev_err(&p->pdev->dev, "failed to get I/O memory\n");
-		return -ENXIO;
+	clk = of_clk_get(node, 0);
+	if (IS_ERR(clk)) {
+		pr_err("failed to get clock for clocksource\n");
+		return;
 	}
 
-	p->clk = clk_get(&p->pdev->dev, "fck");
-	if (IS_ERR(p->clk)) {
-		dev_err(&p->pdev->dev, "can't get clk\n");
-		return PTR_ERR(p->clk);
+	base[CH_L] = of_iomap(node, CH_L);
+	if (!base[CH_L]) {
+		pr_err("failed to map registers for clocksource\n");
+		goto free_clk;
+	}
+	base[CH_H] = of_iomap(node, CH_H);
+	if (!base[CH_H]) {
+		pr_err("failed to map registers for clocksource\n");
+		goto unmap_L;
 	}
 
-	p->mapbase1 = res[CH_L]->start;
-	p->mapbase2 = res[CH_H]->start;
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
+	if (!p) {
+		pr_err("failed to allocate memory for clocksource\n");
+		goto unmap_H;
+	}
 
-	p->cs.name = pdev->name;
+	p->mapbase1 = (unsigned long)base[CH_L];
+	p->mapbase2 = (unsigned long)base[CH_H];
+
+	p->cs.name = node->name;
 	p->cs.rating = 200;
 	p->cs.read = tpu_clocksource_read;
 	p->cs.enable = tpu_clocksource_enable;
@@ -150,58 +160,15 @@ static int __init tpu_setup(struct tpu_priv *p, struct platform_device *pdev)
 	p->cs.mask = CLOCKSOURCE_MASK(sizeof(unsigned long) * 8);
 	p->cs.flags = CLOCK_SOURCE_IS_CONTINUOUS;
 	clocksource_register_hz(&p->cs, clk_get_rate(p->clk) / 64);
-	platform_set_drvdata(pdev, p);
 
-	return 0;
+	return;
+
+unmap_H:
+	iounmap(base[CH_H]);
+unmap_L:
+	iounmap(base[CH_H]);
+free_clk:
+	clk_put(clk);
 }
 
-static int tpu_probe(struct platform_device *pdev)
-{
-	struct tpu_priv *p = platform_get_drvdata(pdev);
-
-	if (p) {
-		dev_info(&pdev->dev, "kept as earlytimer\n");
-		return 0;
-	}
-
-	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
-	if (!p)
-		return -ENOMEM;
-
-	return tpu_setup(p, pdev);
-}
-
-static int tpu_remove(struct platform_device *pdev)
-{
-	return -EBUSY;
-}
-
-static const struct of_device_id tpu_of_table[] = {
-	{ .compatible = "renesas,tpu" },
-	{ }
-};
-
-static struct platform_driver tpu_driver = {
-	.probe		= tpu_probe,
-	.remove		= tpu_remove,
-	.driver		= {
-		.name	= "h8s-tpu",
-		.of_match_table = of_match_ptr(tpu_of_table),
-	}
-};
-
-static int __init tpu_init(void)
-{
-	return platform_driver_register(&tpu_driver);
-}
-
-static void __exit tpu_exit(void)
-{
-	platform_driver_unregister(&tpu_driver);
-}
-
-subsys_initcall(tpu_init);
-module_exit(tpu_exit);
-MODULE_AUTHOR("Yoshinori Sato");
-MODULE_DESCRIPTION("H8S Timer Pulse Unit Driver");
-MODULE_LICENSE("GPL v2");
+CLOCKSOURCE_OF_DECLARE(h8300_tpu, "renesas,tpu", h8300_tpu_init);
