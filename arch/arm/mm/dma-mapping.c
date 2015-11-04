@@ -850,12 +850,20 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
 	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
 
 	paddr = page_to_phys(page) + off;
-	if (dir == DMA_FROM_DEVICE) {
-		outer_inv_range(paddr, paddr + size);
-	} else {
-		outer_clean_range(paddr, paddr + size);
+
+	switch (dir) {
+	case DMA_FROM_DEVICE:
+			outer_inv_range(paddr, paddr + size);
+			break;
+	case DMA_TO_DEVICE:
+			outer_clean_range(paddr, paddr + size);
+			break;
+	case DMA_BIDIRECTIONAL:
+			outer_flush_range(paddr, paddr + size);
+			break;
+	default:
+			break;
 	}
-	/* FIXME: non-speculating: flush on bidirectional mappings? */
 }
 
 static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
