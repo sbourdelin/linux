@@ -1484,6 +1484,8 @@ static int gen8_do_reset(struct drm_device *dev)
 	struct intel_engine_cs *engine;
 	int i;
 
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
 	for_each_ring(engine, dev_priv, i) {
 		I915_WRITE(RING_RESET_CTL(engine->mmio_base),
 			   _MASKED_BIT_ENABLE(RESET_CTL_REQUEST_RESET));
@@ -1498,12 +1500,16 @@ static int gen8_do_reset(struct drm_device *dev)
 		}
 	}
 
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+
 	return gen6_do_reset(dev);
 
 not_ready:
 	for_each_ring(engine, dev_priv, i)
 		I915_WRITE(RING_RESET_CTL(engine->mmio_base),
 			   _MASKED_BIT_DISABLE(RESET_CTL_REQUEST_RESET));
+
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 
 	return -EIO;
 }
