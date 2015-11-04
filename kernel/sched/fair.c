@@ -2155,6 +2155,7 @@ void task_numa_work(struct callback_head *work)
 	unsigned long migrate, next_scan, now = jiffies;
 	struct task_struct *p = current;
 	struct mm_struct *mm = p->mm;
+	u64 runtime = p->se.sum_exec_runtime;
 	struct vm_area_struct *vma;
 	unsigned long start, end;
 	unsigned long nr_pte_updates = 0;
@@ -2277,6 +2278,20 @@ out:
 	else
 		reset_ptenuma_scan(p);
 	up_read(&mm->mmap_sem);
+
+	/*
+	 * There is a fundamental mismatch between the runtime based
+	 * NUMA scanning at the task level, and the wall clock time
+	 * NUMA scanning at the mm level. On a severely overloaded
+	 * system, with very large processes, this mismatch can cause
+	 * the system to spend all of its time in change_prot_numa().
+	 * Limit NUMA PTE scanning to 3% of the task's run time, if
+	 * we spent so much time scanning we got rescheduled.
+	 */
+	if (unlikely(p->se.sum_exec_runtime != runtime)) {
+		u64 diff = p->se.sum_exec_runtime - runtime;
+		p->node_stamp += 32 * diff;
+	}
 }
 
 /*
@@ -2302,7 +2317,7 @@ void task_tick_numa(struct rq *rq, struct task_struct *curr)
 	now = curr->se.sum_exec_runtime;
 	period = (u64)curr->numa_scan_period * NSEC_PER_MSEC;
 
-	if (now - curr->node_stamp > period) {
+	if (now > curr->node_stamp + period) {
 		if (!curr->node_stamp)
 			curr->numa_scan_period = task_scan_min(curr);
 		curr->node_stamp += period;
