@@ -48,6 +48,7 @@
 
 #define DRV_VERSION "0.6"
 
+/* REGISTERS */
 #define PCF2123_REG_CTRL1	(0x00)	/* Control Register 1 */
 #define PCF2123_REG_CTRL2	(0x01)	/* Control Register 2 */
 #define PCF2123_REG_SC		(0x02)	/* datetime */
@@ -57,7 +58,27 @@
 #define PCF2123_REG_DW		(0x06)
 #define PCF2123_REG_MO		(0x07)
 #define PCF2123_REG_YR		(0x08)
+#define PCF2123_REG_ALRM_MN	(0x09)	/* Alarm Registers */
+#define PCF2123_REG_ALRM_HR	(0x0a)
+#define PCF2123_REG_ALRM_DM	(0x0b)
+#define PCF2123_REG_ALRM_DW	(0x0c)
+#define PCF2123_REG_OFFSET	(0x0d)	/* Clock Rate Offset Register */
+#define PCF2123_REG_TMR_CLKOUT	(0x0e)	/* Timer Registers */
+#define PCF2123_REG_CTDWN_TMR	(0x0f)
+#define PCF2123_REG_MAX		(PCF2123_REG_CTDWN_TMR)
 
+/* PCF2123_REG_CTRL1 BITS */
+#define CTRL1_CLEAR		(0x00)	/* Clear */
+#define CTRL1_CORRECTION_INT	(0x02)	/* Correction Interrupt */
+#define CTRL1_12_HOUR		(0x04)	/* 12 hour time */
+#define CTRL1_STOP		(0x20)	/* Stop the clock */
+#define CTRL1_SW_RESET		(0x58)	/* Software reset */
+#define CTRL1_EXT_TEST		(0x80)	/* External Clock Test mode */
+
+/* PCF2123_REG_SC BITS */
+#define OSC_HAS_STOPPED		(0x80)	/* Clock has been stopped */
+
+/* READ/WRITE ADDRESS BITS */
 #define PCF2123_SUBADDR		(1 << 4)
 #define PCF2123_WRITE		((0 << 7) | PCF2123_SUBADDR)
 #define PCF2123_READ		((1 << 7) | PCF2123_SUBADDR)
