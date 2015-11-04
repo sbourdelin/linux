@@ -354,11 +354,9 @@ static int gmac_clk_init(struct rk_priv_data *bsp_priv)
 
 static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
 {
-	int phy_iface = phy_iface = bsp_priv->phy_iface;
-
 	if (enable) {
 		if (!bsp_priv->clk_enabled) {
-			if (phy_iface == PHY_INTERFACE_MODE_RMII) {
+			if (bsp_priv->phy_iface == PHY_INTERFACE_MODE_RMII) {
 				if (!IS_ERR(bsp_priv->mac_clk_rx))
 					clk_prepare_enable(
 						bsp_priv->mac_clk_rx);
@@ -390,7 +388,7 @@ static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
 		}
 	} else {
 		if (bsp_priv->clk_enabled) {
-			if (phy_iface == PHY_INTERFACE_MODE_RMII) {
+			if (bsp_priv->phy_iface == PHY_INTERFACE_MODE_RMII) {
 				if (!IS_ERR(bsp_priv->mac_clk_rx))
 					clk_disable_unprepare(
 						bsp_priv->mac_clk_rx);
