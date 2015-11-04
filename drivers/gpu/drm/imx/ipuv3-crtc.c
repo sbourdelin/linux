@@ -370,6 +370,10 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
 	id = imx_drm_crtc_id(ipu_crtc->imx_crtc);
 	ipu_crtc->plane[0] = ipu_plane_init(ipu_crtc->base.dev, ipu,
 					    pdata->dma[0], dp, BIT(id), true);
+	if (IS_ERR(ipu_crtc->plane[0])) {
+		ret = PTR_ERR(ipu_crtc->plane[0]);
+		goto err_put_resources;
+	}
 	ret = ipu_plane_get_resources(ipu_crtc->plane[0]);
 	if (ret) {
 		dev_err(ipu_crtc->dev, "getting plane 0 resources failed with %d.\n",
