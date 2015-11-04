@@ -142,7 +142,7 @@ static void genpd_sd_counter_inc(struct generic_pm_domain *genpd)
 
 static void genpd_recalc_cpu_exit_latency(struct generic_pm_domain *genpd)
 {
-	s64 usecs64;
+	u64 usecs64;
 
 	if (!genpd->cpuidle_data)
 		return;
