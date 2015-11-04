@@ -174,7 +174,7 @@ int ext4_mpage_readpages(struct address_space *mapping,
 			goto confused;
 
 		block_in_file = (sector_t)page->index << (PAGE_CACHE_SHIFT - blkbits);
-		last_block = block_in_file + nr_pages * blocks_per_page;
+		last_block = block_in_file + (nr_pages - page_idx) * blocks_per_page;
 		last_block_in_file = (i_size_read(inode) + blocksize - 1) >> blkbits;
 		if (last_block > last_block_in_file)
 			last_block = last_block_in_file;
