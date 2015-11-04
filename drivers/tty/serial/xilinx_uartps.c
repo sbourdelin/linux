@@ -947,10 +947,9 @@ static int cdns_uart_poll_get_char(struct uart_port *port)
 {
 	u32 imr;
 	int c;
+	unsigned long flags;
 
-	/* Disable all interrupts */
-	imr = readl(port->membase + CDNS_UART_IMR_OFFSET);
-	writel(imr, port->membase + CDNS_UART_IDR_OFFSET);
+	spin_lock_irqsave(&port->lock, flags);
 
 	/* Check if FIFO is empty */
 	if (readl(port->membase + CDNS_UART_SR_OFFSET) & CDNS_UART_SR_RXEMPTY)
@@ -959,8 +958,7 @@ static int cdns_uart_poll_get_char(struct uart_port *port)
 		c = (unsigned char) readl(
 					port->membase + CDNS_UART_FIFO_OFFSET);
 
-	/* Enable interrupts */
-	writel(imr, port->membase + CDNS_UART_IER_OFFSET);
+	spin_unlock_irqrestore(&port->lock, flags);
 
 	return c;
 }
@@ -968,10 +966,9 @@ static int cdns_uart_poll_get_char(struct uart_port *port)
 static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
 {
 	u32 imr;
+	unsigned long flags;
 
-	/* Disable all interrupts */
-	imr = readl(port->membase + CDNS_UART_IMR_OFFSET);
-	writel(imr, port->membase + CDNS_UART_IDR_OFFSET);
+	spin_lock_irqsave(&port->lock, flags);
 
 	/* Wait until FIFO is empty */
 	while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
@@ -986,8 +983,7 @@ static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
 				CDNS_UART_SR_TXEMPTY))
 		cpu_relax();
 
-	/* Enable interrupts */
-	writel(imr, port->membase + CDNS_UART_IER_OFFSET);
+	spin_unlock_irqrestore(&port->lock, flags);
 
 	return;
 }
