@@ -697,9 +697,10 @@ struct perf_cgroup {
  * if there is no cgroup event for the current CPU context.
  */
 static inline struct perf_cgroup *
-perf_cgroup_from_task(struct task_struct *task)
+perf_cgroup_from_task(struct task_struct *task, struct perf_event_context *ctx)
 {
-	return container_of(task_css(task, perf_event_cgrp_id),
+	bool safe = ctx ? lockdep_is_held(&ctx->lock) : true;
+	return container_of(task_css_check(task, perf_event_cgrp_id, safe),
 			    struct perf_cgroup, css);
 }
 #endif /* CONFIG_CGROUP_PERF */
