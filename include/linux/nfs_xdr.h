@@ -250,6 +250,7 @@ struct nfs4_layoutget {
 	struct nfs4_layoutget_res res;
 	struct rpc_cred *cred;
 	gfp_t gfp_flags;
+	long timeout;
 };
 
 struct nfs4_getdeviceinfo_args {
@@ -288,6 +289,7 @@ struct nfs4_layoutcommit_data {
 	struct list_head lseg_list;
 	struct rpc_cred *cred;
 	struct inode *inode;
+	long timeout;
 	struct nfs4_layoutcommit_args args;
 	struct nfs4_layoutcommit_res res;
 };
@@ -313,6 +315,7 @@ struct nfs4_layoutreturn {
 	struct rpc_cred *cred;
 	struct nfs_client *clp;
 	struct inode *inode;
+	long timeout;
 	int rpc_status;
 };
 
@@ -1378,6 +1381,7 @@ struct nfs_pgio_header {
 	int			error;		/* merge with pnfs_error */
 	unsigned long		good_bytes;	/* boundary of good data */
 	unsigned long		flags;
+	long			timeout;
 
 	/*
 	 * rpc data
@@ -1430,6 +1434,7 @@ struct nfs_commit_data {
 	struct nfs_open_context *context;
 	struct pnfs_layout_segment *lseg;
 	struct nfs_client	*ds_clp;	/* pNFS data server */
+	long			timeout;
 	int			ds_commit_index;
 	loff_t			lwb;
 	const struct rpc_call_ops *mds_ops;
