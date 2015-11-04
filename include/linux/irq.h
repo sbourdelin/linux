@@ -341,6 +341,8 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
  * @irq_get_irqchip_state:	return the internal state of an interrupt
  * @irq_set_irqchip_state:	set the internal state of a interrupt
  * @irq_set_vcpu_affinity:	optional to target a vCPU in a virtual machine
+ * @irq_pm_get:	optional to bring the HW in a state that enables IRQ generation
+ * @irq_pm_put:	undo any effects of @irq_pm_get
  * @flags:		chip specific flags
  */
 struct irq_chip {
@@ -384,6 +386,8 @@ struct irq_chip {
 	int		(*irq_set_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool state);
 
 	int		(*irq_set_vcpu_affinity)(struct irq_data *data, void *vcpu_info);
+	int		(*irq_pm_get)(struct irq_data *data);
+	void		(*irq_pm_put)(struct irq_data *data);
 
 	unsigned long	flags;
 };

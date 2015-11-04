@@ -112,6 +112,20 @@ extern void irq_set_thread_affinity(struct irq_desc *desc);
 extern int irq_do_set_affinity(struct irq_data *data,
 			       const struct cpumask *dest, bool force);
 
+static inline int chip_pm_get(struct irq_desc *desc)
+{
+	if (unlikely(desc->irq_data.chip->irq_pm_get))
+		return desc->irq_data.chip->irq_pm_get(&desc->irq_data);
+
+	return 0;
+}
+
+static inline void chip_pm_put(struct irq_desc *desc)
+{
+	if (unlikely(desc->irq_data.chip->irq_pm_put))
+		desc->irq_data.chip->irq_pm_put(&desc->irq_data);
+}
+
 /* Inline functions for support of irq chips on slow busses */
 static inline void chip_bus_lock(struct irq_desc *desc)
 {

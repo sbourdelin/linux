@@ -1556,6 +1556,7 @@ void free_irq(unsigned int irq, void *dev_id)
 	chip_bus_lock(desc);
 	kfree(__free_irq(irq, dev_id));
 	chip_bus_sync_unlock(desc);
+	chip_pm_put(desc);
 }
 EXPORT_SYMBOL(free_irq);
 
@@ -1647,14 +1648,16 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	action->name = devname;
 	action->dev_id = dev_id;
 
+	retval = chip_pm_get(desc);
+	if (retval < 0)
+		goto err_pm_get;
+
 	chip_bus_lock(desc);
 	retval = __setup_irq(irq, desc, action);
 	chip_bus_sync_unlock(desc);
 
-	if (retval) {
-		kfree(action->secondary);
-		kfree(action);
-	}
+	if (retval)
+		goto err_setup_irq;
 
 #ifdef CONFIG_DEBUG_SHIRQ_FIXME
 	if (!retval && (irqflags & IRQF_SHARED)) {
@@ -1675,6 +1678,15 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 		enable_irq(irq);
 	}
 #endif
+
+	return 0;
+
+err_setup_irq:
+	chip_pm_put(desc);
+err_pm_get:
+	kfree(action->secondary);
+	kfree(action);
+
 	return retval;
 }
 EXPORT_SYMBOL(request_threaded_irq);
