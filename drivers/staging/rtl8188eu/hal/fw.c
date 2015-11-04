@@ -89,10 +89,8 @@ static void _rtl88e_fill_dummy(u8 *pfwbuf, u32 *pfwlen)
 	remain = (remain == 0) ? 0 : (4 - remain);
 	n = remain;
 
-	while (remain > 0) {
+	for (; remain > 0; fwlen++, remain--) {
 		pfwbuf[fwlen] = 0;
-		fwlen++;
-		remain--;
 	}
 
 	*pfwlen = fwlen;
