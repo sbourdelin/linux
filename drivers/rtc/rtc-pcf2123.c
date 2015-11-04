@@ -179,7 +179,7 @@ static ssize_t pcf2123_store(struct device *dev, struct device_attribute *attr,
 	if (ret)
 		return ret;
 
-	ret = kstrtoul(buffer, 10, &val);
+	ret = kstrtoul(buffer, 0, &val);
 	if (ret)
 		return ret;
 
