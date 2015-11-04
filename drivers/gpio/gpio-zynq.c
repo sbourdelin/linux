@@ -460,6 +460,22 @@ static int zynq_gpio_set_wake(struct irq_data *data, unsigned int on)
 	return 0;
 }
 
+static int zynq_gpio_irq_pm_get(struct irq_data *data)
+{
+	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
+	struct device *dev = gpio->chip.dev;
+
+	return pm_runtime_get_sync(dev);
+}
+
+static void zynq_gpio_irq_pm_put(struct irq_data *data)
+{
+	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
+	struct device *dev = gpio->chip.dev;
+
+	pm_runtime_put(dev);
+}
+
 /* irq chip descriptor */
 static struct irq_chip zynq_gpio_level_irqchip = {
 	.name		= DRIVER_NAME,
@@ -469,6 +485,8 @@ static struct irq_chip zynq_gpio_level_irqchip = {
 	.irq_unmask	= zynq_gpio_irq_unmask,
 	.irq_set_type	= zynq_gpio_set_irq_type,
 	.irq_set_wake	= zynq_gpio_set_wake,
+	.irq_pm_get	= zynq_gpio_irq_pm_get,
+	.irq_pm_put	= zynq_gpio_irq_pm_put,
 	.flags		= IRQCHIP_EOI_THREADED | IRQCHIP_EOI_IF_HANDLED |
 			  IRQCHIP_MASK_ON_SUSPEND,
 };
@@ -481,6 +499,8 @@ static struct irq_chip zynq_gpio_edge_irqchip = {
 	.irq_unmask	= zynq_gpio_irq_unmask,
 	.irq_set_type	= zynq_gpio_set_irq_type,
 	.irq_set_wake	= zynq_gpio_set_wake,
+	.irq_pm_get	= zynq_gpio_irq_pm_get,
+	.irq_pm_put	= zynq_gpio_irq_pm_put,
 	.flags		= IRQCHIP_MASK_ON_SUSPEND,
 };
 
