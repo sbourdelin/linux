@@ -78,10 +78,16 @@
 /* PCF2123_REG_SC BITS */
 #define OSC_HAS_STOPPED		(0x80)	/* Clock has been stopped */
 
+/* PCF2123_REG_OFFSET BITS */
+#define OFFSET_COARSE		(0x80)	/* Coarse Mode Offset */
+
 /* READ/WRITE ADDRESS BITS */
 #define PCF2123_SUBADDR		(1 << 4)
 #define PCF2123_WRITE		((0 << 7) | PCF2123_SUBADDR)
 #define PCF2123_READ		((1 << 7) | PCF2123_SUBADDR)
+
+/* offset granularity in parts per billion in fine mode */
+#define OFFSET_STEP		(2170)
 
 static struct spi_driver pcf2123_driver;
 
@@ -161,6 +167,65 @@ static ssize_t pcf2123_store(struct device *dev, struct device_attribute *attr,
 
 	reg = hex_to_bin(attr->attr.name[0]);
 	pcf2123_write_reg(dev, reg, val);
+	if (ret < 0)
+		return -EIO;
+
+	return count;
+}
+
+static ssize_t pcf2123_adjust_show(struct device *dev,
+				   struct device_attribute *attr, char *buffer)
+{
+	ssize_t ret;
+	s8 reg;
+
+	ret = pcf2123_read(dev, PCF2123_REG_OFFSET, &reg, 1);
+	if (ret < 0)
+		return -EIO;
+
+	if (reg & OFFSET_COARSE) {
+		reg <<= 1;
+	} else {
+		reg &= ~OFFSET_COARSE;
+		reg |= (reg & 0x40) << 1; /* sign extend */
+	}
+
+	return sprintf(buffer, "%ld\n", ((long)reg) * OFFSET_STEP);
+}
+
+static ssize_t pcf2123_adjust_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buffer, size_t count)
+{
+	ssize_t ret;
+	long val;
+	s8 reg;
+
+	ret = kstrtol(buffer, 10, &val);
+	if (ret)
+		return ret;
+
+	if (val > OFFSET_STEP * 127)
+		reg = 127;
+	else if (val < OFFSET_STEP * -128)
+		reg = -128;
+	else
+		reg = (s8)((val + (OFFSET_STEP >> 1)) / OFFSET_STEP);
+
+/*
+ * Each even value of the fine adjust overlaps with a value of the coarse
+ * adjustment, and since the coarse adjsutment will spread the adjustments
+ * over both hours, we use coarse for all even values, as well as values
+ * that are beyond the range of fine adjustment
+ */
+	if (reg <= 63 && reg >= -64 && reg & 1) {
+		reg &= ~OFFSET_COARSE;
+	} else {
+		reg >>= 1;
+		reg |= OFFSET_COARSE;
+	}
+
+	pcf2123_write_reg(dev, PCF2123_REG_OFFSET, reg);
 	if (ret < 0)
 		return -EIO;
 
@@ -315,6 +380,8 @@ static DEVICE_ATTR(c, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
 static DEVICE_ATTR(d, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
 static DEVICE_ATTR(e, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
 static DEVICE_ATTR(f, S_IRUGO | S_IWUSR, pcf2123_show, pcf2123_store);
+static DEVICE_ATTR(adjust, S_IRUGO | S_IWUSR, pcf2123_adjust_show,
+		   pcf2123_adjust_store);
 
 static struct attribute *pcf2123_attrs[] = {
 	&dev_attr_0.attr,
@@ -333,6 +400,7 @@ static struct attribute *pcf2123_attrs[] = {
 	&dev_attr_d.attr,
 	&dev_attr_e.attr,
 	&dev_attr_f.attr,
+	&dev_attr_adjust.attr,
 	NULL
 };
 
