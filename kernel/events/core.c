@@ -4937,7 +4937,7 @@ static void perf_sample_regs_user(struct perf_regs *regs_user,
 	}
 }
 
-static void perf_sample_regs_intr(struct perf_regs *regs_intr,
+void __attribute__((weak)) perf_sample_regs_intr(struct perf_regs *regs_intr,
 				  struct pt_regs *regs)
 {
 	regs_intr->regs = regs;

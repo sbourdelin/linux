@@ -57,6 +57,7 @@ struct cpu_hw_events {
 	void				*bhrb_context;
 	struct	perf_branch_stack	bhrb_stack;
 	struct	perf_branch_entry	bhrb_entries[BHRB_MAX_ENTRIES];
+	struct arch_misc_regs arch_regs;
 };
 
 static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
@@ -1904,6 +1905,28 @@ ssize_t power_events_sysfs_show(struct device *dev,
 	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
 }
 
+void perf_sample_regs_intr(struct perf_regs *regs_intr, struct pt_regs *regs)
+{
+	struct cpu_hw_events *cpuhw;
+	cpuhw = this_cpu_ptr(&cpu_hw_events);
+
+	regs_intr->regs = regs;
+	regs_intr->arch_regs = &cpuhw->arch_regs;
+	regs_intr->abi  = perf_reg_abi(current);
+}
+
+static void power_arch_misc_regs(struct arch_misc_regs *regs)
+{
+	regs->pmc1 = mfspr(SPRN_PMC1);
+	regs->pmc2 = mfspr(SPRN_PMC2);
+	regs->pmc3 = mfspr(SPRN_PMC3);
+	regs->pmc4 = mfspr(SPRN_PMC4);
+	regs->pmc5 = mfspr(SPRN_PMC5);
+	regs->pmc6 = mfspr(SPRN_PMC6);
+	regs->mmcr0 = mfspr(SPRN_MMCR0);
+	regs->mmcr1 = mfspr(SPRN_MMCR1);
+}
+
 static struct pmu power_pmu = {
 	.pmu_enable	= power_pmu_enable,
 	.pmu_disable	= power_pmu_disable,
@@ -1983,6 +2006,12 @@ static void record_and_restart(struct perf_event *event, unsigned long val,
 			cpuhw = this_cpu_ptr(&cpu_hw_events);
 			power_pmu_bhrb_read(cpuhw);
 			data.br_stack = &cpuhw->bhrb_stack;
+		}
+
+		if (event->attr.sample_type & PERF_SAMPLE_REGS_INTR) {
+			struct cpu_hw_events *cpuhw;
+			cpuhw = this_cpu_ptr(&cpu_hw_events);
+			power_arch_misc_regs(&cpuhw->arch_regs);
 		}
 
 		if (perf_event_overflow(event, &data, regs))
