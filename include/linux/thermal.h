@@ -176,6 +176,8 @@ struct thermal_attr {
  * @thermal_instances:	list of &struct thermal_instance of this thermal zone
  * @idr:	&struct idr to generate unique id for this zone's cooling
  *		devices
+ * @link_idr:	&struct idr to generate unique ids for this zone's links to
+ *		other thermal zones
  * @lock:	lock to protect thermal_instances list
  * @node:	node in thermal_tz_list (in thermal_core.c)
  * @poll_queue:	delayed work for polling
@@ -204,6 +206,7 @@ struct thermal_zone_device {
 	void *governor_data;
 	struct list_head thermal_instances;
 	struct idr idr;
+	struct idr link_idr;
 	struct mutex lock;
 	struct list_head node;
 	struct delayed_work poll_queue;

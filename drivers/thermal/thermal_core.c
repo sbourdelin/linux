@@ -62,6 +62,8 @@ static DEFINE_MUTEX(thermal_governor_lock);
 static struct thermal_governor *def_governor;
 
 struct thermal_zone_link {
+	int id;
+	char name[THERMAL_NAME_LENGTH];
 	struct thermal_zone_device *slave;
 	struct list_head node;
 };
@@ -2076,6 +2078,23 @@ int thermal_zone_add_subtz(struct thermal_zone_device *tz,
 	link->slave = subtz;
 	list_add_tail(&link->node, &tz->slave_tzs);
 
+	ret = get_idr(&tz->link_idr, NULL, &link->id);
+	if (ret) {
+		/*
+		 * Even if we couldn't create the symlink in sysfs,
+		 * we've linked the thermal zones, so return success
+		 */
+		ret = 0;
+		goto unlock;
+	}
+
+	snprintf(link->name, ARRAY_SIZE(link->name), "subtz%d", link->id);
+	ret = sysfs_create_link(&tz->device.kobj, &subtz->device.kobj,
+				link->name);
+	if (ret)
+		pr_warn("Failed to create symlink to sub thermal zone: %d\n",
+			ret);
+
 	ret = 0;
 
 unlock:
@@ -2107,6 +2126,9 @@ int thermal_zone_del_subtz(struct thermal_zone_device *tz,
 
 	list_for_each_entry(link, &tz->slave_tzs, node) {
 		if (link->slave == subtz) {
+			sysfs_remove_link(&tz->device.kobj, link->name);
+			release_idr(&tz->link_idr, NULL, link->id);
+
 			list_del(&link->node);
 			kfree(link);
 
