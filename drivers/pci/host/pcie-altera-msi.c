@@ -181,6 +181,8 @@ static const struct irq_domain_ops msi_domain_ops = {
 
 static int altera_allocate_domains(struct altera_msi *msi)
 {
+	struct fwnode_handle *fwnode = of_node_to_fwnode(msi->pdev->dev.of_node);
+
 	msi->inner_domain = irq_domain_add_linear(NULL, msi->num_of_vectors,
 					     &msi_domain_ops, msi);
 	if (!msi->inner_domain) {
@@ -188,7 +190,7 @@ static int altera_allocate_domains(struct altera_msi *msi)
 		return -ENOMEM;
 	}
 
-	msi->msi_domain = pci_msi_create_irq_domain(msi->pdev->dev.of_node,
+	msi->msi_domain = pci_msi_create_irq_domain(fwnode,
 				&altera_msi_domain_info, msi->inner_domain);
 	if (!msi->msi_domain) {
 		dev_err(&msi->pdev->dev, "failed to create MSI domain\n");
