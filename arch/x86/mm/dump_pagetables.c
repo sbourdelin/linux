@@ -362,8 +362,13 @@ static void ptdump_walk_pgd_level_core(struct seq_file *m, pgd_t *pgd,
 				       bool checkwx)
 {
 #ifdef CONFIG_X86_64
+/* ffff800000000000 - ffff87ffffffffff is reserved for hypervisor */
+#define is_hypervisor_range(idx) (paravirt_enabled() && \
+				  (((idx) >= pgd_index(__PAGE_OFFSET) - 16) && \
+				   ((idx) < pgd_index(__PAGE_OFFSET))))
 	pgd_t *start = (pgd_t *) &init_level4_pgt;
 #else
+#define is_hypervisor_range(idx)   0
 	pgd_t *start = swapper_pg_dir;
 #endif
 	pgprotval_t prot;
@@ -381,7 +386,7 @@ static void ptdump_walk_pgd_level_core(struct seq_file *m, pgd_t *pgd,
 
 	for (i = 0; i < PTRS_PER_PGD; i++) {
 		st.current_address = normalize_addr(i * PGD_LEVEL_MULT);
-		if (!pgd_none(*start)) {
+		if (!pgd_none(*start) && !is_hypervisor_range(i)) {
 			if (pgd_large(*start) || !pgd_present(*start)) {
 				prot = pgd_flags(*start);
 				note_page(m, &st, __pgprot(prot), 1);
