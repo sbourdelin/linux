@@ -629,11 +629,9 @@ static struct section_perm ro_perms[] = {
 static inline void section_update(unsigned long addr, pmdval_t mask,
 				  pmdval_t prot)
 {
-	struct mm_struct *mm;
 	pmd_t *pmd;
 
-	mm = current->active_mm;
-	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
+	pmd = pmd_offset(pud_offset(pgd_offset_k(addr), addr), addr);
 
 #ifdef CONFIG_ARM_LPAE
 	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
