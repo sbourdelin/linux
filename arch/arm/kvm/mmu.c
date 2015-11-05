@@ -206,18 +206,20 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
 
 	start_pte = pte = pte_offset_kernel(pmd, addr);
 	do {
-		if (!pte_none(*pte)) {
-			pte_t old_pte = *pte;
+		if (pte_none(*pte))
+			continue;
 
-			kvm_set_pte(pte, __pte(0));
-			kvm_tlb_flush_vmid_ipa(kvm, addr);
+		pte_t old_pte = *pte;
 
-			/* No need to invalidate the cache for device mappings */
-			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-				kvm_flush_dcache_pte(old_pte);
+		kvm_set_pte(pte, __pte(0));
+		kvm_tlb_flush_vmid_ipa(kvm, addr);
 
-			put_page(virt_to_page(pte));
-		}
+		/* No need to invalidate the cache for device mappings */
+		if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE &&
+		    (pte_val(old_pte) & PAGE_HYP_DEVICE) != PAGE_HYP_DEVICE)
+			kvm_flush_dcache_pte(old_pte);
+
+		put_page(virt_to_page(pte));
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 
 	if (kvm_pte_table_empty(kvm, start_pte))
