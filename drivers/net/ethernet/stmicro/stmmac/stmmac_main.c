@@ -652,11 +652,13 @@ static int stmmac_init_ptp(struct stmmac_priv *priv)
 	if (priv->dma_cap.atime_stamp && priv->extend_desc)
 		priv->adv_ts = 1;
 
-	if (netif_msg_hw(priv) && priv->dma_cap.time_stamp)
-		netdev_dbg(priv->dev, "IEEE 1588-2002 Time Stamp supported\n");
+	if (priv->dma_cap.time_stamp)
+		netif_dbg(priv, hw, priv->dev,
+			  "IEEE 1588-2002 Time Stamp supported\n");
 
-	if (netif_msg_hw(priv) && priv->adv_ts)
-		netdev_dbg(priv->dev, "IEEE 1588-2008 Advanced Time Stamp supported\n");
+	if (priv->adv_ts)
+		netif_dbg(priv, hw, priv->dev,
+			  "IEEE 1588-2008 Advanced Time Stamp supported\n");
 
 	priv->hw->ptp = &stmmac_ptp;
 	priv->hwts_tx_en = 0;
@@ -735,10 +737,9 @@ static void stmmac_adjust_link(struct net_device *dev)
 				stmmac_hw_fix_mac_speed(priv);
 				break;
 			default:
-				if (netif_msg_link(priv))
-					netdev_warn(priv->dev,
-						    "Speed (%d) not 10/100\n",
-						    phydev->speed);
+				netif_warn(priv, link, priv->dev,
+					   "Speed (%d) not 10/100\n",
+					   phydev->speed);
 				break;
 			}
 
@@ -1041,18 +1042,15 @@ static int init_dma_desc_rings(struct net_device *dev, gfp_t flags)
 
 	priv->dma_buf_sz = bfsize;
 
-	if (netif_msg_probe(priv))
-		netdev_dbg(priv->dev, "txsize %d, rxsize %d, bfsize %d\n",
-			   txsize, rxsize, bfsize);
+	netif_dbg(priv, probe, priv->dev, "txsize %d, rxsize %d, bfsize %d\n",
+		  txsize, rxsize, bfsize);
 
-	if (netif_msg_probe(priv)) {
-		netdev_dbg(priv->dev, "(%s) dma_rx_phy=0x%08x dma_tx_phy=0x%08x\n",
-			   __func__, (u32)priv->dma_rx_phy,
-			   (u32)priv->dma_tx_phy);
+	netif_dbg(priv, probe, priv->dev, "(%s) dma_rx_phy=0x%08x dma_tx_phy=0x%08x\n",
+		  __func__, (u32)priv->dma_rx_phy, (u32)priv->dma_tx_phy);
 
-		/* RX INITIALIZATION */
-		netdev_dbg(priv->dev, "SKB addresses:\nskb\t\tskb data\tdma data\n");
-	}
+	/* RX INITIALIZATION */
+	netif_dbg(priv, probe, priv->dev, "SKB addresses:\nskb\t\tskb data\tdma data\n");
+
 	for (i = 0; i < rxsize; i++) {
 		struct dma_desc *p;
 
@@ -1065,11 +1063,9 @@ static int init_dma_desc_rings(struct net_device *dev, gfp_t flags)
 		if (ret)
 			goto err_init_rx_buffers;
 
-		if (netif_msg_probe(priv))
-			netdev_dbg(priv->dev, "[%p]\t[%p]\t[%x]\n",
-				   priv->rx_skbuff[i],
-				 priv->rx_skbuff[i]->data,
-				 (unsigned int)priv->rx_skbuff_dma[i]);
+		netif_dbg(priv, probe, priv->dev, "[%p]\t[%p]\t[%x]\n",
+			  priv->rx_skbuff[i], priv->rx_skbuff[i]->data,
+			  (unsigned int)priv->rx_skbuff_dma[i]);
 	}
 	priv->cur_rx = 0;
 	priv->dirty_rx = (unsigned int)(i - rxsize);
@@ -1349,9 +1345,8 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
 
 			stmmac_get_tx_hwtstamp(priv, entry, skb);
 		}
-		if (netif_msg_tx_done(priv))
-			netdev_dbg(priv->dev, "curr %d, dirty %d\n",
-				   priv->cur_tx, priv->dirty_tx);
+		netif_dbg(priv, tx_done, priv->dev, "curr %d, dirty %d\n",
+			  priv->cur_tx, priv->dirty_tx);
 
 		if (likely(priv->tx_skbuff_dma[entry].buf)) {
 			if (priv->tx_skbuff_dma[entry].map_as_page)
@@ -1388,8 +1383,7 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
 		netif_tx_lock(priv->dev);
 		if (netif_queue_stopped(priv->dev) &&
 		    stmmac_tx_avail(priv) > STMMAC_TX_THRESH(priv)) {
-			if (netif_msg_tx_done(priv))
-				netdev_dbg(priv->dev, "restart transmit\n");
+			netif_dbg(priv, tx_done, priv->dev, "restart transmit\n");
 			netif_wake_queue(priv->dev);
 		}
 		netif_tx_unlock(priv->dev);
@@ -2066,8 +2060,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 		print_pkt(skb->data, skb->len);
 	}
 	if (unlikely(stmmac_tx_avail(priv) <= (MAX_SKB_FRAGS + 1))) {
-		if (netif_msg_hw(priv))
-			netdev_dbg(priv->dev, "stop transmitted packets\n");
+		netif_dbg(priv, hw, priv->dev, "stop transmitted packets\n");
 		netif_stop_queue(dev);
 	}
 
@@ -2155,9 +2148,8 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 
 			priv->hw->mode->refill_desc3(priv, p);
 
-			if (netif_msg_rx_status(priv))
-				netdev_dbg(priv->dev,
-					   "refill entry #%d\n", entry);
+			netif_dbg(priv, rx_status, priv->dev,
+				  "refill entry #%d\n", entry);
 		}
 		wmb();
 		priv->hw->desc->set_rx_owner(p);
