@@ -167,5 +167,43 @@
 			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
 			clock-names = "uartclk", "apb_pclk";
 		};
+		gpio0: gpio@f8011000 {
+			compatible = "arm,pl061", "arm,primecell";
+			reg = <0x0 0xf8011000 0x0 0x1000>;
+			interrupts = <0 52 0x4>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			clocks = <&ao_ctrl 2>;
+			clock-names = "apb_pclk";
+			status = "ok";
+		};
+
+		gpio1: gpio@f8012000 {
+			compatible = "arm,pl061", "arm,primecell";
+			reg = <0x0 0xf8012000 0x0 0x1000>;
+			interrupts = <0 53 0x4>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			clocks = <&ao_ctrl 2>;
+			clock-names = "apb_pclk";
+			status = "ok";
+		};
+
+		gpio2: gpio@f8013000 {
+			compatible = "arm,pl061", "arm,primecell";
+			reg = <0x0 0xf8013000 0x0 0x1000>;
+			interrupts = <0 54 0x4>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			clocks = <&ao_ctrl 2>;
+			clock-names = "apb_pclk";
+			status = "ok";
+		};
 	};
 };
