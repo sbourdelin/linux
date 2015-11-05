@@ -1103,6 +1103,9 @@ struct snd_soc_card {
 				   struct snd_soc_dapm_context *dapm,
 				   enum snd_soc_bias_level level);
 
+	int (*add_dai_link)(struct snd_soc_card *,
+			    struct snd_soc_dai_link *link);
+
 	long pmdown_time;
 
 	/* CPU <--> Codec DAI links  */

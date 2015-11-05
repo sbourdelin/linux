@@ -1243,6 +1243,10 @@ static int soc_init_dai_link(struct snd_soc_card *card,
 void snd_soc_add_dai_link(struct snd_soc_card *card,
 		struct snd_soc_dai_link *dai_link)
 {
+	/* Notify the machine driver for extra initialization. */
+	if (card && card->add_dai_link)
+		card->add_dai_link(card, dai_link);
+
 	lockdep_assert_held(&client_mutex);
 	list_add_tail(&dai_link->list, &card->dai_link_list);
 	card->num_dai_links++;
