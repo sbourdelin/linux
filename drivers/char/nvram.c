@@ -28,11 +28,11 @@
  * drivers, this is the case on the Atari.
  *
  *
- * 	1.1	Cesar Barros: SMP locking fixes
- * 		added changelog
- * 	1.2	Erik Gilling: Cobalt Networks support
- * 		Tim Hockin: general cleanup, Cobalt support
- * 	1.3	Wim Van Sebroeck: convert PRINT_PROC to seq_file
+ *	1.1	Cesar Barros: SMP locking fixes
+ *		added changelog
+ *	1.2	Erik Gilling: Cobalt Networks support
+ *		Tim Hockin: general cleanup, Cobalt support
+ *	1.3	Wim Van Sebroeck: convert PRINT_PROC to seq_file
  */
 
 #define NVRAM_VERSION	"1.3"
@@ -61,7 +61,7 @@
 #define PC_CKS_RANGE_START	2
 #define PC_CKS_RANGE_END	31
 #define PC_CKS_LOC		32
-#define NVRAM_BYTES		(128-NVRAM_FIRST_BYTE)
+#define NVRAM_BYTES		(128 - NVRAM_FIRST_BYTE)
 
 #define mach_check_checksum	pc_check_checksum
 #define mach_set_checksum	pc_set_checksum
@@ -74,13 +74,14 @@
 /* Special parameters for RTC in Atari machines */
 #include <asm/atarihw.h>
 #include <asm/atariints.h>
-#define RTC_PORT(x)		(TT_RTC_BAS + 2*(x))
+#define RTC_PORT(x)		(TT_RTC_BAS + 2 * (x))
 #define CHECK_DRIVER_INIT()	(MACH_IS_ATARI && ATARIHW_PRESENT(TT_CLK))
 
 #define NVRAM_BYTES		50
 
 /* On Ataris, the checksum is over all bytes except the checksum bytes
- * themselves; these are at the very end */
+ * themselves; these are at the very end
+ */
 #define ATARI_CKS_RANGE_START	0
 #define ATARI_CKS_RANGE_END	47
 #define ATARI_CKS_LOC		48
@@ -111,7 +112,6 @@
 #include <linux/uaccess.h>
 #include <linux/mutex.h>
 
-
 static DEFINE_MUTEX(nvram_mutex);
 static DEFINE_SPINLOCK(nvram_state_lock);
 static int nvram_open_cnt;	/* #times opened */
@@ -124,7 +124,7 @@ static void mach_set_checksum(void);
 
 #ifdef CONFIG_PROC_FS
 static void mach_proc_infos(unsigned char *contents, struct seq_file *seq,
-								void *offset);
+			    void *offset);
 #endif
 
 /*
@@ -231,7 +231,7 @@ static loff_t nvram_llseek(struct file *file, loff_t offset, int origin)
 }
 
 static ssize_t nvram_read(struct file *file, char __user *buf,
-						size_t count, loff_t *ppos)
+			  size_t count, loff_t *ppos)
 {
 	unsigned char contents[NVRAM_BYTES];
 	unsigned i = *ppos;
@@ -260,7 +260,7 @@ checksum_err:
 }
 
 static ssize_t nvram_write(struct file *file, const char __user *buf,
-						size_t count, loff_t *ppos)
+			   size_t count, loff_t *ppos)
 {
 	unsigned char contents[NVRAM_BYTES];
 	unsigned i = *ppos;
@@ -304,7 +304,6 @@ static long nvram_ioctl(struct file *file, unsigned int cmd,
 	int i;
 
 	switch (cmd) {
-
 	case NVRAM_INIT:
 		/* initialize NVRAM contents and checksum */
 		if (!capable(CAP_SYS_ADMIN))
@@ -323,7 +322,8 @@ static long nvram_ioctl(struct file *file, unsigned int cmd,
 
 	case NVRAM_SETCKS:
 		/* just set checksum, contents unchanged (maybe useful after
-		 * checksum garbaged somehow...) */
+		 * checksum garbaged somehow...)
+		 */
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 
@@ -449,17 +449,16 @@ static int __init nvram_init(void)
 
 	ret = misc_register(&nvram_dev);
 	if (ret) {
-		printk(KERN_ERR "nvram: can't misc_register on minor=%d\n",
-		    NVRAM_MINOR);
+		pr_err("nvram: can't misc_register on minor=%d\n", NVRAM_MINOR);
 		goto out;
 	}
 	ret = nvram_add_proc_fs();
 	if (ret) {
-		printk(KERN_ERR "nvram: can't create /proc/driver/nvram\n");
+		pri_err("nvram: can't create /proc/driver/nvram\n");
 		goto outmisc;
 	}
 	ret = 0;
-	printk(KERN_INFO "Non-volatile memory driver v" NVRAM_VERSION "\n");
+	pr_info("Non-volatile memory driver v" NVRAM_VERSION "\n");
 out:
 	return ret;
 outmisc:
@@ -490,8 +489,8 @@ static int pc_check_checksum(void)
 
 	for (i = PC_CKS_RANGE_START; i <= PC_CKS_RANGE_END; ++i)
 		sum += __nvram_read_byte(i);
-	expect = __nvram_read_byte(PC_CKS_LOC)<<8 |
-	    __nvram_read_byte(PC_CKS_LOC+1);
+	expect = __nvram_read_byte(PC_CKS_LOC) << 8 |
+	    __nvram_read_byte(PC_CKS_LOC + 1);
 	return (sum & 0xffff) == expect;
 }
 
@@ -521,7 +520,7 @@ static const char * const gfx_types[] = {
 };
 
 static void pc_proc_infos(unsigned char *nvram, struct seq_file *seq,
-								void *offset)
+			  void *offset)
 {
 	int checksum;
 	int type;
@@ -534,32 +533,32 @@ static void pc_proc_infos(unsigned char *nvram, struct seq_file *seq,
 
 	seq_printf(seq, "# floppies     : %d\n",
 	    (nvram[6] & 1) ? (nvram[6] >> 6) + 1 : 0);
-	seq_printf(seq, "Floppy 0 type  : ");
+	seq_puts(seq, "Floppy 0 type  : ");
 	type = nvram[2] >> 4;
 	if (type < ARRAY_SIZE(floppy_types))
 		seq_printf(seq, "%s\n", floppy_types[type]);
 	else
 		seq_printf(seq, "%d (unknown)\n", type);
-	seq_printf(seq, "Floppy 1 type  : ");
+	seq_puts(seq, "Floppy 1 type  : ");
 	type = nvram[2] & 0x0f;
 	if (type < ARRAY_SIZE(floppy_types))
 		seq_printf(seq, "%s\n", floppy_types[type]);
 	else
 		seq_printf(seq, "%d (unknown)\n", type);
 
-	seq_printf(seq, "HD 0 type      : ");
+	seq_puts(seq, "HD 0 type      : ");
 	type = nvram[4] >> 4;
 	if (type)
 		seq_printf(seq, "%02x\n", type == 0x0f ? nvram[11] : type);
 	else
-		seq_printf(seq, "none\n");
+		seq_puts(seq, "none\n");
 
-	seq_printf(seq, "HD 1 type      : ");
+	seq_puts(seq, "HD 1 type      : ");
 	type = nvram[4] & 0x0f;
 	if (type)
 		seq_printf(seq, "%02x\n", type == 0x0f ? nvram[12] : type);
 	else
-		seq_printf(seq, "none\n");
+		seq_puts(seq, "none\n");
 
 	seq_printf(seq, "HD type 48 data: %d/%d/%d C/H/S, precomp %d, lz %d\n",
 	    nvram[18] | (nvram[19] << 8),
@@ -579,8 +578,6 @@ static void pc_proc_infos(unsigned char *nvram, struct seq_file *seq,
 
 	seq_printf(seq, "FPU            : %sinstalled\n",
 	    (nvram[6] & 2) ? "" : "not ");
-
-	return;
 }
 #endif
 
@@ -651,7 +648,7 @@ static const char * const colors[] = {
 };
 
 static void atari_proc_infos(unsigned char *nvram, struct seq_file *seq,
-								void *offset)
+			     void *offset)
 {
 	int checksum = nvram_check_checksum();
 	int i;
@@ -659,7 +656,7 @@ static void atari_proc_infos(unsigned char *nvram, struct seq_file *seq,
 
 	seq_printf(seq, "Checksum status  : %svalid\n", checksum ? "" : "not ");
 
-	seq_printf(seq, "Boot preference  : ");
+	seq_puts(seq, "Boot preference  : ");
 	for (i = ARRAY_SIZE(boot_prefs) - 1; i >= 0; --i) {
 		if (nvram[1] == boot_prefs[i].val) {
 			seq_printf(seq, "%s\n", boot_prefs[i].name);
@@ -671,33 +668,33 @@ static void atari_proc_infos(unsigned char *nvram, struct seq_file *seq,
 
 	seq_printf(seq, "SCSI arbitration : %s\n",
 	    (nvram[16] & 0x80) ? "on" : "off");
-	seq_printf(seq, "SCSI host ID     : ");
+	seq_puts(seq, "SCSI host ID     : ");
 	if (nvram[16] & 0x80)
 		seq_printf(seq, "%d\n", nvram[16] & 7);
 	else
-		seq_printf(seq, "n/a\n");
+		seq_puts(seq, "n/a\n");
 
 	/* the following entries are defined only for the Falcon */
 	if ((atari_mch_cookie >> 16) != ATARI_MCH_FALCON)
 		return;
 
-	seq_printf(seq, "OS language      : ");
+	seq_puts(seq, "OS language      : ");
 	if (nvram[6] < ARRAY_SIZE(languages))
 		seq_printf(seq, "%s\n", languages[nvram[6]]);
 	else
 		seq_printf(seq, "%u (undefined)\n", nvram[6]);
-	seq_printf(seq, "Keyboard language: ");
+	seq_puts(seq, "Keyboard language: ");
 	if (nvram[7] < ARRAY_SIZE(languages))
 		seq_printf(seq, "%s\n", languages[nvram[7]]);
 	else
 		seq_printf(seq, "%u (undefined)\n", nvram[7]);
-	seq_printf(seq, "Date format      : ");
+	seq_puts(seq, "Date format      : ");
 	seq_printf(seq, dateformat[nvram[8] & 7],
 	    nvram[9] ? nvram[9] : '/', nvram[9] ? nvram[9] : '/');
 	seq_printf(seq, ", %dh clock\n", nvram[8] & 16 ? 24 : 12);
-	seq_printf(seq, "Boot delay       : ");
+	seq_puts(seq, "Boot delay       : ");
 	if (nvram[10] == 0)
-		seq_printf(seq, "default");
+		seq_puts(seq, "default");
 	else
 		seq_printf(seq, "%ds%s\n", nvram[10],
 		    nvram[10] < 8 ? ", no memory test" : "");
@@ -713,8 +710,6 @@ static void atari_proc_infos(unsigned char *nvram, struct seq_file *seq,
 	    vmode & 128 ? "on" : "off",
 	    vmode & 256 ?
 	    (vmode & 16 ? ", line doubling" : ", half screen") : "");
-
-	return;
 }
 #endif
 
