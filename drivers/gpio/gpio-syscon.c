@@ -192,6 +192,9 @@ static int syscon_gpio_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	int ret;
 
+	if (!of_id)
+		return -ENODEV;
+
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
