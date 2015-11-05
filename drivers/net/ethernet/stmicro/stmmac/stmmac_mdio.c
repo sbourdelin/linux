@@ -176,7 +176,7 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 #endif
 
 	if (data->phy_reset) {
-		pr_debug("stmmac_mdio_reset: calling phy_reset\n");
+		netdev_dbg(ndev, "stmmac_mdio_reset: calling phy_reset\n");
 		data->phy_reset(priv->plat->bsp_priv);
 	}
 
@@ -235,7 +235,7 @@ int stmmac_mdio_register(struct net_device *ndev)
 	new_bus->parent = priv->device;
 	err = mdiobus_register(new_bus);
 	if (err != 0) {
-		pr_err("%s: Cannot register as MDIO bus\n", new_bus->name);
+		netdev_err(ndev, "Cannot register the MDIO bus\n");
 		goto bus_register_fail;
 	}
 
@@ -278,16 +278,16 @@ int stmmac_mdio_register(struct net_device *ndev)
 				irq_str = irq_num;
 				break;
 			}
-			pr_info("%s: PHY ID %08x at %d IRQ %s (%s)%s\n",
-				ndev->name, phydev->phy_id, addr,
-				irq_str, dev_name(&phydev->dev),
-				act ? " active" : "");
+			netdev_info(ndev, "PHY ID %08x at %d IRQ %s (%s)%s\n",
+				    phydev->phy_id, addr,
+				    irq_str, dev_name(&phydev->dev),
+				    act ? " active" : "");
 			found = 1;
 		}
 	}
 
 	if (!found) {
-		pr_warn("%s: No PHY found\n", ndev->name);
+		netdev_warn(ndev, "No PHY found\n");
 		mdiobus_unregister(new_bus);
 		mdiobus_free(new_bus);
 		return -ENODEV;
