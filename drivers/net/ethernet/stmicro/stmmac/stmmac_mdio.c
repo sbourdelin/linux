@@ -13,10 +13,6 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
   more details.
 
-  You should have received a copy of the GNU General Public License along with
-  this program; if not, write to the Free Software Foundation, Inc.,
-  51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
-
   The full GNU General Public License is included in this distribution in
   the file called "COPYING".
 
@@ -30,7 +26,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 
-#include <asm/io.h>
+#include <linux/io.h>
 
 #include "stmmac.h"
 
@@ -142,6 +138,7 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 
 		if (data->reset_gpio < 0) {
 			struct device_node *np = priv->device->of_node;
+
 			if (!np)
 				return 0;
 
@@ -207,7 +204,7 @@ int stmmac_mdio_register(struct net_device *ndev)
 		return 0;
 
 	new_bus = mdiobus_alloc();
-	if (new_bus == NULL)
+	if (!new_bus)
 		return -ENOMEM;
 
 	if (mdio_bus_data->irqs) {
@@ -242,23 +239,22 @@ int stmmac_mdio_register(struct net_device *ndev)
 	found = 0;
 	for (addr = 0; addr < PHY_MAX_ADDR; addr++) {
 		struct phy_device *phydev = new_bus->phy_map[addr];
+
 		if (phydev) {
 			int act = 0;
 			char irq_num[4];
 			char *irq_str;
 
-			/*
-			 * If an IRQ was provided to be assigned after
+			/* If an IRQ was provided to be assigned after
 			 * the bus probe, do it here.
 			 */
-			if ((mdio_bus_data->irqs == NULL) &&
+			if ((!mdio_bus_data->irqs) &&
 			    (mdio_bus_data->probed_phy_irq > 0)) {
 				irqlist[addr] = mdio_bus_data->probed_phy_irq;
 				phydev->irq = mdio_bus_data->probed_phy_irq;
 			}
 
-			/*
-			 * If we're going to bind the MAC to this PHY bus,
+			/* If we're going to bind the MAC to this PHY bus,
 			 * and no PHY number was provided to the MAC,
 			 * use the one probed here.
 			 */
