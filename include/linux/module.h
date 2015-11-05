@@ -766,9 +766,13 @@ extern int module_sysfs_initialized;
 #define __MODULE_STRING(x) __stringify(x)
 
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
+extern void set_module_core_ro_nx(struct module *mod);
+extern void unset_module_core_ro_nx(struct module *mod);
 extern void set_all_modules_text_rw(void);
 extern void set_all_modules_text_ro(void);
 #else
+static inline void set_module_core_ro_nx(struct module *mod) { }
+static inline void unset_module_core_ro_nx(struct module *mod) { }
 static inline void set_all_modules_text_rw(void) { }
 static inline void set_all_modules_text_ro(void) { }
 #endif

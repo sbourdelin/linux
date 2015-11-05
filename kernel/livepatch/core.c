@@ -28,6 +28,7 @@
 #include <linux/list.h>
 #include <linux/kallsyms.h>
 #include <linux/livepatch.h>
+#include <asm/cacheflush.h>
 
 /**
  * struct klp_ops - structure for tracking registered ftrace ops structs
@@ -283,7 +284,7 @@ static int klp_find_external_symbol(struct module *pmod, const char *name,
 static int klp_write_object_relocations(struct module *pmod,
 					struct klp_object *obj)
 {
-	int ret;
+	int ret = 0;
 	struct klp_reloc *reloc;
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
@@ -292,12 +293,14 @@ static int klp_write_object_relocations(struct module *pmod,
 	if (WARN_ON(!obj->relocs))
 		return -EINVAL;
 
+	unset_module_core_ro_nx(pmod);
+
 	for (reloc = obj->relocs; reloc->name; reloc++) {
 		if (!klp_is_module(obj)) {
 			ret = klp_verify_vmlinux_symbol(reloc->name,
 							reloc->val);
 			if (ret)
-				return ret;
+				goto out;
 		} else {
 			/* module, reloc->val needs to be discovered */
 			if (reloc->external)
@@ -309,18 +312,20 @@ static int klp_write_object_relocations(struct module *pmod,
 							     reloc->name,
 							     &reloc->val);
 			if (ret)
-				return ret;
+				goto out;
 		}
 		ret = klp_write_module_reloc(pmod, reloc->type, reloc->loc,
 					     reloc->val + reloc->addend);
 		if (ret) {
 			pr_err("relocation failed for symbol '%s' at 0x%016lx (%d)\n",
 			       reloc->name, reloc->val, ret);
-			return ret;
+			goto out;
 		}
 	}
 
-	return 0;
+out:
+	set_module_core_ro_nx(pmod);
+	return ret;
 }
 
 static void notrace klp_ftrace_handler(unsigned long ip,

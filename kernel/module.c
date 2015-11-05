@@ -1911,14 +1911,14 @@ static void set_section_ro_nx(void *base,
 	}
 }
 
-static void set_module_core_ro_nx(struct module *mod)
+void set_module_core_ro_nx(struct module *mod)
 {
 	set_section_ro_nx(mod->module_core, mod->core_text_size,
 			  mod->core_ro_size, mod->core_size,
 			  set_memory_ro, set_memory_nx);
 }
 
-static void unset_module_core_ro_nx(struct module *mod)
+void unset_module_core_ro_nx(struct module *mod)
 {
 	set_section_ro_nx(mod->module_core, mod->core_text_size,
 			  mod->core_ro_size, mod->core_size,
@@ -1985,9 +1985,7 @@ void set_all_modules_text_ro(void)
 	mutex_unlock(&module_mutex);
 }
 #else
-static void set_module_core_ro_nx(struct module *mod) { }
 static void set_module_init_ro_nx(struct module *mod) { }
-static void unset_module_core_ro_nx(struct module *mod) { }
 static void unset_module_init_ro_nx(struct module *mod) { }
 #endif
 
