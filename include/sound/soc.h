@@ -1039,6 +1039,7 @@ struct snd_soc_dai_link {
 	unsigned int ignore_pmdown_time:1;
 
 	struct list_head list; /* dai link list of the soc card */
+	struct snd_soc_dobj dobj;
 };
 
 struct snd_soc_codec_conf {
