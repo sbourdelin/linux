@@ -1228,6 +1228,27 @@ static int soc_init_dai_link(struct snd_soc_card *card,
 	return 0;
 }
 
+/**
+ * snd_soc_add_dai_link - Add a DAI link dynamically
+ * @card: The ASoC card to which the DAI link is added
+ * @dai_link: The new DAI link to add
+ *
+ * This function adds a DAI link to the ASoC card, and creates a ASoC
+ * runtime for the link.
+ *
+ * Note: For adding DAI links dynamically by machine drivers based on
+ * the topology info when probing the platform component. And machine
+ * drivers can still define static DAI links in dai_link array.
+ */
+void snd_soc_add_dai_link(struct snd_soc_card *card,
+		struct snd_soc_dai_link *dai_link)
+{
+	lockdep_assert_held(&client_mutex);
+	list_add_tail(&dai_link->list, &card->dai_link_list);
+	card->num_dai_links++;
+}
+EXPORT_SYMBOL_GPL(snd_soc_add_dai_link);
+
 static void soc_set_name_prefix(struct snd_soc_card *card,
 				struct snd_soc_component *component)
 {
@@ -1721,6 +1742,10 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 		if (ret != 0)
 			goto base_error;
 	}
+
+	/* add predefined DAI links to the list */
+	for (i = 0; i < card->num_links; i++)
+		snd_soc_add_dai_link(card, card->dai_link+i);
 
 	/* initialize the register cache for each available codec */
 	list_for_each_entry(codec, &codec_list, list) {
@@ -2478,6 +2503,9 @@ int snd_soc_register_card(struct snd_soc_card *card)
 	dev_set_drvdata(card->dev, card);
 
 	snd_soc_initialize_card_lists(card);
+
+	INIT_LIST_HEAD(&card->dai_link_list);
+	card->num_dai_links = 0;
 
 	INIT_LIST_HEAD(&card->rtd_list);
 	card->num_rtd = 0;
