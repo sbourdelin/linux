@@ -3176,6 +3176,9 @@ int sdhci_add_host(struct sdhci_host *host)
 	} else if (caps[1] & SDHCI_SUPPORT_SDR50)
 		mmc->caps |= MMC_CAP_UHS_SDR50;
 
+	if (host->quirks2 & SDHCI_QUIRK2_BROKEN_SDR50)
+		mmc->caps &= ~MMC_CAP_UHS_SDR50;
+
 	if (host->quirks2 & SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400 &&
 	    (caps[1] & SDHCI_SUPPORT_HS400))
 		mmc->caps2 |= MMC_CAP2_HS400;
