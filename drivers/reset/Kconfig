@@ -1,9 +1,5 @@
-config ARCH_HAS_RESET_CONTROLLER
+config RESET_CONTROLLER
 	bool
-
-menuconfig RESET_CONTROLLER
-	bool "Reset Controller Support"
-	default y if ARCH_HAS_RESET_CONTROLLER
 	help
 	  Generic Reset Controller support.
 
@@ -12,4 +8,10 @@ menuconfig RESET_CONTROLLER
 
 	  If unsure, say no.
 
+
+menu "Reset Controllers"
+	depends on RESET_CONTROLLER
+
 source "drivers/reset/sti/Kconfig"
+
+endmenu
