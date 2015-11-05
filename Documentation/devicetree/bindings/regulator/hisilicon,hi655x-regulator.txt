@@ -1,0 +1,50 @@
+Hisilicon Hi655x Voltage regulators
+
+Note:
+The hi655x regulator control is managed by hi655x Power IC.
+So the node of this regulator must be child node of hi655x
+pmic node.
+
+The driver uses the regulator core framework, so please also
+take the bindings of regulator.txt for reference.
+
+Required properties:
+- compatible: Must be "hisilicon,hi655x-regulator-pmic";
+- regulator-name: Regulator name in SoC.
+- regulator-min-microvolt: Smallest voltage support.
+- regulator-max-microvolt: Largest voltages support.
+- regulator-initial-mode: Init mode of this regulator.
+- regulator-valid-modes-mask: Valid support mode mask.
+- regulator-off-on-delay: The time wait for power steady
+- regulator-ctrl-regs: Registers offset of control register.
+  In turn with enable disable and status register offset.
+- regulator-ctrl-mask: The control mask of the register.
+- regulator-vset-regs: Voltage set register offset.
+- regulator-vset-mask: voltage set control mask.
+- regulator-n-vol: The num of support voltages.
+- regulator-vset-table: The table of support voltages.
+
+Example:
+        pmic: pmic@f8000000 {
+                compatible = "hisilicon,hi655x-pmic-driver";
+		...
+                ldo2: regulator@a21 {
+                        compatible = "hisilicon,hi655x-regulator-pmic";
+                        regulator-name = "ldo2";
+                        regulator-min-microvolt = <2500000>;
+                        regulator-max-microvolt = <3200000>;
+                        regulator-valid-modes-mask = <0x02>;
+                        regulator-initial-mode = <0x02>;
+                        regulator-off-on-delay = <120>;
+                        regulator-ctrl-regs = <0x029 0x02a 0x02b>;
+                        regulator-ctrl-mask = <0x1>;
+                        regulator-vset-regs = <0x072>;
+                        regulator-vset-mask = <0x3>;
+                        regulator-n-vol = <8>;
+                        regulator-vset-table  = <2500000>,<2600000>,
+                                                <2700000>,<2800000>,
+                                                <2900000>,<3000000>,
+                                                <3100000>,<3200000>;
+                };
+		...
+	}
