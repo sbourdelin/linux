@@ -1767,6 +1767,18 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 			goto base_error;
 	}
 
+	/* find auxiliary components */
+	for (i = 0; i < card->num_aux_components; i++) {
+		card->aux_components[i].comp =
+			soc_find_component(NULL, card->aux_components[i].name);
+		if (!card->aux_components[i].comp) {
+			dev_err(card->dev, "ASoC: Aux component %s not registered\n",
+				card->aux_components[i].name);
+			ret = -EPROBE_DEFER;
+			goto base_error;
+		}
+	}
+
 	/* add predefined DAI links to the list */
 	for (i = 0; i < card->num_links; i++)
 		snd_soc_add_dai_link(card, card->dai_link+i);
@@ -1819,6 +1831,21 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 		ret = card->probe(card);
 		if (ret < 0)
 			goto card_probe_error;
+	}
+
+	/* probe auxiliary components */
+	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
+			order++) {
+		for (i = 0; i < card->num_aux_components; i++) {
+			ret = soc_probe_component(card,
+					card->aux_components[i].comp);
+			if (ret < 0) {
+				dev_err(card->dev,
+					"ASoC: failed to probe aux component %s %d\n",
+					card->aux_components[i].name, ret);
+				goto probe_dai_err;
+			}
+		}
 	}
 
 	/* probe all components used by DAI links on this card */

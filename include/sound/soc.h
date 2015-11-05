@@ -1070,6 +1070,11 @@ struct snd_soc_aux_dev {
 	int (*init)(struct snd_soc_component *component);
 };
 
+struct snd_soc_aux_component {
+	const char *name;
+	struct snd_soc_component *comp;
+};
+
 /* SoC card */
 struct snd_soc_card {
 	const char *name;
@@ -1113,6 +1118,10 @@ struct snd_soc_card {
 	int num_links;  /* predefined links only */
 	struct list_head dai_link_list; /* all links */
 	int num_dai_links;
+
+	/* auxiliary components, e.g. topology */
+	struct snd_soc_aux_component *aux_components;
+	int num_aux_components;
 
 	struct list_head rtd_list;
 	int num_rtd;
