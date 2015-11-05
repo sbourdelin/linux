@@ -313,7 +313,7 @@ static ssize_t hfi1_file_write(struct file *fp, const char __user *data,
 	case HFI1_CMD_SDMA_STATUS_UPD:
 		break;
 	case HFI1_CMD_CREDIT_UPD:
-		if (uctxt && uctxt->sc)
+		if (uctxt)
 			sc_return_credits(uctxt->sc);
 		break;
 	case HFI1_CMD_TID_UPDATE:
