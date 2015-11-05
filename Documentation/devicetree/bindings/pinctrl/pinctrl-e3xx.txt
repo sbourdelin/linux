@@ -1,0 +1,27 @@
+USRP E3xx Pincontrol bindings
+
+The pins of the NI Ettus Research USRP E3xx idle image can be configured for different
+daughterboard configurations. This pinmux is implemented in an FPGA as soft core.
+
+Required properties:
+- compatible: Must be one of the following:
+  - "ettus,pinctrl-e3xx-1.0"
+- clocks: The clock driving the pinmux
+
+Example:
+
+	e3xx_pinctrl: e3xx-pinctrl@40200a00 {
+		compatible = "ettus,e3xx-pinctrl-1.0";
+		reg = <0x40200a00 0x1000>;
+		clocks = <&clkc 15>;
+
+		foo_state: pinconf {
+			conf {
+				pins = E31X_LED_RX1_RX;
+				output-low;
+			};
+		};
+	};
+
+Note: Constants that facilitate creation of devicetree files are available in
+      include/dt-bindings/pinctrl/pinctrl-e3xx.h
