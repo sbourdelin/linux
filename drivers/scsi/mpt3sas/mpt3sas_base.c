@@ -1535,9 +1535,29 @@ _base_config_dma_addressing(struct MPT3SAS_ADAPTER *ioc, struct pci_dev *pdev)
 		ioc->base_add_sg_single = &_base_add_sg_single_32;
 		ioc->sge_size = sizeof(Mpi2SGESimple32_t);
 		ioc->dma_mask = 32;
-	} else
+	} else {
+		/* Try 64 bit, 32 bit failed */
+		consistent_dma_mask = DMA_BIT_MASK(64);
+		if (sizeof(dma_addr_t) > 4) {
+			const uint64_t required_mask =
+				dma_get_required_mask(&pdev->dev);
+			int consistent_mask =
+				pci_set_consistent_dma_mask(pdev,
+							consistent_dma_mask);
+
+			if ((required_mask > DMA_BIT_MASK(32)) &&
+				!pci_set_dma_mask(pdev, DMA_BIT_MASK(64)) &&
+				!consistent_mask) {
+				ioc->base_add_sg_single =
+					&_base_add_sg_single_64;
+				ioc->sge_size = sizeof(Mpi2SGESimple64_t);
+				ioc->dma_mask = 64;
+				goto out;
+			}
+		}
 		return -ENODEV;
 
+	}
  out:
 	si_meminfo(&s);
 	pr_info(MPT3SAS_FMT
