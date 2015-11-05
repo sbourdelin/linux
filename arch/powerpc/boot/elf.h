@@ -133,15 +133,13 @@ typedef struct elf64_phdr {
 #define	ELFCLASSNONE	0	/* EI_CLASS */
 #define	ELFCLASS32	1
 #define	ELFCLASS64	2
-#define	ELFCLASSNUM	3
 
-#define ELFDATANONE	0	/* e_ident[EI_DATA] */
+#define ELFDATANONE	0	/* EI_DATA */
 #define ELFDATA2LSB	1
 #define ELFDATA2MSB	2
 
-#define EV_NONE		0	/* e_version, EI_VERSION */
+#define EV_NONE		0	/* EI_VERSION */
 #define EV_CURRENT	1
-#define EV_NUM		2
 
 #define ELFOSABI_NONE	0
 #define ELFOSABI_LINUX	3
