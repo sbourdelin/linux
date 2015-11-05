@@ -236,7 +236,8 @@ static int pop_vlan(struct sk_buff *skb, struct sw_flow_key *key)
 	if (skb_vlan_tag_present(skb))
 		invalidate_flow_key(key);
 	else
-		key->eth.tci = 0;
+		key->eth.vlan.tci = 0;
+		key->eth.vlan.tpid = 0;
 	return err;
 }
 
@@ -246,7 +247,8 @@ static int push_vlan(struct sk_buff *skb, struct sw_flow_key *key,
 	if (skb_vlan_tag_present(skb))
 		invalidate_flow_key(key);
 	else
-		key->eth.tci = vlan->vlan_tci;
+		key->eth.vlan.tci = vlan->vlan_tci;
+		key->eth.vlan.tpid = vlan->vlan_tpid;
 	return skb_vlan_push(skb, vlan->vlan_tpid,
 			     ntohs(vlan->vlan_tci) & ~VLAN_TAG_PRESENT);
 }
