@@ -47,9 +47,6 @@ enum {
 	LST_INIT_CONSOLE
 };
 
-extern int lstcon_console_init(void);
-extern int lstcon_console_fini(void);
-
 static int lst_init_step = LST_INIT_NONE;
 
 struct cfs_wi_sched *lst_sched_serial;

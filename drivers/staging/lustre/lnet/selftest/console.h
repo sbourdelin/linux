@@ -169,6 +169,8 @@ typedef struct {
 } lstcon_session_t; /* session descriptor */
 
 extern lstcon_session_t	 console_session;
+extern srpc_service_t lstcon_acceptor_service;
+int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data);
 
 static inline lstcon_trans_stat_t *
 lstcon_trans_stat(void)

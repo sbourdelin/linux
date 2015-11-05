@@ -1698,8 +1698,6 @@ lstcon_new_session_id(lst_sid_t *sid)
 	sid->ses_stamp = cfs_time_current();
 }
 
-extern srpc_service_t lstcon_acceptor_service;
-
 int
 lstcon_session_new(char *name, int key, unsigned feats,
 		   int timeout, int force, lst_sid_t *sid_up)
@@ -1983,8 +1981,6 @@ static void lstcon_init_acceptor_service(void)
 	lstcon_acceptor_service.sv_id       = SRPC_SERVICE_JOIN;
 	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
 }
-
-extern int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data);
 
 static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
 
