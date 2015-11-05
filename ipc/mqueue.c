@@ -885,8 +885,7 @@ SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
 
 out_unlock:
 	mutex_unlock(&d_inode(mnt->mnt_root)->i_mutex);
-	if (inode)
-		iput(inode);
+	iput(inode);
 	mnt_drop_write(mnt);
 out_name:
 	putname(name);
@@ -1460,8 +1459,7 @@ static int __init init_mqueue_fs(void)
 out_filesystem:
 	unregister_filesystem(&mqueue_fs_type);
 out_sysctl:
-	if (mq_sysctl_table)
-		unregister_sysctl_table(mq_sysctl_table);
+	unregister_sysctl_table(mq_sysctl_table);
 	kmem_cache_destroy(mqueue_inode_cachep);
 	return error;
 }
