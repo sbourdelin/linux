@@ -120,6 +120,9 @@ static int mmio_74xx_gpio_probe(struct platform_device *pdev)
 	void __iomem *dat;
 	int err;
 
+	if (!of_id)
+		return -ENODEV;
+
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
