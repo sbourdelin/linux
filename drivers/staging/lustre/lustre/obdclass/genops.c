@@ -216,8 +216,7 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 	return 0;
 
  failed:
-	if (type->typ_kobj)
-		kobject_put(type->typ_kobj);
+	kobject_put(type->typ_kobj);
 	kfree(type->typ_name);
 	kfree(type->typ_md_ops);
 	kfree(type->typ_dt_ops);
@@ -244,8 +243,7 @@ int class_unregister_type(const char *name)
 		return -EBUSY;
 	}
 
-	if (type->typ_kobj)
-		kobject_put(type->typ_kobj);
+	kobject_put(type->typ_kobj);
 
 	if (!IS_ERR_OR_NULL(type->typ_debugfs_entry))
 		ldebugfs_remove(&type->typ_debugfs_entry);

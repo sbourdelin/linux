@@ -1062,13 +1062,9 @@ static int ldlm_cleanup(void)
 	if (ldlm_state->ldlm_cb_service != NULL)
 		ptlrpc_unregister_service(ldlm_state->ldlm_cb_service);
 
-	if (ldlm_ns_kset)
-		kset_unregister(ldlm_ns_kset);
-	if (ldlm_svc_kset)
-		kset_unregister(ldlm_svc_kset);
-	if (ldlm_kobj)
-		kobject_put(ldlm_kobj);
-
+	kset_unregister(ldlm_ns_kset);
+	kset_unregister(ldlm_svc_kset);
+	kobject_put(ldlm_kobj);
 	ldlm_debugfs_cleanup();
 
 	kfree(ldlm_state);

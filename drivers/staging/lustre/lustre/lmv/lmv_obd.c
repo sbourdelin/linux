@@ -240,7 +240,7 @@ static int lmv_connect(const struct lu_env *env,
 	if (data->ocd_connect_flags & OBD_CONNECT_REAL)
 		rc = lmv_check_connect(obd);
 
-	if (rc && lmv->lmv_tgts_kobj)
+	if (rc)
 		kobject_put(lmv->lmv_tgts_kobj);
 
 	return rc;
@@ -646,8 +646,7 @@ static int lmv_disconnect(struct obd_export *exp)
 		lmv_disconnect_mdc(obd, lmv->tgts[i]);
 	}
 
-	if (lmv->lmv_tgts_kobj)
-		kobject_put(lmv->lmv_tgts_kobj);
+	kobject_put(lmv->lmv_tgts_kobj);
 
 out_local:
 	/*
