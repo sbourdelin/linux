@@ -3341,6 +3341,15 @@ L:	linux-pm@vger.kernel.org
 S:	Maintained
 F:	drivers/devfreq/
 
+DEVICE FREQUENCY EVENT (DEVFREQ-EVENT)
+M:	Chanwoo Choi <cw00.choi@samsung.com>
+L:	linux-pm@vger.kernel.org
+S:	Supported
+F:	drivers/devfreq/event
+F:	drivers/devfreq/devfreq-event.c
+F:	include/linux/devfreq-event.h
+F:	Documentation/devicetree/bindings/devfreq/event
+
 DEVICE NUMBER REGISTRY
 M:	Torben Mathiasen <device@lanana.org>
 W:	http://lanana.org/docs/device-list/index.html
