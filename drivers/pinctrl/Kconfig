@@ -101,6 +101,17 @@ config PINCTRL_DIGICOLOR
 	select PINMUX
 	select GENERIC_PINCONF
 
+config PINCTRL_E3XX
+	bool "NI Ettus Research USRP E3xx pinctrl driver"
+	depends on OF
+	select PINCONF
+	select GENERIC_PINCONF
+	help
+	  Say Y here to support Ettus Research E3xx pinctrl driver, which is used for
+	  the NI Ettus Research USRP E3xx family of embedded SDRs, including E310
+	  and E330.
+	  This driver requires the pinctrl framework.
+
 config PINCTRL_LANTIQ
 	bool
 	depends on LANTIQ
