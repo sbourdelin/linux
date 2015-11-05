@@ -259,6 +259,8 @@ extern int nfs4_set_rw_stateid(nfs4_stateid *stateid,
 		fmode_t fmode);
 
 #if defined(CONFIG_NFS_V4_1)
+int nfs41_free_stateid(struct nfs_server *, nfs4_stateid *,
+		struct rpc_cred *, int issync);
 static inline struct nfs4_session *nfs4_get_session(const struct nfs_server *server)
 {
 	return server->nfs_client->cl_session;

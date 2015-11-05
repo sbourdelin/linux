@@ -205,6 +205,12 @@ static int nfs_do_return_delegation(struct inode *inode, struct nfs_delegation *
 				delegation->cred,
 				&delegation->stateid,
 				issync);
+#if defined(CONFIG_NFS_V4_1)
+	else if (NFS_SERVER(inode)->nfs_client->cl_minorversion)
+		res = nfs41_free_stateid(NFS_SERVER(inode),
+					&delegation->stateid,
+					delegation->cred, issync);
+#endif /* CONFIG_NFS_V4_1 */
 	nfs_free_delegation(delegation);
 	return res;
 }

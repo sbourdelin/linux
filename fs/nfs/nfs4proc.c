@@ -89,8 +89,6 @@ static int nfs4_do_setattr(struct inode *inode, struct rpc_cred *cred,
 #ifdef CONFIG_NFS_V4_1
 static int nfs41_test_stateid(struct nfs_server *, nfs4_stateid *,
 		struct rpc_cred *);
-static int nfs41_free_stateid(struct nfs_server *, nfs4_stateid *,
-		struct rpc_cred *);
 #endif
 
 #ifdef CONFIG_NFS_V4_SECURITY_LABEL
@@ -2274,7 +2272,7 @@ static void nfs41_check_delegation_stateid(struct nfs4_state *state)
 		/* Free the stateid unless the server explicitly
 		 * informs us the stateid is unrecognized. */
 		if (status != -NFS4ERR_BAD_STATEID)
-			nfs41_free_stateid(server, &stateid, cred);
+			nfs41_free_stateid(server, &stateid, cred, 1);
 		nfs_finish_clear_delegation_stateid(state);
 	}
 
@@ -2308,7 +2306,7 @@ static int nfs41_check_open_stateid(struct nfs4_state *state)
 		/* Free the stateid unless the server explicitly
 		 * informs us the stateid is unrecognized. */
 		if (status != -NFS4ERR_BAD_STATEID)
-			nfs41_free_stateid(server, stateid, cred);
+			nfs41_free_stateid(server, stateid, cred, 1);
 
 		clear_bit(NFS_O_RDONLY_STATE, &state->flags);
 		clear_bit(NFS_O_WRONLY_STATE, &state->flags);
@@ -6034,7 +6032,7 @@ static int nfs41_check_expired_locks(struct nfs4_state *state)
 				if (status != -NFS4ERR_BAD_STATEID)
 					nfs41_free_stateid(server,
 							&lsp->ls_stateid,
-							cred);
+							cred, 1);
 				clear_bit(NFS_LOCK_INITIALIZED, &lsp->ls_flags);
 				ret = status;
 			}
@@ -8554,19 +8552,23 @@ static struct rpc_task *_nfs41_free_stateid(struct nfs_server *server,
  * Returns NFS_OK if the server freed "stateid".  Otherwise a
  * negative NFS4ERR value is returned.
  */
-static int nfs41_free_stateid(struct nfs_server *server,
+int nfs41_free_stateid(struct nfs_server *server,
 		nfs4_stateid *stateid,
-		struct rpc_cred *cred)
+		struct rpc_cred *cred,
+		int issync)
 {
 	struct rpc_task *task;
-	int ret;
+	int ret = 0;
 
 	task = _nfs41_free_stateid(server, stateid, cred, true);
 	if (IS_ERR(task))
 		return PTR_ERR(task);
+	if (!issync)
+		goto out;
 	ret = rpc_wait_for_completion_task(task);
 	if (!ret)
 		ret = task->tk_status;
+out:
 	rpc_put_task(task);
 	return ret;
 }
