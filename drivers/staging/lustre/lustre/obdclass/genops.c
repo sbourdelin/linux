@@ -171,13 +171,16 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 		return rc;
 
 	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
-	type->typ_md_ops = kzalloc(sizeof(*type->typ_md_ops), GFP_NOFS);
-	type->typ_name = kzalloc(strlen(name) + 1, GFP_NOFS);
+	if (!type->typ_dt_ops)
+		goto free_type;
 
-	if (!type->typ_dt_ops ||
-	    !type->typ_md_ops ||
-	    !type->typ_name)
-		goto failed;
+	type->typ_md_ops = kzalloc(sizeof(*type->typ_md_ops), GFP_NOFS);
+	if (!type->typ_md_ops)
+		goto free_dt_ops;
+
+	type->typ_name = kzalloc(strlen(name) + 1, GFP_NOFS);
+	if (!type->typ_name)
+		goto free_md_ops;
 
 	*(type->typ_dt_ops) = *dt_ops;
 	/* md_ops is optional */
@@ -193,20 +196,20 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 		rc = type->typ_debugfs_entry ? PTR_ERR(type->typ_debugfs_entry)
 					     : -ENOMEM;
 		type->typ_debugfs_entry = NULL;
-		goto failed;
+		goto free_name;
 	}
 
 	type->typ_kobj = kobject_create_and_add(type->typ_name, lustre_kobj);
 	if (!type->typ_kobj) {
 		rc = -ENOMEM;
-		goto failed;
+		goto free_name;
 	}
 
 	if (ldt != NULL) {
 		type->typ_lu = ldt;
 		rc = lu_device_type_init(ldt);
 		if (rc != 0)
-			goto failed;
+			goto put_object;
 	}
 
 	spin_lock(&obd_types_lock);
@@ -214,12 +217,15 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
 	spin_unlock(&obd_types_lock);
 
 	return 0;
-
- failed:
+put_object:
 	kobject_put(type->typ_kobj);
+free_name:
 	kfree(type->typ_name);
+free_md_ops:
 	kfree(type->typ_md_ops);
+free_dt_ops:
 	kfree(type->typ_dt_ops);
+free_type:
 	kfree(type);
 	return rc;
 }
