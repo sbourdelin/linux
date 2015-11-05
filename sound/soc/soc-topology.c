@@ -48,9 +48,11 @@
 #define SOC_TPLG_PASS_PCM_DAI		4
 #define SOC_TPLG_PASS_GRAPH		5
 #define SOC_TPLG_PASS_PINS		6
+#define SOC_TPLG_PASS_BE_LINK		7
+#define SOC_TPLG_PASS_CC_LINK		8
 
 #define SOC_TPLG_PASS_START	SOC_TPLG_PASS_MANIFEST
-#define SOC_TPLG_PASS_END	SOC_TPLG_PASS_PINS
+#define SOC_TPLG_PASS_END	SOC_TPLG_PASS_CC_LINK
 
 struct soc_tplg {
 	const struct firmware *fw;
@@ -263,6 +265,8 @@ static enum snd_soc_dobj_type get_dobj_type(struct snd_soc_tplg_hdr *hdr,
 		return SND_SOC_DOBJ_PCM;
 	case SND_SOC_TPLG_TYPE_CODEC_LINK:
 		return SND_SOC_DOBJ_CODEC_LINK;
+	case SND_SOC_TPLG_TYPE_BACKEND_LINK:
+		return SND_SOC_DOBJ_BACKEND_LINK;
 	default:
 		return SND_SOC_DOBJ_NONE;
 	}
@@ -522,6 +526,21 @@ static void remove_pcm_dai(struct snd_soc_component *comp,
 	kfree(dai);
 }
 
+static void soc_tplg_free_be_cc_params(struct snd_soc_component *comp,
+	struct snd_soc_dobj *dobj, int pass)
+{
+	struct snd_soc_card *card = comp->card;
+	struct snd_soc_dai_link *dai_link = card->dai_link;
+	int i, num_links = card->num_links;
+
+	if (pass != SOC_TPLG_PASS_BE_LINK || pass != SOC_TPLG_PASS_CC_LINK)
+		return;
+
+	/* loop through all dai_links. */
+	for (i = 0; i < num_links; i++)
+		kfree(dai_link->hw_params);
+
+}
 /* bind a kcontrol to it's IO handlers */
 static int soc_tplg_kcontrol_bind_io(struct snd_soc_tplg_ctl_hdr *hdr,
 	struct snd_kcontrol_new *k,
@@ -1701,6 +1720,89 @@ static int soc_tplg_pcm_elems_load(struct soc_tplg *tplg,
 	return 0;
 }
 
+static void soc_tplg_make_hw_params(struct snd_pcm_hardware *hw,
+	struct snd_soc_tplg_stream *streams, int num_streams)
+{
+	struct snd_soc_tplg_stream *stream;
+	unsigned int rate;
+	int i;
+
+	for (i = 0; i < num_streams; i++) {
+		stream = streams + i;
+		hw->formats |= stream->format;
+
+		hw->rates |= stream->rate;
+		rate = snd_pcm_rate_bit_to_rate(stream->rate);
+		if (!hw->rate_min || hw->rate_min > rate)
+			hw->rate_min = rate;
+		if (hw->rate_max < rate)
+			hw->rate_max = rate;
+
+		if (!hw->channels_min || hw->channels_min > stream->channels)
+			hw->channels_min = stream->channels;
+		if (hw->channels_max < stream->channels)
+			hw->channels_max = stream->channels;
+
+		if (!hw->period_bytes_min
+			|| hw->period_bytes_min > stream->period_bytes)
+			hw->period_bytes_min = stream->period_bytes;
+		if (hw->period_bytes_max < stream->period_bytes)
+			hw->period_bytes_max = stream->period_bytes;
+
+		if (hw->buffer_bytes_max < stream->buffer_bytes)
+			hw->buffer_bytes_max = stream->buffer_bytes;
+		}
+}
+
+/* modify already existing backend links and codec links. */
+static int soc_tplg_link_elems_load(struct soc_tplg *tplg,
+	struct snd_soc_tplg_hdr *hdr)
+{
+	int i, j;
+	struct snd_soc_tplg_link_config *link;
+	struct snd_soc_card *card = tplg->comp->card;
+	struct snd_soc_dai_link *dai_link = card->dai_link;
+	struct snd_pcm_hardware *pcm_hw;
+	int count = hdr->count, num_dailinks = card->num_links;
+
+	if (tplg->pass != SOC_TPLG_PASS_BE_LINK &&
+		tplg->pass != SOC_TPLG_PASS_CC_LINK)
+		return 0;
+
+	for (i = 0; i < count; i++) {
+		link = (struct snd_soc_tplg_link_config *) tplg->pos;
+		/**
+		 * The machine driver will initially create BE and CC Links.
+		 * In topology, we are searching for the existing BE Link
+		 * by it unique id (be_id).
+		 */
+		for (j = 0; j < num_dailinks; j++) {
+			if (dai_link[j].be_id == link->id)
+				break;
+		}
+
+		if (j == num_dailinks && dai_link[j].be_id != link->id) {
+			dev_err(tplg->dev,
+				"ASoC: cannot find Back End DAI with id %d",
+				link->id);
+			continue;
+		}
+
+		/* copy the data from tplg_elem to BE/CC DAI Link. */
+		pcm_hw = kzalloc(sizeof(struct snd_pcm_hardware), GFP_KERNEL);
+		if (!pcm_hw)
+			return -ENOMEM;
+		soc_tplg_make_hw_params(pcm_hw,
+			link->stream, link->num_streams);
+		dai_link[j].hw_params = pcm_hw;
+
+		tplg->pos += sizeof(struct snd_soc_tplg_link_config);
+	}
+
+
+	return 0;
+}
+
 static int soc_tplg_manifest_load(struct soc_tplg *tplg,
 	struct snd_soc_tplg_hdr *hdr)
 {
@@ -1791,8 +1893,10 @@ static int soc_tplg_load_header(struct soc_tplg *tplg,
 		return soc_tplg_dapm_widget_elems_load(tplg, hdr);
 	case SND_SOC_TPLG_TYPE_PCM:
 	case SND_SOC_TPLG_TYPE_DAI_LINK:
-	case SND_SOC_TPLG_TYPE_CODEC_LINK:
 		return soc_tplg_pcm_elems_load(tplg, hdr);
+	case SND_SOC_TPLG_TYPE_BACKEND_LINK:
+	case SND_SOC_TPLG_TYPE_CODEC_LINK:
+		return soc_tplg_link_elems_load(tplg, hdr);
 	case SND_SOC_TPLG_TYPE_MANIFEST:
 		return soc_tplg_manifest_load(tplg, hdr);
 	default:
@@ -1950,8 +2054,11 @@ int snd_soc_tplg_component_remove(struct snd_soc_component *comp, u32 index)
 				break;
 			case SND_SOC_DOBJ_PCM:
 			case SND_SOC_DOBJ_DAI_LINK:
-			case SND_SOC_DOBJ_CODEC_LINK:
 				remove_pcm_dai(comp, dobj, pass);
+				break;
+			case SND_SOC_DOBJ_BACKEND_LINK:
+			case SND_SOC_DOBJ_CODEC_LINK:
+				soc_tplg_free_be_cc_params(comp, dobj, pass);
 				break;
 			default:
 				dev_err(comp->dev, "ASoC: invalid component type %d for removal\n",
