@@ -39,6 +39,7 @@ struct imx6_pcie {
 	struct pcie_port	pp;
 	struct regmap		*iomuxc_gpr;
 	void __iomem		*mem_base;
+	int			link_cap;
 };
 
 /* PCIe Root Complex registers (memory-mapped) */
@@ -393,11 +394,15 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 	if (ret)
 		return ret;
 
-	/* Allow Gen2 mode after the link is up. */
-	tmp = readl(pp->dbi_base + PCIE_RC_LCR);
-	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
-	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
-	writel(tmp, pp->dbi_base + PCIE_RC_LCR);
+	if (imx6_pcie->link_cap == 2) {
+		/* Allow Gen2 mode after the link is up. */
+		tmp = readl(pp->dbi_base + PCIE_RC_LCR);
+		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
+		writel(tmp, pp->dbi_base + PCIE_RC_LCR);
+	} else {
+		dev_info(pp->dev, "Link: Gen2 disabled\n");
+	}
 
 	/*
 	 * Start Directed Speed Change so the best possible speed both link
@@ -421,7 +426,7 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 	}
 
 	tmp = readl(pp->dbi_base + PCIE_RC_LCSR);
-	dev_dbg(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
+	dev_info(pp->dev, "Link up, Gen%i\n", (tmp >> 16) & 0xf);
 	return 0;
 }
 
@@ -590,6 +595,11 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 			return ret;
 		}
 	}
+
+	/* default link capability to gen1 */
+	imx6_pcie->link_cap = 1;
+	if (of_property_read_u32(np, "fsl,max-link-speed", &ret) == 0)
+		imx6_pcie->link_cap = ret;
 
 	/* Fetch clocks */
 	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");

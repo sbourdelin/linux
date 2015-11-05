@@ -12,6 +12,8 @@ Required properties:
 	- "msi": The interrupt that is asserted when an MSI is received
 - clock-names: Must include the following additional entries:
 	- "pcie_phy"
+- fsl,max-link-speed: Specify PCI gen. Defaults to 1, can be 2 if board has
+  an external clock generator fed back to PCIe core.
 
 Example:
 
@@ -37,4 +39,5 @@ Example:
 		                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
 		clock-names = "pcie", "pcie_bus", "pcie_phy";
+		fsl,max-link-speed = <2>;
 	};
