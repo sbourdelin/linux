@@ -1,3 +1,11 @@
+config GOLDFISH
+	bool "goldfish generic driver"
+	default n
+
+config OLPC
+	bool "OLPC driver"
+	default n
+
 if X86
 source "drivers/platform/x86/Kconfig"
 endif
