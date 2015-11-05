@@ -88,7 +88,10 @@ static void sg_proc_cleanup(void);
  * Of course an overflow is inavoidable if the result of muldiv doesn't fit
  * in 32 bits.
  */
-#define MULDIV(X,MUL,DIV) ((((X % DIV) * MUL) / DIV) + ((X / DIV) * MUL))
+static inline u64 MULDIV(u64 X, u32 MUL, u32 DIV)
+{
+	return ((((X % DIV) * MUL) / DIV) + ((X / DIV) * MUL));
+}
 
 #define SG_DEFAULT_TIMEOUT MULDIV(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
 
