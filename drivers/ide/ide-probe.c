@@ -917,9 +917,9 @@ static int exact_lock(dev_t dev, void *data)
 	return 0;
 }
 
-void ide_register_region(struct gendisk *disk)
+int ide_register_region(struct gendisk *disk)
 {
-	blk_register_region(MKDEV(disk->major, disk->first_minor),
+	return blk_register_region(MKDEV(disk->major, disk->first_minor),
 			    disk->minors, NULL, exact_match, exact_lock, disk);
 }
 
@@ -988,8 +988,9 @@ static int hwif_init(ide_hwif_t *hwif)
 		goto out;
 	}
 
-	blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,
-			    THIS_MODULE, ata_probe, ata_lock, hwif);
+	if (blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,
+			    THIS_MODULE, ata_probe, ata_lock, hwif))
+		goto out;
 	return 1;
 
 out:
