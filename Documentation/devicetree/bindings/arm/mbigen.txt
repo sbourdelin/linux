@@ -1,0 +1,63 @@
+Hisilicon mbigen device tree bindings.
+=======================================
+
+Mbigen means: message based interrupt generator.
+
+MBI is kind of msi interrupt only used on Non-PCI devices.
+
+To reduce the wired interrupt number connected to GIC,
+Hisilicon designed mbigen to collect and generate interrupt.
+
+
+Non-pci devices can connect to mbigen and generate the
+interrupt by writing ITS register.
+
+The mbigen chip and devices connect to mbigen have the following properties:
+
+Mbigen main node required properties:
+-------------------------------------------
+- compatible: Should be "hisilicon,mbigen-v2"
+- reg: Specifies the base physical address and size of the Mbigen
+  registers.
+- interrupt controller: Identifies the node as an interrupt controller
+- msi-parent: This property has two cells.
+	The 1st cell specifies the ITS this device connected.
+	The 2nd cell specifies the device id.
+- nr-msis:Specifies the total number of interrupt this device has.
+- #interrupt-cells : Specifies the number of cells needed to encode an
+  interrupt source. The value is 2 now.
+
+  The 1st cell is global hardware pin number of the interrupt.
+		This value depends on the Soc design.
+  The 2nd cell is the interrupt trigger type.
+
+Examples:
+
+ 	mbigen_device_gmac:intc {
+			compatible = "hisilicon,mbigen-v2";
+			reg = <0x0 0xc0080000 0x0 0x10000>;
+			interrupt-controller;
+			msi-parent = <&its_dsa 0x40b1c>;
+			num-msis = <9>;
+			#interrupt-cells = <2>;
+ 	};
+
+Devices connect to mbigen required properties:
+----------------------------------------------------
+-interrupt-parent: Specifies the mbigen device node which device connected.
+-interrupts:specifies the interrupt source.
+  The 1st cell is global hardware pin number of the interrupt.
+		This value depends on the Soc design.
+  The 2nd cell is the interrupt trigger type
+
+Examples:
+	gmac0: ethernet@c2080000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0 0xc2080000 0 0x20000>,
+		      <0 0xc0000000 0 0x1000>;
+		interrupt-parent  = <&mbigen_device_gmac>;
+		interrupts =	<656 1>,
+				<657 1>;
+	};
+
