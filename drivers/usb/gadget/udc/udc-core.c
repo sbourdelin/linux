@@ -129,6 +129,32 @@ void usb_gadget_giveback_request(struct usb_ep *ep,
 }
 EXPORT_SYMBOL_GPL(usb_gadget_giveback_request);
 
+int usb_gadget_register_notify(struct usb_gadget *gadget,
+			       struct notifier_block *nb)
+{
+	int ret;
+
+	mutex_lock(&gadget->lock);
+	ret = raw_notifier_chain_register(&gadget->nh, nb);
+	mutex_unlock(&gadget->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(usb_gadget_register_notify);
+
+int usb_gadget_unregister_notify(struct usb_gadget *gadget,
+				 struct notifier_block *nb)
+{
+	int ret;
+
+	mutex_lock(&gadget->lock);
+	ret = raw_notifier_chain_unregister(&gadget->nh, nb);
+	mutex_unlock(&gadget->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(usb_gadget_unregister_notify);
+
 /* ------------------------------------------------------------------------- */
 
 /**
@@ -225,6 +251,10 @@ static void usb_gadget_state_work(struct work_struct *work)
 {
 	struct usb_gadget *gadget = work_to_gadget(work);
 	struct usb_udc *udc = gadget->udc;
+
+	mutex_lock(&gadget->lock);
+	raw_notifier_call_chain(&gadget->nh, gadget->state, gadget);
+	mutex_unlock(&gadget->lock);
 
 	if (udc)
 		sysfs_notify(&udc->dev.kobj, NULL, "state");
@@ -364,6 +394,8 @@ int usb_add_gadget_udc_release(struct device *parent, struct usb_gadget *gadget,
 
 	dev_set_name(&gadget->dev, "gadget");
 	INIT_WORK(&gadget->work, usb_gadget_state_work);
+	RAW_INIT_NOTIFIER_HEAD(&gadget->nh);
+	mutex_init(&gadget->lock);
 	gadget->dev.parent = parent;
 
 #ifdef	CONFIG_HAS_DMA

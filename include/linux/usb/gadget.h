@@ -609,6 +609,8 @@ struct usb_gadget {
 	unsigned			out_epnum;
 	unsigned			in_epnum;
 	struct usb_otg_caps		*otg_caps;
+	struct raw_notifier_head	nh;
+	struct mutex			lock;
 
 	unsigned			sg_supported:1;
 	unsigned			is_otg:1;
@@ -1180,6 +1182,22 @@ extern int usb_gadget_map_request(struct usb_gadget *gadget,
 
 extern void usb_gadget_unmap_request(struct usb_gadget *gadget,
 		struct usb_request *req, int is_in);
+
+/*-------------------------------------------------------------------------*/
+
+/**
+ * Register a notifiee to get notified by any attach status changes from
+ * the usb gadget
+ */
+int usb_gadget_register_notify(struct usb_gadget *gadget,
+			       struct notifier_block *nb);
+
+/*-------------------------------------------------------------------------*/
+
+
+/* Unregister a notifiee from the usb gadget */
+int usb_gadget_unregister_notify(struct usb_gadget *gadget,
+				 struct notifier_block *nb);
 
 /*-------------------------------------------------------------------------*/
 
