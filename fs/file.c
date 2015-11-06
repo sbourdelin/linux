@@ -277,7 +277,7 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 {
 	struct files_struct *newf;
 	struct file **old_fds, **new_fds;
-	int open_files, size, i;
+	int open_files, i;
 	struct fdtable *old_fdt, *new_fdt;
 
 	*errorp = -ENOMEM;
@@ -358,18 +358,16 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 	}
 	spin_unlock(&oldf->file_lock);
 
-	/* compute the remainder to be cleared */
-	size = (new_fdt->max_fds - open_files) * sizeof(struct file *);
-
-	/* This is long word aligned thus could use a optimized version */
-	memset(new_fds, 0, size);
-
+	/* clear the remainder if needed */
 	if (new_fdt->max_fds > open_files) {
-		int left = (new_fdt->max_fds - open_files) / 8;
+		int left = new_fdt->max_fds - open_files;
 		int start = open_files / BITS_PER_LONG;
 
-		memset(&new_fdt->open_fds[start], 0, left);
-		memset(&new_fdt->close_on_exec[start], 0, left);
+		memset(new_fds, 0, left * sizeof(struct file *));
+		memset(&new_fdt->open_fds[start], 0, left / 8);
+		memset(&new_fdt->close_on_exec[start], 0, left / 8);
+		memset(&new_fdt->full_fds_bits[BITBIT_NR(open_files)], 0,
+		       BITBIT_SIZE(new_fdt->max_fds) - BITBIT_SIZE(open_files));
 	}
 
 	rcu_assign_pointer(newf->fdt, new_fdt);
