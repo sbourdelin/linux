@@ -363,7 +363,7 @@ static void kdelete(void **buf)
 	}
 }
 
-static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
+static int gdm_wimax_ioctl_get_data(struct data_us *dst, struct data_s *src)
 {
 	int size;
 
@@ -379,7 +379,7 @@ static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
 	return 0;
 }
 
-static int gdm_wimax_ioctl_set_data(struct data_s *dst, struct data_s *src)
+static int gdm_wimax_ioctl_set_data(struct data_s *dst, struct data_us *src)
 {
 	if (!src->size) {
 		dst->size = 0;
@@ -469,7 +469,7 @@ static int gdm_wimax_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		}
 		if (req->cmd == SIOCG_DATA) {
 			ret = gdm_wimax_ioctl_get_data(
-				&req->data, &nic->sdk_data[req->data_id]);
+				&req->udata, &nic->sdk_data[req->data_id]);
 			if (ret < 0)
 				return ret;
 		} else if (req->cmd == SIOCS_DATA) {
@@ -481,7 +481,7 @@ static int gdm_wimax_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					       req->data.buf);
 			}
 			ret = gdm_wimax_ioctl_set_data(
-				&nic->sdk_data[req->data_id], &req->data);
+				&nic->sdk_data[req->data_id], &req->udata);
 			if (ret < 0)
 				return ret;
 		}

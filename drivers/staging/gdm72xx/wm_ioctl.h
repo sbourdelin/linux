@@ -78,6 +78,11 @@ struct data_s {
 	void	*buf;
 };
 
+struct data_us {
+	int	size;
+	void __user *buf;
+};
+
 struct wm_req_s {
 	union {
 		char ifrn_name[IFNAMSIZ];
@@ -85,6 +90,7 @@ struct wm_req_s {
 	unsigned short	cmd;
 	unsigned short	data_id;
 	struct data_s	data;
+	struct data_us  udata;
 
 /* NOTE: sizeof(struct wm_req_s) must be less than sizeof(struct ifreq). */
 };
