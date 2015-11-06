@@ -654,7 +654,7 @@ static int dso__split_kallsyms_for_kcore(struct dso *dso, struct map *map,
 	struct map_groups *kmaps = map__kmaps(map);
 	struct map *curr_map;
 	struct symbol *pos;
-	int count = 0, moved = 0;
+	int count = 0;
 	struct rb_root *root = &dso->symbols[map->type];
 	struct rb_node *next = rb_first(root);
 
@@ -677,25 +677,23 @@ static int dso__split_kallsyms_for_kcore(struct dso *dso, struct map *map,
 			rb_erase_init(&pos->rb_node, root);
 			symbol__delete(pos);
 		} else {
+			rb_erase_init(&pos->rb_node, root);
+
 			pos->start -= curr_map->start - curr_map->pgoff;
 			if (pos->end)
 				pos->end -= curr_map->start - curr_map->pgoff;
-			if (curr_map->dso != map->dso) {
-				rb_erase_init(&pos->rb_node, root);
-				symbols__insert(
-					&curr_map->dso->symbols[curr_map->type],
-					pos);
-				++moved;
-			} else {
-				++count;
-			}
+
+			symbols__insert(
+				&curr_map->dso->symbols[curr_map->type],
+				pos);
+			++count;
 		}
 	}
 
 	/* Symbols have been adjusted */
 	dso->adjust_symbols = 1;
 
-	return count + moved;
+	return count;
 }
 
 /*
