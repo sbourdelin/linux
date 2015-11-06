@@ -1122,6 +1122,10 @@ static void dwc2_process_periodic_channels(struct dwc2_hsotg *hsotg)
 			break;
 		}
 
+		if (qh->channel->xact_pos == DWC2_HCSPLT_XACTPOS_BEGIN ||
+		    qh->channel->xact_pos == DWC2_HCSPLT_XACTPOS_MID)
+			break;
+
 		/*
 		 * In Slave mode, stay on the current transfer until there is
 		 * nothing more to do or the high-bandwidth request count is
