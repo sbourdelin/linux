@@ -8906,10 +8906,12 @@ static int __init md_init(void)
 		goto err_mdp;
 	mdp_major = ret;
 
-	blk_register_region(MKDEV(MD_MAJOR, 0), 512, THIS_MODULE,
-			    md_probe, NULL, NULL);
-	blk_register_region(MKDEV(mdp_major, 0), 1UL<<MINORBITS, THIS_MODULE,
-			    md_probe, NULL, NULL);
+	if (blk_register_region(MKDEV(MD_MAJOR, 0), 512, THIS_MODULE,
+			    md_probe, NULL, NULL))
+		goto err_md_blk;
+	if (blk_register_region(MKDEV(mdp_major, 0), 1UL<<MINORBITS,
+			    THIS_MODULE, md_probe, NULL, NULL))
+		goto err_mdp_blk;
 
 	register_reboot_notifier(&md_notifier);
 	raid_table_header = register_sysctl_table(raid_root_table);
@@ -8917,6 +8919,10 @@ static int __init md_init(void)
 	md_geninit();
 	return 0;
 
+err_mdp_blk:
+	blk_unregister_region(MKDEV(MD_MAJOR, 0), 512);
+err_md_blk:
+	unregister_blkdev(MD_MAJOR, "mdp");
 err_mdp:
 	unregister_blkdev(MD_MAJOR, "md");
 err_md:
