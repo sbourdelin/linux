@@ -50,6 +50,7 @@
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/miscdevice.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
@@ -615,11 +616,19 @@ static int goldfish_pipe_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_pipe_match[] = {
+	{ .compatible = "generic,android-pipe" },
+	{ },
+};
+#endif
+
 static struct platform_driver goldfish_pipe = {
 	.probe = goldfish_pipe_probe,
 	.remove = goldfish_pipe_remove,
 	.driver = {
-		.name = "goldfish_pipe"
+		.name = "goldfish_pipe",
+		.of_match_table	= of_match_ptr(goldfish_pipe_match),
 	}
 };
 

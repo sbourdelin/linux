@@ -23,6 +23,7 @@
 #include <linux/ioport.h>
 #include <linux/vmalloc.h>
 #include <linux/mtd/mtd.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/mutex.h>
 #include <linux/goldfish.h>
@@ -430,11 +431,19 @@ static int goldfish_nand_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_nand_match[] = {
+	{ .compatible = "generic,goldfish-nand" },
+	{ },
+};
+#endif
+
 static struct platform_driver goldfish_nand_driver = {
 	.probe		= goldfish_nand_probe,
 	.remove		= goldfish_nand_remove,
 	.driver = {
-		.name = "goldfish_nand"
+		.name = "goldfish_nand",
+		.of_match_table	= of_match_ptr(goldfish_nand_match),
 	}
 };
 

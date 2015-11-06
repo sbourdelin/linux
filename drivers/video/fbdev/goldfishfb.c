@@ -25,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 
 enum {
@@ -304,12 +305,19 @@ static int goldfish_fb_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_fb_match[] = {
+	{ .compatible = "generic,goldfish-fb" },
+	{ },
+};
+#endif
 
 static struct platform_driver goldfish_fb_driver = {
 	.probe		= goldfish_fb_probe,
 	.remove		= goldfish_fb_remove,
 	.driver = {
-		.name = "goldfish_fb"
+		.name = "goldfish_fb",
+		.of_match_table = of_match_ptr(goldfish_fb_match),
 	}
 };
 

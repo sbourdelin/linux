@@ -18,6 +18,7 @@
 
 #include <linux/module.h>
 #include <linux/err.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
 #include <linux/types.h>
@@ -227,11 +228,19 @@ static int goldfish_battery_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_battery_match[] = {
+	{ .compatible = "generic,goldfish-battery" },
+	{ },
+};
+#endif
+
 static struct platform_driver goldfish_battery_device = {
 	.probe		= goldfish_battery_probe,
 	.remove		= goldfish_battery_remove,
 	.driver = {
-		.name = "goldfish-battery"
+		.name = "goldfish-battery",
+		.of_match_table	= of_match_ptr(goldfish_battery_match),
 	}
 };
 module_platform_driver(goldfish_battery_device);

@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -344,11 +345,19 @@ static int goldfish_audio_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_audio_match[] = {
+	{ .compatible = "generic,goldfish-audio" },
+	{ },
+};
+#endif
+
 static struct platform_driver goldfish_audio_driver = {
 	.probe		= goldfish_audio_probe,
 	.remove		= goldfish_audio_remove,
 	.driver = {
-		.name = "goldfish_audio"
+		.name = "goldfish_audio",
+		.of_match_table	= of_match_ptr(goldfish_audio_match),
 	}
 };
 

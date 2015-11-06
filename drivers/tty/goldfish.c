@@ -15,6 +15,7 @@
 
 #include <linux/console.h>
 #include <linux/interrupt.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -324,11 +325,19 @@ static int goldfish_tty_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_tty_match[] = {
+	{ .compatible = "generic,goldfish-tty" },
+	{ },
+};
+#endif
+
 static struct platform_driver goldfish_tty_platform_driver = {
 	.probe = goldfish_tty_probe,
 	.remove = goldfish_tty_remove,
 	.driver = {
-		.name = "goldfish_tty"
+		.name = "goldfish_tty",
+		.of_match_table = of_match_ptr(goldfish_tty_match),
 	}
 };
 

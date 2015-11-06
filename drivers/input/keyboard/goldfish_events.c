@@ -18,6 +18,7 @@
 #include <linux/types.h>
 #include <linux/input.h>
 #include <linux/kernel.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
@@ -178,10 +179,18 @@ static int events_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id goldfish_events_match[] = {
+	{ .compatible = "generic,goldfish-events-keypad" },
+	{ },
+};
+#endif
+
 static struct platform_driver events_driver = {
 	.probe	= events_probe,
 	.driver	= {
 		.name	= "goldfish_events",
+		.of_match_table	= of_match_ptr(goldfish_events_match),
 	},
 };
 
