@@ -183,7 +183,11 @@ int usb_charger_unregister_notify(struct usb_charger *uchger,
 enum usb_charger_type
 usb_charger_detect_type(struct usb_charger *uchger)
 {
-	if (uchger->psy) {
+	if (uchger->gadget && uchger->gadget->ops
+	    && uchger->gadget->ops->get_charger_type) {
+		uchger->type =
+			uchger->gadget->ops->get_charger_type(uchger->gadget);
+	} else if (uchger->psy) {
 		union power_supply_propval val;
 
 		power_supply_get_property(uchger->psy,
@@ -387,6 +391,30 @@ static int
 usb_charger_plug_by_gadget(struct notifier_block *nb,
 			   unsigned long state, void *data)
 {
+	struct usb_gadget *gadget = (struct usb_gadget *)data;
+	struct usb_charger *uchger = gadget->charger;
+	enum usb_charger_state uchger_state;
+
+	if (!uchger)
+		return NOTIFY_BAD;
+
+	/* Report event to power to setting the current limitation
+	 * for this usb charger when one usb charger state is changed
+	 * with detecting by usb gadget state.
+	 */
+	if (uchger->old_gadget_state != state) {
+		uchger->old_gadget_state = state;
+
+		if (state >= USB_STATE_ATTACHED)
+			uchger_state = USB_CHARGER_PRESENT;
+		else if (state == USB_STATE_NOTATTACHED)
+			uchger_state = USB_CHARGER_REMOVE;
+		else
+			uchger_state = USB_CHARGER_DEFAULT;
+
+		usb_charger_notify_others(uchger, uchger_state);
+	}
+
 	return NOTIFY_OK;
 }
 
@@ -542,6 +570,7 @@ int usb_charger_init(struct usb_gadget *ugadget)
 
 	/* register a notifier on a usb gadget device */
 	uchger->gadget = ugadget;
+	ugadget->charger = uchger;
 	uchger->old_gadget_state = ugadget->state;
 	uchger->gadget_nb.notifier_call = usb_charger_plug_by_gadget;
 	usb_gadget_register_notify(ugadget, &uchger->gadget_nb);
@@ -565,7 +594,19 @@ fail:
 
 int usb_charger_exit(struct usb_gadget *ugadget)
 {
-	return 0;
+	struct usb_charger *uchger = ugadget->charger;
+
+	if (!uchger)
+		return -EINVAL;
+
+	if (uchger->extcon_dev)
+		extcon_unregister_notifier(uchger->extcon_dev,
+					   EXTCON_USB, &uchger->extcon_nb.nb);
+
+	usb_gadget_unregister_notify(uchger->gadget, &uchger->gadget_nb);
+	ida_simple_remove(&usb_charger_ida, uchger->id);
+
+	return usb_charger_unregister(uchger);
 }
 
 static int __init usb_charger_sysfs_init(void)
