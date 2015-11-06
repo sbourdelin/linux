@@ -1046,9 +1046,7 @@ xpc_do_exit(enum xp_retval reason)
 	/* clear the interface to XPC's functions */
 	xpc_clear_interface();
 
-	if (xpc_sysctl)
-		unregister_sysctl_table(xpc_sysctl);
-
+	unregister_sysctl_table(xpc_sysctl);
 	xpc_teardown_partitions();
 
 	if (is_shub())
@@ -1331,9 +1329,7 @@ out_3:
 	(void)unregister_die_notifier(&xpc_die_notifier);
 	(void)unregister_reboot_notifier(&xpc_reboot_notifier);
 out_2:
-	if (xpc_sysctl)
-		unregister_sysctl_table(xpc_sysctl);
-
+	unregister_sysctl_table(xpc_sysctl);
 	xpc_teardown_partitions();
 out_1:
 	if (is_shub())
