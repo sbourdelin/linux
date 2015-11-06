@@ -1049,6 +1049,14 @@ static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 		if (ret)
 			goto reset_pin_count;
 	}
+
+	/* If we are holding this LRC from last unpin, unref it here. */
+	if (ring->last_unpin_ctx == rq->ctx) {
+		rq->ctx->engine[ring->id].pin_count--;
+		i915_gem_context_unreference(rq->ctx);
+		ring->last_unpin_ctx = NULL;
+	}
+
 	return ret;
 
 reset_pin_count:
@@ -1056,18 +1064,46 @@ reset_pin_count:
 	return ret;
 }
 
+static void
+lrc_unpin_last_ctx(struct intel_engine_cs *ring)
+{
+	struct intel_context *ctx = ring->last_unpin_ctx;
+	struct drm_i915_gem_object *ctx_obj;
+
+	if (!ctx)
+		return;
+
+	i915_gem_object_ggtt_unpin(ctx->engine[ring->id].state);
+	intel_unpin_ringbuffer_obj(ctx->engine[ring->id].ringbuf);
+
+	WARN_ON(--ctx->engine[ring->id].pin_count);
+	i915_gem_context_unreference(ctx);
+
+	ring->last_unpin_ctx = NULL;
+}
+
 void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 {
 	struct intel_engine_cs *ring = rq->ring;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct intel_ringbuffer *ringbuf = rq->ringbuf;
 
-	if (ctx_obj) {
-		WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
-		if (--rq->ctx->engine[ring->id].pin_count == 0) {
-			intel_unpin_ringbuffer_obj(ringbuf);
-			i915_gem_object_ggtt_unpin(ctx_obj);
-		}
+	if (!rq->ctx->engine[ring->id].state)
+		return;
+
+	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+
+	/* HW completes request from a different LRC, unpin the last one. */
+	if (ring->last_unpin_ctx != rq->ctx)
+		lrc_unpin_last_ctx(ring);
+
+	if (--rq->ctx->engine[ring->id].pin_count == 0) {
+		/* Last one should be unpined already */
+		WARN_ON(ring->last_unpin_ctx);
+
+		/* Keep the context pinned and ref-counted */
+		rq->ctx->engine[ring->id].pin_count++;
+		i915_gem_context_reference(rq->ctx);
+
+		ring->last_unpin_ctx = rq->ctx;
 	}
 }
 
@@ -1882,6 +1918,8 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	}
 
 	lrc_destroy_wa_ctx_obj(ring);
+
+	lrc_unpin_last_ctx(ring);
 }
 
 static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *ring)
