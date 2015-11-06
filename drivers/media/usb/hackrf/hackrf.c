@@ -1528,9 +1528,9 @@ err_v4l2_ctrl_handler_free_tx:
 err_v4l2_ctrl_handler_free_rx:
 	v4l2_ctrl_handler_free(&dev->rx_ctrl_handler);
 err_kfree:
+	dev_dbg(dev->dev, "failed=%d\n", ret);
 	kfree(dev);
 err:
-	dev_dbg(dev->dev, "failed=%d\n", ret);
 	return ret;
 }
 
