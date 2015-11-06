@@ -364,12 +364,20 @@ z2_init(void)
     sprintf(z2ram_gendisk->disk_name, "z2ram");
 
     z2ram_gendisk->queue = z2_queue;
-    add_disk(z2ram_gendisk);
-    blk_register_region(MKDEV(Z2RAM_MAJOR, 0), Z2MINOR_COUNT, THIS_MODULE,
+    ret = add_disk(z2ram_gendisk);
+    if (ret)
+	goto out_add_disk;
+
+    ret = blk_register_region(MKDEV(Z2RAM_MAJOR, 0), Z2MINOR_COUNT, THIS_MODULE,
 				z2_find, NULL, NULL);
+    if (ret)
+	goto out_blk_reg;
 
     return 0;
 
+out_blk_reg:
+	del_gendisk(z2ram_gendisk);
+out_add_disk:
 out_queue:
     put_disk(z2ram_gendisk);
 out_disk:
