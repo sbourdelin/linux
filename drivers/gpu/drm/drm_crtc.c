@@ -5539,6 +5539,8 @@ int drm_format_plane_cpp(uint32_t format, int plane)
 	case DRM_FORMAT_YUV444:
 	case DRM_FORMAT_YVU444:
 		return 1;
+	case DRM_FORMAT_AYUV:
+		return 4;
 	default:
 		drm_fb_get_bpp_depth(format, &depth, &bpp);
 		return bpp >> 3;
