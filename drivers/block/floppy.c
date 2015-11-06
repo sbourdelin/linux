@@ -4219,8 +4219,10 @@ static int __init do_floppy_init(void)
 	if (err)
 		goto out_unreg_blkdev;
 
-	blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
+	err = blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
 			    floppy_find, NULL, NULL);
+	if (err)
+		goto out_unreg_region;
 
 	for (i = 0; i < 256; i++)
 		if (ITYPE(i))
@@ -4250,7 +4252,7 @@ static int __init do_floppy_init(void)
 	if (fdc_state[0].address == -1) {
 		cancel_delayed_work(&fd_timeout);
 		err = -ENODEV;
-		goto out_unreg_region;
+		goto out_fdc_err;
 	}
 #if N_FDC > 1
 	fdc_state[1].address = FDC2;
@@ -4261,7 +4263,7 @@ static int __init do_floppy_init(void)
 	if (err) {
 		cancel_delayed_work(&fd_timeout);
 		err = -EBUSY;
-		goto out_unreg_region;
+		goto out_fdc_region;
 	}
 
 	/* initialise drive state */
@@ -4357,8 +4359,9 @@ out_remove_drives:
 out_release_dma:
 	if (atomic_read(&usage_count))
 		floppy_release_irq_and_dma();
-out_unreg_region:
+out_fdc_err:
 	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
+out_unreg_region:
 	platform_driver_unregister(&floppy_driver);
 out_unreg_blkdev:
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
