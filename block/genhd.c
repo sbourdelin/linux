@@ -39,8 +39,8 @@ static struct device_type disk_type;
 
 static void disk_check_events(struct disk_events *ev,
 			      unsigned int *clearing_ptr);
-static void disk_alloc_events(struct gendisk *disk);
-static void disk_add_events(struct gendisk *disk);
+static int disk_alloc_events(struct gendisk *disk);
+static int disk_add_events(struct gendisk *disk);
 static void disk_del_events(struct gendisk *disk);
 static void disk_release_events(struct gendisk *disk);
 
@@ -473,11 +473,11 @@ static char *bdevt_str(dev_t devt, char *buf)
  * range must be nonzero
  * The hash chain is sorted on range, so that subranges can override.
  */
-void blk_register_region(dev_t devt, unsigned long range, struct module *module,
+int blk_register_region(dev_t devt, unsigned long range, struct module *module,
 			 struct kobject *(*probe)(dev_t, int *, void *),
 			 int (*lock)(dev_t, void *), void *data)
 {
-	kobj_map(bdev_map, devt, range, module, probe, lock, data);
+	return kobj_map(bdev_map, devt, range, module, probe, lock, data);
 }
 
 EXPORT_SYMBOL(blk_register_region);
@@ -505,7 +505,7 @@ static int exact_lock(dev_t devt, void *data)
 	return 0;
 }
 
-static void register_disk(struct gendisk *disk)
+static int register_disk(struct gendisk *disk)
 {
 	struct device *ddev = disk_to_dev(disk);
 	struct block_device *bdev;
@@ -520,14 +520,15 @@ static void register_disk(struct gendisk *disk)
 	/* delay uevents, until we scanned partition table */
 	dev_set_uevent_suppress(ddev, 1);
 
-	if (device_add(ddev))
-		return;
+	err = device_add(ddev);
+	if (err)
+		return err;
 	if (!sysfs_deprecated) {
 		err = sysfs_create_link(block_depr, &ddev->kobj,
 					kobject_name(&ddev->kobj));
 		if (err) {
 			device_del(ddev);
-			return;
+			return err;
 		}
 	}
 
@@ -569,6 +570,7 @@ exit:
 	while ((part = disk_part_iter_next(&piter)))
 		kobject_uevent(&part_to_dev(part)->kobj, KOBJ_ADD);
 	disk_part_iter_exit(&piter);
+	return err;
 }
 
 /**
@@ -577,10 +579,8 @@ exit:
  *
  * This function registers the partitioning information in @disk
  * with the kernel.
- *
- * FIXME: error handling
  */
-void add_disk(struct gendisk *disk)
+int add_disk(struct gendisk *disk)
 {
 	struct backing_dev_info *bdi;
 	dev_t devt;
@@ -598,7 +598,7 @@ void add_disk(struct gendisk *disk)
 	retval = blk_alloc_devt(&disk->part0, &devt);
 	if (retval) {
 		WARN_ON(1);
-		return;
+		return retval;
 	}
 	disk_to_dev(disk)->devt = devt;
 
@@ -608,17 +608,27 @@ void add_disk(struct gendisk *disk)
 	disk->major = MAJOR(devt);
 	disk->first_minor = MINOR(devt);
 
-	disk_alloc_events(disk);
-
+	retval = disk_alloc_events(disk);
+	if (retval)
+		goto err_blk_devt;
 	/* Register BDI before referencing it from bdev */
 	bdi = &disk->queue->backing_dev_info;
-	bdi_register_dev(bdi, disk_devt(disk));
+	retval = bdi_register_dev(bdi, disk_devt(disk));
+	if (retval)
+		goto err_alloc_event;
 
-	blk_register_region(disk_devt(disk), disk->minors, NULL,
+	retval = blk_register_region(disk_devt(disk), disk->minors, NULL,
 			    exact_match, exact_lock, disk);
-	register_disk(disk);
-	blk_register_queue(disk);
+	if (retval)
+		goto err_alloc_event;
 
+	retval = register_disk(disk);
+	if (retval)
+		goto err_reg_region;
+
+	retval = blk_register_queue(disk);
+	if (retval)
+		goto err_reg_disk;
 	/*
 	 * Take an extra ref on queue which will be put on disk_release()
 	 * so that it sticks around as long as @disk is there.
@@ -627,9 +637,28 @@ void add_disk(struct gendisk *disk)
 
 	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,
 				   "bdi");
-	WARN_ON(retval);
+	if (retval)
+		goto err_blk_reg_queue;
 
-	disk_add_events(disk);
+	retval = disk_add_events(disk);
+	if (retval)
+		goto err_sysfs;
+
+	return 0;
+
+err_blk_devt:
+	blk_free_devt(devt);
+err_alloc_event:
+	disk_del_events(disk);
+err_reg_region:
+	blk_unregister_region(disk_devt(disk), disk->minors);
+err_reg_disk:
+	del_gendisk(disk);
+err_blk_reg_queue:
+	blk_unregister_queue(disk);
+err_sysfs:
+	sysfs_remove_link(&disk_to_dev(disk)->kobj, "bdi");
+	return retval;
 }
 EXPORT_SYMBOL(add_disk);
 
@@ -1782,17 +1811,17 @@ module_param_cb(events_dfl_poll_msecs, &disk_events_dfl_poll_msecs_param_ops,
 /*
  * disk_{alloc|add|del|release}_events - initialize and destroy disk_events.
  */
-static void disk_alloc_events(struct gendisk *disk)
+static int disk_alloc_events(struct gendisk *disk)
 {
 	struct disk_events *ev;
 
 	if (!disk->fops->check_events)
-		return;
+		return 0;
 
 	ev = kzalloc(sizeof(*ev), GFP_KERNEL);
 	if (!ev) {
 		pr_warn("%s: failed to initialize events\n", disk->disk_name);
-		return;
+		return -ENOMEM;
 	}
 
 	INIT_LIST_HEAD(&ev->node);
@@ -1804,17 +1833,22 @@ static void disk_alloc_events(struct gendisk *disk)
 	INIT_DELAYED_WORK(&ev->dwork, disk_events_workfn);
 
 	disk->ev = ev;
+	return 0;
 }
 
-static void disk_add_events(struct gendisk *disk)
+static int disk_add_events(struct gendisk *disk)
 {
-	if (!disk->ev)
-		return;
+	int ret = 0;
 
-	/* FIXME: error handling */
-	if (sysfs_create_files(&disk_to_dev(disk)->kobj, disk_events_attrs) < 0)
+	if (!disk->ev)
+		return ret;
+
+	ret = sysfs_create_files(&disk_to_dev(disk)->kobj, disk_events_attrs);
+	if (ret) {
 		pr_warn("%s: failed to create sysfs files for events\n",
 			disk->disk_name);
+		return ret;
+	}
 
 	mutex_lock(&disk_events_mutex);
 	list_add_tail(&disk->ev->node, &disk_events);
@@ -1825,6 +1859,7 @@ static void disk_add_events(struct gendisk *disk)
 	 * unblock kicks it into action.
 	 */
 	__disk_unblock_events(disk, true);
+	return ret;
 }
 
 static void disk_del_events(struct gendisk *disk)
