@@ -1037,6 +1037,57 @@ unpin_ctx_obj:
 	return ret;
 }
 
+static void intel_lr_context_do_unpin(struct intel_engine_cs *ring,
+		struct intel_context *ctx)
+{
+	struct drm_device *dev = ring->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_gem_object *ctx_obj;
+
+	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+	if (!ctx)
+		return;
+
+	ctx_obj = ctx->engine[ring->id].state;
+	if (!ctx_obj)
+		return;
+
+	i915_gem_object_ggtt_unpin(ctx_obj);
+	intel_unpin_ringbuffer_obj(ctx->engine[ring->id].ringbuf);
+
+	ctx_obj->dirty = true;
+
+	/* Invalidate GuC TLB. */
+	if (i915.enable_guc_submission)
+		I915_WRITE(GEN8_GTCR, GEN8_GTCR_INVALIDATE);
+}
+
+static void set_retired_lrc(struct intel_engine_cs *ring,
+		struct intel_context *ctx)
+{
+	struct intel_context *last = ring->retired_ctx;
+
+	if (WARN_ON(ctx == last))
+		return;
+
+	/* Either the actual unpin is done already or it is pinned again. */
+	if (ctx == NULL) {
+		last->engine[ring->id].pin_count--;
+		i915_gem_context_unreference(last);
+		ring->retired_ctx = NULL;
+		return;
+	}
+
+	/* Last retired lrc should be handled already. */
+	WARN_ON(last);
+
+	/* A lrc is set to retired. Increase its ref count to avoid release
+	 * immediately. It is deferred to the completion of next request. */
+	ctx->engine[ring->id].pin_count++;
+	i915_gem_context_reference(ctx);
+	ring->retired_ctx = ctx;
+}
+
 static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 {
 	int ret = 0;
@@ -1049,6 +1100,10 @@ static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 		if (ret)
 			goto reset_pin_count;
 	}
+
+	if (ring->retired_ctx == rq->ctx)
+		set_retired_lrc(ring, NULL);
+
 	return ret;
 
 reset_pin_count:
@@ -1059,16 +1114,20 @@ reset_pin_count:
 void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 {
 	struct intel_engine_cs *ring = rq->ring;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct intel_ringbuffer *ringbuf = rq->ringbuf;
 
-	if (ctx_obj) {
-		WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
-		if (--rq->ctx->engine[ring->id].pin_count == 0) {
-			intel_unpin_ringbuffer_obj(ringbuf);
-			i915_gem_object_ggtt_unpin(ctx_obj);
-		}
+	if (!rq->ctx->engine[ring->id].state)
+		return;
+
+	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+
+	/* HW completes request from a new LRC, then do the actual unpin. */
+	if (ring->retired_ctx && ring->retired_ctx != rq->ctx) {
+		intel_lr_context_do_unpin(ring, ring->retired_ctx);
+		set_retired_lrc(ring, NULL);
 	}
+
+	if (--rq->ctx->engine[ring->id].pin_count == 0)
+		set_retired_lrc(ring, rq->ctx);
 }
 
 static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
@@ -1882,6 +1941,11 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	}
 
 	lrc_destroy_wa_ctx_obj(ring);
+
+	if (ring->retired_ctx) {
+		intel_lr_context_do_unpin(ring, ring->retired_ctx);
+		set_retired_lrc(ring, NULL);
+	}
 }
 
 static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *ring)

@@ -265,6 +265,7 @@ struct  intel_engine_cs {
 	spinlock_t execlist_lock;
 	struct list_head execlist_queue;
 	struct list_head execlist_retired_req_list;
+	struct intel_context *retired_ctx;
 	u8 next_context_status_buffer;
 	u32             irq_keep_mask; /* bitmask for interrupts that should not be masked */
 	int		(*emit_request)(struct drm_i915_gem_request *request);
