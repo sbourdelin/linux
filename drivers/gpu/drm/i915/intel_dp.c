@@ -4461,21 +4461,30 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
  *  3. Use Link Training from 2.5.3.3 and 3.5.1.3
  *  4. Check link status on receipt of hot-plug interrupt
  */
-static void
+static bool
 intel_dp_short_pulse(struct intel_dp *intel_dp)
 {
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	u8 sink_irq_vector;
 	u8 link_status[DP_LINK_STATUS_SIZE];
+	u8 old_sink_count = intel_dp->sink_count;
+	bool ret;
 
 	/* Try to read receiver status if the link appears to be up */
 	if (!intel_dp_get_link_status(intel_dp, link_status)) {
-		return;
+		return false;
 	}
 
-	/* Now read the DPCD to see if it's actually running */
-	if (!intel_dp_get_dpcd(intel_dp)) {
-		return;
+	/* Now read the DPCD to see if it's actually running
+	 * Don't return immediately if dpcd read failed,
+	 * if sink count was 1 and dpcd read failed we need
+	 * to do full detection
+	 */
+	ret = intel_dp_get_dpcd(intel_dp);
+
+	if ((old_sink_count != intel_dp->sink_count) || !ret) {
+		/* No need to proceed if we are going to do full detect */
+		return false;
 	}
 
 	/* Try to read the source of the interrupt */
@@ -4495,6 +4504,8 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	intel_dp_check_link_status(intel_dp);
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+
+	return true;
 }
 
 /* XXX this is probably wrong for multiple downstream ports */
@@ -5237,7 +5248,10 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 		}
 
 		if (!intel_dp->is_mst) {
-			intel_dp_short_pulse(intel_dp);
+			if (!intel_dp_short_pulse(intel_dp)) {
+				intel_dp_long_pulse(intel_dp->attached_connector);
+				goto put_power;
+			}
 		}
 	}
 
