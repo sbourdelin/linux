@@ -165,6 +165,8 @@ enum aarch64_insn_ldst_type {
 	AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX,
 	AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX,
 	AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX,
+	AARCH64_INSN_LDST_LOAD_PAIR,
+	AARCH64_INSN_LDST_STORE_PAIR,
 };
 
 enum aarch64_insn_adsb_type {
@@ -225,6 +227,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
 
 __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
 __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
+__AARCH64_INSN_FUNCS(stp,	0x7FC00000, 0x29000000)
+__AARCH64_INSN_FUNCS(ldp,	0x7FC00000, 0x29400000)
 __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
 __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
 __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
@@ -277,6 +281,7 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
 __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
 __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
 __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
+__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F00E0)
 
 #undef	__AARCH64_INSN_FUNCS
 
@@ -370,6 +375,19 @@ bool aarch32_insn_is_wide(u32 insn);
 u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
 u32 aarch32_insn_mcr_extract_opc2(u32 insn);
 u32 aarch32_insn_mcr_extract_crm(u32 insn);
+int aarch64_insn_decode_add_sub_imm(u32 insn,
+				    enum aarch64_insn_register *dst,
+				    enum aarch64_insn_register *src,
+				    int *imm,
+				    enum aarch64_insn_variant *variant,
+				    enum aarch64_insn_adsb_type *type);
+int aarch64_insn_decode_load_store_pair(u32 insn,
+					enum aarch64_insn_register *reg1,
+					enum aarch64_insn_register *reg2,
+					enum aarch64_insn_register *base,
+					int *offset,
+					enum aarch64_insn_variant *variant,
+					enum aarch64_insn_ldst_type *type);
 #endif /* __ASSEMBLY__ */
 
 #endif	/* __ASM_INSN_H */
