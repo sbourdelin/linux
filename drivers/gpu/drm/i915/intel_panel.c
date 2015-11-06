@@ -1729,8 +1729,7 @@ void intel_panel_destroy_backlight(struct drm_connector *connector)
 	struct intel_panel *panel = &intel_connector->panel;
 
 	/* dispose of the pwm */
-	if (panel->backlight.pwm)
-		pwm_put(panel->backlight.pwm);
+	pwm_put(panel->backlight.pwm);
 
 	panel->backlight.present = false;
 }
