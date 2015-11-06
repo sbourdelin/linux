@@ -817,11 +817,6 @@ int cfs_trace_allocate_string_buffer(char **str, int nob)
 	return 0;
 }
 
-void cfs_trace_free_string_buffer(char *str, int nob)
-{
-	kfree(str);
-}
-
 int cfs_trace_dump_debug_buffer_usrstr(void __user *usr_str, int usr_str_nob)
 {
 	char	 *str;
@@ -842,7 +837,7 @@ int cfs_trace_dump_debug_buffer_usrstr(void __user *usr_str, int usr_str_nob)
 	}
 	rc = cfs_tracefile_dump_all_pages(str);
 out:
-	cfs_trace_free_string_buffer(str, usr_str_nob + 1);
+	kfree(str);
 	return rc;
 }
 
@@ -898,7 +893,7 @@ int cfs_trace_daemon_command_usrstr(void __user *usr_str, int usr_str_nob)
 	if (rc == 0)
 		rc = cfs_trace_daemon_command(str);
 
-	cfs_trace_free_string_buffer(str, usr_str_nob + 1);
+	kfree(str);
 	return rc;
 }
 
