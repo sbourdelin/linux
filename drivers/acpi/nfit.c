@@ -190,6 +190,90 @@ static int acpi_nfit_ctl(struct nvdimm_bus_descriptor *nd_desc,
 	return rc;
 }
 
+
+static int acpi_nfit_ctl_passthru(struct nvdimm_bus_descriptor *nd_desc,
+		struct nvdimm *nvdimm, unsigned int cmd, void *buf,
+		unsigned int buf_len)
+{
+	struct acpi_nfit_desc *acpi_desc = to_acpi_nfit_desc(nd_desc);
+	union acpi_object in_obj, in_buf, *out_obj;
+	struct device *dev = acpi_desc->dev;
+	const char *dimm_name;
+	acpi_handle handle;
+	const u8 *uuid;
+	int rc = 0;
+	int rev = 0;
+
+	struct ndn_pkg *pkg = buf;
+
+	if (nvdimm) {
+		struct nfit_mem *nfit_mem = nvdimm_provider_data(nvdimm);
+		struct acpi_device *adev = nfit_mem->adev;
+
+		if (!adev)
+			return -ENOTTY;
+		dimm_name = nvdimm_name(nvdimm);
+		handle = adev->handle;
+	} else {
+		struct acpi_device *adev = to_acpi_dev(acpi_desc);
+
+		handle = adev->handle;
+		dimm_name = "bus";
+	}
+	uuid = pkg->h.dsm_uuid;
+	rev  = pkg->h.dsm_rev ? pkg->h.dsm_rev : 1;
+
+	in_obj.type = ACPI_TYPE_PACKAGE;
+	in_obj.package.count = 1;
+	in_obj.package.elements = &in_buf;
+	in_buf.type = ACPI_TYPE_BUFFER;
+	in_buf.buffer.pointer = (void *) &pkg->buf;
+
+	in_buf.buffer.length = pkg->h.dsm_in;
+
+	if (IS_ENABLED(CONFIG_ACPI_NFIT_DEBUG)) {
+		dev_dbg(dev, "%s:%s cmd: %d input length: %d\n", __func__,
+				dimm_name, cmd, in_buf.buffer.length);
+		print_hex_dump_debug("cmd: ", DUMP_PREFIX_OFFSET, 4,
+				4, in_buf.buffer.pointer, min_t(u32, 128,
+					in_buf.buffer.length), true);
+	}
+
+	out_obj = acpi_evaluate_dsm(handle, uuid, rev, cmd, &in_obj);
+	if (!out_obj) {
+		dev_dbg(dev, "%s:%s _DSM failed cmd: %d\n", __func__, dimm_name,
+				cmd);
+		return -EINVAL;
+	}
+
+	if (out_obj->package.type != ACPI_TYPE_BUFFER) {
+		dev_dbg(dev, "%s:%s unexpected output object type cmd: %d type: %d\n",
+				__func__, dimm_name, cmd, out_obj->type);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (IS_ENABLED(CONFIG_ACPI_NFIT_DEBUG)) {
+		dev_dbg(dev, "%s:%s cmd: %d output length: %d\n", __func__,
+				dimm_name, cmd, out_obj->buffer.length);
+		print_hex_dump_debug("cmd: ", DUMP_PREFIX_OFFSET, 4,
+				4, out_obj->buffer.pointer, min_t(u32, 128,
+					out_obj->buffer.length), true);
+	}
+
+	pkg->h.dsm_size = out_obj->buffer.length;
+	memcpy(pkg->buf + pkg->h.dsm_in,
+			out_obj->buffer.pointer,
+			min(pkg->h.dsm_size, pkg->h.dsm_out));
+
+
+ out:
+	ACPI_FREE(out_obj);
+
+	return rc;
+}
+
+
 static const char *spa_type_name(u16 type)
 {
 	static const char *to_name[] = {
@@ -1614,6 +1698,7 @@ static int acpi_nfit_add(struct acpi_device *adev)
 	nd_desc = &acpi_desc->nd_desc;
 	nd_desc->provider_name = "ACPI.NFIT";
 	nd_desc->ndctl = acpi_nfit_ctl;
+	nd_desc->ndctl_passthru = acpi_nfit_ctl_passthru;
 	nd_desc->attr_groups = acpi_nfit_attribute_groups;
 
 	acpi_desc->nvdimm_bus = nvdimm_bus_register(dev, nd_desc);

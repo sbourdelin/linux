@@ -599,18 +599,103 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 	return rc;
 }
 
+
+static int __nd_ioctl_passthru(struct nvdimm_bus *nvdimm_bus,
+		struct nvdimm *nvdimm, int read_only, unsigned
+		int ioctl_cmd, unsigned long arg)
+{
+	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
+	size_t buf_len = 0, in_len = 0, out_len = 0;
+	unsigned int cmd = _IOC_NR(ioctl_cmd);
+	unsigned int size = _IOC_SIZE(ioctl_cmd);
+	void __user *p = (void __user *) arg;
+	struct device *dev = &nvdimm_bus->dev;
+	const char *dimm_name = "";
+	void *buf = NULL;
+	int i, rc;
+	struct ndn_pkg pkg;
+
+	if (nvdimm)
+		dimm_name = dev_name(&nvdimm->dev);
+	else
+		dimm_name = "bus";
+
+	if (copy_from_user(&pkg, p, sizeof(pkg))) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(pkg.h.res); i++)
+		if (pkg.h.res[i])
+			return -EINVAL;
+
+	/* Caller must tell us size of input to _DSM. */
+	/* This may be bigger that the fixed portion of the pakcage */
+	in_len  = pkg.h.dsm_in;
+	out_len = pkg.h.dsm_out;
+	buf_len = sizeof(pkg.h) + in_len + out_len;
+
+
+	dev_dbg(dev, "%s:%s cmd: %d, size: %d, in: %zu, out: %zu len: %zu\n",
+				__func__,
+				dimm_name, cmd, size,
+				in_len, out_len, buf_len);
+
+	if (buf_len > ND_IOCTL_MAX_BUFLEN) {
+		dev_dbg(dev, "%s:%s cmd: %d buf_len: %zu > %d\n", __func__,
+				dimm_name, cmd, buf_len,
+				ND_IOCTL_MAX_BUFLEN);
+		return -EINVAL;
+	}
+
+	buf = vmalloc(buf_len);
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, p, buf_len)) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	nvdimm_bus_lock(&nvdimm_bus->dev);
+	rc = nd_cmd_clear_to_send(nvdimm, cmd);
+	if (rc)
+		goto out_unlock;
+
+	rc = nd_desc->ndctl_passthru(nd_desc, nvdimm, cmd, buf, buf_len);
+	if (rc < 0)
+		goto out_unlock;
+	if (copy_to_user(p, buf, buf_len))
+		rc = -EFAULT;
+ out_unlock:
+	nvdimm_bus_unlock(&nvdimm_bus->dev);
+ out:
+	vfree(buf);
+	return rc;
+}
+
 static long nd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long id = (long) file->private_data;
 	int rc = -ENXIO, read_only;
 	struct nvdimm_bus *nvdimm_bus;
+	unsigned int type = _IOC_TYPE(cmd);
 
 	read_only = (O_RDWR != (file->f_flags & O_ACCMODE));
 	mutex_lock(&nvdimm_bus_list_mutex);
 	list_for_each_entry(nvdimm_bus, &nvdimm_bus_list, list) {
-		if (nvdimm_bus->id == id) {
+		if (nvdimm_bus->id != id)
+			continue;
+
+		switch (type) {
+		case NVDIMM_TYPE_INTEL:
 			rc = __nd_ioctl(nvdimm_bus, NULL, read_only, cmd, arg);
 			break;
+		case NVDIMM_TYPE_PASSTHRU:
+			rc = __nd_ioctl_passthru(nvdimm_bus, NULL, 0, cmd, arg);
+			break;
+		default:
+			rc = -ENOTTY;
 		}
 	}
 	mutex_unlock(&nvdimm_bus_list_mutex);
@@ -633,10 +718,11 @@ static int match_dimm(struct device *dev, void *data)
 
 static long nvdimm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int rc = -ENXIO, read_only;
+	int rc = -ENXIO, ro;
 	struct nvdimm_bus *nvdimm_bus;
+	unsigned int type = _IOC_TYPE(cmd);
 
-	read_only = (O_RDWR != (file->f_flags & O_ACCMODE));
+	ro = (O_RDWR != (file->f_flags & O_ACCMODE));
 	mutex_lock(&nvdimm_bus_list_mutex);
 	list_for_each_entry(nvdimm_bus, &nvdimm_bus_list, list) {
 		struct device *dev = device_find_child(&nvdimm_bus->dev,
@@ -647,7 +733,18 @@ static long nvdimm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			continue;
 
 		nvdimm = to_nvdimm(dev);
-		rc = __nd_ioctl(nvdimm_bus, nvdimm, read_only, cmd, arg);
+
+		switch (type) {
+		case NVDIMM_TYPE_INTEL:
+			rc = __nd_ioctl(nvdimm_bus, nvdimm, ro, cmd, arg);
+			break;
+		case NVDIMM_TYPE_PASSTHRU:
+			rc = __nd_ioctl_passthru(nvdimm_bus, nvdimm, ro, cmd, arg);
+			break;
+		default:
+			rc = -ENOTTY;
+		}
+
 		put_device(dev);
 		break;
 	}
