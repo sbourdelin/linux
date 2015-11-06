@@ -259,10 +259,12 @@ void mmc_add_host_debugfs(struct mmc_host *host)
 	if (fail_request)
 		setup_fault_attr(&fail_default_attr, fail_request);
 	host->fail_mmc_request = fail_default_attr;
+#ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
 	if (IS_ERR(fault_create_debugfs_attr("fail_mmc_request",
 					     root,
 					     &host->fail_mmc_request)))
 		goto err_node;
+#endif
 #endif
 	return;
 
