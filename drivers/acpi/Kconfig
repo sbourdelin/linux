@@ -58,7 +58,7 @@ config ACPI_CCA_REQUIRED
 	bool
 
 config ACPI_DEBUGGER
-	bool "In-kernel debugger (EXPERIMENTAL)"
+	bool "In-kernel debugger"
 	select ACPI_DEBUG
 	help
 	  Enable in-kernel debugging facilities: statistics, internal
