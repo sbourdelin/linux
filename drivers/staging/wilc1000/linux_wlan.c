@@ -1791,6 +1791,7 @@ int wilc_netdev_init(struct wilc **wilc)
 /*The 1st function called after module inserted*/
 static int __init init_wilc_driver(void)
 {
+	struct wilc *wilc;
 #ifdef WILC_SPI
 	struct wilc *wilc;
 #endif
