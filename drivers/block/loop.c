@@ -1632,10 +1632,14 @@ static int loop_add(struct loop_device **l, int i)
 	disk->private_data	= lo;
 	disk->queue		= lo->lo_queue;
 	sprintf(disk->disk_name, "loop%d", i);
-	add_disk(disk);
+	err = add_disk(disk);
+	if (err)
+		goto out_free_disk;
 	*l = lo;
 	return lo->lo_number;
 
+out_free_disk:
+	put_disk(disk);
 out_free_queue:
 	blk_cleanup_queue(lo->lo_queue);
 out_cleanup_tags:
@@ -1836,8 +1840,10 @@ static int __init loop_init(void)
 		goto misc_out;
 	}
 
-	blk_register_region(MKDEV(LOOP_MAJOR, 0), range,
+	err = blk_register_region(MKDEV(LOOP_MAJOR, 0), range,
 				  THIS_MODULE, loop_probe, NULL, NULL);
+	if (err)
+		goto out_blkdev;
 
 	/* pre-create number of devices given by config or max_loop */
 	mutex_lock(&loop_index_mutex);
@@ -1848,6 +1854,8 @@ static int __init loop_init(void)
 	printk(KERN_INFO "loop: module loaded\n");
 	return 0;
 
+out_blkdev:
+	unregister_blkdev(LOOP_MAJOR, "loop");
 misc_out:
 	misc_deregister(&loop_misc);
 	return err;
