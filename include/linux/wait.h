@@ -209,11 +209,12 @@ wait_queue_head_t *bit_waitqueue(void *, int);
  * otherwise.
  */
 
-#define ___wait_event(wq, condition, state, exclusive, ret, cmd)	\
+#define ___wait_event(wq, condition, nstate, exclusive, ret, cmd)	\
 ({									\
 	__label__ __out;						\
 	wait_queue_t __wait;						\
 	long __ret = ret;	/* explicit shadow */			\
+	long ostate = current->state;					\
 									\
 	INIT_LIST_HEAD(&__wait.task_list);				\
 	if (exclusive)							\
@@ -222,16 +223,16 @@ wait_queue_head_t *bit_waitqueue(void *, int);
 		__wait.flags = 0;					\
 									\
 	for (;;) {							\
-		long __int = prepare_to_wait_event(&wq, &__wait, state);\
+		long __int = prepare_to_wait_event(&wq, &__wait, nstate);\
 									\
 		if (condition)						\
 			break;						\
 									\
-		if (___wait_is_interruptible(state) && __int) {		\
+		if (___wait_is_interruptible(nstate) && __int) {	\
 			__ret = __int;					\
 			if (exclusive) {				\
 				abort_exclusive_wait(&wq, &__wait,	\
-						     state, NULL);	\
+						     nstate, NULL);	\
 				goto __out;				\
 			}						\
 			break;						\
@@ -240,6 +241,7 @@ wait_queue_head_t *bit_waitqueue(void *, int);
 		cmd;							\
 	}								\
 	finish_wait(&wq, &__wait);					\
+	set_current_state(ostate);					\
 __out:	__ret;								\
 })
 
