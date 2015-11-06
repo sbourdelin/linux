@@ -48,6 +48,14 @@ Optional properties:
 - mmc-hs400-1_2v: eMMC HS400 mode(1.2V I/O) is supported
 - dsr: Value the card's (optional) Driver Stage Register (DSR) should be
   programmed with. Valid range: [0 .. 0xffff].
+- sdhci,auto-cmd12: the controller supports Auto-CMD12 to stop multiblock
+  transfers.
+- broken-64-bit-dma: the controller does not support 64-bit DMA even if
+  the controller claims it does.
+- broken-timeout-value: the timeout value specified by the controller is
+  incorrect and the MAX timeout will be used instead.
+- broken-sdr50: SDR50 mode is broken.
+- broken-ddr50: DDR50 mode is broken.
 
 *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
 polarity properties, we have to fix the meaning of the "normal" and "inverted"
