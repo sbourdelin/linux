@@ -15,6 +15,9 @@
 
 #include <linux/types.h>
 
+#define NVDIMM_TYPE_INTEL		'N'
+#define NVDIMM_TYPE_PASSTHRU		'P'
+
 struct nd_cmd_smart {
 	__u32 status;
 	__u8 data[128];
@@ -148,7 +151,8 @@ static inline const char *nvdimm_cmd_name(unsigned cmd)
 	return "unknown";
 }
 
-#define ND_IOCTL 'N'
+#define ND_IOCTL			NVDIMM_TYPE_INTEL
+
 
 #define ND_IOCTL_SMART			_IOWR(ND_IOCTL, ND_CMD_SMART,\
 					struct nd_cmd_smart)
@@ -204,4 +208,18 @@ enum ars_masks {
 	ARS_STATUS_MASK = 0x0000FFFF,
 	ARS_EXT_STATUS_SHIFT = 16,
 };
+
+
+struct ndn_pkg {
+	struct {
+		__u8	dsm_uuid[16];
+		__u32	dsm_in;			/* size of _DSM input    */
+		__u32	dsm_out;		/* size of user buffer   */
+		__u32	dsm_rev;		/* revision of dsm call  */
+		__u32	res[8];			/* reserved must be zero */
+		__u32	dsm_size;		/* size _DSM would write */
+	} h;
+	unsigned char buf[];
+} __packed;
+
 #endif /* __NDCTL_H__ */
