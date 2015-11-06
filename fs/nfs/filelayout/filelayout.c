@@ -206,8 +206,8 @@ static int filelayout_async_handle_error(struct rpc_task *task,
 		/* fall through */
 	default:
 reset:
-		dprintk("%s Retry through MDS. Error %d\n", __func__,
-			task->tk_status);
+		printk(KERN_INFO "NFS: %s: Retry through MDS. DS %pISpc error %d\n", __func__,
+			&task->tk_client->cl_xprt->addr, task->tk_status);
 		return -NFS4ERR_RESET_TO_MDS;
 	}
 out:
