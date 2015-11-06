@@ -24,6 +24,7 @@
 #include <linux/videodev2.h>
 #include <linux/v4l2-mediabus.h>
 #include <linux/module.h>
+#include <linux/gpio/consumer.h>
 
 #include <media/mt9v032.h>
 #include <media/v4l2-ctrls.h>
@@ -251,6 +252,8 @@ struct mt9v032 {
 
 	struct regmap *regmap;
 	struct clk *clk;
+	struct gpio_desc *reset_gpio;
+	struct gpio_desc *standby_gpio;
 
 	struct mt9v032_platform_data *pdata;
 	const struct mt9v032_model_info *model;
@@ -312,14 +315,24 @@ static int mt9v032_power_on(struct mt9v032 *mt9v032)
 	struct regmap *map = mt9v032->regmap;
 	int ret;
 
+	gpiod_set_value_cansleep(mt9v032->reset_gpio, 1);
+
 	ret = clk_set_rate(mt9v032->clk, mt9v032->sysclk);
 	if (ret < 0)
 		return ret;
 
+	/* system clock has to be enabled before releasing the reset */
 	ret = clk_prepare_enable(mt9v032->clk);
 	if (ret)
 		return ret;
 
+	udelay(1);
+
+	gpiod_set_value_cansleep(mt9v032->reset_gpio, 0);
+
+	/*
+	 * After releasing reset, it can take up to 1us until the chip is done
+	 */
 	udelay(1);
 
 	/* Reset the chip and stop data read out */
@@ -953,6 +966,16 @@ static int mt9v032_probe(struct i2c_client *client,
 	mt9v032->clk = devm_clk_get(&client->dev, NULL);
 	if (IS_ERR(mt9v032->clk))
 		return PTR_ERR(mt9v032->clk);
+
+	mt9v032->reset_gpio = devm_gpiod_get_optional(&client->dev, "reset",
+						      GPIOD_OUT_HIGH);
+	if (IS_ERR(mt9v032->reset_gpio))
+		return PTR_ERR(mt9v032->reset_gpio);
+
+	mt9v032->standby_gpio = devm_gpiod_get_optional(&client->dev, "standby",
+							GPIOD_OUT_LOW);
+	if (IS_ERR(mt9v032->standby_gpio))
+		return PTR_ERR(mt9v032->standby_gpio);
 
 	mutex_init(&mt9v032->power_lock);
 	mt9v032->pdata = pdata;
