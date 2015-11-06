@@ -77,22 +77,17 @@ size_t pci_get_rom_size(struct pci_dev *pdev, void __iomem *rom, size_t size)
 	do {
 		void __iomem *pds;
 		/* Standard PCI ROMs start out with these bytes 55 AA */
-		if (readb(image) != 0x55) {
-			dev_err(&pdev->dev, "Invalid ROM contents\n");
+		if ((readb(image) != 0x55) || (readb(image + 1) != 0xAA)) {
+			dev_err(&pdev->dev, "Invalid PCI ROM signature\n");
 			break;
 		}
-		if (readb(image + 1) != 0xAA)
-			break;
 		/* get the PCI data structure and check its signature */
 		pds = image + readw(image + 24);
-		if (readb(pds) != 'P')
+		if ((readb(pds) != 'P') || (readb(pds + 1) != 'C') ||
+			(readb(pds + 2) != 'I') || (readb(pds + 3) != 'R')) {
+			dev_err(&pdev->dev, "Invalid PCI ROM data signature\n");
 			break;
-		if (readb(pds + 1) != 'C')
-			break;
-		if (readb(pds + 2) != 'I')
-			break;
-		if (readb(pds + 3) != 'R')
-			break;
+		}
 		last_image = readb(pds + 21) & 0x80;
 		length = readw(pds + 16);
 		image += length * 512;
