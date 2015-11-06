@@ -71,7 +71,7 @@ struct nvdimm_bus_descriptor {
 	const struct attribute_group **attr_groups;
 	unsigned long dsm_mask;
 	char *provider_name;
-	ndctl_fn ndctl;
+	ndctl_fn ndctl_intel;
 	ndctl_fn ndctl_passthru;
 };
 

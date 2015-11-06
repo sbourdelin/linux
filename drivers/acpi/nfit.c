@@ -62,7 +62,7 @@ static struct acpi_device *to_acpi_dev(struct acpi_nfit_desc *acpi_desc)
 	return to_acpi_device(acpi_desc->dev);
 }
 
-static int acpi_nfit_ctl(struct nvdimm_bus_descriptor *nd_desc,
+static int acpi_nfit_ctl_intel(struct nvdimm_bus_descriptor *nd_desc,
 		struct nvdimm *nvdimm, unsigned int cmd, void *buf,
 		unsigned int buf_len)
 {
@@ -1352,7 +1352,7 @@ static int acpi_nfit_blk_get_flags(struct nvdimm_bus_descriptor *nd_desc,
 	int rc;
 
 	memset(&flags, 0, sizeof(flags));
-	rc = nd_desc->ndctl(nd_desc, nvdimm, ND_CMD_DIMM_FLAGS, &flags,
+	rc = nd_desc->ndctl_intel(nd_desc, nvdimm, ND_CMD_DIMM_FLAGS, &flags,
 			sizeof(flags));
 
 	if (rc >= 0 && flags.status == 0)
@@ -1697,7 +1697,7 @@ static int acpi_nfit_add(struct acpi_device *adev)
 	acpi_desc->blk_do_io = acpi_nfit_blk_region_do_io;
 	nd_desc = &acpi_desc->nd_desc;
 	nd_desc->provider_name = "ACPI.NFIT";
-	nd_desc->ndctl = acpi_nfit_ctl;
+	nd_desc->ndctl_intel = acpi_nfit_ctl_intel;
 	nd_desc->ndctl_passthru = acpi_nfit_ctl_passthru;
 	nd_desc->attr_groups = acpi_nfit_attribute_groups;
 

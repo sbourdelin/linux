@@ -74,7 +74,7 @@ int nvdimm_init_nsarea(struct nvdimm_drvdata *ndd)
 
 	memset(cmd, 0, sizeof(*cmd));
 	nd_desc = nvdimm_bus->nd_desc;
-	return nd_desc->ndctl(nd_desc, to_nvdimm(ndd->dev),
+	return nd_desc->ndctl_intel(nd_desc, to_nvdimm(ndd->dev),
 			ND_CMD_GET_CONFIG_SIZE, cmd, sizeof(*cmd));
 }
 
@@ -118,7 +118,7 @@ int nvdimm_init_config_data(struct nvdimm_drvdata *ndd)
 			offset += cmd->in_length) {
 		cmd->in_length = min(config_size, max_cmd_size);
 		cmd->in_offset = offset;
-		rc = nd_desc->ndctl(nd_desc, to_nvdimm(ndd->dev),
+		rc = nd_desc->ndctl_intel(nd_desc, to_nvdimm(ndd->dev),
 				ND_CMD_GET_CONFIG_DATA, cmd,
 				cmd->in_length + sizeof(*cmd));
 		if (rc || cmd->status) {
@@ -170,7 +170,7 @@ int nvdimm_set_config_data(struct nvdimm_drvdata *ndd, size_t offset,
 		cmd_size = sizeof(*cmd) + cmd->in_length + sizeof(u32);
 		status = ((void *) cmd) + cmd_size - sizeof(u32);
 
-		rc = nd_desc->ndctl(nd_desc, to_nvdimm(ndd->dev),
+		rc = nd_desc->ndctl_intel(nd_desc, to_nvdimm(ndd->dev),
 				ND_CMD_SET_CONFIG_DATA, cmd, cmd_size);
 		if (rc || *status) {
 			rc = rc ? rc : -ENXIO;

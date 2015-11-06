@@ -479,8 +479,9 @@ static int nd_cmd_clear_to_send(struct nvdimm *nvdimm, unsigned int cmd)
 	return 0;
 }
 
-static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
-		int read_only, unsigned int ioctl_cmd, unsigned long arg)
+static int __nd_ioctl_intel(struct nvdimm_bus *nvdimm_bus,
+		struct nvdimm *nvdimm, int read_only, unsigned int ioctl_cmd,
+		unsigned long arg)
 {
 	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
 	size_t buf_len = 0, in_len = 0, out_len = 0;
@@ -587,7 +588,7 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 	if (rc)
 		goto out_unlock;
 
-	rc = nd_desc->ndctl(nd_desc, nvdimm, cmd, buf, buf_len);
+	rc = nd_desc->ndctl_intel(nd_desc, nvdimm, cmd, buf, buf_len);
 	if (rc < 0)
 		goto out_unlock;
 	if (copy_to_user(p, buf, buf_len))
@@ -677,11 +678,11 @@ static int __nd_ioctl_passthru(struct nvdimm_bus *nvdimm_bus,
 static long nd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long id = (long) file->private_data;
-	int rc = -ENXIO, read_only;
+	int rc = -ENXIO, ro;
 	struct nvdimm_bus *nvdimm_bus;
 	unsigned int type = _IOC_TYPE(cmd);
 
-	read_only = (O_RDWR != (file->f_flags & O_ACCMODE));
+	ro = (O_RDWR != (file->f_flags & O_ACCMODE));
 	mutex_lock(&nvdimm_bus_list_mutex);
 	list_for_each_entry(nvdimm_bus, &nvdimm_bus_list, list) {
 		if (nvdimm_bus->id != id)
@@ -689,7 +690,7 @@ static long nd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		switch (type) {
 		case NVDIMM_TYPE_INTEL:
-			rc = __nd_ioctl(nvdimm_bus, NULL, read_only, cmd, arg);
+			rc = __nd_ioctl_intel(nvdimm_bus, NULL, ro, cmd, arg);
 			break;
 		case NVDIMM_TYPE_PASSTHRU:
 			rc = __nd_ioctl_passthru(nvdimm_bus, NULL, 0, cmd, arg);
@@ -736,7 +737,7 @@ static long nvdimm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		switch (type) {
 		case NVDIMM_TYPE_INTEL:
-			rc = __nd_ioctl(nvdimm_bus, nvdimm, ro, cmd, arg);
+			rc = __nd_ioctl_intel(nvdimm_bus, nvdimm, ro, cmd, arg);
 			break;
 		case NVDIMM_TYPE_PASSTHRU:
 			rc = __nd_ioctl_passthru(nvdimm_bus, nvdimm, ro, cmd, arg);
