@@ -250,7 +250,8 @@ Works.  Use "Insert file..." or external editor.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Gmail (Web GUI)
 
-Does not work for sending patches.
+Gmail works fine for sending patches provided you do NOT use the web interface
+and just use Gmail as an IMAP server with a text based email client.
 
 Gmail web client converts tabs to spaces automatically.
 
