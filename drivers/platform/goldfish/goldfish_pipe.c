@@ -111,16 +111,27 @@
 #define PIPE_WAKE_READ         (1 << 1)  /* pipe can now be read from */
 #define PIPE_WAKE_WRITE        (1 << 2)  /* pipe can now be written to */
 
+#ifdef CONFIG_64BIT
 struct access_params {
-	unsigned long channel;
-	u32 size;
-	unsigned long address;
-	u32 cmd;
-	u32 result;
+	uint64_t channel;   /* 0x00 */
+	uint32_t size;      /* 0x08 */
+	uint64_t address;   /* 0x0c */
+	uint32_t cmd;       /* 0x14 */
+	uint32_t result;    /* 0x18 */
 	/* reserved for future extension */
-	u32 flags;
+	uint32_t flags;     /* 0x1c */
 };
-
+#else
+struct access_params {
+	uint32_t channel;   /* 0x00 */
+	uint32_t size;      /* 0x04 */
+	uint32_t address;   /* 0x08 */
+	uint32_t cmd;       /* 0x0c */
+	uint32_t result;    /* 0x10 */
+	/* reserved for future extension */
+	uint32_t flags;     /* 0x14 */
+};
+#endif
 /* The global driver data. Holds a reference to the i/o page used to
  * communicate with the emulator, and a wake queue for blocked tasks
  * waiting to be awoken.
@@ -236,6 +247,7 @@ static int setup_access_params_addr(struct platform_device *pdev,
 		return -1;
 }
 
+#if 0
 /* A value that will not be set by qemu emulator */
 #define INITIAL_BATCH_RESULT (0xdeadbeaf)
 static int access_with_param(struct goldfish_pipe_dev *dev, const int cmd,
@@ -262,6 +274,7 @@ static int access_with_param(struct goldfish_pipe_dev *dev, const int cmd,
 	*status = aps->result;
 	return 0;
 }
+#endif
 
 /* This function is used for both reading from and writing to a given
  * pipe.
@@ -303,6 +316,8 @@ static ssize_t goldfish_pipe_read_write(struct file *filp, char __user *buffer,
 								 : address_end;
 		unsigned long  avail    = next - address;
 		int status, wakeBit;
+		struct page *page;
+		phys_addr_t phys_addr;
 
 		/* Ensure that the corresponding page is properly mapped */
 		/* FIXME: this isn't safe or sufficient - use get_user_pages */
@@ -322,23 +337,22 @@ static ssize_t goldfish_pipe_read_write(struct file *filp, char __user *buffer,
 				break;
 			}
 		}
-
+		if (get_user_pages_unlocked(current, current->active_mm,
+					address, 1, !is_write, 0, &page) != 1)
+			return -EINVAL;
+		phys_addr = page_to_phys(page) + offset_in_page(address);
 		/* Now, try to transfer the bytes in the current page */
 		spin_lock_irqsave(&dev->lock, irq_flags);
-		if (access_with_param(dev, CMD_WRITE_BUFFER + cmd_offset,
-				address, avail, pipe, &status)) {
-			gf_write_ptr(pipe, dev->base + PIPE_REG_CHANNEL,
-				     dev->base + PIPE_REG_CHANNEL_HIGH);
-			writel(avail, dev->base + PIPE_REG_SIZE);
-			gf_write_ptr((void *)address,
-				     dev->base + PIPE_REG_ADDRESS,
-				     dev->base + PIPE_REG_ADDRESS_HIGH);
-			writel(CMD_WRITE_BUFFER + cmd_offset,
-					dev->base + PIPE_REG_COMMAND);
-			status = readl(dev->base + PIPE_REG_STATUS);
-		}
+		gf_write_ptr(pipe, dev->base + PIPE_REG_CHANNEL,
+			     dev->base + PIPE_REG_CHANNEL_HIGH);
+		writel(avail, dev->base + PIPE_REG_SIZE);
+		gf_write_ptr((void *)phys_addr, dev->base + PIPE_REG_ADDRESS,
+			     dev->base + PIPE_REG_ADDRESS_HIGH);
+		writel(CMD_WRITE_BUFFER + cmd_offset,
+				dev->base + PIPE_REG_COMMAND);
+		status = readl(dev->base + PIPE_REG_STATUS);
 		spin_unlock_irqrestore(&dev->lock, irq_flags);
-
+		put_page(page);
 		if (status > 0) { /* Correct transfer */
 			ret += status;
 			address += status;
