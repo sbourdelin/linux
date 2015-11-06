@@ -18,6 +18,7 @@
 #include <linux/kernel.h>
 #include <linux/export.h>
 #include <linux/ftrace.h>
+#include <linux/kallsyms.h>
 #include <linux/sched.h>
 #include <linux/stacktrace.h>
 
@@ -326,5 +327,56 @@ void save_stack_trace_sp(struct stack_trace *trace,
 {
 	__save_stack_trace_tsk(current, trace, stack_dump_sp);
 }
+
+static int start_analyzer_test __initdata;
+
+static int __init enable_analyzer_test(char *str)
+{
+	get_option(&str, &start_analyzer_test);
+	return 0;
+}
+early_param("function_prologue_analyzer_test", enable_analyzer_test);
+
+static void __init do_test_function_prologue_analyzer(void)
+{
+	extern unsigned long __start_mcount_loc[];
+	extern unsigned long __stop_mcount_loc[];
+	unsigned long count, i, errors;
+	int print_once;
+
+	count = __stop_mcount_loc - __start_mcount_loc;
+	errors = print_once = 0;
+	for (i = 0; i < count; i++) {
+		unsigned long addr, sp_off, fp_off;
+		int pos;
+		bool check;
+		char buf[60];
+
+		addr = __start_mcount_loc[i];
+		pos = analyze_function_prologue(addr, &sp_off, &fp_off);
+		check = ((pos != 0) || !sp_off || (sp_off <= fp_off));
+		if (check)
+			errors++;
+		if (check || (start_analyzer_test > 1)) {
+			if (!print_once) {
+				pr_debug("       po sp    fp    symbol\n");
+				pr_debug("       == ==    ==    ======\n");
+				print_once++;
+			}
+			sprint_symbol(buf, addr);
+			pr_debug("%5ld: %d  0x%03lx 0x%03lx %s\n",
+					i, pos, sp_off, fp_off, buf);
+		}
+	}
+	pr_debug("function prologue analyzer test: %ld errors\n", errors);
+}
+
+static int __init test_function_prologue_analyzer(void)
+{
+	if (start_analyzer_test)
+		do_test_function_prologue_analyzer();
+	return 0;
+}
+late_initcall(test_function_prologue_analyzer);
 #endif /* CONFIG_STACK_TRACER */
 #endif
