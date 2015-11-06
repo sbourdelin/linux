@@ -1116,20 +1116,9 @@ nfqnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 	struct nfgenmsg *nfmsg = nlmsg_data(nlh);
 	u_int16_t queue_num = ntohs(nfmsg->res_id);
 	struct nfqnl_instance *queue;
-	struct nfqnl_msg_config_cmd *cmd = NULL;
 	struct net *net = sock_net(ctnl);
 	struct nfnl_queue_net *q = nfnl_queue_pernet(net);
 	int ret = 0;
-
-	if (nfqa[NFQA_CFG_CMD]) {
-		cmd = nla_data(nfqa[NFQA_CFG_CMD]);
-
-		/* Obsolete commands without queue context */
-		switch (cmd->command) {
-		case NFQNL_CFG_CMD_PF_BIND: return 0;
-		case NFQNL_CFG_CMD_PF_UNBIND: return 0;
-		}
-	}
 
 	rcu_read_lock();
 	queue = instance_lookup(q, queue_num);
@@ -1138,7 +1127,9 @@ nfqnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 		goto err_out_unlock;
 	}
 
-	if (cmd != NULL) {
+	if (nfqa[NFQA_CFG_CMD]) {
+		struct nfqnl_msg_config_cmd *cmd = nla_data(nfqa[NFQA_CFG_CMD]);
+
 		switch (cmd->command) {
 		case NFQNL_CFG_CMD_BIND:
 			if (queue) {
@@ -1161,7 +1152,8 @@ nfqnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 			break;
 		case NFQNL_CFG_CMD_PF_BIND:
 		case NFQNL_CFG_CMD_PF_UNBIND:
-			break;
+			/* Obsolete commands without queue context */
+			goto err_out_unlock;
 		default:
 			ret = -ENOTSUPP;
 			break;
