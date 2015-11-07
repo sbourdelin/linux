@@ -1289,3 +1289,8 @@ struct regmap_config wm8994_base_regmap_config = {
 	.val_bits = 16,
 };
 EXPORT_SYMBOL(wm8994_base_regmap_config);
+
+MODULE_DESCRIPTION("WM8994 Register mapping data");
+MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
+MODULE_LICENSE("GPL v2");
+MODULE_ALIAS("platform:wm8994-regmap");
