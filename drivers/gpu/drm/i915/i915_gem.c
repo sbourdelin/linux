@@ -766,14 +766,26 @@ i915_gem_gtt_pwrite_fast(struct drm_device *dev,
 			 struct drm_file *file)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_mm_node node;
 	ssize_t remain;
 	loff_t offset, page_base;
 	char __user *user_data;
-	int page_offset, page_length, ret;
+	int page_offset, page_length, ret, i = 0;
+	bool pinned = true;
 
 	ret = i915_gem_obj_ggtt_pin(obj, 0, PIN_MAPPABLE | PIN_NONBLOCK);
-	if (ret)
-		goto out;
+	if (ret) {
+		pinned = false;
+		memset(&node, 0, sizeof(node));
+		ret = drm_mm_insert_node_in_range_generic(&dev_priv->gtt.base.mm,
+							  &node, 4096, 0,
+							  I915_CACHE_NONE, 0,
+							  dev_priv->gtt.mappable_end,
+							  DRM_MM_SEARCH_DEFAULT,
+							  DRM_MM_CREATE_DEFAULT);
+		if (ret)
+			goto out;
+	}
 
 	ret = i915_gem_object_set_to_gtt_domain(obj, true);
 	if (ret)
@@ -783,26 +795,41 @@ i915_gem_gtt_pwrite_fast(struct drm_device *dev,
 	if (ret)
 		goto out_unpin;
 
+	i915_gem_object_pin_pages(obj);
+
 	user_data = to_user_ptr(args->data_ptr);
 	remain = args->size;
 
-	offset = i915_gem_obj_ggtt_offset(obj) + args->offset;
-
 	intel_fb_obj_invalidate(obj, ORIGIN_GTT);
 
-	while (remain > 0) {
-		/* Operation in this page
-		 *
-		 * page_base = page offset within aperture
-		 * page_offset = offset within page
-		 * page_length = bytes to copy for this page
-		 */
+	if (pinned) {
+		offset = i915_gem_obj_ggtt_offset(obj) + args->offset;
+		/* page_base = page offset within aperture */
 		page_base = offset & PAGE_MASK;
-		page_offset = offset_in_page(offset);
+	} else {
+		offset = args->offset;
+		page_base = node.start;
+		i = args->offset / PAGE_SIZE;
+	}
+
+	/* page_offset = offset within page */
+	page_offset = offset_in_page(offset);
+	while (remain > 0) {
+		/* page_length = bytes to copy for the page */
 		page_length = remain;
 		if ((page_offset + remain) > PAGE_SIZE)
 			page_length = PAGE_SIZE - page_offset;
 
+		if (!pinned) {
+			wmb();
+			dev_priv->gtt.base.insert_page(&dev_priv->gtt.base,
+					i915_gem_object_get_dma_address(obj, i),
+					node.start,
+					I915_CACHE_NONE,
+					0);
+			wmb();
+			i++;
+		}
 		/* If we get a fault while copying data, then (presumably) our
 		 * source page isn't available.  Return the error and we'll
 		 * retry in the slow path.
@@ -815,13 +842,24 @@ i915_gem_gtt_pwrite_fast(struct drm_device *dev,
 
 		remain -= page_length;
 		user_data += page_length;
-		offset += page_length;
+		page_offset = 0;
 	}
 
 out_flush:
+	if (!pinned) {
+		wmb();
+		dev_priv->gtt.base.clear_range(&dev_priv->gtt.base,
+				node.start, node.size,
+				true);
+	}
+
+	i915_gem_object_unpin_pages(obj);
 	intel_fb_obj_flush(obj, false, ORIGIN_GTT);
 out_unpin:
-	i915_gem_object_ggtt_unpin(obj);
+	if (pinned)
+		i915_gem_object_ggtt_unpin(obj);
+	else
+		drm_mm_remove_node(&node);
 out:
 	return ret;
 }
