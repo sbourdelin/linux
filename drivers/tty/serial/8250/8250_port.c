@@ -559,7 +559,37 @@ static void serial8250_rpm_put_tx(struct uart_8250_port *p)
 	pm_runtime_mark_last_busy(p->port.dev);
 	pm_runtime_put_autosuspend(p->port.dev);
 }
+static void serial8250_stop_rx(struct uart_port *port);
+static void serial8250_rs485_start_tx(struct uart_8250_port *p)
+{
+	if (p->capabilities & UART_CAP_HW485 || !(p->port.rs485.flags & SER_RS485_ENABLED))
+		return;
 
+	if (p->port.rs485.flags & SER_RS485_RTS_ON_SEND) {
+		serial_port_out(&p->port, UART_MCR, UART_MCR_RTS);
+		if (p->port.rs485.delay_rts_before_send > 0)
+			mdelay(p->port.rs485.delay_rts_before_send);
+	}
+	if (!(p->port.rs485.flags & SER_RS485_RX_DURING_TX))
+		serial8250_stop_rx(&p->port);
+}
+static void serial8250_rs485_stop_tx(struct uart_8250_port *p)
+{
+	if (p->capabilities & UART_CAP_HW485 || !(p->port.rs485.flags & SER_RS485_ENABLED))
+		return;
+
+	if (p->port.rs485.flags & SER_RS485_RTS_AFTER_SEND) {
+		if (p->port.rs485.delay_rts_after_send > 0)
+			mdelay(p->port.rs485.delay_rts_after_send);
+		serial_port_out(&p->port, UART_MCR, UART_MCR_RTS);
+	}
+	/*
+	* Empty the RX FIFO, we are not interested in anything
+	* received during the half-duplex transmission.
+	*/
+	if (!(p->port.rs485.flags & SER_RS485_RX_DURING_TX))
+		serial8250_clear_fifos(p);
+}
 /*
  * IER sleep support.  UARTs which have EFRs need the "extended
  * capability" bit enabled.  Note that on XR16C850s, we need to
@@ -1303,6 +1333,7 @@ static void serial8250_stop_tx(struct uart_port *port)
 		up->acr |= UART_ACR_TXDIS;
 		serial_icr_write(up, UART_ACR, up->acr);
 	}
+	serial8250_rs485_stop_tx(up);
 	serial8250_rpm_put(up);
 }
 
@@ -1311,6 +1342,7 @@ static void serial8250_start_tx(struct uart_port *port)
 	struct uart_8250_port *up = up_to_u8250p(port);
 
 	serial8250_rpm_get_tx(up);
+	serial8250_rs485_start_tx(up);
 
 	if (up->dma && !up->dma->tx_dma(up))
 		return;
