@@ -5,6 +5,7 @@
 # 2) Generate timeconst.h
 # 3) Generate asm-offsets.h (may need bounds.h and timeconst.h)
 # 4) Check for missing system calls
+# 5) Generate random_init.h
 
 # Default sed regexp - multiline due to syntax constraints
 define sed-y
@@ -98,3 +99,23 @@ missing-syscalls: scripts/checksyscalls.sh $(offsets-file) FORCE
 
 # Keep these three files during make clean
 no-clean-files := $(bounds-file) $(offsets-file) $(timeconst-file)
+
+#####
+# 5) Generate random_init.h
+
+ifdef CONFIG_RANDOM_INIT
+init-file := include/generated/random_init.h
+used-file := scripts/gen_random
+source-file := $(used-file).c
+always  += $(init-file)
+targets  += $(init-file)
+$(init-file) : $(used-file)
+	$(Q) $(used-file) > $(init-file)
+ifdef CONFIG_RANDOM_GCM
+$(used-file) : $(source-file)
+	$(CC) $< -DCONFIG_RANDOM_GCM -o $@
+else
+$(used-file) : $(source-file)
+	$(CC) $< -o $@
+endif
+endif
