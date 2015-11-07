@@ -395,6 +395,12 @@ static void serial8250_release_rsa_resource(struct uart_8250_port *up)
 	}
 }
 #endif
+static int serial8250_rs485_config(struct uart_port *port,
+				struct serial_rs485 *rs485)
+{
+	port->rs485 = *rs485;
+	return 0;
+}
 
 static const struct uart_ops *base_ops;
 static struct uart_ops univ8250_port_ops;
@@ -986,6 +992,10 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 		uart->port.rs485_config	= up->port.rs485_config;
 		uart->port.rs485	= up->port.rs485;
 		uart->dma		= up->dma;
+
+		/* Use software RS485 support when hardware one is not available */
+		if (!(uart->capabilities & UART_CAP_HW485) && !uart->port.rs485_config)
+			uart->port.rs485_config = serial8250_rs485_config;
 
 		/* Take tx_loadsz from fifosize if it wasn't set separately */
 		if (uart->port.fifosize && !uart->tx_loadsz)
