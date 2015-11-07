@@ -262,3 +262,8 @@ void wm8994_irq_exit(struct wm8994 *wm8994)
 	regmap_del_irq_chip(wm8994->irq, wm8994->irq_data);
 }
 EXPORT_SYMBOL(wm8994_irq_exit);
+
+MODULE_DESCRIPTION("WM8994 interrupt controller");
+MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
+MODULE_LICENSE("GPL v2");
+MODULE_ALIAS("platform:wm8994-irq");
