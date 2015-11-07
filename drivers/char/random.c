@@ -231,7 +231,7 @@
  * not be attributed to the Phil, Colin, or any of authors of PGP.
  *
  * Further background information on this topic may be obtained from
- * RFC 1750, "Randomness Recommendations for Security", by Donald
+ * RFC 4086, "Randomness Requirements for Security", by Donald
  * Eastlake, Steve Crocker, and Jeff Schiller.
  */
 
@@ -275,13 +275,19 @@
 /*
  * Configuration information
  */
+#ifdef CONFIG_RANDOM_INIT
+
+#include <generated/random_init.h>
+
+#else
 #define INPUT_POOL_SHIFT	12
 #define INPUT_POOL_WORDS	(1 << (INPUT_POOL_SHIFT-5))
 #define OUTPUT_POOL_SHIFT	10
 #define OUTPUT_POOL_WORDS	(1 << (OUTPUT_POOL_SHIFT-5))
-#define SEC_XFER_SIZE		512
-#define EXTRACT_SIZE		10
+#endif
 
+#define EXTRACT_SIZE		10
+#define SEC_XFER_SIZE		512
 #define DEBUG_RANDOM_BOOT 0
 
 #define LONGS(x) (((x) + sizeof(unsigned long) - 1)/sizeof(unsigned long))
@@ -295,6 +301,27 @@
  */
 #define ENTROPY_SHIFT 3
 #define ENTROPY_BITS(r) ((r)->entropy_count >> ENTROPY_SHIFT)
+
+/* sanity checks */
+
+#if ((ENTROPY_SHIFT+INPUT_POOL_SHIFT) >= 16)
+#ifndef CONFIG_64BIT
+#error *_SHIFT values problematic for credit_entropy_bits()
+#endif
+#endif
+
+#if ((INPUT_POOL_WORDS%16) || (OUTPUT_POOL_WORDS%16))
+#error Pool size not divisible by 16, which code assumes
+#endif
+
+#if (INPUT_POOL_WORDS < 32)
+#error Input pool less than a quarter of default size
+#endif
+
+#if (INPUT_POOL_WORDS < OUTPUT_POOL_WORDS)
+#error Strange configuration, input pool smalller than output
+#endif
+
 
 /*
  * The minimum number of bits of entropy before we wake up a read on
@@ -442,16 +469,23 @@ struct entropy_store {
 };
 
 static void push_to_pool(struct work_struct *work);
+
+#ifndef CONFIG_RANDOM_INIT
 static __u32 input_pool_data[INPUT_POOL_WORDS];
 static __u32 blocking_pool_data[OUTPUT_POOL_WORDS];
 static __u32 nonblocking_pool_data[OUTPUT_POOL_WORDS];
+#endif
 
 static struct entropy_store input_pool = {
 	.poolinfo = &poolinfo_table[0],
 	.name = "input",
 	.limit = 1,
 	.lock = __SPIN_LOCK_UNLOCKED(input_pool.lock),
-	.pool = input_pool_data
+#ifdef CONFIG_RANDOM_INIT
+	.pool = pools,
+#else
+	.pool = input_pool_data,
+#endif
 };
 
 static struct entropy_store blocking_pool = {
@@ -460,7 +494,11 @@ static struct entropy_store blocking_pool = {
 	.limit = 1,
 	.pull = &input_pool,
 	.lock = __SPIN_LOCK_UNLOCKED(blocking_pool.lock),
+#ifdef CONFIG_RANDOM_INIT
+	.pool = pools + INPUT_POOL_WORDS,
+#else
 	.pool = blocking_pool_data,
+#endif
 	.push_work = __WORK_INITIALIZER(blocking_pool.push_work,
 					push_to_pool),
 };
@@ -470,7 +508,11 @@ static struct entropy_store nonblocking_pool = {
 	.name = "nonblocking",
 	.pull = &input_pool,
 	.lock = __SPIN_LOCK_UNLOCKED(nonblocking_pool.lock),
+#ifdef CONFIG_RANDOM_INIT
+	.pool = pools + INPUT_POOL_WORDS + OUTPUT_POOL_WORDS,
+#else
 	.pool = nonblocking_pool_data,
+#endif
 	.push_work = __WORK_INITIALIZER(nonblocking_pool.push_work,
 					push_to_pool),
 };
