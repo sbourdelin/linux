@@ -5932,7 +5932,7 @@ static void megasas_detach_one(struct pci_dev *pdev)
 						  fusion->max_map_sz,
 						  fusion->ld_map[i],
 						  fusion->ld_map_phys[i]);
-			if (fusion->ld_drv_map[i])
+			if (fusion->ld_drv_map[i]) {
 				free_pages((ulong)fusion->ld_drv_map[i],
 					fusion->drv_map_pages);
 				if (fusion->pd_seq_sync)
@@ -5940,6 +5940,7 @@ static void megasas_detach_one(struct pci_dev *pdev)
 						pd_seq_map_sz,
 						fusion->pd_seq_sync[i],
 						fusion->pd_seq_phys[i]);
+			}
 		}
 		free_pages((ulong)instance->ctrl_context,
 			instance->ctrl_context_pages);
