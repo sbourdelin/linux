@@ -112,3 +112,6 @@ all.config
 
 # Kdevelop4
 *.kdev4
+
+certs/x509_certificate_list
+scripts/gen_random
