@@ -69,6 +69,7 @@ struct serial8250_config {
 	unsigned int	flags;
 };
 
+#define UART_CAP_HW485	(1 << 7)	/* UART has hardware direction control for RS485 */
 #define UART_CAP_FIFO	(1 << 8)	/* UART has FIFO */
 #define UART_CAP_EFR	(1 << 9)	/* UART has EFR */
 #define UART_CAP_SLEEP	(1 << 10)	/* UART has IER sleep */
