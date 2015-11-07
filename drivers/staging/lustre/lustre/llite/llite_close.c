@@ -301,7 +301,7 @@ static void ll_done_writing(struct inode *inode)
 		CERROR("inode %lu mdc done_writing failed: rc = %d\n",
 		       inode->i_ino, rc);
 out:
-	ll_finish_md_op_data(op_data);
+	kfree(op_data);
 	if (och) {
 		md_clear_open_replay_data(ll_i2sbi(inode)->ll_md_exp, och);
 		kfree(och);
