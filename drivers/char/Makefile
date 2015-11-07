@@ -2,7 +2,30 @@
 # Makefile for the kernel character device drivers.
 #
 
-obj-y				+= mem.o random.o
+obj-y				+= mem.o
+
+ifeq ($(CONFIG_RANDOM_GCM),y)
+  random_c		= random_gcm.c
+  random_o		= random_gcm.o
+  random_no		= random.o
+else
+  random_c		= random.c
+  random_o		= random.o
+  random_no		= random_gcm.o
+endif
+obj-y				+= $(random_o)
+
+# remove the generated file after use so that
+# a fresh one is built (by scripts/gen_random)
+# for every compile
+# remove random_no so it will not get linked
+ifeq ($(CONFIG_RANDOM_INIT),y)
+init-file = include/generated/random_init.h
+$(random_o): $(random_c) $(init-file)
+	$(CC) $< -o $@
+	$(Q) rm --force $(init-file) $(random_no)
+endif
+
 obj-$(CONFIG_TTY_PRINTK)	+= ttyprintk.o
 obj-y				+= misc.o
 obj-$(CONFIG_ATARI_DSP56K)	+= dsp56k.o
