@@ -603,5 +603,28 @@ config TILE_SROM
 
 source "drivers/char/xillybus/Kconfig"
 
+
+config RANDOM_INIT
+	bool "Initialise random(4) pools with random data (NEW)"
+	default n
+	help
+	  Use /dev/urandom on development machine to set
+	  up pools, different for each compile.
+	  Compiles scripts/gen_random_init.c
+	  Creates include/generated/random_init.h
+
+config RANDOM_GCM
+	bool "modified random(4) driver (EXPERIMENTAL)"
+	depends on RANDOM_INIT
+	default n
+	help
+	  New version using the hash from AES-GCM.
+	  Main goal decoupling so that heavy use of
+	  /dev/urandom cannot deplete entropy for
+	  /dev/random.
+	  Should not be used in production before much
+	  more analysis and testing is done.
+	  When in doubt, say "N".
+
 endmenu
 
