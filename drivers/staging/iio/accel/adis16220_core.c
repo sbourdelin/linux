@@ -387,11 +387,16 @@ static const struct iio_info adis16220_info = {
 };
 
 static const char * const adis16220_status_error_msgs[] = {
-	[ADIS16220_DIAG_STAT_VIOLATION_BIT] = "Capture period violation/interruption",
-	[ADIS16220_DIAG_STAT_SPI_FAIL_BIT] = "SPI failure",
-	[ADIS16220_DIAG_STAT_FLASH_UPT_BIT] = "Flash update failed",
-	[ADIS16220_DIAG_STAT_POWER_HIGH_BIT] = "Power supply above 3.625V",
-	[ADIS16220_DIAG_STAT_POWER_LOW_BIT] = "Power supply below 3.15V",
+	[ADIS16220_DIAG_STAT_VIOLATION_BIT] =
+	"Capture period violation/interruption",
+	[ADIS16220_DIAG_STAT_SPI_FAIL_BIT] =
+	"SPI failure",
+	[ADIS16220_DIAG_STAT_FLASH_UPT_BIT] =
+	"Flash update failed",
+	[ADIS16220_DIAG_STAT_POWER_HIGH_BIT] =
+	"Power supply above 3.625V",
+	[ADIS16220_DIAG_STAT_POWER_LOW_BIT] =
+	"Power supply below 3.15V",
 };
 
 static const struct adis_data adis16220_data = {
