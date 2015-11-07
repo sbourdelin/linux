@@ -1441,6 +1441,27 @@ static int hidpp_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 	return 0;
 }
 
+static int hidpp_input_mapped(struct hid_device *hdev, struct hid_input *hi,
+		struct hid_field *field, struct hid_usage *usage,
+		unsigned long **bit, int *max)
+{
+	/* Ensure that Logitech G920 is not given a default fuzz/flat value */
+	if (usage->type == EV_ABS && (usage->code == ABS_X ||
+			usage->code == ABS_Y || usage->code == ABS_Z ||
+			usage->code == ABS_RZ)) {
+		switch (hdev->product) {
+		case USB_DEVICE_ID_LOGITECH_G920_WHEEL:
+			field->application = HID_GD_MULTIAXIS;
+			break;
+		default:
+			break;
+		}
+	}
+
+	return 0;
+}
+
+
 static void hidpp_populate_input(struct hidpp_device *hidpp,
 		struct input_dev *input, bool origin_is_hid_core)
 {
@@ -1875,6 +1896,7 @@ static struct hid_driver hidpp_driver = {
 	.raw_event = hidpp_raw_event,
 	.input_configured = hidpp_input_configured,
 	.input_mapping = hidpp_input_mapping,
+	.input_mapped = hidpp_input_mapped,
 };
 
 module_hid_driver(hidpp_driver);
