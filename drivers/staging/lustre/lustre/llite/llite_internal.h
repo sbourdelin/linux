@@ -792,7 +792,6 @@ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
 				      struct inode *i1, struct inode *i2,
 				      const char *name, int namelen,
 				      int mode, __u32 opc, void *data);
-void ll_finish_md_op_data(struct md_op_data *op_data);
 int ll_get_obd_name(struct inode *inode, unsigned int cmd, unsigned long arg);
 char *ll_get_fsname(struct super_block *sb, char *buf, int buflen);
 void ll_open_cleanup(struct super_block *sb, struct ptlrpc_request *open_req);
