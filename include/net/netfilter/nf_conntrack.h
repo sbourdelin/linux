@@ -125,6 +125,21 @@ nf_ct_tuplehash_to_ctrack(const struct nf_conntrack_tuple_hash *hash)
 			    tuplehash[hash->tuple.dst.dir]);
 }
 
+static inline enum ip_conntrack_info
+nf_ct_get_info(const struct nf_conntrack_tuple_hash *h)
+{
+	const struct nf_conn *ct = nf_ct_tuplehash_to_ctrack(h);
+
+	if (NF_CT_DIRECTION(h) == IP_CT_DIR_REPLY)
+		return IP_CT_ESTABLISHED_REPLY;
+	/* Once we've had two way comms, always ESTABLISHED. */
+	if (test_bit(IPS_SEEN_REPLY_BIT, &ct->status))
+		return IP_CT_ESTABLISHED;
+	if (test_bit(IPS_EXPECTED_BIT, &ct->status))
+		return IP_CT_RELATED;
+	return IP_CT_NEW;
+}
+
 static inline u_int16_t nf_ct_l3num(const struct nf_conn *ct)
 {
 	return ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.l3num;
