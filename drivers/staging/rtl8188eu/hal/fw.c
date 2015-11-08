@@ -187,7 +187,7 @@ int rtl88eu_download_fw(struct adapter *adapt)
 	if (fw->size > FW_8188E_SIZE) {
 		dev_err(device, "Firmware size exceed 0x%X. Check it.\n",
 			 FW_8188E_SIZE);
-		return -1;
+		return -EFBIG;
 	}
 
 	pfwdata = kzalloc(FW_8188E_SIZE, GFP_KERNEL);
