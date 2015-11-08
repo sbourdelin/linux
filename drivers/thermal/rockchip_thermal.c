@@ -53,6 +53,16 @@ enum sensor_id {
 };
 
 /**
+* The conversion table has the adc value and temperature.
+* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
+* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
+*/
+enum sort_flag {
+	ADC_DECREMENT = 0,
+	ADC_INCREMENT,
+};
+
+/**
  * The max sensors is two in rockchip SoCs.
  * Two sensors: CPU and GPU sensor.
  */
@@ -66,6 +76,9 @@ struct chip_tsadc_table {
 
 	/* that analogic mask data */
 	u32 data_mask;
+
+	/* the flag is adc value that increment or decrement in table */
+	bool sort_flag;
 };
 
 struct rockchip_tsadc_chip {
@@ -223,19 +236,43 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
 
 	WARN_ON(table.length < 2);
 
-	code &= table.data_mask;
-	if (code < table.id[high].code)
-		return -EAGAIN;		/* Incorrect reading */
+	switch (table.sort_flag) {
+	case ADC_DECREMENT:
+		code &= table.data_mask;
+		if (code < table.id[high].code)
+			return -EAGAIN;		/* Incorrect reading */
 
-	while (low <= high) {
-		if (code >= table.id[mid].code &&
-		    code < table.id[mid - 1].code)
-			break;
-		else if (code < table.id[mid].code)
-			low = mid + 1;
-		else
-			high = mid - 1;
-		mid = (low + high) / 2;
+		while (low <= high) {
+			if (code >= table.id[mid].code &&
+			    code < table.id[mid - 1].code)
+				break;
+			else if (code < table.id[mid].code)
+				low = mid + 1;
+			else
+				high = mid - 1;
+
+			mid = (low + high) / 2;
+		}
+		break;
+	case ADC_INCREMENT:
+		code &= table.data_mask;
+		if (code < table.id[low].code)
+			return -EAGAIN;		/* Incorrect reading */
+
+		while (low <= high) {
+			if (code >= table.id[mid - 1].code &&
+			    code < table.id[mid].code)
+				break;
+			else if (code > table.id[mid].code)
+				low = mid + 1;
+			else
+				high = mid - 1;
+
+			mid = (low + high) / 2;
+		}
+		break;
+	default:
+		pr_err("Invalid the conversion table\n");
 	}
 
 	/*
@@ -245,8 +282,8 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
 	 * to produce less granular result.
 	 */
 	num = table.id[mid].temp - v2_code_table[mid - 1].temp;
-	num *= table.id[mid - 1].code - code;
-	denom = table.id[mid - 1].code - table.id[mid].code;
+	num *= abs(table.id[mid - 1].code - code);
+	denom = abs(table.id[mid - 1].code - table.id[mid].code);
 	*temp = table.id[mid - 1].temp + (num / denom);
 
 	return 0;
@@ -367,6 +404,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
 		.id = v2_code_table,
 		.length = ARRAY_SIZE(v2_code_table),
 		.data_mask = TSADCV2_DATA_MASK,
+		.sort_flag = ADC_DECREMENT,
 	},
 };
 
