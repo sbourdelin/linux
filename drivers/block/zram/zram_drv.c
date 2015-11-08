@@ -511,7 +511,7 @@ static struct zram_meta *zram_meta_alloc(char *pool_name, u64 disksize)
 	meta->table = vzalloc(num_pages * sizeof(*meta->table));
 	if (!meta->table) {
 		pr_err("Error allocating zram address table\n");
-		goto out_error;
+		goto out_free;
 	}
 
 	meta->mem_pool = zs_create_pool(pool_name, GFP_NOIO | __GFP_HIGHMEM);
@@ -524,6 +524,7 @@ static struct zram_meta *zram_meta_alloc(char *pool_name, u64 disksize)
 
 out_error:
 	vfree(meta->table);
+out_free:
 	kfree(meta);
 	return NULL;
 }
