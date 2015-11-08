@@ -170,13 +170,12 @@ exit:
 
 int rtl88eu_download_fw(struct adapter *adapt)
 {
-	struct hal_data_8188e *rtlhal = GET_HAL_DATA(adapt);
 	struct dvobj_priv *dvobj = adapter_to_dvobj(adapt);
 	struct device *device = dvobj_to_dev(dvobj);
 	const struct firmware *fw;
 	const char fw_name[] = "rtlwifi/rtl8188eufw.bin";
 	struct rtl92c_firmware_header *pfwheader = NULL;
-	u8 *pfwdata;
+	u8 *pfwdata, *pfwbody;
 	u32 fwsize;
 
 	if (request_firmware(&fw, fw_name, device)) {
@@ -194,17 +193,17 @@ int rtl88eu_download_fw(struct adapter *adapt)
 	if (!pfwdata)
 		return -ENOMEM;
 
-	rtlhal->pfirmware = pfwdata;
-	memcpy(rtlhal->pfirmware, fw->data, fw->size);
-	rtlhal->fwsize = fw->size;
+	memcpy(pfwdata, fw->data, fw->size);
+	fwsize = fw->size;
 	release_firmware(fw);
 
-	fwsize = rtlhal->fwsize;
 	pfwheader = (struct rtl92c_firmware_header *)pfwdata;
 
 	if (IS_FW_HEADER_EXIST(pfwheader)) {
-		pfwdata = pfwdata + 32;
+		pfwbody = pfwdata + 32;
 		fwsize = fwsize - 32;
+	} else {
+		pfwbody = pfwdata;
 	}
 
 	if (usb_read8(adapt, REG_MCUFWDL) & RAM_DL_SEL) {
@@ -213,8 +212,9 @@ int rtl88eu_download_fw(struct adapter *adapt)
 	}
 	_rtl88e_enable_fw_download(adapt, true);
 	usb_write8(adapt, REG_MCUFWDL, usb_read8(adapt, REG_MCUFWDL) | FWDL_ChkSum_rpt);
-	_rtl88e_write_fw(adapt, pfwdata, fwsize);
+	_rtl88e_write_fw(adapt, pfwbody, fwsize);
 	_rtl88e_enable_fw_download(adapt, false);
 
+	kfree(pfwdata);
 	return _rtl88e_fw_free_to_go(adapt);
 }
