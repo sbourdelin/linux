@@ -186,7 +186,7 @@ static int amixer_setup(struct amixer *amixer, struct rsc *input,
 	return 0;
 }
 
-static struct amixer_rsc_ops amixer_ops = {
+static const struct amixer_rsc_ops amixer_ops = {
 	.set_input		= amixer_set_input,
 	.set_invalid_squash	= amixer_set_invalid_squash,
 	.set_scale		= amixer_set_y,
