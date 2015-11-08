@@ -111,6 +111,7 @@ int cfs_str2mask(const char *str, const char *(*bit2str)(int bit),
 	*oldmask = newmask;
 	return 0;
 }
+EXPORT_SYMBOL(cfs_str2mask);
 
 /* get the first string out of @str */
 char *cfs_firststr(char *str, size_t size)
