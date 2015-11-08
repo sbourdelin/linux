@@ -1261,15 +1261,12 @@ static void hw_var_set_macaddr(struct adapter *adapter, u8 variable, u8 *val)
 		usb_write8(adapter, REG_MACID + i, val[i]);
 }
 
-static void hw_var_set_bssid(struct adapter *Adapter, u8 variable, u8 *val)
+static void hw_var_set_bssid(struct adapter *adapter, u8 variable, u8 *val)
 {
-	u8 idx = 0;
-	u32 reg_bssid;
+	int i;
 
-	reg_bssid = REG_BSSID;
-
-	for (idx = 0; idx < 6; idx++)
-		usb_write8(Adapter, (reg_bssid+idx), val[idx]);
+	for (i = 0; i < 6; i++)
+		usb_write8(adapter, REG_BSSID + i, val[i]);
 }
 
 static void hw_var_set_bcn_func(struct adapter *Adapter, u8 variable, u8 *val)
