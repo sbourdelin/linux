@@ -87,7 +87,7 @@ struct rockchip_tsadc_chip {
 	int chn_num;
 
 	/* The hardware-controlled tshut property */
-	long tshut_temp;
+	int tshut_temp;
 	enum tshut_mode tshut_mode;
 	enum tshut_polarity tshut_polarity;
 
@@ -100,7 +100,7 @@ struct rockchip_tsadc_chip {
 	int (*get_temp)(struct chip_tsadc_table table,
 			int chn, void __iomem *reg, int *temp);
 	void (*set_tshut_temp)(struct chip_tsadc_table table,
-			       int chn, void __iomem *reg, long temp);
+			       int chn, void __iomem *reg, int temp);
 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
 
 	/* Per-table methods */
@@ -125,7 +125,7 @@ struct rockchip_thermal_data {
 
 	void __iomem *regs;
 
-	long tshut_temp;
+	int tshut_temp;
 	enum tshut_mode tshut_mode;
 	enum tshut_polarity tshut_polarity;
 };
@@ -159,7 +159,7 @@ struct rockchip_thermal_data {
 
 struct tsadc_table {
 	u32 code;
-	long temp;
+	int temp;
 };
 
 static const struct tsadc_table v2_code_table[] = {
@@ -201,7 +201,7 @@ static const struct tsadc_table v2_code_table[] = {
 };
 
 static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
-				   long temp)
+				   int temp)
 {
 	int high, low, mid;
 
@@ -355,7 +355,7 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
 }
 
 static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
-				  int chn, void __iomem *regs, long temp)
+				  int chn, void __iomem *regs, int temp)
 {
 	u32 tshut_value, val;
 
