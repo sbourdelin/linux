@@ -249,12 +249,14 @@ static int phram_setup(const char *val)
 	if (ret) {
 		kfree(name);
 		parse_err("illegal start address\n");
+		goto err;
 	}
 
 	ret = parse_num64(&len, token[2]);
 	if (ret) {
 		kfree(name);
 		parse_err("illegal device length\n");
+		goto err;
 	}
 
 	ret = register_device(name, start, len);
@@ -262,7 +264,7 @@ static int phram_setup(const char *val)
 		pr_info("%s device: %#llx at %#llx\n", name, len, start);
 	else
 		kfree(name);
-
+err:
 	return ret;
 }
 
