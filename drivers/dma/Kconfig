@@ -320,7 +320,7 @@ config MOXART_DMA
 	select DMA_VIRTUAL_CHANNELS
 	help
 	  Enable support for the MOXA ART SoC DMA controller.
- 
+
 	  Say Y here if you enabled MMP ADMA, otherwise say N.
 
 config MPC512X_DMA
@@ -407,15 +407,6 @@ config PXA_DMA
 	  platform. The internal DMA IP of all PXA variants is supported, with
 	  16 to 32 channels for peripheral to memory or memory to memory
 	  transfers.
-
-config QCOM_BAM_DMA
-	tristate "QCOM BAM DMA support"
-	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
-	select DMA_ENGINE
-	select DMA_VIRTUAL_CHANNELS
-	---help---
-	  Enable support for the QCOM BAM DMA controller.  This controller
-	  provides DMA capabilities for a variety of on-chip devices.
 
 config SIRF_DMA
 	tristate "CSR SiRFprimaII/SiRFmarco DMA support"
@@ -526,6 +517,8 @@ config ZX_DMA
 
 # driver files
 source "drivers/dma/bestcomm/Kconfig"
+
+source "drivers/dma/qcom/Kconfig"
 
 source "drivers/dma/dw/Kconfig"
 
