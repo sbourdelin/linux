@@ -407,6 +407,7 @@ static int wpa_set_encryption(struct net_device *dev, struct ieee_param *param, 
 			pwep = (struct ndis_802_11_wep *)rtw_malloc(wep_total_len);
 			if (pwep == NULL) {
 				RT_TRACE(_module_rtl871x_ioctl_os_c, _drv_err_, (" wpa_set_encryption: pwep allocate fail !!!\n"));
+				ret = -ENOMEM;
 				goto exit;
 			}
 			memset(pwep, 0, wep_total_len);
