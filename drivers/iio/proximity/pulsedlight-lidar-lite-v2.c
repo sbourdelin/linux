@@ -13,14 +13,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
- * TODO: runtime pm, interrupt mode, and signal strength reporting
+ * TODO: interrupt mode, and signal strength reporting
  */
 
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/delay.h>
+#include <linux/mutex.h>
 #include <linux/module.h>
+#include <linux/pm_runtime.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 #include <linux/iio/buffer.h>
@@ -37,12 +39,14 @@
 
 #define LIDAR_REG_DATA_HBYTE	0x0f
 #define LIDAR_REG_DATA_LBYTE	0x10
+#define LIDAR_REG_PWR_CONTROL	0x65
 
 #define LIDAR_DRV_NAME "lidar"
 
 struct lidar_data {
 	struct iio_dev *indio_dev;
 	struct i2c_client *client;
+	struct mutex lock;
 
 	u16 buffer[8]; /* 2 byte distance + 8 byte timestamp */
 };
@@ -90,6 +94,12 @@ static inline int lidar_write_control(struct lidar_data *data, int val)
 	return i2c_smbus_write_byte_data(data->client, LIDAR_REG_CONTROL, val);
 }
 
+static inline int lidar_write_power(struct lidar_data *data, int val)
+{
+	return i2c_smbus_write_byte_data(data->client,
+					 LIDAR_REG_PWR_CONTROL, val);
+}
+
 static int lidar_read_measurement(struct lidar_data *data, u16 *reg)
 {
 	int ret;
@@ -113,8 +123,18 @@ static int lidar_read_measurement(struct lidar_data *data, u16 *reg)
 static int lidar_get_measurement(struct lidar_data *data, u16 *reg)
 {
 	struct i2c_client *client = data->client;
+	int suspended;
 	int tries = 10;
 	int ret;
+
+	mutex_lock(&data->lock);
+
+	suspended = pm_runtime_suspended(&client->dev);
+	pm_runtime_get_sync(&client->dev);
+
+	/* regulator and FPGA needs settling time */
+	if (suspended)
+		usleep_range(15000, 20000);
 
 	/* start sample */
 	ret = lidar_write_control(data, LIDAR_REG_CONTROL_ACQUIRE);
@@ -144,6 +164,10 @@ static int lidar_get_measurement(struct lidar_data *data, u16 *reg)
 		}
 		ret = -EIO;
 	}
+	pm_runtime_mark_last_busy(&client->dev);
+	pm_runtime_put_autosuspend(&client->dev);
+
+	mutex_unlock(&data->lock);
 
 	return ret;
 }
@@ -231,6 +255,7 @@ static int lidar_probe(struct i2c_client *client,
 	data = iio_priv(indio_dev);
 	i2c_set_clientdata(client, indio_dev);
 
+	mutex_init(&data->lock);
 	data->client = client;
 	data->indio_dev = indio_dev;
 
@@ -242,6 +267,15 @@ static int lidar_probe(struct i2c_client *client,
 	ret = iio_device_register(indio_dev);
 	if (ret)
 		goto error_unreg_buffer;
+
+	pm_runtime_set_autosuspend_delay(&client->dev, 1000);
+	pm_runtime_use_autosuspend(&client->dev);
+
+	pm_runtime_set_active(&client->dev);
+	pm_runtime_enable(&client->dev);
+
+	pm_runtime_mark_last_busy(&client->dev);
+	pm_runtime_idle(&client->dev);
 
 	return 0;
 
@@ -258,6 +292,9 @@ static int lidar_remove(struct i2c_client *client)
 	iio_device_unregister(indio_dev);
 	iio_triggered_buffer_cleanup(indio_dev);
 
+	pm_runtime_disable(&client->dev);
+	pm_runtime_set_suspended(&client->dev);
+
 	return 0;
 }
 
@@ -273,10 +310,34 @@ static const struct of_device_id lidar_dt_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, lidar_dt_ids);
 
+#ifdef CONFIG_PM
+static int lidar_pm_runtime_suspend(struct device *dev)
+{
+	struct iio_dev *indio_dev = i2c_get_clientdata(to_i2c_client(dev));
+	struct lidar_data *data = iio_priv(indio_dev);
+
+	return lidar_write_power(data, 0x0f);
+}
+
+static int lidar_pm_runtime_resume(struct device *dev)
+{
+	struct iio_dev *indio_dev = i2c_get_clientdata(to_i2c_client(dev));
+	struct lidar_data *data = iio_priv(indio_dev);
+
+	return lidar_write_power(data, 0);
+}
+#endif
+
+static const struct dev_pm_ops lidar_pm_ops = {
+	SET_RUNTIME_PM_OPS(lidar_pm_runtime_suspend,
+			   lidar_pm_runtime_resume, NULL)
+};
+
 static struct i2c_driver lidar_driver = {
 	.driver = {
 		.name	= LIDAR_DRV_NAME,
 		.of_match_table	= of_match_ptr(lidar_dt_ids),
+		.pm	= &lidar_pm_ops,
 	},
 	.probe		= lidar_probe,
 	.remove		= lidar_remove,
