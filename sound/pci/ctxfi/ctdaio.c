@@ -263,7 +263,7 @@ static int dao_clear_right_input(struct dao *dao)
 	return 0;
 }
 
-static struct dao_rsc_ops dao_ops = {
+static const struct dao_rsc_ops dao_ops = {
 	.set_spos		= dao_spdif_set_spos,
 	.commit_write		= dao_commit_write,
 	.get_spos		= dao_spdif_get_spos,
@@ -318,7 +318,7 @@ static int dai_commit_write(struct dai *dai)
 	return 0;
 }
 
-static struct dai_rsc_ops dai_ops = {
+static const struct dai_rsc_ops dai_ops = {
 	.set_srt_srcl		= dai_set_srt_srcl,
 	.set_srt_srcr		= dai_set_srt_srcr,
 	.set_srt_msr		= dai_set_srt_msr,
