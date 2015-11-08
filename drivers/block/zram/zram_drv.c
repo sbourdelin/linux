@@ -625,7 +625,7 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 	if (!uncmem) {
 		pr_err("Unable to allocate temp memory\n");
 		ret = -ENOMEM;
-		goto out_cleanup;
+		goto out_free;
 	}
 
 	ret = zram_decompress_page(zram, uncmem, index);
@@ -641,6 +641,7 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 	ret = 0;
 out_cleanup:
 	kunmap_atomic(user_mem);
+out_free:
 	if (is_partial_io(bvec))
 		kfree(uncmem);
 	return ret;
