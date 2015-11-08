@@ -189,7 +189,7 @@ int rtl88eu_download_fw(struct adapter *adapt)
 		return -EFBIG;
 	}
 
-	pfwdata = kzalloc(FW_8188E_SIZE, GFP_KERNEL);
+	pfwdata = kmalloc(FW_8188E_SIZE, GFP_KERNEL);
 	if (!pfwdata)
 		return -ENOMEM;
 
