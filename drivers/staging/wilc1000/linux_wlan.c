@@ -208,7 +208,7 @@ static int dev_state_ev_handler(struct notifier_block *this, unsigned long event
 	return NOTIFY_DONE;
 }
 
-#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO)
+#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO) || (!defined WILC_SDIO)
 static irqreturn_t isr_uh_routine(int irq, void *user_data)
 {
 	perInterface_wlan_t *nic;
@@ -246,7 +246,7 @@ irqreturn_t isr_bh_routine(int irq, void *userdata)
 	return IRQ_HANDLED;
 }
 
-#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO)
+#if (defined WILC_SPI) || (defined WILC_SDIO_IRQ_GPIO) || (!defined WILC_SDIO)
 static int init_irq(struct net_device *dev)
 {
 	int ret = 0;
@@ -937,6 +937,10 @@ static void wlan_deinitialize_threads(struct net_device *dev)
 	}
 }
 
+#if (!defined WILC_SDIO) || (defined WILC_SDIO_IRQ_GPIO)
+static int init_irq(struct net_device *dev);
+#endif
+
 int wilc1000_wlan_init(struct net_device *dev, perInterface_wlan_t *p_nic)
 {
 	wilc_wlan_inp_t nwi;
@@ -1578,9 +1582,7 @@ int wilc_netdev_init(struct wilc **wilc)
 
 static int __init init_wilc_driver(void)
 {
-#ifdef WILC_SPI
 	struct wilc *wilc;
-#endif
 
 #if defined(WILC_DEBUGFS)
 	if (wilc_debugfs_init() < 0) {
