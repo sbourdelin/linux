@@ -114,12 +114,133 @@ static inline unsigned int loop_timeout(int cpu)
 }
 
 /*
+ * Read the current TSC counter value excluding time-stamps that are zero.
+ * Zero is treated as a special measurement synchronization value in the TSC
+ * offset synchronization code.
+ */
+static inline unsigned long long get_cycles_nz(void)
+{
+	unsigned long long ts;
+again:
+	ts = rdtsc_ordered();
+	if (unlikely(!ts))
+		goto again;
+	return ts;
+}
+
+static atomic64_t target_t0;
+static atomic64_t target_t1;
+static atomic64_t source_ts;
+/*
+ * Measure the TSC offset for the target CPU being brought up vs. the source
+ * CPU. We are collecting three time-stamps:
+ *
+ * target     source
+ *   t0 ---\
+ *          \-->
+ *              ts
+ *          /--
+ *   t1 <--/
+ *
+ * If the source and target TSCs are synchronized, and the interconnect is
+ * symmetric, then ts falls exactly half-way between t0 and t1. We are returning
+ * any deviation from [t0..t1] mid-point as the offset of the target TSC vs. the
+ * source TSC. The measured offset will contain errors like the latency of RDTSC
+ * instruction and the latency introduced by the interconnect. Multiple
+ * measurements are required to filter out these errors.
+ */
+static s64 target_tsc_offset(void)
+{
+	u64 t0, t1, ts;
+	s64 offset;
+
+	t0 = get_cycles_nz();
+	atomic64_set(&target_t0, t0);
+
+	while (!(ts = atomic64_read(&source_ts)))
+		cpu_relax();
+	atomic64_set(&source_ts, 0);
+
+	t1 = get_cycles_nz();
+
+	/* Calculate the offset w/o overflow. */
+	offset = t0/2 + t1/2 - ts;
+	offset += ((t0 & 0x1) & (t1 & 0x1));
+
+	atomic64_set(&target_t1, t1);
+
+	return offset;
+}
+
+static void source_tsc_offset(void)
+{
+	while (!atomic64_read(&target_t0))
+		cpu_relax();
+	atomic64_set(&target_t0, 0);
+
+	atomic64_set(&source_ts, get_cycles_nz());
+
+	while (!atomic64_read(&target_t1))
+		cpu_relax();
+	atomic64_set(&target_t1, 0);
+}
+
+static void adjust_tsc_offset(s64 offset)
+{
+	u64 ts;
+
+	ts = rdtsc_ordered();
+	ts -= offset;
+	write_tsc((u32)ts, (u32)(ts >> 32));
+}
+
+/*
+ * Synchronize a target CPU that has a constant offset vs. a source CPU.
+ * Multiple measurements of the TSC offset are performed and the minimum
+ * value is used for adjustment. This is to eliminate as much of the measurement
+ * latency as possible; it will also filter out the errors in the first
+ * iteration caused by the target CPU arriving early.
+ */
+#define NUM_SYNC_ROUNDS 64
+static void sync_tsc_target(void)
+{
+	int i;
+	s64 off, min_off;
+
+	min_off = S64_MAX;
+	for (i = 0; i < NUM_SYNC_ROUNDS; i++) {
+		off = target_tsc_offset();
+		if (i && (abs64(off) < abs64(min_off)))
+			min_off = off;
+		if (unlikely(!(i & 7)))
+			touch_nmi_watchdog();
+	}
+	adjust_tsc_offset(min_off);
+}
+
+static void sync_tsc_source(void)
+{
+	int i;
+
+	preempt_disable();
+	for (i = 0; i < NUM_SYNC_ROUNDS; i++) {
+		source_tsc_offset();
+		if (unlikely(!(i & 7)))
+			touch_nmi_watchdog();
+	}
+	preempt_enable();
+}
+
+/*
  * Source CPU calls into this - it waits for the freshly booted
  * target CPU to arrive and then starts the measurement:
  */
 void check_tsc_sync_source(int cpu)
 {
 	int cpus = 2;
+
+	if (static_cpu_has_bug(X86_BUG_TSC_OFFSET))
+		sync_tsc_source();
 
 	/*
 	 * No need to check if we already know that the TSC is not
@@ -186,6 +307,9 @@ void check_tsc_sync_source(int cpu)
 void check_tsc_sync_target(void)
 {
 	int cpus = 2;
+
+	if (static_cpu_has_bug(X86_BUG_TSC_OFFSET))
+		sync_tsc_target();
 
 	/* Also aborts if there is no TSC. */
 	if (unsynchronized_tsc() || tsc_clocksource_reliable)

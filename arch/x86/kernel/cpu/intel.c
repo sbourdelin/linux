@@ -295,6 +295,15 @@ static void intel_workarounds(struct cpuinfo_x86 *c)
 #else
 static void intel_workarounds(struct cpuinfo_x86 *c)
 {
+#ifdef CONFIG_X86_TSC
+	/*
+	 * Xeon E5 BT81 errata: TSC is not affected by warm reset.
+	 * The TSC registers for CPUs other than CPU0 are not cleared by a warm
+	 * reset resulting in a constant offset error.
+	 */
+	if ((c->x86 == 6) && (c->x86_model == 0x3f))
+		set_cpu_bug(c, X86_BUG_TSC_OFFSET);
+#endif
 }
 #endif
 
