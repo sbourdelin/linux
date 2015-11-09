@@ -42,80 +42,80 @@
 #define XILINX_DOWNLOAD_RESET	0x42	/* Xilinx registers */
 
 #define ME_CONTROL_1			0x0000	/* - | W */
-#define   INTERRUPT_ENABLE		(1<<15)
-#define   COUNTER_B_IRQ			(1<<12)
-#define   COUNTER_A_IRQ			(1<<11)
-#define   CHANLIST_READY_IRQ		(1<<10)
-#define   EXT_IRQ			(1<<9)
-#define   ADFIFO_HALFFULL_IRQ		(1<<8)
-#define   SCAN_COUNT_ENABLE		(1<<5)
-#define   SIMULTANEOUS_ENABLE		(1<<4)
-#define   TRIGGER_FALLING_EDGE		(1<<3)
-#define   CONTINUOUS_MODE		(1<<2)
-#define   DISABLE_ADC			(0<<0)
-#define   SOFTWARE_TRIGGERED_ADC	(1<<0)
-#define   SCAN_TRIGGERED_ADC		(2<<0)
-#define   EXT_TRIGGERED_ADC		(3<<0)
+#define INTERRUPT_ENABLE		BIT(15)
+#define COUNTER_B_IRQ			BIT(12)
+#define COUNTER_A_IRQ			BIT(11)
+#define CHANLIST_READY_IRQ		BIT(10)
+#define EXT_IRQ					BIT(9)
+#define ADFIFO_HALFFULL_IRQ		BIT(8)
+#define SCAN_COUNT_ENABLE		BIT(5)
+#define SIMULTANEOUS_ENABLE		BIT(4)
+#define TRIGGER_FALLING_EDGE	BIT(3)
+#define CONTINUOUS_MODE			BIT(2)
+#define DISABLE_ADC				0
+#define SOFTWARE_TRIGGERED_ADC	BIT(0)
+#define SCAN_TRIGGERED_ADC		(BIT(1) & (~(BIT(0))))
+#define EXT_TRIGGERED_ADC		(BIT(1) | BIT(0))
 #define ME_ADC_START			0x0000	/* R | - */
 #define ME_CONTROL_2			0x0002	/* - | W */
-#define   ENABLE_ADFIFO			(1<<10)
-#define   ENABLE_CHANLIST		(1<<9)
-#define   ENABLE_PORT_B			(1<<7)
-#define   ENABLE_PORT_A			(1<<6)
-#define   ENABLE_COUNTER_B		(1<<4)
-#define   ENABLE_COUNTER_A		(1<<3)
-#define   ENABLE_DAC			(1<<1)
-#define   BUFFERED_DAC			(1<<0)
+#define ENABLE_ADFIFO			BIT(10)
+#define ENABLE_CHANLIST			BIT(9)
+#define ENABLE_PORT_B			BIT(7)
+#define ENABLE_PORT_A			BIT(6)
+#define ENABLE_COUNTER_B		BIT(4)
+#define ENABLE_COUNTER_A		BIT(3)
+#define ENABLE_DAC				BIT(1)
+#define BUFFERED_DAC			BIT(0)
 #define ME_DAC_UPDATE			0x0002	/* R | - */
-#define ME_STATUS			0x0004	/* R | - */
-#define   COUNTER_B_IRQ_PENDING		(1<<12)
-#define   COUNTER_A_IRQ_PENDING		(1<<11)
-#define   CHANLIST_READY_IRQ_PENDING	(1<<10)
-#define   EXT_IRQ_PENDING		(1<<9)
-#define   ADFIFO_HALFFULL_IRQ_PENDING	(1<<8)
-#define   ADFIFO_FULL			(1<<4)
-#define   ADFIFO_HALFFULL		(1<<3)
-#define   ADFIFO_EMPTY			(1<<2)
-#define   CHANLIST_FULL			(1<<1)
-#define   FST_ACTIVE			(1<<0)
-#define ME_RESET_INTERRUPT		0x0004	/* - | W */
-#define ME_DIO_PORT_A			0x0006	/* R | W */
-#define ME_DIO_PORT_B			0x0008	/* R | W */
-#define ME_TIMER_DATA_0			0x000A	/* - | W */
-#define ME_TIMER_DATA_1			0x000C	/* - | W */
-#define ME_TIMER_DATA_2			0x000E	/* - | W */
-#define ME_CHANNEL_LIST			0x0010	/* - | W */
-#define   ADC_UNIPOLAR			(1<<6)
-#define   ADC_GAIN_0			(0<<4)
-#define   ADC_GAIN_1			(1<<4)
-#define   ADC_GAIN_2			(2<<4)
-#define   ADC_GAIN_3			(3<<4)
-#define ME_READ_AD_FIFO			0x0010	/* R | - */
-#define ME_DAC_CONTROL			0x0012	/* - | W */
-#define   DAC_UNIPOLAR_D		(0<<4)
-#define   DAC_BIPOLAR_D			(1<<4)
-#define   DAC_UNIPOLAR_C		(0<<5)
-#define   DAC_BIPOLAR_C			(1<<5)
-#define   DAC_UNIPOLAR_B		(0<<6)
-#define   DAC_BIPOLAR_B			(1<<6)
-#define   DAC_UNIPOLAR_A		(0<<7)
-#define   DAC_BIPOLAR_A			(1<<7)
-#define   DAC_GAIN_0_D			(0<<8)
-#define   DAC_GAIN_1_D			(1<<8)
-#define   DAC_GAIN_0_C			(0<<9)
-#define   DAC_GAIN_1_C			(1<<9)
-#define   DAC_GAIN_0_B			(0<<10)
-#define   DAC_GAIN_1_B			(1<<10)
-#define   DAC_GAIN_0_A			(0<<11)
-#define   DAC_GAIN_1_A			(1<<11)
-#define ME_DAC_CONTROL_UPDATE		0x0012	/* R | - */
+#define ME_STATUS				0x0004	/* R | - */
+#define COUNTER_B_IRQ_PENDING	BIT(12)
+#define COUNTER_A_IRQ_PENDING	BIT(11)
+#define CHANLIST_READY_IRQ_PENDING	BIT(10)
+#define EXT_IRQ_PENDING				BIT(9)
+#define ADFIFO_HALFFULL_IRQ_PENDING	BIT(8)
+#define ADFIFO_FULL					BIT(4)
+#define ADFIFO_HALFFULL				BIT(3)
+#define ADFIFO_EMPTY				BIT(2)
+#define CHANLIST_FULL				BIT(1)
+#define FST_ACTIVE					BIT(0)
+#define ME_RESET_INTERRUPT	0x0004	/* - | W */
+#define ME_DIO_PORT_A		0x0006	/* R | W */
+#define ME_DIO_PORT_B		0x0008	/* R | W */
+#define ME_TIMER_DATA_0		0x000A	/* - | W */
+#define ME_TIMER_DATA_1		0x000C	/* - | W */
+#define ME_TIMER_DATA_2		0x000E	/* - | W */
+#define ME_CHANNEL_LIST		0x0010	/* - | W */
+#define ADC_UNIPOLAR		BIT(6)
+#define ADC_GAIN_0			0
+#define ADC_GAIN_1			BIT(4)
+#define ADC_GAIN_2			(BIT(5) & (~BIT(4)))
+#define ADC_GAIN_3			(BIT(4) | BIT(5))
+#define ME_READ_AD_FIFO		0x0010	/* R | - */
+#define ME_DAC_CONTROL		0x0012	/* - | W */
+#define DAC_UNIPOLAR_D		0
+#define DAC_BIPOLAR_D		BIT(4)
+#define DAC_UNIPOLAR_C		0
+#define DAC_BIPOLAR_C		BIT(5)
+#define DAC_UNIPOLAR_B		0
+#define DAC_BIPOLAR_B		BIT(6)
+#define DAC_UNIPOLAR_A		0
+#define DAC_BIPOLAR_A		BIT(7)
+#define DAC_GAIN_0_D		0
+#define DAC_GAIN_1_D		BIT(8)
+#define DAC_GAIN_0_C		0
+#define DAC_GAIN_1_C		BIT(9)
+#define DAC_GAIN_0_B		0
+#define DAC_GAIN_1_B		BIT(10)
+#define DAC_GAIN_0_A		0
+#define DAC_GAIN_1_A		BIT(11)
+#define ME_DAC_CONTROL_UPDATE	0x0012	/* R | - */
 #define ME_DAC_DATA_A			0x0014	/* - | W */
 #define ME_DAC_DATA_B			0x0016	/* - | W */
 #define ME_DAC_DATA_C			0x0018	/* - | W */
 #define ME_DAC_DATA_D			0x001A	/* - | W */
-#define ME_COUNTER_ENDDATA_A		0x001C	/* - | W */
-#define ME_COUNTER_ENDDATA_B		0x001E	/* - | W */
-#define ME_COUNTER_STARTDATA_A		0x0020	/* - | W */
+#define ME_COUNTER_ENDDATA_A	0x001C	/* - | W */
+#define ME_COUNTER_ENDDATA_B	0x001E	/* - | W */
+#define ME_COUNTER_STARTDATA_A	0x0020	/* - | W */
 #define ME_COUNTER_VALUE_A		0x0020	/* R | - */
 #define ME_COUNTER_STARTDATA_B		0x0022	/* - | W */
 #define ME_COUNTER_VALUE_B		0x0022	/* R | - */
