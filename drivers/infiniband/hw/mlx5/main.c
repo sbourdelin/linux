@@ -213,10 +213,33 @@ static int mlx5_ib_query_device(struct ib_device *ibdev,
 	int max_rq_sg;
 	int max_sq_sg;
 	u64 min_page_size = 1ull << MLX5_CAP_GEN(mdev, log_pg_sz);
+	struct mlx5_uverbs_ex_query_device cmd = {};
+	struct mlx5_uverbs_ex_query_device_resp resp = {};
 
-	if (uhw->inlen || uhw->outlen)
-		return -EINVAL;
+	if (uhw->inlen) {
+		if (uhw->inlen < offsetof(struct mlx5_uverbs_ex_query_device,
+					  comp_mask) +
+				 sizeof(cmd.comp_mask))
+			return -EINVAL;
 
+		err = ib_copy_from_udata(&cmd, uhw, min(sizeof(cmd),
+							uhw->inlen));
+		if (err)
+			return err;
+
+		if (cmd.comp_mask)
+			return -EINVAL;
+
+		if (cmd.reserved)
+			return -EINVAL;
+
+		if (!ib_is_udata_cleared(uhw, '\0', sizeof(cmd),
+					 sizeof(cmd) - uhw->inlen))
+			return -EINVAL;
+	}
+
+	resp.response_length = offsetof(typeof(resp), response_length) +
+		sizeof(resp.response_length);
 	memset(props, 0, sizeof(*props));
 	err = mlx5_query_system_image_guid(ibdev,
 					   &props->sys_image_guid);
@@ -293,12 +316,27 @@ static int mlx5_ib_query_device(struct ib_device *ibdev,
 	props->max_total_mcast_qp_attach = props->max_mcast_qp_attach *
 					   props->max_mcast_grp;
 	props->max_map_per_fmr = INT_MAX; /* no limit in ConnectIB */
+	props->hca_core_clock = MLX5_CAP_GEN(mdev, device_frequency_khz);
+	props->timestamp_mask = 0xFFFFFFFFFFFFFFULL;
 
 #ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
 	if (MLX5_CAP_GEN(mdev, pg))
 		props->device_cap_flags |= IB_DEVICE_ON_DEMAND_PAGING;
 	props->odp_caps = dev->odp_caps;
 #endif
+
+	if (field_avail(typeof(resp), hca_core_clock_offset, uhw->outlen)) {
+		resp.response_length += sizeof(resp.hca_core_clock_offset);
+		resp.comp_mask |= QUERY_DEVICE_RESP_MASK_TIMESTAMP;
+		resp.hca_core_clock_offset =
+			offsetof(struct mlx5_init_seg, internal_timer_h) % PAGE_SIZE;
+	}
+
+	if (uhw->outlen) {
+		err = ib_copy_to_udata(uhw, &resp, resp.response_length);
+		if (err)
+			return err;
+	}
 
 	return 0;
 }
