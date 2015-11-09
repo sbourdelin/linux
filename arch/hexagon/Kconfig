@@ -28,6 +28,7 @@ config HEXAGON
 	select MODULES_USE_ELF_RELA
 	select GENERIC_CPU_DEVICES
 	select HAVE_DMA_ATTRS
+	select ARCH_WANT_FRAME_POINTERS
 	---help---
 	  Qualcomm Hexagon is a processor architecture designed for high
 	  performance and low power across a wide variety of applications.
@@ -36,9 +37,6 @@ config HEXAGON_PHYS_OFFSET
 	def_bool y
 	---help---
 	  Platforms that don't load the kernel at zero set this.
-
-config FRAME_POINTER
-	def_bool y
 
 config LOCKDEP_SUPPORT
 	def_bool y
