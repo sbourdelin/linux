@@ -128,6 +128,8 @@ struct xdbc_state {
 	u32		dev;
 	u32		func;
 	u8		bar;
+	u16		vendor;
+	u16		device;
 	void __iomem	*xhci_base;
 	size_t		xhci_length;
 #define	XDBC_PCI_MAX_BUSES		256
