@@ -852,10 +852,10 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	}
 
 	ret = iommu_group_add_device(group, dev);
-	if (ret) {
-		iommu_group_put(group);
+	iommu_group_put(group);
+
+	if (ret)
 		return ERR_PTR(ret);
-	}
 
 	return group;
 }
