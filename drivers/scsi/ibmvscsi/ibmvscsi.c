@@ -84,6 +84,7 @@
  */
 static int max_id = 64;
 static int max_channel = 3;
+static int max_lun = 8;
 static int init_timeout = 300;
 static int login_timeout = 60;
 static int info_timeout = 30;
@@ -117,6 +118,9 @@ module_param_named(fast_fail, fast_fail, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(fast_fail, "Enable fast fail. [Default=1]");
 module_param_named(client_reserve, client_reserve, int, S_IRUGO );
 MODULE_PARM_DESC(client_reserve, "Attempt client managed reserve/release");
+module_param(max_lun, int, S_IRUGO);
+MODULE_PARM_DESC(max_lun, "Maximum allowed LUN "
+                          "[Default=8,Max="__stringify(IBMVSCSI_MAX_LUN)"]");
 
 static void ibmvscsi_handle_crq(struct viosrp_crq *crq,
 				struct ibmvscsi_host_data *hostdata);
@@ -2289,7 +2293,7 @@ static int ibmvscsi_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 		goto init_pool_failed;
 	}
 
-	host->max_lun = 8;
+	host->max_lun = max_lun;
 	host->max_id = max_id;
 	host->max_channel = max_channel;
 	host->max_cmd_len = 16;
@@ -2413,6 +2417,9 @@ static struct srp_function_template ibmvscsi_transport_functions = {
 int __init ibmvscsi_module_init(void)
 {
 	int ret;
+
+	if (max_lun > IBMVSCSI_MAX_LUN)
+		return -EINVAL;
 
 	/* Ensure we have two requests to do error recovery */
 	driver_template.can_queue = max_requests;
