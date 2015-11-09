@@ -1373,6 +1373,7 @@ static int do_ip_getsockopt(struct sock *sk, int level, int optname,
 	case IP_MULTICAST_IF:
 	{
 		struct in_addr addr;
+		memset(&addr, 0, sizeof(addr));
 		len = min_t(unsigned int, len, sizeof(struct in_addr));
 		addr.s_addr = inet->mc_addr;
 		release_sock(sk);
