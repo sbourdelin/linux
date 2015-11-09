@@ -620,15 +620,15 @@ static struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize,
 	int num = 0, i, first = 1;
 	int ver, rev;
 
+	if (edid == NULL || !edid_checksum(edid) ||
+	    !edid_check_header(edid)) {
+		return NULL;
+	}
+
 	mode = kzalloc(50 * sizeof(struct fb_videomode), GFP_KERNEL);
 	if (mode == NULL)
 		return NULL;
 
-	if (edid == NULL || !edid_checksum(edid) ||
-	    !edid_check_header(edid)) {
-		kfree(mode);
-		return NULL;
-	}
 
 	ver = edid[EDID_STRUCT_VERSION];
 	rev = edid[EDID_STRUCT_REVISION];
