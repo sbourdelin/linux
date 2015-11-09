@@ -1859,6 +1859,26 @@ static inline int ib_copy_to_udata(struct ib_udata *udata, void *src, size_t len
 	return copy_to_user(udata->outbuf, src, len) ? -EFAULT : 0;
 }
 
+static inline bool ib_is_udata_cleared(struct ib_udata *udata,
+				       char cleared_char,
+				       size_t offset,
+				       size_t len)
+{
+	short i;
+
+	for (i = 0; i < len; i++) {
+		char c;
+
+		if (copy_from_user(&c, udata->inbuf + offset + i, sizeof(c)))
+			return false;
+
+		if (c != cleared_char)
+			return false;
+	}
+
+	return true;
+}
+
 /**
  * ib_modify_qp_is_ok - Check that the supplied attribute mask
  * contains all required attributes and no attributes not allowed for
