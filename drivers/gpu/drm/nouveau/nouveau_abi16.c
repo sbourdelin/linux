@@ -54,11 +54,11 @@ nouveau_abi16_get(struct drm_file *file_priv, struct drm_device *dev)
 			if (nvif_device_init(&cli->base.object,
 					     NOUVEAU_ABI16_DEVICE, NV_DEVICE,
 					     &args, sizeof(args),
-					     &abi16->device) == 0)
-				return cli->abi16;
+					     &abi16->device)) {
 
-			kfree(cli->abi16);
-			cli->abi16 = NULL;
+				kfree(cli->abi16);
+				cli->abi16 = NULL;
+			}
 		}
 
 		mutex_unlock(&cli->mutex);
