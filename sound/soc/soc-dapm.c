@@ -2303,6 +2303,9 @@ static void dapm_free_widgets(struct snd_soc_dapm_context *dapm)
 			continue;
 		snd_soc_dapm_free_widget(w);
 	}
+
+	dapm->path_sink_cache.widget = NULL;
+	dapm->path_source_cache.widget = NULL;
 }
 
 static struct snd_soc_dapm_widget *dapm_find_widget(
