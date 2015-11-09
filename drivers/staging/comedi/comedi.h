@@ -895,7 +895,8 @@ enum amplc_dio_ts_clock_src {
 };
 
 /* Values for setting a gate source with INSN_CONFIG_SET_GATE_SRC for
- * 8254 counter subdevices on Amplicon DIO boards (amplc_dio200 driver). */
+ * 8254 counter subdevices on Amplicon DIO boards (amplc_dio200 driver).
+ */
 enum amplc_dio_gate_source {
 	AMPLC_DIO_GAT_VCC,	/* internal high logic level */
 	AMPLC_DIO_GAT_GND,	/* internal low logic level */
