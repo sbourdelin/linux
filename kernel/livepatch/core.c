@@ -142,6 +142,7 @@ struct klp_find_arg {
 	 * name in the same object.
 	 */
 	unsigned long count;
+	unsigned long pos;
 };
 
 static int klp_find_callback(void *data, const char *name,
@@ -166,28 +167,39 @@ static int klp_find_callback(void *data, const char *name,
 	args->addr = addr;
 	args->count++;
 
+	/*
+	 * ensure count matches the symbol position
+	 */
+	if (args->pos == (args->count-1))
+		return 1;
+
 	return 0;
 }
 
 static int klp_find_object_symbol(const char *objname, const char *name,
-				  unsigned long *addr)
+				  unsigned long *addr, unsigned long sympos)
 {
 	struct klp_find_arg args = {
 		.objname = objname,
 		.name = name,
 		.addr = 0,
-		.count = 0
+		.count = 0,
+		.pos = sympos,
 	};
 
 	mutex_lock(&module_mutex);
 	kallsyms_on_each_symbol(klp_find_callback, &args);
 	mutex_unlock(&module_mutex);
 
-	if (args.count == 0)
+	/*
+	 * Ensure an address was found, then check that the symbol position
+	 * count matches sympos.
+	 */
+	if (args.addr == 0)
 		pr_err("symbol '%s' not found in symbol table\n", name);
-	else if (args.count > 1)
-		pr_err("unresolvable ambiguity (%lu matches) on symbol '%s' in object '%s'\n",
-		       args.count, name, objname);
+	else if (sympos != (args.count - 1))
+		pr_err("symbol position %lu for symbol '%s' in object '%s' not found\n",
+		       sympos, name, objname ? objname : "vmlinux");
 	else {
 		*addr = args.addr;
 		return 0;
@@ -239,20 +251,19 @@ static int klp_verify_vmlinux_symbol(const char *name, unsigned long addr)
 static int klp_find_verify_func_addr(struct klp_object *obj,
 				     struct klp_func *func)
 {
+	int sympos = 0;
 	int ret;
 
-#if defined(CONFIG_RANDOMIZE_BASE)
-	/* If KASLR has been enabled, adjust old_addr accordingly */
-	if (kaslr_enabled() && func->old_addr)
-		func->old_addr += kaslr_offset();
-#endif
+	if (func->old_sympos && !klp_is_module(obj))
+		sympos = func->old_sympos;
 
-	if (!func->old_addr || klp_is_module(obj))
-		ret = klp_find_object_symbol(obj->name, func->old_name,
-					     &func->old_addr);
-	else
-		ret = klp_verify_vmlinux_symbol(func->old_name,
-						func->old_addr);
+	/*
+	 * Verify the symbol, find old_addr, and write it to the structure.
+	 * By default sympos will be 0 and thus will only look for the first
+	 * occurrence. If another value is specified then that will be used.
+	 */
+	ret = klp_find_object_symbol(obj->name, func->old_name,
+				     &func->old_addr, sympos);
 
 	return ret;
 }
@@ -277,7 +288,7 @@ static int klp_find_external_symbol(struct module *pmod, const char *name,
 	preempt_enable();
 
 	/* otherwise check if it's in another .o within the patch module */
-	return klp_find_object_symbol(pmod->name, name, addr);
+	return klp_find_object_symbol(pmod->name, name, addr, 0);
 }
 
 static int klp_write_object_relocations(struct module *pmod,
@@ -307,7 +318,7 @@ static int klp_write_object_relocations(struct module *pmod,
 			else
 				ret = klp_find_object_symbol(obj->mod->name,
 							     reloc->name,
-							     &reloc->val);
+							     &reloc->val, 0);
 			if (ret)
 				return ret;
 		}
@@ -587,7 +598,7 @@ EXPORT_SYMBOL_GPL(klp_enable_patch);
  * /sys/kernel/livepatch/<patch>
  * /sys/kernel/livepatch/<patch>/enabled
  * /sys/kernel/livepatch/<patch>/<object>
- * /sys/kernel/livepatch/<patch>/<object>/<func>
+ * /sys/kernel/livepatch/<patch>/<object>/<func,number>
  */
 
 static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -732,8 +743,7 @@ static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 	INIT_LIST_HEAD(&func->stack_node);
 	func->state = KLP_DISABLED;
 
-	return kobject_init_and_add(&func->kobj, &klp_ktype_func,
-				    &obj->kobj, "%s", func->old_name);
+	return 0;
 }
 
 /* parts of the initialization that is done only when the object is loaded */
@@ -751,6 +761,18 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 
 	klp_for_each_func(obj, func) {
 		ret = klp_find_verify_func_addr(obj, func);
+		if (ret)
+			return ret;
+	}
+
+	/*
+	 * for each function initialize and add, old_sympos will be already
+	 * verified at this point
+	 */
+	klp_for_each_func(obj, func) {
+		ret = kobject_init_and_add(&func->kobj, &klp_ktype_func,
+				    &obj->kobj, "%s,%lu", func->old_name,
+				    func->old_sympos ? func->old_sympos : 0);
 		if (ret)
 			return ret;
 	}
