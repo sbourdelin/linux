@@ -45,6 +45,7 @@ struct nft_payload {
 	u8			offset;
 	u8			len;
 	enum nft_registers	dreg:8;
+	u8			csum_offset;
 };
 
 extern const struct nft_expr_ops nft_payload_fast_ops;
