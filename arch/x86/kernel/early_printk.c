@@ -17,6 +17,7 @@
 #include <asm/intel-mid.h>
 #include <asm/pgtable.h>
 #include <linux/usb/ehci_def.h>
+#include <linux/usb/xhci-dbc.h>
 #include <linux/efi.h>
 #include <asm/efi.h>
 #include <asm/pci_x86.h>
@@ -372,6 +373,10 @@ static int __init setup_early_printk(char *buf)
 #ifdef CONFIG_EARLY_PRINTK_DBGP
 		if (!strncmp(buf, "dbgp", 4) && !early_dbgp_init(buf + 4))
 			early_console_register(&early_dbgp_console, keep);
+#endif
+#ifdef CONFIG_EARLY_PRINTK_XDBC
+		if (!strncmp(buf, "xdbc", 4) && !early_xdbc_init(buf + 4))
+			early_console_register(&early_xdbc_console, keep);
 #endif
 #ifdef CONFIG_HVC_XEN
 		if (!strncmp(buf, "xen", 3))
