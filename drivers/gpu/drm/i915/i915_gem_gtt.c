@@ -2340,6 +2340,23 @@ static void gen8_set_pte(void __iomem *addr, gen8_pte_t pte)
 #endif
 }
 
+static void gen8_ggtt_insert_page(struct i915_address_space *vm,
+				  dma_addr_t addr,
+				  uint64_t offset,
+				  enum i915_cache_level level,
+				  u32 unused)
+{
+	struct drm_i915_private *dev_priv = to_i915(vm->dev);
+	gen8_pte_t __iomem *pte =
+		(gen8_pte_t __iomem *)dev_priv->gtt.gsm +
+		(offset >> PAGE_SHIFT);
+
+	gen8_set_pte(pte, gen8_pte_encode(addr, level, true));
+	wmb();
+
+	I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
+}
+
 static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 				     struct sg_table *st,
 				     uint64_t start,
@@ -2378,6 +2395,23 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 	 */
 	I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
 	POSTING_READ(GFX_FLSH_CNTL_GEN6);
+}
+
+static void gen6_ggtt_insert_page(struct i915_address_space *vm,
+				  dma_addr_t addr,
+				  uint64_t offset,
+				  enum i915_cache_level level,
+				  u32 flags)
+{
+	struct drm_i915_private *dev_priv = to_i915(vm->dev);
+	gen6_pte_t __iomem *pte =
+		(gen6_pte_t __iomem *)dev_priv->gtt.gsm +
+		(offset >> PAGE_SHIFT);
+
+	iowrite32(vm->pte_encode(addr, level, true, flags), pte);
+	wmb();
+
+	I915_WRITE(GFX_FLSH_CNTL_GEN6, GFX_FLSH_CNTL_EN);
 }
 
 /*
@@ -2474,6 +2508,18 @@ static void gen6_ggtt_clear_range(struct i915_address_space *vm,
 	for (i = 0; i < num_entries; i++)
 		iowrite32(scratch_pte, &gtt_base[i]);
 	readl(gtt_base);
+}
+
+static void i915_ggtt_insert_page(struct i915_address_space *vm,
+				  dma_addr_t addr,
+				  uint64_t offset,
+				  enum i915_cache_level cache_level,
+				  u32 unused)
+{
+	unsigned int flags = (cache_level == I915_CACHE_NONE) ?
+		AGP_USER_MEMORY : AGP_USER_CACHED_MEMORY;
+
+	intel_gtt_insert_page(addr, offset >> PAGE_SHIFT, flags);
 }
 
 static void i915_ggtt_insert_entries(struct i915_address_space *vm,
@@ -2991,6 +3037,7 @@ static int gen8_gmch_probe(struct drm_device *dev,
 	ret = ggtt_probe_common(dev, gtt_size);
 
 	dev_priv->gtt.base.clear_range = gen8_ggtt_clear_range;
+	dev_priv->gtt.base.insert_page = gen8_ggtt_insert_page;
 	dev_priv->gtt.base.insert_entries = gen8_ggtt_insert_entries;
 	dev_priv->gtt.base.bind_vma = ggtt_bind_vma;
 	dev_priv->gtt.base.unbind_vma = ggtt_unbind_vma;
@@ -3033,6 +3080,7 @@ static int gen6_gmch_probe(struct drm_device *dev,
 	ret = ggtt_probe_common(dev, gtt_size);
 
 	dev_priv->gtt.base.clear_range = gen6_ggtt_clear_range;
+	dev_priv->gtt.base.insert_page = gen6_ggtt_insert_page;
 	dev_priv->gtt.base.insert_entries = gen6_ggtt_insert_entries;
 	dev_priv->gtt.base.bind_vma = ggtt_bind_vma;
 	dev_priv->gtt.base.unbind_vma = ggtt_unbind_vma;
@@ -3067,6 +3115,7 @@ static int i915_gmch_probe(struct drm_device *dev,
 	intel_gtt_get(gtt_total, stolen, mappable_base, mappable_end);
 
 	dev_priv->gtt.do_idle_maps = needs_idle_maps(dev_priv->dev);
+	dev_priv->gtt.base.insert_page = i915_ggtt_insert_page;
 	dev_priv->gtt.base.insert_entries = i915_ggtt_insert_entries;
 	dev_priv->gtt.base.clear_range = i915_ggtt_clear_range;
 	dev_priv->gtt.base.bind_vma = ggtt_bind_vma;
