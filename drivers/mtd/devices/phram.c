@@ -257,6 +257,9 @@ static int phram_setup(const char *val)
 		parse_err("illegal device length\n");
 	}
 
+	if(!name)
+		return -EINVAL;
+
 	ret = register_device(name, start, len);
 	if (!ret)
 		pr_info("%s device: %#llx at %#llx\n", name, len, start);
