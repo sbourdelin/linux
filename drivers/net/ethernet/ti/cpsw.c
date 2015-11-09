@@ -2039,19 +2039,35 @@ static int cpsw_probe_dt(struct cpsw_priv *priv,
 		priv->phy_node = of_parse_phandle(slave_node, "phy-handle", 0);
 		parp = of_get_property(slave_node, "phy_id", &lenp);
 		if ((parp == NULL) || (lenp != (sizeof(void *) * 2))) {
-			dev_err(&pdev->dev, "Missing slave[%d] phy_id property\n", i);
-			goto no_phy_slave;
+			if (!of_phy_is_fixed_link(slave_node)) {
+				dev_err(&pdev->dev,
+					"Missing slave[%d] phy_id property\n",
+					i);
+				goto no_phy_slave;
+			}
+
+			ret = of_phy_register_fixed_link(slave_node);
+			if (ret) {
+				dev_err(&pdev->dev, "cannot register fixed PHY\n");
+				return ret;
+			}
+
+			/* In the case of a fixed PHY, the DT node associated
+			 * to the PHY is the Ethernet MAC DT node.
+			 */
+			priv->phy_node = of_node_get(slave_node);
+		} else {
+			mdio_node = of_find_node_by_phandle(be32_to_cpup(parp));
+			phyid = be32_to_cpup(parp + 1);
+			mdio = of_find_device_by_node(mdio_node);
+			of_node_put(mdio_node);
+			if (!mdio) {
+				dev_err(&pdev->dev, "Missing mdio platform device\n");
+				return -EINVAL;
+			}
+			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+				 PHY_ID_FMT, mdio->name, phyid);
 		}
-		mdio_node = of_find_node_by_phandle(be32_to_cpup(parp));
-		phyid = be32_to_cpup(parp+1);
-		mdio = of_find_device_by_node(mdio_node);
-		of_node_put(mdio_node);
-		if (!mdio) {
-			dev_err(&pdev->dev, "Missing mdio platform device\n");
-			return -EINVAL;
-		}
-		snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
-			 PHY_ID_FMT, mdio->name, phyid);
 		slave_data->phy_if = of_get_phy_mode(slave_node);
 		if (slave_data->phy_if < 0) {
 			dev_err(&pdev->dev, "Missing or malformed slave[%d] phy-mode property\n",
