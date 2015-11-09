@@ -194,6 +194,15 @@ config HI8435
 	  This driver can also be built as a module. If so, the module will be
 	  called hi8435.
 
+config IMX7D_ADC
+	tristate "IMX7D ADC driver"
+	depends on OF
+	help
+	  Say yes here to build support for IMX7D ADC.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called imx7d_adc.
+
 config LP8788_ADC
 	tristate "LP8788 ADC driver"
 	depends on MFD_LP8788
