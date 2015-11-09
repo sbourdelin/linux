@@ -566,12 +566,16 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
 
-	if (request->ctx != ring->default_context)
-		intel_lr_context_pin(request);
-
 	i915_gem_request_reference(request);
 
 	spin_lock_irq(&ring->execlist_lock);
+
+	if (request->ctx != ring->default_context) {
+		if (!request->ctx->engine[ring->id].unsaved) {
+			intel_lr_context_pin(request);
+			request->ctx->engine[ring->id].unsaved = true;
+		}
+	}
 
 	list_for_each_entry(cursor, &ring->execlist_queue, execlist_link)
 		if (++num_elements > 2)
@@ -958,12 +962,6 @@ void intel_execlists_retire_requests(struct intel_engine_cs *ring)
 	spin_unlock_irq(&ring->execlist_lock);
 
 	list_for_each_entry_safe(req, tmp, &retired_list, execlist_link) {
-		struct intel_context *ctx = req->ctx;
-		struct drm_i915_gem_object *ctx_obj =
-				ctx->engine[ring->id].state;
-
-		if (ctx_obj && (ctx != ring->default_context))
-			intel_lr_context_unpin(req);
 		list_del(&req->execlist_link);
 		i915_gem_request_unreference(req);
 	}
@@ -1071,6 +1069,31 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 			i915_gem_object_ggtt_unpin(ctx_obj);
 		}
 	}
+}
+
+void intel_lr_context_complete_check(struct drm_i915_gem_request *req)
+{
+	struct intel_engine_cs *ring = req->ring;
+
+	assert_spin_locked(&ring->execlist_lock);
+
+	if (ring->last_context && ring->last_context != req->ctx) {
+		if (req->ctx != ring->default_context
+			&& ring->last_context->engine[ring->id].unsaved) {
+			/* Create fake request for unpinning the old context */
+			struct drm_i915_gem_request tmp;
+
+			tmp.ring = ring;
+			tmp.ctx = ring->last_context;
+			tmp.ringbuf =
+				ring->last_context->engine[ring->id].ringbuf;
+
+			intel_lr_context_unpin(&tmp);
+			ring->last_context->engine[ring->id].unsaved = false;
+			ring->last_context = NULL;
+		}
+	}
+	ring->last_context = req->ctx;
 }
 
 static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
@@ -2388,7 +2411,22 @@ void intel_lr_context_free(struct intel_context *ctx)
 				intel_unpin_ringbuffer_obj(ringbuf);
 				i915_gem_object_ggtt_unpin(ctx_obj);
 			}
-			WARN_ON(ctx->engine[ring->id].pin_count);
+
+			if (ctx->engine[ring->id].unsaved) {
+				/**
+				 * Create fake request for unpinning the old
+				 * context
+				 */
+				struct drm_i915_gem_request tmp;
+
+				tmp.ring = ring;
+				tmp.ctx = ctx;
+				tmp.ringbuf = ringbuf;
+				intel_lr_context_unpin(&tmp);
+				ctx->engine[ring->id].unsaved = false;
+			}
+
+			WARN_ON(ctx->engine[i].pin_count);
 			intel_ringbuffer_free(ringbuf);
 			drm_gem_object_unreference(&ctx_obj->base);
 		}

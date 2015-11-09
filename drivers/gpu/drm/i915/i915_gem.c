@@ -1385,6 +1385,13 @@ __i915_gem_request_retire__upto(struct drm_i915_gem_request *req)
 		tmp = list_first_entry(&engine->request_list,
 				       typeof(*tmp), list);
 
+		if (i915.enable_execlists) {
+			unsigned long flags;
+
+			spin_lock_irqsave(&engine->execlist_lock, flags);
+			intel_lr_context_complete_check(tmp);
+			spin_unlock_irqrestore(&engine->execlist_lock, flags);
+		}
 		i915_gem_request_retire(tmp);
 	} while (tmp != req);
 
