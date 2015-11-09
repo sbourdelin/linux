@@ -816,6 +816,63 @@ out:
 	return ret;
 }
 
+struct kvm_vcpu *kvm_intr_vector_hashing_dest_fast(struct kvm *kvm,
+						   struct kvm_lapic_irq *irq)
+{
+	struct kvm_apic_map *map;
+	struct kvm_vcpu *vcpu = NULL;
+
+	if (irq->shorthand)
+		return NULL;
+
+	rcu_read_lock();
+	map = rcu_dereference(kvm->arch.apic_map);
+
+	if (!map)
+		goto out;
+
+	if ((irq->dest_mode != APIC_DEST_PHYSICAL) &&
+			kvm_lowest_prio_delivery(irq)) {
+		u16 cid;
+		int i, idx = 0;
+		unsigned long bitmap = 1;
+		unsigned int mod, dest_vcpus = 0;
+		struct kvm_lapic **dst = NULL;
+
+
+		if (!kvm_apic_logical_map_valid(map))
+			goto out;
+
+		apic_logical_id(map, irq->dest_id, &cid, (u16 *)&bitmap);
+
+		if (cid >= ARRAY_SIZE(map->logical_map))
+			goto out;
+
+		dst = map->logical_map[cid];
+
+		for_each_set_bit(i, &bitmap, 16) {
+			if (!dst[i])
+				continue;
+
+			dest_vcpus++;
+		}
+
+		mod = irq->vector % dest_vcpus;
+
+		for (i = 0; i <= mod; i++) {
+			idx = find_next_bit(&bitmap, KVM_MAX_VCPUS, idx) + 1;
+			BUG_ON(idx >= KVM_MAX_VCPUS);
+		}
+
+		if (kvm_apic_present(dst[idx-1]->vcpu))
+			vcpu = dst[idx-1]->vcpu;
+	}
+
+out:
+	rcu_read_unlock();
+	return vcpu;
+}
+
 /*
  * Add a pending IRQ into lapic.
  * Return 1 if successfully added and 0 if discarded.

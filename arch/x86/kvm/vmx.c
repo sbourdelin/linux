@@ -159,6 +159,9 @@ static int ple_window_actual_max = KVM_VMX_DEFAULT_PLE_WINDOW_MAX;
 static int ple_window_max        = KVM_VMX_DEFAULT_PLE_WINDOW_MAX;
 module_param(ple_window_max, int, S_IRUGO);
 
+static bool __read_mostly enable_pi_vector_hashing = 1;
+module_param(enable_pi_vector_hashing, bool, S_IRUGO);
+
 extern const ulong vmx_return;
 
 #define NR_AUTOLOAD_MSRS 8
@@ -10702,8 +10705,15 @@ static int vmx_update_pi_irte(struct kvm *kvm, unsigned int host_irq,
 		 */
 
 		kvm_set_msi_irq(e, &irq);
-		if (!kvm_intr_is_single_vcpu(kvm, &irq, &vcpu))
-			continue;
+		if (!kvm_intr_is_single_vcpu(kvm, &irq, &vcpu)) {
+			if ((!enable_pi_vector_hashing ||
+				irq.delivery_mode != APIC_DM_LOWEST))
+				continue;
+
+			vcpu = kvm_intr_vector_hashing_dest(kvm, &irq);
+			if (!vcpu)
+				continue;
+		}
 
 		vcpu_info.pi_desc_addr = __pa(vcpu_to_pi_desc(vcpu));
 		vcpu_info.vector = irq.vector;

@@ -170,4 +170,6 @@ void wait_lapic_expire(struct kvm_vcpu *vcpu);
 
 bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 			struct kvm_vcpu **dest_vcpu);
+struct kvm_vcpu *kvm_intr_vector_hashing_dest_fast(struct kvm *kvm,
+						   struct kvm_lapic_irq *irq);
 #endif

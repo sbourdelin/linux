@@ -266,6 +266,58 @@ out:
 	return r;
 }
 
+/*
+ * This routine handles lowest-priority interrupts using vector-hashing
+ * mechanism. As an example, modern Intel CPUs use this method to handle
+ * lowest-priority interrupts.
+ *
+ * Here is the details about the vector-hashing mechanism:
+ * 1. For lowest-priority interrupts, store all the possible destination
+ *    vCPUs in an array.
+ * 2. Use "guest vector % max number of destination vCPUs" to find the right
+ *    destination vCPU in the array for the lowest-priority interrupt.
+ */
+struct kvm_vcpu *kvm_intr_vector_hashing_dest(struct kvm *kvm,
+					      struct kvm_lapic_irq *irq)
+
+{
+	unsigned long dest_vcpu_bitmap[BITS_TO_LONGS(KVM_MAX_VCPUS)];
+	unsigned int dest_vcpus = 0;
+	struct kvm_vcpu *vcpu;
+	unsigned int i, mod, idx = 0;
+
+	vcpu = kvm_intr_vector_hashing_dest_fast(kvm, irq);
+	if (vcpu)
+		return vcpu;
+
+	memset(dest_vcpu_bitmap, 0, sizeof(dest_vcpu_bitmap));
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (!kvm_apic_present(vcpu))
+			continue;
+
+		if (!kvm_apic_match_dest(vcpu, NULL, irq->shorthand,
+					irq->dest_id, irq->dest_mode))
+			continue;
+
+		__set_bit(vcpu->vcpu_id, dest_vcpu_bitmap);
+		dest_vcpus++;
+	}
+
+	if (dest_vcpus == 0)
+		return NULL;
+
+	mod = irq->vector % dest_vcpus;
+
+	for (i = 0; i <= mod; i++) {
+		idx = find_next_bit(dest_vcpu_bitmap, KVM_MAX_VCPUS, idx) + 1;
+		BUG_ON(idx >= KVM_MAX_VCPUS);
+	}
+
+	return kvm_get_vcpu(kvm, idx - 1);
+}
+EXPORT_SYMBOL_GPL(kvm_intr_vector_hashing_dest);
+
 bool kvm_intr_is_single_vcpu(struct kvm *kvm, struct kvm_lapic_irq *irq,
 			     struct kvm_vcpu **dest_vcpu)
 {
