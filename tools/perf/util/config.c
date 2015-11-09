@@ -129,7 +129,10 @@ static int get_value(config_fn_t fn, void *data, char *name, unsigned int len)
 {
 	int c;
 	char *value;
+	bool has_underscore = false;
 
+	if (prefixcmp(name, "annotate.") == 0)
+		has_underscore = true;
 	/* Get the full name */
 	for (;;) {
 		c = get_next_char();
@@ -137,6 +140,11 @@ static int get_value(config_fn_t fn, void *data, char *name, unsigned int len)
 			break;
 		if (!iskeychar(c))
 			break;
+		/* Correct typing errors about dash or underscore */
+		if (has_underscore && c == '-')
+			c = '_';
+		else if (!has_underscore && c == '_')
+			c = '-';
 		name[len++] = c;
 		if (len >= MAXNAME)
 			return -1;
