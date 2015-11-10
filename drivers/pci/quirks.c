@@ -2107,6 +2107,55 @@ static void quirk_via_cx700_pci_parking_caching(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA, 0x324e, quirk_via_cx700_pci_parking_caching);
 
 /*
+ * A read/write to sysfs entry ('/sys/bus/pci/devices/<id>/vpd')
+ * will dump 32k of data. The default length is set as 32768.
+ * Reading a full 32k will cause an access beyond the VPD end tag.
+ * The system behaviour at that point is mostly unpredictable.
+ * Also I dont believe vendors have implemented this VPD headers properly.
+ * Atleast I dont see it in following megaraid sas controller.
+ * That is why adding the quirk here.
+ */
+static void quirk_megaraid_sas_limit_vpd(struct pci_dev *dev)
+{
+	if (dev->vpd)
+		dev->vpd->len = 0;
+}
+
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_SAS1078R,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_SAS1078DE,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_VERDE_ZCR,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_SAS1078GEN2,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_SAS0079GEN2,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_SAS0073SKINNY,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_SAS0071SKINNY,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_FUSION,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_PLASMA,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_INVADER,
+		quirk_megaraid_sas_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_LSI_FURY,
+		quirk_megaraid_sas_limit_vpd);
+
+/*
  * For Broadcom 5706, 5708, 5709 rev. A nics, any read beyond the
  * VPD end tag will hang the device.  This problem was initially
  * observed when a vpd entry was created in sysfs
