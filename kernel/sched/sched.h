@@ -347,7 +347,7 @@ struct cfs_bandwidth { };
 struct cfs_rq {
 	struct load_weight load;
 	unsigned int nr_running, h_nr_running;
-
+	unsigned int runnable, forced_idle;
 	u64 exec_clock;
 	u64 min_vruntime;
 #ifndef CONFIG_64BIT

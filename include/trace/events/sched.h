@@ -562,6 +562,29 @@ TRACE_EVENT(sched_wake_idle_without_ipi,
 
 	TP_printk("cpu=%d", __entry->cpu)
 );
+
+/*
+ * Tracepoint for idle injection
+ */
+TRACE_EVENT(sched_cfs_idle_inject,
+
+	TP_PROTO(char *msg, int throttled),
+
+	TP_ARGS(msg, throttled),
+
+	TP_STRUCT__entry(
+		__string(msg, msg)
+		__field(int, throttled)
+	),
+
+	TP_fast_assign(
+		__assign_str(msg, msg);
+		__entry->throttled = throttled;
+	),
+
+	TP_printk("%s: throttled=%d", __get_str(msg), __entry->throttled)
+);
+
 #endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */

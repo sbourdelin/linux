@@ -3185,3 +3185,15 @@ static inline unsigned long rlimit_max(unsigned int limit)
 }
 
 #endif
+
+#ifdef CONFIG_CFS_IDLE_INJECT
+extern int proc_sched_cfs_idle_inject_pct_handler(struct ctl_table *table,
+						int write,
+						void __user *buffer,
+						size_t *length, loff_t *ppos);
+extern int proc_sched_cfs_idle_inject_duration_handler(struct ctl_table *table,
+						int write,
+						void __user *buffer,
+						size_t *length, loff_t *ppos);
+
+#endif
