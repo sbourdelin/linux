@@ -1001,6 +1001,23 @@ static struct notifier_block klp_module_nb = {
 	.priority = INT_MIN+1, /* called late but before ftrace notifier */
 };
 
+/*
+ * Save necessary information from info in order to be able to
+ * patch modules that might be loaded later
+ */
+void klp_prepare_patch_module(struct module *mod, struct load_info *info)
+{
+	Elf_Shdr *symsect;
+
+	symsect = info->sechdrs + info->index.sym;
+	/* update sh_addr to point to symtab */
+	symsect->sh_addr = (unsigned long)info->hdr + symsect->sh_offset;
+
+	mod->info = kzalloc(sizeof(*info), GFP_KERNEL);
+	memcpy(mod->info, info, sizeof(*info));
+
+}
+
 static int __init klp_init(void)
 {
 	int ret;

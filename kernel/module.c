@@ -318,20 +318,6 @@ int unregister_module_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(unregister_module_notifier);
 
-struct load_info {
-	Elf_Ehdr *hdr;
-	unsigned long len;
-	Elf_Shdr *sechdrs;
-	char *secstrings, *strtab;
-	unsigned long symoffs, stroffs;
-	struct _ddebug *debug;
-	unsigned int num_debug;
-	bool sig_ok;
-	struct {
-		unsigned int sym, str, mod, vers, info, pcpu;
-	} index;
-};
-
 /* We require a truly strong try_module_get(): 0 means failure due to
    ongoing or failed initialization etc. */
 static inline int strong_try_module_get(struct module *mod)
@@ -2133,6 +2119,11 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
 			       (long)sym[i].st_value);
 			break;
 
+#ifdef CONFIG_LIVEPATCH
+		case SHN_LIVEPATCH:
+			break;
+#endif
+
 		case SHN_UNDEF:
 			ksym = resolve_symbol_wait(mod, info, name);
 			/* Ok if resolved.  */
@@ -2180,6 +2171,11 @@ static int apply_relocations(struct module *mod, const struct load_info *info)
 		/* Don't bother with non-allocated sections */
 		if (!(info->sechdrs[infosec].sh_flags & SHF_ALLOC))
 			continue;
+
+#ifdef CONFIG_LIVEPATCH
+		if (info->sechdrs[i].sh_flags & SHF_RELA_LIVEPATCH)
+			continue;
+#endif
 
 		if (info->sechdrs[i].sh_type == SHT_REL)
 			err = apply_relocate(info->sechdrs, info->strtab,
@@ -3526,8 +3522,20 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	if (err < 0)
 		goto bug_cleanup;
 
+#ifdef CONFIG_LIVEPATCH
+	/*
+	 * Save sechdrs, indices, and other data from info
+	 * in order to patch to-be-loaded modules.
+	 * Do not call free_copy() for livepatch modules.
+	 */
+	if (get_modinfo((struct load_info *)info, "livepatch"))
+		klp_prepare_patch_module(mod, info);
+	else
+		free_copy(info);
+#else
 	/* Get rid of temporary copy. */
 	free_copy(info);
+#endif
 
 	/* Done! */
 	trace_module_load(mod);

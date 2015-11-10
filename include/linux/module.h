@@ -36,6 +36,20 @@ struct modversion_info {
 	char name[MODULE_NAME_LEN];
 };
 
+struct load_info {
+	Elf_Ehdr *hdr;
+	unsigned long len;
+	Elf_Shdr *sechdrs;
+	char *secstrings, *strtab;
+	unsigned long symoffs, stroffs;
+	struct _ddebug *debug;
+	unsigned int num_debug;
+	bool sig_ok;
+	struct {
+		unsigned int sym, str, mod, vers, info, pcpu;
+	} index;
+};
+
 struct module;
 
 struct module_kobject {
@@ -462,6 +476,8 @@ struct module {
 
 #ifdef CONFIG_LIVEPATCH
 	bool klp_alive;
+	/* save info to patch to-be-loaded modules */
+	struct load_info *info;
 #endif
 
 #ifdef CONFIG_MODULE_UNLOAD
@@ -634,6 +650,15 @@ static inline bool module_requested_async_probing(struct module *module)
 {
 	return module && module->async_probe_requested;
 }
+
+#ifdef CONFIG_LIVEPATCH
+extern void klp_prepare_patch_module(struct module *mod,
+				     struct load_info *info);
+extern int
+apply_relocate_add(Elf64_Shdr *sechdrs, const char *strtab,
+		   unsigned int symindex, unsigned int relsec,
+		   struct module *me);
+#endif
 
 #else /* !CONFIG_MODULES... */
 
