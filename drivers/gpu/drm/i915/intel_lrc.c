@@ -260,7 +260,8 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
 
 /**
  * intel_execlists_ctx_id() - get the Execlists Context ID
- * @ctx_obj: Logical Ring Context backing object.
+ * @ctx: User context we are interested in
+ * @ring: Engine to get the Context ID for
  *
  * Do not confuse with ctx->id! Unfortunately we have a name overload
  * here: the old context ID we pass to userspace as a handler so that
@@ -270,14 +271,12 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
  *
  * Return: 20-bits globally unique context ID.
  */
-u32 intel_execlists_ctx_id(struct drm_i915_gem_object *ctx_obj)
+u32 intel_execlists_ctx_id(struct intel_context *ctx,
+			   struct intel_engine_cs *ring)
 {
-	u32 lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
-			LRC_PPHWSP_PN * PAGE_SIZE;
-
 	/* LRCA is required to be 4K aligned so the more significant 20 bits
 	 * are globally unique */
-	return lrca >> 12;
+	return ctx->engine[ring->id].lrca >> 12;
 }
 
 static bool disable_lite_restore_wa(struct intel_engine_cs *ring)
@@ -292,13 +291,11 @@ static bool disable_lite_restore_wa(struct intel_engine_cs *ring)
 uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 				     struct intel_engine_cs *ring)
 {
-	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
 	uint64_t desc = ring->ctx_desc_template;
-	uint64_t lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
-			LRC_PPHWSP_PN * PAGE_SIZE;
+	uint64_t lrca = ctx->engine[ring->id].lrca;
 
 	desc |= lrca;
-	desc |= (u64)intel_execlists_ctx_id(ctx_obj) << GEN8_CTX_ID_SHIFT;
+	desc |= (u64)intel_execlists_ctx_id(ctx, ring) << GEN8_CTX_ID_SHIFT;
 
 	return desc;
 }
@@ -457,9 +454,7 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
 					    execlist_link);
 
 	if (head_req != NULL) {
-		struct drm_i915_gem_object *ctx_obj =
-				head_req->ctx->engine[ring->id].state;
-		if (intel_execlists_ctx_id(ctx_obj) == request_id) {
+		if (intel_execlists_ctx_id(head_req->ctx, ring) == request_id) {
 			WARN(head_req->elsp_submitted == 0,
 			     "Never submitted head request\n");
 
@@ -1041,6 +1036,8 @@ static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 		ret = intel_lr_context_do_pin(ring, ctx_obj, ringbuf);
 		if (ret)
 			goto reset_pin_count;
+		rq->ctx->engine[ring->id].lrca =
+		  i915_gem_obj_ggtt_offset(ctx_obj) + LRC_PPHWSP_PN * PAGE_SIZE;
 	}
 	return ret;
 
@@ -1060,6 +1057,7 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 		if (--rq->ctx->engine[ring->id].pin_count == 0) {
 			intel_unpin_ringbuffer_obj(ringbuf);
 			i915_gem_object_ggtt_unpin(ctx_obj);
+			rq->ctx->engine[ring->id].lrca = 0;
 		}
 	}
 }
@@ -1936,6 +1934,10 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 			ring->name, ret);
 		return ret;
 	}
+
+	ring->default_context->engine[ring->id].lrca =
+		i915_gem_obj_ggtt_offset(ring->default_context->engine[ring->id].state)
+					 + LRC_PPHWSP_PN * PAGE_SIZE;
 
 	ring->disable_lite_restore_wa = disable_lite_restore_wa(ring);
 
