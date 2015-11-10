@@ -1199,7 +1199,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 		ACCESS_ONCE(dev_priv->gpu_error.test_irq_rings) & intel_ring_flag(ring);
 	DEFINE_WAIT(wait);
 	unsigned long timeout_expire;
-	s64 before, now;
+	s64 before;
 	int ret;
 
 	WARN(!intel_irqs_enabled(dev_priv), "IRQs disabled");
@@ -1210,15 +1210,17 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	if (i915_gem_request_completed(req, true))
 		return 0;
 
-	timeout_expire = timeout ?
-		jiffies + nsecs_to_jiffies_timeout((u64)*timeout) : 0;
-
 	if (INTEL_INFO(dev_priv)->gen >= 6)
 		gen6_rps_boost(dev_priv, rps, req->emitted_jiffies);
 
 	/* Record current time in case interrupted by signal, or wedged */
 	trace_i915_gem_request_wait_begin(req);
-	before = ktime_get_raw_ns();
+	if (timeout) {
+		before = ktime_get_raw_ns();
+		timeout_expire = jiffies + nsecs_to_jiffies_timeout((u64)*timeout);
+	} else {
+		timeout_expire = 0;
+	}
 
 	/* Optimistic spin for the next jiffie before touching IRQs */
 	ret = __i915_spin_request(req);
@@ -1284,11 +1286,10 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	finish_wait(&ring->irq_queue, &wait);
 
 out:
-	now = ktime_get_raw_ns();
 	trace_i915_gem_request_wait_end(req);
 
 	if (timeout) {
-		s64 tres = *timeout - (now - before);
+		s64 tres = *timeout - (ktime_get_raw_ns() - before);
 
 		*timeout = tres < 0 ? 0 : tres;
 
