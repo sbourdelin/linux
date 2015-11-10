@@ -9,6 +9,12 @@
 #ifndef __BFIN_ASM_FIXED_CODE_H__
 #define __BFIN_ASM_FIXED_CODE_H__
 
+#ifdef CONFIG_PHY_RAM_BASE_ADDRESS
+#define CONFIG_PHY_RAM_BASE_ADDRESS 0x0
+#endif
+
+#define PHY_RAM_BASE_ADDRESS CONFIG_PHY_RAM_BASE_ADDRESS
+
 #include <uapi/asm/fixed_code.h>
 
 #ifndef __ASSEMBLY__
