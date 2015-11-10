@@ -361,6 +361,11 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
  * @handle_err: the subsystem calls the driver to handle an error that occurs
  *		in the generic implementation of transfer_one_message().
  * @unprepare_message: undo any work done by prepare_message().
+ * @spi_mtd_mmap_read: some spi-controller hardwares provide memory.
+ *                     Flash drivers (like m25p80) can request memory
+ *                     mapped read via this method. This interface
+ *                     should only be used by mtd flashes and cannot be
+ *                     used by other spi devices.
  * @cs_gpios: Array of GPIOs to use as chip select lines; one per CS
  *	number. Any individual value may be -ENOENT for CS lines that
  *	are not GPIOs (driven by the SPI controller itself).
@@ -507,6 +512,11 @@ struct spi_master {
 			       struct spi_message *message);
 	int (*unprepare_message)(struct spi_master *master,
 				 struct spi_message *message);
+	int (*spi_mtd_mmap_read)(struct  spi_device *spi,
+				 loff_t from, size_t len,
+				 size_t *retlen, u_char *buf,
+				 u8 read_opcode, u8 addr_width,
+				 u8 dummy_bytes);
 
 	/*
 	 * These hooks are for drivers that use a generic implementation
@@ -998,6 +1008,16 @@ static inline ssize_t spi_w8r16be(struct spi_device *spi, u8 cmd)
 
 	return be16_to_cpu(result);
 }
+
+/* SPI core interface for memory mapped read support */
+static inline bool spi_mmap_read_supported(struct spi_device *spi)
+{
+	return spi->master->spi_mtd_mmap_read ? true : false;
+}
+
+int spi_mtd_mmap_read(struct spi_device *spi, loff_t from, size_t len,
+		      size_t *retlen, u_char *buf, u8 read_opcode,
+		      u8 addr_width, u8 dummy_bytes);
 
 /*---------------------------------------------------------------------------*/
 
