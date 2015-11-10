@@ -85,7 +85,7 @@ struct klp_reloc {
 /**
  * struct klp_object - kernel object structure for live patching
  * @name:	module name (or NULL for vmlinux)
- * @relocs:	relocation entries to be applied at load time
+ * @reloc_secs:	relocation sections to be applied at load time
  * @funcs:	function entries for functions to be patched in the object
  * @kobj:	kobject for sysfs resources
  * @mod:	kernel module associated with the patched object
@@ -95,7 +95,7 @@ struct klp_reloc {
 struct klp_object {
 	/* external */
 	const char *name;
-	struct klp_reloc *relocs;
+	struct list_head reloc_secs;
 	struct klp_func *funcs;
 
 	/* internal */
@@ -128,6 +128,13 @@ struct klp_patch {
 
 #define klp_for_each_func(obj, func) \
 	for (func = obj->funcs; func->old_name; func++)
+
+struct klp_reloc_sec {
+	unsigned int index;
+	char *name;
+	char *objname;
+	struct list_head list;
+};
 
 int klp_register_patch(struct klp_patch *);
 int klp_unregister_patch(struct klp_patch *);

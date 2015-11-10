@@ -793,9 +793,15 @@ extern int module_sysfs_initialized;
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
 extern void set_all_modules_text_rw(void);
 extern void set_all_modules_text_ro(void);
+extern void
+set_page_attributes(void *start, void *end,
+		    int (*set)(unsigned long start, int num_pages));
 #else
 static inline void set_all_modules_text_rw(void) { }
 static inline void set_all_modules_text_ro(void) { }
+static inline void
+set_page_attributes(void *start, void *end,
+		    int (*set)(unsigned long start, int num_pages)) { }
 #endif
 
 #ifdef CONFIG_GENERIC_BUG
