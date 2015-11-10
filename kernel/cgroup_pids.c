@@ -40,6 +40,9 @@
 #define PIDS_MAX (PID_MAX_LIMIT + 1ULL)
 #define PIDS_MAX_STR "max"
 
+#define PIDS_UNLIMITED -1
+#define PIDS_UNLIMITED_STR "unlimited"
+
 struct pids_cgroup {
 	struct cgroup_subsys_state	css;
 
@@ -49,6 +52,12 @@ struct pids_cgroup {
 	 */
 	atomic64_t			counter;
 	int64_t				limit;
+
+	/**
+	 * The remaining number of forks allowed.  -1 is the magic
+	 * value for "unlimited".
+	 */
+	atomic_t fork_remaining;
 };
 
 static struct pids_cgroup *css_pids(struct cgroup_subsys_state *css)
@@ -72,6 +81,7 @@ pids_css_alloc(struct cgroup_subsys_state *parent)
 
 	pids->limit = PIDS_MAX;
 	atomic64_set(&pids->counter, 0);
+	atomic_set(&pids->fork_remaining, -1);
 	return &pids->css;
 }
 
@@ -162,6 +172,61 @@ revert:
 	return -EAGAIN;
 }
 
+/**
+ * pids_cancel_fork_remaining - uncharge fork_remaining counter.
+ */
+static void pids_cancel_fork_remaining(struct pids_cgroup *pids, int n)
+{
+	atomic_add_unless(&pids->fork_remaining, n, -1);
+}
+
+/**
+ * pids_cancel_fork_remaining - uncharge fork_remaining counter,
+ * traversing the parent chain, until (not including) the given last
+ * one.
+ */
+static void pids_cancel_fork_remaining_until(struct pids_cgroup *pids,
+					     struct pids_cgroup *last, int n)
+{
+	for (; pids != last; pids = parent_pids(pids))
+		pids_cancel_fork_remaining(pids, 1);
+}
+
+/**
+ * pids_cancel_fork_remaining - uncharge fork_remaining counter,
+ * traversing the whole parent chain.
+ */
+static void pids_cancel_fork_remaining_all(struct pids_cgroup *pids, int n)
+{
+	pids_cancel_fork_remaining_until(pids, NULL, n);
+}
+
+/**
+ * pids_try_fork - check if forking is allowed according to
+ * fork_remaining, and decrement the fork_remaining counter.
+ */
+static int pids_try_fork_remaining(struct pids_cgroup *pids)
+{
+	struct pids_cgroup *p;
+
+	for (p = pids; p; p = parent_pids(p)) {
+		int new = atomic_dec_if_positive(&p->fork_remaining);
+
+		if (new == -1)
+			/*
+			 * The old value was 0 which means we're not
+			 * allowed to fork.
+			 */
+			goto revert;
+	}
+
+	return 0;
+
+revert:
+	pids_cancel_fork_remaining_until(pids, p, 1);
+	return -EAGAIN;
+}
+
 static int pids_can_attach(struct cgroup_subsys_state *css,
 			   struct cgroup_taskset *tset)
 {
@@ -220,9 +285,15 @@ static int pids_can_fork(struct task_struct *task, void **priv_p)
 	css = task_get_css(current, pids_cgrp_id);
 	pids = css_pids(css);
 
-	err = pids_try_charge(pids, 1);
+	err = pids_try_fork_remaining(pids);
 	if (err)
 		goto err_css_put;
+
+	err = pids_try_charge(pids, 1);
+	if (err) {
+		pids_cancel_fork_remaining_all(pids, 1);
+		goto err_css_put;
+	}
 
 	*priv_p = css;
 	return 0;
@@ -237,6 +308,7 @@ static void pids_cancel_fork(struct task_struct *task, void *priv)
 	struct cgroup_subsys_state *css = priv;
 	struct pids_cgroup *pids = css_pids(css);
 
+	pids_cancel_fork_remaining_all(pids, 1);
 	pids_uncharge(pids, 1);
 	css_put(css);
 }
@@ -325,6 +397,49 @@ static s64 pids_current_read(struct cgroup_subsys_state *css,
 	return atomic64_read(&pids->counter);
 }
 
+static int pids_fork_remaining_write(struct kernfs_open_file *of, char *buf,
+				     size_t nbytes, loff_t off)
+{
+	struct cgroup_subsys_state *css = of_css(of);
+	struct pids_cgroup *pids = css_pids(css);
+	int fork_remaining;
+	int64_t value;
+	int err;
+
+	buf = strstrip(buf);
+	if (!strcmp(buf, PIDS_UNLIMITED_STR)) {
+		fork_remaining = PIDS_UNLIMITED;
+		goto set_limit;
+	}
+
+	err = kstrtoll(buf, 0, &value);
+	if (err)
+		return err;
+
+	if (value < 0 || value > INT_MAX)
+		return -EINVAL;
+
+	fork_remaining = (int)value;
+
+set_limit:
+	atomic_set(&pids->fork_remaining, fork_remaining);
+	return nbytes;
+}
+
+static int pids_fork_remaining_show(struct seq_file *sf, void *v)
+{
+	struct cgroup_subsys_state *css = seq_css(sf);
+	struct pids_cgroup *pids = css_pids(css);
+	int fork_remaining = atomic_read(&pids->fork_remaining);
+
+	if (fork_remaining == PIDS_UNLIMITED)
+		seq_printf(sf, "%s\n", PIDS_UNLIMITED_STR);
+	else
+		seq_printf(sf, "%d\n", fork_remaining);
+
+	return 0;
+}
+
 static struct cftype pids_files[] = {
 	{
 		.name = "max",
@@ -335,6 +450,12 @@ static struct cftype pids_files[] = {
 	{
 		.name = "current",
 		.read_s64 = pids_current_read,
+	},
+	{
+		.name = "fork_remaining",
+		.write = pids_fork_remaining_write,
+		.seq_show = pids_fork_remaining_show,
+		.flags = CFTYPE_NOT_ON_ROOT,
 	},
 	{ }	/* terminate */
 };

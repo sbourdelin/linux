@@ -83,3 +83,34 @@ sh: fork: Resource temporary unavailable
 # /bin/echo "We can't even spawn a single process now."
 sh: fork: Resource temporary unavailable
 #
+
+Fork Limit
+----------
+
+Apart from limiting the total number of processes in a cgroup, the
+`pids` controller can also limit the number of fork()/clone() calls,
+no matter how many of those processes are still alive.  That setting
+is controlled by "pids.fork_remaining".  The default value is
+"unlimited", and it can be set to any non-negative integer.  Each
+successful fork()/clone() decrements the counter, until it hits zero.
+At this point, further fork()/clone() fail.
+
+Example:
+
+# mkdir /sys/fs/cgroup/pids/parent
+# echo 2 > /sys/fs/cgroup/pids/parent/pids.fork_remaining
+# echo $$ > /sys/fs/cgroup/pids/parent/cgroup.procs
+# cat /sys/fs/cgroup/pids/parent/pids.fork_remaining
+1
+# cat /sys/fs/cgroup/pids/parent/pids.fork_remaining
+0
+# cat /sys/fs/cgroup/pids/parent/pids.fork_remaining
+sh: fork: Resource temporary unavailable
+
+Note that the first `cat` returns "1"; that is because at this point,
+the counter has already been decremented by launching `cat` inside
+that cgroup.
+
+To lift the limit, write "unlimited" to "pids.fork_remaining":
+
+# echo unlimited > /sys/fs/cgroup/pids/parent/pids.fork_remaining
