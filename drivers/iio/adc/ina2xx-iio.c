@@ -321,7 +321,19 @@ static const struct iio_chan_spec ina2xx_channels[] = {
 	IIO_CHAN_SOFT_TIMESTAMP(4),
 };
 
+static int ina2xx_debug_reg(struct iio_dev *indio_dev,
+			    unsigned reg, unsigned writeval, unsigned *readval)
+{
+	struct ina2xx_chip_info *chip = iio_priv(indio_dev);
+
+	if (!readval)
+		return regmap_write(chip->regmap, reg, writeval);
+
+	return regmap_read(chip->regmap, reg, readval);
+}
+
 static const struct iio_info ina2xx_info = {
+	.debugfs_reg_access = &ina2xx_debug_reg,
 	.read_raw = &ina2xx_read_raw,
 	.write_raw = &ina2xx_write_raw,
 	.driver_module = THIS_MODULE,
