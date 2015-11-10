@@ -133,6 +133,11 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
 	/* convert the dummy cycles to the number of bytes */
 	dummy /= 8;
 
+	if (spi_mmap_read_supported(spi))
+		return spi_mtd_mmap_read(spi, from, len, retlen, buf,
+					 nor->read_opcode,
+					 nor->addr_width, dummy);
+
 	spi_message_init(&m);
 	memset(t, 0, (sizeof t));
 
