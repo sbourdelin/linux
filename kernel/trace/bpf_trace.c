@@ -186,6 +186,7 @@ const struct bpf_func_proto *bpf_get_trace_printk_proto(void)
 	return &bpf_trace_printk_proto;
 }
 
+#if IS_ENABLED(CONFIG_PERF_EVENTS)
 static u64 bpf_perf_event_read(u64 r1, u64 index, u64 r3, u64 r4, u64 r5)
 {
 	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
@@ -263,6 +264,7 @@ static const struct bpf_func_proto bpf_perf_event_output_proto = {
 	.arg4_type	= ARG_PTR_TO_STACK,
 	.arg5_type	= ARG_CONST_STACK_SIZE,
 };
+#endif
 
 static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func_id)
 {
@@ -289,10 +291,12 @@ static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func
 		return bpf_get_trace_printk_proto();
 	case BPF_FUNC_get_smp_processor_id:
 		return &bpf_get_smp_processor_id_proto;
+#if IS_ENABLED(CONFIG_PERF_EVENTS)
 	case BPF_FUNC_perf_event_read:
 		return &bpf_perf_event_read_proto;
 	case BPF_FUNC_perf_event_output:
 		return &bpf_perf_event_output_proto;
+#endif
 	default:
 		return NULL;
 	}
