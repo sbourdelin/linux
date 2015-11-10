@@ -994,7 +994,8 @@ int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 			    (!cap_raised(current_cred()->cap_permitted, arg3) ||
 			     !cap_raised(current_cred()->cap_inheritable,
 					 arg3) ||
-			     issecure(SECURE_NO_CAP_AMBIENT_RAISE)))
+			     issecure(SECURE_NO_CAP_AMBIENT_RAISE) ||
+			     capable(CAP_ENABLE_AMBIENT)))
 				return -EPERM;
 
 			new = prepare_creds();
