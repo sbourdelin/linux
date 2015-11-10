@@ -25,7 +25,7 @@ static inline bool cpu_has_ht_siblings(void)
 {
 	bool has_siblings = false;
 #ifdef CONFIG_SMP
-	has_siblings = cpu_has_ht && smp_num_siblings > 1;
+	has_siblings = static_cpu_has_safe(X86_FEATURE_HT) && smp_num_siblings > 1;
 #endif
 	return has_siblings;
 }

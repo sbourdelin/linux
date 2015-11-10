@@ -909,7 +909,7 @@ static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum)
 
 void set_dr_addr_mask(unsigned long mask, int dr)
 {
-	if (!cpu_has_bpext)
+	if (!static_cpu_has_safe(X86_FEATURE_BPEXT))
 		return;
 
 	switch (dr) {

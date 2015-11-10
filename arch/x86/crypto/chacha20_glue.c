@@ -125,7 +125,7 @@ static struct crypto_alg alg = {
 
 static int __init chacha20_simd_mod_init(void)
 {
-	if (!cpu_has_ssse3)
+	if (!static_cpu_has_safe(X86_FEATURE_SSSE3))
 		return -ENODEV;
 
 #ifdef CONFIG_AS_AVX2

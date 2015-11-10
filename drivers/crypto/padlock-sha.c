@@ -540,7 +540,8 @@ static int __init padlock_init(void)
 	struct shash_alg *sha1;
 	struct shash_alg *sha256;
 
-	if (!x86_match_cpu(padlock_sha_ids) || !cpu_has_phe_enabled)
+	if (!x86_match_cpu(padlock_sha_ids) ||
+	    !static_cpu_has_safe(X86_FEATURE_PHE_EN))
 		return -ENODEV;
 
 	/* Register the newly added algorithm module if on *

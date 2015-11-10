@@ -526,7 +526,7 @@ static int __init amd_uncore_init(void)
 	if (!cpu_has_topoext)
 		goto fail_nodev;
 
-	if (cpu_has_perfctr_nb) {
+	if (static_cpu_has_safe(X86_FEATURE_PERFCTR_NB)) {
 		amd_uncore_nb = alloc_percpu(struct amd_uncore *);
 		if (!amd_uncore_nb) {
 			ret = -ENOMEM;
@@ -540,7 +540,7 @@ static int __init amd_uncore_init(void)
 		ret = 0;
 	}
 
-	if (cpu_has_perfctr_l2) {
+	if (static_cpu_has_safe(X86_FEATURE_PERFCTR_L2)) {
 		amd_uncore_l2 = alloc_percpu(struct amd_uncore *);
 		if (!amd_uncore_l2) {
 			ret = -ENOMEM;
@@ -583,10 +583,10 @@ fail_online:
 
 	/* amd_uncore_nb/l2 should have been freed by cleanup_cpu_online */
 	amd_uncore_nb = amd_uncore_l2 = NULL;
-	if (cpu_has_perfctr_l2)
+	if (static_cpu_has_safe(X86_FEATURE_PERFCTR_L2))
 		perf_pmu_unregister(&amd_l2_pmu);
 fail_l2:
-	if (cpu_has_perfctr_nb)
+	if (static_cpu_has_safe(X86_FEATURE_PERFCTR_NB))
 		perf_pmu_unregister(&amd_nb_pmu);
 	if (amd_uncore_l2)
 		free_percpu(amd_uncore_l2);
