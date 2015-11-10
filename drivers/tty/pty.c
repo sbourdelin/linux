@@ -26,7 +26,7 @@
 #include <linux/mutex.h>
 #include <linux/poll.h>
 
-#undef TTY_DEBUG_HANGUP
+#define TTY_DEBUG_HANGUP
 #ifdef TTY_DEBUG_HANGUP
 # define tty_debug_hangup(tty, f, args...)	tty_debug(tty, f, ##args)
 #else

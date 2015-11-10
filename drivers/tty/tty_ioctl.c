@@ -24,7 +24,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#undef TTY_DEBUG_WAIT_UNTIL_SENT
+#define TTY_DEBUG_WAIT_UNTIL_SENT
 
 #ifdef TTY_DEBUG_WAIT_UNTIL_SENT
 # define tty_debug_wait_until_sent(tty, f, args...)    tty_debug(tty, f, ##args)
