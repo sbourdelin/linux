@@ -2320,12 +2320,12 @@ static void tpacket_destruct_skb(struct sk_buff *skb)
 	sock_wfree(skb);
 }
 
-static bool ll_header_truncated(const struct net_device *dev, int len)
+static bool ll_header_truncated(int hard_header_len, int len)
 {
 	/* net device doesn't like empty head */
-	if (unlikely(len <= dev->hard_header_len)) {
+	if (unlikely(len <= hard_header_len)) {
 		net_warn_ratelimited("%s: packet size is too short (%d <= %d)\n",
-				     current->comm, len, dev->hard_header_len);
+				     current->comm, len, hard_header_len);
 		return true;
 	}
 
@@ -2333,8 +2333,9 @@ static bool ll_header_truncated(const struct net_device *dev, int len)
 }
 
 static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
-		void *frame, struct net_device *dev, int size_max,
-		__be16 proto, unsigned char *addr, int hlen)
+			    void *frame, struct net_device *dev, int size_max,
+			    __be16 proto, unsigned char *addr, int hlen,
+			    int reserve)
 {
 	union tpacket_uhdr ph;
 	int to_write, offset, len, tp_len, nr_frags, len_max;
@@ -2400,22 +2401,45 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 	to_write = tp_len;
 
 	if (sock->type == SOCK_DGRAM) {
-		err = dev_hard_header(skb, dev, ntohs(proto), addr,
-				NULL, tp_len);
+		/* In DGRAM sockets, we expect struct sockaddr_ll was filled
+		 * via struct msghdr, so we have dest mac and skb->protocol.
+		 * Otherwise there's not too much useful things we can do in
+		 * this flush run.
+		 */
+		err = dev_hard_header(skb, dev, ntohs(skb->protocol), addr,
+				      NULL, tp_len);
 		if (unlikely(err < 0))
 			return -EINVAL;
-	} else if (dev->hard_header_len) {
-		if (ll_header_truncated(dev, tp_len))
-			return -EINVAL;
+	} else {
+		/* If skb->protocol is still 0, try to infer/guess it. Might
+		 * not be fully reliable in the sense that a user could still
+		 * change/race data afterwards, but on the other hand the proto
+		 * can be set arbitrarily anyways. We only need to take care
+		 * in case of extra large VLAN frames.
+		 */
+		if (!skb->protocol && tp_len >= ETH_HLEN)
+			skb->protocol = ((struct ethhdr *)data)->h_proto;
 
-		skb_push(skb, dev->hard_header_len);
-		err = skb_store_bits(skb, 0, data,
-				dev->hard_header_len);
-		if (unlikely(err))
-			return err;
+		/* Copy Ethernet header in case we need to deal with extra
+		 * VLAN space as otherwise data could change underneath us.
+		 * The caller already accomodated for enough linear room.
+		 */
+		if (dev->hard_header_len || tp_len > dev->mtu + reserve) {
+			int hdr_len = dev->hard_header_len;
 
-		data += dev->hard_header_len;
-		to_write -= dev->hard_header_len;
+			if (hdr_len < ETH_HLEN)
+				hdr_len = ETH_HLEN;
+			if (unlikely(ll_header_truncated(hdr_len, tp_len)))
+				return -EINVAL;
+
+			skb_push(skb, hdr_len);
+			err = skb_store_bits(skb, 0, data, hdr_len);
+			if (unlikely(err))
+				return err;
+
+			data     += hdr_len;
+			to_write -= hdr_len;
+		}
 	}
 
 	offset = offset_in_page(data);
@@ -2445,6 +2469,20 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 		offset = 0;
 		len_max = PAGE_SIZE;
 		len = ((to_write > len_max) ? len_max : to_write);
+	}
+
+	/* Check for full frame with extra VLAN space. We can probe
+	 * here on the linear header, if necessary. Earlier code
+	 * assumed this would be a VLAN pkt, double-check this now
+	 * that we have the actual packet and protocol at hand.
+	 */
+	if (tp_len > dev->mtu + reserve) {
+		if (skb->protocol != htons(ETH_P_8021Q))
+			return -EMSGSIZE;
+
+		skb_reset_mac_header(skb);
+		if (eth_hdr(skb)->h_proto != htons(ETH_P_8021Q))
+			return -EMSGSIZE;
 	}
 
 	skb_probe_transport_header(skb, 0);
@@ -2493,12 +2531,12 @@ static int tpacket_snd(struct packet_sock *po, struct msghdr *msg)
 	if (unlikely(!(dev->flags & IFF_UP)))
 		goto out_put;
 
-	reserve = dev->hard_header_len + VLAN_HLEN;
-	size_max = po->tx_ring.frame_size
-		- (po->tp_hdrlen - sizeof(struct sockaddr_ll));
-
-	if (size_max > dev->mtu + reserve)
-		size_max = dev->mtu + reserve;
+	if (po->sk.sk_socket->type == SOCK_RAW)
+		reserve = dev->hard_header_len;
+	size_max = po->tx_ring.frame_size - (po->tp_hdrlen -
+					     sizeof(struct sockaddr_ll));
+	if (size_max > dev->mtu + reserve + VLAN_HLEN)
+		size_max = dev->mtu + reserve + VLAN_HLEN;
 
 	do {
 		ph = packet_current_frame(po, &po->tx_ring,
@@ -2523,20 +2561,7 @@ static int tpacket_snd(struct packet_sock *po, struct msghdr *msg)
 			goto out_status;
 		}
 		tp_len = tpacket_fill_skb(po, skb, ph, dev, size_max, proto,
-					  addr, hlen);
-		if (likely(tp_len >= 0) &&
-		    tp_len > dev->mtu + dev->hard_header_len) {
-			struct ethhdr *ehdr;
-			/* Earlier code assumed this would be a VLAN pkt,
-			 * double-check this now that we have the actual
-			 * packet in hand.
-			 */
-
-			skb_reset_mac_header(skb);
-			ehdr = eth_hdr(skb);
-			if (ehdr->h_proto != htons(ETH_P_8021Q))
-				tp_len = -EMSGSIZE;
-		}
+					  addr, hlen, reserve);
 		if (unlikely(tp_len < 0)) {
 			if (po->tp_loss) {
 				__packet_set_status(po, ph,
@@ -2754,7 +2779,7 @@ static int packet_snd(struct socket *sock, struct msghdr *msg, size_t len)
 		if (unlikely(offset < 0))
 			goto out_free;
 	} else {
-		if (ll_header_truncated(dev, len))
+		if (unlikely(ll_header_truncated(dev->hard_header_len, len)))
 			goto out_free;
 	}
 
