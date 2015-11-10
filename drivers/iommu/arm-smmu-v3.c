@@ -1825,8 +1825,10 @@ static int arm_smmu_add_device(struct device *dev)
 	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
 	for (i = 0; i < smmu_group->num_sids; ++i) {
 		/* If we already know about this SID, then we're done */
-		if (smmu_group->sids[i] == sid)
+		if (smmu_group->sids[i] == sid) {
+			iommu_group_put(group);
 			return 0;
+		}
 	}
 
 	/* Check the SID is in range of the SMMU and our stream table */
@@ -1855,6 +1857,9 @@ static int arm_smmu_add_device(struct device *dev)
 	/* Add the new SID */
 	sids[smmu_group->num_sids - 1] = sid;
 	smmu_group->sids = sids;
+
+	iommu_group_put(group);
+
 	return 0;
 
 out_put_group:
