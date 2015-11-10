@@ -1154,8 +1154,7 @@ static int intel_backlight_device_update_status(struct backlight_device *bd)
 	 */
 	if (panel->backlight.enabled) {
 		if (panel->backlight.power) {
-			bool enable = bd->props.power == FB_BLANK_UNBLANK &&
-				bd->props.brightness != 0;
+			bool enable = bd->props.power == FB_BLANK_UNBLANK;
 			panel->backlight.power(connector, enable);
 		}
 	} else {
@@ -1211,7 +1210,7 @@ static int intel_backlight_device_register(struct intel_connector *connector)
 	 * Note: Everything should work even if the backlight device max
 	 * presented to the userspace is arbitrarily chosen.
 	 */
-	props.max_brightness = panel->backlight.max;
+	props.max_brightness = panel->backlight.max - panel->backlight.min;
 	props.brightness = scale_hw_to_user(connector,
 					    panel->backlight.level,
 					    props.max_brightness);
@@ -1429,10 +1428,11 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	if (min != dev_priv->vbt.backlight.min_brightness) {
 		DRM_DEBUG_KMS("clamping VBT min backlight %d/255 to %d/255\n",
 			      dev_priv->vbt.backlight.min_brightness, min);
+		/* vbt value is a coefficient in range [0..255] */
+		return scale(min, 0, 255, 0, panel->backlight.max);
 	}
 
-	/* vbt value is a coefficient in range [0..255] */
-	return scale(min, 0, 255, 0, panel->backlight.max);
+	return min;
 }
 
 static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unused)
