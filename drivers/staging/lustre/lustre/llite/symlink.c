@@ -73,7 +73,7 @@ static int ll_readlink_internal(struct inode *inode,
 
 	op_data->op_valid = OBD_MD_LINKNAME;
 	rc = md_getattr(sbi->ll_md_exp, op_data, request);
-	ll_finish_md_op_data(op_data);
+	kfree(op_data);
 	if (rc) {
 		if (rc != -ENOENT)
 			CERROR("inode %lu: rc = %d\n", inode->i_ino, rc);
