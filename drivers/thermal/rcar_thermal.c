@@ -373,7 +373,7 @@ static int rcar_thermal_remove(struct platform_device *pdev)
 		thermal_zone_device_unregister(priv->zone);
 	}
 
-	pm_runtime_put(dev);
+	pm_runtime_put_sync(dev);
 	pm_runtime_disable(dev);
 
 	return 0;
