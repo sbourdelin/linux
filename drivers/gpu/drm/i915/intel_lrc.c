@@ -301,7 +301,8 @@ uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 }
 
 static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
-				 struct drm_i915_gem_request *rq1)
+				 struct drm_i915_gem_request *rq1,
+				 bool fw_locked)
 {
 
 	struct intel_engine_cs *ring = rq0->ring;
@@ -319,9 +320,12 @@ static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
 	desc[0] = intel_lr_context_descriptor(rq0->ctx, rq0->ring);
 	rq0->elsp_submitted++;
 
+	if (!fw_locked) {
+		spin_lock(&dev_priv->uncore.lock);
+		intel_uncore_forcewake_get__locked(dev_priv, FORCEWAKE_ALL);
+	}
+
 	/* You must always write both descriptors in the order below. */
-	spin_lock(&dev_priv->uncore.lock);
-	intel_uncore_forcewake_get__locked(dev_priv, FORCEWAKE_ALL);
 	I915_WRITE_FW(RING_ELSP(ring), upper_32_bits(desc[1]));
 	I915_WRITE_FW(RING_ELSP(ring), lower_32_bits(desc[1]));
 
@@ -331,8 +335,11 @@ static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
 
 	/* ELSP is a wo register, use another nearby reg for posting */
 	POSTING_READ_FW(RING_EXECLIST_STATUS_LO(ring));
-	intel_uncore_forcewake_put__locked(dev_priv, FORCEWAKE_ALL);
-	spin_unlock(&dev_priv->uncore.lock);
+
+	if (!fw_locked) {
+		intel_uncore_forcewake_put__locked(dev_priv, FORCEWAKE_ALL);
+		spin_unlock(&dev_priv->uncore.lock);
+	}
 }
 
 static int execlists_update_context(struct drm_i915_gem_request *rq)
@@ -372,17 +379,19 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 }
 
 static void execlists_submit_requests(struct drm_i915_gem_request *rq0,
-				      struct drm_i915_gem_request *rq1)
+				      struct drm_i915_gem_request *rq1,
+				      bool fw_locked)
 {
 	execlists_update_context(rq0);
 
 	if (rq1)
 		execlists_update_context(rq1);
 
-	execlists_elsp_write(rq0, rq1);
+	execlists_elsp_write(rq0, rq1, fw_locked);
 }
 
-static void execlists_context_unqueue(struct intel_engine_cs *ring)
+static void
+execlists_context_unqueue(struct intel_engine_cs *ring, bool fw_locked)
 {
 	struct drm_i915_gem_request *req0 = NULL, *req1 = NULL;
 	struct drm_i915_gem_request *cursor = NULL, *tmp = NULL;
@@ -439,7 +448,7 @@ static void execlists_context_unqueue(struct intel_engine_cs *ring)
 
 	WARN_ON(req1 && req1->elsp_submitted);
 
-	execlists_submit_requests(req0, req1);
+	execlists_submit_requests(req0, req1, fw_locked);
 }
 
 static bool execlists_check_remove_request(struct intel_engine_cs *ring,
@@ -487,19 +496,23 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 	u32 status_id;
 	u32 submit_contexts = 0;
 
-	status_pointer = I915_READ(RING_CONTEXT_STATUS_PTR(ring));
+	spin_lock(&ring->execlist_lock);
+
+	spin_lock(&dev_priv->uncore.lock);
+	intel_uncore_forcewake_get__locked(dev_priv, FORCEWAKE_ALL);
+
+	status_pointer = I915_READ_FW(RING_CONTEXT_STATUS_PTR(ring));
 
 	read_pointer = ring->next_context_status_buffer;
 	write_pointer = status_pointer & GEN8_CSB_PTR_MASK;
 	if (read_pointer > write_pointer)
 		write_pointer += GEN8_CSB_ENTRIES;
 
-	spin_lock(&ring->execlist_lock);
 
 	while (read_pointer < write_pointer) {
 		read_pointer++;
-		status = I915_READ(RING_CONTEXT_STATUS_BUF_LO(ring, read_pointer % GEN8_CSB_ENTRIES));
-		status_id = I915_READ(RING_CONTEXT_STATUS_BUF_HI(ring, read_pointer % GEN8_CSB_ENTRIES));
+		status = I915_READ_FW(RING_CONTEXT_STATUS_BUF_LO(ring, read_pointer % GEN8_CSB_ENTRIES));
+		status_id = I915_READ_FW(RING_CONTEXT_STATUS_BUF_HI(ring, read_pointer % GEN8_CSB_ENTRIES));
 
 		if (status & GEN8_CTX_STATUS_IDLE_ACTIVE)
 			continue;
@@ -523,20 +536,23 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 		/* Prevent a ctx to preempt itself */
 		if ((status & GEN8_CTX_STATUS_ACTIVE_IDLE) &&
 		    (submit_contexts != 0))
-			execlists_context_unqueue(ring);
+			execlists_context_unqueue(ring, true);
 	} else if (submit_contexts != 0) {
-		execlists_context_unqueue(ring);
+		execlists_context_unqueue(ring, true);
 	}
-
-	spin_unlock(&ring->execlist_lock);
 
 	WARN(submit_contexts > 2, "More than two context complete events?\n");
 	ring->next_context_status_buffer = write_pointer % GEN8_CSB_ENTRIES;
 
-	I915_WRITE(RING_CONTEXT_STATUS_PTR(ring),
-		   _MASKED_FIELD(GEN8_CSB_PTR_MASK << 8,
-				 ((u32)ring->next_context_status_buffer &
-				  GEN8_CSB_PTR_MASK) << 8));
+	I915_WRITE_FW(RING_CONTEXT_STATUS_PTR(ring),
+		      _MASKED_FIELD(GEN8_CSB_PTR_MASK << 8,
+		      ((u32)ring->next_context_status_buffer &
+		      GEN8_CSB_PTR_MASK) << 8));
+
+	intel_uncore_forcewake_put__locked(dev_priv, FORCEWAKE_ALL);
+	spin_unlock(&dev_priv->uncore.lock);
+
+	spin_unlock(&ring->execlist_lock);
 }
 
 static int execlists_context_queue(struct drm_i915_gem_request *request)
@@ -574,7 +590,7 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 
 	list_add_tail(&request->execlist_link, &ring->execlist_queue);
 	if (num_elements == 0)
-		execlists_context_unqueue(ring);
+		execlists_context_unqueue(ring, false);
 
 	spin_unlock_irq(&ring->execlist_lock);
 
