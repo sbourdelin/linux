@@ -118,6 +118,7 @@ typedef __s64	Elf64_Sxword;
 #define STB_LOCAL  0
 #define STB_GLOBAL 1
 #define STB_WEAK   2
+#define STB_LIVEPATCH_EXT 11
 
 #define STT_NOTYPE  0
 #define STT_OBJECT  1
@@ -286,6 +287,7 @@ typedef struct elf64_phdr {
 #define SHF_ALLOC	0x2
 #define SHF_EXECINSTR	0x4
 #define SHF_MASKPROC	0xf0000000
+#define SHF_RELA_LIVEPATCH  0x4000000
 
 /* special section indexes */
 #define SHN_UNDEF	0
@@ -295,6 +297,7 @@ typedef struct elf64_phdr {
 #define SHN_ABS		0xfff1
 #define SHN_COMMON	0xfff2
 #define SHN_HIRESERVE	0xffff
+#define SHN_LIVEPATCH 0xff21
  
 typedef struct elf32_shdr {
   Elf32_Word	sh_name;
