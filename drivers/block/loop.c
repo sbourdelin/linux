@@ -221,7 +221,8 @@ static void __loop_update_dio(struct loop_device *lo, bool dio)
 }
 
 static int
-figure_loop_size(struct loop_device *lo, loff_t offset, loff_t sizelimit)
+figure_loop_size(struct loop_device *lo, loff_t offset, loff_t sizelimit,
+		 loff_t logical_blocksize)
 {
 	loff_t size = get_size(offset, sizelimit, lo->lo_backing_file);
 	sector_t x = (sector_t)size;
@@ -234,6 +235,8 @@ figure_loop_size(struct loop_device *lo, loff_t offset, loff_t sizelimit)
 	if (lo->lo_sizelimit != sizelimit)
 		lo->lo_sizelimit = sizelimit;
 	if (lo->lo_flags & LO_FLAGS_BLOCKSIZE) {
+		if (lo->lo_logical_blocksize != logical_blocksize)
+			lo->lo_logical_blocksize = logical_blocksize;
 		blk_queue_physical_block_size(lo->lo_queue, lo->lo_blocksize);
 		blk_queue_logical_block_size(lo->lo_queue,
 					     lo->lo_logical_blocksize);
@@ -1129,13 +1132,24 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	if (err)
 		return err;
 
-	if (info->lo_flags & LO_FLAGS_BLOCKSIZE)
+	if (info->lo_flags & LO_FLAGS_BLOCKSIZE) {
 		lo->lo_flags |= LO_FLAGS_BLOCKSIZE;
+		if ((info->lo_init[0] != 512) &&
+		    (info->lo_init[0] != 1024) &&
+		    (info->lo_init[0] != 2048) &&
+		    (info->lo_init[0] != 4096))
+			return -EINVAL;
+		if (info->lo_init[0] > lo->lo_blocksize)
+			return -EINVAL;
+	}
 
 	if (lo->lo_offset != info->lo_offset ||
 	    lo->lo_sizelimit != info->lo_sizelimit ||
-	    lo->lo_flags != lo_flags)
-		if (figure_loop_size(lo, info->lo_offset, info->lo_sizelimit))
+	    lo->lo_flags != lo_flags ||
+	    ((lo->lo_flags & LO_FLAGS_BLOCKSIZE) &&
+	     (lo->lo_logical_blocksize != info->lo_init[0])))
+		if (figure_loop_size(lo, info->lo_offset, info->lo_sizelimit,
+				     info->lo_init[0]))
 			return -EFBIG;
 
 	loop_config_discard(lo);
@@ -1320,7 +1334,8 @@ static int loop_set_capacity(struct loop_device *lo)
 	if (unlikely(lo->lo_state != Lo_bound))
 		return -ENXIO;
 
-	return figure_loop_size(lo, lo->lo_offset, lo->lo_sizelimit);
+	return figure_loop_size(lo, lo->lo_offset, lo->lo_sizelimit,
+				lo->lo_logical_blocksize);
 }
 
 static int loop_set_dio(struct loop_device *lo, unsigned long arg)
