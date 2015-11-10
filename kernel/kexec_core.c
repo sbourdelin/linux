@@ -977,7 +977,11 @@ static void final_note(u32 *buf)
 
 void crash_save_cpu(struct pt_regs *regs, int cpu)
 {
+#ifdef CONFIG_BINFMT_ELF_FDPIC
+	struct elf_fdpic_prstatus prstatus;
+#else
 	struct elf_prstatus prstatus;
+#endif
 	u32 *buf;
 
 	if ((cpu < 0) || (cpu >= nr_cpu_ids))

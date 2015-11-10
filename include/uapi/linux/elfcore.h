@@ -60,7 +60,40 @@ struct elf_prstatus
 	long	pr_instr;		/* Current instruction */
 #endif
 	elf_gregset_t pr_reg;	/* GP registers */
-#ifdef CONFIG_BINFMT_ELF_FDPIC
+	int pr_fpvalid;		/* True if math co-processor being used.  */
+};
+
+/* Architectures that set CONFIG_BINFMT_ELF_FDPIC use this instead of
+ * "struct elf_prstatus".
+ */
+struct elf_fdpic_prstatus
+{
+#if 0
+	long	pr_flags;	/* XXX Process flags */
+	short	pr_why;		/* XXX Reason for process halt */
+	short	pr_what;	/* XXX More detailed reason */
+#endif
+	struct elf_siginfo pr_info;	/* Info associated with signal */
+	short	pr_cursig;		/* Current signal */
+	unsigned long pr_sigpend;	/* Set of pending signals */
+	unsigned long pr_sighold;	/* Set of held signals */
+#if 0
+	struct sigaltstack pr_altstack;	/* Alternate stack info */
+	struct sigaction pr_action;	/* Signal action for current sig */
+#endif
+	pid_t	pr_pid;
+	pid_t	pr_ppid;
+	pid_t	pr_pgrp;
+	pid_t	pr_sid;
+	struct timeval pr_utime;	/* User time */
+	struct timeval pr_stime;	/* System time */
+	struct timeval pr_cutime;	/* Cumulative user time */
+	struct timeval pr_cstime;	/* Cumulative system time */
+#if 0
+	long	pr_instr;		/* Current instruction */
+#endif
+	elf_gregset_t pr_reg;	/* GP registers */
+
 	/* When using FDPIC, the loadmap addresses need to be communicated
 	 * to GDB in order for GDB to do the necessary relocations.  The
 	 * fields (below) used to communicate this information are placed
@@ -69,7 +102,7 @@ struct elf_prstatus
 	 */
 	unsigned long pr_exec_fdpic_loadmap;
 	unsigned long pr_interp_fdpic_loadmap;
-#endif
+
 	int pr_fpvalid;		/* True if math co-processor being used.  */
 };
 

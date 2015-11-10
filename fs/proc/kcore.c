@@ -90,7 +90,11 @@ static size_t get_kcore_size(int *nphdr, size_t *elf_buflen)
 			(*nphdr + 2)*sizeof(struct elf_phdr) + 
 			3 * ((sizeof(struct elf_note)) +
 			     roundup(sizeof(CORE_STR), 4)) +
+#ifdef CONFIG_BINFMT_ELF_FDPIC
+			roundup(sizeof(struct elf_fdpic_prstatus), 4) +
+#else
 			roundup(sizeof(struct elf_prstatus), 4) +
+#endif
 			roundup(sizeof(struct elf_prpsinfo), 4) +
 			roundup(arch_task_struct_size, 4);
 	*elf_buflen = PAGE_ALIGN(*elf_buflen);
@@ -318,7 +322,11 @@ static char *storenote(struct memelfnote *men, char *bufp)
  */
 static void elf_kcore_store_hdr(char *bufp, int nphdr, int dataoff)
 {
+#ifdef CONFIG_BINFMT_ELF_FDPIC
+	struct elf_fdpic_prstatus prstatus;	/* NT_PRSTATUS */
+#else
 	struct elf_prstatus prstatus;	/* NT_PRSTATUS */
+#endif
 	struct elf_prpsinfo prpsinfo;	/* NT_PRPSINFO */
 	struct elf_phdr *nhdr, *phdr;
 	struct elfhdr *elf;
@@ -387,10 +395,18 @@ static void elf_kcore_store_hdr(char *bufp, int nphdr, int dataoff)
 	/* set up the process status */
 	notes[0].name = CORE_STR;
 	notes[0].type = NT_PRSTATUS;
+#ifdef CONFIG_BINFMT_ELF_FDPIC
+	notes[0].datasz = sizeof(struct elf_fdpic_prstatus);
+#else
 	notes[0].datasz = sizeof(struct elf_prstatus);
+#endif
 	notes[0].data = &prstatus;
 
+#ifdef CONFIG_BINFMT_ELF_FDPIC
+	memset(&prstatus, 0, sizeof(struct elf_fdpic_prstatus));
+#else
 	memset(&prstatus, 0, sizeof(struct elf_prstatus));
+#endif
 
 	nhdr->p_filesz	= notesize(&notes[0]);
 	bufp = storenote(&notes[0], bufp);
