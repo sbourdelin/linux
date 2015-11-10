@@ -494,6 +494,22 @@ static void handle_fault_error(struct fault *fault)
 	}
 }
 
+static bool access_error(struct vm_area_struct *vma, struct fault *fault)
+{
+	unsigned int allowed = 0;
+
+	if (fault->flags & PPR_FAULT_EXEC)
+		allowed = vma->vm_flags & VM_EXEC;
+
+	if (fault->flags & PPR_FAULT_READ)
+		allowed = vma->vm_flags & VM_READ;
+
+	if (fault->flags & PPR_FAULT_WRITE)
+		allowed = vma->vm_flags & VM_WRITE;
+
+	return allowed ? false : true;
+}
+
 static void do_fault(struct work_struct *work)
 {
 	struct fault *fault = container_of(work, struct fault, work);
@@ -516,8 +532,8 @@ static void do_fault(struct work_struct *work)
 		goto out;
 	}
 
-	if (!(vma->vm_flags & (VM_READ | VM_EXEC | VM_WRITE))) {
-		/* handle_mm_fault would BUG_ON() */
+	/* Check if we have the right permissions on the vma */
+	if (access_error(vma, fault)) {
 		up_read(&mm->mmap_sem);
 		handle_fault_error(fault);
 		goto out;
