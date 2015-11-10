@@ -630,6 +630,8 @@ struct nft_expr_ops {
 	int				(*validate)(const struct nft_ctx *ctx,
 						    const struct nft_expr *expr,
 						    const struct nft_data **data);
+	int				(*clone)(struct nft_expr *dst,
+						 const struct nft_expr *src);
 	const struct nft_expr_type	*type;
 	void				*data;
 };
@@ -660,10 +662,20 @@ void nft_expr_destroy(const struct nft_ctx *ctx, struct nft_expr *expr);
 int nft_expr_dump(struct sk_buff *skb, unsigned int attr,
 		  const struct nft_expr *expr);
 
-static inline void nft_expr_clone(struct nft_expr *dst, struct nft_expr *src)
+static inline int nft_expr_clone(struct nft_expr *dst, struct nft_expr *src)
 {
+	int err;
+
 	__module_get(src->ops->type->owner);
-	memcpy(dst, src, src->ops->size);
+	if (src->ops->clone) {
+		memcpy(dst, src, sizeof(*src));
+		err = src->ops->clone(dst, src);
+		if (err < 0)
+			return err;
+	} else {
+		memcpy(dst, src, src->ops->size);
+	}
+	return 0;
 }
 
 /**
