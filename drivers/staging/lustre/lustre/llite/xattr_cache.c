@@ -306,7 +306,7 @@ static int ll_xattr_find_get_lock(struct inode *inode,
 	op_data->op_valid = OBD_MD_FLXATTR | OBD_MD_FLXATTRLS;
 
 	rc = md_enqueue(exp, &einfo, oit, op_data, &lockh, NULL, 0, NULL, 0);
-	ll_finish_md_op_data(op_data);
+	kfree(op_data);
 
 	if (rc < 0) {
 		CDEBUG(D_CACHE,
