@@ -1355,7 +1355,7 @@ out:
 		if (!rc)
 			rc = rc1;
 	}
-	ll_finish_md_op_data(op_data);
+	kfree(op_data);
 
 	if (!S_ISDIR(inode->i_mode)) {
 		mutex_lock(&inode->i_mutex);
@@ -1732,7 +1732,7 @@ int ll_iocontrol(struct inode *inode, struct file *file,
 
 		op_data->op_valid = OBD_MD_FLFLAGS;
 		rc = md_getattr(sbi->ll_md_exp, op_data, &req);
-		ll_finish_md_op_data(op_data);
+		kfree(op_data);
 		if (rc) {
 			CERROR("failure %d inode %lu\n", rc, inode->i_ino);
 			return -abs(rc);
@@ -1763,7 +1763,7 @@ int ll_iocontrol(struct inode *inode, struct file *file,
 		op_data->op_attr.ia_valid |= ATTR_ATTR_FLAG;
 		rc = md_setattr(sbi->ll_md_exp, op_data,
 				NULL, 0, NULL, 0, &req, NULL);
-		ll_finish_md_op_data(op_data);
+		kfree(op_data);
 		ptlrpc_req_finished(req);
 		if (rc)
 			return rc;
@@ -1934,7 +1934,7 @@ void ll_open_cleanup(struct super_block *sb, struct ptlrpc_request *open_req)
 	op_data->op_mod_time = get_seconds();
 	md_close(exp, op_data, NULL, &close_req);
 	ptlrpc_req_finished(close_req);
-	ll_finish_md_op_data(op_data);
+	kfree(op_data);
 }
 
 int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
@@ -2168,11 +2168,6 @@ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
 		op_data->op_bias |= MDS_DATA_MODIFIED;
 
 	return op_data;
-}
-
-void ll_finish_md_op_data(struct md_op_data *op_data)
-{
-	kfree(op_data);
 }
 
 int ll_show_options(struct seq_file *seq, struct dentry *dentry)
