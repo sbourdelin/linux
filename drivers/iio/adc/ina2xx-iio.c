@@ -16,7 +16,10 @@
  * Licensed under the GPL-2 or later.
  */
 #include <linux/module.h>
-#include <linux/iio/iio.h>
+#include <linux/kthread.h>
+#include <linux/delay.h>
+#include <linux/iio/kfifo_buf.h>
+
 #include <linux/i2c.h>
 #include <linux/regmap.h>
 #include <linux/platform_data/ina2xx.h>
@@ -73,6 +76,7 @@ struct ina2xx_config {
 
 struct ina2xx_chip_info {
 	struct iio_dev *indio_dev;
+	struct task_struct *task;
 	const struct ina2xx_config *config;
 	struct mutex state_lock;
 	long rshunt;
@@ -263,6 +267,9 @@ static int ina2xx_write_raw(struct iio_dev *indio_dev,
 	int ret = 0;
 	unsigned int config, tmp;
 
+	if (iio_buffer_enabled(indio_dev))
+		return -EBUSY;
+
 	mutex_lock(&chip->state_lock);
 
 	ret = regmap_read(chip->regmap, INA2XX_CONFIG, &config);
@@ -321,6 +328,106 @@ static const struct iio_chan_spec ina2xx_channels[] = {
 	IIO_CHAN_SOFT_TIMESTAMP(4),
 };
 
+/*
+ * return uS until next due sampling.
+ */
+
+static s64 prev_ns;
+
+static int ina2xx_work_buffer(struct ina2xx_chip_info *chip)
+{
+	unsigned short data[8];
+	struct iio_dev *indio_dev = chip->indio_dev;
+	int bit, ret = 0, i = 0;
+	unsigned long buffer_us = 0, elapsed_us = 0;
+	s64 time_a, time_b;
+
+	time_a = iio_get_time_ns();
+
+	/* Single register reads: bulk_read will not work with ina226
+	 * as there is no auto-increment of the address register for
+	 * data length longer than 16bits.
+	 */
+	for_each_set_bit(bit, indio_dev->active_scan_mask,
+			 indio_dev->masklength) {
+		unsigned int val;
+
+		ret = regmap_read(chip->regmap,
+				  INA2XX_SHUNT_VOLTAGE + bit, &val);
+		if (ret < 0)
+			goto _err;
+
+		data[i++] = val;
+	}
+
+	time_b = iio_get_time_ns();
+
+	iio_push_to_buffers_with_timestamp(chip->indio_dev,
+					   (unsigned int *)data, time_a);
+
+	buffer_us = (unsigned long)(time_b - time_a) / 1000;
+	elapsed_us = (unsigned long)(time_a - prev_ns) / 1000;
+
+	trace_printk("uS: elapsed: %lu, buf: %lu\n", elapsed_us, buffer_us);
+
+	prev_ns = time_a;
+_err:
+	return buffer_us;
+};
+
+static int ina2xx_capture_thread(void *data)
+{
+	struct ina2xx_chip_info *chip = (struct ina2xx_chip_info *)data;
+	unsigned int sampling_us = chip->period_us * chip->avg;
+	unsigned long buffer_us;
+
+	do {
+		buffer_us = ina2xx_work_buffer(chip);
+
+		if (sampling_us > buffer_us)
+			udelay(sampling_us - buffer_us);
+
+	} while (!kthread_should_stop());
+
+	chip->task = NULL;
+
+	return 0;
+}
+
+int ina2xx_buffer_enable(struct iio_dev *indio_dev)
+{
+	struct ina2xx_chip_info *chip = iio_priv(indio_dev);
+	unsigned int sampling_us = chip->period_us * chip->avg;
+
+	trace_printk("Enabling buffer w/ scan_mask %02x, freq = %d, avg =%u\n",
+		     (unsigned int)(*indio_dev->active_scan_mask), chip->freq,
+		     chip->avg);
+
+	trace_printk("Expected work period is %u us\n", sampling_us);
+
+	prev_ns = iio_get_time_ns();
+
+	chip->task = kthread_run(ina2xx_capture_thread, (void *)chip,
+				 "ina2xx-%uus", sampling_us);
+
+	return PTR_ERR_OR_ZERO(chip->task);
+}
+
+int ina2xx_buffer_disable(struct iio_dev *indio_dev)
+{
+	struct ina2xx_chip_info *chip = iio_priv(indio_dev);
+
+	if (chip->task)
+		kthread_stop(chip->task);
+
+	return 0;
+}
+
+static const struct iio_buffer_setup_ops ina2xx_setup_ops = {
+	.postenable = &ina2xx_buffer_enable,
+	.postdisable = &ina2xx_buffer_disable,
+};
+
 static int ina2xx_debug_reg(struct iio_dev *indio_dev,
 			    unsigned reg, unsigned writeval, unsigned *readval)
 {
@@ -360,6 +467,7 @@ static int ina2xx_probe(struct i2c_client *client,
 {
 	struct ina2xx_chip_info *chip;
 	struct iio_dev *indio_dev;
+	struct iio_buffer *buffer;
 	int ret;
 	unsigned int val;
 
@@ -402,7 +510,7 @@ static int ina2xx_probe(struct i2c_client *client,
 
 	indio_dev->dev.parent = &client->dev;
 	indio_dev->info = &ina2xx_info;
-	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->modes = INDIO_DIRECT_MODE | INDIO_BUFFER_SOFTWARE;
 
 	chip->regmap = devm_regmap_init_i2c(client, &ina2xx_regmap_config);
 	if (IS_ERR(chip->regmap)) {
@@ -423,6 +531,14 @@ static int ina2xx_probe(struct i2c_client *client,
 			ret);
 		return -ENODEV;
 	}
+
+	buffer = devm_iio_kfifo_allocate(&indio_dev->dev);
+	if (!buffer)
+		return -ENOMEM;
+
+	indio_dev->setup_ops = &ina2xx_setup_ops;
+
+	iio_device_attach_buffer(indio_dev, buffer);
 
 	return iio_device_register(indio_dev);
 }

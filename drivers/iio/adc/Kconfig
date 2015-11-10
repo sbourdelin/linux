@@ -13,6 +13,8 @@ config AD_SIGMA_DELTA
 config INA2XX_IIO
         tristate "Texas Instruments INA2xx Power Monitors IIO driver"
 	depends on I2C
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
         help
           Say yes here to build support for TI INA2xx familly Power Monitors.
 
