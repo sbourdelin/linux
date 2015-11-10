@@ -17,6 +17,7 @@
 #include <asm/user.h>
 #include <asm/fpu/api.h>
 #include <asm/fpu/xstate.h>
+#include <asm/trace/fpu.h>
 
 /*
  * High level FPU state handling functions:
@@ -527,6 +528,7 @@ static inline void __fpregs_deactivate(struct fpu *fpu)
 
 	fpu->fpregs_active = 0;
 	this_cpu_write(fpu_fpregs_owner_ctx, NULL);
+	trace_fpu_regs_deactivated(fpu);
 }
 
 /* Must be paired with a 'clts' (fpregs_activate_hw()) before! */
@@ -536,6 +538,7 @@ static inline void __fpregs_activate(struct fpu *fpu)
 
 	fpu->fpregs_active = 1;
 	this_cpu_write(fpu_fpregs_owner_ctx, fpu);
+	trace_fpu_regs_activated(fpu);
 }
 
 /*
@@ -606,11 +609,13 @@ switch_fpu_prepare(struct fpu *old_fpu, struct fpu *new_fpu, int cpu)
 
 		/* But leave fpu_fpregs_owner_ctx! */
 		old_fpu->fpregs_active = 0;
+		trace_fpu_regs_deactivated(old_fpu);
 
 		/* Don't change CR0.TS if we just switch! */
 		if (fpu.preload) {
 			new_fpu->counter++;
 			__fpregs_activate(new_fpu);
+			trace_fpu_regs_activated(new_fpu);
 			prefetch(&new_fpu->state);
 		} else {
 			__fpregs_deactivate_hw();

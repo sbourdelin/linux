@@ -10,6 +10,7 @@
 #include <asm/fpu/regset.h>
 
 #include <asm/sigframe.h>
+#include <asm/trace/fpu.h>
 
 static struct _fpx_sw_bytes fx_sw_reserved, fx_sw_reserved_ia32;
 
@@ -311,6 +312,7 @@ static int __fpu__restore_sig(void __user *buf, void __user *buf_fx, int size)
 		if (__copy_from_user(&fpu->state.xsave, buf_fx, state_size) ||
 		    __copy_from_user(&env, buf, sizeof(env))) {
 			fpstate_init(&fpu->state);
+			trace_fpu_init_state(fpu);
 			err = -1;
 		} else {
 			sanitize_restored_xstate(tsk, &env, xfeatures, fx_only);
