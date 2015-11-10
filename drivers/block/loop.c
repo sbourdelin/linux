@@ -233,6 +233,8 @@ figure_loop_size(struct loop_device *lo, loff_t offset, loff_t sizelimit)
 		lo->lo_offset = offset;
 	if (lo->lo_sizelimit != sizelimit)
 		lo->lo_sizelimit = sizelimit;
+	if (lo->lo_flags & LO_FLAGS_BLOCKSIZE)
+		blk_queue_physical_block_size(lo->lo_queue, lo->lo_blocksize);
 	set_capacity(lo->lo_disk, x);
 	bd_set_size(bdev, (loff_t)get_capacity(bdev->bd_disk) << 9);
 	/* let user-space know about the new size */
@@ -1092,6 +1094,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	int err;
 	struct loop_func_table *xfer;
 	kuid_t uid = current_uid();
+	int lo_flags = lo->lo_flags;
 
 	if (lo->lo_encrypt_key_size &&
 	    !uid_eq(lo->lo_key_owner, uid) &&
@@ -1121,8 +1124,12 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	if (err)
 		return err;
 
+	if (info->lo_flags & LO_FLAGS_BLOCKSIZE)
+		lo->lo_flags |= LO_FLAGS_BLOCKSIZE;
+
 	if (lo->lo_offset != info->lo_offset ||
-	    lo->lo_sizelimit != info->lo_sizelimit)
+	    lo->lo_sizelimit != info->lo_sizelimit ||
+	    lo->lo_flags != lo_flags)
 		if (figure_loop_size(lo, info->lo_offset, info->lo_sizelimit))
 			return -EFBIG;
 
