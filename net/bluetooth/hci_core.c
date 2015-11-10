@@ -3072,8 +3072,6 @@ void hci_conn_params_clear_all(struct hci_dev *hdev)
 	list_for_each_entry_safe(params, tmp, &hdev->le_conn_params, list)
 		hci_conn_params_free(params);
 
-	hci_update_background_scan(hdev);
-
 	BT_DBG("All LE connection parameters were removed");
 }
 
