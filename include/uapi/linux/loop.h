@@ -22,6 +22,7 @@ enum {
 	LO_FLAGS_AUTOCLEAR	= 4,
 	LO_FLAGS_PARTSCAN	= 8,
 	LO_FLAGS_DIRECT_IO	= 16,
+	LO_FLAGS_BLOCKSIZE	= 32,
 };
 
 #include <asm/posix_types.h>	/* for __kernel_old_dev_t */
