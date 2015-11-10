@@ -199,11 +199,6 @@ static inline void kill_final_newline(char *str)
 }
 
 
-#define parse_err(fmt, args...) do {	\
-	pr_err(fmt , ## args);	\
-	return 1;		\
-} while (0)
-
 #ifndef MODULE
 static int phram_init_called;
 /*
@@ -226,8 +221,10 @@ static int phram_setup(const char *val)
 	uint64_t len;
 	int i, ret;
 
-	if (strnlen(val, sizeof(buf)) >= sizeof(buf))
-		parse_err("parameter too long\n");
+	if (strnlen(val, sizeof(buf)) >= sizeof(buf)) {
+		pr_err("parameter too long\n");
+		return -EINVAL;
+	}
 
 	strcpy(str, val);
 	kill_final_newline(str);
@@ -235,11 +232,15 @@ static int phram_setup(const char *val)
 	for (i = 0; i < 3; i++)
 		token[i] = strsep(&str, ",");
 
-	if (str)
-		parse_err("too many arguments\n");
+	if (str) {
+		pr_err("too many arguments\n");
+		return -EINVAL;
+	}
 
-	if (!token[2])
-		parse_err("not enough arguments\n");
+	if (!token[2]) {
+		pr_err("not enough arguments\n");
+		return -EINVAL;
+	}
 
 	ret = parse_name(&name, token[0]);
 	if (ret)
@@ -248,13 +249,15 @@ static int phram_setup(const char *val)
 	ret = parse_num64(&start, token[1]);
 	if (ret) {
 		kfree(name);
-		parse_err("illegal start address\n");
+		pr_err("invalid start address\n");
+		return -EINVAL;
 	}
 
 	ret = parse_num64(&len, token[2]);
 	if (ret) {
 		kfree(name);
-		parse_err("illegal device length\n");
+		pr_err("invalid device length\n");
+		return -EINVAL;
 	}
 
 	ret = register_device(name, start, len);
