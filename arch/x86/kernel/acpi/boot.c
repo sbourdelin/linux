@@ -1699,6 +1699,20 @@ int __acpi_release_global_lock(unsigned int *lock)
 	return old & 0x1;
 }
 
+bool __acpi_memory_readable(void *pointer, size_t length)
+{
+	unsigned long start_pfn, end_pfn;
+
+	start_pfn = page_to_pfn(virt_to_page(pointer));
+	end_pfn = page_to_pfn(virt_to_page(pointer + length));
+	/*
+	 * Since the acpi address is allocated by kmalloc, we only
+	 * need to consider the direct-mapping virtual address,
+	 * rather than the kmap/vmalloc/ioremap address.
+	 */
+	return pfn_range_is_mapped(start_pfn, end_pfn) ? true : false;
+}
+
 void __init arch_reserve_mem_area(acpi_physical_address addr, size_t size)
 {
 	e820_add_region(addr, size, E820_ACPI);

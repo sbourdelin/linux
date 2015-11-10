@@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
 config ACPI_CCA_REQUIRED
 	bool
 
+config ACPI_MEMORY_ACCESS_CHECK_SUPPORT
+	bool
+
 config ACPI_DEBUGGER
 	bool "In-kernel debugger"
 	select ACPI_DEBUG

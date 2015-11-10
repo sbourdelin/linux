@@ -1390,6 +1390,18 @@ acpi_status acpi_os_get_line(char *buffer, u32 buffer_length, u32 *bytes_read)
 	return AE_OK;
 }
 
+#ifdef CONFIG_ACPI_MEMORY_ACCESS_CHECK_SUPPORT
+u8 acpi_os_readable(void *pointer, acpi_size length)
+{
+	return __acpi_memory_readable(pointer, length);
+}
+#else
+u8 acpi_os_readable(void *pointer, acpi_size length)
+{
+	return true;
+}
+#endif
+
 acpi_status acpi_os_wait_command_ready(void)
 {
 	int ret;

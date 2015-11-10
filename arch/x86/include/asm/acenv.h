@@ -20,6 +20,7 @@
 
 int __acpi_acquire_global_lock(unsigned int *lock);
 int __acpi_release_global_lock(unsigned int *lock);
+bool __acpi_memory_readable(void *pointer, size_t length);
 
 #define ACPI_ACQUIRE_GLOBAL_LOCK(facs, Acq) \
 	((Acq) = __acpi_acquire_global_lock(&facs->global_lock))
