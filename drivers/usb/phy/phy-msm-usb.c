@@ -1731,6 +1731,12 @@ static int msm_otg_probe(struct platform_device *pdev)
 		return motg->irq;
 	}
 
+	motg->async_irq = platform_get_irq_byname(pdev, "async_irq");
+	if (motg->async_irq < 0) {
+		dev_info(&pdev->dev, "platform_get_irq for async_irq failed\n");
+		motg->async_irq = 0;
+	}
+
 	regs[0].supply = "vddcx";
 	regs[1].supply = "v3p3";
 	regs[2].supply = "v1p8";
@@ -1778,6 +1784,16 @@ static int msm_otg_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "request irq failed\n");
 		goto disable_ldo;
+	}
+
+	if (motg->async_irq) {
+		ret = devm_request_irq(&pdev->dev, motg->async_irq,
+				      msm_otg_irq, IRQF_TRIGGER_RISING,
+				      "msm_otg", motg);
+		if (ret) {
+			dev_err(&pdev->dev, "request irq failed (ASYNC INT)\n");
+			goto disable_ldo;
+		}
 	}
 
 	phy->init = msm_phy_init;
