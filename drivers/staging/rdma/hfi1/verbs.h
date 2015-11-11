@@ -441,6 +441,7 @@ struct hfi1_qp {
 	struct hfi1_swqe *s_wq;  /* send work queue */
 	struct hfi1_mmap_info *ip;
 	struct ahg_ib_header *s_hdr;     /* next packet header to send */
+	struct sdma_engine *s_sde; /* current sde */
 	u8 s_sc;			/* SC[0..4] for next packet */
 	unsigned long timeout_jiffies;  /* computed from timeout */
 
@@ -504,7 +505,6 @@ struct hfi1_qp {
 	struct hfi1_swqe *s_wqe;
 	struct hfi1_sge_state s_sge;     /* current send request data */
 	struct hfi1_mregion *s_rdma_mr;
-	struct sdma_engine *s_sde; /* current sde */
 	u32 s_cur_size;         /* size of send packet in bytes */
 	u32 s_len;              /* total length of s_sge */
 	u32 s_rdma_read_len;    /* total length of s_rdma_read_sge */
