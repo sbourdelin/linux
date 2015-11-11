@@ -213,19 +213,39 @@ static int blk_ioctl_discard(struct block_device *bdev, uint64_t start,
 }
 
 static int blk_ioctl_zeroout(struct block_device *bdev, uint64_t start,
-			     uint64_t len)
+			     uint64_t len, uint32_t flags)
 {
+	int ret;
+	struct address_space *mapping;
+	uint64_t end = start + len - 1;
+
+	if (flags & ~BLKZEROOUT2_DISCARD_OK)
+		return -EINVAL;
 	if (start & 511)
 		return -EINVAL;
 	if (len & 511)
 		return -EINVAL;
-	start >>= 9;
-	len >>= 9;
-
-	if (start + len > (i_size_read(bdev->bd_inode) >> 9))
+	if (end >= i_size_read(bdev->bd_inode))
 		return -EINVAL;
 
-	return blkdev_issue_zeroout(bdev, start, len, GFP_KERNEL, false);
+	/* Invalidate the page cache, including dirty pages */
+	mapping = bdev->bd_inode->i_mapping;
+	truncate_inode_pages_range(mapping, start, end);
+
+	ret = blkdev_issue_zeroout(bdev, start >> 9, len >> 9, GFP_KERNEL,
+				   flags & BLKZEROOUT2_DISCARD_OK);
+	if (ret)
+		goto out;
+
+	/*
+	 * Invalidate again; if someone wandered in and dirtied a page,
+	 * the caller will be given -EBUSY.
+	 */
+	ret = invalidate_inode_pages2_range(mapping,
+					    start >> PAGE_CACHE_SHIFT,
+					    end >> PAGE_CACHE_SHIFT);
+out:
+	return ret;
 }
 
 static int put_ushort(unsigned long arg, unsigned short val)
@@ -353,7 +373,21 @@ int blkdev_ioctl(struct block_device *bdev, fmode_t mode, unsigned cmd,
 		if (copy_from_user(range, (void __user *)arg, sizeof(range)))
 			return -EFAULT;
 
-		return blk_ioctl_zeroout(bdev, range[0], range[1]);
+		return blk_ioctl_zeroout(bdev, range[0], range[1], 0);
+	}
+	case BLKZEROOUT2: {
+		struct blkzeroout2 p;
+
+		if (!(mode & FMODE_WRITE))
+			return -EBADF;
+
+		if (copy_from_user(&p, (void __user *)arg, sizeof(p)))
+			return -EFAULT;
+
+		if (p.padding || p.padding2)
+			return -EINVAL;
+
+		return blk_ioctl_zeroout(bdev, p.start, p.length, p.flags);
 	}
 
 	case HDIO_GETGEO: {
