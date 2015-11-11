@@ -173,9 +173,7 @@ void *devm_memremap_pages(struct device *dev, struct resource *res)
 
 	memcpy(&page_map->res, res, sizeof(*res));
 
-	nid = dev_to_node(dev);
-	if (nid < 0)
-		nid = 0;
+	nid = memory_add_physaddr_to_nid(res->start);
 
 	error = arch_add_memory(nid, res->start, resource_size(res), true);
 	if (error) {
