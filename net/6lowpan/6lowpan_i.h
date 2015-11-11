@@ -3,6 +3,9 @@
 
 #include <linux/netdevice.h>
 
+extern const struct lowpan_iphc_ctx_ops iphc_ctx_unicast_ops;
+extern const struct lowpan_iphc_ctx_ops iphc_ctx_mcast_ops;
+
 #ifdef CONFIG_6LOWPAN_DEBUGFS
 int lowpan_dev_debugfs_init(struct net_device *dev);
 

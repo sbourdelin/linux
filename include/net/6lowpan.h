@@ -73,6 +73,8 @@
 #define LOWPAN_IPHC_MAX_HC_BUF_LEN	(sizeof(struct ipv6hdr) +	\
 					 LOWPAN_IPHC_MAX_HEADER_LEN +	\
 					 LOWPAN_NHC_MAX_HDR_LEN)
+/* SCI/DCI is 4 bit width, so we have maximum 16 entries */
+#define LOWPAN_IPHC_CI_TABLE_SIZE	(1 << 4)
 
 #define LOWPAN_DISPATCH_IPV6		0x41 /* 01000001 = 65 */
 #define LOWPAN_DISPATCH_IPHC		0x60 /* 011xxxxx = ... */
@@ -96,8 +98,44 @@ enum lowpan_lltypes {
 	LOWPAN_LLTYPE_IEEE802154,
 };
 
+enum lowpan_iphc_ctx_states {
+	LOWPAN_IPHC_CTX_STATE_DISABLED,
+	LOWPAN_IPHC_CTX_STATE_ENABLED,
+
+	__LOWPAN_IPHC_CTX_STATE_INVALID,
+	LOWPAN_IPHC_CTX_STATE_MAX = __LOWPAN_IPHC_CTX_STATE_INVALID - 1,
+};
+
+struct lowpan_iphc_ctx {
+	enum lowpan_iphc_ctx_states state;
+	u8 id;
+	struct in6_addr addr;
+	u8 prefix_len;
+};
+
+struct lowpan_iphc_ctx_ops {
+	bool (*valid_prefix)(const struct lowpan_iphc_ctx *ctx);
+	int (*update)(struct lowpan_iphc_ctx *table,
+		      const struct lowpan_iphc_ctx *ctx);
+	struct lowpan_iphc_ctx *(*get_by_id)(const struct net_device *dev,
+					     struct lowpan_iphc_ctx *table,
+					     u8 id);
+	struct lowpan_iphc_ctx *(*get_by_addr)(const struct net_device *dev,
+					       struct lowpan_iphc_ctx *table,
+					       const struct in6_addr *addr);
+};
+
+struct lowpan_iphc_ctx_table {
+	spinlock_t lock;
+	const struct lowpan_iphc_ctx_ops *ops;
+	struct lowpan_iphc_ctx table[LOWPAN_IPHC_CI_TABLE_SIZE];
+};
+
 struct lowpan_priv {
 	enum lowpan_lltypes lltype;
+	struct lowpan_iphc_ctx_table iphc_dci;
+	struct lowpan_iphc_ctx_table iphc_sci;
+	struct lowpan_iphc_ctx_table iphc_mcast_dci;
 
 	/* must be last */
 	u8 priv[0] __aligned(sizeof(void *));
@@ -120,6 +158,30 @@ struct lowpan_802154_cb *lowpan_802154_cb(const struct sk_buff *skb)
 {
 	BUILD_BUG_ON(sizeof(struct lowpan_802154_cb) > sizeof(skb->cb));
 	return (struct lowpan_802154_cb *)skb->cb;
+}
+
+static inline int lowpan_ctx_update(struct lowpan_iphc_ctx_table *t,
+				    const struct lowpan_iphc_ctx *ctx)
+{
+	if (!t->ops->valid_prefix(ctx))
+		return -EINVAL;
+
+	return t->ops->update(t->table, ctx);
+}
+
+static inline struct lowpan_iphc_ctx *
+lowpan_ctx_by_id(const struct net_device *dev, struct lowpan_iphc_ctx_table *t,
+		 u8 id)
+{
+	return t->ops->get_by_id(dev, t->table, id);
+}
+
+static inline struct lowpan_iphc_ctx *
+lowpan_ctx_by_addr(const struct net_device *dev,
+		   struct lowpan_iphc_ctx_table *t,
+		   const struct in6_addr *addr)
+{
+	return t->ops->get_by_addr(dev, t->table, addr);
 }
 
 #ifdef DEBUG
