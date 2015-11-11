@@ -147,7 +147,6 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	addi	r1, r1, 112
 	ld	r7, HSTATE_HOST_MSR(r13)
 
-	cmpwi	cr1, r12, BOOK3S_INTERRUPT_MACHINE_CHECK
 	cmpwi	r12, BOOK3S_INTERRUPT_EXTERNAL
 	beq	11f
 	cmpwi	cr2, r12, BOOK3S_INTERRUPT_HMI
@@ -160,15 +159,12 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	mtmsrd	r6, 1			/* Clear RI in MSR */
 	mtsrr0	r8
 	mtsrr1	r7
-	beq	cr1, 13f		/* machine check */
 	RFI
 
 	/* On POWER7, we have external interrupts set to use HSRR0/1 */
 11:	mtspr	SPRN_HSRR0, r8
 	mtspr	SPRN_HSRR1, r7
 	ba	0x500
-
-13:	b	machine_check_fwnmi
 
 14:	mtspr	SPRN_HSRR0, r8
 	mtspr	SPRN_HSRR1, r7
@@ -2381,24 +2377,19 @@ machine_check_realmode:
 	ld	r9, HSTATE_KVM_VCPU(r13)
 	li	r12, BOOK3S_INTERRUPT_MACHINE_CHECK
 	/*
-	 * Deliver unhandled/fatal (e.g. UE) MCE errors to guest through
-	 * machine check interrupt (set HSRR0 to 0x200). And for handled
-	 * errors (no-fatal), just go back to guest execution with current
-	 * HSRR0 instead of exiting guest. This new approach will inject
-	 * machine check to guest for fatal error causing guest to crash.
-	 *
-	 * The old code used to return to host for unhandled errors which
-	 * was causing guest to hang with soft lockups inside guest and
-	 * makes it difficult to recover guest instance.
+	 * Deliver unhandled/fatal (e.g. UE) MCE errors to guest
+	 * by exiting the guest with KVM_EXIT_NMI exit reason (exit
+	 * reason set later based on trap). For handled errors
+	 * (no-fatal), go back to guest execution with current HSRR0
+	 * instead of exiting the guest. This approach will cause
+	 * the guest to exit in case of fatal machine check error.
 	 */
-	ld	r10, VCPU_PC(r9)
+	bne	2f	/* Continue guest execution? */
+	/* If not, exit the guest. SRR0/1 are already set */
+	b	mc_cont
+2:	ld	r10, VCPU_PC(r9)
 	ld	r11, VCPU_MSR(r9)
-	bne	2f	/* Continue guest execution. */
-	/* If not, deliver a machine check.  SRR0/1 are already set */
-	li	r10, BOOK3S_INTERRUPT_MACHINE_CHECK
-	ld	r11, VCPU_MSR(r9)
-	bl	kvmppc_msr_interrupt
-2:	b	fast_interrupt_c_return
+	b	fast_interrupt_c_return
 
 /*
  * Check the reason we woke from nap, and take appropriate action.
