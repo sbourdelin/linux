@@ -609,20 +609,6 @@ bool machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 		severity = mce_severity(&m, mca_cfg.tolerant, NULL, false);
 
 		/*
-		 * In the cases where we don't have a valid address after all,
-		 * do not add it into the ring buffer.
-		 */
-		if (severity == MCE_DEFERRED_SEVERITY && memory_error(&m)) {
-			if (m.status & MCI_STATUS_ADDRV) {
-				m.severity = severity;
-				m.usable_addr = mce_usable_address(&m);
-
-				if (!mce_gen_pool_add(&m))
-					mce_schedule_work();
-			}
-		}
-
-		/*
 		 * Don't get the IP here because it's unlikely to
 		 * have anything to do with the actual error location.
 		 */
