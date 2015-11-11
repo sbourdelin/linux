@@ -87,6 +87,20 @@ struct usbtmc_device_data {
 	u8 bTag_last_write;	/* needed for abort */
 	u8 bTag_last_read;	/* needed for abort */
 
+
+	/* data for interrupt in endpoint handling */
+	u8             bNotify1;
+	u8             bNotify2;
+	u16            ifnum;
+	u8             iin_bTag;
+	u8            *iin_buffer;
+	atomic_t       iin_data_valid;
+	unsigned int   iin_ep;
+	int            iin_ep_present;
+	int            iin_interval;
+	struct urb    *iin_urb;
+	u16            iin_wMaxPacketSize;
+
 	u8 rigol_quirk;
 
 	/* attributes from the USB TMC spec for this device */
@@ -99,6 +113,7 @@ struct usbtmc_device_data {
 	struct usbtmc_dev_capabilities	capabilities;
 	struct kref kref;
 	struct mutex io_mutex;	/* only one i/o function running at a time */
+	wait_queue_head_t waitq;
 };
 #define to_usbtmc_data(d) container_of(d, struct usbtmc_device_data, kref)
 
@@ -369,6 +384,91 @@ usbtmc_abort_bulk_out_clear_halt:
 	rv = 0;
 
 exit:
+	kfree(buffer);
+	return rv;
+}
+
+static int usbtmc488_ioctl_read_stb(struct usbtmc_device_data *data,
+				unsigned long arg)
+{
+	u8 *buffer;
+	struct device *dev;
+	int rv;
+	u8 tag, stb;
+
+	dev = &data->intf->dev;
+
+	dev_dbg(dev, "Enter ioctl_read_stb iin_ep_present: %d\n",
+		data->iin_ep_present);
+
+	buffer = kmalloc(8, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+
+	atomic_set(&data->iin_data_valid, 0);
+
+	rv = usb_control_msg(data->usb_dev,
+			usb_rcvctrlpipe(data->usb_dev, 0),
+			USBTMC488_REQUEST_READ_STATUS_BYTE,
+			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			data->iin_bTag,
+			data->ifnum,
+			buffer, 0x03, USBTMC_TIMEOUT);
+
+	if (rv < 0) {
+		dev_err(dev, "stb usb_control_msg returned %d\n", rv);
+		goto exit;
+	}
+
+	if (buffer[0] != USBTMC_STATUS_SUCCESS) {
+		dev_err(dev, "control status returned %x\n",
+			buffer[0]);
+		rv = -EIO;
+		goto exit;
+	}
+
+	if (data->iin_ep_present) {
+
+		rv = wait_event_interruptible_timeout(
+			data->waitq,
+			(atomic_read(&data->iin_data_valid) != 0),
+			USBTMC_TIMEOUT
+			);
+
+		if (rv < 0) {
+			dev_dbg(dev, "wait interrupted %d\n", rv);
+			goto exit;
+		}
+
+		if (rv == 0) {
+			dev_dbg(dev, "wait timed out\n");
+			rv = -ETIME;
+			goto exit;
+		}
+
+		tag = data->bNotify1 & 0x7f;
+
+		if (tag != data->iin_bTag) {
+			dev_err(dev, "expected bTag %x got %x\n",
+				data->iin_bTag, tag);
+		}
+
+		stb = data->bNotify2;
+	} else {
+		stb = buffer[2];
+	}
+
+	rv = copy_to_user((void __user *)arg, &stb, sizeof(stb));
+	if (rv)
+		rv = -EFAULT;
+
+ exit:
+	/* bump interrupt bTag */
+	data->iin_bTag += 1;
+	if (data->iin_bTag > 127)
+		data->iin_bTag = 2;
+
 	kfree(buffer);
 	return rv;
 }
@@ -1069,6 +1169,11 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case USBTMC_IOCTL_ABORT_BULK_IN:
 		retval = usbtmc_ioctl_abort_bulk_in(data);
 		break;
+
+	case USBTMC488_IOCTL_READ_STB:
+		retval = usbtmc488_ioctl_read_stb(data, arg);
+		break;
+
 	}
 
 skip_io_on_zombie:
@@ -1092,6 +1197,69 @@ static struct usb_class_driver usbtmc_class = {
 	.minor_base =	USBTMC_MINOR_BASE,
 };
 
+static void usbtmc_interrupt(struct urb *urb)
+{
+	struct usbtmc_device_data *data = urb->context;
+	int status = urb->status;
+	int rv;
+
+	dev_dbg(&data->intf->dev, "int status: %d len %d\n",
+		status, urb->actual_length);
+
+	switch (status) {
+	case 0: /* SUCCESS */
+
+		if (data->iin_buffer[0] & 0x80) {
+			/* check for valid STB notification */
+			if ((data->iin_buffer[0] & 0x7f) > 1) {
+				data->bNotify1 = data->iin_buffer[0];
+				data->bNotify2 = data->iin_buffer[1];
+				atomic_set(&data->iin_data_valid, 1);
+				wake_up_interruptible(&data->waitq);
+				goto exit;
+			}
+		}
+		dev_warn(&data->intf->dev, "invalid notification: %x\n",
+			data->iin_buffer[0]);
+		break;
+	case -EOVERFLOW:
+		dev_err(&data->intf->dev,
+			"%s - overflow with length %d, actual length is %d\n",
+			__func__, data->iin_wMaxPacketSize, urb->actual_length);
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+	case -EILSEQ:
+	case -ETIME:
+		/* urb terminated, clean up */
+		dev_dbg(&data->intf->dev,
+			"%s - urb terminated, status: %d\n",
+			__func__, status);
+		return;
+	default:
+		dev_err(&data->intf->dev,
+			"%s - unknown status received: %d\n",
+			__func__, status);
+	}
+exit:
+	rv = usb_submit_urb(urb, GFP_ATOMIC);
+	if (rv) {
+		dev_err(&data->intf->dev, "%s - usb_submit_urb failed: %d\n",
+			__func__, rv);
+	}
+}
+
+static void usbtmc_free_int(struct usbtmc_device_data *data)
+{
+	if (data->iin_ep_present) {
+		if (data->iin_urb) {
+			usb_kill_urb(data->iin_urb);
+			kfree(data->iin_buffer);
+			usb_free_urb(data->iin_urb);
+			kref_put(&data->kref, usbtmc_delete);
+		}
+	}
+}
 
 static int usbtmc_probe(struct usb_interface *intf,
 			const struct usb_device_id *id)
@@ -1114,6 +1282,8 @@ static int usbtmc_probe(struct usb_interface *intf,
 	usb_set_intfdata(intf, data);
 	kref_init(&data->kref);
 	mutex_init(&data->io_mutex);
+	init_waitqueue_head(&data->waitq);
+	atomic_set(&data->iin_data_valid, 0);
 	data->zombie = 0;
 
 	/* Determine if it is a Rigol or not */
@@ -1134,9 +1304,12 @@ static int usbtmc_probe(struct usb_interface *intf,
 	data->bTag	= 1;
 	data->TermCharEnabled = 0;
 	data->TermChar = '\n';
+	/*  2 <= bTag <= 127   USBTMC-USB488 subclass specification 4.3.1 */
+	data->iin_bTag = 2;
 
 	/* USBTMC devices have only one setting, so use that */
 	iface_desc = data->intf->cur_altsetting;
+	data->ifnum = iface_desc->desc.bInterfaceNumber;
 
 	/* Find bulk in endpoint */
 	for (n = 0; n < iface_desc->desc.bNumEndpoints; n++) {
@@ -1161,6 +1334,20 @@ static int usbtmc_probe(struct usb_interface *intf,
 			break;
 		}
 	}
+	/* Find int endpoint */
+	for (n = 0; n < iface_desc->desc.bNumEndpoints; n++) {
+		endpoint = &iface_desc->endpoint[n].desc;
+
+		if (usb_endpoint_is_int_in(endpoint)) {
+			data->iin_ep_present = 1;
+			data->iin_ep = endpoint->bEndpointAddress;
+			data->iin_wMaxPacketSize = usb_endpoint_maxp(endpoint);
+			data->iin_interval = endpoint->bInterval;
+			dev_dbg(&intf->dev, "Found Int in endpoint at %u\n",
+				data->iin_ep);
+			break;
+		}
+	}
 
 	retcode = get_capabilities(data);
 	if (retcode)
@@ -1168,6 +1355,40 @@ static int usbtmc_probe(struct usb_interface *intf,
 	else
 		retcode = sysfs_create_group(&intf->dev.kobj,
 					     &capability_attr_grp);
+
+
+	if (data->iin_ep_present) {
+		/* allocate int urb */
+		data->iin_urb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!data->iin_urb) {
+			dev_err(&intf->dev, "Failed to allocate int urb\n");
+			goto error_register;
+		}
+
+		/* will reference data in int urb */
+		kref_get(&data->kref);
+
+		/* allocate buffer for interrupt in */
+		data->iin_buffer = kmalloc(data->iin_wMaxPacketSize,
+					GFP_KERNEL);
+		if (!data->iin_buffer) {
+			dev_err(&intf->dev, "Failed to allocate int buf\n");
+			goto error_register;
+		}
+
+		/* fill interrupt urb */
+		usb_fill_int_urb(data->iin_urb, data->usb_dev,
+				usb_rcvintpipe(data->usb_dev, data->iin_ep),
+				data->iin_buffer, data->iin_wMaxPacketSize,
+				usbtmc_interrupt,
+				data, data->iin_interval);
+
+		if (usb_submit_urb(data->iin_urb, GFP_KERNEL)) {
+			retcode = -EIO;
+			dev_err(&intf->dev, "Failed to submit iin_urb\n");
+			goto error_register;
+		}
+	}
 
 	retcode = sysfs_create_group(&intf->dev.kobj, &data_attr_grp);
 
@@ -1185,6 +1406,7 @@ static int usbtmc_probe(struct usb_interface *intf,
 error_register:
 	sysfs_remove_group(&intf->dev.kobj, &capability_attr_grp);
 	sysfs_remove_group(&intf->dev.kobj, &data_attr_grp);
+	usbtmc_free_int(data);
 	kref_put(&data->kref, usbtmc_delete);
 	return retcode;
 }
@@ -1196,6 +1418,7 @@ static void usbtmc_disconnect(struct usb_interface *intf)
 	dev_dbg(&intf->dev, "usbtmc_disconnect called\n");
 
 	data = usb_get_intfdata(intf);
+	usbtmc_free_int(data);
 	usb_deregister_dev(intf, &usbtmc_class);
 	sysfs_remove_group(&intf->dev.kobj, &capability_attr_grp);
 	sysfs_remove_group(&intf->dev.kobj, &data_attr_grp);
