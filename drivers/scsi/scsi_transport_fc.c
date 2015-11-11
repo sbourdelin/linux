@@ -70,6 +70,18 @@ MODULE_PARM_DESC(dev_loss_tmo,
 		 " fast_io_fail_tmo is not set.");
 
 /*
+ * disable_target_scan: Disable target scan per default
+ *   useful on larger installations where only a small
+ *   number of LUNs are required for booting.
+ */
+static bool fc_disable_target_scan;
+
+module_param_named(disable_target_scan, fc_disable_target_scan,
+		   bool, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(disable_target_scan,
+		 "Disable target scan on remote ports (default=0)");
+
+/*
  * Redefine so that we can have same named attributes in the
  * sdev/starget/host objects.
  */
@@ -3272,10 +3284,14 @@ fc_scsi_scan_rport(struct work_struct *work)
 	struct Scsi_Host *shost = rport_to_shost(rport);
 	struct fc_internal *i = to_fc_internal(shost->transportt);
 	unsigned long flags;
+	bool disable_target_scan;
+
+	disable_target_scan = fc_disable_target_scan ?
+		fc_disable_target_scan : i->f->disable_target_scan;
 
 	if ((rport->port_state == FC_PORTSTATE_ONLINE) &&
 	    (rport->roles & FC_PORT_ROLE_FCP_TARGET) &&
-	    !(i->f->disable_target_scan)) {
+	    !disable_target_scan) {
 		scsi_scan_target(&rport->dev, rport->channel,
 			rport->scsi_target_id, SCAN_WILD_CARD, 1);
 	}
