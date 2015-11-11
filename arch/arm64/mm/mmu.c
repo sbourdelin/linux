@@ -73,7 +73,7 @@ static void __init *early_alloc(unsigned long sz)
 /*
  * remap a PMD into pages
  */
-static void split_pmd(pmd_t *pmd, pte_t *pte)
+void split_pmd(pmd_t *pmd, pte_t *pte)
 {
 	unsigned long pfn = pmd_pfn(*pmd);
 	unsigned long addr = pfn << PAGE_SHIFT;

@@ -493,6 +493,18 @@ config ARCH_HAS_CACHE_LINE_SIZE
 
 source "mm/Kconfig"
 
+config DEBUG_CHANGE_PAGEATTR
+	bool "Allow all kernel memory to have attributes changed"
+	default y
+	help
+	  If this option is selected, APIs that change page attributes
+	  (RW <-> RO, X <-> NX) will be valid for all memory mapped in
+	  the kernel space. The trade off is that there may be increased
+	  TLB pressure from finer grained page mapping. Turn on this option
+	  if security is more important than performance
+
+	  If in doubt, say Y
+
 config SECCOMP
 	bool "Enable seccomp to safely compute untrusted bytecode"
 	---help---
