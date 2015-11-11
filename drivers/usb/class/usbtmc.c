@@ -482,6 +482,68 @@ static int usbtmc488_ioctl_read_stb(struct usbtmc_device_data *data,
 	return rv;
 }
 
+static int usbtmc488_ioctl_simple(struct usbtmc_device_data *data,
+				unsigned long arg,
+				unsigned int cmd)
+{
+	u8 *buffer;
+	struct device *dev;
+	int rv;
+	unsigned int val;
+	u16 wValue;
+
+	dev = &data->intf->dev;
+
+	if (0 == (data->usb488_caps & USBTMC488_CAPABILITY_SIMPLE))
+		return -EINVAL;
+
+	buffer = kmalloc(8, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+
+	if (cmd == USBTMC488_REQUEST_REN_CONTROL) {
+		rv = copy_from_user(&val, (void __user *)arg, sizeof(val));
+		if (rv) {
+			rv = -EFAULT;
+			goto exit;
+		}
+		wValue = (val) ? 1 : 0;
+	} else {
+		wValue = 0;
+	}
+
+	rv = usb_control_msg(data->usb_dev,
+			usb_rcvctrlpipe(data->usb_dev, 0),
+			cmd,
+			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			wValue,
+			data->ifnum,
+			buffer, 0x01, USBTMC_TIMEOUT);
+
+	if (rv < 0) {
+		dev_err(dev, "simple usb_control_msg failed %d\n", rv);
+		goto exit;
+	} else if (rv != 1) {
+		dev_warn(dev, "simple usb_control_msg returned %d\n", rv);
+		rv = -EIO;
+		goto exit;
+	}
+
+	if (buffer[0] != USBTMC_STATUS_SUCCESS) {
+		dev_err(dev, "simple control status returned %x\n",
+			buffer[0]);
+		rv = -EIO;
+		goto exit;
+	} else {
+		rv = 0;
+	}
+
+ exit:
+	kfree(buffer);
+	return rv;
+}
+
 /*
  * Sends a REQUEST_DEV_DEP_MSG_IN message on the Bulk-IN endpoint.
  * @transfer_size: number of bytes to request from the device.
@@ -1192,6 +1254,20 @@ static long usbtmc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		retval = usbtmc488_ioctl_read_stb(data, arg);
 		break;
 
+	case USBTMC488_IOCTL_REN_CONTROL:
+		retval = usbtmc488_ioctl_simple(data, arg,
+						USBTMC488_REQUEST_REN_CONTROL);
+		break;
+
+	case USBTMC488_IOCTL_GOTO_LOCAL:
+		retval = usbtmc488_ioctl_simple(data, arg,
+						USBTMC488_REQUEST_GOTO_LOCAL);
+		break;
+
+	case USBTMC488_IOCTL_LOCAL_LOCKOUT:
+		retval = usbtmc488_ioctl_simple(data, arg,
+						USBTMC488_REQUEST_LOCAL_LOCKOUT);
+		break;
 	}
 
 skip_io_on_zombie:
