@@ -15,7 +15,9 @@
 
 #include <net/6lowpan.h>
 
-void lowpan_netdev_setup(struct net_device *dev, enum lowpan_lltypes lltype)
+#include "6lowpan_i.h"
+
+int lowpan_netdev_setup(struct net_device *dev, enum lowpan_lltypes lltype)
 {
 	dev->addr_len = EUI64_ADDR_LEN;
 	dev->type = ARPHRD_6LOWPAN;
@@ -23,11 +25,19 @@ void lowpan_netdev_setup(struct net_device *dev, enum lowpan_lltypes lltype)
 	dev->priv_flags |= IFF_NO_QUEUE;
 
 	lowpan_priv(dev)->lltype = lltype;
+
+	return lowpan_dev_debugfs_init(dev);
 }
 EXPORT_SYMBOL(lowpan_netdev_setup);
 
 static int __init lowpan_module_init(void)
 {
+	int ret;
+
+	ret = lowpan_debugfs_init();
+	if (ret < 0)
+		return ret;
+
 	request_module_nowait("ipv6");
 
 	request_module_nowait("nhc_dest");
@@ -40,6 +50,13 @@ static int __init lowpan_module_init(void)
 
 	return 0;
 }
+
+static void __exit lowpan_module_exit(void)
+{
+	lowpan_debugfs_exit();
+}
+
 module_init(lowpan_module_init);
+module_exit(lowpan_module_exit);
 
 MODULE_LICENSE("GPL");

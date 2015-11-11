@@ -185,7 +185,7 @@ static inline void lowpan_push_hc_data(u8 **hc_ptr, const void *data,
 	*hc_ptr += len;
 }
 
-void lowpan_netdev_setup(struct net_device *dev, enum lowpan_lltypes lltype);
+int lowpan_netdev_setup(struct net_device *dev, enum lowpan_lltypes lltype);
 
 /**
  * lowpan_header_decompress - replace 6LoWPAN header with IPv6 header
