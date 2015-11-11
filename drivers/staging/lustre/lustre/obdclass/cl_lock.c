@@ -147,11 +147,6 @@ static void cl_lock_trace0(int level, const struct lu_env *env,
 #ifdef CONFIG_LOCKDEP
 static struct lock_class_key cl_lock_key;
 
-static void cl_lock_lockdep_init(struct cl_lock *lock)
-{
-	lockdep_set_class_and_name(lock, &cl_lock_key, "EXT");
-}
-
 static void cl_lock_lockdep_acquire(const struct lu_env *env,
 				    struct cl_lock *lock, __u32 enqflags)
 {
@@ -381,7 +376,7 @@ static struct cl_lock *cl_lock_alloc(const struct lu_env *env,
 		CS_LOCKSTATE_INC(obj, CLS_NEW);
 		CS_LOCK_INC(obj, total);
 		CS_LOCK_INC(obj, create);
-		cl_lock_lockdep_init(lock);
+		lockdep_set_class_and_name(lock, &cl_lock_key, "EXT");
 		list_for_each_entry(obj, &head->loh_layers,
 					co_lu.lo_linkage) {
 			int err;
