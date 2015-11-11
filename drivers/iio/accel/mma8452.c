@@ -911,30 +911,30 @@ static struct attribute_group mma8452_event_attribute_group = {
 }
 
 static const struct iio_chan_spec mma8452_channels[] = {
-	MMA8452_CHANNEL(X, 0, 12),
-	MMA8452_CHANNEL(Y, 1, 12),
-	MMA8452_CHANNEL(Z, 2, 12),
+	MMA8452_CHANNEL(X, axis_x, 12),
+	MMA8452_CHANNEL(Y, axis_y, 12),
+	MMA8452_CHANNEL(Z, axis_z, 12),
 	IIO_CHAN_SOFT_TIMESTAMP(3),
 };
 
 static const struct iio_chan_spec mma8453_channels[] = {
-	MMA8452_CHANNEL(X, 0, 10),
-	MMA8452_CHANNEL(Y, 1, 10),
-	MMA8452_CHANNEL(Z, 2, 10),
+	MMA8452_CHANNEL(X, axis_x, 10),
+	MMA8452_CHANNEL(Y, axis_y, 10),
+	MMA8452_CHANNEL(Z, axis_z, 10),
 	IIO_CHAN_SOFT_TIMESTAMP(3),
 };
 
 static const struct iio_chan_spec mma8652_channels[] = {
-	MMA8652_CHANNEL(X, 0, 12),
-	MMA8652_CHANNEL(Y, 1, 12),
-	MMA8652_CHANNEL(Z, 2, 12),
+	MMA8652_CHANNEL(X, axis_x, 12),
+	MMA8652_CHANNEL(Y, axis_y, 12),
+	MMA8652_CHANNEL(Z, axis_z, 12),
 	IIO_CHAN_SOFT_TIMESTAMP(3),
 };
 
 static const struct iio_chan_spec mma8653_channels[] = {
-	MMA8652_CHANNEL(X, 0, 10),
-	MMA8652_CHANNEL(Y, 1, 10),
-	MMA8652_CHANNEL(Z, 2, 10),
+	MMA8652_CHANNEL(X, axis_x, 10),
+	MMA8652_CHANNEL(Y, axis_y, 10),
+	MMA8652_CHANNEL(Z, axis_z, 10),
 	IIO_CHAN_SOFT_TIMESTAMP(3),
 };
 
