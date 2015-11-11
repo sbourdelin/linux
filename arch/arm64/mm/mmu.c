@@ -76,15 +76,13 @@ static void __init *early_alloc(unsigned long sz)
 static void split_pmd(pmd_t *pmd, pte_t *pte)
 {
 	unsigned long pfn = pmd_pfn(*pmd);
+	unsigned long addr = pfn << PAGE_SHIFT;
+	pgprot_t prot = __pgprot((pmd_val(*pmd) ^ addr) | PTE_TYPE_PAGE);
+
 	int i = 0;
 
 	do {
-		/*
-		 * Need to have the least restrictive permissions available
-		 * permissions will be fixed up later. Default the new page
-		 * range as contiguous ptes.
-		 */
-		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
+		set_pte(pte, pfn_pte(pfn, prot));
 		pfn++;
 	} while (pte++, i++, i < PTRS_PER_PTE);
 }
