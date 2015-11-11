@@ -455,6 +455,20 @@ static const u8 lowpan_ttl_values[] = {
 	[LOWPAN_IPHC_HLIM_11] = 255,
 };
 
+static inline bool lowpan_iphc_is_reserved(u8 iphc1)
+{
+	switch (iphc1 & (LOWPAN_IPHC_DAC | LOWPAN_IPHC_M |
+			 LOWPAN_IPHC_DAM_MASK)) {
+	case LOWPAN_IPHC_DAC | LOWPAN_IPHC_DAM_00:
+	case LOWPAN_IPHC_DAC | LOWPAN_IPHC_M | LOWPAN_IPHC_DAM_01:
+	case LOWPAN_IPHC_DAC | LOWPAN_IPHC_M | LOWPAN_IPHC_DAM_10:
+	case LOWPAN_IPHC_DAC | LOWPAN_IPHC_M | LOWPAN_IPHC_DAM_11:
+		return true;
+	default:
+		return false;
+	}
+}
+
 int lowpan_header_decompress(struct sk_buff *skb, const struct net_device *dev,
 			     const void *daddr, const void *saddr)
 {
@@ -466,7 +480,8 @@ int lowpan_header_decompress(struct sk_buff *skb, const struct net_device *dev,
 		       skb->data, skb->len);
 
 	if (lowpan_fetch_skb(skb, &iphc0, sizeof(iphc0)) ||
-	    lowpan_fetch_skb(skb, &iphc1, sizeof(iphc1)))
+	    lowpan_fetch_skb(skb, &iphc1, sizeof(iphc1)) ||
+	    lowpan_iphc_is_reserved(iphc1))
 		return -EINVAL;
 
 	/* another if the CID flag is set */
