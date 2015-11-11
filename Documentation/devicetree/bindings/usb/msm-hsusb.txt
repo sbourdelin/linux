@@ -23,7 +23,12 @@ Required properties:
   "qcom,usb-otg-snps" for chipsets with Synopsys 28nm PHY
 
 - regs:         Offset and length of the register set in the memory map
-- interrupts:   interrupt-specifier for the OTG interrupt.
+- interrupts:   interrupt-specifier for the OTG interrupts
+
+- interrupt-names: Should contain the following:
+  "core_irq"    USB core interrupt
+  "async_irq"   Asynchronous interrupt to wake up from low power mode
+                (optional)
 
 - clocks:       A list of phandle + clock-specifier pairs for the
                 clocks listed in clock-names
@@ -89,7 +94,8 @@ Example HSUSB OTG controller device node:
     usb@f9a55000 {
         compatible = "qcom,usb-otg-snps";
         reg = <0xf9a55000 0x400>;
-        interrupts = <0 134 0>;
+        interrupts = <0 134 0>, <0 140 0>;
+        interrupt-names = "core_irq", "async_irq";
         dr_mode = "peripheral";
 
         clocks = <&gcc GCC_XO_CLK>, <&gcc GCC_USB_HS_SYSTEM_CLK>,
