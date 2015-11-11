@@ -20,9 +20,9 @@
 #define __SMIAPP_PRIV_H_
 
 #include <linux/mutex.h>
+#include <media/i2c/smiapp.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
-#include <media/smiapp.h>
 
 #include "smiapp-pll.h"
 #include "smiapp-reg.h"
