@@ -82,6 +82,21 @@ MODULE_PARM_DESC(disable_target_scan,
 		 "Disable target scan on remote ports (default=0)");
 
 /*
+ * async_user_scan: make 'scan' sysfs attribute asynchronous
+ *   on larger installations scanning can take a very long time
+ *   during which the process invoking the scan will be blocked
+ *   on writing to the 'scan' attribute. Enabling this attribute
+ *   will move scanning to a work queue, allowing the process
+ *   to return immediately.
+ */
+static bool fc_async_user_scan;
+
+module_param_named(async_user_scan, fc_async_user_scan,
+		   bool, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(async_user_scan,
+		 "Allow for asynchronous user LUN scanning (default=0)");
+
+/*
  * Redefine so that we can have same named attributes in the
  * sdev/starget/host objects.
  */
@@ -2121,8 +2136,18 @@ fc_user_scan_tgt(struct Scsi_Host *shost, uint channel, uint id, u64 lun)
 
 		if ((channel == rport->channel) &&
 		    (id == rport->scsi_target_id)) {
-			spin_unlock_irqrestore(shost->host_lock, flags);
-			scsi_scan_target(&rport->dev, channel, id, lun, 1);
+			if (lun == SCAN_WILD_CARD &&
+			    fc_async_user_scan) {
+				if (!(rport->flags & FC_RPORT_SCAN_PENDING)) {
+					rport->flags |= FC_RPORT_SCAN_PENDING;
+					scsi_queue_work(shost,
+							&rport->scan_work);
+				}
+				spin_unlock_irqrestore(shost->host_lock, flags);
+			} else {
+				spin_unlock_irqrestore(shost->host_lock, flags);
+				scsi_scan_target(&rport->dev, channel, id, lun, 1);
+			}
 			return;
 		}
 	}
