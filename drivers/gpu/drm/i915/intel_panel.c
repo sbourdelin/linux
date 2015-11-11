@@ -1207,11 +1207,14 @@ static int intel_backlight_device_register(struct intel_connector *connector)
 	memset(&props, 0, sizeof(props));
 	props.type = BACKLIGHT_RAW;
 
-	/*
-	 * Note: Everything should work even if the backlight device max
-	 * presented to the userspace is arbitrarily chosen.
-	 */
-	props.max_brightness = panel->backlight.max;
+	/* Setting max to fixed 100 if the range is large enough. */
+	if (panel->backlight.max > panel->backlight.min + 99)
+		props.max_brightness = 100;
+	else if (panel->backlight.max > panel->backlight.min)
+		props.max_brightness = panel->backlight.max - panel->backlight.min;
+	else
+		props.max_brightness = panel->backlight.max;
+
 	props.brightness = scale_hw_to_user(connector,
 					    panel->backlight.level,
 					    props.max_brightness);
@@ -1414,6 +1417,8 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_panel *panel = &connector->panel;
+	u32 pwm_min;
+	u32 pwm_step;
 	int min;
 
 	WARN_ON(panel->backlight.max == 0);
@@ -1432,7 +1437,28 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	}
 
 	/* vbt value is a coefficient in range [0..255] */
-	return scale(min, 0, 255, 0, panel->backlight.max);
+	pwm_min = scale(min, 0, 255, 0, panel->backlight.max);
+
+	if (min == 0)
+		return pwm_min;
+
+	/* Calculate the PWM step */
+	if (panel->backlight.max > pwm_min + 99)
+		pwm_step = scale(1, 0, 99, 0, panel->backlight.max);
+	else if (panel->backlight.max > pwm_min)
+		pwm_step = scale(1, 0, panel->backlight.max - pwm_min,
+				 0, panel->backlight.max);
+	else
+		return pwm_min;
+.
+	/*
+	 * Because sysfs brightness 0 is used to turn off the backlight, we need step
+	 * down a little bit to make sysfs brightness 1 become the lowest brightness.
+	 */
+	if (pwm_min > pwm_step)
+		return pwm_min - pwm_step;
+	else
+		return pwm_min;
 }
 
 static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unused)
