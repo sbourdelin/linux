@@ -29,4 +29,13 @@ config DRM_PARADE_PS8622
 	---help---
 	  Parade eDP-LVDS bridge chip driver.
 
+config DRM_PARADE_PS8640
+	bool "Parade PS8640 MIPI DSI to eDP Converter"
+	select DRM_KMS_HELPER
+	select DRM_PANEL
+	---help---
+	  Choose this option if you have PS8640 for display
+	  The PS8640 is a high-performance and low-power
+	  MIPI DSI to eDP converter
+
 endmenu
