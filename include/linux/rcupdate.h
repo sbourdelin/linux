@@ -389,7 +389,7 @@ static inline void rcu_init_nohz(void)
  * macro rather than an inline function to avoid #include hell.
  */
 #ifdef CONFIG_TASKS_RCU
-#define TASKS_RCU(x) x
+
 extern struct srcu_struct tasks_rcu_exit_srcu;
 #define rcu_note_voluntary_context_switch(t) \
 	do { \
@@ -397,9 +397,38 @@ extern struct srcu_struct tasks_rcu_exit_srcu;
 		if (READ_ONCE((t)->rcu_tasks_holdout)) \
 			WRITE_ONCE((t)->rcu_tasks_holdout, false); \
 	} while (0)
+
+static inline int tasks_rcu_read_lock(void)
+{
+	int idx;
+
+	preempt_disable();
+	idx = __srcu_read_lock(&tasks_rcu_exit_srcu);
+	preempt_enable();
+
+	return idx;
+}
+
+static inline void tasks_rcu_read_unlock(int idx)
+{
+	preempt_disable();
+	__srcu_read_unlock(&tasks_rcu_exit_srcu, idx);
+	preempt_enable();
+}
+
 #else /* #ifdef CONFIG_TASKS_RCU */
-#define TASKS_RCU(x) do { } while (0)
+
 #define rcu_note_voluntary_context_switch(t)	rcu_all_qs()
+
+static inline int tasks_rcu_read_lock(void)
+{
+	return 0;
+}
+
+static inline void tasks_rcu_read_unlock(int idx)
+{
+}
+
 #endif /* #else #ifdef CONFIG_TASKS_RCU */
 
 /**
