@@ -15,7 +15,7 @@
  *
  * 7-bit I2C slave address 0x1c/0x1d (pin selectable)
  *
- * TODO: orientation / freefall events, autosleep
+ * TODO: orientation events, autosleep
  */
 
 #include <linux/module.h>
@@ -141,6 +141,12 @@ struct mma_chip_info {
 	u8 ev_ths;
 	u8 ev_ths_mask;
 	u8 ev_count;
+};
+
+enum {
+	axis_x,
+	axis_y,
+	axis_z,
 };
 
 static int mma8452_drdy(struct mma8452_data *data)
@@ -409,6 +415,74 @@ fail:
 	return ret;
 }
 
+static ssize_t mma8452_get_freefall_mode(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	int val;
+	struct mma8452_data *data = iio_priv(i2c_get_clientdata(
+					     to_i2c_client(dev)));
+	const struct mma_chip_info *chip = data->chip_info;
+
+	mutex_lock(&data->lock);
+	val = i2c_smbus_read_byte_data(data->client, chip->ev_cfg);
+	mutex_unlock(&data->lock);
+	if (val < 0)
+		return val;
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+			 !(val & MMA8452_FF_MT_CFG_OAE));
+}
+
+static ssize_t mma8452_set_freefall_mode(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf,
+					 size_t len)
+{
+	int val, ret;
+	u8 user_val;
+	struct mma8452_data *data = iio_priv(i2c_get_clientdata(
+					     to_i2c_client(dev)));
+	const struct mma_chip_info *chip = data->chip_info;
+
+	ret = kstrtou8(buf, 10, &user_val);
+	if (ret)
+		goto err;
+
+	val = i2c_smbus_read_byte_data(data->client, chip->ev_cfg);
+	if (val < 0) {
+		ret = val;
+		goto err;
+	}
+
+	if (user_val && (val & MMA8452_FF_MT_CFG_OAE)) {
+		val |= BIT(axis_x + chip->ev_cfg_chan_shift);
+		val |= BIT(axis_y + chip->ev_cfg_chan_shift);
+		val |= BIT(axis_z + chip->ev_cfg_chan_shift);
+		val &= ~MMA8452_FF_MT_CFG_OAE;
+	} else if (!user_val && !(val & MMA8452_FF_MT_CFG_OAE)) {
+		val &= ~BIT(axis_x + chip->ev_cfg_chan_shift);
+		val &= ~BIT(axis_y + chip->ev_cfg_chan_shift);
+		val &= ~BIT(axis_z + chip->ev_cfg_chan_shift);
+		val |= MMA8452_FF_MT_CFG_OAE;
+	}
+
+	ret = mma8452_change_config(data, chip->ev_cfg, val);
+	if (ret)
+		goto err;
+
+	return len;
+err:
+	return ret;
+}
+
+static IIO_DEVICE_ATTR_NAMED(accel_xayaz_mag_falling_en,
+			     in_accel_x&y&z_mag_falling_en,
+			     S_IRUGO | S_IWUSR,
+			     mma8452_get_freefall_mode,
+			     mma8452_set_freefall_mode,
+			     0);
+
 static int mma8452_set_hp_filter_frequency(struct mma8452_data *data,
 					   int val, int val2)
 {
@@ -630,7 +704,6 @@ static int mma8452_write_event_config(struct iio_dev *indio_dev,
 		val &= ~BIT(chan->scan_index + chip->ev_cfg_chan_shift);
 
 	val |= chip->ev_cfg_ele;
-	val |= MMA8452_FF_MT_CFG_OAE;
 
 	return mma8452_change_config(data, chip->ev_cfg, val);
 }
@@ -639,11 +712,25 @@ static void mma8452_transient_interrupt(struct iio_dev *indio_dev)
 {
 	struct mma8452_data *data = iio_priv(indio_dev);
 	s64 ts = iio_get_time_ns();
-	int src;
+	int src, cfg;
 
 	src = i2c_smbus_read_byte_data(data->client, data->chip_info->ev_src);
 	if (src < 0)
 		return;
+
+	cfg = i2c_smbus_read_byte_data(data->client, data->chip_info->ev_cfg);
+	if (cfg < 0)
+		return;
+
+	if (!(cfg & MMA8452_FF_MT_CFG_OAE)) {
+		iio_push_event(indio_dev,
+			       IIO_MOD_EVENT_CODE(IIO_ACCEL, 0,
+						  IIO_MOD_X_AND_Y_AND_Z,
+						  IIO_EV_TYPE_MAG,
+						  IIO_EV_DIR_FALLING),
+			       ts);
+		return;
+	}
 
 	if (src & data->chip_info->ev_src_xe)
 		iio_push_event(indio_dev,
@@ -757,6 +844,13 @@ static const struct iio_event_spec mma8452_motion_event[] = {
 		.mask_shared_by_type = BIT(IIO_EV_INFO_VALUE) |
 					BIT(IIO_EV_INFO_PERIOD)
 	},
+	{
+		.type = IIO_EV_TYPE_MAG,
+		.dir = IIO_EV_DIR_FALLING,
+		.mask_separate = BIT(IIO_EV_INFO_ENABLE),
+		.mask_shared_by_type = BIT(IIO_EV_INFO_VALUE) |
+					BIT(IIO_EV_INFO_PERIOD)
+	},
 };
 
 /*
@@ -767,6 +861,7 @@ static IIO_CONST_ATTR_NAMED(accel_transient_scale, in_accel_scale, "0.617742");
 
 static struct attribute *mma8452_event_attributes[] = {
 	&iio_const_attr_accel_transient_scale.dev_attr.attr,
+	&iio_dev_attr_accel_xayaz_mag_falling_en.dev_attr.attr,
 	NULL,
 };
 
@@ -1056,6 +1151,7 @@ static int mma8452_probe(struct i2c_client *client,
 	struct mma8452_data *data;
 	struct iio_dev *indio_dev;
 	int ret;
+	u8 val;
 	const struct of_device_id *match;
 
 	match = of_match_device(mma8452_dt_ids, &client->dev);
@@ -1148,6 +1244,18 @@ static int mma8452_probe(struct i2c_client *client,
 		if (ret < 0)
 			return ret;
 	}
+
+	/* don't activate freefall mode on startup */
+	ret = i2c_smbus_read_byte_data(data->client, data->chip_info->ev_cfg);
+	if (ret < 0)
+		return ret;
+
+	val = ret;
+	ret = i2c_smbus_write_byte_data(client,
+					data->chip_info->ev_cfg,
+					val | MMA8452_FF_MT_CFG_OAE);
+	if (ret < 0)
+		return ret;
 
 	data->ctrl_reg1 = MMA8452_CTRL_ACTIVE |
 			  (MMA8452_CTRL_DR_DEFAULT << MMA8452_CTRL_DR_SHIFT);
