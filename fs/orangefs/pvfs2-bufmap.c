@@ -518,7 +518,7 @@ int pvfs_bufmap_copy_from_iovec(struct pvfs2_bufmap *bufmap,
 	int i;
 
 	gossip_debug(GOSSIP_BUFMAP_DEBUG,
-		     "%s: buffer_index:%d: size:%lu:\n",
+		     "%s: buffer_index:%d: size:%zu:\n",
 		     __func__, buffer_index, size);
 
 	to = &bufmap->desc_array[buffer_index];
@@ -550,7 +550,7 @@ int pvfs_bufmap_copy_to_iovec(struct pvfs2_bufmap *bufmap,
 	size_t written;
 
 	gossip_debug(GOSSIP_BUFMAP_DEBUG,
-		     "%s: buffer_index:%d: iov_iter_count(iter):%lu:\n",
+		     "%s: buffer_index:%d: iov_iter_count(iter):%zu:\n",
 		     __func__, buffer_index, iov_iter_count(iter));
 
 	from = &bufmap->desc_array[buffer_index];
