@@ -1152,18 +1152,19 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
 {
 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
 	const struct bcm2835_clock_data *data = clock->data;
-	u32 unused_frac_mask = GENMASK(CM_DIV_FRAC_BITS - data->frac_bits, 0);
+	u32 unused_frac_mask =
+		GENMASK(CM_DIV_FRAC_BITS - data->frac_bits, 0) >> 1;
 	u64 temp = (u64)parent_rate << CM_DIV_FRAC_BITS;
+	u64 rem;
 	u32 div;
 
-	do_div(temp, rate);
+	rem = do_div(temp, rate);
 	div = temp;
 
-	/* Round and mask off the unused bits */
-	if (unused_frac_mask != 0) {
-		div += unused_frac_mask >> 1;
-		div &= ~unused_frac_mask;
-	}
+	/* Round up and mask off the unused bits */
+	if ((div & unused_frac_mask) != 0 || rem != 0)
+		div += unused_frac_mask + 1;
+	div &= ~unused_frac_mask;
 
 	/* Clamp to the limits. */
 	div = max(div, unused_frac_mask + 1);
