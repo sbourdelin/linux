@@ -695,7 +695,7 @@ choice
 		select DEBUG_OMAP2PLUS_UART
 
 	config DEBUG_AM33XXUART1
-		bool "Kernel low-level debugging messages via AM33XX UART1"
+		bool "Kernel low-level debugging messages via AM335x/AM43x UART1"
 		depends on ARCH_OMAP2PLUS
 		select DEBUG_OMAP2PLUS_UART
 
