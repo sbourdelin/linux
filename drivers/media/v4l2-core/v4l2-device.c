@@ -122,7 +122,8 @@ void v4l2_device_unregister(struct v4l2_device *v4l2_dev)
 			   We cannot rely on i2c_del_adapter to always
 			   unregister clients for us, since if the i2c bus
 			   is a platform bus, then it is never deleted. */
-			if (client)
+			if (client &&
+			    !client->dev.of_node && !client->dev.fwnode)
 				i2c_unregister_device(client);
 			continue;
 		}
@@ -131,7 +132,7 @@ void v4l2_device_unregister(struct v4l2_device *v4l2_dev)
 		if (sd->flags & V4L2_SUBDEV_FL_IS_SPI) {
 			struct spi_device *spi = v4l2_get_subdevdata(sd);
 
-			if (spi)
+			if (spi && !spi->dev.of_node && !spi->dev.fwnode)
 				spi_unregister_device(spi);
 			continue;
 		}
