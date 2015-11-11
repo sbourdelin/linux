@@ -741,6 +741,39 @@ void intel_psr_flush(struct drm_device *dev,
 }
 
 /**
+ * intel_psr_irq_hpd - Let PSR aware of IRQ_HPD
+ * @dev: DRM device
+ *
+ * This function is called when IRQ_HPD is received on eDP.
+ */
+void intel_psr_irq_hpd(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int delay_ms = HAS_DDI(dev) ? 100 : 500;
+
+	mutex_lock(&dev_priv->psr.lock);
+
+	/*
+	 * According to VESA spec "If a Source device receives and IRQ_HPD
+	 * while in a PSR active state, and cannot identify what caused the
+	 * IRQ_HPD to be generated, based on Sink device status registers,
+	 * the Source device can take implementation-specific action.
+	 * One such action can be to exit and then re-enter a PSR active
+	 * state." Since we aren't checking for any sink status registers
+	 * and we aren't looking for any other implementation-specific
+	 * action, in case we receive any IRQ_HPD and psr is active let's
+	 * force the exit and reschedule it back.
+	 */
+	if (dev_priv->psr.active) {
+		intel_psr_exit(dev);
+		schedule_delayed_work(&dev_priv->psr.work,
+				      msecs_to_jiffies(delay_ms));
+	}
+
+	mutex_unlock(&dev_priv->psr.lock);
+}
+
+/**
  * intel_psr_init - Init basic PSR work and mutex.
  * @dev: DRM device
  *
