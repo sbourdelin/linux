@@ -1207,11 +1207,8 @@ static int intel_backlight_device_register(struct intel_connector *connector)
 	memset(&props, 0, sizeof(props));
 	props.type = BACKLIGHT_RAW;
 
-	/*
-	 * Note: Everything should work even if the backlight device max
-	 * presented to the userspace is arbitrarily chosen.
-	 */
-	props.max_brightness = panel->backlight.max;
+	/* Set brightness maximum to a fixed value 100. */
+	props.max_brightness = 100;
 	props.brightness = scale_hw_to_user(connector,
 					    panel->backlight.level,
 					    props.max_brightness);
@@ -1414,6 +1411,8 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_panel *panel = &connector->panel;
+	u32 pwm_min;
+	u32 pwm_step;
 	int min;
 
 	WARN_ON(panel->backlight.max == 0);
@@ -1432,7 +1431,20 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	}
 
 	/* vbt value is a coefficient in range [0..255] */
-	return scale(min, 0, 255, 0, panel->backlight.max);
+	pwm_min = scale(min, 0, 255, 0, panel->backlight.max);
+
+	/* Calculate the PWM step */
+	pwm_step = scale(1, 0, 99, 0, panel->backlight.max - pwm_min);
+
+	/*
+	 * Because backlight class brightness 0 is used to turn off the backlight, we
+	 * need to step down a little bit here to make backlight class brightness 1
+	 * match the PWM min.
+	 */
+	if (pwm_min >= pwm_step)
+		return pwm_min - pwm_step;
+
+	return pwm_min;
 }
 
 static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unused)
