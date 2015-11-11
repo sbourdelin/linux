@@ -120,9 +120,9 @@ struct hfi1_packet;
 
 #define HFI1_VENDOR_IPG		cpu_to_be16(0xFFA0)
 
-#define IB_BTH_REQ_ACK		(1 << 31)
-#define IB_BTH_SOLICITED	(1 << 23)
-#define IB_BTH_MIG_REQ		(1 << 22)
+#define IB_BTH_REQ_ACK		BIT(31)
+#define IB_BTH_SOLICITED	BIT(23)
+#define IB_BTH_MIG_REQ		BIT(22)
 
 #define IB_GRH_VERSION		6
 #define IB_GRH_VERSION_MASK	0xF
