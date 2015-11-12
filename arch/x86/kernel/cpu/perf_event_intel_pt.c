@@ -1129,6 +1129,9 @@ static __init int pt_init(void)
 {
 	int ret, cpu, prior_warn = 0;
 
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
+		return 0;
+
 	BUILD_BUG_ON(sizeof(struct topa) > PAGE_SIZE);
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
