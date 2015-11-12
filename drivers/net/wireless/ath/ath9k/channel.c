@@ -1405,7 +1405,7 @@ static void ath9k_update_p2p_ps_timer(struct ath_softc *sc, struct ath_vif *avp)
 {
 	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
 	struct ath_hw *ah = sc->sc_ah;
-	s32 tsf, target_tsf;
+	u32 tsf, target_tsf;
 
 	if (!avp || !avp->noa.has_next_tsf)
 		return;
