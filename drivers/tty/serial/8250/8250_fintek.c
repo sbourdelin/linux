@@ -208,6 +208,7 @@ fintek_8250_probe(struct pnp_dev *dev, const struct pnp_device_id *dev_id)
 	uart.port.iobase = pnp_port_start(dev, 0);
 	uart.port.iotype = UPIO_PORT;
 	uart.port.rs485_config = fintek_8250_rs485_config;
+	uart.capabilities = UART_CAP_HW485;
 
 	uart.port.flags |= UPF_SKIP_TEST | UPF_BOOT_AUTOCONF;
 	if (pnp_irq_flags(dev, 0) & IORESOURCE_IRQ_SHAREABLE)
