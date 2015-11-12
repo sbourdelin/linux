@@ -2729,6 +2729,14 @@ serial8250_type(struct uart_port *port)
 	return uart_config[type].name;
 }
 
+static int serial8250_rs485_config(struct uart_port *port,
+				struct serial_rs485 *rs485)
+{
+	port->rs485 = *rs485;
+	port->rs485.flags |= SER_RS485_SOFTWARE;
+	return 0;
+}
+
 static const struct uart_ops serial8250_pops = {
 	.tx_empty	= serial8250_tx_empty,
 	.set_mctrl	= serial8250_set_mctrl,
@@ -2791,6 +2799,8 @@ void serial8250_set_defaults(struct uart_8250_port *up)
 		if (!up->dma->rx_dma)
 			up->dma->rx_dma = serial8250_rx_dma;
 	}
+
+	up->port.rs485_config = serial8250_rs485_config;
 }
 EXPORT_SYMBOL_GPL(serial8250_set_defaults);
 
