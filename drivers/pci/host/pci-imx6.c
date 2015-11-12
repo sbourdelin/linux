@@ -425,7 +425,7 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
 	return 0;
 }
 
-static void imx6_pcie_host_init(struct pcie_port *pp)
+static int imx6_pcie_host_init(struct pcie_port *pp)
 {
 	imx6_pcie_assert_core_reset(pp);
 
@@ -439,6 +439,8 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
 
 	if (IS_ENABLED(CONFIG_PCI_MSI))
 		dw_pcie_msi_init(pp);
+
+	return 0;
 }
 
 static void imx6_pcie_reset_phy(struct pcie_port *pp)
