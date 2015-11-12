@@ -73,7 +73,8 @@ struct klp_func {
  * @type:	ELF relocation type
  * @name:	name of the referenced symbol (for lookup/verification)
  * @addend:	offset from the referenced symbol
- * @external:	symbol is either exported or within the live patch module itself
+ * @external:	set for external symbols that are accessed from this object
+ *		but defined outside; they must be exported
  */
 struct klp_reloc {
 	unsigned long loc;
