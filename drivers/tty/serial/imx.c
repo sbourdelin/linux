@@ -1826,8 +1826,7 @@ static int serial_imx_probe_dt(struct imx_port *sport,
 		struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
-	const struct of_device_id *of_id =
-			of_match_device(imx_uart_dt_ids, &pdev->dev);
+	const struct of_device_id *of_id;
 	int ret;
 
 	if (!np)
@@ -1847,6 +1846,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
 	if (of_get_property(np, "fsl,dte-mode", NULL))
 		sport->dte_mode = 1;
 
+	of_id = of_match_device(imx_uart_dt_ids, &pdev->dev);
+	if (!of_id)
+		return -ENODEV;
 	sport->devdata = of_id->data;
 
 	return 0;
