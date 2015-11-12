@@ -639,6 +639,7 @@ static int rcar_i2c_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	u32 bus_speed;
 	int irq, ret;
+	const struct of_device_id *of_id;
 
 	priv = devm_kzalloc(dev, sizeof(struct rcar_i2c_priv), GFP_KERNEL);
 	if (!priv)
@@ -653,7 +654,10 @@ static int rcar_i2c_probe(struct platform_device *pdev)
 	bus_speed = 100000; /* default 100 kHz */
 	of_property_read_u32(dev->of_node, "clock-frequency", &bus_speed);
 
-	priv->devtype = (enum rcar_i2c_type)of_match_device(rcar_i2c_dt_ids, dev)->data;
+	of_id = of_match_device(rcar_i2c_dt_ids, dev);
+	if (!of_id)
+		return -ENODEV;
+	priv->devtype = (enum rcar_i2c_type)of_id->data;
 
 	ret = rcar_i2c_clock_calculate(priv, bus_speed, dev);
 	if (ret < 0)
