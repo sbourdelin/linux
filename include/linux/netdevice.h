@@ -1236,6 +1236,10 @@ struct net_device_ops {
 							 bool proto_down);
 	int			(*ndo_fill_metadata_dst)(struct net_device *dev,
 						       struct sk_buff *skb);
+	int		(*ndo_bond_slave_add)(struct net_device *slave_dev,
+				struct net_device *bond);
+	int		(*ndo_bond_slave_discard)(struct net_device *slave_dev,
+				struct net_device *bond);
 };
 
 /**
