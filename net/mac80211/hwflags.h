@@ -86,4 +86,6 @@ static inline void ieee80211_hwflags_sync_add(unsigned long *flags) {}
 static inline void ieee80211_hwflags_sync_del(unsigned long *flags) {}
 #endif /* CONFIG_JUMP_LABEL */
 
+void ieee80211_test_hwflags(void);
+
 #endif /* __mac80211_hwflags_h */
