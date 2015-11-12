@@ -258,26 +258,24 @@ static int klp_find_verify_func_addr(struct klp_object *obj,
 }
 
 /*
- * external symbols are located outside the parent object (where the parent
- * object is either vmlinux or the kmod being patched).
+ * External symbols are exported symbols that are defined outside both
+ * the patched object and the patch.
  */
 static int klp_find_external_symbol(struct module *pmod, const char *name,
 				    unsigned long *addr)
 {
 	const struct kernel_symbol *sym;
+	int ret = -EINVAL;
 
-	/* first, check if it's an exported symbol */
 	preempt_disable();
 	sym = find_symbol(name, NULL, NULL, true, true);
 	if (sym) {
 		*addr = sym->value;
-		preempt_enable();
-		return 0;
+		ret = 0;
 	}
 	preempt_enable();
 
-	/* otherwise check if it's in another .o within the patch module */
-	return klp_find_object_symbol(pmod->name, name, addr);
+	return ret;
 }
 
 static int klp_write_object_relocations(struct module *pmod,
