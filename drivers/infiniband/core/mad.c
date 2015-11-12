@@ -1811,6 +1811,14 @@ static int validate_mad(const struct ib_mad_hdr *mad_hdr,
 		if (qp_num == 0)
 			valid = 1;
 	} else {
+		/* CM attributes other than ClassPortInfo only use Send method */
+		if (mad_hdr->mgmt_class == IB_MGMT_CLASS_CM) {
+			if (mad_hdr->attr_id != IB_MGMT_CLASSPORTINFO_ATTR_ID) {
+				if (mad_hdr->method != IB_MGMT_METHOD_SEND)
+					goto out;
+			} else if (mad_hdr->method != IB_MGMT_METHOD_GET_RESP)
+				goto out;
+		}
 		/* Filter GSI packets sent to QP0 */
 		if (qp_num != 0)
 			valid = 1;
