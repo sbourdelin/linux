@@ -890,6 +890,12 @@ void nft_unregister_chain_type(const struct nf_chain_type *);
 int nft_register_expr(struct nft_expr_type *);
 void nft_unregister_expr(struct nft_expr_type *);
 
+void nf_tables_trace_notify(const struct nft_pktinfo *pkt,
+			    const struct nft_chain *chain,
+			    const struct nft_rule *rule,
+			    u32 verdict,
+			    enum nft_trace_types type);
+
 #define nft_dereference(p)					\
 	nfnl_dereference(p, NFNL_SUBSYS_NFTABLES)
 

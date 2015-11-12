@@ -200,6 +200,9 @@ void nft_meta_set_eval(const struct nft_expr *expr,
 		skb->priority = value;
 		break;
 	case NFT_META_NFTRACE:
+		if (skb->nf_trace == 0)
+			nf_tables_trace_notify(pkt, NULL, NULL, 0,
+					       NFT_TRACETYPE_PACKET);
 		skb->nf_trace = 1;
 		break;
 	default:
