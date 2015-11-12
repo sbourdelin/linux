@@ -86,6 +86,8 @@ struct uart_8250_ops {
 struct uart_8250_port {
 	struct uart_port	port;
 	struct timer_list	timer;		/* "no irq" timer */
+	struct timer_list	rs485_start_tx_timer; /* "rs485 start tx" timer */
+	struct timer_list	rs485_stop_tx_timer; /* "rs485 stop tx" timer */
 	struct list_head	list;		/* ports on this IRQ */
 	unsigned short		capabilities;	/* port capabilities */
 	unsigned short		bugs;		/* port bugs */

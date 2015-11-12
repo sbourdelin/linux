@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/pm_runtime.h>
+#include <linux/timer.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -1293,13 +1294,87 @@ static void serial8250_stop_rx(struct uart_port *port)
 	serial8250_rpm_put(up);
 }
 
-static inline void __stop_tx(struct uart_8250_port *p)
+static inline void serial8250_rs485_set_rts_on_send(struct uart_8250_port *p)
+{
+	if (p->port.rs485.flags & SER_RS485_RTS_ON_SEND)
+		p->mcr |= UART_MCR_RTS;
+	else
+		p->mcr &= ~UART_MCR_RTS;
+	serial_out(p, UART_MCR, p->mcr);
+}
+
+static inline void serial8250_rs485_set_rts_after_send(struct uart_8250_port *p)
+{
+	if (p->port.rs485.flags & SER_RS485_RTS_AFTER_SEND)
+		p->mcr |= UART_MCR_RTS;
+	else
+		p->mcr &= ~UART_MCR_RTS;
+	serial_out(p, UART_MCR, p->mcr);
+}
+
+static __u32 serial8250_rs485_start_tx(struct uart_8250_port *p)
+{
+	if (p->capabilities & UART_CAP_HW485 || !(p->port.rs485.flags & SER_RS485_ENABLED))
+		return 0;
+	
+	if (!(p->port.rs485.flags & SER_RS485_RX_DURING_TX))
+		serial8250_stop_rx(&p->port);
+	
+	del_timer_sync(&p->rs485_stop_tx_timer);
+
+	if (!!(p->port.rs485.flags & SER_RS485_RTS_ON_SEND) != !!(p->mcr & UART_MCR_RTS)) {
+		serial8250_rs485_set_rts_on_send(p);
+		return p->port.rs485.delay_rts_before_send;
+	}
+
+	return 0;
+}
+
+static inline void __do_stop_tx_rs485(struct uart_8250_port *p)
+{
+	serial8250_rs485_set_rts_after_send(p);
+	/*
+	* Empty the RX FIFO, we are not interested in anything
+	* received during the half-duplex transmission.
+	*/
+	if (!(p->port.rs485.flags & SER_RS485_RX_DURING_TX))
+		serial8250_clear_fifos(p);
+}
+
+static void serial8250_handle_rs485_stop_tx_timer(unsigned long arg)
+{
+	struct uart_8250_port *p = (struct uart_8250_port*)arg;
+	__do_stop_tx_rs485(p);
+}
+
+static inline void __stop_tx_rs485(struct uart_8250_port *p)
+{
+	if (p->capabilities & UART_CAP_HW485 || !(p->port.rs485.flags & SER_RS485_ENABLED))
+		return;
+
+	del_timer_sync(&p->rs485_start_tx_timer);
+
+	/* __do_stop_tx_rs485 is going to set RTS according to config AND flush RX FIFO if required */
+	if (p->port.rs485.delay_rts_after_send > 0) {
+		mod_timer(&p->rs485_stop_tx_timer, jiffies + p->port.rs485.delay_rts_after_send * HZ / 1000);
+	} else {
+		__do_stop_tx_rs485(p);
+	}
+}
+
+static inline void __do_stop_tx(struct uart_8250_port *p)
 {
 	if (p->ier & UART_IER_THRI) {
 		p->ier &= ~UART_IER_THRI;
 		serial_out(p, UART_IER, p->ier);
 		serial8250_rpm_put_tx(p);
 	}
+}
+
+static inline void __stop_tx(struct uart_8250_port *p)
+{
+	__do_stop_tx(p);
+	__stop_tx_rs485(p);
 }
 
 static void serial8250_stop_tx(struct uart_port *port)
@@ -1319,11 +1394,9 @@ static void serial8250_stop_tx(struct uart_port *port)
 	serial8250_rpm_put(up);
 }
 
-static void serial8250_start_tx(struct uart_port *port)
+static inline void __start_tx(struct uart_port* port)
 {
 	struct uart_8250_port *up = up_to_u8250p(port);
-
-	serial8250_rpm_get_tx(up);
 
 	if (up->dma && !up->dma->tx_dma(up))
 		return;
@@ -1347,6 +1420,29 @@ static void serial8250_start_tx(struct uart_port *port)
 	if (port->type == PORT_16C950 && up->acr & UART_ACR_TXDIS) {
 		up->acr &= ~UART_ACR_TXDIS;
 		serial_icr_write(up, UART_ACR, up->acr);
+	}
+}
+
+static void serial8250_handle_rs485_start_tx_timer(unsigned long arg)
+{
+	struct uart_port* port = (struct uart_port*)arg;
+	__start_tx(port);
+}
+
+static void serial8250_start_tx(struct uart_port *port)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	__u32 delay;
+	
+	serial8250_rpm_get_tx(up);
+
+	if (timer_pending(&up->rs485_start_tx_timer))
+		return;
+
+	if ((delay = serial8250_rs485_start_tx(up))) {
+		mod_timer(&up->rs485_start_tx_timer, jiffies + delay * HZ / 1000);
+	} else {
+		__start_tx(port);
 	}
 }
 
@@ -1800,6 +1896,16 @@ static void serial8250_put_poll_char(struct uart_port *port,
 
 #endif /* CONFIG_CONSOLE_POLL */
 
+static inline void serial8250_startup_rs485(struct uart_port *port)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	
+	if (up->capabilities & UART_CAP_HW485 || !(up->port.rs485.flags & SER_RS485_ENABLED))
+		return;
+
+	serial8250_rs485_set_rts_after_send(up);
+}
+
 int serial8250_do_startup(struct uart_port *port)
 {
 	struct uart_8250_port *up = up_to_u8250p(port);
@@ -2041,6 +2147,8 @@ dont_test_tx_en:
 		inb_p(icp);
 	}
 	retval = 0;
+
+	serial8250_startup_rs485(port);
 out:
 	serial8250_rpm_put(up);
 	return retval;
@@ -2054,12 +2162,24 @@ static int serial8250_startup(struct uart_port *port)
 	return serial8250_do_startup(port);
 }
 
+static inline void serial8250_shutdown_rs485(struct uart_port *port)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	
+	if (up->capabilities & UART_CAP_HW485 || !(up->port.rs485.flags & SER_RS485_ENABLED))
+		return;
+
+	del_timer_sync(&up->rs485_start_tx_timer);
+	del_timer_sync(&up->rs485_stop_tx_timer);
+}
+
 void serial8250_do_shutdown(struct uart_port *port)
 {
 	struct uart_8250_port *up = up_to_u8250p(port);
 	unsigned long flags;
 
 	serial8250_rpm_get(up);
+	serial8250_shutdown_rs485(port);
 	/*
 	 * Disable interrupts from this port
 	 */
@@ -2729,11 +2849,23 @@ serial8250_type(struct uart_port *port)
 	return uart_config[type].name;
 }
 
-static int serial8250_rs485_config(struct uart_port *port,
-				struct serial_rs485 *rs485)
+static int serial8250_rs485_config(struct uart_port *port, struct serial_rs485 *rs485)
 {
+	bool need_startup = false;
+
+	if (!(port->rs485.flags & SER_RS485_ENABLED) && (rs485->flags & SER_RS485_ENABLED)) {
+		need_startup = true;
+	}
+	if ((port->rs485.flags & SER_RS485_ENABLED) && !(rs485->flags & SER_RS485_ENABLED)) {
+		serial8250_shutdown_rs485(port);
+	}
+
 	port->rs485 = *rs485;
 	port->rs485.flags |= SER_RS485_SOFTWARE;
+
+	if (need_startup)
+		serial8250_startup_rs485(port);
+
 	return 0;
 }
 
@@ -2801,6 +2933,14 @@ void serial8250_set_defaults(struct uart_8250_port *up)
 	}
 
 	up->port.rs485_config = serial8250_rs485_config;
+	init_timer(&up->rs485_stop_tx_timer);
+	up->rs485_stop_tx_timer.function = serial8250_handle_rs485_stop_tx_timer;
+	up->rs485_stop_tx_timer.data = (unsigned long)up;
+	up->rs485_stop_tx_timer.flags |= TIMER_IRQSAFE;
+	init_timer(&up->rs485_start_tx_timer);
+	up->rs485_start_tx_timer.function = serial8250_handle_rs485_start_tx_timer;
+	up->rs485_start_tx_timer.data = (unsigned long)up;
+	up->rs485_start_tx_timer.flags |= TIMER_IRQSAFE;
 }
 EXPORT_SYMBOL_GPL(serial8250_set_defaults);
 
