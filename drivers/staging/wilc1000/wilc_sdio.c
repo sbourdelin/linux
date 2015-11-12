@@ -564,8 +564,6 @@ static int sdio_init(struct wilc *wilc, wilc_debug_func func)
 	if (!linux_sdio_init()) {
 		g_sdio.dPrint(N_ERR, "[wilc sdio]: Failed io init bus...\n");
 		return 0;
-	} else {
-		return 0;
 	}
 
 	/**

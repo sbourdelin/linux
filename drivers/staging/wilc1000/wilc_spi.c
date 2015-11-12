@@ -968,8 +968,6 @@ static int wilc_spi_init(struct wilc *wilc, wilc_debug_func func)
 	if (!linux_spi_init()) {
 		PRINT_ER("[wilc spi]: Failed io init bus...\n");
 		return 0;
-	} else {
-		return 0;
 	}
 
 	/**
