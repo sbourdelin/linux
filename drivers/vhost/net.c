@@ -287,6 +287,45 @@ static void vhost_zerocopy_callback(struct ubuf_info *ubuf, bool success)
 	rcu_read_unlock_bh();
 }
 
+static inline unsigned long busy_clock(void)
+{
+	return local_clock() >> 10;
+}
+
+static bool vhost_can_busy_poll(struct vhost_dev *dev,
+				unsigned long endtime)
+{
+	return likely(!need_resched()) &&
+	       likely(!time_after(busy_clock(), endtime)) &&
+	       likely(!signal_pending(current)) &&
+	       !vhost_has_work(dev) &&
+	       single_task_running();
+}
+
+static int vhost_net_tx_get_vq_desc(struct vhost_net *net,
+				    struct vhost_virtqueue *vq,
+				    struct iovec iov[], unsigned int iov_size,
+				    unsigned int *out_num, unsigned int *in_num)
+{
+	unsigned long uninitialized_var(endtime);
+
+	if (vq->busyloop_timeout) {
+		preempt_disable();
+		endtime = busy_clock() + vq->busyloop_timeout;
+	}
+
+	while (vq->busyloop_timeout &&
+	       vhost_can_busy_poll(vq->dev, endtime) &&
+	       !vhost_vq_more_avail(vq->dev, vq))
+		cpu_relax();
+
+	if (vq->busyloop_timeout)
+		preempt_enable();
+
+	return vhost_get_vq_desc(vq, vq->iov, ARRAY_SIZE(vq->iov),
+				 out_num, in_num, NULL, NULL);
+}
+
 /* Expects to be always run from workqueue - which acts as
  * read-size critical section for our kind of RCU. */
 static void handle_tx(struct vhost_net *net)
@@ -331,10 +370,9 @@ static void handle_tx(struct vhost_net *net)
 			      % UIO_MAXIOV == nvq->done_idx))
 			break;
 
-		head = vhost_get_vq_desc(vq, vq->iov,
-					 ARRAY_SIZE(vq->iov),
-					 &out, &in,
-					 NULL, NULL);
+		head = vhost_net_tx_get_vq_desc(net, vq, vq->iov,
+						ARRAY_SIZE(vq->iov),
+						&out, &in);
 		/* On error, stop handling until the next kick. */
 		if (unlikely(head < 0))
 			break;
@@ -433,6 +471,35 @@ static int peek_head_len(struct sock *sk)
 
 	spin_unlock_irqrestore(&sk->sk_receive_queue.lock, flags);
 	return len;
+}
+
+static int vhost_net_peek_head_len(struct vhost_net *net, struct sock *sk)
+{
+	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_TX];
+	struct vhost_virtqueue *vq = &nvq->vq;
+	unsigned long uninitialized_var(endtime);
+
+	if (vq->busyloop_timeout) {
+		mutex_lock(&vq->mutex);
+		vhost_disable_notify(&net->dev, vq);
+		preempt_disable();
+		endtime = busy_clock() + vq->busyloop_timeout;
+	}
+
+	while (vq->busyloop_timeout &&
+	       vhost_can_busy_poll(&net->dev, endtime) &&
+	       skb_queue_empty(&sk->sk_receive_queue) &&
+	       !vhost_vq_more_avail(&net->dev, vq))
+		cpu_relax();
+
+	if (vq->busyloop_timeout) {
+		preempt_enable();
+		if (vhost_enable_notify(&net->dev, vq))
+			vhost_poll_queue(&vq->poll);
+		mutex_unlock(&vq->mutex);
+	}
+
+	return peek_head_len(sk);
 }
 
 /* This is a multi-buffer version of vhost_get_desc, that works if
@@ -553,7 +620,7 @@ static void handle_rx(struct vhost_net *net)
 		vq->log : NULL;
 	mergeable = vhost_has_feature(vq, VIRTIO_NET_F_MRG_RXBUF);
 
-	while ((sock_len = peek_head_len(sock->sk))) {
+	while ((sock_len = vhost_net_peek_head_len(net, sock->sk))) {
 		sock_len += sock_hlen;
 		vhost_len = sock_len + vhost_hlen;
 		headcount = get_rx_bufs(vq, vq->heads, vhost_len,

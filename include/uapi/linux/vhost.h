@@ -27,6 +27,11 @@ struct vhost_vring_file {
 
 };
 
+struct vhost_vring_busyloop_timeout {
+	unsigned int index;
+	unsigned int timeout;
+};
+
 struct vhost_vring_addr {
 	unsigned int index;
 	/* Option flags. */
@@ -126,6 +131,12 @@ struct vhost_memory {
 #define VHOST_SET_VRING_CALL _IOW(VHOST_VIRTIO, 0x21, struct vhost_vring_file)
 /* Set eventfd to signal an error */
 #define VHOST_SET_VRING_ERR _IOW(VHOST_VIRTIO, 0x22, struct vhost_vring_file)
+/* Set busy loop timeout */
+#define VHOST_SET_VRING_BUSYLOOP_TIMEOUT _IOW(VHOST_VIRTIO, 0x23,	\
+		                     struct vhost_vring_busyloop_timeout)
+/* Get busy loop timeout */
+#define VHOST_GET_VRING_BUSYLOOP_TIMEOUT _IOW(VHOST_VIRTIO, 0x24,	\
+		                     struct vhost_vring_busyloop_timeout)
 
 /* VHOST_NET specific defines */
 
