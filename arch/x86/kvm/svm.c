@@ -3231,6 +3231,9 @@ static int svm_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	case MSR_IA32_UCODE_REV:
 		msr_info->data = 0x01000065;
 		break;
+	case MSR_F15H_IC_CFG:
+		msr_info->data = 0x1E;
+		break;
 	default:
 		return kvm_get_msr_common(vcpu, msr_info);
 	}
