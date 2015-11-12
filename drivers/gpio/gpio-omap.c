@@ -217,15 +217,29 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
 	u32			val;
 	u32			l;
 	bool			enable = !!debounce;
+	unsigned long		flags;
 
 	if (!bank->dbck_flag)
 		return;
 
 	if (enable) {
-		debounce = DIV_ROUND_UP(debounce, 31) - 1;
+		struct clk	*clk;
+		unsigned long	rate;
+
+		clk = clk_get(bank->dev, "fck");
+		if (IS_ERR(clk)) {
+			dev_err(bank->dev, "can't get clock\n");
+			return;
+		}
+
+		rate = clk_get_rate(clk);
+		clk_put(clk);
+
+		debounce = DIV_ROUND_UP(debounce, rate);
 		debounce &= OMAP4_GPIO_DEBOUNCINGTIME_MASK;
 	}
 
+	raw_spin_lock_irqsave(&bank->lock, flags);
 	l = BIT(offset);
 
 	clk_enable(bank->dbck);
@@ -256,6 +270,7 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
 		bank->context.debounce = debounce;
 		bank->context.debounce_en = val;
 	}
+	raw_spin_unlock_irqrestore(&bank->lock, flags);
 }
 
 /**
@@ -1002,14 +1017,9 @@ static int omap_gpio_output(struct gpio_chip *chip, unsigned offset, int value)
 static int omap_gpio_debounce(struct gpio_chip *chip, unsigned offset,
 			      unsigned debounce)
 {
-	struct gpio_bank *bank;
-	unsigned long flags;
+	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
 
-	bank = container_of(chip, struct gpio_bank, chip);
-
-	raw_spin_lock_irqsave(&bank->lock, flags);
 	omap2_set_gpio_debounce(bank, offset, debounce);
-	raw_spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
 }
