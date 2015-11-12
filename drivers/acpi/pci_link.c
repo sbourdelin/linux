@@ -1,6 +1,7 @@
 /*
  *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
  *
+ *  Copyright (c) 2015, The Linux Foundation. All rights reserved.
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2002       Dominik Brodowski <devel@brodo.de>
@@ -67,12 +68,12 @@ static struct acpi_scan_handler pci_link_handler = {
  * later even the link is disable. Instead, we just repick the active irq
  */
 struct acpi_pci_link_irq {
-	u8 active;		/* Current IRQ */
+	u32 active;		/* Current IRQ */
 	u8 triggering;		/* All IRQs */
 	u8 polarity;		/* All IRQs */
 	u8 resource_type;
 	u8 possible_count;
-	u8 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+	u32 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
 	u8 initialized:1;
 	u8 reserved:7;
 };
@@ -437,7 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
  * enabled system.
  */
 
-#define ACPI_MAX_IRQS		256
+#define ACPI_MAX_IRQS		1020
 #define ACPI_MAX_ISA_IRQ	16
 
 #define PIRQ_PENALTY_PCI_AVAILABLE	(0)
@@ -493,7 +494,8 @@ int __init acpi_irq_penalty_init(void)
 					    penalty;
 			}
 
-		} else if (link->irq.active) {
+		} else if (link->irq.active &&
+			(link->irq.active < ACPI_MAX_IRQS)) {
 			acpi_irq_penalty[link->irq.active] +=
 			    PIRQ_PENALTY_PCI_POSSIBLE;
 		}
@@ -541,14 +543,16 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
 	else
 		irq = link->irq.possible[link->irq.possible_count - 1];
 
-	if (acpi_irq_balance || !link->irq.active) {
+	if ((acpi_irq_balance || !link->irq.active) && (irq < ACPI_MAX_IRQS)) {
 		/*
-		 * Select the best IRQ.  This is done in reverse to promote
-		 * the use of IRQs 9, 10, 11, and >15.
+		 * Select the best IRQ.  This is done in reverse to
+		 * promote the use of IRQs 9, 10, 11, and >15.
 		 */
-		for (i = (link->irq.possible_count - 1); i >= 0; i--) {
-			if (acpi_irq_penalty[irq] >
-			    acpi_irq_penalty[link->irq.possible[i]])
+		i = link->irq.possible_count;
+		while (--i) {
+			if ((link->irq.possible[i] < ACPI_MAX_IRQS) &&
+			    (acpi_irq_penalty[irq] >
+			    acpi_irq_penalty[link->irq.possible[i]]))
 				irq = link->irq.possible[i];
 		}
 	}
@@ -568,7 +572,9 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
 			    acpi_device_bid(link->device));
 		return -ENODEV;
 	} else {
-		acpi_irq_penalty[link->irq.active] += PIRQ_PENALTY_PCI_USING;
+		if (link->irq.active < ACPI_MAX_IRQS)
+			acpi_irq_penalty[link->irq.active] +=
+				PIRQ_PENALTY_PCI_USING;
 		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
 		       acpi_device_name(link->device),
 		       acpi_device_bid(link->device), link->irq.active);
