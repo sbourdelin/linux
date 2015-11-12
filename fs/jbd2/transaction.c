@@ -65,7 +65,7 @@ void jbd2_journal_free_transaction(transaction_t *transaction)
 }
 
 /*
- * jbd2_get_transaction: obtain a new transaction_t object.
+ * jbd2_init_transaction: obtain a new transaction_t object.
  *
  * Simply allocate and initialise a new transaction.  Create it in
  * RUNNING state and add it to the current journal (which should not
@@ -79,8 +79,8 @@ void jbd2_journal_free_transaction(transaction_t *transaction)
  *
  */
 
-static transaction_t *
-jbd2_get_transaction(journal_t *journal, transaction_t *transaction)
+static void
+jbd2_init_transaction(journal_t *journal, transaction_t *transaction)
 {
 	transaction->t_journal = journal;
 	transaction->t_state = T_RUNNING;
@@ -104,8 +104,6 @@ jbd2_get_transaction(journal_t *journal, transaction_t *transaction)
 	transaction->t_max_wait = 0;
 	transaction->t_start = jiffies;
 	transaction->t_requested = 0;
-
-	return transaction;
 }
 
 /*
@@ -343,7 +341,7 @@ repeat:
 		write_lock(&journal->j_state_lock);
 		if (!journal->j_running_transaction &&
 		    (handle->h_reserved || !journal->j_barrier_count)) {
-			jbd2_get_transaction(journal, new_transaction);
+			jbd2_init_transaction(journal, new_transaction);
 			new_transaction = NULL;
 		}
 		write_unlock(&journal->j_state_lock);
