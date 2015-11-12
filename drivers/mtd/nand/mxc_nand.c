@@ -1464,8 +1464,7 @@ static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
 {
 	struct device_node *np = host->dev->of_node;
 	struct mxc_nand_platform_data *pdata = &host->pdata;
-	const struct of_device_id *of_id =
-		of_match_device(mxcnd_dt_ids, host->dev);
+	const struct of_device_id *of_id;
 	int buswidth;
 
 	if (!np)
@@ -1482,6 +1481,9 @@ static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
 
 	pdata->width = buswidth / 8;
 
+	of_id = of_match_device(mxcnd_dt_ids, host->dev);
+	if (!of_id)
+		return -ENODEV;
 	host->devtype_data = of_id->data;
 
 	return 0;
