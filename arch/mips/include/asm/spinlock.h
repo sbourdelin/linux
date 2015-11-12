@@ -140,7 +140,7 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 static inline void arch_spin_unlock(arch_spinlock_t *lock)
 {
 	unsigned int serving_now = lock->h.serving_now + 1;
-	wmb();
+	smp_mb();
 	lock->h.serving_now = (u16)serving_now;
 	nudge_writes();
 }
