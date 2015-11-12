@@ -1007,26 +1007,6 @@ static void pte_list_remove(u64 *spte, unsigned long *pte_list)
 	}
 }
 
-typedef void (*pte_list_walk_fn) (u64 *spte);
-static void pte_list_walk(unsigned long *pte_list, pte_list_walk_fn fn)
-{
-	struct pte_list_desc *desc;
-	int i;
-
-	if (!*pte_list)
-		return;
-
-	if (!(*pte_list & 1))
-		return fn((u64 *)*pte_list);
-
-	desc = (struct pte_list_desc *)(*pte_list & ~1ul);
-	while (desc) {
-		for (i = 0; i < PTE_LIST_EXT && desc->sptes[i]; ++i)
-			fn(desc->sptes[i]);
-		desc = desc->more;
-	}
-}
-
 static unsigned long *__gfn_to_rmap(gfn_t gfn, int level,
 				    struct kvm_memory_slot *slot)
 {
@@ -1741,7 +1721,12 @@ static struct kvm_mmu_page *kvm_mmu_alloc_page(struct kvm_vcpu *vcpu,
 static void mark_unsync(u64 *spte);
 static void kvm_mmu_mark_parents_unsync(struct kvm_mmu_page *sp)
 {
-	pte_list_walk(&sp->parent_ptes, mark_unsync);
+	u64 *sptep;
+	struct rmap_iterator iter;
+
+	for_each_rmap_spte(&sp->parent_ptes, &iter, sptep) {
+		mark_unsync(sptep);
+	}
 }
 
 static void mark_unsync(u64 *spte)
@@ -2111,12 +2096,17 @@ static struct kvm_mmu_page *kvm_mmu_get_page(struct kvm_vcpu *vcpu,
 		if (sp->unsync && kvm_sync_page_transient(vcpu, sp))
 			break;
 
-		mmu_page_add_parent_pte(vcpu, sp, parent_pte);
 		if (sp->unsync_children) {
 			kvm_make_request(KVM_REQ_MMU_SYNC, vcpu);
 			kvm_mmu_mark_parents_unsync(sp);
-		} else if (sp->unsync)
+			if (parent_pte)
+				mark_unsync(parent_pte);
+		} else if (sp->unsync) {
 			kvm_mmu_mark_parents_unsync(sp);
+			if (parent_pte)
+				mark_unsync(parent_pte);
+		}
+		mmu_page_add_parent_pte(vcpu, sp, parent_pte);
 
 		__clear_sp_write_flooding_count(sp);
 		trace_kvm_mmu_get_page(sp, false);
