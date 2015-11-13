@@ -81,6 +81,13 @@ struct mmc_command {
 	unsigned int		retries;	/* max number of retries */
 	int			error;		/* command error */
 
+/* for mmc_check_result() */
+#define MMC_RESULT_OK		0
+#define MMC_RESULT_FAIL		1
+#define MMC_RESULT_UNSUP_HOST	2
+#define MMC_RESULT_UNSUP_CARD	3
+
+
 /*
  * Standard errno values are used for errors, but some have specific
  * meaning in the MMC layer:
@@ -200,6 +207,7 @@ extern void mmc_prepare_mrq(struct mmc_card *card,
 	struct mmc_request *mrq, struct scatterlist *sg, unsigned sg_len,
 	unsigned dev_addr, unsigned blocks, unsigned blksz, int write);
 extern int mmc_wait_busy(struct mmc_card *card);
+extern int mmc_check_result(struct mmc_request *mrq);
 
 /**
  *	mmc_claim_host - exclusively claim a host

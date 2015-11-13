@@ -2894,6 +2894,34 @@ int mmc_wait_busy(struct mmc_card *card)
 }
 EXPORT_SYMBOL(mmc_wait_busy);
 
+/*
+ * Checks that a normal transfer didn't have any errors
+ */
+int mmc_check_result(struct mmc_request *mrq)
+{
+	int ret;
+
+	BUG_ON(!mrq || !mrq->cmd || !mrq->data);
+
+	ret = 0;
+
+	if (!ret && mrq->cmd->error)
+		ret = mrq->cmd->error;
+	if (!ret && mrq->data->error)
+		ret = mrq->data->error;
+	if (!ret && mrq->stop && mrq->stop->error)
+		ret = mrq->stop->error;
+	if (!ret && mrq->data->bytes_xfered !=
+		mrq->data->blocks * mrq->data->blksz)
+		ret = MMC_RESULT_FAIL;
+
+	if (ret == -EINVAL)
+		ret = MMC_RESULT_UNSUP_HOST;
+
+	return ret;
+}
+EXPORT_SYMBOL(mmc_check_result);
+
 /**
  * mmc_init_context_info() - init synchronization context
  * @host: mmc host
