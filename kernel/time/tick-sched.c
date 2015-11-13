@@ -156,10 +156,52 @@ static void tick_sched_handle(struct tick_sched *ts, struct pt_regs *regs)
 cpumask_var_t tick_nohz_full_mask;
 cpumask_var_t housekeeping_mask;
 bool tick_nohz_full_running;
+static unsigned long tick_dependency;
 
-static bool can_stop_full_tick(void)
+static void trace_tick_dependency(unsigned long dep)
+{
+	if (dep & TICK_POSIX_TIMER_MASK) {
+		trace_tick_stop(0, "posix timers running\n");
+		return;
+	}
+
+	if (dep & TICK_PERF_EVENTS_MASK) {
+		trace_tick_stop(0, "perf events running\n");
+		return;
+	}
+
+	if (dep & TICK_SCHED_MASK) {
+		trace_tick_stop(0, "more than 1 task in runqueue\n");
+		return;
+	}
+
+	if (dep & TICK_CLOCK_UNSTABLE_MASK)
+		trace_tick_stop(0, "unstable sched clock\n");
+}
+
+static bool can_stop_full_tick(struct tick_sched *ts)
 {
 	WARN_ON_ONCE(!irqs_disabled());
+
+	if (tick_dependency) {
+		trace_tick_dependency(tick_dependency);
+		return false;
+	}
+
+	if (ts->tick_dependency) {
+		trace_tick_dependency(ts->tick_dependency);
+		return false;
+	}
+
+	if (current->tick_dependency) {
+		trace_tick_dependency(current->tick_dependency);
+		return false;
+	}
+
+	if (current->signal->tick_dependency) {
+		trace_tick_dependency(current->signal->tick_dependency);
+		return false;
+	}
 
 	if (!sched_can_stop_tick()) {
 		trace_tick_stop(0, "more than 1 task in runqueue\n");
@@ -176,9 +218,10 @@ static bool can_stop_full_tick(void)
 		return false;
 	}
 
-	/* sched_clock_tick() needs us? */
 #ifdef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
 	/*
+	 * sched_clock_tick() needs us?
+	 *
 	 * TODO: kick full dynticks CPUs when
 	 * sched_clock_stable is set.
 	 */
@@ -253,6 +296,79 @@ void tick_nohz_full_kick_all(void)
 	preempt_enable();
 }
 
+void __tick_nohz_clear_dep(enum tick_dependency_bit bit,
+				       unsigned long *dep)
+{
+	clear_bit(bit, dep);
+}
+
+static void kick_all_work_fn(struct work_struct *work)
+{
+       tick_nohz_full_kick_all();
+}
+static DECLARE_WORK(kick_all_work, kick_all_work_fn);
+
+void __tick_nohz_set_dep_delayed(enum tick_dependency_bit bit, unsigned long *dep)
+{
+	unsigned long prev;
+
+	prev = fetch_or(dep, BIT_MASK(bit));
+	if (!prev) {
+		/*
+		* We need the IPIs to be sent from sane process context.
+		* The posix cpu timers are always set with irqs disabled.
+		*/
+		schedule_work(&kick_all_work);
+	}
+}
+
+/*
+ * Set a global tick dependency. Lets do the wide IPI kick asynchronously
+ * for callers with irqs disabled.
+ */
+void tick_nohz_set_dep(enum tick_dependency_bit bit)
+{
+	unsigned long prev;
+
+	prev = fetch_or(&tick_dependency, BIT_MASK(bit));
+	if (!prev)
+		tick_nohz_full_kick_all();
+}
+
+void tick_nohz_clear_dep(enum tick_dependency_bit bit)
+{
+	__tick_nohz_clear_dep(bit, &tick_dependency);
+}
+
+void tick_nohz_set_dep_cpu(enum tick_dependency_bit bit, int cpu)
+{
+	unsigned long prev;
+	struct tick_sched *ts;
+
+	ts = per_cpu_ptr(&tick_cpu_sched, cpu);
+
+	prev = fetch_or(&ts->tick_dependency, BIT_MASK(bit));
+	if (!prev) {
+		preempt_disable();
+		/* Perf needs local kick that is NMI safe */
+		if (cpu == smp_processor_id()) {
+			tick_nohz_full_kick();
+		} else {
+			/* Remote irq work not NMI-safe */
+			WARN_ON_ONCE(in_nmi());
+			tick_nohz_full_kick_cpu(cpu);
+		}
+		preempt_enable();
+	}
+}
+
+void tick_nohz_clear_dep_cpu(enum tick_dependency_bit bit, int cpu)
+{
+	struct tick_sched *ts = per_cpu_ptr(&tick_cpu_sched, cpu);
+
+	__tick_nohz_clear_dep(bit, &ts->tick_dependency);
+}
+
 /*
  * Re-evaluate the need for the tick as we switch the current task.
  * It might need the tick due to per task/process properties:
@@ -261,15 +377,19 @@ void tick_nohz_full_kick_all(void)
 void __tick_nohz_task_switch(void)
 {
 	unsigned long flags;
+	struct tick_sched *ts;
 
 	local_irq_save(flags);
 
 	if (!tick_nohz_full_cpu(smp_processor_id()))
 		goto out;
 
-	if (tick_nohz_tick_stopped() && !can_stop_full_tick())
-		tick_nohz_full_kick();
+	ts = this_cpu_ptr(&tick_cpu_sched);
 
+	if (ts->tick_stopped) {
+		if (current->tick_dependency || current->signal->tick_dependency)
+			tick_nohz_full_kick();
+	}
 out:
 	local_irq_restore(flags);
 }
@@ -722,7 +842,7 @@ static void tick_nohz_full_update_tick(struct tick_sched *ts)
 	if (!ts->tick_stopped && ts->nohz_mode == NOHZ_MODE_INACTIVE)
 		return;
 
-	if (can_stop_full_tick())
+	if (can_stop_full_tick(ts))
 		tick_nohz_stop_sched_tick(ts, ktime_get(), cpu);
 	else if (ts->tick_stopped)
 		tick_nohz_restart_sched_tick(ts, ktime_get());

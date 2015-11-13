@@ -97,6 +97,18 @@ static inline void tick_broadcast_exit(void)
 	tick_broadcast_oneshot_control(TICK_BROADCAST_EXIT);
 }
 
+enum tick_dependency_bit {
+	TICK_POSIX_TIMER_BIT	= 0,
+	TICK_PERF_EVENTS_BIT	= 1,
+	TICK_SCHED_BIT		= 2,
+	TICK_CLOCK_UNSTABLE_BIT	= 3
+};
+
+#define TICK_POSIX_TIMER_MASK		(1 << TICK_POSIX_TIMER_BIT)
+#define TICK_PERF_EVENTS_MASK		(1 << TICK_PERF_EVENTS_BIT)
+#define TICK_SCHED_MASK			(1 << TICK_SCHED_BIT)
+#define TICK_CLOCK_UNSTABLE_MASK	(1 << TICK_CLOCK_UNSTABLE_BIT)
+
 #ifdef CONFIG_NO_HZ_COMMON
 extern int tick_nohz_tick_stopped(void);
 extern void tick_nohz_idle_enter(void);
@@ -151,6 +163,15 @@ static inline int housekeeping_any_cpu(void)
 {
 	return cpumask_any_and(housekeeping_mask, cpu_online_mask);
 }
+
+extern void __tick_nohz_set_dep_delayed(enum tick_dependency_bit bit,
+					unsigned long *dep);
+extern void __tick_nohz_clear_dep(enum tick_dependency_bit bit,
+				  unsigned long *dep);
+extern void tick_nohz_set_dep(enum tick_dependency_bit bit);
+extern void tick_nohz_clear_dep(enum tick_dependency_bit bit);
+extern void tick_nohz_set_dep_cpu(enum tick_dependency_bit bit, int cpu);
+extern void tick_nohz_clear_dep_cpu(enum tick_dependency_bit bit, int cpu);
 
 extern void tick_nohz_full_kick(void);
 extern void tick_nohz_full_kick_cpu(int cpu);
