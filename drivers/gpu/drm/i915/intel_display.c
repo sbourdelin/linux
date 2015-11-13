@@ -12036,13 +12036,15 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 			continue;
 		}
 
-		DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d enabled",
+		DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d %s",
 			plane->type == DRM_PLANE_TYPE_CURSOR ? "CURSOR" : "STANDARD",
 			plane->base.id, intel_plane->pipe,
 			crtc->base.primary == plane ? 0 : intel_plane->plane + 1,
-			drm_plane_index(plane));
-		DRM_DEBUG_KMS("\tFB:%d, fb = %ux%u format = 0x%x",
-			fb->base.id, fb->width, fb->height, fb->pixel_format);
+			drm_plane_index(plane),
+			state->visible ? "enabled" : "not visible");
+		DRM_DEBUG_KMS("\tFB:%d, fb = %ux%u format = 0x%x bpp = %d",
+			fb->base.id, fb->width, fb->height, fb->pixel_format,
+			fb->bits_per_pixel);
 		DRM_DEBUG_KMS("\tscaler:%d src (%u, %u) %ux%u dst (%u, %u) %ux%u\n",
 			state->scaler_id,
 			state->src.x1 >> 16, state->src.y1 >> 16,
