@@ -12008,11 +12008,23 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 
 	DRM_DEBUG_KMS("planes on this crtc\n");
 	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
+		struct drm_plane_state *ps = NULL;
+
 		intel_plane = to_intel_plane(plane);
 		if (intel_plane->pipe != crtc->pipe)
 			continue;
 
-		state = to_intel_plane_state(plane->state);
+		/* Get in-flight plane state, if any */
+		if (pipe_config->base.state)
+			ps = drm_atomic_get_existing_plane_state(pipe_config->base.state,
+								 plane);
+
+		/* If no in-flight state, use active state instead */
+		if (!ps)
+			ps = plane->state;
+
+		state = to_intel_plane_state(ps);
+
 		fb = state->base.fb;
 		if (!fb) {
 			DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d "
