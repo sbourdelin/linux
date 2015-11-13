@@ -930,7 +930,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		if (page_mapped(page) || PageSwapCache(page))
 			sc->nr_scanned++;
 
-		may_enter_fs = (sc->gfp_mask & __GFP_FS) ||
+		may_enter_fs = (page_is_file_cache(page) && (sc->gfp_mask & __GFP_FS)) ||
 			(PageSwapCache(page) && (sc->gfp_mask & __GFP_IO));
 
 		/*
