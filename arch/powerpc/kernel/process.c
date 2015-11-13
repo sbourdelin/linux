@@ -934,10 +934,12 @@ static void show_instructions(struct pt_regs *regs)
 	printk("\n");
 }
 
-static struct regbit {
+struct regbit {
 	unsigned long bit;
 	const char *name;
-} msr_bits[] = {
+};
+
+static struct regbit msr_bits[] = {
 #if defined(CONFIG_PPC64) && !defined(CONFIG_BOOKE)
 	{MSR_SF,	"SF"},
 	{MSR_HV,	"HV"},
@@ -967,16 +969,41 @@ static struct regbit {
 	{0,		NULL}
 };
 
-static void printbits(unsigned long val, struct regbit *bits)
+static void printbits(unsigned long val, struct regbit *bits, const char *sep)
 {
-	const char *sep = "";
+	const char *s = "";
 
-	printk("<");
 	for (; bits->bit; ++bits)
 		if (val & bits->bit) {
-			printk("%s%s", sep, bits->name);
-			sep = ",";
+			printk("%s%s", s, bits->name);
+			s = sep;
 		}
+}
+
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+static struct regbit msr_tm_bits[] = {
+	{MSR_TS_T,	"T"},
+	{MSR_TS_S,	"S"},
+	{MSR_TM,	"E"},
+	{0,		NULL}
+};
+static void printtmbits(unsigned long val)
+{
+	if (val & (MSR_TM | MSR_TS_S | MSR_TS_T)) {
+		printk(",TM[");
+		printbits(val, msr_tm_bits, "");
+		printk("]");
+	}
+}
+#else
+static void printtmbits(unsigned long val) {}
+#endif
+
+static void printmsrbits(unsigned long val)
+{
+	printk("<");
+	printbits(val, msr_bits, ",");
+	printtmbits(val);
 	printk(">");
 }
 
@@ -1001,7 +1028,7 @@ void show_regs(struct pt_regs * regs)
 	printk("REGS: %p TRAP: %04lx   %s  (%s)\n",
 	       regs, regs->trap, print_tainted(), init_utsname()->release);
 	printk("MSR: "REG" ", regs->msr);
-	printbits(regs->msr, msr_bits);
+	printmsrbits(regs->msr);
 	printk("  CR: %08lx  XER: %08lx\n", regs->ccr, regs->xer);
 	trap = TRAP(regs);
 	if ((regs->trap != 0xc00) && cpu_has_feature(CPU_FTR_CFAR))
