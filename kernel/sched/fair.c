@@ -5313,8 +5313,10 @@ idle:
 	if (in_forced_idle(cfs_rq)) {
 		if (unlikely(local_softirq_pending())) {
 			__unthrottle_cfs_rq(cfs_rq);
+			trace_sched_cfs_idle_inject(CFS_IDLE_INJECT_YIELD_SOFTIRQ, 1);
 			goto again;
 		}
+		trace_sched_cfs_idle_inject(CFS_IDLE_INJECT_FORCED, 1);
 		return NULL;
 	}
 	/*
@@ -8469,6 +8471,7 @@ static enum hrtimer_restart idle_inject_timer_fn(struct hrtimer *hrtimer)
 		throttle_rq(cpu);
 	}
 	raw_cpu_write(idle_injected, !status);
+	trace_sched_cfs_idle_inject(CFS_IDLE_INJECT_TIMER, !status);
 
 	return HRTIMER_RESTART;
 }

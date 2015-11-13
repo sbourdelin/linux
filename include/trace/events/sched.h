@@ -562,6 +562,31 @@ TRACE_EVENT(sched_wake_idle_without_ipi,
 
 	TP_printk("cpu=%d", __entry->cpu)
 );
+
+#ifdef CONFIG_CFS_IDLE_INJECT
+/*
+ * Tracepoint for idle injection
+ */
+TRACE_EVENT(sched_cfs_idle_inject,
+
+	TP_PROTO(enum cfs_idle_inject_action action, int throttled),
+
+	TP_ARGS(action, throttled),
+
+	TP_STRUCT__entry(
+		__field(enum cfs_idle_inject_action, action)
+		__field(int, throttled)
+	),
+
+	TP_fast_assign(
+		__entry->action = action;
+		__entry->throttled = throttled;
+	),
+
+	TP_printk("action:%d throttled:%d", __entry->action, __entry->throttled)
+);
+#endif
+
 #endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */

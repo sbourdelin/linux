@@ -3193,6 +3193,11 @@ extern int proc_sched_cfs_idle_inject_duration_handler(struct ctl_table *table,
 						int write,
 						void __user *buffer,
 						size_t *length, loff_t *ppos);
+enum cfs_idle_inject_action {
+	CFS_IDLE_INJECT_TIMER,    /* timer sync point */
+	CFS_IDLE_INJECT_FORCED,   /* idle forced in rq */
+	CFS_IDLE_INJECT_YIELD_SOFTIRQ   /* yield to pending softirq */
+};
 #endif
 
 #endif
