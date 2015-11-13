@@ -36,15 +36,24 @@ check_events:
 
 /*
  * We can't use sysexit directly, because we're not running in ring0.
- * But we can easily fake it up using iret.  Assuming xen_sysexit is
- * jumped to with a standard stack frame, we can just strip it back to
- * a standard iret frame and use iret.
+ * But we can easily fake it up using iret.
+ * We came here from the opportunistic SYSEXIT path in entry_SYSENTER_32
+ * which left the stack looking like this:
+ * 	$__USER_DS
+ * 	%ecx
+ * 	eflags
+ *	$__USER_CS
+ *	%eip
+ *	%eax
+ *	%gs
+ *	%fs
+ *	%es
+ *	%ds	<-- %esp
+ *
+ * so we need to adjust it to look like a standard iret frame
  */
 ENTRY(xen_sysexit)
-	movl PT_EAX(%esp), %eax			/* Shouldn't be necessary? */
-	orl $X86_EFLAGS_IF, PT_EFLAGS(%esp)
-	lea PT_EIP(%esp), %esp
-
+	add $5*4, %esp
 	jmp xen_iret
 ENDPROC(xen_sysexit)
 
