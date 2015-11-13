@@ -593,9 +593,9 @@ mtrr_calc_range_state(u64 chunk_size, u64 gran_size,
 		      unsigned long x_remove_base,
 		      unsigned long x_remove_size, int i)
 {
-	static struct range range_new[RANGE_NUM];
+	static struct range range_new[RANGE_NUM] __initdata;
 	unsigned long range_sums_new;
-	static int nr_range_new;
+	int nr_range_new;
 	int num_reg;
 
 	/* Convert ranges to var ranges state: */
