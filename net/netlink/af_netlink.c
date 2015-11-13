@@ -2373,7 +2373,7 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		err = 0;
 		netlink_lock_table();
 		for (pos = 0; pos * 8 < nlk->ngroups; pos += sizeof(u32)) {
-			if (len - pos < sizeof(u32))
+			if (len < pos + sizeof(u32))
 				break;
 
 			idx = pos / sizeof(unsigned long);
