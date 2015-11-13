@@ -1,0 +1,36 @@
+Analogix ANX7814 SlimPort (Full-HD Transmitter)
+-----------------------------------------------
+
+The ANX7814 is an ultra-low power Full-HD (1080p60) SlimPort transmitter
+designed for portable devices.
+
+Required properties:
+
+ - compatible		: "analogix,anx7814"
+ - reg			: I2C address of the device
+ - cable-det-gpios	: Which GPIO to use for cable detection
+ - pd-gpios		: Which GPIO to use for power down
+ - reset-gpios		: Which GPIO to use for reset
+
+Optional properties:
+
+ - v10-gpios	: Which GPIO to use for V10 control.
+ - video interfaces: Device node can contain video interface port nodes.
+
+Example:
+
+	anx7814: anx7814@38 {
+		compatible = "analogix,anx7814";
+		reg = <0x38>;
+		cable-det-gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+		pd-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+		v10-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+		ports {
+			port@0 {
+				anx7814_in: endpoint {
+					remote-endpoint = <&hdmi0_out>;
+				};
+			};
+		};
+	};
