@@ -22,7 +22,6 @@
 #include <linux/module.h>
 #include <linux/irq_work.h>
 #include <linux/posix-timers.h>
-#include <linux/perf_event.h>
 #include <linux/context_tracking.h>
 
 #include <asm/irq_regs.h>
@@ -210,11 +209,6 @@ static bool can_stop_full_tick(struct tick_sched *ts)
 
 	if (!posix_cpu_timers_can_stop_tick(current)) {
 		trace_tick_stop(0, "posix timers running\n");
-		return false;
-	}
-
-	if (!perf_event_can_stop_tick()) {
-		trace_tick_stop(0, "perf events running\n");
 		return false;
 	}
 

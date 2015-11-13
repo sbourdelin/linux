@@ -3099,17 +3099,6 @@ done:
 	return rotate;
 }
 
-#ifdef CONFIG_NO_HZ_FULL
-bool perf_event_can_stop_tick(void)
-{
-	if (atomic_read(&nr_freq_events) ||
-	    __this_cpu_read(perf_throttled_count))
-		return false;
-	else
-		return true;
-}
-#endif
-
 void perf_event_task_tick(void)
 {
 	struct list_head *head = this_cpu_ptr(&active_ctx_list);
@@ -3120,6 +3109,7 @@ void perf_event_task_tick(void)
 
 	__this_cpu_inc(perf_throttled_seq);
 	throttled = __this_cpu_xchg(perf_throttled_count, 0);
+	tick_nohz_clear_dep_cpu(TICK_PERF_EVENTS_BIT, smp_processor_id());
 
 	list_for_each_entry_safe(ctx, tmp, head, active_ctx_list)
 		perf_adjust_freq_unthr_context(ctx, throttled);
@@ -3540,8 +3530,10 @@ static void unaccount_event(struct perf_event *event)
 		atomic_dec(&nr_comm_events);
 	if (event->attr.task)
 		atomic_dec(&nr_task_events);
-	if (event->attr.freq)
-		atomic_dec(&nr_freq_events);
+	if (event->attr.freq) {
+		if (atomic_dec_and_test(&nr_freq_events))
+			tick_nohz_clear_dep(TICK_PERF_EVENTS_BIT);
+	}
 	if (event->attr.context_switch) {
 		static_key_slow_dec_deferred(&perf_sched_events);
 		atomic_dec(&nr_switch_events);
@@ -6307,9 +6299,9 @@ static int __perf_event_overflow(struct perf_event *event,
 		if (unlikely(throttle
 			     && hwc->interrupts >= max_samples_per_tick)) {
 			__this_cpu_inc(perf_throttled_count);
+			tick_nohz_set_dep_cpu(TICK_PERF_EVENTS_BIT, smp_processor_id());
 			hwc->interrupts = MAX_INTERRUPTS;
 			perf_log_throttle(event, 0);
-			tick_nohz_full_kick();
 			ret = 1;
 		}
 	}
@@ -7695,7 +7687,7 @@ static void account_event(struct perf_event *event)
 		atomic_inc(&nr_task_events);
 	if (event->attr.freq) {
 		if (atomic_inc_return(&nr_freq_events) == 1)
-			tick_nohz_full_kick_all();
+			tick_nohz_set_dep(TICK_PERF_EVENTS_BIT);
 	}
 	if (event->attr.context_switch) {
 		atomic_inc(&nr_switch_events);
