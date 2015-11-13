@@ -248,6 +248,8 @@ static u32 lancer_cmd_get_file_len(struct be_adapter *adapter, u8 *file_name)
 	status = lancer_cmd_read_object(adapter, &data_len_cmd, 0, 0,
 					file_name, &data_read, &eof,
 					&addn_status);
+	if (status)
+		return 0;
 
 	return data_read;
 }
