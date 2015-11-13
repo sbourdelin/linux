@@ -1086,6 +1086,16 @@ menuconfig CGROUP_SCHED
 	  bandwidth allocation to such task groups. It uses cgroups to group
 	  tasks.
 
+config CFS_IDLE_INJECT
+	bool "Synchronized CFS idle injection"
+	depends on NO_HZ_IDLE && HIGH_RES_TIMERS
+	default n
+	help
+	  This feature let scheduler inject synchronized idle time across all online
+	  CPUs. Idle injection affects normal tasks only, yeilds to RT and interrupts.
+	  Effecitvely, CPUs can be duty cycled between running at the most power
+	  efficient performance state and deep idle states.
+
 if CGROUP_SCHED
 config FAIR_GROUP_SCHED
 	bool "Group scheduling for SCHED_OTHER"

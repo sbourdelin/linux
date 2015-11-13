@@ -124,6 +124,7 @@ static int __maybe_unused one = 1;
 static int __maybe_unused two = 2;
 static int __maybe_unused four = 4;
 static unsigned long one_ul = 1;
+static int fifty = 50;
 static int one_hundred = 100;
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
@@ -431,6 +432,26 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &one,
+	},
+#endif
+#ifdef CONFIG_CFS_IDLE_INJECT
+	{
+		.procname	= "sched_cfs_idle_inject_pct",
+		.data		= &sysctl_sched_cfs_idle_inject_pct,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_sched_cfs_idle_inject_pct_handler,
+		.extra1		= &zero,
+		.extra2		= &fifty,
+	},
+	{
+		.procname	= "sched_cfs_idle_inject_duration",
+		.data		= &sysctl_sched_cfs_idle_inject_duration,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_sched_cfs_idle_inject_duration_handler,
+		.extra1		= &four,
+		.extra2		= &one_hundred,
 	},
 #endif
 #ifdef CONFIG_PROVE_LOCKING

@@ -347,7 +347,9 @@ struct cfs_bandwidth { };
 struct cfs_rq {
 	struct load_weight load;
 	unsigned int nr_running, h_nr_running;
-
+#ifdef CONFIG_CFS_IDLE_INJECT
+	unsigned int runnable, forced_idle;
+#endif
 	u64 exec_clock;
 	u64 min_vruntime;
 #ifndef CONFIG_64BIT
@@ -422,6 +424,56 @@ struct cfs_rq {
 #endif /* CONFIG_CFS_BANDWIDTH */
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 };
+
+#ifdef CONFIG_CFS_IDLE_INJECT
+static inline void cfs_rq_nr_running_inc(struct cfs_rq *cfs_rq)
+{
+	if (!cfs_rq->nr_running++ && !cfs_rq->forced_idle)
+		cfs_rq->runnable = true;
+}
+
+static inline void cfs_rq_nr_running_dec(struct cfs_rq *cfs_rq)
+{
+	if (!--cfs_rq->nr_running && !cfs_rq->forced_idle)
+		cfs_rq->runnable = false;
+}
+
+static inline bool cfs_rq_runnable(struct cfs_rq *cfs_rq)
+{
+	return cfs_rq->runnable;
+}
+
+static inline void __unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
+{
+	cfs_rq->forced_idle = false;
+	cfs_rq->runnable = cfs_rq->nr_running;
+}
+static inline bool in_forced_idle(struct cfs_rq *cfs_rq)
+{
+	return cfs_rq->forced_idle;
+}
+#else
+
+static inline void cfs_rq_nr_running_inc(struct cfs_rq *cfs_rq)
+{
+	cfs_rq->nr_running++;
+}
+
+static inline void cfs_rq_nr_running_dec(struct cfs_rq *cfs_rq)
+{
+	cfs_rq->nr_running--;
+
+}
+
+static inline bool cfs_rq_runnable(struct cfs_rq *cfs_rq)
+{
+	return !!cfs_rq->nr_running;
+}
+
+static inline void __unthrottle_cfs_rq(struct cfs_rq *cfs_rq) {}
+static inline bool in_forced_idle(struct cfs_rq *cfs_rq) { return false; }
+
+#endif /* CONFIG_CFS_ILDE_INJECT */
 
 static inline int rt_bandwidth_enabled(void)
 {
