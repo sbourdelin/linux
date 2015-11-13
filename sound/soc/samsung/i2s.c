@@ -1244,7 +1244,8 @@ static int samsung_i2s_probe(struct platform_device *pdev)
 		if (ret != 0)
 			return ret;
 
-		return samsung_asoc_dma_platform_register(&pdev->dev);
+		return samsung_asoc_dma_platform_register(&pdev->dev,
+						  i2s_pdata->dma_filter);
 	}
 
 	pri_dai = i2s_alloc_dai(pdev, false);
@@ -1348,7 +1349,8 @@ static int samsung_i2s_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 
-	ret = samsung_asoc_dma_platform_register(&pdev->dev);
+	ret = samsung_asoc_dma_platform_register(&pdev->dev,
+					i2s_pdata->dma_filter);
 	if (ret != 0)
 		return ret;
 
