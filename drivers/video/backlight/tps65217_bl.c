@@ -320,10 +320,21 @@ static int tps65217_bl_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id tps65217_bl_of_match[] = {
+	{ .compatible = "ti,tps65217-bl", },
+	{ /* sentinel */ },
+};
+MODULE_DEVICE_TABLE(of, tps65217_bl_of_match);
+#endif
+
 static struct platform_driver tps65217_bl_driver = {
 	.probe		= tps65217_bl_probe,
 	.driver		= {
 		.name	= "tps65217-bl",
+#ifdef CONFIG_OF
+		.of_match_table = tps65217_bl_of_match,
+#endif
 	},
 };
 
