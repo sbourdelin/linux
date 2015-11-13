@@ -51,13 +51,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
 
 static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
 {
-	return readl(timer->base + offs);
+	return readl_relaxed(timer->base + offs);
 }
 
 static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
 		 unsigned long offs)
 {
-	writel(val, timer->base + offs);
+	writel_relaxed(val, timer->base + offs);
 }
 
 static void apbt_disable_int(struct dw_apb_timer *timer)
