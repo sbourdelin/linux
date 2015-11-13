@@ -555,7 +555,7 @@ static void tm_reclaim_thread(struct thread_struct *thr,
 	 * Use the current MSR TM suspended bit to track if we have
 	 * checkpointed state outstanding.
 	 * On signal delivery, we'd normally reclaim the checkpointed
-	 * state to obtain stack pointer (see:get_tm_stackpointer()).
+	 * state to obtain stack pointer (see:get_tm_stackpointer_and_reclaim()).
 	 * This will then directly return to userspace without going
 	 * through __switch_to(). However, if the stack frame is bad,
 	 * we need to exit this thread which calls __switch_to() which

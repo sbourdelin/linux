@@ -5,6 +5,6 @@
 #include <uapi/asm/signal.h>
 #include <uapi/asm/ptrace.h>
 
-extern unsigned long get_tm_stackpointer(struct pt_regs *regs);
+extern unsigned long get_tm_stackpointer_and_reclaim(struct pt_regs *regs);
 
 #endif /* _ASM_POWERPC_SIGNAL_H */

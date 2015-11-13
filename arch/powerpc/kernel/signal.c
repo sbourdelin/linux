@@ -162,7 +162,7 @@ void do_notify_resume(struct pt_regs *regs, unsigned long thread_info_flags)
 	user_enter();
 }
 
-unsigned long get_tm_stackpointer(struct pt_regs *regs)
+unsigned long get_tm_stackpointer_and_reclaim(struct pt_regs *regs)
 {
 	/* When in an active transaction that takes a signal, we need to be
 	 * careful with the stack.  It's possible that the stack has moved back
