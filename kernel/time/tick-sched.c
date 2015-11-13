@@ -202,11 +202,6 @@ static bool can_stop_full_tick(struct tick_sched *ts)
 		return false;
 	}
 
-	if (!sched_can_stop_tick()) {
-		trace_tick_stop(0, "more than 1 task in runqueue\n");
-		return false;
-	}
-
 	if (!posix_cpu_timers_can_stop_tick(current)) {
 		trace_tick_stop(0, "posix timers running\n");
 		return false;
