@@ -57,6 +57,17 @@ config SDIO_UART
 	  SDIO function driver for SDIO cards that implements the UART
 	  class, as well as the GPS class which appears like a UART.
 
+config MMC_FFU
+	bool "Field Firmware Update support"
+	depends on MMC != n
+	help
+	  Some eMMC 5.0 devices allow to update their firmware "in the
+	  field". This option enables support for this.
+
+	  If this is compiled in, you can use the mmc utility to request
+	  that the kernel loads the firmware via udev and writes it
+	  to the eMMC.
+
 config MMC_TEST
 	tristate "MMC host test driver"
 	help
