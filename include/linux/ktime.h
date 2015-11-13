@@ -233,6 +233,16 @@ static inline ktime_t ktime_sub_us(const ktime_t kt, const u64 usec)
 
 extern ktime_t ktime_add_safe(const ktime_t lhs, const ktime_t rhs);
 
+static inline ktime_t ktime_roundup(ktime_t x, ktime_t y)
+{
+	u64 temp_tv64;
+
+	temp_tv64 = x.tv64 + y.tv64 - 1;
+	temp_tv64 = div64_u64(temp_tv64, y.tv64);
+	x.tv64 = temp_tv64 * y.tv64;
+
+	return x;
+}
 /**
  * ktime_to_timespec_cond - convert a ktime_t variable to timespec
  *			    format only if the variable contains data
