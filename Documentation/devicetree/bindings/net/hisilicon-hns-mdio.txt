@@ -1,7 +1,9 @@
 Hisilicon MDIO bus controller
 
 Properties:
-- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
+- compatible: can be one of "hisilicon,hns-mdio","hisilicon,mdio",
+  for hip04 board, please use "hisilicon,mdio",
+  other boards, "hisilicon,hns-mdio" is OK.
 - reg: The base address of the MDIO bus controller register bank.
 - #address-cells: Must be <1>.
 - #size-cells: Must be <0>.  MDIO addresses have no size component.
