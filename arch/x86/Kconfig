@@ -757,6 +757,14 @@ config HPET_EMULATE_RTC
 	def_bool y
 	depends on HPET_TIMER && (RTC=y || RTC=m || RTC_DRV_CMOS=m || RTC_DRV_CMOS=y)
 
+config CACHE_RESERVATION
+	tristate "Cache Reservation Support"
+	default n
+	---help---
+	  This feature makes use of Intel's Cache Allocation Technology to allow the
+	  reservation of portions of the L3 cache to specific tasks. Please, see
+	  Documentation/x86/cache-reservation.txt for more information.
+
 config APB_TIMER
        def_bool y if X86_INTEL_MID
        prompt "Intel MID APB Timer Support" if X86_INTEL_MID
