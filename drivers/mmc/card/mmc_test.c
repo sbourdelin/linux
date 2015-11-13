@@ -721,32 +721,6 @@ err:
 }
 
 /*
- * Tests a basic transfer with certain parameters
- */
-static int mmc_test_simple_transfer(struct mmc_test_card *test,
-	struct scatterlist *sg, unsigned sg_len, unsigned dev_addr,
-	unsigned blocks, unsigned blksz, int write)
-{
-	struct mmc_request mrq = {0};
-	struct mmc_command cmd = {0};
-	struct mmc_command stop = {0};
-	struct mmc_data data = {0};
-
-	mrq.cmd = &cmd;
-	mrq.data = &data;
-	mrq.stop = &stop;
-
-	mmc_prepare_mrq(test->card, &mrq, sg, sg_len, dev_addr,
-		blocks, blksz, write);
-
-	mmc_wait_for_req(test->card->host, &mrq);
-
-	mmc_wait_busy(test->card);
-
-	return mmc_check_result(&mrq);
-}
-
-/*
  * Tests a transfer where the card will fail completely or partly
  */
 static int mmc_test_broken_transfer(struct mmc_test_card *test,
@@ -801,7 +775,7 @@ static int mmc_test_transfer(struct mmc_test_card *test,
 	if (ret)
 		return ret;
 
-	ret = mmc_test_simple_transfer(test, sg, sg_len, dev_addr,
+	ret = mmc_simple_transfer(test->card, sg, sg_len, dev_addr,
 		blocks, blksz, write);
 	if (ret)
 		return ret;
@@ -875,7 +849,7 @@ static int mmc_test_basic_write(struct mmc_test_card *test)
 
 	sg_init_one(&sg, test->buffer, 512);
 
-	return mmc_test_simple_transfer(test, &sg, 1, 0, 1, 512, 1);
+	return mmc_simple_transfer(test->card, &sg, 1, 0, 1, 512, 1);
 }
 
 static int mmc_test_basic_read(struct mmc_test_card *test)
@@ -889,7 +863,7 @@ static int mmc_test_basic_read(struct mmc_test_card *test)
 
 	sg_init_one(&sg, test->buffer, 512);
 
-	return mmc_test_simple_transfer(test, &sg, 1, 0, 1, 512, 0);
+	return mmc_simple_transfer(test->card, &sg, 1, 0, 1, 512, 0);
 }
 
 static int mmc_test_verify_write(struct mmc_test_card *test)
@@ -898,7 +872,7 @@ static int mmc_test_verify_write(struct mmc_test_card *test)
 
 	sg_init_one(&sg, test->buffer, 512);
 
-	return mmc_test_transfer(test, &sg, 1, 0, 1, 512, 1);
+	return mmc_simple_transfer(test->card, &sg, 1, 0, 1, 512, 1);
 }
 
 static int mmc_test_verify_read(struct mmc_test_card *test)
@@ -907,7 +881,7 @@ static int mmc_test_verify_read(struct mmc_test_card *test)
 
 	sg_init_one(&sg, test->buffer, 512);
 
-	return mmc_test_transfer(test, &sg, 1, 0, 1, 512, 0);
+	return mmc_simple_transfer(test->card, &sg, 1, 0, 1, 512, 0);
 }
 
 static int mmc_test_multi_write(struct mmc_test_card *test)
@@ -1268,7 +1242,7 @@ static int mmc_test_area_transfer(struct mmc_test_card *test,
 {
 	struct mmc_test_area *t = &test->area;
 
-	return mmc_test_simple_transfer(test, t->sg, t->sg_len, dev_addr,
+	return mmc_simple_transfer(test->card, t->sg, t->sg_len, dev_addr,
 					t->blocks, 512, write);
 }
 
