@@ -202,45 +202,6 @@ static int klp_find_object_symbol(const char *objname, const char *name,
 	return -EINVAL;
 }
 
-struct klp_verify_args {
-	const char *name;
-	const unsigned long addr;
-};
-
-static int klp_verify_callback(void *data, const char *name,
-			       struct module *mod, unsigned long addr)
-{
-	struct klp_verify_args *args = data;
-
-	if (!mod &&
-	    !strcmp(args->name, name) &&
-	    args->addr == addr)
-		return 1;
-
-	return 0;
-}
-
-static int klp_verify_vmlinux_symbol(const char *name, unsigned long addr)
-{
-	struct klp_verify_args args = {
-		.name = name,
-		.addr = addr,
-	};
-	int ret;
-
-	mutex_lock(&module_mutex);
-	ret = kallsyms_on_each_symbol(klp_verify_callback, &args);
-	mutex_unlock(&module_mutex);
-
-	if (!ret) {
-		pr_err("symbol '%s' not found at specified address 0x%016lx, kernel mismatch?\n",
-			name, addr);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 /*
  * external symbols are located outside the parent object (where the parent
  * object is either vmlinux or the kmod being patched).
@@ -268,6 +229,7 @@ static int klp_write_object_relocations(struct module *pmod,
 					struct klp_object *obj)
 {
 	int ret;
+	unsigned long val;
 	struct klp_reloc *reloc;
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
@@ -277,29 +239,30 @@ static int klp_write_object_relocations(struct module *pmod,
 		return -EINVAL;
 
 	for (reloc = obj->relocs; reloc->name; reloc++) {
-		if (!klp_is_module(obj)) {
-			ret = klp_verify_vmlinux_symbol(reloc->name,
-							reloc->val);
-			if (ret)
-				return ret;
-		} else {
-			/* module, reloc->val needs to be discovered */
-			if (reloc->external)
-				ret = klp_find_external_symbol(pmod,
-							       reloc->name,
-							       &reloc->val);
-			else
-				ret = klp_find_object_symbol(obj->mod->name,
-							     reloc->name,
-							     0, &reloc->val);
-			if (ret)
-				return ret;
-		}
+		/* discover the address of the referenced symbol */
+		if (reloc->external) {
+			/*
+			 * external symbols aren't specified by the user
+			 * therefore sympos should not be used
+			 */
+			if (reloc->sympos) {
+				pr_err("symbol '%s' is external and has sympos %lu\n",
+				       reloc->name, reloc->sympos);
+				return -EINVAL;
+			}
+			ret = klp_find_external_symbol(pmod, reloc->name, &val);
+		} else
+			ret = klp_find_object_symbol(obj->mod->name,
+						     reloc->name,
+						     reloc->sympos,
+						     &val);
+		if (ret)
+			return ret;
 		ret = klp_write_module_reloc(pmod, reloc->type, reloc->loc,
-					     reloc->val + reloc->addend);
+					     val + reloc->addend);
 		if (ret) {
 			pr_err("relocation failed for symbol '%s' at 0x%016lx (%d)\n",
-			       reloc->name, reloc->val, ret);
+			       reloc->name, val, ret);
 			return ret;
 		}
 	}
