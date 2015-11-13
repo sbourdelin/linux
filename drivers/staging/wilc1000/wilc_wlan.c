@@ -1056,15 +1056,13 @@ int wilc_wlan_handle_txq(struct net_device *dev, u32 *pu32TxqCount)
 				memcpy(&txb[offset], &header, 4);
 				if (tqe->type == WILC_CFG_PKT) {
 					buffer_offset = ETH_CONFIG_PKT_HDR_OFFSET;
-				}
-				else if (tqe->type == WILC_NET_PKT) {
+				} else if (tqe->type == WILC_NET_PKT) {
 					char *pBSSID = ((struct tx_complete_data *)(tqe->priv))->pBssid;
 
 					buffer_offset = ETH_ETHERNET_HDR_OFFSET;
 					/* copy the bssid at the sart of the buffer */
 					memcpy(&txb[offset + 4], pBSSID, 6);
-				}
-				else {
+				} else {
 					buffer_offset = HOST_HDR_OFFSET;
 				}
 
@@ -1183,9 +1181,7 @@ static void wilc_wlan_handle_rxq(struct wilc *wilc)
 				pkt_offset &= ~(IS_MANAGMEMENT | IS_MANAGMEMENT_CALLBACK | IS_MGMT_STATUS_SUCCES);
 
 				WILC_WFI_mgmt_rx(wilc, &buffer[offset + HOST_HDR_OFFSET], pkt_len);
-			}
-			else
-			{
+			} else {
 
 				if (!is_cfg_packet) {
 					if (pkt_len > 0) {
