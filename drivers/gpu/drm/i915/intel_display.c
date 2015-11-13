@@ -14888,6 +14888,9 @@ void intel_modeset_init(struct drm_device *dev)
 		 * just get the first one.
 		 */
 		intel_find_initial_plane_obj(crtc, &plane_config);
+
+		intel_dump_pipe_config(crtc, crtc->config,
+				       "[state after init fb reconstruction]");
 	}
 }
 
