@@ -1208,10 +1208,9 @@ static int intel_backlight_device_register(struct intel_connector *connector)
 	props.type = BACKLIGHT_RAW;
 
 	/*
-	 * Note: Everything should work even if the backlight device max
-	 * presented to the userspace is arbitrarily chosen.
+	 * Expose the whole valid PWM brightness range to the backlight class.
 	 */
-	props.max_brightness = panel->backlight.max;
+	props.max_brightness = panel->backlight.max - panel->backlight.min;
 	props.brightness = scale_hw_to_user(connector,
 					    panel->backlight.level,
 					    props.max_brightness);
@@ -1414,25 +1413,23 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_panel *panel = &connector->panel;
-	int min;
+	u32 min;
 
 	WARN_ON(panel->backlight.max == 0);
 
-	/*
-	 * XXX: If the vbt value is 255, it makes min equal to max, which leads
-	 * to problems. There are such machines out there. Either our
-	 * interpretation is wrong or the vbt has bogus data. Or both. Safeguard
-	 * against this by letting the minimum be at most (arbitrarily chosen)
-	 * 25% of the max.
-	 */
-	min = clamp_t(int, dev_priv->vbt.backlight.min_brightness, 0, 64);
-	if (min != dev_priv->vbt.backlight.min_brightness) {
-		DRM_DEBUG_KMS("clamping VBT min backlight %d/255 to %d/255\n",
-			      dev_priv->vbt.backlight.min_brightness, min);
-	}
-
 	/* vbt value is a coefficient in range [0..255] */
-	return scale(min, 0, 255, 0, panel->backlight.max);
+	min = scale(dev_priv->vbt.backlight.min_brightness, 0, 255,
+		    0, panel->backlight.max);
+
+	/*
+	 * The backlight class brightness 0 is mapping to PWM 0 and it is used to
+	 * turn off the backlight, so we need to step down a little bit here to make
+	 * backlight class brightness 1 map to the real PWM min.
+	 */
+	if (min > 0)
+		return min - 1;
+	else
+		return 0;
 }
 
 static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unused)
