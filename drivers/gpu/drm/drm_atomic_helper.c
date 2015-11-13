@@ -2027,8 +2027,8 @@ EXPORT_SYMBOL(drm_atomic_helper_page_flip);
  *
  * This is the main helper function provided by the atomic helper framework for
  * implementing the legacy DPMS connector interface. It computes the new desired
- * ->active state for the corresponding CRTC (if the connector is enabled) and
- *  updates it.
+ * ->active state for the corresponding CRTC and planes on it (if the connector
+ * is enabled) and updates it.
  *
  * Returns:
  * Returns 0 on success, negative errno numbers on failure.
@@ -2041,6 +2041,7 @@ int drm_atomic_helper_connector_dpms(struct drm_connector *connector,
 	struct drm_crtc_state *crtc_state;
 	struct drm_crtc *crtc;
 	struct drm_connector *tmp_connector;
+	struct drm_plane *tmp_plane;
 	int ret;
 	bool active = false;
 	int old_mode = connector->dpms;
@@ -2078,6 +2079,20 @@ retry:
 		}
 	}
 	crtc_state->active = active;
+
+	/* Collect associated plane states to global state object. */
+	list_for_each_entry(tmp_plane, &config->plane_list, head) {
+		struct drm_plane_state *plane_state;
+
+		if (tmp_plane->state->crtc != crtc)
+			continue;
+
+		plane_state = drm_atomic_get_plane_state(state, tmp_plane);
+		if (IS_ERR(plane_state)) {
+			ret = PTR_ERR(plane_state);
+			goto fail;
+		}
+	}
 
 	ret = drm_atomic_commit(state);
 	if (ret != 0)
