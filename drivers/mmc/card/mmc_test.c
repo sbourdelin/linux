@@ -184,44 +184,6 @@ static int mmc_test_set_blksize(struct mmc_test_card *test, unsigned size)
 	return mmc_set_blocklen(test->card, size);
 }
 
-static int mmc_test_busy(struct mmc_command *cmd)
-{
-	return !(cmd->resp[0] & R1_READY_FOR_DATA) ||
-		(R1_CURRENT_STATE(cmd->resp[0]) == R1_STATE_PRG);
-}
-
-/*
- * Wait for the card to finish the busy state
- */
-static int mmc_test_wait_busy(struct mmc_test_card *test)
-{
-	int ret, busy;
-	struct mmc_command cmd = {0};
-
-	busy = 0;
-	do {
-		memset(&cmd, 0, sizeof(struct mmc_command));
-
-		cmd.opcode = MMC_SEND_STATUS;
-		cmd.arg = test->card->rca << 16;
-		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
-
-		ret = mmc_wait_for_cmd(test->card->host, &cmd, 0);
-		if (ret)
-			break;
-
-		if (!busy && mmc_test_busy(&cmd)) {
-			busy = 1;
-			if (test->card->host->caps & MMC_CAP_WAIT_WHILE_BUSY)
-				pr_info("%s: Warning: Host did not "
-					"wait for busy state to end.\n",
-					mmc_hostname(test->card->host));
-		}
-	} while (mmc_test_busy(&cmd));
-
-	return ret;
-}
-
 /*
  * Transfer a single sector of kernel addressable data
  */
@@ -250,7 +212,7 @@ static int mmc_test_buffer_transfer(struct mmc_test_card *test,
 	if (data.error)
 		return data.error;
 
-	return mmc_test_wait_busy(test);
+	return mmc_wait_busy(test->card);
 }
 
 static void mmc_test_free_mem(struct mmc_test_mem *mem)
@@ -675,7 +637,7 @@ static int mmc_test_check_result_async(struct mmc_card *card,
 	struct mmc_test_async_req *test_async =
 		container_of(areq, struct mmc_test_async_req, areq);
 
-	mmc_test_wait_busy(test_async->test);
+	mmc_wait_busy(test_async->test->card);
 
 	return mmc_test_check_result(test_async->test, areq->mrq);
 }
@@ -812,7 +774,7 @@ static int mmc_test_simple_transfer(struct mmc_test_card *test,
 
 	mmc_wait_for_req(test->card->host, &mrq);
 
-	mmc_test_wait_busy(test);
+	mmc_wait_busy(test->card);
 
 	return mmc_test_check_result(test, &mrq);
 }
@@ -841,7 +803,7 @@ static int mmc_test_broken_transfer(struct mmc_test_card *test,
 
 	mmc_wait_for_req(test->card->host, &mrq);
 
-	mmc_test_wait_busy(test);
+	mmc_wait_busy(test->card);
 
 	return mmc_test_check_broken_result(test, &mrq);
 }
