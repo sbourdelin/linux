@@ -7,6 +7,16 @@ Required properties:
 - compatible : "asahi-kasei,ak4613"
 - reg : The chip select number on the I2C bus
 
+Optional properties:
+- in1-single-end	: Boolean. Indicate input / output pins are single-ended.
+- in2-single-end	  rather than differential.
+- out1-single-end
+- out2-single-end
+- out3-single-end
+- out4-single-end
+- out5-single-end
+- out6-single-end
+
 Example:
 
 &i2c {
