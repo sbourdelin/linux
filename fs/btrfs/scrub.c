@@ -3532,6 +3532,7 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 	u64 length;
 	u64 chunk_offset;
 	int ret = 0;
+	int ro_set = 0;
 	int slot;
 	struct extent_buffer *l;
 	struct btrfs_key key;
@@ -3617,10 +3618,7 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 		scrub_pause_on(fs_info);
 		ret = btrfs_inc_block_group_ro(root, cache);
 		scrub_pause_off(fs_info);
-		if (ret) {
-			btrfs_put_block_group(cache);
-			break;
-		}
+		ro_set = !ret;
 
 		dev_replace->cursor_right = found_key.offset + length;
 		dev_replace->cursor_left = found_key.offset;
@@ -3660,7 +3658,8 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 
 		scrub_pause_off(fs_info);
 
-		btrfs_dec_block_group_ro(root, cache);
+		if (ro_set)
+			btrfs_dec_block_group_ro(root, cache);
 
 		btrfs_put_block_group(cache);
 		if (ret)
