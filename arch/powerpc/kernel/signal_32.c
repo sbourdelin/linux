@@ -874,7 +874,16 @@ static long restore_tm_user_regs(struct pt_regs *regs,
 		       + ELF_NEVRREG))
 		return 1;
 #endif /* CONFIG_SPE */
-
+	/* Get the top half of the MSR */
+	if (__get_user(msr_hi, &tm_sr->mc_gregs[PT_MSR]))
+		return 1;
+	/* Pull in MSR TM from user context */
+	regs->msr = (regs->msr & ~MSR_TS_MASK) | ((msr_hi<<32) & MSR_TS_MASK);
+	/* Don't let the user set both TM bits */
+	if (MSR_TM_RESV(regs->msr)) {
+		regs->msr &= ~MSR_TS_MASK;
+		return 1;
+	}
 	/* Now, recheckpoint.  This loads up all of the checkpointed (older)
 	 * registers, including FP and V[S]Rs.  After recheckpointing, the
 	 * transactional versions should be loaded.
@@ -884,11 +893,6 @@ static long restore_tm_user_regs(struct pt_regs *regs,
 	current->thread.tm_texasr |= TEXASR_FS;
 	/* This loads the checkpointed FP/VEC state, if used */
 	tm_recheckpoint(&current->thread, msr);
-	/* Get the top half of the MSR */
-	if (__get_user(msr_hi, &tm_sr->mc_gregs[PT_MSR]))
-		return 1;
-	/* Pull in MSR TM from user context */
-	regs->msr = (regs->msr & ~MSR_TS_MASK) | ((msr_hi<<32) & MSR_TS_MASK);
 
 	/* This loads the speculative FP/VEC state, if used */
 	if (msr & MSR_FP) {
