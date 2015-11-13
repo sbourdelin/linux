@@ -768,6 +768,8 @@ struct drm_connector {
 struct drm_plane_state {
 	struct drm_plane *plane;
 
+	bool active;
+
 	struct drm_crtc *crtc;   /* do not write directly, use drm_atomic_set_crtc_for_plane() */
 	struct drm_framebuffer *fb;  /* do not write directly, use drm_atomic_set_fb_for_plane() */
 	struct fence *fence;

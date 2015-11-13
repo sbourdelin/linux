@@ -1197,15 +1197,7 @@ void drm_atomic_helper_commit_planes(struct drm_device *dev,
 		if (!funcs)
 			continue;
 
-		/*
-		 * Special-case disabling the plane if drivers support it.
-		 */
-		if (drm_atomic_plane_disabling(plane, old_plane_state) &&
-		    funcs->atomic_disable)
-			funcs->atomic_disable(plane, old_plane_state);
-		else if (plane->state->crtc ||
-			 drm_atomic_plane_disabling(plane, old_plane_state))
-			funcs->atomic_update(plane, old_plane_state);
+		drm_atomic_helper_update_plane_state(plane, old_plane_state);
 	}
 
 	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
@@ -1266,18 +1258,59 @@ drm_atomic_helper_commit_planes_on_crtc(struct drm_crtc_state *old_crtc_state)
 
 		WARN_ON(plane->state->crtc && plane->state->crtc != crtc);
 
-		if (drm_atomic_plane_disabling(plane, old_plane_state) &&
-		    plane_funcs->atomic_disable)
-			plane_funcs->atomic_disable(plane, old_plane_state);
-		else if (plane->state->crtc ||
-			 drm_atomic_plane_disabling(plane, old_plane_state))
-			plane_funcs->atomic_update(plane, old_plane_state);
+		drm_atomic_helper_update_plane_state(plane, old_plane_state);
 	}
 
 	if (crtc_funcs && crtc_funcs->atomic_flush)
 		crtc_funcs->atomic_flush(crtc, old_crtc_state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_commit_planes_on_crtc);
+
+/*
+ * drm_atomic_helper_update_plane_state - update plane's atomic state
+ * @plane: plane object
+ * @old_state: previous atomic state
+ *
+ * Update plane's atomic state, disables it if that is required, and
+ * updates drm_palnes_state's active-flag. This also WARNs if it
+ * detects an invalid state (both CRTC and FB need to either both be
+ * NULL or both be non-NULL).
+ */
+void drm_atomic_helper_update_plane_state(struct drm_plane *plane,
+					  struct drm_plane_state *old_state)
+{
+	const struct drm_plane_helper_funcs *funcs = plane->helper_private;
+
+	/*
+	 * When disabling a plane, CRTC and FB should always be NULL together.
+	 * Anything else should be considered a bug in the atomic core, so we
+	 * gently warn about it.
+	 */
+	WARN_ON((plane->state->crtc == NULL && plane->state->fb != NULL) ||
+		(plane->state->crtc != NULL && plane->state->fb == NULL));
+
+	if (!funcs)
+		return;
+
+	/*
+	 * The plane needs to be active only if it has an associated CRTC
+	 * and the CRTC is active. Use atomic_disable() if available.
+	 */
+	if (plane->state->active) {
+		if (!plane->state->crtc || !plane->state->crtc->state->active) {
+			plane->state->active = false;
+			if (funcs->atomic_disable) {
+				funcs->atomic_disable(plane, old_state);
+				return;
+			}
+		}
+		funcs->atomic_update(plane, old_state);
+	} else if (plane->state->crtc && plane->state->crtc->state->active) {
+		plane->state->active = true;
+		funcs->atomic_update(plane, old_state);
+	}
+}
+EXPORT_SYMBOL(drm_atomic_helper_update_plane_state);
 
 /**
  * drm_atomic_helper_cleanup_planes - cleanup plane resources after commit
