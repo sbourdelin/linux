@@ -409,12 +409,14 @@ EXPORT_SYMBOL_GPL(hw_breakpoint_restore);
  * as BD, BS or BT) indicating that more than one debug condition is
  * met and requires some more action in do_debug().
  *
- * NOTIFY_STOP returned for all other cases
+	* NOTIFY_DONE returned for all other cases in the event another
+	* do_debug int1 handler is active.
  *
  */
+
 static int hw_breakpoint_handler(struct die_args *args)
 {
-	int i, cpu, rc = NOTIFY_STOP;
+	int i, cpu, rc = NOTIFY_DONE;
 	struct perf_event *bp;
 	unsigned long dr7, dr6;
 	unsigned long *dr6_p;
@@ -434,6 +436,7 @@ static int hw_breakpoint_handler(struct die_args *args)
 	get_debugreg(dr7, 7);
 	/* Disable breakpoints during exception handling */
 	set_debugreg(0UL, 7);
+
 	/*
 	 * Assert that local interrupts are disabled
 	 * Reset the DRn bits in the virtualized register value.
@@ -446,45 +449,56 @@ static int hw_breakpoint_handler(struct die_args *args)
 	for (i = 0; i < HBP_NUM; ++i) {
 		if (likely(!(dr6 & (DR_TRAP0 << i))))
 			continue;
+		/*
+		 * Set up resume flag to avoid breakpoint recursion when
+		 * returning back to origin.   check dr7 and do not depend
+		 * on user input as to what type of breakpoint we are
+		 * dealing with.  if a breakpoint register is set or
+		 * triggered by another do_debug int1 handler, and we
+		 * depend on user input, the system will hang in a
+		 * recursive int1 exception state if the resume flag
+		 * is not set.  if execute breakpoint, set the resume
+		 * flag.
+		 */
+		if (!(dr7 & (3 << ((i * 4) + 16))))
+			args->regs->flags |= X86_EFLAGS_RF;
 
 		/*
-		 * The counter may be concurrently released but that can only
-		 * occur from a call_rcu() path. We can then safely fetch
-		 * the breakpoint, use its callback, touch its counter
-		 * while we are in an rcu_read_lock() path.
+		 * The counter may be concurrently released but that can
+		 * only occur from a call_rcu() path. We can then safely
+		 * fetch the breakpoint, use its callback, touch its
+		 * counter while we are in an rcu_read_lock() path.
 		 */
 		rcu_read_lock();
 
 		bp = per_cpu(bp_per_reg[i], cpu);
-		/*
-		 * Reset the 'i'th TRAP bit in dr6 to denote completion of
-		 * exception handling
-		 */
-		(*dr6_p) &= ~(DR_TRAP0 << i);
+
 		/*
 		 * bp can be NULL due to lazy debug register switching
 		 * or due to concurrent perf counter removing.
 		 */
 		if (!bp) {
 			rcu_read_unlock();
-			break;
+			continue;
 		}
 
-		perf_bp_event(bp, args->regs);
-
 		/*
-		 * Set up resume flag to avoid breakpoint recursion when
-		 * returning back to origin.
+		 * Reset the 'i'th TRAP bit in dr6 to denote completion of
+		 * exception handling.  don't clear dr6 status if
+		 * another do_debug int1 handler is active unless its
+		 * really one of our breakpoints.
 		 */
-		if (bp->hw.info.type == X86_BREAKPOINT_EXECUTE)
-			args->regs->flags |= X86_EFLAGS_RF;
+		(*dr6_p) &= ~(DR_TRAP0 << i);
+
+		perf_bp_event(bp, args->regs);
 
 		rcu_read_unlock();
 	}
 	/*
 	 * Further processing in do_debug() is needed for a) user-space
 	 * breakpoints (to generate signals) and b) when the system has
-	 * taken exception due to multiple causes
+	 * taken exception due to multiple causes and c) other do_debug
+	 * int handlers.
 	 */
 	if ((current->thread.debugreg6 & DR_TRAP_BITS) ||
 	    (dr6 & (~DR_TRAP_BITS)))
@@ -494,6 +508,7 @@ static int hw_breakpoint_handler(struct die_args *args)
 	put_cpu();
 
 	return rc;
+
 }
 
 /*
