@@ -172,8 +172,7 @@ static unsigned int nf_hashfn(const struct inet_frag_queue *q)
 
 static void nf_skb_free(struct sk_buff *skb)
 {
-	if (NFCT_FRAG6_CB(skb)->orig)
-		kfree_skb(NFCT_FRAG6_CB(skb)->orig);
+	kfree_skb(NFCT_FRAG6_CB(skb)->orig);
 }
 
 static void nf_ct_frag6_expire(unsigned long data)
