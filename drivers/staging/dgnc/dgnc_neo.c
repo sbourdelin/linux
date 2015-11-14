@@ -351,8 +351,8 @@ static inline void neo_clear_break(struct channel_t *ch, int force)
 
 	/* Turn break off, and unset some variables */
 	if (ch->ch_flags & CH_BREAK_SENDING) {
-		if (time_after_eq(jiffies, ch->ch_stop_sending_break)
-		    || force) {
+		if (time_after_eq(jiffies, ch->ch_stop_sending_break) ||
+		    force) {
 			unsigned char temp = readb(&ch->ch_neo_uart->lcr);
 
 			writeb((temp & ~UART_LCR_SBC), &ch->ch_neo_uart->lcr);
@@ -1783,9 +1783,9 @@ static void neo_vpd(struct dgnc_board *brd)
 		brd->vpd[(i*2)+1] = (a >> 8) & 0xff;
 	}
 
-	if  (((brd->vpd[0x08] != 0x82)	   /* long resource name tag */
-		&&  (brd->vpd[0x10] != 0x82))   /* long resource name tag (PCI-66 files)*/
-		||  (brd->vpd[0x7F] != 0x78)) { /* small resource end tag */
+	if  (((brd->vpd[0x08] != 0x82) &&  /* long resource name tag */
+	      (brd->vpd[0x10] != 0x82)) || /* long resource name tag (PCI-66 files)*/
+	      (brd->vpd[0x7F] != 0x78)) { /* small resource end tag */
 
 		memset(brd->vpd, '\0', NEO_VPD_IMAGESIZE);
 	} else {
