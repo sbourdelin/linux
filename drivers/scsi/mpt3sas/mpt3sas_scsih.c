@@ -8308,7 +8308,7 @@ static struct raid_function_template mpt3sas_raid_functions = {
 	.get_state	= _scsih_get_state,
 };
 
-static struct pci_error_handlers _scsih_err_handler = {
+static const struct pci_error_handlers _scsih_err_handler = {
 	.error_detected = _scsih_pci_error_detected,
 	.mmio_enabled = _scsih_pci_mmio_enabled,
 	.slot_reset =	_scsih_pci_slot_reset,
