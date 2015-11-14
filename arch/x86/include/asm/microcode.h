@@ -1,6 +1,7 @@
 #ifndef _ASM_X86_MICROCODE_H
 #define _ASM_X86_MICROCODE_H
 
+#include <asm/cpu.h>
 #include <linux/earlycpio.h>
 
 #define native_rdmsr(msr, val1, val2)			\
@@ -118,40 +119,14 @@ static inline int x86_vendor(void)
 	return X86_VENDOR_UNKNOWN;
 }
 
-static inline unsigned int __x86_family(unsigned int sig)
-{
-	unsigned int x86;
-
-	x86 = (sig >> 8) & 0xf;
-
-	if (x86 == 0xf)
-		x86 += (sig >> 20) & 0xff;
-
-	return x86;
-}
-
-static inline unsigned int x86_family(void)
+static inline unsigned int x86_family_cpuid(void)
 {
 	u32 eax = 0x00000001;
 	u32 ebx, ecx = 0, edx;
 
 	native_cpuid(&eax, &ebx, &ecx, &edx);
 
-	return __x86_family(eax);
-}
-
-static inline unsigned int x86_model(unsigned int sig)
-{
-	unsigned int x86, model;
-
-	x86 = __x86_family(sig);
-
-	model = (sig >> 4) & 0xf;
-
-	if (x86 == 0x6 || x86 == 0xf)
-		model += ((sig >> 16) & 0xf) << 4;
-
-	return model;
+	return x86_family(eax);
 }
 
 #ifdef CONFIG_MICROCODE

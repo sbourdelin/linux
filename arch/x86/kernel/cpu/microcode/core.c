@@ -130,7 +130,7 @@ void __init load_ucode_bsp(void)
 		return;
 
 	vendor = x86_vendor();
-	family = x86_family();
+	family = x86_family_cpuid();
 
 	switch (vendor) {
 	case X86_VENDOR_INTEL:
@@ -166,7 +166,7 @@ void load_ucode_ap(void)
 		return;
 
 	vendor = x86_vendor();
-	family = x86_family();
+	family = x86_family_cpuid();
 
 	switch (vendor) {
 	case X86_VENDOR_INTEL:
@@ -207,7 +207,7 @@ void reload_early_microcode(void)
 	int vendor, family;
 
 	vendor = x86_vendor();
-	family = x86_family();
+	family = x86_family_cpuid();
 
 	switch (vendor) {
 	case X86_VENDOR_INTEL:
