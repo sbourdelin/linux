@@ -64,7 +64,7 @@ static irqreturn_t iio_simple_dummy_trigger_h(int irq, void *p)
 		 * software scans: can be considered to be random access
 		 *   so efficient reading is just a case of minimal bus
 		 *   transactions.
-		 * software culled hardware scans:
+		 * software called hardware scans:
 		 *   occasionally a driver may process the nearest hardware
 		 *   scan to avoid storing elements that are not desired. This
 		 *   is the fiddliest option by far.
