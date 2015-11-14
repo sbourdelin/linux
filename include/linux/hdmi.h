@@ -32,11 +32,13 @@ enum hdmi_infoframe_type {
 	HDMI_INFOFRAME_TYPE_AVI = 0x82,
 	HDMI_INFOFRAME_TYPE_SPD = 0x83,
 	HDMI_INFOFRAME_TYPE_AUDIO = 0x84,
+	HDMI_INFOFRAME_TYPE_MPEG = 0x85,
 };
 
 #define HDMI_IEEE_OUI 0x000c03
 #define HDMI_INFOFRAME_HEADER_SIZE  4
 #define HDMI_AVI_INFOFRAME_SIZE    13
+#define HDMI_MPEG_INFOFRAME_SIZE   10
 #define HDMI_SPD_INFOFRAME_SIZE    25
 #define HDMI_AUDIO_INFOFRAME_SIZE  10
 
@@ -297,6 +299,26 @@ int hdmi_vendor_infoframe_init(struct hdmi_vendor_infoframe *frame);
 ssize_t hdmi_vendor_infoframe_pack(struct hdmi_vendor_infoframe *frame,
 				   void *buffer, size_t size);
 
+enum hdmi_mpeg_picture_type {
+	HDMI_MPEG_PICTURE_TYPE_UNKNOWN = 0x00,
+	HDMI_MPEG_PICTURE_TYPE_I = 0x01,
+	HDMI_MPEG_PICTURE_TYPE_B = 0x02,
+	HDMI_MPEG_PICTURE_TYPE_P = 0x03,
+};
+
+struct hdmi_mpeg_infoframe {
+	enum hdmi_infoframe_type type;
+	unsigned char version;
+	unsigned char length;
+	u32 bitrate;
+	enum hdmi_mpeg_picture_type picture_type;
+	bool repeated;
+};
+
+int hdmi_mpeg_infoframe_init(struct hdmi_mpeg_infoframe *frame);
+ssize_t hdmi_mpeg_infoframe_pack(struct hdmi_mpeg_infoframe *frame,
+				   void *buffer, size_t size);
+
 union hdmi_vendor_any_infoframe {
 	struct {
 		enum hdmi_infoframe_type type;
@@ -314,6 +336,7 @@ union hdmi_vendor_any_infoframe {
  * @spd: spd infoframe
  * @vendor: union of all vendor infoframes
  * @audio: audio infoframe
+ * @mpeg: mpeg infoframe
  *
  * This is used by the generic pack function. This works since all infoframes
  * have the same header which also indicates which type of infoframe should be
@@ -325,6 +348,7 @@ union hdmi_infoframe {
 	struct hdmi_spd_infoframe spd;
 	union hdmi_vendor_any_infoframe vendor;
 	struct hdmi_audio_infoframe audio;
+	struct hdmi_mpeg_infoframe mpeg;
 };
 
 ssize_t
