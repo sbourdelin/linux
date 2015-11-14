@@ -1226,6 +1226,8 @@ int xt_proto_init(struct net *net, u_int8_t af)
 #ifdef CONFIG_PROC_FS
 	char buf[XT_FUNCTION_MAXNAMELEN];
 	struct proc_dir_entry *proc;
+	kuid_t root_uid;
+	kgid_t root_gid;
 #endif
 
 	if (af >= ARRAY_SIZE(xt_prefix))
@@ -1233,12 +1235,16 @@ int xt_proto_init(struct net *net, u_int8_t af)
 
 
 #ifdef CONFIG_PROC_FS
+	root_uid = make_kuid(current_user_ns(), 1000);
+	root_gid = make_kgid(current_user_ns(), 1000);
+
 	strlcpy(buf, xt_prefix[af], sizeof(buf));
 	strlcat(buf, FORMAT_TABLES, sizeof(buf));
 	proc = proc_create_data(buf, 0440, net->proc_net, &xt_table_ops,
 				(void *)(unsigned long)af);
 	if (!proc)
 		goto out;
+	proc_set_user(proc, root_uid, root_gid);
 
 	strlcpy(buf, xt_prefix[af], sizeof(buf));
 	strlcat(buf, FORMAT_MATCHES, sizeof(buf));
