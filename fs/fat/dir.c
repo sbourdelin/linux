@@ -555,7 +555,7 @@ static int __fat_readdir(struct inode *inode, struct file *file,
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	struct buffer_head *bh;
+	struct buffer_head *bh = NULL;
 	struct msdos_dir_entry *de;
 	unsigned char nr_slots;
 	wchar_t *unicode = NULL;
@@ -584,10 +584,9 @@ static int __fat_readdir(struct inode *inode, struct file *file,
 		goto out;
 	}
 
-	bh = NULL;
 get_new:
 	if (fat_get_entry(inode, &cpos, &bh, &de) == -1)
-		goto end_of_dir;
+		goto out;
 parse_record:
 	nr_slots = 0;
 	/*
@@ -610,7 +609,7 @@ parse_record:
 		int status = fat_parse_long(inode, &cpos, &bh, &de,
 					    &unicode, &nr_slots);
 		if (status < 0) {
-			ctx->pos = cpos;
+			bh = NULL;
 			ret = status;
 			goto out;
 		} else if (status == PARSE_INVALID)
@@ -618,7 +617,7 @@ parse_record:
 		else if (status == PARSE_NOT_LONGNAME)
 			goto parse_record;
 		else if (status == PARSE_EOF)
-			goto end_of_dir;
+			goto out;
 
 		if (nr_slots) {
 			void *longname = unicode + FAT_MAX_UNI_CHARS;
@@ -654,8 +653,9 @@ parse_record:
 	fill_len = short_len;
 
 start_filldir:
-	if (!fake_offset)
-		ctx->pos = cpos - (nr_slots + 1) * sizeof(struct msdos_dir_entry);
+	ctx->pos = cpos - (nr_slots + 1) * sizeof(struct msdos_dir_entry);
+	if (fake_offset && ctx->pos < 2)
+		ctx->pos = 2;
 
 	if (!memcmp(de->name, MSDOS_DOT, MSDOS_NAME)) {
 		if (!dir_emit_dot(file, ctx))
@@ -681,14 +681,19 @@ record_end:
 	fake_offset = 0;
 	ctx->pos = cpos;
 	goto get_new;
-end_of_dir:
-	ctx->pos = cpos;
+
+out:
+	if (fake_offset && cpos < 2)
+		ctx->pos = 2;
+	else
+		ctx->pos = cpos;
 fill_failed:
 	brelse(bh);
 	if (unicode)
 		__putname(unicode);
-out:
+
 	mutex_unlock(&sbi->s_lock);
+
 	return ret;
 }
 
