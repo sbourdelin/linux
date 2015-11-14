@@ -278,6 +278,9 @@ trace:
 	/* save_mcount_regs fills in first two parameters */
 	save_mcount_regs
 
+	/* Load the ftrace_ops into the 3rd parameter */
+	movq function_trace_op(%rip), %rdx
+
 	call   *ftrace_trace_function
 
 	restore_mcount_regs
