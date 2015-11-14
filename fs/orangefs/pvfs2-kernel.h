@@ -661,10 +661,10 @@ extern int hash_table_size;
 
 extern const struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
-extern struct inode_operations pvfs2_file_inode_operations;
+extern const struct inode_operations pvfs2_file_inode_operations;
 extern const struct file_operations pvfs2_file_operations;
-extern struct inode_operations pvfs2_symlink_inode_operations;
-extern struct inode_operations pvfs2_dir_inode_operations;
+extern const struct inode_operations pvfs2_symlink_inode_operations;
+extern const struct inode_operations pvfs2_dir_inode_operations;
 extern const struct file_operations pvfs2_dir_operations;
 extern const struct dentry_operations pvfs2_dentry_operations;
 extern const struct file_operations pvfs2_devreq_file_operations;

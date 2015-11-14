@@ -21,7 +21,7 @@ static const char *pvfs2_follow_link(struct dentry *dentry, void **cookie)
 	return target;
 }
 
-struct inode_operations pvfs2_symlink_inode_operations = {
+const struct inode_operations pvfs2_symlink_inode_operations = {
 	.readlink = generic_readlink,
 	.follow_link = pvfs2_follow_link,
 	.setattr = pvfs2_setattr,

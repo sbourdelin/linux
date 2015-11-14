@@ -295,7 +295,7 @@ int pvfs2_getattr(struct vfsmount *mnt,
 }
 
 /* PVFS2 implementation of VFS inode operations for files */
-struct inode_operations pvfs2_file_inode_operations = {
+const struct inode_operations pvfs2_file_inode_operations = {
 	.get_acl = pvfs2_get_acl,
 	.set_acl = pvfs2_set_acl,
 	.setattr = pvfs2_setattr,

@@ -448,7 +448,7 @@ static int pvfs2_rename(struct inode *old_dir,
 }
 
 /* PVFS2 implementation of VFS inode operations for directories */
-struct inode_operations pvfs2_dir_inode_operations = {
+const struct inode_operations pvfs2_dir_inode_operations = {
 	.lookup = pvfs2_lookup,
 	.get_acl = pvfs2_get_acl,
 	.set_acl = pvfs2_set_acl,
