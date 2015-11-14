@@ -671,8 +671,7 @@ static void dsa_of_free_platform_data(struct dsa_platform_data *pd)
 		kfree(pd->chip[i].rtable);
 
 		/* Drop our reference to the MDIO bus device */
-		if (pd->chip[i].host_dev)
-			put_device(pd->chip[i].host_dev);
+		put_device(pd->chip[i].host_dev);
 	}
 	kfree(pd->chip);
 }
