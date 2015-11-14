@@ -1,0 +1,198 @@
+What:		/sys/firmware/qemu_fw_cfg/
+Date:		August 2015
+Contact:	Gabriel Somlo <somlo@cmu.edu>
+Description:
+		Several different architectures supported by QEMU (x86, arm,
+		sun4*, ppc/mac) are provisioned with a firmware configuration
+		(fw_cfg) device, originally intended as a way for the host to
+		provide configuration data to the guest firmware. Starting
+		with QEMU v2.4, arbitrary fw_cfg file entries may be specified
+		by the user on the command line, which makes fw_cfg additionally
+		useful as an out-of-band, asynchronous mechanism for providing
+		configuration data to the guest userspace.
+
+		=== Guest-side Hardware Interface ===
+
+		The fw_cfg device is available to guest VMs as a register pair
+		(control and data), accessible as either a IO ports or as MMIO
+		addresses, depending on the architecture.
+
+		--- Control Register ---
+
+		Width: 16-bit
+		Access: Write-Only
+		Endianness: LE (if IOport) or BE (if MMIO)
+
+		A write to the control register selects the index for one of
+		the firmware configuration items (or "blobs") available on the
+		fw_cfg device, which can subsequently be read from the data
+		register.
+
+		Each time the control register is written, an data offset
+		internal to the fw_cfg device will be set to zero. This data
+		offset impacts which portion of the selected fw_cfg blob is
+		accessed by reading the data register, as explained below.
+
+		--- Data Register ---
+
+		Width: 8-bit (if IOport), or 8/16/32/64-bit (if MMIO)
+		Access: Read-Only
+		Endianness: string preserving
+
+		The data register allows access to an array of bytes which
+		represent the fw_cfg blob last selected by a write to the
+		control register.
+
+		Immediately following a write to the control register, the data
+		offset will be set to zero. Each successful read access to the
+		data register will increment the data offset by the appropriate
+		access width.
+
+		Each fw_cfg blob has a maximum associated data length. Once the
+		data offset exceeds this maximum length, any subsequent reads
+		via the data register will return 0x00.
+
+		An N-byte wide read of the data register will return the next
+		available N bytes of the selected fw_cfg blob, as a substring,
+		in increasing address order, similar to memcpy(), zero-padded
+		if necessary should the maximum data length of the selected
+		item be reached, as described above.
+
+		--- Per-arch Register Details ---
+
+		-------------------------------------------------------------
+		arch	access	       base	ctrl	ctrl	data	max.
+			mode	    address	offset	endian	offset	data
+						(bytes)			(bytes)
+		-------------------------------------------------------------
+		x86	IOport	      0x510	0	LE	1	1
+		arm	MMIO	  0x9020000	8	BE	0	8
+		sun4u	IOport	      0x510	0	LE	1	1
+		sun4m	MMIO	0xd00000510	0	BE	2	1
+		ppc/mac	MMIO	 0xf0000510	0	BE	2	1
+		-------------------------------------------------------------
+
+		NOTE 1. On platforms where the fw_cfg registers are exposed as
+		IO ports, the data port number will always be one greater than
+		the port number of the control register. I.e., the two ports
+		are overlapping, and can not be mapped separately.
+
+		NOTE 2. QEMU publishes the base and size of the register set
+		in ACPI (as _HID "QEMU0002", on x86 and select aarch64 subsets)
+		and in the Device Tree (as compatible = "qemu,fw-cfg-mmio", on
+		arm guests).
+
+		NOTE 3. On architectures where automatic detection of fw_cfg
+		"hardware" (via ACPI or DT) is not supported, the guest side
+		kernel driver allows configuration using a command line
+		parameter, with the following syntax:
+
+			[fw_cfg.]ioport=<size>@<base>[:<ctrl_off>:<data_off>]
+		or
+			[fw_cfg.]mmio=<size>@<base>[:<ctrl_off>:<data_off>]
+
+		where:
+			<size> : size of ioport or mmio range
+			<base> : physical base address of ioport or mmio range
+		and, optionally:
+			<ctrl_off> : offset of control register
+			<data_off> : offset of data register
+
+		Since neither ACPI nor DT provide specific details on register
+		offsets within the overall specified register set range, using
+		<ctrl_off> and <data_off> allows the arm-specific default MMIO
+		offset values (8 and 0, respectively) to be overridden for e.g.
+		sun4m and ppc/mac, where the ofsets should be 0 and 2,
+		respectively. Using ppc/mac as an example:
+
+			fw_cfg.mmio=3@0xf0000510:0:2
+
+		=== Firmware Configuration Items of Interest ===
+
+		Originally, the index key, size, and formatting of blobs in
+		fw_cfg was hard coded by mutual agreement between QEMU on the
+		host side, and the guest-side firmware. Later on, a file
+		transfer interface was added: by reading a special blob, the
+		fw_cfg consumer can retrieve a list of records containing the
+		name, selector key, and size of further fw_cfg blobs made
+		available by the host. Below we describe three fw_cfg blobs
+		of interest to the sysfs driver.
+
+		--- Signature (Key 0x0000, FW_CFG_SIGNATURE) ---
+
+		The presence of the fw_cfg device can be verified by selecting
+		the signature blob by writing 0x0000 to the control register,
+		and reading four bytes from the data register. If the fw_cfg
+		device is present, the four bytes read will match the ASCII
+		characters "QEMU".
+
+		--- Revision (Key 0x0001, FW_CFG_ID) ---
+
+		A 32-bit little-endian unsigned integer, this item is used as
+		an interface revision number.
+
+		--- File Directory (Key 0x0019, FW_CFG_FILE_DIR) ---
+
+		Any fw_cfg blobs stored at key 0x0020 FW_CFG_FILE_FIRST() or
+		higher will have an associated entry in this "directory" blob,
+		which facilitates the discovery of available items by software
+		(e.g. BIOS) running on the guest. The format of the directory
+		blob is shown below.
+
+		NOTE: All integers are stored in big-endian format!
+
+		/* the entire file directory "blob" */
+		struct FWCfgFiles {
+			u32 count;		/* total number of entries */
+			struct FWCfgFile f[];	/* entry array, see below */
+		};
+
+		/* an individual directory entry, 64 bytes total */
+		struct FWCfgFile {
+			u32 size;	/* size of referenced blob */
+			u16 select;	/* selector key for referenced blob */
+			u16 reserved;
+			char name[56];	/* blob name, nul-terminated ASCII */
+		};
+
+		=== SysFS fw_cfg Interface ===
+
+		The fw_cfg sysfs interface described in this document is only
+		intended to display discoverable blobs (i.e., those registered
+		with the file directory), as there is no way to determine the
+		presence or size of "legacy" blobs (with selector keys between
+		0x0002 and 0x0018) programmatically.
+
+		All fw_cfg information is shown under:
+
+			/sys/firmware/qemu_fw_cfg/
+
+		The only legacy blob displayed is the fw_cfg device revision:
+
+			/sys/firmware/qemu_fw_cfg/rev
+
+		--- Discoverable fw_cfg blobs by selector key ---
+
+		All discoverable blobs listed in the fw_cfg file directory are
+		displayed as entries named after their unique selector key
+		value, e.g.:
+
+			/sys/firmware/qemu_fw_cfg/by_key/32
+			/sys/firmware/qemu_fw_cfg/by_key/33
+			/sys/firmware/qemu_fw_cfg/by_key/34
+			...
+
+		Each such fw_cfg sysfs entry has the following values exported
+		as attributes:
+
+		name  	: The 56-byte nul-terminated ASCII string used as the
+			  blob's 'file name' in the fw_cfg directory.
+		size  	: The length of the blob, as given in the fw_cfg
+			  directory.
+		key	: The value of the blob's selector key as given in the
+			  fw_cfg directory. This value is the same as used in
+			  the parent directory name.
+		raw	: The raw bytes of the blob, obtained by selecting the
+			  entry via the control register, and reading a number
+			  of bytes equal to the blob size from the data
+			  register.
