@@ -1903,6 +1903,7 @@ static void try_to_push_tasks(void *arg)
 	struct rq *rq, *src_rq;
 	int this_cpu;
 	int cpu;
+	unsigned long flags;
 
 	this_cpu = rt_rq->push_cpu;
 
@@ -1914,13 +1915,13 @@ static void try_to_push_tasks(void *arg)
 
 again:
 	if (has_pushable_tasks(rq)) {
-		raw_spin_lock(&rq->lock);
+		raw_spin_lock_irqsave(&rq->lock, flags);
 		push_rt_task(rq);
-		raw_spin_unlock(&rq->lock);
+		raw_spin_unlock_irqrestore(&rq->lock, flags);
 	}
 
 	/* Pass the IPI to the next rt overloaded queue */
-	raw_spin_lock(&rt_rq->push_lock);
+	raw_spin_lock_irqsave(&rt_rq->push_lock, flags);
 	/*
 	 * If the source queue changed since the IPI went out,
 	 * we need to restart the search from that CPU again.
@@ -1934,7 +1935,7 @@ again:
 
 	if (cpu >= nr_cpu_ids)
 		rt_rq->push_flags &= ~RT_PUSH_IPI_EXECUTING;
-	raw_spin_unlock(&rt_rq->push_lock);
+	raw_spin_unlock_irqrestore(&rt_rq->push_lock, flags);
 
 	if (cpu >= nr_cpu_ids)
 		return;
