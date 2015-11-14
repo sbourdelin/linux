@@ -125,7 +125,7 @@
 
 struct hpdi_private {
 	void __iomem *plx9080_mmio;
-	uint32_t *dio_buffer[NUM_DMA_BUFFERS];	/* dma buffers */
+	u32 *dio_buffer[NUM_DMA_BUFFERS];	/* dma buffers */
 	/* physical addresses of dma buffers */
 	dma_addr_t dio_buffer_phys_addr[NUM_DMA_BUFFERS];
 	/*
@@ -137,7 +137,7 @@ struct hpdi_private {
 	dma_addr_t dma_desc_phys_addr;
 	unsigned int num_dma_descriptors;
 	/* pointer to start of buffers indexed by descriptor */
-	uint32_t *desc_dio_buffer[NUM_DMA_DESCRIPTORS];
+	u32 *desc_dio_buffer[NUM_DMA_DESCRIPTORS];
 	/* index of the dma descriptor that is currently being used */
 	unsigned int dma_desc_index;
 	unsigned int tx_fifo_size;
@@ -192,10 +192,10 @@ static irqreturn_t gsc_hpdi_interrupt(int irq, void *d)
 	struct hpdi_private *devpriv = dev->private;
 	struct comedi_subdevice *s = dev->read_subdev;
 	struct comedi_async *async = s->async;
-	uint32_t hpdi_intr_status, hpdi_board_status;
-	uint32_t plx_status;
-	uint32_t plx_bits;
-	uint8_t dma0_status, dma1_status;
+	u32 hpdi_intr_status, hpdi_board_status;
+	u32 plx_status;
+	u32 plx_bits;
+	u8 dma0_status, dma1_status;
 	unsigned long flags;
 
 	if (!dev->attached)
@@ -290,7 +290,7 @@ static int gsc_hpdi_cmd(struct comedi_device *dev,
 	struct comedi_async *async = s->async;
 	struct comedi_cmd *cmd = &async->cmd;
 	unsigned long flags;
-	uint32_t bits;
+	u32 bits;
 
 	if (s->io_bits)
 		return -EINVAL;
@@ -424,7 +424,7 @@ static int gsc_hpdi_setup_dma_descriptors(struct comedi_device *dev,
 {
 	struct hpdi_private *devpriv = dev->private;
 	dma_addr_t phys_addr = devpriv->dma_desc_phys_addr;
-	uint32_t next_bits = PLX_DESC_IN_PCI_BIT | PLX_INTR_TERM_COUNT |
+	u32 next_bits = PLX_DESC_IN_PCI_BIT | PLX_INTR_TERM_COUNT |
 			     PLX_XFER_LOCAL_TO_PCI;
 	unsigned int offset = 0;
 	unsigned int idx = 0;
@@ -516,7 +516,7 @@ static void gsc_hpdi_free_dma(struct comedi_device *dev)
 static int gsc_hpdi_init(struct comedi_device *dev)
 {
 	struct hpdi_private *devpriv = dev->private;
-	uint32_t plx_intcsr_bits;
+	u32 plx_intcsr_bits;
 
 	/* wait 10usec after reset before accessing fifos */
 	writel(BOARD_RESET_BIT, dev->mmio + BOARD_CONTROL_REG);
@@ -546,7 +546,7 @@ static int gsc_hpdi_init(struct comedi_device *dev)
 static void gsc_hpdi_init_plx9080(struct comedi_device *dev)
 {
 	struct hpdi_private *devpriv = dev->private;
-	uint32_t bits;
+	u32 bits;
 	void __iomem *plx_iobase = devpriv->plx9080_mmio;
 
 #ifdef __BIG_ENDIAN
