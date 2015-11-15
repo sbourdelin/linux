@@ -40,34 +40,42 @@ int snd_dice_stream_calculate_rate(__be32 reg, unsigned int *rate)
 
 static int ensure_phase_lock(struct snd_dice *dice, __be32 reg)
 {
-	unsigned int retries = 3;
+	__be32 stat;
+	unsigned int retries = 10;
 	int err;
-retry:
+
 	if (completion_done(&dice->clock_accepted))
 		reinit_completion(&dice->clock_accepted);
 
 	err = snd_dice_transaction_write_global(dice, GLOBAL_CLOCK_SELECT,
 						&reg, sizeof(reg));
 	if (err < 0)
-		goto end;
+		return err;
 
-	/* Timeout means it's invalid request, probably bus reset occurred. */
-	if (wait_for_completion_timeout(&dice->clock_accepted,
-			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
-		if (retries-- == 0) {
-			err = -ETIMEDOUT;
-			goto end;
-		}
+	wait_for_completion_timeout(&dice->clock_accepted,
+			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS));
 
-		err = snd_dice_transaction_reinit(dice);
+	/*
+	 * Some models don't perform phase lock yet. In this case, transferred
+	 * packet includes dicsontinuity. Here, wait till one second.
+	 */
+	while (retries-- > 0) {
+		err = snd_dice_transaction_read_global(dice, GLOBAL_STATUS,
+						       &stat, sizeof(stat));
 		if (err < 0)
-			goto end;
+			return err;
 
-		msleep(500);	/* arbitrary */
-		goto retry;
+		if ((be32_to_cpu(stat) & 0x01) == STATUS_SOURCE_LOCKED &&
+		    ((be32_to_cpu(stat) & STATUS_NOMINAL_RATE_MASK) ==
+		      (be32_to_cpu(reg) & STATUS_NOMINAL_RATE_MASK)))
+			break;
+
+		msleep(100);
 	}
-end:
-	return err;
+	if (retries == 0)
+		return -ETIMEDOUT;
+
+	return 0;
 }
 
 static void release_resources(struct snd_dice *dice,
