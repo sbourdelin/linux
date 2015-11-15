@@ -35,7 +35,11 @@ static int limit_channels_and_rates(struct snd_dice *dice,
 	hw->channels_min = hw->channels_max = be32_to_cpu(reg[0]);
 
 	/* Retrieve current sampling transfer frequency and limit to it. */
-	err = snd_dice_transaction_get_rate(dice, &rate);
+	err = snd_dice_transaction_read_global(dice, GLOBAL_CLOCK_SELECT,
+					       &reg, sizeof(reg[0]));
+	if (err < 0)
+		return err;
+	err = snd_dice_stream_calculate_rate(reg[0], &rate);
 	if (err < 0)
 		return err;
 

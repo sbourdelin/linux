@@ -149,18 +149,13 @@ static inline int snd_dice_transaction_read_sync(struct snd_dice *dice,
 					 buf, len);
 }
 
-int snd_dice_transaction_get_clock_source(struct snd_dice *dice,
-					  unsigned int *source);
-int snd_dice_transaction_set_rate(struct snd_dice *dice, unsigned int rate);
-int snd_dice_transaction_get_rate(struct snd_dice *dice, unsigned int *rate);
 int snd_dice_transaction_set_enable(struct snd_dice *dice);
 void snd_dice_transaction_clear_enable(struct snd_dice *dice);
 int snd_dice_transaction_init(struct snd_dice *dice);
 int snd_dice_transaction_reinit(struct snd_dice *dice);
 void snd_dice_transaction_destroy(struct snd_dice *dice);
 
-#define SND_DICE_RATES_COUNT	7
-extern const unsigned int snd_dice_rates[SND_DICE_RATES_COUNT];
+int snd_dice_stream_calculate_rate(__be32 reg, unsigned int *rate);
 
 int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate);
 void snd_dice_stream_stop_duplex(struct snd_dice *dice);

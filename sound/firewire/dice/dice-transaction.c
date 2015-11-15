@@ -9,8 +9,6 @@
 
 #include "dice.h"
 
-#define NOTIFICATION_TIMEOUT_MS	100
-
 static u64 get_subaddr(struct snd_dice *dice, enum snd_dice_addr_type type,
 		       u64 offset)
 {
@@ -54,113 +52,6 @@ int snd_dice_transaction_read(struct snd_dice *dice,
 				  (len == 4) ? TCODE_READ_QUADLET_REQUEST :
 					       TCODE_READ_BLOCK_REQUEST,
 				  get_subaddr(dice, type, offset), buf, len, 0);
-}
-
-static unsigned int get_clock_info(struct snd_dice *dice, __be32 *info)
-{
-	return snd_dice_transaction_read_global(dice, GLOBAL_CLOCK_SELECT,
-						info, 4);
-}
-
-static int set_clock_info(struct snd_dice *dice,
-			  unsigned int rate, unsigned int source)
-{
-	unsigned int retries = 3;
-	unsigned int i;
-	__be32 info;
-	u32 mask;
-	u32 clock;
-	int err;
-retry:
-	err = get_clock_info(dice, &info);
-	if (err < 0)
-		goto end;
-
-	clock = be32_to_cpu(info);
-	if (source != UINT_MAX) {
-		mask = CLOCK_SOURCE_MASK;
-		clock &= ~mask;
-		clock |= source;
-	}
-	if (rate != UINT_MAX) {
-		for (i = 0; i < ARRAY_SIZE(snd_dice_rates); i++) {
-			if (snd_dice_rates[i] == rate)
-				break;
-		}
-		if (i == ARRAY_SIZE(snd_dice_rates)) {
-			err = -EINVAL;
-			goto end;
-		}
-
-		mask = CLOCK_RATE_MASK;
-		clock &= ~mask;
-		clock |= i << CLOCK_RATE_SHIFT;
-	}
-	info = cpu_to_be32(clock);
-
-	if (completion_done(&dice->clock_accepted))
-		reinit_completion(&dice->clock_accepted);
-
-	err = snd_dice_transaction_write_global(dice, GLOBAL_CLOCK_SELECT,
-						&info, 4);
-	if (err < 0)
-		goto end;
-
-	/* Timeout means it's invalid request, probably bus reset occurred. */
-	if (wait_for_completion_timeout(&dice->clock_accepted,
-			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
-		if (retries-- == 0) {
-			err = -ETIMEDOUT;
-			goto end;
-		}
-
-		err = snd_dice_transaction_reinit(dice);
-		if (err < 0)
-			goto end;
-
-		msleep(500);	/* arbitrary */
-		goto retry;
-	}
-end:
-	return err;
-}
-
-int snd_dice_transaction_get_clock_source(struct snd_dice *dice,
-					  unsigned int *source)
-{
-	__be32 info;
-	int err;
-
-	err = get_clock_info(dice, &info);
-	if (err >= 0)
-		*source = be32_to_cpu(info) & CLOCK_SOURCE_MASK;
-
-	return err;
-}
-
-int snd_dice_transaction_get_rate(struct snd_dice *dice, unsigned int *rate)
-{
-	__be32 info;
-	unsigned int index;
-	int err;
-
-	err = get_clock_info(dice, &info);
-	if (err < 0)
-		goto end;
-
-	index = (be32_to_cpu(info) & CLOCK_RATE_MASK) >> CLOCK_RATE_SHIFT;
-	if (index >= SND_DICE_RATES_COUNT) {
-		err = -ENOSYS;
-		goto end;
-	}
-
-	*rate = snd_dice_rates[index];
-end:
-	return err;
-}
-int snd_dice_transaction_set_rate(struct snd_dice *dice, unsigned int rate)
-{
-	return set_clock_info(dice, rate, UINT_MAX);
 }
 
 int snd_dice_transaction_set_enable(struct snd_dice *dice)

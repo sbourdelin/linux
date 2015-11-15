@@ -12,7 +12,7 @@
 #define	CALLBACK_TIMEOUT	200
 #define NOTIFICATION_TIMEOUT_MS	100
 
-const unsigned int snd_dice_rates[SND_DICE_RATES_COUNT] = {
+static const unsigned int dice_stream_rates[] = {
 	/* mode 0 */
 	[0] =  32000,
 	[1] =  44100,
@@ -24,6 +24,51 @@ const unsigned int snd_dice_rates[SND_DICE_RATES_COUNT] = {
 	[5] = 176400,
 	[6] = 192000,
 };
+
+int snd_dice_stream_calculate_rate(__be32 reg, unsigned int *rate)
+{
+	unsigned int index;
+
+	index = (be32_to_cpu(reg) & CLOCK_RATE_MASK) >> CLOCK_RATE_SHIFT;
+	if (index >= ARRAY_SIZE(dice_stream_rates))
+		return -EIO;
+
+	*rate = dice_stream_rates[index];
+
+	return 0;
+}
+
+static int ensure_phase_lock(struct snd_dice *dice, __be32 reg)
+{
+	unsigned int retries = 3;
+	int err;
+retry:
+	if (completion_done(&dice->clock_accepted))
+		reinit_completion(&dice->clock_accepted);
+
+	err = snd_dice_transaction_write_global(dice, GLOBAL_CLOCK_SELECT,
+						&reg, sizeof(reg));
+	if (err < 0)
+		goto end;
+
+	/* Timeout means it's invalid request, probably bus reset occurred. */
+	if (wait_for_completion_timeout(&dice->clock_accepted,
+			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
+		if (retries-- == 0) {
+			err = -ETIMEDOUT;
+			goto end;
+		}
+
+		err = snd_dice_transaction_reinit(dice);
+		if (err < 0)
+			goto end;
+
+		msleep(500);	/* arbitrary */
+		goto retry;
+	}
+end:
+	return err;
+}
 
 static void release_resources(struct snd_dice *dice,
 			      struct fw_iso_resources *resources)
@@ -151,21 +196,16 @@ end:
 	return err;
 }
 
-static int get_sync_mode(struct snd_dice *dice, enum cip_flags *sync_mode)
+static inline int calculate_sync_mode(__be32 reg, enum cip_flags *sync_mode)
 {
-	u32 source;
-	int err;
+	int err = 0;
 
-	err = snd_dice_transaction_get_clock_source(dice, &source);
-	if (err < 0)
-		goto end;
-
-	switch (source) {
+	switch (be32_to_cpu(reg) & CLOCK_SOURCE_MASK) {
 	/* So-called 'SYT Match' modes, sync_to_syt value of packets received */
 	case CLOCK_SOURCE_ARX4:	/* in 4th stream */
 	case CLOCK_SOURCE_ARX3:	/* in 3rd stream */
 	case CLOCK_SOURCE_ARX2:	/* in 2nd stream */
-		err = -ENOSYS;
+		err = -EINVAL;
 		break;
 	case CLOCK_SOURCE_ARX1:	/* in 1st stream, which this driver uses */
 		*sync_mode = 0;
@@ -174,13 +214,14 @@ static int get_sync_mode(struct snd_dice *dice, enum cip_flags *sync_mode)
 		*sync_mode = CIP_SYNC_TO_DEVICE;
 		break;
 	}
-end:
+
 	return err;
 }
 
 int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 {
 	struct amdtp_stream *master, *slave;
+	__be32 reg;
 	unsigned int curr_rate;
 	enum cip_flags sync_mode;
 	int err = 0;
@@ -188,7 +229,12 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 	if (dice->substreams_counter == 0)
 		goto end;
 
-	err = get_sync_mode(dice, &sync_mode);
+	err = snd_dice_transaction_read_global(dice, GLOBAL_CLOCK_SELECT,
+					       &reg, sizeof(reg));
+	if (err < 0)
+		goto end;
+
+	err = calculate_sync_mode(reg, &sync_mode);
 	if (err < 0)
 		goto end;
 	if (sync_mode == CIP_SYNC_TO_DEVICE) {
@@ -204,7 +250,7 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 		stop_stream(dice, master);
 
 	/* Stop stream if rate is different. */
-	err = snd_dice_transaction_get_rate(dice, &curr_rate);
+	err = snd_dice_stream_calculate_rate(reg, &curr_rate);
 	if (err < 0) {
 		dev_err(&dice->unit->device,
 			"fail to get sampling rate\n");
@@ -223,10 +269,10 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 
 		amdtp_stream_set_sync(sync_mode, master, slave);
 
-		err = snd_dice_transaction_set_rate(dice, rate);
+		err = ensure_phase_lock(dice, reg);
 		if (err < 0) {
 			dev_err(&dice->unit->device,
-				"fail to set sampling rate\n");
+				"fail to ensure phase lock\n");
 			goto end;
 		}
 
