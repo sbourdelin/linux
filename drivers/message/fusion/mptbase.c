@@ -140,7 +140,9 @@ static int			 MptDriverClass[MPT_MAX_PROTOCOL_DRIVERS];
 static MPT_EVHANDLER		 MptEvHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 					/* Reset handler lookup table */
 static MPT_RESETHANDLER		 MptResetHandlers[MPT_MAX_PROTOCOL_DRIVERS];
-static struct mpt_pci_driver 	*MptDeviceDriverHandlers[MPT_MAX_PROTOCOL_DRIVERS];
+
+static const
+struct mpt_pci_driver *MptDeviceDriverHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry 	*mpt_proc_root_dir;
@@ -826,7 +828,7 @@ mpt_reset_deregister(u8 cb_idx)
  *	@cb_idx: MPT protocol driver index
  */
 int
-mpt_device_driver_register(struct mpt_pci_driver * dd_cbfunc, u8 cb_idx)
+mpt_device_driver_register(const struct mpt_pci_driver *dd_cbfunc, u8 cb_idx)
 {
 	MPT_ADAPTER	*ioc;
 	const struct pci_device_id *id;
@@ -855,7 +857,7 @@ mpt_device_driver_register(struct mpt_pci_driver * dd_cbfunc, u8 cb_idx)
 void
 mpt_device_driver_deregister(u8 cb_idx)
 {
-	struct mpt_pci_driver *dd_cbfunc;
+	const struct mpt_pci_driver *dd_cbfunc;
 	MPT_ADAPTER	*ioc;
 
 	if (!cb_idx || cb_idx >= MPT_MAX_PROTOCOL_DRIVERS)

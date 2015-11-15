@@ -1443,7 +1443,7 @@ mptlan_remove(struct pci_dev *pdev)
 	}
 }
 
-static struct mpt_pci_driver mptlan_driver = {
+static const struct mpt_pci_driver mptlan_driver = {
 	.probe		= mptlan_probe,
 	.remove		= mptlan_remove,
 };
