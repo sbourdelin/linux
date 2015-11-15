@@ -365,6 +365,20 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 		.vendor_id	= VENDOR_TASCAM,
 		.model_id	= 0x800007,
 	},
+	/* Stanton, Stanton Controllers & Systems 1 Mixer (SCS.1m) */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= OUI_STANTON,
+		.model_id	= 0x001000,
+	},
+	/* Stanton, Stanton Controllers & Systems 1 Deck (SCS.1d) */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= OUI_STANTON,
+		.model_id	= 0x002000,
+	},
 	{ }
 };
 MODULE_DEVICE_TABLE(ieee1394, oxfw_id_table);
