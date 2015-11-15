@@ -40,6 +40,15 @@ struct device_info {
 	u8 volume_fb_id;
 };
 
+struct snd_oxfw;
+struct snd_oxfw_spec {
+	int (*add)(struct snd_oxfw *oxfw);
+	void (*update)(struct snd_oxfw *oxfw);
+	void (*remove)(struct snd_oxfw *oxfw);
+	void *private_data;
+	unsigned int private_size;
+};
+
 /* This is an arbitrary number for convinience. */
 #define	SND_OXFW_STREAM_FORMAT_ENTRIES	10
 struct snd_oxfw {
@@ -68,6 +77,7 @@ struct snd_oxfw {
 	s16 volume[6];
 	s16 volume_min;
 	s16 volume_max;
+	struct snd_oxfw_spec *spec;
 
 	int dev_lock_count;
 	bool dev_lock_changed;

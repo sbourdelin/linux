@@ -122,6 +122,13 @@ static void oxfw_card_free(struct snd_card *card)
 	if (oxfw->has_output)
 		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
 
+	if (oxfw->spec) {
+		if (oxfw->spec->remove)
+			oxfw->spec->remove(oxfw);
+		if (oxfw->spec->private_size)
+			kfree(oxfw->spec->private_data);
+	}
+
 	fw_unit_put(oxfw->unit);
 
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
@@ -196,9 +203,24 @@ static int oxfw_probe(struct fw_unit *unit,
 
 	detect_quirks(oxfw);
 
+	if (oxfw->spec && oxfw->spec->private_size > 0) {
+		oxfw->spec->private_data =
+				kzalloc(oxfw->spec->private_size, GFP_KERNEL);
+		if (oxfw->spec->private_data == NULL) {
+			err = -ENOMEM;
+			goto error;
+		}
+	}
+
 	err = name_card(oxfw);
 	if (err < 0)
 		goto error;
+
+	if (oxfw->spec && oxfw->spec->add) {
+		err = oxfw->spec->add(oxfw);
+		if (err < 0)
+			goto error;
+	}
 
 	err = snd_oxfw_create_pcm(oxfw);
 	if (err < 0)
@@ -249,6 +271,9 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
 	fcp_bus_reset(oxfw->unit);
+
+	if (oxfw->spec && oxfw->spec->update)
+		oxfw->spec->update(oxfw);
 
 	mutex_lock(&oxfw->mutex);
 
