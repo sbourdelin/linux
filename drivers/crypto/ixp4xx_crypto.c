@@ -433,17 +433,17 @@ static void crypto_done_action(unsigned long arg)
 
 static int init_ixp_crypto(struct device *dev)
 {
-	int ret = -ENODEV;
+	int ret;
 	u32 msg[2] = { 0, 0 };
 
 	if (! ( ~(*IXP4XX_EXP_CFG2) & (IXP4XX_FEATURE_HASH |
 				IXP4XX_FEATURE_AES | IXP4XX_FEATURE_DES))) {
 		printk(KERN_ERR "ixp_crypto: No HW crypto available\n");
-		return ret;
+		return -ENODEV;
 	}
 	npe_c = npe_request(NPE_ID);
 	if (!npe_c)
-		return ret;
+		return -ENODEV;
 
 	if (!npe_running(npe_c)) {
 		ret = npe_load_firmware(npe_c, npe_name(npe_c), dev);
@@ -481,13 +481,14 @@ static int init_ixp_crypto(struct device *dev)
 	BUILD_BUG_ON(SHA1_DIGEST_SIZE > sizeof(struct buffer_desc));
 	buffer_pool = dma_pool_create("buffer", dev,
 			sizeof(struct buffer_desc), 32, 0);
-	ret = -ENOMEM;
 	if (!buffer_pool) {
+		ret = -ENOMEM;
 		goto err;
 	}
 	ctx_pool = dma_pool_create("context", dev,
 			NPE_CTX_LEN, 16, 0);
 	if (!ctx_pool) {
+		ret = -ENOMEM;
 		goto err;
 	}
 	ret = qmgr_request_queue(SEND_QID, NPE_QLEN_TOTAL, 0, 0,
