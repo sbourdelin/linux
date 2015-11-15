@@ -303,11 +303,20 @@ static int midi_playback_open(struct snd_rawmidi_substream *stream)
 	scs->output_bytes = 1;
 	scs->output_escaped = false;
 
+	ACCESS_ONCE(scs->output) = stream;
+
 	return 0;
 }
 
 static int midi_playback_close(struct snd_rawmidi_substream *stream)
 {
+	struct fw_scs1x *scs = stream->rmidi->private_data;
+
+	ACCESS_ONCE(scs->output) = NULL;
+
+	wait_event(scs->idle_wait, scs->output_idle);
+	tasklet_kill(&scs->tasklet);
+
 	return 0;
 }
 
@@ -315,7 +324,6 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *stream, int up)
 {
 	struct fw_scs1x *scs = stream->rmidi->private_data;
 
-	ACCESS_ONCE(scs->output) = up ? stream : NULL;
 	if (up) {
 		scs->output_idle = false;
 		tasklet_schedule(&scs->tasklet);
@@ -393,13 +401,6 @@ static void scs1x_update(struct snd_oxfw *oxfw)
 static void scs1x_remove(struct snd_oxfw *oxfw)
 {
 	struct fw_scs1x *scs = oxfw->spec->private_data;
-
-	ACCESS_ONCE(scs->output) = NULL;
-	ACCESS_ONCE(scs->input) = NULL;
-
-	wait_event(scs->idle_wait, scs->output_idle);
-
-	tasklet_kill(&scs->tasklet);
 
 	fw_core_remove_address_handler(&scs->hss_handler);
 }
