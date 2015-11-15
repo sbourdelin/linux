@@ -45,6 +45,7 @@
 #include <asm/debugreg.h>
 #include <asm/kexec.h>
 #include <asm/apic.h>
+#include <asm/page.h>
 
 #include "trace.h"
 #include "pmu.h"
@@ -104,6 +105,9 @@ static u64 __read_mostly host_xss;
 
 static bool __read_mostly enable_pml = 1;
 module_param_named(pml, enable_pml, bool, S_IRUGO);
+
+static bool __read_mostly enable_eptp_switching = 0;
+module_param_named(eptp_switching_test, enable_eptp_switching, bool, S_IRUGO);
 
 #define KVM_GUEST_CR0_MASK (X86_CR0_NW | X86_CR0_CD)
 #define KVM_VM_CR0_ALWAYS_ON_UNRESTRICTED_GUEST (X86_CR0_WP | X86_CR0_NE)
@@ -547,6 +551,10 @@ struct vcpu_vmx {
 	/* Support for PML */
 #define PML_ENTITY_NUM		512
 	struct page *pml_pg;
+
+	/* Support for EPTP switching */
+#define EPTP_LIST_NUM		512
+	struct page *eptp_list_pg;
 };
 
 enum segment_cache_field {
@@ -1111,6 +1119,22 @@ static inline bool cpu_has_vmx_shadow_vmcs(void)
 static inline bool cpu_has_vmx_pml(void)
 {
 	return vmcs_config.cpu_based_2nd_exec_ctrl & SECONDARY_EXEC_ENABLE_PML;
+}
+
+static inline bool cpu_has_vmx_vm_functions(void)
+{
+	return vmcs_config.cpu_based_2nd_exec_ctrl &
+		SECONDARY_EXEC_ENABLE_VM_FUNCTIONS;
+}
+
+/* check if the cpu supports writing EPTP switching */
+static inline bool cpu_has_vmx_eptp_switching(void)
+{
+	u64 vmx_msr;
+
+	rdmsrl(MSR_IA32_VMX_VMFUNC, vmx_msr);
+	/* This MSR has same format as VM-function controls */
+	return vmx_msr & VM_FUNCTION_EPTP_SWITCHING;
 }
 
 static inline bool report_flexpriority(void)
@@ -3011,6 +3035,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 			SECONDARY_EXEC_PAUSE_LOOP_EXITING |
 			SECONDARY_EXEC_RDTSCP |
 			SECONDARY_EXEC_ENABLE_INVPCID |
+			SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
 			SECONDARY_EXEC_APIC_REGISTER_VIRT |
 			SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 			SECONDARY_EXEC_SHADOW_VMCS |
@@ -3600,6 +3625,13 @@ static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 	guest_cr3 = cr3;
 	if (enable_ept) {
 		eptp = construct_eptp(cr3);
+		if (to_vmx(vcpu)->eptp_list_pg) {
+			u64 *eptp_list = phys_to_virt(page_to_phys(to_vmx(vcpu)->eptp_list_pg));
+			int i;
+
+			for (i = 0; i < EPTP_LIST_NUM; ++i)
+				eptp_list[i] = eptp;
+		}
 		vmcs_write64(EPT_POINTER, eptp);
 		if (is_paging(vcpu) || is_guest_mode(vcpu))
 			guest_cr3 = kvm_read_cr3(vcpu);
@@ -6171,6 +6203,13 @@ static __init int hardware_setup(void)
 	if (!enable_ept || !enable_ept_ad_bits || !cpu_has_vmx_pml())
 		enable_pml = 0;
 
+	/*
+	 * Only enable EPT switching when hardware supports EPT switching, and EPT
+	 * and VM functions are enabled -- EPT switching depends on these to work.
+	 */
+	if (!enable_ept || !cpu_has_vmx_vm_functions() || !cpu_has_vmx_eptp_switching())
+		enable_eptp_switching = 0;
+
 	if (!enable_pml) {
 		kvm_x86_ops->slot_enable_log_dirty = NULL;
 		kvm_x86_ops->slot_disable_log_dirty = NULL;
@@ -7619,6 +7658,26 @@ static int vmx_enable_pml(struct vcpu_vmx *vmx)
 	return 0;
 }
 
+static int vmx_enable_ept_switching(struct vcpu_vmx *vmx)
+{
+	struct page *eptp_list_pg;
+	u64 vm_function_control;
+
+	eptp_list_pg = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	if (!eptp_list_pg)
+		return -ENOMEM;
+
+	vmx->eptp_list_pg = eptp_list_pg;
+
+	vmcs_write64(EPTP_LIST_ADDRESS, page_to_phys(vmx->eptp_list_pg));
+
+	vm_function_control = vmcs_read64(VM_FUNCTION_CTRL);
+	vm_function_control |= VM_FUNCTION_EPTP_SWITCHING;
+	vmcs_write64(VM_FUNCTION_CTRL, vm_function_control);
+
+	return 0;
+}
+
 static void vmx_disable_pml(struct vcpu_vmx *vmx)
 {
 	u32 exec_control;
@@ -7630,6 +7689,21 @@ static void vmx_disable_pml(struct vcpu_vmx *vmx)
 	exec_control = vmcs_read32(SECONDARY_VM_EXEC_CONTROL);
 	exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
 	vmcs_write32(SECONDARY_VM_EXEC_CONTROL, exec_control);
+}
+
+static void vmx_disable_ept_switching(struct vcpu_vmx *vmx)
+{
+	u64 vm_function_control;
+
+	ASSERT(vmx->eptp_list_pg);
+	__free_page(vmx->eptp_list_pg);
+	vmx->eptp_list_pg = NULL;
+
+	vmcs_write64(EPTP_LIST_ADDRESS, 0);
+
+	vm_function_control = vmcs_read64(VM_FUNCTION_CTRL);
+	vm_function_control &= ~VM_FUNCTION_EPTP_SWITCHING;
+	vmcs_write64(VM_FUNCTION_CTRL, vm_function_control);
 }
 
 static void vmx_flush_pml_buffer(struct kvm_vcpu *vcpu)
@@ -8505,6 +8579,8 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 
+	if (enable_eptp_switching)
+		vmx_disable_ept_switching(vmx);
 	if (enable_pml)
 		vmx_disable_pml(vmx);
 	free_vpid(vmx);
@@ -8593,8 +8669,16 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 			goto free_vmcs;
 	}
 
+	if (enable_eptp_switching) {
+		err = vmx_enable_ept_switching(vmx);
+		if (err)
+			goto disable_pml;
+	}
+
 	return &vmx->vcpu;
 
+disable_pml:
+	vmx_disable_pml(vmx);
 free_vmcs:
 	free_loaded_vmcs(vmx->loaded_vmcs);
 free_msrs:
