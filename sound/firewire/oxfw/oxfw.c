@@ -19,6 +19,7 @@
 #define VENDOR_BEHRINGER	0x001564
 #define VENDOR_LACIE		0x00d04b
 #define VENDOR_TASCAM		0x00022e
+#define OUI_STANTON		0x001260
 
 #define MODEL_SATELLITE		0x00200f
 
@@ -182,6 +183,21 @@ static void detect_quirks(struct snd_oxfw *oxfw)
 	 */
 	if (vendor == VENDOR_GRIFFIN || vendor == VENDOR_LACIE)
 		oxfw->spec = &snd_oxfw_spec_spkr;
+
+	/*
+	 * Stanton models supports asynchronous transactions for unique MIDI
+	 * messages.
+	 */
+	if (vendor == OUI_STANTON) {
+		/* No physical MIDI ports. */
+		oxfw->midi_input_ports = 0;
+		oxfw->midi_output_ports = 0;
+
+		/* Output stream exists but no data channels are useful. */
+		oxfw->has_output = false;
+
+		oxfw->spec = &snd_oxfw_spec_scs1x;
+	}
 }
 
 static int oxfw_probe(struct fw_unit *unit,

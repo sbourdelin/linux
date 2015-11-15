@@ -141,3 +141,4 @@ int snd_oxfw_create_midi(struct snd_oxfw *oxfw);
 int snd_oxfw_create_hwdep(struct snd_oxfw *oxfw);
 
 extern struct snd_oxfw_spec snd_oxfw_spec_spkr;
+extern struct snd_oxfw_spec snd_oxfw_spec_scs1x;
