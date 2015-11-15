@@ -1,7 +1,9 @@
 /*
- * oxfw_stream.c - a part of driver for OXFW970/971 based devices
+ * oxfw-spkr.c - a part of driver for OXFW970/971 based devices
  *
  * Copyright (c) Clemens Ladisch <clemens@ladisch.de>
+ * Copyright (c) 2015 Takashi Sakamoto <o-takashi@sakamocchi.jp>
+ *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
