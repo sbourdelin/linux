@@ -1113,6 +1113,8 @@ int mmc_attach_sdio(struct mmc_host *host)
 		pm_runtime_enable(&card->dev);
 	}
 
+	device_enable_async_suspend(&card->dev);
+
 	/*
 	 * The number of functions on the card is encoded inside
 	 * the ocr.
@@ -1133,6 +1135,8 @@ int mmc_attach_sdio(struct mmc_host *host)
 		 */
 		if (host->caps & MMC_CAP_POWER_OFF_CARD)
 			pm_runtime_enable(&card->sdio_func[i]->dev);
+
+		device_enable_async_suspend(&card->sdio_func[i]->dev);
 	}
 
 	/*
