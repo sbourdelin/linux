@@ -226,7 +226,7 @@ out:
 	return ret;
 }
 
-static struct fence_ops vmw_fence_ops = {
+static const struct fence_ops vmw_fence_ops = {
 	.get_driver_name = vmw_fence_get_driver_name,
 	.get_timeline_name = vmw_fence_get_timeline_name,
 	.enable_signaling = vmw_fence_enable_signaling,
