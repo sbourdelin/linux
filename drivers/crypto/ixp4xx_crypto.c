@@ -509,9 +509,11 @@ static int init_ixp_crypto(struct device *dev)
 npe_error:
 	printk(KERN_ERR "%s not responding\n", npe_name(npe_c));
 	ret = -EIO;
+	goto release_npe;
 err:
 	dma_pool_destroy(ctx_pool);
 	dma_pool_destroy(buffer_pool);
+release_npe:
 	npe_release(npe_c);
 	return ret;
 }
