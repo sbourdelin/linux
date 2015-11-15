@@ -418,9 +418,12 @@ static int acpi_find_gpio(struct acpi_resource *ares, void *data)
 		 * GpioIo is used then the only way to set the flag is
 		 * to use _DSD "gpios" property.
 		 */
-		if (lookup->info.gpioint)
+		if (lookup->info.gpioint) {
 			lookup->info.active_low =
 				agpio->polarity == ACPI_ACTIVE_LOW;
+			irq_set_irq_type(gpiod_to_irq(lookup->desc),
+					 acpi_get_irq_type(agpio->triggering, agpio->polarity));
+		}
 	}
 
 	return 1;
