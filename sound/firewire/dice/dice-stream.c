@@ -10,7 +10,7 @@
 #include "dice.h"
 
 #define	CALLBACK_TIMEOUT	200
-#define NOTIFICATION_TIMEOUT_MS	100
+#define NOTIFICATION_TIMEOUT_MS	2000
 
 static const unsigned int dice_stream_rates[] = {
 	/* mode 0 */
