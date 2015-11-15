@@ -483,23 +483,23 @@ static int init_ixp_crypto(struct device *dev)
 			sizeof(struct buffer_desc), 32, 0);
 	if (!buffer_pool) {
 		ret = -ENOMEM;
-		goto err;
+		goto release_npe;
 	}
 	ctx_pool = dma_pool_create("context", dev,
 			NPE_CTX_LEN, 16, 0);
 	if (!ctx_pool) {
 		ret = -ENOMEM;
-		goto err;
+		goto destroy_buffer_pool;
 	}
 	ret = qmgr_request_queue(SEND_QID, NPE_QLEN_TOTAL, 0, 0,
 				 "ixp_crypto:out", NULL);
 	if (ret)
-		goto err;
+		goto destroy_ctx_pool;
 	ret = qmgr_request_queue(RECV_QID, NPE_QLEN, 0, 0,
 				 "ixp_crypto:in", NULL);
 	if (ret) {
 		qmgr_release_queue(SEND_QID);
-		goto err;
+		goto destroy_ctx_pool;
 	}
 	qmgr_set_irq(RECV_QID, QUEUE_IRQ_SRC_NOT_EMPTY, irqhandler, NULL);
 	tasklet_init(&crypto_done_tasklet, crypto_done_action, 0);
@@ -511,8 +511,9 @@ npe_error:
 	printk(KERN_ERR "%s not responding\n", npe_name(npe_c));
 	ret = -EIO;
 	goto release_npe;
-err:
+destroy_ctx_pool:
 	dma_pool_destroy(ctx_pool);
+destroy_buffer_pool:
 	dma_pool_destroy(buffer_pool);
 release_npe:
 	npe_release(npe_c);
