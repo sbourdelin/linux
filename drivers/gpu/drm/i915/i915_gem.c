@@ -1146,14 +1146,36 @@ static bool missed_irq(struct drm_i915_private *dev_priv,
 	return test_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings);
 }
 
+static u64 local_clock_us(unsigned *cpu)
+{
+	u64 t;
+
+	*cpu = get_cpu();
+	t = local_clock() >> 10;
+	put_cpu();
+
+	return t;
+}
+
+static bool busywait_stop(u64 timeout, unsigned cpu)
+{
+	unsigned this_cpu;
+
+	if (time_after64(local_clock_us(&this_cpu), timeout))
+		return true;
+
+	return this_cpu != cpu;
+}
+
 static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 {
-	unsigned long timeout;
+	u64 timeout;
+	unsigned cpu;
 
 	if (i915_gem_request_get_ring(req)->irq_refcount)
 		return -EBUSY;
 
-	timeout = jiffies + 1;
+	timeout = local_clock_us(&cpu) + 2;
 	while (!need_resched()) {
 		if (i915_gem_request_completed(req, true))
 			return 0;
@@ -1161,7 +1183,7 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 		if (signal_pending_state(state, current))
 			break;
 
-		if (time_after_eq(jiffies, timeout))
+		if (busywait_stop(timeout, cpu))
 			break;
 
 		cpu_relax_lowlatency();
