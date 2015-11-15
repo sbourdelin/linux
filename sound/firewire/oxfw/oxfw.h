@@ -31,15 +31,6 @@
 #include "../amdtp-am824.h"
 #include "../cmp.h"
 
-struct device_info {
-	const char *driver_name;
-	const char *vendor_name;
-	const char *model_name;
-	unsigned int mixer_channels;
-	u8 mute_fb_id;
-	u8 volume_fb_id;
-};
-
 struct snd_oxfw;
 struct snd_oxfw_spec {
 	int (*add)(struct snd_oxfw *oxfw);
@@ -54,7 +45,6 @@ struct snd_oxfw_spec {
 struct snd_oxfw {
 	struct snd_card *card;
 	struct fw_unit *unit;
-	const struct device_info *device_info;
 	struct mutex mutex;
 	spinlock_t lock;
 
@@ -73,10 +63,6 @@ struct snd_oxfw {
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
 
-	bool mute;
-	s16 volume[6];
-	s16 volume_min;
-	s16 volume_max;
 	struct snd_oxfw_spec *spec;
 
 	int dev_lock_count;
@@ -148,10 +134,10 @@ void snd_oxfw_stream_lock_release(struct snd_oxfw *oxfw);
 
 int snd_oxfw_create_pcm(struct snd_oxfw *oxfw);
 
-int snd_oxfw_create_mixer(struct snd_oxfw *oxfw);
-
 void snd_oxfw_proc_init(struct snd_oxfw *oxfw);
 
 int snd_oxfw_create_midi(struct snd_oxfw *oxfw);
 
 int snd_oxfw_create_hwdep(struct snd_oxfw *oxfw);
+
+extern struct snd_oxfw_spec snd_oxfw_spec_spkr;

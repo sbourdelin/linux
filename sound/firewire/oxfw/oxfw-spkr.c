@@ -9,6 +9,18 @@
 
 #include "oxfw.h"
 
+/* Old firewire-speakers module supports some control elements. */
+struct fw_spkr {
+	unsigned int mixer_channels;
+	u8 mute_fb_id;
+	u8 volume_fb_id;
+
+	bool mute;
+	s16 volume[6];
+	s16 volume_min;
+	s16 volume_max;
+};
+
 enum control_action { CTL_READ, CTL_WRITE };
 enum control_attribute {
 	CTL_MIN		= 0x02,
@@ -19,6 +31,7 @@ enum control_attribute {
 static int spkr_mute_command(struct snd_oxfw *oxfw, bool *value,
 			     enum control_action action)
 {
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 	u8 *buf;
 	u8 response_ok;
 	int err;
@@ -37,7 +50,7 @@ static int spkr_mute_command(struct snd_oxfw *oxfw, bool *value,
 	buf[1] = 0x08;			/* audio unit 0 */
 	buf[2] = 0xb8;			/* FUNCTION BLOCK */
 	buf[3] = 0x81;			/* function block type: feature */
-	buf[4] = oxfw->device_info->mute_fb_id; /* function block ID */
+	buf[4] = spkr->mute_fb_id;	/* function block ID */
 	buf[5] = 0x10;			/* control attribute: current */
 	buf[6] = 0x02;			/* selector length */
 	buf[7] = 0x00;			/* audio channel number */
@@ -77,6 +90,7 @@ static int spkr_volume_command(struct snd_oxfw *oxfw, s16 *value,
 			       enum control_attribute attribute,
 			       enum control_action action)
 {
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 	u8 *buf;
 	u8 response_ok;
 	int err;
@@ -95,7 +109,7 @@ static int spkr_volume_command(struct snd_oxfw *oxfw, s16 *value,
 	buf[1] = 0x08;			/* audio unit 0 */
 	buf[2] = 0xb8;			/* FUNCTION BLOCK */
 	buf[3] = 0x81;			/* function block type: feature */
-	buf[4] = oxfw->device_info->volume_fb_id; /* function block ID */
+	buf[4] = spkr->volume_fb_id;	/* function block ID */
 	buf[5] = attribute;		/* control attribute */
 	buf[6] = 0x02;			/* selector length */
 	buf[7] = channel;		/* audio channel number */
@@ -137,8 +151,9 @@ static int spkr_mute_get(struct snd_kcontrol *control,
 			 struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 
-	value->value.integer.value[0] = !oxfw->mute;
+	value->value.integer.value[0] = !spkr->mute;
 
 	return 0;
 }
@@ -147,18 +162,19 @@ static int spkr_mute_put(struct snd_kcontrol *control,
 			 struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 	bool mute;
 	int err;
 
 	mute = !value->value.integer.value[0];
 
-	if (mute == oxfw->mute)
+	if (mute == spkr->mute)
 		return 0;
 
 	err = spkr_mute_command(oxfw, &mute, CTL_WRITE);
 	if (err < 0)
 		return err;
-	oxfw->mute = mute;
+	spkr->mute = mute;
 
 	return 1;
 }
@@ -167,11 +183,12 @@ static int spkr_volume_info(struct snd_kcontrol *control,
 			    struct snd_ctl_elem_info *info)
 {
 	struct snd_oxfw *oxfw = control->private_data;
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 
 	info->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	info->count = oxfw->device_info->mixer_channels;
-	info->value.integer.min = oxfw->volume_min;
-	info->value.integer.max = oxfw->volume_max;
+	info->count = spkr->mixer_channels;
+	info->value.integer.min = spkr->volume_min;
+	info->value.integer.max = spkr->volume_max;
 
 	return 0;
 }
@@ -182,10 +199,11 @@ static int spkr_volume_get(struct snd_kcontrol *control,
 			   struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 	unsigned int i;
 
-	for (i = 0; i < oxfw->device_info->mixer_channels; ++i)
-		value->value.integer.value[channel_map[i]] = oxfw->volume[i];
+	for (i = 0; i < spkr->mixer_channels; ++i)
+		value->value.integer.value[channel_map[i]] = spkr->volume[i];
 
 	return 0;
 }
@@ -194,14 +212,15 @@ static int spkr_volume_put(struct snd_kcontrol *control,
 			   struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 	unsigned int i, changed_channels;
 	bool equal_values = true;
 	s16 volume;
 	int err;
 
-	for (i = 0; i < oxfw->device_info->mixer_channels; ++i) {
-		if (value->value.integer.value[i] < oxfw->volume_min ||
-		    value->value.integer.value[i] > oxfw->volume_max)
+	for (i = 0; i < spkr->mixer_channels; ++i) {
+		if (value->value.integer.value[i] < spkr->volume_min ||
+		    value->value.integer.value[i] > spkr->volume_max)
 			return -EINVAL;
 		if (value->value.integer.value[i] !=
 		    value->value.integer.value[0])
@@ -209,15 +228,15 @@ static int spkr_volume_put(struct snd_kcontrol *control,
 	}
 
 	changed_channels = 0;
-	for (i = 0; i < oxfw->device_info->mixer_channels; ++i)
+	for (i = 0; i < spkr->mixer_channels; ++i)
 		if (value->value.integer.value[channel_map[i]] !=
-							oxfw->volume[i])
+							spkr->volume[i])
 			changed_channels |= 1 << (i + 1);
 
 	if (equal_values && changed_channels != 0)
 		changed_channels = 1 << 0;
 
-	for (i = 0; i <= oxfw->device_info->mixer_channels; ++i) {
+	for (i = 0; i <= spkr->mixer_channels; ++i) {
 		volume = value->value.integer.value[channel_map[i ? i - 1 : 0]];
 		if (changed_channels & (1 << i)) {
 			err = spkr_volume_command(oxfw, &volume, i,
@@ -226,13 +245,13 @@ static int spkr_volume_put(struct snd_kcontrol *control,
 				return err;
 		}
 		if (i > 0)
-			oxfw->volume[i - 1] = volume;
+			spkr->volume[i - 1] = volume;
 	}
 
 	return changed_channels != 0;
 }
 
-int snd_oxfw_create_mixer(struct snd_oxfw *oxfw)
+static int spkr_add(struct snd_oxfw *oxfw)
 {
 	static const struct snd_kcontrol_new controls[] = {
 		{
@@ -250,25 +269,37 @@ int snd_oxfw_create_mixer(struct snd_oxfw *oxfw)
 			.put = spkr_volume_put,
 		},
 	};
+	struct fw_spkr *spkr = oxfw->spec->private_data;
 	unsigned int i, first_ch;
 	int err;
 
-	err = spkr_volume_command(oxfw, &oxfw->volume_min,
+	if (strcmp(oxfw->card->driver, "FireWave") == 0) {
+		spkr->mixer_channels = 6;
+		spkr->mute_fb_id = 0x01;
+		spkr->volume_fb_id = 0x02;
+	}
+	if (strcmp(oxfw->card->driver, "FWSpeakers") == 0) {
+		spkr->mixer_channels = 1;
+		spkr->mute_fb_id = 0x01;
+		spkr->volume_fb_id = 0x01;
+	}
+
+	err = spkr_volume_command(oxfw, &spkr->volume_min,
 				   0, CTL_MIN, CTL_READ);
 	if (err < 0)
 		return err;
-	err = spkr_volume_command(oxfw, &oxfw->volume_max,
+	err = spkr_volume_command(oxfw, &spkr->volume_max,
 				   0, CTL_MAX, CTL_READ);
 	if (err < 0)
 		return err;
 
-	err = spkr_mute_command(oxfw, &oxfw->mute, CTL_READ);
+	err = spkr_mute_command(oxfw, &spkr->mute, CTL_READ);
 	if (err < 0)
 		return err;
 
-	first_ch = oxfw->device_info->mixer_channels == 1 ? 0 : 1;
-	for (i = 0; i < oxfw->device_info->mixer_channels; ++i) {
-		err = spkr_volume_command(oxfw, &oxfw->volume[i],
+	first_ch = spkr->mixer_channels == 1 ? 0 : 1;
+	for (i = 0; i < spkr->mixer_channels; ++i) {
+		err = spkr_volume_command(oxfw, &spkr->volume[i],
 					   first_ch + i, CTL_CURRENT, CTL_READ);
 		if (err < 0)
 			return err;
@@ -283,3 +314,8 @@ int snd_oxfw_create_mixer(struct snd_oxfw *oxfw)
 
 	return 0;
 }
+
+struct snd_oxfw_spec snd_oxfw_spec_spkr = {
+	.add = spkr_add,
+	.private_size = sizeof(struct fw_spkr),
+};

@@ -56,7 +56,7 @@ static bool detect_loud_models(struct fw_unit *unit)
 	return (i < ARRAY_SIZE(models));
 }
 
-static int name_card(struct snd_oxfw *oxfw)
+static int name_card(struct snd_oxfw *oxfw, const struct ieee1394_device_id *id)
 {
 	struct fw_device *fw_dev = fw_parent_device(oxfw->unit);
 	char vendor[24];
@@ -84,10 +84,14 @@ static int name_card(struct snd_oxfw *oxfw)
 	be32_to_cpus(&firmware);
 
 	/* to apply card definitions */
-	if (oxfw->device_info) {
-		d = oxfw->device_info->driver_name;
-		v = oxfw->device_info->vendor_name;
-		m = oxfw->device_info->model_name;
+	if (id->vendor_id == VENDOR_GRIFFIN) {
+		d = "FireWave";
+		v = "Griffin";
+		m = "FireWave";
+	} else if (id->vendor_id == VENDOR_LACIE) {
+		d = "FWSpeakers";
+		v = "LaCie";
+		m = "FireWire Speakers";
 	} else {
 		d = "OXFW";
 		v = vendor;
@@ -171,6 +175,13 @@ static void detect_quirks(struct snd_oxfw *oxfw)
 		oxfw->midi_input_ports++;
 		oxfw->midi_output_ports++;
 	}
+
+	/*
+	 * For compatibility that old firewire-speaker modules add ALSA control
+	 * character devices for these two models.
+	 */
+	if (vendor == VENDOR_GRIFFIN || vendor == VENDOR_LACIE)
+		oxfw->spec = &snd_oxfw_spec_spkr;
 }
 
 static int oxfw_probe(struct fw_unit *unit,
@@ -193,7 +204,6 @@ static int oxfw_probe(struct fw_unit *unit,
 	oxfw->card = card;
 	mutex_init(&oxfw->mutex);
 	oxfw->unit = fw_unit_get(unit);
-	oxfw->device_info = (const struct device_info *)id->driver_data;
 	spin_lock_init(&oxfw->lock);
 	init_waitqueue_head(&oxfw->hwdep_wait);
 
@@ -212,7 +222,7 @@ static int oxfw_probe(struct fw_unit *unit,
 		}
 	}
 
-	err = name_card(oxfw);
+	err = name_card(oxfw, id);
 	if (err < 0)
 		goto error;
 
@@ -225,12 +235,6 @@ static int oxfw_probe(struct fw_unit *unit,
 	err = snd_oxfw_create_pcm(oxfw);
 	if (err < 0)
 		goto error;
-
-	if (oxfw->device_info) {
-		err = snd_oxfw_create_mixer(oxfw);
-		if (err < 0)
-			goto error;
-	}
 
 	snd_oxfw_proc_init(oxfw);
 
@@ -292,24 +296,6 @@ static void oxfw_remove(struct fw_unit *unit)
 	snd_card_free_when_closed(oxfw->card);
 }
 
-static const struct device_info griffin_firewave = {
-	.driver_name = "FireWave",
-	.vendor_name = "Griffin",
-	.model_name = "FireWave",
-	.mixer_channels = 6,
-	.mute_fb_id   = 0x01,
-	.volume_fb_id = 0x02,
-};
-
-static const struct device_info lacie_speakers = {
-	.driver_name = "FWSpeakers",
-	.vendor_name = "LaCie",
-	.model_name = "FireWire Speakers",
-	.mixer_channels = 1,
-	.mute_fb_id   = 0x01,
-	.volume_fb_id = 0x01,
-};
-
 static const struct ieee1394_device_id oxfw_id_table[] = {
 	{
 		.match_flags  = IEEE1394_MATCH_VENDOR_ID |
@@ -320,7 +306,6 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 		.model_id     = 0x00f970,
 		.specifier_id = SPECIFIER_1394TA,
 		.version      = VERSION_AVC,
-		.driver_data  = (kernel_ulong_t)&griffin_firewave,
 	},
 	{
 		.match_flags  = IEEE1394_MATCH_VENDOR_ID |
@@ -331,7 +316,6 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 		.model_id     = 0x00f970,
 		.specifier_id = SPECIFIER_1394TA,
 		.version      = VERSION_AVC,
-		.driver_data  = (kernel_ulong_t)&lacie_speakers,
 	},
 	/* Behringer,F-Control Audio 202 */
 	{
