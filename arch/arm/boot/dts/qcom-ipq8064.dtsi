@@ -3,6 +3,7 @@
 #include "skeleton.dtsi"
 #include <dt-bindings/clock/qcom,gcc-ipq806x.h>
 #include <dt-bindings/clock/qcom,lcc-ipq806x.h>
+#include <dt-bindings/mfd/qcom,ssbi.h>
 #include <dt-bindings/soc/qcom,gsbi.h>
 
 / {
@@ -307,7 +308,7 @@
 		qcom,ssbi@500000 {
 			compatible = "qcom,ssbi";
 			reg = <0x00500000 0x1000>;
-			qcom,controller-type = "pmic-arbiter";
+			qcom,controller-type = <MSM_SBI_CTRL_PMIC_ARBITER>;
 		};
 
 		gcc: clock-controller@900000 {

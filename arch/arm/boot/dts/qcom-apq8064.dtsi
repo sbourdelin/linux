@@ -5,6 +5,7 @@
 #include <dt-bindings/reset/qcom,gcc-msm8960.h>
 #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
 #include <dt-bindings/soc/qcom,gsbi.h>
+#include <dt-bindings/mfd/qcom,ssbi.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 / {
 	model = "Qualcomm APQ8064";
@@ -314,7 +315,7 @@
 		qcom,ssbi@500000 {
 			compatible = "qcom,ssbi";
 			reg = <0x00500000 0x1000>;
-			qcom,controller-type = "pmic-arbiter";
+			qcom,controller-type = <MSM_SBI_CTRL_PMIC_ARBITER>;
 
 			pmicintc: pmic@0 {
 				compatible = "qcom,pm8921";

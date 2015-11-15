@@ -274,7 +274,7 @@ static int ssbi_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct resource *mem_res;
 	struct ssbi *ssbi;
-	const char *type;
+	u32 type;
 
 	ssbi = devm_kzalloc(&pdev->dev, sizeof(*ssbi), GFP_KERNEL);
 	if (!ssbi)
@@ -287,22 +287,17 @@ static int ssbi_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ssbi);
 
-	type = of_get_property(np, "qcom,controller-type", NULL);
-	if (type == NULL) {
+	if (of_property_read_u32(np, "qcom,controller-type", &type)) {
 		dev_err(&pdev->dev, "Missing qcom,controller-type property\n");
 		return -EINVAL;
 	}
-	dev_info(&pdev->dev, "SSBI controller type: '%s'\n", type);
-	if (strcmp(type, "ssbi") == 0)
-		ssbi->controller_type = MSM_SBI_CTRL_SSBI;
-	else if (strcmp(type, "ssbi2") == 0)
-		ssbi->controller_type = MSM_SBI_CTRL_SSBI2;
-	else if (strcmp(type, "pmic-arbiter") == 0)
-		ssbi->controller_type = MSM_SBI_CTRL_PMIC_ARBITER;
-	else {
+
+	dev_info(&pdev->dev, "SSBI controller type: '%d'\n", type);
+	if (type > MSM_SBI_CTRL_PMIC_ARBITER) {
 		dev_err(&pdev->dev, "Unknown qcom,controller-type\n");
 		return -EINVAL;
 	}
+	ssbi->controller_type = type;
 
 	if (ssbi->controller_type == MSM_SBI_CTRL_PMIC_ARBITER) {
 		ssbi->read = ssbi_pa_read_bytes;
