@@ -200,7 +200,7 @@ mISDN_sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 
 	skb = _l2_alloc_skb(len, GFP_KERNEL);
 	if (!skb)
-		goto done;
+		goto release_socket;
 
 	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
 		err = -EFAULT;
@@ -237,6 +237,7 @@ mISDN_sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 
 done:
 	kfree_skb(skb);
+release_socket:
 	release_sock(sk);
 	return err;
 }
