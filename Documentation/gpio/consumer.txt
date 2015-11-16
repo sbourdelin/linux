@@ -27,7 +27,7 @@ With the descriptor-based interface, GPIOs are identified with an opaque,
 non-forgeable handler that must be obtained through a call to one of the
 gpiod_get() functions. Like many other kernel subsystems, gpiod_get() takes the
 device that will use the GPIO and the function the requested GPIO is supposed to
-fulfill:
+fulfil:
 
 	struct gpio_desc *gpiod_get(struct device *dev, const char *con_id,
 				    enum gpiod_flags flags)
@@ -260,7 +260,7 @@ will be driven low.
 
 To summarize:
 
-Function (example)               active-low proporty  physical line
+Function (example)               active-low property  physical line
 gpiod_set_raw_value(desc, 0);        don't care           low
 gpiod_set_raw_value(desc, 1);        don't care           high
 gpiod_set_value(desc, 0);       default (active-high)     low
