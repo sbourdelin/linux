@@ -149,15 +149,14 @@ static void mcasp_set_ctl_reg(struct davinci_mcasp *mcasp, u32 ctl_reg, u32 val)
 
 	mcasp_set_bits(mcasp, ctl_reg, val);
 
-	/* programming GBLCTL needs to read back from GBLCTL and verfiy */
+	/* programming GBLCTL needs to read back from GBLCTL and verify */
 	/* loop count is to avoid the lock-up */
-	for (i = 0; i < 1000; i++) {
+	for (i = 0; i <= 1000; i++) {
 		if ((mcasp_get_reg(mcasp, ctl_reg) & val) == val)
-			break;
+			return;
 	}
 
-	if (i == 1000 && ((mcasp_get_reg(mcasp, ctl_reg) & val) != val))
-		printk(KERN_ERR "GBLCTL write error\n");
+	printk(KERN_ERR "GBLCTL write error\n");
 }
 
 static bool mcasp_is_synchronous(struct davinci_mcasp *mcasp)
