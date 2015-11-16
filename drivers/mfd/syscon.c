@@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
 	struct syscon *syscon;
 	struct regmap *regmap;
 	void __iomem *base;
+	u32 bus_width;
 	int ret;
 	struct regmap_config syscon_config = syscon_regmap_config;
 
@@ -68,6 +69,17 @@ static struct syscon *of_syscon_register(struct device_node *np)
 		syscon_config.val_format_endian = REGMAP_ENDIAN_BIG;
 	 else if (of_property_read_bool(np, "little-endian"))
 		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+
+	 ret = of_property_read_u32(np, "bus-width", &bus_width);
+	 if (!ret) {
+		 /*
+		  * the property has been provided, regmap_init_mmio
+		  * will return an error if these values are invalid
+		  * so there is no need to check them here.
+		  */
+		 syscon_config.val_bits = bus_width;
+		 syscon_config.reg_stride = syscon_config.val_bits / 8;
+	 }
 
 	regmap = regmap_init_mmio(NULL, base, &syscon_config);
 	if (IS_ERR(regmap)) {
