@@ -109,6 +109,7 @@ enum {
 	ND_CMD_VENDOR_EFFECT_LOG_SIZE = 7,
 	ND_CMD_VENDOR_EFFECT_LOG = 8,
 	ND_CMD_VENDOR = 9,
+	ND_CMD_PASSTHRU = 100,
 };
 
 enum {
@@ -204,4 +205,19 @@ enum ars_masks {
 	ARS_STATUS_MASK = 0x0000FFFF,
 	ARS_EXT_STATUS_SHIFT = 16,
 };
+
+
+struct nd_passthru_pkg {
+	struct {
+		__u8	dsm_uuid[16];
+		__u64	dsm_rev;		/* revision of dsm call  */
+		__u64	dsm_fun_idx;		/* DSM function id       */
+		__u32	dsm_in;			/* size of _DSM input    */
+		__u32	dsm_out;		/* size of user buffer   */
+		__u64	reserved[12];		/* reserved must be zero */
+		__u32	dsm_size;		/* size _DSM would write */
+	} h;
+	unsigned char buf[];
+};
+
 #endif /* __NDCTL_H__ */
