@@ -588,11 +588,9 @@ fail_online:
 fail_l2:
 	if (cpu_has_perfctr_nb)
 		perf_pmu_unregister(&amd_nb_pmu);
-	if (amd_uncore_l2)
-		free_percpu(amd_uncore_l2);
+	free_percpu(amd_uncore_l2);
 fail_nb:
-	if (amd_uncore_nb)
-		free_percpu(amd_uncore_nb);
+	free_percpu(amd_uncore_nb);
 
 fail_nodev:
 	return ret;
