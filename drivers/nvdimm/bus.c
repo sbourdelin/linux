@@ -479,7 +479,7 @@ static int nd_cmd_clear_to_send(struct nvdimm *nvdimm, unsigned int cmd)
 	return 0;
 }
 
-static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
+static int __nd_ioctl_intel(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 		int read_only, unsigned int ioctl_cmd, unsigned long arg)
 {
 	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
@@ -597,6 +597,93 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
  out:
 	vfree(buf);
 	return rc;
+}
+
+
+static int __nd_ioctl_passthru(struct nvdimm_bus *nvdimm_bus,
+		struct nvdimm *nvdimm, int read_only, unsigned
+		int ioctl_cmd, unsigned long arg)
+{
+	struct nvdimm_bus_descriptor *nd_desc = nvdimm_bus->nd_desc;
+	size_t buf_len = 0, in_len = 0, out_len = 0;
+	unsigned int cmd = _IOC_NR(ioctl_cmd);
+	void __user *p = (void __user *) arg;
+	struct device *dev = &nvdimm_bus->dev;
+	const char *dimm_name = "";
+	void *buf = NULL;
+	int i, rc;
+	struct nd_passthru_pkg pkg;
+
+	if (nvdimm)
+		dimm_name = dev_name(&nvdimm->dev);
+	else
+		dimm_name = "bus";
+
+	if (copy_from_user(&pkg, p, sizeof(pkg))) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	/* Caller must tell us size of input to _DSM. */
+	/* This may be bigger that the fixed portion of the pakcage */
+	in_len  = pkg.h.dsm_in;
+	out_len = pkg.h.dsm_out;
+	buf_len = sizeof(pkg.h) + in_len + out_len;
+
+	dev_dbg(dev, "%s:%s rev: %llu, idx: %llu, in: %zu, out: %zu, len %zu\n",
+		__func__, dimm_name,
+		pkg.h.dsm_rev, pkg.h.dsm_fun_idx,
+		in_len, out_len, buf_len);
+
+	for (i = 0; i < ARRAY_SIZE(pkg.h.reserved); i++)
+		if (pkg.h.reserved[i])
+			return -EINVAL;
+
+	if (buf_len > ND_IOCTL_MAX_BUFLEN) {
+		dev_dbg(dev, "%s:%s cmd: %d, idx: %llu buf_len: %zu > %d\n",
+			__func__, dimm_name, cmd, pkg.h.dsm_fun_idx,
+			buf_len, ND_IOCTL_MAX_BUFLEN);
+		return -EINVAL;
+	}
+
+	buf = vmalloc(buf_len);
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, p, buf_len)) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	nvdimm_bus_lock(&nvdimm_bus->dev);
+	rc = nd_cmd_clear_to_send(nvdimm, cmd);
+	if (rc)
+		goto out_unlock;
+
+	rc = nd_desc->ndctl(nd_desc, nvdimm, cmd, buf, buf_len);
+	if (rc < 0)
+		goto out_unlock;
+	if (copy_to_user(p, buf, buf_len))
+		rc = -EFAULT;
+ out_unlock:
+	nvdimm_bus_unlock(&nvdimm_bus->dev);
+ out:
+	vfree(buf);
+	return rc;
+}
+
+static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
+		int ro, unsigned int ioctl_cmd, unsigned long arg)
+
+{
+	unsigned int cmd = _IOC_NR(ioctl_cmd);
+
+	switch (cmd) {
+	case ND_CMD_PASSTHRU:
+		return __nd_ioctl_passthru(nvdimm_bus, nvdimm, ro, ioctl_cmd, arg);
+	default:
+		return __nd_ioctl_intel(nvdimm_bus, nvdimm, ro, ioctl_cmd, arg);
+	}
 }
 
 static long nd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
