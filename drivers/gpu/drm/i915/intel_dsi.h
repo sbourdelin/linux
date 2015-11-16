@@ -74,6 +74,8 @@ struct intel_dsi {
 
 	u8 escape_clk_div;
 	u8 dual_link;
+	u8 bkl_dcs_ports;
+	u8 pwm_blk_ctrl;
 	u8 pixel_overlap;
 	u32 port_bits;
 	u32 bw_timer;

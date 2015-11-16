@@ -793,6 +793,19 @@ parse_mipi(struct drm_i915_private *dev_priv, const struct bdb_header *bdb)
 		return;
 	}
 
+	/*
+	 * These below bits will inform us on which port the panel blk_cntrl and
+	 * CABC ON/OFF commands needs to be sent in case of dual link panels
+	 *	u16 dl_cabc_port:2;
+	 *	u16 pwm_bkl_ctrl:2;
+	 * But these are introduced from the VBT version 197 onwards, so making
+	 * sure that these bits are zero in the pervious versions.
+	 */
+	if (dev_priv->vbt.dsi.config->dual_link && bdb->version < 197) {
+		dev_priv->vbt.dsi.config->dl_cabc_port = 0;
+		dev_priv->vbt.dsi.config->pwm_bkl_ctrl = 0;
+	}
+
 	/* We have mandatory mipi config blocks. Initialize as generic panel */
 	dev_priv->vbt.dsi.panel_id = MIPI_DSI_GENERIC_PANEL_ID;
 
