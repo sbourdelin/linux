@@ -1253,6 +1253,13 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 	return ret;
 }
 
+int pm_genpd_add_device(struct generic_pm_domain *genpd,
+				      struct device *dev)
+{
+	return __pm_genpd_add_device(genpd, dev, NULL);
+}
+EXPORT_SYMBOL_GPL(pm_genpd_add_device);
+
 /**
  * pm_genpd_remove_device - Remove a device from an I/O PM domain.
  * @genpd: PM domain to remove the device from.
