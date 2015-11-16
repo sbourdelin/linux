@@ -59,8 +59,7 @@ static int ir_raw_event_thread(void *data)
 
 		mutex_lock(&ir_raw_handler_lock);
 		list_for_each_entry(handler, &ir_raw_handler_list, list)
-			if (raw->dev->enabled_protocols & handler->protocols ||
-			    !handler->protocols)
+			if (raw->dev->enabled_protocols & handler->protocols)
 				handler->decode(raw->dev, ev);
 		raw->prev_ev = ev;
 		mutex_unlock(&ir_raw_handler_lock);
@@ -360,13 +359,3 @@ void ir_raw_handler_unregister(struct ir_raw_handler *ir_raw_handler)
 	mutex_unlock(&ir_raw_handler_lock);
 }
 EXPORT_SYMBOL(ir_raw_handler_unregister);
-
-void ir_raw_init(void)
-{
-	/* Load the decoder modules */
-	load_lirc_codec();
-
-	/* If needed, we may later add some init code. In this case,
-	   it is needed to change the CONFIG_MODULE test at rc-core.h
-	 */
-}

@@ -20,6 +20,8 @@
 #include <linux/spinlock.h>
 #include <media/rc-core.h>
 
+#define RC_BIT_LIRC	(1ULL << 63)
+
 struct ir_raw_handler {
 	struct list_head list;
 
@@ -159,19 +161,5 @@ void ir_raw_event_unregister(struct rc_dev *dev);
 int ir_raw_handler_register(struct ir_raw_handler *ir_raw_handler);
 void ir_raw_handler_unregister(struct ir_raw_handler *ir_raw_handler);
 void ir_raw_init(void);
-
-/*
- * Decoder initialization code
- *
- * Those load logic are called during ir-core init, and automatically
- * loads the compiled decoders for their usage with IR raw events
- */
-
-/* from ir-lirc-codec.c */
-#ifdef CONFIG_IR_LIRC_CODEC_MODULE
-#define load_lirc_codec()	request_module_nowait("ir-lirc-codec")
-#else
-static inline void load_lirc_codec(void) { }
-#endif
 
 #endif /* _RC_CORE_PRIV */

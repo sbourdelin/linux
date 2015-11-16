@@ -802,6 +802,7 @@ static const struct {
 	{ RC_BIT_SHARP,		"sharp",	"ir-sharp-decoder"	},
 	{ RC_BIT_MCE_KBD,	"mce_kbd",	"ir-mce_kbd-decoder"	},
 	{ RC_BIT_XMP,		"xmp",		"ir-xmp-decoder"	},
+	{ RC_BIT_LIRC,		"lirc",		"ir-lirc-codec"		},
 };
 
 /**
@@ -828,23 +829,6 @@ struct rc_filter_attribute {
 		.type = (_type),					\
 		.mask = (_mask),					\
 	}
-
-static bool lirc_is_present(void)
-{
-#if defined(CONFIG_LIRC_MODULE)
-	struct module *lirc;
-
-	mutex_lock(&module_mutex);
-	lirc = find_module("lirc_dev");
-	mutex_unlock(&module_mutex);
-
-	return lirc ? true : false;
-#elif defined(CONFIG_LIRC)
-	return true;
-#else
-	return false;
-#endif
-}
 
 /**
  * show_protocols() - shows the current/wakeup IR protocol(s)
@@ -900,9 +884,6 @@ static ssize_t show_protocols(struct device *device,
 			allowed &= ~proto_names[i].type;
 	}
 
-	if (dev->driver_type == RC_DRIVER_IR_RAW && lirc_is_present())
-		tmp += sprintf(tmp, "[lirc] ");
-
 	if (tmp != buf)
 		tmp--;
 	*tmp = '\n';
@@ -954,12 +935,8 @@ static int parse_protocol_change(u64 *protocols, const char *buf)
 		}
 
 		if (i == ARRAY_SIZE(proto_names)) {
-			if (!strcasecmp(tmp, "lirc"))
-				mask = 0;
-			else {
-				IR_dprintk(1, "Unknown protocol: '%s'\n", tmp);
-				return -EINVAL;
-			}
+			IR_dprintk(1, "Unknown protocol: '%s'\n", tmp);
+			return -EINVAL;
 		}
 
 		count++;
@@ -1376,7 +1353,6 @@ EXPORT_SYMBOL_GPL(rc_free_device);
 
 int rc_register_device(struct rc_dev *dev)
 {
-	static bool raw_init = false; /* raw decoders loaded? */
 	struct rc_map *rc_map;
 	const char *path;
 	int attr = 0;
@@ -1473,12 +1449,7 @@ int rc_register_device(struct rc_dev *dev)
 	kfree(path);
 
 	if (dev->driver_type == RC_DRIVER_IR_RAW) {
-		/* Load raw decoders, if they aren't already */
-		if (!raw_init) {
-			IR_dprintk(1, "Loading raw decoders\n");
-			ir_raw_init();
-			raw_init = true;
-		}
+		dev->allowed_protocols |= RC_BIT_LIRC;
 		/* calls ir_register_device so unlock mutex here*/
 		mutex_unlock(&dev->lock);
 		rc = ir_raw_event_register(dev);
