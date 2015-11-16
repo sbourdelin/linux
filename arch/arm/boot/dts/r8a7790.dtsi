@@ -832,6 +832,7 @@
 		clocks = <&mstp1_clks R8A7790_CLK_VSP1_S>;
 		power-domains = <&cpg_clocks>;
 
+		renesas,has-clu;
 		renesas,has-lut;
 		renesas,has-sru;
 		renesas,#rpf = <5>;
