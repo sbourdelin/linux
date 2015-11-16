@@ -62,6 +62,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(DRV_VERSION);
 
 int ipoib_sendq_size __read_mostly = IPOIB_TX_RING_SIZE;
+int ipoib_sendq_low_th __read_mostly;
 int ipoib_recvq_size __read_mostly = IPOIB_RX_RING_SIZE;
 
 module_param_named(send_queue_size, ipoib_sendq_size, int, 0444);
@@ -2001,6 +2002,10 @@ static int __init ipoib_init_module(void)
 	ipoib_sendq_size = roundup_pow_of_two(ipoib_sendq_size);
 	ipoib_sendq_size = min(ipoib_sendq_size, IPOIB_MAX_QUEUE_SIZE);
 	ipoib_sendq_size = max3(ipoib_sendq_size, 2 * MAX_SEND_CQE, IPOIB_MIN_QUEUE_SIZE);
+	/* Let's do it once so no need to recalculate on every send cycle */
+	ipoib_sendq_low_th = (ipoib_sendq_size * IPOIB_TX_RING_LOW_TH_FACTOR /
+			      100);
+
 #ifdef CONFIG_INFINIBAND_IPOIB_CM
 	ipoib_max_conn_qp = min(ipoib_max_conn_qp, IPOIB_CM_MAX_CONN_QP);
 #endif

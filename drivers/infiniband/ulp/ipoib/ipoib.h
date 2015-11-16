@@ -115,6 +115,9 @@ enum {
 	IPOIB_RTNL_CHILD	  = 2,
 };
 
+/* Wake queue in case tx_outstanding go below 90% of sendq size */
+#define IPOIB_TX_RING_LOW_TH_FACTOR	90
+
 #define	IPOIB_OP_RECV   (1ul << 31)
 #ifdef CONFIG_INFINIBAND_IPOIB_CM
 #define	IPOIB_OP_CM     (1ul << 30)
@@ -767,6 +770,7 @@ static inline void ipoib_unregister_debugfs(void) { }
 	ipoib_printk(KERN_WARNING, priv, format , ## arg)
 
 extern int ipoib_sendq_size;
+extern int ipoib_sendq_low_th;
 extern int ipoib_recvq_size;
 
 extern struct ib_sa_client ipoib_sa_client;
