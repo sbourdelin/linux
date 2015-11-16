@@ -1449,7 +1449,6 @@ int rc_register_device(struct rc_dev *dev)
 	kfree(path);
 
 	if (dev->driver_type == RC_DRIVER_IR_RAW) {
-		dev->allowed_protocols |= RC_BIT_LIRC;
 		/* calls ir_register_device so unlock mutex here*/
 		mutex_unlock(&dev->lock);
 		rc = ir_raw_event_register(dev);
