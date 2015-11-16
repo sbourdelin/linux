@@ -1037,7 +1037,7 @@ static void destroy_hdlc_queues(struct port *port)
 		port->desc_tab = NULL;
 	}
 
-	if (!ports_open && dma_pool) {
+	if (!ports_open) {
 		dma_pool_destroy(dma_pool);
 		dma_pool = NULL;
 	}
