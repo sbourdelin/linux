@@ -5939,17 +5939,9 @@ static void post_kvm_run_save(struct kvm_vcpu *vcpu)
 	kvm_run->flags = is_smm(vcpu) ? KVM_RUN_X86_SMM : 0;
 	kvm_run->cr8 = kvm_get_cr8(vcpu);
 	kvm_run->apic_base = kvm_get_apic_base(vcpu);
-	if (!irqchip_in_kernel(vcpu->kvm))
-		kvm_run->ready_for_interrupt_injection =
-			kvm_arch_interrupt_allowed(vcpu) &&
-			!kvm_cpu_has_interrupt(vcpu) &&
-			!kvm_event_needs_reinjection(vcpu);
-	else if (!pic_in_kernel(vcpu->kvm))
-		kvm_run->ready_for_interrupt_injection =
-			kvm_apic_accept_pic_intr(vcpu) &&
-			!kvm_cpu_has_interrupt(vcpu);
-	else
-		kvm_run->ready_for_interrupt_injection = 1;
+	kvm_run->ready_for_interrupt_injection =
+		pic_in_kernel(vcpu->kvm) ||
+		kvm_vcpu_ready_for_interrupt_injection(vcpu);
 }
 
 static void update_cr8_intercept(struct kvm_vcpu *vcpu)
