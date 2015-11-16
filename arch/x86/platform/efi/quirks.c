@@ -259,12 +259,6 @@ void __init efi_apply_memmap_quirks(void)
 		pr_info("efi: Setup done, disabling due to 32/64-bit mismatch\n");
 		efi_unmap_memmap();
 	}
-
-	/*
-	 * UV doesn't support the new EFI pagetable mapping yet.
-	 */
-	if (is_uv_system())
-		set_bit(EFI_OLD_MEMMAP, &efi.flags);
 }
 
 /*
