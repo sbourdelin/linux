@@ -2763,6 +2763,14 @@ static int kvm_vcpu_ioctl_set_lapic(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+static int kvm_vcpu_ready_for_interrupt_injection(struct kvm_vcpu *vcpu) {
+	return kvm_arch_interrupt_allowed(vcpu) &&
+		!kvm_cpu_has_interrupt(vcpu) &&
+		!kvm_event_needs_reinjection(vcpu) &&
+		(!lapic_in_kernel(vcpu) ||
+		 kvm_apic_accept_pic_intr(vcpu));
+}
+
 static int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu,
 				    struct kvm_interrupt *irq)
 {
@@ -5918,15 +5926,8 @@ static int emulator_fix_hypercall(struct x86_emulate_ctxt *ctxt)
  */
 static int dm_request_for_irq_injection(struct kvm_vcpu *vcpu)
 {
-	if (!vcpu->run->request_interrupt_window || pic_in_kernel(vcpu->kvm))
-		return false;
-
-	if (kvm_cpu_has_interrupt(vcpu))
-		return false;
-
-	return (irqchip_split(vcpu->kvm)
-		? kvm_apic_accept_pic_intr(vcpu)
-		: kvm_arch_interrupt_allowed(vcpu));
+	return vcpu->run->request_interrupt_window &&
+		likely(!pic_in_kernel(vcpu->kvm));
 }
 
 static void post_kvm_run_save(struct kvm_vcpu *vcpu)
@@ -6663,7 +6664,8 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 		if (kvm_cpu_has_pending_timer(vcpu))
 			kvm_inject_pending_timer_irqs(vcpu);
 
-		if (dm_request_for_irq_injection(vcpu)) {
+		if (dm_request_for_irq_injection(vcpu) &&
+			kvm_vcpu_ready_for_interrupt_injection(vcpu)) {
 			r = 0;
 			vcpu->run->exit_reason = KVM_EXIT_IRQ_WINDOW_OPEN;
 			++vcpu->stat.request_irq_exits;
