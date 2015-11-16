@@ -34,13 +34,6 @@ EXPORT_SYMBOL(tsc_khz);
  */
 static int __read_mostly tsc_unstable;
 
-/* native_sched_clock() is called before tsc_init(), so
-   we must start with the TSC soft disabled to prevent
-   erroneous rdtsc usage on !cpu_has_tsc processors */
-static int __read_mostly tsc_disabled = -1;
-
-static DEFINE_STATIC_KEY_FALSE(__use_tsc);
-
 int tsc_clocksource_reliable;
 
 /*
@@ -279,29 +272,36 @@ done:
 	sched_clock_idle_wakeup_event(0);
 	local_irq_restore(flags);
 }
+
+void __init early_tsc_init(void)
+{
+	int cpu;
+
+	/*
+	 * We need to init the cycles to ns conversion machinery because
+	 * init_idle() below will call sched_clock() which needs it.
+	 */
+	for_each_possible_cpu(cpu)
+		cyc2ns_init(cpu);
+}
+
 /*
  * Scheduler clock - returns current time in nanosec units.
  */
 u64 native_sched_clock(void)
 {
-	if (static_branch_likely(&__use_tsc)) {
-		u64 tsc_now = rdtsc();
-
-		/* return the value in ns */
-		return cycles_2_ns(tsc_now);
-	}
-
+#ifdef CONFIG_X86_TSC
 	/*
-	 * Fall back to jiffies if there's no TSC available:
-	 * ( But note that we still use it if the TSC is marked
-	 *   unstable. We do this because unlike Time Of Day,
-	 *   the scheduler clock tolerates small errors and it's
-	 *   very important for it to be as fast as the platform
-	 *   can achieve it. )
+	 * Return the value in ns. Note that we still use the TSC even if it is
+	 * marked unstable. We do this because unlike Time Of Day, the scheduler
+	 * clock tolerates small errors and it's very important for it to be as
+	 * fast as the platform can achieve it.
 	 */
-
-	/* No locking but a rare wrong value is not a big deal: */
+	return cycles_2_ns(rdtsc());
+#else
+	/* No locking - a rare wrong value is not a big deal: */
 	return (jiffies_64 - INITIAL_JIFFIES) * (1000000000 / HZ);
+#endif
 }
 
 /*
@@ -330,32 +330,15 @@ int check_tsc_unstable(void)
 }
 EXPORT_SYMBOL_GPL(check_tsc_unstable);
 
-int check_tsc_disabled(void)
+/* Disable the TSC feature flag to avoid further TSC use. */
+int __init notsc_setup(void)
 {
-	return tsc_disabled;
-}
-EXPORT_SYMBOL_GPL(check_tsc_disabled);
-
-#ifdef CONFIG_X86_TSC
-int __init notsc_setup(char *str)
-{
-	pr_warn("Kernel compiled with CONFIG_X86_TSC, cannot disable TSC completely\n");
-	tsc_disabled = 1;
-	return 1;
-}
-#else
-/*
- * disable flag for tsc. Takes effect by clearing the TSC cpu flag
- * in cpu/common.c
- */
-int __init notsc_setup(char *str)
-{
+#ifndef CONFIG_X86_TSC
 	setup_clear_cpu_cap(X86_FEATURE_TSC);
 	return 1;
-}
 #endif
-
-__setup("notsc", notsc_setup);
+	return 0;
+}
 
 static int no_sched_irq_time;
 
@@ -1148,7 +1131,7 @@ out:
 
 static int __init init_tsc_clocksource(void)
 {
-	if (!cpu_has_tsc || tsc_disabled > 0 || !tsc_khz)
+	if (!cpu_has_tsc || !tsc_khz)
 		return 0;
 
 	if (tsc_clocksource_reliable)
@@ -1187,7 +1170,7 @@ void __init tsc_init(void)
 
 	x86_init.timers.tsc_pre_init();
 
-	if (!cpu_has_tsc) {
+	if (notsc_setup()) {
 		setup_clear_cpu_cap(X86_FEATURE_TSC_DEADLINE_TIMER);
 		return;
 	}
@@ -1211,18 +1194,8 @@ void __init tsc_init(void)
 	 * speed as the bootup CPU. (cpufreq notifiers will fix this
 	 * up if their speed diverges)
 	 */
-	for_each_possible_cpu(cpu) {
-		cyc2ns_init(cpu);
+	for_each_possible_cpu(cpu)
 		set_cyc2ns_scale(cpu_khz, cpu);
-	}
-
-	if (tsc_disabled > 0)
-		return;
-
-	/* now allow native_sched_clock() to use rdtsc */
-
-	tsc_disabled = 0;
-	static_branch_enable(&__use_tsc);
 
 	if (!no_sched_irq_time)
 		enable_sched_clock_irqtime();
@@ -1250,7 +1223,7 @@ unsigned long calibrate_delay_is_known(void)
 {
 	int i, cpu = smp_processor_id();
 
-	if (!tsc_disabled && !cpu_has(&cpu_data(cpu), X86_FEATURE_CONSTANT_TSC))
+	if (!cpu_has(&cpu_data(cpu), X86_FEATURE_CONSTANT_TSC))
 		return 0;
 
 	for_each_online_cpu(i)

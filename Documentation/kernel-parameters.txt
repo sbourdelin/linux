@@ -2549,8 +2549,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	nosync		[HW,M68K] Disables sync negotiation for all devices.
 
-	notsc		[BUGS=X86-32] Disable Time Stamp Counter
-
 	nousb		[USB] Disable the USB subsystem
 
 	nowatchdog	[KNL] Disable both lockup detectors, i.e.

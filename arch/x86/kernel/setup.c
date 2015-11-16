@@ -1252,6 +1252,8 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	microcode_init();
+
+	early_tsc_init();
 }
 
 #ifdef CONFIG_X86_32
