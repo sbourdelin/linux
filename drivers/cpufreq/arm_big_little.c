@@ -23,6 +23,7 @@
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/cpumask.h>
+#include <linux/cpu_cooling.h>
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -55,6 +56,7 @@ static bool bL_switching_enabled;
 #define ACTUAL_FREQ(cluster, freq)  ((cluster == A7_CLUSTER) ? freq << 1 : freq)
 #define VIRT_FREQ(cluster, freq)    ((cluster == A7_CLUSTER) ? freq >> 1 : freq)
 
+static struct thermal_cooling_device *cdev[MAX_CLUSTERS];
 static struct cpufreq_arm_bL_ops *arm_bL_ops;
 static struct clk *clk[MAX_CLUSTERS];
 static struct cpufreq_frequency_table *freq_table[MAX_CLUSTERS + 1];
@@ -493,6 +495,7 @@ static int bL_cpufreq_init(struct cpufreq_policy *policy)
 static int bL_cpufreq_exit(struct cpufreq_policy *policy)
 {
 	struct device *cpu_dev;
+	int domain;
 
 	cpu_dev = get_cpu_device(policy->cpu);
 	if (!cpu_dev) {
@@ -501,10 +504,41 @@ static int bL_cpufreq_exit(struct cpufreq_policy *policy)
 		return -ENODEV;
 	}
 
+	domain = topology_physical_package_id(cpu_dev->id);
+	cpufreq_cooling_unregister(cdev[domain]);
+	cdev[domain] = NULL;
+
 	put_cluster_clk_and_freq_table(cpu_dev);
 	dev_dbg(cpu_dev, "%s: Exited, cpu: %d\n", __func__, policy->cpu);
 
 	return 0;
+}
+
+static void bL_cpufreq_ready(struct cpufreq_policy *policy)
+{
+	struct device *cpu_dev = get_cpu_device(policy->cpu);
+	struct device_node *np = of_node_get(cpu_dev->of_node);
+	int domain = topology_physical_package_id(cpu_dev->id);
+
+	if (WARN_ON(!np))
+		return;
+
+	if (of_find_property(np, "#cooling-cells", NULL)) {
+		u32 power_coefficient = 0;
+
+		of_property_read_u32(np, "dynamic-power-coefficient",
+				     &power_coefficient);
+
+		cdev[domain] = of_cpufreq_power_cooling_register(np,
+				policy->related_cpus, power_coefficient, NULL);
+		if (IS_ERR(cdev[domain])) {
+			dev_err(cpu_dev,
+				"running cpufreq without cooling device: %ld\n",
+				PTR_ERR(cdev[domain]));
+			cdev[domain] = NULL;
+		}
+	}
+	of_node_put(np);
 }
 
 static struct cpufreq_driver bL_cpufreq_driver = {
@@ -517,6 +551,7 @@ static struct cpufreq_driver bL_cpufreq_driver = {
 	.get			= bL_cpufreq_get_rate,
 	.init			= bL_cpufreq_init,
 	.exit			= bL_cpufreq_exit,
+	.ready			= bL_cpufreq_ready,
 	.attr			= cpufreq_generic_attr,
 };
 
