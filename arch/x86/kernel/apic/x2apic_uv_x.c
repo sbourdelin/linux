@@ -712,12 +712,6 @@ static __init void map_mmioh_high(int min_pnode, int max_pnode)
 	}
 }
 
-static __init void map_low_mmrs(void)
-{
-	init_extra_mapping_uc(UV_GLOBAL_MMR32_BASE, UV_GLOBAL_MMR32_SIZE);
-	init_extra_mapping_uc(UV_LOCAL_MMR_BASE, UV_LOCAL_MMR_SIZE);
-}
-
 static __init void uv_rtc_init(void)
 {
 	long status;
@@ -890,7 +884,6 @@ void __init uv_system_init(void)
 		return;
 	}
 	pr_info("UV: Found %s hub\n", hub);
-	map_low_mmrs();
 
 	m_n_config.v = uv_read_local_mmr(UVH_RH_GAM_CONFIG_MMR );
 	m_val = m_n_config.s.m_skt;
