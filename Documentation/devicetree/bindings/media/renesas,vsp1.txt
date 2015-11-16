@@ -19,6 +19,8 @@ Required properties:
 
 Optional properties:
 
+  - renesas,has-clu: Boolean, indicates that the Cubic Look Up Table (CLU)
+    module is available.
   - renesas,has-lif: Boolean, indicates that the LCD Interface (LIF) module is
     available.
   - renesas,has-lut: Boolean, indicates that the Look Up Table (LUT) module is
@@ -35,6 +37,7 @@ Example: R8A7790 (R-Car H2) VSP1-S node
 		interrupts = <0 267 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp1_clks R8A7790_CLK_VSP1_S>;
 
+		renesas,has-clu;
 		renesas,has-lut;
 		renesas,has-sru;
 		renesas,#rpf = <5>;

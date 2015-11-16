@@ -22,6 +22,7 @@
 
 #include "vsp1.h"
 #include "vsp1_bru.h"
+#include "vsp1_clu.h"
 #include "vsp1_hsit.h"
 #include "vsp1_lif.h"
 #include "vsp1_lut.h"
@@ -164,6 +165,16 @@ static int vsp1_create_entities(struct vsp1_device *vsp1)
 	}
 
 	list_add_tail(&vsp1->bru->entity.list_dev, &vsp1->entities);
+
+	if (vsp1->pdata.features & VSP1_HAS_CLU) {
+		vsp1->clu = vsp1_clu_create(vsp1);
+		if (IS_ERR(vsp1->clu)) {
+			ret = PTR_ERR(vsp1->clu);
+			goto done;
+		}
+
+		list_add_tail(&vsp1->clu->entity.list_dev, &vsp1->entities);
+	}
 
 	vsp1->hsi = vsp1_hsit_create(vsp1, true);
 	if (IS_ERR(vsp1->hsi)) {
@@ -440,6 +451,8 @@ static int vsp1_parse_dt(struct vsp1_device *vsp1)
 	struct device_node *np = vsp1->dev->of_node;
 	struct vsp1_platform_data *pdata = &vsp1->pdata;
 
+	if (of_property_read_bool(np, "renesas,has-clu"))
+		pdata->features |= VSP1_HAS_CLU;
 	if (of_property_read_bool(np, "renesas,has-lif"))
 		pdata->features |= VSP1_HAS_LIF;
 	if (of_property_read_bool(np, "renesas,has-lut"))
