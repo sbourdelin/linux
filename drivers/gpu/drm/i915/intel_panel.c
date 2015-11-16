@@ -34,6 +34,7 @@
 #include <linux/moduleparam.h>
 #include <linux/pwm.h>
 #include "intel_drv.h"
+#include "intel_dsi.h"
 
 #define CRC_PMIC_PWM_PERIOD_NS	21333
 
@@ -533,6 +534,30 @@ static u32 vlv_get_backlight(struct intel_connector *connector)
 	return _vlv_get_backlight(dev, pipe);
 }
 
+static u32 cabc_get_backlight(struct intel_connector *connector)
+{
+	struct intel_dsi *intel_dsi = NULL;
+	struct intel_encoder *encoder = NULL;
+	struct mipi_dsi_device *dsi_device;
+	u8 data[2] = {0};
+	enum port port;
+
+	encoder = connector->encoder;
+	if (encoder->type == INTEL_OUTPUT_DSI)
+		intel_dsi = enc_to_intel_dsi(&encoder->base);
+	else {
+		DRM_ERROR("Use DSI encoder for CABC\n");
+		return -EINVAL;
+	}
+
+	for_each_dsi_port(port, intel_dsi->bkl_dcs_ports) {
+		dsi_device = intel_dsi->dsi_hosts[port]->device;
+		mipi_dsi_dcs_read(dsi_device, MIPI_DCS_CABC_LEVEL_RD, data, 2);
+	}
+
+	return data[1];
+}
+
 static u32 bxt_get_backlight(struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
@@ -629,6 +654,30 @@ static void vlv_set_backlight(struct intel_connector *connector, u32 level)
 
 	tmp = I915_READ(VLV_BLC_PWM_CTL(pipe)) & ~BACKLIGHT_DUTY_CYCLE_MASK;
 	I915_WRITE(VLV_BLC_PWM_CTL(pipe), tmp | level);
+}
+
+static void cabc_set_backlight(struct intel_connector *connector, u32 level)
+{
+	struct intel_dsi *intel_dsi = NULL;
+	struct intel_encoder *encoder = NULL;
+	struct mipi_dsi_device *dsi_device;
+	u8 data[2] = {0};
+	enum port port;
+
+	encoder = connector->encoder;
+	if (encoder->type == INTEL_OUTPUT_DSI)
+		intel_dsi = enc_to_intel_dsi(&encoder->base);
+	else {
+		DRM_ERROR("Use DSI encoder for CABC\n");
+		return;
+	}
+
+	for_each_dsi_port(port, intel_dsi->bkl_dcs_ports) {
+		dsi_device = intel_dsi->dsi_hosts[port]->device;
+		data[1] = level;
+		data[0] = MIPI_DCS_CABC_LEVEL_WR;
+		mipi_dsi_dcs_write_buffer(dsi_device, data, 2);
+	}
 }
 
 static void bxt_set_backlight(struct intel_connector *connector, u32 level)
@@ -782,6 +831,34 @@ static void vlv_disable_backlight(struct intel_connector *connector)
 
 	tmp = I915_READ(VLV_BLC_PWM_CTL2(pipe));
 	I915_WRITE(VLV_BLC_PWM_CTL2(pipe), tmp & ~BLM_PWM_ENABLE);
+}
+
+static void cabc_disable_backlight(struct intel_connector *connector)
+{
+	struct intel_dsi *intel_dsi = NULL;
+	struct intel_encoder *encoder = NULL;
+	struct mipi_dsi_device *dsi_device;
+	enum port port;
+	u8 data[2] = {0};
+
+	encoder = connector->encoder;
+	if (encoder->type == INTEL_OUTPUT_DSI)
+		intel_dsi = enc_to_intel_dsi(&encoder->base);
+	else {
+		DRM_ERROR("Use DSI encoder for CABC\n");
+		return;
+	}
+
+	intel_panel_actually_set_backlight(connector, 0);
+
+	for_each_dsi_port(port, intel_dsi->bkl_dcs_ports) {
+		dsi_device = intel_dsi->dsi_hosts[port]->device;
+		data[1] = CABC_OFF;
+		data[0] = MIPI_DCS_CABC_CONTROL_WR;
+		mipi_dsi_dcs_write_buffer(dsi_device, data, 2);
+		data[0] = MIPI_DCS_CABC_CONTROL_BRIGHT_WR;
+		mipi_dsi_dcs_write_buffer(dsi_device, data, 2);
+	}
 }
 
 static void bxt_disable_backlight(struct intel_connector *connector)
@@ -1117,6 +1194,36 @@ void intel_panel_enable_backlight(struct intel_connector *connector)
 		panel->backlight.device->props.power = FB_BLANK_UNBLANK;
 
 	mutex_unlock(&dev_priv->backlight_lock);
+}
+
+static void cabc_enable_backlight(struct intel_connector *connector)
+{
+	struct intel_dsi *intel_dsi = NULL;
+	struct intel_encoder *encoder = NULL;
+	struct intel_panel *panel = &connector->panel;
+	struct mipi_dsi_device *dsi_device;
+	enum port port;
+	u8 data[2] = {0};
+
+	encoder = connector->encoder;
+	if (encoder->type == INTEL_OUTPUT_DSI)
+		intel_dsi = enc_to_intel_dsi(&encoder->base);
+	else {
+		DRM_ERROR("Use DSI encoder for the CABC\n");
+		return;
+	}
+
+	for_each_dsi_port(port, intel_dsi->bkl_dcs_ports) {
+		dsi_device = intel_dsi->dsi_hosts[port]->device;
+		data[0] = MIPI_DCS_CABC_CONTROL_BRIGHT_WR;
+		data[1] = CABC_BACKLIGHT | CABC_DIMMING_DISPLAY | CABC_BCTRL;
+		mipi_dsi_dcs_write_buffer(dsi_device, data, 2);
+		data[0] = MIPI_DCS_CABC_CONTROL_WR;
+		data[1] = CABC_STILL_PICTURE;
+		mipi_dsi_dcs_write_buffer(dsi_device, data, 2);
+	}
+
+	intel_panel_actually_set_backlight(connector, panel->backlight.level);
 }
 
 #if IS_ENABLED(CONFIG_BACKLIGHT_CLASS_DEVICE)
@@ -1587,6 +1694,26 @@ static int vlv_setup_backlight(struct intel_connector *connector, enum pipe pipe
 	return 0;
 }
 
+static int cabc_setup_backlight(struct intel_connector *connector,
+		enum pipe unused)
+{
+	struct drm_device *dev = connector->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_panel *panel = &connector->panel;
+
+	if (dev_priv->vbt.backlight.present)
+		panel->backlight.present = true;
+	else {
+		DRM_ERROR("no backlight present per VBT\n");
+		return 0;
+	}
+
+	panel->backlight.max = CABC_MAX_VALUE;
+	panel->backlight.level = CABC_MAX_VALUE;
+
+	return 0;
+}
+
 static int
 bxt_setup_backlight(struct intel_connector *connector, enum pipe unused)
 {
@@ -1731,11 +1858,19 @@ intel_panel_init_backlight_funcs(struct intel_panel *panel)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	if (IS_BROXTON(dev)) {
-		panel->backlight.setup = bxt_setup_backlight;
-		panel->backlight.enable = bxt_enable_backlight;
-		panel->backlight.disable = bxt_disable_backlight;
-		panel->backlight.set = bxt_set_backlight;
-		panel->backlight.get = bxt_get_backlight;
+		if (dev_priv->vbt.dsi.config->cabc_supported) {
+			panel->backlight.setup = cabc_setup_backlight;
+			panel->backlight.enable = cabc_enable_backlight;
+			panel->backlight.disable = cabc_disable_backlight;
+			panel->backlight.set = cabc_set_backlight;
+			panel->backlight.get = cabc_get_backlight;
+		} else {
+			panel->backlight.setup = bxt_setup_backlight;
+			panel->backlight.enable = bxt_enable_backlight;
+			panel->backlight.disable = bxt_disable_backlight;
+			panel->backlight.set = bxt_set_backlight;
+			panel->backlight.get = bxt_get_backlight;
+		}
 	} else if (HAS_PCH_LPT(dev) || HAS_PCH_SPT(dev)) {
 		panel->backlight.setup = lpt_setup_backlight;
 		panel->backlight.enable = lpt_enable_backlight;

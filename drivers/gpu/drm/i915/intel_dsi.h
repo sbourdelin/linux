@@ -34,6 +34,30 @@
 #define DSI_DUAL_LINK_FRONT_BACK	1
 #define DSI_DUAL_LINK_PIXEL_ALT		2
 
+#define CABC_OFF			(0 << 0)
+#define CABC_USER_INTERFACE_IMAGE	(1 << 0)
+#define CABC_STILL_PICTURE		(2 << 0)
+#define CABC_VIDEO_MODE			(3 << 0)
+
+#define CABC_BACKLIGHT			(1 << 2)
+#define CABC_DIMMING_DISPLAY		(1 << 3)
+#define CABC_BCTRL			(1 << 5)
+
+#define CABC_PORT_A			0x00
+#define CABC_PORT_C			0x01
+#define CABC_PORT_A_AND_C		0x02
+
+#define CABC_MAX_VALUE			0xFF
+
+#define MIPI_DCS_CABC_LEVEL_RD		0x52
+#define MIPI_DCS_CABC_MIN_BRIGHTNESS_RD	0x5F
+#define MIPI_DCS_CABC_CONTROL_RD	0x56
+#define MIPI_DCS_CABC_CONTROL_BRIGHT_RD	0x54
+#define MIPI_DCS_CABC_LEVEL_WR		0x51
+#define MIPI_DCS_CABC_MIN_BRIGHTNESS_WR	0x5E
+#define MIPI_DCS_CABC_CONTROL_WR	0x55
+#define MIPI_DCS_CABC_CONTROL_BRIGHT_WR	0x53
+
 struct intel_dsi_host;
 
 struct intel_dsi {
