@@ -288,9 +288,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
 
 	/* Some boards don't have PCIe reset GPIO. */
 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-		gpio_set_value(imx6_pcie->reset_gpio, 0);
+		struct gpio_desc *gd = gpio_to_desc(imx6_pcie->reset_gpio);
+
+		gpiod_set_value(gd, 0);
 		msleep(100);
-		gpio_set_value(imx6_pcie->reset_gpio, 1);
+		gpiod_set_value(gd, 1);
 	}
 	return 0;
 
@@ -562,6 +564,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	struct pcie_port *pp;
 	struct device_node *np = pdev->dev.of_node;
 	struct resource *dbi_base;
+	enum of_gpio_flags of_flags;
+	int flags = GPIOF_OUT_INIT_LOW;
 	int ret;
 
 	imx6_pcie = devm_kzalloc(&pdev->dev, sizeof(*imx6_pcie), GFP_KERNEL);
@@ -581,10 +585,13 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 		return PTR_ERR(pp->dbi_base);
 
 	/* Fetch GPIOs */
-	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+	imx6_pcie->reset_gpio = of_get_named_gpio_flags(np, "reset-gpio", 0,
+							&of_flags);
 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+		if (of_flags & OF_GPIO_ACTIVE_LOW)
+			flags |= GPIOF_ACTIVE_LOW;
 		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
-					    GPIOF_OUT_INIT_LOW, "PCIe reset");
+					    flags, "PCIe reset");
 		if (ret) {
 			dev_err(&pdev->dev, "unable to get reset gpio\n");
 			return ret;
