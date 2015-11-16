@@ -28,6 +28,7 @@
 #include <linux/random.h>
 #include <linux/hw_breakpoint.h>
 #include <linux/leds.h>
+#include <trace/events/power.h>
 
 #include <asm/processor.h>
 #include <asm/thread_notify.h>
@@ -66,11 +67,15 @@ void (*arm_pm_idle)(void);
 
 void arch_cpu_idle(void)
 {
-	if (arm_pm_idle)
+	if (arm_pm_idle) {
 		arm_pm_idle();
-	else
+		local_irq_enable();
+	} else {
+		trace_cpu_idle_rcuidle(1, smp_processor_id());
 		cpu_do_idle();
-	local_irq_enable();
+		local_irq_enable();
+		trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+	}
 }
 
 void arch_cpu_idle_prepare(void)
