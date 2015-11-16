@@ -27,11 +27,33 @@
 #include <linux/hardirq.h>
 #include <linux/acpi.h>
 #include <linux/dynamic_debug.h>
+#include <linux/irq.h>
 
 #include "internal.h"
 
 #define _COMPONENT		ACPI_BUS_COMPONENT
 ACPI_MODULE_NAME("utils");
+
+unsigned int acpi_get_irq_type(int trigger, int polarity)
+{
+	switch (polarity) {
+	case ACPI_ACTIVE_LOW:
+		return trigger == ACPI_EDGE_SENSITIVE ?
+		       IRQ_TYPE_EDGE_FALLING :
+		       IRQ_TYPE_LEVEL_LOW;
+	case ACPI_ACTIVE_HIGH:
+		return trigger == ACPI_EDGE_SENSITIVE ?
+		       IRQ_TYPE_EDGE_RISING :
+		       IRQ_TYPE_LEVEL_HIGH;
+	case ACPI_ACTIVE_BOTH:
+		if (trigger == ACPI_EDGE_SENSITIVE)
+			return IRQ_TYPE_EDGE_BOTH;
+	default:
+		return IRQ_TYPE_NONE;
+	}
+}
+EXPORT_SYMBOL_GPL(acpi_get_irq_type);
+
 
 /* --------------------------------------------------------------------------
                             Object Evaluation Helpers
