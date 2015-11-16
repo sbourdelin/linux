@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/export.h>
 #include <linux/module.h>
+#include <linux/console.h>
 
 #include "u_serial.h"
 
@@ -79,6 +80,16 @@
  */
 #define QUEUE_SIZE		16
 #define WRITE_BUF_SIZE		8192		/* TX only */
+#define GS_BUFFER_SIZE		(4096)
+#define GS_CONSOLE_BUF_SIZE	(2 * GS_BUFFER_SIZE)
+
+struct gscons_info {
+	struct gs_port		*port;
+	struct tty_driver	*tty_driver;
+	struct work_struct	work;
+	int			buf_tail;
+	char			buf[GS_CONSOLE_BUF_SIZE];
+};
 
 /* circular buffer */
 struct gs_buf {
@@ -117,6 +128,7 @@ struct gs_port {
 
 	/* REVISIT this state ... */
 	struct usb_cdc_line_coding port_line_coding;	/* 8-N-1 etc */
+	struct usb_request	*console_req;
 };
 
 static struct portmaster {
@@ -1052,6 +1064,7 @@ gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
 
 	port->port_num = port_num;
 	port->port_line_coding = *coding;
+	port->console_req = NULL;
 
 	ports[port_num].port = port;
 out:
@@ -1141,6 +1154,227 @@ err:
 }
 EXPORT_SYMBOL_GPL(gserial_alloc_line);
 
+#ifdef CONFIG_U_SERIAL_CONSOLE
+
+static struct usb_request *gs_request_new(struct usb_ep *ep, int buffer_size)
+{
+	struct usb_request *req = usb_ep_alloc_request(ep, GFP_ATOMIC);
+
+	if (!req)
+		return NULL;
+
+	/* now allocate buffers for the requests */
+	req->buf = kmalloc(buffer_size, GFP_ATOMIC);
+	if (!req->buf) {
+		usb_ep_free_request(ep, req);
+		return NULL;
+	}
+
+	return req;
+}
+
+static void gs_request_free(struct usb_request *req, struct usb_ep *ep)
+{
+	if (req) {
+		kfree(req->buf);
+		usb_ep_free_request(ep, req);
+	}
+}
+
+static void gs_complete_out(struct usb_ep *ep, struct usb_request *req)
+{
+	if (req->status != 0 && req->status != -ECONNRESET)
+		return;
+}
+
+static struct console gserial_cons;
+static int gs_console_connect(void)
+{
+	struct gscons_info *info = gserial_cons.data;
+	int port_num = gserial_cons.index;
+	struct usb_request *req;
+	struct gs_port *port;
+	struct usb_ep *ep;
+
+	if (port_num >= MAX_U_SERIAL_PORTS || port_num < 0) {
+		pr_err("%s: port num [%d] exceeds the range.\n",
+		       __func__, port_num);
+		return -ENXIO;
+	}
+
+	port = ports[port_num].port;
+	if (!port) {
+		pr_err("%s: serial line [%d] not allocated.\n",
+		       __func__, port_num);
+		return -ENODEV;
+	}
+
+	if (!port->port_usb) {
+		pr_err("%s: no port usb.\n", __func__);
+		return -ENODEV;
+	}
+
+	ep = port->port_usb->in;
+	if (!ep) {
+		pr_err("%s: no usb endpoint.\n", __func__);
+		return -ENXIO;
+	}
+
+	req = port->console_req;
+	if (!req) {
+		req = gs_request_new(ep, GS_BUFFER_SIZE);
+		if (!req) {
+			pr_err("%s: request fail.\n", __func__);
+			return -ENOMEM;
+		}
+		req->complete = gs_complete_out;
+	}
+
+	info->port = port;
+
+	pr_debug("%s: port[%d] console connect!\n", __func__, port_num);
+	return 0;
+}
+
+static void gs_console_work(struct work_struct *work)
+{
+	struct gscons_info *info = container_of(work, struct gscons_info, work);
+	struct gs_port *port = info->port;
+	struct usb_request *req;
+	struct usb_ep *ep;
+	int xfer, ret, count;
+	char *p;
+
+	if (!port || !port->port_usb)
+		return;
+
+	req = port->console_req;
+	ep = port->port_usb->in;
+	if (!req || !ep)
+		return;
+
+	spin_lock_irq(&port->port_lock);
+	count = info->buf_tail;
+	p = info->buf;
+
+	while (count > 0 && !port->write_busy) {
+		if (count > GS_BUFFER_SIZE)
+			xfer = GS_BUFFER_SIZE;
+		else
+			xfer = count;
+
+		memcpy(req->buf, p, xfer);
+		req->length = xfer;
+
+		port->write_busy = true;
+		spin_unlock(&port->port_lock);
+		ret = usb_ep_queue(ep, req, GFP_ATOMIC);
+		spin_lock(&port->port_lock);
+		port->write_busy = false;
+		if (ret < 0)
+			break;
+
+		p += xfer;
+		count -= xfer;
+	}
+
+	info->buf_tail -= count;
+	spin_unlock_irq(&port->port_lock);
+}
+
+static int gs_console_setup(struct console *co, char *options)
+{
+	struct gscons_info *gscons_info;
+
+	gscons_info = kzalloc(sizeof(struct gscons_info), GFP_KERNEL);
+	if (!gscons_info)
+		return -ENOMEM;
+
+	gscons_info->port = NULL;
+	gscons_info->tty_driver = gs_tty_driver;
+	INIT_WORK(&gscons_info->work, gs_console_work);
+	gscons_info->buf_tail = 0;
+	co->data = gscons_info;
+
+	return 0;
+}
+
+static void gs_console_write(struct console *co,
+			     const char *buf, unsigned count)
+{
+	struct gscons_info *info = co->data;
+	int avail, xfer;
+	char *p;
+
+	avail = GS_CONSOLE_BUF_SIZE - info->buf_tail;
+	if (count > avail)
+		xfer = avail;
+	else
+		xfer = count;
+
+	p = &info->buf[info->buf_tail];
+	memcpy(p, buf, xfer);
+	info->buf_tail += xfer;
+
+	schedule_work(&info->work);
+}
+
+static struct tty_driver *gs_console_device(struct console *co, int *index)
+{
+	struct gscons_info *info = co->data;
+
+	*index = co->index;
+	return info->tty_driver;
+}
+
+static struct console gserial_cons = {
+	.name =		"ttyGS",
+	.write =	gs_console_write,
+	.device =	gs_console_device,
+	.setup =	gs_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
+};
+
+static void gserial_console_init(void)
+{
+	register_console(&gserial_cons);
+}
+
+static void gserial_console_exit(void)
+{
+	struct gscons_info *info = gserial_cons.data;
+	struct gs_port *port = info->port;
+	struct usb_request *req;
+	struct usb_ep *ep;
+
+	if (port && port->port_usb) {
+		req = port->console_req;
+		ep = port->port_usb->in;
+		gs_request_free(req, ep);
+	}
+
+	kfree(info);
+	unregister_console(&gserial_cons);
+}
+
+#else
+
+static int gs_console_connect(void)
+{
+	return 0;
+}
+
+static void gserial_console_init(void)
+{
+}
+
+static void gserial_console_exit(void)
+{
+}
+
+#endif
+
 /**
  * gserial_connect - notify TTY I/O glue that USB link is active
  * @gser: the function, set up with endpoints and descriptors
@@ -1217,6 +1451,7 @@ int gserial_connect(struct gserial *gser, u8 port_num)
 			gser->disconnect(gser);
 	}
 
+	status = gs_console_connect();
 	spin_unlock_irqrestore(&port->port_lock, flags);
 
 	return status;
@@ -1318,6 +1553,8 @@ static int userial_init(void)
 		goto fail;
 	}
 
+	gserial_console_init();
+
 	pr_debug("%s: registered %d ttyGS* device%s\n", __func__,
 			MAX_U_SERIAL_PORTS,
 			(MAX_U_SERIAL_PORTS == 1) ? "" : "s");
@@ -1332,6 +1569,7 @@ module_init(userial_init);
 
 static void userial_cleanup(void)
 {
+	gserial_console_exit();
 	tty_unregister_driver(gs_tty_driver);
 	put_tty_driver(gs_tty_driver);
 	gs_tty_driver = NULL;
