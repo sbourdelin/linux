@@ -1051,7 +1051,7 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 {
 	struct ifinfomsg *ifm;
 	struct nlmsghdr *nlh;
-	struct rtnl_link_stats64 temp;
+	static struct rtnl_link_stats64 temp;
 	const struct rtnl_link_stats64 *stats;
 	struct nlattr *attr, *af_spec;
 	struct rtnl_af_ops *af_ops;
@@ -1153,16 +1153,16 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 		if (!vfinfo)
 			goto nla_put_failure;
 		for (i = 0; i < num_vfs; i++) {
-			struct ifla_vf_info ivi;
-			struct ifla_vf_mac vf_mac;
-			struct ifla_vf_vlan vf_vlan;
-			struct ifla_vf_rate vf_rate;
-			struct ifla_vf_tx_rate vf_tx_rate;
-			struct ifla_vf_spoofchk vf_spoofchk;
-			struct ifla_vf_link_state vf_linkstate;
-			struct ifla_vf_rss_query_en vf_rss_query_en;
-			struct ifla_vf_stats vf_stats;
-			struct ifla_vf_trust vf_trust;
+			static struct ifla_vf_info ivi;
+			static struct ifla_vf_mac vf_mac;
+			static struct ifla_vf_vlan vf_vlan;
+			static struct ifla_vf_rate vf_rate;
+			static struct ifla_vf_tx_rate vf_tx_rate;
+			static struct ifla_vf_spoofchk vf_spoofchk;
+			static struct ifla_vf_link_state vf_linkstate;
+			static struct ifla_vf_rss_query_en vf_rss_query_en;
+			static struct ifla_vf_stats vf_stats;
+			static struct ifla_vf_trust vf_trust;
 
 			/*
 			 * Not all SR-IOV capable drivers support the
