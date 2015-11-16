@@ -1730,6 +1730,10 @@ intel_panel_init_backlight_funcs(struct intel_panel *panel)
 	struct drm_device *dev = intel_connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
+	if (intel_connector->base.connector_type == DRM_MODE_CONNECTOR_eDP &&
+			intel_dp_aux_init_backlight_funcs(intel_connector) == 0)
+		return;
+
 	if (IS_BROXTON(dev)) {
 		panel->backlight.setup = bxt_setup_backlight;
 		panel->backlight.enable = bxt_enable_backlight;
