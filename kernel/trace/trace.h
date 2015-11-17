@@ -567,7 +567,8 @@ int trace_empty(struct trace_iterator *iter);
 
 void *trace_find_next_entry_inc(struct trace_iterator *iter);
 
-void trace_init_global_iter(struct trace_iterator *iter);
+int trace_init_global_iter(struct trace_iterator *iter);
+void trace_finalize_global_iter(struct trace_iterator *iter);
 
 void tracing_iter_reset(struct trace_iterator *iter, int cpu);
 

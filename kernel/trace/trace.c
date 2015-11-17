@@ -6940,12 +6940,21 @@ trace_printk_seq(struct trace_seq *s)
 	trace_seq_init(s);
 }
 
-void trace_init_global_iter(struct trace_iterator *iter)
+int trace_init_global_iter(struct trace_iterator *iter)
 {
 	iter->tr = &global_trace;
 	iter->trace = iter->tr->current_trace;
 	iter->cpu_file = RING_BUFFER_ALL_CPUS;
 	iter->trace_buffer = &global_trace.trace_buffer;
+
+	/*
+	 * iter->started will be used if the ring buffer has overrun.
+	 *
+	 * We allocate it with GFP_NOWAIT since this function can be called with
+	 * interrupt disabled.
+	 */
+	if (!zalloc_cpumask_var(&iter->started, GFP_NOWAIT))
+		return -ENOMEM;
 
 	if (iter->trace && iter->trace->open)
 		iter->trace->open(iter);
@@ -6957,6 +6966,12 @@ void trace_init_global_iter(struct trace_iterator *iter)
 	/* Output in nanoseconds only if we are using a clock in nanoseconds. */
 	if (trace_clocks[iter->tr->clock_id].in_ns)
 		iter->iter_flags |= TRACE_FILE_TIME_IN_NS;
+
+	return 0;
+}
+
+void trace_finalize_global_iter(struct trace_iterator *iter) {
+	free_cpumask_var(iter->started);
 }
 
 void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
@@ -6987,7 +7002,10 @@ void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
 	local_irq_save(flags);
 
 	/* Simulate the iterator */
-	trace_init_global_iter(&iter);
+	if (trace_init_global_iter(&iter) < 0) {
+		printk(KERN_WARNING "Global iter initialization fails\n");
+		return;
+	}
 
 	for_each_tracing_cpu(cpu) {
 		atomic_inc(&per_cpu_ptr(iter.trace_buffer->data, cpu)->disabled);
@@ -7066,6 +7084,7 @@ void ftrace_dump(enum ftrace_dump_mode oops_dump_mode)
 	}
  	atomic_dec(&dump_running);
 	local_irq_restore(flags);
+	trace_finalize_global_iter(&iter);
 }
 EXPORT_SYMBOL_GPL(ftrace_dump);
 

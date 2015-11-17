@@ -24,7 +24,11 @@ static void ftrace_dump_buf(int skip_lines, long cpu_file)
 	unsigned int old_userobj;
 	int cnt = 0, cpu;
 
-	trace_init_global_iter(&iter);
+	if (trace_init_global_iter(&iter) < 0) {
+		kdb_printf("Global iter initialization fails\n");
+		return;
+	}
+
 	iter.buffer_iter = buffer_iter;
 
 	for_each_tracing_cpu(cpu) {
@@ -94,6 +98,8 @@ out:
 			iter.buffer_iter[cpu] = NULL;
 		}
 	}
+
+	trace_finalize_global_iter(&iter);
 }
 
 /*
