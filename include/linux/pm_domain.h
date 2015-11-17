@@ -16,6 +16,7 @@
 #include <linux/of.h>
 #include <linux/notifier.h>
 #include <linux/spinlock.h>
+#include <linux/ktime.h>
 
 /* Defines used for the flags field in the struct generic_pm_domain */
 #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
@@ -104,6 +105,7 @@ struct gpd_timing_data {
 	s64 effective_constraint_ns;
 	bool constraint_changed;
 	bool cached_stop_ok;
+	ktime_t next_wakeup;
 };
 
 struct pm_domain_data {
