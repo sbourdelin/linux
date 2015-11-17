@@ -21,6 +21,7 @@
 #include <linux/pm_qos.h>
 #include <linux/rculist.h>
 #include <linux/slab.h>
+#include <linux/tick.h>
 
 #define CPU_PD_NAME_MAX 36
 
@@ -65,6 +66,86 @@ static void get_cpus_in_domain(struct generic_pm_domain *genpd,
 		get_cpus_in_domain(sd, mask);
 	}
 }
+
+static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
+{
+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
+	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
+	int qos = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+	u64 sleep_ns = ~0;
+	ktime_t earliest;
+	int cpu;
+	int i;
+
+	/* Reset the last set genpd state, default to index 0 */
+	genpd->state_idx = 0;
+
+	/* We dont want to power down, if QoS is 0 */
+	if (!qos)
+		return false;
+
+	/*
+	 * Find the sleep time for the cluster.
+	 * The time between now and the first wake up of any CPU that
+	 * are in this domain hierarchy is the time available for the
+	 * domain to be idle.
+	 */
+	earliest.tv64 = KTIME_MAX;
+	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
+		struct device *cpu_dev = get_cpu_device(cpu);
+		struct gpd_timing_data *td;
+
+		td = &dev_gpd_data(cpu_dev)->td;
+
+		if (earliest.tv64 < td->next_wakeup.tv64)
+			earliest = td->next_wakeup;
+	}
+
+	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
+	if (sleep_ns <= 0)
+		return false;
+
+	/*
+	 * Find the deepest sleep state that satisfies the residency
+	 * requirement and the QoS constraint
+	 */
+	for (i = genpd->state_count - 1; i > 0; i--) {
+		u64 state_sleep_ns;
+
+		state_sleep_ns = genpd->states[i].power_off_latency_ns +
+			genpd->states[i].power_on_latency_ns +
+			genpd->states[i].residency_ns;
+
+		/*
+		 * If we cant sleep to save power in the state, move on
+		 * to the next lower idle state.
+		 */
+		if (state_sleep_ns > sleep_ns)
+		       continue;
+
+		/*
+		 * We also dont want to sleep more than we should to
+		 * gaurantee QoS.
+		 */
+		if (state_sleep_ns < (qos * NSEC_PER_USEC))
+			break;
+	}
+
+	if (i >= 0)
+		genpd->state_idx = i;
+
+	return  (i >= 0) ? true : false;
+}
+
+static bool cpu_stop_ok(struct device *dev)
+{
+	return true;
+}
+
+struct dev_power_governor cpu_pd_gov = {
+	.power_down_ok = cpu_pd_down_ok,
+	.stop_ok = cpu_stop_ok,
+};
 
 static int cpu_pd_power_off(struct generic_pm_domain *genpd)
 {
@@ -183,7 +264,7 @@ int of_register_cpu_pm_domain(struct device_node *dn,
 
 	/* Register the CPU genpd */
 	pr_debug("adding %s as CPU PM domain.\n", pd->genpd->name);
-	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
+	ret = of_pm_genpd_init(dn, pd->genpd, &cpu_pd_gov, false);
 	if (ret) {
 		pr_err("Unable to initialize domain %s\n", dn->full_name);
 		return ret;
