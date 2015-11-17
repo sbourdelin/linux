@@ -9999,7 +9999,7 @@ static void intel_crtc_update_cursor(struct drm_crtc *crtc,
 	I915_WRITE(CURPOS(pipe), pos);
 
 	/* ILK+ do this automagically */
-	if (HAS_GMCH_DISPLAY(dev) &&
+	if (HAS_GMCH_DISPLAY(dev) && base &&
 	    crtc->cursor->state->rotation == BIT(DRM_ROTATE_180)) {
 		base += (cursor_state->crtc_h *
 			 cursor_state->crtc_w - 1) * 4;
