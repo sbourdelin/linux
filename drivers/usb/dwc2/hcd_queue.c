@@ -325,35 +325,45 @@ static int dwc2_check_periodic_bandwidth(struct dwc2_hsotg *hsotg,
 
 /**
  * Microframe scheduler
- * track the total use in hsotg->frame_usecs
- * keep each qh use in qh->frame_usecs
+ * track the total use in hsotg->periodic_bitmap
+ * keep each qh use in qh->start_usecs
  * when surrendering the qh then donate the time back
  */
 static const unsigned short max_uframe_usecs[] = {
-	100, 100, 100, 100, 100, 100, 30, 0
+	EARLY_FRAME_USEC, EARLY_FRAME_USEC, EARLY_FRAME_USEC,
+	EARLY_FRAME_USEC, EARLY_FRAME_USEC, EARLY_FRAME_USEC,
+	30, 0
 };
-
-void dwc2_hcd_init_usecs(struct dwc2_hsotg *hsotg)
-{
-	int i;
-
-	for (i = 0; i < 8; i++)
-		hsotg->frame_usecs[i] = max_uframe_usecs[i];
-}
 
 static int dwc2_find_single_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 {
+	unsigned short frame_start = 0;
 	unsigned short utime = qh->usecs;
 	int i;
 
-	for (i = 0; i < 8; i++) {
-		/* At the start hsotg->frame_usecs[i] = max_uframe_usecs[i] */
-		if (utime <= hsotg->frame_usecs[i]) {
-			hsotg->frame_usecs[i] -= utime;
-			qh->frame_usecs[i] += utime;
+	for (i = 0; i < ARRAY_SIZE(max_uframe_usecs); i++) {
+		unsigned short frame_time = max_uframe_usecs[i];
+		unsigned long start;
+
+		/* Look for a chunk starting at begin of this frame */
+		start = bitmap_find_next_zero_area(hsotg->periodic_bitmap,
+						   frame_start + frame_time,
+						   frame_start, utime, 0);
+
+		/* The chunk has to totally fit in this frame */
+		if (start < frame_start + frame_time) {
+			bitmap_set(hsotg->periodic_bitmap, start, utime);
+			qh->start_usecs = start;
+			dwc2_sch_dbg(hsotg, "%s: assigned %d us @ %d us\n",
+				     __func__, qh->usecs, qh->start_usecs);
 			return i;
 		}
+
+		frame_start += frame_time;
 	}
+
+	dwc2_sch_dbg(hsotg, "%s: failed to assign %d us\n",
+		     __func__, qh->usecs);
 	return -ENOSPC;
 }
 
@@ -363,57 +373,23 @@ static int dwc2_find_single_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 static int dwc2_find_multi_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 {
 	unsigned short utime = qh->usecs;
-	unsigned short xtime;
-	int t_left;
-	int i;
-	int j;
-	int k;
+	unsigned long start;
 
-	for (i = 0; i < 8; i++) {
-		if (hsotg->frame_usecs[i] <= 0)
-			continue;
-
-		/*
-		 * we need n consecutive slots so use j as a start slot
-		 * j plus j+1 must be enough time (for now)
-		 */
-		xtime = hsotg->frame_usecs[i];
-		for (j = i + 1; j < 8; j++) {
-			/*
-			 * if we add this frame remaining time to xtime we may
-			 * be OK, if not we need to test j for a complete frame
-			 */
-			if (xtime + hsotg->frame_usecs[j] < utime) {
-				if (hsotg->frame_usecs[j] <
-							max_uframe_usecs[j])
-					continue;
-			}
-			if (xtime >= utime) {
-				t_left = utime;
-				for (k = i; k < 8; k++) {
-					t_left -= hsotg->frame_usecs[k];
-					if (t_left <= 0) {
-						qh->frame_usecs[k] +=
-							hsotg->frame_usecs[k]
-								+ t_left;
-						hsotg->frame_usecs[k] = -t_left;
-						return i;
-					} else {
-						qh->frame_usecs[k] +=
-							hsotg->frame_usecs[k];
-						hsotg->frame_usecs[k] = 0;
-					}
-				}
-			}
-			/* add the frame time to x time */
-			xtime += hsotg->frame_usecs[j];
-			/* we must have a fully available next frame or break */
-			if (xtime < utime &&
-			   hsotg->frame_usecs[j] == max_uframe_usecs[j])
-				continue;
-		}
+	start = bitmap_find_next_zero_area(hsotg->periodic_bitmap,
+					   TOTAL_PERIODIC_USEC, 0, utime, 0);
+	if (start >= TOTAL_PERIODIC_USEC) {
+		dwc2_sch_dbg(hsotg, "%s: failed to assign %d us\n",
+			     __func__, qh->usecs);
+		return -ENOSPC;
 	}
-	return -ENOSPC;
+
+	bitmap_set(hsotg->periodic_bitmap, start, qh->usecs);
+	qh->start_usecs = start;
+
+	dwc2_sch_dbg(hsotg, "%s: assigned %d us @ %d us\n",
+		     __func__, qh->usecs, qh->start_usecs);
+
+	return start / EARLY_FRAME_USEC;
 }
 
 static int dwc2_find_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
@@ -490,8 +466,10 @@ static int dwc2_schedule_periodic(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 		if (frame >= 0) {
 			qh->sched_frame &= ~0x7;
 			qh->sched_frame |= (frame & 7);
-			dwc2_sch_dbg(hsotg, "sched_p %p sch=%04x, uf=%d\n",
-				     qh, qh->sched_frame, frame);
+			dwc2_sch_dbg(hsotg,
+				     "sched_p %p sch=%04x, uf=%d, us=%d\n",
+				     qh, qh->sched_frame, frame,
+				     qh->start_usecs);
 		}
 
 		if (status > 0)
@@ -551,22 +529,21 @@ static int dwc2_schedule_periodic(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 static void dwc2_deschedule_periodic(struct dwc2_hsotg *hsotg,
 				     struct dwc2_qh *qh)
 {
-	int i;
+	int start = qh->start_usecs;
+	int utime = qh->usecs;
 
 	list_del_init(&qh->qh_list_entry);
 
 	/* Update claimed usecs per (micro)frame */
 	hsotg->periodic_usecs -= qh->usecs;
 
-	if (hsotg->core_params->uframe_sched > 0) {
-		for (i = 0; i < 8; i++) {
-			hsotg->frame_usecs[i] += qh->frame_usecs[i];
-			qh->frame_usecs[i] = 0;
-		}
-	} else {
+	if (hsotg->core_params->uframe_sched <= 0) {
 		/* Release periodic channel reservation */
 		hsotg->periodic_channels--;
+		return;
 	}
+
+	bitmap_clear(hsotg->periodic_bitmap, start, utime);
 }
 
 /**
@@ -600,8 +577,8 @@ int dwc2_hcd_qh_add(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 		new_frame = dwc2_frame_num_inc(hsotg->frame_number,
 				SCHEDULE_SLOP);
 
-		dwc2_sch_dbg(hsotg, "reset %p sch=%04x=>%04x\n",
-			     qh, qh->sched_frame, new_frame);
+		dwc2_sch_dbg(hsotg, "reset %p sch=%04x=>%04x, us=%d\n",
+			     qh, qh->sched_frame, new_frame, qh->start_usecs);
 		qh->sched_frame = new_frame;
 	}
 
@@ -695,10 +672,11 @@ static void dwc2_sched_periodic_split(struct dwc2_hsotg *hsotg,
 		qh->start_split_frame = qh->sched_frame;
 	}
 
-	dwc2_sch_dbg(hsotg, "next(%d) %p fn=%04x, sch=%04x=>%04x (%+d)\n",
+	dwc2_sch_dbg(hsotg, "next(%d) %p fn=%04x, sch=%04x=>%04x (%+d) us=%d\n",
 		     sched_next_periodic_split, qh, frame_number, old_frame,
 		     qh->sched_frame,
-		     dwc2_frame_num_dec(qh->sched_frame, old_frame));
+		     dwc2_frame_num_dec(qh->sched_frame, old_frame),
+		     qh->start_usecs);
 }
 
 /*

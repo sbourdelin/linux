@@ -658,7 +658,7 @@ struct dwc2_hregs_backup {
  *                      This value is in microseconds per (micro)frame. The
  *                      assumption is that all periodic transfers may occur in
  *                      the same (micro)frame.
- * @frame_usecs:        Internal variable used by the microframe scheduler
+ * @periodic_bitmap:    Bitmap used by the microframe scheduler
  * @frame_number:       Frame number read from the core at SOF. The value ranges
  *                      from 0 to HFNUM_MAX_FRNUM.
  * @periodic_qh_count:  Count of periodic QHs, if using several eps. Used for
@@ -753,6 +753,11 @@ struct dwc2_hsotg {
 #define DWC2_CORE_REV_3_00a	0x4f54300a
 
 #if IS_ENABLED(CONFIG_USB_DWC2_HOST) || IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)
+
+/* Total number of microseconds for scheduling */
+#define EARLY_FRAME_USEC		100
+#define TOTAL_PERIODIC_USEC		(6 * EARLY_FRAME_USEC + 30)
+
 	union dwc2_hcd_internal_flags {
 		u32 d32;
 		struct {
@@ -775,7 +780,8 @@ struct dwc2_hsotg {
 	struct list_head periodic_sched_assigned;
 	struct list_head periodic_sched_queued;
 	u16 periodic_usecs;
-	u16 frame_usecs[8];
+	unsigned long periodic_bitmap[DIV_ROUND_UP(TOTAL_PERIODIC_USEC,
+						   BITS_PER_LONG)];
 	u16 frame_number;
 	u16 periodic_qh_count;
 	bool bus_suspended;

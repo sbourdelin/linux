@@ -137,8 +137,9 @@ static void dwc2_sof_intr(struct dwc2_hsotg *hsotg)
 		qh_entry = qh_entry->next;
 		if (dwc2_frame_num_le(qh->sched_frame, hsotg->frame_number)) {
 			dwc2_sch_dbg(hsotg,
-				     "ready %p fn=%04x, sch=%04x\n",
-				     qh, hsotg->frame_number, qh->sched_frame);
+				     "ready %p fn=%04x, sch=%04x, us=%d\n",
+				     qh, hsotg->frame_number, qh->sched_frame,
+				     qh->start_usecs);
 
 			/*
 			 * Move QH to the ready list to be executed next

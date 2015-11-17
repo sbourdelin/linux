@@ -3091,9 +3091,6 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
 		hsotg->hc_ptr_array[i] = channel;
 	}
 
-	if (hsotg->core_params->uframe_sched > 0)
-		dwc2_hcd_init_usecs(hsotg);
-
 	/* Initialize hsotg start work */
 	INIT_DELAYED_WORK(&hsotg->start_work, dwc2_hcd_start_func);
 
