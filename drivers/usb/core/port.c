@@ -353,6 +353,13 @@ static void find_and_link_peer(struct usb_hub *hub, int port1)
 	struct usb_hub *peer_hub;
 
 	/*
+	 * Un-used ports have zero'd out data that can create a false
+	 * peer in-use failure.
+	 */
+	if (port_dev->connect_type == USB_PORT_NOT_USED)
+		return;
+
+	/*
 	 * If location data is available then we can only peer this port
 	 * by a location match, not the default peer (lest we create a
 	 * situation where we need to go back and undo a default peering
