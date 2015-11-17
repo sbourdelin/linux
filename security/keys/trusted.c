@@ -713,6 +713,8 @@ enum {
 	Opt_keyhandle, Opt_keyauth, Opt_blobauth,
 	Opt_pcrinfo, Opt_pcrlock, Opt_migratable,
 	Opt_hash,
+	Opt_policydigest,
+	Opt_policyhandle,
 };
 
 static const match_table_t key_tokens = {
@@ -726,6 +728,8 @@ static const match_table_t key_tokens = {
 	{Opt_pcrlock, "pcrlock=%s"},
 	{Opt_migratable, "migratable=%s"},
 	{Opt_hash, "hash=%s"},
+	{Opt_policydigest, "policydigest=%s"},
+	{Opt_policyhandle, "policyhandle=%s"},
 	{Opt_err, NULL}
 };
 
@@ -739,6 +743,7 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 	int res;
 	unsigned long handle;
 	unsigned long lock;
+	unsigned int policydigest_len;
 	int i;
 	int tpm2;
 
@@ -747,6 +752,8 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 		return tpm2;
 
 	opt->hash = tpm2 ? HASH_ALGO_SHA256 : HASH_ALGO_SHA1;
+	opt->digest_len = hash_digest_size[opt->hash];
+	policydigest_len = opt->digest_len;
 
 	while ((p = strsep(&c, " \t"))) {
 		if (*p == '\0' || *p == ' ' || *p == '\t')
@@ -802,6 +809,8 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 			for (i = 0; i < HASH_ALGO__LAST; i++) {
 				if (!strcmp(args[0].from, hash_algo_name[i])) {
 					opt->hash = i;
+					opt->digest_len =
+						hash_digest_size[opt->hash];
 					break;
 				}
 			}
@@ -812,10 +821,37 @@ static int getoptions(char *c, struct trusted_key_payload *pay,
 				return -EINVAL;
 			}
 			break;
+		case Opt_policydigest:
+			if (!tpm2 ||
+			    strlen(args[0].from) != (2 * opt->digest_len))
+				return -EINVAL;
+			kfree(opt->policydigest);
+			opt->policydigest = kzalloc(opt->digest_len,
+						    GFP_KERNEL);
+			if (!opt->policydigest)
+				return -ENOMEM;
+			res = hex2bin(opt->policydigest, args[0].from,
+				      opt->digest_len);
+			if (res < 0)
+				return -EINVAL;
+			policydigest_len = opt->digest_len;
+			break;
+		case Opt_policyhandle:
+			if (!tpm2)
+				return -EINVAL;
+			res = kstrtoul(args[0].from, 16, &handle);
+			if (res < 0)
+				return -EINVAL;
+			opt->policyhandle = handle;
+			break;
 		default:
 			return -EINVAL;
 		}
 	}
+
+	if (opt->policydigest && policydigest_len != opt->digest_len)
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -902,6 +938,12 @@ static struct trusted_key_options *trusted_options_alloc(void)
 			options->keyhandle = SRKHANDLE;
 	}
 	return options;
+}
+
+static void trusted_options_free(struct trusted_key_options *options)
+{
+	kfree(options->policydigest);
+	kfree(options);
 }
 
 static struct trusted_key_payload *trusted_payload_alloc(struct key *key)
@@ -1010,7 +1052,7 @@ static int trusted_instantiate(struct key *key,
 		ret = pcrlock(options->pcrlock);
 out:
 	kfree(datablob);
-	kfree(options);
+	trusted_options_free(options);
 	if (!ret)
 		rcu_assign_keypointer(key, payload);
 	else
@@ -1098,7 +1140,7 @@ static int trusted_update(struct key *key, struct key_preparsed_payload *prep)
 	call_rcu(&p->rcu, trusted_rcu_free);
 out:
 	kfree(datablob);
-	kfree(new_o);
+	trusted_options_free(new_o);
 	return ret;
 }
 
