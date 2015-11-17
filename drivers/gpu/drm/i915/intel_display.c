@@ -9859,7 +9859,8 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 	return true;
 }
 
-static void i845_update_cursor(struct drm_crtc *crtc, u32 base)
+static void i845_update_cursor(struct drm_crtc *crtc, u32 base,
+			       const struct intel_plane_state *plane_state)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -9867,8 +9868,8 @@ static void i845_update_cursor(struct drm_crtc *crtc, u32 base)
 	uint32_t cntl = 0, size = 0;
 
 	if (base) {
-		unsigned int width = intel_crtc->base.cursor->state->crtc_w;
-		unsigned int height = intel_crtc->base.cursor->state->crtc_h;
+		unsigned int width = plane_state->base.crtc_w;
+		unsigned int height = plane_state->base.crtc_h;
 		unsigned int stride = roundup_pow_of_two(width) * 4;
 
 		switch (stride) {
@@ -9921,7 +9922,8 @@ static void i845_update_cursor(struct drm_crtc *crtc, u32 base)
 	}
 }
 
-static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base)
+static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base,
+			       const struct intel_plane_state *plane_state)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -9932,7 +9934,7 @@ static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base)
 	cntl = 0;
 	if (base) {
 		cntl = MCURSOR_GAMMA_ENABLE;
-		switch (intel_crtc->base.cursor->state->crtc_w) {
+		switch (plane_state->base.crtc_w) {
 			case 64:
 				cntl |= CURSOR_MODE_64_ARGB_AX;
 				break;
@@ -9943,17 +9945,17 @@ static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base)
 				cntl |= CURSOR_MODE_256_ARGB_AX;
 				break;
 			default:
-				MISSING_CASE(intel_crtc->base.cursor->state->crtc_w);
+				MISSING_CASE(plane_state->base.crtc_w);
 				return;
 		}
 		cntl |= pipe << 28; /* Connect to correct pipe */
 
 		if (HAS_DDI(dev))
 			cntl |= CURSOR_PIPE_CSC_ENABLE;
-	}
 
-	if (crtc->cursor->state->rotation == BIT(DRM_ROTATE_180))
-		cntl |= CURSOR_ROTATE_180;
+		if (plane_state->base.rotation == BIT(DRM_ROTATE_180))
+			cntl |= CURSOR_ROTATE_180;
+	}
 
 	if (intel_crtc->cursor_cntl != cntl) {
 		I915_WRITE(CURCNTR(pipe), cntl);
@@ -9970,19 +9972,28 @@ static void i9xx_update_cursor(struct drm_crtc *crtc, u32 base)
 
 /* If no-part of the cursor is visible on the framebuffer, then the GPU may hang... */
 static void intel_crtc_update_cursor(struct drm_crtc *crtc,
-				     bool on)
+				     const struct intel_plane_state *plane_state)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	int pipe = intel_crtc->pipe;
-	struct drm_plane_state *cursor_state = crtc->cursor->state;
-	int x = cursor_state->crtc_x;
-	int y = cursor_state->crtc_y;
+	int x = 0, y = 0;
 	u32 base = 0, pos = 0;
 
-	if (on)
+	if (plane_state && plane_state->visible) {
 		base = intel_crtc->cursor_addr;
+
+		x = plane_state->base.crtc_x;
+		y = plane_state->base.crtc_y;
+
+		/* ILK+ do this automagically */
+		if (HAS_GMCH_DISPLAY(dev) &&
+		    plane_state->base.rotation == BIT(DRM_ROTATE_180)) {
+			base += (plane_state->base.crtc_h *
+				 plane_state->base.crtc_w - 1) * 4;
+		}
+	}
 
 	if (x < 0) {
 		pos |= CURSOR_POS_SIGN << CURSOR_X_SHIFT;
@@ -9998,17 +10009,10 @@ static void intel_crtc_update_cursor(struct drm_crtc *crtc,
 
 	I915_WRITE(CURPOS(pipe), pos);
 
-	/* ILK+ do this automagically */
-	if (HAS_GMCH_DISPLAY(dev) && base &&
-	    crtc->cursor->state->rotation == BIT(DRM_ROTATE_180)) {
-		base += (cursor_state->crtc_h *
-			 cursor_state->crtc_w - 1) * 4;
-	}
-
 	if (IS_845G(dev) || IS_I865G(dev))
-		i845_update_cursor(crtc, base);
+		i845_update_cursor(crtc, base, plane_state);
 	else
-		i9xx_update_cursor(crtc, base);
+		i9xx_update_cursor(crtc, base, plane_state);
 }
 
 static bool cursor_size_ok(struct drm_device *dev,
@@ -13879,25 +13883,23 @@ static void
 intel_disable_cursor_plane(struct drm_plane *plane,
 			   struct drm_crtc *crtc)
 {
-	struct intel_crtc *crtc = to_intel_crtc(crtc);
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 
 	intel_crtc->cursor_addr = 0;
 	intel_crtc->cursor_bo = NULL;
-	intel_crtc_update_cursor(crtc, false);
+	intel_crtc_update_cursor(crtc, NULL);
 }
 
 static void
-intel_commit_cursor_plane(struct drm_plane *plane,
-			  struct intel_plane_state *state)
+intel_update_cursor_plane(struct drm_plane *plane,
+			  const struct intel_crtc_state *crtc_state,
+			  const struct intel_plane_state *state)
 {
-	struct drm_crtc *crtc = state->base.crtc;
+	struct drm_crtc *crtc = crtc_state->base.crtc;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct drm_device *dev = plane->dev;
-	struct intel_crtc *intel_crtc;
 	struct drm_i915_gem_object *obj = intel_fb_obj(state->base.fb);
 	uint32_t addr;
-
-	crtc = crtc ? crtc : plane->crtc;
-	intel_crtc = to_intel_crtc(crtc);
 
 	if (intel_crtc->cursor_bo == obj)
 		goto update;
@@ -13913,7 +13915,7 @@ intel_commit_cursor_plane(struct drm_plane *plane,
 	intel_crtc->cursor_bo = obj;
 
 update:
-	intel_crtc_update_cursor(crtc, state->visible);
+	intel_crtc_update_cursor(crtc, state);
 }
 
 static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
@@ -13939,7 +13941,7 @@ static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 	cursor->plane = pipe;
 	cursor->frontbuffer_bit = INTEL_FRONTBUFFER_CURSOR(pipe);
 	cursor->check_plane = intel_check_cursor_plane;
-	cursor->commit_plane = intel_commit_cursor_plane;
+	cursor->update_plane = intel_update_cursor_plane;
 	cursor->disable_plane = intel_disable_cursor_plane;
 
 	drm_universal_plane_init(dev, &cursor->base, 0,
