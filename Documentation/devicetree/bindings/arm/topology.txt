@@ -109,6 +109,14 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
 	The cluster node name must be "clusterN" as described in 2.1 above.
 	A cluster node can not be a leaf node.
 
+	Properties for a cluster node are -
+
+	-cluster
+		Usage: Optional
+		Value type: <phandle>
+		Definition: a phandle to a cluster node that corresponds to
+			    this cluster.
+
 	A cluster node's child nodes must be:
 
 	- one or more cluster nodes; or
