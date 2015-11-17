@@ -84,6 +84,17 @@ config IOMMU_PGTABLES_L2
 	def_bool y
 	depends on MSM_IOMMU && MMU && SMP && CPU_DCACHE_DISABLE=n
 
+config HI6220_IOMMU
+	bool "Hi6220 IOMMU Support"
+	depends on ARM64
+	select IOMMU_API
+	select IOMMU_IOVA
+	help
+	  Enable IOMMU Driver for hi6220 SoC. The IOMMU API and IOMMU IOVA
+	  is also selected.
+
+	  If unsure, say N.
+
 # AMD IOMMU support
 config AMD_IOMMU
 	bool "AMD IOMMU support"
