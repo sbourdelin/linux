@@ -234,7 +234,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 /*
  * release file op
  */
-static int hiddev_release(struct inode * inode, struct file * file)
+static int hiddev_release(struct inode *inode, struct file *file)
 {
 	struct hiddev_list *list = file->private_data;
 	unsigned long flags;
@@ -330,7 +330,7 @@ bail:
 /*
  * "write" file op
  */
-static ssize_t hiddev_write(struct file * file, const char __user * buffer, size_t count, loff_t *ppos)
+static ssize_t hiddev_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	return -EINVAL;
 }
@@ -338,7 +338,7 @@ static ssize_t hiddev_write(struct file * file, const char __user * buffer, size
 /*
  * "read" file op
  */
-static ssize_t hiddev_read(struct file * file, char __user * buffer, size_t count, loff_t *ppos)
+static ssize_t hiddev_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	DEFINE_WAIT(wait);
 	struct hiddev_list *list = file->private_data;
