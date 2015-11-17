@@ -208,11 +208,13 @@ struct imx_i2c_struct {
 	unsigned int		cur_clk;
 	unsigned int		bitrate;
 	const struct imx_i2c_hwdata	*hwdata;
+#ifdef CONFIG_PINCTRL
 	struct i2c_bus_recovery_info rinfo;
 
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pinctrl_pins_default;
 	struct pinctrl_state *pinctrl_pins_gpio;
+#endif
 
 	struct imx_i2c_dma	*dma;
 };
@@ -902,12 +904,14 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
 
 	/* Start I2C transfer */
 	result = i2c_imx_start(i2c_imx);
+#ifdef CONFIG_PINCTRL
 	if (result) {
 		if (i2c_imx->adapter.bus_recovery_info) {
 			i2c_recover_bus(&i2c_imx->adapter);
 			result = i2c_imx_start(i2c_imx);
 		}
 	}
+#endif
 
 	if (result)
 		goto fail0;
@@ -969,6 +973,7 @@ fail0:
 	return (result < 0) ? result : num;
 }
 
+#ifdef CONFIG_PINCTRL
 static void i2c_imx_prepare_recovery(struct i2c_adapter *adap)
 {
 	struct imx_i2c_struct *i2c_imx;
@@ -1017,6 +1022,7 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
 	rinfo->recover_bus = i2c_generic_gpio_recovery;
 	i2c_imx->adapter.bus_recovery_info = rinfo;
 }
+#endif
 
 static u32 i2c_imx_func(struct i2c_adapter *adapter)
 {
@@ -1086,11 +1092,13 @@ static int i2c_imx_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+#ifdef CONFIG_PINCTRL
 	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR(i2c_imx->pinctrl)) {
 		ret = PTR_ERR(i2c_imx->pinctrl);
 		goto clk_disable;
 	}
+#endif
 
 	/* Request IRQ */
 	ret = devm_request_irq(&pdev->dev, irq, i2c_imx_isr, 0,
@@ -1125,7 +1133,9 @@ static int i2c_imx_probe(struct platform_device *pdev)
 		goto clk_disable;
 	}
 
+#ifdef CONFIG_PINCTRL
 	i2c_imx_init_recovery_info(i2c_imx, pdev);
+#endif
 
 	/* Set up platform driver data */
 	platform_set_drvdata(pdev, i2c_imx);
