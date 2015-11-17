@@ -23,6 +23,7 @@
 bool psci_tos_resident_on(int cpu);
 bool psci_power_state_loses_context(u32 state);
 bool psci_power_state_is_valid(u32 state);
+bool psci_has_ext_power_state(void);
 
 struct psci_operations {
 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
