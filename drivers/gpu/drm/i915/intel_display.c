@@ -13879,6 +13879,10 @@ static void
 intel_disable_cursor_plane(struct drm_plane *plane,
 			   struct drm_crtc *crtc)
 {
+	struct intel_crtc *crtc = to_intel_crtc(crtc);
+
+	intel_crtc->cursor_addr = 0;
+	intel_crtc->cursor_bo = NULL;
 	intel_crtc_update_cursor(crtc, false);
 }
 
