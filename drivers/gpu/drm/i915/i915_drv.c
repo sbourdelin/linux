@@ -1503,8 +1503,7 @@ static int intel_runtime_suspend(struct device *device)
 	 * We could deadlock here in case another thread holding struct_mutex
 	 * calls RPM suspend concurrently, since the RPM suspend will wait
 	 * first for this RPM suspend to finish. In this case the concurrent
-	 * RPM resume will be followed by its RPM suspend counterpart. Still
-	 * for consistency return -EAGAIN, which will reschedule this suspend.
+	 * RPM resume will be followed by its RPM suspend counterpart.
 	 */
 	if (!mutex_trylock(&dev->struct_mutex)) {
 		DRM_DEBUG_KMS("device lock contention, deffering suspend\n");
@@ -1514,7 +1513,8 @@ static int intel_runtime_suspend(struct device *device)
 		 */
 		pm_runtime_mark_last_busy(device);
 
-		return -EAGAIN;
+		/* Fail silently to avoid upsetting the pm core. */
+		return 0;
 	}
 	/*
 	 * We are safe here against re-faults, since the fault handler takes
