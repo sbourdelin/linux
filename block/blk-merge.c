@@ -7,6 +7,8 @@
 #include <linux/blkdev.h>
 #include <linux/scatterlist.h>
 
+#include <trace/events/block.h>
+
 #include "blk.h"
 
 static struct bio *blk_bio_discard_split(struct request_queue *q,
@@ -49,6 +51,7 @@ static struct bio *blk_bio_discard_split(struct request_queue *q,
 	if (split_sectors > tmp)
 		split_sectors -= tmp;
 
+	trace_block_split(q, bio, bio->bi_iter.bi_sector + split_sectors);
 	return bio_split(bio, split_sectors, GFP_NOIO, bs);
 }
 
@@ -65,6 +68,7 @@ static struct bio *blk_bio_write_same_split(struct request_queue *q,
 	if (bio_sectors(bio) <= q->limits.max_write_same_sectors)
 		return NULL;
 
+	trace_block_split(q, bio, bio->bi_iter.bi_sector);
 	return bio_split(bio, q->limits.max_write_same_sectors, GFP_NOIO, bs);
 }
 
@@ -117,6 +121,7 @@ new_segment:
 	return NULL;
 split:
 	*segs = nsegs;
+	trace_block_split(q, bio, bio->bi_iter.bi_sector + sectors);
 	return bio_split(bio, sectors, GFP_NOIO, bs);
 }
 
