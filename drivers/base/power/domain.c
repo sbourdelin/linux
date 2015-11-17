@@ -1245,6 +1245,7 @@ static int genpd_alloc_states_data(struct generic_pm_domain *genpd,
 			st[i].power_on_latency_ns;
 		genpd->states[i].power_off_latency_ns =
 			st[i].power_off_latency_ns;
+		genpd->states[i].residency_ns = st[i].residency_ns;
 		genpd->states[i].param = st[i].param;
 	}
 
@@ -1513,6 +1514,7 @@ static int of_get_genpd_power_state(struct genpd_power_state *genpd_state,
 	const struct of_device_id *match_id;
 	int err = 0;
 	u32 latency;
+	u32 residency;
 	u32 param;
 
 	match_id = of_match_node(power_state_match, state_node);
@@ -1553,6 +1555,10 @@ static int of_get_genpd_power_state(struct genpd_power_state *genpd_state,
 			 state_node->full_name);
 		return -EINVAL;
 	}
+
+	err = of_property_read_u32(state_node, "residency-us", &residency);
+	if (!err)
+		genpd_state->residency_ns = 1000 * residency;
 
 	err = of_property_read_u32(state_node, "state-param", &param);
 	if (!err)

@@ -67,6 +67,13 @@ have the following properties -
 		If omitted, this is assumed to be equal to:
 			entry-latency-us + exit-latency-us
 
+	- residency-us:
+		Usage: Optional
+		Value type: <prop-encoded-array>
+		Definition: A u32 value representing the time for which a
+		domain must be idle in the state to reap power saving benefits
+		of entering the state.
+
 	- state-param:
 		Usage: Optional
 		Value type: <prop-encoded-array>
