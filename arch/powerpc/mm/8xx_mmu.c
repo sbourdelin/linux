@@ -20,6 +20,7 @@
 #define IMMR_SIZE (__fix_to_virt(FIX_IMMR_TOP) + PAGE_SIZE - VIRT_IMMR_BASE)
 
 extern int __map_without_ltlbs;
+int initial_memory_size; /* size of initial memory mapped by head_8xx.S */
 
 /*
  * Return PA for this VA if it is in IMMR area, or 0
@@ -143,11 +144,6 @@ void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	 */
 	BUG_ON(first_memblock_base != 0);
 
-#ifdef CONFIG_PIN_TLB
-	/* 8xx can only access 24MB at the moment */
-	memblock_set_current_limit(min_t(u64, first_memblock_size, 0x01800000));
-#else
-	/* 8xx can only access 8MB at the moment */
-	memblock_set_current_limit(min_t(u64, first_memblock_size, 0x00800000));
-#endif
+	memblock_set_current_limit(min_t(u64, first_memblock_size,
+					 initial_memory_size));
 }

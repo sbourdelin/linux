@@ -72,6 +72,9 @@
 #define RPN_PATTERN	0x00f0
 #endif
 
+/* ePAPR magic value for non BOOK III-E CPUs */
+#define EPAPR_SMAGIC	0x65504150
+
 	__HEAD
 _ENTRY(_stext);
 _ENTRY(_start);
@@ -101,6 +104,38 @@ _ENTRY(_start);
  */
 	.globl	__start
 __start:
+/*
+ * Determine initial RAM size
+ *
+ * If the Bootloader is ePAPR compliant, the size is given in r7
+ * otherwise, we have to determine how much is needed. For that, we have to
+ * check whether _end of kernel and device tree are within the first 8Mb.
+ */
+	lis	r30, 0x00800000@h	/* 8Mb by default */
+
+	lis	r8, EPAPR_SMAGIC@h
+	ori	r8, r8, EPAPR_SMAGIC@l
+	cmplw	cr0, r8, r6
+	bne	1f
+	lis	r30, 0x01800000@h	/* 24Mb max */
+	cmplw	cr0, r7, r30
+	bgt	2f
+	mr	r30, r7			/* save initial ram size */
+	b	2f
+1:
+	/* is kernel _end or DTB in the first 8M ? if not map 16M */
+	lis	r8, (_end - PAGE_OFFSET)@h
+	ori	r8, r8, (_end - PAGE_OFFSET)@l
+	addi	r8, r8, -1
+	or	r8, r8, r3
+	cmplw	cr0, r8, r30
+	blt	2f
+	lis	r30, 0x01000000@h	/* 16Mb */
+	/* is kernel _end or DTB in the first 16M ? if not map 24M */
+	cmplw	cr0, r8, r30
+	blt	2f
+	lis	r30, 0x01800000@h	/* 24Mb */
+2:
 	mr	r31,r3			/* save device tree ptr */
 
 	/* We have to turn on the MMU right away so we get cache modes
@@ -737,6 +772,8 @@ start_here:
 /*
  * Decide what sort of machine this is and initialize the MMU.
  */
+	lis	r3, initial_memory_size@ha
+	stw	r30, initial_memory_size@l(r3)
 	li	r3,0
 	mr	r4,r31
 	bl	machine_init
@@ -868,10 +905,15 @@ initial_mmu:
 	mtspr	SPRN_MD_RPN, r8
 
 #ifdef CONFIG_PIN_TLB
-	/* Map two more 8M kernel data pages.
-	*/
+	/* Map one more 8M kernel data page. */
 	addi	r10, r10, 0x0100
 	mtspr	SPRN_MD_CTR, r10
+#else
+	/* Map one more 8M kernel data page if needed */
+	lis	r10, 0x00800000@h
+	cmplw	cr0, r30, r10
+	ble	1f
+#endif
 
 	lis	r8, KERNELBASE@h	/* Create vaddr for TLB */
 	addis	r8, r8, 0x0080		/* Add 8M */
@@ -884,20 +926,28 @@ initial_mmu:
 	addis	r11, r11, 0x0080	/* Add 8M */
 	mtspr	SPRN_MD_RPN, r11
 
+#ifdef CONFIG_PIN_TLB
+	/* Map one more 8M kernel data page. */
 	addi	r10, r10, 0x0100
 	mtspr	SPRN_MD_CTR, r10
+#else
+	/* Map one more 8M kernel data page if needed */
+	lis	r10, 0x01000000@h
+	cmplw	cr0, r30, r10
+	ble	1f
+#endif
 
 	addis	r8, r8, 0x0080		/* Add 8M */
 	mtspr	SPRN_MD_EPN, r8
 	mtspr	SPRN_MD_TWC, r9
 	addis	r11, r11, 0x0080	/* Add 8M */
 	mtspr	SPRN_MD_RPN, r11
-#endif
 
 	/* Since the cache is enabled according to the information we
 	 * just loaded into the TLB, invalidate and enable the caches here.
 	 * We should probably check/set other modes....later.
 	 */
+1:
 	lis	r8, IDC_INVALL@h
 	mtspr	SPRN_IC_CST, r8
 	mtspr	SPRN_DC_CST, r8
