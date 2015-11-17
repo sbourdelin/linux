@@ -231,6 +231,9 @@ enum dwc2_transaction_type {
  * @do_split:           Full/low speed endpoint on high-speed hub requires split
  * @td_first:           Index of first activated isochronous transfer descriptor
  * @td_last:            Index of last activated isochronous transfer descriptor
+ * @sched_uframe:       The microframe that we're scheduled to be in (0 - 7).
+ *                      Whenever we start a new split this is expected to be the
+ *                      lower 3 bits of sched_frame.
  * @usecs:              Bandwidth in microseconds per (micro)frame
  * @interval:           Interval between transfers in (micro)frames
  * @sched_frame:        (Micro)frame to initialize a periodic transfer.
@@ -263,6 +266,7 @@ struct dwc2_qh {
 	u8 do_split;
 	u8 td_first;
 	u8 td_last;
+	u8 sched_uframe;
 	u16 usecs;
 	u16 interval;
 	u16 sched_frame;

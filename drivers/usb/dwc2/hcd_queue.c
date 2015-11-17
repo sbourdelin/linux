@@ -464,8 +464,10 @@ static int dwc2_schedule_periodic(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 
 		/* Set the new frame up */
 		if (frame >= 0) {
-			qh->sched_frame &= ~0x7;
-			qh->sched_frame |= (frame & 7);
+			qh->sched_uframe = frame;
+
+			/* The next frame that matches our scheduled uframe */
+			qh->sched_frame = ((qh->sched_frame + 7) & ~7) | frame;
 			dwc2_sch_dbg(hsotg,
 				     "sched_p %p sch=%04x, uf=%d, us=%d\n",
 				     qh, qh->sched_frame, frame,
@@ -668,7 +670,15 @@ static void dwc2_sched_periodic_split(struct dwc2_hsotg *hsotg,
 						     qh->interval);
 		if (dwc2_frame_num_le(qh->sched_frame, frame_number))
 			qh->sched_frame = frame_number;
-		qh->sched_frame |= 0x7;
+
+		if (hsotg->core_params->uframe_sched > 0)
+			/* The next frame that matches our scheduled uframe */
+			qh->sched_frame = ((qh->sched_frame + 7) & ~7) |
+					  qh->sched_uframe;
+		else
+			/* The beginning of the next full frame */
+			qh->sched_frame |= 0x7;
+
 		qh->start_split_frame = qh->sched_frame;
 	}
 
