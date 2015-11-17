@@ -825,16 +825,14 @@ static int setup_netdev(struct l2cap_chan *chan, struct lowpan_dev **dev)
 	list_add_rcu(&(*dev)->list, &bt_6lowpan_devices);
 	spin_unlock(&devices_lock);
 
-	lowpan_netdev_setup(netdev, LOWPAN_LLTYPE_BTLE);
+	err = lowpan_netdev_setup(netdev, LOWPAN_LLTYPE_BTLE);
+	if (err < 0)
+		goto free_netdev;
 
 	err = register_netdev(netdev);
 	if (err < 0) {
 		BT_INFO("register_netdev failed %d", err);
-		spin_lock(&devices_lock);
-		list_del_rcu(&(*dev)->list);
-		spin_unlock(&devices_lock);
-		free_netdev(netdev);
-		goto out;
+		goto unsetup_lowpan;
 	}
 
 	BT_DBG("ifindex %d peer bdaddr %pMR type %d my addr %pMR type %d",
@@ -844,7 +842,15 @@ static int setup_netdev(struct l2cap_chan *chan, struct lowpan_dev **dev)
 
 	return 0;
 
-out:
+unsetup_lowpan:
+	lowpan_netdev_unsetup(netdev);
+
+free_netdev:
+	spin_lock(&devices_lock);
+	list_del_rcu(&(*dev)->list);
+	spin_unlock(&devices_lock);
+	free_netdev(netdev);
+
 	return err;
 }
 
@@ -1348,6 +1354,7 @@ static void disconnect_devices(void)
 		ifdown(entry->netdev);
 		BT_DBG("Unregistering netdev %s %p",
 		       entry->netdev->name, entry->netdev);
+		lowpan_netdev_unsetup(entry->netdev);
 		unregister_netdev(entry->netdev);
 		kfree(entry);
 	}
