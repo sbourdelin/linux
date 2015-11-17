@@ -18,7 +18,7 @@ static inline void pm_runtime_early_init(struct device *dev)
 }
 
 extern void pm_runtime_init(struct device *dev);
-extern void pm_runtime_remove(struct device *dev);
+extern void pm_runtime_remove(struct device *dev, bool disable);
 
 struct wake_irq {
 	struct device *dev;
@@ -84,7 +84,7 @@ static inline void pm_runtime_early_init(struct device *dev)
 }
 
 static inline void pm_runtime_init(struct device *dev) {}
-static inline void pm_runtime_remove(struct device *dev) {}
+static inline void pm_runtime_remove(struct device *dev, bool disable) {}
 
 static inline int dpm_sysfs_add(struct device *dev) { return 0; }
 static inline void dpm_sysfs_remove(struct device *dev) {}
@@ -132,7 +132,7 @@ static inline void device_pm_add(struct device *dev) {}
 
 static inline void device_pm_remove(struct device *dev)
 {
-	pm_runtime_remove(dev);
+	pm_runtime_remove(dev, true);
 }
 
 static inline void device_pm_move_before(struct device *deva,

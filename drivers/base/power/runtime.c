@@ -1393,15 +1393,20 @@ void pm_runtime_init(struct device *dev)
  * pm_runtime_remove - Prepare for removing a device from device hierarchy.
  * @dev: Device object being removed from device hierarchy.
  */
-void pm_runtime_remove(struct device *dev)
+void pm_runtime_remove(struct device *dev, bool disable)
 {
-	__pm_runtime_disable(dev, false);
+	if (disable)
+		__pm_runtime_disable(dev, false);
 
-	/* Change the status back to 'suspended' to match the initial status. */
-	if (dev->power.runtime_status == RPM_ACTIVE)
-		pm_runtime_set_suspended(dev);
-	if (dev->power.irq_safe && dev->parent)
-		pm_runtime_put(dev->parent);
+	if (!pm_runtime_enabled(dev)) {
+		/* Restore initial runtime PM states. */
+		if (dev->power.runtime_status == RPM_ACTIVE)
+			pm_runtime_set_suspended(dev);
+		if (dev->power.irq_safe && dev->parent) {
+			pm_runtime_put(dev->parent);
+			dev->power.irq_safe = 0;
+		}
+	}
 }
 
 /**
