@@ -2298,10 +2298,8 @@ int __init scsi_init_queue(void)
 cleanup_sdb:
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
 		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
-		if (sgp->pool)
-			mempool_destroy(sgp->pool);
-		if (sgp->slab)
-			kmem_cache_destroy(sgp->slab);
+		mempool_destroy(sgp->pool);
+		kmem_cache_destroy(sgp->slab);
 	}
 	kmem_cache_destroy(scsi_sdb_cache);
 
