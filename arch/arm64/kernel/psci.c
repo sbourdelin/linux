@@ -15,10 +15,12 @@
 
 #define pr_fmt(fmt) "psci: " fmt
 
+#include <linux/cpu-pd.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/smp.h>
 #include <linux/delay.h>
+#include <linux/pm_domain.h>
 #include <linux/psci.h>
 #include <linux/slab.h>
 
@@ -31,6 +33,44 @@
 #include <asm/suspend.h>
 
 static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+static DEFINE_PER_CPU(u32, cluster_state_id);
+
+static inline u32 psci_get_composite_state_id(u32 cpu_state)
+{
+	u32 val = cpu_state;
+
+	if (psci_has_ext_power_state())
+		val += this_cpu_read(cluster_state_id);
+
+	return val;
+}
+
+static inline void psci_reset_composite_state_id(void)
+{
+	this_cpu_write(cluster_state_id, 0);
+}
+
+static int psci_pd_power_on(struct generic_pm_domain *genpd)
+{
+	return 0;
+}
+
+static int psci_pd_power_off(struct generic_pm_domain *genpd)
+{
+	__this_cpu_add(cluster_state_id, genpd->states[genpd->state_idx].param);
+	return 0;
+}
+
+static const struct cpu_pd_ops psci_pd_ops = {
+	.power_on = psci_pd_power_on,
+	.power_off = psci_pd_power_off,
+};
+
+static int __init psci_setup_cpu_domains(void)
+{
+	return of_setup_cpu_domain_topology(&psci_pd_ops);
+}
+subsys_initcall(psci_setup_cpu_domains);
 
 static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
 {
@@ -117,6 +157,8 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
 	if (err)
 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
 
+	/* Reset CPU cluster states */
+	psci_reset_composite_state_id();
 	return err;
 }
 
@@ -181,15 +223,16 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
 static int psci_suspend_finisher(unsigned long index)
 {
 	u32 *state = __this_cpu_read(psci_power_state);
+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
 
-	return psci_ops.cpu_suspend(state[index - 1],
-				    virt_to_phys(cpu_resume));
+	return psci_ops.cpu_suspend(ext_state, virt_to_phys(cpu_resume));
 }
 
 static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
 {
 	int ret;
 	u32 *state = __this_cpu_read(psci_power_state);
+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
 	/*
 	 * idle state index 0 corresponds to wfi, should never be called
 	 * from the cpu_suspend operations
@@ -198,10 +241,15 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
 		return -EINVAL;
 
 	if (!psci_power_state_loses_context(state[index - 1]))
-		ret = psci_ops.cpu_suspend(state[index - 1], 0);
+		ret = psci_ops.cpu_suspend(ext_state, 0);
 	else
 		ret = cpu_suspend(index, psci_suspend_finisher);
 
+	/*
+	 * Clear the CPU's cluster states, we start afresh after coming
+	 * out of idle.
+	 */
+	psci_reset_composite_state_id();
 	return ret;
 }
 
