@@ -3671,8 +3671,10 @@ static int decode_attr_fs_locations(struct xdr_stream *xdr, uint32_t *bitmap, st
 		if (unlikely(status != 0))
 			goto out_eio;
 	}
-	if (res->nlocations != 0)
+	if (res->nlocations != 0) {
+		bitmap[0] &= ~FATTR4_WORD0_FS_LOCATIONS;
 		status = NFS_ATTR_FATTR_V4_LOCATIONS;
+	}
 out:
 	dprintk("%s: fs_locations done, error = %d\n", __func__, status);
 	return status;
