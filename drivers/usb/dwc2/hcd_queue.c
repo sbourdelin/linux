@@ -372,10 +372,33 @@ static int dwc2_find_single_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
  */
 static int dwc2_find_multi_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 {
+	unsigned long tmp_bmp[DIV_ROUND_UP(TOTAL_PERIODIC_USEC, BITS_PER_LONG)];
+	unsigned long *bmp;
 	unsigned short utime = qh->usecs;
 	unsigned long start;
+	int i;
 
-	start = bitmap_find_next_zero_area(hsotg->periodic_bitmap,
+	if (qh->do_split) {
+		/*
+		 * Eventually we'll only want to exclude out microframes used by
+		 * other people on the same TT as us, and then only if we're on
+		 * a single_tt hub.  ...but until we have that logic, just
+		 * schedule everyone together.
+		 */
+		bmp = tmp_bmp;
+		memcpy(bmp, hsotg->periodic_bitmap, sizeof(tmp_bmp));
+		start = 0;
+
+		for (i = 0; i < ARRAY_SIZE(max_uframe_usecs); i++) {
+			if (hsotg->has_split[i])
+				bitmap_set(bmp, start, max_uframe_usecs[i]);
+			start += max_uframe_usecs[i];
+		}
+	} else {
+		bmp = hsotg->periodic_bitmap;
+	}
+
+	start = bitmap_find_next_zero_area(bmp,
 					   TOTAL_PERIODIC_USEC, 0, utime, 0);
 	if (start >= TOTAL_PERIODIC_USEC) {
 		dwc2_sch_dbg(hsotg, "%s: failed to assign %d us\n",
@@ -385,6 +408,13 @@ static int dwc2_find_multi_uframe(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
 
 	bitmap_set(hsotg->periodic_bitmap, start, qh->usecs);
 	qh->start_usecs = start;
+
+	if (qh->do_split) {
+		for (i = start / EARLY_FRAME_USEC;
+		     i < DIV_ROUND_UP(start + utime - 1, EARLY_FRAME_USEC);
+		     i++)
+			hsotg->has_split[i] = true;
+	}
 
 	dwc2_sch_dbg(hsotg, "%s: assigned %d us @ %d us\n",
 		     __func__, qh->usecs, qh->start_usecs);
@@ -533,6 +563,7 @@ static void dwc2_deschedule_periodic(struct dwc2_hsotg *hsotg,
 {
 	int start = qh->start_usecs;
 	int utime = qh->usecs;
+	int i;
 
 	list_del_init(&qh->qh_list_entry);
 
@@ -546,6 +577,13 @@ static void dwc2_deschedule_periodic(struct dwc2_hsotg *hsotg,
 	}
 
 	bitmap_clear(hsotg->periodic_bitmap, start, utime);
+
+	if (qh->do_split) {
+		for (i = start / EARLY_FRAME_USEC;
+		     i < DIV_ROUND_UP(start + utime - 1, EARLY_FRAME_USEC);
+		     i++)
+			hsotg->has_split[i] = false;
+	}
 }
 
 /**

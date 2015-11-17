@@ -782,6 +782,7 @@ struct dwc2_hsotg {
 	u16 periodic_usecs;
 	unsigned long periodic_bitmap[DIV_ROUND_UP(TOTAL_PERIODIC_USEC,
 						   BITS_PER_LONG)];
+	bool has_split[8];
 	u16 frame_number;
 	u16 periodic_qh_count;
 	bool bus_suspended;
