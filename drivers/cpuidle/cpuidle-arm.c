@@ -18,9 +18,11 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/rcupdate.h>
+#include <linux/tick.h>
 
 #include <asm/cpuidle.h>
 
@@ -49,7 +51,9 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
 	ret = cpu_pm_enter();
 	if (!ret) {
 		struct device *cpu_dev = get_cpu_device(dev->cpu);
+		struct generic_pm_domain_data *gpd = dev_gpd_data(cpu_dev);
 
+		gpd->td.next_wakeup = tick_nohz_get_next_wakeup();
 		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
 
 		/*
@@ -60,6 +64,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
 		arm_cpuidle_suspend(idx);
 
 		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
+		gpd->td.next_wakeup.tv64 = 0;
 		cpu_pm_exit();
 	}
 
