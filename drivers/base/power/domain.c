@@ -390,6 +390,7 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	struct generic_pm_domain *genpd;
 	bool (*stop_ok)(struct device *__dev);
 	struct gpd_timing_data *td = &dev_gpd_data(dev)->td;
+	bool system_pm = !pm_runtime_enabled(dev);
 	ktime_t time_start;
 	s64 elapsed_ns;
 	int ret;
@@ -400,12 +401,18 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
+	/*
+	 * A runtime PM centric subsystem/driver may re-use the runtime PM
+	 * callbacks for system PM. In these cases, don't validate or measure
+	 * latencies.
+	 */
 	stop_ok = genpd->gov ? genpd->gov->stop_ok : NULL;
-	if (stop_ok && !stop_ok(dev))
+	if (!system_pm && stop_ok && !stop_ok(dev))
 		return -EBUSY;
 
 	/* Measure suspend latency. */
-	time_start = ktime_get();
+	if (!system_pm)
+		time_start = ktime_get();
 
 	ret = genpd_save_dev(genpd, dev);
 	if (ret)
@@ -416,6 +423,10 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 		genpd_restore_dev(genpd, dev);
 		return ret;
 	}
+
+	/* Don't try poweroff in system PM as it's prevented anyway. */
+	if (system_pm)
+		return 0;
 
 	/* Update suspend latency value if the measured time exceeds it. */
 	elapsed_ns = ktime_to_ns(ktime_sub(ktime_get(), time_start));
@@ -453,6 +464,7 @@ static int pm_genpd_runtime_resume(struct device *dev)
 {
 	struct generic_pm_domain *genpd;
 	struct gpd_timing_data *td = &dev_gpd_data(dev)->td;
+	bool system_pm = !pm_runtime_enabled(dev);
 	ktime_t time_start;
 	s64 elapsed_ns;
 	int ret;
@@ -464,8 +476,8 @@ static int pm_genpd_runtime_resume(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	/* If power.irq_safe, the PM domain is never powered off. */
-	if (dev->power.irq_safe) {
+	/* If power.irq_safe or system PM, the PM domain remains powered. */
+	if (dev->power.irq_safe || system_pm) {
 		timed = false;
 		goto out;
 	}
