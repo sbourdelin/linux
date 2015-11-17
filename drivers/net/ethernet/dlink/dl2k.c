@@ -1824,11 +1824,57 @@ rio_remove1 (struct pci_dev *pdev)
 	}
 }
 
+#ifdef CONFIG_PM
+static int rio_suspend(struct pci_dev *pdev, pm_message_t state)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct netdev_private *np = netdev_priv(dev);
+
+	pci_save_state(pdev);
+
+	if (netif_running(dev)) {
+		netif_device_detach(dev);
+		del_timer_sync(&np->timer);
+		rio_hw_stop(dev);
+		free_list(dev);
+	}
+
+	pci_set_power_state(pdev, PCI_D3hot);
+
+	return 0;
+}
+
+static int rio_resume(struct pci_dev *pdev)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct netdev_private *np = netdev_priv(dev);
+
+	pci_set_power_state(pdev, PCI_D0);
+	pci_restore_state(pdev);
+
+	if (netif_running(dev)) {
+		alloc_list(dev);
+		rio_hw_init(dev);
+		np->timer.expires = jiffies + 1 * HZ;
+		add_timer(&np->timer);
+		netif_device_attach(dev);
+		dl2k_enable_int(np);
+	}
+
+	return 0;
+}
+
+#endif /* CONFIG_PM */
+
 static struct pci_driver rio_driver = {
 	.name		= "dl2k",
 	.id_table	= rio_pci_tbl,
 	.probe		= rio_probe1,
 	.remove		= rio_remove1,
+#ifdef CONFIG_PM
+	.suspend	= rio_suspend,
+	.resume		= rio_resume,
+#endif /* CONFIG_PM */
 };
 
 module_pci_driver(rio_driver);
