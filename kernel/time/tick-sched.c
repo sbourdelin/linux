@@ -870,6 +870,14 @@ ktime_t tick_nohz_get_sleep_length(void)
 	return ts->sleep_length;
 }
 
+ktime_t tick_nohz_get_next_wakeup(void)
+{
+	struct clock_event_device *dev =
+			__this_cpu_read(tick_cpu_device.evtdev);
+
+	return dev->next_event;
+}
+
 static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
 {
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
