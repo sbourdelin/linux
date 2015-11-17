@@ -44,6 +44,15 @@
 #include <linux/usb/phy.h>
 #include "hw.h"
 
+#ifdef DWC2_TRACE_SCHEDULER
+#define dwc2_scheduler_printk trace_printk
+#else
+#define dwc2_scheduler_printk no_printk
+#endif
+#define dwc2_sch_dbg(hsotg, fmt, ...)					\
+	dwc2_scheduler_printk(pr_fmt("%s: SCH: " fmt),			\
+			      dev_name(hsotg->dev), ##__VA_ARGS__)
+
 static inline u32 dwc2_readl(const void __iomem *addr)
 {
 	u32 value = __raw_readl(addr);
