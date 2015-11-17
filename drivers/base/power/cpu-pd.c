@@ -18,6 +18,7 @@
 #include <linux/device.h>
 #include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
+#include <linux/pm_qos.h>
 #include <linux/rculist.h>
 #include <linux/slab.h>
 
@@ -42,6 +43,27 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
 	rcu_read_unlock();
 
 	return res;
+}
+
+/**
+ * get_cpus_in_domain() - Recursively parse CPUs in a domain.
+ */
+static void get_cpus_in_domain(struct generic_pm_domain *genpd,
+		struct cpumask *mask)
+{
+	struct gpd_link *link;
+	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+	struct generic_pm_domain *sd;
+
+	if (!cpumask_empty(pd->cpus) && mask != pd->cpus) {
+		cpumask_or(mask, pd->cpus, mask);
+		return;
+	}
+
+	list_for_each_entry(link, &genpd->master_links, master_node) {
+		sd = link->slave;
+		get_cpus_in_domain(sd, mask);
+	}
 }
 
 static int cpu_pd_power_off(struct generic_pm_domain *genpd)
@@ -81,7 +103,8 @@ static void run_cpu(void *unused)
 	pm_runtime_get_noresume(cpu_dev);
 }
 
-static int of_pm_domain_attach_cpus(struct device_node *dn)
+static int of_pm_domain_attach_cpus(struct device_node *dn,
+		struct cpu_pm_domain *pd)
 {
 	int cpuid, ret;
 
@@ -126,6 +149,7 @@ static int of_pm_domain_attach_cpus(struct device_node *dn)
 		} else {
 			pm_runtime_enable(cpu_dev);
 			dev_dbg(cpu_dev, "Attached CPU%d to domain\n", cpuid);
+			cpumask_set_cpu(cpuid, pd->cpus);
 		}
 	}
 
@@ -171,7 +195,7 @@ int of_register_cpu_pm_domain(struct device_node *dn,
 				pd->genpd->name);
 
 	/* Attach the CPUs to the CPU PM domain */
-	ret = of_pm_domain_attach_cpus(dn);
+	ret = of_pm_domain_attach_cpus(dn, pd);
 	if (ret)
 		of_genpd_del_provider(dn);
 
@@ -213,6 +237,13 @@ struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
 		return ERR_PTR(-ENOMEM);
 	}
 
+	if (!zalloc_cpumask_var(&pd->cpus, GFP_KERNEL)) {
+		kfree(pd->genpd->name);
+		kfree(pd->genpd);
+		kfree(pd);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	if (ops) {
 		pd->plat_ops.power_off = ops->power_off;
 		pd->plat_ops.power_on = ops->power_on;
@@ -222,6 +253,7 @@ struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
 	if (ret) {
 		kfree(pd->genpd->name);
 		kfree(pd->genpd);
+		kfree(pd->cpus);
 		kfree(pd);
 		return ERR_PTR(ret);
 	}
@@ -229,3 +261,63 @@ struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
 	return pd->genpd;
 }
 EXPORT_SYMBOL(of_init_cpu_pm_domain);
+
+/**
+ * of_attach_cpu_pm_domain() - Attach a CPU PM domain to its parent
+ * @dn: The device node of the CPU PM domain that needs to be attached
+ *
+ * The platform code can use this simplfied function to parse the domain
+ * provider of this device node and attach the genpd associated with @dn
+ * to it parents.
+ *
+ * Note: Both @dn and its domain provider must be initialized using
+ * of_init_cpu_pm_domain.
+ */
+int of_attach_cpu_pm_domain(struct device_node *dn)
+{
+	struct of_phandle_args args;
+	struct generic_pm_domain *genpd, *parent;
+	struct cpu_pm_domain *pd;
+	int ret;
+
+	args.np = dn;
+	args.args_count = 0;
+
+	genpd = of_genpd_get_from_provider(&args);
+	if (IS_ERR(genpd))
+		return -EINVAL;
+
+	if (!to_cpu_pd(genpd)) {
+		pr_warn("%s: domain %s is not a CPU domain\n",
+				__func__, genpd->name);
+		return -EINVAL;
+	}
+
+	ret = of_parse_phandle_with_args(dn, "power-domains",
+			"#power-domain-cells", 0, &args);
+	if (ret < 0)
+		return ret;
+
+	parent = of_genpd_get_from_provider(&args);
+	if (IS_ERR(parent))
+		return -EINVAL;
+
+	pd = to_cpu_pd(parent);
+	if (!pd) {
+		pr_warn("%s: domain (%s) parent (%s) is non-CPU domain\n",
+				__func__, genpd->name, parent->name);
+		return -EINVAL;
+	}
+
+	ret = pm_genpd_add_subdomain(genpd, parent);
+	if (ret) {
+		pr_err("%s: Unable to add sub-domain (%s) to parent (%s)\n",
+				__func__, genpd->name, parent->name);
+		return ret;
+	}
+
+	get_cpus_in_domain(parent, pd->cpus);
+
+	return 0;
+}
+EXPORT_SYMBOL(of_attach_cpu_pm_domain);
