@@ -687,6 +687,10 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 
 	dev_priv->mm.bit_6_swizzle_x = swizzle_x;
 	dev_priv->mm.bit_6_swizzle_y = swizzle_y;
+
+	if (swizzle_x == I915_BIT_6_SWIZZLE_UNKNOWN ||
+	    swizzle_y == I915_BIT_6_SWIZZLE_UNKNOWN)
+		dev_priv->quirks |= QUIRK_PIN_SWIZZLED_PAGES;
 }
 
 /*
