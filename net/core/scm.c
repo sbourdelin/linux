@@ -193,7 +193,7 @@ int __scm_send(struct socket *sock, struct msghdr *msg, struct scm_cookie *p)
 		}
 	}
 
-	if (p->fp && !p->fp->count)
+	if (likely(!p->fp->count))
 	{
 		kfree(p->fp);
 		p->fp = NULL;
