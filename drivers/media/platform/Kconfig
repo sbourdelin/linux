@@ -148,6 +148,12 @@ config VIDEO_CODA
 	   Coda is a range of video codec IPs that supports
 	   H.264, MPEG-4, and other video formats.
 
+config MEDIATEK_VPU
+	bool "Mediatek Video Processor Unit"
+	---help---
+	    This driver provides downloading firmware vpu and
+	    communicating with vpu.
+
 config VIDEO_MEM2MEM_DEINTERLACE
 	tristate "Deinterlace support"
 	depends on VIDEO_DEV && VIDEO_V4L2 && DMA_ENGINE
