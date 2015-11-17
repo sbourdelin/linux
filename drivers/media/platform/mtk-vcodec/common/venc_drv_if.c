@@ -26,7 +26,7 @@
 
 #include "venc_drv_if.h"
 #include "venc_drv_base.h"
-
+#include "venc_vp8_if.h"
 
 int venc_if_create(void *ctx, unsigned int fourcc, unsigned long *handle)
 {
@@ -44,6 +44,10 @@ int venc_if_create(void *ctx, unsigned int fourcc, unsigned long *handle)
 	mtk_vcodec_debug(h, "fmt = %s handle = %p", str, h);
 
 	switch (fourcc) {
+	case V4L2_PIX_FMT_VP8:
+		h->enc_if = get_vp8_enc_comm_if();
+		break;
+	case V4L2_PIX_FMT_H264:
 	default:
 		mtk_vcodec_err(h, "invalid format %s", str);
 		goto err_out;
