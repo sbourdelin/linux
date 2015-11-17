@@ -311,6 +311,13 @@ static int intel_pstate_init_perf_limits(struct cpufreq_policy *policy)
 		 * correct max turbo frequency based on the turbo ratio.
 		 * Also need to convert to MHz as _PSS freq is in MHz.
 		 */
+		if (turbo_pss_ctl > cpu->pstate.turbo_pstate) {
+			/* We hava an invalid control value here */
+			turbo_pss_ctl = cpu->pstate.turbo_pstate;
+			cpu->acpi_perf_data.states[0].control =
+							turbo_pss_ctl << 8;
+		}
+
 		cpu->acpi_perf_data.states[0].core_frequency =
 				turbo_pss_ctl * cpu->pstate.scaling / 1000;
 	}
@@ -1303,6 +1310,8 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 
 #if IS_ENABLED(CONFIG_ACPI)
 	cpu = all_cpu_data[policy->cpu];
+	limits->min_perf_ctl = 0;
+	limits->max_perf_ctl = 0;
 	for (i = 0; i < cpu->acpi_perf_data.state_count; i++) {
 		int control;
 
