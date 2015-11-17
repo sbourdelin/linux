@@ -41,6 +41,7 @@ struct genpd_power_state {
 	char *name;
 	s64 power_off_latency_ns;
 	s64 power_on_latency_ns;
+	u32 param;
 };
 
 struct generic_pm_domain {

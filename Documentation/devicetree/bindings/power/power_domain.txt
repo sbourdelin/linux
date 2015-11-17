@@ -67,6 +67,12 @@ have the following properties -
 		If omitted, this is assumed to be equal to:
 			entry-latency-us + exit-latency-us
 
+	- state-param:
+		Usage: Optional
+		Value type: <prop-encoded-array>
+		Definition: A u32 value as defined by the state. May be used
+		by the driver to hold state related u32 data.
+
 Example:
 
 	power: power-controller@12340000 {
