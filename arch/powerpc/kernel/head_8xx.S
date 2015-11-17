@@ -254,6 +254,37 @@ DataAccess:
 	. = 0x400
 InstructionAccess:
 
+/*
+ * Bottom part of DTLBMiss handler for 512k pages
+ * not enough space in the primary location
+ */
+#ifdef CONFIG_PPC_4K_PAGES
+/*
+ * 512k pages are only used for mapping IMMR area in 4K pages mode.
+ * Only map the first 512k page of the 4M area covered by the PGD entry.
+ * This should not happen, but if we are called for another page of that
+ * area, don't mark it valid
+ *
+ * In 16k pages mode, IMMR is directly mapped with 16k pages
+ */
+DTLBMiss512k:
+	rlwinm.	r10, r10, 0, 0x00380000
+	bne-	1f
+	ori	r11, r11, MD_SVALID
+1:	mtcr	r3
+	MTSPR_CPU6(SPRN_MD_TWC, r11, r3)
+	rlwinm	r10, r11, 0, 0xffc00000
+	ori	r10, r10, 0xf0 | MD_SPS16K | _PAGE_SHARED | _PAGE_DIRTY	| \
+			  _PAGE_PRESENT | _PAGE_NO_CACHE
+	MTSPR_CPU6(SPRN_MD_RPN, r10, r3)	/* Update TLB entry */
+
+	li	r11, RPN_PATTERN
+	mfspr	r3, SPRN_SPRG_SCRATCH2
+	mtspr	SPRN_DAR, r11	/* Tag DAR */
+	EXCEPTION_EPILOG_0
+	rfi
+#endif
+
 /* External interrupt */
 	EXCEPTION(0x500, HardwareInterrupt, do_IRQ, EXC_XFER_LITE)
 
@@ -405,6 +436,9 @@ DataStoreTLBMiss:
 	lwz	r11, (swapper_pg_dir-PAGE_OFFSET)@l(r11)	/* Get the level 1 entry */
 	mtcr	r11
 	bt-	28,DTLBMiss8M		/* bit 28 = Large page (8M) */
+#ifdef CONFIG_PPC_4K_PAGES
+	bt-	29,DTLBMiss512k		/* bit 29 = Large page (8M or 512K) */
+#endif
 	mtcr	r3
 
 	/* We have a pte table, so load fetch the pte from the table.
@@ -559,7 +593,7 @@ FixupDAR:/* Entry point for dcbx workaround. */
 3:	rlwimi	r11, r10, 32 - ((PAGE_SHIFT - 2) << 1), (PAGE_SHIFT - 2) << 1, 29
 	lwz	r11, (swapper_pg_dir-PAGE_OFFSET)@l(r11)	/* Get the level 1 entry */
 	mtcr	r11
-	bt	28,200f		/* bit 28 = Large page (8M) */
+	bt	29,200f		/* bit 29 = Large page (8M or 512K) */
 	rlwinm	r11, r11,0,0,19	/* Extract page descriptor page address */
 	/* Insert level 2 index */
 	rlwimi	r11, r10, 32 - (PAGE_SHIFT - 2), 32 - PAGE_SHIFT, 29
