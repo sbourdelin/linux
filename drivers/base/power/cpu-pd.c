@@ -429,3 +429,79 @@ int of_attach_cpu_pm_domain(struct device_node *dn)
 	return 0;
 }
 EXPORT_SYMBOL(of_attach_cpu_pm_domain);
+
+static int of_parse_cpu_pd(struct device_node *cluster,
+		const struct cpu_pd_ops *ops)
+{
+	struct device_node *domain_node;
+	struct generic_pm_domain *genpd;
+	char name[10];
+	struct device_node *c;
+	int i, ret;
+
+	for (i = 0; ; i++) {
+		snprintf(name, sizeof(name), "cluster%d", i);
+		c = of_get_child_by_name(cluster, name);
+		if (!c)
+			break;
+
+		domain_node = of_parse_phandle(c, "cluster", 0);
+		if (!domain_node)
+			return -1;
+
+		/* Initialize CPU PM domain domain at this level */
+		genpd = of_init_cpu_pm_domain(domain_node, ops);
+		if (IS_ERR(genpd))
+			return -1;
+
+		/* Initialize and attach child domains */
+		ret = of_parse_cpu_pd(c, ops);
+
+		/*
+		 * Attach the domain to its parent after reading
+		 * the children, so the mask of CPUs in this domain
+		 * are setup correctly.
+		 */
+		if (!ret)
+			of_attach_cpu_pm_domain(domain_node);
+
+		of_node_put(c);
+		if (ret != 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
+ * topology node in DT.
+ *
+ * @ops: The PM domain suspend/resume ops for all the domains in the topology
+ */
+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
+{
+	struct device_node *cn, *map;
+	int ret = 0;
+
+	cn = of_find_node_by_path("/cpus");
+	if (!cn) {
+		pr_err("No CPU information found in DT\n");
+		return 0;
+	}
+
+	map = of_get_child_by_name(cn, "cpu-map");
+	if (!map)
+		goto out;
+
+	ret = of_parse_cpu_pd(map, ops);
+	if (ret != 0)
+		goto out_map;
+
+out_map:
+	of_node_put(map);
+out:
+	of_node_put(cn);
+	return ret;
+}
+EXPORT_SYMBOL(of_setup_cpu_domain_topology);

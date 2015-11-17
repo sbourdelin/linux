@@ -32,4 +32,5 @@ struct cpu_pm_domain {
 struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
 		const struct cpu_pd_ops *ops);
 int of_attach_cpu_pm_domain(struct device_node *dn);
+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops);
 #endif /* __CPU_PD_H__ */
