@@ -57,3 +57,6 @@ obj-$(CONFIG_VIDEO_XILINX)		+= xilinx/
 ccflags-y += -I$(srctree)/drivers/media/i2c
 
 obj-$(CONFIG_MEDIATEK_VPU)		+= mtk-vpu/
+
+obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC)		+= mtk-vcodec/
+
