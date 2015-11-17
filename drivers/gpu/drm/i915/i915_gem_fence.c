@@ -677,8 +677,8 @@ i915_gem_detect_bit_6_swizzle(struct drm_device *dev)
 		 * the minimum size of a rank.
 		 */
 		if (I915_READ16(C0DRB3) != I915_READ16(C1DRB3)) {
-			swizzle_x = I915_BIT_6_SWIZZLE_NONE;
-			swizzle_y = I915_BIT_6_SWIZZLE_NONE;
+			swizzle_x = I915_BIT_6_SWIZZLE_UNKNOWN;
+			swizzle_y = I915_BIT_6_SWIZZLE_UNKNOWN;
 		} else {
 			swizzle_x = I915_BIT_6_SWIZZLE_9_10;
 			swizzle_y = I915_BIT_6_SWIZZLE_9;
