@@ -339,9 +339,7 @@ static struct kobj_type ext4_ktype = {
 	.sysfs_ops	= &ext4_attr_ops,
 };
 
-static struct kset ext4_kset = {
-	.kobj   = {.ktype = &ext4_ktype},
-};
+static struct kset ext4_kset;
 
 static struct kobj_type ext4_feat_ktype = {
 	.default_attrs	= ext4_feat_attrs,
@@ -423,11 +421,12 @@ int __init ext4_init_sysfs(void)
 {
 	int ret;
 
-	kobject_set_name(&ext4_kset.kobj, "ext4");
-	ext4_kset.kobj.parent = fs_kobj;
-	ret = kset_register(&ext4_kset);
-	if (ret)
+	kset_init(&ext4_kset, &ext4_ktype, NULL);
+	ret = kset_register(&ext4_kset, "ext4", fs_kobj);
+	if (ret) {
+		kset_unregister(&ext4_kset);
 		return ret;
+	}
 
 	ret = kobject_init_and_add(&ext4_feat, &ext4_feat_ktype,
 				   NULL, "features");

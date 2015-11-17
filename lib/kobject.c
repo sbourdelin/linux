@@ -761,15 +761,35 @@ struct kobject *kobject_create_and_add(const char *name, struct kobject *parent)
 EXPORT_SYMBOL_GPL(kobject_create_and_add);
 
 /**
- * kset_init - initialize a kset for use
- * @k: kset
+ * kset_init - initialize a kset structure
+ * @kset: pointer to the kset to initialize
+ * @ktype: pointer to the ktype for this kset's contained kobject.
+ * @uevent_ops: an optional struct kset_uevent_ops for the kset.
+ *
+ * This function will properly initialize a kset such that it can then
+ * be passed to the kset_register() call.
+ *
+ * Note that there are only very few circumstances where you would
+ * initialize a kset by yourself, i.e. by calling kset_init()! The
+ * normal way to get a working kset object is through
+ * kset_create_and_add().
+ *
+ * Repeating the warning from kobject_init():
+ * after this function has been called, the kset MUST be cleaned up by
+ * a call to either kset_put() or, if it has been registered through
+ * kset_register(), to kset_unregister(). You shall not free it by a
+ * call to kfree() directly in order to ensure that all of the memory
+ * is cleaned up properly.
  */
-void kset_init(struct kset *k)
+void kset_init(struct kset *kset, struct kobj_type *ktype,
+	const struct kset_uevent_ops *uevent_ops)
 {
-	kobject_init_internal(&k->kobj);
-	INIT_LIST_HEAD(&k->list);
-	spin_lock_init(&k->list_lock);
+	kobject_init(&kset->kobj, ktype);
+	INIT_LIST_HEAD(&kset->list);
+	spin_lock_init(&kset->list_lock);
+	kset->uevent_ops = uevent_ops;
 }
+EXPORT_SYMBOL_GPL(kset_init);
 
 /* default kobject attribute operations */
 static ssize_t kobj_attr_show(struct kobject *kobj, struct attribute *attr,
@@ -803,17 +823,37 @@ const struct sysfs_ops kobj_sysfs_ops = {
 EXPORT_SYMBOL_GPL(kobj_sysfs_ops);
 
 /**
- * kset_register - initialize and add a kset.
- * @k: kset.
+ * kset_register - add a struct kset to sysfs.
+ * @k: the kset to add
+ * @name: the name for the kset
+ * @parent_kobj: the parent kobject of this kset, if any.
+ *
+ * The kset @name is set and added to the kobject hierarchy in this
+ * function. This function is for ksets what kobject_add() is for kobjects.
+ *
+ * The rules to determine the parent kobject are the same as for
+ * kobject_add().
+ *
+ * If this function returns an error, either kset_put() (preferred) or
+ * kset_unregister() must be called to properly clean up the memory
+ * associated with the object. Under no instance should the kset
+ * that is passed to this function be directly freed with a call to
+ * kfree(), that will leak memory.
+ *
+ * Note, that an "add" uevent will be created with this call.
  */
-int kset_register(struct kset *k)
+int kset_register(struct kset *k, const char *name, struct kobject *parent_kobj)
 {
 	int err;
 
 	if (!k)
 		return -EINVAL;
 
-	kset_init(k);
+	err = kobject_set_name(&k->kobj, "%s", name);
+	if (err)
+		return err;
+
+	k->kobj.parent = parent_kobj;
 	err = kobject_add_internal(&k->kobj);
 	if (err)
 		return err;
@@ -823,7 +863,7 @@ int kset_register(struct kset *k)
 EXPORT_SYMBOL(kset_register);
 
 /**
- * kset_unregister - remove a kset.
+ * kset_unregister - unlink a kset from hierarchy and decrement its refcount.
  * @k: kset.
  */
 void kset_unregister(struct kset *k)
@@ -878,9 +918,7 @@ static struct kobj_type kset_ktype = {
 /**
  * kset_create - create a struct kset dynamically
  *
- * @name: the name for the kset
- * @uevent_ops: a struct kset_uevent_ops for the kset
- * @parent_kobj: the parent kobject of this kset, if any.
+ * @uevent_ops: an optional struct kset_uevent_ops for the kset
  *
  * This function creates a kset structure dynamically.  This structure can
  * then be registered with the system and show up in sysfs with a call to
@@ -890,32 +928,15 @@ static struct kobj_type kset_ktype = {
  *
  * If the kset was not able to be created, NULL will be returned.
  */
-static struct kset *kset_create(const char *name,
-				const struct kset_uevent_ops *uevent_ops,
-				struct kobject *parent_kobj)
+static struct kset *kset_create(const struct kset_uevent_ops *uevent_ops)
 {
 	struct kset *kset;
-	int retval;
 
 	kset = kzalloc(sizeof(*kset), GFP_KERNEL);
 	if (!kset)
 		return NULL;
-	retval = kobject_set_name(&kset->kobj, "%s", name);
-	if (retval) {
-		kfree(kset);
-		return NULL;
-	}
-	kset->uevent_ops = uevent_ops;
-	kset->kobj.parent = parent_kobj;
 
-	/*
-	 * The kobject of this kset will have a type of kset_ktype and belong to
-	 * no kset itself.  That way we can properly free it when it is
-	 * finished being used.
-	 */
-	kset->kobj.ktype = &kset_ktype;
-	kset->kobj.kset = NULL;
-
+	kset_init(kset, &kset_ktype, uevent_ops);
 	return kset;
 }
 
@@ -940,12 +961,13 @@ struct kset *kset_create_and_add(const char *name,
 	struct kset *kset;
 	int error;
 
-	kset = kset_create(name, uevent_ops, parent_kobj);
+	kset = kset_create(uevent_ops);
 	if (!kset)
 		return NULL;
-	error = kset_register(kset);
+
+	error = kset_register(kset, name, parent_kobj);
 	if (error) {
-		kfree(kset);
+		kset_put(kset);
 		return NULL;
 	}
 	return kset;

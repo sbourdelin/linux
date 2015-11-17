@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/genhd.h>
 #include <linux/mutex.h>
+#include <linux/printk.h>
 #include "base.h"
 
 #define to_class_attr(_attr) container_of(_attr, struct class_attribute, attr)
@@ -80,6 +81,24 @@ static struct kobj_type class_ktype = {
 	.sysfs_ops	= &class_sysfs_ops,
 	.release	= class_release,
 	.child_ns_type	= class_child_ns_type,
+};
+
+static void glue_dirs_release_dummy(struct kobject *kobj)
+{
+	/*
+	 * The glue_dirs kset member of struct subsys_private is never
+	 * registered and thus, never unregistered.
+	 * This release function is a dummy to make kset_init() happy.
+	 */
+	pr_err(
+	"class (%p): unexpected kset_put() on glue_dirs, something is broken.",
+		container_of(kobj, struct subsys_private,
+				glue_dirs.kobj)->class);
+	dump_stack();
+}
+
+static struct kobj_type glue_dirs_ktype = {
+	.release = glue_dirs_release_dummy,
 };
 
 /* Hotplug events for classes go to the class subsys */
@@ -175,18 +194,14 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 		return -ENOMEM;
 	klist_init(&cp->klist_devices, klist_class_dev_get, klist_class_dev_put);
 	INIT_LIST_HEAD(&cp->interfaces);
-	kset_init(&cp->glue_dirs);
+	kset_init(&cp->glue_dirs, &glue_dirs_ktype, NULL);
 	__mutex_init(&cp->mutex, "subsys mutex", key);
-	error = kobject_set_name(&cp->subsys.kobj, "%s", cls->name);
-	if (error) {
-		kfree(cp);
-		return error;
-	}
 
 	/* set the default /sys/dev directory for devices of this class */
 	if (!cls->dev_kobj)
 		cls->dev_kobj = sysfs_dev_char_kobj;
 
+	kset_init(&cp->subsys, &class_ktype, NULL);
 #if defined(CONFIG_BLOCK)
 	/* let the block class directory show up in the root of sysfs */
 	if (!sysfs_deprecated || cls != &block_class)
@@ -194,13 +209,19 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 #else
 	cp->subsys.kobj.kset = class_kset;
 #endif
-	cp->subsys.kobj.ktype = &class_ktype;
 	cp->class = cls;
 	cls->p = cp;
 
-	error = kset_register(&cp->subsys);
+	error = kset_register(&cp->subsys, cls->name, NULL);
 	if (error) {
-		kfree(cp);
+		/*
+		 * class->release() would be called by cp->subsys'
+		 * release function. Prevent this from happening in
+		 * the error case by zeroing cp->class out.
+		 */
+		cp->class = NULL;
+		cls->p = NULL;
+		kset_put(&cp->subsys);
 		return error;
 	}
 	error = add_class_attrs(class_get(cls));

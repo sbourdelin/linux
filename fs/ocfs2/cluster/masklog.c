@@ -164,13 +164,12 @@ static struct kobj_type mlog_ktype = {
 	.sysfs_ops     = &mlog_attr_ops,
 };
 
-static struct kset mlog_kset = {
-	.kobj   = {.ktype = &mlog_ktype},
-};
+static struct kset mlog_kset;
 
 int mlog_sys_init(struct kset *o2cb_kset)
 {
 	int i = 0;
+	int ret;
 
 	while (mlog_attrs[i].attr.mode) {
 		mlog_attr_ptrs[i] = &mlog_attrs[i].attr;
@@ -178,9 +177,13 @@ int mlog_sys_init(struct kset *o2cb_kset)
 	}
 	mlog_attr_ptrs[i] = NULL;
 
-	kobject_set_name(&mlog_kset.kobj, "logmask");
+	kset_init(&mlog_kset, &mlog_ktype, NULL);
 	mlog_kset.kobj.kset = o2cb_kset;
-	return kset_register(&mlog_kset);
+	ret = kset_register(&mlog_kset, "logmask", NULL);
+	if (ret)
+		kset_unregister(&mlog_kset);
+
+	return ret;
 }
 
 void mlog_sys_shutdown(void)

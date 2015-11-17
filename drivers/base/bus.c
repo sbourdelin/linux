@@ -900,15 +900,11 @@ int bus_register(struct bus_type *bus)
 
 	BLOCKING_INIT_NOTIFIER_HEAD(&priv->bus_notifier);
 
-	retval = kobject_set_name(&priv->subsys.kobj, "%s", bus->name);
-	if (retval)
-		goto out;
-
-	priv->subsys.kobj.kset = bus_kset;
-	priv->subsys.kobj.ktype = &bus_ktype;
 	priv->drivers_autoprobe = 1;
 
-	retval = kset_register(&priv->subsys);
+	kset_init(&priv->subsys, &bus_ktype, NULL);
+	priv->subsys.kobj.kset = bus_kset;
+	retval = kset_register(&priv->subsys, bus->name, NULL);
 	if (retval)
 		goto out;
 
@@ -955,10 +951,8 @@ bus_drivers_fail:
 bus_devices_fail:
 	bus_remove_file(bus, &bus_attr_uevent);
 bus_uevent_fail:
-	kset_unregister(&bus->p->subsys);
 out:
-	kfree(bus->p);
-	bus->p = NULL;
+	kset_unregister(&bus->p->subsys);
 	return retval;
 }
 EXPORT_SYMBOL_GPL(bus_register);
