@@ -49,8 +49,15 @@
 #define XHCI_EXT_CAPS_PM	3
 #define XHCI_EXT_CAPS_VIRT	4
 #define XHCI_EXT_CAPS_ROUTE	5
-/* IDs 6-9 reserved */
+#define XHCI_EXT_CAPS_LOCALMEM	6
+/* IDs 7-9 reserved */
 #define XHCI_EXT_CAPS_DEBUG	10
+/* IDs 192-255 vendor specific */
+#define XHCI_EXT_CAPS_VEN_START	192
+#define XHCI_EXT_CAPS_VEN_END	255
+#define XHCI_EXT_CAPS_VENDOR(p)	(((p) >= XHCI_EXT_CAPS_VEN_START) && \
+				((p) <= XHCI_EXT_CAPS_VEN_END))
+#define XHCI_EXT_MAX_CAPID	XHCI_EXT_CAPS_VEN_END
 /* USB Legacy Support Capability - section 7.1.1 */
 #define XHCI_HC_BIOS_OWNED	(1 << 16)
 #define XHCI_HC_OS_OWNED	(1 << 24)
@@ -72,6 +79,11 @@
 /* USB 2.0 xHCI 1.0 hardware LMP capability - section 7.2.2.1.3.2 */
 #define XHCI_HLC               (1 << 19)
 #define XHCI_BLC               (1 << 20)
+
+/* Debug capability - section 7.6.8 */
+#define XHCI_DBC_DCCTRL		0x20
+#define XHCI_DBC_DCCTRL_DCR	(1 << 0)
+#define	XHCI_DBC_DCCTRL_DCE	(1 << 31)
 
 /* command register values to disable interrupts and halt the HC */
 /* start/stop HC execution - do not write unless HC is halted*/
