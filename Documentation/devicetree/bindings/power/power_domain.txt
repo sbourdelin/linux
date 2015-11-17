@@ -29,6 +29,44 @@ Optional properties:
    specified by this binding. More details about power domain specifier are
    available in the next section.
 
+- power-states : A phandle of an idle-state that shall be soaked into a
+                generic domain power state. The power-state shall be
+		compatible with "linux,domain-state".
+
+==Power state==
+
+A PM domain power state describes an idle state of a domain and must be
+have the following properties -
+
+	- compatible
+		Usage: Required
+		Value type: <stringlist>
+		Definition: Must be "linux,domain-state"
+
+	- entry-latency-us
+		Usage: Not required if wakeup-latency-us is provided.
+		Value type: <prop-encoded-array>
+		Definition: u32 value representing worst case latency in
+		microseconds required to enter the idle state.
+		The exit-latency-us duration may be guaranteed
+		only after entry-latency-us has passed.
+
+	- exit-latency-us
+		Usage: Not required if wakeup-latency-us is provided.
+		Value type: <prop-encoded-array>
+		Definition: u32 value representing worst case latency
+		in microseconds required to exit the idle state.
+
+	- wakeup-latency-us:
+		Usage: Not required if entry-latency-us and exit-latency-us
+		are provided.
+		Value type: <prop-encoded-array>
+		Definition: u32 value representing maximum delay between the
+		signaling the wakeup of the domain and the domain resuming
+		regular operation.
+		If omitted, this is assumed to be equal to:
+			entry-latency-us + exit-latency-us
+
 Example:
 
 	power: power-controller@12340000 {
@@ -54,6 +92,31 @@ Example 2:
 		power-domains = <&parent 0>;
 		#power-domain-cells = <1>;
 	};
+
+Example 3:
+
+	pm-domains {
+		a57_pd: a57_pd@ {
+			/* will have a57 platform ARM_PD_METHOD_OF_DECLARE*/
+			compatible = "arm,pd","arm,cortex-a57";
+			#power-domain-cells = <0>;
+			power-states = <&CLUSTER_SLEEP_0>;
+		};
+
+		a53_pd: a53_pd@ {
+			/* will have a a53 platform ARM_PD_METHOD_OF_DECLARE*/
+			compatible = "arm,pd","arm,cortex-a53";
+			#power-domain-cells = <0>;
+			power-states = <&CLUSTER_SLEEP_0>;
+		};
+
+		CLUSTER_SLEEP_0: power-state@0 {
+			compatible = "pm-domain,power-state";
+			entry-latency-us = <1000>;
+			exit-latency-us = <2000>;
+		};
+	};
+
 
 The nodes above define two power controllers: 'parent' and 'child'.
 Domains created by the 'child' power controller are subdomains of '0' power

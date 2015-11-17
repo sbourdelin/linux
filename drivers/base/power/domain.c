@@ -35,6 +35,7 @@
 })
 
 #define GENPD_MAX_NAME_SIZE 20
+#define GENPD_MAX_DOMAIN_STATES 10
 
 static int pm_genpd_alloc_states_names(struct generic_pm_domain *genpd,
 				       const struct genpd_power_state *st,
@@ -1515,6 +1516,105 @@ static int pm_genpd_default_restore_state(struct device *dev)
 	return cb ? cb(dev) : 0;
 }
 
+static const struct of_device_id power_state_match[] = {
+	{ .compatible = "linux,domain-state" },
+	{ }
+};
+
+static int of_get_genpd_power_state(struct genpd_power_state *genpd_state,
+					   struct device_node *state_node)
+{
+	const struct of_device_id *match_id;
+	int err = 0;
+	u32 latency;
+
+	match_id = of_match_node(power_state_match, state_node);
+	if (!match_id)
+		return -ENODEV;
+
+	err = of_property_read_u32(state_node, "wakeup-latency-us", &latency);
+	if (err) {
+		u32 entry_latency, exit_latency;
+
+		err = of_property_read_u32(state_node, "entry-latency-us",
+					   &entry_latency);
+		if (err) {
+			pr_debug(" * %s missing entry-latency-us property\n",
+				 state_node->full_name);
+			return -EINVAL;
+		}
+
+		err = of_property_read_u32(state_node, "exit-latency-us",
+					   &exit_latency);
+		if (err) {
+			pr_debug(" * %s missing exit-latency-us property\n",
+				 state_node->full_name);
+			return -EINVAL;
+		}
+		/*
+		 * If wakeup-latency-us is missing, default to entry+exit
+		 * latencies as defined in idle states bindings
+		 */
+		latency = entry_latency + exit_latency;
+	}
+
+	genpd_state->power_on_latency_ns = 1000 * latency;
+
+	err = of_property_read_u32(state_node, "entry-latency-us", &latency);
+	if (err) {
+		pr_debug(" * %s missing min-residency-us property\n",
+			 state_node->full_name);
+		return -EINVAL;
+	}
+
+	genpd_state->power_off_latency_ns = 1000 * latency;
+
+	return 0;
+}
+
+static int of_genpd_device_parse_states(struct device_node *np,
+				 struct genpd_power_state *genpd_states,
+				 int *state_count)
+{
+	struct device_node *state_node;
+	int i, err = 0;
+
+	for (i = 0;; i++) {
+		struct genpd_power_state genpd_state;
+
+		state_node = of_parse_phandle(np, "power-states", i);
+		if (!state_node)
+			break;
+
+		if (i == GENPD_MAX_DOMAIN_STATES) {
+			err = -ENOMEM;
+			break;
+		}
+
+		err = of_get_genpd_power_state(&genpd_state, state_node);
+		if (err) {
+			pr_err
+			    ("Parsing idle state node %s failed with err %d\n",
+			     state_node->full_name, err);
+			err = -EINVAL;
+			break;
+		}
+#ifdef CONFIG_PM_ADVANCED_DEBUG
+		genpd_state.name = kstrndup(state_node->full_name,
+					    GENPD_MAX_NAME_SIZE, GFP_KERNEL);
+		if (!genpd_state.name)
+			err = -ENOMEM;
+#endif
+		of_node_put(state_node);
+		memcpy(&genpd_states[i], &genpd_state, sizeof(genpd_state));
+#ifdef CONFIG_PM_ADVANCED_DEBUG
+		kfree(genpd_state.name);
+#endif
+	}
+	*state_count = i;
+	return err;
+}
+
 /**
  * pm_genpd_init - Initialize a generic I/O PM domain object.
  * @genpd: PM domain object to initialize.
@@ -1595,6 +1695,34 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	mutex_unlock(&gpd_list_lock);
 }
 EXPORT_SYMBOL_GPL(pm_genpd_init);
+
+int of_pm_genpd_init(struct device_node *dn, struct generic_pm_domain *genpd,
+		   struct dev_power_governor *gov, bool is_off)
+{
+	struct genpd_power_state states[GENPD_MAX_DOMAIN_STATES] = { { 0 } };
+	int state_count = GENPD_MAX_DOMAIN_STATES;
+	int ret;
+
+	if (IS_ERR_OR_NULL(genpd))
+		return -EINVAL;
+
+	ret = of_genpd_device_parse_states(dn, states, &state_count);
+	if (ret) {
+		pr_err("Error parsing genpd states for %s\n", genpd->name);
+		return ret;
+	}
+
+	ret = genpd_alloc_states_data(genpd, states, state_count);
+	if (ret) {
+		pr_err("Failed to allocate states for %s\n", genpd->name);
+		return ret;
+	}
+
+	pm_genpd_init(genpd, gov, is_off);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(of_pm_genpd_init);
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
 /*

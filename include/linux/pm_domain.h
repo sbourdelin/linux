@@ -213,6 +213,8 @@ struct generic_pm_domain *__of_genpd_xlate_onecell(
 					void *data);
 
 int genpd_dev_pm_attach(struct device *dev);
+int of_pm_genpd_init(struct device_node *dn, struct generic_pm_domain *genpd,
+		   struct dev_power_governor *gov, bool is_off);
 #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
 static inline int __of_genpd_add_provider(struct device_node *np,
 					genpd_xlate_t xlate, void *data)
@@ -234,6 +236,10 @@ static inline int genpd_dev_pm_attach(struct device *dev)
 {
 	return -ENODEV;
 }
+
+static inline int of_pm_genpd_init(struct device_node *dn,
+		struct generic_pm_domain *genpd,
+		struct dev_power_governor *gov, bool is_off) {}
 #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 
 static inline int of_genpd_add_provider_simple(struct device_node *np,
