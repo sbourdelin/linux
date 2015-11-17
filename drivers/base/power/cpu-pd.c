@@ -237,6 +237,30 @@ static int of_pm_domain_attach_cpus(struct device_node *dn,
 	return 0;
 }
 
+static int cpu_hotplug(struct notifier_block *nb,
+			unsigned long action, void *data)
+{
+	struct device *dev = get_cpu_device(smp_processor_id());
+
+	/* Execute CPU runtime PM on that CPU */
+	switch (action) {
+	case CPU_DYING:
+	case CPU_DYING_FROZEN:
+		pm_runtime_put_sync_suspend(dev);
+		pm_runtime_disable(dev);
+		break;
+	case CPU_STARTING:
+	case CPU_STARTING_FROZEN:
+		pm_runtime_enable(dev);
+		pm_runtime_get_sync(dev);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
 int of_register_cpu_pm_domain(struct device_node *dn,
 		struct cpu_pm_domain *pd)
 {
@@ -277,10 +301,13 @@ int of_register_cpu_pm_domain(struct device_node *dn,
 
 	/* Attach the CPUs to the CPU PM domain */
 	ret = of_pm_domain_attach_cpus(dn, pd);
-	if (ret)
+	if (ret) {
 		of_genpd_del_provider(dn);
+		return ret;
+	}
 
-	return ret;
+	hotcpu_notifier(cpu_hotplug, 0)
+	return 0;
 }
 
 /**
