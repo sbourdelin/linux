@@ -568,9 +568,10 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		}
 	}
 
-	return 0;
+	err = 0;
 
 fail:
+	kfree(configs);
 	return err;
 }
 
