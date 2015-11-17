@@ -43,3 +43,9 @@ config ION_OF
 	  extensions
 
 	  If using Ion and devicetree, you should say Y here
+
+config ION_OF_SAMPLE
+	bool "Sample driver"
+	depends on ION_OF
+	help
+	  Small sample driver showing the Ion OF interface
