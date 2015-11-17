@@ -419,8 +419,8 @@ static int __must_check xen_allocate_irq_gsi(unsigned gsi)
 	if (xen_pv_domain() && !xen_initial_domain())
 		return xen_allocate_irq_dynamic();
 
-	/* Legacy IRQ descriptors are already allocated by the arch. */
-	if (gsi < NR_IRQS_LEGACY)
+	/* On HVM legacy IRQ descriptors are already allocated by the arch. */
+	if (xen_hvm_domain() && gsi < NR_IRQS_LEGACY)
 		irq = gsi;
 	else
 		irq = irq_alloc_desc_at(gsi, -1);
@@ -445,8 +445,8 @@ static void xen_free_irq(unsigned irq)
 
 	kfree(info);
 
-	/* Legacy IRQ descriptors are managed by the arch. */
-	if (irq < NR_IRQS_LEGACY)
+	/* On HVM legacy IRQ descriptors are managed by the arch. */
+	if (xen_hvm_domain() && irq < NR_IRQS_LEGACY)
 		return;
 
 	irq_free_desc(irq);
