@@ -44,6 +44,8 @@ static int pm_genpd_alloc_states_names(struct generic_pm_domain *genpd,
 static LIST_HEAD(gpd_list);
 static DEFINE_MUTEX(gpd_list_lock);
 
+static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async);
+
 static inline int genpd_lock_nosleep(struct generic_pm_domain *genpd,
 					unsigned int subclass)
 	__acquires(&genpd->slock)
@@ -298,6 +300,13 @@ static int __genpd_poweron(struct generic_pm_domain *genpd)
 					&genpd->slave_links,
 					slave_node) {
 		genpd_sd_counter_dec(link->master);
+
+		/* Assume masters that are non-irq safe are always-on */
+		if (genpd->irq_safe && link->master->irq_safe) {
+			genpd_poweroff(link->master, false);
+			continue;
+		}
+
 		genpd_queue_power_off_work(link->master);
 	}
 
@@ -448,6 +457,13 @@ static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async)
 
 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
 		genpd_sd_counter_dec(link->master);
+
+		/* Assume masters that are non-irq safe are always-on */
+		if (genpd->irq_safe && link->master->irq_safe) {
+			genpd_poweroff(link->master, false);
+			continue;
+		}
+
 		genpd_queue_power_off_work(link->master);
 	}
 
