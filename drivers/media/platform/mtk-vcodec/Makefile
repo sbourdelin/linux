@@ -4,7 +4,7 @@ obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += mtk_vcodec_intr.o \
 				       mtk_vcodec_enc.o \
 				       mtk_vcodec_enc_pm.o
 
-obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += common/ vp8_enc/
+obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += common/ vp8_enc/ h264_enc/
 
 ccflags-y += -I$(srctree)/drivers/media/platform/mtk-vcodec/include \
 	     -I$(srctree)/drivers/media/platform/mtk-vcodec \
