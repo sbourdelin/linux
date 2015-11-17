@@ -1100,9 +1100,7 @@ struct platform_device s3c_device_wdt = {
 #ifdef CONFIG_S3C64XX_DEV_SPI0
 static struct resource s3c64xx_spi0_resource[] = {
 	[0] = DEFINE_RES_MEM(S3C_PA_SPI0, SZ_256),
-	[1] = DEFINE_RES_DMA(DMACH_SPI0_TX),
-	[2] = DEFINE_RES_DMA(DMACH_SPI0_RX),
-	[3] = DEFINE_RES_IRQ(IRQ_SPI0),
+	[1] = DEFINE_RES_IRQ(IRQ_SPI0),
 };
 
 struct platform_device s3c64xx_device_spi0 = {
@@ -1130,11 +1128,13 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
 	pd.num_cs = num_cs;
 	pd.src_clk_nr = src_clk_nr;
 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
-#if defined(CONFIG_PL330_DMA)
-	pd.filter = pl330_filter;
-#elif defined(CONFIG_S3C64XX_PL080)
+#if defined(CONFIG_S3C64XX_PL080)
+	pd.dma_tx = (void *)DMACH_SPI0_TX;
+	pd.dma_rx = (void *)DMACH_SPI0_RX;
 	pd.filter = pl08x_filter_id;
 #elif defined(CONFIG_S3C24XX_DMAC)
+	pd.dma_tx = (void *)DMACH_SPI0_TX;
+	pd.dma_rx = (void *)DMACH_SPI0_RX;
 	pd.filter = s3c24xx_dma_filter;
 #endif
 
@@ -1145,9 +1145,7 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
 #ifdef CONFIG_S3C64XX_DEV_SPI1
 static struct resource s3c64xx_spi1_resource[] = {
 	[0] = DEFINE_RES_MEM(S3C_PA_SPI1, SZ_256),
-	[1] = DEFINE_RES_DMA(DMACH_SPI1_TX),
-	[2] = DEFINE_RES_DMA(DMACH_SPI1_RX),
-	[3] = DEFINE_RES_IRQ(IRQ_SPI1),
+	[1] = DEFINE_RES_IRQ(IRQ_SPI1),
 };
 
 struct platform_device s3c64xx_device_spi1 = {
@@ -1175,9 +1173,9 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
 	pd.num_cs = num_cs;
 	pd.src_clk_nr = src_clk_nr;
 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi1_cfg_gpio;
-#if defined(CONFIG_PL330_DMA)
-	pd.filter = pl330_filter;
-#elif defined(CONFIG_S3C64XX_PL080)
+#if defined(CONFIG_S3C64XX_PL080)
+	pd.dma_tx = (void *)DMACH_SPI1_TX;
+	pd.dma_rx = (void *)DMACH_SPI1_RX;
 	pd.filter = pl08x_filter_id;
 #endif
 
@@ -1188,9 +1186,7 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
 #ifdef CONFIG_S3C64XX_DEV_SPI2
 static struct resource s3c64xx_spi2_resource[] = {
 	[0] = DEFINE_RES_MEM(S3C_PA_SPI2, SZ_256),
-	[1] = DEFINE_RES_DMA(DMACH_SPI2_TX),
-	[2] = DEFINE_RES_DMA(DMACH_SPI2_RX),
-	[3] = DEFINE_RES_IRQ(IRQ_SPI2),
+	[1] = DEFINE_RES_IRQ(IRQ_SPI2),
 };
 
 struct platform_device s3c64xx_device_spi2 = {
@@ -1218,9 +1214,9 @@ void __init s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
 	pd.num_cs = num_cs;
 	pd.src_clk_nr = src_clk_nr;
 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi2_cfg_gpio;
-#if defined(CONFIG_PL330_DMA)
-	pd.filter = pl330_filter;
-#elif defined(CONFIG_S3C64XX_PL080)
+#if defined(CONFIG_S3C64XX_PL080)
+	pd.dma_tx = (void *)DMACH_SPI2_TX;
+	pd.dma_rx = (void *)DMACH_SPI2_RX;
 	pd.filter = pl08x_filter_id;
 #endif
 
