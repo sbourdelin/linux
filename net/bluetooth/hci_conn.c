@@ -491,6 +491,19 @@ static void le_conn_timeout(struct work_struct *work)
 	hci_abort_conn(conn, HCI_ERROR_REMOTE_USER_TERM);
 }
 
+static void sco_conn_timeout(struct work_struct *work)
+{
+	struct hci_conn *conn = container_of(work, struct hci_conn,
+					     sco_conn_timeout.work);
+
+	BT_DBG("");
+
+	if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags)) {
+		BT_ERR("Fail to exit sniff mode to setup SCO within timeout");
+		hci_sco_setup(conn, 0x0c);
+	}
+}
+
 struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst,
 			      u8 role)
 {
@@ -519,6 +532,7 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst,
 
 	set_bit(HCI_CONN_POWER_SAVE, &conn->flags);
 	conn->disc_timeout = HCI_DISCONN_TIMEOUT;
+	conn->sco_timeout = HCI_SCO_TIMEOUT;
 
 	if (conn->role == HCI_ROLE_MASTER)
 		conn->out = true;
@@ -550,6 +564,7 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst,
 	INIT_DELAYED_WORK(&conn->disc_work, hci_conn_timeout);
 	INIT_DELAYED_WORK(&conn->auto_accept_work, hci_conn_auto_accept);
 	INIT_DELAYED_WORK(&conn->idle_work, hci_conn_idle);
+	INIT_DELAYED_WORK(&conn->sco_conn_timeout, sco_conn_timeout);
 	INIT_DELAYED_WORK(&conn->le_conn_timeout, le_conn_timeout);
 	INIT_WORK(&conn->le_scan_cleanup, le_scan_cleanup);
 
@@ -580,6 +595,8 @@ int hci_conn_del(struct hci_conn *conn)
 		struct hci_conn *sco = conn->link;
 		if (sco)
 			sco->link = NULL;
+
+		cancel_delayed_work_sync(&conn->sco_conn_timeout);
 
 		/* Unacked frames */
 		hdev->acl_cnt += conn->sent;
