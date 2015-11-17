@@ -445,6 +445,10 @@ struct drm_crtc {
 	int cursor_x;
 	int cursor_y;
 
+	/* hotspot of cursor */
+	int hot_x;
+	int hot_y;
+
 	bool enabled;
 
 	/* Requested mode from modesetting. */

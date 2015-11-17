@@ -2831,6 +2831,9 @@ static int drm_mode_cursor_universal(struct drm_crtc *crtc,
 				DRM_DEBUG_KMS("failed to wrap cursor buffer in drm framebuffer\n");
 				return PTR_ERR(fb);
 			}
+
+			crtc->hot_x = req->hot_x;
+			crtc->hot_y = req->hot_y;
 		} else {
 			fb = NULL;
 		}
@@ -2841,11 +2844,11 @@ static int drm_mode_cursor_universal(struct drm_crtc *crtc,
 	}
 
 	if (req->flags & DRM_MODE_CURSOR_MOVE) {
-		crtc_x = req->x;
-		crtc_y = req->y;
+		crtc_x = req->x - crtc->hot_x;
+		crtc_y = req->y - crtc->hot_y;
 	} else {
-		crtc_x = crtc->cursor_x;
-		crtc_y = crtc->cursor_y;
+		crtc_x = crtc->cursor_x - crtc->hot_x;
+		crtc_y = crtc->cursor_y - crtc->hot_y;
 	}
 
 	if (fb) {
