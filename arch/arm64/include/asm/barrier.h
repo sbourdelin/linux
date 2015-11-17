@@ -64,7 +64,7 @@ do {									\
 
 #define smp_load_acquire(p)						\
 ({									\
-	typeof(*p) ___p1;						\
+	unsigned long ___p1;						\
 	compiletime_assert_atomic_type(*p);				\
 	switch (sizeof(*p)) {						\
 	case 1:								\
@@ -84,7 +84,7 @@ do {									\
 			: "=r" (___p1) : "Q" (*p) : "memory");		\
 		break;							\
 	}								\
-	___p1;								\
+	(typeof(*p))___p1;								\
 })
 
 #define read_barrier_depends()		do { } while(0)
