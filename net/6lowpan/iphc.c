@@ -594,7 +594,6 @@ int lowpan_header_decompress(struct sk_buff *skb, const struct net_device *dev,
 EXPORT_SYMBOL_GPL(lowpan_header_decompress);
 
 static const u8 lowpan_iphc_dam_to_sam_value[] = {
-	[LOWPAN_IPHC_DAM_00] = LOWPAN_IPHC_SAM_00,
 	[LOWPAN_IPHC_DAM_01] = LOWPAN_IPHC_SAM_01,
 	[LOWPAN_IPHC_DAM_10] = LOWPAN_IPHC_SAM_10,
 	[LOWPAN_IPHC_DAM_11] = LOWPAN_IPHC_SAM_11,
@@ -603,7 +602,7 @@ static const u8 lowpan_iphc_dam_to_sam_value[] = {
 static u8 lowpan_compress_addr_64(u8 **hc_ptr, const struct in6_addr *ipaddr,
 				  const unsigned char *lladdr, bool sam)
 {
-	u8 dam = LOWPAN_IPHC_DAM_00;
+	u8 dam;
 
 	if (is_addr_mac_addr_based(ipaddr, lladdr)) {
 		dam = LOWPAN_IPHC_DAM_11; /* 0-bits */
