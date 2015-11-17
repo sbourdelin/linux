@@ -3,3 +3,4 @@
 #
 
 obj-$(CONFIG_EARLY_PRINTK_DBGP) += ehci-dbgp.o
+obj-$(CONFIG_EARLY_PRINTK_XDBC) += xhci-dbc.o
