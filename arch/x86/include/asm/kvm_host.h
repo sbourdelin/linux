@@ -91,6 +91,7 @@ static inline gfn_t gfn_to_index(gfn_t gfn, gfn_t base_gfn, int level)
 #define KVM_MAX_CPUID_ENTRIES 80
 #define KVM_NR_FIXED_MTRR_REGION 88
 #define KVM_NR_VAR_MTRR 8
+#define KVM_MAX_LBR_MSRS 128
 
 #define ASYNC_PF_PER_VCPU 64
 
@@ -376,6 +377,12 @@ struct kvm_vcpu_hv {
 	u64 hv_vapic;
 };
 
+struct msr_data {
+	bool host_initiated;
+	u32 index;
+	u64 data;
+};
+
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -515,6 +522,15 @@ struct kvm_vcpu_arch {
 	unsigned long dr7;
 	unsigned long eff_db[KVM_NR_DB_REGS];
 	unsigned long guest_debug_dr7;
+
+	int lbr_status;
+	int lbr_used;
+
+	struct lbr_msr {
+		unsigned nr;
+		struct msr_data guest[KVM_MAX_LBR_MSRS];
+		struct msr_data host[KVM_MAX_LBR_MSRS];
+	} lbr_msr;
 
 	u64 mcg_cap;
 	u64 mcg_status;
@@ -727,12 +743,6 @@ struct kvm_vcpu_stat {
 };
 
 struct x86_instruction_info;
-
-struct msr_data {
-	bool host_initiated;
-	u32 index;
-	u64 data;
-};
 
 struct kvm_lapic_irq {
 	u32 vector;
