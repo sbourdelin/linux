@@ -404,6 +404,8 @@ struct drm_crtc_funcs {
  * @cursor: cursor plane for this CRTC
  * @cursor_x: current x position of the cursor, used for universal cursor planes
  * @cursor_y: current y position of the cursor, used for universal cursor planes
+ * @hot_x: x-coordinate of cursor hotspot, used for universal cursor planes
+ * @hot_y: y-coordinate of cursor hotspot, used for universal cursor planes
  * @enabled: is this CRTC enabled?
  * @mode: current mode timings
  * @hwmode: mode timings as programmed to hw regs
@@ -444,6 +446,10 @@ struct drm_crtc {
 	/* position of cursor plane on crtc */
 	int cursor_x;
 	int cursor_y;
+
+	/* hotspot of cursor */
+	int hot_x;
+	int hot_y;
 
 	bool enabled;
 
