@@ -8,6 +8,7 @@ menuconfig 6LOWPAN
 config 6LOWPAN_DEBUGFS
 	bool "6LoWPAN debugfs support"
 	depends on 6LOWPAN
+	depends on DEBUG_FS
 	---help---
 	  This enables 6LoWPAN debugfs support. For example to manipulate
 	  IPHC context information at runtime.
