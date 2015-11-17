@@ -613,8 +613,8 @@ static int encx24j600_hw_init(struct encx24j600_priv *priv)
 		goto err_out;
 	}
 
-	netif_info(priv, drv, dev, "Silicon rev ID: 0x%02x\n",
-		   (eidled & REVID_MASK) >> REVID_SHIFT);
+	netif_dbg(priv, drv, dev, "Silicon rev ID: 0x%02x\n",
+		  (eidled & REVID_MASK) >> REVID_SHIFT);
 
 	/* PHY Leds: link status,
 	 * LEDA: Link State + collision events
