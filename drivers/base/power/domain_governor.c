@@ -125,8 +125,12 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
 		return genpd->cached_power_down_ok;
 	}
 
-	off_on_time_ns = genpd->power_off_latency_ns +
-				genpd->power_on_latency_ns;
+	/*
+	 * Use the only available state, until multiple state support is added
+	 * to the governor.
+	 */
+	off_on_time_ns = genpd->states[0].power_off_latency_ns +
+				genpd->states[0].power_on_latency_ns;
 
 	min_off_time_ns = -1;
 	/*
@@ -203,8 +207,11 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
 	 * The difference between the computed minimum subdomain or device off
 	 * time and the time needed to turn the domain on is the maximum
 	 * theoretical time this domain can spend in the "off" state.
+	 * Use the only available state, until multiple state support is added
+	 * to the governor.
 	 */
-	genpd->max_off_time_ns = min_off_time_ns - genpd->power_on_latency_ns;
+	genpd->max_off_time_ns = min_off_time_ns -
+		genpd->states[0].power_on_latency_ns;
 	return true;
 }
 
