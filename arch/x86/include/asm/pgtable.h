@@ -62,9 +62,7 @@ extern struct mm_struct *pgd_page_get_mm(struct page *page);
 #define pmd_clear(pmd)			native_pmd_clear(pmd)
 
 #define pte_update(mm, addr, ptep)              do { } while (0)
-#define pte_update_defer(mm, addr, ptep)        do { } while (0)
 #define pmd_update(mm, addr, ptep)              do { } while (0)
-#define pmd_update_defer(mm, addr, ptep)        do { } while (0)
 
 #define pgd_val(x)	native_pgd_val(x)
 #define __pgd(x)	native_make_pgd(x)
@@ -710,14 +708,9 @@ static inline void native_set_pmd_at(struct mm_struct *mm, unsigned long addr,
  * updates should either be sets, clears, or set_pte_atomic for P->P
  * transitions, which means this hook should only be called for user PTEs.
  * This hook implies a P->P protection or access change has taken place, which
- * requires a subsequent TLB flush.  The notification can optionally be delayed
- * until the TLB flush event by using the pte_update_defer form of the
- * interface, but care must be taken to assure that the flush happens while
- * still holding the same page table lock so that the shadow and primary pages
- * do not become out of sync on SMP.
+ * requires a subsequent TLB flush.
  */
 #define pte_update(mm, addr, ptep)		do { } while (0)
-#define pte_update_defer(mm, addr, ptep)	do { } while (0)
 #endif
 
 /*
