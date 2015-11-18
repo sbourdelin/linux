@@ -2523,13 +2523,11 @@ retry:
 		}
 
 		/*
-		 * We have two constraints: We find one extent to map and we
+		 * We have a constraint: We find one extent to map and we
 		 * must always write out whole page (makes a difference when
 		 * blocksize < pagesize) so that we don't block on IO when we
-		 * try to write out the rest of the page. Journalled mode is
-		 * not supported by delalloc.
+		 * try to write out the rest of the page.
 		 */
-		BUG_ON(ext4_should_journal_data(inode));
 		needed_blocks = ext4_da_writepages_trans_blocks(inode);
 
 		/* start a new transaction */
