@@ -69,6 +69,9 @@ struct clocksource {
 	 * clocksource itself is cacheline aligned.
 	 */
 	cycle_t (*read)(struct clocksource *cs);
+#ifdef CONFIG_CLKSRC_MMIO
+	void __iomem *reg;
+#endif
 	cycle_t mask;
 	u32 mult;
 	u32 shift;
