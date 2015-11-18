@@ -64,7 +64,8 @@ do {									\
 
 #define smp_load_acquire(p)						\
 ({									\
-	typeof(*p) ___p1;						\
+	typeof((typeof(*p))(*p + 0)) ___p1;				\
+	compiletime_assert(sizeof(___p1) == sizeof(*p), "remove const"); \
 	compiletime_assert_atomic_type(*p);				\
 	switch (sizeof(*p)) {						\
 	case 1:								\
