@@ -768,9 +768,6 @@ static v4l2_std_id tvp5150_read_std(struct v4l2_subdev *sd)
 
 static int tvp5150_reset(struct v4l2_subdev *sd, u32 val)
 {
-	struct tvp5150 *decoder = to_tvp5150(sd);
-	v4l2_std_id std;
-
 	/* Initializes TVP5150 to its default values */
 	tvp5150_write_inittab(sd, tvp5150_init_default);
 
@@ -779,6 +776,14 @@ static int tvp5150_reset(struct v4l2_subdev *sd, u32 val)
 
 	/* Selects decoder input */
 	tvp5150_selmux(sd);
+
+	return 0;
+}
+
+static int tvp5150_enable(struct v4l2_subdev *sd)
+{
+	struct tvp5150 *decoder = to_tvp5150(sd);
+	v4l2_std_id std;
 
 	/* Initializes TVP5150 to stream enabled values */
 	tvp5150_write_inittab(sd, tvp5150_init_enable);
@@ -844,6 +849,7 @@ static int tvp5150_enum_mbus_code(struct v4l2_subdev *sd,
 		return -EINVAL;
 
 	code->code = MEDIA_BUS_FMT_UYVY8_2X8;
+
 	return 0;
 }
 
@@ -1166,8 +1172,10 @@ static int tvp5150_set_format(struct v4l2_subdev *sd,
 
 	format->format = *mbus_format;
 
-	if (format->which == V4L2_SUBDEV_FORMAT_ACTIVE)
+	if (format->which == V4L2_SUBDEV_FORMAT_ACTIVE) {
 		tvp5150_reset(sd, 0);
+		tvp5150_enable(sd);
+	}
 
 	v4l2_dbg(1, debug, sd, "width = %d, height = %d\n", mbus_format->width,
 			mbus_format->height);
@@ -1431,6 +1439,7 @@ static int tvp5150_probe(struct i2c_client *c,
 	}
 	v4l2_ctrl_handler_setup(&core->hdl);
 
+	tvp5150_reset(sd, 0);
 	/* Default is no cropping */
 	tvp5150_set_default(tvp5150_read_std(sd), &core->rect, &core->format);
 
