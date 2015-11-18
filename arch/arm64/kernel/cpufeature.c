@@ -293,6 +293,28 @@ static struct arm64_ftr_reg arm64_ftr_regs[] = {
 	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_generic32),
 };
 
+/*
+ * Park the calling CPU which doesn't have the capability
+ * as advertised by the system.
+ */
+static void fail_incapable_cpu(void)
+{
+	int cpu = smp_processor_id();
+
+	pr_crit("CPU%d: will not boot\n", cpu);
+
+	/* Mark this CPU absent */
+	set_cpu_present(cpu, 0);
+
+	/* Check if we can park ourselves */
+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+		cpu_ops[cpu]->cpu_die(cpu);
+	asm(
+	"1:	wfe\n"
+	"	wfi\n"
+	"	b	1b");
+}
+
 static int search_cmp_ftr_reg(const void *id, const void *regp)
 {
 	return (int)(unsigned long)id - (int)((const struct arm64_ftr_reg *)regp)->sys_id;
@@ -459,6 +481,40 @@ static int check_update_ftr_reg(u32 sys_id, int cpu, u64 val, u64 boot)
 }
 
 /*
+ * The asid_bits, which determine the width of the mm context
+ * id, is based on the boot CPU value. If the new CPU doesn't
+ * have an ASID >= boot CPU, we are in trouble. Fail this CPU.
+ */
+static void check_cpu_asid_bits(int cpu,
+				struct cpuinfo_arm64 *info,
+				struct cpuinfo_arm64 *boot)
+{
+	u32 asid_boot = cpuid_feature_extract_unsigned_field(boot->reg_id_aa64mmfr0,
+							ID_AA64MMFR0_ASID_SHIFT);
+	u32 asid_cur = cpuid_feature_extract_unsigned_field(info->reg_id_aa64mmfr0,
+							ID_AA64MMFR0_ASID_SHIFT);
+	if (asid_cur < asid_boot) {
+		pr_crit("CPU%d: has incompatible ASIDBits: %u vs Boot CPU:%u\n",
+				cpu, asid_cur, asid_boot);
+		fail_incapable_cpu();
+	}
+	return;
+}
+
+/*
+ * Checks whether the cpu is missing any of the features
+ * the kernel has already started using at early boot,
+ * before the other CPUs are brought up. This is intended
+ * for checking features where variations can be fatal.
+ */
+static void check_early_cpu_features(int cpu,
+				struct cpuinfo_arm64 *info,
+				struct cpuinfo_arm64 *boot)
+{
+	check_cpu_asid_bits(cpu, info, boot);
+}
+
+/*
  * Update system wide CPU feature registers with the values from a
  * non-boot CPU. Also performs SANITY checks to make sure that there
  * aren't any insane variations from that of the boot CPU.
@@ -468,6 +524,9 @@ void update_cpu_features(int cpu,
 			 struct cpuinfo_arm64 *boot)
 {
 	int taint = 0;
+
+	/* Make sure there are no fatal feature variations for this cpu */
+	check_early_cpu_features(cpu, info, boot);
 
 	/*
 	 * The kernel can handle differing I-cache policies, but otherwise
@@ -806,28 +865,6 @@ static u64 __raw_read_system_reg(u32 sys_id)
 		BUG();
 		return 0;
 	}
-}
-
-/*
- * Park the calling CPU which doesn't have the capability
- * as advertised by the system.
- */
-static void fail_incapable_cpu(void)
-{
-	int cpu = smp_processor_id();
-
-	pr_crit("CPU%d: will not boot\n", cpu);
-
-	/* Mark this CPU absent */
-	set_cpu_present(cpu, 0);
-
-	/* Check if we can park ourselves */
-	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-		cpu_ops[cpu]->cpu_die(cpu);
-	asm(
-	"1:	wfe\n"
-	"	wfi\n"
-	"	b	1b");
 }
 
 /*
