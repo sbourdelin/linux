@@ -1264,6 +1264,8 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 	struct cpudata *cpu;
 	int i;
 #endif
+	int max_policy_calc;
+
 	pr_debug("intel_pstate: %s max %u policy->max %u\n", __func__,
 		 policy->cpuinfo.max_freq, policy->max);
 	if (!policy->cpuinfo.max_freq)
@@ -1280,7 +1282,10 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 	limits = &powersave_limits;
 	limits->min_policy_pct = (policy->min * 100) / policy->cpuinfo.max_freq;
 	limits->min_policy_pct = clamp_t(int, limits->min_policy_pct, 0 , 100);
-	limits->max_policy_pct = (policy->max * 100) / policy->cpuinfo.max_freq;
+
+	max_policy_calc = (policy->max * 1000) / policy->cpuinfo.max_freq;
+	limits->max_policy_pct = DIV_ROUND_UP(max_policy_calc, 10);
+
 	limits->max_policy_pct = clamp_t(int, limits->max_policy_pct, 0 , 100);
 
 	/* Normalize user input to [min_policy_pct, max_policy_pct] */
@@ -1300,6 +1305,7 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 				  int_tofp(100));
 	limits->max_perf = div_fp(int_tofp(limits->max_perf_pct),
 				  int_tofp(100));
+	limits->max_perf = round_up(limits->max_perf, 8);
 
 #if IS_ENABLED(CONFIG_ACPI)
 	cpu = all_cpu_data[policy->cpu];
