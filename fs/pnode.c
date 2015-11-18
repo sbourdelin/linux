@@ -16,17 +16,17 @@
 /* return the next shared peer mount of @p */
 static inline struct mount *next_peer(struct mount *p)
 {
-	return list_entry(p->mnt_share.next, struct mount, mnt_share);
+	return list_next_entry(p, mnt_share);
 }
 
 static inline struct mount *first_slave(struct mount *p)
 {
-	return list_entry(p->mnt_slave_list.next, struct mount, mnt_slave);
+	return list_first_entry(&p->mnt_slave_list, struct mount, mnt_slave);
 }
 
 static inline struct mount *next_slave(struct mount *p)
 {
-	return list_entry(p->mnt_slave.next, struct mount, mnt_slave);
+	return list_next_entry(p, mnt_slave);
 }
 
 static struct mount *get_peer_under_root(struct mount *mnt,
