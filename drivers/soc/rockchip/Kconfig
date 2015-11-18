@@ -15,4 +15,11 @@ config ROCKCHIP_PM_DOMAINS
 
           If unsure, say N.
 
+config ROCKCHIP_REBOOT
+	bool "Rockchip reboot notifier driver"
+	help
+	  Say y here will enable reboot notifier support.
+	  This will get reboot mode arguments from userspace and
+	  store it in special register.
+
 endif
