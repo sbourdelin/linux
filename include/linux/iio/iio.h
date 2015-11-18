@@ -419,6 +419,8 @@ struct iio_info {
 
 /**
  * struct iio_buffer_setup_ops - buffer setup related callbacks
+ * @enable_trigger:	[DRIVER] function to call if a trigger is instancied
+ *				 upon enabling the buffer (sw triggers)
  * @preenable:		[DRIVER] function to run prior to marking buffer enabled
  * @postenable:		[DRIVER] function to run after marking buffer enabled
  * @predisable:		[DRIVER] function to run prior to marking buffer
@@ -428,6 +430,7 @@ struct iio_info {
  *			scan mask is valid for the device.
  */
 struct iio_buffer_setup_ops {
+	int (*enable_trigger)(struct iio_dev *);
 	int (*preenable)(struct iio_dev *);
 	int (*postenable)(struct iio_dev *);
 	int (*predisable)(struct iio_dev *);

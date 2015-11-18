@@ -647,6 +647,11 @@ static int iio_verify_update(struct iio_dev *indio_dev,
 	if (insert_buffer)
 		modes &= insert_buffer->access->modes;
 
+	if (indio_dev->setup_ops &&
+	    indio_dev->setup_ops->enable_trigger &&
+	   (indio_dev->setup_ops->enable_trigger(indio_dev) < 0))
+		return -ENXIO;
+
 	/* Definitely possible for devices to support both of these. */
 	if ((modes & INDIO_BUFFER_TRIGGERED) && indio_dev->trig) {
 		config->mode = INDIO_BUFFER_TRIGGERED;
