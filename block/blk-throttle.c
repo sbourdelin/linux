@@ -263,10 +263,11 @@ static void throtl_qnode_add_bio(struct bio *bio, struct throtl_qnode *qn,
  */
 static struct bio *throtl_peek_queued(struct list_head *queued)
 {
-	struct throtl_qnode *qn = list_first_entry(queued, struct throtl_qnode, node);
+	struct throtl_qnode *qn;
 	struct bio *bio;
 
-	if (list_empty(queued))
+	qn = list_first_entry_or_null(queued, struct throtl_qnode, node);
+	if (!qn)
 		return NULL;
 
 	bio = bio_list_peek(&qn->bios);
@@ -291,10 +292,11 @@ static struct bio *throtl_peek_queued(struct list_head *queued)
 static struct bio *throtl_pop_queued(struct list_head *queued,
 				     struct throtl_grp **tg_to_put)
 {
-	struct throtl_qnode *qn = list_first_entry(queued, struct throtl_qnode, node);
+	struct throtl_qnode *qn;
 	struct bio *bio;
 
-	if (list_empty(queued))
+	qn = list_first_entry_or_null(queued, struct throtl_qnode, node);
+	if (!qn)
 		return NULL;
 
 	bio = bio_list_pop(&qn->bios);
