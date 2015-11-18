@@ -70,6 +70,7 @@ static int taos_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
 	struct serio *serio = adapter->algo_data;
 	struct taos_data *taos = serio_get_drvdata(serio);
 	char *p;
+	int err;
 
 	/* Encode our transaction. "@" is for the device address, "$" for the
 	   SMBus command and "#" for the data. */
@@ -130,7 +131,14 @@ static int taos_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
 			return 0;
 	} else {
 		if (p[0] == 'x') {
-			data->byte = simple_strtol(p + 1, NULL, 16);
+			/*
+			 * voluntary dropping error code of kstrtou8 since all
+			 * error code that it could return are invalid according
+			 * to Documentation/i2c/fault-codes
+			 */
+			err = kstrtou8(p + 1, 16, &data->byte);
+			if (err)
+				return -EPROTO;
 			return 0;
 		}
 	}
