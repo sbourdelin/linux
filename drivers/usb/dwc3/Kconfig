@@ -104,4 +104,12 @@ config USB_DWC3_QCOM
 	  Recent Qualcomm SoCs ship with one DesignWare Core USB3 IP inside,
 	  say 'Y' or 'M' if you have one such device.
 
+config USB_DWC3_XILINX
+	tristate "Xilinx ZynqMP Platform"
+	depends on ARCH_ZYNQMP || COMPILE_TEST
+	default USB_DWC3
+	help
+	  Xilinx ZynqMP SOC ship with two DesignWare Core USB3 IPs inside,
+	  say 'Y' or 'M' if you have one such device.
+
 endif
