@@ -27,6 +27,7 @@
 #include <linux/file.h>
 #include <linux/vmalloc.h>
 #include <linux/scif.h>
+#include <linux/list.h>
 #include "../common/mic_dev.h"
 
 #define SCIF_MGMT_NODE 0
