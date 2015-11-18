@@ -1839,8 +1839,10 @@ static void hci_cs_sniff_mode(struct hci_dev *hdev, __u8 status)
 	if (conn) {
 		clear_bit(HCI_CONN_MODE_CHANGE_PEND, &conn->flags);
 
-		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags))
+		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags)) {
+			cancel_delayed_work(&conn->sco_conn_timeout);
 			hci_sco_setup(conn, status);
+		}
 	}
 
 	hci_dev_unlock(hdev);
@@ -1865,9 +1867,10 @@ static void hci_cs_exit_sniff_mode(struct hci_dev *hdev, __u8 status)
 	conn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(cp->handle));
 	if (conn) {
 		clear_bit(HCI_CONN_MODE_CHANGE_PEND, &conn->flags);
-
-		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags))
-			hci_sco_setup(conn, status);
+		if (test_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags))
+			queue_delayed_work(conn->hdev->workqueue,
+					   &conn->sco_conn_timeout,
+					   conn->sco_timeout);
 	}
 
 	hci_dev_unlock(hdev);
@@ -3335,8 +3338,10 @@ static void hci_mode_change_evt(struct hci_dev *hdev, struct sk_buff *skb)
 				clear_bit(HCI_CONN_POWER_SAVE, &conn->flags);
 		}
 
-		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags))
+		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->flags)) {
+			cancel_delayed_work(&conn->sco_conn_timeout);
 			hci_sco_setup(conn, ev->status);
+		}
 	}
 
 	hci_dev_unlock(hdev);

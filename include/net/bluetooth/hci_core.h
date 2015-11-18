@@ -442,6 +442,7 @@ struct hci_conn {
 	__u8		passkey_entered;
 	__u16		disc_timeout;
 	__u16		conn_timeout;
+	__u16		sco_timeout;
 	__u16		setting;
 	__u16		le_conn_min_interval;
 	__u16		le_conn_max_interval;
@@ -472,6 +473,7 @@ struct hci_conn {
 	struct delayed_work disc_work;
 	struct delayed_work auto_accept_work;
 	struct delayed_work idle_work;
+	struct delayed_work sco_conn_timeout;
 	struct delayed_work le_conn_timeout;
 	struct work_struct  le_scan_cleanup;
 
