@@ -12,7 +12,7 @@ executable; scripts wishing to do that should 'use Context.pm'.
 
 The Perl->C perf interface is completely driven by Context.xs.  If you
 want to add new Perl functions that end up accessing C data in the
-perf executable, you add desciptions of the new functions here.
+perf executable, you add descriptions of the new functions here.
 scripting_context is a pointer to the perf data in the perf executable
 that you want to access - it's passed as the second parameter,
 $context, to all handler functions.
