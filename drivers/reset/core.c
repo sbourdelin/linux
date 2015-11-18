@@ -30,7 +30,6 @@ static LIST_HEAD(reset_controller_list);
  */
 struct reset_control {
 	struct reset_controller_dev *rcdev;
-	struct device *dev;
 	unsigned int id;
 };
 
@@ -220,11 +219,7 @@ struct reset_control *reset_control_get(struct device *dev, const char *id)
 	if (!dev)
 		return ERR_PTR(-EINVAL);
 
-	rstc = of_reset_control_get(dev->of_node, id);
-	if (!IS_ERR(rstc))
-		rstc->dev = dev;
-
-	return rstc;
+	return of_reset_control_get(dev->of_node, id);
 }
 EXPORT_SYMBOL_GPL(reset_control_get);
 
