@@ -320,7 +320,7 @@ static inline void m_can_config_endisable(const struct m_can_priv *priv,
 					  bool enable)
 {
 	u32 cccr = m_can_read(priv, M_CAN_CCCR);
-	u32 timeout = 10;
+	u32 timeout = 1000;
 	u32 val = 0;
 
 	if (enable) {
