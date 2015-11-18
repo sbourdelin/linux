@@ -496,7 +496,7 @@
 		};
 	};
 
-	reboot {
+	reset {
 		ap_warm_reset_h: ap-warm-reset-h {
 			rockchip,pins = <RK_GPIO0 13 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
