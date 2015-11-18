@@ -46,6 +46,7 @@ struct tvp5150 {
 	struct regmap *regmap;
 
 	v4l2_std_id norm;	/* Current set standard */
+	v4l2_std_id detected_norm;
 	u32 input;
 	u32 output;
 	int enable;
@@ -1206,13 +1207,19 @@ static int tvp5150_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	struct tvp5150 *decoder = to_tvp5150(sd);
 	v4l2_std_id std;
 
-	if (decoder->norm == V4L2_STD_ALL)
+	if (decoder->norm == V4L2_STD_ALL) {
 		std = tvp5150_read_std(sd);
-	else
-		std = decoder->norm;
+		if (std != decoder->detected_norm) {
+			decoder->detected_norm = std;
 
-	tvp5150_set_default(std, v4l2_subdev_get_try_crop(fh, 0),
-				 v4l2_subdev_get_try_format(fh, 0));
+			if (std & V4L2_STD_525_60)
+				decoder->rect.height = TVP5150_V_MAX_525_60;
+			else
+				decoder->rect.height = TVP5150_V_MAX_OTHERS;
+			decoder->format.height = decoder->rect.height;
+		}
+	}
+
 	return 0;
 }
 
@@ -1420,6 +1427,7 @@ static int tvp5150_probe(struct i2c_client *c,
 	}
 
 	core->norm = V4L2_STD_ALL;	/* Default is autodetect */
+	core->detected_norm = V4L2_STD_UNKNOWN;
 	core->input = TVP5150_COMPOSITE1;
 	core->enable = 1;
 
