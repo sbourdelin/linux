@@ -1,0 +1,18 @@
+Rockchip reboot notifier driver
+
+This driver get reboot mode arguments from userspace
+and stores it in special register. Then the bootloader
+will read it and take different action according the
+argument stored.
+
+Required properties:
+- compatible: should be "rockchip,reboot"
+- regmap: this is phandle to the register map node
+- offset: offset in the register map for the storage register (in bytes)
+
+Examples:
+	reboot {
+	   compatible = "rockchip,reboot";
+	   regmap = <&pmu>;
+	   offset = <0x94>;
+	};
