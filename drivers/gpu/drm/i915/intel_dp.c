@@ -5004,6 +5004,9 @@ intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port, bool long_hpd)
 			goto mst_fail;
 		}
 	} else {
+		if (intel_dig_port->base.type == INTEL_OUTPUT_EDP)
+			intel_psr_irq_hpd(dev);
+
 		if (intel_dp->is_mst) {
 			if (intel_dp_check_mst_status(intel_dp) == -EINVAL)
 				goto mst_fail;
