@@ -147,6 +147,11 @@ ifdef PARSER_DEBUG
   $(call detected_var,PARSER_DEBUG_FLEX)
 endif
 
+ifdef REFCNT_DEBUG
+  CFLAGS += -DREFCNT_DEBUG
+  $(call detected,CONFIG_REFCNT_DEBUG)
+endif
+
 ifndef NO_LIBPYTHON
   # Try different combinations to accommodate systems that only have
   # python[2][-config] in weird combinations but always preferring
