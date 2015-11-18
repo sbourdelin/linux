@@ -4083,6 +4083,7 @@ static int create_one_cdev(struct scsi_tape *tape, int mode, int rew)
 	}
 	cdev->owner = THIS_MODULE;
 	cdev->ops = &st_fops;
+	STm->cdevs[rew] = cdev;
 
 	error = cdev_add(cdev, cdev_devno, 1);
 	if (error) {
@@ -4091,7 +4092,6 @@ static int create_one_cdev(struct scsi_tape *tape, int mode, int rew)
 		pr_err("st%d: Device not attached.\n", dev_num);
 		goto out_free;
 	}
-	STm->cdevs[rew] = cdev;
 
 	i = mode << (4 - ST_NBR_MODE_BITS);
 	snprintf(name, 10, "%s%s%s", rew ? "n" : "",
@@ -4102,6 +4102,7 @@ static int create_one_cdev(struct scsi_tape *tape, int mode, int rew)
 	if (IS_ERR(dev)) {
 		pr_err("st%d: device_create failed\n", dev_num);
 		error = PTR_ERR(dev);
+		STm->devs[rew] = NULL;
 		goto out_free;
 	}
 
