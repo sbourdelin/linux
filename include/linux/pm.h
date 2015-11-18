@@ -702,11 +702,17 @@ extern int dpm_suspend_late(pm_message_t state);
 extern int dpm_suspend(pm_message_t state);
 extern int dpm_prepare(pm_message_t state);
 
-extern void __suspend_report_result(const char *function, void *fn, int ret);
+extern void __suspend_report_result(const char *function, void *fn, int ret,
+				    bool runtime_pm);
 
 #define suspend_report_result(fn, ret)					\
 	do {								\
-		__suspend_report_result(__func__, fn, ret);		\
+		__suspend_report_result(__func__, fn, ret, false);	\
+	} while (0)
+
+#define rpm_suspend_report_result(fn, ret)				\
+	do {								\
+		__suspend_report_result(__func__, fn, ret, true);	\
 	} while (0)
 
 extern int device_pm_wait_for_dev(struct device *sub, struct device *dev);
