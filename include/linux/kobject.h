@@ -172,8 +172,10 @@ struct kset {
 	const struct kset_uevent_ops *uevent_ops;
 };
 
-extern void kset_init(struct kset *kset);
-extern int __must_check kset_register(struct kset *kset);
+extern void kset_init(struct kset *kset, struct kobj_type *ktype,
+		const struct kset_uevent_ops *uevent_ops);
+extern int __must_check kset_register(struct kset *kset, const char *name,
+				struct kobject *parent_kobj);
 extern void kset_unregister(struct kset *kset);
 extern struct kset * __must_check kset_create_and_add(const char *name,
 						const struct kset_uevent_ops *u,
