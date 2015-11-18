@@ -813,29 +813,37 @@ intel_check_sprite_plane(struct drm_plane *plane,
 	crtc_h = drm_rect_height(dst);
 
 	if (state->visible) {
-		/* check again in case clipping clamped the results */
-		hscale = drm_rect_calc_hscale(src, dst, min_scale, max_scale);
-		if (hscale < 0) {
-			DRM_DEBUG_KMS("Horizontal scaling factor out of limits\n");
-			drm_rect_debug_print("src: ", src, true);
-			drm_rect_debug_print("dst: ", dst, false);
 
-			return hscale;
+		/* Gen 9 and above has fractional scaling support */
+		if (INTEL_INFO(plane->dev)->gen < 9) {
+
+			/* check again in case clipping clamped the results */
+			hscale = drm_rect_calc_hscale(src, dst, min_scale, max_scale);
+			if (hscale < 0) {
+				DRM_DEBUG_KMS("Horizontal scaling factor out of limits\n");
+				drm_rect_debug_print("src: ", src, true);
+				drm_rect_debug_print("dst: ", dst, false);
+
+				return hscale;
+			}
+
+			vscale = drm_rect_calc_vscale(src, dst, min_scale, max_scale);
+			if (vscale < 0) {
+				DRM_DEBUG_KMS("Vertical scaling factor out of limits\n");
+				drm_rect_debug_print("src: ", src, true);
+				drm_rect_debug_print("dst: ", dst, false);
+
+				return vscale;
+			}
+
+			/*
+			 * Make the source viewport size an exact
+			 * multiple of the scaling factors.
+			 */
+			drm_rect_adjust_size(src,
+					     drm_rect_width(dst) * hscale - drm_rect_width(src),
+					     drm_rect_height(dst) * vscale - drm_rect_height(src));
 		}
-
-		vscale = drm_rect_calc_vscale(src, dst, min_scale, max_scale);
-		if (vscale < 0) {
-			DRM_DEBUG_KMS("Vertical scaling factor out of limits\n");
-			drm_rect_debug_print("src: ", src, true);
-			drm_rect_debug_print("dst: ", dst, false);
-
-			return vscale;
-		}
-
-		/* Make the source viewport size an exact multiple of the scaling factors. */
-		drm_rect_adjust_size(src,
-				     drm_rect_width(dst) * hscale - drm_rect_width(src),
-				     drm_rect_height(dst) * vscale - drm_rect_height(src));
 
 		drm_rect_rotate_inv(src, fb->width << 16, fb->height << 16,
 				    state->base.rotation);
