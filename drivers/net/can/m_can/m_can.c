@@ -269,6 +269,8 @@ enum m_can_mram_cfg {
 #define TX_BUF_XTD		BIT(30)
 #define TX_BUF_RTR		BIT(29)
 
+#define AT91_CAN_CLK_FREQ	20000000
+
 /* address offset and element number for each FIFO/Buffer in the Message RAM */
 struct mram_cfg {
 	u16 off;
@@ -1188,7 +1190,7 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	struct m_can_priv *priv;
 	struct resource *res;
 	void __iomem *addr;
-	struct clk *hclk, *cclk;
+	struct clk *hclk, *cclk, *upll_clk;
 	int irq, ret;
 
 	hclk = devm_clk_get(&pdev->dev, "hclk");
@@ -1196,6 +1198,18 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	if (IS_ERR(hclk) || IS_ERR(cclk)) {
 		dev_err(&pdev->dev, "no clock find\n");
 		return -ENODEV;
+	}
+
+	upll_clk = devm_clk_get(&pdev->dev, "upllclk");
+	if (!IS_ERR(upll_clk)) {
+		ret = clk_set_parent(cclk, upll_clk);
+		if (!ret) {
+			ret = clk_set_rate(cclk, AT91_CAN_CLK_FREQ);
+			if (ret) {
+				dev_err(&pdev->dev, "failed to set gck\n");
+				return -ENODEV;
+			}
+		}
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "m_can");
