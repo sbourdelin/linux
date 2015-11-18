@@ -138,7 +138,7 @@ void map__init(struct map *map, enum map_type type,
 	RB_CLEAR_NODE(&map->rb_node);
 	map->groups   = NULL;
 	map->erange_warned = false;
-	atomic_set(&map->refcnt, 1);
+	refcnt__init(map, refcnt);
 }
 
 struct map *map__new(struct machine *machine, u64 start, u64 len,
@@ -241,6 +241,7 @@ bool __map__is_kernel(const struct map *map)
 static void map__exit(struct map *map)
 {
 	BUG_ON(!RB_EMPTY_NODE(&map->rb_node));
+	refcnt__exit(map, refcnt);
 	dso__zput(map->dso);
 }
 
@@ -252,7 +253,7 @@ void map__delete(struct map *map)
 
 void map__put(struct map *map)
 {
-	if (map && atomic_dec_and_test(&map->refcnt))
+	if (map && refcnt__put(map, refcnt))
 		map__delete(map);
 }
 
@@ -353,7 +354,7 @@ struct map *map__clone(struct map *from)
 	struct map *map = memdup(from, sizeof(*map));
 
 	if (map != NULL) {
-		atomic_set(&map->refcnt, 1);
+		refcnt__init(map, refcnt);
 		RB_CLEAR_NODE(&map->rb_node);
 		dso__get(map->dso);
 		map->groups = NULL;
