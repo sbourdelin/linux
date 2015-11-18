@@ -293,12 +293,6 @@
 		{.base = xbase, .num_regs = xregs,	      \
 		 .mask = xmask }) }
 
-#define SND_SOC_BYTES_EXT(xname, xcount, xhandler_get, xhandler_put) \
-{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
-	.info = snd_soc_bytes_info_ext, \
-	.get = xhandler_get, .put = xhandler_put, \
-	.private_value = (unsigned long)&(struct soc_bytes_ext) \
-		{.max = xcount} }
 #define SND_SOC_BYTES_TLV(xname, xcount, xhandler_get, xhandler_put) \
 {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
 	.access = SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE | \
