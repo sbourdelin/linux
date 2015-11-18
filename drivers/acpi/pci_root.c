@@ -419,7 +419,7 @@ out:
 }
 EXPORT_SYMBOL(acpi_pci_osc_control_set);
 
-static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
+static void negotiate_os_control(struct acpi_pci_root *root)
 {
 	u32 support, control, requested;
 	acpi_status status;
@@ -456,7 +456,7 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
 	if (ACPI_FAILURE(status)) {
 		dev_info(&device->dev, "_OSC failed (%s); disabling ASPM\n",
 			 acpi_format_exception(status));
-		*no_aspm = 1;
+		pcie_no_aspm();
 		return;
 	}
 
@@ -495,22 +495,14 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
 			 * intact and prevent the OS from touching it.
 			 */
 			dev_info(&device->dev, "FADT indicates ASPM is unsupported, using BIOS configuration\n");
-			*no_aspm = 1;
+			pcie_no_aspm();
 		}
 	} else {
 		decode_osc_control(root, "OS requested", requested);
 		decode_osc_control(root, "platform willing to grant", control);
 		dev_info(&device->dev, "_OSC failed (%s); disabling ASPM\n",
 			acpi_format_exception(status));
-
-		/*
-		 * We want to disable ASPM here, but aspm_disabled
-		 * needs to remain in its state from boot so that we
-		 * properly handle PCIe 1.1 devices.  So we set this
-		 * flag here, to defer the action until after the ACPI
-		 * root scan.
-		 */
-		*no_aspm = 1;
+		pcie_no_aspm();
 	}
 }
 
@@ -522,7 +514,6 @@ static int acpi_pci_root_add(struct acpi_device *device,
 	int result;
 	struct acpi_pci_root *root;
 	acpi_handle handle = device->handle;
-	int no_aspm = 0;
 	bool hotadd = system_state != SYSTEM_BOOTING;
 
 	root = kzalloc(sizeof(struct acpi_pci_root), GFP_KERNEL);
@@ -581,7 +572,7 @@ static int acpi_pci_root_add(struct acpi_device *device,
 
 	root->mcfg_addr = acpi_pci_root_get_mcfg_addr(handle);
 
-	negotiate_os_control(root, &no_aspm);
+	negotiate_os_control(root);
 
 	/*
 	 * TBD: Need PCI interface for enumeration/configuration of roots.
@@ -603,9 +594,6 @@ static int acpi_pci_root_add(struct acpi_device *device,
 		result = -ENODEV;
 		goto remove_dmar;
 	}
-
-	if (no_aspm)
-		pcie_no_aspm();
 
 	pci_acpi_add_bus_pm_notifier(device);
 	if (device->wakeup.flags.run_wake)

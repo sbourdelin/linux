@@ -954,6 +954,7 @@ void pcie_no_aspm(void)
 	if (!aspm_force) {
 		aspm_policy = POLICY_DEFAULT;
 		aspm_disabled = 1;
+		aspm_support_enabled = false;
 	}
 }
 
