@@ -202,6 +202,12 @@
 		method = "smc";
 	};
 
+	reboot {
+		compatible = "rockchip,reboot";
+		rockchip,regmap = <&pmugrf>;
+		offset = <0x200>;
+	};
+
 	timer {
 		compatible = "arm,armv8-timer";
 		interrupts = <GIC_PPI 13
