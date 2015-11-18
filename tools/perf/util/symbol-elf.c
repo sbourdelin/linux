@@ -1045,6 +1045,8 @@ int dso__load_sym(struct dso *dso, struct map *map,
 				/* kmaps already got it */
 				map__put(curr_map);
 				dsos__add(&map->groups->machine->dsos, curr_dso);
+				/* curr_map and machine->dsos already got it */
+				dso__put(curr_dso);
 				dso__set_loaded(curr_dso, map->type);
 			} else
 				curr_dso = curr_map->dso;
