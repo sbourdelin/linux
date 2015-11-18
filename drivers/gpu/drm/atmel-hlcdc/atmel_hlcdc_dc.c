@@ -733,7 +733,7 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
 	if (!ddev)
 		return -ENOMEM;
 
-	ret = drm_dev_set_unique(ddev, dev_name(ddev->dev));
+	ret = drm_dev_set_unique(ddev, "%s", dev_name(ddev->dev));
 	if (ret)
 		goto err_unref;
 

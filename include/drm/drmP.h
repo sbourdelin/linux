@@ -1049,6 +1049,7 @@ void drm_dev_ref(struct drm_device *dev);
 void drm_dev_unref(struct drm_device *dev);
 int drm_dev_register(struct drm_device *dev, unsigned long flags);
 void drm_dev_unregister(struct drm_device *dev);
+__printf(2, 3)
 int drm_dev_set_unique(struct drm_device *dev, const char *fmt, ...);
 
 struct drm_minor *drm_minor_acquire(unsigned int minor_id);
