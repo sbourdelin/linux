@@ -75,6 +75,7 @@
 		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-parent = <&gic>;
 		clocks = <&dpll_mpu_m2_ck>;
+		status = "disabled";
 	};
 
 	local_timer: timer@48240600 {
@@ -83,6 +84,7 @@
 		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-parent = <&gic>;
 		clocks = <&dpll_mpu_m2_ck>;
+		status = "disabled";
 	};
 
 	l2-cache-controller@48242000 {
