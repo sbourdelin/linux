@@ -657,33 +657,50 @@ static int wm5102_adsp_power_ev(struct snd_soc_dapm_widget *w,
 	return wm_adsp2_early_event(w, kcontrol, event);
 }
 
+#define WM5102_OUT_COMP_SZ 2
+
 static int wm5102_out_comp_coeff_get(struct snd_kcontrol *kcontrol,
-				     struct snd_ctl_elem_value *ucontrol)
+			unsigned int __user *data, unsigned int size)
 {
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct arizona *arizona = dev_get_drvdata(codec->dev->parent);
+	u16 buff;
+	int ret = 0;
+
+	if (size > WM5102_OUT_COMP_SZ)
+		return -EINVAL;
 
 	mutex_lock(&arizona->dac_comp_lock);
-	put_unaligned_be16(arizona->dac_comp_coeff,
-			   ucontrol->value.bytes.data);
+	put_unaligned_be16(arizona->dac_comp_coeff, &buff);
+	if (copy_to_user(data, &buff, sizeof(buff)))
+		ret = -EFAULT;
+
 	mutex_unlock(&arizona->dac_comp_lock);
 
-	return 0;
+	return ret;
 }
 
 static int wm5102_out_comp_coeff_put(struct snd_kcontrol *kcontrol,
-				     struct snd_ctl_elem_value *ucontrol)
+			const unsigned int __user *data, unsigned int size)
 {
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct arizona *arizona = dev_get_drvdata(codec->dev->parent);
+	int ret = 0;
+
+	if (size > WM5102_OUT_COMP_SZ)
+		return -EINVAL;
 
 	mutex_lock(&arizona->dac_comp_lock);
-	memcpy(&arizona->dac_comp_coeff, ucontrol->value.bytes.data,
-	       sizeof(arizona->dac_comp_coeff));
+	if (copy_from_user(&arizona->dac_comp_coeff, data, size)) {
+		ret = -EFAULT;
+		goto exit;
+	}
 	arizona->dac_comp_coeff = be16_to_cpu(arizona->dac_comp_coeff);
+
+exit:
 	mutex_unlock(&arizona->dac_comp_lock);
 
-	return 0;
+	return ret;
 }
 
 static int wm5102_out_comp_switch_get(struct snd_kcontrol *kcontrol,
@@ -939,7 +956,7 @@ SOC_SINGLE_TLV("Noise Gate Threshold Volume", ARIZONA_NOISE_GATE_CONTROL,
 	       ARIZONA_NGATE_THR_SHIFT, 7, 1, ng_tlv),
 SOC_ENUM("Noise Gate Hold", arizona_ng_hold),
 
-SND_SOC_BYTES_EXT("Output Compensation Coefficient", 2,
+SND_SOC_BYTES_TLV("Output Compensation Coefficient", WM5102_OUT_COMP_SZ,
 		  wm5102_out_comp_coeff_get, wm5102_out_comp_coeff_put),
 
 SOC_SINGLE_EXT("Output Compensation Switch", 0, 0, 1, 0,
