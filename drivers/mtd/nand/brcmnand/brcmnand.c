@@ -2238,16 +2238,20 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 			struct brcmnand_host *host;
 
 			host = devm_kzalloc(dev, sizeof(*host), GFP_KERNEL);
-			if (!host)
+			if (!host) {
+				of_node_put(child);
 				return -ENOMEM;
+			}
 			host->pdev = pdev;
 			host->ctrl = ctrl;
 			host->of_node = child;
 
 			ret = brcmnand_init_cs(host);
-			if (ret)
+			if (ret) {
+				devm_kfree(dev, host);
 				continue; /* Try all chip-selects */
-
+			}
+			of_node_get(child);
 			list_add_tail(&host->node, &ctrl->host_list);
 		}
 	}
@@ -2265,8 +2269,10 @@ int brcmnand_remove(struct platform_device *pdev)
 	struct brcmnand_controller *ctrl = dev_get_drvdata(&pdev->dev);
 	struct brcmnand_host *host;
 
-	list_for_each_entry(host, &ctrl->host_list, node)
+	list_for_each_entry(host, &ctrl->host_list, node) {
+		of_node_put(host->of_node);
 		nand_release(&host->mtd);
+	}
 
 	dev_set_drvdata(&pdev->dev, NULL);
 
