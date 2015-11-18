@@ -356,6 +356,41 @@ static void __init dmi_save_extended_devices(const struct dmi_header *dm)
 	dmi_save_one_device(*d & 0x7f, dmi_string_nosave(dm, *(d - 1)));
 }
 
+static void __init dmi_save_dev_slot(int instance, int segment, int bus, int devfn, const char *name)
+{
+	struct dmi_dev_onboard *slot;
+
+	slot = dmi_alloc(sizeof(*slot) + strlen(name) + 1);
+	if (!slot) {
+		printk(KERN_ERR "dmi_save_system_slot: out of memory.\n");
+		return;
+	}
+	slot->instance = instance;
+	slot->segment = segment;
+	slot->bus = bus;
+	slot->devfn = devfn;
+
+	strcpy((char *)&slot[1], name);
+	slot->dev.type = DMI_DEV_TYPE_SYSTEM_SLOT;
+	slot->dev.name = (char *)&slot[1];
+	slot->dev.device_data = slot;
+
+	list_add(&slot->dev.list, &dmi_devices);
+}
+
+
+static void __init dmi_save_system_slot(const struct dmi_header *dm)
+{
+	const char *name;
+	const u8 *d = (u8*)dm;
+
+	if (dm->type == DMI_ENTRY_SYSTEM_SLOT && dm->length >= 0x11) {
+		name = dmi_string_nosave(dm, *(d + 0x04));
+		dmi_save_dev_slot(*(u16 *)(d + 0x09), *(u16 *)(d + 0xD),
+				  *(d + 0xF), *(d + 0x10), name);
+	}
+}
+
 static void __init count_mem_devices(const struct dmi_header *dm, void *v)
 {
 	if (dm->type != DMI_ENTRY_MEM_DEVICE)
@@ -437,6 +472,10 @@ static void __init dmi_decode(const struct dmi_header *dm, void *dummy)
 		break;
 	case 41:	/* Onboard Devices Extended Information */
 		dmi_save_extended_devices(dm);
+		break;
+	case 9:         /* System Slots */
+		dmi_save_system_slot(dm);
+		break;
 	}
 }
 
