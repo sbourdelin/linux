@@ -13705,6 +13705,9 @@ intel_check_primary_plane(struct drm_plane *plane,
 	int min_scale = DRM_PLANE_HELPER_NO_SCALING;
 	int max_scale = DRM_PLANE_HELPER_NO_SCALING;
 	bool can_position = false;
+	struct drm_rect *src = &state->src;
+	struct drm_rect *dest = &state->dst;
+	int ret = -1;
 
 	/* use scaler when colorkey is not required */
 	if (INTEL_INFO(plane->dev)->gen >= 9 &&
@@ -13714,11 +13717,26 @@ intel_check_primary_plane(struct drm_plane *plane,
 		can_position = true;
 	}
 
-	return drm_plane_helper_check_update(plane, crtc, fb, &state->src,
-					     &state->dst, &state->clip,
+	/*
+	 * FIXME the following code does a bunch of fuzzy adjustments to the
+	 * coordinates and sizes for rotations. We probably need some way to
+	 * decide whether more strict checking should be done instead.
+	 */
+	if (fb)
+		drm_rect_rotate(src, fb->width << 16, fb->height << 16,
+				state->base.rotation);
+
+	ret = drm_plane_helper_check_update(plane, crtc, fb, src,
+					     dest, &state->clip,
 					     min_scale, max_scale,
 					     can_position, true,
 					     &state->visible);
+
+	/* Restore the originl unrotated co-ordinates */
+	if (fb)
+		drm_rect_rotate_inv(src, fb->width << 16, fb->height << 16,
+				    state->base.rotation);
+	return ret;
 }
 
 static void
