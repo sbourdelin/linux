@@ -183,7 +183,6 @@ static int aim_close(struct inode *inode, struct file *filp)
 static ssize_t aim_write(struct file *filp, const char __user *buf,
 			 size_t count, loff_t *offset)
 {
-	int ret, err;
 	size_t actual_len;
 	size_t max_len;
 	ssize_t retval;
@@ -202,8 +201,8 @@ static ssize_t aim_write(struct file *filp, const char __user *buf,
 	}
 
 	if (unlikely(!c->dev)) {
-		err = -EPIPE;
-		goto error;
+		mutex_unlock(&c->io_mutex);
+		return -EPIPE;
 	}
 
 	max_len = c->cfg->buffer_size;
@@ -212,23 +211,14 @@ static ssize_t aim_write(struct file *filp, const char __user *buf,
 
 	retval = copy_from_user(mbo->virt_address, buf, mbo->buffer_length);
 	if (retval) {
-		err = -EIO;
-		goto error;
+		most_put_mbo(mbo);
+		mutex_unlock(&c->io_mutex);
+		return -EIO;
 	}
 
-	ret = most_submit_mbo(mbo);
-	if (ret) {
-		pr_info("submitting MBO to core failed\n");
-		err = ret;
-		goto error;
-	}
+	most_submit_mbo(mbo);
 	mutex_unlock(&c->io_mutex);
 	return actual_len - retval;
-error:
-	if (mbo)
-		most_put_mbo(mbo);
-	mutex_unlock(&c->io_mutex);
-	return err;
 }
 
 /**
