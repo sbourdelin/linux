@@ -2021,8 +2021,8 @@ static ssize_t bcm2048_##prop##_read(struct device *dev,		\
 }
 
 #define DEFINE_SYSFS_PROPERTY(prop, signal, size, mask, check)		\
-property_write(prop, signal size, mask, check)				\
-property_read(prop, size, mask)
+(property_write(prop, signal size, mask, check)				\
+property_read(prop, size, mask))
 
 #define property_str_read(prop, size)					\
 static ssize_t bcm2048_##prop##_read(struct device *dev,		\
