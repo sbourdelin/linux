@@ -429,7 +429,6 @@ static int pkt_sysfs_init(void)
 	class_pktcdvd->class_attrs = class_pktcdvd_attrs;
 	ret = class_register(class_pktcdvd);
 	if (ret) {
-		kfree(class_pktcdvd);
 		class_pktcdvd = NULL;
 		pr_err("failed to create class pktcdvd\n");
 		return ret;

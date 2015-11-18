@@ -662,7 +662,6 @@ static int osdblk_sysfs_init(void)
 
 	ret = class_register(class_osdblk);
 	if (ret) {
-		kfree(class_osdblk);
 		class_osdblk = NULL;
 		printk(PFX "failed to create class osdblk\n");
 		return ret;

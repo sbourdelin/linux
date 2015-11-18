@@ -189,8 +189,11 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 	pr_debug("device class '%s': registering\n", cls->name);
 
 	cp = kzalloc(sizeof(*cp), GFP_KERNEL);
-	if (!cp)
+	if (!cp) {
+		if (cls->class_release)
+			cls->class_release(cls);
 		return -ENOMEM;
+	}
 	klist_init(&cp->klist_devices, klist_class_dev_get, klist_class_dev_put);
 	INIT_LIST_HEAD(&cp->interfaces);
 	kset_init(&cp->glue_dirs, &glue_dirs_ktype, NULL);
@@ -213,12 +216,6 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 
 	error = kset_register(&cp->subsys, cls->name, NULL);
 	if (error) {
-		/*
-		 * class->release() would be called by cp->subsys'
-		 * release function. Prevent this from happening in
-		 * the error case by zeroing cp->class out.
-		 */
-		cp->class = NULL;
 		cls->p = NULL;
 		kset_put(&cp->subsys);
 		return error;
@@ -226,8 +223,6 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 	error = add_class_attrs(class_get(cls));
 	class_put(cls);
 	if (error) {
-		/* as above, clear cp->class on error */
-		cp->class = NULL;
 		cls->p = NULL;
 		kset_put(&cp->subsys);
 	}
@@ -285,7 +280,6 @@ struct class *__class_create(struct module *owner, const char *name,
 	return cls;
 
 error:
-	kfree(cls);
 	return ERR_PTR(retval);
 }
 EXPORT_SYMBOL_GPL(__class_create);

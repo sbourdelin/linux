@@ -797,7 +797,6 @@ struct pvr2_sysfs_class *pvr2_sysfs_class_create(void)
 	if (class_register(&clp->class)) {
 		pvr2_sysfs_trace(
 			"Registration failed for pvr2_sysfs_class id=%p",clp);
-		kfree(clp);
 		clp = NULL;
 	}
 	return clp;
