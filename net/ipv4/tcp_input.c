@@ -5904,11 +5904,16 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			break;
 		}
 
-		if (tp->linger2 < 0 ||
-		    (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
-		     after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt))) {
-			tcp_done(sk);
+		if (tp->linger2 < 0) {
 			NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPABORTONDATA);
+			tcp_done(sk);
+			return 1;
+		}
+
+		if (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
+		    after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt)) {
+			NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPABORTONDATA);
+			tcp_time_wait(sk, TCP_TIME_WAIT, 0);
 			return 1;
 		}
 
@@ -5966,7 +5971,13 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			if (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
 			    after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt)) {
 				NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPABORTONDATA);
-				tcp_reset(sk);
+
+				if (sk->sk_state == TCP_CLOSE_WAIT ||
+				    sk->sk_state == TCP_LAST_ACK)
+					tcp_reset(sk);
+				else
+					tcp_time_wait(sk, TCP_TIME_WAIT, 0);
+
 				return 1;
 			}
 		}
