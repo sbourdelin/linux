@@ -225,6 +225,12 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 	}
 	error = add_class_attrs(class_get(cls));
 	class_put(cls);
+	if (error) {
+		/* as above, clear cp->class on error */
+		cp->class = NULL;
+		cls->p = NULL;
+		kset_put(&cp->subsys);
+	}
 	return error;
 }
 EXPORT_SYMBOL_GPL(__class_register);
