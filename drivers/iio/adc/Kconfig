@@ -187,6 +187,9 @@ config INA2XX_IIO
 	tristate "Texas Instruments INA2xx Power Monitors IIO driver"
 	depends on I2C
 	select REGMAP_I2C
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	select IIO_HRTIMER_TRIGGER
 	help
 	  Say yes here to build support for TI INA2xx familly Power Monitors.
 

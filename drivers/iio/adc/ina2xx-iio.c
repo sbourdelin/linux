@@ -28,6 +28,10 @@
 
 #include <linux/util_macros.h>
 
+#include <linux/iio/buffer.h>
+#include <linux/iio/trigger_consumer.h>
+#include <linux/iio/triggered_buffer.h>
+
 /*
  * INA2XX registers definition
  */
@@ -294,6 +298,10 @@ static int ina2xx_write_raw(struct iio_dev *indio_dev,
 	case IIO_CHAN_INFO_SAMP_FREQ:
 
 		ret = ina226_set_frequency(chip, val, &tmp);
+
+		trace_printk("Enabling buffer w/ freq = %d, avg =%u, period= %u\n",
+                    chip->freq, chip->avg, chip->period_us );
+
 		break;
 
 	default:
@@ -377,6 +385,58 @@ static int ina2xx_debug_reg(struct iio_dev *indio_dev,
 		return regmap_write(chip->regmap, reg, writeval);
 
 	return regmap_read(chip->regmap, reg, readval);
+}
+
+static s64 prev_ns;
+
+static irqreturn_t ina2xx_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct ina2xx_chip_info *chip = iio_priv(indio_dev);
+	unsigned short data[8];
+	int bit, ret = 0, i = 0;
+
+	unsigned long buffer_us = 0, elapsed_us = 0;
+	s64 time_a, time_b;
+
+	time_a = iio_get_time_ns();
+
+	/* Single register reads: bulk_read will not work with ina226
+	* as there is no auto-increment of the address register for
+	* data length longer than 16bits.
+	*/
+	for_each_set_bit(bit, indio_dev->active_scan_mask,
+					indio_dev->masklength) {
+		unsigned int val;
+
+		ret = regmap_read(chip->regmap,
+				  INA2XX_SHUNT_VOLTAGE + bit, &val);
+		if (ret < 0)
+			goto _err;
+
+		data[i++] = val;
+	}
+
+	time_b = iio_get_time_ns();
+
+	iio_push_to_buffers_with_timestamp(indio_dev, (unsigned int *)data,
+					   time_b);
+
+	buffer_us = (unsigned long)(time_b - time_a) / 1000;
+	elapsed_us = (unsigned long)(time_a - prev_ns) / 1000;
+
+	/* delais in uS */
+	trace_printk("T[k]-T[k_1] = %lu, xfer %lu", elapsed_us, buffer_us);
+
+	ret = IRQ_HANDLED;
+
+        prev_ns = time_a;
+
+_err:
+	iio_trigger_notify_done(indio_dev->trig);
+
+	return ret;
 }
 
 /* frequencies matching the cummulated integration times for vshunt and vbus */
@@ -486,8 +546,21 @@ static int ina2xx_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
+	ret = iio_triggered_buffer_setup(indio_dev, NULL,
+					&ina2xx_trigger_handler, NULL);
+	if (ret)
+		return ret;
+
 	return devm_iio_device_register(&client->dev, indio_dev);
 }
+
+static int ina2xx_remove(struct i2c_client *client)
+{
+	iio_triggered_buffer_cleanup(dev_get_drvdata(&client->dev));
+
+	return 0;
+}
+
 
 static const struct i2c_device_id ina2xx_id[] = {
 	{"ina219", ina219},
@@ -505,6 +578,7 @@ static struct i2c_driver ina2xx_driver = {
 		   .name = KBUILD_MODNAME,
 		   },
 	.probe = ina2xx_probe,
+	.remove = ina2xx_remove,
 	.id_table = ina2xx_id,
 };
 
