@@ -456,6 +456,23 @@ static int blkif_ioctl(struct block_device *bdev, fmode_t mode,
 	return 0;
 }
 
+static unsigned long blkif_ring_get_request(struct blkfront_info *info,
+					    struct request *req,
+					    struct blkif_request **ring_req)
+{
+	unsigned long id;
+
+	*ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
+	info->ring.req_prod_pvt++;
+
+	id = get_id_from_freelist(info);
+	info->shadow[id].request = req;
+
+	(*ring_req)->u.rw.id = id;
+
+	return id;
+}
+
 static int blkif_queue_discard_req(struct request *req)
 {
 	struct blkfront_info *info = req->rq_disk->private_data;
@@ -463,9 +480,7 @@ static int blkif_queue_discard_req(struct request *req)
 	unsigned long id;
 
 	/* Fill out a communications ring structure. */
-	ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
-	id = get_id_from_freelist(info);
-	info->shadow[id].request = req;
+	id = blkif_ring_get_request(info, req, &ring_req);
 
 	ring_req->operation = BLKIF_OP_DISCARD;
 	ring_req->u.discard.nr_sectors = blk_rq_sectors(req);
@@ -475,8 +490,6 @@ static int blkif_queue_discard_req(struct request *req)
 		ring_req->u.discard.flag = BLKIF_DISCARD_SECURE;
 	else
 		ring_req->u.discard.flag = 0;
-
-	info->ring.req_prod_pvt++;
 
 	/* Keep a private copy so we can reissue requests when recovering. */
 	info->shadow[id].req = *ring_req;
@@ -613,9 +626,7 @@ static int blkif_queue_rw_req(struct request *req)
 		new_persistent_gnts = 0;
 
 	/* Fill out a communications ring structure. */
-	ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
-	id = get_id_from_freelist(info);
-	info->shadow[id].request = req;
+	id = blkif_ring_get_request(info, req, &ring_req);
 
 	BUG_ON(info->max_indirect_segments == 0 &&
 	       GREFS(req->nr_phys_segments) > BLKIF_MAX_SEGMENTS_PER_REQUEST);
@@ -628,7 +639,6 @@ static int blkif_queue_rw_req(struct request *req)
 	for_each_sg(info->shadow[id].sg, sg, num_sg, i)
 	       num_grant += gnttab_count_grant(sg->offset, sg->length);
 
-	ring_req->u.rw.id = id;
 	info->shadow[id].num_sg = num_sg;
 	if (num_grant > BLKIF_MAX_SEGMENTS_PER_REQUEST) {
 		/*
@@ -693,8 +703,6 @@ static int blkif_queue_rw_req(struct request *req)
 	}
 	if (setup.segments)
 		kunmap_atomic(setup.segments);
-
-	info->ring.req_prod_pvt++;
 
 	/* Keep a private copy so we can reissue requests when recovering. */
 	info->shadow[id].req = *ring_req;
