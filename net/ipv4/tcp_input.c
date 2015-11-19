@@ -72,6 +72,7 @@
 #include <net/dst.h>
 #include <net/tcp.h>
 #include <net/inet_common.h>
+#include <net/l3mdev.h>
 #include <linux/ipsec.h>
 #include <asm/unaligned.h>
 #include <linux/errqueue.h>
@@ -6187,7 +6188,8 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	tcp_openreq_init(req, &tmp_opt, skb, sk);
 
 	/* Note: tcp_v6_init_req() might override ir_iif for link locals */
-	inet_rsk(req)->ir_iif = sk->sk_bound_dev_if;
+	inet_rsk(req)->ir_iif = sk->sk_bound_dev_if ? :
+			l3mdev_master_ifindex_by_index(sock_net(sk), skb->skb_iif);
 
 	af_ops->init_req(req, sk, skb);
 
