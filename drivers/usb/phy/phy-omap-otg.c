@@ -105,11 +105,12 @@ static int omap_otg_probe(struct platform_device *pdev)
 	extcon = extcon_get_extcon_dev(config->extcon);
 	if (!extcon)
 		return -EPROBE_DEFER;
-	otg_dev->extcon = extcon;
 
 	otg_dev = devm_kzalloc(&pdev->dev, sizeof(*otg_dev), GFP_KERNEL);
 	if (!otg_dev)
 		return -ENOMEM;
+
+	otg_dev->extcon = extcon;
 
 	otg_dev->base = devm_ioremap_resource(&pdev->dev, &pdev->resource[0]);
 	if (IS_ERR(otg_dev->base))
