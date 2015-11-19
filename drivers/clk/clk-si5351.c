@@ -1091,6 +1091,11 @@ static int si5351_clkout_set_rate(struct clk_hw *hw, unsigned long rate,
 	si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
 			SI5351_CLK_POWERDOWN, 0);
 
+	/* do a pll soft reset on both plls, needed in some cases to get all
+	 * outputs running */
+	si5351_reg_write(hwdata->drvdata, SI5351_PLL_RESET,
+			 SI5351_PLL_RESET_A | SI5351_PLL_RESET_B);
+
 	dev_dbg(&hwdata->drvdata->client->dev,
 		"%s - %s: rdiv = %u, parent_rate = %lu, rate = %lu\n",
 		__func__, clk_hw_get_name(hw), (1 << rdiv),
@@ -1357,6 +1362,14 @@ static int si5351_i2c_probe(struct i2c_client *client,
 	if (IS_ERR(drvdata->regmap)) {
 		dev_err(&client->dev, "failed to allocate register map\n");
 		return PTR_ERR(drvdata->regmap);
+	}
+
+	/* Disable outputs */
+	si5351_reg_write(drvdata, SI5351_OUTPUT_ENABLE_CTRL, 0xff);
+
+	/* Power down all output drivers */
+	for (n = 0; n < 8; n++) {
+		si5351_reg_write(drvdata, SI5351_CLK0_CTRL + n, 0x80);
 	}
 
 	/* Disable interrupts */
