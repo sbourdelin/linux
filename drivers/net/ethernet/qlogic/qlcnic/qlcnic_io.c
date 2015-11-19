@@ -368,6 +368,16 @@ static void qlcnic_send_filter(struct qlcnic_adapter *adapter,
 #define QLCNIC_ENCAP_DO_L3_CSUM		BIT_4
 #define QLCNIC_ENCAP_DO_L4_CSUM		BIT_5
 
+static const struct skb_csum_offl_spec csum_offl_encap_spec = {
+	.ipv4_okay = 1,
+	.ip_options_okay = 1,
+	.vlan_okay = 1,
+	.tcp_okay = 1,
+	.udp_okay = 1,
+	.encap_okay = 1,
+	.no_not_encapped = 1,
+};
+
 static int qlcnic_tx_encap_pkt(struct qlcnic_adapter *adapter,
 			       struct cmd_desc_type0 *first_desc,
 			       struct sk_buff *skb,
@@ -378,6 +388,7 @@ static int qlcnic_tx_encap_pkt(struct qlcnic_adapter *adapter,
 	u32 producer = tx_ring->producer;
 	struct cmd_desc_type0 *hwdesc;
 	u16 flags = 0, encap_descr = 0;
+	bool csum_encapped;
 
 	opcode = QLCNIC_TX_ETHER_PKT;
 	encap_descr = QLCNIC_ENCAP_VXLAN_PKT;
@@ -423,7 +434,8 @@ static int qlcnic_tx_encap_pkt(struct qlcnic_adapter *adapter,
 		adapter->stats.encap_lso_frames++;
 
 		opcode = QLCNIC_TX_ENCAP_LSO;
-	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
+	} else if (skb_csum_offload_chk(skb, &csum_offl_encap_spec,
+					&csum_encapped, true)) {
 		if (inner_ip_hdr(skb)->version == 6) {
 			if (inner_ipv6_hdr(skb)->nexthdr == IPPROTO_UDP)
 				encap_descr |= QLCNIC_ENCAP_INNER_L4_UDP;
@@ -552,7 +564,7 @@ set_flags:
 		smp_mb();
 		adapter->stats.lso_frames++;
 
-	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
+	} else if (skb_csum_off_chk_help_cmn(skb)) {
 		if (protocol == ETH_P_IP) {
 			l4proto = ip_hdr(skb)->protocol;
 

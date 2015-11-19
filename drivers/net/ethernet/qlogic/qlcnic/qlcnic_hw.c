@@ -1044,8 +1044,7 @@ static netdev_features_t qlcnic_process_flags(struct qlcnic_adapter *adapter,
 	u32 offload_flags = adapter->offload_flags;
 
 	if (offload_flags & BIT_0) {
-		features |= NETIF_F_RXCSUM | NETIF_F_IP_CSUM |
-			    NETIF_F_IPV6_CSUM;
+		features |= NETIF_F_RXCSUM | NETIF_F_HW_CSUM;
 		adapter->rx_csum = 1;
 		if (QLCNIC_IS_TSO_CAPABLE(adapter)) {
 			if (!(offload_flags & BIT_1))
@@ -1059,9 +1058,7 @@ static netdev_features_t qlcnic_process_flags(struct qlcnic_adapter *adapter,
 				features |= NETIF_F_TSO6;
 		}
 	} else {
-		features &= ~(NETIF_F_RXCSUM |
-			      NETIF_F_IP_CSUM |
-			      NETIF_F_IPV6_CSUM);
+		features &= ~(NETIF_F_RXCSUM | NETIF_F_HW_CSUM);
 
 		if (QLCNIC_IS_TSO_CAPABLE(adapter))
 			features &= ~(NETIF_F_TSO | NETIF_F_TSO6);
@@ -1084,8 +1081,7 @@ netdev_features_t qlcnic_fix_features(struct net_device *netdev,
 		} else {
 			changed = features ^ netdev->features;
 			features ^= changed & (NETIF_F_RXCSUM |
-					       NETIF_F_IP_CSUM |
-					       NETIF_F_IPV6_CSUM |
+					       NETIF_F_HW_CSUM |
 					       NETIF_F_TSO |
 					       NETIF_F_TSO6);
 		}
