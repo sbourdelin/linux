@@ -105,7 +105,7 @@
 #include "vgic.h"
 
 static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
-static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu);
+static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu, unsigned state);
 static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
 static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
 static u64 vgic_get_elrsr(struct kvm_vcpu *vcpu);
@@ -713,18 +713,10 @@ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
 			add_sgi_source(vcpu, lr.irq, lr.source);
 
 		/*
-		 * If the LR holds an active (10) or a pending and active (11)
-		 * interrupt then move the active state to the
-		 * distributor tracking bit.
+		 * retire pending, active, active and pending LR's and
+		 * sync their state back to the distributor
 		 */
-		if (lr.state & LR_STATE_ACTIVE)
-			vgic_irq_set_active(vcpu, lr.irq);
-
-		/*
-		 * Reestablish the pending state on the distributor and the
-		 * CPU interface and mark the LR as free for other use.
-		 */
-		vgic_retire_lr(i, vcpu);
+		vgic_retire_lr(i, vcpu, LR_STATE_ACTIVE | LR_STATE_PENDING);
 
 		/* Finally update the VGIC state. */
 		vgic_update_state(vcpu->kvm);
@@ -1077,22 +1069,25 @@ static inline void vgic_enable(struct kvm_vcpu *vcpu)
 	vgic_ops->enable(vcpu);
 }
 
-static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu)
+static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu, unsigned state)
 {
 	struct vgic_lr vlr = vgic_get_lr(vcpu, lr_nr);
 
-	vgic_irq_clear_queued(vcpu, vlr.irq);
-
-	/*
-	 * We must transfer the pending state back to the distributor before
-	 * retiring the LR, otherwise we may loose edge-triggered interrupts.
-	 */
-	if (vlr.state & LR_STATE_PENDING) {
-		vgic_dist_irq_set_pending(vcpu, vlr.irq);
-		vlr.hwirq = 0;
+	if (vlr.state & LR_STATE_ACTIVE & state) {
+		vgic_irq_set_active(vcpu, vlr.irq);
+		vlr.state &= ~LR_STATE_ACTIVE;
 	}
 
-	vlr.state = 0;
+	if (vlr.state & LR_STATE_PENDING & state) {
+		vgic_dist_irq_set_pending(vcpu, vlr.irq);
+		vlr.state &= ~LR_STATE_PENDING;
+	}
+
+	if (!(vlr.state & LR_STATE_MASK)) {
+		vlr.hwirq = 0;
+		vlr.state = 0;
+		vgic_irq_clear_queued(vcpu, vlr.irq);
+	}
 	vgic_set_lr(vcpu, lr_nr, vlr);
 }
 
@@ -1114,8 +1109,14 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
 	for_each_clear_bit(lr, elrsr_ptr, vgic->nr_lr) {
 		struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
 
+		/*
+		 * retire pending only LR's and sync their state
+		 * back to the distributor. Active LR's cannot be
+		 * retired since the guest will attempt to deactivate
+		 * the IRQ.
+		 */
 		if (!vgic_irq_is_enabled(vcpu, vlr.irq))
-			vgic_retire_lr(lr, vcpu);
+			vgic_retire_lr(lr, vcpu, LR_STATE_PENDING);
 	}
 }
 
