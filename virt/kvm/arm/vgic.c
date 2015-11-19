@@ -604,14 +604,34 @@ bool vgic_handle_clear_active_reg(struct kvm *kvm,
 				  struct kvm_exit_mmio *mmio,
 				  phys_addr_t offset, int vcpu_id)
 {
-	u32 *reg;
+	u32 *reg, orig, cleared;
 	struct vgic_dist *dist = &kvm->arch.vgic;
+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, vcpu_id);
+	unsigned int i;
 
 	reg = vgic_bitmap_get_reg(&dist->irq_active, vcpu_id, offset);
+	orig = *reg;
 	vgic_reg_access(mmio, reg, offset,
 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
 
 	if (mmio->is_write) {
+		cleared = orig ^ *reg;
+
+		for (i = 0; i < 32; i++) {
+			struct irq_phys_map *map;
+			unsigned int irq_num;
+
+			if (!(cleared && (1 << i)))
+				continue;
+			irq_num = (offset * 8) + i;
+			map = vgic_irq_map_search(vcpu, irq_num);
+			if (!map || (map && map->shared))
+				continue;
+			irq_set_irqchip_state(map->irq,
+					      IRQCHIP_STATE_ACTIVE,
+					      false);
+		}
+
 		vgic_update_state(kvm);
 		return true;
 	}
