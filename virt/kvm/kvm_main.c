@@ -571,12 +571,14 @@ static int kvm_create_vm_debugfs(struct kvm *kvm)
 	snprintf(dir_name, sizeof(dir_name), "%d", current->pid);
 	kvm->debugfs_dentry = debugfs_create_dir(dir_name, kvm_debugfs_dir);
 	if (!kvm->debugfs_dentry)
-		goto out_err;
+		return -ENOMEM;
 
 	kvm->debugfs_data = kmalloc(sizeof(*kvm->debugfs_data) *
 				    kvm_debugfs_num_entries, GFP_KERNEL);
-	if (!kvm->debugfs_data)
-		return -ENOMEM;
+	if (!kvm->debugfs_data) {
+		r = -ENOMEM;
+		goto err_remove_dir;
+	}
 
 	for (p = debugfs_entries; p->name; p++, i++) {
 		stat_data = kzalloc(sizeof(*stat_data), GFP_KERNEL);
@@ -600,13 +602,15 @@ static int kvm_create_vm_debugfs(struct kvm *kvm)
 	return r;
 
 out_err_clean:
-	debugfs_remove_recursive(kvm->debugfs_dentry);
 	kfree(stat_data);
 	for (i--; i >= 0; i--)
 		kfree(kvm->debugfs_data[i]);
 
 	kfree(kvm->debugfs_data);
-out_err:
+
+err_remove_dir:
+	debugfs_remove_recursive(kvm->debugfs_dentry);
+
 	return r;
 }
 
