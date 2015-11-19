@@ -588,6 +588,12 @@ static int atmel_classd_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	ret = clk_set_parent(dd->gclk, dd->aclk);
+	if (ret) {
+		dev_err(dev, "failed to set GCK parent clock: %d\n", ret);
+		return ret;
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(dev, "no memory resource\n");
