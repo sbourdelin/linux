@@ -2475,13 +2475,21 @@ int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
 int kvm_set_irq(struct kvm *kvm, int irq_source_id,
 		u32 irq, int level, bool line_status)
 {
+	struct vgic_dist *dist = &kvm->arch.vgic;
 	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
+	struct irq_phys_map *map;
+	int vcpu_id;
 
 	trace_kvm_set_irq(irq, level, irq_source_id);
 
 	BUG_ON(!vgic_initialized(kvm));
 
-	return kvm_vgic_inject_irq(kvm, 0, spi, level);
+	vcpu_id = dist->irq_spi_cpu[irq];
+	map = vgic_irq_map_search(kvm_get_vcpu(kvm, vcpu_id), spi);
+	if (!map)
+		return kvm_vgic_inject_irq(kvm, vcpu_id, spi, level);
+	else
+		return kvm_vgic_inject_mapped_irq(kvm, vcpu_id, map, level);
 }
 
 /* MSI not implemented yet */
