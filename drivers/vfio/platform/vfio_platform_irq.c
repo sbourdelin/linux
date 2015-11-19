@@ -203,6 +203,25 @@ static int vfio_platform_set_forwarded(struct vfio_platform_irq *irq,
 	return 0;
 }
 
+static int vfio_platform_irq_is_active(struct vfio_platform_irq *irq)
+{
+	unsigned long flags;
+	bool active;
+	int ret;
+
+	spin_lock_irqsave(&irq->lock, flags);
+
+	ret = irq_get_irqchip_state(irq->hwirq, IRQCHIP_STATE_ACTIVE, &active);
+	if (ret)
+		goto out;
+
+	ret = active || irq->masked;
+
+out:
+	spin_unlock_irqrestore(&irq->lock, flags);
+	return ret;
+}
+
 static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
 {
 }
