@@ -487,6 +487,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
 		return -EINVAL;
 	}
 
+	pp->link_gen = -1;
+	if (of_property_read_u32(np, "max-link-speed", &ret) == 0)
+		pp->link_gen = ret;
+
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
 		if (!pp->ops->msi_host_init) {
 			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,

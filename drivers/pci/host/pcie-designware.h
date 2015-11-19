@@ -48,6 +48,7 @@ struct pcie_port {
 	struct resource		busn;
 	int			irq;
 	u32			lanes;
+	int			link_gen;
 	struct pcie_host_ops	*ops;
 	int			msi_irq;
 	struct irq_domain	*irq_domain;
