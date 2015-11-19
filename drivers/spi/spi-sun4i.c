@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 #include <linux/spi/spi.h>
 
@@ -173,6 +174,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 	unsigned int tx_len = 0;
 	int ret = 0;
 	u32 reg;
+	u32 wdelay = 0;
 
 	/* We don't support transfer larger than the FIFO */
 	if (tfr->len > SUN4I_FIFO_DEPTH)
@@ -260,6 +262,11 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 	}
 
 	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
+
+	/* Set optional inter-word wait cycles */
+	of_property_read_u32(spi->dev.of_node, "sun4i,spi-wdelay",
+			     &wdelay);
+	sun4i_spi_write(sspi, SUN4I_WAIT_REG, (u16)wdelay);
 
 	/* Setup the transfer now... */
 	if (sspi->tx_buf)

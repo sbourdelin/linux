@@ -10,6 +10,10 @@ Required properties:
   - "mod": the parent module clock
 - clock-names: Must contain the clock names described just above
 
+Optional properties for slave devices:
+- sun4i,spi-wdelay : delay between transmission of words, specified in number
+  of SPI clock periods (actual delay is wdelay + 3 clock periods)
+
 Example:
 
 spi1: spi@01c06000 {
@@ -21,4 +25,11 @@ spi1: spi@01c06000 {
 	status = "disabled";
 	#address-cells = <1>;
 	#size-cells = <0>;
+
+	spi1_0 {
+		compatible = "example,dummy";
+		reg = <0>;
+		spi-max-frequency = <1000000>; /* 1Mhz = 1us clock period */
+		sun4i,spi-wdelay = <2>; /* delay 5us (2 + 3 clock periods) */
+	};
 };
