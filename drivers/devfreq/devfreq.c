@@ -121,6 +121,11 @@ static void devfreq_set_freq_table(struct devfreq *devfreq)
 		profile->freq_table[i] = freq;
 	}
 	rcu_read_unlock();
+
+	mutex_lock(&devfreq->lock);
+	devfreq->min_freq = profile->freq_table[0];
+	devfreq->max_freq = profile->freq_table[profile->max_state - 1];
+	mutex_unlock(&devfreq->lock);
 }
 
 /**
