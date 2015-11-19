@@ -1406,8 +1406,7 @@ struct net_device *fm10k_alloc_netdev(void)
 	interface->msg_enable = (1 << DEFAULT_DEBUG_LEVEL_SHIFT) - 1;
 
 	/* configure default features */
-	dev->features |= NETIF_F_IP_CSUM |
-			 NETIF_F_IPV6_CSUM |
+	dev->features |= NETIF_F_HW_CSUM |
 			 NETIF_F_SG |
 			 NETIF_F_TSO |
 			 NETIF_F_TSO6 |
@@ -1426,7 +1425,7 @@ struct net_device *fm10k_alloc_netdev(void)
 	dev->vlan_features |= dev->features;
 
 	/* configure tunnel offloads */
-	dev->hw_enc_features |= NETIF_F_IP_CSUM |
+	dev->hw_enc_features |= NETIF_F_HW_CSUM |
 				NETIF_F_TSO |
 				NETIF_F_TSO6 |
 				NETIF_F_TSO_ECN |

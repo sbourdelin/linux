@@ -827,6 +827,17 @@ err_vxlan:
 	return -1;
 }
 
+static const struct skb_csum_offl_spec csum_offl_spec = {
+	.ipv4_okay = 1,
+	.ip_options_okay = 1,
+	.ipv6_okay = 1,
+	.encap_okay = 1,
+	.no_encapped_ipv6 = 1,
+	.vlan_okay = 1,
+	.tcp_okay = 1,
+	.udp_okay = 1,
+};
+
 static void fm10k_tx_csum(struct fm10k_ring *tx_ring,
 			  struct fm10k_tx_buffer *first)
 {
@@ -839,11 +850,12 @@ static void fm10k_tx_csum(struct fm10k_ring *tx_ring,
 	} network_hdr;
 	__be16 protocol;
 	u8 l4_hdr = 0;
+	bool csum_encapped;
 
-	if (skb->ip_summed != CHECKSUM_PARTIAL)
+	if (!skb_csum_offload_chk(skb, &csum_offl_spec, &csum_encapped, true))
 		goto no_csum;
 
-	if (skb->encapsulation) {
+	if (csum_encapped) {
 		protocol = fm10k_tx_encap_offload(skb);
 		if (!protocol) {
 			if (skb_checksum_help(skb)) {
