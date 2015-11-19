@@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
 {
 	unsigned int status, numbytes = port->fifosize;
 
-	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
-		return;
-
 	/*
 	 * Set the TX enable bit and clear the TX disable bit to enable the
 	 * transmitter.
@@ -523,6 +520,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
 	status &= ~CDNS_UART_CR_TX_DIS;
 	status |= CDNS_UART_CR_TX_EN;
 	writel(status, port->membase + CDNS_UART_CR_OFFSET);
+
+	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+		return;
 
 	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
 				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
