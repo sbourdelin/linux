@@ -131,6 +131,56 @@ unsigned long find_last_bit(const unsigned long *addr, unsigned long size)
 EXPORT_SYMBOL(find_last_bit);
 #endif
 
+#ifndef all_bit_is_zero
+/*
+ * return val: 1 means all bit is zero
+ */
+unsigned int all_bit_is_zero(const unsigned long *addr, unsigned size)
+{
+	unsigned long idx;
+	unsigned long mask = size;
+
+	if (unlikely(size == 0))
+		return 1;
+
+	if (size > BITS_PER_LONG) {
+		for (idx = 0; idx * BITS_PER_LONG < size; idx++)
+			if (addr[idx])
+				return 0;
+
+		mask = size - (idx - 1) * BITS_PER_LONG;
+	}
+
+	return !(*addr & BITMAP_LAST_WORD_MASK(mask));
+}
+EXPORT_SYMBOL(all_bit_is_zero);
+#endif
+
+#ifndef all_bit_is_one
+/*
+ * return val: 1 means all bit is one
+ */
+unsigned int all_bit_is_one(const unsigned long *addr, unsigned size)
+{
+	unsigned long idx;
+	unsigned long mask = size;
+
+	if (unlikely(size == 0))
+		return 1;
+
+	if (size > BITS_PER_LONG) {
+		for (idx = 0; idx * BITS_PER_LONG < size; idx++)
+			if (~addr[idx])
+				return 0;
+
+		mask = size - (idx - 1) * BITS_PER_LONG;
+	}
+
+	return !(~(*addr) & BITMAP_LAST_WORD_MASK(mask));
+}
+EXPORT_SYMBOL(all_bit_is_one);
+#endif
+
 #ifdef __BIG_ENDIAN
 
 /* include/linux/byteorder does not support "unsigned long" type */
