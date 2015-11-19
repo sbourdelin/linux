@@ -368,4 +368,9 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
 }
 #endif
 
+int kvm_vgic_set_forward(struct kvm *kvm, unsigned int irq,
+			 unsigned int virt_irq);
+void kvm_vgic_unset_forward(struct kvm *kvm, unsigned int irq,
+			    unsigned int virt_irq);
+
 #endif

@@ -2499,3 +2499,121 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
 {
 	return 0;
 }
+
+/**
+ * kvm_vgic_set_forward - Set IRQ forwarding
+ *
+ * @kvm: handle to the VM
+ * @irq: the host linux IRQ
+ * @virt_irq: the guest SPI ID
+ *
+ * This function is supposed to be called only if the IRQ
+ * is not in progress: ie. not active at GIC level and not
+ * currently under injection in the guest. The physical IRQ must
+ * also be disabled and all vCPUs must have been exited and
+ * prevented from being re-entered.
+ */
+int kvm_vgic_set_forward(struct kvm *kvm, unsigned int irq,
+			 unsigned int virt_irq)
+{
+	struct vgic_dist *dist = &kvm->arch.vgic;
+	struct kvm_vcpu *vcpu;
+	struct irq_phys_map *map;
+	int cpu_id;
+
+	kvm_debug("%s irq=%d virt_irq=%d\n", __func__, irq, virt_irq);
+
+	cpu_id = dist->irq_spi_cpu[virt_irq - VGIC_NR_PRIVATE_IRQS];
+	vcpu = kvm_get_vcpu(kvm, cpu_id);
+	if (!vcpu)
+		return 0;
+	/*
+	 * let's tell the irqchip driver that after this function
+	 * returns, a new occurrence of that physical irq will be handled
+	 * as a forwarded IRQ, ie. the host will only perform priority
+	 * drop but will not deactivate the physical IRQ: guest will
+	 */
+	irq_set_vcpu_affinity(irq, vcpu);
+
+	/*
+	 * let's program the vgic so that after this function returns
+	 * any subsequent virt_irq injection will be considered as
+	 * forwarded and LR will be programmed with HWbit set
+	 */
+	map = kvm_vgic_map_phys_irq(vcpu, virt_irq, irq, false);
+
+	return !map;
+}
+
+/**
+ * kvm_vgic_unset_forward - Unset IRQ forwarding
+ *
+ * @kvm: handle to the VM
+ * @irq: host Linux IRQ number
+ * @virt_irq: virtual SPI ID
+ *
+ * This function must be called when the host irq is disabled
+ * and all vCPUs have been exited and prevented from being re-entered.
+ */
+void kvm_vgic_unset_forward(struct kvm *kvm,
+			      unsigned int irq,
+			      unsigned int virt_irq)
+{
+	struct vgic_dist *dist = &kvm->arch.vgic;
+	struct kvm_vcpu *vcpu;
+	int cpu_id;
+	bool active, is_level;
+	struct irq_phys_map *map;
+
+	kvm_debug("%s irq=%d virt_irq=%d\n", __func__, irq, virt_irq);
+
+	spin_lock(&dist->lock);
+
+	cpu_id = dist->irq_spi_cpu[virt_irq - VGIC_NR_PRIVATE_IRQS];
+	vcpu = kvm_get_vcpu(kvm, cpu_id);
+	is_level = !vgic_irq_is_edge(vcpu, virt_irq);
+
+	irq_get_irqchip_state(irq, IRQCHIP_STATE_ACTIVE, &active);
+
+	if (!vcpu)
+		goto out;
+
+	map = vgic_irq_map_search(vcpu, virt_irq);
+	if (!map || map->shared || kvm_vgic_unmap_phys_irq(vcpu, map)) {
+		WARN_ON(1);
+		goto out;
+	}
+
+	if (!active) {
+		/*
+		 * The physical IRQ is not active so no virtual IRQ
+		 * is under injection, reset the level state which was
+		 * not modelled.
+		 */
+		vgic_dist_irq_clear_level(vcpu, virt_irq);
+		goto out;
+	}
+
+	vgic_unqueue_irqs(vcpu);
+
+	if (vgic_dist_irq_is_pending(vcpu, virt_irq) ||
+	    vgic_irq_is_active(vcpu, virt_irq)) {
+		/*
+		 * on next flush, LR for virt_irq will be programmed
+		 * with maintenance IRQ. For level sensitive IRQ,
+		 * let's set the level which was not modelled up to now
+		 */
+		if (is_level)
+			vgic_dist_irq_set_level(vcpu, virt_irq);
+	} else {
+		vgic_dist_irq_clear_level(vcpu, virt_irq);
+	}
+
+out:
+	/* Let's deactivate and unmap the physical IRQ from the vCPU */
+	irq_set_irqchip_state(irq, IRQCHIP_STATE_ACTIVE, false);
+	irq_set_vcpu_affinity(irq, NULL);
+
+	spin_unlock(&dist->lock);
+}
+
