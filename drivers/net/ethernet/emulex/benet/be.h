@@ -480,6 +480,7 @@ struct be_wrb_params {
 	u32 features;	/* Feature bits */
 	u16 vlan_tag;	/* VLAN tag */
 	u16 lso_mss;	/* MSS for LSO */
+	u32 encapped_csum : 1;
 };
 
 struct be_adapter {

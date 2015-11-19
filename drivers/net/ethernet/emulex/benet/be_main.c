@@ -678,7 +678,8 @@ void be_link_status_update(struct be_adapter *adapter, u8 link_status)
 	netdev_info(netdev, "Link is %s\n", link_status ? "Up" : "Down");
 }
 
-static void be_tx_stats_update(struct be_tx_obj *txo, struct sk_buff *skb)
+static void be_tx_stats_update(struct be_tx_obj *txo, struct sk_buff *skb,
+			       bool encapped_csum)
 {
 	struct be_tx_stats *stats = tx_stats(txo);
 	u64 tx_pkts = skb_shinfo(skb)->gso_segs ? : 1;
@@ -687,7 +688,7 @@ static void be_tx_stats_update(struct be_tx_obj *txo, struct sk_buff *skb)
 	stats->tx_reqs++;
 	stats->tx_bytes += skb->len;
 	stats->tx_pkts += tx_pkts;
-	if (skb->encapsulation && skb->ip_summed == CHECKSUM_PARTIAL)
+	if (encapped_csum)
 		stats->tx_vxlan_offload_pkts += tx_pkts;
 	u64_stats_update_end(&stats->sync);
 }
@@ -762,19 +763,32 @@ static inline bool be_is_tx_compl_pending(struct be_tx_obj *txo)
 	return atomic_read(&txo->q.used) > txo->pend_wrb_cnt;
 }
 
+static const struct skb_csum_offl_spec csum_offl_spec = {
+	.ipv4_okay = 1,
+	.ip_options_okay = 1,
+	.ipv6_okay = 1,
+	.encap_okay = 1,
+	.vlan_okay = 1,
+	.tcp_okay = 1,
+	.udp_okay = 1,
+};
+
 static void be_get_wrb_params_from_skb(struct be_adapter *adapter,
 				       struct sk_buff *skb,
 				       struct be_wrb_params *wrb_params)
 {
 	u16 proto;
+	bool csum_encapped;
 
 	if (skb_is_gso(skb)) {
 		BE_WRB_F_SET(wrb_params->features, LSO, 1);
 		wrb_params->lso_mss = skb_shinfo(skb)->gso_size;
 		if (skb_is_gso_v6(skb) && !lancer_chip(adapter))
 			BE_WRB_F_SET(wrb_params->features, LSO6, 1);
-	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		if (skb->encapsulation) {
+	} else if (skb_csum_offload_chk(skb, &csum_offl_spec,
+					&csum_encapped, true)) {
+		wrb_params->encapped_csum = csum_encapped;
+		if (csum_encapped) {
 			BE_WRB_F_SET(wrb_params->features, IPCS, 1);
 			proto = skb_inner_ip_proto(skb);
 		} else {
@@ -960,7 +974,7 @@ static u32 be_xmit_enqueue(struct be_adapter *adapter, struct be_tx_obj *txo,
 
 	be_tx_setup_wrb_hdr(adapter, txo, wrb_params, skb, head);
 
-	be_tx_stats_update(txo, skb);
+	be_tx_stats_update(txo, skb, !!wrb_params->encapped_csum);
 	return wrb_cnt;
 
 dma_err:
@@ -5217,7 +5231,7 @@ static void be_add_vxlan_port(struct net_device *netdev, sa_family_t sa_family,
 	adapter->flags |= BE_FLAGS_VXLAN_OFFLOADS;
 	adapter->vxlan_port = port;
 
-	netdev->hw_enc_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+	netdev->hw_enc_features |= NETIF_F_HW_CSUM |
 				   NETIF_F_TSO | NETIF_F_TSO6 |
 				   NETIF_F_GSO_UDP_TUNNEL;
 	netdev->hw_features |= NETIF_F_GSO_UDP_TUNNEL;
@@ -5356,7 +5370,7 @@ static void be_netdev_init(struct net_device *netdev)
 	struct be_adapter *adapter = netdev_priv(netdev);
 
 	netdev->hw_features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
-		NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM |
+		NETIF_F_HW_CSUM | NETIF_F_RXCSUM |
 		NETIF_F_HW_VLAN_CTAG_TX;
 	if (be_multi_rxq(adapter))
 		netdev->hw_features |= NETIF_F_RXHASH;
@@ -5365,7 +5379,7 @@ static void be_netdev_init(struct net_device *netdev)
 		NETIF_F_HW_VLAN_CTAG_RX | NETIF_F_HW_VLAN_CTAG_FILTER;
 
 	netdev->vlan_features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
-		NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		NETIF_F_HW_CSUM;
 
 	netdev->priv_flags |= IFF_UNICAST_FLT;
 
