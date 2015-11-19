@@ -163,6 +163,24 @@ struct disk_part_tbl {
 
 struct disk_events;
 
+#define DISK_MAX_POISON	(PAGE_SIZE/8)
+
+struct disk_poison {
+	int count;		/* count of bad blocks */
+	int unacked_exist;	/* there probably are unacknowledged
+				 * bad blocks.  This is only cleared
+				 * when a read discovers none
+				 */
+	int shift;		/* shift from sectors to block size
+				 * a -ve shift means badblocks are
+				 * disabled.*/
+	u64 *page;		/* badblock list */
+	int changed;
+	seqlock_t lock;
+	sector_t sector;
+	sector_t size;		/* in sectors */
+};
+
 struct gendisk {
 	/* major, first_minor and minors are input parameters only,
 	 * don't use directly.  Use disk_devt() and disk_max_parts().
@@ -201,6 +219,7 @@ struct gendisk {
 	struct blk_integrity *integrity;
 #endif
 	int node_id;
+	struct disk_poison *plist;
 };
 
 static inline struct gendisk *part_to_disk(struct hd_struct *part)
@@ -434,6 +453,13 @@ extern void disk_block_events(struct gendisk *disk);
 extern void disk_unblock_events(struct gendisk *disk);
 extern void disk_flush_events(struct gendisk *disk, unsigned int mask);
 extern unsigned int disk_clear_events(struct gendisk *disk, unsigned int mask);
+extern int disk_poison_list_init(struct gendisk *disk);
+extern int disk_check_poison(struct gendisk *disk, sector_t s, int sectors,
+		   sector_t *first_bad, int *bad_sectors);
+extern int disk_add_poison(struct gendisk *disk, sector_t s, int sectors,
+			    int acknowledged);
+extern int disk_clear_poison(struct gendisk *disk, sector_t s, int sectors);
+extern void disk_ack_all_poison(struct gendisk *disk);
 
 /* drivers/char/random.c */
 extern void add_disk_randomness(struct gendisk *disk);
