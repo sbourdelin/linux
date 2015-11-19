@@ -9710,6 +9710,69 @@ static void broadwell_modeset_commit_cdclk(struct drm_atomic_state *old_state)
 	broadwell_set_cdclk(dev, req_cdclk);
 }
 
+static int skl_modeset_calc_cdclk(struct drm_atomic_state *state)
+{
+	struct drm_i915_private *dev_priv = to_i915(state->dev);
+	int max_pixclk = ilk_max_pixel_rate(state);
+	int cdclk;
+	uint32_t linkrate;
+
+	linkrate = (I915_READ(DPLL_CTRL1) &
+		    DPLL_CTRL1_LINK_RATE_MASK(SKL_DPLL0)) >> 1;
+
+	/*
+	* FIXME should also account for plane ratio
+	* once 64bpp pixel formats are supported.
+	*/
+
+	if (linkrate == DPLL_CTRL1_LINK_RATE_2160 ||
+	    linkrate == DPLL_CTRL1_LINK_RATE_1080) {
+		/* vco 8640 */
+		if (max_pixclk > 540000)
+			cdclk = 617140;
+		else if (max_pixclk > 432000)
+			cdclk = 540000;
+		else if (max_pixclk > 308570)
+			cdclk = 432000;
+		else
+			cdclk = 308570;
+	}
+	else {
+		/* VCO 8100 */
+		if (max_pixclk > 540000)
+			cdclk = 675000;
+		else if (max_pixclk > 450000)
+			cdclk = 540000;
+		else if (max_pixclk > 337500)
+			cdclk = 450000;
+		else
+			cdclk = 337500;
+	}
+
+	/*
+	 * FIXME move the cdclk caclulation to
+	 * compute_config() so we can fail gracefully.
+	 */
+	if (cdclk > dev_priv->max_cdclk_freq) {
+		DRM_ERROR("requested cdclk (%d kHz) exceeds max (%d kHz)\n",
+			  cdclk, dev_priv->max_cdclk_freq);
+		cdclk = dev_priv->max_cdclk_freq;
+	}
+
+	to_intel_atomic_state(state)->cdclk = cdclk;
+
+	return 0;
+}
+
+static void skl_modeset_commit_cdclk(struct drm_atomic_state *old_state)
+{
+	struct drm_device *dev = old_state->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	unsigned int req_cdclk = to_intel_atomic_state(old_state)->cdclk;
+
+	skl_set_cdclk(dev_priv, req_cdclk);
+}
+
 static int haswell_crtc_compute_clock(struct intel_crtc *crtc,
 				      struct intel_crtc_state *crtc_state)
 {
@@ -14801,6 +14864,11 @@ static void intel_init_display(struct drm_device *dev)
 			broxton_modeset_commit_cdclk;
 		dev_priv->display.modeset_calc_cdclk =
 			broxton_modeset_calc_cdclk;
+	} else if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev)) {
+		dev_priv->display.modeset_commit_cdclk =
+			skl_modeset_commit_cdclk;
+		dev_priv->display.modeset_calc_cdclk =
+			skl_modeset_calc_cdclk;
 	}
 
 	switch (INTEL_INFO(dev)->gen) {
