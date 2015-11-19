@@ -224,23 +224,49 @@ out:
 
 static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
 {
+	disable_irq(prod->irq);
 }
 
 static void vfio_platform_irq_bypass_start(struct irq_bypass_producer *prod)
 {
+	enable_irq(prod->irq);
 }
 
 static int vfio_platform_irq_bypass_add_consumer(
 			struct irq_bypass_producer *prod,
 			struct irq_bypass_consumer *cons)
 {
-	return 0;
+	struct vfio_platform_irq *irq =
+		container_of(prod, struct vfio_platform_irq, producer);
+	int ret;
+
+	/*
+	 * if the IRQ is active at irqchip level or masked by VFIO
+	 * this means the host IRQ may be under injection and
+	 * it is not safe to change the forwarding state at that time.
+	 * It is not possible to discriminate VFIO explicit masking
+	 * from VFIO auto-masking, leading to possible false detection of
+	 * IRQ activity. It is up to the user-space to avoid VFIO explicit
+	 * masking situation. In case of failure, no retry is attempted and
+	 * bypass setup simply fails.
+	 */
+	ret = vfio_platform_irq_is_active(irq);
+	if (ret < 0)
+		return ret;
+	else if (ret == 1)
+		return -EAGAIN;
+
+	return vfio_platform_set_forwarded(irq, true);
 }
 
 static void vfio_platform_irq_bypass_del_consumer(
 			struct irq_bypass_producer *prod,
 			struct irq_bypass_consumer *cons)
 {
+	struct vfio_platform_irq *irq =
+		container_of(prod, struct vfio_platform_irq, producer);
+
+	vfio_platform_set_forwarded(irq, false);
 }
 
 static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
