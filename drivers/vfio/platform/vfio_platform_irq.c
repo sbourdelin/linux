@@ -186,6 +186,23 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
 	return ret;
 }
 
+static int vfio_platform_set_forwarded(struct vfio_platform_irq *irq,
+					   bool forwarded)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&irq->lock, flags);
+	irq->forwarded = forwarded;
+
+	if (!forwarded && (irq->flags & VFIO_IRQ_INFO_AUTOMASKED))
+		irq->handler = vfio_automasked_irq_handler;
+	else
+		irq->handler = vfio_irq_handler;
+
+	spin_unlock_irqrestore(&irq->lock, flags);
+	return 0;
+}
+
 static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
 {
 }
