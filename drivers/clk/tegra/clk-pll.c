@@ -967,11 +967,6 @@ const struct clk_ops tegra_clk_plle_ops = {
 	.enable = clk_plle_enable,
 };
 
-#if defined(CONFIG_ARCH_TEGRA_114_SOC) || \
-	defined(CONFIG_ARCH_TEGRA_124_SOC) || \
-	defined(CONFIG_ARCH_TEGRA_132_SOC) || \
-	defined(CONFIG_ARCH_TEGRA_210_SOC)
-
 static int _pll_fixed_mdiv(struct tegra_clk_pll_params *pll_params,
 			   unsigned long parent_rate)
 {
@@ -989,6 +984,40 @@ static int _pll_fixed_mdiv(struct tegra_clk_pll_params *pll_params,
 	else
 		return 1;
 }
+
+static int _calc_dynamic_ramp_rate(struct clk_hw *hw,
+				struct tegra_clk_pll_freq_table *cfg,
+				unsigned long rate, unsigned long parent_rate)
+{
+	struct tegra_clk_pll *pll = to_clk_pll(hw);
+	unsigned int p;
+	int p_div;
+
+	if (!rate)
+		return -EINVAL;
+
+	p = DIV_ROUND_UP(pll->params->vco_min, rate);
+	cfg->m = _pll_fixed_mdiv(pll->params, parent_rate);
+	cfg->output_rate = rate * p;
+	cfg->n = cfg->output_rate * cfg->m / parent_rate;
+	cfg->input_rate = parent_rate;
+
+	p_div = _p_div_to_hw(hw, p);
+	if (p_div < 0)
+		return p_div;
+
+	cfg->p = p_div;
+
+	if (cfg->n > divn_max(pll) || cfg->output_rate > pll->params->vco_max)
+		return -EINVAL;
+
+	return 0;
+}
+
+#if defined(CONFIG_ARCH_TEGRA_114_SOC) || \
+	defined(CONFIG_ARCH_TEGRA_124_SOC) || \
+	defined(CONFIG_ARCH_TEGRA_132_SOC) || \
+	defined(CONFIG_ARCH_TEGRA_210_SOC)
 
 u16 tegra_pll_get_fixed_mdiv(struct clk_hw *hw, unsigned long input_rate)
 {
@@ -1035,35 +1064,6 @@ static int _setup_dynamic_ramp(struct tegra_clk_pll_params *pll_params,
 	val = step_a << pll_params->stepa_shift;
 	val |= step_b << pll_params->stepb_shift;
 	writel_relaxed(val, clk_base + pll_params->dyn_ramp_reg);
-
-	return 0;
-}
-
-static int _calc_dynamic_ramp_rate(struct clk_hw *hw,
-				struct tegra_clk_pll_freq_table *cfg,
-				unsigned long rate, unsigned long parent_rate)
-{
-	struct tegra_clk_pll *pll = to_clk_pll(hw);
-	unsigned int p;
-	int p_div;
-
-	if (!rate)
-		return -EINVAL;
-
-	p = DIV_ROUND_UP(pll->params->vco_min, rate);
-	cfg->m = _pll_fixed_mdiv(pll->params, parent_rate);
-	cfg->output_rate = rate * p;
-	cfg->n = cfg->output_rate * cfg->m / parent_rate;
-	cfg->input_rate = parent_rate;
-
-	p_div = _p_div_to_hw(hw, p);
-	if (p_div < 0)
-		return p_div;
-
-	cfg->p = p_div;
-
-	if (cfg->n > divn_max(pll) || cfg->output_rate > pll->params->vco_max)
-		return -EINVAL;
 
 	return 0;
 }
