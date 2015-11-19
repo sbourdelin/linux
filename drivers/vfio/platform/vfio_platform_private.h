@@ -40,6 +40,7 @@ struct vfio_platform_irq {
 	struct virqfd		*mask;
 	struct irq_bypass_producer producer;
 	bool			forwarded;
+	irqreturn_t (*handler)(int irq, void *dev_id);
 };
 
 struct vfio_platform_region {
