@@ -527,6 +527,9 @@ void intel_psr_disable(struct intel_dp *intel_dp)
 	mutex_unlock(&dev_priv->psr.lock);
 
 	cancel_delayed_work_sync(&dev_priv->psr.work);
+
+	/* Disable PSR on Sink */
+	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
 }
 
 static void intel_psr_work(struct work_struct *work)
