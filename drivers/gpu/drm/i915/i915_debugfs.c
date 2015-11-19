@@ -1873,6 +1873,9 @@ static int i915_gem_framebuffer_info(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	ifbdev = dev_priv->fbdev;
+	if (!ifbdev)
+		goto fb_loop;
+
 	fb = to_intel_framebuffer(ifbdev->helper.fb);
 
 	seq_printf(m, "fbcon size: %d x %d, depth %d, %d bpp, modifier 0x%llx, refcount %d, obj ",
@@ -1884,8 +1887,9 @@ static int i915_gem_framebuffer_info(struct seq_file *m, void *data)
 		   atomic_read(&fb->base.refcount.refcount));
 	describe_obj(m, fb->obj);
 	seq_putc(m, '\n');
-#endif
 
+fb_loop:
+#endif
 	mutex_lock(&dev->mode_config.fb_lock);
 	drm_for_each_fb(drm_fb, dev) {
 		fb = to_intel_framebuffer(drm_fb);
@@ -3868,11 +3872,18 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 			       enum intel_pipe_crc_source source)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_pipe_crc *pipe_crc = &dev_priv->pipe_crc[pipe];
-	struct intel_crtc *crtc = to_intel_crtc(intel_get_crtc_for_pipe(dev,
-									pipe));
+	struct intel_pipe_crc *pipe_crc;
+	struct intel_crtc *crtc;
 	u32 val = 0; /* shut up gcc */
 	int ret;
+
+	if ((pipe < PIPE_A) || (pipe >= I915_MAX_PIPES))
+		return -EINVAL;
+
+	pipe_crc = &dev_priv->pipe_crc[pipe];
+
+	crtc = to_intel_crtc(intel_get_crtc_for_pipe(dev,
+                                                     pipe));
 
 	if (pipe_crc->source == source)
 		return 0;
