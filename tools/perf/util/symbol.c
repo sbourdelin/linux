@@ -1516,7 +1516,7 @@ int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 	}
 
 	if (!runtime_ss && !syms_ss)
-		goto out_free;
+		goto jit_fallback;
 
 	if (runtime_ss && !syms_ss) {
 		syms_ss = runtime_ss;
@@ -1541,7 +1541,36 @@ int dso__load(struct dso *dso, struct map *map, symbol_filter_t filter)
 
 	for (; ss_pos > 0; ss_pos--)
 		symsrc__destroy(&ss_[ss_pos - 1]);
-out_free:
+
+jit_fallback:
+	/* If we couldn't load symbols, fall back to /tmp/perf-%pid.map. */
+	if (ret < 0) {
+		struct stat st;
+		const char *origlongname;
+		snprintf(name, PATH_MAX, "/tmp/perf-%d.map", map->pid);
+
+		if (lstat(name, &st) < 0)
+			goto out;
+
+		if (st.st_uid && (st.st_uid != geteuid())) {
+			pr_warning("File %s not owned by current user or root, "
+				"ignoring it.\n", name);
+			goto out;
+		}
+
+		origlongname = dso->long_name;
+		dso->long_name = name;
+
+		ret = dso__load_perf_map(dso, map, filter);
+
+		dso->long_name = origlongname;
+		dso->symtab_type = ret > 0 ? DSO_BINARY_TYPE__JAVA_JIT :
+					     DSO_BINARY_TYPE__NOT_FOUND;
+
+		if (ret > 0)
+			map->map_ip = map->unmap_ip = identity__map_ip;
+	}
+
 	free(name);
 	if (ret < 0 && strstr(dso->name, " (deleted)") != NULL)
 		ret = 0;

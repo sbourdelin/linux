@@ -52,6 +52,7 @@ struct map {
 	struct dso		*dso;
 	struct map_groups	*groups;
 	atomic_t		refcnt;
+	u32			pid;
 };
 
 struct kmap {

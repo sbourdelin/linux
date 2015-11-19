@@ -164,6 +164,7 @@ struct map *map__new(struct machine *machine, u64 start, u64 len,
 		map->ino_generation = ino_gen;
 		map->prot = prot;
 		map->flags = flags;
+		map->pid = pid;
 
 		if ((anon || no_dso) && type == MAP__FUNCTION) {
 			snprintf(newfilename, sizeof(newfilename), "/tmp/perf-%d.map", pid);
