@@ -1198,7 +1198,7 @@ static int intel_backlight_device_register(struct intel_connector *connector)
 	 * Note: Everything should work even if the backlight device max
 	 * presented to the userspace is arbitrarily chosen.
 	 */
-	props.max_brightness = panel->backlight.max;
+	props.max_brightness = 100;
 	props.brightness = scale_hw_to_user(connector,
 					    panel->backlight.level,
 					    props.max_brightness);
