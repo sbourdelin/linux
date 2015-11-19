@@ -834,21 +834,15 @@ static ssize_t link_state_store(struct device *dev,
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct pcie_link_state *link, *root = pdev->link_state->root;
-	u32 val, state = 0;
+	u32 state;
 
-	if (kstrtouint(buf, 10, &val))
+	if (kstrtouint(buf, 10, &state))
 		return -EINVAL;
 
 	if (aspm_disabled)
 		return -EPERM;
-	if (n < 1 || val > 3)
+	if ((state & ~ASPM_STATE_ALL) != 0)
 		return -EINVAL;
-
-	/* Convert requested state to ASPM state */
-	if (val & PCIE_LINK_STATE_L0S)
-		state |= ASPM_STATE_L0S;
-	if (val & PCIE_LINK_STATE_L1)
-		state |= ASPM_STATE_L1;
 
 	down_read(&pci_bus_sem);
 	mutex_lock(&aspm_lock);
