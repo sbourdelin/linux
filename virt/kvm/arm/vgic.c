@@ -410,7 +410,11 @@ void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
 
 static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
 {
-	return !vgic_irq_is_queued(vcpu, irq);
+	struct irq_phys_map *map = vgic_irq_map_search(vcpu, irq);
+	bool non_shared_mapped_irq = map && !map->shared;
+
+	return !vgic_irq_is_queued(vcpu, irq) ||
+		(non_shared_mapped_irq && vgic_dist_irq_is_pending(vcpu, irq));
 }
 
 /**
@@ -1204,11 +1208,14 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
 
 static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
 {
+	struct irq_phys_map *map = vgic_irq_map_search(vcpu, irq);
+	bool non_shared_mapped_irq = map && !map->shared;
+
 	if (!vgic_can_sample_irq(vcpu, irq))
 		return true; /* level interrupt, already queued */
 
 	if (vgic_queue_irq(vcpu, 0, irq)) {
-		if (vgic_irq_is_edge(vcpu, irq)) {
+		if (vgic_irq_is_edge(vcpu, irq) || non_shared_mapped_irq) {
 			vgic_dist_irq_clear_pending(vcpu, irq);
 			vgic_cpu_irq_clear(vcpu, irq);
 		} else {
@@ -1291,6 +1298,8 @@ static int process_queued_irq(struct kvm_vcpu *vcpu,
 				   int lr, struct vgic_lr vlr)
 {
 	int pending = 0;
+	struct irq_phys_map *map = vgic_irq_map_search(vcpu, vlr.irq);
+	bool non_shared_mapped_irq = map && !map->shared;
 
 	/*
 	 * If the IRQ was EOIed (called from vgic_process_maintenance) or it
@@ -1311,8 +1320,7 @@ static int process_queued_irq(struct kvm_vcpu *vcpu,
 	vgic_irq_clear_queued(vcpu, vlr.irq);
 
 	/* Any additional pending interrupt? */
-	if (vgic_irq_is_edge(vcpu, vlr.irq)) {
-		BUG_ON(!(vlr.state & LR_HW));
+	if (vgic_irq_is_edge(vcpu, vlr.irq) || non_shared_mapped_irq) {
 		pending = vgic_dist_irq_is_pending(vcpu, vlr.irq);
 	} else {
 		if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
@@ -1505,18 +1513,23 @@ void vgic_kick_vcpus(struct kvm *kvm)
 	}
 }
 
-static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
+static int vgic_validate_injection(struct kvm_vcpu *vcpu,
+				   struct irq_phys_map *map,
+				   int irq, int level)
 {
 	int edge_triggered = vgic_irq_is_edge(vcpu, irq);
 
 	/*
 	 * Only inject an interrupt if:
 	 * - edge triggered and we have a rising edge
-	 * - level triggered and we change level
+	 * - level triggered and we change level (except for
+	 *   mapped unshared IRQs where level is not modelled)
 	 */
 	if (edge_triggered) {
 		int state = vgic_dist_irq_is_pending(vcpu, irq);
 		return level > state;
+	} else if (map && !map->shared) {
+		return true;
 	} else {
 		int state = vgic_dist_irq_get_level(vcpu, irq);
 		return level != state;
@@ -1544,7 +1557,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
 	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
 	level_triggered = !edge_triggered;
 
-	if (!vgic_validate_injection(vcpu, irq_num, level)) {
+	if (!vgic_validate_injection(vcpu, map, irq_num, level)) {
 		ret = false;
 		goto out;
 	}
@@ -1717,16 +1730,20 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
  * @vcpu: The VCPU pointer
  * @virt_irq: The virtual irq number
  * @irq: The Linux IRQ number
+ * @shared: Indicates if the interrupt has to be context-switched or
+ *          if it is private to a VM
  *
  * Establish a mapping between a guest visible irq (@virt_irq) and a
  * Linux irq (@irq). On injection, @virt_irq will be associated with
  * the physical interrupt represented by @irq. This mapping can be
  * established multiple times as long as the parameters are the same.
+ * If @shared is true, the active state of the interrupt will be
+ * context-switched.
  *
  * Returns a valid pointer on success, and an error pointer otherwise
  */
 struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-					   int virt_irq, int irq)
+					   int virt_irq, int irq, bool shared)
 {
 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
 	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
@@ -1760,7 +1777,8 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
 	if (map) {
 		/* Make sure this mapping matches */
 		if (map->phys_irq != phys_irq	||
-		    map->irq      != irq)
+		    map->irq      != irq ||
+		    map->shared   != shared)
 			map = ERR_PTR(-EINVAL);
 
 		/* Found an existing, valid mapping */
@@ -1771,6 +1789,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
 	map->virt_irq = virt_irq;
 	map->phys_irq = phys_irq;
 	map->irq      = irq;
+	map->shared   = shared;
 
 	list_add_tail_rcu(&entry->entry, root);
 
