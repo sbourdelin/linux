@@ -1232,6 +1232,12 @@ static int vop_crtc_mode_set(struct drm_crtc *crtc,
 	reset_control_deassert(vop->dclk_rst);
 
 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
+
+	/*
+	 * Sometimes the clock driver can not set a accurate clock_rate for vop,
+	 * get the true rate of vop_dclk and set it back to adjusted_mode.
+	 */
+	adjusted_mode->clock = clk_get_rate(vop->dclk) / 1000;
 out:
 	ret_clk = clk_enable(vop->dclk);
 	if (ret_clk < 0) {
