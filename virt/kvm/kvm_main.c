@@ -3576,10 +3576,11 @@ static int vm_stat_get(void *_offset, u64 *val)
 
 	*val = 0;
 	spin_lock(&kvm_lock);
-	list_for_each_entry(kvm, &vm_list, vm_list)
+	list_for_each_entry(kvm, &vm_list, vm_list) {
 		stat_tmp.kvm = kvm;
 		vm_stat_get_per_vm((void *)&stat_tmp, &tmp_val);
 		*val += tmp_val;
+	}
 	spin_unlock(&kvm_lock);
 	return 0;
 }
