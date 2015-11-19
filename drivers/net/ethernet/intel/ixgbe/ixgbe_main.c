@@ -6999,15 +6999,28 @@ static int ixgbe_tso(struct ixgbe_ring *tx_ring,
 	return 1;
 }
 
+static const struct skb_csum_offl_spec csum_offl_spec = {
+	.ipv4_okay = 1,
+	.ip_options_okay = 1,
+	.ipv6_okay = 1,
+	.encap_okay = 1,
+	.vlan_okay = 1,
+	.tcp_okay = 1,
+	.udp_okay = 1,
+};
+
 static void ixgbe_tx_csum(struct ixgbe_ring *tx_ring,
-			  struct ixgbe_tx_buffer *first)
+			  struct ixgbe_tx_buffer *first,
+			  struct ixgbe_adapter *adapter)
 {
 	struct sk_buff *skb = first->skb;
 	u32 vlan_macip_lens = 0;
 	u32 mss_l4len_idx = 0;
 	u32 type_tucmd = 0;
+	bool csum_encapped;
 
-	if (skb->ip_summed != CHECKSUM_PARTIAL) {
+	if (!skb_csum_offload_chk(skb, &csum_offl_spec, &csum_encapped, true)) {
+no_csum:
 		if (!(first->tx_flags & IXGBE_TX_FLAGS_HW_VLAN) &&
 		    !(first->tx_flags & IXGBE_TX_FLAGS_CC))
 			return;
@@ -7025,7 +7038,15 @@ static void ixgbe_tx_csum(struct ixgbe_ring *tx_ring,
 			u8 *raw;
 		} transport_hdr;
 
-		if (skb->encapsulation) {
+		if (csum_encapped) {
+			switch (adapter->hw.mac.type) {
+			case ixgbe_mac_X550:
+			case ixgbe_mac_X550EM_x:
+				break;
+			default:
+				skb_checksum_help(skb);
+				goto no_csum;
+			}
 			network_hdr.raw = skb_inner_network_header(skb);
 			transport_hdr.raw = skb_inner_transport_header(skb);
 			vlan_macip_lens = skb_inner_network_offset(skb) <<
@@ -7602,7 +7623,7 @@ netdev_tx_t ixgbe_xmit_frame_ring(struct sk_buff *skb,
 	if (tso < 0)
 		goto out_drop;
 	else if (!tso)
-		ixgbe_tx_csum(tx_ring, first);
+		ixgbe_tx_csum(tx_ring, first, adapter);
 
 	/* add the ATR filter if ATR is on */
 	if (test_bit(__IXGBE_TX_FDIR_INIT_DONE, &tx_ring->state))
@@ -8765,8 +8786,7 @@ skip_sriov:
 
 #endif
 	netdev->features = NETIF_F_SG |
-			   NETIF_F_IP_CSUM |
-			   NETIF_F_IPV6_CSUM |
+			   NETIF_F_HW_CSUM |
 			   NETIF_F_HW_VLAN_CTAG_TX |
 			   NETIF_F_HW_VLAN_CTAG_RX |
 			   NETIF_F_TSO |
@@ -8794,12 +8814,10 @@ skip_sriov:
 
 	netdev->vlan_features |= NETIF_F_TSO;
 	netdev->vlan_features |= NETIF_F_TSO6;
-	netdev->vlan_features |= NETIF_F_IP_CSUM;
-	netdev->vlan_features |= NETIF_F_IPV6_CSUM;
+	netdev->vlan_features |= NETIF_F_HW_CSUM;
 	netdev->vlan_features |= NETIF_F_SG;
 
-	netdev->hw_enc_features |= NETIF_F_SG | NETIF_F_IP_CSUM |
-				   NETIF_F_IPV6_CSUM;
+	netdev->hw_enc_features |= NETIF_F_SG | NETIF_F_HW_CSUM;
 
 	netdev->priv_flags |= IFF_UNICAST_FLT;
 	netdev->priv_flags |= IFF_SUPP_NOFCS;
@@ -8809,8 +8827,7 @@ skip_sriov:
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 		netdev->hw_enc_features |= NETIF_F_RXCSUM |
-					   NETIF_F_IP_CSUM |
-					   NETIF_F_IPV6_CSUM;
+					   NETIF_F_HW_CSUM;
 		break;
 	default:
 		break;
