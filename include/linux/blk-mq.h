@@ -28,6 +28,9 @@ struct blk_mq_hw_ctx {
 	struct delayed_work	run_work;
 	struct delayed_work	delay_work;
 	cpumask_var_t		cpumask;
+	cpumask_var_t		cpu_service_mask;
+	cpumask_var_t		cpu_pending_mask;
+	cpumask_var_t		cpu_next_mask;
 	int			next_cpu;
 	int			next_cpu_batch;
 
@@ -57,6 +60,9 @@ struct blk_mq_hw_ctx {
 
 	atomic_t		nr_active;
 
+	int			use_time_slice;
+	unsigned long		sched_slice_exp;
+	int			sched_cpu;
 	struct blk_mq_cpu_notifier	cpu_notifier;
 	struct kobject		kobj;
 

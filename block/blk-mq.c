@@ -68,6 +68,8 @@ static void blk_mq_hctx_mark_pending(struct blk_mq_hw_ctx *hctx,
 
 	if (!test_bit(CTX_TO_BIT(hctx, ctx), &bm->word))
 		set_bit(CTX_TO_BIT(hctx, ctx), &bm->word);
+
+	cpumask_set_cpu(ctx->cpu, hctx->cpu_pending_mask);
 }
 
 static void blk_mq_hctx_clear_pending(struct blk_mq_hw_ctx *hctx,
@@ -76,6 +78,7 @@ static void blk_mq_hctx_clear_pending(struct blk_mq_hw_ctx *hctx,
 	struct blk_align_bitmap *bm = get_bm(hctx, ctx);
 
 	clear_bit(CTX_TO_BIT(hctx, ctx), &bm->word);
+	cpumask_clear_cpu(ctx->cpu, hctx->cpu_pending_mask);
 }
 
 void blk_mq_freeze_queue_start(struct request_queue *q)
@@ -685,10 +688,26 @@ static bool blk_mq_attempt_merge(struct request_queue *q,
  * Process software queues that have been marked busy, splicing them
  * to the for-dispatch
  */
-static void flush_busy_ctxs(struct blk_mq_hw_ctx *hctx, struct list_head *list)
+static void flush_busy_ctxs(struct blk_mq_hw_ctx *hctx,
+			struct list_head *list,	int cpu)
 {
+	struct request_queue *q = hctx->queue;
 	struct blk_mq_ctx *ctx;
 	int i;
+	const int use_time_slice = hctx->use_time_slice;
+
+	if (use_time_slice && cpu != -1) {
+		if (cpu != -1) {
+			ctx = __blk_mq_get_ctx(q, cpu);
+			spin_lock(&ctx->lock);
+			list_splice_tail_init(&ctx->rq_list, list);
+			spin_lock(&hctx->lock);
+			blk_mq_hctx_clear_pending(hctx, ctx);
+			spin_unlock(&hctx->lock);
+			spin_unlock(&ctx->lock);
+		}
+		return;
+	}
 
 	for (i = 0; i < hctx->ctx_map.size; i++) {
 		struct blk_align_bitmap *bm = &hctx->ctx_map.map[i];
@@ -705,14 +724,81 @@ static void flush_busy_ctxs(struct blk_mq_hw_ctx *hctx, struct list_head *list)
 				break;
 
 			ctx = hctx->ctxs[bit + off];
-			clear_bit(bit, &bm->word);
 			spin_lock(&ctx->lock);
 			list_splice_tail_init(&ctx->rq_list, list);
+			spin_lock(&hctx->lock);
+			blk_mq_hctx_clear_pending(hctx, ctx);
+			spin_unlock(&hctx->lock);
 			spin_unlock(&ctx->lock);
 
 			bit++;
 		} while (1);
 	}
+}
+
+/*
+ * It'd be great if the workqueue API had a way to pass
+ * in a mask and had some smarts for more clever placement.
+ * For now we just round-robin here, switching for every
+ * BLK_MQ_CPU_WORK_BATCH queued items.
+ */
+static int blk_mq_hctx_next_cpu(struct blk_mq_hw_ctx *hctx)
+{
+	if (hctx->queue->nr_hw_queues == 1)
+		return WORK_CPU_UNBOUND;
+
+	if (--hctx->next_cpu_batch <= 0) {
+		int cpu = hctx->next_cpu, next_cpu;
+
+		next_cpu = cpumask_next(hctx->next_cpu, hctx->cpumask);
+		if (next_cpu >= nr_cpu_ids)
+			next_cpu = cpumask_first(hctx->cpumask);
+
+		hctx->next_cpu = next_cpu;
+		hctx->next_cpu_batch = BLK_MQ_CPU_WORK_BATCH;
+
+		return cpu;
+	}
+
+	return hctx->next_cpu;
+}
+
+static int blk_mq_sched_slice_expired(struct blk_mq_hw_ctx *hctx)
+{
+	/*
+	 * Use time slice before requests of other CPUs are serviced.
+	 * Maybe change to serve n requests certain number of sectors
+	 * before switching to other CPU.
+	 */
+	if (time_after_eq(jiffies, hctx->sched_slice_exp))
+		return 1;
+
+	return 0;
+}
+
+static int blk_mq_sched_next_cpu(struct blk_mq_hw_ctx *hctx)
+{
+	int c = hctx->sched_cpu;
+
+	if (c != -1)
+		cpumask_clear_cpu(c, hctx->cpu_service_mask);
+
+	if (cpumask_and(hctx->cpu_next_mask, hctx->cpu_pending_mask,
+				hctx->cpu_service_mask)) {
+		c = cpumask_first(hctx->cpu_next_mask);
+	} else {
+		/* we are idle, epoch ended, reset */
+		hctx->sched_slice_exp = 0;
+		cpumask_setall(hctx->cpu_service_mask);
+		c = cpumask_first(hctx->cpu_pending_mask);
+	}
+
+	if (c >= nr_cpu_ids)
+		return -1;
+
+	hctx->sched_slice_exp = jiffies +
+		msecs_to_jiffies(hctx->use_time_slice);
+	return c;
 }
 
 /*
@@ -729,6 +815,8 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 	LIST_HEAD(driver_list);
 	struct list_head *dptr;
 	int queued;
+	const int use_time_slice = hctx->use_time_slice;
+	int cpu = -1;
 
 	WARN_ON(!cpumask_test_cpu(raw_smp_processor_id(), hctx->cpumask));
 
@@ -737,10 +825,19 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 
 	hctx->run++;
 
+	if (use_time_slice) {
+		spin_lock(&hctx->lock);
+		if (blk_mq_sched_slice_expired(hctx))
+			hctx->sched_cpu = blk_mq_sched_next_cpu(hctx);
+		cpu = hctx->sched_cpu;
+		spin_unlock(&hctx->lock);
+		/* don't leave, but check dispatch queue if cpu == -1 */
+	}
+
 	/*
 	 * Touch any software queue that has pending entries.
 	 */
-	flush_busy_ctxs(hctx, &rq_list);
+	flush_busy_ctxs(hctx, &rq_list, cpu);
 
 	/*
 	 * If we have previous entries on our dispatch list, grab them
@@ -825,34 +922,13 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 		 * blk_mq_run_hw_queue() already checks the STOPPED bit
 		 **/
 		blk_mq_run_hw_queue(hctx, true);
+	} else if (use_time_slice && !cpumask_empty(hctx->cpu_pending_mask)) {
+		long t = hctx->sched_slice_exp - jiffies;
+		t = (t < 0) ? 0 : t;
+		kblockd_schedule_delayed_work_on(blk_mq_hctx_next_cpu(hctx),
+						&hctx->run_work,
+						(unsigned int)t);
 	}
-}
-
-/*
- * It'd be great if the workqueue API had a way to pass
- * in a mask and had some smarts for more clever placement.
- * For now we just round-robin here, switching for every
- * BLK_MQ_CPU_WORK_BATCH queued items.
- */
-static int blk_mq_hctx_next_cpu(struct blk_mq_hw_ctx *hctx)
-{
-	if (hctx->queue->nr_hw_queues == 1)
-		return WORK_CPU_UNBOUND;
-
-	if (--hctx->next_cpu_batch <= 0) {
-		int cpu = hctx->next_cpu, next_cpu;
-
-		next_cpu = cpumask_next(hctx->next_cpu, hctx->cpumask);
-		if (next_cpu >= nr_cpu_ids)
-			next_cpu = cpumask_first(hctx->cpumask);
-
-		hctx->next_cpu = next_cpu;
-		hctx->next_cpu_batch = BLK_MQ_CPU_WORK_BATCH;
-
-		return cpu;
-	}
-
-	return hctx->next_cpu;
 }
 
 void blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async)
@@ -991,7 +1067,10 @@ static void __blk_mq_insert_request(struct blk_mq_hw_ctx *hctx,
 	struct blk_mq_ctx *ctx = rq->mq_ctx;
 
 	__blk_mq_insert_req_list(hctx, ctx, rq, at_head);
+	spin_lock(&hctx->lock);
 	blk_mq_hctx_mark_pending(hctx, ctx);
+	spin_unlock(&hctx->lock);
+
 }
 
 void blk_mq_insert_request(struct request *rq, bool at_head, bool run_queue,
@@ -1580,7 +1659,9 @@ static int blk_mq_hctx_cpu_offline(struct blk_mq_hw_ctx *hctx, int cpu)
 	spin_lock(&ctx->lock);
 	if (!list_empty(&ctx->rq_list)) {
 		list_splice_init(&ctx->rq_list, &tmp);
+		spin_lock(&hctx->lock);
 		blk_mq_hctx_clear_pending(hctx, ctx);
+		spin_unlock(&hctx->lock);
 	}
 	spin_unlock(&ctx->lock);
 
@@ -1599,7 +1680,9 @@ static int blk_mq_hctx_cpu_offline(struct blk_mq_hw_ctx *hctx, int cpu)
 	}
 
 	hctx = q->mq_ops->map_queue(q, ctx->cpu);
+	spin_lock(&hctx->lock);
 	blk_mq_hctx_mark_pending(hctx, ctx);
+	spin_unlock(&hctx->lock);
 
 	spin_unlock(&ctx->lock);
 
@@ -1687,6 +1770,10 @@ static int blk_mq_init_hctx(struct request_queue *q,
 	hctx->queue = q;
 	hctx->queue_num = hctx_idx;
 	hctx->flags = set->flags & ~BLK_MQ_F_TAG_SHARED;
+
+	hctx->use_time_slice = 0;
+	hctx->sched_slice_exp = 0;
+	hctx->sched_cpu = -1;
 
 	blk_mq_init_cpu_notifier(&hctx->cpu_notifier,
 					blk_mq_hctx_notify, hctx);
@@ -2010,6 +2097,18 @@ struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 						node))
 			goto err_hctxs;
 
+		if (!zalloc_cpumask_var_node(&hctxs[i]->cpu_pending_mask,
+						GFP_KERNEL, node))
+			goto err_hctxs;
+
+		if (!zalloc_cpumask_var_node(&hctxs[i]->cpu_service_mask,
+						GFP_KERNEL, node))
+			goto err_hctxs;
+
+		if (!zalloc_cpumask_var_node(&hctxs[i]->cpu_next_mask,
+						GFP_KERNEL, node))
+			goto err_hctxs;
+
 		atomic_set(&hctxs[i]->nr_active, 0);
 		hctxs[i]->numa_node = node;
 		hctxs[i]->queue_num = i;
@@ -2073,6 +2172,9 @@ err_hctxs:
 		if (!hctxs[i])
 			break;
 		free_cpumask_var(hctxs[i]->cpumask);
+		free_cpumask_var(hctxs[i]->cpu_pending_mask);
+		free_cpumask_var(hctxs[i]->cpu_service_mask);
+		free_cpumask_var(hctxs[i]->cpu_next_mask);
 		kfree(hctxs[i]);
 	}
 err_map:
