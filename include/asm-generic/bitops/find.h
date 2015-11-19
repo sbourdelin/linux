@@ -59,4 +59,7 @@ extern unsigned long find_first_zero_bit(const unsigned long *addr,
 
 #endif /* CONFIG_GENERIC_FIND_FIRST_BIT */
 
+extern unsigned int all_bit_is_one(const unsigned long *addr, unsigned size);
+extern unsigned int all_bit_is_zero(const unsigned long *addr, unsigned size);
+
 #endif /*_ASM_GENERIC_BITOPS_FIND_H_ */
