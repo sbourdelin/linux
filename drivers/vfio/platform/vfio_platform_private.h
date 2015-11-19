@@ -39,6 +39,7 @@ struct vfio_platform_irq {
 	struct virqfd		*unmask;
 	struct virqfd		*mask;
 	struct irq_bypass_producer producer;
+	bool			forwarded;
 };
 
 struct vfio_platform_region {
