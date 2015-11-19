@@ -1203,7 +1203,7 @@ static void record_gp_stall_check_time(struct rcu_state *rsp)
  */
 static char *gp_state_getname(short gs)
 {
-	if (gs < 0 || gs > ARRAY_SIZE(gp_state_names))
+	if (gs < 0 || gs >= ARRAY_SIZE(gp_state_names))
 		return "???";
 	return gp_state_names[gs];
 }
