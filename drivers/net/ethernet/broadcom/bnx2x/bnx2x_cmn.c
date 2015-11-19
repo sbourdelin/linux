@@ -3383,13 +3383,24 @@ static __le16 bnx2x_csum_fix(unsigned char *t_header, u16 csum, s8 fix)
 	return bswab16(tsum);
 }
 
+static const struct skb_csum_offl_spec csum_offl_spec = {
+	.ipv4_okay = 1,
+	.ip_options_okay = 1,
+	.ipv6_okay = 1,
+	.encap_okay = 1,
+	.vlan_okay = 1,
+	.tcp_okay = 1,
+	.udp_okay = 1,
+};
+
 static u32 bnx2x_xmit_type(struct bnx2x *bp, struct sk_buff *skb)
 {
 	u32 rc;
 	__u8 prot = 0;
 	__be16 protocol;
+	bool csum_encapped;
 
-	if (skb->ip_summed != CHECKSUM_PARTIAL)
+	if (!skb_csum_offload_chk(skb, &csum_offl_spec, &csum_encapped, true))
 		return XMIT_PLAIN;
 
 	protocol = vlan_get_protocol(skb);
@@ -3401,7 +3412,7 @@ static u32 bnx2x_xmit_type(struct bnx2x *bp, struct sk_buff *skb)
 		prot = ip_hdr(skb)->protocol;
 	}
 
-	if (!CHIP_IS_E1x(bp) && skb->encapsulation) {
+	if (!CHIP_IS_E1x(bp) && csum_encapped) {
 		if (inner_ip_hdr(skb)->version == 6) {
 			rc |= XMIT_CSUM_ENC_V6;
 			if (inner_ipv6_hdr(skb)->nexthdr == IPPROTO_TCP)
