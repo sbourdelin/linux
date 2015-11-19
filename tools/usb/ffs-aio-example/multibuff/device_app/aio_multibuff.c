@@ -263,20 +263,26 @@ int main(int argc, char *argv[])
 	sprintf(ep_path, "%s/ep0", argv[1]);
 	ep0 = open(ep_path, O_RDWR);
 	if (ep0 < 0) {
+		free(ep_path);
 		perror("unable to open ep0");
 		return 1;
 	}
 	if (write(ep0, &descriptors, sizeof(descriptors)) < 0) {
+		close(ep0);
+		free(ep_path);
 		perror("unable do write descriptors");
 		return 1;
 	}
 	if (write(ep0, &strings, sizeof(strings)) < 0) {
+		close(ep0);
+		free(ep_path);
 		perror("unable to write strings");
 		return 1;
 	}
 	sprintf(ep_path, "%s/ep1", argv[1]);
 	ep1 = open(ep_path, O_RDWR);
 	if (ep1 < 0) {
+		free(ep_path);
 		perror("unable to open ep1");
 		return 1;
 	}
