@@ -21,4 +21,5 @@ struct eeprom_93xx46_platform_data {
 	 */
 	void (*prepare)(void *);
 	void (*finish)(void *);
+	unsigned int select_gpio;
 };

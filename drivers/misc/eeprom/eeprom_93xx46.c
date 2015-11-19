@@ -10,11 +10,14 @@
 
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_gpio.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
 #include <linux/sysfs.h>
@@ -344,6 +347,20 @@ static ssize_t eeprom_93xx46_store_erase(struct device *dev,
 static DEVICE_ATTR(erase, S_IWUSR, NULL, eeprom_93xx46_store_erase);
 
 #ifdef CONFIG_OF
+static void select_assert(void *context)
+{
+	struct eeprom_93xx46_dev *edev = context;
+
+	gpiod_set_value_cansleep(gpio_to_desc(edev->pdata->select_gpio), 1);
+}
+
+static void select_deassert(void *context)
+{
+	struct eeprom_93xx46_dev *edev = context;
+
+	gpiod_set_value_cansleep(gpio_to_desc(edev->pdata->select_gpio), 0);
+}
+
 static const struct of_device_id eeprom_93xx46_of_table[] = {
 	{ .compatible = "eeprom-93xx46", },
 	{ .compatible = "atmel,at93c46d", .data = &atmel_at93c46d_data, },
@@ -384,6 +401,15 @@ static int eeprom_93xx46_probe_dt(struct spi_device *spi)
 
 	if (of_property_read_bool(np, "read-only"))
 		pd->flags |= EE_READONLY;
+
+	ret = of_get_named_gpio(np, "select-gpios", 0);
+	if (ret < 0) {
+		pd->select_gpio = -1;
+	} else {
+		pd->select_gpio = ret;
+		pd->prepare = select_assert;
+		pd->finish = select_deassert;
+	}
 
 	if (of_id->data) {
 		const struct eeprom_93xx46_devtype_data *data = of_id->data;
