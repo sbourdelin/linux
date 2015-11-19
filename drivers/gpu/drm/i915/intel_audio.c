@@ -587,7 +587,8 @@ static void i915_audio_component_codec_wake_override(struct device *dev,
 	struct drm_i915_private *dev_priv = dev_to_i915(dev);
 	u32 tmp;
 
-	if (!IS_SKYLAKE(dev_priv) && !IS_KABYLAKE(dev_priv))
+	if (!IS_SKYLAKE(dev_priv) && !IS_BROXTON(dev_priv) &&
+			!IS_KABYLAKE(dev_priv))
 		return;
 
 	/*
