@@ -420,9 +420,6 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 
 		/* Enable PSR on the panel */
 		hsw_psr_enable_sink(intel_dp);
-
-		if (INTEL_INFO(dev)->gen >= 9)
-			intel_psr_activate(intel_dp);
 	} else {
 		vlv_psr_setup_vsc(intel_dp);
 
@@ -441,15 +438,14 @@ void intel_psr_enable(struct intel_dp *intel_dp)
 	/*
 	 * FIXME: Activation should happen immediately since this function
 	 * is just called after pipe is fully trained and enabled.
-	 * However on every platform we face issues when first activation
+	 * However on some platforms we face issues when first activation
 	 * follows a modeset so quickly.
 	 *     - On VLV/CHV we get bank screen on first activation
 	 *     - On HSW/BDW we get a recoverable frozen screen until next
 	 *       exit-activate sequence.
 	 */
-	if (INTEL_INFO(dev)->gen < 9)
-		schedule_delayed_work(&dev_priv->psr.work,
-				      msecs_to_jiffies(intel_dp->panel_power_cycle_delay * 5));
+	schedule_delayed_work(&dev_priv->psr.work,
+			      msecs_to_jiffies(intel_dp->panel_power_cycle_delay * 5));
 
 	dev_priv->psr.enabled = intel_dp;
 unlock:
