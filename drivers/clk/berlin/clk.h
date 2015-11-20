@@ -25,9 +25,21 @@ struct clk_desc {
 	unsigned long	flags;
 };
 
+struct gateclk_desc {
+	const char	*name;
+	const char	*parent_name;
+	u8		bit_idx;
+	unsigned long	flags;
+};
+
 void __init berlin_clk_setup(struct device_node *np,
 			     const struct clk_desc *desc,
 			     struct clk_onecell_data *clk_data,
 			     int n);
+
+void __init berlin_gateclk_setup(struct device_node *np,
+				 const struct gateclk_desc *descs,
+				 struct clk_onecell_data *clk_data,
+				 int n);
 
 #endif
