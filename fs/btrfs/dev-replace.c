@@ -516,12 +516,7 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 	dev_replace->time_stopped = get_seconds();
 	dev_replace->item_needs_writeback = 1;
 
-	/* replace old device with new one in mapping tree */
-	if (!scrub_ret) {
-		btrfs_dev_replace_update_device_in_mapping_tree(fs_info,
-								src_device,
-								tgt_device);
-	} else {
+	if (scrub_ret) {
 		btrfs_err_in_rcu(root->fs_info,
 			      "btrfs_scrub_dev(%s, %llu, %s) failed %d",
 			      src_device->missing ? "<missing disk>" :
@@ -564,6 +559,14 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 		fs_info->fs_devices->latest_bdev = tgt_device->bdev;
 	list_add(&tgt_device->dev_alloc_list, &fs_info->fs_devices->alloc_list);
 	fs_info->fs_devices->rw_devices++;
+
+	/*
+	 * Now that our new device replaced the old device and it's completely
+	 * setup, replace the old device with the new one in the mapping tree.
+	 */
+	btrfs_dev_replace_update_device_in_mapping_tree(fs_info,
+							src_device,
+							tgt_device);
 
 	btrfs_dev_replace_unlock(dev_replace);
 
