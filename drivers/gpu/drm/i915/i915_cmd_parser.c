@@ -806,10 +806,7 @@ find_cmd_in_table(struct intel_engine_cs *ring,
 	hash_for_each_possible(ring->cmd_hash, desc_node, node,
 			       cmd_header & CMD_HASH_MASK) {
 		const struct drm_i915_cmd_descriptor *desc = desc_node->desc;
-		u32 masked_cmd = desc->cmd.mask & cmd_header;
-		u32 masked_value = desc->cmd.value & desc->cmd.mask;
-
-		if (masked_cmd == masked_value)
+		if (((cmd_header ^ desc->cmd.value) & desc->cmd.mask) == 0)
 			return desc;
 	}
 
