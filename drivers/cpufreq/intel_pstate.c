@@ -1110,6 +1110,8 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 	limits->min_policy_pct = clamp_t(int, limits->min_policy_pct, 0 , 100);
 	limits->max_policy_pct = (policy->max * 100) / policy->cpuinfo.max_freq;
 	limits->max_policy_pct = clamp_t(int, limits->max_policy_pct, 0 , 100);
+	limits->max_policy_pct = DIV_ROUND_UP(policy->max * 100,
+					      policy->cpuinfo.max_freq);
 
 	/* Normalize user input to [min_policy_pct, max_policy_pct] */
 	limits->min_perf_pct = max(limits->min_policy_pct,
