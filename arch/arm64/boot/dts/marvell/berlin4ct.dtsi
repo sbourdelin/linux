@@ -42,6 +42,7 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <dt-bindings/clock/berlin4ct.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 
 / {
@@ -135,6 +136,22 @@
 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 		};
 
+		cpupll: cpupll {
+			compatible = "marvell,berlin-pll";
+			reg = <0x922000 0x14>, <0xea0710 4>;
+			#clock-cells = <0>;
+			clocks = <&osc>, <&clk CLK_CPUFASTREF>;
+			bypass-shift = /bits/ 8 <2>;
+		};
+
+		mempll: mempll {
+			compatible = "marvell,berlin-pll";
+			reg = <0x940034 0x14>, <0xea0710 4>;
+			#clock-cells = <0>;
+			clocks = <&osc>, <&clk CLK_MEMFASTREF>;
+			bypass-shift = /bits/ 8 <1>;
+		};
+
 		apb@e80000 {
 			compatible = "simple-bus";
 			#address-cells = <1>;
@@ -223,6 +240,27 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
 			};
+		};
+
+		syspll: syspll {
+			compatible = "marvell,berlin-pll";
+			reg = <0xea0200 0x14>, <0xea0710 4>;
+			#clock-cells = <0>;
+			clocks = <&osc>;
+			bypass-shift = /bits/ 8 <0>;
+		};
+
+		gateclk: gateclk {
+			compatible = "marvell,berlin4ct-gateclk";
+			reg = <0xea0700 4>;
+			#clock-cells = <1>;
+		};
+
+		clk: clk {
+			compatible = "marvell,berlin4ct-clk";
+			reg = <0xea0720 0x144>;
+			#clock-cells = <1>;
+			clocks = <&syspll>;
 		};
 
 		soc_pinctrl: pin-controller@ea8000 {
