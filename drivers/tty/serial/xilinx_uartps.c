@@ -191,9 +191,10 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
 	spin_lock_irqsave(&port->lock, flags);
 
 	/* Read the interrupt status register to determine which
-	 * interrupt(s) is/are active.
+	 * interrupt(s) is/are active and clear them.
 	 */
 	isrstatus = readl(port->membase + CDNS_UART_ISR_OFFSET);
+	writel(isrstatus, port->membase + CDNS_UART_ISR_OFFSET);
 
 	if (isrstatus & CDNS_UART_IXR_TXEMPTY) {
 		cdns_uart_handle_tx(dev_id);
@@ -201,8 +202,6 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
 	}
 	if (isrstatus & CDNS_UART_IXR_MASK)
 		cdns_uart_handle_rx(dev_id, isrstatus);
-
-	writel(isrstatus, port->membase + CDNS_UART_ISR_OFFSET);
 
 	/* be sure to release the lock and tty before leaving */
 	spin_unlock_irqrestore(&port->lock, flags);
@@ -354,37 +353,32 @@ static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
 {
 	struct uart_port *port = (struct uart_port *)dev_id;
 	unsigned int data;
+	unsigned int framerrprocessed = 0;
 	char status = TTY_NORMAL;
 
-	/*
-	 * There is no hardware break detection, so we interpret framing
-	 * error with all-zeros data as a break sequence. Most of the time,
-	 * there's another non-zero byte at the end of the sequence.
-	 */
-	if (isrstatus & CDNS_UART_IXR_FRAMING) {
-		while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
-			CDNS_UART_SR_RXEMPTY)) {
-			if (!readl(port->membase + CDNS_UART_FIFO_OFFSET)) {
+	while ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+		CDNS_UART_SR_RXEMPTY) != CDNS_UART_SR_RXEMPTY) {
+		data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
+		port->icount.rx++;
+
+		/*
+		 * There is no hardware break detection, so we interpret framing
+		 * error with all-zeros data as a break sequence. Most of the
+		 * time, there's another non-zero byte at the end of the
+		 * sequence.
+		 */
+		if (isrstatus & CDNS_UART_IXR_FRAMING) {
+			if (!data) {
 				port->read_status_mask |= CDNS_UART_IXR_BRK;
-				isrstatus &= ~CDNS_UART_IXR_FRAMING;
+				framerrprocessed = 1;
+				continue;
 			}
 		}
-		writel(CDNS_UART_IXR_FRAMING,
-			port->membase + CDNS_UART_ISR_OFFSET);
-	}
 
-	/* drop byte with parity error if IGNPAR specified */
-	if (isrstatus & port->ignore_status_mask & CDNS_UART_IXR_PARITY)
-		isrstatus &= ~(CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT);
-
-	isrstatus &= port->read_status_mask;
-	isrstatus &= ~port->ignore_status_mask;
-	if ((isrstatus & CDNS_UART_IXR_TOUT) ||
-		(isrstatus & CDNS_UART_IXR_RXTRIG)) {
-		/* Receive Timeout Interrupt */
-		while ((readl(port->membase + CDNS_UART_SR_OFFSET) &
-			CDNS_UART_SR_RXEMPTY) != CDNS_UART_SR_RXEMPTY) {
-			data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
+		isrstatus &= port->read_status_mask;
+		isrstatus &= ~port->ignore_status_mask;
+		if ((isrstatus & CDNS_UART_IXR_TOUT) ||
+			(isrstatus & CDNS_UART_IXR_RXTRIG)) {
 
 			/* Non-NULL byte after BREAK is garbage (99%) */
 			if (data && (port->read_status_mask
@@ -416,21 +410,25 @@ static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
 			if (isrstatus & CDNS_UART_IXR_PARITY) {
 				port->icount.parity++;
 				status = TTY_PARITY;
-			} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
+			}
+			if (isrstatus & CDNS_UART_IXR_FRAMING) {
 				port->icount.frame++;
 				status = TTY_FRAME;
-			} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
+			}
+			if (isrstatus & CDNS_UART_IXR_OVERRUN) {
 				port->icount.overrun++;
+				tty_insert_flip_char(&port->state->port, 0,
+								TTY_OVERRUN);
 			}
 
-			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
-								data, status);
+			tty_insert_flip_char(&port->state->port, data, status);
 		}
+	}
 		spin_unlock(&port->lock);
 		tty_flip_buffer_push(&port->state->port);
 		spin_lock(&port->lock);
 }
-}
+
 #ifdef CONFIG_COMMON_CLK
 /**
  * cdns_uart_clk_notitifer_cb - Clock notifier callback
