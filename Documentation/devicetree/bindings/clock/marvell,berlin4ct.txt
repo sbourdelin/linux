@@ -1,0 +1,38 @@
+* Marvell berlin4ct Clock Controllers
+
+This binding uses the common clock binding[1].
+
+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+The berlin4ct clock subsystem generates and supplies clock to various
+controllers within the berlin4ct SoC. The berlin4ct contains 3 clock controller
+blocks: pll, gateclk, berlin-clk.
+
+Required Properties:
+
+- compatible: should be one of the following.
+  - "marvell,berlin-pll" - pll compatible
+  - "marvell,berlin4ct-clk" - berlin clk compatible
+  - "marvell,berlin4ct-gateclk" - gateclk compatible
+- reg: physical base address of the clock controller and length of memory mapped
+  region. For pll, the second reg defines the bypass register base address and
+  length of memory mapped region.
+- #clock-cells: for pll should 0, for gateclk and berlin clk should be 1.
+- #bypass-shift: the bypass bit in bypass register.
+
+Example:
+
+syspll: syspll {
+	compatible = "marvell,berlin-pll";
+	reg = <0xea0200 0x14>, <0xea0710 4>;
+	#clock-cells = <0>;
+	clocks = <&osc>;
+	bypass-shift = /bits/ 8 <0>;
+};
+
+clk: clk {
+	compatible = "marvell,berlin4ct-clk";
+	reg = <0xea0720 0x144>;
+	#clock-cells = <1>;
+	clocks = <&syspll>;
+};
