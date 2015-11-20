@@ -2394,6 +2394,8 @@ struct drm_i915_cmd_descriptor {
 		u32 condition_offset;
 		u32 condition_mask;
 	} bits[MAX_CMD_DESC_BITMASKS];
+
+	struct hlist_node node[I915_NUM_RINGS];
 };
 
 /*
@@ -2403,7 +2405,7 @@ struct drm_i915_cmd_descriptor {
  * descriptors, which must be sorted with command opcodes in ascending order.
  */
 struct drm_i915_cmd_table {
-	const struct drm_i915_cmd_descriptor *table;
+	struct drm_i915_cmd_descriptor *table;
 	int count;
 };
 

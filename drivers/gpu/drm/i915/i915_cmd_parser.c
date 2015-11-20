@@ -113,7 +113,7 @@
 
 /*            Command                          Mask   Fixed Len   Action
 	      ---------------------------------------------------------- */
-static const struct drm_i915_cmd_descriptor common_cmds[] = {
+static struct drm_i915_cmd_descriptor common_cmds[] = {
 	CMD(  MI_NOOP,                          SMI,    F,  1,      S  ),
 	CMD(  MI_USER_INTERRUPT,                SMI,    F,  1,      R  ),
 	CMD(  MI_WAIT_FOR_EVENT,                SMI,    F,  1,      M  ),
@@ -146,7 +146,7 @@ static const struct drm_i915_cmd_descriptor common_cmds[] = {
 	CMD(  MI_BATCH_BUFFER_START,            SMI,   !F,  0xFF,   S  ),
 };
 
-static const struct drm_i915_cmd_descriptor render_cmds[] = {
+static struct drm_i915_cmd_descriptor render_cmds[] = {
 	CMD(  MI_FLUSH,                         SMI,    F,  1,      S  ),
 	CMD(  MI_ARB_ON_OFF,                    SMI,    F,  1,      R  ),
 	CMD(  MI_PREDICATE,                     SMI,    F,  1,      S  ),
@@ -207,7 +207,7 @@ static const struct drm_i915_cmd_descriptor render_cmds[] = {
 	      }},						       ),
 };
 
-static const struct drm_i915_cmd_descriptor hsw_render_cmds[] = {
+static struct drm_i915_cmd_descriptor hsw_render_cmds[] = {
 	CMD(  MI_SET_PREDICATE,                 SMI,    F,  1,      S  ),
 	CMD(  MI_RS_CONTROL,                    SMI,    F,  1,      S  ),
 	CMD(  MI_URB_ATOMIC_ALLOC,              SMI,    F,  1,      S  ),
@@ -229,7 +229,7 @@ static const struct drm_i915_cmd_descriptor hsw_render_cmds[] = {
 	CMD(  GFX_OP_3DSTATE_BINDING_TABLE_EDIT_PS,  S3D,   !F,  0x1FF,  S  ),
 };
 
-static const struct drm_i915_cmd_descriptor video_cmds[] = {
+static struct drm_i915_cmd_descriptor video_cmds[] = {
 	CMD(  MI_ARB_ON_OFF,                    SMI,    F,  1,      R  ),
 	CMD(  MI_SET_APPID,                     SMI,    F,  1,      S  ),
 	CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0xFF,   B,
@@ -273,7 +273,7 @@ static const struct drm_i915_cmd_descriptor video_cmds[] = {
 	CMD(  MFX_WAIT,                         SMFX,   F,  1,      S  ),
 };
 
-static const struct drm_i915_cmd_descriptor vecs_cmds[] = {
+static struct drm_i915_cmd_descriptor vecs_cmds[] = {
 	CMD(  MI_ARB_ON_OFF,                    SMI,    F,  1,      R  ),
 	CMD(  MI_SET_APPID,                     SMI,    F,  1,      S  ),
 	CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0xFF,   B,
@@ -311,7 +311,7 @@ static const struct drm_i915_cmd_descriptor vecs_cmds[] = {
 	      }},						       ),
 };
 
-static const struct drm_i915_cmd_descriptor blt_cmds[] = {
+static struct drm_i915_cmd_descriptor blt_cmds[] = {
 	CMD(  MI_DISPLAY_FLIP,                  SMI,   !F,  0xFF,   R  ),
 	CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0x3FF,  B,
 	      .bits = {{
@@ -344,7 +344,7 @@ static const struct drm_i915_cmd_descriptor blt_cmds[] = {
 	CMD(  SRC_COPY_BLT,                     S2D,   !F,  0x3F,   S  ),
 };
 
-static const struct drm_i915_cmd_descriptor hsw_blt_cmds[] = {
+static struct drm_i915_cmd_descriptor hsw_blt_cmds[] = {
 	CMD(  MI_LOAD_SCAN_LINES_INCL,          SMI,   !F,  0x3F,   M  ),
 	CMD(  MI_LOAD_SCAN_LINES_EXCL,          SMI,   !F,  0x3F,   R  ),
 };
@@ -618,11 +618,6 @@ static bool validate_regs_sorted(struct intel_engine_cs *ring)
 			     ring->master_reg_count);
 }
 
-struct cmd_node {
-	const struct drm_i915_cmd_descriptor *desc;
-	struct hlist_node node;
-};
-
 /*
  * Different command ranges have different numbers of bits for the opcode. For
  * example, MI commands use bits 31:23 while 3D commands use bits 31:16. The
@@ -651,33 +646,13 @@ static int init_hash_table(struct intel_engine_cs *ring,
 		const struct drm_i915_cmd_table *table = &cmd_tables[i];
 
 		for (j = 0; j < table->count; j++) {
-			const struct drm_i915_cmd_descriptor *desc =
-				&table->table[j];
-			struct cmd_node *desc_node =
-				kmalloc(sizeof(*desc_node), GFP_KERNEL);
-
-			if (!desc_node)
-				return -ENOMEM;
-
-			desc_node->desc = desc;
-			hash_add(ring->cmd_hash, &desc_node->node,
+			struct drm_i915_cmd_descriptor *desc = &table->table[j];
+			hash_add(ring->cmd_hash, &desc->node[ring->id],
 				 desc->cmd.value & CMD_HASH_MASK);
 		}
 	}
 
 	return 0;
-}
-
-static void fini_hash_table(struct intel_engine_cs *ring)
-{
-	struct hlist_node *tmp;
-	struct cmd_node *desc_node;
-	int i;
-
-	hash_for_each_safe(ring->cmd_hash, i, tmp, desc_node, node) {
-		hash_del(&desc_node->node);
-		kfree(desc_node);
-	}
 }
 
 /**
@@ -770,7 +745,6 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *ring)
 	ret = init_hash_table(ring, cmd_tables, cmd_table_count);
 	if (ret) {
 		DRM_ERROR("CMD: cmd_parser_init failed!\n");
-		fini_hash_table(ring);
 		return ret;
 	}
 
@@ -790,8 +764,6 @@ void i915_cmd_parser_fini_ring(struct intel_engine_cs *ring)
 {
 	if (!ring->needs_cmd_parser)
 		return;
-
-	fini_hash_table(ring);
 }
 
 /*
@@ -801,11 +773,10 @@ static const struct drm_i915_cmd_descriptor*
 find_cmd_in_table(struct intel_engine_cs *ring,
 		  u32 cmd_header)
 {
-	struct cmd_node *desc_node;
+	const struct drm_i915_cmd_descriptor *desc;
 
-	hash_for_each_possible(ring->cmd_hash, desc_node, node,
+	hash_for_each_possible(ring->cmd_hash, desc, node[ring->id],
 			       cmd_header & CMD_HASH_MASK) {
-		const struct drm_i915_cmd_descriptor *desc = desc_node->desc;
 		if (((cmd_header ^ desc->cmd.value) & desc->cmd.mask) == 0)
 			return desc;
 	}
