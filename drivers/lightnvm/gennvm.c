@@ -60,6 +60,8 @@ static int gennvm_luns_init(struct nvm_dev *dev, struct gen_nvm *gn)
 		lun->vlun.lun_id = i % dev->luns_per_chnl;
 		lun->vlun.chnl_id = i / dev->luns_per_chnl;
 		lun->vlun.nr_free_blocks = dev->blks_per_lun;
+		lun->vlun.nr_inuse_blocks = 0;
+		lun->vlun.nr_bad_blocks = 0;
 	}
 	return 0;
 }
@@ -84,6 +86,7 @@ static int gennvm_block_bb(u32 lun_id, void *bb_bitmap, unsigned int nr_blocks,
 		}
 
 		list_move_tail(&blk->list, &lun->bb_list);
+		lun->vlun.nr_bad_blocks++;
 	}
 
 	return 0;
@@ -136,6 +139,7 @@ static int gennvm_block_map(u64 slba, u32 nlb, __le64 *entries, void *private)
 			list_move_tail(&blk->list, &lun->used_list);
 			blk->type = 1;
 			lun->vlun.nr_free_blocks--;
+			lun->vlun.nr_inuse_blocks++;
 		}
 	}
 
@@ -164,8 +168,10 @@ static int gennvm_blocks_init(struct nvm_dev *dev, struct gen_nvm *gn)
 			block->id = cur_block_id++;
 
 			/* First block is reserved for device */
-			if (unlikely(lun_iter == 0 && blk_iter == 0))
+			if (unlikely(lun_iter == 0 && blk_iter == 0)) {
+				lun->vlun.nr_free_blocks--;
 				continue;
+			}
 
 			list_add_tail(&block->list, &lun->free_list);
 		}
@@ -254,6 +260,7 @@ static struct nvm_block *gennvm_get_blk(struct nvm_dev *dev,
 	blk->type = 1;
 
 	lun->vlun.nr_free_blocks--;
+	lun->vlun.nr_inuse_blocks++;
 
 	spin_unlock(&vlun->lock);
 out:
@@ -271,16 +278,21 @@ static void gennvm_put_blk(struct nvm_dev *dev, struct nvm_block *blk)
 	case 1:
 		list_move_tail(&blk->list, &lun->free_list);
 		lun->vlun.nr_free_blocks++;
+		lun->vlun.nr_inuse_blocks--;
 		blk->type = 0;
 		break;
 	case 2:
 		list_move_tail(&blk->list, &lun->bb_list);
+		lun->vlun.nr_bad_blocks++;
+		lun->vlun.nr_inuse_blocks--;
 		break;
 	default:
 		WARN_ON_ONCE(1);
 		pr_err("gennvm: erroneous block type (%lu -> %u)\n",
 							blk->id, blk->type);
 		list_move_tail(&blk->list, &lun->bb_list);
+		lun->vlun.nr_bad_blocks++;
+		lun->vlun.nr_inuse_blocks--;
 	}
 
 	spin_unlock(&vlun->lock);
