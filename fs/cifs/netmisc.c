@@ -910,10 +910,6 @@ smbCalcSize(void *buf)
 		2 /* size of the bcc field */ + get_bcc(ptr));
 }
 
-/* The following are taken from fs/ntfs/util.c */
-
-#define NTFS_TIME_OFFSET ((u64)(369*365 + 89) * 24 * 3600 * 10000000)
-
 /*
  * Convert the NT UTC (based 1601-01-01, in hundred nanosecond units)
  * into Unix UTC (based 1970-01-01, in seconds).

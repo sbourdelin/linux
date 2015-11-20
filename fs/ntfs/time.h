@@ -27,8 +27,6 @@
 
 #include "endian.h"
 
-#define NTFS_TIME_OFFSET ((s64)(369 * 365 + 89) * 24 * 3600 * 10000000)
-
 /**
  * utc2ntfs - convert Linux UTC time to NTFS time
  * @ts:		Linux UTC time to convert to NTFS time

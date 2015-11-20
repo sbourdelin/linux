@@ -6,6 +6,8 @@
 
 typedef __s64 time64_t;
 
+#define NTFS_TIME_OFFSET ((u64)(369*365 + 89) * 24 * 3600 * 10000000)
+
 /*
  * This wants to go into uapi/linux/time.h once we agreed about the
  * userspace interfaces.

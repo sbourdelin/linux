@@ -207,6 +207,30 @@ cifs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
+/*
+ * Read filesystem information.
+ */
+static int cifs_get_fsinfo(struct dentry *dentry, struct fsinfo *f,
+			   unsigned flags)
+{
+	f->f_namelen = PATH_MAX;
+
+	/* Times are signed 64-bit values with a granularity of 100ns
+	 * with a zero point of 1st Jan 1601.
+	 */
+	f->f_min_time = S64_MIN / 10000000 - NTFS_TIME_OFFSET;
+	f->f_max_time = S64_MAX / 10000000 - NTFS_TIME_OFFSET;
+	f->f_atime_gran_exponent = -7;
+	f->f_btime_gran_exponent = -7;
+	f->f_ctime_gran_exponent = -7;
+	f->f_mtime_gran_exponent = -7;
+
+	f->f_supported_ioc_flags =
+		FS_IMMUTABLE_FL | FS_COMPR_FL | FS_HIDDEN_FL |
+		FS_SYSTEM_FL | FS_ARCHIVE_FL;
+	return 0;
+}
+
 static long cifs_fallocate(struct file *file, int mode, loff_t off, loff_t len)
 {
 	struct cifs_sb_info *cifs_sb = CIFS_FILE_SB(file);
@@ -571,6 +595,7 @@ static int cifs_drop_inode(struct inode *inode)
 
 static const struct super_operations cifs_super_ops = {
 	.statfs = cifs_statfs,
+	.get_fsinfo	= cifs_get_fsinfo,
 	.alloc_inode = cifs_alloc_inode,
 	.destroy_inode = cifs_destroy_inode,
 	.drop_inode	= cifs_drop_inode,
