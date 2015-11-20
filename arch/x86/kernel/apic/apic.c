@@ -82,6 +82,12 @@ physid_mask_t phys_cpu_present_map;
 static unsigned int disabled_cpu_apicid __read_mostly = BAD_APICID;
 
 /*
+ * This variable controls which CPUs receive external NMIs.  By default,
+ * external NMIs are delivered to only BSP.
+ */
+static int apic_extnmi = APIC_EXTNMI_BSP;
+
+/*
  * Map cpu index to physical APIC ID
  */
 DEFINE_EARLY_PER_CPU_READ_MOSTLY(u16, x86_cpu_to_apicid, BAD_APICID);
@@ -1161,6 +1167,8 @@ void __init init_bsp_APIC(void)
 	value = APIC_DM_NMI;
 	if (!lapic_is_integrated())		/* 82489DX */
 		value |= APIC_LVT_LEVEL_TRIGGER;
+	if (apic_extnmi == APIC_EXTNMI_NONE)
+		value |= APIC_LVT_MASKED;
 	apic_write(APIC_LVT1, value);
 }
 
@@ -1380,7 +1388,8 @@ void setup_local_APIC(void)
 	/*
 	 * only the BP should see the LINT1 NMI signal, obviously.
 	 */
-	if (!cpu)
+	if ((!cpu && apic_extnmi != APIC_EXTNMI_NONE) ||
+	    apic_extnmi == APIC_EXTNMI_ALL)
 		value = APIC_DM_NMI;
 	else
 		value = APIC_DM_NMI | APIC_LVT_MASKED;
@@ -2548,3 +2557,23 @@ static int __init apic_set_disabled_cpu_apicid(char *arg)
 	return 0;
 }
 early_param("disable_cpu_apicid", apic_set_disabled_cpu_apicid);
+
+static int __init apic_set_extnmi(char *arg)
+{
+	if (!arg)
+		return -EINVAL;
+
+	if (strcmp("all", arg) == 0)
+		apic_extnmi = APIC_EXTNMI_ALL;
+	else if (strcmp("none", arg) == 0)
+		apic_extnmi = APIC_EXTNMI_NONE;
+	else if (strcmp("bsp", arg) == 0)
+		apic_extnmi = APIC_EXTNMI_BSP;
+	else {
+		pr_warn("Unknown external NMI delivery mode `%s' is ignored\n",
+			arg);
+	}
+
+	return 0;
+}
+early_param("apic_extnmi", apic_set_extnmi);
