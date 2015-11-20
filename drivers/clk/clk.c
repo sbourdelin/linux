@@ -3051,25 +3051,17 @@ int of_clk_get_parent_count(struct device_node *np)
 }
 EXPORT_SYMBOL_GPL(of_clk_get_parent_count);
 
-const char *of_clk_get_parent_name(struct device_node *np, int index)
+const char *of_clk_get_name(struct device_node *np, int index)
 {
-	struct of_phandle_args clkspec;
 	const char *clk_name;
 	const __be32 *list;
-	int rc, len, i;
-	struct clk *clk;
+	int len, i, rc;
 
-	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
-					&clkspec);
-	if (rc)
-		return NULL;
-
-	index = clkspec.args_count ? clkspec.args[0] : 0;
-
-	/* if there is an indices property, use it to transfer the index
+	/*
+	 * if there is an indices property, use it to transfer the index
 	 * specified into an array offset for the clock-output-names property.
 	 */
-	list = of_get_property(clkspec.np, "clock-indices", &len);
+	list = of_get_property(np, "clock-indices", &len);
 	if (list) {
 		len /= sizeof(*list);
 		for (i = 0; i < len; i++)
@@ -3081,9 +3073,29 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
 			return NULL;
 	}
 
-	if (of_property_read_string_index(clkspec.np, "clock-output-names",
-					  index,
-					  &clk_name) < 0) {
+	rc = of_property_read_string_index(np, "clock-output-names", index,
+					   &clk_name);
+
+	return rc ? NULL : clk_name;
+}
+EXPORT_SYMBOL_GPL(of_clk_get_name);
+
+const char *of_clk_get_parent_name(struct device_node *np, int index)
+{
+	struct of_phandle_args clkspec;
+	const char *clk_name;
+	struct clk *clk;
+	int rc;
+
+	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
+					&clkspec);
+	if (rc)
+		return NULL;
+
+	index = clkspec.args_count ? clkspec.args[0] : 0;
+
+	clk_name = of_clk_get_name(clkspec.np, index);
+	if (!clk_name) {
 		/*
 		 * Best effort to get the name if the clock has been
 		 * registered with the framework. If the clock isn't
@@ -3101,7 +3113,6 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
 			clk_put(clk);
 		}
 	}
-
 
 	of_node_put(clkspec.np);
 	return clk_name;
