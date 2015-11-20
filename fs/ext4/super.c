@@ -73,6 +73,8 @@ static void ext4_clear_journal_err(struct super_block *sb,
 static int ext4_sync_fs(struct super_block *sb, int wait);
 static int ext4_remount(struct super_block *sb, int *flags, char *data);
 static int ext4_statfs(struct dentry *dentry, struct kstatfs *buf);
+static int ext4_get_fsinfo(struct dentry *dentry, struct fsinfo *f,
+			   unsigned flags);
 static int ext4_unfreeze(struct super_block *sb);
 static int ext4_freeze(struct super_block *sb);
 static struct dentry *ext4_mount(struct file_system_type *fs_type, int flags,
@@ -1122,6 +1124,7 @@ static const struct super_operations ext4_sops = {
 	.freeze_fs	= ext4_freeze,
 	.unfreeze_fs	= ext4_unfreeze,
 	.statfs		= ext4_statfs,
+	.get_fsinfo	= ext4_get_fsinfo,
 	.remount_fs	= ext4_remount,
 	.show_options	= ext4_show_options,
 #ifdef CONFIG_QUOTA
@@ -3524,6 +3527,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (sb->s_magic != EXT4_SUPER_MAGIC)
 		goto cantfind_ext4;
 	sbi->s_kbytes_written = le64_to_cpu(es->s_kbytes_written);
+	memcpy(sb->s_uuid, es->s_uuid, sizeof(sb->s_uuid));
 
 	/* Warn if metadata_csum and gdt_csum are both set. */
 	if (EXT4_HAS_RO_COMPAT_FEATURE(sb,
@@ -5177,6 +5181,41 @@ static int ext4_statfs(struct dentry *dentry, struct kstatfs *buf)
 	buf->f_fsid.val[1] = (fsid >> 32) & 0xFFFFFFFFUL;
 
 	return 0;
+}
+
+/*
+ * Read filesystem information.
+ */
+static int ext4_get_fsinfo(struct dentry *dentry, struct fsinfo *f,
+			   unsigned flags)
+{
+	struct super_block *sb = dentry->d_sb;
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
+	struct ext4_super_block *es = sbi->s_es;
+	struct inode *inode = d_inode(dentry);
+	struct ext4_inode *raw_inode;
+	struct ext4_inode_info *ei = EXT4_I(inode);
+
+	strcpy(f->f_volume_name, es->s_volume_name);
+
+	f->f_mask = FSINFO_FSID | FSINFO_VOLUME_NAME;
+	f->f_supported_ioc_flags = EXT4_FL_USER_VISIBLE;
+
+	f->f_min_time = S32_MIN;
+	f->f_max_time = S32_MAX;
+
+	if (EXT4_FITS_IN_INODE(raw_inode, ei, i_ctime_extra))
+		f->f_ctime_gran_exponent = -9;
+	if (EXT4_FITS_IN_INODE(raw_inode, ei, i_mtime_extra))
+		f->f_mtime_gran_exponent = -9;
+	if (EXT4_FITS_IN_INODE(raw_inode, ei, i_atime_extra)) {
+		f->f_atime_gran_exponent = -9;
+		f->f_max_time += ((1 << EXT4_EPOCH_BITS) - 1) * 0x100000000LL;
+	}
+	if (EXT4_FITS_IN_INODE(raw_inode, ei, i_crtime_extra))
+		f->f_btime_gran_exponent = -9;
+
+	return vfs_get_fsinfo_from_statfs(dentry, f, flags);
 }
 
 /* Helper function for writing quotas on sync - we need to start transaction
