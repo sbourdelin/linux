@@ -723,19 +723,23 @@ struct move_extent {
 	<= (EXT4_GOOD_OLD_INODE_SIZE +			\
 	    (einode)->i_extra_isize))			\
 
-static inline __le32 ext4_encode_extra_time(struct timespec *time)
+static inline void ext4_decode_extra_time(struct timespec *time, __le32 _extra)
 {
-       return cpu_to_le32((sizeof(time->tv_sec) > 4 ?
-			   (time->tv_sec >> 32) & EXT4_EPOCH_MASK : 0) |
-                          ((time->tv_nsec << EXT4_EPOCH_BITS) & EXT4_NSEC_MASK));
+	u32 extra = le32_to_cpu(_extra);
+	u32 epoch = extra & EXT4_EPOCH_MASK;
+
+	time->tv_sec = (s32)time->tv_sec + ((s64)epoch  << 32);
+	time->tv_nsec = (extra & EXT4_NSEC_MASK) >> EXT4_EPOCH_BITS;
 }
 
-static inline void ext4_decode_extra_time(struct timespec *time, __le32 extra)
+static inline __le32 ext4_encode_extra_time(struct timespec *time)
 {
-       if (sizeof(time->tv_sec) > 4)
-	       time->tv_sec |= (__u64)(le32_to_cpu(extra) & EXT4_EPOCH_MASK)
-			       << 32;
-       time->tv_nsec = (le32_to_cpu(extra) & EXT4_NSEC_MASK) >> EXT4_EPOCH_BITS;
+	u32 extra;
+	s64 epoch = time->tv_sec - (s32)time->tv_sec;
+
+	extra = (epoch >> 32) & EXT4_EPOCH_MASK;
+	extra |= (time->tv_nsec << EXT4_EPOCH_BITS) & EXT4_NSEC_MASK;
+	return cpu_to_le32(extra);
 }
 
 #define EXT4_INODE_SET_XTIME(xtime, inode, raw_inode)			       \
