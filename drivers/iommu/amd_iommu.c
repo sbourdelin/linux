@@ -3603,6 +3603,7 @@ static struct irq_remap_table *get_irq_table(u16 devid, bool ioapic)
 	}
 
 	irq_lookup_table[devid] = table;
+	kmemleak_ignore(table);
 	set_dte_irq_entry(devid, table);
 	iommu_flush_dte(iommu, devid);
 	if (devid != alias) {
