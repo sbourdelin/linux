@@ -1042,6 +1042,55 @@ unpin_ctx_obj:
 	return ret;
 }
 
+static void intel_lr_context_do_unpin(struct intel_engine_cs *ring,
+		struct intel_context *ctx)
+{
+	struct drm_device *dev = ring->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_gem_object *ctx_obj;
+
+	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+
+	ctx_obj = ctx->engine[ring->id].state;
+	if (!ctx_obj)
+		return;
+
+	i915_gem_object_ggtt_unpin(ctx_obj);
+	intel_unpin_ringbuffer_obj(ctx->engine[ring->id].ringbuf);
+
+	/* Invalidate GuC TLB. */
+	if (i915.enable_guc_submission)
+		I915_WRITE(GEN8_GTCR, GEN8_GTCR_INVALIDATE);
+}
+
+static void set_last_lrc(struct intel_engine_cs *ring,
+		struct intel_context *ctx)
+{
+	struct intel_context *last;
+
+	/* Unpin will be deferred, so the release of lrc. Hold pin & ref count
+	 * untill we receive the retire of next request. */
+	if (ctx) {
+		ctx->engine[ring->id].pin_count++;
+		i915_gem_context_reference(ctx);
+	}
+
+	last = ring->last_context;
+	ring->last_context = ctx;
+
+	if (last == NULL)
+		return;
+
+	/* Unpin is on hold for last context. Release pincount first. Then if HW
+	 * completes request from another lrc, try to do the actual unpin. */
+	last->engine[ring->id].pin_count--;
+	if (last != ctx && !last->engine[ring->id].pin_count)
+		intel_lr_context_do_unpin(ring, last);
+
+	/* Release previous context refcount that on hold */
+	i915_gem_context_unreference(last);
+}
+
 static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 {
 	int ret = 0;
@@ -1065,14 +1114,11 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 {
 	struct intel_engine_cs *ring = rq->ring;
 	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct intel_ringbuffer *ringbuf = rq->ringbuf;
 
 	if (ctx_obj) {
 		WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
-		if (--rq->ctx->engine[ring->id].pin_count == 0) {
-			intel_unpin_ringbuffer_obj(ringbuf);
-			i915_gem_object_ggtt_unpin(ctx_obj);
-		}
+		--rq->ctx->engine[ring->id].pin_count;
+		set_last_lrc(ring, rq->ctx);
 	}
 }
 
@@ -1883,6 +1929,9 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	}
 
 	lrc_destroy_wa_ctx_obj(ring);
+
+	/* this will clean up last lrc */
+	set_last_lrc(ring, NULL);
 }
 
 static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *ring)
