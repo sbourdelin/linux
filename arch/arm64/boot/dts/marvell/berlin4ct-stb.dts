@@ -61,6 +61,56 @@
 	};
 };
 
+&avio_pinctrl {
+	twsi1_pmux: twsi1-pmux {
+		groups = "TX_EDDC_SCL", "TX_EDDC_SDA";
+		function = "tx_eddc";
+	};
+};
+
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&twsi0_pmux>;
+	pinctrl-names = "default";
+};
+
+&i2c1 {
+	status = "okay";
+	pinctrl-0 = <&twsi1_pmux>;
+	pinctrl-names = "default";
+};
+
+&i2c2 {
+	status = "okay";
+	pinctrl-0 = <&twsi2_pmux>;
+	pinctrl-names = "default";
+};
+
+&i2c3 {
+	status = "okay";
+	pinctrl-0 = <&twsi3_pmux>;
+	pinctrl-names = "default";
+};
+
+&soc_pinctrl {
+	twsi0_pmux: twsi0-pmux {
+		groups = "TW0_SCL", "TW0_SDA";
+		function = "tw0";
+	};
+};
+
+&system_pinctrl {
+	twsi2_pmux: twsi2-pmux {
+		groups = "SM_TW2_SCL", "SM_TW2_SDA";
+		function = "tw2";
+	};
+
+	twsi3_pmux: twsi3-pmux {
+		groups = "SM_TW3_SCL", "SM_TW3_SDA";
+		function = "tw3";
+	};
+};
+
 &uart0 {
 	status = "okay";
 };
