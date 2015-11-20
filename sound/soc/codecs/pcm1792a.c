@@ -91,14 +91,9 @@ static int pcm1792a_digital_mute(struct snd_soc_dai *dai, int mute)
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct pcm1792a_private *priv = snd_soc_codec_get_drvdata(codec);
-	int ret;
 
-	ret = regmap_update_bits(priv->regmap, PCM1792A_SOFT_MUTE,
+	return regmap_update_bits(priv->regmap, PCM1792A_SOFT_MUTE,
 				 PCM1792A_MUTE_MASK, !!mute);
-	if (ret < 0)
-		return ret;
-
-	return 0;
 }
 
 static int pcm1792a_hw_params(struct snd_pcm_substream *substream,
@@ -107,7 +102,8 @@ static int pcm1792a_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct pcm1792a_private *priv = snd_soc_codec_get_drvdata(codec);
-	int val = 0, ret;
+	int val = 0;
+	int ret = 0;
 
 	priv->rate = params_rate(params);
 
@@ -147,10 +143,8 @@ static int pcm1792a_hw_params(struct snd_pcm_substream *substream,
 
 	ret = regmap_update_bits(priv->regmap, PCM1792A_FMT_CONTROL,
 				 PCM1792A_FMT_MASK | PCM1792A_ATLD_ENABLE, val);
-	if (ret < 0)
-		return ret;
 
-	return 0;
+	return ret;
 }
 
 static const struct snd_soc_dai_ops pcm1792a_dai_ops = {
