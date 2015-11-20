@@ -645,12 +645,23 @@ static bool nfs_need_revalidate_inode(struct inode *inode)
 int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = d_inode(dentry);
-	int need_atime = NFS_I(inode)->cache_validity & NFS_INO_INVALID_ATIME;
+	bool force_sync = stat->query_flags & AT_FORCE_ATTR_SYNC;
+	bool suppress_sync = stat->query_flags & AT_NO_ATTR_SYNC;
+	bool need_atime = NFS_I(inode)->cache_validity & NFS_INO_INVALID_ATIME;
 	int err = 0;
 
 	trace_nfs_getattr_enter(inode);
-	/* Flush out writes to the server in order to update c/mtime.  */
-	if (S_ISREG(inode->i_mode)) {
+
+	if (NFS_SERVER(inode)->nfs_client->rpc_ops->version < 4)
+		stat->request_mask &= ~STATX_VERSION;
+
+	/* Flush out writes to the server in order to update c/mtime or data
+	 * version if the user wants them.
+	 */
+	if (S_ISREG(inode->i_mode) && !suppress_sync &&
+	    (force_sync || (stat->request_mask &
+			    (STATX_MTIME | STATX_CTIME | STATX_VERSION)))
+	    ) {
 		mutex_lock(&inode->i_mutex);
 		err = nfs_sync_inode(inode);
 		mutex_unlock(&inode->i_mutex);
@@ -667,11 +678,16 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 	 *  - NFS never sets MS_NOATIME or MS_NODIRATIME so there is
 	 *    no point in checking those.
 	 */
- 	if ((mnt->mnt_flags & MNT_NOATIME) ||
- 	    ((mnt->mnt_flags & MNT_NODIRATIME) && S_ISDIR(inode->i_mode)))
-		need_atime = 0;
+	if ((mnt->mnt_flags & MNT_NOATIME) ||
+	    ((mnt->mnt_flags & MNT_NODIRATIME) && S_ISDIR(inode->i_mode))) {
+		stat->ioc_flags |= FS_NOATIME_FL;
+		need_atime = false;
+	} else if (!(stat->request_mask & STATX_ATIME)) {
+		need_atime = false;
+	}
 
-	if (need_atime || nfs_need_revalidate_inode(inode)) {
+	if (!suppress_sync &&
+	    (force_sync || need_atime || nfs_need_revalidate_inode(inode))) {
 		struct nfs_server *server = NFS_SERVER(inode);
 
 		if (server->caps & NFS_CAP_READDIRPLUS)
@@ -684,6 +700,21 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 		if (S_ISDIR(inode->i_mode))
 			stat->blksize = NFS_SERVER(inode)->dtsize;
 	}
+
+	generic_fillattr(inode, stat);
+	stat->ino = nfs_compat_user_ino64(NFS_FILEID(inode));
+
+	if (stat->request_mask & STATX_VERSION) {
+		stat->version = inode->i_version;
+		stat->result_mask |= STATX_VERSION;
+	}
+
+	if (IS_AUTOMOUNT(inode))
+		stat->information |= STATX_INFO_FABRICATED;
+
+	stat->information |= STATX_INFO_REMOTE;
+	stat->result_mask |= STATX_IOC_FLAGS;
+
 out:
 	trace_nfs_getattr_exit(inode, err);
 	return err;
