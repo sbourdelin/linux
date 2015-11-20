@@ -27,6 +27,8 @@ Required properties:
 			  derive HCK, SCK and FS.
 	"fsys"		  The system clock derived from ahb clock used to
 			  derive HCK, SCK and FS.
+	"spba"		  The spba clock is needed when two spba master port
+			  is used.
 
   - fsl,fifo-depth	: The number of elements in the transmit and receive
 			  FIFOs. This number is the maximum allowed value for
