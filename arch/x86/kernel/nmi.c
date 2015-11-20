@@ -29,6 +29,7 @@
 #include <asm/mach_traps.h>
 #include <asm/nmi.h>
 #include <asm/x86_init.h>
+#include <asm/reboot.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/nmi.h>
@@ -231,7 +232,7 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
 #endif
 
 	if (panic_on_unrecovered_nmi)
-		nmi_panic("NMI: Not continuing");
+		nmi_panic(regs, "NMI: Not continuing");
 
 	pr_emerg("Dazed and confused, but trying to continue\n");
 
@@ -256,7 +257,7 @@ io_check_error(unsigned char reason, struct pt_regs *regs)
 	show_regs(regs);
 
 	if (panic_on_io_nmi) {
-		nmi_panic("NMI IOCK error: Not continuing");
+		nmi_panic(regs, "NMI IOCK error: Not continuing");
 
 		/*
 		 * If we return from nmi_panic(), it means we have received
@@ -305,7 +306,7 @@ unknown_nmi_error(unsigned char reason, struct pt_regs *regs)
 
 	pr_emerg("Do you have a strange power saving mode enabled?\n");
 	if (unknown_nmi_panic || panic_on_unrecovered_nmi)
-		nmi_panic("NMI: Not continuing");
+		nmi_panic(regs, "NMI: Not continuing");
 
 	pr_emerg("Dazed and confused, but trying to continue\n");
 }
@@ -357,7 +358,15 @@ static void default_do_nmi(struct pt_regs *regs)
 	}
 
 	/* Non-CPU-specific NMI: NMI sources can be processed on any CPU */
-	raw_spin_lock(&nmi_reason_lock);
+
+	/*
+	 * Another CPU may be processing panic routines with holding
+	 * nmi_reason_lock.  Check IPI issuance from the panicking CPU
+	 * and call the callback directly.
+	 */
+	while (!raw_spin_trylock(&nmi_reason_lock))
+		poll_crash_ipi_and_callback(regs);
+
 	reason = x86_platform.get_nmi_reason();
 
 	if (reason & NMI_REASON_MASK) {
