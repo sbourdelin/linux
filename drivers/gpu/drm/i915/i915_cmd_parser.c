@@ -860,100 +860,6 @@ find_reg(const struct drm_i915_reg_descriptor *table,
 	return NULL;
 }
 
-static u32 *vmap_batch(struct drm_i915_gem_object *obj,
-		       unsigned start, unsigned len)
-{
-	int i;
-	void *addr = NULL;
-	struct sg_page_iter sg_iter;
-	int first_page = start >> PAGE_SHIFT;
-	int last_page = (len + start + 4095) >> PAGE_SHIFT;
-	int npages = last_page - first_page;
-	struct page **pages;
-
-	pages = drm_malloc_ab(npages, sizeof(*pages));
-	if (pages == NULL) {
-		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
-		goto finish;
-	}
-
-	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, first_page) {
-		pages[i++] = sg_page_iter_page(&sg_iter);
-		if (i == npages)
-			break;
-	}
-
-	addr = vmap(pages, i, 0, PAGE_KERNEL);
-	if (addr == NULL) {
-		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
-		goto finish;
-	}
-
-finish:
-	if (pages)
-		drm_free_large(pages);
-	return (u32*)addr;
-}
-
-/* Returns a vmap'd pointer to dest_obj, which the caller must unmap */
-static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,
-		       struct drm_i915_gem_object *src_obj,
-		       u32 batch_start_offset,
-		       u32 batch_len)
-{
-	int needs_clflush = 0;
-	void *src_base, *src;
-	void *dst = NULL;
-	int ret;
-
-	if (batch_len > dest_obj->base.size ||
-	    batch_len + batch_start_offset > src_obj->base.size)
-		return ERR_PTR(-E2BIG);
-
-	if (WARN_ON(dest_obj->pages_pin_count == 0))
-		return ERR_PTR(-ENODEV);
-
-	ret = i915_gem_obj_prepare_shmem_read(src_obj, &needs_clflush);
-	if (ret) {
-		DRM_DEBUG_DRIVER("CMD: failed to prepare shadow batch\n");
-		return ERR_PTR(ret);
-	}
-
-	src_base = vmap_batch(src_obj, batch_start_offset, batch_len);
-	if (!src_base) {
-		DRM_DEBUG_DRIVER("CMD: Failed to vmap batch\n");
-		ret = -ENOMEM;
-		goto unpin_src;
-	}
-
-	ret = i915_gem_object_set_to_cpu_domain(dest_obj, true);
-	if (ret) {
-		DRM_DEBUG_DRIVER("CMD: Failed to set shadow batch to CPU\n");
-		goto unmap_src;
-	}
-
-	dst = vmap_batch(dest_obj, 0, batch_len);
-	if (!dst) {
-		DRM_DEBUG_DRIVER("CMD: Failed to vmap shadow batch\n");
-		ret = -ENOMEM;
-		goto unmap_src;
-	}
-
-	src = src_base + offset_in_page(batch_start_offset);
-	if (needs_clflush)
-		drm_clflush_virt_range(src, batch_len);
-
-	memcpy(dst, src, batch_len);
-
-unmap_src:
-	vunmap(src_base);
-unpin_src:
-	i915_gem_object_unpin_pages(src_obj);
-
-	return ret ? ERR_PTR(ret) : dst;
-}
-
 /**
  * i915_needs_cmd_parser() - should a given ring use software command parsing?
  * @ring: the ring in question
@@ -1097,6 +1003,7 @@ static bool check_cmd(const struct intel_engine_cs *ring,
 }
 
 #define LENGTH_BIAS 2
+#define MAX_PARTIAL 256
 
 /**
  * i915_parse_cmds() - parse a submitted batch buffer for privilege violations
@@ -1120,86 +1027,180 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 		    u32 batch_len,
 		    bool is_master)
 {
-	u32 *cmd, *batch_base, *batch_end;
+	const struct drm_i915_cmd_descriptor *desc;
+	unsigned dst_iter, src_iter;
+	int needs_clflush = 0;
+	struct get_page rewind;
+	void *src, *dst, *tmp;
+	u32 partial, length;
+	unsigned in, out;
 	struct drm_i915_cmd_descriptor default_desc = { 0 };
 	bool oacontrol_set = false; /* OACONTROL tracking. See check_cmd() */
 	int ret = 0;
 
-	batch_base = copy_batch(shadow_batch_obj, batch_obj,
-				batch_start_offset, batch_len);
-	if (IS_ERR(batch_base)) {
-		DRM_DEBUG_DRIVER("CMD: Failed to copy batch\n");
-		return PTR_ERR(batch_base);
+	if (batch_len > shadow_batch_obj->base.size ||
+	    batch_len + batch_start_offset > batch_obj->base.size)
+		return -E2BIG;
+
+	if (WARN_ON(shadow_batch_obj->pages_pin_count == 0))
+		return -ENODEV;
+
+	ret = i915_gem_obj_prepare_shmem_read(batch_obj, &needs_clflush);
+	if (ret) {
+		DRM_DEBUG_DRIVER("CMD: failed to prepare shadow batch\n");
+		return ret;
 	}
+
+	ret = i915_gem_object_set_to_cpu_domain(shadow_batch_obj, true);
+	if (ret) {
+		DRM_DEBUG_DRIVER("CMD: Failed to set shadow batch to CPU\n");
+		goto unpin;
+	}
+
+	tmp = kmalloc(PAGE_SIZE + MAX_PARTIAL, GFP_KERNEL);
+	if (tmp == NULL)
+		return -ENOMEM;
 
 	/*
 	 * We use the batch length as size because the shadow object is as
 	 * large or larger and copy_batch() will write MI_NOPs to the extra
 	 * space. Parsing should be faster in some cases this way.
 	 */
-	batch_end = batch_base + (batch_len / sizeof(*batch_end));
+	ret = -EINVAL;
+	rewind = batch_obj->get_page;
 
-	cmd = batch_base;
-	while (cmd < batch_end) {
-		const struct drm_i915_cmd_descriptor *desc;
-		u32 length;
+	dst_iter = 0;
+	dst = kmap_atomic(i915_gem_object_get_page(shadow_batch_obj, dst_iter));
+	out = 0;
 
-		if (*cmd == MI_BATCH_BUFFER_END)
-			break;
+	in = offset_in_page(batch_start_offset);
+	partial = 0;
+	for (src_iter = batch_start_offset >> PAGE_SHIFT;
+	     src_iter < batch_obj->base.size >> PAGE_SHIFT;
+	     src_iter++) {
+		u32 *cmd, *page_end, *batch_end;
+		u32 this;
 
-		desc = find_cmd(ring, *cmd, &default_desc);
-		if (!desc) {
-			DRM_DEBUG_DRIVER("CMD: Unrecognized command: 0x%08X\n",
-					 *cmd);
-			ret = -EINVAL;
-			break;
-		}
+		this = batch_len;
+		if (this > PAGE_SIZE - in)
+			this = PAGE_SIZE - in;
 
-		/*
-		 * If the batch buffer contains a chained batch, return an
-		 * error that tells the caller to abort and dispatch the
-		 * workload as a non-secure batch.
-		 */
-		if (desc->cmd.value == MI_BATCH_BUFFER_START) {
-			ret = -EACCES;
-			break;
-		}
+		src = kmap_atomic(i915_gem_object_get_page(batch_obj, src_iter));
+		if (needs_clflush)
+			drm_clflush_virt_range(src + in, this);
 
-		if (desc->flags & CMD_DESC_FIXED)
-			length = desc->length.fixed;
+		if (this == PAGE_SIZE && partial == 0)
+			copy_page(tmp, src);
 		else
-			length = ((*cmd & desc->length.mask) + LENGTH_BIAS);
+			memcpy(tmp+partial, src+in, this);
 
-		if ((batch_end - cmd) < length) {
-			DRM_DEBUG_DRIVER("CMD: Command length exceeds batch length: 0x%08X length=%u batchlen=%td\n",
-					 *cmd,
-					 length,
-					 batch_end - cmd);
-			ret = -EINVAL;
-			break;
+		cmd = tmp;
+		page_end = tmp + this + partial;
+		batch_end = tmp + batch_len + partial;
+		partial = 0;
+
+		do {
+			if (*cmd == MI_BATCH_BUFFER_END) {
+				if (oacontrol_set) {
+					DRM_DEBUG_DRIVER("CMD: batch set OACONTROL but did not clear it\n");
+					goto unmap;
+				}
+
+				cmd++; /* copy this cmd to dst */
+				batch_len = this; /* no more src */
+				ret = 0;
+				break;
+			}
+
+			desc = find_cmd(ring, *cmd, &default_desc);
+			if (!desc) {
+				DRM_DEBUG_DRIVER("CMD: Unrecognized command: 0x%08X\n",
+						 *cmd);
+				goto unmap;
+			}
+
+			/*
+			 * If the batch buffer contains a chained batch, return an
+			 * error that tells the caller to abort and dispatch the
+			 * workload as a non-secure batch.
+			 */
+			if (desc->cmd.value == MI_BATCH_BUFFER_START) {
+				ret = -EACCES;
+				goto unmap;
+			}
+
+			if (desc->flags & CMD_DESC_FIXED)
+				length = desc->length.fixed;
+			else
+				length = ((*cmd & desc->length.mask) + LENGTH_BIAS);
+
+			if (unlikely(cmd + length > page_end)) {
+				if (unlikely(cmd + length > batch_end)) {
+					DRM_DEBUG_DRIVER("CMD: Command length exceeds batch length: 0x%08X length=%u batchlen=%td\n",
+							 *cmd, length, batch_end - cmd);
+					goto unmap;
+				}
+
+				if (WARN_ON(length > MAX_PARTIAL)) {
+					ret = -ENODEV;
+					goto unmap;
+				}
+
+				partial = 4*(page_end - cmd);
+				break;
+			}
+
+			if (!check_cmd(ring, desc, cmd, length, is_master,
+				       &oacontrol_set))
+				goto unmap;
+
+			cmd += length;
+		} while (cmd < page_end);
+
+		/* Copy the validated page to the GPU batch */
+		{
+			/* exclude partial cmd, we copy it next time */
+			unsigned dst_length = (void *)cmd - tmp;
+			in = 0;
+			do {
+				int len;
+
+				if (out == PAGE_SIZE) {
+					kunmap_atomic(dst);
+					dst = kmap_atomic(i915_gem_object_get_page(shadow_batch_obj, ++dst_iter));
+					out = 0;
+				}
+
+				len = dst_length;
+				if (len + out > PAGE_SIZE)
+					len = PAGE_SIZE - out;
+				if (len == PAGE_SIZE)
+					copy_page(dst, tmp + in);
+				else
+					memcpy(dst + out, tmp + in, len);
+				in += len;
+				out += len;
+				dst_length -= len;
+			} while (dst_length);
 		}
 
-		if (!check_cmd(ring, desc, cmd, length, is_master,
-			       &oacontrol_set)) {
-			ret = -EINVAL;
+		batch_len -= this;
+		if (batch_len == 0)
 			break;
-		}
 
-		cmd += length;
+		if (partial)
+			memmove(tmp, cmd, partial);
+
+		kunmap_atomic(src);
+		in = 0;
 	}
-
-	if (oacontrol_set) {
-		DRM_DEBUG_DRIVER("CMD: batch set OACONTROL but did not clear it\n");
-		ret = -EINVAL;
-	}
-
-	if (cmd >= batch_end) {
-		DRM_DEBUG_DRIVER("CMD: Got to the end of the buffer w/o a BBE cmd!\n");
-		ret = -EINVAL;
-	}
-
-	vunmap(batch_base);
-
+unmap:
+	kunmap_atomic(src);
+	kunmap_atomic(dst);
+	batch_obj->get_page = rewind;
+	kfree(tmp);
+unpin:
+	i915_gem_object_unpin_pages(batch_obj);
 	return ret;
 }
 
