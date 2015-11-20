@@ -214,7 +214,6 @@ static int ext4_dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	if (write) {
 		sb_start_pagefault(sb);
-		file_update_time(vma->vm_file);
 		handle = ext4_journal_start_sb(sb, EXT4_HT_WRITE_PAGE,
 						EXT4_DATA_TRANS_BLOCKS(sb));
 	}
@@ -245,7 +244,6 @@ static int ext4_dax_pmd_fault(struct vm_area_struct *vma, unsigned long addr,
 
 	if (write) {
 		sb_start_pagefault(sb);
-		file_update_time(vma->vm_file);
 		handle = ext4_journal_start_sb(sb, EXT4_HT_WRITE_PAGE,
 				ext4_chunk_trans_blocks(inode,
 							PMD_SIZE / PAGE_SIZE));
