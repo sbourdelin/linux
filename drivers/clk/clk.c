@@ -3054,12 +3054,9 @@ EXPORT_SYMBOL_GPL(of_clk_get_parent_count);
 const char *of_clk_get_parent_name(struct device_node *np, int index)
 {
 	struct of_phandle_args clkspec;
-	struct property *prop;
 	const char *clk_name;
-	const __be32 *vp;
-	u32 pv;
-	int rc;
-	int count;
+	const __be32 *list;
+	int rc, len, i;
 	struct clk *clk;
 
 	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
@@ -3068,17 +3065,20 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
 		return NULL;
 
 	index = clkspec.args_count ? clkspec.args[0] : 0;
-	count = 0;
 
 	/* if there is an indices property, use it to transfer the index
 	 * specified into an array offset for the clock-output-names property.
 	 */
-	of_property_for_each_u32(clkspec.np, "clock-indices", prop, vp, pv) {
-		if (index == pv) {
-			index = count;
-			break;
-		}
-		count++;
+	list = of_get_property(clkspec.np, "clock-indices", &len);
+	if (list) {
+		len /= sizeof(*list);
+		for (i = 0; i < len; i++)
+			if (index == be32_to_cpup(list++)) {
+				index = i;
+				break;
+			}
+		if (i == len)
+			return NULL;
 	}
 
 	if (of_property_read_string_index(clkspec.np, "clock-output-names",
