@@ -47,7 +47,7 @@
 		reg = <0x0 0x80000000>;
 	};
 
-	backlight {
+	backlight: backlight {
 		compatible = "pwm-backlight";
 		brightness-levels = <
 			  0   1   2   3   4   5   6   7
@@ -177,6 +177,21 @@
 	status = "okay";
 };
 
+&mipi_dsi {
+	status = "okay";
+
+	panel {
+		compatible ="boe,tv080wum-nl0";
+		reg = <0>;
+
+		enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_en>;
+		backlight = <&backlight>;
+		status = "okay";
+	};
+};
+
 &sdmmc {
 	bus-width = <4>;
 	cap-mmc-highspeed;
@@ -246,6 +261,9 @@
 	backlight {
 		bl_en: bl-en {
 			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		lcd_en: lcd-en {
+			rockchip,pins = <7 3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
