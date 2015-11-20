@@ -19,6 +19,12 @@
 #include <linux/uidgid.h>
 
 struct kstat {
+	u32		query_flags;		/* Operational flags */
+#define KSTAT_QUERY_FLAGS (AT_FORCE_ATTR_SYNC | AT_NO_ATTR_SYNC)
+	u32		request_mask;		/* What fields the user asked for */
+	u32		result_mask;		/* What fields the user got */
+	u32		information;
+	u64		ioc_flags;		/* Inode flags (FS_IOC_GETFLAGS) */
 	u64		ino;
 	dev_t		dev;
 	umode_t		mode;
@@ -27,11 +33,13 @@ struct kstat {
 	kgid_t		gid;
 	dev_t		rdev;
 	loff_t		size;
-	struct timespec  atime;
+	struct timespec	atime;
 	struct timespec	mtime;
 	struct timespec	ctime;
-	unsigned long	blksize;
-	unsigned long long	blocks;
+	struct timespec	btime;			/* File creation time */
+	uint32_t	blksize;		/* Preferred I/O size */
+	u64		blocks;
+	u64		version;		/* Data version */
 };
 
 #endif
