@@ -304,7 +304,8 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
 	int size;
 
 	syscall_nr = trace_get_syscall_nr(current, regs);
-	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
+	sys_data = syscall_nr_to_meta(syscall_nr);
+	if (!sys_data)
 		return;
 
 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE) */
@@ -313,10 +314,6 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
 		return;
 
 	if (trace_trigger_soft_disabled(trace_file))
-		return;
-
-	sys_data = syscall_nr_to_meta(syscall_nr);
-	if (!sys_data)
 		return;
 
 	size = sizeof(*entry) + sizeof(unsigned long) * sys_data->nb_args;
@@ -351,7 +348,8 @@ static void ftrace_syscall_exit(void *data, struct pt_regs *regs, long ret)
 	int syscall_nr;
 
 	syscall_nr = trace_get_syscall_nr(current, regs);
-	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
+	sys_data = syscall_nr_to_meta(syscall_nr);
+	if (!sys_data)
 		return;
 
 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE()) */
@@ -360,10 +358,6 @@ static void ftrace_syscall_exit(void *data, struct pt_regs *regs, long ret)
 		return;
 
 	if (trace_trigger_soft_disabled(trace_file))
-		return;
-
-	sys_data = syscall_nr_to_meta(syscall_nr);
-	if (!sys_data)
 		return;
 
 	local_save_flags(irq_flags);
@@ -555,13 +549,11 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
 	int size;
 
 	syscall_nr = trace_get_syscall_nr(current, regs);
-	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
-		return;
-	if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
-		return;
-
 	sys_data = syscall_nr_to_meta(syscall_nr);
 	if (!sys_data)
+		return;
+
+	if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
 		return;
 
 	head = this_cpu_ptr(sys_data->enter_event->perf_events);
@@ -629,13 +621,11 @@ static void perf_syscall_exit(void *ignore, struct pt_regs *regs, long ret)
 	int size;
 
 	syscall_nr = trace_get_syscall_nr(current, regs);
-	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
-		return;
-	if (!test_bit(syscall_nr, enabled_perf_exit_syscalls))
-		return;
-
 	sys_data = syscall_nr_to_meta(syscall_nr);
 	if (!sys_data)
+		return;
+
+	if (!test_bit(syscall_nr, enabled_perf_exit_syscalls))
 		return;
 
 	head = this_cpu_ptr(sys_data->exit_event->perf_events);
