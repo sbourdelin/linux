@@ -51,16 +51,14 @@ static void of_get_regulation_constraints(struct device_node *np,
 	if (min_uV && max_uV && constraints->min_uV == constraints->max_uV)
 		constraints->apply_uV = true;
 
-	if (!of_property_read_u32(np, "regulator-microvolt-offset", &pval))
-		constraints->uV_offset = pval;
-	if (!of_property_read_u32(np, "regulator-min-microamp", &pval))
-		constraints->min_uA = pval;
-	if (!of_property_read_u32(np, "regulator-max-microamp", &pval))
-		constraints->max_uA = pval;
-
-	if (!of_property_read_u32(np, "regulator-input-current-limit-microamp",
-				  &pval))
-		constraints->ilim_uA = pval;
+	of_property_read_u32(np, "regulator-microvolt-offset",
+						&constraints->uV_offset);
+	of_property_read_u32(np, "regulator-min-microamp",
+						&constraints->min_uA);
+	of_property_read_u32(np, "regulator-max-microamp",
+						&constraints->max_uA);
+	of_property_read_u32(np, "regulator-input-current-limit-microamp",
+						&constraints->ilim_uA);
 
 	/* Current change possible? */
 	if (constraints->min_uA != constraints->max_uA)
@@ -79,17 +77,13 @@ static void of_get_regulation_constraints(struct device_node *np,
 	if (of_property_read_bool(np, "regulator-allow-set-load"))
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_DRMS;
 
-	ret = of_property_read_u32(np, "regulator-ramp-delay", &pval);
-	if (!ret) {
-		if (pval)
-			constraints->ramp_delay = pval;
-		else
+	if (!of_property_read_u32(np, "regulator-ramp-delay",
+					&constraints->ramp_delay))
+		if (!constraints->ramp_delay)
 			constraints->ramp_disable = true;
-	}
 
-	ret = of_property_read_u32(np, "regulator-enable-ramp-delay", &pval);
-	if (!ret)
-		constraints->enable_time = pval;
+	of_property_read_u32(np, "regulator-enable-ramp-delay",
+					&constraints->enable_time);
 
 	constraints->soft_start = of_property_read_bool(np,
 					"regulator-soft-start");
@@ -107,8 +101,8 @@ static void of_get_regulation_constraints(struct device_node *np,
 		}
 	}
 
-	if (!of_property_read_u32(np, "regulator-system-load", &pval))
-		constraints->system_load = pval;
+	of_property_read_u32(np, "regulator-system-load",
+					&constraints->system_load);
 
 	constraints->over_current_protection = of_property_read_bool(np,
 					"regulator-over-current-protection");
@@ -154,9 +148,8 @@ static void of_get_regulation_constraints(struct device_node *np,
 					"regulator-off-in-suspend"))
 			suspend_state->disabled = true;
 
-		if (!of_property_read_u32(suspend_np,
-					"regulator-suspend-microvolt", &pval))
-			suspend_state->uV = pval;
+		of_property_read_u32(suspend_np,
+			"regulator-suspend-microvolt", &suspend_state->uV);
 
 		of_node_put(suspend_np);
 		suspend_state = NULL;
