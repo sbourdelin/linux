@@ -86,24 +86,24 @@
  * general bitmasking mechanism.
  */
 
-#define STD_MI_OPCODE_MASK  0xFF800000
-#define STD_3D_OPCODE_MASK  0xFFFF0000
-#define STD_2D_OPCODE_MASK  0xFFC00000
-#define STD_MFX_OPCODE_MASK 0xFFFF0000
+#define STD_MI_OPCODE_SHIFT  (32 - 9)
+#define STD_3D_OPCODE_SHIFT  (32 - 16)
+#define STD_2D_OPCODE_SHIFT  (32 - 10)
+#define STD_MFX_OPCODE_SHIFT (32 - 16)
 
 #define CMD(op, opm, f, lm, fl, ...)				\
 	{							\
 		.flags = (fl) | ((f) ? CMD_DESC_FIXED : 0),	\
-		.cmd = { (op), (opm) },				\
+		.cmd = { (op), ~0 << (opm) }, 			\
 		.length = { (lm) },				\
 		__VA_ARGS__					\
 	}
 
 /* Convenience macros to compress the tables */
-#define SMI STD_MI_OPCODE_MASK
-#define S3D STD_3D_OPCODE_MASK
-#define S2D STD_2D_OPCODE_MASK
-#define SMFX STD_MFX_OPCODE_MASK
+#define SMI STD_MI_OPCODE_SHIFT
+#define S3D STD_3D_OPCODE_SHIFT
+#define S2D STD_2D_OPCODE_SHIFT
+#define SMFX STD_MFX_OPCODE_SHIFT
 #define F true
 #define S CMD_DESC_SKIP
 #define R CMD_DESC_REJECT
@@ -627,12 +627,24 @@ static bool validate_regs_sorted(struct intel_engine_cs *ring)
  * non-opcode bits being set. But if we don't include those bits, some 3D
  * commands may hash to the same bucket due to not including opcode bits that
  * make the command unique. For now, we will risk hashing to the same bucket.
- *
- * If we attempt to generate a perfect hash, we should be able to look at bits
- * 31:29 of a command from a batch buffer and use the full mask for that
- * client. The existing INSTR_CLIENT_MASK/SHIFT defines can be used for this.
  */
-#define CMD_HASH_MASK STD_MI_OPCODE_MASK
+static inline u32 cmd_header_key(u32 x)
+{
+	u32 shift;
+	switch (x >> INSTR_CLIENT_SHIFT) {
+	default:
+	case INSTR_MI_CLIENT:
+		shift = STD_MI_OPCODE_SHIFT;
+		break;
+	case INSTR_RC_CLIENT:
+		shift = STD_3D_OPCODE_SHIFT;
+		break;
+	case INSTR_BC_CLIENT:
+		shift = STD_2D_OPCODE_SHIFT;
+		break;
+	}
+	return x >> shift;
+}
 
 static int init_hash_table(struct intel_engine_cs *ring,
 			   const struct drm_i915_cmd_table *cmd_tables,
@@ -648,7 +660,7 @@ static int init_hash_table(struct intel_engine_cs *ring,
 		for (j = 0; j < table->count; j++) {
 			struct drm_i915_cmd_descriptor *desc = &table->table[j];
 			hash_add(ring->cmd_hash, &desc->node[ring->id],
-				 desc->cmd.value & CMD_HASH_MASK);
+				 cmd_header_key(desc->cmd.value));
 		}
 	}
 
@@ -776,10 +788,9 @@ find_cmd_in_table(struct intel_engine_cs *ring,
 	const struct drm_i915_cmd_descriptor *desc;
 
 	hash_for_each_possible(ring->cmd_hash, desc, node[ring->id],
-			       cmd_header & CMD_HASH_MASK) {
+			       cmd_header_key(cmd_header))
 		if (((cmd_header ^ desc->cmd.value) & desc->cmd.mask) == 0)
 			return desc;
-	}
 
 	return NULL;
 }
