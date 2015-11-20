@@ -39,8 +39,11 @@
 #include <linux/time.h>
 #include <linux/sched_clock.h>
 #include <linux/clocksource.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 /*
  * 32KHz clocksource ... always available, on pretty most chips except
@@ -88,15 +91,28 @@ static u64 notrace omap_32k_read_sched_clock(void)
 	return ti_32k_read_cycles(&ti_32k_timer.cs);
 }
 
-static void __init ti_32k_timer_init(struct device_node *np)
+static const struct of_device_id ti_32k_of_table[] = {
+	{ .compatible = "ti,omap-counter32k" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, ti_32k_of_table);
+
+static int __init ti_32k_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
+	struct resource *res;
 	int ret;
 
-	ti_32k_timer.base = of_iomap(np, 0);
-	if (!ti_32k_timer.base) {
-		pr_err("Can't ioremap 32k timer base\n");
-		return;
-	}
+	/* Static mapping, never released */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	ti_32k_timer.base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(ti_32k_timer.base))
+		return PTR_ERR(ti_32k_timer.base);
+
+	pm_runtime_enable(dev);
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0)
+		goto probe_err;
 
 	ti_32k_timer.counter = ti_32k_timer.base;
 
@@ -116,11 +132,35 @@ static void __init ti_32k_timer_init(struct device_node *np)
 	ret = clocksource_register_hz(&ti_32k_timer.cs, 32768);
 	if (ret) {
 		pr_err("32k_counter: can't register clocksource\n");
-		return;
+		goto probe_err;
 	}
 
 	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
+	return 0;
+
+probe_err:
+	pm_runtime_put_noidle(dev);
+	return ret;
+};
+
+static struct platform_driver ti_32k_driver __initdata = {
+	.probe		= ti_32k_probe,
+	.driver		= {
+		.name	= "ti_32k_timer",
+		.of_match_table = of_match_ptr(ti_32k_of_table),
+	}
+};
+
+static int __init ti_32k_init(void)
+{
+	return platform_driver_register(&ti_32k_driver);
 }
-CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
-		ti_32k_timer_init);
+
+subsys_initcall(ti_32k_init);
+
+MODULE_AUTHOR("Paul Mundt");
+MODULE_AUTHOR("Juha Yrjölä");
+MODULE_DESCRIPTION("OMAP2 32k Timer");
+MODULE_ALIAS("platform:ti_32k_timer");
+MODULE_LICENSE("GPL v2");

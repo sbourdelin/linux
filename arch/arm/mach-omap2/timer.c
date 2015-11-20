@@ -393,23 +393,15 @@ static const struct of_device_id omap_counter_match[] __initconst = {
 static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
 {
 	int ret;
-	struct device_node *np = NULL;
 	struct omap_hwmod *oh;
 	const char *oh_name = "counter_32k";
 
 	/*
-	 * If device-tree is present, then search the DT blob
-	 * to see if the 32kHz counter is supported.
+	 * If device-tree is present, then just exit -
+	 * 32kHz clocksource driver will handle it.
 	 */
-	if (of_have_populated_dt()) {
-		np = omap_get_timer_dt(omap_counter_match, NULL);
-		if (!np)
-			return -ENODEV;
-
-		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-		if (!oh_name)
-			return -ENODEV;
-	}
+	if (of_have_populated_dt())
+		return 0;
 
 	/*
 	 * First check hwmod data is available for sync32k counter
