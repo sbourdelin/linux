@@ -225,6 +225,16 @@ static int intelfb_create(struct drm_fb_helper *helper,
 
 	mutex_lock(&dev->struct_mutex);
 
+	/* The fb constructor will have already pinned us (or inherited a
+	 * GGTT region from the BIOS) suitable for a scanout, so
+	 * this should just be a no-op and increment the pin count for the
+	 * fbdev mmapping. It does have a useful side-effect of validating
+	 * the pin for fbdev's use via a GGTT mmapping.
+	 */
+	ret = i915_gem_obj_ggtt_pin(obj, 0, PIN_MAPPABLE);
+	if (ret)
+		goto out_unlock;
+
 	info = drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(info)) {
 		DRM_ERROR("Failed to allocate fb_info\n");
@@ -279,6 +289,12 @@ static int intelfb_create(struct drm_fb_helper *helper,
 		      fb->width, fb->height,
 		      i915_gem_obj_ggtt_offset(obj), obj);
 
+	/* We pin the vma for our access through info->screen_base, so
+	 * we can drop the pin we took if we created the intel_fb.
+	 */
+	if (!prealloc)
+		i915_gem_object_ggtt_unpin(obj);
+
 	mutex_unlock(&dev->struct_mutex);
 	vga_switcheroo_client_fb_set(dev->pdev, info);
 	return 0;
@@ -286,7 +302,12 @@ static int intelfb_create(struct drm_fb_helper *helper,
 out_destroy_fbi:
 	drm_fb_helper_release_fbi(helper);
 out_unpin:
+	/* Once for info->screen_base mmaping... */
 	i915_gem_object_ggtt_unpin(obj);
+out_unlock:
+	if (!prealloc)
+		/* ...and once for the intel_fb */
+		i915_gem_object_ggtt_unpin(obj);
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
@@ -524,6 +545,8 @@ static const struct drm_fb_helper_funcs intel_fb_helper_funcs = {
 static void intel_fbdev_destroy(struct drm_device *dev,
 				struct intel_fbdev *ifbdev)
 {
+	/* Release the pinning for the info->screen_base mmaping. */
+	i915_gem_object_ggtt_unpin(ifbdev->fb->obj);
 
 	drm_fb_helper_unregister_fbi(&ifbdev->helper);
 	drm_fb_helper_release_fbi(&ifbdev->helper);
