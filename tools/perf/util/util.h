@@ -358,4 +358,9 @@ int fetch_kernel_version(unsigned int *puint,
 #define KVER_FMT	"%d.%d.%d"
 #define KVER_PARAM(x)	KVER_VERSION(x), KVER_PATCHLEVEL(x), KVER_SUBLEVEL(x)
 
+extern struct thread *perf_thread;
+
+void create_perf_thread(void);
+void destroy_perf_thread(void);
+
 #endif /* GIT_COMPAT_UTIL_H */

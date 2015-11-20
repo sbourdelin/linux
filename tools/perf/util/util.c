@@ -16,6 +16,9 @@
 #include <linux/kernel.h>
 #include <unistd.h>
 #include "callchain.h"
+#include "machine.h"
+#include "thread.h"
+#include "thread_map.h"
 
 struct callchain_param	callchain_param = {
 	.mode	= CHAIN_GRAPH_ABS,
@@ -694,4 +697,63 @@ fetch_kernel_version(unsigned int *puint, char *str,
 	if (puint)
 		*puint = (version << 16) + (patchlevel << 8) + sublevel;
 	return 0;
+}
+
+
+static int process_event(struct perf_tool *tool, union perf_event *event,
+			 struct perf_sample *sample, struct machine *machine)
+{
+	switch (event->header.type) {
+	case PERF_RECORD_COMM:
+		return tool->comm(tool, event, sample, machine);
+	case PERF_RECORD_MMAP:
+		return tool->mmap(tool, event, sample, machine);
+	case PERF_RECORD_MMAP2:
+		return tool->mmap2(tool, event, sample, machine);
+	default:
+		break;
+	}
+	return 0;
+}
+
+struct thread *perf_thread;
+
+void create_perf_thread(void)
+{
+	struct perf_tool tool = {
+		.comm	= perf_event__process_comm,
+		.mmap	= perf_event__process_mmap,
+		.mmap2	= perf_event__process_mmap2,
+	};
+	struct thread_map *tm;
+	struct machine *machine;
+	int pid = getpid();
+
+	machine = machine__new_host();
+	if (machine == NULL)
+		return;
+
+	tm = thread_map__new_dummy();
+	if (tm == NULL) {
+		machine__delete(machine);
+		return;
+	}
+
+	thread_map__set_pid(tm, 0, pid);
+
+	perf_event__synthesize_thread_map(&tool, tm, process_event, machine,
+					  false, 500);
+
+	perf_thread = machine__find_thread(machine, pid, pid);
+	BUG_ON(perf_thread == NULL);
+
+	thread_map__put(tm);
+}
+
+void destroy_perf_thread(void)
+{
+	struct machine *machine = perf_thread->mg->machine;
+
+	machine__delete_threads(machine);
+	machine__delete(machine);
 }

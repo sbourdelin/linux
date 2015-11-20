@@ -13,6 +13,8 @@
 #include "../libslang.h"
 #include "../keysyms.h"
 #include "tui.h"
+#include "../../util/symbol.h"
+#include "../../util/thread.h"
 
 static volatile int ui__need_resize;
 
@@ -96,14 +98,29 @@ int ui__getch(int delay_secs)
 static void ui__signal_backtrace(int sig)
 {
 	void *stackdump[32];
-	size_t size;
+	size_t size, i;
 
 	ui__exit(false);
 	psignal(sig, "perf");
 
 	printf("-------- backtrace --------\n");
 	size = backtrace(stackdump, ARRAY_SIZE(stackdump));
-	backtrace_symbols_fd(stackdump, size, STDOUT_FILENO);
+	/* skip first two stack frame (for this function and signal stack) */
+	for (i = 2; i < size; i++) {
+		struct addr_location al = {
+			.sym = NULL,
+		};
+
+		thread__find_addr_location(perf_thread, PERF_RECORD_MISC_USER,
+					   MAP__FUNCTION, (long)stackdump[i], &al);
+
+		if (al.sym)
+			printf("%s(+0x%"PRIx64") in ", al.sym->name,
+			       map__map_ip(al.map, (u64)stackdump[i]) - al.sym->start);
+		if (al.map)
+			printf("%s ", al.map->dso->short_name);
+		printf("[0x%lx]\n", (unsigned long)stackdump[i]);
+	}
 
 	exit(0);
 }
