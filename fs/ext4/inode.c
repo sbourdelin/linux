@@ -4818,11 +4818,36 @@ err_out:
 int ext4_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		 struct kstat *stat)
 {
-	struct inode *inode;
-	unsigned long long delalloc_blocks;
+	struct inode *inode = d_inode(dentry);
+	struct ext4_inode *raw_inode;
+	struct ext4_inode_info *ei = EXT4_I(inode);
 
-	inode = d_inode(dentry);
+	if (EXT4_FITS_IN_INODE(raw_inode, ei, i_crtime)) {
+		stat->result_mask |= STATX_BTIME;
+		stat->btime.tv_sec = ei->i_crtime.tv_sec;
+		stat->btime.tv_nsec = ei->i_crtime.tv_nsec;
+	}
+
+	if (S_ISDIR(inode->i_mode) || IS_I_VERSION(inode)) {
+		stat->result_mask |= STATX_VERSION;
+		stat->version = inode->i_version;
+	}
+
+	ext4_get_inode_flags(ei);
+	stat->ioc_flags |= ei->i_flags & EXT4_FL_USER_VISIBLE;
+	stat->result_mask |= STATX_IOC_FLAGS;
+
 	generic_fillattr(inode, stat);
+	return 0;
+}
+
+int ext4_file_getattr(struct vfsmount *mnt, struct dentry *dentry,
+		      struct kstat *stat)
+{
+	struct inode *inode = dentry->d_inode;
+	u64 delalloc_blocks;
+
+	ext4_getattr(mnt, dentry, stat);
 
 	/*
 	 * If there is inline data in the inode, the inode will normally not
