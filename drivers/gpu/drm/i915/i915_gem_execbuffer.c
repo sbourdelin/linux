@@ -1462,6 +1462,13 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	/* take note of the batch buffer before we might reorder the lists */
 	batch_obj = eb_get_batch(eb);
 
+	if (args->batch_len > batch_obj->base.size ||
+	    args->batch_start_offset > batch_obj->base.size - args->batch_len) {
+		DRM_DEBUG("Attempting to execute commands from beyond the bounds of the batch object\n");
+		ret = -EINVAL;
+		goto err;
+	}
+
 	/* Move the objects en-masse into the GTT, evicting if necessary. */
 	need_relocs = (args->flags & I915_EXEC_NO_RELOC) == 0;
 	ret = i915_gem_execbuffer_reserve(ring, &eb->vmas, ctx, &need_relocs);
