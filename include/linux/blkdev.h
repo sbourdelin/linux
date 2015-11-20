@@ -656,16 +656,7 @@ static inline bool rq_mergeable(struct request *rq)
 static inline bool blk_check_merge_flags(unsigned int flags1,
 					 unsigned int flags2)
 {
-	if ((flags1 & REQ_DISCARD) != (flags2 & REQ_DISCARD))
-		return false;
-
-	if ((flags1 & REQ_SECURE) != (flags2 & REQ_SECURE))
-		return false;
-
-	if ((flags1 & REQ_WRITE_SAME) != (flags2 & REQ_WRITE_SAME))
-		return false;
-
-	return true;
+	return !((flags1 ^ flags2) & (REQ_DISCARD | REQ_SECURE | REQ_WRITE_SAME));
 }
 
 static inline bool blk_write_same_mergeable(struct bio *a, struct bio *b)
