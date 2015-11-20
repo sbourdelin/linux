@@ -291,7 +291,7 @@ static struct pcie_host_ops keystone_pcie_host_ops = {
 	.scan_bus = ks_dw_pcie_v3_65_scan_bus,
 };
 
-static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+static int ks_add_pcie_port(struct keystone_pcie *ks_pcie,
 			 struct platform_device *pdev)
 {
 	struct pcie_port *pp = &ks_pcie->pp;
@@ -340,7 +340,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init ks_pcie_probe(struct platform_device *pdev)
+static int ks_pcie_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct keystone_pcie *ks_pcie;
@@ -396,7 +396,7 @@ fail_clk:
 	return ret;
 }
 
-static struct platform_driver ks_pcie_driver __refdata = {
+static struct platform_driver ks_pcie_driver = {
 	.probe  = ks_pcie_probe,
 	.remove = __exit_p(ks_pcie_remove),
 	.driver = {
