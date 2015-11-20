@@ -87,6 +87,25 @@ int inet_csk_bind_conflict(const struct sock *sk,
 }
 EXPORT_SYMBOL_GPL(inet_csk_bind_conflict);
 
+static void printops(const struct inet_connection_sock_af_ops *o)
+{
+	printk("queue_xmit:%p\n", o->queue_xmit);
+	printk("send_check:%p\n", o->send_check);
+	printk("rebuild_header:%p\n", o->rebuild_header);
+	printk("sk_rx_dst_set:%p\n", o->sk_rx_dst_set);
+	printk("conn_request:%p\n", o->conn_request);
+	printk("syn_recv_sock:%p\n", o->syn_recv_sock);
+	printk("setsockopt:%p\n", o->setsockopt);
+	printk("getsockopt:%p\n", o->getsockopt);
+#ifdef CONFIG_COMPAT
+	printk("compat_setsockopt:%p\n", o->compat_setsockopt);
+	printk("compat_getsockopt:%p\n", o->compat_getsockopt);
+#endif
+	printk("addr2sockaddr:%p\n", o->addr2sockaddr);
+	printk("bind_conflict:%p\n", o->bind_conflict);
+	printk("mtu_reduced:%p\n", o->mtu_reduced);
+}
+
 /* Obtain a reference to a local port for the given sock,
  * if snum is zero it means select any available local port.
  */
@@ -137,6 +156,15 @@ again:
 						smallest_size = tb->num_owners;
 						smallest_rover = rover;
 					}
+
+					if (inet_csk(sk)->icsk_af_ops->bind_conflict == NULL) {
+						printk(KERN_INFO "1st bind_conflict == NULL\tops=%p state=%d err:%d protocol:%d type:%d\n",
+								inet_csk(sk)->icsk_af_ops,
+								sk->sk_state, sk->sk_err, sk->sk_protocol, sk->sk_type);
+						printops(inet_csk(sk)->icsk_af_ops);
+						goto fail_unlock;
+					}
+
 					if (!inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, false)) {
 						snum = rover;
 						goto tb_found;
@@ -198,6 +226,15 @@ tb_found:
 			goto success;
 		} else {
 			ret = 1;
+
+			if (inet_csk(sk)->icsk_af_ops->bind_conflict == NULL) {
+				printk(KERN_INFO "2nd bind_conflict == NULL\tops=%p state=%d err:%d protocol:%d type:%d\n",
+						inet_csk(sk)->icsk_af_ops,
+						sk->sk_state, sk->sk_err, sk->sk_protocol, sk->sk_type);
+				printops(inet_csk(sk)->icsk_af_ops);
+				goto fail_unlock;
+			}
+
 			if (inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, true)) {
 				if (((sk->sk_reuse && sk->sk_state != TCP_LISTEN) ||
 				     (tb->fastreuseport > 0 &&
