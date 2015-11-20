@@ -2212,12 +2212,24 @@ void  i915_ppgtt_release(struct kref *kref)
 {
 	struct i915_hw_ppgtt *ppgtt =
 		container_of(kref, struct i915_hw_ppgtt, ref);
+	struct i915_vma *vma, *next;
 
 	trace_i915_ppgtt_release(&ppgtt->base);
 
 	/* vmas should already be unbound */
 	WARN_ON(!list_empty(&ppgtt->base.active_list));
 	WARN_ON(!list_empty(&ppgtt->base.inactive_list));
+
+	/*
+	 * This ppgtt is going away and we need to remove all VMAs still
+	 * around. This is to handle imported shared objects for which
+	 * destructor did not run when their handles were closed.
+	 */
+	list_for_each_entry_safe(vma, next, &ppgtt->base.inactive_list,
+				 mm_list) {
+		if (WARN_ON(__i915_vma_unbind_no_wait(vma)))
+			break;
+	}
 
 	list_del(&ppgtt->base.global_link);
 	drm_mm_takedown(&ppgtt->base.mm);
