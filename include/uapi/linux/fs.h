@@ -197,10 +197,13 @@ struct inodes_stat_t {
 #define FS_EXTENT_FL			0x00080000 /* Extents */
 #define FS_DIRECTIO_FL			0x00100000 /* Use direct i/o */
 #define FS_NOCOW_FL			0x00800000 /* Do not cow file */
+#define FS_HIDDEN_FL			0x10000000 /* Windows hidden file attribute */
+#define FS_SYSTEM_FL			0x20000000 /* Windows system file attribute */
+#define FS_ARCHIVE_FL			0x40000000 /* Windows archive file attribute */
 #define FS_RESERVED_FL			0x80000000 /* reserved for ext2 lib */
 
-#define FS_FL_USER_VISIBLE		0x0003DFFF /* User visible flags */
-#define FS_FL_USER_MODIFIABLE		0x000380FF /* User modifiable flags */
+#define FS_FL_USER_VISIBLE		0x7003DFFF /* User visible flags */
+#define FS_FL_USER_MODIFIABLE		0x700380FF /* User modifiable flags */
 
 
 #define SYNC_FILE_RANGE_WAIT_BEFORE	1
