@@ -1496,8 +1496,9 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
 	struct atmel_nand_data *board = &host->board;
 	enum of_gpio_flags flags = 0;
 
-	host->caps = (struct atmel_nand_caps *)
-		of_match_device(atmel_nand_dt_ids, host->dev)->data;
+	host->caps = of_device_get_match_data(host->dev);
+	if (!host->caps)
+		return 1;
 
 	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
 		if (val >= 32) {
