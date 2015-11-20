@@ -12,6 +12,7 @@
 #include <linux/blkdev.h>
 #include <linux/device.h>
 #include <linux/pm_runtime.h>
+#include <linux/backing-dev.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
@@ -1084,6 +1085,7 @@ void __scsi_remove_device(struct scsi_device *sdev)
 		device_unregister(&sdev->sdev_dev);
 		transport_remove_device(dev);
 		scsi_dh_remove_device(sdev);
+		bdi_sysfs_del(&sdev->request_queue->backing_dev_info);
 		device_del(dev);
 	} else
 		put_device(&sdev->sdev_dev);

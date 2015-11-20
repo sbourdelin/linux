@@ -774,6 +774,7 @@ int bdi_init(struct backing_dev_info *bdi)
 	int ret;
 
 	bdi->dev = NULL;
+	bdi->is_visible = false;
 
 	bdi->min_ratio = 0;
 	bdi->max_ratio = 100;
@@ -806,6 +807,7 @@ int bdi_register(struct backing_dev_info *bdi, struct device *parent,
 		return PTR_ERR(dev);
 
 	bdi->dev = dev;
+	bdi->is_visible = true;
 
 	bdi_debug_register(bdi, dev_name(dev));
 	set_bit(WB_registered, &bdi->wb.state);
@@ -837,6 +839,28 @@ static void bdi_remove_from_list(struct backing_dev_info *bdi)
 	synchronize_rcu_expedited();
 }
 
+/**
+ * bdi_sysfs_del - remove a BDI device from sysfs
+ * @bdi: BDI device pointer.
+ *
+ * It is safe to call this function more than once.
+ */
+void bdi_sysfs_del(struct backing_dev_info *bdi)
+{
+	bool is_visible = false;
+
+	spin_lock_bh(&bdi_lock);
+	swap(bdi->is_visible, is_visible);
+	spin_unlock_bh(&bdi_lock);
+
+	if (!is_visible)
+		return;
+
+	bdi_debug_unregister(bdi);
+	device_del(bdi->dev);
+}
+EXPORT_SYMBOL(bdi_sysfs_del);
+
 void bdi_unregister(struct backing_dev_info *bdi)
 {
 	/* make sure nobody finds us on the bdi_list anymore */
@@ -845,8 +869,8 @@ void bdi_unregister(struct backing_dev_info *bdi)
 	cgwb_bdi_destroy(bdi);
 
 	if (bdi->dev) {
-		bdi_debug_unregister(bdi);
-		device_unregister(bdi->dev);
+		bdi_sysfs_del(bdi);
+		put_device(bdi->dev);
 		bdi->dev = NULL;
 	}
 }
