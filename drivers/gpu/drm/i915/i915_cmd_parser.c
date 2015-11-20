@@ -794,6 +794,9 @@ void i915_cmd_parser_fini_ring(struct intel_engine_cs *ring)
 	fini_hash_table(ring);
 }
 
+/*
+ * Returns a pointer to a descriptor for the command specified by cmd_header.
+ */
 static const struct drm_i915_cmd_descriptor*
 find_cmd_in_table(struct intel_engine_cs *ring,
 		  u32 cmd_header)
@@ -811,37 +814,6 @@ find_cmd_in_table(struct intel_engine_cs *ring,
 	}
 
 	return NULL;
-}
-
-/*
- * Returns a pointer to a descriptor for the command specified by cmd_header.
- *
- * The caller must supply space for a default descriptor via the default_desc
- * parameter. If no descriptor for the specified command exists in the ring's
- * command parser tables, this function fills in default_desc based on the
- * ring's default length encoding and returns default_desc.
- */
-static const struct drm_i915_cmd_descriptor*
-find_cmd(struct intel_engine_cs *ring,
-	 u32 cmd_header,
-	 struct drm_i915_cmd_descriptor *default_desc)
-{
-	const struct drm_i915_cmd_descriptor *desc;
-	u32 mask;
-
-	desc = find_cmd_in_table(ring, cmd_header);
-	if (desc)
-		return desc;
-
-	mask = ring->get_cmd_length_mask(cmd_header);
-	if (!mask)
-		return NULL;
-
-	BUG_ON(!default_desc);
-	default_desc->flags = CMD_DESC_SKIP;
-	default_desc->length.mask = mask;
-
-	return default_desc;
 }
 
 static const struct drm_i915_reg_descriptor *
@@ -886,17 +858,6 @@ static bool check_cmd(const struct intel_engine_cs *ring,
 		      const bool is_master,
 		      bool *oacontrol_set)
 {
-	if (desc->flags & CMD_DESC_REJECT) {
-		DRM_DEBUG_DRIVER("CMD: Rejected command: 0x%08X\n", *cmd);
-		return false;
-	}
-
-	if ((desc->flags & CMD_DESC_MASTER) && !is_master) {
-		DRM_DEBUG_DRIVER("CMD: Rejected master-only command: 0x%08X\n",
-				 *cmd);
-		return false;
-	}
-
 	if (desc->flags & CMD_DESC_REGISTER) {
 		/*
 		 * Get the distance between individual register offset
@@ -1027,14 +988,15 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 		    u32 batch_len,
 		    bool is_master)
 {
-	const struct drm_i915_cmd_descriptor *desc;
+	struct drm_i915_cmd_descriptor default_desc = { CMD_DESC_SKIP };
+	const struct drm_i915_cmd_descriptor *desc = &default_desc;
+	u32 last_cmd_header = 0;
 	unsigned dst_iter, src_iter;
 	int needs_clflush = 0;
 	struct get_page rewind;
 	void *src, *dst, *tmp;
-	u32 partial, length;
+	u32 partial, length = 1;
 	unsigned in, out;
-	struct drm_i915_cmd_descriptor default_desc = { 0 };
 	bool oacontrol_set = false; /* OACONTROL tracking. See check_cmd() */
 	int ret = 0;
 
@@ -1100,39 +1062,62 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 		partial = 0;
 
 		do {
-			if (*cmd == MI_BATCH_BUFFER_END) {
-				if (oacontrol_set) {
-					DRM_DEBUG_DRIVER("CMD: batch set OACONTROL but did not clear it\n");
-					goto unmap;
+			if (*cmd != last_cmd_header) {
+				if (*cmd == MI_BATCH_BUFFER_END) {
+					if (unlikely(oacontrol_set)) {
+						DRM_DEBUG_DRIVER("CMD: batch set OACONTROL but did not clear it\n");
+						goto unmap;
+					}
+
+					cmd++; /* copy this cmd to dst */
+					batch_len = this; /* no more src */
+					ret = 0;
+					break;
 				}
 
-				cmd++; /* copy this cmd to dst */
-				batch_len = this; /* no more src */
-				ret = 0;
-				break;
-			}
+				desc = find_cmd_in_table(ring, *cmd);
+				if (desc) {
+					if (unlikely(desc->flags & CMD_DESC_REJECT)) {
+						DRM_DEBUG_DRIVER("CMD: Rejected command: 0x%08X\n", *cmd);
+						goto unmap;
+					}
 
-			desc = find_cmd(ring, *cmd, &default_desc);
-			if (!desc) {
-				DRM_DEBUG_DRIVER("CMD: Unrecognized command: 0x%08X\n",
-						 *cmd);
-				goto unmap;
-			}
+					if (unlikely((desc->flags & CMD_DESC_MASTER) && !is_master)) {
+						DRM_DEBUG_DRIVER("CMD: Rejected master-only command: 0x%08X\n", *cmd);
+						goto unmap;
+					}
 
-			/*
-			 * If the batch buffer contains a chained batch, return an
-			 * error that tells the caller to abort and dispatch the
-			 * workload as a non-secure batch.
-			 */
-			if (desc->cmd.value == MI_BATCH_BUFFER_START) {
-				ret = -EACCES;
-				goto unmap;
-			}
+					/*
+					 * If the batch buffer contains a
+					 * chained batch, return an error that
+					 * tells the caller to abort and
+					 * dispatch the workload as a
+					 * non-secure batch.
+					 */
+					if (unlikely(desc->cmd.value == MI_BATCH_BUFFER_START)) {
+						ret = -EACCES;
+						goto unmap;
+					}
 
-			if (desc->flags & CMD_DESC_FIXED)
-				length = desc->length.fixed;
-			else
-				length = ((*cmd & desc->length.mask) + LENGTH_BIAS);
+					if (desc->flags & CMD_DESC_FIXED)
+						length = desc->length.fixed;
+					else
+						length = (*cmd & desc->length.mask) + LENGTH_BIAS;
+				} else {
+					u32 mask = ring->get_cmd_length_mask(*cmd);
+					if (unlikely(!mask)) {
+						DRM_DEBUG_DRIVER("CMD: Unrecognized command: 0x%08X\n", *cmd);
+						goto unmap;
+					}
+
+					default_desc.length.mask = mask;
+					desc = &default_desc;
+
+					length = (*cmd & mask) + LENGTH_BIAS;
+				}
+
+				last_cmd_header = *cmd;
+			}
 
 			if (unlikely(cmd + length > page_end)) {
 				if (unlikely(cmd + length > batch_end)) {

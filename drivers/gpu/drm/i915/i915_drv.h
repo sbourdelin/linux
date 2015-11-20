@@ -2331,12 +2331,12 @@ struct drm_i915_cmd_descriptor {
 	 *                  is the DRM master
 	 */
 	u32 flags;
+#define CMD_DESC_SKIP     (0)
 #define CMD_DESC_FIXED    (1<<0)
-#define CMD_DESC_SKIP     (1<<1)
-#define CMD_DESC_REJECT   (1<<2)
-#define CMD_DESC_REGISTER (1<<3)
-#define CMD_DESC_BITMASK  (1<<4)
-#define CMD_DESC_MASTER   (1<<5)
+#define CMD_DESC_REJECT   (1<<1)
+#define CMD_DESC_REGISTER (1<<2)
+#define CMD_DESC_BITMASK  (1<<3)
+#define CMD_DESC_MASTER   (1<<4)
 
 	/*
 	 * The command's unique identification bits and the bitmask to get them.
