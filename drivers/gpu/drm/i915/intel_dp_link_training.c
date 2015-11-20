@@ -85,8 +85,17 @@ static bool
 intel_dp_reset_link_train(struct intel_dp *intel_dp,
 			uint8_t dp_train_pat)
 {
-	if (!intel_dp->train_set_valid)
+	if (i915.enable_dp_flt) {
+		DRM_DEBUG_KMS("DP flt enabled, train set valid: %s\n",
+			      intel_dp->train_set_valid ? "true" : "false");
+
+		if (!intel_dp->train_set_valid)
+			memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
+	} else {
+		DRM_DEBUG_KMS("DP flt disabled\n");
 		memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
+	}
+
 	intel_dp_set_signal_levels(intel_dp);
 	return intel_dp_set_link_train(intel_dp, dp_train_pat);
 }
