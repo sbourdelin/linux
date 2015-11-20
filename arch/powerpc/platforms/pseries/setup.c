@@ -236,7 +236,7 @@ static void __init pseries_discover_pic(void)
 	for_each_node_by_name(np, "interrupt-controller") {
 		typep = of_get_property(np, "compatible", NULL);
 		if (strstr(typep, "open-pic")) {
-			pSeries_mpic_node = of_node_get(np);
+			pSeries_mpic_node = np;
 			ppc_md.init_IRQ       = pseries_mpic_init_IRQ;
 			setup_kexec_cpu_down_mpic();
 			smp_init_pseries_mpic();
@@ -245,6 +245,7 @@ static void __init pseries_discover_pic(void)
 			ppc_md.init_IRQ       = pseries_xics_init_IRQ;
 			setup_kexec_cpu_down_xics();
 			smp_init_pseries_xics();
+			of_node_put(np);
 			return;
 		}
 	}
