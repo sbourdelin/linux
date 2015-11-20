@@ -125,7 +125,7 @@ print_syscall_enter(struct trace_iterator *iter, int flags,
 
 	if (entry->enter_event->event.type != ent->type) {
 		WARN_ON_ONCE(1);
-		goto end;
+		return TRACE_TYPE_UNHANDLED;
 	}
 
 	trace_seq_printf(s, "%s(", entry->name);
