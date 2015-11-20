@@ -587,7 +587,12 @@ static void i915_audio_component_codec_wake_override(struct device *dev,
 	struct drm_i915_private *dev_priv = dev_to_i915(dev);
 	u32 tmp;
 
-	if (!IS_SKYLAKE(dev_priv) && !IS_KABYLAKE(dev_priv))
+	/*
+	 * The patch is only applicable to chips that HDMI/DP codecs and PCH
+	 * HD Audio Controller are in different power wells, such as SKL,
+	 * BXT and KBL.
+	 */
+	if (INTEL_INFO(dev_priv)->gen < 9)
 		return;
 
 	/*
