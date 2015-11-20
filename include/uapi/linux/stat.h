@@ -158,4 +158,73 @@ struct statx {
 #define STATX_INFO_NONSYSTEM_OWNERSHIP	0x00000100U /* File has non-system ownership details */
 #define STATX_INFO_REPARSE_POINT	0x00000200U /* File is reparse point (NTFS/CIFS) */
 
+/*
+ * Information struct for fsinfo() request 0.
+ */
+struct fsinfo {
+	/* 0x00 - General info */
+	__u32	f_mask;		/* What optional fields are filled in */
+	__u32	f_fstype;	/* Filesystem type from linux/magic.h [uncond] */
+	__u32	f_dev_major;	/* As st_dev_* from struct statx [uncond] */
+	__u32	f_dev_minor;
+
+	/* 0x10 - statfs information */
+	__u64	f_blocks;	/* Total number of blocks in fs */
+	__u64	f_bfree;	/* Total number of free blocks */
+	__u64	f_bavail;	/* Number of free blocks available to ordinary user */
+	__u64	f_files;	/* Total number of file nodes in fs */
+	__u64	f_ffree;	/* Number of free file nodes */
+	__u64	f_favail;	/* Number of free file nodes available to ordinary user */
+	/* 0x40 */
+	__u32	f_bsize;	/* Optimal block size */
+	__u16	f_frsize;	/* Fragment size */
+	__u16	f_namelen;	/* Maximum name length [uncond] */
+	__u64	f_flags;	/* Filesystem mount flags */
+	/* 0x50 */
+	__u64	f_fsid;		/* Short 64-bit Filesystem ID (as statfs) */
+	__u64	f_supported_ioc_flags; /* supported FS_IOC_GETFLAGS flags  */
+
+	/* 0x60 - File timestamp info */
+	__s64	f_min_time;	/* Minimum timestamp value in seconds */
+	__s64	f_max_time;	/* Maximum timestamp value in seconds */
+	/* 0x70 */
+	__u16	f_atime_gran_mantissa;	/* granularity(secs) = mant * 10^exp */
+	__u16	f_btime_gran_mantissa;
+	__u16	f_ctime_gran_mantissa;
+	__u16	f_mtime_gran_mantissa;
+	__s8	f_atime_gran_exponent;
+	__s8	f_btime_gran_exponent;
+	__s8	f_ctime_gran_exponent;
+	__s8	f_mtime_gran_exponent;
+	__u8	__spare6c[0x80 - 0x7c];
+
+	/* 0x80 */
+	__u8	__spare80[0xd0 - 0x80];
+	/* 0xd0 */
+	char	f_fs_name[15 + 1]; /* Filesystem name [uncond] */
+	/* 0xe0 */
+	__u8	f_volume_id[16]; /* Volume/fs identifier */
+	__u8	f_volume_uuid[16]; /* Volume/fs UUID */
+	/* 0x100 */
+	char	f_volume_name[255 + 1]; /* Volume name */
+	/* 0x200 */
+	char	f_domain_name[255 + 1]; /* Domain/cell/workgroup name */
+	/* 0x300 */
+	__u8	__spare300[0x400 - 0x300];
+	/* 0x400 */
+};
+
+/*
+ * Flags to be found in f_mask.
+ */
+#define FSINFO_BLOCKS_INFO	0x00000001	/* Got f_blocks, f_bfree, f_bavail */
+#define FSINFO_FILES_INFO	0x00000002	/* Got f_files, f_ffree, f_favail */
+#define FSINFO_BSIZE		0x00000004	/* Got f_bsize */
+#define FSINFO_FRSIZE		0x00000008	/* Got f_frsize */
+#define FSINFO_FSID		0x00000010	/* Got f_fsid */
+#define FSINFO_VOLUME_ID	0x00000020	/* Got f_volume_id */
+#define FSINFO_VOLUME_UUID	0x00000040	/* Got f_volume_uuid */
+#define FSINFO_VOLUME_NAME	0x00000080	/* Got f_volume_name */
+#define FSINFO_DOMAIN_NAME	0x00000100	/* Got f_domain_name */
+
 #endif /* _UAPI_LINUX_STAT_H */

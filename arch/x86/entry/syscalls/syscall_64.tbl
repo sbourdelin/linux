@@ -332,6 +332,7 @@
 323	common	userfaultfd		sys_userfaultfd
 324	common	membarrier		sys_membarrier
 325	common	statx			sys_statx
+326	common	fsinfo			sys_fsinfo
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact

@@ -49,6 +49,7 @@ struct stat64;
 struct statfs;
 struct statfs64;
 struct statx;
+struct fsinfo;
 struct __sysctl_args;
 struct sysinfo;
 struct timespec;
@@ -889,5 +890,7 @@ asmlinkage long sys_execveat(int dfd, const char __user *filename,
 asmlinkage long sys_membarrier(int cmd, int flags);
 asmlinkage long sys_statx(int dfd, const char __user *path, unsigned flags,
 			  unsigned mask, struct statx __user *buffer);
+asmlinkage long sys_fsinfo(int dfd, const char __user *path, unsigned flags,
+			   unsigned request, void __user *buffer);
 
 #endif
