@@ -215,6 +215,32 @@
 				};
 			};
 
+			i2c0: i2c@1400 {
+				compatible = "snps,designware-i2c";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x1400 0x100>;
+				clocks = <&clk CLK_APBCORE>;
+				i2c-sda-hold-time-ns = <35>;
+				i2c-sda-falling-time-ns = <425>;
+				i2c-scl-falling-time-ns = <205>;
+				interrupts = <4>;
+				status = "disabled";
+			};
+
+			i2c1: i2c@1800 {
+				compatible = "snps,designware-i2c";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x1800 0x100>;
+				clocks = <&clk CLK_APBCORE>;
+				i2c-sda-hold-time-ns = <35>;
+				i2c-sda-falling-time-ns = <425>;
+				i2c-scl-falling-time-ns = <205>;
+				interrupts = <5>;
+				status = "disabled";
+			};
+
 			aic: interrupt-controller@3800 {
 				compatible = "snps,dw-apb-ictl";
 				reg = <0x3800 0x30>;
@@ -300,6 +326,32 @@
 					snps,nr-gpios = <32>;
 					reg = <0>;
 				};
+			};
+
+			i2c2: i2c@b000 {
+				compatible = "snps,designware-i2c";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0xb000 0x100>;
+				clocks = <&osc>;
+				i2c-sda-hold-time-ns = <140>;
+				i2c-sda-falling-time-ns = <500>;
+				i2c-scl-falling-time-ns = <220>;
+				interrupts = <6>;
+				status = "disabled";
+			};
+
+			i2c3: i2c@c000 {
+				compatible = "snps,designware-i2c";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0xc000 0x100>;
+				clocks = <&osc>;
+				i2c-sda-hold-time-ns = <140>;
+				i2c-sda-falling-time-ns = <500>;
+				i2c-scl-falling-time-ns = <220>;
+				interrupts = <7>;
+				status = "disabled";
 			};
 
 			uart0: uart@d000 {
