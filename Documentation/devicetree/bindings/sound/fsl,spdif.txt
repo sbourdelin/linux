@@ -27,6 +27,8 @@ Required properties:
 			  Transceiver Clock Diagram" of SoC reference manual.
 			  It can also be referred to TxClk_Source bit of
 			  register SPDIF_STC.
+	"spba"		  The spba clock is needed when two spba master port
+			  is used.
 
    - big-endian		: If this property is absent, the native endian mode
 			  will be in use as default, or the big endian mode
