@@ -9,10 +9,15 @@ Required properties:
 For required properties on SPI, please consult
 Documentation/devicetree/bindings/spi/spi-bus.txt
 
+Optional properties:
+- ti,side: specifie the channel side
+  insertion, removal.
+
 Examples:
 
 	codec_spi: 1792a@0 {
 		compatible = "ti,pcm1792a";
 		spi-max-frequency = <600000>;
+		ti,side = <left>
 	};
 
