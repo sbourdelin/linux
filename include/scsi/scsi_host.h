@@ -707,6 +707,11 @@ struct Scsi_Host {
 
 	enum scsi_host_state shost_state;
 
+	/* refcnt manipulated by scsi_host_get() / scsi_host_put() */
+	struct kref		kref1;
+	/* refcnt that tracks existence of shost_gendev and shost_dev */
+	struct kref		kref2;
+
 	/* ldm bits */
 	struct device		shost_gendev, shost_dev;
 

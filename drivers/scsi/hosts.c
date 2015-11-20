@@ -45,16 +45,6 @@
 static atomic_t scsi_host_next_hn = ATOMIC_INIT(0);	/* host_no for next new host */
 
 
-static void scsi_host_cls_release(struct device *dev)
-{
-	put_device(&class_to_shost(dev)->shost_gendev);
-}
-
-static struct class shost_class = {
-	.name		= "scsi_host",
-	.dev_release	= scsi_host_cls_release,
-};
-
 /**
  *	scsi_host_set_state - Take the given host through the host state model.
  *	@shost:	scsi host to change the state of.
@@ -180,7 +170,7 @@ void scsi_remove_host(struct Scsi_Host *shost)
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	transport_unregister_device(&shost->shost_gendev);
-	device_unregister(&shost->shost_dev);
+	device_del(&shost->shost_dev);
 	device_del(&shost->shost_gendev);
 }
 EXPORT_SYMBOL(scsi_remove_host);
@@ -263,8 +253,6 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 	if (error)
 		goto out_del_gendev;
 
-	get_device(&shost->shost_gendev);
-
 	if (shost->transportt->host_size) {
 		shost->shost_data = kzalloc(shost->transportt->host_size,
 					 GFP_KERNEL);
@@ -311,10 +299,10 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 }
 EXPORT_SYMBOL(scsi_add_host_with_dma);
 
-static void scsi_host_dev_release(struct device *dev)
+static void scsi_host_free(struct kref *kref)
 {
-	struct Scsi_Host *shost = dev_to_shost(dev);
-	struct device *parent = dev->parent;
+	struct Scsi_Host *shost = container_of(kref, typeof(*shost), kref2);
+	struct device *parent = shost->shost_gendev.parent;
 	struct request_queue *q;
 	void *queuedata;
 
@@ -347,6 +335,35 @@ static void scsi_host_dev_release(struct device *dev)
 	if (parent)
 		put_device(parent);
 	kfree(shost);
+}
+
+/* Called if shost_gendev refcnt drops to zero. */
+static void scsi_host_dev_release(struct device *dev)
+{
+	struct Scsi_Host *shost = dev_to_shost(dev);
+
+	kref_put(&shost->kref2, scsi_host_free);
+}
+
+/* Called if shost_dev refcnt drops to zero. */
+static void scsi_host_cls_release(struct device *dev)
+{
+	struct Scsi_Host *shost = class_to_shost(dev);
+
+	kref_put(&shost->kref2, scsi_host_free);
+}
+
+static struct class shost_class = {
+	.name		= "scsi_host",
+	.dev_release	= scsi_host_cls_release,
+};
+
+static void scsi_host_release(struct kref *kref)
+{
+	struct Scsi_Host *shost = container_of(kref, typeof(*shost), kref1);
+
+	put_device(&shost->shost_gendev);
+	put_device(&shost->shost_dev);
 }
 
 static int shost_eh_deadline = -1;
@@ -467,6 +484,10 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 
 	shost->use_blk_mq = scsi_use_blk_mq && !shost->hostt->disable_blk_mq;
 
+	kref_init(&shost->kref1);
+	kref_init(&shost->kref2);
+	kref_get(&shost->kref2);
+
 	device_initialize(&shost->shost_gendev);
 	dev_set_name(&shost->shost_gendev, "host%d", shost->host_no);
 	shost->shost_gendev.bus = &scsi_bus_type;
@@ -571,7 +592,7 @@ EXPORT_SYMBOL(scsi_host_lookup);
 struct Scsi_Host *scsi_host_get(struct Scsi_Host *shost)
 {
 	if ((shost->shost_state == SHOST_DEL) ||
-		!get_device(&shost->shost_gendev))
+		!kref_get_unless_zero(&shost->kref1))
 		return NULL;
 	return shost;
 }
@@ -583,7 +604,7 @@ EXPORT_SYMBOL(scsi_host_get);
  **/
 void scsi_host_put(struct Scsi_Host *shost)
 {
-	put_device(&shost->shost_gendev);
+	kref_put(&shost->kref1, scsi_host_release);
 }
 EXPORT_SYMBOL(scsi_host_put);
 
