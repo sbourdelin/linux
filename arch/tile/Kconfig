@@ -116,9 +116,6 @@ config ARCH_DISCONTIGMEM_DEFAULT
 config TRACE_IRQFLAGS_SUPPORT
 	def_bool y
 
-config STRICT_DEVMEM
-	def_bool y
-
 # SMP is required for Tilera Linux.
 config SMP
 	def_bool y

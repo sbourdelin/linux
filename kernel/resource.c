@@ -1498,6 +1498,9 @@ int iomem_is_exclusive(u64 addr)
 			break;
 		if (p->end < addr)
 			continue;
+		if (IS_ENABLED(CONFIG_IO_STRICT_DEVMEM)
+				&& p->flags & IORESOURCE_BUSY)
+			break;
 		if (p->flags & IORESOURCE_BUSY &&
 		     p->flags & IORESOURCE_EXCLUSIVE) {
 			err = 1;
