@@ -37,6 +37,8 @@ static void afs_kill_super(struct super_block *sb);
 static struct inode *afs_alloc_inode(struct super_block *sb);
 static void afs_destroy_inode(struct inode *inode);
 static int afs_statfs(struct dentry *dentry, struct kstatfs *buf);
+static int afs_get_fsinfo(struct dentry *dentry, struct fsinfo *f,
+			  unsigned flags);
 
 struct file_system_type afs_fs_type = {
 	.owner		= THIS_MODULE,
@@ -49,6 +51,7 @@ MODULE_ALIAS_FS("afs");
 
 static const struct super_operations afs_super_ops = {
 	.statfs		= afs_statfs,
+	.get_fsinfo	= afs_get_fsinfo,
 	.alloc_inode	= afs_alloc_inode,
 	.drop_inode	= afs_drop_inode,
 	.destroy_inode	= afs_destroy_inode,
@@ -553,5 +556,41 @@ static int afs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	else
 		buf->f_blocks = vs.max_quota;
 	buf->f_bavail = buf->f_bfree = buf->f_blocks - vs.blocks_in_use;
+	return 0;
+}
+
+/*
+ * Read filesystem information.
+ */
+static int afs_get_fsinfo(struct dentry *dentry, struct fsinfo *f,
+			  unsigned flags)
+{
+	struct afs_super_info *as = dentry->d_sb->s_fs_info;
+	int ret;
+
+	f->f_bsize	= AFS_BLOCK_SIZE;
+	f->f_namelen	= AFSNAMEMAX - 1;
+	f->f_min_time	= 0;
+	f->f_max_time	= U32_MAX;
+
+	/* Construct a volume ID from the AFS volume ID and type */
+	f->f_volume_id[0] = as->volume->vid >> 24;
+	f->f_volume_id[1] = as->volume->vid >> 16;
+	f->f_volume_id[2] = as->volume->vid >> 8;
+	f->f_volume_id[3] = as->volume->vid >> 0;
+	f->f_volume_id[4] = as->volume->type;
+
+	strcpy(f->f_volume_name, as->volume->vlocation->vldb.name);
+	strcpy(f->f_domain_name, as->volume->cell->name);
+
+	f->f_mask = FSINFO_VOLUME_ID | FSINFO_VOLUME_NAME | FSINFO_DOMAIN_NAME;
+
+	if (flags & AT_NO_ATTR_SYNC)
+		return 0;
+
+	ret = vfs_get_fsinfo_from_statfs(dentry, f, flags);
+
+	/* Don't pass the FSID to userspace since this isn't exportable */
+	f->f_mask &= ~FSINFO_FSID;
 	return 0;
 }
