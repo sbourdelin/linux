@@ -10,17 +10,28 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/lz4.h>
+#include <linux/vmalloc.h>
+#include <linux/mm.h>
 
 #include "zcomp_lz4.h"
 
 static void *zcomp_lz4_create(void)
 {
-	return kzalloc(LZ4_MEM_COMPRESS, GFP_KERNEL);
+	void *ret;
+
+	ret = kzalloc(LZ4_MEM_COMPRESS,
+			__GFP_NORETRY|__GFP_NOWARN|__GFP_NOMEMALLOC);
+	if (!ret)
+		ret = vzalloc(LZ4_MEM_COMPRESS);
+	return ret;
 }
 
 static void zcomp_lz4_destroy(void *private)
 {
-	kfree(private);
+	if (is_vmalloc_addr(private))
+		vfree(private);
+	else
+		kfree(private);
 }
 
 static int zcomp_lz4_compress(const unsigned char *src, unsigned char *dst,
