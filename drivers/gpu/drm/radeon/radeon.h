@@ -2460,6 +2460,9 @@ struct radeon_device {
 	/* amdkfd interface */
 	struct kfd_dev		*kfd;
 
+	/* last time we received an hpd signal */
+	unsigned long hpd_time;
+
 	struct mutex	mn_lock;
 	DECLARE_HASHTABLE(mn_hash, 7);
 };

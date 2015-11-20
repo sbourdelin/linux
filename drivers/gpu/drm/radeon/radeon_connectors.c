@@ -1228,19 +1228,33 @@ radeon_dvi_detect(struct drm_connector *connector, bool force)
 	const struct drm_encoder_helper_funcs *encoder_funcs;
 	int i, r;
 	enum drm_connector_status ret = connector_status_disconnected;
-	bool dret = false, broken_edid = false;
+	bool dret = false, broken_edid = false, hpd_unchanged;
 
 	r = pm_runtime_get_sync(connector->dev->dev);
 	if (r < 0)
 		return connector_status_disconnected;
 
-	if (!force && radeon_check_hpd_status_unchanged(connector)) {
+	hpd_unchanged = radeon_check_hpd_status_unchanged(connector);
+	if (!force && hpd_unchanged) {
 		ret = connector->status;
 		goto exit;
 	}
 
-	if (radeon_connector->ddc_bus)
+	if (radeon_connector->ddc_bus) {
 		dret = radeon_ddc_probe(radeon_connector, false);
+
+		/* Sometimes the pins required for the DDC probe on DVI
+		 * connectors don't make contact at the same time that the ones
+		 * for HPD do. If the DDC probe fails even though we had an HPD
+		 * signal, signal userspace to try again */
+		if (!dret && !hpd_unchanged &&
+		    connector->status != connector_status_connected &&
+		    time_before(jiffies, rdev->hpd_time + msecs_to_jiffies(1000))) {
+			DRM_DEBUG_KMS("%s: hpd asserted but ddc probe failed, retrying\n",
+				      connector->name);
+			drm_sysfs_hotplug_event(dev);
+		}
+	}
 	if (dret) {
 		radeon_connector->detected_by_load = false;
 		radeon_connector_free_edid(connector);
