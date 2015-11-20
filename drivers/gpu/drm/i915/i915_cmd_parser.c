@@ -992,9 +992,10 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 	const struct drm_i915_cmd_descriptor *desc = &default_desc;
 	u32 last_cmd_header = 0;
 	unsigned dst_iter, src_iter;
-	int needs_clflush = 0;
 	struct get_page rewind;
 	void *src, *dst, *tmp;
+	int src_needs_clflush = 0;
+	bool dst_needs_clflush;
 	u32 partial, length = 1;
 	unsigned in, out;
 	bool oacontrol_set = false; /* OACONTROL tracking. See check_cmd() */
@@ -1007,13 +1008,19 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 	if (WARN_ON(shadow_batch_obj->pages_pin_count == 0))
 		return -ENODEV;
 
-	ret = i915_gem_obj_prepare_shmem_read(batch_obj, &needs_clflush);
+	ret = i915_gem_obj_prepare_shmem_read(batch_obj, &src_needs_clflush);
 	if (ret) {
 		DRM_DEBUG_DRIVER("CMD: failed to prepare shadow batch\n");
 		return ret;
 	}
 
-	ret = i915_gem_object_set_to_cpu_domain(shadow_batch_obj, true);
+	dst_needs_clflush =
+		shadow_batch_obj->base.write_domain != I915_GEM_DOMAIN_CPU &&
+		!INTEL_INFO(shadow_batch_obj->base.dev)->has_llc;
+	if (dst_needs_clflush)
+		ret = i915_gem_object_set_to_gtt_domain(shadow_batch_obj, true);
+	else
+		ret = i915_gem_object_set_to_cpu_domain(shadow_batch_obj, true);
 	if (ret) {
 		DRM_DEBUG_DRIVER("CMD: Failed to set shadow batch to CPU\n");
 		goto unpin;
@@ -1048,7 +1055,7 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 			this = PAGE_SIZE - in;
 
 		src = kmap_atomic(i915_gem_object_get_page(batch_obj, src_iter));
-		if (needs_clflush)
+		if (src_needs_clflush)
 			drm_clflush_virt_range(src + in, this);
 
 		if (this == PAGE_SIZE && partial == 0)
@@ -1151,6 +1158,8 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 				int len;
 
 				if (out == PAGE_SIZE) {
+					if (dst_needs_clflush)
+						drm_clflush_virt_range(dst, PAGE_SIZE);
 					kunmap_atomic(dst);
 					dst = kmap_atomic(i915_gem_object_get_page(shadow_batch_obj, ++dst_iter));
 					out = 0;
@@ -1179,6 +1188,8 @@ int i915_parse_cmds(struct intel_engine_cs *ring,
 		kunmap_atomic(src);
 		in = 0;
 	}
+	if (dst_needs_clflush)
+		drm_clflush_virt_range(dst, out);
 unmap:
 	kunmap_atomic(src);
 	kunmap_atomic(dst);
