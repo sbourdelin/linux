@@ -17,6 +17,8 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/mfd/syscon.h>
+#include <linux/regmap.h>
 
 struct dwc3_qcom {
 	struct device		*dev;
@@ -30,6 +32,9 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct dwc3_qcom *qdwc;
+	struct regmap *regmap;
+	u32 mux_offset;
+	u32 mux_bit;
 	int ret;
 
 	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
@@ -56,6 +61,26 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 	if (IS_ERR(qdwc->sleep_clk)) {
 		dev_info(qdwc->dev, "failed to get optional sleep clock\n");
 		qdwc->sleep_clk = NULL;
+	}
+
+	/* look for tcsr and if present, provision it */
+	regmap = syscon_regmap_lookup_by_phandle(node, "syscon-tcsr");
+	if (!IS_ERR(regmap)) {
+		if (of_property_read_u32_index(node, "syscon-tcsr", 1,
+					       &mux_offset)) {
+			dev_err(qdwc->dev, "missing USB TCSR mux offset\n");
+			return -EINVAL;
+		}
+		if (of_property_read_u32_index(node, "syscon-tcsr", 2,
+					       &mux_bit)) {
+			dev_err(qdwc->dev, "missing USB TCSR mux bit\n");
+			return -EINVAL;
+		}
+
+		regmap_update_bits(regmap, mux_offset, BIT(mux_bit),
+				   BIT(mux_bit));
+	} else {
+		dev_info(qdwc->dev, "missing syscon tcsr entry\n");
 	}
 
 	ret = clk_prepare_enable(qdwc->core_clk);
