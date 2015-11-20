@@ -1086,8 +1086,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* optional bus recovery feature through pinctrl */
 	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
-	if (IS_ERR(i2c_imx->pinctrl)) {
+	/* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
+	if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
+			PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
 		ret = PTR_ERR(i2c_imx->pinctrl);
 		goto clk_disable;
 	}
@@ -1125,7 +1128,10 @@ static int i2c_imx_probe(struct platform_device *pdev)
 		goto clk_disable;
 	}
 
-	i2c_imx_init_recovery_info(i2c_imx, pdev);
+	if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
+		dev_info(&pdev->dev, "can't get pinctrl, bus recovery feature disabled\n");
+	else
+		i2c_imx_init_recovery_info(i2c_imx, pdev);
 
 	/* Set up platform driver data */
 	platform_set_drvdata(pdev, i2c_imx);
