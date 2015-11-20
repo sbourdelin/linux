@@ -54,6 +54,7 @@ static const struct super_operations nfs4_sops = {
 	.write_inode	= nfs4_write_inode,
 	.drop_inode	= nfs_drop_inode,
 	.statfs		= nfs_statfs,
+	.get_fsinfo	= nfs_get_fsinfo,
 	.evict_inode	= nfs4_evict_inode,
 	.umount_begin	= nfs_umount_begin,
 	.show_options	= nfs_show_options,

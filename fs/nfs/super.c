@@ -311,6 +311,7 @@ const struct super_operations nfs_sops = {
 	.write_inode	= nfs_write_inode,
 	.drop_inode	= nfs_drop_inode,
 	.statfs		= nfs_statfs,
+	.get_fsinfo	= nfs_get_fsinfo,
 	.evict_inode	= nfs_evict_inode,
 	.umount_begin	= nfs_umount_begin,
 	.show_options	= nfs_show_options,
@@ -492,6 +493,63 @@ int nfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return error;
 }
 EXPORT_SYMBOL_GPL(nfs_statfs);
+
+/*
+ * Read filesystem information.
+ */
+int nfs_get_fsinfo(struct dentry *dentry, struct fsinfo *f, unsigned flags)
+{
+	struct nfs_server *server = NFS_SB(dentry->d_sb);
+	struct nfs_client *client = server->nfs_client;
+	int ret;
+
+	f->f_bsize	= dentry->d_sb->s_blocksize;
+	f->f_namelen	= server->namelen;
+
+	if (client->rpc_ops->version < 4) {
+		f->f_min_time = 0;
+		f->f_max_time = U32_MAX;
+	} else {
+		f->f_min_time = S64_MIN;
+		f->f_max_time = S64_MAX;
+	}
+
+	f->f_atime_gran_exponent = -6;
+	f->f_ctime_gran_exponent = -6;
+	f->f_mtime_gran_exponent = -6;
+	if (client->rpc_ops->version >= 3) {
+		f->f_atime_gran_exponent = -9;
+		f->f_ctime_gran_exponent = -9;
+		f->f_mtime_gran_exponent = -9;
+	}
+
+	if (client->cl_hostname) {
+		strncpy(f->f_domain_name, client->cl_hostname,
+			sizeof(f->f_domain_name));
+		f->f_domain_name[sizeof(f->f_domain_name) - 1] = 0;
+		f->f_mask |= FSINFO_DOMAIN_NAME;
+	}
+
+	/* Treat the remote FSID as the volume ID since we don't support
+	 * reexportation through NFSD.
+	 */
+	memcpy(f->f_volume_id, &server->fsid,
+	       min(sizeof(f->f_volume_id), sizeof(server->fsid)));
+	f->f_mask |= FSINFO_VOLUME_ID;
+	
+	if (flags & AT_NO_ATTR_SYNC)
+		return 0;
+
+	ret = vfs_get_fsinfo_from_statfs(dentry, f, flags);
+	if (ret < 0)
+		return ret;
+
+	/* Don't pass the FSID to userspace since this isn't exportable */
+	memset(&f->f_fsid, 0, sizeof(f->f_fsid));
+	f->f_mask &= ~FSINFO_FSID;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nfs_get_fsinfo);
 
 /*
  * Map the security flavour number to a name
