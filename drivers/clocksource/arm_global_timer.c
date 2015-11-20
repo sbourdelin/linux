@@ -51,6 +51,7 @@ static void __iomem *gt_base;
 static unsigned long gt_clk_rate;
 static int gt_ppi;
 static struct clock_event_device __percpu *gt_evt;
+static bool gt_always_on;
 
 /*
  * To get the value from the Global Timer Counter register proceed as follows:
@@ -163,6 +164,9 @@ static int gt_clockevents_init(struct clock_event_device *clk)
 {
 	int cpu = smp_processor_id();
 
+	if (!gt_always_on)
+		clk->features |= CLOCK_EVT_FEAT_C3STOP;
+
 	clk->name = "arm_global_timer";
 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
 		CLOCK_EVT_FEAT_PERCPU;
@@ -190,12 +194,19 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
 	return gt_counter_read();
 }
 
+static void gt_resume(struct clocksource *cs)
+{
+	/* re-enable timer on resume */
+	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+}
+
 static struct clocksource gt_clocksource = {
 	.name	= "arm_global_timer",
 	.rating	= 300,
 	.read	= gt_clocksource_read,
 	.mask	= CLOCKSOURCE_MASK(64),
 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+	.resume = gt_resume,
 };
 
 #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
@@ -212,6 +223,9 @@ static void __init gt_clocksource_init(void)
 	writel(0, gt_base + GT_COUNTER1);
 	/* enables timer on all the cores */
 	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+
+	if (gt_always_on)
+		gt_clocksource.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
 
 #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
 	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
@@ -283,6 +297,8 @@ static void __init global_timer_of_register(struct device_node *np)
 		err = -ENOMEM;
 		goto out_clk;
 	}
+
+	gt_always_on = of_property_read_bool(np, "always-on");
 
 	err = request_percpu_irq(gt_ppi, gt_clockevent_interrupt,
 				 "gt", gt_evt);
