@@ -597,14 +597,13 @@ int i915_guc_submit(struct i915_guc_client *client,
 {
 	struct intel_guc *guc = client->guc;
 	enum intel_ring_id ring_id = rq->ring->id;
-	unsigned long flags;
 	int q_ret, b_ret;
 
 	/* Need this because of the deferred pin ctx and ring */
 	/* Shall we move this right after ring is pinned? */
 	lr_context_update(rq);
 
-	spin_lock_irqsave(&client->wq_lock, flags);
+	spin_lock(&client->wq_lock);
 
 	q_ret = guc_add_workqueue_item(client, rq);
 	if (q_ret == 0)
@@ -620,7 +619,7 @@ int i915_guc_submit(struct i915_guc_client *client,
 	} else {
 		client->retcode = 0;
 	}
-	spin_unlock_irqrestore(&client->wq_lock, flags);
+	spin_unlock(&client->wq_lock);
 
 	spin_lock(&guc->host2guc_lock);
 	guc->submissions[ring_id] += 1;
