@@ -792,7 +792,7 @@ cifs_d_revalidate(struct dentry *direntry, unsigned int flags)
 		return -ECHILD;
 
 	if (d_really_is_positive(direntry)) {
-		if (cifs_revalidate_dentry(direntry))
+		if (cifs_revalidate_dentry(direntry, false, false))
 			return 0;
 		else {
 			/*

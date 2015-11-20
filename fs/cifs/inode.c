@@ -166,13 +166,21 @@ cifs_fattr_to_inode(struct inode *inode, struct cifs_fattr *fattr)
 	cifs_nlink_fattr_to_inode(inode, fattr);
 	inode->i_uid = fattr->cf_uid;
 	inode->i_gid = fattr->cf_gid;
+	if (fattr->cf_flags & CIFS_FATTR_UID_FAKED)
+		cifs_i->uid_faked = true;
+	if (fattr->cf_flags & CIFS_FATTR_GID_FAKED)
+		cifs_i->gid_faked = true;
 
 	/* if dynperm is set, don't clobber existing mode */
 	if (inode->i_state & I_NEW ||
 	    !(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DYNPERM))
 		inode->i_mode = fattr->cf_mode;
 
-	cifs_i->cifsAttrs = fattr->cf_cifsattrs;
+	if (fattr->cf_flags & CIFS_FATTR_WINATTRS_VALID) {
+		cifs_i->cifsAttrs = fattr->cf_cifsattrs;
+		cifs_i->btime = fattr->cf_btime;
+		cifs_i->btime_valid = true;
+	}
 
 	if (fattr->cf_flags & CIFS_FATTR_NEED_REVAL)
 		cifs_i->time = 0;
@@ -284,18 +292,22 @@ cifs_unix_basic_to_fattr(struct cifs_fattr *fattr, FILE_UNIX_BASIC_INFO *info,
 		u64 id = le64_to_cpu(info->Uid);
 		if (id < ((uid_t)-1)) {
 			kuid_t uid = make_kuid(&init_user_ns, id);
-			if (uid_valid(uid))
+			if (uid_valid(uid)) {
 				fattr->cf_uid = uid;
+				fattr->cf_flags |= CIFS_FATTR_UID_FAKED;
+			}
 		}
 	}
-	
+
 	fattr->cf_gid = cifs_sb->mnt_gid;
 	if (!(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_OVERR_GID)) {
 		u64 id = le64_to_cpu(info->Gid);
 		if (id < ((gid_t)-1)) {
 			kgid_t gid = make_kgid(&init_user_ns, id);
-			if (gid_valid(gid))
+			if (gid_valid(gid)) {
 				fattr->cf_gid = gid;
+				fattr->cf_flags |= CIFS_FATTR_GID_FAKED;
+			}
 		}
 	}
 
@@ -324,7 +336,8 @@ cifs_create_dfs_fattr(struct cifs_fattr *fattr, struct super_block *sb)
 	fattr->cf_ctime = CURRENT_TIME;
 	fattr->cf_mtime = CURRENT_TIME;
 	fattr->cf_nlink = 2;
-	fattr->cf_flags |= CIFS_FATTR_DFS_REFERRAL;
+	fattr->cf_flags |= CIFS_FATTR_DFS_REFERRAL |
+		CIFS_FATTR_UID_FAKED | CIFS_FATTR_GID_FAKED;
 }
 
 static int
@@ -590,6 +603,7 @@ cifs_all_info_to_fattr(struct cifs_fattr *fattr, FILE_ALL_INFO *info,
 	struct cifs_tcon *tcon = cifs_sb_master_tcon(cifs_sb);
 
 	memset(fattr, 0, sizeof(*fattr));
+	fattr->cf_flags = CIFS_FATTR_WINATTRS_VALID;
 	fattr->cf_cifsattrs = le32_to_cpu(info->Attributes);
 	if (info->DeletePending)
 		fattr->cf_flags |= CIFS_FATTR_DELETE_PENDING;
@@ -601,6 +615,7 @@ cifs_all_info_to_fattr(struct cifs_fattr *fattr, FILE_ALL_INFO *info,
 
 	fattr->cf_ctime = cifs_NTtimeToUnix(info->ChangeTime);
 	fattr->cf_mtime = cifs_NTtimeToUnix(info->LastWriteTime);
+	fattr->cf_btime = cifs_NTtimeToUnix(info->CreationTime);
 
 	if (adjust_tz) {
 		fattr->cf_ctime.tv_sec += tcon->ses->server->timeAdj;
@@ -1887,7 +1902,8 @@ int cifs_revalidate_file_attr(struct file *filp)
 	return rc;
 }
 
-int cifs_revalidate_dentry_attr(struct dentry *dentry)
+int cifs_revalidate_dentry_attr(struct dentry *dentry,
+				bool want_extra_bits, bool force)
 {
 	unsigned int xid;
 	int rc = 0;
@@ -1898,7 +1914,7 @@ int cifs_revalidate_dentry_attr(struct dentry *dentry)
 	if (inode == NULL)
 		return -ENOENT;
 
-	if (!cifs_inode_needs_reval(inode))
+	if (!force && !cifs_inode_needs_reval(inode))
 		return rc;
 
 	xid = get_xid();
@@ -1915,9 +1931,12 @@ int cifs_revalidate_dentry_attr(struct dentry *dentry)
 		 full_path, inode, inode->i_count.counter,
 		 dentry, dentry->d_time, jiffies);
 
-	if (cifs_sb_master_tcon(CIFS_SB(sb))->unix_ext)
+	if (cifs_sb_master_tcon(CIFS_SB(sb))->unix_ext) {
 		rc = cifs_get_inode_info_unix(&inode, full_path, sb, xid);
-	else
+		if (rc != 0)
+			goto out;
+	}
+	if (!cifs_sb_master_tcon(CIFS_SB(sb))->unix_ext || want_extra_bits)
 		rc = cifs_get_inode_info(&inode, full_path, NULL, sb,
 					 xid, NULL);
 
@@ -1940,12 +1959,13 @@ int cifs_revalidate_file(struct file *filp)
 }
 
 /* revalidate a dentry's inode attributes */
-int cifs_revalidate_dentry(struct dentry *dentry)
+int cifs_revalidate_dentry(struct dentry *dentry,
+			   bool want_extra_bits, bool force)
 {
 	int rc;
 	struct inode *inode = d_inode(dentry);
 
-	rc = cifs_revalidate_dentry_attr(dentry);
+	rc = cifs_revalidate_dentry_attr(dentry, want_extra_bits, force);
 	if (rc)
 		return rc;
 
@@ -1958,28 +1978,62 @@ int cifs_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	struct cifs_sb_info *cifs_sb = CIFS_SB(dentry->d_sb);
 	struct cifs_tcon *tcon = cifs_sb_master_tcon(cifs_sb);
 	struct inode *inode = d_inode(dentry);
+	struct cifsInodeInfo *cifs_i = CIFS_I(inode);
+	bool force = stat->query_flags & AT_FORCE_ATTR_SYNC;
+	bool want_extra_bits = false;
+	u32 info, ioc = 0;
+	u32 attrs;
 	int rc;
 
-	/*
-	 * We need to be sure that all dirty pages are written and the server
-	 * has actual ctime, mtime and file length.
-	 */
-	if (!CIFS_CACHE_READ(CIFS_I(inode)) && inode->i_mapping &&
-	    inode->i_mapping->nrpages != 0) {
-		rc = filemap_fdatawait(inode->i_mapping);
-		if (rc) {
-			mapping_set_error(inode->i_mapping, rc);
-			return rc;
-		}
-	}
+	if (cifs_i->uid_faked)
+		stat->request_mask &= ~STATX_UID;
+	if (cifs_i->gid_faked)
+		stat->request_mask &= ~STATX_GID;
 
-	rc = cifs_revalidate_dentry_attr(dentry);
-	if (rc)
-		return rc;
+	if ((stat->request_mask & STATX_BTIME && !cifs_i->btime_valid) ||
+	    stat->request_mask & STATX_IOC_FLAGS)
+		want_extra_bits = force = true;
+
+	if (!(stat->query_flags & AT_NO_ATTR_SYNC)) {
+		/* Unless we're explicitly told not to sync, we need to be sure
+		 * that all dirty pages are written and the server has actual
+		 * ctime, mtime and file length.
+		 */
+		bool flush = force;
+
+		if (stat->request_mask &
+		    (STATX_CTIME | STATX_MTIME | STATX_SIZE))
+			flush = true;
+
+		if (flush &&
+		    !CIFS_CACHE_READ(CIFS_I(inode)) && inode->i_mapping &&
+		    inode->i_mapping->nrpages != 0) {
+			rc = filemap_fdatawait(inode->i_mapping);
+			if (rc) {
+				mapping_set_error(inode->i_mapping, rc);
+				return rc;
+			}
+		}
+
+		rc = cifs_revalidate_dentry(dentry, want_extra_bits, force);
+		if (rc)
+			return rc;
+	}
 
 	generic_fillattr(inode, stat);
 	stat->blksize = CIFS_MAX_MSGSIZE;
-	stat->ino = CIFS_I(inode)->uniqueid;
+
+	info = STATX_INFO_REMOTE | STATX_INFO_NONSYSTEM_OWNERSHIP;
+
+	if (cifs_i->btime_valid) {
+		stat->btime = cifs_i->btime;
+		stat->result_mask |= STATX_BTIME;
+	}
+
+	/* We don't promise an inode number if we made one up */
+	stat->ino = cifs_i->uniqueid;
+	if (!(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM))
+		stat->result_mask &= ~STATX_INO;
 
 	/*
 	 * If on a multiuser mount without unix extensions or cifsacl being
@@ -1993,8 +2047,24 @@ int cifs_getattr(struct vfsmount *mnt, struct dentry *dentry,
 			stat->uid = current_fsuid();
 		if (!(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_OVERR_GID))
 			stat->gid = current_fsgid();
+		stat->result_mask &= ~(STATX_UID | STATX_GID);
 	}
-	return rc;
+
+	attrs = cifs_i->cifsAttrs;
+	if (attrs & ATTR_TEMPORARY)	info |= STATX_INFO_TEMPORARY;
+	if (attrs & ATTR_REPARSE)	info |= STATX_INFO_REPARSE_POINT;
+	if (attrs & ATTR_OFFLINE)	info |= STATX_INFO_OFFLINE;
+	if (attrs & ATTR_ENCRYPTED)	info |= STATX_INFO_ENCRYPTED;
+	stat->information |= info;
+
+	if (attrs & ATTR_READONLY)	ioc |= FS_IMMUTABLE_FL;
+	if (attrs & ATTR_COMPRESSED)	ioc |= FS_COMPR_FL;
+	if (attrs & ATTR_HIDDEN)	ioc |= FS_HIDDEN_FL;
+	if (attrs & ATTR_SYSTEM)	ioc |= FS_SYSTEM_FL;
+	if (attrs & ATTR_ARCHIVE)	ioc |= FS_ARCHIVE_FL;
+	stat->ioc_flags |= ioc;
+
+	return 0;
 }
 
 static int cifs_truncate_page(struct address_space *mapping, loff_t from)

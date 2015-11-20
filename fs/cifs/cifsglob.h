@@ -1152,7 +1152,11 @@ struct cifsInodeInfo {
 	unsigned long flags;
 	spinlock_t writers_lock;
 	unsigned int writers;		/* Number of writers on this inode */
+	bool btime_valid:1;		/* stored creation time is valid */
+	bool uid_faked:1;		/* true if i_uid is faked */
+	bool gid_faked:1;		/* true if i_gid is faked */
 	unsigned long time;		/* jiffies of last update of inode */
+	struct timespec btime;		/* creation time */
 	u64  server_eof;		/* current file size on server -- protected by i_lock */
 	u64  uniqueid;			/* server inode number */
 	u64  createtime;		/* creation time on server */
@@ -1365,6 +1369,9 @@ struct dfs_info3_param {
 #define CIFS_FATTR_NEED_REVAL		0x4
 #define CIFS_FATTR_INO_COLLISION	0x8
 #define CIFS_FATTR_UNKNOWN_NLINK	0x10
+#define CIFS_FATTR_WINATTRS_VALID	0x20	/* T if cf_btime and cf_cifsattrs valid */
+#define CIFS_FATTR_UID_FAKED		0x40	/* T if cf_uid is faked */
+#define CIFS_FATTR_GID_FAKED		0x80	/* T if cf_gid is faked */
 
 struct cifs_fattr {
 	u32		cf_flags;
@@ -1382,6 +1389,7 @@ struct cifs_fattr {
 	struct timespec	cf_atime;
 	struct timespec	cf_mtime;
 	struct timespec	cf_ctime;
+	struct timespec	cf_btime;
 };
 
 static inline void free_dfs_info_param(struct dfs_info3_param *param)
