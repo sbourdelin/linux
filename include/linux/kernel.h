@@ -445,6 +445,19 @@ extern int sysctl_panic_on_stackoverflow;
 
 extern bool crash_kexec_post_notifiers;
 
+extern atomic_t panic_cpu;
+
+/*
+ * A variant of panic() called from NMI context.
+ * If we've already panicked on this cpu, return from here.
+ */
+#define nmi_panic(fmt, ...)						\
+	do {								\
+		int this_cpu = raw_smp_processor_id();			\
+		if (atomic_cmpxchg(&panic_cpu, -1, this_cpu) != this_cpu) \
+			panic(fmt, ##__VA_ARGS__);			\
+	} while (0)
+
 /*
  * Only to be used by arch init code. If the user over-wrote the default
  * CONFIG_PANIC_TIMEOUT, honor it.
