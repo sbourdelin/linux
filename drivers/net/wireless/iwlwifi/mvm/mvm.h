@@ -788,6 +788,10 @@ struct iwl_mvm {
 	 */
 	bool temperature_test;  /* Debug test temperature is enabled */
 
+#if IS_ENABLED(CONFIG_HWMON)
+	struct device *hwmon;
+#endif
+
 	struct iwl_time_quota_cmd last_quota_cmd;
 
 #ifdef CONFIG_NL80211_TESTMODE
@@ -1416,6 +1420,13 @@ void iwl_mvm_tt_initialize(struct iwl_mvm *mvm, u32 min_backoff);
 void iwl_mvm_tt_exit(struct iwl_mvm *mvm);
 void iwl_mvm_set_hw_ctkill_state(struct iwl_mvm *mvm, bool state);
 int iwl_mvm_get_temp(struct iwl_mvm *mvm);
+#if IS_ENABLED(CONFIG_HWMON)
+int iwl_mvm_hwmon_register(struct iwl_mvm *mvm);
+void iwl_mvm_hwmon_unregister(struct iwl_mvm *mvm);
+#else
+static inline int iwl_mvm_hwmon_register(struct iwl_mvm *mvm) { return 0; }
+static inline void iwl_mvm_hwmon_unregister(struct iwl_mvm *mvm) {}
+#endif
 
 /* Location Aware Regulatory */
 struct iwl_mcc_update_resp *

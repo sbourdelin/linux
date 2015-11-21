@@ -64,6 +64,7 @@
  *
  *****************************************************************************/
 
+#include <linux/hwmon.h>
 #include "mvm.h"
 
 #define IWL_MVM_TEMP_NOTIF_WAIT_TIMEOUT	HZ
@@ -413,6 +414,67 @@ void iwl_mvm_tt_handler(struct iwl_mvm *mvm)
 		tt->throttle = false;
 	}
 }
+
+#if IS_ENABLED(CONFIG_HWMON)
+static ssize_t temp1_input_show(struct device *device,
+				struct device_attribute *devattr,
+				char *buf)
+{
+	struct iwl_mvm *mvm = dev_get_drvdata(device);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", mvm->temperature * 1000);
+}
+static DEVICE_ATTR_RO(temp1_input);
+
+static ssize_t temp1_crit_show(struct device *device,
+			       struct device_attribute *devattr,
+			       char *buf)
+{
+	struct iwl_mvm *mvm = dev_get_drvdata(device);
+	struct iwl_tt_params *params = &mvm->thermal_throttle.params;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", params->ct_kill_entry * 1000);
+}
+static DEVICE_ATTR_RO(temp1_crit);
+
+static ssize_t temp1_max_show(struct device *device,
+			      struct device_attribute *devattr,
+			      char *buf)
+{
+	struct iwl_mvm *mvm = dev_get_drvdata(device);
+	struct iwl_tt_params *params = &mvm->thermal_throttle.params;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", params->tx_protection_entry * 1000);
+}
+static DEVICE_ATTR_RO(temp1_max);
+
+static struct attribute *mvm_hwmon_attrs[] = {
+	&dev_attr_temp1_input.attr,
+	&dev_attr_temp1_crit.attr,
+	&dev_attr_temp1_max.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(mvm_hwmon);
+
+int iwl_mvm_hwmon_register(struct iwl_mvm *mvm)
+{
+	struct wiphy *wiphy = mvm->hw->wiphy;
+	struct device *hwmon;
+
+	hwmon = hwmon_device_register_with_groups(mvm->dev, wiphy_name(wiphy),
+						  mvm, mvm_hwmon_groups);
+	if (!IS_ERR(hwmon))
+		mvm->hwmon = hwmon;
+	return PTR_ERR_OR_ZERO(hwmon);
+}
+
+void iwl_mvm_hwmon_unregister(struct iwl_mvm *mvm)
+{
+	if (mvm->hwmon)
+		hwmon_device_unregister(mvm->hwmon);
+	mvm->hwmon = NULL;
+}
+#endif /* CONFIG_HWMON */
 
 static const struct iwl_tt_params iwl_mvm_default_tt_params = {
 	.ct_kill_entry = 118,

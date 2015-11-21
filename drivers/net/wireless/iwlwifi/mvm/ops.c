@@ -595,6 +595,7 @@ iwl_op_mode_mvm_start(struct iwl_trans *trans, const struct iwl_cfg *cfg,
 	mvm->refs[IWL_MVM_REF_UCODE_DOWN] = 1;
 
 	iwl_mvm_tof_init(mvm);
+	iwl_mvm_hwmon_register(mvm);
 
 	return op_mode;
 
@@ -616,6 +617,7 @@ static void iwl_op_mode_mvm_stop(struct iwl_op_mode *op_mode)
 	struct iwl_mvm *mvm = IWL_OP_MODE_GET_MVM(op_mode);
 	int i;
 
+	iwl_mvm_hwmon_unregister(mvm);
 	iwl_mvm_leds_exit(mvm);
 
 	iwl_mvm_tt_exit(mvm);
