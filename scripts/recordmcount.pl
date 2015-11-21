@@ -113,17 +113,22 @@ $P =~ s@.*/@@g;
 
 my $V = '0.1';
 
-if ($#ARGV != 11) {
-	print "usage: $P arch endian bits objdump objcopy cc ld nm rm mv is_module inputfile\n";
+if ($#ARGV != 12) {
+	print "usage: $P arch endian bits objdump objcopy cc ld nm rm mv is_module is_traced inputfile\n";
 	print "version: $V\n";
 	exit(1);
 }
 
 my ($arch, $endian, $bits, $objdump, $objcopy, $cc,
-    $ld, $nm, $rm, $mv, $is_module, $inputfile) = @ARGV;
+    $ld, $nm, $rm, $mv, $is_module, $is_traced, $inputfile) = @ARGV;
 
 # This file refers to mcount and shouldn't be ftraced, so lets' ignore it
 if ($inputfile =~ m,kernel/trace/ftrace\.o$,) {
+    exit(0);
+}
+
+# We only trace mcount calls
+if ($is_traced eq "0") {
     exit(0);
 }
 

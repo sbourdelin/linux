@@ -53,6 +53,7 @@ static struct stat sb;	/* Remember .st_size, etc. */
 static jmp_buf jmpenv;	/* setjmp/longjmp per-file error escape */
 static const char *altmcount;	/* alternate mcount symbol name */
 static int warn_on_notrace_sect; /* warn when section has mcount not being recorded */
+static int trace_mcount; /* Record mcount callers */
 
 /* setjmp() return values */
 enum {
@@ -429,19 +430,22 @@ main(int argc, char *argv[])
 	int c;
 	int i;
 
-	while ((c = getopt(argc, argv, "w")) >= 0) {
+	while ((c = getopt(argc, argv, "wt")) >= 0) {
 		switch (c) {
 		case 'w':
 			warn_on_notrace_sect = 1;
 			break;
+		case 't':
+			trace_mcount = 1;
+			break;
 		default:
-			fprintf(stderr, "usage: recordmcount [-w] file.o...\n");
+			fprintf(stderr, "usage: recordmcount [-wt] file.o...\n");
 			return 0;
 		}
 	}
 
 	if ((argc - optind) < 1) {
-		fprintf(stderr, "usage: recordmcount [-w] file.o...\n");
+		fprintf(stderr, "usage: recordmcount [-wt] file.o...\n");
 		return 0;
 	}
 
