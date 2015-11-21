@@ -375,6 +375,39 @@ void __init early_print(const char *str, ...)
 	printk("%s", buf);
 }
 
+#ifdef CONFIG_ARM_PATCH_UIDIV
+static void __init patch_aeabi_uidiv(void)
+{
+	extern unsigned long *__start_udiv_loc[], *__stop_udiv_loc[];
+	extern unsigned long *__start_idiv_loc[], *__stop_idiv_loc[];
+	unsigned long **p;
+	unsigned int udiv_insn, sdiv_insn, mask;
+
+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+		mask = HWCAP_IDIVT;
+		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+	} else {
+		mask = HWCAP_IDIVA;
+		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+	}
+
+	if (elf_hwcap & mask) {
+		for (p = __start_udiv_loc; p < __stop_udiv_loc; p++) {
+			unsigned long *inst = *p;
+			*inst = udiv_insn;
+		}
+		for (p = __start_idiv_loc; p < __stop_idiv_loc; p++) {
+			unsigned long *inst = *p;
+			*inst = sdiv_insn;
+		}
+	}
+}
+#else
+static void __init patch_aeabi_uidiv(void) { }
+#endif
+
 static void __init cpuid_init_hwcaps(void)
 {
 	int block;
@@ -642,6 +675,7 @@ static void __init setup_processor(void)
 	elf_hwcap = list->elf_hwcap;
 
 	cpuid_init_hwcaps();
+	patch_aeabi_uidiv();
 
 #ifndef CONFIG_ARM_THUMB
 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);

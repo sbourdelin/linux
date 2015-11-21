@@ -20,6 +20,7 @@
 #include <linux/string.h>
 #include <linux/gfp.h>
 
+#include <asm/hwcap.h>
 #include <asm/pgtable.h>
 #include <asm/sections.h>
 #include <asm/smp_plat.h>
@@ -48,6 +49,43 @@ void *module_alloc(unsigned long size)
 	return __vmalloc_node_range(size, 1,  VMALLOC_START, VMALLOC_END,
 				GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
 				__builtin_return_address(0));
+}
+#endif
+
+#ifdef CONFIG_ARM_PATCH_UIDIV
+static int module_patch_aeabi_uidiv(unsigned long loc, const Elf32_Sym *sym)
+{
+	extern char __aeabi_uidiv[], __aeabi_idiv[];
+	unsigned long udiv_addr = (unsigned long)__aeabi_uidiv;
+	unsigned long sdiv_addr = (unsigned long)__aeabi_idiv;
+	unsigned int udiv_insn, sdiv_insn, mask;
+
+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+		mask = HWCAP_IDIVT;
+		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+	} else {
+		mask = HWCAP_IDIVA;
+		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+	}
+
+	if (elf_hwcap & mask) {
+		if (sym->st_value == udiv_addr) {
+			*(u32 *)loc = udiv_insn;
+			return 1;
+		} else if (sym->st_value == sdiv_addr) {
+			*(u32 *)loc = sdiv_insn;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+#else
+static int module_patch_aeabi_uidiv(unsigned long loc, const Elf32_Sym *sym)
+{
+	return 0;
 }
 #endif
 
@@ -108,6 +146,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 				       module->name, relindex, i, symname);
 				return -ENOEXEC;
 			}
+
+			if (module_patch_aeabi_uidiv(loc, sym))
+				break;
 
 			offset = __mem_to_opcode_arm(*(u32 *)loc);
 			offset = (offset & 0x00ffffff) << 2;
@@ -194,6 +235,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 				       module->name, relindex, i, symname);
 				return -ENOEXEC;
 			}
+
+			if (module_patch_aeabi_uidiv(loc, sym))
+				break;
 
 			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
 			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));

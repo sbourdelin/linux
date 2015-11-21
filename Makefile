@@ -736,6 +736,13 @@ ifdef CONFIG_DYNAMIC_FTRACE
 endif
 endif
 
+ifdef CONFIG_ARM_PATCH_UIDIV
+	ifndef BUILD_C_RECORDMCOUNT
+		BUILD_C_RECORDMCOUNT := y
+		export BUILD_C_RECORDMCOUNT
+	endif
+endif
+
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
 KBUILD_CFLAGS += $(call cc-option, -fno-inline-functions-called-once)

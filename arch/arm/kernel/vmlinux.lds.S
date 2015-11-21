@@ -28,6 +28,18 @@
 	*(.hyp.idmap.text)						\
 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
 
+#ifdef CONFIG_ARM_PATCH_UIDIV
+#define UIDIV_REC	. = ALIGN(8);					\
+			VMLINUX_SYMBOL(__start_udiv_loc) = .;		\
+			*(__udiv_loc)					\
+			VMLINUX_SYMBOL(__stop_udiv_loc) = .;		\
+			VMLINUX_SYMBOL(__start_idiv_loc) = .;		\
+			*(__idiv_loc)					\
+			VMLINUX_SYMBOL(__stop_idiv_loc) = .;
+#else
+#define UIDIV_REC
+#endif
+
 #ifdef CONFIG_HOTPLUG_CPU
 #define ARM_CPU_DISCARD(x)
 #define ARM_CPU_KEEP(x)		x
@@ -210,6 +222,7 @@ SECTIONS
 	.init.data : {
 #ifndef CONFIG_XIP_KERNEL
 		INIT_DATA
+		UIDIV_REC
 #endif
 		INIT_SETUP(16)
 		INIT_CALLS

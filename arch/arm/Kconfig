@@ -1637,6 +1637,20 @@ config AEABI
 
 	  To use this you need GCC version 4.0.0 or later.
 
+config ARM_PATCH_UIDIV
+	bool "Runtime patch calls to __aeabi_{u}idiv() with udiv/sdiv"
+	depends on CPU_V7 && !XIP_KERNEL && AEABI
+	help
+	  Some v7 CPUs have support for the udiv and sdiv instructions
+	  that can be used in place of calls to __aeabi_uidiv and __aeabi_idiv
+	  functions provided by the ARM runtime ABI.
+
+	  Enabling this option allows the kernel to modify itself to replace
+	  branches to these library functions with the udiv and sdiv
+	  instructions themselves. Typically this will be faster and less
+	  power intensive than running the library support code to do
+	  integer division.
+
 config OABI_COMPAT
 	bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
 	depends on AEABI && !THUMB2_KERNEL
