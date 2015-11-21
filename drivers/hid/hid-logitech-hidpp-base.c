@@ -22,6 +22,7 @@
 #include <asm/unaligned.h>
 #include "hid-ids.h"
 #include "hid-logitech-hidpp-base.h"
+#include "hid-logitech-hidpp-ff.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Benjamin Tissoires <benjamin.tissoires@gmail.com>");
@@ -1232,97 +1233,11 @@ static int k400_connect(struct hid_device *hdev, bool connected)
 
 #define HIDPP_PAGE_G920_FORCE_FEEDBACK			0x8123
 
-/* Using session ID = 1 */
-#define CMD_G920_FORCE_GET_APERTURE			0x51
-#define CMD_G920_FORCE_SET_APERTURE			0x61
-
-struct g920_private_data {
-	u8 force_feature;
-	u16 range;
-};
-
-#define to_hid_device(pdev) container_of(pdev, struct hid_device, dev)
-
-static ssize_t g920_range_show(struct device *dev, struct device_attribute *attr,
-				char *buf)
-{
-	struct hid_device *hid = to_hid_device(dev);
-	struct hidpp_device *hidpp = hid_get_drvdata(hid);
-	struct g920_private_data *pdata;
-
-	pdata = hidpp->private_data;
-	if (!pdata) {
-		hid_err(hid, "Private driver data not found!\n");
-		return -EINVAL;
-	}
-
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pdata->range);
-}
-
-static ssize_t g920_range_store(struct device *dev, struct device_attribute *attr,
-				 const char *buf, size_t count)
-{
-	struct hid_device *hid = to_hid_device(dev);
-	struct hidpp_device *hidpp = hid_get_drvdata(hid);
-	struct g920_private_data *pdata;
-	struct hidpp_report response;
-	u8 params[2];
-	int ret;
-	u16 range = simple_strtoul(buf, NULL, 10);
-
-	pdata = hidpp->private_data;
-	if (!pdata) {
-		hid_err(hid, "Private driver data not found!\n");
-		return -EINVAL;
-	}
-
-	if (range < 180)
-		range = 180;
-	else if (range > 900)
-		range = 900;
-
-	params[0] = range >> 8;
-	params[1] = range & 0x00FF;
-
-	ret = hidpp_send_fap_command_sync(hidpp, pdata->force_feature,
-		CMD_G920_FORCE_SET_APERTURE, params, 2, &response);
-	if (ret)
-		return ret;
-
-	pdata->range = range;
-	return count;
-}
-
-static DEVICE_ATTR(range, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, g920_range_show, g920_range_store);
-
-static int g920_allocate(struct hid_device *hdev)
-{
-	struct hidpp_device *hidpp = hid_get_drvdata(hdev);
-	struct g920_private_data *pdata;
-
-	pdata = devm_kzalloc(&hdev->dev, sizeof(struct g920_private_data),
-			GFP_KERNEL);
-	if (!pdata)
-		return -ENOMEM;
-
-	hidpp->private_data = pdata;
-
-	return 0;
-}
-
 static int g920_get_config(struct hidpp_device *hidpp)
 {
-	struct g920_private_data *pdata = hidpp->private_data;
-	struct hidpp_report response;
 	u8 feature_type;
 	u8 feature_index;
 	int ret;
-
-	pdata = hidpp->private_data;
-	if (!pdata) {
-		hid_err(hidpp->hid_dev, "Private driver data not found!\n");
-		return -EINVAL;
-	}
 
 	/* Find feature and store for later use */
 	ret = hidpp_root_get_feature(hidpp, HIDPP_PAGE_G920_FORCE_FEEDBACK,
@@ -1330,25 +1245,9 @@ static int g920_get_config(struct hidpp_device *hidpp)
 	if (ret)
 		return ret;
 
-	pdata->force_feature = feature_index;
-
-	/* Read current Range */
-	ret = hidpp_send_fap_command_sync(hidpp, feature_index,
-		CMD_G920_FORCE_GET_APERTURE, NULL, 0, &response);
-	if (ret > 0) {
-		hid_err(hidpp->hid_dev, "%s: received protocol error 0x%02x\n",
-			__func__, ret);
-		return -EPROTO;
-	}
+	ret = hidpp_ff_init(hidpp, feature_index);
 	if (ret)
-		return ret;
-
-	pdata->range = get_unaligned_be16(&response.fap.params[0]);
-
-	/* Create sysfs interface */
-	ret = device_create_file(&(hidpp->hid_dev->dev), &dev_attr_range);
-	if (ret)
-		hid_warn(hidpp->hid_dev, "Unable to create sysfs interface for \"range\", errno %d\n", ret);
+		hid_warn(hidpp->hid_dev, "Unable to initialize force feedback support, errno %d\n", ret);
 
 	return 0;
 }
@@ -1672,10 +1571,6 @@ static int hidpp_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		ret = k400_allocate(hdev);
 		if (ret)
 			goto allocate_fail;
-	} else if (hidpp->quirks & HIDPP_QUIRK_CLASS_G920) {
-		ret = g920_allocate(hdev);
-		if (ret)
-			goto allocate_fail;
 	}
 
 	INIT_WORK(&hidpp->work, delayed_work_cb);
@@ -1758,7 +1653,6 @@ static int hidpp_probe(struct hid_device *hdev, const struct hid_device_id *id)
 hid_hw_open_failed:
 	hid_device_io_stop(hdev);
 	if (hidpp->quirks & HIDPP_QUIRK_CLASS_G920) {
-		device_remove_file(&hdev->dev, &dev_attr_range);
 		hid_hw_close(hdev);
 		hid_hw_stop(hdev);
 	}
@@ -1776,7 +1670,7 @@ static void hidpp_remove(struct hid_device *hdev)
 	struct hidpp_device *hidpp = hid_get_drvdata(hdev);
 
 	if (hidpp->quirks & HIDPP_QUIRK_CLASS_G920) {
-		device_remove_file(&hdev->dev, &dev_attr_range);
+		hidpp_ff_deinit(hdev);
 		hid_hw_close(hdev);
 	}
 	hid_hw_stop(hdev);

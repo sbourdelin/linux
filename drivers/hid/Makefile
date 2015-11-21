@@ -17,7 +17,7 @@ hid-logitech-$(CONFIG_LOGIRUMBLEPAD2_FF)	+= hid-lg2ff.o
 hid-logitech-$(CONFIG_LOGIG940_FF)	+= hid-lg3ff.o
 hid-logitech-$(CONFIG_LOGIWHEELS_FF)	+= hid-lg4ff.o
 
-hid-logitech-hidpp-y	:= hid-logitech-hidpp-base.o
+hid-logitech-hidpp-y	:= hid-logitech-hidpp-base.o hid-logitech-hidpp-ff.o
 
 hid-wiimote-y		:= hid-wiimote-core.o hid-wiimote-modules.o
 hid-wiimote-$(CONFIG_DEBUG_FS)	+= hid-wiimote-debug.o
