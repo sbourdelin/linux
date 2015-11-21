@@ -923,7 +923,7 @@ static struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
 	return lsm;
 }
 
-struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
+static struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
 {
 	struct lu_object *luobj;
 	struct lov_stripe_md *lsm = NULL;
@@ -939,7 +939,7 @@ struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
 }
 EXPORT_SYMBOL(lov_lsm_get);
 
-void lov_lsm_put(struct cl_object *unused, struct lov_stripe_md *lsm)
+static void lov_lsm_put(struct cl_object *unused, struct lov_stripe_md *lsm)
 {
 	if (lsm != NULL)
 		lov_free_memmd(&lsm);
