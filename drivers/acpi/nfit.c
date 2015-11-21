@@ -235,9 +235,13 @@ static bool add_spa(struct acpi_nfit_desc *acpi_desc,
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_spa *nfit_spa;
+	size_t length = sizeof(*spa);
+
+	if (length > spa->header.length)
+		length = spa->header.length;
 
 	list_for_each_entry(nfit_spa, &prev->spas, list) {
-		if (memcmp(nfit_spa->spa, spa, sizeof(*spa)) == 0) {
+		if (memcmp(nfit_spa->spa, spa, length) == 0) {
 			list_move_tail(&nfit_spa->list, &acpi_desc->spas);
 			return true;
 		}
@@ -261,9 +265,13 @@ static bool add_memdev(struct acpi_nfit_desc *acpi_desc,
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_memdev *nfit_memdev;
+	size_t length = sizeof(*memdev);
+
+	if (length > memdev->header.length)
+		length = memdev->header.length;
 
 	list_for_each_entry(nfit_memdev, &prev->memdevs, list)
-		if (memcmp(nfit_memdev->memdev, memdev, sizeof(*memdev)) == 0) {
+		if (memcmp(nfit_memdev->memdev, memdev, length) == 0) {
 			list_move_tail(&nfit_memdev->list, &acpi_desc->memdevs);
 			return true;
 		}
@@ -286,9 +294,13 @@ static bool add_dcr(struct acpi_nfit_desc *acpi_desc,
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_dcr *nfit_dcr;
+	size_t length = sizeof(*dcr);
+
+	if (length > dcr->header.length)
+		length = dcr->header.length;
 
 	list_for_each_entry(nfit_dcr, &prev->dcrs, list)
-		if (memcmp(nfit_dcr->dcr, dcr, sizeof(*dcr)) == 0) {
+		if (memcmp(nfit_dcr->dcr, dcr, length) == 0) {
 			list_move_tail(&nfit_dcr->list, &acpi_desc->dcrs);
 			return true;
 		}
@@ -310,9 +322,13 @@ static bool add_bdw(struct acpi_nfit_desc *acpi_desc,
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_bdw *nfit_bdw;
+	size_t length = sizeof(*bdw);
+
+	if (length > bdw->header.length)
+		length = bdw->header.length;
 
 	list_for_each_entry(nfit_bdw, &prev->bdws, list)
-		if (memcmp(nfit_bdw->bdw, bdw, sizeof(*bdw)) == 0) {
+		if (memcmp(nfit_bdw->bdw, bdw, length) == 0) {
 			list_move_tail(&nfit_bdw->list, &acpi_desc->bdws);
 			return true;
 		}
@@ -334,9 +350,13 @@ static bool add_idt(struct acpi_nfit_desc *acpi_desc,
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_idt *nfit_idt;
+	size_t length = sizeof(*idt);
+
+	if (length > idt->header.length)
+		length = idt->header.length;
 
 	list_for_each_entry(nfit_idt, &prev->idts, list)
-		if (memcmp(nfit_idt->idt, idt, sizeof(*idt)) == 0) {
+		if (memcmp(nfit_idt->idt, idt, length) == 0) {
 			list_move_tail(&nfit_idt->list, &acpi_desc->idts);
 			return true;
 		}
@@ -358,9 +378,13 @@ static bool add_flush(struct acpi_nfit_desc *acpi_desc,
 {
 	struct device *dev = acpi_desc->dev;
 	struct nfit_flush *nfit_flush;
+	size_t length = sizeof(*flush);
+
+	if (length > flush->header.length)
+		length = flush->header.length;
 
 	list_for_each_entry(nfit_flush, &prev->flushes, list)
-		if (memcmp(nfit_flush->flush, flush, sizeof(*flush)) == 0) {
+		if (memcmp(nfit_flush->flush, flush, length) == 0) {
 			list_move_tail(&nfit_flush->list, &acpi_desc->flushes);
 			return true;
 		}
