@@ -199,14 +199,6 @@ static inline u64 drm_mm_hole_node_end(struct drm_mm_node *hole_node)
  * The __drm_mm_for_each_hole version is similar, but with added support for
  * going backwards.
  */
-#define drm_mm_for_each_hole(entry, mm, hole_start, hole_end) \
-	for (entry = list_entry((mm)->hole_stack.next, struct drm_mm_node, hole_stack); \
-	     &entry->hole_stack != &(mm)->hole_stack ? \
-	     hole_start = drm_mm_hole_node_start(entry), \
-	     hole_end = drm_mm_hole_node_end(entry), \
-	     1 : 0; \
-	     entry = list_entry(entry->hole_stack.next, struct drm_mm_node, hole_stack))
-
 #define __drm_mm_for_each_hole(entry, mm, hole_start, hole_end, backwards) \
 	for (entry = list_entry((backwards) ? (mm)->hole_stack.prev : (mm)->hole_stack.next, struct drm_mm_node, hole_stack); \
 	     &entry->hole_stack != &(mm)->hole_stack ? \
@@ -214,6 +206,9 @@ static inline u64 drm_mm_hole_node_end(struct drm_mm_node *hole_node)
 	     hole_end = drm_mm_hole_node_end(entry), \
 	     1 : 0; \
 	     entry = list_entry((backwards) ? entry->hole_stack.prev : entry->hole_stack.next, struct drm_mm_node, hole_stack))
+
+#define drm_mm_for_each_hole(entry, mm, hole_start, hole_end) \
+	__drm_mm_for_each_hole(entry, mm, hole_start, hole_end, 0)
 
 /*
  * Basic range manager support (drm_mm.c)
