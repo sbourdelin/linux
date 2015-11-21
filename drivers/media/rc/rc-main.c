@@ -829,21 +829,12 @@ struct rc_filter_attribute {
 		.mask = (_mask),					\
 	}
 
-static bool lirc_is_present(void)
+atomic_t ir_raw_lirc_available = ATOMIC_INIT(0);
+EXPORT_SYMBOL(ir_raw_lirc_available);
+
+static inline bool lirc_is_present(void)
 {
-#if defined(CONFIG_LIRC_MODULE)
-	struct module *lirc;
-
-	mutex_lock(&module_mutex);
-	lirc = find_module("lirc_dev");
-	mutex_unlock(&module_mutex);
-
-	return lirc ? true : false;
-#elif defined(CONFIG_LIRC)
-	return true;
-#else
-	return false;
-#endif
+	return atomic_read(&ir_raw_lirc_available) != 0;
 }
 
 /**

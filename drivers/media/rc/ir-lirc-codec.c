@@ -22,6 +22,8 @@
 
 #define LIRCBUF_SIZE 256
 
+extern atomic_t ir_raw_lirc_available;
+
 /**
  * ir_lirc_decode() - Send raw IR data to lirc_dev to be relayed to the
  *		      lircd userspace daemon for decoding.
@@ -398,6 +400,7 @@ static int ir_lirc_register(struct rc_dev *dev)
 
 	dev->raw->lirc.drv = drv;
 	dev->raw->lirc.dev = dev;
+	atomic_set(&ir_raw_lirc_available, 1);
 	return 0;
 
 lirc_register_failed:
@@ -413,6 +416,7 @@ static int ir_lirc_unregister(struct rc_dev *dev)
 {
 	struct lirc_codec *lirc = &dev->raw->lirc;
 
+	atomic_set(&ir_raw_lirc_available, 0);
 	lirc_unregister_driver(lirc->drv->minor);
 	lirc_buffer_free(lirc->drv->rbuf);
 	kfree(lirc->drv);
