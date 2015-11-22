@@ -1762,6 +1762,7 @@ struct kobject *most_register_interface(struct most_interface *iface)
 	inst = create_most_inst_obj(name);
 	if (!inst) {
 		pr_info("Failed to allocate interface instance\n");
+		ida_simple_remove(&mdev_id, id);
 		return ERR_PTR(-ENOMEM);
 	}
 
