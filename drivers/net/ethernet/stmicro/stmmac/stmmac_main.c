@@ -1022,6 +1022,14 @@ static void stmmac_free_rx_buffers(struct stmmac_priv *priv, int i)
 	priv->rx_skbuff[i] = NULL;
 }
 
+static void dma_free_rx_skbufs(struct stmmac_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < priv->dma_rx_size; i++)
+		stmmac_free_rx_buffers(priv, i);
+}
+
 /**
  * init_dma_desc_rings - init the RX/TX descriptor rings
  * @dev: net device structure
@@ -1058,6 +1066,8 @@ static int init_dma_desc_rings(struct net_device *dev, gfp_t flags)
 		/* RX INITIALIZATION */
 		pr_debug("\tSKB addresses:\nskb\t\tskb data\tdma data\n");
 	}
+
+	dma_free_rx_skbufs(priv);
 	for (i = 0; i < rxsize; i++) {
 		struct dma_desc *p;
 		if (priv->extend_desc)
@@ -1120,14 +1130,6 @@ err_init_rx_buffers:
 	while (--i >= 0)
 		stmmac_free_rx_buffers(priv, i);
 	return ret;
-}
-
-static void dma_free_rx_skbufs(struct stmmac_priv *priv)
-{
-	int i;
-
-	for (i = 0; i < priv->dma_rx_size; i++)
-		stmmac_free_rx_buffers(priv, i);
 }
 
 static void dma_free_tx_skbufs(struct stmmac_priv *priv)
