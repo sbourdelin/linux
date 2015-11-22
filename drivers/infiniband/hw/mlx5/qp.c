@@ -1064,13 +1064,10 @@ static void mlx5_ib_lock_cqs(struct mlx5_ib_cq *send_cq, struct mlx5_ib_cq *recv
 			}
 		} else {
 			spin_lock_irq(&send_cq->lock);
-			__acquire(&recv_cq->lock);
 		}
 	} else if (recv_cq) {
 		spin_lock_irq(&recv_cq->lock);
-		__acquire(&send_cq->lock);
 	} else {
-		__acquire(&send_cq->lock);
 		__acquire(&recv_cq->lock);
 	}
 }
@@ -1091,15 +1088,12 @@ static void mlx5_ib_unlock_cqs(struct mlx5_ib_cq *send_cq, struct mlx5_ib_cq *re
 				spin_unlock_irq(&recv_cq->lock);
 			}
 		} else {
-			__release(&recv_cq->lock);
 			spin_unlock_irq(&send_cq->lock);
 		}
 	} else if (recv_cq) {
-		__release(&send_cq->lock);
 		spin_unlock_irq(&recv_cq->lock);
 	} else {
 		__release(&recv_cq->lock);
-		__release(&send_cq->lock);
 	}
 }
 
