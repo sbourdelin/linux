@@ -1913,31 +1913,38 @@ EXPORT_SYMBOL_GPL(most_resume_enqueue);
 
 static int __init most_init(void)
 {
+	int err;
+
 	pr_info("init()\n");
 	INIT_LIST_HEAD(&instance_list);
 	INIT_LIST_HEAD(&aim_list);
 	mutex_init(&deregister_mutex);
 	ida_init(&mdev_id);
 
-	if (bus_register(&most_bus)) {
+	err = bus_register(&most_bus);
+	if (err) {
 		pr_info("Cannot register most bus\n");
-		goto exit;
+		return err;
 	}
 
 	most_class = class_create(THIS_MODULE, "most");
 	if (IS_ERR(most_class)) {
 		pr_info("No udev support.\n");
+		err = PTR_ERR(most_class);
 		goto exit_bus;
 	}
-	if (driver_register(&mostcore)) {
+	err = driver_register(&mostcore);
+	if (err) {
 		pr_info("Cannot register core driver\n");
 		goto exit_class;
 	}
 
 	class_glue_dir =
 		device_create(most_class, NULL, 0, NULL, "mostcore");
-	if (IS_ERR(class_glue_dir))
+	if (IS_ERR(class_glue_dir)) {
+		err = -ENOMEM;
 		goto exit_driver;
+	}
 
 	most_aim_kset =
 		kset_create_and_add("aims", NULL, &class_glue_dir->kobj);
@@ -1946,8 +1953,10 @@ static int __init most_init(void)
 
 	most_inst_kset =
 		kset_create_and_add("devices", NULL, &class_glue_dir->kobj);
-	if (!most_inst_kset)
+	if (!most_inst_kset) {
+		err = -ENOMEM;
 		goto exit_driver_kset;
+	}
 
 	return 0;
 
@@ -1961,8 +1970,7 @@ exit_class:
 	class_destroy(most_class);
 exit_bus:
 	bus_unregister(&most_bus);
-exit:
-	return -ENOMEM;
+	return err;
 }
 
 static void __exit most_exit(void)
