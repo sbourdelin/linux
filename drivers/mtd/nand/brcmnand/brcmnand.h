@@ -24,6 +24,7 @@ struct brcmnand_soc {
 	bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
 	void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
 	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
+	void (*remove_device)(struct brcmnand_soc *soc);
 };
 
 static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)

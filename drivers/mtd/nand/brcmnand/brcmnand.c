@@ -2268,6 +2268,9 @@ int brcmnand_remove(struct platform_device *pdev)
 	list_for_each_entry(host, &ctrl->host_list, node)
 		nand_release(&host->mtd);
 
+	if (ctrl->soc && ctrl->soc->remove_device)
+		ctrl->soc->remove_device(ctrl->soc);
+
 	dev_set_drvdata(&pdev->dev, NULL);
 
 	return 0;
