@@ -174,8 +174,8 @@ static int nvm_core_init(struct nvm_dev *dev)
 	dev->nr_chnls = grp->num_ch;
 	dev->luns_per_chnl = grp->num_lun;
 	dev->pgs_per_blk = grp->num_pg;
-	dev->blks_per_lun = grp->num_blk;
 	dev->nr_planes = grp->num_pln;
+	dev->blks_per_lun = grp->num_blk * grp->num_pln;
 	dev->sec_size = grp->csecs;
 	dev->oob_size = grp->sos;
 	dev->sec_per_pg = grp->fpg_sz / grp->csecs;
@@ -191,13 +191,12 @@ static int nvm_core_init(struct nvm_dev *dev)
 		dev->plane_mode = NVM_PLANE_QUAD;
 
 	/* calculated values */
-	dev->sec_per_pl = dev->sec_per_pg * dev->nr_planes;
-	dev->sec_per_blk = dev->sec_per_pl * dev->pgs_per_blk;
+	dev->sec_per_blk = dev->sec_per_pg * dev->pgs_per_blk;
+	dev->sec_per_pl = dev->sec_per_blk * grp->num_blk;
 	dev->sec_per_lun = dev->sec_per_blk * dev->blks_per_lun;
 	dev->nr_luns = dev->luns_per_chnl * dev->nr_chnls;
 
-	dev->total_blocks = dev->nr_planes *
-				dev->blks_per_lun *
+	dev->total_blocks = dev->blks_per_lun *
 				dev->luns_per_chnl *
 				dev->nr_chnls;
 	dev->total_pages = dev->total_blocks * dev->pgs_per_blk;
