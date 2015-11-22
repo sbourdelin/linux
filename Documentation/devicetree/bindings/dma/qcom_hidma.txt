@@ -1,0 +1,18 @@
+Qualcomm Technologies HIDMA Channel driver
+
+Required properties:
+- compatible: must contain "qcom,hidma-1.0"
+- reg: Addresses for the transfer and event channel
+- interrupts: Should contain the event interrupt
+- desc-count: Number of asynchronous requests this channel can handle
+- event-channel: The HW event channel completions will be delivered.
+Example:
+
+	hidma_24: dma-controller@0x5c050000 {
+		compatible = "qcom,hidma-1.0";
+		reg = <0 0x5c050000 0x0 0x1000>,
+		      <0 0x5c0b0000 0x0 0x1000>;
+		interrupts = <0 389 0>;
+		desc-count = <10>;
+		event-channel = <4>;
+	};
