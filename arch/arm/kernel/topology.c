@@ -78,6 +78,35 @@ static unsigned long *__cpu_capacity;
 #define cpu_capacity(cpu)	__cpu_capacity[cpu]
 
 static unsigned long middle_capacity = 1;
+static bool capacity_from_dt = true;
+static u32 capacity_scale = SCHED_CAPACITY_SCALE;
+
+static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+{
+	int ret = 1;
+	u32 cpu_capacity;
+
+	ret = of_property_read_u32(cpu_node,
+				   "capacity",
+				   &cpu_capacity);
+	if (!ret) {
+		u64 capacity;
+
+		/*
+		 * Enforce capacity <= capacity-scale.
+		 */
+		cpu_capacity = cpu_capacity <= capacity_scale ? cpu_capacity :
+			capacity_scale;
+		capacity = (cpu_capacity << SCHED_CAPACITY_SHIFT) /
+			capacity_scale;
+
+		set_capacity_scale(cpu, capacity);
+		pr_info("CPU%d: DT cpu capacity %lu\n",
+			cpu, arch_scale_cpu_capacity(NULL, cpu));
+	}
+
+	return !ret;
+}
 
 /*
  * Iterate all CPUs' descriptor in DT and compute the efficiency
@@ -99,6 +128,18 @@ static void __init parse_dt_topology(void)
 	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
 				 GFP_NOWAIT);
 
+	cn = of_find_node_by_path("/cpus");
+	if (!cn) {
+		pr_err("No CPU information found in DT\n");
+		return;
+	}
+
+	if (!of_property_read_u32(cn, "capacity-scale", &capacity_scale))
+		pr_info("DT cpus capacity-scale %u\n", capacity_scale);
+	else
+		pr_debug("DT cpus capacity-scale not found: assuming %u\n",
+			capacity_scale);
+
 	for_each_possible_cpu(cpu) {
 		const u32 *rate;
 		int len;
@@ -109,6 +150,13 @@ static void __init parse_dt_topology(void)
 			pr_err("missing device node for CPU %d\n", cpu);
 			continue;
 		}
+
+		if (parse_cpu_capacity(cn, cpu)) {
+			of_node_put(cn);
+			continue;
+		}
+
+		capacity_from_dt = false;
 
 		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
 			if (of_device_is_compatible(cn, cpu_eff->compatible))
@@ -160,7 +208,7 @@ static void __init parse_dt_topology(void)
  */
 static void update_cpu_capacity(unsigned int cpu)
 {
-	if (!cpu_capacity(cpu))
+	if (!cpu_capacity(cpu) || capacity_from_dt)
 		return;
 
 	set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
