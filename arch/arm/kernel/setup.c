@@ -980,16 +980,14 @@ void __init setup_arch(char **cmdline_p)
 	psci_dt_init();
 	xen_early_init();
 #ifdef CONFIG_SMP
-	if (is_smp()) {
-		if (!mdesc->smp_init || !mdesc->smp_init()) {
-			if (psci_smp_available())
-				smp_set_ops(&psci_smp_ops);
-			else if (mdesc->smp)
-				smp_set_ops(mdesc->smp);
-		}
-		smp_init_cpus();
-		smp_build_mpidr_hash();
+	if (!mdesc->smp_init || !mdesc->smp_init()) {
+		if (psci_smp_available())
+			smp_set_ops(&psci_smp_ops);
+		else if (mdesc->smp)
+			smp_set_ops(mdesc->smp);
 	}
+	smp_init_cpus();
+	smp_build_mpidr_hash();
 #endif
 
 	if (!is_smp())
