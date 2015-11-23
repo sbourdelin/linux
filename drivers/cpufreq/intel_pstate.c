@@ -134,12 +134,16 @@ struct pstate_funcs {
 	int (*get_scaling)(void);
 	void (*set)(struct cpudata*, int pstate);
 	void (*get_vid)(struct cpudata *);
+	int32_t (*get_busy_percent)(struct cpudata *);
 };
 
 struct cpu_defaults {
 	struct pstate_adjust_policy pid_policy;
 	struct pstate_funcs funcs;
 };
+
+static inline int32_t intel_pstate_calc_scaled_busy(struct cpudata *cpu);
+static inline int32_t intel_pstate_get_scaled_busy_estimate(struct cpudata *cpu);
 
 static struct pstate_adjust_policy pid_params;
 static struct pstate_funcs pstate_funcs;
@@ -739,6 +743,7 @@ static struct cpu_defaults core_params = {
 		.get_turbo = core_get_turbo_pstate,
 		.get_scaling = core_get_scaling,
 		.set = core_set_pstate,
+		.get_busy_percent = intel_pstate_get_scaled_busy_estimate,
 	},
 };
 
@@ -759,6 +764,7 @@ static struct cpu_defaults silvermont_params = {
 		.set = atom_set_pstate,
 		.get_scaling = silvermont_get_scaling,
 		.get_vid = atom_get_vid,
+		.get_busy_percent = intel_pstate_calc_scaled_busy,
 	},
 };
 
@@ -779,6 +785,7 @@ static struct cpu_defaults airmont_params = {
 		.set = atom_set_pstate,
 		.get_scaling = airmont_get_scaling,
 		.get_vid = atom_get_vid,
+		.get_busy_percent = intel_pstate_calc_scaled_busy,
 	},
 };
 
@@ -798,6 +805,7 @@ static struct cpu_defaults knl_params = {
 		.get_turbo = knl_get_turbo_pstate,
 		.get_scaling = core_get_scaling,
 		.set = core_set_pstate,
+		.get_busy_percent = intel_pstate_get_scaled_busy_estimate,
 	},
 };
 
@@ -1012,7 +1020,7 @@ static inline void intel_pstate_adjust_busy_pstate(struct cpudata *cpu)
 	from = cpu->pstate.current_pstate;
 
 	pid = &cpu->pid;
-	busy_scaled = intel_pstate_calc_scaled_busy(cpu);
+	busy_scaled = pstate_funcs.get_busy_percent(cpu);
 
 	ctl = pid_calc(pid, busy_scaled);
 
@@ -1271,6 +1279,8 @@ static void copy_cpu_funcs(struct pstate_funcs *funcs)
 	pstate_funcs.get_scaling = funcs->get_scaling;
 	pstate_funcs.set       = funcs->set;
 	pstate_funcs.get_vid   = funcs->get_vid;
+	pstate_funcs.get_busy_percent = funcs->get_busy_percent;
+
 }
 
 #if IS_ENABLED(CONFIG_ACPI)
