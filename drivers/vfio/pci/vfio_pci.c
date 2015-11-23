@@ -421,6 +421,77 @@ static int vfio_pci_for_each_slot_or_bus(struct pci_dev *pdev,
 	return walk.ret;
 }
 
+struct caps {
+	struct vfio_info_cap_header *buf;
+	size_t size;
+	size_t head;
+};
+
+static void *add_region_info_cap(struct caps *caps,
+				 size_t size, u16 id, u16 version)
+{
+	void *tmp;
+	struct vfio_info_cap_header *header;
+
+	/* This would be ridiculous and exceeds the ioctl's abilities */
+	BUG_ON(caps->size + size + sizeof(struct vfio_region_info) > U32_MAX);
+
+	tmp = krealloc(caps->buf, caps->size + size, GFP_KERNEL);
+	if (!tmp) {
+		kfree(caps->buf);
+		caps->size = 0;
+		return ERR_PTR(-ENOMEM);
+	}
+
+	caps->buf = tmp;
+	header = tmp + caps->size;
+	header->id = id;
+	header->version = version;
+	header->next = caps->head;
+	caps->head = caps->size + sizeof(struct vfio_region_info);
+	caps->size += size;
+
+	return header;
+}
+
+static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev, struct caps *caps)
+{
+	struct vfio_region_info_cap_sparse_mmap *sparse;
+	size_t end, size;
+	int nr_areas = 2, i = 0;
+
+	end = pci_resource_len(vdev->pdev, vdev->msix_bar);
+
+	/* If MSI-X table is aligned to the start or end, only one area */
+	if (((vdev->msix_offset & PAGE_MASK) == 0) ||
+	    (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) >= end))
+		nr_areas = 1;
+
+	size = sizeof(*sparse) + (nr_areas * sizeof(*sparse->areas));
+
+	sparse = add_region_info_cap(caps, size,
+				     VFIO_REGION_INFO_CAP_SPARSE_MMAP, 1);
+	if (IS_ERR(sparse))
+		return PTR_ERR(sparse);
+
+	sparse->nr_areas = nr_areas;
+
+	if (vdev->msix_offset & PAGE_MASK) {
+		sparse->areas[i].offset = 0;
+		sparse->areas[i].size = vdev->msix_offset & PAGE_MASK;
+		i++;
+	}
+
+	if (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) < end) {
+		sparse->areas[i].offset = PAGE_ALIGN(vdev->msix_offset +
+						     vdev->msix_size);
+		sparse->areas[i].size = end - sparse->areas[i].offset;
+		i++;
+	}
+
+	return 0;
+}
+
 static long vfio_pci_ioctl(void *device_data,
 			   unsigned int cmd, unsigned long arg)
 {
@@ -451,6 +522,8 @@ static long vfio_pci_ioctl(void *device_data,
 	} else if (cmd == VFIO_DEVICE_GET_REGION_INFO) {
 		struct pci_dev *pdev = vdev->pdev;
 		struct vfio_region_info info;
+		struct caps caps = { .buf = NULL, .size = 0, .head = 0 };
+		int ret;
 
 		minsz = offsetofend(struct vfio_region_info, offset);
 
@@ -479,8 +552,15 @@ static long vfio_pci_ioctl(void *device_data,
 				     VFIO_REGION_INFO_FLAG_WRITE;
 			if (IS_ENABLED(CONFIG_VFIO_PCI_MMAP) &&
 			    pci_resource_flags(pdev, info.index) &
-			    IORESOURCE_MEM && info.size >= PAGE_SIZE)
+			    IORESOURCE_MEM && info.size >= PAGE_SIZE) {
 				info.flags |= VFIO_REGION_INFO_FLAG_MMAP;
+				if (info.index == vdev->msix_bar) {
+					ret = msix_sparse_mmap_cap(vdev, &caps);
+					if (ret)
+						return ret;
+				}
+			}
+
 			break;
 		case VFIO_PCI_ROM_REGION_INDEX:
 		{
@@ -518,6 +598,25 @@ static long vfio_pci_ioctl(void *device_data,
 			break;
 		default:
 			return -EINVAL;
+		}
+
+		if (caps.size) {
+			info.flags |= VFIO_REGION_INFO_FLAG_CAPS;
+			if (info.argsz < sizeof(info) + caps.size) {
+				info.argsz = sizeof(info) + caps.size;
+				info.cap_offset = 0;
+			} else {
+				ret = copy_to_user((void __user *)arg +
+						   sizeof(info), caps.buf,
+						   caps.size);
+				if (ret) {
+					kfree(caps.buf);
+					return ret;
+				}
+				info.cap_offset = caps.head;
+			}
+
+			kfree(caps.buf);
 		}
 
 		return copy_to_user((void __user *)arg, &info, minsz);
