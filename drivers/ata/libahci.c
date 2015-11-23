@@ -1796,7 +1796,8 @@ static void ahci_port_intr(struct ata_port *ap)
 	ahci_handle_port_interrupt(ap, port_mmio, status);
 }
 
-static irqreturn_t ahci_multi_irqs_intr_hard(int irq, void *dev_instance)
+static irqreturn_t __maybe_unused ahci_multi_irqs_intr_hard(int irq,
+							    void *dev_instance)
 {
 	struct ata_port *ap = dev_instance;
 	void __iomem *port_mmio = ahci_port_base(ap);
@@ -2454,6 +2455,7 @@ void ahci_set_em_messages(struct ahci_host_priv *hpriv,
 }
 EXPORT_SYMBOL_GPL(ahci_set_em_messages);
 
+#ifdef CONFIG_PCI_MSI
 static int ahci_host_activate_multi_irqs(struct ata_host *host,
 					 struct scsi_host_template *sht)
 {
@@ -2492,6 +2494,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
 
 	return ata_host_register(host, sht);
 }
+#endif
 
 /**
  *	ahci_host_activate - start AHCI host, request IRQs and register it
@@ -2510,9 +2513,12 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
 	int irq = hpriv->irq;
 	int rc;
 
+#ifdef CONFIG_PCI_MSI
 	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
 		rc = ahci_host_activate_multi_irqs(host, sht);
-	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
+	else
+#endif
+	if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
 		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
 				       IRQF_SHARED, sht);
 	else
