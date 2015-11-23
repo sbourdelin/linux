@@ -62,6 +62,14 @@ nodes to be present and contain the properties described below.
 		Value type: <u32>
 		Definition: must be set to 0
 
+	A cpus node may also define the following optional property:
+
+	- capacity-scale
+		Usage: optional
+		Value type: <u32>
+		Definition: value used as a reference for CPU capacity [3]
+			    (see below).
+
 - cpu node
 
 	Description: Describes a CPU in an ARM based system
@@ -230,6 +238,13 @@ nodes to be present and contain the properties described below.
 		Definition:
 			# List of phandles to idle state nodes supported
 			  by this cpu [3].
+
+	- capacity
+		Usage: Optional
+		Value type: <u32>
+		Definition:
+			# u32 value representing CPU capacity [3], relative to
+			  capacity-scale (see above).
 
 	- rockchip,pmu
 		Usage: optional for systems that have an "enable-method"
@@ -437,3 +452,5 @@ cpus {
 [2] arm/msm/qcom,kpss-acc.txt
 [3] ARM Linux kernel documentation - idle states bindings
     Documentation/devicetree/bindings/arm/idle-states.txt
+[3] ARM Linux kernel documentation - cpu capacity bindings
+    Documentation/devicetree/bindings/arm/cpu-capacity.txt
