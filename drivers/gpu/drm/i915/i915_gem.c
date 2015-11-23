@@ -2372,17 +2372,32 @@ static void
 i915_gem_object_retire__read(struct drm_i915_gem_object *obj, int ring)
 {
 	struct i915_vma *vma;
+	struct i915_address_space *vm;
 
 	RQ_BUG_ON(obj->last_read_req[ring] == NULL);
 	RQ_BUG_ON(!(obj->active & (1 << ring)));
 
 	list_del_init(&obj->ring_list[ring]);
-	i915_gem_request_assign(&obj->last_read_req[ring], NULL);
 
 	if (obj->last_write_req && obj->last_write_req->ring->id == ring)
 		i915_gem_object_retire__write(obj);
 
 	obj->active &= ~(1 << ring);
+
+	if (obj->last_read_req[ring]->ctx->ppgtt)
+		vm = &obj->last_read_req[ring]->ctx->ppgtt->base;
+	else
+		vm = &obj->last_read_req[ring]->i915->gtt.base;
+
+	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+		if (vma->vm == vm &&
+		    vma->ggtt_view.type == I915_GGTT_VIEW_NORMAL &&
+		    !list_empty(&vma->mm_list))
+			list_move_tail(&vma->mm_list, &vma->vm->inactive_list);
+	}
+
+	i915_gem_request_assign(&obj->last_read_req[ring], NULL);
+
 	if (obj->active)
 		return;
 
