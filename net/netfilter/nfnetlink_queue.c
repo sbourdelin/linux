@@ -372,6 +372,8 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 			if (ct != NULL)
 				size += nfnl_ct->build_size(ct);
 		}
+	} else {
+		nfnl_ct = NULL;
 	}
 
 	if (queue->flags & NFQA_CFG_F_UID_GID) {
@@ -1069,6 +1071,8 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 		nfnl_ct = rcu_dereference(nfnl_ct_hook);
 		if (nfnl_ct != NULL)
 			ct = nfqnl_ct_parse(nfnl_ct, nlh, nfqa, entry, &ctinfo);
+	} else {
+		nfnl_ct = NULL;
 	}
 
 	if (nfqa[NFQA_PAYLOAD]) {
