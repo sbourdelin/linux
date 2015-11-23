@@ -372,15 +372,12 @@ static struct socket *geneve_create_sock(struct net *net, bool ipv6,
 static void geneve_notify_add_rx_port(struct geneve_sock *gs)
 {
 	struct sock *sk = gs->sock->sk;
-	sa_family_t sa_family = sk->sk_family;
+	struct net *net = sock_net(sk);
 	int err;
 
-	if (sa_family == AF_INET) {
-		err = udp_add_offload(&gs->udp_offloads);
-		if (err)
-			pr_warn("geneve: udp_add_offload failed with status %d\n",
-				err);
-	}
+	err = udp_add_offload(&gs->udp_offloads, net);
+	if (err)
+		pr_warn("geneve: udp_add_offload failed with status %d\n", err);
 }
 
 static int geneve_hlen(struct genevehdr *gh)
@@ -505,6 +502,8 @@ static struct geneve_sock *geneve_socket_create(struct net *net, __be16 port,
 
 	/* Initialize the geneve udp offloads structure */
 	gs->udp_offloads.port = port;
+	gs->udp_offloads.tunnel_type = UDP_TUNNEL_GENEVE;
+	gs->udp_offloads.family = ipv6 ? AF_INET6 : AF_INET;
 	gs->udp_offloads.callbacks.gro_receive  = geneve_gro_receive;
 	gs->udp_offloads.callbacks.gro_complete = geneve_gro_complete;
 	geneve_notify_add_rx_port(gs);
@@ -522,10 +521,9 @@ static struct geneve_sock *geneve_socket_create(struct net *net, __be16 port,
 static void geneve_notify_del_rx_port(struct geneve_sock *gs)
 {
 	struct sock *sk = gs->sock->sk;
-	sa_family_t sa_family = sk->sk_family;
+	struct net *net = sock_net(sk);
 
-	if (sa_family == AF_INET)
-		udp_del_offload(&gs->udp_offloads);
+	udp_del_offload(&gs->udp_offloads, net);
 }
 
 static void __geneve_sock_release(struct geneve_sock *gs)

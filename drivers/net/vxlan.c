@@ -613,49 +613,22 @@ static int vxlan_gro_complete(struct sk_buff *skb, int nhoff,
 /* Notify netdevs that UDP port started listening */
 static void vxlan_notify_add_rx_port(struct vxlan_sock *vs)
 {
-	struct net_device *dev;
 	struct sock *sk = vs->sock->sk;
 	struct net *net = sock_net(sk);
-	sa_family_t sa_family = vxlan_get_sk_family(vs);
-	__be16 port = inet_sk(sk)->inet_sport;
 	int err;
 
-	if (sa_family == AF_INET) {
-		err = udp_add_offload(&vs->udp_offloads);
-		if (err)
-			pr_warn("vxlan: udp_add_offload failed with status %d\n", err);
-	}
-
-	rcu_read_lock();
-	for_each_netdev_rcu(net, dev) {
-		if (dev->netdev_ops->ndo_add_udp_tunnel_port)
-			dev->netdev_ops->ndo_add_udp_tunnel_port(dev, sa_family,
-							      port,
-							      UDP_TUNNEL_VXLAN);
-	}
-	rcu_read_unlock();
+	err = udp_add_offload(&vs->udp_offloads, net);
+	if (err)
+		pr_warn("vxlan: udp_add_offload failed with status %d\n", err);
 }
 
 /* Notify netdevs that UDP port is no more listening */
 static void vxlan_notify_del_rx_port(struct vxlan_sock *vs)
 {
-	struct net_device *dev;
 	struct sock *sk = vs->sock->sk;
 	struct net *net = sock_net(sk);
-	sa_family_t sa_family = vxlan_get_sk_family(vs);
-	__be16 port = inet_sk(sk)->inet_sport;
 
-	rcu_read_lock();
-	for_each_netdev_rcu(net, dev) {
-		if (dev->netdev_ops->ndo_del_udp_tunnel_port)
-			dev->netdev_ops->ndo_del_udp_tunnel_port(dev, sa_family,
-							      port,
-							      UDP_TUNNEL_VXLAN);
-	}
-	rcu_read_unlock();
-
-	if (sa_family == AF_INET)
-		udp_del_offload(&vs->udp_offloads);
+	udp_del_offload(&vs->udp_offloads, net);
 }
 
 /* Add new entry to forwarding table -- assumes lock held */

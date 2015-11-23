@@ -241,18 +241,28 @@ out:
 	return segs;
 }
 
-int udp_add_offload(struct udp_offload *uo)
+int udp_add_offload(struct udp_offload *uo, struct net *net)
 {
-	struct udp_offload_priv *new_offload = kzalloc(sizeof(*new_offload), GFP_ATOMIC);
+	struct udp_offload_priv *new_offload = NULL;
+	struct net_device *dev;
 
-	if (!new_offload)
-		return -ENOMEM;
-
-	new_offload->offload = uo;
+	if (uo->family == AF_INET) {
+		new_offload = kzalloc(sizeof(*new_offload), GFP_ATOMIC);
+		if (!new_offload)
+			return -ENOMEM;
+		new_offload->offload = uo;
+	}
 
 	spin_lock(&udp_offload_lock);
-	new_offload->next = udp_offload_base;
-	rcu_assign_pointer(udp_offload_base, new_offload);
+	if (new_offload) {
+		new_offload->next = udp_offload_base;
+		rcu_assign_pointer(udp_offload_base, new_offload);
+	}
+	for_each_netdev_rcu(net, dev) {
+		if (dev->netdev_ops->ndo_add_udp_tunnel_port)
+			dev->netdev_ops->ndo_add_udp_tunnel_port(dev,
+					 uo->family, uo->port, uo->tunnel_type);
+	}
 	spin_unlock(&udp_offload_lock);
 
 	return 0;
@@ -265,24 +275,35 @@ static void udp_offload_free_routine(struct rcu_head *head)
 	kfree(ou_priv);
 }
 
-void udp_del_offload(struct udp_offload *uo)
+void udp_del_offload(struct udp_offload *uo, struct net *net)
 {
-	struct udp_offload_priv __rcu **head = &udp_offload_base;
-	struct udp_offload_priv *uo_priv;
+	struct udp_offload_priv __rcu **head;
+	struct udp_offload_priv *uo_priv = NULL;
+	struct net_device *dev;
 
 	spin_lock(&udp_offload_lock);
 
-	uo_priv = udp_deref_protected(*head);
-	for (; uo_priv != NULL;
-	     uo_priv = udp_deref_protected(*head)) {
-		if (uo_priv->offload == uo) {
-			rcu_assign_pointer(*head,
-					   udp_deref_protected(uo_priv->next));
-			goto unlock;
-		}
-		head = &uo_priv->next;
+	for_each_netdev_rcu(net, dev) {
+		if (dev->netdev_ops->ndo_add_udp_tunnel_port)
+			dev->netdev_ops->ndo_del_udp_tunnel_port(dev,
+					 uo->family, uo->port, uo->tunnel_type);
 	}
-	pr_warn("udp_del_offload: didn't find offload for port %d\n", ntohs(uo->port));
+
+	if (uo->family == AF_INET) {
+		head = &udp_offload_base;
+		uo_priv = udp_deref_protected(*head);
+		for (; uo_priv != NULL;
+		     uo_priv = udp_deref_protected(*head)) {
+			if (uo_priv->offload == uo) {
+				rcu_assign_pointer(*head,
+					    udp_deref_protected(uo_priv->next));
+				goto unlock;
+			}
+			head = &uo_priv->next;
+		}
+		pr_warn("udp_del_offload: didn't find offload for port %d\n",
+			ntohs(uo->port));
+	}
 unlock:
 	spin_unlock(&udp_offload_lock);
 	if (uo_priv)

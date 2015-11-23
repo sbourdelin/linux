@@ -411,9 +411,9 @@ static void fou_release(struct fou *fou)
 {
 	struct socket *sock = fou->sock;
 	struct sock *sk = sock->sk;
+	struct net *net = sock_net(sk);
 
-	if (sk->sk_family == AF_INET)
-		udp_del_offload(&fou->udp_offloads);
+	udp_del_offload(&fou->udp_offloads, net);
 	list_del(&fou->list);
 	udp_tunnel_sock_release(sock);
 
@@ -484,6 +484,9 @@ static int fou_create(struct net *net, struct fou_cfg *cfg,
 		goto error;
 	}
 
+	fou->udp_offloads.tunnel_type = UDP_TUNNEL_UNSPEC;
+	fou->udp_offloads.family = cfg->udp_config.family;
+
 	fou->type = cfg->type;
 
 	udp_sk(sk)->encap_type = 1;
@@ -496,11 +499,9 @@ static int fou_create(struct net *net, struct fou_cfg *cfg,
 
 	sk->sk_allocation = GFP_ATOMIC;
 
-	if (cfg->udp_config.family == AF_INET) {
-		err = udp_add_offload(&fou->udp_offloads);
-		if (err)
-			goto error;
-	}
+	err = udp_add_offload(&fou->udp_offloads, net);
+	if (err)
+		goto error;
 
 	err = fou_add_to_port_list(net, fou);
 	if (err)
