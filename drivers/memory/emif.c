@@ -1262,11 +1262,10 @@ static void __init_or_module of_get_custom_configs(struct device_node *np_emif,
 		struct emif_data *emif)
 {
 	struct emif_custom_configs	*cust_cfgs = NULL;
-	int				len;
-	const __be32			*lpmode, *poll_intvl;
+	u32				lpmode = 0, poll_intvl = 0;
 
-	lpmode = of_get_property(np_emif, "low-power-mode", &len);
-	poll_intvl = of_get_property(np_emif, "temp-alert-poll-interval", &len);
+	of_property_read_u32(np_emif, "low-power-mode", &lpmode);
+	of_property_read_u32(np_emif, "temp-alert-poll-interval", &poll_intvl);
 
 	if (lpmode || poll_intvl)
 		cust_cfgs = devm_kzalloc(emif->dev, sizeof(*cust_cfgs),
@@ -1277,7 +1276,7 @@ static void __init_or_module of_get_custom_configs(struct device_node *np_emif,
 
 	if (lpmode) {
 		cust_cfgs->mask |= EMIF_CUSTOM_CONFIG_LPMODE;
-		cust_cfgs->lpmode = be32_to_cpup(lpmode);
+		cust_cfgs->lpmode = lpmode;
 		of_property_read_u32(np_emif,
 				"low-power-mode-timeout-performance",
 				&cust_cfgs->lpmode_timeout_performance);
@@ -1292,11 +1291,10 @@ static void __init_or_module of_get_custom_configs(struct device_node *np_emif,
 	if (poll_intvl) {
 		cust_cfgs->mask |=
 				EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL;
-		cust_cfgs->temp_alert_poll_interval_ms =
-						be32_to_cpup(poll_intvl);
+		cust_cfgs->temp_alert_poll_interval_ms = poll_intvl;
 	}
 
-	if (of_find_property(np_emif, "extended-temp-part", &len))
+	if (of_find_property(np_emif, "extended-temp-part", NULL))
 		cust_cfgs->mask |= EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART;
 
 	if (!is_custom_config_valid(cust_cfgs, emif->dev)) {
