@@ -83,7 +83,6 @@ static int __init orion_nand_probe(struct platform_device *pdev)
 	struct clk *clk;
 	void __iomem *io_base;
 	int ret = 0;
-	u32 val = 0;
 
 	nc = devm_kzalloc(&pdev->dev,
 			sizeof(struct nand_chip) + sizeof(struct mtd_info),
@@ -103,22 +102,15 @@ static int __init orion_nand_probe(struct platform_device *pdev)
 					GFP_KERNEL);
 		if (!board)
 			return -ENOMEM;
-		if (!of_property_read_u32(pdev->dev.of_node, "cle", &val))
-			board->cle = (u8)val;
-		else
-			board->cle = 0;
-		if (!of_property_read_u32(pdev->dev.of_node, "ale", &val))
-			board->ale = (u8)val;
-		else
+		of_property_read_u8(pdev->dev.of_node, "cle", &board->cle);
+
+		if (of_property_read_u8(pdev->dev.of_node, "ale", &board->ale))
 			board->ale = 1;
-		if (!of_property_read_u32(pdev->dev.of_node,
-						"bank-width", &val))
-			board->width = (u8)val * 8;
-		else
+		if (of_property_read_u8(pdev->dev.of_node,
+						"bank-width", &board->width))
 			board->width = 8;
-		if (!of_property_read_u32(pdev->dev.of_node,
-						"chip-delay", &val))
-			board->chip_delay = (u8)val;
+		of_property_read_u8(pdev->dev.of_node,
+					"chip-delay", &board->chip_delay)
 	} else {
 		board = dev_get_platdata(&pdev->dev);
 	}
