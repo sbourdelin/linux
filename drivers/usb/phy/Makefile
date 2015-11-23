@@ -2,7 +2,11 @@
 # Makefile for physical layer USB drivers
 #
 obj-$(CONFIG_USB_PHY)			+= phy.o
-obj-$(CONFIG_OF)			+= of.o
+
+ifdef CONFIG_OF
+usb-phy-of-objs				:= of.o
+obj-$(CONFIG_USB_COMMON)		+= usb-phy-of.o
+endif
 
 # transceiver drivers, keep the list sorted
 
