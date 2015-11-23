@@ -6984,30 +6984,30 @@ static void i40e_handle_mdd_event(struct i40e_pf *pf)
 	i40e_flush(hw);
 }
 
-#ifdef CONFIG_I40E_VXLAN
 /**
- * i40e_sync_vxlan_filters_subtask - Sync the VSI filter list with HW
+ * i40e_sync_udp_filters_subtask - Sync the VSI filter list with HW
  * @pf: board private structure
  **/
-static void i40e_sync_vxlan_filters_subtask(struct i40e_pf *pf)
+static void i40e_sync_udp_filters_subtask(struct i40e_pf *pf)
 {
+#ifdef CONFIG_I40E_VXLAN
 	struct i40e_hw *hw = &pf->hw;
 	i40e_status ret;
 	__be16 port;
 	int i;
 
-	if (!(pf->flags & I40E_FLAG_VXLAN_FILTER_SYNC))
+	if (!(pf->flags & I40E_FLAG_UDP_FILTER_SYNC))
 		return;
 
-	pf->flags &= ~I40E_FLAG_VXLAN_FILTER_SYNC;
+	pf->flags &= ~I40E_FLAG_UDP_FILTER_SYNC;
 
 	for (i = 0; i < I40E_MAX_PF_UDP_OFFLOAD_PORTS; i++) {
-		if (pf->pending_vxlan_bitmap & BIT_ULL(i)) {
-			pf->pending_vxlan_bitmap &= ~BIT_ULL(i);
-			port = pf->vxlan_ports[i];
+		if (pf->pending_udp_bitmap & BIT_ULL(i)) {
+			pf->pending_udp_bitmap &= ~BIT_ULL(i);
+			port = pf->udp_ports[i].index;
 			if (port)
 				ret = i40e_aq_add_udp_tunnel(hw, ntohs(port),
-						     I40E_AQC_TUNNEL_TYPE_VXLAN,
+						     pf->udp_ports[i].type,
 						     NULL, NULL);
 			else
 				ret = i40e_aq_del_udp_tunnel(hw, i, NULL);
@@ -7020,13 +7020,13 @@ static void i40e_sync_vxlan_filters_subtask(struct i40e_pf *pf)
 					 i40e_stat_str(&pf->hw, ret),
 					 i40e_aq_str(&pf->hw,
 						    pf->hw.aq.asq_last_status));
-				pf->vxlan_ports[i] = 0;
+				pf->udp_ports[i].index = 0;
 			}
 		}
 	}
+#endif
 }
 
-#endif
 /**
  * i40e_service_task - Run the driver's async subtasks
  * @work: pointer to work_struct containing our data
@@ -7051,9 +7051,7 @@ static void i40e_service_task(struct work_struct *work)
 	i40e_watchdog_subtask(pf);
 	i40e_fdir_reinit_subtask(pf);
 	i40e_sync_filters_subtask(pf);
-#ifdef CONFIG_I40E_VXLAN
-	i40e_sync_vxlan_filters_subtask(pf);
-#endif
+	i40e_sync_udp_filters_subtask(pf);
 	i40e_clean_adminq_subtask(pf);
 
 	i40e_service_event_complete(pf);
@@ -8277,18 +8275,18 @@ static int i40e_set_features(struct net_device *netdev,
 
 #ifdef CONFIG_I40E_VXLAN
 /**
- * i40e_get_vxlan_port_idx - Lookup a possibly offloaded for Rx UDP port
+ * i40e_get_udp_port_idx - Lookup a possibly offloaded for Rx UDP port
  * @pf: board private structure
  * @port: The UDP port to look up
  *
  * Returns the index number or I40E_MAX_PF_UDP_OFFLOAD_PORTS if port not found
  **/
-static u8 i40e_get_vxlan_port_idx(struct i40e_pf *pf, __be16 port)
+static u8 i40e_get_udp_port_idx(struct i40e_pf *pf, __be16 port)
 {
 	u8 i;
 
 	for (i = 0; i < I40E_MAX_PF_UDP_OFFLOAD_PORTS; i++) {
-		if (pf->vxlan_ports[i] == port)
+		if (pf->udp_ports[i].index == port)
 			return i;
 	}
 
@@ -8321,28 +8319,31 @@ static void i40e_add_tunnel_port(struct net_device *netdev,
 	if (sa_family == AF_INET6)
 		return;
 
-	idx = i40e_get_vxlan_port_idx(pf, port);
+	idx = i40e_get_udp_port_idx(pf, port);
 
 	/* Check if port already exists */
 	if (idx < I40E_MAX_PF_UDP_OFFLOAD_PORTS) {
-		netdev_info(netdev, "vxlan port %d already offloaded\n",
+		netdev_info(netdev, "UDP port %d already offloaded\n",
 			    ntohs(port));
 		return;
 	}
 
 	/* Now check if there is space to add the new port */
-	next_idx = i40e_get_vxlan_port_idx(pf, 0);
+	next_idx = i40e_get_udp_port_idx(pf, 0);
 
 	if (next_idx == I40E_MAX_PF_UDP_OFFLOAD_PORTS) {
-		netdev_info(netdev, "maximum number of vxlan UDP ports reached, not adding port %d\n",
+		netdev_info(netdev, "maximum number of UDP ports reached, not adding port %d\n",
 			    ntohs(port));
 		return;
 	}
 
 	/* New port: add it and mark its index in the bitmap */
-	pf->vxlan_ports[next_idx] = port;
-	pf->pending_vxlan_bitmap |= BIT_ULL(next_idx);
-	pf->flags |= I40E_FLAG_VXLAN_FILTER_SYNC;
+	pf->udp_ports[next_idx].index = port;
+	if (type == UDP_TUNNEL_VXLAN)
+		pf->udp_ports[next_idx].type = I40E_AQC_TUNNEL_TYPE_VXLAN;
+
+	pf->pending_udp_bitmap |= BIT_ULL(next_idx);
+	pf->flags |= I40E_FLAG_UDP_FILTER_SYNC;
 }
 
 /**
@@ -8370,18 +8371,18 @@ static void i40e_del_tunnel_port(struct net_device *netdev,
 	if (sa_family == AF_INET6)
 		return;
 
-	idx = i40e_get_vxlan_port_idx(pf, port);
+	idx = i40e_get_udp_port_idx(pf, port);
 
 	/* Check if port already exists */
 	if (idx < I40E_MAX_PF_UDP_OFFLOAD_PORTS) {
 		/* if port exists, set it to 0 (mark for deletion)
 		 * and make it pending
 		 */
-		pf->vxlan_ports[idx] = 0;
-		pf->pending_vxlan_bitmap |= BIT_ULL(idx);
-		pf->flags |= I40E_FLAG_VXLAN_FILTER_SYNC;
+		pf->udp_ports[idx].index = 0;
+		pf->pending_udp_bitmap |= BIT_ULL(idx);
+		pf->flags |= I40E_FLAG_UDP_FILTER_SYNC;
 	} else {
-		netdev_warn(netdev, "vxlan port %d was not found, not deleting\n",
+		netdev_warn(netdev, "udp tunnel port %d was not found, not deleting\n",
 			    ntohs(port));
 	}
 }
