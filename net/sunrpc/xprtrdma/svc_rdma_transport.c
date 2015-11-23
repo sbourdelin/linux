@@ -1284,19 +1284,14 @@ static int svc_rdma_secure_port(struct svc_rqst *rqstp)
 	return 1;
 }
 
-int svc_rdma_send(struct svcxprt_rdma *xprt, struct ib_send_wr *wr)
+int svc_rdma_send(struct svcxprt_rdma *xprt, struct ib_send_wr *wr,
+		  int wr_count)
 {
-	struct ib_send_wr *bad_wr, *n_wr;
-	int wr_count;
-	int i;
-	int ret;
+	struct ib_send_wr *bad_wr;
+	int i, ret;
 
 	if (test_bit(XPT_CLOSE, &xprt->sc_xprt.xpt_flags))
 		return -ENOTCONN;
-
-	wr_count = 1;
-	for (n_wr = wr->next; n_wr; n_wr = n_wr->next)
-		wr_count++;
 
 	/* If the SQ is full, wait until an SQ entry is available */
 	while (1) {
@@ -1326,7 +1321,7 @@ int svc_rdma_send(struct svcxprt_rdma *xprt, struct ib_send_wr *wr)
 		if (ret) {
 			set_bit(XPT_CLOSE, &xprt->sc_xprt.xpt_flags);
 			atomic_sub(wr_count, &xprt->sc_sq_count);
-			for (i = 0; i < wr_count; i ++)
+			for (i = 0; i < wr_count; i++)
 				svc_xprt_put(&xprt->sc_xprt);
 			dprintk("svcrdma: failed to post SQ WR rc=%d, "
 			       "sc_sq_count=%d, sc_sq_depth=%d\n",
@@ -1384,7 +1379,7 @@ void svc_rdma_send_error(struct svcxprt_rdma *xprt, struct rpcrdma_msg *rmsgp,
 	err_wr.send_flags = IB_SEND_SIGNALED;
 
 	/* Post It */
-	ret = svc_rdma_send(xprt, &err_wr);
+	ret = svc_rdma_send(xprt, &err_wr, 1);
 	if (ret) {
 		dprintk("svcrdma: Error %d posting send for protocol error\n",
 			ret);

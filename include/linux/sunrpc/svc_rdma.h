@@ -218,7 +218,7 @@ extern int svc_rdma_bc_post_send(struct svcxprt_rdma *,
 				 struct svc_rdma_op_ctxt *, struct xdr_buf *);
 
 /* svc_rdma_transport.c */
-extern int svc_rdma_send(struct svcxprt_rdma *, struct ib_send_wr *);
+extern int svc_rdma_send(struct svcxprt_rdma *, struct ib_send_wr *, int);
 extern void svc_rdma_send_error(struct svcxprt_rdma *, struct rpcrdma_msg *,
 				enum rpcrdma_errcode);
 extern int svc_rdma_post_recv(struct svcxprt_rdma *);

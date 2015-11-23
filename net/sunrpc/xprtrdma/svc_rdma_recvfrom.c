@@ -190,7 +190,7 @@ int rdma_read_chunk_lcl(struct svcxprt_rdma *xprt,
 	read_wr.wr.sg_list = ctxt->sge;
 	read_wr.wr.num_sge = pages_needed;
 
-	ret = svc_rdma_send(xprt, &read_wr.wr);
+	ret = svc_rdma_send(xprt, &read_wr.wr, 1);
 	if (ret) {
 		pr_err("svcrdma: Error %d posting RDMA_READ\n", ret);
 		set_bit(XPT_CLOSE, &xprt->sc_xprt.xpt_flags);
@@ -227,7 +227,7 @@ int rdma_read_chunk_frmr(struct svcxprt_rdma *xprt,
 	int nents = PAGE_ALIGN(*page_offset + rs_length) >> PAGE_SHIFT;
 	struct svc_rdma_op_ctxt *ctxt = svc_rdma_get_context(xprt);
 	struct svc_rdma_fastreg_mr *frmr = svc_rdma_get_frmr(xprt);
-	int ret, read, pno, dma_nents, n;
+	int ret, read, pno, num_wrs, dma_nents, n;
 	u32 pg_off = *page_offset;
 	u32 pg_no = *page_no;
 
@@ -299,6 +299,8 @@ int rdma_read_chunk_frmr(struct svcxprt_rdma *xprt,
 	ctxt->count = 1;
 	ctxt->read_hdr = head;
 
+	num_wrs = 2;
+
 	/* Prepare REG WR */
 	reg_wr.wr.opcode = IB_WR_REG_MR;
 	reg_wr.wr.wr_id = 0;
@@ -329,11 +331,12 @@ int rdma_read_chunk_frmr(struct svcxprt_rdma *xprt,
 		inv_wr.opcode = IB_WR_LOCAL_INV;
 		inv_wr.send_flags = IB_SEND_SIGNALED | IB_SEND_FENCE;
 		inv_wr.ex.invalidate_rkey = frmr->mr->lkey;
+		num_wrs++;
 	}
 	ctxt->wr_op = read_wr.wr.opcode;
 
 	/* Post the chain */
-	ret = svc_rdma_send(xprt, &reg_wr.wr);
+	ret = svc_rdma_send(xprt, &reg_wr.wr, num_wrs);
 	if (ret) {
 		pr_err("svcrdma: Error %d posting RDMA_READ\n", ret);
 		set_bit(XPT_CLOSE, &xprt->sc_xprt.xpt_flags);

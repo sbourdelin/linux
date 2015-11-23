@@ -292,7 +292,7 @@ static int send_write(struct svcxprt_rdma *xprt, struct svc_rqst *rqstp,
 
 	/* Post It */
 	atomic_inc(&rdma_stat_write);
-	if (svc_rdma_send(xprt, &write_wr.wr))
+	if (svc_rdma_send(xprt, &write_wr.wr, 1))
 		goto err;
 	return write_len - bc;
  err:
@@ -557,7 +557,7 @@ static int send_reply(struct svcxprt_rdma *rdma,
 	send_wr.opcode = IB_WR_SEND;
 	send_wr.send_flags =  IB_SEND_SIGNALED;
 
-	ret = svc_rdma_send(rdma, &send_wr);
+	ret = svc_rdma_send(rdma, &send_wr, 1);
 	if (ret)
 		goto err;
 
@@ -699,7 +699,7 @@ int svc_rdma_bc_post_send(struct svcxprt_rdma *rdma,
 	send_wr.opcode = IB_WR_SEND;
 	send_wr.send_flags = IB_SEND_SIGNALED;
 
-	ret = svc_rdma_send(rdma, &send_wr);
+	ret = svc_rdma_send(rdma, &send_wr, 1);
 	if (ret) {
 		svc_rdma_unmap_dma(ctxt);
 		ret = -EIO;
