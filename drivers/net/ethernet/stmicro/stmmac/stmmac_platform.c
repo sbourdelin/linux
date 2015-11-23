@@ -123,8 +123,10 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 		plat->max_speed = -1;
 
 	plat->bus_id = of_alias_get_id(np, "ethernet");
-	if (plat->bus_id < 0)
+	if (plat->bus_id < 0) {
+		dev_warn(&pdev->dev, "no aliases for ethernet; multiple ethernets will break\n");
 		plat->bus_id = 0;
+	}
 
 	/* Default to phy auto-detection */
 	plat->phy_addr = -1;
