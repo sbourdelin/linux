@@ -23,6 +23,7 @@
 #if IS_ENABLED(CONFIG_FM10K_VXLAN)
 #include <net/udp_tunnel.h>
 #include <net/vxlan.h>
+#include <net/protocol.h>
 #endif /* CONFIG_FM10K_VXLAN */
 
 /**
@@ -573,7 +574,7 @@ int fm10k_open(struct net_device *netdev)
 
 #if IS_ENABLED(CONFIG_FM10K_VXLAN)
 	/* update VXLAN port configuration */
-	vxlan_get_rx_port(netdev);
+	udp_offload_get_port(netdev);
 
 #endif
 	fm10k_up(interface);

@@ -31,6 +31,7 @@
 #include <net/vxlan.h>
 #endif
 #include <net/udp_tunnel.h>
+#include <net/protocol.h>
 
 const char i40e_driver_name[] = "i40e";
 static const char i40e_driver_string[] =
@@ -5303,9 +5304,7 @@ int i40e_open(struct net_device *netdev)
 						       TCP_FLAG_CWR) >> 16);
 	wr32(&pf->hw, I40E_GLLAN_TSOMSK_L, be32_to_cpu(TCP_FLAG_CWR) >> 16);
 
-#ifdef CONFIG_I40E_VXLAN
-	vxlan_get_rx_port(netdev);
-#endif
+	udp_offload_get_port(netdev);
 
 	return 0;
 }

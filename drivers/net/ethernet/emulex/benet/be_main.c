@@ -25,6 +25,7 @@
 #include <net/busy_poll.h>
 #include <net/udp_tunnel.h>
 #include <net/vxlan.h>
+#include <net/protocol.h>
 
 MODULE_VERSION(DRV_VER);
 MODULE_DESCRIPTION(DRV_DESC " " DRV_VER);
@@ -3606,7 +3607,7 @@ static int be_open(struct net_device *netdev)
 
 #ifdef CONFIG_BE2NET_VXLAN
 	if (skyhawk_chip(adapter))
-		vxlan_get_rx_port(netdev);
+		udp_offload_get_port(netdev);
 #endif
 
 	return 0;
@@ -5241,6 +5242,7 @@ static void be_del_vxlan_port(struct net_device *netdev, sa_family_t sa_family,
 
 	if (type != UDP_TUNNEL_VXLAN)
 		return;
+
 	if (lancer_chip(adapter) || BEx_chip(adapter) || be_is_mc(adapter))
 		return;
 

@@ -290,6 +290,33 @@ unlock:
 }
 EXPORT_SYMBOL(udp_del_offload);
 
+void udp_offload_get_port(struct net_device *dev)
+{
+	struct udp_offload_priv __rcu **head;
+	struct udp_offload_priv *uo_priv;
+	struct udp_offload *uo;
+
+	if (udp_offload_base)
+		head = &udp_offload_base;
+	else
+		return;
+
+	spin_lock(&udp_offload_lock);
+	uo_priv = udp_deref_protected(*head);
+	for (; uo_priv != NULL; uo_priv = udp_deref_protected(*head)) {
+		/* call the right add port */
+		uo = uo_priv->offload;
+		if (uo && dev->netdev_ops->ndo_add_udp_tunnel_port)
+			dev->netdev_ops->ndo_add_udp_tunnel_port(dev,
+							uo->family,
+							uo->port,
+							uo->tunnel_type);
+		head = &uo_priv->next;
+	}
+	spin_unlock(&udp_offload_lock);
+}
+EXPORT_SYMBOL(udp_offload_get_port);
+
 struct sk_buff **udp_gro_receive(struct sk_buff **head, struct sk_buff *skb,
 				 struct udphdr *uh)
 {

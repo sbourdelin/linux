@@ -52,6 +52,7 @@
 #include <scsi/fc/fc_fcoe.h>
 #include <net/udp_tunnel.h>
 #include <net/vxlan.h>
+#include <net/protocol.h>
 
 #ifdef CONFIG_OF
 #include <linux/of_net.h>
@@ -5823,7 +5824,7 @@ static int ixgbe_open(struct net_device *netdev)
 
 	ixgbe_clear_vxlan_port(adapter);
 #ifdef CONFIG_IXGBE_VXLAN
-	vxlan_get_rx_port(netdev);
+	udp_offload_get_port(netdev);
 #endif
 
 	return 0;
@@ -6913,7 +6914,7 @@ static void ixgbe_service_task(struct work_struct *work)
 #ifdef CONFIG_IXGBE_VXLAN
 	if (adapter->flags2 & IXGBE_FLAG2_VXLAN_REREG_NEEDED) {
 		adapter->flags2 &= ~IXGBE_FLAG2_VXLAN_REREG_NEEDED;
-		vxlan_get_rx_port(adapter->netdev);
+		udp_offload_get_port(adapter->netdev);
 	}
 #endif /* CONFIG_IXGBE_VXLAN */
 	ixgbe_reset_subtask(adapter);

@@ -39,6 +39,7 @@
 #include <net/ip6_checksum.h>
 #if defined(CONFIG_VXLAN) || defined(CONFIG_VXLAN_MODULE)
 #include <net/vxlan.h>
+#include <net/protocol.h>
 #endif
 #ifdef CONFIG_NET_RX_BUSY_POLL
 #include <net/busy_poll.h>
@@ -4591,7 +4592,7 @@ static int __bnxt_open_nic(struct bnxt *bp, bool irq_re_init, bool link_re_init)
 
 	if (irq_re_init) {
 #if defined(CONFIG_VXLAN) || defined(CONFIG_VXLAN_MODULE)
-		vxlan_get_rx_port(bp->dev);
+		udp_offload_get_port(bp->dev);
 #endif
 		if (!bnxt_hwrm_tunnel_dst_port_alloc(
 				bp, htons(0x17c1),
@@ -5460,6 +5461,7 @@ static void bnxt_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
 
 	if (type != UDP_TUNNEL_VXLAN)
 		return;
+
 	if (bp->vxlan_port_cnt && bp->vxlan_port == port) {
 		bp->vxlan_port_cnt--;
 

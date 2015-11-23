@@ -2055,6 +2055,8 @@ struct udp_offload_callbacks {
 
 struct udp_offload {
 	__be16			 port;
+	u8			 tunnel_type;
+	u8			 family;
 	u8			 ipproto;
 	struct udp_offload_callbacks callbacks;
 };

@@ -60,6 +60,7 @@
 #include <linux/semaphore.h>
 #include <linux/stringify.h>
 #include <linux/vmalloc.h>
+#include <net/protocol.h>
 
 #include "bnx2x.h"
 #include "bnx2x_init.h"
@@ -10293,7 +10294,7 @@ sp_rtnl_not_reset:
 			netdev_info(bp->dev,
 				    "Deleted vxlan dest port %d", port);
 			bp->vxlan_dst_port = 0;
-			vxlan_get_rx_port(bp->dev);
+			udp_offload_get_port(bp->dev);
 		}
 	}
 #endif
@@ -12499,7 +12500,7 @@ static int bnx2x_open(struct net_device *dev)
 
 #ifdef CONFIG_BNX2X_VXLAN
 	if (IS_PF(bp))
-		vxlan_get_rx_port(dev);
+		udp_offload_get_port(dev);
 #endif
 
 	return 0;

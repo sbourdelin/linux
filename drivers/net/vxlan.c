@@ -2424,33 +2424,6 @@ static struct device_type vxlan_type = {
 	.name = "vxlan",
 };
 
-/* Calls the ndo_add_udp_tunnel_port of the caller in order to
- * supply the listening VXLAN udp ports. Callers are expected
- * to implement the ndo_add_tunnel_port.
- */
-void vxlan_get_rx_port(struct net_device *dev)
-{
-	struct vxlan_sock *vs;
-	struct net *net = dev_net(dev);
-	struct vxlan_net *vn = net_generic(net, vxlan_net_id);
-	sa_family_t sa_family;
-	__be16 port;
-	unsigned int i;
-
-	spin_lock(&vn->sock_lock);
-	for (i = 0; i < PORT_HASH_SIZE; ++i) {
-		hlist_for_each_entry_rcu(vs, &vn->sock_list[i], hlist) {
-			port = inet_sk(vs->sock->sk)->inet_sport;
-			sa_family = vxlan_get_sk_family(vs);
-			dev->netdev_ops->ndo_add_udp_tunnel_port(dev, sa_family,
-							      port,
-							      UDP_TUNNEL_VXLAN);
-		}
-	}
-	spin_unlock(&vn->sock_lock);
-}
-EXPORT_SYMBOL_GPL(vxlan_get_rx_port);
-
 /* Initialize the device structure. */
 static void vxlan_setup(struct net_device *dev)
 {
@@ -2639,6 +2612,8 @@ static struct vxlan_sock *vxlan_socket_create(struct net *net, bool ipv6,
 
 	/* Initialize the vxlan udp offloads structure */
 	vs->udp_offloads.port = port;
+	vs->udp_offloads.tunnel_type = UDP_TUNNEL_VXLAN;
+	vs->udp_offloads.family = ipv6 ? AF_INET6 : AF_INET;
 	vs->udp_offloads.callbacks.gro_receive  = vxlan_gro_receive;
 	vs->udp_offloads.callbacks.gro_complete = vxlan_gro_complete;
 
