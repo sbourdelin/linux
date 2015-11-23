@@ -201,9 +201,12 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 	union guc_doorbell_qw *db;
 	void *base;
 	int attempt = 2, ret = -EAGAIN;
+	unsigned long flags;
 
 	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
 	desc = base + gc->proc_desc_offset;
+
+	spin_lock_irqsave(&gc->wq_lock, flags);
 
 	/* Update the tail so it is visible to GuC */
 	desc->tail = gc->wq_tail;
@@ -248,7 +251,10 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 			db_exc.cookie = 1;
 	}
 
+	spin_unlock_irqrestore(&gc->wq_lock, flags);
+
 	kunmap_atomic(base);
+
 	return ret;
 }
 
@@ -487,16 +493,16 @@ static int guc_get_workqueue_space(struct i915_guc_client *gc, u32 *offset)
 	struct guc_process_desc *desc;
 	void *base;
 	u32 size = sizeof(struct guc_wq_item);
-	int ret = 0, timeout_counter = 200;
+	int ret = -ETIMEDOUT, timeout_counter = 200;
+	unsigned long flags;
 
 	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
 	desc = base + gc->proc_desc_offset;
 
 	while (timeout_counter-- > 0) {
-		ret = wait_for_atomic(CIRC_SPACE(gc->wq_tail, desc->head,
-				gc->wq_size) >= size, 1);
+		spin_lock_irqsave(&gc->wq_lock, flags);
 
-		if (!ret) {
+		if (CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size) >= size) {
 			*offset = gc->wq_tail;
 
 			/* advance the tail for next workqueue item */
@@ -505,7 +511,13 @@ static int guc_get_workqueue_space(struct i915_guc_client *gc, u32 *offset)
 
 			/* this will break the loop */
 			timeout_counter = 0;
+			ret = 0;
 		}
+
+		spin_unlock_irqrestore(&gc->wq_lock, flags);
+
+		if (timeout_counter)
+			usleep_range(1000, 2000);
 	};
 
 	kunmap_atomic(base);
@@ -597,19 +609,17 @@ int i915_guc_submit(struct i915_guc_client *client,
 {
 	struct intel_guc *guc = client->guc;
 	enum intel_ring_id ring_id = rq->ring->id;
-	unsigned long flags;
 	int q_ret, b_ret;
 
 	/* Need this because of the deferred pin ctx and ring */
 	/* Shall we move this right after ring is pinned? */
 	lr_context_update(rq);
 
-	spin_lock_irqsave(&client->wq_lock, flags);
-
 	q_ret = guc_add_workqueue_item(client, rq);
 	if (q_ret == 0)
 		b_ret = guc_ring_doorbell(client);
 
+	spin_lock(&guc->host2guc_lock);
 	client->submissions[ring_id] += 1;
 	if (q_ret) {
 		client->q_fail += 1;
@@ -620,9 +630,6 @@ int i915_guc_submit(struct i915_guc_client *client,
 	} else {
 		client->retcode = 0;
 	}
-	spin_unlock_irqrestore(&client->wq_lock, flags);
-
-	spin_lock(&guc->host2guc_lock);
 	guc->submissions[ring_id] += 1;
 	guc->last_seqno[ring_id] = rq->seqno;
 	spin_unlock(&guc->host2guc_lock);
