@@ -922,7 +922,7 @@ static inline void intel_pstate_set_sample_time(struct cpudata *cpu)
 	mod_timer_pinned(&cpu->timer, jiffies + delay);
 }
 
-static inline int32_t intel_pstate_get_scaled_busy(struct cpudata *cpu)
+static inline int32_t intel_pstate_get_scaled_busy_estimate(struct cpudata *cpu)
 {
 	int32_t core_busy, max_pstate, current_pstate, sample_ratio;
 	s64 duration_us;
@@ -974,7 +974,7 @@ static inline void intel_pstate_adjust_busy_pstate(struct cpudata *cpu)
 	from = cpu->pstate.current_pstate;
 
 	pid = &cpu->pid;
-	busy_scaled = intel_pstate_get_scaled_busy(cpu);
+	busy_scaled = intel_pstate_get_scaled_busy_estimate(cpu);
 
 	ctl = pid_calc(pid, busy_scaled);
 
