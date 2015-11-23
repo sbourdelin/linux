@@ -130,7 +130,7 @@ static int dev_state_ev_handler(struct notifier_block *this, unsigned long event
 
 	dev  = (struct net_device *)dev_iface->ifa_dev->dev;
 	if (!dev->ieee80211_ptr || !dev->ieee80211_ptr->wiphy) {
-		PRINT_D(GENERIC_DBG, "No Wireless registerd\n");
+		PRINT_D(GENERIC_DBG, "No Wireless registered\n");
 		return NOTIFY_DONE;
 	}
 	priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
@@ -346,7 +346,7 @@ struct net_device *get_if_handler(struct wilc *wilc, u8 *mac_header)
 		    !memcmp(bssid, wilc->vif[i].bssid, ETH_ALEN))
 			return wilc->vif[i].ndev;
 
-	PRINT_INFO(INIT_DBG, "Invalide handle\n");
+	PRINT_INFO(INIT_DBG, "Invalid handle\n");
 	for (i = 0; i < 25; i++)
 		PRINT_D(INIT_DBG, "%02x ", mac_header[i]);
 	bssid = mac_header + 18;
@@ -500,13 +500,13 @@ int linux_wlan_get_firmware(struct net_device *dev)
 
 #ifdef WILC_SDIO
 	if (request_firmware(&wilc_firmware, firmware, &wilc->wilc_sdio_func->dev) != 0) {
-		PRINT_ER("%s - firmare not available\n", firmware);
+		PRINT_ER("%s - firmware not available\n", firmware);
 		ret = -1;
 		goto _fail_;
 	}
 #else
 	if (request_firmware(&wilc_firmware, firmware, &wilc->wilc_spidev->dev) != 0) {
-		PRINT_ER("%s - firmare not available\n", firmware);
+		PRINT_ER("%s - firmware not available\n", firmware);
 		ret = -1;
 		goto _fail_;
 	}
@@ -1155,19 +1155,19 @@ static void wilc_set_multicast_list(struct net_device *dev)
 		dev->mc.count);
 
 	if (dev->flags & IFF_PROMISC) {
-		PRINT_D(INIT_DBG, "Set promiscuous mode ON, retrive all packets\n");
+		PRINT_D(INIT_DBG, "Set promiscuous mode ON, retrieve all packets\n");
 		return;
 	}
 
 	if ((dev->flags & IFF_ALLMULTI) ||
 	    (dev->mc.count) > WILC_MULTICAST_TABLE_SIZE) {
-		PRINT_D(INIT_DBG, "Disable multicast filter, retrive all multicast packets\n");
+		PRINT_D(INIT_DBG, "Disable multicast filter, retrieve all multicast packets\n");
 		host_int_setup_multicast_filter(hif_drv, false, 0);
 		return;
 	}
 
 	if ((dev->mc.count) == 0) {
-		PRINT_D(INIT_DBG, "Enable multicast filter, retrive directed packets only.\n");
+		PRINT_D(INIT_DBG, "Enable multicast filter, retrieve directed packets only.\n");
 		host_int_setup_multicast_filter(hif_drv, true, 0);
 		return;
 	}
@@ -1413,7 +1413,7 @@ void frmw_to_linux(struct wilc *wilc, u8 *buff, u32 size, u32 pkt_offset)
 
 		skb = dev_alloc_skb(frame_len);
 		if (!skb) {
-			PRINT_ER("Low memory - packet droped\n");
+			PRINT_ER("Low memory - packet dropped\n");
 			return;
 		}
 
