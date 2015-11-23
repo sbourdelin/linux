@@ -240,7 +240,6 @@ int rdma_read_chunk_frmr(struct svcxprt_rdma *xprt,
 	read = min_t(int, (nents << PAGE_SHIFT) - *page_offset, rs_length);
 
 	frmr->direction = DMA_FROM_DEVICE;
-	frmr->access_flags = (IB_ACCESS_LOCAL_WRITE|IB_ACCESS_REMOTE_WRITE);
 	frmr->sg_nents = nents;
 
 	for (pno = 0; pno < nents; pno++) {
@@ -308,7 +307,7 @@ int rdma_read_chunk_frmr(struct svcxprt_rdma *xprt,
 	reg_wr.wr.num_sge = 0;
 	reg_wr.mr = frmr->mr;
 	reg_wr.key = frmr->mr->lkey;
-	reg_wr.access = frmr->access_flags;
+	reg_wr.access = (IB_ACCESS_LOCAL_WRITE|IB_ACCESS_REMOTE_WRITE);
 	reg_wr.wr.next = &read_wr.wr;
 
 	/* Prepare RDMA_READ */

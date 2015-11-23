@@ -107,7 +107,6 @@ struct svc_rdma_fastreg_mr {
 	struct ib_mr *mr;
 	struct scatterlist *sg;
 	int sg_nents;
-	unsigned long access_flags;
 	enum dma_data_direction direction;
 	struct list_head frmr_list;
 };
