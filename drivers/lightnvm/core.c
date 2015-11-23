@@ -721,8 +721,11 @@ static long nvm_ioctl_get_devices(struct file *file, void __user *arg)
 
 	devices->nr_devices = i;
 
-	if (copy_to_user(arg, devices, sizeof(struct nvm_ioctl_get_devices)))
+	if (copy_to_user(arg, devices,
+			 sizeof(struct nvm_ioctl_get_devices))) {
+		kfree(devices);
 		return -EFAULT;
+	}
 
 	kfree(devices);
 	return 0;
