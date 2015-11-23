@@ -47,6 +47,7 @@
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/tcp.h>
+#include <net/udp_tunnel.h>
 #include <net/vxlan.h>
 #include <net/checksum.h>
 #include <net/ip6_checksum.h>
@@ -10124,11 +10125,14 @@ static void __bnx2x_add_vxlan_port(struct bnx2x *bp, u16 port)
 }
 
 static void bnx2x_add_vxlan_port(struct net_device *netdev,
-				 sa_family_t sa_family, __be16 port)
+				 sa_family_t sa_family, __be16 port,
+				 u32 type)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	u16 t_port = ntohs(port);
 
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 	__bnx2x_add_vxlan_port(bp, t_port);
 }
 
@@ -10152,11 +10156,14 @@ static void __bnx2x_del_vxlan_port(struct bnx2x *bp, u16 port)
 }
 
 static void bnx2x_del_vxlan_port(struct net_device *netdev,
-				 sa_family_t sa_family, __be16 port)
+				 sa_family_t sa_family, __be16 port,
+				 u32 type)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	u16 t_port = ntohs(port);
 
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 	__bnx2x_del_vxlan_port(bp, t_port);
 }
 #endif
@@ -13011,8 +13018,8 @@ static const struct net_device_ops bnx2x_netdev_ops = {
 	.ndo_set_vf_link_state	= bnx2x_set_vf_link_state,
 	.ndo_features_check	= bnx2x_features_check,
 #ifdef CONFIG_BNX2X_VXLAN
-	.ndo_add_vxlan_port	= bnx2x_add_vxlan_port,
-	.ndo_del_vxlan_port	= bnx2x_del_vxlan_port,
+	.ndo_add_udp_tunnel_port	= bnx2x_add_vxlan_port,
+	.ndo_del_udp_tunnel_port	= bnx2x_del_vxlan_port,
 #endif
 };
 

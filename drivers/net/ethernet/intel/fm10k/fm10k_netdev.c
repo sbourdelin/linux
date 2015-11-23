@@ -21,6 +21,7 @@
 #include "fm10k.h"
 #include <linux/vmalloc.h>
 #if IS_ENABLED(CONFIG_FM10K_VXLAN)
+#include <net/udp_tunnel.h>
 #include <net/vxlan.h>
 #endif /* CONFIG_FM10K_VXLAN */
 
@@ -439,17 +440,23 @@ static void fm10k_restore_vxlan_port(struct fm10k_intfc *interface)
  * @netdev: network interface device structure
  * @sa_family: Address family of new port
  * @port: port number used for VXLAN
+ * @type: Tunnel type
  *
- * This funciton is called when a new VXLAN interface has added a new port
+ * This function is called when a new VXLAN interface has added a new port
  * number to the range that is currently in use for VXLAN.  The new port
  * number is always added to the tail so that the port number list should
  * match the order in which the ports were allocated.  The head of the list
  * is always used as the VXLAN port number for offloads.
  **/
 static void fm10k_add_vxlan_port(struct net_device *dev,
-				 sa_family_t sa_family, __be16 port) {
+				 sa_family_t sa_family, __be16 port,
+				 u32 type) {
+#if IS_ENABLED(CONFIG_FM10K_VXLAN)
 	struct fm10k_intfc *interface = netdev_priv(dev);
 	struct fm10k_vxlan_port *vxlan_port;
+
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 
 	/* only the PF supports configuring tunnels */
 	if (interface->hw.mac.type != fm10k_mac_pf)
@@ -476,6 +483,7 @@ insert_tail:
 	list_add_tail(&vxlan_port->list, &interface->vxlan_port);
 
 	fm10k_restore_vxlan_port(interface);
+#endif
 }
 
 /**
@@ -483,16 +491,22 @@ insert_tail:
  * @netdev: network interface device structure
  * @sa_family: Address family of freed port
  * @port: port number used for VXLAN
+ * @type: Tunnel type
  *
- * This funciton is called when a new VXLAN interface has freed a port
+ * This function is called when a new VXLAN interface has freed a port
  * number from the range that is currently in use for VXLAN.  The freed
  * port is removed from the list and the new head is used to determine
  * the port number for offloads.
  **/
 static void fm10k_del_vxlan_port(struct net_device *dev,
-				 sa_family_t sa_family, __be16 port) {
+				 sa_family_t sa_family, __be16 port,
+				 u32 type) {
+#if IS_ENABLED(CONFIG_FM10K_VXLAN)
 	struct fm10k_intfc *interface = netdev_priv(dev);
 	struct fm10k_vxlan_port *vxlan_port;
+
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 
 	if (interface->hw.mac.type != fm10k_mac_pf)
 		return;
@@ -508,6 +522,7 @@ static void fm10k_del_vxlan_port(struct net_device *dev,
 	}
 
 	fm10k_restore_vxlan_port(interface);
+#endif
 }
 
 /**
@@ -1375,8 +1390,8 @@ static const struct net_device_ops fm10k_netdev_ops = {
 	.ndo_set_vf_vlan	= fm10k_ndo_set_vf_vlan,
 	.ndo_set_vf_rate	= fm10k_ndo_set_vf_bw,
 	.ndo_get_vf_config	= fm10k_ndo_get_vf_config,
-	.ndo_add_vxlan_port	= fm10k_add_vxlan_port,
-	.ndo_del_vxlan_port	= fm10k_del_vxlan_port,
+	.ndo_add_udp_tunnel_port	= fm10k_add_vxlan_port,
+	.ndo_del_udp_tunnel_port	= fm10k_del_vxlan_port,
 	.ndo_do_ioctl		= fm10k_ioctl,
 	.ndo_dfwd_add_station	= fm10k_dfwd_add_station,
 	.ndo_dfwd_del_station	= fm10k_dfwd_del_station,
