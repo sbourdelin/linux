@@ -211,12 +211,15 @@ static int gennvm_register(struct nvm_dev *dev)
 	ret = gennvm_blocks_init(dev, gn);
 	if (ret) {
 		pr_err("gennvm: could not initialize blocks\n");
+		gennvm_blocks_free(dev);
+		gennvm_luns_free(dev);
 		goto err;
 	}
 
 	return 1;
 err:
 	kfree(gn);
+	dev->mp = NULL;
 	return ret;
 }
 
