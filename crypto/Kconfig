@@ -1639,6 +1639,18 @@ config CRYPTO_USER_API_AEAD
 	  This option enables the user-spaces interface for AEAD
 	  cipher algorithms.
 
+config CRYPTO_USER_API_TLS
+	tristate "User-space interface for TLS net sockets"
+	depends on NET
+	select CRYPTO_AEAD
+	select CRYPTO_USER_API
+	help
+	  This option enables kernel TLS socket framing
+	  cipher algorithms.  TLS framing is added/removed and
+          chained to a TCP socket.  Handshake is done in
+          userspace.
+
+
 config CRYPTO_HASH_INFO
 	bool
 
