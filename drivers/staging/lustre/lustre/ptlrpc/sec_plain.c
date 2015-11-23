@@ -956,7 +956,7 @@ static struct ptlrpc_ctx_ops plain_ctx_ops = {
 	.unwrap_bulk	    = plain_cli_unwrap_bulk,
 };
 
-static struct ptlrpc_sec_cops plain_sec_cops = {
+static const struct ptlrpc_sec_cops plain_sec_cops = {
 	.create_sec	     = plain_create_sec,
 	.destroy_sec	    = plain_destroy_sec,
 	.kill_sec	       = plain_kill_sec,

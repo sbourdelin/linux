@@ -378,7 +378,7 @@ static struct ptlrpc_ctx_ops null_ctx_ops = {
 	.verify		 = null_ctx_verify,
 };
 
-static struct ptlrpc_sec_cops null_sec_cops = {
+static const struct ptlrpc_sec_cops null_sec_cops = {
 	.create_sec	     = null_create_sec,
 	.destroy_sec	    = null_destroy_sec,
 	.lookup_ctx	     = null_lookup_ctx,
