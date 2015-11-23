@@ -949,12 +949,7 @@ static int helper_rfc4106_encrypt(struct aead_request *req)
 	struct scatter_walk src_sg_walk;
 	struct scatter_walk dst_sg_walk;
 	unsigned int i;
-
-	/* Assuming we are supporting rfc4106 64-bit extended */
-	/* sequence numbers We need to have the AAD length equal */
-	/* to 16 or 20 bytes */
-	if (unlikely(req->assoclen != 16 && req->assoclen != 20))
-		return -EINVAL;
+	unsigned int padded_assoclen = (req->assoclen + 3) & ~3;
 
 	/* IV below built */
 	for (i = 0; i < 4; i++)
@@ -970,21 +965,21 @@ static int helper_rfc4106_encrypt(struct aead_request *req)
 		one_entry_in_sg = 1;
 		scatterwalk_start(&src_sg_walk, req->src);
 		assoc = scatterwalk_map(&src_sg_walk);
-		src = assoc + req->assoclen;
+		src = assoc + padded_assoclen;
 		dst = src;
 		if (unlikely(req->src != req->dst)) {
 			scatterwalk_start(&dst_sg_walk, req->dst);
-			dst = scatterwalk_map(&dst_sg_walk) + req->assoclen;
+			dst = scatterwalk_map(&dst_sg_walk) + padded_assoclen;
 		}
 	} else {
 		/* Allocate memory for src, dst, assoc */
-		assoc = kmalloc(req->cryptlen + auth_tag_len + req->assoclen,
+		assoc = kmalloc(req->cryptlen + auth_tag_len + padded_assoclen,
 			GFP_ATOMIC);
 		if (unlikely(!assoc))
 			return -ENOMEM;
 		scatterwalk_map_and_copy(assoc, req->src, 0,
-					 req->assoclen + req->cryptlen, 0);
-		src = assoc + req->assoclen;
+					 padded_assoclen + req->cryptlen, 0);
+		src = assoc + padded_assoclen;
 		dst = src;
 	}
 
@@ -998,7 +993,7 @@ static int helper_rfc4106_encrypt(struct aead_request *req)
 	 * back to the packet. */
 	if (one_entry_in_sg) {
 		if (unlikely(req->src != req->dst)) {
-			scatterwalk_unmap(dst - req->assoclen);
+			scatterwalk_unmap(dst - padded_assoclen);
 			scatterwalk_advance(&dst_sg_walk, req->dst->length);
 			scatterwalk_done(&dst_sg_walk, 1, 0);
 		}
@@ -1006,7 +1001,7 @@ static int helper_rfc4106_encrypt(struct aead_request *req)
 		scatterwalk_advance(&src_sg_walk, req->src->length);
 		scatterwalk_done(&src_sg_walk, req->src == req->dst, 0);
 	} else {
-		scatterwalk_map_and_copy(dst, req->dst, req->assoclen,
+		scatterwalk_map_and_copy(dst, req->dst, padded_assoclen,
 					 req->cryptlen + auth_tag_len, 1);
 		kfree(assoc);
 	}
@@ -1029,13 +1024,7 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 	struct scatter_walk src_sg_walk;
 	struct scatter_walk dst_sg_walk;
 	unsigned int i;
-
-	if (unlikely(req->assoclen != 16 && req->assoclen != 20))
-		return -EINVAL;
-
-	/* Assuming we are supporting rfc4106 64-bit extended */
-	/* sequence numbers We need to have the AAD length */
-	/* equal to 16 or 20 bytes */
+	unsigned int padded_assoclen = (req->assoclen + 3) & ~3;
 
 	tempCipherLen = (unsigned long)(req->cryptlen - auth_tag_len);
 	/* IV below built */
@@ -1052,21 +1041,21 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 		one_entry_in_sg = 1;
 		scatterwalk_start(&src_sg_walk, req->src);
 		assoc = scatterwalk_map(&src_sg_walk);
-		src = assoc + req->assoclen;
+		src = assoc + padded_assoclen;
 		dst = src;
 		if (unlikely(req->src != req->dst)) {
 			scatterwalk_start(&dst_sg_walk, req->dst);
-			dst = scatterwalk_map(&dst_sg_walk) + req->assoclen;
+			dst = scatterwalk_map(&dst_sg_walk) + padded_assoclen;
 		}
 
 	} else {
 		/* Allocate memory for src, dst, assoc */
-		assoc = kmalloc(req->cryptlen + req->assoclen, GFP_ATOMIC);
+		assoc = kmalloc(req->cryptlen + padded_assoclen, GFP_ATOMIC);
 		if (!assoc)
 			return -ENOMEM;
 		scatterwalk_map_and_copy(assoc, req->src, 0,
-					 req->assoclen + req->cryptlen, 0);
-		src = assoc + req->assoclen;
+					 padded_assoclen + req->cryptlen, 0);
+		src = assoc + padded_assoclen;
 		dst = src;
 	}
 
@@ -1082,7 +1071,7 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 
 	if (one_entry_in_sg) {
 		if (unlikely(req->src != req->dst)) {
-			scatterwalk_unmap(dst - req->assoclen);
+			scatterwalk_unmap(dst - padded_assoclen);
 			scatterwalk_advance(&dst_sg_walk, req->dst->length);
 			scatterwalk_done(&dst_sg_walk, 1, 0);
 		}
@@ -1090,7 +1079,7 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 		scatterwalk_advance(&src_sg_walk, req->src->length);
 		scatterwalk_done(&src_sg_walk, req->src == req->dst, 0);
 	} else {
-		scatterwalk_map_and_copy(dst, req->dst, req->assoclen,
+		scatterwalk_map_and_copy(dst, req->dst, padded_assoclen,
 					 tempCipherLen, 1);
 		kfree(assoc);
 	}
@@ -1107,6 +1096,12 @@ static int rfc4106_encrypt(struct aead_request *req)
 				  cryptd_aead_child(cryptd_tfm) :
 				  &cryptd_tfm->base);
 
+	/* Assuming we are supporting rfc4106 64-bit extended */
+	/* sequence numbers We need to have the AAD length */
+	/* equal to 16 or 20 bytes */
+	if (unlikely(req->assoclen != 16 && req->assoclen != 20))
+		return -EINVAL;
+
 	return crypto_aead_encrypt(req);
 }
 
@@ -1115,6 +1110,44 @@ static int rfc4106_decrypt(struct aead_request *req)
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct cryptd_aead **ctx = crypto_aead_ctx(tfm);
 	struct cryptd_aead *cryptd_tfm = *ctx;
+
+	aead_request_set_tfm(req, irq_fpu_usable() ?
+				  cryptd_aead_child(cryptd_tfm) :
+				  &cryptd_tfm->base);
+
+	/* Assuming we are supporting rfc4106 64-bit extended */
+	/* sequence numbers We need to have the AAD length */
+	/* equal to 16 or 20 bytes */
+	if (unlikely(req->assoclen != 16 && req->assoclen != 20))
+		return -EINVAL;
+
+	return crypto_aead_decrypt(req);
+}
+
+static int rfc5288_encrypt(struct aead_request *req)
+{
+	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+	struct cryptd_aead **ctx = crypto_aead_ctx(tfm);
+	struct cryptd_aead *cryptd_tfm = *ctx;
+
+	if (unlikely(req->assoclen != 21))
+		return -EINVAL;
+
+	aead_request_set_tfm(req, irq_fpu_usable() ?
+				  cryptd_aead_child(cryptd_tfm) :
+				  &cryptd_tfm->base);
+
+	return crypto_aead_encrypt(req);
+}
+
+static int rfc5288_decrypt(struct aead_request *req)
+{
+	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+	struct cryptd_aead **ctx = crypto_aead_ctx(tfm);
+	struct cryptd_aead *cryptd_tfm = *ctx;
+
+	if (unlikely(req->assoclen != 21))
+		return -EINVAL;
 
 	aead_request_set_tfm(req, irq_fpu_usable() ?
 				  cryptd_aead_child(cryptd_tfm) :
@@ -1436,6 +1469,24 @@ static struct aead_alg aesni_aead_algs[] = { {
 	.base = {
 		.cra_name		= "rfc4106(gcm(aes))",
 		.cra_driver_name	= "rfc4106-gcm-aesni",
+		.cra_priority		= 400,
+		.cra_flags		= CRYPTO_ALG_ASYNC,
+		.cra_blocksize		= 1,
+		.cra_ctxsize		= sizeof(struct cryptd_aead *),
+		.cra_module		= THIS_MODULE,
+	},
+}, {
+	.init			= rfc4106_init,
+	.exit			= rfc4106_exit,
+	.setkey			= rfc4106_set_key,
+	.setauthsize		= rfc4106_set_authsize,
+	.encrypt		= rfc5288_encrypt,
+	.decrypt		= rfc5288_decrypt,
+	.ivsize			= 8,
+	.maxauthsize		= 16,
+	.base = {
+		.cra_name		= "rfc5288(gcm(aes))",
+		.cra_driver_name	= "rfc5288-gcm-aesni",
 		.cra_priority		= 400,
 		.cra_flags		= CRYPTO_ALG_ASYNC,
 		.cra_blocksize		= 1,
