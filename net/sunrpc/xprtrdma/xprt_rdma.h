@@ -337,6 +337,11 @@ struct rpcrdma_create_data_internal {
 #define RPCRDMA_INLINE_PAD_VALUE(rq)\
 	rpcx_to_rdmad(rq->rq_xprt).padding
 
+/* To help prevent spurious connection shutdown, allow senders to
+ * overrun our receive inline threshold by a small bit.
+ */
+#define RPCRDMA_RECV_MARGIN	(128)
+
 /*
  * Statistics for RPCRDMA
  */

@@ -924,7 +924,11 @@ rpcrdma_create_rep(struct rpcrdma_xprt *r_xprt)
 	if (rep == NULL)
 		goto out;
 
-	rep->rr_rdmabuf = rpcrdma_alloc_regbuf(ia, cdata->inline_rsize,
+	/* The actual size of our receive buffers is increased slightly
+	 * to prevent small receive overruns from killing our connection.
+	 */
+	rep->rr_rdmabuf = rpcrdma_alloc_regbuf(ia, cdata->inline_rsize +
+					       RPCRDMA_RECV_MARGIN,
 					       GFP_KERNEL);
 	if (IS_ERR(rep->rr_rdmabuf)) {
 		rc = PTR_ERR(rep->rr_rdmabuf);

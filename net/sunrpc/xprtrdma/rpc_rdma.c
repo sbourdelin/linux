@@ -776,6 +776,7 @@ rpcrdma_reply_handler(struct rpcrdma_rep *rep)
 	int rdmalen, status;
 	unsigned long cwnd;
 	u32 credits;
+	RPC_IFDEBUG(struct rpcrdma_create_data_internal *cdata);
 
 	dprintk("RPC:       %s: incoming rep %p\n", __func__, rep);
 
@@ -783,6 +784,12 @@ rpcrdma_reply_handler(struct rpcrdma_rep *rep)
 		goto out_badstatus;
 	if (rep->rr_len < RPCRDMA_HDRLEN_MIN)
 		goto out_shortreply;
+#if IS_ENABLED(CONFIG_SUNRPC_DEBUG)
+	cdata = &r_xprt->rx_data;
+	if (rep->rr_len > cdata->inline_rsize)
+		pr_warn("RPC: %u byte reply exceeds inline threshold\n",
+			rep->rr_len);
+#endif
 
 	headerp = rdmab_to_msg(rep->rr_rdmabuf);
 	if (headerp->rm_vers != rpcrdma_version)
