@@ -48,6 +48,7 @@
 #include <asm/kvm_arm.h>
 #include <asm/kvm_mmu.h>
 
+#include "sys_regs.h"
 #include "vgic.h"
 
 static bool handle_mmio_rao_wi(struct kvm_vcpu *vcpu,
@@ -991,6 +992,227 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 		vgic_kick_vcpus(vcpu->kvm);
 }
 
+static bool access_gic_ctlr(struct kvm_vcpu *vcpu,
+			    const struct sys_reg_params *p,
+			    const struct sys_reg_desc *r)
+{
+	u64 val;
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+	if (p->is_write) {
+		val = *p->val;
+
+		vgicv3->vgic_vmcr &= ~(ICH_VMCR_CBPR|ICH_VMCR_EOIM);
+		vgicv3->vgic_vmcr |= (val << (ICH_VMCR_CBPR_SHIFT -
+						ICC_CTLR_EL1_CBPR_SHIFT)) &
+					ICH_VMCR_CBPR;
+		vgicv3->vgic_vmcr |= (val << (ICH_VMCR_EOIM_SHIFT -
+						ICC_CTLR_EL1_EOImode_SHIFT)) &
+					ICH_VMCR_EOIM;
+	} else {
+		asm volatile("mrs_s %0," __stringify(ICC_IAR1_EL1)
+			     : "=r" (val));
+		val &= (ICC_CTLR_EL1_A3V | ICC_CTLR_EL1_SEIS |
+			ICC_CTLR_EL1_IDbits_MASK | ICC_CTLR_EL1_PRIbits_MASK);
+		val |= (vgicv3->vgic_vmcr & ICH_VMCR_CBPR) >>
+			(ICH_VMCR_CBPR_SHIFT - ICC_CTLR_EL1_CBPR_SHIFT);
+		val |= (vgicv3->vgic_vmcr & ICH_VMCR_EOIM) >>
+			(ICH_VMCR_EOIM_SHIFT - ICC_CTLR_EL1_EOImode_SHIFT);
+
+		*p->val = val;
+	}
+
+	return true;
+}
+
+static bool access_gic_pmr(struct kvm_vcpu *vcpu,
+			   const struct sys_reg_params *p,
+			   const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+	if (p->is_write) {
+		vgicv3->vgic_vmcr &= ~ICH_VMCR_PMR_MASK;
+		vgicv3->vgic_vmcr |= (*p->val << ICH_VMCR_PMR_SHIFT) &
+					ICH_VMCR_PMR_MASK;
+	} else {
+		*p->val = (vgicv3->vgic_vmcr & ICH_VMCR_PMR_MASK) >>
+			  ICH_VMCR_PMR_SHIFT;
+	}
+
+	return true;
+}
+
+static bool access_gic_bpr0(struct kvm_vcpu *vcpu,
+			    const struct sys_reg_params *p,
+			    const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+	if (p->is_write) {
+		vgicv3->vgic_vmcr &= ~ICH_VMCR_BPR0_MASK;
+		vgicv3->vgic_vmcr |= (*p->val << ICH_VMCR_BPR0_SHIFT) &
+				     ICH_VMCR_BPR0_MASK;
+	} else {
+		*p->val = (vgicv3->vgic_vmcr & ICH_VMCR_BPR0_MASK) >>
+			  ICH_VMCR_BPR0_SHIFT;
+	}
+
+	return true;
+}
+
+static bool access_gic_bpr1(struct kvm_vcpu *vcpu,
+			    const struct sys_reg_params *p,
+			    const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+	if (p->is_write) {
+		vgicv3->vgic_vmcr &= ~ICH_VMCR_BPR1_MASK;
+		vgicv3->vgic_vmcr |= (*p->val << ICH_VMCR_BPR1_SHIFT) &
+				     ICH_VMCR_BPR1_MASK;
+	} else {
+		*p->val = (vgicv3->vgic_vmcr & ICH_VMCR_BPR1_MASK) >>
+			  ICH_VMCR_BPR1_SHIFT;
+	}
+
+	return true;
+}
+
+static bool access_gic_grpen0(struct kvm_vcpu *vcpu,
+			      const struct sys_reg_params *p,
+			      const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+	if (p->is_write) {
+		vgicv3->vgic_vmcr &= ~ICH_VMCR_ENG0;
+		vgicv3->vgic_vmcr |= (*p->val << ICH_VMCR_ENG0_SHIFT) &
+				     ICH_VMCR_ENG0;
+	} else {
+		*p->val = (vgicv3->vgic_vmcr & ICH_VMCR_ENG0) >>
+			  ICH_VMCR_ENG0_SHIFT;
+	}
+
+	return true;
+}
+
+static bool access_gic_grpen1(struct kvm_vcpu *vcpu,
+			      const struct sys_reg_params *p,
+			      const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+	if (p->is_write) {
+		vgicv3->vgic_vmcr &= ~ICH_VMCR_ENG1;
+		vgicv3->vgic_vmcr |= (*p->val << ICH_VMCR_ENG1_SHIFT) &
+				     ICH_VMCR_ENG1;
+	} else {
+		*p->val = (vgicv3->vgic_vmcr & ICH_VMCR_ENG1) >>
+			  ICH_VMCR_ENG1_SHIFT;
+	}
+
+	return true;
+}
+
+static bool access_gic_ap0r(struct kvm_vcpu *vcpu,
+			      const struct sys_reg_params *p,
+			      const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+	u8 idx = r->Op2 & 3;
+
+	if (p->is_write)
+		vgicv3->vgic_ap0r[idx] = *p->val;
+	else
+		*p->val = vgicv3->vgic_ap0r[idx];
+
+	return true;
+}
+
+static bool access_gic_ap1r(struct kvm_vcpu *vcpu,
+			      const struct sys_reg_params *p,
+			      const struct sys_reg_desc *r)
+{
+	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+	u8 idx = r->Op2 & 3;
+
+	if (p->is_write)
+		vgicv3->vgic_ap1r[idx] = *p->val;
+	else
+		*p->val = vgicv3->vgic_ap1r[idx];
+
+	return true;
+}
+
+static const struct sys_reg_desc gic_v3_icc_reg_descs[] = {
+	/* ICC_PMR_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b0100), CRm(0b0110), Op2(0b000),
+	  access_gic_pmr },
+	/* ICC_BPR0_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1000), Op2(0b011),
+	  access_gic_bpr0 },
+	/* ICC_AP0R0_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1000), Op2(0b100),
+	  access_gic_ap0r },
+	/* ICC_AP0R1_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1000), Op2(0b101),
+	  access_gic_ap0r },
+	/* ICC_AP0R2_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1000), Op2(0b110),
+	  access_gic_ap0r },
+	/* ICC_AP0R3_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1000), Op2(0b111),
+	  access_gic_ap0r },
+	/* ICC_AP1R0_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1001), Op2(0b000),
+	  access_gic_ap1r },
+	/* ICC_AP1R1_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1001), Op2(0b001),
+	  access_gic_ap1r },
+	/* ICC_AP1R2_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1001), Op2(0b010),
+	  access_gic_ap1r },
+	/* ICC_AP1R3_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1001), Op2(0b011),
+	  access_gic_ap1r },
+	/* ICC_BPR1_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b011),
+	  access_gic_bpr1 },
+	/* ICC_CTLR_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b100),
+	  access_gic_ctlr },
+	/* ICC_IGRPEN0_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b110),
+	  access_gic_grpen0 },
+	/* ICC_GRPEN1_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b111),
+	  access_gic_grpen1 },
+};
+
+static int vgic_v3_cpu_regs_access(struct kvm_vcpu *vcpu, u64 id, u64 *reg,
+				   bool is_write)
+{
+	struct sys_reg_params params;
+	const struct sys_reg_desc *r;
+
+	params.val = (u_long *)reg;
+	params.is_write = is_write;
+	params.is_aarch32 = false;
+	params.is_32bit = false;
+
+	r = find_reg_by_id(id, &params, gic_v3_icc_reg_descs,
+			   ARRAY_SIZE(gic_v3_icc_reg_descs));
+	if (!r)
+		return -ENXIO;
+
+	/* Ensure that VCPU is not running */
+	if (unlikely(vcpu->cpu != -1))
+		return -EBUSY;
+
+	return r->access(vcpu, &params, r) ? 0 : -EINVAL;
+}
+
 static u32 vgic_v3_get_reg_size(u32 group, u32 offset)
 {
 	switch (group) {
@@ -1021,7 +1243,7 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
 	const struct vgic_io_range *ranges;
 	phys_addr_t offset;
 	struct kvm_vcpu *vcpu;
-	u64 cpuid;
+	u64 cpuid, regid;
 	struct vgic_dist *vgic = &dev->kvm->arch.vgic;
 	struct kvm_exit_mmio mmio;
 	__le64 data;
@@ -1045,6 +1267,14 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
 		mmio.phys_addr = vgic->vgic_redist_base + offset;
 		ranges = vgic_redist_ranges;
 		break;
+	case KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS:
+		/*
+		 * Our register ID is missing size specifier, expected by
+		 * index_to_params()
+		 */
+		regid = (attr->attr & KVM_DEV_ARM_VGIC_SYSREG_MASK) |
+			KVM_REG_SIZE_U64;
+		return vgic_v3_cpu_regs_access(vcpu, regid, reg, is_write);
 	default:
 		return -ENXIO;
 	}
