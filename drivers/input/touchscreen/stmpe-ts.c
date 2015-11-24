@@ -268,27 +268,18 @@ static void stmpe_ts_get_platform_info(struct platform_device *pdev,
 					struct stmpe_touch *ts)
 {
 	struct device_node *np = pdev->dev.of_node;
-	u32 val;
 
 	if (np) {
-		if (!of_property_read_u32(np, "st,sample-time", &val))
-			ts->sample_time = val;
-		if (!of_property_read_u32(np, "st,mod-12b", &val))
-			ts->mod_12b = val;
-		if (!of_property_read_u32(np, "st,ref-sel", &val))
-			ts->ref_sel = val;
-		if (!of_property_read_u32(np, "st,adc-freq", &val))
-			ts->adc_freq = val;
-		if (!of_property_read_u32(np, "st,ave-ctrl", &val))
-			ts->ave_ctrl = val;
-		if (!of_property_read_u32(np, "st,touch-det-delay", &val))
-			ts->touch_det_delay = val;
-		if (!of_property_read_u32(np, "st,settling", &val))
-			ts->settling = val;
-		if (!of_property_read_u32(np, "st,fraction-z", &val))
-			ts->fraction_z = val;
-		if (!of_property_read_u32(np, "st,i-drive", &val))
-			ts->i_drive = val;
+		of_property_read_u32(np, "st,sample-time", &ts->sample_time);
+		of_property_read_u32(np, "st,mod-12b", &ts->mod_12b);
+		of_property_read_u32(np, "st,ref-sel", &ts->ref_sel);
+		of_property_read_u32(np, "st,adc-freq", &ts->adc_freq);
+		of_property_read_u32(np, "st,ave-ctrl", &ts->ave_ctrl);
+		of_property_read_u32(np, "st,touch-det-delay",
+						&ts->touch_det_delay);
+		of_property_read_u32(np, "st,settling", &ts->settling = val);
+		of_property_read_u32(np, "st,fraction-z", &ts->fraction_z);
+		of_property_read_u32(np, "st,i-drive", &ts->i_drive);
 	}
 }
 
