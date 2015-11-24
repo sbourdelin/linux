@@ -1,0 +1,70 @@
+UniPhier System Bus
+-------------------
+
+The UniPhier System Bus is an external bus where on-board devices are connected
+to the UniPhier SoC.  It it a simple parallel bus with address, data, and some
+control signals.  It supports up to 8 banks (chip selects).
+
+Required properties for System Bus:
+- compatible: should be "socionext,uniphier-system-bus", "simple-bus".
+- #address-cells: should be equal to or grater than 2.  The first cell is the
+  bank number (chip select).  The rest is the base address within the bank that
+  should be mapped onto the parent bus (usually AMBA).
+
+Optional properties for System Bus:
+- #size-cells: should be the same as that of the parent bus, if exists.  The
+  value of the parent bus is assumed, if not specified.
+
+
+UniPhier System Bus Controller
+------------------------------
+
+The UniPhier System Bus Controller is a hardware block with registers that
+controls the System Bus accessing; how each bank is mapped onto the parent bus,
+various timing parameters of the bus access, etc.
+
+Required properties for System Bus Controller:
+- compatible: should be "socionext,uniphier-system-bus-controller".
+- reg: offsets and lengths of the register sets for the device.  It should
+  contain 2 regions: base & control register, misc register, in this order.
+
+
+Example
+-------
+	system_bus: system-bus {
+		compatible = "socionext,uniphier-system-bus", "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <1 0x00000000 0x42000000 0x02000000
+			  5 0x00000000 0x48000000 0x01000000>;
+
+		eth: ethernet@1,01f00000 {
+			compatible = "smsc,lan9115";
+			reg = <1 0x01f00000 0x1000>;
+			phy-mode = "mii";
+			reg-io-width = <4>;
+		};
+
+		serial: uart@5,00200000 {
+			compatible = "ns16550a";
+			reg = <5 0x00200000 0x20>;
+			clock-frequency = <12288000>;
+			reg-shift = <1>;
+		};
+	};
+
+	system-bus-controller@58c00000 {
+		compatible = "socionext,uniphier-system-bus-controller";
+		reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
+		system-bus = <&system_bus>;
+	};
+
+In this example, the range 0x00000000-0x02000000 of bank 1 (CS1) is mapped to
+the range 0x42000000-0x44000000 of the parent bus.
+Likewise, the range 0x00000000-0x01000000 of bank 5 (CS5) is mapped to the
+range 0x48000000-0x49000000 of the parent bus.
+
+The Ethernet device is connected at the address 0x01f00000 of CS1, and visible
+at the address 0x43f00000 in the parent bus.  The UART device is connected at
+the address 0x00200000 of CS5, and visible at the address 0x48200000 in the
+parent bus.
