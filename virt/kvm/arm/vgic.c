@@ -2374,7 +2374,7 @@ int vgic_attr_regs_access(struct kvm_vcpu *vcpu,
 	struct kvm_vcpu *tmp_vcpu;
 	struct vgic_dist *vgic;
 
-	r = vgic_find_range(ranges, 4, offset);
+	r = vgic_find_range(ranges, mmio->len, offset);
 
 	if (unlikely(!r || !r->handle_mmio))
 		return -ENXIO;
@@ -2412,7 +2412,7 @@ int vgic_attr_regs_access(struct kvm_vcpu *vcpu,
 		vgic_unqueue_irqs(tmp_vcpu);
 
 	offset -= r->base;
-	r->handle_mmio(vcpu, mmio, offset);
+	call_range_handler(vcpu, mmio, offset, r);
 
 	ret = 0;
 out_vgic_unlock:

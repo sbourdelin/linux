@@ -43,6 +43,7 @@
 #define GICD_IGRPMODR			0x0D00
 #define GICD_NSACR			0x0E00
 #define GICD_IROUTER			0x6000
+#define GICD_IROUTER1019		0x7FD8
 #define GICD_IDREGS			0xFFD0
 #define GICD_PIDR2			0xFFE8
 
