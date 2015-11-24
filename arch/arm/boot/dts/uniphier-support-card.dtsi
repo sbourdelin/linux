@@ -42,7 +42,7 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
-&extbus {
+&system_bus {
 	support_card: support_card {
 		compatible = "simple-bus";
 		#address-cells = <1>;

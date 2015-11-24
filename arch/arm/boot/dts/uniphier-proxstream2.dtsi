@@ -108,7 +108,7 @@
 		ranges;
 		interrupt-parent = <&intc>;
 
-		extbus: extbus {
+		system_bus: system-bus {
 			compatible = "socionext,uniphier-system-bus",
 				     "simple-bus";
 			#address-cells = <2>;
