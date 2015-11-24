@@ -318,6 +318,7 @@ int nvm_register(struct request_queue *q, char *disk_name,
 								"ppalist");
 		if (!dev->ppalist_pool) {
 			pr_err("nvm: could not create ppa pool\n");
+			nvm_free(dev);
 			return -ENOMEM;
 		}
 	}
