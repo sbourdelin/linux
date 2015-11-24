@@ -397,6 +397,7 @@ static int ifx_spi_decode_spi_header(unsigned char *buffer, int *length,
 		*received_cts = 0;
 		return IFX_SPI_HEADER_0;
 	} else if (h1 == 0xffff && h2 == 0xffff) {
+		*received_cts = 0;
 		/* spi_slave_cts remains as it was */
 		return IFX_SPI_HEADER_F;
 	}
