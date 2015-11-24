@@ -65,9 +65,21 @@ static const struct intel_lpss_platform_info spt_info = {
 	.clk_rate = 120000000,
 };
 
+static struct property_entry uart_properties[] = {
+	PROPERTY_ENTRY_U32("reg-io-width", 4),
+	PROPERTY_ENTRY_U32("reg-shift", 2),
+	PROPERTY_ENTRY_U8("snps,uart-16550-compatible", 1),
+	{ },
+};
+
+static struct property_set uart_pset = {
+	.properties = uart_properties,
+};
+
 static const struct intel_lpss_platform_info spt_uart_info = {
 	.clk_rate = 120000000,
 	.clk_con_id = "baudclk",
+	.pset = &uart_pset,
 };
 
 static const struct intel_lpss_platform_info bxt_info = {
@@ -77,6 +89,7 @@ static const struct intel_lpss_platform_info bxt_info = {
 static const struct intel_lpss_platform_info bxt_uart_info = {
 	.clk_rate = 100000000,
 	.clk_con_id = "baudclk",
+	.pset = &uart_pset,
 };
 
 static const struct intel_lpss_platform_info bxt_i2c_info = {
