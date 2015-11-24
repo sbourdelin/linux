@@ -13,6 +13,7 @@ obj-y += clk-simple-gates.o
 obj-y += clk-sun8i-apb0.o
 obj-y += clk-sun8i-mbus.o
 obj-y += clk-sun9i-core.o
+obj-y += clk-sun9i-cpus.o
 obj-y += clk-sun9i-mmc.o
 obj-y += clk-usb.o
 
