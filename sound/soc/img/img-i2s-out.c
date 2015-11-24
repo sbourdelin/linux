@@ -382,8 +382,14 @@ static int img_i2s_out_dai_probe(struct snd_soc_dai *dai)
 	return 0;
 }
 
+static const struct snd_soc_dapm_widget img_i2s_out_widgets[] = {
+	SND_SOC_DAPM_AIF_IN("IMG I2S OUT", "Playback", 0, SND_SOC_NOPM, 0, 0)
+};
+
 static const struct snd_soc_component_driver img_i2s_out_component = {
-	.name = "img-i2s-out"
+	.name = "img-i2s-out",
+	.dapm_widgets = img_i2s_out_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(img_i2s_out_widgets)
 };
 
 static int img_i2s_out_dma_prepare_slave_config(struct snd_pcm_substream *st,
@@ -501,6 +507,7 @@ static int img_i2s_out_probe(struct platform_device *pdev)
 	i2s->dai_driver.playback.channels_max = i2s->max_i2s_chan * 2;
 	i2s->dai_driver.playback.rates = SNDRV_PCM_RATE_8000_192000;
 	i2s->dai_driver.playback.formats = SNDRV_PCM_FMTBIT_S32_LE;
+	i2s->dai_driver.playback.stream_name = "Playback";
 	i2s->dai_driver.ops = &img_i2s_out_dai_ops;
 
 	ret = devm_snd_soc_register_component(&pdev->dev,
