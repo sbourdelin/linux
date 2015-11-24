@@ -571,9 +571,6 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
 
-	if (request->ctx != ring->default_context)
-		intel_lr_context_pin(request);
-
 	i915_gem_request_reference(request);
 
 	spin_lock_irq(&ring->execlist_lock);
@@ -733,9 +730,15 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 	intel_logical_ring_advance(request->ringbuf);
 
 	request->tail = request->ringbuf->tail;
-
 	if (intel_ring_stopped(ring))
 		return;
+
+	if (request->ctx != ring->default_context) {
+		if (!request->ctx->engine[ring->id].unsaved) {
+			intel_lr_context_pin(request);
+			request->ctx->engine[ring->id].unsaved = true;
+		}
+	}
 
 	if (dev_priv->guc.execbuf_client)
 		i915_guc_submit(dev_priv->guc.execbuf_client, request);
@@ -963,12 +966,6 @@ void intel_execlists_retire_requests(struct intel_engine_cs *ring)
 	spin_unlock_irq(&ring->execlist_lock);
 
 	list_for_each_entry_safe(req, tmp, &retired_list, execlist_link) {
-		struct intel_context *ctx = req->ctx;
-		struct drm_i915_gem_object *ctx_obj =
-				ctx->engine[ring->id].state;
-
-		if (ctx_obj && (ctx != ring->default_context))
-			intel_lr_context_unpin(req);
 		list_del(&req->execlist_link);
 		i915_gem_request_unreference(req);
 	}
@@ -1063,19 +1060,39 @@ reset_pin_count:
 	return ret;
 }
 
-void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
+static void intel_lr_context_unpin_no_req(struct intel_engine_cs *ring,
+		struct intel_context *ctx)
 {
-	struct intel_engine_cs *ring = rq->ring;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct intel_ringbuffer *ringbuf = rq->ringbuf;
-
+	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
+	struct intel_ringbuffer *ringbuf = ctx->engine[ring->id].ringbuf;
 	if (ctx_obj) {
 		WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
-		if (--rq->ctx->engine[ring->id].pin_count == 0) {
+		if (--ctx->engine[ring->id].pin_count == 0) {
 			intel_unpin_ringbuffer_obj(ringbuf);
 			i915_gem_object_ggtt_unpin(ctx_obj);
 		}
 	}
+}
+
+void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
+{
+	intel_lr_context_unpin_no_req(rq->ring, rq->ctx);
+}
+
+void intel_lr_context_complete_check(struct drm_i915_gem_request *req)
+{
+	struct intel_engine_cs *ring = req->ring;
+
+	assert_spin_locked(&ring->execlist_lock);
+
+	if (ring->last_context && ring->last_context != req->ctx &&
+			ring->last_context->engine[ring->id].unsaved) {
+		intel_lr_context_unpin_no_req(
+				ring,
+				ring->last_context);
+		ring->last_context->engine[ring->id].unsaved = false;
+	}
+	ring->last_context = req->ctx;
 }
 
 static int intel_logical_ring_workarounds_emit(struct drm_i915_gem_request *req)
@@ -2363,7 +2380,7 @@ void intel_lr_context_free(struct intel_context *ctx)
 {
 	int i;
 
-	for (i = 0; i < I915_NUM_RINGS; i++) {
+	for (i = 0; i < I915_NUM_RINGS; ++i) {
 		struct drm_i915_gem_object *ctx_obj = ctx->engine[i].state;
 
 		if (ctx_obj) {
@@ -2375,7 +2392,20 @@ void intel_lr_context_free(struct intel_context *ctx)
 				intel_unpin_ringbuffer_obj(ringbuf);
 				i915_gem_object_ggtt_unpin(ctx_obj);
 			}
-			WARN_ON(ctx->engine[ring->id].pin_count);
+
+			if (ctx->engine[ring->id].unsaved) {
+				int ret;
+				struct drm_i915_gem_request *req;
+
+				ret = i915_gem_request_alloc(ring,
+					ring->default_context, &req);
+				if (!ret) {
+					i915_add_request(req);
+					i915_wait_request(req);
+				}
+			}
+
+			WARN_ON(ctx->engine[i].pin_count);
 			intel_ringbuffer_free(ringbuf);
 			drm_gem_object_unreference(&ctx_obj->base);
 		}
@@ -2539,5 +2569,12 @@ void intel_lr_context_reset(struct drm_device *dev,
 
 		ringbuf->head = 0;
 		ringbuf->tail = 0;
+
+		if (ctx->engine[ring->id].unsaved) {
+			intel_lr_context_unpin_no_req(
+					ring,
+					ctx);
+			ctx->engine[ring->id].unsaved = false;
+		}
 	}
 }

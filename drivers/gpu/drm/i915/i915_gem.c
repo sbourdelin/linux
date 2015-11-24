@@ -1354,6 +1354,14 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 {
 	trace_i915_gem_request_retire(request);
 
+	if (i915.enable_execlists) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&request->ring->execlist_lock, flags);
+		intel_lr_context_complete_check(request);
+		spin_unlock_irqrestore(&request->ring->execlist_lock, flags);
+	}
+
 	/* We know the GPU must have read the request to have
 	 * sent us the seqno + interrupt, so use the position
 	 * of tail of the request to update the last known position
@@ -1384,7 +1392,6 @@ __i915_gem_request_retire__upto(struct drm_i915_gem_request *req)
 	do {
 		tmp = list_first_entry(&engine->request_list,
 				       typeof(*tmp), list);
-
 		i915_gem_request_retire(tmp);
 	} while (tmp != req);
 
