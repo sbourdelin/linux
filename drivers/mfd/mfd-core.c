@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
+#include <linux/property.h>
 #include <linux/mfd/core.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
@@ -191,6 +192,8 @@ static int mfd_add_device(struct device *parent, int id,
 		if (ret)
 			goto fail_alias;
 	}
+
+	device_add_property_set(&pdev->dev, cell->pset);
 
 	ret = mfd_platform_add_cell(pdev, cell, usage_count);
 	if (ret)
