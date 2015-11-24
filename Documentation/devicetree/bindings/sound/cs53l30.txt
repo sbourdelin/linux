@@ -1,0 +1,21 @@
+CS53L30 audio CODEC
+
+Required properties:
+
+  - compatible : "cirrus,cs53l30"
+
+  - reg : the I2C address of the device
+
+Optional properties:
+
+  - reset-gpios : a GPIO spec for the reset pin.
+
+
+Example:
+
+codec: cs53l30@48 {
+        compatible = "cirrus,cs53l30";
+        reg = <0x48>;
+        reset-gpios = <&gpio 54 0>;
+};
+
