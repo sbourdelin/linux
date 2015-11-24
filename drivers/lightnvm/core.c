@@ -264,7 +264,8 @@ static int nvm_init(struct nvm_dev *dev)
 
 	if (!ret) {
 		pr_info("nvm: no compatible manager found.\n");
-		return 0;
+		ret = -ENODEV;
+		goto err;
 	}
 
 	pr_info("nvm: registered %s [%u/%u/%u/%u/%u/%u]\n",
