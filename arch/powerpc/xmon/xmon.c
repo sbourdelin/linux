@@ -184,6 +184,12 @@ extern void xmon_leave(void);
 #define GETWORD(v)	(((v)[0] << 24) + ((v)[1] << 16) + ((v)[2] << 8) + (v)[3])
 #endif
 
+#if BITS_PER_LONG == 64
+#define GETLONG(v)	(((unsigned long) GETWORD(v)) << 32 | GETWORD(v+4))
+#else
+#define GETLONG(v)	GETWORD(v)
+#endif
+
 static char *help_string = "\
 Commands:\n\
   b	show breakpoints\n\
@@ -2447,14 +2453,15 @@ memdiffs(unsigned char *p1, unsigned char *p2, unsigned nb, unsigned maxpr)
 		printf("Total of %d differences\n", prt);
 }
 
-static unsigned mend;
-static unsigned mask;
+static unsigned long mend;
+static unsigned long mask;
 
 static void
 memlocate(void)
 {
-	unsigned a, n;
-	unsigned char val[4];
+	unsigned long a, n;
+	int size = sizeof(unsigned long);
+	unsigned char val[size];
 
 	last_cmd = "ml";
 	scanhex((void *)&mdest);
@@ -2470,10 +2477,10 @@ memlocate(void)
 		}
 	}
 	n = 0;
-	for (a = mdest; a < mend; a += 4) {
-		if (mread(a, val, 4) == 4
-			&& ((GETWORD(val) ^ mval) & mask) == 0) {
-			printf("%.16x:  %.16x\n", a, GETWORD(val));
+	for (a = mdest; a < mend; a += size) {
+		if (mread(a, val, size) == size
+			&& ((GETLONG(val) ^ mval) & mask) == 0){
+			printf("%.16lx:  %.16lx\n", a, GETLONG(val));
 			if (++n >= 10)
 				break;
 		}
