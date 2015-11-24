@@ -2260,6 +2260,13 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 }
 EXPORT_SYMBOL_GPL(brcmnand_probe);
 
+struct brcmnand_soc *brcmnand_get_socdata(struct platform_device *pdev)
+{
+	struct brcmnand_controller *ctrl = dev_get_drvdata(&pdev->dev);
+
+	return ctrl ? ctrl->soc : NULL;
+}
+
 int brcmnand_remove(struct platform_device *pdev)
 {
 	struct brcmnand_controller *ctrl = dev_get_drvdata(&pdev->dev);

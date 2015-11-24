@@ -65,6 +65,7 @@ static inline void brcmnand_writel(u32 val, void __iomem *addr)
 
 int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc);
 int brcmnand_remove(struct platform_device *pdev);
+struct brcmnand_soc *brcmnand_get_socdata(struct platform_device *pdev);
 
 extern const struct dev_pm_ops brcmnand_pm_ops;
 
