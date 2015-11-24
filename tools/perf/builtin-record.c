@@ -37,6 +37,16 @@
 #include <sched.h>
 #include <sys/mman.h>
 
+static volatile int memory_enabled;
+static volatile int memory_signalled;
+/* The maximum size of one perf_event is 65536*/
+#define MEMORY_SIZE_MIN 65537
+
+struct memory {
+	void *start;
+	u64 head, tail;
+	u64 size;
+};
 
 struct record {
 	struct perf_tool	tool;
@@ -51,16 +61,134 @@ struct record {
 	bool			no_buildid;
 	bool			no_buildid_cache;
 	unsigned long long	samples;
+	struct memory memory;
 };
+
+static int buf_to_file(struct record *rec, void *buf,
+				size_t size, u64 head, u64 tail)
+{
+	size_t written = 0;
+
+	if (head < tail) {
+		if (perf_data_file__write(rec->session->file,
+					buf + head, tail - head) < 0)
+			goto out;
+		written += tail - head;
+	} else if (head > tail) {
+		if (perf_data_file__write(rec->session->file,
+					buf + head, size - head) < 0)
+			goto out;
+		written += size - head;
+
+		if (perf_data_file__write(rec->session->file, buf, tail) < 0)
+			goto out;
+		written += tail;
+	}
+
+	rec->bytes_written += written;
+	return 0;
+out:
+	pr_err("failed to write perf data, error: %m\n");
+	return -1;
+}
+
+static int memory_to_file(struct record *rec)
+{
+	if (buf_to_file(rec, rec->memory.start, rec->memory.size,
+			rec->memory.head, rec->memory.tail) < 0)
+		return -1;
+	rec->memory.head = rec->memory.tail;
+
+	return 0;
+}
+
+static ssize_t perf_memory__write(struct memory *memory, void *buf, size_t size)
+{
+	void *buf_start = buf;
+	size_t left = size, written, delta, skip;
+	union perf_event *event;
+	struct perf_event_header hdr;
+	struct record *rec = container_of(memory, struct record, memory);
+
+	while (left) {
+		skip = 0;
+		written = min(left, memory->size - memory->tail);
+		if (memory->head > memory->tail)
+			delta = memory->head - memory->tail;
+		else
+			delta = memory->size - memory->tail + memory->head;
+		if (delta <= written) {
+			do {
+				if ((memory->head + skip) <= (memory->size -
+						sizeof(struct perf_event_header)))
+					event = (union perf_event *)(memory->start +
+							memory->head + skip);
+				else {
+					size_t hdr_left;
+
+					hdr_left = sizeof(struct perf_event_header) -
+								memory->size + memory->head + skip;
+					memcpy(&hdr, memory->start + memory->head + skip,
+						sizeof(struct perf_event_header) - hdr_left);
+
+					if (hdr_left <= memory->tail)
+						memcpy((void *)&hdr + sizeof(struct perf_event_header) -
+								hdr_left, memory->start, hdr_left);
+					else if (!memory->tail)
+						memcpy((void *)&hdr + sizeof(struct perf_event_header) -
+								hdr_left, buf, hdr_left);
+					else {
+						memcpy((void *)&hdr + sizeof(struct perf_event_header) -
+								hdr_left, memory->start, memory->tail);
+						hdr_left -= memory->tail;
+						memcpy((void *)&hdr + sizeof(struct perf_event_header) -
+								hdr_left, buf, hdr_left);
+					}
+
+					event = (union perf_event *)&hdr;
+					if (rec->session->header.needs_swap)
+						perf_event_header__bswap(&event->header);
+				}
+
+				if (event->header.type != PERF_RECORD_SAMPLE) {
+					if (buf_to_file(rec, memory->start, memory->size,
+						memory->head + skip, (memory->head + skip +
+						event->header.size) % memory->size) < 0)
+						return -1;
+				}
+
+				skip += event->header.size;
+			} while (skip <= written - delta);
+		}
+
+		memcpy(memory->start + memory->tail, buf, written);
+
+		memory->head = (memory->head + skip) % memory->size;
+		memory->tail = (memory->tail + written) % memory->size;
+
+		left -= written;
+		buf  += written;
+	}
+
+	BUG_ON((size_t)(buf - buf_start) != size);
+	return size;
+}
 
 static int record__write(struct record *rec, void *bf, size_t size)
 {
-	if (perf_data_file__write(rec->session->file, bf, size) < 0) {
-		pr_err("failed to write perf data, error: %m\n");
-		return -1;
+	if (rec->memory.size && memory_enabled) {
+		if (perf_memory__write(&rec->memory, bf, size) < 0) {
+			pr_err("failed to write memory data, error: %m\n");
+			return -1;
+		}
+	} else {
+		if (perf_data_file__write(rec->session->file, bf, size) < 0) {
+			pr_err("failed to write perf data, error: %m\n");
+			return -1;
+		}
+		rec->bytes_written += size;
 	}
 
-	rec->bytes_written += size;
 	return 0;
 }
 
@@ -85,6 +213,8 @@ static int record__mmap_read(struct record *rec, int idx)
 
 	if (old == head)
 		return 0;
+
+	memory_enabled = 1;
 
 	rec->samples++;
 
@@ -113,6 +243,7 @@ static int record__mmap_read(struct record *rec, int idx)
 	md->prev = old;
 	perf_evlist__mmap_consume(rec->evlist, idx);
 out:
+	memory_enabled = 0;
 	return rc;
 }
 
@@ -426,8 +557,11 @@ static int record__mmap_read_all(struct record *rec)
 	 * Mark the round finished in case we wrote
 	 * at least one event.
 	 */
-	if (bytes_written != rec->bytes_written)
+	if (bytes_written != rec->bytes_written) {
+		memory_enabled = 1;
 		rc = record__write(rec, &finished_round_event, sizeof(finished_round_event));
+		memory_enabled = 0;
+	}
 
 out:
 	return rc;
@@ -492,7 +626,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	signal(SIGCHLD, sig_handler);
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
-	if (rec->opts.auxtrace_snapshot_mode)
+	if (rec->opts.auxtrace_snapshot_mode || rec->memory.size)
 		signal(SIGUSR2, snapshot_sig_handler);
 	else
 		signal(SIGUSR2, SIG_IGN);
@@ -682,6 +816,14 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 				record__read_auxtrace_snapshot(rec);
 			if (auxtrace_snapshot_err) {
 				pr_err("AUX area tracing snapshot failed\n");
+				err = -1;
+				goto out_child;
+			}
+		}
+
+		if (memory_signalled) {
+			memory_signalled = 0;
+			if (memory_to_file(rec) < 0) {
 				err = -1;
 				goto out_child;
 			}
@@ -1009,6 +1151,12 @@ static struct record record = {
 		.mmap2		= perf_event__process_mmap2,
 		.ordered_events	= true,
 	},
+	.memory = {
+		.start = NULL,
+		.head = 0,
+		.tail = 0,
+		.size = 0,
+	},
 };
 
 const char record_callchain_help[] = CALLCHAIN_RECORD_HELP
@@ -1119,6 +1267,7 @@ struct option __record_options[] = {
 	OPT_STRING(0, "clang-opt", &llvm_param.clang_opt, "clang options",
 		   "options passed to clang when compiling BPF scriptlets"),
 #endif
+	OPT_U64('M', "memory", &record.memory.size, "user space ring buffer memory size (bytes)"),
 	OPT_END()
 };
 
@@ -1220,19 +1369,29 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 		goto out_symbol_exit;
 	}
 
+	if (rec->memory.size) {
+		if (rec->memory.size < MEMORY_SIZE_MIN)
+			rec->memory.size = MEMORY_SIZE_MIN;
+		rec->memory.start = malloc(rec->memory.size);
+	}
+
 	err = __cmd_record(&record, argc, argv);
 out_symbol_exit:
 	perf_evlist__delete(rec->evlist);
 	symbol__exit();
 	auxtrace_record__free(rec->itr);
+	if (rec->memory.size)
+		free(rec->memory.start);
 	return err;
 }
 
 static void snapshot_sig_handler(int sig __maybe_unused)
 {
-	if (!auxtrace_snapshot_enabled)
-		return;
-	auxtrace_snapshot_enabled = 0;
-	auxtrace_snapshot_err = auxtrace_record__snapshot_start(record.itr);
-	auxtrace_record__snapshot_started = 1;
+	if (record.opts.auxtrace_snapshot_mode && auxtrace_snapshot_enabled) {
+		auxtrace_snapshot_enabled = 0;
+		auxtrace_snapshot_err = auxtrace_record__snapshot_start(record.itr);
+		auxtrace_record__snapshot_started = 1;
+	}
+	if (record.memory.size && !memory_signalled)
+		memory_signalled = 1;
 }
