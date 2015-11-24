@@ -9,6 +9,12 @@
 #include <net/addrconf.h>
 #endif
 
+enum udp_tunnel_type {
+	UDP_TUNNEL_UNSPEC,
+	UDP_TUNNEL_VXLAN,
+	UDP_TUNNEL_GENEVE,
+};
+
 struct udp_port_cfg {
 	u8			family;
 

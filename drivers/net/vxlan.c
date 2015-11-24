@@ -628,9 +628,10 @@ static void vxlan_notify_add_rx_port(struct vxlan_sock *vs)
 
 	rcu_read_lock();
 	for_each_netdev_rcu(net, dev) {
-		if (dev->netdev_ops->ndo_add_vxlan_port)
-			dev->netdev_ops->ndo_add_vxlan_port(dev, sa_family,
-							    port);
+		if (dev->netdev_ops->ndo_add_udp_tunnel_port)
+			dev->netdev_ops->ndo_add_udp_tunnel_port(dev, sa_family,
+							      port,
+							      UDP_TUNNEL_VXLAN);
 	}
 	rcu_read_unlock();
 }
@@ -646,9 +647,10 @@ static void vxlan_notify_del_rx_port(struct vxlan_sock *vs)
 
 	rcu_read_lock();
 	for_each_netdev_rcu(net, dev) {
-		if (dev->netdev_ops->ndo_del_vxlan_port)
-			dev->netdev_ops->ndo_del_vxlan_port(dev, sa_family,
-							    port);
+		if (dev->netdev_ops->ndo_del_udp_tunnel_port)
+			dev->netdev_ops->ndo_del_udp_tunnel_port(dev, sa_family,
+							      port,
+							      UDP_TUNNEL_VXLAN);
 	}
 	rcu_read_unlock();
 
@@ -2422,9 +2424,9 @@ static struct device_type vxlan_type = {
 	.name = "vxlan",
 };
 
-/* Calls the ndo_add_vxlan_port of the caller in order to
+/* Calls the ndo_add_udp_tunnel_port of the caller in order to
  * supply the listening VXLAN udp ports. Callers are expected
- * to implement the ndo_add_vxlan_port.
+ * to implement the ndo_add_tunnel_port.
  */
 void vxlan_get_rx_port(struct net_device *dev)
 {
@@ -2440,8 +2442,9 @@ void vxlan_get_rx_port(struct net_device *dev)
 		hlist_for_each_entry_rcu(vs, &vn->sock_list[i], hlist) {
 			port = inet_sk(vs->sock->sk)->inet_sport;
 			sa_family = vxlan_get_sk_family(vs);
-			dev->netdev_ops->ndo_add_vxlan_port(dev, sa_family,
-							    port);
+			dev->netdev_ops->ndo_add_udp_tunnel_port(dev, sa_family,
+							      port,
+							      UDP_TUNNEL_VXLAN);
 		}
 	}
 	spin_unlock(&vn->sock_lock);

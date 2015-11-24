@@ -40,6 +40,7 @@
 #if defined(CONFIG_VXLAN) || defined(CONFIG_VXLAN_MODULE)
 #include <net/vxlan.h>
 #endif
+#include <net/udp_tunnel.h>
 #ifdef CONFIG_NET_RX_BUSY_POLL
 #include <net/busy_poll.h>
 #endif
@@ -5423,7 +5424,7 @@ static void bnxt_cfg_ntp_filters(struct bnxt *bp)
 #endif /* CONFIG_RFS_ACCEL */
 
 static void bnxt_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				__be16 port)
+				__be16 port, u32 type)
 {
 	struct bnxt *bp = netdev_priv(dev);
 
@@ -5431,6 +5432,9 @@ static void bnxt_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
 		return;
 
 	if (sa_family != AF_INET6 && sa_family != AF_INET)
+		return;
+
+	if (type != UDP_TUNNEL_VXLAN)
 		return;
 
 	if (bp->vxlan_port_cnt && bp->vxlan_port != port)
@@ -5445,7 +5449,7 @@ static void bnxt_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
 }
 
 static void bnxt_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				__be16 port)
+				__be16 port, u32 type)
 {
 	struct bnxt *bp = netdev_priv(dev);
 
@@ -5455,6 +5459,8 @@ static void bnxt_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
 	if (sa_family != AF_INET6 && sa_family != AF_INET)
 		return;
 
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 	if (bp->vxlan_port_cnt && bp->vxlan_port == port) {
 		bp->vxlan_port_cnt--;
 
@@ -5493,8 +5499,8 @@ static const struct net_device_ops bnxt_netdev_ops = {
 #ifdef CONFIG_RFS_ACCEL
 	.ndo_rx_flow_steer	= bnxt_rx_flow_steer,
 #endif
-	.ndo_add_vxlan_port	= bnxt_add_vxlan_port,
-	.ndo_del_vxlan_port	= bnxt_del_vxlan_port,
+	.ndo_add_udp_tunnel_port	= bnxt_add_vxlan_port,
+	.ndo_del_udp_tunnel_port	= bnxt_del_vxlan_port,
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	.ndo_busy_poll		= bnxt_busy_poll,
 #endif

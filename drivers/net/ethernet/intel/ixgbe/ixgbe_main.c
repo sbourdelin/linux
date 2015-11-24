@@ -50,6 +50,7 @@
 #include <linux/if_bridge.h>
 #include <linux/prefetch.h>
 #include <scsi/fc/fc_fcoe.h>
+#include <net/udp_tunnel.h>
 #include <net/vxlan.h>
 
 #ifdef CONFIG_OF
@@ -8088,13 +8089,17 @@ static int ixgbe_set_features(struct net_device *netdev,
  * @dev: The port's netdev
  * @sa_family: Socket Family that VXLAN is notifiying us about
  * @port: New UDP port number that VXLAN started listening to
+ * @type: Tunnel type
  **/
 static void ixgbe_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				 __be16 port)
+				 __be16 port, u32 type)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 	struct ixgbe_hw *hw = &adapter->hw;
 	u16 new_port = ntohs(port);
+
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 
 	if (!(adapter->flags & IXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
 		return;
@@ -8121,12 +8126,16 @@ static void ixgbe_add_vxlan_port(struct net_device *dev, sa_family_t sa_family,
  * @dev: The port's netdev
  * @sa_family: Socket Family that VXLAN is notifying us about
  * @port: UDP port number that VXLAN stopped listening to
+ * @type: Tunnel type
  **/
 static void ixgbe_del_vxlan_port(struct net_device *dev, sa_family_t sa_family,
-				 __be16 port)
+				 __be16 port, u32 type)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 	u16 new_port = ntohs(port);
+
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 
 	if (!(adapter->flags & IXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
 		return;
@@ -8436,8 +8445,8 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_dfwd_add_station	= ixgbe_fwd_add,
 	.ndo_dfwd_del_station	= ixgbe_fwd_del,
 #ifdef CONFIG_IXGBE_VXLAN
-	.ndo_add_vxlan_port	= ixgbe_add_vxlan_port,
-	.ndo_del_vxlan_port	= ixgbe_del_vxlan_port,
+	.ndo_add_udp_tunnel_port	= ixgbe_add_vxlan_port,
+	.ndo_del_udp_tunnel_port	= ixgbe_del_vxlan_port,
 #endif /* CONFIG_IXGBE_VXLAN */
 	.ndo_features_check	= ixgbe_features_check,
 };

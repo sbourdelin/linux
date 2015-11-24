@@ -30,6 +30,7 @@
 #ifdef CONFIG_I40E_VXLAN
 #include <net/vxlan.h>
 #endif
+#include <net/udp_tunnel.h>
 
 const char i40e_driver_name[] = "i40e";
 static const char i40e_driver_string[] =
@@ -8296,19 +8297,27 @@ static u8 i40e_get_vxlan_port_idx(struct i40e_pf *pf, __be16 port)
 }
 
 /**
- * i40e_add_vxlan_port - Get notifications about VXLAN ports that come up
+ * i40e_add_tunnel_port - Get notifications about UDP tunnel ports that come up
  * @netdev: This physical port's netdev
- * @sa_family: Socket Family that VXLAN is notifying us about
- * @port: New UDP port number that VXLAN started listening to
+ * @sa_family: Socket Family that tunnel netdev is  associated with
+ * @port: New UDP port number that tunnel started listening to
+ * @type: Tunnel Type
+ *
+ * This function modifies a common data structure for all udp_tunnels
+ * hence it is expected that it is called under a common lock.
  **/
-static void i40e_add_vxlan_port(struct net_device *netdev,
-				sa_family_t sa_family, __be16 port)
+static void i40e_add_tunnel_port(struct net_device *netdev,
+				 sa_family_t sa_family, __be16 port,
+				 u32 type)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
 	struct i40e_pf *pf = vsi->back;
 	u8 next_idx;
 	u8 idx;
+
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 
 	if (sa_family == AF_INET6)
 		return;
@@ -8338,18 +8347,26 @@ static void i40e_add_vxlan_port(struct net_device *netdev,
 }
 
 /**
- * i40e_del_vxlan_port - Get notifications about VXLAN ports that go away
+ * i40e_del_tunnel_port - Get notifications about UDP tunnel ports that go away
  * @netdev: This physical port's netdev
- * @sa_family: Socket Family that VXLAN is notifying us about
- * @port: UDP port number that VXLAN stopped listening to
+ * @sa_family: Socket Family that tunnel netdev is associated with
+ * @port: UDP port number that tunnel stopped listening to
+ * @type: Tunnel Type
+ *
+ * This function modifies a common data structure for all udp_tunnels
+ * hence it is expected that it is called under common lock.
  **/
-static void i40e_del_vxlan_port(struct net_device *netdev,
-				sa_family_t sa_family, __be16 port)
+static void i40e_del_tunnel_port(struct net_device *netdev,
+				 sa_family_t sa_family, __be16 port,
+				 u32 type)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
 	struct i40e_pf *pf = vsi->back;
 	u8 idx;
+
+	if (type != UDP_TUNNEL_VXLAN)
+		return;
 
 	if (sa_family == AF_INET6)
 		return;
@@ -8596,8 +8613,8 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_set_vf_link_state	= i40e_ndo_set_vf_link_state,
 	.ndo_set_vf_spoofchk	= i40e_ndo_set_vf_spoofchk,
 #ifdef CONFIG_I40E_VXLAN
-	.ndo_add_vxlan_port	= i40e_add_vxlan_port,
-	.ndo_del_vxlan_port	= i40e_del_vxlan_port,
+	.ndo_add_udp_tunnel_port	= i40e_add_tunnel_port,
+	.ndo_del_udp_tunnel_port	= i40e_del_tunnel_port,
 #endif
 	.ndo_get_phys_port_id	= i40e_get_phys_port_id,
 	.ndo_fdb_add		= i40e_ndo_fdb_add,
