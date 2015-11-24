@@ -296,6 +296,11 @@ int nvm_register(struct request_queue *q, char *disk_name,
 	if (!ops->identity)
 		return -EINVAL;
 
+	if (ops->max_phys_sect > 256) {
+		pr_info("nvm: max sectors supported is 256.\n");
+		return -EINVAL;
+	}
+
 	dev = kzalloc(sizeof(struct nvm_dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
@@ -319,9 +324,6 @@ int nvm_register(struct request_queue *q, char *disk_name,
 			pr_err("nvm: could not create ppa pool\n");
 			return -ENOMEM;
 		}
-	} else if (dev->ops->max_phys_sect > 256) {
-		pr_info("nvm: max sectors supported is 256.\n");
-		return -EINVAL;
 	}
 
 	return 0;
