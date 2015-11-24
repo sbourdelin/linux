@@ -1,6 +1,7 @@
 /*
  *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
  *
+ *  Copyright (c) 2015, The Linux Foundation. All rights reserved.
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2002       Dominik Brodowski <devel@brodo.de>
@@ -47,6 +48,14 @@ ACPI_MODULE_NAME("pci_link");
 #define ACPI_PCI_LINK_FILE_STATUS	"state"
 #define ACPI_PCI_LINK_MAX_POSSIBLE	16
 
+/*
+ * 1020 is the maximum interrupt ID that can be assigned to
+ * an ARM SPI interrupt according to ARM architecture.
+ */
+#define ACPI_MAX_IRQS		1020
+#define ACPI_MAX_ISA_IRQ	16
+
+
 static int acpi_pci_link_add(struct acpi_device *device,
 			     const struct acpi_device_id *not_used);
 static void acpi_pci_link_remove(struct acpi_device *device);
@@ -67,12 +76,12 @@ static struct acpi_scan_handler pci_link_handler = {
  * later even the link is disable. Instead, we just repick the active irq
  */
 struct acpi_pci_link_irq {
-	u8 active;		/* Current IRQ */
+	u32 active;		/* Current IRQ */
 	u8 triggering;		/* All IRQs */
 	u8 polarity;		/* All IRQs */
 	u8 resource_type;
 	u8 possible_count;
-	u8 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+	u32 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
 	u8 initialized:1;
 	u8 reserved:7;
 };
@@ -145,6 +154,12 @@ static acpi_status acpi_pci_link_check_possible(struct acpi_resource *resource,
 					printk(KERN_WARNING PREFIX
 					       "Invalid _PRS IRQ %d\n",
 					       p->interrupts[i]);
+					continue;
+				}
+				if (p->interrupts[i] > ACPI_MAX_IRQS) {
+					pr_warn("IRQ %d exceeds max (%d)\n",
+						p->interrupts[i],
+						ACPI_MAX_IRQS);
 					continue;
 				}
 				link->irq.possible[i] = p->interrupts[i];
@@ -279,6 +294,11 @@ static int acpi_pci_link_get_current(struct acpi_pci_link *link)
 		result = -ENODEV;
 	}
 
+	if (irq > ACPI_MAX_IRQS) {
+		pr_err("IRQ %d number exceed max IRQ (%d)\n", irq,
+			ACPI_MAX_IRQS);
+		result = -ENODEV;
+	}
 	link->irq.active = irq;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link at IRQ %d \n", link->irq.active));
@@ -436,9 +456,6 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
  * with a pin dedicated to each device.  Or for that matter, an MSI
  * enabled system.
  */
-
-#define ACPI_MAX_IRQS		256
-#define ACPI_MAX_ISA_IRQ	16
 
 #define PIRQ_PENALTY_PCI_AVAILABLE	(0)
 #define PIRQ_PENALTY_PCI_POSSIBLE	(16*16)
