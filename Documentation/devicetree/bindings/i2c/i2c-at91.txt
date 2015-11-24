@@ -17,6 +17,9 @@ Optional properties:
 - dma-names: should contain "tx" and "rx".
 - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
   capable I2C controllers.
+- atmel,twd-hold-cycles: number of cycles for TWD hold time whose value is
+  determinated by (atmel,twd-hold-cycles + 3) x t_peripheral_clock,
+  maximum value is 0x1f.
 - Child nodes conforming to i2c bus binding
 
 Examples :
@@ -29,6 +32,7 @@ i2c0: i2c@fff84000 {
 	#size-cells = <0>;
 	clocks = <&twi0_clk>;
 	clock-frequency = <400000>;
+	atmel,twd-hold-cycles = <2>;
 
 	24c512@50 {
 		compatible = "24c512";
