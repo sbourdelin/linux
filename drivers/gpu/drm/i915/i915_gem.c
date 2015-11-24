@@ -3552,6 +3552,7 @@ i915_gem_clflush_object(struct drm_i915_gem_object *obj,
 	trace_i915_gem_object_clflush(obj);
 	drm_clflush_sg(obj->pages);
 	obj->cache_dirty = false;
+	obj->cache_clean = true;
 
 	return true;
 }
@@ -3982,7 +3983,13 @@ i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, bool write)
 
 	/* Flush the CPU cache if it's still invalid. */
 	if ((obj->base.read_domains & I915_GEM_DOMAIN_CPU) == 0) {
-		i915_gem_clflush_object(obj, false);
+		/* Invalidation not needed as there should not be any data in
+		 * CPU cache lines for this object, since clflush would have
+		 * happened when the object last moved out of CPU write domain.
+		 */
+		if (!obj->cache_clean)
+			i915_gem_clflush_object(obj, false);
+		obj->cache_clean = false;
 
 		obj->base.read_domains |= I915_GEM_DOMAIN_CPU;
 	}

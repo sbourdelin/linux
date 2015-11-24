@@ -2099,6 +2099,7 @@ struct drm_i915_gem_object {
 	unsigned long gt_ro:1;
 	unsigned int cache_level:3;
 	unsigned int cache_dirty:1;
+	unsigned int cache_clean:1;
 
 	unsigned int frontbuffer_bits:INTEL_FRONTBUFFER_BITS;
 
