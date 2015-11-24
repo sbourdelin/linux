@@ -29,6 +29,7 @@
 #include <linux/of_platform.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
+#include <linux/vfio.h>
 
 #include <linux/irqchip.h>
 #include <linux/irqchip/arm-gic-v3.h>
@@ -1257,8 +1258,38 @@ out:
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_VFIO)
+
+static int its_vfio_map(struct irq_domain *domain,
+			const struct vfio_iommu_driver_ops *ops,
+			void *iommu_data)
+{
+	struct msi_domain_info *msi_info = msi_get_domain_info(domain);
+	struct its_node *its = msi_info->data;
+	u64 addr = its->phys_base + GIC_V3_ITS_CONTROL_SIZE;
+
+	return ops->map(iommu_data, addr, addr, 1, IOMMU_READ|IOMMU_WRITE);
+}
+
+static void its_vfio_unmap(struct irq_domain *domain,
+			   const struct vfio_iommu_driver_ops *ops,
+			   void *iommu_data)
+{
+	struct msi_domain_info *msi_info = msi_get_domain_info(domain);
+	struct its_node *its = msi_info->data;
+	u64 addr = its->phys_base + GIC_V3_ITS_CONTROL_SIZE;
+
+	ops->unmap(iommu_data, addr, 1);
+}
+
+#endif
+
 static struct msi_domain_ops its_msi_domain_ops = {
 	.msi_prepare	= its_msi_prepare,
+#if IS_ENABLED(CONFIG_VFIO)
+	.vfio_map	= its_vfio_map,
+	.vfio_unmap	= its_vfio_unmap,
+#endif
 };
 
 static int its_irq_gic_domain_alloc(struct irq_domain *domain,

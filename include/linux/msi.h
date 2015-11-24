@@ -155,6 +155,8 @@ void arch_restore_msi_irqs(struct pci_dev *dev);
 void default_teardown_msi_irqs(struct pci_dev *dev);
 void default_restore_msi_irqs(struct pci_dev *dev);
 
+struct vfio_iommu_driver_ops;
+
 struct msi_controller {
 	struct module *owner;
 	struct device *dev;
@@ -189,6 +191,8 @@ struct msi_domain_info;
  * @msi_finish:		Optional callbacl to finalize the allocation
  * @set_desc:		Set the msi descriptor for an interrupt
  * @handle_error:	Optional error handler if the allocation fails
+ * @vfio_map:		Map the MSI hardware for VFIO
+ * @vfio_unmap:		Unmap the MSI hardware for VFIO
  *
  * @get_hwirq, @msi_init and @msi_free are callbacks used by
  * msi_create_irq_domain() and related interfaces
@@ -218,6 +222,14 @@ struct msi_domain_ops {
 				    struct msi_desc *desc);
 	int		(*handle_error)(struct irq_domain *domain,
 					struct msi_desc *desc, int error);
+#if IS_ENABLED(CONFIG_VFIO)
+	int		(*vfio_map)(struct irq_domain *domain,
+				    const struct vfio_iommu_driver_ops *ops,
+				    void *iommu_data);
+	void		(*vfio_unmap)(struct irq_domain *domain,
+				      const struct vfio_iommu_driver_ops *ops,
+				      void *iommu_data);
+#endif
 };
 
 /**

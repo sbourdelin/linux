@@ -240,6 +240,8 @@
 #define GITS_BASER_TYPE_RESERVED6	6
 #define GITS_BASER_TYPE_RESERVED7	7
 
+#define GIC_V3_ITS_CONTROL_SIZE		0x10000
+
 /*
  * ITS commands
  */
