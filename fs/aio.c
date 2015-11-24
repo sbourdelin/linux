@@ -1065,6 +1065,9 @@ static void aio_complete(struct kiocb *kiocb, long res, long res2)
 	unsigned tail, pos, head;
 	unsigned long	flags;
 
+	if (kiocb->ki_flags & IOCB_WRITE)
+		file_end_write(kiocb->ki_filp);
+
 	/*
 	 * Special case handling for sync iocbs:
 	 *  - events go directly into the iocb for fast handling
@@ -1449,13 +1452,14 @@ rw_common:
 
 		len = ret;
 
-		if (rw == WRITE)
+		/* We drop freeze protection in aio_complete() */
+		if (rw == WRITE) {
 			file_start_write(file);
+			req->ki_flags |= IOCB_WRITE;
+		}
 
 		ret = iter_op(req, &iter);
 
-		if (rw == WRITE)
-			file_end_write(file);
 		kfree(iovec);
 		break;
 
