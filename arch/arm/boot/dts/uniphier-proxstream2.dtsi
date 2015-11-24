@@ -109,7 +109,8 @@
 		interrupt-parent = <&intc>;
 
 		extbus: extbus {
-			compatible = "simple-bus";
+			compatible = "socionext,uniphier-system-bus",
+				     "simple-bus";
 			#address-cells = <2>;
 			#size-cells = <1>;
 		};
