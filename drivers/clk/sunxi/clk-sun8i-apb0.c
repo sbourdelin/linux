@@ -17,7 +17,50 @@
 #include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
+
+static void sun8i_a23_apb0_setup(struct device_node *node)
+{
+	const char *clk_name = node->name;
+	const char *clk_parent;
+	void __iomem *reg;
+	struct resource res;
+	struct clk *clk;
+	int ret;
+
+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+	if (IS_ERR(reg))
+		return;
+
+	clk_parent = of_clk_get_parent_name(node, 0);
+	if (!clk_parent)
+		goto err_unmap;
+
+	of_property_read_string(node, "clock-output-names", &clk_name);
+
+	/* The A23 APB0 clock is a standard 2 bit wide divider clock */
+	clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
+				   0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+	if (IS_ERR(clk))
+		goto err_unmap;
+
+	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+	if (ret)
+		goto err_unregister;
+
+	return;
+
+err_unregister:
+	clk_unregister_divider(clk);
+
+err_unmap:
+	iounmap(reg);
+	of_address_to_resource(node, 0, &res);
+	release_mem_region(res.start, resource_size(&res));
+}
+CLK_OF_DECLARE(sun8i_a23_apb0, "allwinner,sun8i-a23-apb0-clk",
+	       sun8i_a23_apb0_setup);
 
 static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
 {
