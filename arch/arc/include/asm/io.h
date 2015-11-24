@@ -17,6 +17,8 @@ extern void __iomem *ioremap(unsigned long physaddr, unsigned long size);
 extern void __iomem *ioremap_prot(phys_addr_t offset, unsigned long size,
 				  unsigned long flags);
 extern void iounmap(const void __iomem *addr);
+extern void __iomem *ioport_map(unsigned long port, unsigned int size);
+extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
 
 #define ioremap_nocache(phy, sz)	ioremap(phy, sz)
 #define ioremap_wc(phy, sz)		ioremap(phy, sz)

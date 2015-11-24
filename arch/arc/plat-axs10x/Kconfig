@@ -8,6 +8,7 @@
 
 menuconfig ARC_PLAT_AXS10X
 	bool "Synopsys ARC AXS10x Software Development Platforms"
+	select MIGHT_HAVE_PCI
 	select DW_APB_ICTL
 	select GPIO_DWAPB
 	select OF_GPIO
