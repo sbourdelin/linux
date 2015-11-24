@@ -4195,7 +4195,7 @@ F:	include/linux/netfilter_bridge/
 F:	net/bridge/
 
 ETHERNET PHY LIBRARY
-M:	Florian Fainelli <f.fainelli@gmail.com>
+R:	Florian Fainelli <f.fainelli@gmail.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	include/linux/phy.h
