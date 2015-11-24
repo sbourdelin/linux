@@ -558,6 +558,33 @@ unwind:
 	return ret;
 }
 
+static int vfio_iommu_type1_map(void *iommu_data, dma_addr_t iova,
+			      phys_addr_t paddr, long npage, int prot)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	int ret;
+
+	mutex_lock(&iommu->lock);
+	ret = vfio_iommu_map(iommu, iova, paddr >> PAGE_SHIFT, npage, prot);
+	mutex_unlock(&iommu->lock);
+
+	return ret;
+}
+
+static void vfio_iommu_type1_unmap(void *iommu_data, dma_addr_t iova,
+				   long npage)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	struct vfio_domain *d;
+
+	mutex_lock(&iommu->lock);
+
+	list_for_each_entry_reverse(d, &iommu->domain_list, next)
+		iommu_unmap(d->domain, iova, npage << PAGE_SHIFT);
+
+	mutex_unlock(&iommu->lock);
+}
+
 static int vfio_dma_do_map(struct vfio_iommu *iommu,
 			   struct vfio_iommu_type1_dma_map *map)
 {
@@ -1046,6 +1073,8 @@ static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
 	.ioctl		= vfio_iommu_type1_ioctl,
 	.attach_group	= vfio_iommu_type1_attach_group,
 	.detach_group	= vfio_iommu_type1_detach_group,
+	.map		= vfio_iommu_type1_map,
+	.unmap		= vfio_iommu_type1_unmap,
 };
 
 static int __init vfio_iommu_type1_init(void)
