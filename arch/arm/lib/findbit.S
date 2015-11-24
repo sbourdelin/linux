@@ -19,7 +19,7 @@
 
 /*
  * Purpose  : Find a 'zero' bit
- * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
+ * Prototype: unsigned long find_first_zero_bit(void *addr, unsigned int maxbit);
  */
 ENTRY(_find_first_zero_bit_le)
 		teq	r1, #0	
@@ -40,7 +40,7 @@ ENDPROC(_find_first_zero_bit_le)
 
 /*
  * Purpose  : Find next 'zero' bit
- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
+ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
  */
 ENTRY(_find_next_zero_bit_le)
 		teq	r1, #0
@@ -60,7 +60,7 @@ ENDPROC(_find_next_zero_bit_le)
 
 /*
  * Purpose  : Find a 'one' bit
- * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
+ * Prototype: unsigned long find_first_bit(const unsigned long *addr, unsigned int maxbit);
  */
 ENTRY(_find_first_bit_le)
 		teq	r1, #0	
@@ -81,7 +81,7 @@ ENDPROC(_find_first_bit_le)
 
 /*
  * Purpose  : Find next 'one' bit
- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
+ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
  */
 ENTRY(_find_next_bit_le)
 		teq	r1, #0

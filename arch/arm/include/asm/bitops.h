@@ -159,18 +159,18 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
  */
-extern int _find_first_zero_bit_le(const void * p, unsigned size);
-extern int _find_next_zero_bit_le(const void * p, int size, int offset);
-extern int _find_first_bit_le(const unsigned long *p, unsigned size);
-extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+extern unsigned long _find_first_zero_bit_le(const void *p, unsigned size);
+extern unsigned long _find_next_zero_bit_le(const void *p, int size, int offset);
+extern unsigned long _find_first_bit_le(const unsigned long *p, unsigned size);
+extern unsigned long _find_next_bit_le(const unsigned long *p, int size, int offset);
 
 /*
  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
  */
-extern int _find_first_zero_bit_be(const void * p, unsigned size);
-extern int _find_next_zero_bit_be(const void * p, int size, int offset);
-extern int _find_first_bit_be(const unsigned long *p, unsigned size);
-extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+extern unsigned long _find_first_zero_bit_be(const void *p, unsigned size);
+extern unsigned long _find_next_zero_bit_be(const void *p, int size, int offset);
+extern unsigned long _find_first_bit_be(const unsigned long *p, unsigned size);
+extern unsigned long _find_next_bit_be(const unsigned long *p, int size, int offset);
 
 #ifndef CONFIG_SMP
 /*
@@ -317,19 +317,19 @@ static inline unsigned long __ffs(unsigned long x)
 
 #ifdef __ARMEB__
 
-static inline int find_first_zero_bit_le(const void *p, unsigned size)
+static inline unsigned long find_first_zero_bit_le(const void *p, unsigned size)
 {
 	return _find_first_zero_bit_le(p, size);
 }
 #define find_first_zero_bit_le find_first_zero_bit_le
 
-static inline int find_next_zero_bit_le(const void *p, int size, int offset)
+static inline unsigned long find_next_zero_bit_le(const void *p, int size, int offset)
 {
 	return _find_next_zero_bit_le(p, size, offset);
 }
 #define find_next_zero_bit_le find_next_zero_bit_le
 
-static inline int find_next_bit_le(const void *p, int size, int offset)
+static inline unsigned long find_next_bit_le(const void *p, int size, int offset)
 {
 	return _find_next_bit_le(p, size, offset);
 }
