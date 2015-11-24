@@ -259,12 +259,19 @@ static int vfio_msi_enable(struct vfio_pci_device *vdev, int nvec, bool msix)
 	if (!vdev->ctx)
 		return -ENOMEM;
 
+	ret = vfio_device_map_msi(&pdev->dev);
+	if (ret) {
+		kfree(vdev->ctx);
+		return ret;
+	}
+
 	if (msix) {
 		int i;
 
 		vdev->msix = kzalloc(nvec * sizeof(struct msix_entry),
 				     GFP_KERNEL);
 		if (!vdev->msix) {
+			vfio_device_unmap_msi(&pdev->dev);
 			kfree(vdev->ctx);
 			return -ENOMEM;
 		}
@@ -277,6 +284,7 @@ static int vfio_msi_enable(struct vfio_pci_device *vdev, int nvec, bool msix)
 			if (ret > 0)
 				pci_disable_msix(pdev);
 			kfree(vdev->msix);
+			vfio_device_unmap_msi(&pdev->dev);
 			kfree(vdev->ctx);
 			return ret;
 		}
@@ -285,6 +293,7 @@ static int vfio_msi_enable(struct vfio_pci_device *vdev, int nvec, bool msix)
 		if (ret < nvec) {
 			if (ret > 0)
 				pci_disable_msi(pdev);
+			vfio_device_unmap_msi(&pdev->dev);
 			kfree(vdev->ctx);
 			return ret;
 		}
@@ -412,6 +421,8 @@ static void vfio_msi_disable(struct vfio_pci_device *vdev, bool msix)
 		kfree(vdev->msix);
 	} else
 		pci_disable_msi(pdev);
+
+	vfio_device_unmap_msi(&pdev->dev);
 
 	vdev->irq_type = VFIO_PCI_NUM_IRQS;
 	vdev->num_ctx = 0;
