@@ -21,9 +21,11 @@
 #include <linux/fs.h>
 #include <linux/idr.h>
 #include <linux/iommu.h>
+#include <linux/irqdomain.h>
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
+#include <linux/msi.h>
 #include <linux/mutex.h>
 #include <linux/pci.h>
 #include <linux/rwsem.h>
@@ -63,6 +65,8 @@ struct vfio_container {
 	struct vfio_iommu_driver	*iommu_driver;
 	void				*iommu_data;
 	bool				noiommu;
+	struct list_head		msi_list;
+	struct mutex			msi_lock;
 };
 
 struct vfio_unbound_dev {
@@ -95,6 +99,13 @@ struct vfio_device {
 	struct vfio_group		*group;
 	struct list_head		group_next;
 	void				*device_data;
+};
+
+struct vfio_msi {
+	struct kref			kref;
+	struct list_head		msi_next;
+	struct vfio_container		*container;
+	struct irq_domain		*domain;
 };
 
 #ifdef CONFIG_VFIO_NOIOMMU
@@ -882,6 +893,105 @@ void *vfio_device_data(struct vfio_device *device)
 }
 EXPORT_SYMBOL_GPL(vfio_device_data);
 
+int vfio_device_map_msi(struct device *dev)
+{
+	struct irq_domain *msi_domain = dev_get_msi_domain(dev);
+	struct msi_domain_info *info;
+	struct vfio_device *device;
+	struct vfio_container *container;
+	struct vfio_msi *vmsi;
+	int ret;
+
+	if (!msi_domain)
+		return 0;
+	info = msi_domain->host_data;
+	if (!info->ops->vfio_map)
+		return 0;
+
+	device = dev_get_drvdata(dev);
+	container = device->group->container;
+
+	if (!container->iommu_driver->ops->map)
+		return -EINVAL;
+
+	mutex_lock(&container->msi_lock);
+
+	list_for_each_entry(vmsi, &container->msi_list, msi_next) {
+		if (vmsi->domain == msi_domain) {
+			kref_get(&vmsi->kref);
+			mutex_unlock(&container->msi_lock);
+			return 0;
+		}
+	}
+
+	vmsi = kmalloc(sizeof(*vmsi), GFP_KERNEL);
+	if (!vmsi) {
+		mutex_unlock(&container->msi_lock);
+		return -ENOMEM;
+	}
+
+	ret = info->ops->vfio_map(msi_domain, container->iommu_driver->ops,
+				  container->iommu_data);
+	if (ret) {
+		mutex_unlock(&container->msi_lock);
+		kfree(vmsi);
+		return ret;
+	}
+
+	kref_init(&vmsi->kref);
+	vmsi->container = container;
+	vmsi->domain = msi_domain;
+	list_add(&vmsi->msi_next, &container->msi_list);
+
+	mutex_unlock(&container->msi_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL(vfio_device_map_msi);
+
+static void msi_release(struct kref *kref)
+{
+	struct vfio_msi *vmsi = container_of(kref, struct vfio_msi, kref);
+	struct vfio_container *container = vmsi->container;
+	struct msi_domain_info *info = vmsi->domain->host_data;
+
+	info->ops->vfio_unmap(vmsi->domain, container->iommu_driver->ops,
+			      container->iommu_data);
+
+	list_del(&vmsi->msi_next);
+	kfree(vmsi);
+}
+
+void vfio_device_unmap_msi(struct device *dev)
+{
+	struct irq_domain *msi_domain = dev_get_msi_domain(dev);
+	struct msi_domain_info *info;
+	struct vfio_device *device;
+	struct vfio_container *container;
+	struct vfio_msi *vmsi;
+
+	if (!msi_domain)
+		return;
+	info = msi_domain->host_data;
+	if (!info->ops->vfio_unmap)
+		return;
+
+	device = dev_get_drvdata(dev);
+	container = device->group->container;
+
+	mutex_lock(&container->msi_lock);
+
+	list_for_each_entry(vmsi, &container->msi_list, msi_next) {
+		if (vmsi->domain == msi_domain) {
+			kref_put(&vmsi->kref, msi_release);
+			break;
+		}
+	}
+
+	mutex_unlock(&container->msi_lock);
+}
+EXPORT_SYMBOL(vfio_device_unmap_msi);
+
 /* Given a referenced group, check if it contains the device */
 static bool vfio_dev_present(struct vfio_group *group, struct device *dev)
 {
@@ -1170,6 +1280,8 @@ static int vfio_fops_open(struct inode *inode, struct file *filep)
 
 	INIT_LIST_HEAD(&container->group_list);
 	init_rwsem(&container->group_lock);
+	INIT_LIST_HEAD(&container->msi_list);
+	mutex_init(&container->msi_lock);
 	kref_init(&container->kref);
 
 	filep->private_data = container;
