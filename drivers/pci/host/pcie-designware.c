@@ -706,6 +706,15 @@ static struct pci_ops dw_pcie_ops = {
 	.write = dw_pcie_wr_conf,
 };
 
+void dw_pcie_link_retrain(struct pcie_port *pp)
+{
+	u32 val = 0;
+
+	dw_pcie_readl_rc(pp, LINK_CONTROL_LINK_STATUS_REG, &val);
+	val = val | PCIE_RETRAIN_LINK_MASK;
+	dw_pcie_writel_rc(pp, val, LINK_CONTROL_LINK_STATUS_REG);
+}
+
 void dw_pcie_setup_rc(struct pcie_port *pp)
 {
 	u32 val;
