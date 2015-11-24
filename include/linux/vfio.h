@@ -75,7 +75,9 @@ struct vfio_iommu_driver_ops {
 					struct iommu_group *group);
 	void		(*detach_group)(void *iommu_data,
 					struct iommu_group *group);
-
+	int		(*map)(void *iommu_data, dma_addr_t iova,
+			       phys_addr_t paddr, long npage, int prot);
+	void		(*unmap)(void *iommu_data, dma_addr_t iova, long npage);
 };
 
 extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);
