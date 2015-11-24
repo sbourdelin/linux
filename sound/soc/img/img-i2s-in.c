@@ -356,8 +356,14 @@ static int img_i2s_in_dai_probe(struct snd_soc_dai *dai)
 	return 0;
 }
 
+static const struct snd_soc_dapm_widget img_i2s_in_widgets[] = {
+	SND_SOC_DAPM_AIF_OUT("IMG I2S IN", "Capture", 0, SND_SOC_NOPM, 0, 0)
+};
+
 static const struct snd_soc_component_driver img_i2s_in_component = {
-	.name = "img-i2s-in"
+	.name = "img-i2s-in",
+	.dapm_widgets = img_i2s_in_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(img_i2s_in_widgets)
 };
 
 static int img_i2s_in_dma_prepare_slave_config(struct snd_pcm_substream *st,
@@ -441,6 +447,7 @@ static int img_i2s_in_probe(struct platform_device *pdev)
 	i2s->dai_driver.capture.rates = SNDRV_PCM_RATE_8000_192000;
 	i2s->dai_driver.capture.formats = SNDRV_PCM_FMTBIT_S32_LE |
 		SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S16_LE;
+	i2s->dai_driver.capture.stream_name = "Capture";
 	i2s->dai_driver.ops = &img_i2s_in_dai_ops;
 
 	rst = devm_reset_control_get(dev, "rst");
