@@ -278,10 +278,18 @@ err:
 	return ret;
 }
 
+static void nvm_remove_target(struct nvm_target *t);
+
 static void nvm_exit(struct nvm_dev *dev)
 {
+	struct nvm_target *t, *n;
+
 	if (dev->ppalist_pool)
 		dev->ops->destroy_dma_pool(dev->ppalist_pool);
+	down_write(&nvm_lock);
+	list_for_each_entry_safe(t, n, &dev->online_targets, list)
+		nvm_remove_target(t);
+	up_write(&nvm_lock);
 	nvm_free(dev);
 
 	pr_info("nvm: successfully unloaded\n");
@@ -496,13 +504,13 @@ static int __nvm_configure_create(struct nvm_ioctl_create *create)
 
 static int __nvm_configure_remove(struct nvm_ioctl_remove *remove)
 {
-	struct nvm_target *t = NULL;
+	struct nvm_target *n, *t = NULL;
 	struct nvm_dev *dev;
 	int ret = -1;
 
 	down_write(&nvm_lock);
 	list_for_each_entry(dev, &nvm_devices, devices)
-		list_for_each_entry(t, &dev->online_targets, list) {
+		list_for_each_entry_safe(t, n, &dev->online_targets, list) {
 			if (!strcmp(remove->tgtname, t->disk->disk_name)) {
 				nvm_remove_target(t);
 				ret = 0;
