@@ -437,7 +437,7 @@ static int stm32_dma_start_transfer(struct stm32_dma_chan *chan)
 	if (!chan->desc) {
 		vdesc = vchan_next_desc(&chan->vchan);
 		if (!vdesc)
-			return 0;
+			return -EPERM;
 
 		chan->desc = to_stm32_dma_desc(vdesc);
 		chan->next_sg = 0;
