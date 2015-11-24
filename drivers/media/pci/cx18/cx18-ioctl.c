@@ -234,6 +234,13 @@ static int cx18_try_fmt_vid_cap(struct file *file, void *fh,
 
 	fmt->fmt.pix.width = w;
 	fmt->fmt.pix.height = h;
+	if (fmt->fmt.pix.pixelformat == V4L2_PIX_FMT_HM12) {
+		fmt->fmt.pix.sizeimage = h * 720 * 3 / 2;
+		fmt->fmt.pix.bytesperline = 720; /* First plane */
+	} else {
+		fmt->fmt.pix.sizeimage = h * 720 * 2;
+		fmt->fmt.pix.bytesperline = 1440; /* Packed */
+	}
 	return 0;
 }
 
