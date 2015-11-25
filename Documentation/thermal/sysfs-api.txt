@@ -219,11 +219,16 @@ Thermal zone device sys I/F, created once it's registered:
     |---temp:			Current temperature
     |---mode:			Working mode of the thermal zone
     |---policy:			Thermal governor used for this zone
+    |---aggregation_function:	Function to use when aggregating the
+				temperature of this zone's slave thermal zones
     |---available_policies:	Available thermal governors for this zone
     |---trip_point_[0-*]_temp:	Trip point temperature
     |---trip_point_[0-*]_type:	Trip point type
     |---trip_point_[0-*]_hyst:	Hysteresis value for this trip point
     |---emul_temp:		Emulated temperature set node
+    |---subtz[0-*]:		Slave thermal zones of this thermal zone
+    |---subtz[0-*]_weight:	Weight of the slave thermal zone on
+				this thermal zone
     |---sustainable_power:      Sustainable dissipatable power
     |---k_po:                   Proportional term during temperature overshoot
     |---k_pu:                   Proportional term during temperature undershoot
@@ -296,6 +301,19 @@ policy
 	One of the various thermal governors used for a particular zone.
 	RW, Required
 
+aggregation_function
+	The aggregation function used to calculate the temperature of
+	this thermal zone when it has sub thermal zones.  It can
+	either be "max" or "weighted_average".  If it's "max", the
+	temperature of this thermal zone is the maximum of the
+	temperatures of the sub thermal zones.  If
+	aggregation_function is "weighted_average", the temperature of
+	this thermal zone is the weighted average of the temperatures
+	of the sub thermal zones.  The weights are specified in
+	subtz[0-*]_weights.  The aggregation_function sysfs entry
+	doesn't exist for thermal zones without sub thermal zones.
+	RW, Optional
+
 available_policies
 	Available thermal governors which can be used for a particular zone.
 	RO, Required
@@ -358,6 +376,21 @@ emul_temp
 	  WARNING: Be careful while enabling this option on production systems,
 	  because userland can easily disable the thermal policy by simply
 	  flooding this sysfs node with low temperature values.
+
+subtz[0-*]
+	sysfs link to the slave thermal zone device.
+	RO, Optional
+
+subtz[0-*]_weight
+	The influence of subtz[0-*] in this thermal zone.  This
+	parameter is only used when using "weighted_average" as the
+	aggregation_function.  When calculating the temperature of
+	this thermal zone, the temperature of each of the thermal
+	zone's slaves is multiplied by its weight.  The result is
+	divided by the sum of all weights.  If all weights are 0,
+	the temperature of this thermal zone is the average of the
+	temperatures of the sub thermal zones.
+	RW, Optional
 
 sustainable_power
 	An estimate of the sustained power that can be dissipated by

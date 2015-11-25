@@ -63,14 +63,23 @@ static struct thermal_governor *def_governor;
 
 /**
  * struct thermal_zone_link - a link between "master" and "slave" thermal zones
+ * @id:		link number in the master thermal zone
+ * @name:	filename in the master thermal zone's sysfs directory
  * @weight:	weight of the @slave thermal zone in the master
  *		calculation.  Used when the master thermal zone's
  *		aggregation function is THERMAL_AGG_WEIGHTED_AVG
+ * @weight_attr_name:	filename of the weight attribute in the master's thermal
+ *			zone sysfs directory
+ * @weight_attr:	device attribute for the weight entry in sysfs
  * @slave:	pointer to the slave thermal zone
  * @node:	list node in the master thermal zone's slave_tzs list.
  */
 struct thermal_zone_link {
+	int id;
+	char name[THERMAL_NAME_LENGTH];
 	int weight;
+	char weight_attr_name[THERMAL_NAME_LENGTH];
+	struct device_attribute weight_attr;
 	struct thermal_zone_device *slave;
 	struct list_head node;
 };
@@ -990,6 +999,45 @@ emul_temp_store(struct device *dev, struct device_attribute *attr,
 static DEVICE_ATTR(emul_temp, S_IWUSR, NULL, emul_temp_store);
 
 static ssize_t
+agg_func_show(struct device *dev, struct device_attribute *devattr, char *buf)
+{
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+
+	if (tz->slave_agg_function == THERMAL_AGG_MAX)
+		return sprintf(buf, "max\n");
+	else if (tz->slave_agg_function == THERMAL_AGG_WEIGHTED_AVG)
+		return sprintf(buf, "weighted_average\n");
+	else
+		return sprintf(buf, "(invalid)\n");
+}
+
+static ssize_t
+agg_func_store(struct device *dev, struct device_attribute *attr,
+	       const char *buf, size_t count)
+{
+	int ret = 0;
+	struct thermal_zone_device *tz = to_thermal_zone(dev);
+	char func_name[THERMAL_NAME_LENGTH];
+
+	snprintf(func_name, sizeof(func_name), "%s", buf);
+
+	mutex_lock(&tz->lock);
+
+	if (sysfs_streq(func_name, "max"))
+		tz->slave_agg_function = THERMAL_AGG_MAX;
+	else if (sysfs_streq(func_name, "weighted_average"))
+		tz->slave_agg_function = THERMAL_AGG_WEIGHTED_AVG;
+	else
+		ret = -EINVAL;
+
+	mutex_unlock(&tz->lock);
+
+	return ret ? ret : count;
+}
+static DEVICE_ATTR(aggregation_function, S_IRUGO | S_IWUSR, agg_func_show,
+		   agg_func_store);
+
+static ssize_t
 sustainable_power_show(struct device *dev, struct device_attribute *devattr,
 		       char *buf)
 {
@@ -1305,6 +1353,35 @@ thermal_cooling_device_weight_store(struct device *dev,
 
 	return count;
 }
+
+static ssize_t
+thermal_subtz_weight_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
+{
+	struct thermal_zone_link *link;
+
+	link = container_of(attr, struct thermal_zone_link, weight_attr);
+
+	return sprintf(buf, "%d\n", link->weight);
+}
+
+static ssize_t
+thermal_subtz_weight_store(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct thermal_zone_link *link;
+	int ret, weight;
+
+	ret = kstrtoint(buf, 0, &weight);
+	if (ret)
+		return ret;
+
+	link = container_of(attr, struct thermal_zone_link, weight_attr);
+	link->weight = weight;
+
+	return count;
+}
+
 /* Device management */
 
 /**
@@ -2135,6 +2212,47 @@ int thermal_zone_add_subtz(struct thermal_zone_device *tz,
 	link->weight = weight;
 	list_add_tail(&link->node, &tz->slave_tzs);
 
+	if (list_is_singular(&tz->slave_tzs)) {
+		ret = device_create_file(&tz->device,
+					 &dev_attr_aggregation_function);
+		if (ret)
+			pr_warn("Failed to create aggregation_function sysfs file: %d\n",
+				ret);
+			/*
+			 * Fall through: we failed to create the sysfs file, but
+			 * it's not fatal
+			 */
+	}
+
+	ret = get_idr(&tz->link_idr, NULL, &link->id);
+	if (ret) {
+		/*
+		 * Even if we can't create the symlink in sysfs,
+		 * we've linked the thermal zones, so return success
+		 */
+		ret = 0;
+		goto unlock;
+	}
+
+	snprintf(link->name, ARRAY_SIZE(link->name), "subtz%d", link->id);
+	ret = sysfs_create_link(&tz->device.kobj, &subtz->device.kobj,
+				link->name);
+	if (ret)
+		pr_warn("Failed to create symlink to sub thermal zone: %d\n",
+			ret);
+
+	snprintf(link->weight_attr_name, THERMAL_NAME_LENGTH, "subtz%d_weight",
+		 link->id);
+	sysfs_attr_init(&link->weight_attr.attr);
+	link->weight_attr.attr.name = link->weight_attr_name;
+	link->weight_attr.attr.mode = S_IWUSR | S_IRUGO;
+	link->weight_attr.show = thermal_subtz_weight_show;
+	link->weight_attr.store = thermal_subtz_weight_store;
+	ret = device_create_file(&tz->device, &link->weight_attr);
+	if (ret)
+		pr_warn("Failed to create sub thermal zone weight: %d\n",
+			ret);
+
 	ret = 0;
 
 unlock:
@@ -2166,6 +2284,10 @@ int thermal_zone_del_subtz(struct thermal_zone_device *tz,
 
 	list_for_each_entry(link, &tz->slave_tzs, node) {
 		if (link->slave == subtz) {
+			device_remove_file(&tz->device, &link->weight_attr);
+			sysfs_remove_link(&tz->device.kobj, link->name);
+			release_idr(&tz->link_idr, NULL, link->id);
+
 			list_del(&link->node);
 			kfree(link);
 
@@ -2173,6 +2295,9 @@ int thermal_zone_del_subtz(struct thermal_zone_device *tz,
 			break;
 		}
 	}
+
+	if (list_empty(&tz->slave_tzs))
+		device_remove_file(&tz->device, &dev_attr_aggregation_function);
 
 	mutex_unlock(&tz->lock);
 
