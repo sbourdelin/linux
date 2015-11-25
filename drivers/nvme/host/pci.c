@@ -1960,12 +1960,9 @@ static int nvme_compat_ioctl(struct block_device *bdev, fmode_t mode,
 #endif
 
 static void nvme_free_dev(struct kref *kref);
-static void nvme_free_ns(struct kref *kref)
+void nvme_free_ns(struct kref *kref)
 {
 	struct nvme_ns *ns = container_of(kref, struct nvme_ns, kref);
-
-	if (ns->type == NVME_NS_LIGHTNVM)
-		nvme_nvm_unregister(ns->queue, ns->disk->disk_name);
 
 	spin_lock(&dev_list_lock);
 	ns->disk->private_data = NULL;
@@ -2532,6 +2529,11 @@ static inline bool nvme_io_incapable(struct nvme_dev *dev)
 static void nvme_ns_remove(struct nvme_ns *ns)
 {
 	bool kill = nvme_io_incapable(ns->dev) && !blk_queue_dying(ns->queue);
+
+	if (ns->type == NVME_NS_LIGHTNVM) {
+		nvme_nvm_unregister(ns->queue, ns->disk->disk_name);
+		ns->type = 0;
+	}
 
 	if (kill)
 		blk_set_queue_dying(ns->queue);
