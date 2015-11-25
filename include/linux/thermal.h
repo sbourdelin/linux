@@ -40,7 +40,7 @@
 /* No upper/lower limit requirement */
 #define THERMAL_NO_LIMIT	((u32)~0)
 
-/* Default weight of a bound cooling device */
+/* Default weight for cooling devices and sub thermal zones */
 #define THERMAL_WEIGHT_DEFAULT 0
 
 /* Unit conversion macros */
@@ -87,6 +87,18 @@ enum thermal_trend {
 	THERMAL_TREND_DROPPING, /* temperature is dropping */
 	THERMAL_TREND_RAISE_FULL, /* apply highest cooling action */
 	THERMAL_TREND_DROP_FULL, /* apply lowest cooling action */
+};
+
+/**
+ * enum thermal_aggregation_function - aggregation function for sub thermal zones
+ * @THERMAL_AGG_MAX:	calculate the maximum of all sub thermal zones
+
+ * @THERMAL_AGG_WEIGHTED_AVG:	calculate the weighted average of all
+ *				sub thermal zones
+ */
+enum thermal_aggregation_function {
+	THERMAL_AGG_MAX,
+	THERMAL_AGG_WEIGHTED_AVG,
 };
 
 struct thermal_zone_device_ops {
@@ -170,6 +182,12 @@ struct thermal_attr {
  * @ops:	operations this &thermal_zone_device supports
  * @tzp:	thermal zone parameters
  * @governor:	pointer to the governor for this thermal zone
+ * @slave_agg_function: aggretion function to calculate the
+ *			temperature as a combination of the slave thermal zones
+ *			of this thermal zone.  See enum
+ *			thermal_aggregation_function for valid values
+ * @slave_tzs:	list of thermal zones that are a slave of this thermal zone
+ * @slave_tz_visited: used to detect loops in stacked thermal zones
  * @governor_data:	private pointer for governor data
  * @thermal_instances:	list of &struct thermal_instance of this thermal zone
  * @idr:	&struct idr to generate unique id for this zone's cooling
@@ -197,6 +215,9 @@ struct thermal_zone_device {
 	struct thermal_zone_device_ops *ops;
 	struct thermal_zone_params *tzp;
 	struct thermal_governor *governor;
+	enum thermal_aggregation_function slave_agg_function;
+	struct list_head slave_tzs;
+	bool slave_tz_visited;
 	void *governor_data;
 	struct list_head thermal_instances;
 	struct idr idr;
@@ -311,6 +332,13 @@ struct thermal_zone_params {
 	 * 		Used by thermal zone drivers (default 0).
 	 */
 	int offset;
+
+	/*
+	 * aggregation function to use when calculating the
+	 * temperature as a combination of multiple sub thermal
+	 * zones
+	 */
+	enum thermal_aggregation_function agg_func;
 };
 
 struct thermal_genl_event {
@@ -405,6 +433,10 @@ struct thermal_cooling_device *
 thermal_of_cooling_device_register(struct device_node *np, char *, void *,
 				   const struct thermal_cooling_device_ops *);
 void thermal_cooling_device_unregister(struct thermal_cooling_device *);
+int thermal_zone_add_subtz(struct thermal_zone_device *,
+			   struct thermal_zone_device *, int);
+int thermal_zone_del_subtz(struct thermal_zone_device *,
+			   struct thermal_zone_device *);
 struct thermal_zone_device *thermal_zone_get_zone_by_name(const char *name);
 int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp);
 
@@ -458,6 +490,13 @@ thermal_of_cooling_device_register(struct device_node *np,
 static inline void thermal_cooling_device_unregister(
 	struct thermal_cooling_device *cdev)
 { }
+static inline int thermal_zone_add_subtz(struct thermal_zone_device *tz,
+					 struct thermal_zone_device *subtz,
+					 int weight)
+{ return -ENODEV; }
+static inline int thermal_zone_del_subtz(struct thermal_zone_device *tz,
+					 struct thermal_zone_device *subtz)
+{ return -ENODEV; }
 static inline struct thermal_zone_device *thermal_zone_get_zone_by_name(
 		const char *name)
 { return ERR_PTR(-ENODEV); }

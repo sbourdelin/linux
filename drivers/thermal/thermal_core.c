@@ -61,6 +61,20 @@ static DEFINE_MUTEX(thermal_governor_lock);
 
 static struct thermal_governor *def_governor;
 
+/**
+ * struct thermal_zone_link - a link between "master" and "slave" thermal zones
+ * @weight:	weight of the @slave thermal zone in the master
+ *		calculation.  Used when the master thermal zone's
+ *		aggregation function is THERMAL_AGG_WEIGHTED_AVG
+ * @slave:	pointer to the slave thermal zone
+ * @node:	list node in the master thermal zone's slave_tzs list.
+ */
+struct thermal_zone_link {
+	int weight;
+	struct thermal_zone_device *slave;
+	struct list_head node;
+};
+
 static struct thermal_governor *__find_governor(const char *name)
 {
 	struct thermal_governor *pos;
@@ -465,6 +479,80 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
 }
 
 /**
+ * get_subtz_temp() - get the aggregate temperature of all the sub thermal zones
+ * @tz:	thermal zone pointer
+ * @temp: pointer in which to store the result
+ *
+ * Go through all the thermal zones listed in @tz slave_tzs and
+ * calculate the aggregate temperature of all of them.  The result is
+ * stored in @temp.  The function used for aggregation is defined by
+ * the thermal zone's "slave_agg_function" parameter.  It can only be
+ * THERMAL_AGG_MAX or THERMAL_AGG_WEIGHTED_AVG.  If THERMAL_AGG_MAX is
+ * used then the @temp holds the maximum temperature of all slave
+ * thermal zones.  With THERMAL_AGG_WEIGHTED_AVG a weighted average of
+ * all temperatures is calculated.  Each thermal zone's temperature is
+ * multiplied by its weight and the result is divided by the sum of
+ * all weights.  If all weights are zero, the result is the average
+ * weight of the thermal zones.
+ *
+ * Return: 0 on success, -EINVAL if there are no slave thermal zones,
+ * -E* if thermal_zone_get_temp() fails for any of the slave thermal
+ * zones.
+ */
+static int get_subtz_temp(struct thermal_zone_device *tz, int *temp)
+{
+	struct thermal_zone_link *link;
+	int ret_temp, total_weight = 0;
+	bool all_weights_are_zero = false;
+
+	if (list_empty(&tz->slave_tzs))
+		return -EINVAL;
+
+	if (tz->slave_agg_function == THERMAL_AGG_WEIGHTED_AVG) {
+		int total_instances = 0;
+
+		list_for_each_entry(link, &tz->slave_tzs, node) {
+			total_weight += link->weight;
+			total_instances++;
+		}
+
+		if (!total_weight) {
+			all_weights_are_zero = true;
+			total_weight = total_instances;
+		} else {
+			all_weights_are_zero = false;
+		}
+
+		ret_temp = 0;
+	} else if (tz->slave_agg_function == THERMAL_AGG_MAX) {
+		ret_temp = INT_MIN;
+	}
+
+	list_for_each_entry(link, &tz->slave_tzs, node) {
+		int this_temp, ret;
+
+		ret = thermal_zone_get_temp(link->slave, &this_temp);
+		if (ret)
+			return ret;
+
+		if (tz->slave_agg_function == THERMAL_AGG_MAX) {
+			if (this_temp > ret_temp)
+				ret_temp = this_temp;
+		} else if (tz->slave_agg_function == THERMAL_AGG_WEIGHTED_AVG) {
+			int weight = all_weights_are_zero ? 1 : link->weight;
+
+			ret_temp += weight * this_temp;
+		}
+	}
+
+	if (tz->slave_agg_function == THERMAL_AGG_WEIGHTED_AVG)
+		ret_temp /= total_weight;
+
+	*temp = ret_temp;
+	return 0;
+}
+
+/**
  * thermal_zone_get_temp() - returns the temperature of a thermal zone
  * @tz: a valid pointer to a struct thermal_zone_device
  * @temp: a valid pointer to where to store the resulting temperature.
@@ -481,10 +569,21 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 	int crit_temp = INT_MAX;
 	enum thermal_trip_type type;
 
-	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
+	if (!tz || IS_ERR(tz))
 		goto exit;
 
+	/* Avoid loops */
+	if (tz->slave_tz_visited)
+		return -EDEADLK;
+
 	mutex_lock(&tz->lock);
+
+	tz->slave_tz_visited = true;
+
+	if (!tz->ops->get_temp) {
+		ret = get_subtz_temp(tz, temp);
+		goto unlock;
+	}
 
 	ret = tz->ops->get_temp(tz, temp);
 
@@ -506,7 +605,9 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 		if (!ret && *temp < crit_temp)
 			*temp = tz->emul_temperature;
 	}
- 
+
+unlock:
+	tz->slave_tz_visited = false;
 	mutex_unlock(&tz->lock);
 exit:
 	return ret;
@@ -539,9 +640,6 @@ static void update_temperature(struct thermal_zone_device *tz)
 void thermal_zone_device_update(struct thermal_zone_device *tz)
 {
 	int count;
-
-	if (!tz->ops->get_temp)
-		return;
 
 	update_temperature(tz);
 
@@ -1785,10 +1883,17 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 	if (trips > 0 && (!ops->get_trip_type || !ops->get_trip_temp))
 		return ERR_PTR(-EINVAL);
 
+	if (tzp && (tzp->agg_func != THERMAL_AGG_MAX) &&
+	    (tzp->agg_func != THERMAL_AGG_WEIGHTED_AVG))
+		return ERR_PTR(-EINVAL);
+
 	tz = kzalloc(sizeof(struct thermal_zone_device), GFP_KERNEL);
 	if (!tz)
 		return ERR_PTR(-ENOMEM);
 
+	if (tzp)
+		tz->slave_agg_function = tzp->agg_func;
+	INIT_LIST_HEAD(&tz->slave_tzs);
 	INIT_LIST_HEAD(&tz->thermal_instances);
 	idr_init(&tz->idr);
 	mutex_init(&tz->lock);
@@ -1921,6 +2026,7 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	const struct thermal_zone_params *tzp;
 	struct thermal_cooling_device *cdev;
 	struct thermal_zone_device *pos = NULL;
+	struct thermal_zone_link *link, *tmp;
 
 	if (!tz)
 		return;
@@ -1958,6 +2064,9 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 
 	mutex_unlock(&thermal_list_lock);
 
+	list_for_each_entry_safe(link, tmp, &tz->slave_tzs, node)
+		thermal_zone_del_subtz(tz, link->slave);
+
 	thermal_zone_device_set_polling(tz, 0);
 
 	if (tz->type[0])
@@ -1978,6 +2087,97 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 	return;
 }
 EXPORT_SYMBOL_GPL(thermal_zone_device_unregister);
+
+/**
+ * thermal_zone_add_subtz() - add a sub thermal zone to a thermal zone
+ * @tz:	pointer to the master thermal zone
+ * @subtz: pointer to the slave thermal zone
+ * @weight: relative contribution of the sub thermal zone
+ *
+ * Add @subtz to the list of slave thermal zones of @tz.  If @tz
+ * doesn't provide a get_temp() op, its temperature will be calculated
+ * as a combination of the temperatures of its sub thermal zones.  The
+ * @weight is the relative contribution of this thermal zone when
+ * using THERMAL_AGG_WEIGHTED_AVG.  Set @weight to
+ * THERMAL_WEIGHT_DEFAULT for all sub thermal zones to do a simple
+ * average.  See get_sub_tz_temp() for more information on how the
+ * temperature for @tz is calculated.
+ *
+ * Return: 0 on success, -EINVAL if @tz or @subtz are not valid
+ * pointers, -EEXIST if the link already exists or -ENOMEM if we ran
+ * out of memory.
+ */
+int thermal_zone_add_subtz(struct thermal_zone_device *tz,
+			   struct thermal_zone_device *subtz, int weight)
+{
+	int ret;
+	struct thermal_zone_link *link;
+
+	if (IS_ERR_OR_NULL(tz) || IS_ERR_OR_NULL(subtz))
+		return -EINVAL;
+
+	mutex_lock(&tz->lock);
+
+	list_for_each_entry(link, &tz->slave_tzs, node) {
+		if (link->slave == subtz) {
+			ret = -EEXIST;
+			goto unlock;
+		}
+	}
+
+	link = kzalloc(sizeof(*link), GFP_KERNEL);
+	if (!link) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
+
+	link->slave = subtz;
+	link->weight = weight;
+	list_add_tail(&link->node, &tz->slave_tzs);
+
+	ret = 0;
+
+unlock:
+	mutex_unlock(&tz->lock);
+
+	return ret;
+}
+
+/**
+ * thermal_zone_del_subtz() - delete a sub thermal zone from its master thermal zone
+ * @tz:	pointer to the master thermal zone
+ * @subtz: pointer to the slave thermal zone
+ *
+ * Remove @subtz from the list of slave thermal zones of @tz.
+ *
+ * Return: 0 on success, -EINVAL if either thermal is invalid or if
+ * @subtz is not a slave of @tz.
+ */
+int thermal_zone_del_subtz(struct thermal_zone_device *tz,
+			   struct thermal_zone_device *subtz)
+{
+	int ret = -EINVAL;
+	struct thermal_zone_link *link;
+
+	if (IS_ERR_OR_NULL(tz) || IS_ERR_OR_NULL(subtz))
+		return -EINVAL;
+
+	mutex_lock(&tz->lock);
+
+	list_for_each_entry(link, &tz->slave_tzs, node) {
+		if (link->slave == subtz) {
+			list_del(&link->node);
+			kfree(link);
+
+			ret = 0;
+			break;
+		}
+	}
+
+	mutex_unlock(&tz->lock);
+
+	return ret;
+}
 
 /**
  * thermal_zone_get_zone_by_name() - search for a zone and returns its ref
