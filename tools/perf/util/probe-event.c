@@ -2516,11 +2516,27 @@ static int find_probe_trace_events_from_map(struct perf_probe_event *pev,
 	struct probe_trace_point *tp;
 	int num_matched_functions;
 	int ret, i, j, skipped = 0;
+	const char *dup_filename;
 
 	map = get_target_map(pev->target, pev->uprobes);
 	if (!map) {
 		ret = -EINVAL;
 		goto out;
+	}
+
+	/*
+	 * If the map's dso is an offline module, give dso__load() a chance
+	 * to find the file path of that module by fixing long_name.
+	 */
+	if (map->dso && strchr(pev->target, '/')) {
+		if (!map->dso->long_name || map->dso->long_name[0] == '[') {
+			dup_filename = strdup(pev->target);
+			if (!dup_filename) {
+				ret = -ENOMEM;
+				goto out;
+			}
+			dso__set_long_name(map->dso, dup_filename, true);
+		}
 	}
 
 	syms = malloc(sizeof(struct symbol *) * probe_conf.max_probes);
