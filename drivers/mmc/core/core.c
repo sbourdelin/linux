@@ -204,6 +204,13 @@ static void __mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 		return;
 	}
 
+	/* We do not support SDIO commands */
+	if (mmc_is_io_op(mrq->cmd->opcode) && host->caps2 & MMC_CAP2_NO_SDIO) {
+		mrq->cmd->error = -EINVAL;
+		mmc_request_done(host, mrq);
+		return;
+	}
+
 	/*
 	 * For sdio rw commands we must wait for card busy otherwise some
 	 * sdio devices won't work properly.
