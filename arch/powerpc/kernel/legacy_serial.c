@@ -164,6 +164,8 @@ static int __init add_legacy_soc_port(struct device_node *np,
 	u64 addr;
 	const __be32 *addrp;
 	struct device_node *tsi = of_get_parent(np);
+	int index = -1, len;
+	u32 *indexp;
 
 	/* We only support ports that have a clock frequency properly
 	 * encoded in the device-tree.
@@ -188,14 +190,19 @@ static int __init add_legacy_soc_port(struct device_node *np,
 	if (addr == OF_BAD_ADDR)
 		return -1;
 
+	/* Check if the ports have an ordering, defined by 'cell-index' */
+	if (((indexp = (u32*)of_get_property(np, "cell-index", &len)) != NULL) &&
+	    (len == sizeof(u32)))
+		index = *indexp;
+
 	/* Add port, irq will be dealt with later. We passed a translated
 	 * IO port value. It will be fixed up later along with the irq
 	 */
 	if (tsi && !strcmp(tsi->type, "tsi-bridge"))
-		return add_legacy_port(np, -1, UPIO_TSI, addr, addr,
+		return add_legacy_port(np, index, UPIO_TSI, addr, addr,
 				       NO_IRQ, legacy_port_flags, 0);
 	else
-		return add_legacy_port(np, -1, UPIO_MEM, addr, addr,
+		return add_legacy_port(np, index, UPIO_MEM, addr, addr,
 				       NO_IRQ, legacy_port_flags, 0);
 }
 
