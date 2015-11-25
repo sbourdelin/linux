@@ -1146,7 +1146,11 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 		case Opt_time_offset:
 			if (match_int(&args[0], &option))
 				return -EINVAL;
-			if (option < -12 * 60 || option > 12 * 60)
+			/*
+			 * Allow for GMT+-12 zones to have DST like
+			 * corrections
+			 */
+			if (option < -13 * 60 || option > 13 * 60)
 				return -EINVAL;
 			opts->tz_set = 1;
 			opts->time_offset = option;
