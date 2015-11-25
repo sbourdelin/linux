@@ -48,6 +48,13 @@
  * The code also supports underrun detection on the PCH transcoder.
  */
 
+static bool cpt_transcoder_exists(struct drm_i915_private *dev_priv,
+				  enum transcoder pch_transcoder)
+{
+	/* HSW/BDW have only transcoder A */
+	return !HAS_DDI(dev_priv) || pch_transcoder == TRANSCODER_A;
+}
+
 static bool ivb_can_enable_err_int(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -69,13 +76,16 @@ static bool ivb_can_enable_err_int(struct drm_device *dev)
 static bool cpt_can_enable_serr_int(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	enum pipe pipe;
-	struct intel_crtc *crtc;
+	enum transcoder pch_transcoder;
 
 	assert_spin_locked(&dev_priv->irq_lock);
 
-	for_each_pipe(dev_priv, pipe) {
-		crtc = to_intel_crtc(dev_priv->pipe_to_crtc_mapping[pipe]);
+	for_each_pipe(dev_priv, pch_transcoder) {
+		struct intel_crtc *crtc =
+			to_intel_crtc(dev_priv->pipe_to_crtc_mapping[pch_transcoder]);
+
+		if (!cpt_transcoder_exists(dev_priv, pch_transcoder))
+			continue;
 
 		if (crtc->pch_fifo_underrun_disabled)
 			return false;
@@ -210,6 +220,9 @@ static void cpt_check_pch_fifo_underruns(struct intel_crtc *crtc)
 
 	assert_spin_locked(&dev_priv->irq_lock);
 
+	if (!cpt_transcoder_exists(dev_priv, pch_transcoder))
+		return;
+
 	if ((serr_int & SERR_INT_TRANS_FIFO_UNDERRUN(pch_transcoder)) == 0)
 		return;
 
@@ -225,6 +238,9 @@ static void cpt_set_fifo_underrun_reporting(struct drm_device *dev,
 					    bool enable, bool old)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (!cpt_transcoder_exists(dev_priv, pch_transcoder))
+		return;
 
 	if (enable) {
 		I915_WRITE(SERR_INT,
