@@ -26,5 +26,10 @@ static inline bool mmc_is_rw_io_op(u32 opcode)
 	return opcode == SD_IO_RW_DIRECT || opcode == SD_IO_RW_EXTENDED;
 }
 
+static inline bool mmc_is_io_op(u32 opcode)
+{
+	return mmc_is_rw_io_op(opcode) || opcode == SD_IO_SEND_OP_COND;
+}
+
 #endif
 
