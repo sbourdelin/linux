@@ -18,6 +18,8 @@ Required properties:
 Option properties:
 
 - interrupts		: use interrupt
+- tripN-temp		: temperature of trip point N. it will use 90000 as default
+			  if DT doesn't have tripN-temp
 
 Example (non interrupt support):
 

@@ -63,6 +63,7 @@ struct rcar_thermal_priv {
 	struct mutex lock;
 	struct list_head list;
 	int id;
+	int trip_temp;
 	u32 ctemp;
 };
 
@@ -222,7 +223,7 @@ static int rcar_thermal_get_trip_type(struct thermal_zone_device *zone,
 
 	/* see rcar_thermal_get_temp() */
 	switch (trip) {
-	case 0: /* +90 <= temp */
+	case 0:
 		*type = THERMAL_TRIP_CRITICAL;
 		break;
 	default:
@@ -241,8 +242,8 @@ static int rcar_thermal_get_trip_temp(struct thermal_zone_device *zone,
 
 	/* see rcar_thermal_get_temp() */
 	switch (trip) {
-	case 0: /* +90 <= temp */
-		*temp = MCELSIUS(90);
+	case 0:
+		*temp = priv->trip_temp;
 		break;
 	default:
 		dev_err(dev, "rcar driver trip error\n");
@@ -361,6 +362,30 @@ static irqreturn_t rcar_thermal_irq(int irq, void *data)
 /*
  *		platform functions
  */
+static void rcar_thermal_of_parse(struct rcar_thermal_priv *priv)
+{
+	struct device *dev = rcar_priv_to_dev(priv);
+	struct device_node *np = dev->of_node;
+	char prop_name[32];
+	s32 val;
+
+	/*
+	 * let's use db8500 thermal style
+	 */
+	sprintf(prop_name, "trip%d-temp", priv->id);
+	if (of_property_read_s32(np, prop_name, &val))
+		return;
+
+	if (val < -45000 ||
+	    val > 125000) {
+		dev_err(dev, "unsupported trip temp, use default\n");
+		return;
+	}
+
+	/* overwrite trip temp */
+	priv->trip_temp = val;
+}
+
 static int rcar_thermal_probe(struct platform_device *pdev)
 {
 	struct rcar_thermal_common *common;
@@ -418,10 +443,13 @@ static int rcar_thermal_probe(struct platform_device *pdev)
 
 		priv->common = common;
 		priv->id = i;
+		priv->trip_temp = MCELSIUS(90); /* default*/
 		mutex_init(&priv->lock);
 		INIT_LIST_HEAD(&priv->list);
 		INIT_DELAYED_WORK(&priv->work, rcar_thermal_work);
 		rcar_thermal_update_temp(priv);
+
+		rcar_thermal_of_parse(priv);
 
 		priv->zone = thermal_zone_device_register("rcar_thermal",
 						1, 0, priv,
