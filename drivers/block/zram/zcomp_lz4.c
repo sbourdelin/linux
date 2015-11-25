@@ -15,25 +15,13 @@
 
 #include "zcomp_lz4.h"
 
-static void *zcomp_lz4_create(void)
+static void *zcomp_lz4_create(gfp_t flags)
 {
 	void *ret;
 
-	/*
-	 * This function could be called in swapout/fs write path
-	 * so we couldn't use GFP_FS|IO. And it assumes we already
-	 * have at least one stream in zram initialization so we
-	 * don't do best effort to allocate more stream in here.
-	 * A default stream will work well without further multiple
-	 * stream. That's why we use  __GFP_NORETRY|NOWARN|NOMEMALLOC.
-	 */
-	ret = kzalloc(LZ4_MEM_COMPRESS, GFP_NOIO|__GFP_NORETRY|
-					__GFP_NOWARN|__GFP_NOMEMALLOC);
+	ret = kmalloc(LZ4_MEM_COMPRESS, flags);
 	if (!ret)
-		ret = __vmalloc(LZ4_MEM_COMPRESS, GFP_NOIO|__GFP_NORETRY|
-						__GFP_NOWARN|__GFP_NOMEMALLOC|
-						__GFP_ZERO,
-						PAGE_KERNEL);
+		ret = __vmalloc(LZ4_MEM_COMPRESS, flags, PAGE_KERNEL);
 	return ret;
 }
 
