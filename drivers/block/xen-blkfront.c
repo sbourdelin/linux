@@ -2128,7 +2128,7 @@ static int __init xlblk_init(void)
 	if (xen_blkif_max_ring_order > XENBUS_MAX_RING_PAGE_ORDER) {
 		pr_info("Invalid max_ring_order (%d), will use default max: %d.\n",
 			xen_blkif_max_ring_order, XENBUS_MAX_RING_PAGE_ORDER);
-		xen_blkif_max_ring_order = 0;
+		xen_blkif_max_ring_order = XENBUS_MAX_RING_PAGE_ORDER;
 	}
 
 	if (!xen_has_pv_disk_devices())
