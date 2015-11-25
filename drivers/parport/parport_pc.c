@@ -3340,8 +3340,8 @@ static void __exit parport_pc_exit(void)
 		struct parport_pc_private *priv;
 		struct parport *port;
 		struct device *dev;
-		priv = list_entry(ports_list.next,
-				  struct parport_pc_private, list);
+		priv = list_first_entry(&ports_list,
+					struct parport_pc_private, list);
 		port = priv->port;
 		dev = port->dev;
 		parport_pc_unregister_port(port);
