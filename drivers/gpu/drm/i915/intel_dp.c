@@ -1621,6 +1621,12 @@ found:
 	intel_dp_compute_rate(intel_dp, pipe_config->port_clock,
 			      &link_bw, &rate_select);
 
+	intel_dp->link_bw = link_bw;
+	intel_dp->rate_select = rate_select;
+	intel_dp->lane_count = lane_count;
+	intel_dp->port_clock = pipe_config->port_clock;
+	intel_dp->bpp = bpp;
+
 	DRM_DEBUG_KMS("DP link bw %02x rate select %02x lane count %d clock %d bpp %d\n",
 		      link_bw, rate_select, pipe_config->lane_count,
 		      pipe_config->port_clock, bpp);

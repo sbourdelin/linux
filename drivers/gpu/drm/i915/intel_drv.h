@@ -744,7 +744,11 @@ struct intel_dp {
 	i915_reg_t aux_ch_data_reg[5];
 	uint32_t DP;
 	int link_rate;
-	uint8_t lane_count;
+	uint8_t lane_count, old_lane_count;
+	uint8_t link_bw, old_link_bw;
+	uint8_t rate_select, old_rate_select;
+	int port_clock, old_port_clock;
+	int bpp, old_bpp;
 	bool has_audio;
 	enum hdmi_force_audio force_audio;
 	bool limited_color_range;
