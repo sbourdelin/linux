@@ -243,7 +243,7 @@ static __init void dm355_leopard_init(void)
 
 	aemif = clk_get(&dm355leopard_dm9000.dev, "aemif");
 	if (IS_ERR(aemif))
-		WARN("%s: unable to get AEMIF clock\n", __func__);
+		WARN(1, "%s: unable to get AEMIF clock\n", __func__);
 	else
 		clk_prepare_enable(aemif);
 
