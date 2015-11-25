@@ -241,12 +241,25 @@ cmd_record_mcount =						\
 	fi;
 endif
 
+ifdef CONFIG_ARM_PATCH_UIDIV
+# Due to recursion, we must skip empty.o.
+# The empty.o file is created in the make process in order to determine
+#  the target endianness and word size. It is made before all other C
+#  files, including recorduidiv.
+cmd_record_uidiv =					\
+	if [ $(@) != "scripts/mod/empty.o" ]; then	\
+		$(objtree)/scripts/recorduidiv "$(@)";	\
+	fi;
+recorduidiv_source := $(srctree)/scripts/recorduidiv.c
+endif
+
 define rule_cc_o_c
 	$(call echo-cmd,checksrc) $(cmd_checksrc)			  \
 	$(call echo-cmd,cc_o_c) $(cmd_cc_o_c);				  \
 	$(cmd_modversions)						  \
 	$(call echo-cmd,record_mcount)					  \
 	$(cmd_record_mcount)						  \
+	$(call echo-cmd,record_uidiv) $(cmd_record_uidiv)		  \
 	scripts/basic/fixdep $(depfile) $@ '$(call make-cmd,cc_o_c)' >    \
 	                                              $(dot-target).tmp;  \
 	rm -f $(depfile);						  \
@@ -254,13 +267,13 @@ define rule_cc_o_c
 endef
 
 # Built-in and composite module parts
-$(obj)/%.o: $(src)/%.c $(recordmcount_source) FORCE
+$(obj)/%.o: $(src)/%.c $(recordmcount_source) $(recorduidiv_source) FORCE
 	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
 
-$(single-used-m): $(obj)/%.o: $(src)/%.c $(recordmcount_source) FORCE
+$(single-used-m): $(obj)/%.o: $(src)/%.c $(recordmcount_source) $(recorduidiv_source) FORCE
 	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 	@{ echo $(@:.o=.ko); echo $@; } > $(MODVERDIR)/$(@F:.o=.mod)
