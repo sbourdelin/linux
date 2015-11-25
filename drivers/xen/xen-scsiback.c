@@ -800,7 +800,7 @@ static int scsiback_init_sring(struct vscsibk_info *info, grant_ref_t ring_ref,
 	int err;
 
 	if (info->irq)
-		return -1;
+		return -EBUSY;
 
 	err = xenbus_map_ring_valloc(info->dev, &ring_ref, 1, &area);
 	if (err)
