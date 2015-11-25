@@ -18,16 +18,4 @@ config HAVE_CLKSRC_QCOM
 	  Select this option if you want to support platforms
 	  with the qcom clocksource such as MSM8660 and MSM8960.
 
-config ARCH_MSM8X60
-	bool "Enable support for MSM8X60"
-	select CLKSRC_QCOM
-
-config ARCH_MSM8960
-	bool "Enable support for MSM8960"
-	select CLKSRC_QCOM
-
-config ARCH_MSM8974
-	bool "Enable support for MSM8974"
-	select HAVE_ARM_ARCH_TIMER
-
 endif
