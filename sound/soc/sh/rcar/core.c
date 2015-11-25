@@ -1204,7 +1204,6 @@ static int rsnd_probe(struct platform_device *pdev)
 	struct rsnd_priv *priv;
 	struct device *dev = &pdev->dev;
 	struct rsnd_dai *rdai;
-	const struct of_device_id *of_id = of_match_device(rsnd_of_match, dev);
 	const struct rsnd_of_data *of_data;
 	int (*probe_func[])(struct platform_device *pdev,
 			    const struct rsnd_of_data *of_data,
@@ -1221,11 +1220,13 @@ static int rsnd_probe(struct platform_device *pdev)
 	};
 	int ret, i;
 
+	of_data = of_device_get_match_data(dev);
+	if (!of_data)
+		return 1;
 	info = devm_kzalloc(&pdev->dev, sizeof(struct rcar_snd_info),
 			    GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
-	of_data = of_id->data;
 
 	/*
 	 *	init priv data
