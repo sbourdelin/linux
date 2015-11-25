@@ -933,6 +933,12 @@ int i915_reset(struct drm_device *dev)
 
 	simulated = dev_priv->gpu_error.stop_rings != 0;
 
+	if (!i915.reset) {
+		DRM_INFO("GPU reset disabled in module option, not resetting\n");
+		mutex_unlock(&dev->struct_mutex);
+		return -ENODEV;
+	}
+
 	ret = intel_gpu_reset(dev);
 
 	/* Also reset the gpu hangman. */

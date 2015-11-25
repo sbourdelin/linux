@@ -2940,7 +2940,7 @@ int __must_check i915_gem_check_wedge(struct i915_gpu_error *error,
 static inline bool i915_reset_in_progress(struct i915_gpu_error *error)
 {
 	return unlikely(atomic_read(&error->reset_counter)
-			& (I915_RESET_IN_PROGRESS_FLAG | I915_WEDGED));
+			& I915_RESET_IN_PROGRESS_FLAG);
 }
 
 static inline bool i915_terminally_wedged(struct i915_gpu_error *error)
