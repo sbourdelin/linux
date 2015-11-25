@@ -461,9 +461,7 @@ fail:
 
 int focaltech_init(struct psmouse *psmouse)
 {
-	focaltech_reset(psmouse);
-
-	return 0;
+	return -ENOSYS;
 }
 
 #endif /* CONFIG_MOUSE_PS2_FOCALTECH */
