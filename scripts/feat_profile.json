@@ -1,0 +1,12 @@
+{
+    "glsl" : {
+        "include_tests" : "glsl",
+        "exclude_tests" : "",
+        "target_rate" : 90
+    },
+    "arb" : {
+        "include_tests" : "ARB_shader|deqp.arb shader",
+        "exclude_tests" : "",
+        "target_rate" : 10
+    }
+}
