@@ -10,17 +10,35 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/lzo.h>
+#include <linux/vmalloc.h>
+#include <linux/mm.h>
 
 #include "zcomp_lzo.h"
 
 static void *lzo_create(void)
 {
-	return kzalloc(LZO1X_MEM_COMPRESS, GFP_NOIO);
+	void *ret;
+	/*
+	 * This function could be called in swapout/fs write path
+	 * so we couldn't use GFP_FS|IO. And it assumes we already
+	 * have at least one stream in zram initialization so we
+	 * don't do best effort to allocate more stream in here.
+	 * A default stream will work well without further multiple
+	 * stream. That's why we use  __GFP_NORETRY|NOWARN|NOMEMALLOC.
+	 */
+	ret = kzalloc(LZO1X_MEM_COMPRESS, GFP_NOIO|__GFP_NORETRY|
+					__GFP_NOWARN|__GFP_NOMEMALLOC);
+	if (!ret)
+		ret = __vmalloc(LZO1X_MEM_COMPRESS, GFP_NOIO|__GFP_NORETRY|
+						__GFP_NOWARN|__GFP_NOMEMALLOC|
+						__GFP_ZERO,
+						PAGE_KERNEL);
+	return ret;
 }
 
 static void lzo_destroy(void *private)
 {
-	kfree(private);
+	kvfree(private);
 }
 
 static int lzo_compress(const unsigned char *src, unsigned char *dst,
