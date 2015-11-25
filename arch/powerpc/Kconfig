@@ -163,6 +163,9 @@ config PPC
 	select ARCH_HAS_DMA_SET_COHERENT_MASK
 	select HAVE_ARCH_SECCOMP_FILTER
 
+config HAVE_LIVEPATCH
+       def_bool PPC64 && CPU_LITTLE_ENDIAN
+
 config GENERIC_CSUM
 	def_bool CPU_LITTLE_ENDIAN
 
@@ -1095,3 +1098,5 @@ config PPC_LIB_RHEAP
 	bool
 
 source "arch/powerpc/kvm/Kconfig"
+
+source "kernel/livepatch/Kconfig"
