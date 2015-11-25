@@ -250,8 +250,14 @@ static inline int cpu_is_pj4(void)
 
 	return 0;
 }
+
+static inline bool __attribute_const__ cpu_is_pj4_nomp(void)
+{
+	return read_cpuid_part() == 0x56005810;
+}
 #else
-#define cpu_is_pj4()	0
+#define cpu_is_pj4()		0
+#define cpu_is_pj4_nomp()	0
 #endif
 
 static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,

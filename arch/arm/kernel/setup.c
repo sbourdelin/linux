@@ -32,6 +32,7 @@
 #include <linux/compiler.h>
 #include <linux/sort.h>
 #include <linux/psci.h>
+#include <linux/module.h>
 
 #include <asm/unified.h>
 #include <asm/cp15.h>
@@ -375,6 +376,72 @@ void __init early_print(const char *str, ...)
 	printk("%s", buf);
 }
 
+#ifdef CONFIG_ARM_PATCH_UIDIV
+/* "sdiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 4" if we're on pj4 w/o MP */
+static u32 __attribute_const__ sdiv_instruction(void)
+{
+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+		if (cpu_is_pj4_nomp())
+			return __opcode_to_mem_thumb32(0xee300691);
+		return __opcode_to_mem_thumb32(0xfb90f0f1);
+	}
+
+	if (cpu_is_pj4_nomp())
+		return __opcode_to_mem_arm(0xee300691);
+	return __opcode_to_mem_arm(0xe710f110);
+}
+
+/* "udiv r0, r0, r1" or "mrc p6, 1, r0, CR0, CR1, 0" if we're on pj4 w/o MP */
+static u32 __attribute_const__ udiv_instruction(void)
+{
+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+		if (cpu_is_pj4_nomp())
+			return __opcode_to_mem_thumb32(0xee300611);
+		return __opcode_to_mem_thumb32(0xfbb0f0f1);
+	}
+
+	if (cpu_is_pj4_nomp())
+		return __opcode_to_mem_arm(0xee300611);
+	return __opcode_to_mem_arm(0xe730f110);
+}
+
+static void __init_or_module patch(u32 **addr, size_t count, u32 insn)
+{
+	for (; count != 0; count -= 4)
+		**addr++ = insn;
+}
+
+void __init_or_module patch_udiv(void *addr, size_t size)
+{
+	patch(addr, size, udiv_instruction());
+}
+
+void __init_or_module patch_sdiv(void *addr, size_t size)
+{
+	return patch(addr, size, sdiv_instruction());
+}
+
+static void __init patch_aeabi_uidiv(void)
+{
+	extern char __start_udiv_loc[], __stop_udiv_loc[];
+	extern char __start_idiv_loc[], __stop_idiv_loc[];
+	unsigned int mask;
+
+	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+		mask = HWCAP_IDIVT;
+	else
+		mask = HWCAP_IDIVA;
+
+	if (!(elf_hwcap & mask))
+		return;
+
+	patch_udiv(__start_udiv_loc, __stop_udiv_loc - __start_udiv_loc);
+	patch_sdiv(__start_idiv_loc, __stop_idiv_loc - __start_idiv_loc);
+}
+#else
+static void __init patch_aeabi_uidiv(void) { }
+#endif
+
 static void __init cpuid_init_hwcaps(void)
 {
 	int block;
@@ -642,6 +709,7 @@ static void __init setup_processor(void)
 	elf_hwcap = list->elf_hwcap;
 
 	cpuid_init_hwcaps();
+	patch_aeabi_uidiv();
 
 #ifndef CONFIG_ARM_THUMB
 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
