@@ -922,7 +922,7 @@ static int __init hugetlbpage_init(void)
 #endif
 arch_initcall(hugetlbpage_init);
 
-void flush_dcache_icache_hugepage(struct page *page)
+notrace void flush_dcache_icache_hugepage(struct page *page)
 {
 	int i;
 	void *start;
@@ -955,7 +955,7 @@ void flush_dcache_icache_hugepage(struct page *page)
  * when we have MSR[EE] = 0 but the paca->soft_enabled = 1
  */
 
-pte_t *__find_linux_pte_or_hugepte(pgd_t *pgdir, unsigned long ea,
+notrace pte_t *__find_linux_pte_or_hugepte(pgd_t *pgdir, unsigned long ea,
 				   unsigned *shift)
 {
 	pgd_t pgd, *pgdp;
