@@ -342,7 +342,7 @@ struct ipath_base_info {
 	__u64 spi_port_rcvhdr_base;
 	__u64 spi_port_rcvhdr_tailaddr;
 
-} __attribute__ ((aligned(8)));
+} __aligned(8);
 
 
 /*
@@ -427,7 +427,7 @@ struct ipath_user_info {
 	 */
 	__u64 spu_base_info;
 
-} __attribute__ ((aligned(8)));
+} __aligned(8);
 
 /* User commands. */
 
