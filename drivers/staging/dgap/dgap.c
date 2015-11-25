@@ -2328,6 +2328,37 @@ schedule_poller:
 		add_timer(&dgap_poll_timer);
 }
 
+
+/*
+ * Wait if necessary before updating the head
+ * pointer to limit the number of outstanding
+ * commands to the FEP.   If the time spent waiting
+ * is outlandish, declare the FEP dead.
+ */
+static void wait_for_fep_cmds_limit(struct channel_t *ch,
+				    struct __iomem cm_t *cm_addr,
+				    u16 head, u16 tail, uint ncmds)
+{
+	int n;
+	int count;
+
+	for (count = dgap_count ;;) {
+		head = readw(&cm_addr->cm_head);
+		tail = readw(&cm_addr->cm_tail);
+
+		n = (head - tail) & (CMDMAX - CMDSTART - 4);
+
+		if (n <= ncmds * sizeof(struct cm_t))
+			break;
+
+		if (--count == 0) {
+			ch->ch_bd->state = BOARD_FAILED;
+			return;
+		}
+		udelay(10);
+	}
+}
+
 /*=======================================================================
  *
  *      dgap_cmdb - Sends a 2 byte command to the FEP.
@@ -2345,8 +2376,6 @@ static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
 {
 	char __iomem *vaddr;
 	struct __iomem cm_t *cm_addr;
-	uint count;
-	uint n;
 	u16 head;
 	u16 tail;
 
@@ -2391,27 +2420,9 @@ static void dgap_cmdb(struct channel_t *ch, u8 cmd, u8 byte1,
 
 	writew(head, &cm_addr->cm_head);
 
-	/*
-	 * Wait if necessary before updating the head
-	 * pointer to limit the number of outstanding
-	 * commands to the FEP.   If the time spent waiting
-	 * is outlandish, declare the FEP dead.
-	 */
-	for (count = dgap_count ;;) {
-		head = readw(&cm_addr->cm_head);
-		tail = readw(&cm_addr->cm_tail);
+	wait_for_fep_cmds_limit(ch, cm_addr, head, tail, ncmds);
 
-		n = (head - tail) & (CMDMAX - CMDSTART - 4);
-
-		if (n <= ncmds * sizeof(struct cm_t))
-			break;
-
-		if (--count == 0) {
-			ch->ch_bd->state = BOARD_FAILED;
-			return;
-		}
-		udelay(10);
-	}
+	return;
 }
 
 /*=======================================================================
@@ -2429,8 +2440,6 @@ static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds)
 {
 	char __iomem *vaddr;
 	struct __iomem cm_t *cm_addr;
-	uint count;
-	uint n;
 	u16 head;
 	u16 tail;
 
@@ -2473,27 +2482,9 @@ static void dgap_cmdw(struct channel_t *ch, u8 cmd, u16 word, uint ncmds)
 
 	writew(head, &cm_addr->cm_head);
 
-	/*
-	 * Wait if necessary before updating the head
-	 * pointer to limit the number of outstanding
-	 * commands to the FEP.   If the time spent waiting
-	 * is outlandish, declare the FEP dead.
-	 */
-	for (count = dgap_count ;;) {
-		head = readw(&cm_addr->cm_head);
-		tail = readw(&cm_addr->cm_tail);
+	wait_for_fep_cmds_limit(ch, cm_addr, head, tail, ncmds);
 
-		n = (head - tail) & (CMDMAX - CMDSTART - 4);
-
-		if (n <= ncmds * sizeof(struct cm_t))
-			break;
-
-		if (--count == 0) {
-			ch->ch_bd->state = BOARD_FAILED;
-			return;
-		}
-		udelay(10);
-	}
+	return;
 }
 
 /*=======================================================================
@@ -2511,8 +2502,6 @@ static void dgap_cmdw_ext(struct channel_t *ch, u16 cmd, u16 word, uint ncmds)
 {
 	char __iomem *vaddr;
 	struct __iomem cm_t *cm_addr;
-	uint count;
-	uint n;
 	u16 head;
 	u16 tail;
 
@@ -2567,27 +2556,9 @@ static void dgap_cmdw_ext(struct channel_t *ch, u16 cmd, u16 word, uint ncmds)
 
 	writew(head, &cm_addr->cm_head);
 
-	/*
-	 * Wait if necessary before updating the head
-	 * pointer to limit the number of outstanding
-	 * commands to the FEP.   If the time spent waiting
-	 * is outlandish, declare the FEP dead.
-	 */
-	for (count = dgap_count ;;) {
-		head = readw(&cm_addr->cm_head);
-		tail = readw(&cm_addr->cm_tail);
+	wait_for_fep_cmds_limit(ch, cm_addr, head, tail, ncmds);
 
-		n = (head - tail) & (CMDMAX - CMDSTART - 4);
-
-		if (n <= ncmds * sizeof(struct cm_t))
-			break;
-
-		if (--count == 0) {
-			ch->ch_bd->state = BOARD_FAILED;
-			return;
-		}
-		udelay(10);
-	}
+	return;
 }
 
 /*=======================================================================
