@@ -173,6 +173,9 @@ int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
 	addr = start;
 	len = (unsigned long) nr_pages << PAGE_SHIFT;
 	end = start + len;
+	if (unlikely(!access_ok(write ? VERIFY_WRITE : VERIFY_READ,
+					(void __user *)start, len)))
+		return 0;
 
 	local_irq_save(flags);
 	pgdp = pgd_offset(mm, addr);
@@ -203,6 +206,8 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
 	addr = start;
 	len = (unsigned long) nr_pages << PAGE_SHIFT;
 	end = start + len;
+	if (end < start)
+		goto slow_irqon;
 
 	/*
 	 * XXX: batch / limit 'nr', to avoid large irq off latency
