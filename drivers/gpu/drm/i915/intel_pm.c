@@ -3610,14 +3610,18 @@ static void skl_update_wm(struct drm_crtc *crtc)
 	dev_priv->wm.skl_hw = *results;
 }
 
-static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
+static void ilk_program_watermarks(struct intel_crtc_state *cstate)
 {
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_crtc *crtc = cstate->base.crtc;
+	struct drm_device *dev = crtc->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_pipe_wm lp_wm_1_2 = {}, lp_wm_5_6 = {}, *best_lp_wm;
 	struct ilk_wm_maximums max;
 	struct intel_wm_config *config = &dev_priv->wm.config;
 	struct ilk_wm_values results = {};
 	enum intel_ddb_partitioning partitioning;
+
+	to_intel_crtc(crtc)->wm.active.ilk = cstate->wm.optimal.ilk;
 
 	ilk_compute_wm_maximums(dev, 1, config, INTEL_DDB_PART_1_2, &max);
 	ilk_wm_merge(dev, config, &max, &lp_wm_1_2);
@@ -3643,7 +3647,6 @@ static void ilk_program_watermarks(struct drm_i915_private *dev_priv)
 
 static void ilk_update_wm(struct drm_crtc *crtc)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	struct intel_crtc_state *cstate = to_intel_crtc_state(crtc->state);
 
@@ -3661,9 +3664,7 @@ static void ilk_update_wm(struct drm_crtc *crtc)
 		intel_wait_for_vblank(crtc->dev, intel_crtc->pipe);
 	}
 
-	intel_crtc->wm.active.ilk = cstate->wm.optimal.ilk;
-
-	ilk_program_watermarks(dev_priv);
+	ilk_program_watermarks(cstate);
 }
 
 static void skl_pipe_wm_active_state(uint32_t val,
@@ -6971,6 +6972,7 @@ void intel_init_pm(struct drm_device *dev)
 		     dev_priv->wm.spr_latency[0] && dev_priv->wm.cur_latency[0])) {
 			dev_priv->display.update_wm = ilk_update_wm;
 			dev_priv->display.compute_pipe_wm = ilk_compute_pipe_wm;
+			dev_priv->display.program_watermarks = ilk_program_watermarks;
 		} else {
 			DRM_DEBUG_KMS("Failed to read display plane latency. "
 				      "Disable CxSR\n");
