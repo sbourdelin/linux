@@ -145,9 +145,12 @@ Required properties:
   Size: one cell
 
 - thermal-sensors:	A list of thermal sensor phandles and sensor specifier
-  Type: list of 	used while monitoring the thermal zone.
-  phandles + sensor
-  specifier
+  Type: list of 	used while monitoring the thermal zone. The phandles
+  phandles + sensor	can point to thermal sensors or other thermal zone
+  specifier		nodes. If it points to other thermal zone
+			nodes you should omit the sensor specifier
+			and set #thermal-sensor-cells to 0 for the
+			thermal zone.
 
 - trips:		A sub-node which is a container of only trip point nodes
   Type: sub-node	required to describe the thermal zone.
@@ -603,3 +606,148 @@ thermal-zones {
 The above example is a mix of previous examples, a sensor IP with several internal
 sensors used to monitor different zones, one of them is composed by several sensors and
 with different cooling devices.
+
+(e) Board thermal with stacked thermal zones
+
+Instead of setting up one thermal zone combining multiple thermal
+zones and multiple trip points for each cooling device, we can create
+a hierarchy of thermal zones.
+
+#include <dt-bindings/thermal/thermal.h>
+
+&i2c1 {
+	...
+	/*
+	 * An IC with several temperature sensor.
+	 */
+	adc_dummy: sensor@0x50 {
+		...
+		#thermal-sensor-cells = <1>; /* sensor internal ID */
+	};
+};
+
+thermal-zones {
+
+        cpu_thermal: cpu_thermal {
+		polling-delay-passive = <1000>; /* milliseconds */
+		polling-delay = <2500>; /* milliseconds */
+
+		sustainable-power = <2500>;
+
+		thermal-sensors = <&adc_dummy 0>
+
+		trips {
+			cpu_trip: cpu-trip {
+				temperature = <60000>; /* millicelsius */
+				hysteresis = <2000>; /* millicelsius */
+				type = "passive";
+			};
+                };
+
+		cooling-maps {
+			map0 {
+				trip = <&cpu_trip>;
+				cooling-device = <&cpu0 0 2>;
+			};
+                };
+        };
+
+        gpu_thermal: gpu_thermal {
+		polling-delay-passive = <1000>; /* milliseconds */
+		polling-delay = <2500>; /* milliseconds */
+
+		sustainable-power = <2500>;
+
+		thermal-sensors = <&adc_dummy 2>
+
+		trips {
+			gpu_trip: gpu-trip {
+				temperature = <55000>; /* millicelsius */
+				hysteresis = <2000>; /* millicelsius */
+				type = "passive";
+			}
+                };
+
+		cooling-maps {
+			map0 {
+				trip = <&gpu_trip>;
+				cooling-device = <&gpu0 0 2>;
+			};
+                };
+        };
+
+        lcd_thermal: lcd_thermal {
+		polling-delay-passive = <1000>; /* milliseconds */
+		polling-delay = <2500>; /* milliseconds */
+
+		sustainable-power = <2500>;
+
+		thermal-sensors = <&adc_dummy 1>
+
+		trips {
+			lcd_trip: lcp-trip {
+				temperature = <53000>; /* millicelsius */
+				hysteresis = <2000>; /* millicelsius */
+				type = "passive";
+			};
+                };
+
+		cooling-maps {
+			map0 {
+				trip = <&lcd_trip>;
+				cooling-device = <&lcd0 5 10>;
+			};
+                };
+        };
+
+	board_thermal: board-thermal {
+		polling-delay-passive = <1000>; /* milliseconds */
+		polling-delay = <2500>; /* milliseconds */
+
+		thermal-sensors = <&cpu_thermal &gpu_thermal &lcd_thermal>
+
+		sustainable-power = <2500>;
+
+		trips {
+			warm_trip: warm-trip {
+				temperature = <62000>; /* millicelsius */
+				hysteresis = <2000>; /* millicelsius */
+				type = "passive";
+			};
+			crit_trip: crit-trip {
+				temperature = <68000>; /* millicelsius */
+				hysteresis = <2000>; /* millicelsius */
+				type = "critical";
+			};
+		};
+
+		cooling-maps {
+			map0 {
+				trip = <&warm_trip>;
+				cooling-device = <&cpu0 2 2>;
+				contribution = <55>;
+			};
+			map1 {
+				trip = <&warm_trip>;
+				cooling-device = <&gpu0 2 2>;
+				contribution = <20>;
+			};
+			map2 {
+				trip = <&lcd_trip>;
+				cooling-device = <&lcd0 7 10>;
+				contribution = <15>;
+			};
+		};
+	};
+};
+
+The above example is a different take at example (d).  We create one
+thermal zone per sensor: cpu_thermal, gpu_thermal and lcd_thermal.
+Each of which has its own trip point for each own cooling device.  We
+then define a board_thermal thermal zone that is a combination of all
+the other thermal zones.  If the board hits its warm_trip, then all
+cooling devices are throttled.
+
+This example illustrates how we can throttle each device individually
+if its too hot and at the same time have some control over the whole
+system.
