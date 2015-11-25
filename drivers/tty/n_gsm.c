@@ -2037,15 +2037,13 @@ static void gsm_cleanup_mux(struct gsm_mux *gsm)
 
 	gsm->dead = 1;
 
+	/* open failed before registering => nothing to do*/
+	if (gsm_mux[gsm->num] != gsm)
+		return;
+
 	spin_lock(&gsm_mux_lock);
-	for (i = 0; i < MAX_MUX; i++) {
-		if (gsm_mux[i] == gsm) {
-			gsm_mux[i] = NULL;
-			break;
-		}
-	}
+	gsm_mux[gsm->num] = NULL;
 	spin_unlock(&gsm_mux_lock);
-	WARN_ON(i == MAX_MUX);
 
 	/* In theory disconnecting DLCI 0 is sufficient but for some
 	   modems this is apparently not the case. */
