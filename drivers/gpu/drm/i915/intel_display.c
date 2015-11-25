@@ -1908,6 +1908,8 @@ static void intel_enable_shared_dpll(struct intel_crtc *crtc)
 	if (pll->active++) {
 		WARN_ON(!pll->on);
 		assert_shared_dpll_enabled(dev_priv, pll);
+		/* to update high speed IO clock state */
+		pll->enable(dev_priv, pll);
 		return;
 	}
 	WARN_ON(pll->on);
@@ -8899,11 +8901,6 @@ static uint32_t ironlake_compute_dpll(struct intel_crtc *intel_crtc,
 	dpll |= (crtc_state->pixel_multiplier - 1)
 		<< PLL_REF_SDVO_HDMI_MULTIPLIER_SHIFT;
 
-	if (is_sdvo)
-		dpll |= DPLL_SDVO_HIGH_SPEED;
-	if (crtc_state->has_dp_encoder)
-		dpll |= DPLL_SDVO_HIGH_SPEED;
-
 	/* compute bitmask from p1 value */
 	dpll |= (1 << (crtc_state->dpll.p1 - 1)) << DPLL_FPA01_P1_POST_DIV_SHIFT;
 	/* also FPA1 */
@@ -13533,7 +13530,7 @@ static bool ibx_pch_dpll_get_hw_state(struct drm_i915_private *dev_priv,
 		return false;
 
 	val = I915_READ(PCH_DPLL(pll->id));
-	hw_state->dpll = val;
+	hw_state->dpll = val & ~DPLL_SDVO_HIGH_SPEED;
 	hw_state->fp0 = I915_READ(PCH_FP0(pll->id));
 	hw_state->fp1 = I915_READ(PCH_FP1(pll->id));
 
@@ -13550,10 +13547,26 @@ static void ibx_pch_dpll_mode_set(struct drm_i915_private *dev_priv,
 static void ibx_pch_dpll_enable(struct drm_i915_private *dev_priv,
 				struct intel_shared_dpll *pll)
 {
+	struct drm_device *dev = dev_priv->dev;
+	struct intel_crtc *crtc;
+	u32 dpll = pll->config.hw_state.dpll;
+
+	/* Configure high speed IO clock as needed */
+	for_each_intel_crtc(dev, crtc) {
+		if (intel_crtc_to_shared_dpll(crtc) == pll &&
+		    crtc->config->base.active &&
+		    (crtc->config->has_dp_encoder ||
+		     intel_pipe_has_type(crtc, INTEL_OUTPUT_SDVO) ||
+		     intel_pipe_has_type(crtc, INTEL_OUTPUT_HDMI))) {
+			dpll |= DPLL_SDVO_HIGH_SPEED;
+			break;
+		}
+	}
+
 	/* PCH refclock must be enabled first */
 	ibx_assert_pch_refclk_enabled(dev_priv);
 
-	I915_WRITE(PCH_DPLL(pll->id), pll->config.hw_state.dpll);
+	I915_WRITE(PCH_DPLL(pll->id), dpll);
 
 	/* Wait for the clocks to stabilize. */
 	POSTING_READ(PCH_DPLL(pll->id));
@@ -13564,7 +13577,7 @@ static void ibx_pch_dpll_enable(struct drm_i915_private *dev_priv,
 	 *
 	 * So write it again.
 	 */
-	I915_WRITE(PCH_DPLL(pll->id), pll->config.hw_state.dpll);
+	I915_WRITE(PCH_DPLL(pll->id), dpll);
 	POSTING_READ(PCH_DPLL(pll->id));
 	udelay(200);
 }
