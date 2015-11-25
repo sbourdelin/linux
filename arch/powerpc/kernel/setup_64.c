@@ -127,7 +127,7 @@ static void setup_tlb_core_data(void)
 		    !mmu_has_feature(MMU_FTR_USE_TLBRSRV) &&
 		    book3e_htw_mode != PPC_HTW_E6500) {
 			/* Should we panic instead? */
-			WARN_ONCE("%s: unsupported MMU configuration -- expect problems\n",
+			WARN_ONCE(1, "%s: unsupported MMU configuration -- expect problems\n",
 				  __func__);
 		}
 	}
