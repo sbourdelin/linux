@@ -279,6 +279,21 @@ out:
 		complete(&wdt->response);
 }
 
+/*
+ * mei_wdt_event_notif - callback for notification
+ *
+ * @cldev: bus device
+ */
+static void mei_wdt_event_notif(struct mei_cl_device *cldev)
+{
+	struct mei_wdt *wdt = mei_cldev_get_drvdata(cldev);
+
+	if (wdt->state == MEI_WDT_NOT_REQUIRED) {
+		mei_wdt_register(wdt);
+		wdt->state = MEI_WDT_IDLE;
+	}
+}
+
 /**
  * mei_wdt_event - callback for event receive
  *
@@ -291,6 +306,9 @@ static void mei_wdt_event(struct mei_cl_device *cldev,
 {
 	if (events & BIT(MEI_CL_EVENT_RX))
 		mei_wdt_event_rx(cldev);
+
+	if (events & BIT(MEI_CL_EVENT_NOTIF))
+		mei_wdt_event_notif(cldev);
 }
 
 /**
@@ -466,9 +484,13 @@ static int mei_wdt_probe(struct mei_cl_device *cldev,
 
 	wd_info.firmware_version = mei_cldev_ver(cldev);
 
-	ret = mei_cldev_register_event_cb(wdt->cldev, BIT(MEI_CL_EVENT_RX),
+	ret = mei_cldev_register_event_cb(wdt->cldev,
+					  BIT(MEI_CL_EVENT_RX) |
+					  BIT(MEI_CL_EVENT_NOTIF),
 					  mei_wdt_event, NULL);
-	if (ret) {
+
+	/* on legacy devices notification is not supported */
+	if (ret && ret != -EOPNOTSUPP) {
 		dev_err(&cldev->dev, "Could not register event ret=%d\n", ret);
 		goto err_disable;
 	}
