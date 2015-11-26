@@ -470,6 +470,22 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
 	 * (online configuration)
 	 */
 	if (enable) {
+		/*
+		 * Clear RX or TX FIFO to remove samples from the previous
+		 * stream session which may be still present in the FIFO and
+		 * may introduce bad samples and/or channel slipping.
+		 *
+		 * Note: The SOR is not documented in recent IMX datasheet, but
+		 * is described in IMX51 reference manual at section 56.3.3.15.
+		 */
+		if (vals->scr & CCSR_SSI_SCR_RE) {
+			regmap_update_bits(regs, CCSR_SSI_SOR,
+				CCSR_SSI_SOR_RX_CLR, CCSR_SSI_SOR_RX_CLR);
+		} else {
+			regmap_update_bits(regs, CCSR_SSI_SOR,
+				CCSR_SSI_SOR_TX_CLR, CCSR_SSI_SOR_TX_CLR);
+		}
+
 		regmap_update_bits(regs, CCSR_SSI_SRCR, vals->srcr, vals->srcr);
 		regmap_update_bits(regs, CCSR_SSI_STCR, vals->stcr, vals->stcr);
 		regmap_update_bits(regs, CCSR_SSI_SIER, vals->sier, vals->sier);
