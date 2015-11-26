@@ -85,8 +85,7 @@ i915_gem_wait_for_error(struct i915_gpu_error *error)
 {
 	int ret;
 
-#define EXIT_COND (!i915_reset_in_progress(error) || \
-		   i915_terminally_wedged(error))
+#define EXIT_COND (!i915_reset_in_progress(error))
 	if (EXIT_COND)
 		return 0;
 
@@ -1113,14 +1112,14 @@ int
 i915_gem_check_wedge(struct i915_gpu_error *error,
 		     bool interruptible)
 {
+	/* Recovery complete, but the reset failed ... */
+	if (i915_terminally_wedged(error))
+		return -EIO;
+
 	if (i915_reset_in_progress(error)) {
 		/* Non-interruptible callers can't handle -EAGAIN, hence return
 		 * -EIO unconditionally for these. */
 		if (!interruptible)
-			return -EIO;
-
-		/* Recovery complete, but the reset failed ... */
-		if (i915_terminally_wedged(error))
 			return -EIO;
 
 		/*
@@ -1239,11 +1238,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 		/* We need to check whether any gpu reset happened in between
 		 * the caller grabbing the seqno and now ... */
 		if (reset_counter != atomic_read(&dev_priv->gpu_error.reset_counter)) {
-			/* ... but upgrade the -EAGAIN to an -EIO if the gpu
-			 * is truely gone. */
-			ret = i915_gem_check_wedge(&dev_priv->gpu_error, interruptible);
-			if (ret == 0)
-				ret = -EAGAIN;
+			ret = -EAGAIN;
 			break;
 		}
 
@@ -1577,7 +1572,7 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret)
-		return ret;
+		goto out;
 
 	obj = to_intel_bo(drm_gem_object_lookup(dev, file, args->handle));
 	if (&obj->base == NULL) {
@@ -1609,6 +1604,10 @@ unref:
 	drm_gem_object_unreference(&obj->base);
 unlock:
 	mutex_unlock(&dev->struct_mutex);
+out:
+	/* ABI: set_domain_ioctl must not fail even when the gpu is wedged. */
+	WARN_ON(ret == -EIO);
+
 	return ret;
 }
 

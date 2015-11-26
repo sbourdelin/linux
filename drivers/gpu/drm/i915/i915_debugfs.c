@@ -4682,6 +4682,10 @@ i915_wedged_set(void *data, u64 val)
 	if (i915_reset_in_progress(&dev_priv->gpu_error))
 		return -EAGAIN;
 
+	/* Already wedged, force us out of this terminal state. */
+	if (i915_terminally_wedged(&dev_priv->gpu_error))
+		atomic_set(&dev_priv->gpu_error.reset_counter, 0);
+
 	intel_runtime_pm_get(dev_priv);
 
 	i915_handle_error(dev, val,

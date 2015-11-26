@@ -2401,7 +2401,8 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
  * Fire an error uevent so userspace can see that a hang or error
  * was detected.
  */
-static void i915_reset_and_wakeup(struct drm_device *dev)
+static void i915_reset_and_wakeup(struct drm_device *dev,
+				  bool wedged)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct i915_gpu_error *error = &dev_priv->gpu_error;
@@ -2422,7 +2423,7 @@ static void i915_reset_and_wakeup(struct drm_device *dev)
 	 * the reset in-progress bit is only ever set by code outside of this
 	 * work we don't need to worry about any other races.
 	 */
-	if (i915_reset_in_progress(error) && !i915_terminally_wedged(error)) {
+	if (wedged) {
 		DRM_DEBUG_DRIVER("resetting chip\n");
 		kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE,
 				   reset_event);
@@ -2432,7 +2433,7 @@ static void i915_reset_and_wakeup(struct drm_device *dev)
 		 * reference held, for example because there is a pending GPU
 		 * request that won't finish until the reset is done. This
 		 * isn't the case at least when we get here by doing a
-		 * simulated reset via debugs, so get an RPM reference.
+		 * simulated reset via debugfs, so get an RPM reference.
 		 */
 		intel_runtime_pm_get(dev_priv);
 
@@ -2467,7 +2468,7 @@ static void i915_reset_and_wakeup(struct drm_device *dev)
 			kobject_uevent_env(&dev->primary->kdev->kobj,
 					   KOBJ_CHANGE, reset_done_event);
 		} else {
-			atomic_or(I915_WEDGED, &error->reset_counter);
+			atomic_set(&error->reset_counter, I915_WEDGED);
 		}
 
 		/*
@@ -2614,7 +2615,7 @@ void i915_handle_error(struct drm_device *dev, bool wedged,
 		i915_error_wake_up(dev_priv, false);
 	}
 
-	i915_reset_and_wakeup(dev);
+	i915_reset_and_wakeup(dev, wedged);
 }
 
 /* Called from drm generic code, passed 'crtc' which
