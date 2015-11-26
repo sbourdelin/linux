@@ -52,7 +52,7 @@ g94_i2c_aux_init(struct g94_i2c_aux *aux)
 		udelay(1);
 		if (!timeout--) {
 			AUX_ERR(&aux->base, "begin idle timeout %08x", ctrl);
-			return -EBUSY;
+			return -EAGAIN;
 		}
 	} while (ctrl & 0x03010000);
 
@@ -65,7 +65,7 @@ g94_i2c_aux_init(struct g94_i2c_aux *aux)
 		if (!timeout--) {
 			AUX_ERR(&aux->base, "magic wait %08x", ctrl);
 			g94_i2c_aux_fini(aux);
-			return -EBUSY;
+			return -EAGAIN;
 		}
 	} while ((ctrl & 0x03000000) != urep);
 
