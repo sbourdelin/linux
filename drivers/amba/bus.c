@@ -364,6 +364,10 @@ static int read_periphid(struct amba_device *d, unsigned int *periphid)
 	if (!tmp)
 		return -ENOMEM;
 
+	ret = dev_pm_domain_attach(&d->dev, true);
+	if (ret == -EPROBE_DEFER)
+		goto err_unmap;
+
 	ret = amba_get_enable_pclk(d);
 	if (ret == 0) {
 		u32 pid, cid;
@@ -388,6 +392,8 @@ static int read_periphid(struct amba_device *d, unsigned int *periphid)
 			ret = -ENODEV;
 	}
 
+	dev_pm_domain_detach(&d->dev, true);
+err_unmap:
 	iounmap(tmp);
 
 	return ret;
