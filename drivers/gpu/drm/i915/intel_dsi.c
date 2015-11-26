@@ -1176,8 +1176,23 @@ void intel_dsi_init(struct drm_device *dev)
 		intel_dsi->ports = (1 << PORT_C);
 	}
 
-	if (dev_priv->vbt.dsi.config->dual_link)
+	if (dev_priv->vbt.dsi.config->dual_link) {
 		intel_dsi->ports = ((1 << PORT_A) | (1 << PORT_C));
+		switch (dev_priv->vbt.dsi.config->dl_cabc_port) {
+		case CABC_PORT_A:
+			intel_dsi->bkl_dcs_ports = (1 << PORT_A);
+			break;
+		case CABC_PORT_C:
+			intel_dsi->bkl_dcs_ports = (1 << PORT_C);
+			break;
+		case CABC_PORT_A_AND_C:
+			intel_dsi->bkl_dcs_ports = intel_dsi->ports;
+			break;
+		default:
+			DRM_ERROR("Unknown MIPI ports for sending DCS\n");
+		}
+	} else
+		intel_dsi->bkl_dcs_ports = intel_dsi->ports;
 
 	/* Create a DSI host (and a device) for each port. */
 	for_each_dsi_port(port, intel_dsi->ports) {
