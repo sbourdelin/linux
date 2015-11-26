@@ -342,6 +342,14 @@ static struct region_info region_configs[] = {
 		.deemphasis		= 50,
 		.region			= 3,
 	},
+	/* Japan wide band */
+	{
+		.channel_spacing	= 10,
+		.bottom_frequency	= 76000,
+		.top_frequency		= 108000,
+		.deemphasis		= 50,
+		.region			= 4,
+	},
 };
 
 /*
@@ -613,7 +621,7 @@ static int bcm2048_set_fm_frequency(struct bcm2048_device *bdev, u32 frequency)
 static int bcm2048_get_fm_frequency(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 lsb = 0, msb = 0;
+	u8 lsb, msb;
 
 	mutex_lock(&bdev->mutex);
 
@@ -658,7 +666,7 @@ static int bcm2048_set_fm_af_frequency(struct bcm2048_device *bdev,
 static int bcm2048_get_fm_af_frequency(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 lsb = 0, msb = 0;
+	u8 lsb, msb;
 
 	mutex_lock(&bdev->mutex);
 
@@ -733,18 +741,6 @@ static int bcm2048_set_region(struct bcm2048_device *bdev, u8 region)
 
 	mutex_lock(&bdev->mutex);
 	bdev->region_info = region_configs[region];
-
-	if (region_configs[region].bottom_frequency < 87500)
-		bdev->cache_fm_ctrl |= BCM2048_BAND_SELECT;
-	else
-		bdev->cache_fm_ctrl &= ~BCM2048_BAND_SELECT;
-
-	err = bcm2048_send_command(bdev, BCM2048_I2C_FM_CTRL,
-					bdev->cache_fm_ctrl);
-	if (err) {
-		mutex_unlock(&bdev->mutex);
-		goto done;
-	}
 	mutex_unlock(&bdev->mutex);
 
 	if (bdev->frequency < region_configs[region].bottom_frequency ||
@@ -1052,7 +1048,7 @@ static int bcm2048_set_rds_b_block_mask(struct bcm2048_device *bdev, u16 mask)
 static int bcm2048_get_rds_b_block_mask(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 lsb = 0, msb = 0;
+	u8 lsb, msb;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1088,7 +1084,7 @@ static int bcm2048_set_rds_b_block_match(struct bcm2048_device *bdev,
 static int bcm2048_get_rds_b_block_match(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 lsb = 0, msb = 0;
+	u8 lsb, msb;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1123,7 +1119,7 @@ static int bcm2048_set_rds_pi_mask(struct bcm2048_device *bdev, u16 mask)
 static int bcm2048_get_rds_pi_mask(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 lsb = 0, msb = 0;
+	u8 lsb, msb;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1158,7 +1154,7 @@ static int bcm2048_set_rds_pi_match(struct bcm2048_device *bdev, u16 match)
 static int bcm2048_get_rds_pi_match(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 lsb = 0, msb = 0;
+	u8 lsb, msb;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1193,7 +1189,7 @@ static int bcm2048_set_fm_rds_mask(struct bcm2048_device *bdev, u16 mask)
 static int bcm2048_get_fm_rds_mask(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 value0 = 0, value1 = 0;
+	u8 value0, value1;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1211,7 +1207,7 @@ static int bcm2048_get_fm_rds_mask(struct bcm2048_device *bdev)
 static int bcm2048_get_fm_rds_flags(struct bcm2048_device *bdev)
 {
 	int err;
-	u8 value0 = 0, value1 = 0;
+	u8 value0, value1;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1239,7 +1235,7 @@ static int bcm2048_get_region_top_frequency(struct bcm2048_device *bdev)
 static int bcm2048_set_fm_best_tune_mode(struct bcm2048_device *bdev, u8 mode)
 {
 	int err;
-	u8 value = 0;
+	u8 value;
 
 	mutex_lock(&bdev->mutex);
 
@@ -1913,7 +1909,7 @@ unlock:
 static void bcm2048_work(struct work_struct *work)
 {
 	struct bcm2048_device *bdev;
-	u8 flag_lsb = 0, flag_msb = 0, flags;
+	u8 flag_lsb, flag_msb, flags;
 
 	bdev = container_of(work, struct bcm2048_device, work);
 	bcm2048_recv_command(bdev, BCM2048_I2C_FM_RDS_FLAG0, &flag_lsb);

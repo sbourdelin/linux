@@ -424,7 +424,7 @@ static int stmmac_hwtstamp_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
 	struct hwtstamp_config config;
-	struct timespec64 now;
+	struct timespec now;
 	u64 temp = 0;
 	u32 ptp_v2 = 0;
 	u32 tstamp_all = 0;
@@ -621,10 +621,8 @@ static int stmmac_hwtstamp_ioctl(struct net_device *dev, struct ifreq *ifr)
 					     priv->default_addend);
 
 		/* initialize system time */
-		ktime_get_real_ts64(&now);
-
-		/* lower 32 bits of tv_sec are safe until y2106 */
-		priv->hw->ptp->init_systime(priv->ioaddr, (u32)now.tv_sec,
+		getnstimeofday(&now);
+		priv->hw->ptp->init_systime(priv->ioaddr, now.tv_sec,
 					    now.tv_nsec);
 	}
 
@@ -839,11 +837,8 @@ static int stmmac_init_phy(struct net_device *dev)
 				     interface);
 	}
 
-	if (IS_ERR_OR_NULL(phydev)) {
+	if (IS_ERR(phydev)) {
 		pr_err("%s: Could not attach to PHY\n", dev->name);
-		if (!phydev)
-			return -ENODEV;
-
 		return PTR_ERR(phydev);
 	}
 
@@ -1947,7 +1942,7 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
 	unsigned int txsize = priv->dma_tx_size;
-	int entry;
+	unsigned int entry;
 	int i, csum_insertion = 0, is_jumbo = 0;
 	int nfrags = skb_shinfo(skb)->nr_frags;
 	struct dma_desc *desc, *first;
@@ -2848,7 +2843,7 @@ int stmmac_dvr_probe(struct device *device,
 	if (res->mac)
 		memcpy(priv->dev->dev_addr, res->mac, ETH_ALEN);
 
-	dev_set_drvdata(device, priv->dev);
+	dev_set_drvdata(device, priv);
 
 	/* Verify driver arguments */
 	stmmac_verify_args();

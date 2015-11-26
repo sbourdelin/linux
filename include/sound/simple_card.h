@@ -19,8 +19,6 @@ struct asoc_simple_dai {
 	unsigned int sysclk;
 	int slots;
 	int slot_width;
-	unsigned int tx_slot_mask;
-	unsigned int rx_slot_mask;
 	struct clk *clk;
 };
 

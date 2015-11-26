@@ -25,8 +25,23 @@
 #include "../../include/linux/libcfs/libcfs.h"
 #include "../../include/linux/lnet/lib-lnet.h"
 
+#if  defined(LNET_ROUTER)
+
 /* This is really lnet_proc.c. You might need to update sanity test 215
  * if any file format is changed. */
+
+static struct ctl_table_header *lnet_table_header;
+
+#define CTL_LNET	 (0x100)
+enum {
+	PSDEV_LNET_STATS = 100,
+	PSDEV_LNET_ROUTES,
+	PSDEV_LNET_ROUTERS,
+	PSDEV_LNET_PEERS,
+	PSDEV_LNET_BUFFERS,
+	PSDEV_LNET_NIS,
+	PSDEV_LNET_PTL_ROTOR,
+};
 
 #define LNET_LOFFT_BITS		(sizeof(loff_t) * 8)
 /*
@@ -692,7 +707,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
 		if (ni != NULL) {
 			struct lnet_tx_queue *tq;
 			char *stat;
-			time64_t now = ktime_get_real_seconds();
+			long now = get_seconds();
 			int last_alive = -1;
 			int i;
 			int j;
@@ -910,11 +925,44 @@ static struct ctl_table lnet_table[] = {
 	}
 };
 
-void lnet_router_debugfs_init(void)
+static struct ctl_table top_table[] = {
+	{
+		.procname = "lnet",
+		.mode     = 0555,
+		.data     = NULL,
+		.maxlen   = 0,
+		.child    = lnet_table,
+	},
+	{
+	}
+};
+
+void
+lnet_proc_init(void)
 {
-	lustre_insert_debugfs(lnet_table, NULL);
+	if (lnet_table_header == NULL)
+		lnet_table_header = register_sysctl_table(top_table);
 }
 
-void lnet_router_debugfs_fini(void)
+void
+lnet_proc_fini(void)
+{
+	if (lnet_table_header != NULL)
+		unregister_sysctl_table(lnet_table_header);
+
+	lnet_table_header = NULL;
+}
+
+#else
+
+void
+lnet_proc_init(void)
 {
 }
+
+void
+lnet_proc_fini(void)
+{
+}
+
+#endif

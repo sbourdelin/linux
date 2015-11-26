@@ -13,6 +13,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include <linux/module.h>
@@ -27,6 +31,8 @@
 
 static int init_display(struct fbtft_par *par)
 {
+
+	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
 
 	par->fbtftops.reset(par);
 	mdelay(150);
@@ -72,6 +78,9 @@ static int init_display(struct fbtft_par *par)
 
 static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 {
+	fbtft_par_dbg(DEBUG_SET_ADDR_WIN, par,
+		"%s(xs=%d, ys=%d, xe=%d, ye=%d)\n", __func__, xs, ys, xe, ye);
+
 	/* column address */
 	write_reg(par, 0x2a, xs >> 8, xs & 0xff, xe >> 8, xe & 0xff);
 
@@ -82,11 +91,13 @@ static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 	write_reg(par, 0x2c);
 }
 
-#define my BIT(7)
-#define mx BIT(6)
-#define mv BIT(5)
+#define my (1 << 7)
+#define mx (1 << 6)
+#define mv (1 << 5)
 static int set_var(struct fbtft_par *par)
 {
+	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
+
 	/* madctl - memory data access control
 	     rgb/bgr:
 	     1. mode selection pin srgb
@@ -116,6 +127,8 @@ static int set_var(struct fbtft_par *par)
 */
 static int set_gamma(struct fbtft_par *par, unsigned long *curves)
 {
+	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
+
 	write_reg(par, 0xE0,
 		curves[0], curves[1], curves[2], curves[3],
 		curves[4], curves[5], curves[6], curves[7],
@@ -125,6 +138,7 @@ static int set_gamma(struct fbtft_par *par, unsigned long *curves)
 
 	return 0;
 }
+
 
 static struct fbtft_display display = {
 	.regwidth = 8,
@@ -140,7 +154,6 @@ static struct fbtft_display display = {
 		.set_gamma = set_gamma,
 	},
 };
-
 FBTFT_REGISTER_DRIVER(DRVNAME, "himax,hx8353d", &display);
 
 MODULE_ALIAS("spi:" DRVNAME);

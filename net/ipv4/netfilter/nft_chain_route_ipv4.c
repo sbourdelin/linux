@@ -21,7 +21,7 @@
 #include <net/route.h>
 #include <net/ip.h>
 
-static unsigned int nf_route_table_hook(void *priv,
+static unsigned int nf_route_table_hook(const struct nf_hook_ops *ops,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
 {
@@ -37,7 +37,7 @@ static unsigned int nf_route_table_hook(void *priv,
 	    ip_hdrlen(skb) < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
-	nft_set_pktinfo_ipv4(&pkt, skb, state);
+	nft_set_pktinfo_ipv4(&pkt, ops, skb, state);
 
 	mark = skb->mark;
 	iph = ip_hdr(skb);
@@ -45,7 +45,7 @@ static unsigned int nf_route_table_hook(void *priv,
 	daddr = iph->daddr;
 	tos = iph->tos;
 
-	ret = nft_do_chain(&pkt, priv);
+	ret = nft_do_chain(&pkt, ops);
 	if (ret != NF_DROP && ret != NF_QUEUE) {
 		iph = ip_hdr(skb);
 
@@ -53,7 +53,7 @@ static unsigned int nf_route_table_hook(void *priv,
 		    iph->daddr != daddr ||
 		    skb->mark != mark ||
 		    iph->tos != tos)
-			if (ip_route_me_harder(state->net, skb, RTN_UNSPEC))
+			if (ip_route_me_harder(skb, RTN_UNSPEC))
 				ret = NF_DROP;
 	}
 	return ret;

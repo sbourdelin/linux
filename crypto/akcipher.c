@@ -21,6 +21,7 @@
 #include <linux/cryptouser.h>
 #include <net/netlink.h>
 #include <crypto/akcipher.h>
+#include <crypto/public_key.h>
 #include "internal.h"
 
 #ifdef CONFIG_NET

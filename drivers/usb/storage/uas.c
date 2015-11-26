@@ -257,16 +257,17 @@ static void uas_stat_cmplt(struct urb *urb)
 	struct uas_cmd_info *cmdinfo;
 	unsigned long flags;
 	unsigned int idx;
-	int status = urb->status;
 
 	spin_lock_irqsave(&devinfo->lock, flags);
 
 	if (devinfo->resetting)
 		goto out;
 
-	if (status) {
-		if (status != -ENOENT && status != -ECONNRESET && status != -ESHUTDOWN)
-			dev_err(&urb->dev->dev, "stat urb: status %d\n", status);
+	if (urb->status) {
+		if (urb->status != -ENOENT && urb->status != -ECONNRESET) {
+			dev_err(&urb->dev->dev, "stat urb: status %d\n",
+				urb->status);
+		}
 		goto out;
 	}
 
@@ -347,7 +348,6 @@ static void uas_data_cmplt(struct urb *urb)
 	struct uas_dev_info *devinfo = (void *)cmnd->device->hostdata;
 	struct scsi_data_buffer *sdb = NULL;
 	unsigned long flags;
-	int status = urb->status;
 
 	spin_lock_irqsave(&devinfo->lock, flags);
 
@@ -374,9 +374,9 @@ static void uas_data_cmplt(struct urb *urb)
 		goto out;
 	}
 
-	if (status) {
-		if (status != -ENOENT && status != -ECONNRESET && status != -ESHUTDOWN)
-			uas_log_cmd_state(cmnd, "data cmplt err", status);
+	if (urb->status) {
+		if (urb->status != -ENOENT && urb->status != -ECONNRESET)
+			uas_log_cmd_state(cmnd, "data cmplt err", urb->status);
 		/* error: no data transfered */
 		sdb->resid = sdb->length;
 	} else {
@@ -812,6 +812,7 @@ static struct scsi_host_template uas_host_template = {
 	.this_id = -1,
 	.sg_tablesize = SG_NONE,
 	.skip_settle_delay = 1,
+	.use_blk_tags = 1,
 };
 
 #define UNUSUAL_DEV(id_vendor, id_product, bcdDeviceMin, bcdDeviceMax, \
@@ -927,6 +928,10 @@ static int uas_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	result = uas_configure_endpoints(devinfo);
 	if (result)
 		goto set_alt0;
+
+	result = scsi_init_shared_tag_map(shost, devinfo->qdepth - 2);
+	if (result)
+		goto free_streams;
 
 	usb_set_intfdata(intf, shost);
 	result = scsi_add_host(shost, &intf->dev);

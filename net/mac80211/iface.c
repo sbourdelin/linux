@@ -661,13 +661,11 @@ int ieee80211_do_open(struct wireless_dev *wdev, bool coming_up)
 		}
 
 		/*
-		 * Set default queue parameters so drivers don't
+		 * set default queue parameters so drivers don't
 		 * need to initialise the hardware if the hardware
-		 * doesn't start up with sane defaults.
-		 * Enable QoS for anything but station interfaces.
+		 * doesn't start up with sane defaults
 		 */
-		ieee80211_set_wmm_default(sdata, true,
-			sdata->vif.type != NL80211_IFTYPE_STATION);
+		ieee80211_set_wmm_default(sdata, true);
 	}
 
 	set_bit(SDATA_STATE_RUNNING, &sdata->state);
@@ -711,7 +709,7 @@ int ieee80211_do_open(struct wireless_dev *wdev, bool coming_up)
 	if (hw_reconf_flags)
 		ieee80211_hw_config(local, hw_reconf_flags);
 
-	ieee80211_recalc_ps(local);
+	ieee80211_recalc_ps(local, -1);
 
 	if (sdata->vif.type == NL80211_IFTYPE_MONITOR ||
 	    sdata->vif.type == NL80211_IFTYPE_AP_VLAN) {
@@ -1018,7 +1016,7 @@ static void ieee80211_do_stop(struct ieee80211_sub_if_data *sdata,
 			drv_remove_interface(local, sdata);
 	}
 
-	ieee80211_recalc_ps(local);
+	ieee80211_recalc_ps(local, -1);
 
 	if (cancel_scan)
 		flush_delayed_work(&local->scan_work);
@@ -1206,7 +1204,7 @@ static void ieee80211_iface_work(struct work_struct *work)
 	if (!ieee80211_sdata_running(sdata))
 		return;
 
-	if (test_bit(SCAN_SW_SCANNING, &local->scanning))
+	if (local->scanning)
 		return;
 
 	if (!ieee80211_can_run_worker(local))
@@ -1244,6 +1242,8 @@ static void ieee80211_iface_work(struct work_struct *work)
 							WLAN_BACK_RECIPIENT, 0,
 							false);
 			mutex_unlock(&local->sta_mtx);
+		} else if (skb->pkt_type == IEEE80211_SDATA_QUEUE_TDLS_CHSW) {
+			ieee80211_process_tdls_channel_switch(sdata, skb);
 		} else if (ieee80211_is_action(mgmt->frame_control) &&
 			   mgmt->u.action.category == WLAN_CATEGORY_BACK) {
 			int len = skb->len;
@@ -1790,23 +1790,13 @@ int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 		sband = local->hw.wiphy->bands[i];
 		sdata->rc_rateidx_mask[i] =
 			sband ? (1 << sband->n_bitrates) - 1 : 0;
-		if (sband) {
-			__le16 cap;
-			u16 *vht_rate_mask;
-
+		if (sband)
 			memcpy(sdata->rc_rateidx_mcs_mask[i],
 			       sband->ht_cap.mcs.rx_mask,
 			       sizeof(sdata->rc_rateidx_mcs_mask[i]));
-
-			cap = sband->vht_cap.vht_mcs.rx_mcs_map;
-			vht_rate_mask = sdata->rc_rateidx_vht_mcs_mask[i];
-			ieee80211_get_vht_mask_from_cap(cap, vht_rate_mask);
-		} else {
+		else
 			memset(sdata->rc_rateidx_mcs_mask[i], 0,
 			       sizeof(sdata->rc_rateidx_mcs_mask[i]));
-			memset(sdata->rc_rateidx_vht_mcs_mask[i], 0,
-			       sizeof(sdata->rc_rateidx_vht_mcs_mask[i]));
-		}
 	}
 
 	ieee80211_set_default_queues(sdata);
@@ -1873,6 +1863,10 @@ void ieee80211_sdata_stop(struct ieee80211_sub_if_data *sdata)
 	ieee80211_teardown_sdata(sdata);
 }
 
+/*
+ * Remove all interfaces, may only be called at hardware unregistration
+ * time because it doesn't do RCU-safe list removals.
+ */
 void ieee80211_remove_interfaces(struct ieee80211_local *local)
 {
 	struct ieee80211_sub_if_data *sdata, *tmp;
@@ -1881,21 +1875,14 @@ void ieee80211_remove_interfaces(struct ieee80211_local *local)
 
 	ASSERT_RTNL();
 
-	/* Before destroying the interfaces, make sure they're all stopped so
-	 * that the hardware is stopped. Otherwise, the driver might still be
-	 * iterating the interfaces during the shutdown, e.g. from a worker
-	 * or from RX processing or similar, and if it does so (using atomic
-	 * iteration) while we're manipulating the list, the iteration will
-	 * crash.
-	 *
-	 * After this, the hardware should be stopped and the driver should
-	 * have stopped all of its activities, so that we can do RCU-unaware
-	 * manipulations of the interface list below.
+	/*
+	 * Close all AP_VLAN interfaces first, as otherwise they
+	 * might be closed while the AP interface they belong to
+	 * is closed, causing unregister_netdevice_many() to crash.
 	 */
-	cfg80211_shutdown_all_interfaces(local->hw.wiphy);
-
-	WARN(local->open_count, "%s: open count remains %d\n",
-	     wiphy_name(local->hw.wiphy), local->open_count);
+	list_for_each_entry(sdata, &local->interfaces, list)
+		if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+			dev_close(sdata->dev);
 
 	mutex_lock(&local->iflist_mtx);
 	list_for_each_entry_safe(sdata, tmp, &local->interfaces, list) {

@@ -11,10 +11,6 @@
 #include "thread.h"
 #include "callchain.h"
 
-#if defined (__x86_64__) || defined (__i386__)
-#include "arch-tests.h"
-#endif
-
 /* For bsearch. We try to unwind functions in shared object. */
 #include <stdlib.h>
 

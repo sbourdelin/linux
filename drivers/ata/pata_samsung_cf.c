@@ -70,7 +70,7 @@ struct s3c_ide_info {
 	struct clk *clk;
 	void __iomem *ide_addr;
 	void __iomem *sfr_addr;
-	int irq;
+	unsigned int irq;
 	enum s3c_cpu_type cpu_type;
 	unsigned int fifo_status_reg;
 };

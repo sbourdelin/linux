@@ -141,9 +141,7 @@ int dm_btree_empty(struct dm_btree_info *info, dm_block_t *root)
 	n->header.value_size = cpu_to_le32(info->value_type.size);
 
 	*root = dm_block_location(b);
-	unlock_block(info, b);
-
-	return 0;
+	return unlock_block(info, b);
 }
 EXPORT_SYMBOL_GPL(dm_btree_empty);
 
@@ -257,7 +255,7 @@ int dm_btree_del(struct dm_btree_info *info, dm_block_t root)
 	int r;
 	struct del_stack *s;
 
-	s = kmalloc(sizeof(*s), GFP_NOIO);
+	s = kmalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
 		return -ENOMEM;
 	s->info = info;
@@ -422,8 +420,8 @@ EXPORT_SYMBOL_GPL(dm_btree_lookup);
  *
  * Where A* is a shadow of A.
  */
-static int btree_split_sibling(struct shadow_spine *s, unsigned parent_index,
-			       uint64_t key)
+static int btree_split_sibling(struct shadow_spine *s, dm_block_t root,
+			       unsigned parent_index, uint64_t key)
 {
 	int r;
 	size_t size;
@@ -525,7 +523,7 @@ static int btree_split_beneath(struct shadow_spine *s, uint64_t key)
 
 	r = new_block(s->info, &right);
 	if (r < 0) {
-		unlock_block(s->info, left);
+		/* FIXME: put left */
 		return r;
 	}
 
@@ -627,7 +625,7 @@ static int btree_insert_raw(struct shadow_spine *s, dm_block_t root,
 			if (top)
 				r = btree_split_beneath(s, key);
 			else
-				r = btree_split_sibling(s, i, key);
+				r = btree_split_sibling(s, root, i, key);
 
 			if (r < 0)
 				return r;
@@ -669,7 +667,12 @@ static int insert(struct dm_btree_info *info, dm_block_t root,
 	struct btree_node *n;
 	struct dm_btree_value_type le64_type;
 
-	init_le64_type(info->tm, &le64_type);
+	le64_type.context = NULL;
+	le64_type.size = sizeof(__le64);
+	le64_type.inc = NULL;
+	le64_type.dec = NULL;
+	le64_type.equal = NULL;
+
 	init_shadow_spine(&spine, info);
 
 	for (level = 0; level < (info->levels - 1); level++) {

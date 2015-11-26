@@ -56,6 +56,7 @@
 #define MADE_WITHOUT_COMPROMISE
 #endif
 
+
 #define SWI_STATE_NEWBORN           0
 #define SWI_STATE_REPLY_SUBMITTED   1
 #define SWI_STATE_REPLY_SENT        2
@@ -278,7 +279,7 @@ struct srpc_service_cd {
 	/** error code for scd_buf_wi */
 	int			scd_buf_err;
 	/** timestamp for scd_buf_err */
-	time64_t                scd_buf_err_stamp;
+	unsigned long           scd_buf_err_stamp;
 	/** total # request buffers */
 	int			scd_buf_total;
 	/** # posted request buffers */
@@ -496,6 +497,7 @@ swi_deschedule_workitem(swi_workitem_t *swi)
 	return cfs_wi_deschedule(swi->swi_sched, &swi->swi_workitem);
 }
 
+
 int sfw_startup(void);
 int srpc_startup(void);
 void sfw_shutdown(void);
@@ -560,17 +562,17 @@ static inline const char *
 swi_state2str (int state)
 {
 #define STATE2STR(x) case x: return #x
-	switch (state) {
-	default:
-		LBUG();
-	STATE2STR(SWI_STATE_NEWBORN);
-	STATE2STR(SWI_STATE_REPLY_SUBMITTED);
-	STATE2STR(SWI_STATE_REPLY_SENT);
-	STATE2STR(SWI_STATE_REQUEST_SUBMITTED);
-	STATE2STR(SWI_STATE_REQUEST_SENT);
-	STATE2STR(SWI_STATE_REPLY_RECEIVED);
-	STATE2STR(SWI_STATE_BULK_STARTED);
-	STATE2STR(SWI_STATE_DONE);
+	switch(state) {
+		default:
+			LBUG();
+		STATE2STR(SWI_STATE_NEWBORN);
+		STATE2STR(SWI_STATE_REPLY_SUBMITTED);
+		STATE2STR(SWI_STATE_REPLY_SENT);
+		STATE2STR(SWI_STATE_REQUEST_SUBMITTED);
+		STATE2STR(SWI_STATE_REQUEST_SENT);
+		STATE2STR(SWI_STATE_REPLY_RECEIVED);
+		STATE2STR(SWI_STATE_BULK_STARTED);
+		STATE2STR(SWI_STATE_DONE);
 	}
 #undef STATE2STR
 }
@@ -580,6 +582,7 @@ swi_state2str (int state)
 		set_current_state(TASK_UNINTERRUPTIBLE);	\
 		schedule_timeout(cfs_time_seconds(1) / 10);	\
 	} while (0)
+
 
 #define lst_wait_until(cond, lock, fmt, ...)				\
 do {									\

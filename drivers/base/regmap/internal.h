@@ -59,7 +59,6 @@ struct regmap {
 	regmap_lock lock;
 	regmap_unlock unlock;
 	void *lock_arg; /* This is passed to lock/unlock functions */
-	gfp_t alloc_flags;
 
 	struct device *dev; /* Device we do I/O on */
 	void *work_buf;     /* Scratch buffer used to format I/O */
@@ -99,8 +98,6 @@ struct regmap {
 
 	int (*reg_read)(void *context, unsigned int reg, unsigned int *val);
 	int (*reg_write)(void *context, unsigned int reg, unsigned int val);
-	int (*reg_update_bits)(void *context, unsigned int reg,
-			       unsigned int mask, unsigned int val);
 
 	bool defer_caching;
 
@@ -125,9 +122,9 @@ struct regmap {
 	unsigned int num_reg_defaults_raw;
 
 	/* if set, only the cache is modified not the HW */
-	bool cache_only;
+	u32 cache_only;
 	/* if set, only the HW is modified not the cache */
-	bool cache_bypass;
+	u32 cache_bypass;
 	/* if set, remember to free reg_defaults_raw */
 	bool cache_free;
 
@@ -135,23 +132,17 @@ struct regmap {
 	const void *reg_defaults_raw;
 	void *cache;
 	/* if set, the cache contains newer data than the HW */
-	bool cache_dirty;
+	u32 cache_dirty;
 	/* if set, the HW registers are known to match map->reg_defaults */
 	bool no_sync_defaults;
 
-	struct reg_sequence *patch;
+	struct reg_default *patch;
 	int patch_regs;
 
-	/* if set, converts bulk read to single read */
-	bool use_single_read;
-	/* if set, converts bulk read to single read */
-	bool use_single_write;
+	/* if set, converts bulk rw to single rw */
+	bool use_single_rw;
 	/* if set, the device supports multi write mode */
 	bool can_multi_write;
-
-	/* if set, raw reads/writes are limited to this size */
-	size_t max_raw_read;
-	size_t max_raw_write;
 
 	struct rb_root range_tree;
 	void *selector_work_buf;	/* Scratch buffer used for selector */

@@ -375,7 +375,10 @@ bool __weak arch_find_n_match_cpu_physical_id(struct device_node *cpun,
 					   cpu, thread))
 		return true;
 
-	return __of_find_n_match_cpu_property(cpun, "reg", cpu, thread);
+	if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
+		return true;
+
+	return false;
 }
 
 /**

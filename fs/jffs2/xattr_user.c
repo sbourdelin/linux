@@ -16,9 +16,8 @@
 #include <linux/mtd/mtd.h>
 #include "nodelist.h"
 
-static int jffs2_user_getxattr(const struct xattr_handler *handler,
-			       struct dentry *dentry, const char *name,
-			       void *buffer, size_t size)
+static int jffs2_user_getxattr(struct dentry *dentry, const char *name,
+			       void *buffer, size_t size, int type)
 {
 	if (!strcmp(name, ""))
 		return -EINVAL;
@@ -26,9 +25,8 @@ static int jffs2_user_getxattr(const struct xattr_handler *handler,
 				 name, buffer, size);
 }
 
-static int jffs2_user_setxattr(const struct xattr_handler *handler,
-			       struct dentry *dentry, const char *name,
-			       const void *buffer, size_t size, int flags)
+static int jffs2_user_setxattr(struct dentry *dentry, const char *name,
+		const void *buffer, size_t size, int flags, int type)
 {
 	if (!strcmp(name, ""))
 		return -EINVAL;
@@ -36,10 +34,8 @@ static int jffs2_user_setxattr(const struct xattr_handler *handler,
 				 name, buffer, size, flags);
 }
 
-static size_t jffs2_user_listxattr(const struct xattr_handler *handler,
-				   struct dentry *dentry, char *list,
-				   size_t list_size, const char *name,
-				   size_t name_len)
+static size_t jffs2_user_listxattr(struct dentry *dentry, char *list,
+		size_t list_size, const char *name, size_t name_len, int type)
 {
 	size_t retlen = XATTR_USER_PREFIX_LEN + name_len + 1;
 

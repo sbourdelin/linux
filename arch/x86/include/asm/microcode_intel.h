@@ -57,7 +57,7 @@ extern int has_newer_microcode(void *mc, unsigned int csig, int cpf, int rev);
 extern int microcode_sanity_check(void *mc, int print_err);
 extern int find_matching_signature(void *mc, unsigned int csig, int cpf);
 
-#ifdef CONFIG_MICROCODE_INTEL
+#ifdef CONFIG_MICROCODE_INTEL_EARLY
 extern void __init load_ucode_intel_bsp(void);
 extern void load_ucode_intel_ap(void);
 extern void show_ucode_info_early(void);
@@ -71,9 +71,13 @@ static inline int __init save_microcode_in_initrd_intel(void) { return -EINVAL; 
 static inline void reload_ucode_intel(void) {}
 #endif
 
-#ifdef CONFIG_HOTPLUG_CPU
+#if defined(CONFIG_MICROCODE_INTEL_EARLY) && defined(CONFIG_HOTPLUG_CPU)
 extern int save_mc_for_early(u8 *mc);
 #else
-static inline int save_mc_for_early(u8 *mc) { return 0; }
+static inline int save_mc_for_early(u8 *mc)
+{
+	return 0;
+}
 #endif
+
 #endif /* _ASM_X86_MICROCODE_INTEL_H */

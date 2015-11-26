@@ -201,7 +201,7 @@ _xfs_buf_alloc(
 	atomic_set(&bp->b_pin_count, 0);
 	init_waitqueue_head(&bp->b_waiters);
 
-	XFS_STATS_INC(target->bt_mount, xb_create);
+	XFS_STATS_INC(xb_create);
 	trace_xfs_buf_init(bp, _RET_IP_);
 
 	return bp;
@@ -354,16 +354,15 @@ retry:
 			 */
 			if (!(++retries % 100))
 				xfs_err(NULL,
-		"%s(%u) possible memory allocation deadlock in %s (mode:0x%x)",
-					current->comm, current->pid,
+		"possible memory allocation deadlock in %s (mode:0x%x)",
 					__func__, gfp_mask);
 
-			XFS_STATS_INC(bp->b_target->bt_mount, xb_page_retries);
+			XFS_STATS_INC(xb_page_retries);
 			congestion_wait(BLK_RW_ASYNC, HZ/50);
 			goto retry;
 		}
 
-		XFS_STATS_INC(bp->b_target->bt_mount, xb_page_found);
+		XFS_STATS_INC(xb_page_found);
 
 		nbytes = min_t(size_t, size, PAGE_SIZE - offset);
 		size -= nbytes;
@@ -439,6 +438,7 @@ _xfs_buf_find(
 	xfs_buf_flags_t		flags,
 	xfs_buf_t		*new_bp)
 {
+	size_t			numbytes;
 	struct xfs_perag	*pag;
 	struct rb_node		**rbp;
 	struct rb_node		*parent;
@@ -450,9 +450,10 @@ _xfs_buf_find(
 
 	for (i = 0; i < nmaps; i++)
 		numblks += map[i].bm_len;
+	numbytes = BBTOB(numblks);
 
 	/* Check for IOs smaller than the sector size / not sector aligned */
-	ASSERT(!(BBTOB(numblks) < btp->bt_meta_sectorsize));
+	ASSERT(!(numbytes < btp->bt_meta_sectorsize));
 	ASSERT(!(BBTOB(blkno) & (xfs_off_t)btp->bt_meta_sectormask));
 
 	/*
@@ -517,7 +518,7 @@ _xfs_buf_find(
 		new_bp->b_pag = pag;
 		spin_unlock(&pag->pag_buf_lock);
 	} else {
-		XFS_STATS_INC(btp->bt_mount, xb_miss_locked);
+		XFS_STATS_INC(xb_miss_locked);
 		spin_unlock(&pag->pag_buf_lock);
 		xfs_perag_put(pag);
 	}
@@ -530,11 +531,11 @@ found:
 	if (!xfs_buf_trylock(bp)) {
 		if (flags & XBF_TRYLOCK) {
 			xfs_buf_rele(bp);
-			XFS_STATS_INC(btp->bt_mount, xb_busy_locked);
+			XFS_STATS_INC(xb_busy_locked);
 			return NULL;
 		}
 		xfs_buf_lock(bp);
-		XFS_STATS_INC(btp->bt_mount, xb_get_locked_waited);
+		XFS_STATS_INC(xb_get_locked_waited);
 	}
 
 	/*
@@ -550,7 +551,7 @@ found:
 	}
 
 	trace_xfs_buf_find(bp, flags, _RET_IP_);
-	XFS_STATS_INC(btp->bt_mount, xb_get_locked);
+	XFS_STATS_INC(xb_get_locked);
 	return bp;
 }
 
@@ -604,7 +605,7 @@ found:
 		}
 	}
 
-	XFS_STATS_INC(target->bt_mount, xb_get);
+	XFS_STATS_INC(xb_get);
 	trace_xfs_buf_get(bp, flags, _RET_IP_);
 	return bp;
 }
@@ -644,7 +645,7 @@ xfs_buf_read_map(
 		trace_xfs_buf_read(bp, flags, _RET_IP_);
 
 		if (!XFS_BUF_ISDONE(bp)) {
-			XFS_STATS_INC(target->bt_mount, xb_get_read);
+			XFS_STATS_INC(xb_get_read);
 			bp->b_ops = ops;
 			_xfs_buf_read(bp, flags);
 		} else if (flags & XBF_ASYNC) {
@@ -1095,7 +1096,8 @@ xfs_bwrite(
 
 STATIC void
 xfs_buf_bio_end_io(
-	struct bio		*bio)
+	struct bio		*bio,
+	int			error)
 {
 	xfs_buf_t		*bp = (xfs_buf_t *)bio->bi_private;
 
@@ -1103,10 +1105,10 @@ xfs_buf_bio_end_io(
 	 * don't overwrite existing errors - otherwise we can lose errors on
 	 * buffers that require multiple bios to complete.
 	 */
-	if (bio->bi_error) {
+	if (error) {
 		spin_lock(&bp->b_lock);
 		if (!bp->b_io_error)
-			bp->b_io_error = bio->bi_error;
+			bp->b_io_error = error;
 		spin_unlock(&bp->b_lock);
 	}
 
@@ -1531,10 +1533,9 @@ xfs_wait_buftarg(
 			list_del_init(&bp->b_lru);
 			if (bp->b_flags & XBF_WRITE_FAIL) {
 				xfs_alert(btp->bt_mount,
-"Corruption Alert: Buffer at block 0x%llx had permanent write failures!",
+"Corruption Alert: Buffer at block 0x%llx had permanent write failures!\n"
+"Please run xfs_repair to determine the extent of the problem.",
 					(long long)bp->b_bn);
-				xfs_alert(btp->bt_mount,
-"Please run xfs_repair to determine the extent of the problem.");
 			}
 			xfs_buf_rele(bp);
 		}

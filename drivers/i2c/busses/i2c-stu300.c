@@ -977,7 +977,6 @@ static const struct of_device_id stu300_dt_match[] = {
 	{ .compatible = "st,ddci2c" },
 	{},
 };
-MODULE_DEVICE_TABLE(of, stu300_dt_match);
 
 static struct platform_driver stu300_i2c_driver = {
 	.driver = {

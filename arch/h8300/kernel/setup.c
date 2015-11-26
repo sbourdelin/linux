@@ -29,7 +29,6 @@
 #include <linux/clk-provider.h>
 #include <linux/memblock.h>
 #include <linux/screen_info.h>
-#include <linux/clocksource.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -253,5 +252,4 @@ void __init calibrate_delay(void)
 void __init time_init(void)
 {
 	of_clk_init(NULL);
-	clocksource_probe();
 }

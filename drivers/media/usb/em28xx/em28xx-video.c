@@ -433,14 +433,14 @@ static inline void finish_buffer(struct em28xx *dev,
 {
 	em28xx_isocdbg("[%p/%d] wakeup\n", buf, buf->top_field);
 
-	buf->vb.sequence = dev->v4l2->field_count++;
+	buf->vb.v4l2_buf.sequence = dev->v4l2->field_count++;
 	if (dev->v4l2->progressive)
-		buf->vb.field = V4L2_FIELD_NONE;
+		buf->vb.v4l2_buf.field = V4L2_FIELD_NONE;
 	else
-		buf->vb.field = V4L2_FIELD_INTERLACED;
-	v4l2_get_timestamp(&buf->vb.timestamp);
+		buf->vb.v4l2_buf.field = V4L2_FIELD_INTERLACED;
+	v4l2_get_timestamp(&buf->vb.v4l2_buf.timestamp);
 
-	vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
+	vb2_buffer_done(&buf->vb, VB2_BUF_STATE_DONE);
 }
 
 /*
@@ -871,11 +871,10 @@ static void res_free(struct em28xx *dev, enum v4l2_buf_type f_type)
 	Videobuf2 operations
    ------------------------------------------------------------------*/
 
-static int queue_setup(struct vb2_queue *vq, const void *parg,
+static int queue_setup(struct vb2_queue *vq, const struct v4l2_format *fmt,
 		       unsigned int *nbuffers, unsigned int *nplanes,
 		       unsigned int sizes[], void *alloc_ctxs[])
 {
-	const struct v4l2_format *fmt = parg;
 	struct em28xx *dev = vb2_get_drv_priv(vq);
 	struct em28xx_v4l2 *v4l2 = dev->v4l2;
 	unsigned long size;
@@ -901,12 +900,12 @@ static int queue_setup(struct vb2_queue *vq, const void *parg,
 static int
 buffer_prepare(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct em28xx        *dev = vb2_get_drv_priv(vb->vb2_queue);
 	struct em28xx_v4l2   *v4l2 = dev->v4l2;
+	struct em28xx_buffer *buf = container_of(vb, struct em28xx_buffer, vb);
 	unsigned long size;
 
-	em28xx_videodbg("%s, field=%d\n", __func__, vbuf->field);
+	em28xx_videodbg("%s, field=%d\n", __func__, vb->v4l2_buf.field);
 
 	size = (v4l2->width * v4l2->height * v4l2->format->depth + 7) >> 3;
 
@@ -915,7 +914,7 @@ buffer_prepare(struct vb2_buffer *vb)
 				__func__, vb2_plane_size(vb, 0), size);
 		return -EINVAL;
 	}
-	vb2_set_plane_payload(vb, 0, size);
+	vb2_set_plane_payload(&buf->vb, 0, size);
 
 	return 0;
 }
@@ -925,7 +924,6 @@ int em28xx_start_analog_streaming(struct vb2_queue *vq, unsigned int count)
 	struct em28xx *dev = vb2_get_drv_priv(vq);
 	struct em28xx_v4l2 *v4l2 = dev->v4l2;
 	struct v4l2_frequency f;
-	struct v4l2_fh *owner;
 	int rc = 0;
 
 	em28xx_videodbg("%s\n", __func__);
@@ -966,8 +964,7 @@ int em28xx_start_analog_streaming(struct vb2_queue *vq, unsigned int count)
 		/* Ask tuner to go to analog or radio mode */
 		memset(&f, 0, sizeof(f));
 		f.frequency = v4l2->frequency;
-		owner = (struct v4l2_fh *)vq->owner;
-		if (owner && owner->vdev->vfl_type == VFL_TYPE_RADIO)
+		if (vq->owner && vq->owner->vdev->vfl_type == VFL_TYPE_RADIO)
 			f.type = V4L2_TUNER_RADIO;
 		else
 			f.type = V4L2_TUNER_ANALOG_TV;
@@ -998,8 +995,7 @@ static void em28xx_stop_streaming(struct vb2_queue *vq)
 
 	spin_lock_irqsave(&dev->slock, flags);
 	if (dev->usb_ctl.vid_buf != NULL) {
-		vb2_buffer_done(&dev->usb_ctl.vid_buf->vb.vb2_buf,
-				VB2_BUF_STATE_ERROR);
+		vb2_buffer_done(&dev->usb_ctl.vid_buf->vb, VB2_BUF_STATE_ERROR);
 		dev->usb_ctl.vid_buf = NULL;
 	}
 	while (!list_empty(&vidq->active)) {
@@ -1007,7 +1003,7 @@ static void em28xx_stop_streaming(struct vb2_queue *vq)
 
 		buf = list_entry(vidq->active.next, struct em28xx_buffer, list);
 		list_del(&buf->list);
-		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
 	}
 	spin_unlock_irqrestore(&dev->slock, flags);
 }
@@ -1030,8 +1026,7 @@ void em28xx_stop_vbi_streaming(struct vb2_queue *vq)
 
 	spin_lock_irqsave(&dev->slock, flags);
 	if (dev->usb_ctl.vbi_buf != NULL) {
-		vb2_buffer_done(&dev->usb_ctl.vbi_buf->vb.vb2_buf,
-				VB2_BUF_STATE_ERROR);
+		vb2_buffer_done(&dev->usb_ctl.vbi_buf->vb, VB2_BUF_STATE_ERROR);
 		dev->usb_ctl.vbi_buf = NULL;
 	}
 	while (!list_empty(&vbiq->active)) {
@@ -1039,7 +1034,7 @@ void em28xx_stop_vbi_streaming(struct vb2_queue *vq)
 
 		buf = list_entry(vbiq->active.next, struct em28xx_buffer, list);
 		list_del(&buf->list);
-		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
 	}
 	spin_unlock_irqrestore(&dev->slock, flags);
 }
@@ -1047,10 +1042,8 @@ void em28xx_stop_vbi_streaming(struct vb2_queue *vq)
 static void
 buffer_queue(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct em28xx *dev = vb2_get_drv_priv(vb->vb2_queue);
-	struct em28xx_buffer *buf =
-		container_of(vbuf, struct em28xx_buffer, vb);
+	struct em28xx_buffer *buf = container_of(vb, struct em28xx_buffer, vb);
 	struct em28xx_dmaqueue *vidq = &dev->vidq;
 	unsigned long flags = 0;
 

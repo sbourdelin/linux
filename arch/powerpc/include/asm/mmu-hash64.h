@@ -14,7 +14,6 @@
 
 #include <asm/asm-compat.h>
 #include <asm/page.h>
-#include <asm/bug.h>
 
 /*
  * This is necessary to get the definition of PGTABLE_RANGE which we

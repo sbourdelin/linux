@@ -124,8 +124,7 @@ int cn_netlink_send_mult(struct cn_msg *msg, u16 len, u32 portid, u32 __group,
 	if (group)
 		return netlink_broadcast(dev->nls, skb, portid, group,
 					 gfp_mask);
-	return netlink_unicast(dev->nls, skb, portid,
-			!gfpflags_allow_blocking(gfp_mask));
+	return netlink_unicast(dev->nls, skb, portid, !(gfp_mask&__GFP_WAIT));
 }
 EXPORT_SYMBOL_GPL(cn_netlink_send_mult);
 

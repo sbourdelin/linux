@@ -48,7 +48,9 @@ static void __nft_trace_packet(const struct nft_pktinfo *pkt,
 			       const struct nft_chain *chain,
 			       int rulenum, enum nft_trace type)
 {
-	nf_log_trace(pkt->net, pkt->pf, pkt->hook, pkt->skb, pkt->in,
+	struct net *net = dev_net(pkt->in ? pkt->in : pkt->out);
+
+	nf_log_trace(net, pkt->xt.family, pkt->ops->hooknum, pkt->skb, pkt->in,
 		     pkt->out, &trace_loginfo, "TRACE: %s:%s:%s:%u ",
 		     chain->table->name, chain->name, comments[type],
 		     rulenum);
@@ -109,10 +111,11 @@ struct nft_jumpstack {
 };
 
 unsigned int
-nft_do_chain(struct nft_pktinfo *pkt, void *priv)
+nft_do_chain(struct nft_pktinfo *pkt, const struct nf_hook_ops *ops)
 {
-	const struct nft_chain *chain = priv, *basechain = chain;
-	const struct net *net = pkt->net;
+	const struct nft_chain *chain = ops->priv, *basechain = chain;
+	const struct net *chain_net = read_pnet(&nft_base_chain(basechain)->pnet);
+	const struct net *net = dev_net(pkt->in ? pkt->in : pkt->out);
 	const struct nft_rule *rule;
 	const struct nft_expr *expr, *last;
 	struct nft_regs regs;
@@ -121,6 +124,10 @@ nft_do_chain(struct nft_pktinfo *pkt, void *priv)
 	struct nft_stats *stats;
 	int rulenum;
 	unsigned int gencursor = nft_genmask_cur(net);
+
+	/* Ignore chains that are not for the current network namespace */
+	if (!net_eq(net, chain_net))
+		return NF_ACCEPT;
 
 do_chain:
 	rulenum = 0;

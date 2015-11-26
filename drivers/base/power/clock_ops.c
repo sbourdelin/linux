@@ -17,7 +17,7 @@
 #include <linux/err.h>
 #include <linux/pm_runtime.h>
 
-#ifdef CONFIG_PM_CLK
+#ifdef CONFIG_PM
 
 enum pce_status {
 	PCE_STATUS_NONE = 0,
@@ -38,7 +38,7 @@ struct pm_clock_entry {
  * @dev: The device for the given clock
  * @ce: PM clock entry corresponding to the clock.
  */
-static inline void __pm_clk_enable(struct device *dev, struct pm_clock_entry *ce)
+static inline int __pm_clk_enable(struct device *dev, struct pm_clock_entry *ce)
 {
 	int ret;
 
@@ -50,6 +50,8 @@ static inline void __pm_clk_enable(struct device *dev, struct pm_clock_entry *ce
 			dev_err(dev, "%s: failed to enable clk %p, error %d\n",
 				__func__, ce->clk, ret);
 	}
+
+	return ret;
 }
 
 /**
@@ -93,7 +95,7 @@ static int __pm_clk_add(struct device *dev, const char *con_id,
 			return -ENOMEM;
 		}
 	} else {
-		if (IS_ERR(clk)) {
+		if (IS_ERR(clk) || !__clk_get(clk)) {
 			kfree(ce);
 			return -ENOENT;
 		}
@@ -127,9 +129,7 @@ int pm_clk_add(struct device *dev, const char *con_id)
  * @clk: Clock pointer
  *
  * Add the clock to the list of clocks used for the power management of @dev.
- * The power-management code will take control of the clock reference, so
- * callers should not call clk_put() on @clk after this function sucessfully
- * returned.
+ * It will increment refcount on clock pointer, use clk_put() on it when done.
  */
 int pm_clk_add_clk(struct device *dev, struct clk *clk)
 {
@@ -406,7 +406,7 @@ int pm_clk_runtime_resume(struct device *dev)
 	return pm_generic_runtime_resume(dev);
 }
 
-#else /* !CONFIG_PM_CLK */
+#else /* !CONFIG_PM */
 
 /**
  * enable_clock - Enable a device clock.
@@ -486,7 +486,7 @@ static int pm_clk_notify(struct notifier_block *nb,
 	return 0;
 }
 
-#endif /* !CONFIG_PM_CLK */
+#endif /* !CONFIG_PM */
 
 /**
  * pm_clk_add_notifier - Add bus type notifier for power management clocks.

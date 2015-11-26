@@ -26,6 +26,7 @@
 #include <linux/acpi.h>
 
 /* supported DMA engine drivers */
+#include <linux/platform_data/dma-dw.h>
 #include <linux/dma/dw.h>
 
 #include <asm/page.h>
@@ -168,6 +169,12 @@ err:
 	return ret;
 }
 
+static struct dw_dma_platform_data dw_pdata = {
+	.is_private = 1,
+	.chan_allocation_order = CHAN_ALLOCATION_ASCENDING,
+	.chan_priority = CHAN_PRIORITY_ASCENDING,
+};
+
 static struct dw_dma_chip *dw_probe(struct device *dev, struct resource *mem,
 	int irq)
 {
@@ -188,8 +195,7 @@ static struct dw_dma_chip *dw_probe(struct device *dev, struct resource *mem,
 		return ERR_PTR(err);
 
 	chip->dev = dev;
-
-	err = dw_dma_probe(chip, NULL);
+	err = dw_dma_probe(chip, &dw_pdata);
 	if (err)
 		return ERR_PTR(err);
 

@@ -46,7 +46,7 @@ static int __maybe_unused apmu_power_on(void __iomem *p, int bit)
 	return 0;
 }
 
-static int __maybe_unused apmu_power_off(void __iomem *p, int bit)
+static int apmu_power_off(void __iomem *p, int bit)
 {
 	/* request Core Standby for next WFI */
 	writel_relaxed(3, p + CPUNCR_OFFS(bit));
@@ -67,7 +67,7 @@ static int __maybe_unused apmu_power_off_poll(void __iomem *p, int bit)
 	return 0;
 }
 
-static int __maybe_unused apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu))
+static int apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu))
 {
 	void __iomem *p = apmu_cpus[cpu].iomem;
 
@@ -88,7 +88,7 @@ static void apmu_init_cpu(struct resource *res, int cpu, int bit)
 static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit),
 			   struct rcar_apmu_config *apmu_config, int num)
 {
-	int id;
+	u32 id;
 	int k;
 	int bit, index;
 	bool is_allowed;
@@ -170,7 +170,7 @@ static inline void cpu_enter_lowpower_a15(void)
 	dsb();
 }
 
-static void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
+void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
 {
 
 	/* Select next sleep mode using the APMU */

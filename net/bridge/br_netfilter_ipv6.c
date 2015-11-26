@@ -100,10 +100,11 @@ bad:
 	return -1;
 }
 
-int br_validate_ipv6(struct net *net, struct sk_buff *skb)
+int br_validate_ipv6(struct sk_buff *skb)
 {
 	const struct ipv6hdr *hdr;
-	struct inet6_dev *idev = __in6_dev_get(skb->dev);
+	struct net_device *dev = skb->dev;
+	struct inet6_dev *idev = in6_dev_get(skb->dev);
 	u32 pkt_len;
 	u8 ip6h_len = sizeof(struct ipv6hdr);
 
@@ -122,12 +123,12 @@ int br_validate_ipv6(struct net *net, struct sk_buff *skb)
 
 	if (pkt_len || hdr->nexthdr != NEXTHDR_HOP) {
 		if (pkt_len + ip6h_len > skb->len) {
-			IP6_INC_STATS_BH(net, idev,
+			IP6_INC_STATS_BH(dev_net(dev), idev,
 					 IPSTATS_MIB_INTRUNCATEDPKTS);
 			goto drop;
 		}
 		if (pskb_trim_rcsum(skb, pkt_len + ip6h_len)) {
-			IP6_INC_STATS_BH(net, idev,
+			IP6_INC_STATS_BH(dev_net(dev), idev,
 					 IPSTATS_MIB_INDISCARDS);
 			goto drop;
 		}
@@ -142,7 +143,7 @@ int br_validate_ipv6(struct net *net, struct sk_buff *skb)
 	return 0;
 
 inhdr_error:
-	IP6_INC_STATS_BH(net, idev, IPSTATS_MIB_INHDRERRORS);
+	IP6_INC_STATS_BH(dev_net(dev), idev, IPSTATS_MIB_INHDRERRORS);
 drop:
 	return -1;
 }
@@ -160,7 +161,7 @@ br_nf_ipv6_daddr_was_changed(const struct sk_buff *skb,
  * for br_nf_pre_routing_finish(), same logic is used here but
  * equivalent IPv6 function ip6_route_input() called indirectly.
  */
-static int br_nf_pre_routing_finish_ipv6(struct net *net, struct sock *sk, struct sk_buff *skb)
+static int br_nf_pre_routing_finish_ipv6(struct sock *sk, struct sk_buff *skb)
 {
 	struct nf_bridge_info *nf_bridge = nf_bridge_info_get(skb);
 	struct rtable *rt;
@@ -173,7 +174,7 @@ static int br_nf_pre_routing_finish_ipv6(struct net *net, struct sock *sk, struc
 		skb->pkt_type = PACKET_OTHERHOST;
 		nf_bridge->pkt_otherhost = false;
 	}
-	nf_bridge->in_prerouting = 0;
+	nf_bridge->mask &= ~BRNF_NF_BRIDGE_PREROUTING;
 	if (br_nf_ipv6_daddr_was_changed(skb, nf_bridge)) {
 		skb_dst_drop(skb);
 		v6ops->route_input(skb);
@@ -188,7 +189,7 @@ static int br_nf_pre_routing_finish_ipv6(struct net *net, struct sock *sk, struc
 			nf_bridge_update_protocol(skb);
 			nf_bridge_push_encap_header(skb);
 			NF_HOOK_THRESH(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING,
-				       net, sk, skb, skb->dev, NULL,
+				       sk, skb, skb->dev, NULL,
 				       br_nf_pre_routing_finish_bridge,
 				       1);
 			return 0;
@@ -207,7 +208,7 @@ static int br_nf_pre_routing_finish_ipv6(struct net *net, struct sock *sk, struc
 	skb->dev = nf_bridge->physindev;
 	nf_bridge_update_protocol(skb);
 	nf_bridge_push_encap_header(skb);
-	NF_HOOK_THRESH(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, net, sk, skb,
+	NF_HOOK_THRESH(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, sk, skb,
 		       skb->dev, NULL,
 		       br_handle_frame_finish, 1);
 
@@ -217,13 +218,13 @@ static int br_nf_pre_routing_finish_ipv6(struct net *net, struct sock *sk, struc
 /* Replicate the checks that IPv6 does on packet reception and pass the packet
  * to ip6tables.
  */
-unsigned int br_nf_pre_routing_ipv6(void *priv,
+unsigned int br_nf_pre_routing_ipv6(const struct nf_hook_ops *ops,
 				    struct sk_buff *skb,
 				    const struct nf_hook_state *state)
 {
 	struct nf_bridge_info *nf_bridge;
 
-	if (br_validate_ipv6(state->net, skb))
+	if (br_validate_ipv6(skb))
 		return NF_DROP;
 
 	nf_bridge_put(skb->nf_bridge);
@@ -236,7 +237,7 @@ unsigned int br_nf_pre_routing_ipv6(void *priv,
 	nf_bridge->ipv6_daddr = ipv6_hdr(skb)->daddr;
 
 	skb->protocol = htons(ETH_P_IPV6);
-	NF_HOOK(NFPROTO_IPV6, NF_INET_PRE_ROUTING, state->net, state->sk, skb,
+	NF_HOOK(NFPROTO_IPV6, NF_INET_PRE_ROUTING, state->sk, skb,
 		skb->dev, NULL,
 		br_nf_pre_routing_finish_ipv6);
 

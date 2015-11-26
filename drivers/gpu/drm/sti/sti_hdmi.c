@@ -588,7 +588,7 @@ static int sti_hdmi_connector_get_modes(struct drm_connector *connector)
 	return count;
 
 fail:
-	DRM_ERROR("Can't read HDMI EDID\n");
+	DRM_ERROR("Can not read HDMI EDID\n");
 	return 0;
 }
 
@@ -628,8 +628,7 @@ struct drm_encoder *sti_hdmi_best_encoder(struct drm_connector *connector)
 	return hdmi_connector->encoder;
 }
 
-static const
-struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
+static struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
 	.get_modes = sti_hdmi_connector_get_modes,
 	.mode_valid = sti_hdmi_connector_mode_valid,
 	.best_encoder = sti_hdmi_best_encoder,
@@ -664,7 +663,7 @@ static void sti_hdmi_connector_destroy(struct drm_connector *connector)
 	kfree(hdmi_connector);
 }
 
-static const struct drm_connector_funcs sti_hdmi_connector_funcs = {
+static struct drm_connector_funcs sti_hdmi_connector_funcs = {
 	.dpms = drm_atomic_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.detect = sti_hdmi_connector_detect,
@@ -694,24 +693,38 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
 	struct sti_hdmi_connector *connector;
 	struct drm_connector *drm_connector;
 	struct drm_bridge *bridge;
+	struct device_node *ddc;
 	int err;
+
+	ddc = of_parse_phandle(dev->of_node, "ddc", 0);
+	if (ddc) {
+		hdmi->ddc_adapt = of_find_i2c_adapter_by_node(ddc);
+		if (!hdmi->ddc_adapt) {
+			err = -EPROBE_DEFER;
+			of_node_put(ddc);
+			return err;
+		}
+
+		of_node_put(ddc);
+	}
 
 	/* Set the drm device handle */
 	hdmi->drm_dev = drm_dev;
 
 	encoder = sti_hdmi_find_encoder(drm_dev);
 	if (!encoder)
-		return -EINVAL;
+		goto err_adapt;
 
 	connector = devm_kzalloc(dev, sizeof(*connector), GFP_KERNEL);
 	if (!connector)
-		return -EINVAL;
+		goto err_adapt;
+
 
 	connector->hdmi = hdmi;
 
 	bridge = devm_kzalloc(dev, sizeof(*bridge), GFP_KERNEL);
 	if (!bridge)
-		return -EINVAL;
+		goto err_adapt;
 
 	bridge->driver_private = hdmi;
 	bridge->funcs = &sti_hdmi_bridge_funcs;
@@ -748,7 +761,8 @@ err_sysfs:
 	drm_connector_unregister(drm_connector);
 err_connector:
 	drm_connector_cleanup(drm_connector);
-
+err_adapt:
+	put_device(&hdmi->ddc_adapt->dev);
 	return -EINVAL;
 }
 
@@ -782,7 +796,6 @@ static int sti_hdmi_probe(struct platform_device *pdev)
 	struct sti_hdmi *hdmi;
 	struct device_node *np = dev->of_node;
 	struct resource *res;
-	struct device_node *ddc;
 	int ret;
 
 	DRM_INFO("%s\n", __func__);
@@ -791,43 +804,30 @@ static int sti_hdmi_probe(struct platform_device *pdev)
 	if (!hdmi)
 		return -ENOMEM;
 
-	ddc = of_parse_phandle(pdev->dev.of_node, "ddc", 0);
-	if (ddc) {
-		hdmi->ddc_adapt = of_get_i2c_adapter_by_node(ddc);
-		of_node_put(ddc);
-		if (!hdmi->ddc_adapt)
-			return -EPROBE_DEFER;
-	}
-
 	hdmi->dev = pdev->dev;
 
 	/* Get resources */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hdmi-reg");
 	if (!res) {
 		DRM_ERROR("Invalid hdmi resource\n");
-		ret = -ENOMEM;
-		goto release_adapter;
+		return -ENOMEM;
 	}
 	hdmi->regs = devm_ioremap_nocache(dev, res->start, resource_size(res));
-	if (!hdmi->regs) {
-		ret = -ENOMEM;
-		goto release_adapter;
-	}
+	if (!hdmi->regs)
+		return -ENOMEM;
 
 	if (of_device_is_compatible(np, "st,stih416-hdmi")) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						   "syscfg");
 		if (!res) {
 			DRM_ERROR("Invalid syscfg resource\n");
-			ret = -ENOMEM;
-			goto release_adapter;
+			return -ENOMEM;
 		}
 		hdmi->syscfg = devm_ioremap_nocache(dev, res->start,
 						    resource_size(res));
-		if (!hdmi->syscfg) {
-			ret = -ENOMEM;
-			goto release_adapter;
-		}
+		if (!hdmi->syscfg)
+			return -ENOMEM;
+
 	}
 
 	hdmi->phy_ops = (struct hdmi_phy_ops *)
@@ -837,29 +837,25 @@ static int sti_hdmi_probe(struct platform_device *pdev)
 	hdmi->clk_pix = devm_clk_get(dev, "pix");
 	if (IS_ERR(hdmi->clk_pix)) {
 		DRM_ERROR("Cannot get hdmi_pix clock\n");
-		ret = PTR_ERR(hdmi->clk_pix);
-		goto release_adapter;
+		return PTR_ERR(hdmi->clk_pix);
 	}
 
 	hdmi->clk_tmds = devm_clk_get(dev, "tmds");
 	if (IS_ERR(hdmi->clk_tmds)) {
 		DRM_ERROR("Cannot get hdmi_tmds clock\n");
-		ret = PTR_ERR(hdmi->clk_tmds);
-		goto release_adapter;
+		return PTR_ERR(hdmi->clk_tmds);
 	}
 
 	hdmi->clk_phy = devm_clk_get(dev, "phy");
 	if (IS_ERR(hdmi->clk_phy)) {
 		DRM_ERROR("Cannot get hdmi_phy clock\n");
-		ret = PTR_ERR(hdmi->clk_phy);
-		goto release_adapter;
+		return PTR_ERR(hdmi->clk_phy);
 	}
 
 	hdmi->clk_audio = devm_clk_get(dev, "audio");
 	if (IS_ERR(hdmi->clk_audio)) {
 		DRM_ERROR("Cannot get hdmi_audio clock\n");
-		ret = PTR_ERR(hdmi->clk_audio);
-		goto release_adapter;
+		return PTR_ERR(hdmi->clk_audio);
 	}
 
 	hdmi->hpd = readl(hdmi->regs + HDMI_STA) & HDMI_STA_HOT_PLUG;
@@ -872,7 +868,7 @@ static int sti_hdmi_probe(struct platform_device *pdev)
 			hdmi_irq_thread, IRQF_ONESHOT, dev_name(dev), hdmi);
 	if (ret) {
 		DRM_ERROR("Failed to register HDMI interrupt\n");
-		goto release_adapter;
+		return ret;
 	}
 
 	hdmi->reset = devm_reset_control_get(dev, "hdmi");
@@ -883,20 +879,16 @@ static int sti_hdmi_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, hdmi);
 
 	return component_add(&pdev->dev, &sti_hdmi_ops);
-
- release_adapter:
-	i2c_put_adapter(hdmi->ddc_adapt);
-
-	return ret;
 }
 
 static int sti_hdmi_remove(struct platform_device *pdev)
 {
 	struct sti_hdmi *hdmi = dev_get_drvdata(&pdev->dev);
 
-	i2c_put_adapter(hdmi->ddc_adapt);
-	component_del(&pdev->dev, &sti_hdmi_ops);
+	if (hdmi->ddc_adapt)
+		put_device(&hdmi->ddc_adapt->dev);
 
+	component_del(&pdev->dev, &sti_hdmi_ops);
 	return 0;
 }
 
@@ -909,6 +901,8 @@ struct platform_driver sti_hdmi_driver = {
 	.probe = sti_hdmi_probe,
 	.remove = sti_hdmi_remove,
 };
+
+module_platform_driver(sti_hdmi_driver);
 
 MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
 MODULE_DESCRIPTION("STMicroelectronics SoC DRM driver");

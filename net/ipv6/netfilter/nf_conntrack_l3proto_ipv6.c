@@ -95,7 +95,7 @@ static int ipv6_get_l4proto(const struct sk_buff *skb, unsigned int nhoff,
 	return NF_ACCEPT;
 }
 
-static unsigned int ipv6_helper(void *priv,
+static unsigned int ipv6_helper(const struct nf_hook_ops *ops,
 				struct sk_buff *skb,
 				const struct nf_hook_state *state)
 {
@@ -131,7 +131,7 @@ static unsigned int ipv6_helper(void *priv,
 	return helper->help(skb, protoff, ct, ctinfo);
 }
 
-static unsigned int ipv6_confirm(void *priv,
+static unsigned int ipv6_confirm(const struct nf_hook_ops *ops,
 				 struct sk_buff *skb,
 				 const struct nf_hook_state *state)
 {
@@ -165,14 +165,14 @@ out:
 	return nf_conntrack_confirm(skb);
 }
 
-static unsigned int ipv6_conntrack_in(void *priv,
+static unsigned int ipv6_conntrack_in(const struct nf_hook_ops *ops,
 				      struct sk_buff *skb,
 				      const struct nf_hook_state *state)
 {
-	return nf_conntrack_in(state->net, PF_INET6, state->hook, skb);
+	return nf_conntrack_in(dev_net(state->in), PF_INET6, ops->hooknum, skb);
 }
 
-static unsigned int ipv6_conntrack_local(void *priv,
+static unsigned int ipv6_conntrack_local(const struct nf_hook_ops *ops,
 					 struct sk_buff *skb,
 					 const struct nf_hook_state *state)
 {
@@ -181,42 +181,48 @@ static unsigned int ipv6_conntrack_local(void *priv,
 		net_notice_ratelimited("ipv6_conntrack_local: packet too short\n");
 		return NF_ACCEPT;
 	}
-	return nf_conntrack_in(state->net, PF_INET6, state->hook, skb);
+	return nf_conntrack_in(dev_net(state->out), PF_INET6, ops->hooknum, skb);
 }
 
 static struct nf_hook_ops ipv6_conntrack_ops[] __read_mostly = {
 	{
 		.hook		= ipv6_conntrack_in,
+		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_PRE_ROUTING,
 		.priority	= NF_IP6_PRI_CONNTRACK,
 	},
 	{
 		.hook		= ipv6_conntrack_local,
+		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_OUT,
 		.priority	= NF_IP6_PRI_CONNTRACK,
 	},
 	{
 		.hook		= ipv6_helper,
+		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP6_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= ipv6_confirm,
+		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP6_PRI_LAST,
 	},
 	{
 		.hook		= ipv6_helper,
+		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP6_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= ipv6_confirm,
+		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP6_PRI_LAST-1,
@@ -245,7 +251,7 @@ ipv6_getorigdst(struct sock *sk, int optval, void __user *user, int *len)
 	if (*len < 0 || (unsigned int) *len < sizeof(sin6))
 		return -EINVAL;
 
-	h = nf_conntrack_find_get(sock_net(sk), &nf_ct_zone_dflt, &tuple);
+	h = nf_conntrack_find_get(sock_net(sk), NF_CT_DEFAULT_ZONE, &tuple);
 	if (!h) {
 		pr_debug("IP6T_SO_ORIGINAL_DST: Can't find %pI6c/%u-%pI6c/%u.\n",
 			 &tuple.src.u3.ip6, ntohs(tuple.src.u.tcp.port),

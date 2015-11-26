@@ -323,7 +323,7 @@ static ssize_t hwrng_attr_current_store(struct device *dev,
 		return -ERESTARTSYS;
 	err = -ENODEV;
 	list_for_each_entry(rng, &rng_list, list) {
-		if (sysfs_streq(rng->name, buf)) {
+		if (strcmp(rng->name, buf) == 0) {
 			err = 0;
 			if (rng != current_rng)
 				err = set_current_rng(rng);
@@ -429,7 +429,7 @@ static int hwrng_fillfn(void *unused)
 static void start_khwrngd(void)
 {
 	hwrng_fill = kthread_run(hwrng_fillfn, NULL, "hwrng");
-	if (IS_ERR(hwrng_fill)) {
+	if (hwrng_fill == ERR_PTR(-ENOMEM)) {
 		pr_err("hwrng_fill thread creation failed");
 		hwrng_fill = NULL;
 	}

@@ -494,7 +494,7 @@ static int bitmap_new_disk_sb(struct bitmap *bitmap)
 	bitmap_super_t *sb;
 	unsigned long chunksize, daemon_sleep, write_behind;
 
-	bitmap->storage.sb_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	bitmap->storage.sb_page = alloc_page(GFP_KERNEL);
 	if (bitmap->storage.sb_page == NULL)
 		return -ENOMEM;
 	bitmap->storage.sb_page->index = 0;
@@ -541,7 +541,6 @@ static int bitmap_new_disk_sb(struct bitmap *bitmap)
 	sb->state = cpu_to_le32(bitmap->flags);
 	bitmap->events_cleared = bitmap->mddev->events;
 	sb->events_cleared = cpu_to_le64(bitmap->mddev->events);
-	bitmap->mddev->bitmap_info.nodes = 0;
 
 	kunmap_atomic(sb);
 
@@ -559,7 +558,6 @@ static int bitmap_read_sb(struct bitmap *bitmap)
 	unsigned long sectors_reserved = 0;
 	int err = -EINVAL;
 	struct page *sb_page;
-	loff_t offset = bitmap->mddev->bitmap_info.offset;
 
 	if (!bitmap->storage.file && !bitmap->mddev->bitmap_info.offset) {
 		chunksize = 128 * 1024 * 1024;
@@ -586,9 +584,9 @@ re_read:
 		bm_blocks = ((bm_blocks+7) >> 3) + sizeof(bitmap_super_t);
 		/* to 4k blocks */
 		bm_blocks = DIV_ROUND_UP_SECTOR_T(bm_blocks, 4096);
-		offset = bitmap->mddev->bitmap_info.offset + (bitmap->cluster_slot * (bm_blocks << 3));
+		bitmap->mddev->bitmap_info.offset += bitmap->cluster_slot * (bm_blocks << 3);
 		pr_info("%s:%d bm slot: %d offset: %llu\n", __func__, __LINE__,
-			bitmap->cluster_slot, offset);
+			bitmap->cluster_slot, (unsigned long long)bitmap->mddev->bitmap_info.offset);
 	}
 
 	if (bitmap->storage.file) {
@@ -599,7 +597,7 @@ re_read:
 				bitmap, bytes, sb_page);
 	} else {
 		err = read_sb_page(bitmap->mddev,
-				   offset,
+				   bitmap->mddev->bitmap_info.offset,
 				   sb_page,
 				   0, sizeof(bitmap_super_t));
 	}
@@ -613,20 +611,14 @@ re_read:
 	daemon_sleep = le32_to_cpu(sb->daemon_sleep) * HZ;
 	write_behind = le32_to_cpu(sb->write_behind);
 	sectors_reserved = le32_to_cpu(sb->sectors_reserved);
-	/* Setup nodes/clustername only if bitmap version is
-	 * cluster-compatible
-	 */
-	if (sb->version == cpu_to_le32(BITMAP_MAJOR_CLUSTERED)) {
-		nodes = le32_to_cpu(sb->nodes);
-		strlcpy(bitmap->mddev->bitmap_info.cluster_name,
-				sb->cluster_name, 64);
-	}
+	nodes = le32_to_cpu(sb->nodes);
+	strlcpy(bitmap->mddev->bitmap_info.cluster_name, sb->cluster_name, 64);
 
 	/* verify that the bitmap-specific fields are valid */
 	if (sb->magic != cpu_to_le32(BITMAP_MAGIC))
 		reason = "bad magic";
 	else if (le32_to_cpu(sb->version) < BITMAP_MAJOR_LO ||
-		 le32_to_cpu(sb->version) > BITMAP_MAJOR_CLUSTERED)
+		 le32_to_cpu(sb->version) > BITMAP_MAJOR_HI)
 		reason = "unrecognized superblock version";
 	else if (chunksize < 512)
 		reason = "bitmap chunksize too small";
@@ -679,7 +671,7 @@ out:
 	kunmap_atomic(sb);
 	/* Assiging chunksize is required for "re_read" */
 	bitmap->mddev->bitmap_info.chunksize = chunksize;
-	if (err == 0 && nodes && (bitmap->cluster_slot < 0)) {
+	if (nodes && (bitmap->cluster_slot < 0)) {
 		err = md_setup_cluster(bitmap->mddev, nodes);
 		if (err) {
 			pr_err("%s: Could not setup cluster service (%d)\n",
@@ -1570,7 +1562,7 @@ void bitmap_close_sync(struct bitmap *bitmap)
 }
 EXPORT_SYMBOL(bitmap_close_sync);
 
-void bitmap_cond_end_sync(struct bitmap *bitmap, sector_t sector, bool force)
+void bitmap_cond_end_sync(struct bitmap *bitmap, sector_t sector)
 {
 	sector_t s = 0;
 	sector_t blocks;
@@ -1581,7 +1573,7 @@ void bitmap_cond_end_sync(struct bitmap *bitmap, sector_t sector, bool force)
 		bitmap->last_end_sync = jiffies;
 		return;
 	}
-	if (!force && time_before(jiffies, (bitmap->last_end_sync
+	if (time_before(jiffies, (bitmap->last_end_sync
 				  + bitmap->mddev->bitmap_info.daemon_sleep)))
 		return;
 	wait_event(bitmap->mddev->recovery_wait,
@@ -1874,6 +1866,10 @@ int bitmap_copy_from_slot(struct mddev *mddev, int slot,
 	if (IS_ERR(bitmap))
 		return PTR_ERR(bitmap);
 
+	rv = bitmap_read_sb(bitmap);
+	if (rv)
+		goto err;
+
 	rv = bitmap_init_from_disk(bitmap, 0);
 	if (rv)
 		goto err;
@@ -1995,8 +1991,7 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 	if (bitmap->mddev->bitmap_info.offset || bitmap->mddev->bitmap_info.file)
 		ret = bitmap_storage_alloc(&store, chunks,
 					   !bitmap->mddev->bitmap_info.external,
-					   mddev_is_clustered(bitmap->mddev)
-					   ? bitmap->cluster_slot : 0);
+					   bitmap->cluster_slot);
 	if (ret)
 		goto err;
 

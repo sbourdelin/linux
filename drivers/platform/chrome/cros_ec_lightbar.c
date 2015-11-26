@@ -252,7 +252,7 @@ static ssize_t led_rgb_store(struct device *dev, struct device_attribute *attr,
 
 		ret = sscanf(buf, "%i", &val[i++]);
 		if (ret == 0)
-			goto exit;
+			return -EINVAL;
 
 		if (i == 4) {
 			param = (struct ec_params_lightbar *)msg->data;
@@ -268,15 +268,17 @@ static ssize_t led_rgb_store(struct device *dev, struct device_attribute *attr,
 			if ((j++ % 4) == 0) {
 				ret = lb_throttle();
 				if (ret)
-					goto exit;
+					return ret;
 			}
 
 			ret = cros_ec_cmd_xfer(ec->ec_dev, msg);
 			if (ret < 0)
 				goto exit;
 
-			if (msg->result != EC_RES_SUCCESS)
+			if (msg->result != EC_RES_SUCCESS) {
+				ret = -EINVAL;
 				goto exit;
+			}
 
 			i = 0;
 			ok = 1;
@@ -350,6 +352,10 @@ static ssize_t sequence_store(struct device *dev, struct device_attribute *attr,
 	struct cros_ec_dev *ec = container_of(dev,
 					      struct cros_ec_dev, class_dev);
 
+	msg = alloc_lightbar_cmd_msg(ec);
+	if (!msg)
+		return -ENOMEM;
+
 	for (len = 0; len < count; len++)
 		if (!isalnum(buf[len]))
 			break;
@@ -364,30 +370,21 @@ static ssize_t sequence_store(struct device *dev, struct device_attribute *attr,
 			return ret;
 	}
 
-	msg = alloc_lightbar_cmd_msg(ec);
-	if (!msg)
-		return -ENOMEM;
-
 	param = (struct ec_params_lightbar *)msg->data;
 	param->cmd = LIGHTBAR_CMD_SEQ;
 	param->seq.num = num;
 	ret = lb_throttle();
 	if (ret)
-		goto exit;
+		return ret;
 
 	ret = cros_ec_cmd_xfer(ec->ec_dev, msg);
 	if (ret < 0)
-		goto exit;
+		return ret;
 
-	if (msg->result != EC_RES_SUCCESS) {
-		ret = -EINVAL;
-		goto exit;
-	}
+	if (msg->result != EC_RES_SUCCESS)
+		return -EINVAL;
 
-	ret = count;
-exit:
-	kfree(msg);
-	return ret;
+	return count;
 }
 
 /* Module initialization */

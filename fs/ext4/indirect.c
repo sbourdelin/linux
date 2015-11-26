@@ -22,7 +22,6 @@
 
 #include "ext4_jbd2.h"
 #include "truncate.h"
-#include <linux/dax.h>
 #include <linux/uio.h>
 
 #include <trace/events/ext4.h>
@@ -562,10 +561,11 @@ int ext4_ind_map_blocks(handle_t *handle, struct inode *inode,
 	/*
 	 * Okay, we need to do block allocation.
 	*/
-	if (ext4_has_feature_bigalloc(inode->i_sb)) {
+	if (EXT4_HAS_RO_COMPAT_FEATURE(inode->i_sb,
+				       EXT4_FEATURE_RO_COMPAT_BIGALLOC)) {
 		EXT4_ERROR_INODE(inode, "Can't allocate blocks for "
 				 "non-extent mapped inodes with bigalloc");
-		return -EFSCORRUPTED;
+		return -EUCLEAN;
 	}
 
 	/* Set up for the direct block allocation */

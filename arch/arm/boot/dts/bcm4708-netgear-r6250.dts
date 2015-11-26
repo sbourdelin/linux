@@ -24,14 +24,13 @@
 		reg = <0x00000000 0x08000000>;
 	};
 
-	axi@18000000 {
-		usb3@23000 {
-			reg = <0x00023000 0x1000>;
+	chipcommonA {
+		uart0: serial@0300 {
+			status = "okay";
+		};
 
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+		uart1: serial@0400 {
+			status = "okay";
 		};
 	};
 
@@ -92,8 +91,4 @@
 			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
 		};
 	};
-};
-
-&uart0 {
-	status = "okay";
 };

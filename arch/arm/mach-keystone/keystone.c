@@ -97,9 +97,6 @@ static long long __init keystone_pv_fixup(void)
 }
 
 static const char *const keystone_match[] __initconst = {
-	"ti,k2hk",
-	"ti,k2e",
-	"ti,k2l",
 	"ti,keystone",
 	NULL,
 };

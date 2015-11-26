@@ -35,6 +35,8 @@
 #include <target/target_core_base.h>
 #include <target/target_core_backend.h>
 #include <target/target_core_fabric.h>
+#include <target/target_core_fabric_configfs.h>
+#include <target/configfs_macros.h>
 #include <asm/unaligned.h>
 
 #include "sbp_target.h"
@@ -2109,21 +2111,24 @@ static void sbp_drop_tport(struct se_wwn *wwn)
 	kfree(tport);
 }
 
-static ssize_t sbp_wwn_version_show(struct config_item *item, char *page)
+static ssize_t sbp_wwn_show_attr_version(
+		struct target_fabric_configfs *tf,
+		char *page)
 {
 	return sprintf(page, "FireWire SBP fabric module %s\n", SBP_VERSION);
 }
 
-CONFIGFS_ATTR_RO(sbp_wwn_, version);
+TF_WWN_ATTR_RO(sbp, version);
 
 static struct configfs_attribute *sbp_wwn_attrs[] = {
-	&sbp_wwn_attr_version,
+	&sbp_wwn_version.attr,
 	NULL,
 };
 
-static ssize_t sbp_tpg_directory_id_show(struct config_item *item, char *page)
+static ssize_t sbp_tpg_show_directory_id(
+		struct se_portal_group *se_tpg,
+		char *page)
 {
-	struct se_portal_group *se_tpg = to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 
@@ -2133,10 +2138,11 @@ static ssize_t sbp_tpg_directory_id_show(struct config_item *item, char *page)
 		return sprintf(page, "%06x\n", tport->directory_id);
 }
 
-static ssize_t sbp_tpg_directory_id_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t sbp_tpg_store_directory_id(
+		struct se_portal_group *se_tpg,
+		const char *page,
+		size_t count)
 {
-	struct se_portal_group *se_tpg = to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	unsigned long val;
@@ -2160,18 +2166,20 @@ static ssize_t sbp_tpg_directory_id_store(struct config_item *item,
 	return count;
 }
 
-static ssize_t sbp_tpg_enable_show(struct config_item *item, char *page)
+static ssize_t sbp_tpg_show_enable(
+		struct se_portal_group *se_tpg,
+		char *page)
 {
-	struct se_portal_group *se_tpg = to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	return sprintf(page, "%d\n", tport->enable);
 }
 
-static ssize_t sbp_tpg_enable_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t sbp_tpg_store_enable(
+		struct se_portal_group *se_tpg,
+		const char *page,
+		size_t count)
 {
-	struct se_portal_group *se_tpg = to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	unsigned long val;
@@ -2211,28 +2219,29 @@ static ssize_t sbp_tpg_enable_store(struct config_item *item,
 	return count;
 }
 
-CONFIGFS_ATTR(sbp_tpg_, directory_id);
-CONFIGFS_ATTR(sbp_tpg_, enable);
+TF_TPG_BASE_ATTR(sbp, directory_id, S_IRUGO | S_IWUSR);
+TF_TPG_BASE_ATTR(sbp, enable, S_IRUGO | S_IWUSR);
 
 static struct configfs_attribute *sbp_tpg_base_attrs[] = {
-	&sbp_tpg_attr_directory_id,
-	&sbp_tpg_attr_enable,
+	&sbp_tpg_directory_id.attr,
+	&sbp_tpg_enable.attr,
 	NULL,
 };
 
-static ssize_t sbp_tpg_attrib_mgt_orb_timeout_show(struct config_item *item,
+static ssize_t sbp_tpg_attrib_show_mgt_orb_timeout(
+		struct se_portal_group *se_tpg,
 		char *page)
 {
-	struct se_portal_group *se_tpg = attrib_to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	return sprintf(page, "%d\n", tport->mgt_orb_timeout);
 }
 
-static ssize_t sbp_tpg_attrib_mgt_orb_timeout_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t sbp_tpg_attrib_store_mgt_orb_timeout(
+		struct se_portal_group *se_tpg,
+		const char *page,
+		size_t count)
 {
-	struct se_portal_group *se_tpg = attrib_to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	unsigned long val;
@@ -2255,19 +2264,20 @@ static ssize_t sbp_tpg_attrib_mgt_orb_timeout_store(struct config_item *item,
 	return count;
 }
 
-static ssize_t sbp_tpg_attrib_max_reconnect_timeout_show(struct config_item *item,
+static ssize_t sbp_tpg_attrib_show_max_reconnect_timeout(
+		struct se_portal_group *se_tpg,
 		char *page)
 {
-	struct se_portal_group *se_tpg = attrib_to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	return sprintf(page, "%d\n", tport->max_reconnect_timeout);
 }
 
-static ssize_t sbp_tpg_attrib_max_reconnect_timeout_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t sbp_tpg_attrib_store_max_reconnect_timeout(
+		struct se_portal_group *se_tpg,
+		const char *page,
+		size_t count)
 {
-	struct se_portal_group *se_tpg = attrib_to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	unsigned long val;
@@ -2290,19 +2300,20 @@ static ssize_t sbp_tpg_attrib_max_reconnect_timeout_store(struct config_item *it
 	return count;
 }
 
-static ssize_t sbp_tpg_attrib_max_logins_per_lun_show(struct config_item *item,
+static ssize_t sbp_tpg_attrib_show_max_logins_per_lun(
+		struct se_portal_group *se_tpg,
 		char *page)
 {
-	struct se_portal_group *se_tpg = attrib_to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	return sprintf(page, "%d\n", tport->max_logins_per_lun);
 }
 
-static ssize_t sbp_tpg_attrib_max_logins_per_lun_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t sbp_tpg_attrib_store_max_logins_per_lun(
+		struct se_portal_group *se_tpg,
+		const char *page,
+		size_t count)
 {
-	struct se_portal_group *se_tpg = attrib_to_tpg(item);
 	struct sbp_tpg *tpg = container_of(se_tpg, struct sbp_tpg, se_tpg);
 	struct sbp_tport *tport = tpg->tport;
 	unsigned long val;
@@ -2319,14 +2330,14 @@ static ssize_t sbp_tpg_attrib_max_logins_per_lun_store(struct config_item *item,
 	return count;
 }
 
-CONFIGFS_ATTR(sbp_tpg_attrib_, mgt_orb_timeout);
-CONFIGFS_ATTR(sbp_tpg_attrib_, max_reconnect_timeout);
-CONFIGFS_ATTR(sbp_tpg_attrib_, max_logins_per_lun);
+TF_TPG_ATTRIB_ATTR(sbp, mgt_orb_timeout, S_IRUGO | S_IWUSR);
+TF_TPG_ATTRIB_ATTR(sbp, max_reconnect_timeout, S_IRUGO | S_IWUSR);
+TF_TPG_ATTRIB_ATTR(sbp, max_logins_per_lun, S_IRUGO | S_IWUSR);
 
 static struct configfs_attribute *sbp_tpg_attrib_attrs[] = {
-	&sbp_tpg_attrib_attr_mgt_orb_timeout,
-	&sbp_tpg_attrib_attr_max_reconnect_timeout,
-	&sbp_tpg_attrib_attr_max_logins_per_lun,
+	&sbp_tpg_attrib_mgt_orb_timeout.attr,
+	&sbp_tpg_attrib_max_reconnect_timeout.attr,
+	&sbp_tpg_attrib_max_logins_per_lun.attr,
 	NULL,
 };
 

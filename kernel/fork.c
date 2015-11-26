@@ -251,7 +251,6 @@ void __put_task_struct(struct task_struct *tsk)
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
 
-	cgroup_free(tsk);
 	task_numa_free(tsk);
 	security_task_free(tsk);
 	exit_creds(tsk);
@@ -288,11 +287,6 @@ static void set_max_threads(unsigned int max_threads_suggested)
 	max_threads = clamp_t(u64, threads, MIN_THREADS, MAX_THREADS);
 }
 
-#ifdef CONFIG_ARCH_WANTS_DYNAMIC_TASK_STRUCT
-/* Initialized by the architecture: */
-int arch_task_struct_size __read_mostly;
-#endif
-
 void __init fork_init(void)
 {
 #ifndef CONFIG_ARCH_TASK_STRUCT_ALLOCATOR
@@ -301,7 +295,7 @@ void __init fork_init(void)
 #endif
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
-		kmem_cache_create("task_struct", arch_task_struct_size,
+		kmem_cache_create("task_struct", sizeof(struct task_struct),
 			ARCH_MIN_TASKALIGN, SLAB_PANIC | SLAB_NOTRACK, NULL);
 #endif
 
@@ -455,10 +449,8 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 		tmp->vm_mm = mm;
 		if (anon_vma_fork(tmp, mpnt))
 			goto fail_nomem_anon_vma_fork;
-		tmp->vm_flags &=
-			~(VM_LOCKED|VM_LOCKONFAULT|VM_UFFD_MISSING|VM_UFFD_WP);
+		tmp->vm_flags &= ~VM_LOCKED;
 		tmp->vm_next = tmp->vm_prev = NULL;
-		tmp->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 		file = tmp->vm_file;
 		if (file) {
 			struct inode *inode = file_inode(file);
@@ -1075,7 +1067,6 @@ static int copy_sighand(unsigned long clone_flags, struct task_struct *tsk)
 	rcu_assign_pointer(tsk->sighand, sig);
 	if (!sig)
 		return -ENOMEM;
-
 	atomic_set(&sig->count, 1);
 	memcpy(sig->action, current->sighand->action, sizeof(sig->action));
 	return 0;
@@ -1103,7 +1094,7 @@ static void posix_cpu_timers_init_group(struct signal_struct *sig)
 	cpu_limit = READ_ONCE(sig->rlim[RLIMIT_CPU].rlim_cur);
 	if (cpu_limit != RLIM_INFINITY) {
 		sig->cputime_expires.prof_exp = secs_to_cputime(cpu_limit);
-		sig->cputimer.running = true;
+		sig->cputimer.running = 1;
 	}
 
 	/* The timer lists. */
@@ -1137,7 +1128,6 @@ static int copy_signal(unsigned long clone_flags, struct task_struct *tsk)
 	init_sigpending(&sig->shared_pending);
 	INIT_LIST_HEAD(&sig->posix_timers);
 	seqlock_init(&sig->stats_lock);
-	prev_cputime_init(&sig->prev_cputime);
 
 	hrtimer_init(&sig->real_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	sig->real_timer.function = it_real_fn;
@@ -1249,7 +1239,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 {
 	int retval;
 	struct task_struct *p;
-	void *cgrp_ss_priv[CGROUP_CANFORK_COUNT] = {};
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
@@ -1284,9 +1273,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	/*
 	 * If the new process will be in a different pid or user namespace
-	 * do not allow it to share a thread group with the forking task.
+	 * do not allow it to share a thread group or signal handlers or
+	 * parent with the forking task.
 	 */
-	if (clone_flags & CLONE_THREAD) {
+	if (clone_flags & CLONE_SIGHAND) {
 		if ((clone_flags & (CLONE_NEWUSER | CLONE_NEWPID)) ||
 		    (task_active_pid_ns(current) !=
 				current->nsproxy->pid_ns_for_children))
@@ -1345,8 +1335,9 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	p->utime = p->stime = p->gtime = 0;
 	p->utimescaled = p->stimescaled = 0;
-	prev_cputime_init(&p->prev_cputime);
-
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+	p->prev_cputime.utime = p->prev_cputime.stime = 0;
+#endif
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 	seqlock_init(&p->vtime_seqlock);
 	p->vtime_snap = 0;
@@ -1522,16 +1513,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->task_works = NULL;
 
 	/*
-	 * Ensure that the cgroup subsystem policies allow the new process to be
-	 * forked. It should be noted the the new process's css_set can be changed
-	 * between here and cgroup_post_fork() if an organisation operation is in
-	 * progress.
-	 */
-	retval = cgroup_can_fork(p, cgrp_ss_priv);
-	if (retval)
-		goto bad_fork_free_pid;
-
-	/*
 	 * Make it visible to the rest of the system, but dont wake it up yet.
 	 * Need tasklist lock for parent etc handling!
 	 */
@@ -1567,7 +1548,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		spin_unlock(&current->sighand->siglock);
 		write_unlock_irq(&tasklist_lock);
 		retval = -ERESTARTNOINTR;
-		goto bad_fork_cancel_cgroup;
+		goto bad_fork_free_pid;
 	}
 
 	if (likely(p->pid)) {
@@ -1609,7 +1590,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	write_unlock_irq(&tasklist_lock);
 
 	proc_fork_connector(p);
-	cgroup_post_fork(p, cgrp_ss_priv);
+	cgroup_post_fork(p);
 	if (clone_flags & CLONE_THREAD)
 		threadgroup_change_end(current);
 	perf_event_fork(p);
@@ -1619,8 +1600,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	return p;
 
-bad_fork_cancel_cgroup:
-	cgroup_cancel_fork(p, cgrp_ss_priv);
 bad_fork_free_pid:
 	if (pid != &init_struct_pid)
 		free_pid(pid);
@@ -1887,21 +1866,13 @@ static int check_unshare_flags(unsigned long unshare_flags)
 				CLONE_NEWUSER|CLONE_NEWPID))
 		return -EINVAL;
 	/*
-	 * Not implemented, but pretend it works if there is nothing
-	 * to unshare.  Note that unsharing the address space or the
-	 * signal handlers also need to unshare the signal queues (aka
-	 * CLONE_THREAD).
+	 * Not implemented, but pretend it works if there is nothing to
+	 * unshare. Note that unsharing CLONE_THREAD or CLONE_SIGHAND
+	 * needs to unshare vm.
 	 */
 	if (unshare_flags & (CLONE_THREAD | CLONE_SIGHAND | CLONE_VM)) {
-		if (!thread_group_empty(current))
-			return -EINVAL;
-	}
-	if (unshare_flags & (CLONE_SIGHAND | CLONE_VM)) {
-		if (atomic_read(&current->sighand->count) > 1)
-			return -EINVAL;
-	}
-	if (unshare_flags & CLONE_VM) {
-		if (!current_is_single_threaded())
+		/* FIXME: get_task_mm() increments ->mm_users */
+		if (atomic_read(&current->mm->mm_users) > 1)
 			return -EINVAL;
 	}
 
@@ -1965,21 +1936,20 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
 	int err;
 
 	/*
-	 * If unsharing a user namespace must also unshare the thread group
-	 * and unshare the filesystem root and working directories.
+	 * If unsharing a user namespace must also unshare the thread.
 	 */
 	if (unshare_flags & CLONE_NEWUSER)
 		unshare_flags |= CLONE_THREAD | CLONE_FS;
+	/*
+	 * If unsharing a thread from a thread group, must also unshare vm.
+	 */
+	if (unshare_flags & CLONE_THREAD)
+		unshare_flags |= CLONE_VM;
 	/*
 	 * If unsharing vm, must also unshare signal handlers.
 	 */
 	if (unshare_flags & CLONE_VM)
 		unshare_flags |= CLONE_SIGHAND;
-	/*
-	 * If unsharing a signal handlers, must also unshare the signal queues.
-	 */
-	if (unshare_flags & CLONE_SIGHAND)
-		unshare_flags |= CLONE_THREAD;
 	/*
 	 * If unsharing namespace, must also unshare filesystem information.
 	 */

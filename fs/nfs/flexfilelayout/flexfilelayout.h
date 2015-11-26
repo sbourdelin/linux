@@ -10,7 +10,6 @@
 #define FS_NFS_NFS4FLEXFILELAYOUT_H
 
 #define FF_FLAGS_NO_LAYOUTCOMMIT 1
-#define FF_FLAGS_NO_IO_THRU_MDS 2
 
 #include "../pnfs.h"
 
@@ -68,8 +67,7 @@ struct nfs4_ff_layoutstat {
 };
 
 struct nfs4_ff_layout_mirror {
-	struct pnfs_layout_hdr		*layout;
-	struct list_head		mirrors;
+	struct pnfs_layout_segment	*lseg; /* back pointer */
 	u32				ds_count;
 	u32				efficiency;
 	struct nfs4_ff_layout_ds	*mirror_ds;
@@ -79,7 +77,6 @@ struct nfs4_ff_layout_mirror {
 	u32				uid;
 	u32				gid;
 	struct rpc_cred			*cred;
-	atomic_t			ref;
 	spinlock_t			lock;
 	struct nfs4_ff_layoutstat	read_stat;
 	struct nfs4_ff_layoutstat	write_stat;
@@ -98,7 +95,6 @@ struct nfs4_ff_layout_segment {
 struct nfs4_flexfile_layout {
 	struct pnfs_layout_hdr generic_hdr;
 	struct pnfs_ds_commit_info commit_info;
-	struct list_head	mirrors;
 	struct list_head	error_list; /* nfs4_ff_layout_ds_err */
 };
 
@@ -144,12 +140,6 @@ static inline u32
 FF_LAYOUT_MIRROR_COUNT(struct pnfs_layout_segment *lseg)
 {
 	return FF_LAYOUT_LSEG(lseg)->mirror_array_cnt;
-}
-
-static inline bool
-ff_layout_no_fallback_to_mds(struct pnfs_layout_segment *lseg)
-{
-	return FF_LAYOUT_LSEG(lseg)->flags & FF_FLAGS_NO_IO_THRU_MDS;
 }
 
 static inline bool

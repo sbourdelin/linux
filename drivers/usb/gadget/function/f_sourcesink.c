@@ -20,6 +20,7 @@
 #include <linux/err.h>
 
 #include "g_zero.h"
+#include "gadget_chips.h"
 #include "u_f.h"
 
 /*
@@ -41,6 +42,11 @@
  * queues are relatively independent, will receive a range of packet sizes,
  * and can often be made to run out completely.  Those issues are important
  * when stress testing peripheral controller drivers.
+ *
+ *
+ * This is currently packaged as a configuration driver, which can't be
+ * combined with other functions to make composite devices.  However, it
+ * can be combined with other independent configurations.
  */
 struct f_sourcesink {
 	struct usb_function	function;
@@ -50,19 +56,19 @@ struct f_sourcesink {
 	struct usb_ep		*iso_in_ep;
 	struct usb_ep		*iso_out_ep;
 	int			cur_alt;
-
-	unsigned pattern;
-	unsigned isoc_interval;
-	unsigned isoc_maxpacket;
-	unsigned isoc_mult;
-	unsigned isoc_maxburst;
-	unsigned buflen;
 };
 
 static inline struct f_sourcesink *func_to_ss(struct usb_function *f)
 {
 	return container_of(f, struct f_sourcesink, function);
 }
+
+static unsigned pattern;
+static unsigned isoc_interval;
+static unsigned isoc_maxpacket;
+static unsigned isoc_mult;
+static unsigned isoc_maxburst;
+static unsigned buflen;
 
 /*-------------------------------------------------------------------------*/
 
@@ -298,9 +304,7 @@ static struct usb_gadget_strings *sourcesink_strings[] = {
 
 static inline struct usb_request *ss_alloc_ep_req(struct usb_ep *ep, int len)
 {
-	struct f_sourcesink		*ss = ep->driver_data;
-
-	return alloc_ep_req(ep, len, ss->buflen);
+	return alloc_ep_req(ep, len, buflen);
 }
 
 void free_ep_req(struct usb_ep *ep, struct usb_request *req)
@@ -313,9 +317,13 @@ static void disable_ep(struct usb_composite_dev *cdev, struct usb_ep *ep)
 {
 	int			value;
 
-	value = usb_ep_disable(ep);
-	if (value < 0)
-		DBG(cdev, "disable %s --> %d\n", ep->name, value);
+	if (ep->driver_data) {
+		value = usb_ep_disable(ep);
+		if (value < 0)
+			DBG(cdev, "disable %s --> %d\n",
+					ep->name, value);
+		ep->driver_data = NULL;
+	}
 }
 
 void disable_endpoints(struct usb_composite_dev *cdev,
@@ -353,37 +361,42 @@ autoconf_fail:
 			f->name, cdev->gadget->name);
 		return -ENODEV;
 	}
+	ss->in_ep->driver_data = cdev;	/* claim */
 
 	ss->out_ep = usb_ep_autoconfig(cdev->gadget, &fs_sink_desc);
 	if (!ss->out_ep)
 		goto autoconf_fail;
+	ss->out_ep->driver_data = cdev;	/* claim */
 
 	/* sanity check the isoc module parameters */
-	if (ss->isoc_interval < 1)
-		ss->isoc_interval = 1;
-	if (ss->isoc_interval > 16)
-		ss->isoc_interval = 16;
-	if (ss->isoc_mult > 2)
-		ss->isoc_mult = 2;
-	if (ss->isoc_maxburst > 15)
-		ss->isoc_maxburst = 15;
+	if (isoc_interval < 1)
+		isoc_interval = 1;
+	if (isoc_interval > 16)
+		isoc_interval = 16;
+	if (isoc_mult > 2)
+		isoc_mult = 2;
+	if (isoc_maxburst > 15)
+		isoc_maxburst = 15;
 
 	/* fill in the FS isoc descriptors from the module parameters */
-	fs_iso_source_desc.wMaxPacketSize = ss->isoc_maxpacket > 1023 ?
-						1023 : ss->isoc_maxpacket;
-	fs_iso_source_desc.bInterval = ss->isoc_interval;
-	fs_iso_sink_desc.wMaxPacketSize = ss->isoc_maxpacket > 1023 ?
-						1023 : ss->isoc_maxpacket;
-	fs_iso_sink_desc.bInterval = ss->isoc_interval;
+	fs_iso_source_desc.wMaxPacketSize = isoc_maxpacket > 1023 ?
+						1023 : isoc_maxpacket;
+	fs_iso_source_desc.bInterval = isoc_interval;
+	fs_iso_sink_desc.wMaxPacketSize = isoc_maxpacket > 1023 ?
+						1023 : isoc_maxpacket;
+	fs_iso_sink_desc.bInterval = isoc_interval;
 
 	/* allocate iso endpoints */
 	ss->iso_in_ep = usb_ep_autoconfig(cdev->gadget, &fs_iso_source_desc);
 	if (!ss->iso_in_ep)
 		goto no_iso;
+	ss->iso_in_ep->driver_data = cdev;	/* claim */
 
 	ss->iso_out_ep = usb_ep_autoconfig(cdev->gadget, &fs_iso_sink_desc);
-	if (!ss->iso_out_ep) {
-		usb_ep_autoconfig_release(ss->iso_in_ep);
+	if (ss->iso_out_ep) {
+		ss->iso_out_ep->driver_data = cdev;	/* claim */
+	} else {
+		ss->iso_in_ep->driver_data = NULL;
 		ss->iso_in_ep = NULL;
 no_iso:
 		/*
@@ -396,8 +409,8 @@ no_iso:
 		ss_source_sink_descs[SS_ALT_IFC_1_OFFSET] = NULL;
 	}
 
-	if (ss->isoc_maxpacket > 1024)
-		ss->isoc_maxpacket = 1024;
+	if (isoc_maxpacket > 1024)
+		isoc_maxpacket = 1024;
 
 	/* support high speed hardware */
 	hs_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
@@ -408,15 +421,15 @@ no_iso:
 	 * We assume that the user knows what they are doing and won't
 	 * give parameters that their UDC doesn't support.
 	 */
-	hs_iso_source_desc.wMaxPacketSize = ss->isoc_maxpacket;
-	hs_iso_source_desc.wMaxPacketSize |= ss->isoc_mult << 11;
-	hs_iso_source_desc.bInterval = ss->isoc_interval;
+	hs_iso_source_desc.wMaxPacketSize = isoc_maxpacket;
+	hs_iso_source_desc.wMaxPacketSize |= isoc_mult << 11;
+	hs_iso_source_desc.bInterval = isoc_interval;
 	hs_iso_source_desc.bEndpointAddress =
 		fs_iso_source_desc.bEndpointAddress;
 
-	hs_iso_sink_desc.wMaxPacketSize = ss->isoc_maxpacket;
-	hs_iso_sink_desc.wMaxPacketSize |= ss->isoc_mult << 11;
-	hs_iso_sink_desc.bInterval = ss->isoc_interval;
+	hs_iso_sink_desc.wMaxPacketSize = isoc_maxpacket;
+	hs_iso_sink_desc.wMaxPacketSize |= isoc_mult << 11;
+	hs_iso_sink_desc.bInterval = isoc_interval;
 	hs_iso_sink_desc.bEndpointAddress = fs_iso_sink_desc.bEndpointAddress;
 
 	/* support super speed hardware */
@@ -430,21 +443,21 @@ no_iso:
 	 * We assume that the user knows what they are doing and won't
 	 * give parameters that their UDC doesn't support.
 	 */
-	ss_iso_source_desc.wMaxPacketSize = ss->isoc_maxpacket;
-	ss_iso_source_desc.bInterval = ss->isoc_interval;
-	ss_iso_source_comp_desc.bmAttributes = ss->isoc_mult;
-	ss_iso_source_comp_desc.bMaxBurst = ss->isoc_maxburst;
-	ss_iso_source_comp_desc.wBytesPerInterval = ss->isoc_maxpacket *
-		(ss->isoc_mult + 1) * (ss->isoc_maxburst + 1);
+	ss_iso_source_desc.wMaxPacketSize = isoc_maxpacket;
+	ss_iso_source_desc.bInterval = isoc_interval;
+	ss_iso_source_comp_desc.bmAttributes = isoc_mult;
+	ss_iso_source_comp_desc.bMaxBurst = isoc_maxburst;
+	ss_iso_source_comp_desc.wBytesPerInterval =
+		isoc_maxpacket * (isoc_mult + 1) * (isoc_maxburst + 1);
 	ss_iso_source_desc.bEndpointAddress =
 		fs_iso_source_desc.bEndpointAddress;
 
-	ss_iso_sink_desc.wMaxPacketSize = ss->isoc_maxpacket;
-	ss_iso_sink_desc.bInterval = ss->isoc_interval;
-	ss_iso_sink_comp_desc.bmAttributes = ss->isoc_mult;
-	ss_iso_sink_comp_desc.bMaxBurst = ss->isoc_maxburst;
-	ss_iso_sink_comp_desc.wBytesPerInterval = ss->isoc_maxpacket *
-		(ss->isoc_mult + 1) * (ss->isoc_maxburst + 1);
+	ss_iso_sink_desc.wMaxPacketSize = isoc_maxpacket;
+	ss_iso_sink_desc.bInterval = isoc_interval;
+	ss_iso_sink_comp_desc.bmAttributes = isoc_mult;
+	ss_iso_sink_comp_desc.bMaxBurst = isoc_maxburst;
+	ss_iso_sink_comp_desc.wBytesPerInterval =
+		isoc_maxpacket * (isoc_mult + 1) * (isoc_maxburst + 1);
 	ss_iso_sink_desc.bEndpointAddress = fs_iso_sink_desc.bEndpointAddress;
 
 	ret = usb_assign_descriptors(f, fs_source_sink_descs,
@@ -482,13 +495,12 @@ static int check_read_data(struct f_sourcesink *ss, struct usb_request *req)
 	unsigned		i;
 	u8			*buf = req->buf;
 	struct usb_composite_dev *cdev = ss->function.config->cdev;
-	int max_packet_size = le16_to_cpu(ss->out_ep->desc->wMaxPacketSize);
 
-	if (ss->pattern == 2)
+	if (pattern == 2)
 		return 0;
 
 	for (i = 0; i < req->actual; i++, buf++) {
-		switch (ss->pattern) {
+		switch (pattern) {
 
 		/* all-zeroes has no synchronization issues */
 		case 0:
@@ -504,7 +516,7 @@ static int check_read_data(struct f_sourcesink *ss, struct usb_request *req)
 		 * stutter for any reason, including buffer duplication...)
 		 */
 		case 1:
-			if (*buf == (u8)((i % max_packet_size) % 63))
+			if (*buf == (u8)(i % 63))
 				continue;
 			break;
 		}
@@ -519,16 +531,14 @@ static void reinit_write_data(struct usb_ep *ep, struct usb_request *req)
 {
 	unsigned	i;
 	u8		*buf = req->buf;
-	int max_packet_size = le16_to_cpu(ep->desc->wMaxPacketSize);
-	struct f_sourcesink *ss = ep->driver_data;
 
-	switch (ss->pattern) {
+	switch (pattern) {
 	case 0:
 		memset(req->buf, 0, req->length);
 		break;
 	case 1:
 		for  (i = 0; i < req->length; i++)
-			*buf++ = (u8) ((i % max_packet_size) % 63);
+			*buf++ = (u8) (i % 63);
 		break;
 	case 2:
 		break;
@@ -552,7 +562,7 @@ static void source_sink_complete(struct usb_ep *ep, struct usb_request *req)
 	case 0:				/* normal completion? */
 		if (ep == ss->out_ep) {
 			check_read_data(ss, req);
-			if (ss->pattern != 2)
+			if (pattern != 2)
 				memset(req->buf, 0x55, req->length);
 		}
 		break;
@@ -601,16 +611,15 @@ static int source_sink_start_ep(struct f_sourcesink *ss, bool is_in,
 		if (is_iso) {
 			switch (speed) {
 			case USB_SPEED_SUPER:
-				size = ss->isoc_maxpacket *
-						(ss->isoc_mult + 1) *
-						(ss->isoc_maxburst + 1);
+				size = isoc_maxpacket * (isoc_mult + 1) *
+						(isoc_maxburst + 1);
 				break;
 			case USB_SPEED_HIGH:
-				size = ss->isoc_maxpacket * (ss->isoc_mult + 1);
+				size = isoc_maxpacket * (isoc_mult + 1);
 				break;
 			default:
-				size = ss->isoc_maxpacket > 1023 ?
-						1023 : ss->isoc_maxpacket;
+				size = isoc_maxpacket > 1023 ?
+						1023 : isoc_maxpacket;
 				break;
 			}
 			ep = is_in ? ss->iso_in_ep : ss->iso_out_ep;
@@ -626,7 +635,7 @@ static int source_sink_start_ep(struct f_sourcesink *ss, bool is_in,
 		req->complete = source_sink_complete;
 		if (is_in)
 			reinit_write_data(ep, req);
-		else if (ss->pattern != 2)
+		else if (pattern != 2)
 			memset(req->buf, 0x55, req->length);
 
 		status = usb_ep_queue(ep, req, GFP_ATOMIC);
@@ -680,6 +689,7 @@ enable_source_sink(struct usb_composite_dev *cdev, struct f_sourcesink *ss,
 fail:
 		ep = ss->in_ep;
 		usb_ep_disable(ep);
+		ep->driver_data = NULL;
 		return result;
 	}
 
@@ -698,6 +708,7 @@ fail:
 fail2:
 		ep = ss->out_ep;
 		usb_ep_disable(ep);
+		ep->driver_data = NULL;
 		goto fail;
 	}
 
@@ -719,8 +730,10 @@ fail2:
 		if (result < 0) {
 fail3:
 			ep = ss->iso_in_ep;
-			if (ep)
+			if (ep) {
 				usb_ep_disable(ep);
+				ep->driver_data = NULL;
+			}
 			goto fail2;
 		}
 	}
@@ -739,6 +752,7 @@ fail3:
 		result = source_sink_start_ep(ss, false, true, speed);
 		if (result < 0) {
 			usb_ep_disable(ep);
+			ep->driver_data = NULL;
 			goto fail3;
 		}
 	}
@@ -755,7 +769,8 @@ static int sourcesink_set_alt(struct usb_function *f,
 	struct f_sourcesink		*ss = func_to_ss(f);
 	struct usb_composite_dev	*cdev = f->config->cdev;
 
-	disable_source_sink(ss);
+	if (ss->in_ep->driver_data)
+		disable_source_sink(ss);
 	return enable_source_sink(cdev, ss, alt);
 }
 
@@ -863,12 +878,12 @@ static struct usb_function *source_sink_alloc_func(
 	ss_opts->refcnt++;
 	mutex_unlock(&ss_opts->lock);
 
-	ss->pattern = ss_opts->pattern;
-	ss->isoc_interval = ss_opts->isoc_interval;
-	ss->isoc_maxpacket = ss_opts->isoc_maxpacket;
-	ss->isoc_mult = ss_opts->isoc_mult;
-	ss->isoc_maxburst = ss_opts->isoc_maxburst;
-	ss->buflen = ss_opts->bulk_buflen;
+	pattern = ss_opts->pattern;
+	isoc_interval = ss_opts->isoc_interval;
+	isoc_maxpacket = ss_opts->isoc_maxpacket;
+	isoc_mult = ss_opts->isoc_mult;
+	isoc_maxburst = ss_opts->isoc_maxburst;
+	buflen = ss_opts->bulk_buflen;
 
 	ss->function.name = "source/sink";
 	ss->function.bind = sourcesink_bind;
@@ -889,6 +904,9 @@ static inline struct f_ss_opts *to_f_ss_opts(struct config_item *item)
 			    func_inst.group);
 }
 
+CONFIGFS_ATTR_STRUCT(f_ss_opts);
+CONFIGFS_ATTR_OPS(f_ss_opts);
+
 static void ss_attr_release(struct config_item *item)
 {
 	struct f_ss_opts *ss_opts = to_f_ss_opts(item);
@@ -898,24 +916,24 @@ static void ss_attr_release(struct config_item *item)
 
 static struct configfs_item_operations ss_item_ops = {
 	.release		= ss_attr_release,
+	.show_attribute		= f_ss_opts_attr_show,
+	.store_attribute	= f_ss_opts_attr_store,
 };
 
-static ssize_t f_ss_opts_pattern_show(struct config_item *item, char *page)
+static ssize_t f_ss_opts_pattern_show(struct f_ss_opts *opts, char *page)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int result;
 
 	mutex_lock(&opts->lock);
-	result = sprintf(page, "%u\n", opts->pattern);
+	result = sprintf(page, "%u", opts->pattern);
 	mutex_unlock(&opts->lock);
 
 	return result;
 }
 
-static ssize_t f_ss_opts_pattern_store(struct config_item *item,
+static ssize_t f_ss_opts_pattern_store(struct f_ss_opts *opts,
 				       const char *page, size_t len)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int ret;
 	u8 num;
 
@@ -941,24 +959,25 @@ end:
 	return ret;
 }
 
-CONFIGFS_ATTR(f_ss_opts_, pattern);
+static struct f_ss_opts_attribute f_ss_opts_pattern =
+	__CONFIGFS_ATTR(pattern, S_IRUGO | S_IWUSR,
+			f_ss_opts_pattern_show,
+			f_ss_opts_pattern_store);
 
-static ssize_t f_ss_opts_isoc_interval_show(struct config_item *item, char *page)
+static ssize_t f_ss_opts_isoc_interval_show(struct f_ss_opts *opts, char *page)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int result;
 
 	mutex_lock(&opts->lock);
-	result = sprintf(page, "%u\n", opts->isoc_interval);
+	result = sprintf(page, "%u", opts->isoc_interval);
 	mutex_unlock(&opts->lock);
 
 	return result;
 }
 
-static ssize_t f_ss_opts_isoc_interval_store(struct config_item *item,
+static ssize_t f_ss_opts_isoc_interval_store(struct f_ss_opts *opts,
 				       const char *page, size_t len)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int ret;
 	u8 num;
 
@@ -984,24 +1003,25 @@ end:
 	return ret;
 }
 
-CONFIGFS_ATTR(f_ss_opts_, isoc_interval);
+static struct f_ss_opts_attribute f_ss_opts_isoc_interval =
+	__CONFIGFS_ATTR(isoc_interval, S_IRUGO | S_IWUSR,
+			f_ss_opts_isoc_interval_show,
+			f_ss_opts_isoc_interval_store);
 
-static ssize_t f_ss_opts_isoc_maxpacket_show(struct config_item *item, char *page)
+static ssize_t f_ss_opts_isoc_maxpacket_show(struct f_ss_opts *opts, char *page)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int result;
 
 	mutex_lock(&opts->lock);
-	result = sprintf(page, "%u\n", opts->isoc_maxpacket);
+	result = sprintf(page, "%u", opts->isoc_maxpacket);
 	mutex_unlock(&opts->lock);
 
 	return result;
 }
 
-static ssize_t f_ss_opts_isoc_maxpacket_store(struct config_item *item,
+static ssize_t f_ss_opts_isoc_maxpacket_store(struct f_ss_opts *opts,
 				       const char *page, size_t len)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int ret;
 	u16 num;
 
@@ -1027,24 +1047,25 @@ end:
 	return ret;
 }
 
-CONFIGFS_ATTR(f_ss_opts_, isoc_maxpacket);
+static struct f_ss_opts_attribute f_ss_opts_isoc_maxpacket =
+	__CONFIGFS_ATTR(isoc_maxpacket, S_IRUGO | S_IWUSR,
+			f_ss_opts_isoc_maxpacket_show,
+			f_ss_opts_isoc_maxpacket_store);
 
-static ssize_t f_ss_opts_isoc_mult_show(struct config_item *item, char *page)
+static ssize_t f_ss_opts_isoc_mult_show(struct f_ss_opts *opts, char *page)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int result;
 
 	mutex_lock(&opts->lock);
-	result = sprintf(page, "%u\n", opts->isoc_mult);
+	result = sprintf(page, "%u", opts->isoc_mult);
 	mutex_unlock(&opts->lock);
 
 	return result;
 }
 
-static ssize_t f_ss_opts_isoc_mult_store(struct config_item *item,
+static ssize_t f_ss_opts_isoc_mult_store(struct f_ss_opts *opts,
 				       const char *page, size_t len)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int ret;
 	u8 num;
 
@@ -1070,24 +1091,25 @@ end:
 	return ret;
 }
 
-CONFIGFS_ATTR(f_ss_opts_, isoc_mult);
+static struct f_ss_opts_attribute f_ss_opts_isoc_mult =
+	__CONFIGFS_ATTR(isoc_mult, S_IRUGO | S_IWUSR,
+			f_ss_opts_isoc_mult_show,
+			f_ss_opts_isoc_mult_store);
 
-static ssize_t f_ss_opts_isoc_maxburst_show(struct config_item *item, char *page)
+static ssize_t f_ss_opts_isoc_maxburst_show(struct f_ss_opts *opts, char *page)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int result;
 
 	mutex_lock(&opts->lock);
-	result = sprintf(page, "%u\n", opts->isoc_maxburst);
+	result = sprintf(page, "%u", opts->isoc_maxburst);
 	mutex_unlock(&opts->lock);
 
 	return result;
 }
 
-static ssize_t f_ss_opts_isoc_maxburst_store(struct config_item *item,
+static ssize_t f_ss_opts_isoc_maxburst_store(struct f_ss_opts *opts,
 				       const char *page, size_t len)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int ret;
 	u8 num;
 
@@ -1113,24 +1135,25 @@ end:
 	return ret;
 }
 
-CONFIGFS_ATTR(f_ss_opts_, isoc_maxburst);
+static struct f_ss_opts_attribute f_ss_opts_isoc_maxburst =
+	__CONFIGFS_ATTR(isoc_maxburst, S_IRUGO | S_IWUSR,
+			f_ss_opts_isoc_maxburst_show,
+			f_ss_opts_isoc_maxburst_store);
 
-static ssize_t f_ss_opts_bulk_buflen_show(struct config_item *item, char *page)
+static ssize_t f_ss_opts_bulk_buflen_show(struct f_ss_opts *opts, char *page)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int result;
 
 	mutex_lock(&opts->lock);
-	result = sprintf(page, "%u\n", opts->bulk_buflen);
+	result = sprintf(page, "%u", opts->bulk_buflen);
 	mutex_unlock(&opts->lock);
 
 	return result;
 }
 
-static ssize_t f_ss_opts_bulk_buflen_store(struct config_item *item,
+static ssize_t f_ss_opts_bulk_buflen_store(struct f_ss_opts *opts,
 					   const char *page, size_t len)
 {
-	struct f_ss_opts *opts = to_f_ss_opts(item);
 	int ret;
 	u32 num;
 
@@ -1151,15 +1174,18 @@ end:
 	return ret;
 }
 
-CONFIGFS_ATTR(f_ss_opts_, bulk_buflen);
+static struct f_ss_opts_attribute f_ss_opts_bulk_buflen =
+	__CONFIGFS_ATTR(buflen, S_IRUGO | S_IWUSR,
+			f_ss_opts_bulk_buflen_show,
+			f_ss_opts_bulk_buflen_store);
 
 static struct configfs_attribute *ss_attrs[] = {
-	&f_ss_opts_attr_pattern,
-	&f_ss_opts_attr_isoc_interval,
-	&f_ss_opts_attr_isoc_maxpacket,
-	&f_ss_opts_attr_isoc_mult,
-	&f_ss_opts_attr_isoc_maxburst,
-	&f_ss_opts_attr_bulk_buflen,
+	&f_ss_opts_pattern.attr,
+	&f_ss_opts_isoc_interval.attr,
+	&f_ss_opts_isoc_maxpacket.attr,
+	&f_ss_opts_isoc_mult.attr,
+	&f_ss_opts_isoc_maxburst.attr,
+	&f_ss_opts_bulk_buflen.attr,
 	NULL,
 };
 

@@ -194,15 +194,11 @@ static void brcmf_flowring_block(struct brcmf_flowring *flow, u8 flowid,
 	spin_lock_irqsave(&flow->block_lock, flags);
 
 	ring = flow->rings[flowid];
-	if (ring->blocked == blocked) {
-		spin_unlock_irqrestore(&flow->block_lock, flags);
-		return;
-	}
 	ifidx = brcmf_flowring_ifidx_get(flow, flowid);
 
 	currently_blocked = false;
 	for (i = 0; i < flow->nrofrings; i++) {
-		if ((flow->rings[i]) && (i != flowid)) {
+		if (flow->rings[i]) {
 			ring = flow->rings[i];
 			if ((ring->status == RING_OPEN) &&
 			    (brcmf_flowring_ifidx_get(flow, i) == ifidx)) {
@@ -213,15 +209,15 @@ static void brcmf_flowring_block(struct brcmf_flowring *flow, u8 flowid,
 			}
 		}
 	}
-	flow->rings[flowid]->blocked = blocked;
-	if (currently_blocked) {
+	ring->blocked = blocked;
+	if (currently_blocked == blocked) {
 		spin_unlock_irqrestore(&flow->block_lock, flags);
 		return;
 	}
 
 	bus_if = dev_get_drvdata(flow->dev);
 	drvr = bus_if->drvr;
-	ifp = brcmf_get_ifp(drvr, ifidx);
+	ifp = drvr->iflist[ifidx];
 	brcmf_txflowblock_if(ifp, BRCMF_NETIF_STOP_REASON_FLOW, blocked);
 
 	spin_unlock_irqrestore(&flow->block_lock, flags);

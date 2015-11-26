@@ -849,7 +849,7 @@ EXPORT_SYMBOL_GPL(ktime_get_real_seconds);
 #ifdef CONFIG_NTP_PPS
 
 /**
- * ktime_get_raw_and_real_ts64 - get day and raw monotonic time in timespec format
+ * getnstime_raw_and_real - get day and raw monotonic time in timespec format
  * @ts_raw:	pointer to the timespec to be set to raw monotonic time
  * @ts_real:	pointer to the timespec to be set to the time of day
  *
@@ -857,7 +857,7 @@ EXPORT_SYMBOL_GPL(ktime_get_real_seconds);
  * same time atomically and stores the resulting timestamps in timespec
  * format.
  */
-void ktime_get_raw_and_real_ts64(struct timespec64 *ts_raw, struct timespec64 *ts_real)
+void getnstime_raw_and_real(struct timespec *ts_raw, struct timespec *ts_real)
 {
 	struct timekeeper *tk = &tk_core.timekeeper;
 	unsigned long seq;
@@ -868,7 +868,7 @@ void ktime_get_raw_and_real_ts64(struct timespec64 *ts_raw, struct timespec64 *t
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 
-		*ts_raw = tk->raw_time;
+		*ts_raw = timespec64_to_timespec(tk->raw_time);
 		ts_real->tv_sec = tk->xtime_sec;
 		ts_real->tv_nsec = 0;
 
@@ -877,10 +877,10 @@ void ktime_get_raw_and_real_ts64(struct timespec64 *ts_raw, struct timespec64 *t
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
-	timespec64_add_ns(ts_raw, nsecs_raw);
-	timespec64_add_ns(ts_real, nsecs_real);
+	timespec_add_ns(ts_raw, nsecs_raw);
+	timespec_add_ns(ts_real, nsecs_real);
 }
-EXPORT_SYMBOL(ktime_get_raw_and_real_ts64);
+EXPORT_SYMBOL(getnstime_raw_and_real);
 
 #endif /* CONFIG_NTP_PPS */
 
@@ -911,7 +911,6 @@ int do_settimeofday64(const struct timespec64 *ts)
 	struct timekeeper *tk = &tk_core.timekeeper;
 	struct timespec64 ts_delta, xt;
 	unsigned long flags;
-	int ret = 0;
 
 	if (!timespec64_valid_strict(ts))
 		return -EINVAL;
@@ -925,15 +924,10 @@ int do_settimeofday64(const struct timespec64 *ts)
 	ts_delta.tv_sec = ts->tv_sec - xt.tv_sec;
 	ts_delta.tv_nsec = ts->tv_nsec - xt.tv_nsec;
 
-	if (timespec64_compare(&tk->wall_to_monotonic, &ts_delta) > 0) {
-		ret = -EINVAL;
-		goto out;
-	}
-
 	tk_set_wall_to_mono(tk, timespec64_sub(tk->wall_to_monotonic, ts_delta));
 
 	tk_set_xtime(tk, ts);
-out:
+
 	timekeeping_update(tk, TK_CLEAR_NTP | TK_MIRROR | TK_CLOCK_WAS_SET);
 
 	write_seqcount_end(&tk_core.seq);
@@ -942,7 +936,7 @@ out:
 	/* signal hrtimers about time change */
 	clock_was_set();
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(do_settimeofday64);
 
@@ -971,8 +965,7 @@ int timekeeping_inject_offset(struct timespec *ts)
 
 	/* Make sure the proposed value is valid */
 	tmp = timespec64_add(tk_xtime(tk),  ts64);
-	if (timespec64_compare(&tk->wall_to_monotonic, &ts64) > 0 ||
-	    !timespec64_valid_strict(&tmp)) {
+	if (!timespec64_valid_strict(&tmp)) {
 		ret = -EINVAL;
 		goto error;
 	}
@@ -1251,7 +1244,7 @@ void __init timekeeping_init(void)
 	set_normalized_timespec64(&tmp, -boot.tv_sec, -boot.tv_nsec);
 	tk_set_wall_to_mono(tk, tmp);
 
-	timekeeping_update(tk, TK_MIRROR | TK_CLOCK_WAS_SET);
+	timekeeping_update(tk, TK_MIRROR);
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
@@ -1674,7 +1667,7 @@ static void timekeeping_adjust(struct timekeeper *tk, s64 offset)
 /**
  * accumulate_nsecs_to_secs - Accumulates nsecs into secs
  *
- * Helper function that accumulates the nsecs greater than a second
+ * Helper function that accumulates a the nsecs greater then a second
  * from the xtime_nsec field to the xtime_secs field.
  * It also calls into the NTP code to handle leapsecond processing.
  *
@@ -1726,7 +1719,7 @@ static cycle_t logarithmic_accumulation(struct timekeeper *tk, cycle_t offset,
 	cycle_t interval = tk->cycle_interval << shift;
 	u64 raw_nsecs;
 
-	/* If the offset is smaller than a shifted interval, do nothing */
+	/* If the offset is smaller then a shifted interval, do nothing */
 	if (offset < interval)
 		return offset;
 
@@ -1881,7 +1874,7 @@ struct timespec __current_kernel_time(void)
 	return timespec64_to_timespec(tk_xtime(tk));
 }
 
-struct timespec64 current_kernel_time64(void)
+struct timespec current_kernel_time(void)
 {
 	struct timekeeper *tk = &tk_core.timekeeper;
 	struct timespec64 now;
@@ -1893,9 +1886,9 @@ struct timespec64 current_kernel_time64(void)
 		now = tk_xtime(tk);
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
-	return now;
+	return timespec64_to_timespec(now);
 }
-EXPORT_SYMBOL(current_kernel_time64);
+EXPORT_SYMBOL(current_kernel_time);
 
 struct timespec64 get_monotonic_coarse64(void)
 {
@@ -2025,7 +2018,7 @@ int do_adjtimex(struct timex *txc)
 /**
  * hardpps() - Accessor function to NTP __hardpps function
  */
-void hardpps(const struct timespec64 *phase_ts, const struct timespec64 *raw_ts)
+void hardpps(const struct timespec *phase_ts, const struct timespec *raw_ts)
 {
 	unsigned long flags;
 

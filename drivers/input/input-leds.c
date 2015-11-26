@@ -71,18 +71,6 @@ static void input_leds_event(struct input_handle *handle, unsigned int type,
 {
 }
 
-static int input_leds_get_count(struct input_dev *dev)
-{
-	unsigned int led_code;
-	int count = 0;
-
-	for_each_set_bit(led_code, dev->ledbit, LED_CNT)
-		if (input_led_info[led_code].name)
-			count++;
-
-	return count;
-}
-
 static int input_leds_connect(struct input_handler *handler,
 			      struct input_dev *dev,
 			      const struct input_device_id *id)
@@ -93,7 +81,7 @@ static int input_leds_connect(struct input_handler *handler,
 	int led_no;
 	int error;
 
-	num_leds = input_leds_get_count(dev);
+	num_leds = bitmap_weight(dev->ledbit, LED_CNT);
 	if (!num_leds)
 		return -ENXIO;
 
@@ -124,7 +112,7 @@ static int input_leds_connect(struct input_handler *handler,
 		led->handle = &leds->handle;
 		led->code = led_code;
 
-		if (!input_led_info[led_code].name)
+		if (WARN_ON(!input_led_info[led_code].name))
 			continue;
 
 		led->cdev.name = kasprintf(GFP_KERNEL, "%s::%s",

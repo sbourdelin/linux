@@ -183,19 +183,12 @@ int ipu_dc_init_sync(struct ipu_dc *dc, struct ipu_di *di, bool interlaced,
 	}
 
 	if (interlaced) {
-		int addr;
-
-		if (dc->di)
-			addr = 1;
-		else
-			addr = 0;
-
-		dc_link_event(dc, DC_EVT_NL, addr, 3);
-		dc_link_event(dc, DC_EVT_EOL, addr, 2);
-		dc_link_event(dc, DC_EVT_NEW_DATA, addr, 1);
+		dc_link_event(dc, DC_EVT_NL, 0, 3);
+		dc_link_event(dc, DC_EVT_EOL, 0, 2);
+		dc_link_event(dc, DC_EVT_NEW_DATA, 0, 1);
 
 		/* Init template microcode */
-		dc_write_tmpl(dc, addr, WROD(0), 0, map, SYNC_WAVE, 0, 6, 1);
+		dc_write_tmpl(dc, 0, WROD(0), 0, map, SYNC_WAVE, 0, 8, 1);
 	} else {
 		if (dc->di) {
 			dc_link_event(dc, DC_EVT_NL, 2, 3);

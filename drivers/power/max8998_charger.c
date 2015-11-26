@@ -117,7 +117,8 @@ static int max8998_battery_probe(struct platform_device *pdev)
 			"EOC value not set: leave it unchanged.\n");
 	} else {
 		dev_err(max8998->dev, "Invalid EOC value\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	/* Setup Charge Restart Level */
@@ -140,7 +141,8 @@ static int max8998_battery_probe(struct platform_device *pdev)
 		break;
 	default:
 		dev_err(max8998->dev, "Invalid Restart Level\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	/* Setup Charge Full Timeout */
@@ -163,20 +165,32 @@ static int max8998_battery_probe(struct platform_device *pdev)
 		break;
 	default:
 		dev_err(max8998->dev, "Invalid Full Timeout value\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	psy_cfg.drv_data = max8998;
 
-	max8998->battery = devm_power_supply_register(max8998->dev,
-						      &max8998_battery_desc,
-						      &psy_cfg);
+	max8998->battery = power_supply_register(max8998->dev,
+						 &max8998_battery_desc,
+						 &psy_cfg);
 	if (IS_ERR(max8998->battery)) {
 		ret = PTR_ERR(max8998->battery);
 		dev_err(max8998->dev, "failed: power supply register: %d\n",
 			ret);
-		return ret;
+		goto err;
 	}
+
+	return 0;
+err:
+	return ret;
+}
+
+static int max8998_battery_remove(struct platform_device *pdev)
+{
+	struct max8998_battery_data *max8998 = platform_get_drvdata(pdev);
+
+	power_supply_unregister(max8998->battery);
 
 	return 0;
 }
@@ -191,6 +205,7 @@ static struct platform_driver max8998_battery_driver = {
 		.name = "max8998-battery",
 	},
 	.probe = max8998_battery_probe,
+	.remove = max8998_battery_remove,
 	.id_table = max8998_battery_id,
 };
 

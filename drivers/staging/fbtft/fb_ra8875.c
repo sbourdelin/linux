@@ -1,7 +1,19 @@
-/*
- * FBTFT driver for the RA8875 LCD Controller
- * Copyright by Pf@nne & NOTRO
- *
+/******************************************************************************
+
+  ProjectName: FBTFT driver                       ***** *****
+	       for the RA8875 LCD Controller     *     *      ************
+						*   **   **   *           *
+  Copyright © by Pf@nne & NOTRO                *   *   *   *   *   ****	   *
+						*   *       *   *   *   *   *
+  Last modification by:                        *   *       *   *   ****    *
+  - Pf@nne (pf@nne-mail.de)                     *   *     *****           *
+						 *   *        *   *******
+						  *****      *   *
+  Date    : 10.06.2014                                      *   *
+  Version : V1.13                                          *****
+  Revision : 5
+
+*******************************************************************************
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -11,6 +23,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include <linux/module.h>
@@ -181,15 +197,18 @@ static int init_display(struct fbtft_par *par)
 
 static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 {
+	fbtft_par_dbg(DEBUG_SET_ADDR_WIN, par,
+		"%s(xs=%d, ys=%d, xe=%d, ye=%d)\n", __func__, xs, ys, xe, ye);
+
 	/* Set_Active_Window */
 	write_reg(par, 0x30, xs & 0x00FF);
 	write_reg(par, 0x31, (xs & 0xFF00) >> 8);
 	write_reg(par, 0x32, ys & 0x00FF);
 	write_reg(par, 0x33, (ys & 0xFF00) >> 8);
-	write_reg(par, 0x34, (xs + xe) & 0x00FF);
-	write_reg(par, 0x35, ((xs + xe) & 0xFF00) >> 8);
-	write_reg(par, 0x36, (ys + ye) & 0x00FF);
-	write_reg(par, 0x37, ((ys + ye) & 0xFF00) >> 8);
+	write_reg(par, 0x34, (xs+xe) & 0x00FF);
+	write_reg(par, 0x35, ((xs+xe) & 0xFF00) >> 8);
+	write_reg(par, 0x36, (ys+ye) & 0x00FF);
+	write_reg(par, 0x37, ((ys+ye) & 0xFF00) >> 8);
 
 	/* Set_Memory_Write_Cursor */
 	write_reg(par, 0x46,  xs & 0xff);
@@ -204,7 +223,7 @@ static void write_reg8_bus8(struct fbtft_par *par, int len, ...)
 {
 	va_list args;
 	int i, ret;
-	u8 *buf = par->buf;
+	u8 *buf = (u8 *)par->buf;
 
 	/* slow down spi-speed for writing registers */
 	par->fbtftops.write = write_spi;
@@ -269,7 +288,7 @@ static int write_vmem16_bus8(struct fbtft_par *par, size_t offset, size_t len)
 		__func__, offset, len);
 
 	remain = len / 2;
-	vmem16 = (u16 *)(par->info->screen_buffer + offset);
+	vmem16 = (u16 *)(par->info->screen_base + offset);
 	tx_array_size = par->txbuf.len / 2;
 		txbuf16 = (u16 *)(par->txbuf.buf + 1);
 		tx_array_size -= 2;
@@ -305,7 +324,6 @@ static struct fbtft_display display = {
 		.write = write_spi,
 	},
 };
-
 FBTFT_REGISTER_DRIVER(DRVNAME, "raio,ra8875", &display);
 
 MODULE_ALIAS("spi:" DRVNAME);

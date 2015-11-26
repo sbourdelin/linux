@@ -42,6 +42,7 @@
 #include <asm/thread_info.h>
 #include <asm/stacktrace.h>
 
+#ifdef CONFIG_SMP
 unsigned long profile_pc(struct pt_regs *regs)
 {
 	struct stackframe frame;
@@ -61,15 +62,22 @@ unsigned long profile_pc(struct pt_regs *regs)
 	return frame.pc;
 }
 EXPORT_SYMBOL(profile_pc);
+#endif
 
 void __init time_init(void)
 {
 	u32 arch_timer_rate;
 
 	of_clk_init(NULL);
-	clocksource_probe();
+	clocksource_of_init();
 
 	tick_setup_hrtimer_broadcast();
+
+	/*
+	 * Since ACPI or FDT will only one be available in the system,
+	 * we can use acpi_generic_timer_init() here safely
+	 */
+	acpi_generic_timer_init();
 
 	arch_timer_rate = arch_timer_get_rate();
 	if (!arch_timer_rate)

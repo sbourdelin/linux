@@ -46,8 +46,7 @@
 	compatible = "google,chromecast", "marvell,berlin2cd", "marvell,berlin";
 
 	chosen {
-		bootargs = "earlyprintk";
-		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttyS0,115200 earlyprintk";
 	};
 
 	memory {

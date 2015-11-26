@@ -954,32 +954,46 @@ static int pm860x_battery_probe(struct platform_device *pdev)
 	else
 		info->resistor = 300;	/* set default internal resistor */
 
-	info->battery = devm_power_supply_register(&pdev->dev,
-						   &pm860x_battery_desc,
-						   NULL);
+	info->battery = power_supply_register(&pdev->dev, &pm860x_battery_desc,
+					      NULL);
 	if (IS_ERR(info->battery))
 		return PTR_ERR(info->battery);
 	info->battery->dev.parent = &pdev->dev;
 
-	ret = devm_request_threaded_irq(chip->dev, info->irq_cc, NULL,
-					pm860x_coulomb_handler, IRQF_ONESHOT,
-					"coulomb", info);
+	ret = request_threaded_irq(info->irq_cc, NULL,
+				pm860x_coulomb_handler, IRQF_ONESHOT,
+				"coulomb", info);
 	if (ret < 0) {
 		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
 			info->irq_cc, ret);
-		return ret;
+		goto out_reg;
 	}
 
-	ret = devm_request_threaded_irq(chip->dev, info->irq_batt, NULL,
-					pm860x_batt_handler,
-					IRQF_ONESHOT, "battery", info);
+	ret = request_threaded_irq(info->irq_batt, NULL, pm860x_batt_handler,
+				IRQF_ONESHOT, "battery", info);
 	if (ret < 0) {
 		dev_err(chip->dev, "Failed to request IRQ: #%d: %d\n",
 			info->irq_batt, ret);
-		return ret;
+		goto out_coulomb;
 	}
 
 
+	return 0;
+
+out_coulomb:
+	free_irq(info->irq_cc, info);
+out_reg:
+	power_supply_unregister(info->battery);
+	return ret;
+}
+
+static int pm860x_battery_remove(struct platform_device *pdev)
+{
+	struct pm860x_battery_info *info = platform_get_drvdata(pdev);
+
+	free_irq(info->irq_batt, info);
+	free_irq(info->irq_cc, info);
+	power_supply_unregister(info->battery);
 	return 0;
 }
 
@@ -1014,6 +1028,7 @@ static struct platform_driver pm860x_battery_driver = {
 		   .pm = &pm860x_battery_pm_ops,
 	},
 	.probe = pm860x_battery_probe,
+	.remove = pm860x_battery_remove,
 };
 module_platform_driver(pm860x_battery_driver);
 

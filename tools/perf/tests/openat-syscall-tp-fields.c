@@ -1,4 +1,3 @@
-#include <linux/err.h>
 #include "perf.h"
 #include "evlist.h"
 #include "evsel.h"
@@ -31,7 +30,7 @@ int test__syscall_openat_tp_fields(void)
 	}
 
 	evsel = perf_evsel__newtp("syscalls", "sys_enter_openat");
-	if (IS_ERR(evsel)) {
+	if (evsel == NULL) {
 		pr_debug("%s: perf_evsel__newtp\n", __func__);
 		goto out_delete_evlist;
 	}
@@ -89,7 +88,7 @@ int test__syscall_openat_tp_fields(void)
 
 				err = perf_evsel__parse_sample(evsel, event, &sample);
 				if (err) {
-					pr_debug("Can't parse sample, err = %d\n", err);
+					pr_err("Can't parse sample, err = %d\n", err);
 					goto out_delete_evlist;
 				}
 

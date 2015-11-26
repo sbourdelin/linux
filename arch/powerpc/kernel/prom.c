@@ -218,18 +218,22 @@ static void __init check_cpu_pa_features(unsigned long node)
 }
 
 #ifdef CONFIG_PPC_STD_MMU_64
-static void __init init_mmu_slb_size(unsigned long node)
+static void __init check_cpu_slb_size(unsigned long node)
 {
 	const __be32 *slb_size_ptr;
 
-	slb_size_ptr = of_get_flat_dt_prop(node, "slb-size", NULL) ? :
-			of_get_flat_dt_prop(node, "ibm,slb-size", NULL);
-
-	if (slb_size_ptr)
+	slb_size_ptr = of_get_flat_dt_prop(node, "slb-size", NULL);
+	if (slb_size_ptr != NULL) {
 		mmu_slb_size = be32_to_cpup(slb_size_ptr);
+		return;
+	}
+	slb_size_ptr = of_get_flat_dt_prop(node, "ibm,slb-size", NULL);
+	if (slb_size_ptr != NULL) {
+		mmu_slb_size = be32_to_cpup(slb_size_ptr);
+	}
 }
 #else
-#define init_mmu_slb_size(node) do { } while(0)
+#define check_cpu_slb_size(node) do { } while(0)
 #endif
 
 static struct feature_property {
@@ -376,7 +380,7 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 
 	check_cpu_feature_properties(node);
 	check_cpu_pa_features(node);
-	init_mmu_slb_size(node);
+	check_cpu_slb_size(node);
 
 #ifdef CONFIG_PPC64
 	if (nthreads > 1)
@@ -472,10 +476,9 @@ static int __init early_init_dt_scan_drconf_memory(unsigned long node)
 		flags = of_read_number(&dm[3], 1);
 		/* skip DRC index, pad, assoc. list index, flags */
 		dm += 4;
-		/* skip this block if the reserved bit is set in flags
-		   or if the block is not assigned to this partition */
-		if ((flags & DRCONF_MEM_RESERVED) ||
-				!(flags & DRCONF_MEM_ASSIGNED))
+		/* skip this block if the reserved bit is set in flags (0x80)
+		   or if the block is not assigned to this partition (0x8) */
+		if ((flags & 0x80) || !(flags & 0x8))
 			continue;
 		size = memblock_size;
 		rngs = 1;
@@ -783,19 +786,17 @@ void __init early_get_first_memblock_info(void *params, phys_addr_t *size)
 int of_get_ibm_chip_id(struct device_node *np)
 {
 	of_node_get(np);
-	while (np) {
-		u32 chip_id;
+	while(np) {
+		struct device_node *old = np;
+		const __be32 *prop;
 
-		/*
-		 * Skiboot may produce memory nodes that contain more than one
-		 * cell in chip-id, we only read the first one here.
-		 */
-		if (!of_property_read_u32(np, "ibm,chip-id", &chip_id)) {
+		prop = of_get_property(np, "ibm,chip-id", NULL);
+		if (prop) {
 			of_node_put(np);
-			return chip_id;
+			return be32_to_cpup(prop);
 		}
-
-		np = of_get_next_parent(np);
+		np = of_get_parent(np);
+		of_node_put(old);
 	}
 	return -1;
 }

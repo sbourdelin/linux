@@ -65,29 +65,31 @@ int nft_bridge_ip6hdr_validate(struct sk_buff *skb)
 EXPORT_SYMBOL_GPL(nft_bridge_ip6hdr_validate);
 
 static inline void nft_bridge_set_pktinfo_ipv4(struct nft_pktinfo *pkt,
+					       const struct nf_hook_ops *ops,
 					       struct sk_buff *skb,
 					       const struct nf_hook_state *state)
 {
 	if (nft_bridge_iphdr_validate(skb))
-		nft_set_pktinfo_ipv4(pkt, skb, state);
+		nft_set_pktinfo_ipv4(pkt, ops, skb, state);
 	else
-		nft_set_pktinfo(pkt, skb, state);
+		nft_set_pktinfo(pkt, ops, skb, state);
 }
 
 static inline void nft_bridge_set_pktinfo_ipv6(struct nft_pktinfo *pkt,
+					       const struct nf_hook_ops *ops,
 					       struct sk_buff *skb,
 					       const struct nf_hook_state *state)
 {
 #if IS_ENABLED(CONFIG_IPV6)
 	if (nft_bridge_ip6hdr_validate(skb) &&
-	    nft_set_pktinfo_ipv6(pkt, skb, state) == 0)
+	    nft_set_pktinfo_ipv6(pkt, ops, skb, state) == 0)
 		return;
 #endif
-	nft_set_pktinfo(pkt, skb, state);
+	nft_set_pktinfo(pkt, ops, skb, state);
 }
 
 static unsigned int
-nft_do_chain_bridge(void *priv,
+nft_do_chain_bridge(const struct nf_hook_ops *ops,
 		    struct sk_buff *skb,
 		    const struct nf_hook_state *state)
 {
@@ -95,17 +97,17 @@ nft_do_chain_bridge(void *priv,
 
 	switch (eth_hdr(skb)->h_proto) {
 	case htons(ETH_P_IP):
-		nft_bridge_set_pktinfo_ipv4(&pkt, skb, state);
+		nft_bridge_set_pktinfo_ipv4(&pkt, ops, skb, state);
 		break;
 	case htons(ETH_P_IPV6):
-		nft_bridge_set_pktinfo_ipv6(&pkt, skb, state);
+		nft_bridge_set_pktinfo_ipv6(&pkt, ops, skb, state);
 		break;
 	default:
-		nft_set_pktinfo(&pkt, skb, state);
+		nft_set_pktinfo(&pkt, ops, skb, state);
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, ops);
 }
 
 static struct nft_af_info nft_af_bridge __read_mostly = {

@@ -181,16 +181,6 @@
 #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
 #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
 
-#ifdef CONFIG_ACPI
-#define ACPI_PROBE_TABLE(name)						\
-	. = ALIGN(8);							\
-	VMLINUX_SYMBOL(__##name##_acpi_probe_table) = .;		\
-	*(__##name##_acpi_probe_table)					\
-	VMLINUX_SYMBOL(__##name##_acpi_probe_table_end) = .;
-#else
-#define ACPI_PROBE_TABLE(name)
-#endif
-
 #define KERNEL_DTB()							\
 	STRUCT_ALIGN();							\
 	VMLINUX_SYMBOL(__dtb_start) = .;				\
@@ -422,10 +412,12 @@
  * during second ld run in second ld pass when generating System.map */
 #define TEXT_TEXT							\
 		ALIGN_FUNCTION();					\
-		*(.text.hot .text .text.fixup .text.unlikely)		\
+		*(.text.hot)						\
+		*(.text .text.fixup)					\
 		*(.ref.text)						\
 	MEM_KEEP(init.text)						\
 	MEM_KEEP(exit.text)						\
+		*(.text.unlikely)
 
 
 /* sched.text is aling to function alignment to secure we have same
@@ -524,8 +516,6 @@
 	CPUIDLE_METHOD_OF_TABLES()					\
 	KERNEL_DTB()							\
 	IRQCHIP_OF_MATCH_TABLE()					\
-	ACPI_PROBE_TABLE(irqchip)					\
-	ACPI_PROBE_TABLE(clksrc)					\
 	EARLYCON_TABLE()						\
 	EARLYCON_OF_TABLES()
 

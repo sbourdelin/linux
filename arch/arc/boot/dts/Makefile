@@ -6,12 +6,10 @@ ifneq ($(CONFIG_ARC_BUILTIN_DTB_NAME),"")
 endif
 
 obj-y   += $(builtindtb-y).dtb.o
-dtb-y := $(builtindtb-y).dtb
+targets += $(builtindtb-y).dtb
 
 .SECONDARY: $(obj)/$(builtindtb-y).dtb.S
 
-dtstree		:= $(srctree)/$(src)
-dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dtstree)/*.dts))
+dtbs:  $(addprefix  $(obj)/, $(builtindtb-y).dtb)
 
-always := $(dtb-y)
 clean-files := *.dtb  *.dtb.S

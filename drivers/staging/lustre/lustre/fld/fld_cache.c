@@ -53,6 +53,7 @@
 #include "../include/obd_support.h"
 #include "../include/lprocfs_status.h"
 
+#include "../include/dt_object.h"
 #include "../include/lustre_req_layout.h"
 #include "../include/lustre_fld.h"
 #include "fld_internal.h"
@@ -69,7 +70,7 @@ struct fld_cache *fld_cache_init(const char *name,
 	LASSERT(cache_threshold < cache_size);
 
 	cache = kzalloc(sizeof(*cache), GFP_NOFS);
-	if (!cache)
+	if (cache == NULL)
 		return ERR_PTR(-ENOMEM);
 
 	INIT_LIST_HEAD(&cache->fci_entries_head);
@@ -265,7 +266,7 @@ static void fld_cache_punch_hole(struct fld_cache *cache,
 	const u64 new_end  = range->lsr_end;
 	struct fld_cache_entry *fldt;
 
-	fldt = kzalloc(sizeof(*fldt), GFP_ATOMIC);
+	OBD_ALLOC_GFP(fldt, sizeof(*fldt), GFP_ATOMIC);
 	if (!fldt) {
 		kfree(f_new);
 		/* overlap is not allowed, so dont mess up list. */

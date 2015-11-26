@@ -1110,7 +1110,6 @@ static void xgbe_rx_desc_reset(struct xgbe_prv_data *pdata,
 	unsigned int rx_usecs = pdata->rx_usecs;
 	unsigned int rx_frames = pdata->rx_frames;
 	unsigned int inte;
-	dma_addr_t hdr_dma, buf_dma;
 
 	if (!rx_usecs && !rx_frames) {
 		/* No coalescing, interrupt for every descriptor */
@@ -1130,12 +1129,10 @@ static void xgbe_rx_desc_reset(struct xgbe_prv_data *pdata,
 	 *   Set buffer 2 (hi) address to buffer dma address (hi) and
 	 *     set control bits OWN and INTE
 	 */
-	hdr_dma = rdata->rx.hdr.dma_base + rdata->rx.hdr.dma_off;
-	buf_dma = rdata->rx.buf.dma_base + rdata->rx.buf.dma_off;
-	rdesc->desc0 = cpu_to_le32(lower_32_bits(hdr_dma));
-	rdesc->desc1 = cpu_to_le32(upper_32_bits(hdr_dma));
-	rdesc->desc2 = cpu_to_le32(lower_32_bits(buf_dma));
-	rdesc->desc3 = cpu_to_le32(upper_32_bits(buf_dma));
+	rdesc->desc0 = cpu_to_le32(lower_32_bits(rdata->rx.hdr.dma));
+	rdesc->desc1 = cpu_to_le32(upper_32_bits(rdata->rx.hdr.dma));
+	rdesc->desc2 = cpu_to_le32(lower_32_bits(rdata->rx.buf.dma));
+	rdesc->desc3 = cpu_to_le32(upper_32_bits(rdata->rx.buf.dma));
 
 	XGMAC_SET_BITS_LE(rdesc->desc3, RX_NORMAL_DESC3, INTE, inte);
 
@@ -1595,7 +1592,7 @@ static void xgbe_dev_xmit(struct xgbe_channel *channel)
 				  packet->rdesc_count, 1);
 
 	/* Make sure ownership is written to the descriptor */
-	smp_wmb();
+	dma_wmb();
 
 	ring->cur = cur_index + 1;
 	if (!packet->skb->xmit_more ||
@@ -1940,31 +1937,84 @@ static void xgbe_config_mtl_mode(struct xgbe_prv_data *pdata)
 static unsigned int xgbe_calculate_per_queue_fifo(unsigned int fifo_size,
 						  unsigned int queue_count)
 {
-	unsigned int q_fifo_size;
-	unsigned int p_fifo;
+	unsigned int q_fifo_size = 0;
+	enum xgbe_mtl_fifo_size p_fifo = XGMAC_MTL_FIFO_SIZE_256;
 
-	/* Calculate the configured fifo size */
-	q_fifo_size = 1 << (fifo_size + 7);
+	/* Calculate Tx/Rx fifo share per queue */
+	switch (fifo_size) {
+	case 0:
+		q_fifo_size = XGBE_FIFO_SIZE_B(128);
+		break;
+	case 1:
+		q_fifo_size = XGBE_FIFO_SIZE_B(256);
+		break;
+	case 2:
+		q_fifo_size = XGBE_FIFO_SIZE_B(512);
+		break;
+	case 3:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(1);
+		break;
+	case 4:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(2);
+		break;
+	case 5:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(4);
+		break;
+	case 6:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(8);
+		break;
+	case 7:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(16);
+		break;
+	case 8:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(32);
+		break;
+	case 9:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(64);
+		break;
+	case 10:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(128);
+		break;
+	case 11:
+		q_fifo_size = XGBE_FIFO_SIZE_KB(256);
+		break;
+	}
 
-	/* The configured value may not be the actual amount of fifo RAM */
+	/* The configured value is not the actual amount of fifo RAM */
 	q_fifo_size = min_t(unsigned int, XGBE_FIFO_MAX, q_fifo_size);
 
 	q_fifo_size = q_fifo_size / queue_count;
 
-	/* Each increment in the queue fifo size represents 256 bytes of
-	 * fifo, with 0 representing 256 bytes. Distribute the fifo equally
-	 * between the queues.
-	 */
-	p_fifo = q_fifo_size / 256;
-	if (p_fifo)
-		p_fifo--;
+	/* Set the queue fifo size programmable value */
+	if (q_fifo_size >= XGBE_FIFO_SIZE_KB(256))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_256K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(128))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_128K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(64))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_64K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(32))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_32K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(16))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_16K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(8))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_8K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(4))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_4K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(2))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_2K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_KB(1))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_1K;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_B(512))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_512;
+	else if (q_fifo_size >= XGBE_FIFO_SIZE_B(256))
+		p_fifo = XGMAC_MTL_FIFO_SIZE_256;
 
 	return p_fifo;
 }
 
 static void xgbe_config_tx_fifo_size(struct xgbe_prv_data *pdata)
 {
-	unsigned int fifo_size;
+	enum xgbe_mtl_fifo_size fifo_size;
 	unsigned int i;
 
 	fifo_size = xgbe_calculate_per_queue_fifo(pdata->hw_feat.tx_fifo_size,
@@ -1980,7 +2030,7 @@ static void xgbe_config_tx_fifo_size(struct xgbe_prv_data *pdata)
 
 static void xgbe_config_rx_fifo_size(struct xgbe_prv_data *pdata)
 {
-	unsigned int fifo_size;
+	enum xgbe_mtl_fifo_size fifo_size;
 	unsigned int i;
 
 	fifo_size = xgbe_calculate_per_queue_fifo(pdata->hw_feat.rx_fifo_size,
@@ -2171,7 +2221,7 @@ static u64 xgbe_mmc_read(struct xgbe_prv_data *pdata, unsigned int reg_lo)
 
 	default:
 		read_hi = false;
-	}
+	};
 
 	val = XGMAC_IOREAD(pdata, reg_lo);
 

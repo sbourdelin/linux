@@ -42,11 +42,6 @@ struct altera_gpio_chip {
 	int mapped_irq;
 };
 
-static struct altera_gpio_chip *to_altera(struct gpio_chip *gc)
-{
-	return container_of(gc, struct altera_gpio_chip, mmchip.gc);
-}
-
 static void altera_gpio_irq_unmask(struct irq_data *d)
 {
 	struct altera_gpio_chip *altera_gc;
@@ -54,7 +49,7 @@ static void altera_gpio_irq_unmask(struct irq_data *d)
 	unsigned long flags;
 	u32 intmask;
 
-	altera_gc = to_altera(irq_data_get_irq_chip_data(d));
+	altera_gc = irq_data_get_irq_chip_data(d);
 	mm_gc = &altera_gc->mmchip;
 
 	spin_lock_irqsave(&altera_gc->gpio_lock, flags);
@@ -72,7 +67,7 @@ static void altera_gpio_irq_mask(struct irq_data *d)
 	unsigned long flags;
 	u32 intmask;
 
-	altera_gc = to_altera(irq_data_get_irq_chip_data(d));
+	altera_gc = irq_data_get_irq_chip_data(d);
 	mm_gc = &altera_gc->mmchip;
 
 	spin_lock_irqsave(&altera_gc->gpio_lock, flags);
@@ -92,7 +87,7 @@ static int altera_gpio_irq_set_type(struct irq_data *d,
 {
 	struct altera_gpio_chip *altera_gc;
 
-	altera_gc = to_altera(irq_data_get_irq_chip_data(d));
+	altera_gc = irq_data_get_irq_chip_data(d);
 
 	if (type == IRQ_TYPE_NONE)
 		return 0;
@@ -206,7 +201,8 @@ static int altera_gpio_direction_output(struct gpio_chip *gc,
 	return 0;
 }
 
-static void altera_gpio_irq_edge_handler(struct irq_desc *desc)
+static void altera_gpio_irq_edge_handler(unsigned int irq,
+					struct irq_desc *desc)
 {
 	struct altera_gpio_chip *altera_gc;
 	struct irq_chip *chip;
@@ -215,7 +211,7 @@ static void altera_gpio_irq_edge_handler(struct irq_desc *desc)
 	unsigned long status;
 	int i;
 
-	altera_gc = to_altera(irq_desc_get_handler_data(desc));
+	altera_gc = irq_desc_get_handler_data(desc);
 	chip = irq_desc_get_chip(desc);
 	mm_gc = &altera_gc->mmchip;
 	irqdomain = altera_gc->mmchip.gc.irqdomain;
@@ -235,7 +231,8 @@ static void altera_gpio_irq_edge_handler(struct irq_desc *desc)
 }
 
 
-static void altera_gpio_irq_leveL_high_handler(struct irq_desc *desc)
+static void altera_gpio_irq_leveL_high_handler(unsigned int irq,
+					      struct irq_desc *desc)
 {
 	struct altera_gpio_chip *altera_gc;
 	struct irq_chip *chip;
@@ -244,7 +241,7 @@ static void altera_gpio_irq_leveL_high_handler(struct irq_desc *desc)
 	unsigned long status;
 	int i;
 
-	altera_gc = to_altera(irq_desc_get_handler_data(desc));
+	altera_gc = irq_desc_get_handler_data(desc);
 	chip = irq_desc_get_chip(desc);
 	mm_gc = &altera_gc->mmchip;
 	irqdomain = altera_gc->mmchip.gc.irqdomain;
@@ -341,9 +338,9 @@ static int altera_gpio_remove(struct platform_device *pdev)
 {
 	struct altera_gpio_chip *altera_gc = platform_get_drvdata(pdev);
 
-	of_mm_gpiochip_remove(&altera_gc->mmchip);
+	gpiochip_remove(&altera_gc->mmchip.gc);
 
-	return 0;
+	return -EIO;
 }
 
 static const struct of_device_id altera_gpio_of_match[] = {

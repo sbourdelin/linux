@@ -22,8 +22,6 @@
 
 static struct kmem_cache *mc_dev_cache;
 
-static bool fsl_mc_is_root_dprc(struct device *dev);
-
 /**
  * fsl_mc_bus_match - device to driver matching callback
  * @dev: the MC object device structure to match against
@@ -41,7 +39,7 @@ static int fsl_mc_bus_match(struct device *dev, struct device_driver *drv)
 	bool major_version_mismatch = false;
 	bool minor_version_mismatch = false;
 
-	if (WARN_ON(!fsl_mc_bus_exists()))
+	if (WARN_ON(!fsl_mc_bus_type.dev_root))
 		goto out;
 
 	if (!mc_drv->match_id_table)
@@ -52,7 +50,7 @@ static int fsl_mc_bus_match(struct device *dev, struct device_driver *drv)
 	 * Only exception is the root DPRC, which is a special case.
 	 */
 	if ((mc_dev->obj_desc.state & DPRC_OBJ_STATE_PLUGGED) == 0 &&
-	    !fsl_mc_is_root_dprc(&mc_dev->dev))
+	    &mc_dev->dev != fsl_mc_bus_type.dev_root)
 		goto out;
 
 	/*
@@ -108,8 +106,6 @@ struct bus_type fsl_mc_bus_type = {
 	.uevent = fsl_mc_bus_uevent,
 };
 EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
-
-static atomic_t root_dprc_count = ATOMIC_INIT(0);
 
 static int fsl_mc_driver_probe(struct device *dev)
 {
@@ -210,61 +206,21 @@ void fsl_mc_driver_unregister(struct fsl_mc_driver *mc_driver)
 }
 EXPORT_SYMBOL_GPL(fsl_mc_driver_unregister);
 
-/**
- * fsl_mc_bus_exists - check if a root dprc exists
- */
-bool fsl_mc_bus_exists(void)
-{
-	return atomic_read(&root_dprc_count) > 0;
-}
-EXPORT_SYMBOL_GPL(fsl_mc_bus_exists);
-
-/**
-* fsl_mc_get_root_dprc - function to traverse to the root dprc
-*/
-static void fsl_mc_get_root_dprc(struct device *dev,
-				 struct device **root_dprc_dev)
-{
-	if (WARN_ON(!dev)) {
-		*root_dprc_dev = NULL;
-	} else if (WARN_ON(dev->bus != &fsl_mc_bus_type)) {
-		*root_dprc_dev = NULL;
-	} else {
-		*root_dprc_dev = dev;
-		while ((*root_dprc_dev)->parent->bus == &fsl_mc_bus_type)
-			*root_dprc_dev = (*root_dprc_dev)->parent;
-	}
-}
-
-/**
- * fsl_mc_is_root_dprc - function to check if a given device is a root dprc
- */
-static bool fsl_mc_is_root_dprc(struct device *dev)
-{
-	struct device *root_dprc_dev;
-
-	fsl_mc_get_root_dprc(dev, &root_dprc_dev);
-	if (!root_dprc_dev)
-		return false;
-	else
-		return dev == root_dprc_dev;
-}
-
 static int get_dprc_icid(struct fsl_mc_io *mc_io,
-			 int container_id, u16 *icid)
+			 int container_id, uint16_t *icid)
 {
-	u16 dprc_handle;
+	uint16_t dprc_handle;
 	struct dprc_attributes attr;
 	int error;
 
-	error = dprc_open(mc_io, 0, container_id, &dprc_handle);
+	error = dprc_open(mc_io, container_id, &dprc_handle);
 	if (error < 0) {
 		pr_err("dprc_open() failed: %d\n", error);
 		return error;
 	}
 
 	memset(&attr, 0, sizeof(attr));
-	error = dprc_get_attributes(mc_io, 0, dprc_handle, &attr);
+	error = dprc_get_attributes(mc_io, dprc_handle, &attr);
 	if (error < 0) {
 		pr_err("dprc_get_attributes() failed: %d\n", error);
 		goto common_cleanup;
@@ -274,28 +230,20 @@ static int get_dprc_icid(struct fsl_mc_io *mc_io,
 	error = 0;
 
 common_cleanup:
-	(void)dprc_close(mc_io, 0, dprc_handle);
+	(void)dprc_close(mc_io, dprc_handle);
 	return error;
 }
 
-static int translate_mc_addr(struct fsl_mc_device *mc_dev,
-			     enum dprc_region_type mc_region_type,
-			     u64 mc_offset, phys_addr_t *phys_addr)
+static int translate_mc_addr(uint64_t mc_addr, phys_addr_t *phys_addr)
 {
 	int i;
-	struct device *root_dprc_dev;
-	struct fsl_mc *mc;
-
-	fsl_mc_get_root_dprc(&mc_dev->dev, &root_dprc_dev);
-	if (WARN_ON(!root_dprc_dev))
-		return -EINVAL;
-	mc = dev_get_drvdata(root_dprc_dev->parent);
+	struct fsl_mc *mc = dev_get_drvdata(fsl_mc_bus_type.dev_root->parent);
 
 	if (mc->num_translation_ranges == 0) {
 		/*
 		 * Do identity mapping:
 		 */
-		*phys_addr = mc_offset;
+		*phys_addr = mc_addr;
 		return 0;
 	}
 
@@ -303,11 +251,10 @@ static int translate_mc_addr(struct fsl_mc_device *mc_dev,
 		struct fsl_mc_addr_translation_range *range =
 			&mc->translation_ranges[i];
 
-		if (mc_region_type == range->mc_region_type &&
-		    mc_offset >= range->start_mc_offset &&
-		    mc_offset < range->end_mc_offset) {
+		if (mc_addr >= range->start_mc_addr &&
+		    mc_addr < range->end_mc_addr) {
 			*phys_addr = range->start_phys_addr +
-				     (mc_offset - range->start_mc_offset);
+				     (mc_addr - range->start_mc_addr);
 			return 0;
 		}
 	}
@@ -323,22 +270,6 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
 	struct resource *regions;
 	struct dprc_obj_desc *obj_desc = &mc_dev->obj_desc;
 	struct device *parent_dev = mc_dev->dev.parent;
-	enum dprc_region_type mc_region_type;
-
-	if (strcmp(obj_desc->type, "dprc") == 0 ||
-	    strcmp(obj_desc->type, "dpmcp") == 0) {
-		mc_region_type = DPRC_REGION_TYPE_MC_PORTAL;
-	} else if (strcmp(obj_desc->type, "dpio") == 0) {
-		mc_region_type = DPRC_REGION_TYPE_QBMAN_PORTAL;
-	} else {
-		/*
-		 * This function should not have been called for this MC object
-		 * type, as this object type is not supposed to have MMIO
-		 * regions
-		 */
-		WARN_ON(true);
-		return -EINVAL;
-	}
 
 	regions = kmalloc_array(obj_desc->region_count,
 				sizeof(regions[0]), GFP_KERNEL);
@@ -349,7 +280,6 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
 		struct dprc_region_desc region_desc;
 
 		error = dprc_get_obj_region(mc_bus_dev->mc_io,
-					    0,
 					    mc_bus_dev->mc_handle,
 					    obj_desc->type,
 					    obj_desc->id, i, &region_desc);
@@ -359,15 +289,14 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
 			goto error_cleanup_regions;
 		}
 
+		WARN_ON(region_desc.base_paddr == 0x0);
 		WARN_ON(region_desc.size == 0);
-		error = translate_mc_addr(mc_dev, mc_region_type,
-					  region_desc.base_offset,
+		error = translate_mc_addr(region_desc.base_paddr,
 					  &regions[i].start);
 		if (error < 0) {
 			dev_err(parent_dev,
-				"Invalid MC offset: %#x (for %s.%d\'s region %d)\n",
-				region_desc.base_offset,
-				obj_desc->type, obj_desc->id, i);
+				"Invalid MC address: %#llx\n",
+				region_desc.base_paddr);
 			goto error_cleanup_regions;
 		}
 
@@ -458,7 +387,8 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 
 			mc_io2 = mc_io;
 
-			atomic_inc(&root_dprc_count);
+			if (!fsl_mc_bus_type.dev_root)
+				fsl_mc_bus_type.dev_root = &mc_dev->dev;
 		}
 
 		error = get_dprc_icid(mc_io2, obj_desc->id, &mc_dev->icid);
@@ -541,12 +471,8 @@ void fsl_mc_device_remove(struct fsl_mc_device *mc_dev)
 			mc_dev->mc_io = NULL;
 		}
 
-		if (fsl_mc_is_root_dprc(&mc_dev->dev)) {
-			if (atomic_read(&root_dprc_count) > 0)
-				atomic_dec(&root_dprc_count);
-			else
-				WARN_ON(1);
-		}
+		if (&mc_dev->dev == fsl_mc_bus_type.dev_root)
+			fsl_mc_bus_type.dev_root = NULL;
 	}
 
 	if (mc_bus)
@@ -561,7 +487,7 @@ static int parse_mc_ranges(struct device *dev,
 			   int *mc_addr_cells,
 			   int *mc_size_cells,
 			   const __be32 **ranges_start,
-			   u8 *num_ranges)
+			   uint8_t *num_ranges)
 {
 	const __be32 *prop;
 	int range_tuple_cell_count;
@@ -609,7 +535,7 @@ static int parse_mc_ranges(struct device *dev,
 static int get_mc_addr_translation_ranges(struct device *dev,
 					  struct fsl_mc_addr_translation_range
 						**ranges,
-					  u8 *num_ranges)
+					  uint8_t *num_ranges)
 {
 	int error;
 	int paddr_cells;
@@ -648,13 +574,11 @@ static int get_mc_addr_translation_ranges(struct device *dev,
 	for (i = 0; i < *num_ranges; ++i) {
 		struct fsl_mc_addr_translation_range *range = &(*ranges)[i];
 
-		range->mc_region_type = of_read_number(cell, 1);
-		range->start_mc_offset = of_read_number(cell + 1,
-							mc_addr_cells - 1);
+		range->start_mc_addr = of_read_number(cell, mc_addr_cells);
 		cell += mc_addr_cells;
 		range->start_phys_addr = of_read_number(cell, paddr_cells);
 		cell += paddr_cells;
-		range->end_mc_offset = range->start_mc_offset +
+		range->end_mc_addr = range->start_mc_addr +
 				     of_read_number(cell, mc_size_cells);
 
 		cell += mc_size_cells;
@@ -676,7 +600,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 	struct fsl_mc_io *mc_io = NULL;
 	int container_id;
 	phys_addr_t mc_portal_phys_addr;
-	u32 mc_portal_size;
+	uint32_t mc_portal_size;
 	struct mc_version mc_version;
 	struct resource res;
 
@@ -706,7 +630,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 	if (error < 0)
 		return error;
 
-	error = mc_get_version(mc_io, 0, &mc_version);
+	error = mc_get_version(mc_io, &mc_version);
 	if (error != 0) {
 		dev_err(&pdev->dev,
 			"mc_get_version() failed with error %d\n", error);
@@ -737,7 +661,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 	if (error < 0)
 		goto error_cleanup_mc_io;
 
-	error = dpmng_get_container_id(mc_io, 0, &container_id);
+	error = dpmng_get_container_id(mc_io, &container_id);
 	if (error < 0) {
 		dev_err(&pdev->dev,
 			"dpmng_get_container_id() failed: %d\n", error);
@@ -749,7 +673,6 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 	obj_desc.id = container_id;
 	obj_desc.ver_major = DPRC_VER_MAJOR;
 	obj_desc.ver_minor = DPRC_VER_MINOR;
-	obj_desc.irq_count = 1;
 	obj_desc.region_count = 0;
 
 	error = fsl_mc_device_add(&obj_desc, mc_io, &pdev->dev, &mc_bus_dev);
@@ -772,7 +695,7 @@ static int fsl_mc_bus_remove(struct platform_device *pdev)
 {
 	struct fsl_mc *mc = platform_get_drvdata(pdev);
 
-	if (WARN_ON(!fsl_mc_is_root_dprc(&mc->root_mc_bus_dev->dev)))
+	if (WARN_ON(&mc->root_mc_bus_dev->dev != fsl_mc_bus_type.dev_root))
 		return -EINVAL;
 
 	fsl_mc_device_remove(mc->root_mc_bus_dev);
@@ -790,7 +713,6 @@ MODULE_DEVICE_TABLE(of, fsl_mc_bus_match_table);
 static struct platform_driver fsl_mc_bus_driver = {
 	.driver = {
 		   .name = "fsl_mc_bus",
-		   .owner = THIS_MODULE,
 		   .pm = NULL,
 		   .of_match_table = fsl_mc_bus_match_table,
 		   },

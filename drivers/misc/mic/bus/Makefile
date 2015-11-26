@@ -4,4 +4,3 @@
 #
 obj-$(CONFIG_INTEL_MIC_BUS) += mic_bus.o
 obj-$(CONFIG_SCIF_BUS) += scif_bus.o
-obj-$(CONFIG_MIC_COSM) += cosm_bus.o

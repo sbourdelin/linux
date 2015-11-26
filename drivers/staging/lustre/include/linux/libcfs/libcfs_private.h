@@ -79,13 +79,31 @@ do {									\
 
 #define KLASSERT(e) LASSERT(e)
 
-void __noreturn lbug_with_loc(struct libcfs_debug_msg_data *);
+void lbug_with_loc(struct libcfs_debug_msg_data *)__attribute__((noreturn));
 
 #define LBUG()							  \
 do {								    \
 	LIBCFS_DEBUG_MSG_DATA_DECL(msgdata, D_EMERG, NULL);	     \
 	lbug_with_loc(&msgdata);					\
 } while (0)
+
+extern atomic_t libcfs_kmemory;
+/*
+ * Memory
+ */
+
+# define libcfs_kmem_inc(ptr, size)		\
+do {						\
+	atomic_add(size, &libcfs_kmemory);	\
+} while (0)
+
+# define libcfs_kmem_dec(ptr, size)		\
+do {						\
+	atomic_sub(size, &libcfs_kmemory);	\
+} while (0)
+
+# define libcfs_kmem_read()			\
+	atomic_read(&libcfs_kmemory)
 
 #ifndef LIBCFS_VMALLOC_SIZE
 #define LIBCFS_VMALLOC_SIZE	(2 << PAGE_CACHE_SHIFT) /* 2 pages */
@@ -95,7 +113,7 @@ do {								    \
 do {									    \
 	LASSERT(!in_interrupt() ||					    \
 		((size) <= LIBCFS_VMALLOC_SIZE &&			    \
-		 !gfpflags_allow_blocking(mask)));			    \
+		 ((mask) & __GFP_WAIT) == 0));				    \
 } while (0)
 
 #define LIBCFS_ALLOC_POST(ptr, size)					    \
@@ -103,9 +121,14 @@ do {									    \
 	if (unlikely((ptr) == NULL)) {					    \
 		CERROR("LNET: out of memory at %s:%d (tried to alloc '"	    \
 		       #ptr "' = %d)\n", __FILE__, __LINE__, (int)(size));  \
+		CERROR("LNET: %d total bytes allocated by lnet\n",	    \
+		       libcfs_kmem_read());				    \
 	} else {							    \
 		memset((ptr), 0, (size));				    \
-	}								    \
+		libcfs_kmem_inc((ptr), (size));				    \
+		CDEBUG(D_MALLOC, "alloc '" #ptr "': %d at %p (tot %d).\n",  \
+		       (int)(size), (ptr), libcfs_kmem_read());		    \
+	}								   \
 } while (0)
 
 /**
@@ -157,6 +180,9 @@ do {								    \
 		       "%s:%d\n", s, __FILE__, __LINE__);	       \
 		break;						  \
 	}							       \
+	libcfs_kmem_dec((ptr), s);				      \
+	CDEBUG(D_MALLOC, "kfreed '" #ptr "': %d at %p (tot %d).\n",     \
+	       s, (ptr), libcfs_kmem_read());				\
 	if (unlikely(s > LIBCFS_VMALLOC_SIZE))			  \
 		vfree(ptr);				    \
 	else							    \

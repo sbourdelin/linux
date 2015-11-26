@@ -40,6 +40,7 @@
  * Author: Nathan Rutman <nathan@clusterfs.com>
  */
 
+
 #define DEBUG_SUBSYSTEM S_CLASS
 #define D_MOUNT (D_SUPER|D_CONFIG/*|D_WARNING */)
 #define PRINT_CMD CDEBUG
@@ -84,7 +85,7 @@ int lustre_process_log(struct super_block *sb, char *logname,
 	LASSERT(cfg);
 
 	bufs = kzalloc(sizeof(*bufs), GFP_NOFS);
-	if (!bufs)
+	if (bufs == NULL)
 		return -ENOMEM;
 
 	/* mgc_process_config */
@@ -142,8 +143,8 @@ EXPORT_SYMBOL(lustre_end_log);
 /** lustre_cfg_bufs are a holdover from 1.4; we can still set these up from
  * lctl (and do for echo cli/srv.
  */
-static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
-		   char *s1, char *s2, char *s3, char *s4)
+int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
+	    char *s1, char *s2, char *s3, char *s4)
 {
 	struct lustre_cfg_bufs bufs;
 	struct lustre_cfg     *lcfg = NULL;
@@ -168,15 +169,15 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
 	lustre_cfg_free(lcfg);
 	return rc;
 }
+EXPORT_SYMBOL(do_lcfg);
 
 /** Call class_attach and class_setup.  These methods in turn call
  * obd type-specific methods.
  */
-static int lustre_start_simple(char *obdname, char *type, char *uuid,
-			       char *s1, char *s2, char *s3, char *s4)
+int lustre_start_simple(char *obdname, char *type, char *uuid,
+			char *s1, char *s2, char *s3, char *s4)
 {
 	int rc;
-
 	CDEBUG(D_MOUNT, "Starting obd %s (typ=%s)\n", obdname, type);
 
 	rc = do_lcfg(obdname, 0, LCFG_ATTACH, type, uuid, NULL, NULL);
@@ -209,17 +210,35 @@ int lustre_start_mgc(struct super_block *sb)
 	struct obd_uuid *uuid;
 	class_uuid_t uuidc;
 	lnet_nid_t nid;
-	char nidstr[LNET_NIDSTR_SIZE];
 	char *mgcname = NULL, *niduuid = NULL, *mgssec = NULL;
 	char *ptr;
-	int rc = 0, i = 0, j;
+	int rc = 0, i = 0, j, len;
 
 	LASSERT(lsi->lsi_lmd);
 
-	/* Use nids from mount line: uml1,1@elan:uml2,2@elan:/lustre */
-	ptr = lsi->lsi_lmd->lmd_dev;
-	if (class_parse_nid(ptr, &nid, &ptr) == 0)
-		i++;
+	/* Find the first non-lo MGS nid for our MGC name */
+	if (IS_SERVER(lsi)) {
+		/* mount -o mgsnode=nid */
+		ptr = lsi->lsi_lmd->lmd_mgs;
+		if (lsi->lsi_lmd->lmd_mgs &&
+		    (class_parse_nid(lsi->lsi_lmd->lmd_mgs, &nid, &ptr) == 0)) {
+			i++;
+		} else if (IS_MGS(lsi)) {
+			lnet_process_id_t id;
+			while ((rc = LNetGetId(i++, &id)) != -ENOENT) {
+				if (LNET_NETTYP(LNET_NIDNET(id.nid)) == LOLND)
+					continue;
+				nid = id.nid;
+				i++;
+				break;
+			}
+		}
+	} else { /* client */
+		/* Use nids from mount line: uml1,1@elan:uml2,2@elan:/lustre */
+		ptr = lsi->lsi_lmd->lmd_dev;
+		if (class_parse_nid(ptr, &nid, &ptr) == 0)
+			i++;
+	}
 	if (i == 0) {
 		CERROR("No valid MGS nids found.\n");
 		return -EINVAL;
@@ -227,19 +246,19 @@ int lustre_start_mgc(struct super_block *sb)
 
 	mutex_lock(&mgc_start_lock);
 
-	libcfs_nid2str_r(nid, nidstr, sizeof(nidstr));
-	mgcname = kasprintf(GFP_NOFS,
-			    "%s%s", LUSTRE_MGC_OBDNAME, nidstr);
-	niduuid = kasprintf(GFP_NOFS, "%s_%x", mgcname, i);
+	len = strlen(LUSTRE_MGC_OBDNAME) + strlen(libcfs_nid2str(nid)) + 1;
+	mgcname = kzalloc(len, GFP_NOFS);
+	niduuid = kzalloc(len + 2, GFP_NOFS);
 	if (!mgcname || !niduuid) {
 		rc = -ENOMEM;
 		goto out_free;
 	}
+	sprintf(mgcname, "%s%s", LUSTRE_MGC_OBDNAME, libcfs_nid2str(nid));
 
 	mgssec = lsi->lsi_lmd->lmd_mgssec ? lsi->lsi_lmd->lmd_mgssec : "";
 
 	data = kzalloc(sizeof(*data), GFP_NOFS);
-	if (!data) {
+	if (data == NULL) {
 		rc = -ENOMEM;
 		goto out_free;
 	}
@@ -281,6 +300,12 @@ int lustre_start_mgc(struct super_block *sb)
 		}
 
 		recov_bk = 0;
+		/* If we are restarting the MGS, don't try to keep the MGC's
+		   old connection, or registration will fail. */
+		if (IS_MGS(lsi)) {
+			CDEBUG(D_MOUNT, "New MGS with live MGC\n");
+			recov_bk = 1;
+		}
 
 		/* Try all connections, but only once (again).
 		   We don't want to block another target from starting
@@ -301,15 +326,46 @@ int lustre_start_mgc(struct super_block *sb)
 
 	/* Add the primary nids for the MGS */
 	i = 0;
-	/* Use nids from mount line: uml1,1@elan:uml2,2@elan:/lustre */
-	ptr = lsi->lsi_lmd->lmd_dev;
-	while (class_parse_nid(ptr, &nid, &ptr) == 0) {
-		rc = do_lcfg(mgcname, nid,
-			     LCFG_ADD_UUID, niduuid, NULL, NULL, NULL);
-		i++;
-		/* Stop at the first failover nid */
-		if (*ptr == ':')
-			break;
+	sprintf(niduuid, "%s_%x", mgcname, i);
+	if (IS_SERVER(lsi)) {
+		ptr = lsi->lsi_lmd->lmd_mgs;
+		if (IS_MGS(lsi)) {
+			/* Use local nids (including LO) */
+			lnet_process_id_t id;
+			while ((rc = LNetGetId(i++, &id)) != -ENOENT) {
+				rc = do_lcfg(mgcname, id.nid,
+					     LCFG_ADD_UUID, niduuid,
+					     NULL, NULL, NULL);
+			}
+		} else {
+			/* Use mgsnode= nids */
+			/* mount -o mgsnode=nid */
+			if (lsi->lsi_lmd->lmd_mgs) {
+				ptr = lsi->lsi_lmd->lmd_mgs;
+			} else if (class_find_param(ptr, PARAM_MGSNODE,
+						    &ptr) != 0) {
+				CERROR("No MGS nids given.\n");
+				rc = -EINVAL;
+				goto out_free;
+			}
+			while (class_parse_nid(ptr, &nid, &ptr) == 0) {
+				rc = do_lcfg(mgcname, nid,
+					     LCFG_ADD_UUID, niduuid,
+					     NULL, NULL, NULL);
+				i++;
+			}
+		}
+	} else { /* client */
+		/* Use nids from mount line: uml1,1@elan:uml2,2@elan:/lustre */
+		ptr = lsi->lsi_lmd->lmd_dev;
+		while (class_parse_nid(ptr, &nid, &ptr) == 0) {
+			rc = do_lcfg(mgcname, nid,
+				     LCFG_ADD_UUID, niduuid, NULL, NULL, NULL);
+			i++;
+			/* Stop at the first failover nid */
+			if (*ptr == ':')
+				break;
+		}
 	}
 	if (i == 0) {
 		CERROR("No valid MGS nids found.\n");
@@ -488,7 +544,7 @@ out:
 
 /***************** lustre superblock **************/
 
-static struct lustre_sb_info *lustre_init_lsi(struct super_block *sb)
+struct lustre_sb_info *lustre_init_lsi(struct super_block *sb)
 {
 	struct lustre_sb_info *lsi;
 
@@ -547,7 +603,7 @@ static int lustre_free_lsi(struct super_block *sb)
 
 /* The lsi has one reference for every server that is using the disk -
    e.g. MDT, MGS, and potentially MGC */
-static int lustre_put_lsi(struct super_block *sb)
+int lustre_put_lsi(struct super_block *sb)
 {
 	struct lustre_sb_info *lsi = s2lsi(sb);
 
@@ -555,6 +611,14 @@ static int lustre_put_lsi(struct super_block *sb)
 
 	CDEBUG(D_MOUNT, "put %p %d\n", sb, atomic_read(&lsi->lsi_mounts));
 	if (atomic_dec_and_test(&lsi->lsi_mounts)) {
+		if (IS_SERVER(lsi) && lsi->lsi_osd_exp) {
+			lu_device_put(&lsi->lsi_dt_dev->dd_lu_dev);
+			lsi->lsi_osd_exp->exp_obd->obd_lvfs_ctxt.dt = NULL;
+			lsi->lsi_dt_dev = NULL;
+			obd_disconnect(lsi->lsi_osd_exp);
+			/* wait till OSD is gone */
+			obd_zombie_barrier();
+		}
 		lustre_free_lsi(sb);
 		return 1;
 	}
@@ -577,8 +641,7 @@ static int lustre_put_lsi(struct super_block *sb)
  * @param [out] endptr if endptr isn't NULL it is set to end of fsname
  * rc < 0  on error
  */
-static int server_name2fsname(const char *svname, char *fsname,
-			      const char **endptr)
+int server_name2fsname(const char *svname, char *fsname, const char **endptr)
 {
 	const char *dash;
 
@@ -598,13 +661,40 @@ static int server_name2fsname(const char *svname, char *fsname,
 
 	return 0;
 }
+EXPORT_SYMBOL(server_name2fsname);
+
+/**
+ * Get service name (svname) from string
+ * rc < 0 on error
+ * if endptr isn't NULL it is set to end of fsname *
+ */
+int server_name2svname(const char *label, char *svname, const char **endptr,
+		       size_t svsize)
+{
+	int rc;
+	const char *dash;
+
+	/* We use server_name2fsname() just for parsing */
+	rc = server_name2fsname(label, NULL, &dash);
+	if (rc != 0)
+		return rc;
+
+	if (endptr != NULL)
+		*endptr = dash;
+
+	if (strlcpy(svname, dash + 1, svsize) >= svsize)
+		return -E2BIG;
+
+	return 0;
+}
+EXPORT_SYMBOL(server_name2svname);
+
 
 /* Get the index from the obd name.
    rc = server type, or
    rc < 0  on error
    if endptr isn't NULL it is set to end of name */
-static int server_name2index(const char *svname, __u32 *idx,
-			     const char **endptr)
+int server_name2index(const char *svname, __u32 *idx, const char **endptr)
 {
 	unsigned long index;
 	int rc;
@@ -643,6 +733,7 @@ static int server_name2index(const char *svname, __u32 *idx,
 
 	return rc;
 }
+EXPORT_SYMBOL(server_name2index);
 
 /*************** mount common between server and client ***************/
 
@@ -794,7 +885,7 @@ static int lmd_parse_mgssec(struct lustre_mount_data *lmd, char *ptr)
 		length = tail - ptr;
 
 	lmd->lmd_mgssec = kzalloc(length + 1, GFP_NOFS);
-	if (!lmd->lmd_mgssec)
+	if (lmd->lmd_mgssec == NULL)
 		return -ENOMEM;
 
 	memcpy(lmd->lmd_mgssec, ptr, length);
@@ -820,7 +911,7 @@ static int lmd_parse_string(char **handle, char *ptr)
 		length = tail - ptr;
 
 	*handle = kzalloc(length + 1, GFP_NOFS);
-	if (!*handle)
+	if (*handle == NULL)
 		return -ENOMEM;
 
 	memcpy(*handle, ptr, length);
@@ -839,8 +930,7 @@ static int lmd_parse_mgs(struct lustre_mount_data *lmd, char **ptr)
 	int   oldlen = 0;
 
 	/* Find end of nidlist */
-	while (class_parse_nid_quiet(tail, &nid, &tail) == 0)
-		;
+	while (class_parse_nid_quiet(tail, &nid, &tail) == 0) {}
 	length = tail - *ptr;
 	if (length == 0) {
 		LCONSOLE_ERROR_MSG(0x159, "Can't parse NID '%s'\n", *ptr);
@@ -851,7 +941,7 @@ static int lmd_parse_mgs(struct lustre_mount_data *lmd, char **ptr)
 		oldlen = strlen(lmd->lmd_mgs) + 1;
 
 	mgsnid = kzalloc(oldlen + length + 1, GFP_NOFS);
-	if (!mgsnid)
+	if (mgsnid == NULL)
 		return -ENOMEM;
 
 	if (lmd->lmd_mgs != NULL) {
@@ -893,7 +983,7 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
 	lmd->lmd_magic = LMD_MAGIC;
 
 	lmd->lmd_params = kzalloc(4096, GFP_NOFS);
-	if (!lmd->lmd_params)
+	if (lmd->lmd_params == NULL)
 		return -ENOMEM;
 	lmd->lmd_params[0] = '\0';
 
@@ -980,7 +1070,6 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
 		} else if (strncmp(s1, "param=", 6) == 0) {
 			int length;
 			char *tail = strchr(s1 + 6, ',');
-
 			if (tail == NULL)
 				length = strlen(s1);
 			else
@@ -1029,12 +1118,12 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
 		++s1;
 		lmd->lmd_flags |= LMD_FLG_CLIENT;
 		/* Remove leading /s from fsname */
-		while (*++s1 == '/')
-			;
+		while (*++s1 == '/') ;
 		/* Freed in lustre_free_lsi */
-		lmd->lmd_profile = kasprintf(GFP_NOFS, "%s-client", s1);
+		lmd->lmd_profile = kzalloc(strlen(s1) + 8, GFP_NOFS);
 		if (!lmd->lmd_profile)
 			return -ENOMEM;
+		sprintf(lmd->lmd_profile, "%s-client", s1);
 	}
 
 	/* Freed in lustre_free_lsi */
@@ -1075,7 +1164,7 @@ struct lustre_mount_data2 {
  * and this is where we start setting things up.
  * @param data Mount options (e.g. -o flock,abort_recov)
  */
-static int lustre_fill_super(struct super_block *sb, void *data, int silent)
+int lustre_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct lustre_mount_data *lmd;
 	struct lustre_mount_data2 *lmd2 = data;
@@ -1101,7 +1190,7 @@ static int lustre_fill_super(struct super_block *sb, void *data, int silent)
 	obd_zombie_barrier();
 
 	/* Figure out the lmd from the mount options */
-	if (lmd_parse((lmd2->lmd2_data), lmd)) {
+	if (lmd_parse((char *)(lmd2->lmd2_data), lmd)) {
 		lustre_put_lsi(sb);
 		rc = -EINVAL;
 		goto out;
@@ -1146,6 +1235,7 @@ out:
 	return rc;
 }
 
+
 /* We can't call ll_fill_super by name because it lives in a module that
    must be loaded after this one. */
 void lustre_register_client_fill_super(int (*cfs)(struct super_block *sb,
@@ -1177,7 +1267,7 @@ static void lustre_kill_super(struct super_block *sb)
 {
 	struct lustre_sb_info *lsi = s2lsi(sb);
 
-	if (kill_super_cb && lsi)
+	if (kill_super_cb && lsi && !IS_SERVER(lsi))
 		(*kill_super_cb)(sb);
 
 	kill_anon_super(sb);
@@ -1185,13 +1275,13 @@ static void lustre_kill_super(struct super_block *sb)
 
 /** Register the "lustre" fs type
  */
-static struct file_system_type lustre_fs_type = {
+struct file_system_type lustre_fs_type = {
 	.owner	= THIS_MODULE,
 	.name	 = "lustre",
 	.mount	= lustre_mount,
 	.kill_sb      = lustre_kill_super,
 	.fs_flags     = FS_BINARY_MOUNTDATA | FS_REQUIRES_DEV |
-			FS_RENAME_DOES_D_MOVE,
+			FS_HAS_FIEMAP | FS_RENAME_DOES_D_MOVE,
 };
 MODULE_ALIAS_FS("lustre");
 

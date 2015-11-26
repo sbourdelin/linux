@@ -1377,6 +1377,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	struct uart_state *state = tty->driver_data;
 	struct tty_port *port;
 	struct uart_port *uport;
+	unsigned long flags;
 
 	if (!state) {
 		struct uart_driver *drv = tty->driver->driver_state;
@@ -1402,9 +1403,10 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	 * disable the receive line status interrupts.
 	 */
 	if (port->flags & ASYNC_INITIALIZED) {
-		spin_lock_irq(&uport->lock);
+		unsigned long flags;
+		spin_lock_irqsave(&uport->lock, flags);
 		uport->ops->stop_rx(uport);
-		spin_unlock_irq(&uport->lock);
+		spin_unlock_irqrestore(&uport->lock, flags);
 		/*
 		 * Before we drop DTR, make sure the UART transmitter
 		 * has completely drained; this is especially
@@ -1416,18 +1418,18 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	mutex_lock(&port->mutex);
 	uart_shutdown(tty, state);
 	tty_port_tty_set(port, NULL);
-
-	spin_lock_irq(&port->lock);
+	tty->closing = 0;
+	spin_lock_irqsave(&port->lock, flags);
 
 	if (port->blocked_open) {
-		spin_unlock_irq(&port->lock);
+		spin_unlock_irqrestore(&port->lock, flags);
 		if (port->close_delay)
 			msleep_interruptible(jiffies_to_msecs(port->close_delay));
-		spin_lock_irq(&port->lock);
+		spin_lock_irqsave(&port->lock, flags);
 	} else if (!uart_console(uport)) {
-		spin_unlock_irq(&port->lock);
+		spin_unlock_irqrestore(&port->lock, flags);
 		uart_change_pm(state, UART_PM_STATE_OFF);
-		spin_lock_irq(&port->lock);
+		spin_lock_irqsave(&port->lock, flags);
 	}
 
 	/*
@@ -1435,13 +1437,13 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	 */
 	clear_bit(ASYNCB_NORMAL_ACTIVE, &port->flags);
 	clear_bit(ASYNCB_CLOSING, &port->flags);
-	spin_unlock_irq(&port->lock);
+	spin_unlock_irqrestore(&port->lock, flags);
 	wake_up_interruptible(&port->open_wait);
+	wake_up_interruptible(&port->close_wait);
 
 	mutex_unlock(&port->mutex);
 
 	tty_ldisc_flush(tty);
-	tty->closing = 0;
 }
 
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1527,6 +1529,11 @@ static void uart_hangup(struct tty_struct *tty)
 		wake_up_interruptible(&port->delta_msr_wait);
 	}
 	mutex_unlock(&port->mutex);
+}
+
+static int uart_port_activate(struct tty_port *port, struct tty_struct *tty)
+{
+	return 0;
 }
 
 static void uart_port_shutdown(struct tty_port *port)
@@ -1818,8 +1825,8 @@ uart_get_console(struct uart_port *ports, int nr, struct console *co)
  *	@options: ptr for <options> field; NULL if not present (out)
  *
  *	Decodes earlycon kernel command line parameters of the form
- *	   earlycon=<name>,io|mmio|mmio32|mmio32be|mmio32native,<addr>,<options>
- *	   console=<name>,io|mmio|mmio32|mmio32be|mmio32native,<addr>,<options>
+ *	   earlycon=<name>,io|mmio|mmio32|mmio32be,<addr>,<options>
+ *	   console=<name>,io|mmio|mmio32|mmio32be,<addr>,<options>
  *
  *	The optional form
  *	   earlycon=<name>,0x<addr>,<options>
@@ -1840,10 +1847,6 @@ int uart_parse_earlycon(char *p, unsigned char *iotype, unsigned long *addr,
 	} else if (strncmp(p, "mmio32be,", 9) == 0) {
 		*iotype = UPIO_MEM32BE;
 		p += 9;
-	} else if (strncmp(p, "mmio32native,", 13) == 0) {
-		*iotype = IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) ?
-			UPIO_MEM32BE : UPIO_MEM32;
-		p += 13;
 	} else if (strncmp(p, "io,", 3) == 0) {
 		*iotype = UPIO_PORT;
 		p += 3;
@@ -2375,6 +2378,8 @@ static const struct tty_operations uart_ops = {
 };
 
 static const struct tty_port_operations uart_port_ops = {
+	.activate	= uart_port_activate,
+	.shutdown	= uart_port_shutdown,
 	.carrier_raised = uart_carrier_raised,
 	.dtr_rts	= uart_dtr_rts,
 };

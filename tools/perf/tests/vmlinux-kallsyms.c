@@ -68,7 +68,7 @@ int test__vmlinux_matches_kallsyms(void)
 	 * to see if the running kernel was relocated by checking if it has the
 	 * same value in the vmlinux file we load.
 	 */
-	kallsyms_map = machine__kernel_map(&kallsyms);
+	kallsyms_map = machine__kernel_map(&kallsyms, type);
 
 	/*
 	 * Step 5:
@@ -80,7 +80,7 @@ int test__vmlinux_matches_kallsyms(void)
 		goto out;
 	}
 
-	vmlinux_map = machine__kernel_map(&vmlinux);
+	vmlinux_map = machine__kernel_map(&vmlinux, type);
 
 	/*
 	 * Step 6:

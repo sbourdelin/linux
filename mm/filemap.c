@@ -331,14 +331,23 @@ int filemap_flush(struct address_space *mapping)
 }
 EXPORT_SYMBOL(filemap_flush);
 
-static int __filemap_fdatawait_range(struct address_space *mapping,
-				     loff_t start_byte, loff_t end_byte)
+/**
+ * filemap_fdatawait_range - wait for writeback to complete
+ * @mapping:		address space structure to wait for
+ * @start_byte:		offset in bytes where the range starts
+ * @end_byte:		offset in bytes where the range ends (inclusive)
+ *
+ * Walk the list of under-writeback pages of the given address space
+ * in the given range and wait for all of them.
+ */
+int filemap_fdatawait_range(struct address_space *mapping, loff_t start_byte,
+			    loff_t end_byte)
 {
 	pgoff_t index = start_byte >> PAGE_CACHE_SHIFT;
 	pgoff_t end = end_byte >> PAGE_CACHE_SHIFT;
 	struct pagevec pvec;
 	int nr_pages;
-	int ret = 0;
+	int ret2, ret = 0;
 
 	if (end_byte < start_byte)
 		goto out;
@@ -365,29 +374,6 @@ static int __filemap_fdatawait_range(struct address_space *mapping,
 		cond_resched();
 	}
 out:
-	return ret;
-}
-
-/**
- * filemap_fdatawait_range - wait for writeback to complete
- * @mapping:		address space structure to wait for
- * @start_byte:		offset in bytes where the range starts
- * @end_byte:		offset in bytes where the range ends (inclusive)
- *
- * Walk the list of under-writeback pages of the given address space
- * in the given range and wait for all of them.  Check error status of
- * the address space and return it.
- *
- * Since the error status of the address space is cleared by this function,
- * callers are responsible for checking the return value and handling and/or
- * reporting the error.
- */
-int filemap_fdatawait_range(struct address_space *mapping, loff_t start_byte,
-			    loff_t end_byte)
-{
-	int ret, ret2;
-
-	ret = __filemap_fdatawait_range(mapping, start_byte, end_byte);
 	ret2 = filemap_check_errors(mapping);
 	if (!ret)
 		ret = ret2;
@@ -397,38 +383,11 @@ int filemap_fdatawait_range(struct address_space *mapping, loff_t start_byte,
 EXPORT_SYMBOL(filemap_fdatawait_range);
 
 /**
- * filemap_fdatawait_keep_errors - wait for writeback without clearing errors
- * @mapping: address space structure to wait for
- *
- * Walk the list of under-writeback pages of the given address space
- * and wait for all of them.  Unlike filemap_fdatawait(), this function
- * does not clear error status of the address space.
- *
- * Use this function if callers don't handle errors themselves.  Expected
- * call sites are system-wide / filesystem-wide data flushers: e.g. sync(2),
- * fsfreeze(8)
- */
-void filemap_fdatawait_keep_errors(struct address_space *mapping)
-{
-	loff_t i_size = i_size_read(mapping->host);
-
-	if (i_size == 0)
-		return;
-
-	__filemap_fdatawait_range(mapping, 0, i_size - 1);
-}
-
-/**
  * filemap_fdatawait - wait for all under-writeback pages to complete
  * @mapping: address space structure to wait for
  *
  * Walk the list of under-writeback pages of the given address space
- * and wait for all of them.  Check error status of the address space
- * and return it.
- *
- * Since the error status of the address space is cleared by this function,
- * callers are responsible for checking the return value and handling and/or
- * reporting the error.
+ * and wait for all of them.
  */
 int filemap_fdatawait(struct address_space *mapping)
 {
@@ -551,7 +510,7 @@ int replace_page_cache_page(struct page *old, struct page *new, gfp_t gfp_mask)
 			__inc_zone_page_state(new, NR_SHMEM);
 		spin_unlock_irqrestore(&mapping->tree_lock, flags);
 		mem_cgroup_end_page_stat(memcg);
-		mem_cgroup_replace_page(old, new);
+		mem_cgroup_migrate(old, new, true);
 		radix_tree_preload_end();
 		if (freepage)
 			freepage(old);
@@ -715,7 +674,7 @@ struct page *__page_cache_alloc(gfp_t gfp)
 		do {
 			cpuset_mems_cookie = read_mems_allowed_begin();
 			n = cpuset_mem_spread_node();
-			page = __alloc_pages_node(n, gfp, 0);
+			page = alloc_pages_exact_node(n, gfp, 0);
 		} while (!page && read_mems_allowed_retry(cpuset_mems_cookie));
 
 		return page;
@@ -1722,7 +1681,7 @@ no_cached_page:
 			goto out;
 		}
 		error = add_to_page_cache_lru(page, mapping, index,
-				mapping_gfp_constraint(mapping, GFP_KERNEL));
+					GFP_KERNEL & mapping_gfp_mask(mapping));
 		if (error) {
 			page_cache_release(page);
 			if (error == -EEXIST) {
@@ -1824,7 +1783,7 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 			return -ENOMEM;
 
 		ret = add_to_page_cache_lru(page, mapping, offset,
-				mapping_gfp_constraint(mapping, GFP_KERNEL));
+				GFP_KERNEL & mapping_gfp_mask(mapping));
 		if (ret == 0)
 			ret = mapping->a_ops->readpage(file, page);
 		else if (ret == -EEXIST)
@@ -1848,6 +1807,7 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 				   struct file *file,
 				   pgoff_t offset)
 {
+	unsigned long ra_pages;
 	struct address_space *mapping = file->f_mapping;
 
 	/* If we don't want any read-ahead, don't bother */
@@ -1876,9 +1836,10 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	/*
 	 * mmap read-around
 	 */
-	ra->start = max_t(long, 0, offset - ra->ra_pages / 2);
-	ra->size = ra->ra_pages;
-	ra->async_size = ra->ra_pages / 4;
+	ra_pages = max_sane_readahead(ra->ra_pages);
+	ra->start = max_t(long, 0, offset - ra_pages / 2);
+	ra->size = ra_pages;
+	ra->async_size = ra_pages / 4;
 	ra_submit(ra, mapping, file);
 }
 
@@ -2527,11 +2488,6 @@ again:
 			break;
 		}
 
-		if (fatal_signal_pending(current)) {
-			status = -EINTR;
-			break;
-		}
-
 		status = a_ops->write_begin(file, mapping, pos, bytes, flags,
 						&page, &fsdata);
 		if (unlikely(status < 0))
@@ -2569,6 +2525,10 @@ again:
 		written += copied;
 
 		balance_dirty_pages_ratelimited(mapping);
+		if (fatal_signal_pending(current)) {
+			status = -EINTR;
+			break;
+		}
 	} while (iov_iter_count(i));
 
 	return written ? written : status;
@@ -2713,7 +2673,7 @@ EXPORT_SYMBOL(generic_file_write_iter);
  * page is known to the local caching routines.
  *
  * The @gfp_mask argument specifies whether I/O may be performed to release
- * this page (__GFP_IO), and whether the call may block (__GFP_RECLAIM & __GFP_FS).
+ * this page (__GFP_IO), and whether the call may block (__GFP_WAIT & __GFP_FS).
  *
  */
 int try_to_release_page(struct page *page, gfp_t gfp_mask)

@@ -207,9 +207,7 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_emmc = {
 	.caps2   = MMC_CAP2_HC_ERASE_SZ,
 	.flags   = SDHCI_ACPI_RUNTIME_PM,
 	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-		   SDHCI_QUIRK2_STOP_WITH_TC |
-		   SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN | SDHCI_QUIRK2_STOP_WITH_TC,
 	.probe_slot	= sdhci_acpi_emmc_probe_slot,
 };
 
@@ -241,9 +239,6 @@ struct sdhci_acpi_uid_slot {
 };
 
 static const struct sdhci_acpi_uid_slot sdhci_acpi_uids[] = {
-	{ "80865ACA", NULL, &sdhci_acpi_slot_int_sd },
-	{ "80865ACC", NULL, &sdhci_acpi_slot_int_emmc },
-	{ "80865AD0", NULL, &sdhci_acpi_slot_int_sdio },
 	{ "80860F14" , "1" , &sdhci_acpi_slot_int_emmc },
 	{ "80860F14" , "3" , &sdhci_acpi_slot_int_sd   },
 	{ "80860F16" , NULL, &sdhci_acpi_slot_int_sd   },
@@ -252,15 +247,11 @@ static const struct sdhci_acpi_uid_slot sdhci_acpi_uids[] = {
 	{ "INT33C6"  , NULL, &sdhci_acpi_slot_int_sdio },
 	{ "INT3436"  , NULL, &sdhci_acpi_slot_int_sdio },
 	{ "INT344D"  , NULL, &sdhci_acpi_slot_int_sdio },
-	{ "PNP0FFF"  , "3" , &sdhci_acpi_slot_int_sd   },
 	{ "PNP0D40"  },
 	{ },
 };
 
 static const struct acpi_device_id sdhci_acpi_ids[] = {
-	{ "80865ACA" },
-	{ "80865ACC" },
-	{ "80865AD0" },
 	{ "80860F14" },
 	{ "80860F16" },
 	{ "INT33BB"  },

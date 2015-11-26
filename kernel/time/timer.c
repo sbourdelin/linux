@@ -461,17 +461,10 @@ void __timer_stats_timer_set_start_info(struct timer_list *timer, void *addr)
 
 static void timer_stats_account_timer(struct timer_list *timer)
 {
-	void *site;
-
-	/*
-	 * start_site can be concurrently reset by
-	 * timer_stats_timer_clear_start_info()
-	 */
-	site = READ_ONCE(timer->start_site);
-	if (likely(!site))
+	if (likely(!timer->start_site))
 		return;
 
-	timer_stats_update_stats(timer, timer->start_pid, site,
+	timer_stats_update_stats(timer, timer->start_pid, timer->start_site,
 				 timer->function, timer->start_comm,
 				 timer->flags);
 }
@@ -814,8 +807,8 @@ __mod_timer(struct timer_list *timer, unsigned long expires,
 			spin_unlock(&base->lock);
 			base = new_base;
 			spin_lock(&base->lock);
-			WRITE_ONCE(timer->flags,
-				   (timer->flags & ~TIMER_BASEMASK) | base->cpu);
+			timer->flags &= ~TIMER_BASEMASK;
+			timer->flags |= base->cpu;
 		}
 	}
 
@@ -874,7 +867,7 @@ unsigned long apply_slack(struct timer_list *timer, unsigned long expires)
 	if (mask == 0)
 		return expires;
 
-	bit = __fls(mask);
+	bit = find_last_bit(&mask, BITS_PER_LONG);
 
 	mask = (1UL << bit) - 1;
 
@@ -977,29 +970,13 @@ EXPORT_SYMBOL(add_timer);
  */
 void add_timer_on(struct timer_list *timer, int cpu)
 {
-	struct tvec_base *new_base = per_cpu_ptr(&tvec_bases, cpu);
-	struct tvec_base *base;
+	struct tvec_base *base = per_cpu_ptr(&tvec_bases, cpu);
 	unsigned long flags;
 
 	timer_stats_timer_set_start_info(timer);
 	BUG_ON(timer_pending(timer) || !timer->function);
-
-	/*
-	 * If @timer was on a different CPU, it should be migrated with the
-	 * old base locked to prevent other operations proceeding with the
-	 * wrong base locked.  See lock_timer_base().
-	 */
-	base = lock_timer_base(timer, &flags);
-	if (base != new_base) {
-		timer->flags |= TIMER_MIGRATING;
-
-		spin_unlock(&base->lock);
-		base = new_base;
-		spin_lock(&base->lock);
-		WRITE_ONCE(timer->flags,
-			   (timer->flags & ~TIMER_BASEMASK) | cpu);
-	}
-
+	spin_lock_irqsave(&base->lock, flags);
+	timer->flags = (timer->flags & ~TIMER_BASEMASK) | cpu;
 	debug_activate(timer, timer->expires);
 	internal_add_timer(base, timer);
 	spin_unlock_irqrestore(&base->lock, flags);

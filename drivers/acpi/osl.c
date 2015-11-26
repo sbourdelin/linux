@@ -19,6 +19,10 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  */
@@ -43,7 +47,6 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <linux/io-64-nonatomic-lo-hi.h>
 
 #include "internal.h"
 
@@ -66,6 +69,8 @@ struct acpi_os_dpc {
 /* stuff for debugger support */
 int acpi_in_debugger;
 EXPORT_SYMBOL(acpi_in_debugger);
+
+extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
 
 static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 pm1a_ctrl,
@@ -78,8 +83,6 @@ static void *acpi_irq_context;
 static struct workqueue_struct *kacpid_wq;
 static struct workqueue_struct *kacpi_notify_wq;
 static struct workqueue_struct *kacpi_hotplug_wq;
-static bool acpi_os_initialized;
-unsigned int acpi_sci_irq = INVALID_ACPI_IRQ;
 
 /*
  * This list of permanent mappings is for memory that may be accessed from
@@ -172,14 +175,10 @@ static void __init acpi_request_region (struct acpi_generic_address *gas,
 	if (!addr || !length)
 		return;
 
-	/* Resources are never freed */
-	if (gas->space_id == ACPI_ADR_SPACE_SYSTEM_IO)
-		request_region(addr, length, desc);
-	else if (gas->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY)
-		request_mem_region(addr, length, desc);
+	acpi_reserve_region(addr, length, gas->space_id, 0, desc);
 }
 
-static int __init acpi_reserve_resources(void)
+static void __init acpi_reserve_resources(void)
 {
 	acpi_request_region(&acpi_gbl_FADT.xpm1a_event_block, acpi_gbl_FADT.pm1_event_length,
 		"ACPI PM1a_EVT_BLK");
@@ -208,10 +207,7 @@ static int __init acpi_reserve_resources(void)
 	if (!(acpi_gbl_FADT.gpe1_block_length & 0x1))
 		acpi_request_region(&acpi_gbl_FADT.xgpe1_block,
 			       acpi_gbl_FADT.gpe1_block_length, "ACPI GPE1_BLK");
-
-	return 0;
 }
-fs_initcall_sync(acpi_reserve_resources);
 
 void acpi_os_printf(const char *fmt, ...)
 {
@@ -855,19 +851,17 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 		acpi_irq_handler = NULL;
 		return AE_NOT_ACQUIRED;
 	}
-	acpi_sci_irq = irq;
 
 	return AE_OK;
 }
 
-acpi_status acpi_os_remove_interrupt_handler(u32 gsi, acpi_osd_handler handler)
+acpi_status acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
 {
-	if (gsi != acpi_gbl_FADT.sci_interrupt || !acpi_sci_irq_valid())
+	if (irq != acpi_gbl_FADT.sci_interrupt)
 		return AE_BAD_PARAMETER;
 
-	free_irq(acpi_sci_irq, acpi_irq);
+	free_irq(irq, acpi_irq);
 	acpi_irq_handler = NULL;
-	acpi_sci_irq = INVALID_ACPI_IRQ;
 
 	return AE_OK;
 }
@@ -946,6 +940,21 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
 
 EXPORT_SYMBOL(acpi_os_write_port);
 
+#ifdef readq
+static inline u64 read64(const volatile void __iomem *addr)
+{
+	return readq(addr);
+}
+#else
+static inline u64 read64(const volatile void __iomem *addr)
+{
+	u64 l, h;
+	l = readl(addr);
+	h = readl(addr+4);
+	return l | (h << 32);
+}
+#endif
+
 acpi_status
 acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 {
@@ -978,7 +987,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 		*(u32 *) value = readl(virt_addr);
 		break;
 	case 64:
-		*(u64 *) value = readq(virt_addr);
+		*(u64 *) value = read64(virt_addr);
 		break;
 	default:
 		BUG();
@@ -991,6 +1000,19 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 
 	return AE_OK;
 }
+
+#ifdef writeq
+static inline void write64(u64 val, volatile void __iomem *addr)
+{
+	writeq(val, addr);
+}
+#else
+static inline void write64(u64 val, volatile void __iomem *addr)
+{
+	writel(val, addr);
+	writel(val>>32, addr+4);
+}
+#endif
 
 acpi_status
 acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
@@ -1020,7 +1042,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 		writel(value, virt_addr);
 		break;
 	case 64:
-		writeq(value, virt_addr);
+		write64(value, virt_addr);
 		break;
 	default:
 		BUG();
@@ -1181,8 +1203,8 @@ void acpi_os_wait_events_complete(void)
 	 * Make sure the GPE handler or the fixed event handler is not used
 	 * on another CPU after removal.
 	 */
-	if (acpi_sci_irq_valid())
-		synchronize_hardirq(acpi_sci_irq);
+	if (acpi_irq_handler)
+		synchronize_hardirq(acpi_gbl_FADT.sci_interrupt);
 	flush_workqueue(kacpid_wq);
 	flush_workqueue(kacpi_notify_wq);
 }
@@ -1287,9 +1309,6 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 	long jiffies;
 	int ret = 0;
 
-	if (!acpi_os_initialized)
-		return AE_OK;
-
 	if (!sem || (units < 1))
 		return AE_BAD_PARAMETER;
 
@@ -1329,9 +1348,6 @@ acpi_status acpi_os_signal_semaphore(acpi_handle handle, u32 units)
 {
 	struct semaphore *sem = (struct semaphore *)handle;
 
-	if (!acpi_os_initialized)
-		return AE_OK;
-
 	if (!sem || (units < 1))
 		return AE_BAD_PARAMETER;
 
@@ -1346,13 +1362,15 @@ acpi_status acpi_os_signal_semaphore(acpi_handle handle, u32 units)
 	return AE_OK;
 }
 
-acpi_status acpi_os_get_line(char *buffer, u32 buffer_length, u32 *bytes_read)
+#ifdef ACPI_FUTURE_USAGE
+u32 acpi_os_get_line(char *buffer)
 {
+
 #ifdef ENABLE_DEBUGGER
 	if (acpi_in_debugger) {
 		u32 chars;
 
-		kdb_read(buffer, buffer_length);
+		kdb_read(buffer, sizeof(line_buf));
 
 		/* remove the CR kdb includes */
 		chars = strlen(buffer) - 1;
@@ -1360,8 +1378,9 @@ acpi_status acpi_os_get_line(char *buffer, u32 buffer_length, u32 *bytes_read)
 	}
 #endif
 
-	return AE_OK;
+	return 0;
 }
+#endif				/*  ACPI_FUTURE_USAGE  */
 
 acpi_status acpi_os_signal(u32 function, void *info)
 {
@@ -1837,13 +1856,13 @@ acpi_status __init acpi_os_initialize(void)
 		rv = acpi_os_map_generic_address(&acpi_gbl_FADT.reset_register);
 		pr_debug(PREFIX "%s: map reset_reg status %d\n", __func__, rv);
 	}
-	acpi_os_initialized = true;
 
 	return AE_OK;
 }
 
 acpi_status __init acpi_os_initialize1(void)
 {
+	acpi_reserve_resources();
 	kacpid_wq = alloc_workqueue("kacpid", 0, 1);
 	kacpi_notify_wq = alloc_workqueue("kacpi_notify", 0, 1);
 	kacpi_hotplug_wq = alloc_ordered_workqueue("kacpi_hotplug", 0);

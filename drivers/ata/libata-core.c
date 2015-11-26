@@ -4230,8 +4230,6 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 						ATA_HORKAGE_ZERO_AFTER_TRIM, },
 	{ "Samsung SSD 8*",		NULL,	ATA_HORKAGE_NO_NCQ_TRIM |
 						ATA_HORKAGE_ZERO_AFTER_TRIM, },
-	{ "FCCT*M500*",			NULL,	ATA_HORKAGE_NO_NCQ_TRIM |
-						ATA_HORKAGE_ZERO_AFTER_TRIM, },
 
 	/* devices that don't properly handle TRIM commands */
 	{ "SuperSSpeed S238*",		NULL,	ATA_HORKAGE_NOTRIM, },
@@ -4753,7 +4751,6 @@ void swap_buf_le16(u16 *buf, unsigned int buf_words)
 /**
  *	ata_qc_new_init - Request an available ATA command, and initialize it
  *	@dev: Device from whom we request an available command structure
- *	@tag: tag
  *
  *	LOCKING:
  *	None.
@@ -6223,7 +6220,6 @@ int ata_host_activate(struct ata_host *host, int irq,
 		      struct scsi_host_template *sht)
 {
 	int i, rc;
-	char *irq_desc;
 
 	rc = ata_host_start(host);
 	if (rc)
@@ -6235,14 +6231,8 @@ int ata_host_activate(struct ata_host *host, int irq,
 		return ata_host_register(host, sht);
 	}
 
-	irq_desc = devm_kasprintf(host->dev, GFP_KERNEL, "%s[%s]",
-				  dev_driver_string(host->dev),
-				  dev_name(host->dev));
-	if (!irq_desc)
-		return -ENOMEM;
-
 	rc = devm_request_irq(host->dev, irq, irq_handler, irq_flags,
-			      irq_desc, host);
+			      dev_name(host->dev), host);
 	if (rc)
 		return rc;
 

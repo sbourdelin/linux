@@ -88,7 +88,7 @@
 	acpi_os_printf (" %-18s%s\n", name, description);
 
 #define FILE_SUFFIX_DISASSEMBLY     "dsl"
-#define FILE_SUFFIX_BINARY_TABLE    ".dat"	/* Needs the dot */
+#define ACPI_TABLE_FILE_SUFFIX      ".dat"
 
 /*
  * getopt

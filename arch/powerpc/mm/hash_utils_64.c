@@ -640,7 +640,7 @@ extern u32 ht64_call_hpte_updatepp[];
 
 static void __init htab_finish_init(void)
 {
-#ifdef CONFIG_PPC_64K_PAGES
+#ifdef CONFIG_PPC_HAS_HASH_64K
 	patch_branch(ht64_call_hpte_insert1,
 		ppc_function_entry(ppc_md.hpte_insert),
 		BRANCH_SET_LINK);
@@ -653,7 +653,7 @@ static void __init htab_finish_init(void)
 	patch_branch(ht64_call_hpte_updatepp,
 		ppc_function_entry(ppc_md.hpte_updatepp),
 		BRANCH_SET_LINK);
-#endif /* CONFIG_PPC_64K_PAGES */
+#endif /* CONFIG_PPC_HAS_HASH_64K */
 
 	patch_branch(htab_call_hpte_insert1,
 		ppc_function_entry(ppc_md.hpte_insert),
@@ -994,7 +994,6 @@ int hash_page_mm(struct mm_struct *mm, unsigned long ea,
 		 unsigned long access, unsigned long trap,
 		 unsigned long flags)
 {
-	bool is_thp;
 	enum ctx_state prev_state = exception_enter();
 	pgd_t *pgdir;
 	unsigned long vsid;
@@ -1069,7 +1068,7 @@ int hash_page_mm(struct mm_struct *mm, unsigned long ea,
 #endif /* CONFIG_PPC_64K_PAGES */
 
 	/* Get PTE and page size from page tables */
-	ptep = __find_linux_pte_or_hugepte(pgdir, ea, &is_thp, &hugeshift);
+	ptep = __find_linux_pte_or_hugepte(pgdir, ea, &hugeshift);
 	if (ptep == NULL || !pte_present(*ptep)) {
 		DBG_LOW(" no PTE !\n");
 		rc = 1;
@@ -1089,7 +1088,7 @@ int hash_page_mm(struct mm_struct *mm, unsigned long ea,
 	}
 
 	if (hugeshift) {
-		if (is_thp)
+		if (pmd_trans_huge(*(pmd_t *)ptep))
 			rc = __hash_page_thp(ea, access, vsid, (pmd_t *)ptep,
 					     trap, flags, ssize, psize);
 #ifdef CONFIG_HUGETLB_PAGE
@@ -1152,12 +1151,12 @@ int hash_page_mm(struct mm_struct *mm, unsigned long ea,
 		check_paca_psize(ea, mm, psize, user_region);
 #endif /* CONFIG_PPC_64K_PAGES */
 
-#ifdef CONFIG_PPC_64K_PAGES
+#ifdef CONFIG_PPC_HAS_HASH_64K
 	if (psize == MMU_PAGE_64K)
 		rc = __hash_page_64K(ea, access, vsid, ptep, trap,
 				     flags, ssize);
 	else
-#endif /* CONFIG_PPC_64K_PAGES */
+#endif /* CONFIG_PPC_HAS_HASH_64K */
 	{
 		int spp = subpage_protection(mm, ea);
 		if (access & spp)
@@ -1244,7 +1243,7 @@ void hash_preload(struct mm_struct *mm, unsigned long ea,
 	 * THP pages use update_mmu_cache_pmd. We don't do
 	 * hash preload there. Hence can ignore THP here
 	 */
-	ptep = find_linux_pte_or_hugepte(pgdir, ea, NULL, &hugepage_shift);
+	ptep = find_linux_pte_or_hugepte(pgdir, ea, &hugepage_shift);
 	if (!ptep)
 		goto out_exit;
 
@@ -1265,12 +1264,12 @@ void hash_preload(struct mm_struct *mm, unsigned long ea,
 		update_flags |= HPTE_LOCAL_UPDATE;
 
 	/* Hash it in */
-#ifdef CONFIG_PPC_64K_PAGES
+#ifdef CONFIG_PPC_HAS_HASH_64K
 	if (mm->context.user_psize == MMU_PAGE_64K)
 		rc = __hash_page_64K(ea, access, vsid, ptep, trap,
 				     update_flags, ssize);
 	else
-#endif /* CONFIG_PPC_64K_PAGES */
+#endif /* CONFIG_PPC_HAS_HASH_64K */
 		rc = __hash_page_4K(ea, access, vsid, ptep, trap, update_flags,
 				    ssize, subpage_protection(mm, ea));
 

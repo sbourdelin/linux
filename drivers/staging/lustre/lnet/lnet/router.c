@@ -162,6 +162,7 @@ lnet_ni_notify_locked(lnet_ni_t *ni, lnet_peer_t *lp)
 	lp->lp_notifying = 0;
 }
 
+
 static void
 lnet_rtr_addref_locked(lnet_peer_t *lp)
 {
@@ -235,8 +236,8 @@ lnet_find_net_locked(__u32 net)
 static void lnet_shuffle_seed(void)
 {
 	static int seeded;
-	__u32 lnd_type, seed[2];
-	struct timespec64 ts;
+	int lnd_type, seed[2];
+	struct timeval tv;
 	lnet_ni_t *ni;
 	struct list_head *tmp;
 
@@ -255,8 +256,8 @@ static void lnet_shuffle_seed(void)
 			seed[0] ^= (LNET_NIDADDR(ni->ni_nid) | lnd_type);
 	}
 
-	ktime_get_ts64(&ts);
-	cfs_srand(ts.tv_sec ^ seed[0], ts.tv_nsec ^ seed[1]);
+	do_gettimeofday(&tv);
+	cfs_srand(tv.tv_sec ^ seed[0], tv.tv_usec ^ seed[1]);
 	seeded = 1;
 }
 
@@ -788,7 +789,7 @@ static void
 lnet_update_ni_status_locked(void)
 {
 	lnet_ni_t *ni;
-	time64_t now;
+	long now;
 	int timeout;
 
 	LASSERT(the_lnet.ln_routing);
@@ -796,7 +797,7 @@ lnet_update_ni_status_locked(void)
 	timeout = router_ping_timeout +
 		  max(live_router_check_interval, dead_router_check_interval);
 
-	now = ktime_get_real_seconds();
+	now = get_seconds();
 	list_for_each_entry(ni, &the_lnet.ln_nis, ni_list) {
 		if (ni->ni_lnd->lnd_type == LOLND)
 			continue;
@@ -1245,7 +1246,7 @@ lnet_new_rtrbuf(lnet_rtrbufpool_t *rbp, int cpt)
 	for (i = 0; i < npages; i++) {
 		page = alloc_pages_node(
 				cfs_cpt_spread_node(lnet_cpt_table(), cpt),
-				GFP_KERNEL | __GFP_ZERO, 0);
+				__GFP_ZERO | GFP_IOFS, 0);
 		if (page == NULL) {
 			while (--i >= 0)
 				__free_page(rb->rb_kiov[i].kiov_page);
@@ -1496,7 +1497,7 @@ lnet_notify(lnet_ni_t *ni, lnet_nid_t nid, int alive, unsigned long when)
 	unsigned long now = cfs_time_current();
 	int cpt = lnet_cpt_of_nid(nid);
 
-	LASSERT(!in_interrupt());
+	LASSERT(!in_interrupt ());
 
 	CDEBUG(D_NET, "%s notifying %s: %s\n",
 		(ni == NULL) ? "userspace" : libcfs_nid2str(ni->ni_nid),

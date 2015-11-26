@@ -47,6 +47,7 @@
 
 #include "../include/obd.h"
 #include "../include/obd_class.h"
+#include "../include/dt_object.h"
 #include "../include/obd_support.h"
 #include "../include/lustre_req_layout.h"
 #include "../include/lustre_fid.h"
@@ -204,6 +205,8 @@ ldebugfs_fid_server_seq_show(struct seq_file *m, void *unused)
 	if (seq->lcs_exp != NULL) {
 		cli = &seq->lcs_exp->exp_obd->u.cli;
 		seq_printf(m, "%s\n", cli->cl_target_uuid.uuid);
+	} else {
+		seq_printf(m, "%s\n", seq->lcs_srv->lss_name);
 	}
 
 	return 0;

@@ -168,12 +168,13 @@ struct ring_buffer_event *
 trace_current_buffer_lock_reserve(struct ring_buffer **current_buffer,
 				  int type, unsigned long len,
 				  unsigned long flags, int pc);
-void trace_buffer_unlock_commit(struct trace_array *tr,
-				struct ring_buffer *buffer,
+void trace_current_buffer_unlock_commit(struct ring_buffer *buffer,
+					struct ring_buffer_event *event,
+					unsigned long flags, int pc);
+void trace_buffer_unlock_commit(struct ring_buffer *buffer,
 				struct ring_buffer_event *event,
 				unsigned long flags, int pc);
-void trace_buffer_unlock_commit_regs(struct trace_array *tr,
-				     struct ring_buffer *buffer,
+void trace_buffer_unlock_commit_regs(struct ring_buffer *buffer,
 				     struct ring_buffer_event *event,
 				     unsigned long flags, int pc,
 				     struct pt_regs *regs);
@@ -242,7 +243,6 @@ enum {
 	TRACE_EVENT_FL_USE_CALL_FILTER_BIT,
 	TRACE_EVENT_FL_TRACEPOINT_BIT,
 	TRACE_EVENT_FL_KPROBE_BIT,
-	TRACE_EVENT_FL_UPROBE_BIT,
 };
 
 /*
@@ -257,7 +257,6 @@ enum {
  *  USE_CALL_FILTER - For trace internal events, don't use file filter
  *  TRACEPOINT    - Event is a tracepoint
  *  KPROBE        - Event is a kprobe
- *  UPROBE        - Event is a uprobe
  */
 enum {
 	TRACE_EVENT_FL_FILTERED		= (1 << TRACE_EVENT_FL_FILTERED_BIT),
@@ -268,10 +267,7 @@ enum {
 	TRACE_EVENT_FL_USE_CALL_FILTER	= (1 << TRACE_EVENT_FL_USE_CALL_FILTER_BIT),
 	TRACE_EVENT_FL_TRACEPOINT	= (1 << TRACE_EVENT_FL_TRACEPOINT_BIT),
 	TRACE_EVENT_FL_KPROBE		= (1 << TRACE_EVENT_FL_KPROBE_BIT),
-	TRACE_EVENT_FL_UPROBE		= (1 << TRACE_EVENT_FL_UPROBE_BIT),
 };
-
-#define TRACE_EVENT_FL_UKPROBE (TRACE_EVENT_FL_KPROBE | TRACE_EVENT_FL_UPROBE)
 
 struct trace_event_call {
 	struct list_head	list;
@@ -328,7 +324,6 @@ enum {
 	EVENT_FILE_FL_SOFT_DISABLED_BIT,
 	EVENT_FILE_FL_TRIGGER_MODE_BIT,
 	EVENT_FILE_FL_TRIGGER_COND_BIT,
-	EVENT_FILE_FL_PID_FILTER_BIT,
 };
 
 /*
@@ -342,7 +337,6 @@ enum {
  *                   tracepoint may be enabled)
  *  TRIGGER_MODE  - When set, invoke the triggers associated with the event
  *  TRIGGER_COND  - When set, one or more triggers has an associated filter
- *  PID_FILTER    - When set, the event is filtered based on pid
  */
 enum {
 	EVENT_FILE_FL_ENABLED		= (1 << EVENT_FILE_FL_ENABLED_BIT),
@@ -353,7 +347,6 @@ enum {
 	EVENT_FILE_FL_SOFT_DISABLED	= (1 << EVENT_FILE_FL_SOFT_DISABLED_BIT),
 	EVENT_FILE_FL_TRIGGER_MODE	= (1 << EVENT_FILE_FL_TRIGGER_MODE_BIT),
 	EVENT_FILE_FL_TRIGGER_COND	= (1 << EVENT_FILE_FL_TRIGGER_COND_BIT),
-	EVENT_FILE_FL_PID_FILTER	= (1 << EVENT_FILE_FL_PID_FILTER_BIT),
 };
 
 struct trace_event_file {
@@ -432,8 +425,6 @@ extern enum event_trigger_type event_triggers_call(struct trace_event_file *file
 extern void event_triggers_post_call(struct trace_event_file *file,
 				     enum event_trigger_type tt);
 
-bool trace_event_ignore_this_pid(struct trace_event_file *trace_file);
-
 /**
  * trace_trigger_soft_disabled - do triggers and test if soft disabled
  * @file: The file pointer of the event to test
@@ -453,8 +444,6 @@ trace_trigger_soft_disabled(struct trace_event_file *file)
 			event_triggers_call(file, NULL);
 		if (eflags & EVENT_FILE_FL_SOFT_DISABLED)
 			return true;
-		if (eflags & EVENT_FILE_FL_PID_FILTER)
-			return trace_event_ignore_this_pid(file);
 	}
 	return false;
 }
@@ -514,7 +503,7 @@ event_trigger_unlock_commit(struct trace_event_file *file,
 	enum event_trigger_type tt = ETT_NONE;
 
 	if (!__event_trigger_test_discard(file, buffer, event, entry, &tt))
-		trace_buffer_unlock_commit(file->tr, buffer, event, irq_flags, pc);
+		trace_buffer_unlock_commit(buffer, event, irq_flags, pc);
 
 	if (tt)
 		event_triggers_post_call(file, tt);
@@ -546,14 +535,14 @@ event_trigger_unlock_commit_regs(struct trace_event_file *file,
 	enum event_trigger_type tt = ETT_NONE;
 
 	if (!__event_trigger_test_discard(file, buffer, event, entry, &tt))
-		trace_buffer_unlock_commit_regs(file->tr, buffer, event,
+		trace_buffer_unlock_commit_regs(buffer, event,
 						irq_flags, pc, regs);
 
 	if (tt)
 		event_triggers_post_call(file, tt);
 }
 
-#ifdef CONFIG_BPF_EVENTS
+#ifdef CONFIG_BPF_SYSCALL
 unsigned int trace_call_bpf(struct bpf_prog *prog, void *ctx);
 #else
 static inline unsigned int trace_call_bpf(struct bpf_prog *prog, void *ctx)

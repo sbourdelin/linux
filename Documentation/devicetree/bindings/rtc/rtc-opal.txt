@@ -5,13 +5,12 @@ Required properties:
 - comapatible: Should be "ibm,opal-rtc"
 
 Optional properties:
-- wakeup-source: Decides if the wakeup is supported or not
-		 (Legacy property supported: "has-tpo")
+- has-tpo: Decides if the wakeup is supported or not.
 
 Example:
 	rtc {
 		compatible = "ibm,opal-rtc";
-		wakeup-source;
+		has-tpo;
 		phandle = <0x10000029>;
 		linux,phandle = <0x10000029>;
 	};

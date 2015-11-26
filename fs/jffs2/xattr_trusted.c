@@ -16,9 +16,8 @@
 #include <linux/mtd/mtd.h>
 #include "nodelist.h"
 
-static int jffs2_trusted_getxattr(const struct xattr_handler *handler,
-				  struct dentry *dentry, const char *name,
-				  void *buffer, size_t size)
+static int jffs2_trusted_getxattr(struct dentry *dentry, const char *name,
+		void *buffer, size_t size, int type)
 {
 	if (!strcmp(name, ""))
 		return -EINVAL;
@@ -26,9 +25,8 @@ static int jffs2_trusted_getxattr(const struct xattr_handler *handler,
 				 name, buffer, size);
 }
 
-static int jffs2_trusted_setxattr(const struct xattr_handler *handler,
-				  struct dentry *dentry, const char *name,
-				  const void *buffer, size_t size, int flags)
+static int jffs2_trusted_setxattr(struct dentry *dentry, const char *name,
+		const void *buffer, size_t size, int flags, int type)
 {
 	if (!strcmp(name, ""))
 		return -EINVAL;
@@ -36,15 +34,10 @@ static int jffs2_trusted_setxattr(const struct xattr_handler *handler,
 				 name, buffer, size, flags);
 }
 
-static size_t jffs2_trusted_listxattr(const struct xattr_handler *handler,
-				      struct dentry *dentry, char *list,
-				      size_t list_size, const char *name,
-				      size_t name_len)
+static size_t jffs2_trusted_listxattr(struct dentry *dentry, char *list,
+		size_t list_size, const char *name, size_t name_len, int type)
 {
 	size_t retlen = XATTR_TRUSTED_PREFIX_LEN + name_len + 1;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return 0;
 
 	if (list && retlen<=list_size) {
 		strcpy(list, XATTR_TRUSTED_PREFIX);

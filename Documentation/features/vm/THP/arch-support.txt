@@ -7,7 +7,7 @@
     |         arch |status|
     -----------------------
     |       alpha: | TODO |
-    |         arc: |  ok  |
+    |         arc: |  ..  |
     |         arm: |  ok  |
     |       arm64: |  ok  |
     |       avr32: |  ..  |
@@ -20,7 +20,7 @@
     |        ia64: | TODO |
     |        m32r: |  ..  |
     |        m68k: |  ..  |
-    |       metag: | TODO |
+    |       metag: |  ..  |
     |  microblaze: |  ..  |
     |        mips: |  ok  |
     |     mn10300: |  ..  |

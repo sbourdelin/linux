@@ -29,26 +29,6 @@
 	status = "okay";
 };
 
-&bsca {
-	status = "okay";
-};
-
-&bscb {
-	status = "okay";
-};
-
-&bscc {
-	status = "okay";
-};
-
-&bscd {
-	status = "okay";
-};
-
-&bsce {
-	status = "okay";
-};
-
 &enet0 {
 	status = "okay";
 };
@@ -82,13 +62,5 @@
 };
 
 &ohci3 {
-	status = "okay";
-};
-
-&sata {
-	status = "okay";
-};
-
-&sata_phy {
 	status = "okay";
 };

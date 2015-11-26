@@ -508,22 +508,22 @@ out:
 	return param;
 }
 
-static struct lp8727_platform_data *lp8727_parse_dt(struct device *dev)
+static int lp8727_parse_dt(struct device *dev)
 {
 	struct device_node *np = dev->of_node;
 	struct device_node *child;
 	struct lp8727_platform_data *pdata;
 	const char *type;
 
-	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata)
-		return ERR_PTR(-ENOMEM);
-
-	of_property_read_u32(np, "debounce-ms", &pdata->debounce_msec);
-
 	/* If charging parameter is not defined, just skip parsing the dt */
 	if (of_get_child_count(np) == 0)
-		return pdata;
+		goto out;
+
+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return -ENOMEM;
+
+	of_property_read_u32(np, "debounce-ms", &pdata->debounce_msec);
 
 	for_each_child_of_node(np, child) {
 		of_property_read_string(child, "charger-type", &type);
@@ -535,30 +535,29 @@ static struct lp8727_platform_data *lp8727_parse_dt(struct device *dev)
 			pdata->usb = lp8727_parse_charge_pdata(dev, child);
 	}
 
-	return pdata;
+	dev->platform_data = pdata;
+out:
+	return 0;
 }
 #else
-static struct lp8727_platform_data *lp8727_parse_dt(struct device *dev)
+static int lp8727_parse_dt(struct device *dev)
 {
-	return NULL;
+	return 0;
 }
 #endif
 
 static int lp8727_probe(struct i2c_client *cl, const struct i2c_device_id *id)
 {
 	struct lp8727_chg *pchg;
-	struct lp8727_platform_data *pdata;
 	int ret;
 
 	if (!i2c_check_functionality(cl->adapter, I2C_FUNC_SMBUS_I2C_BLOCK))
 		return -EIO;
 
 	if (cl->dev.of_node) {
-		pdata = lp8727_parse_dt(&cl->dev);
-		if (IS_ERR(pdata))
-			return PTR_ERR(pdata);
-	} else {
-		pdata = dev_get_platdata(&cl->dev);
+		ret = lp8727_parse_dt(&cl->dev);
+		if (ret)
+			return ret;
 	}
 
 	pchg = devm_kzalloc(&cl->dev, sizeof(*pchg), GFP_KERNEL);
@@ -567,7 +566,7 @@ static int lp8727_probe(struct i2c_client *cl, const struct i2c_device_id *id)
 
 	pchg->client = cl;
 	pchg->dev = &cl->dev;
-	pchg->pdata = pdata;
+	pchg->pdata = cl->dev.platform_data;
 	i2c_set_clientdata(cl, pchg);
 
 	mutex_init(&pchg->xfer_lock);

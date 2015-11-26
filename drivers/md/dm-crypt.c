@@ -968,8 +968,7 @@ static void crypt_free_buffer_pages(struct crypt_config *cc, struct bio *clone);
 
 /*
  * Generate a new unfragmented bio with the given size
- * This should never violate the device limitations (but only because
- * max_segment_size is being constrained to PAGE_SIZE).
+ * This should never violate the device limitations
  *
  * This function may be called concurrently. If we allocate from the mempool
  * concurrently, there is a possibility of deadlock. For example, if we have
@@ -994,7 +993,7 @@ static struct bio *crypt_alloc_buffer(struct dm_crypt_io *io, unsigned size)
 	struct bio_vec *bvec;
 
 retry:
-	if (unlikely(gfp_mask & __GFP_DIRECT_RECLAIM))
+	if (unlikely(gfp_mask & __GFP_WAIT))
 		mutex_lock(&cc->bio_alloc_lock);
 
 	clone = bio_alloc_bioset(GFP_NOIO, nr_iovecs, cc->bs);
@@ -1010,7 +1009,7 @@ retry:
 		if (!page) {
 			crypt_free_buffer_pages(cc, clone);
 			bio_put(clone);
-			gfp_mask |= __GFP_DIRECT_RECLAIM;
+			gfp_mask |= __GFP_WAIT;
 			goto retry;
 		}
 
@@ -1027,7 +1026,7 @@ retry:
 	}
 
 return_clone:
-	if (unlikely(gfp_mask & __GFP_DIRECT_RECLAIM))
+	if (unlikely(gfp_mask & __GFP_WAIT))
 		mutex_unlock(&cc->bio_alloc_lock);
 
 	return clone;
@@ -1077,8 +1076,7 @@ static void crypt_dec_pending(struct dm_crypt_io *io)
 	if (io->ctx.req)
 		crypt_free_req(cc, io->ctx.req, base_bio);
 
-	base_bio->bi_error = error;
-	bio_endio(base_bio);
+	bio_endio(base_bio, error);
 }
 
 /*
@@ -1098,12 +1096,14 @@ static void crypt_dec_pending(struct dm_crypt_io *io)
  * The work is done per CPU global for all dm-crypt instances.
  * They should not depend on each other and do not block.
  */
-static void crypt_endio(struct bio *clone)
+static void crypt_endio(struct bio *clone, int error)
 {
 	struct dm_crypt_io *io = clone->bi_private;
 	struct crypt_config *cc = io->cc;
 	unsigned rw = bio_data_dir(clone);
-	int error;
+
+	if (unlikely(!bio_flagged(clone, BIO_UPTODATE) && !error))
+		error = -EIO;
 
 	/*
 	 * free the processed pages
@@ -1111,7 +1111,6 @@ static void crypt_endio(struct bio *clone)
 	if (rw == WRITE)
 		crypt_free_buffer_pages(cc, clone);
 
-	error = clone->bi_error;
 	bio_put(clone);
 
 	if (rw == READ && !error) {
@@ -1544,8 +1543,10 @@ static void crypt_dtr(struct dm_target *ti)
 	if (cc->bs)
 		bioset_free(cc->bs);
 
-	mempool_destroy(cc->page_pool);
-	mempool_destroy(cc->req_pool);
+	if (cc->page_pool)
+		mempool_destroy(cc->page_pool);
+	if (cc->req_pool)
+		mempool_destroy(cc->req_pool);
 
 	if (cc->iv_gen_ops && cc->iv_gen_ops->dtr)
 		cc->iv_gen_ops->dtr(cc);
@@ -1810,13 +1811,11 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 	cc->iv_offset = tmpll;
 
-	ret = dm_get_device(ti, argv[3], dm_table_get_mode(ti->table), &cc->dev);
-	if (ret) {
+	if (dm_get_device(ti, argv[3], dm_table_get_mode(ti->table), &cc->dev)) {
 		ti->error = "Device lookup failed";
 		goto bad;
 	}
 
-	ret = -EINVAL;
 	if (sscanf(argv[4], "%llu%c", &tmpll, &dummy) != 1) {
 		ti->error = "Invalid device sector";
 		goto bad;
@@ -2036,6 +2035,21 @@ error:
 	return -EINVAL;
 }
 
+static int crypt_merge(struct dm_target *ti, struct bvec_merge_data *bvm,
+		       struct bio_vec *biovec, int max_size)
+{
+	struct crypt_config *cc = ti->private;
+	struct request_queue *q = bdev_get_queue(cc->dev->bdev);
+
+	if (!q->merge_bvec_fn)
+		return max_size;
+
+	bvm->bi_bdev = cc->dev->bdev;
+	bvm->bi_sector = cc->start + dm_target_offset(ti, bvm->bi_sector);
+
+	return min(max_size, q->merge_bvec_fn(q, bvm, biovec));
+}
+
 static int crypt_iterate_devices(struct dm_target *ti,
 				 iterate_devices_callout_fn fn, void *data)
 {
@@ -2044,20 +2058,9 @@ static int crypt_iterate_devices(struct dm_target *ti,
 	return fn(ti, cc->dev, cc->start, ti->len, data);
 }
 
-static void crypt_io_hints(struct dm_target *ti, struct queue_limits *limits)
-{
-	/*
-	 * Unfortunate constraint that is required to avoid the potential
-	 * for exceeding underlying device's max_segments limits -- due to
-	 * crypt_alloc_buffer() possibly allocating pages for the encryption
-	 * bio that are not as physically contiguous as the original bio.
-	 */
-	limits->max_segment_size = PAGE_SIZE;
-}
-
 static struct target_type crypt_target = {
 	.name   = "crypt",
-	.version = {1, 14, 1},
+	.version = {1, 14, 0},
 	.module = THIS_MODULE,
 	.ctr    = crypt_ctr,
 	.dtr    = crypt_dtr,
@@ -2067,8 +2070,8 @@ static struct target_type crypt_target = {
 	.preresume = crypt_preresume,
 	.resume = crypt_resume,
 	.message = crypt_message,
+	.merge  = crypt_merge,
 	.iterate_devices = crypt_iterate_devices,
-	.io_hints = crypt_io_hints,
 };
 
 static int __init dm_crypt_init(void)

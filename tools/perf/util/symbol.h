@@ -105,9 +105,7 @@ struct symbol_conf {
 			demangle_kernel,
 			filter_relative,
 			show_hist_headers,
-			branch_callstack,
-			has_filter,
-			show_ref_callgraph;
+			branch_callstack;
 	const char	*vmlinux_name,
 			*kallsyms_name,
 			*source_prefix,
@@ -191,7 +189,6 @@ struct addr_location {
 	u8	      filtered;
 	u8	      cpumode;
 	s32	      cpu;
-	s32	      socket;
 };
 
 struct symsrc {
@@ -253,8 +250,8 @@ int modules__parse(const char *filename, void *arg,
 int filename__read_debuglink(const char *filename, char *debuglink,
 			     size_t size);
 
-struct perf_env;
-int symbol__init(struct perf_env *env);
+struct perf_session_env;
+int symbol__init(struct perf_session_env *env);
 void symbol__exit(void);
 void symbol__elf_init(void);
 struct symbol *symbol__new(u64 start, u64 len, u8 binding, const char *name);

@@ -67,10 +67,6 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
 		lr_desc.state |= LR_STATE_ACTIVE;
 	if (val & ICH_LR_EOI)
 		lr_desc.state |= LR_EOI_INT;
-	if (val & ICH_LR_HW) {
-		lr_desc.state |= LR_HW;
-		lr_desc.hwirq = (val >> ICH_LR_PHYS_ID_SHIFT) & GENMASK(9, 0);
-	}
 
 	return lr_desc;
 }
@@ -88,17 +84,10 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
 	 * Eventually we want to make this configurable, so we may revisit
 	 * this in the future.
 	 */
-	switch (vcpu->kvm->arch.vgic.vgic_model) {
-	case KVM_DEV_TYPE_ARM_VGIC_V3:
+	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
 		lr_val |= ICH_LR_GROUP;
-		break;
-	case  KVM_DEV_TYPE_ARM_VGIC_V2:
-		if (lr_desc.irq < VGIC_NR_SGIS)
-			lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
-		break;
-	default:
-		BUG();
-	}
+	else
+		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
 
 	if (lr_desc.state & LR_STATE_PENDING)
 		lr_val |= ICH_LR_PENDING_BIT;
@@ -106,13 +95,13 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
 		lr_val |= ICH_LR_ACTIVE_BIT;
 	if (lr_desc.state & LR_EOI_INT)
 		lr_val |= ICH_LR_EOI;
-	if (lr_desc.state & LR_HW) {
-		lr_val |= ICH_LR_HW;
-		lr_val |= ((u64)lr_desc.hwirq) << ICH_LR_PHYS_ID_SHIFT;
-	}
 
 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+}
 
+static void vgic_v3_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
+				  struct vgic_lr lr_desc)
+{
 	if (!(lr_desc.state & LR_STATE_MASK))
 		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
 	else
@@ -189,7 +178,6 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
 	 * anyway.
 	 */
 	vgic_v3->vgic_vmcr = 0;
-	vgic_v3->vgic_elrsr = ~0;
 
 	/*
 	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
@@ -208,6 +196,7 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
 static const struct vgic_ops vgic_v3_ops = {
 	.get_lr			= vgic_v3_get_lr,
 	.set_lr			= vgic_v3_set_lr,
+	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
 	.get_elrsr		= vgic_v3_get_elrsr,
 	.get_eisr		= vgic_v3_get_eisr,
 	.clear_eisr		= vgic_v3_clear_eisr,
@@ -284,7 +273,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
 
 	vgic->vctrl_base = NULL;
 	vgic->type = VGIC_V3;
-	vgic->max_gic_vcpus = VGIC_V3_MAX_CPUS;
+	vgic->max_gic_vcpus = KVM_MAX_VCPUS;
 
 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
 		 vcpu_res.start, vgic->maint_irq);

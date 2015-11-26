@@ -24,8 +24,7 @@
 #include <linux/fcntl.h>	/* For O_CLOEXEC and O_NONBLOCK */
 #include <linux/kmemcheck.h>
 #include <linux/rcupdate.h>
-#include <linux/once.h>
-
+#include <linux/jump_label.h>
 #include <uapi/linux/net.h>
 
 struct poll_table_struct;
@@ -240,19 +239,25 @@ do {								\
 	net_ratelimited_function(pr_warn, fmt, ##__VA_ARGS__)
 #define net_info_ratelimited(fmt, ...)				\
 	net_ratelimited_function(pr_info, fmt, ##__VA_ARGS__)
-#if defined(DEBUG)
 #define net_dbg_ratelimited(fmt, ...)				\
 	net_ratelimited_function(pr_debug, fmt, ##__VA_ARGS__)
-#else
-#define net_dbg_ratelimited(fmt, ...)				\
-	do {							\
-		if (0)						\
-			no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); \
-	} while (0)
-#endif
 
-#define net_get_random_once(buf, nbytes)			\
-	get_random_once((buf), (nbytes))
+bool __net_get_random_once(void *buf, int nbytes, bool *done,
+			   struct static_key *done_key);
+
+#define net_get_random_once(buf, nbytes)				\
+	({								\
+		bool ___ret = false;					\
+		static bool ___done = false;				\
+		static struct static_key ___once_key =			\
+			STATIC_KEY_INIT_TRUE;				\
+		if (static_key_true(&___once_key))			\
+			___ret = __net_get_random_once(buf,		\
+						       nbytes,		\
+						       &___done,	\
+						       &___once_key);	\
+		___ret;							\
+	})
 
 int kernel_sendmsg(struct socket *sock, struct msghdr *msg, struct kvec *vec,
 		   size_t num, size_t len);

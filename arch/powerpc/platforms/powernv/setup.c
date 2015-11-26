@@ -165,6 +165,14 @@ static void pnv_progress(char *s, unsigned short hex)
 {
 }
 
+static u64 pnv_dma_get_required_mask(struct device *dev)
+{
+	if (dev_is_pci(dev))
+		return pnv_pci_dma_get_required_mask(to_pci_dev(dev));
+
+	return __dma_get_required_mask(dev);
+}
+
 static void pnv_shutdown(void)
 {
 	/* Let the PCI code clear up IODA tables */
@@ -187,7 +195,7 @@ static void pnv_kexec_wait_secondaries_down(void)
 
 	for_each_online_cpu(i) {
 		uint8_t status;
-		int64_t rc, timeout = 1000;
+		int64_t rc;
 
 		if (i == my_cpu)
 			continue;
@@ -203,18 +211,6 @@ static void pnv_kexec_wait_secondaries_down(void)
 				       "(physical %d) to enter OPAL\n",
 				       i, paca[i].hw_cpu_id);
 				notified = i;
-			}
-
-			/*
-			 * On crash secondaries might be unreachable or hung,
-			 * so timeout if we've waited too long
-			 * */
-			mdelay(1);
-			if (timeout-- == 0) {
-				printk(KERN_ERR "kexec: timed out waiting for "
-				       "cpu %d (physical %d) to enter OPAL\n",
-				       i, paca[i].hw_cpu_id);
-				break;
 			}
 		}
 	}
@@ -237,16 +233,16 @@ static void pnv_kexec_cpu_down(int crash_shutdown, int secondary)
 
 		/* Return the CPU to OPAL */
 		opal_return_cpu();
+	} else if (crash_shutdown) {
+		/*
+		 * On crash, we don't wait for secondaries to go
+		 * down as they might be unreachable or hung, so
+		 * instead we just wait a bit and move on.
+		 */
+		mdelay(1);
 	} else {
 		/* Primary waits for the secondaries to have reached OPAL */
 		pnv_kexec_wait_secondaries_down();
-
-		/*
-		 * We might be running as little-endian - now that interrupts
-		 * are disabled, reset the HILE bit to big-endian so we don't
-		 * take interrupts in the wrong endian later
-		 */
-		opal_reinit_cpus(OPAL_REINIT_CPUS_HILE_BE);
 	}
 }
 #endif /* CONFIG_KEXEC */
@@ -318,6 +314,7 @@ define_machine(powernv) {
 	.machine_shutdown	= pnv_shutdown,
 	.power_save             = power7_idle,
 	.calibrate_decr		= generic_calibrate_decr,
+	.dma_get_required_mask	= pnv_dma_get_required_mask,
 #ifdef CONFIG_KEXEC
 	.kexec_cpu_down		= pnv_kexec_cpu_down,
 #endif

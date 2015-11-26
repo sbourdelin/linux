@@ -21,8 +21,7 @@
 	compatible = "altr,socfpga-arria10", "altr,socfpga";
 
 	chosen {
-		bootargs = "earlyprintk";
-		stdout-path = "serial1:115200n8";
+		bootargs = "console=ttyS0,115200 rootwait";
 	};
 
 	memory {
@@ -70,33 +69,6 @@
 	status = "okay";
 };
 
-&i2c1 {
-	speed-mode = <0>;
-	status = "okay";
-
-	/*
-	 * adjust the falling times to decrease the i2c frequency to 50Khz
-	 * because the LCD module does not work at the standard 100Khz
-	 */
-	i2c-sda-falling-time-ns = <6000>;
-	i2c-scl-falling-time-ns = <6000>;
-
-	eeprom@51 {
-		compatible = "atmel,24c32";
-		reg = <0x51>;
-		pagesize = <32>;
-	};
-
-	rtc@68 {
-		compatible = "dallas,ds1339";
-		reg = <0x68>;
-	};
-};
-
 &uart1 {
-	status = "okay";
-};
-
-&usb0 {
 	status = "okay";
 };

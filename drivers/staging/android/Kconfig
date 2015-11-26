@@ -20,8 +20,7 @@ config ANDROID_TIMED_OUTPUT
 
 config ANDROID_TIMED_GPIO
 	tristate "Android timed gpio driver"
-	depends on GPIOLIB || COMPILE_TEST
-	depends on ANDROID_TIMED_OUTPUT
+	depends on GPIOLIB && ANDROID_TIMED_OUTPUT
 	default n
         ---help---
 	  Unlike generic gpio is to allow programs to access and manipulate gpio
@@ -54,7 +53,7 @@ config SW_SYNC
 	depends on SYNC
 	---help---
 	  A sync object driver that uses a 32bit counter to coordinate
-	  synchronization.  Useful when there is no hardware primitive backing
+	  syncrhronization.  Useful when there is no hardware primitive backing
 	  the synchronization.
 
 config SW_SYNC_USER

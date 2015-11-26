@@ -143,36 +143,34 @@ static int __ipv6_mc_check_mld(struct sk_buff *skb,
 	struct sk_buff *skb_chk = NULL;
 	unsigned int transport_len;
 	unsigned int len = skb_transport_offset(skb) + sizeof(struct mld_msg);
-	int ret = -EINVAL;
+	int ret;
 
 	transport_len = ntohs(ipv6_hdr(skb)->payload_len);
 	transport_len -= skb_transport_offset(skb) - sizeof(struct ipv6hdr);
 
+	skb_get(skb);
 	skb_chk = skb_checksum_trimmed(skb, transport_len,
 				       ipv6_mc_validate_checksum);
 	if (!skb_chk)
-		goto err;
+		return -EINVAL;
 
-	if (!pskb_may_pull(skb_chk, len))
-		goto err;
+	if (!pskb_may_pull(skb_chk, len)) {
+		kfree_skb(skb_chk);
+		return -EINVAL;
+	}
 
 	ret = ipv6_mc_check_mld_msg(skb_chk);
-	if (ret)
-		goto err;
+	if (ret) {
+		kfree_skb(skb_chk);
+		return ret;
+	}
 
 	if (skb_trimmed)
 		*skb_trimmed = skb_chk;
-	/* free now unneeded clone */
-	else if (skb_chk != skb)
+	else
 		kfree_skb(skb_chk);
 
-	ret = 0;
-
-err:
-	if (ret && skb_chk && skb_chk != skb)
-		kfree_skb(skb_chk);
-
-	return ret;
+	return 0;
 }
 
 /**
@@ -181,7 +179,7 @@ err:
  * @skb_trimmed: to store an skb pointer trimmed to IPv6 packet tail (optional)
  *
  * Checks whether an IPv6 packet is a valid MLD packet. If so sets
- * skb transport header accordingly and returns zero.
+ * skb network and transport headers accordingly and returns zero.
  *
  * -EINVAL: A broken packet was detected, i.e. it violates some internet
  *  standard
@@ -196,8 +194,7 @@ err:
  * to leave the original skb and its full frame unchanged (which might be
  * desirable for layer 2 frame jugglers).
  *
- * Caller needs to set the skb network header and free any returned skb if it
- * differs from the provided skb.
+ * The caller needs to release a reference count from any returned skb_trimmed.
  */
 int ipv6_mc_check_mld(struct sk_buff *skb, struct sk_buff **skb_trimmed)
 {

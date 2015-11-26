@@ -234,9 +234,7 @@ static int iwl_mvm_tdls_sta_init(struct iwl_mvm *mvm,
 	/* Found a place for all queues - enable them */
 	for (ac = 0; ac < IEEE80211_NUM_ACS; ac++) {
 		iwl_mvm_enable_ac_txq(mvm, mvmsta->hw_queue[ac],
-				      mvmsta->hw_queue[ac],
-				      iwl_mvm_ac_to_tx_fifo[ac], 0,
-				      wdg_timeout);
+				      iwl_mvm_ac_to_tx_fifo[ac], wdg_timeout);
 		mvmsta->tfd_queue_msk |= BIT(mvmsta->hw_queue[ac]);
 	}
 
@@ -255,7 +253,7 @@ static void iwl_mvm_tdls_sta_deinit(struct iwl_mvm *mvm,
 	/* disable the TDLS STA-specific queues */
 	sta_msk = mvmsta->tfd_queue_msk;
 	for_each_set_bit(i, &sta_msk, sizeof(sta_msk) * BITS_PER_BYTE)
-		iwl_mvm_disable_txq(mvm, i, i, IWL_MAX_TID_COUNT, 0);
+		iwl_mvm_disable_txq(mvm, i, 0);
 }
 
 int iwl_mvm_add_sta(struct iwl_mvm *mvm,
@@ -277,11 +275,6 @@ int iwl_mvm_add_sta(struct iwl_mvm *mvm,
 	if (sta_id == IWL_MVM_STATION_COUNT)
 		return -ENOSPC;
 
-	if (vif->type == NL80211_IFTYPE_AP) {
-		mvmvif->ap_assoc_sta_count++;
-		iwl_mvm_mac_ctxt_changed(mvm, vif, false, NULL);
-	}
-
 	spin_lock_init(&mvm_sta->lock);
 
 	mvm_sta->sta_id = sta_id;
@@ -294,7 +287,7 @@ int iwl_mvm_add_sta(struct iwl_mvm *mvm,
 
 	/* HW restart, don't assume the memory has been zeroed */
 	atomic_set(&mvm->pending_frames[sta_id], 0);
-	mvm_sta->tid_disable_agg = 0xffff; /* No aggs at first */
+	mvm_sta->tid_disable_agg = 0;
 	mvm_sta->tfd_queue_msk = 0;
 
 	/* allocate new queues for a TDLS station */
@@ -474,8 +467,7 @@ void iwl_mvm_sta_drained_wk(struct work_struct *wk)
 			unsigned long i, msk = mvm->tfd_drained[sta_id];
 
 			for_each_set_bit(i, &msk, sizeof(msk) * BITS_PER_BYTE)
-				iwl_mvm_disable_txq(mvm, i, i,
-						    IWL_MAX_TID_COUNT, 0);
+				iwl_mvm_disable_txq(mvm, i, 0);
 
 			mvm->tfd_drained[sta_id] = 0;
 			IWL_DEBUG_TDLS(mvm, "Drained sta %d, with queues %ld\n",
@@ -502,7 +494,7 @@ int iwl_mvm_rm_sta(struct iwl_mvm *mvm,
 		if (ret)
 			return ret;
 		/* flush its queues here since we are freeing mvm_sta */
-		ret = iwl_mvm_flush_tx_path(mvm, mvm_sta->tfd_queue_msk, 0);
+		ret = iwl_mvm_flush_tx_path(mvm, mvm_sta->tfd_queue_msk, true);
 		if (ret)
 			return ret;
 		ret = iwl_trans_wait_tx_queue_empty(mvm->trans,
@@ -654,8 +646,8 @@ int iwl_mvm_add_aux_sta(struct iwl_mvm *mvm)
 	lockdep_assert_held(&mvm->mutex);
 
 	/* Map Aux queue to fifo - needs to happen before adding Aux station */
-	iwl_mvm_enable_ac_txq(mvm, mvm->aux_queue, mvm->aux_queue,
-			      IWL_MVM_TX_FIFO_MCAST, 0, wdg_timeout);
+	iwl_mvm_enable_ac_txq(mvm, mvm->aux_queue,
+			      IWL_MVM_TX_FIFO_MCAST, wdg_timeout);
 
 	/* Allocate aux station and assign to it the aux queue */
 	ret = iwl_mvm_allocate_int_sta(mvm, &mvm->aux_sta, BIT(mvm->aux_queue),
@@ -926,7 +918,6 @@ int iwl_mvm_sta_tx_agg_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	struct iwl_mvm_sta *mvmsta = iwl_mvm_sta_from_mac80211(sta);
 	struct iwl_mvm_tid_data *tid_data;
 	int txq_id;
-	int ret;
 
 	if (WARN_ON_ONCE(tid >= IWL_MAX_TID_COUNT))
 		return -EINVAL;
@@ -939,6 +930,17 @@ int iwl_mvm_sta_tx_agg_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	lockdep_assert_held(&mvm->mutex);
 
+	for (txq_id = mvm->first_agg_queue;
+	     txq_id <= mvm->last_agg_queue; txq_id++)
+		if (mvm->queue_to_mac80211[txq_id] ==
+		    IWL_INVALID_MAC80211_QUEUE)
+			break;
+
+	if (txq_id > mvm->last_agg_queue) {
+		IWL_ERR(mvm, "Failed to allocate agg queue\n");
+		return -EIO;
+	}
+
 	spin_lock_bh(&mvmsta->lock);
 
 	/* possible race condition - we entered D0i3 while starting agg */
@@ -948,18 +950,8 @@ int iwl_mvm_sta_tx_agg_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return -EIO;
 	}
 
-	spin_lock_bh(&mvm->queue_info_lock);
-
-	txq_id = iwl_mvm_find_free_queue(mvm, mvm->first_agg_queue,
-					 mvm->last_agg_queue);
-	if (txq_id < 0) {
-		ret = txq_id;
-		spin_unlock_bh(&mvm->queue_info_lock);
-		IWL_ERR(mvm, "Failed to allocate agg queue\n");
-		goto release_locks;
-	}
-	mvm->queue_info[txq_id].setup_reserved = true;
-	spin_unlock_bh(&mvm->queue_info_lock);
+	/* the new tx queue is still connected to the same mac80211 queue */
+	mvm->queue_to_mac80211[txq_id] = vif->hw_queue[tid_to_mac80211_ac[tid]];
 
 	tid_data = &mvmsta->tid_data[tid];
 	tid_data->ssn = IEEE80211_SEQ_TO_SN(tid_data->seq_number);
@@ -978,12 +970,9 @@ int iwl_mvm_sta_tx_agg_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		tid_data->state = IWL_EMPTYING_HW_QUEUE_ADDBA;
 	}
 
-	ret = 0;
-
-release_locks:
 	spin_unlock_bh(&mvmsta->lock);
 
-	return ret;
+	return 0;
 }
 
 int iwl_mvm_sta_tx_agg_oper(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
@@ -1011,18 +1000,12 @@ int iwl_mvm_sta_tx_agg_oper(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	fifo = iwl_mvm_ac_to_tx_fifo[tid_to_mac80211_ac[tid]];
 
-	iwl_mvm_enable_agg_txq(mvm, queue,
-			       vif->hw_queue[tid_to_mac80211_ac[tid]], fifo,
-			       mvmsta->sta_id, tid, buf_size, ssn, wdg_timeout);
+	iwl_mvm_enable_agg_txq(mvm, queue, fifo, mvmsta->sta_id, tid,
+			       buf_size, ssn, wdg_timeout);
 
 	ret = iwl_mvm_sta_tx_agg(mvm, sta, tid, queue, true);
 	if (ret)
 		return -EIO;
-
-	/* No need to mark as reserved */
-	spin_lock_bh(&mvm->queue_info_lock);
-	mvm->queue_info[queue].setup_reserved = false;
-	spin_unlock_bh(&mvm->queue_info_lock);
 
 	/*
 	 * Even though in theory the peer could have different
@@ -1068,11 +1051,6 @@ int iwl_mvm_sta_tx_agg_stop(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	mvmsta->agg_tids &= ~BIT(tid);
 
-	/* No need to mark as reserved anymore */
-	spin_lock_bh(&mvm->queue_info_lock);
-	mvm->queue_info[txq_id].setup_reserved = false;
-	spin_unlock_bh(&mvm->queue_info_lock);
-
 	switch (tid_data->state) {
 	case IWL_AGG_ON:
 		tid_data->ssn = IEEE80211_SEQ_TO_SN(tid_data->seq_number);
@@ -1090,15 +1068,14 @@ int iwl_mvm_sta_tx_agg_stop(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 		tid_data->ssn = 0xffff;
 		tid_data->state = IWL_AGG_OFF;
+		mvm->queue_to_mac80211[txq_id] = IWL_INVALID_MAC80211_QUEUE;
 		spin_unlock_bh(&mvmsta->lock);
 
 		ieee80211_stop_tx_ba_cb_irqsafe(vif, sta->addr, tid);
 
 		iwl_mvm_sta_tx_agg(mvm, sta, tid, txq_id, false);
 
-		iwl_mvm_disable_txq(mvm, txq_id,
-				    vif->hw_queue[tid_to_mac80211_ac[tid]], tid,
-				    0);
+		iwl_mvm_disable_txq(mvm, txq_id, 0);
 		return 0;
 	case IWL_AGG_STARTING:
 	case IWL_EMPTYING_HW_QUEUE_ADDBA:
@@ -1109,6 +1086,7 @@ int iwl_mvm_sta_tx_agg_stop(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 		/* No barriers since we are under mutex */
 		lockdep_assert_held(&mvm->mutex);
+		mvm->queue_to_mac80211[txq_id] = IWL_INVALID_MAC80211_QUEUE;
 
 		ieee80211_stop_tx_ba_cb_irqsafe(vif, sta->addr, tid);
 		tid_data->state = IWL_AGG_OFF;
@@ -1149,14 +1127,9 @@ int iwl_mvm_sta_tx_agg_flush(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	mvmsta->agg_tids &= ~BIT(tid);
 	spin_unlock_bh(&mvmsta->lock);
 
-	/* No need to mark as reserved */
-	spin_lock_bh(&mvm->queue_info_lock);
-	mvm->queue_info[txq_id].setup_reserved = false;
-	spin_unlock_bh(&mvm->queue_info_lock);
-
 	if (old_state >= IWL_AGG_ON) {
 		iwl_mvm_drain_sta(mvm, mvmsta, true);
-		if (iwl_mvm_flush_tx_path(mvm, BIT(txq_id), 0))
+		if (iwl_mvm_flush_tx_path(mvm, BIT(txq_id), true))
 			IWL_ERR(mvm, "Couldn't flush the AGG queue\n");
 		iwl_trans_wait_tx_queue_empty(mvm->trans,
 					      mvmsta->tfd_queue_msk);
@@ -1164,41 +1137,29 @@ int iwl_mvm_sta_tx_agg_flush(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 		iwl_mvm_sta_tx_agg(mvm, sta, tid, txq_id, false);
 
-		iwl_mvm_disable_txq(mvm, tid_data->txq_id,
-				    vif->hw_queue[tid_to_mac80211_ac[tid]], tid,
-				    0);
+		iwl_mvm_disable_txq(mvm, tid_data->txq_id, 0);
 	}
+
+	mvm->queue_to_mac80211[tid_data->txq_id] =
+				IWL_INVALID_MAC80211_QUEUE;
 
 	return 0;
 }
 
 static int iwl_mvm_set_fw_key_idx(struct iwl_mvm *mvm)
 {
-	int i, max = -1, max_offs = -1;
+	int i;
 
 	lockdep_assert_held(&mvm->mutex);
 
-	/* Pick the unused key offset with the highest 'deleted'
-	 * counter. Every time a key is deleted, all the counters
-	 * are incremented and the one that was just deleted is
-	 * reset to zero. Thus, the highest counter is the one
-	 * that was deleted longest ago. Pick that one.
-	 */
-	for (i = 0; i < STA_KEY_MAX_NUM; i++) {
-		if (test_bit(i, mvm->fw_key_table))
-			continue;
-		if (mvm->fw_key_deleted[i] > max) {
-			max = mvm->fw_key_deleted[i];
-			max_offs = i;
-		}
-	}
+	i = find_first_zero_bit(mvm->fw_key_table, STA_KEY_MAX_NUM);
 
-	if (max_offs < 0)
+	if (i == STA_KEY_MAX_NUM)
 		return STA_KEY_IDX_INVALID;
 
-	__set_bit(max_offs, mvm->fw_key_table);
+	__set_bit(i, mvm->fw_key_table);
 
-	return max_offs;
+	return i;
 }
 
 static u8 iwl_mvm_get_key_sta_id(struct ieee80211_vif *vif,
@@ -1316,6 +1277,8 @@ static int iwl_mvm_send_sta_igtk(struct iwl_mvm *mvm,
 		const u8 *pn;
 
 		memcpy(igtk_cmd.IGTK, keyconf->key, keyconf->keylen);
+		ieee80211_aes_cmac_calculate_k1_k2(keyconf,
+						   igtk_cmd.K1, igtk_cmd.K2);
 		ieee80211_get_key_rx_seq(keyconf, 0, &seq);
 		pn = seq.aes_cmac.pn;
 		igtk_cmd.receive_seq_cnt = cpu_to_le64(((u64) pn[5] << 0) |
@@ -1438,7 +1401,6 @@ int iwl_mvm_set_sta_key(struct iwl_mvm *mvm,
 	bool mcast = !(keyconf->flags & IEEE80211_KEY_FLAG_PAIRWISE);
 	u8 sta_id;
 	int ret;
-	static const u8 __maybe_unused zero_addr[ETH_ALEN] = {0};
 
 	lockdep_assert_held(&mvm->mutex);
 
@@ -1505,7 +1467,7 @@ int iwl_mvm_set_sta_key(struct iwl_mvm *mvm,
 end:
 	IWL_DEBUG_WEP(mvm, "key: cipher=%x len=%d idx=%d sta=%pM ret=%d\n",
 		      keyconf->cipher, keyconf->keylen, keyconf->keyidx,
-		      sta ? sta->addr : zero_addr, ret);
+		      sta->addr, ret);
 	return ret;
 }
 
@@ -1516,7 +1478,7 @@ int iwl_mvm_remove_sta_key(struct iwl_mvm *mvm,
 {
 	bool mcast = !(keyconf->flags & IEEE80211_KEY_FLAG_PAIRWISE);
 	u8 sta_id;
-	int ret, i;
+	int ret;
 
 	lockdep_assert_held(&mvm->mutex);
 
@@ -1534,13 +1496,6 @@ int iwl_mvm_remove_sta_key(struct iwl_mvm *mvm,
 			keyconf->hw_key_idx);
 		return -ENOENT;
 	}
-
-	/* track which key was deleted last */
-	for (i = 0; i < STA_KEY_MAX_NUM; i++) {
-		if (mvm->fw_key_deleted[i] < U8_MAX)
-			mvm->fw_key_deleted[i]++;
-	}
-	mvm->fw_key_deleted[keyconf->hw_key_idx] = 0;
 
 	if (sta_id == IWL_MVM_STATION_COUNT) {
 		IWL_DEBUG_WEP(mvm, "station non-existent, early return.\n");
@@ -1705,8 +1660,9 @@ void iwl_mvm_sta_modify_sleep_tx_count(struct iwl_mvm *mvm,
 		IWL_ERR(mvm, "Failed to send ADD_STA command (%d)\n", ret);
 }
 
-void iwl_mvm_rx_eosp_notif(struct iwl_mvm *mvm,
-			   struct iwl_rx_cmd_buffer *rxb)
+int iwl_mvm_rx_eosp_notif(struct iwl_mvm *mvm,
+			  struct iwl_rx_cmd_buffer *rxb,
+			  struct iwl_device_cmd *cmd)
 {
 	struct iwl_rx_packet *pkt = rxb_addr(rxb);
 	struct iwl_mvm_eosp_notification *notif = (void *)pkt->data;
@@ -1714,13 +1670,15 @@ void iwl_mvm_rx_eosp_notif(struct iwl_mvm *mvm,
 	u32 sta_id = le32_to_cpu(notif->sta_id);
 
 	if (WARN_ON_ONCE(sta_id >= IWL_MVM_STATION_COUNT))
-		return;
+		return 0;
 
 	rcu_read_lock();
 	sta = rcu_dereference(mvm->fw_id_to_mac_id[sta_id]);
 	if (!IS_ERR_OR_NULL(sta))
 		ieee80211_sta_eosp(sta);
 	rcu_read_unlock();
+
+	return 0;
 }
 
 void iwl_mvm_sta_modify_disable_tx(struct iwl_mvm *mvm,

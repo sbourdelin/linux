@@ -871,6 +871,7 @@ static int wm8988_spi_remove(struct spi_device *spi)
 static struct spi_driver wm8988_spi_driver = {
 	.driver = {
 		.name	= "wm8988",
+		.owner	= THIS_MODULE,
 	},
 	.probe		= wm8988_spi_probe,
 	.remove		= wm8988_spi_remove,
@@ -918,6 +919,7 @@ MODULE_DEVICE_TABLE(i2c, wm8988_i2c_id);
 static struct i2c_driver wm8988_i2c_driver = {
 	.driver = {
 		.name = "wm8988",
+		.owner = THIS_MODULE,
 	},
 	.probe =    wm8988_i2c_probe,
 	.remove =   wm8988_i2c_remove,

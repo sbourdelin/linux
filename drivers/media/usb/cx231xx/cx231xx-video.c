@@ -1114,8 +1114,7 @@ int cx231xx_enum_input(struct file *file, void *priv,
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
 	u32 gen_stat;
-	unsigned int n;
-	int ret;
+	unsigned int ret, n;
 
 	n = i->index;
 	if (n >= MAX_CX231XX_INPUT)
@@ -1876,7 +1875,7 @@ static int cx231xx_close(struct file *filp)
 			v4l2_fh_exit(&fh->fh);
 			kfree(fh);
 			dev->users--;
-			wake_up_interruptible(&dev->open);
+			wake_up_interruptible_nr(&dev->open, 1);
 			return 0;
 		}
 
@@ -1909,7 +1908,7 @@ static int cx231xx_close(struct file *filp)
 	}
 	v4l2_fh_exit(&fh->fh);
 	kfree(fh);
-	wake_up_interruptible(&dev->open);
+	wake_up_interruptible_nr(&dev->open, 1);
 	return 0;
 }
 

@@ -9,8 +9,6 @@
 
 #include <linux/tracepoint.h>
 
-#include "state.h"
-
 DECLARE_EVENT_CLASS(nfsd_stateid_class,
 	TP_PROTO(stateid_t *stp),
 	TP_ARGS(stp),

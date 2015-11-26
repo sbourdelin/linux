@@ -1135,6 +1135,7 @@ static void axienet_ethtools_get_drvinfo(struct net_device *ndev,
 {
 	strlcpy(ed->driver, DRIVER_NAME, sizeof(ed->driver));
 	strlcpy(ed->version, DRIVER_VERSION, sizeof(ed->version));
+	ed->regdump_len = sizeof(u32) * AXIENET_REGS_N;
 }
 
 /**
@@ -1529,9 +1530,9 @@ static int axienet_probe(struct platform_device *pdev)
 	/* Map device registers */
 	ethres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	lp->regs = devm_ioremap_resource(&pdev->dev, ethres);
-	if (IS_ERR(lp->regs)) {
+	if (!lp->regs) {
 		dev_err(&pdev->dev, "could not map Axi Ethernet regs.\n");
-		ret = PTR_ERR(lp->regs);
+		ret = -ENOMEM;
 		goto free_netdev;
 	}
 
@@ -1598,9 +1599,9 @@ static int axienet_probe(struct platform_device *pdev)
 		goto free_netdev;
 	}
 	lp->dma_regs = devm_ioremap_resource(&pdev->dev, &dmares);
-	if (IS_ERR(lp->dma_regs)) {
+	if (!lp->dma_regs) {
 		dev_err(&pdev->dev, "could not map DMA regs\n");
-		ret = PTR_ERR(lp->dma_regs);
+		ret = -ENOMEM;
 		goto free_netdev;
 	}
 	lp->rx_irq = irq_of_parse_and_map(np, 1);

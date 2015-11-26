@@ -1542,8 +1542,11 @@ static int u132_periodic_reinit(struct u132 *u132)
 		(fit ^ FIT) | u132->hc_fminterval);
 	if (retval)
 		return retval;
-	return u132_write_pcimem(u132, periodicstart,
-	       ((9 * fi) / 10) & 0x3fff);
+	retval = u132_write_pcimem(u132, periodicstart,
+		((9 * fi) / 10) & 0x3fff);
+	if (retval)
+		return retval;
+	return 0;
 }
 
 static char *hcfs2string(int state)
@@ -2244,8 +2247,9 @@ static int u132_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 {
 	struct u132 *u132 = hcd_to_u132(hcd);
 	if (irqs_disabled()) {
-		if (gfpflags_allow_blocking(mem_flags)) {
-			printk(KERN_ERR "invalid context for function that might sleep\n");
+		if (__GFP_WAIT & mem_flags) {
+			printk(KERN_ERR "invalid context for function that migh"
+				"t sleep\n");
 			return -EINVAL;
 		}
 	}
@@ -2697,18 +2701,28 @@ static int u132_roothub_setportfeature(struct u132 *u132, u16 wValue,
 	if (wIndex == 0 || wIndex > u132->num_ports) {
 		return -EINVAL;
 	} else {
+		int retval;
 		int port_index = wIndex - 1;
 		struct u132_port *port = &u132->port[port_index];
 		port->Status &= ~(1 << wValue);
 		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
-			return u132_write_pcimem(u132,
-			       roothub.portstatus[port_index], RH_PS_PSS);
+			retval = u132_write_pcimem(u132,
+				roothub.portstatus[port_index], RH_PS_PSS);
+			if (retval)
+				return retval;
+			return 0;
 		case USB_PORT_FEAT_POWER:
-			return u132_write_pcimem(u132,
-			       roothub.portstatus[port_index], RH_PS_PPS);
+			retval = u132_write_pcimem(u132,
+				roothub.portstatus[port_index], RH_PS_PPS);
+			if (retval)
+				return retval;
+			return 0;
 		case USB_PORT_FEAT_RESET:
-			return u132_roothub_portreset(u132, port_index);
+			retval = u132_roothub_portreset(u132, port_index);
+			if (retval)
+				return retval;
+			return 0;
 		default:
 			return -EPIPE;
 		}
@@ -2723,6 +2737,7 @@ static int u132_roothub_clearportfeature(struct u132 *u132, u16 wValue,
 	} else {
 		int port_index = wIndex - 1;
 		u32 temp;
+		int retval;
 		struct u132_port *port = &u132->port[port_index];
 		port->Status &= ~(1 << wValue);
 		switch (wValue) {
@@ -2758,8 +2773,11 @@ static int u132_roothub_clearportfeature(struct u132 *u132, u16 wValue,
 		default:
 			return -EPIPE;
 		}
-		return u132_write_pcimem(u132, roothub.portstatus[port_index],
-		       temp);
+		retval = u132_write_pcimem(u132, roothub.portstatus[port_index],
+			 temp);
+		if (retval)
+			return retval;
+		return 0;
 	}
 }
 

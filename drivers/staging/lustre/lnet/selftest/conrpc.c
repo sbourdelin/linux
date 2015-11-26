@@ -40,6 +40,7 @@
  * Author: Liang Zhen <liang@whamcloud.com>
  */
 
+
 #include "../../include/linux/libcfs/libcfs.h"
 #include "../../include/linux/lnet/lib-lnet.h"
 #include "timer.h"
@@ -504,7 +505,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
 
 		dur = (long)cfs_time_sub(crpc->crp_stamp,
 		      (unsigned long)console_session.ses_id.ses_stamp);
-		jiffies_to_timeval(dur, &tv);
+		cfs_duration_usec(dur, &tv);
 
 		if (copy_to_user(&ent->rpe_peer,
 				     &nd->nd_id, sizeof(lnet_process_id_t)) ||
@@ -860,7 +861,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
 			bulk->bk_iovs[i].kiov_offset = 0;
 			bulk->bk_iovs[i].kiov_len    = len;
 			bulk->bk_iovs[i].kiov_page   =
-				alloc_page(GFP_KERNEL);
+				alloc_page(GFP_IOFS);
 
 			if (bulk->bk_iovs[i].kiov_page == NULL) {
 				lstcon_rpc_put(*crpc);
@@ -1175,7 +1176,7 @@ lstcon_rpc_pinger(void *arg)
 	srpc_debug_reqst_t *drq;
 	lstcon_ndlink_t *ndl;
 	lstcon_node_t *nd;
-	int intv;
+	time_t intv;
 	int count = 0;
 	int rc;
 
@@ -1190,8 +1191,8 @@ lstcon_rpc_pinger(void *arg)
 	}
 
 	if (!console_session.ses_expired &&
-	    ktime_get_real_seconds() - console_session.ses_laststamp >
-	    (time64_t)console_session.ses_timeout)
+	    get_seconds() - console_session.ses_laststamp >
+	    (time_t)console_session.ses_timeout)
 		console_session.ses_expired = 1;
 
 	trans = console_session.ses_ping;
@@ -1247,8 +1248,9 @@ lstcon_rpc_pinger(void *arg)
 		if (nd->nd_state != LST_NODE_ACTIVE)
 			continue;
 
-		intv = (jiffies - nd->nd_stamp) / HZ;
-		if (intv < nd->nd_timeout / 2)
+		intv = cfs_duration_sec(cfs_time_sub(cfs_time_current(),
+						     nd->nd_stamp));
+		if (intv < (time_t)nd->nd_timeout / 2)
 			continue;
 
 		rc = lstcon_rpc_init(nd, SRPC_SERVICE_DEBUG,
@@ -1276,7 +1278,7 @@ lstcon_rpc_pinger(void *arg)
 
 	CDEBUG(D_NET, "Ping %d nodes in session\n", count);
 
-	ptimer->stt_expires = ktime_get_real_seconds() + LST_PING_INTERVAL;
+	ptimer->stt_expires = (unsigned long)(get_seconds() + LST_PING_INTERVAL);
 	stt_add_timer(ptimer);
 
 	mutex_unlock(&console_session.ses_mutex);
@@ -1299,7 +1301,7 @@ lstcon_rpc_pinger_start(void)
 	}
 
 	ptimer = &console_session.ses_ping_timer;
-	ptimer->stt_expires = ktime_get_real_seconds() + LST_PING_INTERVAL;
+	ptimer->stt_expires = (unsigned long)(get_seconds() + LST_PING_INTERVAL);
 
 	stt_add_timer(ptimer);
 

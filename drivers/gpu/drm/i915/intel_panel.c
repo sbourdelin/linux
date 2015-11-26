@@ -32,10 +32,7 @@
 
 #include <linux/kernel.h>
 #include <linux/moduleparam.h>
-#include <linux/pwm.h>
 #include "intel_drv.h"
-
-#define CRC_PMIC_PWM_PERIOD_NS	21333
 
 void
 intel_fixed_panel_mode(const struct drm_display_mode *fixed_mode,
@@ -105,55 +102,59 @@ intel_pch_panel_fitting(struct intel_crtc *intel_crtc,
 			struct intel_crtc_state *pipe_config,
 			int fitting_mode)
 {
-	const struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
-	int x = 0, y = 0, width = 0, height = 0;
+	struct drm_display_mode *adjusted_mode;
+	int x, y, width, height;
+
+	adjusted_mode = &pipe_config->base.adjusted_mode;
+
+	x = y = width = height = 0;
 
 	/* Native modes don't need fitting */
-	if (adjusted_mode->crtc_hdisplay == pipe_config->pipe_src_w &&
-	    adjusted_mode->crtc_vdisplay == pipe_config->pipe_src_h)
+	if (adjusted_mode->hdisplay == pipe_config->pipe_src_w &&
+	    adjusted_mode->vdisplay == pipe_config->pipe_src_h)
 		goto done;
 
 	switch (fitting_mode) {
 	case DRM_MODE_SCALE_CENTER:
 		width = pipe_config->pipe_src_w;
 		height = pipe_config->pipe_src_h;
-		x = (adjusted_mode->crtc_hdisplay - width + 1)/2;
-		y = (adjusted_mode->crtc_vdisplay - height + 1)/2;
+		x = (adjusted_mode->hdisplay - width + 1)/2;
+		y = (adjusted_mode->vdisplay - height + 1)/2;
 		break;
 
 	case DRM_MODE_SCALE_ASPECT:
 		/* Scale but preserve the aspect ratio */
 		{
-			u32 scaled_width = adjusted_mode->crtc_hdisplay
+			u32 scaled_width = adjusted_mode->hdisplay
 				* pipe_config->pipe_src_h;
 			u32 scaled_height = pipe_config->pipe_src_w
-				* adjusted_mode->crtc_vdisplay;
+				* adjusted_mode->vdisplay;
 			if (scaled_width > scaled_height) { /* pillar */
 				width = scaled_height / pipe_config->pipe_src_h;
 				if (width & 1)
 					width++;
-				x = (adjusted_mode->crtc_hdisplay - width + 1) / 2;
+				x = (adjusted_mode->hdisplay - width + 1) / 2;
 				y = 0;
-				height = adjusted_mode->crtc_vdisplay;
+				height = adjusted_mode->vdisplay;
 			} else if (scaled_width < scaled_height) { /* letter */
 				height = scaled_width / pipe_config->pipe_src_w;
 				if (height & 1)
 				    height++;
-				y = (adjusted_mode->crtc_vdisplay - height + 1) / 2;
+				y = (adjusted_mode->vdisplay - height + 1) / 2;
 				x = 0;
-				width = adjusted_mode->crtc_hdisplay;
+				width = adjusted_mode->hdisplay;
 			} else {
 				x = y = 0;
-				width = adjusted_mode->crtc_hdisplay;
-				height = adjusted_mode->crtc_vdisplay;
+				width = adjusted_mode->hdisplay;
+				height = adjusted_mode->vdisplay;
 			}
 		}
 		break;
 
 	case DRM_MODE_SCALE_FULLSCREEN:
 		x = y = 0;
-		width = adjusted_mode->crtc_hdisplay;
-		height = adjusted_mode->crtc_vdisplay;
+		width = adjusted_mode->hdisplay;
+		height = adjusted_mode->vdisplay;
 		break;
 
 	default:
@@ -168,46 +169,46 @@ done:
 }
 
 static void
-centre_horizontally(struct drm_display_mode *adjusted_mode,
+centre_horizontally(struct drm_display_mode *mode,
 		    int width)
 {
 	u32 border, sync_pos, blank_width, sync_width;
 
 	/* keep the hsync and hblank widths constant */
-	sync_width = adjusted_mode->crtc_hsync_end - adjusted_mode->crtc_hsync_start;
-	blank_width = adjusted_mode->crtc_hblank_end - adjusted_mode->crtc_hblank_start;
+	sync_width = mode->crtc_hsync_end - mode->crtc_hsync_start;
+	blank_width = mode->crtc_hblank_end - mode->crtc_hblank_start;
 	sync_pos = (blank_width - sync_width + 1) / 2;
 
-	border = (adjusted_mode->crtc_hdisplay - width + 1) / 2;
+	border = (mode->hdisplay - width + 1) / 2;
 	border += border & 1; /* make the border even */
 
-	adjusted_mode->crtc_hdisplay = width;
-	adjusted_mode->crtc_hblank_start = width + border;
-	adjusted_mode->crtc_hblank_end = adjusted_mode->crtc_hblank_start + blank_width;
+	mode->crtc_hdisplay = width;
+	mode->crtc_hblank_start = width + border;
+	mode->crtc_hblank_end = mode->crtc_hblank_start + blank_width;
 
-	adjusted_mode->crtc_hsync_start = adjusted_mode->crtc_hblank_start + sync_pos;
-	adjusted_mode->crtc_hsync_end = adjusted_mode->crtc_hsync_start + sync_width;
+	mode->crtc_hsync_start = mode->crtc_hblank_start + sync_pos;
+	mode->crtc_hsync_end = mode->crtc_hsync_start + sync_width;
 }
 
 static void
-centre_vertically(struct drm_display_mode *adjusted_mode,
+centre_vertically(struct drm_display_mode *mode,
 		  int height)
 {
 	u32 border, sync_pos, blank_width, sync_width;
 
 	/* keep the vsync and vblank widths constant */
-	sync_width = adjusted_mode->crtc_vsync_end - adjusted_mode->crtc_vsync_start;
-	blank_width = adjusted_mode->crtc_vblank_end - adjusted_mode->crtc_vblank_start;
+	sync_width = mode->crtc_vsync_end - mode->crtc_vsync_start;
+	blank_width = mode->crtc_vblank_end - mode->crtc_vblank_start;
 	sync_pos = (blank_width - sync_width + 1) / 2;
 
-	border = (adjusted_mode->crtc_vdisplay - height + 1) / 2;
+	border = (mode->vdisplay - height + 1) / 2;
 
-	adjusted_mode->crtc_vdisplay = height;
-	adjusted_mode->crtc_vblank_start = height + border;
-	adjusted_mode->crtc_vblank_end = adjusted_mode->crtc_vblank_start + blank_width;
+	mode->crtc_vdisplay = height;
+	mode->crtc_vblank_start = height + border;
+	mode->crtc_vblank_end = mode->crtc_vblank_start + blank_width;
 
-	adjusted_mode->crtc_vsync_start = adjusted_mode->crtc_vblank_start + sync_pos;
-	adjusted_mode->crtc_vsync_end = adjusted_mode->crtc_vsync_start + sync_width;
+	mode->crtc_vsync_start = mode->crtc_vblank_start + sync_pos;
+	mode->crtc_vsync_end = mode->crtc_vsync_start + sync_width;
 }
 
 static inline u32 panel_fitter_scaling(u32 source, u32 target)
@@ -226,11 +227,11 @@ static inline u32 panel_fitter_scaling(u32 source, u32 target)
 static void i965_scale_aspect(struct intel_crtc_state *pipe_config,
 			      u32 *pfit_control)
 {
-	const struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
-	u32 scaled_width = adjusted_mode->crtc_hdisplay *
+	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
+	u32 scaled_width = adjusted_mode->hdisplay *
 		pipe_config->pipe_src_h;
 	u32 scaled_height = pipe_config->pipe_src_w *
-		adjusted_mode->crtc_vdisplay;
+		adjusted_mode->vdisplay;
 
 	/* 965+ is easy, it does everything in hw */
 	if (scaled_width > scaled_height)
@@ -239,7 +240,7 @@ static void i965_scale_aspect(struct intel_crtc_state *pipe_config,
 	else if (scaled_width < scaled_height)
 		*pfit_control |= PFIT_ENABLE |
 			PFIT_SCALING_LETTER;
-	else if (adjusted_mode->crtc_hdisplay != pipe_config->pipe_src_w)
+	else if (adjusted_mode->hdisplay != pipe_config->pipe_src_w)
 		*pfit_control |= PFIT_ENABLE | PFIT_SCALING_AUTO;
 }
 
@@ -248,10 +249,10 @@ static void i9xx_scale_aspect(struct intel_crtc_state *pipe_config,
 			      u32 *border)
 {
 	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
-	u32 scaled_width = adjusted_mode->crtc_hdisplay *
+	u32 scaled_width = adjusted_mode->hdisplay *
 		pipe_config->pipe_src_h;
 	u32 scaled_height = pipe_config->pipe_src_w *
-		adjusted_mode->crtc_vdisplay;
+		adjusted_mode->vdisplay;
 	u32 bits;
 
 	/*
@@ -265,9 +266,9 @@ static void i9xx_scale_aspect(struct intel_crtc_state *pipe_config,
 				    pipe_config->pipe_src_h);
 
 		*border = LVDS_BORDER_ENABLE;
-		if (pipe_config->pipe_src_h != adjusted_mode->crtc_vdisplay) {
+		if (pipe_config->pipe_src_h != adjusted_mode->vdisplay) {
 			bits = panel_fitter_scaling(pipe_config->pipe_src_h,
-						    adjusted_mode->crtc_vdisplay);
+						    adjusted_mode->vdisplay);
 
 			*pfit_pgm_ratios |= (bits << PFIT_HORIZ_SCALE_SHIFT |
 					     bits << PFIT_VERT_SCALE_SHIFT);
@@ -281,9 +282,9 @@ static void i9xx_scale_aspect(struct intel_crtc_state *pipe_config,
 				  pipe_config->pipe_src_w);
 
 		*border = LVDS_BORDER_ENABLE;
-		if (pipe_config->pipe_src_w != adjusted_mode->crtc_hdisplay) {
+		if (pipe_config->pipe_src_w != adjusted_mode->hdisplay) {
 			bits = panel_fitter_scaling(pipe_config->pipe_src_w,
-						    adjusted_mode->crtc_hdisplay);
+						    adjusted_mode->hdisplay);
 
 			*pfit_pgm_ratios |= (bits << PFIT_HORIZ_SCALE_SHIFT |
 					     bits << PFIT_VERT_SCALE_SHIFT);
@@ -306,11 +307,13 @@ void intel_gmch_panel_fitting(struct intel_crtc *intel_crtc,
 {
 	struct drm_device *dev = intel_crtc->base.dev;
 	u32 pfit_control = 0, pfit_pgm_ratios = 0, border = 0;
-	struct drm_display_mode *adjusted_mode = &pipe_config->base.adjusted_mode;
+	struct drm_display_mode *adjusted_mode;
+
+	adjusted_mode = &pipe_config->base.adjusted_mode;
 
 	/* Native modes don't need fitting */
-	if (adjusted_mode->crtc_hdisplay == pipe_config->pipe_src_w &&
-	    adjusted_mode->crtc_vdisplay == pipe_config->pipe_src_h)
+	if (adjusted_mode->hdisplay == pipe_config->pipe_src_w &&
+	    adjusted_mode->vdisplay == pipe_config->pipe_src_h)
 		goto out;
 
 	switch (fitting_mode) {
@@ -336,8 +339,8 @@ void intel_gmch_panel_fitting(struct intel_crtc *intel_crtc,
 		 * Full scaling, even if it changes the aspect ratio.
 		 * Fortunately this is all done for us in hw.
 		 */
-		if (pipe_config->pipe_src_h != adjusted_mode->crtc_vdisplay ||
-		    pipe_config->pipe_src_w != adjusted_mode->crtc_hdisplay) {
+		if (pipe_config->pipe_src_h != adjusted_mode->vdisplay ||
+		    pipe_config->pipe_src_w != adjusted_mode->hdisplay) {
 			pfit_control |= PFIT_ENABLE;
 			if (INTEL_INFO(dev)->gen >= 4)
 				pfit_control |= PFIT_SCALING_AUTO;
@@ -381,7 +384,7 @@ intel_panel_detect(struct drm_device *dev)
 
 	/* Assume that the BIOS does not lie through the OpRegion... */
 	if (!i915.panel_ignore_lid && dev_priv->opregion.lid_state) {
-		return *dev_priv->opregion.lid_state & 0x1 ?
+		return ioread32(dev_priv->opregion.lid_state) & 0x1 ?
 			connector_status_connected :
 			connector_status_disconnected;
 	}
@@ -478,7 +481,7 @@ static u32 intel_panel_compute_brightness(struct intel_connector *connector,
 	return val;
 }
 
-static u32 lpt_get_backlight(struct intel_connector *connector)
+static u32 bdw_get_backlight(struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -536,19 +539,9 @@ static u32 vlv_get_backlight(struct intel_connector *connector)
 static u32 bxt_get_backlight(struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
-	struct intel_panel *panel = &connector->panel;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	return I915_READ(BXT_BLC_PWM_DUTY(panel->backlight.controller));
-}
-
-static u32 pwm_get_backlight(struct intel_connector *connector)
-{
-	struct intel_panel *panel = &connector->panel;
-	int duty_ns;
-
-	duty_ns = pwm_get_duty_cycle(panel->backlight.pwm);
-	return DIV_ROUND_UP(duty_ns * 100, CRC_PMIC_PWM_PERIOD_NS);
+	return I915_READ(BXT_BLC_PWM_DUTY1);
 }
 
 static u32 intel_panel_get_backlight(struct intel_connector *connector)
@@ -561,7 +554,7 @@ static u32 intel_panel_get_backlight(struct intel_connector *connector)
 	mutex_lock(&dev_priv->backlight_lock);
 
 	if (panel->backlight.enabled) {
-		val = panel->backlight.get(connector);
+		val = dev_priv->display.get_backlight(connector);
 		val = intel_panel_compute_brightness(connector, val);
 	}
 
@@ -571,7 +564,7 @@ static u32 intel_panel_get_backlight(struct intel_connector *connector)
 	return val;
 }
 
-static void lpt_set_backlight(struct intel_connector *connector, u32 level)
+static void bdw_set_backlight(struct intel_connector *connector, u32 level)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -635,28 +628,20 @@ static void bxt_set_backlight(struct intel_connector *connector, u32 level)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_panel *panel = &connector->panel;
 
-	I915_WRITE(BXT_BLC_PWM_DUTY(panel->backlight.controller), level);
-}
-
-static void pwm_set_backlight(struct intel_connector *connector, u32 level)
-{
-	struct intel_panel *panel = &connector->panel;
-	int duty_ns = DIV_ROUND_UP(level * CRC_PMIC_PWM_PERIOD_NS, 100);
-
-	pwm_config(panel->backlight.pwm, duty_ns, CRC_PMIC_PWM_PERIOD_NS);
+	I915_WRITE(BXT_BLC_PWM_DUTY1, level);
 }
 
 static void
 intel_panel_actually_set_backlight(struct intel_connector *connector, u32 level)
 {
-	struct intel_panel *panel = &connector->panel;
+	struct drm_device *dev = connector->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	DRM_DEBUG_DRIVER("set backlight PWM = %d\n", level);
 
 	level = intel_panel_compute_brightness(connector, level);
-	panel->backlight.set(connector, level);
+	dev_priv->display.set_backlight(connector, level);
 }
 
 /* set backlight brightness to level in range [0..max], scaling wrt hw min */
@@ -724,32 +709,6 @@ void intel_panel_set_backlight_acpi(struct intel_connector *connector,
 	mutex_unlock(&dev_priv->backlight_lock);
 }
 
-static void lpt_disable_backlight(struct intel_connector *connector)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 tmp;
-
-	intel_panel_actually_set_backlight(connector, 0);
-
-	/*
-	 * Although we don't support or enable CPU PWM with LPT/SPT based
-	 * systems, it may have been enabled prior to loading the
-	 * driver. Disable to avoid warnings on LCPLL disable.
-	 *
-	 * This needs rework if we need to add support for CPU PWM on PCH split
-	 * platforms.
-	 */
-	tmp = I915_READ(BLC_PWM_CPU_CTL2);
-	if (tmp & BLM_PWM_ENABLE) {
-		DRM_DEBUG_KMS("cpu backlight was enabled, disabling\n");
-		I915_WRITE(BLC_PWM_CPU_CTL2, tmp & ~BLM_PWM_ENABLE);
-	}
-
-	tmp = I915_READ(BLC_PWM_PCH_CTL1);
-	I915_WRITE(BLC_PWM_PCH_CTL1, tmp & ~BLM_PCH_PWM_ENABLE);
-}
-
 static void pch_disable_backlight(struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
@@ -802,30 +761,12 @@ static void bxt_disable_backlight(struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_panel *panel = &connector->panel;
-	u32 tmp, val;
+	u32 tmp;
 
 	intel_panel_actually_set_backlight(connector, 0);
 
-	tmp = I915_READ(BXT_BLC_PWM_CTL(panel->backlight.controller));
-	I915_WRITE(BXT_BLC_PWM_CTL(panel->backlight.controller),
-			tmp & ~BXT_BLC_PWM_ENABLE);
-
-	if (panel->backlight.controller == 1) {
-		val = I915_READ(UTIL_PIN_CTL);
-		val &= ~UTIL_PIN_ENABLE;
-		I915_WRITE(UTIL_PIN_CTL, val);
-	}
-}
-
-static void pwm_disable_backlight(struct intel_connector *connector)
-{
-	struct intel_panel *panel = &connector->panel;
-
-	/* Disable the backlight */
-	pwm_config(panel->backlight.pwm, 0, CRC_PMIC_PWM_PERIOD_NS);
-	usleep_range(2000, 3000);
-	pwm_disable(panel->backlight.pwm);
+	tmp = I915_READ(BXT_BLC_PWM_CTL1);
+	I915_WRITE(BXT_BLC_PWM_CTL1, tmp & ~BXT_BLC_PWM_ENABLE);
 }
 
 void intel_panel_disable_backlight(struct intel_connector *connector)
@@ -838,7 +779,7 @@ void intel_panel_disable_backlight(struct intel_connector *connector)
 		return;
 
 	/*
-	 * Do not disable backlight on the vga_switcheroo path. When switching
+	 * Do not disable backlight on the vgaswitcheroo path. When switching
 	 * away from i915, the other client may depend on i915 to handle the
 	 * backlight. This will leave the backlight on unnecessarily when
 	 * another client is not activated.
@@ -853,12 +794,12 @@ void intel_panel_disable_backlight(struct intel_connector *connector)
 	if (panel->backlight.device)
 		panel->backlight.device->props.power = FB_BLANK_POWERDOWN;
 	panel->backlight.enabled = false;
-	panel->backlight.disable(connector);
+	dev_priv->display.disable_backlight(connector);
 
 	mutex_unlock(&dev_priv->backlight_lock);
 }
 
-static void lpt_enable_backlight(struct intel_connector *connector)
+static void bdw_enable_backlight(struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -1047,38 +988,16 @@ static void bxt_enable_backlight(struct intel_connector *connector)
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_panel *panel = &connector->panel;
-	enum pipe pipe = intel_get_pipe_from_connector(connector);
-	u32 pwm_ctl, val;
+	u32 pwm_ctl;
 
-	/* To use 2nd set of backlight registers, utility pin has to be
-	 * enabled with PWM mode.
-	 * The field should only be changed when the utility pin is disabled
-	 */
-	if (panel->backlight.controller == 1) {
-		val = I915_READ(UTIL_PIN_CTL);
-		if (val & UTIL_PIN_ENABLE) {
-			DRM_DEBUG_KMS("util pin already enabled\n");
-			val &= ~UTIL_PIN_ENABLE;
-			I915_WRITE(UTIL_PIN_CTL, val);
-		}
-
-		val = 0;
-		if (panel->backlight.util_pin_active_low)
-			val |= UTIL_PIN_POLARITY;
-		I915_WRITE(UTIL_PIN_CTL, val | UTIL_PIN_PIPE(pipe) |
-				UTIL_PIN_MODE_PWM | UTIL_PIN_ENABLE);
-	}
-
-	pwm_ctl = I915_READ(BXT_BLC_PWM_CTL(panel->backlight.controller));
+	pwm_ctl = I915_READ(BXT_BLC_PWM_CTL1);
 	if (pwm_ctl & BXT_BLC_PWM_ENABLE) {
 		DRM_DEBUG_KMS("backlight already enabled\n");
 		pwm_ctl &= ~BXT_BLC_PWM_ENABLE;
-		I915_WRITE(BXT_BLC_PWM_CTL(panel->backlight.controller),
-				pwm_ctl);
+		I915_WRITE(BXT_BLC_PWM_CTL1, pwm_ctl);
 	}
 
-	I915_WRITE(BXT_BLC_PWM_FREQ(panel->backlight.controller),
-			panel->backlight.max);
+	I915_WRITE(BXT_BLC_PWM_FREQ1, panel->backlight.max);
 
 	intel_panel_actually_set_backlight(connector, panel->backlight.level);
 
@@ -1086,18 +1005,9 @@ static void bxt_enable_backlight(struct intel_connector *connector)
 	if (panel->backlight.active_low_pwm)
 		pwm_ctl |= BXT_BLC_PWM_POLARITY;
 
-	I915_WRITE(BXT_BLC_PWM_CTL(panel->backlight.controller), pwm_ctl);
-	POSTING_READ(BXT_BLC_PWM_CTL(panel->backlight.controller));
-	I915_WRITE(BXT_BLC_PWM_CTL(panel->backlight.controller),
-			pwm_ctl | BXT_BLC_PWM_ENABLE);
-}
-
-static void pwm_enable_backlight(struct intel_connector *connector)
-{
-	struct intel_panel *panel = &connector->panel;
-
-	pwm_enable(panel->backlight.pwm);
-	intel_panel_actually_set_backlight(connector, panel->backlight.level);
+	I915_WRITE(BXT_BLC_PWM_CTL1, pwm_ctl);
+	POSTING_READ(BXT_BLC_PWM_CTL1);
+	I915_WRITE(BXT_BLC_PWM_CTL1, pwm_ctl | BXT_BLC_PWM_ENABLE);
 }
 
 void intel_panel_enable_backlight(struct intel_connector *connector)
@@ -1125,7 +1035,7 @@ void intel_panel_enable_backlight(struct intel_connector *connector)
 						 panel->backlight.device->props.max_brightness);
 	}
 
-	panel->backlight.enable(connector);
+	dev_priv->display.enable_backlight(connector);
 	panel->backlight.enabled = true;
 	if (panel->backlight.device)
 		panel->backlight.device->props.power = FB_BLANK_UNBLANK;
@@ -1153,10 +1063,10 @@ static int intel_backlight_device_update_status(struct backlight_device *bd)
 	 * callback needs to take this into account.
 	 */
 	if (panel->backlight.enabled) {
-		if (panel->backlight.power) {
+		if (panel->backlight_power) {
 			bool enable = bd->props.power == FB_BLANK_UNBLANK &&
 				bd->props.brightness != 0;
-			panel->backlight.power(connector, enable);
+			panel->backlight_power(connector, enable);
 		}
 	} else {
 		bd->props.power = FB_BLANK_POWERDOWN;
@@ -1264,150 +1174,10 @@ static void intel_backlight_device_unregister(struct intel_connector *connector)
 #endif /* CONFIG_BACKLIGHT_CLASS_DEVICE */
 
 /*
- * SPT: This value represents the period of the PWM stream in clock periods
- * multiplied by 16 (default increment) or 128 (alternate increment selected in
- * SCHICKEN_1 bit 0). PWM clock is 24 MHz.
- */
-static u32 spt_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 mul, clock;
-
-	if (I915_READ(SOUTH_CHICKEN1) & SPT_PWM_GRANULARITY)
-		mul = 128;
-	else
-		mul = 16;
-
-	clock = MHz(24);
-
-	return clock / (pwm_freq_hz * mul);
-}
-
-/*
- * LPT: This value represents the period of the PWM stream in clock periods
- * multiplied by 128 (default increment) or 16 (alternate increment, selected in
- * LPT SOUTH_CHICKEN2 register bit 5).
- */
-static u32 lpt_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 mul, clock;
-
-	if (I915_READ(SOUTH_CHICKEN2) & LPT_PWM_GRANULARITY)
-		mul = 16;
-	else
-		mul = 128;
-
-	if (dev_priv->pch_id == INTEL_PCH_LPT_DEVICE_ID_TYPE)
-		clock = MHz(135); /* LPT:H */
-	else
-		clock = MHz(24); /* LPT:LP */
-
-	return clock / (pwm_freq_hz * mul);
-}
-
-/*
- * ILK/SNB/IVB: This value represents the period of the PWM stream in PCH
- * display raw clocks multiplied by 128.
- */
-static u32 pch_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
-{
-	struct drm_device *dev = connector->base.dev;
-	int clock = MHz(intel_pch_rawclk(dev));
-
-	return clock / (pwm_freq_hz * 128);
-}
-
-/*
- * Gen2: This field determines the number of time base events (display core
- * clock frequency/32) in total for a complete cycle of modulated backlight
- * control.
- *
- * Gen3: A time base event equals the display core clock ([DevPNV] HRAW clock)
- * divided by 32.
- */
-static u32 i9xx_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	int clock;
-
-	if (IS_PINEVIEW(dev))
-		clock = intel_hrawclk(dev);
-	else
-		clock = 1000 * dev_priv->display.get_display_clock_speed(dev);
-
-	return clock / (pwm_freq_hz * 32);
-}
-
-/*
- * Gen4: This value represents the period of the PWM stream in display core
- * clocks multiplied by 128.
- */
-static u32 i965_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	int clock = 1000 * dev_priv->display.get_display_clock_speed(dev);
-
-	return clock / (pwm_freq_hz * 128);
-}
-
-/*
- * VLV: This value represents the period of the PWM stream in display core
- * clocks ([DevCTG] 200MHz HRAW clocks) multiplied by 128 or 25MHz S0IX clocks
- * multiplied by 16. CHV uses a 19.2MHz S0IX clock.
- */
-static u32 vlv_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	int clock;
-
-	if ((I915_READ(CBR1_VLV) & CBR_PWM_CLOCK_MUX_SELECT) == 0) {
-		if (IS_CHERRYVIEW(dev))
-			return KHz(19200) / (pwm_freq_hz * 16);
-		else
-			return MHz(25) / (pwm_freq_hz * 16);
-	} else {
-		clock = intel_hrawclk(dev);
-		return MHz(clock) / (pwm_freq_hz * 128);
-	}
-}
-
-static u32 get_backlight_max_vbt(struct intel_connector *connector)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_panel *panel = &connector->panel;
-	u16 pwm_freq_hz = dev_priv->vbt.backlight.pwm_freq_hz;
-	u32 pwm;
-
-	if (!pwm_freq_hz) {
-		DRM_DEBUG_KMS("backlight frequency not specified in VBT\n");
-		return 0;
-	}
-
-	if (!panel->backlight.hz_to_pwm) {
-		DRM_DEBUG_KMS("backlight frequency setting from VBT currently not supported on this platform\n");
-		return 0;
-	}
-
-	pwm = panel->backlight.hz_to_pwm(connector, pwm_freq_hz);
-	if (!pwm) {
-		DRM_DEBUG_KMS("backlight frequency conversion failed\n");
-		return 0;
-	}
-
-	DRM_DEBUG_KMS("backlight frequency %u Hz from VBT\n", pwm_freq_hz);
-
-	return pwm;
-}
-
-/*
  * Note: The setup hooks can't assume pipe is set!
+ *
+ * XXX: Query mode clock or hardware clock and program PWM modulation frequency
+ * appropriately when it's 0. Use VBT and/or sane defaults.
  */
 static u32 get_backlight_min_vbt(struct intel_connector *connector)
 {
@@ -1435,7 +1205,7 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	return scale(min, 0, 255, 0, panel->backlight.max);
 }
 
-static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unused)
+static int bdw_setup_backlight(struct intel_connector *connector, enum pipe unused)
 {
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -1447,16 +1217,12 @@ static int lpt_setup_backlight(struct intel_connector *connector, enum pipe unus
 
 	pch_ctl2 = I915_READ(BLC_PWM_PCH_CTL2);
 	panel->backlight.max = pch_ctl2 >> 16;
-
-	if (!panel->backlight.max)
-		panel->backlight.max = get_backlight_max_vbt(connector);
-
 	if (!panel->backlight.max)
 		return -ENODEV;
 
 	panel->backlight.min = get_backlight_min_vbt(connector);
 
-	val = lpt_get_backlight(connector);
+	val = bdw_get_backlight(connector);
 	panel->backlight.level = intel_panel_compute_brightness(connector, val);
 
 	panel->backlight.enabled = (pch_ctl1 & BLM_PCH_PWM_ENABLE) &&
@@ -1477,10 +1243,6 @@ static int pch_setup_backlight(struct intel_connector *connector, enum pipe unus
 
 	pch_ctl2 = I915_READ(BLC_PWM_PCH_CTL2);
 	panel->backlight.max = pch_ctl2 >> 16;
-
-	if (!panel->backlight.max)
-		panel->backlight.max = get_backlight_max_vbt(connector);
-
 	if (!panel->backlight.max)
 		return -ENODEV;
 
@@ -1512,17 +1274,11 @@ static int i9xx_setup_backlight(struct intel_connector *connector, enum pipe unu
 		panel->backlight.active_low_pwm = ctl & BLM_POLARITY_PNV;
 
 	panel->backlight.max = ctl >> 17;
-
-	if (!panel->backlight.max) {
-		panel->backlight.max = get_backlight_max_vbt(connector);
-		panel->backlight.max >>= 1;
-	}
+	if (panel->backlight.combination_mode)
+		panel->backlight.max *= 0xff;
 
 	if (!panel->backlight.max)
 		return -ENODEV;
-
-	if (panel->backlight.combination_mode)
-		panel->backlight.max *= 0xff;
 
 	panel->backlight.min = get_backlight_min_vbt(connector);
 
@@ -1547,15 +1303,11 @@ static int i965_setup_backlight(struct intel_connector *connector, enum pipe unu
 
 	ctl = I915_READ(BLC_PWM_CTL);
 	panel->backlight.max = ctl >> 16;
-
-	if (!panel->backlight.max)
-		panel->backlight.max = get_backlight_max_vbt(connector);
+	if (panel->backlight.combination_mode)
+		panel->backlight.max *= 0xff;
 
 	if (!panel->backlight.max)
 		return -ENODEV;
-
-	if (panel->backlight.combination_mode)
-		panel->backlight.max *= 0xff;
 
 	panel->backlight.min = get_backlight_min_vbt(connector);
 
@@ -1573,7 +1325,20 @@ static int vlv_setup_backlight(struct intel_connector *connector, enum pipe pipe
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_panel *panel = &connector->panel;
+	enum pipe p;
 	u32 ctl, ctl2, val;
+
+	for_each_pipe(dev_priv, p) {
+		u32 cur_val = I915_READ(VLV_BLC_PWM_CTL(p));
+
+		/* Skip if the modulation freq is already set */
+		if (cur_val & ~BACKLIGHT_DUTY_CYCLE_MASK)
+			continue;
+
+		cur_val &= BACKLIGHT_DUTY_CYCLE_MASK;
+		I915_WRITE(VLV_BLC_PWM_CTL(p), (0xf42 << 16) |
+			   cur_val);
+	}
 
 	if (WARN_ON(pipe != PIPE_A && pipe != PIPE_B))
 		return -ENODEV;
@@ -1583,10 +1348,6 @@ static int vlv_setup_backlight(struct intel_connector *connector, enum pipe pipe
 
 	ctl = I915_READ(VLV_BLC_PWM_CTL(pipe));
 	panel->backlight.max = ctl >> 16;
-
-	if (!panel->backlight.max)
-		panel->backlight.max = get_backlight_max_vbt(connector);
-
 	if (!panel->backlight.max)
 		return -ENODEV;
 
@@ -1609,32 +1370,10 @@ bxt_setup_backlight(struct intel_connector *connector, enum pipe unused)
 	struct intel_panel *panel = &connector->panel;
 	u32 pwm_ctl, val;
 
-	/*
-	 * For BXT hard coding the Backlight controller to 0.
-	 * TODO : Read the controller value from VBT and generalize
-	 */
-	panel->backlight.controller = 0;
-
-	pwm_ctl = I915_READ(BXT_BLC_PWM_CTL(panel->backlight.controller));
-
-	/* Keeping the check if controller 1 is to be programmed.
-	 * This will come into affect once the VBT parsing
-	 * is fixed for controller selection, and controller 1 is used
-	 * for a prticular display configuration.
-	 */
-	if (panel->backlight.controller == 1) {
-		val = I915_READ(UTIL_PIN_CTL);
-		panel->backlight.util_pin_active_low =
-					val & UTIL_PIN_POLARITY;
-	}
-
+	pwm_ctl = I915_READ(BXT_BLC_PWM_CTL1);
 	panel->backlight.active_low_pwm = pwm_ctl & BXT_BLC_PWM_POLARITY;
-	panel->backlight.max =
-		I915_READ(BXT_BLC_PWM_FREQ(panel->backlight.controller));
 
-	if (!panel->backlight.max)
-		panel->backlight.max = get_backlight_max_vbt(connector);
-
+	panel->backlight.max = I915_READ(BXT_BLC_PWM_FREQ1);
 	if (!panel->backlight.max)
 		return -ENODEV;
 
@@ -1643,40 +1382,6 @@ bxt_setup_backlight(struct intel_connector *connector, enum pipe unused)
 
 	panel->backlight.enabled = (pwm_ctl & BXT_BLC_PWM_ENABLE) &&
 		panel->backlight.level != 0;
-
-	return 0;
-}
-
-static int pwm_setup_backlight(struct intel_connector *connector,
-			       enum pipe pipe)
-{
-	struct drm_device *dev = connector->base.dev;
-	struct intel_panel *panel = &connector->panel;
-	int retval;
-
-	/* Get the PWM chip for backlight control */
-	panel->backlight.pwm = pwm_get(dev->dev, "pwm_backlight");
-	if (IS_ERR(panel->backlight.pwm)) {
-		DRM_ERROR("Failed to own the pwm chip\n");
-		panel->backlight.pwm = NULL;
-		return -ENODEV;
-	}
-
-	retval = pwm_config(panel->backlight.pwm, CRC_PMIC_PWM_PERIOD_NS,
-			    CRC_PMIC_PWM_PERIOD_NS);
-	if (retval < 0) {
-		DRM_ERROR("Failed to configure the pwm chip\n");
-		pwm_put(panel->backlight.pwm);
-		panel->backlight.pwm = NULL;
-		return retval;
-	}
-
-	panel->backlight.min = 0; /* 0% */
-	panel->backlight.max = 100; /* 100% */
-	panel->backlight.level = DIV_ROUND_UP(
-				 pwm_get_duty_cycle(panel->backlight.pwm) * 100,
-				 CRC_PMIC_PWM_PERIOD_NS);
-	panel->backlight.enabled = panel->backlight.level != 0;
 
 	return 0;
 }
@@ -1698,13 +1403,9 @@ int intel_panel_setup_backlight(struct drm_connector *connector, enum pipe pipe)
 		}
 	}
 
-	/* ensure intel_panel has been initialized first */
-	if (WARN_ON(!panel->backlight.setup))
-		return -ENODEV;
-
 	/* set level and max in panel struct */
 	mutex_lock(&dev_priv->backlight_lock);
-	ret = panel->backlight.setup(intel_connector, pipe);
+	ret = dev_priv->display.setup_backlight(intel_connector, pipe);
 	mutex_unlock(&dev_priv->backlight_lock);
 
 	if (ret) {
@@ -1728,74 +1429,50 @@ void intel_panel_destroy_backlight(struct drm_connector *connector)
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct intel_panel *panel = &intel_connector->panel;
 
-	/* dispose of the pwm */
-	if (panel->backlight.pwm)
-		pwm_put(panel->backlight.pwm);
-
 	panel->backlight.present = false;
 }
 
 /* Set up chip specific backlight functions */
-static void
-intel_panel_init_backlight_funcs(struct intel_panel *panel)
+void intel_panel_init_backlight_funcs(struct drm_device *dev)
 {
-	struct intel_connector *intel_connector =
-		container_of(panel, struct intel_connector, panel);
-	struct drm_device *dev = intel_connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	if (IS_BROXTON(dev)) {
-		panel->backlight.setup = bxt_setup_backlight;
-		panel->backlight.enable = bxt_enable_backlight;
-		panel->backlight.disable = bxt_disable_backlight;
-		panel->backlight.set = bxt_set_backlight;
-		panel->backlight.get = bxt_get_backlight;
-	} else if (HAS_PCH_LPT(dev) || HAS_PCH_SPT(dev)) {
-		panel->backlight.setup = lpt_setup_backlight;
-		panel->backlight.enable = lpt_enable_backlight;
-		panel->backlight.disable = lpt_disable_backlight;
-		panel->backlight.set = lpt_set_backlight;
-		panel->backlight.get = lpt_get_backlight;
-		if (HAS_PCH_LPT(dev))
-			panel->backlight.hz_to_pwm = lpt_hz_to_pwm;
-		else
-			panel->backlight.hz_to_pwm = spt_hz_to_pwm;
+		dev_priv->display.setup_backlight = bxt_setup_backlight;
+		dev_priv->display.enable_backlight = bxt_enable_backlight;
+		dev_priv->display.disable_backlight = bxt_disable_backlight;
+		dev_priv->display.set_backlight = bxt_set_backlight;
+		dev_priv->display.get_backlight = bxt_get_backlight;
+	} else if (IS_BROADWELL(dev) || IS_SKYLAKE(dev)) {
+		dev_priv->display.setup_backlight = bdw_setup_backlight;
+		dev_priv->display.enable_backlight = bdw_enable_backlight;
+		dev_priv->display.disable_backlight = pch_disable_backlight;
+		dev_priv->display.set_backlight = bdw_set_backlight;
+		dev_priv->display.get_backlight = bdw_get_backlight;
 	} else if (HAS_PCH_SPLIT(dev)) {
-		panel->backlight.setup = pch_setup_backlight;
-		panel->backlight.enable = pch_enable_backlight;
-		panel->backlight.disable = pch_disable_backlight;
-		panel->backlight.set = pch_set_backlight;
-		panel->backlight.get = pch_get_backlight;
-		panel->backlight.hz_to_pwm = pch_hz_to_pwm;
+		dev_priv->display.setup_backlight = pch_setup_backlight;
+		dev_priv->display.enable_backlight = pch_enable_backlight;
+		dev_priv->display.disable_backlight = pch_disable_backlight;
+		dev_priv->display.set_backlight = pch_set_backlight;
+		dev_priv->display.get_backlight = pch_get_backlight;
 	} else if (IS_VALLEYVIEW(dev)) {
-		if (dev_priv->vbt.has_mipi) {
-			panel->backlight.setup = pwm_setup_backlight;
-			panel->backlight.enable = pwm_enable_backlight;
-			panel->backlight.disable = pwm_disable_backlight;
-			panel->backlight.set = pwm_set_backlight;
-			panel->backlight.get = pwm_get_backlight;
-		} else {
-			panel->backlight.setup = vlv_setup_backlight;
-			panel->backlight.enable = vlv_enable_backlight;
-			panel->backlight.disable = vlv_disable_backlight;
-			panel->backlight.set = vlv_set_backlight;
-			panel->backlight.get = vlv_get_backlight;
-			panel->backlight.hz_to_pwm = vlv_hz_to_pwm;
-		}
+		dev_priv->display.setup_backlight = vlv_setup_backlight;
+		dev_priv->display.enable_backlight = vlv_enable_backlight;
+		dev_priv->display.disable_backlight = vlv_disable_backlight;
+		dev_priv->display.set_backlight = vlv_set_backlight;
+		dev_priv->display.get_backlight = vlv_get_backlight;
 	} else if (IS_GEN4(dev)) {
-		panel->backlight.setup = i965_setup_backlight;
-		panel->backlight.enable = i965_enable_backlight;
-		panel->backlight.disable = i965_disable_backlight;
-		panel->backlight.set = i9xx_set_backlight;
-		panel->backlight.get = i9xx_get_backlight;
-		panel->backlight.hz_to_pwm = i965_hz_to_pwm;
+		dev_priv->display.setup_backlight = i965_setup_backlight;
+		dev_priv->display.enable_backlight = i965_enable_backlight;
+		dev_priv->display.disable_backlight = i965_disable_backlight;
+		dev_priv->display.set_backlight = i9xx_set_backlight;
+		dev_priv->display.get_backlight = i9xx_get_backlight;
 	} else {
-		panel->backlight.setup = i9xx_setup_backlight;
-		panel->backlight.enable = i9xx_enable_backlight;
-		panel->backlight.disable = i9xx_disable_backlight;
-		panel->backlight.set = i9xx_set_backlight;
-		panel->backlight.get = i9xx_get_backlight;
-		panel->backlight.hz_to_pwm = i9xx_hz_to_pwm;
+		dev_priv->display.setup_backlight = i9xx_setup_backlight;
+		dev_priv->display.enable_backlight = i9xx_enable_backlight;
+		dev_priv->display.disable_backlight = i9xx_disable_backlight;
+		dev_priv->display.set_backlight = i9xx_set_backlight;
+		dev_priv->display.get_backlight = i9xx_get_backlight;
 	}
 }
 
@@ -1803,8 +1480,6 @@ int intel_panel_init(struct intel_panel *panel,
 		     struct drm_display_mode *fixed_mode,
 		     struct drm_display_mode *downclock_mode)
 {
-	intel_panel_init_backlight_funcs(panel);
-
 	panel->fixed_mode = fixed_mode;
 	panel->downclock_mode = downclock_mode;
 

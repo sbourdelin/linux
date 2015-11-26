@@ -65,6 +65,7 @@ static int awg_generate_instr(enum opcode opcode,
 
 			mux = 0;
 			data_enable = 0;
+			arg = (arg << 22) >> 22;
 			arg &= (0x3ff);
 			break;
 		case REPEAT:
@@ -76,12 +77,14 @@ static int awg_generate_instr(enum opcode opcode,
 
 			mux = 0;
 			data_enable = 0;
+			arg = (arg << 22) >> 22;
 			arg &= (0x3ff);
 			break;
 		case JUMP:
 			mux = 0;
 			data_enable = 0;
 			arg |= 0x40; /* for jump instruction 7th bit is 1 */
+			arg = (arg << 22) >> 22;
 			arg &= 0x3ff;
 			break;
 		case STOP:
@@ -91,6 +94,7 @@ static int awg_generate_instr(enum opcode opcode,
 		case RPTSET:
 		case RPLSET:
 		case HOLD:
+			arg = (arg << 24) >> 24;
 			arg &= (0x0ff);
 			break;
 		default:

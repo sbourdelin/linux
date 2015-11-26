@@ -84,7 +84,7 @@ cifs_prime_dcache(struct dentry *parent, struct qstr *name,
 	cifs_dbg(FYI, "%s: for %s\n", __func__, name->name);
 
 	dentry = d_hash_and_lookup(parent, name);
-	if (IS_ERR(dentry))
+	if (unlikely(IS_ERR(dentry)))
 		return;
 
 	if (dentry) {

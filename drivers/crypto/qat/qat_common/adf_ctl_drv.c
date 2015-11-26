@@ -398,9 +398,10 @@ static int adf_ctl_ioctl_get_status(struct file *fp, unsigned int cmd,
 	}
 
 	accel_dev = adf_devmgr_get_dev_by_id(dev_info.accel_id);
-	if (!accel_dev)
+	if (!accel_dev) {
+		pr_err("QAT: Device %d not found\n", dev_info.accel_id);
 		return -ENODEV;
-
+	}
 	hw_data = accel_dev->hw_device;
 	dev_info.state = adf_dev_started(accel_dev) ? DEV_UP : DEV_DOWN;
 	dev_info.num_ae = hw_data->get_num_aes(hw_data);
@@ -463,6 +464,9 @@ static int __init adf_register_ctl_device_driver(void)
 {
 	mutex_init(&adf_ctl_lock);
 
+	if (qat_algs_init())
+		goto err_algs_init;
+
 	if (adf_chr_drv_create())
 		goto err_chr_dev;
 
@@ -479,6 +483,8 @@ err_crypto_register:
 err_aer:
 	adf_chr_drv_destroy();
 err_chr_dev:
+	qat_algs_exit();
+err_algs_init:
 	mutex_destroy(&adf_ctl_lock);
 	return -EFAULT;
 }
@@ -488,7 +494,7 @@ static void __exit adf_unregister_ctl_device_driver(void)
 	adf_chr_drv_destroy();
 	adf_exit_aer();
 	qat_crypto_unregister();
-	adf_clean_vf_map(false);
+	qat_algs_exit();
 	mutex_destroy(&adf_ctl_lock);
 }
 

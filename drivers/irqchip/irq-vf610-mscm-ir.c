@@ -26,7 +26,6 @@
 #include <linux/cpu_pm.h>
 #include <linux/io.h>
 #include <linux/irq.h>
-#include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/mfd/syscon.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
@@ -34,6 +33,8 @@
 #include <linux/of_address.h>
 #include <linux/slab.h>
 #include <linux/regmap.h>
+
+#include "irqchip.h"
 
 #define MSCM_CPxNUM		0x4
 
@@ -130,51 +131,35 @@ static int vf610_mscm_ir_domain_alloc(struct irq_domain *domain, unsigned int vi
 {
 	int i;
 	irq_hw_number_t hwirq;
-	struct irq_fwspec *fwspec = arg;
-	struct irq_fwspec parent_fwspec;
+	struct of_phandle_args *irq_data = arg;
+	struct of_phandle_args gic_data;
 
-	if (!irq_domain_get_of_node(domain->parent))
+	if (irq_data->args_count != 2)
 		return -EINVAL;
 
-	if (fwspec->param_count != 2)
-		return -EINVAL;
-
-	hwirq = fwspec->param[0];
+	hwirq = irq_data->args[0];
 	for (i = 0; i < nr_irqs; i++)
 		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
 					      &vf610_mscm_ir_irq_chip,
 					      domain->host_data);
 
-	parent_fwspec.fwnode = domain->parent->fwnode;
+	gic_data.np = domain->parent->of_node;
 
 	if (mscm_ir_data->is_nvic) {
-		parent_fwspec.param_count = 1;
-		parent_fwspec.param[0] = fwspec->param[0];
+		gic_data.args_count = 1;
+		gic_data.args[0] = irq_data->args[0];
 	} else {
-		parent_fwspec.param_count = 3;
-		parent_fwspec.param[0] = GIC_SPI;
-		parent_fwspec.param[1] = fwspec->param[0];
-		parent_fwspec.param[2] = fwspec->param[1];
+		gic_data.args_count = 3;
+		gic_data.args[0] = GIC_SPI;
+		gic_data.args[1] = irq_data->args[0];
+		gic_data.args[2] = irq_data->args[1];
 	}
 
-	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
-					    &parent_fwspec);
-}
-
-static int vf610_mscm_ir_domain_translate(struct irq_domain *d,
-					  struct irq_fwspec *fwspec,
-					  unsigned long *hwirq,
-					  unsigned int *type)
-{
-	if (WARN_ON(fwspec->param_count < 2))
-		return -EINVAL;
-	*hwirq = fwspec->param[0];
-	*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
-	return 0;
+	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
 }
 
 static const struct irq_domain_ops mscm_irq_domain_ops = {
-	.translate = vf610_mscm_ir_domain_translate,
+	.xlate = irq_domain_xlate_twocell,
 	.alloc = vf610_mscm_ir_domain_alloc,
 	.free = irq_domain_free_irqs_common,
 };
@@ -221,8 +206,7 @@ static int __init vf610_mscm_ir_of_init(struct device_node *node,
 		goto out_unmap;
 	}
 
-	if (of_device_is_compatible(irq_domain_get_of_node(domain->parent),
-				    "arm,armv7m-nvic"))
+	if (of_device_is_compatible(domain->parent->of_node, "arm,armv7m-nvic"))
 		mscm_ir_data->is_nvic = true;
 
 	cpu_pm_register_notifier(&mscm_ir_notifier_block);

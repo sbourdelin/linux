@@ -589,8 +589,7 @@ static int cosa_probe(int base, int irq, int dma)
 		chan->netdev->base_addr = chan->cosa->datareg;
 		chan->netdev->irq = chan->cosa->irq;
 		chan->netdev->dma = chan->cosa->dma;
-		err = register_hdlc_device(chan->netdev);
-		if (err) {
+		if (register_hdlc_device(chan->netdev)) {
 			netdev_warn(chan->netdev,
 				    "register_hdlc_device() failed\n");
 			free_netdev(chan->netdev);

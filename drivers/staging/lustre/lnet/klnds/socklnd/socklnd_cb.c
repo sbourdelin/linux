@@ -89,6 +89,7 @@ ksocknal_alloc_tx_noop(__u64 cookie, int nonblk)
 	return tx;
 }
 
+
 void
 ksocknal_free_tx (ksock_tx_t *tx)
 {
@@ -298,7 +299,6 @@ ksocknal_recv_kiov (ksock_conn_t *conn)
 	lnet_kiov_t *kiov = conn->ksnc_rx_kiov;
 	int nob;
 	int rc;
-
 	LASSERT(conn->ksnc_rx_nkiov > 0);
 
 	/* Never touch conn->ksnc_rx_kiov or change connection
@@ -526,7 +526,8 @@ ksocknal_process_transmit (ksock_conn_t *conn, ksock_tx_t *tx)
 
 		counter++;   /* exponential backoff warnings */
 		if ((counter & (-counter)) == counter)
-			CWARN("%u ENOMEM tx %p\n", counter, conn);
+			CWARN("%u ENOMEM tx %p (%u allocated)\n",
+			      counter, conn, atomic_read(&libcfs_kmemory));
 
 		/* Queue on ksnd_enomem_conns for retry after a timeout */
 		spin_lock_bh(&ksocknal_data.ksnd_reaper_lock);
@@ -626,7 +627,7 @@ ksocknal_find_conn_locked(ksock_peer_t *peer, ksock_tx_t *tx, int nonblk)
 	list_for_each (tmp, &peer->ksnp_conns) {
 		ksock_conn_t *c  = list_entry(tmp, ksock_conn_t, ksnc_list);
 		int nob = atomic_read(&c->ksnc_tx_nob) +
-			c->ksnc_sock->sk->sk_wmem_queued;
+                                      c->ksnc_sock->sk->sk_wmem_queued;
 		int rc;
 
 		LASSERT(!c->ksnc_closing);
@@ -714,7 +715,7 @@ ksocknal_queue_tx_locked (ksock_tx_t *tx, ksock_conn_t *conn)
 	LASSERT(tx->tx_resid == tx->tx_nob);
 
 	CDEBUG (D_NET, "Packet %p type %d, nob %d niov %d nkiov %d\n",
-		tx, (tx->tx_lnetmsg != NULL) ? tx->tx_lnetmsg->msg_hdr.type :
+		tx, (tx->tx_lnetmsg != NULL) ? tx->tx_lnetmsg->msg_hdr.type:
 					       KSOCK_MSG_NOOP,
 		tx->tx_nob, tx->tx_niov, tx->tx_nkiov);
 
@@ -771,6 +772,7 @@ ksocknal_queue_tx_locked (ksock_tx_t *tx, ksock_conn_t *conn)
 
 	spin_unlock_bh(&sched->kss_lock);
 }
+
 
 ksock_route_t *
 ksocknal_find_connectable_route_locked (ksock_peer_t *peer)
@@ -1091,7 +1093,7 @@ ksocknal_new_packet (ksock_conn_t *conn, int nob_to_skip)
 		conn->ksnc_rx_iov[niov].iov_len  = nob;
 		niov++;
 		skipped += nob;
-		nob_to_skip -= nob;
+		nob_to_skip -=nob;
 
 	} while (nob_to_skip != 0 &&    /* mustn't overflow conn's rx iov */
 		 niov < sizeof(conn->ksnc_rx_iov_space) / sizeof (struct iovec));
@@ -1312,7 +1314,7 @@ ksocknal_recv (lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
 	       unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
 	       unsigned int offset, unsigned int mlen, unsigned int rlen)
 {
-	ksock_conn_t *conn = private;
+	ksock_conn_t *conn = (ksock_conn_t *)private;
 	ksock_sched_t *sched = conn->ksnc_scheduler;
 
 	LASSERT(mlen <= rlen);
@@ -1997,7 +1999,7 @@ ksocknal_connect (ksock_route_t *route)
  * running out of resource.
  */
 static int
-ksocknal_connd_check_start(time64_t sec, long *timeout)
+ksocknal_connd_check_start(long sec, long *timeout)
 {
 	char name[16];
 	int rc;
@@ -2047,7 +2049,7 @@ ksocknal_connd_check_start(time64_t sec, long *timeout)
 	/* we tried ... */
 	LASSERT(ksocknal_data.ksnd_connd_starting > 0);
 	ksocknal_data.ksnd_connd_starting--;
-	ksocknal_data.ksnd_connd_failed_stamp = ktime_get_real_seconds();
+	ksocknal_data.ksnd_connd_failed_stamp = get_seconds();
 
 	return 1;
 }
@@ -2059,7 +2061,7 @@ ksocknal_connd_check_start(time64_t sec, long *timeout)
  * again to recheck these conditions.
  */
 static int
-ksocknal_connd_check_stop(time64_t sec, long *timeout)
+ksocknal_connd_check_stop(long sec, long *timeout)
 {
 	int val;
 
@@ -2140,7 +2142,7 @@ ksocknal_connd (void *arg)
 
 	while (!ksocknal_data.ksnd_shuttingdown) {
 		ksock_route_t *route = NULL;
-		time64_t sec = ktime_get_real_seconds();
+		long sec = get_seconds();
 		long timeout = MAX_SCHEDULE_TIMEOUT;
 		int dropped_lock = 0;
 
@@ -2239,7 +2241,6 @@ ksocknal_find_timed_out_conn (ksock_peer_t *peer)
 
 	list_for_each (ctmp, &peer->ksnp_conns) {
 		int error;
-
 		conn = list_entry (ctmp, ksock_conn_t, ksnc_list);
 
 		/* Don't need the {get,put}connsock dance to deref ksnc_sock */
@@ -2393,6 +2394,7 @@ ksocknal_send_keepalive_locked(ksock_peer_t *peer)
 
 	return -EIO;
 }
+
 
 static void
 ksocknal_check_peer_timeouts (int idx)

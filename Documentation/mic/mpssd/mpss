@@ -119,10 +119,10 @@ stop()
 	# Wait for the cards to go offline
 	for f in $sysfs/*
 	do
-		while [ "`cat $f/state`" != "ready" ]
+		while [ "`cat $f/state`" != "offline" ]
 		do
 			sleep 1
-			echo -e "Waiting for "`basename $f`" to become ready"
+			echo -e "Waiting for "`basename $f`" to go offline"
 		done
 	done
 

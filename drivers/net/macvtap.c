@@ -137,7 +137,7 @@ static const struct proto_ops macvtap_socket_ops;
 #define TUN_OFFLOADS (NETIF_F_HW_CSUM | NETIF_F_TSO_ECN | NETIF_F_TSO | \
 		      NETIF_F_TSO6 | NETIF_F_UFO)
 #define RX_OFFLOADS (NETIF_F_GRO | NETIF_F_LRO)
-#define TAP_FEATURES (NETIF_F_GSO | NETIF_F_SG | NETIF_F_FRAGLIST)
+#define TAP_FEATURES (NETIF_F_GSO | NETIF_F_SG)
 
 static struct macvlan_dev *macvtap_get_vlan_rcu(const struct net_device *dev)
 {
@@ -719,7 +719,6 @@ static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 	struct virtio_net_hdr vnet_hdr = { 0 };
 	int vnet_hdr_len = 0;
 	int copylen = 0;
-	int depth;
 	bool zerocopy = false;
 	size_t linear;
 	ssize_t n;
@@ -804,12 +803,6 @@ static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 	}
 
 	skb_probe_transport_header(skb, ETH_HLEN);
-
-	/* Move network header to the right position for VLAN tagged packets */
-	if ((skb->protocol == htons(ETH_P_8021Q) ||
-	     skb->protocol == htons(ETH_P_8021AD)) &&
-	    __vlan_get_protocol(skb, skb->protocol, &depth) != 0)
-		skb_set_network_header(skb, depth);
 
 	rcu_read_lock();
 	vlan = rcu_dereference(q->vlan);
@@ -935,9 +928,6 @@ static ssize_t macvtap_do_read(struct macvtap_queue *q,
 		/* Nothing to read, let's sleep */
 		schedule();
 	}
-	if (!noblock)
-		finish_wait(sk_sleep(&q->sk), &wait);
-
 	if (skb) {
 		ret = macvtap_put_user(q, skb, to);
 		if (unlikely(ret < 0))
@@ -945,6 +935,8 @@ static ssize_t macvtap_do_read(struct macvtap_queue *q,
 		else
 			consume_skb(skb);
 	}
+	if (!noblock)
+		finish_wait(sk_sleep(&q->sk), &wait);
 	return ret;
 }
 
@@ -1112,10 +1104,10 @@ static long macvtap_ioctl(struct file *file, unsigned int cmd,
 		return 0;
 
 	case TUNSETSNDBUF:
-		if (get_user(s, sp))
+		if (get_user(u, up))
 			return -EFAULT;
 
-		q->sk.sk_sndbuf = s;
+		q->sk.sk_sndbuf = u;
 		return 0;
 
 	case TUNGETVNETHDRSZ:
@@ -1363,7 +1355,6 @@ static void macvtap_exit(void)
 	class_unregister(macvtap_class);
 	cdev_del(&macvtap_cdev);
 	unregister_chrdev_region(macvtap_major, MACVTAP_NUM_DEVS);
-	idr_destroy(&minor_idr);
 }
 module_exit(macvtap_exit);
 

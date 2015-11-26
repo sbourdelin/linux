@@ -44,6 +44,7 @@
 #include "../include/lustre_handles.h"
 #include "../include/lustre_lib.h"
 
+
 static __u64 handle_base;
 #define HANDLE_INCR 7
 static spinlock_t handle_base_lock;
@@ -125,7 +126,6 @@ static void class_handle_unhash_nolock(struct portals_handle *h)
 void class_handle_unhash(struct portals_handle *h)
 {
 	struct handle_bucket *bucket;
-
 	bucket = handle_hash + (h->h_cookie & HANDLE_HASH_MASK);
 
 	spin_lock(&bucket->lock);
@@ -133,6 +133,19 @@ void class_handle_unhash(struct portals_handle *h)
 	spin_unlock(&bucket->lock);
 }
 EXPORT_SYMBOL(class_handle_unhash);
+
+void class_handle_hash_back(struct portals_handle *h)
+{
+	struct handle_bucket *bucket;
+
+	bucket = handle_hash + (h->h_cookie & HANDLE_HASH_MASK);
+
+	spin_lock(&bucket->lock);
+	list_add_rcu(&h->h_link, &bucket->head);
+	h->h_in = 1;
+	spin_unlock(&bucket->lock);
+}
+EXPORT_SYMBOL(class_handle_hash_back);
 
 void *class_handle2object(__u64 cookie)
 {
@@ -180,7 +193,7 @@ EXPORT_SYMBOL(class_handle_free_cb);
 int class_handle_init(void)
 {
 	struct handle_bucket *bucket;
-	struct timespec64 ts;
+	struct timeval tv;
 	int seed[2];
 
 	LASSERT(handle_hash == NULL);
@@ -199,8 +212,8 @@ int class_handle_init(void)
 
 	/** bug 21430: add randomness to the initial base */
 	cfs_get_random_bytes(seed, sizeof(seed));
-	ktime_get_ts64(&ts);
-	cfs_srand(ts.tv_sec ^ seed[0], ts.tv_nsec ^ seed[1]);
+	do_gettimeofday(&tv);
+	cfs_srand(tv.tv_sec ^ seed[0], tv.tv_usec ^ seed[1]);
 
 	cfs_get_random_bytes(&handle_base, sizeof(handle_base));
 	LASSERT(handle_base != 0ULL);
@@ -233,7 +246,6 @@ static int cleanup_all_handles(void)
 void class_handle_cleanup(void)
 {
 	int count;
-
 	LASSERT(handle_hash != NULL);
 
 	count = cleanup_all_handles();

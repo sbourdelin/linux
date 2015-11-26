@@ -79,8 +79,11 @@ typedef void (*dm_status_fn) (struct dm_target *ti, status_type_t status_type,
 
 typedef int (*dm_message_fn) (struct dm_target *ti, unsigned argc, char **argv);
 
-typedef int (*dm_prepare_ioctl_fn) (struct dm_target *ti,
-			    struct block_device **bdev, fmode_t *mode);
+typedef int (*dm_ioctl_fn) (struct dm_target *ti, unsigned int cmd,
+			    unsigned long arg);
+
+typedef int (*dm_merge_fn) (struct dm_target *ti, struct bvec_merge_data *bvm,
+			    struct bio_vec *biovec, int max_size);
 
 /*
  * These iteration functions are typically used to check (and combine)
@@ -156,7 +159,8 @@ struct target_type {
 	dm_resume_fn resume;
 	dm_status_fn status;
 	dm_message_fn message;
-	dm_prepare_ioctl_fn prepare_ioctl;
+	dm_ioctl_fn ioctl;
+	dm_merge_fn merge;
 	dm_busy_fn busy;
 	dm_iterate_devices_fn iterate_devices;
 	dm_io_hints_fn io_hints;

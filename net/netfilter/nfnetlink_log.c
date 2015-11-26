@@ -27,7 +27,6 @@
 #include <net/netlink.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nfnetlink_log.h>
-#include <linux/netfilter/nf_conntrack_common.h>
 #include <linux/spinlock.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
@@ -402,9 +401,7 @@ __build_packet_message(struct nfnl_log_net *log,
 			unsigned int hooknum,
 			const struct net_device *indev,
 			const struct net_device *outdev,
-			const char *prefix, unsigned int plen,
-			const struct nfnl_ct_hook *nfnl_ct,
-			struct nf_conn *ct, enum ip_conntrack_info ctinfo)
+			const char *prefix, unsigned int plen)
 {
 	struct nfulnl_msg_packet_hdr pmsg;
 	struct nlmsghdr *nlh;
@@ -541,9 +538,9 @@ __build_packet_message(struct nfnl_log_net *log,
 
 	if (skb->tstamp.tv64) {
 		struct nfulnl_msg_packet_timestamp ts;
-		struct timespec64 kts = ktime_to_timespec64(skb->tstamp);
-		ts.sec = cpu_to_be64(kts.tv_sec);
-		ts.usec = cpu_to_be64(kts.tv_nsec / NSEC_PER_USEC);
+		struct timeval tv = ktime_to_timeval(skb->tstamp);
+		ts.sec = cpu_to_be64(tv.tv_sec);
+		ts.usec = cpu_to_be64(tv.tv_usec);
 
 		if (nla_put(inst->skb, NFULA_TIMESTAMP, sizeof(ts), &ts))
 			goto nla_put_failure;
@@ -576,10 +573,6 @@ __build_packet_message(struct nfnl_log_net *log,
 	if ((inst->flags & NFULNL_CFG_F_SEQ_GLOBAL) &&
 	    nla_put_be32(inst->skb, NFULA_SEQ_GLOBAL,
 			 htonl(atomic_inc_return(&log->global_seq))))
-		goto nla_put_failure;
-
-	if (ct && nfnl_ct->build(inst->skb, ct, ctinfo,
-				 NFULA_CT, NFULA_CT_INFO) < 0)
 		goto nla_put_failure;
 
 	if (data_len) {
@@ -627,16 +620,12 @@ nfulnl_log_packet(struct net *net,
 		  const struct nf_loginfo *li_user,
 		  const char *prefix)
 {
-	size_t size;
-	unsigned int data_len;
+	unsigned int size, data_len;
 	struct nfulnl_instance *inst;
 	const struct nf_loginfo *li;
 	unsigned int qthreshold;
 	unsigned int plen;
 	struct nfnl_log_net *log = nfnl_log_pernet(net);
-	const struct nfnl_ct_hook *nfnl_ct = NULL;
-	struct nf_conn *ct = NULL;
-	enum ip_conntrack_info uninitialized_var(ctinfo);
 
 	if (li_user && li_user->type == NF_LOG_TYPE_ULOG)
 		li = li_user;
@@ -682,14 +671,6 @@ nfulnl_log_packet(struct net *net,
 		size += nla_total_size(sizeof(u_int32_t));
 	if (inst->flags & NFULNL_CFG_F_SEQ_GLOBAL)
 		size += nla_total_size(sizeof(u_int32_t));
-	if (inst->flags & NFULNL_CFG_F_CONNTRACK) {
-		nfnl_ct = rcu_dereference(nfnl_ct_hook);
-		if (nfnl_ct != NULL) {
-			ct = nfnl_ct->get_ct(skb, &ctinfo);
-			if (ct != NULL)
-				size += nfnl_ct->build_size(ct);
-		}
-	}
 
 	qthreshold = inst->qthreshold;
 	/* per-rule qthreshold overrides per-instance */
@@ -734,8 +715,7 @@ nfulnl_log_packet(struct net *net,
 	inst->qlen++;
 
 	__build_packet_message(log, inst, skb, data_len, pf,
-				hooknum, in, out, prefix, plen,
-				nfnl_ct, ct, ctinfo);
+				hooknum, in, out, prefix, plen);
 
 	if (inst->qlen >= qthreshold)
 		__nfulnl_flush(inst);
@@ -825,7 +805,6 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 	struct net *net = sock_net(ctnl);
 	struct nfnl_log_net *log = nfnl_log_pernet(net);
 	int ret = 0;
-	u16 flags;
 
 	if (nfula[NFULA_CFG_CMD]) {
 		u_int8_t pf = nfmsg->nfgen_family;
@@ -845,28 +824,6 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 	if (inst && inst->peer_portid != NETLINK_CB(skb).portid) {
 		ret = -EPERM;
 		goto out_put;
-	}
-
-	/* Check if we support these flags in first place, dependencies should
-	 * be there too not to break atomicity.
-	 */
-	if (nfula[NFULA_CFG_FLAGS]) {
-		flags = ntohs(nla_get_be16(nfula[NFULA_CFG_FLAGS]));
-
-		if ((flags & NFULNL_CFG_F_CONNTRACK) &&
-		    !rcu_access_pointer(nfnl_ct_hook)) {
-#ifdef CONFIG_MODULES
-			nfnl_unlock(NFNL_SUBSYS_ULOG);
-			request_module("ip_conntrack_netlink");
-			nfnl_lock(NFNL_SUBSYS_ULOG);
-			if (rcu_access_pointer(nfnl_ct_hook)) {
-				ret = -EAGAIN;
-				goto out_put;
-			}
-#endif
-			ret = -EOPNOTSUPP;
-			goto out_put;
-		}
 	}
 
 	if (cmd != NULL) {
@@ -897,15 +854,16 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 			ret = -ENOTSUPP;
 			break;
 		}
-	} else if (!inst) {
-		ret = -ENODEV;
-		goto out;
 	}
 
 	if (nfula[NFULA_CFG_MODE]) {
-		struct nfulnl_msg_config_mode *params =
-			nla_data(nfula[NFULA_CFG_MODE]);
+		struct nfulnl_msg_config_mode *params;
+		params = nla_data(nfula[NFULA_CFG_MODE]);
 
+		if (!inst) {
+			ret = -ENODEV;
+			goto out;
+		}
 		nfulnl_set_mode(inst, params->copy_mode,
 				ntohl(params->copy_range));
 	}
@@ -913,23 +871,42 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 	if (nfula[NFULA_CFG_TIMEOUT]) {
 		__be32 timeout = nla_get_be32(nfula[NFULA_CFG_TIMEOUT]);
 
+		if (!inst) {
+			ret = -ENODEV;
+			goto out;
+		}
 		nfulnl_set_timeout(inst, ntohl(timeout));
 	}
 
 	if (nfula[NFULA_CFG_NLBUFSIZ]) {
 		__be32 nlbufsiz = nla_get_be32(nfula[NFULA_CFG_NLBUFSIZ]);
 
+		if (!inst) {
+			ret = -ENODEV;
+			goto out;
+		}
 		nfulnl_set_nlbufsiz(inst, ntohl(nlbufsiz));
 	}
 
 	if (nfula[NFULA_CFG_QTHRESH]) {
 		__be32 qthresh = nla_get_be32(nfula[NFULA_CFG_QTHRESH]);
 
+		if (!inst) {
+			ret = -ENODEV;
+			goto out;
+		}
 		nfulnl_set_qthresh(inst, ntohl(qthresh));
 	}
 
-	if (nfula[NFULA_CFG_FLAGS])
-		nfulnl_set_flags(inst, flags);
+	if (nfula[NFULA_CFG_FLAGS]) {
+		__be16 flags = nla_get_be16(nfula[NFULA_CFG_FLAGS]);
+
+		if (!inst) {
+			ret = -ENODEV;
+			goto out;
+		}
+		nfulnl_set_flags(inst, ntohs(flags));
+	}
 
 out_put:
 	instance_put(inst);

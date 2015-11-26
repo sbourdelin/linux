@@ -17,7 +17,8 @@
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
-#include <linux/atomic.h>
+
+#include <asm/cmpxchg.h>
 
 #define USBHS_LPSTS			0x02
 #define USBHS_UGCTRL			0x80
@@ -183,7 +184,7 @@ static int rcar_gen2_phy_power_off(struct phy *p)
 	return 0;
 }
 
-static const struct phy_ops rcar_gen2_phy_ops = {
+static struct phy_ops rcar_gen2_phy_ops = {
 	.init		= rcar_gen2_phy_init,
 	.exit		= rcar_gen2_phy_exit,
 	.power_on	= rcar_gen2_phy_power_on,

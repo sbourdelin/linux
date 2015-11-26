@@ -3131,7 +3131,6 @@ static const struct of_device_id smiapp_of_table[] = {
 	{ .compatible = "nokia,smia" },
 	{ },
 };
-MODULE_DEVICE_TABLE(of, smiapp_of_table);
 
 static const struct i2c_device_id smiapp_id_table[] = {
 	{ SMIAPP_NAME, 0 },

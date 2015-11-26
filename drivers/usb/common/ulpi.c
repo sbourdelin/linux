@@ -242,7 +242,7 @@ static int __init ulpi_init(void)
 {
 	return bus_register(&ulpi_bus);
 }
-subsys_initcall(ulpi_init);
+module_init(ulpi_init);
 
 static void __exit ulpi_exit(void)
 {

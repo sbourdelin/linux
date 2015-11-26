@@ -102,7 +102,7 @@ static int sdv_xlate(struct irq_domain *h, struct device_node *node,
 {
 	u32 line, type;
 
-	if (node != irq_domain_get_of_node(h))
+	if (node != h->of_node)
 		return -EINVAL;
 
 	if (intsize < 2)

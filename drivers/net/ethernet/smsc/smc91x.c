@@ -2018,18 +2018,10 @@ static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
 	lp->cfg.flags |= SMC91X_USE_DMA;
 #  endif
 	if (lp->cfg.flags & SMC91X_USE_DMA) {
-		dma_cap_mask_t mask;
-		struct pxad_param param;
-
-		dma_cap_zero(mask);
-		dma_cap_set(DMA_SLAVE, mask);
-		param.prio = PXAD_PRIO_LOWEST;
-		param.drcmr = -1UL;
-
-		lp->dma_chan =
-			dma_request_slave_channel_compat(mask, pxad_filter_fn,
-							 &param, &dev->dev,
-							 "data");
+		int dma = pxa_request_dma(dev->name, DMA_PRIO_LOW,
+					  smc_pxa_dma_irq, NULL);
+		if (dma >= 0)
+			dev->dma = dma;
 	}
 #endif
 
@@ -2040,8 +2032,8 @@ static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
 			    version_string, revision_register & 0x0f,
 			    lp->base, dev->irq);
 
-		if (lp->dma_chan)
-			pr_cont(" DMA %p", lp->dma_chan);
+		if (dev->dma != (unsigned char)-1)
+			pr_cont(" DMA %d", dev->dma);
 
 		pr_cont("%s%s\n",
 			lp->cfg.flags & SMC91X_NOWAIT ? " [nowait]" : "",
@@ -2066,8 +2058,8 @@ static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
 
 err_out:
 #ifdef CONFIG_ARCH_PXA
-	if (retval && lp->dma_chan)
-		dma_release_channel(lp->dma_chan);
+	if (retval && dev->dma != (unsigned char)-1)
+		pxa_free_dma(dev->dma);
 #endif
 	return retval;
 }
@@ -2378,7 +2370,6 @@ static int smc_drv_probe(struct platform_device *pdev)
 		struct smc_local *lp = netdev_priv(ndev);
 		lp->device = &pdev->dev;
 		lp->physaddr = res->start;
-
 	}
 #endif
 
@@ -2415,8 +2406,8 @@ static int smc_drv_remove(struct platform_device *pdev)
 	free_irq(ndev->irq, ndev);
 
 #ifdef CONFIG_ARCH_PXA
-	if (lp->dma_chan)
-		dma_release_channel(lp->dma_chan);
+	if (ndev->dma != (unsigned char)-1)
+		pxa_free_dma(ndev->dma);
 #endif
 	iounmap(lp->base);
 

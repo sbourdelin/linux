@@ -73,6 +73,8 @@
 #include "../../include/lustre_ver.h"
 #include "../../include/lustre/lustre_build_version.h"
 
+int proc_version;
+
 /* buffer MUST be at least the size of obd_ioctl_hdr */
 int obd_ioctl_getdata(char **buf, int *len, void *arg)
 {
@@ -212,6 +214,7 @@ struct miscdevice obd_psdev = {
 	.name  = OBD_DEV_NAME,
 	.fops  = &obd_psdev_fops,
 };
+
 
 static ssize_t version_show(struct kobject *kobj, struct attribute *attr,
 			    char *buf)
@@ -382,7 +385,7 @@ static int obd_device_list_seq_show(struct seq_file *p, void *v)
 	return 0;
 }
 
-static const struct seq_operations obd_device_list_sops = {
+struct seq_operations obd_device_list_sops = {
 	.start = obd_device_list_seq_start,
 	.stop = obd_device_list_seq_stop,
 	.next = obd_device_list_seq_next,
@@ -403,7 +406,7 @@ static int obd_device_list_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct file_operations obd_device_list_fops = {
+struct file_operations obd_device_list_fops = {
 	.owner   = THIS_MODULE,
 	.open    = obd_device_list_open,
 	.read    = seq_read,
@@ -420,7 +423,7 @@ static struct attribute_group lustre_attr_group = {
 
 int class_procfs_init(void)
 {
-	int rc = -ENOMEM;
+	int rc = 0;
 	struct dentry *file;
 
 	lustre_kobj = kobject_create_and_add("lustre", fs_kobj);

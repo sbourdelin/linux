@@ -886,7 +886,7 @@ verify_sock_status:
 			break;
 		}
 
-		sk_wait_data(sk, &timeo, NULL);
+		sk_wait_data(sk, &timeo);
 		continue;
 	found_ok_skb:
 		if (len > skb->len)

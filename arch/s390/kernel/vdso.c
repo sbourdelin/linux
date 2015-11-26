@@ -299,7 +299,7 @@ static int __init vdso_init(void)
 
 	get_page(virt_to_page(vdso_data));
 
-	smp_mb();
+	smp_wmb();
 
 	return 0;
 }

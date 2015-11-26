@@ -17,11 +17,15 @@
 #include <asm/mach/pci.h>
 
 static int debug_pci;
-static resource_size_t (*align_resource)(struct pci_dev *dev,
-		  const struct resource *res,
-		  resource_size_t start,
-		  resource_size_t size,
-		  resource_size_t align) = NULL;
+
+#ifdef CONFIG_PCI_MSI
+struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+{
+	struct pci_sys_data *sysdata = dev->bus->sysdata;
+
+	return sysdata->msi_ctrl;
+}
+#endif
 
 /*
  * We can't use pci_get_device() here since we are
@@ -455,13 +459,16 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 
 	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
 		sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
-		if (WARN(!sys, "PCI: unable to allocate sys data!"))
-			break;
+		if (!sys)
+			panic("PCI: unable to allocate sys data!");
 
+#ifdef CONFIG_PCI_MSI
+		sys->msi_ctrl = hw->msi_ctrl;
+#endif
 		sys->busnr   = busnr;
 		sys->swizzle = hw->swizzle;
 		sys->map_irq = hw->map_irq;
-		align_resource = hw->align_resource;
+		sys->align_resource = hw->align_resource;
 		INIT_LIST_HEAD(&sys->resources);
 
 		if (hw->private_data)
@@ -479,14 +486,11 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 			if (hw->scan)
 				sys->bus = hw->scan(nr, sys);
 			else
-				sys->bus = pci_scan_root_bus_msi(parent,
-					sys->busnr, hw->ops, sys,
-					&sys->resources, hw->msi_ctrl);
+				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+						hw->ops, sys, &sys->resources);
 
-			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
-				kfree(sys);
-				break;
-			}
+			if (!sys->bus)
+				panic("PCI: unable to scan bus!");
 
 			busnr = sys->bus->busn_res.end + 1;
 
@@ -517,8 +521,6 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
 		struct pci_bus *bus = sys->bus;
 
 		if (!pci_has_flag(PCI_PROBE_ONLY)) {
-			struct pci_bus *child;
-
 			/*
 			 * Size the bridge windows.
 			 */
@@ -528,14 +530,24 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
 			 * Assign resources.
 			 */
 			pci_bus_assign_resources(bus);
-
-			list_for_each_entry(child, &bus->children, node)
-				pcie_bus_configure_settings(child);
 		}
+
 		/*
 		 * Tell drivers about devices found.
 		 */
 		pci_bus_add_devices(bus);
+	}
+
+	list_for_each_entry(sys, &head, node) {
+		struct pci_bus *bus = sys->bus;
+
+		/* Configure PCI Express settings */
+		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+			struct pci_bus *child;
+
+			list_for_each_entry(child, &bus->children, node)
+				pcie_bus_configure_settings(child);
+		}
 	}
 }
 
@@ -577,6 +589,7 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
 				resource_size_t size, resource_size_t align)
 {
 	struct pci_dev *dev = data;
+	struct pci_sys_data *sys = dev->sysdata;
 	resource_size_t start = res->start;
 
 	if (res->flags & IORESOURCE_IO && start & 0x300)
@@ -584,8 +597,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
 
 	start = (start + align - 1) & ~(align - 1);
 
-	if (align_resource)
-		return align_resource(dev, res, start, size, align);
+	if (sys->align_resource)
+		return sys->align_resource(dev, res, start, size, align);
 
 	return start;
 }

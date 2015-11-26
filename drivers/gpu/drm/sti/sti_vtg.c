@@ -79,7 +79,7 @@ LIST_HEAD(vtg_lookup);
  * @irq: VTG irq
  * @type: VTG type (main or aux)
  * @notifier_list: notifier callback
- * @crtc: the CRTC for vblank event
+ * @crtc_id: the crtc id for vblank event
  * @slave: slave vtg
  * @link: List node to link the structure in lookup list
  */
@@ -90,7 +90,7 @@ struct sti_vtg {
 	int irq;
 	u32 irq_status;
 	struct raw_notifier_head notifier_list;
-	struct drm_crtc *crtc;
+	int crtc_id;
 	struct sti_vtg *slave;
 	struct list_head link;
 };
@@ -110,6 +110,7 @@ struct sti_vtg *of_vtg_find(struct device_node *np)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL(of_vtg_find);
 
 static void vtg_reset(struct sti_vtg *vtg)
 {
@@ -241,6 +242,7 @@ void sti_vtg_set_config(struct sti_vtg *vtg,
 	else
 		vtg_enable_irq(vtg);
 }
+EXPORT_SYMBOL(sti_vtg_set_config);
 
 /**
  * sti_vtg_get_line_number
@@ -263,6 +265,7 @@ u32 sti_vtg_get_line_number(struct drm_display_mode mode, int y)
 
 	return start_line + y;
 }
+EXPORT_SYMBOL(sti_vtg_get_line_number);
 
 /**
  * sti_vtg_get_pixel_number
@@ -278,16 +281,18 @@ u32 sti_vtg_get_pixel_number(struct drm_display_mode mode, int x)
 {
 	return mode.htotal - mode.hsync_start + x;
 }
+EXPORT_SYMBOL(sti_vtg_get_pixel_number);
 
-int sti_vtg_register_client(struct sti_vtg *vtg, struct notifier_block *nb,
-			    struct drm_crtc *crtc)
+int sti_vtg_register_client(struct sti_vtg *vtg,
+		struct notifier_block *nb, int crtc_id)
 {
 	if (vtg->slave)
-		return sti_vtg_register_client(vtg->slave, nb, crtc);
+		return sti_vtg_register_client(vtg->slave, nb, crtc_id);
 
-	vtg->crtc = crtc;
+	vtg->crtc_id = crtc_id;
 	return raw_notifier_chain_register(&vtg->notifier_list, nb);
 }
+EXPORT_SYMBOL(sti_vtg_register_client);
 
 int sti_vtg_unregister_client(struct sti_vtg *vtg, struct notifier_block *nb)
 {
@@ -296,6 +301,7 @@ int sti_vtg_unregister_client(struct sti_vtg *vtg, struct notifier_block *nb)
 
 	return raw_notifier_chain_unregister(&vtg->notifier_list, nb);
 }
+EXPORT_SYMBOL(sti_vtg_unregister_client);
 
 static irqreturn_t vtg_irq_thread(int irq, void *arg)
 {
@@ -305,7 +311,7 @@ static irqreturn_t vtg_irq_thread(int irq, void *arg)
 	event = (vtg->irq_status & VTG_IRQ_TOP) ?
 		VTG_TOP_FIELD_EVENT : VTG_BOTTOM_FIELD_EVENT;
 
-	raw_notifier_call_chain(&vtg->notifier_list, event, vtg->crtc);
+	raw_notifier_call_chain(&vtg->notifier_list, event, &vtg->crtc_id);
 
 	return IRQ_HANDLED;
 }
@@ -399,6 +405,8 @@ struct platform_driver sti_vtg_driver = {
 	.probe	= vtg_probe,
 	.remove = vtg_remove,
 };
+
+module_platform_driver(sti_vtg_driver);
 
 MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
 MODULE_DESCRIPTION("STMicroelectronics SoC DRM driver");

@@ -4,8 +4,6 @@
 #include <asm/fpu/internal.h>
 #include <asm/tlbflush.h>
 
-#include <linux/sched.h>
-
 /*
  * Initialize the TS bit in CR0 according to the style of context-switches
  * we are using:
@@ -40,12 +38,7 @@ static void fpu__init_cpu_generic(void)
 	write_cr0(cr0);
 
 	/* Flush out any pending x87 state: */
-#ifdef CONFIG_MATH_EMULATION
-	if (!cpu_has_fpu)
-		fpstate_init_soft(&current->thread.fpu.state.soft);
-	else
-#endif
-		asm volatile ("fninit");
+	asm volatile ("fninit");
 }
 
 /*
@@ -142,43 +135,6 @@ static void __init fpu__init_system_generic(void)
  */
 unsigned int xstate_size;
 EXPORT_SYMBOL_GPL(xstate_size);
-
-/* Enforce that 'MEMBER' is the last field of 'TYPE': */
-#define CHECK_MEMBER_AT_END_OF(TYPE, MEMBER) \
-	BUILD_BUG_ON(sizeof(TYPE) != offsetofend(TYPE, MEMBER))
-
-/*
- * We append the 'struct fpu' to the task_struct:
- */
-static void __init fpu__init_task_struct_size(void)
-{
-	int task_size = sizeof(struct task_struct);
-
-	/*
-	 * Subtract off the static size of the register state.
-	 * It potentially has a bunch of padding.
-	 */
-	task_size -= sizeof(((struct task_struct *)0)->thread.fpu.state);
-
-	/*
-	 * Add back the dynamically-calculated register state
-	 * size.
-	 */
-	task_size += xstate_size;
-
-	/*
-	 * We dynamically size 'struct fpu', so we require that
-	 * it be at the end of 'thread_struct' and that
-	 * 'thread_struct' be at the end of 'task_struct'.  If
-	 * you hit a compile error here, check the structure to
-	 * see if something got added to the end.
-	 */
-	CHECK_MEMBER_AT_END_OF(struct fpu, state);
-	CHECK_MEMBER_AT_END_OF(struct thread_struct, fpu);
-	CHECK_MEMBER_AT_END_OF(struct task_struct, thread);
-
-	arch_task_struct_size = task_size;
-}
 
 /*
  * Set up the xstate_size based on the legacy FPU context size.
@@ -290,11 +246,11 @@ static void __init fpu__init_system_ctx_switch(void)
 	if (cpu_has_xsaveopt && eagerfpu != DISABLE)
 		eagerfpu = ENABLE;
 
-	if (xfeatures_mask & XFEATURE_MASK_EAGER) {
+	if (xfeatures_mask & XSTATE_EAGER) {
 		if (eagerfpu == DISABLE) {
 			pr_err("x86/fpu: eagerfpu switching disabled, disabling the following xstate features: 0x%llx.\n",
-			       xfeatures_mask & XFEATURE_MASK_EAGER);
-			xfeatures_mask &= ~XFEATURE_MASK_EAGER;
+			       xfeatures_mask & XSTATE_EAGER);
+			xfeatures_mask &= ~XSTATE_EAGER;
 		} else {
 			eagerfpu = ENABLE;
 		}
@@ -331,7 +287,6 @@ void __init fpu__init_system(struct cpuinfo_x86 *c)
 	fpu__init_system_generic();
 	fpu__init_system_xstate_size_legacy();
 	fpu__init_system_xstate();
-	fpu__init_task_struct_size();
 
 	fpu__init_system_ctx_switch();
 }
@@ -354,7 +309,11 @@ static int __init x86_noxsave_setup(char *s)
 	if (strlen(s))
 		return 0;
 
-	fpu__xstate_clear_all_cpu_caps();
+	setup_clear_cpu_cap(X86_FEATURE_XSAVE);
+	setup_clear_cpu_cap(X86_FEATURE_XSAVEOPT);
+	setup_clear_cpu_cap(X86_FEATURE_XSAVES);
+	setup_clear_cpu_cap(X86_FEATURE_AVX);
+	setup_clear_cpu_cap(X86_FEATURE_AVX2);
 
 	return 1;
 }

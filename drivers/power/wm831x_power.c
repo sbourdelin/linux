@@ -499,8 +499,7 @@ static int wm831x_power_probe(struct platform_device *pdev)
 	struct wm831x_power *power;
 	int ret, irq, i;
 
-	power = devm_kzalloc(&pdev->dev, sizeof(struct wm831x_power),
-			     GFP_KERNEL);
+	power = kzalloc(sizeof(struct wm831x_power), GFP_KERNEL);
 	if (power == NULL)
 		return -ENOMEM;
 
@@ -537,7 +536,7 @@ static int wm831x_power_probe(struct platform_device *pdev)
 					    NULL);
 	if (IS_ERR(power->wall)) {
 		ret = PTR_ERR(power->wall);
-		goto err;
+		goto err_kmalloc;
 	}
 
 	power->usb_desc.name = power->usb_name,
@@ -573,7 +572,7 @@ static int wm831x_power_probe(struct platform_device *pdev)
 
 	irq = wm831x_irq(wm831x, platform_get_irq_byname(pdev, "SYSLO"));
 	ret = request_threaded_irq(irq, NULL, wm831x_syslo_irq,
-				   IRQF_TRIGGER_RISING | IRQF_ONESHOT, "System power low",
+				   IRQF_TRIGGER_RISING, "System power low",
 				   power);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "Failed to request SYSLO IRQ %d: %d\n",
@@ -583,7 +582,7 @@ static int wm831x_power_probe(struct platform_device *pdev)
 
 	irq = wm831x_irq(wm831x, platform_get_irq_byname(pdev, "PWR SRC"));
 	ret = request_threaded_irq(irq, NULL, wm831x_pwr_src_irq,
-				   IRQF_TRIGGER_RISING | IRQF_ONESHOT, "Power source",
+				   IRQF_TRIGGER_RISING, "Power source",
 				   power);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "Failed to request PWR SRC IRQ %d: %d\n",
@@ -596,7 +595,7 @@ static int wm831x_power_probe(struct platform_device *pdev)
 				 platform_get_irq_byname(pdev,
 							 wm831x_bat_irqs[i]));
 		ret = request_threaded_irq(irq, NULL, wm831x_bat_irq,
-					   IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+					   IRQF_TRIGGER_RISING,
 					   wm831x_bat_irqs[i],
 					   power);
 		if (ret != 0) {
@@ -627,7 +626,8 @@ err_usb:
 	power_supply_unregister(power->usb);
 err_wall:
 	power_supply_unregister(power->wall);
-err:
+err_kmalloc:
+	kfree(power);
 	return ret;
 }
 
@@ -654,6 +654,7 @@ static int wm831x_power_remove(struct platform_device *pdev)
 		power_supply_unregister(wm831x_power->battery);
 	power_supply_unregister(wm831x_power->wall);
 	power_supply_unregister(wm831x_power->usb);
+	kfree(wm831x_power);
 	return 0;
 }
 

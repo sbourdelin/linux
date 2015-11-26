@@ -40,6 +40,7 @@
 
 #define DEBUG_SUBSYSTEM S_LLITE
 
+
 #include "../include/obd.h"
 #include "../include/lustre_lite.h"
 #include "llite_internal.h"
@@ -79,7 +80,7 @@ static void *vvp_key_init(const struct lu_context *ctx,
 {
 	struct vvp_thread_info *info;
 
-	info = kmem_cache_alloc(vvp_thread_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(info, vvp_thread_kmem, GFP_NOFS);
 	if (info == NULL)
 		info = ERR_PTR(-ENOMEM);
 	return info;
@@ -90,7 +91,7 @@ static void vvp_key_fini(const struct lu_context *ctx,
 {
 	struct vvp_thread_info *info = data;
 
-	kmem_cache_free(vvp_thread_kmem, info);
+	OBD_SLAB_FREE_PTR(info, vvp_thread_kmem);
 }
 
 static void *vvp_session_key_init(const struct lu_context *ctx,
@@ -98,7 +99,7 @@ static void *vvp_session_key_init(const struct lu_context *ctx,
 {
 	struct vvp_session *session;
 
-	session = kmem_cache_alloc(vvp_session_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(session, vvp_session_kmem, GFP_NOFS);
 	if (session == NULL)
 		session = ERR_PTR(-ENOMEM);
 	return session;
@@ -109,8 +110,9 @@ static void vvp_session_key_fini(const struct lu_context *ctx,
 {
 	struct vvp_session *session = data;
 
-	kmem_cache_free(vvp_session_kmem, session);
+	OBD_SLAB_FREE_PTR(session, vvp_session_kmem);
 }
+
 
 struct lu_context_key vvp_key = {
 	.lct_tags = LCT_CL_THREAD,
@@ -184,6 +186,7 @@ void vvp_global_fini(void)
 	ccc_global_fini(&vvp_device_type);
 	lu_kmem_fini(vvp_caches);
 }
+
 
 /*****************************************************************************
  *

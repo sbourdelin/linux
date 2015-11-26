@@ -38,6 +38,8 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_fabric.h>
+#include <target/target_core_fabric_configfs.h>
+#include <target/configfs_macros.h>
 
 #include "tcm_fc.h"
 
@@ -129,51 +131,55 @@ static ssize_t ft_wwn_store(void *arg, const char *buf, size_t len)
  * ACL auth ops.
  */
 
-static ssize_t ft_nacl_port_name_show(struct config_item *item, char *page)
+static ssize_t ft_nacl_show_port_name(
+	struct se_node_acl *se_nacl,
+	char *page)
 {
-	struct se_node_acl *se_nacl = acl_to_nacl(item);
 	struct ft_node_acl *acl = container_of(se_nacl,
 			struct ft_node_acl, se_node_acl);
 
 	return ft_wwn_show(&acl->node_auth.port_name, page);
 }
 
-static ssize_t ft_nacl_port_name_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t ft_nacl_store_port_name(
+	struct se_node_acl *se_nacl,
+	const char *page,
+	size_t count)
 {
-	struct se_node_acl *se_nacl = acl_to_nacl(item);
 	struct ft_node_acl *acl = container_of(se_nacl,
 			struct ft_node_acl, se_node_acl);
 
 	return ft_wwn_store(&acl->node_auth.port_name, page, count);
 }
 
-static ssize_t ft_nacl_node_name_show(struct config_item *item,
-		char *page)
+TF_NACL_BASE_ATTR(ft, port_name, S_IRUGO | S_IWUSR);
+
+static ssize_t ft_nacl_show_node_name(
+	struct se_node_acl *se_nacl,
+	char *page)
 {
-	struct se_node_acl *se_nacl = acl_to_nacl(item);
 	struct ft_node_acl *acl = container_of(se_nacl,
 			struct ft_node_acl, se_node_acl);
 
 	return ft_wwn_show(&acl->node_auth.node_name, page);
 }
 
-static ssize_t ft_nacl_node_name_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t ft_nacl_store_node_name(
+	struct se_node_acl *se_nacl,
+	const char *page,
+	size_t count)
 {
-	struct se_node_acl *se_nacl = acl_to_nacl(item);
 	struct ft_node_acl *acl = container_of(se_nacl,
 			struct ft_node_acl, se_node_acl);
 
 	return ft_wwn_store(&acl->node_auth.node_name, page, count);
 }
 
-CONFIGFS_ATTR(ft_nacl_, node_name);
-CONFIGFS_ATTR(ft_nacl_, port_name);
+TF_NACL_BASE_ATTR(ft, node_name, S_IRUGO | S_IWUSR);
 
 static struct configfs_attribute *ft_nacl_base_attrs[] = {
-	&ft_nacl_attr_port_name,
-	&ft_nacl_attr_node_name,
+	&ft_nacl_port_name.attr,
+	&ft_nacl_node_name.attr,
 	NULL,
 };
 
@@ -380,16 +386,18 @@ static void ft_del_wwn(struct se_wwn *wwn)
 	kfree(ft_wwn);
 }
 
-static ssize_t ft_wwn_version_show(struct config_item *item, char *page)
+static ssize_t ft_wwn_show_attr_version(
+	struct target_fabric_configfs *tf,
+	char *page)
 {
 	return sprintf(page, "TCM FC " FT_VERSION " on %s/%s on "
 		""UTS_RELEASE"\n",  utsname()->sysname, utsname()->machine);
 }
 
-CONFIGFS_ATTR_RO(ft_wwn_, version);
+TF_WWN_ATTR_RO(ft, version);
 
 static struct configfs_attribute *ft_wwn_attrs[] = {
-	&ft_wwn_attr_version,
+	&ft_wwn_version.attr,
 	NULL,
 };
 

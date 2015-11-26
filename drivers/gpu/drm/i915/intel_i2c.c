@@ -114,8 +114,8 @@ intel_i2c_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	I915_WRITE(GMBUS0, 0);
-	I915_WRITE(GMBUS4, 0);
+	I915_WRITE(dev_priv->gpio_mmio_base + GMBUS0, 0);
+	I915_WRITE(dev_priv->gpio_mmio_base + GMBUS4, 0);
 }
 
 static void intel_i2c_quirk_set(struct drm_i915_private *dev_priv, bool enable)
@@ -261,6 +261,7 @@ gmbus_wait_hw_status(struct drm_i915_private *dev_priv,
 		     u32 gmbus4_irq_en)
 {
 	int i;
+	int reg_offset = dev_priv->gpio_mmio_base;
 	u32 gmbus2 = 0;
 	DEFINE_WAIT(wait);
 
@@ -270,13 +271,13 @@ gmbus_wait_hw_status(struct drm_i915_private *dev_priv,
 	/* Important: The hw handles only the first bit, so set only one! Since
 	 * we also need to check for NAKs besides the hw ready/idle signal, we
 	 * need to wake up periodically and check that ourselves. */
-	I915_WRITE(GMBUS4, gmbus4_irq_en);
+	I915_WRITE(GMBUS4 + reg_offset, gmbus4_irq_en);
 
 	for (i = 0; i < msecs_to_jiffies_timeout(50); i++) {
 		prepare_to_wait(&dev_priv->gmbus_wait_queue, &wait,
 				TASK_UNINTERRUPTIBLE);
 
-		gmbus2 = I915_READ_NOTRACE(GMBUS2);
+		gmbus2 = I915_READ_NOTRACE(GMBUS2 + reg_offset);
 		if (gmbus2 & (GMBUS_SATOER | gmbus2_status))
 			break;
 
@@ -284,7 +285,7 @@ gmbus_wait_hw_status(struct drm_i915_private *dev_priv,
 	}
 	finish_wait(&dev_priv->gmbus_wait_queue, &wait);
 
-	I915_WRITE(GMBUS4, 0);
+	I915_WRITE(GMBUS4 + reg_offset, 0);
 
 	if (gmbus2 & GMBUS_SATOER)
 		return -ENXIO;
@@ -297,19 +298,20 @@ static int
 gmbus_wait_idle(struct drm_i915_private *dev_priv)
 {
 	int ret;
+	int reg_offset = dev_priv->gpio_mmio_base;
 
-#define C ((I915_READ_NOTRACE(GMBUS2) & GMBUS_ACTIVE) == 0)
+#define C ((I915_READ_NOTRACE(GMBUS2 + reg_offset) & GMBUS_ACTIVE) == 0)
 
 	if (!HAS_GMBUS_IRQ(dev_priv->dev))
 		return wait_for(C, 10);
 
 	/* Important: The hw handles only the first bit, so set only one! */
-	I915_WRITE(GMBUS4, GMBUS_IDLE_EN);
+	I915_WRITE(GMBUS4 + reg_offset, GMBUS_IDLE_EN);
 
 	ret = wait_event_timeout(dev_priv->gmbus_wait_queue, C,
 				 msecs_to_jiffies_timeout(10));
 
-	I915_WRITE(GMBUS4, 0);
+	I915_WRITE(GMBUS4 + reg_offset, 0);
 
 	if (ret)
 		return 0;
@@ -323,7 +325,9 @@ gmbus_xfer_read_chunk(struct drm_i915_private *dev_priv,
 		      unsigned short addr, u8 *buf, unsigned int len,
 		      u32 gmbus1_index)
 {
-	I915_WRITE(GMBUS1,
+	int reg_offset = dev_priv->gpio_mmio_base;
+
+	I915_WRITE(GMBUS1 + reg_offset,
 		   gmbus1_index |
 		   GMBUS_CYCLE_WAIT |
 		   (len << GMBUS_BYTE_COUNT_SHIFT) |
@@ -338,7 +342,7 @@ gmbus_xfer_read_chunk(struct drm_i915_private *dev_priv,
 		if (ret)
 			return ret;
 
-		val = I915_READ(GMBUS3);
+		val = I915_READ(GMBUS3 + reg_offset);
 		do {
 			*buf++ = val & 0xff;
 			val >>= 8;
@@ -376,6 +380,7 @@ static int
 gmbus_xfer_write_chunk(struct drm_i915_private *dev_priv,
 		       unsigned short addr, u8 *buf, unsigned int len)
 {
+	int reg_offset = dev_priv->gpio_mmio_base;
 	unsigned int chunk_size = len;
 	u32 val, loop;
 
@@ -385,8 +390,8 @@ gmbus_xfer_write_chunk(struct drm_i915_private *dev_priv,
 		len -= 1;
 	}
 
-	I915_WRITE(GMBUS3, val);
-	I915_WRITE(GMBUS1,
+	I915_WRITE(GMBUS3 + reg_offset, val);
+	I915_WRITE(GMBUS1 + reg_offset,
 		   GMBUS_CYCLE_WAIT |
 		   (chunk_size << GMBUS_BYTE_COUNT_SHIFT) |
 		   (addr << GMBUS_SLAVE_ADDR_SHIFT) |
@@ -399,7 +404,7 @@ gmbus_xfer_write_chunk(struct drm_i915_private *dev_priv,
 			val |= *buf++ << (8 * loop);
 		} while (--len && ++loop < 4);
 
-		I915_WRITE(GMBUS3, val);
+		I915_WRITE(GMBUS3 + reg_offset, val);
 
 		ret = gmbus_wait_hw_status(dev_priv, GMBUS_HW_RDY,
 					   GMBUS_HW_RDY_EN);
@@ -447,6 +452,7 @@ gmbus_is_index_read(struct i2c_msg *msgs, int i, int num)
 static int
 gmbus_xfer_index_read(struct drm_i915_private *dev_priv, struct i2c_msg *msgs)
 {
+	int reg_offset = dev_priv->gpio_mmio_base;
 	u32 gmbus1_index = 0;
 	u32 gmbus5 = 0;
 	int ret;
@@ -460,13 +466,13 @@ gmbus_xfer_index_read(struct drm_i915_private *dev_priv, struct i2c_msg *msgs)
 
 	/* GMBUS5 holds 16-bit index */
 	if (gmbus5)
-		I915_WRITE(GMBUS5, gmbus5);
+		I915_WRITE(GMBUS5 + reg_offset, gmbus5);
 
 	ret = gmbus_xfer_read(dev_priv, &msgs[1], gmbus1_index);
 
 	/* Clear GMBUS5 after each index transfer */
 	if (gmbus5)
-		I915_WRITE(GMBUS5, 0);
+		I915_WRITE(GMBUS5 + reg_offset, 0);
 
 	return ret;
 }
@@ -480,7 +486,7 @@ gmbus_xfer(struct i2c_adapter *adapter,
 					       struct intel_gmbus,
 					       adapter);
 	struct drm_i915_private *dev_priv = bus->dev_priv;
-	int i = 0, inc, try = 0;
+	int i = 0, inc, try = 0, reg_offset;
 	int ret = 0;
 
 	intel_aux_display_runtime_get(dev_priv);
@@ -491,8 +497,10 @@ gmbus_xfer(struct i2c_adapter *adapter,
 		goto out;
 	}
 
+	reg_offset = dev_priv->gpio_mmio_base;
+
 retry:
-	I915_WRITE(GMBUS0, bus->reg0);
+	I915_WRITE(GMBUS0 + reg_offset, bus->reg0);
 
 	for (; i < num; i += inc) {
 		inc = 1;
@@ -522,7 +530,7 @@ retry:
 	 * a STOP on the very first cycle. To simplify the code we
 	 * unconditionally generate the STOP condition with an additional gmbus
 	 * cycle. */
-	I915_WRITE(GMBUS1, GMBUS_CYCLE_STOP | GMBUS_SW_RDY);
+	I915_WRITE(GMBUS1 + reg_offset, GMBUS_CYCLE_STOP | GMBUS_SW_RDY);
 
 	/* Mark the GMBUS interface as disabled after waiting for idle.
 	 * We will re-enable it at the start of the next xfer,
@@ -533,7 +541,7 @@ retry:
 			 adapter->name);
 		ret = -ETIMEDOUT;
 	}
-	I915_WRITE(GMBUS0, 0);
+	I915_WRITE(GMBUS0 + reg_offset, 0);
 	ret = ret ?: i;
 	goto out;
 
@@ -562,9 +570,9 @@ clear_err:
 	 * of resetting the GMBUS controller and so clearing the
 	 * BUS_ERROR raised by the slave's NAK.
 	 */
-	I915_WRITE(GMBUS1, GMBUS_SW_CLR_INT);
-	I915_WRITE(GMBUS1, 0);
-	I915_WRITE(GMBUS0, 0);
+	I915_WRITE(GMBUS1 + reg_offset, GMBUS_SW_CLR_INT);
+	I915_WRITE(GMBUS1 + reg_offset, 0);
+	I915_WRITE(GMBUS0 + reg_offset, 0);
 
 	DRM_DEBUG_KMS("GMBUS [%s] NAK for addr: %04x %c(%d)\n",
 			 adapter->name, msgs[i].addr,
@@ -587,7 +595,7 @@ clear_err:
 timeout:
 	DRM_INFO("GMBUS [%s] timed out, falling back to bit banging on pin %d\n",
 		 bus->adapter.name, bus->reg0 & 0xff);
-	I915_WRITE(GMBUS0, 0);
+	I915_WRITE(GMBUS0 + reg_offset, 0);
 
 	/* Hardware may not support GMBUS over these pins? Try GPIO bitbanging instead. */
 	bus->force_bit = 1;

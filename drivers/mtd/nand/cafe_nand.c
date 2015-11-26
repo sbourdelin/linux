@@ -516,8 +516,7 @@ static struct nand_bbt_descr cafe_bbt_mirror_descr_512 = {
 
 static int cafe_nand_write_page_lowlevel(struct mtd_info *mtd,
 					  struct nand_chip *chip,
-					  const uint8_t *buf, int oob_required,
-					  int page)
+					  const uint8_t *buf, int oob_required)
 {
 	struct cafe_priv *cafe = mtd->priv;
 
@@ -605,6 +604,7 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 
 	mtd->dev.parent = &pdev->dev;
 	mtd->priv = cafe;
+	mtd->owner = THIS_MODULE;
 
 	cafe->pdev = pdev;
 	cafe->mmio = pci_iomap(pdev, 0, 0);

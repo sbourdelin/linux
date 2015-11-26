@@ -125,7 +125,7 @@ u32 rtw_enqueue_cmd(struct cmd_priv *pcmdpriv, struct cmd_obj *cmd_obj)
 	cmd_obj->padapter = padapter;
 
 	res = rtw_cmd_filter(pcmdpriv, cmd_obj);
-	if (res == _FAIL) {
+	if (_FAIL == res) {
 		rtw_free_cmd_obj(cmd_obj);
 		goto exit;
 	}
@@ -199,7 +199,7 @@ _next:
 		if (!pcmd)
 			continue;
 
-		if (rtw_cmd_filter(pcmdpriv, pcmd) == _FAIL) {
+		if (_FAIL == rtw_cmd_filter(pcmdpriv, pcmd)) {
 			pcmd->res = H2C_DROPPED;
 			goto post_process;
 		}
@@ -553,7 +553,7 @@ u8 rtw_disassoc_cmd(struct adapter *padapter, u32 deauth_timeout_ms, bool enqueu
 		res = rtw_enqueue_cmd(cmdpriv, cmdobj);
 	} else {
 		/* no need to enqueue, do the cmd hdl directly and free cmd parameter */
-		if (disconnect_hdl(padapter, (u8 *)param) != H2C_SUCCESS)
+		if (H2C_SUCCESS != disconnect_hdl(padapter, (u8 *)param))
 			res = _FAIL;
 		kfree(param);
 	}
@@ -819,7 +819,7 @@ u8 rtw_set_chplan_cmd(struct adapter *padapter, u8 chplan, u8 enqueue)
 		res = rtw_enqueue_cmd(pcmdpriv, pcmdobj);
 	} else {
 		/* no need to enqueue, do the cmd hdl directly and free cmd parameter */
-		if (set_chplan_hdl(padapter, (unsigned char *)setChannelPlan_param) != H2C_SUCCESS)
+		if (H2C_SUCCESS != set_chplan_hdl(padapter, (unsigned char *)setChannelPlan_param))
 			res = _FAIL;
 
 		kfree(setChannelPlan_param);

@@ -12,14 +12,20 @@
 #include <linux/irq.h>
 #include <linux/spinlock.h>
 #include <asm/mcip.h>
-#include <asm/setup.h>
 
 static char smp_cpuinfo_buf[128];
 static int idu_detected;
 
 static DEFINE_RAW_SPINLOCK(mcip_lock);
 
-static void mcip_setup_per_cpu(int cpu)
+/*
+ * Any SMP specific init any CPU does when it comes up.
+ * Here we setup the CPU to enable Inter-Processor-Interrupts
+ * Called for each CPU
+ * -Master      : init_IRQ()
+ * -Other(s)    : start_kernel_secondary()
+ */
+void mcip_init_smp(unsigned int cpu)
 {
 	smp_ipi_irq_setup(cpu, IPI_IRQ);
 }
@@ -90,8 +96,34 @@ static void mcip_ipi_clear(int irq)
 #endif
 }
 
-static void mcip_probe_n_setup(void)
+volatile int wake_flag;
+
+static void mcip_wakeup_cpu(int cpu, unsigned long pc)
 {
+	BUG_ON(cpu == 0);
+	wake_flag = cpu;
+}
+
+void arc_platform_smp_wait_to_boot(int cpu)
+{
+	while (wake_flag != cpu)
+		;
+
+	wake_flag = 0;
+	__asm__ __volatile__("j @first_lines_of_secondary	\n");
+}
+
+struct plat_smp_ops plat_smp_ops = {
+	.info		= smp_cpuinfo_buf,
+	.cpu_kick	= mcip_wakeup_cpu,
+	.ipi_send	= mcip_ipi_send,
+	.ipi_clear	= mcip_ipi_clear,
+};
+
+void mcip_init_early_smp(void)
+{
+#define IS_AVAIL1(var, str)    ((var) ? str : "")
+
 	struct mcip_bcr {
 #ifdef CONFIG_CPU_BIG_ENDIAN
 		unsigned int pad3:8,
@@ -129,14 +161,6 @@ static void mcip_probe_n_setup(void)
 		panic("kernel trying to use non-existent GRTC\n");
 }
 
-struct plat_smp_ops plat_smp_ops = {
-	.info		= smp_cpuinfo_buf,
-	.init_early_smp	= mcip_probe_n_setup,
-	.init_irq_cpu	= mcip_setup_per_cpu,
-	.ipi_send	= mcip_ipi_send,
-	.ipi_clear	= mcip_ipi_clear,
-};
-
 /***************************************************************************
  * ARCv2 Interrupt Distribution Unit (IDU)
  *
@@ -151,6 +175,7 @@ struct plat_smp_ops plat_smp_ops = {
 #include <linux/irqchip.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
+#include "../../drivers/irqchip/irqchip.h"
 
 /*
  * Set the DEST for @cmn_irq to @cpu_mask (1 bit per core)
@@ -193,28 +218,11 @@ static void idu_irq_unmask(struct irq_data *data)
 	raw_spin_unlock_irqrestore(&mcip_lock, flags);
 }
 
-#ifdef CONFIG_SMP
 static int
-idu_irq_set_affinity(struct irq_data *data, const struct cpumask *cpumask,
-		     bool force)
+idu_irq_set_affinity(struct irq_data *d, const struct cpumask *cpumask, bool f)
 {
-	unsigned long flags;
-	cpumask_t online;
-
-	/* errout if no online cpu per @cpumask */
-	if (!cpumask_and(&online, cpumask, cpu_online_mask))
-		return -EINVAL;
-
-	raw_spin_lock_irqsave(&mcip_lock, flags);
-
-	idu_set_dest(data->hwirq, cpumask_bits(&online)[0]);
-	idu_set_mode(data->hwirq, IDU_M_TRIG_LEVEL, IDU_M_DISTRI_RR);
-
-	raw_spin_unlock_irqrestore(&mcip_lock, flags);
-
 	return IRQ_SET_MASK_OK;
 }
-#endif
 
 static struct irq_chip idu_irq_chip = {
 	.name			= "MCIP IDU Intc",
@@ -228,10 +236,9 @@ static struct irq_chip idu_irq_chip = {
 
 static int idu_first_irq;
 
-static void idu_cascade_isr(struct irq_desc *desc)
+static void idu_cascade_isr(unsigned int core_irq, struct irq_desc *desc)
 {
 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
-	unsigned int core_irq = irq_desc_get_irq(desc);
 	unsigned int idu_irq;
 
 	idu_irq = core_irq - idu_first_irq;
@@ -323,7 +330,8 @@ idu_of_init(struct device_node *intc, struct device_node *parent)
 		if (!i)
 			idu_first_irq = irq;
 
-		irq_set_chained_handler_and_data(irq, idu_cascade_isr, domain);
+		irq_set_handler_data(irq, domain);
+		irq_set_chained_handler(irq, idu_cascade_isr);
 	}
 
 	__mcip_cmd(CMD_IDU_ENABLE, 0);

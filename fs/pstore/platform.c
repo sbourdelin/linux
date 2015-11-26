@@ -237,14 +237,6 @@ static void allocate_buf_for_compression(void)
 
 }
 
-static void free_buf_for_compression(void)
-{
-	kfree(stream.workspace);
-	stream.workspace = NULL;
-	kfree(big_oops_buf);
-	big_oops_buf = NULL;
-}
-
 /*
  * Called when compression fails, since the printk buffer
  * would be fetched for compression calling it again when
@@ -361,19 +353,6 @@ static struct kmsg_dumper pstore_dumper = {
 	.dump = pstore_dump,
 };
 
-/*
- * Register with kmsg_dump to save last part of console log on panic.
- */
-static void pstore_register_kmsg(void)
-{
-	kmsg_dump_register(&pstore_dumper);
-}
-
-static void pstore_unregister_kmsg(void)
-{
-	kmsg_dump_unregister(&pstore_dumper);
-}
-
 #ifdef CONFIG_PSTORE_CONSOLE
 static void pstore_console_write(struct console *con, const char *s, unsigned c)
 {
@@ -411,14 +390,8 @@ static void pstore_register_console(void)
 {
 	register_console(&pstore_console);
 }
-
-static void pstore_unregister_console(void)
-{
-	unregister_console(&pstore_console);
-}
 #else
 static void pstore_register_console(void) {}
-static void pstore_unregister_console(void) {}
 #endif
 
 static int pstore_write_compat(enum pstore_type_id type,
@@ -437,6 +410,8 @@ static int pstore_write_compat(enum pstore_type_id type,
  * read function right away to populate the file system. If not
  * then the pstore mount code will call us later to fill out
  * the file system.
+ *
+ * Register with kmsg_dump to save last part of console log on panic.
  */
 int pstore_register(struct pstore_info *psi)
 {
@@ -467,7 +442,7 @@ int pstore_register(struct pstore_info *psi)
 	if (pstore_is_mounted())
 		pstore_get_records(0);
 
-	pstore_register_kmsg();
+	kmsg_dump_register(&pstore_dumper);
 
 	if ((psi->flags & PSTORE_FLAGS_FRAGILE) == 0) {
 		pstore_register_console();
@@ -487,27 +462,11 @@ int pstore_register(struct pstore_info *psi)
 	 */
 	backend = psi->name;
 
-	module_put(owner);
-
 	pr_info("Registered %s as persistent store backend\n", psi->name);
 
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pstore_register);
-
-void pstore_unregister(struct pstore_info *psi)
-{
-	pstore_unregister_pmsg();
-	pstore_unregister_ftrace();
-	pstore_unregister_console();
-	pstore_unregister_kmsg();
-
-	free_buf_for_compression();
-
-	psinfo = NULL;
-	backend = NULL;
-}
-EXPORT_SYMBOL_GPL(pstore_unregister);
 
 /*
  * Read all the records from the persistent store. Create

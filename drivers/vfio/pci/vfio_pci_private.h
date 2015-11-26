@@ -13,7 +13,6 @@
 
 #include <linux/mutex.h>
 #include <linux/pci.h>
-#include <linux/irqbypass.h>
 
 #ifndef VFIO_PCI_PRIVATE_H
 #define VFIO_PCI_PRIVATE_H
@@ -30,7 +29,6 @@ struct vfio_pci_irq_ctx {
 	struct virqfd		*mask;
 	char			*name;
 	bool			masked;
-	struct irq_bypass_producer	producer;
 };
 
 struct vfio_pci_device {

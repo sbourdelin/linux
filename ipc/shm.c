@@ -159,7 +159,7 @@ static inline struct shmid_kernel *shm_lock(struct ipc_namespace *ns, int id)
 	 * We raced in the idr lookup or with shm_destroy().  Either way, the
 	 * ID is busted.
 	 */
-	WARN_ON(IS_ERR(ipcp));
+	BUG_ON(IS_ERR(ipcp));
 
 	return container_of(ipcp, struct shmid_kernel, shm_perm);
 }
@@ -393,7 +393,7 @@ static int shm_mmap(struct file *file, struct vm_area_struct *vma)
 		return ret;
 	sfd->vm_ops = vma->vm_ops;
 #ifdef CONFIG_MMU
-	WARN_ON(!sfd->vm_ops->fault);
+	BUG_ON(!sfd->vm_ops->fault);
 #endif
 	vma->vm_ops = &shm_vm_ops;
 	shm_open(vma);
@@ -545,11 +545,17 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 		if  ((shmflg & SHM_NORESERVE) &&
 				sysctl_overcommit_memory != OVERCOMMIT_NEVER)
 			acctflag = VM_NORESERVE;
-		file = shmem_kernel_file_setup(name, size, acctflag);
+		file = shmem_file_setup(name, size, acctflag);
 	}
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;
+
+	id = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
+	if (id < 0) {
+		error = id;
+		goto no_id;
+	}
 
 	shp->shm_cprid = task_tgid_vnr(current);
 	shp->shm_lprid = 0;
@@ -559,13 +565,6 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	shp->shm_nattch = 0;
 	shp->shm_file = file;
 	shp->shm_creator = current;
-
-	id = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
-	if (id < 0) {
-		error = id;
-		goto no_id;
-	}
-
 	list_add(&shp->shm_clist, &current->sysvshm.shm_clist);
 
 	/*

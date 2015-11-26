@@ -67,12 +67,6 @@ static struct addr_marker address_markers[] = {
 	{ -1,			NULL },
 };
 
-/*
- * The page dumper groups page table entries of the same type into a single
- * description. It uses pg_state to track the range information while
- * iterating over the pte entries. When the continuity is broken it then
- * dumps out a description of the range.
- */
 struct pg_state {
 	struct seq_file *seq;
 	const struct addr_marker *marker;
@@ -119,16 +113,6 @@ static const struct prot_bits pte_bits[] = {
 		.val	= PTE_NG,
 		.set	= "NG",
 		.clear	= "  ",
-	}, {
-		.mask	= PTE_CONT,
-		.val	= PTE_CONT,
-		.set	= "CON",
-		.clear	= "   ",
-	}, {
-		.mask	= PTE_TABLE_BIT,
-		.val	= PTE_TABLE_BIT,
-		.set	= "   ",
-		.clear	= "BLK",
 	}, {
 		.mask	= PTE_UXN,
 		.val	= PTE_UXN,
@@ -214,7 +198,7 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
 		unsigned long delta;
 
 		if (st->current_prot) {
-			seq_printf(st->seq, "0x%016lx-0x%016lx   ",
+			seq_printf(st->seq, "0x%16lx-0x%16lx   ",
 				   st->start_address, addr);
 
 			delta = (addr - st->start_address) >> 10;

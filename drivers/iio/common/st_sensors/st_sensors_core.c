@@ -44,28 +44,6 @@ st_sensors_write_data_with_mask_error:
 	return err;
 }
 
-int st_sensors_debugfs_reg_access(struct iio_dev *indio_dev,
-				  unsigned reg, unsigned writeval,
-				  unsigned *readval)
-{
-	struct st_sensor_data *sdata = iio_priv(indio_dev);
-	u8 readdata;
-	int err;
-
-	if (!readval)
-		return sdata->tf->write_byte(&sdata->tb, sdata->dev,
-					     (u8)reg, (u8)writeval);
-
-	err = sdata->tf->read_byte(&sdata->tb, sdata->dev, (u8)reg, &readdata);
-	if (err < 0)
-		return err;
-
-	*readval = (unsigned)readdata;
-
-	return 0;
-}
-EXPORT_SYMBOL(st_sensors_debugfs_reg_access);
-
 static int st_sensors_match_odr(struct st_sensor_settings *sensor_settings,
 			unsigned int odr, struct st_sensor_odr_avl *odr_out)
 {
@@ -147,9 +125,6 @@ static int st_sensors_set_fullscale(struct iio_dev *indio_dev, unsigned int fs)
 {
 	int err, i = 0;
 	struct st_sensor_data *sdata = iio_priv(indio_dev);
-
-	if (sdata->sensor_settings->fs.addr == 0)
-		return 0;
 
 	err = st_sensors_match_fs(sdata->sensor_settings, fs, &i);
 	if (err < 0)
@@ -504,43 +479,46 @@ int st_sensors_check_device_support(struct iio_dev *indio_dev,
 			int num_sensors_list,
 			const struct st_sensor_settings *sensor_settings)
 {
-	int i, n, err;
 	u8 wai;
+	int i, n, err;
 	struct st_sensor_data *sdata = iio_priv(indio_dev);
 
-	for (i = 0; i < num_sensors_list; i++) {
-		for (n = 0; n < ST_SENSORS_MAX_4WAI; n++) {
-			if (strcmp(indio_dev->name,
-				sensor_settings[i].sensors_supported[n]) == 0) {
-				break;
-			}
-		}
-		if (n < ST_SENSORS_MAX_4WAI)
-			break;
-	}
-	if (i == num_sensors_list) {
-		dev_err(&indio_dev->dev, "device name %s not recognized.\n",
-							indio_dev->name);
-		return -ENODEV;
-	}
-
 	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
-					sensor_settings[i].wai_addr, &wai);
+					ST_SENSORS_DEFAULT_WAI_ADDRESS, &wai);
 	if (err < 0) {
 		dev_err(&indio_dev->dev, "failed to read Who-Am-I register.\n");
-		return err;
+		goto read_wai_error;
 	}
 
-	if (sensor_settings[i].wai != wai) {
-		dev_err(&indio_dev->dev, "%s: WhoAmI mismatch (0x%x).\n",
-						indio_dev->name, wai);
-		return -EINVAL;
+	for (i = 0; i < num_sensors_list; i++) {
+		if (sensor_settings[i].wai == wai)
+			break;
+	}
+	if (i == num_sensors_list)
+		goto device_not_supported;
+
+	for (n = 0; n < ARRAY_SIZE(sensor_settings[i].sensors_supported); n++) {
+		if (strcmp(indio_dev->name,
+				&sensor_settings[i].sensors_supported[n][0]) == 0)
+			break;
+	}
+	if (n == ARRAY_SIZE(sensor_settings[i].sensors_supported)) {
+		dev_err(&indio_dev->dev, "device name \"%s\" and WhoAmI (0x%02x) mismatch",
+			indio_dev->name, wai);
+		goto sensor_name_mismatch;
 	}
 
 	sdata->sensor_settings =
 			(struct st_sensor_settings *)&sensor_settings[i];
 
 	return i;
+
+device_not_supported:
+	dev_err(&indio_dev->dev, "device not supported: WhoAmI (0x%x).\n", wai);
+sensor_name_mismatch:
+	err = -ENODEV;
+read_wai_error:
+	return err;
 }
 EXPORT_SYMBOL(st_sensors_check_device_support);
 

@@ -20,10 +20,7 @@ Required properties:
 	"marvell,berlin2cd-soc-pinctrl",
 	"marvell,berlin2cd-system-pinctrl",
 	"marvell,berlin2q-soc-pinctrl",
-	"marvell,berlin2q-system-pinctrl",
-	"marvell,berlin4ct-avio-pinctrl",
-	"marvell,berlin4ct-soc-pinctrl",
-	"marvell,berlin4ct-system-pinctrl"
+	"marvell,berlin2q-system-pinctrl"
 
 Required subnode-properties:
 - groups: a list of strings describing the group names.

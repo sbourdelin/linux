@@ -246,7 +246,6 @@ void btrfs_unpin_free_ino(struct btrfs_root *root)
 {
 	struct btrfs_free_space_ctl *ctl = root->free_ino_ctl;
 	struct rb_root *rbroot = &root->free_ino_pinned->free_space_offset;
-	spinlock_t *rbroot_lock = &root->free_ino_pinned->tree_lock;
 	struct btrfs_free_space *info;
 	struct rb_node *n;
 	u64 count;
@@ -255,30 +254,24 @@ void btrfs_unpin_free_ino(struct btrfs_root *root)
 		return;
 
 	while (1) {
-		bool add_to_ctl = true;
-
-		spin_lock(rbroot_lock);
 		n = rb_first(rbroot);
-		if (!n) {
-			spin_unlock(rbroot_lock);
+		if (!n)
 			break;
-		}
 
 		info = rb_entry(n, struct btrfs_free_space, offset_index);
 		BUG_ON(info->bitmap); /* Logic error */
 
 		if (info->offset > root->ino_cache_progress)
-			add_to_ctl = false;
+			goto free;
 		else if (info->offset + info->bytes > root->ino_cache_progress)
 			count = root->ino_cache_progress - info->offset + 1;
 		else
 			count = info->bytes;
 
+		__btrfs_add_free_space(ctl, info->offset, count);
+free:
 		rb_erase(&info->offset_index, rbroot);
-		spin_unlock(rbroot_lock);
-		if (add_to_ctl)
-			__btrfs_add_free_space(ctl, info->offset, count);
-		kmem_cache_free(btrfs_free_space_cachep, info);
+		kfree(info);
 	}
 }
 
@@ -488,17 +481,17 @@ again:
 	/* Just to make sure we have enough space */
 	prealloc += 8 * PAGE_CACHE_SIZE;
 
-	ret = btrfs_delalloc_reserve_space(inode, 0, prealloc);
+	ret = btrfs_delalloc_reserve_space(inode, prealloc);
 	if (ret)
 		goto out_put;
 
 	ret = btrfs_prealloc_file_range_trans(inode, trans, 0, 0, prealloc,
 					      prealloc, prealloc, &alloc_hint);
 	if (ret) {
-		btrfs_delalloc_release_space(inode, 0, prealloc);
+		btrfs_delalloc_release_space(inode, prealloc);
 		goto out_put;
 	}
-	btrfs_free_reserved_data_space(inode, 0, prealloc);
+	btrfs_free_reserved_data_space(inode, prealloc);
 
 	ret = btrfs_write_out_ino_cache(root, trans, path, inode);
 out_put:

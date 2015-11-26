@@ -1244,6 +1244,7 @@ static struct i2c_driver pm2xxx_charger_driver = {
 	.remove = pm2xxx_wall_charger_remove,
 	.driver = {
 		.name = "pm2xxx-wall_charger",
+		.owner = THIS_MODULE,
 		.pm = PM2XXX_PM_OPS,
 	},
 	.id_table = pm2xxx_id,
@@ -1264,4 +1265,5 @@ module_exit(pm2xxx_charger_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Rajkumar kasirajan, Olivier Launay");
+MODULE_ALIAS("i2c:pm2xxx-charger");
 MODULE_DESCRIPTION("PM2xxx charger management driver");

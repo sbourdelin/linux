@@ -133,11 +133,11 @@ static int init_hw_info(struct snd_dice *dice,
 		   SNDRV_PCM_INFO_BLOCK_TRANSFER;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		hw->formats = AM824_IN_PCM_FORMAT_BITS;
+		hw->formats = AMDTP_IN_PCM_FORMAT_BITS;
 		stream = &dice->tx_stream;
 		pcm_channels = dice->tx_channels;
 	} else {
-		hw->formats = AM824_OUT_PCM_FORMAT_BITS;
+		hw->formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		stream = &dice->rx_stream;
 		pcm_channels = dice->rx_channels;
 	}
@@ -156,7 +156,7 @@ static int init_hw_info(struct snd_dice *dice,
 	if (err < 0)
 		goto end;
 
-	err = amdtp_am824_add_pcm_hw_constraints(stream, runtime);
+	err = amdtp_stream_add_pcm_hw_constraints(stream, runtime);
 end:
 	return err;
 }
@@ -230,12 +230,6 @@ static int capture_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_dice *dice = substream->private_data;
-	int err;
-
-	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
-					       params_buffer_bytes(hw_params));
-	if (err < 0)
-		return err;
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		mutex_lock(&dice->mutex);
@@ -243,20 +237,16 @@ static int capture_hw_params(struct snd_pcm_substream *substream,
 		mutex_unlock(&dice->mutex);
 	}
 
-	amdtp_am824_set_pcm_format(&dice->tx_stream, params_format(hw_params));
+	amdtp_stream_set_pcm_format(&dice->tx_stream,
+				    params_format(hw_params));
 
-	return 0;
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
 }
 static int playback_hw_params(struct snd_pcm_substream *substream,
 			      struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_dice *dice = substream->private_data;
-	int err;
-
-	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
-					       params_buffer_bytes(hw_params));
-	if (err < 0)
-		return err;
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		mutex_lock(&dice->mutex);
@@ -264,9 +254,11 @@ static int playback_hw_params(struct snd_pcm_substream *substream,
 		mutex_unlock(&dice->mutex);
 	}
 
-	amdtp_am824_set_pcm_format(&dice->rx_stream, params_format(hw_params));
+	amdtp_stream_set_pcm_format(&dice->rx_stream,
+				    params_format(hw_params));
 
-	return 0;
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
 }
 
 static int capture_hw_free(struct snd_pcm_substream *substream)

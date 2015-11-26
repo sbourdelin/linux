@@ -67,7 +67,7 @@ void lov_finish_set(struct lov_request_set *set)
 		list_del_init(&req->rq_link);
 
 		if (req->rq_oi.oi_oa)
-			kmem_cache_free(obdo_cachep, req->rq_oi.oi_oa);
+			OBDO_FREE(req->rq_oi.oi_oa);
 		kfree(req->rq_oi.oi_osfs);
 		kfree(req);
 	}
@@ -202,7 +202,7 @@ static int common_attr_done(struct lov_request_set *set)
 	if (!atomic_read(&set->set_success))
 		return -EIO;
 
-	tmp_oa = kmem_cache_alloc(obdo_cachep, GFP_NOFS | __GFP_ZERO);
+	OBDO_ALLOC(tmp_oa);
 	if (tmp_oa == NULL) {
 		rc = -ENOMEM;
 		goto out;
@@ -236,7 +236,7 @@ static int common_attr_done(struct lov_request_set *set)
 	memcpy(set->set_oi->oi_oa, tmp_oa, sizeof(*set->set_oi->oi_oa));
 out:
 	if (tmp_oa)
-		kmem_cache_free(obdo_cachep, tmp_oa);
+		OBDO_FREE(tmp_oa);
 	return rc;
 
 }
@@ -275,7 +275,7 @@ int lov_prep_getattr_set(struct obd_export *exp, struct obd_info *oinfo,
 	int rc = 0, i;
 
 	set = kzalloc(sizeof(*set), GFP_NOFS);
-	if (!set)
+	if (set == NULL)
 		return -ENOMEM;
 	lov_init_set(set);
 
@@ -301,7 +301,7 @@ int lov_prep_getattr_set(struct obd_export *exp, struct obd_info *oinfo,
 		}
 
 		req = kzalloc(sizeof(*req), GFP_NOFS);
-		if (!req) {
+		if (req == NULL) {
 			rc = -ENOMEM;
 			goto out_set;
 		}
@@ -309,8 +309,7 @@ int lov_prep_getattr_set(struct obd_export *exp, struct obd_info *oinfo,
 		req->rq_stripe = i;
 		req->rq_idx = loi->loi_ost_idx;
 
-		req->rq_oi.oi_oa = kmem_cache_alloc(obdo_cachep,
-						    GFP_NOFS | __GFP_ZERO);
+		OBDO_ALLOC(req->rq_oi.oi_oa);
 		if (req->rq_oi.oi_oa == NULL) {
 			kfree(req);
 			rc = -ENOMEM;
@@ -320,6 +319,7 @@ int lov_prep_getattr_set(struct obd_export *exp, struct obd_info *oinfo,
 		       sizeof(*req->rq_oi.oi_oa));
 		req->rq_oi.oi_oa->o_oi = loi->loi_oi;
 		req->rq_oi.oi_cb_up = cb_getattr_update;
+		req->rq_oi.oi_capa = oinfo->oi_capa;
 
 		lov_set_add_req(req, set);
 	}
@@ -358,7 +358,7 @@ int lov_prep_destroy_set(struct obd_export *exp, struct obd_info *oinfo,
 	int rc = 0, i;
 
 	set = kzalloc(sizeof(*set), GFP_NOFS);
-	if (!set)
+	if (set == NULL)
 		return -ENOMEM;
 	lov_init_set(set);
 
@@ -384,7 +384,7 @@ int lov_prep_destroy_set(struct obd_export *exp, struct obd_info *oinfo,
 		}
 
 		req = kzalloc(sizeof(*req), GFP_NOFS);
-		if (!req) {
+		if (req == NULL) {
 			rc = -ENOMEM;
 			goto out_set;
 		}
@@ -392,8 +392,7 @@ int lov_prep_destroy_set(struct obd_export *exp, struct obd_info *oinfo,
 		req->rq_stripe = i;
 		req->rq_idx = loi->loi_ost_idx;
 
-		req->rq_oi.oi_oa = kmem_cache_alloc(obdo_cachep,
-						    GFP_NOFS | __GFP_ZERO);
+		OBDO_ALLOC(req->rq_oi.oi_oa);
 		if (req->rq_oi.oi_oa == NULL) {
 			kfree(req);
 			rc = -ENOMEM;
@@ -478,7 +477,7 @@ int lov_prep_setattr_set(struct obd_export *exp, struct obd_info *oinfo,
 	int rc = 0, i;
 
 	set = kzalloc(sizeof(*set), GFP_NOFS);
-	if (!set)
+	if (set == NULL)
 		return -ENOMEM;
 	lov_init_set(set);
 
@@ -501,15 +500,14 @@ int lov_prep_setattr_set(struct obd_export *exp, struct obd_info *oinfo,
 		}
 
 		req = kzalloc(sizeof(*req), GFP_NOFS);
-		if (!req) {
+		if (req == NULL) {
 			rc = -ENOMEM;
 			goto out_set;
 		}
 		req->rq_stripe = i;
 		req->rq_idx = loi->loi_ost_idx;
 
-		req->rq_oi.oi_oa = kmem_cache_alloc(obdo_cachep,
-						    GFP_NOFS | __GFP_ZERO);
+		OBDO_ALLOC(req->rq_oi.oi_oa);
 		if (req->rq_oi.oi_oa == NULL) {
 			kfree(req);
 			rc = -ENOMEM;
@@ -520,6 +518,7 @@ int lov_prep_setattr_set(struct obd_export *exp, struct obd_info *oinfo,
 		req->rq_oi.oi_oa->o_oi = loi->loi_oi;
 		req->rq_oi.oi_oa->o_stripe_idx = i;
 		req->rq_oi.oi_cb_up = cb_setattr_update;
+		req->rq_oi.oi_capa = oinfo->oi_capa;
 
 		if (oinfo->oi_oa->o_valid & OBD_MD_FLSIZE) {
 			int off = lov_stripe_offset(oinfo->oi_md,
@@ -705,7 +704,7 @@ int lov_prep_statfs_set(struct obd_device *obd, struct obd_info *oinfo,
 	int rc = 0, i;
 
 	set = kzalloc(sizeof(*set), GFP_NOFS);
-	if (!set)
+	if (set == NULL)
 		return -ENOMEM;
 	lov_init_set(set);
 
@@ -731,14 +730,14 @@ int lov_prep_statfs_set(struct obd_device *obd, struct obd_info *oinfo,
 		}
 
 		req = kzalloc(sizeof(*req), GFP_NOFS);
-		if (!req) {
+		if (req == NULL) {
 			rc = -ENOMEM;
 			goto out_set;
 		}
 
 		req->rq_oi.oi_osfs = kzalloc(sizeof(*req->rq_oi.oi_osfs),
 					     GFP_NOFS);
-		if (!req->rq_oi.oi_osfs) {
+		if (req->rq_oi.oi_osfs == NULL) {
 			kfree(req);
 			rc = -ENOMEM;
 			goto out_set;

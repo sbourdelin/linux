@@ -93,10 +93,8 @@ else
   print_install =		echo '  INSTALL  '$1'	to	$(DESTDIR_SQ)$2';
 endif
 
-all:
-
 export srctree OUTPUT CC LD CFLAGS V
-include $(srctree)/tools/build/Makefile.include
+build := -f $(srctree)/tools/build/Makefile.build dir=. obj
 
 do_compile_shared_library =			\
 	($(print_shared_lib_compile)		\
@@ -111,7 +109,7 @@ CMD_TARGETS = $(LIB_FILE)
 TARGETS = $(CMD_TARGETS)
 
 
-all: fixdep all_cmd
+all: all_cmd
 
 all_cmd: $(CMD_TARGETS)
 

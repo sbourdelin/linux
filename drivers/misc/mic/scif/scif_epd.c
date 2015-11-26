@@ -65,14 +65,14 @@ void scif_teardown_ep(void *endpt)
 void scif_add_epd_to_zombie_list(struct scif_endpt *ep, bool eplock_held)
 {
 	if (!eplock_held)
-		mutex_lock(&scif_info.eplock);
+		spin_lock(&scif_info.eplock);
 	spin_lock(&ep->lock);
 	ep->state = SCIFEP_ZOMBIE;
 	spin_unlock(&ep->lock);
 	list_add_tail(&ep->list, &scif_info.zombie);
 	scif_info.nr_zombies++;
 	if (!eplock_held)
-		mutex_unlock(&scif_info.eplock);
+		spin_unlock(&scif_info.eplock);
 	schedule_work(&scif_info.misc_work);
 }
 
@@ -81,15 +81,16 @@ static struct scif_endpt *scif_find_listen_ep(u16 port)
 	struct scif_endpt *ep = NULL;
 	struct list_head *pos, *tmpq;
 
-	mutex_lock(&scif_info.eplock);
+	spin_lock(&scif_info.eplock);
 	list_for_each_safe(pos, tmpq, &scif_info.listen) {
 		ep = list_entry(pos, struct scif_endpt, list);
 		if (ep->port.port == port) {
-			mutex_unlock(&scif_info.eplock);
+			spin_lock(&ep->lock);
+			spin_unlock(&scif_info.eplock);
 			return ep;
 		}
 	}
-	mutex_unlock(&scif_info.eplock);
+	spin_unlock(&scif_info.eplock);
 	return NULL;
 }
 
@@ -98,17 +99,14 @@ void scif_cleanup_zombie_epd(void)
 	struct list_head *pos, *tmpq;
 	struct scif_endpt *ep;
 
-	mutex_lock(&scif_info.eplock);
+	spin_lock(&scif_info.eplock);
 	list_for_each_safe(pos, tmpq, &scif_info.zombie) {
 		ep = list_entry(pos, struct scif_endpt, list);
-		if (scif_rma_ep_can_uninit(ep)) {
-			list_del(pos);
-			scif_info.nr_zombies--;
-			put_iova_domain(&ep->rma_info.iovad);
-			kfree(ep);
-		}
+		list_del(pos);
+		scif_info.nr_zombies--;
+		kfree(ep);
 	}
-	mutex_unlock(&scif_info.eplock);
+	spin_unlock(&scif_info.eplock);
 }
 
 /**
@@ -139,8 +137,6 @@ void scif_cnctreq(struct scif_dev *scifdev, struct scifmsg *msg)
 	if (!ep)
 		/*  Send reject due to no listening ports */
 		goto conreq_sendrej_free;
-	else
-		spin_lock(&ep->lock);
 
 	if (ep->backlog <= ep->conreqcnt) {
 		/*  Send reject due to too many pending requests */

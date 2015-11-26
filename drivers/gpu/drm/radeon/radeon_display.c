@@ -323,8 +323,7 @@ void radeon_crtc_handle_vblank(struct radeon_device *rdev, int crtc_id)
 	 */
 	if (update_pending &&
 	    (DRM_SCANOUTPOS_VALID & radeon_get_crtc_scanoutpos(rdev->ddev, crtc_id, 0,
-							       &vpos, &hpos, NULL, NULL,
-							       &rdev->mode_info.crtcs[crtc_id]->base.hwmode)) &&
+							       &vpos, &hpos, NULL, NULL)) &&
 	    ((vpos >= (99 * rdev->mode_info.crtcs[crtc_id]->base.hwmode.crtc_vdisplay)/100) ||
 	     (vpos < 0 && !ASIC_IS_AVIVO(rdev)))) {
 		/* crtc didn't flip in this target vblank interval,
@@ -1634,8 +1633,18 @@ int radeon_modeset_init(struct radeon_device *rdev)
 	radeon_fbdev_init(rdev);
 	drm_kms_helper_poll_init(rdev->ddev);
 
-	/* do pm late init */
-	ret = radeon_pm_late_init(rdev);
+	if (rdev->pm.dpm_enabled) {
+		/* do dpm late init */
+		ret = radeon_pm_late_init(rdev);
+		if (ret) {
+			rdev->pm.dpm_enabled = false;
+			DRM_ERROR("radeon_pm_late_init failed, disabling dpm\n");
+		}
+		/* set the dpm state for PX since there won't be
+		 * a modeset to call this.
+		 */
+		radeon_pm_compute_clocks(rdev);
+	}
 
 	return 0;
 }
@@ -1789,10 +1798,8 @@ bool radeon_crtc_scaling_mode_fixup(struct drm_crtc *crtc,
  * unknown small number of scanlines wrt. real scanout position.
  *
  */
-int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
-			       unsigned int flags, int *vpos, int *hpos,
-			       ktime_t *stime, ktime_t *etime,
-			       const struct drm_display_mode *mode)
+int radeon_get_crtc_scanoutpos(struct drm_device *dev, int crtc, unsigned int flags,
+			       int *vpos, int *hpos, ktime_t *stime, ktime_t *etime)
 {
 	u32 stat_crtc = 0, vbl = 0, position = 0;
 	int vbl_start, vbl_end, vtotal, ret = 0;
@@ -1807,42 +1814,42 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 		*stime = ktime_get();
 
 	if (ASIC_IS_DCE4(rdev)) {
-		if (pipe == 0) {
+		if (crtc == 0) {
 			vbl = RREG32(EVERGREEN_CRTC_V_BLANK_START_END +
 				     EVERGREEN_CRTC0_REGISTER_OFFSET);
 			position = RREG32(EVERGREEN_CRTC_STATUS_POSITION +
 					  EVERGREEN_CRTC0_REGISTER_OFFSET);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 1) {
+		if (crtc == 1) {
 			vbl = RREG32(EVERGREEN_CRTC_V_BLANK_START_END +
 				     EVERGREEN_CRTC1_REGISTER_OFFSET);
 			position = RREG32(EVERGREEN_CRTC_STATUS_POSITION +
 					  EVERGREEN_CRTC1_REGISTER_OFFSET);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 2) {
+		if (crtc == 2) {
 			vbl = RREG32(EVERGREEN_CRTC_V_BLANK_START_END +
 				     EVERGREEN_CRTC2_REGISTER_OFFSET);
 			position = RREG32(EVERGREEN_CRTC_STATUS_POSITION +
 					  EVERGREEN_CRTC2_REGISTER_OFFSET);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 3) {
+		if (crtc == 3) {
 			vbl = RREG32(EVERGREEN_CRTC_V_BLANK_START_END +
 				     EVERGREEN_CRTC3_REGISTER_OFFSET);
 			position = RREG32(EVERGREEN_CRTC_STATUS_POSITION +
 					  EVERGREEN_CRTC3_REGISTER_OFFSET);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 4) {
+		if (crtc == 4) {
 			vbl = RREG32(EVERGREEN_CRTC_V_BLANK_START_END +
 				     EVERGREEN_CRTC4_REGISTER_OFFSET);
 			position = RREG32(EVERGREEN_CRTC_STATUS_POSITION +
 					  EVERGREEN_CRTC4_REGISTER_OFFSET);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 5) {
+		if (crtc == 5) {
 			vbl = RREG32(EVERGREEN_CRTC_V_BLANK_START_END +
 				     EVERGREEN_CRTC5_REGISTER_OFFSET);
 			position = RREG32(EVERGREEN_CRTC_STATUS_POSITION +
@@ -1850,19 +1857,19 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
 	} else if (ASIC_IS_AVIVO(rdev)) {
-		if (pipe == 0) {
+		if (crtc == 0) {
 			vbl = RREG32(AVIVO_D1CRTC_V_BLANK_START_END);
 			position = RREG32(AVIVO_D1CRTC_STATUS_POSITION);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 1) {
+		if (crtc == 1) {
 			vbl = RREG32(AVIVO_D2CRTC_V_BLANK_START_END);
 			position = RREG32(AVIVO_D2CRTC_STATUS_POSITION);
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
 	} else {
 		/* Pre-AVIVO: Different encoding of scanout pos and vblank interval. */
-		if (pipe == 0) {
+		if (crtc == 0) {
 			/* Assume vbl_end == 0, get vbl_start from
 			 * upper 16 bits.
 			 */
@@ -1876,7 +1883,7 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 
 			ret |= DRM_SCANOUTPOS_VALID;
 		}
-		if (pipe == 1) {
+		if (crtc == 1) {
 			vbl = (RREG32(RADEON_CRTC2_V_TOTAL_DISP) &
 				RADEON_CRTC_V_DISP) >> RADEON_CRTC_V_DISP_SHIFT;
 			position = (RREG32(RADEON_CRTC2_VLINE_CRNT_VLINE) >> 16) & RADEON_CRTC_V_TOTAL;
@@ -1907,7 +1914,7 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	}
 	else {
 		/* No: Fake something reasonable which gives at least ok results. */
-		vbl_start = mode->crtc_vdisplay;
+		vbl_start = rdev->mode_info.crtcs[crtc]->base.hwmode.crtc_vdisplay;
 		vbl_end = 0;
 	}
 
@@ -1923,7 +1930,7 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 
 	/* Inside "upper part" of vblank area? Apply corrective offset if so: */
 	if (in_vbl && (*vpos >= vbl_start)) {
-		vtotal = mode->crtc_vtotal;
+		vtotal = rdev->mode_info.crtcs[crtc]->base.hwmode.crtc_vtotal;
 		*vpos = *vpos - vtotal;
 	}
 
@@ -1945,8 +1952,8 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	 * We only do this if DRM_CALLED_FROM_VBLIRQ.
 	 */
 	if ((flags & DRM_CALLED_FROM_VBLIRQ) && !in_vbl) {
-		vbl_start = mode->crtc_vdisplay;
-		vtotal = mode->crtc_vtotal;
+		vbl_start = rdev->mode_info.crtcs[crtc]->base.hwmode.crtc_vdisplay;
+		vtotal = rdev->mode_info.crtcs[crtc]->base.hwmode.crtc_vtotal;
 
 		if (vbl_start - *vpos < vtotal / 100) {
 			*vpos -= vtotal;

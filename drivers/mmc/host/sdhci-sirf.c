@@ -50,8 +50,7 @@ static u32 sdhci_sirf_readl_le(struct sdhci_host *host, int reg)
 	if (unlikely((reg == SDHCI_CAPABILITIES_1) &&
 			(host->mmc->caps & MMC_CAP_UHS_SDR50))) {
 		/* fake CAP_1 register */
-		val = SDHCI_SUPPORT_DDR50 |
-			SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
+		val = SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
 	}
 
 	if (unlikely(reg == SDHCI_SLOT_INT_STATUS)) {
@@ -98,7 +97,7 @@ retry:
 			clock_setting | phase,
 			SDHCI_CLK_DELAY_SETTING);
 
-		if (!mmc_send_tuning(mmc, opcode, NULL)) {
+		if (!mmc_send_tuning(mmc)) {
 			/* Tuning is successful at this tuning point */
 			tuned_phase_cnt++;
 			dev_dbg(mmc_dev(mmc), "%s: Found good phase = %d\n",
@@ -162,8 +161,8 @@ static struct sdhci_pltfm_data sdhci_sirf_pdata = {
 	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
 		SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
 		SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
-		SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+		SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+		SDHCI_QUIRK_DELAY_AFTER_POWER,
 };
 
 static int sdhci_sirf_probe(struct platform_device *pdev)

@@ -176,7 +176,7 @@ static int fun_chip_init(struct fsl_upm_nand *fun,
 		fun->chip.dev_ready = fun_chip_ready;
 
 	fun->mtd.priv = &fun->chip;
-	fun->mtd.dev.parent = fun->dev;
+	fun->mtd.owner = THIS_MODULE;
 
 	flash_np = of_get_next_child(upm_np, NULL);
 	if (!flash_np)

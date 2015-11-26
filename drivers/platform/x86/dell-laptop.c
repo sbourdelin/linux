@@ -309,15 +309,12 @@ static const struct dmi_system_id dell_quirks[] __initconst = {
 static struct calling_interface_buffer *buffer;
 static DEFINE_MUTEX(buffer_mutex);
 
-static void clear_buffer(void)
-{
-	memset(buffer, 0, sizeof(struct calling_interface_buffer));
-}
+static int hwswitch_state;
 
 static void get_buffer(void)
 {
 	mutex_lock(&buffer_mutex);
-	clear_buffer();
+	memset(buffer, 0, sizeof(struct calling_interface_buffer));
 }
 
 static void release_buffer(void)
@@ -551,41 +548,21 @@ static int dell_rfkill_set(void *data, bool blocked)
 	int disable = blocked ? 1 : 0;
 	unsigned long radio = (unsigned long)data;
 	int hwswitch_bit = (unsigned long)data - 1;
-	int hwswitch;
-	int status;
-	int ret;
 
 	get_buffer();
-
 	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
-	status = buffer->output[1];
-
-	if (ret != 0)
-		goto out;
-
-	clear_buffer();
-
-	buffer->input[0] = 0x2;
-	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
-	hwswitch = buffer->output[1];
 
 	/* If the hardware switch controls this radio, and the hardware
 	   switch is disabled, always disable the radio */
-	if (ret == 0 && (hwswitch & BIT(hwswitch_bit)) &&
-	    (status & BIT(0)) && !(status & BIT(16)))
+	if ((hwswitch_state & BIT(hwswitch_bit)) &&
+	    !(buffer->output[1] & BIT(16)))
 		disable = 1;
-
-	clear_buffer();
 
 	buffer->input[0] = (1 | (radio<<8) | (disable << 16));
 	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
 
- out:
 	release_buffer();
-	return dell_smi_error(ret);
+	return 0;
 }
 
 /* Must be called with the buffer held */
@@ -595,7 +572,6 @@ static void dell_rfkill_update_sw_state(struct rfkill *rfkill, int radio,
 	if (status & BIT(0)) {
 		/* Has hw-switch, sync sw_state to BIOS */
 		int block = rfkill_blocked(rfkill);
-		clear_buffer();
 		buffer->input[0] = (1 | (radio << 8) | (block << 16));
 		dell_send_request(buffer, 17, 11);
 	} else {
@@ -605,43 +581,23 @@ static void dell_rfkill_update_sw_state(struct rfkill *rfkill, int radio,
 }
 
 static void dell_rfkill_update_hw_state(struct rfkill *rfkill, int radio,
-					int status, int hwswitch)
+					int status)
 {
-	if (hwswitch & (BIT(radio - 1)))
+	if (hwswitch_state & (BIT(radio - 1)))
 		rfkill_set_hw_state(rfkill, !(status & BIT(16)));
 }
 
 static void dell_rfkill_query(struct rfkill *rfkill, void *data)
 {
-	int radio = ((unsigned long)data & 0xF);
-	int hwswitch;
 	int status;
-	int ret;
 
 	get_buffer();
-
 	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
 	status = buffer->output[1];
 
-	if (ret != 0 || !(status & BIT(0))) {
-		release_buffer();
-		return;
-	}
-
-	clear_buffer();
-
-	buffer->input[0] = 0x2;
-	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
-	hwswitch = buffer->output[1];
+	dell_rfkill_update_hw_state(rfkill, (unsigned long)data, status);
 
 	release_buffer();
-
-	if (ret != 0)
-		return;
-
-	dell_rfkill_update_hw_state(rfkill, radio, status, hwswitch);
 }
 
 static const struct rfkill_ops dell_rfkill_ops = {
@@ -653,27 +609,13 @@ static struct dentry *dell_laptop_dir;
 
 static int dell_debugfs_show(struct seq_file *s, void *data)
 {
-	int hwswitch_state;
-	int hwswitch_ret;
 	int status;
-	int ret;
 
 	get_buffer();
-
 	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
 	status = buffer->output[1];
-
-	clear_buffer();
-
-	buffer->input[0] = 0x2;
-	dell_send_request(buffer, 17, 11);
-	hwswitch_ret = buffer->output[0];
-	hwswitch_state = buffer->output[1];
-
 	release_buffer();
 
-	seq_printf(s, "return:\t%d\n", ret);
 	seq_printf(s, "status:\t0x%X\n", status);
 	seq_printf(s, "Bit 0 : Hardware switch supported:   %lu\n",
 		   status & BIT(0));
@@ -715,8 +657,7 @@ static int dell_debugfs_show(struct seq_file *s, void *data)
 	seq_printf(s, "Bit 21: WiGig is blocked:            %lu\n",
 		  (status & BIT(21)) >> 21);
 
-	seq_printf(s, "\nhwswitch_return:\t%d\n", hwswitch_ret);
-	seq_printf(s, "hwswitch_state:\t0x%X\n", hwswitch_state);
+	seq_printf(s, "\nhwswitch_state:\t0x%X\n", hwswitch_state);
 	seq_printf(s, "Bit 0 : Wifi controlled by switch:      %lu\n",
 		   hwswitch_state & BIT(0));
 	seq_printf(s, "Bit 1 : Bluetooth controlled by switch: %lu\n",
@@ -752,43 +693,25 @@ static const struct file_operations dell_debugfs_fops = {
 
 static void dell_update_rfkill(struct work_struct *ignored)
 {
-	int hwswitch = 0;
 	int status;
-	int ret;
 
 	get_buffer();
-
 	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
 	status = buffer->output[1];
 
-	if (ret != 0)
-		goto out;
-
-	clear_buffer();
-
-	buffer->input[0] = 0x2;
-	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
-
-	if (ret == 0 && (status & BIT(0)))
-		hwswitch = buffer->output[1];
-
 	if (wifi_rfkill) {
-		dell_rfkill_update_hw_state(wifi_rfkill, 1, status, hwswitch);
+		dell_rfkill_update_hw_state(wifi_rfkill, 1, status);
 		dell_rfkill_update_sw_state(wifi_rfkill, 1, status);
 	}
 	if (bluetooth_rfkill) {
-		dell_rfkill_update_hw_state(bluetooth_rfkill, 2, status,
-					    hwswitch);
+		dell_rfkill_update_hw_state(bluetooth_rfkill, 2, status);
 		dell_rfkill_update_sw_state(bluetooth_rfkill, 2, status);
 	}
 	if (wwan_rfkill) {
-		dell_rfkill_update_hw_state(wwan_rfkill, 3, status, hwswitch);
+		dell_rfkill_update_hw_state(wwan_rfkill, 3, status);
 		dell_rfkill_update_sw_state(wwan_rfkill, 3, status);
 	}
 
- out:
 	release_buffer();
 }
 static DECLARE_DELAYED_WORK(dell_rfkill_work, dell_update_rfkill);
@@ -850,17 +773,21 @@ static int __init dell_setup_rfkill(void)
 
 	get_buffer();
 	dell_send_request(buffer, 17, 11);
-	ret = buffer->output[0];
 	status = buffer->output[1];
+	buffer->input[0] = 0x2;
+	dell_send_request(buffer, 17, 11);
+	hwswitch_state = buffer->output[1];
 	release_buffer();
 
-	/* dell wireless info smbios call is not supported */
-	if (ret != 0)
-		return 0;
-
-	/* rfkill is only tested on laptops with a hwswitch */
-	if (!(status & BIT(0)) && !force_rfkill)
-		return 0;
+	if (!(status & BIT(0))) {
+		if (force_rfkill) {
+			/* No hwsitch, clear all hw-controlled bits */
+			hwswitch_state &= ~7;
+		} else {
+			/* rfkill is only tested on laptops with a hwswitch */
+			return 0;
+		}
+	}
 
 	if ((status & (1<<2|1<<8)) == (1<<2|1<<8)) {
 		wifi_rfkill = rfkill_alloc("dell-wifi", &platform_device->dev,
@@ -1005,50 +932,47 @@ static void dell_cleanup_rfkill(void)
 
 static int dell_send_intensity(struct backlight_device *bd)
 {
-	int token;
-	int ret;
-
-	token = find_token_location(BRIGHTNESS_TOKEN);
-	if (token == -1)
-		return -ENODEV;
+	int ret = 0;
 
 	get_buffer();
-	buffer->input[0] = token;
+	buffer->input[0] = find_token_location(BRIGHTNESS_TOKEN);
 	buffer->input[1] = bd->props.brightness;
+
+	if (buffer->input[0] == -1) {
+		ret = -ENODEV;
+		goto out;
+	}
 
 	if (power_supply_is_system_supplied() > 0)
 		dell_send_request(buffer, 1, 2);
 	else
 		dell_send_request(buffer, 1, 1);
 
-	ret = dell_smi_error(buffer->output[0]);
-
+ out:
 	release_buffer();
 	return ret;
 }
 
 static int dell_get_intensity(struct backlight_device *bd)
 {
-	int token;
-	int ret;
-
-	token = find_token_location(BRIGHTNESS_TOKEN);
-	if (token == -1)
-		return -ENODEV;
+	int ret = 0;
 
 	get_buffer();
-	buffer->input[0] = token;
+	buffer->input[0] = find_token_location(BRIGHTNESS_TOKEN);
+
+	if (buffer->input[0] == -1) {
+		ret = -ENODEV;
+		goto out;
+	}
 
 	if (power_supply_is_system_supplied() > 0)
 		dell_send_request(buffer, 0, 2);
 	else
 		dell_send_request(buffer, 0, 1);
 
-	if (buffer->output[0])
-		ret = dell_smi_error(buffer->output[0]);
-	else
-		ret = buffer->output[1];
+	ret = buffer->output[1];
 
+ out:
 	release_buffer();
 	return ret;
 }
@@ -2112,7 +2036,6 @@ static void kbd_led_exit(void)
 static int __init dell_init(void)
 {
 	int max_intensity = 0;
-	int token;
 	int ret;
 
 	if (!dmi_check_system(dell_device_table))
@@ -2171,15 +2094,13 @@ static int __init dell_init(void)
 	if (acpi_video_get_backlight_type() != acpi_backlight_vendor)
 		return 0;
 
-	token = find_token_location(BRIGHTNESS_TOKEN);
-	if (token != -1) {
-		get_buffer();
-		buffer->input[0] = token;
+	get_buffer();
+	buffer->input[0] = find_token_location(BRIGHTNESS_TOKEN);
+	if (buffer->input[0] != -1) {
 		dell_send_request(buffer, 0, 2);
-		if (buffer->output[0] == 0)
-			max_intensity = buffer->output[3];
-		release_buffer();
+		max_intensity = buffer->output[3];
 	}
+	release_buffer();
 
 	if (max_intensity) {
 		struct backlight_properties props;

@@ -277,6 +277,14 @@ int ll_commit_write(struct file *file, struct page *vmpage, unsigned from,
 	return result;
 }
 
+struct obd_capa *cl_capa_lookup(struct inode *inode, enum cl_req_type crt)
+{
+	__u64 opc;
+
+	opc = crt == CRT_WRITE ? CAPA_OPC_OSS_WRITE : CAPA_OPC_OSS_RW;
+	return ll_osscapa_get(inode, opc);
+}
+
 static void ll_ra_stats_inc_sbi(struct ll_sb_info *sbi, enum ra_stat which);
 
 /**
@@ -327,7 +335,6 @@ static unsigned long ll_ra_count_get(struct ll_sb_info *sbi,
 	 * the RPC boundary from needing an extra read RPC. */
 	if (ria->ria_pages == 0) {
 		long beyond_rpc = (ria->ria_start + ret) % PTLRPC_MAX_BRW_PAGES;
-
 		if (/* beyond_rpc != 0 && */ beyond_rpc < ret)
 			ret -= beyond_rpc;
 	}
@@ -344,7 +351,6 @@ out:
 void ll_ra_count_put(struct ll_sb_info *sbi, unsigned long len)
 {
 	struct ll_ra_info *ra = &sbi->ll_ra_info;
-
 	atomic_sub(len, &ra->ra_cur_pages);
 }
 
@@ -357,7 +363,6 @@ static void ll_ra_stats_inc_sbi(struct ll_sb_info *sbi, enum ra_stat which)
 void ll_ra_stats_inc(struct address_space *mapping, enum ra_stat which)
 {
 	struct ll_sb_info *sbi = ll_i2sbi(mapping->host);
-
 	ll_ra_stats_inc_sbi(sbi, which);
 }
 
@@ -418,6 +423,30 @@ void ll_ra_read_ex(struct file *f, struct ll_ra_read *rar)
 	spin_lock(&ras->ras_lock);
 	list_del_init(&rar->lrr_linkage);
 	spin_unlock(&ras->ras_lock);
+}
+
+static struct ll_ra_read *ll_ra_read_get_locked(struct ll_readahead_state *ras)
+{
+	struct ll_ra_read *scan;
+
+	list_for_each_entry(scan, &ras->ras_read_beads, lrr_linkage) {
+		if (scan->lrr_reader == current)
+			return scan;
+	}
+	return NULL;
+}
+
+struct ll_ra_read *ll_ra_read_get(struct file *f)
+{
+	struct ll_readahead_state *ras;
+	struct ll_ra_read	 *bead;
+
+	ras = ll_ras_get(f);
+
+	spin_lock(&ras->ras_lock);
+	bead = ll_ra_read_get_locked(ras);
+	spin_unlock(&ras->ras_lock);
+	return bead;
 }
 
 static int cl_read_ahead_page(const struct lu_env *env, struct cl_io *io,
@@ -528,7 +557,6 @@ static inline int stride_io_mode(struct ll_readahead_state *ras)
 {
 	return ras->ras_consecutive_stride_requests > 1;
 }
-
 /* The function calculates how much pages will be read in
  * [off, off + length], in such stride IO area,
  * stride_offset = st_off, stride_length = st_len,
@@ -628,7 +656,7 @@ static int ll_read_ahead_pages(const struct lu_env *env,
 						page_idx, mapping);
 			if (rc == 1) {
 				(*reserved_pages)--;
-				count++;
+				count ++;
 			} else if (rc == -ENOLCK)
 				break;
 		} else if (stride_ria) {
@@ -862,7 +890,7 @@ static void ras_update_stride_detector(struct ll_readahead_state *ras,
 	if (!stride_io_mode(ras) && (stride_gap != 0 ||
 	     ras->ras_consecutive_stride_requests == 0)) {
 		ras->ras_stride_pages = ras->ras_consecutive_pages;
-		ras->ras_stride_length = stride_gap+ras->ras_consecutive_pages;
+		ras->ras_stride_length = stride_gap +ras->ras_consecutive_pages;
 	}
 	LASSERT(ras->ras_request_index == 0);
 	LASSERT(ras->ras_consecutive_stride_requests == 0);
@@ -874,7 +902,7 @@ static void ras_update_stride_detector(struct ll_readahead_state *ras,
 	}
 
 	ras->ras_stride_pages = ras->ras_consecutive_pages;
-	ras->ras_stride_length = stride_gap+ras->ras_consecutive_pages;
+	ras->ras_stride_length = stride_gap +ras->ras_consecutive_pages;
 
 	RAS_CDEBUG(ras);
 	return;

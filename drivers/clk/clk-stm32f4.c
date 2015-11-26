@@ -175,10 +175,11 @@ static long clk_apb_mul_round_rate(struct clk_hw *hw, unsigned long rate,
 	if (readl(base + STM32F4_RCC_CFGR) & BIT(am->bit_idx))
 		mult = 2;
 
-	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
 		unsigned long best_parent = rate / mult;
 
-		*prate = clk_hw_round_rate(clk_hw_get_parent(hw), best_parent);
+		*prate =
+		    __clk_round_rate(__clk_get_parent(hw->clk), best_parent);
 	}
 
 	return *prate * mult;
@@ -267,7 +268,7 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
 	memcpy(table, stm32f42xx_gate_map, sizeof(table));
 
 	/* only bits set in table can be used as indices */
-	if (WARN_ON(secondary >= BITS_PER_BYTE * sizeof(table) ||
+	if (WARN_ON(secondary > 8 * sizeof(table) ||
 		    0 == (table[BIT_ULL_WORD(secondary)] &
 			  BIT_ULL_MASK(secondary))))
 		return -EINVAL;

@@ -26,10 +26,8 @@
 #include <linux/iommu.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
-#include <linux/msi.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include <linux/of_platform.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 
@@ -58,7 +56,6 @@
 #define IDR0_TTF_SHIFT			2
 #define IDR0_TTF_MASK			0x3
 #define IDR0_TTF_AARCH64		(2 << IDR0_TTF_SHIFT)
-#define IDR0_TTF_AARCH32_64		(3 << IDR0_TTF_SHIFT)
 #define IDR0_S1P			(1 << 1)
 #define IDR0_S2P			(1 << 0)
 
@@ -121,7 +118,6 @@
 
 #define ARM_SMMU_IRQ_CTRL		0x50
 #define IRQ_CTRL_EVTQ_IRQEN		(1 << 2)
-#define IRQ_CTRL_PRIQ_IRQEN		(1 << 1)
 #define IRQ_CTRL_GERROR_IRQEN		(1 << 0)
 
 #define ARM_SMMU_IRQ_CTRLACK		0x54
@@ -177,14 +173,14 @@
 #define ARM_SMMU_PRIQ_IRQ_CFG2		0xdc
 
 /* Common MSI config fields */
+#define MSI_CFG0_SH_SHIFT		60
+#define MSI_CFG0_SH_NSH			(0UL << MSI_CFG0_SH_SHIFT)
+#define MSI_CFG0_SH_OSH			(2UL << MSI_CFG0_SH_SHIFT)
+#define MSI_CFG0_SH_ISH			(3UL << MSI_CFG0_SH_SHIFT)
+#define MSI_CFG0_MEMATTR_SHIFT		56
+#define MSI_CFG0_MEMATTR_DEVICE_nGnRE	(0x1 << MSI_CFG0_MEMATTR_SHIFT)
 #define MSI_CFG0_ADDR_SHIFT		2
 #define MSI_CFG0_ADDR_MASK		0x3fffffffffffUL
-#define MSI_CFG2_SH_SHIFT		4
-#define MSI_CFG2_SH_NSH			(0UL << MSI_CFG2_SH_SHIFT)
-#define MSI_CFG2_SH_OSH			(2UL << MSI_CFG2_SH_SHIFT)
-#define MSI_CFG2_SH_ISH			(3UL << MSI_CFG2_SH_SHIFT)
-#define MSI_CFG2_MEMATTR_SHIFT		0
-#define MSI_CFG2_MEMATTR_DEVICE_nGnRE	(0x1 << MSI_CFG2_MEMATTR_SHIFT)
 
 #define Q_IDX(q, p)			((p) & ((1 << (q)->max_n_shift) - 1))
 #define Q_WRP(q, p)			((p) & (1 << (q)->max_n_shift))
@@ -203,10 +199,9 @@
  * Stream table.
  *
  * Linear: Enough to cover 1 << IDR1.SIDSIZE entries
- * 2lvl: 128k L1 entries,
- *       256 lazy entries per table (each table covers a PCI bus)
+ * 2lvl: 8k L1 entries, 256 lazy entries per table (each table covers a PCI bus)
  */
-#define STRTAB_L1_SZ_SHIFT		20
+#define STRTAB_L1_SZ_SHIFT		16
 #define STRTAB_SPLIT			8
 
 #define STRTAB_L1_DESC_DWORDS		1
@@ -274,10 +269,10 @@
 #define ARM64_TCR_TG0_SHIFT		14
 #define ARM64_TCR_TG0_MASK		0x3UL
 #define CTXDESC_CD_0_TCR_IRGN0_SHIFT	8
-#define ARM64_TCR_IRGN0_SHIFT		8
+#define ARM64_TCR_IRGN0_SHIFT		24
 #define ARM64_TCR_IRGN0_MASK		0x3UL
 #define CTXDESC_CD_0_TCR_ORGN0_SHIFT	10
-#define ARM64_TCR_ORGN0_SHIFT		10
+#define ARM64_TCR_ORGN0_SHIFT		26
 #define ARM64_TCR_ORGN0_MASK		0x3UL
 #define CTXDESC_CD_0_TCR_SH0_SHIFT	12
 #define ARM64_TCR_SH0_SHIFT		12
@@ -345,8 +340,7 @@
 #define CMDQ_TLBI_0_VMID_SHIFT		32
 #define CMDQ_TLBI_0_ASID_SHIFT		48
 #define CMDQ_TLBI_1_LEAF		(1UL << 0)
-#define CMDQ_TLBI_1_VA_MASK		~0xfffUL
-#define CMDQ_TLBI_1_IPA_MASK		0xfffffffff000UL
+#define CMDQ_TLBI_1_ADDR_MASK		~0xfffUL
 
 #define CMDQ_PRI_0_SSID_SHIFT		12
 #define CMDQ_PRI_0_SSID_MASK		0xfffffUL
@@ -403,31 +397,6 @@ enum pri_resp {
 	PRI_RESP_DENY,
 	PRI_RESP_FAIL,
 	PRI_RESP_SUCC,
-};
-
-enum arm_smmu_msi_index {
-	EVTQ_MSI_INDEX,
-	GERROR_MSI_INDEX,
-	PRIQ_MSI_INDEX,
-	ARM_SMMU_MAX_MSIS,
-};
-
-static phys_addr_t arm_smmu_msi_cfg[ARM_SMMU_MAX_MSIS][3] = {
-	[EVTQ_MSI_INDEX] = {
-		ARM_SMMU_EVTQ_IRQ_CFG0,
-		ARM_SMMU_EVTQ_IRQ_CFG1,
-		ARM_SMMU_EVTQ_IRQ_CFG2,
-	},
-	[GERROR_MSI_INDEX] = {
-		ARM_SMMU_GERROR_IRQ_CFG0,
-		ARM_SMMU_GERROR_IRQ_CFG1,
-		ARM_SMMU_GERROR_IRQ_CFG2,
-	},
-	[PRIQ_MSI_INDEX] = {
-		ARM_SMMU_PRIQ_IRQ_CFG0,
-		ARM_SMMU_PRIQ_IRQ_CFG1,
-		ARM_SMMU_PRIQ_IRQ_CFG2,
-	},
 };
 
 struct arm_smmu_cmdq_ent {
@@ -573,9 +542,6 @@ struct arm_smmu_device {
 #define ARM_SMMU_FEAT_HYP		(1 << 12)
 	u32				features;
 
-#define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-	u32				options;
-
 	struct arm_smmu_cmdq		cmdq;
 	struct arm_smmu_evtq		evtq;
 	struct arm_smmu_priq		priq;
@@ -597,6 +563,7 @@ struct arm_smmu_device {
 	unsigned int			sid_bits;
 
 	struct arm_smmu_strtab_cfg	strtab_cfg;
+	struct list_head		list;
 };
 
 /* SMMU private data for an IOMMU group */
@@ -631,33 +598,13 @@ struct arm_smmu_domain {
 	struct iommu_domain		domain;
 };
 
-struct arm_smmu_option_prop {
-	u32 opt;
-	const char *prop;
-};
-
-static struct arm_smmu_option_prop arm_smmu_options[] = {
-	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-	{ 0, NULL},
-};
+/* Our list of SMMU instances */
+static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+static LIST_HEAD(arm_smmu_devices);
 
 static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
 {
 	return container_of(dom, struct arm_smmu_domain, domain);
-}
-
-static void parse_driver_options(struct arm_smmu_device *smmu)
-{
-	int i = 0;
-
-	do {
-		if (of_property_read_bool(smmu->dev->of_node,
-						arm_smmu_options[i].prop)) {
-			smmu->options |= arm_smmu_options[i].opt;
-			dev_notice(smmu->dev, "option %s\n",
-				arm_smmu_options[i].prop);
-		}
-	} while (arm_smmu_options[++i].opt);
 }
 
 /* Low-level queue manipulation functions */
@@ -794,13 +741,11 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
 		break;
 	case CMDQ_OP_TLBI_NH_VA:
 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
-		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
-		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_VA_MASK;
-		break;
+		/* Fallthrough */
 	case CMDQ_OP_TLBI_S2_IPA:
 		cmd[0] |= (u64)ent->tlbi.vmid << CMDQ_TLBI_0_VMID_SHIFT;
 		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
-		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_IPA_MASK;
+		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_ADDR_MASK;
 		break;
 	case CMDQ_OP_TLBI_NH_ASID:
 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
@@ -1091,8 +1036,7 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
 	arm_smmu_sync_ste_for_sid(smmu, sid);
 
 	/* It's likely that we'll want to use the new STE soon */
-	if (!(smmu->options & ARM_SMMU_OPT_SKIP_PREFETCH))
-		arm_smmu_cmdq_issue_cmd(smmu, &prefetch_cmd);
+	arm_smmu_cmdq_issue_cmd(smmu, &prefetch_cmd);
 }
 
 static void arm_smmu_init_bypass_stes(u64 *strtab, unsigned int nent)
@@ -1120,7 +1064,7 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
 		return 0;
 
 	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
-	strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
+	strtab = &cfg->strtab[sid >> STRTAB_SPLIT << STRTAB_L1_DESC_DWORDS];
 
 	desc->span = STRTAB_SPLIT + 1;
 	desc->l2ptr = dma_zalloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
@@ -1357,10 +1301,33 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
 }
 
+static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
+{
+	struct arm_smmu_domain *smmu_domain = cookie;
+	struct arm_smmu_device *smmu = smmu_domain->smmu;
+	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
+
+	if (smmu->features & ARM_SMMU_FEAT_COHERENCY) {
+		dsb(ishst);
+	} else {
+		dma_addr_t dma_addr;
+		struct device *dev = smmu->dev;
+
+		dma_addr = dma_map_page(dev, virt_to_page(addr), offset, size,
+					DMA_TO_DEVICE);
+
+		if (dma_mapping_error(dev, dma_addr))
+			dev_err(dev, "failed to flush pgtable at %p\n", addr);
+		else
+			dma_unmap_page(dev, dma_addr, size, DMA_TO_DEVICE);
+	}
+}
+
 static struct iommu_gather_ops arm_smmu_gather_ops = {
 	.tlb_flush_all	= arm_smmu_tlb_inv_context,
 	.tlb_add_flush	= arm_smmu_tlb_inv_range_nosync,
 	.tlb_sync	= arm_smmu_tlb_sync,
+	.flush_pgtable	= arm_smmu_flush_pgtable,
 };
 
 /* IOMMU API */
@@ -1449,7 +1416,7 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
 				       struct io_pgtable_cfg *pgtbl_cfg)
 {
 	int ret;
-	int asid;
+	u16 asid;
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
 
@@ -1461,11 +1428,10 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
 					 &cfg->cdptr_dma, GFP_KERNEL);
 	if (!cfg->cdptr) {
 		dev_warn(smmu->dev, "failed to allocate context descriptor\n");
-		ret = -ENOMEM;
 		goto out_free_asid;
 	}
 
-	cfg->cd.asid	= (u16)asid;
+	cfg->cd.asid	= asid;
 	cfg->cd.ttbr	= pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
 	cfg->cd.tcr	= pgtbl_cfg->arm_lpae_s1_cfg.tcr;
 	cfg->cd.mair	= pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
@@ -1479,7 +1445,7 @@ out_free_asid:
 static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
 				       struct io_pgtable_cfg *pgtbl_cfg)
 {
-	int vmid;
+	u16 vmid;
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	struct arm_smmu_s2_cfg *cfg = &smmu_domain->s2_cfg;
 
@@ -1487,7 +1453,7 @@ static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
 	if (IS_ERR_VALUE(vmid))
 		return vmid;
 
-	cfg->vmid	= (u16)vmid;
+	cfg->vmid	= vmid;
 	cfg->vttbr	= pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
 	cfg->vtcr	= pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
 	return 0;
@@ -1536,7 +1502,6 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
 		.ias		= ias,
 		.oas		= oas,
 		.tlb		= &arm_smmu_gather_ops,
-		.iommu_dev	= smmu->dev,
 	};
 
 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
@@ -1749,8 +1714,7 @@ static void __arm_smmu_release_pci_iommudata(void *data)
 static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
 {
 	struct device_node *of_node;
-	struct platform_device *smmu_pdev;
-	struct arm_smmu_device *smmu = NULL;
+	struct arm_smmu_device *curr, *smmu = NULL;
 	struct pci_bus *bus = pdev->bus;
 
 	/* Walk up to the root bus */
@@ -1763,10 +1727,14 @@ static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
 		return NULL;
 
 	/* See if we can find an SMMU corresponding to the phandle */
-	smmu_pdev = of_find_device_by_node(of_node);
-	if (smmu_pdev)
-		smmu = platform_get_drvdata(smmu_pdev);
-
+	spin_lock(&arm_smmu_devices_lock);
+	list_for_each_entry(curr, &arm_smmu_devices, list) {
+		if (curr->dev->of_node == of_node) {
+			smmu = curr;
+			break;
+		}
+	}
+	spin_unlock(&arm_smmu_devices_lock);
 	of_node_put(of_node);
 	return smmu;
 }
@@ -1922,7 +1890,6 @@ static struct iommu_ops arm_smmu_ops = {
 	.iova_to_phys		= arm_smmu_iova_to_phys,
 	.add_device		= arm_smmu_add_device,
 	.remove_device		= arm_smmu_remove_device,
-	.device_group		= pci_device_group,
 	.domain_get_attr	= arm_smmu_domain_get_attr,
 	.domain_set_attr	= arm_smmu_domain_set_attr,
 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
@@ -2053,31 +2020,21 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
 {
 	void *strtab;
 	u64 reg;
-	u32 size, l1size;
+	u32 size;
 	int ret;
 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
 
-	/*
-	 * If we can resolve everything with a single L2 table, then we
-	 * just need a single L1 descriptor. Otherwise, calculate the L1
-	 * size, capped to the SIDSIZE.
-	 */
-	if (smmu->sid_bits < STRTAB_SPLIT) {
-		size = 0;
-	} else {
-		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
-		size = min(size, smmu->sid_bits - STRTAB_SPLIT);
-	}
-	cfg->num_l1_ents = 1 << size;
-
-	size += STRTAB_SPLIT;
-	if (size < smmu->sid_bits)
+	/* Calculate the L1 size, capped to the SIDSIZE */
+	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+	if (size + STRTAB_SPLIT < smmu->sid_bits)
 		dev_warn(smmu->dev,
 			 "2-level strtab only covers %u/%u bits of SID\n",
-			 size, smmu->sid_bits);
+			 size + STRTAB_SPLIT, smmu->sid_bits);
 
-	l1size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
-	strtab = dma_zalloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
+	cfg->num_l1_ents = 1 << size;
+	size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+	strtab = dma_zalloc_coherent(smmu->dev, size, &cfg->strtab_dma,
 				     GFP_KERNEL);
 	if (!strtab) {
 		dev_err(smmu->dev,
@@ -2098,7 +2055,8 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
 	ret = arm_smmu_init_l1_strtab(smmu);
 	if (ret)
 		dma_free_coherent(smmu->dev,
-				  l1size,
+				  cfg->num_l1_ents *
+				  (STRTAB_L1_DESC_DWORDS << 3),
 				  strtab,
 				  cfg->strtab_dma);
 	return ret;
@@ -2207,76 +2165,9 @@ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
 					  1, ARM_SMMU_POLL_TIMEOUT_US);
 }
 
-static void arm_smmu_free_msis(void *data)
-{
-	struct device *dev = data;
-	platform_msi_domain_free_irqs(dev);
-}
-
-static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
-{
-	phys_addr_t doorbell;
-	struct device *dev = msi_desc_to_dev(desc);
-	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-	phys_addr_t *cfg = arm_smmu_msi_cfg[desc->platform.msi_index];
-
-	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
-	doorbell &= MSI_CFG0_ADDR_MASK << MSI_CFG0_ADDR_SHIFT;
-
-	writeq_relaxed(doorbell, smmu->base + cfg[0]);
-	writel_relaxed(msg->data, smmu->base + cfg[1]);
-	writel_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE, smmu->base + cfg[2]);
-}
-
-static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
-{
-	struct msi_desc *desc;
-	int ret, nvec = ARM_SMMU_MAX_MSIS;
-	struct device *dev = smmu->dev;
-
-	/* Clear the MSI address regs */
-	writeq_relaxed(0, smmu->base + ARM_SMMU_GERROR_IRQ_CFG0);
-	writeq_relaxed(0, smmu->base + ARM_SMMU_EVTQ_IRQ_CFG0);
-
-	if (smmu->features & ARM_SMMU_FEAT_PRI)
-		writeq_relaxed(0, smmu->base + ARM_SMMU_PRIQ_IRQ_CFG0);
-	else
-		nvec--;
-
-	if (!(smmu->features & ARM_SMMU_FEAT_MSI))
-		return;
-
-	/* Allocate MSIs for evtq, gerror and priq. Ignore cmdq */
-	ret = platform_msi_domain_alloc_irqs(dev, nvec, arm_smmu_write_msi_msg);
-	if (ret) {
-		dev_warn(dev, "failed to allocate MSIs\n");
-		return;
-	}
-
-	for_each_msi_entry(desc, dev) {
-		switch (desc->platform.msi_index) {
-		case EVTQ_MSI_INDEX:
-			smmu->evtq.q.irq = desc->irq;
-			break;
-		case GERROR_MSI_INDEX:
-			smmu->gerr_irq = desc->irq;
-			break;
-		case PRIQ_MSI_INDEX:
-			smmu->priq.q.irq = desc->irq;
-			break;
-		default:	/* Unknown */
-			continue;
-		}
-	}
-
-	/* Add callback to free MSIs on teardown */
-	devm_add_action(dev, arm_smmu_free_msis, dev);
-}
-
 static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 {
 	int ret, irq;
-	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
 
 	/* Disable IRQs first */
 	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
@@ -2286,9 +2177,11 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 		return ret;
 	}
 
-	arm_smmu_setup_msis(smmu);
+	/* Clear the MSI address regs */
+	writeq_relaxed(0, smmu->base + ARM_SMMU_GERROR_IRQ_CFG0);
+	writeq_relaxed(0, smmu->base + ARM_SMMU_EVTQ_IRQ_CFG0);
 
-	/* Request interrupt lines */
+	/* Request wired interrupt lines */
 	irq = smmu->evtq.q.irq;
 	if (irq) {
 		ret = devm_request_threaded_irq(smmu->dev, irq,
@@ -2317,6 +2210,8 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 	}
 
 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+		writeq_relaxed(0, smmu->base + ARM_SMMU_PRIQ_IRQ_CFG0);
+
 		irq = smmu->priq.q.irq;
 		if (irq) {
 			ret = devm_request_threaded_irq(smmu->dev, irq,
@@ -2327,13 +2222,13 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 			if (IS_ERR_VALUE(ret))
 				dev_warn(smmu->dev,
 					 "failed to enable priq irq\n");
-			else
-				irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
 		}
 	}
 
 	/* Enable interrupt generation on the SMMU */
-	ret = arm_smmu_write_reg_sync(smmu, irqen_flags,
+	ret = arm_smmu_write_reg_sync(smmu,
+				      IRQ_CTRL_EVTQ_IRQEN |
+				      IRQ_CTRL_GERROR_IRQEN,
 				      ARM_SMMU_IRQ_CTRL, ARM_SMMU_IRQ_CTRLACK);
 	if (ret)
 		dev_warn(smmu->dev, "failed to enable irqs\n");
@@ -2547,13 +2442,7 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
 	}
 
 	/* We only support the AArch64 table format at present */
-	switch (reg & IDR0_TTF_MASK << IDR0_TTF_SHIFT) {
-	case IDR0_TTF_AARCH32_64:
-		smmu->ias = 40;
-		/* Fallthrough */
-	case IDR0_TTF_AARCH64:
-		break;
-	default:
+	if ((reg & IDR0_TTF_MASK << IDR0_TTF_SHIFT) < IDR0_TTF_AARCH64) {
 		dev_err(smmu->dev, "AArch64 table format not supported!\n");
 		return -ENXIO;
 	}
@@ -2621,12 +2510,12 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
 	case IDR5_OAS_44_BIT:
 		smmu->oas = 44;
 		break;
-	default:
-		dev_info(smmu->dev,
-			"unknown output address size. Truncating to 48-bit\n");
-		/* Fallthrough */
 	case IDR5_OAS_48_BIT:
 		smmu->oas = 48;
+		break;
+	default:
+		dev_err(smmu->dev, "unknown output address size!\n");
+		return -ENXIO;
 	}
 
 	/* Set the DMA mask for our table walker */
@@ -2634,7 +2523,8 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
 		dev_warn(smmu->dev,
 			 "failed to set DMA mask for table walker\n");
 
-	smmu->ias = max(smmu->ias, smmu->oas);
+	if (!smmu->ias)
+		smmu->ias = smmu->oas;
 
 	dev_info(smmu->dev, "ias %lu-bit, oas %lu-bit (features 0x%08x)\n",
 		 smmu->ias, smmu->oas, smmu->features);
@@ -2683,8 +2573,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	if (irq > 0)
 		smmu->gerr_irq = irq;
 
-	parse_driver_options(smmu);
-
 	/* Probe the h/w */
 	ret = arm_smmu_device_probe(smmu);
 	if (ret)
@@ -2695,14 +2583,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	/* Record our private device structure */
-	platform_set_drvdata(pdev, smmu);
-
 	/* Reset the device */
 	ret = arm_smmu_device_reset(smmu);
 	if (ret)
 		goto out_free_structures;
 
+	/* Record our private device structure */
+	INIT_LIST_HEAD(&smmu->list);
+	spin_lock(&arm_smmu_devices_lock);
+	list_add(&smmu->list, &arm_smmu_devices);
+	spin_unlock(&arm_smmu_devices_lock);
 	return 0;
 
 out_free_structures:
@@ -2712,7 +2602,21 @@ out_free_structures:
 
 static int arm_smmu_device_remove(struct platform_device *pdev)
 {
-	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+	struct arm_smmu_device *curr, *smmu = NULL;
+	struct device *dev = &pdev->dev;
+
+	spin_lock(&arm_smmu_devices_lock);
+	list_for_each_entry(curr, &arm_smmu_devices, list) {
+		if (curr->dev == dev) {
+			smmu = curr;
+			list_del(&smmu->list);
+			break;
+		}
+	}
+	spin_unlock(&arm_smmu_devices_lock);
+
+	if (!smmu)
+		return -ENODEV;
 
 	arm_smmu_device_disable(smmu);
 	arm_smmu_free_structures(smmu);

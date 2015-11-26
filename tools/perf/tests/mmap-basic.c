@@ -3,7 +3,6 @@
 #include "thread_map.h"
 #include "cpumap.h"
 #include "tests.h"
-#include <linux/err.h>
 
 /*
  * This test will generate random numbers of calls to some getpid syscalls,
@@ -66,7 +65,7 @@ int test__basic_mmap(void)
 
 		snprintf(name, sizeof(name), "sys_enter_%s", syscall_names[i]);
 		evsels[i] = perf_evsel__newtp("syscalls", name);
-		if (IS_ERR(evsels[i])) {
+		if (evsels[i] == NULL) {
 			pr_debug("perf_evsel__new\n");
 			goto out_delete_evlist;
 		}

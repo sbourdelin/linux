@@ -88,11 +88,11 @@
 
 
 struct vip_buffer {
-	struct vb2_v4l2_buffer vb;
+	struct vb2_buffer	vb;
 	struct list_head	list;
 	dma_addr_t		dma;
 };
-static inline struct vip_buffer *to_vip_buffer(struct vb2_v4l2_buffer *vb2)
+static inline struct vip_buffer *to_vip_buffer(struct vb2_buffer *vb2)
 {
 	return container_of(vb2, struct vip_buffer, vb);
 }
@@ -265,7 +265,7 @@ static void vip_active_buf_next(struct sta2x11_vip *vip)
 
 
 /* Videobuf2 Operations */
-static int queue_setup(struct vb2_queue *vq, const void *parg,
+static int queue_setup(struct vb2_queue *vq, const struct v4l2_format *fmt,
 		       unsigned int *nbuffers, unsigned int *nplanes,
 		       unsigned int sizes[], void *alloc_ctxs[])
 {
@@ -287,8 +287,7 @@ static int queue_setup(struct vb2_queue *vq, const void *parg,
 };
 static int buffer_init(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
-	struct vip_buffer *vip_buf = to_vip_buffer(vbuf);
+	struct vip_buffer *vip_buf = to_vip_buffer(vb);
 
 	vip_buf->dma = vb2_dma_contig_plane_dma_addr(vb, 0);
 	INIT_LIST_HEAD(&vip_buf->list);
@@ -297,9 +296,8 @@ static int buffer_init(struct vb2_buffer *vb)
 
 static int buffer_prepare(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct sta2x11_vip *vip = vb2_get_drv_priv(vb->vb2_queue);
-	struct vip_buffer *vip_buf = to_vip_buffer(vbuf);
+	struct vip_buffer *vip_buf = to_vip_buffer(vb);
 	unsigned long size;
 
 	size = vip->format.sizeimage;
@@ -309,15 +307,14 @@ static int buffer_prepare(struct vb2_buffer *vb)
 		return -EINVAL;
 	}
 
-	vb2_set_plane_payload(&vip_buf->vb.vb2_buf, 0, size);
+	vb2_set_plane_payload(&vip_buf->vb, 0, size);
 
 	return 0;
 }
 static void buffer_queue(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct sta2x11_vip *vip = vb2_get_drv_priv(vb->vb2_queue);
-	struct vip_buffer *vip_buf = to_vip_buffer(vbuf);
+	struct vip_buffer *vip_buf = to_vip_buffer(vb);
 
 	spin_lock(&vip->lock);
 	list_add_tail(&vip_buf->list, &vip->buffer_list);
@@ -332,9 +329,8 @@ static void buffer_queue(struct vb2_buffer *vb)
 }
 static void buffer_finish(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct sta2x11_vip *vip = vb2_get_drv_priv(vb->vb2_queue);
-	struct vip_buffer *vip_buf = to_vip_buffer(vbuf);
+	struct vip_buffer *vip_buf = to_vip_buffer(vb);
 
 	/* Buffer handled, remove it from the list */
 	spin_lock(&vip->lock);
@@ -374,7 +370,7 @@ static void stop_streaming(struct vb2_queue *vq)
 	/* Release all active buffers */
 	spin_lock(&vip->lock);
 	list_for_each_entry_safe(vip_buf, node, &vip->buffer_list, list) {
-		vb2_buffer_done(&vip_buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+		vb2_buffer_done(&vip_buf->vb, VB2_BUF_STATE_ERROR);
 		list_del(&vip_buf->list);
 	}
 	spin_unlock(&vip->lock);
@@ -817,9 +813,9 @@ static irqreturn_t vip_irq(int irq, struct sta2x11_vip *vip)
 		/* Disable acquisition */
 		reg_write(vip, DVP_CTL, reg_read(vip, DVP_CTL) & ~DVP_CTL_ENA);
 		/* Remove the active buffer from the list */
-		v4l2_get_timestamp(&vip->active->vb.timestamp);
-		vip->active->vb.sequence = vip->sequence++;
-		vb2_buffer_done(&vip->active->vb.vb2_buf, VB2_BUF_STATE_DONE);
+		v4l2_get_timestamp(&vip->active->vb.v4l2_buf.timestamp);
+		vip->active->vb.v4l2_buf.sequence = vip->sequence++;
+		vb2_buffer_done(&vip->active->vb, VB2_BUF_STATE_DONE);
 	}
 
 	return IRQ_HANDLED;

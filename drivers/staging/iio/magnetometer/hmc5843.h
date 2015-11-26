@@ -48,7 +48,7 @@ struct hmc5843_data {
 };
 
 int hmc5843_common_probe(struct device *dev, struct regmap *regmap,
-			 enum hmc5843_ids id, const char *name);
+			 enum hmc5843_ids id);
 int hmc5843_common_remove(struct device *dev);
 
 int hmc5843_common_suspend(struct device *dev);

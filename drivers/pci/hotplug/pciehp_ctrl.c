@@ -204,39 +204,36 @@ static void pciehp_power_thread(struct work_struct *work)
 	kfree(info);
 }
 
-static void pciehp_queue_power_work(struct slot *p_slot, int req)
+void pciehp_queue_pushbutton_work(struct work_struct *work)
 {
+	struct slot *p_slot = container_of(work, struct slot, work.work);
 	struct power_work_info *info;
-
-	p_slot->state = (req == ENABLE_REQ) ? POWERON_STATE : POWEROFF_STATE;
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
-		ctrl_err(p_slot->ctrl, "no memory to queue %s request\n",
-			 (req == ENABLE_REQ) ? "poweron" : "poweroff");
+		ctrl_err(p_slot->ctrl, "%s: Cannot allocate memory\n",
+			 __func__);
 		return;
 	}
 	info->p_slot = p_slot;
 	INIT_WORK(&info->work, pciehp_power_thread);
-	info->req = req;
-	queue_work(p_slot->wq, &info->work);
-}
-
-void pciehp_queue_pushbutton_work(struct work_struct *work)
-{
-	struct slot *p_slot = container_of(work, struct slot, work.work);
 
 	mutex_lock(&p_slot->lock);
 	switch (p_slot->state) {
 	case BLINKINGOFF_STATE:
-		pciehp_queue_power_work(p_slot, DISABLE_REQ);
+		p_slot->state = POWEROFF_STATE;
+		info->req = DISABLE_REQ;
 		break;
 	case BLINKINGON_STATE:
-		pciehp_queue_power_work(p_slot, ENABLE_REQ);
+		p_slot->state = POWERON_STATE;
+		info->req = ENABLE_REQ;
 		break;
 	default:
-		break;
+		kfree(info);
+		goto out;
 	}
+	queue_work(p_slot->wq, &info->work);
+ out:
 	mutex_unlock(&p_slot->lock);
 }
 
@@ -304,12 +301,27 @@ static void handle_button_press_event(struct slot *p_slot)
 static void handle_surprise_event(struct slot *p_slot)
 {
 	u8 getstatus;
+	struct power_work_info *info;
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info) {
+		ctrl_err(p_slot->ctrl, "%s: Cannot allocate memory\n",
+			 __func__);
+		return;
+	}
+	info->p_slot = p_slot;
+	INIT_WORK(&info->work, pciehp_power_thread);
 
 	pciehp_get_adapter_status(p_slot, &getstatus);
-	if (!getstatus)
-		pciehp_queue_power_work(p_slot, DISABLE_REQ);
-	else
-		pciehp_queue_power_work(p_slot, ENABLE_REQ);
+	if (!getstatus) {
+		p_slot->state = POWEROFF_STATE;
+		info->req = DISABLE_REQ;
+	} else {
+		p_slot->state = POWERON_STATE;
+		info->req = ENABLE_REQ;
+	}
+
+	queue_work(p_slot->wq, &info->work);
 }
 
 /*
@@ -318,6 +330,17 @@ static void handle_surprise_event(struct slot *p_slot)
 static void handle_link_event(struct slot *p_slot, u32 event)
 {
 	struct controller *ctrl = p_slot->ctrl;
+	struct power_work_info *info;
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info) {
+		ctrl_err(p_slot->ctrl, "%s: Cannot allocate memory\n",
+			 __func__);
+		return;
+	}
+	info->p_slot = p_slot;
+	info->req = event == INT_LINK_UP ? ENABLE_REQ : DISABLE_REQ;
+	INIT_WORK(&info->work, pciehp_power_thread);
 
 	switch (p_slot->state) {
 	case BLINKINGON_STATE:
@@ -325,19 +348,22 @@ static void handle_link_event(struct slot *p_slot, u32 event)
 		cancel_delayed_work(&p_slot->work);
 		/* Fall through */
 	case STATIC_STATE:
-		pciehp_queue_power_work(p_slot, event == INT_LINK_UP ?
-					ENABLE_REQ : DISABLE_REQ);
+		p_slot->state = event == INT_LINK_UP ?
+		    POWERON_STATE : POWEROFF_STATE;
+		queue_work(p_slot->wq, &info->work);
 		break;
 	case POWERON_STATE:
 		if (event == INT_LINK_UP) {
 			ctrl_info(ctrl,
 				  "Link Up event ignored on slot(%s): already powering on\n",
 				  slot_name(p_slot));
+			kfree(info);
 		} else {
 			ctrl_info(ctrl,
 				  "Link Down event queued on slot(%s): currently getting powered on\n",
 				  slot_name(p_slot));
-			pciehp_queue_power_work(p_slot, DISABLE_REQ);
+			p_slot->state = POWEROFF_STATE;
+			queue_work(p_slot->wq, &info->work);
 		}
 		break;
 	case POWEROFF_STATE:
@@ -345,16 +371,19 @@ static void handle_link_event(struct slot *p_slot, u32 event)
 			ctrl_info(ctrl,
 				  "Link Up event queued on slot(%s): currently getting powered off\n",
 				  slot_name(p_slot));
-			pciehp_queue_power_work(p_slot, ENABLE_REQ);
+			p_slot->state = POWERON_STATE;
+			queue_work(p_slot->wq, &info->work);
 		} else {
 			ctrl_info(ctrl,
 				  "Link Down event ignored on slot(%s): already powering off\n",
 				  slot_name(p_slot));
+			kfree(info);
 		}
 		break;
 	default:
 		ctrl_err(ctrl, "ignoring invalid state %#x on slot(%s)\n",
 			 p_slot->state, slot_name(p_slot));
+		kfree(info);
 		break;
 	}
 }

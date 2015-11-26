@@ -53,6 +53,7 @@
 
 #include <target/target_core_base.h>
 #include <target/target_core_fabric.h>
+#include <target/target_core_fabric_configfs.h>
 
 #include <asm/hypervisor.h>
 
@@ -1437,10 +1438,9 @@ static void scsiback_aborted_task(struct se_cmd *se_cmd)
 {
 }
 
-static ssize_t scsiback_tpg_param_alias_show(struct config_item *item,
+static ssize_t scsiback_tpg_param_show_alias(struct se_portal_group *se_tpg,
 					     char *page)
 {
-	struct se_portal_group *se_tpg = param_to_tpg(item);
 	struct scsiback_tpg *tpg = container_of(se_tpg, struct scsiback_tpg,
 						se_tpg);
 	ssize_t rb;
@@ -1452,10 +1452,9 @@ static ssize_t scsiback_tpg_param_alias_show(struct config_item *item,
 	return rb;
 }
 
-static ssize_t scsiback_tpg_param_alias_store(struct config_item *item,
+static ssize_t scsiback_tpg_param_store_alias(struct se_portal_group *se_tpg,
 					      const char *page, size_t count)
 {
-	struct se_portal_group *se_tpg = param_to_tpg(item);
 	struct scsiback_tpg *tpg = container_of(se_tpg, struct scsiback_tpg,
 						se_tpg);
 	int len;
@@ -1475,10 +1474,10 @@ static ssize_t scsiback_tpg_param_alias_store(struct config_item *item,
 	return count;
 }
 
-CONFIGFS_ATTR(scsiback_tpg_param_, alias);
+TF_TPG_PARAM_ATTR(scsiback, alias, S_IRUGO | S_IWUSR);
 
 static struct configfs_attribute *scsiback_param_attrs[] = {
-	&scsiback_tpg_param_attr_alias,
+	&scsiback_tpg_param_alias.attr,
 	NULL,
 };
 
@@ -1586,9 +1585,9 @@ static int scsiback_drop_nexus(struct scsiback_tpg *tpg)
 	return 0;
 }
 
-static ssize_t scsiback_tpg_nexus_show(struct config_item *item, char *page)
+static ssize_t scsiback_tpg_show_nexus(struct se_portal_group *se_tpg,
+					char *page)
 {
-	struct se_portal_group *se_tpg = to_tpg(item);
 	struct scsiback_tpg *tpg = container_of(se_tpg,
 				struct scsiback_tpg, se_tpg);
 	struct scsiback_nexus *tv_nexus;
@@ -1607,10 +1606,10 @@ static ssize_t scsiback_tpg_nexus_show(struct config_item *item, char *page)
 	return ret;
 }
 
-static ssize_t scsiback_tpg_nexus_store(struct config_item *item,
-		const char *page, size_t count)
+static ssize_t scsiback_tpg_store_nexus(struct se_portal_group *se_tpg,
+					 const char *page,
+					 size_t count)
 {
-	struct se_portal_group *se_tpg = to_tpg(item);
 	struct scsiback_tpg *tpg = container_of(se_tpg,
 				struct scsiback_tpg, se_tpg);
 	struct scsiback_tport *tport_wwn = tpg->tport;
@@ -1682,25 +1681,26 @@ check_newline:
 	return count;
 }
 
-CONFIGFS_ATTR(scsiback_tpg_, nexus);
+TF_TPG_BASE_ATTR(scsiback, nexus, S_IRUGO | S_IWUSR);
 
 static struct configfs_attribute *scsiback_tpg_attrs[] = {
-	&scsiback_tpg_attr_nexus,
+	&scsiback_tpg_nexus.attr,
 	NULL,
 };
 
 static ssize_t
-scsiback_wwn_version_show(struct config_item *item, char *page)
+scsiback_wwn_show_attr_version(struct target_fabric_configfs *tf,
+				char *page)
 {
 	return sprintf(page, "xen-pvscsi fabric module %s on %s/%s on "
 		UTS_RELEASE"\n",
 		VSCSI_VERSION, utsname()->sysname, utsname()->machine);
 }
 
-CONFIGFS_ATTR_RO(scsiback_wwn_, version);
+TF_WWN_ATTR_RO(scsiback, version);
 
 static struct configfs_attribute *scsiback_wwn_attrs[] = {
-	&scsiback_wwn_attr_version,
+	&scsiback_wwn_version.attr,
 	NULL,
 };
 
