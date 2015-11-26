@@ -937,7 +937,7 @@ static ssize_t
 intel_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 {
 	struct intel_dp *intel_dp = container_of(aux, struct intel_dp, aux);
-	uint8_t txbuf[20], rxbuf[20];
+	uint8_t txbuf[20], rxbuf[20], dumbuf[20];
 	size_t txsize, rxsize;
 	int ret;
 
@@ -974,6 +974,18 @@ intel_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 		break;
 
 	case DP_AUX_NATIVE_READ:
+		/*
+		 * FIXME: Sometime we just get the same incorrect byte repeated
+		 * over the entire buffer. Doing just one throw away read
+		 * initially seems to "solve" it.
+		 */
+		dumbuf[0] = (DP_AUX_NATIVE_READ << 4) |
+			((DP_DPCD_REV >> 16) & 0xf);
+		dumbuf[1] = (DP_DPCD_REV >> 8) & 0xff;
+		dumbuf[2] = DP_DPCD_REV & 0xff;
+		dumbuf[3] = 0;
+		intel_dp_aux_ch(intel_dp, dumbuf, HEADER_SIZE, rxbuf, 2);
+
 	case DP_AUX_I2C_READ:
 		txsize = msg->size ? HEADER_SIZE : BARE_ADDRESS_SIZE;
 		rxsize = msg->size + 1;
@@ -3170,13 +3182,6 @@ intel_dp_dpcd_read_wake(struct drm_dp_aux *aux, unsigned int offset,
 {
 	ssize_t ret;
 	int i;
-
-	/*
-	 * Sometime we just get the same incorrect byte repeated
-	 * over the entire buffer. Doing just one throw away read
-	 * initially seems to "solve" it.
-	 */
-	drm_dp_dpcd_read(aux, DP_DPCD_REV, buffer, 1);
 
 	for (i = 0; i < 3; i++) {
 		ret = drm_dp_dpcd_read(aux, offset, buffer, size);
