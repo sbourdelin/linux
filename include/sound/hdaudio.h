@@ -71,7 +71,7 @@ struct hdac_device {
 			 unsigned int flags, unsigned int *res);
 
 	/* widgets */
-	unsigned int num_nodes;
+	int num_nodes;
 	hda_nid_t start_nid, end_nid;
 
 	/* misc flags */
