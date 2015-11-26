@@ -722,6 +722,10 @@ struct drm_dp_aux {
 	 *   to check for failure.
 	 * - -EBUSY: When BUSY helpers will attempt retries before propagating
 	 *   this error.
+	 * - -EAGAIN: DPCD helper will attempt immediatelly retries before
+	 *   propagating this error. i2c helper will only propagate directly
+	 *   since i2c layer already perform retries with timeouts for repeated
+	 *   -EAGAINs.
 	 *
 	 * Note that the aux helper code assumes that the .transfer() function
 	 * only modifies the reply field of the drm_dp_aux_msg structure.  The

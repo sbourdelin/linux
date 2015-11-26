@@ -198,6 +198,11 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 		err = aux->transfer(aux, &msg);
 		mutex_unlock(&aux->hw_mutex);
 		if (err < 0) {
+			/* Immediately retry */
+			if (err == -EAGAIN)
+				continue;
+
+			/* FIXME: On BUSY we could wait before retrying */
 			if (err == -EBUSY)
 				continue;
 
@@ -547,6 +552,11 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 		ret = aux->transfer(aux, msg);
 		mutex_unlock(&aux->hw_mutex);
 		if (ret < 0) {
+
+			/*
+			 * -EAGAIN retries are handled by i2c layer with
+			 * timeouts for repeated -EAGAINs
+			 */
 			if (ret == -EBUSY)
 				continue;
 
