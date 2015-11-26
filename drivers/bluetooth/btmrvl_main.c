@@ -693,6 +693,7 @@ int btmrvl_register_hdev(struct btmrvl_private *priv)
 #ifdef CONFIG_DEBUG_FS
 	btmrvl_debugfs_init(hdev);
 #endif
+	btmrvl_sysfs_register(priv);
 
 	return 0;
 
@@ -768,6 +769,7 @@ int btmrvl_remove_card(struct btmrvl_private *priv)
 #ifdef CONFIG_DEBUG_FS
 	btmrvl_debugfs_remove(hdev);
 #endif
+	btmrvl_sysfs_unregister(priv);
 
 	hci_unregister_dev(hdev);
 

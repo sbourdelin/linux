@@ -174,6 +174,9 @@ int btmrvl_prepare_command(struct btmrvl_private *priv);
 int btmrvl_enable_hs(struct btmrvl_private *priv);
 void btmrvl_firmware_dump(struct btmrvl_private *priv);
 
+int btmrvl_sysfs_register(struct btmrvl_private *priv);
+void btmrvl_sysfs_unregister(struct btmrvl_private *priv);
+
 #ifdef CONFIG_DEBUG_FS
 void btmrvl_debugfs_init(struct hci_dev *hdev);
 void btmrvl_debugfs_remove(struct hci_dev *hdev);
