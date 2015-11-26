@@ -124,19 +124,33 @@ void __local_bh_disable_ip(unsigned long ip, unsigned int cnt)
 EXPORT_SYMBOL(__local_bh_disable_ip);
 #endif /* CONFIG_TRACE_IRQFLAGS */
 
+/*
+ * Special-case - softirqs can safely be enabled in
+ *  __do_softirq(), without processing still-pending softirqs.
+ */
 static void __local_bh_enable(unsigned int cnt)
 {
 	WARN_ON_ONCE(!irqs_disabled());
 
+	/*
+	 * The preempt tracer hooks into preempt_count_sub and will break
+	 * lockdep because it calls back into lockdep before SOFTIRQ_OFFSET
+	 * is cleared while current->softirq_enabled is set.
+	 * We must call the trace_preempt_off now, and decrement preempt_count
+	 * afterwards manually.
+	 */
+	if (preempt_count() == cnt)
+		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
+
 	if (softirq_count() == (cnt & SOFTIRQ_MASK))
 		trace_softirqs_on(_RET_IP_);
-	preempt_count_sub(cnt);
+
+	__preempt_count_sub(cnt);
 }
 
 /*
- * Special-case - softirqs can safely be enabled in
- * cond_resched_softirq(), or by __do_softirq(),
- * without processing still-pending softirqs:
+ * Special-case - enable softirqs without processing
+ * still pending softirqs from IRQ context.
  */
 void _local_bh_enable(void)
 {
