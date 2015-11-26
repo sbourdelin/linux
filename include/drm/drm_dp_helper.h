@@ -721,7 +721,8 @@ struct drm_dp_aux {
 	 * - -EPROTO: On a short, helpers will return -EPROTO to make it simpler
 	 *   to check for failure.
 	 * - -EBUSY: When BUSY helpers will attempt retries before propagating
-	 *   this error.
+	 *   this error, with 1ms between attempts to give a time for downstream
+	 *   devices to recover.
 	 * - -EAGAIN: DPCD helper will attempt immediatelly retries before
 	 *   propagating this error. i2c helper will only propagate directly
 	 *   since i2c layer already perform retries with timeouts for repeated

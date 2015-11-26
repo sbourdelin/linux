@@ -202,9 +202,11 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 			if (err == -EAGAIN)
 				continue;
 
-			/* FIXME: On BUSY we could wait before retrying */
-			if (err == -EBUSY)
+			/* Give a time for aux channels to recover */
+			if (err == -EBUSY) {
+				usleep_range(1000, 1000);
 				continue;
+			}
 
 			return err;
 		}
@@ -557,8 +559,10 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 			 * -EAGAIN retries are handled by i2c layer with
 			 * timeouts for repeated -EAGAINs
 			 */
-			if (ret == -EBUSY)
+			if (ret == -EBUSY) {
+				usleep_range(1000, 1000);
 				continue;
+			}
 
 			DRM_DEBUG_KMS("transaction failed: %d\n", ret);
 			return ret;
