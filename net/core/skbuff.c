@@ -748,11 +748,13 @@ void consume_skb(struct sk_buff *skb)
 EXPORT_SYMBOL(consume_skb);
 
 /* Make sure a field is enclosed inside headers_start/headers_end section */
-#define CHECK_SKB_FIELD(field) \
-	BUILD_BUG_ON(offsetof(struct sk_buff, field) <		\
-		     offsetof(struct sk_buff, headers_start));	\
-	BUILD_BUG_ON(offsetof(struct sk_buff, field) >		\
-		     offsetof(struct sk_buff, headers_end));	\
+#define CHECK_SKB_FIELD(field)						\
+	do {								\
+		BUILD_BUG_ON(offsetof(struct sk_buff, field) <		\
+			offsetof(struct sk_buff, headers_start));	\
+		BUILD_BUG_ON(offsetof(struct sk_buff, field) >		\
+			offsetof(struct sk_buff, headers_end));		\
+	} while (0)							\
 
 static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 {
