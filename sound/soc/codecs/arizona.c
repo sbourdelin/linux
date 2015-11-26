@@ -2215,6 +2215,7 @@ static int arizona_enable_fll(struct arizona_fll *fll)
 		regmap_update_bits_async(fll->arizona->regmap, fll->base + 1,
 					 ARIZONA_FLL1_FREERUN,
 					 ARIZONA_FLL1_FREERUN);
+		udelay(32);
 	}
 
 	/*
