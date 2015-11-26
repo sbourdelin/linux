@@ -1530,7 +1530,6 @@ int ib_sg_to_pages(struct ib_mr *mr,
 		   int (*set_page)(struct ib_mr *, u64))
 {
 	struct scatterlist *sg;
-	u64 last_end_dma_addr = 0, last_page_addr = 0;
 	unsigned int last_page_off = 0;
 	u64 page_mask = ~((u64)mr->page_size - 1);
 	int i;
@@ -1544,23 +1543,9 @@ int ib_sg_to_pages(struct ib_mr *mr,
 		u64 end_dma_addr = dma_addr + dma_len;
 		u64 page_addr = dma_addr & page_mask;
 
-		if (i && page_addr != dma_addr) {
-			if (last_end_dma_addr != dma_addr) {
-				/* gap */
-				goto done;
-
-			} else if (last_page_off + dma_len <= mr->page_size) {
-				/* chunk this fragment with the last */
-				mr->length += dma_len;
-				last_end_dma_addr += dma_len;
-				last_page_off += dma_len;
-				continue;
-			} else {
-				/* map starting from the next page */
-				page_addr = last_page_addr + mr->page_size;
-				dma_len -= mr->page_size - last_page_off;
-			}
-		}
+		/* gap */
+		if (i && (last_page_off || page_addr != dma_addr))
+			goto done;
 
 		do {
 			if (unlikely(set_page(mr, page_addr)))
@@ -1569,8 +1554,6 @@ int ib_sg_to_pages(struct ib_mr *mr,
 		} while (page_addr < end_dma_addr);
 
 		mr->length += dma_len;
-		last_end_dma_addr = end_dma_addr;
-		last_page_addr = end_dma_addr & page_mask;
 		last_page_off = end_dma_addr & ~page_mask;
 	}
 
