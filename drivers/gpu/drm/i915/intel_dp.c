@@ -835,7 +835,7 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 			last_status = status;
 		}
 
-		ret = -EBUSY;
+		ret = -EAGAIN;
 		goto out;
 	}
 
@@ -890,7 +890,7 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 
 	if ((status & DP_AUX_CH_CTL_DONE) == 0) {
 		DRM_ERROR("dp_aux_ch not done status 0x%08x\n", status);
-		ret = -EBUSY;
+		ret = -EAGAIN;
 		goto out;
 	}
 
