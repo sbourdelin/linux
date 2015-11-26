@@ -99,7 +99,7 @@ static ssize_t path_show(struct pci_slot *pci_slot, char *buf)
 	if (!slot)
 		return retval;
 
-	retval = sprintf (buf, "%s\n", slot->physical_path);
+	retval = sprintf(buf, "%s\n", slot->physical_path);
 	return retval;
 }
 

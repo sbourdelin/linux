@@ -460,7 +460,7 @@ void shpchp_queue_pushbutton_work(struct work_struct *work)
 	mutex_unlock(&p_slot->lock);
 }
 
-static int update_slot_info (struct slot *slot)
+static int update_slot_info(struct slot *slot)
 {
 	struct hotplug_slot_info *info;
 	int result;
@@ -475,7 +475,7 @@ static int update_slot_info (struct slot *slot)
 	slot->hpc_ops->get_adapter_status(slot, &(info->adapter_status));
 
 	result = pci_hp_change_slot_info(slot->hotplug_slot, info);
-	kfree (info);
+	kfree(info);
 	return result;
 }
 
@@ -566,7 +566,7 @@ static void interrupt_event_handler(struct work_struct *work)
 }
 
 
-static int shpchp_enable_slot (struct slot *p_slot)
+static int shpchp_enable_slot(struct slot *p_slot)
 {
 	u8 getstatus = 0;
 	int rc, retval = -ENODEV;
@@ -623,7 +623,7 @@ static int shpchp_enable_slot (struct slot *p_slot)
 }
 
 
-static int shpchp_disable_slot (struct slot *p_slot)
+static int shpchp_disable_slot(struct slot *p_slot)
 {
 	u8 getstatus = 0;
 	int rc, retval = -ENODEV;

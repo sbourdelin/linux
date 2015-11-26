@@ -226,7 +226,7 @@ static ssize_t test_write_file(struct pci_slot *pci_slot, const char *buf,
 	u32 test;
 	int retval = 0;
 
-	ltest = simple_strtoul (buf, NULL, 10);
+	ltest = simple_strtoul(buf, NULL, 10);
 	test = (u32)(ltest & 0xffffffff);
 	dbg("test = %d\n", test);
 

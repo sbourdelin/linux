@@ -54,7 +54,7 @@
 #define dbg(format, arg...)					\
 	do {							\
 		if (debug)					\
-			printk (KERN_DEBUG "%s: " format "\n",	\
+			printk(KERN_DEBUG "%s: " format "\n",	\
 				MY_NAME , ## arg);		\
 	} while (0)
 #define err(format, arg...) printk(KERN_ERR "%s: " format "\n", MY_NAME , ## arg)
@@ -164,7 +164,7 @@ static int __init cpcihp_generic_init(void)
 	bus = dev->subordinate;
 	pci_dev_put(dev);
 
-	memset(&generic_hpc, 0, sizeof (struct cpci_hp_controller));
+	memset(&generic_hpc, 0, sizeof(struct cpci_hp_controller));
 	generic_hpc_ops.query_enum = query_enum;
 	generic_hpc.ops = &generic_hpc_ops;
 

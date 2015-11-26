@@ -424,7 +424,7 @@ int cpqhp_process_SS(struct controller *ctrl, struct pci_func *func);
 int cpqhp_hardware_test(struct controller *ctrl, int test_num);
 
 /* resource functions */
-int	cpqhp_resource_sort_and_combine	(struct pci_resource **head);
+int cpqhp_resource_sort_and_combine(struct pci_resource **head);
 
 /* pci functions */
 int cpqhp_set_irq(u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num);

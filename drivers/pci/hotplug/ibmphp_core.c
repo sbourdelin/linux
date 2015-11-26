@@ -39,11 +39,11 @@
 #include <asm/io_apic.h>
 #include "ibmphp.h"
 
-#define attn_on(sl)  ibmphp_hpc_writeslot (sl, HPC_SLOT_ATTNON)
-#define attn_off(sl) ibmphp_hpc_writeslot (sl, HPC_SLOT_ATTNOFF)
-#define attn_LED_blink(sl) ibmphp_hpc_writeslot (sl, HPC_SLOT_BLINKLED)
-#define get_ctrl_revision(sl, rev) ibmphp_hpc_readslot (sl, READ_REVLEVEL, rev)
-#define get_hpc_options(sl, opt) ibmphp_hpc_readslot (sl, READ_HPCOPTIONS, opt)
+#define attn_on(sl)  ibmphp_hpc_writeslot(sl, HPC_SLOT_ATTNON)
+#define attn_off(sl) ibmphp_hpc_writeslot(sl, HPC_SLOT_ATTNOFF)
+#define attn_LED_blink(sl) ibmphp_hpc_writeslot(sl, HPC_SLOT_BLINKLED)
+#define get_ctrl_revision(sl, rev) ibmphp_hpc_readslot(sl, READ_REVLEVEL, rev)
+#define get_hpc_options(sl, opt) ibmphp_hpc_readslot(sl, READ_HPCOPTIONS, opt)
 
 #define DRIVER_VERSION	"0.6"
 #define DRIVER_DESC	"IBM Hot Plug PCI Controller Driver"
@@ -52,9 +52,9 @@ int ibmphp_debug;
 
 static bool debug;
 module_param(debug, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC (debug, "Debugging mode enabled or not");
-MODULE_LICENSE ("GPL");
-MODULE_DESCRIPTION (DRIVER_DESC);
+MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION(DRIVER_DESC);
 
 struct pci_bus *ibmphp_pci_bus;
 static int max_slots;
@@ -113,7 +113,7 @@ static inline int slot_update(struct slot **sl)
 	return rc;
 }
 
-static int __init get_max_slots (void)
+static int __init get_max_slots(void)
 {
 	struct slot *slot_cur;
 	struct list_head *tmp;
