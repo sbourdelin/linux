@@ -209,4 +209,11 @@ struct mlxsw_bus_info {
 	u8 psid[MLXSW_CMD_BOARDINFO_PSID_LEN];
 };
 
+struct mlxsw_hwmon;
+
+int mlxsw_hwmon_init(struct mlxsw_core *mlxsw_core,
+		     const struct mlxsw_bus_info *mlxsw_bus_info,
+		     struct mlxsw_hwmon **p_hwmon);
+void mlxsw_hwmon_fini(struct mlxsw_hwmon *mlxsw_hwmon);
+
 #endif
