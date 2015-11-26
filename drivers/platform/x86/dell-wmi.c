@@ -44,6 +44,10 @@ MODULE_LICENSE("GPL");
 #define DELL_EVENT_GUID "9DBB5994-A997-11DA-B012-B622A1EF5492"
 
 static int acpi_video;
+static bool process_dil;
+
+module_param(process_dil, bool, 0644);
+MODULE_PARM_DESC(process_dil, "Generate an input event when the WMI event for Dell Instant Launch hotkey is received");
 
 MODULE_ALIAS("wmi:"DELL_EVENT_GUID);
 
@@ -87,7 +91,7 @@ static const struct key_entry dell_wmi_legacy_keymap[] __initconst = {
 	{ KE_IGNORE, 0xe020, { KEY_MUTE } },
 
 	/* Shortcut and audio panel keys */
-	{ KE_IGNORE, 0xe025, { KEY_RESERVED } },
+	{ KE_KEY, 0xe025, { KEY_PROG4 } },
 	{ KE_IGNORE, 0xe026, { KEY_RESERVED } },
 
 	{ KE_IGNORE, 0xe02e, { KEY_VOLUMEDOWN } },
@@ -179,6 +183,9 @@ static void dell_wmi_process_key(int reported_key)
 	/* Don't report brightness notifications that will also come via ACPI */
 	if ((key->keycode == KEY_BRIGHTNESSUP ||
 	     key->keycode == KEY_BRIGHTNESSDOWN) && acpi_video)
+		return;
+
+	if (key->keycode == KEY_PROG4 && !process_dil)
 		return;
 
 	sparse_keymap_report_entry(dell_wmi_input_dev, key, 1, true);
