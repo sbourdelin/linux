@@ -1459,10 +1459,21 @@ int mwifiex_dnld_dt_cfgdata(struct mwifiex_private *priv,
 #ifdef CONFIG_OF
 	struct property *prop;
 	size_t len = strlen(prefix);
+	u32 data;
 	int ret;
 
 	/* look for all matching property names */
 	for_each_property_of_node(node, prop) {
+		if (!strncmp(prop->name, "marvell,hscfg_gpio",
+			     strlen("marvell,hscfg_gpio"))) {
+			if (!of_property_read_u32(priv->adapter->dt_node,
+						  prop->name, &data)) {
+				dev_dbg(priv->adapter->dev,
+					"hscfg gpio = 0x%x\n", data);
+				priv->adapter->hs_cfg.gpio = data;
+			}
+		}
+
 		if (len > strlen(prop->name) ||
 		    strncmp(prop->name, prefix, len))
 			continue;
