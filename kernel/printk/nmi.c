@@ -42,7 +42,7 @@ atomic_t nmi_message_lost;
 struct nmi_seq_buf {
 	atomic_t		len;	/* length of written data */
 	struct irq_work		work;	/* IRQ work that flushes the buffer */
-	unsigned char		buffer[PAGE_SIZE - sizeof(atomic_t) -
+	unsigned char		buffer[2 * PAGE_SIZE - sizeof(atomic_t) -
 				       sizeof(struct irq_work)];
 };
 static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
