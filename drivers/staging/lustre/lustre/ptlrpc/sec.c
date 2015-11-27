@@ -1580,7 +1580,7 @@ int sptlrpc_cli_enlarge_reqbuf(struct ptlrpc_request *req,
 			       int segment, int newsize)
 {
 	struct ptlrpc_cli_ctx *ctx = req->rq_cli_ctx;
-	struct ptlrpc_sec_cops *cops;
+	const struct ptlrpc_sec_cops *cops;
 	struct lustre_msg *msg = req->rq_reqmsg;
 
 	LASSERT(ctx);
