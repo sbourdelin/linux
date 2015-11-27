@@ -189,6 +189,7 @@ typedef void (nvm_destroy_dma_pool_fn)(void *);
 typedef void *(nvm_dev_dma_alloc_fn)(struct request_queue *, void *, gfp_t,
 								dma_addr_t *);
 typedef void (nvm_dev_dma_free_fn)(void *, void*, dma_addr_t);
+typedef void (nvm_dev_remove_fn) (struct request_queue *);
 
 struct nvm_dev_ops {
 	nvm_id_fn		*identity;
@@ -203,6 +204,7 @@ struct nvm_dev_ops {
 	nvm_destroy_dma_pool_fn	*destroy_dma_pool;
 	nvm_dev_dma_alloc_fn	*dev_dma_alloc;
 	nvm_dev_dma_free_fn	*dev_dma_free;
+	nvm_dev_remove_fn	*dev_remove;
 
 	unsigned int		max_phys_sect;
 };
@@ -238,6 +240,7 @@ struct nvm_dev {
 
 	/* Media manager */
 	struct nvmm_type *mt;
+	struct kref kref;
 	void *mp;
 
 	/* Device information */
