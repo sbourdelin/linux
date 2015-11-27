@@ -1416,6 +1416,15 @@ static int vgacon_dummy(struct vc_data *c)
 	return 0;
 }
 
+/*
+ * Used by drivers which wreak utter havoc to the legacy vga state to prevent
+ * the vga console driver from ever reloading.
+ */
+void vgacon_unregister(void)
+{
+	give_up_console(&vga_con);
+}
+EXPORT_SYMBOL(vgacon_unregister);
 #define DUMMY (void *) vgacon_dummy
 
 const struct consw vga_con = {

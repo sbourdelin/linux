@@ -190,8 +190,10 @@ void vcs_remove_sysfs(int index);
 
 #ifdef CONFIG_VGA_CONSOLE
 extern bool vgacon_text_force(void);
+extern void vgacon_unregister(void);
 #else
 static inline bool vgacon_text_force(void) { return false; }
+static inline void vgacon_unregister(void) {}
 #endif
 
 #endif /* _LINUX_CONSOLE_H */

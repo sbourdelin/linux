@@ -717,6 +717,9 @@ static void intel_fbdev_initial_config(void *data, async_cookie_t cookie)
 	if (drm_fb_helper_initial_config(&ifbdev->helper,
 					 ifbdev->preferred_bpp))
 		intel_fbdev_fini(dev_priv->dev);
+
+	/* Need to do this after fbcon setup for "smooth" takeover. */
+	vgacon_unregister();
 }
 
 void intel_fbdev_initial_config_async(struct drm_device *dev)

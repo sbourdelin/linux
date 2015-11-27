@@ -45,6 +45,7 @@
 #include <linux/pnp.h>
 #include <linux/vga_switcheroo.h>
 #include <linux/slab.h>
+#include <linux/console.h>
 #include <acpi/video.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
