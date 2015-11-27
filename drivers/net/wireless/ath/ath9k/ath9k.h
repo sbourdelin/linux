@@ -37,6 +37,7 @@ extern int ath9k_modparam_nohwcrypt;
 extern int ath9k_led_blink;
 extern bool is_ath9k_unloaded;
 extern int ath9k_use_chanctx;
+extern int ath9k_sta_ap_ratio;
 
 /*************************/
 /* Descriptor Management */
@@ -335,6 +336,7 @@ struct ath_chanctx {
 	struct timespec tsf_ts;
 	u64 tsf_val;
 	u32 last_beacon;
+	u32 ctwindow;
 
 	int flush_timeout;
 	u16 txpower;

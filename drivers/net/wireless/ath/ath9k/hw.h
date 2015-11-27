@@ -193,6 +193,7 @@
 #define INIT_BCON_CNTRL_REG         0x00000000
 
 #define TU_TO_USEC(_tu)             ((_tu) << 10)
+#define USEC_TO_TU(_us)             ((_us) >> 10)
 
 #define ATH9K_HW_RX_HP_QDEPTH	16
 #define ATH9K_HW_RX_LP_QDEPTH	128

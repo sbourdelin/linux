@@ -67,6 +67,9 @@ int ath9k_use_chanctx;
 module_param_named(use_chanctx, ath9k_use_chanctx, int, 0444);
 MODULE_PARM_DESC(use_chanctx, "Enable channel context for concurrency");
 
+int ath9k_sta_ap_ratio;
+module_param_named(sta_ap_ratio, ath9k_sta_ap_ratio, int, 0444);
+MODULE_PARM_DESC(sta_ap_ratio, "sta/ap ratio 20-80");
 #endif /* CONFIG_ATH9K_CHANNEL_CONTEXT */
 
 bool is_ath9k_unloaded;

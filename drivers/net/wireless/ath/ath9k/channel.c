@@ -313,11 +313,21 @@ ath_chanctx_get_next(struct ath_softc *sc, struct ath_chanctx *ctx)
 	return &sc->chanctx[!idx];
 }
 
+static u32 get_ratio(u32 beacon_int)
+{
+	if (ath9k_sta_ap_ratio < 20 ||
+	    ath9k_sta_ap_ratio > 80)
+		return beacon_int / 2;
+
+	return (beacon_int * ath9k_sta_ap_ratio) / 100;
+}
+
 static void ath_chanctx_adjust_tbtt_delta(struct ath_softc *sc)
 {
+	struct ath_common *common = ath9k_hw_common(sc->sc_ah);
 	struct ath_chanctx *prev, *cur;
 	struct timespec ts;
-	u32 cur_tsf, prev_tsf, beacon_int;
+	u32 cur_tsf, prev_tsf, beacon_int, diff;
 	s32 offset;
 
 	beacon_int = TU_TO_USEC(sc->cur_chan->beacon.beacon_interval);
@@ -344,7 +354,14 @@ static void ath_chanctx_adjust_tbtt_delta(struct ath_softc *sc)
 	if (offset < 0 || offset > 3 * beacon_int)
 		return;
 
-	offset = beacon_int / 2 - (offset % beacon_int);
+	diff = 2 * prev->ctwindow;
+	diff += sc->sched.channel_switch_time;
+	if (diff > beacon_int / 2)
+		diff = beacon_int / 2;
+
+	ath_dbg(common, CHAN_CTX, "Setup beacon interval offset %u ms\n",
+		diff / 1000);
+	offset = diff - (offset % beacon_int);
 	prev->tsf_val += offset;
 }
 
@@ -435,7 +452,7 @@ static void ath_chanctx_set_periodic_noa(struct ath_softc *sc,
 			sc->sched.channel_switch_time;
 	else
 		avp->noa_duration =
-			TU_TO_USEC(cur_conf->beacon_interval) / 2 +
+			TU_TO_USEC(get_ratio(cur_conf->beacon_interval)) +
 			sc->sched.channel_switch_time;
 
 	if (test_bit(ATH_OP_SCANNING, &common->op_flags) ||
@@ -481,7 +498,8 @@ void ath_chanctx_event(struct ath_softc *sc, struct ieee80211_vif *vif,
 	struct ath_beacon_config *cur_conf;
 	struct ath_vif *avp = NULL;
 	struct ath_chanctx *ctx;
-	u32 tsf_time;
+	u32 tsf_time, defer_time;
+	u32 beacon_resp_time = ah->config.sw_beacon_response_time;
 	u32 beacon_int;
 
 	if (vif)
@@ -565,10 +583,26 @@ void ath_chanctx_event(struct ath_softc *sc, struct ieee80211_vif *vif,
 		cur_conf = &sc->cur_chan->beacon;
 		beacon_int = TU_TO_USEC(cur_conf->beacon_interval);
 
-		/* defer channel switch by a quarter beacon interval */
-		tsf_time = sc->sched.next_tbtt + beacon_int / 4;
+		/* defer channel switch */
+		defer_time = beacon_int - get_ratio(beacon_int);
+		defer_time -= sc->sched.channel_switch_time;
+		defer_time /= 2;
+
+		if (defer_time < TU_TO_USEC(2 + beacon_resp_time)) {
+			defer_time *= 2;
+			if (defer_time > TU_TO_USEC(3 + beacon_resp_time))
+				defer_time -= TU_TO_USEC(3 + beacon_resp_time);
+			else
+				defer_time = 1000;
+		}
+
+		ath_dbg(common, CHAN_CTX, "Setup defer_time %u (%u ms)\n",
+			defer_time, defer_time / 1000);
+
+		tsf_time = sc->sched.next_tbtt + defer_time;
 		sc->sched.switch_start_time = tsf_time;
 		sc->cur_chan->last_beacon = sc->sched.next_tbtt;
+		sc->cur_chan->ctwindow = defer_time;
 
 		/*
 		 * If an offchannel switch is scheduled to happen after
@@ -707,7 +741,7 @@ void ath_chanctx_event(struct ath_softc *sc, struct ieee80211_vif *vif,
 		sc->sched.state = ATH_CHANCTX_STATE_WAIT_FOR_TIMER;
 		sc->sched.wait_switch = false;
 
-		tsf_time = TU_TO_USEC(cur_conf->beacon_interval) / 2;
+		tsf_time = TU_TO_USEC(get_ratio(cur_conf->beacon_interval));
 
 		if (sc->sched.extend_absence) {
 			sc->sched.beacon_miss = 0;
@@ -1454,26 +1488,13 @@ static void ath9k_update_p2p_ps(struct ath_softc *sc, struct ieee80211_vif *vif)
 
 static u8 ath9k_get_ctwin(struct ath_softc *sc, struct ath_vif *avp)
 {
-	struct ath_beacon_config *cur_conf = &sc->cur_chan->beacon;
-	u8 switch_time, ctwin;
-
 	/*
 	 * Channel switch in multi-channel mode is deferred
-	 * by a quarter beacon interval when handling
-	 * ATH_CHANCTX_EVENT_BEACON_PREPARE, so the P2P-GO
-	 * interface is guaranteed to be discoverable
-	 * for that duration after a TBTT.
+	 * when handling ATH_CHANCTX_EVENT_BEACON_PREPARE,
+	 * so the P2P-GO interface is guaranteed to be
+	 * discoverable for that duration after a TBTT.
 	 */
-	switch_time = cur_conf->beacon_interval / 4;
-
-	ctwin = avp->vif->bss_conf.p2p_noa_attr.oppps_ctwindow;
-	if (ctwin && (ctwin < switch_time))
-		return ctwin;
-
-	if (switch_time < P2P_DEFAULT_CTWIN)
-		return 0;
-
-	return P2P_DEFAULT_CTWIN;
+	return USEC_TO_TU(sc->cur_chan->ctwindow);
 }
 
 void ath9k_beacon_add_noa(struct ath_softc *sc, struct ath_vif *avp,
