@@ -1070,7 +1070,7 @@ static i915_reg_t ilk_aux_data_reg(struct drm_i915_private *dev_priv,
  * On SKL we don't have Aux for port E so we rely
  * on VBT to set a proper alternate aux channel.
  */
-static enum port skl_porte_aux_port(struct drm_i915_private *dev_priv)
+enum port skl_porte_aux_port(struct drm_i915_private *dev_priv)
 {
 	const struct ddi_vbt_port_info *info =
 		&dev_priv->vbt.ddi_port_info[PORT_E];

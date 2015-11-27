@@ -5212,8 +5212,11 @@ static enum intel_display_power_domain port_to_power_domain(enum port port)
 	}
 }
 
-static enum intel_display_power_domain port_to_aux_power_domain(enum port port)
+static enum intel_display_power_domain port_to_aux_power_domain(
+			struct drm_i915_private *dev_priv, enum port port)
 {
+	enum port alternate_port;
+
 	switch (port) {
 	case PORT_A:
 		return POWER_DOMAIN_AUX_A;
@@ -5224,7 +5227,14 @@ static enum intel_display_power_domain port_to_aux_power_domain(enum port port)
 	case PORT_D:
 		return POWER_DOMAIN_AUX_D;
 	case PORT_E:
-		/* FIXME: Check VBT for actual wiring of PORT E */
+		if (IS_SKYLAKE(dev_priv)) {
+			alternate_port = skl_porte_aux_port(dev_priv);
+			if (alternate_port != PORT_E)
+				return port_to_aux_power_domain(dev_priv,
+								alternate_port);
+			WARN_ON_ONCE(alternate_port == PORT_E);
+		}
+
 		return POWER_DOMAIN_AUX_D;
 	default:
 		MISSING_CASE(port);
@@ -5263,6 +5273,7 @@ enum intel_display_power_domain
 intel_display_port_aux_power_domain(struct intel_encoder *intel_encoder)
 {
 	struct drm_device *dev = intel_encoder->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_digital_port *intel_dig_port;
 
 	switch (intel_encoder->type) {
@@ -5279,10 +5290,10 @@ intel_display_port_aux_power_domain(struct intel_encoder *intel_encoder)
 	case INTEL_OUTPUT_DISPLAYPORT:
 	case INTEL_OUTPUT_EDP:
 		intel_dig_port = enc_to_dig_port(&intel_encoder->base);
-		return port_to_aux_power_domain(intel_dig_port->port);
+		return port_to_aux_power_domain(dev_priv, intel_dig_port->port);
 	case INTEL_OUTPUT_DP_MST:
 		intel_dig_port = enc_to_mst(&intel_encoder->base)->primary;
-		return port_to_aux_power_domain(intel_dig_port->port);
+		return port_to_aux_power_domain(dev_priv, intel_dig_port->port);
 	default:
 		MISSING_CASE(intel_encoder->type);
 		return POWER_DOMAIN_AUX_A;
