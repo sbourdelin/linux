@@ -447,7 +447,7 @@ static int intel_flush(struct hci_uart *hu)
 	return 0;
 }
 
-static int inject_cmd_complete(struct hci_dev *hdev, __u16 opcode)
+static int inject_cmd_complete(struct hci_dev *hdev, __u16 opcode, __u8 status)
 {
 	struct sk_buff *skb;
 	struct hci_event_hdr *hdr;
@@ -465,7 +465,7 @@ static int inject_cmd_complete(struct hci_dev *hdev, __u16 opcode)
 	evt->ncmd = 0x01;
 	evt->opcode = cpu_to_le16(opcode);
 
-	*skb_put(skb, 1) = 0x00;
+	*skb_put(skb, 1) = status;
 
 	hci_skb_pkt_type(skb) = HCI_EVENT_PKT;
 
@@ -1150,7 +1150,7 @@ static struct sk_buff *intel_dequeue(struct hci_uart *hu)
 		 * control working inject that event here.
 		 */
 		if (opcode == 0xfc01)
-			inject_cmd_complete(hu->hdev, opcode);
+			inject_cmd_complete(hu->hdev, opcode, 0x00);
 	}
 
 	/* Prepend skb with frame type */
