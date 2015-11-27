@@ -234,6 +234,16 @@ struct input_mask {
 
 #define EVIOCSCLOCKID		_IOW('E', 0xa0, int)			/* Set clockid to be used for timestamps */
 
+#define EVIOCSIFTYPE		_IOW('E', 0xa1, int)			/* Set if_type */
+#define EVIOCGIFTYPE		_IOR('E', 0xa2, int)			/* Get if_type */
+
+/*
+ * evdev interface type
+ */
+#define EVDEV_LEGACY			0x00
+#define EVDEV_RAW			0x01
+#define EVDEV_COMPOSITE			0x02
+
 /*
  * IDs.
  */

@@ -175,7 +175,6 @@ static void evdev_queue_syn_dropped(struct evdev_client *client)
 
 static int evdev_set_clk_type(struct evdev_client *client, unsigned int clkid)
 {
-	unsigned long flags;
 	unsigned int clk_type;
 
 	switch (clkid) {
@@ -193,21 +192,29 @@ static int evdev_set_clk_type(struct evdev_client *client, unsigned int clkid)
 		return -EINVAL;
 	}
 
-	if (client->clk_type != clk_type) {
+	if (client->clk_type != clk_type)
 		client->clk_type = clk_type;
 
-		/*
-		 * Flush pending events and queue SYN_DROPPED event,
-		 * but only if the queue is not empty.
-		 */
-		spin_lock_irqsave(&client->buffer_lock, flags);
+	return 0;
+}
 
-		if (client->head != client->tail) {
-			client->packet_head = client->head = client->tail;
-			__evdev_queue_syn_dropped(client);
-		}
+static int evdev_set_if_type(struct evdev_client *client, unsigned int if_type)
+{
+	if (client->if_type == if_type)
+		return 0;
 
-		spin_unlock_irqrestore(&client->buffer_lock, flags);
+	switch (if_type) {
+	case EVDEV_LEGACY:
+		client->if_type = EV_IF_LEGACY;
+		break;
+	case EVDEV_RAW:
+		client->if_type = EV_IF_RAW;
+		break;
+	case EVDEV_COMPOSITE:
+		client->if_type = EV_IF_COMPOSITE;
+		break;
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
@@ -1046,6 +1053,7 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 	int __user *ip = (int __user *)p;
 	unsigned int i, t, u, v;
 	unsigned int size;
+	int if_type;
 	int error;
 
 	/* First we check for fixed-length commands */
@@ -1144,6 +1152,13 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 
 	case EVIOCSKEYCODE_V2:
 		return evdev_handle_set_keycode_v2(dev, p);
+	case EVIOCSIFTYPE:
+		if (get_user(if_type, ip))
+			return -EFAULT;
+
+		return evdev_set_if_type(client, if_type);
+	case EVIOCGIFTYPE:
+		return put_user(client->if_type, ip);
 	}
 
 	size = _IOC_SIZE(cmd);
