@@ -49,7 +49,7 @@ static void __init pnv_setup_arch(void)
 	pnv_pci_init();
 
 	/* Setup RTC and NVRAM callbacks */
-	if (firmware_has_feature(FW_FEATURE_OPAL))
+	if (firmware_has_feature(FW_FEATURE_OPALv3))
 		opal_nvram_init();
 
 	/* Enable NAP mode */
@@ -67,7 +67,7 @@ static void __init pnv_init_early(void)
 	opal_lpc_init();
 
 #ifdef CONFIG_HVC_OPAL
-	if (firmware_has_feature(FW_FEATURE_OPAL))
+	if (firmware_has_feature(FW_FEATURE_OPALv3))
 		hvc_opal_init_early();
 	else
 #endif
@@ -92,8 +92,6 @@ static void pnv_show_cpuinfo(struct seq_file *m)
 	seq_printf(m, "machine\t\t: PowerNV %s\n", model);
 	if (firmware_has_feature(FW_FEATURE_OPALv3))
 		seq_printf(m, "firmware\t: OPAL v3\n");
-	else if (firmware_has_feature(FW_FEATURE_OPAL))
-		seq_printf(m, "firmware\t: OPAL v1\n");
 	else
 		seq_printf(m, "firmware\t: BML\n");
 	of_node_put(root);
@@ -277,7 +275,7 @@ static int __init pnv_probe(void)
 
 	hpte_init_native();
 
-	if (firmware_has_feature(FW_FEATURE_OPAL))
+	if (firmware_has_feature(FW_FEATURE_OPALv3))
 		pnv_setup_machdep_opal();
 
 	pr_debug("PowerNV detected !\n");

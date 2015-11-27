@@ -244,7 +244,7 @@ static struct platform_driver opal_rtc_driver = {
 
 static int __init opal_rtc_init(void)
 {
-	if (!firmware_has_feature(FW_FEATURE_OPAL))
+	if (!firmware_has_feature(FW_FEATURE_OPALv3))
 		return -ENODEV;
 
 	return platform_driver_register(&opal_rtc_driver);

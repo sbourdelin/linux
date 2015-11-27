@@ -276,7 +276,7 @@ static struct platform_driver i2c_opal_driver = {
 
 static int __init i2c_opal_init(void)
 {
-	if (!firmware_has_feature(FW_FEATURE_OPAL))
+	if (!firmware_has_feature(FW_FEATURE_OPALv3))
 		return -ENODEV;
 
 	return platform_driver_register(&i2c_opal_driver);

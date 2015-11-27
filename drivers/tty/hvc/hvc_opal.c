@@ -255,7 +255,7 @@ static struct platform_driver hvc_opal_driver = {
 
 static int __init hvc_opal_init(void)
 {
-	if (!firmware_has_feature(FW_FEATURE_OPAL))
+	if (!firmware_has_feature(FW_FEATURE_OPALv3))
 		return -ENODEV;
 
 	/* Register as a vio device to receive callbacks */

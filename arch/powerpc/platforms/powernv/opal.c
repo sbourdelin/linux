@@ -98,7 +98,6 @@ int __init early_init_dt_scan_opal(unsigned long node,
 	pr_debug("OPAL Entry = 0x%llx (sizep=%p runtimesz=%d)\n",
 		 opal.size, sizep, runtimesz);
 
-	powerpc_firmware_features |= FW_FEATURE_OPAL;
 	if (of_flat_dt_is_compatible(node, "ibm,opal-v3")) {
 		powerpc_firmware_features |= FW_FEATURE_OPALv3;
 		pr_info("OPAL V3 detected !\n");
@@ -180,7 +179,7 @@ static int __init opal_register_exception_handlers(void)
 #ifdef __BIG_ENDIAN__
 	u64 glue;
 
-	if (!(powerpc_firmware_features & FW_FEATURE_OPAL))
+	if (!(powerpc_firmware_features & FW_FEATURE_OPALv3))
 		return -ENODEV;
 
 	/* Hookup some exception handlers except machine check. We use the

@@ -786,7 +786,7 @@ void __init pnv_pci_init(void)
 	pci_add_flags(PCI_CAN_SKIP_ISA_ALIGN);
 
 	/* If we don't have OPAL, eg. in sim, just skip PCI probe */
-	if (!firmware_has_feature(FW_FEATURE_OPAL))
+	if (!firmware_has_feature(FW_FEATURE_OPALv3))
 		return;
 
 	/* Look for IODA IO-Hubs. We don't support mixing IODA

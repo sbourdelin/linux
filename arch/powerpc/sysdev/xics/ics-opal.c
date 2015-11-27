@@ -226,7 +226,7 @@ static long ics_opal_get_server(struct ics *ics, unsigned long vec)
 
 int __init ics_opal_init(void)
 {
-	if (!firmware_has_feature(FW_FEATURE_OPAL))
+	if (!firmware_has_feature(FW_FEATURE_OPALv3))
 		return -ENODEV;
 
 	/* We need to patch our irq chip's EOI to point to the

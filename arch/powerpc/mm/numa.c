@@ -297,7 +297,7 @@ static int __init find_min_common_depth(void)
 	int depth;
 	struct device_node *root;
 
-	if (firmware_has_feature(FW_FEATURE_OPAL))
+	if (firmware_has_feature(FW_FEATURE_OPALv3))
 		root = of_find_node_by_path("/ibm,opal");
 	else
 		root = of_find_node_by_path("/rtas");
@@ -327,7 +327,7 @@ static int __init find_min_common_depth(void)
 
 	distance_ref_points_depth /= sizeof(int);
 
-	if (firmware_has_feature(FW_FEATURE_OPAL) ||
+	if (firmware_has_feature(FW_FEATURE_OPALv3) ||
 	    firmware_has_feature(FW_FEATURE_TYPE1_AFFINITY)) {
 		dbg("Using form 1 affinity\n");
 		form1_affinity = 1;
