@@ -1072,7 +1072,7 @@ static void i915_gem_record_rings(struct drm_device *dev,
 			struct drm_i915_error_request *erq;
 
 			erq = &error->ring[i].requests[count++];
-			erq->seqno = request->seqno;
+			erq->seqno = request->seqno_complete;
 			erq->jiffies = request->emitted_jiffies;
 			erq->tail = request->postfix;
 		}

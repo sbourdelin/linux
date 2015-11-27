@@ -625,7 +625,7 @@ int i915_guc_submit(struct i915_guc_client *client,
 
 	spin_lock(&guc->host2guc_lock);
 	guc->submissions[ring_id] += 1;
-	guc->last_seqno[ring_id] = rq->seqno;
+	guc->last_seqno[ring_id] = rq->seqno_complete;
 	spin_unlock(&guc->host2guc_lock);
 
 	return q_ret;

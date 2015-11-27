@@ -1193,8 +1193,13 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 	 * takes to sleep on a request, on the order of a microsecond.
 	 */
 
-	if (i915_gem_request_get_ring(req)->irq_refcount)
+	if (req->ring->irq_refcount)
 		return -EBUSY;
+
+	/* Only spin if we know the GPU is processing this request */
+	if (!i915_seqno_passed(req->ring->get_seqno(req->ring, false),
+			       req->seqno_active))
+		return -EAGAIN;
 
 	timeout = local_clock_us(&cpu) + 10;
 	while (!need_resched()) {
@@ -2592,7 +2597,8 @@ void __i915_add_request(struct drm_i915_gem_request *request,
 	request->batch_obj = obj;
 
 	request->emitted_jiffies = jiffies;
-	ring->last_submitted_seqno = request->seqno;
+	request->seqno_active = ring->last_submitted_seqno;
+	ring->last_submitted_seqno = request->seqno_complete;
 	list_add_tail(&request->list, &ring->request_list);
 
 	trace_i915_gem_request_add(request);
@@ -2691,7 +2697,7 @@ int i915_gem_request_alloc(struct intel_engine_cs *ring,
 	if (req == NULL)
 		return -ENOMEM;
 
-	ret = i915_gem_get_seqno(ring->dev, &req->seqno);
+	ret = i915_gem_get_seqno(ring->dev, &req->seqno_complete);
 	if (ret)
 		goto err;
 

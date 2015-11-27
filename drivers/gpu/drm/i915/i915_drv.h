@@ -2192,8 +2192,12 @@ struct drm_i915_gem_request {
 	struct drm_i915_private *i915;
 	struct intel_engine_cs *ring;
 
-	/** GEM sequence number associated with this request. */
-	uint32_t seqno;
+	/* GEM sequence numbers associated with this request:
+	 *   active - marks the start of the request, passed when
+	 *           the GPU completes the previous request
+	 *   complete - marks the end of the request
+	 */
+	u32 seqno_active, seqno_complete;
 
 	/** Position in the ringbuffer of the start of the request */
 	u32 head;
@@ -2270,7 +2274,7 @@ int i915_gem_request_add_to_client(struct drm_i915_gem_request *req,
 static inline uint32_t
 i915_gem_request_get_seqno(struct drm_i915_gem_request *req)
 {
-	return req ? req->seqno : 0;
+	return req ? req->seqno_complete : 0;
 }
 
 static inline struct intel_engine_cs *
@@ -2909,16 +2913,17 @@ i915_seqno_passed(uint32_t seq1, uint32_t seq2)
 	return (int32_t)(seq1 - seq2) >= 0;
 }
 
+static inline bool i915_gem_request_active(struct drm_i915_gem_request *req)
+{
+	u32 seqno = req->ring->get_seqno(req->ring, true);
+	return i915_seqno_passed(seqno, req->seqno_active);
+}
+
 static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req,
 					      bool lazy_coherency)
 {
-	u32 seqno;
-
-	BUG_ON(req == NULL);
-
-	seqno = req->ring->get_seqno(req->ring, lazy_coherency);
-
-	return i915_seqno_passed(seqno, req->seqno);
+	u32 seqno = req->ring->get_seqno(req->ring, lazy_coherency);
+	return i915_seqno_passed(seqno, req->seqno_complete);
 }
 
 int __must_check i915_gem_get_seqno(struct drm_device *dev, u32 *seqno);
