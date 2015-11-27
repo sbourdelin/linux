@@ -202,7 +202,11 @@ void __init printk_nmi_init(void)
 
 void printk_nmi_enter(void)
 {
-	this_cpu_write(printk_func, vprintk_nmi);
+	/*
+	 * We try hard to print the messages directly when Oops is in progress.
+	 */
+	if (!oops_in_progress)
+		this_cpu_write(printk_func, vprintk_nmi);
 }
 
 void printk_nmi_exit(void)

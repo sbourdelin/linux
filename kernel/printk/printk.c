@@ -1705,6 +1705,13 @@ asmlinkage int vprintk_emit(int facility, int level,
 	}
 
 	lockdep_off();
+	/*
+	 * Messages are passed from NMI context using an extra buffer.
+	 * The only exception is when Oops is in progress. In this case
+	 * we try hard to get them out directly.
+	 */
+	if (unlikely(oops_in_progress && in_nmi()))
+		zap_locks();
 	raw_spin_lock(&logbuf_lock);
 	logbuf_cpu = this_cpu;
 

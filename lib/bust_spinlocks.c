@@ -20,6 +20,7 @@ void __attribute__((weak)) bust_spinlocks(int yes)
 {
 	if (yes) {
 		++oops_in_progress;
+		printk_nmi_flush();
 	} else {
 #ifdef CONFIG_VT
 		unblank_screen();

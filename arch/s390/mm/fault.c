@@ -80,6 +80,7 @@ void bust_spinlocks(int yes)
 {
 	if (yes) {
 		oops_in_progress = 1;
+		printk_nmi_flush();
 	} else {
 		int loglevel_save = console_loglevel;
 		console_unblank();
