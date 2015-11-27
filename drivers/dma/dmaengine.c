@@ -43,6 +43,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -714,6 +715,96 @@ struct dma_chan *dma_request_slave_channel(struct device *dev,
 	return ch;
 }
 EXPORT_SYMBOL_GPL(dma_request_slave_channel);
+
+static bool dma_filter_dev_is_match(struct dma_device *device,
+				    struct device *dev)
+{
+	bool found = false;
+	int i;
+
+	if (!device->filter_map.devcnt)
+		return false;
+
+	for (i = 0; i < device->filter_map.devcnt; i++) {
+		if (!strcmp(device->filter_map.devnames[i], dev_name(dev))) {
+			found = true;
+			break;
+		}
+	}
+
+	return found;
+}
+
+struct dma_chan *dma_request_chan(struct device *dev, const char *name,
+				  const dma_cap_mask_t *mask)
+{
+	struct dma_device *device, *_d;
+	struct dma_chan *chan = NULL;
+
+	/* If device-tree is present get slave info from here */
+	if (dev->of_node)
+		chan = of_dma_request_slave_channel(dev->of_node, name);
+
+	/* If device was enumerated by ACPI get slave info from here */
+	if (ACPI_HANDLE(dev) && !chan)
+		chan = acpi_dma_request_slave_chan_by_name(dev, name);
+
+	if (chan)
+		goto validate;
+
+	/* Try to find the channel via the DMA filter map(s) */
+	mutex_lock(&dma_list_mutex);
+	list_for_each_entry_safe(device, _d, &dma_device_list, global_node) {
+		bool match = dma_filter_dev_is_match(device, dev);
+		struct resource *r;
+
+		if (!match)
+			continue;
+
+		r = platform_get_resource_byname(to_platform_device(dev),
+						 IORESOURCE_DMA, name);
+		if (!r)
+			continue;
+
+		chan = dma_get_channel(device, mask,
+				       device->filter_map.filter_fn,
+				       &r->start);
+		if (!IS_ERR(chan))
+			break;
+	}
+	mutex_unlock(&dma_list_mutex);
+
+	if (!chan)
+		return ERR_PTR(-EPROBE_DEFER);
+validate:
+	if (IS_ERR(chan) || !mask)
+		return chan;
+
+	if (!__dma_device_satisfies_mask(chan->device, mask)) {
+		dev_dbg(chan->device->dev, "%s: wrong capabilities for %s:%s\n",
+			__func__, dev_name(dev), name);
+		dma_release_channel(chan);
+		chan = ERR_PTR(-ENODEV);
+	}
+
+	return chan;
+}
+EXPORT_SYMBOL_GPL(dma_request_chan);
+
+struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask)
+{
+	struct dma_chan *chan;
+
+	if (!mask)
+		return ERR_PTR(-ENODEV);
+
+	chan = __dma_request_channel(mask, NULL, NULL);
+	if (!chan)
+		chan = ERR_PTR(-ENODEV);
+
+	return chan;
+}
+EXPORT_SYMBOL_GPL(dma_request_chan_by_mask);
 
 void dma_release_channel(struct dma_chan *chan)
 {
