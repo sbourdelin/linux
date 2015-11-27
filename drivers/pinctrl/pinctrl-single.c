@@ -1619,12 +1619,14 @@ static void pcs_irq_unmask(struct irq_data *d)
  */
 static int pcs_irq_set_wake(struct irq_data *d, unsigned int state)
 {
+	struct pcs_soc_data *pcs_soc = irq_data_get_irq_chip_data(d);
+
 	if (state)
 		pcs_irq_unmask(d);
 	else
 		pcs_irq_mask(d);
 
-	return 0;
+	return irq_set_irq_wake(pcs_soc->irq, state);
 }
 
 /**
@@ -1760,8 +1762,7 @@ static int pcs_irq_init_chained_handler(struct pcs_device *pcs,
 		int res;
 
 		res = request_irq(pcs_soc->irq, pcs_irq_handler,
-				  IRQF_SHARED | IRQF_NO_SUSPEND |
-				  IRQF_NO_THREAD,
+				  IRQF_SHARED | IRQF_NO_THREAD,
 				  name, pcs_soc);
 		if (res) {
 			pcs_soc->irq = -1;
