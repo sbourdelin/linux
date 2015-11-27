@@ -1412,7 +1412,7 @@ EXPORT_SYMBOL_GPL(channel_has_mbo);
  * Returns a pointer to MBO on success or NULL otherwise.
  */
 struct mbo *most_get_mbo(struct most_interface *iface, int id,
-			 struct most_aim *aim)
+			 struct most_aim *aim, struct mbo **mbo_p)
 {
 	struct mbo *mbo;
 	struct most_c_obj *c;
@@ -1446,6 +1446,7 @@ struct mbo *most_get_mbo(struct most_interface *iface, int id,
 
 	mbo->num_buffers_ptr = num_buffers_ptr;
 	mbo->buffer_length = c->cfg.buffer_size;
+	*mbo_p = mbo;
 	return mbo;
 }
 EXPORT_SYMBOL_GPL(most_get_mbo);

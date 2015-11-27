@@ -240,8 +240,8 @@ static int playback_thread(void *data)
 			channel->playback_waitq,
 			kthread_should_stop() ||
 			(channel->is_stream_running &&
-			 (mbo = most_get_mbo(channel->iface, channel->id,
-					     &audio_aim))));
+			 most_get_mbo(channel->iface, channel->id,
+				      &audio_aim, &mbo)));
 		if (!mbo)
 			continue;
 

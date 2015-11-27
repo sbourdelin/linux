@@ -667,7 +667,7 @@ static void request_netinfo(struct most_interface *most_iface, int ch_idx)
 		return;
 	}
 
-	mbo = most_get_mbo(&dev->most_iface, dev->atx_idx, NULL);
+	mbo = most_get_mbo(&dev->most_iface, dev->atx_idx, NULL, &mbo);
 	if (!mbo)
 		return;
 

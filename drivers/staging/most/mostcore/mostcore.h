@@ -308,7 +308,7 @@ void most_resume_enqueue(struct most_interface *iface, int channel_idx);
 int most_register_aim(struct most_aim *aim);
 int most_deregister_aim(struct most_aim *aim);
 struct mbo *most_get_mbo(struct most_interface *iface, int channel_idx,
-			 struct most_aim *);
+			 struct most_aim *, struct mbo **);
 void most_put_mbo(struct mbo *mbo);
 int channel_has_mbo(struct most_interface *iface, int channel_idx);
 int most_start_channel(struct most_interface *iface, int channel_idx,
