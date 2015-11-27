@@ -50,7 +50,6 @@ static int uinput_dev_event(struct input_dev *dev,
 	udev->buff[udev->head].type = type;
 	udev->buff[udev->head].code = code;
 	udev->buff[udev->head].value = value;
-	do_gettimeofday(&udev->buff[udev->head].time);
 	udev->head = (udev->head + 1) % UINPUT_BUFFER_SIZE;
 
 	wake_up_interruptible(&udev->waitq);
@@ -436,24 +435,24 @@ static int uinput_setup_device(struct uinput_device *udev,
 static ssize_t uinput_inject_events(struct uinput_device *udev,
 				    const char __user *buffer, size_t count)
 {
-	struct input_event ev;
+	struct input_value ev;
 	size_t bytes = 0;
 
-	if (count != 0 && count < input_event_size())
+	if (count != 0 && count < input_event_size(EV_IF_LEGACY))
 		return -EINVAL;
 
-	while (bytes + input_event_size() <= count) {
+	while (bytes + input_event_size(EV_IF_LEGACY) <= count) {
 		/*
 		 * Note that even if some events were fetched successfully
 		 * we are still going to return EFAULT instead of partial
 		 * count to let userspace know that it got it's buffers
 		 * all wrong.
 		 */
-		if (input_event_from_user(buffer + bytes, &ev))
+		if (input_event_from_user(buffer + bytes, &ev, EV_IF_LEGACY))
 			return -EFAULT;
 
 		input_event(udev->dev, ev.type, ev.code, ev.value);
-		bytes += input_event_size();
+		bytes += input_event_size(EV_IF_LEGACY);
 	}
 
 	return bytes;
@@ -482,7 +481,7 @@ static ssize_t uinput_write(struct file *file, const char __user *buffer,
 }
 
 static bool uinput_fetch_next_event(struct uinput_device *udev,
-				    struct input_event *event)
+				    struct input_value *event)
 {
 	bool have_event;
 
@@ -502,16 +501,16 @@ static bool uinput_fetch_next_event(struct uinput_device *udev,
 static ssize_t uinput_events_to_user(struct uinput_device *udev,
 				     char __user *buffer, size_t count)
 {
-	struct input_event event;
+	struct input_value event;
 	size_t read = 0;
 
-	while (read + input_event_size() <= count &&
+	while (read + input_event_size(EV_IF_LEGACY) <= count &&
 	       uinput_fetch_next_event(udev, &event)) {
 
-		if (input_event_to_user(buffer + read, &event))
+		if (input_value_to_user(buffer + read, &event, EV_IF_LEGACY))
 			return -EFAULT;
 
-		read += input_event_size();
+		read += input_event_size(EV_IF_LEGACY);
 	}
 
 	return read;
@@ -523,7 +522,7 @@ static ssize_t uinput_read(struct file *file, char __user *buffer,
 	struct uinput_device *udev = file->private_data;
 	ssize_t retval;
 
-	if (count != 0 && count < input_event_size())
+	if (count != 0 && count < input_event_size(EV_IF_LEGACY))
 		return -EINVAL;
 
 	do {
