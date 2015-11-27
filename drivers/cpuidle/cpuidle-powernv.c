@@ -93,6 +93,14 @@ static int fastsleep_loop(struct cpuidle_device *dev,
 	return index;
 }
 #endif
+
+static int winkle_loop(struct cpuidle_device *dev,
+				struct cpuidle_driver *drv,
+				int index)
+{
+	power7_winkle();
+	return index;
+}
 /*
  * States for dedicated partition case.
  */
@@ -235,6 +243,13 @@ static int powernv_add_idle_states(void)
 			powernv_states[nr_idle_states].enter = &fastsleep_loop;
 		}
 #endif
+		if (flags[i] & OPAL_PM_WINKLE_ENABLED) {
+			strcpy(powernv_states[nr_idle_states].name, "winkle");
+			strcpy(powernv_states[nr_idle_states].desc, "winkle");
+			powernv_states[nr_idle_states].flags = CPUIDLE_FLAG_TIMER_STOP;
+			powernv_states[nr_idle_states].target_residency = 3000000;
+			powernv_states[nr_idle_states].enter = &winkle_loop;
+		}
 		powernv_states[nr_idle_states].exit_latency =
 				((unsigned int)latency_ns[i]) / 1000;
 
