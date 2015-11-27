@@ -568,21 +568,16 @@ static struct davinci_nand_pdata
 		pdev->dev.platform_data = pdata;
 		if (!pdata)
 			return ERR_PTR(-ENOMEM);
-		if (!of_property_read_u32(pdev->dev.of_node,
-			"ti,davinci-chipselect", &prop))
-			pdev->id = prop;
-		else
+		if (of_property_read_u32(pdev->dev.of_node,
+			"ti,davinci-chipselect", &pdev->id))
 			return ERR_PTR(-EINVAL);
 
-		if (!of_property_read_u32(pdev->dev.of_node,
-			"ti,davinci-mask-ale", &prop))
-			pdata->mask_ale = prop;
-		if (!of_property_read_u32(pdev->dev.of_node,
-			"ti,davinci-mask-cle", &prop))
-			pdata->mask_cle = prop;
-		if (!of_property_read_u32(pdev->dev.of_node,
-			"ti,davinci-mask-chipsel", &prop))
-			pdata->mask_chipsel = prop;
+		of_property_read_u32(pdev->dev.of_node,
+			"ti,davinci-mask-ale", &pdata->mask_ale);
+		of_property_read_u32(pdev->dev.of_node,
+			"ti,davinci-mask-cle", &pdata->mask_cle);
+		of_property_read_u32(pdev->dev.of_node,
+			"ti,davinci-mask-chipsel", &pdata->mask_chipsel);
 		if (!of_property_read_string(pdev->dev.of_node,
 			"nand-ecc-mode", &mode) ||
 		    !of_property_read_string(pdev->dev.of_node,
@@ -594,9 +589,8 @@ static struct davinci_nand_pdata
 			if (!strncmp("hw", mode, 2))
 				pdata->ecc_mode = NAND_ECC_HW;
 		}
-		if (!of_property_read_u32(pdev->dev.of_node,
-			"ti,davinci-ecc-bits", &prop))
-			pdata->ecc_bits = prop;
+		of_property_read_u32(pdev->dev.of_node,
+			"ti,davinci-ecc-bits", &pdata->ecc_bits);
 
 		prop = of_get_nand_bus_width(pdev->dev.of_node);
 		if (0 < prop || !of_property_read_u32(pdev->dev.of_node,
