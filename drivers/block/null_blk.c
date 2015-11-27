@@ -738,7 +738,7 @@ static int null_add_dev(void)
 		rv = nvm_register(nullb->q, nullb->disk_name,
 							&null_lnvm_dev_ops);
 		if (rv)
-			goto out_cleanup_blk_queue;
+			goto out_cleanup_blk_list;
 		goto done;
 	}
 
@@ -765,6 +765,10 @@ done:
 out_cleanup_lightnvm:
 	if (use_lightnvm)
 		nvm_unregister(nullb->disk_name);
+out_cleanup_blk_list:
+	mutex_lock(&lock);
+	list_del_init(&nullb->list);
+	mutex_unlock(&lock);
 out_cleanup_blk_queue:
 	blk_cleanup_queue(nullb->q);
 out_cleanup_tags:
