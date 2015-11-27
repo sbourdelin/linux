@@ -33,6 +33,7 @@ static const char * const axp20x_model_names[] = {
 	"AXP202",
 	"AXP209",
 	"AXP221",
+	"AXP223",
 	"AXP288",
 };
 
@@ -616,6 +617,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
 		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
 		break;
 	case AXP221_ID:
+	case AXP223_ID:
 		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
 		axp20x->cells = axp22x_cells;
 		axp20x->regmap_cfg = &axp22x_regmap_config;
