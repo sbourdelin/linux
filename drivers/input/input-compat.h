@@ -65,26 +65,48 @@ struct ff_effect_compat {
 	} u;
 };
 
-static inline size_t input_event_size(void)
-{
-	return (INPUT_COMPAT_TEST && !COMPAT_USE_64BIT_TIME) ?
-		sizeof(struct input_event_compat) : sizeof(struct input_event);
-}
-
-#else
-
-static inline size_t input_event_size(void)
-{
-	return sizeof(struct input_event);
-}
-
 #endif /* CONFIG_COMPAT */
 
-int input_event_from_user(const char __user *buffer,
-			 struct input_event *event);
+enum event_clock_type {
+	EV_CLK_REAL = 0,
+	EV_CLK_MONO,
+	EV_CLK_BOOT,
+	EV_CLK_MAX
+};
 
-int input_event_to_user(char __user *buffer,
-			const struct input_event *event);
+enum event_if_type {
+	EV_IF_LEGACY = 0,
+	EV_IF_RAW,
+	EV_IF_COMPOSITE,
+	EV_IF_MAX
+};
+
+static inline size_t input_event_size(int if_type)
+{
+	switch (if_type) {
+	case EV_IF_LEGACY:
+#ifdef CONFIG_COMPAT
+		if (INPUT_COMPAT_TEST && !COMPAT_USE_64BIT_TIME)
+			return sizeof(struct input_event_compat);
+#endif
+		return sizeof(struct input_event);
+	case EV_IF_RAW:
+		return sizeof(struct input_value);
+	case EV_IF_COMPOSITE:
+		return sizeof(struct input_composite_event);
+	default:
+		return 0;
+	}
+}
+
+int input_event_from_user(const char __user *buffer,
+			  struct input_value *event, int if_type);
+
+int input_event_to_user(char __user *buffer, const struct input_value *event,
+			int clk_type, int if_type);
+
+#define input_value_to_user(buffer, event, if_type)	\
+	input_event_to_user(buffer, event, 0, if_type)
 
 int input_ff_effect_from_user(const char __user *buffer, size_t size,
 			      struct ff_effect *effect);

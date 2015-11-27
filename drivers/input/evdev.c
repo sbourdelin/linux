@@ -28,13 +28,6 @@
 #include <linux/cdev.h>
 #include "input-compat.h"
 
-enum evdev_clock_type {
-	EV_CLK_REAL = 0,
-	EV_CLK_MONO,
-	EV_CLK_BOOT,
-	EV_CLK_MAX
-};
-
 struct evdev {
 	int open;
 	struct input_handle handle;
@@ -57,10 +50,11 @@ struct evdev_client {
 	struct evdev *evdev;
 	struct list_head node;
 	unsigned int clk_type;
+	unsigned int if_type;
 	bool revoked;
 	unsigned long *evmasks[EV_CNT];
 	unsigned int bufsize;
-	struct input_event buffer[];
+	struct input_value buffer[];
 };
 
 static size_t evdev_get_mask_cnt(unsigned int type)
@@ -113,7 +107,7 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 	unsigned int i, head, num;
 	unsigned int mask = client->bufsize - 1;
 	bool is_report;
-	struct input_event *ev;
+	struct input_value *ev;
 
 	BUG_ON(type == EV_SYN);
 
@@ -135,7 +129,6 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 			continue;
 		} else if (head != i) {
 			/* move entry to fill the gap */
-			client->buffer[head].time = ev->time;
 			client->buffer[head].type = ev->type;
 			client->buffer[head].code = ev->code;
 			client->buffer[head].value = ev->value;
@@ -155,16 +148,8 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 
 static void __evdev_queue_syn_dropped(struct evdev_client *client)
 {
-	struct input_event ev;
-	ktime_t time;
+	struct input_value ev;
 
-	time = client->clk_type == EV_CLK_REAL ?
-			ktime_get_real() :
-			client->clk_type == EV_CLK_MONO ?
-				ktime_get() :
-				ktime_get_boottime();
-
-	ev.time = ktime_to_timeval(time);
 	ev.type = EV_SYN;
 	ev.code = SYN_DROPPED;
 	ev.value = 0;
@@ -229,7 +214,7 @@ static int evdev_set_clk_type(struct evdev_client *client, unsigned int clkid)
 }
 
 static void __pass_event(struct evdev_client *client,
-			 const struct input_event *event)
+			 const struct input_value *event)
 {
 	client->buffer[client->head++] = *event;
 	client->head &= client->bufsize - 1;
@@ -241,7 +226,6 @@ static void __pass_event(struct evdev_client *client,
 		 */
 		client->tail = (client->head - 2) & (client->bufsize - 1);
 
-		client->buffer[client->tail].time = event->time;
 		client->buffer[client->tail].type = EV_SYN;
 		client->buffer[client->tail].code = SYN_DROPPED;
 		client->buffer[client->tail].value = 0;
@@ -256,18 +240,14 @@ static void __pass_event(struct evdev_client *client,
 }
 
 static void evdev_pass_values(struct evdev_client *client,
-			const struct input_value *vals, unsigned int count,
-			ktime_t *ev_time)
+			const struct input_value *vals, unsigned int count)
 {
 	struct evdev *evdev = client->evdev;
 	const struct input_value *v;
-	struct input_event event;
 	bool wakeup = false;
 
 	if (client->revoked)
 		return;
-
-	event.time = ktime_to_timeval(ev_time[client->clk_type]);
 
 	/* Interrupts are disabled, just acquire the lock. */
 	spin_lock(&client->buffer_lock);
@@ -284,10 +264,7 @@ static void evdev_pass_values(struct evdev_client *client,
 			wakeup = true;
 		}
 
-		event.type = v->type;
-		event.code = v->code;
-		event.value = v->value;
-		__pass_event(client, &event);
+		__pass_event(client, v);
 	}
 
 	spin_unlock(&client->buffer_lock);
@@ -304,22 +281,16 @@ static void evdev_events(struct input_handle *handle,
 {
 	struct evdev *evdev = handle->private;
 	struct evdev_client *client;
-	ktime_t ev_time[EV_CLK_MAX];
-
-	ev_time[EV_CLK_MONO] = ktime_get();
-	ev_time[EV_CLK_REAL] = ktime_mono_to_real(ev_time[EV_CLK_MONO]);
-	ev_time[EV_CLK_BOOT] = ktime_mono_to_any(ev_time[EV_CLK_MONO],
-						 TK_OFFS_BOOT);
 
 	rcu_read_lock();
 
 	client = rcu_dereference(evdev->grab);
 
 	if (client)
-		evdev_pass_values(client, vals, count, ev_time);
+		evdev_pass_values(client, vals, count);
 	else
 		list_for_each_entry_rcu(client, &evdev->client_list, node)
-			evdev_pass_values(client, vals, count, ev_time);
+			evdev_pass_values(client, vals, count);
 
 	rcu_read_unlock();
 }
@@ -498,7 +469,7 @@ static int evdev_open(struct inode *inode, struct file *file)
 	struct evdev *evdev = container_of(inode->i_cdev, struct evdev, cdev);
 	unsigned int bufsize = evdev_compute_buffer_size(evdev->handle.dev);
 	unsigned int size = sizeof(struct evdev_client) +
-					bufsize * sizeof(struct input_event);
+					bufsize * sizeof(struct input_value);
 	struct evdev_client *client;
 	int error;
 
@@ -533,10 +504,10 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 {
 	struct evdev_client *client = file->private_data;
 	struct evdev *evdev = client->evdev;
-	struct input_event event;
+	struct input_value event;
 	int retval = 0;
 
-	if (count != 0 && count < input_event_size())
+	if (count != 0 && count < input_event_size(client->if_type))
 		return -EINVAL;
 
 	retval = mutex_lock_interruptible(&evdev->mutex);
@@ -548,13 +519,19 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 		goto out;
 	}
 
-	while (retval + input_event_size() <= count) {
+	while (retval + input_event_size(client->if_type) <= count) {
 
-		if (input_event_from_user(buffer + retval, &event)) {
+		if (input_event_from_user(buffer + retval, &event,
+					client->if_type)) {
 			retval = -EFAULT;
 			goto out;
 		}
-		retval += input_event_size();
+
+		/*
+		 * We aren't interested in timestamp from userspace,
+		 * skip it if in composite interface
+		 */
+		retval += input_event_size(client->if_type);
 
 		input_inject_event(&evdev->handle,
 				   event.type, event.code, event.value);
@@ -566,7 +543,7 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 }
 
 static int evdev_fetch_next_event(struct evdev_client *client,
-				  struct input_event *event)
+				  struct input_value *event)
 {
 	int have_event;
 
@@ -588,11 +565,11 @@ static ssize_t evdev_read(struct file *file, char __user *buffer,
 {
 	struct evdev_client *client = file->private_data;
 	struct evdev *evdev = client->evdev;
-	struct input_event event;
+	struct input_value event;
 	size_t read = 0;
 	int error;
 
-	if (count != 0 && count < input_event_size())
+	if (count != 0 && count < input_event_size(client->if_type))
 		return -EINVAL;
 
 	for (;;) {
@@ -610,13 +587,14 @@ static ssize_t evdev_read(struct file *file, char __user *buffer,
 		if (count == 0)
 			break;
 
-		while (read + input_event_size() <= count &&
+		while (read + input_event_size(client->if_type) <= count &&
 		       evdev_fetch_next_event(client, &event)) {
 
-			if (input_event_to_user(buffer + read, &event))
+			if (input_event_to_user(buffer + read, &event,
+					client->clk_type, client->if_type))
 				return -EFAULT;
 
-			read += input_event_size();
+			read += input_event_size(client->if_type);
 		}
 
 		if (read)

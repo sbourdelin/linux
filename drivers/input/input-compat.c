@@ -12,55 +12,117 @@
 #include <asm/uaccess.h>
 #include "input-compat.h"
 
-#ifdef CONFIG_COMPAT
+static ktime_t input_get_time(int clk_type)
+{
+	switch (clk_type) {
+	case EV_CLK_MONO:
+		return ktime_get();
+	case EV_CLK_BOOT:
+		return ktime_get_boottime();
+	case EV_CLK_REAL:
+	default:
+		return ktime_get_real();
+	}
+}
 
 int input_event_from_user(const char __user *buffer,
-			  struct input_event *event)
+			  struct input_value *event, int if_type)
 {
-	if (INPUT_COMPAT_TEST && !COMPAT_USE_64BIT_TIME) {
-		struct input_event_compat compat_event;
+	if (if_type == EV_IF_LEGACY) {
+#ifdef CONFIG_COMPAT
+		if (INPUT_COMPAT_TEST && !COMPAT_USE_64BIT_TIME) {
+			struct input_event_compat compat_event;
 
-		if (copy_from_user(&compat_event, buffer,
-				   sizeof(struct input_event_compat)))
+			if (copy_from_user(&compat_event, buffer,
+					   sizeof(struct input_event_compat)))
+				return -EFAULT;
+
+			event->type = compat_event.type;
+			event->code = compat_event.code;
+			event->value = compat_event.value;
+		} else {
+#endif
+			struct input_event ev;
+
+			if (copy_from_user(&ev, buffer,
+						sizeof(struct input_event)))
+				return -EFAULT;
+
+			/* drop timestamp from userspace */
+			event->type = ev.type;
+			event->code = ev.code;
+			event->value = ev.value;
+#ifdef CONFIG_COMPAT
+		}
+#endif
+	} else if (if_type == EV_IF_RAW || if_type == EV_IF_COMPOSITE) {
+		if (copy_from_user(event, buffer, sizeof(struct input_value)))
 			return -EFAULT;
-
-		event->time.tv_sec = compat_event.time.tv_sec;
-		event->time.tv_usec = compat_event.time.tv_usec;
-		event->type = compat_event.type;
-		event->code = compat_event.code;
-		event->value = compat_event.value;
-
-	} else {
-		if (copy_from_user(event, buffer, sizeof(struct input_event)))
-			return -EFAULT;
-	}
+	} else
+		return -EINVAL;
 
 	return 0;
 }
 
-int input_event_to_user(char __user *buffer,
-			const struct input_event *event)
+int input_event_to_user(char __user *buffer, const struct input_value *event,
+			int clk_type, int if_type)
 {
-	if (INPUT_COMPAT_TEST && !COMPAT_USE_64BIT_TIME) {
-		struct input_event_compat compat_event;
+	if (if_type == EV_IF_LEGACY) {
+		struct timeval timestamp = ktime_to_timeval(
+				input_get_time(clk_type));
 
-		compat_event.time.tv_sec = event->time.tv_sec;
-		compat_event.time.tv_usec = event->time.tv_usec;
-		compat_event.type = event->type;
-		compat_event.code = event->code;
-		compat_event.value = event->value;
+#ifdef CONFIG_COMPAT
+		if (INPUT_COMPAT_TEST && !COMPAT_USE_64BIT_TIME) {
+			struct input_event_compat compat_event;
 
-		if (copy_to_user(buffer, &compat_event,
-				 sizeof(struct input_event_compat)))
+			compat_event.time.tv_sec = timestamp.tv_sec;
+			compat_event.time.tv_usec = timestamp.tv_usec;
+			compat_event.type = event->type;
+			compat_event.code = event->code;
+			compat_event.value = event->value;
+
+			if (copy_to_user(buffer, &compat_event,
+					 sizeof(struct input_event_compat)))
+				return -EFAULT;
+		} else {
+#endif
+			struct input_event ev;
+
+			ev.time = timestamp;
+			ev.type = event->type;
+			ev.code = event->code;
+			ev.value = event->value;
+
+			if (copy_to_user(buffer, &ev,
+					sizeof(struct input_event)))
+				return -EFAULT;
+#ifdef CONFIG_COMPAT
+		}
+#endif
+	} else if (if_type == EV_IF_RAW || if_type == EV_IF_COMPOSITE) {
+		if (copy_to_user(buffer, event, sizeof(struct input_value)))
 			return -EFAULT;
 
-	} else {
-		if (copy_to_user(buffer, event, sizeof(struct input_event)))
-			return -EFAULT;
-	}
+		if (if_type != EV_IF_RAW) {
+			/*
+			 * composite interface, send timestamp event
+			 *
+			 * s64 and input_value are the same size, use s64
+			 * directly here.
+			 */
+			s64 time = ktime_to_ns(input_get_time(clk_type));
+
+			if (copy_to_user(buffer + sizeof(struct input_value),
+						&time, sizeof(s64)))
+				return -EFAULT;
+		}
+	} else
+		return -EINVAL;
 
 	return 0;
 }
+
+#ifdef CONFIG_COMPAT
 
 int input_ff_effect_from_user(const char __user *buffer, size_t size,
 			      struct ff_effect *effect)
@@ -98,24 +160,6 @@ int input_ff_effect_from_user(const char __user *buffer, size_t size,
 }
 
 #else
-
-int input_event_from_user(const char __user *buffer,
-			 struct input_event *event)
-{
-	if (copy_from_user(event, buffer, sizeof(struct input_event)))
-		return -EFAULT;
-
-	return 0;
-}
-
-int input_event_to_user(char __user *buffer,
-			const struct input_event *event)
-{
-	if (copy_to_user(buffer, event, sizeof(struct input_event)))
-		return -EFAULT;
-
-	return 0;
-}
 
 int input_ff_effect_from_user(const char __user *buffer, size_t size,
 			      struct ff_effect *effect)

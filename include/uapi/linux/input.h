@@ -29,6 +29,23 @@ struct input_event {
 	__s32 value;
 };
 
+/**
+ * struct input_value - input value representation
+ * @type: type of value (EV_KEY, EV_ABS, etc)
+ * @code: the value code
+ * @value: the value
+ */
+struct input_value {
+	__u16 type;
+	__u16 code;
+	__s32 value;
+};
+
+struct input_composite_event {
+	struct input_value v;
+	__s64 time;
+};
+
 /*
  * Protocol version.
  */
