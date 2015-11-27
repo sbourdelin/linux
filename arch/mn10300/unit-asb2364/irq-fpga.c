@@ -31,10 +31,8 @@ static void asb2364_fpga_ack(struct irq_data *d)
 
 static void asb2364_fpga_mask_ack(struct irq_data *d)
 {
-	ASB2364_FPGA_REG_MASK(d->irq - NR_CPU_IRQS) = 0x0001;
-	SyncExBus();
-	ASB2364_FPGA_REG_IRQ(d->irq - NR_CPU_IRQS) = 0x0001;
-	SyncExBus();
+	asb2364_fpga_mask(d);
+	asb2364_fpga_irq(d);
 }
 
 static void asb2364_fpga_unmask(struct irq_data *d)
