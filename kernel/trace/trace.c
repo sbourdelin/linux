@@ -533,6 +533,62 @@ void tracing_on(void)
 EXPORT_SYMBOL_GPL(tracing_on);
 
 /**
+ * tracing_change_tracer - switch live tracing to specified tracer
+ * @tracer: Name of the tracer to change to
+ */
+void tracing_change_tracer(const char *tracer)
+{
+	tracing_set_tracer(&global_trace, tracer);
+}
+EXPORT_SYMBOL_GPL(tracing_change_tracer);
+
+/**
+ * tracing_clear_cpu - reset a cpu live tracing buffer
+ * @cpu: cpu to clear
+ */
+void tracing_clear_cpu(int cpu)
+{
+	mutex_lock(&trace_types_lock);
+	tracing_reset(&global_trace.trace_buffer, cpu);
+	mutex_unlock(&trace_types_lock);
+}
+EXPORT_SYMBOL_GPL(tracing_clear_cpu);
+
+/**
+ * tracing_clear_all - reset all cpu tracing buffers
+ */
+void tracing_clear_all(void)
+{
+	mutex_lock(&trace_types_lock);
+	tracing_reset_online_cpus(&global_trace.trace_buffer);
+	mutex_unlock(&trace_types_lock);
+}
+EXPORT_SYMBOL_GPL(tracing_clear_all);
+
+static ssize_t tracing_resize_ring_buffer(struct trace_array *, unsigned long, int);
+
+/**
+ * tracing_resize_cpu - resize a cpu's ring buffer
+ * @size - new size in KB
+ * @cpu - target cpu for buf resize
+ */
+void tracing_resize_cpu(unsigned long size, int cpu)
+{
+	tracing_resize_ring_buffer(&global_trace, size, cpu);
+}
+EXPORT_SYMBOL_GPL(tracing_resize_cpu);
+
+/**
+ * tracing_resize_all - resize all per-cpu ring buffers
+ * @size - new size in KB
+ */
+void tracing_resize_all(unsigned long size)
+{
+	tracing_resize_ring_buffer(&global_trace, size, RING_BUFFER_ALL_CPUS);
+}
+EXPORT_SYMBOL_GPL(tracing_resize_all);
+
+/**
  * __trace_puts - write a constant string into the trace buffer.
  * @ip:	   The address of the caller
  * @str:   The constant string to write

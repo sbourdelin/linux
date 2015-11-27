@@ -552,6 +552,11 @@ void tracing_off(void);
 int tracing_is_on(void);
 void tracing_snapshot(void);
 void tracing_snapshot_alloc(void);
+void tracing_clear_all(void);
+void tracing_clear_cpu(int cpu);
+void tracing_resize_all(unsigned long size);
+void tracing_resize_cpu(unsigned long size, int cpu);
+void tracing_change_tracer(const char *tracer);
 
 extern void tracing_start(void);
 extern void tracing_stop(void);
