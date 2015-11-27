@@ -468,8 +468,8 @@ static int aim_probe(struct most_interface *iface, int channel_id,
 				     NULL,
 				     "%s", name);
 
-	retval = IS_ERR(channel->dev);
-	if (retval) {
+	if (IS_ERR(channel->dev)) {
+		retval = PTR_ERR(channel->dev);
 		pr_info("failed to create new device node %s\n", name);
 		goto error_create_device;
 	}
