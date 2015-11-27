@@ -206,7 +206,7 @@ static int nfsd_init_socks(struct net *net)
 	return 0;
 }
 
-static int nfsd_users = 0;
+static int nfsd_users;
 
 static int nfsd_startup_generic(int nrservs)
 {
