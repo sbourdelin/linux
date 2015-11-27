@@ -170,7 +170,8 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 	if (ret >= count)
 		goto err;
 
-	if (page_ext->last_migrate_reason != -1) {
+	if (IS_ENABLED(CONFIG_MIGRATION) &&
+	    page_ext->last_migrate_reason != -1) {
 		ret += snprintf(kbuf + ret, count - ret,
 			"Page has been migrated, last migrate reason: %s\n",
 			migrate_reason_names[page_ext->last_migrate_reason]);
@@ -213,7 +214,8 @@ void __dump_page_owner(struct page *page)
 	dump_gfpflag_names(gfp_mask);
 	print_stack_trace(&trace, 0);
 
-	if (page_ext->last_migrate_reason != -1)
+	if (IS_ENABLED(CONFIG_MIGRATION) &&
+	    page_ext->last_migrate_reason != -1)
 		pr_alert("page has been migrated, last migrate reason: %s\n",
 			migrate_reason_names[page_ext->last_migrate_reason]);
 }
