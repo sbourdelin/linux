@@ -96,6 +96,18 @@ and have the following read/write attributes:
 		for "rising" and "falling" edges will follow this
 		setting.
 
+	"isr" ... reads as either 0 (false) or 1 (true). Reading the
+		file will clear the value, so that reading a 1 means
+		that there has been an interrupt-triggering action
+		on the pin since the file was last read.
+
+		This file exists only if the gpio chip supports reading
+		the interrupt status register bit for the pin.
+
+		Note that if reading the isr register for this pin
+		interferes with active interrupts, the read will fail
+		with an error.
+
 GPIO controllers have paths like /sys/class/gpio/gpiochip42/ (for the
 controller implementing GPIOs starting at #42) and have the following
 read-only attributes:

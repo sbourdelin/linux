@@ -119,6 +119,7 @@ void gpiod_set_raw_value_cansleep(struct gpio_desc *desc, int value);
 void gpiod_set_raw_array_value_cansleep(unsigned int array_size,
 					struct gpio_desc **desc_array,
 					int *value_array);
+int gpiod_get_isr_cansleep(const struct gpio_desc *desc);
 
 int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
 

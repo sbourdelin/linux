@@ -139,6 +139,28 @@ static ssize_t value_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(value);
 
+static ssize_t isr_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct gpiod_data	*data = dev_get_drvdata(dev);
+	struct gpio_desc	*desc = data->desc;
+	ssize_t			status;
+	int			isr;
+
+	mutex_lock(&data->mutex);
+
+	isr = gpiod_get_isr_cansleep(desc);
+	if (isr < 0)
+		status = isr;
+	else
+		status = sprintf(buf, "%d\n", isr);
+
+	mutex_unlock(&data->mutex);
+
+	return status;
+}
+static DEVICE_ATTR_RO(isr);
+
 static irqreturn_t gpio_sysfs_irq(int irq, void *priv)
 {
 	struct gpiod_data *data = priv;
@@ -367,6 +389,13 @@ static umode_t gpio_is_visible(struct kobject *kobj, struct attribute *attr,
 			mode = 0;
 		if (!show_direction && test_bit(FLAG_IS_OUT, &desc->flags))
 			mode = 0;
+	} else if (attr == &dev_attr_isr.attr) {
+		if (!desc->chip->get_isr)
+			mode = 0;
+		if (gpiod_to_irq(desc) < 0)
+			mode = 0;
+		if (!show_direction && test_bit(FLAG_IS_OUT, &desc->flags))
+			mode = 0;
 	}
 
 	return mode;
@@ -377,6 +406,7 @@ static struct attribute *gpio_attrs[] = {
 	&dev_attr_edge.attr,
 	&dev_attr_value.attr,
 	&dev_attr_active_low.attr,
+	&dev_attr_isr.attr,
 	NULL,
 };
 

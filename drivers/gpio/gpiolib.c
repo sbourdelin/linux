@@ -1689,6 +1689,21 @@ int gpiod_get_value_cansleep(const struct gpio_desc *desc)
 }
 EXPORT_SYMBOL_GPL(gpiod_get_value_cansleep);
 
+int gpiod_get_isr_cansleep(const struct gpio_desc *desc)
+{
+	struct gpio_chip *chip;
+	int offset;
+
+	might_sleep_if(extra_checks);
+	if (!desc)
+		return -EINVAL;
+
+	chip = desc->chip;
+	offset = gpio_chip_hwgpio(desc);
+	return chip->get_isr ? chip->get_isr(chip, offset) : -ENXIO;
+}
+EXPORT_SYMBOL_GPL(gpiod_get_isr_cansleep);
+
 /**
  * gpiod_set_raw_value_cansleep() - assign a gpio's raw value
  * @desc: gpio whose value will be assigned
