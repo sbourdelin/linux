@@ -542,6 +542,14 @@ static void nvme_nvm_dev_dma_free(void *pool, void *ppa_list,
 	dma_pool_free(pool, ppa_list, dma_handler);
 }
 
+static void nvme_nvm_dev_remove(struct request_queue *q)
+{
+	struct nvme_ns *ns = q->queuedata;
+
+	kref_put(&ns->kref, nvme_free_ns);
+
+}
+
 static struct nvm_dev_ops nvme_nvm_dev_ops = {
 	.identity		= nvme_nvm_identity,
 
@@ -557,13 +565,20 @@ static struct nvm_dev_ops nvme_nvm_dev_ops = {
 	.destroy_dma_pool	= nvme_nvm_destroy_dma_pool,
 	.dev_dma_alloc		= nvme_nvm_dev_dma_alloc,
 	.dev_dma_free		= nvme_nvm_dev_dma_free,
+	.dev_remove		= nvme_nvm_dev_remove,
 
 	.max_phys_sect		= 64,
 };
 
 int nvme_nvm_register(struct request_queue *q, char *disk_name)
 {
-	return nvm_register(q, disk_name, &nvme_nvm_dev_ops);
+	int ret;
+	struct nvme_ns *ns = q->queuedata;
+
+	ret = nvm_register(q, disk_name, &nvme_nvm_dev_ops);
+	if (!ret)
+		kref_get(&ns->kref);
+	return ret;
 }
 
 void nvme_nvm_unregister(struct request_queue *q, char *disk_name)
