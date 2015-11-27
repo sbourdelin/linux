@@ -739,32 +739,28 @@ static int null_add_dev(void)
 							&null_lnvm_dev_ops);
 		if (rv)
 			goto out_cleanup_blk_list;
-		goto done;
+	} else {
+		disk = nullb->disk = alloc_disk_node(1, home_node);
+		if (!disk) {
+			rv = -ENOMEM;
+			goto out_cleanup_blk_list;
+		}
+		size = gb * 1024 * 1024 * 1024ULL;
+		set_capacity(disk, size >> 9);
+
+		disk->flags |=
+			GENHD_FL_EXT_DEVT | GENHD_FL_SUPPRESS_PARTITION_INFO;
+		disk->major		= null_major;
+		disk->first_minor	= nullb->index;
+		disk->fops		= &null_fops;
+		disk->private_data	= nullb;
+		disk->queue		= nullb->q;
+		strncpy(disk->disk_name, nullb->disk_name, DISK_NAME_LEN);
+
+		add_disk(disk);
 	}
-
-	disk = nullb->disk = alloc_disk_node(1, home_node);
-	if (!disk) {
-		rv = -ENOMEM;
-		goto out_cleanup_lightnvm;
-	}
-	size = gb * 1024 * 1024 * 1024ULL;
-	set_capacity(disk, size >> 9);
-
-	disk->flags |= GENHD_FL_EXT_DEVT | GENHD_FL_SUPPRESS_PARTITION_INFO;
-	disk->major		= null_major;
-	disk->first_minor	= nullb->index;
-	disk->fops		= &null_fops;
-	disk->private_data	= nullb;
-	disk->queue		= nullb->q;
-	strncpy(disk->disk_name, nullb->disk_name, DISK_NAME_LEN);
-
-	add_disk(disk);
-done:
 	return 0;
 
-out_cleanup_lightnvm:
-	if (use_lightnvm)
-		nvm_unregister(nullb->disk_name);
 out_cleanup_blk_list:
 	mutex_lock(&lock);
 	list_del_init(&nullb->list);
