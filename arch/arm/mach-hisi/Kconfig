@@ -48,6 +48,15 @@ config ARCH_HIX5HD2
 	select PINCTRL_SINGLE
 	help
 	  Support for Hisilicon HIX5HD2 SoC family
+
+config ARCH_HI3519
+	bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
+	select HAVE_ARM_ARCH_TIMER
+	select ARCH_HAS_RESET_CONTROLLER
+
+	help
+	  Support for Hisilicon Hi3519 Soc
+
 endmenu
 
 endif
