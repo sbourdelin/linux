@@ -322,6 +322,8 @@ static void timer_trig_handler(struct work_struct *work)
   reg_timer_rw_intr_mask intr_mask;
   reg_timer_rw_trig_cfg trig_cfg = { 0 };
   struct fast_timer *t;
+  fast_timer_function_type *f;
+  unsigned long d;
   unsigned long flags;
 
 	/* We keep interrupts disabled not only when we modify the
@@ -349,9 +351,6 @@ static void timer_trig_handler(struct work_struct *work)
 
   fast_timer_running = 0;
   fast_timer_ints++;
-
-	fast_timer_function_type *f;
-	unsigned long d;
 
   t = fast_timer_list;
 	while (t) {
