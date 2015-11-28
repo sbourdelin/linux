@@ -30,6 +30,7 @@
 #include <linux/of_gpio.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/machine.h>
+#include <linux/mfd/syscon.h>
 
 struct fixed_voltage_data {
 	struct regulator_desc desc;
@@ -92,6 +93,19 @@ of_get_fixed_voltage_config(struct device *dev,
 	if ((config->gpio == -ENODEV) || (config->gpio == -EPROBE_DEFER))
 		return ERR_PTR(-EPROBE_DEFER);
 
+	config->regmap = syscon_regmap_lookup_by_phandle(np, "regmap");
+	if (!IS_ERR(config->regmap)) {
+		u32 val;
+
+		if (of_property_read_u32(np, "regmap-offset", &val))
+			return ERR_PTR(-EINVAL);
+		config->enable_reg = val;
+
+		if (of_property_read_u32(np, "regmap-mask", &val))
+			return ERR_PTR(-EINVAL);
+		config->enable_mask = val;
+	}
+
 	of_property_read_u32(np, "startup-delay-us", &config->startup_delay);
 
 	config->enable_high = of_property_read_bool(np, "enable-active-high");
@@ -105,6 +119,12 @@ of_get_fixed_voltage_config(struct device *dev,
 }
 
 static struct regulator_ops fixed_voltage_ops = {
+};
+
+static struct regulator_ops fixed_voltage_regmap_ops = {
+	.enable = regulator_enable_regmap,
+	.disable = regulator_disable_regmap,
+	.is_enabled = regulator_is_enabled_regmap,
 };
 
 static int reg_fixed_voltage_probe(struct platform_device *pdev)
@@ -140,7 +160,15 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
 	}
 	drvdata->desc.type = REGULATOR_VOLTAGE;
 	drvdata->desc.owner = THIS_MODULE;
-	drvdata->desc.ops = &fixed_voltage_ops;
+	if (!IS_ERR_OR_NULL(config->regmap)) {
+		drvdata->desc.ops = &fixed_voltage_regmap_ops;
+		cfg.regmap = config->regmap;
+		drvdata->desc.enable_reg = config->enable_reg;
+		drvdata->desc.enable_mask = config->enable_mask;
+		drvdata->desc.enable_is_inverted = !config->enable_high;
+	} else {
+		drvdata->desc.ops = &fixed_voltage_ops;
+	}
 
 	drvdata->desc.enable_time = config->startup_delay;
 

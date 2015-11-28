@@ -26,6 +26,10 @@ struct regulator_init_data;
  * @microvolts:		Output voltage of regulator
  * @gpio:		GPIO to use for enable control
  * 			set to -EINVAL if not used
+ * @regmap:		Regmap to use for enable control
+ *			set to -ENODEV if not used
+ * @enable_reg:		Register for control when using regmap
+ * @enable_mask:	Mask for control when using regmap
  * @startup_delay:	Start-up time in microseconds
  * @gpio_is_open_drain: Gpio pin is open drain or normal type.
  *			If it is open drain type then HIGH will be set
@@ -33,7 +37,7 @@ struct regulator_init_data;
  *			and low will be set as gpio-output with driven
  *			to low. For non-open-drain case, the gpio will
  *			will be in output and drive to low/high accordingly.
- * @enable_high:	Polarity of enable GPIO
+ * @enable_high:	Polarity of enable GPIO/regmap
  *			1 = Active high, 0 = Active low
  * @enabled_at_boot:	Whether regulator has been enabled at
  * 			boot or not. 1 = Yes, 0 = No
@@ -50,6 +54,9 @@ struct fixed_voltage_config {
 	const char *input_supply;
 	int microvolts;
 	int gpio;
+	struct regmap *regmap;
+	unsigned int enable_reg;
+	unsigned int enable_mask;
 	unsigned startup_delay;
 	unsigned gpio_is_open_drain:1;
 	unsigned enable_high:1;
