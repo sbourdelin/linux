@@ -48,6 +48,7 @@ struct nft_payload {
 };
 
 extern const struct nft_expr_ops nft_payload_fast_ops;
+extern struct static_key_false nft_trace_enabled;
 
 int nft_payload_module_init(void);
 void nft_payload_module_exit(void);
