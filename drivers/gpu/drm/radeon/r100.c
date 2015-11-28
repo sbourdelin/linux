@@ -3665,7 +3665,7 @@ int r100_ring_test(struct radeon_device *rdev, struct radeon_ring *ring)
 	if (i < rdev->usec_timeout) {
 		DRM_INFO("ring test succeeded in %d usecs\n", i);
 	} else {
-		DRM_ERROR("radeon: ring test failed (scratch(0x%04X)=0x%08X)\n",
+		DRM_ERROR("radeon: ring test failed (scratch(0x%04X)=0x%08X), try radeon.agpmode=1?\n",
 			  scratch, tmp);
 		r = -EINVAL;
 	}
