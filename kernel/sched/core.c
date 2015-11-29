@@ -3537,8 +3537,8 @@ SYSCALL_DEFINE1(nice, int, increment)
  * @p: the task in question.
  *
  * Return: The priority value as seen by users in /proc.
- * RT tasks are offset by -200. Normal tasks are centered
- * around 0, value goes from -16 to +15.
+ * Values range from -100 to to -2 for RT tasks, and from
+ * 0 to 39 for normal tasks.
  */
 int task_prio(const struct task_struct *p)
 {
