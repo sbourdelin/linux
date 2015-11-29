@@ -3066,15 +3066,14 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 	if (rings_hung)
 		return i915_handle_error(dev, true, "Ring hung");
 
+	/* Reset timer in case GPU hangs without another request being added */
 	if (busy_count)
-		/* Reset timer case chip hangs without another request
-		 * being added */
-		i915_queue_hangcheck(dev);
+		i915_queue_hangcheck(dev_priv);
 }
 
-void i915_queue_hangcheck(struct drm_device *dev)
+void i915_queue_hangcheck(struct drm_i915_private *dev_priv)
 {
-	struct i915_gpu_error *e = &to_i915(dev)->gpu_error;
+	struct i915_gpu_error *e = &dev_priv->gpu_error;
 
 	if (!i915.enable_hangcheck)
 		return;
