@@ -1227,7 +1227,6 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	int state = interruptible ? TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE;
 	DEFINE_WAIT(wait);
 	unsigned long timeout_remain;
-	s64 before, now;
 	int ret;
 
 	if (list_empty(&req->list))
@@ -1244,13 +1243,12 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 		if (*timeout == 0)
 			return -ETIME;
 
+		/* Record current time in case interrupted, or wedged */
 		timeout_remain = nsecs_to_jiffies_timeout(*timeout);
+		*timeout += ktime_get_raw_ns();
 	}
 
-	/* Record current time in case interrupted by signal, or wedged */
 	trace_i915_gem_request_wait_begin(req);
-	before = ktime_get_raw_ns();
-
 	if (INTEL_INFO(req->i915)->gen >= 6)
 		gen6_rps_boost(req->i915, rps, req->emitted_jiffies);
 
@@ -1286,14 +1284,13 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	}
 	finish_wait(&req->wait, &wait);
 out:
-	now = ktime_get_raw_ns();
 	intel_breadcrumbs_remove_waiter(req);
 	trace_i915_gem_request_wait_end(req);
 
 	if (timeout) {
-		s64 tres = *timeout - (now - before);
-
-		*timeout = tres < 0 ? 0 : tres;
+		*timeout -= ktime_get_raw_ns();
+		if (*timeout < 0)
+			*timeout = 0;
 
 		/*
 		 * Apparently ktime isn't accurate enough and occasionally has a
