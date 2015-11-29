@@ -4660,7 +4660,7 @@ i915_wedged_get(void *data, u64 *val)
 	struct drm_device *dev = data;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	*val = atomic_read(&dev_priv->gpu_error.reset_counter);
+	*val = i915_terminally_wedged(&dev_priv->gpu_error);
 
 	return 0;
 }

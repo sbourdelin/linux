@@ -2254,6 +2254,14 @@ static int ring_wait_for_space(struct intel_engine_cs *ring, int n)
 	if (ret)
 		return ret;
 
+	/* If the request was completed due to a GPU hang, we want to
+	 * error out before we continue to emit more commands to the GPU.
+	 */
+	ret = i915_gem_check_wedge(i915_reset_counter(&to_i915(ring->dev)->gpu_error),
+				   to_i915(ring->dev)->mm.interruptible);
+	if (ret)
+		return ret;
+
 	ringbuf->space = space;
 	return 0;
 }
@@ -2286,7 +2294,6 @@ int intel_ring_idle(struct intel_engine_cs *ring)
 
 	/* Make sure we do not trigger any retires */
 	return __i915_wait_request(req,
-				   atomic_read(&to_i915(ring->dev)->gpu_error.reset_counter),
 				   to_i915(ring->dev)->mm.interruptible,
 				   NULL, NULL);
 }
@@ -2416,11 +2423,6 @@ int intel_ring_begin(struct drm_i915_gem_request *req,
 	WARN_ON(req == NULL);
 	ring = req->ring;
 	dev_priv = ring->dev->dev_private;
-
-	ret = i915_gem_check_wedge(&dev_priv->gpu_error,
-				   dev_priv->mm.interruptible);
-	if (ret)
-		return ret;
 
 	ret = __intel_ring_prepare(ring, num_dwords * sizeof(uint32_t));
 	if (ret)

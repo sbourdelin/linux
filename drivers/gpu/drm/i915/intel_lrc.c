@@ -711,6 +711,14 @@ static int logical_ring_wait_for_space(struct drm_i915_gem_request *req,
 	if (ret)
 		return ret;
 
+	/* If the request was completed due to a GPU hang, we want to
+	 * error out before we continue to emit more commands to the GPU.
+	 */
+	ret = i915_gem_check_wedge(i915_reset_counter(&req->i915->gpu_error),
+				   req->i915->mm.interruptible);
+	if (ret)
+		return ret;
+
 	ringbuf->space = space;
 	return 0;
 }
@@ -824,11 +832,6 @@ int intel_logical_ring_begin(struct drm_i915_gem_request *req, int num_dwords)
 
 	WARN_ON(req == NULL);
 	dev_priv = req->ring->dev->dev_private;
-
-	ret = i915_gem_check_wedge(&dev_priv->gpu_error,
-				   dev_priv->mm.interruptible);
-	if (ret)
-		return ret;
 
 	ret = logical_ring_prepare(req, num_dwords * sizeof(uint32_t));
 	if (ret)

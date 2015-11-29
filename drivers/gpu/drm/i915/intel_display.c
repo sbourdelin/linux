@@ -3289,8 +3289,7 @@ static bool intel_crtc_has_pending_flip(struct drm_crtc *crtc)
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	bool pending;
 
-	if (i915_reset_in_progress(&dev_priv->gpu_error) ||
-	    intel_crtc->reset_counter != atomic_read(&dev_priv->gpu_error.reset_counter))
+	if (intel_crtc->reset_counter != i915_reset_counter(&dev_priv->gpu_error))
 		return false;
 
 	spin_lock_irq(&dev->event_lock);
@@ -10879,8 +10878,7 @@ static bool page_flip_finished(struct intel_crtc *crtc)
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (i915_reset_in_progress(&dev_priv->gpu_error) ||
-	    crtc->reset_counter != atomic_read(&dev_priv->gpu_error.reset_counter))
+	if (crtc->reset_counter != i915_reset_counter(&dev_priv->gpu_error))
 		return true;
 
 	/*
@@ -11322,7 +11320,6 @@ static void intel_mmio_flip_work_func(struct work_struct *work)
 
 	if (mmio_flip->req) {
 		WARN_ON(__i915_wait_request(mmio_flip->req,
-					    mmio_flip->crtc->reset_counter,
 					    false, NULL,
 					    &mmio_flip->i915->rps.mmioflips));
 		i915_gem_request_unreference__unlocked(mmio_flip->req);
@@ -13313,9 +13310,6 @@ static int intel_atomic_prepare_commit(struct drm_device *dev,
 
 	ret = drm_atomic_helper_prepare_planes(dev, state);
 	if (!ret && !async && !i915_reset_in_progress(&dev_priv->gpu_error)) {
-		u32 reset_counter;
-
-		reset_counter = atomic_read(&dev_priv->gpu_error.reset_counter);
 		mutex_unlock(&dev->struct_mutex);
 
 		for_each_plane_in_state(state, plane, plane_state, i) {
@@ -13326,8 +13320,7 @@ static int intel_atomic_prepare_commit(struct drm_device *dev,
 				continue;
 
 			ret = __i915_wait_request(intel_plane_state->wait_req,
-						  reset_counter, true,
-						  NULL, NULL);
+						  true, NULL, NULL);
 
 			/* Swallow -EIO errors to allow updates during hw lockup. */
 			if (ret == -EIO)

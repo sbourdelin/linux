@@ -1384,9 +1384,6 @@ struct i915_gpu_error {
 
 	/* For missed irq/seqno simulation. */
 	unsigned int test_irq_rings;
-
-	/* Used to prevent gem_check_wedged returning -EAGAIN during gpu reset   */
-	bool reload_in_reset;
 };
 
 enum modeset_restore {
@@ -2181,6 +2178,7 @@ struct drm_i915_gem_request {
 	/** On Which ring this request was generated */
 	struct drm_i915_private *i915;
 	struct intel_engine_cs *ring;
+	unsigned reset_counter;
 
 	 /** GEM sequence number associated with the previous request,
 	  * when the HWS breadcrumb is equal to this the GPU is processing
@@ -2976,23 +2974,47 @@ i915_gem_find_active_request(struct intel_engine_cs *ring);
 
 bool i915_gem_retire_requests(struct drm_device *dev);
 void i915_gem_retire_requests_ring(struct intel_engine_cs *ring);
-int __must_check i915_gem_check_wedge(struct i915_gpu_error *error,
+int __must_check i915_gem_check_wedge(unsigned reset_counter,
 				      bool interruptible);
+
+static inline u32 i915_reset_counter(struct i915_gpu_error *error)
+{
+	return atomic_read(&error->reset_counter);
+}
+
+static inline bool __i915_reset_in_progress(u32 reset)
+{
+	return unlikely(reset & I915_RESET_IN_PROGRESS_FLAG);
+}
+
+static inline bool __i915_reset_in_progress_or_wedged(u32 reset)
+{
+	return unlikely(reset & (I915_RESET_IN_PROGRESS_FLAG | I915_WEDGED));
+}
+
+static inline bool __i915_terminally_wedged(u32 reset)
+{
+	return unlikely(reset & I915_WEDGED);
+}
 
 static inline bool i915_reset_in_progress(struct i915_gpu_error *error)
 {
-	return unlikely(atomic_read(&error->reset_counter)
-			& (I915_RESET_IN_PROGRESS_FLAG | I915_WEDGED));
+	return __i915_reset_in_progress(i915_reset_counter(error));
+}
+
+static inline bool i915_reset_in_progress_or_wedged(struct i915_gpu_error *error)
+{
+	return __i915_reset_in_progress_or_wedged(i915_reset_counter(error));
 }
 
 static inline bool i915_terminally_wedged(struct i915_gpu_error *error)
 {
-	return atomic_read(&error->reset_counter) & I915_WEDGED;
+	return __i915_terminally_wedged(i915_reset_counter(error));
 }
 
 static inline u32 i915_reset_count(struct i915_gpu_error *error)
 {
-	return ((atomic_read(&error->reset_counter) & ~I915_WEDGED) + 1) / 2;
+	return ((i915_reset_counter(error) & ~I915_WEDGED) + 1) / 2;
 }
 
 static inline bool i915_stop_ring_allow_ban(struct drm_i915_private *dev_priv)
@@ -3025,7 +3047,6 @@ void __i915_add_request(struct drm_i915_gem_request *req,
 #define i915_add_request_no_flush(req) \
 	__i915_add_request(req, NULL, false)
 int __i915_wait_request(struct drm_i915_gem_request *req,
-			unsigned reset_counter,
 			bool interruptible,
 			s64 *timeout,
 			struct intel_rps_client *rps);
