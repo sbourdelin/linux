@@ -564,6 +564,7 @@ struct drm_i915_error_state {
 			long jiffies;
 			u32 seqno;
 			u32 tail;
+			u32 waiters;
 		} *requests;
 
 		struct {
@@ -1383,7 +1384,7 @@ struct i915_gpu_error {
 #define I915_STOP_RING_ALLOW_WARN      (1 << 30)
 
 	/* For missed irq/seqno simulation. */
-	unsigned int test_irq_rings;
+	unsigned long test_irq_rings;
 };
 
 enum modeset_restore {
@@ -1694,6 +1695,27 @@ struct drm_i915_private {
 	void __iomem *regs;
 
 	struct intel_uncore uncore;
+
+	/* Rather than have every client wait upon all user interrupts,
+	 * with the herd waking after every interrupt and each doing the
+	 * heavyweight seqno dance, we delegate the task to a bottom-half
+	 * for the user interrupt (one bh handling all engines). Now,
+	 * just one task is woken up and does the coherent seqno read and
+	 * then wakes up all the waiters registered with the bottom-half
+	 * that are complete. This avoid the thundering herd problem
+	 * with lots of concurrent waiters, at the expense of an extra
+	 * context switch between the interrupt and the client. That should
+	 * be mitigated somewhat by the busyspin in the client before we go to
+	 * sleep waiting for an interrupt from the bottom-half.
+	 */
+	struct intel_breadcrumbs {
+		spinlock_t lock; /* protects the per-engine request list */
+		struct task_struct *task; /* bh for all user interrupts */
+		struct intel_breadcrumbs_engine {
+			struct rb_root requests; /* sorted by retirement */
+			struct drm_i915_gem_request *first;
+		} engine[I915_NUM_RINGS];
+	} breadcrumbs;
 
 	struct i915_virtual_gpu vgpu;
 
@@ -2227,6 +2249,11 @@ struct drm_i915_gem_request {
 
 	/** global list entry for this request */
 	struct list_head list;
+
+	/** List of clients waiting for completion of this request */
+	wait_queue_head_t wait;
+	struct rb_node irq_node;
+	unsigned irq_count;
 
 	struct drm_i915_file_private *file_priv;
 	/** file_priv list entry for this request */
@@ -2799,6 +2826,12 @@ ibx_disable_display_interrupt(struct drm_i915_private *dev_priv, uint32_t bits)
 	ibx_display_interrupt_update(dev_priv, bits, 0);
 }
 
+
+/* intel_breadcrumbs.c -- user interrupt bottom-half for waiters */
+int intel_breadcrumbs_init(struct drm_i915_private *i915);
+bool intel_breadcrumbs_add_waiter(struct drm_i915_gem_request *request);
+void intel_breadcrumbs_remove_waiter(struct drm_i915_gem_request *request);
+void intel_breadcrumbs_fini(struct drm_i915_private *i915);
 
 /* i915_gem.c */
 int i915_gem_create_ioctl(struct drm_device *dev, void *data,

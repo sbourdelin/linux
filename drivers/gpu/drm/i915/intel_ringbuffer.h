@@ -157,6 +157,7 @@ struct  intel_engine_cs {
 #define LAST_USER_RING (VECS + 1)
 	u32		mmio_base;
 	struct		drm_device *dev;
+	struct drm_i915_private *i915;
 	struct intel_ringbuffer *buffer;
 	struct list_head buffers;
 
@@ -302,8 +303,6 @@ struct  intel_engine_cs {
 	u32 last_submitted_seqno;
 
 	bool gpu_caches_dirty;
-
-	wait_queue_head_t irq_queue;
 
 	struct intel_context *default_context;
 	struct intel_context *last_context;

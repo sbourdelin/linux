@@ -996,12 +996,11 @@ static void ironlake_rps_change_irq_handler(struct drm_device *dev)
 
 static void notify_ring(struct intel_engine_cs *ring)
 {
-	if (!intel_ring_initialized(ring))
+	if (ring->i915 == NULL)
 		return;
 
 	trace_i915_gem_request_notify(ring);
-
-	wake_up_all(&ring->irq_queue);
+	wake_up_process(ring->i915->breadcrumbs.task);
 }
 
 static void vlv_c0_read(struct drm_i915_private *dev_priv,
@@ -2399,9 +2398,6 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 			       bool reset_completed)
 {
-	struct intel_engine_cs *ring;
-	int i;
-
 	/*
 	 * Notify all waiters for GPU completion events that reset state has
 	 * been changed, and that they need to restart their wait after
@@ -2410,8 +2406,7 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 	 */
 
 	/* Wake up __wait_seqno, potentially holding dev->struct_mutex. */
-	for_each_ring(ring, dev_priv, i)
-		wake_up_all(&ring->irq_queue);
+	wake_up_process(dev_priv->breadcrumbs.task);
 
 	/* Wake up intel_crtc_wait_for_pending_flips, holding crtc->mutex. */
 	wake_up_all(&dev_priv->pending_flip_queue);
@@ -2986,16 +2981,16 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 			if (ring_idle(ring, seqno)) {
 				ring->hangcheck.action = HANGCHECK_IDLE;
 
-				if (waitqueue_active(&ring->irq_queue)) {
+				if (READ_ONCE(dev_priv->breadcrumbs.engine[ring->id].first)) {
 					/* Issue a wake-up to catch stuck h/w. */
 					if (!test_and_set_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings)) {
-						if (!(dev_priv->gpu_error.test_irq_rings & intel_ring_flag(ring)))
+						if (!test_bit(ring->id, &dev_priv->gpu_error.test_irq_rings))
 							DRM_ERROR("Hangcheck timer elapsed... %s idle\n",
 								  ring->name);
 						else
 							DRM_INFO("Fake missed irq on %s\n",
 								 ring->name);
-						wake_up_all(&ring->irq_queue);
+						wake_up_process(dev_priv->breadcrumbs.task);
 					}
 					/* Safeguard against driver failure */
 					ring->hangcheck.score += BUSY;

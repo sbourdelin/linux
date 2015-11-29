@@ -2157,14 +2157,13 @@ static int intel_init_ring_buffer(struct drm_device *dev,
 	WARN_ON(ring->buffer);
 
 	ring->dev = dev;
+	ring->i915 = to_i915(dev);
 	INIT_LIST_HEAD(&ring->active_list);
 	INIT_LIST_HEAD(&ring->request_list);
 	INIT_LIST_HEAD(&ring->execlist_queue);
 	INIT_LIST_HEAD(&ring->buffers);
 	i915_gem_batch_pool_init(dev, &ring->batch_pool);
 	memset(ring->semaphore.sync_seqno, 0, sizeof(ring->semaphore.sync_seqno));
-
-	init_waitqueue_head(&ring->irq_queue);
 
 	ringbuf = intel_engine_create_ringbuffer(ring, 32 * PAGE_SIZE);
 	if (IS_ERR(ringbuf))

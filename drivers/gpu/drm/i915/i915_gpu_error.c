@@ -453,10 +453,11 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 				   dev_priv->ring[i].name,
 				   error->ring[i].num_requests);
 			for (j = 0; j < error->ring[i].num_requests; j++) {
-				err_printf(m, "  seqno 0x%08x, emitted %ld, tail 0x%08x\n",
+				err_printf(m, "  seqno 0x%08x, emitted %ld, tail 0x%08x, waiters? %d\n",
 					   error->ring[i].requests[j].seqno,
 					   error->ring[i].requests[j].jiffies,
-					   error->ring[i].requests[j].tail);
+					   error->ring[i].requests[j].tail,
+					   error->ring[i].requests[j].waiters);
 			}
 		}
 
@@ -900,7 +901,7 @@ static void i915_record_ring_state(struct drm_device *dev,
 		ering->instdone = I915_READ(GEN2_INSTDONE);
 	}
 
-	ering->waiting = waitqueue_active(&ring->irq_queue);
+	ering->waiting = READ_ONCE(dev_priv->breadcrumbs.engine[ring->id].first);
 	ering->instpm = I915_READ(RING_INSTPM(ring->mmio_base));
 	ering->seqno = ring->get_seqno(ring, false);
 	ering->acthd = intel_ring_get_active_head(ring);
@@ -1105,6 +1106,7 @@ static void i915_gem_record_rings(struct drm_device *dev,
 			erq->seqno = request->seqno;
 			erq->jiffies = request->emitted_jiffies;
 			erq->tail = request->postfix;
+			erq->waiters = request->irq_count;
 		}
 	}
 }
