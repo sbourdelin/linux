@@ -83,8 +83,8 @@ static int receiver_wake_function(wait_queue_t *wait, unsigned int mode, int syn
 /*
  * Wait for the last received packet to be different from skb
  */
-static int wait_for_more_packets(struct sock *sk, int *err, long *timeo_p,
-				 const struct sk_buff *skb)
+int __skb_wait_for_more_packets(struct sock *sk, int *err, long *timeo_p,
+				const struct sk_buff *skb)
 {
 	int error;
 	DEFINE_WAIT_FUNC(wait, receiver_wake_function);
@@ -130,6 +130,7 @@ out_noerr:
 	error = 1;
 	goto out;
 }
+EXPORT_SYMBOL(__skb_wait_for_more_packets);
 
 static struct sk_buff *skb_set_peeked(struct sk_buff *skb)
 {
@@ -159,6 +160,71 @@ done:
 
 	return skb;
 }
+
+struct sk_buff *__skb_try_recv_datagram(struct sock *sk, unsigned int flags,
+					int *peeked, int *off, int *err,
+					struct sk_buff **last)
+{
+	struct sk_buff_head *queue = &sk->sk_receive_queue;
+	struct sk_buff *skb;
+	unsigned long cpu_flags;
+	/*
+	 * Caller is allowed not to check sk->sk_err before skb_recv_datagram()
+	 */
+	int error = sock_error(sk);
+
+	if (error)
+		goto no_packet;
+
+	do {
+		/* Again only user level code calls this function, so nothing
+		 * interrupt level will suddenly eat the receive_queue.
+		 *
+		 * Look at current nfs client by the way...
+		 * However, this function was correct in any case. 8)
+		 */
+		int _off = *off;
+
+		*last = (struct sk_buff *)queue;
+		spin_lock_irqsave(&queue->lock, cpu_flags);
+		skb_queue_walk(queue, skb) {
+			*last = skb;
+			*peeked = skb->peeked;
+			if (flags & MSG_PEEK) {
+				if (_off >= skb->len && (skb->len || _off ||
+							 skb->peeked)) {
+					_off -= skb->len;
+					continue;
+				}
+
+				skb = skb_set_peeked(skb);
+				error = PTR_ERR(skb);
+				if (IS_ERR(skb)) {
+					spin_unlock_irqrestore(&queue->lock,
+							       cpu_flags);
+					goto no_packet;
+				}
+
+				atomic_inc(&skb->users);
+			} else
+				__skb_unlink(skb, queue);
+
+			spin_unlock_irqrestore(&queue->lock, cpu_flags);
+			*off = _off;
+			return skb;
+		}
+
+		spin_unlock_irqrestore(&queue->lock, cpu_flags);
+	} while (sk_can_busy_loop(sk) &&
+		 sk_busy_loop(sk, flags & MSG_DONTWAIT));
+
+	error = -EAGAIN;
+
+no_packet:
+	*err = error;
+	return NULL;
+}
+EXPORT_SYMBOL(__skb_try_recv_datagram);
 
 /**
  *	__skb_recv_datagram - Receive a datagram skbuff
@@ -194,73 +260,22 @@ done:
 struct sk_buff *__skb_recv_datagram(struct sock *sk, unsigned int flags,
 				    int *peeked, int *off, int *err)
 {
-	struct sk_buff_head *queue = &sk->sk_receive_queue;
 	struct sk_buff *skb, *last;
-	unsigned long cpu_flags;
 	long timeo;
-	/*
-	 * Caller is allowed not to check sk->sk_err before skb_recv_datagram()
-	 */
-	int error = sock_error(sk);
-
-	if (error)
-		goto no_packet;
 
 	timeo = sock_rcvtimeo(sk, flags & MSG_DONTWAIT);
+	last = NULL;
 
 	do {
-		/* Again only user level code calls this function, so nothing
-		 * interrupt level will suddenly eat the receive_queue.
-		 *
-		 * Look at current nfs client by the way...
-		 * However, this function was correct in any case. 8)
-		 */
-		int _off = *off;
-
-		last = (struct sk_buff *)queue;
-		spin_lock_irqsave(&queue->lock, cpu_flags);
-		skb_queue_walk(queue, skb) {
-			last = skb;
-			*peeked = skb->peeked;
-			if (flags & MSG_PEEK) {
-				if (_off >= skb->len && (skb->len || _off ||
-							 skb->peeked)) {
-					_off -= skb->len;
-					continue;
-				}
-
-				skb = skb_set_peeked(skb);
-				error = PTR_ERR(skb);
-				if (IS_ERR(skb))
-					goto unlock_err;
-
-				atomic_inc(&skb->users);
-			} else
-				__skb_unlink(skb, queue);
-
-			spin_unlock_irqrestore(&queue->lock, cpu_flags);
-			*off = _off;
+		skb = __skb_try_recv_datagram(sk, flags, peeked, off, err,
+					      &last);
+		if (skb)
 			return skb;
-		}
-		spin_unlock_irqrestore(&queue->lock, cpu_flags);
 
-		if (sk_can_busy_loop(sk) &&
-		    sk_busy_loop(sk, flags & MSG_DONTWAIT))
-			continue;
+		if (!timeo || *err != -EAGAIN)
+			break;
+	} while (!__skb_wait_for_more_packets(sk, err, &timeo, last));
 
-		/* User doesn't want to wait */
-		error = -EAGAIN;
-		if (!timeo)
-			goto no_packet;
-
-	} while (!wait_for_more_packets(sk, err, &timeo, last));
-
-	return NULL;
-
-unlock_err:
-	spin_unlock_irqrestore(&queue->lock, cpu_flags);
-no_packet:
-	*err = error;
 	return NULL;
 }
 EXPORT_SYMBOL(__skb_recv_datagram);
