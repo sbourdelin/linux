@@ -1501,11 +1501,7 @@ pc_render_add_request(struct drm_i915_gem_request *req)
 static void
 gen6_seqno_barrier(struct intel_engine_cs *ring)
 {
-	/* Workaround to force correct ordering between irq and seqno writes on
-	 * ivb (and maybe also on snb) by reading from a CS register (like
-	 * ACTHD) before reading the status page. */
-	struct drm_i915_private *dev_priv = ring->i915;
-	POSTING_READ(RING_ACTHD(ring->mmio_base));
+	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 }
 
 static bool
