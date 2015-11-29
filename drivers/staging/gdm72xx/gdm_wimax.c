@@ -366,6 +366,7 @@ static void kdelete(void **buf)
 static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
 {
 	int size;
+	void __user *p;
 
 	size = dst->size < src->size ? dst->size : src->size;
 
@@ -373,7 +374,9 @@ static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
 	if (src->size) {
 		if (!dst->buf)
 			return -EINVAL;
-		if (copy_to_user(dst->buf, src->buf, size))
+
+		p = (__force void __user *)dst->buf;
+		if (copy_to_user(p, src->buf, size))
 			return -EFAULT;
 	}
 	return 0;
@@ -381,6 +384,8 @@ static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
 
 static int gdm_wimax_ioctl_set_data(struct data_s *dst, struct data_s *src)
 {
+	void __user *p;
+
 	if (!src->size) {
 		dst->size = 0;
 		return 0;
@@ -396,7 +401,8 @@ static int gdm_wimax_ioctl_set_data(struct data_s *dst, struct data_s *src)
 			return -ENOMEM;
 	}
 
-	if (copy_from_user(dst->buf, src->buf, src->size)) {
+	p = (__force void __user *)src->buf;
+	if (copy_from_user(dst->buf, p, src->size)) {
 		kdelete(&dst->buf);
 		return -EFAULT;
 	}
