@@ -1173,13 +1173,16 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 	 * takes to sleep on a request, on the order of a microsecond.
 	 */
 
+	if (req->ring->seqno_barrier)
+		req->ring->seqno_barrier(req->ring);
+
 	/* Only spin if we know the GPU is processing this request */
-	if (!i915_gem_request_started(req, false))
+	if (!i915_gem_request_started(req))
 		return -EAGAIN;
 
 	timeout = local_clock_us(&cpu) + 10;
-	while (!need_resched()) {
-		if (i915_gem_request_completed(req, true))
+	do {
+		if (i915_gem_request_completed(req))
 			return 0;
 
 		if (signal_pending_state(state, current))
@@ -1189,9 +1192,12 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 			break;
 
 		cpu_relax_lowlatency();
-	}
+	} while (!need_resched());
 
-	if (i915_gem_request_completed(req, false))
+	if (req->ring->seqno_barrier)
+		req->ring->seqno_barrier(req->ring);
+
+	if (i915_gem_request_completed(req))
 		return 0;
 
 	return -EAGAIN;
@@ -1227,7 +1233,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	if (list_empty(&req->list))
 		return 0;
 
-	if (i915_gem_request_completed(req, true))
+	if (i915_gem_request_completed(req))
 		return 0;
 
 	timeout_remain = 0;
@@ -1258,7 +1264,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	for (;;) {
 		prepare_to_wait(&req->wait, &wait, state);
 
-		if (i915_gem_request_completed(req, true) ||
+		if (i915_gem_request_completed(req) ||
 		    req->reset_counter != i915_reset_counter(&req->i915->gpu_error)) {
 			ret = 0;
 			break;
@@ -2695,7 +2701,7 @@ i915_gem_find_active_request(struct intel_engine_cs *ring)
 	struct drm_i915_gem_request *request;
 
 	list_for_each_entry(request, &ring->request_list, list) {
-		if (i915_gem_request_completed(request, false))
+		if (i915_gem_request_completed(request))
 			continue;
 
 		return request;
@@ -2836,7 +2842,7 @@ i915_gem_retire_requests_ring(struct intel_engine_cs *ring)
 					   struct drm_i915_gem_request,
 					   list);
 
-		if (!i915_gem_request_completed(request, true))
+		if (!i915_gem_request_completed(request))
 			break;
 
 		i915_gem_request_retire(request);
@@ -2860,7 +2866,7 @@ i915_gem_retire_requests_ring(struct intel_engine_cs *ring)
 	}
 
 	if (unlikely(ring->trace_irq_req &&
-		     i915_gem_request_completed(ring->trace_irq_req, true))) {
+		     i915_gem_request_completed(ring->trace_irq_req))) {
 		ring->irq_put(ring);
 		i915_gem_request_assign(&ring->trace_irq_req, NULL);
 	}
@@ -2966,7 +2972,7 @@ i915_gem_object_flush_active(struct drm_i915_gem_object *obj)
 		if (list_empty(&req->list))
 			goto retire;
 
-		if (i915_gem_request_completed(req, true)) {
+		if (i915_gem_request_completed(req)) {
 			__i915_gem_request_retire__upto(req);
 retire:
 			i915_gem_object_retire__read(obj, i);
@@ -3087,7 +3093,7 @@ __i915_gem_object_sync(struct drm_i915_gem_object *obj,
 	if (to == from)
 		return 0;
 
-	if (i915_gem_request_completed(from_req, true))
+	if (i915_gem_request_completed(from_req))
 		return 0;
 
 	if (!i915_semaphore_is_enabled(obj->base.dev)) {

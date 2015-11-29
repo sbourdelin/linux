@@ -87,6 +87,7 @@ static int intel_breadcrumbs_irq(void *data)
 			struct intel_engine_cs *engine = &i915->ring[i];
 			struct intel_breadcrumbs_engine *be = &b->engine[i];
 			struct drm_i915_gem_request *request = be->first;
+			u32 seqno;
 
 			if (request == NULL) {
 				if ((irq_get & (1 << i))) {
@@ -106,11 +107,15 @@ static int intel_breadcrumbs_irq(void *data)
 				irq_get |= 1 << i;
 			}
 
+			if (engine->seqno_barrier)
+				engine->seqno_barrier(engine);
+
+			seqno = engine->get_seqno(engine);
 			do {
 				struct rb_node *next;
 
 				if (request->reset_counter == reset_counter &&
-				    !i915_gem_request_completed(request, false))
+				    !i915_seqno_passed(seqno, request->seqno))
 					break;
 
 				next = rb_next(&request->irq_node);
