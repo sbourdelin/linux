@@ -110,7 +110,7 @@ static int intel_breadcrumbs_irq(void *data)
 			if (engine->seqno_barrier)
 				engine->seqno_barrier(engine);
 
-			seqno = engine->get_seqno(engine);
+			seqno = intel_ring_get_seqno(engine);
 			do {
 				struct rb_node *next;
 
