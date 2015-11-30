@@ -142,7 +142,9 @@ static void br_stp_start(struct net_bridge *br)
 	char *envp[] = { NULL };
 	struct net_bridge_port *p;
 
-	r = call_usermodehelper(BR_STP_PROG, argv, envp, UMH_WAIT_PROC);
+	r = -ENOENT;
+	if (dev_net(br->dev) == &init_net)
+		r = call_usermodehelper(BR_STP_PROG, argv, envp, UMH_WAIT_PROC);
 
 	spin_lock_bh(&br->lock);
 
