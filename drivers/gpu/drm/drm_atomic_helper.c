@@ -2468,6 +2468,10 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 		}
 	}
 
+	err = drm_modeset_lock(&dev->mode_config.connection_mutex, ctx);
+	if (err)
+		goto free;
+
 	drm_for_each_connector(conn, dev) {
 		struct drm_connector_state *conn_state;
 
