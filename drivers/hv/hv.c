@@ -310,8 +310,8 @@ void hv_cleanup(void)
  * This involves a hypercall.
  */
 int hv_post_message(union hv_connection_id connection_id,
-		  enum hv_message_type message_type,
-		  void *payload, size_t payload_size)
+		    u32 message_type,
+		    void *payload, size_t payload_size)
 {
 
 	struct hv_input_post_message *aligned_msg;

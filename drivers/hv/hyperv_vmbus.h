@@ -75,32 +75,30 @@ enum hv_cpuid_function {
 #define HV_EVENT_FLAGS_DWORD_COUNT	(256 / sizeof(u32))
 
 /* Define hypervisor message types. */
-enum hv_message_type {
-	HVMSG_NONE			= 0x00000000,
+#define HVMSG_NONE			0x00000000
 
-	/* Memory access messages. */
-	HVMSG_UNMAPPED_GPA		= 0x80000000,
-	HVMSG_GPA_INTERCEPT		= 0x80000001,
+/* Memory access messages. */
+#define HVMSG_UNMAPPED_GPA		0x80000000
+#define HVMSG_GPA_INTERCEPT		0x80000001
 
-	/* Timer notification messages. */
-	HVMSG_TIMER_EXPIRED			= 0x80000010,
+/* Timer notification messages. */
+#define HVMSG_TIMER_EXPIRED		0x80000010
 
-	/* Error messages. */
-	HVMSG_INVALID_VP_REGISTER_VALUE	= 0x80000020,
-	HVMSG_UNRECOVERABLE_EXCEPTION	= 0x80000021,
-	HVMSG_UNSUPPORTED_FEATURE		= 0x80000022,
+/* Error messages. */
+#define HVMSG_INVALID_VP_REGISTER_VALUE	0x80000020
+#define HVMSG_UNRECOVERABLE_EXCEPTION	0x80000021
+#define HVMSG_UNSUPPORTED_FEATURE	0x80000022
 
-	/* Trace buffer complete messages. */
-	HVMSG_EVENTLOG_BUFFERCOMPLETE	= 0x80000040,
+/* Trace buffer complete messages. */
+#define HVMSG_EVENTLOG_BUFFERCOMPLETE	0x80000040
 
-	/* Platform-specific processor intercept messages. */
-	HVMSG_X64_IOPORT_INTERCEPT		= 0x80010000,
-	HVMSG_X64_MSR_INTERCEPT		= 0x80010001,
-	HVMSG_X64_CPUID_INTERCEPT		= 0x80010002,
-	HVMSG_X64_EXCEPTION_INTERCEPT	= 0x80010003,
-	HVMSG_X64_APIC_EOI			= 0x80010004,
-	HVMSG_X64_LEGACY_FP_ERROR		= 0x80010005
-};
+/* Platform-specific processor intercept messages. */
+#define HVMSG_X64_IOPORT_INTERCEPT	0x80010000
+#define HVMSG_X64_MSR_INTERCEPT		0x80010001
+#define HVMSG_X64_CPUID_INTERCEPT	0x80010002
+#define HVMSG_X64_EXCEPTION_INTERCEPT	0x80010003
+#define HVMSG_X64_APIC_EOI		0x80010004
+#define HVMSG_X64_LEGACY_FP_ERROR	0x80010005
 
 #define HV_SYNIC_STIMER_COUNT		(4)
 
@@ -174,7 +172,7 @@ union hv_message_flags {
 
 /* Define synthetic interrupt controller message header. */
 struct hv_message_header {
-	enum hv_message_type message_type;
+	u32 message_type;
 	u8 payload_size;
 	union hv_message_flags message_flags;
 	u8 reserved[2];
@@ -347,7 +345,7 @@ enum hv_call_code {
 struct hv_input_post_message {
 	union hv_connection_id connectionid;
 	u32 reserved;
-	enum hv_message_type message_type;
+	u32 message_type;
 	u32 payload_size;
 	u64 payload[HV_MESSAGE_PAYLOAD_QWORD_COUNT];
 };
@@ -579,8 +577,8 @@ extern int hv_init(void);
 extern void hv_cleanup(void);
 
 extern int hv_post_message(union hv_connection_id connection_id,
-			 enum hv_message_type message_type,
-			 void *payload, size_t payload_size);
+			   u32 message_type,
+			   void *payload, size_t payload_size);
 
 extern u16 hv_signal_event(void *con_id);
 
