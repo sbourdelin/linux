@@ -66,6 +66,7 @@
 
 static void set_multicast_list(struct net_device *ndev);
 static void fec_enet_itr_coal_init(struct net_device *ndev);
+static void fec_reset_phy(struct platform_device *pdev);
 
 #define DRIVER_NAME	"fec"
 
@@ -1861,6 +1862,8 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 			ret = clk_prepare_enable(fep->clk_enet_out);
 			if (ret)
 				goto failed_clk_enet_out;
+
+			fec_reset_phy(fep->pdev);
 		}
 		if (fep->clk_ptp) {
 			mutex_lock(&fep->ptp_clk_mutex);
@@ -3231,12 +3234,31 @@ static int fec_enet_init(struct net_device *ndev)
 }
 
 #ifdef CONFIG_OF
-static void fec_reset_phy(struct platform_device *pdev)
+static struct gpio_desc *fec_get_reset_gpio(struct platform_device *pdev)
 {
 	struct gpio_desc *phy_reset;
-	int msec = 1;
 	struct device_node *np = pdev->dev.of_node;
 
+	if (!np)
+		return ERR_PTR(-ENODEV);
+
+	phy_reset = devm_gpiod_get_optional(&pdev->dev, "phy-reset",
+					    GPIOD_OUT_LOW);
+	if (IS_ERR(phy_reset))
+		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %ld\n",
+			PTR_ERR(phy_reset));
+	return phy_reset;
+}
+
+static void fec_reset_phy(struct platform_device *pdev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	struct net_device *ndev = platform_get_drvdata(pdev);
+	struct fec_enet_private *fep = netdev_priv(ndev);
+	int msec = 1;
+
+	if (!fep->phy_reset)
+		return;
 	if (!np)
 		return;
 
@@ -3245,17 +3267,16 @@ static void fec_reset_phy(struct platform_device *pdev)
 	if (msec > 1000)
 		msec = 1;
 
-	phy_reset = devm_gpiod_get_optional(&pdev->dev, "phy-reset",
-					    GPIOD_OUT_LOW);
-	if (IS_ERR(phy_reset)) {
-		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %ld\n",
-			PTR_ERR(phy_reset));
-		return;
-	}
+	gpiod_set_value_cansleep(fep->phy_reset, 0);
 	msleep(msec);
-	gpiod_set_value_cansleep(phy_reset, 1);
+	gpiod_set_value_cansleep(fep->phy_reset, 1);
 }
 #else /* CONFIG_OF */
+static void fec_get_reset_gpio(struct platform_device *pdev)
+{
+	return -EINVAL;
+}
+
 static void fec_reset_phy(struct platform_device *pdev)
 {
 	/*
@@ -3309,8 +3330,12 @@ fec_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node, *phy_node;
 	int num_tx_qs;
 	int num_rx_qs;
+	struct gpio_desc *phy_reset;
 
 	fec_enet_get_queue_num(pdev, &num_tx_qs, &num_rx_qs);
+	phy_reset = fec_get_reset_gpio(pdev);
+	if (IS_ERR(phy_reset) && PTR_ERR(phy_reset) == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
 
 	/* Init network device */
 	ndev = alloc_etherdev_mqs(sizeof(struct fec_enet_private),
@@ -3331,6 +3356,7 @@ fec_probe(struct platform_device *pdev)
 	fep->netdev = ndev;
 	fep->num_rx_queues = num_rx_qs;
 	fep->num_tx_queues = num_tx_qs;
+	fep->phy_reset = phy_reset;
 
 #if !defined(CONFIG_M5272)
 	/* default enable pause frame auto negotiation */
