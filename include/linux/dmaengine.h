@@ -606,6 +606,24 @@ enum dmaengine_alignment {
 	DMAENGINE_ALIGN_64_BYTES = 6,
 };
 
+struct dma_filter_map {
+        char *devname;
+        char *slave;
+        void *param;
+};
+#define DMA_FILTER_ENTRY(_devname, _slave, _param)	\
+	{						\
+		.devname = _devname,			\
+		.slave = _slave,			\
+		.param = (void*)_param,			\
+	}
+
+struct dma_filter {
+        dma_filter_fn filter_fn;
+        int mapcnt;
+        struct dma_filter_map *map;
+};
+
 /**
  * struct dma_device - info on the entity supplying DMA services
  * @chancnt: how many DMA channels are supported
@@ -666,6 +684,7 @@ struct dma_device {
 	unsigned int privatecnt;
 	struct list_head channels;
 	struct list_head global_node;
+	struct dma_filter filter_map;
 	dma_cap_mask_t  cap_mask;
 	unsigned short max_xor;
 	unsigned short max_pq;
@@ -1143,6 +1162,10 @@ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
 struct dma_chan *dma_request_slave_channel_reason(struct device *dev,
 						  const char *name);
 struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
+
+struct dma_chan *dma_request_chan(struct device *dev, const char *name);
+struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
+
 void dma_release_channel(struct dma_chan *chan);
 int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps);
 #else
@@ -1175,6 +1198,14 @@ static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
 							 const char *name)
 {
 	return NULL;
+}
+static inline struct dma_chan *dma_request_chan(struct device *dev)
+{
+	return ERR_PTR(-ENODEV);
+}
+static inline struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask)
+{
+	return ERR_PTR(-ENODEV);
 }
 static inline void dma_release_channel(struct dma_chan *chan)
 {
