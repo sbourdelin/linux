@@ -1258,6 +1258,7 @@ static struct of_device_id swim3_match[] =
 	},
 	{ /* end of list */ }
 };
+MODULE_DEVICE_TABLE(of, swim3_match);
 
 static struct macio_driver swim3_driver =
 {
