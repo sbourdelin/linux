@@ -135,6 +135,18 @@ config XEN_COMPAT_XENFS_XENBUS
 	  Xen 4.6.0 and newer.
 	  If in doubt, say yes.
 
+config XEN_COMPAT_XENFS_PRIVCMD
+	bool "privcmd accessible from xenfs"
+	depends on XENFS
+	default y
+	help
+	  Since Xen 4.7.0, Xen userland will prefer to use the
+	  /dev/xen/privcmd device over the "privcmd" interface on the
+	  xenfs filesystem. Selecting this causes the kernel to include
+	  the "privcmd" interface on the xenfs filesystem and you can
+	  safely say no for Xen 4.7.0 and newer.
+	  If in doubt, say yes.
+
 config XEN_SYS_HYPERVISOR
        bool "Create xen entries under /sys/hypervisor"
        depends on SYSFS

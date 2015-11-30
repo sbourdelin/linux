@@ -50,7 +50,9 @@ static int xenfs_fill_super(struct super_block *sb, void *data, int silent)
 		{ "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
 #endif
 		{ "capabilities", &capabilities_file_ops, S_IRUGO },
+#ifdef CONFIG_XEN_COMPAT_XENFS_PRIVCMD
 		{ "privcmd", &xen_privcmd_fops, S_IRUSR|S_IWUSR },
+#endif
 		{""},
 	};
 
@@ -60,7 +62,9 @@ static int xenfs_fill_super(struct super_block *sb, void *data, int silent)
 		{ "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
 #endif
 		{ "capabilities", &capabilities_file_ops, S_IRUGO },
+#ifdef CONFIG_XEN_COMPAT_XENFS_PRIVCMD
 		{ "privcmd", &xen_privcmd_fops, S_IRUSR|S_IWUSR },
+#endif
 		{ "xsd_kva", &xsd_kva_file_ops, S_IRUSR|S_IWUSR},
 		{ "xsd_port", &xsd_port_file_ops, S_IRUSR|S_IWUSR},
 #ifdef CONFIG_XEN_SYMS
