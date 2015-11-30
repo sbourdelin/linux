@@ -271,4 +271,78 @@ typedef struct _HV_REFERENCE_TSC_PAGE {
 
 #define HV_SYNIC_STIMER_COUNT		(4)
 
+/* Define synthetic interrupt controller message constants. */
+#define HV_MESSAGE_SIZE			(256)
+#define HV_MESSAGE_PAYLOAD_BYTE_COUNT	(240)
+#define HV_MESSAGE_PAYLOAD_QWORD_COUNT	(30)
+
+/* Define hypervisor message types. */
+#define HVMSG_NONE			0x00000000
+
+/* Memory access messages. */
+#define HVMSG_UNMAPPED_GPA		0x80000000
+#define HVMSG_GPA_INTERCEPT		0x80000001
+
+/* Timer notification messages. */
+#define HVMSG_TIMER_EXPIRED		0x80000010
+
+/* Error messages. */
+#define HVMSG_INVALID_VP_REGISTER_VALUE	0x80000020
+#define HVMSG_UNRECOVERABLE_EXCEPTION	0x80000021
+#define HVMSG_UNSUPPORTED_FEATURE	0x80000022
+
+/* Trace buffer complete messages. */
+#define HVMSG_EVENTLOG_BUFFERCOMPLETE	0x80000040
+
+/* Platform-specific processor intercept messages. */
+#define HVMSG_X64_IOPORT_INTERCEPT	0x80010000
+#define HVMSG_X64_MSR_INTERCEPT		0x80010001
+#define HVMSG_X64_CPUID_INTERCEPT	0x80010002
+#define HVMSG_X64_EXCEPTION_INTERCEPT	0x80010003
+#define HVMSG_X64_APIC_EOI		0x80010004
+#define HVMSG_X64_LEGACY_FP_ERROR	0x80010005
+
+/* Define synthetic interrupt controller message flags. */
+union hv_message_flags {
+	__u8 asu8;
+	struct {
+		__u8 msg_pending:1;
+		__u8 reserved:7;
+	};
+};
+
+/* Define port identifier type. */
+union hv_port_id {
+	__u32 asu32;
+	struct {
+		__u32 id:24;
+		__u32 reserved:8;
+	} u;
+};
+
+/* Define synthetic interrupt controller message header. */
+struct hv_message_header {
+	__u32 message_type;
+	__u8 payload_size;
+	union hv_message_flags message_flags;
+	__u8 reserved[2];
+	union {
+		__u64 sender;
+		union hv_port_id port;
+	};
+};
+
+/* Define synthetic interrupt controller message format. */
+struct hv_message {
+	struct hv_message_header header;
+	union {
+		__u64 payload[HV_MESSAGE_PAYLOAD_QWORD_COUNT];
+	} u;
+};
+
+/* Define the synthetic interrupt message page layout. */
+struct hv_message_page {
+	struct hv_message sint_message[HV_SYNIC_SINT_COUNT];
+};
+
 #endif
