@@ -1,0 +1,8 @@
+#
+# MIPS Boston board
+#
+platform-$(CONFIG_BOSTON)	+= boston/
+cflags-$(CONFIG_BOSTON)		+= -I$(srctree)/arch/mips/include/asm/mach-boston
+load-$(CONFIG_BOSTON)		+= 0xffffffff80100000
+all-$(CONFIG_BOSTON)		:= $(COMPRESSION_FNAME).bin
+its-$(CONFIG_BOSTON)		+= boston/vmlinux.its

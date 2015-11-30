@@ -5435,6 +5435,9 @@ F:	security/integrity/ima/
 IMGTEC BOSTON PLATFORM SUPPORT
 M:	Paul Burton <paul.burton@imgtec.com>
 S:	Maintained
+F:	arch/mips/boot/dts/img/boston.dts
+F:	arch/mips/boston/
+F:	arch/mips/include/asm/mach-boston/
 F:	Documentation/devicetree/bindings/mips/img/boston.txt
 
 IMGTEC IR DECODER DRIVER
