@@ -62,9 +62,13 @@ typedef struct __user_cap_data_struct {
 #define VFS_CAP_U32_2           2
 #define XATTR_CAPS_SZ_2         (sizeof(__le32)*(1 + 2*VFS_CAP_U32_2))
 
+/* version number for security.nscapability xattrs hdr->hdr_info */
+#define VFS_NS_CAP_REVISION     1
+
 #define XATTR_CAPS_SZ           XATTR_CAPS_SZ_2
 #define VFS_CAP_U32             VFS_CAP_U32_2
 #define VFS_CAP_REVISION	VFS_CAP_REVISION_2
+
 
 struct vfs_cap_data {
 	__le32 magic_etc;            /* Little endian */
@@ -72,6 +76,49 @@ struct vfs_cap_data {
 		__le32 permitted;    /* Little endian */
 		__le32 inheritable;  /* Little endian */
 	} data[VFS_CAP_U32];
+};
+
+/*
+ * Q: do we want version in the header, or in the data?
+ * If it is in the header, then a container will need to
+ * make sure it is writing the same data.
+ *
+ * Actually, perhaps we simply do not support writing the
+ * xattr, we just use a new system call to get/set the fscap.
+ * The kernel can be in charge of watching the version numbers.
+ * After all, we can't allow the container to override the
+ * fscaps of the init ns.
+ *
+ * @flags currently only containers the effective bit.  The
+ * other bits are reserved, and must be 0 at the moment.
+ * @rootid contains the kuid value of the root in the namespace
+ * for which this capability should be used.  If -1, then this
+ * works for all namespaces.  Only root in the initial ns can
+ * use this.
+ *
+ * Q: do we want to use a range instead?  Then root in a container
+ * could allow one binary with one capability to be used by any
+ * nested containers.
+ */
+#define VFS_NS_CAP_EFFECTIVE    0x1
+struct vfs_ns_cap_data {
+	__le32 flags;
+	__le32 rootid;
+	struct {
+		__le32 permitted;    /* Little endian */
+		__le32 inheritable;  /* Little endian */
+	} data[VFS_CAP_U32];
+};
+
+/*
+ * 32-bit hdr_info contains
+ * 16 leftmost: reserved
+ * next 8: ncaps
+ * last 8: version
+ */
+struct vfs_ns_cap_header {
+	__le32 hdr_info;
+	/* ncaps * vfs_ns_cap_data */
 };
 
 #ifndef __KERNEL__

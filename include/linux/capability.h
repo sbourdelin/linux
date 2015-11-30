@@ -13,6 +13,7 @@
 #define _LINUX_CAPABILITY_H
 
 #include <uapi/linux/capability.h>
+#include <linux/uidgid.h>
 
 
 #define _KERNEL_CAPABILITY_VERSION _LINUX_CAPABILITY_VERSION_3
@@ -30,6 +31,20 @@ struct cpu_vfs_cap_data {
 	kernel_cap_t permitted;
 	kernel_cap_t inheritable;
 };
+
+struct cpu_vfs_ns_cap_data {
+	__u32 flags;
+	kuid_t rootid;
+	kernel_cap_t permitted;
+	kernel_cap_t inheritable;
+};
+
+struct cpu_vfs_ns_cap_header {
+	__u32 hdr_info;
+	struct cpu_vfs_ns_cap_data caps[0];
+};
+#define NS_CAPS_VERSION(x) (x & 0xFF)
+#define NS_CAPS_NCAPS(x) ( (x >> 8) & 0xFF )
 
 #define _USER_CAP_HEADER_SIZE  (sizeof(struct __user_cap_header_struct))
 #define _KERNEL_CAP_T_SIZE     (sizeof(kernel_cap_t))
