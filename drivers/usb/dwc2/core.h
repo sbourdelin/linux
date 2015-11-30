@@ -162,6 +162,7 @@ struct dwc2_hsotg_ep {
 	unsigned char           mc;
 	unsigned char           interval;
 
+	unsigned int		enabled:1;
 	unsigned int            halted:1;
 	unsigned int            periodic:1;
 	unsigned int            isochronous:1;

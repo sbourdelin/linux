@@ -2423,6 +2423,7 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 	/* enable, but don't activate EP0in */
 	dwc2_writel(dwc2_hsotg_ep0_mps(hsotg->eps_out[0]->ep.maxpacket) |
 	       DXEPCTL_USBACTEP, hsotg->regs + DIEPCTL0);
+	hsotg->eps_out[0]->enabled = 1;
 
 	dwc2_hsotg_enqueue_setup(hsotg);
 
@@ -2680,6 +2681,14 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 		return -EINVAL;
 	}
 
+	spin_lock_irqsave(&hsotg->lock, flags);
+	if (hs_ep->enabled) {
+		dev_warn(hsotg->dev, "%s: ep %s already enabled\n",
+			__func__, hs_ep->name);
+		ret = -EBUSY;
+		goto error;
+	}
+
 	mps = usb_endpoint_maxp(desc);
 
 	/* note, we handle this here instead of dwc2_hsotg_set_ep_maxpacket */
@@ -2690,7 +2699,6 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 	dev_dbg(hsotg->dev, "%s: read DxEPCTL=0x%08x from 0x%08x\n",
 		__func__, epctrl, epctrl_reg);
 
-	spin_lock_irqsave(&hsotg->lock, flags);
 
 	epctrl &= ~(DXEPCTL_EPTYPE_MASK | DXEPCTL_MPS_MASK);
 	epctrl |= DXEPCTL_MPS(mps);
@@ -2806,6 +2814,8 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 	/* enable the endpoint interrupt */
 	dwc2_hsotg_ctrl_epint(hsotg, index, dir_in, 1);
 
+	hs_ep->enabled = 1;
+
 error:
 	spin_unlock_irqrestore(&hsotg->lock, flags);
 	return ret;
@@ -2835,6 +2845,11 @@ static int dwc2_hsotg_ep_disable(struct usb_ep *ep)
 	epctrl_reg = dir_in ? DIEPCTL(index) : DOEPCTL(index);
 
 	spin_lock_irqsave(&hsotg->lock, flags);
+	if (!hs_ep->enabled) {
+		dev_warn(hsotg->dev, "%s: ep %s already disabled\n",
+			__func__, hs_ep->name);
+		goto out;
+	}
 
 	hsotg->fifo_map &= ~(1<<hs_ep->fifo_index);
 	hs_ep->fifo_index = 0;
@@ -2854,6 +2869,9 @@ static int dwc2_hsotg_ep_disable(struct usb_ep *ep)
 	/* terminate all requests with shutdown */
 	kill_all_requests(hsotg, hs_ep, -ESHUTDOWN);
 
+	hs_ep->enabled = 0;
+
+out:
 	spin_unlock_irqrestore(&hsotg->lock, flags);
 	return 0;
 }
