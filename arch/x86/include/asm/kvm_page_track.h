@@ -15,4 +15,6 @@ void kvm_page_track_add_page(struct kvm *kvm, gfn_t gfn,
 			     enum kvm_page_track_mode mode);
 void kvm_page_track_remove_page(struct kvm *kvm, gfn_t gfn,
 				enum kvm_page_track_mode mode);
+bool kvm_page_track_check_mode(struct kvm_vcpu *vcpu, gfn_t gfn,
+			       enum kvm_page_track_mode mode);
 #endif

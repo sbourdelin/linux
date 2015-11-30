@@ -41,6 +41,7 @@
 #include <asm/cmpxchg.h>
 #include <asm/io.h>
 #include <asm/vmx.h>
+#include <asm/kvm_page_track.h>
 
 /*
  * When setting this variable to true it enables Two-Dimensional-Paging
@@ -2456,25 +2457,29 @@ static void kvm_unsync_pages(struct kvm_vcpu *vcpu,  gfn_t gfn)
 	}
 }
 
-static int mmu_need_write_protect(struct kvm_vcpu *vcpu, gfn_t gfn,
-				  bool can_unsync)
+static bool mmu_need_write_protect(struct kvm_vcpu *vcpu, gfn_t gfn,
+				   bool can_unsync)
 {
 	struct kvm_mmu_page *s;
 	bool need_unsync = false;
 
+	if (kvm_page_track_check_mode(vcpu, gfn, KVM_PAGE_TRACK_WRITE))
+		return true;
+
 	for_each_gfn_indirect_valid_sp(vcpu->kvm, s, gfn) {
 		if (!can_unsync)
-			return 1;
+			return true;
 
 		if (s->role.level != PT_PAGE_TABLE_LEVEL)
-			return 1;
+			return true;
 
 		if (!s->unsync)
 			need_unsync = true;
 	}
 	if (need_unsync)
 		kvm_unsync_pages(vcpu, gfn);
-	return 0;
+
+	return false;
 }
 
 static bool kvm_is_mmio_pfn(pfn_t pfn)
@@ -3388,10 +3393,30 @@ int handle_mmio_page_fault(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 }
 EXPORT_SYMBOL_GPL(handle_mmio_page_fault);
 
+static bool page_fault_handle_page_track(struct kvm_vcpu *vcpu,
+					 u32 error_code, gfn_t gfn)
+{
+	if (unlikely(error_code & PFERR_RSVD_MASK))
+		return false;
+
+	if (!(error_code & PFERR_PRESENT_MASK) ||
+	      !(error_code & PFERR_WRITE_MASK))
+		return false;
+
+	/*
+	 * guest is writing the page which is write tracked which can
+	 * not be fixed by page fault handler.
+	 */
+	if (kvm_page_track_check_mode(vcpu, gfn, KVM_PAGE_TRACK_WRITE))
+		return true;
+
+	return false;
+}
+
 static int nonpaging_page_fault(struct kvm_vcpu *vcpu, gva_t gva,
 				u32 error_code, bool prefault)
 {
-	gfn_t gfn;
+	gfn_t gfn = gva >> PAGE_SHIFT;
 	int r;
 
 	pgprintk("%s: gva %lx error %x\n", __func__, gva, error_code);
@@ -3403,13 +3428,15 @@ static int nonpaging_page_fault(struct kvm_vcpu *vcpu, gva_t gva,
 			return r;
 	}
 
+	if (page_fault_handle_page_track(vcpu, error_code, gfn))
+		return 1;
+
 	r = mmu_topup_memory_caches(vcpu);
 	if (r)
 		return r;
 
 	MMU_WARN_ON(!VALID_PAGE(vcpu->arch.mmu.root_hpa));
 
-	gfn = gva >> PAGE_SHIFT;
 
 	return nonpaging_map(vcpu, gva & PAGE_MASK,
 			     error_code, gfn, prefault);
@@ -3492,6 +3519,9 @@ static int tdp_page_fault(struct kvm_vcpu *vcpu, gva_t gpa, u32 error_code,
 		if (likely(r != RET_MMIO_PF_INVALID))
 			return r;
 	}
+
+	if (page_fault_handle_page_track(vcpu, error_code, gfn))
+		return 1;
 
 	r = mmu_topup_memory_caches(vcpu);
 	if (r)
