@@ -2914,11 +2914,11 @@ static void semaphore_clear_deadlocks(struct drm_i915_private *dev_priv)
 }
 
 static enum intel_ring_hangcheck_action
-ring_stuck(struct intel_engine_cs *ring, u64 acthd)
+head_stuck(struct intel_engine_cs *ring, u64 acthd)
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 tmp;
+	u32 head;
 
 	if (acthd != ring->hangcheck.acthd) {
 		if (acthd > ring->hangcheck.max_acthd) {
@@ -2928,6 +2928,30 @@ ring_stuck(struct intel_engine_cs *ring, u64 acthd)
 
 		return HANGCHECK_ACTIVE_LOOP;
 	}
+
+	head = I915_READ_HEAD(ring) & HEAD_ADDR;
+
+	/* Some operations, like pipe flush, can take a long time.
+	 * Detect if we are inside ringbuffer and treat these as if
+	 * the ring would be busy.
+	 */
+	if (lower_32_bits(acthd) == head)
+		return HANGCHECK_ACTIVE_LOOP;
+
+	return HANGCHECK_HUNG;
+}
+
+static enum intel_ring_hangcheck_action
+ring_stuck(struct intel_engine_cs *ring, u64 acthd)
+{
+	struct drm_device *dev = ring->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	enum intel_ring_hangcheck_action ha;
+	u32 tmp;
+
+	ha = head_stuck(ring, acthd);
+	if (ha != HANGCHECK_HUNG)
+		return ha;
 
 	if (IS_GEN2(dev))
 		return HANGCHECK_HUNG;
