@@ -147,6 +147,7 @@ static inline void disable_acpi(void) { }
 #ifdef CONFIG_ACPI_NUMA
 extern int acpi_numa;
 extern int x86_acpi_numa_init(void);
+unsigned long acpi_get_max_possible_pfn(void);
 #endif /* CONFIG_ACPI_NUMA */
 
 #define acpi_unlazy_tlb(x)	leave_mm(x)
@@ -169,5 +170,9 @@ static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
 	 return PAGE_KERNEL;
 }
 #endif
+
+#ifdef CONFIG_ACPI_HOTPLUG_MEMORY
+extern bool acpi_no_memhotplug;
+#endif /* CONFIG_ACPI_HOTPLUG_MEMORY */
 
 #endif /* _ASM_X86_ACPI_H */

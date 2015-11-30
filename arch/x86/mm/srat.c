@@ -153,9 +153,19 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 static inline int save_add_info(void) {return 1;}
+static unsigned long max_possible_pfn __initdata;
 #else
 static inline int save_add_info(void) {return 0;}
 #endif
+
+unsigned long __init acpi_get_max_possible_pfn(void)
+{
+#ifdef CONFIG_ACPI_HOTPLUG_MEMORY
+	if (!acpi_no_memhotplug)
+		return max_possible_pfn;
+#endif
+	return max_pfn;
+}
 
 /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
 int __init
@@ -202,6 +212,11 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	if (hotpluggable && memblock_mark_hotplug(start, ma->length))
 		pr_warn("SRAT: Failed to mark hotplug range [mem %#010Lx-%#010Lx] in memblock\n",
 			(unsigned long long)start, (unsigned long long)end - 1);
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+	if (max_possible_pfn < PFN_UP(end - 1))
+		max_possible_pfn = PFN_UP(end - 1);
+#endif
 
 	return 0;
 out_err_bad_srat:

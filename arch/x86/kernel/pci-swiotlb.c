@@ -88,7 +88,11 @@ int __init pci_swiotlb_detect_4gb(void)
 {
 	/* don't initialize swiotlb if iommu=off (no_iommu=1) */
 #ifdef CONFIG_X86_64
+#ifdef CONFIG_ACPI_NUMA
+	if (!no_iommu && acpi_get_max_possible_pfn() > MAX_DMA32_PFN)
+#else
 	if (!no_iommu && max_pfn > MAX_DMA32_PFN)
+#endif
 		swiotlb = 1;
 #endif
 	return swiotlb;
