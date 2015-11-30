@@ -24,6 +24,7 @@ FILES=					\
 	test-libpython.bin		\
 	test-libpython-version.bin	\
 	test-libslang.bin		\
+	test-libcrypto.bin		\
 	test-libunwind.bin		\
 	test-libunwind-debug-frame.bin	\
 	test-pthread-attr-setaffinity-np.bin	\
@@ -103,6 +104,9 @@ test-libaudit.bin:
 
 test-libslang.bin:
 	$(BUILD) -I/usr/include/slang -lslang
+
+test-libcrypto.bin:
+	$(BUILD) -lcrypto
 
 test-gtk2.bin:
 	$(BUILD) $(shell $(PKG_CONFIG) --libs --cflags gtk+-2.0 2>/dev/null)

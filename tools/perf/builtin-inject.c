@@ -17,6 +17,7 @@
 #include "util/build-id.h"
 #include "util/data.h"
 #include "util/auxtrace.h"
+#include "util/jit.h"
 
 #include "util/parse-options.h"
 
@@ -29,6 +30,7 @@ struct perf_inject {
 	bool			sched_stat;
 	bool			have_auxtrace;
 	bool			strip;
+	bool			jit_mode;
 	const char		*input_name;
 	struct perf_data_file	output;
 	u64			bytes_written;
@@ -69,6 +71,13 @@ static int perf_event__repipe_oe_synth(struct perf_tool *tool,
 				       struct ordered_events *oe __maybe_unused)
 {
 	return perf_event__repipe_synth(tool, event);
+}
+
+static int perf_event__drop_oe(struct perf_tool *tool __maybe_unused,
+			       union perf_event *event __maybe_unused,
+			       struct ordered_events *oe __maybe_unused)
+{
+	return 0;
 }
 
 static int perf_event__repipe_op2_synth(struct perf_tool *tool,
@@ -234,6 +243,25 @@ static int perf_event__repipe_mmap(struct perf_tool *tool,
 	return err;
 }
 
+static int perf_event__jit_repipe_mmap(struct perf_tool *tool,
+				       union perf_event *event,
+				       struct perf_sample *sample,
+				       struct machine *machine)
+{
+	struct perf_inject *inject = container_of(tool, struct perf_inject, tool);
+	u64 n = 0;
+
+	/*
+	 * if jit marker, then inject jit mmaps and generate ELF images
+	 */
+	if (!jit_process(inject->session, &inject->output, machine,
+			 event->mmap.filename, sample->pid, &n)) {
+		inject->bytes_written += n;
+		return 0;
+	}
+	return perf_event__repipe_mmap(tool, event, sample, machine);
+}
+
 static int perf_event__repipe_mmap2(struct perf_tool *tool,
 				   union perf_event *event,
 				   struct perf_sample *sample,
@@ -245,6 +273,25 @@ static int perf_event__repipe_mmap2(struct perf_tool *tool,
 	perf_event__repipe(tool, event, sample, machine);
 
 	return err;
+}
+
+static int perf_event__jit_repipe_mmap2(struct perf_tool *tool,
+					union perf_event *event,
+					struct perf_sample *sample,
+					struct machine *machine)
+{
+	struct perf_inject *inject = container_of(tool, struct perf_inject, tool);
+	u64 n = 0;
+
+	/*
+	 * if jit marker, then inject jit mmaps and generate ELF images
+	 */
+	if (!jit_process(inject->session, &inject->output, machine,
+			  event->mmap2.filename, sample->pid, &n)) {
+		inject->bytes_written += n;
+		return 0;
+	}
+	return perf_event__repipe_mmap2(tool, event, sample, machine);
 }
 
 static int perf_event__repipe_fork(struct perf_tool *tool,
@@ -664,6 +711,21 @@ static int __cmd_inject(struct perf_inject *inject)
 	return ret;
 }
 
+static int
+jit_validate_events(struct perf_session *session)
+{
+	struct perf_evsel *evsel;
+
+	/*
+	 * check that all events use CLOCK_MONOTONIC
+	 */
+	evlist__for_each(session->evlist, evsel) {
+		if (evsel->attr.use_clockid == 0 || evsel->attr.clockid != CLOCK_MONOTONIC)
+			return -1;
+	}
+	return 0;
+}
+
 int cmd_inject(int argc, const char **argv, const char *prefix __maybe_unused)
 {
 	struct perf_inject inject = {
@@ -713,6 +775,7 @@ int cmd_inject(int argc, const char **argv, const char *prefix __maybe_unused)
 		OPT_BOOLEAN('s', "sched-stat", &inject.sched_stat,
 			    "Merge sched-stat and sched-switch for getting events "
 			    "where and how long tasks slept"),
+		OPT_BOOLEAN('j', "jit", &inject.jit_mode, "merge jitdump files into perf.data file"),
 		OPT_INCR('v', "verbose", &verbose,
 			 "be more verbose (show build ids, etc)"),
 		OPT_STRING(0, "kallsyms", &symbol_conf.kallsyms_name, "file",
@@ -754,6 +817,36 @@ int cmd_inject(int argc, const char **argv, const char *prefix __maybe_unused)
 	inject.session = perf_session__new(&file, true, &inject.tool);
 	if (inject.session == NULL)
 		return -1;
+
+	if (inject.build_ids) {
+		/*
+		 * to make sure the mmap records are ordered correctly
+		 * and so that the correct especially due to jitted code
+		 * mmaps. We cannot generate the buildid hit list and
+		 * inject the jit mmaps at the same time for now.
+		 */
+		inject.tool.ordered_events = true;
+		inject.tool.ordering_requires_timestamps = true;
+	}
+
+	if (inject.jit_mode) {
+		/*
+		 * validate event is using the correct clockid
+		 */
+		if (jit_validate_events(inject.session)) {
+			fprintf(stderr, "error, jitted code must be sampled with perf record -k 1\n");
+			return -1;
+		}
+		inject.tool.mmap2	   = perf_event__jit_repipe_mmap2;
+		inject.tool.mmap	   = perf_event__jit_repipe_mmap;
+		inject.tool.ordered_events = true;
+		inject.tool.ordering_requires_timestamps = true;
+		/*
+		 * JIT MMAP injection injects all MMAP events in one go, so it
+		 * does not obey finished_round semantics.
+		 */
+		inject.tool.finished_round = perf_event__drop_oe;
+	}
 
 	ret = symbol__init(&inject.session->header.env);
 	if (ret < 0)
