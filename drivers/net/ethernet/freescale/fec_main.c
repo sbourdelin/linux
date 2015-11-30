@@ -3233,7 +3233,7 @@ static int fec_enet_init(struct net_device *ndev)
 #ifdef CONFIG_OF
 static void fec_reset_phy(struct platform_device *pdev)
 {
-	int err, phy_reset;
+	struct gpio_desc *phy_reset;
 	int msec = 1;
 	struct device_node *np = pdev->dev.of_node;
 
@@ -3245,18 +3245,15 @@ static void fec_reset_phy(struct platform_device *pdev)
 	if (msec > 1000)
 		msec = 1;
 
-	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
-	if (!gpio_is_valid(phy_reset))
-		return;
-
-	err = devm_gpio_request_one(&pdev->dev, phy_reset,
-				    GPIOF_OUT_INIT_LOW, "phy-reset");
-	if (err) {
-		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
+	phy_reset = devm_gpiod_get_optional(&pdev->dev, "phy-reset",
+					    GPIOD_OUT_LOW);
+	if (IS_ERR(phy_reset)) {
+		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %ld\n",
+			PTR_ERR(phy_reset));
 		return;
 	}
 	msleep(msec);
-	gpio_set_value_cansleep(phy_reset, 1);
+	gpiod_set_value_cansleep(phy_reset, 1);
 }
 #else /* CONFIG_OF */
 static void fec_reset_phy(struct platform_device *pdev)
