@@ -23,6 +23,8 @@
 #include <linux/net_tstamp.h>
 #include <linux/ptp_classify.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/of_gpio.h>
 
 #define DRV_VERSION     "1.01"
 const char pch_driver_version[] = DRV_VERSION;
@@ -2594,12 +2596,40 @@ static void pch_gbe_remove(struct pci_dev *pdev)
 	free_netdev(netdev);
 }
 
+static int pch_gbe_parse_dt(struct pci_dev *pdev,
+			    struct pch_gbe_privdata **pdata)
+{
+	struct device_node *np = pdev->dev.of_node;
+	struct gpio_desc *gpio;
+
+	if (!config_enabled(CONFIG_OF) || !np)
+		return 0;
+
+	if (!*pdata)
+		*pdata = devm_kzalloc(&pdev->dev, sizeof(**pdata), GFP_KERNEL);
+	if (!*pdata)
+		return -ENOMEM;
+
+	gpio = devm_gpiod_get(&pdev->dev, "phy-reset", GPIOD_ASIS);
+	if (IS_ERR(gpio))
+		return PTR_ERR(gpio);
+
+	(*pdata)->phy_reset_gpio = gpio;
+	return 0;
+}
+
 static int pch_gbe_probe(struct pci_dev *pdev,
 			  const struct pci_device_id *pci_id)
 {
 	struct net_device *netdev;
 	struct pch_gbe_adapter *adapter;
+	struct pch_gbe_privdata *pdata;
 	int ret;
+
+	pdata = (struct pch_gbe_privdata *)pci_id->driver_data;
+	ret = pch_gbe_parse_dt(pdev, &pdata);
+	if (ret)
+		goto err_out;
 
 	ret = pcim_enable_device(pdev);
 	if (ret)
@@ -2638,7 +2668,7 @@ static int pch_gbe_probe(struct pci_dev *pdev,
 	adapter->pdev = pdev;
 	adapter->hw.back = adapter;
 	adapter->hw.reg = pcim_iomap_table(pdev)[PCH_GBE_PCI_BAR];
-	adapter->pdata = (struct pch_gbe_privdata *)pci_id->driver_data;
+	adapter->pdata = pdata;
 	if (adapter->pdata && adapter->pdata->platform_init)
 		adapter->pdata->platform_init(pdev, pdata);
 
@@ -2729,6 +2759,7 @@ err_free_adapter:
 	pch_gbe_hal_phy_hw_reset(&adapter->hw);
 err_free_netdev:
 	free_netdev(netdev);
+err_out:
 	return ret;
 }
 
