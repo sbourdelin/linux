@@ -5037,6 +5037,11 @@ F:	include/uapi/linux/if_hippi.h
 F:	net/802/hippi.c
 F:	drivers/net/hippi/
 
+HISILICON LOW PIN COUNT DRIVER
+M:	Rongrong Zou <zourongrong@huawei.com>
+S:	Maintained
+F:	drivers/misc/hisi-lpc/
+
 HOST AP DRIVER
 M:	Jouni Malinen <j@w1.fi>
 L:	hostap@shmoo.com (subscribers-only)
