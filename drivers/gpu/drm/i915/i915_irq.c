@@ -3091,6 +3091,9 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 			ring->hangcheck.acthd = ring->hangcheck.max_acthd = 0;
 		}
 
+		if (!busy)
+			ring->hangcheck.score = 0;
+
 		ring->hangcheck.seqno = seqno;
 		ring->hangcheck.acthd = acthd;
 		busy_count += busy;
