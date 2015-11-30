@@ -11,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/clk.h>
 #include <linux/serial_8250.h>
+#include <linux/dmaengine.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/edma.h>
 #include <linux/platform_data/gpio-davinci.h>
@@ -505,9 +506,20 @@ static s8 queue_priority_mapping[][2] = {
 	{-1, -1},
 };
 
+static struct dma_filter_map da644x_edma_map[] = {
+	DMA_FILTER_ENTRY("davinci-mcbsp", "tx", EDMA_CTLR_CHAN(0, 2)),
+	DMA_FILTER_ENTRY("davinci-mcbsp", "rx", EDMA_CTLR_CHAN(0, 3)),
+	DMA_FILTER_ENTRY("spi_davinci", "tx", EDMA_CTLR_CHAN(0, 16)),
+	DMA_FILTER_ENTRY("spi_davinci", "rx", EDMA_CTLR_CHAN(0, 17)),
+	DMA_FILTER_ENTRY("dm6441-mmc.0", "rx", EDMA_CTLR_CHAN(0, 26)),
+	DMA_FILTER_ENTRY("dm6441-mmc.0", "tx", EDMA_CTLR_CHAN(0, 27)),
+};
+
 static struct edma_soc_info dm644x_edma_pdata = {
 	.queue_priority_mapping	= queue_priority_mapping,
 	.default_queue		= EVENTQ_1,
+	.filter_map		= da644x_edma_map,
+	.filtercnt		= ARRAY_SIZE(da644x_edma_map),
 };
 
 static struct resource edma_resources[] = {
