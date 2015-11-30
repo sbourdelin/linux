@@ -77,6 +77,26 @@ static void update_gfn_track(struct kvm_memory_slot *slot, gfn_t gfn,
 	WARN_ON(val < 0);
 }
 
+void
+kvm_slot_page_track_add_page_nolock(struct kvm *kvm,
+				    struct kvm_memory_slot *slot, gfn_t gfn,
+				    enum kvm_page_track_mode mode)
+{
+	WARN_ON(!check_mode(mode));
+
+	update_gfn_track(slot, gfn, mode, 1);
+
+	/*
+	 * new track stops large page mapping for the
+	 * tracked page.
+	 */
+	kvm_mmu_gfn_disallow_lpage(slot, gfn);
+
+	if (mode == KVM_PAGE_TRACK_WRITE)
+		if (kvm_mmu_slot_gfn_write_protect(kvm, slot, gfn))
+			kvm_flush_remote_tlbs(kvm);
+}
+
 /*
  * add guest page to the tracking pool so that corresponding access on that
  * page will be intercepted.
@@ -101,19 +121,25 @@ void kvm_page_track_add_page(struct kvm *kvm, gfn_t gfn,
 		slot = __gfn_to_memslot(slots, gfn);
 
 		spin_lock(&kvm->mmu_lock);
-		update_gfn_track(slot, gfn, mode, 1);
-
-		/*
-		 * new track stops large page mapping for the
-		 * tracked page.
-		 */
-		kvm_mmu_gfn_disallow_lpage(slot, gfn);
-
-		if (mode == KVM_PAGE_TRACK_WRITE)
-			if (kvm_mmu_slot_gfn_write_protect(kvm, slot, gfn))
-				kvm_flush_remote_tlbs(kvm);
+		kvm_slot_page_track_add_page_nolock(kvm, slot, gfn, mode);
 		spin_unlock(&kvm->mmu_lock);
 	}
+}
+
+void kvm_slot_page_track_remove_page_nolock(struct kvm *kvm,
+					    struct kvm_memory_slot *slot,
+					    gfn_t gfn,
+					    enum kvm_page_track_mode mode)
+{
+	WARN_ON(!check_mode(mode));
+
+	update_gfn_track(slot, gfn, mode, -1);
+
+	/*
+	 * allow large page mapping for the tracked page
+	 * after the tracker is gone.
+	 */
+	kvm_mmu_gfn_allow_lpage(slot, gfn);
 }
 
 /*
@@ -134,20 +160,12 @@ void kvm_page_track_remove_page(struct kvm *kvm, gfn_t gfn,
 	struct kvm_memory_slot *slot;
 	int i;
 
-	WARN_ON(!check_mode(mode));
-
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
 		slots = __kvm_memslots(kvm, i);
 		slot = __gfn_to_memslot(slots, gfn);
 
 		spin_lock(&kvm->mmu_lock);
-		update_gfn_track(slot, gfn, mode, -1);
-
-		/*
-		 * allow large page mapping for the tracked page
-		 * after the tracker is gone.
-		 */
-		kvm_mmu_gfn_allow_lpage(slot, gfn);
+		kvm_slot_page_track_remove_page_nolock(kvm, slot, gfn, mode);
 		spin_unlock(&kvm->mmu_lock);
 	}
 }
