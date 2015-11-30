@@ -1,0 +1,24 @@
+/dts-v1/;
+
+/ {
+	description = "MIPS Linux";
+	#address-cells = <1>;
+
+	images {
+		kernel@0 {
+			description = "Linux";
+			data = /incbin/("__VMLINUX__");
+			type = "kernel";
+			arch = "mips";
+			os = "linux";
+			compression = "__VMLINUX_COMPRESSION__";
+			load = <__LOAD_ADDR__>;
+			entry = <__ENTRY_ADDR__>;
+			hash@1 {
+				algo = "sha1";
+			};
+		};
+	};
+};
+
+__PLATFORM_INCLUDES__
