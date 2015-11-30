@@ -9,6 +9,7 @@
  * or implied.
  */
 #include <linux/dma-mapping.h>
+#include <linux/dmaengine.h>
 #include <linux/init.h>
 #include <linux/clk.h>
 #include <linux/serial_8250.h>
@@ -540,9 +541,19 @@ static s8 dm646x_queue_priority_mapping[][2] = {
 	{-1, -1},
 };
 
+static struct dma_filter_map da646x_edma_map[] = {
+	DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 6)),
+	DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 9)),
+	DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 12)),
+	DMA_FILTER_ENTRY("spi_davinci", "tx", EDMA_CTLR_CHAN(0, 16)),
+	DMA_FILTER_ENTRY("spi_davinci", "rx", EDMA_CTLR_CHAN(0, 17)),
+};
+
 static struct edma_soc_info dm646x_edma_pdata = {
 	.queue_priority_mapping	= dm646x_queue_priority_mapping,
 	.default_queue		= EVENTQ_1,
+	.filter_map		= da646x_edma_map,
+	.filtercnt		= ARRAY_SIZE(da646x_edma_map),
 };
 
 static struct resource edma_resources[] = {
