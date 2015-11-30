@@ -733,8 +733,30 @@ static u32 xhci_get_port_status(struct usb_hcd *hcd,
 		if ((raw_port_status & PORT_RESET) ||
 				!(raw_port_status & PORT_PE))
 			return 0xffffffff;
-		if (time_after_eq(jiffies,
-					bus_state->resume_done[wIndex])) {
+		/* did port event handler already start 20ms resume timing? */
+		if (!bus_state->resume_done[wIndex]) {
+			/* If not, maybe we are in a host initated resume? */
+			if (test_bit(wIndex, &bus_state->resuming_ports)) {
+				/* Host initated resume doesn't time the resume
+				 * signalling using resume_done[].
+				 * It manually sets RESUME state, sleeps 20ms
+				 * and sets U0 state. This should probably be
+				 * changed, but not right now, do nothing
+				 */
+			} else {
+				/* port resume was discovered now and here,
+				 * start resume timing
+				 */
+				unsigned long timeout = jiffies +
+					msecs_to_jiffies(USB_RESUME_TIMEOUT);
+
+				set_bit(wIndex, &bus_state->resuming_ports);
+				bus_state->resume_done[wIndex] = timeout;
+				mod_timer(&hcd->rh_timer, timeout);
+			}
+		/* Has resume been signalled for 20ms? yet? */
+		} else if (time_after_eq(jiffies,
+					 bus_state->resume_done[wIndex])) {
 			int time_left;
 
 			xhci_dbg(xhci, "Resume USB2 port %d\n",
@@ -781,6 +803,16 @@ static u32 xhci_get_port_status(struct usb_hcd *hcd,
 			 */
 			status |= USB_PORT_STAT_SUSPEND;
 		}
+	}
+	/* Clear stale usb2 resume signalling variables in case port changed
+	 * state during 20ms resume signalling. For example on error
+	 */
+	if ((bus_state->resume_done[wIndex] ||
+	     test_bit(wIndex, &bus_state->resuming_ports) &&
+	     (raw_port_status & PORT_PLS_MASK) != XDEV_U3 &&
+	     (raw_port_status & PORT_PLS_MASK) != XDEV_RESUME)) {
+		bus_state->resume_done[wIndex] = 0;
+		clear_bit(wIndex, &bus_state->resuming_ports);
 	}
 	if ((raw_port_status & PORT_PLS_MASK) == XDEV_U0
 			&& (raw_port_status & PORT_POWER)
@@ -1112,6 +1144,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				if ((temp & PORT_PE) == 0)
 					goto error;
 
+				set_bit(wIndex, &bus_state->resuming_ports);
 				xhci_set_link_state(xhci, port_array, wIndex,
 							XDEV_RESUME);
 				spin_unlock_irqrestore(&xhci->lock, flags);
@@ -1119,6 +1152,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				spin_lock_irqsave(&xhci->lock, flags);
 				xhci_set_link_state(xhci, port_array, wIndex,
 							XDEV_U0);
+				clear_bit(wIndex, &bus_state->resuming_ports);
 			}
 			bus_state->port_c_suspend |= 1 << wIndex;
 
