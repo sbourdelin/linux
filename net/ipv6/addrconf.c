@@ -53,6 +53,7 @@
 #include <linux/if_arp.h>
 #include <linux/if_arcnet.h>
 #include <linux/if_infiniband.h>
+#include <linux/random.h>
 #include <linux/route.h>
 #include <linux/inetdevice.h>
 #include <linux/init.h>
@@ -2026,6 +2027,13 @@ static int addrconf_ifid_ip6tnl(u8 *eui, struct net_device *dev)
 	return 0;
 }
 
+static int addrconf_ifid_random(u8 *eui, struct net_device *dev)
+{
+	get_random_bytes(eui, 8);
+	eui[0] |= 0x02;
+	return 0;
+}
+
 static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 {
 	switch (dev->type) {
@@ -2047,6 +2055,8 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		return addrconf_ifid_ieee1394(eui, dev);
 	case ARPHRD_TUNNEL6:
 		return addrconf_ifid_ip6tnl(eui, dev);
+	case ARPHRD_NONE:
+		return addrconf_ifid_random(eui, dev);
 	}
 	return -1;
 }
@@ -3069,8 +3079,8 @@ static void addrconf_dev_config(struct net_device *dev)
 	    (dev->type != ARPHRD_IEEE802154) &&
 	    (dev->type != ARPHRD_IEEE1394) &&
 	    (dev->type != ARPHRD_TUNNEL6) &&
-	    (dev->type != ARPHRD_6LOWPAN)) {
-		/* Alas, we support only Ethernet autoconfiguration. */
+	    (dev->type != ARPHRD_6LOWPAN) &&
+	    (dev->type != ARPHRD_NONE)) {
 		return;
 	}
 
