@@ -614,6 +614,11 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	mutex_lock(&klp_mutex);
 
+	if (!klp_is_patch_registered(patch)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
 	if (val == patch->state) {
 		/* already in requested state */
 		ret = -EINVAL;
