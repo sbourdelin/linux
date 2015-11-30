@@ -810,6 +810,9 @@ static void mac80211_hwsim_monitor_rx(struct ieee80211_hw *hw,
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(tx_skb);
 	struct ieee80211_rate *txrate = ieee80211_get_tx_rate(hw, info);
 
+	if (!txrate)
+		return;
+
 	if (!netif_running(hwsim_mon))
 		return;
 
