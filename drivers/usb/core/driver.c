@@ -310,6 +310,15 @@ static int usb_probe_interface(struct device *dev)
 
 	dev_dbg(dev, "%s - got id\n", __func__);
 
+	if (driver->num_endpoints &&
+	    intf->altsetting[0].desc.bNumEndpoints < driver->num_endpoints) {
+
+		dev_err(dev, "Not enough endpoints %d (want %d)\n",
+			intf->altsetting[0].desc.bNumEndpoints,
+			driver->num_endpoints);
+		return -EINVAL;
+	}
+
 	error = usb_autoresume_device(udev);
 	if (error)
 		return error;

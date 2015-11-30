@@ -1055,6 +1055,11 @@ struct usbdrv_wrap {
  * @id_table: USB drivers use ID table to support hotplugging.
  *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
  *	or your driver's probe function will never get called.
+ * @num_endpoints: Number of endpoints that should be present in default
+ *	setting (altsetting 0) the driver needs to operate properly.
+ *	The probe will be aborted if actual number of endpoints is less
+ *	than what the driver specified here. 0 means no check should be
+ *	performed.
  * @dynids: used internally to hold the list of dynamically added device
  *	ids for this driver.
  * @drvwrap: Driver-model core structure wrapper.
@@ -1102,6 +1107,8 @@ struct usb_driver {
 	int (*post_reset)(struct usb_interface *intf);
 
 	const struct usb_device_id *id_table;
+
+	unsigned int num_endpoints;
 
 	struct usb_dynids dynids;
 	struct usbdrv_wrap drvwrap;
