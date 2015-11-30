@@ -17,6 +17,7 @@
 #include <linux/serial_8250.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
+#include <linux/dmaengine.h>
 #include <linux/spi/spi.h>
 #include <linux/platform_data/edma.h>
 #include <linux/platform_data/gpio-davinci.h>
@@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
 	{-1, -1},
 };
 
+static struct dma_filter_map da365_edma_map[] = {
+	DMA_FILTER_ENTRY("davinci-mcbsp.0", "tx", EDMA_CTLR_CHAN(0, 2)),
+	DMA_FILTER_ENTRY("davinci-mcbsp.0", "rx", EDMA_CTLR_CHAN(0, 3)),
+	DMA_FILTER_ENTRY("davinci_voicecodec", "tx", EDMA_CTLR_CHAN(0, 2)),
+	DMA_FILTER_ENTRY("davinci_voicecodec", "rx", EDMA_CTLR_CHAN(0, 3)),
+	DMA_FILTER_ENTRY("spi_davinci.2", "tx", EDMA_CTLR_CHAN(0, 10)),
+	DMA_FILTER_ENTRY("spi_davinci.2", "rx", EDMA_CTLR_CHAN(0, 11)),
+	DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 14)),
+	DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 15)),
+	DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 16)),
+	DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 17)),
+	DMA_FILTER_ENTRY("spi_davinci.3", "tx", EDMA_CTLR_CHAN(0, 18)),
+	DMA_FILTER_ENTRY("spi_davinci.3", "rx", EDMA_CTLR_CHAN(0, 19)),
+	DMA_FILTER_ENTRY("dm6441-mmc.0", "rx", EDMA_CTLR_CHAN(0, 26)),
+	DMA_FILTER_ENTRY("dm6441-mmc.0", "tx", EDMA_CTLR_CHAN(0, 27)),
+	DMA_FILTER_ENTRY("dm6441-mmc.1", "rx", EDMA_CTLR_CHAN(0, 30)),
+	DMA_FILTER_ENTRY("dm6441-mmc.1", "tx", EDMA_CTLR_CHAN(0, 31)),
+};
+
 static struct edma_soc_info dm365_edma_pdata = {
 	.queue_priority_mapping	= dm365_queue_priority_mapping,
 	.default_queue		= EVENTQ_3,
+	.filter_map		= da365_edma_map,
+	.filtercnt		= ARRAY_SIZE(da365_edma_map),
 };
 
 static struct resource edma_resources[] = {
