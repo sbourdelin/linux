@@ -45,14 +45,20 @@ static const struct file_operations capabilities_file_ops = {
 static int xenfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	static struct tree_descr xenfs_files[] = {
-		[2] = { "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
+		[2] =
+#ifdef CONFIG_XEN_COMPAT_XENFS_XENBUS
+		{ "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
+#endif
 		{ "capabilities", &capabilities_file_ops, S_IRUGO },
 		{ "privcmd", &xen_privcmd_fops, S_IRUSR|S_IWUSR },
 		{""},
 	};
 
 	static struct tree_descr xenfs_init_files[] = {
-		[2] = { "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
+		[2] =
+#ifdef CONFIG_XEN_COMPAT_XENFS_XENBUS
+		{ "xenbus", &xen_xenbus_fops, S_IRUSR|S_IWUSR },
+#endif
 		{ "capabilities", &capabilities_file_ops, S_IRUGO },
 		{ "privcmd", &xen_privcmd_fops, S_IRUSR|S_IWUSR },
 		{ "xsd_kva", &xsd_kva_file_ops, S_IRUSR|S_IWUSR},
