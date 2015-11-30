@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/rtc.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
@@ -84,6 +85,14 @@ static const struct i2c_device_id m41t80_id[] = {
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, m41t80_id);
+
+#ifdef CONFIG_OF
+static const struct of_device_id m41t80_of_match[] = {
+	{ .compatible = "st,m41t81s", .name = "m41t81s" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, m41t80_of_match);
+#endif
 
 struct m41t80_data {
 	u8 features;
@@ -637,6 +646,22 @@ static int m41t80_probe(struct i2c_client *client,
 	struct rtc_device *rtc = NULL;
 	struct rtc_time tm;
 	struct m41t80_data *clientdata = NULL;
+	const struct of_device_id *of_id;
+
+	if (!id && client->dev.of_node) {
+		of_id = of_match_node(of_match_ptr(m41t80_of_match),
+				      client->dev.of_node);
+		for (id = m41t80_id; id->name[0]; id++) {
+			if (strcmp(of_id->name, id->name) == 0)
+				break;
+		}
+		if (!id->name[0])
+			id = NULL;
+	}
+	if (!id) {
+		dev_err(&client->dev, "No i2c_device_id found\n");
+		return -EINVAL;
+	}
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C
 				     | I2C_FUNC_SMBUS_BYTE_DATA))
@@ -728,6 +753,7 @@ static int m41t80_remove(struct i2c_client *client)
 static struct i2c_driver m41t80_driver = {
 	.driver = {
 		.name = "rtc-m41t80",
+		.of_match_table = of_match_ptr(m41t80_of_match),
 	},
 	.probe = m41t80_probe,
 	.remove = m41t80_remove,
