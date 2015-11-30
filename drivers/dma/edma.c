@@ -2098,6 +2098,8 @@ static struct dma_chan *of_edma_xlate(struct of_phandle_args *dma_spec,
 }
 #endif
 
+static bool edma_filter_for_map(struct dma_chan *chan, void *param);
+
 static int edma_probe(struct platform_device *pdev)
 {
 	struct edma_soc_info	*info = pdev->dev.platform_data;
@@ -2297,6 +2299,12 @@ static int edma_probe(struct platform_device *pdev)
 		edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
 	}
 
+	if (info->filter_map) {
+		ecc->dma_slave.filter_map.map = info->filter_map;
+		ecc->dma_slave.filter_map.mapcnt = info->filtercnt;
+		ecc->dma_slave.filter_map.filter_fn = edma_filter_for_map;
+	}
+
 	ret = dma_async_device_register(&ecc->dma_slave);
 	if (ret) {
 		dev_err(dev, "slave ddev registration failed (%d)\n", ret);
@@ -2427,6 +2435,22 @@ bool edma_filter_fn(struct dma_chan *chan, void *param)
 	return match;
 }
 EXPORT_SYMBOL(edma_filter_fn);
+
+static bool edma_filter_for_map(struct dma_chan *chan, void *param)
+{
+	bool match = false;
+
+	if (chan->device->dev->driver == &edma_driver.driver) {
+		struct edma_chan *echan = to_edma_chan(chan);
+		unsigned ch_req = (unsigned)param;
+		if (ch_req == echan->ch_num) {
+			/* The channel is going to be used as HW synchronized */
+			echan->hw_triggered = true;
+			match = true;
+		}
+	}
+	return match;
+}
 
 static int edma_init(void)
 {

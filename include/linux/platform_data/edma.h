@@ -59,6 +59,8 @@ struct edma_rsv_info {
 	const s16	(*rsv_slots)[2];
 };
 
+struct dma_filter_map;
+
 /* platform_data for EDMA driver */
 struct edma_soc_info {
 	/*
@@ -76,6 +78,9 @@ struct edma_soc_info {
 
 	s8	(*queue_priority_mapping)[2];
 	const s16	(*xbar_chans)[2];
+
+	struct dma_filter_map *filter_map;
+	int filtercnt;
 };
 
 #endif
