@@ -2100,6 +2100,15 @@ struct drm_i915_gem_object {
 	unsigned int cache_level:3;
 	unsigned int cache_dirty:1;
 
+	/*
+	 * Tracks if the CPU cache has been completely clflushed.
+	 * !cache_clean does not imply cache_dirty (there is some data in the
+	 * CPU cachelines, but has not been dirtied), but cache_clean
+	 * does imply !cache_dirty (no data in cachelines, so not dirty also).
+	 * Actually cache_dirty tracks whether we have been omitting clflushes.
+	 */
+	unsigned int cache_clean:1;
+
 	unsigned int frontbuffer_bits:INTEL_FRONTBUFFER_BITS;
 
 	unsigned int pin_display;
