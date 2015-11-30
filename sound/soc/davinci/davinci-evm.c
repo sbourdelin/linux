@@ -364,8 +364,11 @@ static int davinci_evm_probe(struct platform_device *pdev)
 	struct snd_soc_card_drvdata_davinci *drvdata = NULL;
 	struct clk *mclk;
 	int ret = 0;
+	struct snd_soc_card *card = devm_kzalloc(&pdev->dev, sizeof(struct snd_soc_card), GFP_KERNEL);
 
-	evm_soc_card.dai_link = dai;
+	*card = evm_soc_card;
+
+	card->dai_link = dai;
 
 	dai->codec_of_node = of_parse_phandle(np, "ti,audio-codec", 0);
 	if (!dai->codec_of_node)
@@ -377,8 +380,8 @@ static int davinci_evm_probe(struct platform_device *pdev)
 
 	dai->platform_of_node = dai->cpu_of_node;
 
-	evm_soc_card.dev = &pdev->dev;
-	ret = snd_soc_of_parse_card_name(&evm_soc_card, "ti,model");
+	card->dev = &pdev->dev;
+	ret = snd_soc_of_parse_card_name(card, "ti,model");
 	if (ret)
 		return ret;
 
@@ -415,8 +418,8 @@ static int davinci_evm_probe(struct platform_device *pdev)
 				 requestd_rate, drvdata->sysclk);
 	}
 
-	snd_soc_card_set_drvdata(&evm_soc_card, drvdata);
-	ret = devm_snd_soc_register_card(&pdev->dev, &evm_soc_card);
+	snd_soc_card_set_drvdata(card, drvdata);
+	ret = devm_snd_soc_register_card(&pdev->dev, card);
 
 	if (ret)
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
