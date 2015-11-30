@@ -46,7 +46,6 @@ my ($Xip,$Htbl,$inp,$len)=map("r$_",(3..6));	# argument block
 
 my ($Xl,$Xm,$Xh,$IN)=map("v$_",(0..3));
 my ($zero,$t0,$t1,$t2,$xC2,$H,$Hh,$Hl,$lemask)=map("v$_",(4..12));
-my $vrsave="r12";
 
 $code=<<___;
 .machine	"any"
@@ -54,11 +53,8 @@ $code=<<___;
 .text
 
 .globl	.gcm_init_p8
-	lis		r0,0xfff0
 	li		r8,0x10
-	mfspr		$vrsave,256
 	li		r9,0x20
-	mtspr		256,r0
 	li		r10,0x30
 	lvx_u		$H,0,r4			# load H
 	le?xor		r7,r7,r7
@@ -94,7 +90,6 @@ $code=<<___;
 	stvx_u		$H, r9,r3
 	stvx_u		$Hh,r10,r3
 
-	mtspr		256,$vrsave
 	blr
 	.long		0
 	.byte		0,12,0x14,0,0,0,2,0
@@ -104,9 +99,7 @@ $code=<<___;
 .globl	.gcm_gmult_p8
 	lis		r0,0xfff8
 	li		r8,0x10
-	mfspr		$vrsave,256
 	li		r9,0x20
-	mtspr		256,r0
 	li		r10,0x30
 	lvx_u		$IN,0,$Xip		# load Xi
 
@@ -142,7 +135,6 @@ $code=<<___;
 	le?vperm	$Xl,$Xl,$Xl,$lemask
 	stvx_u		$Xl,0,$Xip		# write out Xi
 
-	mtspr		256,$vrsave
 	blr
 	.long		0
 	.byte		0,12,0x14,0,0,0,2,0
@@ -152,9 +144,7 @@ $code=<<___;
 .globl	.gcm_ghash_p8
 	lis		r0,0xfff8
 	li		r8,0x10
-	mfspr		$vrsave,256
 	li		r9,0x20
-	mtspr		256,r0
 	li		r10,0x30
 	lvx_u		$Xl,0,$Xip		# load Xi
 
@@ -209,7 +199,6 @@ Loop:
 	le?vperm	$Xl,$Xl,$Xl,$lemask
 	stvx_u		$Xl,0,$Xip		# write out Xi
 
-	mtspr		256,$vrsave
 	blr
 	.long		0
 	.byte		0,12,0x14,0,0,0,4,0

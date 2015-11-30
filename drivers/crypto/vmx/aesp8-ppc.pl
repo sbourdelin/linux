@@ -102,10 +102,6 @@ Lset_encrypt_key:
 	andi.		r0,$bits,0x3f
 	bne-		Lenc_key_abort
 
-	lis		r0,0xfff0
-	mfspr		$vrsave,256
-	mtspr		256,r0
-
 	bl		Lconsts
 	mtlr		r11
 
@@ -334,7 +330,6 @@ Ldone:
 	vsel		$in1,$outhead,$in1,$outmask
 	stvx		$in1,0,$inp
 	li		$ptr,0
-	mtspr		256,$vrsave
 	stw		$rounds,0($out)
 
 Lenc_key_abort:
@@ -402,10 +397,7 @@ my ($inp,$out,$key,$rounds,$idx)=map("r$_",(3..7));
 $code.=<<___;
 .globl	.${prefix}_${dir}crypt
 	lwz		$rounds,240($key)
-	lis		r0,0xfc00
-	mfspr		$vrsave,256
 	li		$idx,15			# 15 is not typo
-	mtspr		256,r0
 
 	lvx		v0,0,$inp
 	neg		r11,$out
@@ -459,7 +451,6 @@ Loop_${dir}c:
 	vsel		v0,v0,v4,v2
 	stvx		v0,$idx,$out
 
-	mtspr		256,$vrsave
 	blr
 	.long		0
 	.byte		0,12,0x14,0,0,0,3,0
@@ -482,9 +473,6 @@ $code.=<<___;
 	bltlr-
 
 	cmpwi		$enc,0			# test direction
-	lis		r0,0xffe0
-	mfspr		$vrsave,256
-	mtspr		256,r0
 
 	li		$idx,15
 	vxor		$rndkey0,$rndkey0,$rndkey0
@@ -630,7 +618,6 @@ Lcbc_done:
 	vsel		$inout,$ivec,$inptail,$outmask
 	stvx		$inout,$idx,$ivp
 
-	mtspr		256,$vrsave
 	blr
 	.long		0
 	.byte		0,12,0x14,0,0,0,6,0
@@ -1238,10 +1225,6 @@ $code.=<<___;
 	${UCMP}i	$len,1
 	bltlr-
 
-	lis		r0,0xfff0
-	mfspr		$vrsave,256
-	mtspr		256,r0
-
 	li		$idx,15
 	vxor		$rndkey0,$rndkey0,$rndkey0
 	le?vspltisb	$tmp,0x0f
@@ -1333,7 +1316,6 @@ Loop_ctr32_enc:
 	vsel		$inout,$outhead,$inout,$outmask
 	stvx		$inout,0,$out
 
-	mtspr		256,$vrsave
 	blr
 	.long		0
 	.byte		0,12,0x14,0,0,0,6,0
