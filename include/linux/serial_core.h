@@ -345,7 +345,7 @@ struct earlycon_id {
 } __aligned(32);
 
 extern int setup_earlycon(char *buf);
-extern int of_setup_earlycon(unsigned long addr,
+extern int of_setup_earlycon(const void *fdt, int offset, unsigned long addr,
 			     int (*setup)(struct earlycon_device *, const char *));
 
 #define EARLYCON_DECLARE(_name, func)					\

@@ -17,6 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/libfdt.h>
 #include <linux/serial_core.h>
 #include <linux/sizes.h>
 #include <linux/mod_devicetable.h>
@@ -196,16 +197,28 @@ static int __init param_setup_earlycon(char *buf)
 }
 early_param("earlycon", param_setup_earlycon);
 
-int __init of_setup_earlycon(unsigned long addr,
+int __init of_setup_earlycon(const void *fdt, int offset, unsigned long addr,
 			     int (*setup)(struct earlycon_device *, const char *))
 {
 	int err;
 	struct uart_port *port = &early_console_dev.port;
+	const __be32 *prop;
 
 	port->iotype = UPIO_MEM;
 	port->mapbase = addr;
 	port->uartclk = BASE_BAUD * 16;
 	port->membase = earlycon_map(addr, SZ_4K);
+
+	if (config_enabled(CONFIG_LIBFDT)) {
+		prop = fdt_getprop(fdt, offset, "reg-io-width", NULL);
+		if (prop) {
+			switch (be32_to_cpup(prop)) {
+			case 4:
+				port->iotype = UPIO_MEM32;
+				break;
+			}
+		}
+	}
 
 	early_console_dev.con->data = &early_console_dev;
 	err = setup(&early_console_dev, NULL);
