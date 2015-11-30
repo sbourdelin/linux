@@ -2914,12 +2914,8 @@ static void semaphore_clear_deadlocks(struct drm_i915_private *dev_priv)
 }
 
 static enum intel_ring_hangcheck_action
-head_stuck(struct intel_engine_cs *ring, u64 acthd)
+head_action(struct intel_engine_cs *ring, u64 acthd)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 head;
-
 	if (acthd != ring->hangcheck.acthd) {
 		if (acthd > ring->hangcheck.max_acthd) {
 			ring->hangcheck.max_acthd = acthd;
@@ -2929,6 +2925,21 @@ head_stuck(struct intel_engine_cs *ring, u64 acthd)
 		return HANGCHECK_ACTIVE_LOOP;
 	}
 
+	return HANGCHECK_HUNG;
+}
+
+static enum intel_ring_hangcheck_action
+head_stuck(struct intel_engine_cs *ring, u64 acthd)
+{
+	struct drm_device *dev = ring->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	static enum intel_ring_hangcheck_action ha;
+	u32 head, retries = 5;
+
+	ha = head_action(ring, acthd);
+	if (ha != HANGCHECK_HUNG)
+		return ha;
+
 	head = I915_READ_HEAD(ring) & HEAD_ADDR;
 
 	/* Some operations, like pipe flush, can take a long time.
@@ -2937,6 +2948,17 @@ head_stuck(struct intel_engine_cs *ring, u64 acthd)
 	 */
 	if (lower_32_bits(acthd) == head)
 		return HANGCHECK_ACTIVE_LOOP;
+
+	do {
+		msleep(20);
+
+		ring->hangcheck.acthd = acthd;
+		acthd = intel_ring_get_active_head(ring);
+
+		ha = head_action(ring, acthd);
+		if (ha != HANGCHECK_HUNG)
+			return ha;
+	} while (retries--);
 
 	return HANGCHECK_HUNG;
 }
