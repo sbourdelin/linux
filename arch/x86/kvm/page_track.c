@@ -56,3 +56,98 @@ void kvm_page_track_free_memslot(struct kvm_memory_slot *free,
 	if (!dont || free->arch.gfn_track != dont->arch.gfn_track)
 		page_track_slot_free(free);
 }
+
+static bool check_mode(enum kvm_page_track_mode mode)
+{
+	if (mode < 0 || mode >= KVM_PAGE_TRACK_MAX)
+		return false;
+
+	return true;
+}
+
+static void update_gfn_track(struct kvm_memory_slot *slot, gfn_t gfn,
+			     enum kvm_page_track_mode mode, int count)
+{
+	int index, val;
+
+	index = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
+
+	slot->arch.gfn_track[mode][index] += count;
+	val = slot->arch.gfn_track[mode][index];
+	WARN_ON(val < 0);
+}
+
+/*
+ * add guest page to the tracking pool so that corresponding access on that
+ * page will be intercepted.
+ *
+ * It should be called under the protection of kvm->srcu or kvm->slots_lock
+ *
+ * @kvm: the guest instance we are interested in.
+ * @gfn: the guest page.
+ * @mode: tracking mode, currently only write track is supported.
+ */
+void kvm_page_track_add_page(struct kvm *kvm, gfn_t gfn,
+			     enum kvm_page_track_mode mode)
+{
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *slot;
+	int i;
+
+	WARN_ON(!check_mode(mode));
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		slot = __gfn_to_memslot(slots, gfn);
+
+		spin_lock(&kvm->mmu_lock);
+		update_gfn_track(slot, gfn, mode, 1);
+
+		/*
+		 * new track stops large page mapping for the
+		 * tracked page.
+		 */
+		kvm_mmu_gfn_disallow_lpage(slot, gfn);
+
+		if (mode == KVM_PAGE_TRACK_WRITE)
+			if (kvm_mmu_slot_gfn_write_protect(kvm, slot, gfn))
+				kvm_flush_remote_tlbs(kvm);
+		spin_unlock(&kvm->mmu_lock);
+	}
+}
+
+/*
+ * remove the guest page from the tracking pool which stops the interception
+ * of corresponding access on that page. It is the opposed operation of
+ * kvm_page_track_add_page().
+ *
+ * It should be called under the protection of kvm->srcu or kvm->slots_lock
+ *
+ * @kvm: the guest instance we are interested in.
+ * @gfn: the guest page.
+ * @mode: tracking mode, currently only write track is supported.
+ */
+void kvm_page_track_remove_page(struct kvm *kvm, gfn_t gfn,
+				enum kvm_page_track_mode mode)
+{
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *slot;
+	int i;
+
+	WARN_ON(!check_mode(mode));
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		slot = __gfn_to_memslot(slots, gfn);
+
+		spin_lock(&kvm->mmu_lock);
+		update_gfn_track(slot, gfn, mode, -1);
+
+		/*
+		 * allow large page mapping for the tracked page
+		 * after the tracker is gone.
+		 */
+		kvm_mmu_gfn_allow_lpage(slot, gfn);
+		spin_unlock(&kvm->mmu_lock);
+	}
+}
