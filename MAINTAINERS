@@ -5432,6 +5432,11 @@ L:	linux-security-module@vger.kernel.org
 S:	Supported
 F:	security/integrity/ima/
 
+IMGTEC BOSTON PLATFORM SUPPORT
+M:	Paul Burton <paul.burton@imgtec.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/mips/img/boston.txt
+
 IMGTEC IR DECODER DRIVER
 M:	James Hogan <james.hogan@imgtec.com>
 S:	Maintained
