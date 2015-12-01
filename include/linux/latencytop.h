@@ -10,6 +10,9 @@
 #define _INCLUDE_GUARD_LATENCYTOP_H_
 
 #include <linux/compiler.h>
+
+#include <asm/current.h>
+
 struct task_struct;
 
 #ifdef CONFIG_LATENCYTOP
@@ -35,12 +38,24 @@ account_scheduler_latency(struct task_struct *task, int usecs, int inter)
 		__account_scheduler_latency(task, usecs, inter);
 }
 
+static inline void
+account_latency(int usecs)
+{
+	if (unlikely(latencytop_enabled))
+		__account_scheduler_latency(current, usecs, 0);
+}
+
 void clear_all_latency_tracing(struct task_struct *p);
 
 #else
 
 static inline void
 account_scheduler_latency(struct task_struct *task, int usecs, int inter)
+{
+}
+
+static inline void
+account_latency(int usecs)
 {
 }
 
