@@ -43,6 +43,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <asm/hypervisor.h>
+#include <asm/vmware.h>
 
 MODULE_AUTHOR("VMware, Inc.");
 MODULE_DESCRIPTION("VMware Memory Control (Balloon) Driver");
@@ -142,23 +143,17 @@ enum vmwballoon_capabilities {
 
 #define VMW_BALLOON_SUCCESS_WITH_CAPABILITIES	(0x03000000)
 
-#define VMWARE_BALLOON_CMD(cmd, data, result)			\
-({								\
-	unsigned long __status, __dummy1, __dummy2;		\
-	__asm__ __volatile__ ("inl %%dx" :			\
-		"=a"(__status),					\
-		"=c"(__dummy1),					\
-		"=d"(__dummy2),					\
-		"=b"(result) :					\
-		"0"(VMW_BALLOON_HV_MAGIC),			\
-		"1"(VMW_BALLOON_CMD_##cmd),			\
-		"2"(VMW_BALLOON_HV_PORT),			\
-		"3"(data) :					\
-		"memory");					\
-	if (VMW_BALLOON_CMD_##cmd == VMW_BALLOON_CMD_START)	\
-		result = __dummy1;				\
-	result &= -1UL;						\
-	__status & -1UL;					\
+#define VMWARE_BALLOON_CMD(cmd, data, result)			   \
+({								   \
+	unsigned long __status, __dummy1, __dummy2;		   \
+	unsigned long __si = 0, __di = 0;			   \
+	VMW_PORT(data, VMW_BALLOON_CMD_##cmd, VMW_BALLOON_HV_PORT, \
+		 VMW_BALLOON_HV_MAGIC,				   \
+		 __status, result, __dummy1, __dummy2, __si, __di);\
+	if (VMW_BALLOON_CMD_##cmd == VMW_BALLOON_CMD_START)	   \
+		result = __dummy1;				   \
+	result &= -1UL;						   \
+	__status & -1UL;					   \
 })
 
 #ifdef CONFIG_DEBUG_FS
