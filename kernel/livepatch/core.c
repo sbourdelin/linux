@@ -28,6 +28,9 @@
 #include <linux/list.h>
 #include <linux/kallsyms.h>
 #include <linux/livepatch.h>
+#include <linux/elf.h>
+#include <asm/cacheflush.h>
+#include <linux/moduleloader.h>
 
 /**
  * struct klp_ops - structure for tracking registered ftrace ops structs
@@ -281,52 +284,48 @@ static int klp_find_external_symbol(struct module *pmod, const char *name,
 }
 
 static int klp_write_object_relocations(struct module *pmod,
-					struct klp_object *obj)
+					struct klp_object *obj,
+					struct klp_patch *patch)
 {
-	int ret;
-	struct klp_reloc *reloc;
+	int relindex, num_relas;
+	int i, ret = 0;
+	unsigned long addr;
+	char *symname;
+	struct klp_reloc_sec *reloc_sec;
+	Elf_Rela *rela;
+	Elf_Sym *sym, *symtab;
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
 		return -EINVAL;
 
-	if (WARN_ON(!obj->relocs))
-		return -EINVAL;
+	symtab = (void *)pmod->core_symtab;
 
-	for (reloc = obj->relocs; reloc->name; reloc++) {
-		if (!klp_is_module(obj)) {
+	/* For each __klp_rela section for this object */
+	klp_for_each_reloc_sec(obj, reloc_sec) {
+		relindex = reloc_sec->index;
+		num_relas = pmod->sechdrs[relindex].sh_size / sizeof(Elf_Rela);
+		rela = (Elf_Rela *) pmod->sechdrs[relindex].sh_addr;
 
-#if defined(CONFIG_RANDOMIZE_BASE)
-			/* If KASLR has been enabled, adjust old value accordingly */
-			if (kaslr_enabled())
-				reloc->val += kaslr_offset();
-#endif
-			ret = klp_verify_vmlinux_symbol(reloc->name,
-							reloc->val);
-			if (ret)
-				return ret;
-		} else {
-			/* module, reloc->val needs to be discovered */
-			if (reloc->external)
-				ret = klp_find_external_symbol(pmod,
-							       reloc->name,
-							       &reloc->val);
-			else
-				ret = klp_find_object_symbol(obj->mod->name,
-							     reloc->name,
-							     &reloc->val);
-			if (ret)
-				return ret;
+		/* For each rela in this __klp_rela section */
+		for (i = 0; i < num_relas; i++, rela++) {
+			sym = symtab + ELF_R_SYM(rela->r_info);
+			symname = pmod->core_strtab + sym->st_name;
+
+			if (sym->st_shndx == SHN_LIVEPATCH) {
+				if (sym->st_info == 'K')
+					ret = klp_find_external_symbol(pmod, symname, &addr);
+				else
+					ret = klp_find_object_symbol(obj->name, symname, &addr);
+				if (ret)
+					return ret;
+				sym->st_value = addr;
+			}
 		}
-		ret = klp_write_module_reloc(pmod, reloc->type, reloc->loc,
-					     reloc->val + reloc->addend);
-		if (ret) {
-			pr_err("relocation failed for symbol '%s' at 0x%016lx (%d)\n",
-			       reloc->name, reloc->val, ret);
-			return ret;
-		}
+		ret = apply_relocate_add(pmod->sechdrs, pmod->core_strtab,
+					 pmod->index.sym, relindex, pmod);
 	}
 
-	return 0;
+	return ret;
 }
 
 static void notrace klp_ftrace_handler(unsigned long ip,
@@ -747,13 +746,22 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 				  struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct module *pmod;
 	int ret;
 
-	if (obj->relocs) {
-		ret = klp_write_object_relocations(patch->mod, obj);
-		if (ret)
-			return ret;
-	}
+	pmod = patch->mod;
+
+	set_page_attributes(pmod->module_core,
+			    pmod->module_core + pmod->core_text_size,
+			    set_memory_rw);
+
+	ret = klp_write_object_relocations(pmod, obj, patch);
+	if (ret)
+		return ret;
+
+	set_page_attributes(pmod->module_core,
+			    pmod->module_core + pmod->core_text_size,
+			    set_memory_ro);
 
 	klp_for_each_func(obj, func) {
 		ret = klp_find_verify_func_addr(obj, func);

@@ -64,28 +64,21 @@ struct klp_func {
 };
 
 /**
- * struct klp_reloc - relocation structure for live patching
- * @loc:	address where the relocation will be written
- * @val:	address of the referenced symbol (optional,
- *		vmlinux	patches only)
- * @type:	ELF relocation type
- * @name:	name of the referenced symbol (for lookup/verification)
- * @addend:	offset from the referenced symbol
- * @external:	symbol is either exported or within the live patch module itself
+ * struct klp_reloc_sec - relocation section struct for live patching
+ * @index:	Elf section index of the relocation section
+ * @name:	name of the relocation section
+ * @objname:	name of the object associated with the klp reloc section
  */
-struct klp_reloc {
-	unsigned long loc;
-	unsigned long val;
-	unsigned long type;
-	const char *name;
-	int addend;
-	int external;
+struct klp_reloc_sec {
+	unsigned int index;
+	char *name;
+	char *objname;
 };
 
 /**
  * struct klp_object - kernel object structure for live patching
  * @name:	module name (or NULL for vmlinux)
- * @relocs:	relocation entries to be applied at load time
+ * @reloc_secs:	relocation sections to be applied at load time
  * @funcs:	function entries for functions to be patched in the object
  * @kobj:	kobject for sysfs resources
  * @mod:	kernel module associated with the patched object
@@ -95,7 +88,7 @@ struct klp_reloc {
 struct klp_object {
 	/* external */
 	const char *name;
-	struct klp_reloc *relocs;
+	struct klp_reloc_sec *reloc_secs;
 	struct klp_func *funcs;
 
 	/* internal */
@@ -128,6 +121,9 @@ struct klp_patch {
 
 #define klp_for_each_func(obj, func) \
 	for (func = obj->funcs; func->old_name; func++)
+
+#define klp_for_each_reloc_sec(obj, reloc_sec) \
+	for (reloc_sec = obj->reloc_secs; reloc_sec->name; reloc_sec++)
 
 int klp_register_patch(struct klp_patch *);
 int klp_unregister_patch(struct klp_patch *);
