@@ -47,6 +47,38 @@ static int acpi_video;
 
 MODULE_ALIAS("wmi:"DELL_EVENT_GUID);
 
+struct quirk_entry {
+	bool process_dell_instant_launch;
+};
+
+static struct quirk_entry *quirks;
+
+static struct quirk_entry quirk_unknown = {
+};
+
+static struct quirk_entry quirk_dell_vostro_v131 = {
+	.process_dell_instant_launch = true,
+};
+
+static int __init dmi_matched(const struct dmi_system_id *dmi)
+{
+	quirks = dmi->driver_data;
+	return 1;
+}
+
+static const struct dmi_system_id dell_wmi_quirks[] __initconst = {
+	{
+		.callback = dmi_matched,
+		.ident = "Dell Vostro V131",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Vostro V131"),
+		},
+		.driver_data = &quirk_dell_vostro_v131,
+	},
+	{ }
+};
+
 /*
  * Certain keys are flagged as KE_IGNORE. All of these are either
  * notifications (rather than requests for change) or are also sent
@@ -87,7 +119,7 @@ static const struct key_entry dell_wmi_legacy_keymap[] __initconst = {
 	{ KE_IGNORE, 0xe020, { KEY_MUTE } },
 
 	/* Shortcut and audio panel keys */
-	{ KE_IGNORE, 0xe025, { KEY_RESERVED } },
+	{ KE_KEY, 0xe025, { KEY_PROG4 } },
 	{ KE_IGNORE, 0xe026, { KEY_RESERVED } },
 
 	{ KE_IGNORE, 0xe02e, { KEY_VOLUMEDOWN } },
@@ -179,6 +211,9 @@ static void dell_wmi_process_key(int reported_key)
 	/* Don't report brightness notifications that will also come via ACPI */
 	if ((key->keycode == KEY_BRIGHTNESSUP ||
 	     key->keycode == KEY_BRIGHTNESSDOWN) && acpi_video)
+		return;
+
+	if (key->keycode == KEY_PROG4 && !quirks->process_dell_instant_launch)
 		return;
 
 	sparse_keymap_report_entry(dell_wmi_input_dev, key, 1, true);
@@ -416,6 +451,8 @@ static int __init dell_wmi_init(void)
 		return -ENODEV;
 	}
 
+	quirks = &quirk_unknown;
+	dmi_check_system(dell_wmi_quirks);
 	dmi_walk(find_hk_type, NULL);
 	acpi_video = acpi_video_get_backlight_type() != acpi_backlight_vendor;
 
