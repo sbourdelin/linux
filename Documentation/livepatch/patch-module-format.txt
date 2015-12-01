@@ -1,0 +1,116 @@
+---------------------------
+Livepatch module Elf format
+---------------------------
+
+This document outlines the special Elf constants and sections livepatch
+uses to patch both modules and the kernel (vmlinux).
+
+--------------------------
+1. Livepatch modinfo field
+--------------------------
+
+Livepatch modules can be identified by users by using the 'modinfo' command
+and looking for the presence of the "livepatch" field. This field is also
+used by the kernel module loader to identify livepatch modules.
+
+Example modinfo output:
+
+% modinfo kpatch-meminfo.ko
+filename:		kpatch-meminfo.ko
+livepatch:		Y
+license:		GPL
+depends:
+vermagic:		4.3.0+ SMP mod_unload
+
+--------------------
+2. Livepatch symbols
+--------------------
+
+These are symbols marked with SHN_LIVEPATCH and are manually resolved by
+livepatch. This is useful in cases where we cannot immediately know the
+address of a symbol because the to-be-patched module is not loaded yet.
+livepatch modules keep these symbols in their original symbol tables, and
+the symbol table is made accessible through module->core_symtab.
+
+-----------------------------------
+3. Livepatch "external" symbol bind
+-----------------------------------
+
+The STB_LIVEPATCH_EXT symbol bind is used to help livepatch resolve global
+symbols referenced by klp relocations. After the module is copied into
+memory the module loader actually overwrites each symbol's bind with a
+character (see add_kallsyms() in kernel/module.c), so STB_LIVEPATCH_EXT
+symbols are represented with a capital 'K'.
+
+-----------------------------------
+4. "__klp_rela" relocation sections
+-----------------------------------
+
+A livepatch module uses special Elf relocation sections to apply
+relocations both for regular vmlinux patches as well as those that should
+be applied as soon as the to-be-patched module is loaded. For example, if a
+patch module patches a driver that is not currently loaded, livepatch will
+apply its corresponding klp relocation section(s) to the driver once it
+loads.
+
+The names of these livepatch relocation sections are formatted
+"__klp_rela_${objname}", where ${objname} is the name of the "object" being
+patched (e.g. vmlinux or name of module). Each object within a patch module
+may have multiple klp sections (e.g. patches to multiple functions within
+the same object). There is a 1-1 correspondence between a klp relocation
+section and the target section (usually the text section for a function) to
+which the relocation(s) apply.
+
+Here's a sample readelf output for a livepatch module that patches vmlinux and
+modules 9p, btrfs, ext4:
+  ...
+  [29] __klp_rela_9p.text.caches_show RELA                    0000000000000000 002d58 0000c0 18 AIo 64   9  8
+  [30] __klp_rela_btrfs.text.btrfs_feature_attr_show RELA     0000000000000000 002e18 000060 18 AIo 64  11  8
+  ...
+  [34] __klp_rela_ext4.text.ext4_attr_store RELA              0000000000000000 002fd8 0000d8 18 AIo 64  13  8
+  [35] __klp_rela_ext4.text.ext4_attr_show RELA               0000000000000000 0030b0 000150 18 AIo 64  15  8
+  [36] __klp_rela_vmlinux.text.cmdline_proc_show RELA         0000000000000000 003200 000018 18 AIo 64  17  8
+  [37] __klp_rela_vmlinux.text.meminfo_proc_show RELA         0000000000000000 003218 0000f0 18 AIo 64  19  8
+  ...
+
+klp relocation sections are SHT_RELA sections but with a few special
+characteristics. Notice that they are marked SHF_ALLOC ("A") so that they
+will not be discarded when the module is loaded into memory, as well as
+with the SHF_RELA_LIVEPATCH flag ("o" - for OS-specific) so the module
+loader can identify them and avoid treating them as regular SHT_RELA
+sections, since they are manually managed by livepatch.
+
+---------------------------------------------------------------
+4.1 How klp relocation sections are represented and initialized
+---------------------------------------------------------------
+
+Livepatch modules must initialize a klp_patch structure to pass in to
+klp_register_patch(). A klp_patch struct contains an array of klp_objects,
+and each klp_object contains an array of klp_reloc_sec structs that
+represent the klp relocation sections that must be applied to that object.
+Each klp_reloc_sec struct is allocated and initialized by the patch module
+code before the call to klp_register_patch().
+
+The klp_reloc_sec structure contains useful metadata about a klp relocation
+section such as its section index and name. Since Elf information is
+preserved for livepatch modules (see Section 5), a klp relocation section
+can be applied simply by passing in the saved section index to
+apply_relocate_add() (in the module loader code), which then uses it to
+access the actual Elf relocation section and apply the relocations.
+
+--------------------------------------------------------
+5. How a livepatch module accesses its symbol table and
+its klp relocation sections
+--------------------------------------------------------
+
+The kernel module loader checks whether the module being loaded is a
+livepatch module. If so, it then makes a copy of the module's Elf header,
+section headers, section name string table, and some noteworthy section
+indices (for example, the symtab's section index). It adjusts the symtab's
+sh_addr to point to mod->core_symtab, since the original mod->symtab lies
+in init memory and gets freed once the module finishes initializing. For
+livepatch modules, the core_symtab will be an exact copy of its original
+symbol table (where normally, only "core" symbols are included in this
+symbol table. See is_core_symbol() in kernel/module.c). livepatch requires
+that the symbols retain their original indices in the symbol table so that
+the klp relocation sections can be applied correctly.
