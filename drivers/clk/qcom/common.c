@@ -213,7 +213,10 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 	if (ret)
 		return ret;
 
-	devm_add_action(dev, qcom_cc_del_clk_provider, pdev->dev.of_node);
+	ret = devm_add_action(dev, qcom_cc_del_clk_provider,
+			      pdev->dev.of_node);
+	if (ret)
+		return ret;
 
 	reset = &cc->reset;
 	reset->rcdev.of_node = dev->of_node;
@@ -236,8 +239,12 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 			return ret;
 	}
 
-	devm_add_action(dev, qcom_cc_gdsc_unregister, dev);
-
+	ret = devm_add_action(dev, qcom_cc_gdsc_unregister, dev);
+	if (ret) {
+		if (desc->gdscs && desc->num_gdscs)
+			gdsc_unregister(dev);
+		return ret;
+	}
 
 	return 0;
 }
