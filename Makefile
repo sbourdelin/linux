@@ -642,6 +642,12 @@ KBUILD_CFLAGS += $(call cc-option,-fno-reorder-blocks,) \
                  $(call cc-option,-fno-partial-inlining)
 endif
 
+# Ask gcc to use interprocedural register allocation when possible.
+# This allows it to violate the callee-saved register ABI and avoid
+# generating register spills in the caller when it knows the function does
+# not clobber these registers
+KBUILD_CFLAGS += $(call cc-option,-fipa-ra,)
+
 ifneq ($(CONFIG_FRAME_WARN),0)
 KBUILD_CFLAGS += $(call cc-option,-Wframe-larger-than=${CONFIG_FRAME_WARN})
 endif
