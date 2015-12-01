@@ -1395,7 +1395,7 @@ EXPORT_SYMBOL(__devm_release_region);
 #define MAXRESERVE 4
 static int __init reserve_setup(char *str)
 {
-	static int reserved;
+	static int reserved __initdata;
 	static struct resource reserve[MAXRESERVE];
 
 	for (;;) {
