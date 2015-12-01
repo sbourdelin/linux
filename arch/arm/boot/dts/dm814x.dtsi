@@ -207,11 +207,11 @@
 
 				pincntl: pinmux@800 {
 					compatible = "pinctrl-single";
-					reg = <0x800 0xc38>;
+					reg = <0x800 0x438>;
 					#address-cells = <1>;
 					#size-cells = <0>;
 					pinctrl-single,register-width = <32>;
-					pinctrl-single,function-mask = <0x300ff>;
+					pinctrl-single,function-mask = <0x707ff>;
 				};
 			};
 
