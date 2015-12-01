@@ -612,7 +612,19 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	patch = container_of(kobj, struct klp_patch, kobj);
 
-	mutex_lock(&klp_mutex);
+	/*
+	 * Avoid a deadlock with kobject_put(&patch->kobj) that is
+	 * called under klp_mutex. Bail out when the patch is not
+	 * longer registered.
+	 */
+	if (!mutex_trylock(&klp_mutex)) {
+		if (!klp_is_patch_registered(patch))
+			return -EINVAL;
+		/* Do not spin with trylock that bounce cache lines. */
+		while (mutex_is_locked(&klp_mutex) &&
+		       klp_is_patch_registered(patch))
+			cond_resched();
+	}
 
 	if (val == patch->state) {
 		/* already in requested state */
