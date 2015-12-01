@@ -819,6 +819,15 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
 };
 
 static const char *const rk3368_critical_clocks[] __initconst = {
+	/*
+	 * HACK: Make sure this stays enabled so all its parents (like pclk_cpu)
+	 * stay enabled. CLK_IGNORE_UNUSED doesn't take care of parents.
+	 *
+	 * This is temporary until the PWM driver enables the right clock, which
+	 * it can't do until we get the ordering _just right_ and never glitch
+	 * the voltage of the PWM regulator.  Ick.
+	 */
+	"pclk_pwm1",
 	"pclk_pd_pmu",
 };
 
