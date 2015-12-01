@@ -3331,6 +3331,20 @@ the userspace IOAPIC should process the EOI and retrigger the interrupt if
 it is still asserted.  Vector is the LAPIC interrupt vector for which the
 EOI was received.
 
+		/* KVM_EXIT_IRQ */
+		struct kvm_irq_level irq;
+
+Indicates that an interrupt happens, to be processed by irqchip implemented in
+userspace. irq.irq specifies the raw IRQ number, and irq.status is to be
+interpreted according to interrupt type:
+ For level-triggered interrupts irq.status is set to new level of the line, and
+  the exit happens upon level change.
+ For edge-triggered interrupts irq.status is set to active level of the line
+  (low or high), and the exit happens when the line is pulsed.
+
+CPU-private interrupts (like per-CPU timers) belong to the vCPU where the exit
+happened.
+
 		/* Fix the size of the union. */
 		char padding[256];
 	};
