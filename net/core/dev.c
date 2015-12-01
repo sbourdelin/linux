@@ -6681,6 +6681,7 @@ int register_netdevice(struct net_device *dev)
 {
 	int ret;
 	struct net *net = dev_net(dev);
+	int ifindex = 0;
 
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
@@ -6718,6 +6719,23 @@ int register_netdevice(struct net_device *dev)
 	}
 
 	ret = -EBUSY;
+	/* See if interface name is present in name2index map */
+	if (!dev->ifindex) {
+		if (strcmp (dev->name, "gre_ffrl_fra_a") == 0) {
+			ifindex = 23;
+		} else if (strcmp (dev->name, "bb-pad-cr01") == 0) {
+			ifindex = 42;
+		}
+
+		/* If we found and index and it's not already in use, use it.
+		 * XXX: One could argue that if the users wants index X and it's
+		 *      already in use, this should raise EBUSY. Not decided yet
+		 *      which way would be preferable.
+		 */
+		if (ifindex && !__dev_get_by_index(net, ifindex))
+			dev->ifindex = ifindex;
+	}
+
 	if (!dev->ifindex)
 		dev->ifindex = dev_new_index(net);
 	else if (__dev_get_by_index(net, dev->ifindex))
