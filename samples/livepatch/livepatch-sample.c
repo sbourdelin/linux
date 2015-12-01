@@ -53,10 +53,15 @@ static struct klp_func funcs[] = {
 	}, { }
 };
 
+static struct klp_reloc_sec reloc_secs[] = {
+	{ }
+};
+
 static struct klp_object objs[] = {
 	{
 		/* name being NULL means vmlinux */
 		.funcs = funcs,
+		.reloc_secs = reloc_secs,
 	}, { }
 };
 
@@ -89,3 +94,4 @@ static void livepatch_exit(void)
 module_init(livepatch_init);
 module_exit(livepatch_exit);
 MODULE_LICENSE("GPL");
+MODULE_INFO(livepatch, "Y");
