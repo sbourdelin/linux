@@ -432,6 +432,7 @@ static struct omap_hwmod_ocp_if dm81xx_l4_ls__elm = {
 	.user		= OCP_USER_MPU,
 };
 
+/* On dm81xx RESETDONE bit seems to never goes high again after SOFTRESET */
 static struct omap_hwmod_class_sysconfig dm81xx_gpio_sysc = {
 	.rev_offs	= 0x0000,
 	.sysc_offs	= 0x0010,
@@ -463,6 +464,7 @@ static struct omap_hwmod dm81xx_gpio1_hwmod = {
 	.name		= "gpio1",
 	.clkdm_name	= "alwon_l3s_clkdm",
 	.class		= &dm81xx_gpio_hwmod_class,
+	.flags		= HWMOD_INIT_NO_RESET,
 	.main_clk	= "sysclk6_ck",
 	.prcm = {
 		.omap4 = {
@@ -490,6 +492,7 @@ static struct omap_hwmod dm81xx_gpio2_hwmod = {
 	.clkdm_name	= "alwon_l3s_clkdm",
 	.class		= &dm81xx_gpio_hwmod_class,
 	.main_clk	= "sysclk6_ck",
+	.flags		= HWMOD_INIT_NO_RESET,
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = DM81XX_CM_ALWON_GPIO_1_CLKCTRL,
