@@ -48,7 +48,16 @@ struct reset_controller_dev {
 	unsigned int nr_resets;
 };
 
+#if IS_ENABLED(CONFIG_RESET_CONTROLLER)
 int reset_controller_register(struct reset_controller_dev *rcdev);
 void reset_controller_unregister(struct reset_controller_dev *rcdev);
+#else
+static inline int reset_controller_register(struct reset_controller_dev *r)
+{
+	return -EINVAL;
+}
 
+static inline void reset_controller_unregister(struct reset_controller_dev *r)
+{
+}
 #endif
