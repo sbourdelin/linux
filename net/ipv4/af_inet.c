@@ -1203,6 +1203,7 @@ static struct sk_buff *inet_gso_segment(struct sk_buff *skb,
 	int nhoff;
 	int ihl;
 	int id;
+	bool need_xfrm = skb->recirc;
 
 	if (unlikely(skb_shinfo(skb)->gso_type &
 		     ~(SKB_GSO_TCPV4 |
@@ -1254,14 +1255,22 @@ static struct sk_buff *inet_gso_segment(struct sk_buff *skb,
 		udpfrag = proto == IPPROTO_UDP && !skb->encapsulation;
 
 	ops = rcu_dereference(inet_offloads[proto]);
-	if (likely(ops && ops->callbacks.gso_segment))
+	if (likely(ops && ops->callbacks.gso_segment)) {
+		/* tcp_gso_segment gets called here. It will add the
+		 * XFRM by calling xfrm_output_one->esp_output.
+		 * We will move things around to make space for the	
+		 * esp header in xfrm4_mode_transport.c (for transport
+		 * mode- this is in xfrm4_transport_output_gso() 
+		 */
 		segs = ops->callbacks.gso_segment(skb, features);
+	}
 
 	if (IS_ERR_OR_NULL(segs))
 		goto out;
 
 	skb = segs;
 	do {
+		nhoff = skb_network_header(skb) - skb_mac_header(skb);
 		iph = (struct iphdr *)(skb_mac_header(skb) + nhoff);
 		if (udpfrag) {
 			iph->id = htons(id);

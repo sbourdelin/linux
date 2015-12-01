@@ -50,7 +50,7 @@ static struct dst_entry *skb_dst_pop(struct sk_buff *skb)
 	return child;
 }
 
-static int xfrm_output_one(struct sk_buff *skb, int err)
+int xfrm_output_one(struct sk_buff *skb, int err)
 {
 	struct dst_entry *dst = skb_dst(skb);
 	struct xfrm_state *x = dst->xfrm;
@@ -128,6 +128,7 @@ error_nolock:
 out:
 	return err;
 }
+EXPORT_SYMBOL_GPL(xfrm_output_one);
 
 int xfrm_output_resume(struct sk_buff *skb, int err)
 {

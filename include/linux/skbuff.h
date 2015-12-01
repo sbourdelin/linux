@@ -593,8 +593,8 @@ struct sk_buff {
 				fclone:2,
 				peeked:1,
 				head_frag:1,
-				xmit_more:1;
-	/* one bit hole */
+				xmit_more:1,
+				recirc:1; /* uses one bit hole */
 	kmemcheck_bitfield_end(flags1);
 
 	/* fields enclosed in headers_start/headers_end are copied
@@ -3576,6 +3576,8 @@ static inline unsigned int skb_gso_network_seglen(const struct sk_buff *skb)
 			       skb_network_header(skb);
 	return hdr_len + skb_gso_transport_seglen(skb);
 }
+
+#define XFRM_GSO 1 /* use this for now to quickly toggle back to baseline */
 
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

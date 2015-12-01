@@ -270,10 +270,14 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 #if defined(CONFIG_NETFILTER) && defined(CONFIG_XFRM)
 	/* Policy lookup after SNAT yielded a new policy */
 	if (skb_dst(skb)->xfrm) {
+		if (sk_can_gso(sk) && skb_is_gso(skb) &&
+		    sk->sk_gso_type == SKB_GSO_TCPV4)
+			goto xfrm_gso;
 		IPCB(skb)->flags |= IPSKB_REROUTED;
 		return dst_output(net, sk, skb);
 	}
 #endif
+xfrm_gso:
 	mtu = ip_skb_dst_mtu(skb);
 	if (skb_is_gso(skb))
 		return ip_finish_output_gso(net, sk, skb, mtu);

@@ -13,6 +13,7 @@
 #include <linux/skbuff.h>
 #include <net/tcp.h>
 #include <net/protocol.h>
+#include <net/xfrm.h>
 
 static void tcp_gso_tstamp(struct sk_buff *skb, unsigned int ts_seq,
 			   unsigned int seq, unsigned int mss)
@@ -51,6 +52,49 @@ static struct sk_buff *tcp4_gso_segment(struct sk_buff *skb,
 	return tcp_gso_segment(skb, features);
 }
 
+#ifdef XFRM_GSO
+static int add_xfrm_post_gso(struct sk_buff *skb)
+{
+	struct xfrm_state *x = skb_dst(skb)->xfrm;
+	int err;
+
+	if (!x)	 {
+		skb->recirc = 0;
+		return 0;
+	}
+	memset(IPCB(skb), 0, sizeof(*IPCB(skb)));
+
+	/* XXX sub-optimal stuff.
+	 * at this point ip_summed is CHECKSUM_PARTIAL. This bit
+	 * should be optimized- we should not be doing this again.
+	 * For now, just use ethool to set tx off rx off, and let
+	 * the rest of the GSO logic compute the checksum efficiently
+	 */
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		err = skb_checksum_help(skb);
+		/* at this point ip_summed is 0 */
+
+		if (err) {
+			kfree_skb(skb);
+			return err;
+		}
+        }
+	err = 1;
+	skb->recirc = 1;
+	err = xfrm_output_one(skb, err);
+	WARN_ON(err != 0);
+
+	/* reset all the abuse */
+	skb->recirc = 0;
+	skb->mac_header = skb->network_header - 14;
+	skb->transport_header += x->props.header_len;
+	__skb_push(skb, 14); 
+
+	skb_dst_drop(skb);
+	return err;
+}
+#endif /* XFRM_GSO */
+
 struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
 				netdev_features_t features)
 {
@@ -65,6 +109,9 @@ struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
 	struct sk_buff *gso_skb = skb;
 	__sum16 newcheck;
 	bool ooo_okay, copy_destructor;
+#ifdef XFRM_GSO
+	bool need_xfrm = (skb->recirc == 1);
+#endif
 
 	th = tcp_hdr(skb);
 	thlen = th->doff * 4;
@@ -113,6 +160,7 @@ struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
 	skb->ooo_okay = 0;
 
 	segs = skb_segment(skb, features);
+	skb->recirc = 0;
 	if (IS_ERR(segs))
 		goto out;
 
@@ -172,6 +220,14 @@ struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
 	if (skb->ip_summed != CHECKSUM_PARTIAL)
 		th->check = gso_make_checksum(skb, ~th->check);
 out:
+#ifdef XFRM_GSO
+	if (need_xfrm) {
+		struct sk_buff *nskb;
+
+		for (nskb = segs; nskb; nskb = nskb->next)
+			add_xfrm_post_gso(nskb);
+	}
+#endif
 	return segs;
 }
 

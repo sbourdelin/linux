@@ -98,6 +98,15 @@ static int __xfrm4_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 
 int xfrm4_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
+#ifdef XFRM_GSO
+	if (sk_can_gso(sk) && sk->sk_gso_type == SKB_GSO_TCPV4 &&
+	     skb_is_gso(skb)) {
+		BUG_ON(IPCB(skb)->flags & IPSKB_REROUTED);
+		skb->recirc = 1;
+		return (ip_output(net, sk, skb));
+	}
+#endif /* XFRM_GSO */
+
 	return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,
 			    net, sk, skb, NULL, skb_dst(skb)->dev,
 			    __xfrm4_output,

@@ -2807,7 +2807,7 @@ out_null:
 
 struct sk_buff *validate_xmit_skb_list(struct sk_buff *skb, struct net_device *dev)
 {
-	struct sk_buff *next, *head = NULL, *tail;
+	struct sk_buff *next, *head = NULL, *tail = NULL;
 
 	for (; skb != NULL; skb = next) {
 		next = skb->next;
@@ -3089,10 +3089,12 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 	/* If device/qdisc don't need skb->dst, release it right now while
 	 * its hot in this cpu cache.
 	 */
-	if (dev->priv_flags & IFF_XMIT_DST_RELEASE)
+	if ((dev->priv_flags & IFF_XMIT_DST_RELEASE) &&
+	    !skb->recirc) {
 		skb_dst_drop(skb);
-	else
+	} else {
 		skb_dst_force(skb);
+	}
 
 #ifdef CONFIG_NET_SWITCHDEV
 	/* Don't forward if offload device already forwarded */
