@@ -26,6 +26,7 @@
 #include <asm/div64.h>
 #include <asm/x86_init.h>
 #include <asm/hypervisor.h>
+#include <asm/vmware.h>
 
 #define CPUID_VMWARE_INFO_LEAF	0x40000000
 #define VMWARE_HYPERVISOR_MAGIC	0x564D5868
@@ -37,13 +38,14 @@
 #define VMWARE_PORT_CMD_LEGACY_X2APIC	3
 #define VMWARE_PORT_CMD_VCPU_RESERVED	31
 
-#define VMWARE_PORT(cmd, eax, ebx, ecx, edx)				\
-	__asm__("inl (%%dx)" :						\
-			"=a"(eax), "=c"(ecx), "=d"(edx), "=b"(ebx) :	\
-			"0"(VMWARE_HYPERVISOR_MAGIC),			\
-			"1"(VMWARE_PORT_CMD_##cmd),			\
-			"2"(VMWARE_HYPERVISOR_PORT), "3"(UINT_MAX) :	\
-			"memory");
+#define VMWARE_PORT(cmd, eax, ebx, ecx, edx)				  \
+({									  \
+	unsigned long __si = 0, __di = 0;                                 \
+	VMW_PORT(UINT_MAX, VMWARE_PORT_CMD_##cmd, VMWARE_HYPERVISOR_PORT, \
+		 VMWARE_HYPERVISOR_MAGIC,                                 \
+		 eax, ebx, ecx, edx, __si, __di);                         \
+})
+
 
 static inline int __vmware_platform(void)
 {
