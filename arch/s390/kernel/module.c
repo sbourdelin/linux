@@ -51,6 +51,9 @@ void *module_alloc(unsigned long size)
 
 void module_arch_freeing_init(struct module *mod)
 {
+	if (mod->klp)
+		return;
+
 	vfree(mod->arch.syminfo);
 	mod->arch.syminfo = NULL;
 }
@@ -420,12 +423,18 @@ int apply_relocate_add(Elf_Shdr *sechdrs, const char *strtab,
 	return 0;
 }
 
+void module_arch_cleanup(struct module *mod)
+{
+	if (mod->klp) {
+		vfree(mod->arch.syminfo);
+		mod->arch.syminfo = NULL;
+	}
+}
+
 int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
 	jump_label_apply_nops(me);
-	vfree(me->arch.syminfo);
-	me->arch.syminfo = NULL;
 	return 0;
 }
