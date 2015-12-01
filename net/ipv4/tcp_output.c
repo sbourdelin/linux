@@ -2894,6 +2894,7 @@ void tcp_send_active_reset(struct sock *sk, gfp_t priority)
 
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_OUTRSTS);
 }
+EXPORT_SYMBOL_GPL(tcp_send_active_reset);
 
 /* Send a crossed SYN-ACK during socket establishment.
  * WARNING: This routine must only be called when we have already sent
