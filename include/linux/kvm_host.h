@@ -281,6 +281,13 @@ struct kvm_vcpu {
 	} spin_loop;
 #endif
 	bool preempted;
+
+	/*
+	 * IRQ pending to the userspace on this CPU.
+	 * Currently we support only one slot, used only by ARM architecture.
+	 */
+	const struct kvm_irq_level *irq;
+
 	struct kvm_vcpu_arch arch;
 };
 

@@ -580,6 +580,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		if (signal_pending(current)) {
 			ret = -EINTR;
 			run->exit_reason = KVM_EXIT_INTR;
+		} else if (vcpu->irq) {
+			ret = 0;
+			run->exit_reason = KVM_EXIT_IRQ;
+			run->irq.irq = vcpu->irq->irq;
+			run->irq.level = vcpu->irq->level;
+			vcpu->irq = NULL;
 		}
 
 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
