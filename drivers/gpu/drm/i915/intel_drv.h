@@ -747,7 +747,11 @@ struct intel_dp {
 	i915_reg_t aux_ch_data_reg[5];
 	uint32_t DP;
 	int link_rate;
-	uint8_t lane_count;
+	uint8_t lane_count, old_lane_count;
+	uint8_t link_bw, old_link_bw;
+	uint8_t rate_select, old_rate_select;
+	int port_clock, old_port_clock;
+	int bpp, old_bpp;
 	bool has_audio;
 	enum hdmi_force_audio force_audio;
 	bool limited_color_range;
@@ -1237,6 +1241,7 @@ int intel_dp_sink_crc(struct intel_dp *intel_dp, u8 *crc);
 bool intel_dp_compute_config(struct intel_encoder *encoder,
 			     struct intel_crtc_state *pipe_config);
 bool intel_dp_is_edp(struct drm_device *dev, enum port port);
+bool intel_dp_get_dpcd(struct intel_dp *intel_dp);
 enum irqreturn intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port,
 				  bool long_hpd);
 void intel_edp_backlight_on(struct intel_dp *intel_dp);

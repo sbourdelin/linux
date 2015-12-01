@@ -82,9 +82,43 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,
 }
 
 static bool
+intel_dp_check_conf(struct intel_dp *intel_dp)
+{
+	if (intel_dp->link_bw != intel_dp->old_link_bw)
+		return false;
+	else if (intel_dp->lane_count != intel_dp->old_lane_count)
+		return false;
+	else if (intel_dp->rate_select != intel_dp->old_rate_select)
+		return false;
+	else if (intel_dp->port_clock != intel_dp->old_port_clock)
+		return false;
+	else if (intel_dp->bpp != intel_dp->old_bpp)
+		return false;
+	else
+		return true;
+}
+
+static bool
 intel_dp_reset_link_train(struct intel_dp *intel_dp,
 			uint8_t dp_train_pat)
 {
+	bool has_dpcd;
+	bool flt_supported = false;
+
+	has_dpcd = intel_dp_get_dpcd(intel_dp);
+
+	if (has_dpcd) {
+		if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11)
+			flt_supported = (intel_dp->dpcd[DP_MAX_DOWNSPREAD] &
+					 DP_NO_AUX_HANDSHAKE_LINK_TRAINING);
+	}
+
+	intel_dp->train_set_valid &= flt_supported;
+	intel_dp->train_set_valid &= intel_dp_check_conf(intel_dp);
+
+	DRM_DEBUG_KMS("fast link training enabled: %s\n",
+		      intel_dp->train_set_valid ? "true" : "false");
+
 	if (!intel_dp->train_set_valid)
 		memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp_set_signal_levels(intel_dp);
@@ -305,6 +339,11 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp)
 
 	if (channel_eq) {
 		intel_dp->train_set_valid = true;
+		intel_dp->old_link_bw = intel_dp->link_bw;
+		intel_dp->old_rate_select = intel_dp->rate_select;
+		intel_dp->old_lane_count = intel_dp->lane_count;
+		intel_dp->old_port_clock = intel_dp->port_clock;
+		intel_dp->old_bpp = intel_dp->bpp;
 		DRM_DEBUG_KMS("Channel EQ done. DP Training successful\n");
 	}
 }
