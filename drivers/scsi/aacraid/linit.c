@@ -1355,6 +1355,7 @@ static int aac_acquire_resources(struct aac_dev *dev)
 	int i, j;
 	int instance = dev->id;
 	const char *name = dev->name;
+	int vector = 0;
 	unsigned long status;
 	/*
 	 *	First clear out all interrupts.  Then enable the one's that we
@@ -1409,9 +1410,31 @@ static int aac_acquire_resources(struct aac_dev *dev)
 	}
 
 	aac_adapter_enable_int(dev);
+	/*max msix may change  after EEH
+	 * Re-assign vectors to fibs
+	 */
+	 for (i = 0;
+		i < (dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB);
+		i++) {
+		if ((dev->max_msix == 1) ||
+		   (i > ((dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB - 1)
+			- dev->vector_cap))) {
+			dev->fibs[i].vector_no = 0;
+		} else {
+			dev->fibs[i].vector_no = vector;
+			vector++;
+			if (vector == dev->max_msix)
+				vector = 1;
+		}
+	}
 
-	if (!dev->sync_mode)
+	if (!dev->sync_mode) {
+		/* After EEH recovery or suspend resume, max_msix count
+		 * may change, therfore updating in init as well.
+		 */
 		aac_adapter_start(dev);
+		dev->init->Sa_MSIXVectors = cpu_to_le32(dev->max_msix);
+	}
 	return 0;
 
 error_iounmap:
