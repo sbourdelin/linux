@@ -156,10 +156,53 @@ int aac_fib_setup(struct aac_dev * dev)
 	 */
 	dev->fibs[dev->scsi_host_ptr->can_queue + AAC_NUM_MGT_FIB - 1].next = NULL;
 	/*
-	 *	Enable this to debug out of queue space
-	 */
-	dev->free_fib = &dev->fibs[0];
+	*	Set 8 fibs aside for management tools
+	*/
+	dev->free_fib = &dev->fibs[dev->scsi_host_ptr->can_queue];
 	return 0;
+}
+
+/**
+ *	aac_fib_alloc	-	allocate a fib
+ *	@dev: Adapter to allocate the fib for
+ *
+ *	Allocate a fib from the adapter fib pool using tags
+ *	from the blk layer.
+ */
+
+struct fib *aac_fib_alloc_tag(struct aac_dev *dev, struct scsi_cmnd *scmd)
+{
+	struct fib *fibptr;
+
+	fibptr = &dev->fibs[scmd->request->tag];
+	/*
+	 *	Set the proper node type code and node byte size
+	 */
+	fibptr->type = FSAFS_NTC_FIB_CONTEXT;
+	fibptr->size = sizeof(struct fib);
+	/*
+	 *	Null out fields that depend on being zero at the start of
+	 *	each I/O
+	 */
+	fibptr->hw_fib_va->header.XferState = 0;
+	fibptr->flags = 0;
+	fibptr->callback = NULL;
+	fibptr->callback_data = NULL;
+
+	return fibptr;
+}
+
+/**
+ *	aac_fib_free_tag	free a fib
+ *	@fibptr: fib to free up
+ *
+ *	Placeholder to free tag allocated fibs
+ *	Does not do anything
+ */
+
+void aac_fib_free_tag(struct fib *fibptr)
+{
+	(void)fibptr;
 }
 
 /**
