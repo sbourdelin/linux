@@ -128,15 +128,17 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
 	int ret;
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 
-	BUG_ON(!vgic_initialized(vcpu->kvm));
-
 	timer->irq.level = new_level;
 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
 				   timer->irq.level);
-	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-					 timer->map,
-					 timer->irq.level);
-	WARN_ON(ret);
+	if (irqchip_in_kernel(vcpu->kvm)) {
+		ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+						 timer->map,
+						 timer->irq.level);
+		WARN_ON(ret);
+	} else {
+		vcpu->irq = &timer->irq;
+	}
 }
 
 /*
@@ -149,12 +151,12 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 
 	/*
 	 * If userspace modified the timer registers via SET_ONE_REG before
-	 * the vgic was initialized, we mustn't set the timer->irq.level value
+	 * the timer was initialized, we mustn't set the timer->irq.level value
 	 * because the guest would never see the interrupt.  Instead wait
 	 * until we call this function from kvm_timer_flush_hwstate.
 	 */
-	if (!vgic_initialized(vcpu->kvm))
-	    return;
+	if (!vcpu->kvm->arch.timer.enabled)
+		return;
 
 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
 		kvm_timer_update_irq(vcpu, !timer->irq.level);
@@ -237,7 +239,8 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
 	* to ensure that hardware interrupts from the timer triggers a guest
 	* exit.
 	*/
-	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->map))
+	if (timer->irq.level || (irqchip_in_kernel(vcpu->kvm) &&
+				 kvm_vgic_map_is_active(vcpu, timer->map)))
 		phys_active = true;
 	else
 		phys_active = false;
