@@ -315,6 +315,11 @@ MODULE_PARM_DESC(wwn, "Select a WWN type for the arrays:\n"
 	"\t1 - Array Meta Data Signature (default)\n"
 	"\t2 - Adapter Serial Number");
 
+int aac_disable_device_id_wildcards;
+module_param_named(disable_device_id_wildcards,
+	aac_disable_device_id_wildcards, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(disable_device_id_wildcards,
+	"Disable device ID wildcards");
 
 static inline int aac_valid_context(struct scsi_cmnd *scsicmd,
 		struct fib *fibptr) {

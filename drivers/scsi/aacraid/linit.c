@@ -1135,6 +1135,11 @@ static int aac_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	u64 dmamask;
 	extern int aac_sync_mode;
 
+	if (aac_disable_device_id_wildcards &&
+		id->subvendor == PCI_ANY_ID &&
+		id->subdevice == PCI_ANY_ID)
+		return -ENODEV;
+
 	/*
 	 * Only series 7 needs freset.
 	 */
