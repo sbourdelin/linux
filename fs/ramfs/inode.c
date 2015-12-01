@@ -257,7 +257,7 @@ static struct file_system_type ramfs_fs_type = {
 
 int __init init_ramfs_fs(void)
 {
-	static unsigned long once;
+	static unsigned long once __initdata;
 
 	if (test_and_set_bit(0, &once))
 		return 0;
