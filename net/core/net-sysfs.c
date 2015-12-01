@@ -1239,12 +1239,50 @@ static struct netdev_queue_attribute xps_cpus_attribute =
     __ATTR(xps_cpus, S_IRUGO | S_IWUSR, show_xps_map, store_xps_map);
 #endif /* CONFIG_XPS */
 
+static ssize_t tx_usecs_show(struct netdev_queue *queue,
+			     struct netdev_queue_attribute *attr,
+			     char *buf)
+{
+	struct net_device *dev = queue->dev;
+	int index = queue - dev->_tx;
+	u32 val;
+
+	if (dev->netdev_ops->ndo_get_per_queue_tx_usecs) {
+		val = dev->netdev_ops->ndo_get_per_queue_tx_usecs(dev, index);
+		return sprintf(buf, "%u\n", val);
+	}
+
+	return sprintf(buf, "N/A\n");
+}
+
+static ssize_t tx_usecs_store(struct netdev_queue *queue,
+			      struct netdev_queue_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct net_device *dev = queue->dev;
+	int index = queue - dev->_tx;
+	u32 val, ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret < 0)
+		return -EINVAL;
+
+	if (dev->netdev_ops->ndo_set_per_queue_tx_usecs)
+		dev->netdev_ops->ndo_set_per_queue_tx_usecs(dev, index, val);
+
+	return len;
+}
+
+static struct netdev_queue_attribute tx_usecs_attribute =
+    __ATTR(tx_usecs, S_IRUGO | S_IWUSR, tx_usecs_show, tx_usecs_store);
+
 static struct attribute *netdev_queue_default_attrs[] = {
 	&queue_trans_timeout.attr,
 #ifdef CONFIG_XPS
 	&xps_cpus_attribute.attr,
 	&queue_tx_maxrate.attr,
 #endif
+	&tx_usecs_attribute.attr,
 	NULL
 };
 

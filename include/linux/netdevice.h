@@ -1059,6 +1059,10 @@ typedef u16 (*select_queue_fallback_t)(struct net_device *dev,
  *	This function is used to get egress tunnel information for given skb.
  *	This is useful for retrieving outer tunnel header parameters while
  *	sampling packet.
+ * void (*ndo_set_per_queue_tx_usecs)(struct net_device *dev,
+ * 				      int index, u32 val);
+ * void (*ndo_get_per_queue_tx_usecs)(struct net_device *dev, int index);
+ * 	This function is used to set/get per queue coalesce parameter tx_usecs.
  *
  */
 struct net_device_ops {
@@ -1236,6 +1240,10 @@ struct net_device_ops {
 							 bool proto_down);
 	int			(*ndo_fill_metadata_dst)(struct net_device *dev,
 						       struct sk_buff *skb);
+	void			(*ndo_set_per_queue_tx_usecs)(struct net_device *dev,
+							      int index, u32 val);
+	u32			(*ndo_get_per_queue_tx_usecs)(struct net_device *dev,
+							      int index);
 };
 
 /**

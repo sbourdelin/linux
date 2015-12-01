@@ -431,6 +431,18 @@ a max-rate attribute is supported, by setting a Mbps value to
 
 A value of zero means disabled, and this is the default.
 
+Per Queue interrupt moderation:
+=============================
+
+The interrupt moderation mechanism, which implemented by HW, employs
+a series of timers to limit the number of interrupts it generates.
+TX queue absolute delay timer can be set to a microseconds value with
+
+/sys/class/net/<dev>/queues/tx-<n>/tx_usecs
+
+For the device which doesn't support per queue interrupt moderation,
+it shows "N/A".
+
 Further Information
 ===================
 RPS and RFS were introduced in kernel 2.6.35. XPS was incorporated into
