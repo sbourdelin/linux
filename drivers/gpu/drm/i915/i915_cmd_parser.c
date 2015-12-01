@@ -945,6 +945,7 @@ static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,
 		drm_clflush_virt_range(src, batch_len);
 
 	memcpy(dst, src, batch_len);
+	dest_obj->dirty = 1;
 
 unmap_src:
 	vunmap(src_base);

@@ -391,6 +391,7 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 	}
 
 	kunmap_atomic(reg_state);
+	ctx_obj->dirty = 1;
 
 	return 0;
 }
@@ -1030,7 +1031,7 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	if (ret)
 		goto unpin_ctx_obj;
 
-	ctx_obj->dirty = true;
+	ctx_obj->dirty = 1;
 
 	/* Invalidate GuC TLB. */
 	if (i915.enable_guc_submission)
@@ -1461,6 +1462,8 @@ static int intel_init_workaround_bb(struct intel_engine_cs *ring)
 
 out:
 	kunmap_atomic(batch);
+	wa_ctx->obj->dirty = 1;
+
 	if (ret)
 		lrc_destroy_wa_ctx_obj(ring);
 
@@ -2536,6 +2539,7 @@ void intel_lr_context_reset(struct drm_device *dev,
 		reg_state[CTX_RING_TAIL+1] = 0;
 
 		kunmap_atomic(reg_state);
+		ctx_obj->dirty = 1;
 
 		ringbuf->head = 0;
 		ringbuf->tail = 0;
