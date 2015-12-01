@@ -1,0 +1,27 @@
+Device-Tree bindings for chromeos-firmware.c.
+
+Required properties:
+	- compatible = "google,gpio-firmware";
+
+Each signal is represented as a sub-node of "chromeos_firmware":
+Subnode properties:
+
+	- gpios: OF device-tree gpio specification.
+
+Example nodes:
+
+	chromeos_firmware {
+		compatible = "google,gpio-firmware";
+
+		write-protect {
+			gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
+		};
+
+		developer-switch {
+			gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
+		};
+
+		recovery-switch {
+			gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
+		};
+	};
