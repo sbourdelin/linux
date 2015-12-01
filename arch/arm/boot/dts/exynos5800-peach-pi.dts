@@ -53,6 +53,25 @@
 		};
 	};
 
+	chromeos-firmware {
+		compatible = "google,gpio-firmware";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&wp_gpio &dev_mode &rec_mode>;
+
+		write-protect {
+			gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
+		};
+
+		developer-switch {
+			gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
+		};
+
+		recovery-switch {
+			gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
+		};
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 
@@ -731,6 +750,13 @@
 		samsung,pin-val = <0>;
 	};
 
+	rec_mode: rec-mode {
+		samsung,pins = "gpx0-7";
+		samsung,pin-function = <0>;
+		samsung,pin-pud = <0>;
+		samsung,pin-drv = <0>;
+	};
+
 	tpm_irq: tpm-irq {
 		samsung,pins = "gpx1-0";
 		samsung,pin-function = <0>;
@@ -752,6 +778,13 @@
 		samsung,pin-drv = <0>;
 	};
 
+	dev_mode: dev-mode {
+		samsung,pins = "gpx1-3";
+		samsung,pin-function = <0>;
+		samsung,pin-pud = <3>;
+		samsung,pin-drv = <0>;
+	};
+
 	ec_irq: ec-irq {
 		samsung,pins = "gpx1-5";
 		samsung,pin-function = <0>;
@@ -770,6 +803,13 @@
 		samsung,pins = "gpx2-6";
 		samsung,pin-function = <0>;
 		samsung,pin-pud = <3>;
+		samsung,pin-drv = <0>;
+	};
+
+	wp_gpio: wp_gpio {
+		samsung,pins = "gpx3-0";
+		samsung,pin-function = <0>;
+		samsung,pin-pud = <0>;
 		samsung,pin-drv = <0>;
 	};
 
