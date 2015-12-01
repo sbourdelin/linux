@@ -2913,13 +2913,31 @@ static void semaphore_clear_deadlocks(struct drm_i915_private *dev_priv)
 		ring->hangcheck.deadlock = 0;
 }
 
-static enum intel_ring_hangcheck_action
-ring_stuck(struct intel_engine_cs *ring, u64 acthd)
+static bool subunits_stuck(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	u32 tmp;
+	int i;
+	u32 instdone[I915_NUM_INSTDONE_REG];
+	bool stuck;
 
+	if (ring->id != RCS)
+		return true;
+
+	i915_get_extra_instdone(ring->dev, instdone);
+
+	stuck = true;
+	for (i = 0; i < I915_NUM_INSTDONE_REG; i++) {
+		if (instdone[i] != ring->hangcheck.instdone[i])
+			stuck = false;
+
+		ring->hangcheck.instdone[i] = instdone[i];
+	}
+
+	return stuck;
+}
+
+static enum intel_ring_hangcheck_action
+head_stuck(struct intel_engine_cs *ring, u64 acthd)
+{
 	if (acthd != ring->hangcheck.acthd) {
 		if (acthd > ring->hangcheck.max_acthd) {
 			ring->hangcheck.max_acthd = acthd;
@@ -2928,6 +2946,24 @@ ring_stuck(struct intel_engine_cs *ring, u64 acthd)
 
 		return HANGCHECK_ACTIVE_LOOP;
 	}
+
+	if (!subunits_stuck(ring))
+		return HANGCHECK_ACTIVE_LOOP;
+
+	return HANGCHECK_HUNG;
+}
+
+static enum intel_ring_hangcheck_action
+ring_stuck(struct intel_engine_cs *ring, u64 acthd)
+{
+	struct drm_device *dev = ring->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	enum intel_ring_hangcheck_action ha;
+	u32 tmp;
+
+	ha = head_stuck(ring, acthd);
+	if (ha != HANGCHECK_HUNG)
+		return ha;
 
 	if (IS_GEN2(dev))
 		return HANGCHECK_HUNG;
@@ -3064,6 +3100,9 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 				ring->hangcheck.score--;
 
 			ring->hangcheck.acthd = ring->hangcheck.max_acthd = 0;
+
+			memset(ring->hangcheck.instdone, 0,
+			       sizeof(ring->hangcheck.instdone));
 		}
 
 		ring->hangcheck.seqno = seqno;
