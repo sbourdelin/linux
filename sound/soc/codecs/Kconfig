@@ -39,6 +39,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_AK4613 if I2C
 	select SND_SOC_AK4641 if I2C
 	select SND_SOC_AK4642 if I2C
+	select SND_SOC_MAX98926 if I2C
 	select SND_SOC_AK4671 if I2C
 	select SND_SOC_AK5386
 	select SND_SOC_ALC5623 if I2C
@@ -339,6 +340,10 @@ config SND_SOC_AK4613
 
 config SND_SOC_AK4641
 	tristate
+
+config SND_SOC_MAX98926
+	tristate "MAX98926 CODEC"
+	depends on I2C
 
 config SND_SOC_AK4642
 	tristate "AKM AK4642 CODEC"
