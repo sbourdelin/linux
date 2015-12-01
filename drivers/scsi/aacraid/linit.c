@@ -1454,6 +1454,7 @@ static int aac_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct aac_dev *aac = (struct aac_dev *)shost->hostdata;
 
 	scsi_block_requests(shost);
+	aac->adapter_shutdown = 1;
 	aac_send_shutdown(aac);
 
 	aac_release_resources(aac);
