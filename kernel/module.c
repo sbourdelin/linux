@@ -1984,6 +1984,13 @@ static void unset_module_core_ro_nx(struct module *mod) { }
 static void unset_module_init_ro_nx(struct module *mod) { }
 #endif
 
+static void free_module_elf(struct module *mod)
+{
+	kfree(mod->hdr);
+	kfree(mod->sechdrs);
+	kfree(mod->secstrings);
+}
+
 void __weak module_memfree(void *module_region)
 {
 	vfree(module_region);
@@ -2021,6 +2028,9 @@ static void free_module(struct module *mod)
 
 	/* Free any allocated parameters. */
 	destroy_params(mod->kp, mod->num_kp);
+
+	/* Free Elf information if it was saved */
+	free_module_elf(mod);
 
 	/* Now we can delete it from the lists */
 	mutex_lock(&module_mutex);
@@ -2137,6 +2147,10 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
 			       (long)sym[i].st_value);
 			break;
 
+		case SHN_LIVEPATCH:
+			/* klp symbols are resolved by livepatch */
+			break;
+
 		case SHN_UNDEF:
 			ksym = resolve_symbol_wait(mod, info, name);
 			/* Ok if resolved.  */
@@ -2183,6 +2197,10 @@ static int apply_relocations(struct module *mod, const struct load_info *info)
 
 		/* Don't bother with non-allocated sections */
 		if (!(info->sechdrs[infosec].sh_flags & SHF_ALLOC))
+			continue;
+
+		/* klp relocation sections are applied by livepatch */
+		if (info->sechdrs[i].sh_flags & SHF_RELA_LIVEPATCH)
 			continue;
 
 		if (info->sechdrs[i].sh_type == SHT_REL)
@@ -2393,6 +2411,11 @@ static char elf_type(const Elf_Sym *sym, const struct load_info *info)
 {
 	const Elf_Shdr *sechdrs = info->sechdrs;
 
+	if (ELF_ST_BIND(sym->st_info) == STB_LIVEPATCH_EXT)
+		return 'K';
+	if (sym->st_shndx == SHN_LIVEPATCH)
+		return 'k';
+
 	if (ELF_ST_BIND(sym->st_info) == STB_WEAK) {
 		if (ELF_ST_TYPE(sym->st_info) == STT_OBJECT)
 			return 'v';
@@ -2475,7 +2498,7 @@ static void layout_symtab(struct module *mod, struct load_info *info)
 
 	/* Compute total space required for the core symbols' strtab. */
 	for (ndst = i = 0; i < nsrc; i++) {
-		if (i == 0 ||
+		if (i == 0 || mod->klp ||
 		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum)) {
 			strtab_size += strlen(&info->strtab[src[i].st_name])+1;
 			ndst++;
@@ -2517,7 +2540,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
 	mod->core_strtab = s = mod->module_core + info->stroffs;
 	src = mod->symtab;
 	for (ndst = i = 0; i < mod->num_symtab; i++) {
-		if (i == 0 ||
+		if (i == 0 || mod->klp ||
 		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum)) {
 			dst[ndst] = src[i];
 			dst[ndst++].st_name = s - mod->core_strtab;
@@ -2637,6 +2660,64 @@ static int elf_header_check(struct load_info *info)
 
 	return 0;
 }
+
+/*
+ * copy_module_elf - preserve Elf information about a module
+ */
+static int copy_module_elf(struct module *mod, struct load_info *info)
+{
+	unsigned int size;
+	int ret = 0;
+	Elf_Shdr *symsect;
+
+	/* Elf header */
+	size = sizeof(Elf_Ehdr);
+	mod->hdr = kzalloc(size, GFP_KERNEL);
+	if (mod->hdr == NULL) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	memcpy(mod->hdr, info->hdr, size);
+
+	/* Elf section header table */
+	size = sizeof(Elf_Shdr) * info->hdr->e_shnum;
+	mod->sechdrs = kzalloc(size, GFP_KERNEL);
+	if (mod->sechdrs == NULL) {
+		ret = -ENOMEM;
+		goto free_hdr;
+	}
+	memcpy(mod->sechdrs, info->sechdrs, size);
+
+	/* Elf section name string table */
+	size = info->sechdrs[info->hdr->e_shstrndx].sh_size;
+	mod->secstrings = kzalloc(size, GFP_KERNEL);
+	if (mod->secstrings == NULL) {
+		ret = -ENOMEM;
+		goto free_sechdrs;
+	}
+	memcpy(mod->secstrings, info->secstrings, size);
+
+	/* Elf section indices */
+	memcpy(&mod->index, &info->index, sizeof(info->index));
+
+	/*
+	 * Update symtab's sh_addr to point to a valid
+	 * symbol table, as the temporary symtab in module
+	 * init memory will be freed
+	 */
+	symsect = mod->sechdrs + mod->index.sym;
+	symsect->sh_addr = (unsigned long)mod->core_symtab;
+
+	return ret;
+
+free_sechdrs:
+	kfree(mod->sechdrs);
+free_hdr:
+	kfree(mod->hdr);
+out:
+	return ret;
+}
+
 
 #define COPY_CHUNK_SIZE (16*PAGE_SIZE)
 
@@ -2865,6 +2946,9 @@ static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 		pr_warn("%s: module is from the staging directory, the quality "
 			"is unknown, you have been warned.\n", mod->name);
 	}
+
+	if (get_modinfo(info, "livepatch"))
+		mod->klp = true;
 
 	/* Set up license info based on the info section */
 	set_license(mod, get_modinfo(info, "license"));
@@ -3527,6 +3611,16 @@ static int load_module(struct load_info *info, const char __user *uargs,
 
 	/* Link in to syfs. */
 	err = mod_sysfs_setup(mod, info, mod->kp, mod->num_kp);
+	if (err < 0)
+		goto bug_cleanup;
+
+	/*
+	 * Save sechdrs, indices, and other data from info
+	 * in order to patch to-be-loaded modules.
+	 * Do not call free_copy() for livepatch modules.
+	 */
+	if (mod->klp)
+		err = copy_module_elf(mod, info);
 	if (err < 0)
 		goto bug_cleanup;
 

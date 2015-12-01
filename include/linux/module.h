@@ -425,6 +425,14 @@ struct module {
 
 	/* Notes attributes */
 	struct module_notes_attrs *notes_attrs;
+
+	/* Elf information (optionally saved) */
+	Elf_Ehdr *hdr;
+	Elf_Shdr *sechdrs;
+	char *secstrings;
+	struct {
+		unsigned int sym, str, mod, vers, info, pcpu;
+	} index;
 #endif
 
 	/* The command line arguments (may be mangled).  People like
@@ -461,6 +469,7 @@ struct module {
 #endif
 
 #ifdef CONFIG_LIVEPATCH
+	bool klp; /* Is this a livepatch module? */
 	bool klp_alive;
 #endif
 
