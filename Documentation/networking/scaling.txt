@@ -440,6 +440,10 @@ TX queue absolute delay timer can be set to a microseconds value with
 
 /sys/class/net/<dev>/queues/tx-<n>/tx_usecs
 
+RX queue absolute delay timer can be set to a microseconds value with
+
+/sys/class/net/<dev>/queues/rx-<n>/rx_usecs
+
 For the device which doesn't support per queue interrupt moderation,
 it shows "N/A".
 

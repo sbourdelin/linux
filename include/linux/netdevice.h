@@ -1063,6 +1063,10 @@ typedef u16 (*select_queue_fallback_t)(struct net_device *dev,
  * 				      int index, u32 val);
  * void (*ndo_get_per_queue_tx_usecs)(struct net_device *dev, int index);
  * 	This function is used to set/get per queue coalesce parameter tx_usecs.
+ * void (*ndo_set_per_queue_rx_usecs)(struct net_device *dev,
+ * 				      int index, u32 val);
+ * void (*ndo_get_per_queue_rx_usecs)(struct net_device *dev, int index);
+ * 	This function is used to set/get per queue coalesce parameter rx_usecs.
  *
  */
 struct net_device_ops {
@@ -1243,6 +1247,10 @@ struct net_device_ops {
 	void			(*ndo_set_per_queue_tx_usecs)(struct net_device *dev,
 							      int index, u32 val);
 	u32			(*ndo_get_per_queue_tx_usecs)(struct net_device *dev,
+							      int index);
+	void			(*ndo_set_per_queue_rx_usecs)(struct net_device *dev,
+							      int index, u32 val);
+	u32			(*ndo_get_per_queue_rx_usecs)(struct net_device *dev,
 							      int index);
 };
 

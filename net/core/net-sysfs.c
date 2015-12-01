@@ -831,11 +831,47 @@ static struct rx_queue_attribute rps_dev_flow_table_cnt_attribute =
 	    show_rps_dev_flow_table_cnt, store_rps_dev_flow_table_cnt);
 #endif /* CONFIG_RPS */
 
+static ssize_t rx_usecs_show(struct netdev_rx_queue *queue,
+			     struct rx_queue_attribute *attribute, char *buf)
+{
+	struct net_device *dev = queue->dev;
+	int index = queue - dev->_rx;
+	u32 val;
+
+	if (dev->netdev_ops->ndo_get_per_queue_rx_usecs) {
+		val = dev->netdev_ops->ndo_get_per_queue_rx_usecs(dev, index);
+		return sprintf(buf, "%u\n", val);
+	}
+	return sprintf(buf, "N/A\n");
+}
+
+static ssize_t rx_usecs_store(struct netdev_rx_queue *queue,
+			      struct rx_queue_attribute *attribute,
+			      const char *buf, size_t len)
+{
+	struct net_device *dev = queue->dev;
+	int index = queue - dev->_rx;
+	u32 val, ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret < 0)
+		return -EINVAL;
+
+	if (dev->netdev_ops->ndo_set_per_queue_rx_usecs)
+		dev->netdev_ops->ndo_set_per_queue_rx_usecs(dev, index, val);
+
+	return len;
+}
+
+static struct rx_queue_attribute rx_usecs_attribute =
+	__ATTR(rx_usecs, S_IRUGO | S_IWUSR, rx_usecs_show, rx_usecs_store);
+
 static struct attribute *rx_queue_default_attrs[] = {
 #ifdef CONFIG_RPS
 	&rps_cpus_attribute.attr,
 	&rps_dev_flow_table_cnt_attribute.attr,
 #endif
+	&rx_usecs_attribute.attr,
 	NULL
 };
 
