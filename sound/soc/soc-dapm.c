@@ -1817,12 +1817,9 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 			/* Supplies and micbiases only bring the
 			 * context up to STANDBY as unless something
 			 * else is active and passing audio they
-			 * generally don't require full power.  Signal
-			 * generators are virtual pins and have no
-			 * power impact themselves.
+			 * generally don't require full power.
 			 */
 			switch (w->id) {
-			case snd_soc_dapm_siggen:
 			case snd_soc_dapm_vmid:
 				break;
 			case snd_soc_dapm_supply:
@@ -3354,7 +3351,6 @@ snd_soc_dapm_new_control_unlocked(struct snd_soc_dapm_context *dapm,
 		w->power_check = dapm_generic_check_power;
 		break;
 	case snd_soc_dapm_vmid:
-	case snd_soc_dapm_siggen:
 		w->is_ep = SND_SOC_DAPM_EP_SOURCE;
 		w->power_check = dapm_always_on_check_power;
 		break;
