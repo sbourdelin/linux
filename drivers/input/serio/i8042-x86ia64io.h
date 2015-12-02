@@ -9,6 +9,7 @@
 
 #ifdef CONFIG_X86
 #include <asm/x86_init.h>
+#include <linux/acpi.h>
 #endif
 
 /*
@@ -1046,6 +1047,9 @@ static int __init i8042_platform_init(void)
 	u8 a20_on = 0xdf;
 	/* Just return if pre-detection shows no i8042 controller exist */
 	if (!x86_platform.i8042_detect())
+		return -ENODEV;
+
+	if (!(acpi_gbl_FADT.boot_flags & ACPI_FADT_8042))
 		return -ENODEV;
 #endif
 
