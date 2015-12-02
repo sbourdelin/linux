@@ -3080,6 +3080,60 @@ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
 	dwc2_set_param_hibernation(hsotg, params->hibernation);
 }
 
+/*
+ * Force host mode if not in host mode. Returns true if the mode was
+ * forced.
+ */
+static bool dwc2_force_host_if_needed(struct dwc2_hsotg *hsotg)
+{
+	u32 gusbcfg;
+
+	if (dwc2_is_host_mode(hsotg))
+		return false;
+
+	gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
+	gusbcfg &= ~GUSBCFG_FORCEDEVMODE;
+	gusbcfg |= GUSBCFG_FORCEHOSTMODE;
+	dwc2_writel(gusbcfg, hsotg->regs + GUSBCFG);
+	usleep_range(25000, 50000);
+
+	return true;
+}
+
+/*
+ * Force device mode if not in device mode. Returns true if the mode
+ * was forced.
+ */
+static bool dwc2_force_device_if_needed(struct dwc2_hsotg *hsotg)
+{
+	u32 gusbcfg;
+
+	if (dwc2_is_device_mode(hsotg))
+		return false;
+
+	gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
+	gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
+	gusbcfg |= GUSBCFG_FORCEDEVMODE;
+	dwc2_writel(gusbcfg, hsotg->regs + GUSBCFG);
+	usleep_range(25000, 50000);
+
+	return true;
+}
+
+/*
+ * Clears the force mode bits.
+ */
+static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
+{
+	u32 gusbcfg;
+
+	gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
+	gusbcfg &= ~GUSBCFG_FORCEHOSTMODE;
+	gusbcfg &= ~GUSBCFG_FORCEDEVMODE;
+	dwc2_writel(gusbcfg, hsotg->regs + GUSBCFG);
+	usleep_range(25000, 50000);
+}
+
 /**
  * During device initialization, read various hardware configuration
  * registers and interpret the contents.
