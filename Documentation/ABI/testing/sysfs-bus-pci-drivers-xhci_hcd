@@ -1,0 +1,23 @@
+What:		/sys/bus/pci/drivers/xhci_hcd/.../debug_port_state
+Date:		November 2015
+KernelVersion:	4.4.0
+Contact:	Lu Baolu <baolu.lu@linux.intel.com>
+Description:
+		This file is designed for users to check the state of a
+		USB3 debug port. On a machine which supports USB3 debug
+		port, this file will be created. Reading this file will
+		show the state (disabled, enabled or configured) of the
+		debug port. On a machine that doesn't support USB3 debug
+		port, this file doesn't exist.
+
+		The state of a debug port could be:
+		1) disabled: The debug port is not enabled and the root
+			port has been switched to xHCI host as a normal
+			root port.
+		2) enabled: The debug port is enabled. The debug port
+			has been assigned to debug capability. The debug
+			capability is able to handle the control requests
+			defined in USB3 spec.
+		3) configured: The debug port has been enumerated by the
+			debug host as a debug device. The debug port is
+			in use now.

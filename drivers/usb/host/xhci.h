@@ -1953,4 +1953,8 @@ struct xhci_input_control_ctx *xhci_get_input_control_ctx(struct xhci_container_
 struct xhci_slot_ctx *xhci_get_slot_ctx(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx);
 struct xhci_ep_ctx *xhci_get_ep_ctx(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx, unsigned int ep_index);
 
+/* xHCI sysfs interfaces */
+int xhci_sysfs_create_files(struct xhci_hcd *xhci);
+void xhci_sysfs_remove_files(struct xhci_hcd *xhci);
+
 #endif /* __LINUX_XHCI_HCD_H */
