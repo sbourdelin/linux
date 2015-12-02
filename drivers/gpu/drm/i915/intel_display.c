@@ -34,6 +34,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drmP.h>
 #include "intel_drv.h"
+#include "intel_dsi.h"
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_trace.h"
@@ -116,6 +117,15 @@ static void skylake_pfit_enable(struct intel_crtc *crtc);
 static void ironlake_pfit_disable(struct intel_crtc *crtc, bool force);
 static void ironlake_pfit_enable(struct intel_crtc *crtc);
 static void intel_modeset_setup_hw_state(struct drm_device *dev);
+static void bxt_get_ddi_pll(struct drm_i915_private *dev_priv,
+		enum port port,
+		struct intel_crtc_state *pipe_config);
+static void skylake_get_ddi_pll(struct drm_i915_private *dev_priv,
+		enum port port,
+		struct intel_crtc_state *pipe_config);
+static void haswell_get_ddi_pll(struct drm_i915_private *dev_priv,
+		enum port port,
+		struct intel_crtc_state *pipe_config);
 
 typedef struct {
 	int	min, max;
@@ -10685,6 +10695,33 @@ static void ironlake_pch_clock_get(struct intel_crtc *crtc,
 					 &pipe_config->fdi_m_n);
 }
 
+static void haswell_crtc_clock_get(struct intel_crtc *crtc,
+		struct intel_crtc_state *pipe_config)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_encoder *encoder = NULL;
+	enum port port;
+	bool is_dsi = intel_pipe_has_type(crtc, INTEL_OUTPUT_DSI);
+
+	for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
+		port = intel_ddi_get_encoder_port(encoder);
+		if (IS_BROXTON(dev) && is_dsi) {
+			pipe_config->port_clock = bxt_get_dsi_pclk(encoder,
+					pipe_config->pipe_bpp);
+			break;
+		}
+		if (IS_SKYLAKE(dev))
+			skylake_get_ddi_pll(dev_priv, port, pipe_config);
+		else if (IS_BROXTON(dev))
+			bxt_get_ddi_pll(dev_priv, port, pipe_config);
+		else
+			haswell_get_ddi_pll(dev_priv, port, pipe_config);
+
+		intel_ddi_clock_get(encoder, pipe_config);
+	}
+}
+
 /** Returns the currently programmed mode of the given pipe. */
 struct drm_display_mode *intel_crtc_mode_get(struct drm_device *dev,
 					     struct drm_crtc *crtc)
@@ -10699,6 +10736,7 @@ struct drm_display_mode *intel_crtc_mode_get(struct drm_device *dev,
 	int vtot = I915_READ(VTOTAL(cpu_transcoder));
 	int vsync = I915_READ(VSYNC(cpu_transcoder));
 	enum pipe pipe = intel_crtc->pipe;
+	bool is_dsi = intel_pipe_has_type(intel_crtc, INTEL_OUTPUT_DSI);
 
 	mode = kzalloc(sizeof(*mode), GFP_KERNEL);
 	if (!mode)
@@ -10716,17 +10754,37 @@ struct drm_display_mode *intel_crtc_mode_get(struct drm_device *dev,
 	pipe_config.dpll_hw_state.dpll = I915_READ(DPLL(pipe));
 	pipe_config.dpll_hw_state.fp0 = I915_READ(FP0(pipe));
 	pipe_config.dpll_hw_state.fp1 = I915_READ(FP1(pipe));
-	i9xx_crtc_clock_get(intel_crtc, &pipe_config);
+	if (HAS_DDI(dev) || INTEL_INFO(dev)->gen >= 9) {
+		haswell_crtc_clock_get(intel_crtc, &pipe_config);
+	} else {
+		i9xx_crtc_clock_get(intel_crtc, &pipe_config);
+	}
 
 	mode->clock = pipe_config.port_clock / pipe_config.pixel_multiplier;
-	mode->hdisplay = (htot & 0xffff) + 1;
 	mode->htotal = ((htot & 0xffff0000) >> 16) + 1;
 	mode->hsync_start = (hsync & 0xffff) + 1;
 	mode->hsync_end = ((hsync & 0xffff0000) >> 16) + 1;
-	mode->vdisplay = (vtot & 0xffff) + 1;
-	mode->vtotal = ((vtot & 0xffff0000) >> 16) + 1;
 	mode->vsync_start = (vsync & 0xffff) + 1;
 	mode->vsync_end = ((vsync & 0xffff0000) >> 16) + 1;
+	if (IS_BROXTON(dev) && is_dsi) {
+		struct intel_encoder *encoder;
+
+		for_each_encoder_on_crtc(dev, &intel_crtc->base, encoder) {
+			struct intel_dsi *intel_dsi =
+				enc_to_intel_dsi(&encoder->base);
+			enum port port;
+
+			for_each_dsi_port(port, intel_dsi->ports) {
+				mode->vtotal = I915_READ(BXT_MIPI_TRANS_VTOTAL(port));
+				mode->hdisplay = I915_READ(BXT_MIPI_TRANS_HACTIVE(port));
+				mode->vdisplay = I915_READ(BXT_MIPI_TRANS_VACTIVE(port));
+			}
+		}
+	} else {
+		mode->vtotal = ((vtot & 0xffff0000) >> 16) + 1;
+		mode->hdisplay = (htot & 0xffff) + 1;
+		mode->vdisplay = (vtot & 0xffff) + 1;
+	}
 
 	drm_mode_set_name(mode);
 
