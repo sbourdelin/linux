@@ -107,9 +107,10 @@ static struct vring_desc *alloc_indirect(struct virtqueue *_vq,
 	/*
 	 * We require lowmem mappings for the descriptors because
 	 * otherwise virt_to_phys will give us bogus addresses in the
-	 * virtqueue.
+	 * virtqueue. Access to high-priority reserves is preserved
+	 * if originally requested by GFP_ATOMIC.
 	 */
-	gfp &= ~(__GFP_HIGHMEM | __GFP_HIGH);
+	gfp &= ~__GFP_HIGHMEM;
 
 	desc = kmalloc(total_sg * sizeof(struct vring_desc), gfp);
 	if (!desc)
