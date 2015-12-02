@@ -1277,8 +1277,10 @@ static void ui_browser__hists_seek(struct ui_browser *browser,
 	 * Moves not relative to the first visible entry invalidates its
 	 * row_offset:
 	 */
-	h = rb_entry(browser->top, struct hist_entry, rb_node);
-	h->row_offset = 0;
+	if (browser->top) {
+		h = rb_entry(browser->top, struct hist_entry, rb_node);
+		h->row_offset = 0;
+	}
 
 	/*
 	 * Here we have to check if nd is expanded (+), if it is we can't go
@@ -1294,6 +1296,8 @@ static void ui_browser__hists_seek(struct ui_browser *browser,
 	 * and stop when we printed enough lines to fill the screen.
 	 */
 do_offset:
+	if (!nd)
+		return;
 	if (offset > 0) {
 		do {
 			h = rb_entry(nd, struct hist_entry, rb_node);
