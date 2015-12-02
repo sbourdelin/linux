@@ -14,6 +14,7 @@
 #include <asm/time.h>
 #include <asm/intel-mid.h>
 #include <asm/rtc.h>
+#include <asm/i8259.h>
 
 #ifdef CONFIG_X86_32
 /*
@@ -199,6 +200,10 @@ static __init int add_rtc_cmos(void)
 		return -ENODEV;
 	}
 #endif
+
+	/* RTC uses legacy IRQs. */
+	if (!nr_legacy_irqs())
+		return -ENODEV;
 
 	platform_device_register(&rtc_device);
 	dev_info(&rtc_device.dev,
