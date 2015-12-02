@@ -5473,6 +5473,9 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
+	if (sample_type & PERF_SAMPLE_SIZE)
+		perf_output_put(handle, header->size);
+
 	if (!event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
@@ -5592,6 +5595,9 @@ void perf_prepare_sample(struct perf_event_header *header,
 
 		header->size += size;
 	}
+
+	if (sample_type & PERF_SAMPLE_SIZE)
+		header->size += sizeof(u16);
 }
 
 void perf_event_output(struct perf_event *event,
