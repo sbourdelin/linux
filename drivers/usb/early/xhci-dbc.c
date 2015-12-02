@@ -1163,6 +1163,37 @@ static int xdbc_wait_until_dbc_configured(void)
 	return -ETIMEDOUT;
 }
 
+static int xdbc_wait_until_epstall_cleared(bool read)
+{
+	int timeout = 0;
+
+	if (read) {
+		do {
+			if (!(readl(&xdbcp->xdbc_reg->control) & CTRL_HIT)) {
+				xdbcp->in_ep_state = EP_RUNNING;
+
+				return 0;
+			}
+
+			xdbcp->in_ep_state = EP_HALTED;
+			xdbc_udelay(10);
+		} while (timeout++ < XDBC_LOOPS);
+	} else {
+		do {
+			if (!(readl(&xdbcp->xdbc_reg->control) & CTRL_HOT)) {
+				xdbcp->out_ep_state = EP_RUNNING;
+
+				return 0;
+			}
+
+			xdbcp->out_ep_state = EP_HALTED;
+			xdbc_udelay(10);
+		} while (timeout++ < XDBC_LOOPS);
+	}
+
+	return -ETIMEDOUT;
+}
+
 static int xdbc_bulk_transfer(void *data, int size, int loops, bool read)
 {
 	u64 addr;
@@ -1179,6 +1210,11 @@ static int xdbc_bulk_transfer(void *data, int size, int loops, bool read)
 
 	if (xdbc_wait_until_dbc_configured()) {
 		xdbc_trace("%s: hardware not ready\n", __func__);
+		return -EPERM;
+	}
+
+	if (xdbc_wait_until_epstall_cleared(read)) {
+		xdbc_trace("%s: endpoint not ready\n", __func__);
 		return -EPERM;
 	}
 
