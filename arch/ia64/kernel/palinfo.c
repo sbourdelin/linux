@@ -126,7 +126,7 @@ static const char *mem_attrib[]={
 static void bitvector_process(struct seq_file *m, u64 vector)
 {
 	int i,j;
-	static const char *units[]={ "", "K", "M", "G", "T" };
+	static const char *units[] = { "", "K", "M", "G", "T", "P", "E" };
 
 	for (i=0, j=0; i < 64; i++ , j=i/10) {
 		if (vector & 0x1)
