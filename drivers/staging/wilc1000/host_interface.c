@@ -142,7 +142,7 @@ struct beacon_attr {
 };
 
 struct set_multicast {
-	bool enabled;
+	u32 enabled;
 	u32 cnt;
 };
 
@@ -2752,9 +2752,9 @@ static s32 Handle_AddBASession(struct host_if_drv *hif_drv,
 	*ptr++ = strHostIfBASessionInfo->tid;
 	*ptr++ = 1;
 	*ptr++ = (strHostIfBASessionInfo->buf_size & 0xFF);
-	*ptr++ = ((strHostIfBASessionInfo->buf_size >> 16) & 0xFF);
+	*ptr++ = ((strHostIfBASessionInfo->buf_size >> 8) & 0xFF);
 	*ptr++ = (strHostIfBASessionInfo->time_out & 0xFF);
-	*ptr++ = ((strHostIfBASessionInfo->time_out >> 16) & 0xFF);
+	*ptr++ = ((strHostIfBASessionInfo->time_out >> 8) & 0xFF);
 	*ptr++ = (AddbaTimeout & 0xFF);
 	*ptr++ = ((AddbaTimeout >> 16) & 0xFF);
 	*ptr++ = 8;
@@ -2777,7 +2777,7 @@ static s32 Handle_AddBASession(struct host_if_drv *hif_drv,
 	*ptr++ = strHostIfBASessionInfo->tid;
 	*ptr++ = 8;
 	*ptr++ = (strHostIfBASessionInfo->buf_size & 0xFF);
-	*ptr++ = ((strHostIfBASessionInfo->time_out >> 16) & 0xFF);
+	*ptr++ = ((strHostIfBASessionInfo->time_out >> 8) & 0xFF);
 	*ptr++ = 3;
 	result = send_config_pkt(SET_CFG, &wid, 1,
 				 get_id_from_handler(hif_drv));
