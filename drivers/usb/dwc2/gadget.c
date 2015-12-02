@@ -3531,19 +3531,6 @@ int dwc2_gadget_init(struct dwc2_hsotg *hsotg, int irq)
 	else if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL)
 		hsotg->op_state = OTG_STATE_B_PERIPHERAL;
 
-	/*
-	 * Force Device mode before initialization.
-	 * This allows correctly configuring fifo for device mode.
-	 */
-	__bic32(hsotg->regs + GUSBCFG, GUSBCFG_FORCEHOSTMODE);
-	__orr32(hsotg->regs + GUSBCFG, GUSBCFG_FORCEDEVMODE);
-
-	/*
-	 * According to Synopsys databook, this sleep is needed for the force
-	 * device mode to take effect.
-	 */
-	msleep(25);
-
 	dwc2_core_reset(hsotg);
 	ret = dwc2_hsotg_hw_cfg(hsotg);
 	if (ret) {
@@ -3552,9 +3539,6 @@ int dwc2_gadget_init(struct dwc2_hsotg *hsotg, int irq)
 	}
 
 	dwc2_hsotg_init(hsotg);
-
-	/* Switch back to default configuration */
-	__bic32(hsotg->regs + GUSBCFG, GUSBCFG_FORCEDEVMODE);
 
 	hsotg->ctrl_buff = devm_kzalloc(hsotg->dev,
 			DWC2_CTRL_BUFF_SIZE, GFP_KERNEL);
