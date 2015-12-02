@@ -1848,6 +1848,27 @@ static int vxlan_xmit_skb(struct rtable *rt, struct sock *sk, struct sk_buff *sk
 				   !(vxflags & VXLAN_F_UDP_CSUM));
 }
 
+static struct rtable *vxlan_get_route(struct vxlan_dev *vxlan,
+				      struct sk_buff *skb, int oif, u8 tos,
+				      __be32 daddr, __be32 *saddr)
+{
+	struct rtable *rt = NULL;
+	struct flowi4 fl4;
+
+	memset(&fl4, 0, sizeof(fl4));
+	fl4.flowi4_oif = oif;
+	fl4.flowi4_tos = RT_TOS(tos);
+	fl4.flowi4_mark = skb->mark;
+	fl4.flowi4_proto = IPPROTO_UDP;
+	fl4.daddr = daddr;
+	fl4.saddr = vxlan->cfg.saddr.sin.sin_addr.s_addr;
+
+	rt = ip_route_output_key(vxlan->net, &fl4);
+	if (!IS_ERR(rt))
+		*saddr = fl4.saddr;
+	return rt;
+}
+
 /* Bypass encapsulation if the destination is local */
 static void vxlan_encap_bypass(struct sk_buff *skb, struct vxlan_dev *src_vxlan,
 			       struct vxlan_dev *dst_vxlan)
@@ -1901,7 +1922,6 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 	struct sock *sk;
 	struct rtable *rt = NULL;
 	const struct iphdr *old_iph;
-	struct flowi4 fl4;
 	union vxlan_addr *dst;
 	union vxlan_addr remote_ip;
 	struct vxlan_metadata _md;
@@ -1973,6 +1993,8 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	if (dst->sa.sa_family == AF_INET) {
+		__be32 saddr;
+
 		if (!vxlan->vn4_sock)
 			goto drop;
 		sk = vxlan->vn4_sock->sock->sk;
@@ -1980,15 +2002,9 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		if (info && (info->key.tun_flags & TUNNEL_DONT_FRAGMENT))
 			df = htons(IP_DF);
 
-		memset(&fl4, 0, sizeof(fl4));
-		fl4.flowi4_oif = rdst ? rdst->remote_ifindex : 0;
-		fl4.flowi4_tos = RT_TOS(tos);
-		fl4.flowi4_mark = skb->mark;
-		fl4.flowi4_proto = IPPROTO_UDP;
-		fl4.daddr = dst->sin.sin_addr.s_addr;
-		fl4.saddr = vxlan->cfg.saddr.sin.sin_addr.s_addr;
-
-		rt = ip_route_output_key(vxlan->net, &fl4);
+		rt = vxlan_get_route(vxlan, skb,
+				     rdst ? rdst->remote_ifindex : 0, tos,
+				     dst->sin.sin_addr.s_addr, &saddr);
 		if (IS_ERR(rt)) {
 			netdev_dbg(dev, "no route to %pI4\n",
 				   &dst->sin.sin_addr.s_addr);
@@ -2020,7 +2036,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 
 		tos = ip_tunnel_ecn_encap(tos, old_iph, skb);
 		ttl = ttl ? : ip4_dst_hoplimit(&rt->dst);
-		err = vxlan_xmit_skb(rt, sk, skb, fl4.saddr,
+		err = vxlan_xmit_skb(rt, sk, skb, saddr,
 				     dst->sin.sin_addr.s_addr, tos, ttl, df,
 				     src_port, dst_port, htonl(vni << 8), md,
 				     !net_eq(vxlan->net, dev_net(vxlan->dev)),
@@ -2366,20 +2382,13 @@ static int egress_ipv4_tun_info(struct net_device *dev, struct sk_buff *skb,
 {
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 	struct rtable *rt;
-	struct flowi4 fl4;
 
-	memset(&fl4, 0, sizeof(fl4));
-	fl4.flowi4_tos = RT_TOS(info->key.tos);
-	fl4.flowi4_mark = skb->mark;
-	fl4.flowi4_proto = IPPROTO_UDP;
-	fl4.daddr = info->key.u.ipv4.dst;
-
-	rt = ip_route_output_key(vxlan->net, &fl4);
+	rt = vxlan_get_route(vxlan, skb, 0, info->key.tos,
+			     info->key.u.ipv4.dst, &info->key.u.ipv4.src);
 	if (IS_ERR(rt))
 		return PTR_ERR(rt);
 	ip_rt_put(rt);
 
-	info->key.u.ipv4.src = fl4.saddr;
 	info->key.tp_src = sport;
 	info->key.tp_dst = dport;
 	return 0;
