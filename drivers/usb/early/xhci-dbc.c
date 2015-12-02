@@ -1140,6 +1140,29 @@ static int xdbc_wait_until_bulk_done(struct xdbc_trb *trb, int loops)
 	return -EIO;
 }
 
+static int xdbc_wait_until_dbc_configured(void)
+{
+	int timeout = 0;
+	u32 reg;
+
+	/* Port exits configured state */
+	reg = readl(&xdbcp->xdbc_reg->control);
+	if (!(reg & CTRL_DRC))
+		return 0;
+
+	/* clear run change bit (RW1C) */
+	writel(reg | CTRL_DRC, &xdbcp->xdbc_reg->control);
+
+	do {
+		if (readl(&xdbcp->xdbc_reg->control) & CTRL_DCR)
+			return 0;
+
+		xdbc_udelay(10);
+	} while (timeout++ < XDBC_LOOPS);
+
+	return -ETIMEDOUT;
+}
+
 static int xdbc_bulk_transfer(void *data, int size, int loops, bool read)
 {
 	u64 addr;
@@ -1152,6 +1175,11 @@ static int xdbc_bulk_transfer(void *data, int size, int loops, bool read)
 	if (size > XDBC_MAX_PACKET) {
 		xdbc_trace("%s: bad parameter, size %d", __func__, size);
 		return -EINVAL;
+	}
+
+	if (xdbc_wait_until_dbc_configured()) {
+		xdbc_trace("%s: hardware not ready\n", __func__);
+		return -EPERM;
 	}
 
 	ring = (read ? &xdbcp->in_ring : &xdbcp->out_ring);
