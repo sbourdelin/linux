@@ -236,23 +236,33 @@ struct mxt_object {
 struct mxt_debug_datatype {
 	u8 mode;
 	char *name;
+	char *desc;
+	char *format;
 };
 
 struct mxt_debug_datatype_meta {
 	struct mxt_data *data;
 	const struct mxt_debug_datatype *datatype;
 	struct dentry *dent;
+	u16 width;
+	u16 height;
 	void *buf;
+	struct debugfs_blob_wrapper format_wrapper;
+	struct debugfs_blob_wrapper desc_wrapper;
 };
 
 static const struct mxt_debug_datatype datatypes[] = {
 	{
 		.mode = MXT_DIAGNOSTIC_REFS,
 		.name = "refs",
+		.desc = "Mutual Capacitance References",
+		.format = "uint16",
 	},
 	{
 		.mode = MXT_DIAGNOSTIC_DELTAS,
 		.name = "deltas",
+		.format = "int16",
+		.desc = "Mutual Capacitance Deltas",
 	}
 };
 
@@ -2277,6 +2287,7 @@ static void mxt_debugfs_init(struct mxt_data *data)
 	struct mxt_dbg *dbg = &data->dbg;
 	struct mxt_object *object;
 	struct dentry *dent;
+	struct dentry *dir;
 	struct mxt_debug_datatype_meta *dtm;
 	char dirname[50];
 	int i;
@@ -2333,13 +2344,42 @@ static void mxt_debugfs_init(struct mxt_data *data)
 	for (i = 0; i < ARRAY_SIZE(datatypes); i++) {
 		dtm = &data->dbg.dt_meta[i];
 
+		dir = debugfs_create_dir(datatypes[i].name, dbg->debugfs_dir);
+		if (!dir)
+			goto error;
+
 		dtm->data = data;
 		dtm->datatype = datatypes + i;
+		dtm->width = data->xy_switch ? data->ysize : data->xsize;
+		dtm->height = data->xy_switch ? data->xsize: data->ysize;
 		dtm->buf = dbg->debug_buf;
 
-		dent = debugfs_create_file(datatypes[i].name,
-				S_IRUGO, dbg->debugfs_dir,
-				dtm, &atmel_mxt_dbg_fops);
+		dtm->format_wrapper.data = (void *)dtm->datatype->format;
+		dtm->format_wrapper.size = strlen(dtm->datatype->format);
+		dent = debugfs_create_blob("format", S_IRUGO,
+					   dir, &dtm->format_wrapper);
+		if (!dent)
+			goto error;
+
+		dtm->desc_wrapper.data = (void *)dtm->datatype->desc;
+		dtm->desc_wrapper.size = strlen(dtm->datatype->desc);
+		dent = debugfs_create_blob("name", S_IRUGO,
+					   dir, &dtm->desc_wrapper);
+		if (!dent)
+			goto error;
+
+		dent = debugfs_create_u16("width", S_IRUGO,
+					  dir, &dtm->width);
+		if (!dent)
+			goto error;
+
+		dent = debugfs_create_u16("height", S_IRUGO,
+					  dir, &dtm->height);
+		if (!dent)
+			goto error;
+
+		dent = debugfs_create_file("data", S_IRUGO, dir, dtm,
+					   &atmel_mxt_dbg_fops);
 		if (!dent)
 			goto error;
 
