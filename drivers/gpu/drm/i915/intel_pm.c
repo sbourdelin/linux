@@ -4719,7 +4719,7 @@ static void gen9_enable_rc6(struct drm_device *dev)
 
 }
 
-static void gen8_enable_rps(struct drm_device *dev)
+static void gen8_enable_rc6(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
@@ -4729,15 +4729,12 @@ static void gen8_enable_rps(struct drm_device *dev)
 	/* 1a: Software RC state - RC0 */
 	I915_WRITE(GEN6_RC_STATE, 0);
 
-	/* 1c & 1d: Get forcewake during program sequence. Although the driver
+	/* 1b & 1c: Get forcewake during program sequence. Although the driver
 	 * hasn't enabled a state yet where we need forcewake, BIOS may have.*/
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
 	/* 2a: Disable RC states. */
 	I915_WRITE(GEN6_RC_CONTROL, 0);
-
-	/* Initialize rps frequencies */
-	gen6_init_rps_frequencies(dev);
 
 	/* 2b: Program RC6 thresholds.*/
 	I915_WRITE(GEN6_RC6_WAKE_RATE_LIMIT, 40 << 16);
@@ -4764,7 +4761,20 @@ static void gen8_enable_rps(struct drm_device *dev)
 				GEN6_RC_CTL_EI_MODE(1) |
 				rc6_mask);
 
-	/* 4 Program defaults and thresholds for RPS*/
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+}
+
+static void gen8_enable_rps(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	/* 1: Get forcewake during program sequence. */
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	/* Initialize rps frequencies */
+	gen6_init_rps_frequencies(dev);
+
+	/* 2: Program defaults and thresholds for RPS*/
 	I915_WRITE(GEN6_RPNSWREQ,
 		   HSW_FREQUENCY(dev_priv->rps.rp1_freq));
 	I915_WRITE(GEN6_RC_VIDEO_FREQ,
@@ -4784,7 +4794,7 @@ static void gen8_enable_rps(struct drm_device *dev)
 
 	I915_WRITE(GEN6_RP_IDLE_HYSTERSIS, 10);
 
-	/* 5: Enable RPS */
+	/* 3: Enable RPS */
 	I915_WRITE(GEN6_RP_CONTROL,
 		   GEN6_RP_MEDIA_TURBO |
 		   GEN6_RP_MEDIA_HW_NORMAL_MODE |
@@ -4793,7 +4803,7 @@ static void gen8_enable_rps(struct drm_device *dev)
 		   GEN6_RP_UP_BUSY_AVG |
 		   GEN6_RP_DOWN_IDLE_AVG);
 
-	/* 6: Ring frequency + overclocking (our driver does this later */
+	/* 4: Ring frequency + overclocking (our driver does this later */
 
 	dev_priv->rps.power = HIGH_POWER; /* force a reset */
 	gen6_set_rps(dev_priv->dev, dev_priv->rps.idle_freq);
@@ -5320,14 +5330,13 @@ static void valleyview_cleanup_gt_powersave(struct drm_device *dev)
 	valleyview_cleanup_pctx(dev);
 }
 
-static void cherryview_enable_rps(struct drm_device *dev)
+static void cherryview_enable_rc6(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	u32 gtfifodbg, val, rc6_mode = 0, pcbr;
+	u32 gtfifodbg, rc6_mode = 0, pcbr;
 	int i;
 
-	WARN_ON(!mutex_is_locked(&dev_priv->rps.hw_lock));
 
 	gtfifodbg = I915_READ(GTFIFODBG);
 	if (gtfifodbg) {
@@ -5338,7 +5347,7 @@ static void cherryview_enable_rps(struct drm_device *dev)
 
 	cherryview_check_pctx(dev_priv);
 
-	/* 1a & 1b: Get forcewake during program sequence. Although the driver
+	/* 1: Get forcewake during program sequence. . Although the driver
 	 * hasn't enabled a state yet where we need forcewake, BIOS may have.*/
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
@@ -5372,8 +5381,20 @@ static void cherryview_enable_rps(struct drm_device *dev)
 		rc6_mode = GEN7_RC_CTL_TO_MODE;
 
 	I915_WRITE(GEN6_RC_CONTROL, rc6_mode);
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+}
 
-	/* 4 Program defaults and thresholds for RPS*/
+static void cherryview_enable_rps(struct drm_device *dev)
+{
+        struct drm_i915_private *dev_priv = dev->dev_private;
+        u32 val;
+
+	WARN_ON(!mutex_is_locked(&dev_priv->rps.hw_lock));
+
+	/* 1: Get forcewake during program sequence. */
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	/* 2: Program defaults and thresholds for RPS*/
 	I915_WRITE(GEN6_RP_DOWN_TIMEOUT, 1000000);
 	I915_WRITE(GEN6_RP_UP_THRESHOLD, 59400);
 	I915_WRITE(GEN6_RP_DOWN_THRESHOLD, 245000);
@@ -5382,7 +5403,7 @@ static void cherryview_enable_rps(struct drm_device *dev)
 
 	I915_WRITE(GEN6_RP_IDLE_HYSTERSIS, 10);
 
-	/* 5: Enable RPS */
+	/* 3: Enable RPS */
 	I915_WRITE(GEN6_RP_CONTROL,
 		   GEN6_RP_MEDIA_HW_NORMAL_MODE |
 		   GEN6_RP_MEDIA_IS_GFX |
@@ -5390,7 +5411,7 @@ static void cherryview_enable_rps(struct drm_device *dev)
 		   GEN6_RP_UP_BUSY_AVG |
 		   GEN6_RP_DOWN_IDLE_AVG);
 
-	/* Setting Fixed Bias */
+	/* 4: Setting Fixed Bias */
 	val = VLV_OVERRIDE_EN |
 		  VLV_SOC_TDP_EN |
 		  CHV_BIAS_CPU_50_SOC_50;
@@ -5418,14 +5439,13 @@ static void cherryview_enable_rps(struct drm_device *dev)
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 }
 
-static void valleyview_enable_rps(struct drm_device *dev)
+static void valleyview_enable_rc6(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	u32 gtfifodbg, val, rc6_mode = 0;
+	u32 gtfifodbg, rc6_mode = 0;
 	int i;
 
-	WARN_ON(!mutex_is_locked(&dev_priv->rps.hw_lock));
 
 	valleyview_check_pctx(dev_priv);
 
@@ -5435,27 +5455,10 @@ static void valleyview_enable_rps(struct drm_device *dev)
 		I915_WRITE(GTFIFODBG, gtfifodbg);
 	}
 
-	/* If VLV, Forcewake all wells, else re-direct to regular path */
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
 	/*  Disable RC states. */
 	I915_WRITE(GEN6_RC_CONTROL, 0);
-
-	I915_WRITE(GEN6_RP_DOWN_TIMEOUT, 1000000);
-	I915_WRITE(GEN6_RP_UP_THRESHOLD, 59400);
-	I915_WRITE(GEN6_RP_DOWN_THRESHOLD, 245000);
-	I915_WRITE(GEN6_RP_UP_EI, 66000);
-	I915_WRITE(GEN6_RP_DOWN_EI, 350000);
-
-	I915_WRITE(GEN6_RP_IDLE_HYSTERSIS, 10);
-
-	I915_WRITE(GEN6_RP_CONTROL,
-		   GEN6_RP_MEDIA_TURBO |
-		   GEN6_RP_MEDIA_HW_NORMAL_MODE |
-		   GEN6_RP_MEDIA_IS_GFX |
-		   GEN6_RP_ENABLE |
-		   GEN6_RP_UP_BUSY_AVG |
-		   GEN6_RP_DOWN_IDLE_CONT);
 
 	I915_WRITE(GEN6_RC6_WAKE_RATE_LIMIT, 0x00280000);
 	I915_WRITE(GEN6_RC_EVALUATION_INTERVAL, 125000);
@@ -5479,6 +5482,34 @@ static void valleyview_enable_rps(struct drm_device *dev)
 	intel_print_rc6_info(dev, rc6_mode);
 
 	I915_WRITE(GEN6_RC_CONTROL, rc6_mode);
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+}
+
+static void valleyview_enable_rps(struct drm_device *dev)
+{
+        struct drm_i915_private *dev_priv = dev->dev_private;
+        u32 val;
+
+        WARN_ON(!mutex_is_locked(&dev_priv->rps.hw_lock));
+
+        /* If VLV, Forcewake all wells, else re-direct to regular path */
+        intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+        I915_WRITE(GEN6_RP_DOWN_TIMEOUT, 1000000);
+        I915_WRITE(GEN6_RP_UP_THRESHOLD, 59400);
+        I915_WRITE(GEN6_RP_DOWN_THRESHOLD, 245000);
+        I915_WRITE(GEN6_RP_UP_EI, 66000);
+        I915_WRITE(GEN6_RP_DOWN_EI, 350000);
+
+        I915_WRITE(GEN6_RP_IDLE_HYSTERSIS, 10);
+
+        I915_WRITE(GEN6_RP_CONTROL,
+                   GEN6_RP_MEDIA_TURBO |
+                   GEN6_RP_MEDIA_HW_NORMAL_MODE |
+                   GEN6_RP_MEDIA_IS_GFX |
+                   GEN6_RP_ENABLE |
+                   GEN6_RP_UP_BUSY_AVG |
+                   GEN6_RP_DOWN_IDLE_CONT);
 
 	/* Setting Fixed Bias */
 	val = VLV_OVERRIDE_EN |
@@ -6084,7 +6115,6 @@ static void intel_gen6_powersave_work(struct work_struct *work)
 	} else if (IS_VALLEYVIEW(dev)) {
 		valleyview_enable_rps(dev);
 	} else if (INTEL_INFO(dev)->gen >= 9) {
-		gen9_enable_rc6(dev);
 		gen9_enable_rps(dev);
 		if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
 			__gen6_update_ring_freq(dev);
@@ -6107,8 +6137,9 @@ static void intel_gen6_powersave_work(struct work_struct *work)
 	gen6_enable_rps_interrupts(dev);
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
+	if (!(IS_BROADWELL(dev) || IS_GEN9(dev) || IS_VALLEYVIEW(dev)))
+		intel_runtime_pm_put(dev_priv);
 
-	intel_runtime_pm_put(dev_priv);
 }
 
 void intel_enable_gt_powersave(struct drm_device *dev)
@@ -6126,6 +6157,19 @@ void intel_enable_gt_powersave(struct drm_device *dev)
 		mutex_unlock(&dev->struct_mutex);
 	} else if (INTEL_INFO(dev)->gen >= 6) {
 		/*
+		 * Enabling RC6 here itself and only deferring Turbo
+		 * enabling.
+		 */
+		if (IS_CHERRYVIEW(dev))
+			cherryview_enable_rc6(dev);
+		else if (IS_VALLEYVIEW(dev))
+			valleyview_enable_rc6(dev);
+		else if (IS_BROADWELL(dev))
+			gen8_enable_rc6(dev);
+		else if (INTEL_INFO(dev)->gen >= 9)
+			gen9_enable_rc6(dev);
+
+		/*
 		 * PCU communication is slow and this doesn't need to be
 		 * done at any specific time, so do this out of our fast path
 		 * to make resume and init faster.
@@ -6137,9 +6181,13 @@ void intel_enable_gt_powersave(struct drm_device *dev)
 		 * paths, so the _noresume version is enough (and in case of
 		 * runtime resume it's necessary).
 		 */
+
 		if (schedule_delayed_work(&dev_priv->rps.delayed_resume_work,
-					   round_jiffies_up_relative(HZ)))
-			intel_runtime_pm_get_noresume(dev_priv);
+					   round_jiffies_up_relative(HZ))) {
+			if (!(IS_BROADWELL(dev) || IS_GEN9(dev) || IS_VALLEYVIEW(dev)))
+				intel_runtime_pm_get_noresume(dev_priv);
+		}
+
 	}
 }
 
