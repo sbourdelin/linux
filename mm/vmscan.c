@@ -1019,10 +1019,19 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 			/* Case 3 above */
 			} else {
+				int ret;
+
 				unlock_page(page);
-				wait_on_page_writeback(page);
+				ret = wait_on_page_writeback_killable(page);
 				/* then go back and try same page again */
 				list_add_tail(&page->lru, page_list);
+
+				/*
+				 * We've got killed while waiting here so
+				 * expedite our way out from the reclaim
+				 */
+				if (ret)
+					break;
 				continue;
 			}
 		}

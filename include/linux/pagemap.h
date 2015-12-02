@@ -530,6 +530,14 @@ static inline void wait_on_page_writeback(struct page *page)
 		wait_on_page_bit(page, PG_writeback);
 }
 
+static inline int wait_on_page_writeback_killable(struct page *page)
+{
+	if (PageWriteback(page))
+		return wait_on_page_bit_killable(page, PG_writeback);
+
+	return 0;
+}
+
 extern void end_page_writeback(struct page *page);
 void wait_for_stable_page(struct page *page);
 
