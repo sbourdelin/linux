@@ -38,6 +38,19 @@ config CHROMEOS_PSTORE
 	  If you have a supported Chromebook, choose Y or M here.
 	  The module will be called chromeos_pstore.
 
+config CHROMEOS_FIRMWARE
+	tristate "Chrome OS firmware signal monitoring"
+	depends on GPIO_SYSFS
+	---help---
+	 Many chromebooks have gpio attached to signals used to cause the
+	 firmware to enter alternative modes of operation and/or control other
+	 device characteristics (such as write protection on flash devices).
+	 This driver exposes a read-only interface to allow these signals to be
+	 read from user space.
+
+	 If you have a supported Chromebook, choose Y or M here.
+	 The module will be called chromeos_firmware.
+
 config CROS_EC_CHARDEV
         tristate "Chrome OS Embedded Controller userspace device interface"
         depends on MFD_CROS_EC
