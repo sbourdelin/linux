@@ -380,7 +380,8 @@ static const char *hwcaps[] = {
 	 */
 	"mul32", "div32", "fsmuld", "v8plus", "popc", "vis", "vis2",
 	"ASIBlkInit", "fmaf", "vis3", "hpc", "random", "trans", "fjfmau",
-	"ima", "cspare", "pause", "cbcond",
+	"ima", "cspare", "pause", "cbcond", NULL /*reserved for crypto */,
+	"adp",
 };
 
 static const char *crypto_hwcaps[] = {
@@ -396,9 +397,13 @@ void cpucap_info(struct seq_file *m)
 	seq_puts(m, "cpucaps\t\t: ");
 	for (i = 0; i < ARRAY_SIZE(hwcaps); i++) {
 		unsigned long bit = 1UL << i;
-		if (caps & bit) {
-			seq_printf(m, "%s%s",
-				   printed ? "," : "", hwcaps[i]);
+		if (hwcaps[i] && (caps & bit)) {
+			if (strcmp(hwcaps[i], "adp") == 0)
+				seq_printf(m, "%sadi",
+					   printed ? "," : "");
+			else
+				seq_printf(m, "%s%s",
+					   printed ? "," : "", hwcaps[i]);
 			printed++;
 		}
 	}
@@ -422,8 +427,10 @@ static void __init report_one_hwcap(int *printed, const char *name)
 {
 	if ((*printed) == 0)
 		printk(KERN_INFO "CPU CAPS: [");
-	printk(KERN_CONT "%s%s",
-	       (*printed) ? "," : "", name);
+	if (strcmp(name, "adp") == 0)
+		pr_cont("%sadi", (*printed) ? "," : "");
+	else
+		pr_cont("%s%s", (*printed) ? "," : "", name);
 	if (++(*printed) == 8) {
 		printk(KERN_CONT "]\n");
 		*printed = 0;
@@ -450,7 +457,7 @@ static void __init report_hwcaps(unsigned long caps)
 
 	for (i = 0; i < ARRAY_SIZE(hwcaps); i++) {
 		unsigned long bit = 1UL << i;
-		if (caps & bit)
+		if (hwcaps[i] && (caps & bit))
 			report_one_hwcap(&printed, hwcaps[i]);
 	}
 	if (caps & HWCAP_SPARC_CRYPTO)
@@ -485,7 +492,7 @@ static unsigned long __init mdesc_cpu_hwcap_list(void)
 		for (i = 0; i < ARRAY_SIZE(hwcaps); i++) {
 			unsigned long bit = 1UL << i;
 
-			if (!strcmp(prop, hwcaps[i])) {
+			if (hwcaps[i] && !strcmp(prop, hwcaps[i])) {
 				caps |= bit;
 				break;
 			}
