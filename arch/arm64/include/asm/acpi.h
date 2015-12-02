@@ -46,6 +46,9 @@ typedef u64 phys_cpuid_t;
 extern int acpi_disabled;
 extern int acpi_noirq;
 extern int acpi_pci_disabled;
+#ifdef CONFIG_ACPI_APEI
+extern int acpi_disable_cmcff;
+#endif
 
 static inline void disable_acpi(void)
 {
@@ -94,6 +97,7 @@ static inline const char *acpi_get_enable_method(int cpu)
 
 #ifdef	CONFIG_ACPI_APEI
 pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+void arch_apei_flush_tlb_one(unsigned long addr);
 #endif
 
 #endif /*_ASM_ACPI_H*/

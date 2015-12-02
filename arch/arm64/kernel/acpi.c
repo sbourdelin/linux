@@ -32,6 +32,7 @@
 #ifdef CONFIG_ACPI_APEI
 # include <linux/efi.h>
 # include <asm/pgtable.h>
+# include <asm/tlbflush.h>
 #endif
 
 int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
@@ -40,6 +41,10 @@ EXPORT_SYMBOL(acpi_disabled);
 
 int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
 EXPORT_SYMBOL(acpi_pci_disabled);
+
+#ifdef CONFIG_ACPI_APEI
+int acpi_disable_cmcff;
+#endif
 
 static bool param_acpi_off __initdata;
 static bool param_acpi_force __initdata;
@@ -232,5 +237,10 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
 	if (attr & EFI_MEMORY_WC)
 		return __pgprot(PROT_NORMAL_NC);
 	return __pgprot(PROT_DEVICE_nGnRnE);
+}
+
+void arch_apei_flush_tlb_one(unsigned long addr)
+{
+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
 }
 #endif
