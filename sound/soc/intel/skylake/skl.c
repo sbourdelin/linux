@@ -574,7 +574,7 @@ static void skl_remove(struct pci_dev *pci)
 
 static struct sst_acpi_mach sst_skl_devdata[] = {
 	{ "INT343A", "skl_alc286s_i2s", "intel/dsp_fw_release.bin", NULL, NULL, NULL },
-	{ "INT343B", "skl_nau88l25_ssm4567_i2s", "intel/dsp_fw_release.bin",
+	{ "INT343B", "skl_nau8825_ssm4567_i2s", "intel/dsp_fw_release.bin",
 				NULL, NULL, NULL },
 	{}
 };

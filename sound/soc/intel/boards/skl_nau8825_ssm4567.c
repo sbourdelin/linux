@@ -1,10 +1,10 @@
 /*
- * Intel Skylake I2S Machine Driver for NAU88L25+SSM4567
+ * Intel Skylake I2S Machine Driver for NAU8825+SSM4567
  *
  * Copyright (C) 2015, Intel Corporation. All rights reserved.
  *
  * Modified from:
- *   Intel Skylake I2S Machine Driver for NAU88L25 and SSM4567
+ *   Intel Skylake I2S Machine Driver for NAU8825 and SSM4567
  *
  *   Copyright (C) 2015, Intel Corporation. All rights reserved.
  *
@@ -322,7 +322,7 @@ static struct snd_soc_dai_link skylake_dais[] = {
 	},
 };
 
-/* skylake audio machine driver for SPT + NAU88L25 */
+/* skylake audio machine driver for SPT + NAU8825 */
 static struct snd_soc_card skylake_audio_card = {
 	.name = "sklnau8825adi",
 	.owner = THIS_MODULE,
@@ -348,7 +348,7 @@ static int skylake_audio_probe(struct platform_device *pdev)
 static struct platform_driver skylake_audio = {
 	.probe = skylake_audio_probe,
 	.driver = {
-		.name = "skl_nau88l25_ssm4567_i2s",
+		.name = "skl_nau8825_ssm4567_i2s",
 		.pm = &snd_soc_pm_ops,
 	},
 };
@@ -361,6 +361,6 @@ MODULE_AUTHOR("Harsha Priya <harshapriya.n@intel.com>");
 MODULE_AUTHOR("Naveen M <naveen.m@intel.com>");
 MODULE_AUTHOR("Sathya Prakash M R <sathya.prakash.m.r@intel.com>");
 MODULE_AUTHOR("Yong Zhi <yong.zhi@intel.com>");
-MODULE_DESCRIPTION("Intel Audio Machine driver for SKL with NAU88L25 and SSM4567 in I2S Mode");
+MODULE_DESCRIPTION("Intel Audio Machine driver for SKL with NAU8825 and SSM4567 in I2S Mode");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:skl_nau88l25_ssm4567_i2s");
+MODULE_ALIAS("platform:skl_nau8825_ssm4567_i2s");
