@@ -460,6 +460,7 @@ struct dwc2_hw_params {
 	unsigned en_multiple_tx_fifo:1;
 	unsigned host_rx_fifo_size:16;
 	unsigned host_nperio_tx_fifo_size:16;
+	unsigned dev_nperio_tx_fifo_size:16;
 	unsigned host_perio_tx_fifo_size:16;
 	unsigned nperio_tx_q_depth:3;
 	unsigned host_perio_tx_q_depth:3;

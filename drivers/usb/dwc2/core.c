@@ -3134,17 +3134,76 @@ static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
 	usleep_range(25000, 50000);
 }
 
+/*
+ * Gets host hardware parameters. Forces host mode if not currently in
+ * host mode. Should be called immediately after a core soft reset in
+ * order to get the reset values.
+ */
+static void dwc2_get_host_hwparams(struct dwc2_hsotg *hsotg)
+{
+	struct dwc2_hw_params *hw = &hsotg->hw_params;
+	u32 gnptxfsiz;
+	u32 hptxfsiz;
+	bool forced;
+
+	if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL)
+		return;
+
+	forced = dwc2_force_host_if_needed(hsotg);
+
+	gnptxfsiz = dwc2_readl(hsotg->regs + GNPTXFSIZ);
+	hptxfsiz = dwc2_readl(hsotg->regs + HPTXFSIZ);
+	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
+	dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
+
+	if (forced)
+		dwc2_clear_force_mode(hsotg);
+
+	hw->host_nperio_tx_fifo_size = (gnptxfsiz & FIFOSIZE_DEPTH_MASK) >>
+				       FIFOSIZE_DEPTH_SHIFT;
+	hw->host_perio_tx_fifo_size = (hptxfsiz & FIFOSIZE_DEPTH_MASK) >>
+				      FIFOSIZE_DEPTH_SHIFT;
+}
+
+/*
+ * Gets device hardware parameters. Forces device mode if not
+ * currently in device mode. Should be called immediately after a core
+ * soft reset in order to get the reset values.
+ */
+static void dwc2_get_dev_hwparams(struct dwc2_hsotg *hsotg)
+{
+	struct dwc2_hw_params *hw = &hsotg->hw_params;
+	bool forced;
+	u32 gnptxfsiz;
+
+	if (hsotg->dr_mode == USB_DR_MODE_HOST)
+		return;
+
+	forced = dwc2_force_device_if_needed(hsotg);
+
+	gnptxfsiz = dwc2_readl(hsotg->regs + GNPTXFSIZ);
+	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
+
+	if (forced)
+		dwc2_clear_force_mode(hsotg);
+
+	hw->dev_nperio_tx_fifo_size = (gnptxfsiz & FIFOSIZE_DEPTH_MASK) >>
+				       FIFOSIZE_DEPTH_SHIFT;
+}
+
 /**
  * During device initialization, read various hardware configuration
  * registers and interpret the contents.
+ *
+ * This should be called during driver probe. It will perform a core
+ * soft reset in order to get the reset values of the parameters.
  */
 int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
 {
 	struct dwc2_hw_params *hw = &hsotg->hw_params;
 	unsigned width;
 	u32 hwcfg1, hwcfg2, hwcfg3, hwcfg4;
-	u32 hptxfsiz, grxfsiz, gnptxfsiz;
-	u32 gusbcfg = 0;
+	u32 grxfsiz;
 	int retval;
 
 	/*
@@ -3180,23 +3239,6 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
 	dev_dbg(hsotg->dev, "hwcfg3=%08x\n", hwcfg3);
 	dev_dbg(hsotg->dev, "hwcfg4=%08x\n", hwcfg4);
 	dev_dbg(hsotg->dev, "grxfsiz=%08x\n", grxfsiz);
-
-	/* Force host mode to get HPTXFSIZ / GNPTXFSIZ exact power on value */
-	if (hsotg->dr_mode != USB_DR_MODE_HOST) {
-		gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
-		dwc2_writel(gusbcfg | GUSBCFG_FORCEHOSTMODE,
-			    hsotg->regs + GUSBCFG);
-		usleep_range(25000, 50000);
-	}
-
-	gnptxfsiz = dwc2_readl(hsotg->regs + GNPTXFSIZ);
-	hptxfsiz = dwc2_readl(hsotg->regs + HPTXFSIZ);
-	dev_dbg(hsotg->dev, "gnptxfsiz=%08x\n", gnptxfsiz);
-	dev_dbg(hsotg->dev, "hptxfsiz=%08x\n", hptxfsiz);
-	if (hsotg->dr_mode != USB_DR_MODE_HOST) {
-		dwc2_writel(gusbcfg, hsotg->regs + GUSBCFG);
-		usleep_range(25000, 50000);
-	}
 
 	/* hwcfg2 */
 	hw->op_mode = (hwcfg2 & GHWCFG2_OP_MODE_MASK) >>
@@ -3252,10 +3294,15 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
 	/* fifo sizes */
 	hw->host_rx_fifo_size = (grxfsiz & GRXFSIZ_DEPTH_MASK) >>
 				GRXFSIZ_DEPTH_SHIFT;
-	hw->host_nperio_tx_fifo_size = (gnptxfsiz & FIFOSIZE_DEPTH_MASK) >>
-				       FIFOSIZE_DEPTH_SHIFT;
-	hw->host_perio_tx_fifo_size = (hptxfsiz & FIFOSIZE_DEPTH_MASK) >>
-				      FIFOSIZE_DEPTH_SHIFT;
+
+	/*
+	 * Host/device specific hardware parameters. Reading these
+	 * parameters requires the controller to be in either host or
+	 * device mode. The mode will be forced, if necessary, to read
+	 * these values.
+	 */
+	dwc2_get_host_hwparams(hsotg);
+	dwc2_get_dev_hwparams(hsotg);
 
 	dev_dbg(hsotg->dev, "Detected values from hardware:\n");
 	dev_dbg(hsotg->dev, "  op_mode=%d\n",
