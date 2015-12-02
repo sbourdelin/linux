@@ -1189,6 +1189,7 @@ static unsigned int hist_browser__refresh(struct ui_browser *browser)
 	}
 
 	ui_browser__hists_init_top(browser);
+	hb->selection = NULL;
 
 	for (nd = browser->top; nd; nd = rb_next(nd)) {
 		struct hist_entry *h = rb_entry(nd, struct hist_entry, rb_node);
@@ -2099,7 +2100,7 @@ static int perf_evsel__hists_browse(struct perf_evsel *evsel, int nr_events,
 
 		if (browser->he_selection != NULL) {
 			thread = hist_browser__selected_thread(browser);
-			map = browser->selection->map;
+			map = browser->selection ? browser->selection->map : NULL;
 			socked_id = browser->he_selection->socket;
 		}
 		switch (key) {
@@ -2318,7 +2319,8 @@ skip_annotation:
 			nr_options += add_script_opt(browser,
 						     &actions[nr_options],
 						     &options[nr_options],
-						     NULL, browser->selection->sym);
+						     NULL, browser->selection ?
+						     		browser->selection->sym : NULL);
 		}
 		nr_options += add_script_opt(browser, &actions[nr_options],
 					     &options[nr_options], NULL, NULL);
