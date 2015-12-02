@@ -992,7 +992,7 @@ static void quirk_usb_handoff_xhci(struct pci_dev *pdev)
 	if ((ext_cap_offset + sizeof(val)) > len) {
 		/* We're reading garbage from the controller */
 		dev_warn(&pdev->dev, "xHCI controller failing to respond");
-		return;
+		goto hc_init;
 	}
 	val = readl(base + ext_cap_offset);
 
