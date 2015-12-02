@@ -3125,7 +3125,7 @@ int i915_gem_gtt_init(struct drm_device *dev)
 			gtt->base.pte_encode = iris_pte_encode;
 		else if (IS_HASWELL(dev))
 			gtt->base.pte_encode = hsw_pte_encode;
-		else if (IS_VALLEYVIEW(dev))
+		else if (HAS_GEN7_LP_FEATURES(dev))
 			gtt->base.pte_encode = byt_pte_encode;
 		else if (INTEL_INFO(dev)->gen >= 7)
 			gtt->base.pte_encode = ivb_pte_encode;

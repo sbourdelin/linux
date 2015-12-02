@@ -862,7 +862,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 			   I915_READ(GEN8_PCU_IIR));
 		seq_printf(m, "PCU interrupt enable:\t%08x\n",
 			   I915_READ(GEN8_PCU_IER));
-	} else if (IS_VALLEYVIEW(dev)) {
+	} else if (HAS_GEN7_LP_FEATURES(dev)) {
 		seq_printf(m, "Display IER:\t%08x\n",
 			   I915_READ(VLV_IER));
 		seq_printf(m, "Display IIR:\t%08x\n",
@@ -1284,7 +1284,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 		seq_printf(m,
 			   "efficient (RPe) frequency: %d MHz\n",
 			   intel_gpu_freq(dev_priv, dev_priv->rps.efficient_freq));
-	} else if (IS_VALLEYVIEW(dev)) {
+	} else if (HAS_GEN7_LP_FEATURES(dev)) {
 		u32 freq_sts;
 
 		mutex_lock(&dev_priv->rps.hw_lock);
@@ -1602,7 +1602,7 @@ static int i915_drpc_info(struct seq_file *m, void *unused)
 	struct drm_info_node *node = m->private;
 	struct drm_device *dev = node->minor->dev;
 
-	if (IS_VALLEYVIEW(dev))
+	if (HAS_GEN7_LP_FEATURES(dev))
 		return vlv_drpc_info(m);
 	else if (INTEL_INFO(dev)->gen >= 6)
 		return gen6_drpc_info(m);
@@ -1743,7 +1743,7 @@ static int i915_sr_status(struct seq_file *m, void *unused)
 		sr_enabled = I915_READ(INSTPM) & INSTPM_SELF_EN;
 	else if (IS_PINEVIEW(dev))
 		sr_enabled = I915_READ(DSPFW3) & PINEVIEW_SELF_REFRESH_EN;
-	else if (IS_VALLEYVIEW(dev))
+	else if (HAS_GEN7_LP_FEATURES(dev))
 		sr_enabled = I915_READ(FW_BLC_SELF_VLV) & FW_CSPWRDWNEN;
 
 	intel_runtime_pm_put(dev_priv);
@@ -3983,7 +3983,7 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 		ret = i8xx_pipe_crc_ctl_reg(&source, &val);
 	else if (INTEL_INFO(dev)->gen < 5)
 		ret = i9xx_pipe_crc_ctl_reg(dev, pipe, &source, &val);
-	else if (IS_VALLEYVIEW(dev))
+	else if (HAS_GEN7_LP_FEATURES(dev))
 		ret = vlv_pipe_crc_ctl_reg(dev, pipe, &source, &val);
 	else if (IS_GEN5(dev) || IS_GEN6(dev))
 		ret = ilk_pipe_crc_ctl_reg(&source, &val);
@@ -4052,7 +4052,7 @@ static int pipe_crc_set_source(struct drm_device *dev, enum pipe pipe,
 
 		if (IS_G4X(dev))
 			g4x_undo_pipe_scramble_reset(dev, pipe);
-		else if (IS_VALLEYVIEW(dev))
+		else if (HAS_GEN7_LP_FEATURES(dev))
 			vlv_undo_pipe_scramble_reset(dev, pipe);
 		else if (IS_HASWELL(dev) && pipe == PIPE_A)
 			hsw_trans_edp_pipe_A_crc_wa(dev, false);
@@ -4442,7 +4442,7 @@ static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
 		 * - WM1+ latency values in 0.5us units
 		 * - latencies are in us on gen9/vlv/chv
 		 */
-		if (INTEL_INFO(dev)->gen >= 9 || IS_VALLEYVIEW(dev))
+		if (INTEL_INFO(dev)->gen >= 9 || HAS_GEN7_LP_FEATURES(dev))
 			latency *= 10;
 		else if (level > 0)
 			latency *= 5;

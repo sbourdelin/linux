@@ -362,7 +362,7 @@ static bool intel_crt_detect_hotplug(struct drm_connector *connector)
 	if (HAS_PCH_SPLIT(dev))
 		return intel_ironlake_crt_detect_hotplug(connector);
 
-	if (IS_VALLEYVIEW(dev))
+	if (HAS_GEN7_LP_FEATURES(dev))
 		return valleyview_crt_detect_hotplug(connector);
 
 	/*
@@ -786,7 +786,7 @@ void intel_crt_init(struct drm_device *dev)
 
 	if (HAS_PCH_SPLIT(dev))
 		adpa_reg = PCH_ADPA;
-	else if (IS_VALLEYVIEW(dev))
+	else if (HAS_GEN7_LP_FEATURES(dev))
 		adpa_reg = VLV_ADPA;
 	else
 		adpa_reg = ADPA;

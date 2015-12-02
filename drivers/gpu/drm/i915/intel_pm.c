@@ -283,7 +283,7 @@ void intel_set_memory_cxsr(struct drm_i915_private *dev_priv, bool enable)
 	struct drm_device *dev = dev_priv->dev;
 	u32 val;
 
-	if (IS_VALLEYVIEW(dev)) {
+	if (HAS_GEN7_LP_FEATURES(dev)) {
 		I915_WRITE(FW_BLC_SELF_VLV, enable ? FW_CSPWRDWNEN : 0);
 		POSTING_READ(FW_BLC_SELF_VLV);
 		dev_priv->wm.vlv.cxsr = enable;
@@ -4397,7 +4397,7 @@ void gen6_rps_idle(struct drm_i915_private *dev_priv)
 
 	mutex_lock(&dev_priv->rps.hw_lock);
 	if (dev_priv->rps.enabled) {
-		if (IS_VALLEYVIEW(dev))
+		if (HAS_GEN7_LP_FEATURES(dev))
 			vlv_set_rps_idle(dev_priv);
 		else
 			gen6_set_rps(dev_priv->dev, dev_priv->rps.idle_freq);
@@ -4450,7 +4450,7 @@ void gen6_rps_boost(struct drm_i915_private *dev_priv,
 
 void intel_set_rps(struct drm_device *dev, u8 val)
 {
-	if (IS_VALLEYVIEW(dev))
+	if (HAS_GEN7_LP_FEATURES(dev))
 		valleyview_set_rps(dev, val);
 	else
 		gen6_set_rps(dev, val);
@@ -4494,7 +4494,7 @@ static void valleyview_disable_rps(struct drm_device *dev)
 
 static void intel_print_rc6_info(struct drm_device *dev, u32 mode)
 {
-	if (IS_VALLEYVIEW(dev)) {
+	if (HAS_GEN7_LP_FEATURES(dev)) {
 		if (mode & (GEN7_RC_CTL_TO_MODE | GEN6_RC_CTL_EI_MODE(1)))
 			mode = GEN6_RC_CTL_RC6_ENABLE;
 		else

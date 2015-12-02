@@ -256,7 +256,7 @@ intel_setup_mchbar(struct drm_device *dev)
 	u32 temp;
 	bool enabled;
 
-	if (IS_VALLEYVIEW(dev))
+	if (HAS_GEN7_LP_FEATURES(dev))
 		return;
 
 	dev_priv->mchbar_need_disable = false;
@@ -779,7 +779,7 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 		info->num_sprites[PIPE_A] = 2;
 		info->num_sprites[PIPE_B] = 2;
 		info->num_sprites[PIPE_C] = 1;
-	} else if (IS_VALLEYVIEW(dev))
+	} else if (HAS_GEN7_LP_FEATURES(dev))
 		for_each_pipe(dev_priv, pipe)
 			info->num_sprites[pipe] = 2;
 	else
@@ -791,7 +791,7 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 		info->num_pipes = 0;
 	} else if (info->num_pipes > 0 &&
 		   (INTEL_INFO(dev)->gen == 7 || INTEL_INFO(dev)->gen == 8) &&
-		   !IS_VALLEYVIEW(dev)) {
+		   !HAS_GEN7_LP_FEATURES(dev)) {
 		u32 fuse_strap = I915_READ(FUSE_STRAP);
 		u32 sfuse_strap = I915_READ(SFUSE_STRAP);
 
@@ -836,7 +836,7 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 
 static void intel_init_dpio(struct drm_i915_private *dev_priv)
 {
-	if (!IS_VALLEYVIEW(dev_priv))
+	if (!HAS_GEN7_LP_FEATURES(dev_priv))
 		return;
 
 	/*

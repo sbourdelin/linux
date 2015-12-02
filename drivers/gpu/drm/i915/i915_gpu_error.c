@@ -383,7 +383,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		for (i = 0; i < 4; i++)
 			err_printf(m, "GTIER gt %d: 0x%08x\n", i,
 				   error->gtier[i]);
-	} else if (HAS_PCH_SPLIT(dev) || IS_VALLEYVIEW(dev))
+	} else if (HAS_PCH_SPLIT(dev) || HAS_GEN7_LP_FEATURES(dev))
 		err_printf(m, "GTIER: 0x%08x\n", error->gtier[0]);
 	err_printf(m, "PGTBL_ER: 0x%08x\n", error->pgtbl_er);
 	err_printf(m, "FORCEWAKE: 0x%08x\n", error->forcewake);
@@ -1208,7 +1208,7 @@ static void i915_capture_reg_state(struct drm_i915_private *dev_priv,
 	 */
 
 	/* 1: Registers specific to a single generation */
-	if (IS_VALLEYVIEW(dev)) {
+	if (HAS_GEN7_LP_FEATURES(dev)) {
 		error->gtier[0] = I915_READ(GTIER);
 		error->ier = I915_READ(VLV_IER);
 		error->forcewake = I915_READ_FW(FORCEWAKE_VLV);
@@ -1257,7 +1257,7 @@ static void i915_capture_reg_state(struct drm_i915_private *dev_priv,
 		error->gtier[0] = I915_READ(GTIER);
 	} else if (IS_GEN2(dev)) {
 		error->ier = I915_READ16(IER);
-	} else if (!IS_VALLEYVIEW(dev)) {
+	} else if (!HAS_GEN7_LP_FEATURES(dev)) {
 		error->ier = I915_READ(IER);
 	}
 	error->eir = I915_READ(EIR);
