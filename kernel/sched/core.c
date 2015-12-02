@@ -7342,6 +7342,11 @@ int in_sched_functions(unsigned long addr)
  */
 struct task_group root_task_group;
 LIST_HEAD(task_groups);
+
+#ifdef CONFIG_FAIR_GROUP_SCHED
+/* Cacheline aligned slab cache for task_group */
+static struct kmem_cache *task_group_cache __read_mostly;
+#endif
 #endif
 
 DECLARE_PER_CPU(cpumask_var_t, load_balance_mask);
@@ -7367,6 +7372,7 @@ void __init sched_init(void)
 		root_task_group.cfs_rq = (struct cfs_rq **)ptr;
 		ptr += nr_cpu_ids * sizeof(void **);
 
+		task_group_cache = KMEM_CACHE(task_group, SLAB_HWCACHE_ALIGN);
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 #ifdef CONFIG_RT_GROUP_SCHED
 		root_task_group.rt_se = (struct sched_rt_entity **)ptr;
@@ -7679,12 +7685,38 @@ void set_curr_task(int cpu, struct task_struct *p)
 /* task_group_lock serializes the addition/removal of task groups */
 static DEFINE_SPINLOCK(task_group_lock);
 
+/*
+ * Make sure that the task_group structure is cacheline aligned when
+ * fair group scheduling is enabled.
+ */
+#ifdef CONFIG_FAIR_GROUP_SCHED
+static inline struct task_group *alloc_task_group(void)
+{
+	return kmem_cache_alloc(task_group_cache, GFP_KERNEL | __GFP_ZERO);
+}
+
+static inline void free_task_group(struct task_group *tg)
+{
+	kmem_cache_free(task_group_cache, tg);
+}
+#else /* CONFIG_FAIR_GROUP_SCHED */
+static inline struct task_group *alloc_task_group(void)
+{
+	return kzalloc(sizeof(struct task_group), GFP_KERNEL);
+}
+
+static inline void free_task_group(struct task_group *tg)
+{
+	kfree(tg);
+}
+#endif /* CONFIG_FAIR_GROUP_SCHED */
+
 static void free_sched_group(struct task_group *tg)
 {
 	free_fair_sched_group(tg);
 	free_rt_sched_group(tg);
 	autogroup_free(tg);
-	kfree(tg);
+	free_task_group(tg);
 }
 
 /* allocate runqueue etc for a new task group */
@@ -7692,7 +7724,7 @@ struct task_group *sched_create_group(struct task_group *parent)
 {
 	struct task_group *tg;
 
-	tg = kzalloc(sizeof(*tg), GFP_KERNEL);
+	tg = alloc_task_group();
 	if (!tg)
 		return ERR_PTR(-ENOMEM);
 
