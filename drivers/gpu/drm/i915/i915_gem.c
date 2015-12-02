@@ -3552,6 +3552,7 @@ i915_gem_clflush_object(struct drm_i915_gem_object *obj,
 	trace_i915_gem_object_clflush(obj);
 	drm_clflush_sg(obj->pages);
 	obj->cache_dirty = false;
+	obj->cache_flushed = true;
 
 	return true;
 }
@@ -3982,7 +3983,23 @@ i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, bool write)
 
 	/* Flush the CPU cache if it's still invalid. */
 	if ((obj->base.read_domains & I915_GEM_DOMAIN_CPU) == 0) {
-		i915_gem_clflush_object(obj, false);
+		/* When the object was moved out of the CPU domain following a
+		 * CPU write, we will have flushed it out of the CPU cache (and
+		 * marked the object as cache_flushed).
+		 * After the clflush we know that this object cannot be in the
+		 * CPU cache, nor can it be speculatively loaded into the CPU
+		 * cache as our objects are page-aligned and speculation cannot
+		 * cross page boundaries. So whilst the cache_flushed flag is
+		 * set, we know that any future access to the object's pages
+		 * will miss the CPU cache and have to be serviced from main
+		 * memory (where they will pick up any writes through the GTT or
+		 * by the GPU) i.e. we do not need another clflush here and now
+		 * to invalidate the CPU cache as we prepare to read from the
+		 * object.
+		 */
+		if (!obj->cache_flushed)
+			i915_gem_clflush_object(obj, false);
+		obj->cache_flushed = false;
 
 		obj->base.read_domains |= I915_GEM_DOMAIN_CPU;
 	}
