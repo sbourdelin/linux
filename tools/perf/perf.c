@@ -604,6 +604,11 @@ int main(int argc, const char **argv)
 	 */
 	pthread__block_sigwinch();
 
+	if (create_perf_thread() < 0) {
+		fprintf(stderr, "Failed to reserve information for backtrace\n");
+		goto out;
+	}
+
 	while (1) {
 		static int done_help;
 		int was_alias = run_argv(&argc, &argv);
@@ -615,7 +620,7 @@ int main(int argc, const char **argv)
 			fprintf(stderr, "Expansion of alias '%s' failed; "
 				"'%s' is not a perf-command\n",
 				cmd, argv[0]);
-			goto out;
+			goto out_destroy;
 		}
 		if (!done_help) {
 			cmd = argv[0] = help_unknown_cmd(cmd);
@@ -626,6 +631,9 @@ int main(int argc, const char **argv)
 
 	fprintf(stderr, "Failed to run command '%s': %s\n",
 		cmd, strerror_r(errno, sbuf, sizeof(sbuf)));
+
+out_destroy:
+	destroy_perf_thread();
 out:
 	return 1;
 }
