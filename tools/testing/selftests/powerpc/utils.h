@@ -21,6 +21,7 @@ typedef uint8_t u8;
 
 int test_harness(int (test_function)(void), char *name);
 extern void *get_auxv_entry(int type);
+int pick_online_cpu(void);
 
 /* Yes, this is evil */
 #define FAIL_IF(x)						\
