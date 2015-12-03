@@ -60,6 +60,9 @@ bool is_power_of_2(unsigned long n)
 static inline __attribute__((const))
 unsigned long __roundup_pow_of_two(unsigned long n)
 {
+	if (n == 0)
+		return 1UL << 0;
+
 	return 1UL << fls_long(n - 1);
 }
 
