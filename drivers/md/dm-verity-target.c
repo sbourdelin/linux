@@ -14,12 +14,11 @@
  * access behavior.
  */
 
-#include "dm-bufio.h"
+#include "dm-verity.h"
+#include "dm-verity-fec.h"
 
 #include <linux/module.h>
-#include <linux/device-mapper.h>
 #include <linux/reboot.h>
-#include <crypto/hash.h>
 
 #define DM_MSG_PREFIX			"verity"
 
@@ -28,83 +27,16 @@
 
 #define DM_VERITY_DEFAULT_PREFETCH_SIZE	262144
 
-#define DM_VERITY_MAX_LEVELS		63
 #define DM_VERITY_MAX_CORRUPTED_ERRS	100
 
 #define DM_VERITY_OPT_LOGGING		"ignore_corruption"
 #define DM_VERITY_OPT_RESTART		"restart_on_corruption"
 
-#define DM_VERITY_OPTS_MAX		1
+#define DM_VERITY_OPTS_MAX		(1 + DM_VERITY_OPTS_FEC)
 
 static unsigned dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
 
 module_param_named(prefetch_cluster, dm_verity_prefetch_cluster, uint, S_IRUGO | S_IWUSR);
-
-enum verity_mode {
-	DM_VERITY_MODE_EIO,
-	DM_VERITY_MODE_LOGGING,
-	DM_VERITY_MODE_RESTART
-};
-
-enum verity_block_type {
-	DM_VERITY_BLOCK_TYPE_DATA,
-	DM_VERITY_BLOCK_TYPE_METADATA
-};
-
-struct dm_verity {
-	struct dm_dev *data_dev;
-	struct dm_dev *hash_dev;
-	struct dm_target *ti;
-	struct dm_bufio_client *bufio;
-	char *alg_name;
-	struct crypto_shash *tfm;
-	u8 *root_digest;	/* digest of the root block */
-	u8 *salt;		/* salt: its size is salt_size */
-	unsigned salt_size;
-	sector_t data_start;	/* data offset in 512-byte sectors */
-	sector_t hash_start;	/* hash start in blocks */
-	sector_t data_blocks;	/* the number of data blocks */
-	sector_t hash_blocks;	/* the number of hash blocks */
-	unsigned char data_dev_block_bits;	/* log2(data blocksize) */
-	unsigned char hash_dev_block_bits;	/* log2(hash blocksize) */
-	unsigned char hash_per_block_bits;	/* log2(hashes in hash block) */
-	unsigned char levels;	/* the number of tree levels */
-	unsigned char version;
-	unsigned digest_size;	/* digest size for the current hash algorithm */
-	unsigned shash_descsize;/* the size of temporary space for crypto */
-	int hash_failed;	/* set to 1 if hash of any block failed */
-	enum verity_mode mode;	/* mode for handling verification errors */
-	unsigned corrupted_errs;/* Number of errors for corrupted blocks */
-
-	struct workqueue_struct *verify_wq;
-
-	/* starting blocks for each tree level. 0 is the lowest level. */
-	sector_t hash_level_block[DM_VERITY_MAX_LEVELS];
-};
-
-struct dm_verity_io {
-	struct dm_verity *v;
-
-	/* original value of bio->bi_end_io */
-	bio_end_io_t *orig_bi_end_io;
-
-	sector_t block;
-	unsigned n_blocks;
-
-	struct bvec_iter iter;
-
-	struct work_struct work;
-
-	/*
-	 * Three variably-size fields follow this struct:
-	 *
-	 * u8 hash_desc[v->shash_descsize];
-	 * u8 real_digest[v->digest_size];
-	 * u8 want_digest[v->digest_size];
-	 *
-	 * To access them use: io_hash_desc(), io_real_digest() and io_want_digest().
-	 */
-};
 
 struct dm_verity_prefetch_work {
 	struct work_struct work;
@@ -112,21 +44,6 @@ struct dm_verity_prefetch_work {
 	sector_t block;
 	unsigned n_blocks;
 };
-
-static struct shash_desc *io_hash_desc(struct dm_verity *v, struct dm_verity_io *io)
-{
-	return (struct shash_desc *)(io + 1);
-}
-
-static u8 *io_real_digest(struct dm_verity *v, struct dm_verity_io *io)
-{
-	return (u8 *)(io + 1) + v->shash_descsize;
-}
-
-static u8 *io_want_digest(struct dm_verity *v, struct dm_verity_io *io)
-{
-	return (u8 *)(io + 1) + v->shash_descsize + v->digest_size;
-}
 
 /*
  * Auxiliary structure appended to each dm-bufio buffer. If the value
@@ -236,8 +153,8 @@ static int verity_hash_final(struct dm_verity *v, struct shash_desc *desc,
 	return r;
 }
 
-static int verity_hash(struct dm_verity *v, struct shash_desc *desc,
-		       const u8 *data, size_t len, u8 *digest)
+int verity_hash(struct dm_verity *v, struct shash_desc *desc,
+		const u8 *data, size_t len, u8 *digest)
 {
 	int r;
 
@@ -325,12 +242,12 @@ out:
  * Verify hash of a metadata block pertaining to the specified data block
  * ("block" argument) at a specified level ("level" argument).
  *
- * On successful return, io_want_digest(v, io) contains the hash value for
- * a lower tree level or for the data block (if we're at the lowest leve).
+ * On successful return, verity_io_want_digest(v, io) contains the hash value
+ * for a lower tree level or for the data block (if we're at the lowest level).
  *
  * If "skip_unverified" is true, unverified buffer is skipped and 1 is returned.
  * If "skip_unverified" is false, unverified buffer is hashed and verified
- * against current value of io_want_digest(v, io).
+ * against current value of verity_io_want_digest(v, io).
  */
 static int verity_verify_level(struct dm_verity *v, struct dm_verity_io *io,
 			       sector_t block, int level, bool skip_unverified,
@@ -357,14 +274,18 @@ static int verity_verify_level(struct dm_verity *v, struct dm_verity_io *io,
 			goto release_ret_r;
 		}
 
-		r = verity_hash(v, io_hash_desc(v, io),
+		r = verity_hash(v, verity_io_hash_desc(v, io),
 				data, 1 << v->hash_dev_block_bits,
-				io_real_digest(v, io));
+				verity_io_real_digest(v, io));
 		if (unlikely(r < 0))
 			goto release_ret_r;
 
-		if (likely(memcmp(io_real_digest(v, io), want_digest,
+		if (likely(memcmp(verity_io_real_digest(v, io), want_digest,
 				  v->digest_size) == 0))
+			aux->hash_verified = 1;
+		else if (verity_fec_decode(v, io,
+					   DM_VERITY_BLOCK_TYPE_METADATA,
+					   hash_block, data, NULL) == 0)
 			aux->hash_verified = 1;
 		else if (verity_handle_err(v,
 					   DM_VERITY_BLOCK_TYPE_METADATA,
@@ -387,8 +308,8 @@ release_ret_r:
  * Find a hash for a given block, write it to digest and verify the integrity
  * of the hash tree if necessary.
  */
-static int verity_hash_for_block(struct dm_verity *v, struct dm_verity_io *io,
-				 sector_t block, u8 *digest)
+int verity_hash_for_block(struct dm_verity *v, struct dm_verity_io *io,
+			  sector_t block, u8 *digest)
 {
 	int i;
 	int r;
@@ -418,22 +339,65 @@ static int verity_hash_for_block(struct dm_verity *v, struct dm_verity_io *io,
 }
 
 /*
+ * Calls function process for 1 << v->data_dev_block_bits bytes in the bio_vec
+ * starting from iter.
+ */
+int verity_for_bv_block(struct dm_verity *v, struct dm_verity_io *io,
+			struct bvec_iter *iter,
+			int (*process)(struct dm_verity *v,
+				       struct dm_verity_io *io, u8 *data,
+				       size_t len))
+{
+	unsigned todo = 1 << v->data_dev_block_bits;
+	struct bio *bio = dm_bio_from_per_bio_data(io,
+						   v->ti->per_bio_data_size);
+
+	do {
+		int r;
+		u8 *page;
+		unsigned len;
+		struct bio_vec bv = bio_iter_iovec(bio, *iter);
+
+		page = kmap_atomic(bv.bv_page);
+		len = bv.bv_len;
+
+		if (likely(len >= todo))
+			len = todo;
+
+		r = process(v, io, page + bv.bv_offset, len);
+		kunmap_atomic(page);
+
+		if (r < 0)
+			return r;
+
+		bio_advance_iter(bio, iter, len);
+		todo -= len;
+	} while (todo);
+
+	return 0;
+}
+
+static int verity_bv_hash_update(struct dm_verity *v, struct dm_verity_io *io,
+				 u8 *data, size_t len)
+{
+	return verity_hash_update(v, verity_io_hash_desc(v, io), data, len);
+}
+
+/*
  * Verify one "dm_verity_io" structure.
  */
 static int verity_verify_io(struct dm_verity_io *io)
 {
 	struct dm_verity *v = io->v;
-	struct bio *bio = dm_bio_from_per_bio_data(io,
-						   v->ti->per_bio_data_size);
+	struct bvec_iter start;
 	unsigned b;
 
 	for (b = 0; b < io->n_blocks; b++) {
 		int r;
-		unsigned todo;
-		struct shash_desc *desc = io_hash_desc(v, io);
+		struct shash_desc *desc = verity_io_hash_desc(v, io);
 
 		r = verity_hash_for_block(v, io, io->block + b,
-					  io_want_digest(v, io));
+					  verity_io_want_digest(v, io));
 		if (unlikely(r < 0))
 			return r;
 
@@ -441,36 +405,25 @@ static int verity_verify_io(struct dm_verity_io *io)
 		if (unlikely(r < 0))
 			return r;
 
-		todo = 1 << v->data_dev_block_bits;
-		do {
-			u8 *page;
-			unsigned len;
-			struct bio_vec bv = bio_iter_iovec(bio, io->iter);
-
-			page = kmap_atomic(bv.bv_page);
-			len = bv.bv_len;
-			if (likely(len >= todo))
-				len = todo;
-			r = verity_hash_update(v, desc,  page + bv.bv_offset,
-					       len);
-			kunmap_atomic(page);
-
-			if (unlikely(r < 0))
-				return r;
-
-			bio_advance_iter(bio, &io->iter, len);
-			todo -= len;
-		} while (todo);
-
-		r = verity_hash_final(v, desc, io_real_digest(v, io));
+		start = io->iter;
+		r = verity_for_bv_block(v, io, &io->iter,
+					verity_bv_hash_update);
 		if (unlikely(r < 0))
 			return r;
 
-		if (likely(memcmp(io_real_digest(v, io),
-				io_want_digest(v, io), v->digest_size) == 0))
+		r = verity_hash_final(v, desc, verity_io_real_digest(v, io));
+		if (unlikely(r < 0))
+			return r;
+
+		if (likely(memcmp(verity_io_real_digest(v, io),
+				  verity_io_want_digest(v, io),
+				  v->digest_size) == 0))
+			continue;
+		else if (verity_fec_decode(v, io, DM_VERITY_BLOCK_TYPE_DATA,
+					   io->block + b, NULL, &start) == 0)
 			continue;
 		else if (verity_handle_err(v, DM_VERITY_BLOCK_TYPE_DATA,
-				io->block + b))
+					   io->block + b))
 			return -EIO;
 	}
 
@@ -488,6 +441,8 @@ static void verity_finish_io(struct dm_verity_io *io, int error)
 	bio->bi_end_io = io->orig_bi_end_io;
 	bio->bi_error = error;
 
+	verity_fec_finish_io(io);
+
 	bio_endio(bio);
 }
 
@@ -502,7 +457,7 @@ static void verity_end_io(struct bio *bio)
 {
 	struct dm_verity_io *io = bio->bi_private;
 
-	if (bio->bi_error) {
+	if (bio->bi_error && !verity_fec_is_enabled(io->v)) {
 		verity_finish_io(io, bio->bi_error);
 		return;
 	}
@@ -605,6 +560,8 @@ static int verity_map(struct dm_target *ti, struct bio *bio)
 	bio->bi_private = io;
 	io->iter = bio->bi_iter;
 
+	verity_fec_init_io(io);
+
 	verity_submit_prefetch(v, io);
 
 	generic_make_request(bio);
@@ -619,6 +576,7 @@ static void verity_status(struct dm_target *ti, status_type_t type,
 			  unsigned status_flags, char *result, unsigned maxlen)
 {
 	struct dm_verity *v = ti->private;
+	unsigned args = 0;
 	unsigned sz = 0;
 	unsigned x;
 
@@ -645,8 +603,15 @@ static void verity_status(struct dm_target *ti, status_type_t type,
 		else
 			for (x = 0; x < v->salt_size; x++)
 				DMEMIT("%02x", v->salt[x]);
+		if (v->mode != DM_VERITY_MODE_EIO)
+			args++;
+		if (verity_fec_is_enabled(v))
+			args += DM_VERITY_OPTS_FEC;
+		if (!args)
+			return;
+		DMEMIT(" %u", args);
 		if (v->mode != DM_VERITY_MODE_EIO) {
-			DMEMIT(" 1 ");
+			DMEMIT(" ");
 			switch (v->mode) {
 			case DM_VERITY_MODE_LOGGING:
 				DMEMIT(DM_VERITY_OPT_LOGGING);
@@ -658,6 +623,7 @@ static void verity_status(struct dm_target *ti, status_type_t type,
 				BUG();
 			}
 		}
+		sz = verity_fec_status_table(v, sz, result, maxlen);
 		break;
 	}
 }
@@ -720,6 +686,8 @@ static void verity_dtr(struct dm_target *ti)
 	if (v->data_dev)
 		dm_put_device(ti, v->data_dev);
 
+	verity_fec_dtr(v);
+
 	kfree(v);
 }
 
@@ -752,10 +720,12 @@ static int verity_parse_opt_args(struct dm_arg_set *as, struct dm_verity *v)
 		} else if (!strcasecmp(arg_name, DM_VERITY_OPT_RESTART)) {
 			v->mode = DM_VERITY_MODE_RESTART;
 			continue;
+		} else {
+			r = verity_fec_parse_opt_args(as, v, &argc, arg_name);
 		}
 
-		ti->error = "Unrecognized verity feature request";
-		return -EINVAL;
+		if (r && !ti->error)
+			ti->error = "Unrecognized verity feature request";
 	} while (argc && !r);
 
 	return r;
@@ -793,6 +763,10 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	}
 	ti->private = v;
 	v->ti = ti;
+
+	r = verity_fec_ctr_alloc(v);
+	if (r)
+		goto bad;
 
 	if ((dm_table_get_mode(ti->table) & ~FMODE_READ)) {
 		ti->error = "Device must be readonly";
@@ -982,8 +956,6 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		goto bad;
 	}
 
-	ti->per_bio_data_size = roundup(sizeof(struct dm_verity_io) + v->shash_descsize + v->digest_size * 2, __alignof__(struct dm_verity_io));
-
 	/* WQ_UNBOUND greatly improves performance when running on ramdisk */
 	v->verify_wq = alloc_workqueue("kverityd", WQ_CPU_INTENSIVE | WQ_MEM_RECLAIM | WQ_UNBOUND, num_online_cpus());
 	if (!v->verify_wq) {
@@ -991,6 +963,16 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		r = -ENOMEM;
 		goto bad;
 	}
+
+	ti->per_bio_data_size = sizeof(struct dm_verity_io) +
+				v->shash_descsize + v->digest_size * 2;
+
+	r = verity_fec_ctr(v);
+	if (r)
+		goto bad;
+
+	ti->per_bio_data_size = roundup(ti->per_bio_data_size,
+					__alignof__(struct dm_verity_io));
 
 	return 0;
 
