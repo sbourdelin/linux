@@ -270,8 +270,12 @@ extern asmlinkage void dump_stack(void) __cold;
 #define pr_devel(fmt, ...) \
 	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #else
-#define pr_devel(fmt, ...) \
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_devel(fmt, ...)					\
+do {								\
+	if (0) {						\
+		no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);\
+	}							 \
+} while (0)
 #endif
 
 #include <linux/dynamic_debug.h>
@@ -286,7 +290,11 @@ extern asmlinkage void dump_stack(void) __cold;
 	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #else
 #define pr_debug(fmt, ...) \
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+do {								\
+	if (0) {						\
+		no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);\
+	}							 \
+} while (0)
 #endif
 
 /*
@@ -341,7 +349,11 @@ extern asmlinkage void dump_stack(void) __cold;
 	printk_once(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #else
 #define pr_devel_once(fmt, ...)					\
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+do {								\
+	if (0) {						\
+		no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);\
+	}							 \
+} while (0)
 #endif
 
 /* If you are writing a driver, please use dev_dbg instead */
@@ -350,7 +362,11 @@ extern asmlinkage void dump_stack(void) __cold;
 	printk_once(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #else
 #define pr_debug_once(fmt, ...)					\
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+do {								\
+	if (0) {						\
+		no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);\
+	}							 \
+} while (0)
 #endif
 
 /*
@@ -392,8 +408,12 @@ extern asmlinkage void dump_stack(void) __cold;
 #define pr_devel_ratelimited(fmt, ...)					\
 	printk_ratelimited(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #else
-#define pr_devel_ratelimited(fmt, ...)					\
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_devel_ratelimited(fmt, ...)				\
+do {								\
+	if (0) {						\
+		no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);\
+	}							 \
+} while (0)
 #endif
 
 /* If you are writing a driver, please use dev_dbg instead */
@@ -413,8 +433,12 @@ do {									\
 #define pr_debug_ratelimited(fmt, ...)					\
 	printk_ratelimited(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
 #else
-#define pr_debug_ratelimited(fmt, ...) \
-	no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_debug_ratelimited(fmt, ...)					\
+do {								\
+	if (0) {						\
+		no_printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);\
+	}							 \
+} while (0)
 #endif
 
 extern const struct file_operations kmsg_fops;
