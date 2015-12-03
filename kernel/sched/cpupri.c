@@ -214,8 +214,7 @@ int cpupri_init(struct cpupri *cp)
 	for (i = 0; i < CPUPRI_NR_PRIORITIES; i++) {
 		struct cpupri_vec *vec = &cp->pri_to_cpu[i];
 
-		atomic_set(&vec->count, 0);
-		if (!zalloc_cpumask_var(&vec->mask, GFP_KERNEL))
+		if (!alloc_cpumask_var(&vec->mask, GFP_KERNEL | __GFP_ZERO))
 			goto cleanup;
 	}
 
