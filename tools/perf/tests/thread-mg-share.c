@@ -6,7 +6,6 @@
 
 int test__thread_mg_share(int subtest __maybe_unused)
 {
-	struct machines machines;
 	struct machine *machine;
 
 	/* thread group */
@@ -27,8 +26,7 @@ int test__thread_mg_share(int subtest __maybe_unused)
 	 * other  group (pid: 4, tids: 4, 5)
 	*/
 
-	machines__init(&machines);
-	machine = &machines.host;
+	machine = machine__new_host();
 
 	/* create process with 4 threads */
 	leader = machine__findnew_thread(machine, 0, 0);
@@ -93,6 +91,7 @@ int test__thread_mg_share(int subtest __maybe_unused)
 
 	thread__put(other);
 
-	machines__exit(&machines);
+	machine__delete_threads(machine);
+	machine__delete(machine);
 	return 0;
 }
