@@ -32,6 +32,7 @@
 #ifdef CONFIG_ACPI_APEI
 # include <linux/efi.h>
 # include <asm/pgtable.h>
+# include <asm/tlbflush.h>
 #endif
 
 int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
@@ -232,5 +233,10 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
 	if (attr & EFI_MEMORY_WC)
 		return __pgprot(PROT_NORMAL_NC);
 	return __pgprot(PROT_DEVICE_nGnRnE);
+}
+
+void arch_apei_flush_tlb_one(unsigned long addr)
+{
+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
 }
 #endif

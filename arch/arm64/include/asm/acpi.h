@@ -94,6 +94,7 @@ static inline const char *acpi_get_enable_method(int cpu)
 
 #ifdef	CONFIG_ACPI_APEI
 pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+void arch_apei_flush_tlb_one(unsigned long addr);
 #endif
 
 #endif /*_ASM_ACPI_H*/

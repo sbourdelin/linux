@@ -232,8 +232,10 @@ void __init acpi_hest_init(void)
 		goto err;
 	}
 
+#if defined(__i386__) || defined(__x86_64__)
 	if (!acpi_disable_cmcff)
 		apei_hest_parse(hest_parse_cmc, NULL);
+#endif
 
 	if (!ghes_disable) {
 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
