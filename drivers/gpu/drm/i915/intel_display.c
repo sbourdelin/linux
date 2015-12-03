@@ -12075,10 +12075,6 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 				   const char *context)
 {
 	struct drm_device *dev = crtc->base.dev;
-	struct drm_plane *plane;
-	struct intel_plane *intel_plane;
-	struct intel_plane_state *state;
-	struct drm_framebuffer *fb;
 
 	DRM_DEBUG_KMS("[CRTC:%d]%s config %p for pipe %c\n", crtc->base.base.id,
 		      context, pipe_config, pipe_name(crtc->pipe));
@@ -12171,40 +12167,41 @@ static void intel_dump_pipe_config(struct intel_crtc *crtc,
 			      pipe_config->dpll_hw_state.fp0,
 			      pipe_config->dpll_hw_state.fp1);
 	}
+}
 
-	DRM_DEBUG_KMS("planes on this crtc\n");
-	list_for_each_entry(plane, &dev->mode_config.plane_list, head) {
-		intel_plane = to_intel_plane(plane);
-		if (intel_plane->pipe != crtc->pipe)
-			continue;
+static void intel_dump_plane_config(struct drm_plane_state *pstate)
+{
+	struct drm_plane *plane = pstate->plane;
+	struct intel_plane *intel_plane = to_intel_plane(plane);
+	struct intel_plane_state *intel_pstate = to_intel_plane_state(pstate);
+	const char *type = drm_get_plane_type(plane->type);
+	struct drm_framebuffer *fb = pstate->fb;
+	int idx = (plane->type == DRM_PLANE_TYPE_OVERLAY) ?
+		intel_plane->plane + 1 : 0;
 
-		state = to_intel_plane_state(plane->state);
-		fb = state->base.fb;
-		if (!fb) {
-			DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d "
-				"disabled, scaler_id = %d\n",
-				plane->type == DRM_PLANE_TYPE_CURSOR ? "CURSOR" : "STANDARD",
-				plane->base.id, intel_plane->pipe,
-				(crtc->base.primary == plane) ? 0 : intel_plane->plane + 1,
-				drm_plane_index(plane), state->scaler_id);
-			continue;
-		}
-
-		DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d enabled",
-			plane->type == DRM_PLANE_TYPE_CURSOR ? "CURSOR" : "STANDARD",
-			plane->base.id, intel_plane->pipe,
-			crtc->base.primary == plane ? 0 : intel_plane->plane + 1,
-			drm_plane_index(plane));
-		DRM_DEBUG_KMS("\tFB:%d, fb = %ux%u format = 0x%x",
-			fb->base.id, fb->width, fb->height, fb->pixel_format);
-		DRM_DEBUG_KMS("\tscaler:%d src (%u, %u) %ux%u dst (%u, %u) %ux%u\n",
-			state->scaler_id,
-			state->src.x1 >> 16, state->src.y1 >> 16,
-			drm_rect_width(&state->src) >> 16,
-			drm_rect_height(&state->src) >> 16,
-			state->dst.x1, state->dst.y1,
-			drm_rect_width(&state->dst), drm_rect_height(&state->dst));
+	if (!fb) {
+		DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d "
+			"disabled, scaler_id = %d\n",
+			type, plane->base.id, intel_plane->pipe, idx,
+			drm_plane_index(plane), intel_pstate->scaler_id);
+		return;
 	}
+
+	DRM_DEBUG_KMS("%s PLANE:%d plane: %u.%u idx: %d %s",
+		type, plane->base.id, intel_plane->pipe, idx,
+		drm_plane_index(plane),
+		intel_pstate->visible ? "enabled" : "not visible");
+	DRM_DEBUG_KMS("\tFB:%d, fb = %ux%u format = %s",
+		fb->base.id, fb->width, fb->height,
+		drm_get_format_name(fb->pixel_format));
+	DRM_DEBUG_KMS("\tscaler:%d src (%u, %u) %ux%u dst (%u, %u) %ux%u\n",
+		intel_pstate->scaler_id,
+		intel_pstate->src.x1 >> 16, intel_pstate->src.y1 >> 16,
+		drm_rect_width(&intel_pstate->src) >> 16,
+		drm_rect_height(&intel_pstate->src) >> 16,
+		intel_pstate->dst.x1, intel_pstate->dst.y1,
+		drm_rect_width(&intel_pstate->dst),
+		drm_rect_height(&intel_pstate->dst));
 }
 
 static bool check_digital_port_conflicts(struct drm_atomic_state *state)
@@ -15223,6 +15220,7 @@ void intel_modeset_init(struct drm_device *dev)
 	drm_modeset_unlock_all(dev);
 
 	for_each_intel_crtc(dev, crtc) {
+		struct intel_plane *plane;
 		struct intel_initial_plane_config plane_config = {};
 
 		if (!crtc->active)
@@ -15243,6 +15241,11 @@ void intel_modeset_init(struct drm_device *dev)
 		 * just get the first one.
 		 */
 		intel_find_initial_plane_obj(crtc, &plane_config);
+
+		DRM_DEBUG_KMS("Reconstructed BIOS framebuffer for pipe %c\n",
+			      pipe_name(crtc->pipe));
+		for_each_intel_plane_on_crtc(dev, crtc, plane)
+			intel_dump_plane_config(plane->base.state);
 	}
 }
 

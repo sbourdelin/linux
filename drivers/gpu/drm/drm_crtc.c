@@ -78,6 +78,9 @@ static const struct drm_prop_enum_list drm_plane_type_enum_list[] = {
 	{ DRM_PLANE_TYPE_CURSOR, "Cursor" },
 };
 
+DRM_ENUM_NAME_FN(drm_get_plane_type, drm_plane_type_enum_list)
+EXPORT_SYMBOL(drm_get_plane_type);
+
 /*
  * Optional properties
  */
