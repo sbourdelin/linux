@@ -61,7 +61,7 @@ static int perf_evsel__roundtrip_cache_name_test(void)
 	return ret;
 }
 
-static int __perf_evsel__name_array_test(const char *names[], int nr_names)
+static int perf_evsel__name_array_test(const char *names[], int nr_names)
 {
 	int i, err;
 	struct perf_evsel *evsel;
@@ -92,18 +92,17 @@ out_delete_evlist:
 	return err;
 }
 
-#define perf_evsel__name_array_test(names) \
-	__perf_evsel__name_array_test(names, ARRAY_SIZE(names))
-
 int test__perf_evsel__roundtrip_name_test(int subtest __maybe_unused)
 {
 	int err = 0, ret = 0;
 
-	err = perf_evsel__name_array_test(perf_evsel__hw_names);
+	err = perf_evsel__name_array_test(perf_evsel__hw_names,
+					  ARRAY_SIZE(perf_evsel__hw_names));
 	if (err)
 		ret = err;
 
-	err = perf_evsel__name_array_test(perf_evsel__sw_names);
+	err = perf_evsel__name_array_test(perf_evsel__sw_names,
+					  PERF_COUNT_SW_DUMMY + 1);
 	if (err)
 		ret = err;
 
