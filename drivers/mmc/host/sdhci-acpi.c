@@ -288,6 +288,20 @@ static const struct sdhci_acpi_slot *sdhci_acpi_get_slot(const char *hid,
 	return NULL;
 }
 
+static bool sdhci_acpi_is_removable(acpi_handle handle)
+{
+	acpi_status status;
+	unsigned long long removable = 1; /* default to removable */
+
+	if (acpi_has_method(handle, "_EJ0"))
+		return true;
+	status = acpi_evaluate_integer(handle, "_RMV", NULL, &removable);
+	if (ACPI_SUCCESS(status) && !removable)
+		return false;
+
+	return true;
+}
+
 static int sdhci_acpi_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -300,6 +314,7 @@ static int sdhci_acpi_probe(struct platform_device *pdev)
 	const char *hid;
 	const char *uid;
 	int err;
+	bool gpio_cd = false;
 
 	if (acpi_bus_get_device(handle, &device))
 		return -ENODEV;
@@ -373,8 +388,13 @@ static int sdhci_acpi_probe(struct platform_device *pdev)
 		if (mmc_gpiod_request_cd(host->mmc, NULL, 0, v, 0, NULL)) {
 			dev_warn(dev, "failed to setup card detect gpio\n");
 			c->use_runtime_pm = false;
+		} else {
+			gpio_cd = true;
 		}
 	}
+
+	if (!gpio_cd && !sdhci_acpi_is_removable(handle))
+		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
 
 	err = sdhci_add_host(host);
 	if (err)
