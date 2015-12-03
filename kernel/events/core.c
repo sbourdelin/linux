@@ -2314,6 +2314,50 @@ void perf_event_enable(struct perf_event *event)
 }
 EXPORT_SYMBOL_GPL(perf_event_enable);
 
+static int __perf_event_stop(void *info)
+{
+	int ret = -EINVAL;
+	struct perf_event *event = info;
+	struct perf_event_context *ctx = event->ctx;
+	struct perf_cpu_context *cpuctx = __get_cpu_context(ctx);
+
+	raw_spin_lock(&ctx->lock);
+	/* scheduler had a chance to do its thing */
+	if (ctx->task && cpuctx->task_ctx != ctx)
+		goto unlock;
+
+	ret = 0;
+	if (event->state < PERF_EVENT_STATE_ACTIVE)
+		goto unlock;
+
+	perf_pmu_disable(event->pmu);
+	event->pmu->stop(event, PERF_EF_UPDATE);
+	perf_pmu_enable(event->pmu);
+
+unlock:
+	raw_spin_unlock(&ctx->lock);
+
+	return ret;
+}
+
+/*
+ * Stop an event without touching its state;
+ * useful if you know that it won't get restarted when you let go of
+ * the context lock, such as aux path in perf_mmap_close().
+ */
+static void perf_event_stop(struct perf_event *event)
+{
+	struct perf_event_context *ctx;
+
+	ctx = perf_event_ctx_lock(event);
+
+	if (remote_call_or_ctx_lock(event, __perf_event_stop, event,
+				    PERF_EVENT_STATE_NONE))
+		raw_spin_unlock_irq(&event->ctx->lock);
+
+	perf_event_ctx_unlock(event, ctx);
+}
+
 static int _perf_event_refresh(struct perf_event *event, int refresh)
 {
 	/*
