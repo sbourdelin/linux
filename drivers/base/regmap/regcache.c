@@ -533,21 +533,15 @@ bool regcache_set_val(struct regmap *map, void *base, unsigned int idx,
 	}
 
 	switch (map->cache_word_size) {
-	case 1: {
-		u8 *cache = base;
-		cache[idx] = val;
+	case 1:
+		((u8 *)base)[idx] = val;
 		break;
-	}
-	case 2: {
-		u16 *cache = base;
-		cache[idx] = val;
+	case 2:
+		((u16 *)base)[idx] = val;
 		break;
-	}
-	case 4: {
-		u32 *cache = base;
-		cache[idx] = val;
+	case 4:
+		((u32 *)base)[idx] = val;
 		break;
-	}
 	default:
 		BUG();
 	}
@@ -566,18 +560,12 @@ unsigned int regcache_get_val(struct regmap *map, const void *base,
 								   idx));
 
 	switch (map->cache_word_size) {
-	case 1: {
-		const u8 *cache = base;
-		return cache[idx];
-	}
-	case 2: {
-		const u16 *cache = base;
-		return cache[idx];
-	}
-	case 4: {
-		const u32 *cache = base;
-		return cache[idx];
-	}
+	case 1:
+		return ((u8 *)base)[idx];
+	case 2:
+		return ((u16 *)base)[idx];
+	case 4:
+		return ((u32 *)base)[idx];
 	default:
 		BUG();
 	}
