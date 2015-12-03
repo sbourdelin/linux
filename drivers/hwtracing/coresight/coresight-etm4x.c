@@ -72,7 +72,6 @@ static int etm4_trace_id(struct coresight_device *csdev)
 	if (!drvdata->enable)
 		return drvdata->trcid;
 
-	pm_runtime_get_sync(drvdata->dev);
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 
 	CS_UNLOCK(drvdata->base);
@@ -81,7 +80,6 @@ static int etm4_trace_id(struct coresight_device *csdev)
 	CS_LOCK(drvdata->base);
 
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-	pm_runtime_put(drvdata->dev);
 
 	return trace_id;
 }
@@ -187,7 +185,6 @@ static int etm4_enable(struct coresight_device *csdev)
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	int ret;
 
-	pm_runtime_get_sync(drvdata->dev);
 	spin_lock(&drvdata->spinlock);
 
 	/*
@@ -207,7 +204,6 @@ static int etm4_enable(struct coresight_device *csdev)
 	return 0;
 err:
 	spin_unlock(&drvdata->spinlock);
-	pm_runtime_put(drvdata->dev);
 	return ret;
 }
 
@@ -255,8 +251,6 @@ static void etm4_disable(struct coresight_device *csdev)
 
 	spin_unlock(&drvdata->spinlock);
 	put_online_cpus();
-
-	pm_runtime_put(drvdata->dev);
 
 	dev_info(drvdata->dev, "ETM tracing disabled\n");
 }
