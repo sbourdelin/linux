@@ -374,7 +374,7 @@ static int connlimit_mt_check(const struct xt_mtchk_param *par)
 		} while (!rand);
 		cmpxchg(&connlimit_rnd, 0, rand);
 	}
-	ret = nf_ct_l3proto_try_module_get(par->family);
+	ret = nf_ct_netns_get(par->net, par->family);
 	if (ret < 0) {
 		pr_info("cannot load conntrack support for "
 			"address family %u\n", par->family);
@@ -384,7 +384,7 @@ static int connlimit_mt_check(const struct xt_mtchk_param *par)
 	/* init private data */
 	info->data = kmalloc(sizeof(struct xt_connlimit_data), GFP_KERNEL);
 	if (info->data == NULL) {
-		nf_ct_l3proto_module_put(par->family);
+		nf_ct_netns_put(par->net, par->family);
 		return -ENOMEM;
 	}
 
@@ -420,7 +420,7 @@ static void connlimit_mt_destroy(const struct xt_mtdtor_param *par)
 	const struct xt_connlimit_info *info = par->matchinfo;
 	unsigned int i;
 
-	nf_ct_l3proto_module_put(par->family);
+	nf_ct_netns_put(par->net, par->family);
 
 	for (i = 0; i < ARRAY_SIZE(info->data->climit_root4); ++i)
 		destroy_tree(&info->data->climit_root4[i]);
