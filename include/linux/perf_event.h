@@ -402,6 +402,7 @@ enum perf_event_active_state {
 	PERF_EVENT_STATE_OFF		= -1,
 	PERF_EVENT_STATE_INACTIVE	=  0,
 	PERF_EVENT_STATE_ACTIVE		=  1,
+	PERF_EVENT_STATE_NONE		=  2,
 };
 
 struct file;

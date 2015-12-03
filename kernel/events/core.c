@@ -126,6 +126,59 @@ static int cpu_function_call(int cpu, remote_function_f func, void *info)
 	return data.ret;
 }
 
+static int
+remote_call_or_ctx_lock(struct perf_event *event, remote_function_f func,
+			void *info, enum perf_event_active_state retry_state)
+{
+	struct perf_event_context *ctx = event->ctx;
+	struct task_struct *task = ctx->task;
+	unsigned int retry = 1;
+
+	if (!task) {
+		/*
+		 * Per cpu events are removed via an smp call. The removal can
+		 * fail if the CPU is currently offline, but in that case we
+		 * already called __perf_remove_from_context from
+		 * perf_event_exit_cpu.
+		 */
+		cpu_function_call(event->cpu, func, info);
+		return 0;
+	}
+
+	raw_spin_lock_irq(&ctx->lock);
+	do {
+		/*
+		 * Reload the task pointer, it might have been changed by
+		 * a concurrent perf_event_context_sched_out().
+		 */
+		task = ctx->task;
+
+		/*
+		 * If the context is inactive, we don't need a cross call to
+		 * fiddle with the event so long as the ctx::lock is held.
+		 */
+		if (!ctx->is_active)
+			break;
+
+		raw_spin_unlock_irq(&ctx->lock);
+
+		if (!task_function_call(task, func, info))
+			return 0;
+
+		raw_spin_lock_irq(&ctx->lock);
+
+		if (retry_state <= PERF_EVENT_STATE_ACTIVE)
+			retry = event->state == retry_state;
+	} while (retry);
+
+	/*
+	 * No luck: leaving with ctx::lock held and interrupts disabled
+	 * so that the caller can safely fiddle with event or context.
+	 */
+
+	return -ENXIO;
+}
+
 #define EVENT_OWNER_KERNEL ((void *) -1)
 
 static bool is_kernel_event(struct perf_event *event)
@@ -1673,7 +1726,6 @@ static int __perf_remove_from_context(void *info)
 static void perf_remove_from_context(struct perf_event *event, bool detach_group)
 {
 	struct perf_event_context *ctx = event->ctx;
-	struct task_struct *task = ctx->task;
 	struct remove_event re = {
 		.event = event,
 		.detach_group = detach_group,
@@ -1681,35 +1733,9 @@ static void perf_remove_from_context(struct perf_event *event, bool detach_group
 
 	lockdep_assert_held(&ctx->mutex);
 
-	if (!task) {
-		/*
-		 * Per cpu events are removed via an smp call. The removal can
-		 * fail if the CPU is currently offline, but in that case we
-		 * already called __perf_remove_from_context from
-		 * perf_event_exit_cpu.
-		 */
-		cpu_function_call(event->cpu, __perf_remove_from_context, &re);
+	if (!remote_call_or_ctx_lock(event, __perf_remove_from_context, &re,
+				     PERF_EVENT_STATE_NONE))
 		return;
-	}
-
-retry:
-	if (!task_function_call(task, __perf_remove_from_context, &re))
-		return;
-
-	raw_spin_lock_irq(&ctx->lock);
-	/*
-	 * If we failed to find a running task, but find the context active now
-	 * that we've acquired the ctx->lock, retry.
-	 */
-	if (ctx->is_active) {
-		raw_spin_unlock_irq(&ctx->lock);
-		/*
-		 * Reload the task pointer, it might have been changed by
-		 * a concurrent perf_event_context_sched_out().
-		 */
-		task = ctx->task;
-		goto retry;
-	}
 
 	/*
 	 * Since the task isn't running, its safe to remove the event, us
@@ -1778,33 +1804,9 @@ int __perf_event_disable(void *info)
 static void _perf_event_disable(struct perf_event *event)
 {
 	struct perf_event_context *ctx = event->ctx;
-	struct task_struct *task = ctx->task;
 
-	if (!task) {
-		/*
-		 * Disable the event on the cpu that it's on
-		 */
-		cpu_function_call(event->cpu, __perf_event_disable, event);
+	if (!remote_call_or_ctx_lock(event, __perf_event_disable, event, PERF_EVENT_STATE_ACTIVE))
 		return;
-	}
-
-retry:
-	if (!task_function_call(task, __perf_event_disable, event))
-		return;
-
-	raw_spin_lock_irq(&ctx->lock);
-	/*
-	 * If the event is still active, we need to retry the cross-call.
-	 */
-	if (event->state == PERF_EVENT_STATE_ACTIVE) {
-		raw_spin_unlock_irq(&ctx->lock);
-		/*
-		 * Reload the task pointer, it might have been changed by
-		 * a concurrent perf_event_context_sched_out().
-		 */
-		task = ctx->task;
-		goto retry;
-	}
 
 	/*
 	 * Since we have the lock this context can't be scheduled
@@ -2143,41 +2145,15 @@ perf_install_in_context(struct perf_event_context *ctx,
 			struct perf_event *event,
 			int cpu)
 {
-	struct task_struct *task = ctx->task;
-
 	lockdep_assert_held(&ctx->mutex);
 
 	event->ctx = ctx;
 	if (event->cpu != -1)
 		event->cpu = cpu;
 
-	if (!task) {
-		/*
-		 * Per cpu events are installed via an smp call and
-		 * the install is always successful.
-		 */
-		cpu_function_call(cpu, __perf_install_in_context, event);
+	if (!remote_call_or_ctx_lock(event, __perf_install_in_context, event,
+				     PERF_EVENT_STATE_NONE))
 		return;
-	}
-
-retry:
-	if (!task_function_call(task, __perf_install_in_context, event))
-		return;
-
-	raw_spin_lock_irq(&ctx->lock);
-	/*
-	 * If we failed to find a running task, but find the context active now
-	 * that we've acquired the ctx->lock, retry.
-	 */
-	if (ctx->is_active) {
-		raw_spin_unlock_irq(&ctx->lock);
-		/*
-		 * Reload the task pointer, it might have been changed by
-		 * a concurrent perf_event_context_sched_out().
-		 */
-		task = ctx->task;
-		goto retry;
-	}
 
 	/*
 	 * Since the task isn't running, its safe to add the event, us holding
@@ -2299,15 +2275,6 @@ unlock:
 static void _perf_event_enable(struct perf_event *event)
 {
 	struct perf_event_context *ctx = event->ctx;
-	struct task_struct *task = ctx->task;
-
-	if (!task) {
-		/*
-		 * Enable the event on the cpu that it's on
-		 */
-		cpu_function_call(event->cpu, __perf_event_enable, event);
-		return;
-	}
 
 	raw_spin_lock_irq(&ctx->lock);
 	if (event->state >= PERF_EVENT_STATE_INACTIVE)
@@ -2322,32 +2289,13 @@ static void _perf_event_enable(struct perf_event *event)
 	 */
 	if (event->state == PERF_EVENT_STATE_ERROR)
 		event->state = PERF_EVENT_STATE_OFF;
-
-retry:
-	if (!ctx->is_active) {
-		__perf_event_mark_enabled(event);
-		goto out;
-	}
-
 	raw_spin_unlock_irq(&ctx->lock);
 
-	if (!task_function_call(task, __perf_event_enable, event))
+	if (!remote_call_or_ctx_lock(event, __perf_event_enable, event, PERF_EVENT_STATE_OFF))
 		return;
 
-	raw_spin_lock_irq(&ctx->lock);
-
-	/*
-	 * If the context is active and the event is still off,
-	 * we need to retry the cross-call.
-	 */
-	if (ctx->is_active && event->state == PERF_EVENT_STATE_OFF) {
-		/*
-		 * task could have been flipped by a concurrent
-		 * perf_event_context_sched_out()
-		 */
-		task = ctx->task;
-		goto retry;
-	}
+	if (!ctx->is_active)
+		__perf_event_mark_enabled(event);
 
 out:
 	raw_spin_unlock_irq(&ctx->lock);
@@ -4209,21 +4157,9 @@ static int perf_event_period(struct perf_event *event, u64 __user *arg)
 	task = ctx->task;
 	pe.value = value;
 
-	if (!task) {
-		cpu_function_call(event->cpu, __perf_event_period, &pe);
+	if (!remote_call_or_ctx_lock(event, __perf_event_period, &pe,
+				     PERF_EVENT_STATE_NONE))
 		return 0;
-	}
-
-retry:
-	if (!task_function_call(task, __perf_event_period, &pe))
-		return 0;
-
-	raw_spin_lock_irq(&ctx->lock);
-	if (ctx->is_active) {
-		raw_spin_unlock_irq(&ctx->lock);
-		task = ctx->task;
-		goto retry;
-	}
 
 	__perf_event_period(&pe);
 	raw_spin_unlock_irq(&ctx->lock);
