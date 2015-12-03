@@ -236,12 +236,35 @@ static void vfio_intx_disable(struct vfio_pci_device *vdev)
 	kfree(vdev->ctx);
 }
 
+static irqreturn_t vfio_msihandler(int irq, void *arg)
+{
+	struct vfio_pci_irq_ctx *ctx = arg;
+	struct irq_bypass_producer *producer = &ctx->producer;
+	struct irq_bypass_consumer *consumer;
+	int ret = IRQ_HANDLED, idx;
+
+	idx = srcu_read_lock(&producer->srcu);
+
+	list_for_each_entry_rcu(consumer, &producer->consumers, sibling) {
+		/*
+		 * Invoke the thread handler if any consumer would block, but
+		 * finish all consumes.
+		 */
+		if (consumer->handle_irq(consumer->irq_context) == -EWOULDBLOCK)
+			ret = IRQ_WAKE_THREAD;
+		continue;
+	}
+
+	srcu_read_unlock(&producer->srcu, idx);
+	return ret;
+}
+
 /*
  * MSI/MSI-X
  */
-static irqreturn_t vfio_msihandler(int irq, void *arg)
+static irqreturn_t vfio_msihandler_threaded(int irq, void *arg)
 {
-	struct eventfd_ctx *trigger = arg;
+	struct eventfd_ctx *trigger = ((struct vfio_pci_irq_ctx *)arg)->trigger;
 
 	eventfd_signal(trigger, 1);
 	return IRQ_HANDLED;
@@ -318,7 +341,7 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 		return -EINVAL;
 
 	if (vdev->ctx[vector].trigger) {
-		free_irq(irq, vdev->ctx[vector].trigger);
+		free_irq(irq, &vdev->ctx[vector]);
 		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
 		kfree(vdev->ctx[vector].name);
 		eventfd_ctx_put(vdev->ctx[vector].trigger);
@@ -353,8 +376,14 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 		pci_write_msi_msg(irq, &msg);
 	}
 
-	ret = request_irq(irq, vfio_msihandler, 0,
-			  vdev->ctx[vector].name, trigger);
+	/*
+	 * Currently the primary handler for the thread_irq will be invoked on
+	 * a thread, the IRQF_ONESHOT is a hack for it.
+	 */
+	ret = request_threaded_irq(irq, vfio_msihandler,
+				   vfio_msihandler_threaded,
+				   IRQF_ONESHOT, vdev->ctx[vector].name,
+				   &vdev->ctx[vector]);
 	if (ret) {
 		kfree(vdev->ctx[vector].name);
 		eventfd_ctx_put(trigger);
