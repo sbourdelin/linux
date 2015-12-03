@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/rculist.h>
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("IRQ bypass manager utility module");
@@ -49,11 +50,8 @@ static int __connect(struct irq_bypass_producer *prod,
 			prod->del_consumer(prod, cons);
 	}
 
-	if (cons->start)
-		cons->start(cons);
-	if (prod->start)
-		prod->start(prod);
-
+	if (!ret && cons->handle_irq)
+		list_add_rcu(&cons->sibling, &prod->consumers);
 	return ret;
 }
 
@@ -71,6 +69,11 @@ static void __disconnect(struct irq_bypass_producer *prod,
 	if (prod->del_consumer)
 		prod->del_consumer(prod, cons);
 
+	if (cons->handle_irq) {
+		list_del_rcu(&cons->sibling);
+		synchronize_srcu(&prod->srcu);
+	}
+
 	if (cons->start)
 		cons->start(cons);
 	if (prod->start)
@@ -87,7 +90,8 @@ static void __disconnect(struct irq_bypass_producer *prod,
 int irq_bypass_register_producer(struct irq_bypass_producer *producer)
 {
 	struct irq_bypass_producer *tmp;
-	struct irq_bypass_consumer *consumer;
+	struct list_head *node, *next, siblings = LIST_HEAD_INIT(siblings);
+	int ret;
 
 	might_sleep();
 
@@ -95,6 +99,9 @@ int irq_bypass_register_producer(struct irq_bypass_producer *producer)
 		return -ENODEV;
 
 	mutex_lock(&lock);
+
+	INIT_LIST_HEAD(&producer->consumers);
+	init_srcu_struct(&producer->srcu);
 
 	list_for_each_entry(tmp, &producers, node) {
 		if (tmp->token == producer->token) {
@@ -104,23 +111,48 @@ int irq_bypass_register_producer(struct irq_bypass_producer *producer)
 		}
 	}
 
-	list_for_each_entry(consumer, &consumers, node) {
+	list_for_each_safe(node, next, &consumers) {
+		struct irq_bypass_consumer *consumer = container_of(
+			node, struct irq_bypass_consumer, node);
+
 		if (consumer->token == producer->token) {
-			int ret = __connect(producer, consumer);
-			if (ret) {
-				mutex_unlock(&lock);
-				module_put(THIS_MODULE);
-				return ret;
-			}
-			break;
+			ret = __connect(producer, consumer);
+			if (ret)
+				goto error;
+			/* Keep the connected consumers temply */
+			list_del(&consumer->node);
+			list_add_rcu(&consumer->node, &siblings);
 		}
 	}
 
+	list_for_each_safe(node, next, &siblings) {
+		struct irq_bypass_consumer *consumer = container_of(
+			node, struct irq_bypass_consumer, node);
+
+		list_del(&consumer->node);
+		list_add(&consumer->node, &consumers);
+		if (consumer->start)
+			consumer->start(consumer);
+	}
+
+	if (producer->start)
+		producer->start(producer);
 	list_add(&producer->node, &producers);
 
 	mutex_unlock(&lock);
-
 	return 0;
+
+error:
+	list_for_each_safe(node, next, &siblings) {
+		struct irq_bypass_consumer *consumer = container_of(
+			node, struct irq_bypass_consumer, node);
+
+		list_del(&consumer->node);
+		list_add(&consumer->node, &consumers);
+	}
+	mutex_unlock(&lock);
+	module_put(THIS_MODULE);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(irq_bypass_register_producer);
 
@@ -133,7 +165,7 @@ EXPORT_SYMBOL_GPL(irq_bypass_register_producer);
  */
 void irq_bypass_unregister_producer(struct irq_bypass_producer *producer)
 {
-	struct irq_bypass_producer *tmp;
+	struct irq_bypass_producer *tmp, *n;
 	struct irq_bypass_consumer *consumer;
 
 	might_sleep();
@@ -143,7 +175,7 @@ void irq_bypass_unregister_producer(struct irq_bypass_producer *producer)
 
 	mutex_lock(&lock);
 
-	list_for_each_entry(tmp, &producers, node) {
+	list_for_each_entry_safe(tmp, n, &producers, node) {
 		if (tmp->token != producer->token)
 			continue;
 
@@ -159,6 +191,7 @@ void irq_bypass_unregister_producer(struct irq_bypass_producer *producer)
 		break;
 	}
 
+	cleanup_srcu_struct(&producer->srcu);
 	mutex_unlock(&lock);
 
 	module_put(THIS_MODULE);
@@ -180,6 +213,9 @@ int irq_bypass_register_consumer(struct irq_bypass_consumer *consumer)
 	if (!consumer->add_producer || !consumer->del_producer)
 		return -EINVAL;
 
+	if (consumer->handle_irq && !consumer->irq_context)
+		return -EINVAL;
+
 	might_sleep();
 
 	if (!try_module_get(THIS_MODULE))
@@ -188,7 +224,7 @@ int irq_bypass_register_consumer(struct irq_bypass_consumer *consumer)
 	mutex_lock(&lock);
 
 	list_for_each_entry(tmp, &consumers, node) {
-		if (tmp->token == consumer->token) {
+		if (tmp == consumer) {
 			mutex_unlock(&lock);
 			module_put(THIS_MODULE);
 			return -EBUSY;
@@ -203,6 +239,10 @@ int irq_bypass_register_consumer(struct irq_bypass_consumer *consumer)
 				module_put(THIS_MODULE);
 				return ret;
 			}
+			if (consumer->start)
+				consumer->start(consumer);
+			if (producer->start)
+				producer->start(producer);
 			break;
 		}
 	}
@@ -224,7 +264,7 @@ EXPORT_SYMBOL_GPL(irq_bypass_register_consumer);
  */
 void irq_bypass_unregister_consumer(struct irq_bypass_consumer *consumer)
 {
-	struct irq_bypass_consumer *tmp;
+	struct irq_bypass_consumer *tmp, *n;
 	struct irq_bypass_producer *producer;
 
 	might_sleep();
@@ -234,8 +274,8 @@ void irq_bypass_unregister_consumer(struct irq_bypass_consumer *consumer)
 
 	mutex_lock(&lock);
 
-	list_for_each_entry(tmp, &consumers, node) {
-		if (tmp->token != consumer->token)
+	list_for_each_entry_safe(tmp, n, &consumers, node) {
+		if (tmp != consumer)
 			continue;
 
 		list_for_each_entry(producer, &producers, node) {

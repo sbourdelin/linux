@@ -12,6 +12,7 @@
 #define IRQBYPASS_H
 
 #include <linux/list.h>
+#include <linux/srcu.h>
 
 struct irq_bypass_consumer;
 
@@ -47,6 +48,9 @@ struct irq_bypass_consumer;
  */
 struct irq_bypass_producer {
 	struct list_head node;
+	/* Update side is synchronized by the lock on irqbypass.c */
+	struct srcu_struct srcu;
+	struct list_head consumers;
 	void *token;
 	int irq;
 	int (*add_consumer)(struct irq_bypass_producer *,
@@ -61,6 +65,7 @@ struct irq_bypass_producer {
  * struct irq_bypass_consumer - IRQ bypass consumer definition
  * @node: IRQ bypass manager private list management
  * @token: opaque token to match between producer and consumer
+ * @sibling: consumers with same token list management
  * @add_producer: Connect the IRQ consumer to an IRQ producer
  * @del_producer: Disconnect the IRQ consumer from an IRQ producer
  * @stop: Perform any quiesce operations necessary prior to add/del (optional)
@@ -73,6 +78,7 @@ struct irq_bypass_producer {
  */
 struct irq_bypass_consumer {
 	struct list_head node;
+	struct list_head sibling;
 	void *token;
 	int (*add_producer)(struct irq_bypass_consumer *,
 			    struct irq_bypass_producer *);
@@ -80,6 +86,8 @@ struct irq_bypass_consumer {
 			     struct irq_bypass_producer *);
 	void (*stop)(struct irq_bypass_consumer *);
 	void (*start)(struct irq_bypass_consumer *);
+	int (*handle_irq)(void *arg);
+	void *irq_context;
 };
 
 int irq_bypass_register_producer(struct irq_bypass_producer *);
