@@ -493,6 +493,9 @@ void __init __early_set_fixmap(enum fixed_addresses idx,
 	}
 	pte = early_ioremap_pte(addr);
 
+	if (!(__supported_pte_mask & _PAGE_NX))
+		pgprot_val(flags) &= ~_PAGE_NX;
+
 	if (pgprot_val(flags))
 		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
 	else

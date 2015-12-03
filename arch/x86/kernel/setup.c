@@ -908,6 +908,15 @@ void __init setup_arch(char **cmdline_p)
 	early_cpu_init();
 	early_ioremap_init();
 
+	/*
+	 * x86_configure_nx() is called to detect whether hardware doesn't
+	 * support NX.  It has to be called before __early_set_fixmap() is
+	 * called from setup_olpc_ofw_pgd and parse_setup_data.  It may
+	 * then be called again from within noexec_setup() during parsing
+	 * early parameters to honor the respective command line option.
+	 */
+	x86_configure_nx();
+
 	setup_olpc_ofw_pgd();
 
 	ROOT_DEV = old_decode_dev(boot_params.hdr.root_dev);
@@ -989,15 +998,6 @@ void __init setup_arch(char **cmdline_p)
 
 	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = command_line;
-
-	/*
-	 * x86_configure_nx() is called before parse_early_param() to detect
-	 * whether hardware doesn't support NX (so that the early EHCI debug
-	 * console setup can safely call set_fixmap()). It may then be called
-	 * again from within noexec_setup() during parsing early parameters
-	 * to honor the respective command line option.
-	 */
-	x86_configure_nx();
 
 	parse_early_param();
 
