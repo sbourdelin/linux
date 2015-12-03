@@ -2451,6 +2451,7 @@ static struct nfnl_ct_hook ctnetlink_glue_hook = {
 	.parse		= ctnetlink_glue_parse,
 	.attach_expect	= ctnetlink_glue_attach_expect,
 	.seq_adjust	= ctnetlink_glue_seqadj,
+	.register_hooks = ctnl_bind,
 };
 #endif /* CONFIG_NETFILTER_NETLINK_GLUE_CT */
 

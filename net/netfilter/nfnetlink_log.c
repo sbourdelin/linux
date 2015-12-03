@@ -853,19 +853,27 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 	if (nfula[NFULA_CFG_FLAGS]) {
 		flags = ntohs(nla_get_be16(nfula[NFULA_CFG_FLAGS]));
 
-		if ((flags & NFULNL_CFG_F_CONNTRACK) &&
-		    !rcu_access_pointer(nfnl_ct_hook)) {
+		if (flags & NFULNL_CFG_F_CONNTRACK) {
+			struct nfnl_ct_hook *nfnl_ct;
+
+			nfnl_ct = rcu_dereference(nfnl_ct_hook);
+			if (!nfnl_ct) {
 #ifdef CONFIG_MODULES
-			nfnl_unlock(NFNL_SUBSYS_ULOG);
-			request_module("ip_conntrack_netlink");
-			nfnl_lock(NFNL_SUBSYS_ULOG);
-			if (rcu_access_pointer(nfnl_ct_hook)) {
-				ret = -EAGAIN;
-				goto out_put;
-			}
+				nfnl_unlock(NFNL_SUBSYS_ULOG);
+				request_module("ip_conntrack_netlink");
+				nfnl_lock(NFNL_SUBSYS_ULOG);
+
+				if (rcu_access_pointer(nfnl_ct_hook)) {
+					ret = -EAGAIN;
+					goto out_put;
+				}
 #endif
-			ret = -EOPNOTSUPP;
-			goto out_put;
+				ret = -EOPNOTSUPP;
+				goto out_put;
+
+			}
+
+			nfnl_ct->register_hooks(net);
 		}
 	}
 

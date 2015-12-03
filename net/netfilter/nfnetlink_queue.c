@@ -1224,6 +1224,14 @@ nfqnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 			goto err_out_unlock;
 		}
 #endif
+		if (flags & mask & NFQA_CFG_F_CONNTRACK) {
+			struct nfnl_ct_hook *nfnl_ct;
+
+			nfnl_ct = rcu_dereference(nfnl_ct_hook);
+			if (nfnl_ct)
+				nfnl_ct->register_hooks(net);
+		}
+
 		spin_lock_bh(&queue->lock);
 		queue->flags &= ~mask;
 		queue->flags |= flags & mask;
