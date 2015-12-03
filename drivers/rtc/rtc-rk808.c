@@ -56,6 +56,50 @@ struct rk808_rtc {
 	int irq;
 };
 
+/* Set current time and date in RTC */
+static int rk808_rtc_set_time(struct device *dev, struct rtc_time *tm)
+{
+	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
+	struct rk808 *rk808 = rk808_rtc->rk808;
+	u8 rtc_data[NUM_TIME_REGS];
+	int ret;
+
+	rtc_data[0] = bin2bcd(tm->tm_sec);
+	rtc_data[1] = bin2bcd(tm->tm_min);
+	rtc_data[2] = bin2bcd(tm->tm_hour);
+	rtc_data[3] = bin2bcd(tm->tm_mday);
+	rtc_data[4] = bin2bcd(tm->tm_mon + 1);
+	rtc_data[5] = bin2bcd(tm->tm_year - 100);
+	rtc_data[6] = bin2bcd(tm->tm_wday);
+	dev_dbg(dev, "set RTC date/time %4d-%02d-%02d(%d) %02d:%02d:%02d\n",
+		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
+		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
+
+	/* Stop RTC while updating the RTC registers */
+	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
+				 BIT_RTC_CTRL_REG_STOP_RTC_M,
+				 BIT_RTC_CTRL_REG_STOP_RTC_M);
+	if (ret) {
+		dev_err(dev, "Failed to update RTC control: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_bulk_write(rk808->regmap, RK808_SECONDS_REG,
+				rtc_data, NUM_TIME_REGS);
+	if (ret) {
+		dev_err(dev, "Failed to bull write rtc_data: %d\n", ret);
+		return ret;
+	}
+	/* Start RTC again */
+	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
+				 BIT_RTC_CTRL_REG_STOP_RTC_M, 0);
+	if (ret) {
+		dev_err(dev, "Failed to update RTC control: %d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
 /* Read current time and date in RTC */
 static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
 {
@@ -105,51 +149,14 @@ static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
 		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
 		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
 
+	if (tm->tm_mon == 10 && tm->tm_mday == 31) {
+		dev_warn(dev, "correcting Nov 31st to Dec 1st (HW bug)\n");
+		tm->tm_mon = 11;
+		tm->tm_mday = 1;
+		rk808_rtc_set_time(dev, tm);
+	}
+
 	return ret;
-}
-
-/* Set current time and date in RTC */
-static int rk808_rtc_set_time(struct device *dev, struct rtc_time *tm)
-{
-	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
-	struct rk808 *rk808 = rk808_rtc->rk808;
-	u8 rtc_data[NUM_TIME_REGS];
-	int ret;
-
-	rtc_data[0] = bin2bcd(tm->tm_sec);
-	rtc_data[1] = bin2bcd(tm->tm_min);
-	rtc_data[2] = bin2bcd(tm->tm_hour);
-	rtc_data[3] = bin2bcd(tm->tm_mday);
-	rtc_data[4] = bin2bcd(tm->tm_mon + 1);
-	rtc_data[5] = bin2bcd(tm->tm_year - 100);
-	rtc_data[6] = bin2bcd(tm->tm_wday);
-	dev_dbg(dev, "set RTC date/time %4d-%02d-%02d(%d) %02d:%02d:%02d\n",
-		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
-		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
-
-	/* Stop RTC while updating the RTC registers */
-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
-				 BIT_RTC_CTRL_REG_STOP_RTC_M,
-				 BIT_RTC_CTRL_REG_STOP_RTC_M);
-	if (ret) {
-		dev_err(dev, "Failed to update RTC control: %d\n", ret);
-		return ret;
-	}
-
-	ret = regmap_bulk_write(rk808->regmap, RK808_SECONDS_REG,
-				rtc_data, NUM_TIME_REGS);
-	if (ret) {
-		dev_err(dev, "Failed to bull write rtc_data: %d\n", ret);
-		return ret;
-	}
-	/* Start RTC again */
-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
-				 BIT_RTC_CTRL_REG_STOP_RTC_M, 0);
-	if (ret) {
-		dev_err(dev, "Failed to update RTC control: %d\n", ret);
-		return ret;
-	}
-	return 0;
 }
 
 /* Read alarm time and date in RTC */
