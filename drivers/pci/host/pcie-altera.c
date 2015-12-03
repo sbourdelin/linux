@@ -60,7 +60,7 @@
 #define TLP_LOOP			500
 #define RP_DEVFN			0
 
-#define INTX_NUM			4
+#define INTX_NUM			5
 
 #define DWORD_MASK			3
 
