@@ -14,6 +14,7 @@
 #define _LINUX_CORESIGHT_H
 
 #include <linux/device.h>
+#include <linux/perf_event.h>
 #include <linux/sched.h>
 
 /* Peripheral id registers (0xFD0-0xFEC) */
@@ -181,12 +182,29 @@ struct coresight_device {
 /**
  * struct coresight_ops_sink - basic operations for a sink
  * Operations available for sinks
- * @enable:	enables the sink.
- * @disable:	disables the sink.
+ * @enable:		enables the sink.
+ * @disable:		disables the sink.
+ * @get_config:		initialises perf's ring buffer for trace collection.
+ * @put_config:		release memory allocated in @get_config.
+ * @set_buffer:		initialises buffer mechanic before a trace session.
+ * @reset_buffer:	finalises buffer mechanic after a trace session.
+ * @update_buffer:	update buffer pointers after a trace session.
  */
 struct coresight_ops_sink {
 	int (*enable)(struct coresight_device *csdev, u32 mode);
 	void (*disable)(struct coresight_device *csdev);
+	void *(*get_config)(struct coresight_device *csdev, int cpu,
+			    void **pages, int nr_pages, bool overwrite);
+	void (*put_config)(void *config);
+	int (*set_buffer)(struct coresight_device *csdev,
+			  struct perf_output_handle *handle,
+			  void *sink_config);
+	unsigned long (*reset_buffer)(struct coresight_device *csdev,
+				      struct perf_output_handle *handle,
+				      void *sink_config, bool *lost);
+	void (*update_buffer)(struct coresight_device *csdev,
+			      struct perf_output_handle *handle,
+			      void *sink_config);
 };
 
 /**
