@@ -206,13 +206,20 @@ struct coresight_ops_link {
  * @cpu_id:	returns the value of the CPU number this component
  *		is associated to.
  * @trace_id:	returns the value of the component's trace ID as known
-		to the HW.
+ *		to the HW.
+ * @get_config:	builds the ETM configuration after events' specifics.
+ * @put_config: release memory allocated in @get_config.
+ * @set_config:	associate a tracer with a configuration.
  * @enable:	enables tracing for a source.
  * @disable:	disables tracing for a source.
  */
 struct coresight_ops_source {
 	int (*cpu_id)(struct coresight_device *csdev);
 	int (*trace_id)(struct coresight_device *csdev);
+	void *(*get_config)(struct coresight_device *csdev,
+			    struct perf_event *event);
+	void (*put_config)(void *config);
+	void (*set_config)(struct coresight_device *csdev, void *config);
 	int (*enable)(struct coresight_device *csdev, u32 mode);
 	void (*disable)(struct coresight_device *csdev);
 };
