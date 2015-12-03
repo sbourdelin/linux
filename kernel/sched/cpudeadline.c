@@ -211,7 +211,6 @@ int cpudl_init(struct cpudl *cp)
 
 	memset(cp, 0, sizeof(*cp));
 	raw_spin_lock_init(&cp->lock);
-	cp->size = 0;
 
 	cp->elements = kcalloc(nr_cpu_ids,
 			       sizeof(struct cpudl_item),
@@ -219,7 +218,7 @@ int cpudl_init(struct cpudl *cp)
 	if (!cp->elements)
 		return -ENOMEM;
 
-	if (!zalloc_cpumask_var(&cp->free_cpus, GFP_KERNEL)) {
+	if (!alloc_cpumask_var(&cp->free_cpus, GFP_KERNEL | __GFP_ZERO)) {
 		kfree(cp->elements);
 		return -ENOMEM;
 	}
