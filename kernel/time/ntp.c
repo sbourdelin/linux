@@ -297,6 +297,9 @@ static void ntp_update_offset(long offset)
 	if (!(time_status & STA_PLL))
 		return;
 
+	/* Make sure the multiplication below won't overflow */
+	offset = clamp(offset, -MAXPHASE, MAXPHASE);
+
 	if (!(time_status & STA_NANO))
 		offset *= NSEC_PER_USEC;
 
@@ -304,8 +307,7 @@ static void ntp_update_offset(long offset)
 	 * Scale the phase adjustment and
 	 * clamp to the operating range.
 	 */
-	offset = min(offset, MAXPHASE);
-	offset = max(offset, -MAXPHASE);
+	offset = clamp(offset, -MAXPHASE, MAXPHASE);
 
 	/*
 	 * Select how the frequency is to be controlled
