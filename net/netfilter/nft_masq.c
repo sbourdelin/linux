@@ -48,13 +48,14 @@ int nft_masq_init(const struct nft_ctx *ctx,
 		return err;
 
 	if (tb[NFTA_MASQ_FLAGS] == NULL)
-		return 0;
+		goto out;
 
 	priv->flags = ntohl(nla_get_be32(tb[NFTA_MASQ_FLAGS]));
 	if (priv->flags & ~NF_NAT_RANGE_MASK)
 		return -EINVAL;
+ out:
+	return nf_ct_netns_get(ctx->net, ctx->afi->family);
 
-	return 0;
 }
 EXPORT_SYMBOL_GPL(nft_masq_init);
 
