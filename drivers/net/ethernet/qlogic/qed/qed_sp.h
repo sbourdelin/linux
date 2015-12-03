@@ -124,8 +124,19 @@ struct qed_spq {
 	dma_addr_t		p_phys;
 	struct qed_spq_entry	*p_virt;
 
-	/* Used as index for completions (returns on EQ by FW) */
-	u16			echo_idx;
+	/* Bitmap for handling out-of-order completions */
+#define SPQ_RING_SIZE \
+	(CORE_SPQE_PAGE_SIZE_BYTES / sizeof(struct slow_path_element))
+#define SPQ_COMP_BMAP_SIZE	(SPQ_RING_SIZE / BITS_PER_LONG)
+	unsigned long		p_comp_bitmap[SPQ_COMP_BMAP_SIZE];
+	u8			comp_bitmap_idx;
+
+#define SPQ_COMP_BMAP_SET_BIT(p_spq, idx)	\
+	__set_bit((idx) % SPQ_RING_SIZE, (p_spq)->p_comp_bitmap)
+#define SPQ_COMP_BMAP_CLEAR_BIT(p_spq, idx)	\
+	__clear_bit((idx) % SPQ_RING_SIZE, (p_spq)->p_comp_bitmap)
+#define SPQ_COMP_BMAP_TEST_BIT(p_spq, idx)	\
+	test_bit((idx) % SPQ_RING_SIZE, (p_spq)->p_comp_bitmap)
 
 	/* Statistics */
 	u32			unlimited_pending_count;
