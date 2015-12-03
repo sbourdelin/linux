@@ -65,6 +65,7 @@ struct kvm_kernel_irqfd {
 	poll_table pt;
 	struct work_struct shutdown;
 	struct irq_bypass_consumer consumer;
+	struct irq_bypass_consumer fastpath;
 	struct irq_bypass_producer *producer;
 };
 

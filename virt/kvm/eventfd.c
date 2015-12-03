@@ -144,6 +144,8 @@ irqfd_shutdown(struct work_struct *work)
 #ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
 	irq_bypass_unregister_consumer(&irqfd->consumer);
 #endif
+	if (irqfd->fastpath.token)
+		irq_bypass_unregister_consumer(&irqfd->fastpath);
 	eventfd_ctx_put(irqfd->eventfd);
 	kfree(irqfd);
 }
@@ -200,6 +202,14 @@ irqfd_wakeup_pollin(struct kvm_kernel_irqfd *irqfd)
 	srcu_read_unlock(&kvm->irq_srcu, idx);
 
 	return ret;
+}
+
+static int
+kvm_fastpath_irq(void *arg)
+{
+	struct kvm_kernel_irqfd *irqfd = arg;
+
+	return irqfd_wakeup_pollin(irqfd);
 }
 
 static int
@@ -295,6 +305,34 @@ int  __attribute__((weak)) kvm_arch_update_irqfd_routing(
 	return 0;
 }
 #endif
+
+static int kvm_fastpath_stub(struct irq_bypass_consumer *stub,
+			     struct irq_bypass_producer *stub1)
+{
+	return 0;
+}
+
+static void kvm_fastpath_stub1(struct irq_bypass_consumer *stub,
+			     struct irq_bypass_producer *stub1)
+{
+}
+
+static int setup_fastpath_consumer(struct kvm_kernel_irqfd *irqfd)
+{
+	int ret;
+
+	irqfd->fastpath.token = (void *)irqfd->eventfd;
+	irqfd->fastpath.add_producer = kvm_fastpath_stub;
+	irqfd->fastpath.del_producer = kvm_fastpath_stub1;
+	irqfd->fastpath.handle_irq = kvm_fastpath_irq;
+	irqfd->fastpath.irq_context = irqfd;
+	ret = irq_bypass_register_consumer(&irqfd->fastpath);
+
+	if (ret)
+		/* A special tag to indicate consumer not working */
+		irqfd->fastpath.token = (void *)0;
+	return ret;
+}
 
 static int
 kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
@@ -434,6 +472,10 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 		pr_info("irq bypass consumer (token %p) registration fails: %d\n",
 				irqfd->consumer.token, ret);
 #endif
+
+	if (setup_fastpath_consumer(irqfd))
+		pr_info("irq bypass fastpath consumer (toke %p) registration fails: %d\n",
+				irqfd->eventfd, ret);
 
 	return 0;
 
