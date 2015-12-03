@@ -711,6 +711,9 @@ static int __init rapl_pmu_init(void)
 	struct x86_pmu_quirk *quirk;
 	int i;
 
+	if (boot_cpu_has(X86_FEATURE_HYPERVISOR))
+		return 0;
+
 	/*
 	 * check for Intel processor family 6
 	 */
