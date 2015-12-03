@@ -340,12 +340,25 @@ static int ipv6_hooks_register(struct net *net)
 	return err;
 }
 
+static void ipv6_hooks_unregister_force(struct net *net)
+{
+	struct conntrack6_net *cnet = net_generic(net, conntrack6_net_id);
+
+	mutex_lock(&register_ipv6_hooks);
+	if (cnet->users) {
+		cnet->users = 0;
+		nf_unregister_net_hooks(net, ipv6_conntrack_ops,
+					ARRAY_SIZE(ipv6_conntrack_ops));
+	}
+	mutex_unlock(&register_ipv6_hooks);
+}
+
 static void ipv6_hooks_unregister(struct net *net)
 {
 	struct conntrack6_net *cnet = net_generic(net, conntrack6_net_id);
 
 	mutex_lock(&register_ipv6_hooks);
-	if (--cnet->users == 0)
+	if (cnet->users > 0 && --cnet->users == 0)
 		nf_unregister_net_hooks(net, ipv6_conntrack_ops,
 					ARRAY_SIZE(ipv6_conntrack_ops));
 	mutex_unlock(&register_ipv6_hooks);
@@ -418,6 +431,8 @@ static int ipv6_net_init(struct net *net)
 
 static void ipv6_net_exit(struct net *net)
 {
+	ipv6_hooks_unregister_force(net);
+
 	nf_ct_l3proto_pernet_unregister(net, &nf_conntrack_l3proto_ipv6);
 	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_icmpv6);
 	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_udp6);

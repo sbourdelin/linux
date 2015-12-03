@@ -57,6 +57,11 @@
 MODULE_LICENSE("GPL");
 
 static char __initdata version[] = "0.93";
+static int ctnetlink_net_id __read_mostly;
+
+struct ctnl_net {
+	DECLARE_BITMAP(enabled, NFPROTO_NUMPROTO);
+};
 
 static inline int
 ctnetlink_dump_tuples_proto(struct sk_buff *skb,
@@ -2133,6 +2138,50 @@ ctnetlink_alloc_expect(const struct nlattr *const cda[], struct nf_conn *ct,
 		       struct nf_conntrack_tuple *tuple,
 		       struct nf_conntrack_tuple *mask);
 
+static int ctnl_bind(struct net *net)
+{
+	struct ctnl_net *ctnet = net_generic(net, ctnetlink_net_id);
+	int i;
+
+	might_sleep();
+
+	rcu_read_lock();
+
+	for (i = 0; i < NFPROTO_NUMPROTO; i++) {
+		struct nf_conntrack_l3proto *l3proto;
+		int ret;
+
+		/* don't autoload modules; only ensure those present have
+		 * their hooks registered.
+		 */
+		l3proto = __nf_ct_l3proto_find(i);
+		if (!l3proto || !l3proto->net_ns_get)
+			continue;
+
+		if (test_and_set_bit(i, ctnet->enabled))
+			continue;
+
+		if (!try_module_get(l3proto->me))
+			continue;
+
+		rcu_read_unlock();
+
+		/* might sleep, l3proto can't go away, module ref held */
+		ret = l3proto->net_ns_get(net);
+
+		module_put(l3proto->me);
+
+		if (ret < 0)
+			clear_bit(i, ctnet->enabled);
+
+		rcu_read_lock();
+	}
+
+	rcu_read_unlock();
+
+	return 0;
+}
+
 #ifdef CONFIG_NETFILTER_NETLINK_GLUE_CT
 static size_t
 ctnetlink_glue_build_size(const struct nf_conn *ct)
@@ -3304,6 +3353,7 @@ static const struct nfnetlink_subsystem ctnl_subsys = {
 	.subsys_id			= NFNL_SUBSYS_CTNETLINK,
 	.cb_count			= IPCTNL_MSG_MAX,
 	.cb				= ctnl_cb,
+	.bind				= ctnl_bind,
 };
 
 static const struct nfnetlink_subsystem ctnl_exp_subsys = {
@@ -3311,6 +3361,7 @@ static const struct nfnetlink_subsystem ctnl_exp_subsys = {
 	.subsys_id			= NFNL_SUBSYS_CTNETLINK_EXP,
 	.cb_count			= IPCTNL_MSG_EXP_MAX,
 	.cb				= ctnl_exp_cb,
+	.bind				= ctnl_bind,
 };
 
 MODULE_ALIAS("ip_conntrack_netlink");
@@ -3346,10 +3397,43 @@ err_out:
 
 static void ctnetlink_net_exit(struct net *net)
 {
+	struct ctnl_net *ctnet = net_generic(net, ctnetlink_net_id);
+	int i;
+
 #ifdef CONFIG_NF_CONNTRACK_EVENTS
 	nf_ct_expect_unregister_notifier(net, &ctnl_notifier_exp);
 	nf_conntrack_unregister_notifier(net, &ctnl_notifier);
 #endif
+
+	might_sleep();
+
+	rcu_read_lock();
+
+	for (i = 0; i < NFPROTO_NUMPROTO; i++) {
+		struct nf_conntrack_l3proto *l3proto;
+
+		if (!test_bit(i, ctnet->enabled))
+			continue;
+
+		l3proto = __nf_ct_l3proto_find(i);
+		/* module might have been unloaded, l3proto->net_ns_put
+		 * must have been called by that modules' netns exit handler.
+		 */
+		if (!l3proto)
+			continue;
+
+		if (!try_module_get(l3proto->me))
+			continue;
+
+		rcu_read_unlock();
+
+		l3proto->net_ns_put(net);
+		module_put(l3proto->me);
+
+		rcu_read_lock();
+	}
+
+	rcu_read_unlock();
 }
 
 static void __net_exit ctnetlink_net_exit_batch(struct list_head *net_exit_list)
@@ -3363,6 +3447,8 @@ static void __net_exit ctnetlink_net_exit_batch(struct list_head *net_exit_list)
 static struct pernet_operations ctnetlink_net_ops = {
 	.init		= ctnetlink_net_init,
 	.exit_batch	= ctnetlink_net_exit_batch,
+	.id   = &ctnetlink_net_id,
+	.size = sizeof(struct ctnl_net),
 };
 
 static int __init ctnetlink_init(void)

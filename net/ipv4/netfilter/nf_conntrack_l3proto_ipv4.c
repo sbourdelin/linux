@@ -401,12 +401,25 @@ static int ipv4_hooks_register(struct net *net)
 	return err;
 }
 
+static void ipv4_hooks_unregister_force(struct net *net)
+{
+	struct conntrack4_net *cnet = net_generic(net, conntrack4_net_id);
+
+	mutex_lock(&register_ipv4_hooks);
+	if (cnet->users) {
+		cnet->users = 0;
+		nf_unregister_net_hooks(net, ipv4_conntrack_ops,
+					ARRAY_SIZE(ipv4_conntrack_ops));
+	}
+	mutex_unlock(&register_ipv4_hooks);
+}
+
 static void ipv4_hooks_unregister(struct net *net)
 {
 	struct conntrack4_net *cnet = net_generic(net, conntrack4_net_id);
 
 	mutex_lock(&register_ipv4_hooks);
-	if (--cnet->users == 0)
+	if (cnet->users > 0 && --cnet->users == 0)
 		nf_unregister_net_hooks(net, ipv4_conntrack_ops,
 					ARRAY_SIZE(ipv4_conntrack_ops));
 	mutex_unlock(&register_ipv4_hooks);
@@ -478,6 +491,8 @@ out_tcp:
 
 static void ipv4_net_exit(struct net *net)
 {
+	ipv4_hooks_unregister_force(net);
+
 	nf_ct_l3proto_pernet_unregister(net, &nf_conntrack_l3proto_ipv4);
 	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_icmp);
 	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_udp4);

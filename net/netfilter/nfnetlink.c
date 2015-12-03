@@ -481,11 +481,11 @@ static void nfnetlink_rcv(struct sk_buff *skb)
 	}
 }
 
-#ifdef CONFIG_MODULES
 static int nfnetlink_bind(struct net *net, int group)
 {
 	const struct nfnetlink_subsystem *ss;
-	int type;
+	int type, ret;
+	u8 subsys_id;
 
 	if (group <= NFNLGRP_NONE || group > NFNLGRP_MAX)
 		return 0;
@@ -494,12 +494,33 @@ static int nfnetlink_bind(struct net *net, int group)
 
 	rcu_read_lock();
 	ss = nfnetlink_get_subsys(type << 8);
-	rcu_read_unlock();
-	if (!ss)
+	ret = -EINVAL;
+#ifdef CONFIG_MODULES
+	if (!ss) {
+		rcu_read_unlock();
 		request_module("nfnetlink-subsys-%d", type);
-	return 0;
-}
+		rcu_read_lock();
+		ss = nfnetlink_get_subsys(type << 8);
+	}
 #endif
+	if (!ss) {
+		rcu_read_unlock();
+		return ret;
+	}
+
+	subsys_id = ss->subsys_id;
+	rcu_read_unlock();
+
+	if (!ss->bind)
+		return 0;
+
+	nfnl_lock(subsys_id);
+	if (nfnl_dereference_protected(subsys_id) == ss)
+		ret = ss->bind(net);
+	nfnl_unlock(subsys_id);
+
+	return ret;
+}
 
 static int __net_init nfnetlink_net_init(struct net *net)
 {
@@ -507,9 +528,7 @@ static int __net_init nfnetlink_net_init(struct net *net)
 	struct netlink_kernel_cfg cfg = {
 		.groups	= NFNLGRP_MAX,
 		.input	= nfnetlink_rcv,
-#ifdef CONFIG_MODULES
 		.bind	= nfnetlink_bind,
-#endif
 	};
 
 	nfnl = netlink_kernel_create(net, NETLINK_NETFILTER, &cfg);
