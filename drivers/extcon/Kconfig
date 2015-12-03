@@ -118,3 +118,8 @@ config EXTCON_USB_GPIO
 	  Used typically if GPIO is used for USB ID pin detection.
 
 endif
+
+config EXTCON_INTEL_USB
+	bool
+	depends on X86 && USB
+	select EXTCON
