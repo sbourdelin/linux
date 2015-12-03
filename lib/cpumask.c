@@ -60,6 +60,19 @@ int cpumask_any_but(const struct cpumask *mask, unsigned int cpu)
  */
 bool alloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node)
 {
+	/*
+	 * When CONFIG_CPUMASK_OFFSTACK is not set, the cpumask may
+	 * be zeroed by a memset of the structure that contains the
+	 * mask. But if CONFIG_CPUMASK_OFFSTACK is then enabled,
+	 * the mask may end up containing garbage. By checking
+	 * if the pointer of the mask is already zero, we can assume
+	 * that the mask itself should be allocated to contain all
+	 * zeros as well. This will prevent subtle bugs by the
+	 * inconsistency of the config being set or not.
+	 */
+	if ((long)*mask == 0)
+		flags |= __GFP_ZERO;
+
 	*mask = kmalloc_node(cpumask_size(), flags, node);
 
 #ifdef CONFIG_DEBUG_PER_CPU_MAPS
