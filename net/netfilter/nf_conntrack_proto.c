@@ -259,6 +259,7 @@ int nf_ct_l3proto_register(struct nf_conntrack_l3proto *proto)
 {
 	int ret = 0;
 	struct nf_conntrack_l3proto *old;
+	struct nfnl_ct_hook *nfnl_ct;
 
 	if (proto->l3proto >= AF_MAX)
 		return -EBUSY;
@@ -279,6 +280,11 @@ int nf_ct_l3proto_register(struct nf_conntrack_l3proto *proto)
 
 	rcu_assign_pointer(nf_ct_l3protos[proto->l3proto], proto);
 
+	rcu_read_lock();
+	nfnl_ct = rcu_dereference(nfnl_ct_hook);
+	if (nfnl_ct)
+		nfnl_ct->newproto();
+	rcu_read_unlock();
 out_unlock:
 	mutex_unlock(&nf_ct_proto_mutex);
 	return ret;

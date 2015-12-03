@@ -61,6 +61,7 @@ static int ctnetlink_net_id __read_mostly;
 
 struct ctnl_net {
 	DECLARE_BITMAP(enabled, NFPROTO_NUMPROTO);
+	bool active;
 };
 
 static inline int
@@ -2138,7 +2139,7 @@ ctnetlink_alloc_expect(const struct nlattr *const cda[], struct nf_conn *ct,
 		       struct nf_conntrack_tuple *tuple,
 		       struct nf_conntrack_tuple *mask);
 
-static int ctnl_bind(struct net *net)
+static void __ctnl_bind(struct net *net)
 {
 	struct ctnl_net *ctnet = net_generic(net, ctnetlink_net_id);
 	int i;
@@ -2178,11 +2179,43 @@ static int ctnl_bind(struct net *net)
 	}
 
 	rcu_read_unlock();
+}
+
+static int ctnl_bind(struct net *net)
+{
+	struct ctnl_net *ctnet = net_generic(net, ctnetlink_net_id);
+
+	__ctnl_bind(net);
+
+	if (!ctnet->active)
+		ctnet->active = true;
 
 	return 0;
 }
 
 #ifdef CONFIG_NETFILTER_NETLINK_GLUE_CT
+/* called with RCU read lock held */
+static void ctnl_newproto(void)
+{
+	struct ctnl_net *ctnet;
+	struct net *net;
+
+	if (!try_module_get(THIS_MODULE))
+		return;
+
+	rcu_read_unlock();
+	rtnl_lock();
+	for_each_net(net) {
+		ctnet = net_generic(net, ctnetlink_net_id);
+		if (ctnet->active)
+			__ctnl_bind(net);
+	}
+	rtnl_unlock();
+	rcu_read_lock();
+
+	module_put(THIS_MODULE);
+}
+
 static size_t
 ctnetlink_glue_build_size(const struct nf_conn *ct)
 {
@@ -2452,6 +2485,7 @@ static struct nfnl_ct_hook ctnetlink_glue_hook = {
 	.attach_expect	= ctnetlink_glue_attach_expect,
 	.seq_adjust	= ctnetlink_glue_seqadj,
 	.register_hooks = ctnl_bind,
+	.newproto	= ctnl_newproto,
 };
 #endif /* CONFIG_NETFILTER_NETLINK_GLUE_CT */
 
@@ -3434,6 +3468,7 @@ static void ctnetlink_net_exit(struct net *net)
 		rcu_read_lock();
 	}
 
+	ctnet->active = false;
 	rcu_read_unlock();
 }
 

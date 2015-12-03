@@ -397,6 +397,7 @@ struct nfnl_ct_hook {
 	void (*seq_adjust)(struct sk_buff *skb, struct nf_conn *ct,
 			   enum ip_conntrack_info ctinfo, s32 off);
 	int (*register_hooks)(struct net *);
+	void (*newproto)(void);
 };
 extern struct nfnl_ct_hook __rcu *nfnl_ct_hook;
 
