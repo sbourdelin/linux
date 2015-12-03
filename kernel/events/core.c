@@ -4630,11 +4630,62 @@ static void perf_mmap_close(struct vm_area_struct *vma)
 	 */
 	if (rb_has_aux(rb) && vma->vm_pgoff == rb->aux_pgoff &&
 	    atomic_dec_and_mutex_lock(&rb->aux_mmap_count, &event->mmap_mutex)) {
+		struct perf_event *iter;
+		LIST_HEAD(stop_list);
+		unsigned long flags;
+
+		/*
+		 * Stop all aux events that are writing to this here buffer,
+		 * so that we can free its aux pages and corresponding pmu
+		 * data. Note that after rb::aux_mmap_count dropped to zero,
+		 * they won't start any more (see perf_aux_output_begin()).
+		 *
+		 * Since we can't take ctx::mutex under rb::event_lock, we
+		 * need to jump through hoops to get there, namely fish out
+		 * all events from rb::event_list onto an on-stack list,
+		 * carry out the stopping and splice this on-stack list back
+		 * to rb::event_list.
+		 * This means that these events will miss wakeups during this
+		 * window, but since it's mmap_close, assume the consumer
+		 * doesn't care any more.
+		 *
+		 * Note: list_splice_init_rcu() doesn't cut it, since it syncs
+		 * and rb::event_lock is a spinlock.
+		 */
+retry:
+		spin_lock_irqsave(&rb->event_lock, flags);
+		list_for_each_entry_rcu(iter, &rb->event_list, rb_entry) {
+			list_del_rcu(&iter->rb_entry);
+			spin_unlock_irqrestore(&rb->event_lock, flags);
+
+			synchronize_rcu();
+			list_add_tail(&iter->rb_entry, &stop_list);
+
+			goto retry;
+		}
+		spin_unlock_irqrestore(&rb->event_lock, flags);
+
+		mutex_unlock(&event->mmap_mutex);
+
+		list_for_each_entry(iter, &stop_list, rb_entry) {
+			if (!has_aux(iter))
+				continue;
+
+			perf_event_stop(iter);
+		}
+
+		/* and splice it back now that we're done with them */
+		spin_lock_irqsave(&rb->event_lock, flags);
+		list_splice_tail(&stop_list, &rb->event_list);
+		spin_unlock_irqrestore(&rb->event_lock, flags);
+
+		/* now it's safe to free the pages */
 		atomic_long_sub(rb->aux_nr_pages, &mmap_user->locked_vm);
 		vma->vm_mm->pinned_vm -= rb->aux_mmap_locked;
 
+		/* this has to be the last one */
 		rb_free_aux(rb);
-		mutex_unlock(&event->mmap_mutex);
+		WARN_ON_ONCE(atomic_read(&rb->aux_refcount));
 	}
 
 	atomic_dec(&rb->mmap_count);
