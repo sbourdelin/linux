@@ -852,9 +852,6 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 		bool line_status);
 int kvm_set_msi(struct kvm_kernel_irq_routing_entry *irq_entry, struct kvm *kvm,
 		int irq_source_id, int level, bool line_status);
-int kvm_arch_set_irq_inatomic(struct kvm_kernel_irq_routing_entry *e,
-			       struct kvm *kvm, int irq_source_id,
-			       int level, bool line_status);
 bool kvm_irq_has_notifier(struct kvm *kvm, unsigned irqchip, unsigned pin);
 void kvm_notify_acked_gsi(struct kvm *kvm, int gsi);
 void kvm_notify_acked_irq(struct kvm *kvm, unsigned irqchip, unsigned pin);
@@ -1206,5 +1203,21 @@ void kvm_arch_irq_bypass_start(struct irq_bypass_consumer *);
 int kvm_arch_update_irqfd_routing(struct kvm *kvm, unsigned int host_irq,
 				  uint32_t guest_irq, bool set);
 #endif /* CONFIG_HAVE_KVM_IRQ_BYPASS */
+
+#ifndef CONFIG_KVM_SET_IRQ_INATOMIC
+int __attribute__((weak)) kvm_arch_set_irq_inatomic(
+				struct kvm_kernel_irq_routing_entry *irq,
+				struct kvm *kvm, int irq_source_id,
+				int level,
+				bool line_status)
+{
+	return -EWOULDBLOCK;
+}
+#else
+extern int kvm_arch_set_irq_inatomic(
+			struct kvm_kernel_irq_routing_entry *e,
+			struct kvm *kvm, int irq_source_id, int level,
+			bool line_status);
+#endif
 
 #endif

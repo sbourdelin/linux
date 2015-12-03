@@ -173,15 +173,6 @@ irqfd_deactivate(struct kvm_kernel_irqfd *irqfd)
 	queue_work(irqfd_cleanup_wq, &irqfd->shutdown);
 }
 
-int __attribute__((weak)) kvm_arch_set_irq_inatomic(
-				struct kvm_kernel_irq_routing_entry *irq,
-				struct kvm *kvm, int irq_source_id,
-				int level,
-				bool line_status)
-{
-	return -EWOULDBLOCK;
-}
-
 static int
 irqfd_wakeup_pollin(struct kvm_kernel_irqfd *irqfd)
 {
