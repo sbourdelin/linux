@@ -1307,11 +1307,24 @@ EXPORT_SYMBOL(drm_atomic_commit);
 int drm_atomic_async_commit(struct drm_atomic_state *state)
 {
 	struct drm_mode_config *config = &state->dev->mode_config;
-	int ret;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+	int i, ret;
 
 	ret = drm_atomic_check_only(state);
 	if (ret)
 		return ret;
+
+	if (!state->allow_modeset) {
+		for_each_crtc_in_state(state, crtc, crtc_state, i) {
+			if (crtc_state->active) {
+				DRM_DEBUG_ATOMIC("[CRTC:%d] requires full modeset\n",
+						 crtc->base.id);
+				return -EINVAL;
+
+			}
+		}
+	}
 
 	DRM_DEBUG_ATOMIC("commiting %p asynchronously\n", state);
 
