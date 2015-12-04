@@ -38,12 +38,15 @@ struct apd_private_data;
 
 static u8 peri_id[2] = { 0, 1 };
 
+static int apd_acpi_xlate_filter(int slave_id, struct device *dev);
+
 static struct dma_pl330_platdata amd_pl330 = {
 	.nr_valid_peri = 2,
 	.peri_id = peri_id,
 	.has_no_cap_mask = true,
 	.mcbuf_sz = 0,
 	.flags = IRQF_SHARED,
+	.acpi_xlate_filter = apd_acpi_xlate_filter,
 };
 
 /**
@@ -67,6 +70,15 @@ struct apd_private_data {
 	struct acpi_device *adev;
 	const struct apd_device_desc *dev_desc;
 };
+
+int apd_acpi_xlate_filter(int slave_id, struct device *dev)
+{
+	if (((slave_id == 1) && (!strcmp(dev_name(dev), "AMD0020:00DMA")))
+	    || ((slave_id == 2) && (!strcmp(dev_name(dev), "AMD0020:01DMA"))))
+		return 0;
+
+	return 1;
+}
 
 #ifdef CONFIG_X86_AMD_PLATFORM_DEVICE
 #define APD_ADDR(desc)	((unsigned long)&desc)

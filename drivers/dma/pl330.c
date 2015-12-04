@@ -2079,6 +2079,35 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
 	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
 }
 
+static struct dma_chan *acpi_dma_pl330_xlate(struct acpi_dma_spec *dma_spec,
+					     struct acpi_dma *adma)
+{
+	struct pl330_dmac *pl330 = adma->data;
+	struct dma_pl330_platdata *pdat;
+	unsigned int chan_id;
+	int ret;
+
+	if (!dma_spec)
+		return NULL;
+
+	if (!adma)
+		return NULL;
+
+	pdat = dev_get_platdata(adma->dev);
+
+	chan_id = dma_spec->chan_id;
+	if (chan_id >= pl330->num_peripherals)
+		return NULL;
+
+	if (pdat->acpi_xlate_filter) {
+		ret = pdat->acpi_xlate_filter(dma_spec->slave_id, adma->dev);
+		if (ret)
+			return NULL;
+	}
+
+	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
+}
+
 static int pl330_alloc_chan_resources(struct dma_chan *chan)
 {
 	struct dma_pl330_chan *pch = to_pchan(chan);
@@ -2915,6 +2944,15 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 		if (ret) {
 			dev_err(&adev->dev,
 			"unable to register DMA to the generic DT DMA helpers\n");
+		}
+	}
+
+	if (ACPI_HANDLE(&adev->dev)) {
+		ret = acpi_dma_controller_register(&adev->dev,
+						   acpi_dma_pl330_xlate, pl330);
+		if (ret) {
+			dev_err(&adev->dev,
+				"unable to register DMA to the generic ACPI DMA helpers\n");
 		}
 	}
 

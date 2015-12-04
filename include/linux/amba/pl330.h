@@ -32,6 +32,7 @@ struct dma_pl330_platdata {
 	unsigned mcbuf_sz;
 	/*flags for irq sharing, default is non-shared*/
 	unsigned flags;
+	int (*acpi_xlate_filter)(int slave_id, struct device *dev);
 };
 
 extern bool pl330_filter(struct dma_chan *chan, void *param);
