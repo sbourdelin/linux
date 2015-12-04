@@ -9,7 +9,7 @@
  *
  */
 #include "util.h"
-#include "exec_cmd.h"
+#include <api/util/exec_cmd.h>
 #include "util/hist.h"  /* perf_hist_config */
 #include "util/llvm-utils.h"   /* perf_llvm_config */
 

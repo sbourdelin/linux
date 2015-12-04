@@ -3,7 +3,8 @@
  *
  * No surprises, and works with signed and unsigned chars.
  */
-#include "util.h"
+#include "compat-util.h"
+#include "ctype.h"
 
 enum {
 	S = GIT_SPACE,

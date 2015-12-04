@@ -105,3 +105,8 @@ void exit_browser(bool wait_for_ok)
 		break;
 	}
 }
+
+void exit_browser_no_wait(void)
+{
+	exit_browser(false);
+}

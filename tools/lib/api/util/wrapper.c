@@ -1,7 +1,9 @@
 /*
  * Various trivial helper wrappers around standard functions
  */
-#include "util.h"
+#include "compat-util.h"
+#include "wrapper.h"
+#include "usage.h"
 
 /*
  * There's no pack memory to release - but stay close to the Git

@@ -8,7 +8,7 @@
 #include "util/thread.h"
 #include "util/header.h"
 
-#include "util/parse-options.h"
+#include <api/util/parse-options.h>
 #include "util/trace-event.h"
 
 #include "util/debug.h"

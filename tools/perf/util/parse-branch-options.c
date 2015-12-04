@@ -1,7 +1,7 @@
 #include "perf.h"
 #include "util/util.h"
 #include "util/debug.h"
-#include "util/parse-options.h"
+#include <api/util/parse-options.h>
 #include "util/parse-branch-options.h"
 
 #define BRANCH_OPT(n, m) \

@@ -1,5 +1,9 @@
-#include "util.h"
+#include "compat-util.h"
+
 #include <linux/kernel.h>
+#include "strbuf.h"
+#include "wrapper.h"
+#include "usage.h"
 
 int prefixcmp(const char *str, const char *prefix)
 {

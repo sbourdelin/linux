@@ -1,24 +1,27 @@
 #ifndef __PERF_UTIL_H
 #define __PERF_UTIL_H
 
-#include "compat-util.h"
+#include <api/util/compat-util.h>
 
+#include <api/fs/tracing_path.h>
 #include <api/string/string.h>
+#include <api/util/abspath.h>
+#include <api/util/ctype.h>
+#include <api/util/help.h>
+#include <api/util/pager.h>
+#include <api/util/strbuf.h>
+#include <api/util/term.h>
+#include <api/util/usage.h>
+#include <api/util/wrapper.h>
+
 #include "../perf.h"
-#include "abspath.h"
 #include "alias.h"
 #include "config.h"
-#include "ctype.h"
 #include "lzma.h"
-#include "pager.h"
 #include "path.h"
 #include "srcline.h"
-#include "strbuf.h"
 #include "string.h"
-#include "term.h"
 #include "../ui/ui.h"
-#include "usage.h"
-#include "wrapper.h"
 #include "zlib.h"
 
 int parse_nsec_time(const char *str, u64 *ptime);

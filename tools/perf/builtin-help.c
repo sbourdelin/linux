@@ -6,11 +6,10 @@
 #include "perf.h"
 #include "util/util.h"
 #include "builtin.h"
-#include "util/exec_cmd.h"
+#include <api/util/exec_cmd.h>
 #include "common-cmds.h"
-#include "util/parse-options.h"
-#include "util/run-command.h"
-#include "util/help.h"
+#include <api/util/parse-options.h>
+#include <api/util/run-command.h>
 #include "util/debug.h"
 
 static struct man_viewer_list {
@@ -407,7 +406,7 @@ static int get_html_page_path(struct strbuf *page_path, const char *page)
 #ifndef open_html
 static void open_html(const char *path)
 {
-	execl_perf_cmd("web--browse", "-c", "help.browser", path, NULL);
+	execl_cmd("web--browse", "-c", "help.browser", path, NULL);
 }
 #endif
 

@@ -2,3 +2,4 @@ libapi-y += fd/
 libapi-y += fs/
 libapi-y += cpu.o
 libapi-y += string/
+libapi-y += util/

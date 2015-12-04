@@ -1,0 +1,13 @@
+libapi-y += abspath.o
+libapi-y += cfg.o
+libapi-y += ctype.o
+libapi-y += exec_cmd.o
+libapi-y += help.o
+libapi-y += pager.o
+libapi-y += parse-options.o
+libapi-y += run-command.o
+libapi-y += sigchain.o
+libapi-y += strbuf.o
+libapi-y += term.o
+libapi-y += usage.o
+libapi-y += wrapper.o

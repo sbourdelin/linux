@@ -9,7 +9,7 @@
 #include "perf.h"
 
 #include "util/util.h"
-#include "util/parse-options.h"
+#include <api/util/parse-options.h>
 #include "util/debug.h"
 
 static const char * const config_usage[] = {

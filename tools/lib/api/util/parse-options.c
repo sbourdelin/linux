@@ -1,7 +1,12 @@
-#include "util.h"
+#include "compat-util.h"
+
+#include "../string/string.h"
 #include "parse-options.h"
-#include "header.h"
-#include <api/string/string.h>
+#include "strbuf.h"
+#include "usage.h"
+#include "ctype.h"
+#include "pager.h"
+#include "cfg.h"
 
 #define OPT_SHORT 1
 #define OPT_UNSET 2
@@ -510,7 +515,8 @@ int parse_options_subcommand(int argc, const char **argv, const struct option *o
 	if (subcommands && !usagestr[0]) {
 		struct strbuf buf = STRBUF_INIT;
 
-		strbuf_addf(&buf, "perf %s [<options>] {", argv[0]);
+		strbuf_addf(&buf, "%s %s [<options>] {",
+			    util_cfg.exec_name, argv[0]);
 		for (int i = 0; subcommands[i]; i++) {
 			if (i)
 				strbuf_addstr(&buf, "|");
@@ -771,7 +777,9 @@ int usage_with_options_internal(const char * const *usagestr,
 void usage_with_options(const char * const *usagestr,
 			const struct option *opts)
 {
-	exit_browser(false);
+	if (util_cfg.exit_browser)
+		util_cfg.exit_browser();
+
 	usage_with_options_internal(usagestr, opts, 0, NULL);
 	exit(129);
 }
@@ -781,7 +789,8 @@ void usage_with_options_msg(const char * const *usagestr,
 {
 	va_list ap;
 
-	exit_browser(false);
+	if (util_cfg.exit_browser)
+		util_cfg.exit_browser();
 
 	va_start(ap, fmt);
 	strbuf_addv(&error_buf, fmt, ap);

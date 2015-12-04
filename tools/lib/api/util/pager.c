@@ -1,6 +1,8 @@
-#include "util.h"
+#include "compat-util.h"
+#include "pager.h"
 #include "run-command.h"
 #include "sigchain.h"
+#include "cfg.h"
 
 /*
  * This is split up from the rest of git so that we can do
@@ -46,7 +48,7 @@ static void wait_for_pager_signal(int signo)
 
 void setup_pager(void)
 {
-	const char *pager = getenv("PERF_PAGER");
+	const char *pager = getenv(util_cfg.pager_env);
 
 	if (!isatty(1))
 		return;

@@ -6,8 +6,8 @@
  *
  * Copyright (C) Linus Torvalds, 2005
  */
-#include "util.h"
-#include "debug.h"
+#include "compat-util.h"
+#include "usage.h"
 
 static void report(const char *prefix, const char *err, va_list params)
 {

@@ -1,4 +1,8 @@
-#include "util.h"
+#include "compat-util.h"
+
+#include "../string/string.h"
+#include "abspath.h"
+#include "usage.h"
 
 static const char *get_pwd_cwd(void)
 {

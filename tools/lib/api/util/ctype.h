@@ -1,5 +1,5 @@
-#ifndef __PERF_CTYPE_H
-#define __PERF_CTYPE_H
+#ifndef __API_UTIL_CTYPE_H
+#define __API_UTIL_CTYPE_H
 
 /* Sane ctype - no locale, and works with signed chars */
 #undef isascii
@@ -49,4 +49,4 @@ static inline int sane_case(int x, int high)
 	return x;
 }
 
-#endif /* __PERF_CTYPE_H */
+#endif /* __API_UTIL_CTYPE_H */

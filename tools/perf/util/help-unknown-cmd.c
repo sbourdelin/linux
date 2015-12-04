@@ -1,5 +1,5 @@
 #include "util.h"
-#include "help.h"
+#include <api/util/help.h>
 #include "../builtin.h"
 #include "levenshtein.h"
 

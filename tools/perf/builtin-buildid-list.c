@@ -12,7 +12,7 @@
 #include "util/build-id.h"
 #include "util/util.h"
 #include "util/debug.h"
-#include "util/parse-options.h"
+#include <api/util/parse-options.h>
 #include "util/session.h"
 #include "util/symbol.h"
 #include "util/data.h"

@@ -1,8 +1,9 @@
-#include "util.h"
+#include "compat-util.h"
 #include "exec_cmd.h"
-#include "quote.h"
-
-#include <string.h>
+#include "strbuf.h"
+#include "abspath.h"
+#include "usage.h"
+#include "cfg.h"
 
 #define MAX_ARGS	32
 
@@ -11,18 +12,17 @@ static const char *argv0_path;
 
 char *system_path(const char *path)
 {
-	static const char *prefix = PREFIX;
 	struct strbuf d = STRBUF_INIT;
 
 	if (is_absolute_path(path))
 		return strdup(path);
 
-	strbuf_addf(&d, "%s/%s", prefix, path);
+	strbuf_addf(&d, "%s/%s", util_cfg.prefix, path);
 	path = strbuf_detach(&d, NULL);
 	return (char *)path;
 }
 
-const char *perf_extract_argv0_path(const char *argv0)
+const char *extract_argv0_path(const char *argv0)
 {
 	const char *slash;
 
@@ -41,29 +41,29 @@ const char *perf_extract_argv0_path(const char *argv0)
 	return argv0;
 }
 
-void perf_set_argv_exec_path(const char *exec_path)
+void set_argv_exec_path(const char *exec_path)
 {
 	argv_exec_path = exec_path;
 	/*
 	 * Propagate this setting to external programs.
 	 */
-	setenv(EXEC_PATH_ENVIRONMENT, exec_path, 1);
+	setenv(util_cfg.exec_path_env, exec_path, 1);
 }
 
 
-/* Returns the highest-priority, location to look for perf programs. */
-char *perf_exec_path(void)
+/* Returns the highest-priority location to look for subprograms. */
+char *get_argv_exec_path(void)
 {
 	char *env;
 
 	if (argv_exec_path)
 		return strdup(argv_exec_path);
 
-	env = getenv(EXEC_PATH_ENVIRONMENT);
+	env = getenv(util_cfg.exec_path_env);
 	if (env && *env)
 		return strdup(env);
 
-	return system_path(PERF_EXEC_PATH);
+	return system_path(util_cfg.exec_path);
 }
 
 static void add_path(struct strbuf *out, const char *path)
@@ -82,7 +82,7 @@ void setup_path(void)
 {
 	const char *old_path = getenv("PATH");
 	struct strbuf new_path = STRBUF_INIT;
-	char *tmp = perf_exec_path();
+	char *tmp = get_argv_exec_path();
 
 	add_path(&new_path, tmp);
 	add_path(&new_path, argv0_path);
@@ -98,7 +98,7 @@ void setup_path(void)
 	strbuf_release(&new_path);
 }
 
-static const char **prepare_perf_cmd(const char **argv)
+static const char **prepare_exec_cmd(const char **argv)
 {
 	int argc;
 	const char **nargv;
@@ -107,25 +107,25 @@ static const char **prepare_perf_cmd(const char **argv)
 		; /* just counting */
 	nargv = malloc(sizeof(*nargv) * (argc + 2));
 
-	nargv[0] = "perf";
+	nargv[0] = util_cfg.exec_name;
 	for (argc = 0; argv[argc]; argc++)
 		nargv[argc + 1] = argv[argc];
 	nargv[argc + 1] = NULL;
 	return nargv;
 }
 
-int execv_perf_cmd(const char **argv) {
-	const char **nargv = prepare_perf_cmd(argv);
+int execv_cmd(const char **argv) {
+	const char **nargv = prepare_exec_cmd(argv);
 
 	/* execvp() can only ever return if it fails */
-	execvp("perf", (char **)nargv);
+	execvp(util_cfg.exec_name, (char **)nargv);
 
 	free(nargv);
 	return -1;
 }
 
 
-int execl_perf_cmd(const char *cmd,...)
+int execl_cmd(const char *cmd,...)
 {
 	int argc;
 	const char *argv[MAX_ARGS + 1];
@@ -145,5 +145,5 @@ int execl_perf_cmd(const char *cmd,...)
 		return error("too many args to run %s", cmd);
 
 	argv[argc] = NULL;
-	return execv_perf_cmd(argv);
+	return execv_cmd(argv);
 }

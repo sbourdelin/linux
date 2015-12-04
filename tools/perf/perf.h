@@ -17,6 +17,7 @@
 #define DEFAULT_PERF_DIR_ENVIRONMENT ".perf"
 #define PERF_DEBUGFS_ENVIRONMENT "PERF_DEBUGFS_DIR"
 #define PERF_TRACEFS_ENVIRONMENT "PERF_TRACEFS_DIR"
+#define PERF_PAGER_ENVIRONMENT "PERF_PAGER"
 
 extern bool test_attr__enabled;
 void test_attr__init(void);

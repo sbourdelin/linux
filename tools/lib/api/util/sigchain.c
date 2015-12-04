@@ -1,5 +1,7 @@
-#include "util.h"
+#include "compat-util.h"
 #include "sigchain.h"
+#include "usage.h"
+#include "wrapper.h"
 
 #define SIGCHAIN_MAX_SIGNALS 32
 

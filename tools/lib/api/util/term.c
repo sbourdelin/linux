@@ -1,4 +1,5 @@
-#include "util.h"
+#include "compat-util.h"
+#include "term.h"
 
 void get_term_dimensions(struct winsize *ws)
 {

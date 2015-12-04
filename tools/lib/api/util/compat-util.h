@@ -1,5 +1,5 @@
-#ifndef __PERF_COMPAT_UTIL_H
-#define __PERF_COMPAT_UTIL_H
+#ifndef __API_UTIL_COMPAT_UTIL_H
+#define __API_UTIL_COMPAT_UTIL_H
 
 #ifndef FLEX_ARRAY
 /*
@@ -74,7 +74,6 @@
 #include <linux/magic.h>
 #include <linux/types.h>
 #include <sys/ttydefaults.h>
-#include <api/fs/tracing_path.h>
 #include <termios.h>
 #include <linux/bitops.h>
 #include <termios.h>
@@ -127,4 +126,4 @@
 #define NSEC_PER_MSEC	1000000L
 #endif
 
-#endif /* __PERF_COMPAT_UTIL_H */
+#endif /* __API_UTIL_COMPAT_UTIL_H */

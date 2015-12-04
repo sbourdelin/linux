@@ -1,5 +1,5 @@
-#ifndef __PERF_ABSPATH_H
-#define __PERF_ABSPATH_H
+#ifndef __API_UTIL_ABSPATH_H
+#define __API_UTIL_ABSPATH_H
 
 static inline int is_absolute_path(const char *path)
 {
@@ -8,4 +8,4 @@ static inline int is_absolute_path(const char *path)
 
 const char *make_nonrelative_path(const char *path);
 
-#endif /* __PERF_ABSPATH_H */
+#endif /* __API_UTIL_ABSPATH_H */

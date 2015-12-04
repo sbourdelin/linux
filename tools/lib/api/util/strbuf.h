@@ -1,5 +1,5 @@
-#ifndef __PERF_STRBUF_H
-#define __PERF_STRBUF_H
+#ifndef __API_UTIL_STRBUF_H
+#define __API_UTIL_STRBUF_H
 
 /*
  * Strbuf's can be use in many ways: as a byte array, or to store arbitrary
@@ -93,4 +93,4 @@ extern void strbuf_addv(struct strbuf *sb, const char *fmt, va_list ap);
 /* XXX: if read fails, any partial read is undone */
 extern ssize_t strbuf_read(struct strbuf *, int fd, ssize_t hint);
 
-#endif /* __PERF_STRBUF_H */
+#endif /* __API_UTIL_STRBUF_H */

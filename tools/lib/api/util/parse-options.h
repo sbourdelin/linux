@@ -1,5 +1,5 @@
-#ifndef __PERF_PARSE_OPTIONS_H
-#define __PERF_PARSE_OPTIONS_H
+#ifndef __API_UTIL_PARSE_OPTIONS_H
+#define __API_UTIL_PARSE_OPTIONS_H
 
 #include <linux/kernel.h>
 #include <stdbool.h>
@@ -226,4 +226,5 @@ extern int parse_opt_verbosity_cb(const struct option *, const char *, int);
 extern const char *parse_options_fix_filename(const char *prefix, const char *file);
 
 void set_option_flag(struct option *opts, int sopt, const char *lopt, int flag);
-#endif /* __PERF_PARSE_OPTIONS_H */
+
+#endif /* __API_UTIL_PARSE_OPTIONS_H */

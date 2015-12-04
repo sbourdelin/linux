@@ -1,5 +1,5 @@
-#ifndef __PERF_WRAPPER_H
-#define __PERF_WRAPPER_H
+#ifndef __API_UTIL_WRAPPER_H
+#define __API_UTIL_WRAPPER_H
 
 extern char *xstrdup(const char *str);
 extern void *xrealloc(void *ptr, size_t size) __attribute__((weak));
@@ -31,4 +31,4 @@ static inline void *zalloc(size_t size)
 		} \
 	} while(0)
 
-#endif /* __PERF_WRAPPER_H */
+#endif /* __API_UTIL_WRAPPER_H */

@@ -12,6 +12,7 @@ extern int use_browser;
 
 void setup_browser(bool fallback_to_pager);
 void exit_browser(bool wait_for_ok);
+void exit_browser_no_wait(void);
 
 #ifdef HAVE_SLANG_SUPPORT
 int ui__init(void);

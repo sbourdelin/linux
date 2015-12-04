@@ -9,16 +9,17 @@
 #include "builtin.h"
 
 #include "util/env.h"
-#include "util/exec_cmd.h"
+#include <api/util/exec_cmd.h>
 #include "util/util.h"
 #include "util/quote.h"
-#include "util/run-command.h"
+#include <api/util/run-command.h>
 #include "util/parse-events.h"
-#include "util/parse-options.h"
+#include <api/util/parse-options.h>
 #include "util/bpf-loader.h"
 #include "util/debug.h"
 #include <api/fs/tracing_path.h>
 #include <pthread.h>
+#include <api/util/cfg.h>
 
 const char perf_usage_string[] =
 	"perf [--version] [--help] [OPTIONS] COMMAND [ARGS]";
@@ -119,7 +120,7 @@ static void commit_pager_choice(void)
 {
 	switch (use_pager) {
 	case 0:
-		setenv("PERF_PAGER", "cat", 1);
+		setenv(PERF_PAGER_ENVIRONMENT, "cat", 1);
 		break;
 	case 1:
 		/* setup_pager(); */
@@ -127,6 +128,16 @@ static void commit_pager_choice(void)
 	default:
 		break;
 	}
+}
+
+static void setup_util(void)
+{
+	util_cfg.prefix		= PREFIX;
+	util_cfg.exec_name	= "perf";
+	util_cfg.exec_path	= PERF_EXEC_PATH;
+	util_cfg.exec_path_env	= EXEC_PATH_ENVIRONMENT;
+	util_cfg.pager_env	= PERF_PAGER_ENVIRONMENT;
+	util_cfg.exit_browser	= exit_browser_no_wait;
 }
 
 struct option options[] = {
@@ -183,9 +194,9 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 		if (!prefixcmp(cmd, CMD_EXEC_PATH)) {
 			cmd += strlen(CMD_EXEC_PATH);
 			if (*cmd == '=')
-				perf_set_argv_exec_path(cmd + 1);
+				set_argv_exec_path(cmd + 1);
 			else {
-				puts(perf_exec_path());
+				puts(get_argv_exec_path());
 				exit(0);
 			}
 		} else if (!strcmp(cmd, "--html-path")) {
@@ -530,11 +541,13 @@ int main(int argc, const char **argv)
 	const char *cmd;
 	char sbuf[STRERR_BUFSIZE];
 
+	setup_util();
+
 	/* The page_size is placed in util object. */
 	page_size = sysconf(_SC_PAGE_SIZE);
 	cacheline_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 
-	cmd = perf_extract_argv0_path(argv[0]);
+	cmd = extract_argv0_path(argv[0]);
 	if (!cmd)
 		cmd = "perf-help";
 
