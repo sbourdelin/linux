@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/reboot.h>
@@ -81,8 +82,10 @@ struct rcar_thermal_priv {
 # define rcar_force_update_temp(priv)	0
 #endif
 
+#define USE_OF_THERMAL	1
 static const struct of_device_id rcar_thermal_dt_ids[] = {
 	{ .compatible = "renesas,rcar-thermal", },
+	{ .compatible = "renesas,rcar-thermal-gen2", .data = (void *)USE_OF_THERMAL },
 	{},
 };
 MODULE_DEVICE_TABLE(of, rcar_thermal_dt_ids);
@@ -206,16 +209,34 @@ err_out_unlock:
 	return ret;
 }
 
-static int rcar_thermal_get_temp(struct thermal_zone_device *zone, int *temp)
+static int rcar_thermal_get_current_temp(struct rcar_thermal_priv *priv)
 {
-	struct rcar_thermal_priv *priv = rcar_zone_to_priv(zone);
+	int temp;
 
 	if (!rcar_has_irq_support(priv) || rcar_force_update_temp(priv))
 		rcar_thermal_update_temp(priv);
 
 	mutex_lock(&priv->lock);
-	*temp =  MCELSIUS((priv->ctemp * 5) - 65);
+	temp =  MCELSIUS((priv->ctemp * 5) - 65);
 	mutex_unlock(&priv->lock);
+
+	return temp;
+}
+
+static int rcar_thermal_of_get_temp(void *data, int *temp)
+{
+	struct rcar_thermal_priv *priv = data;
+
+	*temp = rcar_thermal_get_current_temp(priv);
+
+	return 0;
+}
+
+static int rcar_thermal_get_temp(struct thermal_zone_device *zone, int *temp)
+{
+	struct rcar_thermal_priv *priv = rcar_zone_to_priv(zone);
+
+	*temp = rcar_thermal_get_current_temp(priv);
 
 	return 0;
 }
@@ -276,6 +297,10 @@ static int rcar_thermal_notify(struct thermal_zone_device *zone,
 	return 0;
 }
 
+static const struct thermal_zone_of_device_ops rcar_thermal_zone_of_ops = {
+	.get_temp	= rcar_thermal_of_get_temp,
+};
+
 static struct thermal_zone_device_ops rcar_thermal_zone_ops = {
 	.get_temp	= rcar_thermal_get_temp,
 	.get_trip_type	= rcar_thermal_get_trip_type,
@@ -308,11 +333,11 @@ static void rcar_thermal_work(struct work_struct *work)
 
 	priv = container_of(work, struct rcar_thermal_priv, work.work);
 
-	rcar_thermal_get_temp(priv->zone, &cctemp);
+	cctemp = rcar_thermal_get_current_temp(priv);
 	rcar_thermal_update_temp(priv);
 	rcar_thermal_irq_enable(priv);
 
-	rcar_thermal_get_temp(priv->zone, &nctemp);
+	nctemp = rcar_thermal_get_current_temp(priv);
 	if (nctemp != cctemp)
 		thermal_zone_device_update(priv->zone);
 }
@@ -391,6 +416,8 @@ static int rcar_thermal_probe(struct platform_device *pdev)
 	struct rcar_thermal_priv *priv;
 	struct device *dev = &pdev->dev;
 	struct resource *res, *irq;
+	const struct of_device_id *of_id = of_match_device(rcar_thermal_dt_ids, dev);
+	unsigned long of_data = (unsigned long)of_id->data;
 	int mres = 0;
 	int i;
 	int ret = -ENODEV;
@@ -449,7 +476,13 @@ static int rcar_thermal_probe(struct platform_device *pdev)
 		INIT_DELAYED_WORK(&priv->work, rcar_thermal_work);
 		rcar_thermal_update_temp(priv);
 
-		priv->zone = thermal_zone_device_register("rcar_thermal",
+		if (of_data == USE_OF_THERMAL)
+			priv->zone = thermal_zone_of_sensor_register(
+						dev, i, priv,
+						&rcar_thermal_zone_of_ops);
+		else
+			priv->zone = thermal_zone_device_register(
+						"rcar_thermal",
 						1, 0, priv,
 						&rcar_thermal_zone_ops, NULL, 0,
 						idle);
