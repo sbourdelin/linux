@@ -1509,6 +1509,32 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 }
 EXPORT_SYMBOL_GPL(pm_genpd_init);
 
+/**
+ * pm_genpd_remove - Remove a generic I/O PM domain object.
+ * @genpd: PM domain object to remove.
+ */
+int pm_genpd_remove(struct generic_pm_domain *genpd)
+{
+	if (IS_ERR_OR_NULL(genpd))
+		return -EINVAL;
+
+	mutex_lock(&genpd->lock);
+
+	if (!list_empty(&genpd->master_links)
+	    || !list_empty(&genpd->slave_links) || genpd->device_count) {
+		mutex_unlock(&genpd->lock);
+		return -EBUSY;
+	}
+
+	mutex_lock_nested(&gpd_list_lock, SINGLE_DEPTH_NESTING);
+	list_del(&genpd->gpd_list_node);
+	mutex_unlock(&gpd_list_lock);
+	mutex_unlock(&genpd->lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_remove);
+
 #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
 /*
  * Device Tree based PM domain providers.
