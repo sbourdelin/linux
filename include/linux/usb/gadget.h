@@ -402,6 +402,9 @@ static inline void usb_ep_free_request(struct usb_ep *ep,
 static inline int usb_ep_queue(struct usb_ep *ep,
 			       struct usb_request *req, gfp_t gfp_flags)
 {
+	if (!ep->enabled)
+		return -ESHUTDOWN;
+
 	return ep->ops->queue(ep, req, gfp_flags);
 }
 
