@@ -113,6 +113,7 @@ struct tegra_pmc_soc {
 
 	bool has_tsense_reset;
 	bool has_gpu_clamps;
+	bool has_gpu_toggle;
 };
 
 /**
@@ -190,6 +191,9 @@ static int tegra_powergate_set(int id, bool new_state)
 	u32 status;
 	int err = 0;
 
+	if (id == TEGRA_POWERGATE_3D && !pmc->soc->has_gpu_toggle)
+		return -EINVAL;
+
 	mutex_lock(&pmc->powergates_lock);
 
 	status = tegra_pmc_readl(PWRGATE_STATUS);
@@ -244,6 +248,9 @@ int tegra_powergate_is_powered(int id)
 	u32 status;
 
 	if (!PMC_PWRGATE_IS_VALID(id))
+		return -EINVAL;
+
+	if (id == TEGRA_POWERGATE_3D && !pmc->soc->has_gpu_toggle)
 		return -EINVAL;
 
 	status = tegra_pmc_readl(PWRGATE_STATUS);
@@ -929,6 +936,7 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
 	.cpu_powergates = tegra30_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = false,
+	.has_gpu_toggle = true,
 };
 
 static const char * const tegra114_powergates[] = {
@@ -966,6 +974,7 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
 	.cpu_powergates = tegra114_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = false,
+	.has_gpu_toggle = true,
 };
 
 static const char * const tegra124_powergates[] = {
@@ -1009,6 +1018,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
 	.cpu_powergates = tegra124_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
+	.has_gpu_toggle = false,
 };
 
 static const char * const tegra210_powergates[] = {
@@ -1052,6 +1062,7 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.cpu_powergates = tegra210_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
+	.has_gpu_toggle = false,
 };
 
 static const struct of_device_id tegra_pmc_match[] = {
