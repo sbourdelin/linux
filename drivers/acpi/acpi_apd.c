@@ -21,6 +21,7 @@
 #include <linux/amba/bus.h>
 #include <linux/kernel.h>
 #include <linux/sizes.h>
+#include <linux/amba/pl330.h>
 #include <linux/interrupt.h>
 
 #include "internal.h"
@@ -34,6 +35,16 @@ struct apd_private_data;
  */
 #define ACPI_APD_SYSFS	BIT(0)
 #define ACPI_APD_PM	BIT(1)
+
+static u8 peri_id[2] = { 0, 1 };
+
+static struct dma_pl330_platdata amd_pl330 = {
+	.nr_valid_peri = 2,
+	.peri_id = peri_id,
+	.has_no_cap_mask = true,
+	.mcbuf_sz = 0,
+	.flags = IRQF_SHARED,
+};
 
 /**
  * struct apd_device_desc - a descriptor for apd device.
@@ -146,7 +157,7 @@ static int acpi_apd_create_device(struct acpi_device *adev,
 
 		amba_dev = acpi_create_amba_device(pdata->adev, 0x00041330,
 						   48000000,
-						   NULL,
+						   &amd_pl330,
 						   &amba_quirks);
 		if (IS_ERR_OR_NULL(amba_dev))
 			goto err_out;
