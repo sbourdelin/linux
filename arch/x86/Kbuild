@@ -1,6 +1,8 @@
 
 obj-y += entry/
 
+obj-$(CONFIG_PERF_EVENTS) += perf/
+
 obj-$(CONFIG_KVM) += kvm/
 
 # Xen paravirtualization support
