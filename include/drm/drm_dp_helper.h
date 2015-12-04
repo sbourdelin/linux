@@ -73,6 +73,7 @@
 # define DP_ENHANCED_FRAME_CAP		    (1 << 7)
 
 #define DP_MAX_DOWNSPREAD                   0x003
+# define DP_PERCENT_DOWNSPREAD_0_5	    (1 << 0)
 # define DP_NO_AUX_HANDSHAKE_LINK_TRAINING  (1 << 6)
 
 #define DP_NORP                             0x004
@@ -225,6 +226,7 @@
 # define DP_LINK_BW_1_62		    0x06
 # define DP_LINK_BW_2_7			    0x0a
 # define DP_LINK_BW_5_4			    0x14    /* 1.2 */
+# define DP_LINK_BW_6_75		    0x19
 
 #define DP_LANE_COUNT_SET	            0x101
 # define DP_LANE_COUNT_MASK		    0x0f
@@ -354,6 +356,7 @@
 #define DP_PAYLOAD_ALLOCATE_TIME_SLOT_COUNT 0x1c2
 
 #define DP_SINK_COUNT			    0x200
+# define DP_SINK_COUNT_MASK		    0x3f
 /* prior to 1.2 bit 7 was reserved mbz */
 # define DP_GET_SINK_COUNT(x)		    ((((x) & 0x80) >> 1) | ((x) & 0x3f))
 # define DP_SINK_CP_READY		    (1 << 6)
@@ -399,6 +402,10 @@
 # define DP_ADJUST_PRE_EMPHASIS_LANE1_MASK   0xc0
 # define DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT  6
 
+#define DP_SYMBOL_ERROR_COUNT_LANE0	    0x210
+# define DP_ERROR_COUNT_BITS_14_8_MASK	    0x7f
+# define DP_ERROR_COUNT_VALID		    (1 << 7)
+
 #define DP_TEST_REQUEST			    0x218
 # define DP_TEST_LINK_TRAINING		    (1 << 0)
 # define DP_TEST_LINK_VIDEO_PATTERN	    (1 << 1)
@@ -417,6 +424,8 @@
 #define DP_TEST_CRC_R_CR		    0x240
 #define DP_TEST_CRC_G_Y			    0x242
 #define DP_TEST_CRC_B_CB		    0x244
+
+#define DP_PHY_TEST_PATTERN		    0x248 /* DPCD >= 1.1 */
 
 #define DP_TEST_SINK_MISC		    0x246
 # define DP_TEST_CRC_SUPPORTED		    (1 << 5)
@@ -447,6 +456,7 @@
 # define DP_SET_POWER_D0                    0x1
 # define DP_SET_POWER_D3                    0x2
 # define DP_SET_POWER_MASK                  0x3
+# define DP_SET_POWER_12_MASK		    0x7    /* DPCD >= 1.2 */
 
 #define DP_EDP_DPCD_REV			    0x700    /* eDP 1.2 */
 # define DP_EDP_11			    0x00
