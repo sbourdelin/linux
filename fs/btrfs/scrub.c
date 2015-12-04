@@ -700,11 +700,14 @@ static int scrub_fixup_readpage(u64 inum, u64 offset, u64 root, void *fixup_ctx)
 	struct btrfs_root *local_root;
 	int srcu_index;
 
+	fs_info = fixup->root->fs_info;
+	if (fs_info->sb->s_flags & MS_RDONLY)
+		return -EROFS;
+
 	key.objectid = root;
 	key.type = BTRFS_ROOT_ITEM_KEY;
 	key.offset = (u64)-1;
 
-	fs_info = fixup->root->fs_info;
 	srcu_index = srcu_read_lock(&fs_info->subvol_srcu);
 
 	local_root = btrfs_read_fs_root_no_name(fs_info, &key);
