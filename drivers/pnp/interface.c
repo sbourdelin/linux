@@ -32,7 +32,7 @@ struct pnp_info_buffer {
 
 typedef struct pnp_info_buffer pnp_info_buffer_t;
 
-static int pnp_printf(pnp_info_buffer_t * buffer, char *fmt, ...)
+static int pnp_printf(pnp_info_buffer_t *buffer, char *fmt, ...)
 {
 	va_list args;
 	int res;
@@ -51,7 +51,7 @@ static int pnp_printf(pnp_info_buffer_t * buffer, char *fmt, ...)
 	return res;
 }
 
-static void pnp_print_port(pnp_info_buffer_t * buffer, char *space,
+static void pnp_print_port(pnp_info_buffer_t *buffer, char *space,
 			   struct pnp_port *port)
 {
 	pnp_printf(buffer, "%sport %#llx-%#llx, align %#llx, size %#llx, "
@@ -63,7 +63,7 @@ static void pnp_print_port(pnp_info_buffer_t * buffer, char *space,
 		   port->flags & IORESOURCE_IO_16BIT_ADDR ? 16 : 10);
 }
 
-static void pnp_print_irq(pnp_info_buffer_t * buffer, char *space,
+static void pnp_print_irq(pnp_info_buffer_t *buffer, char *space,
 			  struct pnp_irq *irq)
 {
 	int first = 1, i;
@@ -96,7 +96,7 @@ static void pnp_print_irq(pnp_info_buffer_t * buffer, char *space,
 	pnp_printf(buffer, "\n");
 }
 
-static void pnp_print_dma(pnp_info_buffer_t * buffer, char *space,
+static void pnp_print_dma(pnp_info_buffer_t *buffer, char *space,
 			  struct pnp_dma *dma)
 {
 	int first = 1, i;
@@ -148,7 +148,7 @@ static void pnp_print_dma(pnp_info_buffer_t * buffer, char *space,
 	pnp_printf(buffer, " %s\n", s);
 }
 
-static void pnp_print_mem(pnp_info_buffer_t * buffer, char *space,
+static void pnp_print_mem(pnp_info_buffer_t *buffer, char *space,
 			  struct pnp_mem *mem)
 {
 	char *s;
@@ -184,7 +184,7 @@ static void pnp_print_mem(pnp_info_buffer_t * buffer, char *space,
 	pnp_printf(buffer, ", %s\n", s);
 }
 
-static void pnp_print_option(pnp_info_buffer_t * buffer, char *space,
+static void pnp_print_option(pnp_info_buffer_t *buffer, char *space,
 			     struct pnp_option *option)
 {
 	switch (option->type) {
