@@ -23,6 +23,7 @@
 #include <linux/sizes.h>
 #include <linux/amba/pl330.h>
 #include <linux/interrupt.h>
+#include <linux/serial_8250.h>
 
 #include "internal.h"
 
@@ -47,6 +48,10 @@ static struct dma_pl330_platdata amd_pl330 = {
 	.mcbuf_sz = 0,
 	.flags = IRQF_SHARED,
 	.acpi_xlate_filter = apd_acpi_xlate_filter,
+};
+
+static struct plat_dw8250_data amd_dw8250 = {
+	.has_pl330_dma = 1,
 };
 
 /**
@@ -164,6 +169,11 @@ static int acpi_apd_create_device(struct acpi_device *adev,
 		goto err_out;
 
 	if (!strncmp(pdev->name, "AMD0020", 7)) {
+		ret = platform_device_add_data(pdev, &amd_dw8250,
+					       sizeof(amd_dw8250));
+		if (ret)
+			goto err_out;
+
 		memset(&amba_quirks, 0, sizeof(amba_quirks));
 		setup_quirks(pdev, &amba_quirks);
 

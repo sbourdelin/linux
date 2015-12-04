@@ -42,6 +42,10 @@ struct plat_serial8250_port {
 	void		(*handle_break)(struct uart_port *);
 };
 
+struct plat_dw8250_data {
+	unsigned has_pl330_dma:1;
+};
+
 /*
  * Allocate 8250 platform device IDs.  Nothing is implied by
  * the numbering here, except for the legacy entry being -1.
