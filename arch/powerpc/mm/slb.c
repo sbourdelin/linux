@@ -96,7 +96,7 @@ static inline void create_shadowed_slbe(unsigned long ea, int ssize,
 		     : "memory" );
 }
 
-static void __slb_flush_and_rebolt(void)
+static notrace void __slb_flush_and_rebolt(void)
 {
 	/* If you change this make sure you change SLB_NUM_BOLTED
 	 * and PR KVM appropriately too. */
@@ -136,7 +136,7 @@ static void __slb_flush_and_rebolt(void)
 		     : "memory");
 }
 
-void slb_flush_and_rebolt(void)
+notrace void slb_flush_and_rebolt(void)
 {
 
 	WARN_ON(!irqs_disabled());
@@ -151,7 +151,7 @@ void slb_flush_and_rebolt(void)
 	get_paca()->slb_cache_ptr = 0;
 }
 
-void slb_vmalloc_update(void)
+notrace void slb_vmalloc_update(void)
 {
 	unsigned long vflags;
 

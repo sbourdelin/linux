@@ -406,7 +406,7 @@ void flush_dcache_page(struct page *page)
 }
 EXPORT_SYMBOL(flush_dcache_page);
 
-void flush_dcache_icache_page(struct page *page)
+notrace void flush_dcache_icache_page(struct page *page)
 {
 #ifdef CONFIG_HUGETLB_PAGE
 	if (PageCompound(page)) {

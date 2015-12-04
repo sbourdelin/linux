@@ -442,7 +442,7 @@ static void page_table_free_rcu(void *table)
 	}
 }
 
-void pgtable_free_tlb(struct mmu_gather *tlb, void *table, int shift)
+notrace void pgtable_free_tlb(struct mmu_gather *tlb, void *table, int shift)
 {
 	unsigned long pgf = (unsigned long)table;
 
