@@ -2432,6 +2432,9 @@ intel_lr_context_clean_ring(struct intel_context *ctx,
 		}
 	}
 
+	if (ring->last_context == ctx)
+		ring->last_context = NULL;
+
 	WARN_ON(ctx->engine[ring->id].pin_count);
 	intel_ringbuffer_free(ringbuf);
 	drm_gem_object_unreference(&ctx_obj->base);
