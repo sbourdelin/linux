@@ -454,7 +454,7 @@ static void bxt_dsi_program_clocks(struct drm_device *dev, enum port port)
 	dsi_rate = (BXT_REF_CLOCK_KHZ * pll_ratio) / 2;
 
 	/* Max possible output of clock is 39.5 MHz, program value -1 */
-	divider = (dsi_rate / BXT_MAX_VAR_OUTPUT_KHZ) - 1;
+	divider = DIV_ROUND_UP(dsi_rate, BXT_MAX_VAR_OUTPUT_KHZ) - 1;
 	tmp |= BXT_MIPI_ESCLK_VAR_DIV(port, divider);
 
 	/*
