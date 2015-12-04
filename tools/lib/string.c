@@ -16,6 +16,7 @@
 #include <string.h>
 #include <errno.h>
 #include <linux/string.h>
+#include <linux/compiler.h>
 
 /**
  * memdup - duplicate region of memory
@@ -59,4 +60,22 @@ int strtobool(const char *s, bool *res)
 		return -EINVAL;
 	}
 	return 0;
+}
+
+/*
+ * If libc has strlcpy() then that version will override this
+ * implementation:
+ */
+size_t __weak strlcpy(char *dest, const char *src, size_t size)
+{
+	size_t ret = strlen(src);
+
+	if (size) {
+		size_t len = (ret >= size) ? size - 1 : ret;
+
+		memcpy(dest, src, len);
+		dest[len] = '\0';
+	}
+
+	return ret;
 }
