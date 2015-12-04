@@ -37,6 +37,7 @@
 #include <linux/list.h>
 #include <linux/mod_devicetable.h>
 #include <linux/dynamic_debug.h>
+#include <linux/amba/bus.h>
 
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -466,6 +467,26 @@ int acpi_device_modalias(struct device *, char *, int);
 void acpi_walk_dep_device_list(acpi_handle handle);
 
 struct platform_device *acpi_create_platform_device(struct acpi_device *);
+
+#ifdef CONFIG_ARM_AMBA
+
+struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
+					    unsigned int periphid,
+					    unsigned long fixed_rate,
+					    void *pdata);
+
+#else /* !CONFIG_ARM_AMBA */
+
+static inline struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
+							  unsigned int periphid,
+							  unsigned long fixed_rate,
+							  void *pdata)
+{
+	return NULL;
+}
+
+#endif
+
 #define ACPI_PTR(_ptr)	(_ptr)
 
 #else	/* !CONFIG_ACPI */
