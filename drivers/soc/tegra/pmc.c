@@ -807,21 +807,16 @@ out:
 
 static int tegra_pmc_probe(struct platform_device *pdev)
 {
-	void __iomem *base = pmc->base;
-	struct resource *res;
 	int err;
+
+	if (!pmc->base) {
+		dev_err(&pdev->dev, "base address is not configured\n");
+		return -ENXIO;
+	}
 
 	err = tegra_pmc_parse_dt(pmc, pdev->dev.of_node);
 	if (err < 0)
 		return err;
-
-	/* take over the memory region from the early initialization */
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	pmc->base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(pmc->base))
-		return PTR_ERR(pmc->base);
-
-	iounmap(base);
 
 	pmc->clk = devm_clk_get(&pdev->dev, "pclk");
 	if (IS_ERR(pmc->clk)) {
@@ -1126,8 +1121,12 @@ static int __init tegra_pmc_early_init(void)
 		pmc->soc = match->data;
 	}
 
+	if (!request_mem_region(regs.start, resource_size(&regs), regs.name))
+		return -ENOMEM;
+
 	pmc->base = ioremap_nocache(regs.start, resource_size(&regs));
 	if (!pmc->base) {
+		release_mem_region(regs.start, resource_size(&regs));
 		pr_err("failed to map PMC registers\n");
 		return -ENXIO;
 	}
