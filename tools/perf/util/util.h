@@ -9,6 +9,7 @@
 #include "srcline.h"
 #include "strbuf.h"
 #include "string.h"
+#include "term.h"
 #include "usage.h"
 #include "wrapper.h"
 #include "zlib.h"
@@ -37,9 +38,6 @@ void sighandler_dump_stack(int sig);
 
 extern unsigned int page_size;
 extern int cacheline_size;
-
-void get_term_dimensions(struct winsize *ws);
-void set_term_quiet_input(struct termios *old);
 
 struct parse_tag {
 	char tag;
