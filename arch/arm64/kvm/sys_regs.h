@@ -44,7 +44,7 @@ struct sys_reg_desc {
 
 	/* Trapped access from guest, if non-NULL. */
 	bool (*access)(struct kvm_vcpu *,
-		       const struct sys_reg_params *,
+		       struct sys_reg_params *,
 		       const struct sys_reg_desc *);
 
 	/* Initialization for vcpu. */
@@ -63,7 +63,7 @@ struct sys_reg_desc {
 			const struct kvm_one_reg *reg, void __user *uaddr);
 };
 
-static inline void print_sys_reg_instr(const struct sys_reg_params *p)
+static inline void print_sys_reg_instr(struct sys_reg_params *p)
 {
 	/* Look, we even formatted it for you to paste into the table! */
 	kvm_pr_unimpl(" { Op0(%2u), Op1(%2u), CRn(%2u), CRm(%2u), Op2(%2u), func_%s },\n",
@@ -71,20 +71,20 @@ static inline void print_sys_reg_instr(const struct sys_reg_params *p)
 }
 
 static inline bool ignore_write(struct kvm_vcpu *vcpu,
-				const struct sys_reg_params *p)
+				struct sys_reg_params *p)
 {
 	return true;
 }
 
 static inline bool read_zero(struct kvm_vcpu *vcpu,
-			     const struct sys_reg_params *p)
+			     struct sys_reg_params *p)
 {
 	*vcpu_reg(vcpu, p->Rt) = 0;
 	return true;
 }
 
 static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
-				      const struct sys_reg_params *params)
+				      struct sys_reg_params *params)
 {
 	kvm_debug("sys_reg write to read-only register at: %lx\n",
 		  *vcpu_pc(vcpu));
@@ -93,7 +93,7 @@ static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
 }
 
 static inline bool read_from_write_only(struct kvm_vcpu *vcpu,
-					const struct sys_reg_params *params)
+					struct sys_reg_params *params)
 {
 	kvm_debug("sys_reg read to write-only register at: %lx\n",
 		  *vcpu_pc(vcpu));
