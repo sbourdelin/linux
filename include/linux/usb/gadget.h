@@ -268,7 +268,7 @@ static inline int usb_ep_enable(struct usb_ep *ep)
 	int ret;
 
 	if (ep->enabled)
-		return 0;
+		return -EBUSY;
 
 	ret = ep->ops->enable(ep, ep->desc);
 	if (ret)
