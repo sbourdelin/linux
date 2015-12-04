@@ -2657,6 +2657,57 @@ static const struct file_operations stmmac_dma_cap_fops = {
 	.release = single_release,
 };
 
+static int stmmac_sysfs_ptp_read(struct seq_file *seq, void *v)
+{
+	struct net_device *dev = seq->private;
+	struct stmmac_priv *priv = netdev_priv(dev);
+
+	if (!(priv->dma_cap.time_stamp || priv->adv_ts)) {
+		seq_printf(seq, "PTP HW features not supported\n");
+		return 0;
+	}
+
+	seq_printf(seq, "==============================\n");
+	seq_printf(seq, "\tPTP Status\n");
+	seq_printf(seq, "==============================\n");
+	
+	#define DUMP_REG(x) seq_printf(seq, "%-20s       %04x  %08x\n", #x, x, readl(priv->ioaddr + x));
+	DUMP_REG(GMAC_INT_STATUS);
+	DUMP_REG(GMAC_INT_MASK);
+
+	DUMP_REG(PTP_TCR);
+	DUMP_REG(PTP_SSIR);
+	DUMP_REG(PTP_STSR);
+	DUMP_REG(PTP_STNSR);
+	DUMP_REG(PTP_STSUR);
+	DUMP_REG(PTP_STNSUR);
+	DUMP_REG(PTP_TAR);
+	DUMP_REG(PTP_TTSR);
+	DUMP_REG(PTP_TTNSR);
+	DUMP_REG(PTP_STHWSR);
+	DUMP_REG(PTP_TSR);
+	DUMP_REG(PTP_PPSCTLR);
+	DUMP_REG(PTP_AUXTSTNSR);
+	DUMP_REG(PTP_AUXTSTSR);
+	DUMP_REG(PTP_PPS0INTRR);
+	DUMP_REG(PTP_PPS0WDTHR);
+
+	return 0;
+}
+
+static int stmmac_sysfs_ptp_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, stmmac_sysfs_ptp_read, inode->i_private);
+}
+
+static const struct file_operations stmmac_ptp_fops = {
+	.owner = THIS_MODULE,
+	.open = stmmac_sysfs_ptp_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static int stmmac_init_fs(struct net_device *dev)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
@@ -2691,6 +2742,16 @@ static int stmmac_init_fs(struct net_device *dev)
 
 	if (!priv->dbgfs_dma_cap || IS_ERR(priv->dbgfs_dma_cap)) {
 		pr_info("ERROR creating stmmac MMC debugfs file\n");
+		debugfs_remove_recursive(priv->dbgfs_dir);
+	}
+
+	/* Entry to report the PTP status */
+	priv->dbgfs_ptp = debugfs_create_file("ptp", S_IRUGO,
+					    priv->dbgfs_dir,
+					    dev, &stmmac_ptp_fops);
+
+	if (!priv->dbgfs_ptp || IS_ERR(priv->dbgfs_ptp)) {
+		pr_info("ERROR creating stmmac PTP debugfs file\n");
 		debugfs_remove_recursive(priv->dbgfs_dir);
 
 		return -ENOMEM;
