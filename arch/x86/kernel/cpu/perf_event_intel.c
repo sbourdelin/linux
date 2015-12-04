@@ -232,7 +232,7 @@ static struct event_constraint intel_hsw_event_constraints[] = {
 	FIXED_EVENT_CONSTRAINT(0x00c0, 0), /* INST_RETIRED.ANY */
 	FIXED_EVENT_CONSTRAINT(0x003c, 1), /* CPU_CLK_UNHALTED.CORE */
 	FIXED_EVENT_CONSTRAINT(0x0300, 2), /* CPU_CLK_UNHALTED.REF */
-	INTEL_EVENT_CONSTRAINT(0x48, 0x4), /* L1D_PEND_MISS.* */
+	INTEL_UEVENT_CONSTRAINT(0x148, 0x4),	/* L1D_PEND_MISS.PENDING */
 	INTEL_UEVENT_CONSTRAINT(0x01c0, 0x2), /* INST_RETIRED.PREC_DIST */
 	INTEL_EVENT_CONSTRAINT(0xcd, 0x8), /* MEM_TRANS_RETIRED.LOAD_LATENCY */
 	/* CYCLE_ACTIVITY.CYCLES_L1D_PENDING */
@@ -2475,6 +2475,44 @@ static void intel_pebs_aliases_snb(struct perf_event *event)
 	}
 }
 
+static void intel_pebs_aliases_precdist(struct perf_event *event)
+{
+	if ((event->hw.config & X86_RAW_EVENT_MASK) == 0x003c) {
+		/*
+		 * Use an alternative encoding for CPU_CLK_UNHALTED.THREAD_P
+		 * (0x003c) so that we can use it with PEBS.
+		 *
+		 * The regular CPU_CLK_UNHALTED.THREAD_P event (0x003c) isn't
+		 * PEBS capable. However we can use INST_RETIRED.PREC_DIST
+		 * (0x01c0), which is a PEBS capable event, to get the same
+		 * count.
+		 *
+		 * The PREC_DIST event has special support to minimize sample
+		 * shadowing effects. One drawback is that it can be
+		 * only programmed on counter 1, but that seems like an
+		 * acceptable trade off.
+		 */
+		u64 alt_config = X86_CONFIG(.event=0xc0, .umask=0x01, .inv=1, .cmask=16);
+
+		alt_config |= (event->hw.config & ~X86_RAW_EVENT_MASK);
+		event->hw.config = alt_config;
+	}
+}
+
+static void intel_pebs_aliases_ivb(struct perf_event *event)
+{
+	if (event->attr.precise_ip < 3)
+		return intel_pebs_aliases_snb(event);
+	return intel_pebs_aliases_precdist(event);
+}
+
+static void intel_pebs_aliases_skl(struct perf_event *event)
+{
+	if (event->attr.precise_ip < 3)
+		return intel_pebs_aliases_core2(event);
+	return intel_pebs_aliases_precdist(event);
+}
+
 static unsigned long intel_pmu_free_running_flags(struct perf_event *event)
 {
 	unsigned long flags = x86_pmu.free_running_flags;
@@ -3431,7 +3469,8 @@ __init int intel_pmu_init(void)
 
 		x86_pmu.event_constraints = intel_ivb_event_constraints;
 		x86_pmu.pebs_constraints = intel_ivb_pebs_event_constraints;
-		x86_pmu.pebs_aliases = intel_pebs_aliases_snb;
+		x86_pmu.pebs_aliases = intel_pebs_aliases_ivb;
+		x86_pmu.pebs_prec_dist = true;
 		if (boot_cpu_data.x86_model == 62)
 			x86_pmu.extra_regs = intel_snbep_extra_regs;
 		else
@@ -3464,7 +3503,8 @@ __init int intel_pmu_init(void)
 		x86_pmu.event_constraints = intel_hsw_event_constraints;
 		x86_pmu.pebs_constraints = intel_hsw_pebs_event_constraints;
 		x86_pmu.extra_regs = intel_snbep_extra_regs;
-		x86_pmu.pebs_aliases = intel_pebs_aliases_snb;
+		x86_pmu.pebs_aliases = intel_pebs_aliases_ivb;
+		x86_pmu.pebs_prec_dist = true;
 		/* all extra regs are per-cpu when HT is on */
 		x86_pmu.flags |= PMU_FL_HAS_RSP_1;
 		x86_pmu.flags |= PMU_FL_NO_HT_SHARING;
@@ -3499,7 +3539,8 @@ __init int intel_pmu_init(void)
 		x86_pmu.event_constraints = intel_bdw_event_constraints;
 		x86_pmu.pebs_constraints = intel_hsw_pebs_event_constraints;
 		x86_pmu.extra_regs = intel_snbep_extra_regs;
-		x86_pmu.pebs_aliases = intel_pebs_aliases_snb;
+		x86_pmu.pebs_aliases = intel_pebs_aliases_ivb;
+		x86_pmu.pebs_prec_dist = true;
 		/* all extra regs are per-cpu when HT is on */
 		x86_pmu.flags |= PMU_FL_HAS_RSP_1;
 		x86_pmu.flags |= PMU_FL_NO_HT_SHARING;
@@ -3521,7 +3562,8 @@ __init int intel_pmu_init(void)
 		x86_pmu.event_constraints = intel_skl_event_constraints;
 		x86_pmu.pebs_constraints = intel_skl_pebs_event_constraints;
 		x86_pmu.extra_regs = intel_skl_extra_regs;
-		x86_pmu.pebs_aliases = intel_pebs_aliases_snb;
+		x86_pmu.pebs_aliases = intel_pebs_aliases_skl;
+		x86_pmu.pebs_prec_dist = true;
 		/* all extra regs are per-cpu when HT is on */
 		x86_pmu.flags |= PMU_FL_HAS_RSP_1;
 		x86_pmu.flags |= PMU_FL_NO_HT_SHARING;

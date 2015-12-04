@@ -391,7 +391,7 @@ struct cpu_hw_events {
 /* Check flags and event code/umask, and set the HSW N/A flag */
 #define INTEL_FLAGS_UEVENT_CONSTRAINT_DATALA_NA(code, n) \
 	__EVENT_CONSTRAINT(code, n, 			\
-			  INTEL_ARCH_EVENT_MASK|INTEL_ARCH_EVENT_MASK, \
+			  INTEL_ARCH_EVENT_MASK|X86_ALL_EVENT_FLAGS, \
 			  HWEIGHT(n), 0, PERF_X86_EVENT_PEBS_NA_HSW)
 
 
@@ -593,7 +593,8 @@ struct x86_pmu {
 			bts_active	:1,
 			pebs		:1,
 			pebs_active	:1,
-			pebs_broken	:1;
+			pebs_broken	:1,
+			pebs_prec_dist	:1;
 	int		pebs_record_size;
 	void		(*drain_pebs)(struct pt_regs *regs);
 	struct event_constraint *pebs_constraints;
