@@ -395,7 +395,7 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 	target_i915_obj = target_vma->obj;
 	target_obj = &target_vma->obj->base;
 
-	target_offset = target_vma->node.start;
+	target_offset = gen8_canonical_addr(target_vma->node.start);
 
 	/* Sandybridge PPGTT errata: We need a global gtt mapping for MI and
 	 * pipe_control writes because the gpu doesn't properly redirect them
@@ -583,6 +583,7 @@ i915_gem_execbuffer_reserve_vma(struct i915_vma *vma,
 	struct drm_i915_gem_object *obj = vma->obj;
 	struct drm_i915_gem_exec_object2 *entry = vma->exec_entry;
 	uint64_t flags;
+	uint64_t offset;
 	int ret;
 
 	flags = PIN_USER;
@@ -623,8 +624,9 @@ i915_gem_execbuffer_reserve_vma(struct i915_vma *vma,
 			entry->flags |= __EXEC_OBJECT_HAS_FENCE;
 	}
 
-	if (entry->offset != vma->node.start) {
-		entry->offset = vma->node.start;
+	offset = gen8_canonical_addr(vma->node.start);
+	if (entry->offset != offset) {
+		entry->offset = offset;
 		*need_reloc = true;
 	}
 
