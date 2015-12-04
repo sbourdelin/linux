@@ -135,9 +135,10 @@ static void set_page_pfns(u32 pfns[], struct page *page)
 		pfns[i] = page_to_balloon_pfn(page) + i;
 }
 
-static void fill_balloon(struct virtio_balloon *vb, size_t num)
+static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
 {
 	struct balloon_dev_info *vb_dev_info = &vb->vb_dev_info;
+	unsigned num_allocated_pages;
 
 	/* We can only do one array worth at a time. */
 	num = min(num, ARRAY_SIZE(vb->pfns));
@@ -162,10 +163,13 @@ static void fill_balloon(struct virtio_balloon *vb, size_t num)
 			adjust_managed_page_count(page, -1);
 	}
 
+	num_allocated_pages = vb->num_pfns;
 	/* Did we get any? */
 	if (vb->num_pfns != 0)
 		tell_host(vb, vb->inflate_vq);
 	mutex_unlock(&vb->balloon_lock);
+
+	return num_allocated_pages;
 }
 
 static void release_pages_balloon(struct virtio_balloon *vb)
@@ -581,6 +585,7 @@ static int virtballoon_freeze(struct virtio_device *vdev)
 static int virtballoon_restore(struct virtio_device *vdev)
 {
 	struct virtio_balloon *vb = vdev->priv;
+	s64 diff;
 	int ret;
 
 	ret = init_vqs(vdev->priv);
@@ -589,7 +594,9 @@ static int virtballoon_restore(struct virtio_device *vdev)
 
 	virtio_device_ready(vdev);
 
-	fill_balloon(vb, towards_target(vb));
+	diff = towards_target(vb);
+	while (diff > 0)
+		diff -= fill_balloon(vb, diff);
 	update_balloon_size(vb);
 	return 0;
 }
