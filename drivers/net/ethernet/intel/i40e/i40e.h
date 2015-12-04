@@ -418,6 +418,8 @@ struct i40e_pf {
 
 	u32 ioremap_len;
 	u32 fd_inv;
+
+	u32 is_default_mac:1;
 };
 
 struct i40e_mac_filter {
