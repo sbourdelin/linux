@@ -468,19 +468,28 @@ void acpi_walk_dep_device_list(acpi_handle handle);
 
 struct platform_device *acpi_create_platform_device(struct acpi_device *);
 
+struct acpi_amba_quirk {
+	u32 quirk;
+#define MULTI_ATTACHED_QUIRK  BIT(0)
+#define BASE_OFFSET_QUIRK     BIT(1)
+	u32 base_offset;
+};
+
 #ifdef CONFIG_ARM_AMBA
 
 struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
 					    unsigned int periphid,
 					    unsigned long fixed_rate,
-					    void *pdata);
+					    void *pdata,
+					    struct acpi_amba_quirk *quirk);
 
 #else /* !CONFIG_ARM_AMBA */
 
 static inline struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
 							  unsigned int periphid,
 							  unsigned long fixed_rate,
-							  void *pdata)
+							  void *pdata,
+							  struct acpi_amba_quirk *quirk)
 {
 	return NULL;
 }

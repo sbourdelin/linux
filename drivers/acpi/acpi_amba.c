@@ -31,6 +31,8 @@ ACPI_MODULE_NAME("amba");
  * @periphid: AMBA device periphid.
  * @fixed_rate: Clock frequency.
  * @pdata: Platform data specific to the device.
+ * @quirk: Specific device config, including device multiattach.
+ * and mem base offset.
  *
  * Check if the given @adev can be represented as an AMBA device and, if
  * that's the case, create and register an AMBA device, populate its
@@ -42,7 +44,8 @@ ACPI_MODULE_NAME("amba");
 struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
 					    unsigned int periphid,
 					    unsigned long fixed_rate,
-					    void *pdata)
+					    void *pdata,
+					    struct acpi_amba_quirk *quirk)
 {
 	struct amba_device *amba_dev = NULL;
 	struct device *parent;
@@ -54,12 +57,14 @@ struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
 	unsigned int i;
 	unsigned int irq[AMBA_NR_IRQS];
 	struct clk *clk = ERR_PTR(-ENODEV);
+	char amba_devname[100];
 
 	/*
 	 * If the ACPI node already has a physical device attached,
-	 * skip it.
+	 * skip it. Except some special devices such as AMD0020 which
+	 * needs attach physical devices two times.
 	 */
-	if (adev->physical_node_count)
+	if (adev->physical_node_count && !(quirk->quirk & MULTI_ATTACHED_QUIRK))
 		return NULL;
 
 	INIT_LIST_HEAD(&resource_list);
@@ -85,7 +90,24 @@ struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
 			memcpy(resource, rentry->res, sizeof(struct resource));
 	}
 
-	amba_dev = amba_device_alloc(dev_name(&adev->dev),
+	/*
+	 * The memory address of AMD pl330 has an offset of ACPI
+	 * mem resource.
+	 */
+	if (quirk->quirk & BASE_OFFSET_QUIRK)
+		resource->start += quirk->base_offset;
+
+	/*
+	 * If the ACPI device already has a node attached. It must be
+	 * renamed.
+	 */
+	if (quirk->quirk & MULTI_ATTACHED_QUIRK)
+		sprintf(amba_devname, "%s%s", dev_name(&adev->dev), "DMA");
+	else
+		memcpy(amba_devname, dev_name(&adev->dev),
+		       strlen(dev_name(&adev->dev)));
+
+	amba_dev = amba_device_alloc(amba_devname,
 				     resource->start,
 				     resource_size(resource));
 
@@ -136,6 +158,7 @@ struct amba_device *acpi_create_amba_device(struct acpi_device *adev,
 	if (ret)
 		goto amba_register_err;
 
+	amba_dev->dev.init_name = NULL;
 	ret = amba_device_add(amba_dev, resource);
 	if (ret)
 		goto amba_register_err;
