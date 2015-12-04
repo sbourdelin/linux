@@ -1594,7 +1594,7 @@ static __always_inline void timekeeping_freqadjust(struct timekeeper *tk,
 	s64 xinterval = tk->xtime_interval;
 	s64 tick_error;
 	bool negative;
-	u32 adj;
+	u32 adj_scale;
 
 	/* Remove any current error adj from freq calculation */
 	if (tk->ntp_err_mult)
@@ -1613,13 +1613,30 @@ static __always_inline void timekeeping_freqadjust(struct timekeeper *tk,
 	/* preserve the direction of correction */
 	negative = (tick_error < 0);
 
-	/* Sort out the magnitude of the correction */
+	/*
+	 * Sort out the magnitude of the correction, but
+	 * avoid making so large a correction that we go
+	 * over the max adjustment.
+	 */
+	adj_scale = 0;
 	tick_error = abs(tick_error);
-	for (adj = 0; tick_error > interval; adj++)
+	while (tick_error > interval) {
+		u32 base = tk->tkr_mono.clock->mult;
+		u32 max = tk->tkr_mono.clock->maxadj;
+		u32 cur_adj = tk->tkr_mono.mult;
+		u32 adj = 1 << (adj_scale + 1);
+
+		if (negative && (cur_adj - adj) < (base - max))
+			break;
+		if (!negative && (cur_adj + adj) > (base + max))
+			break;
+
+		adj_scale++;
 		tick_error >>= 1;
+	}
 
 	/* scale the corrections */
-	timekeeping_apply_adjustment(tk, offset, negative, adj);
+	timekeeping_apply_adjustment(tk, offset, negative, adj_scale);
 }
 
 /*
