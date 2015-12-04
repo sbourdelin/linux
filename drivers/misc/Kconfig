@@ -525,6 +525,17 @@ config VEXPRESS_SYSCFG
 	  bus. System Configuration interface is one of the possible means
 	  of generating transactions on this bus.
 
+config GPIO_SWITCH
+	tristate "GPIO Switch driver"
+	depends on GPIO_SYSFS
+	---help---
+	 Some devices have gpio attached to dedicated switches, an example of
+	 this are chromebooks (where connection to some switches for predefined
+	 purposes are provided on the generic development card). This driver
+	 provides the ability to create consistently named sysfs entries to the
+	 functionally equivalent signals across a range of devices. This
+	 functionality currently requires a device which supports device tree.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
