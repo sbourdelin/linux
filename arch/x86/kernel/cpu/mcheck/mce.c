@@ -998,7 +998,20 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	u64 recover_paddr = ~0ull;
 	int flags = MF_ACTION_REQUIRED;
 	int lmce = 0;
+	unsigned int cpu = smp_processor_id();
 
+	/*
+	 * if this cpu is offline, just bail out.
+	 */
+	if (cpu_is_offline(cpu)) {
+		u64 mcgstatus;
+
+		mcgstatus = mce_rdmsrl(MSR_IA32_MCG_STATUS);
+		if (mcgstatus & MCG_STATUS_RIPV) {
+			mce_wrmsrl(MSR_IA32_MCG_STATUS, 0);
+			return;
+		}
+	}
 	ist_enter(regs);
 
 	this_cpu_inc(mce_exception_count);
@@ -1142,8 +1155,8 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 
 	if (worst > 0)
 		mce_report_event(regs);
-	mce_wrmsrl(MSR_IA32_MCG_STATUS, 0);
 out:
+	mce_wrmsrl(MSR_IA32_MCG_STATUS, 0);
 	sync_core();
 
 	if (recover_paddr == ~0ull)
