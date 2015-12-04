@@ -6,6 +6,18 @@
 #include <linux/types.h>
 #include <linux/perf_event.h>
 
+#define CMD_EXEC_PATH "--exec-path"
+#define CMD_PERF_DIR "--perf-dir="
+#define CMD_WORK_TREE "--work-tree="
+#define CMD_DEBUGFS_DIR "--debugfs-dir="
+
+#define PERF_DIR_ENVIRONMENT "PERF_DIR"
+#define PERF_WORK_TREE_ENVIRONMENT "PERF_WORK_TREE"
+#define EXEC_PATH_ENVIRONMENT "PERF_EXEC_PATH"
+#define DEFAULT_PERF_DIR_ENVIRONMENT ".perf"
+#define PERF_DEBUGFS_ENVIRONMENT "PERF_DEBUGFS_DIR"
+#define PERF_TRACEFS_ENVIRONMENT "PERF_TRACEFS_DIR"
+
 extern bool test_attr__enabled;
 void test_attr__init(void);
 void test_attr__open(struct perf_event_attr *attr, pid_t pid, int cpu,
