@@ -640,7 +640,8 @@ ssize_t spk_var_store(struct kobject *kobj, struct kobj_attribute *attr,
 			len = E_INC;
 		else
 			len = E_SET;
-		if (kstrtol(cp, 10, &value) == 0)
+		ret = kstrtol(cp, 10, &value);
+		if (!ret)
 			ret = spk_set_num_var(value, param, len);
 		else
 			pr_warn("overflow or parsing error has occurred");
@@ -688,6 +689,8 @@ ssize_t spk_var_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	if (ret == -ERESTART)
 		pr_info("%s reset to default value\n", param->name);
+	else if (ret < 0)
+		return ret;
 	return count;
 }
 EXPORT_SYMBOL_GPL(spk_var_store);
