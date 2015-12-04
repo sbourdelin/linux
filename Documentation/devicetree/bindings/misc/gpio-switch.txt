@@ -1,0 +1,47 @@
+Device-Tree bindings for gpio attached switches.
+
+This provides a mechanism to provide a named link to specified gpios. This can
+be useful in instances such as when theres a need to monitor a switch, which is
+common across a family of devices, but attached to different gpios and even
+implemented in different ways on differnet devices.
+
+Required properties:
+	- compatible = "gpio-switch";
+
+Each signal is represented as a sub-node of "gpio-switch". The naming of
+sub-nodes is arbitrary.
+
+Required sub-node properties:
+
+	- label: Name to be given to gpio switch.
+	- gpios: OF device-tree gpio specification.
+
+Optional sub-node properties:
+
+	- read-only: Boolean flag to mark the gpio as read-only, i.e. the line
+	  should not be driven by the host.
+
+Example nodes:
+
+        gpio-switch {
+                compatible = "gpio-switch";
+
+                write-protect {
+                        label = "write-protect";
+                        gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
+                        read-only;
+                };
+
+                developer-switch {
+                        label = "developer-switch";
+                        gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
+                        read-only;
+                };
+
+                recovery-switch {
+                        label = "recovery-switch";
+                        gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
+                        read-only;
+                };
+        };
+
