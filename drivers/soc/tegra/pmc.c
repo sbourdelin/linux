@@ -28,6 +28,7 @@
 #include <linux/export.h>
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
@@ -100,6 +101,8 @@
 #define PMC_SCRATCH55_I2CSLV1_SHIFT	0
 
 #define GPU_RG_CNTRL			0x2d4
+
+#define PMC_PWRGATE_STATE(status, id)	((status & BIT(id)) != 0)
 
 struct tegra_pmc_soc {
 	unsigned int num_powergates;
@@ -181,22 +184,27 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
  */
 static int tegra_powergate_set(int id, bool new_state)
 {
-	bool status;
+	u32 status;
+	int err = 0;
 
 	mutex_lock(&pmc->powergates_lock);
 
-	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+	status = tegra_pmc_readl(PWRGATE_STATUS);
 
-	if (status == new_state) {
+	if (PMC_PWRGATE_STATE(status, id) == new_state) {
 		mutex_unlock(&pmc->powergates_lock);
 		return 0;
 	}
 
 	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
 
+	err = readx_poll_timeout(tegra_pmc_readl, PWRGATE_STATUS, status,
+				 PMC_PWRGATE_STATE(status, id) == new_state,
+				 10, 100000);
+
 	mutex_unlock(&pmc->powergates_lock);
 
-	return 0;
+	return err;
 }
 
 /**
@@ -235,8 +243,9 @@ int tegra_powergate_is_powered(int id)
 	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
 		return -EINVAL;
 
-	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
-	return !!status;
+	status = tegra_pmc_readl(PWRGATE_STATUS);
+
+	return PMC_PWRGATE_STATE(status, id);
 }
 
 /**
