@@ -742,6 +742,35 @@ int callchain_cursor_append(struct callchain_cursor *cursor,
 	return 0;
 }
 
+int callchain_cursor_prepend(struct callchain_cursor *cursor,
+			     u64 ip, struct map *map, struct symbol *sym)
+{
+	struct callchain_cursor_node *node = *cursor->last;
+
+	if (!node) {
+		node = calloc(1, sizeof(*node));
+		if (!node)
+			return -ENOMEM;
+	} else {
+		/* Pop the first free node off the end of the list */
+		*cursor->last = node->next;
+	}
+
+	node->ip = ip;
+	node->map = map;
+	node->sym = sym;
+
+	node->next = cursor->first;
+	cursor->first = node;
+
+	cursor->nr++;
+	if (cursor->nr == 1) {
+		cursor->last = &node->next;
+	}
+
+	return 0;
+}
+
 int sample__resolve_callchain(struct perf_sample *sample, struct symbol **parent,
 			      struct perf_evsel *evsel, struct addr_location *al,
 			      int max_stack)

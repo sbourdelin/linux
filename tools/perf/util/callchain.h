@@ -182,6 +182,9 @@ static inline void callchain_cursor_reset(struct callchain_cursor *cursor)
 
 int callchain_cursor_append(struct callchain_cursor *cursor, u64 ip,
 			    struct map *map, struct symbol *sym);
+int callchain_cursor_prepend(struct callchain_cursor *cursor, u64 ip,
+			     struct map *map, struct symbol *sym);
+
 
 /* Close a cursor writing session. Initialize for the reader */
 static inline void callchain_cursor_commit(struct callchain_cursor *cursor)

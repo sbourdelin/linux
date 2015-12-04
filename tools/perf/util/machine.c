@@ -1896,7 +1896,7 @@ check_calls:
 	return 0;
 }
 
-static int unwind_entry(struct unwind_entry *entry, void *arg)
+static int unwind_entry_callee(struct unwind_entry *entry, void *arg)
 {
 	struct callchain_cursor *cursor = arg;
 
@@ -1904,6 +1904,16 @@ static int unwind_entry(struct unwind_entry *entry, void *arg)
 		return 0;
 	return callchain_cursor_append(cursor, entry->ip,
 				       entry->map, entry->sym);
+}
+
+static int unwind_entry_caller(struct unwind_entry *entry, void *arg)
+{
+	struct callchain_cursor *cursor = arg;
+
+	if (symbol_conf.hide_unresolved && entry->sym == NULL)
+		return 0;
+	return callchain_cursor_prepend(cursor, entry->ip,
+					entry->map, entry->sym);
 }
 
 int thread__resolve_callchain(struct thread *thread,
@@ -1929,7 +1939,10 @@ int thread__resolve_callchain(struct thread *thread,
 	    (!sample->user_stack.size))
 		return 0;
 
-	return unwind__get_entries(unwind_entry, &callchain_cursor,
+	return unwind__get_entries(callchain_param.order == ORDER_CALLEE ?
+					unwind_entry_callee :
+					unwind_entry_caller,
+				   &callchain_cursor,
 				   thread, sample, max_stack);
 
 }
