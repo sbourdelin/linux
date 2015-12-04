@@ -50,6 +50,8 @@ struct strbuf {
 
 #define STRBUF_INIT  { 0, 0, strbuf_slopbuf }
 
+extern int prefixcmp(const char *str, const char *prefix);
+
 /*----- strbuf life cycle -----*/
 extern void strbuf_init(struct strbuf *buf, ssize_t hint);
 extern void strbuf_release(struct strbuf *);
