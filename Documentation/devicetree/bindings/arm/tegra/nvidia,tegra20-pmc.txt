@@ -1,5 +1,7 @@
 NVIDIA Tegra Power Management Controller (PMC)
 
+== Power Management Controller Node ==
+
 The PMC block interacts with an external Power Management Unit. The PMC
 mostly controls the entry and exit of the system from different sleep
 modes. It provides power-gating controllers for SoC and CPU power-islands.
@@ -69,6 +71,10 @@ Optional properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'
                      Defaults to 0. Valid values are described in section 12.5.2
                      "Pinmux Support" of the Tegra4 Technical Reference Manual.
 
+Optional nodes:
+- pm-domains : This node contains a hierarchy of PM domain nodes, which should
+	       match the power-domains on the Tegra SoC.
+
 Example:
 
 / SoC dts including file
@@ -114,3 +120,58 @@ pmc@7000f400 {
 	};
 	...
 };
+
+
+== PM Domain Nodes ==
+
+Each of the PM domain nodes represents a power-domain on the Tegra SoC
+that can be power-gated by the PMC and should be named appropriately.
+
+Required properties:
+  - clocks: Must contain an entry for each clock required by the PMC for
+    controlling a power-gate. See ../clocks/clock-bindings.txt for details.
+  - resets: Must contain an entry for each reset required by the PMC for
+    controlling a power-gate. See ../reset/reset.txt for details.
+  - nvidia,powergate: Integer cell that contains an identifier for the PMC
+    power-gate that is associated with the power-domain. Please refer to
+    the Tegra TRM for more details.
+  - #power-domain-cells: Must be 0.
+
+Optional properties:
+  - nvidia,powergate-disable-clocks: Boolean property that if present
+    indicates that the clocks listed in the "clocks" property should be
+    disabled after turning on the power-domain. Otherwise the clocks will
+    be kept enabled.
+
+Example:
+
+	pmc: pmc@0,7000e400 {
+		compatible = "nvidia,tegra210-pmc";
+		reg = <0x0 0x7000e400 0x0 0x400>;
+		clocks = <&tegra_car TEGRA210_CLK_PCLK>, <&clk32k_in>;
+		clock-names = "pclk", "clk32k_in";
+
+		pm-domains {
+			pd_audio: aud {
+				clocks = <&tegra_car TEGRA210_CLK_APE>,
+					 <&tegra_car TEGRA210_CLK_APB2APE>;
+				resets = <&tegra_car 198>;
+				nvidia,powergate = <TEGRA_POWERGATE_AUD>;
+				#power-domain-cells = <0>;
+			};
+		};
+	};
+
+
+== PM Domain Consumers ==
+
+Hardware blocks belonging to a PM domain should contain a "power-domains"
+property that is a phandle pointing to the corresponding PM domain node.
+
+Example:
+
+	adma: adma@702e2000 {
+		...
+		power-domains = <&pd_audio>;
+		...
+	};
