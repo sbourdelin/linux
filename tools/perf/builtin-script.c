@@ -1,7 +1,6 @@
 #include "builtin.h"
 
 #include "perf.h"
-#include "util/cache.h"
 #include "util/debug.h"
 #include "util/exec_cmd.h"
 #include "util/header.h"

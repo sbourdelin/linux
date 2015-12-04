@@ -12,7 +12,7 @@
 #include "perf.h"
 
 #include "util/parse-events.h"
-#include "util/cache.h"
+#include "util/util.h"
 #include "util/pmu.h"
 #include "util/parse-options.h"
 

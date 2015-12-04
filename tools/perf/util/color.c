@@ -1,5 +1,5 @@
 #include <linux/kernel.h>
-#include "cache.h"
+#include "util.h"
 #include "color.h"
 #include <math.h>
 

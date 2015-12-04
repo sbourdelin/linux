@@ -1,6 +1,5 @@
 #include "util.h"
 #include "parse-options.h"
-#include "cache.h"
 #include "header.h"
 #include <linux/string.h>
 

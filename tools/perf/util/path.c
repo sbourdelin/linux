@@ -10,7 +10,7 @@
  *
  * which is what it's designed for.
  */
-#include "cache.h"
+#include "util.h"
 
 static char bad_path[] = "/bad-path/";
 /*

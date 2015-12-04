@@ -18,7 +18,6 @@
 #include "event.h"
 #include "strlist.h"
 #include "debug.h"
-#include "cache.h"
 #include "color.h"
 #include "symbol.h"
 #include "thread.h"

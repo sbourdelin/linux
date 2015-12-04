@@ -1,5 +1,5 @@
 #include "gtk.h"
-#include "../../util/cache.h"
+#include "../../util/util.h"
 #include "../../util/debug.h"
 
 extern struct perf_error_ops perf_gtk_eops;

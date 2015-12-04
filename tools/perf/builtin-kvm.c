@@ -4,7 +4,6 @@
 #include "util/evsel.h"
 #include "util/evlist.h"
 #include "util/util.h"
-#include "util/cache.h"
 #include "util/symbol.h"
 #include "util/thread.h"
 #include "util/header.h"

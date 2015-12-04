@@ -1,4 +1,4 @@
-#include "../cache.h"
+#include "../util.h"
 #include "../progress.h"
 #include "../libslang.h"
 #include "../ui.h"

@@ -1,7 +1,7 @@
 #include <pthread.h>
 #include <dlfcn.h>
 
-#include "../util/cache.h"
+#include "../util/util.h"
 #include "../util/debug.h"
 #include "../util/hist.h"
 

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/ttydefaults.h>
 
-#include "../../util/cache.h"
 #include "../../util/debug.h"
 #include "../browser.h"
 #include "../keysyms.h"

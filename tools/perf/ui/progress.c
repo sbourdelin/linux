@@ -1,4 +1,4 @@
-#include "../cache.h"
+#include "../util.h"
 #include "progress.h"
 
 static void null_progress__update(struct ui_progress *p __maybe_unused)

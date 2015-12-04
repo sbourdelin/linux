@@ -8,9 +8,8 @@
 
 #include "perf.h"
 
-#include "util/cache.h"
-#include "util/parse-options.h"
 #include "util/util.h"
+#include "util/parse-options.h"
 #include "util/debug.h"
 
 static const char * const config_usage[] = {

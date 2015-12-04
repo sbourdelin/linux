@@ -1,5 +1,5 @@
 #include "../evlist.h"
-#include "../cache.h"
+#include "../util.h"
 #include "../evsel.h"
 #include "../sort.h"
 #include "../hist.h"

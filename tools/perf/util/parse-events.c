@@ -9,7 +9,6 @@
 #include "exec_cmd.h"
 #include "string.h"
 #include "symbol.h"
-#include "cache.h"
 #include "header.h"
 #include "bpf-loader.h"
 #include "debug.h"

@@ -10,7 +10,7 @@
 #include "builtin.h"
 #include "perf.h"
 #include "util/build-id.h"
-#include "util/cache.h"
+#include "util/util.h"
 #include "util/debug.h"
 #include "util/parse-options.h"
 #include "util/session.h"

@@ -6,7 +6,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "cache.h"
 #include "color.h"
 #include "event.h"
 #include "debug.h"

@@ -12,7 +12,6 @@
 #include "sort.h"
 #include "build-id.h"
 #include "color.h"
-#include "cache.h"
 #include "symbol.h"
 #include "debug.h"
 #include "annotate.h"

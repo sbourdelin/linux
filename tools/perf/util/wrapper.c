@@ -1,7 +1,7 @@
 /*
  * Various trivial helper wrappers around standard functions
  */
-#include "cache.h"
+#include "util.h"
 
 /*
  * There's no pack memory to release - but stay close to the Git

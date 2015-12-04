@@ -4,7 +4,6 @@
 #include <execinfo.h>
 #endif
 
-#include "../../util/cache.h"
 #include "../../util/debug.h"
 #include "../browser.h"
 #include "../helpline.h"

@@ -10,7 +10,7 @@
 
 #include "util/env.h"
 #include "util/exec_cmd.h"
-#include "util/cache.h"
+#include "util/util.h"
 #include "util/quote.h"
 #include "util/run-command.h"
 #include "util/parse-events.h"

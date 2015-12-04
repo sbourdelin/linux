@@ -7,7 +7,6 @@
 #include "util.h"
 #include "debug.h"
 #include "llvm-utils.h"
-#include "cache.h"
 
 #define CLANG_BPF_CMD_DEFAULT_TEMPLATE				\
 		"$CLANG_EXEC -D__KERNEL__ -D__NR_CPUS__=$NR_CPUS "\

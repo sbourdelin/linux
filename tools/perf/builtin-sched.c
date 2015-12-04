@@ -3,7 +3,6 @@
 
 #include "util/util.h"
 #include "util/evlist.h"
-#include "util/cache.h"
 #include "util/evsel.h"
 #include "util/symbol.h"
 #include "util/thread.h"

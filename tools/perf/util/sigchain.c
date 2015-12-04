@@ -1,5 +1,5 @@
+#include "util.h"
 #include "sigchain.h"
-#include "cache.h"
 
 #define SIGCHAIN_MAX_SIGNALS 32
 

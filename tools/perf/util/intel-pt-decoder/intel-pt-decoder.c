@@ -23,7 +23,6 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#include "../cache.h"
 #include "../util.h"
 
 #include "intel-pt-insn-decoder.h"
