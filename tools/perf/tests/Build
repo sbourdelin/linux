@@ -37,21 +37,21 @@ perf-y += topology.o
 
 $(OUTPUT)tests/llvm-src-base.c: tests/bpf-script-example.c
 	$(call rule_mkdir)
-	$(Q)echo '#include <tests/llvm.h>' > $@
+	$(Q)echo '#include "tests/llvm.h"' > $@
 	$(Q)echo 'const char test_llvm__bpf_base_prog[] =' >> $@
 	$(Q)sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/g' $< >> $@
 	$(Q)echo ';' >> $@
 
 $(OUTPUT)tests/llvm-src-kbuild.c: tests/bpf-script-test-kbuild.c
 	$(call rule_mkdir)
-	$(Q)echo '#include <tests/llvm.h>' > $@
+	$(Q)echo '#include "tests/llvm.h"' > $@
 	$(Q)echo 'const char test_llvm__bpf_test_kbuild_prog[] =' >> $@
 	$(Q)sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/g' $< >> $@
 	$(Q)echo ';' >> $@
 
 $(OUTPUT)tests/llvm-src-prologue.c: tests/bpf-script-test-prologue.c
 	$(call rule_mkdir)
-	$(Q)echo '#include <tests/llvm.h>' > $@
+	$(Q)echo '#include "tests/llvm.h"' > $@
 	$(Q)echo 'const char test_llvm__bpf_test_prologue_prog[] =' >> $@
 	$(Q)sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/g' $< >> $@
 	$(Q)echo ';' >> $@

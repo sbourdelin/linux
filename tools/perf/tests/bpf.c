@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <sys/epoll.h>
-#include <util/bpf-loader.h>
-#include <util/evlist.h>
+#include "util/bpf-loader.h"
+#include "util/evlist.h"
 #include "tests.h"
 #include "llvm.h"
 #include "debug.h"

@@ -210,8 +210,8 @@ CFLAGS += -I$(obj-perf)/util
 CFLAGS += -I$(obj-perf)
 endif
 
-CFLAGS += -I$(src-perf)/util
-CFLAGS += -I$(src-perf)
+CFLAGS += -iquote $(src-perf)/util
+CFLAGS += -iquote $(src-perf)
 CFLAGS += -I$(srctree)/tools/lib/
 
 CFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
