@@ -2966,6 +2966,10 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 	if (ret)
 		dev_err(&adev->dev, "unable to set the seg size\n");
 
+	dev_info(&adev->dev, "set the seg boundary\n");
+	ret = dma_set_seg_boundary(&adev->dev, 0xffffffff);
+	if (ret)
+		dev_err(&adev->dev, "unable to set the seg boundary\n");
 
 	dev_info(&adev->dev,
 		 "Loaded driver for PL330 DMAC-%x\n", adev->periphid);
