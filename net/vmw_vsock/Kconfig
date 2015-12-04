@@ -28,11 +28,16 @@ config VMWARE_VMCI_VSOCKETS
 	  will be called vmw_vsock_vmci_transport. If unsure, say N.
 
 config VIRTIO_VSOCKETS
-	tristate "virtio transport for Virtual Sockets"
+	tristate "virtio transport for Virtual Sockets (Experimental)"
 	depends on VSOCKETS && VIRTIO
 	select VIRTIO_VSOCKETS_COMMON
+	default n
 	help
 	  This module implements a virtio transport for Virtual Sockets.
+
+	  This feature is based on a draft of the virtio-vsock device
+	  specification that is still subject to change.  It can be used
+	  to begin developing applications that use Virtual Sockets.
 
 	  Enable this transport if your Virtual Machine runs on Qemu/KVM.
 
