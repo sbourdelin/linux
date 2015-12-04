@@ -507,6 +507,11 @@ static inline size_t gen8_pte_count(uint64_t address, uint64_t length)
 	return i915_pte_count(address, length, GEN8_PDE_SHIFT);
 }
 
+static inline uint64_t gen8_canonical_addr(uint64_t address)
+{
+	return ((int64_t)address << 16) >> 16;
+}
+
 static inline dma_addr_t
 i915_page_dir_dma_addr(const struct i915_hw_ppgtt *ppgtt, const unsigned n)
 {
