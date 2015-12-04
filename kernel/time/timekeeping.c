@@ -1987,6 +1987,10 @@ int do_adjtimex(struct timex *txc)
 
 	if (txc->modes & ADJ_SETOFFSET) {
 		struct timespec delta;
+
+		if (txc->time.tv_usec >= USEC_PER_SEC || txc->time.tv_usec <= -USEC_PER_SEC)
+			return -EINVAL;
+
 		delta.tv_sec  = txc->time.tv_sec;
 		delta.tv_nsec = txc->time.tv_usec;
 		if (!(txc->modes & ADJ_NANO))
