@@ -46,6 +46,7 @@ static int vbi_out_queue_setup(struct vb2_queue *vq, const void *parg,
 		*nbuffers = 2 - vq->num_buffers;
 
 	*nplanes = 1;
+	alloc_ctxs[0] = dev->alloc_ctx;
 	return 0;
 }
 

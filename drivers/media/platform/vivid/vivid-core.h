@@ -157,6 +157,7 @@ struct vivid_dev {
 	struct v4l2_ctrl_handler	ctrl_hdl_sdr_cap;
 	spinlock_t			slock;
 	struct mutex			mutex;
+	void				*alloc_ctx;
 
 	/* capabilities */
 	u32				vid_cap_caps;

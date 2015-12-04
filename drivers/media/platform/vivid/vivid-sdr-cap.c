@@ -217,9 +217,12 @@ static int sdr_cap_queue_setup(struct vb2_queue *vq, const void *parg,
 		       unsigned *nbuffers, unsigned *nplanes,
 		       unsigned sizes[], void *alloc_ctxs[])
 {
+	struct vivid_dev *dev = vb2_get_drv_priv(vq);
+
 	/* 2 = max 16-bit sample returned */
 	sizes[0] = SDR_CAP_SAMPLES_PER_BUF * 2;
 	*nplanes = 1;
+	alloc_ctxs[0] = dev->alloc_ctx;
 	return 0;
 }
 

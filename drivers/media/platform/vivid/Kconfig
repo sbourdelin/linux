@@ -6,7 +6,7 @@ config VIDEO_VIVID
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
-	select VIDEOBUF2_VMALLOC
+	select VIDEO_VIVID_MEM_VMALLOC if !VIDEO_VIVID_MEM_DMA_CONTIG
 	default n
 	---help---
 	  Enables a virtual video driver. This driver emulates a webcam,
@@ -28,3 +28,22 @@ config VIDEO_VIVID_MAX_DEVS
 	---help---
 	  This allows you to specify the maximum number of devices supported
 	  by the vivid driver.
+
+config VIDEO_VIVID_MEM_DMA_CONTIG
+	bool "Enable DMA-CONTIG Memory Type"
+	depends on VIDEO_VIVID
+	select VIDEOBUF2_DMA_CONTIG
+	default n
+	---help---
+	  Enable support for the DMA-CONTIG videobuf2 memory allocator. Say Y
+	  here if you want to test buffer sharing with devices that require
+	  contiguous memory buffers. When in doubt, say N.
+
+config VIDEO_VIVID_MEM_VMALLOC
+	bool "Enable VMALLOC Memory Type"
+	depends on VIDEO_VIVID
+	select VIDEOBUF2_VMALLOC
+	default y
+	---help---
+	  Enable support for the VMALLOC videobuf2 memory allocator. This is the
+	  default memory allocator for the vivid driver. When in doubt, say Y.

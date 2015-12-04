@@ -156,14 +156,11 @@ static int vid_cap_queue_setup(struct vb2_queue *vq, const void *parg,
 
 	*nplanes = buffers;
 
-	/*
-	 * videobuf2-vmalloc allocator is context-less so no need to set
-	 * alloc_ctxs array.
-	 */
-
 	dprintk(dev, 1, "%s: count=%d\n", __func__, *nbuffers);
-	for (p = 0; p < buffers; p++)
+	for (p = 0; p < buffers; p++) {
+		alloc_ctxs[p] = dev->alloc_ctx;
 		dprintk(dev, 1, "%s: size[%u]=%u\n", __func__, p, sizes[p]);
+	}
 
 	return 0;
 }
