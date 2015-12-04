@@ -567,6 +567,16 @@ struct amd_iommu {
 #endif
 };
 
+struct acpihid_map {
+	struct list_head list;
+	u8 uid[2];
+	u8 hid[9];
+	u16 devid;
+	u16 root_devid;
+	bool cmd_line;
+	struct iommu_group *group;
+};
+
 struct devid_map {
 	struct list_head list;
 	u8 id;
@@ -577,6 +587,7 @@ struct devid_map {
 /* Map HPET and IOAPIC ids to the devid used by the IOMMU */
 extern struct list_head ioapic_map;
 extern struct list_head hpet_map;
+extern struct list_head acpihid_map;
 
 /*
  * List with all IOMMUs in the system. This list is not locked because it is

@@ -35,6 +35,7 @@
 #include <linux/msi.h>
 #include <linux/dma-contiguous.h>
 #include <linux/irqdomain.h>
+#include <linux/acpi.h>
 #include <asm/irq_remapping.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
@@ -71,6 +72,7 @@ static DEFINE_SPINLOCK(dev_data_list_lock);
 
 LIST_HEAD(ioapic_map);
 LIST_HEAD(hpet_map);
+LIST_HEAD(acpihid_map);
 
 /*
  * Domain for untranslated devices - only allocated
@@ -174,11 +176,69 @@ static struct iommu_dev_data *find_dev_data(u16 devid)
 	return dev_data;
 }
 
-static inline u16 get_device_id(struct device *dev)
+static inline int match_hid_uid(struct device *dev,
+					struct acpihid_map *entry)
+{
+	const u8 *hid, *uid;
+
+	hid = acpi_device_hid(ACPI_COMPANION(dev));
+	uid = acpi_device_uid(ACPI_COMPANION(dev));
+
+	if (!strcmp(hid, entry->hid) && !strcmp(uid, entry->uid))
+		return 0;
+
+	return -ENODEV;
+}
+
+static inline u16 get_pci_device_id(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 
 	return PCI_DEVID(pdev->bus->number, pdev->devfn);
+}
+
+static inline int get_acpihid_device_id(struct device *dev)
+{
+	struct acpihid_map *entry;
+
+	list_for_each_entry(entry, &acpihid_map, list) {
+		if (!match_hid_uid(dev, entry))
+			return entry->devid;
+	}
+	return -EINVAL;
+}
+
+static inline u16 get_device_id(struct device *dev)
+{
+	if (dev_is_pci(dev))
+		return get_pci_device_id(dev);
+	else
+		return get_acpihid_device_id(dev);
+}
+
+static void find_acpihid_group_by_rootid(struct device *dev,
+					struct iommu_group *group)
+{
+	struct acpihid_map *entry;
+
+	list_for_each_entry(entry, &acpihid_map, list) {
+		if (entry->group)
+			continue;
+		if (entry->root_devid == get_device_id(dev))
+			entry->group = group;
+	}
+}
+
+static struct iommu_group *find_acpihid_group_by_devid(struct device *dev)
+{
+	struct acpihid_map *entry;
+
+	list_for_each_entry(entry, &acpihid_map, list) {
+		if (!match_hid_uid(dev, entry))
+			return entry->group;
+	}
+
+	return NULL;
 }
 
 static struct iommu_dev_data *get_dev_data(struct device *dev)
@@ -260,7 +320,7 @@ static bool check_device(struct device *dev)
 		return false;
 
 	/* No PCI device */
-	if (!dev_is_pci(dev))
+	if (!dev_is_pci(dev) && (get_acpihid_device_id(dev) < 0))
 		return false;
 
 	devid = get_device_id(dev);
@@ -284,6 +344,8 @@ static void init_iommu_group(struct device *dev)
 	group = iommu_group_get_for_dev(dev);
 	if (IS_ERR(group))
 		return;
+
+	find_acpihid_group_by_rootid(dev, group);
 
 	domain = iommu_group_default_domain(group);
 	if (!domain)
@@ -2071,29 +2133,33 @@ static bool pci_pri_tlp_required(struct pci_dev *pdev)
 static int attach_device(struct device *dev,
 			 struct protection_domain *domain)
 {
-	struct pci_dev *pdev = to_pci_dev(dev);
 	struct iommu_dev_data *dev_data;
 	unsigned long flags;
 	int ret;
 
 	dev_data = get_dev_data(dev);
 
-	if (domain->flags & PD_IOMMUV2_MASK) {
-		if (!dev_data->passthrough)
-			return -EINVAL;
+	if (dev_is_pci(dev)) {
 
-		if (dev_data->iommu_v2) {
-			if (pdev_iommuv2_enable(pdev) != 0)
+		struct pci_dev *pdev = to_pci_dev(dev);
+
+		if (domain->flags & PD_IOMMUV2_MASK) {
+			if (!dev_data->passthrough)
 				return -EINVAL;
 
+			if (dev_data->iommu_v2) {
+				if (pdev_iommuv2_enable(pdev) != 0)
+					return -EINVAL;
+
+				dev_data->ats.enabled = true;
+				dev_data->ats.qdep    = pci_ats_queue_depth(pdev);
+				dev_data->pri_tlp     = pci_pri_tlp_required(pdev);
+			}
+		} else if (amd_iommu_iotlb_sup &&
+			   pci_enable_ats(pdev, PAGE_SHIFT) == 0) {
 			dev_data->ats.enabled = true;
 			dev_data->ats.qdep    = pci_ats_queue_depth(pdev);
-			dev_data->pri_tlp     = pci_pri_tlp_required(pdev);
 		}
-	} else if (amd_iommu_iotlb_sup &&
-		   pci_enable_ats(pdev, PAGE_SHIFT) == 0) {
-		dev_data->ats.enabled = true;
-		dev_data->ats.qdep    = pci_ats_queue_depth(pdev);
 	}
 
 	write_lock_irqsave(&amd_iommu_devtable_lock, flags);
@@ -2152,12 +2218,56 @@ static void detach_device(struct device *dev)
 	__detach_device(dev_data);
 	write_unlock_irqrestore(&amd_iommu_devtable_lock, flags);
 
-	if (domain->flags & PD_IOMMUV2_MASK && dev_data->iommu_v2)
-		pdev_iommuv2_disable(to_pci_dev(dev));
-	else if (dev_data->ats.enabled)
-		pci_disable_ats(to_pci_dev(dev));
+	if (dev_is_pci(dev)) {
+
+		if (domain->flags & PD_IOMMUV2_MASK && dev_data->iommu_v2)
+			pdev_iommuv2_disable(to_pci_dev(dev));
+		else if (dev_data->ats.enabled)
+			pci_disable_ats(to_pci_dev(dev));
+	}
 
 	dev_data->ats.enabled = false;
+}
+
+static int init_acpihid_device_group(struct device *dev)
+{
+	struct dma_ops_domain *dma_domain;
+	struct iommu_dev_data *dev_data;
+	struct iommu_domain *domain;
+	struct iommu_group *group;
+	int ret;
+
+	if (dev->archdata.iommu)
+		return 0;
+
+	dev_data = find_dev_data(get_device_id(dev));
+	if (!dev_data)
+		return -ENOMEM;
+
+	dev->archdata.iommu = dev_data;
+
+	group = find_acpihid_group_by_devid(dev);
+	if (!group)
+		return -ENXIO;
+
+	ret = iommu_group_add_device(group, dev);
+	if (ret)
+		return ret;
+
+	domain = iommu_group_default_domain(group);
+	if (!domain)
+		return -ENXIO;
+
+	dma_domain = to_pdomain(domain)->priv;
+
+	init_unity_mappings_for_device(dev, dma_domain);
+
+	if (domain->type == IOMMU_DOMAIN_IDENTITY)
+		dev_data->passthrough = true;
+	else
+		dev->archdata.dma_ops = &amd_iommu_dma_ops;
+
+	return 0;
 }
 
 static int amd_iommu_add_device(struct device *dev)
@@ -2173,6 +2283,15 @@ static int amd_iommu_add_device(struct device *dev)
 
 	devid = get_device_id(dev);
 	iommu = amd_iommu_rlookup_table[devid];
+
+	if (!dev_is_pci(dev)) {
+		ret = init_acpihid_device_group(dev);
+		if (ret) {
+			iommu_ignore_device(dev);
+			dev->archdata.dma_ops = &nommu_dma_ops;
+			goto out;
+		}
+	}
 
 	ret = iommu_init_device(dev);
 	if (ret) {
@@ -2758,7 +2877,17 @@ static struct dma_map_ops amd_iommu_dma_ops = {
 
 int __init amd_iommu_init_api(void)
 {
-	return bus_set_iommu(&pci_bus_type, &amd_iommu_ops);
+	int err;
+
+	err = bus_set_iommu(&pci_bus_type, &amd_iommu_ops);
+	if (err)
+		return err;
+#ifdef CONFIG_ARM_AMBA
+	err = bus_set_iommu(&amba_bustype, &amd_iommu_ops);
+	if (err)
+		return err;
+#endif
+	return 0;
 }
 
 int __init amd_iommu_init_dma_ops(void)

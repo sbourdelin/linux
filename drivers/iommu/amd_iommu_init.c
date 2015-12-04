@@ -58,6 +58,7 @@
 #define IVHD_DEV_EXT_SELECT             0x46
 #define IVHD_DEV_EXT_SELECT_RANGE       0x47
 #define IVHD_DEV_SPECIAL		0x48
+#define IVHD_DEV_ACPI_HID		0xf0
 
 #define IVHD_SPECIAL_IOAPIC		1
 #define IVHD_SPECIAL_HPET		2
@@ -111,6 +112,11 @@ struct ivhd_entry {
 	u16 devid;
 	u8 flags;
 	u32 ext;
+	u32 hidh;
+	u64 cid;
+	u8 uidf;
+	u8 uidl;
+	u8 uid;
 } __attribute__((packed));
 
 /*
@@ -218,8 +224,12 @@ enum iommu_init_state {
 #define EARLY_MAP_SIZE		4
 static struct devid_map __initdata early_ioapic_map[EARLY_MAP_SIZE];
 static struct devid_map __initdata early_hpet_map[EARLY_MAP_SIZE];
+static struct acpihid_map __initdata early_acpihid_map[EARLY_MAP_SIZE];
+
 static int __initdata early_ioapic_map_size;
 static int __initdata early_hpet_map_size;
+static int __initdata early_acpihid_map_size;
+
 static bool __initdata cmdline_maps;
 
 static enum iommu_init_state init_state = IOMMU_START_STATE;
@@ -720,6 +730,45 @@ static int __init add_special_device(u8 type, u8 id, u16 *devid, bool cmd_line)
 	return 0;
 }
 
+static int __init add_acpi_hid_device(u8 *hid,
+			u8 *uid, u16 *devid, bool cmd_line)
+{
+	struct acpihid_map *entry;
+	struct list_head *list;
+
+	list = &acpihid_map;
+
+	list_for_each_entry(entry, list, list) {
+		if (!(!strcmp(entry->hid, hid) && !strcmp(entry->uid, uid)
+							&& entry->cmd_line))
+			continue;
+
+		pr_info("AMD-Vi: Command-line override present for hid:%s uid:%s - ignoring\n", hid, uid);
+
+		*devid = entry->devid;
+
+		return 0;
+	}
+
+	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+
+	memcpy(entry->uid, uid, 2);
+	memcpy(entry->hid, hid, 9);
+
+	entry->devid	= *devid;
+	entry->cmd_line	= cmd_line;
+	entry->root_devid = (entry->devid & (~0x7));
+
+	pr_info("AMD-Vi:Command-line, add hid:%s,uid: %s, root_devid:%d\n",
+				entry->hid, entry->uid, entry->root_devid);
+
+	list_add_tail(&entry->list, list);
+
+	return 0;
+}
+
 static int __init add_early_maps(void)
 {
 	int i, ret;
@@ -738,6 +787,15 @@ static int __init add_early_maps(void)
 					 early_hpet_map[i].id,
 					 &early_hpet_map[i].devid,
 					 early_hpet_map[i].cmd_line);
+		if (ret)
+			return ret;
+	}
+
+	for (i = 0; i < early_acpihid_map_size; ++i) {
+		ret = add_acpi_hid_device(early_acpihid_map[i].hid,
+					 early_acpihid_map[i].uid,
+					 &early_acpihid_map[i].devid,
+					 early_acpihid_map[i].cmd_line);
 		if (ret)
 			return ret;
 	}
@@ -783,7 +841,6 @@ static int __init init_iommu_from_acpi(struct amd_iommu *iommu,
 	struct ivhd_entry *e;
 	int ret;
 
-
 	ret = add_early_maps();
 	if (ret)
 		return ret;
@@ -798,7 +855,6 @@ static int __init init_iommu_from_acpi(struct amd_iommu *iommu,
 	 */
 	p += sizeof(struct ivhd_header);
 	end += h->length;
-
 
 	while (p < end) {
 		e = (struct ivhd_entry *)p;
@@ -942,6 +998,40 @@ static int __init init_iommu_from_acpi(struct amd_iommu *iommu,
 				    PCI_FUNC(devid));
 
 			ret = add_special_device(type, handle, &devid, false);
+			if (ret)
+				return ret;
+
+			/*
+			 * add_special_device might update the devid in case a
+			 * command-line override is present. So call
+			 * set_dev_entry_from_acpi after add_special_device.
+			 */
+			set_dev_entry_from_acpi(iommu, devid, e->flags, 0);
+
+			break;
+		}
+		case IVHD_DEV_ACPI_HID: {
+			u16 devid;
+			u8 hid[9];
+			u8 uid[2];
+			int ret;
+
+			devid  = e->devid;
+			flags = e->flags;
+
+			memcpy(hid, (u8 *)(&e->ext), 8);
+			hid[8] = '\0';
+
+			memcpy(uid, (u8 *)(&e->uid), 1);
+			uid[1] = '\0';
+
+			DUMP_printk("  DEV_ACPI_HID(%s[%s])\t\tdevid: %02x:%02x.%x\n",
+				    hid, uid,
+				    PCI_BUS_NUM(devid),
+				    PCI_SLOT(devid),
+				    PCI_FUNC(devid));
+
+			ret = add_acpi_hid_device(hid, uid, &devid, false);
 			if (ret)
 				return ret;
 
@@ -2226,10 +2316,39 @@ static int __init parse_ivrs_hpet(char *str)
 	return 1;
 }
 
+static int __init parse_ivrs_acpihid(char *str)
+{
+	u32 bus, dev, fn;
+	char *hid, *uid, *p;
+	char acpiid[11] = {0};
+	int ret, i;
+
+	ret = sscanf(str, "[%x:%x.%x]=%s", &bus, &dev, &fn, acpiid);
+	if (ret != 4) {
+		pr_err("AMD-Vi: Invalid command line: ivrs_acpihid(%s)\n", str);
+		return 1;
+	}
+
+	p = acpiid;
+	hid = strsep(&p, ":");
+	uid = p;
+
+	i = early_acpihid_map_size++;
+	memcpy(early_acpihid_map[i].hid, hid, strlen(hid));
+	memcpy(early_acpihid_map[i].uid, uid, strlen(uid));
+
+	early_acpihid_map[i].devid =
+		((bus & 0xff) << 8) | ((dev & 0x1f) << 3) | (fn & 0x7);
+	early_acpihid_map[i].cmd_line	= true;
+
+	return 1;
+}
+
 __setup("amd_iommu_dump",	parse_amd_iommu_dump);
 __setup("amd_iommu=",		parse_amd_iommu_options);
 __setup("ivrs_ioapic",		parse_ivrs_ioapic);
 __setup("ivrs_hpet",		parse_ivrs_hpet);
+__setup("ivrs_acpihid",		parse_ivrs_acpihid);
 
 IOMMU_INIT_FINISH(amd_iommu_detect,
 		  gart_iommu_hole_init,
