@@ -998,6 +998,7 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	u64 recover_paddr = ~0ull;
 	int flags = MF_ACTION_REQUIRED;
 	int lmce = 0;
+	unsigned int cpu = smp_processor_id();
 
 	ist_enter(regs);
 
@@ -1007,6 +1008,14 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 		goto out;
 
 	mce_gather_info(&m, regs);
+
+	/*
+	 * if this cpu is offline, just bail out.
+	 * TBD: looking into adding any logs this offline CPU might have,
+	 * to be collected and reported by the rendezvous master.
+	 */
+	if (cpu_is_offline(cpu) && (m.mcgstatus & MCG_STATUS_RIPV))
+		goto out;
 
 	final = this_cpu_ptr(&mces_seen);
 	*final = m;
@@ -1142,8 +1151,8 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 
 	if (worst > 0)
 		mce_report_event(regs);
-	mce_wrmsrl(MSR_IA32_MCG_STATUS, 0);
 out:
+	mce_wrmsrl(MSR_IA32_MCG_STATUS, 0);
 	sync_core();
 
 	if (recover_paddr == ~0ull)
