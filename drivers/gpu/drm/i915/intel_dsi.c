@@ -222,6 +222,12 @@ static int dpi_send_cmd(struct intel_dsi *intel_dsi, u32 cmd, bool hs,
 	else
 		cmd |= DPI_LP_MODE;
 
+	mask = DPI_FIFO_EMPTY;
+
+	if (wait_for((I915_READ(MIPI_GEN_FIFO_STAT(port)) & mask)
+							== mask, 50))
+		DRM_ERROR("Timeout waiting for DPI FIFO empty\n");
+
 	/* clear bit */
 	I915_WRITE(MIPI_INTR_STAT(port), SPL_PKT_SENT_INTERRUPT);
 
