@@ -1,7 +1,7 @@
 #include "util.h"
 #include "parse-options.h"
 #include "header.h"
-#include <linux/string.h>
+#include <api/string/string.h>
 
 #define OPT_SHORT 1
 #define OPT_UNSET 2

@@ -1,8 +1,8 @@
-#ifndef _TOOLS_LINUX_STRING_H_
-#define _TOOLS_LINUX_STRING_H_
+#ifndef _API_STRING_H
+#define _API_STRING_H
 
-
-#include <linux/types.h>	/* for size_t */
+#include <stddef.h>
+#include <stdbool.h>
 
 void *memdup(const void *src, size_t len);
 
@@ -13,4 +13,4 @@ int strtobool(const char *s, bool *res);
 extern size_t strlcpy(char *dest, const char *src, size_t size);
 #endif
 
-#endif /* _LINUX_STRING_H_ */
+#endif /* _API_STRING_H */

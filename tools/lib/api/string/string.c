@@ -1,5 +1,5 @@
 /*
- *  linux/tools/lib/string.c
+ *  linux/tools/lib/api/string/string.c
  *
  *  Copied from linux/lib/string.c, where it is:
  *
@@ -15,8 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <linux/string.h>
-#include <linux/compiler.h>
+#include "string.h"
+
+#define __weak __attribute__((weak))
 
 /**
  * memdup - duplicate region of memory

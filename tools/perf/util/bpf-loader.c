@@ -8,7 +8,7 @@
 #include <linux/bpf.h>
 #include <bpf/libbpf.h>
 #include <linux/err.h>
-#include <linux/string.h>
+#include <api/string/string.h>
 #include "perf.h"
 #include "debug.h"
 #include "bpf-loader.h"

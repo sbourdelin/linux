@@ -1,6 +1,6 @@
 #include <linux/list.h>
 #include <linux/compiler.h>
-#include <linux/string.h>
+#include <api/string/string.h>
 #include "ordered-events.h"
 #include "session.h"
 #include "asm/bug.h"

@@ -3,7 +3,7 @@
 
 #include "compat-util.h"
 
-#include <linux/string.h>
+#include <api/string/string.h>
 #include "../perf.h"
 #include "abspath.h"
 #include "alias.h"

@@ -22,7 +22,7 @@
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/log2.h>
-#include <linux/string.h>
+#include <api/string/string.h>
 
 #include <sys/param.h>
 #include <stdlib.h>

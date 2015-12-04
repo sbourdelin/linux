@@ -19,7 +19,7 @@
 #include "util/debug.h"
 
 #include <linux/rbtree.h>
-#include <linux/string.h>
+#include <api/string/string.h>
 #include <locale.h>
 #include <regex.h>
 

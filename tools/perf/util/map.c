@@ -14,7 +14,7 @@
 #include "util.h"
 #include "debug.h"
 #include "machine.h"
-#include <linux/string.h>
+#include <api/string/string.h>
 
 static void __maps__insert(struct maps *maps, struct map *map);
 

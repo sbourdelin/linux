@@ -19,7 +19,7 @@
  */
 
 #ifdef __KERNEL__
-#include <linux/string.h>
+#include <api/string/string.h>
 #else
 #include <string.h>
 #endif
