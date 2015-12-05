@@ -528,6 +528,10 @@ static int cpufreq_parse_governor(char *str_governor, unsigned int *policy,
 						CPUFREQ_NAME_LEN)) {
 			*policy = CPUFREQ_POLICY_POWERSAVE;
 			err = 0;
+		} else if (!strncasecmp(str_governor, "ondemand",
+					CPUFREQ_NAME_LEN)) {
+			*policy = CPUFREQ_POLICY_ONDEMAND;
+			err = 0;
 		}
 	} else {
 		struct cpufreq_governor *t;
@@ -640,6 +644,8 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 		return sprintf(buf, "powersave\n");
 	else if (policy->policy == CPUFREQ_POLICY_PERFORMANCE)
 		return sprintf(buf, "performance\n");
+	else if (policy->policy == CPUFREQ_POLICY_ONDEMAND)
+		return sprintf(buf, "ondemand\n");
 	else if (policy->governor)
 		return scnprintf(buf, CPUFREQ_NAME_PLEN, "%s\n",
 				policy->governor->name);
@@ -692,6 +698,8 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy *policy,
 			i += sprintf(buf, "performance ");
 		if (policy->available_policies & CPUFREQ_POLICY_POWERSAVE)
 			i += sprintf(&buf[i], "powersave ");
+		if (policy->available_policies & CPUFREQ_POLICY_ONDEMAND)
+			i += sprintf(&buf[i], "ondemand ");
 		goto out;
 	}
 
