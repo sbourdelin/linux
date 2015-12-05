@@ -76,6 +76,7 @@ struct cpufreq_policy {
 	unsigned int		restore_freq; /* = policy->cur before transition */
 	unsigned int		suspend_freq; /* freq to set during suspend */
 
+	u8			available_policies;
 	unsigned int		policy; /* see above */
 	unsigned int		last_policy; /* policy before unplug */
 	struct cpufreq_governor	*governor; /* see below */
@@ -229,6 +230,8 @@ struct cpufreq_driver {
 	int		(*init)(struct cpufreq_policy *policy);
 	int		(*verify)(struct cpufreq_policy *policy);
 
+	/* Get available generic policies */
+	int		(*get_available_policies)(u8 *mask);
 	/* define one out of two */
 	int		(*setpolicy)(struct cpufreq_policy *policy);
 
