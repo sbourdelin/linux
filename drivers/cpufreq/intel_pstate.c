@@ -183,8 +183,23 @@ static struct perf_limits ondemand_limits = {
 	.min_sysfs_pct = 0,
 };
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+static struct perf_limits powersave_limits = {
+	.no_turbo = 1,
+	.turbo_disabled = 1,
+	.max_perf_pct = 0,
+	.max_perf = int_tofp(1),
+	.min_perf_pct = 0,
+	.min_perf = int_tofp(1),
+	.max_policy_pct = 0,
+	.max_sysfs_pct = 0,
+	.min_policy_pct = 0,
+	.min_sysfs_pct = 0,
+};
+
+#if defined(CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE)
 static struct perf_limits *limits = &performance_limits;
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE)
+static struct perf_limits *limits = &powersave_limits;
 #else
 static struct perf_limits *limits = &ondemand_limits;
 #endif
@@ -1106,13 +1121,26 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 		return 0;
 	}
 
-	pr_debug("intel_pstate: set ondemand\n");
-	limits = &ondemand_limits;
-	limits->min_policy_pct = (policy->min * 100) / policy->cpuinfo.max_freq;
-	limits->min_policy_pct = clamp_t(int, limits->min_policy_pct, 0 , 100);
-	limits->max_policy_pct = DIV_ROUND_UP(policy->max * 100,
-					      policy->cpuinfo.max_freq);
-	limits->max_policy_pct = clamp_t(int, limits->max_policy_pct, 0 , 100);
+	if (policy->policy == CPUFREQ_POLICY_POWERSAVE) {
+		pr_debug("intel_pstate: set powersave\n");
+		limits = &powersave_limits;
+		limits->min_policy_pct = (policy->cpuinfo.min_freq * 100) /
+					  policy->cpuinfo.max_freq;
+		limits->min_policy_pct = clamp_t(int, limits->min_policy_pct,
+						 0, 100);
+		limits->max_policy_pct = limits->min_policy_pct;
+	} else {
+		pr_debug("intel_pstate: set ondemand\n");
+		limits = &ondemand_limits;
+		limits->min_policy_pct = (policy->min * 100) /
+					  policy->cpuinfo.max_freq;
+		limits->min_policy_pct = clamp_t(int, limits->min_policy_pct,
+						 0, 100);
+		limits->max_policy_pct = DIV_ROUND_UP(policy->max * 100,
+						policy->cpuinfo.max_freq);
+		limits->max_policy_pct = clamp_t(int, limits->max_policy_pct,
+						 0, 100);
+	}
 
 	/* Normalize user input to [min_policy_pct, max_policy_pct] */
 	limits->min_perf_pct = max(limits->min_policy_pct,
@@ -1144,7 +1172,8 @@ static int intel_pstate_verify_policy(struct cpufreq_policy *policy)
 	cpufreq_verify_within_cpu_limits(policy);
 
 	if (policy->policy != CPUFREQ_POLICY_ONDEMAND &&
-	    policy->policy != CPUFREQ_POLICY_PERFORMANCE)
+	    policy->policy != CPUFREQ_POLICY_PERFORMANCE &&
+	    policy->policy != CPUFREQ_POLICY_POWERSAVE)
 		return -EINVAL;
 
 	return 0;
@@ -1197,6 +1226,8 @@ static int intel_pstate_available_policies(u8 *mask)
 {
 
 	*mask = CPUFREQ_POLICY_PERFORMANCE | CPUFREQ_POLICY_ONDEMAND;
+	if (!hwp_active)
+		*mask |= CPUFREQ_POLICY_POWERSAVE;
 
 	return 0;
 }
