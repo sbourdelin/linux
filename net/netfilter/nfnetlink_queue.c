@@ -313,7 +313,7 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 	struct net_device *outdev;
 	struct nf_conn *ct = NULL;
 	enum ip_conntrack_info uninitialized_var(ctinfo);
-	struct nfnl_ct_hook *nfnl_ct;
+	struct nfnl_ct_hook *nfnl_ct = NULL;
 	bool csum_verify;
 	char *secdata = NULL;
 	u32 seclen = 0;
@@ -1042,7 +1042,7 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 	unsigned int verdict;
 	struct nf_queue_entry *entry;
 	enum ip_conntrack_info uninitialized_var(ctinfo);
-	struct nfnl_ct_hook *nfnl_ct;
+	struct nfnl_ct_hook *nfnl_ct = NULL;
 	struct nf_conn *ct = NULL;
 
 	struct net *net = sock_net(ctnl);
