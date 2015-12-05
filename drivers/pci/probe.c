@@ -321,6 +321,17 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 
 	for (pos = 0; pos < howmany; pos++) {
 		struct resource *res = &dev->resource[pos];
+		u32 sizes = pci_rbar_get_sizes(dev, pos);
+
+		if (sizes) {
+			/* Just resize to the maximum for now */
+			int size = fls(sizes) - 1;
+
+			if (pci_rbar_set_size(dev, pos, size))
+				dev_info(&dev->dev, "Resized BAR %d to %dMB\n",
+					 pos, 1 << size);
+		}
+
 		reg = PCI_BASE_ADDRESS_0 + (pos << 2);
 		pos += __pci_read_base(dev, pci_bar_unknown, res, reg);
 	}
