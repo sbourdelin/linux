@@ -1125,6 +1125,9 @@ void clk_disable(struct clk *clk)
 {
 	unsigned long flags;
 
+	if (IS_ERR_OR_NULL(clk))
+		return;
+
 	spin_lock_irqsave(&global_clkregs_lock, flags);
 	local_clk_disable(clk);
 	spin_unlock_irqrestore(&global_clkregs_lock, flags);
