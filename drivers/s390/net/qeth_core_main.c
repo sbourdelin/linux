@@ -2682,10 +2682,8 @@ void qeth_print_status_message(struct qeth_card *card)
 		 * */
 		if (!card->info.mcl_level[0]) {
 			sprintf(card->info.mcl_level, "%02x%02x",
-				card->info.mcl_level[2],
-				card->info.mcl_level[3]);
-
-			card->info.mcl_level[QETH_MCL_LENGTH] = 0;
+				card->info.mcl_level[2] & 0xff,
+				card->info.mcl_level[3] & 0xff);
 			break;
 		}
 		/* fallthrough */
