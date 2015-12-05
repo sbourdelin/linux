@@ -697,6 +697,23 @@ static void omap_8250_throttle(struct uart_port *port)
 	pm_runtime_put_autosuspend(port->dev);
 }
 
+static int omap_8250_rs485_config(struct uart_port *port, struct serial_rs485 *rs485)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+
+	if (rs485->flags & SER_RS485_ENABLED && !serial8250_em485_enabled(up)) {
+		port->rs485 = *rs485;
+		return serial8250_em485_init(up);
+	}
+
+	if (serial8250_em485_enabled(up) && !(rs485->flags & SER_RS485_ENABLED))
+		serial8250_em485_destroy(up);
+
+	port->rs485 = *rs485;
+
+	return 0;
+}
+
 static void omap_8250_unthrottle(struct uart_port *port)
 {
 	unsigned long flags;
@@ -1146,6 +1163,7 @@ static int omap8250_probe(struct platform_device *pdev)
 	up.port.shutdown = omap_8250_shutdown;
 	up.port.throttle = omap_8250_throttle;
 	up.port.unthrottle = omap_8250_unthrottle;
+	up.port.rs485_config = omap_8250_rs485_config;
 
 	if (pdev->dev.of_node) {
 		const struct of_device_id *id;
