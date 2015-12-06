@@ -442,6 +442,15 @@ static int nx842_powernv_function(const unsigned char *in, unsigned int inlen,
 			     (unsigned int)ccw,
 			     (unsigned int)be32_to_cpu(crb->ccw));
 
+	/*
+	 * NX842 coprocessor uses 3rd bit to report queue overflow which is
+	 * not an error, just for information to user. So, ignore this bit.
+	 */
+	if (ret & ICSWX_BIT3) {
+		pr_info_ratelimited("842 coprocessor queue overflow\n");
+		ret &= ~ICSWX_BIT3;
+	}
+
 	switch (ret) {
 	case ICSWX_INITIATED:
 		ret = wait_for_csb(wmem, csb);
