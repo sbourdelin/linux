@@ -990,7 +990,7 @@ static void quirk_usb_handoff_xhci(struct pci_dev *pdev)
 			/* We're reading garbage from the controller */
 			dev_warn(&pdev->dev,
 				 "xHCI controller failing to respond");
-			return;
+			goto out;
 		}
 
 		if (!ext_cap_offset)
@@ -1062,6 +1062,7 @@ hc_init:
 			 XHCI_MAX_HALT_USEC, val);
 	}
 
+out:
 	iounmap(base);
 }
 
