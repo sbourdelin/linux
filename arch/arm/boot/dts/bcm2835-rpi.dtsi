@@ -60,3 +60,7 @@
 	status = "okay";
 	bus-width = <4>;
 };
+
+&pwm {
+	status = "okay";
+};
