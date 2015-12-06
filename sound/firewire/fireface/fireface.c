@@ -80,6 +80,10 @@ static int snd_ff_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
+	err = snd_ff_create_midi_devices(ff);
+	if (err < 0)
+		goto error;
+
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;
