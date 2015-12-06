@@ -451,7 +451,7 @@ struct hnae_ae_ops {
 struct hnae_ae_dev {
 	struct device cls_dev; /* the class dev */
 	struct device *dev; /* the presented dev */
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 	struct list_head node;
 	struct module *owner; /* the module who provides this dev */
 	int id;
@@ -471,14 +471,15 @@ struct hnae_handle {
 	u32 eport_id;
 	enum hnae_port_type port_type;
 	struct list_head node;    /* list to hnae_ae_dev->handle_list */
-	struct hnae_buf_ops *bops; /* operation for the buffer */
+	const struct hnae_buf_ops *bops; /* operation for the buffer */
 	struct hnae_queue **qs;  /* array base of all queues */
 };
 
 #define ring_to_dev(ring) ((ring)->q->dev->dev)
 
 struct hnae_handle *hnae_get_handle(struct device *owner_dev, const char *ae_id,
-				    u32 port_id, struct hnae_buf_ops *bops);
+				    u32 port_id,
+				    const struct hnae_buf_ops *bops);
 void hnae_put_handle(struct hnae_handle *handle);
 int hnae_ae_register(struct hnae_ae_dev *dev, struct module *owner);
 void hnae_ae_unregister(struct hnae_ae_dev *dev);
@@ -497,7 +498,7 @@ int hnae_reinit_handle(struct hnae_handle *handle);
 static inline int hnae_reserve_buffer_map(struct hnae_ring *ring,
 					  struct hnae_desc_cb *cb)
 {
-	struct hnae_buf_ops *bops = ring->q->handle->bops;
+	const struct hnae_buf_ops *bops = ring->q->handle->bops;
 	int ret;
 
 	ret = bops->alloc_buffer(ring, cb);
@@ -536,7 +537,7 @@ static inline void hnae_buffer_detach(struct hnae_ring *ring, int i)
 
 static inline void hnae_free_buffer_detach(struct hnae_ring *ring, int i)
 {
-	struct hnae_buf_ops *bops = ring->q->handle->bops;
+	const struct hnae_buf_ops *bops = ring->q->handle->bops;
 	struct hnae_desc_cb *cb = &ring->desc_cb[i];
 
 	if (!ring->desc_cb[i].dma)
@@ -550,7 +551,7 @@ static inline void hnae_free_buffer_detach(struct hnae_ring *ring, int i)
 static inline void hnae_replace_buffer(struct hnae_ring *ring, int i,
 				       struct hnae_desc_cb *res_cb)
 {
-	struct hnae_buf_ops *bops = ring->q->handle->bops;
+	const struct hnae_buf_ops *bops = ring->q->handle->bops;
 	struct hnae_desc_cb tmp_cb = ring->desc_cb[i];
 
 	bops->unmap_buffer(ring, &ring->desc_cb[i]);

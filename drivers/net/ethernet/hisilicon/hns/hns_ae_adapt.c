@@ -730,7 +730,7 @@ int hns_ae_get_regs_len(struct hnae_handle *handle)
 	return total_num;
 }
 
-static struct hnae_ae_ops hns_dsaf_ops = {
+static const struct hnae_ae_ops hns_dsaf_ops = {
 	.get_handle = hns_ae_get_handle,
 	.put_handle = hns_ae_put_handle,
 	.init_queue = hns_ae_init_queue,

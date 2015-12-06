@@ -85,7 +85,7 @@ static void hnae_unmap_buffer(struct hnae_ring *ring, struct hnae_desc_cb *cb)
 			       ring_to_dma_dir(ring));
 }
 
-static struct hnae_buf_ops hnae_bops = {
+static const struct hnae_buf_ops hnae_bops = {
 	.alloc_buffer = hnae_alloc_buffer,
 	.free_buffer = hnae_free_buffer,
 	.map_buffer = hnae_map_buffer,
@@ -317,7 +317,7 @@ EXPORT_SYMBOL(hnae_reinit_handle);
  */
 struct hnae_handle *hnae_get_handle(struct device *owner_dev,
 				    const char *ae_id, u32 port_id,
-				    struct hnae_buf_ops *bops)
+				    const struct hnae_buf_ops *bops)
 {
 	struct hnae_ae_dev *dev;
 	struct hnae_handle *handle;

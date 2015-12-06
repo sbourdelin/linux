@@ -678,7 +678,7 @@ void hns_get_ringparam(struct net_device *net_dev,
 		       struct ethtool_ringparam *param)
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 	struct hnae_queue *queue;
 	u32 uplimit = 0;
 
@@ -703,7 +703,7 @@ static void hns_get_pauseparam(struct net_device *net_dev,
 			       struct ethtool_pauseparam *param)
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 
 	ops = priv->ae_handle->dev->ops;
 
@@ -724,7 +724,7 @@ static int hns_set_pauseparam(struct net_device *net_dev,
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
 	struct hnae_handle *h;
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 
 	assert(priv || priv->ae_handle);
 
@@ -749,7 +749,7 @@ static int hns_get_coalesce(struct net_device *net_dev,
 			    struct ethtool_coalesce *ec)
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 
 	ops = priv->ae_handle->dev->ops;
 
@@ -783,7 +783,7 @@ static int hns_set_coalesce(struct net_device *net_dev,
 			    struct ethtool_coalesce *ec)
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 	int ret;
 
 	assert(priv || priv->ae_handle);
@@ -984,7 +984,7 @@ int hns_get_sset_count(struct net_device *netdev, int stringset)
 {
 	struct hns_nic_priv *priv = netdev_priv(netdev);
 	struct hnae_handle *h = priv->ae_handle;
-	struct hnae_ae_ops *ops = h->dev->ops;
+	const struct hnae_ae_ops *ops = h->dev->ops;
 
 	if (!ops->get_sset_count) {
 		netdev_err(netdev, "get_sset_count is null!\n");
@@ -1126,7 +1126,7 @@ void hns_get_regs(struct net_device *net_dev, struct ethtool_regs *cmd,
 		  void *data)
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 
 	assert(priv || priv->ae_handle);
 
@@ -1150,7 +1150,7 @@ static int hns_get_regs_len(struct net_device *net_dev)
 {
 	u32 reg_num;
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 
 	assert(priv || priv->ae_handle);
 

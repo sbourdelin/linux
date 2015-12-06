@@ -946,7 +946,7 @@ out_has_some_queues:
 static void hns_nic_net_down(struct net_device *ndev)
 {
 	int i;
-	struct hnae_ae_ops *ops;
+	const struct hnae_ae_ops *ops;
 	struct hns_nic_priv *priv = netdev_priv(ndev);
 
 	if (test_and_set_bit(NIC_STATE_DOWN, &priv->state))
@@ -1270,7 +1270,7 @@ static void hns_nic_update_link_status(struct net_device *netdev)
 static void hns_nic_dump(struct hns_nic_priv *priv)
 {
 	struct hnae_handle *h = priv->ae_handle;
-	struct hnae_ae_ops *ops = h->dev->ops;
+	const struct hnae_ae_ops *ops = h->dev->ops;
 	u32 *data, reg_num, i;
 
 	if (ops->get_regs_len && ops->get_regs) {
