@@ -41,7 +41,6 @@
 #include "watchdog_core.h"	/* For watchdog_dev_register/... */
 
 static DEFINE_IDA(watchdog_ida);
-static struct class *watchdog_class;
 
 /*
  * Deferred Registration infrastructure.
@@ -139,7 +138,7 @@ EXPORT_SYMBOL_GPL(watchdog_init_timeout);
 
 static int __watchdog_register_device(struct watchdog_device *wdd)
 {
-	int ret, id = -1, devno;
+	int ret, id = -1;
 
 	if (wdd == NULL || wdd->info == NULL || wdd->ops == NULL)
 		return -EINVAL;
@@ -192,16 +191,6 @@ static int __watchdog_register_device(struct watchdog_device *wdd)
 		}
 	}
 
-	devno = wdd->cdev.dev;
-	wdd->dev = device_create(watchdog_class, wdd->parent, devno,
-					NULL, "watchdog%d", wdd->id);
-	if (IS_ERR(wdd->dev)) {
-		watchdog_dev_unregister(wdd);
-		ida_simple_remove(&watchdog_ida, id);
-		ret = PTR_ERR(wdd->dev);
-		return ret;
-	}
-
 	return 0;
 }
 
@@ -232,19 +221,8 @@ EXPORT_SYMBOL_GPL(watchdog_register_device);
 
 static void __watchdog_unregister_device(struct watchdog_device *wdd)
 {
-	int ret;
-	int devno;
-
-	if (wdd == NULL)
-		return;
-
-	devno = wdd->cdev.dev;
-	ret = watchdog_dev_unregister(wdd);
-	if (ret)
-		pr_err("error unregistering /dev/watchdog (err=%d)\n", ret);
-	device_destroy(watchdog_class, devno);
+	watchdog_dev_unregister(wdd);
 	ida_simple_remove(&watchdog_ida, wdd->id);
-	wdd->dev = NULL;
 }
 
 /**
@@ -287,17 +265,9 @@ static int __init watchdog_init(void)
 {
 	int err;
 
-	watchdog_class = class_create(THIS_MODULE, "watchdog");
-	if (IS_ERR(watchdog_class)) {
-		pr_err("couldn't create class\n");
-		return PTR_ERR(watchdog_class);
-	}
-
 	err = watchdog_dev_init();
-	if (err < 0) {
-		class_destroy(watchdog_class);
+	if (err < 0)
 		return err;
-	}
 
 	watchdog_deferred_registration();
 	return 0;
@@ -306,7 +276,6 @@ static int __init watchdog_init(void)
 static void __exit watchdog_exit(void)
 {
 	watchdog_dev_exit();
-	class_destroy(watchdog_class);
 	ida_destroy(&watchdog_ida);
 }
 

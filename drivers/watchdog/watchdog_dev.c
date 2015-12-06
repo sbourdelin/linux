@@ -49,6 +49,9 @@ static dev_t watchdog_devt;
 /* the watchdog device behind /dev/watchdog */
 static struct watchdog_device *old_wdd;
 
+/* the watchdog device class */
+static struct class *watchdog_class;
+
 /*
  *	watchdog_ping: ping the watchdog.
  *	@wdd: the watchdog device to ping
@@ -523,7 +526,7 @@ static struct miscdevice watchdog_miscdev = {
  *	thus we set it up like that.
  */
 
-int watchdog_dev_register(struct watchdog_device *wdd)
+int _watchdog_dev_register(struct watchdog_device *wdd)
 {
 	int err, devno;
 
@@ -532,11 +535,12 @@ int watchdog_dev_register(struct watchdog_device *wdd)
 		watchdog_miscdev.parent = wdd->parent;
 		err = misc_register(&watchdog_miscdev);
 		if (err != 0) {
-			pr_err("%s: cannot register miscdev on minor=%d (err=%d).\n",
-				wdd->info->identity, WATCHDOG_MINOR, err);
+			dev_err(wdd->dev,
+				"Cannot register miscdev on minor=%d (err=%d).\n",
+				WATCHDOG_MINOR, err);
 			if (err == -EBUSY)
-				pr_err("%s: a legacy watchdog module is probably present.\n",
-					wdd->info->identity);
+				dev_err(wdd->dev,
+					"A legacy watchdog module is probably present.\n");
 			old_wdd = NULL;
 			return err;
 		}
@@ -550,8 +554,8 @@ int watchdog_dev_register(struct watchdog_device *wdd)
 	/* Add the device */
 	err  = cdev_add(&wdd->cdev, devno, 1);
 	if (err) {
-		pr_err("watchdog%d unable to add device %d:%d\n",
-			wdd->id,  MAJOR(watchdog_devt), wdd->id);
+		dev_err(wdd->dev, "Unable to add device %d:%d\n",
+			MAJOR(watchdog_devt), wdd->id);
 		if (wdd->id == 0) {
 			misc_deregister(&watchdog_miscdev);
 			old_wdd = NULL;
@@ -567,7 +571,7 @@ int watchdog_dev_register(struct watchdog_device *wdd)
  *	Unregister the watchdog and if needed the legacy /dev/watchdog device.
  */
 
-int watchdog_dev_unregister(struct watchdog_device *wdd)
+void _watchdog_dev_unregister(struct watchdog_device *wdd)
 {
 	mutex_lock(&wdd->lock);
 	set_bit(WDOG_UNREGISTERED, &wdd->status);
@@ -578,7 +582,31 @@ int watchdog_dev_unregister(struct watchdog_device *wdd)
 		misc_deregister(&watchdog_miscdev);
 		old_wdd = NULL;
 	}
-	return 0;
+}
+
+int watchdog_dev_register(struct watchdog_device *wdd)
+{
+	dev_t devno;
+	int ret;
+
+	devno = MKDEV(MAJOR(watchdog_devt), wdd->id);
+	wdd->dev = device_create(watchdog_class, wdd->parent, devno,
+				 wdd, "watchdog%d", wdd->id);
+	if (IS_ERR(wdd->dev))
+		return PTR_ERR(wdd->dev);
+
+	ret = _watchdog_dev_register(wdd);
+	if (ret)
+		device_destroy(watchdog_class, devno);
+
+	return ret;
+}
+
+void watchdog_dev_unregister(struct watchdog_device *wdd)
+{
+	_watchdog_dev_unregister(wdd);
+	device_destroy(watchdog_class, wdd->dev->devt);
+	wdd->dev = NULL;
 }
 
 /*
@@ -589,9 +617,19 @@ int watchdog_dev_unregister(struct watchdog_device *wdd)
 
 int __init watchdog_dev_init(void)
 {
-	int err = alloc_chrdev_region(&watchdog_devt, 0, MAX_DOGS, "watchdog");
-	if (err < 0)
+	int err;
+
+	watchdog_class = class_create(THIS_MODULE, "watchdog");
+	if (IS_ERR(watchdog_class)) {
+		pr_err("couldn't create watchdog class\n");
+		return PTR_ERR(watchdog_class);
+	}
+
+	err = alloc_chrdev_region(&watchdog_devt, 0, MAX_DOGS, "watchdog");
+	if (err < 0) {
 		pr_err("watchdog: unable to allocate char dev region\n");
+		class_destroy(watchdog_class);
+	}
 	return err;
 }
 
@@ -604,4 +642,5 @@ int __init watchdog_dev_init(void)
 void __exit watchdog_dev_exit(void)
 {
 	unregister_chrdev_region(watchdog_devt, MAX_DOGS);
+	class_destroy(watchdog_class);
 }
