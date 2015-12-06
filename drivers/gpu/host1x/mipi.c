@@ -250,6 +250,7 @@ struct tegra_mipi_device *tegra_mipi_request(struct device *device)
 			dev_err(dev->mipi->dev,
 				"failed to power up MIPI bricks: %d\n",
 				err);
+			mutex_unlock(&dev->mipi->lock);
 			return ERR_PTR(err);
 		}
 	}
