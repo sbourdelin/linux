@@ -38,6 +38,8 @@ static void ff_card_free(struct snd_card *card)
 {
 	struct snd_ff *ff = card->private_data;
 
+	snd_ff_transaction_unregister(ff);
+
 	fw_unit_put(ff->unit);
 
 	mutex_destroy(&ff->mutex);
@@ -74,6 +76,10 @@ static int snd_ff_probe(struct fw_unit *unit,
 	 * bus resets.
 	 */
 
+	err = snd_ff_transaction_register(ff);
+	if (err < 0)
+		goto error;
+
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;
@@ -86,7 +92,9 @@ error:
 
 static void snd_ff_update(struct fw_unit *unit)
 {
-	return;
+	struct snd_ff *ff = dev_get_drvdata(&unit->device);
+
+	snd_ff_transaction_reregister(ff);
 }
 
 static void snd_ff_remove(struct fw_unit *unit)
