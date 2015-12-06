@@ -759,12 +759,7 @@ static void cdns_uart_set_termios(struct uart_port *port,
 static int cdns_uart_startup(struct uart_port *port)
 {
 	unsigned long flags;
-	unsigned int retval = 0, status = 0;
-
-	retval = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME,
-								(void *)port);
-	if (retval)
-		return retval;
+	unsigned int status = 0;
 
 	spin_lock_irqsave(&port->lock, flags);
 
@@ -818,7 +813,7 @@ static int cdns_uart_startup(struct uart_port *port)
 
 	spin_unlock_irqrestore(&port->lock, flags);
 
-	return retval;
+	return request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME, port);
 }
 
 /**
