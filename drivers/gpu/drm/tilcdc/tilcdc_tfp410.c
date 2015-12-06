@@ -18,8 +18,6 @@
 #include <linux/i2c.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
-#include <linux/pinctrl/pinmux.h>
-#include <linux/pinctrl/consumer.h>
 
 #include "tilcdc_drv.h"
 
@@ -312,7 +310,6 @@ static int tfp410_probe(struct platform_device *pdev)
 	struct device_node *i2c_node;
 	struct tfp410_module *tfp410_mod;
 	struct tilcdc_module *mod;
-	struct pinctrl *pinctrl;
 	uint32_t i2c_phandle;
 	int ret = -EINVAL;
 
@@ -330,10 +327,6 @@ static int tfp410_probe(struct platform_device *pdev)
 	pdev->dev.platform_data = mod;
 
 	tilcdc_module_init(mod, "tfp410", &tfp410_module_ops);
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl))
-		dev_warn(&pdev->dev, "pins are not configured\n");
 
 	if (of_property_read_u32(node, "i2c", &i2c_phandle)) {
 		dev_err(&pdev->dev, "could not get i2c bus phandle\n");
