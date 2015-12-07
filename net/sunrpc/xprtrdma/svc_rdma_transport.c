@@ -155,16 +155,27 @@ static void svc_rdma_bc_free(struct svc_xprt *xprt)
 
 struct svc_rdma_op_ctxt *svc_rdma_get_context(struct svcxprt_rdma *xprt)
 {
-	struct svc_rdma_op_ctxt *ctxt;
+	struct svc_rdma_op_ctxt *ctxt = NULL;
 
-	ctxt = kmem_cache_alloc(svc_rdma_ctxt_cachep,
-				GFP_KERNEL | __GFP_NOFAIL);
-	ctxt->xprt = xprt;
-	INIT_LIST_HEAD(&ctxt->dto_q);
+	spin_lock_bh(&xprt->sc_ctxt_lock);
+	if (list_empty(&xprt->sc_ctxt_q))
+		goto out_empty;
+
+	ctxt = list_first_entry(&xprt->sc_ctxt_q,
+				       struct svc_rdma_op_ctxt, free_q);
+	list_del_init(&ctxt->free_q);
+	spin_unlock_bh(&xprt->sc_ctxt_lock);
+
 	ctxt->count = 0;
 	ctxt->frmr = NULL;
+
 	atomic_inc(&xprt->sc_ctxt_used);
 	return ctxt;
+
+out_empty:
+	spin_unlock_bh(&xprt->sc_ctxt_lock);
+	pr_err("svcrdma: empty RDMA ctxt list?\n");
+	return NULL;
 }
 
 void svc_rdma_unmap_dma(struct svc_rdma_op_ctxt *ctxt)
@@ -198,7 +209,27 @@ void svc_rdma_put_context(struct svc_rdma_op_ctxt *ctxt, int free_pages)
 		for (i = 0; i < ctxt->count; i++)
 			put_page(ctxt->pages[i]);
 
-	kmem_cache_free(svc_rdma_ctxt_cachep, ctxt);
+	spin_lock_bh(&xprt->sc_ctxt_lock);
+	list_add(&ctxt->free_q, &xprt->sc_ctxt_q);
+	spin_unlock_bh(&xprt->sc_ctxt_lock);
+
+	atomic_dec(&xprt->sc_ctxt_used);
+}
+
+static void svc_rdma_put_context_irq(struct svc_rdma_op_ctxt *ctxt, int free_pages)
+{
+	struct svcxprt_rdma *xprt;
+	int i;
+
+	xprt = ctxt->xprt;
+	if (free_pages)
+		for (i = 0; i < ctxt->count; i++)
+			put_page(ctxt->pages[i]);
+
+	spin_lock(&xprt->sc_ctxt_lock);
+	list_add(&ctxt->free_q, &xprt->sc_ctxt_q);
+	spin_unlock(&xprt->sc_ctxt_lock);
+
 	atomic_dec(&xprt->sc_ctxt_used);
 }
 
@@ -357,7 +388,7 @@ static void rq_cq_reap(struct svcxprt_rdma *xprt)
 			/* Close the transport */
 			dprintk("svcrdma: transport closing putting ctxt %p\n", ctxt);
 			set_bit(XPT_CLOSE, &xprt->sc_xprt.xpt_flags);
-			svc_rdma_put_context(ctxt, 1);
+			svc_rdma_put_context_irq(ctxt, 1);
 			svc_xprt_put(&xprt->sc_xprt);
 			continue;
 		}
@@ -392,13 +423,13 @@ static void process_context(struct svcxprt_rdma *xprt,
 	case IB_WR_SEND:
 		if (ctxt->frmr)
 			pr_err("svcrdma: SEND: ctxt->frmr != NULL\n");
-		svc_rdma_put_context(ctxt, 1);
+		svc_rdma_put_context_irq(ctxt, 1);
 		break;
 
 	case IB_WR_RDMA_WRITE:
 		if (ctxt->frmr)
 			pr_err("svcrdma: WRITE: ctxt->frmr != NULL\n");
-		svc_rdma_put_context(ctxt, 0);
+		svc_rdma_put_context_irq(ctxt, 0);
 		break;
 
 	case IB_WR_RDMA_READ:
@@ -417,7 +448,7 @@ static void process_context(struct svcxprt_rdma *xprt,
 			}
 			svc_xprt_enqueue(&xprt->sc_xprt);
 		}
-		svc_rdma_put_context(ctxt, 0);
+		svc_rdma_put_context_irq(ctxt, 0);
 		break;
 
 	default:
@@ -523,9 +554,11 @@ static struct svcxprt_rdma *rdma_create_xprt(struct svc_serv *serv,
 	INIT_LIST_HEAD(&cma_xprt->sc_rq_dto_q);
 	INIT_LIST_HEAD(&cma_xprt->sc_read_complete_q);
 	INIT_LIST_HEAD(&cma_xprt->sc_frmr_q);
+	INIT_LIST_HEAD(&cma_xprt->sc_ctxt_q);
 	init_waitqueue_head(&cma_xprt->sc_send_wait);
 
 	spin_lock_init(&cma_xprt->sc_lock);
+	spin_lock_init(&cma_xprt->sc_ctxt_lock);
 	spin_lock_init(&cma_xprt->sc_rq_dto_lock);
 	spin_lock_init(&cma_xprt->sc_frmr_q_lock);
 
@@ -927,6 +960,21 @@ static struct svc_xprt *svc_rdma_accept(struct svc_xprt *xprt)
 				   (size_t)svcrdma_max_requests);
 	newxprt->sc_sq_depth = RPCRDMA_SQ_DEPTH_MULT * newxprt->sc_max_requests;
 
+	for (i = newxprt->sc_sq_depth; i; i--) {
+		struct svc_rdma_op_ctxt *ctxt;
+
+		ctxt = kmalloc(sizeof(*ctxt), GFP_KERNEL);
+		if (!ctxt) {
+			dprintk("svcrdma: No memory for RDMA ctxt\n");
+			goto errout;
+		}
+
+		ctxt->xprt = newxprt;
+		INIT_LIST_HEAD(&ctxt->free_q);
+		INIT_LIST_HEAD(&ctxt->dto_q);
+		list_add(&ctxt->free_q, &newxprt->sc_ctxt_q);
+	}
+
 	/*
 	 * Limit ORD based on client limit, local device limit, and
 	 * configured svcrdma limit.
@@ -1221,6 +1269,14 @@ static void __svc_rdma_free(struct work_struct *work)
 
 	/* Destroy the CM ID */
 	rdma_destroy_id(rdma->sc_cm_id);
+
+	while (!list_empty(&rdma->sc_ctxt_q)) {
+		struct svc_rdma_op_ctxt *ctxt;
+		ctxt = list_first_entry(&rdma->sc_ctxt_q,
+				       struct svc_rdma_op_ctxt, free_q);
+		list_del(&ctxt->free_q);
+		kfree(ctxt);
+	}
 
 	kfree(rdma);
 }
