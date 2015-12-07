@@ -243,4 +243,54 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	}
 }
 
+#ifdef CONFIG_VFPv3
+/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu)
+{
+	u32 fpexc;
+
+	asm volatile(
+	 "mrc p10, 7, %0, cr8, cr0, 0\n"
+	 "str %0, [%1]\n"
+	 "mov %0, #(1 << 30)\n"
+	 "mcr p10, 7, %0, cr8, cr0, 0\n"
+	 "isb\n"
+	 : "+r" (fpexc)
+	 : "r" (&vcpu->arch.host_fpexc)
+	);
+}
+
+/* Called from vcpu_put - restore host fpexc */
+static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu)
+{
+	asm volatile(
+	 "mcr p10, 7, %0, cr8, cr0, 0\n"
+	 :
+	 : "r" (vcpu->arch.host_fpexc)
+	);
+}
+
+/* If trap bits are reset then fp/simd registers are dirty */
+static inline bool kvm_vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+{
+	return !!(~vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+}
+
+static inline void vcpu_reset_cptr(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.hcptr |= (HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11));
+}
+#else
+static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu) {}
+static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+static inline bool kvm_vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+static inline void vcpu_reset_cptr(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.hcptr = HCPTR_TTA;
+}
+#endif
+
 #endif /* __ARM_KVM_EMULATE_H__ */

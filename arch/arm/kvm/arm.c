@@ -301,10 +301,23 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
 
 	kvm_arm_set_running_vcpu(vcpu);
+
+	/*  Save and enable FPEXC before we load guest context */
+	kvm_enable_vcpu_fpexc(vcpu);
+
+	/* reset hyp cptr register to trap on tracing and vfp/simd access*/
+	vcpu_reset_cptr(vcpu);
 }
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
+	/* If the fp/simd registers are dirty save guest, restore host. */
+	if (kvm_vcpu_vfp_isdirty(vcpu))
+		kvm_restore_host_vfp_state(vcpu);
+
+	/* Restore host FPEXC trashed in vcpu_load */
+	kvm_restore_host_fpexc(vcpu);
+
 	/*
 	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
 	 * if the vcpu is no longer assigned to a cpu.  This is used for the
