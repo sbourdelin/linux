@@ -2389,6 +2389,12 @@ static void intel_ddi_post_disable(struct intel_encoder *intel_encoder)
 		intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_OFF);
 		intel_edp_panel_vdd_on(intel_dp);
 		intel_edp_panel_off(intel_dp);
+
+		/* Give additional delay of 250 ms so that resume time will
+		   be faster and also meets T12 delay.
+		*/
+		wait_remaining_ms_from_jiffies(intel_dp->last_power_cycle,
+                                      (intel_dp->panel_power_cycle_delay/2));
 	}
 
 	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
