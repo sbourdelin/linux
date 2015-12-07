@@ -656,7 +656,7 @@ typedef struct cpumask *cpumask_var_t;
 bool alloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node);
 bool zalloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node);
 bool zalloc_cpumask_var(cpumask_var_t *mask, gfp_t flags);
-void alloc_bootmem_cpumask_var(cpumask_var_t *mask);
+void zalloc_bootmem_cpumask_var(cpumask_var_t *mask);
 void free_cpumask_var(cpumask_var_t mask);
 void free_bootmem_cpumask_var(cpumask_var_t mask);
 
@@ -684,7 +684,7 @@ static inline bool zalloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags,
 	return true;
 }
 
-static inline void alloc_bootmem_cpumask_var(cpumask_var_t *mask)
+static inline void zalloc_bootmem_cpumask_var(cpumask_var_t *mask)
 {
 }
 

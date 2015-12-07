@@ -122,7 +122,7 @@ void __init setup_node_to_cpumask_map(void)
 
 	/* allocate the map */
 	for (node = 0; node < nr_node_ids; node++)
-		alloc_bootmem_cpumask_var(&node_to_cpumask_map[node]);
+		zalloc_bootmem_cpumask_var(&node_to_cpumask_map[node]);
 
 	/* cpumask_of_node() will now work */
 	pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);

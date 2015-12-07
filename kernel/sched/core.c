@@ -6047,7 +6047,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
 /* Setup the mask of cpus configured for isolated domains */
 static int __init isolated_cpu_setup(char *str)
 {
-	alloc_bootmem_cpumask_var(&cpu_isolated_map);
+	zalloc_bootmem_cpumask_var(&cpu_isolated_map);
 	cpulist_parse(str, cpu_isolated_map);
 	return 1;
 }

@@ -97,7 +97,7 @@ bool zalloc_cpumask_var(cpumask_var_t *mask, gfp_t flags)
 EXPORT_SYMBOL(zalloc_cpumask_var);
 
 /**
- * alloc_bootmem_cpumask_var - allocate a struct cpumask from the bootmem arena.
+ * zalloc_bootmem_cpumask_var - allocate a struct cpumask from bootmem.
  * @mask: pointer to cpumask_var_t where the cpumask is returned
  *
  * Only defined when CONFIG_CPUMASK_OFFSTACK=y, otherwise is
@@ -105,7 +105,7 @@ EXPORT_SYMBOL(zalloc_cpumask_var);
  * Either returns an allocated (zero-filled) cpumask, or causes the
  * system to panic.
  */
-void __init alloc_bootmem_cpumask_var(cpumask_var_t *mask)
+void __init zalloc_bootmem_cpumask_var(cpumask_var_t *mask)
 {
 	*mask = memblock_virt_alloc(cpumask_size(), 0);
 }
@@ -123,7 +123,7 @@ void free_cpumask_var(cpumask_var_t mask)
 EXPORT_SYMBOL(free_cpumask_var);
 
 /**
- * free_bootmem_cpumask_var - frees result of alloc_bootmem_cpumask_var
+ * free_bootmem_cpumask_var - frees result of zalloc_bootmem_cpumask_var
  * @mask: cpumask to free
  */
 void __init free_bootmem_cpumask_var(cpumask_var_t mask)

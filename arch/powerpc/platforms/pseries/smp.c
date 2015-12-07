@@ -230,7 +230,7 @@ static void __init smp_init_pseries(void)
 
 	pr_debug(" -> smp_init_pSeries()\n");
 
-	alloc_bootmem_cpumask_var(&of_spin_mask);
+	zalloc_bootmem_cpumask_var(&of_spin_mask);
 
 	/*
 	 * Mark threads which are still spinning in hold loops

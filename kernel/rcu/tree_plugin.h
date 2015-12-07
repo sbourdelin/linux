@@ -1804,7 +1804,7 @@ static void increment_cpu_stall_ticks(void)
 /* Parse the boot-time rcu_nocb_mask CPU list from the kernel parameters. */
 static int __init rcu_nocb_setup(char *str)
 {
-	alloc_bootmem_cpumask_var(&rcu_nocb_mask);
+	zalloc_bootmem_cpumask_var(&rcu_nocb_mask);
 	have_rcu_nocb_mask = true;
 	cpulist_parse(str, rcu_nocb_mask);
 	return 1;

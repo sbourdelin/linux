@@ -61,10 +61,10 @@ cpumask_var_t cpu_sibling_setup_mask;
 /* correctly size the local cpu masks */
 void __init setup_cpu_local_masks(void)
 {
-	alloc_bootmem_cpumask_var(&cpu_initialized_mask);
-	alloc_bootmem_cpumask_var(&cpu_callin_mask);
-	alloc_bootmem_cpumask_var(&cpu_callout_mask);
-	alloc_bootmem_cpumask_var(&cpu_sibling_setup_mask);
+	zalloc_bootmem_cpumask_var(&cpu_initialized_mask);
+	zalloc_bootmem_cpumask_var(&cpu_callin_mask);
+	zalloc_bootmem_cpumask_var(&cpu_callout_mask);
+	zalloc_bootmem_cpumask_var(&cpu_sibling_setup_mask);
 }
 
 static void default_init(struct cpuinfo_x86 *c)
