@@ -199,9 +199,9 @@ static int rcar_thermal_update_temp(struct rcar_thermal_priv *priv)
 
 	dev_dbg(dev, "thermal%d  %d -> %d\n", priv->id, priv->ctemp, ctemp);
 
-	priv->ctemp = ctemp;
 	ret = 0;
 err_out_unlock:
+	priv->ctemp = ctemp;
 	mutex_unlock(&priv->lock);
 	return ret;
 }
@@ -209,6 +209,7 @@ err_out_unlock:
 static int rcar_thermal_get_temp(struct thermal_zone_device *zone, int *temp)
 {
 	struct rcar_thermal_priv *priv = rcar_zone_to_priv(zone);
+	int tmp;
 
 	if (!rcar_has_irq_support(priv) || rcar_force_update_temp(priv)) {
 		int ret = rcar_thermal_update_temp(priv);
@@ -217,8 +218,17 @@ static int rcar_thermal_get_temp(struct thermal_zone_device *zone, int *temp)
 	}
 
 	mutex_lock(&priv->lock);
-	*temp =  MCELSIUS((priv->ctemp * 5) - 65);
+	tmp =  MCELSIUS((priv->ctemp * 5) - 65);
 	mutex_unlock(&priv->lock);
+
+	if ((tmp < MCELSIUS(-45)) || (tmp > MCELSIUS(125))) {
+		struct device *dev = rcar_priv_to_dev(priv);
+
+		dev_err(dev, "it couldn't measure temperature correctly\n");
+		return -EIO;
+	}
+
+	*temp = tmp;
 
 	return 0;
 }
