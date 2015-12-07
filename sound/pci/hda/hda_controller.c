@@ -27,12 +27,15 @@
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
+#include <linux/pci.h>
 #include <sound/core.h>
 #include <sound/initval.h>
 #include "hda_controller.h"
 
 #define CREATE_TRACE_POINTS
 #include "hda_controller_trace.h"
+
+#define is_broxton(pci)	((pci)->device == 0x5a98)
 
 /* DSP lock helpers */
 #define dsp_lock(dev)		snd_hdac_dsp_lock(azx_stream(dev))
@@ -880,14 +883,35 @@ EXPORT_SYMBOL_GPL(snd_hda_codec_load_dsp_cleanup);
 #endif /* CONFIG_SND_HDA_DSP_LOADER */
 
 /*
+ * In BXT-P A0, HD-Audio DMA requests is later than expected,
+ * and makes an audio stream sensitive to system latencies when
+ * 24/32 bits are playing.
+ * Adjusting threshold of DMA fifo to force the DMA request
+ * sooner to improve latency tolerance at the expense of power.
+ */
+static void bxt_reduce_dma_latency(struct azx *chip)
+{
+	u32 val;
+
+	val = azx_readl(chip, SKL_EM4L);
+	val &= (0x3 << 20);
+	azx_writel(chip, SKL_EM4L, val);
+}
+
+/*
  * reset and start the controller registers
  */
 void azx_init_chip(struct azx *chip, bool full_reset)
 {
+	struct pci_dev *pci = chip->pci;
+
 	if (snd_hdac_bus_init_chip(azx_bus(chip), full_reset)) {
 		/* correct RINTCNT for CXT */
 		if (chip->driver_caps & AZX_DCAPS_CTX_WORKAROUND)
 			azx_writew(chip, RINTCNT, 0xc0);
+		/* reduce dma latency to avoid noise */
+		if (is_broxton(pci))
+			bxt_reduce_dma_latency(chip);
 	}
 }
 EXPORT_SYMBOL_GPL(azx_init_chip);
