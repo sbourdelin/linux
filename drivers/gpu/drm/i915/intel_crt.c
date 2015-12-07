@@ -786,7 +786,7 @@ void intel_crt_init(struct drm_device *dev)
 
 	if (HAS_PCH_SPLIT(dev))
 		adpa_reg = PCH_ADPA;
-	else if (IS_VALLEYVIEW(dev))
+	else if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev))
 		adpa_reg = VLV_ADPA;
 	else
 		adpa_reg = ADPA;

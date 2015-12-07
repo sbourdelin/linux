@@ -357,8 +357,8 @@ parse_general_features(struct drm_i915_private *dev_priv,
 	if (general) {
 		dev_priv->vbt.int_tv_support = general->int_tv_support;
 		/* int_crt_support can't be trusted on earlier platforms */
-		if (bdb->version >= 155 &&
-		    (HAS_DDI(dev_priv) || IS_VALLEYVIEW(dev_priv)))
+		if (bdb->version >= 155 && (HAS_DDI(dev_priv) ||
+		    IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)))
 			dev_priv->vbt.int_crt_support = general->int_crt_support;
 		dev_priv->vbt.lvds_use_ssc = general->enable_ssc;
 		dev_priv->vbt.lvds_ssc_freq =
