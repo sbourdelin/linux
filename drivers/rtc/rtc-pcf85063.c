@@ -19,6 +19,7 @@
 #define DRV_VERSION "0.0.1"
 
 #define PCF85063_REG_CTRL1		0x00 /* status */
+#define PCF85063_REG_CTRL1_STOP		BIT(5)
 #define PCF85063_REG_CTRL2		0x01
 
 #define PCF85063_REG_SC			0x04 /* datetime */
@@ -72,6 +73,47 @@ static int pcf85063_read_time(struct i2c_client *client, u8 *buf, u16 size)
 	return 0;
 }
 
+static int pcf85063_stop_clock(struct i2c_client *client, u8 *ctrl1)
+{
+	int rc;
+	u8 clk_ctrl[2] = { PCF85063_REG_CTRL1, };
+	struct i2c_msg msgs[] = {
+		{
+			.addr = client->addr,
+			.len = 1,
+			.buf = &clk_ctrl[0],
+		}, {
+			.addr = client->addr,
+			.flags = I2C_M_RD,
+			.len = 1,
+			.buf = &clk_ctrl[1],
+		}, {
+			.addr = client->addr,
+			.len = sizeof(clk_ctrl),
+			.buf = &clk_ctrl[0],
+		},
+	};
+
+	rc = i2c_transfer(client->adapter, &msgs[0], 2);
+	if (rc != 2) {
+		dev_err(&client->dev, "Failing to stop the clock\n");
+		return -EIO;
+	}
+
+	/* stop the clock */
+	clk_ctrl[1] |= PCF85063_REG_CTRL1_STOP;
+
+	rc = i2c_transfer(client->adapter, &msgs[2], 1);
+	if (rc != 1) {
+		dev_err(&client->dev, "Failing to stop the clock\n");
+		return -EIO;
+	}
+
+	*ctrl1 = clk_ctrl[1];
+
+	return 0;
+}
+
 /*
  * In the routines that deal directly with the pcf85063 hardware, we use
  * rtc_time -- month 0-11, hour 0-23, yr = calendar year-epoch.
@@ -110,41 +152,49 @@ static int pcf85063_get_datetime(struct i2c_client *client, struct rtc_time *tm)
 
 static int pcf85063_set_datetime(struct i2c_client *client, struct rtc_time *tm)
 {
-	int i = 0, err = 0;
-	unsigned char buf[11];
+	int rc;
+	u8 regs[9];
 
-	/* Control & status */
-	buf[PCF85063_REG_CTRL1] = 0;
-	buf[PCF85063_REG_CTRL2] = 5;
+	/*
+	 * to accurately set the time, reset the divider chain and keep it in
+	 * reset state until all time/date registers are written
+	 */
+	rc = pcf85063_stop_clock(client, &regs[8]);
+	if (rc != 0)
+		return rc;
 
+	/* write start register */
+	regs[0] = PCF85063_REG_SC;
 	/* hours, minutes and seconds */
-	buf[PCF85063_REG_SC] = bin2bcd(tm->tm_sec) & 0x7F;
+	regs[1] = bin2bcd(tm->tm_sec) & 0x7F; /* clear OS flag */
 
-	buf[PCF85063_REG_MN] = bin2bcd(tm->tm_min);
-	buf[PCF85063_REG_HR] = bin2bcd(tm->tm_hour);
+	regs[2] = bin2bcd(tm->tm_min);
+	regs[3] = bin2bcd(tm->tm_hour);
 
 	/* Day of month, 1 - 31 */
-	buf[PCF85063_REG_DM] = bin2bcd(tm->tm_mday);
+	regs[4] = bin2bcd(tm->tm_mday);
 
 	/* Day, 0 - 6 */
-	buf[PCF85063_REG_DW] = tm->tm_wday & 0x07;
+	regs[5] = tm->tm_wday & 0x07;
 
 	/* month, 1 - 12 */
-	buf[PCF85063_REG_MO] = bin2bcd(tm->tm_mon + 1);
+	regs[6] = bin2bcd(tm->tm_mon + 1);
 
 	/* year and century */
-	buf[PCF85063_REG_YR] = bin2bcd(tm->tm_year % 100);
+	regs[7] = bin2bcd(tm->tm_year % 100);
 
-	/* write register's data */
-	for (i = 0; i < sizeof(buf); i++) {
-		unsigned char data[2] = { i, buf[i] };
+	/*
+	 * after all time/date registers are written, let the address auto
+	 * increment wrap around and write register CTRL1 to re-enable the
+	 * clock divider chain again
+	 */
+	regs[8] &= ~PCF85063_REG_CTRL1_STOP;
 
-		err = i2c_master_send(client, data, sizeof(data));
-		if (err != sizeof(data)) {
-			dev_err(&client->dev, "%s: err=%d addr=%02x, data=%02x\n",
-					__func__, err, data[0], data[1]);
-			return -EIO;
-		}
+	/* write all registers at once */
+	rc = i2c_master_send(client, regs, sizeof(regs));
+	if (rc != sizeof(regs)) {
+		dev_err(&client->dev, "date/time register write error\n");
+		return -EIO;
 	}
 
 	return 0;
