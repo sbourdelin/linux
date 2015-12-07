@@ -482,7 +482,7 @@ int analogix_dp_start_aux_transaction(struct analogix_dp_device *dp)
 	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
 	while (!(reg & RPLY_RECEIV)) {
 		timeout_loop++;
-		if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
+		if (DP_TIMEOUT_LOOP_COUNT * 10 < timeout_loop) {
 			dev_err(dp->dev, "AUX CH command reply failed!\n");
 			return -ETIMEDOUT;
 		}
