@@ -959,7 +959,9 @@ static void acpi_bus_get_power_flags(struct acpi_device *device)
 		acpi_bus_init_power_state(device, i);
 
 	INIT_LIST_HEAD(&device->power.states[ACPI_STATE_D3_COLD].resources);
-	if (!list_empty(&device->power.states[ACPI_STATE_D3_HOT].resources))
+	if (!list_empty(&device->power.states[ACPI_STATE_D3_HOT].resources) ||
+		((acpi_gbl_FADT.header.revision < 6) &&
+		device->power.states[ACPI_STATE_D3_HOT].flags.explicit_set))
 		device->power.states[ACPI_STATE_D3_COLD].flags.valid = 1;
 
 	/* Set defaults for D0 and D3hot states (always valid) */
