@@ -41,6 +41,7 @@ For the below properties, please refer to Analogix DP binding document:
 	-phys (required)
 	-phy-names (required)
 	-hpd-gpios (optional)
+	-analogix,need-force-hpd (optional)
 	-video interfaces (optional)
 
 Deprecated properties for DisplayPort:
