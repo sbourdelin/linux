@@ -35,7 +35,22 @@
 			compatible = "arm,cortex-a57", "arm,armv8";
 			reg = <0x0>;
 			device_type = "cpu";
+			next-level-cache = <&L2_CA57>;
 		};
+	};
+
+	L2_CA57: cache-controller@0 {
+		compatible = "cache";
+		arm,data-latency = <4 4 1>;
+		arm,tag-latency = <3 3 3>;
+		cache-unified;
+		cache-level = <2>;
+	};
+
+	L2_CA53: cache-controller@1 {
+		compatible = "cache";
+		cache-unified;
+		cache-level = <2>;
 	};
 
 	extal_clk: extal {
