@@ -17,7 +17,6 @@
 #include "rrpc.h"
 
 static struct kmem_cache *rrpc_gcb_cache, *rrpc_rq_cache;
-static DECLARE_RWSEM(rrpc_lock);
 
 static int rrpc_submit_io(struct rrpc *rrpc, struct bio *bio,
 				struct nvm_rq *rqd, unsigned long flags);
@@ -1019,26 +1018,6 @@ static int rrpc_map_init(struct rrpc *rrpc)
 
 static int rrpc_core_init(struct rrpc *rrpc)
 {
-	down_write(&rrpc_lock);
-	if (!rrpc_gcb_cache) {
-		rrpc_gcb_cache = kmem_cache_create("rrpc_gcb",
-				sizeof(struct rrpc_block_gc), 0, 0, NULL);
-		if (!rrpc_gcb_cache) {
-			up_write(&rrpc_lock);
-			return -ENOMEM;
-		}
-
-		rrpc_rq_cache = kmem_cache_create("rrpc_rq",
-				sizeof(struct nvm_rq) + sizeof(struct rrpc_rq),
-				0, 0, NULL);
-		if (!rrpc_rq_cache) {
-			kmem_cache_destroy(rrpc_gcb_cache);
-			up_write(&rrpc_lock);
-			return -ENOMEM;
-		}
-	}
-	up_write(&rrpc_lock);
-
 	rrpc->page_pool = mempool_create_page_pool(PAGE_POOL_SIZE, 0);
 	if (!rrpc->page_pool)
 		return -ENOMEM;
@@ -1338,14 +1317,47 @@ static struct nvm_tgt_type tt_rrpc = {
 	.exit		= rrpc_exit,
 };
 
+static int __init rrpc_slab_init(void)
+{
+	rrpc_gcb_cache = kmem_cache_create("rrpc_gcb",
+			sizeof(struct rrpc_block_gc), 0, 0, NULL);
+	if (!rrpc_gcb_cache)
+		goto out;
+
+	rrpc_rq_cache = kmem_cache_create("rrpc_rq",
+			sizeof(struct nvm_rq) + sizeof(struct rrpc_rq),
+			0, 0, NULL);
+	if (!rrpc_rq_cache)
+		goto out_free;
+
+	return 0;
+
+out_free:
+	kmem_cache_destroy(rrpc_gcb_cache);
+out:
+	return -ENOMEM;
+}
+
+static inline void rrpc_slab_free(void)
+{
+	kmem_cache_destroy(rrpc_gcb_cache);
+	kmem_cache_destroy(rrpc_rq_cache);
+}
+
 static int __init rrpc_module_init(void)
 {
+	int ret;
+
+	ret = rrpc_slab_init();
+	if (ret)
+		return ret;
 	return nvm_register_target(&tt_rrpc);
 }
 
 static void rrpc_module_exit(void)
 {
 	nvm_unregister_target(&tt_rrpc);
+	rrpc_slab_free();
 }
 
 module_init(rrpc_module_init);
