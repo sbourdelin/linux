@@ -2122,7 +2122,9 @@ static void macb_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	regs_buff[10] = macb_tx_dma(&bp->queues[0], tail);
 	regs_buff[11] = macb_tx_dma(&bp->queues[0], head);
 
-	regs_buff[12] = macb_or_gem_readl(bp, USRIO);
+	if (!of_property_read_bool(bp->pdev->dev.of_node, "no-usrio")) {
+		regs_buff[12] = macb_or_gem_readl(bp, USRIO);
+	}
 	if (macb_is_gem(bp)) {
 		regs_buff[13] = gem_readl(bp, DMACFG);
 	}
@@ -2401,19 +2403,22 @@ static int macb_init(struct platform_device *pdev)
 		dev->hw_features &= ~NETIF_F_SG;
 	dev->features = dev->hw_features;
 
-	val = 0;
-	if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
-		val = GEM_BIT(RGMII);
-	else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
-		 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-		val = MACB_BIT(RMII);
-	else if (!(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-		val = MACB_BIT(MII);
+	/* Some platform do not implement the USRIO register */
+	if (!of_property_read_bool(pdev->dev.of_node, "no-usrio")) {
+		val = 0;
+		if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
+			val = GEM_BIT(RGMII);
+		else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
+			 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
+			val = MACB_BIT(RMII);
+		else if (!(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
+			val = MACB_BIT(MII);
 
-	if (bp->caps & MACB_CAPS_USRIO_HAS_CLKEN)
-		val |= MACB_BIT(CLKEN);
+		if (bp->caps & MACB_CAPS_USRIO_HAS_CLKEN)
+			val |= MACB_BIT(CLKEN);
 
-	macb_or_gem_writel(bp, USRIO, val);
+		macb_or_gem_writel(bp, USRIO, val);
+	}
 
 	/* Set MII management clock divider */
 	val = macb_mdc_clk_div(bp);
