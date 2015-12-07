@@ -72,6 +72,8 @@ struct nfs_lock_context {
 	struct nfs_open_context *open_context;
 	struct nfs_lockowner lockowner;
 	struct nfs_io_counter io_count;
+#define NFS_LOCK_CLOSE_UNLOCK 0
+	unsigned long flags;
 };
 
 struct nfs4_state;
@@ -373,6 +375,7 @@ extern void nfs_file_set_open_context(struct file *filp, struct nfs_open_context
 extern void nfs_file_clear_open_context(struct file *flip);
 extern struct nfs_lock_context *nfs_get_lock_context(struct nfs_open_context *ctx);
 extern void nfs_put_lock_context(struct nfs_lock_context *l_ctx);
+extern void nfs_unlock_lock_context(struct nfs_lock_context *l_ctx);
 extern u64 nfs_compat_user_ino64(u64 fileid);
 extern void nfs_fattr_init(struct nfs_fattr *fattr);
 extern void nfs_fattr_set_barrier(struct nfs_fattr *fattr);

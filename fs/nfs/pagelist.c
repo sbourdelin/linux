@@ -108,9 +108,13 @@ nfs_iocounter_inc(struct nfs_io_counter *c)
 }
 
 static void
-nfs_iocounter_dec(struct nfs_io_counter *c)
+nfs_iocounter_dec(struct nfs_lock_context *l_ctx)
 {
+	struct nfs_io_counter *c = &l_ctx->io_count;
+
 	if (atomic_dec_and_test(&c->io_count)) {
+		if (test_and_clear_bit(NFS_LOCK_CLOSE_UNLOCK, &l_ctx->flags))
+			nfs_unlock_lock_context(l_ctx);
 		clear_bit(NFS_IO_INPROGRESS, &c->flags);
 		smp_mb__after_atomic();
 		wake_up_bit(&c->flags, NFS_IO_INPROGRESS);
@@ -431,7 +435,7 @@ static void nfs_clear_request(struct nfs_page *req)
 		req->wb_page = NULL;
 	}
 	if (l_ctx != NULL) {
-		nfs_iocounter_dec(&l_ctx->io_count);
+		nfs_iocounter_dec(l_ctx);
 		nfs_put_lock_context(l_ctx);
 		req->wb_lock_context = NULL;
 	}
