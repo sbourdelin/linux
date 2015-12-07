@@ -42,7 +42,16 @@
 					   < 937500 1000000>,
 					   < 750000 1000000>,
 					   < 375000 1000000>;
+			next-level-cache = <&L2_CA15>;
 		};
+	};
+
+	L2_CA15: cache-controller@0 {
+		compatible = "cache";
+		arm,data-latency = <4 4 0>;
+		arm,tag-latency = <3 3 3>;
+		cache-unified;
+		cache-level = <2>;
 	};
 
 	gic: interrupt-controller@f1001000 {
