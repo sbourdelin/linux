@@ -1611,7 +1611,7 @@ static acpi_status acpi_spi_add_device(acpi_handle handle, u32 level,
 	}
 
 	ACPI_COMPANION_SET(&spi->dev, adev);
-	spi->irq = -1;
+	spi->irq = acpi_dev_gpio_irq_get(ACPI_COMPANION(&spi->dev), 0);
 
 	INIT_LIST_HEAD(&resource_list);
 	ret = acpi_dev_get_resources(adev, &resource_list,
