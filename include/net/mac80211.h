@@ -3269,6 +3269,11 @@ enum ieee80211_reconfig_type {
  *	the function call.
  *
  * @wake_tx_queue: Called when new packets have been added to the queue.
+ *
+ * @perform_ftm: Perform a Fine Timing Measurement with the given request
+ *	parameters. The given request can only be used within the function call.
+ * @abort_ftm: Abort a Fine Timing Measurement request. The given cookie must
+ *	match that of the active FTM request.
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -3508,6 +3513,11 @@ struct ieee80211_ops {
 
 	void (*wake_tx_queue)(struct ieee80211_hw *hw,
 			      struct ieee80211_txq *txq);
+
+	int (*perform_ftm)(struct ieee80211_hw *hw, u64 cookie,
+			   struct ieee80211_vif *vif,
+			   struct cfg80211_ftm_request *ftm_req);
+	int (*abort_ftm)(struct ieee80211_hw *hw, u64 cookie);
 };
 
 /**

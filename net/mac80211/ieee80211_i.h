@@ -1347,11 +1347,13 @@ struct ieee80211_local {
 	struct cfg80211_chan_def monitor_chandef;
 
 	/* extended capabilities provided by mac80211 */
-	u8 ext_capa[8];
+	u8 ext_capa[9];
 
 	/* TDLS channel switch */
 	struct work_struct tdls_chsw_work;
 	struct sk_buff_head skb_queue_tdls_chsw;
+
+	u64 msrment_cookie_counter;
 };
 
 static inline struct ieee80211_sub_if_data *
