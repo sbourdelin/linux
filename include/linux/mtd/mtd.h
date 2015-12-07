@@ -253,6 +253,12 @@ struct mtd_info {
 	int usecount;
 };
 
+static inline void mtd_set_ecclayout(struct mtd_info *mtd,
+				     struct nand_ecclayout *ecclayout)
+{
+	mtd->ecclayout = ecclayout;
+}
+
 static inline int mtd_eccpos(struct mtd_info *mtd, int eccbyte)
 {
 	if (!mtd->ecclayout)
