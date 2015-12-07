@@ -19,6 +19,9 @@ Required properties:
 	Optional elements: 'tx_clk'
 - clocks: Phandles to input clocks.
 
+Optional properties:
+- no-usrio: Indicates the platform integration does not implement the USRIO register.
+
 Examples:
 
 	macb0: ethernet@fffc4000 {
