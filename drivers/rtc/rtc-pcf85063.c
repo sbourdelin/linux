@@ -39,6 +39,38 @@ struct pcf85063 {
 	int voltage_low; /* indicates if a low_voltage was detected */
 };
 
+static int pcf85063_read_time(struct i2c_client *client, u8 *buf, u16 size)
+{
+	int rc;
+	u8 clk_ctrl = PCF85063_REG_SC;
+	struct i2c_msg msgs[] = {
+		{
+			.addr = client->addr,
+			.len = sizeof(clk_ctrl),
+			.buf = &clk_ctrl,
+		}, {
+			.addr = client->addr,
+			.flags = I2C_M_RD,
+			.len = size,
+			.buf = buf
+		},
+	};
+
+	/*
+	 * while reading the time/date registers are blocked and not updated
+	 * anymore until the access is finished. To not lose a second
+	 * event, the access must be finished within one second. So, read all
+	 * time/date registers in one turn.
+	 */
+	rc = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
+	if (rc != ARRAY_SIZE(msgs)) {
+		dev_err(&client->dev, "date/time register read error\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
 /*
  * In the routines that deal directly with the pcf85063 hardware, we use
  * rtc_time -- month 0-11, hour 0-23, yr = calendar year-epoch.
