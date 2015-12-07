@@ -290,13 +290,20 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	return data;		/* Leave LE untouched */
 }
 
-static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu) {}
-static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
-static inline void vcpu_reset_cptr(struct kvm_vcpu *vcpu) {}
+static inline bool kvm_guest_vcpu_is_32bit(struct kvm_vcpu *vcpu)
+{
+	 return !(vcpu->arch.hcr_el2 & HCR_RW);
+}
+
+static inline void vcpu_reset_cptr(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.cptr_el2 = CPTR_EL2_TTA | CPTR_EL2_TFP;
+}
+
 
 static inline bool kvm_vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
 {
-	return false;
+	return !!(~vcpu->arch.cptr_el2 & CPTR_EL2_TFP);
 }
 
 #endif /* __ARM64_KVM_EMULATE_H__ */

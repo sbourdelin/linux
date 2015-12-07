@@ -302,8 +302,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	kvm_arm_set_running_vcpu(vcpu);
 
-	/*  Save and enable FPEXC before we load guest context */
-	kvm_enable_vcpu_fpexc(vcpu);
+	/*
+	 * For 32bit guest executing on arm64, enable fp/simd access in
+	 * EL2. On arm32 save host fpexc and then enable fp/simd access.
+	 */
+	if (kvm_guest_vcpu_is_32bit(vcpu))
+		kvm_enable_vcpu_fpexc(vcpu);
 
 	/* reset hyp cptr register to trap on tracing and vfp/simd access*/
 	vcpu_reset_cptr(vcpu);
@@ -312,10 +316,18 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
 	/* If the fp/simd registers are dirty save guest, restore host. */
-	if (kvm_vcpu_vfp_isdirty(vcpu))
+	if (kvm_vcpu_vfp_isdirty(vcpu)) {
 		kvm_restore_host_vfp_state(vcpu);
 
-	/* Restore host FPEXC trashed in vcpu_load */
+		/*
+		 * For 32bit guest on arm64 save the guest fpexc register
+		 * in EL2 mode.
+		 */
+		if (kvm_guest_vcpu_is_32bit(vcpu))
+			kvm_save_guest_vcpu_fpexc(vcpu);
+	}
+
+	/* For arm32 restore host FPEXC trashed in vcpu_load. */
 	kvm_restore_host_fpexc(vcpu);
 
 	/*

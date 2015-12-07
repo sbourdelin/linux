@@ -243,6 +243,11 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	}
 }
 
+static inline bool kvm_guest_vcpu_is_32bit(struct kvm_vcpu *vcpu)
+{
+	return true;
+}
+
 #ifdef CONFIG_VFPv3
 /* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
 static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu)

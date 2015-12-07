@@ -101,6 +101,7 @@ struct kvm_vcpu_arch {
 	/* HYP configuration */
 	u64 hcr_el2;
 	u32 mdcr_el2;
+	u32 cptr_el2;
 
 	/* Exception Information */
 	struct kvm_vcpu_fault_info fault;
@@ -252,7 +253,20 @@ static inline void kvm_arch_hardware_unsetup(void) {}
 static inline void kvm_arch_sync_events(struct kvm *kvm) {}
 static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-static inline void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu) {}
+
+static inline void kvm_enable_vcpu_fpexc(struct kvm_vcpu *vcpu)
+{
+	/* Enable FP/SIMD access from EL2 mode*/
+	kvm_call_hyp(__kvm_vcpu_enable_fpexc32);
+}
+
+static inline void kvm_save_guest_vcpu_fpexc(struct kvm_vcpu *vcpu)
+{
+	/* Save FPEXEC32_EL2 in EL2 mode */
+	kvm_call_hyp(__kvm_vcpu_save_fpexc32, vcpu);
+}
+static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
 
 void kvm_arm_init_debug(void);
 void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
