@@ -1484,6 +1484,7 @@ EXPORT_SYMBOL(blkdev_get_by_dev);
 
 static int blkdev_open(struct inode * inode, struct file * filp)
 {
+	int rc;
 	struct block_device *bdev;
 
 	/*
@@ -1507,7 +1508,11 @@ static int blkdev_open(struct inode * inode, struct file * filp)
 
 	filp->f_mapping = bdev->bd_inode->i_mapping;
 
-	return blkdev_get(bdev, filp->f_mode, filp);
+	rc = blkdev_get(bdev, filp->f_mode, filp);
+	if (rc)
+		bd_forget(inode);
+
+	return rc;
 }
 
 static void __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
