@@ -107,7 +107,7 @@ static unsigned char analogix_dp_calc_edid_check_sum(unsigned char *edid_data)
 
 static int analogix_dp_read_edid(struct analogix_dp_device *dp)
 {
-	unsigned char edid[EDID_BLOCK_LENGTH * 2];
+	unsigned char *edid = dp->edid;
 	unsigned int extend_block = 0;
 	unsigned char sum;
 	unsigned char test_vector;
@@ -901,12 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
 			DRM_ERROR("failed to disable the panel\n");
 	}
 
-	ret = analogix_dp_handle_edid(dp);
-	if (ret) {
-		dev_err(dp->dev, "unable to handle edid\n");
-		return;
-	}
-
 	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
 					 dp->video_info.max_link_rate);
 	if (ret) {
@@ -947,7 +941,23 @@ EXPORT_SYMBOL_GPL(analogix_dp_detect);
 int analogix_dp_get_modes(struct device *dev)
 {
 	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+	struct edid *edid = (struct edid *)dp->edid;
 	int num_modes = 0;
+
+	if (dp->plat_data && dp->plat_data->panel) {
+		if (drm_panel_prepare(dp->plat_data->panel)) {
+			DRM_ERROR("failed to setup the panel\n");
+			return -EINVAL;
+		}
+	}
+
+	if (analogix_dp_handle_edid(dp)) {
+		dev_err(dp->dev, "unable to handle edid\n");
+		return -EINVAL;
+	}
+
+	drm_mode_connector_update_edid_property(dp->connector, edid);
+	num_modes += drm_add_edid_modes(dp->connector, edid);
 
 	if (dp->plat_data->panel)
 		num_modes += drm_panel_get_modes(dp->plat_data->panel);
@@ -1308,6 +1318,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
 	pm_runtime_enable(dev);
 
 	phy_power_on(dp->phy);
+
+	analogix_dp_init_dp(dp);
 
 	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
 			       irq_flags, "analogix-dp", dp);
