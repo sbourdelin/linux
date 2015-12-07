@@ -22,6 +22,7 @@
 #define PCF85063_REG_CTRL2		0x01
 
 #define PCF85063_REG_SC			0x04 /* datetime */
+#define PCF85063_REG_SC_OS		0x80
 #define PCF85063_REG_MN			0x05
 #define PCF85063_REG_HR			0x06
 #define PCF85063_REG_DM			0x07
@@ -77,39 +78,31 @@ static int pcf85063_read_time(struct i2c_client *client, u8 *buf, u16 size)
  */
 static int pcf85063_get_datetime(struct i2c_client *client, struct rtc_time *tm)
 {
+	int rc;
 	struct pcf85063 *pcf85063 = i2c_get_clientdata(client);
-	unsigned char buf[13] = { PCF85063_REG_CTRL1 };
-	struct i2c_msg msgs[] = {
-		{/* setup read ptr */
-			.addr = client->addr,
-			.len = 1,
-			.buf = buf
-		},
-		{/* read status + date */
-			.addr = client->addr,
-			.flags = I2C_M_RD,
-			.len = 13,
-			.buf = buf
-		},
-	};
+	u8 regs[7];
 
-	/* read registers */
-	if ((i2c_transfer(client->adapter, msgs, 2)) != 2) {
-		dev_err(&client->dev, "%s: read error\n", __func__);
-		return -EIO;
+	rc = pcf85063_read_time(client, regs, sizeof(regs));
+	if (rc < 0)
+		return rc;
+
+	/* if the clock has lost its power it makes no sense to use its time */
+	if (regs[0] & PCF85063_REG_SC_OS) {
+		dev_warn(&client->dev, "Power loss detected, invalid time\n");
+		return -EINVAL;
 	}
 
-	tm->tm_sec = bcd2bin(buf[PCF85063_REG_SC] & 0x7F);
-	tm->tm_min = bcd2bin(buf[PCF85063_REG_MN] & 0x7F);
-	tm->tm_hour = bcd2bin(buf[PCF85063_REG_HR] & 0x3F); /* rtc hr 0-23 */
-	tm->tm_mday = bcd2bin(buf[PCF85063_REG_DM] & 0x3F);
-	tm->tm_wday = buf[PCF85063_REG_DW] & 0x07;
-	tm->tm_mon = bcd2bin(buf[PCF85063_REG_MO] & 0x1F) - 1; /* rtc mn 1-12 */
-	tm->tm_year = bcd2bin(buf[PCF85063_REG_YR]);
+	tm->tm_sec = bcd2bin(regs[0] & 0x7F);
+	tm->tm_min = bcd2bin(regs[1] & 0x7F);
+	tm->tm_hour = bcd2bin(regs[2] & 0x3F); /* rtc hr 0-23 */
+	tm->tm_mday = bcd2bin(regs[3] & 0x3F);
+	tm->tm_wday = regs[4] & 0x07;
+	tm->tm_mon = bcd2bin(regs[5] & 0x1F) - 1; /* rtc mn 1-12 */
+	tm->tm_year = bcd2bin(regs[6]);
 	if (tm->tm_year < 70)
 		tm->tm_year += 100;	/* assume we are in 1970...2069 */
 	/* detect the polarity heuristically. see note above. */
-	pcf85063->c_polarity = (buf[PCF85063_REG_MO] & PCF85063_MO_C) ?
+	pcf85063->c_polarity = (regs[5] & PCF85063_MO_C) ?
 		(tm->tm_year >= 100) : (tm->tm_year < 100);
 
 	return rtc_valid_tm(tm);
