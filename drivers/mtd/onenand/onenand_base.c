@@ -4059,7 +4059,7 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
 	     mtd_oobfree(mtd, i++, &oobfree))
 		mtd->oobavail += oobfree.length;
 
-	mtd->ecclayout = this->ecclayout;
+	mtd_set_ecclayout(mtd, this->ecclayout);
 	mtd->ecc_strength = 1;
 
 	/* Fill in remaining MTD driver data */
