@@ -351,11 +351,11 @@ static int padata_setup_cpumasks(struct parallel_data *pd,
 				 const struct cpumask *pcpumask,
 				 const struct cpumask *cbcpumask)
 {
-	if (!alloc_cpumask_var(&pd->cpumask.pcpu, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&pd->cpumask.pcpu, GFP_KERNEL))
 		return -ENOMEM;
 
 	cpumask_and(pd->cpumask.pcpu, pcpumask, cpu_online_mask);
-	if (!alloc_cpumask_var(&pd->cpumask.cbcpu, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&pd->cpumask.cbcpu, GFP_KERNEL)) {
 		free_cpumask_var(pd->cpumask.cbcpu);
 		return -ENOMEM;
 	}
@@ -931,7 +931,7 @@ static ssize_t store_cpumask(struct padata_instance *pinst,
 	ssize_t ret;
 	int mask_type;
 
-	if (!alloc_cpumask_var(&new_cpumask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&new_cpumask, GFP_KERNEL))
 		return -ENOMEM;
 
 	ret = bitmap_parse(buf, count, cpumask_bits(new_cpumask),
@@ -1045,9 +1045,9 @@ struct padata_instance *padata_alloc(struct workqueue_struct *wq,
 		goto err;
 
 	get_online_cpus();
-	if (!alloc_cpumask_var(&pinst->cpumask.pcpu, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&pinst->cpumask.pcpu, GFP_KERNEL))
 		goto err_free_inst;
-	if (!alloc_cpumask_var(&pinst->cpumask.cbcpu, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&pinst->cpumask.cbcpu, GFP_KERNEL)) {
 		free_cpumask_var(pinst->cpumask.pcpu);
 		goto err_free_inst;
 	}

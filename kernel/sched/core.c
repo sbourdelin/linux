@@ -4394,11 +4394,11 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 		retval = -EINVAL;
 		goto out_put_task;
 	}
-	if (!alloc_cpumask_var(&cpus_allowed, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&cpus_allowed, GFP_KERNEL)) {
 		retval = -ENOMEM;
 		goto out_put_task;
 	}
-	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&new_mask, GFP_KERNEL)) {
 		retval = -ENOMEM;
 		goto out_free_cpus_allowed;
 	}
@@ -4486,7 +4486,7 @@ SYSCALL_DEFINE3(sched_setaffinity, pid_t, pid, unsigned int, len,
 	cpumask_var_t new_mask;
 	int retval;
 
-	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&new_mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	retval = get_user_cpu_mask(user_mask_ptr, len, new_mask);
@@ -4542,7 +4542,7 @@ SYSCALL_DEFINE3(sched_getaffinity, pid_t, pid, unsigned int, len,
 	if (len & (sizeof(unsigned long)-1))
 		return -EINVAL;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	ret = sched_getaffinity(pid, mask);
@@ -7039,7 +7039,7 @@ cpumask_var_t *alloc_sched_domains(unsigned int ndoms)
 	if (!doms)
 		return NULL;
 	for (i = 0; i < ndoms; i++) {
-		if (!alloc_cpumask_var(&doms[i], GFP_KERNEL)) {
+		if (!zalloc_cpumask_var(&doms[i], GFP_KERNEL)) {
 			free_sched_domains(doms, i);
 			return NULL;
 		}
@@ -7278,8 +7278,8 @@ void __init sched_init_smp(void)
 {
 	cpumask_var_t non_isolated_cpus;
 
-	alloc_cpumask_var(&non_isolated_cpus, GFP_KERNEL);
-	alloc_cpumask_var(&fallback_doms, GFP_KERNEL);
+	zalloc_cpumask_var(&non_isolated_cpus, GFP_KERNEL);
+	zalloc_cpumask_var(&fallback_doms, GFP_KERNEL);
 
 	sched_init_numa();
 

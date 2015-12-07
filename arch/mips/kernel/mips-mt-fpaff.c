@@ -87,15 +87,15 @@ asmlinkage long mipsmt_sys_sched_setaffinity(pid_t pid, unsigned int len,
 	get_task_struct(p);
 	rcu_read_unlock();
 
-	if (!alloc_cpumask_var(&cpus_allowed, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&cpus_allowed, GFP_KERNEL)) {
 		retval = -ENOMEM;
 		goto out_put_task;
 	}
-	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&new_mask, GFP_KERNEL)) {
 		retval = -ENOMEM;
 		goto out_free_cpus_allowed;
 	}
-	if (!alloc_cpumask_var(&effective_mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&effective_mask, GFP_KERNEL)) {
 		retval = -ENOMEM;
 		goto out_free_new_mask;
 	}

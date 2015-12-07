@@ -266,7 +266,7 @@ static void irq_affinity_notify(struct work_struct *work)
 	cpumask_var_t cpumask;
 	unsigned long flags;
 
-	if (!desc || !alloc_cpumask_var(&cpumask, GFP_KERNEL))
+	if (!desc || !zalloc_cpumask_var(&cpumask, GFP_KERNEL))
 		goto out;
 
 	raw_spin_lock_irqsave(&desc->lock, flags);
@@ -826,7 +826,7 @@ irq_thread_check_affinity(struct irq_desc *desc, struct irqaction *action)
 	 * In case we are out of memory we set IRQTF_AFFINITY again and
 	 * try again next time
 	 */
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL)) {
 		set_bit(IRQTF_AFFINITY, &action->thread_flags);
 		return;
 	}
@@ -1158,7 +1158,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		}
 	}
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL)) {
 		ret = -ENOMEM;
 		goto out_thread;
 	}

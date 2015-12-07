@@ -620,7 +620,7 @@ static inline size_t cpumask_size(void)
  *
  * ie.
  *	cpumask_var_t tmpmask;
- *	if (!alloc_cpumask_var(&tmpmask, GFP_KERNEL))
+ *	if (!zalloc_cpumask_var(&tmpmask, GFP_KERNEL))
  *		return -ENOMEM;
  *
  *	  ... use 'tmpmask' like a normal struct cpumask * ...
@@ -628,12 +628,12 @@ static inline size_t cpumask_size(void)
  *	free_cpumask_var(tmpmask);
  *
  *
- * However, one notable exception is there. alloc_cpumask_var() allocates
+ * However, one notable exception is there. zalloc_cpumask_var() allocates
  * only nr_cpumask_bits bits (in the other hand, real cpumask_t always has
  * NR_CPUS bits). Therefore you don't have to dereference cpumask_var_t.
  *
  *	cpumask_var_t tmpmask;
- *	if (!alloc_cpumask_var(&tmpmask, GFP_KERNEL))
+ *	if (!zalloc_cpumask_var(&tmpmask, GFP_KERNEL))
  *		return -ENOMEM;
  *
  *	var = *tmpmask;

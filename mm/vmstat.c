@@ -1478,7 +1478,7 @@ static void __init start_shepherd_timer(void)
 		INIT_DELAYED_WORK(per_cpu_ptr(&vmstat_work, cpu),
 			vmstat_update);
 
-	if (!alloc_cpumask_var(&cpu_stat_off, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&cpu_stat_off, GFP_KERNEL))
 		BUG();
 	cpumask_copy(cpu_stat_off, cpu_online_mask);
 

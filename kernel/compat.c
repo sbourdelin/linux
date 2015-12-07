@@ -620,7 +620,7 @@ COMPAT_SYSCALL_DEFINE3(sched_setaffinity, compat_pid_t, pid,
 	cpumask_var_t new_mask;
 	int retval;
 
-	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&new_mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	retval = compat_get_user_cpu_mask(user_mask_ptr, len, new_mask);
@@ -644,7 +644,7 @@ COMPAT_SYSCALL_DEFINE3(sched_getaffinity, compat_pid_t,  pid, unsigned int, len,
 	if (len & (sizeof(compat_ulong_t)-1))
 		return -EINVAL;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	ret = sched_getaffinity(pid, mask);

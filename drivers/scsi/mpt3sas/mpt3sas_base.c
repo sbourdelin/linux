@@ -1829,7 +1829,7 @@ _base_request_irq(struct MPT3SAS_ADAPTER *ioc, u8 index, u32 vector)
 	reply_q->msix_index = index;
 	reply_q->vector = vector;
 
-	if (!alloc_cpumask_var(&reply_q->affinity_hint, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&reply_q->affinity_hint, GFP_KERNEL))
 		return -ENOMEM;
 	cpumask_clear(reply_q->affinity_hint);
 

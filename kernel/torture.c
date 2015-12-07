@@ -369,7 +369,7 @@ int torture_shuffle_init(long shuffint)
 
 	shuffle_idle_cpu = -1;
 
-	if (!alloc_cpumask_var(&shuffle_tmp_mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&shuffle_tmp_mask, GFP_KERNEL)) {
 		VERBOSE_TOROUT_ERRSTRING("Failed to alloc mask");
 		return -ENOMEM;
 	}

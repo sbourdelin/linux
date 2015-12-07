@@ -37,7 +37,7 @@ int blk_mq_update_queue_map(unsigned int *map, unsigned int nr_queues,
 	unsigned int i, nr_cpus, nr_uniq_cpus, queue, first_sibling;
 	cpumask_var_t cpus;
 
-	if (!alloc_cpumask_var(&cpus, GFP_ATOMIC))
+	if (!zalloc_cpumask_var(&cpus, GFP_ATOMIC))
 		return 1;
 
 	cpumask_clear(cpus);

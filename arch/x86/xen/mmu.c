@@ -1030,7 +1030,7 @@ static void xen_drop_mm_ref(struct mm_struct *mm)
 	}
 
 	/* Get the "official" set of cpus referring to our pagetable. */
-	if (!alloc_cpumask_var(&mask, GFP_ATOMIC)) {
+	if (!zalloc_cpumask_var(&mask, GFP_ATOMIC)) {
 		for_each_online_cpu(cpu) {
 			if (!cpumask_test_cpu(cpu, mm_cpumask(mm))
 			    && per_cpu(xen_current_cr3, cpu) != __pa(mm->pgd))

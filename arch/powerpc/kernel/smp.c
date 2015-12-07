@@ -767,7 +767,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	 * init thread may have been "borrowed" by another CPU in the meantime
 	 * se we pin us down to CPU 0 for a short while
 	 */
-	alloc_cpumask_var(&old_mask, GFP_NOWAIT);
+	zalloc_cpumask_var(&old_mask, GFP_NOWAIT);
 	cpumask_copy(old_mask, tsk_cpus_allowed(current));
 	set_cpus_allowed_ptr(current, cpumask_of(boot_cpuid));
 	

@@ -371,7 +371,7 @@ static int pcrypt_cpumask_change_notify(struct notifier_block *self,
 	new_mask = kmalloc(sizeof(*new_mask), GFP_KERNEL);
 	if (!new_mask)
 		return -ENOMEM;
-	if (!alloc_cpumask_var(&new_mask->mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&new_mask->mask, GFP_KERNEL)) {
 		kfree(new_mask);
 		return -ENOMEM;
 	}
@@ -419,7 +419,7 @@ static int pcrypt_init_padata(struct padata_pcrypt *pcrypt,
 	mask = kmalloc(sizeof(*mask), GFP_KERNEL);
 	if (!mask)
 		goto err_free_padata;
-	if (!alloc_cpumask_var(&mask->mask, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&mask->mask, GFP_KERNEL)) {
 		kfree(mask);
 		goto err_free_padata;
 	}

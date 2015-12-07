@@ -468,7 +468,7 @@ static int cmd_attr_register_cpumask(struct genl_info *info)
 	cpumask_var_t mask;
 	int rc;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 	rc = parse(info->attrs[TASKSTATS_CMD_ATTR_REGISTER_CPUMASK], mask);
 	if (rc < 0)
@@ -484,7 +484,7 @@ static int cmd_attr_deregister_cpumask(struct genl_info *info)
 	cpumask_var_t mask;
 	int rc;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 	rc = parse(info->attrs[TASKSTATS_CMD_ATTR_DEREGISTER_CPUMASK], mask);
 	if (rc < 0)

@@ -137,7 +137,7 @@ void native_send_call_func_ipi(const struct cpumask *mask)
 {
 	cpumask_var_t allbutself;
 
-	if (!alloc_cpumask_var(&allbutself, GFP_ATOMIC)) {
+	if (!zalloc_cpumask_var(&allbutself, GFP_ATOMIC)) {
 		apic->send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
 		return;
 	}

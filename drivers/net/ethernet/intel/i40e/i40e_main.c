@@ -2705,7 +2705,7 @@ static void i40e_config_xps_tx_ring(struct i40e_ring *ring)
 			netif_set_xps_queue(ring->netdev,
 					    &ring->q_vector->affinity_mask,
 					    ring->queue_index);
-	} else if (alloc_cpumask_var(&mask, GFP_KERNEL)) {
+	} else if (zalloc_cpumask_var(&mask, GFP_KERNEL)) {
 		/* Disable XPS to allow selection based on TC */
 		bitmap_zero(cpumask_bits(mask), nr_cpumask_bits);
 		netif_set_xps_queue(ring->netdev, mask, ring->queue_index);

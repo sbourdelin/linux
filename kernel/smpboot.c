@@ -285,7 +285,7 @@ int smpboot_register_percpu_thread_cpumask(struct smp_hotplug_thread *plug_threa
 	unsigned int cpu;
 	int ret = 0;
 
-	if (!alloc_cpumask_var(&plug_thread->cpumask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&plug_thread->cpumask, GFP_KERNEL))
 		return -ENOMEM;
 	cpumask_copy(plug_thread->cpumask, cpumask);
 
@@ -343,7 +343,7 @@ int smpboot_update_cpumask_percpu_thread(struct smp_hotplug_thread *plug_thread,
 	cpumask_var_t tmp;
 	unsigned int cpu;
 
-	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&tmp, GFP_KERNEL))
 		return -ENOMEM;
 
 	get_online_cpus();

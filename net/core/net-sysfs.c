@@ -693,7 +693,7 @@ static ssize_t store_rps_map(struct netdev_rx_queue *queue,
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	err = bitmap_parse(buf, len, cpumask_bits(mask), nr_cpumask_bits);
@@ -1217,7 +1217,7 @@ static ssize_t store_xps_map(struct netdev_queue *queue,
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	index = get_netdev_queue_index(queue);

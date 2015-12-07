@@ -417,7 +417,7 @@ static int subcore_init(void)
 	if (setup_max_cpus % threads_per_core)
 		return 0;
 
-	BUG_ON(!alloc_cpumask_var(&cpu_offline_mask, GFP_KERNEL));
+	BUG_ON(!zalloc_cpumask_var(&cpu_offline_mask, GFP_KERNEL));
 
 	set_subcores_per_core(1);
 

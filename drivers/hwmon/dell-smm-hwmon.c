@@ -137,7 +137,7 @@ static int i8k_smm(struct smm_regs *regs)
 	cpumask_var_t old_mask;
 
 	/* SMM requires CPU 0 */
-	if (!alloc_cpumask_var(&old_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&old_mask, GFP_KERNEL))
 		return -ENOMEM;
 	cpumask_copy(old_mask, &current->cpus_allowed);
 	rc = set_cpus_allowed_ptr(current, cpumask_of(0));

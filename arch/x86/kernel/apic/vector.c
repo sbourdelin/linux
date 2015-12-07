@@ -403,7 +403,7 @@ int __init arch_early_irq_init(void)
 	arch_init_msi_domain(x86_vector_domain);
 	arch_init_htirq_domain(x86_vector_domain);
 
-	BUG_ON(!alloc_cpumask_var(&vector_cpumask, GFP_KERNEL));
+	BUG_ON(!zalloc_cpumask_var(&vector_cpumask, GFP_KERNEL));
 
 	return arch_early_ioapic_init();
 }
@@ -513,7 +513,7 @@ static void __send_cleanup_vector(struct apic_chip_data *data)
 {
 	cpumask_var_t cleanup_mask;
 
-	if (unlikely(!alloc_cpumask_var(&cleanup_mask, GFP_ATOMIC))) {
+	if (unlikely(!zalloc_cpumask_var(&cleanup_mask, GFP_ATOMIC))) {
 		unsigned int i;
 
 		for_each_cpu_and(i, data->old_domain, cpu_online_mask)

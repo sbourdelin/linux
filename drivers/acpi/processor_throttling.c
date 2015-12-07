@@ -903,7 +903,7 @@ static int acpi_processor_get_throttling(struct acpi_processor *pr)
 	if (!pr->flags.throttling)
 		return -ENODEV;
 
-	if (!alloc_cpumask_var(&saved_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&saved_mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	/*

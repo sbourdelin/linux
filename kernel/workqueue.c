@@ -3007,7 +3007,7 @@ struct workqueue_attrs *alloc_workqueue_attrs(gfp_t gfp_mask)
 	attrs = kzalloc(sizeof(*attrs), gfp_mask);
 	if (!attrs)
 		goto fail;
-	if (!alloc_cpumask_var(&attrs->cpumask, gfp_mask))
+	if (!zalloc_cpumask_var(&attrs->cpumask, gfp_mask))
 		goto fail;
 
 	cpumask_copy(attrs->cpumask, cpu_possible_mask);
@@ -5216,7 +5216,7 @@ static int __init init_workqueues(void)
 
 	WARN_ON(__alignof__(struct pool_workqueue) < __alignof__(long long));
 
-	BUG_ON(!alloc_cpumask_var(&wq_unbound_cpumask, GFP_KERNEL));
+	BUG_ON(!zalloc_cpumask_var(&wq_unbound_cpumask, GFP_KERNEL));
 	cpumask_copy(wq_unbound_cpumask, cpu_possible_mask);
 
 	pwq_cache = KMEM_CACHE(pool_workqueue, SLAB_PANIC);

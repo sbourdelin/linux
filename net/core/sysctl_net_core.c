@@ -106,7 +106,7 @@ static int flow_limit_cpu_sysctl(struct ctl_table *table, int write,
 	cpumask_var_t mask;
 	int i, len, ret = 0;
 
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	if (write) {

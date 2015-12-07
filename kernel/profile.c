@@ -106,7 +106,7 @@ int __ref profile_init(void)
 	prof_len = (_etext - _stext) >> prof_shift;
 	buffer_bytes = prof_len*sizeof(atomic_t);
 
-	if (!alloc_cpumask_var(&prof_cpu_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&prof_cpu_mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	cpumask_copy(prof_cpu_mask, cpu_possible_mask);
@@ -437,7 +437,7 @@ static ssize_t prof_cpu_mask_proc_write(struct file *file,
 	cpumask_var_t new_value;
 	int err;
 
-	if (!alloc_cpumask_var(&new_value, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&new_value, GFP_KERNEL))
 		return -ENOMEM;
 
 	err = cpumask_parse_user(buffer, count, new_value);

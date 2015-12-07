@@ -386,7 +386,7 @@ static void enter_uniprocessor(void)
 	int err;
 
 	if (downed_cpus == NULL &&
-	    !alloc_cpumask_var(&downed_cpus, GFP_KERNEL)) {
+	    !zalloc_cpumask_var(&downed_cpus, GFP_KERNEL)) {
 		pr_notice("Failed to allocate mask\n");
 		goto out;
 	}

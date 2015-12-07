@@ -405,7 +405,7 @@ static int xgene_msi_hwirq_alloc(unsigned int cpu)
 		 * With 8-core X-Gene v1, 2 MSI GIC IRQs are allocated
 		 * to each core.
 		 */
-		if (alloc_cpumask_var(&mask, GFP_KERNEL)) {
+		if (zalloc_cpumask_var(&mask, GFP_KERNEL)) {
 			cpumask_clear(mask);
 			cpumask_set_cpu(cpu, mask);
 			err = irq_set_affinity(msi_group->gic_irq, mask);

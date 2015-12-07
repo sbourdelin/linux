@@ -239,7 +239,7 @@ static ssize_t mce_write(struct file *filp, const char __user *ubuf,
 
 static int inject_init(void)
 {
-	if (!alloc_cpumask_var(&mce_inject_cpumask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mce_inject_cpumask, GFP_KERNEL))
 		return -ENOMEM;
 	printk(KERN_INFO "Machine check injector initialized\n");
 	register_mce_write_callback(mce_write);

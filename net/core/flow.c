@@ -344,7 +344,7 @@ void flow_cache_flush(struct net *net)
 	int i, self;
 
 	/* Track which cpus need flushing to avoid disturbing all cores. */
-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
 		return;
 	cpumask_clear(mask);
 

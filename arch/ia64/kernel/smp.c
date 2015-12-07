@@ -301,7 +301,7 @@ smp_flush_tlb_mm (struct mm_struct *mm)
 		preempt_enable();
 		return;
 	}
-	if (!alloc_cpumask_var(&cpus, GFP_ATOMIC)) {
+	if (!zalloc_cpumask_var(&cpus, GFP_ATOMIC)) {
 		smp_call_function((void (*)(void *))local_finish_flush_tlb_mm,
 			mm, 1);
 	} else {

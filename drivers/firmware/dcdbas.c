@@ -255,7 +255,7 @@ int dcdbas_smi_request(struct smi_cmd *smi_cmd)
 	}
 
 	/* SMI requires CPU 0 */
-	if (!alloc_cpumask_var(&old_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&old_mask, GFP_KERNEL))
 		return -ENOMEM;
 
 	cpumask_copy(old_mask, &current->cpus_allowed);

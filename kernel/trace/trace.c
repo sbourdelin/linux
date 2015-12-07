@@ -3421,7 +3421,7 @@ tracing_cpumask_write(struct file *filp, const char __user *ubuf,
 	cpumask_var_t tracing_cpumask_new;
 	int err, cpu;
 
-	if (!alloc_cpumask_var(&tracing_cpumask_new, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&tracing_cpumask_new, GFP_KERNEL))
 		return -ENOMEM;
 
 	err = cpumask_parse_user(ubuf, count, tracing_cpumask_new);
@@ -4591,7 +4591,7 @@ static int tracing_open_pipe(struct inode *inode, struct file *filp)
 	trace_seq_init(&iter->seq);
 	iter->trace = tr->current_trace;
 
-	if (!alloc_cpumask_var(&iter->started, GFP_KERNEL)) {
+	if (!zalloc_cpumask_var(&iter->started, GFP_KERNEL)) {
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -6641,7 +6641,7 @@ static int instance_mkdir(const char *name)
 	if (!tr->name)
 		goto out_free_tr;
 
-	if (!alloc_cpumask_var(&tr->tracing_cpumask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&tr->tracing_cpumask, GFP_KERNEL))
 		goto out_free_tr;
 
 	tr->trace_flags = global_trace.trace_flags;
@@ -7205,10 +7205,10 @@ __init static int tracer_alloc_buffers(void)
 	 */
 	BUILD_BUG_ON(TRACE_ITER_LAST_BIT > TRACE_FLAGS_MAX_SIZE);
 
-	if (!alloc_cpumask_var(&tracing_buffer_mask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&tracing_buffer_mask, GFP_KERNEL))
 		goto out;
 
-	if (!alloc_cpumask_var(&global_trace.tracing_cpumask, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&global_trace.tracing_cpumask, GFP_KERNEL))
 		goto out_free_buffer_mask;
 
 	/* Only allocate trace_printk buffers if a trace_printk exists */

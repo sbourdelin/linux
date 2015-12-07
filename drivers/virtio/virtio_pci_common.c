@@ -161,7 +161,7 @@ static int vp_request_msix_vectors(struct virtio_device *vdev, int nvectors,
 	if (!vp_dev->msix_affinity_masks)
 		goto error;
 	for (i = 0; i < nvectors; ++i)
-		if (!alloc_cpumask_var(&vp_dev->msix_affinity_masks[i],
+		if (!zalloc_cpumask_var(&vp_dev->msix_affinity_masks[i],
 					GFP_KERNEL))
 			goto error;
 

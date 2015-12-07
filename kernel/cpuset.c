@@ -403,9 +403,9 @@ static struct cpuset *alloc_trial_cpuset(struct cpuset *cs)
 	if (!trial)
 		return NULL;
 
-	if (!alloc_cpumask_var(&trial->cpus_allowed, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&trial->cpus_allowed, GFP_KERNEL))
 		goto free_cs;
-	if (!alloc_cpumask_var(&trial->effective_cpus, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&trial->effective_cpus, GFP_KERNEL))
 		goto free_cpus;
 
 	cpumask_copy(trial->cpus_allowed, cs->cpus_allowed);
@@ -633,7 +633,7 @@ static int generate_sched_domains(cpumask_var_t **domains,
 	dattr = NULL;
 	csa = NULL;
 
-	if (!alloc_cpumask_var(&non_isolated_cpus, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&non_isolated_cpus, GFP_KERNEL))
 		goto done;
 	cpumask_andnot(non_isolated_cpus, cpu_possible_mask, cpu_isolated_map);
 
@@ -1909,9 +1909,9 @@ cpuset_css_alloc(struct cgroup_subsys_state *parent_css)
 	cs = kzalloc(sizeof(*cs), GFP_KERNEL);
 	if (!cs)
 		return ERR_PTR(-ENOMEM);
-	if (!alloc_cpumask_var(&cs->cpus_allowed, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&cs->cpus_allowed, GFP_KERNEL))
 		goto free_cs;
-	if (!alloc_cpumask_var(&cs->effective_cpus, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&cs->effective_cpus, GFP_KERNEL))
 		goto free_cpus;
 
 	set_bit(CS_SCHED_LOAD_BALANCE, &cs->flags);
@@ -2065,9 +2065,9 @@ int __init cpuset_init(void)
 {
 	int err = 0;
 
-	if (!alloc_cpumask_var(&top_cpuset.cpus_allowed, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&top_cpuset.cpus_allowed, GFP_KERNEL))
 		BUG();
-	if (!alloc_cpumask_var(&top_cpuset.effective_cpus, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&top_cpuset.effective_cpus, GFP_KERNEL))
 		BUG();
 
 	cpumask_setall(top_cpuset.cpus_allowed);
@@ -2083,7 +2083,7 @@ int __init cpuset_init(void)
 	if (err < 0)
 		return err;
 
-	if (!alloc_cpumask_var(&cpus_attach, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&cpus_attach, GFP_KERNEL))
 		BUG();
 
 	return 0;

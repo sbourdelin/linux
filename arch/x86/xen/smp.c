@@ -362,7 +362,7 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
 	if (xen_smp_intr_init(0))
 		BUG();
 
-	if (!alloc_cpumask_var(&xen_cpu_initialized_map, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&xen_cpu_initialized_map, GFP_KERNEL))
 		panic("could not allocate xen_cpu_initialized_map\n");
 
 	cpumask_copy(xen_cpu_initialized_map, cpumask_of(0));
