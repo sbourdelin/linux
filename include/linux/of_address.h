@@ -112,8 +112,6 @@ static inline bool of_dma_is_coherent(struct device_node *np)
 extern int of_address_to_resource(struct device_node *dev, int index,
 				  struct resource *r);
 void __iomem *of_iomap(struct device_node *node, int index);
-void __iomem *of_io_request_and_map(struct device_node *device,
-					int index, const char *name);
 #else
 
 #include <linux/io.h>
@@ -128,13 +126,20 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
 {
 	return NULL;
 }
+#endif
+
+#ifdef CONFIG_OF_ADDRESS
+void __iomem *of_io_request_and_map(struct device_node *device,
+				    int index, const char *name);
+#else
+#include <linux/io.h>
 
 static inline void __iomem *of_io_request_and_map(struct device_node *device,
-					int index, const char *name)
+						  int index, const char *name)
 {
 	return IOMEM_ERR_PTR(-EINVAL);
 }
-#endif
+#endif /* CONFIG_OF_ADDRESS */
 
 #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
 extern const __be32 *of_get_pci_address(struct device_node *dev, int bar_no,
