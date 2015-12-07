@@ -122,14 +122,15 @@ static struct nlm_lockowner *nlm_find_lockowner(struct nlm_host *host, fl_owner_
 /*
  * Initialize arguments for TEST/LOCK/UNLOCK/CANCEL calls
  */
-static void nlmclnt_setlockargs(struct nlm_rqst *req, struct file_lock *fl)
+static void nlmclnt_setlockargs(struct nlm_rqst *req, struct file_lock *fl,
+		struct inode *inode)
 {
 	struct nlm_args	*argp = &req->a_args;
 	struct nlm_lock	*lock = &argp->lock;
 	char *nodename = req->a_host->h_rpcclnt->cl_nodename;
 
 	nlmclnt_next_cookie(&argp->cookie);
-	memcpy(&lock->fh, NFS_FH(file_inode(fl->fl_file)), sizeof(struct nfs_fh));
+	memcpy(&lock->fh, NFS_FH(inode), sizeof(struct nfs_fh));
 	lock->caller  = nodename;
 	lock->oh.data = req->a_owner;
 	lock->oh.len  = snprintf(req->a_owner, sizeof(req->a_owner), "%u@%s",
@@ -171,7 +172,7 @@ int nlmclnt_proc(struct nfs_open_context *ctx, int cmd, struct file_lock *fl)
 		return -ENOMEM;
 	}
 	/* Set up the argument struct */
-	nlmclnt_setlockargs(call, fl);
+	nlmclnt_setlockargs(call, fl, inode);
 
 	if (IS_SETLK(cmd) || IS_SETLKW(cmd)) {
 		if (fl->fl_type != F_UNLCK) {
@@ -619,7 +620,7 @@ nlmclnt_reclaim(struct nlm_host *host, struct file_lock *fl,
 	req->a_host  = host;
 
 	/* Set up the argument struct */
-	nlmclnt_setlockargs(req, fl);
+	nlmclnt_setlockargs(req, fl, file_inode(fl->fl_file));
 	req->a_args.reclaim = 1;
 
 	status = nlmclnt_call(nfs_file_cred(fl->fl_file), req, NLMPROC_LOCK);
@@ -746,7 +747,7 @@ static int nlmclnt_cancel(struct nlm_host *host, int block, struct file_lock *fl
 		return -ENOMEM;
 	req->a_flags = RPC_TASK_ASYNC;
 
-	nlmclnt_setlockargs(req, fl);
+	nlmclnt_setlockargs(req, fl, file_inode(fl->fl_file));
 	req->a_args.block = block;
 
 	atomic_inc(&req->a_count);
