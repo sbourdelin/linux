@@ -1583,7 +1583,9 @@ static int f2fs_ioc_get_encryption_pwsalt(struct file *filp, unsigned long arg)
 		return err;
 
 	/* update superblock with uuid */
+	lock_buffer(sbi->raw_super_buf);
 	generate_random_uuid(sbi->raw_super->encrypt_pw_salt);
+	unlock_buffer(sbi->raw_super_buf);
 
 	err = f2fs_commit_super(sbi, false);
 
