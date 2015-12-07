@@ -80,24 +80,19 @@ bool zalloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node)
 EXPORT_SYMBOL(zalloc_cpumask_var_node);
 
 /**
- * alloc_cpumask_var - allocate a struct cpumask
+ * zalloc_cpumask_var - allocate a struct cpumask
  * @mask: pointer to cpumask_var_t where the cpumask is returned
  * @flags: GFP_ flags
  *
  * Only defined when CONFIG_CPUMASK_OFFSTACK=y, otherwise is
  * a nop returning a constant 1 (in <linux/cpumask.h>).
+ * The cpumask is initialized to all zeroes.
  *
- * See alloc_cpumask_var_node.
+ * See alloc_cpumask_var_node().
  */
-bool alloc_cpumask_var(cpumask_var_t *mask, gfp_t flags)
-{
-	return alloc_cpumask_var_node(mask, flags, NUMA_NO_NODE);
-}
-EXPORT_SYMBOL(alloc_cpumask_var);
-
 bool zalloc_cpumask_var(cpumask_var_t *mask, gfp_t flags)
 {
-	return alloc_cpumask_var(mask, flags | __GFP_ZERO);
+	return alloc_cpumask_var_node(mask, flags | __GFP_ZERO, NUMA_NO_NODE);
 }
 EXPORT_SYMBOL(zalloc_cpumask_var);
 
