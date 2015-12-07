@@ -306,7 +306,9 @@ file.
 Note, however, that some subsystem maintainers want to come to their own
 conclusions on which patches should go to the stable trees.  The networking
 maintainer, in particular, would rather not see individual developers
-adding lines like the above to their patches.
+adding lines like the above to their patches. Note: Patches for the wireless
+section of networking should include a recommendation for inclusion in stable
+whenever appropriate.
 
 If changes affect userland-kernel interfaces, please send the MAN-PAGES
 maintainer (as listed in the MAINTAINERS file) a man-pages patch, or at
