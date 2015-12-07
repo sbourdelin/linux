@@ -146,13 +146,34 @@
  * NAND ECC Layout for small page NAND devices
  * Note: For large and huge page devices, the default layouts are used
  */
-static struct nand_ecclayout lpc32xx_nand_oob_16 = {
-	.eccbytes = 6,
-	.eccpos = {10, 11, 12, 13, 14, 15},
-	.oobfree = {
-		{ .offset = 0, .length = 4 },
-		{ .offset = 6, .length = 4 },
-	},
+static int lpc32xx_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	if (eccbyte > 5)
+		return -ERANGE;
+
+	return eccbyte + 10;
+}
+
+static int lpc32xx_oobfree(struct mtd_info *mtd, int section,
+			   struct nand_oobfree *oobfree)
+{
+	if (section > 1)
+		return -ERANGE;
+
+	if (!section) {
+		oobfree->offset = 0;
+		oobfree->length = 4;
+	} else {
+		oobfree->offset = 6;
+		oobfree->length = 4;
+	}
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops lpc32xx_ooblayout_ops = {
+	.eccpos = lpc32xx_eccpos,
+	.oobfree = lpc32xx_oobfree,
 };
 
 static u8 bbt_pattern[] = {'B', 'b', 't', '0' };
@@ -877,7 +898,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
 	 * custom BBT marker layout.
 	 */
 	if (mtd->writesize <= 512)
-		chip->ecc.layout = &lpc32xx_nand_oob_16;
+		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
 
 	/* These sizes remain the same regardless of page size */
 	chip->ecc.size = 256;

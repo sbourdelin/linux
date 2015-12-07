@@ -211,12 +211,9 @@ struct sunxi_nand_chip_sel {
  * sunxi HW ECC infos: stores information related to HW ECC support
  *
  * @mode:	the sunxi ECC mode field deduced from ECC requirements
- * @layout:	the OOB layout depending on the ECC requirements and the
- *		selected ECC mode
  */
 struct sunxi_nand_hw_ecc {
 	int mode;
-	struct nand_ecclayout layout;
 };
 
 /*
@@ -1026,6 +1023,55 @@ static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
 	return sunxi_nand_chip_set_timings(chip, timings);
 }
 
+static int sunxi_nand_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct nand_chip *nand = mtd->priv;
+	struct nand_ecc_ctrl *ecc = &nand->ecc;
+	int eccbytes = ecc->bytes * ecc->steps;
+
+	if (eccbyte >= eccbytes)
+		return -ERANGE;
+
+	return ((eccbyte / ecc->bytes) * (ecc->bytes + 4)) +
+	       (eccbyte % ecc->bytes);
+}
+
+static int sunxi_nand_oobfree(struct mtd_info *mtd, int section,
+			      struct nand_oobfree *oobfree)
+{
+	struct nand_chip *nand = mtd->priv;
+	struct nand_ecc_ctrl *ecc = &nand->ecc;
+
+	if (section > ecc->steps)
+		return -ERANGE;
+
+	/*
+	 * The first 2 bytes are used for BB markers, hence we
+	 * only have 2 bytes available in the first user data
+	 * section.
+	 */
+	if (!section && ecc->mode == NAND_ECC_HW) {
+		oobfree->offset = 2;
+		oobfree->length = 2;
+
+		return 0;
+	}
+
+	oobfree->offset = section * (ecc->bytes + 4);
+
+	if (section < ecc->steps)
+		oobfree->length = 4;
+	else
+		oobfree->offset = mtd->oobsize - oobfree->offset;
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops sunxi_nand_ooblayout_ops = {
+	.eccpos = sunxi_nand_eccpos,
+	.oobfree = sunxi_nand_oobfree,
+};
+
 static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 					      struct nand_ecc_ctrl *ecc,
 					      struct device_node *np)
@@ -1035,7 +1081,6 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
 	struct sunxi_nand_hw_ecc *data;
-	struct nand_ecclayout *layout;
 	int nsectors;
 	int ret;
 	int i;
@@ -1064,7 +1109,6 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 	/* HW ECC always work with even numbers of ECC bytes */
 	ecc->bytes = ALIGN(ecc->bytes, 2);
 
-	layout = &data->layout;
 	nsectors = mtd->writesize / ecc->size;
 
 	if (mtd->oobsize < ((ecc->bytes + 4) * nsectors)) {
@@ -1072,9 +1116,7 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 		goto err;
 	}
 
-	layout->eccbytes = (ecc->bytes * nsectors);
-
-	ecc->layout = layout;
+	mtd_set_ooblayout(mtd, &sunxi_nand_ooblayout_ops);
 	ecc->priv = data;
 
 	return 0;
@@ -1094,9 +1136,6 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
 				       struct nand_ecc_ctrl *ecc,
 				       struct device_node *np)
 {
-	struct nand_ecclayout *layout;
-	int nsectors;
-	int i, j;
 	int ret;
 
 	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
@@ -1105,40 +1144,6 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
 
 	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
 	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
-	layout = ecc->layout;
-	nsectors = mtd->writesize / ecc->size;
-
-	for (i = 0; i < nsectors; i++) {
-		if (i) {
-			layout->oobfree[i].offset =
-				layout->oobfree[i - 1].offset +
-				layout->oobfree[i - 1].length +
-				ecc->bytes;
-			layout->oobfree[i].length = 4;
-		} else {
-			/*
-			 * The first 2 bytes are used for BB markers, hence we
-			 * only have 2 bytes available in the first user data
-			 * section.
-			 */
-			layout->oobfree[i].length = 2;
-			layout->oobfree[i].offset = 2;
-		}
-
-		for (j = 0; j < ecc->bytes; j++)
-			layout->eccpos[(ecc->bytes * i) + j] =
-					layout->oobfree[i].offset +
-					layout->oobfree[i].length + j;
-	}
-
-	if (mtd->oobsize > (ecc->bytes + 4) * nsectors) {
-		layout->oobfree[nsectors].offset =
-				layout->oobfree[nsectors - 1].offset +
-				layout->oobfree[nsectors - 1].length +
-				ecc->bytes;
-		layout->oobfree[nsectors].length = mtd->oobsize -
-				((ecc->bytes + 4) * nsectors);
-	}
 
 	return 0;
 }
@@ -1147,9 +1152,6 @@ static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
 						struct nand_ecc_ctrl *ecc,
 						struct device_node *np)
 {
-	struct nand_ecclayout *layout;
-	int nsectors;
-	int i;
 	int ret;
 
 	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
@@ -1159,15 +1161,6 @@ static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
 	ecc->prepad = 4;
 	ecc->read_page = sunxi_nfc_hw_syndrome_ecc_read_page;
 	ecc->write_page = sunxi_nfc_hw_syndrome_ecc_write_page;
-
-	layout = ecc->layout;
-	nsectors = mtd->writesize / ecc->size;
-
-	for (i = 0; i < (ecc->bytes * nsectors); i++)
-		layout->eccpos[i] = i;
-
-	layout->oobfree[0].length = mtd->oobsize - i;
-	layout->oobfree[0].offset = i;
 
 	return 0;
 }
@@ -1180,7 +1173,6 @@ static void sunxi_nand_ecc_cleanup(struct nand_ecc_ctrl *ecc)
 		sunxi_nand_hw_common_ecc_ctrl_cleanup(ecc);
 		break;
 	case NAND_ECC_NONE:
-		kfree(ecc->layout);
 	default:
 		break;
 	}
@@ -1214,10 +1206,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 			return ret;
 		break;
 	case NAND_ECC_NONE:
-		ecc->layout = kzalloc(sizeof(*ecc->layout), GFP_KERNEL);
-		if (!ecc->layout)
-			return -ENOMEM;
-		ecc->layout->oobfree[0].length = mtd->oobsize;
 	case NAND_ECC_SOFT:
 		break;
 	default:

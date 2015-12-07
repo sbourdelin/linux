@@ -632,8 +632,28 @@ static void hisi_nfc_host_init(struct hinfc_host *host)
 	hinfc_write(host, HINFC504_INTEN_DMA, HINFC504_INTEN);
 }
 
-static struct nand_ecclayout nand_ecc_2K_16bits = {
-	.oobfree = { {2, 6} },
+static int hisi_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	/* FIXME: add real eccpos definition. */
+	return 0;
+}
+
+static int hisi_oobfree(struct mtd_info *mtd, int section,
+			struct nand_oobfree *oobfree)
+{
+	/* FIXME: add full oobfree definition. */
+	if (section)
+		return -ERANGE;
+
+	oobfree->offset = 2;
+	oobfree->length = 6;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops hisi_ooblayout_ops = {
+	.eccpos = hisi_eccpos,
+	.oobfree = hisi_oobfree,
 };
 
 static int hisi_nfc_ecc_probe(struct hinfc_host *host)
@@ -669,7 +689,7 @@ static int hisi_nfc_ecc_probe(struct hinfc_host *host)
 	case 16:
 		ecc_bits = 6;
 		if (mtd->writesize == 2048)
-			chip->ecc.layout = &nand_ecc_2K_16bits;
+			mtd_set_ooblayout(mtd, &hisi_ooblayout_ops);
 
 		/* TODO: add more page size support */
 		break;

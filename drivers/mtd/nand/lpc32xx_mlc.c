@@ -139,22 +139,36 @@ struct lpc32xx_nand_cfg_mlc {
 	unsigned num_parts;
 };
 
-static struct nand_ecclayout lpc32xx_nand_oob = {
-	.eccbytes = 40,
-	.eccpos = { 6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
-		   22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-		   38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-		   54, 55, 56, 57, 58, 59, 60, 61, 62, 63 },
-	.oobfree = {
-		{ .offset = 0,
-		  .length = 6, },
-		{ .offset = 16,
-		  .length = 6, },
-		{ .offset = 32,
-		  .length = 6, },
-		{ .offset = 48,
-		  .length = 6, },
-		},
+static int lpc32xx_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct nand_chip *nand_chip = mtd->priv;
+	int eccbytes = nand_chip->ecc.steps * nand_chip->ecc.bytes;
+	int off = 16 - nand_chip->ecc.bytes;
+
+	if (eccbyte >= eccbytes)
+		return -ERANGE;
+
+	return ((eccbyte / nand_chip->ecc.bytes) * 16) + off +
+	       (eccbyte % nand_chip->ecc.bytes);
+}
+
+static int lpc32xx_oobfree(struct mtd_info *mtd, int section,
+			   struct nand_oobfree *oobfree)
+{
+	struct nand_chip *nand_chip = mtd->priv;
+
+	if (section >= nand_chip->ecc.steps)
+		return -ERANGE;
+
+	oobfree->offset = 16 * section;
+	oobfree->length = 16 - nand_chip->ecc.bytes;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops lpc32xx_ooblayout_ops = {
+	.eccpos = lpc32xx_eccpos,
+	.oobfree = lpc32xx_oobfree,
 };
 
 static struct nand_bbt_descr lpc32xx_nand_bbt = {
@@ -714,6 +728,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
 	nand_chip->ecc.write_oob = lpc32xx_write_oob;
 	nand_chip->ecc.read_oob = lpc32xx_read_oob;
 	nand_chip->ecc.strength = 4;
+	nand_chip->ecc.bytes = 10;
 	nand_chip->waitfunc = lpc32xx_waitfunc;
 
 	nand_chip->options = NAND_NO_SUBPAGE_WRITE;
@@ -752,7 +767,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
 
 	nand_chip->ecc.mode = NAND_ECC_HW;
 	nand_chip->ecc.size = 512;
-	nand_chip->ecc.layout = &lpc32xx_nand_oob;
+	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
 	host->mlcsubpages = mtd->writesize / 512;
 
 	/* initially clear interrupt status */

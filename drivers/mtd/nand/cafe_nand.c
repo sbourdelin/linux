@@ -459,10 +459,35 @@ static int cafe_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	return max_bitflips;
 }
 
-static struct nand_ecclayout cafe_oobinfo_2048 = {
-	.eccbytes = 14,
-	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
-	.oobfree = {{14, 50}}
+static int cafe_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct nand_chip *chip = mtd->priv;
+	int eccbytes = chip->ecc.steps * chip->ecc.bytes;
+
+	if (eccbyte >= eccbytes)
+		return -ERANGE;
+
+	return eccbyte;
+}
+
+static int cafe_oobfree(struct mtd_info *mtd, int section,
+			struct nand_oobfree *oobfree)
+{
+	struct nand_chip *chip = mtd->priv;
+	int eccbytes = chip->ecc.steps * chip->ecc.bytes;
+
+	if (section)
+		return -ERANGE;
+
+	oobfree->offset = eccbytes;
+	oobfree->length = mtd->oobsize - eccbytes;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops cafe_ooblayout_ops = {
+	.eccpos = cafe_eccpos,
+	.oobfree = cafe_oobfree,
 };
 
 /* Ick. The BBT code really ought to be able to work this bit out
@@ -492,12 +517,6 @@ static struct nand_bbt_descr cafe_bbt_mirror_descr_2048 = {
 	.veroffs = 18,
 	.maxblocks = 4,
 	.pattern = cafe_mirror_pattern_2048
-};
-
-static struct nand_ecclayout cafe_oobinfo_512 = {
-	.eccbytes = 14,
-	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
-	.oobfree = {{14, 2}}
 };
 
 static struct nand_bbt_descr cafe_bbt_main_descr_512 = {
@@ -744,12 +763,11 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 		cafe->ctl2 |= 1<<29; /* 2KiB page size */
 
 	/* Set up ECC according to the type of chip we found */
+	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
 	if (mtd->writesize == 2048) {
-		cafe->nand.ecc.layout = &cafe_oobinfo_2048;
 		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
 	} else if (mtd->writesize == 512) {
-		cafe->nand.ecc.layout = &cafe_oobinfo_512;
 		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
 	} else {

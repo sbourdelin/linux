@@ -993,10 +993,34 @@ static int doc200x_correct_data(struct mtd_info *mtd, u_char *dat,
  * safer.  The only problem with it is that any code that parses oobfree must
  * be able to handle out-of-order segments.
  */
-static struct nand_ecclayout doc200x_oobinfo = {
-	.eccbytes = 6,
-	.eccpos = {0, 1, 2, 3, 4, 5},
-	.oobfree = {{8, 8}, {6, 2}}
+static int doc200x_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	if (eccbyte > 5)
+		return -ERANGE;
+
+	return eccbyte;
+}
+
+static int doc200x_oobfree(struct mtd_info *mtd, int section,
+			   struct nand_oobfree *oobfree)
+{
+	if (section > 1)
+		return -ERANGE;
+
+	if (!section) {
+		oobfree->offset = 8;
+		oobfree->length = 8;
+	} else {
+		oobfree->offset = 6;
+		oobfree->length = 2;
+	}
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops doc200x_ooblayout_ops = {
+	.eccpos = doc200x_eccpos,
+	.oobfree = doc200x_oobfree,
 };
 
 /* Find the (I)NFTL Media Header, and optionally also the mirror media header.
@@ -1571,6 +1595,7 @@ static int __init doc_probe(unsigned long physadr)
 
 	mtd->priv		= nand;
 	mtd->owner		= THIS_MODULE;
+	mtd_set_ooblayout(mtd, &doc200x_ooblayout_ops);
 
 	nand->priv		= doc;
 	nand->select_chip	= doc200x_select_chip;
@@ -1582,7 +1607,6 @@ static int __init doc_probe(unsigned long physadr)
 	nand->ecc.calculate	= doc200x_calculate_ecc;
 	nand->ecc.correct	= doc200x_correct_data;
 
-	nand->ecc.layout	= &doc200x_oobinfo;
 	nand->ecc.mode		= NAND_ECC_HW_SYNDROME;
 	nand->ecc.size		= 512;
 	nand->ecc.bytes		= 6;

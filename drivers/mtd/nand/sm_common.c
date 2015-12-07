@@ -12,14 +12,46 @@
 #include <linux/sizes.h>
 #include "sm_common.h"
 
-static struct nand_ecclayout nand_oob_sm = {
-	.eccbytes = 6,
-	.eccpos = {8, 9, 10, 13, 14, 15},
-	.oobfree = {
-		{.offset = 0 , .length = 4}, /* reserved */
-		{.offset = 6 , .length = 2}, /* LBA1 */
-		{.offset = 11, .length = 2}  /* LBA2 */
+static int oob_sm_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	if (eccbyte > 5)
+		return -ERANGE;
+
+	if (eccbyte < 3)
+		return eccbyte + 8;
+
+	return eccbyte + 13;
+}
+
+static int oob_sm_oobfree(struct mtd_info *mtd, int section,
+			  struct nand_oobfree *oobfree)
+{
+	switch (section) {
+	case 0:
+		/* reserved */
+		oobfree->offset = 0;
+		oobfree->length = 4;
+		break;
+	case 1:
+		/* LBA1 */
+		oobfree->offset = 6;
+		oobfree->length = 2;
+		break;
+	case 2:
+		/* LBA2 */
+		oobfree->offset = 11;
+		oobfree->length = 2;
+		break;
+	default:
+		return -ERANGE;
 	}
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops oob_sm_ops = {
+	.eccpos = oob_sm_eccpos,
+	.oobfree = oob_sm_oobfree,
 };
 
 /* NOTE: This layout is is not compatabable with SmartMedia, */
@@ -28,15 +60,39 @@ static struct nand_ecclayout nand_oob_sm = {
 /* If you use smftl, it will bypass this and work correctly */
 /* If you not, then you break SmartMedia compliance anyway */
 
-static struct nand_ecclayout nand_oob_sm_small = {
-	.eccbytes = 3,
-	.eccpos = {0, 1, 2},
-	.oobfree = {
-		{.offset = 3 , .length = 2}, /* reserved */
-		{.offset = 6 , .length = 2}, /* LBA1 */
-	}
-};
+static int oob_sm_small_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	if (eccbyte > 2)
+		return -ERANGE;
 
+	return eccbyte;
+}
+
+static int oob_sm_small_oobfree(struct mtd_info *mtd, int section,
+				struct nand_oobfree *oobfree)
+{
+	switch (section) {
+	case 0:
+		/* reserved */
+		oobfree->offset = 3;
+		oobfree->length = 2;
+		break;
+	case 1:
+		/* LBA1 */
+		oobfree->offset = 6;
+		oobfree->length = 2;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops oob_sm_small_ops = {
+	.eccpos = oob_sm_small_eccpos,
+	.oobfree = oob_sm_small_oobfree,
+};
 
 static int sm_block_markbad(struct mtd_info *mtd, loff_t ofs)
 {
@@ -121,9 +177,9 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
 
 	/* ECC layout */
 	if (mtd->writesize == SM_SECTOR_SIZE)
-		chip->ecc.layout = &nand_oob_sm;
+		mtd_set_ooblayout(mtd, &oob_sm_ops);
 	else if (mtd->writesize == SM_SMALL_PAGE)
-		chip->ecc.layout = &nand_oob_sm_small;
+		mtd_set_ooblayout(mtd, &oob_sm_small_ops);
 	else
 		return -ENODEV;
 

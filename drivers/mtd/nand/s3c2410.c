@@ -84,11 +84,29 @@
 
 /* new oob placement block for use with hardware ecc generation
  */
+static int s3c2410_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	if (eccbyte > 2)
+		return -ERANGE;
 
-static struct nand_ecclayout nand_hw_eccoob = {
-	.eccbytes = 3,
-	.eccpos = {0, 1, 2},
-	.oobfree = {{8, 8}}
+	return eccbyte;
+}
+
+static int s3c2410_oobfree(struct mtd_info *mtd, int section,
+			   struct nand_oobfree *oobfree)
+{
+	if (section)
+		return -ERANGE;
+
+	oobfree->offset = 8;
+	oobfree->length = 8;
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops s3c2410_ooblayout_ops = {
+	.eccpos = s3c2410_eccpos,
+	.oobfree = s3c2410_oobfree,
 };
 
 /* controller and mtd information */
@@ -918,7 +936,7 @@ static void s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
 	} else {
 		chip->ecc.size	    = 512;
 		chip->ecc.bytes	    = 3;
-		chip->ecc.layout    = &nand_hw_eccoob;
+		mtd_set_ooblayout(&nmtd->mtd, &s3c2410_ooblayout_ops);
 	}
 }
 

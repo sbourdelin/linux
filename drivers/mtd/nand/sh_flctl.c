@@ -43,26 +43,66 @@
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/sh_flctl.h>
 
-static struct nand_ecclayout flctl_4secc_oob_16 = {
-	.eccbytes = 10,
-	.eccpos = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-	.oobfree = {
-		{.offset = 12,
-		. length = 4} },
+static int flctl_4secc_oob_smallpage_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+
+	if (eccbyte >= chip->ecc.bytes)
+		return -ERANGE;
+
+	return eccbyte;
+}
+
+static int flctl_4secc_oob_smallpage_oobfree(struct mtd_info *mtd, int section,
+					     struct nand_oobfree *oobfree)
+{
+	if (section)
+		return -ERANGE;
+
+	oobfree->offset = 12;
+	oobfree->length = 4;
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops flctl_4secc_oob_smallpage_ops = {
+	.eccpos = flctl_4secc_oob_smallpage_eccpos,
+	.oobfree = flctl_4secc_oob_smallpage_oobfree,
 };
 
-static struct nand_ecclayout flctl_4secc_oob_64 = {
-	.eccbytes = 4 * 10,
-	.eccpos = {
-		 6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
-		22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-		38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-		54, 55, 56, 57, 58, 59, 60, 61, 62, 63 },
-	.oobfree = {
-		{.offset =  2, .length = 4},
-		{.offset = 16, .length = 6},
-		{.offset = 32, .length = 6},
-		{.offset = 48, .length = 6} },
+static int flctl_4secc_oob_largepage_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+
+	if (eccbyte >= chip->ecc.bytes * chip->ecc.steps)
+		return -ERANGE;
+
+	return ((eccbyte / chip->ecc.bytes) * 16) + 6 +
+	       (eccbyte % chip->ecc.bytes);
+}
+
+static int flctl_4secc_oob_largepage_oobfree(struct mtd_info *mtd, int section,
+					     struct nand_oobfree *oobfree)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+
+	if (section >= chip->ecc.steps)
+		return -ERANGE;
+
+	oobfree->offset = section * 16;
+	oobfree->length = 6;
+
+	if (!section) {
+		oobfree->offset += 2;
+		oobfree->length -= 2;
+	}
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops flctl_4secc_oob_largepage_ops = {
+	.eccpos = flctl_4secc_oob_largepage_eccpos,
+	.oobfree = flctl_4secc_oob_largepage_oobfree,
 };
 
 static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
@@ -987,10 +1027,10 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
 
 	if (flctl->hwecc) {
 		if (mtd->writesize == 512) {
-			chip->ecc.layout = &flctl_4secc_oob_16;
+			mtd_set_ooblayout(mtd, &flctl_4secc_oob_smallpage_ops);
 			chip->badblock_pattern = &flctl_4secc_smallpage;
 		} else {
-			chip->ecc.layout = &flctl_4secc_oob_64;
+			mtd_set_ooblayout(mtd, &flctl_4secc_oob_largepage_ops);
 			chip->badblock_pattern = &flctl_4secc_largepage;
 		}
 

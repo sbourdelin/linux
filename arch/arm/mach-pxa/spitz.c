@@ -763,14 +763,35 @@ static struct nand_bbt_descr spitz_nand_bbt = {
 	.pattern	= scan_ff_pattern
 };
 
-static struct nand_ecclayout akita_oobinfo = {
-	.oobfree	= { {0x08, 0x09} },
-	.eccbytes	= 24,
-	.eccpos		= {
-			0x05, 0x01, 0x02, 0x03, 0x06, 0x07, 0x15, 0x11,
-			0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
-			0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37,
-	},
+static int akita_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	static int eccpos[] = {
+		0x05, 0x01, 0x02, 0x03, 0x06, 0x07, 0x15, 0x11,
+		0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
+		0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37,
+	};
+
+	if (eccbyte >= ARRAY_SIZE(eccpos))
+		return -ERANGE;
+
+	return eccpos[eccbyte];
+}
+
+static int akita_oobfree(struct mtd_info *mtd, int section,
+			 struct nand_oobfree *oobfree)
+{
+	if (section)
+		return -ERANGE;
+
+	oobfree->offset = 8;
+	oobfree->length = 9;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops akita_ooblayout_ops = {
+	.eccpos = akita_eccpos,
+	.oobfree = akita_oobfree,
 };
 
 static struct sharpsl_nand_platform_data spitz_nand_pdata = {
@@ -804,11 +825,11 @@ static void __init spitz_nand_init(void)
 	} else if (machine_is_akita()) {
 		spitz_nand_partitions[1].size = 58 * 1024 * 1024;
 		spitz_nand_bbt.len = 1;
-		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
+		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
 	} else if (machine_is_borzoi()) {
 		spitz_nand_partitions[1].size = 32 * 1024 * 1024;
 		spitz_nand_bbt.len = 1;
-		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
+		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
 	}
 
 	platform_device_register(&spitz_nand_device);
