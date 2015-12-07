@@ -187,6 +187,22 @@ Example:
 		reg = <0xb0000000 0x10000>;
 	};
 
+Hisilicon HiP05 PERISUB system controller
+
+Required properties:
+- compatible : "hisilicon,peri-c-subctrl", "syscon";
+- reg : Register address and size
+
+The HiP05 PERISUB system controller is shared by peripheral controllers in
+HiP05 Soc to implement some basic configurations. the peripheral
+controllers include mdio, ddr, iic, uart, timer and so on.
+
+Example:
+	/* for HiP05 PCIe-SAS system */
+	peri-c-subctrl: sub-ctrl-c@80000000 {
+		compatible = "hisilicon,peri-c-subctrl", "syscon";
+		reg = <0x0 0x80000000 0x0 0x10000>;
+	};
 -----------------------------------------------------------------------
 Hisilicon CPU controller
 
