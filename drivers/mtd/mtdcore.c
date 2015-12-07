@@ -833,6 +833,50 @@ void __put_mtd_device(struct mtd_info *mtd)
 }
 EXPORT_SYMBOL_GPL(__put_mtd_device);
 
+static int nand_ecclayout_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct nand_ecclayout *layout = mtd->ecclayout;
+
+	if (!layout)
+		return -ENOTSUPP;
+
+	if (eccbyte >= layout->eccbytes)
+		return -ERANGE;
+
+	return layout->eccpos[eccbyte];
+}
+
+static int nand_ecclayout_oobfree(struct mtd_info *mtd, int section,
+				  struct nand_oobfree *oobfree)
+{
+	struct nand_ecclayout *layout = mtd->ecclayout;
+
+	if (!layout)
+		return -ENOTSUPP;
+
+	if (section >= MTD_MAX_OOBFREE_ENTRIES_LARGE)
+		return -ERANGE;
+
+	*oobfree = layout->oobfree[section];
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops nand_ecclayout_ops = {
+	.eccpos = nand_ecclayout_eccpos,
+	.oobfree = nand_ecclayout_oobfree,
+};
+
+void mtd_set_ecclayout(struct mtd_info *mtd, struct nand_ecclayout *ecclayout)
+{
+	if (!mtd || !ecclayout)
+		return;
+
+	mtd->ecclayout = ecclayout;
+	mtd_set_ooblayout(mtd, &nand_ecclayout_ops);
+}
+EXPORT_SYMBOL_GPL(mtd_set_ecclayout);
+
 /*
  * Erase is an asynchronous operation.  Device drivers are supposed
  * to call instr->callback() whenever the operation completes, even

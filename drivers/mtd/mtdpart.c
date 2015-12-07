@@ -320,6 +320,26 @@ static int part_block_markbad(struct mtd_info *mtd, loff_t ofs)
 	return res;
 }
 
+static int part_ooblayout_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	struct mtd_part *part = mtd_to_part(mtd);
+
+	return mtd_eccpos(part->master, eccbyte);
+}
+
+static int part_ooblayout_oobfree(struct mtd_info *mtd, int section,
+				  struct nand_oobfree *oobfree)
+{
+	struct mtd_part *part = mtd_to_part(mtd);
+
+	return mtd_oobfree(part->master, section, oobfree);
+}
+
+static const struct mtd_ooblayout_ops part_ooblayout_ops = {
+	.eccpos = part_ooblayout_eccpos,
+	.oobfree = part_ooblayout_oobfree,
+};
+
 static inline void free_partition(struct mtd_part *p)
 {
 	kfree(p->mtd.name);
@@ -536,7 +556,7 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
 			part->name);
 	}
 
-	mtd_set_ecclayout(&slave->mtd, master->ecclayout);
+	mtd_set_ooblayout(&slave->mtd, &part_ooblayout_ops);
 	slave->mtd.ecc_step_size = master->ecc_step_size;
 	slave->mtd.ecc_strength = master->ecc_strength;
 	slave->mtd.bitflip_threshold = master->bitflip_threshold;

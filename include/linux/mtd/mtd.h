@@ -101,11 +101,28 @@ struct mtd_oob_ops {
  * similar, smaller struct nand_ecclayout_user (in mtd-abi.h) that is retained
  * for export to user-space via the ECCGETLAYOUT ioctl.
  * nand_ecclayout should be expandable in the future simply by the above macros.
+ *
+ * This structure is now deprecated, you should use struct nand_ecclayout_ops
+ * to describe your OOB layout.
  */
 struct nand_ecclayout {
 	__u32 eccbytes;
 	__u32 eccpos[MTD_MAX_ECCPOS_ENTRIES_LARGE];
 	struct nand_oobfree oobfree[MTD_MAX_OOBFREE_ENTRIES_LARGE];
+};
+
+/**
+ * struct mtd_ooblayout_ops - NAND OOB layout operations.
+ *
+ * @eccpos: function returning the position of an ECC byte. Should return
+ *	    -ERANGE if %eccbyte exceed the number of ECC bytes.
+ * @oobfree: function returning an oobfree section. Should return -ERANGE
+ *	     if %section exceed the total number of oobfree sections.
+ */
+struct mtd_ooblayout_ops {
+	int (*eccpos)(struct mtd_info *mtd, int eccbyte);
+	int (*oobfree)(struct mtd_info *mtd, int section,
+		       struct nand_oobfree *oobfree);
 };
 
 struct module;	/* only needed for owner field in mtd_info */
@@ -166,8 +183,11 @@ struct mtd_info {
 	const char *name;
 	int index;
 
-	/* ECC layout structure pointer - read only! */
+	/* [Deprecated] ECC layout structure pointer - read only! */
 	struct nand_ecclayout *ecclayout;
+
+	/* OOB layout description */
+	const struct mtd_ooblayout_ops *ooblayout;
 
 	/* the ecc step size. */
 	unsigned int ecc_step_size;
@@ -253,21 +273,20 @@ struct mtd_info {
 	int usecount;
 };
 
-static inline void mtd_set_ecclayout(struct mtd_info *mtd,
-				     struct nand_ecclayout *ecclayout)
+static inline void mtd_set_ooblayout(struct mtd_info *mtd,
+				     const struct mtd_ooblayout_ops *ooblayout)
 {
-	mtd->ecclayout = ecclayout;
+	mtd->ooblayout = ooblayout;
 }
+
+void mtd_set_ecclayout(struct mtd_info *mtd, struct nand_ecclayout *ecclayout);
 
 static inline int mtd_eccpos(struct mtd_info *mtd, int eccbyte)
 {
-	if (!mtd->ecclayout)
+	if (!mtd->ooblayout || !mtd->ooblayout->eccpos)
 		return -ENOTSUPP;
 
-	if (eccbyte >= mtd->ecclayout->eccbytes)
-		return -ERANGE;
-
-	return mtd->ecclayout->eccpos[eccbyte];
+	return mtd->ooblayout->eccpos(mtd, eccbyte);
 }
 
 static inline int mtd_oobfree(struct mtd_info *mtd, int section,
@@ -275,20 +294,20 @@ static inline int mtd_oobfree(struct mtd_info *mtd, int section,
 {
 	memset(oobfree, 0, sizeof(*oobfree));
 
-	if (!mtd->ecclayout)
+	if (!mtd->ooblayout || !mtd->ooblayout->oobfree)
 		return -ENOTSUPP;
 
-	if (section >= MTD_MAX_OOBFREE_ENTRIES_LARGE)
-		return -ERANGE;
-
-	*oobfree = mtd->ecclayout->oobfree[section];
-
-	return 0;
+	return mtd->ooblayout->oobfree(mtd, section, oobfree);
 }
 
 static inline int mtd_eccbytes(struct mtd_info *mtd)
 {
-	return mtd->ecclayout ? mtd->ecclayout->eccbytes : 0;
+	int eccbytes;
+
+	for (eccbytes = 0; mtd_eccpos(mtd, eccbytes) >= 0; eccbytes++)
+		;
+
+	return eccbytes;
 }
 
 static inline void mtd_set_of_node(struct mtd_info *mtd,
