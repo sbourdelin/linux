@@ -482,8 +482,10 @@ static int get_v4l2_buffer32(struct v4l2_buffer *kp, struct v4l2_buffer32 __user
 				return -EFAULT;
 			break;
 		case V4L2_MEMORY_DMABUF:
-			if (get_user(kp->m.fd, &up->m.fd))
+			if (get_user(kp->m.fd, &up->m.fd) ||
+			    get_user(kp->length, &up->length))
 				return -EFAULT;
+
 			break;
 		}
 	}
@@ -550,7 +552,8 @@ static int put_v4l2_buffer32(struct v4l2_buffer *kp, struct v4l2_buffer32 __user
 				return -EFAULT;
 			break;
 		case V4L2_MEMORY_DMABUF:
-			if (put_user(kp->m.fd, &up->m.fd))
+			if (put_user(kp->m.fd, &up->m.fd) ||
+			    put_user(kp->length, &up->length))
 				return -EFAULT;
 			break;
 		}
