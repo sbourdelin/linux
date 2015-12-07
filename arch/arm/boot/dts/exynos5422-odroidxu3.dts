@@ -53,6 +53,14 @@
 	};
 };
 
+&cpu0 {
+	cpu-supply = <&buck6_reg>;
+};
+
+&cpu4 {
+	cpu-supply = <&buck2_reg>;
+};
+
 &i2c_0 {
 	status = "okay";
 
