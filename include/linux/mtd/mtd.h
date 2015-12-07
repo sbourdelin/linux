@@ -253,6 +253,38 @@ struct mtd_info {
 	int usecount;
 };
 
+static inline int mtd_eccpos(struct mtd_info *mtd, int eccbyte)
+{
+	if (!mtd->ecclayout)
+		return -ENOTSUPP;
+
+	if (eccbyte >= mtd->ecclayout->eccbytes)
+		return -ERANGE;
+
+	return mtd->ecclayout->eccpos[eccbyte];
+}
+
+static inline int mtd_oobfree(struct mtd_info *mtd, int section,
+			      struct nand_oobfree *oobfree)
+{
+	memset(oobfree, 0, sizeof(*oobfree));
+
+	if (!mtd->ecclayout)
+		return -ENOTSUPP;
+
+	if (section >= MTD_MAX_OOBFREE_ENTRIES_LARGE)
+		return -ERANGE;
+
+	*oobfree = mtd->ecclayout->oobfree[section];
+
+	return 0;
+}
+
+static inline int mtd_eccbytes(struct mtd_info *mtd)
+{
+	return mtd->ecclayout ? mtd->ecclayout->eccbytes : 0;
+}
+
 static inline void mtd_set_of_node(struct mtd_info *mtd,
 				   struct device_node *np)
 {
