@@ -866,9 +866,9 @@ static void nfs3_proc_commit_setup(struct nfs_commit_data *data, struct rpc_mess
 }
 
 static int
-nfs3_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
+nfs3_proc_lock(struct nfs_open_context *ctx, int cmd, struct file_lock *fl)
 {
-	struct inode *inode = file_inode(filp);
+	struct inode *inode = d_inode(ctx->dentry);
 
 	return nlmclnt_proc(NFS_SERVER(inode)->nlm_host, cmd, fl);
 }
