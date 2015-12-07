@@ -636,9 +636,7 @@ nfs_proc_commit_setup(struct nfs_commit_data *data, struct rpc_message *msg)
 static int
 nfs_proc_lock(struct nfs_open_context *ctx, int cmd, struct file_lock *fl)
 {
-	struct inode *inode = d_inode(ctx->dentry);
-
-	return nlmclnt_proc(NFS_SERVER(inode)->nlm_host, cmd, fl);
+	return nlmclnt_proc(ctx, cmd, fl);
 }
 
 /* Helper functions for NFS lock bounds checking */

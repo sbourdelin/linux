@@ -25,7 +25,8 @@
 
 static int	nlmclnt_test(struct nlm_rqst *, struct file_lock *);
 static int	nlmclnt_lock(struct nlm_rqst *, struct file_lock *);
-static int	nlmclnt_unlock(struct nlm_rqst *, struct file_lock *);
+static int	nlmclnt_unlock(struct nfs_open_context *nfs,
+		struct nlm_rqst *, struct file_lock *);
 static int	nlm_stat_to_errno(__be32 stat);
 static void	nlmclnt_locks_init_private(struct file_lock *fl, struct nlm_host *host);
 static int	nlmclnt_cancel(struct nlm_host *, int , struct file_lock *);
@@ -147,13 +148,15 @@ static void nlmclnt_release_lockargs(struct nlm_rqst *req)
 
 /**
  * nlmclnt_proc - Perform a single client-side lock request
- * @host: address of a valid nlm_host context representing the NLM server
+ * @ctx: address of the nfs_open_context for lock to operate upon
  * @cmd: fcntl-style file lock operation to perform
  * @fl: address of arguments for the lock operation
  *
  */
-int nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl)
+int nlmclnt_proc(struct nfs_open_context *ctx, int cmd, struct file_lock *fl)
 {
+	struct inode		*inode = d_inode(ctx->dentry);
+	struct nlm_host		*host = NFS_SERVER(inode)->nlm_host;
 	struct nlm_rqst		*call;
 	int			status;
 
@@ -175,7 +178,7 @@ int nlmclnt_proc(struct nlm_host *host, int cmd, struct file_lock *fl)
 			call->a_args.block = IS_SETLKW(cmd) ? 1 : 0;
 			status = nlmclnt_lock(call, fl);
 		} else
-			status = nlmclnt_unlock(call, fl);
+			status = nlmclnt_unlock(ctx, call, fl);
 	} else if (IS_GETLK(cmd))
 		status = nlmclnt_test(call, fl);
 	else
@@ -646,7 +649,8 @@ nlmclnt_reclaim(struct nlm_host *host, struct file_lock *fl,
  * UNLOCK: remove an existing lock
  */
 static int
-nlmclnt_unlock(struct nlm_rqst *req, struct file_lock *fl)
+nlmclnt_unlock(struct nfs_open_context *ctx,
+		struct nlm_rqst *req, struct file_lock *fl)
 {
 	struct nlm_host	*host = req->a_host;
 	struct nlm_res	*resp = &req->a_res;
@@ -669,7 +673,7 @@ nlmclnt_unlock(struct nlm_rqst *req, struct file_lock *fl)
 	}
 
 	atomic_inc(&req->a_count);
-	status = nlmclnt_async_call(nfs_file_cred(fl->fl_file), req,
+	status = nlmclnt_async_call(ctx->cred, req,
 			NLMPROC_UNLOCK, &nlmclnt_unlock_ops);
 	if (status < 0)
 		goto out;
