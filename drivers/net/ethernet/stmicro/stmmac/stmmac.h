@@ -130,6 +130,7 @@ struct stmmac_priv {
 	struct dentry *dbgfs_dir;
 	struct dentry *dbgfs_rings_status;
 	struct dentry *dbgfs_dma_cap;
+	struct dentry *dbgfs_ptp;
 #endif
 };
 

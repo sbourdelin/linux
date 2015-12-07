@@ -37,6 +37,11 @@
 #define PTP_TTNSR	0x0720	/* Target Time Nanoseconds Reg */
 #define	PTP_STHWSR	0x0724	/* System Time - Higher Word Seconds Reg */
 #define PTP_TSR		0x0728	/* Timestamp Status */
+#define PTP_PPSCTLR	0x072C	/* PPS Control Reg */
+#define PTP_AUXTSTNSR	0x0730	/* Aux Timestamp - Nanoseconds Reg */
+#define PTP_AUXTSTSR	0x0734	/* Aux Timestamp - Seconds Reg */
+#define PTP_PPS0INTRR	0x0760	/* PPS0 Interval Reg */
+#define PTP_PPS0WDTHR	0x0764	/* PPS0 Width Reg */
 
 #define PTP_STNSUR_ADDSUB_SHIFT 31
 
