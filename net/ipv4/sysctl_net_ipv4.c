@@ -28,6 +28,7 @@
 
 static int zero;
 static int one = 1;
+static int three = 3;
 static int four = 4;
 static int thousand = 1000;
 static int gso_max_segs = GSO_MAX_SEGS;
@@ -743,6 +744,15 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
 		.extra2		= &thousand,
+	},
+	{
+		.procname	= "tcp_timer_restart",
+		.data		= &sysctl_tcp_timer_restart,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &three,
 	},
 	{
 		.procname	= "tcp_autocorking",

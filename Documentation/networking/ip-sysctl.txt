@@ -591,6 +591,18 @@ tcp_syn_retries - INTEGER
 	with the current initial RTO of 1second. With this the final timeout
 	for an active TCP connection attempt will happen after 127seconds.
 
+tcp_timer_restart - INTEGER
+	Controls how the RTO and PTO timers are restarted (RTOR and TLPR).
+	If set (per timer or combined) the timers are restarted with
+	respect to the earliest outstanding segment, to not extend tail loss
+	latency unnecessarily.
+	Possible values:
+		0 disables RTOR and TLPR.
+		1 enables RTOR.
+		2 enables TLPR.
+		3 enables RTOR and TLPR.
+	Default: 3
+
 tcp_timestamps - BOOLEAN
 	Enable timestamps as defined in RFC1323.
 

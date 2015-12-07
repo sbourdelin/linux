@@ -101,6 +101,7 @@ int sysctl_tcp_thin_dupack __read_mostly;
 
 int sysctl_tcp_moderate_rcvbuf __read_mostly = 1;
 int sysctl_tcp_early_retrans __read_mostly = 3;
+int sysctl_tcp_timer_restart __read_mostly = 3;
 int sysctl_tcp_invalid_ratelimit __read_mostly = HZ/2;
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
@@ -2997,6 +2998,18 @@ static void tcp_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 	tcp_sk(sk)->snd_cwnd_stamp = tcp_time_stamp;
 }
 
+static u32 tcp_unsent_pkts(const struct sock *sk)
+{
+	struct sk_buff *skb = tcp_send_head(sk);
+	u32 pkts = 0;
+
+	if (skb)
+		tcp_for_write_queue_from(skb, sk)
+			pkts += tcp_skb_pcount(skb);
+
+	return pkts;
+}
+
 /* Restart timer after forward progress on connection.
  * RFC2988 recommends to restart timer to now+rto.
  */
@@ -3027,6 +3040,17 @@ void tcp_rearm_rto(struct sock *sk)
 			 */
 			if (delta > 0)
 				rto = delta;
+		} else if (icsk->icsk_pending == ICSK_TIME_RETRANS &&
+			   (sysctl_tcp_timer_restart == 1 ||
+			    sysctl_tcp_timer_restart == 3) &&
+			   (tp->packets_out + tcp_unsent_pkts(sk) <
+			    TCP_RTORESTART_THRESH)) {
+			struct sk_buff *skb = tcp_write_queue_head(sk);
+			const u32 rto_time_stamp = tcp_skb_timestamp(skb);
+			s32 delta = (s32)(tcp_time_stamp - rto_time_stamp);
+
+			if (delta > 0 && rto > delta)
+				rto -= delta;
 		}
 		inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, rto,
 					  TCP_RTO_MAX);
