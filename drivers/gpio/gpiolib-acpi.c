@@ -418,9 +418,12 @@ static int acpi_find_gpio(struct acpi_resource *ares, void *data)
 		 * GpioIo is used then the only way to set the flag is
 		 * to use _DSD "gpios" property.
 		 */
-		if (lookup->info.gpioint)
+		if (lookup->info.gpioint) {
 			lookup->info.active_low =
 				agpio->polarity == ACPI_ACTIVE_LOW;
+			lookup->info.irq_type = acpi_get_irq_type(agpio->triggering,
+								  agpio->polarity);
+		}
 	}
 
 	return 1;
@@ -594,7 +597,7 @@ struct gpio_desc *acpi_node_get_gpiod(struct fwnode_handle *fwnode,
  */
 int acpi_dev_gpio_irq_get(struct acpi_device *adev, int index)
 {
-	int idx, i;
+	int idx, i, irq;
 
 	for (i = 0, idx = 0; idx <= index; i++) {
 		struct acpi_gpio_info info;
@@ -603,8 +606,19 @@ int acpi_dev_gpio_irq_get(struct acpi_device *adev, int index)
 		desc = acpi_get_gpiod_by_index(adev, NULL, i, &info);
 		if (IS_ERR(desc))
 			break;
-		if (info.gpioint && idx++ == index)
-			return gpiod_to_irq(desc);
+		if (info.gpioint && idx++ == index) {
+			irq = gpiod_to_irq(desc);
+			if (irq < 0) {
+				dev_err(&adev->dev,
+					"Failed to translate GPIO to IRQ\n");
+				return irq;
+			}
+			/* Set type if specified and different than the current one */
+			if (info.irq_type != IRQ_TYPE_NONE &&
+			    info.irq_type != irq_get_trigger_type(irq))
+				irq_set_irq_type(irq, info.irq_type);
+			return irq;
+		}
 	}
 	return -ENOENT;
 }
