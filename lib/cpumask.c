@@ -45,7 +45,7 @@ int cpumask_any_but(const struct cpumask *mask, unsigned int cpu)
 /* These are not inline because of header tangles. */
 #ifdef CONFIG_CPUMASK_OFFSTACK
 /**
- * alloc_cpumask_var_node - allocate a struct cpumask on a given node
+ * __alloc_cpumask_var_node - allocate a struct cpumask on a given node
  * @mask: pointer to cpumask_var_t where the cpumask is returned
  * @flags: GFP_ flags
  *
@@ -57,8 +57,12 @@ int cpumask_any_but(const struct cpumask *mask, unsigned int cpu)
  * usually smart enough to know that mask can never be NULL if
  * CONFIG_CPUMASK_OFFSTACK=n, so does code elimination in that case
  * too.
+ *
+ * ( Also note that the freshly allocated mask will not be zero
+ *   initialized - in contrast to !CONFIG_CPUMASK_OFFSTACK kernels
+ *   which typically pass in masks that are already initialized. )
  */
-bool alloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node)
+bool __alloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node)
 {
 	*mask = kmalloc_node(cpumask_size(), flags, node);
 
@@ -71,11 +75,11 @@ bool alloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node)
 
 	return *mask != NULL;
 }
-EXPORT_SYMBOL(alloc_cpumask_var_node);
+EXPORT_SYMBOL(__alloc_cpumask_var_node);
 
 bool zalloc_cpumask_var_node(cpumask_var_t *mask, gfp_t flags, int node)
 {
-	return alloc_cpumask_var_node(mask, flags | __GFP_ZERO, node);
+	return __alloc_cpumask_var_node(mask, flags | __GFP_ZERO, node);
 }
 EXPORT_SYMBOL(zalloc_cpumask_var_node);
 
@@ -88,11 +92,11 @@ EXPORT_SYMBOL(zalloc_cpumask_var_node);
  * a nop returning a constant 1 (in <linux/cpumask.h>).
  * The cpumask is initialized to all zeroes.
  *
- * See alloc_cpumask_var_node().
+ * See __alloc_cpumask_var_node().
  */
 bool zalloc_cpumask_var(cpumask_var_t *mask, gfp_t flags)
 {
-	return alloc_cpumask_var_node(mask, flags | __GFP_ZERO, NUMA_NO_NODE);
+	return __alloc_cpumask_var_node(mask, flags | __GFP_ZERO, NUMA_NO_NODE);
 }
 EXPORT_SYMBOL(zalloc_cpumask_var);
 
