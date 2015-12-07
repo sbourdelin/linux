@@ -138,24 +138,6 @@ static int read_cr(struct spi_nor *nor)
 }
 
 /*
- * Dummy Cycle calculation for different type of read.
- * It can be used to support more commands with
- * different dummy cycle requirements.
- */
-static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
-{
-	switch (nor->flash_read) {
-	case SPI_NOR_FAST:
-	case SPI_NOR_DUAL:
-	case SPI_NOR_QUAD:
-		return 8;
-	case SPI_NOR_NORMAL:
-		return 0;
-	}
-	return 0;
-}
-
-/*
  * Write status register 1 byte
  * Returns negative if error occurred.
  */
@@ -1065,27 +1047,6 @@ write_err:
 	return ret;
 }
 
-static int macronix_quad_enable(struct spi_nor *nor)
-{
-	int ret, val;
-
-	val = read_sr(nor);
-	write_enable(nor);
-
-	write_sr(nor, val | SR_QUAD_EN_MX);
-
-	if (spi_nor_wait_till_ready(nor))
-		return 1;
-
-	ret = read_sr(nor);
-	if (!(ret > 0 && (ret & SR_QUAD_EN_MX))) {
-		dev_err(nor->dev, "Macronix Quad bit not set\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 /*
  * Write status Register and configuration register with 2 bytes
  * The first byte will be written to the status register, while the
@@ -1098,6 +1059,226 @@ static int write_sr_cr(struct spi_nor *nor, u16 val)
 	nor->cmd_buf[1] = (val >> 8);
 
 	return nor->write_reg(nor, SPINOR_OP_WRSR, nor->cmd_buf, 2);
+}
+
+static int macronix_dummy2code(u8 read_opcode, u8 read_dummy, u8 *dc)
+{
+	switch (read_opcode) {
+	case SPINOR_OP_READ:
+	case SPINOR_OP_READ4:
+		*dc = 0;
+		break;
+
+	case SPINOR_OP_READ_FAST:
+	case SPINOR_OP_READ_1_1_2:
+	case SPINOR_OP_READ_1_1_4:
+	case SPINOR_OP_READ4_FAST:
+	case SPINOR_OP_READ4_1_1_2:
+	case SPINOR_OP_READ4_1_1_4:
+		switch (read_dummy) {
+		case 6:
+			*dc = 1;
+			break;
+		case 8:
+			*dc = 0;
+			break;
+		case 10:
+			*dc = 3;
+			break;
+		default:
+			return -EINVAL;
+		}
+		break;
+
+	case SPINOR_OP_READ_1_2_2:
+	case SPINOR_OP_READ4_1_2_2:
+		switch (read_dummy) {
+		case 4:
+			*dc = 0;
+			break;
+		case 6:
+			*dc = 1;
+			break;
+		case 8:
+			*dc = 2;
+			break;
+		case 10:
+			*dc = 3;
+		default:
+			return -EINVAL;
+		}
+		break;
+
+	case SPINOR_OP_READ_1_4_4:
+	case SPINOR_OP_READ4_1_4_4:
+		switch (read_dummy) {
+		case 4:
+			*dc = 1;
+			break;
+		case 6:
+			*dc = 0;
+			break;
+		case 8:
+			*dc = 2;
+			break;
+		case 10:
+			*dc = 3;
+		default:
+			return -EINVAL;
+		}
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int macronix_set_dummy_cycles(struct spi_nor *nor, u8 read_dummy)
+{
+	int ret, sr, cr, mask, val;
+	u16 sr_cr;
+	u8 dc;
+
+	/* Convert the number of dummy cycles into Macronix DC volatile bits */
+	ret = macronix_dummy2code(nor->read_opcode, read_dummy, &dc);
+	if (ret)
+		return ret;
+
+	mask = GENMASK(7, 6);
+	val = (dc << 6) & mask;
+
+	cr = read_cr(nor);
+	if (cr < 0) {
+		dev_err(nor->dev, "error while reading the config register\n");
+		return cr;
+	}
+
+	if ((cr & mask) == val) {
+		nor->read_dummy = read_dummy;
+		return 0;
+	}
+
+	sr = read_sr(nor);
+	if (sr < 0) {
+		dev_err(nor->dev, "error while reading the status register\n");
+		return sr;
+	}
+
+	cr = (cr & ~mask) | val;
+	sr_cr = (sr & 0xff) | ((cr & 0xff) << 8);
+	write_enable(nor);
+	ret = write_sr_cr(nor, sr_cr);
+	if (ret) {
+		dev_err(nor->dev,
+			"error while writting the SR and CR registers\n");
+		return ret;
+	}
+
+	ret = spi_nor_wait_till_ready(nor);
+	if (ret)
+		return ret;
+
+	cr = read_cr(nor);
+	if (cr < 0 || (cr & mask) != val) {
+		dev_err(nor->dev, "Macronix Dummy Cycle bits not updated\n");
+		return -EINVAL;
+	}
+
+	/* Save the number of dummy cycles to use with Fast Read commands */
+	nor->read_dummy = read_dummy;
+	return 0;
+}
+
+static int macronix_set_quad_mode(struct spi_nor *nor)
+{
+	/* Check whether the QPI mode is enabled. */
+	if (nor->reg_proto == SPI_PROTO_4_4_4) {
+		/* 
+		 * In QPI mode, only the Fast Read Quad I/O (0xeb) command is
+		 * supported by the memory. Also the memory expects ALL commands
+		 * to use the SPI 4-4-4 protocol.
+		 * We already know that the SPI controller supports this
+		 * protocol as we succeeded in reading the JEDEC ID with the
+		 * 0xaf command and SPI-4-4-4 protocol.
+		 * However, using the 0xeb command we must take care about the
+		 * values sent during the dummy cycles as we don't want the
+		 * memory to enter its Continuous Read (Performance Enhance)
+		 * mode.
+		 */
+		nor->erase_proto = SPI_PROTO_4_4_4;
+		nor->write_proto = SPI_PROTO_4_4_4;
+		nor->read_proto = SPI_PROTO_4_4_4;
+		nor->read_opcode = SPINOR_OP_READ_1_4_4;
+		return macronix_set_dummy_cycles(nor, 8);
+	}
+
+	/*
+	 * Use the Fast Read Quad Output 1-1-4 (0x6b) command with 8 dummy
+	 * cycles (up to 133MHz for STR and 66MHz for DTR).
+	 */
+	nor->read_proto = SPI_PROTO_1_1_4;
+	nor->read_opcode = SPINOR_OP_READ_1_1_4;
+	return macronix_set_dummy_cycles(nor, 8);
+}
+
+static int macronix_set_dual_mode(struct spi_nor *nor)
+{
+	/*
+	 * Use the Fast Read Dual Output 1-1-2 (0x3b) command with 8 dummy
+	 * cycles (up to 133MHz for STR and 66MHz for DTR).
+	 */
+	nor->read_proto = SPI_PROTO_1_1_2;
+	nor->read_opcode = SPINOR_OP_READ_1_1_2;
+	return macronix_set_dummy_cycles(nor, 8);
+}
+
+static int macronix_set_single_mode(struct spi_nor *nor)
+{
+	u8 read_dummy;
+
+	/*
+	 * Configure 8 dummy cycles for Fast Read 1-1-1 (0x0b) command (up to
+	 * 133MHz for STR and 66MHz for DTR). The Read 1-1-1 (0x03) command
+	 * expects no dummy cycle.
+	 * read_opcode should not be overridden here!
+	 */
+	switch (nor->read_opcode) {
+	case SPINOR_OP_READ:
+	case SPINOR_OP_READ4:
+		read_dummy = 0;
+		break;
+
+	default:
+		read_dummy = 8;
+		break;
+	}
+
+	nor->read_proto = SPI_PROTO_1_1_1;
+	return macronix_set_dummy_cycles(nor, read_dummy);
+}
+
+static inline int spansion_get_config(struct spi_nor *nor,
+				      bool *quad_enabled,
+				      u8 *latency_code)
+{
+	int cr;
+
+	cr = read_cr(nor);
+	if (cr < 0) {
+		dev_err(nor->dev,
+			"error while reading the configuration register\n");
+		return cr;
+	}
+
+	if (quad_enabled)
+		*quad_enabled = !!(cr & CR_QUAD_EN_SPAN);
+
+	if (latency_code)
+		*latency_code = (u8)((cr & GENMASK(7, 6)) >> 6);
+
+	return 0;
 }
 
 static int spansion_quad_enable(struct spi_nor *nor)
@@ -1124,24 +1305,170 @@ static int spansion_quad_enable(struct spi_nor *nor)
 	return 0;
 }
 
-static int micron_quad_enable(struct spi_nor *nor)
+static int spansion_set_dummy_cycles(struct spi_nor *nor, u8 latency_code)
 {
-	int ret;
-	u8 val;
+	/* SDR dummy cycles */
+	switch (nor->read_opcode) {
+	case SPINOR_OP_READ:
+	case SPINOR_OP_READ4:
+		nor->read_dummy = 0;
+		break;
 
-	ret = nor->read_reg(nor, SPINOR_OP_RD_EVCR, &val, 1);
+	case SPINOR_OP_READ_FAST:
+	case SPINOR_OP_READ_1_1_2:
+	case SPINOR_OP_READ_1_1_4:
+	case SPINOR_OP_READ4_FAST:
+	case SPINOR_OP_READ4_1_1_2:
+	case SPINOR_OP_READ4_1_1_4:
+		nor->read_dummy = (latency_code == 3) ? 0 : 8;
+		break;
+
+	case SPINOR_OP_READ_1_2_2:
+	case SPINOR_OP_READ4_1_2_2:
+		switch (latency_code) {
+		default:
+		case 0:
+		case 3:
+			nor->read_dummy = 4;
+			break;
+		case 1:
+			nor->read_dummy = 5;
+			break;
+		case 2:
+			nor->read_dummy = 6;
+			break;
+		}
+		break;
+
+
+	case SPINOR_OP_READ_1_4_4:
+	case SPINOR_OP_READ4_1_4_4:
+		switch (latency_code) {
+		default:
+		case 0:
+		case 1:
+			nor->read_dummy = 4;
+			break;
+		case 2:
+			nor->read_dummy = 5;
+			break;
+		case 3:
+			nor->read_dummy = 1;
+			break;
+		}
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int spansion_set_quad_mode(struct spi_nor *nor)
+{
+	bool quad_enabled;
+	u8 latency_code;
+	int ret;
+
+	/*
+	 * The QUAD bit of Configuration Register must be set (CR Bit1=1) for
+	 * using any Quad SPI command.
+	 */
+	ret = spansion_get_config(nor, &quad_enabled, &latency_code);
+	if (ret)
+		return ret;
+
+	/* The Quad mode should be enabled ... */
+	if (!quad_enabled) {
+		/* ... if not try to enable it. */
+		dev_warn(nor->dev, "Spansion Quad mode disabled, enable it\n");
+		ret = spansion_quad_enable(nor);
+		if (ret)
+			return ret;
+	}
+
+	/*
+	 * Don't use the Fast Read Quad I/O (0xeb / 0xec) commands as their
+	 * number of dummy cycles can not be set to a multiple of 8: some SPI
+	 * controllers, especially those relying on the m25p80 driver, expect
+	 * the number of dummy cycles to be a multiple of 8.
+	 * Also when using a Fast Read Quad I/O command, the memory checks the 
+	 * value of the first mode/dummy cycles to decice whether it enters or
+	 * leaves the Countinuous Read mode. We should never enter the
+	 * Countinuous Read mode as the spi-nor framework doesn't support it.
+	 * For all these reason, we'd rather use the Fast Read Quad Output
+	 * 1-1-4 (0x6b / 0x6c) commands instead.
+	 */
+	nor->read_proto = SPI_PROTO_1_1_4;
+	nor->read_opcode = SPINOR_OP_READ_1_1_4;
+	return spansion_set_dummy_cycles(nor, latency_code);
+}
+
+static int spansion_set_dual_mode(struct spi_nor *nor)
+{
+	u8 latency_code;
+	int ret;
+
+	/* We don't care about the quad mode status */
+	ret = spansion_get_config(nor, NULL, &latency_code);
+	if (ret)
+		return ret;
+
+	/*
+	 * Don't use the Fast Read Dual I/O (0xbb / 0xbc) commands as their
+	 * number of dummy cycles can not bet set to a multiple of 8: some SPI
+	 * controllers, especially those relying on the m25p80 driver, expect
+	 * the number of dummy cycles to be a multiple of 8.
+	 * For this reason, w'd rather use the Fast Read Dual Output 1-1-2
+	 * (0x3b / 0x3c) commands instead.
+	 */
+	nor->read_proto = SPI_PROTO_1_1_2;
+	nor->read_opcode = SPINOR_OP_READ_1_1_2;
+	return spansion_set_dummy_cycles(nor, latency_code);
+}
+
+static int spansion_set_single_mode(struct spi_nor *nor)
+{
+	u8 latency_code;
+	int ret;
+
+	/* We don't care about the quad mode status */
+	ret = spansion_get_config(nor, NULL, &latency_code);
+	if (ret)
+		return ret;
+
+	nor->read_proto = SPI_PROTO_1_1_1;
+	return spansion_set_dummy_cycles(nor, latency_code);
+}
+
+static int micron_set_dummy_cycles(struct spi_nor *nor, u8 read_dummy)
+{
+	u8 vcr, val, mask;
+	int ret;
+
+	/* Set bit3 (XIP) to disable the Continuous Read mode */
+	mask = GENMASK(7, 4) | BIT(3);
+	val = ((read_dummy << 4) | BIT(3)) & mask;
+
+	/* Read the Volatile Configuration Register (VCR). */
+	ret = nor->read_reg(nor, SPINOR_OP_RD_VCR, &vcr, 1);
 	if (ret < 0) {
-		dev_err(nor->dev, "error %d reading EVCR\n", ret);
+		dev_err(nor->dev, "error while reading VCR register\n");
 		return ret;
 	}
 
-	write_enable(nor);
+	/* Check whether we need to update the number of dummy cycles. */
+	if ((vcr & mask) == val) {
+		nor->read_dummy = read_dummy;
+		return 0;
+	}
 
-	/* set EVCR, enable quad I/O */
-	nor->cmd_buf[0] = val & ~EVCR_QUAD_EN_MICRON;
-	ret = nor->write_reg(nor, SPINOR_OP_WD_EVCR, nor->cmd_buf, 1);
+	/* Update the number of dummy into the VCR. */
+	write_enable(nor);
+	vcr = (vcr & ~mask) | val;
+	ret = nor->write_reg(nor, SPINOR_OP_WR_VCR, &vcr, 1);
 	if (ret < 0) {
-		dev_err(nor->dev, "error while writing EVCR register\n");
+		dev_err(nor->dev, "error while writing VCR register\n");
 		return ret;
 	}
 
@@ -1149,47 +1476,309 @@ static int micron_quad_enable(struct spi_nor *nor)
 	if (ret)
 		return ret;
 
-	/* read EVCR and check it */
-	ret = nor->read_reg(nor, SPINOR_OP_RD_EVCR, &val, 1);
+	/* Read VCR and check it. */
+	ret = nor->read_reg(nor, SPINOR_OP_RD_VCR, &vcr, 1);
+	if (ret < 0 || (vcr & mask) != val) {
+		dev_err(nor->dev, "Micron VCR dummy cycles not updated\n");
+		return -EINVAL;
+	}
+
+	/* Save the number of dummy cycles to use with Fast Read commands */
+	nor->read_dummy = read_dummy;
+	return 0;
+}
+
+static int micron_set_protocol(struct spi_nor *nor, u8 mask, u8 val,
+			       enum spi_protocol proto)
+{
+	u8 evcr;
+	int ret;
+
+	/* Read the Exhanced Volatile Configuration Register (EVCR). */
+	ret = nor->read_reg(nor, SPINOR_OP_RD_EVCR, &evcr, 1);
 	if (ret < 0) {
-		dev_err(nor->dev, "error %d reading EVCR\n", ret);
+		dev_err(nor->dev, "error while reading EVCR register\n");
 		return ret;
 	}
-	if (val & EVCR_QUAD_EN_MICRON) {
-		dev_err(nor->dev, "Micron EVCR Quad bit not clear\n");
+
+	/* Check whether we need to update the protocol bits. */
+	if ((evcr & mask) == val)
+		return 0;
+
+	/* Set EVCR protocol bits. */
+	write_enable(nor);
+	evcr = (evcr & ~mask) | val;
+	ret = nor->write_reg(nor, SPINOR_OP_WD_EVCR, &evcr, 1);
+	if (ret < 0) {
+		dev_err(nor->dev, "error while writing EVCR register\n");
+		return ret;
+	}
+
+	/* Switch reg protocol now before accessing any other registers. */
+	nor->reg_proto = proto;
+
+	ret = spi_nor_wait_till_ready(nor);
+	if (ret)
+		return ret;
+
+	/* Read EVCR and check it. */
+	ret = nor->read_reg(nor, SPINOR_OP_RD_EVCR, &evcr, 1);
+	if (ret < 0 || (evcr & mask) != val) {
+		dev_err(nor->dev, "Micron EVCR protocol bits not updated\n");
 		return -EINVAL;
 	}
 
 	return 0;
 }
 
+static int micron_set_quad_protocol(struct spi_nor *nor)
+{
+	int ret;
+
+	/* Set Quad bit to 0 to select the Quad SPI mode. */
+	ret = micron_set_protocol(nor,
+				  EVCR_QUAD_EN_MICRON,
+				  0,
+				  SPI_PROTO_4_4_4);
+	if (ret) {
+		dev_err(nor->dev, "Failed to set Micron Quad SPI mode\n");
+		return ret;
+	}
+
+	nor->read_proto = SPI_PROTO_4_4_4;
+	nor->write_proto = SPI_PROTO_4_4_4;
+	nor->erase_proto = SPI_PROTO_4_4_4;
+	return 0;
+}
+
+static int micron_set_dual_protocol(struct spi_nor *nor)
+{
+	int ret;
+
+	/* Set Quad/Dual bits to 10 to select the Dual SPI mode. */
+	ret = micron_set_protocol(nor,
+				  EVCR_QUAD_EN_MICRON | EVCR_DUAL_EN_MICRON,
+				  EVCR_QUAD_EN_MICRON,
+				  SPI_PROTO_2_2_2);
+	if (ret) {
+		dev_err(nor->dev, "Failed to set Micron Dual SPI mode\n");
+		return ret;
+	}
+
+	nor->read_proto = SPI_PROTO_2_2_2;
+	nor->write_proto = SPI_PROTO_2_2_2;
+	nor->erase_proto = SPI_PROTO_2_2_2;
+	return 0;
+}
+
+static int micron_set_extended_spi_protocol(struct spi_nor *nor)
+{
+	int ret;
+
+	/* Set Quad/Dual bits to 11 to select the Extended SPI mode */
+	ret = micron_set_protocol(nor,
+				  EVCR_QUAD_EN_MICRON | EVCR_DUAL_EN_MICRON,
+				  EVCR_QUAD_EN_MICRON | EVCR_DUAL_EN_MICRON,
+				  SPI_PROTO_1_1_1);
+	if (ret) {
+		dev_err(nor->dev, "Failed to set Micron Extended SPI mode\n");
+		return ret;
+	}
+
+	nor->write_proto = SPI_PROTO_1_1_1;
+	nor->erase_proto = SPI_PROTO_1_1_1;
+	return 0;
+}
+
+static int micron_set_quad_mode(struct spi_nor *nor)
+{
+	int ret;
+
+	/* Check whether the Quad SPI mode is enabled. */
+	if (nor->reg_proto == SPI_PROTO_4_4_4) {
+		/*
+		 * If here, the Quad mode should have already been enabled and
+		 * is supported by the SPI controller since the memory replied
+		 * to the Read ID Multiple I/O (0xaf) command in SPI 4-4-4
+		 * protocol. So it might be enough to only set the read, write
+		 * and erase protocols to SPI 4-4-4 but just in case...
+		 */
+		ret = micron_set_quad_protocol(nor);
+		if (ret)
+			return ret;
+
+		/*
+		 * In Quad mode, the memory doesn't make any difference between
+		 * the Fast Read Quad Output 1-1-4 (0x6b) and Fast Read Quad I/O
+		 * 1-4-4 (0xeb) commands: they are both processed in SPI 4-4-4
+		 * protocol. The 1-4-4 command is chosen here only for debug
+		 * purpose to easily detect the chosen mode when logging
+		 * commands.
+		 */
+		nor->read_opcode = SPINOR_OP_READ_1_4_4;
+		return micron_set_dummy_cycles(nor, 8);
+	}
+
+	/*
+	 * Exit Dual or Quad mode if not done yet: the Fast Read Quad Output
+	 * 1-1-4 (0x6b) command is also supported by the Extended SPI Protocol.
+	 * We can change the mode safely as we write into a volatile register.
+	 */
+	ret = micron_set_extended_spi_protocol(nor);
+	if (ret)
+		return ret;
+
+	/*
+	 * Use the Fast Read Quad Output 1-1-4 command.
+	 * Force the number of dummy cycles to 8 and disable the Continuous Read
+	 * mode to prevent some drivers from using it by mistake (m25p80).
+	 * We can change these settings safely as we write into a volatile
+	 * register.
+	 */
+	nor->read_proto = SPI_PROTO_1_1_4;
+	nor->read_opcode = SPINOR_OP_READ_1_1_4;
+	return micron_set_dummy_cycles(nor, 8);
+}
+
+static int micron_set_dual_mode(struct spi_nor *nor)
+{
+	int ret;
+
+	/* Check whether the Dual SPI mode is enabled. */
+	if (nor->reg_proto == SPI_PROTO_2_2_2) {
+		/*
+		 * If here, the Dual mode should have already been enabled and
+		 * is supported by the SPI controller since the memory replied
+		 * to the Read ID Multiple I/O (0xaf) command in SPI 2-2-2
+		 * protocol. So it might be enough to only set the read, write
+		 * and erase protocols to SPI 2-2-2 but just in case...
+		 */
+		ret = micron_set_dual_protocol(nor);
+		if (ret)
+			return ret;
+
+		/*
+		 * In Dual mode, the memory doesn't make any difference between
+		 * the Fast Read Dual Output 1-1-2 (0x3b) and Fast Read Dual I/O
+		 * 1-2-2 (0xbb) commands: they are both processed in SPI 2-2-2
+		 * protocol. The 1-2-2 command is chosen here only for debug
+		 * purpose to easily detect the chosen mode when logging
+		 * commands.
+		 */
+		nor->read_opcode = SPINOR_OP_READ_1_2_2;
+		return micron_set_dummy_cycles(nor, 8);
+	}
+
+	/*
+	 * Exit Dual or Quad mode if not done yet: the Fast Read Dual Output
+	 * 1-1-2 (0x3b) command is also supported by the Extended SPI Protocol.
+	 * We can change the mode safely as we write into a volatile register.
+	 */
+	ret = micron_set_extended_spi_protocol(nor);
+	if (ret)
+		return ret;
+
+	/*
+	 * Use the Fast Read Dual Output 1-1-2 command.
+	 * Force the number of dummy cycles to 8 and disable the Continuous Read
+	 * mode to prevent some drivers from using it by mistake (m25p80).
+	 * We can change these settings safely as we write into a volatile
+	 * register.
+	 */
+	nor->read_proto = SPI_PROTO_1_1_2;
+	nor->read_opcode = SPINOR_OP_READ_1_1_2;
+	return micron_set_dummy_cycles(nor, 8);
+}
+
+static int micron_set_single_mode(struct spi_nor *nor)
+{
+	u8 read_dummy;
+	int ret;
+
+	/*
+	 * Exit Dual or Quad mode if not done yet.
+	 * We can change the mode safely as we write into a volatile register.
+	 */
+	ret = micron_set_extended_spi_protocol(nor);
+	if (ret)
+		return ret;
+
+	/*
+	 * Force the number of dummy cycles to 8 for Fast Read, 0 for Read,
+	 * and disable the Continuous Read mode to prevent some drivers
+	 * from using it by mistake (m25p80).
+	 * We can change these settings safely as we write into a volatile
+	 * register.
+	 */
+	switch (nor->read_opcode) {
+	case SPINOR_OP_READ:
+	case SPINOR_OP_READ4:
+		read_dummy = 0;
+		break;
+
+	default:
+		read_dummy = 8;
+		break;
+	}
+	nor->read_proto = SPI_PROTO_1_1_1;
+	return micron_set_dummy_cycles(nor, read_dummy);
+}
+
 static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
 {
-	int status;
-
 	switch (JEDEC_MFR(info)) {
 	case SNOR_MFR_MACRONIX:
-		status = macronix_quad_enable(nor);
-		if (status) {
-			dev_err(nor->dev, "Macronix quad-read not enabled\n");
-			return -EINVAL;
-		}
-		return status;
+		return macronix_set_quad_mode(nor);
+
 	case SNOR_MFR_MICRON:
-		status = micron_quad_enable(nor);
-		if (status) {
-			dev_err(nor->dev, "Micron quad-read not enabled\n");
-			return -EINVAL;
-		}
-		return status;
+		return micron_set_quad_mode(nor);
+
+	case SNOR_MFR_SPANSION:
+		return spansion_set_quad_mode(nor);
+
 	default:
-		status = spansion_quad_enable(nor);
-		if (status) {
-			dev_err(nor->dev, "Spansion quad-read not enabled\n");
-			return -EINVAL;
-		}
-		return status;
+		break;
 	}
+
+	return -EINVAL;
+}
+
+static int set_dual_mode(struct spi_nor *nor, const struct flash_info *info)
+{
+	switch (JEDEC_MFR(info)) {
+	case SNOR_MFR_MACRONIX:
+		return macronix_set_dual_mode(nor);
+
+	case SNOR_MFR_MICRON:
+		return micron_set_dual_mode(nor);
+
+	case SNOR_MFR_SPANSION:
+		return spansion_set_dual_mode(nor);
+
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
+static int set_single_mode(struct spi_nor *nor, const struct flash_info *info)
+{
+	switch (JEDEC_MFR(info)) {
+	case SNOR_MFR_MACRONIX:
+		return macronix_set_single_mode(nor);
+
+	case SNOR_MFR_MICRON:
+		return micron_set_single_mode(nor);
+
+	case SNOR_MFR_SPANSION:
+		return spansion_set_single_mode(nor);
+
+	default:
+		break;
+	}
+
+	return -EINVAL;
 }
 
 static int spi_nor_check(struct spi_nor *nor)
@@ -1339,7 +1928,22 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	if (info->flags & SPI_NOR_NO_FR)
 		nor->flash_read = SPI_NOR_NORMAL;
 
-	/* Quad/Dual-read mode takes precedence over fast/normal */
+	/* Default commands and number of dummy cycles */
+	nor->program_opcode = SPINOR_OP_PP;
+	if (nor->flash_read == SPI_NOR_NORMAL) {
+		nor->read_opcode = SPINOR_OP_READ;
+		nor->read_dummy = 0;
+	} else {
+		nor->read_opcode = SPINOR_OP_READ_FAST;
+		nor->read_dummy = 8;
+	}
+
+	/*
+	 * Quad/Dual-read mode takes precedence over fast/normal. The opcodes,
+	 * the protocols and the number of dummy cycles are updated depending
+	 * on the manufacturer. The read opcode and protocol should be updated
+	 * by the relevant function when entering Quad or Dual mode.
+	 */
 	if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
 		ret = set_quad_mode(nor, info);
 		if (ret) {
@@ -1348,29 +1952,20 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 		}
 		nor->flash_read = SPI_NOR_QUAD;
 	} else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
+		ret = set_dual_mode(nor, info);
+		if (ret) {
+			dev_err(dev, "dual mode not supported\n");
+			return ret;
+		}
 		nor->flash_read = SPI_NOR_DUAL;
+	} else if (info->flags & (SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ)) {
+		/* We may need to leave a Quad or Dual mode */
+		ret = set_single_mode(nor, info);
+		if (ret) {
+			dev_err(dev, "failed to switch back to single mode\n");
+			return ret;
+		}
 	}
-
-	/* Default commands */
-	switch (nor->flash_read) {
-	case SPI_NOR_QUAD:
-		nor->read_opcode = SPINOR_OP_READ_1_1_4;
-		break;
-	case SPI_NOR_DUAL:
-		nor->read_opcode = SPINOR_OP_READ_1_1_2;
-		break;
-	case SPI_NOR_FAST:
-		nor->read_opcode = SPINOR_OP_READ_FAST;
-		break;
-	case SPI_NOR_NORMAL:
-		nor->read_opcode = SPINOR_OP_READ;
-		break;
-	default:
-		dev_err(dev, "No Read opcode defined\n");
-		return -EINVAL;
-	}
-
-	nor->program_opcode = SPINOR_OP_PP;
 
 	if (info->addr_width)
 		nor->addr_width = info->addr_width;
@@ -1408,8 +2003,6 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 			nor->addr_width);
 		return -EINVAL;
 	}
-
-	nor->read_dummy = spi_nor_read_dummy_cycles(nor);
 
 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
 			(long long)mtd->size >> 10);
