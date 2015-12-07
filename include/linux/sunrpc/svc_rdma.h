@@ -138,6 +138,7 @@ struct svcxprt_rdma {
 
 	int                  sc_max_requests;	/* Depth of RQ */
 	int                  sc_max_req_size;	/* Size of each RQ WR buf */
+	int                  sc_max_bc_requests;
 
 	struct ib_pd         *sc_pd;
 
@@ -182,6 +183,7 @@ struct svcxprt_rdma {
 #define RPCRDMA_SQ_DEPTH_MULT   8
 #define RPCRDMA_MAX_REQUESTS    32
 #define RPCRDMA_MAX_REQ_SIZE    4096
+#define RPCRDMA_MAX_BC_REQUESTS	2
 
 #define RPCSVC_MAXPAYLOAD_RDMA	RPCSVC_MAXPAYLOAD
 
