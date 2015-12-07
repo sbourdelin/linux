@@ -21,8 +21,9 @@
 #define MAX_EQ_LOOP 5
 
 enum link_rate_type {
-	LINK_RATE_1_62GBPS = 0x06,
-	LINK_RATE_2_70GBPS = 0x0a
+	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
+	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
+	LINK_RATE_5_40GBPS = DP_LINK_BW_5_4,
 };
 
 enum link_lane_count_type {
