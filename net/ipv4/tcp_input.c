@@ -3655,7 +3655,7 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	}
 
 	if (icsk->icsk_pending == ICSK_TIME_RETRANS)
-		tcp_schedule_loss_probe(sk);
+		tcp_schedule_loss_probe(sk, true);
 	tcp_update_pacing_rate(sk);
 	return 1;
 
