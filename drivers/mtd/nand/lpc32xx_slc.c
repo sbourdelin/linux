@@ -621,7 +621,7 @@ static int lpc32xx_nand_read_page_syndrome(struct mtd_info *mtd,
 	lpc32xx_slc_ecc_copy(tmpecc, (uint32_t *) host->ecc_buf, chip->ecc.steps);
 
 	/* Pointer to ECC data retrieved from NAND spare area */
-	oobecc = chip->oob_poi + chip->ecc.layout->eccpos[0];
+	oobecc = chip->oob_poi + mtd_eccpos(mtd, 0);
 
 	for (i = 0; i < chip->ecc.steps; i++) {
 		stat = chip->ecc.correct(mtd, buf, oobecc,
@@ -667,7 +667,7 @@ static int lpc32xx_nand_write_page_syndrome(struct mtd_info *mtd,
 					    int oob_required, int page)
 {
 	struct lpc32xx_nand_host *host = chip->priv;
-	uint8_t *pb = chip->oob_poi + chip->ecc.layout->eccpos[0];
+	uint8_t *pb = chip->oob_poi + mtd_eccpos(mtd, 0);
 	int error;
 
 	/* Write data, calculate ECC on outbound data */

@@ -1315,7 +1315,6 @@ static int nand_read_page_swecc(struct mtd_info *mtd, struct nand_chip *chip,
 	uint8_t *p = buf;
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	uint8_t *ecc_code = chip->buffers->ecccode;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 	unsigned int max_bitflips = 0;
 
 	chip->ecc.read_page_raw(mtd, chip, buf, 1, page);
@@ -1324,7 +1323,7 @@ static int nand_read_page_swecc(struct mtd_info *mtd, struct nand_chip *chip,
 		chip->ecc.calculate(mtd, p, &ecc_calc[i]);
 
 	for (i = 0; i < chip->ecc.total; i++)
-		ecc_code[i] = chip->oob_poi[eccpos[i]];
+		ecc_code[i] = chip->oob_poi[mtd_eccpos(mtd, i)];
 
 	eccsteps = chip->ecc.steps;
 	p = buf;
@@ -1357,7 +1356,6 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip,
 			int page)
 {
 	int start_step, end_step, num_steps;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 	uint8_t *p;
 	int data_col_addr, i, gaps = 0;
 	int datafrag_len, eccfrag_len, aligned_len, aligned_pos;
@@ -1392,7 +1390,8 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip,
 	 * ecc.pos. Let's make sure that there are no gaps in ECC positions.
 	 */
 	for (i = 0; i < eccfrag_len - 1; i++) {
-		if (eccpos[i + index] + 1 != eccpos[i + index + 1]) {
+		if (mtd_eccpos(mtd, i + index) + 1 !=
+		    mtd_eccpos(mtd, i + index + 1)) {
 			gaps = 1;
 			break;
 		}
@@ -1405,11 +1404,12 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip,
 		 * Send the command to read the particular ECC bytes take care
 		 * about buswidth alignment in read_buf.
 		 */
-		aligned_pos = eccpos[index] & ~(busw - 1);
+		aligned_pos = mtd_eccpos(mtd, index) & ~(busw - 1);
 		aligned_len = eccfrag_len;
-		if (eccpos[index] & (busw - 1))
+		if (mtd_eccpos(mtd, index) & (busw - 1))
 			aligned_len++;
-		if (eccpos[index + (num_steps * chip->ecc.bytes)] & (busw - 1))
+		if (mtd_eccpos(mtd, index + (num_steps * chip->ecc.bytes)) &
+		    (busw - 1))
 			aligned_len++;
 
 		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
@@ -1418,7 +1418,8 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip,
 	}
 
 	for (i = 0; i < eccfrag_len; i++)
-		chip->buffers->ecccode[i] = chip->oob_poi[eccpos[i + index]];
+		chip->buffers->ecccode[i] =
+				chip->oob_poi[mtd_eccpos(mtd, i + index)];
 
 	p = bufpoi + data_col_addr;
 	for (i = 0; i < eccfrag_len ; i += chip->ecc.bytes, p += chip->ecc.size) {
@@ -1455,7 +1456,6 @@ static int nand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	uint8_t *p = buf;
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	uint8_t *ecc_code = chip->buffers->ecccode;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 	unsigned int max_bitflips = 0;
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
@@ -1466,7 +1466,7 @@ static int nand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
 
 	for (i = 0; i < chip->ecc.total; i++)
-		ecc_code[i] = chip->oob_poi[eccpos[i]];
+		ecc_code[i] = chip->oob_poi[mtd_eccpos(mtd, i)];
 
 	eccsteps = chip->ecc.steps;
 	p = buf;
@@ -1507,7 +1507,6 @@ static int nand_read_page_hwecc_oob_first(struct mtd_info *mtd,
 	int eccsteps = chip->ecc.steps;
 	uint8_t *p = buf;
 	uint8_t *ecc_code = chip->buffers->ecccode;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	unsigned int max_bitflips = 0;
 
@@ -1517,7 +1516,7 @@ static int nand_read_page_hwecc_oob_first(struct mtd_info *mtd,
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
 
 	for (i = 0; i < chip->ecc.total; i++)
-		ecc_code[i] = chip->oob_poi[eccpos[i]];
+		ecc_code[i] = chip->oob_poi[mtd_eccpos(mtd, i)];
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		int stat;
@@ -1603,9 +1602,11 @@ static int nand_read_page_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
  * @ops: oob ops structure
  * @len: size of oob to transfer
  */
-static uint8_t *nand_transfer_oob(struct nand_chip *chip, uint8_t *oob,
+static uint8_t *nand_transfer_oob(struct mtd_info *mtd, uint8_t *oob,
 				  struct mtd_oob_ops *ops, size_t len)
 {
+	struct nand_chip *chip = mtd->priv;
+
 	switch (ops->mode) {
 
 	case MTD_OPS_PLACE_OOB:
@@ -1614,24 +1615,26 @@ static uint8_t *nand_transfer_oob(struct nand_chip *chip, uint8_t *oob,
 		return oob + len;
 
 	case MTD_OPS_AUTO_OOB: {
-		struct nand_oobfree *free = chip->ecc.layout->oobfree;
+		struct nand_oobfree free = { };
 		uint32_t boffs = 0, roffs = ops->ooboffs;
 		size_t bytes = 0;
+		int i = 0;
 
-		for (; free->length && len; free++, len -= bytes) {
+		for (mtd_oobfree(mtd, i++, &free); free.length && len;
+		     mtd_oobfree(mtd, i++, &free), len -= bytes) {
 			/* Read request not from offset 0? */
 			if (unlikely(roffs)) {
-				if (roffs >= free->length) {
-					roffs -= free->length;
+				if (roffs >= free.length) {
+					roffs -= free.length;
 					continue;
 				}
-				boffs = free->offset + roffs;
+				boffs = free.offset + roffs;
 				bytes = min_t(size_t, len,
-					      (free->length - roffs));
+					      (free.length - roffs));
 				roffs = 0;
 			} else {
-				bytes = min_t(size_t, len, free->length);
-				boffs = free->offset;
+				bytes = min_t(size_t, len, free.length);
+				boffs = free.offset;
 			}
 			memcpy(oob, chip->oob_poi + boffs, bytes);
 			oob += bytes;
@@ -1772,7 +1775,7 @@ read_retry:
 				int toread = min(oobreadlen, max_oobsize);
 
 				if (toread) {
-					oob = nand_transfer_oob(chip,
+					oob = nand_transfer_oob(mtd,
 						oob, ops, toread);
 					oobreadlen -= toread;
 				}
@@ -2073,7 +2076,7 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
 			break;
 
 		len = min(len, readlen);
-		buf = nand_transfer_oob(chip, buf, ops, len);
+		buf = nand_transfer_oob(mtd, buf, ops, len);
 
 		if (chip->options & NAND_NEED_READRDY) {
 			/* Apply delay or wait for ready/busy pin */
@@ -2237,14 +2240,13 @@ static int nand_write_page_swecc(struct mtd_info *mtd, struct nand_chip *chip,
 	int eccsteps = chip->ecc.steps;
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	const uint8_t *p = buf;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 
 	/* Software ECC calculation */
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize)
 		chip->ecc.calculate(mtd, p, &ecc_calc[i]);
 
 	for (i = 0; i < chip->ecc.total; i++)
-		chip->oob_poi[eccpos[i]] = ecc_calc[i];
+		chip->oob_poi[mtd_eccpos(mtd, i)] = ecc_calc[i];
 
 	return chip->ecc.write_page_raw(mtd, chip, buf, 1, page);
 }
@@ -2266,7 +2268,6 @@ static int nand_write_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	int eccsteps = chip->ecc.steps;
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	const uint8_t *p = buf;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
@@ -2275,7 +2276,7 @@ static int nand_write_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	}
 
 	for (i = 0; i < chip->ecc.total; i++)
-		chip->oob_poi[eccpos[i]] = ecc_calc[i];
+		chip->oob_poi[mtd_eccpos(mtd, i)] = ecc_calc[i];
 
 	chip->write_buf(mtd, chip->oob_poi, mtd->oobsize);
 
@@ -2303,7 +2304,6 @@ static int nand_write_subpage_hwecc(struct mtd_info *mtd,
 	int ecc_size      = chip->ecc.size;
 	int ecc_bytes     = chip->ecc.bytes;
 	int ecc_steps     = chip->ecc.steps;
-	uint32_t *eccpos  = chip->ecc.layout->eccpos;
 	uint32_t start_step = offset / ecc_size;
 	uint32_t end_step   = (offset + data_len - 1) / ecc_size;
 	int oob_bytes       = mtd->oobsize / ecc_steps;
@@ -2336,7 +2336,7 @@ static int nand_write_subpage_hwecc(struct mtd_info *mtd,
 	/* this include masked-value(0xFF) for unwritten subpages */
 	ecc_calc = chip->buffers->ecccalc;
 	for (i = 0; i < chip->ecc.total; i++)
-		chip->oob_poi[eccpos[i]] = ecc_calc[i];
+		chip->oob_poi[mtd_eccpos(mtd, i)] = ecc_calc[i];
 
 	/* write OOB buffer to NAND device */
 	chip->write_buf(mtd, chip->oob_poi, mtd->oobsize);
@@ -2488,24 +2488,26 @@ static uint8_t *nand_fill_oob(struct mtd_info *mtd, uint8_t *oob, size_t len,
 		return oob + len;
 
 	case MTD_OPS_AUTO_OOB: {
-		struct nand_oobfree *free = chip->ecc.layout->oobfree;
+		struct nand_oobfree free = { };
 		uint32_t boffs = 0, woffs = ops->ooboffs;
 		size_t bytes = 0;
+		int i = 0;
 
-		for (; free->length && len; free++, len -= bytes) {
+		for (mtd_oobfree(mtd, i++, &free); free.length && len;
+		     mtd_oobfree(mtd, i++, &free), len -= bytes) {
 			/* Write request not from offset 0? */
 			if (unlikely(woffs)) {
-				if (woffs >= free->length) {
-					woffs -= free->length;
+				if (woffs >= free.length) {
+					woffs -= free.length;
 					continue;
 				}
-				boffs = free->offset + woffs;
+				boffs = free.offset + woffs;
 				bytes = min_t(size_t, len,
-					      (free->length - woffs));
+					      (free.length - woffs));
 				woffs = 0;
 			} else {
-				bytes = min_t(size_t, len, free->length);
-				boffs = free->offset;
+				bytes = min_t(size_t, len, free.length);
+				boffs = free.offset;
 			}
 			memcpy(chip->oob_poi + boffs, oob, bytes);
 			oob += bytes;
@@ -4087,6 +4089,7 @@ int nand_scan_tail(struct mtd_info *mtd)
 	int i;
 	struct nand_chip *chip = mtd->priv;
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+	struct nand_oobfree oobfree = { };
 	struct nand_buffers *nbuf;
 
 	/* New bad blocks should be marked in OOB, flash-based BBT, or both */
@@ -4284,8 +4287,10 @@ int nand_scan_tail(struct mtd_info *mtd)
 	 * the out of band area.
 	 */
 	mtd->oobavail = 0;
-	for (i = 0; ecc->layout->oobfree[i].length; i++)
-		mtd->oobavail += ecc->layout->oobfree[i].length;
+	i = 0;
+	for (mtd_oobfree(mtd, i++, &oobfree); oobfree.length;
+	     mtd_oobfree(mtd, i++, &oobfree))
+		mtd->oobavail += oobfree.length;
 
 	/* ECC sanity check: warn if it's too weak */
 	if (!nand_ecc_strength_good(mtd))

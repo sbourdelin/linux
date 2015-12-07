@@ -266,7 +266,7 @@ static int is_blank(struct mtd_info *mtd, unsigned int bufnum)
 	}
 
 	for (i = 0; i < chip->ecc.layout->eccbytes; i++) {
-		int pos = chip->ecc.layout->eccpos[i];
+		int pos = mtd_eccpos(mtd, i);
 
 		if (__raw_readb(&oob[pos]) != 0xff)
 			return 0;

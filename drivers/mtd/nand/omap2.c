@@ -1509,7 +1509,6 @@ static int omap_write_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
 {
 	int i;
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
 
 	/* Enable GPMC ecc engine */
 	chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
@@ -1521,7 +1520,7 @@ static int omap_write_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
 	chip->ecc.calculate(mtd, buf, &ecc_calc[0]);
 
 	for (i = 0; i < chip->ecc.total; i++)
-		chip->oob_poi[eccpos[i]] = ecc_calc[i];
+		chip->oob_poi[mtd_eccpos(mtd, i)] = ecc_calc[i];
 
 	/* Write ecc vector to OOB area */
 	chip->write_buf(mtd, chip->oob_poi, mtd->oobsize);
@@ -1548,9 +1547,9 @@ static int omap_read_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
 {
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	uint8_t *ecc_code = chip->buffers->ecccode;
-	uint32_t *eccpos = chip->ecc.layout->eccpos;
-	uint8_t *oob = &chip->oob_poi[eccpos[0]];
-	uint32_t oob_pos = mtd->writesize + chip->ecc.layout->eccpos[0];
+	int ecc0pos = mtd_eccpos(mtd, 0);
+	uint8_t *oob = &chip->oob_poi[ecc0pos];
+	uint32_t oob_pos = mtd->writesize + ecc0pos;
 	int stat;
 	unsigned int max_bitflips = 0;
 
@@ -1567,7 +1566,7 @@ static int omap_read_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
 	/* Calculate ecc bytes */
 	chip->ecc.calculate(mtd, buf, ecc_calc);
 
-	memcpy(ecc_code, &chip->oob_poi[eccpos[0]], chip->ecc.total);
+	memcpy(ecc_code, &chip->oob_poi[ecc0pos], chip->ecc.total);
 
 	stat = chip->ecc.correct(mtd, buf, ecc_code, ecc_calc);
 

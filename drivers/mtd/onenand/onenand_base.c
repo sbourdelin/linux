@@ -1024,27 +1024,29 @@ static int onenand_transfer_auto_oob(struct mtd_info *mtd, uint8_t *buf, int col
 				int thislen)
 {
 	struct onenand_chip *this = mtd->priv;
-	struct nand_oobfree *free;
+	struct nand_oobfree free = { };
 	int readcol = column;
 	int readend = column + thislen;
 	int lastgap = 0;
-	unsigned int i;
+	unsigned int i = 0;
 	uint8_t *oob_buf = this->oob_buf;
 
-	free = this->ecclayout->oobfree;
-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
+	for (mtd_oobfree(mtd, i++, &free); free.length;
+	     mtd_oobfree(mtd, i++, &free)) {
 		if (readcol >= lastgap)
-			readcol += free->offset - lastgap;
+			readcol += free.offset - lastgap;
 		if (readend >= lastgap)
-			readend += free->offset - lastgap;
-		lastgap = free->offset + free->length;
+			readend += free.offset - lastgap;
+		lastgap = free.offset + free.length;
 	}
 	this->read_bufferram(mtd, ONENAND_SPARERAM, oob_buf, 0, mtd->oobsize);
-	free = this->ecclayout->oobfree;
-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
-		int free_end = free->offset + free->length;
-		if (free->offset < readend && free_end > readcol) {
-			int st = max_t(int,free->offset,readcol);
+	memset(&free, 0, sizeof(free));
+	i = 0;
+	for (mtd_oobfree(mtd, i++, &free); free.length;
+	     mtd_oobfree(mtd, i++, &free)) {
+		int free_end = free.offset + free.length;
+		if (free.offset < readend && free_end > readcol) {
+			int st = max_t(int,free.offset,readcol);
 			int ed = min_t(int,free_end,readend);
 			int n = ed - st;
 			memcpy(buf, oob_buf + st, n);
@@ -1816,26 +1818,27 @@ static int onenand_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 static int onenand_fill_auto_oob(struct mtd_info *mtd, u_char *oob_buf,
 				  const u_char *buf, int column, int thislen)
 {
-	struct onenand_chip *this = mtd->priv;
-	struct nand_oobfree *free;
+	struct nand_oobfree free = { };
 	int writecol = column;
 	int writeend = column + thislen;
 	int lastgap = 0;
-	unsigned int i;
+	unsigned int i = 0;
 
-	free = this->ecclayout->oobfree;
-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
+	for (mtd_oobfree(mtd, i++, &free); free.length;
+	     mtd_oobfree(mtd, i++, &free)) {
 		if (writecol >= lastgap)
-			writecol += free->offset - lastgap;
+			writecol += free.offset - lastgap;
 		if (writeend >= lastgap)
-			writeend += free->offset - lastgap;
-		lastgap = free->offset + free->length;
+			writeend += free.offset - lastgap;
+		lastgap = free.offset + free.length;
 	}
-	free = this->ecclayout->oobfree;
-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
-		int free_end = free->offset + free->length;
-		if (free->offset < writeend && free_end > writecol) {
-			int st = max_t(int,free->offset,writecol);
+	memset(&free, 0, sizeof(free));
+	i = 0;
+	for (mtd_oobfree(mtd, i++, &free); free.length;
+	     mtd_oobfree(mtd, i++, &free)) {
+		int free_end = free.offset + free.length;
+		if (free.offset < writeend && free_end > writecol) {
+			int st = max_t(int,free.offset,writecol);
 			int ed = min_t(int,free_end,writeend);
 			int n = ed - st;
 			memcpy(oob_buf + st, buf, n);
@@ -3942,6 +3945,7 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
 {
 	int i, ret;
 	struct onenand_chip *this = mtd->priv;
+	struct nand_oobfree oobfree = {};
 
 	if (!this->read_word)
 		this->read_word = onenand_readw;
@@ -4050,9 +4054,10 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
 	 * the out of band area
 	 */
 	mtd->oobavail = 0;
-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES &&
-	    this->ecclayout->oobfree[i].length; i++)
-		mtd->oobavail += this->ecclayout->oobfree[i].length;
+	i = 0;
+	for (mtd_oobfree(mtd, i++, &oobfree); oobfree.length;
+	     mtd_oobfree(mtd, i++, &oobfree))
+		mtd->oobavail += oobfree.length;
 
 	mtd->ecclayout = this->ecclayout;
 	mtd->ecc_strength = 1;
