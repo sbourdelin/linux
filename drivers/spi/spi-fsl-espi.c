@@ -495,7 +495,7 @@ static int fsl_espi_setup(struct spi_device *spi)
 			&reg_base->csmode[spi->chip_select]);
 	/* mask out bits we are going to set */
 	cs->hw_mode &= ~(CSMODE_CP_BEGIN_EDGECLK | CSMODE_CI_INACTIVEHIGH
-			 | CSMODE_REV);
+			 | CSMODE_REV | CSMODE_POL_1);
 
 	if (spi->mode & SPI_CPHA)
 		cs->hw_mode |= CSMODE_CP_BEGIN_EDGECLK;
@@ -503,6 +503,8 @@ static int fsl_espi_setup(struct spi_device *spi)
 		cs->hw_mode |= CSMODE_CI_INACTIVEHIGH;
 	if (!(spi->mode & SPI_LSB_FIRST))
 		cs->hw_mode |= CSMODE_REV;
+	if (!(spi->mode & SPI_CS_HIGH))
+		cs->hw_mode |= CSMODE_POL_1;
 
 	/* Handle the loop mode */
 	loop_mode = mpc8xxx_spi_read_reg(&reg_base->mode);
