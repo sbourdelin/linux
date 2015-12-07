@@ -16,40 +16,6 @@
 
 static spinlock_t nf_connlabels_lock;
 
-static unsigned int label_bits(const struct nf_conn_labels *l)
-{
-	unsigned int longs = l->words;
-	return longs * BITS_PER_LONG;
-}
-
-bool nf_connlabel_match(const struct nf_conn *ct, u16 bit)
-{
-	struct nf_conn_labels *labels = nf_ct_labels_find(ct);
-
-	if (!labels)
-		return false;
-
-	return bit < label_bits(labels) && test_bit(bit, labels->bits);
-}
-EXPORT_SYMBOL_GPL(nf_connlabel_match);
-
-int nf_connlabel_set(struct nf_conn *ct, u16 bit)
-{
-	struct nf_conn_labels *labels = nf_ct_labels_find(ct);
-
-	if (!labels || bit >= label_bits(labels))
-		return -ENOSPC;
-
-	if (test_bit(bit, labels->bits))
-		return 0;
-
-	if (!test_and_set_bit(bit, labels->bits))
-		nf_conntrack_event_cache(IPCT_LABEL, ct);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(nf_connlabel_set);
-
 static void replace_u32(u32 *address, u32 mask, u32 new)
 {
 	u32 old, tmp;
