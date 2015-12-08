@@ -9,7 +9,9 @@
 
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/irqdomain.h>
 #include <linux/pci.h>
+#include <linux/msi.h>
 #include <linux/pci_hotplug.h>
 #include <linux/module.h>
 #include <linux/pci-aspm.h>
@@ -688,6 +690,36 @@ static struct acpi_bus_type acpi_pci_bus = {
 	.setup = pci_acpi_setup,
 	.cleanup = pci_acpi_cleanup,
 };
+
+
+static struct fwnode_handle *(*pci_msi_get_fwnode_cb)(struct device *dev);
+
+/**
+ * pci_msi_register_fwnode_provider - Register callback to retrieve fwnode
+ * @fn:		The interrupt domain to retrieve
+ *
+ * This should be called by irqchip driver, which is the parent of
+ * the MSI domain to provide callback interface to query fwnode.
+ */
+void
+pci_msi_register_fwnode_provider(struct fwnode_handle *(*fn)(struct device *))
+{
+	pci_msi_get_fwnode_cb = fn;
+}
+
+struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+{
+	struct irq_domain *dom = NULL;
+	struct fwnode_handle *fwnode = NULL;
+
+	if (pci_msi_get_fwnode_cb)
+		fwnode = pci_msi_get_fwnode_cb(&bus->dev);
+
+	if (fwnode)
+		dom = irq_find_matching_fwnode(fwnode,
+					       DOMAIN_BUS_PCI_MSI);
+	return dom;
+}
 
 static int __init acpi_pci_init(void)
 {
