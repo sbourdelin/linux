@@ -688,7 +688,10 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy *policy,
 	struct cpufreq_governor *t;
 
 	if (!has_target()) {
-		i += sprintf(buf, "performance powersave");
+		if (policy->available_policies & CPUFREQ_POLICY_PERFORMANCE)
+			i += sprintf(buf, "performance ");
+		if (policy->available_policies & CPUFREQ_POLICY_POWERSAVE)
+			i += sprintf(&buf[i], "powersave ");
 		goto out;
 	}
 
@@ -965,6 +968,10 @@ static int cpufreq_init_policy(struct cpufreq_policy *policy)
 	struct cpufreq_policy new_policy;
 
 	memcpy(&new_policy, policy, sizeof(*policy));
+
+	if (!policy->available_policies)
+		policy->available_policies = CPUFREQ_POLICY_PERFORMANCE |
+						CPUFREQ_POLICY_POWERSAVE;
 
 	/* Update governor of new_policy to the governor used before hotplug */
 	gov = find_governor(policy->last_governor);
