@@ -6272,6 +6272,17 @@ qlt_enable_vha(struct scsi_qla_host *vha)
 		qla24xx_disable_vp(vha);
 		qla24xx_enable_vp(vha);
 	} else {
+		if (ha->msix_entries) {
+			ql_dbg(ql_dbg_tgt, vha, 0xffff,
+			    "%s: host%ld : vector %d cpu %d\n",
+			    __func__, vha->host_no,
+			    ha->msix_entries[QLA83XX_RSPQ_MSIX_ENTRY_NUMBER].vector,
+			    ha->msix_entries[QLA83XX_RSPQ_MSIX_ENTRY_NUMBER].cpuid);
+
+			ha->tgt.rspq_vector_cpuid =
+			ha->msix_entries[QLA83XX_RSPQ_MSIX_ENTRY_NUMBER].cpuid;
+		}
+
 		set_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags);
 		qla2xxx_wake_dpc(base_vha);
 		qla2x00_wait_for_hba_online(base_vha);
