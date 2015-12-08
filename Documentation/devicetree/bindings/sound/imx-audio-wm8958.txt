@@ -1,0 +1,74 @@
+Freescale i.MX audio complex with WM8958 codec
+
+Required properties:
+
+  - compatible		   : "fsl,imx-audio-wm8958"
+
+  - model		   : The user-visible name of this sound complex
+
+  - cpu-dai		   : The phandle of an CPU DAI controller
+
+  - audio-codec		   : The phandle of the WM8958 audio codec
+
+  - audio-routing	   : A list of the connections between audio components.
+			     Each entry is a pair of strings, the first being
+			     the connection's sink, the second being the
+			     connection's source. Valid names could be power
+			     supplies, WM8958 pins, and the jacks on the board:
+
+			     Power supplies:
+			      * MICBIAS1
+			      * MICBIAS2
+
+			     Board connectors:
+			      * Headphone Jack
+			      * Ext Spk
+
+ - aifx-format             : set format for aifx, such as "i2s", "left_j",
+			     "dsp_a", "dsp_b".
+
+ - aifx-bitclock-master    : If present, aifx wroks as bit clock master.
+			     Otherwise, aifx works as bit clock slave.
+
+ - aifx-frame-master	   : If present, aifx wroks as frame clock master.
+			     Otherwise, aifx works as frame clock slave.
+
+ - aifx-bitclock-inversion : If present, bit clock will invert polarity.
+
+ - aifx-frame-inversion	   : If present, frame clock will invert polarity.
+
+ - aifx-continuous-clock   : If present, bit clock will be continuous.
+			     Otherwise, dai bit clocks can be be gated
+			     (disabled) when the dai is not sending or
+			     receiving PCM data in a frame.
+
+Example:
+
+sound {
+		compatible = "fsl,imx6ul-evk-wm8958",
+			   "fsl,imx-audio-wm8958";
+		model = "wm8960-audio";
+		cpu-dai = <&sai1>;
+		audio-codec = <&codec>;
+		audio-routing =
+			"Headphone Jack", "HPOUT1L",
+			"Headphone Jack", "HPOUT1R",
+			"Ext Spk", "SPKOUTLP",
+			"Ext Spk", "SPKOUTLN",
+			"Ext Spk", "SPKOUTRP",
+			"Ext Spk", "SPKOUTRN",
+			"IN1LN", "MICBIAS2";
+
+		/* set aif1 dai format */
+		aif1-format = "i2s";
+		aif1-bitclock-master;
+		aif1-frame-master;
+		/* set aif2 dai format */
+		aif2-format = "i2s";
+		aif2-bitclock-master;
+		aif2-frame-master;
+		/* set aif3 dai format */
+		aif3-format = "i2s";
+		aif3-bitclock-master;
+		aif3-frame-master;
+};
