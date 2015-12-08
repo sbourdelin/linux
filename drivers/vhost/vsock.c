@@ -56,7 +56,8 @@ struct vhost_vsock {
 
 static u32 vhost_transport_get_local_cid(void)
 {
-	return VHOST_VSOCK_DEFAULT_HOST_CID;
+	u32 cid = VHOST_VSOCK_DEFAULT_HOST_CID;
+	return cid;
 }
 
 static struct vhost_vsock *vhost_vsock_get(u32 guest_cid)
