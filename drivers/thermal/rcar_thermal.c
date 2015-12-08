@@ -210,8 +210,12 @@ static int rcar_thermal_get_temp(struct thermal_zone_device *zone, int *temp)
 {
 	struct rcar_thermal_priv *priv = rcar_zone_to_priv(zone);
 
-	if (!rcar_has_irq_support(priv) || rcar_force_update_temp(priv))
-		rcar_thermal_update_temp(priv);
+	if (!rcar_has_irq_support(priv) || rcar_force_update_temp(priv)) {
+		int ret = rcar_thermal_update_temp(priv);
+
+		if (ret < 0)
+			return ret;
+	}
 
 	mutex_lock(&priv->lock);
 	*temp =  MCELSIUS((priv->ctemp * 5) - 65);
@@ -305,11 +309,15 @@ static void rcar_thermal_work(struct work_struct *work)
 {
 	struct rcar_thermal_priv *priv;
 	int cctemp, nctemp;
+	int ret;
 
 	priv = container_of(work, struct rcar_thermal_priv, work.work);
 
 	rcar_thermal_get_temp(priv->zone, &cctemp);
-	rcar_thermal_update_temp(priv);
+	ret = rcar_thermal_update_temp(priv);
+	if (ret < 0)
+		return;
+
 	rcar_thermal_irq_enable(priv);
 
 	rcar_thermal_get_temp(priv->zone, &nctemp);
@@ -427,7 +435,9 @@ static int rcar_thermal_probe(struct platform_device *pdev)
 		mutex_init(&priv->lock);
 		INIT_LIST_HEAD(&priv->list);
 		INIT_DELAYED_WORK(&priv->work, rcar_thermal_work);
-		rcar_thermal_update_temp(priv);
+		ret = rcar_thermal_update_temp(priv);
+		if (ret < 0)
+			goto error_unregister;
 
 		priv->zone = thermal_zone_device_register("rcar_thermal",
 						1, 0, priv,
