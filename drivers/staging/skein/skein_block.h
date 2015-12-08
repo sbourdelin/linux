@@ -7,6 +7,13 @@
 ** This algorithm and source code is released to the public domain.
 **
 ************************************************************************/
+
+#define BLK_BITS        (WCNT * 64) /* some useful definitions for code here */
+#define KW_TWK_BASE     (0)
+#define KW_KEY_BASE     (3)
+#define ks              (kw + KW_KEY_BASE)
+#define ts              (kw + KW_TWK_BASE)
+
 #ifndef _SKEIN_BLOCK_H_
 #define _SKEIN_BLOCK_H_
 
