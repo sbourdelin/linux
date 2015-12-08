@@ -302,7 +302,7 @@ enum {
 	Opt_check_integrity_print_mask, Opt_fatal_errors, Opt_rescan_uuid_tree,
 	Opt_commit_interval, Opt_barrier, Opt_nodefrag, Opt_nodiscard,
 	Opt_noenospc_debug, Opt_noflushoncommit, Opt_acl, Opt_datacow,
-	Opt_datasum, Opt_treelog, Opt_noinode_cache,
+	Opt_datasum, Opt_treelog, Opt_noinode_cache, Opt_nologreplay,
 #ifdef CONFIG_BTRFS_DEBUG
 	Opt_fragment_data, Opt_fragment_metadata, Opt_fragment_all,
 #endif
@@ -334,6 +334,7 @@ static match_table_t tokens = {
 	{Opt_noacl, "noacl"},
 	{Opt_notreelog, "notreelog"},
 	{Opt_treelog, "treelog"},
+	{Opt_nologreplay, "nologreplay"},
 	{Opt_flushoncommit, "flushoncommit"},
 	{Opt_noflushoncommit, "noflushoncommit"},
 	{Opt_ratio, "metadata_ratio=%d"},
@@ -371,7 +372,8 @@ static match_table_t tokens = {
  * reading in a new superblock is parsed here.
  * XXX JDM: This needs to be cleaned up for remount.
  */
-int btrfs_parse_options(struct btrfs_root *root, char *options)
+int btrfs_parse_options(struct btrfs_root *root, char *options,
+			unsigned long new_flags)
 {
 	struct btrfs_fs_info *info = root->fs_info;
 	substring_t args[MAX_OPT_ARGS];
@@ -386,8 +388,12 @@ int btrfs_parse_options(struct btrfs_root *root, char *options)
 	if (cache_gen)
 		btrfs_set_opt(info->mount_opt, SPACE_CACHE);
 
+	/*
+	 * Even the options are empty, we still need to do extra check
+	 * against new flags
+	 */
 	if (!options)
-		goto out;
+		goto check;
 
 	/*
 	 * strsep changes the string, duplicate it because parse_options
@@ -587,6 +593,10 @@ int btrfs_parse_options(struct btrfs_root *root, char *options)
 			btrfs_clear_and_info(root, NOTREELOG,
 					     "enabling tree log");
 			break;
+		case Opt_nologreplay:
+			btrfs_set_and_info(root, NOLOGREPLAY,
+					   "disabling log replay at mount time");
+			break;
 		case Opt_flushoncommit:
 			btrfs_set_and_info(root, FLUSHONCOMMIT,
 					   "turning on flush-on-commit");
@@ -752,6 +762,15 @@ int btrfs_parse_options(struct btrfs_root *root, char *options)
 		default:
 			break;
 		}
+	}
+check:
+	/*
+	 * Extra check for current option against current flag
+	 */
+	if (btrfs_test_opt(root, NOLOGREPLAY) && !(new_flags & MS_RDONLY)) {
+		btrfs_err(root->fs_info,
+			  "nologreplay must be used with ro mount option");
+		ret = -EINVAL;
 	}
 out:
 	if (!ret && btrfs_test_opt(root, SPACE_CACHE))
@@ -1154,6 +1173,8 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 		seq_puts(seq, ",ssd");
 	if (btrfs_test_opt(root, NOTREELOG))
 		seq_puts(seq, ",notreelog");
+	if (btrfs_test_opt(root, NOLOGREPLAY))
+		seq_puts(seq, ",nologreplay");
 	if (btrfs_test_opt(root, FLUSHONCOMMIT))
 		seq_puts(seq, ",flushoncommit");
 	if (btrfs_test_opt(root, DISCARD))
@@ -1637,7 +1658,7 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 		}
 	}
 
-	ret = btrfs_parse_options(root, data);
+	ret = btrfs_parse_options(root, data, *flags);
 	if (ret) {
 		ret = -EINVAL;
 		goto restore;
