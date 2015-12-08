@@ -42,6 +42,10 @@ Required properties:
 			     (disabled) when the dai is not sending or
 			     receiving PCM data in a frame.
 
+Optional properties:
+
+- hp-det-gpios		   : set headphone detected gpio for sound card.
+
 Example:
 
 sound {
@@ -50,6 +54,7 @@ sound {
 		model = "wm8960-audio";
 		cpu-dai = <&sai1>;
 		audio-codec = <&codec>;
+		hp-det-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
 		audio-routing =
 			"Headphone Jack", "HPOUT1L",
 			"Headphone Jack", "HPOUT1R",
