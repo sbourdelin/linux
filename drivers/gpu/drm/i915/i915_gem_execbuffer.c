@@ -281,6 +281,7 @@ relocate_entry_cpu(struct drm_i915_gem_object *obj,
 	}
 
 	kunmap_atomic(vaddr);
+	obj->dirty = 1;
 
 	return 0;
 }
@@ -372,6 +373,7 @@ relocate_entry_clflush(struct drm_i915_gem_object *obj,
 	}
 
 	kunmap_atomic(vaddr);
+	obj->dirty = 1;
 
 	return 0;
 }

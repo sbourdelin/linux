@@ -144,6 +144,7 @@ static int render_state_setup(struct render_state *so)
 	so->aux_batch_size = ALIGN(so->aux_batch_size, 8);
 
 	kunmap(page);
+	so->obj->dirty = 1;
 
 	ret = i915_gem_object_set_to_gtt_domain(so->obj, false);
 	if (ret)

@@ -574,6 +574,7 @@ static void lr_context_update(struct drm_i915_gem_request *rq)
 	reg_state[CTX_RING_BUFFER_START+1] = i915_gem_obj_ggtt_offset(rb_obj);
 
 	kunmap_atomic(reg_state);
+	ctx_obj->dirty = 1;
 }
 
 /**
