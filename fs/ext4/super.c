@@ -796,21 +796,16 @@ static void ext4_blkdev_remove(struct ext4_sb_info *sbi)
 	}
 }
 
-static inline struct inode *orphan_list_entry(struct list_head *l)
-{
-	return &list_entry(l, struct ext4_inode_info, i_orphan)->vfs_inode;
-}
-
 static void dump_orphan_list(struct super_block *sb, struct ext4_sb_info *sbi)
 {
-	struct list_head *l;
+	struct ext4_inode_info *ei;
 
 	ext4_msg(sb, KERN_ERR, "sb orphan head is %d",
 		 le32_to_cpu(sbi->s_es->s_last_orphan));
 
 	printk(KERN_ERR "sb_info orphan list:\n");
-	list_for_each(l, &sbi->s_orphan) {
-		struct inode *inode = orphan_list_entry(l);
+	list_for_each_entry(ei, &sbi->s_orphan, i_orphan) {
+		struct inode *inode = &ei->vfs_inode;
 		printk(KERN_ERR "  "
 		       "inode %s:%lu at %p: mode %o, nlink %d, next %d\n",
 		       inode->i_sb->s_id, inode->i_ino, inode,
@@ -2699,8 +2694,7 @@ static struct task_struct *ext4_lazyinit_task;
 static int ext4_lazyinit_thread(void *arg)
 {
 	struct ext4_lazy_init *eli = (struct ext4_lazy_init *)arg;
-	struct list_head *pos, *n;
-	struct ext4_li_request *elr;
+	struct ext4_li_request *elr, *n;
 	unsigned long next_wakeup, cur;
 
 	BUG_ON(NULL == eli);
@@ -2715,9 +2709,8 @@ cont_thread:
 			goto exit_thread;
 		}
 
-		list_for_each_safe(pos, n, &eli->li_request_list) {
-			elr = list_entry(pos, struct ext4_li_request,
-					 lr_request);
+		list_for_each_entry_safe(elr, n, &eli->li_request_list,
+					 lr_request) {
 
 			if (time_after_eq(jiffies, elr->lr_next_sched)) {
 				if (ext4_run_li_request(elr) != 0) {
@@ -2775,13 +2768,11 @@ exit_thread:
 
 static void ext4_clear_request_list(void)
 {
-	struct list_head *pos, *n;
-	struct ext4_li_request *elr;
+	struct ext4_li_request *elr, *n;
 
 	mutex_lock(&ext4_li_info->li_list_mtx);
-	list_for_each_safe(pos, n, &ext4_li_info->li_request_list) {
-		elr = list_entry(pos, struct ext4_li_request,
-				 lr_request);
+	list_for_each_entry_safe(elr, n, &ext4_li_info->li_request_list,
+				 lr_request) {
 		ext4_remove_li_request(elr);
 	}
 	mutex_unlock(&ext4_li_info->li_list_mtx);

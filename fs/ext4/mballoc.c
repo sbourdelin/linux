@@ -565,7 +565,7 @@ static int __mb_check_buddy(struct ext4_buddy *e4b, char *file,
 	struct ext4_group_info *grp;
 	int fragments = 0;
 	int fstart;
-	struct list_head *cur;
+	struct ext4_prealloc_space *pa;
 	void *buddy;
 	void *buddy2;
 
@@ -637,10 +637,8 @@ static int __mb_check_buddy(struct ext4_buddy *e4b, char *file,
 	MB_CHECK_ASSERT(e4b->bd_info->bb_fragments == fragments);
 
 	grp = ext4_get_group_info(sb, e4b->bd_group);
-	list_for_each(cur, &grp->bb_prealloc_list) {
+	list_for_each_entry(pa, &grp->bb_prealloc_list, pa_group_list) {
 		ext4_group_t groupnr;
-		struct ext4_prealloc_space *pa;
-		pa = list_entry(cur, struct ext4_prealloc_space, pa_group_list);
 		ext4_get_group_no_and_offset(sb, pa->pa_pstart, &groupnr, &k);
 		MB_CHECK_ASSERT(groupnr == e4b->bd_group);
 		for (i = 0; i < pa->pa_len; i++)
@@ -2684,12 +2682,11 @@ out:
 /* need to called with the ext4 group lock held */
 static void ext4_mb_cleanup_pa(struct ext4_group_info *grp)
 {
-	struct ext4_prealloc_space *pa;
-	struct list_head *cur, *tmp;
+	struct ext4_prealloc_space *pa, *tmp;
 	int count = 0;
 
-	list_for_each_safe(cur, tmp, &grp->bb_prealloc_list) {
-		pa = list_entry(cur, struct ext4_prealloc_space, pa_group_list);
+	list_for_each_entry_safe(pa, tmp, &grp->bb_prealloc_list,
+				 pa_group_list) {
 		list_del(&pa->pa_group_list);
 		count++;
 		kmem_cache_free(ext4_pspace_cachep, pa);
@@ -3469,7 +3466,6 @@ void ext4_mb_generate_from_pa(struct super_block *sb, void *bitmap,
 {
 	struct ext4_group_info *grp = ext4_get_group_info(sb, group);
 	struct ext4_prealloc_space *pa;
-	struct list_head *cur;
 	ext4_group_t groupnr;
 	ext4_grpblk_t start;
 	int preallocated = 0;
@@ -3483,8 +3479,7 @@ void ext4_mb_generate_from_pa(struct super_block *sb, void *bitmap,
 	 * allocation in buddy when concurrent ext4_mb_put_pa()
 	 * is dropping preallocation
 	 */
-	list_for_each(cur, &grp->bb_prealloc_list) {
-		pa = list_entry(cur, struct ext4_prealloc_space, pa_group_list);
+	list_for_each_entry(pa, &grp->bb_prealloc_list, pa_group_list) {
 		spin_lock(&pa->pa_lock);
 		ext4_get_group_no_and_offset(sb, pa->pa_pstart,
 					     &groupnr, &start);
@@ -4077,11 +4072,8 @@ static void ext4_mb_show_ac(struct ext4_allocation_context *ac)
 		struct ext4_group_info *grp = ext4_get_group_info(sb, i);
 		struct ext4_prealloc_space *pa;
 		ext4_grpblk_t start;
-		struct list_head *cur;
 		ext4_lock_group(sb, i);
-		list_for_each(cur, &grp->bb_prealloc_list) {
-			pa = list_entry(cur, struct ext4_prealloc_space,
-					pa_group_list);
+		list_for_each_entry(pa, &grp->bb_prealloc_list, pa_group_list) {
 			spin_lock(&pa->pa_lock);
 			ext4_get_group_no_and_offset(sb, pa->pa_pstart,
 						     NULL, &start);
