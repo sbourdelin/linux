@@ -760,7 +760,8 @@ struct ca0132_spec {
  */
 enum {
 	QUIRK_NONE,
-	QUIRK_ALIENWARE,
+	QUIRK_ALIENWARE_15,
+	QUIRK_ALIENWARE_17,
 };
 
 static const struct hda_pintbl alienware_pincfgs[] = {
@@ -778,7 +779,8 @@ static const struct hda_pintbl alienware_pincfgs[] = {
 };
 
 static const struct snd_pci_quirk ca0132_quirks[] = {
-	SND_PCI_QUIRK(0x1028, 0x0685, "Alienware 15", QUIRK_ALIENWARE),
+	SND_PCI_QUIRK(0x1028, 0x0685, "Alienware 15 2015", QUIRK_ALIENWARE_15),
+	SND_PCI_QUIRK(0x1028, 0x0688, "Alienware 17 2015", QUIRK_ALIENWARE_17),
 	{}
 };
 
@@ -4631,8 +4633,8 @@ static void ca0132_config(struct hda_codec *codec)
 	spec->multiout.num_dacs = 3;
 	spec->multiout.max_channels = 2;
 
-	if (spec->quirk == QUIRK_ALIENWARE) {
-		codec_dbg(codec, "ca0132_config: QUIRK_ALIENWARE applied.\n");
+	if (spec->quirk == QUIRK_ALIENWARE_15 || spec->quirk == QUIRK_ALIENWARE_17) {
+		codec_dbg(codec, "ca0132_config: QUIRK_ALIENWARE_* applied.\n");
 		snd_hda_apply_pincfgs(codec, alienware_pincfgs);
 
 		spec->num_outputs = 2;
