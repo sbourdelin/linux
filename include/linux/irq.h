@@ -128,6 +128,18 @@ struct msi_desc;
 struct irq_domain;
 
 /**
+ * struct ipi_mapping - IPI mapping information object
+ * @nr_hwirqs: number of hwirqs mapped
+ * @nr_cpus: number of cpus the controller can talk to
+ * @cpumap: per cpu hwirq mapping table
+ */
+struct ipi_mapping {
+	unsigned int nr_hwirqs;
+	unsigned int nr_cpus;
+	unsigned int cpumap[];
+};
+
+/**
  * struct irq_common_data - per irq data shared by all irqchips
  * @state_use_accessors: status information for irq chip functions.
  *			Use accessor functions to deal with it
@@ -135,6 +147,9 @@ struct irq_domain;
  * @handler_data:	per-IRQ data for the irq_chip methods
  * @affinity:		IRQ affinity on SMP
  * @msi_desc:		MSI descriptor
+ * @ipi_mapping:	Contains the hwirq mapping of IPIs.
+ *			The use of this struct is optional and not all irqchips
+ *			will use it.
  */
 struct irq_common_data {
 	unsigned int		state_use_accessors;
@@ -144,6 +159,9 @@ struct irq_common_data {
 	void			*handler_data;
 	struct msi_desc		*msi_desc;
 	cpumask_var_t		affinity;
+#ifdef CONFIG_GENERIC_IRQ_IPI
+	struct ipi_mapping	*ipi_map;
+#endif
 };
 
 /**
@@ -681,6 +699,21 @@ static inline struct cpumask *irq_data_get_affinity_mask(struct irq_data *d)
 	return d->common->affinity;
 }
 
+#ifdef CONFIG_GENERIC_IRQ_IPI
+
+static inline struct ipi_mapping *irq_data_get_ipi_map(struct irq_data *d)
+{
+	return d->common->ipi_map;
+}
+
+static inline void irq_data_set_ipi_map(struct irq_data *d,
+					struct ipi_mapping *map)
+{
+	d->common->ipi_map = map;
+}
+
+#endif
+
 unsigned int arch_dynirq_lower_bound(unsigned int from);
 
 int __irq_alloc_descs(int irq, unsigned int from, unsigned int cnt, int node,
@@ -933,5 +966,15 @@ static inline u32 irq_reg_readl(struct irq_chip_generic *gc,
 	else
 		return readl(gc->reg_base + reg_offset);
 }
+
+#define INVALID_HWIRQ	-1
+
+struct ipi_mapping *irq_alloc_ipi_mapping(unsigned int nr_cpus);
+void irq_free_ipi_mapping(struct ipi_mapping *map);
+int irq_map_ipi(struct ipi_mapping *map,
+		unsigned int cpu, irq_hw_number_t hwirq);
+int irq_unmap_ipi(struct ipi_mapping *map, unsigned int cpu);
+irq_hw_number_t irq_ipi_mapping_get_hwirq(struct ipi_mapping *map,
+					  unsigned int cpu);
 
 #endif /* _LINUX_IRQ_H */
