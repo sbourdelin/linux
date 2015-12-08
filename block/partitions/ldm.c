@@ -601,15 +601,14 @@ out:
  * Return:  Pointer, A matching vblk was found
  *          NULL,    No match, or an error
  */
-static struct vblk * ldm_get_disk_objid (const struct ldmdb *ldb)
+static struct vblk *ldm_get_disk_objid(const struct ldmdb *ldb)
 {
-	struct list_head *item;
+	struct vblk *v;
 
-	BUG_ON (!ldb);
+	BUG_ON(!ldb);
 
-	list_for_each (item, &ldb->v_disk) {
-		struct vblk *v = list_entry (item, struct vblk, list);
-		if (!memcmp (v->vblk.disk.disk_id, ldb->ph.disk_id, GUID_SIZE))
+	list_for_each_entry(v, &ldb->v_disk, list) {
+		if (!memcmp(v->vblk.disk.disk_id, ldb->ph.disk_id, GUID_SIZE))
 			return v;
 	}
 
@@ -633,34 +632,32 @@ static struct vblk * ldm_get_disk_objid (const struct ldmdb *ldb)
  * Return:  'true'   Partition created
  *          'false'  Error, probably a range checking problem
  */
-static bool ldm_create_data_partitions (struct parsed_partitions *pp,
-					const struct ldmdb *ldb)
+static bool ldm_create_data_partitions(struct parsed_partitions *pp,
+				       const struct ldmdb *ldb)
 {
-	struct list_head *item;
 	struct vblk *vb;
 	struct vblk *disk;
 	struct vblk_part *part;
 	int part_num = 1;
 
-	BUG_ON (!pp || !ldb);
+	BUG_ON(!pp || !ldb);
 
-	disk = ldm_get_disk_objid (ldb);
+	disk = ldm_get_disk_objid(ldb);
 	if (!disk) {
-		ldm_crit ("Can't find the ID of this disk in the database.");
+		ldm_crit("Can't find the ID of this disk in the database.");
 		return false;
 	}
 
 	strlcat(pp->pp_buf, " [LDM]", PAGE_SIZE);
 
 	/* Create the data partitions */
-	list_for_each (item, &ldb->v_part) {
-		vb = list_entry (item, struct vblk, list);
+	list_for_each_entry(vb, &ldb->v_part, list) {
 		part = &vb->vblk.part;
 
 		if (part->disk_id != disk->obj_id)
 			continue;
 
-		put_partition (pp, part_num, ldb->ph.logical_disk_start +
+		put_partition(pp, part_num, ldb->ph.logical_disk_start +
 				part->start, part->size);
 		part_num++;
 	}
@@ -1231,20 +1228,19 @@ static bool ldm_parse_vblk (const u8 *buf, int len, struct vblk *vb)
  * Return:  'true'   The VBLK was added
  *          'false'  An error occurred
  */
-static bool ldm_ldmdb_add (u8 *data, int len, struct ldmdb *ldb)
+static bool ldm_ldmdb_add(u8 *data, int len, struct ldmdb *ldb)
 {
-	struct vblk *vb;
-	struct list_head *item;
+	struct vblk *vb, *v;
 
-	BUG_ON (!data || !ldb);
+	BUG_ON(!data || !ldb);
 
-	vb = kmalloc (sizeof (*vb), GFP_KERNEL);
+	vb = kmalloc(sizeof(*vb), GFP_KERNEL);
 	if (!vb) {
-		ldm_crit ("Out of memory.");
+		ldm_crit("Out of memory.");
 		return false;
 	}
 
-	if (!ldm_parse_vblk (data, len, vb)) {
+	if (!ldm_parse_vblk(data, len, vb)) {
 		kfree(vb);
 		return false;			/* Already logged */
 	}
@@ -1253,29 +1249,28 @@ static bool ldm_ldmdb_add (u8 *data, int len, struct ldmdb *ldb)
 	switch (vb->type) {
 	case VBLK_DGR3:
 	case VBLK_DGR4:
-		list_add (&vb->list, &ldb->v_dgrp);
+		list_add(&vb->list, &ldb->v_dgrp);
 		break;
 	case VBLK_DSK3:
 	case VBLK_DSK4:
-		list_add (&vb->list, &ldb->v_disk);
+		list_add(&vb->list, &ldb->v_disk);
 		break;
 	case VBLK_VOL5:
-		list_add (&vb->list, &ldb->v_volu);
+		list_add(&vb->list, &ldb->v_volu);
 		break;
 	case VBLK_CMP3:
-		list_add (&vb->list, &ldb->v_comp);
+		list_add(&vb->list, &ldb->v_comp);
 		break;
 	case VBLK_PRT3:
 		/* Sort by the partition's start sector. */
-		list_for_each (item, &ldb->v_part) {
-			struct vblk *v = list_entry (item, struct vblk, list);
+		list_for_each_entry(v, &ldb->v_part, list) {
 			if ((v->vblk.part.disk_id == vb->vblk.part.disk_id) &&
 			    (v->vblk.part.start > vb->vblk.part.start)) {
-				list_add_tail (&vb->list, &v->list);
+				list_add_tail(&vb->list, &v->list);
 				return true;
 			}
 		}
-		list_add_tail (&vb->list, &ldb->v_part);
+		list_add_tail(&vb->list, &ldb->v_part);
 		break;
 	}
 	return true;
@@ -1293,13 +1288,12 @@ static bool ldm_ldmdb_add (u8 *data, int len, struct ldmdb *ldb)
  * Return:  'true'   Success, the VBLK was added to the list
  *          'false'  Error, a problem occurred
  */
-static bool ldm_frag_add (const u8 *data, int size, struct list_head *frags)
+static bool ldm_frag_add(const u8 *data, int size, struct list_head *frags)
 {
 	struct frag *f;
-	struct list_head *item;
 	int rec, num, group;
 
-	BUG_ON (!data || !frags);
+	BUG_ON(!data || !frags);
 
 	if (size < 2 * VBLK_SIZE_HEAD) {
 		ldm_error("Value of size is to small.");
@@ -1310,7 +1304,7 @@ static bool ldm_frag_add (const u8 *data, int size, struct list_head *frags)
 	rec   = get_unaligned_be16(data + 0x0C);
 	num   = get_unaligned_be16(data + 0x0E);
 	if ((num < 1) || (num > 4)) {
-		ldm_error ("A VBLK claims to have %d parts.", num);
+		ldm_error("A VBLK claims to have %d parts.", num);
 		return false;
 	}
 	if (rec >= num) {
@@ -1318,15 +1312,14 @@ static bool ldm_frag_add (const u8 *data, int size, struct list_head *frags)
 		return false;
 	}
 
-	list_for_each (item, frags) {
-		f = list_entry (item, struct frag, list);
+	list_for_each_entry(f, frags, list) {
 		if (f->group == group)
 			goto found;
 	}
 
-	f = kmalloc (sizeof (*f) + size*num, GFP_KERNEL);
+	f = kmalloc(sizeof(*f) + size*num, GFP_KERNEL);
 	if (!f) {
-		ldm_crit ("Out of memory.");
+		ldm_crit("Out of memory.");
 		return false;
 	}
 
@@ -1335,14 +1328,14 @@ static bool ldm_frag_add (const u8 *data, int size, struct list_head *frags)
 	f->rec   = rec;
 	f->map   = 0xFF << num;
 
-	list_add_tail (&f->list, frags);
+	list_add_tail(&f->list, frags);
 found:
 	if (rec >= f->num) {
 		ldm_error("REC value (%d) exceeds NUM value (%d)", rec, f->num);
 		return false;
 	}
 	if (f->map & (1 << rec)) {
-		ldm_error ("Duplicate VBLK, part %d.", rec);
+		ldm_error("Duplicate VBLK, part %d.", rec);
 		f->map &= 0x7F;			/* Mark the group as broken */
 		return false;
 	}
@@ -1357,20 +1350,20 @@ found:
 
 /**
  * ldm_frag_free - Free a linked list of VBLK fragments
- * @list:  Linked list of fragments
+ * @lh:  Linked list of fragments
  *
  * Free a linked list of VBLK fragments
  *
  * Return:  none
  */
-static void ldm_frag_free (struct list_head *list)
+static void ldm_frag_free(struct list_head *lh)
 {
-	struct list_head *item, *tmp;
+	struct frag *f, *tmp;
 
-	BUG_ON (!list);
+	BUG_ON(!lh);
 
-	list_for_each_safe (item, tmp, list)
-		kfree (list_entry (item, struct frag, list));
+	list_for_each_entry_safe(f, tmp, lh, list)
+		kfree(f);
 }
 
 /**
@@ -1384,23 +1377,20 @@ static void ldm_frag_free (struct list_head *list)
  * Return:  'true'   All the fragments we added successfully
  *          'false'  One or more of the fragments we invalid
  */
-static bool ldm_frag_commit (struct list_head *frags, struct ldmdb *ldb)
+static bool ldm_frag_commit(struct list_head *frags, struct ldmdb *ldb)
 {
 	struct frag *f;
-	struct list_head *item;
 
-	BUG_ON (!frags || !ldb);
+	BUG_ON(!frags || !ldb);
 
-	list_for_each (item, frags) {
-		f = list_entry (item, struct frag, list);
-
+	list_for_each_entry(f, frags, list) {
 		if (f->map != 0xFF) {
-			ldm_error ("VBLK group %d is incomplete (0x%02x).",
+			ldm_error("VBLK group %d is incomplete (0x%02x).",
 				f->group, f->map);
 			return false;
 		}
 
-		if (!ldm_ldmdb_add (f->data, f->num*ldb->vm.vblk_size, ldb))
+		if (!ldm_ldmdb_add(f->data, f->num*ldb->vm.vblk_size, ldb))
 			return false;		/* Already logged */
 	}
 	return true;
@@ -1478,14 +1468,14 @@ out:
  *
  * Return:  none
  */
-static void ldm_free_vblks (struct list_head *lh)
+static void ldm_free_vblks(struct list_head *lh)
 {
-	struct list_head *item, *tmp;
+	struct vblk *v, *tmp;
 
-	BUG_ON (!lh);
+	BUG_ON(!lh);
 
-	list_for_each_safe (item, tmp, lh)
-		kfree (list_entry (item, struct vblk, list));
+	list_for_each_entry_safe(v, tmp, lh, list)
+		kfree(v);
 }
 
 
