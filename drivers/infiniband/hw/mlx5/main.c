@@ -43,6 +43,7 @@
 #include <linux/mlx5/vport.h>
 #include <rdma/ib_smi.h>
 #include <rdma/ib_umem.h>
+#include <rdma/ib_cmem.h>
 #include "user.h"
 #include "mlx5_ib.h"
 
@@ -751,6 +752,11 @@ static int get_index(unsigned long offset)
 	return get_arg(offset);
 }
 
+static int get_pg_order(unsigned long offset)
+{
+	return get_arg(offset);
+}
+
 static int mlx5_ib_mmap(struct ib_ucontext *ibcontext, struct vm_area_struct *vma)
 {
 	struct mlx5_ib_ucontext *context = to_mucontext(ibcontext);
@@ -759,6 +765,11 @@ static int mlx5_ib_mmap(struct ib_ucontext *ibcontext, struct vm_area_struct *vm
 	unsigned long command;
 	unsigned long idx;
 	phys_addr_t pfn;
+	unsigned long total_size;
+	unsigned long order;
+	struct ib_cmem *ib_cmem;
+	int err;
+	int local_numa_node;
 
 	command = get_command(vma->vm_pgoff);
 	switch (command) {
@@ -784,8 +795,30 @@ static int mlx5_ib_mmap(struct ib_ucontext *ibcontext, struct vm_area_struct *vm
 			    (unsigned long long)pfn << PAGE_SHIFT);
 		break;
 
+	case MLX5_IB_MMAP_GET_CONTIGUOUS_PAGES_CPU_NUMA:
+	case MLX5_IB_MMAP_GET_CONTIGUOUS_PAGES_DEV_NUMA:
 	case MLX5_IB_MMAP_GET_CONTIGUOUS_PAGES:
-		return -ENOSYS;
+		if (command == MLX5_IB_MMAP_GET_CONTIGUOUS_PAGES_CPU_NUMA)
+			local_numa_node = numa_node_id();
+		else if (command == MLX5_IB_MMAP_GET_CONTIGUOUS_PAGES_DEV_NUMA)
+			local_numa_node = dev_to_node(&dev->mdev->pdev->dev);
+		else
+			local_numa_node = -1;
+
+		total_size = vma->vm_end - vma->vm_start;
+		order = get_pg_order(vma->vm_pgoff);
+
+		ib_cmem = ib_cmem_alloc_contiguous_pages(ibcontext, total_size,
+							 order, local_numa_node);
+		if (IS_ERR(ib_cmem))
+			return PTR_ERR(ib_cmem);
+
+		err = ib_cmem_map_contiguous_pages_to_vma(ib_cmem, vma);
+		if (err) {
+			ib_cmem_release_contiguous_pages(ib_cmem);
+			return err;
+		}
+		break;
 
 	default:
 		return -EINVAL;
