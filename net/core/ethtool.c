@@ -1123,9 +1123,15 @@ static noinline_for_stack int ethtool_get_coalesce(struct net_device *dev,
 						   void __user *useraddr)
 {
 	struct ethtool_coalesce coalesce = { .cmd = ETHTOOL_GCOALESCE };
+	struct ethtool_coalesce tmp = { .queue = -1 };
 
 	if (!dev->ethtool_ops->get_coalesce)
 		return -EOPNOTSUPP;
+
+	if (copy_from_user(&tmp, useraddr, sizeof(coalesce)))
+		return -EFAULT;
+
+	coalesce.queue = tmp.queue;
 
 	dev->ethtool_ops->get_coalesce(dev, &coalesce);
 
