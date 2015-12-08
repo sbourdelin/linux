@@ -19,6 +19,16 @@ Required properties:
 	Optional elements: 'tx_clk'
 - clocks: Phandles to input clocks.
 
+Optional properties:
+- cdns,usrio-has-clken: Boolean; The USRIO register has an clock-enable bit.
+- cdns,usrio-default-mii: Boolean; The USRIO register defaults to MII mode.
+- cdns,usrio-disabled: Boolean; The USRIO register is not implemented.
+- cdns,no-gigabit-half: Boolean; The MAC does not support 1000/Half link mode.
+- cdns,gem-sg-disabled: Boolean; The MAC does not support Scatter-Gather mode.
+- cdns,gem-has-gigabit: Boolean; The MAC supports Gigabit Ethernet.
+- cdns,dma-burst-length: Should countain the DMA burst length.
+- cdns,jumbo-max-length: Should countain the maximum Jumbo frame length.
+
 Examples:
 
 	macb0: ethernet@fffc4000 {
