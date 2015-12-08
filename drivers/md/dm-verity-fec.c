@@ -722,7 +722,7 @@ int verity_fec_ctr(struct dm_verity *v)
 	}
 
 	f->rounds = f->blocks;
-	if (do_div(f->rounds, f->rsn))
+	if (sector_div(f->rounds, f->rsn))
 		f->rounds++;
 
 	/*
