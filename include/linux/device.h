@@ -151,6 +151,11 @@ void subsys_dev_iter_exit(struct subsys_dev_iter *iter);
 
 int bus_for_each_dev(struct bus_type *bus, struct device *start, void *data,
 		     int (*fn)(struct device *dev, void *data));
+
+int bus_device_iter_init(struct klist_iter *iter, struct bus_type *bus);
+struct device *bus_device_iter_next(struct klist_iter *iter);
+void bus_device_iter_exit(struct klist_iter *iter);
+
 struct device *bus_find_device(struct bus_type *bus, struct device *start,
 			       void *data,
 			       int (*match)(struct device *dev, void *data));

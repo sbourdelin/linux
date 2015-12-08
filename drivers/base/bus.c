@@ -318,6 +318,65 @@ int bus_for_each_dev(struct bus_type *bus, struct device *start,
 EXPORT_SYMBOL_GPL(bus_for_each_dev);
 
 /**
+ * bus_device_iter_init - Initialize an iterator for walking a bus's devices.
+ * @iter: iterator structure to initialize
+ * @bus: bus type
+ *
+ * Initializes an iterator for safely walking a bus's list of devices.  The
+ * iterator can be used by bus_device_iter_next() to safely walk the list, even
+ * if a device is removed from the list while being examined.  Needs to be
+ * matched with a call to bus_device_iter_exit() to clean up the iterator when
+ * finished.
+ *
+ * Return 0 on success, non-zero on failure.  Iterator cannot be used
+ * for a non-zero result
+ */
+int bus_device_iter_init(struct klist_iter *iter,
+			 struct bus_type *bus)
+{
+	if (!bus || !bus->p)
+		return -EINVAL;
+
+	klist_iter_init_node(&bus->p->klist_devices, iter, NULL);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(bus_device_iter_init);
+
+/**
+ * bus_device_iter_next - Get a bus's next device from the iterator.
+ * @iter: iterator structure from bus_device_iter_init()
+ *
+ * Finds the next valid device entry on a bus's device list.  Allows the list
+ * to be safely traversed by the caller even when other tasks remove devices
+ * from the list.
+ *
+ * Returns a reference to the next device, or NULL if no more devices.
+ */
+struct device *bus_device_iter_next(struct klist_iter *iter)
+{
+	struct device *dev;
+
+	while ((dev = next_device(iter)))
+		if (get_device(dev))
+			break;
+
+	return dev;
+}
+EXPORT_SYMBOL_GPL(bus_device_iter_next);
+
+/**
+ * bus_device_iter_exit - Clean up an iterator from walking a bus's device list.
+ * @iter: iterator structure from bus_device_iter_init() to clean up
+ *
+ * Clean up any remaining state after finishing walking a bus's device list.
+ */
+void bus_device_iter_exit(struct klist_iter *iter)
+{
+	klist_iter_exit(iter);
+}
+EXPORT_SYMBOL_GPL(bus_device_iter_exit);
+
+/**
  * bus_find_device - device iterator for locating a particular device.
  * @bus: bus type
  * @start: Device to begin with
