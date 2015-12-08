@@ -497,10 +497,12 @@ void __do_irq(struct pt_regs *regs)
 	may_hard_irq_enable();
 
 	/* And finally process it */
-	if (unlikely(irq == NO_IRQ))
+	if (unlikely(irq == NO_IRQ)) {
+		printk_ratelimited(KERN_WARNING "spurious irq on %d\n", irq);
 		__this_cpu_inc(irq_stat.spurious_irqs);
-	else
+	} else {
 		generic_handle_irq(irq);
+	}
 
 	trace_irq_exit(regs);
 
