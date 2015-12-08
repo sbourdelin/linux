@@ -659,8 +659,10 @@ parse_events_config_bpf(struct parse_events_evlist *data,
 						 &error_pos, err, errbuf,
 						 sizeof(errbuf));
 			data->error->help = strdup(
-"Hint:\tValid config term:\n"
+"Hint:\tValid config terms:\n"
 "     \tmaps:[<arraymap>].value=[value]\n"
+"     \tmaps:[<eventmap>].event=[event]\n"
+"\n"
 "     \t(add -v to see detail)");
 			data->error->str = strdup(errbuf);
 			if (err == -BPF_LOADER_ERRNO__OBJCONF_MAP_VALUE)
