@@ -36,6 +36,31 @@ wrong.  If ERR_PTR(-ENODEV) is returned, that is an indication that the
 kernel has been built without debugfs support and none of the functions
 described below will work.
 
+Another way to create a directory where temporary files will be created
+on demand is:
+
+    struct dentry *debugfs_create_dir_with_tmpfiles(const char *name,
+                       umode_t mode, struct dentry *parent, void *data,
+                       const struct file_operations *fops);
+
+This function creates a directory in debugfs with the given name with
+possibility to create temporary files on demand.  Any attempt to open
+a non-existent file in that directory will create a temporary file,
+wich will be deleted when the last file descriptor is closed.  This
+temporary file is very similar to opening a directory with O_TMPFILE,
+with the difference that a resulting dentry has a name, but still is
+unhashed, so is invisible to outer world and can never be reached via
+any pathname.
+
+How those temporary files on demand can be used?  This is a way to provide
+one additional parameter in a file name and specify an object name.  E.g.:
+
+    # cat /sys/kernel/debug/my_objects/$UUID
+
+Where $UUID is a UUID of an object which should be requested.  This $UUID
+file will never appear in lookup and will be deleted when 'cat' closes last
+file descriptor.
+
 The most general way to create a file within a debugfs directory is with:
 
     struct dentry *debugfs_create_file(const char *name, umode_t mode,
