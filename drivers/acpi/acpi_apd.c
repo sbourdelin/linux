@@ -51,7 +51,7 @@ struct apd_private_data {
 	const struct apd_device_desc *dev_desc;
 };
 
-#ifdef CONFIG_X86_AMD_PLATFORM_DEVICE
+#if defined(CONFIG_X86_AMD_PLATFORM_DEVICE) || defined(CONFIG_ARM64)
 #define APD_ADDR(desc)	((unsigned long)&desc)
 
 static int acpi_apd_setup(struct apd_private_data *pdata)
@@ -74,6 +74,11 @@ static int acpi_apd_setup(struct apd_private_data *pdata)
 static struct apd_device_desc cz_i2c_desc = {
 	.setup = acpi_apd_setup,
 	.fixed_clk_rate = 133000000,
+};
+
+static struct apd_device_desc xgene_i2c_desc = {
+	.setup = acpi_apd_setup,
+	.fixed_clk_rate = 100000000,
 };
 
 static struct apd_device_desc cz_uart_desc = {
@@ -135,6 +140,7 @@ static const struct acpi_device_id acpi_apd_device_ids[] = {
 	{ "AMD0010", APD_ADDR(cz_i2c_desc) },
 	{ "AMD0020", APD_ADDR(cz_uart_desc) },
 	{ "AMD0030", },
+	{ "APMC0D0F", APD_ADDR(xgene_i2c_desc) },
 	{ }
 };
 
