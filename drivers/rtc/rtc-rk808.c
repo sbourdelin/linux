@@ -54,103 +54,30 @@ struct rk808_rtc {
 	struct rk808 *rk808;
 	struct rtc_device *rtc;
 	int irq;
+	struct rtc_time anchor_time;	/* Last sync point with real world */
 };
 
-/* Read current time and date in RTC */
-static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
+/*
+ * RK808 has a hardware bug causing it to count 31 days in November. This
+ * function can calculate the amount of days that code needs to adjust for
+ * between two timestamps to compensate for this.
+ */
+static int nov31st_transitions(struct rtc_time *from, struct rtc_time *to)
 {
-	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
-	struct rk808 *rk808 = rk808_rtc->rk808;
-	u8 rtc_data[NUM_TIME_REGS];
-	int ret;
+	int extra_days = to->tm_year - from->tm_year;
 
-	/* Force an update of the shadowed registers right now */
-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
-				 BIT_RTC_CTRL_REG_RTC_GET_TIME,
-				 BIT_RTC_CTRL_REG_RTC_GET_TIME);
-	if (ret) {
-		dev_err(dev, "Failed to update bits rtc_ctrl: %d\n", ret);
-		return ret;
-	}
+	/* Avoid adjusting anything for uninitialized timestamps */
+	if (from->tm_mday == 0 || to->tm_mday == 0)
+		return 0;
 
-	/*
-	 * After we set the GET_TIME bit, the rtc time can't be read
-	 * immediately. So we should wait up to 31.25 us, about one cycle of
-	 * 32khz. If we clear the GET_TIME bit here, the time of i2c transfer
-	 * certainly more than 31.25us: 16 * 2.5us at 400kHz bus frequency.
-	 */
-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
-				 BIT_RTC_CTRL_REG_RTC_GET_TIME,
-				 0);
-	if (ret) {
-		dev_err(dev, "Failed to update bits rtc_ctrl: %d\n", ret);
-		return ret;
-	}
+	if (from->tm_mon > 10)
+		extra_days--;
 
-	ret = regmap_bulk_read(rk808->regmap, RK808_SECONDS_REG,
-			       rtc_data, NUM_TIME_REGS);
-	if (ret) {
-		dev_err(dev, "Failed to bulk read rtc_data: %d\n", ret);
-		return ret;
-	}
+	if (to->tm_mon > 10)
+		extra_days++;
 
-	tm->tm_sec = bcd2bin(rtc_data[0] & SECONDS_REG_MSK);
-	tm->tm_min = bcd2bin(rtc_data[1] & MINUTES_REG_MAK);
-	tm->tm_hour = bcd2bin(rtc_data[2] & HOURS_REG_MSK);
-	tm->tm_mday = bcd2bin(rtc_data[3] & DAYS_REG_MSK);
-	tm->tm_mon = (bcd2bin(rtc_data[4] & MONTHS_REG_MSK)) - 1;
-	tm->tm_year = (bcd2bin(rtc_data[5] & YEARS_REG_MSK)) + 100;
-	tm->tm_wday = bcd2bin(rtc_data[6] & WEEKS_REG_MSK);
-	dev_dbg(dev, "RTC date/time %4d-%02d-%02d(%d) %02d:%02d:%02d\n",
-		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
-		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
-
-	return ret;
-}
-
-/* Set current time and date in RTC */
-static int rk808_rtc_set_time(struct device *dev, struct rtc_time *tm)
-{
-	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
-	struct rk808 *rk808 = rk808_rtc->rk808;
-	u8 rtc_data[NUM_TIME_REGS];
-	int ret;
-
-	rtc_data[0] = bin2bcd(tm->tm_sec);
-	rtc_data[1] = bin2bcd(tm->tm_min);
-	rtc_data[2] = bin2bcd(tm->tm_hour);
-	rtc_data[3] = bin2bcd(tm->tm_mday);
-	rtc_data[4] = bin2bcd(tm->tm_mon + 1);
-	rtc_data[5] = bin2bcd(tm->tm_year - 100);
-	rtc_data[6] = bin2bcd(tm->tm_wday);
-	dev_dbg(dev, "set RTC date/time %4d-%02d-%02d(%d) %02d:%02d:%02d\n",
-		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
-		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
-
-	/* Stop RTC while updating the RTC registers */
-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
-				 BIT_RTC_CTRL_REG_STOP_RTC_M,
-				 BIT_RTC_CTRL_REG_STOP_RTC_M);
-	if (ret) {
-		dev_err(dev, "Failed to update RTC control: %d\n", ret);
-		return ret;
-	}
-
-	ret = regmap_bulk_write(rk808->regmap, RK808_SECONDS_REG,
-				rtc_data, NUM_TIME_REGS);
-	if (ret) {
-		dev_err(dev, "Failed to bull write rtc_data: %d\n", ret);
-		return ret;
-	}
-	/* Start RTC again */
-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
-				 BIT_RTC_CTRL_REG_STOP_RTC_M, 0);
-	if (ret) {
-		dev_err(dev, "Failed to update RTC control: %d\n", ret);
-		return ret;
-	}
-	return 0;
-}
+	return extra_days;
+};
 
 /* Read alarm time and date in RTC */
 static int rk808_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
@@ -159,7 +86,7 @@ static int rk808_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct rk808 *rk808 = rk808_rtc->rk808;
 	u8 alrm_data[NUM_ALARM_REGS];
 	uint32_t int_reg;
-	int ret;
+	int ret, extra_days;
 
 	ret = regmap_bulk_read(rk808->regmap, RK808_ALARM_SECONDS_REG,
 			       alrm_data, NUM_ALARM_REGS);
@@ -170,6 +97,19 @@ static int rk808_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	alrm->time.tm_mday = bcd2bin(alrm_data[3] & DAYS_REG_MSK);
 	alrm->time.tm_mon = (bcd2bin(alrm_data[4] & MONTHS_REG_MSK)) - 1;
 	alrm->time.tm_year = (bcd2bin(alrm_data[5] & YEARS_REG_MSK)) + 100;
+
+	extra_days = nov31st_transitions(&rk808_rtc->anchor_time, &alrm->time);
+	if (alrm->time.tm_mon == 10 && alrm->time.tm_mday == 31) {
+		dev_warn(dev, "read HW alarm date as Nov 31, compensating\n");
+		alrm->time.tm_mon = 11;
+		alrm->time.tm_mday = 1 + extra_days;
+	} else if (extra_days) {
+		unsigned long time;
+		dev_warn(dev, "compensating for %d Nov31 until HW alarm date\n",
+			 extra_days);
+		rtc_tm_to_time(&alrm->time, &time);
+		rtc_time_to_tm(time + extra_days * 86400, &alrm->time);
+	}
 
 	ret = regmap_read(rk808->regmap, RK808_RTC_INT_REG, &int_reg);
 	if (ret) {
@@ -215,7 +155,7 @@ static int rk808_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
 	struct rk808 *rk808 = rk808_rtc->rk808;
 	u8 alrm_data[NUM_ALARM_REGS];
-	int ret;
+	int ret, extra_days;
 
 	ret = rk808_rtc_stop_alarm(rk808_rtc);
 	if (ret) {
@@ -226,6 +166,19 @@ static int rk808_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 		1900 + alrm->time.tm_year, alrm->time.tm_mon + 1,
 		alrm->time.tm_mday, alrm->time.tm_wday, alrm->time.tm_hour,
 		alrm->time.tm_min, alrm->time.tm_sec);
+
+	extra_days = nov31st_transitions(&rk808_rtc->anchor_time, &alrm->time);
+	if (extra_days) {
+		unsigned long time;
+		dev_warn(dev, "writing HW alarm date adjusted for %d Nov31\n",
+			 extra_days);
+		rtc_tm_to_time(&alrm->time, &time);
+		rtc_time_to_tm(time - extra_days * 86400, &alrm->time);
+		/* Compensate in case the subtraction went back over Nov 31st */
+		if (alrm->time.tm_mon == 10 &&
+		    alrm->time.tm_mday == 31 - extra_days)
+			alrm->time.tm_mday++;	/* This can result in 31! */
+	}
 
 	alrm_data[0] = bin2bcd(alrm->time.tm_sec);
 	alrm_data[1] = bin2bcd(alrm->time.tm_min);
@@ -248,6 +201,141 @@ static int rk808_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 		}
 	}
 	return 0;
+}
+
+/* Set current time and date in RTC */
+static int rk808_rtc_set_time(struct device *dev, struct rtc_time *tm)
+{
+	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
+	struct rk808 *rk808 = rk808_rtc->rk808;
+	struct rtc_wkalrm alrm;
+	u8 rtc_data[NUM_TIME_REGS];
+	int ret;
+
+	/* Read out wake alarm with old Nov 31st adjustment */
+	rk808_rtc_readalarm(dev, &alrm);
+
+	rtc_data[0] = bin2bcd(tm->tm_sec);
+	rtc_data[1] = bin2bcd(tm->tm_min);
+	rtc_data[2] = bin2bcd(tm->tm_hour);
+	rtc_data[3] = bin2bcd(tm->tm_mday);
+	rtc_data[4] = bin2bcd(tm->tm_mon + 1);
+	rtc_data[5] = bin2bcd(tm->tm_year - 100);
+	rtc_data[6] = bin2bcd(tm->tm_wday);
+	dev_dbg(dev, "set RTC date/time %4d-%02d-%02d(%d) %02d:%02d:%02d\n",
+		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
+		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
+
+	/* Stop RTC while updating the RTC registers */
+	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
+				 BIT_RTC_CTRL_REG_STOP_RTC_M,
+				 BIT_RTC_CTRL_REG_STOP_RTC_M);
+	if (ret) {
+		dev_err(dev, "Failed to update RTC control: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_bulk_write(rk808->regmap, RK808_SECONDS_REG,
+				rtc_data, NUM_TIME_REGS);
+	if (ret) {
+		dev_err(dev, "Failed to bull write rtc_data: %d\n", ret);
+		return ret;
+	}
+	/* Start RTC again */
+	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
+				 BIT_RTC_CTRL_REG_STOP_RTC_M, 0);
+	if (ret) {
+		dev_err(dev, "Failed to update RTC control: %d\n", ret);
+		return ret;
+	}
+
+	/* Assume a newly set time is always correct (regardless of source) */
+	rk808_rtc->anchor_time = *tm;
+
+	/* Write back wake alarm with new Nov 31st adjustment */
+	rk808_rtc_setalarm(dev, &alrm);
+
+	return 0;
+}
+
+/* Read time from static shadow registers (without updating) */
+static int rk808_rtc_raw_read(struct device *dev, struct rtc_time *tm)
+{
+	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
+	struct rk808 *rk808 = rk808_rtc->rk808;
+	u8 rtc_data[NUM_TIME_REGS];
+	int ret;
+
+	ret = regmap_bulk_read(rk808->regmap, RK808_SECONDS_REG,
+			       rtc_data, NUM_TIME_REGS);
+	if (ret) {
+		dev_err(dev, "Failed to bulk read rtc_data: %d\n", ret);
+		return ret;
+	}
+
+	tm->tm_sec = bcd2bin(rtc_data[0] & SECONDS_REG_MSK);
+	tm->tm_min = bcd2bin(rtc_data[1] & MINUTES_REG_MAK);
+	tm->tm_hour = bcd2bin(rtc_data[2] & HOURS_REG_MSK);
+	tm->tm_mday = bcd2bin(rtc_data[3] & DAYS_REG_MSK);
+	tm->tm_mon = (bcd2bin(rtc_data[4] & MONTHS_REG_MSK)) - 1;
+	tm->tm_year = (bcd2bin(rtc_data[5] & YEARS_REG_MSK)) + 100;
+	tm->tm_wday = bcd2bin(rtc_data[6] & WEEKS_REG_MSK);
+	dev_dbg(dev, "RTC date/time %4d-%02d-%02d(%d) %02d:%02d:%02d\n",
+		1900 + tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
+		tm->tm_wday, tm->tm_hour , tm->tm_min, tm->tm_sec);
+
+	return ret;
+}
+
+/* Read current time and date in RTC */
+static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
+{
+	struct rk808_rtc *rk808_rtc = dev_get_drvdata(dev);
+	struct rk808 *rk808 = rk808_rtc->rk808;
+	int ret, extra_days;
+
+	/* Force an update of the shadowed registers right now */
+	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
+				 BIT_RTC_CTRL_REG_RTC_GET_TIME,
+				 BIT_RTC_CTRL_REG_RTC_GET_TIME);
+	if (ret) {
+		dev_err(dev, "Failed to update bits rtc_ctrl: %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * After we set the GET_TIME bit, the rtc time can't be read
+	 * immediately. So we should wait up to 31.25 us, about one cycle of
+	 * 32khz. If we clear the GET_TIME bit here, the time of i2c transfer
+	 * certainly more than 31.25us: 16 * 2.5us at 400kHz bus frequency.
+	 */
+	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
+				 BIT_RTC_CTRL_REG_RTC_GET_TIME,
+				 0);
+	if (ret) {
+		dev_err(dev, "Failed to update bits rtc_ctrl: %d\n", ret);
+		return ret;
+	}
+
+	ret = rk808_rtc_raw_read(dev, tm);
+	if (ret)
+		return ret;
+
+	extra_days = nov31st_transitions(&rk808_rtc->anchor_time, tm);
+	if (tm->tm_mon == 10 && tm->tm_mday == 31) {
+		dev_warn(dev, "read Nov 31, correcting to Dec 1 (HW bug)\n");
+		tm->tm_mon = 11;
+		tm->tm_mday = 1 + extra_days; /* don't S2R for over 30 years! */
+		rk808_rtc_set_time(dev, tm);
+	} else if (extra_days) {
+		unsigned long time;
+		dev_warn(dev, "compensating for %d skips over Nov 31\n",
+			 extra_days);
+		rtc_tm_to_time(tm, &time);
+		rtc_time_to_tm(time + extra_days * 86400, tm);
+		rk808_rtc_set_time(dev, tm);
+	}
+	return ret;
 }
 
 static int rk808_rtc_alarm_irq_enable(struct device *dev,
@@ -363,6 +451,16 @@ static int rk808_rtc_probe(struct platform_device *pdev)
 			"Failed to write RTC status: %d\n", ret);
 			return ret;
 	}
+
+	/*
+	 * Try to initialize anchor point by reading "last read" shadow
+	 * timestamp, to catch Nov 31st transitions that happened while shut
+	 * down. This only works if no other code (e.g. firmware) has
+	 * transitioned GET_TIME before this point.
+	 */
+	ret = rk808_rtc_raw_read(&pdev->dev, &rk808_rtc->anchor_time);
+	if (ret || rtc_valid_tm(&rk808_rtc->anchor_time))
+		rk808_rtc->anchor_time.tm_mday = 0;	/* invalidate */
 
 	/* set init time */
 	ret = rk808_rtc_readtime(&pdev->dev, &tm);
