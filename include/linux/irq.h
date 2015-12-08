@@ -150,6 +150,7 @@ struct ipi_mapping {
  * @ipi_mapping:	Contains the hwirq mapping of IPIs.
  *			The use of this struct is optional and not all irqchips
  *			will use it.
+ * @ipi_offset:		offset of first IPI in the mask
  */
 struct irq_common_data {
 	unsigned int		state_use_accessors;
@@ -161,6 +162,7 @@ struct irq_common_data {
 	cpumask_var_t		affinity;
 #ifdef CONFIG_GENERIC_IRQ_IPI
 	struct ipi_mapping	*ipi_map;
+	unsigned int		ipi_offset;
 #endif
 };
 
