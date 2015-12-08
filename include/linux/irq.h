@@ -145,7 +145,9 @@ struct ipi_mapping {
  *			Use accessor functions to deal with it
  * @node:		node index useful for balancing
  * @handler_data:	per-IRQ data for the irq_chip methods
- * @affinity:		IRQ affinity on SMP
+ * @affinity:		IRQ affinity on SMP.
+ *			If this is an IPI irq data, this will be the IPI mask
+ *			of the cpus it can talk to.
  * @msi_desc:		MSI descriptor
  * @ipi_mapping:	Contains the hwirq mapping of IPIs.
  *			The use of this struct is optional and not all irqchips
