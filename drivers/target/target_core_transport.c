@@ -639,9 +639,14 @@ void transport_cmd_finish_abort(struct se_cmd *cmd, int remove)
 static void target_complete_failure_work(struct work_struct *work)
 {
 	struct se_cmd *cmd = container_of(work, struct se_cmd, work);
+	unsigned long flags;
 
 	transport_generic_request_failure(cmd,
 			TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE);
+
+	spin_lock_irqsave(&cmd->t_state_lock, flags);
+	cmd->transport_state |= CMD_T_SENT_STATUS;
+	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 }
 
 /*
@@ -1659,6 +1664,7 @@ void transport_generic_request_failure(struct se_cmd *cmd,
 		sense_reason_t sense_reason)
 {
 	int ret = 0, post_ret = 0;
+	unsigned long flags;
 
 	pr_debug("-----[ Storage Engine Exception for cmd: %p ITT: 0x%08llx"
 		" CDB: 0x%02x\n", cmd, cmd->tag, cmd->t_task_cdb[0]);
@@ -1669,6 +1675,10 @@ void transport_generic_request_failure(struct se_cmd *cmd,
 		(cmd->transport_state & CMD_T_ACTIVE) != 0,
 		(cmd->transport_state & CMD_T_STOP) != 0,
 		(cmd->transport_state & CMD_T_SENT) != 0);
+
+	spin_lock_irqsave(&cmd->t_state_lock, flags);
+	cmd->transport_state |= CMD_T_SENT_STATUS;
+	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 
 	/*
 	 * For SAM Task Attribute emulation for failed struct se_cmd
@@ -1951,6 +1961,7 @@ static void transport_complete_task_attr(struct se_cmd *cmd)
 static void transport_complete_qf(struct se_cmd *cmd)
 {
 	int ret = 0;
+	unsigned long flags;
 
 	transport_complete_task_attr(cmd);
 
@@ -1986,6 +1997,10 @@ out:
 	}
 	transport_lun_remove_cmd(cmd);
 	transport_cmd_check_stop_to_fabric(cmd);
+
+	spin_lock_irqsave(&cmd->t_state_lock, flags);
+	cmd->transport_state |= CMD_T_SENT_STATUS;
+	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 }
 
 static void transport_handle_queue_full(
@@ -2032,6 +2047,7 @@ static void target_complete_ok_work(struct work_struct *work)
 {
 	struct se_cmd *cmd = container_of(work, struct se_cmd, work);
 	int ret;
+	unsigned long flags;
 
 	/*
 	 * Check if we need to move delayed/dormant tasks from cmds on the
@@ -2060,6 +2076,10 @@ static void target_complete_ok_work(struct work_struct *work)
 
 		transport_lun_remove_cmd(cmd);
 		transport_cmd_check_stop_to_fabric(cmd);
+
+		spin_lock_irqsave(&cmd->t_state_lock, flags);
+		cmd->transport_state |= CMD_T_SENT_STATUS;
+		spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 		return;
 	}
 	/*
@@ -2086,6 +2106,11 @@ static void target_complete_ok_work(struct work_struct *work)
 
 			transport_lun_remove_cmd(cmd);
 			transport_cmd_check_stop_to_fabric(cmd);
+
+			spin_lock_irqsave(&cmd->t_state_lock, flags);
+			cmd->transport_state |= CMD_T_SENT_STATUS;
+			spin_unlock_irqrestore(&cmd->t_state_lock, flags);
+
 			return;
 		}
 	}
@@ -2136,6 +2161,7 @@ queue_rsp:
 		ret = cmd->se_tfo->queue_status(cmd);
 		if (ret == -EAGAIN || ret == -ENOMEM)
 			goto queue_full;
+
 		break;
 	default:
 		break;
@@ -2143,6 +2169,10 @@ queue_rsp:
 
 	transport_lun_remove_cmd(cmd);
 	transport_cmd_check_stop_to_fabric(cmd);
+
+	spin_lock_irqsave(&cmd->t_state_lock, flags);
+	cmd->transport_state |= CMD_T_SENT_STATUS;
+	spin_unlock_irqrestore(&cmd->t_state_lock, flags);
 	return;
 
 queue_full:
