@@ -334,6 +334,8 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
 	/* thermal framework should take care of data->mask & (1 << trip) */
 	data->trips[trip].temperature = temp;
 
+	thermal_zone_device_update(tz);
+
 	return 0;
 }
 
