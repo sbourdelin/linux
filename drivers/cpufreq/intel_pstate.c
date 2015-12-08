@@ -170,7 +170,7 @@ static struct perf_limits performance_limits = {
 	.min_sysfs_pct = 0,
 };
 
-static struct perf_limits powersave_limits = {
+static struct perf_limits ondemand_limits = {
 	.no_turbo = 0,
 	.turbo_disabled = 0,
 	.max_perf_pct = 100,
@@ -186,7 +186,7 @@ static struct perf_limits powersave_limits = {
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE
 static struct perf_limits *limits = &performance_limits;
 #else
-static struct perf_limits *limits = &powersave_limits;
+static struct perf_limits *limits = &ondemand_limits;
 #endif
 
 static inline void pid_reset(struct _pid *pid, int setpoint, int busy,
@@ -1106,8 +1106,8 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 		return 0;
 	}
 
-	pr_debug("intel_pstate: set powersave\n");
-	limits = &powersave_limits;
+	pr_debug("intel_pstate: set ondemand\n");
+	limits = &ondemand_limits;
 	limits->min_policy_pct = (policy->min * 100) / policy->cpuinfo.max_freq;
 	limits->min_policy_pct = clamp_t(int, limits->min_policy_pct, 0 , 100);
 	limits->max_policy_pct = DIV_ROUND_UP(policy->max * 100,
@@ -1143,7 +1143,7 @@ static int intel_pstate_verify_policy(struct cpufreq_policy *policy)
 {
 	cpufreq_verify_within_cpu_limits(policy);
 
-	if (policy->policy != CPUFREQ_POLICY_POWERSAVE &&
+	if (policy->policy != CPUFREQ_POLICY_ONDEMAND &&
 	    policy->policy != CPUFREQ_POLICY_PERFORMANCE)
 		return -EINVAL;
 
@@ -1178,8 +1178,10 @@ static int intel_pstate_cpu_init(struct cpufreq_policy *policy)
 	if (limits->min_perf_pct == 100 && limits->max_perf_pct == 100)
 		policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	else
-		policy->policy = CPUFREQ_POLICY_POWERSAVE;
+		policy->policy = CPUFREQ_POLICY_ONDEMAND;
 
+	policy->available_policies = CPUFREQ_POLICY_PERFORMANCE |
+						CPUFREQ_POLICY_ONDEMAND;
 	policy->min = cpu->pstate.min_pstate * cpu->pstate.scaling;
 	policy->max = cpu->pstate.turbo_pstate * cpu->pstate.scaling;
 
