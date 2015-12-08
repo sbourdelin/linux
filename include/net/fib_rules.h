@@ -117,4 +117,7 @@ int fib_rules_lookup(struct fib_rules_ops *, struct flowi *, int flags,
 		     struct fib_lookup_arg *);
 int fib_default_rule_add(struct fib_rules_ops *, u32 pref, u32 table,
 			 u32 flags);
+
+int fib_nl_newrule(struct sk_buff *skb, struct nlmsghdr *nlh);
+int fib_nl_delrule(struct sk_buff *skb, struct nlmsghdr *nlh);
 #endif

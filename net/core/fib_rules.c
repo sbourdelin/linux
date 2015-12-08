@@ -265,7 +265,7 @@ errout:
 	return err;
 }
 
-static int fib_nl_newrule(struct sk_buff *skb, struct nlmsghdr* nlh)
+int fib_nl_newrule(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	struct net *net = sock_net(skb->sk);
 	struct fib_rule_hdr *frh = nlmsg_data(nlh);
@@ -424,8 +424,9 @@ errout:
 	rules_ops_put(ops);
 	return err;
 }
+EXPORT_SYMBOL_GPL(fib_nl_newrule);
 
-static int fib_nl_delrule(struct sk_buff *skb, struct nlmsghdr* nlh)
+int fib_nl_delrule(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	struct net *net = sock_net(skb->sk);
 	struct fib_rule_hdr *frh = nlmsg_data(nlh);
@@ -536,6 +537,7 @@ errout:
 	rules_ops_put(ops);
 	return err;
 }
+EXPORT_SYMBOL_GPL(fib_nl_delrule);
 
 static inline size_t fib_rule_nlmsg_size(struct fib_rules_ops *ops,
 					 struct fib_rule *rule)
