@@ -1,7 +1,7 @@
 Renesas Electronics USBHS driver
 
 Required properties:
-  - compatible: Must contain one of the following:
+  - compatible: "renesas,usbhs-<soctype>", "renesas,rcar-usbhs" as fallback.
 	- "renesas,usbhs-r8a7790"
 	- "renesas,usbhs-r8a7791"
 	- "renesas,usbhs-r8a7794"
@@ -22,7 +22,7 @@ Optional properties:
 
 Example:
 	usbhs: usb@e6590000 {
-		compatible = "renesas,usbhs-r8a7790";
+		compatible = "renesas,usbhs-r8a7790", "renesas,rcar-usbhs";
 		reg = <0 0xe6590000 0 0x100>;
 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mstp7_clks R8A7790_CLK_HSUSB>;
