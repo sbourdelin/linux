@@ -617,6 +617,26 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 				struct qla_tgt_cmd, se_cmd);
 	int xmit_type = QLA_TGT_XMIT_STATUS;
 
+	if (se_cmd->transport_state & CMD_T_ABORTED) {
+		/* For TCM TAS support n kernel >= 3.15:
+		 * This cmd is attempting to respond with "Task Aborted Status".
+		 */
+		if (cmd->aborted) {
+			return 0;
+		} else if ((cmd->state == QLA_TGT_STATE_NEED_DATA) &&
+		    cmd->cmd_sent_to_fw) {
+			qlt_abort_cmd(cmd);
+			return 0;
+		} else if (cmd->state == QLA_TGT_STATE_PROCESSED) {
+			if (cmd->cmd_sent_to_fw) {
+				qlt_abort_cmd(cmd);
+				return 0;
+			} else {	/* about to be free */
+				return 0;
+			}
+		}
+	}
+
 	cmd->bufflen = se_cmd->data_length;
 	cmd->sg = NULL;
 	cmd->sg_cnt = 0;

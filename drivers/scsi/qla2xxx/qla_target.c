@@ -3239,36 +3239,34 @@ int qlt_abort_cmd(struct qla_tgt_cmd *cmd)
 	struct qla_tgt *tgt = cmd->tgt;
 	struct scsi_qla_host *vha = tgt->vha;
 	struct se_cmd *se_cmd = &cmd->se_cmd;
-	unsigned long flags,refcount;
+	unsigned long flags, refcount;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xf014,
 	    "qla_target(%d): terminating exchange for aborted cmd=%p "
 	    "(se_cmd=%p, tag=%llu)", vha->vp_idx, cmd, &cmd->se_cmd,
 	    se_cmd->tag);
 
-    spin_lock_irqsave(&cmd->cmd_lock, flags);
-    if (cmd->aborted) {
-        spin_unlock_irqrestore(&cmd->cmd_lock, flags);
+	spin_lock_irqsave(&cmd->cmd_lock, flags);
 
-        /* It's normal to see 2 calls in this path:
-         *  1) XFER Rdy completion + CMD_T_ABORT
-         *  2) TCM TMR - drain_state_list
-         */
-        refcount = atomic_read(&cmd->se_cmd.cmd_kref.refcount);
-        ql_dbg(ql_dbg_tgt_mgt, vha, 0xffff,
-               "multiple abort. %p refcount %lx"
-               "transport_state %x, t_state %x, se_cmd_flags %x \n",
-               cmd, refcount,cmd->se_cmd.transport_state,
-               cmd->se_cmd.t_state,cmd->se_cmd.se_cmd_flags);
+	if (cmd->aborted) {
+		spin_unlock_irqrestore(&cmd->cmd_lock, flags);
+		/* It's normal to see 2 calls in this path:
+		 *  1) XFER Rdy completion + CMD_T_ABORT
+		 *  2) TCM TMR - drain_state_list
+		 */
+		refcount = atomic_read(&cmd->se_cmd.cmd_kref.refcount);
+		ql_dbg(ql_dbg_tgt_mgt, vha, 0xffff,
+		    "multiple abort. %p refcount %lx"
+		    "transport_state %x, t_state %x, se_cmd_flags %x \n",
+		    cmd, refcount, cmd->se_cmd.transport_state,
+		    cmd->se_cmd.t_state, cmd->se_cmd.se_cmd_flags);
 
-        return EIO;
-    }
+		return EIO;
+	}
 
 	cmd->aborted = 1;
 	cmd->cmd_flags |= BIT_6;
-    spin_unlock_irqrestore(&cmd->cmd_lock, flags);
-
-	qlt_send_term_exchange(vha, cmd, &cmd->atio, 0, 1);
+	spin_unlock_irqrestore(&cmd->cmd_lock, flags);
 
 	return 0;
 }
