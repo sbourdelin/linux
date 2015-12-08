@@ -303,7 +303,7 @@ static void tcm_qla2xxx_free_cmd(struct qla_tgt_cmd *cmd)
 	cmd->cmd_flags |= BIT_20;
 
 	INIT_WORK(&cmd->work, tcm_qla2xxx_complete_free);
-	queue_work(tcm_qla2xxx_free_wq, &cmd->work);
+	queue_work_on(smp_processor_id(), tcm_qla2xxx_free_wq, &cmd->work);
 }
 
 /*
@@ -535,7 +535,7 @@ static void tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 	cmd->cmd_flags |= BIT_10;
 	cmd->cmd_in_wq = 1;
 	INIT_WORK(&cmd->work, tcm_qla2xxx_handle_data_work);
-	queue_work(tcm_qla2xxx_free_wq, &cmd->work);
+	queue_work_on(smp_processor_id(), tcm_qla2xxx_free_wq, &cmd->work);
 }
 
 static void tcm_qla2xxx_handle_dif_work(struct work_struct *work)
