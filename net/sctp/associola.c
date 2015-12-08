@@ -795,7 +795,8 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 		 * active state and set cwnd to 1 MTU, see SCTP
 		 * Quick failover draft section 5.1, point 5
 		 */
-		if (transport->state == SCTP_PF) {
+		if ((asoc->pf_retrans < asoc->max_retrans) && 
+			(transport->state == SCTP_PF)) {
 			ulp_notify = false;
 			transport->cwnd = asoc->pathmtu;
 		}
