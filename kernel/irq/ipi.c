@@ -8,6 +8,7 @@
  */
 
 #include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/slab.h>
 
 /**
@@ -106,4 +107,129 @@ irq_hw_number_t irq_ipi_mapping_get_hwirq(struct ipi_mapping *map,
 		return INVALID_HWIRQ;
 
 	return map->cpumap[cpu];
+}
+
+/**
+ * irq_reserve_ipi() - setup an IPI to destination cpumask
+ * @domain: IPI domain
+ * @dest: cpumask of cpus to receive the IPI
+ *
+ * Allocate a virq that can be used to send IPI to any CPU in dest mask.
+ *
+ * On success it'll return linux irq number and 0 on failure
+ */
+unsigned int irq_reserve_ipi(struct irq_domain *domain,
+			     const struct cpumask *dest)
+{
+	struct irq_data *data;
+	unsigned int nr_irqs, offset = 0;
+	int prev_cpu = -1, cpu;
+	int virq, i;
+
+	if (domain == NULL) {
+		pr_warn("Must provide a valid IPI domain!\n");
+		return 0;
+	}
+
+	if (!irq_domain_is_ipi(domain)) {
+		pr_warn("Not an IPI domain!\n");
+		return 0;
+	}
+
+	if (!cpumask_subset(dest, cpu_possible_mask)) {
+		pr_warn("Can't reserve an IPI outside cpu_possible_mask range\n");
+		return 0;
+	}
+
+	nr_irqs = cpumask_weight(dest);
+	if (!nr_irqs) {
+		pr_warn("Can't reserve an IPI for an empty mask\n");
+		return 0;
+	}
+
+	if (irq_domain_is_ipi_single(domain))
+		nr_irqs = 1;
+
+	/*
+	 * Disallow holes in the ipi mask.
+	 * Holes makes it difficult to manage code in generic way. So we always
+	 * assume a consecutive ipi mask. It's easy for the user to split
+	 * an ipi mask with a hole into 2 consecutive ipi masks and manage
+	 * which virq to use locally than adding generic support that would
+	 * complicate the generic code.
+	 */
+	for_each_cpu(cpu, dest) {
+		if (prev_cpu == -1) {
+			/* while at it save the offset */
+			offset = cpu;
+			prev_cpu = cpu;
+			continue;
+		}
+
+		if (prev_cpu - cpu > 1) {
+			pr_err("Can't allocate IPIs using non consecutive mask\n");
+			return 0;
+		}
+
+		prev_cpu = cpu;
+	}
+
+	virq = irq_domain_alloc_descs(-1, nr_irqs, 0, NUMA_NO_NODE);
+	if (virq <= 0) {
+		pr_warn("Can't reserve IPI, failed to alloc descs\n");
+		return 0;
+	}
+
+	virq = __irq_domain_alloc_irqs(domain, virq, nr_irqs, NUMA_NO_NODE,
+					(void *) dest, true);
+	if (virq <= 0) {
+		pr_warn("Can't reserve IPI, failed to alloc irqs\n");
+		goto free_descs;
+	}
+
+	for (i = 0; i < nr_irqs; i++) {
+		data = irq_get_irq_data(virq + i);
+		cpumask_copy(data->common->affinity, dest);
+		data->common->ipi_offset = offset;
+	}
+
+	return virq;
+
+free_descs:
+	irq_free_descs(virq, nr_irqs);
+	return 0;
+}
+
+/**
+ * irq_destroy_ipi() - unreserve an IPI that was previously allocated
+ * @irq: linux irq number to be destroyed
+ *
+ * Return the IPIs allocated with irq_reserve_ipi() to the system destroying all
+ * virqs associated with them.
+ */
+void irq_destroy_ipi(unsigned int irq)
+{
+	struct irq_data *data = irq_get_irq_data(irq);
+	struct cpumask *ipimask = data ? irq_data_get_affinity_mask(data) : NULL;
+	struct irq_domain *domain;
+	unsigned int nr_irqs;
+
+	if (!irq || !data || !ipimask)
+		return;
+
+	domain = data->domain;
+	if (WARN_ON(domain == NULL))
+		return;
+
+	if (!irq_domain_is_ipi(domain)) {
+		pr_warn("Not an IPI domain!\n");
+		return;
+	}
+
+	if (irq_domain_is_ipi_per_cpu(domain))
+		nr_irqs = cpumask_weight(ipimask);
+	else
+		nr_irqs = 1;
+
+	irq_domain_free_irqs(irq, nr_irqs);
 }
