@@ -36,6 +36,8 @@ extern struct device_node *of_find_matching_node_by_address(
 					const struct of_device_id *matches,
 					u64 base_address);
 extern void __iomem *of_iomap(struct device_node *device, int index);
+void __iomem *of_io_request_and_map(struct device_node *device,
+				    int index, const char *name);
 
 /* Extract an address from a device, returns the region size and
  * the address space flags too. The PCI version uses a BAR number
@@ -57,6 +59,14 @@ extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
 				u64 *paddr, u64 *size);
 extern bool of_dma_is_coherent(struct device_node *np);
 #else /* CONFIG_OF_ADDRESS */
+
+#include <linux/io.h>
+
+static inline void __iomem *of_io_request_and_map(struct device_node *device,
+						  int index, const char *name)
+{
+	return IOMEM_ERR_PTR(-EINVAL);
+}
 
 static inline u64 of_translate_address(struct device_node *np,
 				       const __be32 *addr)
@@ -112,8 +122,6 @@ static inline bool of_dma_is_coherent(struct device_node *np)
 extern int of_address_to_resource(struct device_node *dev, int index,
 				  struct resource *r);
 void __iomem *of_iomap(struct device_node *node, int index);
-void __iomem *of_io_request_and_map(struct device_node *device,
-					int index, const char *name);
 #else
 
 #include <linux/io.h>
@@ -127,12 +135,6 @@ static inline int of_address_to_resource(struct device_node *dev, int index,
 static inline void __iomem *of_iomap(struct device_node *device, int index)
 {
 	return NULL;
-}
-
-static inline void __iomem *of_io_request_and_map(struct device_node *device,
-					int index, const char *name)
-{
-	return IOMEM_ERR_PTR(-EINVAL);
 }
 #endif
 
