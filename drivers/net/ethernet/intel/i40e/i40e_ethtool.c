@@ -1848,6 +1848,10 @@ static int i40e_get_coalesce(struct net_device *netdev,
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+	struct i40e_q_vector *q_vector;
+	u16 vector = vsi->base_vector;
 
 	ec->tx_max_coalesced_frames_irq = vsi->work_limit;
 	ec->rx_max_coalesced_frames_irq = vsi->work_limit;
@@ -1869,17 +1873,44 @@ static int i40e_get_coalesce(struct net_device *netdev,
 	ec->rx_coalesce_usecs_high = vsi->int_rate_limit;
 	ec->tx_coalesce_usecs_high = vsi->int_rate_limit;
 
+	if (ec->queue > -1) {
+		if (ec->queue >= vsi->num_q_vectors) {
+			netif_info(pf, drv, netdev, "Invalid queue value, queue range is 0 - %d\n", vsi->num_q_vectors - 1);
+			return -EINVAL;
+		}
+
+		q_vector = vsi->q_vectors[ec->queue];
+		vector += ec->queue;
+
+		ec->rx_coalesce_usecs = ITR_REG_TO_USEC(rd32(hw, I40E_PFINT_ITRN(0, vector - 1)));
+		ec->tx_coalesce_usecs = ITR_REG_TO_USEC(rd32(hw, I40E_PFINT_ITRN(1, vector - 1)));
+	}
+
 	return 0;
+}
+
+static void i40e_set_itr_for_queue(struct i40e_vsi *vsi, int queue, u16 vector)
+{
+	struct i40e_q_vector *q_vector;
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+	u16 intrl = INTRL_USEC_TO_REG(vsi->int_rate_limit);
+
+	q_vector = vsi->q_vectors[queue];
+	q_vector->rx.itr = ITR_TO_REG(vsi->rx_itr_setting);
+	wr32(hw, I40E_PFINT_ITRN(0, vector - 1), q_vector->rx.itr);
+	q_vector->tx.itr = ITR_TO_REG(vsi->tx_itr_setting);
+	wr32(hw, I40E_PFINT_ITRN(1, vector - 1), q_vector->tx.itr);
+	wr32(hw, I40E_PFINT_RATEN(vector - 1), intrl);
+	i40e_flush(hw);
 }
 
 static int i40e_set_coalesce(struct net_device *netdev,
 			     struct ethtool_coalesce *ec)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
-	struct i40e_q_vector *q_vector;
 	struct i40e_vsi *vsi = np->vsi;
 	struct i40e_pf *pf = vsi->back;
-	struct i40e_hw *hw = &pf->hw;
 	u16 vector;
 	int i;
 
@@ -1935,16 +1966,15 @@ static int i40e_set_coalesce(struct net_device *netdev,
 	else
 		vsi->tx_itr_setting &= ~I40E_ITR_DYNAMIC;
 
-	for (i = 0; i < vsi->num_q_vectors; i++, vector++) {
-		u16 intrl = INTRL_USEC_TO_REG(vsi->int_rate_limit);
-
-		q_vector = vsi->q_vectors[i];
-		q_vector->rx.itr = ITR_TO_REG(vsi->rx_itr_setting);
-		wr32(hw, I40E_PFINT_ITRN(0, vector - 1), q_vector->rx.itr);
-		q_vector->tx.itr = ITR_TO_REG(vsi->tx_itr_setting);
-		wr32(hw, I40E_PFINT_ITRN(1, vector - 1), q_vector->tx.itr);
-		wr32(hw, I40E_PFINT_RATEN(vector - 1), intrl);
-		i40e_flush(hw);
+	if (ec->queue < 0) {
+		for (i = 0; i < vsi->num_q_vectors; i++, vector++)
+			i40e_set_itr_for_queue(vsi, i, vector);
+	} else {
+		if (ec->queue >= vsi->num_q_vectors) {
+			netif_info(pf, drv, netdev, "Invalid queue value, queue range is 0 - %d\n", vsi->num_q_vectors - 1);
+			return -EINVAL;
+		}
+		i40e_set_itr_for_queue(vsi, ec->queue, vector + ec->queue);
 	}
 
 	return 0;
