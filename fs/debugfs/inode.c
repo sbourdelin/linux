@@ -170,6 +170,9 @@ static void debugfs_evict_inode(struct inode *inode)
 	clear_inode(inode);
 	if (S_ISLNK(inode->i_mode))
 		kfree(inode->i_link);
+	else if (S_ISDIR(inode->i_mode))
+		/* Only for directories with tmpfiles i_private is set */
+		kfree(inode->i_private);
 }
 
 static const struct super_operations debugfs_super_operations = {
@@ -242,8 +245,19 @@ static struct file_system_type debug_fs_type = {
 };
 MODULE_ALIAS_FS("debugfs");
 
+static inline const struct inode_operations *swap_inode_ops(
+	const struct inode_operations **dst,
+	const struct inode_operations  *new)
+{
+	const struct inode_operations *ret = *dst;
+
+	*dst = new;
+	return ret;
+}
+
 static struct dentry *start_creating(const char *name, struct dentry *parent)
 {
+	const struct inode_operations *i_op;
 	struct dentry *dentry;
 	int error;
 
@@ -266,7 +280,13 @@ static struct dentry *start_creating(const char *name, struct dentry *parent)
 		parent = debugfs_mount->mnt_root;
 
 	mutex_lock(&d_inode(parent)->i_mutex);
+	/* We want to avoid creating temporary inodes while lookup,
+	 * thus use simple inode ops
+	 */
+	i_op = swap_inode_ops(&d_inode(parent)->i_op,
+			      &simple_dir_inode_operations);
 	dentry = lookup_one_len(name, parent, strlen(name));
+	swap_inode_ops(&d_inode(parent)->i_op, i_op);
 	if (!IS_ERR(dentry) && d_really_is_positive(dentry)) {
 		dput(dentry);
 		dentry = ERR_PTR(-EEXIST);
@@ -438,6 +458,98 @@ struct dentry *debugfs_create_dir(const char *name, struct dentry *parent)
 	return __create_dir(name, parent, NULL, &simple_dir_inode_operations);
 }
 EXPORT_SYMBOL_GPL(debugfs_create_dir);
+
+struct tmp_priv {
+	const struct file_operations *fops;
+	void   *data;
+	umode_t mode;
+};
+
+/**
+ * debugfs_tmp_lookup() - lookup for directory with temporary files
+ *
+ * This lookup always creates inode for any name and ties it with dentry,
+ * but dentry cannot be reached via any pathname, so when last referenced
+ * on the file is closed - everything will be deleted (see O_TMPFILE).
+ */
+struct dentry *debugfs_tmp_lookup(struct inode *dir, struct dentry *dentry,
+				  unsigned int flags)
+{
+	struct inode *inode;
+	struct tmp_priv *p;
+
+	inode = debugfs_get_inode(dir->i_sb);
+	if (unlikely(!inode))
+		return ERR_PTR(-ENOMEM);
+
+	p = dir->i_private;
+	BUG_ON(p == NULL);
+
+	inode->i_mode = p->mode;
+	inode->i_fop = p->fops ? p->fops : &debugfs_file_operations;
+	inode->i_private = p->data;
+
+	inode_dec_link_count(inode);
+	d_instantiate(dentry, inode);
+
+	return NULL;
+}
+
+const struct inode_operations debugfs_dir_tmp_inode_operations = {
+	.lookup = debugfs_tmp_lookup,
+};
+
+/**
+ * debugfs_create_dir_with_tmpfiles() - create a directory in the debugfs
+ * filesystem, where temporary files can be created on demand.
+ *
+ * @name: a pointer to a string containing the name of the directory to
+ *        create.
+ * @mode: the permission that a temporary file, which will be created on
+ *        demand,  should have.
+ * @parent: a pointer to the parent dentry for this file.  This should be a
+ *          directory dentry if set.  If this parameter is NULL, then the
+ *          directory will be created in the root of the debugfs filesystem.
+ * @data: a pointer to something that the caller will want to get to later
+ *        on.  The inode.i_private pointer will point to this value on
+ *        the open() call of a temporart file, which will be created on demand.
+ * @fops: a pointer to a struct file_operations that should be used for a
+ *        temporary file, which will be created on demand.
+ *
+ * This function creates a directory in debugfs with the given name with
+ * possibility to create temporary files on demand.  Any attempt to open
+ * a non-existent file in that directory will create a temporary file,
+ * wich will be deleted when the last file descriptor is closed.  This
+ * temporary file is very similar to opening a directory with O_TMPFILE,
+ * with the difference that a resulting dentry has a name, but still is
+ * unhashed, so is invisible to outer world and can never be reached via
+ * any pathname.
+ *
+ * This function will return a pointer to a dentry if it succeeds.  This
+ * pointer must be passed to the debugfs_remove() function when the file is
+ * to be removed (no automatic cleanup happens if your module is unloaded,
+ * you are responsible here.)  If an error occurs, %NULL will be returned.
+ *
+ * If debugfs is not enabled in the kernel, the value -%ENODEV will be
+ * returned.
+ */
+struct dentry *debugfs_create_dir_with_tmpfiles(const char *name, umode_t mode,
+					struct dentry *parent, void *data,
+					const struct file_operations *fops)
+{
+	struct tmp_priv *p;
+
+	p = kmalloc(sizeof(*p), GFP_NOFS);
+	if (unlikely(!p))
+		return NULL;
+
+	p->fops = fops ? fops : &debugfs_file_operations;
+	p->data = data;
+	p->mode = mode;
+
+	return __create_dir(name, parent, p, &debugfs_dir_tmp_inode_operations);
+}
+EXPORT_SYMBOL_GPL(debugfs_create_dir_with_tmpfiles);
 
 /**
  * debugfs_create_automount - create automount point in the debugfs filesystem
@@ -677,6 +789,7 @@ struct dentry *debugfs_rename(struct dentry *old_dir, struct dentry *old_dentry,
 {
 	int error;
 	struct dentry *dentry = NULL, *trap;
+	const struct inode_operations *i_op;
 	const char *old_name;
 
 	trap = lock_rename(new_dir, old_dir);
@@ -687,7 +800,13 @@ struct dentry *debugfs_rename(struct dentry *old_dir, struct dentry *old_dentry,
 	if (d_really_is_negative(old_dentry) || old_dentry == trap ||
 	    d_mountpoint(old_dentry))
 		goto exit;
+	/* We want to avoid creating temporary inodes while lookup,
+	 * thus use simple inode ops
+	 */
+	i_op = swap_inode_ops(&d_inode(new_dir)->i_op,
+			      &simple_dir_inode_operations);
 	dentry = lookup_one_len(new_name, new_dir, strlen(new_name));
+	swap_inode_ops(&d_inode(new_dir)->i_op, i_op);
 	/* Lookup failed, cyclic rename or target exists? */
 	if (IS_ERR(dentry) || dentry == trap || d_really_is_positive(dentry))
 		goto exit;
