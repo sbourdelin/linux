@@ -195,8 +195,13 @@ argument. You need to set the lower limit of the in-processor or
 in-chipset dynamic frequency switching to policy->min, the upper limit
 to policy->max, and -if supported- select a performance-oriented
 setting when policy->policy is CPUFREQ_POLICY_PERFORMANCE, and a
-powersaving-oriented setting when CPUFREQ_POLICY_POWERSAVE. Also check
-the reference implementation in drivers/cpufreq/longrun.c
+powersaving-oriented setting when CPUFREQ_POLICY_POWERSAVE, and a
+optional on demand frequency scaling setting when
+CPUFREQ_POLICY_ONDEMAND. The default supported policies are
+CPUFREQ_POLICY_PERFORMANCE and CPUFREQ_POLICY_POWERSAVE. To change or
+add supported policies set policy->available_policies with a mask of
+supported policies. Also check the reference implementation in
+drivers/cpufreq/longrun.c and intel_pstate.c.
 
 1.7 get_intermediate and target_intermediate
 --------------------------------------------
