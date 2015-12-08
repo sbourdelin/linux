@@ -8,9 +8,9 @@
 
 /* Geneve Header:
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  |Ver|  Opt Len  |O|C|    Rsvd.  |          Protocol Type        |
+ *  |Ver|  Opt Len  |O|C|X|  Rsvd.  |          Protocol Type        |
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *  |        Virtual Network Identifier (VNI)       |    Reserved   |
+ *  |        Virtual Network Identifier (VNI)       |U| Csum start  |
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *  |                    Variable Length Options                    |
  *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -46,7 +46,8 @@ struct genevehdr {
 #ifdef __LITTLE_ENDIAN_BITFIELD
 	u8 opt_len:6;
 	u8 ver:2;
-	u8 rsvd1:6;
+	u8 rsvd1:5;
+	u8 rco:1;
 	u8 critical:1;
 	u8 oam:1;
 #else
@@ -54,13 +55,24 @@ struct genevehdr {
 	u8 opt_len:6;
 	u8 oam:1;
 	u8 critical:1;
-	u8 rsvd1:6;
+	u8 rco:1;
+	u8 rsvd1:5;
 #endif
 	__be16 proto_type;
 	u8 vni[3];
-	u8 rsvd2;
+#ifdef __LITTLE_ENDIAN_BITFIELD
+	u8 rco_start : 7;
+	u8 udp_rco : 1;
+#else
+	u8 udp_rco : 1;
+	u8 rco_start : 7;
+#endif
 	struct geneve_opt options[];
 };
+
+#define GENEVE_RCO_SHIFT 1	/* Left shift of start */
+#define GENEVE_RCO_SHIFT_MASK ((1 << GENEVE_RCO_SHIFT) - 1)
+#define GENEVE_MAX_REMCSUM_START (0x7f << GENEVE_RCO_SHIFT)
 
 #ifdef CONFIG_INET
 struct net_device *geneve_dev_create_fb(struct net *net, const char *name,
