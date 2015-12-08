@@ -175,3 +175,12 @@ nf_conntrack_udp_timeout_stream2 - INTEGER (seconds)
 
 	This extended timeout will be used in case there is an UDP stream
 	detected.
+
+nf_conntrack_sctp_validate_vtag - BOOLEAN
+	0 - disabled (default)
+	not 0 - enabled
+
+	Enable VTAG validation for conntrack entries created from
+	HEARTBEATs. That is, in order to allow such new entry, that vtag
+	must already be known for that port pair, no matter which
+	addresses are used. Most useful in end peers.
