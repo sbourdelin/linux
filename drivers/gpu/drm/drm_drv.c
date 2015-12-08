@@ -797,7 +797,7 @@ EXPORT_SYMBOL(drm_dev_unregister);
 /**
  * drm_dev_set_unique - Set the unique name of a DRM device
  * @dev: device of which to set the unique name
- * @fmt: format string for unique name
+ * @name: unique name
  *
  * Sets the unique name of a DRM device using the specified format string and
  * a variable list of arguments. Drivers can use this at driver probe time if
@@ -805,15 +805,10 @@ EXPORT_SYMBOL(drm_dev_unregister);
  *
  * Return: 0 on success or a negative error code on failure.
  */
-int drm_dev_set_unique(struct drm_device *dev, const char *fmt, ...)
+int drm_dev_set_unique(struct drm_device *dev, const char *name)
 {
-	va_list ap;
-
 	kfree(dev->unique);
-
-	va_start(ap, fmt);
-	dev->unique = kvasprintf(GFP_KERNEL, fmt, ap);
-	va_end(ap);
+	dev->unique = kstrdup(name, GFP_KERNEL);
 
 	return dev->unique ? 0 : -ENOMEM;
 }
