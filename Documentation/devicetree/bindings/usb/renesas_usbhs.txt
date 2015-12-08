@@ -2,10 +2,12 @@ Renesas Electronics USBHS driver
 
 Required properties:
   - compatible: "renesas,usbhs-<soctype>", "renesas,rcar-usbhs" as fallback.
-	- "renesas,usbhs-r8a7790"
-	- "renesas,usbhs-r8a7791"
-	- "renesas,usbhs-r8a7794"
-	- "renesas,usbhs-r8a7795"
+	- "renesas,usbhs-r8a7790" (R-Car H2)
+	- "renesas,usbhs-r8a7791" (R-Car M2-W)
+	- "renesas,usbhs-r8a7792" (R-Car V2H)
+	- "renesas,usbhs-r8a7793" (R-Car M2-N)
+	- "renesas,usbhs-r8a7794" (R-Car E2)
+	- "renesas,usbhs-r8a7795" (R-Car H3)
   - reg: Base address and length of the register for the USBHS
   - interrupts: Interrupt specifier for the USBHS
   - clocks: A list of phandle + clock specifier pairs
