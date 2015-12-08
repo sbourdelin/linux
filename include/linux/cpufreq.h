@@ -230,7 +230,7 @@ struct cpufreq_driver {
 	int		(*init)(struct cpufreq_policy *policy);
 	int		(*verify)(struct cpufreq_policy *policy);
 
-	/* define one out of two */
+	/* define one out of three */
 	int		(*setpolicy)(struct cpufreq_policy *policy);
 
 	/*
@@ -432,6 +432,7 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div,
  */
 #define CPUFREQ_POLICY_POWERSAVE	(1)
 #define CPUFREQ_POLICY_PERFORMANCE	(2)
+#define CPUFREQ_POLICY_ONDEMAND		(4)
 
 /* Governor Events */
 #define CPUFREQ_GOV_START	1
