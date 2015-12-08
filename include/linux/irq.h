@@ -981,4 +981,6 @@ int irq_unmap_ipi(struct ipi_mapping *map, unsigned int cpu);
 irq_hw_number_t irq_ipi_mapping_get_hwirq(struct ipi_mapping *map,
 					  unsigned int cpu);
 
+irq_hw_number_t ipi_get_hwirq(unsigned int irq, unsigned int cpu);
+
 #endif /* _LINUX_IRQ_H */

@@ -233,3 +233,40 @@ void irq_destroy_ipi(unsigned int irq)
 
 	irq_domain_free_irqs(irq, nr_irqs);
 }
+
+/**
+ * ipi_get_hwirq - get the hwirq associated with an IPI to a cpu
+ * @irq: linux irq number
+ * @cpu: the cpu to find the revmap for
+ *
+ * When dealing with coprocessors IPI, we need to inform it of the hwirq it
+ * needs to use to receive and send IPIs. This function provides the revmap
+ * to get this info to pass on to coprocessor firmware.
+ *
+ * Returns hwirq value on success and INVALID_HWIRQ on failure.
+ */
+irq_hw_number_t ipi_get_hwirq(unsigned int irq, unsigned int cpu)
+{
+	struct irq_data *data = irq_get_irq_data(irq);
+	struct cpumask *ipimask = data ? irq_data_get_affinity_mask(data) : NULL;
+	irq_hw_number_t hwirq;
+
+	if (!data || !ipimask)
+		return INVALID_HWIRQ;
+
+	if (cpu > nr_cpu_ids)
+		return INVALID_HWIRQ;
+
+	if (!cpumask_test_cpu(cpu, ipimask))
+		return INVALID_HWIRQ;
+
+	if (irq_domain_is_ipi_per_cpu(data->domain)) {
+		data = irq_get_irq_data(irq + cpu - data->common->ipi_offset);
+		hwirq = data ? irqd_to_hwirq(data) : INVALID_HWIRQ;
+	} else {
+		hwirq = irqd_to_hwirq(data) + cpu - data->common->ipi_offset;
+	}
+
+	return hwirq;
+}
+EXPORT_SYMBOL_GPL(ipi_get_hwirq);
