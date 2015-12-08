@@ -779,5 +779,6 @@ extern int qla_set_exlogin_mem_cfg(scsi_qla_host_t *vha, dma_addr_t phys_addr);
 extern int qla_get_exchoffld_status(scsi_qla_host_t *, uint16_t *, uint16_t *);
 extern int qla_set_exchoffld_mem_cfg(scsi_qla_host_t *vha,
     dma_addr_t phys_addr);
+extern void qlt_handle_abts_recv(struct scsi_qla_host *, response_t *);
 
 #endif /* _QLA_GBL_H */
