@@ -388,6 +388,33 @@ struct dentry *debugfs_create_file_size(const char *name, umode_t mode,
 }
 EXPORT_SYMBOL_GPL(debugfs_create_file_size);
 
+static struct dentry *__create_dir(const char *name,
+				   struct dentry *parent, void *data,
+				   const struct inode_operations *i_op)
+{
+	struct dentry *dentry = start_creating(name, parent);
+	struct inode *inode;
+
+	if (IS_ERR(dentry))
+		return NULL;
+
+	inode = debugfs_get_inode(dentry->d_sb);
+	if (unlikely(!inode))
+		return failed_creating(dentry);
+
+	inode->i_mode = S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO;
+	inode->i_op = i_op;
+	inode->i_private = data;
+	inode->i_fop = &simple_dir_operations;
+
+	/* directory inodes start off with i_nlink == 2 (for "." entry) */
+	inc_nlink(inode);
+	d_instantiate(dentry, inode);
+	inc_nlink(d_inode(dentry->d_parent));
+	fsnotify_mkdir(d_inode(dentry->d_parent), dentry);
+	return end_creating(dentry);
+}
+
 /**
  * debugfs_create_dir - create a directory in the debugfs filesystem
  * @name: a pointer to a string containing the name of the directory to
@@ -408,26 +435,7 @@ EXPORT_SYMBOL_GPL(debugfs_create_file_size);
  */
 struct dentry *debugfs_create_dir(const char *name, struct dentry *parent)
 {
-	struct dentry *dentry = start_creating(name, parent);
-	struct inode *inode;
-
-	if (IS_ERR(dentry))
-		return NULL;
-
-	inode = debugfs_get_inode(dentry->d_sb);
-	if (unlikely(!inode))
-		return failed_creating(dentry);
-
-	inode->i_mode = S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO;
-	inode->i_op = &simple_dir_inode_operations;
-	inode->i_fop = &simple_dir_operations;
-
-	/* directory inodes start off with i_nlink == 2 (for "." entry) */
-	inc_nlink(inode);
-	d_instantiate(dentry, inode);
-	inc_nlink(d_inode(dentry->d_parent));
-	fsnotify_mkdir(d_inode(dentry->d_parent), dentry);
-	return end_creating(dentry);
+	return __create_dir(name, parent, NULL, &simple_dir_inode_operations);
 }
 EXPORT_SYMBOL_GPL(debugfs_create_dir);
 
