@@ -98,6 +98,7 @@ struct parse_events_evlist {
 	int			   idx;
 	int			   nr_groups;
 	struct parse_events_error *error;
+	struct perf_evlist	  *evlist;
 };
 
 struct parse_events_terms {
@@ -171,4 +172,8 @@ extern int is_valid_tracepoint(const char *event_string);
 int valid_event_mount(const char *eventfs);
 char *parse_events_formats_error_string(char *additional_terms);
 
+int parse_events__set_event_alias(struct parse_events_evlist *data,
+				  struct list_head *list,
+				  const char *str,
+				  void *loc_alias_);
 #endif /* __PERF_PARSE_EVENTS_H */
