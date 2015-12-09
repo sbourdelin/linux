@@ -98,6 +98,10 @@ static int buf_sz = DEFAULT_BUFSIZE;
 module_param(buf_sz, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(buf_sz, "DMA buffer size");
 
+static int minrx = 256;
+module_param(minrx, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(minrx, "Copy only tiny-frames");
+
 static const u32 default_msg_level = (NETIF_MSG_DRV | NETIF_MSG_PROBE |
 				      NETIF_MSG_LINK | NETIF_MSG_IFUP |
 				      NETIF_MSG_IFDOWN | NETIF_MSG_TIMER);
@@ -147,6 +151,8 @@ static void stmmac_verify_args(void)
 		pause = PAUSE_TIME;
 	if (eee_timer < 0)
 		eee_timer = STMMAC_DEFAULT_LPI_TIMER;
+	if (minrx < 0)
+		minrx = ETH_FRAME_LEN;
 }
 
 /**
@@ -2198,8 +2204,7 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 			struct sk_buff *skb;
 
 			skb = netdev_alloc_skb_ip_align(priv->dev, bfsize);
-
-			if (unlikely(skb == NULL))
+			if (unlikely(!skb))
 				break;
 
 			priv->rx_skbuff[entry] = skb;
@@ -2322,22 +2327,51 @@ static int stmmac_rx(struct stmmac_priv *priv, int limit)
 					pr_debug("\tframe size %d, COE: %d\n",
 						 frame_len, status);
 			}
-			skb = priv->rx_skbuff[entry];
-			if (unlikely(!skb)) {
-				pr_err("%s: Inconsistent Rx descriptor chain\n",
-				       priv->dev->name);
-				priv->dev->stats.rx_dropped++;
-				break;
+
+			if (unlikely(frame_len < minrx)) {
+				skb = netdev_alloc_skb_ip_align(priv->dev,
+								frame_len);
+				if (unlikely(!skb)) {
+					if (net_ratelimit())
+						dev_warn(priv->device,
+							 "packet dropped\n");
+					priv->dev->stats.rx_dropped++;
+					break;
+				}
+
+				dma_sync_single_for_cpu(priv->device,
+							priv->rx_skbuff_dma
+							[entry], frame_len,
+							DMA_FROM_DEVICE);
+				skb_copy_to_linear_data(skb,
+							priv->
+							rx_skbuff[entry]->data,
+							frame_len);
+
+				skb_put(skb, frame_len);
+				dma_sync_single_for_device(priv->device,
+							   priv->rx_skbuff_dma
+							   [entry], frame_len,
+							   DMA_FROM_DEVICE);
+			} else {
+				skb = priv->rx_skbuff[entry];
+				if (unlikely(!skb)) {
+					pr_err("%s: Inconsistent Rx chain\n",
+					       priv->dev->name);
+					priv->dev->stats.rx_dropped++;
+					break;
+				}
+				prefetch(skb->data - NET_IP_ALIGN);
+				priv->rx_skbuff[entry] = NULL;
+
+				skb_put(skb, frame_len);
+				dma_unmap_single(priv->device,
+						 priv->rx_skbuff_dma[entry],
+						 priv->dma_buf_sz,
+						 DMA_FROM_DEVICE);
 			}
-			prefetch(skb->data - NET_IP_ALIGN);
-			priv->rx_skbuff[entry] = NULL;
 
 			stmmac_get_rx_hwtstamp(priv, entry, skb);
-
-			skb_put(skb, frame_len);
-			dma_unmap_single(priv->device,
-					 priv->rx_skbuff_dma[entry],
-					 priv->dma_buf_sz, DMA_FROM_DEVICE);
 
 			if (netif_msg_pktdata(priv)) {
 				pr_debug("frame received (%dbytes)", frame_len);
@@ -3234,6 +3268,9 @@ static int __init stmmac_cmdline_opt(char *str)
 				goto err;
 		} else if (!strncmp(opt, "chain_mode:", 11)) {
 			if (kstrtoint(opt + 11, 0, &chain_mode))
+				goto err;
+		} else if (!strncmp(opt, "minrx:", 6)) {
+			if (kstrtoint(opt + 6, 0, &minrx))
 				goto err;
 		}
 	}
