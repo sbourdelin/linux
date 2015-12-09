@@ -423,6 +423,16 @@ END_FTR_SECTION_IFSET(CPU_FTR_NEED_PAIRED_STWCX)
 	.globl	ret_from_fork
 ret_from_fork:
 	REST_NVGPRS(r1)
+	/*
+	 * The first context switch for a process doesn't return through
+	 * __switch_to(), so we need to call restore_sprs() here.
+	 */
+	mr	r4,r2
+	bl	restore_sprs
+	/*
+	 * restore_sprs() returns a pointer to the previous task struct,
+	 * which is what schedule_tail() expects to be passed.
+	 */
 	bl	schedule_tail
 	li	r3,0
 	b	ret_from_syscall
@@ -430,6 +440,16 @@ ret_from_fork:
 	.globl	ret_from_kernel_thread
 ret_from_kernel_thread:
 	REST_NVGPRS(r1)
+	/*
+	 * The first context switch for a kernel thread doesn't return through
+	 * __switch_to(), so we need to call restore_sprs() here.
+	 */
+	mr	r4,r2
+	bl	restore_sprs
+	/*
+	 * restore_sprs() returns a pointer to the previous task struct,
+	 * which is what schedule_tail() expects to be passed.
+	 */
 	bl	schedule_tail
 	mtlr	r14
 	mr	r3,r15

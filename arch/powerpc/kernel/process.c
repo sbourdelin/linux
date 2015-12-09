@@ -854,9 +854,12 @@ static inline void save_sprs(struct thread_struct *t)
 #endif
 }
 
-static inline void restore_sprs(struct thread_struct *old_thread,
-				struct thread_struct *new_thread)
+struct task_struct *restore_sprs(struct task_struct *old,
+				 struct task_struct *new)
 {
+	struct thread_struct *old_thread = &old->thread;
+	struct thread_struct *new_thread = &new->thread;
+
 #ifdef CONFIG_ALTIVEC
 	if (cpu_has_feature(CPU_FTR_ALTIVEC) &&
 	    old_thread->vrsave != new_thread->vrsave)
@@ -891,6 +894,12 @@ static inline void restore_sprs(struct thread_struct *old_thread,
 			mtspr(SPRN_TAR, new_thread->tar);
 	}
 #endif
+
+	/*
+	 * ret_from_fork and ret_from_kernel_thread expect us to
+	 * return a pointer to the previous task struct.
+	 */
+	return old;
 }
 
 struct task_struct *__switch_to(struct task_struct *prev,
@@ -966,11 +975,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 
 	last = _switch(old_thread, new_thread);
 
-	/* Need to recalculate these after calling _switch() */
-	old_thread = &last->thread;
-	new_thread = &current->thread;
-
-	restore_sprs(old_thread, new_thread);
+	restore_sprs(last, current);
 
 #ifdef CONFIG_PPC_BOOK3S_64
 	if (current_thread_info()->local_flags & _TLF_LAZY_MMU) {

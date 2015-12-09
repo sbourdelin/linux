@@ -409,12 +409,32 @@ _GLOBAL(ppc_switch_endian)
 	b	.Lsyscall_exit
 
 _GLOBAL(ret_from_fork)
+	/*
+	 * The first context switch for a process doesn't return through
+	 * __switch_to(), so we need to call restore_sprs() here.
+	 */
+	ld	r4,PACACURRENT(r13)
+	bl	restore_sprs
+	/*
+	 * restore_sprs() returns a pointer to the previous task struct,
+	 * which is what schedule_tail() expects to be passed.
+	 */
 	bl	schedule_tail
 	REST_NVGPRS(r1)
 	li	r3,0
 	b	.Lsyscall_exit
 
 _GLOBAL(ret_from_kernel_thread)
+	/*
+	 * The first context switch for a kernel thread doesn't return through
+	 * __switch_to(), so we need to call restore_sprs() here.
+	 */
+	ld	r4,PACACURRENT(r13)
+	bl	restore_sprs
+	/*
+	 * restore_sprs() returns a pointer to the previous task struct,
+	 * which is what schedule_tail() expects to be passed.
+	 */
 	bl	schedule_tail
 	REST_NVGPRS(r1)
 	mtlr	r14
