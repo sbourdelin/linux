@@ -32,7 +32,7 @@ static int stmmac_jumbo_frm(void *p, struct sk_buff *skb, int csum)
 {
 	struct stmmac_priv *priv = (struct stmmac_priv *)p;
 	unsigned int txsize = priv->dma_tx_size;
-	unsigned int entry = priv->cur_tx % txsize;
+	unsigned int entry = priv->cur_tx;
 	struct dma_desc *desc = priv->dma_tx + entry;
 	unsigned int nopaged_len = skb_headlen(skb);
 	unsigned int bmax;
@@ -54,7 +54,8 @@ static int stmmac_jumbo_frm(void *p, struct sk_buff *skb, int csum)
 
 	while (len != 0) {
 		priv->tx_skbuff[entry] = NULL;
-		entry = (++priv->cur_tx) % txsize;
+		if (++entry >= txsize)
+			entry = 0;
 		desc = priv->dma_tx + entry;
 
 		if (len > bmax) {
@@ -82,6 +83,9 @@ static int stmmac_jumbo_frm(void *p, struct sk_buff *skb, int csum)
 			len = 0;
 		}
 	}
+
+	priv->cur_tx = entry;
+
 	return entry;
 }
 
@@ -151,10 +155,9 @@ static void stmmac_clean_desc3(void *priv_ptr, struct dma_desc *p)
 		 * 1588-2002 time stamping is enabled, hence reinitialize it
 		 * to keep explicit chaining in the descriptor.
 		 */
-		p->des3 = (unsigned int)(priv->dma_tx_phy +
-					 (((priv->dirty_tx + 1) %
-					   priv->dma_tx_size) *
-					  sizeof(struct dma_desc)));
+		p->des3 = (unsigned int)((priv->dma_tx_phy +
+					  priv->dirty_tx + 1) *
+					  sizeof(struct dma_desc));
 }
 
 const struct stmmac_mode_ops chain_mode_ops = {

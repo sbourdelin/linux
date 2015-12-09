@@ -201,7 +201,14 @@ static void print_pkt(unsigned char *buf, int len)
 
 static inline u32 stmmac_tx_avail(struct stmmac_priv *priv)
 {
-	return priv->dirty_tx + priv->dma_tx_size - priv->cur_tx - 1;
+	unsigned avail;
+
+	if (priv->dirty_tx > priv->cur_tx)
+		avail = priv->dirty_tx - priv->cur_tx - 1;
+	else
+		avail = priv->dma_tx_size - priv->cur_tx + priv->dirty_tx - 1;
+
+	return avail;
 }
 
 /**
@@ -1315,16 +1322,16 @@ static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
  */
 static void stmmac_tx_clean(struct stmmac_priv *priv)
 {
-	unsigned int txsize = priv->dma_tx_size;
 	unsigned int bytes_compl = 0, pkts_compl = 0;
+	unsigned int txsize = priv->dma_tx_size;
+	unsigned int entry = priv->dirty_tx;
 
 	spin_lock(&priv->tx_lock);
 
 	priv->xstats.tx_clean++;
 
-	while (priv->dirty_tx != priv->cur_tx) {
+	while (entry != priv->cur_tx) {
 		int last;
-		unsigned int entry = priv->dirty_tx % txsize;
 		struct sk_buff *skb = priv->tx_skbuff[entry];
 		struct dma_desc *p;
 
@@ -1381,7 +1388,9 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
 
 		priv->hw->desc->release_tx_desc(p, priv->mode);
 
-		priv->dirty_tx++;
+		if (++entry >= txsize)
+			entry = 0;
+		priv->dirty_tx = entry;
 	}
 
 	netdev_completed_queue(priv->dev, pkts_compl, bytes_compl);
@@ -1981,7 +1990,8 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (priv->tx_path_in_lpi_mode)
 		stmmac_disable_eee_mode(priv);
 
-	entry = priv->cur_tx % txsize;
+	entry = priv->cur_tx;
+
 
 	csum_insertion = (skb->ip_summed == CHECKSUM_PARTIAL);
 
@@ -2016,7 +2026,9 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 		int len = skb_frag_size(frag);
 
 		priv->tx_skbuff[entry] = NULL;
-		entry = (++priv->cur_tx) % txsize;
+		if (++entry >= txsize)
+			entry = 0;
+
 		if (priv->extend_desc)
 			desc = (struct dma_desc *)(priv->dma_etx + entry);
 		else
@@ -2059,7 +2071,10 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 	priv->hw->desc->set_tx_owner(first);
 	wmb();
 
-	priv->cur_tx++;
+	if (++entry >= txsize)
+		entry = 0;
+
+	priv->cur_tx = entry;
 
 	if (netif_msg_pktdata(priv)) {
 		pr_debug("%s: curr %d dirty=%d entry=%d, first=%p, nfrags=%d",
