@@ -221,6 +221,7 @@ ENTRY(stext)
 	 */
 	ldr	x27, =__mmap_switched		// address to jump to after
 						// MMU has been enabled
+	mov	x22, 0				// &secondary_data for Boot CPU
 	adr_l	lr, __enable_mmu		// return (PIC) address
 	b	__cpu_setup			// initialise processor
 ENDPROC(stext)
@@ -598,13 +599,13 @@ ENTRY(secondary_startup)
 	adrp	x26, swapper_pg_dir
 	bl	__cpu_setup			// initialise processor
 
-	ldr	x21, =secondary_data
+	ldr	x22, =secondary_data
 	ldr	x27, =__secondary_switched	// address to jump to after enabling the MMU
 	b	__enable_mmu
 ENDPROC(secondary_startup)
 
 ENTRY(__secondary_switched)
-	ldr	x0, [x21]			// get secondary_data.stack
+	ldr	x0, [x22]			// get secondary_data.stack
 	mov	sp, x0
 	mov	x29, #0
 	b	secondary_start_kernel
