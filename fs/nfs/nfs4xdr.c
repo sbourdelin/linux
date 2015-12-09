@@ -4157,7 +4157,9 @@ static int decode_attr_security_label(struct xdr_stream *xdr, uint32_t *bitmap,
 		if (unlikely(!p))
 			goto out_overflow;
 		if (len < NFS4_MAXLABELLEN) {
-			if (label) {
+			if (label && label->label) {
+				if (len > label->len)
+					return -ERANGE;
 				memcpy(label->label, p, len);
 				label->len = len;
 				label->pi = pi;
@@ -4165,9 +4167,11 @@ static int decode_attr_security_label(struct xdr_stream *xdr, uint32_t *bitmap,
 				status = NFS_ATTR_FATTR_V4_SECURITY_LABEL;
 			}
 			bitmap[2] &= ~FATTR4_WORD2_SECURITY_LABEL;
-		} else
+		} else {
 			printk(KERN_WARNING "%s: label too long (%u)!\n",
 					__func__, len);
+			return -EIO;
+		}
 	}
 	if (label && label->label)
 		dprintk("%s: label=%s, len=%d, PI=%d, LFS=%d\n", __func__,
