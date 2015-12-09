@@ -136,14 +136,23 @@ Raw buffer as a hex string:
 MAC/FDDI addresses:
 
 	%pM	00:01:02:03:04:05
+	%pMl	00:01:02:03:04:05:06:07
 	%pMR	05:04:03:02:01:00
+	%pMRl	07:06:05:04:03:02:01:00
 	%pMF	00-01-02-03-04-05
+	%pMFl	00-01-02-03-04-05-06-07
+	%pMFR	05-04-03-02-01-00
+	%pMFRl	07-06-05-04-03-02-01-00
 	%pm	000102030405
+	%pml	0001020304050607
 	%pmR	050403020100
+	%pmRl	0706050403020100
 
-	For printing 6-byte MAC/FDDI addresses in hex notation. The 'M' and 'm'
-	specifiers result in a printed address with ('M') or without ('m') byte
-	separators. The default byte separator is the colon (':').
+	For printing 6 or 8-byte MAC/FDDI addresses in hex notation. The
+	'M' and 'm' specifiers result in a printed address with ('M')
+	or without ('m') byte separators. The default byte separator is
+	the colon (':'). Append 'l' to specify an 8-byte in accordance
+	with EUI-64 format.
 
 	Where FDDI addresses are concerned the 'F' specifier can be used after
 	the 'M' specifier to use dash ('-') separators instead of the default
