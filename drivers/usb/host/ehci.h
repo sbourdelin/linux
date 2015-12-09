@@ -664,8 +664,8 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 		case 1:
 			return USB_PORT_STAT_LOW_SPEED;
 		case 2:
+		/* fall through to default function return */
 		default:
-			return USB_PORT_STAT_HIGH_SPEED;
 		}
 	}
 	return USB_PORT_STAT_HIGH_SPEED;
