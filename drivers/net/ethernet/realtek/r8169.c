@@ -1705,6 +1705,10 @@ static u32 __rtl8169_get_wol(struct rtl8169_private *tp)
 	if (!(options & PMEnable))
 		return 0;
 
+	options = RTL_R8(Config5);
+	if (!(options & LanWake))
+		return 0;
+
 	options = RTL_R8(Config3);
 	if (options & LinkUp)
 		wolopts |= WAKE_PHY;
