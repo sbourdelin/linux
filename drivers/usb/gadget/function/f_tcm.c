@@ -2300,20 +2300,19 @@ static struct usb_function_instance *tcm_alloc_inst(void)
 	struct f_tcm_opts *opts;
 	int i;
 
-	mutex_lock(&tpg_instances_lock);
-	opts = kzalloc(sizeof(*opts), GFP_KERNEL);
-	if (!opts) {
-		mutex_unlock(&tpg_instances_lock);
 
+	opts = kzalloc(sizeof(*opts), GFP_KERNEL);
+	if (!opts)
 		return ERR_PTR(-ENOMEM);
-	}
+
+	mutex_lock(&tpg_instances_lock);
 	for (i = 0; i < TPG_INSTANCES; ++i)
 		if (!tpg_instances[i].func_inst)
 			break;
 
 	if (i == TPG_INSTANCES) {
 		mutex_unlock(&tpg_instances_lock);
-
+		kfree(opts);
 		return ERR_PTR(-EBUSY);
 	}
 	tpg_instances[i].func_inst = &opts->func_inst;
