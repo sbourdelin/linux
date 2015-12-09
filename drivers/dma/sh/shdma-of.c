@@ -10,7 +10,7 @@
  */
 
 #include <linux/dmaengine.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_dma.h>
 #include <linux/of_platform.h>
@@ -62,18 +62,13 @@ static const struct of_device_id shdma_of_match[] = {
 	{ .compatible = "renesas,shdma-mux", },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, sh_dmae_of_match);
 
 static struct platform_driver shdma_of = {
 	.driver		= {
 		.name	= "shdma-of",
+		.suppress_bind_attrs = true,
 		.of_match_table = shdma_of_match,
 	},
 	.probe		= shdma_of_probe,
 };
-
-module_platform_driver(shdma_of);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("SH-DMA driver DT glue");
-MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+builtin_platform_driver(shdma_of);

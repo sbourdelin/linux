@@ -18,7 +18,7 @@
 #include <linux/dmaengine.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -1051,14 +1051,4 @@ static int __init shdma_enter(void)
 		return -ENOMEM;
 	return 0;
 }
-module_init(shdma_enter);
-
-static void __exit shdma_exit(void)
-{
-	kfree(shdma_slave_used);
-}
-module_exit(shdma_exit);
-
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("SH-DMA driver base library");
-MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+device_initcall(shdma_enter);
