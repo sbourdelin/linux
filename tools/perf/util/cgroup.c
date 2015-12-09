@@ -4,6 +4,7 @@
 #include "evsel.h"
 #include "cgroup.h"
 #include "evlist.h"
+#include "refcnt.h"
 
 int nr_cgroups;
 
@@ -103,6 +104,7 @@ static int add_cgroup(struct perf_evlist *evlist, char *str)
 			free(cgrp);
 			return -1;
 		}
+		refcnt__init_as(cgrp, refcnt, 0, "cgroup_sel");
 	}
 
 	/*
@@ -115,21 +117,24 @@ static int add_cgroup(struct perf_evlist *evlist, char *str)
 			goto found;
 		n++;
 	}
-	if (atomic_read(&cgrp->refcnt) == 0)
+	if (atomic_read(&cgrp->refcnt) == 0) {
+		refcnt__exit(cgrp, refcnt);
 		free(cgrp);
+	}
 
 	return -1;
 found:
-	atomic_inc(&cgrp->refcnt);
+	refcnt__get(cgrp, refcnt);
 	counter->cgrp = cgrp;
 	return 0;
 }
 
 void close_cgroup(struct cgroup_sel *cgrp)
 {
-	if (cgrp && atomic_dec_and_test(&cgrp->refcnt)) {
+	if (cgrp && refcnt__put(cgrp, refcnt)) {
 		close(cgrp->fd);
 		zfree(&cgrp->name);
+		refcnt__exit(cgrp, refcnt);
 		free(cgrp);
 	}
 }
