@@ -945,6 +945,7 @@ static int perf_top__setup_sample_type(struct perf_top *top __maybe_unused)
 static int __cmd_top(struct perf_top *top)
 {
 	struct record_opts *opts = &top->record_opts;
+	struct thread *idle;
 	pthread_t thread;
 	int ret;
 
@@ -964,8 +965,11 @@ static int __cmd_top(struct perf_top *top)
 	if (ret)
 		goto out_delete;
 
-	if (perf_session__register_idle_thread(top->session) == NULL)
+	idle = perf_session__register_idle_thread(top->session);
+	if (idle == NULL)
 		goto out_delete;
+	/* perf_session__register_idle_thread() got the returned thread. */
+	thread__put(idle);
 
 	machine__synthesize_threads(&top->session->machines.host, &opts->target,
 				    top->evlist->threads, false, opts->proc_map_timeout);
