@@ -471,7 +471,7 @@ void map_groups__init(struct map_groups *mg, struct machine *machine)
 		maps__init(&mg->maps[i]);
 	}
 	mg->machine = machine;
-	atomic_set(&mg->refcnt, 1);
+	refcnt__init_as(mg, refcnt, 1, "map_groups");
 }
 
 static void __maps__purge(struct maps *maps)
@@ -501,6 +501,7 @@ void map_groups__exit(struct map_groups *mg)
 
 	for (i = 0; i < MAP__NR_TYPES; ++i)
 		maps__exit(&mg->maps[i]);
+	refcnt__exit(mg, refcnt);
 }
 
 bool map_groups__empty(struct map_groups *mg)
@@ -533,7 +534,7 @@ void map_groups__delete(struct map_groups *mg)
 
 void map_groups__put(struct map_groups *mg)
 {
-	if (mg && atomic_dec_and_test(&mg->refcnt))
+	if (mg && refcnt__put(mg, refcnt))
 		map_groups__delete(mg);
 }
 
