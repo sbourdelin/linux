@@ -889,10 +889,10 @@ static noinline_for_stack
 char *mac_address_string(char *buf, char *end, u8 *addr,
 			 struct printf_spec spec, const char *fmt)
 {
-	char mac_addr[sizeof("xx:xx:xx:xx:xx:xx")];
+	char mac_addr[sizeof("xx:xx:xx:xx:xx:xx:xx:xx")];
 	char *p = mac_addr;
-	int i;
-	char separator;
+	int i, bytes = 6;
+	char separator = ':';
 	bool reversed = false;
 
 	switch (fmt[1]) {
@@ -902,20 +902,33 @@ char *mac_address_string(char *buf, char *end, u8 *addr,
 
 	case 'R':
 		reversed = true;
-		/* fall through */
+		break;
+
+	case 'l':
+		bytes = 8;
+		break;
 
 	default:
-		separator = ':';
 		break;
 	}
+	if (separator == '-' || reversed) {
+		/* 'F' and 'R' may take additional length specifier */
+		switch (fmt[2]) {
+		case 'l':
+			bytes = 8;
+			break;
+		default:
+			break;
+		}
+	}
 
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < bytes; i++) {
 		if (reversed)
-			p = hex_byte_pack(p, addr[5 - i]);
+			p = hex_byte_pack(p, addr[(bytes - 1) - i]);
 		else
 			p = hex_byte_pack(p, addr[i]);
 
-		if (fmt[0] == 'M' && i != 5)
+		if (fmt[0] == 'M' && i != (bytes - 1))
 			*p++ = separator;
 	}
 	*p = '\0';
@@ -1496,6 +1509,8 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 	case 'm':			/* Contiguous: 000102030405 */
 					/* [mM]F (FDDI) */
 					/* [mM]R (Reverse order; Bluetooth) */
+					/* [mM]l (EUI-64) */
+					/* [mM][FR]l (FDDI/Reverse order EUI-64) */
 		return mac_address_string(buf, end, ptr, spec, fmt);
 	case 'I':			/* Formatted IP supported
 					 * 4:	1.2.3.4
