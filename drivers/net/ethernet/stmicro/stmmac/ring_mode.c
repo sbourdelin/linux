@@ -63,7 +63,6 @@ static int stmmac_jumbo_frm(void *p, struct sk_buff *skb, int csum)
 		desc->des3 = desc->des2 + BUF_SIZE_4KiB;
 		priv->hw->desc->prepare_tx_desc(desc, 1, bmax, csum,
 						STMMAC_RING_MODE, 0, false);
-		wmb();
 		priv->tx_skbuff[entry] = NULL;
 		if (++entry >= txsize)
 			entry = 0;
@@ -84,7 +83,6 @@ static int stmmac_jumbo_frm(void *p, struct sk_buff *skb, int csum)
 		desc->des3 = desc->des2 + BUF_SIZE_4KiB;
 		priv->hw->desc->prepare_tx_desc(desc, 0, len, csum,
 						STMMAC_RING_MODE, 1, true);
-		wmb();
 	} else {
 		desc->des2 = dma_map_single(priv->device, skb->data,
 					    nopaged_len, DMA_TO_DEVICE);
