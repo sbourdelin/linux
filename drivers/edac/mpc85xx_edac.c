@@ -238,7 +238,7 @@ static irqreturn_t mpc85xx_pci_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-int mpc85xx_pci_err_probe(struct platform_device *op)
+static int mpc85xx_pci_err_probe(struct platform_device *op)
 {
 	struct edac_pci_ctl_info *pci;
 	struct mpc85xx_pci_pdata *pdata;
@@ -386,7 +386,37 @@ err:
 	devres_release_group(&op->dev, mpc85xx_pci_err_probe);
 	return res;
 }
-EXPORT_SYMBOL(mpc85xx_pci_err_probe);
+
+static const struct of_device_id mpc85xx_pci_err_of_match[] = {
+	{ .compatible = "fsl,mpc8540-pci", },
+	{ .compatible = "fsl,mpc8548-pcie", },
+	{ .compatible = "fsl,mpc8610-pci", },
+	{ .compatible = "fsl,mpc8641-pcie", },
+	{ .compatible = "fsl,qoriq-pcie", },
+	{ .compatible = "fsl,qoriq-pcie-v2.1", },
+	{ .compatible = "fsl,qoriq-pcie-v2.2", },
+	{ .compatible = "fsl,qoriq-pcie-v2.3", },
+	{ .compatible = "fsl,qoriq-pcie-v2.4", },
+	{ .compatible = "fsl,qoriq-pcie-v3.0", },
+
+	/*
+	 * The following entries are for compatibility with older device
+	 * trees.
+	 */
+	{ .compatible = "fsl,p1022-pcie", },
+	{ .compatible = "fsl,p4080-pcie", },
+
+	{},
+};
+MODULE_DEVICE_TABLE(of, mpc85xx_pci_err_of_match);
+
+static struct platform_driver mpc85xx_pci_err_driver = {
+	.driver = {
+		.name = "mpc85xx_edac_pci",
+		.of_match_table = mpc85xx_pci_err_of_match,
+	},
+	.probe = mpc85xx_pci_err_probe,
+};
 
 #endif				/* CONFIG_PCI */
 
@@ -1211,6 +1241,7 @@ static void __init mpc85xx_mc_clear_rfxe(void *data)
 static struct platform_driver * const drivers[] = {
 	&mpc85xx_mc_err_driver,
 	&mpc85xx_l2_err_driver,
+	&mpc85xx_pci_err_driver,
 };
 
 static int __init mpc85xx_mc_init(void)

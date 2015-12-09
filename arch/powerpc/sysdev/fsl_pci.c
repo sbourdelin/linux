@@ -1263,8 +1263,6 @@ static int fsl_pci_probe(struct platform_device *pdev)
 	node = pdev->dev.of_node;
 	ret = fsl_add_bridge(pdev, fsl_pci_primary == node);
 
-	mpc85xx_pci_err_probe(pdev);
-
 	return 0;
 }
 
