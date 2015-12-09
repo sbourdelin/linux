@@ -30,6 +30,7 @@
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
+#include <linux/of_gpio.h>
 
 #include "macb.h"
 
@@ -2737,6 +2738,28 @@ static int at91ether_init(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static void macb_reset_phy(struct macb *bp, struct device_node *np, int state)
+{
+	if (!np)
+		return;
+
+	bp->reset_gpio = of_get_named_gpio(np, "phy-reset-gpio", 0);
+
+	if (gpio_is_valid(bp->reset_gpio))
+		gpio_direction_output(bp->reset_gpio, state);
+}
+#else /* CONFIG_OF */
+static void macb_reset_phy(struct macb *bp, struct device_node *np, int state)
+{
+	/*
+	 * In case of platform probe, the reset has been done
+	 * by machine code.
+	 */
+}
+#endif /* CONFIG_OF */
+
+
 static const struct macb_config at91sam9260_config = {
 	.caps = MACB_CAPS_USRIO_HAS_CLKEN | MACB_CAPS_USRIO_DEFAULT_IS_MII,
 	.clk_init = macb_clk_init,
@@ -2904,6 +2927,8 @@ static int macb_probe(struct platform_device *pdev)
 	else
 		macb_get_hwaddr(bp);
 
+	macb_reset_phy(bp, np, 1);
+
 	err = of_get_phy_mode(np);
 	if (err < 0) {
 		pdata = dev_get_platdata(&pdev->dev);
@@ -2970,6 +2995,7 @@ static int macb_remove(struct platform_device *pdev)
 		mdiobus_unregister(bp->mii_bus);
 		kfree(bp->mii_bus->irq);
 		mdiobus_free(bp->mii_bus);
+		macb_reset_phy(bp, pdev->dev.of_node, 0);
 		unregister_netdev(dev);
 		clk_disable_unprepare(bp->tx_clk);
 		clk_disable_unprepare(bp->hclk);
