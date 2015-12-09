@@ -1,0 +1,151 @@
+/* Refcount backtrace for debugging leaks */
+#include "../perf.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <execinfo.h>	/* For backtrace */
+
+#include "event.h"
+#include "debug.h"
+#include "util.h"
+#include "refcnt.h"
+
+/* A root of backtrace */
+static LIST_HEAD(refcnt_root);	/* List head of refcnt object */
+
+static void refcnt_object__delete(struct refcnt_object *ref)
+{
+	struct refcnt_buffer *buf;
+
+	while (!list_empty(&ref->head)) {
+		buf = list_entry(ref->head.next, struct refcnt_buffer, list);
+		list_del_init(&buf->list);
+		free(buf);
+	}
+	list_del_init(&ref->list);
+	free(ref);
+}
+
+static struct refcnt_object *refcnt_object__find(void *obj)
+{
+	struct refcnt_object *ref;
+
+	/* TODO: use hash list */
+	list_for_each_entry(ref, &refcnt_root, list)
+		if (ref->obj == obj)
+			return ref;
+
+	return NULL;
+}
+
+void refcnt__delete(void *addr)
+{
+	struct refcnt_object *ref = refcnt_object__find(addr);
+
+	if (!ref) {
+		pr_debug("REFCNT: Delete uninitialized refcnt: %p\n", addr);
+		return;
+	}
+	refcnt_object__delete(ref);
+}
+
+static void refcnt_object__record(struct refcnt_object *ref, int count)
+{
+	struct refcnt_buffer *buf = malloc(sizeof(*buf));
+
+	if (!buf) {
+		pr_debug("REFCNT: Out of memory for %p (%s)\n",
+			 ref->obj, ref->name);
+		return;
+	}
+	INIT_LIST_HEAD(&buf->list);
+	buf->count = count;
+	buf->nr = backtrace(buf->buf, BACKTRACE_SIZE);
+	list_add_tail(&buf->list, &ref->head);
+}
+
+static struct refcnt_object *refcnt_object__new(void *obj, const char *name)
+{
+	struct refcnt_object *ref = malloc(sizeof(*ref));
+
+	if (!ref) {
+		pr_debug("REFCNT: Out of memory for %p (%s)\n",
+			 obj, name);
+		return NULL;
+	}
+	INIT_LIST_HEAD(&ref->list);
+	INIT_LIST_HEAD(&ref->head);
+	ref->name = name;
+	ref->obj = obj;
+	list_add_tail(&ref->list, &refcnt_root);
+
+	return ref;
+}
+
+/* This is called via refcnt__init */
+void refcnt__recordnew(void *obj, const char *name, int count)
+{
+	struct refcnt_object *ref = refcnt_object__new(obj, name);
+
+	if (ref)
+		refcnt_object__record(ref, count);
+}
+
+/* This is called via refcnt__get/put */
+void refcnt__record(void *obj, const char *name, int count)
+{
+	struct refcnt_object *ref = refcnt_object__find(obj);
+
+	/* If no entry, allocate new one */
+	if (!ref)
+		refcnt__recordnew(obj, name, count);
+	else
+		refcnt_object__record(ref, count);
+}
+
+static void pr_refcnt_buffer(struct refcnt_buffer *buf)
+{
+	char **symbuf;
+	int i;
+
+	if (!buf)
+		return;
+	symbuf = backtrace_symbols(buf->buf, buf->nr);
+	/* Skip the first one because it is always btrace__record */
+	for (i = 1; i < buf->nr; i++) {
+		if (symbuf)
+			pr_debug("  %s\n", symbuf[i]);
+		else
+			pr_debug("  [%p]\n", buf->buf[i]);
+	}
+	free(symbuf);
+}
+
+static void  __attribute__((destructor)) refcnt__dump_unreclaimed(void)
+{
+	struct refcnt_object *ref, *n;
+	struct refcnt_buffer *buf;
+	int i = 0;
+
+	if (list_empty(&refcnt_root))
+		return;
+
+	pr_warning("REFCNT: BUG: Unreclaimed objects found.\n");
+	list_for_each_entry_safe(ref, n, &refcnt_root, list) {
+		pr_debug("==== [%d] ====\nUnreclaimed %s@%p\n", i,
+			 ref->name ? ref->name : "(object)", ref->obj);
+		list_for_each_entry(buf, &ref->head, list) {
+			pr_debug("Refcount %s => %d at\n",
+				 buf->count >= 0 ? "+1" : "-1",
+				 buf->count >= 0 ? buf->count :
+						  -buf->count - 1);
+			pr_refcnt_buffer(buf);
+		}
+		refcnt_object__delete(ref);
+		i++;
+	}
+	pr_warning("REFCNT: Total %d objects are not reclaimed.\n", i);
+	if (!verbose)
+		pr_warning("   To see all backtraces, rerun with -v option\n");
+}
+
