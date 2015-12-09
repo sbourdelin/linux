@@ -1084,6 +1084,7 @@ static int __qbuf_dmabuf(struct vb2_buffer *vb, const void *pb)
 		if (planes[plane].length < q->plane_sizes[plane]) {
 			dprintk(1, "invalid dmabuf length for plane %d\n",
 				plane);
+			dma_buf_put(dbuf);
 			ret = -EINVAL;
 			goto err;
 		}
