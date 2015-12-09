@@ -351,6 +351,22 @@ unclaimed_reg_access(struct drm_i915_private *dev_priv)
 	return true;
 }
 
+static void
+unclaimed_access_detect_oneshot(struct drm_i915_private *dev_priv)
+{
+	static bool mmio_debug_once = true;
+
+	if (i915.mmio_debug || !mmio_debug_once)
+		return;
+
+	if (unclaimed_reg_access(dev_priv)) {
+		DRM_DEBUG("Unclaimed register detected, "
+			  "enabling oneshot unclaimed register reporting. "
+			  "Please use i915.mmio_debug=N for more information.\n");
+		i915.mmio_debug = mmio_debug_once--;
+	}
+}
+
 static void __intel_uncore_early_sanitize(struct drm_device *dev,
 					  bool restore_forcewake)
 {
@@ -403,8 +419,10 @@ static void __intel_uncore_forcewake_get(struct drm_i915_private *dev_priv,
 			fw_domains &= ~(1 << id);
 	}
 
-	if (fw_domains)
+	if (fw_domains) {
 		dev_priv->uncore.funcs.force_wake_get(dev_priv, fw_domains);
+		unclaimed_access_detect_oneshot(dev_priv);
+	}
 }
 
 /**
@@ -622,22 +640,6 @@ hsw_unclaimed_reg_debug(struct drm_i915_private *dev_priv,
 		WARN(1, "Unclaimed register detected %s %s register 0x%x\n",
 		     when, op, i915_mmio_reg_offset(reg));
 		i915.mmio_debug--; /* Only report the first N failures */
-	}
-}
-
-static void
-hsw_unclaimed_reg_detect(struct drm_i915_private *dev_priv)
-{
-	static bool mmio_debug_once = true;
-
-	if (i915.mmio_debug || !mmio_debug_once)
-		return;
-
-	if (unclaimed_reg_access(dev_priv)) {
-		DRM_DEBUG("Unclaimed register detected, "
-			  "enabling oneshot unclaimed register reporting. "
-			  "Please use i915.mmio_debug=N for more information.\n");
-		i915.mmio_debug = mmio_debug_once--;
 	}
 }
 
@@ -920,7 +922,6 @@ hsw_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, bool t
 		gen6_gt_check_fifodbg(dev_priv); \
 	} \
 	hsw_unclaimed_reg_debug(dev_priv, reg, false, false); \
-	hsw_unclaimed_reg_detect(dev_priv); \
 	GEN6_WRITE_FOOTER; \
 }
 
@@ -955,7 +956,6 @@ gen8_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, bool 
 		__force_wake_get(dev_priv, FORCEWAKE_RENDER); \
 	__raw_i915_write##x(dev_priv, reg, val); \
 	hsw_unclaimed_reg_debug(dev_priv, reg, false, false); \
-	hsw_unclaimed_reg_detect(dev_priv); \
 	GEN6_WRITE_FOOTER; \
 }
 
@@ -1025,7 +1025,6 @@ gen9_write##x(struct drm_i915_private *dev_priv, i915_reg_t reg, u##x val, \
 		__force_wake_get(dev_priv, fw_engine); \
 	__raw_i915_write##x(dev_priv, reg, val); \
 	hsw_unclaimed_reg_debug(dev_priv, reg, false, false); \
-	hsw_unclaimed_reg_detect(dev_priv); \
 	GEN6_WRITE_FOOTER; \
 }
 
