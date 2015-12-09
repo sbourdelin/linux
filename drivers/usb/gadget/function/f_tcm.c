@@ -1145,9 +1145,7 @@ static int usbg_submit_command(struct f_uas *fu,
 	cmd->unpacked_lun = scsilun_to_int(&cmd_iu->lun);
 
 	INIT_WORK(&cmd->work, usbg_cmd_work);
-	ret = queue_work(tpg->workqueue, &cmd->work);
-	if (ret < 0)
-		goto err;
+	queue_work(tpg->workqueue, &cmd->work);
 
 	return 0;
 err:
@@ -1240,9 +1238,7 @@ static int bot_submit_command(struct f_uas *fu,
 	cmd->se_cmd.tag = le32_to_cpu(cmd->bot_tag);
 
 	INIT_WORK(&cmd->work, bot_cmd_work);
-	ret = queue_work(tpg->workqueue, &cmd->work);
-	if (ret < 0)
-		goto err;
+	queue_work(tpg->workqueue, &cmd->work);
 
 	return 0;
 err:
