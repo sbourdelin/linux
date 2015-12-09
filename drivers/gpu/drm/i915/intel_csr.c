@@ -181,8 +181,20 @@ static const struct stepping_info *intel_get_stepping_info(struct drm_device *de
 {
 	const struct stepping_info *si;
 	unsigned int size;
+	int revid = INTEL_REVID(dev);
 
-	if (IS_SKYLAKE(dev)) {
+	/*
+	 * FIXME: Kabylake derivated from Skylake H0, so SKL H0
+	 * is the right firmware for KBL A0 (revid 0).
+	 * We have no visibility yet how next KBL steppings will
+	 * be handled by firmware, so let's just load one we know
+	 * it works on the KBLs we have so far add support for
+	 * the only current available KBL.
+	 */
+	if (IS_KABYLAKE(dev))
+		revid = 7;
+
+	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev)) {
 		size = ARRAY_SIZE(skl_stepping_info);
 		si = skl_stepping_info;
 	} else if (IS_BROXTON(dev)) {
@@ -192,8 +204,8 @@ static const struct stepping_info *intel_get_stepping_info(struct drm_device *de
 		return NULL;
 	}
 
-	if (INTEL_REVID(dev) < size)
-		return si + INTEL_REVID(dev);
+	if (revid < size)
+		return si + revid;
 
 	return NULL;
 }
