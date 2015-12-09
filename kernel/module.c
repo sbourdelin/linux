@@ -1350,10 +1350,12 @@ static inline int check_modstruct_version(Elf_Shdr *sechdrs,
 static inline int same_magic(const char *amagic, const char *bmagic,
 			     bool has_crcs)
 {
+#ifndef CONFIG_MODULE_VERMAGIC_FORCE
 	if (has_crcs) {
 		amagic += strcspn(amagic, " ");
 		bmagic += strcspn(bmagic, " ");
 	}
+#endif
 	return strcmp(amagic, bmagic) == 0;
 }
 #else

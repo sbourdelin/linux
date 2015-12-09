@@ -1889,6 +1889,17 @@ config MODVERSIONS
 	  make them incompatible with the kernel you are running.  If
 	  unsure, say N.
 
+config MODULE_VERMAGIC_FORCE
+	bool "Require vermagic match exactly"
+	default n
+	depends on MODVERSIONS
+	help
+	  Usually, checking kernel version will be ignore when loading
+	  modules if CONFIG_MODVERSIONS option is enable. This could
+	  potentially lead to a mismatch with the running kernel.
+	  With this option, we prevent to load the modules which vermagic
+	  is not match exactly with the running kernel. If unsure, say N.
+
 config MODULE_SRCVERSION_ALL
 	bool "Source checksum for all modules"
 	help
