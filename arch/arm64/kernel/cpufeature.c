@@ -24,6 +24,7 @@
 #include <asm/cpu.h>
 #include <asm/cpufeature.h>
 #include <asm/cpu_ops.h>
+#include <asm/mmu_context.h>
 #include <asm/processor.h>
 #include <asm/sysreg.h>
 
@@ -829,6 +830,7 @@ static u64 __raw_read_system_reg(u32 sys_id)
  */
 static void check_early_cpu_features(void)
 {
+	verify_cpu_asid_bits();
 }
 
 /*
