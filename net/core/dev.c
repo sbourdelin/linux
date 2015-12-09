@@ -3532,12 +3532,14 @@ drop:
 static int netif_rx_internal(struct sk_buff *skb)
 {
 	int ret;
+	struct netdev_rx_queue *dev_rxqueue = skb->dev->_rx;
 
 	net_timestamp_check(netdev_tstamp_prequeue, skb);
 
 	trace_netif_rx(skb);
 #ifdef CONFIG_RPS
-	if (static_key_false(&rps_needed)) {
+	if (static_key_false(&rps_needed) &&
+	    dev_rxqueue->rps_map && dev_rxqueue->rps_map->len) {
 		struct rps_dev_flow voidflow, *rflow = &voidflow;
 		int cpu;
 
@@ -3987,6 +3989,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 static int netif_receive_skb_internal(struct sk_buff *skb)
 {
 	int ret;
+	struct netdev_rx_queue *dev_rxqueue = skb->dev->_rx;
 
 	net_timestamp_check(netdev_tstamp_prequeue, skb);
 
@@ -3996,7 +3999,8 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
 	rcu_read_lock();
 
 #ifdef CONFIG_RPS
-	if (static_key_false(&rps_needed)) {
+	if (static_key_false(&rps_needed) &&
+	    dev_rxqueue->rps_map && dev_rxqueue->rps_map->len) {
 		struct rps_dev_flow voidflow, *rflow = &voidflow;
 		int cpu = get_rps_cpu(skb->dev, skb, &rflow);
 
