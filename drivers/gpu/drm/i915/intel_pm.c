@@ -4401,11 +4401,15 @@ void gen6_rps_busy(struct drm_i915_private *dev_priv)
 
 void gen6_rps_idle(struct drm_i915_private *dev_priv)
 {
-	struct drm_device *dev = dev_priv->dev;
+	/* Flush our bottom-half so that it does not race with us
+	 * setting the idle frequency and so that it is bounded by
+	 * our rpm wakeref.
+	 */
+	flush_work(&dev_priv->rps.work);
 
 	mutex_lock(&dev_priv->rps.hw_lock);
 	if (dev_priv->rps.enabled) {
-		if (IS_VALLEYVIEW(dev))
+		if (IS_VALLEYVIEW(dev_priv))
 			vlv_set_rps_idle(dev_priv);
 		else
 			gen6_set_rps(dev_priv->dev, dev_priv->rps.idle_freq);
