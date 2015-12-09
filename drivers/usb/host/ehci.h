@@ -634,11 +634,11 @@ struct ehci_tt {
 
 /* Prepare the PORTSC wakeup flags during controller suspend/resume */
 
-#define ehci_prepare_ports_for_controller_suspend(ehci, do_wakeup)	\
-		ehci_adjust_port_wakeup_flags(ehci, true, do_wakeup)
+#define ehci_prepare_ports_for_controller_suspend(ehci, do_wakeup) \
+	ehci_adjust_port_wakeup_flags(ehci, true, do_wakeup)
 
-#define ehci_prepare_ports_for_controller_resume(ehci)			\
-		ehci_adjust_port_wakeup_flags(ehci, false, false)
+#define ehci_prepare_ports_for_controller_resume(ehci) \
+	ehci_adjust_port_wakeup_flags(ehci, false, false)
 
 /*-------------------------------------------------------------------------*/
 
@@ -745,18 +745,18 @@ static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
 
 #ifdef CONFIG_SOC_IMX28
 static inline void imx28_ehci_writel(const unsigned int val,
-		volatile __u32 __iomem *addr)
+				     volatile __u32 __iomem *addr)
 {
 	__asm__ ("swp %0, %0, [%1]" : : "r"(val), "r"(addr));
 }
 #else
 static inline void imx28_ehci_writel(const unsigned int val,
-		volatile __u32 __iomem *addr)
+				     volatile __u32 __iomem *addr)
 {
 }
 #endif
 static inline void ehci_writel(const struct ehci_hcd *ehci,
-		const unsigned int val, __u32 __iomem *regs)
+			       const unsigned int val, __u32 __iomem *regs)
 {
 #ifdef CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
 	ehci_big_endian_mmio(ehci) ?
@@ -874,21 +874,21 @@ struct ehci_driver_overrides {
 	size_t		extra_priv_size;
 	int		(*reset)(struct usb_hcd *hcd);
 	int		(*port_power)(struct usb_hcd *hcd,
-				int portnum, bool enable);
+				      int portnum, bool enable);
 };
 
 extern void	ehci_init_driver(struct hc_driver *drv,
-				const struct ehci_driver_overrides *over);
+				 const struct ehci_driver_overrides *over);
 extern int	ehci_setup(struct usb_hcd *hcd);
 extern int	ehci_handshake(struct ehci_hcd *ehci, void __iomem *ptr,
-				u32 mask, u32 done, int usec);
+			       u32 mask, u32 done, int usec);
 extern int	ehci_reset(struct ehci_hcd *ehci);
 
 #ifdef CONFIG_PM
 extern int	ehci_suspend(struct usb_hcd *hcd, bool do_wakeup);
 extern int	ehci_resume(struct usb_hcd *hcd, bool force_reset);
 extern void	ehci_adjust_port_wakeup_flags(struct ehci_hcd *ehci,
-			bool suspending, bool do_wakeup);
+					      bool suspending, bool do_wakeup);
 #endif	/* CONFIG_PM */
 
 extern int	ehci_hub_control(struct usb_hcd	*hcd, u16 typeReq, u16 wValue,
