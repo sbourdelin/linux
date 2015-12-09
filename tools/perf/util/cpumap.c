@@ -23,7 +23,7 @@ static struct cpu_map *cpu_map__default_new(void)
 			cpus->map[i] = i;
 
 		cpus->nr = nr_cpus;
-		atomic_set(&cpus->refcnt, 1);
+		refcnt__init_as(cpus, refcnt, 1, "cpu_map");
 	}
 
 	return cpus;
@@ -37,7 +37,7 @@ static struct cpu_map *cpu_map__trim_new(int nr_cpus, int *tmp_cpus)
 	if (cpus != NULL) {
 		cpus->nr = nr_cpus;
 		memcpy(cpus->map, tmp_cpus, payload_size);
-		atomic_set(&cpus->refcnt, 1);
+		refcnt__init_as(cpus, refcnt, 1, "cpu_map");
 	}
 
 	return cpus;
@@ -197,7 +197,7 @@ struct cpu_map *cpu_map__dummy_new(void)
 	if (cpus != NULL) {
 		cpus->nr = 1;
 		cpus->map[0] = -1;
-		atomic_set(&cpus->refcnt, 1);
+		refcnt__init_as(cpus, refcnt, 1, "cpu_map");
 	}
 
 	return cpus;
@@ -214,32 +214,33 @@ struct cpu_map *cpu_map__empty_new(int nr)
 		for (i = 0; i < nr; i++)
 			cpus->map[i] = -1;
 
-		atomic_set(&cpus->refcnt, 1);
+		refcnt__init_as(cpus, refcnt, 1, "cpu_map");
 	}
 
 	return cpus;
 }
 
-static void cpu_map__delete(struct cpu_map *map)
+static void cpu_map__delete(struct cpu_map *cpus)
 {
-	if (map) {
-		WARN_ONCE(atomic_read(&map->refcnt) != 0,
+	if (cpus) {
+		WARN_ONCE(atomic_read(&cpus->refcnt) != 0,
 			  "cpu_map refcnt unbalanced\n");
-		free(map);
+		refcnt__exit(cpus, refcnt);
+		free(cpus);
 	}
 }
 
-struct cpu_map *cpu_map__get(struct cpu_map *map)
+struct cpu_map *cpu_map__get(struct cpu_map *cpus)
 {
-	if (map)
-		atomic_inc(&map->refcnt);
-	return map;
+	if (cpus)
+		refcnt__get(cpus, refcnt);
+	return cpus;
 }
 
-void cpu_map__put(struct cpu_map *map)
+void cpu_map__put(struct cpu_map *cpus)
 {
-	if (map && atomic_dec_and_test(&map->refcnt))
-		cpu_map__delete(map);
+	if (cpus && refcnt__put(cpus, refcnt))
+		cpu_map__delete(cpus);
 }
 
 static int cpu__get_topology_int(int cpu, const char *name, int *value)
@@ -302,7 +303,7 @@ int cpu_map__build_map(struct cpu_map *cpus, struct cpu_map **res,
 	/* ensure we process id in increasing order */
 	qsort(c->map, c->nr, sizeof(int), cmp_ids);
 
-	atomic_set(&c->refcnt, 1);
+	refcnt__init_as(c, refcnt, 1, "cpu_map");
 	*res = c;
 	return 0;
 }
