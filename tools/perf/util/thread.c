@@ -53,7 +53,7 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 			goto err_thread;
 
 		list_add(&comm->list, &thread->comm_list);
-		atomic_set(&thread->refcnt, 0);
+		refcnt__init(thread, refcnt, 0);
 		RB_CLEAR_NODE(&thread->rb_node);
 	}
 
@@ -81,6 +81,7 @@ void thread__delete(struct thread *thread)
 		comm__free(comm);
 	}
 	unwind__finish_access(thread);
+	refcnt__exit(thread, refcnt);
 
 	free(thread);
 }
@@ -88,13 +89,13 @@ void thread__delete(struct thread *thread)
 struct thread *thread__get(struct thread *thread)
 {
 	if (thread)
-		atomic_inc(&thread->refcnt);
+		refcnt__get(thread, refcnt);
 	return thread;
 }
 
 void thread__put(struct thread *thread)
 {
-	if (thread && atomic_dec_and_test(&thread->refcnt)) {
+	if (thread && refcnt__put(thread, refcnt)) {
 		list_del_init(&thread->node);
 		thread__delete(thread);
 	}
