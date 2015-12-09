@@ -617,6 +617,20 @@ static bool edp_have_panel_power(struct intel_dp *intel_dp)
 	return (I915_READ(_pp_stat_reg(intel_dp)) & PP_ON) != 0;
 }
 
+static bool edp_panel_off_seq(struct intel_dp *intel_dp)
+{
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	lockdep_assert_held(&dev_priv->pps_mutex);
+
+	if (IS_VALLEYVIEW(dev) &&
+	    intel_dp->pps_pipe == INVALID_PIPE)
+		return false;
+
+	return (I915_READ(_pp_stat_reg(intel_dp)) & PP_SEQUENCE_POWER_DOWN) != 0;
+}
+
 static bool edp_have_panel_vdd(struct intel_dp *intel_dp)
 {
 	struct drm_device *dev = intel_dp_to_dev(intel_dp);
@@ -2025,7 +2039,8 @@ static void edp_panel_on(struct intel_dp *intel_dp)
 		 port_name(dp_to_dig_port(intel_dp)->port)))
 		return;
 
-	wait_panel_power_cycle(intel_dp);
+	if (edp_panel_off_seq(intel_dp))
+		wait_panel_power_cycle(intel_dp);
 
 	pp_ctrl_reg = _pp_ctrl_reg(intel_dp);
 	pp = ironlake_get_pp_control(intel_dp);
