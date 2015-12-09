@@ -1,4 +1,5 @@
 /*
+ * Marvell PXA Peripheral DMA Driver
  * Copyright 2015 Robert Jarzmik <robert.jarzmik@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -7,7 +8,6 @@
  */
 
 #include <linux/err.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -400,13 +400,8 @@ err_root:
 	pr_err("pxad: debugfs is not available\n");
 }
 
-static void pxad_cleanup_debugfs(struct pxad_device *pdev)
-{
-	debugfs_remove_recursive(pdev->dbgfs_root);
-}
 #else
 static inline void pxad_init_debugfs(struct pxad_device *pdev) {}
-static inline void pxad_cleanup_debugfs(struct pxad_device *pdev) {}
 #endif
 
 /*
@@ -1246,27 +1241,6 @@ static enum dma_status pxad_tx_status(struct dma_chan *dchan,
 	return ret;
 }
 
-static void pxad_free_channels(struct dma_device *dmadev)
-{
-	struct pxad_chan *c, *cn;
-
-	list_for_each_entry_safe(c, cn, &dmadev->channels,
-				 vc.chan.device_node) {
-		list_del(&c->vc.chan.device_node);
-		tasklet_kill(&c->vc.task);
-	}
-}
-
-static int pxad_remove(struct platform_device *op)
-{
-	struct pxad_device *pdev = platform_get_drvdata(op);
-
-	pxad_cleanup_debugfs(pdev);
-	pxad_free_channels(&pdev->slave);
-	dma_async_device_unregister(&pdev->slave);
-	return 0;
-}
-
 static int pxad_init_phys(struct platform_device *op,
 			  struct pxad_device *pdev,
 			  unsigned int nb_phy_chans)
@@ -1315,7 +1289,6 @@ static const struct of_device_id const pxad_dt_ids[] = {
 	{ .compatible = "marvell,pdma-1.0", },
 	{}
 };
-MODULE_DEVICE_TABLE(of, pxad_dt_ids);
 
 static struct dma_chan *pxad_dma_xlate(struct of_phandle_args *dma_spec,
 					   struct of_dma *ofdma)
@@ -1448,12 +1421,13 @@ static const struct platform_device_id pxad_id_table[] = {
 static struct platform_driver pxad_driver = {
 	.driver		= {
 		.name	= "pxa-dma",
+		.suppress_bind_attrs = true,
 		.of_match_table = pxad_dt_ids,
 	},
 	.id_table	= pxad_id_table,
 	.probe		= pxad_probe,
-	.remove		= pxad_remove,
 };
+builtin_platform_driver(pxad_driver);
 
 bool pxad_filter_fn(struct dma_chan *chan, void *param)
 {
@@ -1478,9 +1452,3 @@ int pxad_toggle_reserved_channel(int legacy_channel)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pxad_toggle_reserved_channel);
-
-module_platform_driver(pxad_driver);
-
-MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
-MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-MODULE_LICENSE("GPL v2");
