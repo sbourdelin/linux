@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <linux/types.h>
+#include "refcnt.h"
 
 enum map_type {
 	MAP__FUNCTION = 0,
@@ -153,7 +154,7 @@ struct map *map__clone(struct map *map);
 static inline struct map *map__get(struct map *map)
 {
 	if (map)
-		atomic_inc(&map->refcnt);
+		refcnt__get(map, refcnt);
 	return map;
 }
 
