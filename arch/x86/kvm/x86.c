@@ -70,7 +70,7 @@
 
 #define MAX_IO_MSRS 256
 #define KVM_MAX_MCE_BANKS 32
-#define KVM_MCE_CAP_SUPPORTED (MCG_CTL_P | MCG_SER_P)
+#define KVM_MCE_CAP_SUPPORTED (MCG_CTL_P | MCG_SER_P | MCG_LMCE_P)
 
 #define emul_to_vcpu(ctxt) \
 	container_of(ctxt, struct kvm_vcpu, arch.emulate_ctxt)
@@ -975,6 +975,7 @@ static u32 emulated_msrs[] = {
 	MSR_IA32_MISC_ENABLE,
 	MSR_IA32_MCG_STATUS,
 	MSR_IA32_MCG_CTL,
+	MSR_IA32_MCG_EXT_CTL,
 	MSR_IA32_SMBASE,
 };
 
@@ -1914,6 +1915,13 @@ static int set_msr_mce(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 			return -1;
 		vcpu->arch.mcg_ctl = data;
 		break;
+	case MSR_IA32_MCG_EXT_CTL:
+		if (!(mcg_cap & MCG_LMCE_P))
+			return 1;
+		if (data != 0 && data != 0x1)
+			return -1;
+		vcpu->arch.mcg_ext_ctl = data;
+		break;
 	default:
 		if (msr >= MSR_IA32_MC0_CTL &&
 		    msr < MSR_IA32_MCx_CTL(bank_num)) {
@@ -2171,6 +2179,7 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 
 	case MSR_IA32_MCG_CTL:
 	case MSR_IA32_MCG_STATUS:
+	case MSR_IA32_MCG_EXT_CTL:
 	case MSR_IA32_MC0_CTL ... MSR_IA32_MCx_CTL(KVM_MAX_MCE_BANKS) - 1:
 		return set_msr_mce(vcpu, msr, data);
 
@@ -2266,6 +2275,11 @@ static int get_msr_mce(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 		if (!(mcg_cap & MCG_CTL_P))
 			return 1;
 		data = vcpu->arch.mcg_ctl;
+		break;
+	case MSR_IA32_MCG_EXT_CTL:
+		if (!(mcg_cap & MCG_LMCE_P))
+			return 1;
+		data = vcpu->arch.mcg_ext_ctl;
 		break;
 	case MSR_IA32_MCG_STATUS:
 		data = vcpu->arch.mcg_status;
@@ -2385,6 +2399,7 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	case MSR_IA32_P5_MC_TYPE:
 	case MSR_IA32_MCG_CAP:
 	case MSR_IA32_MCG_CTL:
+	case MSR_IA32_MCG_EXT_CTL:
 	case MSR_IA32_MCG_STATUS:
 	case MSR_IA32_MC0_CTL ... MSR_IA32_MCx_CTL(KVM_MAX_MCE_BANKS) - 1:
 		return get_msr_mce(vcpu, msr_info->index, &msr_info->data);

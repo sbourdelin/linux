@@ -2746,6 +2746,20 @@ static int vmx_get_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 *pdata)
 	return 0;
 }
 
+bool can_feature_control_exist(struct kvm_vcpu *vcpu)
+{
+	/*
+	 * There are some features that require BIOS enabling.
+	 * In such cases BIOS is supposed to set this bit and indicate
+	 * the feature is enabled and available to the OS.
+	 * Local Machine Check Exception (LMCE) is one such feature.
+	 */
+	if (vcpu->arch.mcg_cap & MCG_LMCE_P)
+		return true;
+
+	return (nested_vmx_allowed(vcpu));
+}
+
 /*
  * Reads an msr value (of 'msr_index') into 'pdata'.
  * Returns 0 on success, non-0 otherwise.
@@ -2788,9 +2802,11 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		msr_info->data = vmcs_read64(GUEST_BNDCFGS);
 		break;
 	case MSR_IA32_FEATURE_CONTROL:
-		if (!nested_vmx_allowed(vcpu))
+		if (can_feature_control_exist(vcpu))
+			msr_info->data =
+			to_vmx(vcpu)->nested.msr_ia32_feature_control;
+		else
 			return 1;
-		msr_info->data = to_vmx(vcpu)->nested.msr_ia32_feature_control;
 		break;
 	case MSR_IA32_VMX_BASIC ... MSR_IA32_VMX_VMFUNC:
 		if (!nested_vmx_allowed(vcpu))
@@ -2881,9 +2897,9 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		ret = kvm_set_msr_common(vcpu, msr_info);
 		break;
 	case MSR_IA32_FEATURE_CONTROL:
-		if (!nested_vmx_allowed(vcpu) ||
-		    (to_vmx(vcpu)->nested.msr_ia32_feature_control &
-		     FEATURE_CONTROL_LOCKED && !msr_info->host_initiated))
+		if ((can_feature_control_exist(vcpu) == false) ||
+		    ((to_vmx(vcpu)->nested.msr_ia32_feature_control &
+		     FEATURE_CONTROL_LOCKED) && !msr_info->host_initiated))
 			return 1;
 		vmx->nested.msr_ia32_feature_control = data;
 		if (msr_info->host_initiated && data == 0)
