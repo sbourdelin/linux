@@ -3,6 +3,7 @@ config PPC64
 	default n
 	select HAVE_VIRT_CPU_ACCOUNTING
 	select ZLIB_DEFLATE
+	select HAVE_CONTEXT_TRACKING
 	help
 	  This option selects whether a 32-bit or a 64-bit kernel
 	  will be built.
