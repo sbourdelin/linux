@@ -60,6 +60,17 @@ static void wait_for_dsi_fifo_empty(struct intel_dsi *intel_dsi, enum port port)
 		DRM_ERROR("DPI FIFOs are not empty\n");
 }
 
+static void wait_for_dpi_fifo_empty(struct intel_dsi *intel_dsi, enum port port)
+{
+	struct drm_encoder *encoder = &intel_dsi->base.base;
+	struct drm_device *dev = encoder->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (wait_for((I915_READ(MIPI_GEN_FIFO_STAT(port)) & DPI_FIFO_EMPTY)
+					== DPI_FIFO_EMPTY, 50))
+		DRM_ERROR("Timeout waiting for DPI FIFO empty\n");
+}
+
 static void write_data(struct drm_i915_private *dev_priv, u32 reg,
 		       const u8 *data, u32 len)
 {
@@ -443,8 +454,10 @@ static void intel_dsi_enable(struct intel_encoder *encoder)
 			I915_WRITE(MIPI_MAX_RETURN_PKT_SIZE(port), 8 * 4);
 	} else {
 		msleep(20); /* XXX */
-		for_each_dsi_port(port, intel_dsi->ports)
+		for_each_dsi_port(port, intel_dsi->ports) {
+			wait_for_dpi_fifo_empty(intel_dsi, port);
 			dpi_send_cmd(intel_dsi, TURN_ON, false, port);
+		}
 		msleep(100);
 
 		drm_panel_enable(intel_dsi->panel);
