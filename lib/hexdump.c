@@ -80,7 +80,9 @@ EXPORT_SYMBOL(bin2hex);
  * @buf: data blob to dump
  * @len: number of bytes in the @buf
  * @rowsize: number of bytes to print per line; must be 16 or 32
- * @groupsize: number of bytes to print at a time (1, 2, 4, 8; default = 1)
+ * @groupflags: number of bytes to print at a time (1, 2, 4, 8; default = 1)
+ *  use a bitwise OR with %DUMP_TYPE_BE or %DUMP_TYPE_LE for endian conversions
+ *  of @buf, otherwise %DUMP_TYPE_CPU is used
  * @linebuf: where to put the converted data
  * @linebuflen: total size of @linebuf, including space for terminating NUL
  * @ascii: include ASCII after the hex output
@@ -105,7 +107,7 @@ EXPORT_SYMBOL(bin2hex);
  * (excluding the terminating NUL) which would have been written to the final
  * string if enough space had been available.
  */
-int hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize,
+int hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupflags,
 		       char *linebuf, size_t linebuflen, bool ascii)
 {
 	const u8 *ptr = buf;
@@ -114,6 +116,7 @@ int hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize,
 	int j, lx = 0;
 	int ascii_column;
 	int ret;
+	int groupsize = groupflags & ~(DUMP_TYPE_LE | DUMP_TYPE_BE);
 
 	if (rowsize != 16 && rowsize != 32)
 		rowsize = 16;
@@ -138,9 +141,16 @@ int hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize,
 		const u64 *ptr8 = buf;
 
 		for (j = 0; j < ngroups; j++) {
+			u64 val;
+
+			if (groupflags & DUMP_TYPE_LE)
+				val = get_unaligned_le64(ptr8 + j);
+			else if (groupflags & DUMP_TYPE_BE)
+				val = get_unaligned_be64(ptr8 + j);
+			else
+				val = get_unaligned(ptr8 + j);
 			ret = snprintf(linebuf + lx, linebuflen - lx,
-				       "%s%16.16llx", j ? " " : "",
-				       get_unaligned(ptr8 + j));
+				       "%s%16.16llx", j ? " " : "", val);
 			if (ret >= linebuflen - lx)
 				goto overflow1;
 			lx += ret;
@@ -149,9 +159,16 @@ int hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize,
 		const u32 *ptr4 = buf;
 
 		for (j = 0; j < ngroups; j++) {
+			u32 val;
+
+			if (groupflags & DUMP_TYPE_LE)
+				val = get_unaligned_le32(ptr4 + j);
+			else if (groupflags & DUMP_TYPE_BE)
+				val = get_unaligned_be32(ptr4 + j);
+			else
+				val = get_unaligned(ptr4 + j);
 			ret = snprintf(linebuf + lx, linebuflen - lx,
-				       "%s%8.8x", j ? " " : "",
-				       get_unaligned(ptr4 + j));
+				       "%s%8.8x", j ? " " : "", val);
 			if (ret >= linebuflen - lx)
 				goto overflow1;
 			lx += ret;
@@ -160,9 +177,16 @@ int hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize,
 		const u16 *ptr2 = buf;
 
 		for (j = 0; j < ngroups; j++) {
+			u16 val;
+
+			if (groupflags & DUMP_TYPE_LE)
+				val = get_unaligned_le16(ptr2 + j);
+			else if (groupflags & DUMP_TYPE_BE)
+				val = get_unaligned_be16(ptr2 + j);
+			else
+				val = get_unaligned(ptr2 + j);
 			ret = snprintf(linebuf + lx, linebuflen - lx,
-				       "%s%4.4x", j ? " " : "",
-				       get_unaligned(ptr2 + j));
+				       "%s%4.4x", j ? " " : "", val);
 			if (ret >= linebuflen - lx)
 				goto overflow1;
 			lx += ret;
@@ -216,7 +240,10 @@ EXPORT_SYMBOL(hex_dump_to_buffer);
  * @prefix_type: controls whether prefix of an offset, address, or none
  *  is printed (%DUMP_PREFIX_OFFSET, %DUMP_PREFIX_ADDRESS, %DUMP_PREFIX_NONE)
  * @rowsize: number of bytes to print per line; must be 16 or 32
- * @groupsize: number of bytes to print at a time (1, 2, 4, 8; default = 1)
+ * @groupflags: number of bytes to print at a time (1, 2, 4, 8; default = 1)
+ * @groupflags: number of bytes to print at a time (1, 2, 4, 8; default = 1)
+ *  use a bitwise OR with %DUMP_TYPE_BE or %DUMP_TYPE_LE for endian conversions
+ *  of @buf, otherwise %DUMP_TYPE_CPU is used
  * @buf: data blob to dump
  * @len: number of bytes in the @buf
  * @ascii: include ASCII after the hex output
@@ -240,7 +267,7 @@ EXPORT_SYMBOL(hex_dump_to_buffer);
  * ffffffff88089af0: 73727170 77767574 7b7a7978 7f7e7d7c  pqrstuvwxyz{|}~.
  */
 void print_hex_dump(const char *level, const char *prefix_str, int prefix_type,
-		    int rowsize, int groupsize,
+		    int rowsize, int groupflags,
 		    const void *buf, size_t len, bool ascii)
 {
 	const u8 *ptr = buf;
@@ -254,7 +281,7 @@ void print_hex_dump(const char *level, const char *prefix_str, int prefix_type,
 		linelen = min(remaining, rowsize);
 		remaining -= rowsize;
 
-		hex_dump_to_buffer(ptr + i, linelen, rowsize, groupsize,
+		hex_dump_to_buffer(ptr + i, linelen, rowsize, groupflags,
 				   linebuf, sizeof(linebuf), ascii);
 
 		switch (prefix_type) {

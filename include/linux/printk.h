@@ -424,12 +424,19 @@ enum {
 	DUMP_PREFIX_ADDRESS,
 	DUMP_PREFIX_OFFSET
 };
+
+enum {
+	DUMP_TYPE_CPU = 0,
+	DUMP_TYPE_LE = BIT(30),
+	DUMP_TYPE_BE = BIT(31)
+};
+
 extern int hex_dump_to_buffer(const void *buf, size_t len, int rowsize,
-			      int groupsize, char *linebuf, size_t linebuflen,
+			      int groupflags, char *linebuf, size_t linebuflen,
 			      bool ascii);
 #ifdef CONFIG_PRINTK
 extern void print_hex_dump(const char *level, const char *prefix_str,
-			   int prefix_type, int rowsize, int groupsize,
+			   int prefix_type, int rowsize, int groupflags,
 			   const void *buf, size_t len, bool ascii);
 #if defined(CONFIG_DYNAMIC_DEBUG)
 #define print_hex_dump_bytes(prefix_str, prefix_type, buf, len)	\
@@ -440,7 +447,7 @@ extern void print_hex_dump_bytes(const char *prefix_str, int prefix_type,
 #endif /* defined(CONFIG_DYNAMIC_DEBUG) */
 #else
 static inline void print_hex_dump(const char *level, const char *prefix_str,
-				  int prefix_type, int rowsize, int groupsize,
+				  int prefix_type, int rowsize, int groupflags,
 				  const void *buf, size_t len, bool ascii)
 {
 }
@@ -453,17 +460,17 @@ static inline void print_hex_dump_bytes(const char *prefix_str, int prefix_type,
 
 #if defined(CONFIG_DYNAMIC_DEBUG)
 #define print_hex_dump_debug(prefix_str, prefix_type, rowsize,	\
-			     groupsize, buf, len, ascii)	\
+			     groupflags, buf, len, ascii)	\
 	dynamic_hex_dump(prefix_str, prefix_type, rowsize,	\
-			 groupsize, buf, len, ascii)
+			 groupflags, buf, len, ascii)
 #elif defined(DEBUG)
 #define print_hex_dump_debug(prefix_str, prefix_type, rowsize,		\
-			     groupsize, buf, len, ascii)		\
+			     groupflags, buf, len, ascii)		\
 	print_hex_dump(KERN_DEBUG, prefix_str, prefix_type, rowsize,	\
-		       groupsize, buf, len, ascii)
+		       groupflags, buf, len, ascii)
 #else
 static inline void print_hex_dump_debug(const char *prefix_str, int prefix_type,
-					int rowsize, int groupsize,
+					int rowsize, int groupflags,
 					const void *buf, size_t len, bool ascii)
 {
 }
