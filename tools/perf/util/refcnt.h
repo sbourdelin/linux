@@ -24,7 +24,7 @@ struct refcnt_buffer {
 };
 
 void refcnt__recordnew(void *obj, const char *name, int count);
-void refcnt__record(void *obj, const char *name, int count);
+void refcnt__record(void *obj, int count);
 void refcnt__delete(void *obj);
 
 static inline void __refcnt__init(atomic_t *refcnt, int n, void *obj,
@@ -34,15 +34,15 @@ static inline void __refcnt__init(atomic_t *refcnt, int n, void *obj,
 	refcnt__recordnew(obj, name, n);
 }
 
-static inline void __refcnt__get(atomic_t *refcnt, void *obj, const char *name)
+static inline void __refcnt__get(atomic_t *refcnt, void *obj)
 {
 	atomic_inc(refcnt);
-	refcnt__record(obj, name, atomic_read(refcnt));
+	refcnt__record(obj, atomic_read(refcnt));
 }
 
-static inline int __refcnt__put(atomic_t *refcnt, void *obj, const char *name)
+static inline int __refcnt__put(atomic_t *refcnt, void *obj)
 {
-	refcnt__record(obj, name, -atomic_read(refcnt));
+	refcnt__record(obj, -atomic_read(refcnt));
 	return atomic_dec_and_test(refcnt);
 }
 
@@ -53,9 +53,9 @@ static inline int __refcnt__put(atomic_t *refcnt, void *obj, const char *name)
 #define refcnt__exit(obj, member)	\
 	refcnt__delete(obj)
 #define refcnt__get(obj, member)	\
-	__refcnt__get(&(obj)->member, obj, #obj)
+	__refcnt__get(&(obj)->member, obj)
 #define refcnt__put(obj, member)	\
-	__refcnt__put(&(obj)->member, obj, #obj)
+	__refcnt__put(&(obj)->member, obj)
 
 #else	/* !REFCNT_DEBUG */
 

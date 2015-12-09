@@ -16,13 +16,20 @@
 
 /* A root of backtraces (a hash table of the list of refcnt_object)*/
 static struct list_head refcnt_root[REFCNT_HASHSZ];
+static const char *refcnt_filter;
 
 static void  __attribute__((constructor)) refcnt__init_root(void)
 {
 	int h;
+	const char *filter;
 
 	for (h = 0; h < REFCNT_HASHSZ; h++)
 		INIT_LIST_HEAD(&refcnt_root[h]);
+
+	/* glob matching filter */
+	filter = getenv("PERF_REFCNT_DEBUG_FILTER");
+	if (filter && *filter)
+		refcnt_filter = filter;
 }
 
 static void refcnt_object__delete(struct refcnt_object *ref)
@@ -54,11 +61,9 @@ void refcnt__delete(void *addr)
 {
 	struct refcnt_object *ref = refcnt_object__find(addr);
 
-	if (!ref) {
-		pr_debug("REFCNT: Delete uninitialized refcnt: %p\n", addr);
-		return;
-	}
-	refcnt_object__delete(ref);
+	/* If !ref, it is already filtered out */
+	if (ref)
+		refcnt_object__delete(ref);
 }
 
 static void refcnt_object__record(struct refcnt_object *ref, int count)
@@ -98,21 +103,23 @@ static struct refcnt_object *refcnt_object__new(void *obj, const char *name)
 /* This is called via refcnt__init */
 void refcnt__recordnew(void *obj, const char *name, int count)
 {
-	struct refcnt_object *ref = refcnt_object__new(obj, name);
+	struct refcnt_object *ref;
 
+	if (refcnt_filter && !strglobmatch(name, refcnt_filter))
+		return;
+
+	ref = refcnt_object__new(obj, name);
 	if (ref)
 		refcnt_object__record(ref, count);
 }
 
 /* This is called via refcnt__get/put */
-void refcnt__record(void *obj, const char *name, int count)
+void refcnt__record(void *obj, int count)
 {
 	struct refcnt_object *ref = refcnt_object__find(obj);
 
-	/* If no entry, allocate new one */
-	if (!ref)
-		refcnt__recordnew(obj, name, count);
-	else
+	/* If no entry, it should be filtered out */
+	if (ref)
 		refcnt_object__record(ref, count);
 }
 
