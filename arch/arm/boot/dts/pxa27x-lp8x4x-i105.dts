@@ -1,0 +1,50 @@
+/* Device tree for ICP DAS LP-8x4x i105 flavor */
+
+#include "pxa27x-lp8x4x.dts"
+
+/ {
+	extbus {
+		flash@0 {
+			compatible = "cfi-flash";
+			reg = <0 0 0x04000000>;
+			bank-width = <4>;
+			device-width = <2>;
+
+			partitions {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				fs@0 {
+					label = "u-boot";
+					reg = <0 0x40000>;
+				};
+				fs@40000 {
+					label = "settings";
+					reg = <0x40000 0x40000>;
+				};
+				fs@80000 {
+					label = "device_tree";
+					reg = <0x80000 0x40000>;
+				};
+				fs@c0000 {
+					label = "kernel";
+					reg = <0xc0000 0x2c0000>;
+				};
+				fs@300000 {
+					label = "root_fs";
+					reg = <0x380000 0x3c80000>;
+				};
+			};
+		};
+
+		flash@1 {
+			compatible = "cfi-flash";
+			reg = <1 0x0 0x02000000>;
+			bank-width = <2>;
+			device-width = <1>;
+			partitions {
+				#address-cells = <1>;
+				#size-cells = <1>;
+			};
+		};
+	};
+};

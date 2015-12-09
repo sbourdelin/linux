@@ -109,6 +109,7 @@ honeywell	Honeywell
 hp	Hewlett Packard
 i2se	I2SE GmbH
 ibm	International Business Machines (IBM)
+icpdas	ICP DAS CO., LTD.
 idt	Integrated Device Technologies, Inc.
 iom	Iomega Corporation
 img	Imagination Technologies Ltd.

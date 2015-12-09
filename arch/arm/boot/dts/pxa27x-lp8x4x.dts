@@ -1,0 +1,260 @@
+/* Device tree for ICP DAS LP-8x4x */
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include "pxa27x.dtsi"
+
+/ {
+	model = "ICP DAS LP-8x4x programmable automation controller";
+	compatible = "marvell,pxa270";
+
+	aliases {
+		ethernet0 = &eth0;
+		ethernet1 = &eth1;
+	};
+
+	memory {
+		reg = <0xa0000000 0x08000000>;
+	};
+
+	regulators {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		vmmc: regulator@0 {
+			compatible = "regulator-fixed";
+			reg = <0>;
+			regulator-name = "vmmc";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+		};
+	};
+
+	pxabus {
+		pxairq: interrupt-controller@40d00000 {
+			marvell,intc-priority;
+			marvell,intc-nr-irqs = <34>;
+		};
+
+		gpio: gpio@40e00000 {
+			interrupts = <8>, <9>, <10>;
+			interrupt-names = "gpio0", "gpio1", "gpio_mux";
+		};
+
+		uart@40100000 {
+			status = "okay";
+		};
+
+		uart@40200000 {
+			status = "okay";
+		};
+
+		uart@40700000 {
+			status = "okay";
+		};
+
+		mmc0: mmc@41100000 {
+			vmmc-supply = <&vmmc>;
+			status = "okay";
+		};
+
+		usb0: ohci@4c000000 {
+			marvell,port-mode = <3>;
+			marvell,oc-mode-perport;
+			marvell,enable-port1;
+			status = "okay";
+		};
+
+		leds {
+			compatible = "gpio-leds";
+
+			status {
+				gpios = <&gpio 84 1>;
+				linux,default-trigger = "heartbeat";
+			};
+		};
+
+		i2c: i2c-gpio {
+			compatible = "i2c-gpio";
+			gpios = <&gpio 22 0 /* sda */
+				 &gpio 12 0 /* scl */>;
+			i2c-gpio,delay-us = <1>;
+			i2c-gpio,timeout-ms = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			eeprom@50 {
+				compatible = "atmel,24c128";
+				reg = <0x50>;
+				pagesize = <64>;
+			};
+		};
+
+		w1: w1-gpio {
+			compatible = "w1-gpio";
+			gpios = <&gpio 83 0>;
+		};
+	};
+
+	extbus {
+		/*
+		 * PXA27x synchrous, static and
+		 * variable-latency IO interfaces
+		 */
+		compatible = "simple-bus";
+
+		#address-cells = <2>; /* first cell is nCS, second is address */
+		#size-cells = <1>;
+		ranges = <0 0 0 0x04000000
+			  1 0 0x04000000 0x04000000
+			  2 0 0x08000000 0x04000000
+			  3 0 0x0c000000 0x04000000
+			  4 0 0x10000000 0x04000000
+			  5 0 0x14000000 0x04000000>;
+
+		flash@0 {
+			compatible = "cfi-flash";
+			reg = <0 0 0x02000000>;
+			bank-width = <4>;
+			device-width = <2>;
+
+			partitions {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				fs@0 {
+					label = "u-boot";
+					reg = <0 0x40000>;
+				};
+				fs@40000 {
+					label = "settings";
+					reg = <0x40000 0x40000>;
+				};
+				fs@80000 {
+					label = "device_tree";
+					reg = <0x80000 0x40000>;
+				};
+				fs@c0000 {
+					label = "kernel";
+					reg = <0xc0000 0x240000>;
+				};
+				fs@300000 {
+					label = "root_fs";
+					reg = <0x300000 0x1d00000>;
+				};
+			};
+		};
+
+		flash@1 {
+			compatible = "cfi-flash";
+			reg = <1 0x0 0x01000000>;
+			bank-width = <2>;
+			device-width = <1>;
+			partitions {
+				#address-cells = <1>;
+				#size-cells = <1>;
+			};
+		};
+
+		netio@3 {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 3 0 0x02000000>;
+			interrupt-parent = <&gpio>;
+
+			eth0: eth@0 {
+				compatible = "davicom,dm9000";
+				reg = <0x0 0x2
+				       0x4000 0x2>;
+				interrupts = <9 IRQ_TYPE_EDGE_RISING>;
+				status = "okay";
+			};
+
+			eth1: eth@1000000 {
+				compatible = "davicom,dm9000";
+				reg = <0x1000000 0x2
+				       0x1004000 0x2>;
+				interrupts = <82 IRQ_TYPE_EDGE_RISING>;
+				status = "okay";
+			};
+		};
+
+		fpga@5 {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 5 0x3000000 0x10000>;
+			interrupt-parent = <&fpgairq>;
+
+			rtc@901c {
+				compatible = "dallas,rtc-ds1302";
+				reg = <0x901c 0x1>;
+				status = "okay";
+			};
+
+			sram@a000 {
+				compatible = "icpdas,sram-lp8x4x";
+				reg = <0xa000 0x1000
+				       0x901e 0x1>;
+
+				partitions {
+					#address-cells = <1>;
+					#size-cells = <1>;
+				};
+			};
+
+			fpgairq: irq@9006 {
+				compatible = "icpdas,irq-lp8x4x";
+				reg = <0x9006 0x16>;
+				interrupt-parent = <&gpio>;
+				interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+				#interrupt-cells = <1>;
+				interrupt-controller;
+				status = "okay";
+			};
+
+			uart@9050 {
+				compatible = "icpdas,uart-lp8x4x";
+				reg = <0x9050 0x10
+				       0x9030 0x02>;
+				interrupts = <13>;
+				status = "okay";
+			};
+
+			uart@9060 {
+				compatible = "icpdas,uart-lp8x4x";
+				reg = <0x9060 0x10
+				       0x9032 0x02>;
+				interrupts = <14>;
+				status = "okay";
+			};
+
+			uart@9070 {
+				compatible = "icpdas,uart-lp8x4x";
+				reg = <0x9070 0x10
+				       0x9034 0x02>;
+				interrupts = <15>;
+				status = "okay";
+			};
+
+			backplane {
+				compatible = "icpdas,backplane-lp8x4x";
+				reg = <0x0 0x2
+				       0x1000 0x10
+				       0x2000 0x10
+				       0x3000 0x10
+				       0x4000 0x10
+				       0x5000 0x10
+				       0x6000 0x10
+				       0x7000 0x10
+				       0x8000 0x10
+				       0x9002 0x2
+				       0x9004 0x2
+				       0x9046 0x2>;
+				eeprom-gpios = <&gpio 4 0>;
+			};
+		};
+	};
+};
