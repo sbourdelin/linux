@@ -394,7 +394,9 @@ enum macvlan_macaddr_mode {
 /* VRF section */
 enum {
 	IFLA_VRF_UNSPEC,
-	IFLA_VRF_TABLE,
+	IFLA_VRF_TABLE,			/* u32 */
+	IFLA_VRF_RULES_PRIORITY,	/* u32 */
+	IFLA_VRF_AUTOCREATE_RULES,	/* u8  */
 	__IFLA_VRF_MAX
 };
 
