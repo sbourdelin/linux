@@ -1,6 +1,7 @@
 /*
  * Driver For Marvell Two-channel DMA Engine
  *
+ * Authors: Leo Yan <leoy@marvell.com>  Zhangfei Gao <zhangfei.gao@marvell.com>
  * Copyright: Marvell International Ltd.
  *
  * The code contained herein is licensed under the GNU General Public
@@ -10,7 +11,6 @@
  */
 
 #include <linux/err.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -530,14 +530,6 @@ static void mmp_tdma_issue_pending(struct dma_chan *chan)
 	mmp_tdma_enable_chan(tdmac);
 }
 
-static int mmp_tdma_remove(struct platform_device *pdev)
-{
-	struct mmp_tdma_device *tdev = platform_get_drvdata(pdev);
-
-	dma_async_device_unregister(&tdev->device);
-	return 0;
-}
-
 static int mmp_tdma_chan_init(struct mmp_tdma_device *tdev,
 					int idx, int irq,
 					int type, struct gen_pool *pool)
@@ -617,7 +609,6 @@ static const struct of_device_id mmp_tdma_dt_ids[] = {
 	{ .compatible = "marvell,pxa910-squ", .data = (void *)PXA910_SQU},
 	{}
 };
-MODULE_DEVICE_TABLE(of, mmp_tdma_dt_ids);
 
 static int mmp_tdma_probe(struct platform_device *pdev)
 {
@@ -728,17 +719,10 @@ static const struct platform_device_id mmp_tdma_id_table[] = {
 static struct platform_driver mmp_tdma_driver = {
 	.driver		= {
 		.name	= "mmp-tdma",
+		.suppress_bind_attrs = true,
 		.of_match_table = mmp_tdma_dt_ids,
 	},
 	.id_table	= mmp_tdma_id_table,
 	.probe		= mmp_tdma_probe,
-	.remove		= mmp_tdma_remove,
 };
-
-module_platform_driver(mmp_tdma_driver);
-
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("MMP Two-Channel DMA Driver");
-MODULE_ALIAS("platform:mmp-tdma");
-MODULE_AUTHOR("Leo Yan <leoy@marvell.com>");
-MODULE_AUTHOR("Zhangfei Gao <zhangfei.gao@marvell.com>");
+builtin_platform_driver(mmp_tdma_driver);
