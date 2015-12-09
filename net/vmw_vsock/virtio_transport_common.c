@@ -815,7 +815,8 @@ virtio_transport_dgram_enqueue(struct vsock_sock *vsk,
 		.type = VIRTIO_VSOCK_TYPE_DGRAM,
 		.msg = msg,
 	};
-	size_t total_written = 0, pkt_off = 0, written;
+	size_t total_written = 0, pkt_off = 0;
+	int written;
 	u16 dgram_id;
 
 	/* The max size of a single dgram we support is 64KB */
@@ -845,7 +846,7 @@ virtio_transport_dgram_enqueue(struct vsock_sock *vsk,
 		}
 		total_written += written;
 		pkt_off += written;
-		pr_debug("%s:id=%d, dgram_len=%zu, off=%zu, total_written=%zu, written=%zu\n",
+		pr_debug("%s:id=%d, dgram_len=%zu, off=%zu, total_written=%zu, written=%d\n",
 			  __func__, dgram_id, dgram_len, pkt_off, total_written, written);
 	}
 
