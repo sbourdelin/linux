@@ -3,6 +3,8 @@
  *
  * Copyright 2012 Texas Instruments
  *
+ * Author: Matt Porter <matt.porter@linaro.org>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation version 2.
@@ -20,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
-#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -2325,21 +2326,6 @@ err_reg1:
 	return ret;
 }
 
-static int edma_remove(struct platform_device *pdev)
-{
-	struct device *dev = &pdev->dev;
-	struct edma_cc *ecc = dev_get_drvdata(dev);
-
-	if (dev->of_node)
-		of_dma_controller_free(dev->of_node);
-	dma_async_device_unregister(&ecc->dma_slave);
-	if (ecc->dma_memcpy)
-		dma_async_device_unregister(ecc->dma_memcpy);
-	edma_free_slot(ecc, ecc->dummy_slot);
-
-	return 0;
-}
-
 #ifdef CONFIG_PM_SLEEP
 static int edma_pm_suspend(struct device *dev)
 {
@@ -2396,11 +2382,11 @@ static const struct dev_pm_ops edma_pm_ops = {
 
 static struct platform_driver edma_driver = {
 	.probe		= edma_probe,
-	.remove		= edma_remove,
 	.driver = {
-		.name	= "edma",
-		.pm	= &edma_pm_ops,
-		.of_match_table = edma_of_ids,
+		.name			= "edma",
+		.pm			= &edma_pm_ops,
+		.of_match_table		= edma_of_ids,
+		.suppress_bind_attrs	= true,
 	},
 };
 
@@ -2439,14 +2425,3 @@ static int edma_init(void)
 	return platform_driver_register(&edma_driver);
 }
 subsys_initcall(edma_init);
-
-static void __exit edma_exit(void)
-{
-	platform_driver_unregister(&edma_driver);
-	platform_driver_unregister(&edma_tptc_driver);
-}
-module_exit(edma_exit);
-
-MODULE_AUTHOR("Matt Porter <matt.porter@linaro.org>");
-MODULE_DESCRIPTION("TI EDMA DMA engine driver");
-MODULE_LICENSE("GPL v2");
