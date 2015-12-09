@@ -471,25 +471,21 @@ static void guc_fini_ctx_desc(struct intel_guc *guc,
 			     sizeof(desc) * client->ctx_index);
 }
 
-/* Get valid workqueue item and return it back to offset */
-static int guc_get_workqueue_space(struct i915_guc_client *gc, u32 *offset)
+int i915_guc_wq_reserve_space(struct i915_guc_client *gc)
 {
 	struct guc_process_desc *desc;
 	void *base;
 	u32 size = sizeof(struct guc_wq_item);
 	int ret = -ETIMEDOUT, timeout_counter = 200;
 
+	if (!gc)
+		return 0;
+
 	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
 	desc = base + gc->proc_desc_offset;
 
 	while (timeout_counter-- > 0) {
 		if (CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size) >= size) {
-			*offset = gc->wq_tail;
-
-			/* advance the tail for next workqueue item */
-			gc->wq_tail += size;
-			gc->wq_tail &= gc->wq_size - 1;
-
 			/* this will break the loop */
 			timeout_counter = 0;
 			ret = 0;
@@ -511,11 +507,12 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	struct guc_wq_item *wqi;
 	void *base;
 	u32 tail, wq_len, wq_off = 0;
-	int ret;
 
-	ret = guc_get_workqueue_space(gc, &wq_off);
-	if (ret)
-		return ret;
+	wq_off = gc->wq_tail;
+
+	/* advance the tail for next workqueue item */
+	gc->wq_tail += sizeof(struct guc_wq_item);
+	gc->wq_tail &= gc->wq_size - 1;
 
 	/* For now workqueue item is 4 DWs; workqueue buffer is 2 pages. So we
 	 * should not have the case where structure wqi is across page, neither
