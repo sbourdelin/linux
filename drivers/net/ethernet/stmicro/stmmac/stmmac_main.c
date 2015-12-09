@@ -211,6 +211,18 @@ static inline u32 stmmac_tx_avail(struct stmmac_priv *priv)
 	return avail;
 }
 
+static inline u32 stmmac_rx_dirty(struct stmmac_priv *priv)
+{
+	unsigned dirty;
+
+	if (priv->dirty_rx <= priv->cur_rx)
+		dirty = priv->cur_rx - priv->dirty_rx;
+	else
+		dirty = priv->dma_rx_size - priv->dirty_rx + priv->cur_rx;
+
+	return dirty;
+}
+
 /**
  * stmmac_hw_fix_mac_speed - callback for speed selection
  * @priv: driver private structure
@@ -2165,9 +2177,10 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 {
 	unsigned int rxsize = priv->dma_rx_size;
 	int bfsize = priv->dma_buf_sz;
+	unsigned int entry = priv->dirty_rx;
+	int dirty = stmmac_rx_dirty(priv);
 
-	for (; priv->cur_rx - priv->dirty_rx > 0; priv->dirty_rx++) {
-		unsigned int entry = priv->dirty_rx % rxsize;
+	while (dirty-- > 0) {
 		struct dma_desc *p;
 
 		if (priv->extend_desc)
@@ -2203,6 +2216,10 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 		wmb();
 		priv->hw->desc->set_rx_owner(p);
 		wmb();
+
+		if (unlikely(++priv->dirty_rx >= rxsize))
+			priv->dirty_rx = 0;
+		entry = priv->dirty_rx;
 	}
 }
 
@@ -2216,7 +2233,7 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv)
 static int stmmac_rx(struct stmmac_priv *priv, int limit)
 {
 	unsigned int rxsize = priv->dma_rx_size;
-	unsigned int entry = priv->cur_rx % rxsize;
+	unsigned int entry = priv->cur_rx;
 	unsigned int next_entry;
 	unsigned int count = 0;
 	int coe = priv->hw->rx_csum;
@@ -2246,7 +2263,10 @@ static int stmmac_rx(struct stmmac_priv *priv, int limit)
 
 		count++;
 
-		next_entry = (++priv->cur_rx) % rxsize;
+		if (unlikely(++priv->cur_rx >= rxsize))
+			priv->cur_rx = 0;
+		next_entry = priv->cur_rx;
+
 		if (priv->extend_desc)
 			prefetch(priv->dma_erx + next_entry);
 		else
