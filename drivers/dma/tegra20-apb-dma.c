@@ -3,6 +3,8 @@
  *
  * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
  *
+ * Author: Laxman Dewangan <ldewangan@nvidia.com>
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
@@ -26,7 +28,6 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/mm.h>
-#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_dma.h>
@@ -1309,7 +1310,6 @@ static const struct of_device_id tegra_dma_of_match[] = {
 	}, {
 	},
 };
-MODULE_DEVICE_TABLE(of, tegra_dma_of_match);
 
 static int tegra_dma_probe(struct platform_device *pdev)
 {
@@ -1488,27 +1488,6 @@ err_irq:
 	return ret;
 }
 
-static int tegra_dma_remove(struct platform_device *pdev)
-{
-	struct tegra_dma *tdma = platform_get_drvdata(pdev);
-	int i;
-	struct tegra_dma_channel *tdc;
-
-	dma_async_device_unregister(&tdma->dma_dev);
-
-	for (i = 0; i < tdma->chip_data->nr_channels; ++i) {
-		tdc = &tdma->channels[i];
-		free_irq(tdc->irq, tdc);
-		tasklet_kill(&tdc->tasklet);
-	}
-
-	pm_runtime_disable(&pdev->dev);
-	if (!pm_runtime_status_suspended(&pdev->dev))
-		tegra_dma_runtime_suspend(&pdev->dev);
-
-	return 0;
-}
-
 static int tegra_dma_runtime_suspend(struct device *dev)
 {
 	struct tegra_dma *tdma = dev_get_drvdata(dev);
@@ -1616,15 +1595,9 @@ static struct platform_driver tegra_dmac_driver = {
 	.driver = {
 		.name	= "tegra-apbdma",
 		.pm	= &tegra_dma_dev_pm_ops,
+		.suppress_bind_attrs = true,
 		.of_match_table = tegra_dma_of_match,
 	},
 	.probe		= tegra_dma_probe,
-	.remove		= tegra_dma_remove,
 };
-
-module_platform_driver(tegra_dmac_driver);
-
-MODULE_ALIAS("platform:tegra20-apbdma");
-MODULE_DESCRIPTION("NVIDIA Tegra APB DMA Controller driver");
-MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(tegra_dmac_driver);
