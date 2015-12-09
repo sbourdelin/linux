@@ -63,6 +63,8 @@
  * where to place its SVC stack
  */
 struct secondary_data secondary_data;
+/* Number of CPUs which aren't online, but looping in kernel text. */
+u32 cpus_stuck_in_kernel;
 
 enum ipi_msg_type {
 	IPI_RESCHEDULE,
@@ -71,6 +73,16 @@ enum ipi_msg_type {
 	IPI_TIMER,
 	IPI_IRQ_WORK,
 };
+
+#ifdef CONFIG_HOTPLUG_CPU
+static int op_cpu_kill(unsigned int cpu);
+#else
+static inline int op_cpu_kill(unsigned int cpu)
+{
+	return -ENOSYS;
+}
+#endif
+
 
 /*
  * Boot a secondary CPU, and assign it the specified idle task.
@@ -86,6 +98,12 @@ static int boot_secondary(unsigned int cpu, struct task_struct *idle)
 
 static DECLARE_COMPLETION(cpu_running);
 
+void update_cpu_boot_status(unsigned long status)
+{
+	secondary_data.status = status;
+	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
+}
+
 int __cpu_up(unsigned int cpu, struct task_struct *idle)
 {
 	int ret;
@@ -95,7 +113,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 	 * page tables.
 	 */
 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
-	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
+	update_cpu_boot_status(CPU_WAIT_RESULT);
 
 	/*
 	 * Now bring the CPU into our world.
@@ -117,7 +135,31 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
 	}
 
+	mb();
+
 	secondary_data.stack = NULL;
+	if (ret && secondary_data.status) {
+		switch(secondary_data.status) {
+		default:
+			pr_err("CPU%u: failed in unknown state : 0x%lx\n",
+					cpu, secondary_data.status);
+			break;
+		case CPU_KILL_ME:
+			if (op_cpu_kill(cpu)) {
+				pr_crit("CPU%u: may not have shut down cleanly\n",
+							cpu);
+				cpus_stuck_in_kernel++;
+			} else
+				pr_crit("CPU%u: died during early boot\n", cpu);
+			break;
+		case CPU_STUCK_IN_KERNEL:
+			pr_crit("CPU%u: is stuck in kernel\n", cpu);
+			cpus_stuck_in_kernel++;
+			break;
+		case CPU_PANIC_KERNEL:
+			panic("CPU%u detected unsupported configuration\n", cpu);
+		}
+	}
 
 	return ret;
 }
@@ -185,6 +227,7 @@ asmlinkage void secondary_start_kernel(void)
 	 */
 	pr_info("CPU%u: Booted secondary processor [%08x]\n",
 					 cpu, read_cpuid_id());
+	update_cpu_boot_status(CPU_BOOT_SUCCESS);
 	set_cpu_online(cpu, true);
 	complete(&cpu_running);
 
@@ -327,10 +370,13 @@ void cpu_die_early(void)
 	set_cpu_present(cpu, 0);
 
 #ifdef CONFIG_HOTPLUG_CPU
+	update_cpu_boot_status(CPU_KILL_ME);
 	/* Check if we can park ourselves */
 	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
 		cpu_ops[cpu]->cpu_die(cpu);
 #endif
+	update_cpu_boot_status(CPU_STUCK_IN_KERNEL);
+	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
 
 	for (;;) {
 		wfe();

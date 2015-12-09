@@ -34,6 +34,7 @@
 #include <asm/pgtable-hwdef.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/smp.h>
 #include <asm/sysreg.h>
 #include <asm/thread_info.h>
 #include <asm/virt.h>
@@ -605,7 +606,7 @@ ENTRY(secondary_startup)
 ENDPROC(secondary_startup)
 
 ENTRY(__secondary_switched)
-	ldr	x0, [x22]			// get secondary_data.stack
+	ldr	x0, [x22, #CPU_BOOT_STACK]	// get secondary_data.stack
 	mov	sp, x0
 	mov	x29, #0
 	b	secondary_start_kernel
@@ -615,6 +616,7 @@ ENDPROC(__secondary_switched)
  * Enable the MMU.
  *
  *  x0  = SCTLR_EL1 value for turning on the MMU.
+ *  x22 = __va(secondary_data)
  *  x27 = *virtual* address to jump to upon completion
  *
  * Other registers depend on the function called upon completion.
@@ -647,6 +649,19 @@ __enable_mmu:
 ENDPROC(__enable_mmu)
 
 __no_granule_support:
+	/* Indicate that this CPU can't boot and is stuck in the kernel */
+	cmp	x22, 0				// Boot CPU doesn't update status
+	b.eq	1f
+	adrp	x1, secondary_data
+	add	x1, x1, #:lo12:secondary_data	// x1 = __pa(secondary_data)
+	mov	x0, #CPU_STUCK_IN_KERNEL
+	str	x0, [x1, #CPU_BOOT_STATUS]	// update the secondary_data.status
+	/* flush the data to PoC */
+	isb
+	dc	civac, x1
+	dsb	sy
+	isb
+1:
 	wfe
-	b __no_granule_support
+	b 1b
 ENDPROC(__no_granule_support)
