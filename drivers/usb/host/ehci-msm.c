@@ -56,10 +56,12 @@ static int ehci_msm_reset(struct usb_hcd *hcd)
 	if (retval)
 		return retval;
 
+	/* select ULPI phy and clear other status/control bits in PORTSC */
+	writel(PORTSC_PTS_ULPI, USB_PORTSC);
 	/* bursts of unspecified length. */
 	writel(0, USB_AHBBURST);
 	/* Use the AHB transactor */
-	writel(0, USB_AHBMODE);
+	writel(0x8, USB_AHBMODE);
 	/* Disable streaming mode and select host mode */
 	writel(0x13, USB_USBMODE);
 	/* Disable ULPI_TX_PKT_EN_CLR_FIX which is valid only for HSIC */
