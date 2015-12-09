@@ -130,6 +130,8 @@ static struct dso *__machine__addnew_vdso(struct machine *machine, const char *s
 		__dsos__add(&machine->dsos, dso);
 		dso__set_long_name(dso, long_name, false);
 	}
+	/* Put the dso here because it is already gotten by __dsos__add */
+	dso__put(dso);
 
 	return dso;
 }
