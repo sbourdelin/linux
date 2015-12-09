@@ -1,5 +1,7 @@
 /*
+ * MARVELL MMP Peripheral DMA Driver
  * Copyright 2012 Marvell International Ltd.
+ * Author: Marvell International Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -7,7 +9,6 @@
  */
 
 #include <linux/err.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -929,14 +930,6 @@ static void dma_do_tasklet(unsigned long data)
 	}
 }
 
-static int mmp_pdma_remove(struct platform_device *op)
-{
-	struct mmp_pdma_device *pdev = platform_get_drvdata(op);
-
-	dma_async_device_unregister(&pdev->device);
-	return 0;
-}
-
 static int mmp_pdma_chan_init(struct mmp_pdma_device *pdev, int idx, int irq)
 {
 	struct mmp_pdma_phy *phy  = &pdev->phy[idx];
@@ -976,7 +969,6 @@ static const struct of_device_id mmp_pdma_dt_ids[] = {
 	{ .compatible = "marvell,pdma-1.0", },
 	{}
 };
-MODULE_DEVICE_TABLE(of, mmp_pdma_dt_ids);
 
 static struct dma_chan *mmp_pdma_dma_xlate(struct of_phandle_args *dma_spec,
 					   struct of_dma *ofdma)
@@ -1110,12 +1102,13 @@ static const struct platform_device_id mmp_pdma_id_table[] = {
 static struct platform_driver mmp_pdma_driver = {
 	.driver		= {
 		.name	= "mmp-pdma",
+		.suppress_bind_attrs = true,
 		.of_match_table = mmp_pdma_dt_ids,
 	},
 	.id_table	= mmp_pdma_id_table,
 	.probe		= mmp_pdma_probe,
-	.remove		= mmp_pdma_remove,
 };
+builtin_platform_driver(mmp_pdma_driver);
 
 bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
 {
@@ -1129,9 +1122,3 @@ bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
 	return true;
 }
 EXPORT_SYMBOL_GPL(mmp_pdma_filter_fn);
-
-module_platform_driver(mmp_pdma_driver);
-
-MODULE_DESCRIPTION("MARVELL MMP Peripheral DMA Driver");
-MODULE_AUTHOR("Marvell International Ltd.");
-MODULE_LICENSE("GPL v2");
