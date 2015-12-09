@@ -2233,6 +2233,19 @@ void intel_runtime_pm_get(struct drm_i915_private *dev_priv)
 	WARN(dev_priv->pm.suspended, "Device still suspended.\n");
 }
 
+bool intel_runtime_pm_tryget(struct drm_i915_private *dev_priv)
+{
+	/* XXX Ideally we would push this to pm_runtime_tryget() */
+#ifdef CONFIG_PM
+	if (HAS_RUNTIME_PM(dev_priv)) {
+		struct device *device = &dev_priv->dev->pdev->dev;
+		return atomic_inc_unless_zero(&dev->power.usage_count);
+	}
+#else
+	return true;
+#endif
+}
+
 /**
  * intel_runtime_pm_get_noresume - grab a runtime pm reference
  * @dev_priv: i915 device instance

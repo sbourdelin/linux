@@ -2989,6 +2989,13 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 	if (!i915.enable_hangcheck)
 		return;
 
+	/* If the runtime pm is off, then the GPU is asleep and we are
+	 * completely idle, so we can belatedly cancel hangcheck. Hangcheck
+	 * will be restarted on the next request.
+	 */
+	if (!intel_runtime_pm_tryget(dev_priv))
+		return;
+
 	for_each_ring(ring, dev_priv, i) {
 		u64 acthd;
 		u32 seqno;
@@ -3079,6 +3086,8 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 			rings_hung++;
 		}
 	}
+
+	intel_runtime_pm_put(dev_priv);
 
 	if (rings_hung)
 		return i915_handle_error(dev, true, "Ring hung");
