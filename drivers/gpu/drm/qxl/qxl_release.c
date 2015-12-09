@@ -360,8 +360,8 @@ int qxl_alloc_release_reserved(struct qxl_device *qdev, unsigned long size,
 	if (!qdev->current_release_bo[cur_idx]) {
 		ret = qxl_release_bo_alloc(qdev, &qdev->current_release_bo[cur_idx]);
 		if (ret) {
-			mutex_unlock(&qdev->release_mutex);
 			qxl_release_free(qdev, *release);
+			mutex_unlock(&qdev->release_mutex);
 			return ret;
 		}
 	}

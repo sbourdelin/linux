@@ -243,7 +243,10 @@ int qxl_garbage_collect(struct qxl_device *qdev)
 			}
 			id = next_id;
 
+			mutex_lock(&qdev->release_mutex);
 			qxl_release_free(qdev, release);
+			mutex_unlock(&qdev->release_mutex);
+
 			++i;
 		}
 	}
