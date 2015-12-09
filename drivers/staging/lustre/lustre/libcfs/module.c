@@ -268,7 +268,7 @@ static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
 			/* XXX The ioc_flags is not GFP flags now, need to be fixed */
 			err = kportal_memhog_alloc(pfile->private_data,
 						   data->ioc_count,
-						   data->ioc_flags);
+					(__force gfp_t)data->ioc_flags);
 			if (err != 0)
 				kportal_memhog_free(pfile->private_data);
 		}
