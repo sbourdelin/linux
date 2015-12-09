@@ -78,14 +78,54 @@ static struct notifier_block masq_dev_notifier = {
 	.notifier_call	= masq_device_event,
 };
 
+struct masq_dev_slow_work {
+	struct work_struct work;
+	struct net *net;
+	int ifindex;
+};
+
+static void iterate_cleanup_work(struct work_struct *work)
+{
+	struct masq_dev_slow_work *w;
+	struct net *net;
+	int ifindex;
+
+	w = container_of(work, struct masq_dev_slow_work, work);
+
+	net = w->net;
+	ifindex = w->ifindex;
+	kfree(w);
+
+	nf_ct_iterate_cleanup(net, device_cmp, (void *)(long)ifindex, 0, 0);
+
+	put_net(net);
+	module_put(THIS_MODULE);
+}
+
 static int masq_inet_event(struct notifier_block *this,
 			   unsigned long event, void *ptr)
 {
 	struct inet6_ifaddr *ifa = ptr;
-	struct netdev_notifier_info info;
+	struct masq_dev_slow_work *w;
 
-	netdev_notifier_info_init(&info, ifa->idev->dev);
-	return masq_device_event(this, event, &info);
+	if (event != NETDEV_DOWN || !try_module_get(THIS_MODULE))
+		return NOTIFY_DONE;
+
+	/* can't call nf_ct_iterate_cleanup in atomic context */
+	w = kmalloc(sizeof(*w), GFP_ATOMIC);
+	if (w) {
+		const struct net_device *dev = ifa->idev->dev;
+
+		INIT_WORK(&w->work, iterate_cleanup_work);
+
+		w->ifindex = dev->ifindex;
+		w->net = get_net(dev_net(dev));
+		schedule_work(&w->work);
+	} else {
+		module_put(THIS_MODULE);
+	}
+
+	return NOTIFY_DONE;
 }
 
 static struct notifier_block masq_inet_notifier = {

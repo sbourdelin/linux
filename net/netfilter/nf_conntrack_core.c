@@ -1422,6 +1422,8 @@ void nf_ct_iterate_cleanup(struct net *net,
 	struct nf_conn *ct;
 	unsigned int bucket = 0;
 
+	might_sleep();
+
 	while ((ct = get_next_corpse(net, iter, data, &bucket)) != NULL) {
 		/* Time to push up daises... */
 		if (del_timer(&ct->timeout))
@@ -1430,6 +1432,7 @@ void nf_ct_iterate_cleanup(struct net *net,
 		/* ... else the timer will get him soon. */
 
 		nf_ct_put(ct);
+		cond_resched();
 	}
 }
 EXPORT_SYMBOL_GPL(nf_ct_iterate_cleanup);
