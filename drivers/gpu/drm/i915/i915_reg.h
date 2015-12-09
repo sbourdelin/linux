@@ -8091,6 +8091,10 @@ enum skl_disp_power_wells {
 #define  BXT_PIPE_SELECT_B				(1 << 7)
 #define  BXT_PIPE_SELECT_A				(0 << 7)
 
+/* BXT has dual link Z inversion overlap field */
+#define  BXT_PIXEL_OVERLAP_CNT_MASK			(0xf << 10)
+#define  BXT_PIXEL_OVERLAP_CNT_SHIFT			10
+
 #define _MIPIA_DATA_ADDRESS		(dev_priv->mipi_mmio_base + 0xb108)
 #define _MIPIC_DATA_ADDRESS		(dev_priv->mipi_mmio_base + 0xb908)
 #define MIPI_DATA_ADDRESS(port)		_MIPI_PORT(port, _MIPIA_DATA_ADDRESS, \
