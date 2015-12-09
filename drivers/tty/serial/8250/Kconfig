@@ -378,3 +378,12 @@ config SERIAL_8250_MID
 	  Selecting this option will enable handling of the extra features
 	  present on the UART found on Intel Medfield SOC and various other
 	  Intel platforms.
+
+config SERIAL_8250_PXA
+	tristate "PXA serial port support"
+	depends on SERIAL_8250 && (ARCH_PXA || ARCH_MMP)
+	help
+	  If you have a machine based on an Intel XScale PXA2xx CPU you
+	  can enable its onboard serial ports by enabling this option.
+
+	  If you choose M here, the module name will be 8250_pxa.
