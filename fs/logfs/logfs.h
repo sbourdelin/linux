@@ -655,11 +655,6 @@ static inline __be32 logfs_crc32(void *data, size_t len, size_t skip)
 	return cpu_to_be32(crc32(~0, data+skip, len-skip));
 }
 
-static inline u8 logfs_type(struct inode *inode)
-{
-	return (inode->i_mode >> 12) & 15;
-}
-
 static inline pgoff_t logfs_index(struct super_block *sb, u64 pos)
 {
 	return pos >> sb->s_blocksize_bits;

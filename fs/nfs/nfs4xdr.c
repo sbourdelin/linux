@@ -7359,7 +7359,7 @@ int nfs4_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 
 	entry->d_type = DT_UNKNOWN;
 	if (entry->fattr->valid & NFS_ATTR_FATTR_TYPE)
-		entry->d_type = nfs_umode_to_dtype(entry->fattr->mode);
+		entry->d_type = DT_TYPE(entry->fattr->mode);
 
 	return 0;
 

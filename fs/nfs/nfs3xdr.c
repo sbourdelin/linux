@@ -1986,7 +1986,7 @@ int nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 		if (unlikely(error))
 			return error;
 		if (entry->fattr->valid & NFS_ATTR_FATTR_V3)
-			entry->d_type = nfs_umode_to_dtype(entry->fattr->mode);
+			entry->d_type = DT_TYPE(entry->fattr->mode);
 
 		if (entry->fattr->fileid != entry->ino) {
 			entry->fattr->mounted_on_fileid = entry->ino;

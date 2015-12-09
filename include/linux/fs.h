@@ -1552,6 +1552,8 @@ int fiemap_check_flags(struct fiemap_extent_info *fieinfo, u32 fs_flags);
 #define DT_SOCK		12
 #define DT_WHT		14
 
+#define DT_TYPE(i_mode)	((unsigned char)(i_mode >> 12) & 15)
+
 /*
  * This is the "filldir" function type, used by readdir() to let
  * the kernel specify what kind of dirent layout it wants to have.

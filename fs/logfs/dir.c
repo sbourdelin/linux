@@ -386,7 +386,7 @@ static int logfs_write_dir(struct inode *dir, struct dentry *dentry,
 		dd = kmap_atomic(page);
 		memset(dd, 0, sizeof(*dd));
 		dd->ino = cpu_to_be64(inode->i_ino);
-		dd->type = logfs_type(inode);
+		dd->type = DT_TYPE(inode->i_mode);
 		logfs_set_name(dd, &dentry->d_name);
 		kunmap_atomic(dd);
 
@@ -640,7 +640,7 @@ static int logfs_replace_inode(struct inode *dir, struct dentry *dentry,
 	if (err)
 		return err;
 	dd->ino = cpu_to_be64(inode->i_ino);
-	dd->type = logfs_type(inode);
+	dd->type = DT_TYPE(inode->i_mode);
 
 	err = write_dir(dir, dd, pos);
 	if (err)

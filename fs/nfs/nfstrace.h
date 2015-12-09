@@ -100,7 +100,7 @@ DECLARE_EVENT_CLASS(nfs_inode_event_done,
 			__entry->dev = inode->i_sb->s_dev;
 			__entry->fileid = nfsi->fileid;
 			__entry->fhandle = nfs_fhandle_hash(&nfsi->fh);
-			__entry->type = nfs_umode_to_dtype(inode->i_mode);
+			__entry->type = DT_TYPE(inode->i_mode);
 			__entry->version = inode->i_version;
 			__entry->size = i_size_read(inode);
 			__entry->nfsi_flags = nfsi->flags;
