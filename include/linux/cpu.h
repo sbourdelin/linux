@@ -282,7 +282,8 @@ void arch_cpu_idle_dead(void);
 
 DECLARE_PER_CPU(bool, cpu_dead_idle);
 
-int cpu_report_state(int cpu);
+int cpu_check_online(int cpu);
+int cpu_check_timeout(int cpu);
 int cpu_check_up_prepare(int cpu);
 void cpu_set_state_online(int cpu);
 #ifdef CONFIG_HOTPLUG_CPU

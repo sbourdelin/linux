@@ -370,19 +370,63 @@ int smpboot_update_cpumask_percpu_thread(struct smp_hotplug_thread *plug_thread,
 }
 EXPORT_SYMBOL_GPL(smpboot_update_cpumask_percpu_thread);
 
-static DEFINE_PER_CPU(atomic_t, cpu_hotplug_state) = ATOMIC_INIT(CPU_POST_DEAD);
+/* The CPU is offline, and its last offline operation was
+ * successful and proceeded normally.  (Or, alternatively, the
+ * CPU never has come online, as this is the initial state.)
+ */
+#define CPUHP_POST_DEAD		0x01
+
+/* The CPU is in the process of coming online.
+ * Simple architectures can skip this state, and just invoke
+ * cpu_set_state_online() unconditionally instead.
+ */
+#define CPUHP_UP_PREPARE	0x02
+
+/* The CPU is now online.  Simple architectures can skip this
+ * state, and just invoke cpu_wait_death() and cpu_report_death()
+ * unconditionally instead.
+ */
+#define CPUHP_ONLINE		0x03
+
+/* The CPU has gone offline, so that it may now be safely
+ * powered off (or whatever the architecture needs to do to it).
+ */
+#define CPUHP_DEAD		0x04
+
+/* The CPU did not go offline in a timely fashion, if at all,
+ * so it might need special processing at the next online (for
+ * example, simply refusing to bring it online).
+ */
+#define CPUHP_BROKEN		0x05
+
+/* The CPU eventually did go offline, but not in a timely
+ * fashion.  If some sort of reset operation is required before it
+ * can be brought online, that reset operation needs to be carried
+ * out at online time.  (Or, again, the architecture might simply
+ * refuse to bring it online.)
+ */
+#define CPUHP_TIMEOUT		0x06
+
+static DEFINE_PER_CPU(atomic_t, cpu_hotplug_state) = ATOMIC_INIT(CPUHP_POST_DEAD);
 
 /*
  * Called to poll specified CPU's state, for example, when waiting for
  * a CPU to come online.
  */
-int cpu_report_state(int cpu)
+int cpu_check_online(int cpu)
 {
-	return atomic_read(&per_cpu(cpu_hotplug_state, cpu));
+	return atomic_read(&per_cpu(cpu_hotplug_state, cpu)) ==
+			   CPUHP_ONLINE;
+}
+
+int cpu_check_timeout(int cpu)
+{
+	return atomic_read(&per_cpu(cpu_hotplug_state, cpu)) ==
+			   CPUHP_TIMEOUT;
 }
 
 /*
- * If CPU has died properly, set its state to CPU_UP_PREPARE and
+ * If CPU has died properly, set its state to CPUHP_UP_PREPARE and
  * return success.  Otherwise, return -EBUSY if the CPU died after
  * cpu_wait_death() timed out.  And yet otherwise again, return -EAGAIN
  * if cpu_wait_death() timed out and the CPU still hasn't gotten around
@@ -396,19 +440,19 @@ int cpu_report_state(int cpu)
 int cpu_check_up_prepare(int cpu)
 {
 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
-		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
+		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPUHP_UP_PREPARE);
 		return 0;
 	}
 
 	switch (atomic_read(&per_cpu(cpu_hotplug_state, cpu))) {
 
-	case CPU_POST_DEAD:
+	case CPUHP_POST_DEAD:
 
 		/* The CPU died properly, so just start it up again. */
-		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
+		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPUHP_UP_PREPARE);
 		return 0;
 
-	case CPU_DEAD_FROZEN:
+	case CPUHP_TIMEOUT:
 
 		/*
 		 * Timeout during CPU death, so let caller know.
@@ -423,7 +467,7 @@ int cpu_check_up_prepare(int cpu)
 		 */
 		return -EBUSY;
 
-	case CPU_BROKEN:
+	case CPUHP_BROKEN:
 
 		/*
 		 * The most likely reason we got here is that there was
@@ -451,7 +495,7 @@ int cpu_check_up_prepare(int cpu)
  */
 void cpu_set_state_online(int cpu)
 {
-	(void)atomic_xchg(&per_cpu(cpu_hotplug_state, cpu), CPU_ONLINE);
+	(void)atomic_xchg(&per_cpu(cpu_hotplug_state, cpu), CPUHP_ONLINE);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -469,12 +513,12 @@ bool cpu_wait_death(unsigned int cpu, int seconds)
 	might_sleep();
 
 	/* The outgoing CPU will normally get done quite quickly. */
-	if (atomic_read(&per_cpu(cpu_hotplug_state, cpu)) == CPU_DEAD)
+	if (atomic_read(&per_cpu(cpu_hotplug_state, cpu)) == CPUHP_DEAD)
 		goto update_state;
 	udelay(5);
 
 	/* But if the outgoing CPU dawdles, wait increasingly long times. */
-	while (atomic_read(&per_cpu(cpu_hotplug_state, cpu)) != CPU_DEAD) {
+	while (atomic_read(&per_cpu(cpu_hotplug_state, cpu)) != CPUHP_DEAD) {
 		schedule_timeout_uninterruptible(sleep_jf);
 		jf_left -= sleep_jf;
 		if (jf_left <= 0)
@@ -483,14 +527,14 @@ bool cpu_wait_death(unsigned int cpu, int seconds)
 	}
 update_state:
 	oldstate = atomic_read(&per_cpu(cpu_hotplug_state, cpu));
-	if (oldstate == CPU_DEAD) {
+	if (oldstate == CPUHP_DEAD) {
 		/* Outgoing CPU died normally, update state. */
 		smp_mb(); /* atomic_read() before update. */
-		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_POST_DEAD);
+		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPUHP_POST_DEAD);
 	} else {
 		/* Outgoing CPU still hasn't died, set state accordingly. */
 		if (atomic_cmpxchg(&per_cpu(cpu_hotplug_state, cpu),
-				   oldstate, CPU_BROKEN) != oldstate)
+				   oldstate, CPUHP_BROKEN) != oldstate)
 			goto update_state;
 		ret = false;
 	}
@@ -501,7 +545,7 @@ update_state:
  * Called by the outgoing CPU to report its successful death.  Return
  * false if this report follows the surviving CPU's timing out.
  *
- * A separate "CPU_DEAD_FROZEN" is used when the surviving CPU
+ * A separate "CPUHP_TIMEOUT" is used when the surviving CPU
  * timed out.  This approach allows architectures to omit calls to
  * cpu_check_up_prepare() and cpu_set_state_online() without defeating
  * the next cpu_wait_death()'s polling loop.
@@ -514,13 +558,13 @@ bool cpu_report_death(void)
 
 	do {
 		oldstate = atomic_read(&per_cpu(cpu_hotplug_state, cpu));
-		if (oldstate != CPU_BROKEN)
-			newstate = CPU_DEAD;
+		if (oldstate != CPUHP_BROKEN)
+			newstate = CPUHP_DEAD;
 		else
-			newstate = CPU_DEAD_FROZEN;
+			newstate = CPUHP_TIMEOUT;
 	} while (atomic_cmpxchg(&per_cpu(cpu_hotplug_state, cpu),
 				oldstate, newstate) != oldstate);
-	return newstate == CPU_DEAD;
+	return newstate == CPUHP_DEAD;
 }
 
 #endif /* #ifdef CONFIG_HOTPLUG_CPU */
