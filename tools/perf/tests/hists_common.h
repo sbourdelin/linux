@@ -1,5 +1,6 @@
 #ifndef __PERF_TESTS__HISTS_COMMON_H__
 #define __PERF_TESTS__HISTS_COMMON_H__
+#include <linux/err.h>
 
 struct machine;
 struct machines;

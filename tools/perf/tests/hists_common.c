@@ -81,14 +81,19 @@ struct machine *setup_fake_machine(struct machines *machines)
 {
 	struct machine *machine = machines__find(machines, HOST_KERNEL_ID);
 	size_t i;
+	int err = -ENOMEM;
 
 	if (machine == NULL) {
 		pr_debug("Not enough memory for machine setup\n");
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	if (machine__create_kernel_maps(machine)) {
-		pr_debug("Not enough memory for machine setup\n");
+		pr_debug("Failed to create kernel maps\n");
+		if (symbol_conf.kptr_restrict) {
+			pr_debug("Hint: Check /proc/sys/kernel/kptr_restrict.\n");
+			err = -EACCES;
+		}
 		goto out;
 	}
 
@@ -153,10 +158,10 @@ struct machine *setup_fake_machine(struct machines *machines)
 	return machine;
 
 out:
-	pr_debug("Not enough memory for machine setup\n");
+	pr_debug("Failed for machine setup\n");
 	machine__delete_threads(machine);
-	machine__delete(machine);
-	return NULL;
+	machine__exit(machine);
+	return ERR_PTR(err);
 }
 
 void print_hists_in(struct hists *hists)

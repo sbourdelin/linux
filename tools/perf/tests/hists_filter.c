@@ -120,6 +120,7 @@ int test__hists_filter(int subtest __maybe_unused)
 	err = parse_events(evlist, "task-clock", NULL);
 	if (err)
 		goto out;
+	err = TEST_FAIL;
 
 	/* default sort order (comm,dso,sym) will be used */
 	if (setup_sorting() < 0)
@@ -129,8 +130,11 @@ int test__hists_filter(int subtest __maybe_unused)
 
 	/* setup threads/dso/map/symbols also */
 	machine = setup_fake_machine(&machines);
-	if (!machine)
+	if (IS_ERR(machine)) {
+		if (PTR_ERR(machine) == -EACCES)
+			err = TEST_SKIP;
 		goto out;
+	}
 
 	if (verbose > 1)
 		machine__fprintf(machine, stderr);
