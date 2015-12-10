@@ -32,6 +32,7 @@ struct hist_field {
 	unsigned long			flags;
 	hist_field_fn_t			fn;
 	unsigned int			size;
+	unsigned int			offset;
 };
 
 static u64 hist_field_counter(struct hist_field *field, void *event)
@@ -73,8 +74,8 @@ DEFINE_HIST_FIELD_FN(u8);
 	for (i = hist_data->n_vals; i < hist_data->n_fields; i++)
 
 #define HITCOUNT_IDX		0
-#define HIST_KEY_MAX		1
-#define HIST_KEY_SIZE_MAX	MAX_FILTER_STR_VAL
+#define HIST_KEY_MAX		2
+#define HIST_KEY_SIZE_MAX	(MAX_FILTER_STR_VAL + sizeof(u64))
 
 enum hist_field_flags {
 	HIST_FIELD_HITCOUNT	= 1,
@@ -342,6 +343,7 @@ static int create_val_fields(struct hist_trigger_data *hist_data,
 
 static int create_key_field(struct hist_trigger_data *hist_data,
 			    unsigned int key_idx,
+			    unsigned int key_offset,
 			    struct trace_event_file *file,
 			    char *field_str)
 {
@@ -368,7 +370,8 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 
 	key_size = ALIGN(key_size, sizeof(u64));
 	hist_data->fields[key_idx]->size = key_size;
-	hist_data->key_size = key_size;
+	hist_data->fields[key_idx]->offset = key_offset;
+	hist_data->key_size += key_size;
 	if (hist_data->key_size > HIST_KEY_SIZE_MAX) {
 		ret = -EINVAL;
 		goto out;
@@ -383,7 +386,7 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 static int create_key_fields(struct hist_trigger_data *hist_data,
 			     struct trace_event_file *file)
 {
-	unsigned int i, n_vals = hist_data->n_vals;
+	unsigned int i, key_offset = 0, n_vals = hist_data->n_vals;
 	char *fields_str, *field_str;
 	int ret = -EINVAL;
 
@@ -399,9 +402,11 @@ static int create_key_fields(struct hist_trigger_data *hist_data,
 		field_str = strsep(&fields_str, ",");
 		if (!field_str)
 			break;
-		ret = create_key_field(hist_data, i, file, field_str);
+		ret = create_key_field(hist_data, i, key_offset,
+				       file, field_str);
 		if (ret < 0)
 			goto out;
+		key_offset += ret;
 	}
 	if (fields_str) {
 		ret = -EINVAL;
@@ -466,7 +471,10 @@ static int create_tracing_map_fields(struct hist_trigger_data *hist_data)
 			else
 				cmp_fn = tracing_map_cmp_num(field->size,
 							     field->is_signed);
-			idx = tracing_map_add_key_field(map, 0, cmp_fn);
+			idx = tracing_map_add_key_field(map,
+							hist_field->offset,
+							cmp_fn);
+
 		} else
 			idx = tracing_map_add_sum_field(map);
 
@@ -546,11 +554,15 @@ static void hist_trigger_elt_update(struct hist_trigger_data *hist_data,
 static void event_hist_trigger(struct event_trigger_data *data, void *rec)
 {
 	struct hist_trigger_data *hist_data = data->private_data;
+	char compound_key[HIST_KEY_SIZE_MAX];
 	struct hist_field *key_field;
 	struct tracing_map_elt *elt;
 	u64 field_contents;
 	void *key = NULL;
 	unsigned int i;
+
+	if (hist_data->n_keys > 1)
+		memset(compound_key, 0, hist_data->key_size);
 
 	for_each_hist_key_field(i, hist_data) {
 		key_field = hist_data->fields[i];
@@ -560,7 +572,15 @@ static void event_hist_trigger(struct event_trigger_data *data, void *rec)
 			key = (void *)(unsigned long)field_contents;
 		else
 			key = (void *)&field_contents;
+
+		if (hist_data->n_keys > 1) {
+			memcpy(compound_key + key_field->offset, key,
+			       key_field->size);
+		}
 	}
+
+	if (hist_data->n_keys > 1)
+		key = compound_key;
 
 	elt = tracing_map_insert(hist_data->map, key);
 	if (elt)
@@ -586,11 +606,11 @@ hist_trigger_entry_print(struct seq_file *m,
 
 		if (key_field->flags & HIST_FIELD_STRING) {
 			seq_printf(m, "%s: %-50s", key_field->field->name,
-				   (char *)key);
+				   (char *)(key + key_field->offset));
 		} else {
-			uval = *(u64 *)key;
-			seq_printf(m, "%s: %10llu",
-				   key_field->field->name, uval);
+			uval = *(u64 *)(key + key_field->offset);
+			seq_printf(m, "%s: %10llu", key_field->field->name,
+				   uval);
 		}
 	}
 
