@@ -292,11 +292,14 @@ void nfs_setsecurity(struct inode *inode, struct nfs_fattr *fattr,
 					struct nfs4_label *label)
 {
 	int error;
+	u32 secid = 0;
 
 	if (label == NULL)
 		return;
 
-	if ((fattr->valid & NFS_ATTR_FATTR_V4_SECURITY_LABEL) && inode->i_security) {
+	security_inode_getsecid(inode, &secid);
+
+	if ((fattr->valid & NFS_ATTR_FATTR_V4_SECURITY_LABEL) && secid != 0) {
 		error = security_inode_notifysecctx(inode, label->label,
 				label->len);
 		if (error)

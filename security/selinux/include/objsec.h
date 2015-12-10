@@ -24,6 +24,7 @@
 #include <linux/binfmts.h>
 #include <linux/in.h>
 #include <linux/spinlock.h>
+#include <linux/selinux_blob.h>
 #include <net/net_namespace.h>
 #include "flask.h"
 #include "avc.h"
@@ -35,19 +36,6 @@ struct task_security_struct {
 	u32 create_sid;		/* fscreate SID */
 	u32 keycreate_sid;	/* keycreate SID */
 	u32 sockcreate_sid;	/* fscreate SID */
-};
-
-struct inode_security_struct {
-	struct inode *inode;	/* back pointer to inode object */
-	union {
-		struct list_head list;	/* list of inode_security_struct */
-		struct rcu_head rcu;	/* for freeing the inode_security_struct */
-	};
-	u32 task_sid;		/* SID of creating task */
-	u32 sid;		/* SID of this object */
-	u16 sclass;		/* security class of this object */
-	unsigned char initialized;	/* initialization flag */
-	struct mutex lock;
 };
 
 struct file_security_struct {

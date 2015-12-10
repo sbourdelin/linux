@@ -24,6 +24,7 @@
 #include <linux/list.h>
 #include <linux/rculist.h>
 #include <linux/lsm_audit.h>
+#include <linux/smack_blob.h>
 
 /*
  * Use IPv6 port labeling if IPv6 is enabled and secmarks
@@ -97,17 +98,6 @@ struct socket_smack {
 	struct smack_known	*smk_out;	/* outbound label */
 	struct smack_known	*smk_in;	/* inbound label */
 	struct smack_known	*smk_packet;	/* TCP peer label */
-};
-
-/*
- * Inode smack data
- */
-struct inode_smack {
-	struct smack_known	*smk_inode;	/* label of the fso */
-	struct smack_known	*smk_task;	/* label of the task */
-	struct smack_known	*smk_mmap;	/* label of the mmap domain */
-	struct mutex		smk_lock;	/* initialization lock */
-	int			smk_flags;	/* smack inode flags */
 };
 
 struct task_smack {
@@ -342,7 +332,7 @@ extern struct hlist_head smack_known_hash[SMACK_HASH_SLOTS];
  */
 static inline int smk_inode_transmutable(const struct inode *isp)
 {
-	struct inode_smack *sip = isp->i_security;
+	const struct inode_smack *sip = &isp->i_smack;
 	return (sip->smk_flags & SMK_INODE_TRANSMUTE) != 0;
 }
 
@@ -351,7 +341,7 @@ static inline int smk_inode_transmutable(const struct inode *isp)
  */
 static inline struct smack_known *smk_of_inode(const struct inode *isp)
 {
-	struct inode_smack *sip = isp->i_security;
+	const struct inode_smack *sip = &isp->i_smack;
 	return sip->smk_inode;
 }
 

@@ -1200,7 +1200,7 @@ static int sel_make_bools(void)
 	struct dentry *dentry = NULL;
 	struct dentry *dir = bool_dir;
 	struct inode *inode = NULL;
-	struct inode_security_struct *isec;
+	struct inode_selinux *isec;
 	char **names = NULL, *page;
 	int num;
 	int *values = NULL;
@@ -1242,7 +1242,7 @@ static int sel_make_bools(void)
 		if (len >= PAGE_SIZE)
 			goto out;
 
-		isec = (struct inode_security_struct *)inode->i_security;
+		isec = &inode->i_selinux;
 		ret = security_genfs_sid("selinuxfs", page, SECCLASS_FILE, &sid);
 		if (ret)
 			goto out;
@@ -1739,7 +1739,7 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 	int ret;
 	struct dentry *dentry;
 	struct inode *inode;
-	struct inode_security_struct *isec;
+	struct inode_selinux *isec;
 
 	static struct tree_descr selinux_files[] = {
 		[SEL_LOAD] = {"load", &sel_load_ops, S_IRUSR|S_IWUSR},
@@ -1783,7 +1783,7 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 		goto err;
 
 	inode->i_ino = ++sel_last_ino;
-	isec = (struct inode_security_struct *)inode->i_security;
+	isec = &inode->i_selinux;
 	isec->sid = SECINITSID_DEVNULL;
 	isec->sclass = SECCLASS_CHR_FILE;
 	isec->initialized = 1;

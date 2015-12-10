@@ -31,6 +31,8 @@
 #include <linux/blk_types.h>
 #include <linux/workqueue.h>
 #include <linux/percpu-rwsem.h>
+#include <linux/selinux_blob.h>
+#include <linux/smack_blob.h>
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
@@ -598,8 +600,15 @@ struct inode {
 	struct address_space	*i_mapping;
 
 #ifdef CONFIG_SECURITY
-	void			*i_security;
+	union {
+#ifdef CONFIG_SECURITY_SELINUX
+		struct inode_selinux	i_selinux;
 #endif
+#ifdef CONFIG_SECURITY_SMACK
+		struct inode_smack	i_smack;
+#endif
+	};
+#endif /* CONFIG_SECURITY */
 
 	/* Stat data, not accessed from path walking */
 	unsigned long		i_ino;

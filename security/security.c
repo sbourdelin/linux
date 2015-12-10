@@ -344,7 +344,6 @@ EXPORT_SYMBOL(security_sb_parse_opts_str);
 
 int security_inode_alloc(struct inode *inode)
 {
-	inode->i_security = NULL;
 	return call_int_hook(inode_alloc_security, 0, inode);
 }
 
@@ -725,6 +724,7 @@ void security_inode_getsecid(const struct inode *inode, u32 *secid)
 {
 	call_void_hook(inode_getsecid, inode, secid);
 }
+EXPORT_SYMBOL(security_inode_getsecid);
 
 int security_file_permission(struct file *file, int mask)
 {
