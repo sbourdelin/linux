@@ -63,21 +63,21 @@
 /* packs and unpacks a channel/range number */
 
 #define CR_PACK(chan, rng, aref)					\
-	((((aref)&0x3)<<24) | (((rng)&0xff)<<16) | (chan))
+	((((aref)&0x3) << 24) | (((rng)&0xff) << 16) | (chan))
 #define CR_PACK_FLAGS(chan, range, aref, flags)				\
 	(CR_PACK(chan, range, aref) | ((flags) & CR_FLAGS_MASK))
 
 #define CR_CHAN(a)	((a)&0xffff)
-#define CR_RANGE(a)	(((a)>>16)&0xff)
-#define CR_AREF(a)	(((a)>>24)&0x03)
+#define CR_RANGE(a)	(((a) >> 16)&0xff)
+#define CR_AREF(a)	(((a) >> 24)&0x03)
 
 #define CR_FLAGS_MASK	0xfc000000
-#define CR_ALT_FILTER	(1<<26)
+#define CR_ALT_FILTER	(1 << 26)
 #define CR_DITHER	CR_ALT_FILTER
 #define CR_DEGLITCH	CR_ALT_FILTER
-#define CR_ALT_SOURCE	(1<<27)
-#define CR_EDGE		(1<<30)
-#define CR_INVERT	(1<<31)
+#define CR_ALT_SOURCE	(1 << 27)
+#define CR_EDGE		(1 << 30)
+#define CR_INVERT	(1 << 31)
 
 #define AREF_GROUND	0x00	/* analog ref = analog ground */
 #define AREF_COMMON	0x01	/* analog ref = analog common */
@@ -114,11 +114,11 @@
 
 #define INSN_READ		(0 | INSN_MASK_READ)
 #define INSN_WRITE		(1 | INSN_MASK_WRITE)
-#define INSN_BITS		(2 | INSN_MASK_READ|INSN_MASK_WRITE)
-#define INSN_CONFIG		(3 | INSN_MASK_READ|INSN_MASK_WRITE)
-#define INSN_GTOD		(4 | INSN_MASK_READ|INSN_MASK_SPECIAL)
-#define INSN_WAIT		(5 | INSN_MASK_WRITE|INSN_MASK_SPECIAL)
-#define INSN_INTTRIG		(6 | INSN_MASK_WRITE|INSN_MASK_SPECIAL)
+#define INSN_BITS		(2 | INSN_MASK_READ | INSN_MASK_WRITE)
+#define INSN_CONFIG		(3 | INSN_MASK_READ | INSN_MASK_WRITE)
+#define INSN_GTOD		(4 | INSN_MASK_READ | INSN_MASK_SPECIAL)
+#define INSN_WAIT		(5 | INSN_MASK_WRITE | INSN_MASK_SPECIAL)
+#define INSN_INTTRIG		(6 | INSN_MASK_WRITE | INSN_MASK_SPECIAL)
 
 /* trigger flags */
 /* These flags are used in comedi_trig structures */
@@ -504,13 +504,13 @@ struct comedi_bufinfo {
 
 /* range stuff */
 
-#define __RANGE(a, b)	((((a)&0xffff)<<16)|((b)&0xffff))
+#define __RANGE(a, b)	((((a)&0xffff) << 16) | ((b)&0xffff))
 
-#define RANGE_OFFSET(a)		(((a)>>16)&0xffff)
+#define RANGE_OFFSET(a)		(((a) >> 16)&0xffff)
 #define RANGE_LENGTH(b)		((b)&0xffff)
 
 #define RF_UNIT(flags)		((flags)&0xff)
-#define RF_EXTERNAL		(1<<8)
+#define RF_EXTERNAL		(1 << 8)
 
 #define UNIT_volt		0
 #define UNIT_mA			1
