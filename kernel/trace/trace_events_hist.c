@@ -58,14 +58,14 @@ static u64 hist_field_dynstring(struct hist_field *hist_field, void *event)
 	int str_loc = str_item & 0xffff;
 	char *addr = (char *)(event + str_loc);
 
-	return (u64)addr;
+	return (u64)(unsigned long)addr;
 }
 
 static u64 hist_field_pstring(struct hist_field *hist_field, void *event)
 {
 	char **addr = (char **)(event + hist_field->field->offset);
 
-	return (u64)*addr;
+	return (u64)(unsigned long)*addr;
 }
 
 #define DEFINE_HIST_FIELD_FN(type)					\
@@ -518,8 +518,8 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 			goto out;
 		}
 
-		if (is_string_field(field)) /* should be last key field */
-			key_size = HIST_KEY_SIZE_MAX - key_offset;
+		if (is_string_field(field))
+			key_size = MAX_FILTER_STR_VAL;
 		else
 			key_size = field->size;
 	}
@@ -814,9 +814,34 @@ static void hist_trigger_elt_update(struct hist_trigger_data *hist_data,
 	}
 }
 
+static inline void add_to_key(char *compound_key, void *key,
+			      struct hist_field *key_field, void *rec)
+{
+	size_t size = key_field->size;
+
+	if (key_field->flags & HIST_FIELD_STRING) {
+		struct ftrace_event_field *field;
+
+		field = key_field->field;
+		if (field->filter_type == FILTER_DYN_STRING)
+			size = *(u32 *)(rec + field->offset) >> 16;
+		else if (field->filter_type == FILTER_PTR_STRING)
+			size = strlen(key);
+		else if (field->filter_type == FILTER_STATIC_STRING)
+			size = field->size;
+
+		/* ensure NULL-termination */
+		if (size > key_field->size - 1)
+			size = key_field->size - 1;
+	}
+
+	memcpy(compound_key + key_field->offset, key, size);
+}
+
 static void event_hist_trigger(struct event_trigger_data *data, void *rec)
 {
 	struct hist_trigger_data *hist_data = data->private_data;
+	bool use_compound_key = (hist_data->n_keys > 1);
 	unsigned long entries[HIST_STACKTRACE_DEPTH];
 	char compound_key[HIST_KEY_SIZE_MAX];
 	struct stack_trace stacktrace;
@@ -826,8 +851,7 @@ static void event_hist_trigger(struct event_trigger_data *data, void *rec)
 	void *key = NULL;
 	unsigned int i;
 
-	if (hist_data->n_keys > 1)
-		memset(compound_key, 0, hist_data->key_size);
+	memset(compound_key, 0, hist_data->key_size);
 
 	for_each_hist_key_field(i, hist_data) {
 		key_field = hist_data->fields[i];
@@ -844,35 +868,18 @@ static void event_hist_trigger(struct event_trigger_data *data, void *rec)
 			key = entries;
 		} else {
 			field_contents = key_field->fn(key_field, rec);
-			if (key_field->flags & HIST_FIELD_STRING)
+			if (key_field->flags & HIST_FIELD_STRING) {
 				key = (void *)(unsigned long)field_contents;
-			else
+				use_compound_key = true;
+			} else
 				key = (void *)&field_contents;
-
-			if (hist_data->n_keys > 1) {
-				/* ensure NULL-termination */
-				size_t size = key_field->size - 1;
-
-				if (key_field->flags & HIST_FIELD_STRING) {
-					struct ftrace_event_field *field;
-
-					field = key_field->field;
-					if (field->filter_type == FILTER_DYN_STRING)
-						size = *(u32 *)(rec + field->offset) >> 16;
-					else if (field->filter_type == FILTER_PTR_STRING)
-						size = strlen(key);
-
-					if (size > key_field->size - 1)
-						size = key_field->size - 1;
-				}
-
-				memcpy(compound_key + key_field->offset, key,
-				       size);
-			}
 		}
+
+		if (use_compound_key)
+			add_to_key(compound_key, key, key_field, rec);
 	}
 
-	if (hist_data->n_keys > 1)
+	if (use_compound_key)
 		key = compound_key;
 
 	elt = tracing_map_insert(hist_data->map, key);
