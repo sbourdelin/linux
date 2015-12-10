@@ -29,6 +29,7 @@
 #include <asm/mach_traps.h>
 #include <asm/nmi.h>
 #include <asm/x86_init.h>
+#include <asm/reboot.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/nmi.h>
@@ -357,7 +358,15 @@ static void default_do_nmi(struct pt_regs *regs)
 	}
 
 	/* Non-CPU-specific NMI: NMI sources can be processed on any CPU */
-	raw_spin_lock(&nmi_reason_lock);
+	/*
+	 * Another CPU may be processing panic routines while holding
+	 * nmi_reason_lock.  Check if the CPU issued the IPI for crash
+	 * dumping, and if so, call its callback directly.  If there is
+	 * no CPU preparing crash dump, we simply loop here without doing
+	 * special things.
+	 */
+	while (!raw_spin_trylock(&nmi_reason_lock))
+		run_crash_ipi_callback(regs);
 	reason = x86_platform.get_nmi_reason();
 
 	if (reason & NMI_REASON_MASK) {
