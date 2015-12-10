@@ -288,7 +288,7 @@ list_set_uadd(struct ip_set *set, void *value, const struct ip_set_ext *ext,
 			n = list_next_entry(next, list);
 	} else {
 		/* Insert before prev element */
-		if (prev->list.prev != &map->members)
+		if (!list_is_first(&prev->list, &map->members))
 			n = list_prev_entry(prev, list);
 	}
 	/* Can we replace a timed out entry? */
