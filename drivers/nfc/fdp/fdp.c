@@ -192,7 +192,7 @@ static int fdp_nci_send_patch(struct nci_dev *ndev, u8 conn_id, u8 type)
 	struct sk_buff *skb;
 	unsigned long len;
 	u8 max_size, payload_size;
-	int rc = 0;
+	int rc;
 
 	if ((type == NCI_PATCH_TYPE_OTP && !info->otp_patch) ||
 	    (type == NCI_PATCH_TYPE_RAM && !info->ram_patch))
@@ -203,11 +203,13 @@ static int fdp_nci_send_patch(struct nci_dev *ndev, u8 conn_id, u8 type)
 	else
 		fw = info->ram_patch;
 
-	max_size = nci_conn_max_data_pkt_payload_size(ndev, conn_id);
-	if (max_size <= 0)
+	rc = nci_conn_max_data_pkt_payload_size(ndev, conn_id);
+	if (rc <= 0)
 		return -EINVAL;
+	max_size = rc;
 
 	len = fw->size;
+	rc = 0;
 
 	fdp_nci_set_data_pkt_counter(ndev, fdp_nci_send_patch_cb,
 				     DIV_ROUND_UP(fw->size, max_size));
