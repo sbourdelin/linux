@@ -44,7 +44,7 @@ noop_former_request(struct request_queue *q, struct request *rq)
 {
 	struct noop_data *nd = q->elevator->elevator_data;
 
-	if (rq->queuelist.prev == &nd->queue)
+	if (list_is_first(&rq->queuelist, &nd->queue))
 		return NULL;
 	return list_prev_entry(rq, queuelist);
 }
@@ -54,7 +54,7 @@ noop_latter_request(struct request_queue *q, struct request *rq)
 {
 	struct noop_data *nd = q->elevator->elevator_data;
 
-	if (rq->queuelist.next == &nd->queue)
+	if (list_is_last(&rq->queuelist, &nd->queue))
 		return NULL;
 	return list_next_entry(rq, queuelist);
 }
