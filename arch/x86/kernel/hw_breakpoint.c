@@ -446,6 +446,14 @@ static int hw_breakpoint_handler(struct die_args *args)
 	for (i = 0; i < HBP_NUM; ++i) {
 		if (likely(!(dr6 & (DR_TRAP0 << i))))
 			continue;
+		/*
+		 * Set up resume flag to avoid breakpoint recursion when
+		 * returning back to origin in the event an int1
+		 * exception is triggered and no event handler
+		 * is present.
+		 */
+		if ((dr7 & (3 << ((i * 4) + 16))) == 0)
+			args->regs->flags |= X86_EFLAGS_RF;
 
 		/*
 		 * The counter may be concurrently released but that can only
