@@ -2,6 +2,7 @@
 #define _LINUX_SCHED_H
 
 #include <uapi/linux/sched.h>
+#include <uapi/linux/thread_local_abi.h>
 
 #include <linux/sched/prio.h>
 
@@ -1815,6 +1816,10 @@ struct task_struct {
 	unsigned long	task_state_change;
 #endif
 	int pagefault_disabled;
+#ifdef CONFIG_THREAD_LOCAL_ABI
+	size_t thread_local_abi_len;
+	struct thread_local_abi __user *thread_local_abi;
+#endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
@@ -3190,5 +3195,32 @@ static inline unsigned long rlimit_max(unsigned int limit)
 {
 	return task_rlimit_max(current, limit);
 }
+
+#ifdef CONFIG_THREAD_LOCAL_ABI
+void thread_local_abi_fork(struct task_struct *t);
+void thread_local_abi_execve(struct task_struct *t);
+void getcpu_cache_handle_notify_resume(struct task_struct *t);
+static inline bool getcpu_cache_active(struct task_struct *t)
+{
+	if (t->thread_local_abi_len < offsetof(struct thread_local_abi, cpu)
+			+ sizeof(t->thread_local_abi->cpu))
+		return false;
+	return true;
+}
+#else
+static inline void thread_local_abi_fork(struct task_struct *t)
+{
+}
+static inline void thread_local_abi_execve(struct task_struct *t)
+{
+}
+static inline void getcpu_cache_handle_notify_resume(struct task_struct *t)
+{
+}
+static inline bool getcpu_cache_active(struct task_struct *t)
+{
+	return false;
+}
+#endif
 
 #endif

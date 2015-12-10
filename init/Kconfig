@@ -1612,6 +1612,13 @@ config MEMBARRIER
 	  pairs of memory barriers into pairs consisting of membarrier() and a
 	  compiler barrier.
 
+config THREAD_LOCAL_ABI
+	bool "Enable thread-local ABI" if EXPERT
+	default y
+	help
+	  Enable the thread-local ABI system call. It provides a user-space
+	  cache for the current CPU number value.
+
 	  If unsure, say Y.
 
 config EMBEDDED

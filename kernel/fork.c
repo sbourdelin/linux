@@ -1612,6 +1612,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	cgroup_post_fork(p, cgrp_ss_priv);
 	if (clone_flags & CLONE_THREAD)
 		threadgroup_change_end(current);
+	if (!(clone_flags & CLONE_THREAD))
+		thread_local_abi_fork(p);
 	perf_event_fork(p);
 
 	trace_task_newtask(p, clone_flags);
