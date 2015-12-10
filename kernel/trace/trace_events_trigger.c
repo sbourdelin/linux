@@ -73,7 +73,7 @@ event_triggers_call(struct trace_event_file *file, void *rec)
 
 	list_for_each_entry_rcu(data, &file->triggers, list) {
 		if (!rec) {
-			data->ops->func(data);
+			data->ops->func(data, rec);
 			continue;
 		}
 		filter = rcu_dereference_sched(data->filter);
@@ -83,7 +83,7 @@ event_triggers_call(struct trace_event_file *file, void *rec)
 			tt |= data->cmd_ops->trigger_type;
 			continue;
 		}
-		data->ops->func(data);
+		data->ops->func(data, rec);
 	}
 	return tt;
 }
@@ -93,6 +93,7 @@ EXPORT_SYMBOL_GPL(event_triggers_call);
  * event_triggers_post_call - Call 'post_triggers' for a trace event
  * @file: The trace_event_file associated with the event
  * @tt: enum event_trigger_type containing a set bit for each trigger to invoke
+ * @rec: The trace entry for the event
  *
  * For each trigger associated with an event, invoke the trigger
  * function registered with the associated trigger command, if the
@@ -103,13 +104,14 @@ EXPORT_SYMBOL_GPL(event_triggers_call);
  */
 void
 event_triggers_post_call(struct trace_event_file *file,
-			 enum event_trigger_type tt)
+			 enum event_trigger_type tt,
+			 void *rec)
 {
 	struct event_trigger_data *data;
 
 	list_for_each_entry_rcu(data, &file->triggers, list) {
 		if (data->cmd_ops->trigger_type & tt)
-			data->ops->func(data);
+			data->ops->func(data, rec);
 	}
 }
 EXPORT_SYMBOL_GPL(event_triggers_post_call);
@@ -749,7 +751,7 @@ int set_trigger_filter(char *filter_str,
 }
 
 static void
-traceon_trigger(struct event_trigger_data *data)
+traceon_trigger(struct event_trigger_data *data, void *rec)
 {
 	if (tracing_is_on())
 		return;
@@ -758,7 +760,7 @@ traceon_trigger(struct event_trigger_data *data)
 }
 
 static void
-traceon_count_trigger(struct event_trigger_data *data)
+traceon_count_trigger(struct event_trigger_data *data, void *rec)
 {
 	if (tracing_is_on())
 		return;
@@ -773,7 +775,7 @@ traceon_count_trigger(struct event_trigger_data *data)
 }
 
 static void
-traceoff_trigger(struct event_trigger_data *data)
+traceoff_trigger(struct event_trigger_data *data, void *rec)
 {
 	if (!tracing_is_on())
 		return;
@@ -782,7 +784,7 @@ traceoff_trigger(struct event_trigger_data *data)
 }
 
 static void
-traceoff_count_trigger(struct event_trigger_data *data)
+traceoff_count_trigger(struct event_trigger_data *data, void *rec)
 {
 	if (!tracing_is_on())
 		return;
@@ -878,13 +880,13 @@ static struct event_command trigger_traceoff_cmd = {
 
 #ifdef CONFIG_TRACER_SNAPSHOT
 static void
-snapshot_trigger(struct event_trigger_data *data)
+snapshot_trigger(struct event_trigger_data *data, void *rec)
 {
 	tracing_snapshot();
 }
 
 static void
-snapshot_count_trigger(struct event_trigger_data *data)
+snapshot_count_trigger(struct event_trigger_data *data, void *rec)
 {
 	if (!data->count)
 		return;
@@ -892,7 +894,7 @@ snapshot_count_trigger(struct event_trigger_data *data)
 	if (data->count != -1)
 		(data->count)--;
 
-	snapshot_trigger(data);
+	snapshot_trigger(data, rec);
 }
 
 static int
@@ -971,13 +973,13 @@ static __init int register_trigger_snapshot_cmd(void) { return 0; }
 #define STACK_SKIP 3
 
 static void
-stacktrace_trigger(struct event_trigger_data *data)
+stacktrace_trigger(struct event_trigger_data *data, void *rec)
 {
 	trace_dump_stack(STACK_SKIP);
 }
 
 static void
-stacktrace_count_trigger(struct event_trigger_data *data)
+stacktrace_count_trigger(struct event_trigger_data *data, void *rec)
 {
 	if (!data->count)
 		return;
@@ -985,7 +987,7 @@ stacktrace_count_trigger(struct event_trigger_data *data)
 	if (data->count != -1)
 		(data->count)--;
 
-	stacktrace_trigger(data);
+	stacktrace_trigger(data, rec);
 }
 
 static int
@@ -1056,7 +1058,7 @@ struct enable_trigger_data {
 };
 
 static void
-event_enable_trigger(struct event_trigger_data *data)
+event_enable_trigger(struct event_trigger_data *data, void *rec)
 {
 	struct enable_trigger_data *enable_data = data->private_data;
 
@@ -1067,7 +1069,7 @@ event_enable_trigger(struct event_trigger_data *data)
 }
 
 static void
-event_enable_count_trigger(struct event_trigger_data *data)
+event_enable_count_trigger(struct event_trigger_data *data, void *rec)
 {
 	struct enable_trigger_data *enable_data = data->private_data;
 
@@ -1081,7 +1083,7 @@ event_enable_count_trigger(struct event_trigger_data *data)
 	if (data->count != -1)
 		(data->count)--;
 
-	event_enable_trigger(data);
+	event_enable_trigger(data, rec);
 }
 
 static int
