@@ -1193,6 +1193,9 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 	case NETDEV_CHANGEMTU:
 		rt_cache_flush(net);
 		break;
+	case NETDEV_VRF_CHANGE:
+		fib_disable_ip(dev, NETDEV_DOWN, true);
+		break;
 	}
 	return NOTIFY_DONE;
 }

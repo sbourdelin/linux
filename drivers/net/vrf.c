@@ -597,12 +597,17 @@ static void cycle_netdev(struct net_device *dev)
 	unsigned int flags = dev->flags;
 	int ret;
 
-	if (!netif_running(dev))
+	if (!netif_running(dev)) {
+		call_netdevice_notifiers(NETDEV_VRF_CHANGE, dev);
 		return;
+	}
 
 	ret = dev_change_flags(dev, flags & ~IFF_UP);
-	if (ret >= 0)
+	if (ret >= 0) {
+		call_netdevice_notifiers(NETDEV_VRF_CHANGE, dev);
+
 		ret = dev_change_flags(dev, flags);
+	}
 
 	if (ret < 0) {
 		netdev_err(dev,
