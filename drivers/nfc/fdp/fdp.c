@@ -368,11 +368,10 @@ static int fdp_nci_patch_otp(struct nci_dev *ndev)
 		goto out;
 
 	/* Patch data connection creation */
-	conn_id = fdp_nci_create_conn(ndev);
-	if (conn_id < 0) {
-		r = conn_id;
+	r = fdp_nci_create_conn(ndev);
+	if (r < 0)
 		goto out;
-	}
+	conn_id = r;
 
 	/* Send the patch over the data connection */
 	r = fdp_nci_send_patch(ndev, conn_id, NCI_PATCH_TYPE_OTP);
@@ -439,11 +438,10 @@ static int fdp_nci_patch_ram(struct nci_dev *ndev)
 		goto out;
 
 	/* Patch data connection creation */
-	conn_id = fdp_nci_create_conn(ndev);
-	if (conn_id < 0) {
-		r = conn_id;
-		goto out;
-	}
+	r = fdp_nci_create_conn(ndev);
+	if (r < 0)
+		got out;
+	conn_id = r;
 
 	/* Send the patch over the data connection */
 	r = fdp_nci_send_patch(ndev, conn_id, NCI_PATCH_TYPE_RAM);
