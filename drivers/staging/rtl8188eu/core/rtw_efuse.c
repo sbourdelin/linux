@@ -220,6 +220,7 @@ static void efuse_read_phymap_from_txpktbuf(
 	struct adapter  *adapter,
 	int bcnhead,	/* beacon head, where FW store len(2-byte) and efuse physical map. */
 	u8 *content,	/* buffer to store efuse physical map */
+
 	u16 *size	/* for efuse content: the max byte to read. will update to byte read */
 	)
 {
@@ -260,6 +261,7 @@ static void efuse_read_phymap_from_txpktbuf(
 			u8 lenc[2];
 			u16 lenbak, aaabak;
 			u16 aaa;
+
 			lenc[0] = usb_read8(adapter, REG_PKTBUF_DBG_DATA_L);
 			lenc[1] = usb_read8(adapter, REG_PKTBUF_DBG_DATA_L+1);
 
@@ -331,6 +333,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_EFUSE_MAX_SECTION:
 		{
 			u8 *pMax_section;
+
 			pMax_section = pOut;
 			*pMax_section = EFUSE_MAX_SECTION_88E;
 		}
@@ -338,6 +341,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_EFUSE_REAL_CONTENT_LEN:
 		{
 			u16 *pu2Tmp;
+
 			pu2Tmp = pOut;
 			*pu2Tmp = EFUSE_REAL_CONTENT_LEN_88E;
 		}
@@ -345,6 +349,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_EFUSE_CONTENT_LEN_BANK:
 		{
 			u16 *pu2Tmp;
+
 			pu2Tmp = pOut;
 			*pu2Tmp = EFUSE_REAL_CONTENT_LEN_88E;
 		}
@@ -352,6 +357,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_AVAILABLE_EFUSE_BYTES_BANK:
 		{
 			u16 *pu2Tmp;
+
 			pu2Tmp = pOut;
 			*pu2Tmp = (u16)(EFUSE_REAL_CONTENT_LEN_88E-EFUSE_OOB_PROTECT_BYTES_88E);
 		}
@@ -359,6 +365,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_AVAILABLE_EFUSE_BYTES_TOTAL:
 		{
 			u16 *pu2Tmp;
+
 			pu2Tmp = pOut;
 			*pu2Tmp = (u16)(EFUSE_REAL_CONTENT_LEN_88E-EFUSE_OOB_PROTECT_BYTES_88E);
 		}
@@ -366,6 +373,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_EFUSE_MAP_LEN:
 		{
 			u16 *pu2Tmp;
+
 			pu2Tmp = pOut;
 			*pu2Tmp = (u16)EFUSE_MAP_LEN_88E;
 		}
@@ -373,6 +381,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	case TYPE_EFUSE_PROTECT_BYTES_BANK:
 		{
 			u8 *pu1Tmp;
+
 			pu1Tmp = pOut;
 			*pu1Tmp = (u8)(EFUSE_OOB_PROTECT_BYTES_88E);
 		}
@@ -380,6 +389,7 @@ void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, v
 	default:
 		{
 			u8 *pu1Tmp;
+
 			pu1Tmp = pOut;
 			*pu1Tmp = 0;
 		}
@@ -642,6 +652,7 @@ static bool hal_EfusePgPacketWrite2ByteHeader(struct adapter *pAdapter, u8 efuse
 				continue;
 			} else if (pg_header != tmp_header) {	/* offset PG fail */
 				struct pgpkt	fixPkt;
+
 				fixPkt.offset = ((pg_header_temp & 0xE0) >> 5) | ((tmp_header & 0xF0) >> 1);
 				fixPkt.word_en = tmp_header & 0x0F;
 				fixPkt.word_cnts = Efuse_CalculateWordCnts(fixPkt.word_en);
@@ -684,6 +695,7 @@ static bool hal_EfusePgPacketWrite1ByteHeader(struct adapter *pAdapter, u8 efuse
 		bRet = true;
 	} else {
 		struct pgpkt	fixPkt;
+
 		fixPkt.offset = (tmp_header>>4) & 0x0F;
 		fixPkt.word_en = tmp_header & 0x0F;
 		fixPkt.word_cnts = Efuse_CalculateWordCnts(fixPkt.word_en);
@@ -898,6 +910,7 @@ bool Efuse_PgPacketWrite(struct adapter *pAdapter, u8 offset, u8 word_en, u8 *pD
 u8 Efuse_CalculateWordCnts(u8 word_en)
 {
 	u8 word_cnts = 0;
+
 	if (!(word_en & BIT(0)))
 		word_cnts++; /*  0 : write enable */
 	if (!(word_en & BIT(1)))
