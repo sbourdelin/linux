@@ -521,7 +521,7 @@ out:
 	return ret;
 }
 
-static int rcar_reg_slave(struct i2c_client *slave)
+static int __maybe_unused rcar_reg_slave(struct i2c_client *slave)
 {
 	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
 
@@ -542,7 +542,7 @@ static int rcar_reg_slave(struct i2c_client *slave)
 	return 0;
 }
 
-static int rcar_unreg_slave(struct i2c_client *slave)
+static int __maybe_unused rcar_unreg_slave(struct i2c_client *slave)
 {
 	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
 
@@ -568,8 +568,10 @@ static u32 rcar_i2c_func(struct i2c_adapter *adap)
 static const struct i2c_algorithm rcar_i2c_algo = {
 	.master_xfer	= rcar_i2c_master_xfer,
 	.functionality	= rcar_i2c_func,
+#ifdef CONFIG_I2C_SLAVE
 	.reg_slave	= rcar_reg_slave,
 	.unreg_slave	= rcar_unreg_slave,
+#endif
 };
 
 static const struct of_device_id rcar_i2c_dt_ids[] = {

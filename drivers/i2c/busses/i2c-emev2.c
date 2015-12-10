@@ -316,7 +316,7 @@ static u32 em_i2c_func(struct i2c_adapter *adap)
 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_SLAVE;
 }
 
-static int em_i2c_reg_slave(struct i2c_client *slave)
+static int __maybe_unused em_i2c_reg_slave(struct i2c_client *slave)
 {
 	struct em_i2c_device *priv = i2c_get_adapdata(slave->adapter);
 
@@ -334,7 +334,7 @@ static int em_i2c_reg_slave(struct i2c_client *slave)
 	return 0;
 }
 
-static int em_i2c_unreg_slave(struct i2c_client *slave)
+static int __maybe_unused em_i2c_unreg_slave(struct i2c_client *slave)
 {
 	struct em_i2c_device *priv = i2c_get_adapdata(slave->adapter);
 
@@ -350,8 +350,10 @@ static int em_i2c_unreg_slave(struct i2c_client *slave)
 static struct i2c_algorithm em_i2c_algo = {
 	.master_xfer = em_i2c_xfer,
 	.functionality = em_i2c_func,
+#ifdef CONFIG_I2C_SLAVE
 	.reg_slave      = em_i2c_reg_slave,
 	.unreg_slave    = em_i2c_unreg_slave,
+#endif
 };
 
 static int em_i2c_probe(struct platform_device *pdev)
