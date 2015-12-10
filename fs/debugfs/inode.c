@@ -193,9 +193,23 @@ static struct vfsmount *debugfs_automount(struct path *path)
 	return p->func(p->data);
 }
 
+static void debugfs_release(struct dentry *dentry)
+{
+	struct completion *comp;
+
+	/* Paired with __debugfs_remove */
+	smp_rmb();
+	comp = dentry->d_fsdata;
+	if (likely(comp)) {
+		dentry->d_fsdata = NULL;
+		complete(comp);
+	}
+}
+
 static const struct dentry_operations debugfs_dops = {
 	.d_delete = always_delete_dentry,
 	.d_automount = debugfs_automount,
+	.d_release = debugfs_release,
 };
 
 static int debug_fill_super(struct super_block *sb, void *data, int silent)
@@ -542,14 +556,24 @@ static int __debugfs_remove(struct dentry *dentry, struct dentry *parent)
 	int ret = 0;
 
 	if (simple_positive(dentry)) {
+		struct completion comp;
+
+		init_completion(&comp);
 		dget(dentry);
 		if (d_is_dir(dentry))
 			ret = simple_rmdir(d_inode(parent), dentry);
 		else
 			simple_unlink(d_inode(parent), dentry);
-		if (!ret)
+		if (likely(!ret)) {
 			d_delete(dentry);
+			dentry->d_fsdata = &comp;
+			/* Paired with debugfs_release callback */
+			smp_wmb();
+		}
 		dput(dentry);
+
+		if (likely(!ret))
+			wait_for_completion(&comp);
 	}
 	return ret;
 }
