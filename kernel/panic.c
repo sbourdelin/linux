@@ -61,6 +61,16 @@ void __weak panic_smp_self_stop(void)
 		cpu_relax();
 }
 
+/*
+ * Stop ourselves in NMI context if another cpu has already panicked.
+ * Architecture code may override this to prepare for crash dumping
+ * (e.g. save register information).
+ */
+void __weak nmi_panic_self_stop(struct pt_regs *regs)
+{
+	panic_smp_self_stop();
+}
+
 atomic_t panic_cpu = ATOMIC_INIT(PANIC_CPU_INVALID);
 
 /**
