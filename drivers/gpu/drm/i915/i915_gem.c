@@ -937,7 +937,6 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 	i915_gem_object_pin_pages(obj);
 
 	offset = args->offset;
-	obj->dirty = 1;
 
 	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents,
 			 offset >> PAGE_SHIFT) {
@@ -1073,6 +1072,9 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		ret = -EINVAL;
 		goto out;
 	}
+
+	/* Object backing store will be out of date hereafter */
+	obj->dirty = 1;
 
 	trace_i915_gem_object_pwrite(obj, args->offset, args->size);
 
