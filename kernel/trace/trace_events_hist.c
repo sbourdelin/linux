@@ -81,6 +81,7 @@ enum hist_field_flags {
 	HIST_FIELD_HITCOUNT	= 1,
 	HIST_FIELD_KEY		= 2,
 	HIST_FIELD_STRING	= 4,
+	HIST_FIELD_HEX		= 8,
 };
 
 struct hist_trigger_attrs {
@@ -299,9 +300,20 @@ static int create_val_field(struct hist_trigger_data *hist_data,
 {
 	struct ftrace_event_field *field = NULL;
 	unsigned long flags = 0;
+	char *field_name;
 	int ret = 0;
 
-	field = trace_find_event_field(file->event_call, field_str);
+	field_name = strsep(&field_str, ".");
+	if (field_str) {
+		if (!strcmp(field_str, "hex"))
+			flags |= HIST_FIELD_HEX;
+		else {
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+
+	field = trace_find_event_field(file->event_call, field_name);
 	if (!field) {
 		ret = -EINVAL;
 		goto out;
@@ -364,11 +376,22 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 	struct ftrace_event_field *field = NULL;
 	unsigned long flags = 0;
 	unsigned int key_size;
+	char *field_name;
 	int ret = 0;
 
 	flags |= HIST_FIELD_KEY;
 
-	field = trace_find_event_field(file->event_call, field_str);
+	field_name = strsep(&field_str, ".");
+	if (field_str) {
+		if (!strcmp(field_str, "hex"))
+			flags |= HIST_FIELD_HEX;
+		else {
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+
+	field = trace_find_event_field(file->event_call, field_name);
 	if (!field) {
 		ret = -EINVAL;
 		goto out;
@@ -698,7 +721,11 @@ hist_trigger_entry_print(struct seq_file *m,
 		if (i > hist_data->n_vals)
 			seq_puts(m, ", ");
 
-		if (key_field->flags & HIST_FIELD_STRING) {
+		if (key_field->flags & HIST_FIELD_HEX) {
+			uval = *(u64 *)(key + key_field->offset);
+			seq_printf(m, "%s: %llx",
+				   key_field->field->name, uval);
+		} else if (key_field->flags & HIST_FIELD_STRING) {
 			seq_printf(m, "%s: %-50s", key_field->field->name,
 				   (char *)(key + key_field->offset));
 		} else {
@@ -714,9 +741,15 @@ hist_trigger_entry_print(struct seq_file *m,
 		   tracing_map_read_sum(elt, HITCOUNT_IDX));
 
 	for (i = 1; i < hist_data->n_vals; i++) {
-		seq_printf(m, "  %s: %10llu",
-			   hist_data->fields[i]->field->name,
-			   tracing_map_read_sum(elt, i));
+		if (hist_data->fields[i]->flags & HIST_FIELD_HEX) {
+			seq_printf(m, "  %s: %10llx",
+				   hist_data->fields[i]->field->name,
+				   tracing_map_read_sum(elt, i));
+		} else {
+			seq_printf(m, "  %s: %10llu",
+				   hist_data->fields[i]->field->name,
+				   tracing_map_read_sum(elt, i));
+		}
 	}
 
 	seq_puts(m, "\n");
@@ -801,9 +834,25 @@ const struct file_operations event_hist_fops = {
 	.release = single_release,
 };
 
+static const char *get_hist_field_flags(struct hist_field *hist_field)
+{
+	const char *flags_str = NULL;
+
+	if (hist_field->flags & HIST_FIELD_HEX)
+		flags_str = "hex";
+
+	return flags_str;
+}
+
 static void hist_field_print(struct seq_file *m, struct hist_field *hist_field)
 {
 	seq_printf(m, "%s", hist_field->field->name);
+	if (hist_field->flags) {
+		const char *flags_str = get_hist_field_flags(hist_field);
+
+		if (flags_str)
+			seq_printf(m, ".%s", flags_str);
+	}
 }
 
 static int event_hist_trigger_print(struct seq_file *m,
