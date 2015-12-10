@@ -167,6 +167,7 @@ enum {
 /* for PCM creation */
 struct hda_pcm {
 	char *name;
+	bool in_use;
 	struct hda_pcm_stream stream[2];
 	unsigned int pcm_type;	/* HDA_PCM_TYPE_XXX */
 	int device;		/* device number to assign */
