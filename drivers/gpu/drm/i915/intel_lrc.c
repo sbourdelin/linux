@@ -1030,7 +1030,7 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	if (ret)
 		goto unpin_ctx_obj;
 
-	ctx_obj->dirty = true;
+	ctx_obj->dirty = 1;
 
 	/* Invalidate GuC TLB. */
 	if (i915.enable_guc_submission)

@@ -946,6 +946,9 @@ static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,
 
 	memcpy(dst, src, batch_len);
 
+	/* After writing on the dest_obj, its backing store is out-of-date */
+	dest_obj->dirty = 1;
+
 unmap_src:
 	vunmap(src_base);
 unpin_src:

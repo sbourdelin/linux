@@ -208,6 +208,9 @@ static int i915_gem_begin_cpu_access(struct dma_buf *dma_buf, size_t start, size
 		return ret;
 
 	ret = i915_gem_object_set_to_cpu_domain(obj, write);
+	if (write)
+		obj->dirty = 1;
+
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
