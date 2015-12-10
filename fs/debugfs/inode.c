@@ -170,6 +170,8 @@ static void debugfs_evict_inode(struct inode *inode)
 	clear_inode(inode);
 	if (S_ISLNK(inode->i_mode))
 		kfree(inode->i_link);
+	else if (S_ISDIR(inode->i_mode) && IS_AUTOMOUNT(inode))
+		kfree(inode->i_private);
 }
 
 static const struct super_operations debugfs_super_operations = {
@@ -179,11 +181,16 @@ static const struct super_operations debugfs_super_operations = {
 	.evict_inode	= debugfs_evict_inode,
 };
 
+struct automount_priv {
+	struct vfsmount *(*func)(void *);
+	void *data;
+};
+
 static struct vfsmount *debugfs_automount(struct path *path)
 {
-	struct vfsmount *(*f)(void *);
-	f = (struct vfsmount *(*)(void *))path->dentry->d_fsdata;
-	return f(d_inode(path->dentry)->i_private);
+	struct automount_priv *p = d_inode(path->dentry)->i_private;
+
+	return p->func(p->data);
 }
 
 static const struct dentry_operations debugfs_dops = {
@@ -448,19 +455,28 @@ struct dentry *debugfs_create_automount(const char *name,
 					void *data)
 {
 	struct dentry *dentry = start_creating(name, parent);
+	struct automount_priv *p;
 	struct inode *inode;
 
 	if (IS_ERR(dentry))
 		return NULL;
 
-	inode = debugfs_get_inode(dentry->d_sb);
-	if (unlikely(!inode))
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (unlikely(!p))
 		return failed_creating(dentry);
+
+	p->func = f;
+	p->data = data;
+
+	inode = debugfs_get_inode(dentry->d_sb);
+	if (unlikely(!inode)) {
+		kfree(p);
+		return failed_creating(dentry);
+	}
 
 	inode->i_mode = S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO;
 	inode->i_flags |= S_AUTOMOUNT;
-	inode->i_private = data;
-	dentry->d_fsdata = (void *)f;
+	inode->i_private = p;
 	/* directory inodes start off with i_nlink == 2 (for "." entry) */
 	inc_nlink(inode);
 	d_instantiate(dentry, inode);
