@@ -122,6 +122,39 @@ int xhci_halt(struct xhci_hcd *xhci)
 	return ret;
 }
 
+static int xhci_fake_doorbell(struct xhci_hcd *xhci, int slot_id)
+{
+	u32 temp;
+
+	/* alloc a virt device for slot */
+	if (!xhci_alloc_virt_device(xhci, slot_id, NULL, GFP_NOIO)) {
+		xhci_warn(xhci, "Could not allocate xHCI USB device data structures\n");
+		return -ENOMEM;
+	}
+
+	/* ring fake doorbell for slot_id ep 0 */
+	xhci_ring_ep_doorbell(xhci, slot_id, 0, 0);
+	usleep_range(1000, 1500);
+
+	/* read the status register to check if HSE is set or not? */
+	temp = readl(&xhci->op_regs->status);
+
+	/* clear HSE if set */
+	if (temp & STS_FATAL) {
+		xhci_dbg(xhci, "HSE problem detected, status: 0x%x\n", temp);
+		temp &= ~0x1fff;
+		temp |= STS_FATAL;
+		writel(temp, &xhci->op_regs->status);
+		usleep_range(1000, 1500);
+		readl(&xhci->op_regs->status);
+	}
+
+	/* Free virt device */
+	xhci_free_virt_device(xhci, slot_id);
+
+	return 0;
+}
+
 /*
  * Set the run bit and wait for the host to be running.
  */
@@ -568,10 +601,26 @@ int xhci_init(struct usb_hcd *hcd)
 
 static int xhci_run_finished(struct xhci_hcd *xhci)
 {
-	if (xhci_start(xhci)) {
-		xhci_halt(xhci);
-		return -ENODEV;
+	int err;
+
+	err = xhci_start(xhci);
+	if (err) {
+		err = -ENODEV;
+		goto out_err;
 	}
+
+	if (xhci->quirks & XHCI_FAKE_DOORBELL) {
+		err = xhci_fake_doorbell(xhci, 1);
+		if (err)
+			goto out_err;
+
+		err = xhci_start(xhci);
+		if (err) {
+			err = -ENODEV;
+			goto out_err;
+		}
+	}
+
 	xhci->shared_hcd->state = HC_STATE_RUNNING;
 	xhci->cmd_ring_state = CMD_RING_STATE_RUNNING;
 
@@ -581,6 +630,10 @@ static int xhci_run_finished(struct xhci_hcd *xhci)
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"Finished xhci_run for USB3 roothub");
 	return 0;
+
+out_err:
+	xhci_halt(xhci);
+	return err;
 }
 
 /*

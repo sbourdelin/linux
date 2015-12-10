@@ -53,6 +53,10 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
 			(pdata && pdata->usb3_lpm_capable))
 		xhci->quirks |= XHCI_LPM_SUPPORT;
+
+	if ((node && of_property_read_bool(node, "usb3-fake-doorbell")) ||
+			(pdata && pdata->usb3_fake_doorbell))
+		xhci->quirks |= XHCI_FAKE_DOORBELL;
 }
 
 /* called during probe() after chip reset completes */

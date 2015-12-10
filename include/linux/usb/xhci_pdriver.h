@@ -18,10 +18,13 @@
  *
  * @usb3_lpm_capable:	determines if this xhci platform supports USB3
  *			LPM capability
+ * @usb3_fake_doorbell: determines is the controller needs a fake doorbell
+ *			to detect the device
  *
  */
 struct usb_xhci_pdata {
 	unsigned	usb3_lpm_capable:1;
+	unsigned	usb3_fake_doorbell:1;
 };
 
 #endif /* __USB_CORE_XHCI_PDRIVER_H */
