@@ -225,7 +225,12 @@ static void hsw_psr_enable_sink(struct intel_dp *intel_dp)
 		   (aux_clock_divider << DP_AUX_CH_CTL_BIT_CLOCK_2X_SHIFT));
 	}
 
-	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, DP_PSR_ENABLE);
+	if (dev_priv->psr.link_standby)
+		drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG,
+				   DP_PSR_ENABLE | DP_PSR_MAIN_LINK_ACTIVE);
+	else
+		drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG,
+				   DP_PSR_ENABLE);
 }
 
 static void vlv_psr_enable_source(struct intel_dp *intel_dp)
@@ -279,6 +284,9 @@ static void hsw_psr_enable_source(struct intel_dp *intel_dp)
 
 	if (IS_HASWELL(dev))
 		val |= EDP_PSR_MIN_LINK_ENTRY_TIME_8_LINES;
+
+	if (dev_priv->psr.link_standby)
+		val |= EDP_PSR_LINK_STANDBY;
 
 	I915_WRITE(EDP_PSR_CTL, val |
 		   max_sleep_time << EDP_PSR_MAX_SLEEP_TIME_SHIFT |
@@ -762,6 +770,9 @@ void intel_psr_init(struct drm_device *dev)
 
 	dev_priv->psr_mmio_base = IS_HASWELL(dev_priv) ?
 		HSW_EDP_PSR_BASE : BDW_EDP_PSR_BASE;
+
+	if (i915.enable_psr == -1)
+		dev_priv->psr.link_standby = true;
 
 	INIT_DELAYED_WORK(&dev_priv->psr.work, intel_psr_work);
 	mutex_init(&dev_priv->psr.lock);
