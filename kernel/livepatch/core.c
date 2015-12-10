@@ -479,7 +479,7 @@ static int __klp_enable_patch(struct klp_patch *patch)
 		return -EINVAL;
 
 	/* enforce stacking: only the first disabled patch can be enabled */
-	if (patch->list.prev != &klp_patches &&
+	if (!list_is_first(&patch->list, &klp_patches) &&
 	    list_prev_entry(patch, list)->state == KLP_DISABLED)
 		return -EBUSY;
 
