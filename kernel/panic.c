@@ -138,7 +138,7 @@ void panic(const char *fmt, ...)
 	 * the "crash_kexec_post_notifiers" option to the kernel.
 	 */
 	if (!crash_kexec_post_notifiers)
-		crash_kexec(NULL);
+		__crash_kexec(NULL); /* bypass panic_cpu check */
 
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which
@@ -163,7 +163,7 @@ void panic(const char *fmt, ...)
 	 * more unstable, it can increase risks of the kdump failure too.
 	 */
 	if (crash_kexec_post_notifiers)
-		crash_kexec(NULL);
+		__crash_kexec(NULL); /* bypass panic_cpu check */
 
 	bust_spinlocks(0);
 
