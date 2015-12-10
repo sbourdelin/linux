@@ -352,7 +352,7 @@ __init int register_event_command(struct event_command *cmd)
  * Currently we only unregister event commands from __init, so mark
  * this __init too.
  */
-static __init int unregister_event_command(struct event_command *cmd)
+__init int unregister_event_command(struct event_command *cmd)
 {
 	struct event_command *p, *n;
 	int ret = -ENODEV;
@@ -1066,15 +1066,6 @@ static __init void unregister_trigger_traceon_traceoff_cmds(void)
 	unregister_event_command(&trigger_traceoff_cmd);
 }
 
-/* Avoid typos */
-#define ENABLE_EVENT_STR	"enable_event"
-#define DISABLE_EVENT_STR	"disable_event"
-
-struct enable_trigger_data {
-	struct trace_event_file		*file;
-	bool				enable;
-};
-
 static void
 event_enable_trigger(struct event_trigger_data *data, void *rec)
 {
@@ -1104,14 +1095,16 @@ event_enable_count_trigger(struct event_trigger_data *data, void *rec)
 	event_enable_trigger(data, rec);
 }
 
-static int
-event_enable_trigger_print(struct seq_file *m, struct event_trigger_ops *ops,
-			   struct event_trigger_data *data)
+int event_enable_trigger_print(struct seq_file *m,
+			       struct event_trigger_ops *ops,
+			       struct event_trigger_data *data)
 {
 	struct enable_trigger_data *enable_data = data->private_data;
 
 	seq_printf(m, "%s:%s:%s",
-		   enable_data->enable ? ENABLE_EVENT_STR : DISABLE_EVENT_STR,
+		   enable_data->hist ?
+		   (enable_data->enable ? ENABLE_HIST_STR : DISABLE_HIST_STR) :
+		   (enable_data->enable ? ENABLE_EVENT_STR : DISABLE_EVENT_STR),
 		   enable_data->file->event_call->class->system,
 		   trace_event_name(enable_data->file->event_call));
 
@@ -1128,9 +1121,8 @@ event_enable_trigger_print(struct seq_file *m, struct event_trigger_ops *ops,
 	return 0;
 }
 
-static void
-event_enable_trigger_free(struct event_trigger_ops *ops,
-			  struct event_trigger_data *data)
+void event_enable_trigger_free(struct event_trigger_ops *ops,
+			       struct event_trigger_data *data)
 {
 	struct enable_trigger_data *enable_data = data->private_data;
 
@@ -1175,10 +1167,9 @@ static struct event_trigger_ops event_disable_count_trigger_ops = {
 	.free			= event_enable_trigger_free,
 };
 
-static int
-event_enable_trigger_func(struct event_command *cmd_ops,
-			  struct trace_event_file *file,
-			  char *glob, char *cmd, char *param)
+int event_enable_trigger_func(struct event_command *cmd_ops,
+			      struct trace_event_file *file,
+			      char *glob, char *cmd, char *param)
 {
 	struct trace_event_file *event_enable_file;
 	struct enable_trigger_data *enable_data;
@@ -1187,6 +1178,7 @@ event_enable_trigger_func(struct event_command *cmd_ops,
 	struct trace_array *tr = file->tr;
 	const char *system;
 	const char *event;
+	bool hist = false;
 	char *trigger;
 	char *number;
 	bool enable;
@@ -1211,8 +1203,15 @@ event_enable_trigger_func(struct event_command *cmd_ops,
 	if (!event_enable_file)
 		goto out;
 
-	enable = strcmp(cmd, ENABLE_EVENT_STR) == 0;
+#ifdef CONFIG_HIST_TRIGGERS
+	hist = ((strcmp(cmd, ENABLE_HIST_STR) == 0) ||
+		(strcmp(cmd, DISABLE_HIST_STR) == 0));
 
+	enable = ((strcmp(cmd, ENABLE_EVENT_STR) == 0) ||
+		  (strcmp(cmd, ENABLE_HIST_STR) == 0));
+#else
+	enable = strcmp(cmd, ENABLE_EVENT_STR) == 0;
+#endif
 	trigger_ops = cmd_ops->get_trigger_ops(cmd, trigger);
 
 	ret = -ENOMEM;
@@ -1232,6 +1231,7 @@ event_enable_trigger_func(struct event_command *cmd_ops,
 	INIT_LIST_HEAD(&trigger_data->list);
 	RCU_INIT_POINTER(trigger_data->filter, NULL);
 
+	enable_data->hist = hist;
 	enable_data->enable = enable;
 	enable_data->file = event_enable_file;
 	trigger_data->private_data = enable_data;
@@ -1309,10 +1309,10 @@ event_enable_trigger_func(struct event_command *cmd_ops,
 	goto out;
 }
 
-static int event_enable_register_trigger(char *glob,
-					 struct event_trigger_ops *ops,
-					 struct event_trigger_data *data,
-					 struct trace_event_file *file)
+int event_enable_register_trigger(char *glob,
+				  struct event_trigger_ops *ops,
+				  struct event_trigger_data *data,
+				  struct trace_event_file *file)
 {
 	struct enable_trigger_data *enable_data = data->private_data;
 	struct enable_trigger_data *test_enable_data;
@@ -1322,6 +1322,8 @@ static int event_enable_register_trigger(char *glob,
 	list_for_each_entry_rcu(test, &file->triggers, list) {
 		test_enable_data = test->private_data;
 		if (test_enable_data &&
+		    (test->cmd_ops->trigger_type ==
+		     data->cmd_ops->trigger_type) &&
 		    (test_enable_data->file == enable_data->file)) {
 			ret = -EEXIST;
 			goto out;
@@ -1346,10 +1348,10 @@ out:
 	return ret;
 }
 
-static void event_enable_unregister_trigger(char *glob,
-					    struct event_trigger_ops *ops,
-					    struct event_trigger_data *test,
-					    struct trace_event_file *file)
+void event_enable_unregister_trigger(char *glob,
+				     struct event_trigger_ops *ops,
+				     struct event_trigger_data *test,
+				     struct trace_event_file *file)
 {
 	struct enable_trigger_data *test_enable_data = test->private_data;
 	struct enable_trigger_data *enable_data;
@@ -1359,6 +1361,8 @@ static void event_enable_unregister_trigger(char *glob,
 	list_for_each_entry_rcu(data, &file->triggers, list) {
 		enable_data = data->private_data;
 		if (enable_data &&
+		    (data->cmd_ops->trigger_type ==
+		     test->cmd_ops->trigger_type) &&
 		    (enable_data->file == test_enable_data->file)) {
 			unregistered = true;
 			list_del_rcu(&data->list);
@@ -1378,8 +1382,12 @@ event_enable_get_trigger_ops(char *cmd, char *param)
 	struct event_trigger_ops *ops;
 	bool enable;
 
+#ifdef CONFIG_HIST_TRIGGERS
+	enable = ((strcmp(cmd, ENABLE_EVENT_STR) == 0) ||
+		  (strcmp(cmd, ENABLE_HIST_STR) == 0));
+#else
 	enable = strcmp(cmd, ENABLE_EVENT_STR) == 0;
-
+#endif
 	if (enable)
 		ops = param ? &event_enable_count_trigger_ops :
 			&event_enable_trigger_ops;
@@ -1450,6 +1458,7 @@ __init int register_trigger_cmds(void)
 	register_trigger_snapshot_cmd();
 	register_trigger_stacktrace_cmd();
 	register_trigger_enable_disable_cmds();
+	register_trigger_hist_enable_disable_cmds();
 	register_trigger_hist_cmd();
 
 	return 0;
