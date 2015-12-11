@@ -416,8 +416,7 @@ intel_read_status_page(struct intel_engine_cs *ring,
 		       int reg)
 {
 	/* Ensure that the compiler doesn't optimize away the load. */
-	barrier();
-	return ring->status_page.page_addr[reg];
+	return READ_ONCE(ring->status_page.page_addr[reg]);
 }
 
 static inline void
