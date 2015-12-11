@@ -1247,7 +1247,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
 	unsigned int xres = 0, yres = 0, bpp = 32, refresh = 0;
 	bool yres_specified = false, cvt = false, rb = false;
 	bool interlace = false, margins = false, was_digit = false;
-	int i, err;
+	int i;
 	enum drm_connector_force force = DRM_FORCE_UNSPECIFIED;
 
 #ifdef CONFIG_FB
@@ -1267,9 +1267,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
 		case '@':
 			if (!refresh_specified && !bpp_specified &&
 			    !yres_specified && !cvt && !rb && was_digit) {
-				err = kstrtouint(&name[i + 1], 10, &refresh);
-				if (err)
-					return false;
+				refresh = simple_strtol(&name[i+1], NULL, 10);
 				refresh_specified = true;
 				was_digit = false;
 			} else
@@ -1278,9 +1276,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
 		case '-':
 			if (!bpp_specified && !yres_specified && !cvt &&
 			    !rb && was_digit) {
-				err = kstrtouint(&name[i + 1], 10, &bpp);
-				if (err)
-					return false;
+				bpp = simple_strtol(&name[i+1], NULL, 10);
 				bpp_specified = true;
 				was_digit = false;
 			} else
@@ -1288,9 +1284,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
 			break;
 		case 'x':
 			if (!yres_specified && was_digit) {
-				err = kstrtouint(&name[i + 1], 10, &yres);
-				if (err)
-					return false;
+				yres = simple_strtol(&name[i+1], NULL, 10);
 				yres_specified = true;
 				was_digit = false;
 			} else
