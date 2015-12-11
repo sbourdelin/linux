@@ -345,9 +345,8 @@ z2_init(void)
     if (!MACH_IS_AMIGA)
 	return -ENODEV;
 
-    ret = -EBUSY;
     if (register_blkdev(Z2RAM_MAJOR, DEVICE_NAME))
-	goto err;
+	return -EBUSY;
 
     ret = -ENOMEM;
     z2ram_gendisk = alloc_disk(1);
@@ -374,7 +373,6 @@ out_queue:
     put_disk(z2ram_gendisk);
 out_disk:
     unregister_blkdev(Z2RAM_MAJOR, DEVICE_NAME);
-err:
     return ret;
 }
 
