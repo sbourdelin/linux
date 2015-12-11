@@ -1387,16 +1387,19 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	bool live_status = false;
-	unsigned int retry = 3;
+	// read hotplug status 4 times at most for 30ms delay (3 retries of 10ms each)
+	unsigned int retry = 4;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
 
 	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
 
-	while (!live_status && --retry) {
+	while (!live_status && retry--) {
 		live_status = intel_digital_port_connected(dev_priv,
 				hdmi_to_dig_port(intel_hdmi));
+		if (live_status || !retry)
+				break;
 		mdelay(10);
 	}
 
