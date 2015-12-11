@@ -363,7 +363,7 @@ static void kdelete(void **buf)
 	}
 }
 
-static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
+static int gdm_wimax_ioctl_get_data(struct udata_s *dst, struct data_s *src)
 {
 	int size;
 
@@ -379,7 +379,7 @@ static int gdm_wimax_ioctl_get_data(struct data_s *dst, struct data_s *src)
 	return 0;
 }
 
-static int gdm_wimax_ioctl_set_data(struct data_s *dst, struct data_s *src)
+static int gdm_wimax_ioctl_set_data(struct data_s *dst, struct udata_s *src)
 {
 	if (!src->size) {
 		dst->size = 0;
@@ -478,7 +478,8 @@ static int gdm_wimax_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				 * before gdm_wimax_ioctl_set_data is called.
 				 */
 				gdm_update_fsm(dev,
-					       req->data.buf);
+						(__force struct fsm_s *)
+						req->data.buf);
 			}
 			ret = gdm_wimax_ioctl_set_data(
 				&nic->sdk_data[req->data_id], &req->data);
