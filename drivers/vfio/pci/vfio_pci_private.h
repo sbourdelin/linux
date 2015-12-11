@@ -74,6 +74,11 @@ static inline bool vfio_pci_bar_page_aligned(void)
 	return IS_ENABLED(CONFIG_PPC64);
 }
 
+static inline bool vfio_msix_table_mmap_enabled(void)
+{
+	return IS_ENABLED(CONFIG_EEH);
+}
+
 extern void vfio_pci_intx_mask(struct vfio_pci_device *vdev);
 extern void vfio_pci_intx_unmask(struct vfio_pci_device *vdev);
 

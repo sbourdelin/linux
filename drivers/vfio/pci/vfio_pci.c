@@ -446,6 +446,9 @@ static long vfio_pci_ioctl(void *device_data,
 		if (vfio_pci_bar_page_aligned())
 			info.flags |= VFIO_DEVICE_FLAGS_PCI_PAGE_ALIGNED;
 
+		if (vfio_msix_table_mmap_enabled())
+			info.flags |= VFIO_DEVICE_FLAGS_PCI_MSIX_MMAP;
+
 		info.num_regions = VFIO_PCI_NUM_REGIONS;
 		info.num_irqs = VFIO_PCI_NUM_IRQS;
 
@@ -871,7 +874,7 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	if (phys_len < PAGE_SIZE || req_start + req_len > phys_len)
 		return -EINVAL;
 
-	if (index == vdev->msix_bar) {
+	if (index == vdev->msix_bar && !vfio_msix_table_mmap_enabled()) {
 		/*
 		 * Disallow mmaps overlapping the MSI-X table; users don't
 		 * get to touch this directly.  We could find somewhere

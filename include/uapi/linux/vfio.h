@@ -173,6 +173,8 @@ struct vfio_device_info {
 #define VFIO_DEVICE_FLAGS_AMBA  (1 << 3)	/* vfio-amba device */
 /* Platform support all PCI MMIO BARs to be page aligned */
 #define VFIO_DEVICE_FLAGS_PCI_PAGE_ALIGNED	(1 << 4)
+/* Platform support mmapping PCI MSI-X vector table */
+#define VFIO_DEVICE_FLAGS_PCI_MSIX_MMAP	(1 << 5)
 	__u32	num_regions;	/* Max region index + 1 */
 	__u32	num_irqs;	/* Max IRQ index + 1 */
 };
