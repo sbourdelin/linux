@@ -81,3 +81,12 @@ static const char *const hip01_compat[] __initconst = {
 DT_MACHINE_START(HIP01, "Hisilicon HIP01 (Flattened Device Tree)")
 	.dt_compat      = hip01_compat,
 MACHINE_END
+
+static const char *const hi3519_compat[] __initconst = {
+	"hisilicon,hi3519",
+	NULL,
+};
+
+DT_MACHINE_START(HI3519_DT, "Hisilicon Hi3519")
+	.dt_compat	= hi3519_compat,
+MACHINE_END
