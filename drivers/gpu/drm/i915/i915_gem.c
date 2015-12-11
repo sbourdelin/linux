@@ -1308,6 +1308,9 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 			break;
 		}
 
+		/* Ensure that even if the GPU hangs, we get woken up. */
+		i915_queue_hangcheck(dev_priv);
+
 		timer.function = NULL;
 		if (timeout || missed_irq(dev_priv, ring)) {
 			unsigned long expire;
@@ -2583,8 +2586,6 @@ void __i915_add_request(struct drm_i915_gem_request *request,
 	list_add_tail(&request->list, &ring->request_list);
 
 	trace_i915_gem_request_add(request);
-
-	i915_queue_hangcheck(ring->dev);
 
 	queue_delayed_work(dev_priv->wq,
 			   &dev_priv->mm.retire_work,

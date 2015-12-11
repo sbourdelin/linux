@@ -2723,7 +2723,7 @@ void intel_hpd_cancel_work(struct drm_i915_private *dev_priv);
 bool intel_hpd_pin_to_port(enum hpd_pin pin, enum port *port);
 
 /* i915_irq.c */
-void i915_queue_hangcheck(struct drm_device *dev);
+void i915_queue_hangcheck(struct drm_i915_private *dev_priv);
 __printf(3, 4)
 void i915_handle_error(struct drm_device *dev, bool wedged,
 		       const char *fmt, ...);
