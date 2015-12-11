@@ -389,6 +389,7 @@ static unsigned int palmas_smps_ramp_delay[4] = {0, 10000, 5000, 2500};
 #define SMPS10_BOOST_EN			(1<<2)
 #define SMPS10_BYPASS_EN		(1<<1)
 #define SMPS10_SWITCH_EN		(1<<0)
+#define TPS65917_LDO_1_2_BYPASS_EN	BIT(6)
 
 #define REGULATOR_SLAVE			0
 
@@ -637,6 +638,19 @@ static struct regulator_ops tps65917_ops_ldo = {
 	.list_voltage		= regulator_list_voltage_linear,
 	.map_voltage		= regulator_map_voltage_linear,
 	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
+};
+
+static struct regulator_ops tps65917_ops_ldo_1_2 = {
+	.is_enabled		= palmas_is_enabled_ldo,
+	.enable			= regulator_enable_regmap,
+	.disable		= regulator_disable_regmap,
+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
+	.list_voltage		= regulator_list_voltage_linear,
+	.map_voltage		= regulator_map_voltage_linear,
+	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
+	.set_bypass		= regulator_set_bypass_regmap,
+	.get_bypass		= regulator_get_bypass_regmap,
 };
 
 static int palmas_regulator_config_external(struct palmas *palmas, int id,
@@ -1019,6 +1033,12 @@ static int tps65917_ldo_registration(struct palmas_pmic *pmic,
 			 * It is of the order of ~60mV/uS.
 			 */
 			desc->ramp_delay = 2500;
+			if (id == TPS65917_REG_LDO1 ||
+			    id == TPS65917_REG_LDO2) {
+				desc->ops = &tps65917_ops_ldo_1_2;
+				desc->bypass_reg = desc->enable_reg;
+				desc->bypass_mask = TPS65917_LDO_1_2_BYPASS_EN;
+			}
 		} else {
 			desc->n_voltages = 1;
 			if (reg_init && reg_init->roof_floor)
