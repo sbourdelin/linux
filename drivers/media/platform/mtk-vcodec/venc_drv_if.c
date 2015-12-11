@@ -25,6 +25,7 @@
 
 #include "venc_drv_base.h"
 #include "vp8_enc/venc_vp8_if.h"
+#include "h264_enc/venc_h264_if.h"
 
 int venc_if_create(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
 {
@@ -38,6 +39,8 @@ int venc_if_create(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
                 ctx->enc_if = get_vp8_enc_comm_if();
                 break;
 	case V4L2_PIX_FMT_H264:
+	        ctx->enc_if = get_h264_enc_comm_if();
+	        break;
 	default:
 		goto err_out;
 	}
