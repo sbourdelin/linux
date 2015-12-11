@@ -2995,9 +2995,6 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 						if (!test_bit(ring->id, &dev_priv->gpu_error.test_irq_rings))
 							DRM_ERROR("Hangcheck timer elapsed... %s idle\n",
 								  ring->name);
-						else
-							DRM_INFO("Fake missed irq on %s\n",
-								 ring->name);
 
 						intel_engine_enable_fake_irq(ring);
 					}
