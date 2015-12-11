@@ -10,6 +10,10 @@ Required properties:
   - "mod": the parent module clock
 - clock-names: Must contain the clock names described just above
 
+Optional properties for slave devices:
+- sun4i,spi-word-wait-ns: hardware based delay in nanoseconds between
+			  transmission of words
+
 Example:
 
 spi1: spi@01c06000 {
@@ -21,4 +25,11 @@ spi1: spi@01c06000 {
 	status = "disabled";
 	#address-cells = <1>;
 	#size-cells = <0>;
+
+	spi1_0 {
+		compatible = "example,dummy";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+		sun4i,spi-word-wait-ns = <12000>;
+	};
 };

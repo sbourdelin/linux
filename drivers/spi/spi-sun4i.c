@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
 
 #include <linux/spi/spi.h>
 
@@ -173,6 +174,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 	unsigned int tx_len = 0;
 	int ret = 0;
 	u32 reg;
+	u32 wait_ns = 0;
+	int wait_clk = 0;
+	int clk_ns = 0;
 
 	/* We don't support transfer larger than the FIFO */
 	if (tfr->len > SUN4I_FIFO_DEPTH)
@@ -260,6 +264,25 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 	}
 
 	sun4i_spi_write(sspi, SUN4I_CLK_CTL_REG, reg);
+
+	/* Setup wait time beteen words */
+	of_property_read_u32(spi->dev.of_node, "sun4i,spi-word-wait-ns",
+			     &wait_ns);
+	if (wait_ns) {
+		/* The wait time is set in SPI_CLK cycles. The SPI hardware
+		 * needs 3 additional cycles to setup the wait counter, so
+		 * the minimum delay time is 4 cycles.
+		 */
+		clk_ns = DIV_ROUND_UP(1000000000, tfr->speed_hz);
+		wait_clk = DIV_ROUND_UP(wait_ns, clk_ns) - 3;
+		if (wait_clk < 1) {
+			wait_clk = 1;
+			dev_info(&spi->dev,
+				 "using minimum of 4 word wait cycles (%uns)",
+				 4 * clk_ns);
+		}
+	}
+	sun4i_spi_write(sspi, SUN4I_WAIT_REG, (u16)wait_clk);
 
 	/* Setup the transfer now... */
 	if (sspi->tx_buf)
