@@ -366,6 +366,16 @@ void intel_uncore_early_sanitize(struct drm_device *dev, bool restore_forcewake)
 
 void intel_uncore_sanitize(struct drm_device *dev)
 {
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (IS_BROXTON(dev)) {
+		/* Store HW/SW RC6 status set by BIOS before we disable.*/
+		dev_priv->bios_hw_rc6_enabled = I915_READ(GEN6_RC_CONTROL) &
+					(GEN6_RC_CTL_RC6_ENABLE | GEN6_RC_CTL_HW_ENABLE);
+		dev_priv->bios_sw_rc6_enabled = !(I915_READ(GEN6_RC_CONTROL) & GEN6_RC_CTL_HW_ENABLE)
+					&& (I915_READ(GEN6_RC_STATE) & RC6_STATE);
+	}
+
 	/* BIOS often leaves RC6 enabled, but disable it for hw init */
 	intel_disable_gt_powersave(dev);
 }

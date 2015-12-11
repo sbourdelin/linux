@@ -386,6 +386,15 @@ static void bdw_get_stolen_reserved(struct drm_i915_private *dev_priv,
 		*size = stolen_top - *base;
 }
 
+void i915_get_stolen_reserved(struct drm_i915_private *dev_priv,
+				    unsigned long *base, unsigned long *size)
+{
+	if (IS_SKYLAKE(dev_priv))
+		bdw_get_stolen_reserved(dev_priv, base, size);
+	else
+		gen8_get_stolen_reserved(dev_priv, base, size);
+}
+
 int i915_gem_init_stolen(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;

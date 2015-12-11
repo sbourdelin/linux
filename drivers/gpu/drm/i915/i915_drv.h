@@ -1696,6 +1696,8 @@ struct drm_i915_private {
 
 	void __iomem *regs;
 
+	bool bios_hw_rc6_enabled;
+	bool bios_sw_rc6_enabled;
 	struct intel_uncore uncore;
 
 	struct i915_virtual_gpu vgpu;
@@ -3247,6 +3249,8 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 					       u32 stolen_offset,
 					       u32 gtt_offset,
 					       u32 size);
+void i915_get_stolen_reserved(struct drm_i915_private *dev_priv,
+				    unsigned long *base, unsigned long *size);
 
 /* i915_gem_shrinker.c */
 unsigned long i915_gem_shrink(struct drm_i915_private *dev_priv,

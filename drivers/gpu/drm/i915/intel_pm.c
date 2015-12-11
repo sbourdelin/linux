@@ -4619,6 +4619,65 @@ static void gen6_init_rps_frequencies(struct drm_device *dev)
 	}
 }
 
+static void bxt_check_pctx(const struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	bool enable_rc6 = true;
+	unsigned long reserved_base = 0, reserved_size, rc6_ctx_base;
+
+	i915_get_stolen_reserved(dev_priv, &reserved_base,
+					&reserved_size);
+
+	if (!(I915_READ(RC6_LOCATION) & RC6_CTX_IN_DRAM)) {
+		DRM_ERROR("RC6 Base location not set properly.\n");
+		enable_rc6 = false;
+	}
+
+	rc6_ctx_base = I915_READ(RC6_CTX_BASE) & RC6_CTX_BASE_MASK;
+	if (!((rc6_ctx_base >= reserved_base) &&
+		(rc6_ctx_base <= (reserved_base + reserved_size)))) {
+		DRM_ERROR("RC6 Base address not as expected.\n");
+		enable_rc6 = false;
+	}
+
+	if (!enable_rc6) {
+		i915.enable_rc6 = 0;
+		DRM_ERROR("RC6 disabled by BIOS\n");
+	}
+}
+
+static void bxt_check_bios_rc6_setup(const struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	bool enable_rc6 = true;
+
+	bxt_check_pctx(dev);
+
+	if (!(((I915_READ(PWRCTX_MAXCNT_RCSUNIT) & IDLE_TIME_MASK) > 1) &&
+	      ((I915_READ(PWRCTX_MAXCNT_VCSUNIT0) & IDLE_TIME_MASK) > 1) &&
+	      ((I915_READ(PWRCTX_MAXCNT_BCSUNIT) & IDLE_TIME_MASK) > 1) &&
+	      ((I915_READ(PWRCTX_MAXCNT_VECSUNIT) & IDLE_TIME_MASK) > 1))) {
+		DRM_ERROR("Engine Idle wait time not set properly.\n");
+		enable_rc6 = false;
+	}
+
+	if (HAS_BSD2(dev) &&
+		((I915_READ(PWRCTX_MAXCNT_VCSUNIT1) & IDLE_TIME_MASK) > 1)) {
+		DRM_ERROR("VCSUNIT1 Idle wait time not set properly.\n");
+		enable_rc6 = false;
+	}
+
+	if (!dev_priv->bios_hw_rc6_enabled && !dev_priv->bios_sw_rc6_enabled) {
+		DRM_ERROR("HW/SW RC6 is not enabled by BIOS.\n");
+		enable_rc6 = false;
+	}
+
+	if (!enable_rc6) {
+		i915.enable_rc6 = 0;
+		DRM_ERROR("RC6 disabled by BIOS\n");
+	}
+}
+
 /* See the Gen9_GT_PM_Programming_Guide doc for the below */
 static void gen9_enable_rps(struct drm_device *dev)
 {
@@ -4659,6 +4718,9 @@ static void gen9_enable_rc6(struct drm_device *dev)
 	struct intel_engine_cs *ring;
 	uint32_t rc6_mask = 0;
 	int unused;
+
+	if (IS_BROXTON(dev))
+		bxt_check_bios_rc6_setup(dev);
 
 	/* 1a: Software RC state - RC0 */
 	I915_WRITE(GEN6_RC_STATE, 0);
