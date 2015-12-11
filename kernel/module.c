@@ -4059,11 +4059,14 @@ struct module *__module_text_address(unsigned long addr)
 }
 EXPORT_SYMBOL_GPL(__module_text_address);
 
+#define MAX_LINE_CHARS	80
+
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)
 {
 	struct module *mod;
 	char buf[8];
+	int cnt = 0;
 
 	printk(KERN_DEFAULT "Modules linked in:");
 	/* Most callers should already have preempt disabled, but make sure */
@@ -4071,7 +4074,13 @@ void print_modules(void)
 	list_for_each_entry_rcu(mod, &modules, list) {
 		if (mod->state == MODULE_STATE_UNFORMED)
 			continue;
-		pr_cont(" %s%s", mod->name, module_flags(mod, buf));
+
+		if (cnt > MAX_LINE_CHARS) {
+			cnt = 0;
+			pr_cont("\n");
+		}
+
+		cnt += pr_cont(" %s%s", mod->name, module_flags(mod, buf));
 	}
 	preempt_enable();
 	if (last_unloaded_module[0])
