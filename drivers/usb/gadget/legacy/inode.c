@@ -1144,6 +1144,7 @@ ep0_write (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 				} else
 					retval = len;
 
+				spin_lock_irq (&dev->lock);
 				return retval;
 			}
 
