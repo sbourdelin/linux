@@ -3062,7 +3062,7 @@ intel_stop_ring_buffer(struct intel_engine_cs *ring)
 		return;
 
 	ret = intel_ring_idle(ring);
-	if (ret && !i915_reset_in_progress_or_wedged(&to_i915(ring->dev)->gpu_error))
+	if (ret)
 		DRM_ERROR("failed to quiesce %s whilst cleaning up: %d\n",
 			  ring->name, ret);
 
