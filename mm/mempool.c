@@ -223,6 +223,47 @@ mempool_t *mempool_create_node(int min_nr, mempool_alloc_t *alloc_fn,
 EXPORT_SYMBOL(mempool_create_node);
 
 /**
+ * mempool_refill - refill an existing memory pool immediately
+ * @pool:       pointer to the memory pool which was allocated via
+ *              mempool_create().
+ *
+ * This function tries to refill the pool with new elements
+ * immediately. Similar with mempool_resize(), it cannot be
+ * guaranteed that the pool will be fully filled immediately.
+ *
+ * Note, the caller must guarantee that no mempool_destroy is called
+ * while this function is running. mempool_alloc() & mempool_free()
+ * might be called (eg. from IRQ contexts) while this function executes.
+ */
+void mempool_refill(mempool_t *pool)
+{
+	void *element;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pool->lock, flags);
+	if (pool->curr_nr >= pool->min_nr) {
+		spin_unlock_irqrestore(&pool->lock, flags);
+		return;
+	}
+
+	while (pool->curr_nr < pool->min_nr) {
+		spin_unlock_irqrestore(&pool->lock, flags);
+		element = pool->alloc(GFP_KERNEL, pool->pool_data);
+		if (!element)
+			return;
+		spin_lock_irqsave(&pool->lock, flags);
+		if (pool->curr_nr < pool->min_nr) {
+			add_element(pool, element);
+		} else {
+			spin_unlock_irqrestore(&pool->lock, flags);
+			pool->free(element, pool->pool_data);	/* Raced */
+			return;
+		}
+	}
+}
+EXPORT_SYMBOL(mempool_refill);
+
+/**
  * mempool_resize - resize an existing memory pool
  * @pool:       pointer to the memory pool which was allocated via
  *              mempool_create().
@@ -256,7 +297,8 @@ int mempool_resize(mempool_t *pool, int new_min_nr)
 			spin_lock_irqsave(&pool->lock, flags);
 		}
 		pool->min_nr = new_min_nr;
-		goto out_unlock;
+		spin_unlock_irqrestore(&pool->lock, flags);
+		goto out;
 	}
 	spin_unlock_irqrestore(&pool->lock, flags);
 
@@ -279,22 +321,9 @@ int mempool_resize(mempool_t *pool, int new_min_nr)
 	pool->elements = new_elements;
 	pool->min_nr = new_min_nr;
 
-	while (pool->curr_nr < pool->min_nr) {
-		spin_unlock_irqrestore(&pool->lock, flags);
-		element = pool->alloc(GFP_KERNEL, pool->pool_data);
-		if (!element)
-			goto out;
-		spin_lock_irqsave(&pool->lock, flags);
-		if (pool->curr_nr < pool->min_nr) {
-			add_element(pool, element);
-		} else {
-			spin_unlock_irqrestore(&pool->lock, flags);
-			pool->free(element, pool->pool_data);	/* Raced */
-			goto out;
-		}
-	}
-out_unlock:
 	spin_unlock_irqrestore(&pool->lock, flags);
+
+	mempool_refill(pool);
 out:
 	return 0;
 }
