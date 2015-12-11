@@ -1394,11 +1394,13 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 
 	intel_display_power_get(dev_priv, POWER_DOMAIN_GMBUS);
 
-	while (!live_status && --retry) {
+	do {
 		live_status = intel_digital_port_connected(dev_priv,
 				hdmi_to_dig_port(intel_hdmi));
+		if (live_status || !retry)
+			break;
 		mdelay(10);
-	}
+	} while (retry--);
 
 	if (!live_status)
 		DRM_DEBUG_KMS("Live status not up!");
