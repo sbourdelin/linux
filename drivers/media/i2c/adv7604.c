@@ -1895,6 +1895,22 @@ static int adv76xx_g_crop(struct v4l2_subdev *sd, struct v4l2_crop *a)
 	return 0;
 }
 
+static int adv76xx_cropcap(struct v4l2_subdev *sd, struct v4l2_cropcap *a)
+{
+	struct adv76xx_state *state = to_state(sd);
+
+	a->bounds.left	 = 0;
+	a->bounds.top	 = 0;
+	a->bounds.width	 = state->timings.bt.width;
+	a->bounds.height = state->timings.bt.height;
+	a->defrect	 = a->bounds;
+	a->type		 = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	a->pixelaspect.numerator   = 1;
+	a->pixelaspect.denominator = 1;
+
+	return 0;
+}
+
 static int adv76xx_set_format(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_pad_config *cfg,
 			      struct v4l2_subdev_format *format)
@@ -2408,6 +2424,7 @@ static const struct v4l2_subdev_core_ops adv76xx_core_ops = {
 static const struct v4l2_subdev_video_ops adv76xx_video_ops = {
 	.s_routing = adv76xx_s_routing,
 	.g_crop = adv76xx_g_crop,
+	.cropcap = adv76xx_cropcap,
 	.g_input_status = adv76xx_g_input_status,
 	.s_dv_timings = adv76xx_s_dv_timings,
 	.g_dv_timings = adv76xx_g_dv_timings,
