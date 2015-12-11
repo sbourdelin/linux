@@ -995,7 +995,7 @@ static void i915_gem_record_rings(struct drm_device *dev,
 
 	for (i = 0; i < I915_NUM_RINGS; i++) {
 		struct intel_engine_cs *ring = &dev_priv->ring[i];
-		struct intel_ringbuffer *rbuf;
+		struct intel_ringbuffer *rbuf = NULL;
 
 		error->ring[i].pid = -1;
 
@@ -1039,23 +1039,15 @@ static void i915_gem_record_rings(struct drm_device *dev,
 				}
 				rcu_read_unlock();
 			}
+
+			error->simulated |= request->ctx->flags & CONTEXT_NO_ERROR_CAPTURE;
+			rbuf = request->ringbuf;
 		}
 
-		if (i915.enable_execlists) {
-			/* TODO: This is only a small fix to keep basic error
-			 * capture working, but we need to add more information
-			 * for it to be useful (e.g. dump the context being
-			 * executed).
-			 */
-			if (request)
-				rbuf = request->ctx->engine[ring->id].ringbuf;
-			else
-				rbuf = ring->default_context->engine[ring->id].ringbuf;
-		} else
-			rbuf = ring->buffer;
-
-		error->ring[i].cpu_ring_head = rbuf->head;
-		error->ring[i].cpu_ring_tail = rbuf->tail;
+		if (rbuf) {
+			error->ring[i].cpu_ring_head = rbuf->head;
+			error->ring[i].cpu_ring_tail = rbuf->tail;
+		}
 
 		error->ring[i].ringbuffer =
 			i915_error_ggtt_object_create(dev_priv, rbuf->obj);
@@ -1345,12 +1337,14 @@ void i915_capture_error_state(struct drm_device *dev, bool wedged,
 	i915_error_capture_msg(dev, error, wedged, error_msg);
 	DRM_INFO("%s\n", error->error_msg);
 
-	spin_lock_irqsave(&dev_priv->gpu_error.lock, flags);
-	if (dev_priv->gpu_error.first_error == NULL) {
-		dev_priv->gpu_error.first_error = error;
-		error = NULL;
+	if (!error->simulated) {
+		spin_lock_irqsave(&dev_priv->gpu_error.lock, flags);
+		if (dev_priv->gpu_error.first_error == NULL) {
+			dev_priv->gpu_error.first_error = error;
+			error = NULL;
+		}
+		spin_unlock_irqrestore(&dev_priv->gpu_error.lock, flags);
 	}
-	spin_unlock_irqrestore(&dev_priv->gpu_error.lock, flags);
 
 	if (error) {
 		i915_error_state_free(&error->ref);

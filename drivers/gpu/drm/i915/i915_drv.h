@@ -493,6 +493,7 @@ struct drm_i915_error_state {
 	struct timeval time;
 
 	char error_msg[128];
+	bool simulated;
 	int iommu;
 	u32 reset_count;
 	u32 suspend_count;
@@ -845,7 +846,9 @@ struct i915_ctx_hang_stats {
 /* This must match up with the value previously used for execbuf2.rsvd1. */
 #define DEFAULT_CONTEXT_HANDLE 0
 
-#define CONTEXT_NO_ZEROMAP (1<<0)
+#define CONTEXT_NO_ZEROMAP		(1<<0)
+#define CONTEXT_NO_ERROR_CAPTURE	(1<<1)
+
 /**
  * struct intel_context - as the name implies, represents a context.
  * @ref: reference count.
@@ -870,10 +873,11 @@ struct intel_context {
 	int user_handle;
 	uint8_t remap_slice;
 	struct drm_i915_private *i915;
-	int flags;
 	struct drm_i915_file_private *file_priv;
 	struct i915_ctx_hang_stats hang_stats;
 	struct i915_hw_ppgtt *ppgtt;
+
+	unsigned flags;
 
 	/* Legacy ring buffer submission */
 	struct {
