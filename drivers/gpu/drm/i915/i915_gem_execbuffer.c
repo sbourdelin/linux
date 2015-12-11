@@ -688,6 +688,11 @@ eb_vma_misplaced(struct i915_vma *vma)
 	    (vma->node.start + vma->node.size - 1) >> 32)
 		return true;
 
+	/* keep the lower addresses free of unnecessary objects */
+	if ((entry->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS) &&
+	    !((vma->node.start + vma->node.size - 1) >> 32))
+		return true;
+
 	return false;
 }
 
