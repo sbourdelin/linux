@@ -1490,10 +1490,21 @@ gen6_ring_get_seqno(struct intel_engine_cs *ring, bool lazy_coherency)
 {
 	/* Workaround to force correct ordering between irq and seqno writes on
 	 * ivb (and maybe also on snb) by reading from a CS register (like
-	 * ACTHD) before reading the status page. */
+	 * ACTHD) before reading the status page.
+	 *
+	 * Note that this effectively effectively stalls the read by the time
+	 * it takes to do a memory transaction, which more or less ensures
+	 * that the write from the GPU has sufficient time to invalidate
+	 * the CPU cacheline. Alternatively we could delay the interrupt from
+	 * the CS ring to give the write time to land, but that would incur
+	 * a delay after every batch i.e. much more frequent than a delay
+	 * when waiting for the interrupt (with the same net latency).
+	 */
 	if (!lazy_coherency) {
 		struct drm_i915_private *dev_priv = ring->dev->dev_private;
-		POSTING_READ(RING_ACTHD(ring->mmio_base));
+		POSTING_READ_FW(RING_ACTHD(ring->mmio_base));
+
+		intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 	}
 
 	return intel_read_status_page(ring, I915_GEM_HWS_INDEX);
