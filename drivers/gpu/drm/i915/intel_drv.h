@@ -1009,7 +1009,8 @@ void intel_ddi_disable_transcoder_func(struct drm_i915_private *dev_priv,
 void intel_ddi_enable_pipe_clock(struct intel_crtc *intel_crtc);
 void intel_ddi_disable_pipe_clock(struct intel_crtc *intel_crtc);
 bool intel_ddi_pll_select(struct intel_crtc *crtc,
-			  struct intel_crtc_state *crtc_state);
+			  struct intel_crtc_state *crtc_state,
+			  struct intel_encoder *encoder);
 void intel_ddi_set_pipe_settings(struct drm_crtc *crtc);
 void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp);
 bool intel_ddi_connector_get_hw_state(struct intel_connector *intel_connector);

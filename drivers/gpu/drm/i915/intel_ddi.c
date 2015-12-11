@@ -1781,11 +1781,16 @@ bxt_ddi_pll_select(struct intel_crtc *intel_crtc,
  * function should be folded into compute_config() eventually.
  */
 bool intel_ddi_pll_select(struct intel_crtc *intel_crtc,
-			  struct intel_crtc_state *crtc_state)
+			  struct intel_crtc_state *crtc_state,
+			  struct intel_encoder *valid_encoder)
 {
 	struct drm_device *dev = intel_crtc->base.dev;
-	struct intel_encoder *intel_encoder =
-		intel_ddi_get_crtc_new_encoder(crtc_state);
+	struct intel_encoder *intel_encoder;
+
+	if (valid_encoder)
+		intel_encoder = valid_encoder;
+	else
+		intel_encoder = intel_ddi_get_crtc_new_encoder(crtc_state);
 
 	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
 		return skl_ddi_pll_select(intel_crtc, crtc_state,

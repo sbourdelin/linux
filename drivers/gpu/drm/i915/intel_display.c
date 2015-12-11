@@ -9808,7 +9808,7 @@ static void broadwell_modeset_commit_cdclk(struct drm_atomic_state *old_state)
 static int haswell_crtc_compute_clock(struct intel_crtc *crtc,
 				      struct intel_crtc_state *crtc_state)
 {
-	if (!intel_ddi_pll_select(crtc, crtc_state))
+	if (!intel_ddi_pll_select(crtc, crtc_state, NULL))
 		return -EINVAL;
 
 	crtc->lowfreq_avail = false;
