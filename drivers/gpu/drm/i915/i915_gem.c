@@ -4811,7 +4811,7 @@ i915_gem_init_hw(struct drm_device *dev)
 
 		ret = i915_gem_request_alloc(ring, ring->default_context, &req);
 		if (ret) {
-			i915_gem_cleanup_ringbuffer(dev);
+			i915_gem_cleanup_engines(dev);
 			goto out;
 		}
 
@@ -4824,7 +4824,7 @@ i915_gem_init_hw(struct drm_device *dev)
 		if (ret && ret != -EIO) {
 			DRM_ERROR("PPGTT enable ring #%d failed %d\n", i, ret);
 			i915_gem_request_cancel(req);
-			i915_gem_cleanup_ringbuffer(dev);
+			i915_gem_cleanup_engines(dev);
 			goto out;
 		}
 
@@ -4832,7 +4832,7 @@ i915_gem_init_hw(struct drm_device *dev)
 		if (ret && ret != -EIO) {
 			DRM_ERROR("Context enable ring #%d failed %d\n", i, ret);
 			i915_gem_request_cancel(req);
-			i915_gem_cleanup_ringbuffer(dev);
+			i915_gem_cleanup_engines(dev);
 			goto out;
 		}
 
@@ -4907,7 +4907,7 @@ out_unlock:
 }
 
 void
-i915_gem_cleanup_ringbuffer(struct drm_device *dev)
+i915_gem_cleanup_engines(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
@@ -4916,13 +4916,14 @@ i915_gem_cleanup_ringbuffer(struct drm_device *dev)
 	for_each_ring(ring, dev_priv, i)
 		dev_priv->gt.cleanup_ring(ring);
 
-    if (i915.enable_execlists)
-            /*
-             * Neither the BIOS, ourselves or any other kernel
-             * expects the system to be in execlists mode on startup,
-             * so we need to reset the GPU back to legacy mode.
-             */
-            intel_gpu_reset(dev);
+	if (i915.enable_execlists) {
+		/*
+		 * Neither the BIOS, ourselves or any other kernel
+		 * expects the system to be in execlists mode on startup,
+		 * so we need to reset the GPU back to legacy mode.
+		 */
+		intel_gpu_reset(dev);
+	}
 }
 
 static void
