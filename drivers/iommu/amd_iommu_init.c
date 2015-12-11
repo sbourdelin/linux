@@ -656,6 +656,16 @@ static void __init set_iommu_for_device(struct amd_iommu *iommu, u16 devid)
 	amd_iommu_rlookup_table[devid] = iommu;
 }
 
+static struct amd_iommu *get_iommu_for_device(u16 devid)
+{
+	struct amd_iommu *iommu = amd_iommu_rlookup_table[devid];
+
+	/* Workaround: Always assign devid zero to the first IOMMU */
+	if (!iommu && !devid && amd_iommus_present)
+		iommu = amd_iommus[0];
+	return iommu;
+}
+
 /*
  * This function takes the device specific flags read from the ACPI
  * table and sets up the device table entry with that information
@@ -751,7 +761,7 @@ static int __init add_early_maps(void)
  */
 static void __init set_device_exclusion_range(u16 devid, struct ivmd_header *m)
 {
-	struct amd_iommu *iommu = amd_iommu_rlookup_table[devid];
+	struct amd_iommu *iommu = get_iommu_for_device(devid);
 
 	if (!(m->flags & IVMD_FLAG_EXCL_RANGE))
 		return;
@@ -2255,7 +2265,7 @@ u8 amd_iommu_pc_get_max_banks(u16 devid)
 	u8 ret = 0;
 
 	/* locate the iommu governing the devid */
-	iommu = amd_iommu_rlookup_table[devid];
+	iommu = get_iommu_for_device(devid);
 	if (iommu)
 		ret = iommu->max_banks;
 
@@ -2275,7 +2285,7 @@ u8 amd_iommu_pc_get_max_counters(u16 devid)
 	u8 ret = 0;
 
 	/* locate the iommu governing the devid */
-	iommu = amd_iommu_rlookup_table[devid];
+	iommu = get_iommu_for_device(devid);
 	if (iommu)
 		ret = iommu->max_counters;
 
@@ -2295,7 +2305,7 @@ int amd_iommu_pc_get_set_reg_val(u16 devid, u8 bank, u8 cntr, u8 fxn,
 		return -ENODEV;
 
 	/* Locate the iommu associated with the device ID */
-	iommu = amd_iommu_rlookup_table[devid];
+	iommu = get_iommu_for_device(devid);
 
 	/* Check for valid iommu and pc register indexing */
 	if (WARN_ON((iommu == NULL) || (fxn > 0x28) || (fxn & 7)))
