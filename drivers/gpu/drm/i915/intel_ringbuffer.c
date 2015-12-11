@@ -2274,7 +2274,7 @@ int intel_ring_idle(struct intel_engine_cs *ring)
 
 	/* Make sure we do not trigger any retires */
 	return __i915_wait_request(req,
-				   atomic_read(&to_i915(ring->dev)->gpu_error.reset_counter),
+				   i915_reset_counter(&to_i915(ring->dev)->gpu_error),
 				   to_i915(ring->dev)->mm.interruptible,
 				   NULL, NULL);
 }
@@ -3068,7 +3068,7 @@ intel_stop_ring_buffer(struct intel_engine_cs *ring)
 		return;
 
 	ret = intel_ring_idle(ring);
-	if (ret && !i915_reset_in_progress(&to_i915(ring->dev)->gpu_error))
+	if (ret && !i915_reset_in_progress_or_wedged(&to_i915(ring->dev)->gpu_error))
 		DRM_ERROR("failed to quiesce %s whilst cleaning up: %d\n",
 			  ring->name, ret);
 
