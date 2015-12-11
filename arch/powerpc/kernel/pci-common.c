@@ -1074,6 +1074,11 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
  * bits, so it's ok to allocate at, say, 0x2800-0x28ff,
  * but we want to try to avoid allocating at 0x2900-0x2bff
  * which might have be mirrored at 0x0100-0x03ff..
+ *
+ * And for PPC64, we enforce the alignment of all MMIO BARs
+ * allocations to be at least PAGE_SIZE(64KB). This would be
+ * helpful to improve performance when we passthrough
+ * a PCI device of which BARs are smaller than PAGE_SIZE
  */
 resource_size_t pcibios_align_resource(void *data, const struct resource *res,
 				resource_size_t size, resource_size_t align)
@@ -1087,7 +1092,10 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
 		if (start & 0x300)
 			start = (start + 0x3ff) & ~0x3ff;
 	}
-
+#ifdef CONFIG_PPC64
+	if (res->flags & IORESOURCE_MEM)
+		start = PAGE_ALIGN(start);
+#endif
 	return start;
 }
 EXPORT_SYMBOL(pcibios_align_resource);
