@@ -1898,6 +1898,8 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	i915_cmd_parser_fini_ring(ring);
 	i915_gem_batch_pool_fini(&ring->batch_pool);
 
+	intel_engine_fini_breadcrumbs(ring);
+
 	if (ring->status_page.obj) {
 		kunmap(sg_page(ring->status_page.obj->pages->sgl));
 		ring->status_page.obj = NULL;
@@ -1915,10 +1917,11 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 	ring->buffer = NULL;
 
 	ring->dev = dev;
+	ring->i915 = to_i915(dev);
 	INIT_LIST_HEAD(&ring->active_list);
 	INIT_LIST_HEAD(&ring->request_list);
 	i915_gem_batch_pool_init(dev, &ring->batch_pool);
-	init_waitqueue_head(&ring->irq_queue);
+	intel_engine_init_breadcrumbs(ring);
 
 	INIT_LIST_HEAD(&ring->buffers);
 	INIT_LIST_HEAD(&ring->execlist_queue);

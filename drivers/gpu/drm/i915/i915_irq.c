@@ -1000,8 +1000,7 @@ static void notify_ring(struct intel_engine_cs *ring)
 		return;
 
 	trace_i915_gem_request_notify(ring);
-
-	wake_up_all(&ring->irq_queue);
+	intel_engine_wakeup(ring);
 }
 
 static void vlv_c0_read(struct drm_i915_private *dev_priv,
@@ -1083,7 +1082,7 @@ static bool any_waiters(struct drm_i915_private *dev_priv)
 	int i;
 
 	for_each_ring(ring, dev_priv, i)
-		if (ring->irq_refcount)
+		if (intel_engine_has_waiter(ring))
 			return true;
 
 	return false;
@@ -2411,7 +2410,7 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 
 	/* Wake up __wait_seqno, potentially holding dev->struct_mutex. */
 	for_each_ring(ring, dev_priv, i)
-		wake_up_all(&ring->irq_queue);
+		intel_engine_wakeup(ring);
 
 	/* Wake up intel_crtc_wait_for_pending_flips, holding crtc->mutex. */
 	wake_up_all(&dev_priv->pending_flip_queue);
@@ -2986,16 +2985,17 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 			if (ring_idle(ring, seqno)) {
 				ring->hangcheck.action = HANGCHECK_IDLE;
 
-				if (waitqueue_active(&ring->irq_queue)) {
+				if (intel_engine_has_waiter(ring)) {
 					/* Issue a wake-up to catch stuck h/w. */
 					if (!test_and_set_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings)) {
-						if (!(dev_priv->gpu_error.test_irq_rings & intel_ring_flag(ring)))
+						if (!test_bit(ring->id, &dev_priv->gpu_error.test_irq_rings))
 							DRM_ERROR("Hangcheck timer elapsed... %s idle\n",
 								  ring->name);
 						else
 							DRM_INFO("Fake missed irq on %s\n",
 								 ring->name);
-						wake_up_all(&ring->irq_queue);
+
+						intel_engine_enable_fake_irq(ring);
 					}
 					/* Safeguard against driver failure */
 					ring->hangcheck.score += BUSY;

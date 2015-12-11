@@ -2152,6 +2152,7 @@ static int intel_init_ring_buffer(struct drm_device *dev,
 	WARN_ON(ring->buffer);
 
 	ring->dev = dev;
+	ring->i915 = to_i915(dev);
 	INIT_LIST_HEAD(&ring->active_list);
 	INIT_LIST_HEAD(&ring->request_list);
 	INIT_LIST_HEAD(&ring->execlist_queue);
@@ -2159,7 +2160,7 @@ static int intel_init_ring_buffer(struct drm_device *dev,
 	i915_gem_batch_pool_init(dev, &ring->batch_pool);
 	memset(ring->semaphore.sync_seqno, 0, sizeof(ring->semaphore.sync_seqno));
 
-	init_waitqueue_head(&ring->irq_queue);
+	intel_engine_init_breadcrumbs(ring);
 
 	ringbuf = intel_engine_create_ringbuffer(ring, 32 * PAGE_SIZE);
 	if (IS_ERR(ringbuf)) {
@@ -2223,6 +2224,8 @@ void intel_cleanup_ring_buffer(struct intel_engine_cs *ring)
 
 	i915_cmd_parser_fini_ring(ring);
 	i915_gem_batch_pool_fini(&ring->batch_pool);
+	intel_engine_fini_breadcrumbs(ring);
+
 	ring->dev = NULL;
 }
 

@@ -1123,17 +1123,6 @@ i915_gem_check_wedge(unsigned reset_counter, bool interruptible)
 	return 0;
 }
 
-static void fake_irq(unsigned long data)
-{
-	wake_up_process((struct task_struct *)data);
-}
-
-static bool missed_irq(struct drm_i915_private *dev_priv,
-		       struct intel_engine_cs *ring)
-{
-	return test_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings);
-}
-
 static unsigned long local_clock_us(unsigned *cpu)
 {
 	unsigned long t;
@@ -1166,7 +1155,9 @@ static bool busywait_stop(unsigned long timeout, unsigned cpu)
 	return this_cpu != cpu;
 }
 
-static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
+static bool __i915_spin_request(struct drm_i915_gem_request *req,
+				struct intel_breadcrumb *wait,
+				int state)
 {
 	unsigned long timeout;
 	unsigned cpu;
@@ -1181,31 +1172,30 @@ static int __i915_spin_request(struct drm_i915_gem_request *req, int state)
 	 * takes to sleep on a request, on the order of a microsecond.
 	 */
 
-	if (req->ring->irq_refcount)
-		return -EBUSY;
-
 	/* Only spin if we know the GPU is processing this request */
 	if (!i915_gem_request_started(req, true))
-		return -EAGAIN;
+		return false;
 
 	timeout = local_clock_us(&cpu) + 5;
-	while (!need_resched()) {
+	do {
 		if (i915_gem_request_completed(req, true))
-			return 0;
+			return true;
 
-		if (signal_pending_state(state, current))
+		if (signal_pending_state(state, wait->task))
 			break;
 
 		if (busywait_stop(timeout, cpu))
 			break;
 
 		cpu_relax_lowlatency();
-	}
 
-	if (i915_gem_request_completed(req, false))
-		return 0;
+		/* Break the loop if we have consumed the timeslice (or been
+		 * preempted) or when either the background thread has
+		 * enabled the interrupt, or the IRQ has fired.
+		 */
+	} while (!need_resched() && wait->task->state == state);
 
-	return -EAGAIN;
+	return false;
 }
 
 /**
@@ -1229,18 +1219,13 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 			s64 *timeout,
 			struct intel_rps_client *rps)
 {
-	struct intel_engine_cs *ring = i915_gem_request_get_ring(req);
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	const bool irq_test_in_progress =
-		ACCESS_ONCE(dev_priv->gpu_error.test_irq_rings) & intel_ring_flag(ring);
 	int state = interruptible ? TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE;
-	DEFINE_WAIT(wait);
-	unsigned long timeout_expire;
+	struct intel_breadcrumb wait;
+	unsigned long timeout_remain;
 	s64 before, now;
-	int ret;
+	int ret = 0;
 
-	WARN(!intel_irqs_enabled(dev_priv), "IRQs disabled");
+	might_sleep();
 
 	if (list_empty(&req->list))
 		return 0;
@@ -1248,7 +1233,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	if (i915_gem_request_completed(req, true))
 		return 0;
 
-	timeout_expire = 0;
+	timeout_remain = MAX_SCHEDULE_TIMEOUT;
 	if (timeout) {
 		if (WARN_ON(*timeout < 0))
 			return -EINVAL;
@@ -1256,30 +1241,66 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 		if (*timeout == 0)
 			return -ETIME;
 
-		timeout_expire = jiffies + nsecs_to_jiffies_timeout(*timeout);
+		timeout_remain = nsecs_to_jiffies_timeout(*timeout);
 	}
-
-	if (INTEL_INFO(dev_priv)->gen >= 6)
-		gen6_rps_boost(dev_priv, rps, req->emitted_jiffies);
 
 	/* Record current time in case interrupted by signal, or wedged */
 	trace_i915_gem_request_wait_begin(req);
 	before = ktime_get_raw_ns();
 
-	/* Optimistic spin for the next jiffie before touching IRQs */
-	ret = __i915_spin_request(req, state);
-	if (ret == 0)
-		goto out;
+	if (INTEL_INFO(req->i915)->gen >= 6)
+		gen6_rps_boost(req->i915, rps, req->emitted_jiffies);
 
-	if (!irq_test_in_progress && WARN_ON(!ring->irq_get(ring))) {
-		ret = -ENODEV;
-		goto out;
+	intel_breadcrumb_init(&wait, req->seqno);
+	set_task_state(wait.task, state);
+
+	/* Optimistic spin for the next ~jiffie before touching IRQs */
+	if (intel_engine_add_breadcrumb(req->ring, &wait)) {
+		if (__i915_spin_request(req, &wait, state))
+			goto out;
+
+		intel_engine_enable_breadcrumb_irq(req->ring);
+
+		/* In order to check that we haven't missed the interrupt
+		 * as we enabled it, we need to kick ourselves to do a
+		 * coherent check on the seqno before we sleep.
+		 */
+		goto wakeup;
 	}
 
 	for (;;) {
-		struct timer_list timer;
+		if (signal_pending_state(state, wait.task)) {
+			ret = -ERESTARTSYS;
+			break;
+		}
 
-		prepare_to_wait(&ring->irq_queue, &wait, state);
+		/* Ensure that even if the GPU hangs, we get woken up. */
+		i915_queue_hangcheck(req->i915);
+
+		timeout_remain = io_schedule_timeout(timeout_remain);
+		if (timeout_remain == 0) {
+			ret = -ETIME;
+			break;
+		}
+
+		if (intel_breadcrumb_complete(&wait))
+			break;
+
+wakeup:		set_task_state(wait.task, state);
+
+		/* Ensure our read of the seqno is coherent so that we
+		 * do not "miss an interrupt" (i.e. if this is the last
+		 * request and the seqno write from the GPU is not visible
+		 * by the time the interrupt fires, we will see that the
+		 * request is incomplete and go back to sleep awaiting
+		 * another interrupt that will never come.)
+		 *
+		 * Strictly, we only need to do this once after an interrupt,
+		 * but it is easier and safer to do it every time the waiter
+		 * is woken.
+		 */
+		if (i915_gem_request_completed(req, false))
+			break;
 
 		/* We need to check whether any gpu reset happened in between
 		 * the request being submitted and now. If a reset has occurred,
@@ -1288,51 +1309,12 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 		 * reset the GPU. The results of the request are lost and we
 		 * are free to continue on with the original operation.
 		 */
-		if (req->reset_counter != i915_reset_counter(&dev_priv->gpu_error)) {
-			ret = 0;
+		if (req->reset_counter != i915_reset_counter(&req->i915->gpu_error))
 			break;
-		}
-
-		if (i915_gem_request_completed(req, false)) {
-			ret = 0;
-			break;
-		}
-
-		if (signal_pending_state(state, current)) {
-			ret = -ERESTARTSYS;
-			break;
-		}
-
-		if (timeout && time_after_eq(jiffies, timeout_expire)) {
-			ret = -ETIME;
-			break;
-		}
-
-		/* Ensure that even if the GPU hangs, we get woken up. */
-		i915_queue_hangcheck(dev_priv);
-
-		timer.function = NULL;
-		if (timeout || missed_irq(dev_priv, ring)) {
-			unsigned long expire;
-
-			setup_timer_on_stack(&timer, fake_irq, (unsigned long)current);
-			expire = missed_irq(dev_priv, ring) ? jiffies + 1 : timeout_expire;
-			mod_timer(&timer, expire);
-		}
-
-		io_schedule();
-
-		if (timer.function) {
-			del_singleshot_timer_sync(&timer);
-			destroy_timer_on_stack(&timer);
-		}
 	}
-	if (!irq_test_in_progress)
-		ring->irq_put(ring);
-
-	finish_wait(&ring->irq_queue, &wait);
-
 out:
+	intel_engine_remove_breadcrumb(req->ring, &wait);
+	__set_task_state(wait.task, TASK_RUNNING);
 	now = ktime_get_raw_ns();
 	trace_i915_gem_request_wait_end(req);
 

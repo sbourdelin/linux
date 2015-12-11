@@ -157,8 +157,34 @@ struct  intel_engine_cs {
 #define LAST_USER_RING (VECS + 1)
 	u32		mmio_base;
 	struct		drm_device *dev;
+	struct drm_i915_private *i915;
 	struct intel_ringbuffer *buffer;
 	struct list_head buffers;
+
+	/* Rather than have every client wait upon all user interrupts,
+	 * with the herd waking after every interrupt and each doing the
+	 * heavyweight seqno dance, we delegate the task (of being the
+	 * bottom-half of the user interrupt) to the first client. After
+	 * every interrupt, we wake up one client, who does the heavyweight
+	 * coherent seqno read and either goes back to sleep (if incomplete),
+	 * or wakes up all the completed clients in parallel, before then
+	 * transferring the bottom-half status to the next client in the queue.
+	 *
+	 * Compared to walking the entire list of waiters in a single dedicated
+	 * bottom-half, we reduce the latency of the first waiter by avoiding
+	 * a context switch, but incur additional coherent seqno reads when
+	 * following the chain of request breadcrumbs. Since it is most likely
+	 * that we have a single client waiting on each seqno, then reducing
+	 * the overhead of waking that client is much preferred.
+	 */
+	struct intel_breadcrumbs {
+		spinlock_t lock; /* protects the lists of requests */
+		struct rb_root requests; /* sorted by retirement */
+		struct task_struct *first_waiter; /* bh for user interrupts */
+		struct timer_list fake_irq; /* used after a missed interrupt */
+		bool irq_enabled;
+		bool rpm_wakelock;
+	} breadcrumbs;
 
 	/*
 	 * A pool of objects to use as shadow copies of client batch buffers
@@ -302,8 +328,6 @@ struct  intel_engine_cs {
 	u32 last_submitted_seqno;
 
 	bool gpu_caches_dirty;
-
-	wait_queue_head_t irq_queue;
 
 	struct intel_context *default_context;
 	struct intel_context *last_context;
@@ -509,5 +533,40 @@ void intel_ring_reserved_space_end(struct intel_ringbuffer *ringbuf);
 
 /* Legacy ringbuffer specific portion of reservation code: */
 int intel_ring_reserve_space(struct drm_i915_gem_request *request);
+
+/* intel_breadcrumbs.c -- user interrupt bottom-half for waiters */
+struct intel_breadcrumb {
+	struct rb_node node;
+	struct task_struct *task;
+	u32 seqno;
+};
+void intel_engine_init_breadcrumbs(struct intel_engine_cs *engine);
+static inline void intel_breadcrumb_init(struct intel_breadcrumb *wait,
+					 u32 seqno)
+{
+	wait->task = current;
+	wait->seqno = seqno;
+}
+static inline bool intel_breadcrumb_complete(struct intel_breadcrumb *wait)
+{
+	return RB_EMPTY_NODE(&wait->node);
+}
+bool intel_engine_add_breadcrumb(struct intel_engine_cs *engine,
+				 struct intel_breadcrumb *wait);
+void intel_engine_remove_breadcrumb(struct intel_engine_cs *engine,
+				    struct intel_breadcrumb *wait);
+static inline bool intel_engine_has_waiter(struct intel_engine_cs *engine)
+{
+	return READ_ONCE(engine->breadcrumbs.first_waiter);
+}
+static inline void intel_engine_wakeup(struct intel_engine_cs *engine)
+{
+	struct task_struct *task = READ_ONCE(engine->breadcrumbs.first_waiter);
+	if (task)
+		wake_up_process(task);
+}
+void intel_engine_enable_breadcrumb_irq(struct intel_engine_cs *engine);
+void intel_engine_enable_fake_irq(struct intel_engine_cs *engine);
+void intel_engine_fini_breadcrumbs(struct intel_engine_cs *engine);
 
 #endif /* _INTEL_RINGBUFFER_H_ */

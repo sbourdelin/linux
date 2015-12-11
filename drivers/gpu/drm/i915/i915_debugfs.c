@@ -730,10 +730,22 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 static void i915_ring_seqno_info(struct seq_file *m,
 				 struct intel_engine_cs *ring)
 {
+	struct rb_node *rb;
+
 	if (ring->get_seqno) {
 		seq_printf(m, "Current sequence (%s): %x\n",
 			   ring->name, ring->get_seqno(ring, false));
 	}
+
+	spin_lock(&ring->breadcrumbs.lock);
+	for (rb = rb_first(&ring->breadcrumbs.requests);
+	     rb != NULL;
+	     rb = rb_next(rb)) {
+		struct intel_breadcrumb *b = container_of(rb, typeof(*b), node);
+		seq_printf(m, "Waiting (%s): %s [%d] on %x\n",
+			   ring->name, b->task->comm, b->task->pid, b->seqno);
+	}
+	spin_unlock(&ring->breadcrumbs.lock);
 }
 
 static int i915_gem_seqno_info(struct seq_file *m, void *data)
@@ -1356,8 +1368,9 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 
 	for_each_ring(ring, dev_priv, i) {
 		seq_printf(m, "%s:\n", ring->name);
-		seq_printf(m, "\tseqno = %x [current %x]\n",
-			   ring->hangcheck.seqno, seqno[i]);
+		seq_printf(m, "\tseqno = %x [current %x], waiters? %d\n",
+			   ring->hangcheck.seqno, seqno[i],
+			   intel_engine_has_waiter(ring));
 		seq_printf(m, "\tACTHD = 0x%08llx [current 0x%08llx]\n",
 			   (long long)ring->hangcheck.acthd,
 			   (long long)acthd[i]);
@@ -2322,7 +2335,7 @@ static int count_irq_waiters(struct drm_i915_private *i915)
 	int i;
 
 	for_each_ring(ring, i915, i)
-		count += ring->irq_refcount;
+		count += intel_engine_has_waiter(ring);
 
 	return count;
 }
