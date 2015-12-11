@@ -2907,12 +2907,6 @@ i915_gem_retire_requests_ring(struct intel_engine_cs *ring)
 		i915_gem_object_retire__read(obj, ring->id);
 	}
 
-	if (unlikely(ring->trace_irq_req &&
-		     i915_gem_request_completed(ring->trace_irq_req))) {
-		ring->irq_put(ring);
-		i915_gem_request_assign(&ring->trace_irq_req, NULL);
-	}
-
 	WARN_ON(i915_verify_lists(ring->dev));
 }
 

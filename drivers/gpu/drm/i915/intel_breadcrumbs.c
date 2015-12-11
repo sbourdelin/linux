@@ -258,17 +258,56 @@ void intel_engine_remove_breadcrumb(struct intel_engine_cs *engine,
 	spin_unlock(&b->lock);
 }
 
+static void intel_breadcrumbs_tracer(struct work_struct *work)
+{
+	struct intel_breadcrumbs *b =
+		container_of(work, struct intel_breadcrumbs, trace);
+	struct intel_rps_client rps;
+
+	INIT_LIST_HEAD(&rps.link);
+
+	do {
+		struct drm_i915_gem_request *request;
+
+		spin_lock(&b->lock);
+		request = b->trace_request;
+		b->trace_request = NULL;
+		spin_unlock(&b->lock);
+		if (request == NULL)
+			return;
+
+		__i915_wait_request(request, true, NULL, &rps);
+		i915_gem_request_unreference__unlocked(request);
+	} while (1);
+}
+
+void intel_breadcrumbs_enable_trace(struct drm_i915_gem_request *request)
+{
+	struct intel_breadcrumbs *b = &request->ring->breadcrumbs;
+
+	spin_lock(&b->lock);
+	if (b->trace_request == NULL) {
+		b->trace_request = i915_gem_request_reference(request);
+		queue_work(system_long_wq, &b->trace);
+	}
+	spin_unlock(&b->lock);
+}
+
 void intel_engine_init_breadcrumbs(struct intel_engine_cs *engine)
 {
 	struct intel_breadcrumbs *b = &engine->breadcrumbs;
 
 	spin_lock_init(&b->lock);
 	setup_timer(&b->fake_irq, intel_breadcrumbs_fake_irq, (unsigned long)b);
+	INIT_WORK(&b->trace, intel_breadcrumbs_tracer);
 }
 
 void intel_engine_fini_breadcrumbs(struct intel_engine_cs *engine)
 {
 	struct intel_breadcrumbs *b = &engine->breadcrumbs;
+
+	cancel_work_sync(&b->trace);
+	i915_gem_request_unreference(b->trace_request);
 
 	del_timer_sync(&b->fake_irq);
 }

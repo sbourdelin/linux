@@ -182,6 +182,8 @@ struct  intel_engine_cs {
 		struct rb_root requests; /* sorted by retirement */
 		struct task_struct *first_waiter; /* bh for user interrupts */
 		struct timer_list fake_irq; /* used after a missed interrupt */
+		struct work_struct trace;
+		struct drm_i915_gem_request *trace_request;
 		bool irq_enabled;
 		bool rpm_wakelock;
 	} breadcrumbs;
@@ -198,7 +200,6 @@ struct  intel_engine_cs {
 
 	unsigned irq_refcount; /* protected by dev_priv->irq_lock */
 	u32		irq_enable_mask;	/* bitmask to enable ring interrupt */
-	struct drm_i915_gem_request *trace_irq_req;
 	bool __must_check (*irq_get)(struct intel_engine_cs *ring);
 	void		(*irq_put)(struct intel_engine_cs *ring);
 
@@ -555,6 +556,7 @@ bool intel_engine_add_breadcrumb(struct intel_engine_cs *engine,
 				 struct intel_breadcrumb *wait);
 void intel_engine_remove_breadcrumb(struct intel_engine_cs *engine,
 				    struct intel_breadcrumb *wait);
+void intel_breadcrumbs_enable_trace(struct drm_i915_gem_request *request);
 static inline bool intel_engine_has_waiter(struct intel_engine_cs *engine)
 {
 	return READ_ONCE(engine->breadcrumbs.first_waiter);
