@@ -36,6 +36,13 @@
 #include <asm/machdep.h>
 
 #undef DEBUG_NVRAM
+#define DEBUG_NVRAM
+struct x{
+	char name[12];
+	unsigned int size;
+};
+#define IOC_NVRAM_CREATE        _IOWR('p', 0x44, struct x)
+#define IOC_NVRAM_REMOVE        _IOWR('p', 0x45, struct x)
 
 #define NVRAM_HEADER_LEN	sizeof(struct nvram_header)
 #define NVRAM_BLOCK_LEN		NVRAM_HEADER_LEN
@@ -835,9 +842,12 @@ out:
 
 }
 
+static void nvram_print_partitions(char * label);
+
 static long dev_nvram_ioctl(struct file *file, unsigned int cmd,
 			    unsigned long arg)
 {
+	int remove = 0;
 	switch(cmd) {
 #ifdef CONFIG_PPC_PMAC
 	case OBSOLETE_PMAC_NVRAM_GET_OFFSET:
@@ -859,6 +869,25 @@ static long dev_nvram_ioctl(struct file *file, unsigned int cmd,
 		return 0;
 	}
 #endif /* CONFIG_PPC_PMAC */
+	case IOC_NVRAM_REMOVE:
+		remove  = 1;
+	case IOC_NVRAM_CREATE: {
+		struct x h;
+		if (copy_from_user(&h, (void __user*)arg, sizeof(h)) != 0) {
+			printk("XINHUI: %s fails\n", __func__);
+			return 0;
+		}
+		printk("XINHUI: %s, [%s],[%d]\n", __func__, h.name, h.size);
+		if (remove == 0)
+			nvram_create_partition(h.name, 0xef, h.size, 0x100);
+		else
+			nvram_remove_partition(h.name, 0xef, NULL);
+       }
+
+#ifdef DEBUG_NVRAM
+		nvram_print_partitions("NVRAM Partitions");
+#endif
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -870,6 +899,7 @@ const struct file_operations nvram_fops = {
 	.read		= dev_nvram_read,
 	.write		= dev_nvram_write,
 	.unlocked_ioctl	= dev_nvram_ioctl,
+	.compat_ioctl	= dev_nvram_ioctl,
 };
 
 static struct miscdevice nvram_dev = {
@@ -880,7 +910,7 @@ static struct miscdevice nvram_dev = {
 
 
 #ifdef DEBUG_NVRAM
-static void __init nvram_print_partitions(char * label)
+static void nvram_print_partitions(char * label)
 {
 	struct nvram_partition * tmp_part;
 	
@@ -896,7 +926,7 @@ static void __init nvram_print_partitions(char * label)
 #endif
 
 
-static int __init nvram_write_header(struct nvram_partition * part)
+static int nvram_write_header(struct nvram_partition * part)
 {
 	loff_t tmp_index;
 	int rc;
@@ -912,7 +942,7 @@ static int __init nvram_write_header(struct nvram_partition * part)
 }
 
 
-static unsigned char __init nvram_checksum(struct nvram_header *p)
+static unsigned char nvram_checksum(struct nvram_header *p)
 {
 	unsigned int c_sum, c_sum2;
 	unsigned short *sp = (unsigned short *)p->name; /* assume 6 shorts */
@@ -957,7 +987,7 @@ static int nvram_can_remove_partition(struct nvram_partition *part,
  *        leave these alone.
  */
 
-int __init nvram_remove_partition(const char *name, int sig,
+int nvram_remove_partition(const char *name, int sig,
 						const char *exceptions[])
 {
 	struct nvram_partition *part, *prev, *tmp;
@@ -1015,7 +1045,7 @@ int __init nvram_remove_partition(const char *name, int sig,
  * you need to query for the actual size yourself after the
  * call using nvram_partition_get_size().
  */
-loff_t __init nvram_create_partition(const char *name, int sig,
+loff_t nvram_create_partition(const char *name, int sig,
 				     int req_size, int min_size)
 {
 	struct nvram_partition *part;
