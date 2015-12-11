@@ -735,6 +735,9 @@ static void i915_ring_seqno_info(struct seq_file *m,
 	seq_printf(m, "Current sequence (%s): %x\n",
 		   ring->name, intel_ring_get_seqno(ring));
 
+	seq_printf(m, "Current user interrupts (%s): %x\n",
+		   ring->name, READ_ONCE(ring->user_interrupts));
+
 	spin_lock(&ring->breadcrumbs.lock);
 	for (rb = rb_first(&ring->breadcrumbs.requests);
 	     rb != NULL;
@@ -1369,6 +1372,9 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 		seq_printf(m, "\tseqno = %x [current %x], waiters? %d\n",
 			   ring->hangcheck.seqno, seqno[i],
 			   intel_engine_has_waiter(ring));
+		seq_printf(m, "\tuser interrupts = %x [current %x]\n",
+			   ring->hangcheck.user_interrupts,
+			   ring->user_interrupts);
 		seq_printf(m, "\tACTHD = 0x%08llx [current 0x%08llx]\n",
 			   (long long)ring->hangcheck.acthd,
 			   (long long)acthd[i]);

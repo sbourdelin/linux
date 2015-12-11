@@ -90,6 +90,7 @@ struct intel_ring_hangcheck {
 	u64 acthd;
 	u64 max_acthd;
 	u32 seqno;
+	unsigned user_interrupts;
 	int score;
 	enum intel_ring_hangcheck_action action;
 	int deadlock;
@@ -323,6 +324,7 @@ struct  intel_engine_cs {
 	 * inspecting request list.
 	 */
 	u32 last_submitted_seqno;
+	unsigned user_interrupts;
 
 	bool gpu_caches_dirty;
 

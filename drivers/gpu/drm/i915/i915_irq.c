@@ -1000,6 +1000,7 @@ static void notify_ring(struct intel_engine_cs *ring)
 		return;
 
 	trace_i915_gem_request_notify(ring);
+	ring->user_interrupts++;
 	intel_engine_wakeup(ring);
 }
 
@@ -2974,12 +2975,14 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 	for_each_ring(ring, dev_priv, i) {
 		u64 acthd;
 		u32 seqno;
+		unsigned user_interrupts;
 		bool busy = true;
 
 		semaphore_clear_deadlocks(dev_priv);
 
 		acthd = intel_ring_get_active_head(ring);
 		seqno = intel_ring_get_seqno(ring);
+		user_interrupts = ring->user_interrupts;
 
 		if (ring->hangcheck.seqno == seqno) {
 			if (ring_idle(ring, seqno)) {
@@ -2987,7 +2990,8 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 
 				if (intel_engine_has_waiter(ring)) {
 					/* Issue a wake-up to catch stuck h/w. */
-					if (!test_and_set_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings)) {
+					if (ring->hangcheck.user_interrupts == user_interrupts &&
+					    !test_and_set_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings)) {
 						if (!test_bit(ring->id, &dev_priv->gpu_error.test_irq_rings))
 							DRM_ERROR("Hangcheck timer elapsed... %s idle\n",
 								  ring->name);
@@ -3051,6 +3055,7 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 
 		ring->hangcheck.seqno = seqno;
 		ring->hangcheck.acthd = acthd;
+		ring->hangcheck.user_interrupts = user_interrupts;
 		busy_count += busy;
 	}
 
