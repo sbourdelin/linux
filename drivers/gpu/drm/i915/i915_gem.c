@@ -1288,6 +1288,12 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 
 wakeup:		set_task_state(wait.task, state);
 
+		/* Before we do the heavier coherent read of the seqno,
+		 * check the value (hopefully) in the CPU cacheline.
+		 */
+		if (i915_gem_request_completed(req))
+			break;
+
 		/* Ensure our read of the seqno is coherent so that we
 		 * do not "miss an interrupt" (i.e. if this is the last
 		 * request and the seqno write from the GPU is not visible
@@ -1299,11 +1305,11 @@ wakeup:		set_task_state(wait.task, state);
 		 * but it is easier and safer to do it every time the waiter
 		 * is woken.
 		 */
-		if (req->ring->seqno_barrier)
+		if (req->ring->seqno_barrier) {
 			req->ring->seqno_barrier(req->ring);
-
-		if (i915_gem_request_completed(req))
-			break;
+			if (i915_gem_request_completed(req))
+				break;
+		}
 
 		/* We need to check whether any gpu reset happened in between
 		 * the request being submitted and now. If a reset has occurred,
