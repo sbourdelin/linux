@@ -75,6 +75,7 @@ extern struct dentry *user_path_create(int, const char __user *, struct path *, 
 extern void done_path_create(struct path *, struct dentry *);
 extern struct dentry *kern_path_locked(const char *, struct path *);
 extern int kern_path_mountpoint(int, const char *, struct path *, unsigned int);
+extern int kern_path_pts(struct path *path);
 
 extern struct dentry *lookup_one_len(const char *, struct dentry *, int);
 

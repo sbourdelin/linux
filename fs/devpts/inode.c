@@ -136,6 +136,50 @@ static inline struct pts_fs_info *DEVPTS_SB(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
+struct inode *devpts_ptmx(struct inode *inode, struct file *filp)
+{
+#ifdef CONFIG_DEVPTS_MULTIPLE_INSTANCES
+	struct path path, old;
+	struct super_block *sb;
+	struct dentry *root;
+
+	if (inode->i_sb->s_magic == DEVPTS_SUPER_MAGIC)
+		return inode;
+
+	old = filp->f_path;
+	path = old;
+	path_get(&path);
+	if (kern_path_pts(&path)) {
+		path_put(&path);
+		return ERR_PTR(-EINVAL);
+	}
+
+	sb = path.mnt->mnt_sb;
+	if (sb->s_magic != DEVPTS_SUPER_MAGIC) {
+		path_put(&path);
+		return ERR_PTR(-EINVAL);
+	}
+
+	/* Advance path to the ptmx dentry */
+	root = path.dentry;
+	path.dentry = dget(DEVPTS_SB(sb)->ptmx_dentry);
+	dput(root);
+
+	/*
+	 * Update filp with the new path so that userspace can use
+	 * fstat to know which instance of devpts is open, and so
+	 * userspace can use readlink /proc/self/fd/NNN to find the
+	 * path to the devpts filesystem for reporting slave inodes.
+	 */
+	inode = path.dentry->d_inode;
+	filp->f_path = path;
+	filp->f_inode = inode;
+	filp->f_mapping = inode->i_mapping;
+	path_put(&old);
+#endif
+	return inode;
+}
+
 static inline struct super_block *pts_sb_from_inode(struct inode *inode)
 {
 #ifdef CONFIG_DEVPTS_MULTIPLE_INSTANCES
@@ -175,7 +219,7 @@ static int parse_mount_options(char *data, int op, struct pts_mount_opts *opts)
 
 	/* newinstance makes sense only on initial mount */
 	if (op == PARSE_MOUNT)
-		opts->newinstance = 0;
+		opts->newinstance = 1;
 
 	while ((p = strsep(&data, ",")) != NULL) {
 		substring_t args[MAX_OPT_ARGS];

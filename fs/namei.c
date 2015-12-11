@@ -2514,6 +2514,75 @@ kern_path_mountpoint(int dfd, const char *name, struct path *path,
 }
 EXPORT_SYMBOL(kern_path_mountpoint);
 
+#ifdef CONFIG_DEVPTS_MULTIPLE_INSTANCES
+int kern_path_pts(struct path *path)
+{
+	/* This is a path walk to ${path}/../pts without permission checks */
+	struct path root;
+	struct dentry *parent, *pts;
+	struct qstr this;
+	int err;
+
+	get_fs_root(current->fs, &root);
+
+	/* Find the parent of the /dev/ptmx device node.
+	 * This is a variation of follow_dotdot.
+	 */
+	err = -ENOENT;
+	while (1) {
+		struct dentry *old = path->dentry;
+
+		if ((old == root.dentry) &&
+		    (path->mnt == root.mnt))
+			goto fail;
+
+		if (old != path->mnt->mnt_root) {
+			path->dentry = dget_parent(old);
+			dput(old);
+			if (unlikely(!path_connected(path)))
+				goto fail;
+			break;
+		}
+		if (!follow_up(path))
+			goto fail;
+	}
+	follow_mount(path);
+
+	/* In the parent directory find the cached pts dentry.  The
+	 * dentry must be cached if it is a mountpoint for the devpts
+	 * filesystem.
+	 */
+	parent = path->dentry;
+	this.name = "pts";
+	this.len = 3;
+	this.hash = full_name_hash(this.name, this.len);
+	if (parent->d_flags & DCACHE_OP_HASH) {
+		err = parent->d_op->d_hash(parent, &this);
+		if (err < 0)
+			goto fail;
+	}
+
+	err = -ENOENT;
+	mutex_lock(&parent->d_inode->i_mutex);
+	pts = d_lookup(parent, &this);
+	mutex_unlock(&parent->d_inode->i_mutex);
+	if (!pts)
+		goto fail;
+
+	/* Find what is mounted on pts */
+	path->dentry = pts;
+	dput(parent);
+	follow_mount(path);
+
+	path_put(&root);
+	return 0;
+
+fail:
+	path_put(&root);
+	return err;
+}
+#endif
+
 int __check_sticky(struct inode *dir, struct inode *inode)
 {
 	kuid_t fsuid = current_fsuid();

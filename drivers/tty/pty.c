@@ -738,6 +738,10 @@ static int ptmx_open(struct inode *inode, struct file *filp)
 	int retval;
 	int index;
 
+	inode = devpts_ptmx(inode, filp);
+	if (IS_ERR(inode))
+		return PTR_ERR(inode);
+
 	nonseekable_open(inode, filp);
 
 	/* We refuse fsnotify events on ptmx, since it's a shared resource */

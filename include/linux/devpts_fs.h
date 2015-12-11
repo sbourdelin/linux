@@ -17,6 +17,7 @@
 
 #ifdef CONFIG_UNIX98_PTYS
 
+struct inode *devpts_ptmx(struct inode *inode, struct file *filp);
 int devpts_new_index(struct inode *ptmx_inode);
 void devpts_kill_index(struct inode *ptmx_inode, int idx);
 /* mknod in devpts */
