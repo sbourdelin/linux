@@ -504,6 +504,18 @@ static inline size_t gen8_pte_count(uint64_t address, uint64_t length)
 	return i915_pte_count(address, length, GEN8_PDE_SHIFT);
 }
 
+/* Used to convert any address to canonical form.
+ * Starting from gen8, some commands (e.g. STATE_BASE_ADDRESS,
+ * MI_LOAD_REGISTER_MEM and others, see Broadwell PRM Vol2a) require the
+ * addresses to be in a canonical form:
+ * "GraphicsAddress[63:48] are ignored by the HW and assumed to be in correct
+ * canonical form [63:48] == [47]."
+ */
+static inline uint64_t gen8_canonical_addr(uint64_t address)
+{
+	return ((int64_t)address << 16) >> 16;
+}
+
 static inline dma_addr_t
 i915_page_dir_dma_addr(const struct i915_hw_ppgtt *ppgtt, const unsigned n)
 {

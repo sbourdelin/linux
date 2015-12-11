@@ -3470,12 +3470,17 @@ i915_gem_object_bind_to_vm(struct drm_i915_gem_object *obj,
 
 	if (flags & PIN_OFFSET_FIXED) {
 		uint64_t offset = flags & PIN_OFFSET_MASK;
+		uint64_t noncanonical_offset = offset & ((1ULL << 48) - 1);
 
-		if (offset & (alignment - 1) || offset + size > end) {
+		if (offset & (alignment - 1) ||
+		    noncanonical_offset + size > end ||
+		    offset != gen8_canonical_addr(offset)) {
 			ret = -EINVAL;
 			goto err_free_vma;
 		}
-		vma->node.start = offset;
+		/* While userspace is using addresses in canonical form, our
+		 * allocator is unaware of this */
+		vma->node.start = noncanonical_offset;
 		vma->node.size = size;
 		vma->node.color = obj->cache_level;
 		ret = drm_mm_reserve_node(&vm->mm, &vma->node);

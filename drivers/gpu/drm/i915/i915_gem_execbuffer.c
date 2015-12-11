@@ -249,6 +249,13 @@ static inline int use_cpu_reloc(struct drm_i915_gem_object *obj)
 		obj->cache_level != I915_CACHE_NONE);
 }
 
+static inline uint64_t
+relocation_target(struct drm_i915_gem_relocation_entry *reloc,
+		  uint64_t target_offset)
+{
+	return gen8_canonical_addr((int)reloc->delta + target_offset);
+}
+
 static int
 relocate_entry_cpu(struct drm_i915_gem_object *obj,
 		   struct drm_i915_gem_relocation_entry *reloc,
@@ -256,7 +263,7 @@ relocate_entry_cpu(struct drm_i915_gem_object *obj,
 {
 	struct drm_device *dev = obj->base.dev;
 	uint32_t page_offset = offset_in_page(reloc->offset);
-	uint64_t delta = reloc->delta + target_offset;
+	uint64_t delta = relocation_target(reloc, target_offset);
 	char *vaddr;
 	int ret;
 
@@ -292,7 +299,7 @@ relocate_entry_gtt(struct drm_i915_gem_object *obj,
 {
 	struct drm_device *dev = obj->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	uint64_t delta = reloc->delta + target_offset;
+	uint64_t delta = relocation_target(reloc, target_offset);
 	uint64_t offset;
 	void __iomem *reloc_page;
 	int ret;
@@ -347,7 +354,7 @@ relocate_entry_clflush(struct drm_i915_gem_object *obj,
 {
 	struct drm_device *dev = obj->base.dev;
 	uint32_t page_offset = offset_in_page(reloc->offset);
-	uint64_t delta = (int)reloc->delta + target_offset;
+	uint64_t delta = relocation_target(reloc, target_offset);
 	char *vaddr;
 	int ret;
 
@@ -395,7 +402,7 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 	target_i915_obj = target_vma->obj;
 	target_obj = &target_vma->obj->base;
 
-	target_offset = target_vma->node.start;
+	target_offset = gen8_canonical_addr(target_vma->node.start);
 
 	/* Sandybridge PPGTT errata: We need a global gtt mapping for MI and
 	 * pipe_control writes because the gpu doesn't properly redirect them
@@ -583,6 +590,7 @@ i915_gem_execbuffer_reserve_vma(struct i915_vma *vma,
 	struct drm_i915_gem_object *obj = vma->obj;
 	struct drm_i915_gem_exec_object2 *entry = vma->exec_entry;
 	uint64_t flags;
+	uint64_t offset;
 	int ret;
 
 	flags = PIN_USER;
@@ -625,8 +633,9 @@ i915_gem_execbuffer_reserve_vma(struct i915_vma *vma,
 			entry->flags |= __EXEC_OBJECT_HAS_FENCE;
 	}
 
-	if (entry->offset != vma->node.start) {
-		entry->offset = vma->node.start;
+	offset = gen8_canonical_addr(vma->node.start);
+	if (entry->offset != offset) {
+		entry->offset = offset;
 		*need_reloc = true;
 	}
 
