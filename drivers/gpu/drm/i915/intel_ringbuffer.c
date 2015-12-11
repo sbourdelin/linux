@@ -1503,109 +1503,56 @@ gen6_seqno_barrier(struct intel_engine_cs *ring)
 	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 }
 
-static bool
-gen5_ring_get_irq(struct intel_engine_cs *ring)
+static void
+gen5_ring_enable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	if (WARN_ON(!intel_irqs_enabled(dev_priv)))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0)
-		gen5_enable_gt_irq(dev_priv, ring->irq_enable_mask);
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
+	gen5_enable_gt_irq(ring->i915, ring->irq_enable_mask);
 }
 
 static void
-gen5_ring_put_irq(struct intel_engine_cs *ring)
+gen5_ring_disable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0)
-		gen5_disable_gt_irq(dev_priv, ring->irq_enable_mask);
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-}
-
-static bool
-i9xx_ring_get_irq(struct intel_engine_cs *ring)
-{
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	if (!intel_irqs_enabled(dev_priv))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0) {
-		dev_priv->irq_mask &= ~ring->irq_enable_mask;
-		I915_WRITE(IMR, dev_priv->irq_mask);
-		POSTING_READ(IMR);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
+	gen5_disable_gt_irq(ring->i915, ring->irq_enable_mask);
 }
 
 static void
-i9xx_ring_put_irq(struct intel_engine_cs *ring)
+i9xx_ring_enable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0) {
-		dev_priv->irq_mask |= ring->irq_enable_mask;
-		I915_WRITE(IMR, dev_priv->irq_mask);
-		POSTING_READ(IMR);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-}
-
-static bool
-i8xx_ring_get_irq(struct intel_engine_cs *ring)
-{
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	if (!intel_irqs_enabled(dev_priv))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0) {
-		dev_priv->irq_mask &= ~ring->irq_enable_mask;
-		I915_WRITE16(IMR, dev_priv->irq_mask);
-		POSTING_READ16(IMR);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
+	dev_priv->irq_mask &= ~ring->irq_enable_mask;
+	I915_WRITE(IMR, dev_priv->irq_mask);
+	POSTING_READ(IMR);
 }
 
 static void
-i8xx_ring_put_irq(struct intel_engine_cs *ring)
+i9xx_ring_disable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0) {
-		dev_priv->irq_mask |= ring->irq_enable_mask;
-		I915_WRITE16(IMR, dev_priv->irq_mask);
-		POSTING_READ16(IMR);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
+	dev_priv->irq_mask |= ring->irq_enable_mask;
+	I915_WRITE(IMR, dev_priv->irq_mask);
+	POSTING_READ(IMR);
+}
+
+static void
+i8xx_ring_enable_irq(struct intel_engine_cs *ring)
+{
+	struct drm_i915_private *dev_priv = ring->i915;
+
+	dev_priv->irq_mask &= ~ring->irq_enable_mask;
+	I915_WRITE16(IMR, dev_priv->irq_mask);
+	POSTING_READ16(IMR);
+}
+
+static void
+i8xx_ring_disable_irq(struct intel_engine_cs *ring)
+{
+	struct drm_i915_private *dev_priv = ring->i915;
+
+	dev_priv->irq_mask |= ring->irq_enable_mask;
+	I915_WRITE16(IMR, dev_priv->irq_mask);
+	POSTING_READ16(IMR);
 }
 
 static int
@@ -1645,128 +1592,77 @@ i9xx_add_request(struct drm_i915_gem_request *req)
 	return 0;
 }
 
-static bool
-gen6_ring_get_irq(struct intel_engine_cs *ring)
-{
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	if (WARN_ON(!intel_irqs_enabled(dev_priv)))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0) {
-		if (HAS_L3_DPF(dev) && ring->id == RCS)
-			I915_WRITE_IMR(ring,
-				       ~(ring->irq_enable_mask |
-					 GT_PARITY_ERROR(dev)));
-		else
-			I915_WRITE_IMR(ring, ~ring->irq_enable_mask);
-		gen5_enable_gt_irq(dev_priv, ring->irq_enable_mask);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
-}
-
 static void
-gen6_ring_put_irq(struct intel_engine_cs *ring)
+gen6_ring_enable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0) {
-		if (HAS_L3_DPF(dev) && ring->id == RCS)
-			I915_WRITE_IMR(ring, ~GT_PARITY_ERROR(dev));
-		else
-			I915_WRITE_IMR(ring, ~0);
-		gen5_disable_gt_irq(dev_priv, ring->irq_enable_mask);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-}
-
-static bool
-hsw_vebox_get_irq(struct intel_engine_cs *ring)
-{
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	if (WARN_ON(!intel_irqs_enabled(dev_priv)))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0) {
+	if (HAS_L3_DPF(dev_priv) && ring->id == RCS)
+		I915_WRITE_IMR(ring,
+			       ~(ring->irq_enable_mask |
+				 GT_PARITY_ERROR(dev_priv)));
+	else
 		I915_WRITE_IMR(ring, ~ring->irq_enable_mask);
-		gen6_enable_pm_irq(dev_priv, ring->irq_enable_mask);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
+	gen5_enable_gt_irq(dev_priv, ring->irq_enable_mask);
 }
 
 static void
-hsw_vebox_put_irq(struct intel_engine_cs *ring)
+gen6_ring_disable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0) {
+	if (HAS_L3_DPF(dev_priv) && ring->id == RCS)
+		I915_WRITE_IMR(ring, ~GT_PARITY_ERROR(dev_priv));
+	else
 		I915_WRITE_IMR(ring, ~0);
-		gen6_disable_pm_irq(dev_priv, ring->irq_enable_mask);
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-}
-
-static bool
-gen8_ring_get_irq(struct intel_engine_cs *ring)
-{
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
-
-	if (WARN_ON(!intel_irqs_enabled(dev_priv)))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0) {
-		if (HAS_L3_DPF(dev) && ring->id == RCS) {
-			I915_WRITE_IMR(ring,
-				       ~(ring->irq_enable_mask |
-					 GT_RENDER_L3_PARITY_ERROR_INTERRUPT));
-		} else {
-			I915_WRITE_IMR(ring, ~ring->irq_enable_mask);
-		}
-		POSTING_READ(RING_IMR(ring->mmio_base));
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
+	gen5_disable_gt_irq(dev_priv, ring->irq_enable_mask);
 }
 
 static void
-gen8_ring_put_irq(struct intel_engine_cs *ring)
+hsw_vebox_enable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0) {
-		if (HAS_L3_DPF(dev) && ring->id == RCS) {
-			I915_WRITE_IMR(ring,
-				       ~GT_RENDER_L3_PARITY_ERROR_INTERRUPT);
-		} else {
-			I915_WRITE_IMR(ring, ~0);
-		}
-		POSTING_READ(RING_IMR(ring->mmio_base));
+	I915_WRITE_IMR(ring, ~ring->irq_enable_mask);
+	gen6_enable_pm_irq(dev_priv, ring->irq_enable_mask);
+}
+
+static void
+hsw_vebox_disable_irq(struct intel_engine_cs *ring)
+{
+	struct drm_i915_private *dev_priv = ring->i915;
+
+	I915_WRITE_IMR(ring, ~0);
+	gen6_disable_pm_irq(dev_priv, ring->irq_enable_mask);
+}
+
+static void
+gen8_ring_enable_irq(struct intel_engine_cs *ring)
+{
+	struct drm_i915_private *dev_priv = ring->i915;
+
+	if (HAS_L3_DPF(dev_priv) && ring->id == RCS) {
+		I915_WRITE_IMR(ring,
+			       ~(ring->irq_enable_mask |
+				 GT_RENDER_L3_PARITY_ERROR_INTERRUPT));
+	} else {
+		I915_WRITE_IMR(ring, ~ring->irq_enable_mask);
 	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
+	POSTING_READ(RING_IMR(ring->mmio_base));
+}
+
+static void
+gen8_ring_disable_irq(struct intel_engine_cs *ring)
+{
+	struct drm_i915_private *dev_priv = ring->i915;
+
+	if (HAS_L3_DPF(dev_priv) && ring->id == RCS) {
+		I915_WRITE_IMR(ring,
+			       ~GT_RENDER_L3_PARITY_ERROR_INTERRUPT);
+	} else {
+		I915_WRITE_IMR(ring, ~0);
+	}
+	POSTING_READ(RING_IMR(ring->mmio_base));
 }
 
 static int
@@ -2667,8 +2563,8 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		ring->init_context = intel_rcs_ctx_init;
 		ring->add_request = gen6_add_request;
 		ring->flush = gen8_render_ring_flush;
-		ring->irq_get = gen8_ring_get_irq;
-		ring->irq_put = gen8_ring_put_irq;
+		ring->irq_enable = gen8_ring_enable_irq;
+		ring->irq_disable = gen8_ring_disable_irq;
 		ring->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
 		ring->seqno_barrier = gen6_seqno_barrier;
 		if (i915_semaphore_is_enabled(dev)) {
@@ -2683,8 +2579,8 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		ring->flush = gen7_render_ring_flush;
 		if (INTEL_INFO(dev)->gen == 6)
 			ring->flush = gen6_render_ring_flush;
-		ring->irq_get = gen6_ring_get_irq;
-		ring->irq_put = gen6_ring_put_irq;
+		ring->irq_enable = gen6_ring_enable_irq;
+		ring->irq_disable = gen6_ring_disable_irq;
 		ring->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
 		ring->seqno_barrier = gen6_seqno_barrier;
 		if (i915_semaphore_is_enabled(dev)) {
@@ -2711,8 +2607,8 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 	} else if (IS_GEN5(dev)) {
 		ring->add_request = pc_render_add_request;
 		ring->flush = gen4_render_ring_flush;
-		ring->irq_get = gen5_ring_get_irq;
-		ring->irq_put = gen5_ring_put_irq;
+		ring->irq_enable = gen5_ring_enable_irq;
+		ring->irq_disable = gen5_ring_disable_irq;
 		ring->irq_enable_mask = GT_RENDER_USER_INTERRUPT |
 					GT_RENDER_PIPECTL_NOTIFY_INTERRUPT;
 	} else {
@@ -2722,11 +2618,11 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		else
 			ring->flush = gen4_render_ring_flush;
 		if (IS_GEN2(dev)) {
-			ring->irq_get = i8xx_ring_get_irq;
-			ring->irq_put = i8xx_ring_put_irq;
+			ring->irq_enable = i8xx_ring_enable_irq;
+			ring->irq_disable = i8xx_ring_disable_irq;
 		} else {
-			ring->irq_get = i9xx_ring_get_irq;
-			ring->irq_put = i9xx_ring_put_irq;
+			ring->irq_enable = i9xx_ring_enable_irq;
+			ring->irq_disable = i9xx_ring_disable_irq;
 		}
 		ring->irq_enable_mask = I915_USER_INTERRUPT;
 	}
@@ -2799,8 +2695,8 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 		if (INTEL_INFO(dev)->gen >= 8) {
 			ring->irq_enable_mask =
 				GT_RENDER_USER_INTERRUPT << GEN8_VCS1_IRQ_SHIFT;
-			ring->irq_get = gen8_ring_get_irq;
-			ring->irq_put = gen8_ring_put_irq;
+			ring->irq_enable = gen8_ring_enable_irq;
+			ring->irq_disable = gen8_ring_disable_irq;
 			ring->dispatch_execbuffer =
 				gen8_ring_dispatch_execbuffer;
 			if (i915_semaphore_is_enabled(dev)) {
@@ -2810,8 +2706,8 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 			}
 		} else {
 			ring->irq_enable_mask = GT_BSD_USER_INTERRUPT;
-			ring->irq_get = gen6_ring_get_irq;
-			ring->irq_put = gen6_ring_put_irq;
+			ring->irq_enable = gen6_ring_enable_irq;
+			ring->irq_disable = gen6_ring_disable_irq;
 			ring->dispatch_execbuffer =
 				gen6_ring_dispatch_execbuffer;
 			if (i915_semaphore_is_enabled(dev)) {
@@ -2835,12 +2731,12 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 		ring->add_request = i9xx_add_request;
 		if (IS_GEN5(dev)) {
 			ring->irq_enable_mask = ILK_BSD_USER_INTERRUPT;
-			ring->irq_get = gen5_ring_get_irq;
-			ring->irq_put = gen5_ring_put_irq;
+			ring->irq_enable = gen5_ring_enable_irq;
+			ring->irq_disable = gen5_ring_disable_irq;
 		} else {
 			ring->irq_enable_mask = I915_BSD_USER_INTERRUPT;
-			ring->irq_get = i9xx_ring_get_irq;
-			ring->irq_put = i9xx_ring_put_irq;
+			ring->irq_enable = i9xx_ring_enable_irq;
+			ring->irq_disable = i9xx_ring_disable_irq;
 		}
 		ring->dispatch_execbuffer = i965_dispatch_execbuffer;
 	}
@@ -2867,8 +2763,8 @@ int intel_init_bsd2_ring_buffer(struct drm_device *dev)
 	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_VCS2_IRQ_SHIFT;
-	ring->irq_get = gen8_ring_get_irq;
-	ring->irq_put = gen8_ring_put_irq;
+	ring->irq_enable = gen8_ring_enable_irq;
+	ring->irq_disable = gen8_ring_disable_irq;
 	ring->dispatch_execbuffer =
 			gen8_ring_dispatch_execbuffer;
 	if (i915_semaphore_is_enabled(dev)) {
@@ -2897,8 +2793,8 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen >= 8) {
 		ring->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_BCS_IRQ_SHIFT;
-		ring->irq_get = gen8_ring_get_irq;
-		ring->irq_put = gen8_ring_put_irq;
+		ring->irq_enable = gen8_ring_enable_irq;
+		ring->irq_disable = gen8_ring_disable_irq;
 		ring->dispatch_execbuffer = gen8_ring_dispatch_execbuffer;
 		if (i915_semaphore_is_enabled(dev)) {
 			ring->semaphore.sync_to = gen8_ring_sync;
@@ -2907,8 +2803,8 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 		}
 	} else {
 		ring->irq_enable_mask = GT_BLT_USER_INTERRUPT;
-		ring->irq_get = gen6_ring_get_irq;
-		ring->irq_put = gen6_ring_put_irq;
+		ring->irq_enable = gen6_ring_enable_irq;
+		ring->irq_disable = gen6_ring_disable_irq;
 		ring->dispatch_execbuffer = gen6_ring_dispatch_execbuffer;
 		if (i915_semaphore_is_enabled(dev)) {
 			ring->semaphore.signal = gen6_signal;
@@ -2954,8 +2850,8 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen >= 8) {
 		ring->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_VECS_IRQ_SHIFT;
-		ring->irq_get = gen8_ring_get_irq;
-		ring->irq_put = gen8_ring_put_irq;
+		ring->irq_enable = gen8_ring_enable_irq;
+		ring->irq_disable = gen8_ring_disable_irq;
 		ring->dispatch_execbuffer = gen8_ring_dispatch_execbuffer;
 		if (i915_semaphore_is_enabled(dev)) {
 			ring->semaphore.sync_to = gen8_ring_sync;
@@ -2964,8 +2860,8 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 		}
 	} else {
 		ring->irq_enable_mask = PM_VEBOX_USER_INTERRUPT;
-		ring->irq_get = hsw_vebox_get_irq;
-		ring->irq_put = hsw_vebox_put_irq;
+		ring->irq_enable = hsw_vebox_enable_irq;
+		ring->irq_disable = hsw_vebox_disable_irq;
 		ring->dispatch_execbuffer = gen6_ring_dispatch_execbuffer;
 		if (i915_semaphore_is_enabled(dev)) {
 			ring->semaphore.sync_to = gen6_ring_sync;

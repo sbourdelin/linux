@@ -1610,37 +1610,20 @@ static int gen8_emit_bb_start(struct drm_i915_gem_request *req,
 	return 0;
 }
 
-static bool gen8_logical_ring_get_irq(struct intel_engine_cs *ring)
+static void gen8_logical_ring_enable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	if (WARN_ON(!intel_irqs_enabled(dev_priv)))
-		return false;
-
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (ring->irq_refcount++ == 0) {
-		I915_WRITE_IMR(ring, ~(ring->irq_enable_mask | ring->irq_keep_mask));
-		POSTING_READ(RING_IMR(ring->mmio_base));
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
-
-	return true;
+	I915_WRITE_IMR(ring, ~(ring->irq_enable_mask | ring->irq_keep_mask));
+	POSTING_READ(RING_IMR(ring->mmio_base));
 }
 
-static void gen8_logical_ring_put_irq(struct intel_engine_cs *ring)
+static void gen8_logical_ring_disable_irq(struct intel_engine_cs *ring)
 {
-	struct drm_device *dev = ring->dev;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long flags;
+	struct drm_i915_private *dev_priv = ring->i915;
 
-	spin_lock_irqsave(&dev_priv->irq_lock, flags);
-	if (--ring->irq_refcount == 0) {
-		I915_WRITE_IMR(ring, ~ring->irq_keep_mask);
-		POSTING_READ(RING_IMR(ring->mmio_base));
-	}
-	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
+	I915_WRITE_IMR(ring, ~ring->irq_keep_mask);
+	POSTING_READ(RING_IMR(ring->mmio_base));
 }
 
 static int gen8_emit_flush(struct drm_i915_gem_request *request,
@@ -1963,8 +1946,8 @@ static int logical_render_ring_init(struct drm_device *dev)
 	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush_render;
-	ring->irq_get = gen8_logical_ring_get_irq;
-	ring->irq_put = gen8_logical_ring_put_irq;
+	ring->irq_enable = gen8_logical_ring_enable_irq;
+	ring->irq_disable = gen8_logical_ring_disable_irq;
 	ring->emit_bb_start = gen8_emit_bb_start;
 
 	ring->dev = dev;
@@ -2009,8 +1992,8 @@ static int logical_bsd_ring_init(struct drm_device *dev)
 	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
-	ring->irq_get = gen8_logical_ring_get_irq;
-	ring->irq_put = gen8_logical_ring_put_irq;
+	ring->irq_enable = gen8_logical_ring_enable_irq;
+	ring->irq_disable = gen8_logical_ring_disable_irq;
 	ring->emit_bb_start = gen8_emit_bb_start;
 
 	return logical_ring_init(dev, ring);
@@ -2033,8 +2016,8 @@ static int logical_bsd2_ring_init(struct drm_device *dev)
 	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
-	ring->irq_get = gen8_logical_ring_get_irq;
-	ring->irq_put = gen8_logical_ring_put_irq;
+	ring->irq_enable = gen8_logical_ring_enable_irq;
+	ring->irq_disable = gen8_logical_ring_disable_irq;
 	ring->emit_bb_start = gen8_emit_bb_start;
 
 	return logical_ring_init(dev, ring);
@@ -2057,8 +2040,8 @@ static int logical_blt_ring_init(struct drm_device *dev)
 	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
-	ring->irq_get = gen8_logical_ring_get_irq;
-	ring->irq_put = gen8_logical_ring_put_irq;
+	ring->irq_enable = gen8_logical_ring_enable_irq;
+	ring->irq_disable = gen8_logical_ring_disable_irq;
 	ring->emit_bb_start = gen8_emit_bb_start;
 
 	return logical_ring_init(dev, ring);
@@ -2081,8 +2064,8 @@ static int logical_vebox_ring_init(struct drm_device *dev)
 	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
-	ring->irq_get = gen8_logical_ring_get_irq;
-	ring->irq_put = gen8_logical_ring_put_irq;
+	ring->irq_enable = gen8_logical_ring_enable_irq;
+	ring->irq_disable = gen8_logical_ring_disable_irq;
 	ring->emit_bb_start = gen8_emit_bb_start;
 
 	return logical_ring_init(dev, ring);

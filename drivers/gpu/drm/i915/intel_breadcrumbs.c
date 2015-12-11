@@ -46,12 +46,16 @@ static void intel_breadcrumbs_fake_irq(unsigned long data)
 
 static void irq_enable(struct intel_engine_cs *engine)
 {
-	WARN_ON(!engine->irq_get(engine));
+	spin_lock_irq(&engine->i915->irq_lock);
+	engine->irq_enable(engine);
+	spin_unlock_irq(&engine->i915->irq_lock);
 }
 
 static void irq_disable(struct intel_engine_cs *engine)
 {
-	engine->irq_put(engine);
+	spin_lock_irq(&engine->i915->irq_lock);
+	engine->irq_disable(engine);
+	spin_unlock_irq(&engine->i915->irq_lock);
 }
 
 static void __intel_breadcrumbs_enable_irq(struct intel_breadcrumbs *b)
