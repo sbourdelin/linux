@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <sound/hda_register.h>
 #include <sound/hdaudio_ext.h>
+#include <linux/pci.h>
 
 /*
  * maximum HDAC capablities we should parse to avoid endless looping:
@@ -306,3 +307,25 @@ int snd_hdac_ext_bus_link_power_down_all(struct hdac_ext_bus *ebus)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_link_power_down_all);
+
+static void update_pci_dword(struct pci_dev *pci,
+			unsigned int reg, u32 mask, u32 val)
+{
+	u32 data;
+
+	pci_read_config_dword(pci, reg, &data);
+	data &= ~mask;
+	data |= (val & mask);
+	pci_write_config_dword(pci, reg, data);
+}
+
+void snd_hdac_ext_bus_enable_miscbdcge(struct device *dev, bool enable)
+{
+	struct pci_dev *pci = to_pci_dev(dev);
+	u32 val;
+
+	val = enable ? AZX_CGCTL_MISCBDCGE_MASK : 0;
+
+	update_pci_dword(pci, AZX_PCIREG_CGCTL, AZX_CGCTL_MISCBDCGE_MASK, val);
+}
+EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_enable_miscbdcge);

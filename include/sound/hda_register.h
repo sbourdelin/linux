@@ -96,6 +96,9 @@ enum { SDI0, SDI1, SDI2, SDI3, SDO0, SDO1, SDO2, SDO3 };
 /* PCI space */
 #define AZX_PCIREG_TCSEL		0x44
 
+#define AZX_PCIREG_CGCTL               0x48
+#define AZX_CGCTL_MISCBDCGE_MASK       (1 << 6)
+
 /*
  * other constants
  */
