@@ -1745,18 +1745,24 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 	return 0;
 }
 
-static void bxt_seqno_barrier(struct intel_engine_cs *ring)
+static void
+gen6_seqno_barrier(struct intel_engine_cs *ring)
 {
-	/*
-	 * On BXT A steppings there is a HW coherency issue whereby the
-	 * MI_STORE_DATA_IMM storing the completed request's seqno
-	 * occasionally doesn't invalidate the CPU cache. Work around this by
-	 * clflushing the corresponding cacheline whenever the caller wants
-	 * the coherency to be guaranteed. Note that this cacheline is known
-	 * to be clean at this point, since we only write it in
-	 * bxt_a_set_seqno(), where we also do a clflush after the write. So
-	 * this clflush in practice becomes an invalidate operation.
+	/* Workaround to force correct ordering between irq and seqno writes on
+	 * ivb (and maybe also on snb) by reading from a CS register (like
+	 * ACTHD) before reading the status page.
+	 *
+	 * Note that this effectively effectively stalls the read by the time
+	 * it takes to do a memory transaction, which more or less ensures
+	 * that the write from the GPU has sufficient time to invalidate
+	 * the CPU cacheline. Alternatively we could delay the interrupt from
+	 * the CS ring to give the write time to land, but that would incur
+	 * a delay after every batch i.e. much more frequent than a delay
+	 * when waiting for the interrupt (with the same net latency).
 	 */
+	struct drm_i915_private *dev_priv = ring->i915;
+	POSTING_READ_FW(RING_ACTHD(ring->mmio_base));
+
 	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 }
 
@@ -1954,8 +1960,7 @@ static int logical_render_ring_init(struct drm_device *dev)
 		ring->init_hw = gen8_init_render_ring;
 	ring->init_context = gen8_init_rcs_context;
 	ring->cleanup = intel_fini_pipe_control;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
-		ring->seqno_barrier = bxt_seqno_barrier;
+	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush_render;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2001,8 +2006,7 @@ static int logical_bsd_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VCS1_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
-		ring->seqno_barrier = bxt_seqno_barrier;
+	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2026,6 +2030,7 @@ static int logical_bsd2_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VCS2_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
+	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2049,8 +2054,7 @@ static int logical_blt_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_BCS_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
-		ring->seqno_barrier = bxt_seqno_barrier;
+	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2074,8 +2078,7 @@ static int logical_vebox_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VECS_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
-		ring->seqno_barrier = bxt_seqno_barrier;
+	ring->seqno_barrier = gen6_seqno_barrier;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
