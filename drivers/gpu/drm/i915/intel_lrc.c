@@ -670,6 +670,12 @@ int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request
 			return ret;
 	}
 
+	/* Reserve GuC WQ space here (one request needs one WQ item) because
+	 * the later i915_add_request() call can't fail. */
+	ret = i915_guc_wq_check_space(request->i915->guc.execbuf_client);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
