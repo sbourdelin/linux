@@ -708,15 +708,18 @@ generic_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
 
 	if (!buffer) {
 		for_each_xattr_handler(handlers, handler) {
-			if (handler->list(dentry))
-				size += strlen(handler->name) + 1;
+			if (!handler->name ||
+			    (handler->list && !handler->list(dentry)))
+				continue;
+			size += strlen(handler->name) + 1;
 		}
 	} else {
 		char *buf = buffer;
 		size_t len;
 
 		for_each_xattr_handler(handlers, handler) {
-			if (!handler->list(dentry))
+			if (!handler->name ||
+			    (handler->list && !handler->list(dentry)))
 				continue;
 			len = strlen(handler->name);
 			if (len + 1 > buffer_size)
