@@ -99,7 +99,7 @@ static ssize_t path_show(struct pci_slot *pci_slot, char *buf)
 	if (!slot)
 		return retval;
 
-	retval = sprintf (buf, "%s\n", slot->physical_path);
+	retval = sprintf(buf, "%s\n", slot->physical_path);
 	return retval;
 }
 
@@ -291,7 +291,7 @@ static int sn_slot_disable(struct hotplug_slot *bss_hotplug_slot,
 	}
 
 	if ((action == PCI_REQ_SLOT_ELIGIBLE) && (rc == PCI_L1_ERR)) {
-		dev_dbg(&slot->pci_bus->self->dev, "L1 failure %d with message \n%s\n",
+		dev_dbg(&slot->pci_bus->self->dev, "L1 failure %d with message\n%s\n",
 			resp.resp_sub_errno, resp.resp_l1_msg);
 		return -EPERM;
 	}
@@ -313,7 +313,7 @@ static int sn_slot_disable(struct hotplug_slot *bss_hotplug_slot,
 	}
 
 	if ((action == PCI_REQ_SLOT_DISABLE) && rc) {
-		dev_dbg(&slot->pci_bus->self->dev,"remove failed rc = %d\n", rc);
+		dev_dbg(&slot->pci_bus->self->dev, "remove failed rc = %d\n", rc);
 	}
 
 	return rc;
@@ -333,6 +333,7 @@ static int enable_slot(struct hotplug_slot *bss_hotplug_slot)
 	int new_ppb = 0;
 	int rc;
 	char *ssdt = NULL;
+
 	void pcibios_fixup_device_resources(struct pci_dev *);
 
 	/* Serialize the Linux PCI infrastructure */
@@ -488,7 +489,7 @@ static int disable_slot(struct hotplug_slot *bss_hotplug_slot)
 
 	/* free the ACPI resources for the slot */
 	if (SN_ACPI_BASE_SUPPORT() &&
-            PCI_CONTROLLER(slot->pci_bus)->companion) {
+		PCI_CONTROLLER(slot->pci_bus)->companion) {
 		unsigned long long adr;
 		struct acpi_device *device;
 		acpi_handle phandle;
@@ -549,6 +550,7 @@ static int disable_slot(struct hotplug_slot *bss_hotplug_slot)
 	/* Remove the SSDT for the slot from the ACPI namespace */
 	if (SN_ACPI_BASE_SUPPORT() && ssdt_hdl) {
 		acpi_status ret;
+
 		ret = acpi_unload_parent_table(ssdt_hdl);
 		if (ACPI_FAILURE(ret)) {
 			acpi_handle_err(ssdt_hdl,

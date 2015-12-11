@@ -36,6 +36,7 @@
 static void rpaphp_release_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = (struct slot *) hotplug_slot->private;
+
 	dealloc_slot_struct(slot);
 }
 
@@ -48,7 +49,7 @@ void dealloc_slot_struct(struct slot *slot)
 }
 
 struct slot *alloc_slot_struct(struct device_node *dn,
-                       int drc_index, char *drc_name, int power_domain)
+		int drc_index, char *drc_name, int power_domain)
 {
 	struct slot *slot;
 

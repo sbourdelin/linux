@@ -115,8 +115,7 @@ static struct bin_attribute ibm_apci_table_attr = {
 	    .read = ibm_read_apci_table,
 	    .write = NULL,
 };
-static struct acpiphp_attention_info ibm_attention_info =
-{
+static struct acpiphp_attention_info ibm_attention_info = {
 	.set_attn = ibm_set_attention_status,
 	.get_attn = ibm_get_attention_status,
 	.owner = THIS_MODULE,
@@ -325,7 +324,7 @@ static int ibm_get_table_from_acpi(char **bufp)
 	}
 
 	size = 0;
-	for (i=0; i<package->package.count; i++) {
+	for (i = 0; i < package->package.count; i++) {
 		memcpy(&lbuf[size],
 				package->package.elements[i].buffer.pointer,
 				package->package.elements[i].buffer.length);

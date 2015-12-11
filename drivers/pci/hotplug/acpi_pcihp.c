@@ -36,10 +36,10 @@
 
 #define MY_NAME	"acpi_pcihp"
 
-#define dbg(fmt, arg...) do { if (debug_acpi) printk(KERN_DEBUG "%s: %s: " fmt , MY_NAME , __func__ , ## arg); } while (0)
-#define err(format, arg...) printk(KERN_ERR "%s: " format , MY_NAME , ## arg)
-#define info(format, arg...) printk(KERN_INFO "%s: " format , MY_NAME , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "%s: " format , MY_NAME , ## arg)
+#define dbg(fmt, arg...) do { if (debug_acpi) printk(KERN_DEBUG "%s: %s: " fmt, MY_NAME, __func__, ## arg); } while (0)
+#define err(format, arg...) printk(KERN_ERR "%s: " format, MY_NAME, ## arg)
+#define info(format, arg...) printk(KERN_INFO "%s: " format, MY_NAME, ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "%s: " format, MY_NAME, ## arg)
 
 #define	METHOD_NAME__SUN	"_SUN"
 #define	METHOD_NAME_OSHP	"OSHP"
@@ -123,6 +123,7 @@ int acpi_get_hp_hw_control_from_firmware(struct pci_dev *pdev, u32 flags)
 		 * space at all. Try to get acpi handle of parent pci bus.
 		 */
 		struct pci_bus *pbus;
+
 		for (pbus = pdev->bus; pbus; pbus = pbus->parent) {
 			handle = acpi_pci_get_bridge_handle(pbus);
 			if (handle)
@@ -132,8 +133,8 @@ int acpi_get_hp_hw_control_from_firmware(struct pci_dev *pdev, u32 flags)
 
 	while (handle) {
 		acpi_get_name(handle, ACPI_FULL_PATHNAME, &string);
-		dbg("Trying to get hotplug control for %s \n",
-		    (char *)string.pointer);
+		dbg("Trying to get hotplug control for %s\n",
+			(char *)string.pointer);
 		status = acpi_run_oshp(handle);
 		if (ACPI_SUCCESS(status))
 			goto got_one;
@@ -161,6 +162,7 @@ static int pcihp_is_ejectable(acpi_handle handle)
 {
 	acpi_status status;
 	unsigned long long removable;
+
 	if (!acpi_has_method(handle, "_ADR"))
 		return 0;
 	if (acpi_has_method(handle, "_EJ0"))
@@ -197,6 +199,7 @@ static acpi_status
 check_hotplug(acpi_handle handle, u32 lvl, void *context, void **rv)
 {
 	int *found = (int *)context;
+
 	if (pcihp_is_ejectable(handle)) {
 		*found = 1;
 		return AE_CTRL_TERMINATE;

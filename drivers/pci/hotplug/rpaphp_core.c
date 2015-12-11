@@ -94,7 +94,7 @@ static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 	int retval, level;
 	struct slot *slot = (struct slot *)hotplug_slot->private;
 
-	retval = rtas_get_power_level (slot->power_domain, &level);
+	retval = rtas_get_power_level(slot->power_domain, &level);
 	if (!retval)
 		*value = level;
 	return retval;
@@ -134,6 +134,7 @@ static int get_adapter_status(struct hotplug_slot *hotplug_slot, u8 *value)
 static enum pci_bus_speed get_max_bus_speed(struct slot *slot)
 {
 	enum pci_bus_speed speed;
+
 	switch (slot->type) {
 	case 1:
 	case 2:
