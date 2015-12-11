@@ -44,7 +44,7 @@ endif
 
 all:
 	for TARGET in $(TARGETS); do \
-		make -C $$TARGET; \
+		make -C $$TARGET || exit 1; \
 	done;
 
 run_tests: all
@@ -54,7 +54,7 @@ run_tests: all
 
 hotplug:
 	for TARGET in $(TARGETS_HOTPLUG); do \
-		make -C $$TARGET; \
+		make -C $$TARGET || exit 1; \
 	done;
 
 run_hotplug: hotplug
@@ -79,7 +79,7 @@ ifdef INSTALL_PATH
 	@# Ask all targets to install their files
 	mkdir -p $(INSTALL_PATH)
 	for TARGET in $(TARGETS); do \
-		make -C $$TARGET INSTALL_PATH=$(INSTALL_PATH)/$$TARGET install; \
+		make -C $$TARGET INSTALL_PATH=$(INSTALL_PATH)/$$TARGET install || exit 1; \
 	done;
 
 	@# Ask all targets to emit their test scripts

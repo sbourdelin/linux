@@ -44,12 +44,14 @@ main()
 
 # Run install using INSTALL_KSFT_PATH override to generate install
 # directory
-./kselftest_install.sh
-tar $copts kselftest${ext} $install_dir
+./kselftest_install.sh || return
+tar $copts kselftest${ext} $install_dir || return
 echo "Kselftest archive kselftest${ext} created!"
-
-# clean up install directory
-rm -rf kselftest
 }
 
 main "$@"
+ret=$?
+# clean up install directory
+rm -rf kselftest
+
+exit $ret
