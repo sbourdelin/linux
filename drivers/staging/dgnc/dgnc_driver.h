@@ -24,6 +24,7 @@
 #include <linux/types.h>
 #include <linux/tty.h>
 #include <linux/interrupt.h>
+#include <linux/spinlock_types.h>
 
 #include "digi.h"		/* Digi specific ioctl header */
 #include "dgnc_sysfs.h"		/* Support for SYSFS */
@@ -88,7 +89,6 @@
 #define   _POSIX_VDISABLE '\0'
 #endif
 
-
 /*
  * All the possible states the driver can be while being loaded.
  */
@@ -105,7 +105,6 @@ enum {
 	BOARD_FOUND,
 	BOARD_READY
 };
-
 
 /*************************************************************************
  *
@@ -144,7 +143,6 @@ struct board_ops {
  * Device flag definitions for bd_flags.
  ************************************************************************/
 #define BD_IS_PCI_EXPRESS     0x0001	  /* Is a PCI Express board */
-
 
 /*
  *	Per-board information
@@ -205,18 +203,18 @@ struct dgnc_board {
 						 * to our channels.
 						 */
 
-	struct tty_driver	SerialDriver;
-	char		SerialName[200];
-	struct tty_driver	PrintDriver;
-	char		PrintName[200];
+	struct tty_driver	serial_driver;
+	char		serial_name[200];
+	struct tty_driver	print_driver;
+	char		print_name[200];
 
-	bool		dgnc_Major_Serial_Registered;
-	bool		dgnc_Major_TransparentPrint_Registered;
+	bool		dgnc_major_serial_registered;
+	bool		dgnc_major_transparent_print_registered;
 
-	uint		dgnc_Serial_Major;
-	uint		dgnc_TransparentPrint_Major;
+	uint		dgnc_serial_major;
+	uint		dgnc_transparent_print_major;
 
-	uint		TtyRefCnt;
+	uint		tty_ref_cnt;
 
 	u16		dpatype;	/* The board "type",
 					 * as defined by DPA
@@ -240,7 +238,6 @@ struct dgnc_board {
 	struct dgnc_proc_entry *dgnc_board_table;
 
 };
-
 
 /************************************************************************
  * Unit flag definitions for un_flags.
@@ -277,7 +274,6 @@ struct un_t {
 	struct device *un_sysfs;
 };
 
-
 /************************************************************************
  * Device flag definitions for ch_flags.
  ************************************************************************/
@@ -300,7 +296,6 @@ struct un_t {
 #define CH_FORCED_STOP  0x20000		/* Output is forcibly stopped	*/
 #define CH_FORCED_STOPI 0x40000		/* Input is forcibly stopped	*/
 
-
 /* Our Read/Error/Write queue sizes */
 #define RQUEUEMASK	0x1FFF		/* 8 K - 1 */
 #define EQUEUEMASK	0x1FFF		/* 8 K - 1 */
@@ -308,7 +303,6 @@ struct un_t {
 #define RQUEUESIZE	(RQUEUEMASK + 1)
 #define EQUEUESIZE	RQUEUESIZE
 #define WQUEUESIZE	(WQUEUEMASK + 1)
-
 
 /************************************************************************
  * Channel information structure.
@@ -397,7 +391,6 @@ struct channel_t {
 	ulong		ch_intr_tx;	/* Count of interrupts */
 	ulong		ch_intr_rx;	/* Count of interrupts */
 
-
 	/* /proc/<board>/<channel> entries */
 	struct proc_dir_entry *proc_entry_pointer;
 	struct dgnc_proc_entry *dgnc_channel_table;
@@ -407,12 +400,12 @@ struct channel_t {
 /*
  * Our Global Variables.
  */
-extern uint		dgnc_Major;		/* Our driver/mgmt major */
+extern uint		dgnc_major;		/* Our driver/mgmt major */
 extern int		dgnc_poll_tick;		/* Poll interval - 20 ms */
 extern spinlock_t	dgnc_global_lock;	/* Driver global spinlock */
 extern spinlock_t	dgnc_poll_lock;		/* Poll scheduling lock */
-extern uint		dgnc_NumBoards;		/* Total number of boards */
-extern struct dgnc_board	*dgnc_Board[MAXBOARDS];	/* Array of board
+extern uint		dgnc_num_boards;	/* Total number of boards */
+extern struct dgnc_board	*dgnc_board[MAXBOARDS];	/* Array of board
 							 * structs
 							 */
 
