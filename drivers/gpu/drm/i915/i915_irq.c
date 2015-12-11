@@ -3073,7 +3073,7 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 
 void i915_queue_hangcheck(struct drm_i915_private *dev_priv)
 {
-	struct i915_gpu_error *e = &dev_priv->gpu_error;
+	unsigned long delay;
 
 	if (!i915.enable_hangcheck)
 		return;
@@ -3083,8 +3083,8 @@ void i915_queue_hangcheck(struct drm_i915_private *dev_priv)
 	 * we will ignore a hung ring if a second ring is kept busy.
 	 */
 
-	queue_delayed_work(e->hangcheck_wq, &e->hangcheck_work,
-			   round_jiffies_up_relative(DRM_I915_HANGCHECK_JIFFIES));
+	delay = round_jiffies_up_relative(DRM_I915_HANGCHECK_JIFFIES);
+	schedule_delayed_work(&dev_priv->gpu_error.hangcheck_work, delay);
 }
 
 static void ibx_irq_reset(struct drm_device *dev)
