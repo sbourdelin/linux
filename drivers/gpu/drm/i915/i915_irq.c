@@ -1609,7 +1609,7 @@ static void gen6_rps_irq_handler(struct drm_i915_private *dev_priv, u32 pm_iir)
 		gen6_disable_pm_irq(dev_priv, pm_iir & dev_priv->pm_rps_events);
 		if (dev_priv->rps.interrupts_enabled) {
 			dev_priv->rps.pm_iir |= pm_iir & dev_priv->pm_rps_events;
-			queue_work(dev_priv->wq, &dev_priv->rps.work);
+			schedule_work(&dev_priv->rps.work);
 		}
 		spin_unlock(&dev_priv->irq_lock);
 	}
