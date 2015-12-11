@@ -111,6 +111,8 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
 	int err;
 	struct uart_port *port = &early_console_dev.port;
 
+	spin_lock_init(&port->lock);
+
 	/* On parsing error, pass the options buf to the setup function */
 	if (buf && !parse_options(&early_console_dev, buf))
 		buf = NULL;
@@ -202,6 +204,7 @@ int __init of_setup_earlycon(unsigned long addr,
 	int err;
 	struct uart_port *port = &early_console_dev.port;
 
+	spin_lock_init(&port->lock);
 	port->iotype = UPIO_MEM;
 	port->mapbase = addr;
 	port->uartclk = BASE_BAUD * 16;
