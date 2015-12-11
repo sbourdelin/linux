@@ -1974,6 +1974,15 @@ static int adv76xx_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 
 		v4l2_subdev_notify_event(sd, &adv76xx_ev_fmt);
 
+		/* update timings */
+		if (adv76xx_query_dv_timings(sd, &state->timings)
+		    == -ENOLINK) {
+			/* no signal, fall back to default timings */
+			const struct v4l2_dv_timings cea640x480 =
+				V4L2_DV_BT_CEA_640X480P59_94;
+			state->timings = cea640x480;
+		}
+
 		if (handled)
 			*handled = true;
 	}
