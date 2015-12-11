@@ -443,6 +443,9 @@ static long vfio_pci_ioctl(void *device_data,
 		if (vdev->reset_works)
 			info.flags |= VFIO_DEVICE_FLAGS_RESET;
 
+		if (vfio_pci_bar_page_aligned())
+			info.flags |= VFIO_DEVICE_FLAGS_PCI_PAGE_ALIGNED;
+
 		info.num_regions = VFIO_PCI_NUM_REGIONS;
 		info.num_irqs = VFIO_PCI_NUM_IRQS;
 
@@ -479,7 +482,8 @@ static long vfio_pci_ioctl(void *device_data,
 				     VFIO_REGION_INFO_FLAG_WRITE;
 			if (IS_ENABLED(CONFIG_VFIO_PCI_MMAP) &&
 			    pci_resource_flags(pdev, info.index) &
-			    IORESOURCE_MEM && info.size >= PAGE_SIZE)
+			    IORESOURCE_MEM && (info.size >= PAGE_SIZE ||
+			    vfio_pci_bar_page_aligned()))
 				info.flags |= VFIO_REGION_INFO_FLAG_MMAP;
 			break;
 		case VFIO_PCI_ROM_REGION_INDEX:
@@ -855,6 +859,10 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	phys_len = pci_resource_len(pdev, index);
+
+	if (vfio_pci_bar_page_aligned())
+		phys_len = PAGE_ALIGN(phys_len);
+
 	req_len = vma->vm_end - vma->vm_start;
 	pgoff = vma->vm_pgoff &
 		((1U << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1);
