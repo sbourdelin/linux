@@ -442,7 +442,7 @@ static int hidma_terminate_channel(struct dma_chan *chan)
 		/* move myself to free_list */
 		list_move(&mdesc->node, &mchan->free);
 	}
-
+	rc = hidma_ll_resume(dmadev->lldev);
 out:
 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
 	pm_runtime_put_autosuspend(dmadev->ddev.dev);
