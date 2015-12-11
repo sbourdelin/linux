@@ -519,10 +519,12 @@ void __handle_sysrq(int key, bool check_mask)
 {
 	struct sysrq_key_op *op_p;
 	int orig_log_level;
-	int i;
+	int i, idx;
+	struct srcu_struct sysrq_rcu;
 
+	init_srcu_struct(&sysrq_rcu);
 	rcu_sysrq_start();
-	rcu_read_lock();
+	idx = srcu_read_lock(&sysrq_rcu);
 	/*
 	 * Raise the apparent loglevel to maximum so that the sysrq header
 	 * is shown to provide the user with positive feedback.  We do not
@@ -564,7 +566,7 @@ void __handle_sysrq(int key, bool check_mask)
 		pr_cont("\n");
 		console_loglevel = orig_log_level;
 	}
-	rcu_read_unlock();
+	srcu_read_unlock(&sysrq_rcu, idx);
 	rcu_sysrq_end();
 }
 
