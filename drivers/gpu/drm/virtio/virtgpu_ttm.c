@@ -319,7 +319,7 @@ static void virtio_gpu_ttm_backend_destroy(struct ttm_tt *ttm)
 	kfree(gtt);
 }
 
-static struct ttm_backend_func virtio_gpu_backend_func = {
+static const struct ttm_backend_func virtio_gpu_backend_func = {
 	.bind = &virtio_gpu_ttm_backend_bind,
 	.unbind = &virtio_gpu_ttm_backend_unbind,
 	.destroy = &virtio_gpu_ttm_backend_destroy,

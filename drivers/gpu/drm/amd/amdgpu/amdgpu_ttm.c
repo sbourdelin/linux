@@ -638,7 +638,7 @@ static void amdgpu_ttm_backend_destroy(struct ttm_tt *ttm)
 	kfree(gtt);
 }
 
-static struct ttm_backend_func amdgpu_backend_func = {
+static const struct ttm_backend_func amdgpu_backend_func = {
 	.bind = &amdgpu_ttm_backend_bind,
 	.unbind = &amdgpu_ttm_backend_unbind,
 	.destroy = &amdgpu_ttm_backend_destroy,

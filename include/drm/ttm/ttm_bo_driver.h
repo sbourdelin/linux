@@ -113,7 +113,7 @@ enum ttm_caching_state {
 
 struct ttm_tt {
 	struct ttm_bo_device *bdev;
-	struct ttm_backend_func *func;
+	const struct ttm_backend_func *func;
 	struct page *dummy_read_page;
 	struct page **pages;
 	uint32_t page_flags;

@@ -180,7 +180,7 @@ static void bochs_ttm_backend_destroy(struct ttm_tt *tt)
 	kfree(tt);
 }
 
-static struct ttm_backend_func bochs_tt_backend_func = {
+static const struct ttm_backend_func bochs_tt_backend_func = {
 	.destroy = &bochs_ttm_backend_destroy,
 };
 

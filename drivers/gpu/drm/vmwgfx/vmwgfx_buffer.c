@@ -683,7 +683,7 @@ static void vmw_ttm_unpopulate(struct ttm_tt *ttm)
 		ttm_pool_unpopulate(ttm);
 }
 
-static struct ttm_backend_func vmw_ttm_func = {
+static const struct ttm_backend_func vmw_ttm_func = {
 	.bind = vmw_ttm_bind,
 	.unbind = vmw_ttm_unbind,
 	.destroy = vmw_ttm_destroy,

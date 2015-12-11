@@ -203,7 +203,7 @@ static void cirrus_ttm_backend_destroy(struct ttm_tt *tt)
 	kfree(tt);
 }
 
-static struct ttm_backend_func cirrus_tt_backend_func = {
+static const struct ttm_backend_func cirrus_tt_backend_func = {
 	.destroy = &cirrus_ttm_backend_destroy,
 };
 

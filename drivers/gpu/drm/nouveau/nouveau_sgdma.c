@@ -51,7 +51,7 @@ nv04_sgdma_unbind(struct ttm_tt *ttm)
 	return 0;
 }
 
-static struct ttm_backend_func nv04_sgdma_backend = {
+static const struct ttm_backend_func nv04_sgdma_backend = {
 	.bind			= nv04_sgdma_bind,
 	.unbind			= nv04_sgdma_unbind,
 	.destroy		= nouveau_sgdma_destroy
@@ -82,7 +82,7 @@ nv50_sgdma_unbind(struct ttm_tt *ttm)
 	return 0;
 }
 
-static struct ttm_backend_func nv50_sgdma_backend = {
+static const struct ttm_backend_func nv50_sgdma_backend = {
 	.bind			= nv50_sgdma_bind,
 	.unbind			= nv50_sgdma_unbind,
 	.destroy		= nouveau_sgdma_destroy

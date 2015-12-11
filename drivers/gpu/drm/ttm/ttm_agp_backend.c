@@ -104,7 +104,7 @@ static void ttm_agp_destroy(struct ttm_tt *ttm)
 	kfree(agp_be);
 }
 
-static struct ttm_backend_func ttm_agp_func = {
+static const struct ttm_backend_func ttm_agp_func = {
 	.bind = ttm_agp_bind,
 	.unbind = ttm_agp_unbind,
 	.destroy = ttm_agp_destroy,

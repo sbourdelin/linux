@@ -288,7 +288,7 @@ static void qxl_ttm_backend_destroy(struct ttm_tt *ttm)
 	kfree(gtt);
 }
 
-static struct ttm_backend_func qxl_backend_func = {
+static const struct ttm_backend_func qxl_backend_func = {
 	.bind = &qxl_ttm_backend_bind,
 	.unbind = &qxl_ttm_backend_unbind,
 	.destroy = &qxl_ttm_backend_destroy,

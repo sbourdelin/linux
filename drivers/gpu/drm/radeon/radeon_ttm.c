@@ -666,7 +666,7 @@ static void radeon_ttm_backend_destroy(struct ttm_tt *ttm)
 	kfree(gtt);
 }
 
-static struct ttm_backend_func radeon_backend_func = {
+static const struct ttm_backend_func radeon_backend_func = {
 	.bind = &radeon_ttm_backend_bind,
 	.unbind = &radeon_ttm_backend_unbind,
 	.destroy = &radeon_ttm_backend_destroy,
