@@ -9888,6 +9888,17 @@ static void haswell_get_ddi_pll(struct drm_i915_private *dev_priv,
 	}
 }
 
+void intel_get_ddi_pll(struct drm_i915_private *dev_priv, enum port port,
+			struct intel_crtc_state *pipe_config)
+{
+	if (IS_SKYLAKE(dev_priv))
+		skylake_get_ddi_pll(dev_priv, port, pipe_config);
+	else if (IS_BROXTON(dev_priv))
+		bxt_get_ddi_pll(dev_priv, port, pipe_config);
+	else
+		haswell_get_ddi_pll(dev_priv, port, pipe_config);
+}
+
 static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 				       struct intel_crtc_state *pipe_config)
 {
@@ -9901,12 +9912,7 @@ static void haswell_get_ddi_port_state(struct intel_crtc *crtc,
 
 	port = (tmp & TRANS_DDI_PORT_MASK) >> TRANS_DDI_PORT_SHIFT;
 
-	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
-		skylake_get_ddi_pll(dev_priv, port, pipe_config);
-	else if (IS_BROXTON(dev))
-		bxt_get_ddi_pll(dev_priv, port, pipe_config);
-	else
-		haswell_get_ddi_pll(dev_priv, port, pipe_config);
+	intel_get_ddi_pll(dev_priv, port, pipe_config);
 
 	if (pipe_config->shared_dpll >= 0) {
 		pll = &dev_priv->shared_dplls[pipe_config->shared_dpll];
