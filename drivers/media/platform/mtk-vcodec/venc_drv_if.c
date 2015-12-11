@@ -24,6 +24,7 @@
 #include "mtk_vpu.h"
 
 #include "venc_drv_base.h"
+#include "vp8_enc/venc_vp8_if.h"
 
 int venc_if_create(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
 {
@@ -34,6 +35,8 @@ int venc_if_create(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
 
 	switch (fourcc) {
 	case V4L2_PIX_FMT_VP8:
+                ctx->enc_if = get_vp8_enc_comm_if();
+                break;
 	case V4L2_PIX_FMT_H264:
 	default:
 		goto err_out;
