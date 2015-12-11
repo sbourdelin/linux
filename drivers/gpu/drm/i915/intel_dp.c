@@ -4643,6 +4643,71 @@ intel_dp_unset_edid(struct intel_dp *intel_dp)
 	intel_dp->has_audio = false;
 }
 
+static void intel_dp_upfront_dpms_off(struct drm_connector *connector,
+				struct drm_modeset_acquire_ctx *ctx)
+{
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
+	struct intel_load_detect_pipe tmp;
+
+	if (intel_get_load_detect_pipe(connector, NULL, &tmp, ctx)) {
+		crtc->acquire_ctx = ctx;
+		tmp.dpms_mode = DRM_MODE_DPMS_OFF;
+		intel_release_load_detect_pipe(connector, &tmp, ctx);
+	}
+}
+
+static void intel_dp_upfront_dpms_on(struct drm_connector *connector,
+				struct drm_modeset_acquire_ctx *ctx)
+{
+	struct intel_load_detect_pipe tmp;
+
+	intel_get_load_detect_pipe(connector, NULL, &tmp, ctx);
+
+	drm_modeset_drop_locks(ctx);
+	drm_modeset_acquire_fini(ctx);
+}
+
+static bool intel_dp_upfront_link_train(struct drm_connector *connector)
+{
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct drm_device *dev = intel_encoder->base.dev;
+	struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
+	struct intel_crtc *intel_crtc = crtc ? to_intel_crtc(crtc) : NULL;
+	struct drm_modeset_acquire_ctx ctx, *old_ctx = NULL;
+	bool ret = true, need_dpms_on = false;
+
+	if (!IS_BROXTON(dev))
+		return true;
+	/*
+	 * On hotplug cases, we call _upfront_link_train directly.
+	 * In connected boot scenarios (boot with {MIPI/eDP} + DP),
+	 * BIOS typically brings up DP. Hence, we disable the crtc
+	 * to do _upfront_link_training and then re-enable it back.
+	 */
+	if (crtc && crtc->enabled && intel_crtc->active) {
+		DRM_DEBUG_KMS("Disabling pipe %c\n", pipe_name(intel_crtc->pipe));
+		old_ctx = crtc->acquire_ctx;
+		drm_modeset_acquire_init(&ctx, 0);
+		intel_dp_upfront_dpms_off(connector, &ctx);
+		need_dpms_on = true;
+	}
+
+	if (HAS_DDI(dev))
+		ret = intel_ddi_upfront_link_train(intel_dp, intel_crtc);
+		/* Other platforms upfront link train call goes here..*/
+
+	if (need_dpms_on) {
+		intel_dp_upfront_dpms_on(connector, &ctx);
+		crtc->acquire_ctx = old_ctx;
+	}
+	return ret;
+}
+
+
 static enum drm_connector_status
 intel_dp_detect(struct drm_connector *connector, bool force)
 {
@@ -4652,7 +4717,7 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	struct drm_device *dev = connector->dev;
 	enum drm_connector_status status;
 	enum intel_display_power_domain power_domain;
-	bool ret;
+	bool ret, do_upfront_link_train;
 	u8 sink_irq_vector;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
@@ -4726,6 +4791,16 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
 	}
 
+	/* Do not do upfront link train, if it is a compliance request */
+	do_upfront_link_train =
+		intel_encoder->type == INTEL_OUTPUT_DISPLAYPORT &&
+		intel_dp->compliance_test_type != DP_TEST_LINK_TRAINING;
+
+	if (do_upfront_link_train) {
+		ret = intel_dp_upfront_link_train(connector);
+		if (!ret)
+			status = connector_status_disconnected;
+	}
 out:
 	intel_display_power_put(to_i915(dev), power_domain);
 	return status;
