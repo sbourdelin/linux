@@ -1265,7 +1265,8 @@ hsw_ddi_calculate_wrpll(int clock /* in Hz */,
 static bool
 hsw_ddi_pll_select(struct intel_crtc *intel_crtc,
 		   struct intel_crtc_state *crtc_state,
-		   struct intel_encoder *intel_encoder)
+		   struct intel_encoder *intel_encoder,
+		   bool find_dpll)
 {
 	int clock = crtc_state->port_clock;
 
@@ -1285,14 +1286,16 @@ hsw_ddi_pll_select(struct intel_crtc *intel_crtc,
 
 		crtc_state->dpll_hw_state.wrpll = val;
 
-		pll = intel_get_shared_dpll(intel_crtc, crtc_state);
-		if (pll == NULL) {
-			DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
-					 pipe_name(intel_crtc->pipe));
-			return false;
-		}
+		if (find_dpll) {
+			pll = intel_get_shared_dpll(intel_crtc, crtc_state);
+			if (pll == NULL) {
+				DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
+						 pipe_name(intel_crtc->pipe));
+				return false;
+			}
 
-		crtc_state->ddi_pll_sel = PORT_CLK_SEL_WRPLL(pll->id);
+			crtc_state->ddi_pll_sel = PORT_CLK_SEL_WRPLL(pll->id);
+		}
 	} else if (crtc_state->ddi_pll_sel == PORT_CLK_SEL_SPLL) {
 		struct drm_atomic_state *state = crtc_state->base.state;
 		struct intel_shared_dpll_config *spll =
@@ -1559,7 +1562,8 @@ skip_remaining_dividers:
 static bool
 skl_ddi_pll_select(struct intel_crtc *intel_crtc,
 		   struct intel_crtc_state *crtc_state,
-		   struct intel_encoder *intel_encoder)
+		   struct intel_encoder *intel_encoder,
+		   bool find_dpll)
 {
 	struct intel_shared_dpll *pll;
 	uint32_t ctrl1, cfgcr1, cfgcr2;
@@ -1613,15 +1617,17 @@ skl_ddi_pll_select(struct intel_crtc *intel_crtc,
 	crtc_state->dpll_hw_state.cfgcr1 = cfgcr1;
 	crtc_state->dpll_hw_state.cfgcr2 = cfgcr2;
 
-	pll = intel_get_shared_dpll(intel_crtc, crtc_state);
-	if (pll == NULL) {
-		DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
-				 pipe_name(intel_crtc->pipe));
-		return false;
-	}
+	if (find_dpll) {
+		pll = intel_get_shared_dpll(intel_crtc, crtc_state);
+		if (pll == NULL) {
+			DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
+					 pipe_name(intel_crtc->pipe));
+			return false;
+		}
 
-	/* shared DPLL id 0 is DPLL 1 */
-	crtc_state->ddi_pll_sel = pll->id + 1;
+		/* shared DPLL id 0 is DPLL 1 */
+		crtc_state->ddi_pll_sel = pll->id + 1;
+	}
 
 	return true;
 }
@@ -1651,7 +1657,8 @@ static const struct bxt_clk_div bxt_dp_clk_val[] = {
 static bool
 bxt_ddi_pll_select(struct intel_crtc *intel_crtc,
 		   struct intel_crtc_state *crtc_state,
-		   struct intel_encoder *intel_encoder)
+		   struct intel_encoder *intel_encoder,
+		   bool find_pll)
 {
 	struct intel_shared_dpll *pll;
 	struct bxt_clk_div clk_div = {0};
@@ -1760,15 +1767,17 @@ bxt_ddi_pll_select(struct intel_crtc *intel_crtc,
 	crtc_state->dpll_hw_state.pcsdw12 =
 		LANESTAGGER_STRAP_OVRD | lanestagger;
 
-	pll = intel_get_shared_dpll(intel_crtc, crtc_state);
-	if (pll == NULL) {
-		DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
-			pipe_name(intel_crtc->pipe));
-		return false;
-	}
+	if (find_pll) {
+		pll = intel_get_shared_dpll(intel_crtc, crtc_state);
+		if (pll == NULL) {
+			DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
+				pipe_name(intel_crtc->pipe));
+			return false;
+		}
 
-	/* shared DPLL id 0 is DPLL A */
-	crtc_state->ddi_pll_sel = pll->id;
+		/* shared DPLL id 0 is DPLL A */
+		crtc_state->ddi_pll_sel = pll->id;
+	}
 
 	return true;
 }
@@ -1782,7 +1791,8 @@ bxt_ddi_pll_select(struct intel_crtc *intel_crtc,
  */
 bool intel_ddi_pll_select(struct intel_crtc *intel_crtc,
 			  struct intel_crtc_state *crtc_state,
-			  struct intel_encoder *valid_encoder)
+			  struct intel_encoder *valid_encoder,
+			  bool find_dpll)
 {
 	struct drm_device *dev = intel_crtc->base.dev;
 	struct intel_encoder *intel_encoder;
@@ -1794,13 +1804,13 @@ bool intel_ddi_pll_select(struct intel_crtc *intel_crtc,
 
 	if (IS_SKYLAKE(dev) || IS_KABYLAKE(dev))
 		return skl_ddi_pll_select(intel_crtc, crtc_state,
-					  intel_encoder);
+					  intel_encoder, find_dpll);
 	else if (IS_BROXTON(dev))
 		return bxt_ddi_pll_select(intel_crtc, crtc_state,
-					  intel_encoder);
+					  intel_encoder, find_dpll);
 	else
 		return hsw_ddi_pll_select(intel_crtc, crtc_state,
-					  intel_encoder);
+					  intel_encoder, find_dpll);
 }
 
 void intel_ddi_set_pipe_settings(struct drm_crtc *crtc)
