@@ -1681,6 +1681,40 @@ void intel_dp_set_link_params(struct intel_dp *intel_dp,
 	intel_dp->lane_count = pipe_config->lane_count;
 }
 
+void intel_dp_update_dpcd_params(struct intel_dp *intel_dp)
+{
+	intel_dp->dpcd[DP_MAX_LANE_COUNT] &= ~DP_MAX_LANE_COUNT_MASK;
+	intel_dp->dpcd[DP_MAX_LANE_COUNT] |=
+			intel_dp->lane_count & DP_MAX_LANE_COUNT_MASK;
+
+	intel_dp->dpcd[DP_MAX_LINK_RATE] =
+			drm_dp_link_rate_to_bw_code(intel_dp->link_rate);
+}
+
+bool intel_dp_get_link_retry_params(uint8_t *lane_count, uint8_t *link_bw)
+{
+	/*
+	 * As per DP1.3 Spec, retry all link rates for a particular
+	 * lane count value, before reducing number of lanes.
+	 */
+	if (*link_bw == DP_LINK_BW_5_4) {
+		*link_bw = DP_LINK_BW_2_7;
+	} else if (*link_bw == DP_LINK_BW_2_7) {
+		*link_bw = DP_LINK_BW_1_62;
+	} else if (*lane_count == 4) {
+		*lane_count = 2;
+		*link_bw = DP_LINK_BW_5_4;
+	} else if (*lane_count == 2) {
+		*lane_count = 1;
+		*link_bw = DP_LINK_BW_5_4;
+	} else {
+		/* Tried all combinations, so exit */
+		return false;
+	}
+
+	return true;
+}
+
 static void intel_dp_prepare(struct intel_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;

@@ -1237,6 +1237,8 @@ bool intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			     struct intel_connector *intel_connector);
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      const struct intel_crtc_state *pipe_config);
+void intel_dp_update_dpcd_params(struct intel_dp *intel_dp);
+bool intel_dp_get_link_retry_params(uint8_t *lane_count, uint8_t *link_bw);
 void intel_dp_start_link_train(struct intel_dp *intel_dp);
 void intel_dp_stop_link_train(struct intel_dp *intel_dp);
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode);
