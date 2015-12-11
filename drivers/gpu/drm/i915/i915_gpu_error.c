@@ -902,8 +902,8 @@ static void i915_record_ring_state(struct drm_device *dev,
 
 	ering->waiting = intel_engine_has_waiter(ring);
 	ering->instpm = I915_READ(RING_INSTPM(ring->mmio_base));
-	ering->seqno = ring->get_seqno(ring, false);
 	ering->acthd = intel_ring_get_active_head(ring);
+	ering->seqno = ring->get_seqno(ring);
 	ering->start = I915_READ_START(ring);
 	ering->head = I915_READ_HEAD(ring);
 	ering->tail = I915_READ_TAIL(ring);
