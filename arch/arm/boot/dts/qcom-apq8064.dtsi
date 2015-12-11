@@ -682,5 +682,11 @@
 			#hwlock-cells = <1>;
 		};
 
+		smem {
+			compatible = "qcom,smem";
+			memory-region = <&smem>;
+			hwlocks = <&sfpb_mutex 3>;
+		};
+
 	};
 };
