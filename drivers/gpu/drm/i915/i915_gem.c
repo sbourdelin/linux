@@ -2495,6 +2495,51 @@ i915_gem_get_seqno(struct drm_device *dev, u32 *seqno)
 	return 0;
 }
 
+static void i915_gem_mark_busy(struct drm_i915_private *dev_priv)
+{
+	if (dev_priv->mm.busy)
+		return;
+
+	intel_runtime_pm_get_noresume(dev_priv);
+
+	i915_update_gfx_val(dev_priv);
+	if (INTEL_INFO(dev_priv)->gen >= 6)
+		gen6_rps_busy(dev_priv);
+
+	queue_delayed_work(dev_priv->wq,
+			   &dev_priv->mm.retire_work,
+			   round_jiffies_up_relative(HZ));
+
+	dev_priv->mm.busy = true;
+}
+
+static void kick_waiters(struct drm_i915_private *dev_priv)
+{
+	struct intel_engine_cs *ring;
+	int i;
+
+	for_each_ring(ring, dev_priv, i) {
+		if (!intel_engine_has_waiter(ring))
+			continue;
+
+		set_bit(ring->id, &dev_priv->gpu_error.missed_irq_rings);
+		intel_engine_wakeup(ring);
+	}
+}
+
+static void i915_gem_mark_idle(struct drm_i915_private *dev_priv)
+{
+	dev_priv->mm.busy = false;
+
+	if (cancel_delayed_work_sync(&dev_priv->gpu_error.hangcheck_work))
+		kick_waiters(dev_priv);
+
+	if (INTEL_INFO(dev_priv)->gen >= 6)
+		gen6_rps_idle(dev_priv);
+
+	intel_runtime_pm_put(dev_priv);
+}
+
 /*
  * NB: This function is not allowed to fail. Doing so would mean the the
  * request is not being tracked for completion but the work itself is
@@ -2575,10 +2620,7 @@ void __i915_add_request(struct drm_i915_gem_request *request,
 
 	trace_i915_gem_request_add(request);
 
-	queue_delayed_work(dev_priv->wq,
-			   &dev_priv->mm.retire_work,
-			   round_jiffies_up_relative(HZ));
-	intel_mark_busy(dev_priv->dev);
+	i915_gem_mark_busy(dev_priv);
 
 	/* Sanity check that the reserved size was large enough. */
 	intel_ring_reserved_space_end(ringbuf);
@@ -2910,7 +2952,7 @@ i915_gem_retire_requests_ring(struct intel_engine_cs *ring)
 	WARN_ON(i915_verify_lists(ring->dev));
 }
 
-bool
+void
 i915_gem_retire_requests(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -2934,10 +2976,8 @@ i915_gem_retire_requests(struct drm_device *dev)
 
 	if (idle)
 		mod_delayed_work(dev_priv->wq,
-				   &dev_priv->mm.idle_work,
-				   msecs_to_jiffies(100));
-
-	return idle;
+				 &dev_priv->mm.idle_work,
+				 msecs_to_jiffies(100));
 }
 
 static void
@@ -2946,16 +2986,20 @@ i915_gem_retire_work_handler(struct work_struct *work)
 	struct drm_i915_private *dev_priv =
 		container_of(work, typeof(*dev_priv), mm.retire_work.work);
 	struct drm_device *dev = dev_priv->dev;
-	bool idle;
 
 	/* Come back later if the device is busy... */
-	idle = false;
 	if (mutex_trylock(&dev->struct_mutex)) {
-		idle = i915_gem_retire_requests(dev);
+		i915_gem_retire_requests(dev);
 		mutex_unlock(&dev->struct_mutex);
 	}
-	if (!idle)
-		queue_delayed_work(dev_priv->wq, &dev_priv->mm.retire_work,
+
+	/* Keep the retire handler running until we are finally idle.
+	 * We do not need to do this test under locking as in the worst-case
+	 * we queue the retire worker once too often.
+	 */
+	if (READ_ONCE(dev_priv->mm.busy))
+		queue_delayed_work(dev_priv->wq,
+				   &dev_priv->mm.retire_work,
 				   round_jiffies_up_relative(HZ));
 }
 
@@ -2968,25 +3012,20 @@ i915_gem_idle_work_handler(struct work_struct *work)
 	struct intel_engine_cs *ring;
 	int i;
 
-	for_each_ring(ring, dev_priv, i)
+	if (!mutex_trylock(&dev->struct_mutex))
+		return;
+
+	for_each_ring(ring, dev_priv, i) {
 		if (!list_empty(&ring->request_list))
-			return;
+			goto out;
 
-	/* we probably should sync with hangcheck here, using cancel_work_sync.
-	 * Also locking seems to be fubar here, ring->request_list is protected
-	 * by dev->struct_mutex. */
-
-	intel_mark_idle(dev);
-
-	if (mutex_trylock(&dev->struct_mutex)) {
-		struct intel_engine_cs *ring;
-		int i;
-
-		for_each_ring(ring, dev_priv, i)
-			i915_gem_batch_pool_fini(&ring->batch_pool);
-
-		mutex_unlock(&dev->struct_mutex);
+		i915_gem_batch_pool_fini(&ring->batch_pool);
 	}
+
+	i915_gem_mark_idle(dev_priv);
+
+out:
+	mutex_unlock(&dev->struct_mutex);
 }
 
 /**

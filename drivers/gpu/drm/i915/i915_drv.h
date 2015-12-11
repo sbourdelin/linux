@@ -2996,7 +2996,7 @@ int __must_check i915_gem_set_seqno(struct drm_device *dev, u32 seqno);
 struct drm_i915_gem_request *
 i915_gem_find_active_request(struct intel_engine_cs *ring);
 
-bool i915_gem_retire_requests(struct drm_device *dev);
+void i915_gem_retire_requests(struct drm_device *dev);
 void i915_gem_retire_requests_ring(struct intel_engine_cs *ring);
 
 static inline u32 i915_reset_counter(struct i915_gpu_error *error)
