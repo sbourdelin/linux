@@ -619,7 +619,7 @@ static inline int overlapped(struct osc_extent *ex1, struct osc_extent *ex2)
  * Find or create an extent which includes @index, core function to manage
  * extent tree.
  */
-struct osc_extent *osc_extent_find(const struct lu_env *env,
+static struct osc_extent *osc_extent_find(const struct lu_env *env,
 				   struct osc_object *obj, pgoff_t index,
 				   int *grants)
 
@@ -1420,7 +1420,7 @@ static void __osc_unreserve_grant(struct client_obd *cli,
 	}
 }
 
-void osc_unreserve_grant(struct client_obd *cli,
+static void osc_unreserve_grant(struct client_obd *cli,
 			 unsigned int reserved, unsigned int unused)
 {
 	client_obd_list_lock(&cli->cl_loi_list_lock);
