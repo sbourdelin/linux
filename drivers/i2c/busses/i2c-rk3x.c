@@ -700,8 +700,8 @@ static int rk3x_i2c_v1_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
 
 	int ret = 0;
 
-	if (WARN_ON(scl_rate > 400000))
-		scl_rate = 400000;
+	if (WARN_ON(scl_rate > 3400000))
+		scl_rate = 3400000;
 
 	if (WARN_ON(scl_rate < 100000))
 		scl_rate = 100000;
@@ -719,7 +719,7 @@ static int rk3x_i2c_v1_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
 
 		start_setup_cnt = 0;
 		stop_setup_cnt = 0;
-	} else {
+	} else if (scl_rate <= 400000) {
 		spec_min_setup_start = 600;
 		spec_min_hold_start = 600;
 
@@ -732,6 +732,32 @@ static int rk3x_i2c_v1_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
 
 		start_setup_cnt = 0;
 		stop_setup_cnt = 0;
+	} else if (scl_rate <= 1700000) {
+		spec_min_low_ns = 320;
+		spec_min_high_ns = 120;
+
+		spec_min_setup_start = 160;
+		spec_min_hold_start = 160;
+
+		spec_max_data_hold_ns = 150;
+		spec_min_data_setup = 10;
+		spec_min_stop_setup = 160;
+
+		start_setup_cnt = 1;
+		stop_setup_cnt = 1;
+	} else {
+		spec_min_low_ns = 160;
+		spec_min_high_ns = 60;
+
+		spec_min_setup_start = 160;
+		spec_min_hold_start = 160;
+
+		spec_min_data_setup = 10;
+		spec_max_data_hold_ns = 70;
+		spec_min_stop_setup = 160;
+
+		start_setup_cnt = 2;
+		stop_setup_cnt = 2;
 	}
 
 	clk_rate_khz = DIV_ROUND_UP(clk_rate, 1000);
@@ -1126,15 +1152,29 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
 				 &i2c->scl_rise_ns)) {
 		if (i2c->scl_frequency <= 100000)
 			i2c->scl_rise_ns = 1000;
-		else
+		else if (i2c->scl_frequency <= 400000)
 			i2c->scl_rise_ns = 300;
+		else if (i2c->scl_frequency <= 1700000)
+			i2c->scl_rise_ns = 80;
+		else
+			i2c->scl_rise_ns = 40;
 	}
 	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-falling-time-ns",
-				 &i2c->scl_fall_ns))
-		i2c->scl_fall_ns = 300;
+				 &i2c->scl_fall_ns)) {
+		if (i2c->scl_frequency <= 400000)
+			i2c->scl_fall_ns = 300;
+		else if (i2c->scl_frequency <= 1700000)
+			i2c->scl_fall_ns = 80;
+		else
+			i2c->scl_fall_ns = 40;
+	}
 	if (of_property_read_u32(pdev->dev.of_node, "i2c-sda-falling-time-ns",
-				 &i2c->scl_fall_ns))
-		i2c->sda_fall_ns = i2c->scl_fall_ns;
+				 &i2c->scl_fall_ns)) {
+		if (i2c->scl_frequency <= 400000)
+			i2c->sda_fall_ns = i2c->scl_fall_ns;
+		else
+			i2c->sda_fall_ns = 2 * i2c->scl_fall_ns;
+	}
 
 	strlcpy(i2c->adap.name, "rk3x-i2c", sizeof(i2c->adap.name));
 	i2c->adap.owner = THIS_MODULE;
