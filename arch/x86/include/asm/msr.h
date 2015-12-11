@@ -27,6 +27,13 @@ struct msr_info {
 	int err;
 };
 
+struct msr_action {
+	u32 msr_no;
+	u64 mask;
+	u64 bits;
+	int err;
+};
+
 struct msr_regs_info {
 	u32 *regs;
 	int err;
@@ -236,6 +243,7 @@ int rdmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 *q);
 int wrmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 q);
 int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
 int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
+int rmwmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 mask, u64 bits);
 #else  /*  CONFIG_SMP  */
 static inline int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h)
 {
@@ -291,6 +299,22 @@ static inline int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8])
 static inline int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8])
 {
 	return wrmsr_safe_regs(regs);
+}
+static inline int rmwmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 mask, u64 bits)
+{
+	int err;
+	u64 val;
+
+	err = rdmsrl_safe(msr_no, &val);
+	if (err)
+		goto out;
+
+	val &= ~mask;
+	val |= bits;
+
+	err = wrmsrl_safe(msr_no, val);
+out:
+	return err;
 }
 #endif  /* CONFIG_SMP */
 #endif /* __ASSEMBLY__ */
