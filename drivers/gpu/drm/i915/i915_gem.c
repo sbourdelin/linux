@@ -2836,6 +2836,8 @@ static void i915_gem_reset_ring_cleanup(struct drm_i915_private *dev_priv,
 		buffer->last_retired_head = buffer->tail;
 		intel_ring_update_space(buffer);
 	}
+
+	intel_ring_init_seqno(ring, ring->last_submitted_seqno);
 }
 
 void i915_gem_reset(struct drm_device *dev)
