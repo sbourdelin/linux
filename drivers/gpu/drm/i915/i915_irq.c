@@ -2875,7 +2875,7 @@ static int semaphore_passed(struct intel_engine_cs *ring)
 	if (signaller->hangcheck.deadlock >= I915_NUM_RINGS)
 		return -1;
 
-	if (i915_seqno_passed(signaller->get_seqno(signaller), seqno))
+	if (i915_seqno_passed(intel_ring_get_seqno(signaller), seqno))
 		return 1;
 
 	/* cursory check for an unkickable deadlock */
@@ -2979,7 +2979,7 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 		semaphore_clear_deadlocks(dev_priv);
 
 		acthd = intel_ring_get_active_head(ring);
-		seqno = ring->get_seqno(ring);
+		seqno = intel_ring_get_seqno(ring);
 
 		if (ring->hangcheck.seqno == seqno) {
 			if (ring_idle(ring, seqno)) {

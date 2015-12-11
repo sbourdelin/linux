@@ -2980,13 +2980,13 @@ i915_seqno_passed(uint32_t seq1, uint32_t seq2)
 
 static inline bool i915_gem_request_started(struct drm_i915_gem_request *req)
 {
-	return i915_seqno_passed(req->ring->get_seqno(req->ring),
+	return i915_seqno_passed(intel_ring_get_seqno(req->ring),
 				 req->previous_seqno);
 }
 
 static inline bool i915_gem_request_completed(struct drm_i915_gem_request *req)
 {
-	return i915_seqno_passed(req->ring->get_seqno(req->ring),
+	return i915_seqno_passed(intel_ring_get_seqno(req->ring),
 				 req->seqno);
 }
 

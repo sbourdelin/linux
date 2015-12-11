@@ -1745,16 +1745,6 @@ static int gen8_emit_flush_render(struct drm_i915_gem_request *request,
 	return 0;
 }
 
-static u32 gen8_get_seqno(struct intel_engine_cs *ring)
-{
-	return intel_read_status_page(ring, I915_GEM_HWS_INDEX);
-}
-
-static void gen8_set_seqno(struct intel_engine_cs *ring, u32 seqno)
-{
-	intel_write_status_page(ring, I915_GEM_HWS_INDEX, seqno);
-}
-
 static void bxt_seqno_barrier(struct intel_engine_cs *ring)
 {
 	/*
@@ -1767,14 +1757,6 @@ static void bxt_seqno_barrier(struct intel_engine_cs *ring)
 	 * bxt_a_set_seqno(), where we also do a clflush after the write. So
 	 * this clflush in practice becomes an invalidate operation.
 	 */
-	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
-}
-
-static void bxt_a_set_seqno(struct intel_engine_cs *ring, u32 seqno)
-{
-	intel_write_status_page(ring, I915_GEM_HWS_INDEX, seqno);
-
-	/* See bxt_a_get_seqno() explaining the reason for the clflush. */
 	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 }
 
@@ -1802,7 +1784,7 @@ static int gen8_emit_request(struct drm_i915_gem_request *request)
 				(ring->status_page.gfx_addr +
 				(I915_GEM_HWS_INDEX << MI_STORE_DWORD_INDEX_SHIFT)));
 	intel_logical_ring_emit(ringbuf, 0);
-	intel_logical_ring_emit(ringbuf, i915_gem_request_get_seqno(request));
+	intel_logical_ring_emit(ringbuf, request->seqno);
 	intel_logical_ring_emit(ringbuf, MI_USER_INTERRUPT);
 	intel_logical_ring_emit(ringbuf, MI_NOOP);
 	intel_logical_ring_advance_and_submit(request);
@@ -1972,12 +1954,8 @@ static int logical_render_ring_init(struct drm_device *dev)
 		ring->init_hw = gen8_init_render_ring;
 	ring->init_context = gen8_init_rcs_context;
 	ring->cleanup = intel_fini_pipe_control;
-	ring->get_seqno = gen8_get_seqno;
-	ring->set_seqno = gen8_set_seqno;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
+	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
 		ring->seqno_barrier = bxt_seqno_barrier;
-		ring->set_seqno = bxt_a_set_seqno;
-	}
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush_render;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2023,12 +2001,8 @@ static int logical_bsd_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VCS1_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	ring->get_seqno = gen8_get_seqno;
-	ring->set_seqno = gen8_set_seqno;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
+	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
 		ring->seqno_barrier = bxt_seqno_barrier;
-		ring->set_seqno = bxt_a_set_seqno;
-	}
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2052,8 +2026,6 @@ static int logical_bsd2_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VCS2_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	ring->get_seqno = gen8_get_seqno;
-	ring->set_seqno = gen8_set_seqno;
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2077,12 +2049,8 @@ static int logical_blt_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_BCS_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	ring->get_seqno = gen8_get_seqno;
-	ring->set_seqno = gen8_set_seqno;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
+	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
 		ring->seqno_barrier = bxt_seqno_barrier;
-		ring->set_seqno = bxt_a_set_seqno;
-	}
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;
@@ -2106,12 +2074,8 @@ static int logical_vebox_ring_init(struct drm_device *dev)
 		GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VECS_IRQ_SHIFT;
 
 	ring->init_hw = gen8_init_common_ring;
-	ring->get_seqno = gen8_get_seqno;
-	ring->set_seqno = gen8_set_seqno;
-	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1)) {
+	if (IS_BXT_REVID(dev, 0, BXT_REVID_A1))
 		ring->seqno_barrier = bxt_seqno_barrier;
-		ring->set_seqno = bxt_a_set_seqno;
-	}
 	ring->emit_request = gen8_emit_request;
 	ring->emit_flush = gen8_emit_flush;
 	ring->irq_get = gen8_logical_ring_get_irq;

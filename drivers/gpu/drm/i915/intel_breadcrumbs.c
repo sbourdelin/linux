@@ -112,7 +112,7 @@ bool intel_engine_add_breadcrumb(struct intel_engine_cs *engine,
 				 struct intel_breadcrumb *wait)
 {
 	struct intel_breadcrumbs *b = &engine->breadcrumbs;
-	u32 seqno = engine->get_seqno(engine);
+	u32 seqno = intel_ring_get_seqno(engine);
 	struct rb_node **p, *parent, *completed;
 	bool first;
 
@@ -222,7 +222,7 @@ void intel_engine_remove_breadcrumb(struct intel_engine_cs *engine,
 			 * the overall latency in waking all the completed
 			 * clients.
 			 */
-			u32 seqno = engine->get_seqno(engine);
+			u32 seqno = intel_ring_get_seqno(engine);
 			while (i915_seqno_passed(seqno,
 						 to_crumb(next)->seqno)) {
 				struct rb_node *n = rb_next(next);
