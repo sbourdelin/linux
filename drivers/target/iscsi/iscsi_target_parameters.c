@@ -200,9 +200,8 @@ free_param:
 int iscsi_create_default_params(struct iscsi_param_list **param_list_ptr)
 {
 	struct iscsi_param *param;
-	struct iscsi_param_list *pl;
+	struct iscsi_param_list *pl = kzalloc(sizeof(*pl), GFP_KERNEL);
 
-	pl = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
 	if (!pl) {
 		pr_err("Unable to allocate memory for"
 				" struct iscsi_param_list.\n");
