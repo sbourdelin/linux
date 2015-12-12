@@ -434,6 +434,8 @@ __wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
 		ret = action(&q->key);
 		if (!ret)
 			continue;
+		if (ret == -EINTR && mode == TASK_UNINTERRUPTIBLE)
+			continue;
 		abort_exclusive_wait(wq, &q->wait, mode, &q->key);
 		return ret;
 	} while (test_and_set_bit(q->key.bit_nr, q->key.flags));
