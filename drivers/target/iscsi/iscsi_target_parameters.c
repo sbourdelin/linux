@@ -921,10 +921,7 @@ static char *iscsi_check_valuelist_for_support(
 	char *value)
 {
 	char *tmp1, *tmp2;
-	char *acceptor_values = NULL, *proposer_values = NULL;
-
-	acceptor_values = param->value;
-	proposer_values = value;
+	char *acceptor_values = param->value, *proposer_values = value;
 
 	do {
 		if (!proposer_values)
