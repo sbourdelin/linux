@@ -13,7 +13,6 @@
 #include <linux/capability.h>
 #include <linux/dnotify.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 #include <linux/pipe_fs_i.h>
 #include <linux/security.h>
 #include <linux/ptrace.h>
@@ -755,5 +754,4 @@ static int __init fcntl_init(void)
 		sizeof(struct fasync_struct), 0, SLAB_PANIC, NULL);
 	return 0;
 }
-
-module_init(fcntl_init)
+fs_initcall(fcntl_init)
