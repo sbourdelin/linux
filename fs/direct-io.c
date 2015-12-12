@@ -20,7 +20,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -1348,4 +1348,4 @@ static __init int dio_init(void)
 	dio_cache = KMEM_CACHE(dio, SLAB_PANIC);
 	return 0;
 }
-module_init(dio_init)
+fs_initcall(dio_init)
