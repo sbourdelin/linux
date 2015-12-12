@@ -65,16 +65,16 @@ static unsigned int get_clock_info(struct snd_dice *dice, __be32 *info)
 static int set_clock_info(struct snd_dice *dice,
 			  unsigned int rate, unsigned int source)
 {
-	unsigned int retries = 3;
+	unsigned int retries = 10;
 	unsigned int i;
-	__be32 info;
+	__be32 info, stat;
 	u32 mask;
 	u32 clock;
 	int err;
-retry:
+
 	err = get_clock_info(dice, &info);
 	if (err < 0)
-		goto end;
+		return err;
 
 	clock = be32_to_cpu(info);
 	if (source != UINT_MAX) {
@@ -87,10 +87,8 @@ retry:
 			if (snd_dice_rates[i] == rate)
 				break;
 		}
-		if (i == ARRAY_SIZE(snd_dice_rates)) {
-			err = -EINVAL;
-			goto end;
-		}
+		if (i == ARRAY_SIZE(snd_dice_rates))
+			return -EINVAL;
 
 		mask = CLOCK_RATE_MASK;
 		clock &= ~mask;
@@ -104,25 +102,33 @@ retry:
 	err = snd_dice_transaction_write_global(dice, GLOBAL_CLOCK_SELECT,
 						&info, 4);
 	if (err < 0)
-		goto end;
+		return err;
 
-	/* Timeout means it's invalid request, probably bus reset occurred. */
-	if (wait_for_completion_timeout(&dice->clock_accepted,
-			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
-		if (retries-- == 0) {
-			err = -ETIMEDOUT;
-			goto end;
-		}
+	wait_for_completion_timeout(&dice->clock_accepted,
+			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS));
 
-		err = snd_dice_transaction_reinit(dice);
+	/*
+	 * Some models don't perform phase lock yet. In this case, transferred
+	 * packet includes dicsontinuity. Here, wait till one second.
+	 */
+	while (retries-- > 0) {
+		err = snd_dice_transaction_read_global(dice, GLOBAL_STATUS,
+						       &stat, sizeof(stat));
 		if (err < 0)
-			goto end;
+			return err;
 
-		msleep(500);	/* arbitrary */
-		goto retry;
+		if ((be32_to_cpu(stat) & 0x01) == STATUS_SOURCE_LOCKED &&
+		    ((be32_to_cpu(stat) & STATUS_NOMINAL_RATE_MASK) ==
+		      (be32_to_cpu(info) & STATUS_NOMINAL_RATE_MASK)))
+			break;
+
+		msleep(100);
 	}
-end:
-	return err;
+
+	if (retries == 0)
+		return -ETIMEDOUT;
+
+	return 0;
 }
 
 int snd_dice_transaction_get_clock_source(struct snd_dice *dice,
