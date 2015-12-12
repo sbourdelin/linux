@@ -253,7 +253,7 @@ static int __init proc_filesystems_init(void)
 	proc_create("filesystems", 0, NULL, &filesystems_proc_fops);
 	return 0;
 }
-module_init(proc_filesystems_init);
+fs_initcall(proc_filesystems_init);
 #endif
 
 static struct file_system_type *__get_fs_type(const char *name, int len)
