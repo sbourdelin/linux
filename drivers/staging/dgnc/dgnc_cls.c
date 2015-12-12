@@ -1168,8 +1168,8 @@ static void cls_uart_init(struct channel_t *ch)
 	/* Clear out UART and FIFO */
 	readb(&ch->ch_cls_uart->txrx);
 
-	writeb((UART_FCR_ENABLE_FIFO|UART_FCR_CLEAR_RCVR|UART_FCR_CLEAR_XMIT),
-	       &ch->ch_cls_uart->isr_fcr);
+	writeb((UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR |
+		   UART_FCR_CLEAR_XMIT), &ch->ch_cls_uart->isr_fcr);
 	udelay(10);
 
 	ch->ch_flags |= (CH_FIFO_ENABLED | CH_TX_FIFO_EMPTY | CH_TX_FIFO_LWM);

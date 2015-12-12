@@ -33,7 +33,7 @@ static DRIVER_ATTR(version, S_IRUSR, dgnc_driver_version_show, NULL);
 
 static ssize_t dgnc_driver_boards_show(struct device_driver *ddp, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", dgnc_NumBoards);
+	return snprintf(buf, PAGE_SIZE, "%d\n", dgnc_num_boards);
 }
 static DRIVER_ATTR(boards, S_IRUSR, dgnc_driver_boards_show, NULL);
 
@@ -91,18 +91,6 @@ void dgnc_remove_driver_sysfiles(struct pci_driver *dgnc_driver)
 	driver_remove_file(driverfs, &driver_attr_pollrate);
 }
 
-#define DGNC_VERIFY_BOARD(p, bd)				\
-	do {							\
-		if (!p)						\
-			return 0;				\
-								\
-		bd = dev_get_drvdata(p);			\
-		if (!bd || bd->magic != DGNC_BOARD_MAGIC)	\
-			return 0;				\
-		if (bd->state != BOARD_READY)			\
-			return 0;				\
-	} while (0)
-
 static ssize_t dgnc_vpd_show(struct device *p, struct device_attribute *attr,
 			     char *buf)
 {
@@ -110,7 +98,14 @@ static ssize_t dgnc_vpd_show(struct device *p, struct device_attribute *attr,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	count += sprintf(buf + count,
 		"\n      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F");
@@ -131,7 +126,14 @@ static ssize_t dgnc_serial_number_show(struct device *p,
 	struct dgnc_board *bd;
 	int count = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	if (bd->serial_num[0] == '\0')
 		count += sprintf(buf + count, "<UNKNOWN>\n");
@@ -149,7 +151,14 @@ static ssize_t dgnc_ports_state_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count,
@@ -167,7 +176,14 @@ static ssize_t dgnc_ports_baud_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count +=  snprintf(buf + count, PAGE_SIZE - count,
@@ -186,19 +202,32 @@ static ssize_t dgnc_ports_msignals_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		if (bd->channels[i]->ch_open_count) {
 			count += snprintf(buf + count, PAGE_SIZE - count,
 				"%d %s %s %s %s %s %s\n",
 				bd->channels[i]->ch_portnum,
-				(bd->channels[i]->ch_mostat & UART_MCR_RTS) ? "RTS" : "",
-				(bd->channels[i]->ch_mistat & UART_MSR_CTS) ? "CTS" : "",
-				(bd->channels[i]->ch_mostat & UART_MCR_DTR) ? "DTR" : "",
-				(bd->channels[i]->ch_mistat & UART_MSR_DSR) ? "DSR" : "",
-				(bd->channels[i]->ch_mistat & UART_MSR_DCD) ? "DCD" : "",
-				(bd->channels[i]->ch_mistat & UART_MSR_RI)  ? "RI"  : "");
+				(bd->channels[i]->ch_mostat & UART_MCR_RTS)
+						? "RTS" : "",
+				(bd->channels[i]->ch_mistat & UART_MSR_CTS)
+						? "CTS" : "",
+				(bd->channels[i]->ch_mostat & UART_MCR_DTR)
+						? "DTR" : "",
+				(bd->channels[i]->ch_mistat & UART_MSR_DSR)
+						? "DSR" : "",
+				(bd->channels[i]->ch_mistat & UART_MSR_DCD)
+						? "DCD" : "",
+				(bd->channels[i]->ch_mistat & UART_MSR_RI)
+						? "RI"  : "");
 		} else {
 			count += snprintf(buf + count, PAGE_SIZE - count,
 				"%d\n", bd->channels[i]->ch_portnum);
@@ -215,7 +244,14 @@ static ssize_t dgnc_ports_iflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -233,7 +269,14 @@ static ssize_t dgnc_ports_cflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -251,7 +294,14 @@ static ssize_t dgnc_ports_oflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -269,7 +319,14 @@ static ssize_t dgnc_ports_lflag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -288,7 +345,14 @@ static ssize_t dgnc_ports_digi_flag_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %x\n",
@@ -306,7 +370,14 @@ static ssize_t dgnc_ports_rxcount_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %ld\n",
@@ -324,7 +395,14 @@ static ssize_t dgnc_ports_txcount_show(struct device *p,
 	int count = 0;
 	int i = 0;
 
-	DGNC_VERIFY_BOARD(p, bd);
+	if (!p)
+		return 0;
+
+	bd = dev_get_drvdata(p);
+	if (!bd || bd->magic != DGNC_BOARD_MAGIC)
+		return 0;
+	if (bd->state != BOARD_READY)
+		return 0;
 
 	for (i = 0; i < bd->nasync; i++) {
 		count += snprintf(buf + count, PAGE_SIZE - count, "%d %ld\n",
