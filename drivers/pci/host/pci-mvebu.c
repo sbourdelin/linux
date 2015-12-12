@@ -1011,6 +1011,7 @@ static int mvebu_pcie_suspend(struct device *dev)
 	pcie = dev_get_drvdata(dev);
 	for (i = 0; i < pcie->nports; i++) {
 		struct mvebu_pcie_port *port = pcie->ports + i;
+
 		port->saved_pcie_stat = mvebu_readl(port, PCIE_STAT_OFF);
 	}
 
@@ -1025,6 +1026,7 @@ static int mvebu_pcie_resume(struct device *dev)
 	pcie = dev_get_drvdata(dev);
 	for (i = 0; i < pcie->nports; i++) {
 		struct mvebu_pcie_port *port = pcie->ports + i;
+
 		mvebu_writel(port, port->saved_pcie_stat, PCIE_STAT_OFF);
 		mvebu_pcie_setup_hw(port);
 	}
@@ -1296,6 +1298,7 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 	{ .compatible = "marvell,kirkwood-pcie", },
 	{},
 };
+
 MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
 
 static struct dev_pm_ops mvebu_pcie_pm_ops = {

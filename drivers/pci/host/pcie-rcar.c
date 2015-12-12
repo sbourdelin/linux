@@ -377,6 +377,7 @@ static int rcar_pcie_setup(struct list_head *resource, struct rcar_pcie *pcie)
 
 		if (res->flags & IORESOURCE_IO) {
 			phys_addr_t io_start = pci_pio_to_address(res->start);
+
 			pci_ioremap_io(global_io_offset, io_start);
 			global_io_offset += SZ_64K;
 		}
@@ -904,6 +905,7 @@ static int rcar_pcie_parse_map_dma_ranges(struct rcar_pcie *pcie,
 	/* Get the dma-ranges from DT */
 	for_each_of_pci_range(&parser, &range) {
 		u64 end = range.cpu_addr + range.size - 1;
+
 		dev_dbg(pcie->dev, "0x%08x 0x%016llx..0x%016llx -> 0x%016llx\n",
 			range.flags, range.cpu_addr, end, range.pci_addr);
 
