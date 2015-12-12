@@ -131,20 +131,20 @@ static struct iscsi_param *iscsi_set_default_param(struct iscsi_param_list *para
 
 	if (!param) {
 		pr_err("Unable to allocate memory for parameter.\n");
-		goto out;
+		return NULL;
 	}
 	INIT_LIST_HEAD(&param->p_list);
 
 	param->name = kstrdup(name, GFP_KERNEL);
 	if (!param->name) {
 		pr_err("Unable to allocate memory for parameter name.\n");
-		goto out;
+		goto free_param;
 	}
 
 	param->value = kstrdup(value, GFP_KERNEL);
 	if (!param->value) {
 		pr_err("Unable to allocate memory for parameter value.\n");
-		goto out;
+		goto free_name;
 	}
 
 	param->phase		= phase;
@@ -182,18 +182,17 @@ static struct iscsi_param *iscsi_set_default_param(struct iscsi_param_list *para
 	default:
 		pr_err("Unknown type_range 0x%02x\n",
 				param->type_range);
-		goto out;
+		goto free_value;
 	}
 	list_add_tail(&param->p_list, &param_list->param_list);
 
 	return param;
-out:
-	if (param) {
-		kfree(param->value);
-		kfree(param->name);
-		kfree(param);
-	}
-
+free_value:
+	kfree(param->value);
+free_name:
+	kfree(param->name);
+free_param:
+	kfree(param);
 	return NULL;
 }
 
