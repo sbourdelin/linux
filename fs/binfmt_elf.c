@@ -7,9 +7,9 @@
  * Tools".
  *
  * Copyright 1993, 1994: Eric Youngdale (ericy@cais.com).
+ * License: GPL
  */
 
-#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -2324,13 +2324,4 @@ static int __init init_elf_binfmt(void)
 	register_binfmt(&elf_format);
 	return 0;
 }
-
-static void __exit exit_elf_binfmt(void)
-{
-	/* Remove the COFF and ELF loaders. */
-	unregister_binfmt(&elf_format);
-}
-
 core_initcall(init_elf_binfmt);
-module_exit(exit_elf_binfmt);
-MODULE_LICENSE("GPL");
