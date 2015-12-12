@@ -17,7 +17,6 @@
  * General Public License for more details.
  */
 #include <linux/fs.h>
-#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/dnotify.h>
 #include <linux/init.h>
@@ -390,5 +389,4 @@ static int __init dnotify_init(void)
 		panic("unable to allocate fsnotify group for dnotify\n");
 	return 0;
 }
-
-module_init(dnotify_init)
+fs_initcall(dnotify_init)
