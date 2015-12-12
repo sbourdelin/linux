@@ -1562,13 +1562,10 @@ iso_stream_schedule (
 					(stream->ps.bw_period - 1);
 			stream->ps.phase_uf = start & 7;
 			reserve_release_iso_bandwidth(ehci, stream, 1);
-		}
-
-		/* New stream is already scheduled; use the upcoming slot */
-		else {
+		} else {
+			/* New stream is already scheduled; use the upcoming slot */
 			start = (stream->ps.phase << 3) + stream->ps.phase_uf;
 		}
-
 		stream->next_uframe = start;
 		new_stream = true;
 	}
