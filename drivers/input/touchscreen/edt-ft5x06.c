@@ -109,6 +109,7 @@ struct edt_ft5x06_ts_data {
 	char name[EDT_NAME_LEN];
 
 	struct edt_reg_addr reg_addr;
+	struct i2c_msg wrmsg[2];
 	enum edt_ver version;
 };
 
@@ -120,26 +121,26 @@ static int edt_ft5x06_ts_readwrite(struct i2c_client *client,
 				   u16 wr_len, u8 *wr_buf,
 				   u16 rd_len, u8 *rd_buf)
 {
-	struct i2c_msg wrmsg[2];
+	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
 	int i = 0;
 	int ret;
 
 	if (wr_len) {
-		wrmsg[i].addr  = client->addr;
-		wrmsg[i].flags = 0;
-		wrmsg[i].len = wr_len;
-		wrmsg[i].buf = wr_buf;
+		tsdata->wrmsg[i].addr  = client->addr;
+		tsdata->wrmsg[i].flags = 0;
+		tsdata->wrmsg[i].len = wr_len;
+		tsdata->wrmsg[i].buf = wr_buf;
 		i++;
 	}
 	if (rd_len) {
-		wrmsg[i].addr  = client->addr;
-		wrmsg[i].flags = I2C_M_RD;
-		wrmsg[i].len = rd_len;
-		wrmsg[i].buf = rd_buf;
+		tsdata->wrmsg[i].addr  = client->addr;
+		tsdata->wrmsg[i].flags = I2C_M_RD;
+		tsdata->wrmsg[i].len = rd_len;
+		tsdata->wrmsg[i].buf = rd_buf;
 		i++;
 	}
 
-	ret = i2c_transfer(client->adapter, wrmsg, i);
+	ret = i2c_transfer(client->adapter, tsdata->wrmsg, i);
 	if (ret < 0)
 		return ret;
 	if (ret != i)
