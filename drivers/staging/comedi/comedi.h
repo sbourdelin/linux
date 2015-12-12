@@ -6,7 +6,8 @@
     Copyright (C) 1998-2001 David A. Schleef <ds@schleef.org>
 
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU Lesser General Public License as published by
+    it under the terms of the GNU Lesser General Public License as publishe
+    d by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
@@ -196,7 +197,7 @@
 #define SDF_MODE3	0x0400	/* can do mode 3 */
 #define SDF_MODE4	0x0800	/* can do mode 4 */
 #define SDF_CMD		0x1000	/* can do commands (deprecated) */
-#define SDF_SOFT_CALIBRATED	0x2000 /* subdevice uses software calibration */
+#define SDF_SOFT_CALIBRATED	0x2000
 #define SDF_CMD_WRITE		0x4000 /* can do output commands */
 #define SDF_CMD_READ		0x8000 /* can do input commands */
 
@@ -307,27 +308,36 @@ enum configuration_ids {
  * data[4] = configuration parameter 2
  * data[5] = configuration parameter 3
  *
- * operation                           parameter 1   parameter 2   parameter 3
- * ---------------------------------   -----------   -----------   -----------
+ * operation                           parameter 1   parameter 2   paramete
+ * r 3
+ * ---------------------------------   -----------   -----------   --------
+ *  ---
  * COMEDI_DIGITAL_TRIG_DISABLE
- * COMEDI_DIGITAL_TRIG_ENABLE_EDGES    left-shift    rising-edges  falling-edges
- * COMEDI_DIGITAL_TRIG_ENABLE_LEVELS   left-shift    high-levels   low-levels
+ * COMEDI_DIGITAL_TRIG_ENABLE_EDGES    left-shift    rising-edges  falling-
+ * edges
+ * COMEDI_DIGITAL_TRIG_ENABLE_LEVELS   left-shift    high-levels   low-leve
+ * ls
  *
- * COMEDI_DIGITAL_TRIG_DISABLE returns the trigger to its default, inactive,
+ * COMEDI_DIGITAL_TRIG_DISABLE returns the trigger to its default, inactive
+ * ,
  * unconfigured state.
  *
- * COMEDI_DIGITAL_TRIG_ENABLE_EDGES sets the rising and/or falling edge inputs
+ * COMEDI_DIGITAL_TRIG_ENABLE_EDGES sets the rising and/or falling edge inp
+ * uts
  * that each can fire the trigger.
  *
  * COMEDI_DIGITAL_TRIG_ENABLE_LEVELS sets a combination of high and/or low
  * level inputs that can fire the trigger.
  *
- * "left-shift" is useful if the trigger has more than 32 inputs to specify the
+ * "left-shift" is useful if the trigger has more than 32 inputs to specify
+ * the
  * first input for this configuration.
  *
- * Some sequences of INSN_CONFIG_DIGITAL_TRIG instructions may have a (partly)
+ * Some sequences of INSN_CONFIG_DIGITAL_TRIG instructions may have a (part
+ * ly)
  * accumulative effect, depending on the low-level driver.  This is useful
- * when setting up a trigger that has more than 32 inputs or has a combination
+ * when setting up a trigger that has more than 32 inputs or has a combinat
+ * ion
  * of edge and level triggered inputs.
  */
 enum comedi_digital_trig_op {
@@ -717,7 +727,7 @@ enum ni_gpct_arm_source {
 	NI_GPCT_ARM_UNKNOWN = 0x1000,
 };
 
-/* digital filtering options for ni 660x for use with INSN_CONFIG_FILTER. */
+/* digital filtering options for ni 660x for use with INSN_CONFIG_FILTER.*/
 enum ni_gpct_filter_select {
 	NI_GPCT_FILTER_OFF = 0x0,
 	NI_GPCT_FILTER_TIMEBASE_3_SYNC = 0x1,
@@ -750,8 +760,10 @@ enum ni_mio_clock_source {
 
 #define NI_MIO_PLL_RTSI_CLOCK(x)	(NI_MIO_PLL_RTSI0_CLOCK + (x))
 
-/* Signals which can be routed to an NI RTSI pin with INSN_CONFIG_SET_ROUTING.
- The numbers assigned are not arbitrary, they correspond to the bits required
+/* Signals which can be routed to an NI RTSI pin with INSN_CONFIG_SET_ROUTI
+ * NG.
+ The numbers assigned are not arbitrary, they correspond to the bits requir
+ ed
  to program the board. */
 enum ni_rtsi_routing {
 	NI_RTSI_OUTPUT_ADR_START1 = 0,
@@ -771,8 +783,10 @@ enum ni_rtsi_routing {
 
 /* Signals which can be routed to an NI PFI pin on an m-series board with
  * INSN_CONFIG_SET_ROUTING.  These numbers are also returned by
- * INSN_CONFIG_GET_ROUTING on pre-m-series boards, even though their routing
- * cannot be changed.  The numbers assigned are not arbitrary, they correspond
+ * INSN_CONFIG_GET_ROUTING on pre-m-series boards, even though their routin
+ * g
+ * cannot be changed.  The numbers assigned are not arbitrary, they corresp
+ * ond
  * to the bits required to program the board. */
 enum ni_pfi_routing {
 	NI_PFI_OUTPUT_PFI_DEFAULT = 0,
@@ -814,7 +828,8 @@ enum ni_660x_pfi_routing {
 	NI_660X_PFI_OUTPUT_DIO = 2,	/* static digital output */
 };
 
-/* NI External Trigger lines.  These values are not arbitrary, but are related
+/* NI External Trigger lines.  These values are not arbitrary, but are rela
+ * ted
  * to the bits required to program the board (offset by 1 for historical
  * reasons). */
 #define NI_EXT_PFI(x)			(NI_USUAL_PFI_SELECT(x) - 1)
@@ -828,7 +843,8 @@ enum comedi_counter_status_flags {
 };
 
 /* Clock sources for CDIO subdevice on NI m-series boards.  Used as the
- * scan_begin_arg for a comedi_command. These sources may also be bitwise-or'd
+ * scan_begin_arg for a comedi_command. These sources may also be bitwise-o
+ * r'd
  * with CR_INVERT to change polarity. */
 enum ni_m_series_cdio_scan_begin_src {
 	NI_CDIO_SCAN_BEGIN_SRC_GROUND = 0,
@@ -846,8 +862,10 @@ enum ni_m_series_cdio_scan_begin_src {
 #define NI_CDIO_SCAN_BEGIN_SRC_PFI(x)	NI_USUAL_PFI_SELECT(x)
 #define NI_CDIO_SCAN_BEGIN_SRC_RTSI(x)	NI_USUAL_RTSI_SELECT(x)
 
-/* scan_begin_src for scan_begin_arg==TRIG_EXT with analog output command on NI
- * boards.  These scan begin sources can also be bitwise-or'd with CR_INVERT to
+/* scan_begin_src for scan_begin_arg==TRIG_EXT with analog output command o
+ * n NI
+ * boards.  These scan begin sources can also be bitwise-or'd with CR_INVER
+ * T to
  * change polarity. */
 #define NI_AO_SCAN_BEGIN_SRC_PFI(x)	NI_USUAL_PFI_SELECT(x)
 #define NI_AO_SCAN_BEGIN_SRC_RTSI(x)	NI_USUAL_RTSI_SELECT(x)
@@ -860,7 +878,7 @@ enum ni_freq_out_clock_source_bits {
 };
 
 /* Values for setting a clock source with INSN_CONFIG_SET_CLOCK_SRC for
- * 8254 counter subdevices on Amplicon DIO boards (amplc_dio200 driver). */
+ * 8254 counter subdevices on Amplicon DIO boards (amplc_dio200 driver).*/
 enum amplc_dio_clock_source {
 	AMPLC_DIO_CLK_CLKN,	/* per channel external clock
 				   input/output pin (pin is only an
@@ -887,7 +905,7 @@ enum amplc_dio_clock_source {
 };
 
 /* Values for setting a clock source with INSN_CONFIG_SET_CLOCK_SRC for
- * timer subdevice on some Amplicon DIO PCIe boards (amplc_dio200 driver). */
+* timer subdevice on some Amplicon DIO PCIe boards (amplc_dio200 driver).*/
 enum amplc_dio_ts_clock_src {
 	AMPLC_DIO_TS_CLK_1GHZ,	/* 1 ns period with 20 ns granularity */
 	AMPLC_DIO_TS_CLK_1MHZ,	/* 1 us period */
