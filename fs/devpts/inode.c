@@ -12,7 +12,6 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
@@ -703,4 +702,4 @@ static int __init init_devpts_fs(void)
 	}
 	return err;
 }
-module_init(init_devpts_fs)
+fs_initcall(init_devpts_fs)
