@@ -920,7 +920,7 @@ static char *iscsi_check_valuelist_for_support(
 	struct iscsi_param *param,
 	char *value)
 {
-	char *tmp1 = NULL, *tmp2 = NULL;
+	char *tmp1, *tmp2;
 	char *acceptor_values = NULL, *proposer_values = NULL;
 
 	acceptor_values = param->value;
