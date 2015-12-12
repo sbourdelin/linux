@@ -54,6 +54,7 @@
 /* Whether we react on sysrq keys or just ignore them */
 static int __read_mostly sysrq_enabled = CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE;
 static bool __read_mostly sysrq_always_enabled;
+DEFINE_STATIC_SRCU(sysrq_rcu);
 
 static bool sysrq_on(void)
 {
@@ -519,10 +520,13 @@ void __handle_sysrq(int key, bool check_mask)
 {
 	struct sysrq_key_op *op_p;
 	int orig_log_level;
-	int i;
+	int i, idx;
 
 	rcu_sysrq_start();
-	rcu_read_lock();
+	if (in_irq())
+		rcu_read_lock();
+	else
+		idx = srcu_read_lock(&sysrq_rcu);
 	/*
 	 * Raise the apparent loglevel to maximum so that the sysrq header
 	 * is shown to provide the user with positive feedback.  We do not
@@ -564,7 +568,10 @@ void __handle_sysrq(int key, bool check_mask)
 		pr_cont("\n");
 		console_loglevel = orig_log_level;
 	}
-	rcu_read_unlock();
+	if (in_irq())
+		rcu_read_unlock();
+	else
+		srcu_read_unlock(&sysrq_rcu, idx);
 	rcu_sysrq_end();
 }
 
@@ -1040,6 +1047,11 @@ int sysrq_toggle_support(int enable_mask)
 	return 0;
 }
 
+static void call_sysrq_srcu(struct rcu_head *head, rcu_callback_t func)
+{
+	call_srcu(&sysrq_rcu, head, func);
+}
+
 static int __sysrq_swap_key_ops(int key, struct sysrq_key_op *insert_op_p,
                                 struct sysrq_key_op *remove_op_p)
 {
@@ -1059,7 +1071,7 @@ static int __sysrq_swap_key_ops(int key, struct sysrq_key_op *insert_op_p,
 	 * Wait for it to go away before returning, so the code for an old
 	 * op is not freed (eg. on module unload) while it is in use.
 	 */
-	synchronize_rcu();
+	synchronize_rcu_mult(call_rcu, call_sysrq_srcu);
 
 	return retval;
 }
