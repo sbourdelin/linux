@@ -688,7 +688,7 @@ static struct inode *ll_create_node(struct inode *dir, struct lookup_intent *it)
 	rc = ll_prep_inode(&inode, request, dir->i_sb, it);
 	if (rc) {
 		inode = ERR_PTR(rc);
-		goto out;
+		goto finish_request;
 	}
 
 	LASSERT(hlist_empty(&inode->i_dentry));
@@ -699,7 +699,7 @@ static struct inode *ll_create_node(struct inode *dir, struct lookup_intent *it)
 	CDEBUG(D_DLMTRACE, "setting l_ast_data to inode %p (%lu/%u)\n",
 	       inode, inode->i_ino, inode->i_generation);
 	ll_set_lock_data(sbi->ll_md_exp, inode, it, NULL);
- out:
+ finish_request:
 	ptlrpc_req_finished(request);
 	return inode;
 }
@@ -962,13 +962,13 @@ static int ll_unlink(struct inode *dir, struct dentry *dentry)
 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
 	ll_finish_md_op_data(op_data);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	ll_update_times(request, dir);
 	ll_stats_ops_tally(ll_i2sbi(dir), LPROC_LL_UNLINK, 1);
 
 	rc = ll_objects_destroy(request, dir);
- out:
+ finish_request:
 	ptlrpc_req_finished(request);
 	return rc;
 }
@@ -1061,11 +1061,11 @@ static int ll_link(struct dentry *old_dentry, struct inode *dir,
 	err = md_link(sbi->ll_md_exp, op_data, &request);
 	ll_finish_md_op_data(op_data);
 	if (err)
-		goto out;
+		goto finish_request;
 
 	ll_update_times(request, dir);
 	ll_stats_ops_tally(sbi, LPROC_LL_LINK, 1);
-out:
+finish_request:
 	ptlrpc_req_finished(request);
 	return err;
 }

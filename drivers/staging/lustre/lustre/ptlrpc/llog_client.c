@@ -176,26 +176,26 @@ static int llog_client_next_block(const struct lu_env *env,
 	ptlrpc_request_set_replen(req);
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	body = req_capsule_server_get(&req->rq_pill, &RMF_LLOGD_BODY);
 	if (body == NULL) {
 		rc = -EFAULT;
-		goto out;
+		goto finish_request;
 	}
 
 	/* The log records are swabbed as they are processed */
 	ptr = req_capsule_server_get(&req->rq_pill, &RMF_EADATA);
 	if (ptr == NULL) {
 		rc = -EFAULT;
-		goto out;
+		goto finish_request;
 	}
 
 	*cur_idx = body->lgd_saved_index;
 	*cur_offset = body->lgd_cur_offset;
 
 	memcpy(buf, ptr, len);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 err_exit:
 	LLOG_CLIENT_EXIT(loghandle->lgh_ctxt, imp);
@@ -233,22 +233,22 @@ static int llog_client_prev_block(const struct lu_env *env,
 
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	body = req_capsule_server_get(&req->rq_pill, &RMF_LLOGD_BODY);
 	if (body == NULL) {
 		rc = -EFAULT;
-		goto out;
+		goto finish_request;
 	}
 
 	ptr = req_capsule_server_get(&req->rq_pill, &RMF_EADATA);
 	if (ptr == NULL) {
 		rc = -EFAULT;
-		goto out;
+		goto finish_request;
 	}
 
 	memcpy(buf, ptr, len);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 err_exit:
 	LLOG_CLIENT_EXIT(loghandle->lgh_ctxt, imp);
@@ -282,12 +282,12 @@ static int llog_client_read_header(const struct lu_env *env,
 	ptlrpc_request_set_replen(req);
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	hdr = req_capsule_server_get(&req->rq_pill, &RMF_LLOG_LOG_HDR);
 	if (hdr == NULL) {
 		rc = -EFAULT;
-		goto out;
+		goto finish_request;
 	}
 
 	memcpy(handle->lgh_hdr, hdr, sizeof(*hdr));
@@ -305,7 +305,7 @@ static int llog_client_read_header(const struct lu_env *env,
 		CERROR("you may need to re-run lconf --write_conf.\n");
 		rc = -EIO;
 	}
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 err_exit:
 	LLOG_CLIENT_EXIT(handle->lgh_ctxt, imp);

@@ -390,19 +390,19 @@ getxattr_nocache:
 		/* only detect the xattr size */
 		if (size == 0) {
 			rc = body->eadatasize;
-			goto out;
+			goto finish_request;
 		}
 
 		if (size < body->eadatasize) {
 			CERROR("server bug: replied size %u > %u\n",
 				body->eadatasize, (int)size);
 			rc = -ERANGE;
-			goto out;
+			goto finish_request;
 		}
 
 		if (body->eadatasize == 0) {
 			rc = -ENODATA;
-			goto out;
+			goto finish_request;
 		}
 
 		/* do not need swab xattr data */
@@ -410,7 +410,7 @@ getxattr_nocache:
 							body->eadatasize);
 		if (!xdata) {
 			rc = -EFAULT;
-			goto out;
+			goto finish_request;
 		}
 
 		memcpy(buffer, xdata, body->eadatasize);
@@ -425,14 +425,14 @@ getxattr_nocache:
 					(posix_acl_xattr_header *)buffer, rc);
 		if (IS_ERR(acl)) {
 			rc = PTR_ERR(acl);
-			goto out;
+			goto finish_request;
 		}
 
 		rc = ee_add(&sbi->ll_et, current_pid(), ll_inode2fid(inode),
 			    xattr_type, acl);
 		if (unlikely(rc < 0)) {
 			lustre_ext_acl_xattr_free(acl);
-			goto out;
+			goto finish_request;
 		}
 	}
 #endif
@@ -444,7 +444,7 @@ out_xattr:
 			ll_get_fsname(inode->i_sb, NULL, 0), rc);
 		sbi->ll_flags &= ~LL_SBI_USER_XATTR;
 	}
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -555,7 +555,7 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
 
 	rc = ll_getxattr_common(inode, NULL, buffer, size, OBD_MD_FLXATTRLS);
 	if (rc < 0)
-		goto out;
+		goto finish_request;
 
 	if (buffer != NULL) {
 		struct ll_sb_info *sbi = ll_i2sbi(inode);
@@ -589,7 +589,7 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
 
 	if (rc2 < 0) {
 		rc2 = 0;
-		goto out;
+		goto finish_request;
 	} else if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)) {
 		const int prefix_len = sizeof(XATTR_LUSTRE_PREFIX) - 1;
 		const size_t name_len   = sizeof("lov") - 1;
@@ -608,7 +608,7 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
 		}
 		rc2 = total_len;
 	}
-out:
+finish_request:
 	ptlrpc_req_finished(request);
 	rc = rc + rc2;
 

@@ -291,12 +291,12 @@ static int osc_getattr(const struct lu_env *env, struct obd_export *exp,
 
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	body = req_capsule_server_get(&req->rq_pill, &RMF_OST_BODY);
 	if (body == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	CDEBUG(D_INODE, "mode: %o\n", body->oa.o_mode);
@@ -306,7 +306,7 @@ static int osc_getattr(const struct lu_env *env, struct obd_export *exp,
 	oinfo->oi_oa->o_blksize = cli_brw_size(exp->exp_obd);
 	oinfo->oi_oa->o_valid |= OBD_MD_FLBLKSZ;
 
- out:
+ finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -336,18 +336,18 @@ static int osc_setattr(const struct lu_env *env, struct obd_export *exp,
 
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	body = req_capsule_server_get(&req->rq_pill, &RMF_OST_BODY);
 	if (body == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	lustre_get_wire_obdo(&req->rq_import->imp_connect_data, oinfo->oi_oa,
 			     &body->oa);
 
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1276,7 +1276,7 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
 
 	if (desc == NULL) {
 		rc = -ENOMEM;
-		goto out;
+		goto finish_request;
 	}
 	/* NB request now owns desc and will free it when it gets freed */
 
@@ -1407,7 +1407,7 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
 	*reqp = req;
 	return 0;
 
- out:
+ finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -2513,17 +2513,17 @@ static int osc_statfs(const struct lu_env *env, struct obd_export *exp,
 
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	msfs = req_capsule_server_get(&req->rq_pill, &RMF_OBD_STATFS);
 	if (msfs == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*osfs = *msfs;
 
- out:
+ finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -2718,16 +2718,16 @@ static int osc_get_info(const struct lu_env *env, struct obd_export *exp,
 		ptlrpc_request_set_replen(req);
 		rc = ptlrpc_queue_wait(req);
 		if (rc)
-			goto out;
+			goto finish_request;
 
 		reply = req_capsule_server_get(&req->rq_pill, &RMF_OBD_ID);
 		if (reply == NULL) {
 			rc = -EPROTO;
-			goto out;
+			goto finish_request;
 		}
 
 		*((u64 *)val) = *reply;
-	out:
+	finish_request:
 		ptlrpc_req_finished(req);
 		return rc;
 	} else if (KEY_IS(KEY_FIEMAP)) {

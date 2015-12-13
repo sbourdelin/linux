@@ -427,27 +427,27 @@ static int ll_intent_file_open(struct dentry *dentry, void *lmm,
 		*/
 		if (!it_disposition(itp, DISP_OPEN_OPEN) ||
 		     it_open_error(DISP_OPEN_OPEN, itp))
-			goto out;
+			goto finish_request;
 		ll_release_openhandle(inode, itp);
-		goto out;
+		goto finish_request;
 	}
 
 	if (it_disposition(itp, DISP_LOOKUP_NEG)) {
 		rc = -ENOENT;
-		goto out;
+		goto finish_request;
 	}
 
 	if (rc != 0 || it_open_error(DISP_OPEN_OPEN, itp)) {
 		rc = rc ? rc : it_open_error(DISP_OPEN_OPEN, itp);
 		CDEBUG(D_VFSTRACE, "lock enqueue: err: %d\n", rc);
-		goto out;
+		goto finish_request;
 	}
 
 	rc = ll_prep_inode(&inode, req, NULL, itp);
 	if (!rc && itp->d.lustre.it_lock_mode)
 		ll_set_lock_data(sbi->ll_md_exp, inode, itp, NULL);
 
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	ll_intent_drop_lock(itp);
 
@@ -2900,13 +2900,13 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
 		oit.it_create_mode &= ~M_CHECK_STALE;
 		if (rc < 0) {
 			rc = ll_inode_revalidate_fini(inode, rc);
-			goto out;
+			goto finish_request;
 		}
 
 		rc = ll_revalidate_it_finish(req, &oit, inode);
 		if (rc != 0) {
 			ll_intent_release(&oit);
-			goto out;
+			goto finish_request;
 		}
 
 		/* Unlinked? Unhash dentry, so it is not picked up later by
@@ -2946,7 +2946,7 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
 
 		rc = ll_prep_inode(&inode, req, NULL, NULL);
 	}
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -3315,25 +3315,25 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
 	if (body == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	lmmsize = body->eadatasize;
 	if (lmmsize == 0) /* empty layout */ {
 		rc = 0;
-		goto out;
+		goto finish_request;
 	}
 
 	lmm = req_capsule_server_sized_get(&req->rq_pill, &RMF_EADATA, lmmsize);
 	if (lmm == NULL) {
 		rc = -EFAULT;
-		goto out;
+		goto finish_request;
 	}
 
 	lvbdata = libcfs_kvzalloc(lmmsize, GFP_NOFS);
 	if (lvbdata == NULL) {
 		rc = -ENOMEM;
-		goto out;
+		goto finish_request;
 	}
 
 	memcpy(lvbdata, lmm, lmmsize);
@@ -3345,7 +3345,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
 	lock->l_lvb_len = lmmsize;
 	unlock_res_and_lock(lock);
 
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }

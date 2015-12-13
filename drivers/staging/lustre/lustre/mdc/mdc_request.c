@@ -92,12 +92,12 @@ static int mdc_getstatus(struct obd_export *exp, struct lu_fid *rootfid)
 
 	rc = ptlrpc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
 	if (body == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*rootfid = body->fid1;
@@ -105,7 +105,7 @@ static int mdc_getstatus(struct obd_export *exp, struct lu_fid *rootfid)
 	       "root fid="DFID", last_committed=%llu\n",
 	       PFID(rootfid),
 	       lustre_msg_get_last_committed(req->rq_repmsg));
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1084,17 +1084,17 @@ static int mdc_statfs(const struct lu_env *env,
 		/* check connection error first */
 		if (imp->imp_connect_error)
 			rc = imp->imp_connect_error;
-		goto out;
+		goto finish_request;
 	}
 
 	msfs = req_capsule_server_get(&req->rq_pill, &RMF_OBD_STATFS);
 	if (msfs == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*osfs = *msfs;
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 output:
 	class_import_put(imp);
@@ -1163,7 +1163,7 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
 					LUSTRE_MDS_VERSION, MDS_HSM_PROGRESS);
 	if (req == NULL) {
 		rc = -ENOMEM;
-		goto out;
+		goto finish_request;
 	}
 
 	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
@@ -1172,7 +1172,7 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
 	req_hpk = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_PROGRESS);
 	if (req_hpk == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*req_hpk = *hpk;
@@ -1181,7 +1181,7 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
 	ptlrpc_request_set_replen(req);
 
 	rc = mdc_queue_wait(req);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1197,7 +1197,7 @@ static int mdc_ioc_hsm_ct_register(struct obd_import *imp, __u32 archives)
 					MDS_HSM_CT_REGISTER);
 	if (req == NULL) {
 		rc = -ENOMEM;
-		goto out;
+		goto finish_request;
 	}
 
 	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
@@ -1207,7 +1207,7 @@ static int mdc_ioc_hsm_ct_register(struct obd_import *imp, __u32 archives)
 					      &RMF_MDS_HSM_ARCHIVE);
 	if (archive_mask == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*archive_mask = archives;
@@ -1215,7 +1215,7 @@ static int mdc_ioc_hsm_ct_register(struct obd_import *imp, __u32 archives)
 	ptlrpc_request_set_replen(req);
 
 	rc = mdc_queue_wait(req);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1246,18 +1246,18 @@ static int mdc_ioc_hsm_current_action(struct obd_export *exp,
 
 	rc = mdc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	req_hca = req_capsule_server_get(&req->rq_pill,
 					 &RMF_MDS_HSM_CURRENT_ACTION);
 	if (req_hca == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*hca = *req_hca;
 
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1272,7 +1272,7 @@ static int mdc_ioc_hsm_ct_unregister(struct obd_import *imp)
 					MDS_HSM_CT_UNREGISTER);
 	if (req == NULL) {
 		rc = -ENOMEM;
-		goto out;
+		goto finish_request;
 	}
 
 	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
@@ -1280,7 +1280,7 @@ static int mdc_ioc_hsm_ct_unregister(struct obd_import *imp)
 	ptlrpc_request_set_replen(req);
 
 	rc = mdc_queue_wait(req);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1311,17 +1311,17 @@ static int mdc_ioc_hsm_state_get(struct obd_export *exp,
 
 	rc = mdc_queue_wait(req);
 	if (rc)
-		goto out;
+		goto finish_request;
 
 	req_hus = req_capsule_server_get(&req->rq_pill, &RMF_HSM_USER_STATE);
 	if (req_hus == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 
 	*hus = *req_hus;
 
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1352,14 +1352,14 @@ static int mdc_ioc_hsm_state_set(struct obd_export *exp,
 	req_hss = req_capsule_client_get(&req->rq_pill, &RMF_HSM_STATE_SET);
 	if (req_hss == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 	*req_hss = *hss;
 
 	ptlrpc_request_set_replen(req);
 
 	rc = mdc_queue_wait(req);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
@@ -1377,7 +1377,7 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
 	req = ptlrpc_request_alloc(imp, &RQF_MDS_HSM_REQUEST);
 	if (req == NULL) {
 		rc = -ENOMEM;
-		goto out;
+		goto finish_request;
 	}
 
 	req_capsule_set_size(&req->rq_pill, &RMF_MDS_HSM_USER_ITEM, RCL_CLIENT,
@@ -1398,7 +1398,7 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
 	req_hr = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_REQUEST);
 	if (req_hr == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 	*req_hr = hur->hur_request;
 
@@ -1406,7 +1406,7 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
 	req_hui = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_USER_ITEM);
 	if (req_hui == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 	memcpy(req_hui, hur->hur_user_item,
 	       hur->hur_request.hr_itemcount * sizeof(struct hsm_user_item));
@@ -1415,14 +1415,14 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
 	req_opaque = req_capsule_client_get(&req->rq_pill, &RMF_GENERIC_DATA);
 	if (req_opaque == NULL) {
 		rc = -EPROTO;
-		goto out;
+		goto finish_request;
 	}
 	memcpy(req_opaque, hur_data(hur), hur->hur_request.hr_data_len);
 
 	ptlrpc_request_set_replen(req);
 
 	rc = mdc_queue_wait(req);
-out:
+finish_request:
 	ptlrpc_req_finished(req);
 	return rc;
 }
