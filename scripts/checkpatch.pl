@@ -4972,10 +4972,10 @@ sub process {
 
 # check for pointer comparisons to NULL
 		if ($^V && $^V ge 5.10.0) {
-			while ($line =~ /\b$LvalOrFunc\s*(==|\!=)\s*NULL\b/g) {
-				my $val = $1;
+			while ($line =~ /([\*]*)\b$LvalOrFunc\s*(==|\!=)\s*NULL\b/g) {
+				my $val = $1 . $2;
 				my $equal = "!";
-				$equal = "" if ($4 eq "!=");
+				$equal = "" if ($5 eq "!=");
 				if (CHK("COMPARISON_TO_NULL",
 					"Comparison to NULL could be written \"${equal}${val}\"\n" . $herecurr) &&
 					    $fix) {
