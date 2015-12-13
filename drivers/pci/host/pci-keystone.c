@@ -16,7 +16,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/irqdomain.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/msi.h>
 #include <linux/of_irq.h>
 #include <linux/of.h>
@@ -329,16 +329,6 @@ static const struct of_device_id ks_pcie_of_match[] = {
 	},
 	{ },
 };
-MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
-
-static int __exit ks_pcie_remove(struct platform_device *pdev)
-{
-	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
-
-	clk_disable_unprepare(ks_pcie->clk);
-
-	return 0;
-}
 
 static int __init ks_pcie_probe(struct platform_device *pdev)
 {
@@ -398,15 +388,10 @@ fail_clk:
 
 static struct platform_driver ks_pcie_driver __refdata = {
 	.probe  = ks_pcie_probe,
-	.remove = __exit_p(ks_pcie_remove),
 	.driver = {
 		.name	= "keystone-pcie",
 		.of_match_table = of_match_ptr(ks_pcie_of_match),
+		.suppress_bind_attrs = true,
 	},
 };
-
-module_platform_driver(ks_pcie_driver);
-
-MODULE_AUTHOR("Murali Karicheri <m-karicheri2@ti.com>");
-MODULE_DESCRIPTION("Keystone PCIe host controller driver");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(ks_pcie_driver);
