@@ -17,7 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/mfd/syscon.h>
 #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of_gpio.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
@@ -641,24 +641,20 @@ static const struct of_device_id imx6_pcie_of_match[] = {
 	{ .compatible = "fsl,imx6q-pcie", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
 
 static struct platform_driver imx6_pcie_driver = {
 	.driver = {
 		.name	= "imx6q-pcie",
 		.of_match_table = imx6_pcie_of_match,
+		.suppress_bind_attrs = true,
 	},
 	.shutdown = imx6_pcie_shutdown,
 };
 
-/* Freescale PCIe driver does not allow module unload */
+/* Freescale PCIe driver does not support module configuration */
 
 static int __init imx6_pcie_init(void)
 {
 	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
 }
-module_init(imx6_pcie_init);
-
-MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
-MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
-MODULE_LICENSE("GPL v2");
+device_initcall(imx6_pcie_init);
