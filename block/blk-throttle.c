@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Vivek Goyal <vgoyal@redhat.com>
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
@@ -1590,5 +1590,4 @@ static int __init throtl_init(void)
 
 	return blkcg_policy_register(&blkcg_policy_throtl);
 }
-
-module_init(throtl_init);
+device_initcall(throtl_init);
