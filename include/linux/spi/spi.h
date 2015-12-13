@@ -272,6 +272,17 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
 	__spi_register_driver(THIS_MODULE, driver)
 
 /**
+ * builtin_spi_driver() - Helper macro for registering a SPI driver
+ * @__spi_driver: spi_driver struct
+ *
+ * Helper macro for SPI drivers which do not do anything special in
+ * init. This eliminates a lot of boilerplate. Each file may only
+ * use this macro once, and calling it replaces device_initcall()
+ */
+#define builtin_spi_driver(__spi_driver) \
+	builtin_driver(__spi_driver, spi_register_driver)
+
+/**
  * module_spi_driver() - Helper macro for registering a SPI driver
  * @__spi_driver: spi_driver struct
  *
