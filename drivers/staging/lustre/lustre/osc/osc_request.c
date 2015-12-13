@@ -2611,7 +2611,7 @@ static int osc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		len = 0;
 		if (obd_ioctl_getdata(&buf, &len, uarg)) {
 			err = -EINVAL;
-			goto out;
+			goto put_module;
 		}
 
 		data = (struct obd_ioctl_data *)buf;
@@ -2619,13 +2619,13 @@ static int osc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		if (sizeof(*desc) > data->ioc_inllen1) {
 			obd_ioctl_freedata(buf, len);
 			err = -EINVAL;
-			goto out;
+			goto put_module;
 		}
 
 		if (data->ioc_inllen2 < sizeof(uuid)) {
 			obd_ioctl_freedata(buf, len);
 			err = -EINVAL;
-			goto out;
+			goto put_module;
 		}
 
 		desc = (struct lov_desc *)data->ioc_inlbuf1;
@@ -2643,39 +2643,39 @@ static int osc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		if (err)
 			err = -EFAULT;
 		obd_ioctl_freedata(buf, len);
-		goto out;
+		goto put_module;
 	}
 	case LL_IOC_LOV_SETSTRIPE:
 		err = obd_alloc_memmd(exp, karg);
 		if (err > 0)
 			err = 0;
-		goto out;
+		goto put_module;
 	case LL_IOC_LOV_GETSTRIPE:
 		err = osc_getstripe(karg, uarg);
-		goto out;
+		goto put_module;
 	case OBD_IOC_CLIENT_RECOVER:
 		err = ptlrpc_recover_import(obd->u.cli.cl_import,
 					    data->ioc_inlbuf1, 0);
 		if (err > 0)
 			err = 0;
-		goto out;
+		goto put_module;
 	case IOC_OSC_SET_ACTIVE:
 		err = ptlrpc_set_import_active(obd->u.cli.cl_import,
 					       data->ioc_offset);
-		goto out;
+		goto put_module;
 	case OBD_IOC_POLL_QUOTACHECK:
 		err = osc_quota_poll_check(exp, karg);
-		goto out;
+		goto put_module;
 	case OBD_IOC_PING_TARGET:
 		err = ptlrpc_obd_ping(obd);
-		goto out;
+		goto put_module;
 	default:
 		CDEBUG(D_INODE, "unrecognised ioctl %#x by %s\n",
 		       cmd, current_comm());
 		err = -ENOTTY;
-		goto out;
+		goto put_module;
 	}
-out:
+put_module:
 	module_put(THIS_MODULE);
 	return err;
 }

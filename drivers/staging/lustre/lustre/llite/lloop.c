@@ -484,14 +484,14 @@ static int loop_set_fd(struct lloop_device *lo, struct file *unused,
 
 	error = -EBUSY;
 	if (lo->lo_state != LLOOP_UNBOUND)
-		goto out;
+		goto put_module;
 
 	mapping = file->f_mapping;
 	inode = mapping->host;
 
 	error = -EINVAL;
 	if (!S_ISREG(inode->i_mode) || inode->i_sb->s_magic != LL_SUPER_MAGIC)
-		goto out;
+		goto put_module;
 
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
@@ -500,7 +500,7 @@ static int loop_set_fd(struct lloop_device *lo, struct file *unused,
 
 	if ((loff_t)(sector_t)size != size) {
 		error = -EFBIG;
-		goto out;
+		goto put_module;
 	}
 
 	/* remove all pages in cache so as dirty pages not to be existent. */
@@ -542,7 +542,7 @@ static int loop_set_fd(struct lloop_device *lo, struct file *unused,
 	down(&lo->lo_sem);
 	return 0;
 
-out:
+put_module:
 	/* This is safe: open() is still holding a reference. */
 	module_put(THIS_MODULE);
 	return error;

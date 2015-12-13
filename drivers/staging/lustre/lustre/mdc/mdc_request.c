@@ -1734,7 +1734,7 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 	switch (cmd) {
 	case OBD_IOC_CHANGELOG_SEND:
 		rc = mdc_ioc_changelog_send(obd, karg);
-		goto out;
+		goto put_module;
 	case OBD_IOC_CHANGELOG_CLEAR: {
 		struct ioc_changelog *icc = karg;
 		struct changelog_setinfo cs = {
@@ -1745,47 +1745,47 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		rc = obd_set_info_async(NULL, exp, strlen(KEY_CHANGELOG_CLEAR),
 					KEY_CHANGELOG_CLEAR, sizeof(cs), &cs,
 					NULL);
-		goto out;
+		goto put_module;
 	}
 	case OBD_IOC_FID2PATH:
 		rc = mdc_ioc_fid2path(exp, karg);
-		goto out;
+		goto put_module;
 	case LL_IOC_HSM_CT_START:
 		rc = mdc_ioc_hsm_ct_start(exp, karg);
 		/* ignore if it was already registered on this MDS. */
 		if (rc == -EEXIST)
 			rc = 0;
-		goto out;
+		goto put_module;
 	case LL_IOC_HSM_PROGRESS:
 		rc = mdc_ioc_hsm_progress(exp, karg);
-		goto out;
+		goto put_module;
 	case LL_IOC_HSM_STATE_GET:
 		rc = mdc_ioc_hsm_state_get(exp, karg);
-		goto out;
+		goto put_module;
 	case LL_IOC_HSM_STATE_SET:
 		rc = mdc_ioc_hsm_state_set(exp, karg);
-		goto out;
+		goto put_module;
 	case LL_IOC_HSM_ACTION:
 		rc = mdc_ioc_hsm_current_action(exp, karg);
-		goto out;
+		goto put_module;
 	case LL_IOC_HSM_REQUEST:
 		rc = mdc_ioc_hsm_request(exp, karg);
-		goto out;
+		goto put_module;
 	case OBD_IOC_CLIENT_RECOVER:
 		rc = ptlrpc_recover_import(imp, data->ioc_inlbuf1, 0);
 		if (rc < 0)
-			goto out;
+			goto put_module;
 		rc = 0;
-		goto out;
+		goto put_module;
 	case IOC_OSC_SET_ACTIVE:
 		rc = ptlrpc_set_import_active(imp, data->ioc_offset);
-		goto out;
+		goto put_module;
 	case OBD_IOC_POLL_QUOTACHECK:
 		rc = mdc_quota_poll_check(exp, (struct if_quotacheck *)karg);
-		goto out;
+		goto put_module;
 	case OBD_IOC_PING_TARGET:
 		rc = ptlrpc_obd_ping(obd);
-		goto out;
+		goto put_module;
 	/*
 	 * Normally IOC_OBD_STATFS, OBD_IOC_QUOTACTL iocontrol are handled by
 	 * LMV instead of MDC. But when the cluster is upgraded from 1.8,
@@ -1798,7 +1798,7 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 
 		if (*((__u32 *) data->ioc_inlbuf2) != 0) {
 			rc = -ENODEV;
-			goto out;
+			goto put_module;
 		}
 
 		/* copy UUID */
@@ -1806,24 +1806,24 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 				 min_t(size_t, data->ioc_plen2,
 					       sizeof(struct obd_uuid)))) {
 			rc = -EFAULT;
-			goto out;
+			goto put_module;
 		}
 
 		rc = mdc_statfs(NULL, obd->obd_self_export, &stat_buf,
 				cfs_time_shift_64(-OBD_STATFS_CACHE_SECONDS),
 				0);
 		if (rc != 0)
-			goto out;
+			goto put_module;
 
 		if (copy_to_user(data->ioc_pbuf1, &stat_buf,
 				 min_t(size_t, data->ioc_plen1,
 					       sizeof(stat_buf)))) {
 			rc = -EFAULT;
-			goto out;
+			goto put_module;
 		}
 
 		rc = 0;
-		goto out;
+		goto put_module;
 	}
 	case OBD_IOC_QUOTACTL: {
 		struct if_quotactl *qctl = karg;
@@ -1832,7 +1832,7 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		oqctl = kzalloc(sizeof(*oqctl), GFP_NOFS);
 		if (!oqctl) {
 			rc = -ENOMEM;
-			goto out;
+			goto put_module;
 		}
 
 		QCTL_COPY(oqctl, qctl);
@@ -1844,26 +1844,26 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
 		}
 
 		kfree(oqctl);
-		goto out;
+		goto put_module;
 	}
 	case LL_IOC_GET_CONNECT_FLAGS:
 		if (copy_to_user(uarg, exp_connect_flags_ptr(exp),
 				 sizeof(*exp_connect_flags_ptr(exp)))) {
 			rc = -EFAULT;
-			goto out;
+			goto put_module;
 		}
 
 		rc = 0;
-		goto out;
+		goto put_module;
 	case LL_IOC_LOV_SWAP_LAYOUTS:
 		rc = mdc_ioc_swap_layouts(exp, karg);
-		goto out;
+		goto put_module;
 	default:
 		CERROR("unrecognised ioctl: cmd = %#x\n", cmd);
 		rc = -ENOTTY;
-		goto out;
+		goto put_module;
 	}
-out:
+put_module:
 	module_put(THIS_MODULE);
 
 	return rc;
