@@ -1228,6 +1228,9 @@ static int ravb_open(struct net_device *ndev)
 		goto out_free_irq2;
 	ravb_emac_init(ndev);
 
+	/* Disable unhandled interrupt */
+	ravb_write(ndev, 0, RIC1);
+
 	/* Initialise PTP Clock driver */
 	ravb_ptp_init(ndev, priv->pdev);
 
@@ -1471,7 +1474,6 @@ static int ravb_close(struct net_device *ndev)
 
 	/* Disable interrupts by clearing the interrupt masks. */
 	ravb_write(ndev, 0, RIC0);
-	ravb_write(ndev, 0, RIC1);
 	ravb_write(ndev, 0, RIC2);
 	ravb_write(ndev, 0, TIC);
 
