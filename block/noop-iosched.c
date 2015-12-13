@@ -1,10 +1,11 @@
 /*
- * elevator noop
+ * elevator noop: No-op IO scheduler
+ * Author: Jens Axboe
+ * License: GPL
  */
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
 #include <linux/bio.h>
-#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 
@@ -109,16 +110,4 @@ static int __init noop_init(void)
 {
 	return elv_register(&elevator_noop);
 }
-
-static void __exit noop_exit(void)
-{
-	elv_unregister(&elevator_noop);
-}
-
-module_init(noop_init);
-module_exit(noop_exit);
-
-
-MODULE_AUTHOR("Jens Axboe");
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("No-op IO scheduler");
+device_initcall(noop_init);
