@@ -1285,14 +1285,14 @@ static int mgc_apply_recover_logs(struct obd_device *mgc,
 static int mgc_process_recover_log(struct obd_device *obd,
 				   struct config_llog_data *cld)
 {
-	struct ptlrpc_request *req = NULL;
+	struct ptlrpc_request *req;
 	struct config_llog_instance *cfg = &cld->cld_cfg;
 	struct mgs_config_body *body;
 	struct mgs_config_res  *res;
 	struct ptlrpc_bulk_desc *desc;
 	struct page **pages;
 	int nrpages;
-	bool eof = true;
+	bool eof;
 	bool mne_swab;
 	int i;
 	int ealen;
@@ -1309,10 +1309,11 @@ static int mgc_process_recover_log(struct obd_device *obd,
 		nrpages = CONFIG_READ_NRPAGES_INIT;
 
 	pages = kcalloc(nrpages, sizeof(*pages), GFP_KERNEL);
-	if (pages == NULL) {
-		rc = -ENOMEM;
-		goto out;
-	}
+	if (!pages)
+		return -ENOMEM;
+
+	req = NULL;
+	eof = true;
 
 	for (i = 0; i < nrpages; i++) {
 		pages[i] = alloc_page(GFP_KERNEL);
@@ -1432,14 +1433,12 @@ out:
 	if (rc == 0 && !eof)
 		goto again;
 
-	if (pages) {
-		for (i = 0; i < nrpages; i++) {
-			if (pages[i] == NULL)
-				break;
-			__free_page(pages[i]);
-		}
-		kfree(pages);
+	for (i = 0; i < nrpages; i++) {
+		if (pages[i] == NULL)
+			break;
+		__free_page(pages[i]);
 	}
+	kfree(pages);
 	return rc;
 }
 
