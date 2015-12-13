@@ -1125,7 +1125,7 @@ static int mdc_ioc_fid2path(struct obd_export *exp, struct getinfo_fid2path *gf)
 
 	if (!fid_is_sane(&gf->gf_fid)) {
 		rc = -EINVAL;
-		goto out;
+		goto free_key;
 	}
 
 	/* Val is struct getinfo_fid2path result plus path */
@@ -1133,20 +1133,19 @@ static int mdc_ioc_fid2path(struct obd_export *exp, struct getinfo_fid2path *gf)
 
 	rc = obd_get_info(NULL, exp, keylen, key, &vallen, gf, NULL);
 	if (rc != 0 && rc != -EREMOTE)
-		goto out;
+		goto free_key;
 
 	if (vallen <= sizeof(*gf)) {
 		rc = -EPROTO;
-		goto out;
+		goto free_key;
 	} else if (vallen > sizeof(*gf) + gf->gf_pathlen) {
 		rc = -EOVERFLOW;
-		goto out;
+		goto free_key;
 	}
 
 	CDEBUG(D_IOCTL, "path get "DFID" from %llu #%d\n%s\n",
 	       PFID(&gf->gf_fid), gf->gf_recno, gf->gf_linkno, gf->gf_path);
-
-out:
+free_key:
 	kfree(key);
 	return rc;
 }
