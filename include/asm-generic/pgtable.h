@@ -51,12 +51,11 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
 					    pte_t *ptep)
 {
 	pte_t pte = *ptep;
-	int r = 1;
+
 	if (!pte_young(pte))
-		r = 0;
-	else
-		set_pte_at(vma->vm_mm, address, ptep, pte_mkold(pte));
-	return r;
+		return 0;
+	set_pte_at(vma->vm_mm, address, ptep, pte_mkold(pte));
+	return 1;
 }
 #endif
 
@@ -67,12 +66,11 @@ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 					    pmd_t *pmdp)
 {
 	pmd_t pmd = *pmdp;
-	int r = 1;
+
 	if (!pmd_young(pmd))
-		r = 0;
-	else
-		set_pmd_at(vma->vm_mm, address, pmdp, pmd_mkold(pmd));
-	return r;
+		return 0;
+	set_pmd_at(vma->vm_mm, address, pmdp, pmd_mkold(pmd));
+	return 1;
 }
 #else
 static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
