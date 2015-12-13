@@ -314,11 +314,11 @@ static inline int pmd_same(pmd_t pmd_a, pmd_t pmd_b)
 static inline pgprot_t pgprot_modify(pgprot_t oldprot, pgprot_t newprot)
 {
 	if (pgprot_val(oldprot) == pgprot_val(pgprot_noncached(oldprot)))
-		newprot = pgprot_noncached(newprot);
+		return pgprot_noncached(newprot);
 	if (pgprot_val(oldprot) == pgprot_val(pgprot_writecombine(oldprot)))
-		newprot = pgprot_writecombine(newprot);
+		return pgprot_writecombine(newprot);
 	if (pgprot_val(oldprot) == pgprot_val(pgprot_device(oldprot)))
-		newprot = pgprot_device(newprot);
+		return pgprot_device(newprot);
 	return newprot;
 }
 #endif
