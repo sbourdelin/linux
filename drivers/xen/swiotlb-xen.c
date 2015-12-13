@@ -456,6 +456,9 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
 	 */
 	if (dir == DMA_FROM_DEVICE)
 		dma_mark_clean(phys_to_virt(paddr), size);
+
+	if (dir != DMA_TO_DEVICE)
+		dma_mark_dirty(phys_to_virt(paddr), size);
 }
 EXPORT_SYMBOL_GPL(xen_swiotlb_unmap_page);
 
@@ -485,6 +488,9 @@ xen_swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
 
 	if (dir == DMA_FROM_DEVICE)
 		dma_mark_clean(phys_to_virt(paddr), size);
+
+	if (dir != DMA_TO_DEVICE)
+		dma_mark_dirty(phys_to_virt(paddr), size);
 }
 EXPORT_SYMBOL_GPL(xen_swiotlb_sync_single_for_cpu);
 

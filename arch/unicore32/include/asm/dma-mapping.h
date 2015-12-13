@@ -49,6 +49,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr)
 }
 
 static inline void dma_mark_clean(void *addr, size_t size) {}
+static inline void dma_mark_dirty(void *addr, size_t size) {}
 
 static inline void dma_cache_sync(struct device *dev, void *vaddr,
 		size_t size, enum dma_data_direction direction)

@@ -28,6 +28,7 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 }
 
 static inline void dma_mark_clean(void *addr, size_t size) {}
+static inline void dma_mark_dirty(void *addr, size_t size) {}
 
 #include <asm-generic/dma-mapping-common.h>
 

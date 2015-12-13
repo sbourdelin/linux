@@ -167,7 +167,8 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 	return 1;
 }
 
-static inline void dma_mark_clean(void *addr, size_t size) { }
+static inline void dma_mark_clean(void *addr, size_t size) {}
+static inline void dma_mark_dirty(void *addr, size_t size) {}
 
 extern int arm_dma_set_mask(struct device *dev, u64 dma_mask);
 

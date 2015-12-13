@@ -91,9 +91,8 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 	return addr + size - 1 <= *dev->dma_mask;
 }
 
-static inline void dma_mark_clean(void *addr, size_t size)
-{
-}
+static inline void dma_mark_clean(void *addr, size_t size) {}
+static inline void dma_mark_dirty(void *addr, size_t size) {}
 
 #endif	/* __KERNEL__ */
 #endif	/* __ASM_DMA_MAPPING_H */

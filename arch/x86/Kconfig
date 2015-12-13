@@ -841,6 +841,17 @@ config SWIOTLB
 	  with more than 3 GB of memory.
 	  If unsure, say Y.
 
+config SWIOTLB_PAGE_DIRTYING
+	bool "SWIOTLB page dirtying"
+	depends on SWIOTLB
+	default n
+	---help---
+	  SWIOTLB page dirtying support provides a means for the guest to
+	  trigger write faults on pages which received DMA from the device
+	  without changing the data contained within.  By doing this the
+	  guest can then support migration assuming the device and any
+	  remaining pages are unmapped prior to the CPU itself being halted.
+
 config IOMMU_HELPER
 	def_bool y
 	depends on CALGARY_IOMMU || GART_IOMMU || SWIOTLB || AMD_IOMMU
