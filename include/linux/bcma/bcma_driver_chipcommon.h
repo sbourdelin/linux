@@ -592,13 +592,9 @@ struct bcma_sflash {
 #endif
 
 #ifdef CONFIG_BCMA_NFLASH
-struct mtd_info;
-
 struct bcma_nflash {
 	bool present;
 	bool boot;		/* This is the flash the SoC boots from */
-
-	struct mtd_info *mtd;
 };
 #endif
 
