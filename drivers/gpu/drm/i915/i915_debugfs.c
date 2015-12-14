@@ -4923,7 +4923,9 @@ i915_max_freq_set(void *data, u64 val)
 
 	dev_priv->rps.max_freq_softlimit = val;
 
+	intel_runtime_pm_get(dev_priv);
 	intel_set_rps(dev, val);
+	intel_runtime_pm_put(dev_priv);
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
 
@@ -4990,7 +4992,9 @@ i915_min_freq_set(void *data, u64 val)
 
 	dev_priv->rps.min_freq_softlimit = val;
 
+	intel_runtime_pm_get(dev_priv);
 	intel_set_rps(dev, val);
+	intel_runtime_pm_put(dev_priv);
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
 

@@ -391,10 +391,12 @@ static ssize_t gt_max_freq_mhz_store(struct device *kdev,
 		      dev_priv->rps.min_freq_softlimit,
 		      dev_priv->rps.max_freq_softlimit);
 
+	intel_runtime_pm_get(dev_priv);
 	/* We still need *_set_rps to process the new max_delay and
 	 * update the interrupt limits and PMINTRMSK even though
 	 * frequency request may be unchanged. */
 	intel_set_rps(dev, val);
+	intel_runtime_pm_put(dev_priv);
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
 
@@ -450,10 +452,12 @@ static ssize_t gt_min_freq_mhz_store(struct device *kdev,
 		      dev_priv->rps.min_freq_softlimit,
 		      dev_priv->rps.max_freq_softlimit);
 
+	intel_runtime_pm_get(dev_priv);
 	/* We still need *_set_rps to process the new min_delay and
 	 * update the interrupt limits and PMINTRMSK even though
 	 * frequency request may be unchanged. */
 	intel_set_rps(dev, val);
+	intel_runtime_pm_put(dev_priv);
 
 	mutex_unlock(&dev_priv->rps.hw_lock);
 
