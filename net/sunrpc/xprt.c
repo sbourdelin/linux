@@ -837,6 +837,20 @@ static void xprt_update_rtt(struct rpc_task *task)
 }
 
 /**
+ * xprt_commit_rqst - remove rqst from pending list early
+ * @task: RPC request to remove
+ *
+ * Caller holds transport lock.
+ */
+void xprt_commit_rqst(struct rpc_task *task)
+{
+	struct rpc_rqst *req = task->tk_rqstp;
+
+	list_del_init(&req->rq_list);
+}
+EXPORT_SYMBOL_GPL(xprt_commit_rqst);
+
+/**
  * xprt_complete_rqst - called when reply processing is complete
  * @task: RPC request that recently completed
  * @copied: actual number of bytes received from the transport
