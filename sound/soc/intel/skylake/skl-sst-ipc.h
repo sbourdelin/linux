@@ -55,6 +55,9 @@ struct skl_sst {
 
 	/* IPC messaging */
 	struct sst_generic_ipc ipc;
+
+	/*Is CGCTL.MISCBDCGE disabled*/
+	bool miscbdcg_disabled;
 };
 
 struct skl_ipc_init_instance_msg {
