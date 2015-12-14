@@ -267,8 +267,12 @@ static inline int usb_ep_enable(struct usb_ep *ep)
 {
 	int ret;
 
-	if (ep->enabled)
-		return 0;
+	/**
+	 * An enabled ep may has requests in progress, hence shouldn't
+	 * reprogram its hw configuration.
+	 */
+	if (WARN_ON_ONCE(ep->enabled))
+		return -EBUSY;
 
 	ret = ep->ops->enable(ep, ep->desc);
 	if (ret)
