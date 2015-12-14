@@ -431,17 +431,22 @@ void i915_gem_context_fini(struct drm_device *dev)
 		i915_gem_object_ggtt_unpin(dctx->legacy_hw_ctx.rcs_state);
 	}
 
-	for (i = 0; i < I915_NUM_RINGS; i++) {
+	for (i = I915_NUM_RINGS; --i >= 0;) {
 		struct intel_engine_cs *ring = &dev_priv->ring[i];
 
 		if (ring->last_context)
 			i915_gem_context_unreference(ring->last_context);
 
-		ring->default_context = NULL;
 		ring->last_context = NULL;
 	}
 
 	i915_gem_context_unreference(dctx);
+
+	for (i = I915_NUM_RINGS; --i >= 0;) {
+		struct intel_engine_cs *ring = &dev_priv->ring[i];
+
+		ring->default_context = NULL;
+	}
 }
 
 int i915_gem_context_enable(struct drm_i915_gem_request *req)
