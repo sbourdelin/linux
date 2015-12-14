@@ -115,7 +115,7 @@ exit:
 
 int rtl8723a_set_rssi_cmd(struct rtw_adapter *padapter, u8 *param)
 {
-	*((u32 *)param) = cpu_to_le32(*((u32 *)param));
+	*((__le32 *)param) = cpu_to_le32(*((u32 *)param));
 
 	FillH2CCmd(padapter, RSSI_SETTING_EID, 3, param);
 
