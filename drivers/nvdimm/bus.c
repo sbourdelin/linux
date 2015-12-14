@@ -367,6 +367,12 @@ static const struct nd_cmd_desc __nd_cmd_dimm_descs[] = {
 		.out_num = 3,
 		.out_sizes = { 4, 4, UINT_MAX, },
 	},
+	[ND_CMD_CALL_DSM] = {
+		.in_num = 2,
+		.in_sizes = {sizeof(struct nd_cmd_dsmcall_pkg), UINT_MAX, },
+		.out_num = 1,
+		.out_sizes = { UINT_MAX, },
+	},
 };
 
 const struct nd_cmd_desc *nd_cmd_dimm_desc(int cmd)
@@ -395,6 +401,12 @@ static const struct nd_cmd_desc __nd_cmd_bus_descs[] = {
 		.out_num = 2,
 		.out_sizes = { 4, UINT_MAX, },
 	},
+	[ND_CMD_CALL_DSM] = {
+		.in_num = 2,
+		.in_sizes = {sizeof(struct nd_cmd_dsmcall_pkg), UINT_MAX, },
+		.out_num = 1,
+		.out_sizes = { UINT_MAX, },
+	},
 };
 
 const struct nd_cmd_desc *nd_cmd_bus_desc(int cmd)
@@ -422,6 +434,10 @@ u32 nd_cmd_in_size(struct nvdimm *nvdimm, int cmd,
 		struct nd_cmd_vendor_hdr *hdr = buf;
 
 		return hdr->in_length;
+	} else if (cmd == ND_CMD_CALL_DSM) {
+		struct nd_cmd_dsmcall_pkg *pkg = buf;
+
+		return pkg->h.dsm_in;
 	}
 
 	return UINT_MAX;
@@ -444,6 +460,12 @@ u32 nd_cmd_out_size(struct nvdimm *nvdimm, int cmd,
 		return out_field[1];
 	else if (!nvdimm && cmd == ND_CMD_ARS_STATUS && idx == 1)
 		return ND_CMD_ARS_STATUS_MAX;
+	else if (cmd == ND_CMD_CALL_DSM) {
+		struct nd_cmd_dsmcall_pkg *pkg =
+				(struct nd_cmd_dsmcall_pkg *) in_field;
+		return pkg->h.dsm_out;
+	}
+
 
 	return UINT_MAX;
 }
@@ -491,19 +513,24 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 	void __user *p = (void __user *) arg;
 	struct device *dev = &nvdimm_bus->dev;
 	const char *cmd_name, *dimm_name;
-	unsigned long dsm_mask;
+	unsigned long dsm_mask = ~0UL;
 	void *buf;
 	int rc, i;
+
+	struct nd_cmd_dsmcall_pkg *pkg;
+	int dsm_call = (cmd == ND_CMD_CALL_DSM);
 
 	if (nvdimm) {
 		desc = nd_cmd_dimm_desc(cmd);
 		cmd_name = nvdimm_cmd_name(cmd);
-		dsm_mask = nvdimm->dsm_mask ? *(nvdimm->dsm_mask) : 0;
+		if (!dsm_call)
+			dsm_mask = nvdimm->dsm_mask ? *(nvdimm->dsm_mask) : 0;
 		dimm_name = dev_name(&nvdimm->dev);
 	} else {
 		desc = nd_cmd_bus_desc(cmd);
 		cmd_name = nvdimm_bus_cmd_name(cmd);
-		dsm_mask = nd_desc->dsm_mask;
+		if (!dsm_call)
+			dsm_mask = nd_desc->dsm_mask;
 		dimm_name = "bus";
 	}
 
@@ -517,6 +544,7 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 		case ND_CMD_VENDOR:
 		case ND_CMD_SET_CONFIG_DATA:
 		case ND_CMD_ARS_START:
+		case ND_CMD_CALL_DSM:
 			dev_dbg(&nvdimm_bus->dev, "'%s' command while read-only.\n",
 					nvdimm ? nvdimm_cmd_name(cmd)
 					: nvdimm_bus_cmd_name(cmd));
@@ -542,6 +570,19 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 		if (copy && copy_from_user(&in_env[in_len], p + in_len, copy))
 			return -EFAULT;
 		in_len += in_size;
+	}
+
+	if (dsm_call) {
+		pkg = (struct nd_cmd_dsmcall_pkg *) in_env;
+
+		dev_dbg(dev, "%s:%s rev: %llu, idx: %llu, in: %zu, out: %zu, len %zu\n",
+			__func__, dimm_name,
+			pkg->h.dsm_rev, pkg->h.dsm_fun_idx,
+			in_len, out_len, buf_len);
+
+		for (i = 0; i < ARRAY_SIZE(pkg->h.reserved2); i++)
+			if (pkg->h.reserved2[i])
+				return -EINVAL;
 	}
 
 	/* process an output envelope */
