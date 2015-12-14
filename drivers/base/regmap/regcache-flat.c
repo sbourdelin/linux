@@ -19,17 +19,19 @@
 static int regcache_flat_init(struct regmap *map)
 {
 	int i;
-	unsigned int *cache;
+	unsigned int index, *cache;
 
-	map->cache = kcalloc(map->max_register + 1, sizeof(unsigned int),
-			     GFP_KERNEL);
+	map->cache = kcalloc(map->max_register / map->reg_stride + 1,
+			     sizeof(unsigned int), GFP_KERNEL);
 	if (!map->cache)
 		return -ENOMEM;
 
 	cache = map->cache;
 
-	for (i = 0; i < map->num_reg_defaults; i++)
-		cache[map->reg_defaults[i].reg] = map->reg_defaults[i].def;
+	for (i = 0; i < map->num_reg_defaults; i++) {
+		index =  map->reg_defaults[i].reg / map->reg_stride;
+		cache[index] = map->reg_defaults[i].def;
+	}
 
 	return 0;
 }
@@ -45,9 +47,10 @@ static int regcache_flat_exit(struct regmap *map)
 static int regcache_flat_read(struct regmap *map,
 			      unsigned int reg, unsigned int *value)
 {
+	unsigned int index = reg / map->reg_stride;
 	unsigned int *cache = map->cache;
 
-	*value = cache[reg];
+	*value = cache[index];
 
 	return 0;
 }
@@ -55,9 +58,10 @@ static int regcache_flat_read(struct regmap *map,
 static int regcache_flat_write(struct regmap *map, unsigned int reg,
 			       unsigned int value)
 {
+	unsigned int index = reg / map->reg_stride;
 	unsigned int *cache = map->cache;
 
-	cache[reg] = value;
+	cache[index] = value;
 
 	return 0;
 }
