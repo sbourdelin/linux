@@ -1137,7 +1137,7 @@ static int netlink_insert(struct sock *sk, u32 portid)
 
 	/* We need to ensure that the socket is hashed and visible. */
 	smp_wmb();
-	nlk_sk(sk)->bound = portid;
+	nlk_sk(sk)->bound = true;
 
 err:
 	release_sock(sk);
