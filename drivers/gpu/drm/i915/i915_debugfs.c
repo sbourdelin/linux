@@ -1678,6 +1678,7 @@ static int i915_fbc_fc_set(void *data, u64 val)
 		return -ENODEV;
 
 	mutex_lock(&dev_priv->fbc.lock);
+	intel_runtime_pm_get(dev_priv);
 
 	reg = I915_READ(ILK_DPFC_CONTROL);
 	dev_priv->fbc.false_color = val;
@@ -1686,7 +1687,9 @@ static int i915_fbc_fc_set(void *data, u64 val)
 		   (reg | FBC_CTL_FALSE_COLOR) :
 		   (reg & ~FBC_CTL_FALSE_COLOR));
 
+	intel_runtime_pm_put(dev_priv);
 	mutex_unlock(&dev_priv->fbc.lock);
+
 	return 0;
 }
 
