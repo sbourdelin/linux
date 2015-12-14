@@ -155,6 +155,7 @@ struct spi_nor {
 	struct mtd_info		mtd;
 	struct mutex		lock;
 	struct device		*dev;
+	struct spi_device       *spi;
 	struct device_node	*flash_node;
 	u32			page_size;
 	u8			addr_width;
