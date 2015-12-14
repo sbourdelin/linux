@@ -20,7 +20,7 @@
 int lowpan_register_netdevice(struct net_device *dev,
 			      enum lowpan_lltypes lltype)
 {
-	int ret;
+	int i, ret;
 
 	dev->addr_len = EUI64_ADDR_LEN;
 	dev->type = ARPHRD_6LOWPAN;
@@ -28,6 +28,10 @@ int lowpan_register_netdevice(struct net_device *dev,
 	dev->priv_flags |= IFF_NO_QUEUE;
 
 	lowpan_priv(dev)->lltype = lltype;
+
+	spin_lock_init(&lowpan_priv(dev)->ctx.lock);
+	for (i = 0; i < LOWPAN_IPHC_CI_TABLE_SIZE; i++)
+		lowpan_priv(dev)->ctx.table[i].id = i;
 
 	ret = lowpan_dev_debugfs_init(dev);
 	if (ret < 0)
