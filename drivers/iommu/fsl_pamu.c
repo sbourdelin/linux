@@ -24,7 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/genalloc.h>
 
-#include <asm/mpc85xx.h>
+#include <linux/svr.h>
 
 /* define indexes for each operation mapping scenario */
 #define OMI_QMAN        0x00

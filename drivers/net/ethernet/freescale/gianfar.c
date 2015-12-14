@@ -90,7 +90,7 @@
 #include <asm/io.h>
 #ifdef CONFIG_PPC
 #include <asm/reg.h>
-#include <asm/mpc85xx.h>
+#include <linux/svr.h>
 #endif
 #include <asm/irq.h>
 #include <asm/uaccess.h>
