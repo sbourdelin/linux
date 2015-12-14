@@ -113,7 +113,7 @@ struct beiscsi_mcc_tag_state {
 #define MCC_TAG_STATE_COMPLETED 0x00
 #define MCC_TAG_STATE_RUNNING   0x01
 #define MCC_TAG_STATE_TIMEOUT   0x02
-	uint8_t tag_state;
+	atomic_t tag_state;
 	struct be_dma_mem tag_mem_state;
 };
 
@@ -124,7 +124,7 @@ struct be_ctrl_info {
 	struct pci_dev *pdev;
 
 	/* Mbox used for cmd request/response */
-	spinlock_t mbox_lock;	/* For serializing mbox cmds to BE card */
+	struct mutex mbox_lock;	/* For serializing mbox cmds to BE card */
 	struct be_dma_mem mbox_mem;
 	/* Mbox mem is adjusted to align to 16 bytes. The allocated addr
 	 * is stored for freeing purpose */
