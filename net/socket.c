@@ -1098,6 +1098,9 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 		return -EAFNOSUPPORT;
 	if (type < 0 || type >= SOCK_MAX)
 		return -EINVAL;
+	/* upper bound should be tested by per-protocol .create callbacks */
+	if (protocol < 0)
+		return -EINVAL;
 
 	/* Compatibility.
 
