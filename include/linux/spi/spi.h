@@ -118,6 +118,7 @@ void spi_statistics_add_transfer_stats(struct spi_statistics *stats,
  *	for driver coldplugging, and in uevents used for hotplugging
  * @cs_gpio: gpio number of the chipselect line (optional, -ENOENT when
  *	when not using a GPIO line)
+ * @word_wait_ns: A wait time between word transfers in nanoseconds
  *
  * @statistics: statistics for the spi_device
  *
@@ -158,6 +159,7 @@ struct spi_device {
 	void			*controller_data;
 	char			modalias[SPI_NAME_SIZE];
 	int			cs_gpio;	/* chip select gpio */
+	u32			word_wait_ns;	/* wait time between words */
 
 	/* the statistics */
 	struct spi_statistics	statistics;
