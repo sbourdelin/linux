@@ -350,9 +350,9 @@ new_segment:
 	*bvprv = *bvec;
 }
 
-static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
-			     struct scatterlist *sglist,
-			     struct scatterlist **sg)
+int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
+		      struct scatterlist *sglist,
+		      struct scatterlist **sg)
 {
 	struct bio_vec bvec, bvprv = { NULL };
 	struct bvec_iter iter;
@@ -391,6 +391,7 @@ single_segment:
 
 	return nsegs;
 }
+EXPORT_SYMBOL(__blk_bios_map_sg);
 
 /*
  * map a request to scatterlist, return number of sg entries setup. Caller
