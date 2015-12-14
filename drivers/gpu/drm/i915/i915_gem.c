@@ -4400,6 +4400,20 @@ i915_gem_madvise_ioctl(struct drm_device *dev, void *data,
 	if (obj->madv == I915_MADV_DONTNEED && obj->pages == NULL)
 		i915_gem_object_truncate(obj);
 
+	if (obj->stolen) {
+		switch (obj->madv) {
+		case I915_MADV_WILLNEED:
+			list_del_init(&obj->stolen->mm_link);
+			break;
+		case I915_MADV_DONTNEED:
+			list_move(&obj->stolen->mm_link,
+				  &dev_priv->mm.stolen_list);
+			break;
+		default:
+			break;
+		}
+	}
+
 	args->retained = obj->madv != __I915_MADV_PURGED;
 
 out:
@@ -4420,6 +4434,7 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 	INIT_LIST_HEAD(&obj->obj_exec_link);
 	INIT_LIST_HEAD(&obj->vma_list);
 	INIT_LIST_HEAD(&obj->batch_pool_link);
+	INIT_LIST_HEAD(&obj->stolen_link);
 
 	obj->ops = ops;
 
@@ -5027,6 +5042,7 @@ i915_gem_load(struct drm_device *dev)
 	INIT_LIST_HEAD(&dev_priv->context_list);
 	INIT_LIST_HEAD(&dev_priv->mm.unbound_list);
 	INIT_LIST_HEAD(&dev_priv->mm.bound_list);
+	INIT_LIST_HEAD(&dev_priv->mm.stolen_list);
 	INIT_LIST_HEAD(&dev_priv->mm.fence_list);
 	for (i = 0; i < I915_NUM_RINGS; i++)
 		init_ring_lists(&dev_priv->ring[i]);
