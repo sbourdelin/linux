@@ -397,7 +397,9 @@ struct beiscsi_hba {
 		 * group together since they are used most frequently
 		 * for cid to cri conversion
 		 */
+#define BEISCSI_PHYS_PORT_MAX	4
 		unsigned int phys_port;
+		/* valid values of phys_port id are 0, 1, 2, 3 */
 		unsigned int eqid_count;
 		unsigned int cqid_count;
 		unsigned int iscsi_cid_start[BEISCSI_ULP_COUNT];
@@ -415,6 +417,7 @@ struct beiscsi_hba {
 	} fw_config;
 
 	unsigned int state;
+	u8 optic_state;
 	int get_boot;
 	bool fw_timeout;
 	bool ue_detected;
@@ -422,6 +425,7 @@ struct beiscsi_hba {
 
 	bool mac_addr_set;
 	u8 mac_address[ETH_ALEN];
+	u8 port_name;
 	char fw_ver_str[BEISCSI_VER_STRLEN];
 	char wq_name[20];
 	struct workqueue_struct *wq;	/* The actuak work queue */
@@ -1073,12 +1077,14 @@ struct hwi_context_memory {
 #define BEISCSI_LOG_CONFIG	0x0020	/* CONFIG Code Path */
 #define BEISCSI_LOG_ISCSI	0x0040	/* SCSI/iSCSI Protocol related Logs */
 
+#define __beiscsi_log(phba, level, fmt, arg...) \
+	shost_printk(level, phba->shost, fmt, __LINE__, ##arg)
+
 #define beiscsi_log(phba, level, mask, fmt, arg...) \
 do { \
 	uint32_t log_value = phba->attr_log_enable; \
 		if (((mask) & log_value) || (level[1] <= '3')) \
-			shost_printk(level, phba->shost, \
-				     fmt, __LINE__, ##arg); \
-} while (0)
+			__beiscsi_log(phba, level, fmt, ##arg); \
+} while (0);
 
 #endif
