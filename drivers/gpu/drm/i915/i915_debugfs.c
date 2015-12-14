@@ -1771,9 +1771,13 @@ static int i915_emon_status(struct seq_file *m, void *unused)
 	if (ret)
 		return ret;
 
+	intel_runtime_pm_get(dev_priv);
+
 	temp = i915_mch_val(dev_priv);
 	chipset = i915_chipset_val(dev_priv);
 	gfx = i915_gfx_val(dev_priv);
+
+	intel_runtime_pm_put(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
 
 	seq_printf(m, "GMCH temp: %ld\n", temp);
