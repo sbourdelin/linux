@@ -31,7 +31,8 @@ INSTALL = install
 DESTDIR ?=
 DESTDIR_SQ = '$(subst ','\'',$(DESTDIR))'
 
-LP64 := $(shell echo __LP64__ | ${CC} ${CFLAGS} -E -x c - | tail -n 1)
+include $(srctree)/tools/perf/config/Makefile.arch
+
 ifeq ($(LP64), 1)
   libdir_relative = lib64
 else
