@@ -106,11 +106,6 @@ static void zram_set_obj_size(struct zram_meta *meta,
 	meta->table[index].value = (flags << ZRAM_FLAG_SHIFT) | size;
 }
 
-static inline bool is_partial_io(struct bio_vec *bvec)
-{
-	return bvec->bv_len != PAGE_SIZE;
-}
-
 /*
  * Check if request is within bounds and aligned on zram logical blocks.
  */
@@ -178,10 +173,7 @@ static void handle_zero_page(struct bio_vec *bvec)
 	void *user_mem;
 
 	user_mem = kmap_atomic(page);
-	if (is_partial_io(bvec))
-		memset(user_mem + bvec->bv_offset, 0, bvec->bv_len);
-	else
-		clear_page(user_mem);
+	clear_page(user_mem);
 	kunmap_atomic(user_mem);
 
 	flush_dcache_page(page);
@@ -600,7 +592,7 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 {
 	int ret;
 	struct page *page;
-	unsigned char *user_mem, *uncmem = NULL;
+	unsigned char *uncmem;
 	struct zram_meta *meta = zram->meta;
 	page = bvec->bv_page;
 
@@ -613,35 +605,16 @@ static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 	}
 	bit_spin_unlock(ZRAM_ACCESS, &meta->table[index].value);
 
-	if (is_partial_io(bvec))
-		/* Use  a temporary buffer to decompress the page */
-		uncmem = kmalloc(PAGE_SIZE, GFP_NOIO);
-
-	user_mem = kmap_atomic(page);
-	if (!is_partial_io(bvec))
-		uncmem = user_mem;
-
-	if (!uncmem) {
-		pr_err("Unable to allocate temp memory\n");
-		ret = -ENOMEM;
-		goto out_cleanup;
-	}
-
+	uncmem = kmap_atomic(page);
 	ret = zram_decompress_page(zram, uncmem, index);
 	/* Should NEVER happen. Return bio error if it does. */
 	if (unlikely(ret))
 		goto out_cleanup;
 
-	if (is_partial_io(bvec))
-		memcpy(user_mem + bvec->bv_offset, uncmem + offset,
-				bvec->bv_len);
-
 	flush_dcache_page(page);
 	ret = 0;
 out_cleanup:
-	kunmap_atomic(user_mem);
-	if (is_partial_io(bvec))
-		kfree(uncmem);
+	kunmap_atomic(uncmem);
 	return ret;
 }
 
@@ -652,42 +625,17 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 	size_t clen;
 	unsigned long handle;
 	struct page *page;
-	unsigned char *user_mem, *cmem, *src, *uncmem = NULL;
+	unsigned char *user_mem, *cmem;
 	struct zram_meta *meta = zram->meta;
 	struct zcomp_strm *zstrm = NULL;
 	unsigned long alloced_pages;
 
 	page = bvec->bv_page;
-	if (is_partial_io(bvec)) {
-		/*
-		 * This is a partial IO. We need to read the full page
-		 * before to write the changes.
-		 */
-		uncmem = kmalloc(PAGE_SIZE, GFP_NOIO);
-		if (!uncmem) {
-			ret = -ENOMEM;
-			goto out;
-		}
-		ret = zram_decompress_page(zram, uncmem, index);
-		if (ret)
-			goto out;
-	}
-
 	zstrm = zcomp_strm_find(zram->comp);
 	user_mem = kmap_atomic(page);
 
-	if (is_partial_io(bvec)) {
-		memcpy(uncmem + offset, user_mem + bvec->bv_offset,
-		       bvec->bv_len);
+	if (page_zero_filled(user_mem)) {
 		kunmap_atomic(user_mem);
-		user_mem = NULL;
-	} else {
-		uncmem = user_mem;
-	}
-
-	if (page_zero_filled(uncmem)) {
-		if (user_mem)
-			kunmap_atomic(user_mem);
 		/* Free memory associated with this sector now. */
 		bit_spin_lock(ZRAM_ACCESS, &meta->table[index].value);
 		zram_free_page(zram, index);
@@ -699,22 +647,15 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 		goto out;
 	}
 
-	ret = zcomp_compress(zram->comp, zstrm, uncmem, &clen);
-	if (!is_partial_io(bvec)) {
-		kunmap_atomic(user_mem);
-		user_mem = NULL;
-		uncmem = NULL;
-	}
+	ret = zcomp_compress(zram->comp, zstrm, user_mem, &clen);
+	kunmap_atomic(user_mem);
 
 	if (unlikely(ret)) {
 		pr_err("Compression failed! err=%d\n", ret);
 		goto out;
 	}
-	src = zstrm->buffer;
 	if (unlikely(clen > max_zpage_size)) {
 		clen = PAGE_SIZE;
-		if (is_partial_io(bvec))
-			src = uncmem;
 	}
 
 	handle = zs_malloc(meta->mem_pool, clen);
@@ -736,12 +677,12 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 
 	cmem = zs_map_object(meta->mem_pool, handle, ZS_MM_WO);
 
-	if ((clen == PAGE_SIZE) && !is_partial_io(bvec)) {
-		src = kmap_atomic(page);
+	if (clen == PAGE_SIZE) {
+		unsigned char *src = kmap_atomic(page);
 		copy_page(cmem, src);
 		kunmap_atomic(src);
 	} else {
-		memcpy(cmem, src, clen);
+		memcpy(cmem, zstrm->buffer, clen);
 	}
 
 	zcomp_strm_release(zram->comp, zstrm);
@@ -765,8 +706,6 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 out:
 	if (zstrm)
 		zcomp_strm_release(zram->comp, zstrm);
-	if (is_partial_io(bvec))
-		kfree(uncmem);
 	return ret;
 }
 
@@ -1242,24 +1181,12 @@ static int zram_add(void)
 	 * and n*PAGE_SIZED sized I/O requests.
 	 */
 	blk_queue_physical_block_size(zram->disk->queue, PAGE_SIZE);
-	blk_queue_logical_block_size(zram->disk->queue,
-					ZRAM_LOGICAL_BLOCK_SIZE);
+	blk_queue_logical_block_size(zram->disk->queue, PAGE_SIZE);
 	blk_queue_io_min(zram->disk->queue, PAGE_SIZE);
 	blk_queue_io_opt(zram->disk->queue, PAGE_SIZE);
 	zram->disk->queue->limits.discard_granularity = PAGE_SIZE;
 	blk_queue_max_discard_sectors(zram->disk->queue, UINT_MAX);
-	/*
-	 * zram_bio_discard() will clear all logical blocks if logical block
-	 * size is identical with physical block size(PAGE_SIZE). But if it is
-	 * different, we will skip discarding some parts of logical blocks in
-	 * the part of the request range which isn't aligned to physical block
-	 * size.  So we can't ensure that all discarded logical blocks are
-	 * zeroed.
-	 */
-	if (ZRAM_LOGICAL_BLOCK_SIZE == PAGE_SIZE)
-		zram->disk->queue->limits.discard_zeroes_data = 1;
-	else
-		zram->disk->queue->limits.discard_zeroes_data = 0;
+	zram->disk->queue->limits.discard_zeroes_data = 1;
 	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, zram->disk->queue);
 
 	add_disk(zram->disk);
