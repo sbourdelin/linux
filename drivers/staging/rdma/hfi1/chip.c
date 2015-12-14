@@ -10107,7 +10107,6 @@ static void init_qos(struct hfi1_devdata *dd, u32 first_ctxt)
 	unsigned qpns_per_vl, ctxt, i, qpn, n = 1, m;
 	u64 *rsmmap;
 	u64 reg;
-	u8  rxcontext = is_a0(dd) ? 0 : 0xff;  /* 0 is default if a0 ver. */
 
 	/* validate */
 	if (dd->n_krcv_queues <= MIN_KERNEL_KCTXTS ||
