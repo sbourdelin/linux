@@ -142,7 +142,6 @@ struct be_async_event_trailer {
 enum {
 	ASYNC_EVENT_LINK_DOWN = 0x0,
 	ASYNC_EVENT_LINK_UP = 0x1,
-	ASYNC_EVENT_LOGICAL = 0x2
 };
 
 /**
@@ -152,13 +151,26 @@ enum {
 struct be_async_event_link_state {
 	u8 physical_port;
 	u8 port_link_status;
+/**
+ * ASYNC_EVENT_LINK_DOWN		0x0
+ * ASYNC_EVENT_LINK_UP			0x1
+ * ASYNC_EVENT_LINK_LOGICAL_DOWN	0x2
+ * ASYNC_EVENT_LINK_LOGICAL_UP		0x3
+ */
+#define BE_ASYNC_LINK_UP_MASK		0x01
 	u8 port_duplex;
 	u8 port_speed;
-#define BEISCSI_PHY_LINK_FAULT_NONE	0x00
-#define BEISCSI_PHY_LINK_FAULT_LOCAL	0x01
-#define BEISCSI_PHY_LINK_FAULT_REMOTE	0x02
+/* BE2ISCSI_LINK_SPEED_ZERO	0x00 - no link */
+#define BE2ISCSI_LINK_SPEED_10MBPS	0x01
+#define BE2ISCSI_LINK_SPEED_100MBPS	0x02
+#define BE2ISCSI_LINK_SPEED_1GBPS	0x03
+#define BE2ISCSI_LINK_SPEED_10GBPS	0x04
+#define BE2ISCSI_LINK_SPEED_25GBPS	0x06
+#define BE2ISCSI_LINK_SPEED_40GBPS	0x07
 	u8 port_fault;
-	u8 rsvd0[7];
+	u8 event_reason;
+	u16 qos_link_speed;
+	u32 event_tag;
 	struct be_async_event_trailer trailer;
 } __packed;
 
@@ -675,20 +687,6 @@ struct be_cmd_req_modify_eq_delay {
 
 /******************** Get MAC ADDR *******************/
 
-#define ETH_ALEN	6
-
-struct be_cmd_get_nic_conf_req {
-	struct be_cmd_req_hdr hdr;
-	u32 nic_port_count;
-	u32 speed;
-	u32 max_speed;
-	u32 link_state;
-	u32 max_frame_size;
-	u16 size_of_structure;
-	u8 mac_address[ETH_ALEN];
-	u32 rsvd[23];
-};
-
 struct be_cmd_get_nic_conf_resp {
 	struct be_cmd_resp_hdr hdr;
 	u32 nic_port_count;
@@ -697,9 +695,8 @@ struct be_cmd_get_nic_conf_resp {
 	u32 link_state;
 	u32 max_frame_size;
 	u16 size_of_structure;
-	u8 mac_address[6];
-	u32 rsvd[23];
-};
+	u8 mac_address[ETH_ALEN];
+} __packed;
 
 #define BEISCSI_ALIAS_LEN 32
 
@@ -709,29 +706,6 @@ struct be_cmd_hba_name {
 	u16 rsvd0;
 	u8 initiator_name[ISCSI_NAME_LEN];
 	u8 initiator_alias[BEISCSI_ALIAS_LEN];
-} __packed;
-
-struct be_cmd_ntwk_link_status_req {
-	struct be_cmd_req_hdr hdr;
-	u32 rsvd0;
-} __packed;
-
-/*** Port Speed Values ***/
-#define BE2ISCSI_LINK_SPEED_ZERO	0x00
-#define BE2ISCSI_LINK_SPEED_10MBPS	0x01
-#define BE2ISCSI_LINK_SPEED_100MBPS	0x02
-#define BE2ISCSI_LINK_SPEED_1GBPS	0x03
-#define BE2ISCSI_LINK_SPEED_10GBPS	0x04
-struct be_cmd_ntwk_link_status_resp {
-	struct be_cmd_resp_hdr hdr;
-	u8 phys_port;
-	u8 mac_duplex;
-	u8 mac_speed;
-	u8 mac_fault;
-	u8 mgmt_mac_duplex;
-	u8 mgmt_mac_speed;
-	u16 qos_link_speed;
-	u32 logical_link_speed;
 } __packed;
 
 int beiscsi_cmd_eq_create(struct be_ctrl_info *ctrl,
@@ -752,7 +726,6 @@ int be_poll_mcc(struct be_ctrl_info *ctrl);
 int mgmt_check_supported_fw(struct be_ctrl_info *ctrl,
 				      struct beiscsi_hba *phba);
 unsigned int be_cmd_get_initname(struct beiscsi_hba *phba);
-unsigned int be_cmd_get_port_speed(struct beiscsi_hba *phba);
 
 void free_mcc_tag(struct be_ctrl_info *ctrl, unsigned int tag);
 
