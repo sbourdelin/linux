@@ -4839,6 +4839,8 @@ i915_drop_caches_set(void *data, u64 val)
 	if (ret)
 		return ret;
 
+	intel_runtime_pm_get(dev_priv);
+
 	if (val & DROP_ACTIVE) {
 		ret = i915_gpu_idle(dev);
 		if (ret)
@@ -4855,6 +4857,7 @@ i915_drop_caches_set(void *data, u64 val)
 		i915_gem_shrink(dev_priv, LONG_MAX, I915_SHRINK_UNBOUND);
 
 unlock:
+	intel_runtime_pm_put(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
 
 	return ret;
