@@ -1,0 +1,20 @@
+Generic Onboard USB HUB
+
+Required properties:
+- compatible: should be "generic-onboard-hub"
+
+Optional properties:
+- clocks: the input clock for USB HUB.
+- clock-frequency: the frequency for HUB's clock.
+- reset-gpios: Should specify the GPIO for reset.
+- reset-duration-us: the duration for assert reset signal, the time unit
+  is microsecond.
+
+Example:
+
+	usb_hub1 {
+		compatible = "generic-onboard-hub";
+		clocks = <&clks IMX6QDL_CLK_CKO>;
+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+		hub-reset-duration-us = <2>;
+	};
