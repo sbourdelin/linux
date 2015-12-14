@@ -462,7 +462,9 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 	if (obj->active && pagefault_disabled())
 		return -EFAULT;
 
-	if (use_cpu_reloc(obj))
+	if (obj->stolen)
+		ret = -EINVAL;
+	else if (use_cpu_reloc(obj))
 		ret = relocate_entry_cpu(obj, reloc, target_offset);
 	else if (obj->map_and_fenceable)
 		ret = relocate_entry_gtt(obj, reloc, target_offset);
