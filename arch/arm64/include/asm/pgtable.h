@@ -57,6 +57,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/bug.h>
 #include <linux/mmdebug.h>
 
 extern void __pte_error(const char *file, int line, unsigned long val);
