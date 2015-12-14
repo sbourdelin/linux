@@ -196,6 +196,8 @@ static void __init cpg_div6_clock_init(struct device_node *np)
 
 	clock->parents = kmalloc_array(num_parents, sizeof(*clock->parents),
 		GFP_KERNEL);
+	if (!clock->parents)
+		return;
 	parent_names = kmalloc_array(num_parents, sizeof(*parent_names),
 				GFP_KERNEL);
 	if (!parent_names)
