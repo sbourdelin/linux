@@ -990,8 +990,10 @@ int intel_opregion_setup(struct drm_device *dev)
 		const void *vbt = base + OPREGION_VBT_OFFSET;
 		u32 vbt_size = OPREGION_ASLE_EXT_OFFSET - OPREGION_VBT_OFFSET;
 
-		if (intel_bios_is_valid_vbt(vbt, vbt_size))
+		if (intel_bios_is_valid_vbt(vbt, vbt_size)) {
 			opregion->vbt = vbt;
+			opregion->vbt_size = vbt_size;
+		}
 	}
 
 	return 0;
