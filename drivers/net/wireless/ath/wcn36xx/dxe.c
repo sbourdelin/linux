@@ -467,6 +467,18 @@ out_err:
 
 }
 
+#define	GET_CH_CTRL_VALUE(x)			\
+	({ u32 __v = WCN36XX_DXE_CTRL_RX_H;	\
+	   if ((x) == WCN36XX_DXE_CH_RX_L)	\
+		__v = WCN36XX_DXE_CTRL_RX_L;	\
+	   __v; })
+
+#define	GET_CH_INT_MASK(x)			\
+	({ u32 __v = WCN36XX_DXE_INT_CH3_MASK;	\
+	   if ((x) == WCN36XX_DXE_CH_RX_L)	\
+		__v = WCN36XX_DXE_INT_CH1_MASK;	\
+	   __v; })
+
 static int wcn36xx_rx_handle_packets(struct wcn36xx *wcn,
 				     struct wcn36xx_dxe_ch *ch)
 {
@@ -474,35 +486,33 @@ static int wcn36xx_rx_handle_packets(struct wcn36xx *wcn,
 	struct wcn36xx_dxe_desc *dxe = ctl->desc;
 	dma_addr_t  dma_addr;
 	struct sk_buff *skb;
+	int ret = 0, int_mask;
+	u32 value;
+
+	value = GET_CH_CTRL_VALUE(ch->ch_type);
+	int_mask = GET_CH_INT_MASK(ch->ch_type);
 
 	while (!(dxe->ctrl & WCN36XX_DXE_CTRL_VALID_MASK)) {
 		skb = ctl->skb;
 		dma_addr = dxe->dst_addr_l;
-		wcn36xx_dxe_fill_skb(wcn->dev, ctl);
+		ret = wcn36xx_dxe_fill_skb(wcn->dev, ctl);
+		if (0 == ret) {
+			/* new skb allocation ok. Use the new one and queue
+			 * the old one to network system.
+			 */
+			dma_unmap_single(wcn->dev, dma_addr, WCN36XX_PKT_SIZE,
+					DMA_FROM_DEVICE);
+			wcn36xx_rx_skb(wcn, skb);
+		} /* else keep rx skb not submitted and use for rx DMA again */
 
-		switch (ch->ch_type) {
-		case WCN36XX_DXE_CH_RX_L:
-			dxe->ctrl = WCN36XX_DXE_CTRL_RX_L;
-			wcn36xx_dxe_write_register(wcn, WCN36XX_DXE_ENCH_ADDR,
-						   WCN36XX_DXE_INT_CH1_MASK);
-			break;
-		case WCN36XX_DXE_CH_RX_H:
-			dxe->ctrl = WCN36XX_DXE_CTRL_RX_H;
-			wcn36xx_dxe_write_register(wcn, WCN36XX_DXE_ENCH_ADDR,
-						   WCN36XX_DXE_INT_CH3_MASK);
-			break;
-		default:
-			wcn36xx_warn("Unknown channel\n");
-		}
-
-		dma_unmap_single(wcn->dev, dma_addr, WCN36XX_PKT_SIZE,
-				 DMA_FROM_DEVICE);
-		wcn36xx_rx_skb(wcn, skb);
+		dxe->ctrl = value;
 		ctl = ctl->next;
 		dxe = ctl->desc;
 	}
 
 	ch->head_blk_ctl = ctl;
+
+	wcn36xx_dxe_write_register(wcn, WCN36XX_DXE_ENCH_ADDR, int_mask);
 
 	return 0;
 }
