@@ -34,24 +34,24 @@ u32 *fsl_get_immr(void)
 			naddr = 2;
 
 		if (naddr != 1 && naddr != 2)
-			goto err;
+			goto report_failure;
 
 		size = getprop(soc, "ranges", prop_buf, MAX_PROP_LEN);
 
 		if (size < 12)
-			goto err;
+			goto report_failure;
 		if (prop_buf[0] != 0)
-			goto err;
+			goto report_failure;
 		if (naddr == 2 && prop_buf[1] != 0)
-			goto err;
+			goto report_failure;
 
 		if (!dt_xlate_addr(soc, prop_buf + naddr, 8, &ret))
 			ret = 0;
 	}
 
-err:
-	if (!ret)
+	if (!ret) {
+report_failure:
 		printf("fsl_get_immr: Failed to find immr base\r\n");
-
+	}
 	return (u32 *)ret;
 }
