@@ -48,6 +48,9 @@
 #define AZX_REG_VS_SDXEFIFOS_XBASE	0x1094
 #define AZX_REG_VS_SDXEFIFOS_XINTERVAL	0x20
 
+#define AZX_PCIREG_CGCTL		0x48
+#define AZX_CGCTL_MISCBDCGE_MASK	(1 << 6)
+
 struct skl_dsp_resource {
 	u32 max_mcps;
 	u32 max_mem;
@@ -96,4 +99,6 @@ int skl_init_dsp(struct skl *skl);
 void skl_free_dsp(struct skl *skl);
 int skl_suspend_dsp(struct skl *skl);
 int skl_resume_dsp(struct skl *skl);
+
+void skl_enable_miscbdcge(struct device *dev, bool enable);
 #endif /* __SOUND_SOC_SKL_H */
