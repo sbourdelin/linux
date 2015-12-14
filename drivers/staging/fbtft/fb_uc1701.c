@@ -125,17 +125,25 @@ static int init_display(struct fbtft_par *par)
 static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 {
 	/* goto address */
-	/* LCD_PAGE_ADDRESS | ((page) & 0x1F),
-	 (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
-	 LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F) */
+	/*
+	 * LCD_PAGE_ADDRESS | ((page) & 0x1F),
+	 * (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
+	 * LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F)
+	 */
 	write_reg(par, LCD_PAGE_ADDRESS);
-	/* LCD_PAGE_ADDRESS | ((page) & 0x1F),
-	 (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
-	  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F) */
+
+	/*
+	 * LCD_PAGE_ADDRESS | ((page) & 0x1F),
+	 * (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
+	 * LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F)
+	 */
 	write_reg(par, 0x00);
-	/* LCD_PAGE_ADDRESS | ((page) & 0x1F),
-	 (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
-	  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F) */
+
+	/*
+	 * LCD_PAGE_ADDRESS | ((page) & 0x1F),
+	 * (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
+	 *  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F)
+	 */
 	write_reg(par, LCD_COL_ADDRESS);
 }
 
@@ -156,17 +164,26 @@ static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 					 1 : 0) << i;
 			buf++;
 		}
-		/* LCD_PAGE_ADDRESS | ((page) & 0x1F),
-		 (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
-		  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F) */
+
+		/*
+		 * LCD_PAGE_ADDRESS | ((page) & 0x1F),
+		 * (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
+		 * LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F)
+		 */
 		write_reg(par, LCD_PAGE_ADDRESS | (u8)y);
-		/* LCD_PAGE_ADDRESS | ((page) & 0x1F),
-		 (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
-		  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F) */
+
+		/*
+		 * LCD_PAGE_ADDRESS | ((page) & 0x1F),
+		 * (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
+		 *  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F)
+		 */
 		write_reg(par, 0x00);
-		/* LCD_PAGE_ADDRESS | ((page) & 0x1F),
-		 (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
-		  LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F) */
+
+		/*
+		 * LCD_PAGE_ADDRESS | ((page) & 0x1F),
+		 * (((col)+SHIFT_ADDR_NORMAL) & 0x0F),
+		 * LCD_COL_ADDRESS | ((((col)+SHIFT_ADDR_NORMAL)>>4) & 0x0F)
+		 */
 		write_reg(par, LCD_COL_ADDRESS);
 		gpio_set_value(par->gpio.dc, 1);
 		ret = par->fbtftops.write(par, par->txbuf.buf, WIDTH);
