@@ -1223,8 +1223,7 @@ static const struct bdb_header *get_bdb_header(const struct vbt_header *vbt)
 
 static const struct vbt_header *validate_vbt(const void *base,
 					     size_t size,
-					     const void *_vbt,
-					     const char *source)
+					     const void *_vbt)
 {
 	size_t offset = _vbt - base;
 	const struct vbt_header *vbt = _vbt;
@@ -1255,8 +1254,6 @@ static const struct vbt_header *validate_vbt(const void *base,
 		return NULL;
 	}
 
-	DRM_DEBUG_KMS("Using VBT from %s: %20s\n",
-		      source, vbt->signature);
 	return vbt;
 }
 
@@ -1276,7 +1273,7 @@ static const struct vbt_header *find_vbt(void __iomem *bios, size_t size)
 			 */
 			void *_bios = (void __force *) bios;
 
-			vbt = validate_vbt(_bios, size, _bios + i, "PCI ROM");
+			vbt = validate_vbt(_bios, size, _bios + i);
 			break;
 		}
 	}
@@ -1309,8 +1306,11 @@ intel_parse_bios(struct drm_device *dev)
 
 	/* XXX Should this validation be moved to intel_opregion.c? */
 	vbt = validate_vbt(dev_priv->opregion.header, OPREGION_SIZE,
-			   dev_priv->opregion.vbt, "OpRegion");
-	if (!vbt) {
+			   dev_priv->opregion.vbt);
+	if (vbt) {
+		DRM_DEBUG_KMS("Using VBT from ACPI OpRegion: %20s\n",
+			      vbt->signature);
+	} else {
 		size_t size;
 
 		bios = pci_map_rom(pdev, &size);
@@ -1322,6 +1322,9 @@ intel_parse_bios(struct drm_device *dev)
 			pci_unmap_rom(pdev, bios);
 			return -1;
 		}
+
+		DRM_DEBUG_KMS("Using VBT from PCI ROM: %20s\n",
+			      vbt->signature);
 	}
 
 	bdb = get_bdb_header(vbt);
