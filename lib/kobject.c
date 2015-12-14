@@ -616,6 +616,7 @@ static void kobject_cleanup(struct kobject *kobj)
 {
 	struct kobj_type *t = get_ktype(kobj);
 	const char *name = kobj->name;
+	struct kobject *parent = kobj->parent;
 
 	pr_debug("kobject: '%s' (%p): %s, parent %p\n",
 		 kobject_name(kobj), kobj, __func__, kobj->parent);
@@ -632,6 +633,8 @@ static void kobject_cleanup(struct kobject *kobj)
 		kobject_uevent(kobj, KOBJ_REMOVE);
 	}
 
+	kobject_get(parent);
+
 	/* remove from sysfs if the caller did not do it */
 	if (kobj->state_in_sysfs) {
 		pr_debug("kobject: '%s' (%p): auto cleanup kobject_del\n",
@@ -644,6 +647,8 @@ static void kobject_cleanup(struct kobject *kobj)
 			 kobject_name(kobj), kobj);
 		t->release(kobj);
 	}
+
+	kobject_put(parent);
 
 	/* free name if we allocated it */
 	if (name) {
