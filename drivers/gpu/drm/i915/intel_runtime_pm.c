@@ -1908,6 +1908,11 @@ static int
 sanitize_disable_power_well_option(const struct drm_i915_private *dev_priv,
 				   int disable_power_well)
 {
+	if (!HAS_RUNTIME_PM(dev_priv)) {
+		DRM_DEBUG_KMS("No runtime PM support, disabling display power well support\n");
+		return 0;
+	}
+
 	if (disable_power_well >= 0)
 		return !!disable_power_well;
 
