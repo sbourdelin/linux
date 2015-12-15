@@ -768,6 +768,8 @@ struct intel_dp {
 	unsigned long last_power_cycle;
 	unsigned long last_power_on;
 	unsigned long last_backlight_off;
+	struct timeval panel_power_off_timestamp;
+	struct timeval panel_power_on_timestamp;
 
 	struct notifier_block edp_notifier;
 

@@ -2032,6 +2032,9 @@ static void edp_panel_on(struct intel_dp *intel_dp)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 	i915_reg_t pp_ctrl_reg;
+	u32 panel_power_off_duration;
+	u32 temp_power_cycle_delay;
+
 
 	lockdep_assert_held(&dev_priv->pps_mutex);
 
@@ -2045,8 +2048,22 @@ static void edp_panel_on(struct intel_dp *intel_dp)
 		 "eDP port %c panel power already on\n",
 		 port_name(dp_to_dig_port(intel_dp)->port)))
 		return;
+	/* taking the diffrence of currrent time and panel power off time
+	   and then make panel to wait for T12 if needed */
+	do_gettimeofday(&intel_dp->panel_power_on_timestamp);
+
+	panel_power_off_duration  = (intel_dp->panel_power_on_timestamp.tv_sec-intel_dp->panel_power_off_timestamp.tv_sec) * 1000000 +  intel_dp->panel_power_on_timestamp.tv_usec-intel_dp->panel_power_off_timestamp.tv_usec;
+	panel_power_off_duration = panel_power_off_duration / 1000 ;
+	temp_power_cycle_delay = intel_dp->panel_power_cycle_delay;
+
+	if(panel_power_off_duration >= intel_dp->panel_power_cycle_delay) {
+		intel_dp->panel_power_cycle_delay = 0;
+	} else {
+		intel_dp->panel_power_cycle_delay = intel_dp->panel_power_cycle_delay - panel_power_off_duration;
+	}
 
 	wait_panel_power_cycle(intel_dp);
+	intel_dp->panel_power_cycle_delay = temp_power_cycle_delay;
 
 	pp_ctrl_reg = _pp_ctrl_reg(intel_dp);
 	pp = ironlake_get_pp_control(intel_dp);
@@ -5127,6 +5144,7 @@ static void intel_dp_init_panel_power_timestamps(struct intel_dp *intel_dp)
 	intel_dp->last_power_cycle = jiffies;
 	intel_dp->last_power_on = jiffies;
 	intel_dp->last_backlight_off = jiffies;
+	do_gettimeofday(&intel_dp->panel_power_off_timestamp);
 }
 
 static void
