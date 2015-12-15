@@ -18,6 +18,8 @@
 #ifndef __LINUX_MTD_NAND_BBT_H
 #define __LINUX_MTD_NAND_BBT_H
 
+struct mtd_info;
+
 /* The maximum number of NAND chips in an array */
 #define NAND_MAX_CHIPS		8
 
@@ -114,5 +116,62 @@ struct nand_bbt_descr {
 
 /* The maximum number of blocks to scan for a bbt */
 #define NAND_BBT_SCAN_MAXBLOCKS	4
+
+/**
+ * struct nand_bbt - bad block table structure
+ * @mtd:	pointer to MTD device structure
+ * @is_bad_bbm:	check if a block is factory bad block
+ * @mark_bad_bbm:	imitate a block as factory bad block
+ * @erase:	erase block bypassing resvered checks
+ * @bbt_options:	bad block specific options. All options used
+ *			here must come from nand_bbt.h.
+ * @numchips:	number of physical chips, required for NAND_BBT_PERCHIP
+ * @bbt_td:	bad block table descriptor for flash lookup.
+ * @bbt_md:	bad block table mirror descriptor
+ * @chipsize:	the size of one chip for multichip arrays
+ * @chip_shift:	number of address bits in one chip
+ * @bbt_erase_shift:	number of address bits in a bbt entry
+ * @page_shift:	number of address bits in a page
+ * @bbt:	bad block table pointer
+ *
+ */
+struct nand_bbt {
+	struct mtd_info *mtd;
+
+	/*
+	 * This is important to abstract out of nand_bbt.c and provide
+	 * separately in nand_base.c and spi-nand-base.c -- it's sort of
+	 * duplicated in nand_block_bad() (nand_base) and
+	 * scan_block_fast() (nand_bbt) right now
+	 *
+	 * Note that this also means nand_chip.badblock_pattern should
+	 * be removed from nand_bbt.c
+	 */
+	int (*is_bad_bbm)(struct mtd_info *mtd, loff_t ofs);
+
+	/*
+	 * Only required if the driver wants to attempt to program new
+	 * bad block markers that imitate the factory-marked BBMs
+	 */
+	int (*mark_bad_bbm)(struct mtd_info *mtd, loff_t ofs);
+
+	/* Erase a block, bypassing reserved checks */
+	int (*erase)(struct mtd_info *mtd, loff_t ofs);
+
+	unsigned int bbt_options;
+	int numchips;
+
+	/*
+	 * Discourage new custom usages here; suggest usage of the
+	 * relevant NAND_BBT_* options instead
+	 */
+	struct nand_bbt_descr *bbt_td;
+	struct nand_bbt_descr *bbt_md;
+	u64 chipsize;
+	int chip_shift;
+	int bbt_erase_shift;
+	int page_shift;
+	u8 *bbt;
+};
 
 #endif	/* __LINUX_MTD_NAND_BBT_H */
