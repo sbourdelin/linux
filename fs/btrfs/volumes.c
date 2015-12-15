@@ -5463,9 +5463,8 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info, int rw,
 		}
 
 	} else if (map->type & BTRFS_BLOCK_GROUP_RAID56_MASK) {
-		if (need_raid_map &&
-		    ((rw & (REQ_WRITE | REQ_GET_READ_MIRRORS)) ||
-		     mirror_num > 1)) {
+		if ((rw & (REQ_WRITE | REQ_GET_READ_MIRRORS)) ||
+		    mirror_num > 1) {
 			/* push stripe_nr back to the start of the full stripe */
 			stripe_nr = div_u64(raid56_full_stripe_start,
 					stripe_len * nr_data_stripes(map));
