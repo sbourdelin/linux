@@ -543,7 +543,7 @@ int beiscsi_process_mcc(struct beiscsi_hba *phba)
 	}
 
 	if (num)
-		hwi_ring_cq_db(phba, phba->ctrl.mcc_obj.cq.id, num, 1, 0);
+		hwi_ring_cq_db(phba, phba->ctrl.mcc_obj.cq.id, num, 1);
 
 	spin_unlock_bh(&phba->ctrl.mcc_cq_lock);
 	return status;
