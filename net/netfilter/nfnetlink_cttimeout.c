@@ -67,16 +67,15 @@ ctnl_timeout_parse_policy(void *timeouts, struct nf_conntrack_l4proto *l4proto,
 	return ret;
 }
 
-static int
-cttimeout_new_timeout(struct sock *ctnl, struct sk_buff *skb,
-		      const struct nlmsghdr *nlh,
-		      const struct nlattr * const cda[])
+static int cttimeout_new_timeout(struct net *net, struct sock *ctnl,
+				 struct sk_buff *skb,
+				 const struct nlmsghdr *nlh,
+				 const struct nlattr * const cda[])
 {
 	__u16 l3num;
 	__u8 l4num;
 	struct nf_conntrack_l4proto *l4proto;
 	struct ctnl_timeout *timeout, *matching = NULL;
-	struct net *net = sock_net(skb->sk);
 	char *name;
 	int ret;
 
@@ -240,10 +239,10 @@ ctnl_timeout_dump(struct sk_buff *skb, struct netlink_callback *cb)
 	return skb->len;
 }
 
-static int
-cttimeout_get_timeout(struct sock *ctnl, struct sk_buff *skb,
-		      const struct nlmsghdr *nlh,
-		      const struct nlattr * const cda[])
+static int cttimeout_get_timeout(struct net *net, struct sock *ctnl,
+				 struct sk_buff *skb,
+				 const struct nlmsghdr *nlh,
+				 const struct nlattr * const cda[])
 {
 	int ret = -ENOENT;
 	char *name;
@@ -339,10 +338,10 @@ static int ctnl_timeout_try_del(struct ctnl_timeout *timeout)
 	return ret;
 }
 
-static int
-cttimeout_del_timeout(struct sock *ctnl, struct sk_buff *skb,
-		      const struct nlmsghdr *nlh,
-		      const struct nlattr * const cda[])
+static int cttimeout_del_timeout(struct net *net, struct sock *ctnl,
+				 struct sk_buff *skb,
+				 const struct nlmsghdr *nlh,
+				 const struct nlattr * const cda[])
 {
 	char *name;
 	struct ctnl_timeout *cur;
@@ -369,15 +368,14 @@ cttimeout_del_timeout(struct sock *ctnl, struct sk_buff *skb,
 	return ret;
 }
 
-static int
-cttimeout_default_set(struct sock *ctnl, struct sk_buff *skb,
-		      const struct nlmsghdr *nlh,
-		      const struct nlattr * const cda[])
+static int cttimeout_default_set(struct net *net, struct sock *ctnl,
+				 struct sk_buff *skb,
+				 const struct nlmsghdr *nlh,
+				 const struct nlattr * const cda[])
 {
 	__u16 l3num;
 	__u8 l4num;
 	struct nf_conntrack_l4proto *l4proto;
-	struct net *net = sock_net(skb->sk);
 	unsigned int *timeouts;
 	int ret;
 
@@ -459,14 +457,14 @@ nla_put_failure:
 	return -1;
 }
 
-static int cttimeout_default_get(struct sock *ctnl, struct sk_buff *skb,
+static int cttimeout_default_get(struct net *net, struct sock *ctnl,
+				 struct sk_buff *skb,
 				 const struct nlmsghdr *nlh,
 				 const struct nlattr * const cda[])
 {
 	__u16 l3num;
 	__u8 l4num;
 	struct nf_conntrack_l4proto *l4proto;
-	struct net *net = sock_net(skb->sk);
 	struct sk_buff *skb2;
 	int ret, err;
 
