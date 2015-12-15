@@ -1353,11 +1353,12 @@ int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt)
 }
 
 /**
- * nand_markbad_bbt - [NAND Interface] Mark a block bad in the BBT
+ * nand_bbt_update_mark - update mark in the BBT
  * @mtd: MTD device structure
  * @offs: offset of the bad block
+ * @mark: block type mark
  */
-int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs)
+static int nand_bbt_update_mark(struct mtd_info *mtd, loff_t offs, uint8_t mark)
 {
 	struct nand_chip *this = mtd_to_nand(mtd);
 	int block, ret = 0;
@@ -1365,7 +1366,7 @@ int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs)
 	block = (int)(offs >> this->bbt_erase_shift);
 
 	/* Mark bad block in memory */
-	bbt_mark_entry(this, block, BBT_BLOCK_WORN);
+	bbt_mark_entry(this, block, mark);
 
 	/* Update flash-based bad block table */
 	if (this->bbt_options & NAND_BBT_USE_FLASH)
@@ -1374,6 +1375,15 @@ int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs)
 	return ret;
 }
 
+/**
+ * nand_markbad_bbt - [NAND Interface] Mark a block bad in the BBT
+ * @mtd: MTD device structure
+ * @offs: offset of the bad block
+ */
+int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs)
+{
+	return nand_bbt_update_mark(mtd, offs, BBT_BLOCK_WORN);
+}
 EXPORT_SYMBOL(nand_scan_bbt);
 
 /**
@@ -1446,3 +1456,19 @@ int nand_bbt_markbad(struct nand_bbt *bbt, loff_t offs)
 	return nand_markbad_bbt(bbt->mtd, offs);
 }
 EXPORT_SYMBOL(nand_bbt_markbad);
+
+/**
+ * nand_bbt_markbad_factory - [NAND BBT Interface] Mark a block as factory bad
+ * in the BBT
+ * @bbt: NAND BBT structure
+ * @offs: offset of the bad block
+ */
+int nand_bbt_markbad_factory(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_markbad_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_bbt_update_mark(bbt->mtd, offs, BBT_BLOCK_FACTORY_BAD);
+}
+EXPORT_SYMBOL(nand_bbt_markbad_factory);
