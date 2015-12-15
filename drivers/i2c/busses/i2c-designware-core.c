@@ -281,7 +281,7 @@ static void __i2c_dw_enable(struct dw_i2c_dev *dev, bool enable)
  */
 int i2c_dw_init(struct dw_i2c_dev *dev)
 {
-	u32 input_clock_khz;
+	u32 input_clock_khz = 0;
 	u32 hcnt, lcnt;
 	u32 reg;
 	u32 sda_falling_time, scl_falling_time;
@@ -295,7 +295,8 @@ int i2c_dw_init(struct dw_i2c_dev *dev)
 		}
 	}
 
-	input_clock_khz = dev->get_clk_rate_khz(dev);
+	if (dev->get_clk_rate_khz)
+		input_clock_khz = dev->get_clk_rate_khz(dev);
 
 	reg = dw_readl(dev, DW_IC_COMP_TYPE);
 	if (reg == ___constant_swab32(DW_IC_COMP_TYPE_VALUE)) {

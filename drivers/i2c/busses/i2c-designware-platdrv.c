@@ -132,6 +132,26 @@ static inline int dw_i2c_acpi_configure(struct platform_device *pdev)
 }
 #endif
 
+static int dw_i2c_configure_clk(struct platform_device *pdev,
+				struct dw_i2c_dev *dev)
+{
+	/* For ACPI, if SSCN and FMCN is provided, we should not
+	 * need the clock value.
+	 */
+	if (has_acpi_companion(&pdev->dev) &&
+	    dev->ss_hcnt && dev->ss_lcnt &&
+	    dev->fs_hcnt && dev->fs_lcnt)
+		return 0;
+
+	dev->clk = devm_clk_get(&pdev->dev, NULL);
+	dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
+	if (IS_ERR(dev->clk))
+		return PTR_ERR(dev->clk);
+	clk_prepare_enable(dev->clk);
+
+	return 0;
+}
+
 static int dw_i2c_plat_probe(struct platform_device *pdev)
 {
 	struct dw_i2c_dev *dev;
@@ -208,13 +228,11 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		dev->master_cfg =  DW_IC_CON_MASTER | DW_IC_CON_SLAVE_DISABLE |
 			DW_IC_CON_RESTART_EN | DW_IC_CON_SPEED_FAST;
 
-	dev->clk = devm_clk_get(&pdev->dev, NULL);
-	dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
-	if (IS_ERR(dev->clk))
-		return PTR_ERR(dev->clk);
-	clk_prepare_enable(dev->clk);
+	r = dw_i2c_configure_clk(pdev, dev);
+	if (r)
+		return r;
 
-	if (!dev->sda_hold_time && ht) {
+	if (!dev->sda_hold_time && ht && dev->get_clk_rate_khz) {
 		u32 ic_clk = dev->get_clk_rate_khz(dev);
 
 		dev->sda_hold_time = div_u64((u64)ic_clk * ht + 500000,
