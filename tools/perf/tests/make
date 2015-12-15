@@ -12,7 +12,7 @@ endif
 else
 PERF := .
 
-include config/Makefile.arch
+include $(srctree)/scripts/Makefile.arch
 
 # FIXME looks like x86 is the only arch running tests ;-)
 # we need some IS_(32/64) flag to make this generic
