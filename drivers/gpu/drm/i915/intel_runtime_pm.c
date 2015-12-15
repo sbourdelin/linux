@@ -2237,9 +2237,6 @@ void intel_runtime_pm_get(struct drm_i915_private *dev_priv)
 	struct drm_device *dev = dev_priv->dev;
 	struct device *device = &dev->pdev->dev;
 
-	if (!HAS_RUNTIME_PM(dev))
-		return;
-
 	pm_runtime_get_sync(device);
 	WARN(dev_priv->pm.suspended, "Device still suspended.\n");
 }
@@ -2266,9 +2263,6 @@ void intel_runtime_pm_get_noresume(struct drm_i915_private *dev_priv)
 	struct drm_device *dev = dev_priv->dev;
 	struct device *device = &dev->pdev->dev;
 
-	if (!HAS_RUNTIME_PM(dev))
-		return;
-
 	WARN(dev_priv->pm.suspended, "Getting nosync-ref while suspended.\n");
 	pm_runtime_get_noresume(device);
 }
@@ -2285,9 +2279,6 @@ void intel_runtime_pm_put(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
 	struct device *device = &dev->pdev->dev;
-
-	if (!HAS_RUNTIME_PM(dev))
-		return;
 
 	pm_runtime_mark_last_busy(device);
 	pm_runtime_put_autosuspend(device);
@@ -2307,9 +2298,6 @@ void intel_runtime_pm_enable(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
 	struct device *device = &dev->pdev->dev;
-
-	if (!HAS_RUNTIME_PM(dev))
-		return;
 
 	pm_runtime_set_autosuspend_delay(device, 10000); /* 10s */
 	pm_runtime_mark_last_busy(device);
