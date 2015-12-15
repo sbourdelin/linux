@@ -363,6 +363,11 @@ static struct reada_extent *reada_find_extent(struct btrfs_root *root,
 	if (ret || !bbio || length < blocksize)
 		goto error;
 
+	if (bbio->map_type & BTRFS_BLOCK_GROUP_RAID56_MASK) {
+		/* Current code can not support RAID56 yet */
+		goto error;
+	}
+
 	if (bbio->num_stripes > BTRFS_MAX_MIRRORS) {
 		btrfs_err(root->fs_info,
 			   "readahead: more than %d copies not supported",
