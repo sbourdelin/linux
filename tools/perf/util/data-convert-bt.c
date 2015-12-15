@@ -7,6 +7,7 @@
  * Released under the GPL v2. (and only v2, not any later version)
  */
 
+#include <sys/utsname.h>
 #include <linux/compiler.h>
 #include <babeltrace/ctf-writer/writer.h>
 #include <babeltrace/ctf-writer/clock.h>
@@ -26,6 +27,7 @@
 #include "evlist.h"
 #include "evsel.h"
 #include "machine.h"
+#include "format-converter.h"
 
 #define pr_N(n, fmt, ...) \
 	eprintf(n, debug_data_convert, fmt, ##__VA_ARGS__)
@@ -896,6 +898,20 @@ static int ctf_writer__setup_env(struct ctf_writer *cw,
 {
 	struct perf_header *header = &session->header;
 	struct bt_ctf_writer *writer = cw->writer;
+	struct utsname uts;
+	int ret;
+
+	ret = uname(&uts);
+	if (ret == 0) {
+		if (!header->env.hostname)
+			header->env.hostname = strdup(uts.nodename);
+		if (!header->env.os_release)
+			header->env.os_release = strdup(uts.release);
+		if (!header->env.version)
+			header->env.version = strdup(perf_version_string);
+		if (!header->env.arch)
+			header->env.arch = strdup(uts.machine);
+	}
 
 #define ADD(__n, __v)							\
 do {									\
@@ -903,11 +919,11 @@ do {									\
 		return -1;						\
 } while (0)
 
-	ADD("host",    header->env.hostname);
+	ADD("host",    header->env.hostname ?: "unknown");
 	ADD("sysname", "Linux");
-	ADD("release", header->env.os_release);
-	ADD("version", header->env.version);
-	ADD("machine", header->env.arch);
+	ADD("release", header->env.os_release ?: "unknown");
+	ADD("version", header->env.version ?: "unknown");
+	ADD("machine", header->env.arch ?: "unknown");
 	ADD("domain", "kernel");
 	ADD("tracer_name", "perf");
 
@@ -1183,3 +1199,165 @@ free_writer:
 	pr_err("Error during conversion setup.\n");
 	return err;
 }
+
+struct ctf_fc {
+	struct convert c;
+
+	void *partial_buf;
+	size_t partial_buf_size;
+
+	void *partial_buf_pos;
+	size_t partial_buf_rem;
+};
+
+static int ctf_fc_init(struct perf_evlist *evlist, const char *path,
+		       void **priv)
+{
+	struct perf_session dummy_session;
+	struct ctf_writer *cw;
+	struct ctf_fc *fc;
+	int err = -1;
+
+	fc = calloc(1, sizeof(*fc));
+	if (!fc)
+		goto nomem;
+
+	cw = &fc->c.writer;
+
+	memset(&dummy_session, 0, sizeof(dummy_session));
+
+        if (ctf_writer__init(cw, path))
+                goto free_mem;
+
+	if (ctf_writer__setup_env(cw, &dummy_session))
+		goto free_writer;
+
+	dummy_session.evlist = evlist;
+	if (setup_events(cw, &dummy_session))
+		goto free_writer;
+
+	if (setup_streams(cw, &dummy_session))
+		goto free_writer;
+
+	*priv = fc;
+
+	return 0;
+
+free_writer:
+	ctf_writer__cleanup(cw);
+free_mem:
+	free(fc);
+nomem:
+	pr_err("Error during conversion setup.\n");
+	return err;
+}
+
+static union perf_event *get_next_event(struct ctf_fc *fc, void *buf,
+					size_t size, size_t *inc)
+{
+	union perf_event *event = buf;
+
+	/* deal with existing partial event first */
+	if (fc->partial_buf_pos) {
+		if (size >= fc->partial_buf_rem)
+			size = fc->partial_buf_rem;
+
+		memcpy(fc->partial_buf_pos, buf, size);
+		fc->partial_buf_pos += size;
+		fc->partial_buf_rem -= size;
+		*inc = size;
+
+		/* event still partial */
+		if (fc->partial_buf_rem)
+			return NULL;
+
+		/* we have a full event */
+		fc->partial_buf_pos = NULL;
+		return fc->partial_buf;
+	}
+
+	/* deal with new paritial event */
+	if (size < event->header.size) {
+		/* realloc larger partial buffer if necessary */
+		if (fc->partial_buf_size < event->header.size) {
+			if (fc->partial_buf) {
+				free(fc->partial_buf);
+				fc->partial_buf_size = 0;
+			}
+			fc->partial_buf = malloc(event->header.size);
+			if (!fc->partial_buf) {
+				*inc = 0;
+				return NULL;
+			}
+			fc->partial_buf_size = event->header.size;
+		}
+
+		/* copy over the part of the event we have */
+		memcpy(fc->partial_buf, buf, size);
+		fc->partial_buf_pos = fc->partial_buf + size;
+		fc->partial_buf_rem = event->header.size - size;
+		*inc = size;
+
+		/* we now have a partial event */
+		return NULL;
+	}
+
+	/* full event available */
+	*inc = event->header.size;
+	return event;
+}
+
+static int ctf_fc_write(struct perf_evlist *evlist, void *buf, size_t size,
+			void *priv)
+{
+	struct ctf_fc *fc = priv;
+	struct convert *c = &fc->c;
+	struct perf_sample sample;
+	struct perf_evsel *evsel;
+	union perf_event *event;
+	size_t inc;
+
+	while (size) {
+		event = get_next_event(fc, buf, size, &inc);
+
+		if (!event || event->header.type != PERF_RECORD_SAMPLE)
+			goto skip_event;
+
+		if (perf_evlist__parse_sample(evlist, event, &sample)) {
+			pr_err("Failed to parse event.\n");
+			goto skip_event;
+		}
+
+		evsel = perf_evlist__id2evsel(evlist, sample.id);
+		if (!evsel) {
+			pr_err("Failed to identify event.\n");
+			goto skip_event;
+		}
+
+		if (process_sample_event(&c->tool, event, &sample, evsel, NULL))
+			pr_err("Failed to process event.\n");
+skip_event:
+		size -= inc;
+		buf += inc;
+	}
+
+	return 0;
+}
+
+static int ctf_fc_cleanup(struct perf_evlist *evlist __maybe_unused, void *priv)
+{
+	struct ctf_fc *fc = priv;
+	struct ctf_writer *cw = &fc->c.writer;
+
+	if (ctf_writer__flush_streams(cw))
+		pr_err("Failed to flush events.\n");
+	ctf_writer__cleanup(cw);
+	free(fc);
+	return 0;
+}
+
+struct format_converter ctf_format = {
+	.init = ctf_fc_init,
+	.write = ctf_fc_write,
+	.cleanup = ctf_fc_cleanup,
+};

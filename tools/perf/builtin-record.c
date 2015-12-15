@@ -32,6 +32,7 @@
 #include "util/parse-branch-options.h"
 #include "util/parse-regs-options.h"
 #include "util/llvm-utils.h"
+#include "util/format-converter.h"
 
 #include <unistd.h>
 #include <sched.h>
@@ -41,6 +42,7 @@
 struct record {
 	struct perf_tool	tool;
 	struct record_opts	opts;
+	struct format_converter	*format;
 	u64			bytes_written;
 	struct perf_data_file	file;
 	struct auxtrace_record	*itr;
@@ -53,9 +55,18 @@ struct record {
 	unsigned long long	samples;
 };
 
+
 static int record__write(struct record *rec, void *bf, size_t size)
 {
-	if (perf_data_file__write(rec->session->file, bf, size) < 0) {
+	if (rec->format) {
+		if (rec->format->write &&
+		    rec->format->write(rec->evlist, bf, size,
+				       rec->format->priv)) {
+			pr_err("failed to write alternate perf data format\n");
+			return -1;
+		}
+
+	} else if (perf_data_file__write(rec->session->file, bf, size) < 0) {
 		pr_err("failed to write perf data, error: %m\n");
 		return -1;
 	}
@@ -153,7 +164,7 @@ static int record__process_auxtrace(struct perf_tool *tool,
 	size_t padding;
 	u8 pad[8] = {0};
 
-	if (!perf_data_file__is_pipe(file)) {
+	if (!perf_data_file__is_pipe(file) && !rec->format) {
 		off_t file_offset;
 		int fd = perf_data_file__fd(file);
 		int err;
@@ -497,7 +508,10 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	else
 		signal(SIGUSR2, SIG_IGN);
 
-	session = perf_session__new(file, false, tool);
+	if (rec->format)
+		session = perf_session__new(NULL, false, tool);
+	else
+		session = perf_session__new(file, false, tool);
 	if (session == NULL) {
 		pr_err("Perf session creation failed.\n");
 		return -1;
@@ -536,7 +550,17 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	if (!rec->evlist->nr_groups)
 		perf_header__clear_feat(&session->header, HEADER_GROUP_DESC);
 
-	if (file->is_pipe) {
+	if (rec->format) {
+		if (!file->path)
+			file->path = "perf.data";
+		if (rec->format->init &&
+		    rec->format->init(rec->evlist, file->path,
+				      &rec->format->priv)) {
+			pr_err("Failed to initialize alternate format.\n");
+			err = -1;
+			goto out_child;
+		}
+	} else if (file->is_pipe) {
 		err = perf_header__write_pipe(fd);
 		if (err < 0)
 			goto out_child;
@@ -561,7 +585,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 						   process_synthesized_event);
 		if (err < 0) {
 			pr_err("Couldn't synthesize attrs.\n");
-			goto out_child;
+			goto out_format;
 		}
 
 		if (have_tracepoints(&rec->evlist->entries)) {
@@ -577,7 +601,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 								  process_synthesized_event);
 			if (err <= 0) {
 				pr_err("Couldn't record tracing data.\n");
-				goto out_child;
+				goto out_format;
 			}
 			rec->bytes_written += err;
 		}
@@ -587,7 +611,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		err = perf_event__synthesize_auxtrace_info(rec->itr, tool,
 					session, process_synthesized_event);
 		if (err)
-			goto out_delete_session;
+			goto out_format;
 	}
 
 	err = perf_event__synthesize_kernel_mmap(tool, process_synthesized_event,
@@ -613,7 +637,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 					    process_synthesized_event, opts->sample_address,
 					    opts->proc_map_timeout);
 	if (err != 0)
-		goto out_child;
+		goto out_format;
 
 	if (rec->realtime_prio) {
 		struct sched_param param;
@@ -622,7 +646,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		if (sched_setscheduler(0, SCHED_FIFO, &param)) {
 			pr_err("Could not set realtime priority.\n");
 			err = -1;
-			goto out_child;
+			goto out_format;
 		}
 	}
 
@@ -673,7 +697,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		if (record__mmap_read_all(rec) < 0) {
 			auxtrace_snapshot_enabled = 0;
 			err = -1;
-			goto out_child;
+			goto out_format;
 		}
 
 		if (auxtrace_record__snapshot_started) {
@@ -683,7 +707,7 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 			if (auxtrace_snapshot_err) {
 				pr_err("AUX area tracing snapshot failed\n");
 				err = -1;
-				goto out_child;
+				goto out_format;
 			}
 		}
 
@@ -721,12 +745,15 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		const char *emsg = strerror_r(workload_exec_errno, msg, sizeof(msg));
 		pr_err("Workload failed: %s\n", emsg);
 		err = -1;
-		goto out_child;
+		goto out_format;
 	}
 
 	if (!quiet)
 		fprintf(stderr, "[ perf record: Woken up %ld times to write data ]\n", waking);
 
+out_format:
+	if (rec->format && rec->format->cleanup)
+		rec->format->cleanup(rec->evlist, rec->format->priv);
 out_child:
 	if (forks) {
 		int exit_status;
@@ -748,7 +775,7 @@ out_child:
 	/* this will be recalculated during process_buildids() */
 	rec->samples = 0;
 
-	if (!err && !file->is_pipe) {
+	if (!err && !file->is_pipe && !rec->format) {
 		rec->session->header.data_size += rec->bytes_written;
 		file->size = lseek(perf_data_file__fd(file), 0, SEEK_CUR);
 
@@ -924,6 +951,37 @@ static int parse_clockid(const struct option *opt, const char *str, int unset)
 
 	opts->use_clockid = false;
 	ui__warning("unknown clockid %s, check man page\n", ostr);
+	return -1;
+}
+
+static int parse_format(const struct option *opt, const char *str, int unset)
+{
+	struct record *rec = opt->value;
+
+	if (unset) {
+		rec->format = NULL;
+		return 0;
+	}
+
+	/* no arg passed */
+	if (!str) {
+		ui__warning("missing format argument\n");
+		return -1;
+	}
+
+	/* no setting it twice */
+	if (rec->format) {
+		ui__warning("format specified multiple times\n");
+		return -1;
+	}
+
+#ifdef HAVE_LIBBABELTRACE_SUPPORT
+	if (strcasecmp(str, "ctf") == 0) {
+		rec->format = &ctf_format;
+		return 0;
+	}
+#endif
+	ui__warning("unknown format %s, check man page\n", str);
 	return -1;
 }
 
@@ -1113,6 +1171,8 @@ struct option __record_options[] = {
 			"per thread proc mmap processing timeout in ms"),
 	OPT_BOOLEAN(0, "switch-events", &record.opts.record_switch_events,
 		    "Record context switch events"),
+	OPT_CALLBACK(0, "format", &record, "format", "alternate output format",
+		     parse_format),
 #ifdef HAVE_LIBBPF_SUPPORT
 	OPT_STRING(0, "clang-path", &llvm_param.clang_path, "clang path",
 		   "clang binary to use for compiling BPF scriptlets"),
