@@ -210,6 +210,8 @@ ssize_t splice_to_pipe(struct pipe_inode_info *pipe,
 			buf->ops = spd->ops;
 			if (spd->flags & SPLICE_F_GIFT)
 				buf->flags |= PIPE_BUF_FLAG_GIFT;
+			if (spd->flags & SPLICE_F_PACKET)
+				buf->flags |= PIPE_BUF_FLAG_PACKET;
 
 			pipe->nrbufs++;
 			page_nr++;
@@ -1420,6 +1422,9 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 			offset = in->f_pos;
 		}
 
+		if (is_packetized(out))
+			flags |= SPLICE_F_PACKET;
+
 		ret = do_splice_to(in, &offset, opipe, len, flags);
 
 		if (!off_in)
@@ -1608,6 +1613,9 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 
 	if (splice_grow_spd(pipe, &spd))
 		return -ENOMEM;
+
+	if (is_packetized(file))
+		spd.flags |= SPLICE_F_PACKET;
 
 	spd.nr_pages = get_iovec_page_array(iov, nr_segs, spd.pages,
 					    spd.partial, false,
