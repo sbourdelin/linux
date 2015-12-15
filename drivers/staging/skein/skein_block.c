@@ -26,12 +26,6 @@
 #define SKEIN_LOOP 001 /* default: unroll 256 and 512, but not 1024 */
 #endif
 
-#define BLK_BITS        (WCNT * 64) /* some useful definitions for code here */
-#define KW_TWK_BASE     (0)
-#define KW_KEY_BASE     (3)
-#define ks              (kw + KW_KEY_BASE)
-#define ts              (kw + KW_TWK_BASE)
-
 #ifdef SKEIN_DEBUG
 #define debug_save_tweak(ctx)       \
 {                                   \
