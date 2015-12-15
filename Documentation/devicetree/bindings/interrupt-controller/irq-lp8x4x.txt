@@ -1,0 +1,49 @@
+ICP DAS LP-8x4x FPGA Interrupt Controller
+
+ICP DAS LP-8x4x contains FPGA chip. The chip functions as a interrupt
+source providing 16 additional interrupts among other things.
+
+Required properties:
+- compatible : should be "icpdas,irq-lp8x4x"
+
+- reg: physical base address of the controller and length of memory mapped
+  region.
+
+- interrupt-controller : identifies the node as an interrupt controller
+
+- #interrupt-cells : should be 1
+
+- interrupts : should provide interrupt
+
+- interrupt-parent : should provide a link to interrupt controller either
+		     explicitly and implicitly from a parent node
+
+Example:
+
+	fpga: fpga@17000006 {
+		compatible = "icpdas,irq-lp8x4x";
+		reg = <0x17000006 0x16>;
+		interrupt-parent = <&gpio>;
+		interrupts = <3 IRQ_TYPE_EDGE_RISING>;
+		#interrupt-cells = <1>;
+		interrupt-controller;
+		status = "okay";
+	};
+
+	uart@17009050 {
+		compatible = "icpdas,uart-lp8x4x";
+		reg = <0x17009050 0x10
+		       0x17009030 0x02>;
+		interrupt-parent = <&fpga>;
+		interrupts = <13>;
+		status = "okay";
+	};
+
+	uart@17009060 {
+		compatible = "icpdas,uart-lp8x4x";
+		reg = <0x17009060 0x10
+		       0x17009032 0x02>;
+		interrupt-parent = <&fpga>;
+		interrupts = <14>;
+		status = "okay";
+	};
