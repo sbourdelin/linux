@@ -2230,6 +2230,7 @@ void intel_runtime_pm_get(struct drm_i915_private *dev_priv)
 		return;
 
 	pm_runtime_get_sync(device);
+	WARN_ON(intel_uncore_arm_unclaimed_mmio_detection(dev_priv));
 	WARN(dev_priv->pm.suspended, "Device still suspended.\n");
 }
 
@@ -2274,6 +2275,8 @@ void intel_runtime_pm_put(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
 	struct device *device = &dev->pdev->dev;
+
+	WARN_ON(intel_uncore_arm_unclaimed_mmio_detection(dev_priv));
 
 	if (!HAS_RUNTIME_PM(dev))
 		return;
