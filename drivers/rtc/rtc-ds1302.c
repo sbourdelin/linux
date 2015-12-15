@@ -50,7 +50,7 @@
 #define ds1302_set_tx()
 #define ds1302_set_rx()
 
-static inline int ds1302_hw_init(void)
+static inline int ds1302_hw_init(struct platform_device *pdev)
 {
 	return 0;
 }
@@ -85,6 +85,101 @@ static inline int ds1302_rxbit(void)
 {
 	return !!(get_dp() & RTC_IODATA);
 }
+
+#elif defined(CONFIG_ARCH_PXA) && defined(CONFIG_HIGH_RES_TIMERS)
+
+#include <linux/delay.h>
+#include <linux/of.h>
+
+#define	RTC_CE		0x01
+#define	RTC_CLK		0x02
+#define	RTC_nWE		0x04
+#define	RTC_IODATA	0x08
+
+static unsigned long ds1302_state;
+
+static void *mem;
+
+static inline int ds1302_hw_init(struct platform_device *pdev)
+{
+	struct resource *r;
+
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!r)
+		return -ENODEV;
+
+	mem = devm_ioremap_resource(&pdev->dev, r);
+	if (!mem)
+		return -EFAULT;
+
+	return 0;
+}
+
+static inline void ds1302_reset(void)
+{
+	ds1302_state = 0;
+	iowrite8(ds1302_state, mem);
+	usleep_range(4, 5);
+}
+
+static inline void ds1302_clock(void)
+{
+	usleep_range(1, 2);
+	ds1302_state |= RTC_CLK;
+	iowrite8(ds1302_state, mem);
+	usleep_range(1, 2);
+	ds1302_state &= ~RTC_CLK;
+	iowrite8(ds1302_state, mem);
+}
+
+static inline void ds1302_start(void)
+{
+	ds1302_state &= ~RTC_CLK;
+	ds1302_state |= RTC_CE;
+	iowrite8(ds1302_state, mem);
+	usleep_range(3, 4);
+}
+
+static inline void ds1302_stop(void)
+{
+	ds1302_state &= ~RTC_CE;
+	iowrite8(ds1302_state, mem);
+}
+
+static inline void ds1302_set_tx(void)
+{
+	ds1302_state &= ~RTC_nWE;
+	iowrite8(ds1302_state, mem);
+}
+
+static inline void ds1302_set_rx(void)
+{
+	ds1302_state |= RTC_nWE;
+	iowrite8(ds1302_state, mem);
+}
+
+static inline void ds1302_txbit(int bit)
+{
+	if (bit)
+		ds1302_state |= RTC_IODATA;
+	else
+		ds1302_state &= ~RTC_IODATA;
+	iowrite8(ds1302_state, mem);
+}
+
+static inline int ds1302_rxbit(void)
+{
+	return ioread8(mem) & 0x1;
+}
+
+#ifdef CONFIG_OF
+static const struct of_device_id ds1302_dt_ids[] = {
+	{ .compatible = "dallas,rtc-ds1302" },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, ds1302_dt_ids);
+#endif
 
 #else
 #error "Add support for your platform"
@@ -216,7 +311,7 @@ static int __init ds1302_rtc_probe(struct platform_device *pdev)
 {
 	struct rtc_device *rtc;
 
-	if (ds1302_hw_init()) {
+	if (ds1302_hw_init(pdev)) {
 		dev_err(&pdev->dev, "Failed to init communication channel");
 		return -EINVAL;
 	}
@@ -244,6 +339,7 @@ static int __init ds1302_rtc_probe(struct platform_device *pdev)
 static struct platform_driver ds1302_platform_driver = {
 	.driver		= {
 		.name	= DRV_NAME,
+		.of_match_table = of_match_ptr(ds1302_dt_ids),
 	},
 };
 

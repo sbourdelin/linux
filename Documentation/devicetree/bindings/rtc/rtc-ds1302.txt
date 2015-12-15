@@ -1,0 +1,14 @@
+* Dallas Semiconductor DS-1302 RTC
+
+Simple device which could be used to store date/time between reboots.
+
+Required properties:
+- compatible : Should be "dallas,rtc-ds1302"
+- reg : Should be address and size of IO memory region
+
+Examples:
+
+rtc@40900000 {
+	compatible = "dallas,rtc-ds1302";
+	reg = <0x1700901c 0x1>;
+};

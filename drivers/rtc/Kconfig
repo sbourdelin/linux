@@ -803,7 +803,7 @@ config RTC_DRV_DS1286
 
 config RTC_DRV_DS1302
 	tristate "Dallas DS1302"
-	depends on SH_SECUREEDGE5410
+	depends on SH_SECUREEDGE5410 || (ARCH_PXA && HIGH_RES_TIMERS)
 	help
 	  If you say yes here you get support for the Dallas DS1302 RTC chips.
 
