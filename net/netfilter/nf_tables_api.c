@@ -831,8 +831,6 @@ static int nf_tables_deltable(struct net *net, struct sock *nlsk,
 	table = nf_tables_table_lookup(afi, nla[NFTA_TABLE_NAME]);
 	if (IS_ERR(table))
 		return PTR_ERR(table);
-	if (table->flags & NFT_TABLE_INACTIVE)
-		return -ENOENT;
 
 	ctx.afi = afi;
 	ctx.table = table;
@@ -1492,14 +1490,10 @@ static int nf_tables_delchain(struct net *net, struct sock *nlsk,
 	table = nf_tables_table_lookup(afi, nla[NFTA_CHAIN_TABLE]);
 	if (IS_ERR(table))
 		return PTR_ERR(table);
-	if (table->flags & NFT_TABLE_INACTIVE)
-		return -ENOENT;
 
 	chain = nf_tables_chain_lookup(table, nla[NFTA_CHAIN_NAME]);
 	if (IS_ERR(chain))
 		return PTR_ERR(chain);
-	if (chain->flags & NFT_CHAIN_INACTIVE)
-		return -ENOENT;
 	if (chain->use > 0)
 		return -EBUSY;
 
@@ -2191,8 +2185,6 @@ static int nf_tables_delrule(struct net *net, struct sock *nlsk,
 	table = nf_tables_table_lookup(afi, nla[NFTA_RULE_TABLE]);
 	if (IS_ERR(table))
 		return PTR_ERR(table);
-	if (table->flags & NFT_TABLE_INACTIVE)
-		return -ENOENT;
 
 	if (nla[NFTA_RULE_CHAIN]) {
 		chain = nf_tables_chain_lookup(table, nla[NFTA_RULE_CHAIN]);
@@ -2361,8 +2353,6 @@ static int nft_ctx_init_from_setattr(struct nft_ctx *ctx, struct net *net,
 		table = nf_tables_table_lookup(afi, nla[NFTA_SET_TABLE]);
 		if (IS_ERR(table))
 			return PTR_ERR(table);
-		if (table->flags & NFT_TABLE_INACTIVE)
-			return -ENOENT;
 	}
 
 	nft_ctx_init(ctx, net, skb, nlh, afi, table, NULL, nla);
@@ -2897,8 +2887,6 @@ static int nf_tables_delset(struct net *net, struct sock *nlsk,
 	set = nf_tables_set_lookup(ctx.table, nla[NFTA_SET_NAME]);
 	if (IS_ERR(set))
 		return PTR_ERR(set);
-	if (set->flags & NFT_SET_INACTIVE)
-		return -ENOENT;
 	if (!list_empty(&set->bindings))
 		return -EBUSY;
 
@@ -3021,8 +3009,7 @@ static const struct nla_policy nft_set_elem_list_policy[NFTA_SET_ELEM_LIST_MAX +
 static int nft_ctx_init_from_elemattr(struct nft_ctx *ctx, struct net *net,
 				      const struct sk_buff *skb,
 				      const struct nlmsghdr *nlh,
-				      const struct nlattr * const nla[],
-				      bool trans)
+				      const struct nlattr * const nla[])
 {
 	const struct nfgenmsg *nfmsg = nlmsg_data(nlh);
 	struct nft_af_info *afi;
@@ -3035,8 +3022,6 @@ static int nft_ctx_init_from_elemattr(struct nft_ctx *ctx, struct net *net,
 	table = nf_tables_table_lookup(afi, nla[NFTA_SET_ELEM_LIST_TABLE]);
 	if (IS_ERR(table))
 		return PTR_ERR(table);
-	if (!trans && (table->flags & NFT_TABLE_INACTIVE))
-		return -ENOENT;
 
 	nft_ctx_init(ctx, net, skb, nlh, afi, table, NULL, nla);
 	return 0;
@@ -3145,9 +3130,11 @@ static int nf_tables_dump_set(struct sk_buff *skb, struct netlink_callback *cb)
 		return err;
 
 	err = nft_ctx_init_from_elemattr(&ctx, net, cb->skb, cb->nlh,
-					 (void *)nla, false);
+					 (void *)nla);
 	if (err < 0)
 		return err;
+	if (ctx.table->flags & NFT_TABLE_INACTIVE)
+		return -ENOENT;
 
 	set = nf_tables_set_lookup(ctx.table, nla[NFTA_SET_ELEM_LIST_SET]);
 	if (IS_ERR(set))
@@ -3211,9 +3198,11 @@ static int nf_tables_getsetelem(struct sock *nlsk, struct sk_buff *skb,
 	struct nft_ctx ctx;
 	int err;
 
-	err = nft_ctx_init_from_elemattr(&ctx, net, skb, nlh, nla, false);
+	err = nft_ctx_init_from_elemattr(&ctx, net, skb, nlh, nla);
 	if (err < 0)
 		return err;
+	if (ctx.table->flags & NFT_TABLE_INACTIVE)
+		return -ENOENT;
 
 	set = nf_tables_set_lookup(ctx.table, nla[NFTA_SET_ELEM_LIST_SET]);
 	if (IS_ERR(set))
@@ -3535,7 +3524,7 @@ static int nf_tables_newsetelem(struct net *net, struct sock *nlsk,
 	if (nla[NFTA_SET_ELEM_LIST_ELEMENTS] == NULL)
 		return -EINVAL;
 
-	err = nft_ctx_init_from_elemattr(&ctx, net, skb, nlh, nla, true);
+	err = nft_ctx_init_from_elemattr(&ctx, net, skb, nlh, nla);
 	if (err < 0)
 		return err;
 
@@ -3629,7 +3618,7 @@ static int nf_tables_delsetelem(struct net *net, struct sock *nlsk,
 	if (nla[NFTA_SET_ELEM_LIST_ELEMENTS] == NULL)
 		return -EINVAL;
 
-	err = nft_ctx_init_from_elemattr(&ctx, net, skb, nlh, nla, false);
+	err = nft_ctx_init_from_elemattr(&ctx, net, skb, nlh, nla);
 	if (err < 0)
 		return err;
 
