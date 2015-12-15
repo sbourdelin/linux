@@ -715,7 +715,7 @@ static inline void ftrace_test_probe_##call(void)			\
 #undef __print_array
 
 #undef TP_printk
-#define TP_printk(fmt, args...) "\"" fmt "\", "  __stringify(args)
+#define TP_printk(fmt, args...) "\"" fmt "\", "  #args
 
 #undef DECLARE_EVENT_CLASS
 #define DECLARE_EVENT_CLASS(call, proto, args, tstruct, assign, print)	\
