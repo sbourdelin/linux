@@ -17,15 +17,20 @@
 
 /* each htab element is struct htab_elem + key + value */
 struct htab_elem {
-	union {
-		struct hlist_node hash_node;
-
-		/* used after deleted from hash */
-		struct bpf_htab *htab;
-	};
-	struct rcu_head rcu;
-	u32 hash;
 	u32 tag;
+	union {
+		/* won't be used after being removed from hash */
+		struct {
+			u32 hash;
+			struct hlist_node hash_node;
+		};
+
+		/* set after being deleted from hash */
+		struct {
+			struct bpf_htab *htab;
+			struct rcu_head rcu;
+		};
+	};
 	char key[0] __aligned(8);
 };
 
