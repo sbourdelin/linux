@@ -76,6 +76,9 @@ static int alloc_bucket_locks(struct rhashtable *ht, struct bucket_table *tbl,
 	/* Never allocate more than 0.5 locks per bucket */
 	size = min_t(unsigned int, size, tbl->size >> 1);
 
+	/* Always allocate at least one lock */
+	size = max_t(unsigned int, size, 1);
+
 	if (sizeof(spinlock_t) != 0) {
 #ifdef CONFIG_NUMA
 		if (size * sizeof(spinlock_t) > PAGE_SIZE &&
