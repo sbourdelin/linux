@@ -2165,11 +2165,6 @@ static irqreturn_t ironlake_irq_handler(int irq, void *arg)
 	if (!intel_irqs_enabled(dev_priv))
 		return IRQ_NONE;
 
-	/* We get interrupts on unclaimed registers, so check for this before we
-	 * do any I915_{READ,WRITE}. */
-	if (intel_uncore_unclaimed_mmio(dev_priv))
-		DRM_ERROR("Unclaimed register before interrupt\n");
-
 	/* disable master interrupt before clearing iir  */
 	de_ier = I915_READ(DEIER);
 	I915_WRITE(DEIER, de_ier & ~DE_MASTER_IRQ_CONTROL);
@@ -2989,6 +2984,11 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 
 	if (!i915.enable_hangcheck)
 		return;
+
+	/* Periodic arming of mmio_debug if hw detects mmio
+	 * access to out of range or to an unpowered block
+	 */
+	intel_uncore_arm_unclaimed_mmio_detection(dev_priv);
 
 	for_each_ring(ring, dev_priv, i) {
 		u64 acthd;

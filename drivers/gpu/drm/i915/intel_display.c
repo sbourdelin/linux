@@ -13545,6 +13545,9 @@ static int intel_atomic_commit(struct drm_device *dev,
 
 	drm_atomic_state_free(state);
 
+	if (intel_uncore_arm_unclaimed_mmio_detection(dev_priv))
+		DRM_DEBUG_DRIVER("%s return with unclaimed access\n", __func__);
+
 	return 0;
 }
 
