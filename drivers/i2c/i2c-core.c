@@ -1556,6 +1556,8 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	dev_set_name(&adap->dev, "i2c-%d", adap->nr);
 	adap->dev.bus = &i2c_bus_type;
 	adap->dev.type = &i2c_adapter_type;
+	if (adap->dev.parent)
+		pm_runtime_get_noresume(adap->dev.parent);
 	res = device_register(&adap->dev);
 	if (res)
 		goto out_list;
@@ -1617,6 +1619,8 @@ exit_recovery:
 	mutex_lock(&core_lock);
 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
 	mutex_unlock(&core_lock);
+	if (adap->dev.parent)
+		pm_runtime_put_noidle(adap->dev.parent);
 
 	return 0;
 
@@ -1624,6 +1628,8 @@ out_list:
 	mutex_lock(&core_lock);
 	idr_remove(&i2c_adapter_idr, adap->nr);
 	mutex_unlock(&core_lock);
+	if (adap->dev.parent)
+		pm_runtime_put_noidle(adap->dev.parent);
 	return res;
 }
 
