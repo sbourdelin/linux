@@ -283,6 +283,13 @@ static bool is_hardlockup(void)
 	__this_cpu_write(hrtimer_interrupts_saved, hrint);
 	return false;
 }
+
+void touch_hardlockup_watchdog(void)
+{
+	__this_cpu_write(hrtimer_interrupts_saved, 0);
+}
+EXPORT_SYMBOL_GPL(touch_hardlockup_watchdog);
+
 #endif
 
 static int is_softlockup(unsigned long touch_ts)
