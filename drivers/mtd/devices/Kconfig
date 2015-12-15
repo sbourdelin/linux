@@ -233,4 +233,18 @@ config BCH_CONST_T
 	default 4
 endif
 
+config MTD_SRAM_LP8X4X
+	tristate "SRAM on ICPDAS LP-8X4X"
+	depends on OF && ARCH_PXA
+       ---help---
+	 This provides an MTD device driver for 512kiB of battery backed up SRAM
+	 on ICPDAS LP-8X4X programmable automation controllers.
+
+	 SRAM chip is connected via FPGA and is not accessible without a driver,
+	 unlike flash memory which is wired to CPU MMU.
+
+	 Say N, unless you plan to run this kernel on LP-8X4X.
+
+	 If you say M, the module will be called sram_lp8x4x.
+
 endmenu

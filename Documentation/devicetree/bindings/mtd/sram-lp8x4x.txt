@@ -1,0 +1,20 @@
+512kB battery backed up SRAM on LP-8x4x industrial computers
+
+Required properties:
+- compatible : should be "icpdas,sram-lp8x4x"
+
+- reg: physical base addresses and region lengths of
+       * IO memory range
+       * SRAM page selector
+
+SRAM chip is connected via FPGA and is not accessible without a driver,
+unlike flash memory which is wired to CPU MMU. Driver is essentially
+an address translation routine.
+
+Example:
+
+	sram@a000 {
+		compatible = "icpdas,sram-lp8x4x";
+		reg = <0xa000 0x1000
+		       0x901e 0x1>;
+	};
