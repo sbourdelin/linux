@@ -1375,3 +1375,74 @@ int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs)
 }
 
 EXPORT_SYMBOL(nand_scan_bbt);
+
+/**
+ * nand_bbt_init - [NAND BBT Interface] Initialize and locate/create a bad block
+ * table
+ * @bbt: NAND BBT structure
+ *
+ * This function selects the default bad block table support for the device and
+ * scans for an existing table, or else creates one.
+ */
+int nand_bbt_init(struct nand_bbt *bbt)
+{
+	/*
+	 * FIXME: For now, we call nand_default_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_default_bbt(bbt->mtd);
+}
+EXPORT_SYMBOL(nand_bbt_init);
+
+void nand_bbt_release(struct nand_bbt *bbt)
+{
+	kfree(bbt->bbt);
+}
+EXPORT_SYMBOL(nand_bbt_release);
+
+/**
+ * nand_bbt_isreserved - [NAND BBT Interface] Check if a block is reserved
+ * @bbt: NAND BBT structure
+ * @offs: offset in the device
+ */
+int nand_bbt_isreserved(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_isreserved_bbt() directly. It will
+	 * change when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_isreserved_bbt(bbt->mtd, offs);
+}
+EXPORT_SYMBOL(nand_bbt_isreserved);
+
+/**
+ * nand_bbt_isbad - [NAND BBT Interface] Check if a block is bad
+ * @bbt: NAND BBT structure
+ * @offs: offset in the device
+ */
+int nand_bbt_isbad(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_isbad_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 * Since we already have nand_bbt_isreserved(), we don't need to
+	 * check pass down allow_bbt.
+	 */
+	return nand_isbad_bbt(bbt->mtd, offs, 1);
+}
+EXPORT_SYMBOL(nand_bbt_isbad);
+
+/**
+ * nand_bbt_markbad - [NAND BBT Interface] Mark a block bad in the BBT
+ * @bbt: NAND BBT structure
+ * @offs: offset of the bad block
+ */
+int nand_bbt_markbad(struct nand_bbt *bbt, loff_t offs)
+{
+	/*
+	 * FIXME: For now, we call nand_markbad_bbt() directly. It will change
+	 * when we use struct nand_bbt instead of struct nand_chip.
+	 */
+	return nand_markbad_bbt(bbt->mtd, offs);
+}
+EXPORT_SYMBOL(nand_bbt_markbad);

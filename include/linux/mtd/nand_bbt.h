@@ -174,4 +174,10 @@ struct nand_bbt {
 	u8 *bbt;
 };
 
+int nand_bbt_init(struct nand_bbt *bbt);
+void nand_bbt_release(struct nand_bbt *bbt);
+int nand_bbt_markbad(struct nand_bbt *bbt, loff_t offs);
+int nand_bbt_isreserved(struct nand_bbt *bbt, loff_t offs);
+int nand_bbt_isbad(struct nand_bbt *bbt, loff_t offs);
+
 #endif	/* __LINUX_MTD_NAND_BBT_H */
