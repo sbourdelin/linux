@@ -753,6 +753,7 @@ struct intel_dp {
 	uint8_t dpcd[DP_RECEIVER_CAP_SIZE];
 	uint8_t psr_dpcd[EDP_PSR_RECEIVER_CAP_SIZE];
 	uint8_t downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
+	uint8_t edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
 	/* sink rates as reported by DP_SUPPORTED_LINK_RATES */
 	uint8_t num_sink_rates;
 	int sink_rates[DP_MAX_SUPPORTED_RATES];
@@ -1279,6 +1280,11 @@ void intel_dp_compute_rate(struct intel_dp *intel_dp, int port_clock,
 bool intel_dp_source_supports_hbr2(struct intel_dp *intel_dp);
 bool
 intel_dp_get_link_status(struct intel_dp *intel_dp, uint8_t link_status[DP_LINK_STATUS_SIZE]);
+ssize_t intel_dp_dpcd_read_wake(struct drm_dp_aux *aux, unsigned int offset,
+		void *buffer, size_t size);
+
+/* intel_dp_aux_backlight.c */
+int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector);
 
 /* intel_dp_mst.c */
 int intel_dp_mst_encoder_init(struct intel_digital_port *intel_dig_port, int conn_id);
