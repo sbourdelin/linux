@@ -164,9 +164,8 @@ int beiscsi_mccq_compl(struct beiscsi_hba *phba,
 	}
 
 	/* Set MBX Tag state to Active */
-	mutex_lock(&phba->ctrl.mbox_lock);
-	phba->ctrl.ptag_state[tag].tag_state = MCC_TAG_STATE_RUNNING;
-	mutex_unlock(&phba->ctrl.mbox_lock);
+	atomic_set(&phba->ctrl.ptag_state[tag].tag_state,
+			MCC_TAG_STATE_RUNNING);
 
 	/* wait for the mccq completion */
 	rc = wait_event_interruptible_timeout(
@@ -178,9 +177,8 @@ int beiscsi_mccq_compl(struct beiscsi_hba *phba,
 	if (rc <= 0) {
 		struct be_dma_mem *tag_mem;
 		/* Set MBX Tag state to timeout */
-		mutex_lock(&phba->ctrl.mbox_lock);
-		phba->ctrl.ptag_state[tag].tag_state = MCC_TAG_STATE_TIMEOUT;
-		mutex_unlock(&phba->ctrl.mbox_lock);
+		atomic_set(&phba->ctrl.ptag_state[tag].tag_state,
+				MCC_TAG_STATE_TIMEOUT);
 
 		/* Store resource addr to be freed later */
 		tag_mem = &phba->ctrl.ptag_state[tag].tag_mem_state;
@@ -199,9 +197,8 @@ int beiscsi_mccq_compl(struct beiscsi_hba *phba,
 	} else {
 		rc = 0;
 		/* Set MBX Tag state to completed */
-		mutex_lock(&phba->ctrl.mbox_lock);
-		phba->ctrl.ptag_state[tag].tag_state = MCC_TAG_STATE_COMPLETED;
-		mutex_unlock(&phba->ctrl.mbox_lock);
+		atomic_set(&phba->ctrl.ptag_state[tag].tag_state,
+				MCC_TAG_STATE_COMPLETED);
 	}
 
 	mcc_tag_response = phba->ctrl.mcc_numtag[tag];
@@ -373,9 +370,11 @@ int be_mcc_compl_process_isr(struct be_ctrl_info *ctrl,
 	ctrl->mcc_numtag[tag] |= (extd_status & 0x000000FF) << 8;
 	ctrl->mcc_numtag[tag] |= (compl_status & 0x000000FF);
 
-	if (ctrl->ptag_state[tag].tag_state == MCC_TAG_STATE_RUNNING) {
+	if (atomic_read(&ctrl->ptag_state[tag].tag_state) ==
+		MCC_TAG_STATE_RUNNING) {
 		wake_up_interruptible(&ctrl->mcc_wait[tag]);
-	} else if (ctrl->ptag_state[tag].tag_state == MCC_TAG_STATE_TIMEOUT) {
+	} else if (atomic_read(&ctrl->ptag_state[tag].tag_state) ==
+			MCC_TAG_STATE_TIMEOUT) {
 		struct be_dma_mem *tag_mem;
 		tag_mem = &ctrl->ptag_state[tag].tag_mem_state;
 
@@ -390,9 +389,8 @@ int be_mcc_compl_process_isr(struct be_ctrl_info *ctrl,
 					    tag_mem->va, tag_mem->dma);
 
 		/* Change tag state */
-		mutex_lock(&phba->ctrl.mbox_lock);
-		ctrl->ptag_state[tag].tag_state = MCC_TAG_STATE_COMPLETED;
-		mutex_unlock(&phba->ctrl.mbox_lock);
+		atomic_set(&ctrl->ptag_state[tag].tag_state,
+				MCC_TAG_STATE_COMPLETED);
 
 		/* Free MCC Tag */
 		free_mcc_tag(ctrl, tag);
