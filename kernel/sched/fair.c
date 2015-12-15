@@ -2909,6 +2909,12 @@ void remove_entity_load_avg(struct sched_entity *se)
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
 	u64 last_update_time;
 
+	/*
+	 * Newly created task should not be removed from the source CPU before migration
+	 */
+	if (se->avg.last_update_time == 0)
+		return;
+
 #ifndef CONFIG_64BIT
 	u64 last_update_time_copy;
 
