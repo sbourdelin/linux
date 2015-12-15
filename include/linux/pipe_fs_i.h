@@ -146,4 +146,6 @@ struct pipe_inode_info *get_pipe_info(struct file *file);
 
 int create_pipe_files(struct file **, int);
 
+int is_packetized(struct file *file);
+
 #endif

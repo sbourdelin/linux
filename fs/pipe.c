@@ -329,7 +329,7 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 	return ret;
 }
 
-static inline int is_packetized(struct file *file)
+int is_packetized(struct file *file)
 {
 	return (file->f_flags & O_DIRECT) != 0;
 }
