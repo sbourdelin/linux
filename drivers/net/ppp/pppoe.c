@@ -109,6 +109,18 @@ struct pppoe_net {
 	rwlock_t hash_lock;
 };
 
+/* PADT packets belong to PPPoE's discovery stage (i.e. control plane)
+ * and should be handled by user space. Unfortunately, some programs
+ * don't listen out for PADT packets and rely on pppoe module for
+ * closing session after reception of PADT.
+ *
+ * This option can be deactivated when PPPoE discovery is handled by
+ * a PADT aware program.
+ */
+static bool handle_padt __read_mostly = true;
+module_param(handle_padt, bool, 0444);
+MODULE_PARM_DESC(handle_padt, "Let kernel interpret incoming PADT");
+
 /*
  * PPPoE could be in the following stages:
  * 1) Discovery stage (to obtain remote MAC and Session ID)
@@ -1173,7 +1185,8 @@ static int __init pppoe_init(void)
 		goto out_unregister_pppoe_proto;
 
 	dev_add_pack(&pppoes_ptype);
-	dev_add_pack(&pppoed_ptype);
+	if (handle_padt)
+		dev_add_pack(&pppoed_ptype);
 	register_netdevice_notifier(&pppoe_notifier);
 
 	return 0;
@@ -1189,7 +1202,8 @@ out:
 static void __exit pppoe_exit(void)
 {
 	unregister_netdevice_notifier(&pppoe_notifier);
-	dev_remove_pack(&pppoed_ptype);
+	if (handle_padt)
+		dev_remove_pack(&pppoed_ptype);
 	dev_remove_pack(&pppoes_ptype);
 	unregister_pppox_proto(PX_PROTO_OE);
 	proto_unregister(&pppoe_sk_proto);
