@@ -207,11 +207,20 @@ comma-separated list with no space: 0,1. Ranges of CPUs are specified with -: 0-
 In per-thread mode with inheritance mode on (default), samples are captured only when
 the thread executes on the designated CPUs. Default is to monitor all CPUs.
 
+-B::
+--no-buildid::
+Do not save the buildid of (used) binaries in the data file. This skips
+post-processing after recoring which might take some time on big machines.
+The Downside is that it can resolve into a wrong symbol after a binary is
+rebuilt later.  You can also set "record.build-id" config variable to
+'skip' to have same effect.
+
 -N::
 --no-buildid-cache::
 Do not update the buildid cache. This saves some overhead in situations
 where the information in the perf.data file (which includes buildids)
-is sufficient.
+is sufficient.  You can also set "record.build-id" config variable to
+'no-cache' to have same effect.
 
 -G name,...::
 --cgroup name,...::
