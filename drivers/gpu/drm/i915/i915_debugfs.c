@@ -4833,11 +4833,13 @@ i915_drop_caches_set(void *data, u64 val)
 
 	DRM_DEBUG("Dropping caches: 0x%08llx\n", val);
 
+	intel_runtime_pm_get(dev_priv);
+
 	/* No need to check and wait for gpu resets, only libdrm auto-restarts
 	 * on ioctls on -EAGAIN. */
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
-		return ret;
+		goto pm_put;
 
 	if (val & DROP_ACTIVE) {
 		ret = i915_gpu_idle(dev);
@@ -4856,7 +4858,9 @@ i915_drop_caches_set(void *data, u64 val)
 
 unlock:
 	mutex_unlock(&dev->struct_mutex);
-
+pm_put:
+	intel_runtime_pm_put(dev_priv);
+	
 	return ret;
 }
 
