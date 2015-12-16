@@ -465,9 +465,9 @@ serial_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *dev_id)
 		return -ENODEV;
 
 #ifdef SERIAL_DEBUG_PNP
-	printk(KERN_DEBUG
-		"Setup PNP port: port %x, mem 0x%lx, irq %d, type %d\n",
-		       uart.port.iobase, uart.port.mapbase, uart.port.irq, uart.port.iotype);
+	pr_debug("Setup PNP port: port %x, mem 0x%lx, irq %d, type %d\n",
+		 uart.port.iobase, uart.port.mapbase,
+		 uart.port.irq, uart.port.iotype);
 #endif
 	if (flags & CIR_PORT) {
 		uart.port.flags |= UPF_FIXED_PORT | UPF_FIXED_TYPE;
