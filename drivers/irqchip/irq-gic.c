@@ -488,6 +488,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
 	void __iomem *base = gic_data_cpu_base(gic);
 	unsigned int cpu_mask, cpu = smp_processor_id();
 	int i;
+	DECLARE_BITMAP(sgi_mask, 16);
 
 	/*
 	 * Setting up the CPU map is only relevant for the primary GIC
@@ -509,6 +510,58 @@ static void gic_cpu_init(struct gic_chip_data *gic)
 		for (i = 0; i < NR_GIC_CPU_IF; i++)
 			if (i != cpu)
 				gic_cpu_map[i] &= ~cpu_mask;
+
+		/*
+		 * Fiddle with the SGI set/clear registers to try identify
+		 * any IPIs that are reserved for secure world.
+		 */
+		bitmap_fill(sgi_mask, 16);
+
+		for (i = 0; i < 16; i++) {
+			void __iomem *set_reg =
+			    dist_base + GIC_DIST_SGI_PENDING_SET + (i & ~3);
+			void __iomem *clear_reg =
+			    dist_base + GIC_DIST_SGI_PENDING_CLEAR + (i & ~3);
+			unsigned long mask = cpu_mask << (8*(i%4));
+			unsigned long flags, pending, after_clear, after_set;
+
+			local_irq_save(flags);
+
+			/* record original value */
+			pending = readl_relaxed(set_reg);
+
+			/* clear, test, set, and test again */
+			writel_relaxed(mask, clear_reg);
+			after_clear = readl_relaxed(set_reg);
+			writel_relaxed(mask, set_reg);
+			after_set = readl_relaxed(set_reg);
+
+			/* restore original value */
+			writel_relaxed(mask & ~pending, clear_reg);
+
+			local_irq_restore(flags);
+
+			if (mask & ~after_clear && mask & after_set)
+				clear_bit(i, sgi_mask);
+		}
+
+		/*
+		 * Show the SGI mask if it is "interesting". Here interesting
+		 * means that the set/clear register is implemented
+		 * (mask is not full) and it tells us that the secure world
+		 * has reserved some SGIs (mask is not empty).
+		 */
+		if (!bitmap_full(sgi_mask, 16) && !bitmap_empty(sgi_mask, 16))
+			pr_info("CPU%d: Detected reserved SGI IDs: %*pbl\n",
+				cpu, 16, sgi_mask);
+
+		/*
+		 * Yell if the reserved IDs make the system unviable.
+		 */
+		if (!bitmap_full(sgi_mask, 16) &&
+		    find_first_bit(sgi_mask, 16) < NR_IPI)
+			pr_crit("CPU%d: Not enough SGI IDs; expect failure\n",
+				cpu);
 	}
 
 	gic_cpu_config(dist_base, NULL);
