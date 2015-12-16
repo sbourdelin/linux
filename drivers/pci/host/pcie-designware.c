@@ -22,8 +22,14 @@
 #include <linux/pci_regs.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
+#include <linux/delay.h>
+#include <linux/sizes.h>
 
 #include "pcie-designware.h"
+
+/* Synopsys Default PCIE Control and Status Register Memory-Mapped */
+#define LINK_CONTROL_LINK_STATUS_REG  0x80
+#define PCIE_RETRAIN_LINK_MASK        (1<<5)
 
 /* Synopsis specific PCIE configuration registers */
 #define PCIE_PORT_LINK_CONTROL		0x710
@@ -704,6 +710,15 @@ static struct pci_ops dw_pcie_ops = {
 	.read = dw_pcie_rd_conf,
 	.write = dw_pcie_wr_conf,
 };
+
+void dw_pcie_link_retrain(struct pcie_port *pp)
+{
+	u32 val = 0;
+
+	dw_pcie_readl_rc(pp, LINK_CONTROL_LINK_STATUS_REG, &val);
+	val = val | PCIE_RETRAIN_LINK_MASK;
+	dw_pcie_writel_rc(pp, val, LINK_CONTROL_LINK_STATUS_REG);
+}
 
 void dw_pcie_setup_rc(struct pcie_port *pp)
 {
