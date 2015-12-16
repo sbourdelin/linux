@@ -73,7 +73,8 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_IRQ_WORK,
 	IPI_COMPLETION,
-	IPI_CPU_BACKTRACE = 15,
+	IPI_CPU_BACKTRACE = 13,
+	/* 14 and 15 are reserved; they do not work on some Krait CPUs */
 };
 
 static DECLARE_COMPLETION(cpu_running);
