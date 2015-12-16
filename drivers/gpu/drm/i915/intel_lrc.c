@@ -1793,7 +1793,6 @@ static void bxt_a_set_seqno(struct intel_engine_cs *ring, u32 seqno)
 static int gen8_emit_request(struct drm_i915_gem_request *request)
 {
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
-	struct intel_engine_cs *ring = ringbuf->ring;
 	u32 cmd;
 	int ret;
 
@@ -1811,8 +1810,7 @@ static int gen8_emit_request(struct drm_i915_gem_request *request)
 
 	intel_logical_ring_emit(ringbuf, cmd);
 	intel_logical_ring_emit(ringbuf,
-				(ring->status_page.gfx_addr +
-				(I915_GEM_HWS_INDEX << MI_STORE_DWORD_INDEX_SHIFT)));
+				I915_GEM_HWS_INDEX << MI_STORE_DWORD_INDEX_SHIFT);
 	intel_logical_ring_emit(ringbuf, 0);
 	intel_logical_ring_emit(ringbuf, i915_gem_request_get_seqno(request));
 	intel_logical_ring_emit(ringbuf, MI_USER_INTERRUPT);
