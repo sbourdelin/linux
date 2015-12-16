@@ -853,6 +853,7 @@ struct i915_ctx_hang_stats {
  * @ref: reference count.
  * @user_handle: userspace tracking identity for this context.
  * @remap_slice: l3 row remapping information.
+ * @is_default: true iff this is the global default context
  * @flags: context specific flags:
  *         CONTEXT_NO_ZEROMAP: do not allow mapping things to page 0.
  * @file_priv: filp associated with this context (NULL for global default
@@ -871,6 +872,7 @@ struct intel_context {
 	struct kref ref;
 	int user_handle;
 	uint8_t remap_slice;
+	uint8_t is_global_default;
 	struct drm_i915_private *i915;
 	int flags;
 	struct drm_i915_file_private *file_priv;

@@ -2367,22 +2367,21 @@ void intel_lr_context_free(struct intel_context *ctx)
 {
 	int i;
 
-	for (i = 0; i < I915_NUM_RINGS; i++) {
+	for (i = I915_NUM_RINGS; --i >= 0; ) {
+		struct intel_ringbuffer *ringbuf = ctx->engine[i].ringbuf;
 		struct drm_i915_gem_object *ctx_obj = ctx->engine[i].state;
 
-		if (ctx_obj) {
-			struct intel_ringbuffer *ringbuf =
-					ctx->engine[i].ringbuf;
-			struct intel_engine_cs *ring = ringbuf->ring;
+		if (!ctx_obj)
+			continue;
 
-			if (ctx == ring->default_context) {
-				intel_unpin_ringbuffer_obj(ringbuf);
-				i915_gem_object_ggtt_unpin(ctx_obj);
-			}
-			WARN_ON(ctx->engine[ring->id].pin_count);
-			intel_ringbuffer_free(ringbuf);
-			drm_gem_object_unreference(&ctx_obj->base);
+		if (ctx->is_global_default) {
+			intel_unpin_ringbuffer_obj(ringbuf);
+			i915_gem_object_ggtt_unpin(ctx_obj);
 		}
+
+		WARN_ON(ctx->engine[i].pin_count);
+		intel_ringbuffer_free(ringbuf);
+		drm_gem_object_unreference(&ctx_obj->base);
 	}
 }
 
@@ -2443,7 +2442,7 @@ static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
  */
 
 int intel_lr_context_deferred_alloc(struct intel_context *ctx,
-				     struct intel_engine_cs *ring)
+				    struct intel_engine_cs *ring)
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_gem_object *ctx_obj;
