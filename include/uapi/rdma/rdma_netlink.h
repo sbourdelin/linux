@@ -5,6 +5,7 @@
 
 enum {
 	RDMA_NL_RDMA_CM = 1,
+	RDMA_NL_I40IW,
 	RDMA_NL_NES,
 	RDMA_NL_C4IW,
 	RDMA_NL_LS,	/* RDMA Local Services */
