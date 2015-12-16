@@ -594,12 +594,22 @@ static void RxReorderIndicatePacket(struct ieee80211_device *ieee,
 {
 	PRT_HIGH_THROUGHPUT	pHTInfo = ieee->pHTInfo;
 	PRX_REORDER_ENTRY	pReorderEntry = NULL;
-	struct ieee80211_rxb *prxbIndicateArray[REORDER_WIN_SIZE];
+	struct ieee80211_rxb **prxbIndicateArray;
 	u8			WinSize = pHTInfo->RxReorderWinSize;
 	u16			WinEnd = (pTS->RxIndicateSeq + WinSize -1)%4096;
 	u8			index = 0;
 	bool			bMatchWinStart = false, bPktInBuf = false;
 	IEEE80211_DEBUG(IEEE80211_DL_REORDER,"%s(): Seq is %d,pTS->RxIndicateSeq is %d, WinSize is %d\n",__func__,SeqNum,pTS->RxIndicateSeq,WinSize);
+
+	prxbIndicateArray = kmalloc(sizeof(struct ieee80211_rxb *) *
+			REORDER_WIN_SIZE, GFP_KERNEL);
+	if (!prxbIndicateArray) {
+		IEEE80211_DEBUG(IEEE80211_DL_ERR,
+				"%s(): kmalloc prxbIndicateArray error\n",
+				__func__);
+		return;
+	}
+
 	/* Rx Reorder initialize condition.*/
 	if (pTS->RxIndicateSeq == 0xffff) {
 		pTS->RxIndicateSeq = SeqNum;
@@ -618,6 +628,8 @@ static void RxReorderIndicatePacket(struct ieee80211_device *ieee,
 			kfree(prxb);
 			prxb = NULL;
 		}
+
+		kfree(prxbIndicateArray);
 		return;
 	}
 
@@ -741,6 +753,7 @@ static void RxReorderIndicatePacket(struct ieee80211_device *ieee,
 		// Indicate packets
 		if(index>REORDER_WIN_SIZE){
 			IEEE80211_DEBUG(IEEE80211_DL_ERR, "RxReorderIndicatePacket(): Rx Reorer buffer full!! \n");
+			kfree(prxbIndicateArray);
 			return;
 		}
 		ieee80211_indicate_packets(ieee, prxbIndicateArray, index);
