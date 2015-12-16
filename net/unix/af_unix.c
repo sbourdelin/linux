@@ -2320,6 +2320,9 @@ again:
 				goto out;
 			}
 
+			if (flags & MSG_PEEK)
+				skip = sk_peek_offset(sk, flags);
+
 			continue;
 unlock:
 			unix_state_unlock(sk);
