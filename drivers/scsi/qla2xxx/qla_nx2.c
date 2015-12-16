@@ -3491,7 +3491,7 @@ qla8044_poll_flash_status_reg(struct scsi_qla_host *vha)
 	int retries = QLA8044_FLASH_READ_RETRY_COUNT;
 	int ret_val = QLA_SUCCESS;
 
-	while (retries--) {
+	while (--retries) {
 		ret_val = qla8044_rd_reg_indirect(vha, QLA8044_FLASH_STATUS,
 		    &flash_status);
 		if (ret_val) {
