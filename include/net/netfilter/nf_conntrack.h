@@ -105,7 +105,11 @@ struct nf_conn {
 
 #if defined(CONFIG_NF_CONNTRACK_MARK)
 	u_int32_t mark;
-#endif
+
+#ifdef CONFIG_NET_SCHED
+	u_int16_t tc_index;
+#endif /* CONFIG_NET_SCHED */
+#endif /* CONFIG_NF_CONNTRACK_MARK */
 
 #ifdef CONFIG_NF_CONNTRACK_SECMARK
 	u_int32_t secmark;
