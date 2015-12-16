@@ -535,6 +535,9 @@ enum ath10k_dev_flags {
 
 	/* Bluetooth coexistance enabled */
 	ATH10K_FLAG_BTCOEX,
+
+	/* Do not use checksum offload */
+	ATH10K_FLAG_HW_CSUM_DISABLED,
 };
 
 enum ath10k_cal_mode {
