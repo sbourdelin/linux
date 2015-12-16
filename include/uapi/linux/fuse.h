@@ -102,6 +102,7 @@
  *  - add ctime and ctimensec to fuse_setattr_in
  *  - add FUSE_RENAME2 request
  *  - add FUSE_NO_OPEN_SUPPORT flag
+ *  - add FUSE_MMAP and FUSE_MUNMAP
  */
 
 #ifndef _LINUX_FUSE_H
@@ -358,6 +359,8 @@ enum fuse_opcode {
 	FUSE_FALLOCATE     = 43,
 	FUSE_READDIRPLUS   = 44,
 	FUSE_RENAME2       = 45,
+	FUSE_MMAP          = 46,
+	FUSE_MUNMAP        = 47,
 
 	/* CUSE specific operations */
 	CUSE_INIT          = 4096,
@@ -668,6 +671,29 @@ struct fuse_fallocate_in {
 	uint64_t	length;
 	uint32_t	mode;
 	uint32_t	padding;
+};
+
+struct fuse_mmap_in {
+	__u64	fh;
+	__u64	addr;
+	__u64	len;
+	__u32	prot;
+	__u32	flags;
+	__u64	offset;
+};
+
+struct fuse_mmap_out {
+	__u64	mapid;		/* Mmap ID, same namespace as Inode ID */
+	__u64	size;		/* Size of memory region */
+	__u64	reserved;
+};
+
+struct fuse_munmap_in {
+	__u64	fh;
+	__u64	mapid;
+	__u64	size;		/* Size of memory region */
+	__u64	offset;
+	__u64	reserved;
 };
 
 struct fuse_in_header {

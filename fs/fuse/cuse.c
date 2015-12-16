@@ -48,6 +48,9 @@
 #include <linux/stat.h>
 #include <linux/module.h>
 #include <linux/uio.h>
+#include <linux/mman.h>
+#include <linux/falloc.h>
+#include <linux/shmem_fs.h>
 
 #include "fuse_i.h"
 
@@ -175,6 +178,441 @@ static long cuse_file_compat_ioctl(struct file *file, unsigned int cmd,
 	return fuse_do_ioctl(file, cmd, arg, flags);
 }
 
+struct fuse_dmmap_region {
+	u64 mapid;
+	u64 size;
+	struct file *filp;
+	struct vm_operations_struct vm_ops;
+	const struct vm_operations_struct *vm_original_ops;
+	struct list_head list;
+	atomic_t ref;
+};
+
+/*
+ * fuse_dmmap_vm represents the result of a single mmap() call, which
+ * can be shared by multiple client vmas created by forking.
+ */
+struct fuse_dmmap_vm {
+	u64 len;
+	u64 off;
+	atomic_t open_count;
+	struct fuse_dmmap_region *region;
+};
+
+static void fuse_dmmap_region_put(struct fuse_conn *fc,
+				  struct fuse_dmmap_region *fdr)
+{
+	if (atomic_dec_and_lock(&fdr->ref, &fc->lock)) {
+
+		list_del(&fdr->list);
+
+		spin_unlock(&fc->lock);
+
+		fput(fdr->filp);
+		kfree(fdr);
+	}
+}
+
+static void fuse_dmmap_vm_open(struct vm_area_struct *vma)
+{
+	struct fuse_dmmap_vm *fdvm = vma->vm_private_data;
+	struct fuse_dmmap_region *fdr = fdvm->region;
+
+	/* vma copied */
+	atomic_inc(&fdvm->open_count);
+
+	if (fdr->vm_original_ops->open)
+		fdr->vm_original_ops->open(vma);
+}
+
+static void fuse_dmmap_vm_close(struct vm_area_struct *vma)
+{
+	struct fuse_dmmap_vm *fdvm = vma->vm_private_data;
+	struct fuse_dmmap_region *fdr = fdvm->region;
+	struct fuse_file *ff = vma->vm_file->private_data;
+	struct fuse_conn *fc = ff->fc;
+	struct fuse_req *req;
+	struct fuse_munmap_in *inarg;
+
+	if (fdr->vm_original_ops->close)
+		fdr->vm_original_ops->close(vma);
+
+	if (!atomic_dec_and_test(&fdvm->open_count))
+		return;
+
+	/*
+	 * Notify server that the mmap region has been unmapped.
+	 * Failing this might lead to resource leak in server, don't
+	 * fail.
+	 */
+	req = fuse_get_req_nofail_nopages(fc, vma->vm_file);
+	inarg = &req->misc.munmap_in;
+
+	inarg->fh = ff->fh;
+	inarg->mapid = fdvm->region->mapid;
+	inarg->size = fdvm->len;
+	inarg->offset = fdvm->off;
+
+	req->in.h.opcode = FUSE_MUNMAP;
+	req->in.h.nodeid = ff->nodeid;
+	req->in.numargs = 1;
+	req->in.args[0].size = sizeof(*inarg);
+	req->in.args[0].value = inarg;
+
+	fuse_request_send(fc, req);
+	fuse_put_request(fc, req);
+	fuse_dmmap_region_put(fc, fdvm->region);
+	kfree(fdvm);
+}
+
+static int fuse_dmmap_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	int ret;
+	struct file *filp = vma->vm_file;
+	struct fuse_dmmap_vm *fdvm = vma->vm_private_data;
+	struct fuse_dmmap_region *fdr = fdvm->region;
+
+	vma->vm_file = fdr->filp;
+	ret = fdr->vm_original_ops->fault(vma, vmf);
+
+	vma->vm_file = filp;
+
+	return ret;
+}
+
+static const struct vm_operations_struct fuse_dmmap_vm_ops = {
+	.open		= fuse_dmmap_vm_open,
+	.close		= fuse_dmmap_vm_close,
+	.fault		= fuse_dmmap_vm_fault,
+};
+
+static struct fuse_dmmap_region *fuse_dmmap_find_locked(struct fuse_conn *fc,
+							u64 mapid)
+{
+	struct fuse_dmmap_region *curr;
+	struct fuse_dmmap_region *fdr = NULL;
+
+	list_for_each_entry(curr, &fc->dmmap_list, list) {
+		if (curr->mapid == mapid) {
+			fdr = curr;
+			atomic_inc(&fdr->ref);
+			break;
+		}
+	}
+
+	return fdr;
+}
+
+static struct fuse_dmmap_region *fuse_dmmap_find(struct fuse_conn *fc,
+						 u64 mapid)
+{
+	struct fuse_dmmap_region *fdr;
+
+	spin_lock(&fc->lock);
+	fdr = fuse_dmmap_find_locked(fc, mapid);
+	spin_unlock(&fc->lock);
+
+	return fdr;
+}
+
+static struct fuse_dmmap_region *fuse_dmmap_get(struct fuse_conn *fc,
+						struct file *file, u64 mapid,
+						u64 size, unsigned long flags)
+{
+	struct fuse_dmmap_region *fdr;
+	char *pathbuf, *filepath;
+	struct file *shmem_file;
+
+	fdr = fuse_dmmap_find(fc, mapid);
+	if (!fdr) {
+		struct fuse_dmmap_region *tmp;
+
+		fdr = kzalloc(sizeof(struct fuse_dmmap_region), GFP_KERNEL);
+		if (!fdr)
+			return ERR_PTR(-ENOMEM);
+
+		atomic_set(&fdr->ref, 1);
+
+		pathbuf = kzalloc(PATH_MAX+1, GFP_KERNEL);
+		if (!pathbuf) {
+			kfree(fdr);
+			return ERR_PTR(-ENOMEM);
+		}
+
+		filepath = d_path(&file->f_path, pathbuf, PATH_MAX+1);
+		if (IS_ERR(filepath)) {
+			kfree(fdr);
+			kfree(pathbuf);
+			return (struct fuse_dmmap_region *) filepath;
+		}
+
+		fdr->mapid = mapid;
+		shmem_file = shmem_file_setup(filepath, size, flags);
+		kfree(pathbuf);
+
+		if (IS_ERR(shmem_file)) {
+			kfree(fdr);
+			return (struct fuse_dmmap_region *) shmem_file;
+		}
+
+		fdr->filp = shmem_file;
+
+		spin_lock(&fc->lock);
+		tmp = fuse_dmmap_find_locked(fc, mapid);
+		if (tmp) {
+			fput(fdr->filp);
+			kfree(fdr);
+			fdr = tmp;
+		} else {
+			INIT_LIST_HEAD(&fdr->list);
+			list_add(&fdr->list, &fc->dmmap_list);
+		}
+		spin_unlock(&fc->lock);
+	}
+
+	if (size > fdr->size) {
+
+		fdr->filp->f_op->fallocate(fdr->filp, 0, 0, size);
+		fdr->size = size;
+	}
+
+	return fdr;
+}
+
+static int cuse_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	int err;
+	struct fuse_file *ff = file->private_data;
+	struct fuse_conn *fc = ff->fc;
+	struct fuse_dmmap_vm *fdvm;
+	struct fuse_dmmap_region *fdr;
+	struct fuse_req *req = NULL;
+	struct fuse_mmap_in inarg;
+	struct fuse_mmap_out outarg;
+
+	if (fc->no_dmmap)
+		return -ENOSYS;
+
+	req = fuse_get_req(fc, 0);
+	if (IS_ERR(req))
+		return PTR_ERR(req);
+
+	/* ask server whether this mmap is okay and what the size should be */
+	memset(&inarg, 0, sizeof(inarg));
+	inarg.fh = ff->fh;
+	inarg.addr = vma->vm_start;
+	inarg.len = vma->vm_end - vma->vm_start;
+	inarg.prot = ((vma->vm_flags & VM_READ) ? PROT_READ : 0) |
+		     ((vma->vm_flags & VM_WRITE) ? PROT_WRITE : 0) |
+		     ((vma->vm_flags & VM_EXEC) ? PROT_EXEC : 0);
+	inarg.flags = ((vma->vm_flags & VM_SHARED) ? MAP_SHARED : 0 ) |
+		      ((vma->vm_flags & VM_GROWSDOWN) ? MAP_GROWSDOWN : 0) |
+		      ((vma->vm_flags & VM_DENYWRITE) ? MAP_DENYWRITE : 0) |
+		      ((vma->vm_flags & VM_EXEC) ? MAP_EXECUTABLE : 0) |
+		      ((vma->vm_flags & VM_LOCKED) ? MAP_LOCKED : 0);
+	inarg.offset = (loff_t)vma->vm_pgoff << PAGE_SHIFT;
+
+	req->in.h.opcode = FUSE_MMAP;
+	req->in.h.nodeid = ff->nodeid;
+	req->in.numargs = 1;
+	req->in.args[0].size = sizeof(inarg);
+	req->in.args[0].value = &inarg;
+	req->out.numargs = 1;
+	req->out.args[0].size = sizeof(outarg);
+	req->out.args[0].value = &outarg;
+
+	fuse_request_send(fc, req);
+	err = req->out.h.error;
+	if (err) {
+		if (err == -ENOSYS)
+			fc->no_dmmap = 1;
+		goto free_req;
+	}
+
+	fdr = fuse_dmmap_get(fc, file, outarg.mapid, outarg.size,
+			     vma->vm_flags);
+	err = PTR_ERR(fdr);
+	if (IS_ERR(fdr))
+		goto free_req;
+
+	err = -ENOMEM;
+
+	fdvm = kzalloc(sizeof(*fdvm), GFP_KERNEL);
+	if (!fdvm) {
+		fuse_dmmap_region_put(fc, fdr);
+		goto free_req;
+	}
+
+	atomic_set(&fdvm->open_count, 1);
+	fdvm->region = fdr;
+	fdvm->len = inarg.len;
+	fdvm->off = inarg.offset;
+
+	fdr->filp->f_op->mmap(fdr->filp, vma);
+
+	memcpy(&fdr->vm_ops, vma->vm_ops, sizeof(fdr->vm_ops));
+	fdr->vm_ops.open = fuse_dmmap_vm_ops.open;
+	fdr->vm_ops.close = fuse_dmmap_vm_ops.close;
+	fdr->vm_ops.fault = fuse_dmmap_vm_ops.fault;
+
+	fdr->vm_original_ops = vma->vm_ops;
+
+	vma->vm_ops = &fdr->vm_ops;
+
+	vma->vm_private_data = fdvm;
+	vma->vm_flags |= VM_DONTEXPAND;	/* disallow expansion for now */
+	err = 0;
+
+free_req:
+	fuse_put_request(fc, req);
+	return err;
+}
+
+static int fuse_notify_store_to_dmmap(struct fuse_conn *fc,
+				      struct fuse_copy_state *cs,
+				      u64 nodeid, u32 size, u64 pos)
+{
+	struct fuse_dmmap_region *fdr;
+	struct file *filp;
+	pgoff_t index;
+	unsigned int off;
+	int err;
+
+	fdr = fuse_dmmap_find(fc, nodeid);
+	if (!fdr)
+		return -ENOENT;
+
+	index = pos >> PAGE_SHIFT;
+	off = pos & ~PAGE_MASK;
+	if (pos > fdr->size)
+		size = 0;
+	else if (size > fdr->size - pos)
+		size = fdr->size - pos;
+
+	filp = fdr->filp;
+
+	while (size) {
+		struct page *page;
+		unsigned int this_num;
+
+		page = shmem_read_mapping_page_gfp(filp->f_inode->i_mapping,
+						   index, GFP_HIGHUSER);
+		if (IS_ERR(page)) {
+
+			err = -ENOMEM;
+			goto out_iput;
+		}
+
+		this_num = min_t(unsigned, size, PAGE_SIZE - off);
+		err = fuse_copy_page(cs, &page, off, this_num, 0);
+
+		unlock_page(page);
+		page_cache_release(page);
+
+		if (err)
+			goto out_iput;
+
+		size -= this_num;
+		off = 0;
+		index++;
+	}
+
+	err = 0;
+
+out_iput:
+	fuse_dmmap_region_put(fc, fdr);
+
+	return err;
+}
+
+static void fuse_retrieve_dmmap_end(struct fuse_conn *fc, struct fuse_req *req)
+{
+	release_pages(req->pages, req->num_pages, 0);
+}
+
+static int fuse_notify_retrieve_from_dmmap(struct fuse_conn *fc,
+				struct fuse_notify_retrieve_out *outarg)
+{
+	struct fuse_dmmap_region *fdr;
+	struct fuse_req *req;
+	struct page *page;
+	struct file *filp;
+	pgoff_t index;
+	unsigned int num;
+	unsigned int offset;
+	unsigned int npages;
+	unsigned int this_num;
+	size_t total_len = 0;
+	int err;
+
+	fdr = fuse_dmmap_find(fc, outarg->nodeid);
+	if (!fdr)
+		return -ENOENT;
+
+	npages = outarg->size >> PAGE_SHIFT;
+	if (outarg->size & ~PAGE_MASK)
+		npages++;
+
+	req = fuse_get_req(fc, npages);
+	err = PTR_ERR(req);
+	if (IS_ERR(req))
+		goto out_put_region;
+
+	offset = outarg->offset & ~PAGE_MASK;
+
+	req->in.h.opcode = FUSE_NOTIFY_REPLY;
+	req->in.h.nodeid = outarg->nodeid;
+	req->in.numargs = 2;
+	req->in.argpages = 1;
+	req->end = fuse_retrieve_dmmap_end;
+
+	index = outarg->offset >> PAGE_SHIFT;
+	num = outarg->size;
+	if (outarg->offset > fdr->size)
+		num = 0;
+	else if (outarg->offset + num > fdr->size)
+		num = fdr->size - outarg->offset;
+
+	filp = fdr->filp;
+
+	npages = 0;
+	while (num && req->num_pages < FUSE_MAX_PAGES_PER_REQ) {
+
+		page = shmem_read_mapping_page_gfp(filp->f_inode->i_mapping,
+						   index,
+						   GFP_KERNEL);
+		if (IS_ERR(page)) {
+			err = -ENOMEM;
+			goto out_put_region;
+		}
+
+		this_num = min_t(unsigned, num, PAGE_SIZE - offset);
+		req->pages[req->num_pages] = page;
+		req->page_descs[req->num_pages].length = this_num;
+		req->num_pages++;
+
+		num -= this_num;
+		total_len += this_num;
+		index++;
+		npages++;
+	}
+	req->misc.retrieve_in.offset = outarg->offset;
+	req->misc.retrieve_in.size = total_len;
+	req->in.args[0].size = sizeof(req->misc.retrieve_in);
+	req->in.args[0].value = &req->misc.retrieve_in;
+	req->in.args[1].size = total_len;
+
+	err = fuse_request_send_notify_reply(fc, req, outarg->notify_unique);
+	if (err)
+		fuse_retrieve_dmmap_end(fc, req);
+
+out_put_region:
+	fuse_dmmap_region_put(fc, fdr);
+
+	return err;
+}
+
+
 static const struct file_operations cuse_frontend_fops = {
 	.owner			= THIS_MODULE,
 	.read_iter		= cuse_read_iter,
@@ -184,7 +622,8 @@ static const struct file_operations cuse_frontend_fops = {
 	.unlocked_ioctl		= cuse_file_ioctl,
 	.compat_ioctl		= cuse_file_compat_ioctl,
 	.poll			= fuse_file_poll,
-	.llseek		= noop_llseek,
+	.llseek			= noop_llseek,
+	.mmap			= cuse_mmap,
 };
 
 
@@ -468,9 +907,25 @@ err:
 
 static void cuse_fc_release(struct fuse_conn *fc)
 {
+	struct fuse_dmmap_region *fdr;
 	struct cuse_conn *cc = fc_to_cc(fc);
+
+	spin_lock(&fc->lock);
+	while (!list_empty(&fc->dmmap_list)) {
+
+		fdr = list_entry(fc->dmmap_list.next, typeof(*fdr), list);
+		fuse_dmmap_region_put(fc, fdr);
+	}
+	spin_unlock(&fc->lock);
+
 	kfree_rcu(cc, fc.rcu);
 }
+
+static const struct fuse_conn_operations cuse_ops = {
+	.release = cuse_fc_release,
+	.notify_store = fuse_notify_store_to_dmmap,
+	.notify_retrieve = fuse_notify_retrieve_from_dmmap,
+};
 
 /**
  * cuse_channel_open - open method for /dev/cuse
@@ -507,7 +962,7 @@ static int cuse_channel_open(struct inode *inode, struct file *file)
 	}
 
 	INIT_LIST_HEAD(&cc->list);
-	cc->fc.release = cuse_fc_release;
+	cc->fc.ops = &cuse_ops;
 
 	cc->fc.initialized = 1;
 	rc = cuse_send_init(cc);

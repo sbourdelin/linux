@@ -337,6 +337,7 @@ struct fuse_req {
 			struct fuse_req *next;
 		} write;
 		struct fuse_notify_retrieve_in retrieve_in;
+		struct fuse_munmap_in munmap_in;
 	} misc;
 
 	/** page vector */
@@ -429,6 +430,21 @@ struct fuse_dev {
 
 	/** list entry on fc->devices */
 	struct list_head entry;
+};
+
+struct fuse_copy_state;
+
+struct fuse_conn_operations {
+	/** Called on final put */
+	void (*release)(struct fuse_conn *);
+
+	/** Called to store data into a mapping */
+	int (*notify_store)(struct fuse_conn *, struct fuse_copy_state *,
+			    u64 nodeid, u32 size, u64 pos);
+
+	/** Called to retrieve data from a mapping */
+	int (*notify_retrieve)(struct fuse_conn *,
+			       struct fuse_notify_retrieve_out *);
 };
 
 /**
@@ -578,6 +594,9 @@ struct fuse_conn {
 	/** Is poll not implemented by fs? */
 	unsigned no_poll:1;
 
+	/** Is direct mmap not implemente by fs? */
+	unsigned no_dmmap:1;
+
 	/** Do multi-page cached writes */
 	unsigned big_writes:1;
 
@@ -635,9 +654,6 @@ struct fuse_conn {
 	/** Version counter for attribute changes */
 	u64 attr_version;
 
-	/** Called on final put */
-	void (*release)(struct fuse_conn *);
-
 	/** Super block for this connection. */
 	struct super_block *sb;
 
@@ -646,6 +662,12 @@ struct fuse_conn {
 
 	/** List of device instances belonging to this connection */
 	struct list_head devices;
+
+	/** List of direct mmaps (currently CUSE only) */
+	struct list_head dmmap_list;
+
+	/** Operations that fuse and cuse can implement differently */
+	const struct fuse_conn_operations *ops;
 };
 
 static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
@@ -943,5 +965,11 @@ int fuse_do_setattr(struct inode *inode, struct iattr *attr,
 		    struct file *file);
 
 void fuse_set_initialized(struct fuse_conn *fc);
+
+int fuse_copy_page(struct fuse_copy_state *cs, struct page **pagep,
+		   unsigned offset, unsigned count, int zeroing);
+
+int fuse_request_send_notify_reply(struct fuse_conn *fc,
+				   struct fuse_req *req, u64 unique);
 
 #endif /* _FS_FUSE_I_H */
