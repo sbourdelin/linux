@@ -195,7 +195,8 @@ static inline int get_baud(struct m68k_serial *ss)
 {
 	unsigned long result = 115200;
 	unsigned short int baud = uart_addr[ss->line].ubaud;
-	if (GET_FIELD(baud, UBAUD_PRESCALER) == 0x38) result = 38400;
+	if (GET_FIELD(baud, UBAUD_PRESCALER) == 0x38)
+		result = 38400;
 	result >>= GET_FIELD(baud, UBAUD_DIVIDE);
 
 	return result;
@@ -560,8 +561,10 @@ static void rs_fair_output(void)
 	struct m68k_serial *info = &m68k_soft[0];
 	char c;
 
-	if (info == NULL) return;
-	if (info->xmit_buf == NULL) return;
+	if (info == NULL)
+		return;
+	if (info->xmit_buf == NULL)
+		return;
 
 	local_irq_save(flags);
 	left = info->xmit_cnt;
@@ -653,7 +656,8 @@ static void rs_flush_chars(struct tty_struct *tty)
 	}
 
 #ifndef USE_INTS
-	while (!(uart->utx.w & UTX_TX_AVAIL)) udelay(5);
+	while (!(uart->utx.w & UTX_TX_AVAIL))
+		udelay(5);
 	}
 #endif
 	local_irq_restore(flags);
@@ -707,7 +711,8 @@ static int rs_write(struct tty_struct *tty,
 #ifdef USE_INTS
 		uart->ustcnt |= USTCNT_TX_INTR_MASK;
 #else
-		while (!(uart->utx.w & UTX_TX_AVAIL)) udelay(5);
+		while (!(uart->utx.w & UTX_TX_AVAIL))
+			udelay(5);
 #endif
 		if (uart->utx.w & UTX_TX_AVAIL) {
 			uart->utx.b.txdata = info->xmit_buf[info->xmit_tail++];
