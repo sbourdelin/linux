@@ -29,6 +29,8 @@
  * which however is currently broken
  */
 
+#include <linux/clk-provider.h>
+#include <linux/clocksource.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
@@ -38,7 +40,6 @@
 #include <linux/init.h>
 #include <linux/timex.h>
 #include <linux/profile.h>
-#include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <asm/irq.h>
 #include <asm/arcregs.h>
@@ -282,6 +283,13 @@ void __init time_init(void)
 		 * because Max 32 bit number is 4,294,967,295
 		 */
 		clocksource_register_hz(&arc_counter, arc_get_core_freq());
+
+#ifdef CONFIG_COMMON_CLK
+	of_clk_init(NULL);
+#endif
+#ifdef CONFIG_CLKSRC_OF
+	clocksource_probe();
+#endif
 
 	/* sets up the periodic event timer */
 	arc_local_timer_setup();
