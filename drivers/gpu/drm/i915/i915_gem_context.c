@@ -391,7 +391,13 @@ int i915_gem_context_init(struct drm_device *dev)
 	for (i = 0; i < I915_NUM_RINGS; i++) {
 		struct intel_engine_cs *ring = &dev_priv->ring[i];
 
-		/* NB: RCS will hold a ref for all rings */
+		/*
+		 * Although each engine has a pointer to the global default
+		 * context, they don't contribute to the refcount on the
+		 * context. We consider that RCS (which is set up first and
+		 * torn down last) holds this reference on behalf of all the
+		 * other engines
+		 */
 		ring->default_context = ctx;
 	}
 
@@ -431,14 +437,21 @@ void i915_gem_context_fini(struct drm_device *dev)
 		i915_gem_object_ggtt_unpin(dctx->legacy_hw_ctx.rcs_state);
 	}
 
-	for (i = 0; i < I915_NUM_RINGS; i++) {
+	for (i = I915_NUM_RINGS; --i >= 0;) {
 		struct intel_engine_cs *ring = &dev_priv->ring[i];
 
-		if (ring->last_context)
+		if (ring->last_context) {
 			i915_gem_context_unreference(ring->last_context);
+			ring->last_context = NULL;
+		}
 
+		/*
+		 * These default_context pointers don't contribute to the
+		 * refcount on the context. We consider that RCS holds its
+		 * reference on behalf of all the other engines, so there's
+		 * just a single unreference() call below.
+		 */
 		ring->default_context = NULL;
-		ring->last_context = NULL;
 	}
 
 	i915_gem_context_unreference(dctx);
