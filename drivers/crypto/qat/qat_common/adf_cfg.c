@@ -64,16 +64,13 @@ static void *qat_dev_cfg_start(struct seq_file *sfile, loff_t *pos)
 
 static int qat_dev_cfg_show(struct seq_file *sfile, void *v)
 {
-	struct list_head *list;
+	struct adf_cfg_key_val *ptr;
 	struct adf_cfg_section *sec =
 				list_entry(v, struct adf_cfg_section, list);
 
 	seq_printf(sfile, "[%s]\n", sec->name);
-	list_for_each(list, &sec->param_head) {
-		struct adf_cfg_key_val *ptr =
-			list_entry(list, struct adf_cfg_key_val, list);
+	list_for_each_entry(ptr, &sec->param_head, list)
 		seq_printf(sfile, "%s = %s\n", ptr->key, ptr->val);
-	}
 	return 0;
 }
 
@@ -198,25 +195,21 @@ static void adf_cfg_keyval_add(struct adf_cfg_key_val *new,
 
 static void adf_cfg_keyval_del_all(struct list_head *head)
 {
-	struct list_head *list_ptr, *tmp;
+	struct adf_cfg_key_val *ptr, *tmp;
 
-	list_for_each_prev_safe(list_ptr, tmp, head) {
-		struct adf_cfg_key_val *ptr =
-			list_entry(list_ptr, struct adf_cfg_key_val, list);
-		list_del(list_ptr);
+	list_for_each_entry_safe_reverse(ptr, tmp, head, list) {
+		list_del(&ptr->list);
 		kfree(ptr);
 	}
 }
 
 static void adf_cfg_section_del_all(struct list_head *head)
 {
-	struct adf_cfg_section *ptr;
-	struct list_head *list, *tmp;
+	struct adf_cfg_section *ptr, *tmp;
 
-	list_for_each_prev_safe(list, tmp, head) {
-		ptr = list_entry(list, struct adf_cfg_section, list);
+	list_for_each_entry_safe_reverse(ptr, tmp, head, list) {
 		adf_cfg_keyval_del_all(&ptr->param_head);
-		list_del(list);
+		list_del(&ptr->list);
 		kfree(ptr);
 	}
 }
@@ -224,11 +217,9 @@ static void adf_cfg_section_del_all(struct list_head *head)
 static struct adf_cfg_key_val *adf_cfg_key_value_find(struct adf_cfg_section *s,
 						      const char *key)
 {
-	struct list_head *list;
+	struct adf_cfg_key_val *ptr;
 
-	list_for_each(list, &s->param_head) {
-		struct adf_cfg_key_val *ptr =
-			list_entry(list, struct adf_cfg_key_val, list);
+	list_for_each_entry(ptr, &s->param_head, list) {
 		if (!strcmp(ptr->key, key))
 			return ptr;
 	}
@@ -239,11 +230,9 @@ static struct adf_cfg_section *adf_cfg_sec_find(struct adf_accel_dev *accel_dev,
 						const char *sec_name)
 {
 	struct adf_cfg_device_data *cfg = accel_dev->cfg;
-	struct list_head *list;
+	struct adf_cfg_section *ptr;
 
-	list_for_each(list, &cfg->sec_list) {
-		struct adf_cfg_section *ptr =
-			list_entry(list, struct adf_cfg_section, list);
+	list_for_each_entry(ptr, &cfg->sec_list, list) {
 		if (!strcmp(ptr->name, sec_name))
 			return ptr;
 	}

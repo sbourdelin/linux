@@ -77,12 +77,9 @@ static int adf_get_vf_num(struct adf_accel_dev *vf)
 
 static struct vf_id_map *adf_find_vf(u32 bdf)
 {
-	struct list_head *itr;
+	struct vf_id_map *ptr;
 
-	list_for_each(itr, &vfs_table) {
-		struct vf_id_map *ptr =
-			list_entry(itr, struct vf_id_map, list);
-
+	list_for_each_entry(ptr, &vfs_table, list) {
 		if (ptr->bdf == bdf)
 			return ptr;
 	}
@@ -91,11 +88,9 @@ static struct vf_id_map *adf_find_vf(u32 bdf)
 
 static int adf_get_vf_real_id(u32 fake)
 {
-	struct list_head *itr;
+	struct vf_id_map *ptr;
 
-	list_for_each(itr, &vfs_table) {
-		struct vf_id_map *ptr =
-			list_entry(itr, struct vf_id_map, list);
+	list_for_each_entry(ptr, &vfs_table, list) {
 		if (ptr->fake_id == fake)
 			return ptr->id;
 	}
@@ -111,12 +106,10 @@ static int adf_get_vf_real_id(u32 fake)
  */
 void adf_clean_vf_map(bool vf)
 {
-	struct vf_id_map *map;
-	struct list_head *ptr, *tmp;
+	struct vf_id_map *map, *tmp;
 
 	mutex_lock(&table_lock);
-	list_for_each_safe(ptr, tmp, &vfs_table) {
-		map = list_entry(ptr, struct vf_id_map, list);
+	list_for_each_entry_safe(map, tmp, &vfs_table, list) {
 		if (map->bdf != -1) {
 			id_map[map->id] = 0;
 			num_devices--;
@@ -125,7 +118,7 @@ void adf_clean_vf_map(bool vf)
 		if (vf && map->bdf == -1)
 			continue;
 
-		list_del(ptr);
+		list_del(&map->list);
 		kfree(map);
 	}
 	mutex_unlock(&table_lock);
@@ -141,13 +134,10 @@ EXPORT_SYMBOL_GPL(adf_clean_vf_map);
 void adf_devmgr_update_class_index(struct adf_hw_device_data *hw_data)
 {
 	struct adf_hw_device_class *class = hw_data->dev_class;
-	struct list_head *itr;
+	struct adf_accel_dev *ptr;
 	int i = 0;
 
-	list_for_each(itr, &accel_table) {
-		struct adf_accel_dev *ptr =
-				list_entry(itr, struct adf_accel_dev, list);
-
+	list_for_each_entry(ptr, &accel_table, list) {
 		if (ptr->hw_device->dev_class == class)
 			ptr->hw_device->instance_id = i++;
 
@@ -183,7 +173,6 @@ static unsigned int adf_find_free_id(void)
 int adf_devmgr_add_dev(struct adf_accel_dev *accel_dev,
 		       struct adf_accel_dev *pf)
 {
-	struct list_head *itr;
 	int ret = 0;
 
 	if (num_devices == ADF_MAX_DEVICES) {
@@ -198,11 +187,9 @@ int adf_devmgr_add_dev(struct adf_accel_dev *accel_dev,
 	/* PF on host or VF on guest */
 	if (!accel_dev->is_vf || (accel_dev->is_vf && !pf)) {
 		struct vf_id_map *map;
+		struct adf_accel_dev *ptr;
 
-		list_for_each(itr, &accel_table) {
-			struct adf_accel_dev *ptr =
-				list_entry(itr, struct adf_accel_dev, list);
-
+		list_for_each_entry(ptr, &accel_table, list) {
 			if (ptr == accel_dev) {
 				ret = -EEXIST;
 				goto unlock;
@@ -341,13 +328,10 @@ struct adf_accel_dev *adf_devmgr_get_first(void)
  */
 struct adf_accel_dev *adf_devmgr_pci_to_accel_dev(struct pci_dev *pci_dev)
 {
-	struct list_head *itr;
+	struct adf_accel_dev *ptr;
 
 	mutex_lock(&table_lock);
-	list_for_each(itr, &accel_table) {
-		struct adf_accel_dev *ptr =
-				list_entry(itr, struct adf_accel_dev, list);
-
+	list_for_each_entry(ptr, &accel_table, list) {
 		if (ptr->accel_pci_dev.pci_dev == pci_dev) {
 			mutex_unlock(&table_lock);
 			return ptr;
@@ -360,7 +344,7 @@ EXPORT_SYMBOL_GPL(adf_devmgr_pci_to_accel_dev);
 
 struct adf_accel_dev *adf_devmgr_get_dev_by_id(uint32_t id)
 {
-	struct list_head *itr;
+	struct adf_accel_dev *ptr;
 	int real_id;
 
 	mutex_lock(&table_lock);
@@ -370,9 +354,7 @@ struct adf_accel_dev *adf_devmgr_get_dev_by_id(uint32_t id)
 
 	id = real_id;
 
-	list_for_each(itr, &accel_table) {
-		struct adf_accel_dev *ptr =
-				list_entry(itr, struct adf_accel_dev, list);
+	list_for_each_entry(ptr, &accel_table, list) {
 		if (ptr->accel_id == id) {
 			mutex_unlock(&table_lock);
 			return ptr;
@@ -396,13 +378,11 @@ int adf_devmgr_verify_id(uint32_t id)
 
 static int adf_get_num_dettached_vfs(void)
 {
-	struct list_head *itr;
+	struct vf_id_map *ptr;
 	int vfs = 0;
 
 	mutex_lock(&table_lock);
-	list_for_each(itr, &vfs_table) {
-		struct vf_id_map *ptr =
-			list_entry(itr, struct vf_id_map, list);
+	list_for_each_entry(ptr, &vfs_table, list) {
 		if (ptr->bdf != ~0 && !ptr->attached)
 			vfs++;
 	}
