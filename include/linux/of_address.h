@@ -56,6 +56,8 @@ extern struct of_pci_range *of_pci_range_parser_one(
 extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
 				u64 *paddr, u64 *size);
 extern bool of_dma_is_coherent(struct device_node *np);
+void __iomem *of_io_request_and_map(struct device_node *device,
+					int index, const char *name);
 #else /* CONFIG_OF_ADDRESS */
 
 static inline u64 of_translate_address(struct device_node *np,
@@ -106,17 +108,21 @@ static inline bool of_dma_is_coherent(struct device_node *np)
 {
 	return false;
 }
+
+#include <linux/io.h>
+
+static inline void __iomem *of_io_request_and_map(struct device_node *device,
+					int index, const char *name)
+{
+	return IOMEM_ERR_PTR(-EINVAL);
+}
 #endif /* CONFIG_OF_ADDRESS */
 
 #ifdef CONFIG_OF
 extern int of_address_to_resource(struct device_node *dev, int index,
 				  struct resource *r);
 void __iomem *of_iomap(struct device_node *node, int index);
-void __iomem *of_io_request_and_map(struct device_node *device,
-					int index, const char *name);
 #else
-
-#include <linux/io.h>
 
 static inline int of_address_to_resource(struct device_node *dev, int index,
 					 struct resource *r)
@@ -129,11 +135,6 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
 	return NULL;
 }
 
-static inline void __iomem *of_io_request_and_map(struct device_node *device,
-					int index, const char *name)
-{
-	return IOMEM_ERR_PTR(-EINVAL);
-}
 #endif
 
 #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
