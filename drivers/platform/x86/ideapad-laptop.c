@@ -482,11 +482,16 @@ static void ideapad_sync_rfk_state(struct ideapad_private *priv)
 {
 	unsigned long hw_blocked = 0;
 	int i;
+	static int hw_unblock_once;
 
 	if (priv->has_hw_rfkill_switch) {
 		if (read_ec_data(priv->adev->handle, VPCCMD_R_RF, &hw_blocked))
 			return;
+		if (hw_blocked)
+			hw_unblock_once = 1;
 		hw_blocked = !hw_blocked;
+		if (!hw_unblock_once)
+			hw_blocked = 0;
 	}
 
 	for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
