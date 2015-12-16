@@ -125,6 +125,7 @@ int __init hp300_setup_serial_console(void)
 	} else {
 #ifdef CONFIG_HPDCA
 		unsigned long pa = dio_scodetophysaddr(scode);
+
 		if (!pa)
 			return 0;
 
