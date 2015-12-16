@@ -239,6 +239,9 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
 		return 0;
 
 	if (user_mode(regs)) {
+		if (interrupts_enabled(regs))
+			local_irq_enable();
+
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code  = TRAP_HWBKPT;
@@ -310,6 +313,9 @@ static int brk_handler(unsigned long addr, unsigned int esr,
 	siginfo_t info;
 
 	if (user_mode(regs)) {
+		if (interrupts_enabled(regs))
+			local_irq_enable();
+
 		info = (siginfo_t) {
 			.si_signo = SIGTRAP,
 			.si_errno = 0,
@@ -336,6 +342,10 @@ int aarch32_break_handler(struct pt_regs *regs)
 
 	if (!compat_user_mode(regs))
 		return -EFAULT;
+
+	/* COMPAT_PSR_I_BIT has the same bit mask with non-compat one */
+	if (interrupts_enabled(regs))
+		local_irq_enable();
 
 	if (compat_thumb_mode(regs)) {
 		/* get 16-bit Thumb instruction */
