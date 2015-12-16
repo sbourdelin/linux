@@ -755,13 +755,22 @@ static inline void dpm_for_each_dev(void *data, void (*fn)(struct device *, void
 {
 }
 
+static inline int pm_generic_resume(struct device *dev)
+{
+	return 0;
+}
+
+static inline int pm_generic_poweroff(struct device *dev)
+{
+	return 0;
+}
+
 #define pm_generic_prepare		NULL
 #define pm_generic_suspend_late		NULL
 #define pm_generic_suspend_noirq	NULL
 #define pm_generic_suspend		NULL
 #define pm_generic_resume_early		NULL
 #define pm_generic_resume_noirq		NULL
-#define pm_generic_resume		NULL
 #define pm_generic_freeze_noirq		NULL
 #define pm_generic_freeze_late		NULL
 #define pm_generic_freeze		NULL
@@ -773,7 +782,6 @@ static inline void dpm_for_each_dev(void *data, void (*fn)(struct device *, void
 #define pm_generic_restore		NULL
 #define pm_generic_poweroff_noirq	NULL
 #define pm_generic_poweroff_late	NULL
-#define pm_generic_poweroff		NULL
 #define pm_generic_complete		NULL
 #endif /* !CONFIG_PM_SLEEP */
 
