@@ -235,3 +235,12 @@ Description:
 		write_same_max_bytes is 0, write same is not supported
 		by the device.
 
+What:		/sys/block/<disk>/queue/max_dev_sectors_kb
+Date:		December 2015
+Contact:	Martin K. Petersen <martin.petersen@oracle.com>
+Description:
+		Some storage devices report the maximum size that the
+		device can process in a single READ or WRITE
+		request. This limit is used in combination with
+		constraints set by the controller driver to limit the
+		size of filesystem requests.

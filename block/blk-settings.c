@@ -232,7 +232,9 @@ EXPORT_SYMBOL(blk_queue_bounce_limit);
  *    max_sectors is a soft limit imposed by the block layer for
  *    filesystem type requests.  This value can be overridden on a
  *    per-device basis in /sys/block/<device>/queue/max_sectors_kb.
- *    The soft limit can not exceed max_hw_sectors.
+ *
+ *    The soft limit's lower bound is the page cache size and it can not
+ *    exceed neither max_hw_sectors, nor max_dev_sectors.
  **/
 void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_sectors)
 {

@@ -225,6 +225,13 @@ static ssize_t queue_max_hw_sectors_show(struct request_queue *q, char *page)
 	return queue_var_show(max_hw_sectors_kb, (page));
 }
 
+static ssize_t queue_max_dev_sectors_show(struct request_queue *q, char *page)
+{
+	int max_dev_sectors_kb = q->limits.max_dev_sectors >> 1;
+
+	return queue_var_show(max_dev_sectors_kb, (page));
+}
+
 #define QUEUE_SYSFS_BIT_FNS(name, flag, neg)				\
 static ssize_t								\
 queue_show_##name(struct request_queue *q, char *page)			\
@@ -371,6 +378,11 @@ static struct queue_sysfs_entry queue_max_hw_sectors_entry = {
 	.show = queue_max_hw_sectors_show,
 };
 
+static struct queue_sysfs_entry queue_max_dev_sectors_entry = {
+	.attr = {.name = "max_dev_sectors_kb", .mode = S_IRUGO },
+	.show = queue_max_dev_sectors_show,
+};
+
 static struct queue_sysfs_entry queue_max_segments_entry = {
 	.attr = {.name = "max_segments", .mode = S_IRUGO },
 	.show = queue_max_segments_show,
@@ -483,6 +495,7 @@ static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
 	&queue_max_hw_sectors_entry.attr,
+	&queue_max_dev_sectors_entry.attr,
 	&queue_max_sectors_entry.attr,
 	&queue_max_segments_entry.attr,
 	&queue_max_integrity_segments_entry.attr,
