@@ -936,37 +936,37 @@ static int rs_ioctl(struct tty_struct *tty,
 	}
 
 	switch (cmd) {
-		case TCSBRK:	/* SVID version: non-zero arg --> no break */
-			retval = tty_check_change(tty);
-			if (retval)
-				return retval;
-			tty_wait_until_sent(tty, 0);
-			if (!arg)
-				send_break(info, 250);	/* 1/4 second */
-			return 0;
-		case TCSBRKP:	/* support for POSIX tcsendbreak() */
-			retval = tty_check_change(tty);
-			if (retval)
-				return retval;
-			tty_wait_until_sent(tty, 0);
-			send_break(info, arg ? arg*(100) : 250);
-			return 0;
-		case TIOCGSERIAL:
-			return get_serial_info(info,
+	case TCSBRK:	/* SVID version: non-zero arg --> no break */
+		retval = tty_check_change(tty);
+		if (retval)
+			return retval;
+		tty_wait_until_sent(tty, 0);
+		if (!arg)
+			send_break(info, 250);	/* 1/4 second */
+		return 0;
+	case TCSBRKP:	/* support for POSIX tcsendbreak() */
+		retval = tty_check_change(tty);
+		if (retval)
+			return retval;
+		tty_wait_until_sent(tty, 0);
+		send_break(info, arg ? arg*(100) : 250);
+		return 0;
+	case TIOCGSERIAL:
+		return get_serial_info(info,
+			       (struct serial_struct *) arg);
+	case TIOCSSERIAL:
+		return set_serial_info(info, tty,
 				       (struct serial_struct *) arg);
-		case TIOCSSERIAL:
-			return set_serial_info(info, tty,
-					       (struct serial_struct *) arg);
-		case TIOCSERGETLSR: /* Get line status register */
-			return get_lsr_info(info, (unsigned int *) arg);
-		case TIOCSERGSTRUCT:
-			if (copy_to_user((struct m68k_serial *) arg,
-				    info, sizeof(struct m68k_serial)))
-				return -EFAULT;
-			return 0;
-		default:
-			return -ENOIOCTLCMD;
-		}
+	case TIOCSERGETLSR: /* Get line status register */
+		return get_lsr_info(info, (unsigned int *) arg);
+	case TIOCSERGSTRUCT:
+		if (copy_to_user((struct m68k_serial *) arg,
+			    info, sizeof(struct m68k_serial)))
+			return -EFAULT;
+		return 0;
+	default:
+		return -ENOIOCTLCMD;
+	}
 	return 0;
 }
 
