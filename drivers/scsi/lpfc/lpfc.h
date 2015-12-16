@@ -347,6 +347,7 @@ struct lpfc_vport {
 #define FC_CT_RFT_ID		0x10	 /* RFT_ID accepted by switch */
 
 	struct list_head fc_nodes;
+	uint32_t throttle_cnt;
 
 	/* Keep counters for the number of entries in each list. */
 	uint16_t fc_plogi_cnt;
@@ -443,6 +444,7 @@ struct lpfc_vport {
 	unsigned long rcv_buffer_time_stamp;
 	uint32_t vport_flag;
 #define STATIC_VPORT	1
+	struct throttle_history log;    /* Throttle log history for phba */
 };
 
 struct hbq_s {
@@ -750,6 +752,9 @@ struct lpfc_hba {
 	uint32_t cfg_request_firmware_upgrade;
 	uint32_t cfg_iocb_cnt;
 	uint32_t cfg_suppress_link_up;
+	uint32_t cfg_throttle_log_cnt;
+	uint32_t cfg_throttle_log_time;
+	struct throttle_history log;	/* Throttle log history for phba */
 	uint32_t cfg_rrq_xri_bitmap_sz;
 #define LPFC_INITIALIZE_LINK              0	/* do normal init_link mbox */
 #define LPFC_DELAY_INIT_LINK              1	/* layered driver hold off */

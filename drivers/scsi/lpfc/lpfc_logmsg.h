@@ -57,3 +57,43 @@ do { \
 			   fmt, phba->brd_no, ##arg); \
 	} \
 } while (0)
+
+#define lpfc_throttle_vlog(vport, hist, log, fmt, arg...) \
+do { \
+	{ if (!lpfc_throttler(vport, (hist))) \
+		break; \
+	lpfc_printf_vlog(vport, KERN_INFO, log, \
+		   fmt, arg); \
+	} \
+} while (0)
+
+#define lpfc_throttle_log(phba, hist, log, fmt, arg...) \
+do { \
+	{ if (!lpfc_throttler((phba->pport), (hist))) \
+		break; \
+	lpfc_printf_log(phba, KERN_INFO, log, \
+		   fmt, arg); \
+	} \
+} while (0)
+
+#define lpfc_optioned_vlog(vport, hist, level, mask, fmt, arg...) \
+do { \
+	{ if (!lpfc_throttler(vport, (hist))) \
+	  { lpfc_printf_vlog(vport, level, mask, fmt, ##arg); \
+		break; \
+	  } \
+	dev_printk(level, &((vport)->phba->pcidev)->dev, "%d:(%d):" \
+		   fmt, (vport)->phba->brd_no, vport->vpi, ##arg); \
+	} \
+} while (0)
+
+#define lpfc_optioned_log(phba, hist, level, mask, fmt, arg...) \
+do { \
+	{ if (!lpfc_throttler((phba->pport), (hist))) \
+	  { lpfc_printf_log(phba, level, mask, fmt, ##arg); \
+		break; \
+	  } \
+	dev_printk(level, &((phba)->pcidev)->dev, "%d:" \
+		   fmt, phba->brd_no, ##arg); \
+	} \
+} while (0)

@@ -3959,6 +3959,29 @@ lpfc_register_remote_port(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 	    (rport->scsi_target_id < LPFC_MAX_TARGET)) {
 		ndlp->nlp_sid = rport->scsi_target_id;
 	}
+
+	lpfc_throttle_vlog(ndlp->vport, &ndlp->log, LOG_NODE,
+			"3237 SCSI ID %d "
+			" WWNN:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x, "
+			" WWPN:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+			ndlp->nlp_sid,
+			ndlp->nlp_nodename.u.wwn[0],
+			ndlp->nlp_nodename.u.wwn[1],
+			ndlp->nlp_nodename.u.wwn[2],
+			ndlp->nlp_nodename.u.wwn[3],
+			ndlp->nlp_nodename.u.wwn[4],
+			ndlp->nlp_nodename.u.wwn[5],
+			ndlp->nlp_nodename.u.wwn[6],
+			ndlp->nlp_nodename.u.wwn[7],
+			ndlp->nlp_portname.u.wwn[0],
+			ndlp->nlp_portname.u.wwn[1],
+			ndlp->nlp_portname.u.wwn[2],
+			ndlp->nlp_portname.u.wwn[3],
+			ndlp->nlp_portname.u.wwn[4],
+			ndlp->nlp_portname.u.wwn[5],
+			ndlp->nlp_portname.u.wwn[6],
+			ndlp->nlp_portname.u.wwn[7]);
+
 	return;
 }
 

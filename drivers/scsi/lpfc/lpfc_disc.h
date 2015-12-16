@@ -74,8 +74,19 @@ struct lpfc_node_rrqs {
 	unsigned long xri_bitmap[XRI_BITMAP_ULONGS];
 };
 
+struct throttle_history {
+	/* Throttle log defaults if more than 10 messages per second */
+	#define ONE_SEC  1000000 /* one second */
+	bool logit;                 /* True means throttle logging on     */
+	uint32_t log_messages_lost;   /* Messages discarded due to throttle */
+	uint32_t log_messages;        /* Log messages count within second   */
+	uint64_t log_start;           /* start of message burst in usec     */
+	char announcement[16];		/* announcement string */
+};
+
 struct lpfc_nodelist {
 	struct list_head nlp_listp;
+	struct throttle_history log;		/* used to record throttle */
 	struct lpfc_name nlp_portname;
 	struct lpfc_name nlp_nodename;
 	uint32_t         nlp_flag;		/* entry flags */

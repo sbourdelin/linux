@@ -4773,6 +4773,20 @@ LPFC_ATTR_R(prot_sg_seg_cnt, LPFC_DEFAULT_SG_SEG_CNT,
 	    LPFC_DEFAULT_SG_SEG_CNT, LPFC_MAX_SG_SEG_CNT,
 	    "Max Protection Scatter Gather Segment Count");
 
+#define THROTTLE_CNT_MIN	1
+#define	THROTTLE_CNT_MAX	1000
+#define THROTTLE_CNT_DEF	10
+LPFC_ATTR_RW(throttle_log_cnt, THROTTLE_CNT_DEF, THROTTLE_CNT_MIN,
+	     THROTTLE_CNT_MAX, "Do not exceed this number of messages "
+	     "logged within throttle_log_time");
+
+#define THROTTLE_TIME_MIN        1
+#define THROTTLE_TIME_MAX        60
+#define THROTTLE_TIME_DEF        1
+LPFC_ATTR_RW(throttle_log_time, THROTTLE_TIME_DEF, THROTTLE_TIME_MIN,
+	     THROTTLE_TIME_MAX, "Do not exceed throttle_log_cnt within "
+	     "this limit (seconds)");
+
 struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_bg_info,
 	&dev_attr_bg_guard_err,
@@ -4868,6 +4882,8 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_sriov_hw_max_virtfn,
 	&dev_attr_protocol,
 	&dev_attr_lpfc_xlane_supported,
+	&dev_attr_lpfc_throttle_log_cnt,
+	&dev_attr_lpfc_throttle_log_time,
 	NULL,
 };
 
@@ -5858,6 +5874,8 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	lpfc_suppress_link_up_init(phba, lpfc_suppress_link_up);
 	lpfc_iocb_cnt_init(phba, lpfc_iocb_cnt);
 	phba->cfg_enable_dss = 1;
+	lpfc_throttle_log_cnt_init(phba, lpfc_throttle_log_cnt);
+	lpfc_throttle_log_time_init(phba, lpfc_throttle_log_time);
 	return;
 }
 

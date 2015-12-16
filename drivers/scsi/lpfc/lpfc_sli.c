@@ -108,9 +108,16 @@ lpfc_sli4_wq_put(struct lpfc_queue *q, union lpfc_wqe *wqe)
 	/* If the host has not yet processed the next entry then we are done */
 	idx = ((q->host_index + 1) % q->entry_count);
 	if (idx == q->hba_index) {
+		lpfc_throttle_log(q->phba, &q->phba->pport->log, LOG_SLI,
+				  "9998 WQ failure.  WQ Full. "
+				  "q_id x%x, host x%x, hba x%x\n",
+				  q->queue_id, idx, q->hba_index);
 		q->WQ_overflow++;
 		return -ENOMEM;
 	}
+	lpfc_throttle_log(q->phba, &q->phba->pport->log, LOG_SLI,
+			  "0039 WQ Posted. q_id x%x, host x%x, hba x%x\n",
+			  q->queue_id, idx, q->hba_index);
 	q->WQ_posted++;
 	/* set consumption flag every once in a while */
 	if (!((q->host_index + 1) % q->entry_repost))

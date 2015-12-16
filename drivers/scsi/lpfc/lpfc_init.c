@@ -9543,6 +9543,9 @@ lpfc_pci_probe_one_s3(struct pci_dev *pdev, const struct pci_device_id *pid)
 	if (error)
 		goto out_disable_pci_dev;
 
+	phba->log.logit = true; /* Turn on throttle logs for Adapter */
+	sprintf(phba->log.announcement, "adapter");
+
 	/* Set up SLI-3 specific device PCI memory space */
 	error = lpfc_sli_pci_mem_setup(phba);
 	if (error) {
@@ -10312,6 +10315,9 @@ lpfc_pci_probe_one_s4(struct pci_dev *pdev, const struct pci_device_id *pid)
 	error = lpfc_api_table_setup(phba, LPFC_PCI_DEV_OC);
 	if (error)
 		goto out_disable_pci_dev;
+
+	phba->log.logit = true; /* Turn on throttle logs for Adapter */
+	sprintf(phba->log.announcement, "adapter");
 
 	/* Set up SLI-4 specific device PCI memory space */
 	error = lpfc_sli4_pci_mem_setup(phba);
@@ -11268,6 +11274,70 @@ lpfc_fof_queue_destroy(struct lpfc_hba *phba)
 		phba->sli4_hba.oas_wq = NULL;
 	}
 	return 0;
+}
+
+/**
+ * lpfc_throttler - lpfc log throttling function
+ * @phba : the adapter instance.
+ *
+ * This routine is to be invoked by lpfc_throttle_log and lpfc_throttle_vlog.
+ * It is controlled using two module parameters.
+ * lpfc_throttle_log_time:  The number of seconds to monitor the log count
+ * lpfc_throttle_log_cnt:   The number of logs that cannot be exceeded within
+ *                          the throttle log time.
+ *
+ * This function acts as a gate to the logger.  It monitors the the lpfc log
+ * load.  If the log load exceeds the threshold, it return false which is a
+ * hint to the caller not to send the log.
+ *
+ * Return codes
+ *   true - Okay to log
+ *   false - Do not log
+ */
+bool
+lpfc_throttler(struct lpfc_vport *vport, struct throttle_history *tlog)
+{
+	/* All times in microseconds */
+	uint64_t now = (jiffies * ONE_SEC) / HZ;
+	struct lpfc_hba *phba = vport->phba;
+
+	if (tlog->logit) {
+		/* Currently Logging */
+		if (now > (tlog->log_start +
+		    (phba->cfg_throttle_log_time * ONE_SEC))) {
+			/* Last Log more than one second ago */
+			tlog->log_messages_lost = 0;
+			tlog->log_messages = 1;
+			tlog->log_start = now;
+		} else if (++tlog->log_messages > phba->cfg_throttle_log_cnt) {
+			/* Transition to throttling */
+			lpfc_printf_log(phba, KERN_INFO, LOG_EVENT,
+					"0040 Log compression on %s starting."
+					"\n", tlog->announcement);
+			tlog->log_messages_lost++;
+			tlog->log_messages = 0;
+			tlog->log_start = now;
+			tlog->logit = false;
+		}
+
+	} else if (now > (tlog->log_start +
+		  (300 * ONE_SEC))) {
+		/* Transition to logging if quiesced for five minutes */
+		lpfc_printf_log(phba, KERN_INFO, LOG_EVENT,
+				"0041 Log compression %s ending, messages "
+				"have been quiesced with %d compressed.\n",
+				tlog->announcement, tlog->log_messages_lost);
+
+
+		tlog->log_start = now;
+		tlog->log_messages_lost = 0;
+		tlog->log_messages = 0;
+		tlog->logit = true;
+	} else {
+		/* Currently throttling */
+		tlog->log_messages_lost++;
+	}
+	return tlog->logit;
 }
 
 static struct pci_device_id lpfc_id_table[] = {
