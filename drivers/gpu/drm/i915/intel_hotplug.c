@@ -442,6 +442,24 @@ void intel_hpd_irq_handler(struct drm_device *dev,
 		schedule_work(&dev_priv->hotplug.hotplug_work);
 }
 
+static void i915_edid_work_func(struct work_struct *work)
+{
+	struct drm_i915_private *dev_priv =
+		container_of(work, struct drm_i915_private, hotplug.edid_work);
+	struct drm_device *dev = dev_priv->dev;
+	struct drm_mode_config *mode_config = &dev->mode_config;
+	struct intel_encoder *encoder;
+
+	mutex_lock(&mode_config->mutex);
+	list_for_each_entry(encoder, &mode_config->encoder_list,
+			base.head) {
+		if (encoder->hot_plug)
+			encoder->hot_plug(encoder);
+	}
+	mutex_unlock(&mode_config->mutex);
+	drm_helper_hpd_irq_event(dev);
+}
+
 /**
  * intel_hpd_init - initializes and enables hpd support
  * @dev_priv: i915 device instance
@@ -482,12 +500,19 @@ void intel_hpd_init(struct drm_i915_private *dev_priv)
 	if (dev_priv->display.hpd_irq_setup)
 		dev_priv->display.hpd_irq_setup(dev);
 	spin_unlock_irq(&dev_priv->irq_lock);
+
+	/*
+	 * Connected boot / resume scenarios can't generate new hot plug.
+	 * So, probe it manually.
+	 */
+	schedule_work(&dev_priv->hotplug.edid_work);
 }
 
 void intel_hpd_init_work(struct drm_i915_private *dev_priv)
 {
 	INIT_WORK(&dev_priv->hotplug.hotplug_work, i915_hotplug_work_func);
 	INIT_WORK(&dev_priv->hotplug.dig_port_work, i915_digport_work_func);
+	INIT_WORK(&dev_priv->hotplug.edid_work, i915_edid_work_func);
 	INIT_DELAYED_WORK(&dev_priv->hotplug.reenable_work,
 			  intel_hpd_irq_storm_reenable_work);
 }
@@ -504,5 +529,6 @@ void intel_hpd_cancel_work(struct drm_i915_private *dev_priv)
 
 	cancel_work_sync(&dev_priv->hotplug.dig_port_work);
 	cancel_work_sync(&dev_priv->hotplug.hotplug_work);
+	cancel_work_sync(&dev_priv->hotplug.edid_work);
 	cancel_delayed_work_sync(&dev_priv->hotplug.reenable_work);
 }
