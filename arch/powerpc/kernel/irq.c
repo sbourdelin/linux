@@ -454,8 +454,6 @@ void migrate_irqs(void)
 
 	free_cpumask_var(mask);
 
-	local_irq_enable();
-	mdelay(1);
 	local_irq_disable();
 }
 #endif
