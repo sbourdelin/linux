@@ -131,6 +131,12 @@ struct drm_crtc_helper_funcs {
 	 * Atomic drivers which need to inspect and adjust more state should
 	 * instead use the @atomic_check callback.
 	 *
+	 * Also beware that the core nor helpers filters mode before passing the
+	 * to the driver. More specifically modes rejected by the ->mode_valid
+	 * callback from #drm_connector_helper_funcs can still be requested by
+	 * userspace and therefore also need to be rejected in either this hook,
+	 * or the one in #drm_encoder_helper_funcs.
+	 *
 	 * RETURNS:
 	 *
 	 * True if an acceptable configuration is possible, false if the modeset
@@ -188,7 +194,9 @@ struct drm_crtc_helper_funcs {
 	 * This callback is used by the legacy CRTC helpers to set a new
 	 * framebuffer and scanout position. It is optional and used as an
 	 * optimized fast-path instead of a full mode set operation with all the
-	 * resulting flickering. Since it can't update other planes it's
+	 * resulting flickering. If it is not present
+	 * drm_crtc_helper_set_config() will fall back to a full modeset, using
+	 * the ->mode_set() callbac. Since it can't update other planes it's
 	 * incompatible with atomic modeset support.
 	 *
 	 * This callback is only used by the CRTC helpers and deprecated.
@@ -439,6 +447,12 @@ struct drm_encoder_helper_funcs {
 	 * Atomic drivers which need to inspect and adjust more state should
 	 * instead use the @atomic_check callback.
 	 *
+	 * Also beware that the core nor helpers filters mode before passing the
+	 * to the driver. More specifically modes rejected by the ->mode_valid
+	 * callback from #drm_connector_helper_funcs can still be requested by
+	 * userspace and therefore also need to be rejected in either this hook,
+	 * or the one in #drm_crtc_helper_funcs.
+	 *
 	 * RETURNS:
 	 *
 	 * True if an acceptable configuration is possible, false if the modeset
@@ -640,8 +654,16 @@ struct drm_connector_helper_funcs {
 	 * In this function drivers then parse the modes in the EDID and add
 	 * them by calling drm_add_edid_modes(). But connectors that driver a
 	 * fixed panel can also manually add specific modes using
-	 * drm_mode_probed_add(). Finally drivers that support audio probably
-	 * want to update the ELD data, too, using drm_edid_to_eld().
+	 * drm_mode_probed_add(). Drivers who manually add modes should also
+	 * make sure that the @display_info, @width_mm and @height_mm fields of the
+	 * struct #drm_connector are filled out.
+	 *
+	 * Virtual drivers who just want some standard VESA mode with a given
+	 * resolution can call drm_add_modes_noedid(), and mark the preferred
+	 * one using drm_set_preferred_mode().
+	 *
+	 * Finally drivers that support audio probably want to update the ELD
+	 * data, too, using drm_edid_to_eld().
 	 *
 	 * This function is only called after the ->detect() hook has indicated
 	 * that a sink is connected and when the EDID isn't overridden through
