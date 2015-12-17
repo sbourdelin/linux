@@ -1748,6 +1748,20 @@ out:
 	return ret;
 }
 
+static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_per_queue_op per_queue_opt;
+
+	if (copy_from_user(&per_queue_opt, useraddr, sizeof(per_queue_opt)))
+		return -EFAULT;
+
+	switch (per_queue_opt.sub_command) {
+
+	default:
+		return -EOPNOTSUPP;
+	};
+}
+
 /* The main entry point in this file.  Called from net/core/dev_ioctl.c */
 
 int dev_ethtool(struct net *net, struct ifreq *ifr)
@@ -1990,6 +2004,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_STUNABLE:
 		rc = ethtool_set_tunable(dev, useraddr);
+		break;
+	case ETHTOOL_PERQUEUE:
+		rc = ethtool_set_per_queue(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;

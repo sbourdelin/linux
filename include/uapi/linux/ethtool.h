@@ -1144,6 +1144,22 @@ enum ethtool_sfeatures_retval_bits {
 #define ETHTOOL_F_WISH          (1 << ETHTOOL_F_WISH__BIT)
 #define ETHTOOL_F_COMPAT        (1 << ETHTOOL_F_COMPAT__BIT)
 
+#define MAX_QUEUE		4096
+#define MAX_QUEUE_MASK		(MAX_QUEUE / 64)
+
+/**
+ * struct ethtool_per_queue_op - apply sub command to the queues in mask.
+ * @cmd: ETHTOOL_PERQUEUE
+ * @queue_mask: Mask the queues which sub command apply to
+ * @sub_command: the sub command
+ * @data: parameters of the command
+ */
+struct ethtool_per_queue_op {
+	__u32	cmd;
+	__u64	queue_mask[MAX_QUEUE_MASK];
+	__u32	sub_command;
+	char	data[];
+};
 
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* Get settings. */
@@ -1225,6 +1241,8 @@ enum ethtool_sfeatures_retval_bits {
 #define ETHTOOL_SRSSH		0x00000047 /* Set RX flow hash configuration */
 #define ETHTOOL_GTUNABLE	0x00000048 /* Get tunable configuration */
 #define ETHTOOL_STUNABLE	0x00000049 /* Set tunable configuration */
+
+#define ETHTOOL_PERQUEUE	0x0000004a /* Set per queue options */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
