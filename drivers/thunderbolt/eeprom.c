@@ -39,6 +39,7 @@ static int tb_eeprom_active(struct tb_switch *sw, bool enable)
 {
 	struct tb_eeprom_ctl ctl;
 	int res = tb_eeprom_ctl_read(sw, &ctl);
+
 	if (res)
 		return res;
 	if (enable) {
@@ -68,6 +69,7 @@ static int tb_eeprom_transfer(struct tb_switch *sw, struct tb_eeprom_ctl *ctl,
 			      enum tb_eeprom_transfer direction)
 {
 	int res;
+
 	if (direction == TB_EEPROM_OUT) {
 		res = tb_eeprom_ctl_write(sw, ctl);
 		if (res)
@@ -94,6 +96,7 @@ static int tb_eeprom_out(struct tb_switch *sw, u8 val)
 	struct tb_eeprom_ctl ctl;
 	int i;
 	int res = tb_eeprom_ctl_read(sw, &ctl);
+
 	if (res)
 		return res;
 	for (i = 0; i < 8; i++) {
@@ -114,6 +117,7 @@ static int tb_eeprom_in(struct tb_switch *sw, u8 *val)
 	struct tb_eeprom_ctl ctl;
 	int i;
 	int res = tb_eeprom_ctl_read(sw, &ctl);
+
 	if (res)
 		return res;
 	*val = 0;
@@ -134,6 +138,7 @@ static int tb_eeprom_read_n(struct tb_switch *sw, u16 offset, u8 *val,
 		size_t count)
 {
 	int i, res;
+
 	res = tb_eeprom_active(sw, true);
 	if (res)
 		return res;
@@ -158,6 +163,7 @@ static u8 tb_crc8(u8 *data, int len)
 {
 	int i, j;
 	u8 val = 0xff;
+
 	for (i = 0; i < len; i++) {
 		val ^= data[i];
 		for (j = 0; j < 8; j++)
@@ -237,6 +243,7 @@ static int tb_eeprom_get_drom_offset(struct tb_switch *sw, u16 *offset)
 {
 	struct tb_cap_plug_events cap;
 	int res;
+
 	if (!sw->cap_plug_events) {
 		tb_sw_warn(sw, "no TB_CAP_PLUG_EVENTS, cannot read eeprom\n");
 		return -ENOSYS;
@@ -272,6 +279,7 @@ int tb_drom_read_uid_only(struct tb_switch *sw, u64 *uid)
 	u16 drom_offset;
 	u8 crc;
 	int res = tb_eeprom_get_drom_offset(sw, &drom_offset);
+
 	if (res)
 		return res;
 
@@ -322,6 +330,7 @@ static int tb_drom_parse_entry(struct tb_switch *sw,
 
 	if (type == TB_TYPE_PORT) {
 		struct tb_drom_entry_port *entry = (void *) header;
+
 		if (header->len != sizeof(*entry)) {
 			tb_sw_warn(sw,
 				"port entry has size %#x (expected %#zx)\n",
@@ -346,6 +355,7 @@ static int tb_drom_parse_entries(struct tb_switch *sw)
 
 	while (pos < drom_size) {
 		struct tb_drom_entry_header *entry = (void *) (sw->drom + pos);
+
 		if (pos + 1 == drom_size || pos + entry->len > drom_size
 				|| !entry->len) {
 			tb_sw_warn(sw, "drom buffer overrun, aborting\n");
@@ -369,6 +379,7 @@ int tb_drom_read(struct tb_switch *sw)
 	u32 crc;
 	struct tb_drom_header *header;
 	int res;
+
 	if (sw->drom)
 		return 0;
 

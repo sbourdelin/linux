@@ -43,6 +43,7 @@ static enum tb_cap tb_cap(struct tb_cap_any *cap)
 static u32 tb_cap_next(struct tb_cap_any *cap, u32 offset)
 {
 	int next;
+
 	if (offset == 1) {
 		/*
 		 * The first pointer is part of the switch header and always
@@ -83,6 +84,7 @@ int tb_find_cap(struct tb_port *port, enum tb_cfg_space space, enum tb_cap cap)
 	struct tb_cap_any header;
 	int res;
 	int retries = 10;
+
 	while (retries--) {
 		res = tb_port_read(port, &header, space, offset, 1);
 		if (res) {

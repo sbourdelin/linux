@@ -64,6 +64,7 @@ static int tb_port_state(struct tb_port *port)
 {
 	struct tb_cap_phy phy;
 	int res;
+
 	if (port->cap_phy == 0) {
 		tb_port_WARN(port, "does not have a PHY\n");
 		return -EINVAL;
@@ -91,6 +92,7 @@ int tb_wait_for_port(struct tb_port *port, bool wait_if_unplugged)
 {
 	int retries = 10;
 	int state;
+
 	if (!port->cap_phy) {
 		tb_port_WARN(port, "does not have PHY\n");
 		return -EINVAL;
@@ -169,6 +171,7 @@ int tb_port_add_nfc_credits(struct tb_port *port, int credits)
 int tb_port_clear_counter(struct tb_port *port, int counter)
 {
 	u32 zero[3] = { 0, 0, 0 };
+
 	tb_port_info(port, "clearing counter %d\n", counter);
 	return tb_port_write(port, zero, TB_CFG_COUNTERS, 3 * counter, 3);
 }
@@ -342,6 +345,7 @@ struct tb_switch *tb_switch_alloc(struct tb *tb, u64 route)
 	int cap;
 	struct tb_switch *sw;
 	int upstream_port = tb_cfg_get_upstream_port(tb->ctl, route);
+
 	if (upstream_port < 0)
 		return NULL;
 
@@ -430,6 +434,7 @@ err:
 void tb_sw_set_unpplugged(struct tb_switch *sw)
 {
 	int i;
+
 	if (sw == sw->tb->root_switch) {
 		tb_sw_WARN(sw, "cannot unplug root switch\n");
 		return;
@@ -449,6 +454,7 @@ int tb_switch_resume(struct tb_switch *sw)
 {
 	int i, err;
 	u64 uid;
+
 	tb_sw_info(sw, "resuming switch\n");
 
 	err = tb_drom_read_uid_only(sw, &uid);
@@ -475,6 +481,7 @@ int tb_switch_resume(struct tb_switch *sw)
 	/* check for surviving downstream switches */
 	for (i = 1; i <= sw->config.max_port_number; i++) {
 		struct tb_port *port = &sw->ports[i];
+
 		if (tb_is_upstream_port(port))
 			continue;
 		if (!port->remote)
@@ -492,6 +499,7 @@ int tb_switch_resume(struct tb_switch *sw)
 void tb_switch_suspend(struct tb_switch *sw)
 {
 	int i, err;
+
 	err = tb_plug_events_active(sw, false);
 	if (err)
 		return;

@@ -35,6 +35,7 @@ static void tb_dump_hop(struct tb_port *port, struct tb_regs_hop *hop)
 struct tb_path *tb_path_alloc(struct tb *tb, int num_hops)
 {
 	struct tb_path *path = kzalloc(sizeof(*path), GFP_KERNEL);
+
 	if (!path)
 		return NULL;
 	path->hops = kcalloc(num_hops, sizeof(*path->hops), GFP_KERNEL);
@@ -63,6 +64,7 @@ void tb_path_free(struct tb_path *path)
 static void __tb_path_deallocate_nfc(struct tb_path *path, int first_hop)
 {
 	int i, res;
+
 	for (i = first_hop; i < path->path_length; i++) {
 		res = tb_port_add_nfc_credits(path->hops[i].in_port,
 					      -path->nfc_credits);
@@ -77,6 +79,7 @@ static void __tb_path_deactivate_hops(struct tb_path *path, int first_hop)
 {
 	int i, res;
 	struct tb_regs_hop hop = { };
+
 	for (i = first_hop; i < path->path_length; i++) {
 		res = tb_port_write(path->hops[i].in_port, &hop, TB_CFG_HOPS,
 				    2 * path->hops[i].in_hop_index, 2);
@@ -116,6 +119,7 @@ int tb_path_activate(struct tb_path *path)
 {
 	int i, res;
 	enum tb_path_port out_mask, in_mask;
+
 	if (path->activated) {
 		tb_WARN(path->tb, "trying to activate already activated path\n");
 		return -EINVAL;
@@ -224,6 +228,7 @@ err:
 bool tb_path_is_invalid(struct tb_path *path)
 {
 	int i = 0;
+
 	for (i = 0; i < path->path_length; i++) {
 		if (path->hops[i].in_port->sw->is_unplugged)
 			return true;

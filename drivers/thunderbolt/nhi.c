@@ -25,6 +25,7 @@
 static int ring_interrupt_index(struct tb_ring *ring)
 {
 	int bit = ring->hop;
+
 	if (!ring->is_tx)
 		bit += ring->nhi->hop_count;
 	return bit;
@@ -41,6 +42,7 @@ static void ring_interrupt_active(struct tb_ring *ring, bool active)
 	int bit = ring_interrupt_index(ring) & 31;
 	int mask = 1 << bit;
 	u32 old, new;
+
 	old = ioread32(ring->nhi->iobase + reg);
 	if (active)
 		new = old | mask;
@@ -81,6 +83,7 @@ static void nhi_disable_interrupts(struct tb_nhi *nhi)
 static void __iomem *ring_desc_base(struct tb_ring *ring)
 {
 	void __iomem *io = ring->nhi->iobase;
+
 	io += ring->is_tx ? REG_TX_RING_BASE : REG_RX_RING_BASE;
 	io += ring->hop * 16;
 	return io;
@@ -89,6 +92,7 @@ static void __iomem *ring_desc_base(struct tb_ring *ring)
 static void __iomem *ring_options_base(struct tb_ring *ring)
 {
 	void __iomem *io = ring->nhi->iobase;
+
 	io += ring->is_tx ? REG_TX_OPTIONS_BASE : REG_RX_OPTIONS_BASE;
 	io += ring->hop * 32;
 	return io;
@@ -134,6 +138,7 @@ static void ring_write_descriptors(struct tb_ring *ring)
 {
 	struct ring_frame *frame, *n;
 	struct ring_desc *descriptor;
+
 	list_for_each_entry_safe(frame, n, &ring->queue, list) {
 		if (ring_full(ring))
 			break;
@@ -167,6 +172,7 @@ static void ring_work(struct work_struct *work)
 	struct ring_frame *frame;
 	bool canceled = false;
 	LIST_HEAD(done);
+
 	mutex_lock(&ring->lock);
 
 	if (!ring->running) {
@@ -227,6 +233,7 @@ invoke_callback:
 int __ring_enqueue(struct tb_ring *ring, struct ring_frame *frame)
 {
 	int ret = 0;
+
 	mutex_lock(&ring->lock);
 	if (ring->running) {
 		list_add_tail(&frame->list, &ring->queue);
@@ -242,6 +249,7 @@ static struct tb_ring *ring_alloc(struct tb_nhi *nhi, u32 hop, int size,
 				  bool transmit)
 {
 	struct tb_ring *ring = NULL;
+
 	dev_info(&nhi->pdev->dev, "allocating %s ring %d of size %d\n",
 		 transmit ? "TX" : "RX", hop, size);
 
@@ -489,6 +497,7 @@ static void nhi_interrupt_work(struct work_struct *work)
 static irqreturn_t nhi_msi(int irq, void *data)
 {
 	struct tb_nhi *nhi = data;
+
 	schedule_work(&nhi->interrupt_work);
 	return IRQ_HANDLED;
 }
@@ -497,6 +506,7 @@ static int nhi_suspend_noirq(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct tb *tb = pci_get_drvdata(pdev);
+
 	thunderbolt_suspend(tb);
 	return 0;
 }
@@ -505,6 +515,7 @@ static int nhi_resume_noirq(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct tb *tb = pci_get_drvdata(pdev);
+
 	thunderbolt_resume(tb);
 	return 0;
 }
@@ -512,6 +523,7 @@ static int nhi_resume_noirq(struct device *dev)
 static void nhi_shutdown(struct tb_nhi *nhi)
 {
 	int i;
+
 	dev_info(&nhi->pdev->dev, "shutdown\n");
 
 	for (i = 0; i < nhi->hop_count; i++) {
@@ -611,6 +623,7 @@ static void nhi_remove(struct pci_dev *pdev)
 {
 	struct tb *tb = pci_get_drvdata(pdev);
 	struct tb_nhi *nhi = tb->nhi;
+
 	thunderbolt_shutdown_and_free(tb);
 	nhi_shutdown(nhi);
 }

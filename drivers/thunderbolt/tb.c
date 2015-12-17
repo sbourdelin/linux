@@ -24,6 +24,7 @@ static void tb_scan_port(struct tb_port *port);
 static void tb_scan_switch(struct tb_switch *sw)
 {
 	int i;
+
 	for (i = 1; i <= sw->config.max_port_number; i++)
 		tb_scan_port(&sw->ports[i]);
 }
@@ -34,6 +35,7 @@ static void tb_scan_switch(struct tb_switch *sw)
 static void tb_scan_port(struct tb_port *port)
 {
 	struct tb_switch *sw;
+
 	if (tb_is_upstream_port(port))
 		return;
 	if (port->config.type != TB_TYPE_PORT)
@@ -64,6 +66,7 @@ static void tb_free_invalid_tunnels(struct tb *tb)
 {
 	struct tb_pci_tunnel *tunnel;
 	struct tb_pci_tunnel *n;
+
 	list_for_each_entry_safe(tunnel, n, &tb->tunnel_list, list)
 	{
 		if (tb_pci_is_invalid(tunnel)) {
@@ -79,8 +82,10 @@ static void tb_free_invalid_tunnels(struct tb *tb)
 static void tb_free_unplugged_children(struct tb_switch *sw)
 {
 	int i;
+
 	for (i = 1; i <= sw->config.max_port_number; i++) {
 		struct tb_port *port = &sw->ports[i];
+
 		if (tb_is_upstream_port(port))
 			continue;
 		if (!port->remote)
@@ -101,6 +106,7 @@ static void tb_free_unplugged_children(struct tb_switch *sw)
 static struct tb_port *tb_find_pci_up_port(struct tb_switch *sw)
 {
 	int i;
+
 	for (i = 1; i <= sw->config.max_port_number; i++)
 		if (sw->ports[i].config.type == TB_TYPE_PCIE_UP)
 			return &sw->ports[i];
@@ -116,6 +122,7 @@ static struct tb_port *tb_find_unused_down_port(struct tb_switch *sw)
 	int cap;
 	int res;
 	int data;
+
 	for (i = 1; i <= sw->config.max_port_number; i++) {
 		if (tb_is_upstream_port(&sw->ports[i]))
 			continue;
@@ -219,6 +226,7 @@ static void tb_handle_hotplug(struct work_struct *work)
 	struct tb *tb = ev->tb;
 	struct tb_switch *sw;
 	struct tb_port *port;
+
 	mutex_lock(&tb->lock);
 	if (!tb->hotplug_active)
 		goto out; /* during init, suspend or shutdown */
@@ -286,6 +294,7 @@ static void tb_schedule_hotplug_handler(void *data, u64 route, u8 port,
 {
 	struct tb *tb = data;
 	struct tb_hotplug_event *ev = kmalloc(sizeof(*ev), GFP_KERNEL);
+
 	if (!ev)
 		return;
 	INIT_WORK(&ev->work, tb_handle_hotplug);
@@ -409,6 +418,7 @@ void thunderbolt_suspend(struct tb *tb)
 void thunderbolt_resume(struct tb *tb)
 {
 	struct tb_pci_tunnel *tunnel, *n;
+
 	tb_info(tb, "resuming...\n");
 	mutex_lock(&tb->lock);
 	tb_ctl_start(tb->ctl);

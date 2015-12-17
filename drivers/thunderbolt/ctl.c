@@ -202,6 +202,7 @@ static struct tb_cfg_result decode_error(struct ctl_pkg *response)
 {
 	struct cfg_error_pkg *pkg = response->buffer;
 	struct tb_cfg_result res = { 0 };
+
 	res.response_route = get_route(pkg->header);
 	res.response_port = 0;
 	res.err = check_header(response, sizeof(*pkg), TB_CFG_PKG_ERROR,
@@ -276,6 +277,7 @@ static void tb_cfg_print_error(struct tb_ctl *ctl,
 static void cpu_to_be32_array(__be32 *dst, u32 *src, size_t len)
 {
 	int i;
+
 	for (i = 0; i < len; i++)
 		dst[i] = cpu_to_be32(src[i]);
 }
@@ -283,6 +285,7 @@ static void cpu_to_be32_array(__be32 *dst, u32 *src, size_t len)
 static void be32_to_cpu_array(u32 *dst, __be32 *src, size_t len)
 {
 	int i;
+
 	for (i = 0; i < len; i++)
 		dst[i] = be32_to_cpu(src[i]);
 }
@@ -304,6 +307,7 @@ static void tb_ctl_pkg_free(struct ctl_pkg *pkg)
 static struct ctl_pkg *tb_ctl_pkg_alloc(struct tb_ctl *ctl)
 {
 	struct ctl_pkg *pkg = kzalloc(sizeof(*pkg), GFP_KERNEL);
+
 	if (!pkg)
 		return NULL;
 	pkg->ctl = ctl;
@@ -323,6 +327,7 @@ static void tb_ctl_tx_callback(struct tb_ring *ring, struct ring_frame *frame,
 			       bool canceled)
 {
 	struct ctl_pkg *pkg = container_of(frame, typeof(*pkg), frame);
+
 	tb_ctl_pkg_free(pkg);
 }
 
@@ -338,6 +343,7 @@ static int tb_ctl_tx(struct tb_ctl *ctl, void *data, size_t len,
 {
 	int res;
 	struct ctl_pkg *pkg;
+
 	if (len % 4 != 0) { /* required for le->be conversion */
 		tb_ctl_WARN(ctl, "TX: invalid size: %zu\n", len);
 		return -EINVAL;
@@ -370,6 +376,7 @@ static void tb_ctl_handle_plug_event(struct tb_ctl *ctl,
 				     struct ctl_pkg *response)
 {
 	struct cfg_event_pkg *pkg = response->buffer;
+
 	u64 route = get_route(pkg->header);
 
 	if (check_header(response, sizeof(*pkg), TB_CFG_PKG_EVENT, route)) {
@@ -475,6 +482,7 @@ struct tb_ctl *tb_ctl_alloc(struct tb_nhi *nhi, hotplug_cb cb, void *cb_data)
 {
 	int i;
 	struct tb_ctl *ctl = kzalloc(sizeof(*ctl), GFP_KERNEL);
+
 	if (!ctl)
 		return NULL;
 	ctl->nhi = nhi;
@@ -520,6 +528,7 @@ err:
 void tb_ctl_free(struct tb_ctl *ctl)
 {
 	int i;
+
 	if (ctl->rx)
 		ring_free(ctl->rx);
 	if (ctl->tx)
@@ -541,6 +550,7 @@ void tb_ctl_free(struct tb_ctl *ctl)
 void tb_ctl_start(struct tb_ctl *ctl)
 {
 	int i;
+
 	tb_ctl_info(ctl, "control channel starting...\n");
 	ring_start(ctl->tx); /* is used to ack hotplug packets, start first */
 	ring_start(ctl->rx);
