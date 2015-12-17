@@ -767,13 +767,37 @@ void udp_set_csum(bool nocheck, struct sk_buff *skb,
 {
 	struct udphdr *uh = udp_hdr(skb);
 
-	if (nocheck)
+	if (nocheck) {
 		uh->check = 0;
-	else if (skb_is_gso(skb))
+	} else if (skb_is_gso(skb)) {
 		uh->check = ~udp_v4_check(len, saddr, daddr, 0);
-	else if (skb_dst(skb) && skb_dst(skb)->dev &&
-		 (skb_dst(skb)->dev->features &
-		  (NETIF_F_IP_CSUM | NETIF_F_HW_CSUM))) {
+	} else if (skb->ip_summed == CHECKSUM_PARTIAL &&
+		   skb_dst(skb) && skb_dst(skb)->dev &&
+		   (skb_dst(skb)->dev->features &
+		    (NETIF_F_IP_CSUM | NETIF_F_HW_CSUM))) {
+		/* Everything from csum_start onwards will be
+		 * checksummed and will thus have a sum of whatever
+		 * we previously put in the checksum field (eg. sum
+		 * of pseudo-header)
+		 */
+		__wsum csum;
+
+		/* Fill in our pseudo-header checksum */
+		uh->check = ~udp_v4_check(len, saddr, daddr, 0);
+		/* Start with complement of inner pseudo-header checksum */
+		csum = ~skb_checksum(skb, skb_checksum_start_offset(skb) + skb->csum_offset,
+				     2, 0);
+		/* Add in checksum of our headers (incl. pseudo-header
+		 * checksum filled in above)
+		 */
+		csum = skb_checksum(skb, 0, skb_checksum_start_offset(skb), csum);
+		/* The result is the outer checksum */
+		uh->check = csum_fold(csum);
+		if (uh->check == 0)
+			uh->check = CSUM_MANGLED_0;
+	} else if (skb_dst(skb) && skb_dst(skb)->dev &&
+		   (skb_dst(skb)->dev->features &
+		    (NETIF_F_IP_CSUM | NETIF_F_HW_CSUM))) {
 
 		BUG_ON(skb->ip_summed == CHECKSUM_PARTIAL);
 
