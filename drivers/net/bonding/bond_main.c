@@ -1991,6 +1991,25 @@ static int bond_miimon_inspect(struct bonding *bond)
 
 		link_state = bond_check_dev_link(bond, slave->dev, 0);
 
+		/* Since some NIC has time span between netif_running and
+		 * getting speed and duples. That is, after a NIC is up (netif_running),
+		 * there is a time span before this NIC is negotiated with speed and duplex.
+		 * During this time span, the slave in 802.3ad is configured without speed
+		 * and duplex. This 802.3ad bonding will not work because it needs slave's speed
+		 * and duplex to generate key field.
+		 * As such, we restrict up in 802.3ad mode to: netif_running && peed != SPEED_UNKNOWN &&
+		 * duplex != DUPLEX_UNKNOWN
+		 */
+		if ((BMSR_LSTATUS == link_state) &&
+		    (BOND_MODE(bond) == BOND_MODE_8023AD)) {
+			bond_update_speed_duplex(slave);
+			if ((slave->speed == SPEED_UNKNOWN) ||
+			    (slave->duplex == DUPLEX_UNKNOWN)) {
+				link_state = 0;
+				netdev_info(bond->dev, "In 802.3ad mode, it is not enough to up without speed and duplex");
+			}
+		}
+
 		switch (slave->link) {
 		case BOND_LINK_UP:
 			if (link_state)
