@@ -1056,25 +1056,15 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 	ct = nf_ct_tuplehash_to_ctrack(h);
 
 	/* It exists; we have (non-exclusive) reference. */
-	if (NF_CT_DIRECTION(h) == IP_CT_DIR_REPLY) {
-		*ctinfo = IP_CT_ESTABLISHED_REPLY;
-		/* Please set reply bit if this packet OK */
-		*set_reply = 1;
-	} else {
-		/* Once we've had two way comms, always ESTABLISHED. */
-		if (test_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
-			pr_debug("nf_conntrack_in: normal packet for %p\n", ct);
-			*ctinfo = IP_CT_ESTABLISHED;
-		} else if (test_bit(IPS_EXPECTED_BIT, &ct->status)) {
-			pr_debug("nf_conntrack_in: related packet for %p\n",
-				 ct);
-			*ctinfo = IP_CT_RELATED;
-		} else {
-			pr_debug("nf_conntrack_in: new packet for %p\n", ct);
-			*ctinfo = IP_CT_NEW;
-		}
-		*set_reply = 0;
-	}
+	*ctinfo = nf_ct_get_info(h);
+	if (*ctinfo == IP_CT_ESTABLISHED)
+		pr_debug("nf_conntrack_in: normal packet for %p\n", ct);
+	else if (*ctinfo == IP_CT_RELATED)
+		pr_debug("nf_conntrack_in: related packet for %p\n", ct);
+	else if (*ctinfo == IP_CT_NEW)
+		pr_debug("nf_conntrack_in: new packet for %p\n", ct);
+	*set_reply = NF_CT_DIRECTION(h) == IP_CT_DIR_REPLY;
+
 	skb->nfct = &ct->ct_general;
 	skb->nfctinfo = *ctinfo;
 	return ct;
