@@ -1485,6 +1485,8 @@ of_register_spi_device(struct spi_master *master, struct device_node *nc)
 	if (of_find_property(nc, "spi-lsb-first", NULL))
 		spi->mode |= SPI_LSB_FIRST;
 
+	of_property_read_u32(nc, "spi-word-wait-ns", &spi->word_wait_ns);
+
 	/* Device DUAL/QUAD mode */
 	if (!of_property_read_u32(nc, "spi-tx-bus-width", &value)) {
 		switch (value) {
