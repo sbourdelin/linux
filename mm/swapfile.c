@@ -2754,6 +2754,13 @@ pgoff_t __page_file_index(struct page *page)
 }
 EXPORT_SYMBOL_GPL(__page_file_index);
 
+/* Trivial accessor exported to kernel modules */
+long __get_nr_swap_pages(void)
+{
+	return get_nr_swap_pages();
+}
+EXPORT_SYMBOL_GPL(__get_nr_swap_pages);
+
 /*
  * add_swap_count_continuation - called when a swap count is duplicated
  * beyond SWAP_MAP_MAX, it allocates a new page and links that to the entry's

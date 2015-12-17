@@ -413,6 +413,10 @@ extern struct page *swapin_readahead(swp_entry_t, gfp_t,
 			struct vm_area_struct *vma, unsigned long addr);
 
 /* linux/mm/swapfile.c */
+
+#ifndef	MODULE
+
+/* Inside the base kernel, code can see these variables */
 extern atomic_long_t nr_swap_pages;
 extern long total_swap_pages;
 
@@ -426,6 +430,14 @@ static inline long get_nr_swap_pages(void)
 {
 	return atomic_long_read(&nr_swap_pages);
 }
+
+#else	/* MODULE */
+
+/* Only this read-only interface is available to modules */
+extern long __get_nr_swap_pages(void);
+#define	get_nr_swap_pages	__get_nr_swap_pages
+
+#endif	/* MODULE */
 
 extern void si_swapinfo(struct sysinfo *);
 extern swp_entry_t get_swap_page(void);
