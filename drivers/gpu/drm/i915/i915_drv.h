@@ -110,6 +110,32 @@
 	unlikely(__ret_warn_on);					\
 })
 
+#define I915_DEBUG(condition, format...) ({				\
+	int __ret_debug_on = !!(condition);				\
+	if (unlikely(__ret_debug_on))					\
+		WARN(unlikely(i915.debug), format);			\
+	unlikely(__ret_debug_on);					\
+})
+
+#define I915_DEBUG_ON(condition) ({					\
+	static const char __debug_on_txt[] =				\
+		"I915_DEBUG_ON(" __stringify(condition) ")\n";		\
+	int __ret_debug_on = !!(condition);				\
+	if (unlikely( __ret_debug_on)) 					\
+		WARN(unlikely(i915.debug), __debug_on_txt);		\
+	unlikely(__ret_debug_on);					\
+})
+
+#define I915_WARN_RECUR(condition, format...) ({			\
+	static bool __section(.data.unlikely) __warned;			\
+	int __ret_warn_on = !!(condition);				\
+	if (unlikely(__ret_warn_on)) {					\
+		if (WARN(unlikely(!__warned || i915.debug), format))	\
+			__warned = true;				\
+	}								\
+	unlikely(__ret_debug_on);					\
+})
+
 static inline const char *yesno(bool v)
 {
 	return v ? "yes" : "no";
