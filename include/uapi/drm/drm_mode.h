@@ -77,6 +77,8 @@
 #define DRM_MODE_PICTURE_ASPECT_NONE		0
 #define DRM_MODE_PICTURE_ASPECT_4_3		1
 #define DRM_MODE_PICTURE_ASPECT_16_9		2
+#define DRM_MODE_PICTURE_ASPECT_64_27		3
+#define DRM_MODE_PICTURE_ASPECT_256_135	4
 
 /* Aspect ratio flag bitmask (4 bits 21:19) */
 #define	 DRM_MODE_FLAG_PARMASK		(0x0F<<19)
@@ -86,6 +88,10 @@
 		(DRM_MODE_PICTURE_ASPECT_4_3 << 19)
 #define  DRM_MODE_FLAG_PAR16_9 \
 		(DRM_MODE_PICTURE_ASPECT_16_9 << 19)
+#define  DRM_MODE_FLAG_PAR64_27 \
+		(DRM_MODE_PICTURE_ASPECT_64_27 << 19)
+#define  DRM_MODE_FLAG_PAR256_135 \
+		(DRM_MODE_PICTURE_ASPECT_256_135 << 19)
 
 /* DPMS flags */
 /* bit compatible with the xorg definitions. */
