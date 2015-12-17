@@ -901,6 +901,16 @@ static int azx_suspend(struct device *dev)
 	return 0;
 }
 
+static int azx_freeze_noirq(struct device *dev)
+{
+	struct pci_dev *pci = to_pci_dev(dev);
+
+	if (pci->vendor == PCI_VENDOR_ID_INTEL)
+		pci_set_power_state(pci, PCI_D3hot);
+
+	return 0;
+}
+
 static int azx_resume(struct device *dev)
 {
 	struct pci_dev *pci = to_pci_dev(dev);
@@ -934,6 +944,14 @@ static int azx_resume(struct device *dev)
 
 	trace_azx_resume(chip);
 	return 0;
+}
+
+static int azx_thaw_noirq(struct device *dev)
+{
+	struct pci_dev *pci = to_pci_dev(dev);
+
+	if (pci->vendor == PCI_VENDOR_ID_INTEL)
+		pci_set_power_state(pci, PCI_D0);
 }
 #endif /* CONFIG_PM_SLEEP || SUPPORT_VGA_SWITCHEROO */
 
@@ -1046,6 +1064,8 @@ static int azx_runtime_idle(struct device *dev)
 
 static const struct dev_pm_ops azx_pm = {
 	SET_SYSTEM_SLEEP_PM_OPS(azx_suspend, azx_resume)
+	.freeze_noirq = azx_freeze_noirq,
+	.thaw_noirq = azx_thaw_noirq,
 	SET_RUNTIME_PM_OPS(azx_runtime_suspend, azx_runtime_resume, azx_runtime_idle)
 };
 
