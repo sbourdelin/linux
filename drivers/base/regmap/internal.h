@@ -270,4 +270,10 @@ static inline unsigned int regmap_get_offset(const struct regmap *map,
 	return index << map->reg_stride_order;
 }
 
+static inline unsigned int regcache_get_index(const struct regmap *map,
+					    unsigned int reg)
+{
+	return reg >> map->reg_stride_order;
+}
+
 #endif
