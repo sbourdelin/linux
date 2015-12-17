@@ -275,8 +275,9 @@ static struct inode *mqueue_get_inode(struct super_block *sb,
 					  info->attr.mq_msgsize);
 
 		spin_lock(&mq_lock);
-		if (u->mq_bytes + mq_bytes < u->mq_bytes ||
-		    u->mq_bytes + mq_bytes > rlimit(RLIMIT_MSGQUEUE)) {
+		if (rlimit(RLIMIT_MSGQUEUE) != RLIM_INFINITY && (
+		    u->mq_bytes + mq_bytes < u->mq_bytes ||
+		    u->mq_bytes + mq_bytes > rlimit(RLIMIT_MSGQUEUE))) {
 			spin_unlock(&mq_lock);
 			/* mqueue_evict_inode() releases info->messages */
 			ret = -EMFILE;
