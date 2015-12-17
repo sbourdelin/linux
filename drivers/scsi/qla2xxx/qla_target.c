@@ -3812,12 +3812,23 @@ static void qlt_do_work(struct work_struct *work)
 	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
 	scsi_qla_host_t *vha = cmd->vha;
 	unsigned long flags;
+	struct list_head h;
+	struct qla_tgt_cmd *c = NULL, *tc = NULL;
 
 	spin_lock_irqsave(&vha->cmd_list_lock, flags);
 	list_del(&cmd->cmd_list);
 	spin_unlock_irqrestore(&vha->cmd_list_lock, flags);
 
+	INIT_LIST_HEAD(&h);
+	if (!list_empty(&cmd->bulk_process_list))
+		list_splice_init(&cmd->bulk_process_list, &h);
+
 	__qlt_do_work(cmd);
+
+	list_for_each_entry_safe(c, tc, &h, bulk_process_list) {
+		list_del_init(&c->bulk_process_list);
+		c->work.func(&c->work);
+	}
 }
 
 static struct qla_tgt_cmd *qlt_get_tag(scsi_qla_host_t *vha,
@@ -3849,6 +3860,7 @@ static struct qla_tgt_cmd *qlt_get_tag(scsi_qla_host_t *vha,
 	cmd->jiffies_at_alloc = get_jiffies_64();
 
 	cmd->reset_count = vha->hw->chip_reset;
+	INIT_LIST_HEAD(&cmd->bulk_process_list);
 
 	return cmd;
 }
@@ -3908,6 +3920,7 @@ static void qlt_create_sess_from_atio(struct work_struct *work)
 		kfree(op);
 		return;
 	}
+
 	/*
 	 * __qlt_do_work() will call ha->tgt.tgt_ops->put_sess() to release
 	 * the extra reference taken above by qlt_make_local_sess()
@@ -3923,6 +3936,40 @@ out_term:
 	kfree(op);
 
 }
+
+static void qlt_add_cmd_to_bulk_list(struct qla_tgt_cmd *cmd)
+{
+	struct qla_hw_data *ha = cmd->tgt->ha;
+	struct qla_tgt_cmd *hc = (struct qla_tgt_cmd *)
+		ha->tgt.atio_for_bulk_process;
+
+	if (IS_QLA27XX(ha) || IS_QLA83XX(ha))
+		/* We are running under atio_lock protection here. */
+		assert_spin_locked(&ha->tgt.atio_lock);
+	else
+		assert_spin_locked(&ha->hardware_lock);
+
+	if (hc)
+		list_add_tail(&cmd->bulk_process_list, &hc->bulk_process_list);
+	else
+		ha->tgt.atio_for_bulk_process = (void *)cmd;
+}
+
+static void qlt_send_atio_bulk(struct qla_hw_data *ha)
+{
+	struct qla_tgt_cmd *cmd =
+		(struct qla_tgt_cmd *)ha->tgt.atio_for_bulk_process;
+
+	if (IS_QLA27XX(ha) || IS_QLA83XX(ha))
+		/*We are running under atio_lock protection here */
+		assert_spin_locked(&ha->tgt.atio_lock);
+	else
+		assert_spin_locked(&ha->hardware_lock);
+
+	ha->tgt.atio_for_bulk_process = NULL;
+	queue_work_on(smp_processor_id(), qla_tgt_wq, &cmd->work);
+}
+
 
 /* ha->hardware_lock supposed to be held on entry */
 static int qlt_handle_cmd_for_atio(struct scsi_qla_host *vha,
@@ -3989,17 +4036,11 @@ static int qlt_handle_cmd_for_atio(struct scsi_qla_host *vha,
 	spin_unlock(&vha->cmd_list_lock);
 
 	INIT_WORK(&cmd->work, qlt_do_work);
-	if (ha->msix_count) {
+	if (ha->msix_count)
 		cmd->se_cmd.cpuid = ha->tgt.rspq_vector_cpuid;
-		if (cmd->atio.u.isp24.fcp_cmnd.rddata)
-			queue_work_on(smp_processor_id(), qla_tgt_wq,
-			    &cmd->work);
-		else
-			queue_work_on(cmd->se_cmd.cpuid, qla_tgt_wq,
-			    &cmd->work);
-	} else {
-		queue_work(qla_tgt_wq, &cmd->work);
-	}
+
+	qlt_add_cmd_to_bulk_list(cmd);
+
 	return 0;
 
 }
@@ -5234,6 +5275,7 @@ qlt_alloc_qfull_cmd(struct scsi_qla_host *vha,
 
 	qlt_incr_num_pend_cmds(vha);
 	INIT_LIST_HEAD(&cmd->cmd_list);
+	INIT_LIST_HEAD(&cmd->bulk_process_list);
 	memcpy(&cmd->atio, atio, sizeof(*atio));
 
 	cmd->tgt = vha->vha_tgt.qla_tgt;
@@ -6442,6 +6484,9 @@ qlt_24xx_process_atio_queue(struct scsi_qla_host *vha, uint8_t ha_locked)
 	/* Adjust ring index */
 	WRT_REG_DWORD(ISP_ATIO_Q_OUT(vha), ha->tgt.atio_ring_index);
 	RD_REG_DWORD_RELAXED(ISP_ATIO_Q_OUT(vha));
+
+	if (ha->tgt.atio_for_bulk_process)
+		qlt_send_atio_bulk(ha);
 }
 
 void

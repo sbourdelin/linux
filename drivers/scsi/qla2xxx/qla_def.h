@@ -2937,6 +2937,9 @@ struct qlt_hw_data {
 	uint32_t leak_exchg_thresh_hold;
 	spinlock_t sess_lock;
 	int rspq_vector_cpuid;
+
+	void *ctio_for_bulk_process;
+	void *atio_for_bulk_process;
 	spinlock_t atio_lock ____cacheline_aligned;
 };
 

@@ -2646,6 +2646,9 @@ process_err:
 		WRT_REG_DWORD(&reg->rsp_q_out[0], rsp->ring_index);
 	} else
 		WRT_REG_DWORD(rsp->rsp_q_out, rsp->ring_index);
+
+	if (ha->tgt.ctio_for_bulk_process)
+		vha->hw->tgt.tgt_ops->handle_bulk(vha);
 }
 
 static void

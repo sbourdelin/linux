@@ -279,6 +279,12 @@ static void tcm_qla2xxx_free_mcmd(struct qla_tgt_mgmt_cmd *mcmd)
 static void tcm_qla2xxx_complete_free(struct work_struct *work)
 {
 	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	struct list_head h;
+	struct qla_tgt_cmd *c = NULL, *tc = NULL;
+
+	INIT_LIST_HEAD(&h);
+	if (!list_empty(&cmd->bulk_process_list))
+		list_splice_init(&cmd->bulk_process_list, &h);
 
 	cmd->cmd_in_wq = 0;
 
@@ -287,6 +293,45 @@ static void tcm_qla2xxx_complete_free(struct work_struct *work)
 	cmd->vha->tgt_counters.qla_core_ret_sta_ctio++;
 	cmd->cmd_flags |= BIT_16;
 	transport_generic_free_cmd(&cmd->se_cmd, 0);
+
+	list_for_each_entry_safe(c, tc, &h, bulk_process_list) {
+		list_del_init(&c->bulk_process_list);
+		c->work.func(&c->work);
+	}
+}
+
+static void tcm_qla2xxx_add_cmd_to_bulk_list(struct qla_tgt_cmd *cmd)
+{
+	struct qla_hw_data *ha = cmd->tgt->ha;
+	struct qla_tgt_cmd *hc;
+	unsigned long flags;
+
+	/* borrowing q_full_lock.  it's not being used very often. */
+	spin_lock_irqsave(&ha->tgt.q_full_lock, flags);
+	hc = (struct qla_tgt_cmd *)ha->tgt.ctio_for_bulk_process;
+
+	if (hc)
+		list_add_tail(&cmd->bulk_process_list, &hc->bulk_process_list);
+	else
+		ha->tgt.ctio_for_bulk_process = (void *)cmd;
+	spin_unlock_irqrestore(&ha->tgt.q_full_lock, flags);
+}
+
+static void tcm_qla2xxx_handle_bulk(struct scsi_qla_host *vha)
+{
+	struct qla_hw_data *ha = vha->hw;
+	struct qla_tgt_cmd *cmd;
+	unsigned long flags;
+
+	/* borrowing q_full_lock.  it's not being used very often. */
+	spin_lock_irqsave(&ha->tgt.q_full_lock, flags);
+	cmd = (struct qla_tgt_cmd *)ha->tgt.ctio_for_bulk_process;
+	ha->tgt.ctio_for_bulk_process = NULL;
+	spin_unlock_irqrestore(&ha->tgt.q_full_lock, flags);
+
+	if (cmd)
+		queue_work_on(smp_processor_id(), tcm_qla2xxx_free_wq,
+		    &cmd->work);
 }
 
 /*
@@ -465,6 +510,12 @@ static int tcm_qla2xxx_handle_cmd(scsi_qla_host_t *vha, struct qla_tgt_cmd *cmd,
 static void tcm_qla2xxx_handle_data_work(struct work_struct *work)
 {
 	struct qla_tgt_cmd *cmd = container_of(work, struct qla_tgt_cmd, work);
+	struct qla_tgt_cmd *c = NULL, *tc = NULL;
+	struct list_head h;
+
+	INIT_LIST_HEAD(&h);
+	if (!list_empty(&cmd->bulk_process_list))
+		list_splice_init(&cmd->bulk_process_list, &h);
 
 	/*
 	 * Ensure that the complete FCP WRITE payload has been received.
@@ -480,7 +531,7 @@ static void tcm_qla2xxx_handle_data_work(struct work_struct *work)
 		 */
 		if (cmd->se_cmd.transport_state & CMD_T_ABORTED) {
 			complete(&cmd->se_cmd.t_transport_stop_comp);
-			return;
+			goto process_bulk;
 		}
 
 		if (cmd->se_cmd.pi_err)
@@ -490,10 +541,18 @@ static void tcm_qla2xxx_handle_data_work(struct work_struct *work)
 			transport_generic_request_failure(&cmd->se_cmd,
 				TCM_CHECK_CONDITION_ABORT_CMD);
 
-		return;
+		goto process_bulk;
 	}
 
-	return target_execute_cmd(&cmd->se_cmd);
+	target_execute_cmd(&cmd->se_cmd);
+
+process_bulk:
+	list_for_each_entry_safe(c, tc, &h, bulk_process_list) {
+		list_del_init(&c->bulk_process_list);
+		c->work.func(&c->work);
+	}
+
+	return;
 }
 
 /*
@@ -504,7 +563,7 @@ static void tcm_qla2xxx_handle_data(struct qla_tgt_cmd *cmd)
 	cmd->cmd_flags |= BIT_10;
 	cmd->cmd_in_wq = 1;
 	INIT_WORK(&cmd->work, tcm_qla2xxx_handle_data_work);
-	queue_work_on(smp_processor_id(), tcm_qla2xxx_free_wq, &cmd->work);
+	tcm_qla2xxx_add_cmd_to_bulk_list(cmd);
 }
 
 static void tcm_qla2xxx_handle_dif_work(struct work_struct *work)
@@ -565,6 +624,7 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 	return qlt_xmit_response(cmd, QLA_TGT_XMIT_DATA|QLA_TGT_XMIT_STATUS,
 				se_cmd->scsi_status);
 }
+
 
 static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 {
@@ -641,7 +701,9 @@ static void tcm_qla2xxx_aborted_task(struct se_cmd *se_cmd)
 {
 	struct qla_tgt_cmd *cmd = container_of(se_cmd,
 				struct qla_tgt_cmd, se_cmd);
+	struct scsi_qla_host *vha = cmd->vha;
 	qlt_abort_cmd(cmd);
+	tcm_qla2xxx_handle_bulk(vha);
 }
 
 static void tcm_qla2xxx_clear_sess_lookup(struct tcm_qla2xxx_lport *,
@@ -1510,6 +1572,7 @@ static struct qla_tgt_func_tmpl tcm_qla2xxx_template = {
 	.clear_nacl_from_fcport_map = tcm_qla2xxx_clear_nacl_from_fcport_map,
 	.put_sess		= tcm_qla2xxx_put_sess,
 	.shutdown_sess		= tcm_qla2xxx_shutdown_sess,
+	.handle_bulk	= tcm_qla2xxx_handle_bulk,
 };
 
 static int tcm_qla2xxx_init_lport(struct tcm_qla2xxx_lport *lport)

@@ -740,6 +740,7 @@ struct qla_tgt_func_tmpl {
 	void (*clear_nacl_from_fcport_map)(struct qla_tgt_sess *);
 	void (*put_sess)(struct qla_tgt_sess *);
 	void (*shutdown_sess)(struct qla_tgt_sess *);
+	void (*handle_bulk)(struct scsi_qla_host *);
 };
 
 int qla2x00_wait_for_hba_online(struct scsi_qla_host *);
@@ -976,6 +977,7 @@ struct qla_tgt_cmd {
 	struct qla_tgt *tgt;	/* to save extra sess dereferences */
 	struct scsi_qla_host *vha;
 	struct list_head cmd_list;
+	struct list_head bulk_process_list;
 
 	struct atio_from_isp atio;
 	/* t10dif */
