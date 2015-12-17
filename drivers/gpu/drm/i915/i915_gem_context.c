@@ -657,7 +657,6 @@ static int do_switch(struct drm_i915_gem_request *req)
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 	struct intel_context *from = ring->last_context;
 	u32 hw_flags = 0;
-	bool uninitialized = false;
 	int ret, i;
 
 	if (from != NULL && ring == &dev_priv->ring[RCS]) {
@@ -764,6 +763,15 @@ static int do_switch(struct drm_i915_gem_request *req)
 			to->remap_slice &= ~(1<<i);
 	}
 
+	if (!to->legacy_hw_ctx.initialized) {
+		if (ring->init_context) {
+			ret = ring->init_context(req);
+			if (ret)
+				goto unpin_out;
+		}
+		to->legacy_hw_ctx.initialized = true;
+	}
+
 	/* The backing object for the context is done after switching to the
 	 * *next* context. Therefore we cannot retire the previous context until
 	 * the next context has already started running. In fact, the below code
@@ -772,6 +780,14 @@ static int do_switch(struct drm_i915_gem_request *req)
 	 */
 	if (from != NULL) {
 		from->legacy_hw_ctx.rcs_state->base.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		/* XXX Note very well this is dangerous!
+		 * We are pinning this object using this request as our
+		 * active reference. However, this request may yet be cancelled
+		 * during the execbuf dispatch, leaving us waiting on a
+		 * dangling request. Waiting upon this dangling request is
+		 * ignored, which means that we may unbind the context whilst
+		 * the GPU is still writing to the backing storage.
+		 */
 		i915_vma_move_to_active(i915_gem_obj_to_ggtt(from->legacy_hw_ctx.rcs_state), req);
 		/* As long as MI_SET_CONTEXT is serializing, ie. it flushes the
 		 * whole damn pipeline, we don't need to explicitly mark the
@@ -787,20 +803,9 @@ static int do_switch(struct drm_i915_gem_request *req)
 		i915_gem_context_unreference(from);
 	}
 
-	uninitialized = !to->legacy_hw_ctx.initialized;
-	to->legacy_hw_ctx.initialized = true;
-
 done:
 	i915_gem_context_reference(to);
 	ring->last_context = to;
-
-	if (uninitialized) {
-		if (ring->init_context) {
-			ret = ring->init_context(req);
-			if (ret)
-				DRM_ERROR("ring init context: %d\n", ret);
-		}
-	}
 
 	return 0;
 
