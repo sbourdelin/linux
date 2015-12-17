@@ -47,6 +47,7 @@
 #include <linux/err.h>
 #include <linux/irq.h>
 #include <linux/suspend.h>
+#include <linux/module.h>
 
 #include <asm/io.h>
 #include <asm/ioctls.h>
