@@ -1785,6 +1785,9 @@ static int vxlan_xmit_skb(struct rtable *rt, struct sock *sk, struct sk_buff *sk
 	bool udp_sum = !!(vxflags & VXLAN_F_UDP_CSUM);
 	int type = udp_sum ? SKB_GSO_UDP_TUNNEL_CSUM : SKB_GSO_UDP_TUNNEL;
 	u16 hdrlen = sizeof(struct vxlanhdr);
+	/* Is device able to do the inner checksum? */
+	bool inner_csum = skb_dst(skb) && skb_dst(skb)->dev &&
+				(skb_dst(skb)->dev->features & NETIF_F_HW_CSUM);
 
 	if ((vxflags & VXLAN_F_REMCSUM_TX) &&
 	    skb->ip_summed == CHECKSUM_PARTIAL) {
@@ -1814,7 +1817,7 @@ static int vxlan_xmit_skb(struct rtable *rt, struct sock *sk, struct sk_buff *sk
 	if (WARN_ON(!skb))
 		return -ENOMEM;
 
-	skb = iptunnel_handle_offloads(skb, udp_sum, type);
+	skb = iptunnel_handle_offloads(skb, udp_sum && !inner_csum, type);
 	if (IS_ERR(skb))
 		return PTR_ERR(skb);
 
