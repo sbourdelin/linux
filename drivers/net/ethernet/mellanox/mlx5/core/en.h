@@ -34,6 +34,7 @@
 #include <linux/etherdevice.h>
 #include <linux/timecounter.h>
 #include <linux/net_tstamp.h>
+#include <linux/ptp_clock_kernel.h>
 #include <linux/mlx5/driver.h>
 #include <linux/mlx5/qp.h>
 #include <linux/mlx5/cq.h>
@@ -497,6 +498,8 @@ struct mlx5e_tstamp {
 	u32                        nominal_c_mult;
 	unsigned long              last_overflow_check;
 	unsigned long              overflow_period;
+	struct ptp_clock          *ptp;
+	struct ptp_clock_info      ptp_info;
 };
 
 struct mlx5e_priv {
@@ -605,6 +608,7 @@ void mlx5e_fill_hwstamp(struct mlx5e_tstamp *clock,
 			u64 timestamp);
 void mlx5e_timestamp_overflow_check(struct mlx5e_priv *priv);
 void mlx5e_timestamp_init(struct mlx5e_priv *priv);
+void mlx5e_timestamp_cleanup(struct mlx5e_priv *priv);
 
 int mlx5e_vlan_rx_add_vid(struct net_device *dev, __always_unused __be16 proto,
 			  u16 vid);
