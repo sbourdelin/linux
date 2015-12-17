@@ -1748,6 +1748,36 @@ out:
 	return ret;
 }
 
+static int ethtool_get_per_queue_coalesce(struct net_device *dev,
+					  void __user *useraddr,
+					  struct ethtool_per_queue_op *per_queue_opt)
+{
+	u64 queue_mask;
+	int bit, i, ret;
+
+	if (!dev->ethtool_ops->get_per_queue_coalesce)
+		return -EOPNOTSUPP;
+
+	useraddr += sizeof(*per_queue_opt);
+	for (i = 0; i < MAX_QUEUE_MASK; i++) {
+		queue_mask = per_queue_opt->queue_mask[i];
+		if (queue_mask > 0) {
+			for_each_set_bit(bit, (unsigned long *)&queue_mask, 64) {
+				struct ethtool_coalesce coalesce = { .cmd = ETHTOOL_GCOALESCE };
+
+				ret = dev->ethtool_ops->get_per_queue_coalesce(dev, bit + i * 64, &coalesce);
+				if (ret != 0)
+					return ret;
+				if (copy_to_user(useraddr, &coalesce, sizeof(coalesce)))
+					return -EFAULT;
+				useraddr += sizeof(coalesce);
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_per_queue_op per_queue_opt;
@@ -1756,7 +1786,8 @@ static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
 		return -EFAULT;
 
 	switch (per_queue_opt.sub_command) {
-
+	case ETHTOOL_GCOALESCE:
+		return ethtool_get_per_queue_coalesce(dev, useraddr, &per_queue_opt);
 	default:
 		return -EOPNOTSUPP;
 	};
