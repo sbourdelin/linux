@@ -165,3 +165,7 @@ static int start_periodic_check_for_corruption(void)
 }
 device_initcall(start_periodic_check_for_corruption);
 
+#ifdef CONFIG_X86_TEST_EARLY_CMDLINE
+int test_early_cmdline(void)
+late_initcall(test_early_cmdline);
+#endif /* CONFIG_X86_TEST_EARLY_CMDLINE */
