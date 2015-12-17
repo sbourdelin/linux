@@ -153,10 +153,12 @@ int vc4_v3d_debugfs_ident(struct seq_file *m, void *unused)
 void
 vc4_v3d_set_power(struct vc4_dev *vc4, bool on)
 {
+#ifdef CONFIG_PM_SLEEP
 	if (on)
 		pm_generic_poweroff(&vc4->v3d->pdev->dev);
 	else
 		pm_generic_resume(&vc4->v3d->pdev->dev);
+#endif
 }
 
 static void vc4_v3d_init_hw(struct drm_device *dev)
