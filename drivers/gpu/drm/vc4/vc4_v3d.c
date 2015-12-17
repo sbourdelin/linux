@@ -150,13 +150,13 @@ int vc4_v3d_debugfs_ident(struct seq_file *m, void *unused)
  * This may be doable with just the clocks interface, though this
  * packet does some other register setup from the firmware, too.
  */
-int
+void
 vc4_v3d_set_power(struct vc4_dev *vc4, bool on)
 {
 	if (on)
-		return pm_generic_poweroff(&vc4->v3d->pdev->dev);
+		pm_generic_poweroff(&vc4->v3d->pdev->dev);
 	else
-		return pm_generic_resume(&vc4->v3d->pdev->dev);
+		pm_generic_resume(&vc4->v3d->pdev->dev);
 }
 
 static void vc4_v3d_init_hw(struct drm_device *dev)
