@@ -304,6 +304,20 @@
 	status = "okay";
 };
 
+&sdio {
+	status = "okay";
+
+	broken-cd;
+	bus-width = <4>;
+	cap-sdio-irq;
+	keep-power-in-suspend;
+	non-removable;
+	num-slots = <1>;
+	default-sample-phase = <90>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdio_clk &sdio_cmd &sdio_bus4>;
+};
+
 &uart2 {
 	status = "okay";
 };
