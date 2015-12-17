@@ -1843,11 +1843,16 @@ static int i40e_set_phys_id(struct net_device *netdev,
  * 125us (8000 interrupts per second) == ITR(62)
  */
 
-static int i40e_get_coalesce(struct net_device *netdev,
-			     struct ethtool_coalesce *ec)
+static int __i40e_get_coalesce(struct net_device *netdev,
+			       struct ethtool_coalesce *ec,
+			       int queue)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+	struct i40e_q_vector *q_vector;
+	u16 vector;
 
 	ec->tx_max_coalesced_frames_irq = vsi->work_limit;
 	ec->rx_max_coalesced_frames_irq = vsi->work_limit;
@@ -1869,7 +1874,31 @@ static int i40e_get_coalesce(struct net_device *netdev,
 	ec->rx_coalesce_usecs_high = vsi->int_rate_limit;
 	ec->tx_coalesce_usecs_high = vsi->int_rate_limit;
 
+	if (queue > 0) {
+		if (queue >= vsi->num_q_vectors) {
+			netif_info(pf, drv, netdev, "Invalid queue number\n");
+			return -EINVAL;
+		}
+
+		q_vector = vsi->q_vectors[queue];
+		vector = vsi->base_vector + queue;
+
+		ec->rx_coalesce_usecs = ITR_REG_TO_USEC(rd32(hw, I40E_PFINT_ITRN(0, vector - 1)));
+		ec->tx_coalesce_usecs = ITR_REG_TO_USEC(rd32(hw, I40E_PFINT_ITRN(1, vector - 1)));
+	}
 	return 0;
+}
+
+static int i40e_get_coalesce(struct net_device *netdev,
+			     struct ethtool_coalesce *ec)
+{
+	return __i40e_get_coalesce(netdev, ec, -1);
+}
+
+static int i40e_get_per_queue_coalesce(struct net_device *netdev, int queue,
+				       struct ethtool_coalesce *ec)
+{
+	return __i40e_get_coalesce(netdev, ec, queue);
 }
 
 static int i40e_set_coalesce(struct net_device *netdev,
@@ -2788,6 +2817,7 @@ static const struct ethtool_ops i40e_ethtool_ops = {
 	.get_ts_info		= i40e_get_ts_info,
 	.get_priv_flags		= i40e_get_priv_flags,
 	.set_priv_flags		= i40e_set_priv_flags,
+	.get_per_queue_coalesce	= i40e_get_per_queue_coalesce,
 };
 
 void i40e_set_ethtool_ops(struct net_device *netdev)
