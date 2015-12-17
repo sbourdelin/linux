@@ -53,6 +53,7 @@
 #include <linux/time.h>
 #include <linux/backing-dev.h>
 #include <linux/sort.h>
+#include <linux/kthread.h>
 
 #include <asm/uaccess.h>
 #include <linux/atomic.h>
@@ -1449,6 +1450,14 @@ static int cpuset_can_attach(struct cgroup_taskset *tset)
 		goto out_unlock;
 
 	cgroup_taskset_for_each(task, css, tset) {
+		/*
+		 * Workqueue threads may acquire PF_NO_SETAFFINITY and
+		 * become trapped in a cpuset.
+		 */
+		if (task->flags & PF_NO_SETAFFINITY) {
+			ret = -EINVAL;
+			goto out_unlock;
+		}
 		ret = task_can_attach(task, cs->cpus_allowed);
 		if (ret)
 			goto out_unlock;
