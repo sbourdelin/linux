@@ -289,22 +289,30 @@ static const struct intel_device_info intel_haswell_m_info = {
 static const struct intel_device_info intel_broadwell_d_info = {
 	HSW_FEATURES,
 	.gen = 8,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
 };
 
 static const struct intel_device_info intel_broadwell_m_info = {
 	HSW_FEATURES,
 	.gen = 8, .is_mobile = 1,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
 };
 
 static const struct intel_device_info intel_broadwell_gt3d_info = {
 	HSW_FEATURES,
 	.gen = 8,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
 static const struct intel_device_info intel_broadwell_gt3m_info = {
 	HSW_FEATURES,
 	.gen = 8, .is_mobile = 1,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
@@ -324,12 +332,16 @@ static const struct intel_device_info intel_skylake_info = {
 	HSW_FEATURES,
 	.is_skylake = 1,
 	.gen = 9,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
 };
 
 static const struct intel_device_info intel_skylake_gt3_info = {
 	HSW_FEATURES,
 	.is_skylake = 1,
 	.gen = 9,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
@@ -339,6 +351,8 @@ static const struct intel_device_info intel_broxton_info = {
 	.gen = 9,
 	.need_gfx_hws = 1, .has_hotplug = 1,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING,
+	.num_samples_after_ctm = BDW_SPLITGAMMA_MAX_VALS,
+	.num_samples_before_ctm = BDW_DEGAMMA_MAX_VALS,
 	.num_pipes = 3,
 	.has_ddi = 1,
 	.has_fpga_dbg = 1,
