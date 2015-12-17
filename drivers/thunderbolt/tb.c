@@ -64,8 +64,7 @@ static void tb_free_invalid_tunnels(struct tb *tb)
 {
 	struct tb_pci_tunnel *tunnel;
 	struct tb_pci_tunnel *n;
-	list_for_each_entry_safe(tunnel, n, &tb->tunnel_list, list)
-	{
+	list_for_each_entry_safe(tunnel, n, &tb->tunnel_list, list) {
 		if (tb_pci_is_invalid(tunnel)) {
 			tb_pci_deactivate(tunnel);
 			tb_pci_free(tunnel);
