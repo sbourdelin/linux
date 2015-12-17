@@ -133,7 +133,7 @@
 		if (WARN(unlikely(!__warned || i915.debug), format))	\
 			__warned = true;				\
 	}								\
-	unlikely(__ret_debug_on);					\
+	unlikely(__ret_warn_on);					\
 })
 
 static inline const char *yesno(bool v)

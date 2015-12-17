@@ -1434,7 +1434,7 @@ void intel_display_power_put(struct drm_i915_private *dev_priv,
 static inline void
 assert_rpm_device_not_suspended(struct drm_i915_private *dev_priv)
 {
-	WARN_ONCE(dev_priv->pm.suspended,
+	I915_WARN_RECUR(dev_priv->pm.suspended,
 		  "Device suspended during HW access\n");
 }
 
@@ -1442,7 +1442,7 @@ static inline void
 assert_rpm_wakelock_held(struct drm_i915_private *dev_priv)
 {
 	assert_rpm_device_not_suspended(dev_priv);
-	WARN_ONCE(!atomic_read(&dev_priv->pm.wakeref_count),
+	I915_WARN_RECUR(!atomic_read(&dev_priv->pm.wakeref_count),
 		  "RPM wakelock ref not held during HW access");
 }
 
@@ -1459,7 +1459,7 @@ assert_rpm_atomic_begin(struct drm_i915_private *dev_priv)
 static inline void
 assert_rpm_atomic_end(struct drm_i915_private *dev_priv, int begin_seq)
 {
-	WARN_ONCE(atomic_read(&dev_priv->pm.atomic_seq) != begin_seq,
+	I915_WARN_RECUR(atomic_read(&dev_priv->pm.atomic_seq) != begin_seq,
 		  "HW access outside of RPM atomic section\n");
 }
 
