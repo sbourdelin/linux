@@ -2829,7 +2829,7 @@ static void ironlake_update_primary_plane(struct drm_crtc *crtc,
 
 	pixel_size = drm_format_plane_cpp(fb->pixel_format, 0);
 
-	dspcntr = DISPPLANE_GAMMA_ENABLE;
+	dspcntr = (DISPPLANE_GAMMA_ENABLE | PLANE_CTL_PLANE_GAMMA_DISABLE);
 
 	dspcntr |= DISPLAY_PLANE_ENABLE;
 

@@ -203,7 +203,8 @@ skl_update_plane(struct drm_plane *drm_plane, struct drm_crtc *crtc,
 
 	plane_ctl = PLANE_CTL_ENABLE |
 		PLANE_CTL_PIPE_GAMMA_ENABLE |
-		PLANE_CTL_PIPE_CSC_ENABLE;
+		PLANE_CTL_PIPE_CSC_ENABLE |
+		PLANE_CTL_PLANE_GAMMA_DISABLE;
 
 	plane_ctl |= skl_plane_ctl_format(fb->pixel_format);
 	plane_ctl |= skl_plane_ctl_tiling(fb->modifier[0]);
@@ -402,7 +403,7 @@ vlv_update_plane(struct drm_plane *dplane, struct drm_crtc *crtc,
 	 * Enable gamma to match primary/cursor plane behaviour.
 	 * FIXME should be user controllable via propertiesa.
 	 */
-	sprctl |= SP_GAMMA_ENABLE;
+	sprctl |= (SP_GAMMA_ENABLE | PLANE_CTL_PLANE_GAMMA_DISABLE);
 
 	if (obj->tiling_mode != I915_TILING_NONE)
 		sprctl |= SP_TILED;
@@ -521,7 +522,7 @@ ivb_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
 	 * Enable gamma to match primary/cursor plane behaviour.
 	 * FIXME should be user controllable via propertiesa.
 	 */
-	sprctl |= SPRITE_GAMMA_ENABLE;
+	sprctl |= (SPRITE_GAMMA_ENABLE | PLANE_CTL_PLANE_GAMMA_DISABLE);
 
 	if (obj->tiling_mode != I915_TILING_NONE)
 		sprctl |= SPRITE_TILED;
