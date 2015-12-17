@@ -34,6 +34,7 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 #include "intel_drv.h"
+#include "intel_color_manager.h"
 
 #include <linux/console.h>
 #include <linux/module.h>
@@ -311,7 +312,9 @@ static const struct intel_device_info intel_cherryview_info = {
 	.gen = 8, .num_pipes = 3,
 	.need_gfx_hws = 1, .has_hotplug = 1,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING,
-	.is_cherryview = 1,
+	.is_valleyview = 1,
+	.num_samples_after_ctm = CHV_10BIT_GAMMA_MAX_VALS,
+	.num_samples_before_ctm = CHV_DEGAMMA_MAX_VALS,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
 	CURSOR_OFFSETS,

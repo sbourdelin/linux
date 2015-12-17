@@ -13940,6 +13940,8 @@ static void intel_begin_crtc_commit(struct drm_crtc *crtc,
 		intel_update_pipe_config(intel_crtc, old_intel_state);
 	else if (INTEL_INFO(dev)->gen >= 9)
 		skl_detach_scalers(intel_crtc);
+
+	intel_color_manager_commit(dev, crtc->state);
 }
 
 static void intel_finish_crtc_commit(struct drm_crtc *crtc,
