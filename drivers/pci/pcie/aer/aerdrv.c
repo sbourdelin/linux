@@ -282,8 +282,10 @@ static void aer_remove(struct pcie_device *dev)
 
 	if (rpc) {
 		/* If register interrupt service, it must be free. */
-		if (rpc->isr)
+		if (rpc->isr) {
 			free_irq(dev->irq, dev);
+			flush_work(&rpc->dpc_handler);
+		}
 
 		wait_event(rpc->wait_release, rpc->prod_idx == rpc->cons_idx);
 
