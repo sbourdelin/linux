@@ -203,6 +203,8 @@ static inline u32 ethtool_rxfh_indir_default(u32 index, u32 n_rx_rings)
  * @set_eee: Set EEE status (enable/disable) as well as LPI timers.
  * @get_per_queue_coalesce: Get interrupt coalescing parameters per queue.
  * 	Returns a negative error code or zero.
+ * @set_per_queue_coalesce: Set interrupt coalescing parameters per queue.
+ * 	Returns a negative error code or zero.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -282,6 +284,8 @@ struct ethtool_ops {
 	int	(*set_tunable)(struct net_device *,
 			       const struct ethtool_tunable *, const void *);
 	int	(*get_per_queue_coalesce)(struct net_device *, int,
+					  struct ethtool_coalesce *);
+	int	(*set_per_queue_coalesce)(struct net_device *, int,
 					  struct ethtool_coalesce *);
 
 };
