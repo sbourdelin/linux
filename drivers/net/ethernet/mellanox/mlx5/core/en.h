@@ -32,6 +32,8 @@
 
 #include <linux/if_vlan.h>
 #include <linux/etherdevice.h>
+#include <linux/timecounter.h>
+#include <linux/net_tstamp.h>
 #include <linux/mlx5/driver.h>
 #include <linux/mlx5/qp.h>
 #include <linux/mlx5/cq.h>
@@ -63,6 +65,7 @@
 #define MLX5E_TX_CQ_POLL_BUDGET        128
 #define MLX5E_UPDATE_STATS_INTERVAL    200 /* msecs */
 #define MLX5E_SQ_BF_BUDGET             16
+#define MLX5E_SERVICE_TASK_DELAY       (HZ / 4)
 
 #define MLX5E_NUM_MAIN_GROUPS 9
 
@@ -486,6 +489,16 @@ struct mlx5e_flow_tables {
 	struct mlx5e_flow_table		main;
 };
 
+struct mlx5e_tstamp {
+	rwlock_t                   lock;
+	struct cyclecounter        cycles;
+	struct timecounter         clock;
+	struct hwtstamp_config     hwtstamp_config;
+	u32                        nominal_c_mult;
+	unsigned long              last_overflow_check;
+	unsigned long              overflow_period;
+};
+
 struct mlx5e_priv {
 	/* priv data path fields - start */
 	int                        default_vlan_prio;
@@ -515,10 +528,12 @@ struct mlx5e_priv {
 	struct work_struct         update_carrier_work;
 	struct work_struct         set_rx_mode_work;
 	struct delayed_work        update_stats_work;
+	struct delayed_work        service_task;
 
 	struct mlx5_core_dev      *mdev;
 	struct net_device         *netdev;
 	struct mlx5e_stats         stats;
+	struct mlx5e_tstamp        tstamp;
 };
 
 #define MLX5E_NET_IP_ALIGN 2
@@ -584,6 +599,12 @@ int mlx5e_create_flow_tables(struct mlx5e_priv *priv);
 void mlx5e_destroy_flow_tables(struct mlx5e_priv *priv);
 void mlx5e_init_eth_addr(struct mlx5e_priv *priv);
 void mlx5e_set_rx_mode_work(struct work_struct *work);
+
+void mlx5e_fill_hwstamp(struct mlx5e_tstamp *clock,
+			struct skb_shared_hwtstamps *hwts,
+			u64 timestamp);
+void mlx5e_timestamp_overflow_check(struct mlx5e_priv *priv);
+void mlx5e_timestamp_init(struct mlx5e_priv *priv);
 
 int mlx5e_vlan_rx_add_vid(struct net_device *dev, __always_unused __be16 proto,
 			  u16 vid);
