@@ -110,6 +110,7 @@ struct regmap {
 	/* number of bits to (left) shift the reg value when formatting*/
 	int reg_shift;
 	int reg_stride;
+	int reg_stride_order;
 
 	/* regcache specific members */
 	const struct regcache_ops *cache_ops;
@@ -261,6 +262,12 @@ static inline const char *regmap_name(const struct regmap *map)
 		return dev_name(map->dev);
 
 	return map->name;
+}
+
+static inline unsigned int regmap_get_offset(const struct regmap *map,
+					     unsigned int index)
+{
+	return index << map->reg_stride_order;
 }
 
 #endif
