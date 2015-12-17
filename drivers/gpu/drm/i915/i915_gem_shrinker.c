@@ -129,6 +129,17 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 			if ((flags & I915_SHRINK_ACTIVE) == 0 && obj->active)
 				continue;
 
+			/*
+			 * Skip the unbinding of objects, possessing a fence
+			 * register, if the device in the suspended state.
+			 * Otherwise device has to be resumed before an access
+			 * is made to the fence register on unbinding.
+			 */
+			if (HAS_RUNTIME_PM(dev_priv->dev) &&
+				dev_priv->pm.suspended &&
+				(obj->fence_reg != I915_FENCE_REG_NONE))
+				continue;
+
 			drm_gem_object_reference(&obj->base);
 
 			/* For the unbound phase, this should be a no-op! */
