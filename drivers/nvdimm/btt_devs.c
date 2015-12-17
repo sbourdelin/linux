@@ -218,6 +218,8 @@ static bool uuid_is_null(u8 *uuid)
  * Check consistency of the btt info block with itself by validating
  * the checksum, and with the parent namespace by verifying the
  * parent_uuid contained in the info block with the one supplied in.
+ * When nd_btt->uuid is set for binding, verify if the metadata is
+ * stale.
  *
  * Returns:
  * false for an invalid info block, true for a valid one
@@ -232,6 +234,10 @@ bool nd_btt_arena_is_valid(struct nd_btt *nd_btt, struct btt_sb *super)
 
 	if (!uuid_is_null(super->parent_uuid))
 		if (memcmp(super->parent_uuid, parent_uuid, 16) != 0)
+			return false;
+
+	if (nd_btt->uuid)
+		if (memcmp(super->uuid, nd_btt->uuid, 16) != 0)
 			return false;
 
 	checksum = le64_to_cpu(super->checksum);
