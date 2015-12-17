@@ -2252,11 +2252,15 @@ static int ath_tx_prepare(struct ieee80211_hw *hw, struct sk_buff *skb,
 	padpos = ieee80211_hdrlen(hdr->frame_control);
 	padsize = padpos & 3;
 	if (padsize && skb->len > padpos) {
-		if (skb_headroom(skb) < padsize)
-			return -ENOMEM;
+		if (ieee80211_hw_check(hw, NEEDS_ALIGNED4_SKBS)) {
+			frmlen -= padsize;
+		} else {
+			if (skb_headroom(skb) < padsize)
+				return -ENOMEM;
 
-		skb_push(skb, padsize);
-		memmove(skb->data, skb->data + padsize, padpos);
+			skb_push(skb, padsize);
+			memmove(skb->data, skb->data + padsize, padpos);
+		}
 	}
 
 	setup_frame_info(hw, sta, skb, frmlen);
@@ -2473,7 +2477,8 @@ static void ath_tx_complete(struct ath_softc *sc, struct sk_buff *skb,
 
 	padpos = ieee80211_hdrlen(hdr->frame_control);
 	padsize = padpos & 3;
-	if (padsize && skb->len>padpos+padsize) {
+	if (padsize && skb->len > padpos + padsize &&
+	    !ieee80211_hw_check(sc->hw, NEEDS_ALIGNED4_SKBS)) {
 		/*
 		 * Remove MAC header padding before giving the frame back to
 		 * mac80211.
