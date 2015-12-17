@@ -85,6 +85,23 @@ static bool
 intel_dp_reset_link_train(struct intel_dp *intel_dp,
 			uint8_t dp_train_pat)
 {
+	bool has_dpcd;
+	bool no_aux_handshake = false;
+
+	has_dpcd = intel_dp_get_dpcd(intel_dp);
+
+	if (has_dpcd) {
+		if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11) {
+			no_aux_handshake = (intel_dp->dpcd[DP_MAX_DOWNSPREAD] &
+					    DP_NO_AUX_HANDSHAKE_LINK_TRAINING);
+		}
+	}
+
+	intel_dp->train_set_valid &= no_aux_handshake;
+
+	DRM_DEBUG_KMS("link training optimization: %s\n",
+		      intel_dp->train_set_valid ? "true" : "false");
+
 	if (!intel_dp->train_set_valid)
 		memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp_set_signal_levels(intel_dp);

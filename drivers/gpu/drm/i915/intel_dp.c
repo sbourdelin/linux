@@ -1676,6 +1676,12 @@ found:
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      const struct intel_crtc_state *pipe_config)
 {
+	if (intel_dp->link_rate != pipe_config->port_clock ||
+	    intel_dp->lane_count != pipe_config->lane_count) {
+		intel_dp->train_set_valid = false;
+		DRM_DEBUG_KMS("setting train set valid as false\n");
+	}
+
 	intel_dp->link_rate = pipe_config->port_clock;
 	intel_dp->lane_count = pipe_config->lane_count;
 }
@@ -3847,7 +3853,7 @@ intel_dp_link_down(struct intel_dp *intel_dp)
 	intel_dp->DP = DP;
 }
 
-static bool
+bool
 intel_dp_get_dpcd(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
