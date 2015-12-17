@@ -263,4 +263,6 @@ static int amd_ntb_peer_spad_addr(struct ntb_dev *ntb, int idx,
 					phys_addr_t *spad_addr);
 static u32 amd_ntb_peer_spad_read(struct ntb_dev *ntb, int idx);
 static int amd_ntb_peer_spad_write(struct ntb_dev *ntb, int idx, u32 val);
+static int amd_ntb_flush_req(struct ntb_dev *ntb);
+static int amd_ntb_wakeup_peer_side(struct ntb_dev *ntb);
 #endif
