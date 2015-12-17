@@ -23,7 +23,8 @@ static inline int myisspace(u8 c)
  * Returns the position of that @option (starts counting with 1)
  * or 0 on not found.
  */
-int cmdline_find_option_bool(const char *cmdline, const char *option)
+static int __cmdline_find_option_bool(const char *cmdline,
+		int max_cmdline_size, const char *option)
 {
 	char c;
 	int len, pos = 0, wstart = 0;
@@ -37,7 +38,7 @@ int cmdline_find_option_bool(const char *cmdline, const char *option)
 	if (!cmdline)
 		return -1;      /* No command line */
 
-	len = min_t(int, strlen(cmdline), COMMAND_LINE_SIZE);
+	len = min_t(int, strlen(cmdline), max_cmdline_size);
 	if (!len)
 		return 0;
 
@@ -81,4 +82,10 @@ int cmdline_find_option_bool(const char *cmdline, const char *option)
 	}
 
 	return 0;	/* Buffer overrun */
+}
+
+int cmdline_find_option_bool(const char *cmdline, const char *option)
+{
+	return __cmdline_find_option_bool(cmdline, COMMAND_LINE_SIZE,
+			option);
 }
