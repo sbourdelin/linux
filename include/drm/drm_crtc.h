@@ -263,11 +263,15 @@ struct drm_atomic_state;
  * @mode_changed: crtc_state->mode or crtc_state->enable has been changed
  * @active_changed: crtc_state->active has been toggled.
  * @connectors_changed: connectors to this crtc have been updated
+ * @color_correction_changed: color correction blob in this crtc got updated
  * @plane_mask: bitmask of (1 << drm_plane_index(plane)) of attached planes
  * @last_vblank_count: for helpers and drivers to capture the vblank of the
  * 	update to ensure framebuffer cleanup isn't done too early
  * @adjusted_mode: for use by helpers and drivers to compute adjusted mode timings
  * @mode: current mode timings
+ * @palette_before_ctm_blob: blob for color corrections to be applied after CTM
+ * @palette_after_ctm_blob: blob for color corrections to be applied before CTM
+ * @ctm_blob: blob for CTM color correction
  * @event: optional pointer to a DRM event to signal upon completion of the
  * 	state update
  * @state: backpointer to global drm_atomic_state
@@ -289,6 +293,7 @@ struct drm_crtc_state {
 	bool mode_changed : 1;
 	bool active_changed : 1;
 	bool connectors_changed : 1;
+	bool color_correction_changed : 1;
 
 	/* attached planes bitmask:
 	 * WARNING: transitional helpers do not maintain plane_mask so
@@ -307,6 +312,11 @@ struct drm_crtc_state {
 
 	/* blob property to expose current mode to atomic userspace */
 	struct drm_property_blob *mode_blob;
+
+	/* Color management blobs */
+	struct drm_property_blob *palette_before_ctm_blob;
+	struct drm_property_blob *palette_after_ctm_blob;
+	struct drm_property_blob *ctm_blob;
 
 	struct drm_pending_vblank_event *event;
 
@@ -1042,6 +1052,11 @@ struct drm_mode_config_funcs {
  * @property_blob_list: list of all the blob property objects
  * @blob_lock: mutex for blob property allocation and management
  * @*_property: core property tracking
+ * @cm_palette_before_ctm_property: color corrections before CTM block
+ * @cm_palette_after_ctm_property: color corrections after CTM block
+ * @cm_ctm_property: color transformation matrix correction
+ * @cm_coeff_before_ctm_property: query no of correction coeffi before CTM
+ * @cm_coeff_after_ctm_property: query no of correction coeffi after CTM
  * @preferred_depth: preferred RBG pixel depth, used by fb helpers
  * @prefer_shadow: hint to userspace to prefer shadow-fb rendering
  * @async_page_flip: does this device support async flips on the primary plane?
@@ -1146,6 +1161,15 @@ struct drm_mode_config {
 	/* properties for virtual machine layout */
 	struct drm_property *suggested_x_property;
 	struct drm_property *suggested_y_property;
+
+	/* Color correction properties */
+	struct drm_property *cm_palette_before_ctm_property;
+	struct drm_property *cm_palette_after_ctm_property;
+	struct drm_property *cm_ctm_property;
+
+	/* Color correction query */
+	struct drm_property *cm_coeff_before_ctm_property;
+	struct drm_property *cm_coeff_after_ctm_property;
 
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;

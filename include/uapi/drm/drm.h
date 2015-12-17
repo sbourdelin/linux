@@ -829,6 +829,36 @@ struct drm_event_vblank {
 	__u32 reserved;
 };
 
+struct drm_r32g32b32 {
+	/*
+	 * Data is in U8.24 fixed point format.
+	 * All platforms support values within [0, 1.0] range,
+	 * for Red, Green and Blue colors.
+	 */
+	__u32 r32;
+	__u32 g32;
+	__u32 b32;
+	__u32 reserved;
+};
+
+struct drm_palette {
+	/*
+	 * Starting of palette LUT in R32G32B32 format.
+	 * Each of RGB value is in U8.24 fixed point format.
+	 */
+	struct drm_r32g32b32 lut[0];
+};
+
+struct drm_ctm {
+	/*
+	 * Each value is in S31.32 format.
+	 * This is 3x3 matrix in row major format.
+	 * Integer part will be clipped to nearest
+	 * max/min boundary as supported by the HW platform.
+	 */
+	__s64 ctm_coeff[9];
+};
+
 /* typedef area */
 #ifndef __KERNEL__
 typedef struct drm_clip_rect drm_clip_rect_t;
