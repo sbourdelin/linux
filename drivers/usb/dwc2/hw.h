@@ -452,10 +452,10 @@
 #define DSTS_ERRATICERR			(1 << 3)
 #define DSTS_ENUMSPD_MASK		(0x3 << 1)
 #define DSTS_ENUMSPD_SHIFT		1
-#define DSTS_ENUMSPD_HS			0
-#define DSTS_ENUMSPD_FS			1
-#define DSTS_ENUMSPD_LS			2
-#define DSTS_ENUMSPD_FS48		3
+#define DSTS_ENUMSPD_HS			(0 << 1)
+#define DSTS_ENUMSPD_FS			(1 << 1)
+#define DSTS_ENUMSPD_LS			(2 << 1)
+#define DSTS_ENUMSPD_FS48		(3 << 1)
 #define DSTS_SUSPSTS			(1 << 0)
 
 #define DIEPMSK				HSOTG_REG(0x810)
