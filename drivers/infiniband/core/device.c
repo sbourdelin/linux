@@ -352,6 +352,12 @@ int ib_register_device(struct ib_device *device,
 		goto out;
 	}
 
+	ret = ib_query_device(device, &device->attrs);
+	if (ret) {
+		printk(KERN_WARNING "Couldn't query the device attributes\n");
+		goto out;
+	}
+
 	ret = ib_device_register_sysfs(device, port_callback);
 	if (ret) {
 		printk(KERN_WARNING "Couldn't register device %s with driver model\n",
