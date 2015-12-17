@@ -43,6 +43,8 @@ ieee80211_tx_h_michael_mic_add(struct ieee80211_tx_data *tx)
 		return TX_CONTINUE;
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&tx->local->hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
 	if (skb->len < hdrlen)
 		return TX_DROP;
 
@@ -201,6 +203,8 @@ static int tkip_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 	}
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&tx->local->hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
 	len = skb->len - hdrlen;
 
 	if (info->control.hw_key)
@@ -307,7 +311,8 @@ ieee80211_crypto_tkip_decrypt(struct ieee80211_rx_data *rx)
 }
 
 
-static void ccmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *b_0, u8 *aad)
+static void ccmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *b_0, u8 *aad,
+				unsigned int padsize)
 {
 	__le16 mask_fc;
 	int a4_included, mgmt;
@@ -329,7 +334,8 @@ static void ccmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *b_0, u8 *aad)
 	mask_fc |= cpu_to_le16(IEEE80211_FCTL_PROTECTED);
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
-	len_a = hdrlen - 2;
+	hdrlen += padsize;
+	len_a = hdrlen - 2 - padsize;
 	a4_included = ieee80211_has_a4(hdr->frame_control);
 
 	if (ieee80211_is_data_qos(hdr->frame_control))
@@ -405,6 +411,7 @@ static int ccmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb,
 	struct ieee80211_key *key = tx->key;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	int hdrlen, len, tail;
+	unsigned int padsize = 0;
 	u8 *pos;
 	u8 pn[6];
 	u64 pn64;
@@ -425,6 +432,9 @@ static int ccmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb,
 	}
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&tx->local->hw, NEEDS_ALIGNED4_SKBS))
+		padsize = hdrlen & 3;
+	hdrlen += padsize;
 	len = skb->len - hdrlen;
 
 	if (info->control.hw_key)
@@ -463,7 +473,8 @@ static int ccmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb,
 		return 0;
 
 	pos += IEEE80211_CCMP_HDR_LEN;
-	ccmp_special_blocks(skb, pn, b_0, aad);
+
+	ccmp_special_blocks(skb, pn, b_0, aad, padsize);
 	ieee80211_aes_ccm_encrypt(key->u.ccmp.tfm, b_0, aad, pos, len,
 				  skb_put(skb, mic_len), mic_len);
 
@@ -534,7 +545,7 @@ ieee80211_crypto_ccmp_decrypt(struct ieee80211_rx_data *rx,
 			u8 aad[2 * AES_BLOCK_SIZE];
 			u8 b_0[AES_BLOCK_SIZE];
 			/* hardware didn't decrypt/verify MIC */
-			ccmp_special_blocks(skb, pn, b_0, aad);
+			ccmp_special_blocks(skb, pn, b_0, aad, 0);
 
 			if (ieee80211_aes_ccm_decrypt(
 				    key->u.ccmp.tfm, b_0, aad,
@@ -556,7 +567,8 @@ ieee80211_crypto_ccmp_decrypt(struct ieee80211_rx_data *rx,
 	return RX_CONTINUE;
 }
 
-static void gcmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *j_0, u8 *aad)
+static void gcmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *j_0, u8 *aad,
+				unsigned int padsize)
 {
 	__le16 mask_fc;
 	u8 qos_tid;
@@ -571,7 +583,8 @@ static void gcmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *j_0, u8 *aad)
 	/* AAD (extra authenticate-only data) / masked 802.11 header
 	 * FC | A1 | A2 | A3 | SC | [A4] | [QC]
 	 */
-	put_unaligned_be16(ieee80211_hdrlen(hdr->frame_control) - 2, &aad[0]);
+	put_unaligned_be16(ieee80211_hdrlen(hdr->frame_control) - 2 - padsize,
+			   &aad[0]);
 	/* Mask FC: zero subtype b4 b5 b6 (if not mgmt)
 	 * Retry, PwrMgt, MoreData; set Protected
 	 */
@@ -633,6 +646,7 @@ static int gcmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 	struct ieee80211_key *key = tx->key;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	int hdrlen, len, tail;
+	unsigned int padsize = 0;
 	u8 *pos;
 	u8 pn[6];
 	u64 pn64;
@@ -652,6 +666,9 @@ static int gcmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 	}
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&tx->local->hw, NEEDS_ALIGNED4_SKBS))
+		padsize = hdrlen & 3;
+	hdrlen += padsize;
 	len = skb->len - hdrlen;
 
 	if (info->control.hw_key)
@@ -692,7 +709,7 @@ static int gcmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 		return 0;
 
 	pos += IEEE80211_GCMP_HDR_LEN;
-	gcmp_special_blocks(skb, pn, j_0, aad);
+	gcmp_special_blocks(skb, pn, j_0, aad, padsize);
 	ieee80211_aes_gcm_encrypt(key->u.gcmp.tfm, j_0, aad, pos, len,
 				  skb_put(skb, IEEE80211_GCMP_MIC_LEN));
 
@@ -760,7 +777,7 @@ ieee80211_crypto_gcmp_decrypt(struct ieee80211_rx_data *rx)
 			u8 aad[2 * AES_BLOCK_SIZE];
 			u8 j_0[AES_BLOCK_SIZE];
 			/* hardware didn't decrypt/verify MIC */
-			gcmp_special_blocks(skb, pn, j_0, aad);
+			gcmp_special_blocks(skb, pn, j_0, aad, 0);
 
 			if (ieee80211_aes_gcm_decrypt(
 				    key->u.gcmp.tfm, j_0, aad,
@@ -804,6 +821,8 @@ ieee80211_crypto_cs_encrypt(struct ieee80211_tx_data *tx,
 		return TX_DROP;
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&tx->local->hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
 
 	pos = skb_push(skb, iv_len);
 	memmove(pos, pos + iv_len, hdrlen);

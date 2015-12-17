@@ -102,6 +102,9 @@ static u8 *ieee80211_wep_add_iv(struct ieee80211_local *local,
 		return NULL;
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&local->hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
+
 	newhdr = skb_push(skb, IEEE80211_WEP_IV_LEN);
 	memmove(newhdr, newhdr + IEEE80211_WEP_IV_LEN, hdrlen);
 
@@ -123,6 +126,9 @@ static void ieee80211_wep_remove_iv(struct ieee80211_local *local,
 	unsigned int hdrlen;
 
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&local->hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
+
 	memmove(skb->data + IEEE80211_WEP_IV_LEN, skb->data, hdrlen);
 	skb_pull(skb, IEEE80211_WEP_IV_LEN);
 }
