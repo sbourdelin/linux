@@ -1628,7 +1628,9 @@ static void ieee80211_assign_perm_addr(struct ieee80211_local *local,
 			((u64)m[2] << 3*8) | ((u64)m[3] << 2*8) |
 			((u64)m[4] << 1*8) | ((u64)m[5] << 0*8);
 
-		if (__ffs64(mask) + hweight64(mask) != fls64(mask)) {
+		inc = (mask & -mask);
+		val = mask + inc;
+		if ((val & (val - 1)) != 0) {
 			/* not a contiguous mask ... not handled now! */
 			pr_info("not contiguous\n");
 			break;
@@ -1649,7 +1651,6 @@ static void ieee80211_assign_perm_addr(struct ieee80211_local *local,
 			((u64)m[2] << 3*8) | ((u64)m[3] << 2*8) |
 			((u64)m[4] << 1*8) | ((u64)m[5] << 0*8);
 
-		inc = 1ULL<<__ffs64(mask);
 		val = (start & mask);
 		addr = (start & ~mask) | (val & mask);
 		do {
