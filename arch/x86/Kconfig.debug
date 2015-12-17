@@ -400,4 +400,11 @@ config PUNIT_ATOM_DEBUG
 	  The current power state can be read from
 	  /sys/kernel/debug/punit_atom/dev_power_state
 
+config X86_TEST_EARLY_CMDLINE
+	bool "Early command line runtime tests"
+	---help---
+	  This creates some test command-lines and tries to parse
+	  a bunch of options from them.  The overhead is small both
+	  at boot and increased text/data sizes.
+
 endmenu
