@@ -3293,14 +3293,11 @@ static void pktgen_stop(struct pktgen_thread *t)
  */
 static void pktgen_rem_one_if(struct pktgen_thread *t)
 {
-	struct list_head *q, *n;
-	struct pktgen_dev *cur;
+	struct pktgen_dev *cur, *n;
 
 	func_enter();
 
-	list_for_each_safe(q, n, &t->if_list) {
-		cur = list_entry(q, struct pktgen_dev, list);
-
+	list_for_each_entry_safe(cur, n, &t->if_list, list) {
 		if (!cur->removal_mark)
 			continue;
 
@@ -3315,16 +3312,13 @@ static void pktgen_rem_one_if(struct pktgen_thread *t)
 
 static void pktgen_rem_all_ifs(struct pktgen_thread *t)
 {
-	struct list_head *q, *n;
-	struct pktgen_dev *cur;
+	struct pktgen_dev *cur, *n;
 
 	func_enter();
 
 	/* Remove all devices, free mem */
 
-	list_for_each_safe(q, n, &t->if_list) {
-		cur = list_entry(q, struct pktgen_dev, list);
-
+	list_for_each_entry_safe(cur, n, &t->if_list, list) {
 		kfree_skb(cur->skb);
 		cur->skb = NULL;
 
@@ -3771,12 +3765,10 @@ static int __net_init pktgen_create_thread(int cpu, struct pktgen_net *pn)
 static void _rem_dev_from_if_list(struct pktgen_thread *t,
 				  struct pktgen_dev *pkt_dev)
 {
-	struct list_head *q, *n;
-	struct pktgen_dev *p;
+	struct pktgen_dev *p, *n;
 
 	if_lock(t);
-	list_for_each_safe(q, n, &t->if_list) {
-		p = list_entry(q, struct pktgen_dev, list);
+	list_for_each_entry_safe(p, n, &t->if_list, list) {
 		if (p == pkt_dev)
 			list_del_rcu(&p->list);
 	}
@@ -3866,8 +3858,7 @@ remove:
 static void __net_exit pg_net_exit(struct net *net)
 {
 	struct pktgen_net *pn = net_generic(net, pg_net_id);
-	struct pktgen_thread *t;
-	struct list_head *q, *n;
+	struct pktgen_thread *t, *n;
 	LIST_HEAD(list);
 
 	/* Stop all interfaces & threads */
@@ -3877,8 +3868,7 @@ static void __net_exit pg_net_exit(struct net *net)
 	list_splice_init(&pn->pktgen_threads, &list);
 	mutex_unlock(&pktgen_thread_lock);
 
-	list_for_each_safe(q, n, &list) {
-		t = list_entry(q, struct pktgen_thread, th_list);
+	list_for_each_entry_safe(t, n, &list, th_list) {
 		list_del(&t->th_list);
 		kthread_stop(t->tsk);
 		put_task_struct(t->tsk);
