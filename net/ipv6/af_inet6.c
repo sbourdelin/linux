@@ -571,7 +571,6 @@ static const struct net_proto_family inet6_family_ops = {
 
 int inet6_register_protosw(struct inet_protosw *p)
 {
-	struct list_head *lh;
 	struct inet_protosw *answer;
 	struct list_head *last_perm;
 	int protocol = p->protocol;
@@ -587,14 +586,12 @@ int inet6_register_protosw(struct inet_protosw *p)
 	answer = NULL;
 	ret = -EPERM;
 	last_perm = &inetsw6[p->type];
-	list_for_each(lh, &inetsw6[p->type]) {
-		answer = list_entry(lh, struct inet_protosw, list);
-
+	list_for_each_entry(answer, &inetsw6[p->type], list) {
 		/* Check only the non-wild match. */
 		if (INET_PROTOSW_PERMANENT & answer->flags) {
 			if (protocol == answer->protocol)
 				break;
-			last_perm = lh;
+			last_perm = &answer->list;
 		}
 
 		answer = NULL;

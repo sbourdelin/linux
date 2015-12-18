@@ -1031,7 +1031,6 @@ static struct inet_protosw inetsw_array[] =
 
 void inet_register_protosw(struct inet_protosw *p)
 {
-	struct list_head *lh;
 	struct inet_protosw *answer;
 	int protocol = p->protocol;
 	struct list_head *last_perm;
@@ -1043,14 +1042,13 @@ void inet_register_protosw(struct inet_protosw *p)
 
 	/* If we are trying to override a permanent protocol, bail. */
 	last_perm = &inetsw[p->type];
-	list_for_each(lh, &inetsw[p->type]) {
-		answer = list_entry(lh, struct inet_protosw, list);
+	list_for_each_entry(answer, &inetsw[p->type], list) {
 		/* Check only the non-wild match. */
 		if ((INET_PROTOSW_PERMANENT & answer->flags) == 0)
 			break;
 		if (protocol == answer->protocol)
 			goto out_permanent;
-		last_perm = lh;
+		last_perm = &answer->list;
 	}
 
 	/* Add the new entry after the last permanent entry if any, so that

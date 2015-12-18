@@ -751,16 +751,14 @@ static void tcp_tasklet_func(unsigned long data)
 	struct tsq_tasklet *tsq = (struct tsq_tasklet *)data;
 	LIST_HEAD(list);
 	unsigned long flags;
-	struct list_head *q, *n;
-	struct tcp_sock *tp;
+	struct tcp_sock *tp, *n;
 	struct sock *sk;
 
 	local_irq_save(flags);
 	list_splice_init(&tsq->head, &list);
 	local_irq_restore(flags);
 
-	list_for_each_safe(q, n, &list) {
-		tp = list_entry(q, struct tcp_sock, tsq_node);
+	list_for_each_entry_safe(tp, n, &list, tsq_node) {
 		list_del(&tp->tsq_node);
 
 		sk = (struct sock *)tp;
