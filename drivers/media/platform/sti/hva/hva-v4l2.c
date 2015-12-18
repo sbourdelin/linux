@@ -33,7 +33,10 @@
 
 #define DFT_CFG_WIDTH		HVA_MIN_WIDTH
 #define	DFT_CFG_HEIGHT		HVA_MIN_HEIGHT
+#define DFT_CFG_LEVEL		V4L2_MPEG_VIDEO_H264_LEVEL_4_0
+#define DFT_CFG_PROFILE		V4L2_MPEG_VIDEO_H264_PROFILE_HIGH
 #define DFT_CFG_BITRATE_MODE	V4L2_MPEG_VIDEO_BITRATE_MODE_CBR
+#define DFT_CFG_ENTROPY_MODE	V4L2_MPEG_VIDEO_H264_ENTROPY_MODE_CAVLC
 #define DFT_CFG_GOP_SIZE	16
 #define DFT_CFG_INTRA_REFRESH	true
 #define DFT_CFG_FRAME_NUM	1
@@ -43,6 +46,7 @@
 #define DFT_CFG_DCT8X8		false
 #define DFT_CFG_COMP_QUALITY	85
 #define DFT_CFG_SAR_ENABLE	1
+#define DFT_CFG_SAR_IDC		V4L2_MPEG_VIDEO_H264_VUI_SAR_IDC_1x1
 #define DFT_CFG_BITRATE		(20000 * 1024)
 #define DFT_CFG_CPB_SIZE	(25000 * 1024)
 
@@ -63,12 +67,14 @@ static const struct hva_frameinfo frame_dflt_fmt = {
 };
 
 static const struct hva_streaminfo stream_dflt_fmt = {
+	.streamformat	= V4L2_PIX_FMT_H264,
 	.width		= DFT_CFG_WIDTH,
 	.height		= DFT_CFG_HEIGHT
 };
 
 /* list of stream formats supported by hva hardware */
 const u32 stream_fmt[] = {
+	V4L2_PIX_FMT_H264,
 };
 
 /* list of pixel formats supported by hva hardware */
@@ -98,6 +104,16 @@ static const struct hva_frame_fmt frame_fmts[] = {
 
 /* registry of available encoders */
 const struct hva_encoder *hva_encoders[] = {
+	&nv12h264enc,
+	&nv21h264enc,
+	&uyvyh264enc,
+	&vyuyh264enc,
+	&rgb24h264enc,
+	&bgr24h264enc,
+	&xrgb32h264enc,
+	&xbgr32h264enc,
+	&rgbx32h264enc,
+	&bgrx32h264enc,
 };
 
 static const struct hva_frame_fmt *hva_find_frame_fmt(u32 pixelformat)
@@ -391,6 +407,7 @@ static int hva_s_ext_ctrls(struct file *file, void *fh,
 {
 	struct hva_ctx *ctx = fh_to_ctx(file->private_data);
 	struct device *dev = ctx_to_dev(ctx);
+	int top_bot = V4L2_MPEG_VIDEO_H264_SEI_FP_ARRANGEMENT_TYPE_TOP_BOTTOM;
 	unsigned int i;
 
 	dev_dbg(dev, "%s %s count controls %d\n", ctx->name, __func__,
@@ -398,6 +415,24 @@ static int hva_s_ext_ctrls(struct file *file, void *fh,
 
 	for (i = 0; i < ctrls->count; i++) {
 		switch (ctrls->controls[i].id) {
+		case V4L2_CID_MPEG_VIDEO_H264_LEVEL:
+			ctx->ctrls.level = ctrls->controls[i].value;
+			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_H264_LEVEL %d\n",
+				ctx->name, ctrls->controls[i].value);
+			if (ctx->flags & HVA_FLAG_STREAMINFO)
+				snprintf(ctx->streaminfo.level,
+					 sizeof(ctx->streaminfo.level),
+					 "%s", level_str(ctx->ctrls.level));
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_PROFILE:
+			ctx->ctrls.profile = ctrls->controls[i].value;
+			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_H264_PROFILE %d\n",
+				ctx->name, ctrls->controls[i].value);
+			if (ctx->flags & HVA_FLAG_STREAMINFO)
+				snprintf(ctx->streaminfo.profile,
+					 sizeof(ctx->streaminfo.profile),
+					 "%s", profile_str(ctx->ctrls.profile));
+			break;
 		case V4L2_CID_MPEG_VIDEO_GOP_SIZE:
 			ctx->ctrls.gop_size = ctrls->controls[i].value;
 			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_GOP_SIZE %d\n",
@@ -408,15 +443,49 @@ static int hva_s_ext_ctrls(struct file *file, void *fh,
 			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_BITRATE_MODE %d\n",
 				ctx->name, ctrls->controls[i].value);
 			break;
+		case V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE:
+			ctx->ctrls.entropy_mode = ctrls->controls[i].value;
+			dev_dbg(dev,
+				"%s V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
 		case V4L2_CID_MPEG_VIDEO_BITRATE:
 			ctx->ctrls.bitrate = ctrls->controls[i].value;
 			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_BITRATE %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE:
+			ctx->ctrls.cpb_size = ctrls->controls[i].value;
+			dev_dbg(dev,
+				"%s V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE %d\n",
 				ctx->name, ctrls->controls[i].value);
 			break;
 		case V4L2_CID_MPEG_VIDEO_CYCLIC_INTRA_REFRESH_MB:
 			ctx->ctrls.intra_refresh = ctrls->controls[i].value;
 			dev_dbg(dev,
 				"%s V4L2_CID_MPEG_VIDEO_CYCLIC_INTRA_REFRESH_MB %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_8X8_TRANSFORM:
+			ctx->ctrls.dct8x8 = ctrls->controls[i].value;
+			dev_dbg(dev,
+				"%s V4L2_CID_MPEG_VIDEO_H264_8X8_TRANSFORM %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_MIN_QP:
+			ctx->ctrls.qpmin = ctrls->controls[i].value;
+			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_H264_MIN_QP %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_MAX_QP:
+			ctx->ctrls.qpmax = ctrls->controls[i].value;
+			dev_dbg(dev, "%s V4L2_CID_MPEG_VIDEO_H264_MAX_QP %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_JPEG_COMPRESSION_QUALITY:
+			ctx->ctrls.jpeg_comp_quality = ctrls->controls[i].value;
+			dev_dbg(dev,
+				"%s V4L2_CID_JPEG_COMPRESSION_QUALITY %d\n",
 				ctx->name, ctrls->controls[i].value);
 			break;
 		case V4L2_CID_MPEG_VIDEO_ASPECT:
@@ -433,6 +502,56 @@ static int hva_s_ext_ctrls(struct file *file, void *fh,
 			default:
 				dev_err(dev,
 					"%s V4L2_CID_MPEG_VIDEO_ASPECT: Unsupported aspect ratio %d\n",
+					ctx->name, ctrls->controls[i].value);
+				return -EINVAL;
+			}
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_VUI_SAR_ENABLE:
+			ctx->ctrls.vui_sar = ctrls->controls[i].value;
+			dev_dbg(dev,
+				"%s V4L2_CID_MPEG_VIDEO_H264_VUI_SAR_ENABLE %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_VUI_SAR_IDC:
+			switch (ctrls->controls[i].value) {
+			/* only one pixel aspect ratio supported (1/1) */
+			case V4L2_MPEG_VIDEO_H264_VUI_SAR_IDC_1x1:
+				ctx->ctrls.vui_sar_idc =
+				    ctrls->controls[i].value;
+				dev_dbg(dev,
+					"%s V4L2_CID_MPEG_VIDEO_H264_VUI_SAR_IDC %d\n",
+					ctx->name, ctrls->controls[i].value);
+				break;
+			default:
+				dev_err(dev,
+					"%s V4L2_CID_MPEG_VIDEO_H264_VUI_SAR_IDC: Unsupported aspect ratio %d\n",
+					ctx->name, ctrls->controls[i].value);
+				return -EINVAL;
+			}
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_VUI_EXT_SAR_WIDTH:
+		case V4L2_CID_MPEG_VIDEO_H264_VUI_EXT_SAR_HEIGHT:
+			dev_err(dev,
+				"%s VIDIOC_S_EXT_CTRLS(): Unsupported control id %d for Extended Aspect Ratio\n",
+				ctx->name, ctrls->controls[i].id);
+			return -EINVAL;
+		case V4L2_CID_MPEG_VIDEO_H264_SEI_FRAME_PACKING:
+			ctx->ctrls.sei_fp = ctrls->controls[i].value;
+			dev_dbg(dev,
+				"%s V4L2_CID_MPEG_VIDEO_H264_SEI_FRAME_PACKING %d\n",
+				ctx->name, ctrls->controls[i].value);
+			break;
+		case V4L2_CID_MPEG_VIDEO_H264_SEI_FP_ARRANGEMENT_TYPE:
+			/* only top/bottom frame packing supported */
+			if (ctrls->controls[i].value == top_bot) {
+				ctx->ctrls.sei_fp_type =
+					ctrls->controls[i].value;
+				dev_dbg(dev,
+					"%s V4L2_CID_MPEG_VIDEO_H264_SEI_FP_ARRANGEMENT_TYPE %d\n",
+					ctx->name, ctrls->controls[i].value);
+			} else {
+				dev_err(dev,
+					"%s V4L2_CID_MPEG_VIDEO_H264_SEI_FP_ARRANGEMENT_TYPE: Unsupported frame packing arrangement %d\n",
 					ctx->name, ctrls->controls[i].value);
 				return -EINVAL;
 			}
@@ -972,6 +1091,9 @@ static int hva_vb2_stream_queue_setup(struct vb2_queue *q,
 	height = ctx->streaminfo.height;
 
 	switch (pixelformat) {
+	case V4L2_PIX_FMT_H264:
+		max_buf_size = width * height;
+		break;
 	default:
 		dev_err(dev, "%s %s Unknown stream format\n", ctx->name,
 			__func__);
@@ -1128,16 +1250,20 @@ static int hva_open(struct file *file)
 	snprintf(ctx->name, sizeof(ctx->name), "[%3d:----]", hva->instance_id);
 
 	/* initialize controls */
+	ctx->ctrls.level = DFT_CFG_LEVEL;
+	ctx->ctrls.profile = DFT_CFG_PROFILE;
 	ctx->ctrls.bitrate_mode = DFT_CFG_BITRATE_MODE;
 	ctx->ctrls.bitrate = DFT_CFG_BITRATE;
 	ctx->ctrls.cpb_size = DFT_CFG_CPB_SIZE;
 	ctx->ctrls.gop_size = DFT_CFG_GOP_SIZE;
 	ctx->ctrls.intra_refresh = DFT_CFG_INTRA_REFRESH;
+	ctx->ctrls.entropy_mode = DFT_CFG_ENTROPY_MODE;
 	ctx->ctrls.dct8x8 = DFT_CFG_DCT8X8;
 	ctx->ctrls.qpmin = DFT_CFG_QPMIN;
 	ctx->ctrls.qpmax = DFT_CFG_QPMAX;
 	ctx->ctrls.jpeg_comp_quality = DFT_CFG_COMP_QUALITY;
 	ctx->ctrls.vui_sar = DFT_CFG_SAR_ENABLE;
+	ctx->ctrls.vui_sar_idc = DFT_CFG_SAR_IDC;
 
 	/* set by default time per frame */
 	ctx->time_per_frame.numerator = DFT_CFG_FRAME_NUM;
