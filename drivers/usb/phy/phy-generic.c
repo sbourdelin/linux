@@ -157,6 +157,16 @@ int usb_gen_phy_init(struct usb_phy *phy)
 }
 EXPORT_SYMBOL_GPL(usb_gen_phy_init);
 
+static int usb_gen_phy_phy_init(struct phy *phy)
+{
+	struct platform_device *pdev = container_of(phy->dev.parent,
+						    struct platform_device,
+						    dev);
+	struct usb_phy_generic *nop = platform_get_drvdata(pdev);
+
+	return usb_gen_phy_init(&nop->phy);
+}
+
 void usb_gen_phy_shutdown(struct usb_phy *phy)
 {
 	struct usb_phy_generic *nop = dev_get_drvdata(phy->dev);
@@ -172,6 +182,23 @@ void usb_gen_phy_shutdown(struct usb_phy *phy)
 	}
 }
 EXPORT_SYMBOL_GPL(usb_gen_phy_shutdown);
+
+static int usb_gen_phy_phy_exit(struct phy *phy)
+{
+	struct platform_device *pdev = container_of(phy->dev.parent,
+						    struct platform_device,
+						    dev);
+	struct usb_phy_generic *nop = platform_get_drvdata(pdev);
+
+	usb_gen_phy_shutdown(&nop->phy);
+	return 0;
+}
+
+static struct phy_ops usb_gen_phy_phy_ops = {
+	.init = usb_gen_phy_phy_init,
+	.exit = usb_gen_phy_phy_exit,
+	.owner = THIS_MODULE,
+};
 
 static int nop_set_peripheral(struct usb_otg *otg, struct usb_gadget *gadget)
 {
@@ -296,12 +323,16 @@ EXPORT_SYMBOL_GPL(usb_phy_gen_create_phy);
 static int usb_phy_generic_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct usb_phy_generic	*nop;
+	struct usb_phy_generic *nop;
+	struct phy *phy;
+	struct phy_provider *phy_provider;
 	int err;
 
 	nop = devm_kzalloc(dev, sizeof(*nop), GFP_KERNEL);
 	if (!nop)
 		return -ENOMEM;
+
+	platform_set_drvdata(pdev, nop);
 
 	err = usb_phy_gen_create_phy(dev, nop, dev_get_platdata(&pdev->dev));
 	if (err)
@@ -322,14 +353,27 @@ static int usb_phy_generic_probe(struct platform_device *pdev)
 	nop->phy.init		= usb_gen_phy_init;
 	nop->phy.shutdown	= usb_gen_phy_shutdown;
 
+	phy = devm_phy_create(dev, NULL, &usb_gen_phy_phy_ops);
+	if (IS_ERR(phy)) {
+		err = PTR_ERR(phy);
+		dev_err(&pdev->dev, "can't create phy device, err: %d\n", err);
+		return err;
+	}
+
+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+	if (IS_ERR(phy_provider)) {
+		err = PTR_ERR(phy_provider);
+		dev_err(&pdev->dev,
+			"can't create phy provider, err: %d\n", err);
+		return err;
+	}
+
 	err = usb_add_phy_dev(&nop->phy);
 	if (err) {
 		dev_err(&pdev->dev, "can't register transceiver, err: %d\n",
 			err);
 		return err;
 	}
-
-	platform_set_drvdata(pdev, nop);
 
 	return 0;
 }

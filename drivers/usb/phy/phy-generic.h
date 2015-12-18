@@ -4,6 +4,7 @@
 #include <linux/usb/usb_phy_generic.h>
 #include <linux/gpio/consumer.h>
 #include <linux/regulator/consumer.h>
+#include <linux/phy/phy.h>
 
 struct usb_phy_generic {
 	struct usb_phy phy;
