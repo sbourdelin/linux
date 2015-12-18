@@ -157,9 +157,9 @@ static unsigned int init_lirc_timer(void)
 			count++;
 		level = newlevel;
 		do_gettimeofday(&now);
-	} while (count < 1000 && (now.tv_sec < tv.tv_sec
-			     || (now.tv_sec == tv.tv_sec
-				 && now.tv_usec < tv.tv_usec)));
+	} while (count < 1000 && (now.tv_sec < tv.tv_sec ||
+				  (now.tv_sec == tv.tv_sec &&
+				   now.tv_usec < tv.tv_usec)));
 
 	timeelapsed = (now.tv_sec + 1 - tv.tv_sec) * 1000000
 		     + (now.tv_usec - tv.tv_usec);
@@ -279,8 +279,8 @@ static void lirc_lirc_irq_handler(void *blah)
 		level = newlevel;
 
 		/* giving up */
-		if (signal > timeout
-		    || (check_pselecd && (in(1) & LP_PSELECD))) {
+		if (signal > timeout ||
+		    (check_pselecd && (in(1) & LP_PSELECD))) {
 			signal = 0;
 			pr_notice("timeout\n");
 			break;
