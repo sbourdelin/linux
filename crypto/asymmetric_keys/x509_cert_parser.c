@@ -497,7 +497,7 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
 	static const unsigned char month_lengths[] = { 31, 28, 31, 30, 31, 30,
 						       31, 31, 30, 31, 30, 31 };
 	const unsigned char *p = value;
-	unsigned year, mon, day, hour, min, sec, mon_len;
+	unsigned year, mon, day, hour, min, sec, mon_len, max_sec;
 
 #define dec2bin(X) ({ unsigned char x = (X) - '0'; if (x > 9) goto invalid_time; x; })
 #define DD2bin(P) ({ unsigned x = dec2bin(P[0]) * 10 + dec2bin(P[1]); P += 2; x; })
@@ -511,6 +511,7 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
 			year += 1900;
 		else
 			year += 2000;
+		max_sec = 59;
 	} else if (tag == ASN1_GENTIM) {
 		/* GenTime: YYYYMMDDHHMMSSZ */
 		if (vlen != 15)
@@ -518,6 +519,7 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
 		year = DD2bin(p) * 100 + DD2bin(p);
 		if (year >= 1950 && year <= 2049)
 			goto invalid_time;
+		max_sec = 60; /* ISO 8601 permits leap seconds [X.680 46.3] */
 	} else {
 		goto unsupported_time;
 	}
@@ -550,7 +552,7 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
 	if (day < 1 || day > mon_len ||
 	    hour > 23 ||
 	    min > 59 ||
-	    sec > 59)
+	    sec > max_sec)
 		goto invalid_time;
 
 	*_t = mktime64(year, mon, day, hour, min, sec);
