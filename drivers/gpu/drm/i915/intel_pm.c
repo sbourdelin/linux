@@ -2802,9 +2802,9 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 static unsigned int skl_cursor_allocation(const struct intel_wm_config *config)
 {
 	if (config->num_pipes_active == 1)
-		return 32;
+		return 52;
 
-	return 8;
+	return 16;
 }
 
 static void skl_ddb_entry_init_from_hw(struct skl_ddb_entry *entry, u32 reg)
