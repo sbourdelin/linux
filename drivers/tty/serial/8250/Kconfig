@@ -379,6 +379,11 @@ config SERIAL_8250_MID
 	  Intel platforms.
 
 config SERIAL_OF_PLATFORM
+	tristate
+	depends on SERIAL_8250 && OF
+	select SERIAL_8250_OF
+
+config SERIAL_8250_OF
 	tristate "Devicetree based probing for 8250 ports"
 	depends on SERIAL_8250 && OF
 	help
