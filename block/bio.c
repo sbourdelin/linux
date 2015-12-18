@@ -581,6 +581,10 @@ void __bio_clone_fast(struct bio *bio, struct bio *bio_src)
 	bio_set_flag(bio, BIO_CLONED);
 	bio->bi_rw = bio_src->bi_rw;
 	bio->bi_iter = bio_src->bi_iter;
+
+	if (bio_flagged(bio, BIO_OWNS_VEC))
+		bvec_free(bio->bi_pool->bvec_pool,
+				bio->bi_io_vec, BIO_POOL_IDX(bio));
 	bio->bi_io_vec = bio_src->bi_io_vec;
 }
 EXPORT_SYMBOL(__bio_clone_fast);
