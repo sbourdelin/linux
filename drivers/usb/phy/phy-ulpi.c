@@ -23,13 +23,16 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <asm/io.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/export.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
 #include <linux/usb.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/ulpi.h>
-
+#include <linux/of.h>
 
 struct ulpi_info {
 	unsigned int	id;
@@ -253,6 +256,20 @@ static int ulpi_set_vbus(struct usb_otg *otg, bool on)
 	return usb_phy_io_write(phy, flags, ULPI_OTG_CTRL);
 }
 
+static void otg_ulpi_init(struct usb_phy *phy, struct usb_otg *otg,
+			  struct usb_phy_io_ops *ops, unsigned int flags)
+{
+	phy->label	= "ULPI";
+	phy->flags	= flags;
+	phy->io_ops	= ops;
+	phy->otg	= otg;
+	phy->init	= ulpi_init;
+
+	otg->usb_phy	= phy;
+	otg->set_host	= ulpi_set_host;
+	otg->set_vbus	= ulpi_set_vbus;
+}
+
 struct usb_phy *
 otg_ulpi_create(struct usb_phy_io_ops *ops,
 		unsigned int flags)
@@ -270,17 +287,109 @@ otg_ulpi_create(struct usb_phy_io_ops *ops,
 		return NULL;
 	}
 
-	phy->label	= "ULPI";
-	phy->flags	= flags;
-	phy->io_ops	= ops;
-	phy->otg	= otg;
-	phy->init	= ulpi_init;
-
-	otg->usb_phy	= phy;
-	otg->set_host	= ulpi_set_host;
-	otg->set_vbus	= ulpi_set_vbus;
+	otg_ulpi_init(phy, otg, ops, flags);
 
 	return phy;
 }
 EXPORT_SYMBOL_GPL(otg_ulpi_create);
 
+struct usb_phy_ulpi_ddata {
+	void __iomem *base;
+	struct usb_phy usbphy;
+	struct usb_otg otg;
+};
+
+static const struct phy_ops usb_phy_ulpi_phy_ops = {
+	.owner = THIS_MODULE,
+};
+
+static void usb_phy_init_dt(struct device_node *np,
+			    struct usb_phy_ulpi_ddata *ddata)
+{
+	struct usb_phy *usbphy = &ddata->usbphy;
+
+
+	/* some bits are missing ... */
+	if (of_get_property(np, "ulpi,otg-id-pullup", NULL))
+		usbphy->flags |= ULPI_OTG_ID_PULLUP;
+
+	if (of_get_property(np, "ulpi,otg-dp-pulldown-disable", NULL))
+		usbphy->flags |= ULPI_OTG_DP_PULLDOWN_DIS;
+
+	if (of_get_property(np, "ulpi,otg-dm-pulldown-disable", NULL))
+		usbphy->flags |= ULPI_OTG_DM_PULLDOWN_DIS;
+
+	if (of_get_property(np, "ulpi,otg-external-vbus", NULL))
+		usbphy->flags |= ULPI_OTG_DRVVBUS_EXT;
+
+	if (of_get_property(np, "ulpi,otg-external-overcurrent-indicator", NULL))
+		usbphy->flags |= ULPI_OTG_EXTVBUSIND;
+}
+
+static int usb_phy_ulpi_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct phy *phy;
+	struct phy_provider *phy_provider;
+	struct usb_phy_ulpi_ddata *ddata;
+	int err;
+
+	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
+	if (!ddata)
+		return -ENOMEM;
+
+	platform_set_drvdata(pdev, ddata);
+
+	otg_ulpi_init(&ddata->usbphy, &ddata->otg, NULL, 0);
+
+	ddata->usbphy.io_priv = NULL;
+	ddata->usbphy.dev = dev;
+
+	usb_phy_init_dt(dev->of_node, ddata);
+
+	phy = devm_phy_create(dev, NULL, &usb_phy_ulpi_phy_ops);
+	if (IS_ERR(phy)) {
+		err = PTR_ERR(phy);
+		dev_err(dev, "can't create phy device, err: %d\n", err);
+		return err;
+	}
+
+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+	if (IS_ERR(phy_provider)) {
+		err = PTR_ERR(phy_provider);
+		dev_err(dev, "can't create phy provider, err: %d\n", err);
+		return err;
+	}
+
+	err = usb_add_phy_dev(&ddata->usbphy);
+	if (err) {
+		dev_err(dev, "can't register usb_phy device, err: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+static int usb_phy_ulpi_remove(struct platform_device *pdev)
+{
+	struct usb_phy_ulpi_ddata *ddata = platform_get_drvdata(pdev);
+
+	usb_remove_phy(&ddata->usbphy);
+
+	return 0;
+}
+
+static const struct of_device_id usb_phy_ulpi_ids[] = {
+	{ .compatible = "usb-ulpi-xceiv" },
+	{ /* sentinel */ }
+};
+
+static struct platform_driver usb_phy_ulpi_driver = {
+	.probe = usb_phy_ulpi_probe,
+	.remove = usb_phy_ulpi_remove,
+	.driver = {
+		.name = "usb-phy-ulpi",
+		.of_match_table = usb_phy_ulpi_ids,
+	},
+};
+module_platform_driver(usb_phy_ulpi_driver);
