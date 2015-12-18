@@ -142,14 +142,11 @@ static void dgnc_cleanup_module(void)
 	/* Turn off poller right away. */
 	del_timer_sync(&dgnc_poll_timer);
 
-	dgnc_remove_driver_sysfiles(&dgnc_driver);
-
 	device_destroy(dgnc_class, MKDEV(dgnc_Major, 0));
 	class_destroy(dgnc_class);
 	unregister_chrdev(dgnc_Major, "dgnc");
 
 	for (i = 0; i < dgnc_NumBoards; ++i) {
-		dgnc_remove_ports_sysfiles(dgnc_Board[i]);
 		dgnc_tty_uninit(dgnc_Board[i]);
 		dgnc_cleanup_board(dgnc_Board[i]);
 	}
@@ -180,6 +177,8 @@ static int __init dgnc_init_module(void)
 	/*
 	 * Find and configure all the cards
 	 */
+	dgnc_driver.driver.groups = dgnc_drv_attr_groups;
+
 	rc = pci_register_driver(&dgnc_driver);
 
 	/*
@@ -193,8 +192,6 @@ static int __init dgnc_init_module(void)
 			pr_warn("WARNING: dgnc driver load failed.  No Digi Neo or Classic boards found.\n");
 
 		dgnc_cleanup_module();
-	} else {
-		dgnc_create_driver_sysfiles(&dgnc_driver);
 	}
 
 	return rc;
@@ -281,6 +278,8 @@ static int dgnc_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	int rc;
 
 	/* wake up and enable device */
+	pdev->dev.groups = dgnc_dev_attr_groups;
+
 	rc = pci_enable_device(pdev);
 
 	if (rc < 0) {
@@ -553,8 +552,6 @@ static int dgnc_found_board(struct pci_dev *pdev, int id)
 
 	brd->state = BOARD_READY;
 	brd->dpastatus = BD_RUNNING;
-
-	dgnc_create_ports_sysfiles(brd);
 
 	/* init our poll helper tasklet */
 	tasklet_init(&brd->helper_tasklet,

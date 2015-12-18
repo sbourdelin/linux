@@ -24,6 +24,7 @@
 
 #include "dgnc_driver.h"
 #include "dgnc_mgmt.h"
+#include "dgnc_sysfs.h"
 
 static ssize_t dgnc_driver_version_show(struct device_driver *ddp, char *buf)
 {
@@ -68,28 +69,22 @@ static ssize_t dgnc_driver_pollrate_store(struct device_driver *ddp,
 static DRIVER_ATTR(pollrate, (S_IRUSR | S_IWUSR), dgnc_driver_pollrate_show,
 		   dgnc_driver_pollrate_store);
 
-void dgnc_create_driver_sysfiles(struct pci_driver *dgnc_driver)
-{
-	int rc = 0;
-	struct device_driver *driverfs = &dgnc_driver->driver;
+static struct attribute *dgnc_drv_attrs[] = {
+	&driver_attr_version.attr,
+	&driver_attr_boards.attr,
+	&driver_attr_maxboards.attr,
+	&driver_attr_pollrate.attr,
+	NULL,
+};
 
-	rc |= driver_create_file(driverfs, &driver_attr_version);
-	rc |= driver_create_file(driverfs, &driver_attr_boards);
-	rc |= driver_create_file(driverfs, &driver_attr_maxboards);
-	rc |= driver_create_file(driverfs, &driver_attr_pollrate);
-	if (rc)
-		pr_err("DGNC: sysfs driver_create_file failed!\n");
-}
+static struct attribute_group dgnc_drv_attr_group = {
+	.attrs = dgnc_drv_attrs,
+};
 
-void dgnc_remove_driver_sysfiles(struct pci_driver *dgnc_driver)
-{
-	struct device_driver *driverfs = &dgnc_driver->driver;
-
-	driver_remove_file(driverfs, &driver_attr_version);
-	driver_remove_file(driverfs, &driver_attr_boards);
-	driver_remove_file(driverfs, &driver_attr_maxboards);
-	driver_remove_file(driverfs, &driver_attr_pollrate);
-}
+const struct attribute_group *dgnc_drv_attr_groups[] = {
+	&dgnc_drv_attr_group,
+	NULL,
+};
 
 #define DGNC_VERIFY_BOARD(p, bd)				\
 	do {							\
@@ -338,43 +333,31 @@ static DEVICE_ATTR(ports_txcount, S_IRUSR, dgnc_ports_txcount_show, NULL);
 /* this function creates the sys files that will export each signal status
  * to sysfs each value will be put in a separate filename
  */
-void dgnc_create_ports_sysfiles(struct dgnc_board *bd)
-{
-	int rc = 0;
 
-	dev_set_drvdata(&bd->pdev->dev, bd);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_state);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_baud);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_msignals);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_iflag);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_cflag);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_oflag);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_lflag);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_digi_flag);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_rxcount);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_ports_txcount);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_vpd);
-	rc |= device_create_file(&bd->pdev->dev, &dev_attr_serial_number);
-	if (rc)
-		dev_err(&bd->pdev->dev, "dgnc: sysfs device_create_file failed!\n");
-}
+static struct attribute *dgnc_dev_attrs[] = {
+	&dev_attr_ports_state.attr,
+	&dev_attr_ports_baud.attr,
+	&dev_attr_ports_msignals.attr,
+	&dev_attr_ports_iflag.attr,
+	&dev_attr_ports_cflag.attr,
+	&dev_attr_ports_oflag.attr,
+	&dev_attr_ports_lflag.attr,
+	&dev_attr_ports_digi_flag.attr,
+	&dev_attr_ports_rxcount.attr,
+	&dev_attr_ports_txcount.attr,
+	&dev_attr_vpd.attr,
+	&dev_attr_serial_number.attr,
+	NULL,
+};
 
-/* removes all the sys files created for that port */
-void dgnc_remove_ports_sysfiles(struct dgnc_board *bd)
-{
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_state);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_baud);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_msignals);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_iflag);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_cflag);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_oflag);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_lflag);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_digi_flag);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_rxcount);
-	device_remove_file(&bd->pdev->dev, &dev_attr_ports_txcount);
-	device_remove_file(&bd->pdev->dev, &dev_attr_vpd);
-	device_remove_file(&bd->pdev->dev, &dev_attr_serial_number);
-}
+static struct attribute_group dgnc_dev_attr_group = {
+	.attrs = dgnc_dev_attrs,
+};
+
+const struct attribute_group *dgnc_dev_attr_groups[] = {
+	&dgnc_dev_attr_group,
+	NULL,
+};
 
 static ssize_t dgnc_tty_state_show(struct device *d,
 				   struct device_attribute *attr, char *buf)
@@ -683,22 +666,7 @@ static struct attribute_group dgnc_tty_attribute_group = {
 	.attrs = dgnc_sysfs_tty_entries,
 };
 
-void dgnc_create_tty_sysfs(struct un_t *un, struct device *c)
-{
-	int ret;
-
-	ret = sysfs_create_group(&c->kobj, &dgnc_tty_attribute_group);
-	if (ret) {
-		dev_err(c, "dgnc: failed to create sysfs tty device attributes.\n");
-		sysfs_remove_group(&c->kobj, &dgnc_tty_attribute_group);
-		return;
-	}
-
-	dev_set_drvdata(c, un);
-}
-
-void dgnc_remove_tty_sysfs(struct device *c)
-{
-	sysfs_remove_group(&c->kobj, &dgnc_tty_attribute_group);
-}
-
+const struct attribute_group *dgnc_tty_attr_groups[] = {
+	&dgnc_tty_attribute_group,
+	NULL,
+};
