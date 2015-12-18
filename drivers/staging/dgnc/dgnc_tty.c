@@ -367,12 +367,14 @@ int dgnc_tty_init(struct dgnc_board *brd)
 			classp = tty_register_device(&brd->SerialDriver, i,
 						     &ch->ch_bd->pdev->dev);
 			ch->ch_tun.un_sysfs = classp;
-			dgnc_create_tty_sysfs(&ch->ch_tun, classp);
+			classp->groups = dgnc_tty_attr_groups;
+			dev_set_drvdata(classp, &ch->ch_tun);
 
 			classp = tty_register_device(&brd->PrintDriver, i,
 						     &ch->ch_bd->pdev->dev);
 			ch->ch_pun.un_sysfs = classp;
-			dgnc_create_tty_sysfs(&ch->ch_pun, classp);
+			classp->groups = dgnc_tty_attr_groups;
+			dev_set_drvdata(classp, &ch->ch_pun);
 		}
 	}
 
@@ -412,8 +414,6 @@ void dgnc_tty_uninit(struct dgnc_board *brd)
 		brd->dgnc_Serial_Major = 0;
 		for (i = 0; i < brd->nasync; i++) {
 			if (brd->channels[i])
-				dgnc_remove_tty_sysfs(brd->channels[i]->
-						      ch_tun.un_sysfs);
 			tty_unregister_device(&brd->SerialDriver, i);
 		}
 		tty_unregister_driver(&brd->SerialDriver);
@@ -425,8 +425,6 @@ void dgnc_tty_uninit(struct dgnc_board *brd)
 		brd->dgnc_TransparentPrint_Major = 0;
 		for (i = 0; i < brd->nasync; i++) {
 			if (brd->channels[i])
-				dgnc_remove_tty_sysfs(brd->channels[i]->
-						      ch_pun.un_sysfs);
 			tty_unregister_device(&brd->PrintDriver, i);
 		}
 		tty_unregister_driver(&brd->PrintDriver);
