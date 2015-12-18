@@ -567,10 +567,17 @@ __v7_ca8_proc_info:
 #ifdef CONFIG_CPU_PJ4B
 	.type   __v7_pj4b_proc_info, #object
 __v7_pj4b_proc_info:
-	.long	0x560f5800
-	.long	0xff0fff00
+	.long	0x562f5840
+	.long	0xfffffff0
 	__v7_proc __v7_pj4b_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+
+	.type   __v7_pj4bmp_proc_info, #object
+__v7_pj4bmp_proc_info:
+	.long	0x561f5810
+	.long	0xfffffff0
+	__v7_proc __v7_pj4bmp_proc_info, __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+	.size	__v7_pj4bmp_proc_info, . - __v7_pj4bmp_proc_info
 #endif
 
 	/*
