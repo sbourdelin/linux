@@ -32,14 +32,11 @@ static int x25_add_route(struct x25_address *address, unsigned int sigdigits,
 			 struct net_device *dev)
 {
 	struct x25_route *rt;
-	struct list_head *entry;
 	int rc = -EINVAL;
 
 	write_lock_bh(&x25_route_list_lock);
 
-	list_for_each(entry, &x25_route_list) {
-		rt = list_entry(entry, struct x25_route, node);
-
+	list_for_each_entry(rt, &x25_route_list, node) {
 		if (!memcmp(&rt->address, address, sigdigits) &&
 		    rt->sigdigits == sigdigits)
 			goto out;
@@ -83,14 +80,11 @@ static int x25_del_route(struct x25_address *address, unsigned int sigdigits,
 			 struct net_device *dev)
 {
 	struct x25_route *rt;
-	struct list_head *entry;
 	int rc = -EINVAL;
 
 	write_lock_bh(&x25_route_list_lock);
 
-	list_for_each(entry, &x25_route_list) {
-		rt = list_entry(entry, struct x25_route, node);
-
+	list_for_each_entry(rt, &x25_route_list, node) {
 		if (!memcmp(&rt->address, address, sigdigits) &&
 		    rt->sigdigits == sigdigits && rt->dev == dev) {
 			__x25_remove_route(rt);
@@ -108,14 +102,11 @@ static int x25_del_route(struct x25_address *address, unsigned int sigdigits,
  */
 void x25_route_device_down(struct net_device *dev)
 {
-	struct x25_route *rt;
-	struct list_head *entry, *tmp;
+	struct x25_route *rt, *tmp;
 
 	write_lock_bh(&x25_route_list_lock);
 
-	list_for_each_safe(entry, tmp, &x25_route_list) {
-		rt = list_entry(entry, struct x25_route, node);
-
+	list_for_each_entry_safe(rt, tmp, &x25_route_list, node) {
 		if (rt->dev == dev)
 			__x25_remove_route(rt);
 	}
@@ -154,13 +145,10 @@ struct net_device *x25_dev_get(char *devname)
 struct x25_route *x25_get_route(struct x25_address *addr)
 {
 	struct x25_route *rt, *use = NULL;
-	struct list_head *entry;
 
 	read_lock_bh(&x25_route_list_lock);
 
-	list_for_each(entry, &x25_route_list) {
-		rt = list_entry(entry, struct x25_route, node);
-
+	list_for_each_entry(rt, &x25_route_list, node) {
 		if (!memcmp(&rt->address, addr, rt->sigdigits)) {
 			if (!use)
 				use = rt;
@@ -214,13 +202,10 @@ out:
  */
 void __exit x25_route_free(void)
 {
-	struct x25_route *rt;
-	struct list_head *entry, *tmp;
+	struct x25_route *rt, *tmp;
 
 	write_lock_bh(&x25_route_list_lock);
-	list_for_each_safe(entry, tmp, &x25_route_list) {
-		rt = list_entry(entry, struct x25_route, node);
+	list_for_each_entry_safe(rt, tmp, &x25_route_list, node)
 		__x25_remove_route(rt);
-	}
 	write_unlock_bh(&x25_route_list_lock);
 }

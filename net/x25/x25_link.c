@@ -296,14 +296,11 @@ static void __x25_remove_neigh(struct x25_neigh *nb)
  */
 void x25_link_device_down(struct net_device *dev)
 {
-	struct x25_neigh *nb;
-	struct list_head *entry, *tmp;
+	struct x25_neigh *nb, *tmp;
 
 	write_lock_bh(&x25_neigh_list_lock);
 
-	list_for_each_safe(entry, tmp, &x25_neigh_list) {
-		nb = list_entry(entry, struct x25_neigh, node);
-
+	list_for_each_entry_safe(nb, tmp, &x25_neigh_list, node) {
 		if (nb->dev == dev) {
 			__x25_remove_neigh(nb);
 			dev_put(dev);
@@ -319,12 +316,9 @@ void x25_link_device_down(struct net_device *dev)
 struct x25_neigh *x25_get_neigh(struct net_device *dev)
 {
 	struct x25_neigh *nb, *use = NULL;
-	struct list_head *entry;
 
 	read_lock_bh(&x25_neigh_list_lock);
-	list_for_each(entry, &x25_neigh_list) {
-		nb = list_entry(entry, struct x25_neigh, node);
-
+	list_for_each_entry(nb, &x25_neigh_list, node) {
 		if (nb->dev == dev) {
 			use = nb;
 			break;
@@ -394,18 +388,13 @@ out_dev_put:
  */
 void __exit x25_link_free(void)
 {
-	struct x25_neigh *nb;
-	struct list_head *entry, *tmp;
+	struct x25_neigh *nb, *tmp;
 
 	write_lock_bh(&x25_neigh_list_lock);
 
-	list_for_each_safe(entry, tmp, &x25_neigh_list) {
-		struct net_device *dev;
-
-		nb = list_entry(entry, struct x25_neigh, node);
-		dev = nb->dev;
+	list_for_each_entry_safe(nb, tmp, &x25_neigh_list, node) {
 		__x25_remove_neigh(nb);
-		dev_put(dev);
+		dev_put(nb->dev);
 	}
 	write_unlock_bh(&x25_neigh_list_lock);
 }
