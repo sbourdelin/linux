@@ -251,7 +251,7 @@ static void lirc_lirc_irq_handler(void *blah)
 			/* really long time */
 			data = PULSE_MASK;
 		else
-			data = (int) (signal*1000000 +
+			data = (int)(signal*1000000 +
 					 tv.tv_usec - lasttv.tv_usec +
 					 LIRC_SFH506_DELAY);
 
@@ -291,9 +291,9 @@ static void lirc_lirc_irq_handler(void *blah)
 		/* adjust value to usecs */
 		__u64 helper;
 
-		helper = ((__u64) signal)*1000000;
+		helper = ((__u64)signal)*1000000;
 		do_div(helper, timer);
-		signal = (long) helper;
+		signal = (long)helper;
 
 		if (signal > LIRC_SFH506_DELAY)
 			data = signal - LIRC_SFH506_DELAY;
@@ -398,9 +398,9 @@ static ssize_t lirc_write(struct file *filep, const char __user *buf, size_t n,
 	for (i = 0; i < count; i++) {
 		__u64 helper;
 
-		helper = ((__u64) wbuf[i])*timer;
+		helper = ((__u64)wbuf[i])*timer;
 		do_div(helper, 1000000);
-		wbuf[i] = (int) helper;
+		wbuf[i] = (int)helper;
 	}
 
 	local_irq_save(flags);
