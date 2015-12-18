@@ -70,6 +70,18 @@ static void sp_write_reg32(const struct sja1000_priv *priv, int reg, u8 val)
 	iowrite8(val, priv->reg_base + reg * 4);
 }
 
+static u8 ts4800_read_reg16(const struct sja1000_priv *priv, int reg)
+{
+	sp_write_reg16(priv, 0,  reg);
+	return sp_read_reg16(priv, 2);
+}
+
+static void ts4800_write_reg16(const struct sja1000_priv *priv, int reg, u8 val)
+{
+	sp_write_reg16(priv, 0, reg);
+	sp_write_reg16(priv, 2, val);
+}
+
 static void sp_populate(struct sja1000_priv *priv,
 			struct sja1000_platform_data *pdata,
 			unsigned long resource_mem_flags)
@@ -98,12 +110,20 @@ static void sp_populate(struct sja1000_priv *priv,
 
 static void sp_populate_of(struct sja1000_priv *priv, struct device_node *of)
 {
+	int is_technologic;
 	int err;
 	u32 prop;
+
+	is_technologic = of_device_is_compatible(of, "technologic,sja1000");
 
 	err = of_property_read_u32(of, "reg-io-width", &prop);
 	if (err)
 		prop = 1; /* 8 bit is default */
+
+	if (is_technologic && prop != 2) {
+		netdev_warn(priv->dev, "forcing reg-io-width to 2\n");
+		prop = 2;
+	}
 
 	switch (prop) {
 	case 4:
@@ -111,8 +131,13 @@ static void sp_populate_of(struct sja1000_priv *priv, struct device_node *of)
 		priv->write_reg = sp_write_reg32;
 		break;
 	case 2:
-		priv->read_reg = sp_read_reg16;
-		priv->write_reg = sp_write_reg16;
+		if (is_technologic) {
+			priv->read_reg = ts4800_read_reg16;
+			priv->write_reg = ts4800_write_reg16;
+		} else {
+			priv->read_reg = sp_read_reg16;
+			priv->write_reg = sp_write_reg16;
+		}
 		break;
 	case 1:	/* fallthrough */
 	default:
@@ -244,6 +269,7 @@ static int sp_remove(struct platform_device *pdev)
 
 static const struct of_device_id sp_of_table[] = {
 	{.compatible = "nxp,sja1000"},
+	{.compatible = "technologic,sja1000"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, sp_of_table);
