@@ -324,8 +324,7 @@ fail:
 void sctp_association_free(struct sctp_association *asoc)
 {
 	struct sock *sk = asoc->base.sk;
-	struct sctp_transport *transport;
-	struct list_head *pos, *temp;
+	struct sctp_transport *transport, *temp;
 	int i;
 
 	/* Only real associations count against the endpoint, so
@@ -380,9 +379,9 @@ void sctp_association_free(struct sctp_association *asoc)
 	kfree(asoc->peer.peer_hmacs);
 
 	/* Release the transport structures. */
-	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, struct sctp_transport, transports);
-		list_del_rcu(pos);
+	list_for_each_entry_safe(transport, temp,
+				 &asoc->peer.transport_addr_list, transports) {
+		list_del_rcu(&transport->transports);
 		sctp_transport_free(transport);
 	}
 
@@ -718,12 +717,10 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 void sctp_assoc_del_peer(struct sctp_association *asoc,
 			 const union sctp_addr *addr)
 {
-	struct list_head	*pos;
-	struct list_head	*temp;
-	struct sctp_transport	*transport;
+	struct sctp_transport	*transport, *temp;
 
-	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, struct sctp_transport, transports);
+	list_for_each_entry_safe(transport, temp,
+				 &asoc->peer.transport_addr_list, transports) {
 		if (sctp_cmp_addr_exact(addr, &transport->ipaddr)) {
 			/* Do book keeping for removing the peer and free it. */
 			sctp_assoc_rm_peer(asoc, transport);
@@ -1090,8 +1087,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 void sctp_assoc_update(struct sctp_association *asoc,
 		       struct sctp_association *new)
 {
-	struct sctp_transport *trans;
-	struct list_head *pos, *temp;
+	struct sctp_transport *trans, *temp;
 
 	/* Copy in new parameters of peer. */
 	asoc->c = new->c;
@@ -1103,8 +1099,8 @@ void sctp_assoc_update(struct sctp_association *asoc,
 			 asoc->peer.i.initial_tsn, GFP_ATOMIC);
 
 	/* Remove any peer addresses not present in the new association. */
-	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		trans = list_entry(pos, struct sctp_transport, transports);
+	list_for_each_entry_safe(trans, temp,
+				 &asoc->peer.transport_addr_list, transports) {
 		if (!sctp_assoc_lookup_paddr(new, &trans->ipaddr)) {
 			sctp_assoc_rm_peer(asoc, trans);
 			continue;

@@ -2293,8 +2293,7 @@ int sctp_process_init(struct sctp_association *asoc, struct sctp_chunk *chunk,
 {
 	struct net *net = sock_net(asoc->base.sk);
 	union sctp_params param;
-	struct sctp_transport *transport;
-	struct list_head *pos, *temp;
+	struct sctp_transport *transport, *temp;
 	struct sctp_af *af;
 	union sctp_addr addr;
 	char *cookie;
@@ -2358,8 +2357,8 @@ int sctp_process_init(struct sctp_association *asoc, struct sctp_chunk *chunk,
 	}
 
 	/* Walk list of transports, removing transports in the UNKNOWN state. */
-	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, struct sctp_transport, transports);
+	list_for_each_entry_safe(transport, temp,
+				 &asoc->peer.transport_addr_list, transports) {
 		if (transport->state == SCTP_UNKNOWN) {
 			sctp_assoc_rm_peer(asoc, transport);
 		}
@@ -2461,8 +2460,8 @@ int sctp_process_init(struct sctp_association *asoc, struct sctp_chunk *chunk,
 
 clean_up:
 	/* Release the transport structures. */
-	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		transport = list_entry(pos, struct sctp_transport, transports);
+	list_for_each_entry_safe(transport, temp,
+				 &asoc->peer.transport_addr_list, transports) {
 		if (transport->state != SCTP_ACTIVE)
 			sctp_assoc_rm_peer(asoc, transport);
 	}

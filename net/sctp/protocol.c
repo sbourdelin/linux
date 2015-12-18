@@ -166,13 +166,11 @@ static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 static void sctp_get_local_addr_list(struct net *net)
 {
 	struct net_device *dev;
-	struct list_head *pos;
 	struct sctp_af *af;
 
 	rcu_read_lock();
 	for_each_netdev_rcu(net, dev) {
-		list_for_each(pos, &sctp_address_families) {
-			af = list_entry(pos, struct sctp_af, list);
+		list_for_each_entry(af, &sctp_address_families, list) {
 			af->copy_addrlist(&net->sctp.local_addr_list, dev);
 		}
 	}
@@ -182,12 +180,10 @@ static void sctp_get_local_addr_list(struct net *net)
 /* Free the existing local addresses.  */
 static void sctp_free_local_addr_list(struct net *net)
 {
-	struct sctp_sockaddr_entry *addr;
-	struct list_head *pos, *temp;
+	struct sctp_sockaddr_entry *addr, *temp;
 
-	list_for_each_safe(pos, temp, &net->sctp.local_addr_list) {
-		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
-		list_del(pos);
+	list_for_each_entry_safe(addr, temp, &net->sctp.local_addr_list, list) {
+		list_del(&addr->list);
 		kfree(addr);
 	}
 }

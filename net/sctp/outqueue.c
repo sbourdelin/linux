@@ -214,7 +214,7 @@ void sctp_outq_init(struct sctp_association *asoc, struct sctp_outq *q)
 static void __sctp_outq_teardown(struct sctp_outq *q)
 {
 	struct sctp_transport *transport;
-	struct list_head *lchunk, *temp;
+	struct list_head *lchunk;
 	struct sctp_chunk *chunk, *tmp;
 
 	/* Throw away unacknowledged chunks. */
@@ -230,28 +230,22 @@ static void __sctp_outq_teardown(struct sctp_outq *q)
 	}
 
 	/* Throw away chunks that have been gap ACKed.  */
-	list_for_each_safe(lchunk, temp, &q->sacked) {
-		list_del_init(lchunk);
-		chunk = list_entry(lchunk, struct sctp_chunk,
-				   transmitted_list);
+	list_for_each_entry_safe(chunk, tmp, &q->sacked, transmitted_list) {
+		list_del_init(&chunk->transmitted_list);
 		sctp_chunk_fail(chunk, q->error);
 		sctp_chunk_free(chunk);
 	}
 
 	/* Throw away any chunks in the retransmit queue. */
-	list_for_each_safe(lchunk, temp, &q->retransmit) {
-		list_del_init(lchunk);
-		chunk = list_entry(lchunk, struct sctp_chunk,
-				   transmitted_list);
+	list_for_each_entry_safe(chunk, tmp, &q->retransmit, transmitted_list) {
+		list_del_init(&chunk->transmitted_list);
 		sctp_chunk_fail(chunk, q->error);
 		sctp_chunk_free(chunk);
 	}
 
 	/* Throw away any chunks that are in the abandoned queue. */
-	list_for_each_safe(lchunk, temp, &q->abandoned) {
-		list_del_init(lchunk);
-		chunk = list_entry(lchunk, struct sctp_chunk,
-				   transmitted_list);
+	list_for_each_entry_safe(chunk, tmp, &q->abandoned, transmitted_list) {
+		list_del_init(&chunk->transmitted_list);
 		sctp_chunk_fail(chunk, q->error);
 		sctp_chunk_free(chunk);
 	}
@@ -377,18 +371,16 @@ void sctp_retransmit_mark(struct sctp_outq *q,
 			  struct sctp_transport *transport,
 			  __u8 reason)
 {
-	struct list_head *lchunk, *ltemp;
-	struct sctp_chunk *chunk;
+	struct sctp_chunk *chunk, *temp;
 
 	/* Walk through the specified transmitted queue.  */
-	list_for_each_safe(lchunk, ltemp, &transport->transmitted) {
-		chunk = list_entry(lchunk, struct sctp_chunk,
-				   transmitted_list);
-
+	list_for_each_entry_safe(chunk, temp, &transport->transmitted,
+				 transmitted_list) {
 		/* If the chunk is abandoned, move it to abandoned list. */
 		if (sctp_chunk_abandoned(chunk)) {
-			list_del_init(lchunk);
-			sctp_insert_list(&q->abandoned, lchunk);
+			list_del_init(&chunk->transmitted_list);
+			sctp_insert_list(&q->abandoned,
+					 &chunk->transmitted_list);
 
 			/* If this chunk has not been previousely acked,
 			 * stop considering it 'outstanding'.  Our peer
@@ -448,8 +440,9 @@ void sctp_retransmit_mark(struct sctp_outq *q,
 			/* Move the chunk to the retransmit queue. The chunks
 			 * on the retransmit queue are always kept in order.
 			 */
-			list_del_init(lchunk);
-			sctp_insert_list(&q->retransmit, lchunk);
+			list_del_init(&chunk->transmitted_list);
+			sctp_insert_list(&q->retransmit,
+					 &chunk->transmitted_list);
 		}
 	}
 
@@ -1126,8 +1119,8 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_chunk *chunk)
 	struct sctp_association *asoc = q->asoc;
 	struct sctp_sackhdr *sack = chunk->subh.sack_hdr;
 	struct sctp_transport *transport;
-	struct sctp_chunk *tchunk = NULL;
-	struct list_head *lchunk, *transport_list, *temp;
+	struct sctp_chunk *tchunk = NULL, *temp;
+	struct list_head *transport_list;
 	sctp_sack_variable_t *frags = sack->variable;
 	__u32 sack_ctsn, ctsn, tsn;
 	__u32 highest_tsn, highest_new_tsn;
@@ -1236,9 +1229,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_chunk *chunk)
 	ctsn = asoc->ctsn_ack_point;
 
 	/* Throw away stuff rotting on the sack queue.  */
-	list_for_each_safe(lchunk, temp, &q->sacked) {
-		tchunk = list_entry(lchunk, struct sctp_chunk,
-				    transmitted_list);
+	list_for_each_entry_safe(tchunk, temp, &q->sacked, transmitted_list) {
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
 		if (TSN_lte(tsn, ctsn)) {
 			list_del_init(&tchunk->transmitted_list);
@@ -1691,8 +1682,7 @@ static void sctp_generate_fwdtsn(struct sctp_outq *q, __u32 ctsn)
 	int nskips = 0;
 	int skip_pos = 0;
 	__u32 tsn;
-	struct sctp_chunk *chunk;
-	struct list_head *lchunk, *temp;
+	struct sctp_chunk *chunk, *temp;
 
 	if (!asoc->peer.prsctp_capable)
 		return;
@@ -1727,16 +1717,14 @@ static void sctp_generate_fwdtsn(struct sctp_outq *q, __u32 ctsn)
 	 * In this example, the data sender successfully advanced the
 	 * "Advanced.Peer.Ack.Point" from 102 to 104 locally.
 	 */
-	list_for_each_safe(lchunk, temp, &q->abandoned) {
-		chunk = list_entry(lchunk, struct sctp_chunk,
-					transmitted_list);
+	list_for_each_entry_safe(chunk, temp, &q->abandoned, transmitted_list) {
 		tsn = ntohl(chunk->subh.data_hdr->tsn);
 
 		/* Remove any chunks in the abandoned queue that are acked by
 		 * the ctsn.
 		 */
 		if (TSN_lte(tsn, ctsn)) {
-			list_del_init(lchunk);
+			list_del_init(&chunk->transmitted_list);
 			sctp_chunk_free(chunk);
 		} else {
 			if (TSN_lte(tsn, asoc->adv_peer_ack_point+1)) {

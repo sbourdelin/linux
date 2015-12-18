@@ -950,12 +950,10 @@ static void sctp_cmd_process_fwdtsn(struct sctp_ulpq *ulpq,
  */
 static void sctp_cmd_del_non_primary(struct sctp_association *asoc)
 {
-	struct sctp_transport *t;
-	struct list_head *pos;
-	struct list_head *temp;
+	struct sctp_transport *t, *temp;
 
-	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
-		t = list_entry(pos, struct sctp_transport, transports);
+	list_for_each_entry_safe(t, temp, &asoc->peer.transport_addr_list,
+				 transports) {
 		if (!sctp_cmp_addr_exact(&t->ipaddr,
 					 &asoc->peer.primary_addr)) {
 			sctp_assoc_rm_peer(asoc, t);

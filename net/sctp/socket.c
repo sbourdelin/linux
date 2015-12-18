@@ -1474,8 +1474,7 @@ static void sctp_close(struct sock *sk, long timeout)
 {
 	struct net *net = sock_net(sk);
 	struct sctp_endpoint *ep;
-	struct sctp_association *asoc;
-	struct list_head *pos, *temp;
+	struct sctp_association *asoc, *temp;
 	unsigned int data_was_unread;
 
 	pr_debug("%s: sk:%p, timeout:%ld\n", __func__, sk, timeout);
@@ -1491,9 +1490,7 @@ static void sctp_close(struct sock *sk, long timeout)
 	data_was_unread += sctp_queue_purge_ulpevents(&sctp_sk(sk)->pd_lobby);
 
 	/* Walk all associations on an endpoint.  */
-	list_for_each_safe(pos, temp, &ep->asocs) {
-		asoc = list_entry(pos, struct sctp_association, asocs);
-
+	list_for_each_entry_safe(asoc, temp, &ep->asocs, asocs) {
 		if (sctp_style(sk, TCP)) {
 			/* A closed association can still be in the list if
 			 * it belongs to a TCP-style listening socket that is

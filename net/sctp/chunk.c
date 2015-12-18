@@ -86,8 +86,7 @@ void sctp_datamsg_free(struct sctp_datamsg *msg)
 /* Final destructruction of datamsg memory. */
 static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 {
-	struct list_head *pos, *temp;
-	struct sctp_chunk *chunk;
+	struct sctp_chunk *chunk, *temp;
 	struct sctp_sock *sp;
 	struct sctp_ulpevent *ev;
 	struct sctp_association *asoc = NULL;
@@ -97,9 +96,8 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 	notify = msg->send_failed ? -1 : 0;
 
 	/* Release all references. */
-	list_for_each_safe(pos, temp, &msg->chunks) {
-		list_del_init(pos);
-		chunk = list_entry(pos, struct sctp_chunk, frag_list);
+	list_for_each_entry_safe(chunk, temp, &msg->chunks, frag_list) {
+		list_del_init(&chunk->frag_list);
 		/* Check whether we _really_ need to notify. */
 		if (notify < 0) {
 			asoc = chunk->asoc;
@@ -169,9 +167,8 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	int max, whole, i, offset, over, err;
 	int len, first_len;
 	int max_data;
-	struct sctp_chunk *chunk;
+	struct sctp_chunk *chunk, *temp;
 	struct sctp_datamsg *msg;
-	struct list_head *pos, *temp;
 	size_t msg_len = iov_iter_count(from);
 	__u8 frag;
 
@@ -334,9 +331,8 @@ errout_chunk_free:
 	sctp_chunk_free(chunk);
 
 errout:
-	list_for_each_safe(pos, temp, &msg->chunks) {
-		list_del_init(pos);
-		chunk = list_entry(pos, struct sctp_chunk, frag_list);
+	list_for_each_entry_safe(chunk, temp, &msg->chunks, frag_list) {
+		list_del_init(&chunk->frag_list);
 		sctp_chunk_free(chunk);
 	}
 	sctp_datamsg_put(msg);
