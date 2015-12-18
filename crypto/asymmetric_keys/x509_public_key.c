@@ -313,9 +313,14 @@ static int x509_key_preparse(struct key_preparsed_payload *prep)
 	cert->pub->id_type = PKEY_ID_X509;
 
 	/* Check the signature on the key if it appears to be self-signed */
-	if ((!cert->akid_skid && !cert->akid_id) ||
-	    asymmetric_key_id_same(cert->skid, cert->akid_skid) ||
-	    asymmetric_key_id_same(cert->id, cert->akid_id)) {
+	if ((!cert->akid_skid && !cert->akid_id)) {
+		if (cert->raw_issuer_size == cert->raw_subject_size &&
+		    memcmp(cert->raw_issuer, cert->raw_subject,
+			   cert->raw_subject_size) == 0)
+			goto self_signed;
+	} else if (asymmetric_key_id_same(cert->skid, cert->akid_skid) ||
+		   asymmetric_key_id_same(cert->id, cert->akid_id)) {
+self_signed:
 		ret = x509_check_signature(cert->pub, cert); /* self-signed */
 		if (ret < 0)
 			goto error_free_cert;
