@@ -1815,7 +1815,6 @@ retry_private:
 			} else if (ret) {
 				/* -EDEADLK */
 				this->pi_state = NULL;
-				free_pi_state(pi_state);
 				goto out_unlock;
 			}
 		}
