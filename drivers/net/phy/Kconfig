@@ -256,6 +256,13 @@ config MDIO_BCM_IPROC
 	  This module provides a driver for the MDIO busses found in the
 	  Broadcom iProc SoC's.
 
+config FSL_BACKPLANE
+	tristate "Support for Backplane on Freescale PCS PHYs"
+	depends on OF_MDIO
+	help
+	  This module provides a driver for Backplane on Freescale PCS PHYs,
+	  it supports 10GBASE-KR and 1000BASE-KX.
+
 endif # PHYLIB
 
 config MICREL_KS8995MA
