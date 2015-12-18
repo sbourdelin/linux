@@ -519,7 +519,11 @@ int rhashtable_walk_init(struct rhashtable *ht, struct rhashtable_iter *iter)
 		return -ENOMEM;
 
 	spin_lock(&ht->lock);
-	iter->walker->tbl = rht_dereference(ht->tbl, ht);
+	/* We do not need RCU protection because we hold ht->lock
+	 * which guarantees that if we see ht->tbl then it won't
+	 * die on us.
+	 */
+	iter->walker->tbl = rcu_dereference_raw(ht->tbl);
 	list_add(&iter->walker->list, &iter->walker->tbl->walkers);
 	spin_unlock(&ht->lock);
 
