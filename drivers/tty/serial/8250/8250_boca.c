@@ -10,7 +10,7 @@
 #include <linux/init.h>
 #include <linux/serial_8250.h>
 
-#define PORT(_base,_irq)				\
+#define PORT(_base, _irq)				\
 	{						\
 		.iobase		= _base,		\
 		.irq		= _irq,			\
