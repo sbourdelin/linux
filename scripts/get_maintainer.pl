@@ -17,7 +17,6 @@ my $V = '0.26';
 
 use Getopt::Long qw(:config no_auto_abbrev);
 
-my $lk_path = "./";
 my $email = 1;
 my $email_usename = 1;
 my $email_maintainer = 1;
@@ -93,11 +92,33 @@ my $rfc822_char = '[\\000-\\377]';
 
 # VCS command support: class-like functions and strings
 
+my $vcs_is_git = 0;
+sub git_get_root {
+	my $output = `git rev-parse --show-toplevel`;
+	chomp $output;
+	$vcs_is_git = !$?;
+	return $output if $vcs_is_git;
+}
+
+my $vcs_is_hg = 0;
+sub hg_get_root {
+	my $output = `hg root`;
+	chomp $output;
+	$vcs_is_hg = !$?;
+	return $output if $vcs_is_hg;
+}
+
+sub get_kernel_root {
+	return git_get_root() || hg_get_root() || ".";
+}
+
+my $lk_path = get_kernel_root() . "/";
+
 my %VCS_cmds;
 
 my %VCS_cmds_git = (
     "execute_cmd" => \&git_execute_cmd,
-    "available" => '(which("git") ne "") && (-e ".git")',
+    "available" => $vcs_is_git,
     "find_signers_cmd" =>
 	"git log --no-color --follow --since=\$email_git_since " .
 	    '--numstat --no-merges ' .
@@ -135,7 +156,7 @@ my %VCS_cmds_git = (
 
 my %VCS_cmds_hg = (
     "execute_cmd" => \&hg_execute_cmd,
-    "available" => '(which("hg") ne "") && (-d ".hg")',
+    "available" => $vcs_is_hg,
     "find_signers_cmd" =>
 	"hg log --date=\$email_hg_since " .
 	    "--template='HgCommit: {node}\\n" .
@@ -854,9 +875,6 @@ EOT
 sub top_of_kernel_tree {
     my ($lk_path) = @_;
 
-    if ($lk_path ne "" && substr($lk_path,length($lk_path)-1,1) ne "/") {
-	$lk_path .= "/";
-    }
     if (   (-f "${lk_path}COPYING")
 	&& (-f "${lk_path}CREDITS")
 	&& (-f "${lk_path}Kbuild")
@@ -1464,9 +1482,9 @@ sub vcs_blame {
 my $printed_novcs = 0;
 sub vcs_exists {
     %VCS_cmds = %VCS_cmds_git;
-    return 1 if eval $VCS_cmds{"available"};
+    return 1 if $vcs_is_git;
     %VCS_cmds = %VCS_cmds_hg;
-    return 2 if eval $VCS_cmds{"available"};
+    return 2 if $vcs_is_hg;
     %VCS_cmds = ();
     if (!$printed_novcs) {
 	warn("$P: No supported VCS found.  Add --nogit to options?\n");
@@ -1476,15 +1494,6 @@ sub vcs_exists {
 	$printed_novcs = 1;
     }
     return 0;
-}
-
-sub vcs_is_git {
-    vcs_exists();
-    return $vcs_used == 1;
-}
-
-sub vcs_is_hg {
-    return $vcs_used == 2;
 }
 
 sub interactive_get_maintainers {
@@ -1553,7 +1562,7 @@ sub interactive_get_maintainers {
 	    }
 	}
 	my $date_ref = \$email_git_since;
-	$date_ref = \$email_hg_since if (vcs_is_hg());
+	$date_ref = \$email_hg_since if ($vcs_is_hg);
 	if ($print_options) {
 	    $print_options = 0;
 	    if (vcs_exists()) {
@@ -1695,9 +1704,9 @@ EOT
 		    $rerun = 1;
 		}
 	    } elsif ($sel eq "d") {
-		if (vcs_is_git()) {
+		if ($vcs_is_git) {
 		    $email_git_since = $str;
-		} elsif (vcs_is_hg()) {
+		} elsif ($vcs_is_hg) {
 		    $email_hg_since = $str;
 		}
 		$rerun = 1;
@@ -2010,7 +2019,7 @@ sub vcs_file_blame {
     $total_lines = @all_commits;
 
     if ($email_git_blame_signatures) {
-	if (vcs_is_hg()) {
+	if ($vcs_is_hg) {
 	    my $commit_count;
 	    my $commit_authors_ref;
 	    my $commit_signers_ref;
@@ -2053,7 +2062,7 @@ sub vcs_file_blame {
     if ($from_filename) {
 	if ($output_rolestats) {
 	    my @blame_signers;
-	    if (vcs_is_hg()) {{		# Double brace for last exit
+	    if ($vcs_is_hg) {{		# Double brace for last exit
 		my $commit_count;
 		my @commit_signers = ();
 		@commits = uniq(@commits);
