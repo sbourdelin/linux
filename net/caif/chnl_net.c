@@ -140,13 +140,10 @@ static int delete_device(struct chnl_net *dev)
 
 static void close_work(struct work_struct *work)
 {
-	struct chnl_net *dev = NULL;
-	struct list_head *list_node;
-	struct list_head *_tmp;
+	struct chnl_net *dev = NULL, *tmp;
 
 	rtnl_lock();
-	list_for_each_safe(list_node, _tmp, &chnl_net_list) {
-		dev = list_entry(list_node, struct chnl_net, list_field);
+	list_for_each_entry_safe(dev, tmp, &chnl_net_list, list_field) {
 		if (dev->state == CAIF_SHUTDOWN)
 			dev_close(dev->netdev);
 	}
@@ -535,14 +532,11 @@ static int __init chnl_init_module(void)
 
 static void __exit chnl_exit_module(void)
 {
-	struct chnl_net *dev = NULL;
-	struct list_head *list_node;
-	struct list_head *_tmp;
+	struct chnl_net *dev = NULL, *tmp;
 	rtnl_link_unregister(&ipcaif_link_ops);
 	rtnl_lock();
-	list_for_each_safe(list_node, _tmp, &chnl_net_list) {
-		dev = list_entry(list_node, struct chnl_net, list_field);
-		list_del(list_node);
+	list_for_each_entry_safe(dev, tmp, &chnl_net_list, list_field) {
+		list_del(&dev->list_field);
 		delete_device(dev);
 	}
 	rtnl_unlock();
