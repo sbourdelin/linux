@@ -53,7 +53,7 @@ static int do_vcc_ioctl(struct socket *sock, unsigned int cmd,
 	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
 	int error;
-	struct list_head *pos;
+	struct atm_ioctl *ic;
 	void __user *argp = (void __user *)arg;
 
 	vcc = ATM_SD(sock);
@@ -163,8 +163,7 @@ static int do_vcc_ioctl(struct socket *sock, unsigned int cmd,
 	error = -ENOIOCTLCMD;
 
 	mutex_lock(&ioctl_mutex);
-	list_for_each(pos, &ioctl_list) {
-		struct atm_ioctl *ic = list_entry(pos, struct atm_ioctl, list);
+	list_for_each_entry(ic, &ioctl_list, list) {
 		if (try_module_get(ic->owner)) {
 			error = ic->ioctl(sock, cmd, arg);
 			module_put(ic->owner);
