@@ -1082,9 +1082,8 @@ static void dwc2_complete_non_isoc_xfer_ddma(struct dwc2_hsotg *hsotg,
 					     int chnum,
 					     enum dwc2_halt_status halt_status)
 {
-	struct list_head *qtd_item, *qtd_tmp;
 	struct dwc2_qh *qh = chan->qh;
-	struct dwc2_qtd *qtd = NULL;
+	struct dwc2_qtd *qtd = NULL, *tmp;
 	int xfer_done;
 	int desc_num = 0;
 
@@ -1094,10 +1093,9 @@ static void dwc2_complete_non_isoc_xfer_ddma(struct dwc2_hsotg *hsotg,
 		return;
 	}
 
-	list_for_each_safe(qtd_item, qtd_tmp, &qh->qtd_list) {
+	list_for_each_entry_safe(qtd, tmp, &qh->qtd_list, qtd_list_entry) {
 		int i;
 
-		qtd = list_entry(qtd_item, struct dwc2_qtd, qtd_list_entry);
 		xfer_done = 0;
 
 		for (i = 0; i < qtd->n_desc; i++) {
