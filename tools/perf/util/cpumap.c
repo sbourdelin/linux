@@ -422,7 +422,7 @@ out:
 }
 
 /* Determine highest possible cpu in the system for sparse allocation */
-static void set_max_cpu_num(void)
+void set_max_cpu_num(void)
 {
 	const char *mnt;
 	char path[PATH_MAX];

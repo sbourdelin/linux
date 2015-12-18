@@ -14,6 +14,7 @@ struct cpu_map {
 	int map[];
 };
 
+void set_max_cpu_num(void);
 struct cpu_map *cpu_map__new(const char *cpu_list);
 struct cpu_map *cpu_map__empty_new(int nr);
 struct cpu_map *cpu_map__dummy_new(void);
