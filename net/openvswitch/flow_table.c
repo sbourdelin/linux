@@ -651,11 +651,9 @@ static bool mask_equal(const struct sw_flow_mask *a,
 static struct sw_flow_mask *flow_mask_find(const struct flow_table *tbl,
 					   const struct sw_flow_mask *mask)
 {
-	struct list_head *ml;
+	struct sw_flow_mask *m;
 
-	list_for_each(ml, &tbl->mask_list) {
-		struct sw_flow_mask *m;
-		m = container_of(ml, struct sw_flow_mask, list);
+	list_for_each_entry(m, &tbl->mask_list, list) {
 		if (mask_equal(mask, m))
 			return m;
 	}
