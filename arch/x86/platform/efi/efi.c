@@ -222,6 +222,25 @@ int __init efi_memblock_x86_reserve_range(void)
 	return 0;
 }
 
+char * __init efi_size_format(char *buf, size_t size, u64 bytes)
+{
+	if (!bytes || (bytes & 0x3ff))
+		snprintf(buf, size, "%llu B", bytes);
+	else if (bytes & 0xfffff)
+		snprintf(buf, size, "%llu KiB", bytes >> 10);
+	else if (bytes & 0x3fffffff)
+		snprintf(buf, size, "%llu MiB", bytes >> 20);
+	else if (bytes & 0xffffffffff)
+		snprintf(buf, size, "%llu GiB", bytes >> 30);
+	else if (bytes & 0x3ffffffffffff)
+		snprintf(buf, size, "%llu TiB", bytes >> 40);
+	else if (bytes & 0xfffffffffffffff)
+		snprintf(buf, size, "%llu PiB", bytes >> 50);
+	else
+		snprintf(buf, size, "%llu EiB", bytes >> 60);
+	return buf;
+}
+
 void __init efi_print_memmap(void)
 {
 #ifdef EFI_DEBUG
@@ -232,14 +251,16 @@ void __init efi_print_memmap(void)
 	for (p = memmap.map, i = 0;
 	     p < memmap.map_end;
 	     p += memmap.desc_size, i++) {
-		char buf[64];
+		char buf[64], buf2[32], buf3[32];
 
 		md = p;
-		pr_info("mem%02u: %s range=[0x%016llx-0x%016llx] (%lluMB)\n",
+		pr_info("mem%02u: %s range=[0x%016llx-0x%016llx] (%s @ %s)\n",
 			i, efi_md_typeattr_format(buf, sizeof(buf), md),
 			md->phys_addr,
 			md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1,
-			(md->num_pages >> (20 - EFI_PAGE_SHIFT)));
+			efi_size_format(buf3, sizeof(buf3),
+				md->num_pages << EFI_PAGE_SHIFT),
+			efi_size_format(buf2, sizeof(buf2), md->phys_addr));
 	}
 #endif  /*  EFI_DEBUG  */
 }
