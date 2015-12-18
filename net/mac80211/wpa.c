@@ -42,7 +42,7 @@ ieee80211_tx_h_michael_mic_add(struct ieee80211_tx_data *tx)
 	    skb->len < 24 || !ieee80211_is_data_present(hdr->frame_control))
 		return TX_CONTINUE;
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = tx->hdrlen;
 	if (skb->len < hdrlen)
 		return TX_DROP;
 
@@ -186,7 +186,6 @@ mic_fail_no_key:
 
 static int tkip_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 {
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
 	struct ieee80211_key *key = tx->key;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	unsigned int hdrlen;
@@ -200,7 +199,7 @@ static int tkip_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 		return 0;
 	}
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = tx->hdrlen;
 	len = skb->len - hdrlen;
 
 	if (info->control.hw_key)
@@ -424,7 +423,7 @@ static int ccmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb,
 		return 0;
 	}
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = tx->hdrlen;
 	len = skb->len - hdrlen;
 
 	if (info->control.hw_key)
@@ -463,6 +462,7 @@ static int ccmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb,
 		return 0;
 
 	pos += IEEE80211_CCMP_HDR_LEN;
+
 	ccmp_special_blocks(skb, pn, b_0, aad);
 	ieee80211_aes_ccm_encrypt(key->u.ccmp.tfm, b_0, aad, pos, len,
 				  skb_put(skb, mic_len), mic_len);
@@ -651,7 +651,7 @@ static int gcmp_encrypt_skb(struct ieee80211_tx_data *tx, struct sk_buff *skb)
 		return 0;
 	}
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = tx->hdrlen;
 	len = skb->len - hdrlen;
 
 	if (info->control.hw_key)
@@ -787,7 +787,6 @@ static ieee80211_tx_result
 ieee80211_crypto_cs_encrypt(struct ieee80211_tx_data *tx,
 			    struct sk_buff *skb)
 {
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct ieee80211_key *key = tx->key;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	int hdrlen;
@@ -803,8 +802,7 @@ ieee80211_crypto_cs_encrypt(struct ieee80211_tx_data *tx,
 		     pskb_expand_head(skb, iv_len, 0, GFP_ATOMIC)))
 		return TX_DROP;
 
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
-
+	hdrlen = tx->hdrlen;
 	pos = skb_push(skb, iv_len);
 	memmove(pos, pos + iv_len, hdrlen);
 

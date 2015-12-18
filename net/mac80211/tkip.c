@@ -204,9 +204,18 @@ void ieee80211_get_tkip_p2k(struct ieee80211_key_conf *keyconf,
 	const u8 *tk = &key->conf.key[NL80211_TKIP_DATA_OFFSET_ENCR_KEY];
 	struct tkip_ctx *ctx = &key->u.tkip.tx;
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
-	const u8 *data = (u8 *)hdr + ieee80211_hdrlen(hdr->frame_control);
-	u32 iv32 = get_unaligned_le32(&data[4]);
-	u16 iv16 = data[2] | (data[0] << 8);
+	unsigned int hdrlen;
+	const u8 *data;
+	u32 iv32;
+	u16 iv16;
+
+	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	if (ieee80211_hw_check(&key->local->hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
+
+	data = (u8 *)hdr + hdrlen;
+	iv32 = get_unaligned_le32(&data[4]);
+	iv16 = data[2] | (data[0] << 8);
 
 	spin_lock(&key->u.tkip.txlock);
 	ieee80211_compute_tkip_p1k(key, iv32);
