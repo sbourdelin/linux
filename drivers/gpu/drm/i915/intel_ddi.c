@@ -2379,6 +2379,9 @@ static void intel_ddi_post_disable(struct intel_encoder *intel_encoder)
 		intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_OFF);
 		intel_edp_panel_vdd_on(intel_dp);
 		intel_edp_panel_off(intel_dp);
+
+		/* storing panel power off time */
+		intel_dp->panel_power_off_time = ktime_get_with_offset(TK_OFFS_BOOT);
 	}
 
 	if (IS_SKYLAKE(dev))
