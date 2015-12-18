@@ -51,19 +51,14 @@ EXPORT_SYMBOL_GPL(unregister_switch_driver);
 static struct dsa_switch_driver *
 dsa_switch_probe(struct device *host_dev, int sw_addr, char **_name)
 {
-	struct dsa_switch_driver *ret;
-	struct list_head *list;
+	struct dsa_switch_driver *ret, *drv;
 	char *name;
 
 	ret = NULL;
 	name = NULL;
 
 	mutex_lock(&dsa_switch_drivers_mutex);
-	list_for_each(list, &dsa_switch_drivers) {
-		struct dsa_switch_driver *drv;
-
-		drv = list_entry(list, struct dsa_switch_driver, list);
-
+	list_for_each_entry(drv, &dsa_switch_drivers, list) {
 		name = drv->probe(host_dev, sw_addr);
 		if (name != NULL) {
 			ret = drv;
