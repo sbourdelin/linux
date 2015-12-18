@@ -217,6 +217,7 @@
 #define MR_DCMD_CTRL_SET_CRASH_DUMP_PARAMS	0x01190100
 #define MR_DRIVER_SET_APP_CRASHDUMP_MODE	(0xF0010000 | 0x0600)
 #define MR_DCMD_PD_GET_INFO			0x02020000
+#define MR_DCMD_CTRL_BIOS_DATA_GET              0x010c0100
 
 /*
  * Global functions
@@ -761,6 +762,21 @@ struct MR_LD_TARGETID_LIST {
 	__le32	count;
 	u8	pad[3];
 	u8	targetId[MAX_LOGICAL_DRIVES_EXT];
+};
+
+struct MR_BIOS_DATA {
+	u16     bootTargetId;
+	u8      doNotExpose;
+	u8      continueOnError;
+	u8      verbose;
+	u8      geometry;
+	u8      exposeAllDrives;
+	u8      disableCTO;
+	u8      bootDeviceIsPD;
+	u8      EKMStatus;
+	u8      autoSelectBootLd;
+	u8      reserved[52];
+	u8      checkSum;
 };
 
 
@@ -1340,6 +1356,8 @@ struct megasas_ctrl_info {
 
 #define SCAN_PD_CHANNEL	0x1
 #define SCAN_VD_CHANNEL	0x2
+
+#define MEGASAS_INVALID_TARGET_ID               0xFFFF
 
 enum MR_SCSI_CMD_TYPE {
 	READ_WRITE_LDIO = 0,
@@ -1994,6 +2012,17 @@ enum MR_PD_TYPE {
 		 FC_PD = 4,
 };
 
+/*
+ *  define the structure specific to drive order feature
+ */
+struct megasas_drive_order {
+	u8 needs_ordering;         /* Drive ordering feature is enabled/disabled */
+	u8 boot_drive_is_pd;       /* Set if boot device is PD */
+	u16 boot_fw_tgt_id;        /* FW Target ID */
+	u8 boot_drive_channel_id;  /* OS Channel ID */
+	u16 boot_drive_tgt_id;     /* OS Target ID */
+};
+
 /* JBOD Queue depth definitions */
 #define MEGASAS_SATA_QD	32
 #define MEGASAS_SAS_QD	64
@@ -2133,7 +2162,9 @@ struct megasas_instance {
 	u8 is_imr;
 	u8 is_rdpq;
 	bool dev_handle;
+	struct megasas_drive_order drive_order;
 };
+
 struct MR_LD_VF_MAP {
 	u32 size;
 	union MR_LD_REF ref;
@@ -2318,6 +2349,7 @@ struct megasas_mgmt_info {
 	struct megasas_instance *instance[MAX_MGMT_ADAPTERS];
 	int max_index;
 };
+
 
 enum MEGASAS_OCR_CAUSE {
 	FW_FAULT_OCR			= 0,
