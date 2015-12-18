@@ -184,6 +184,13 @@ static inline bool system_supports_mixed_endian_el0(void)
 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
 }
 
+static inline bool system_supports_aarch32_el0(void)
+{
+	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+	return ((pfr0 >> ID_AA64PFR0_EL0_SHIFT) & ID_AA64PFR0_ELx_MASK)
+						!= ID_AA64PFR0_EL0_64BIT_ONLY;
+}
+
 #endif /* __ASSEMBLY__ */
 
 #endif
