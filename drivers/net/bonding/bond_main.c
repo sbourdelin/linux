@@ -419,6 +419,35 @@ const char *bond_slave_link_status(s8 link)
 	}
 }
 
+/* This function is to check the speed and duplex of a NIC.
+ * Since the speed and duplex of a slave device are very
+ * important to the bonding in the 802.3ad mode. As such,
+ * it is necessary to check the speed and duplex of a slave
+ * device in 802.3ad mode.
+ *
+ * speed != SPEED_UNKNOWN and duplex == DUPLEX_FULL  :  1
+ *                                           others  :  0
+ */
+static int __check_speed_duplex(struct net_device *netdev)
+{
+	struct ethtool_cmd ecmd;
+	u32 slave_speed = SPEED_UNKNOWN;
+	int res;
+
+	res = __ethtool_get_settings(netdev, &ecmd);
+	if (res < 0)
+		return 0;
+
+	slave_speed = ethtool_cmd_speed(&ecmd);
+	if (slave_speed == 0 || slave_speed == ((__u32) -1))
+		return 0;
+
+	if (DUPLEX_FULL != ecmd.duplex)
+		return 0;
+
+	return 1;
+}
+
 /* if <dev> supports MII link status reporting, check its link status.
  *
  * We either do MII/ETHTOOL ioctls, or check netif_carrier_ok(),
@@ -443,6 +472,11 @@ static int bond_check_dev_link(struct bonding *bond,
 	struct mii_ioctl_data *mii;
 
 	if (!reporting && !netif_running(slave_dev))
+		return 0;
+
+	/* Check the speed and duplex of the slave device in 802.3ad mode. */
+	if ((BOND_MODE(bond) == BOND_MODE_8023AD) &&
+	   !__check_speed_duplex(slave_dev))
 		return 0;
 
 	if (bond->params.use_carrier)
