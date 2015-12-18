@@ -904,8 +904,7 @@ out:
 static void svc_age_temp_xprts(unsigned long closure)
 {
 	struct svc_serv *serv = (struct svc_serv *)closure;
-	struct svc_xprt *xprt;
-	struct list_head *le, *next;
+	struct svc_xprt *xprt, *next;
 
 	dprintk("svc_age_temp_xprts\n");
 
@@ -916,9 +915,7 @@ static void svc_age_temp_xprts(unsigned long closure)
 		return;
 	}
 
-	list_for_each_safe(le, next, &serv->sv_tempsocks) {
-		xprt = list_entry(le, struct svc_xprt, xpt_list);
-
+	list_for_each_entry_safe(xprt, next, &serv->sv_tempsocks, xpt_list) {
 		/* First time through, just mark it OLD. Second time
 		 * through, close it. */
 		if (!test_and_set_bit(XPT_OLD, &xprt->xpt_flags))
@@ -926,7 +923,7 @@ static void svc_age_temp_xprts(unsigned long closure)
 		if (atomic_read(&xprt->xpt_ref.refcount) > 1 ||
 		    test_bit(XPT_BUSY, &xprt->xpt_flags))
 			continue;
-		list_del_init(le);
+		list_del_init(&xprt->xpt_list);
 		set_bit(XPT_CLOSE, &xprt->xpt_flags);
 		dprintk("queuing xprt %p for closing\n", xprt);
 
