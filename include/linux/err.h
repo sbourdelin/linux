@@ -1,6 +1,7 @@
 #ifndef _LINUX_ERR_H
 #define _LINUX_ERR_H
 
+#include <linux/bug.h>
 #include <linux/compiler.h>
 #include <linux/types.h>
 
@@ -18,7 +19,11 @@
 
 #ifndef __ASSEMBLY__
 
-#define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-MAX_ERRNO)
+#define IS_ERR_VALUE(x) \
+({ \
+    BUILD_BUG_ON_MSG((typeof(x))(-MAX_ERRNO) != (unsigned long)-MAX_ERRNO, "Invalid IS_ERR_VALUE argument type");\
+    unlikely((x) >= (unsigned long)-MAX_ERRNO);\
+})
 
 static inline void * __must_check ERR_PTR(long error)
 {
