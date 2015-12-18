@@ -801,6 +801,7 @@ megasas_ioc_init_fusion(struct megasas_instance *instance)
 	if (!dual_qdepth_disable)
 		drv_ops->mfi_capabilities.support_ext_queue_depth = 1;
 
+	drv_ops->mfi_capabilities.support_qd_throttling = 1;
 	/* Convert capability to LE32 */
 	cpu_to_le32s((u32 *)&init_frame->driver_operations.mfi_capabilities);
 
@@ -2180,6 +2181,12 @@ megasas_build_and_issue_cmd_fusion(struct megasas_instance *instance,
 			return SCSI_MLQUEUE_DEVICE_BUSY;
 		else
 			atomic_inc(&instance->ldio_outstanding);
+	}
+
+	if (atomic_read(&instance->fw_outstanding) >=
+			instance->host->can_queue) {
+		dev_err(&instance->pdev->dev, "Throttle IOs beyond Controller queue depth\n");
+		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	cmd = megasas_get_cmd_fusion(instance, scmd->request->tag);
