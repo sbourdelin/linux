@@ -326,6 +326,9 @@ EXPORT_SYMBOL(timespec_trunc);
  * A leap second can be indicated by calling this function with sec as
  * 60 (allowable under ISO 8601).  The leap second is treated the same
  * as the preceding second since they don't exist in UNIX time.
+ *
+ * An encoding of midnight at the end of the day as 24:00:00 - ie. midnight
+ * tomorrow - (allowable under ISO 8601) is supported.
  */
 time64_t mktime64(unsigned int year0, unsigned int mon0,
 		  unsigned int day, unsigned int hour,
@@ -346,7 +349,7 @@ time64_t mktime64(unsigned int year0, unsigned int mon0,
 	return ((((time64_t)
 		  (year/4 - year/100 + year/400 + 367*mon/12 + day) +
 		  year*365 - 719499
-	    )*24 + hour /* now have hours */
+	    )*24 + hour /* now have hours - midnight tomorrow handled here */
 	  )*60 + min /* now have minutes */
 	)*60 + sec; /* finally seconds */
 }
