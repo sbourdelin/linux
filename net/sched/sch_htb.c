@@ -948,10 +948,9 @@ static unsigned int htb_drop(struct Qdisc *sch)
 	int prio;
 
 	for (prio = TC_HTB_NUMPRIO - 1; prio >= 0; prio--) {
-		struct list_head *p;
-		list_for_each(p, q->drops + prio) {
-			struct htb_class *cl = list_entry(p, struct htb_class,
-							  un.leaf.drop_list);
+		struct htb_class *cl;
+
+		list_for_each_entry(cl, q->drops + prio, un.leaf.drop_list) {
 			unsigned int len;
 			if (cl->un.leaf.q->ops->drop &&
 			    (len = cl->un.leaf.q->ops->drop(cl->un.leaf.q))) {
