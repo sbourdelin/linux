@@ -28,7 +28,7 @@
 
 #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
 
-static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
+u8 ti_clk_mux_get_parent(struct clk_hw *hw)
 {
 	struct clk_mux *mux = to_clk_mux(hw);
 	int num_parents = clk_hw_get_num_parents(hw);
@@ -65,7 +65,7 @@ static u8 ti_clk_mux_get_parent(struct clk_hw *hw)
 	return val;
 }
 
-static int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
+int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
 {
 	struct clk_mux *mux = to_clk_mux(hw);
 	u32 val;
