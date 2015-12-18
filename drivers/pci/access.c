@@ -206,6 +206,18 @@ ssize_t pci_write_vpd(struct pci_dev *dev, loff_t pos, size_t count, const void 
 }
 EXPORT_SYMBOL(pci_write_vpd);
 
+/**
+ * pci_vpd_size - Determine the size of the Vital Product Data
+ * @dev:	pci device struct
+ *
+ */
+size_t pci_vpd_size(struct pci_dev *dev)
+{
+	if (!dev->vpd || !dev->vpd->ops)
+		return 0;
+	return dev->vpd->ops->size(dev);
+}
+
 /*
  * The following routines are to prevent the user from accessing PCI config
  * space when it's unsafe to do so.  Some devices require this during BIST and
@@ -428,6 +440,53 @@ out:
 	return ret ? ret : count;
 }
 
+/**
+ * pci_vpd_size - determine actual size of Vital Product Data
+ * @dev:	pci device struct
+ *
+ */
+static size_t pci_vpd_pci22_size(struct pci_dev *dev)
+{
+	ssize_t off = 0;
+	unsigned char header[1+2];	/* 1 byte tag, 2 bytes length */
+
+	while (pci_read_vpd(dev, off, 1, header) == 1) {
+		unsigned char tag;
+
+		if (header[0] & PCI_VPD_LRDT) {
+			/* Large Resource Data Type Tag */
+			tag = pci_vpd_lrdt_tag(header);
+			/* Only read length from known tag items */
+			if ((tag == PCI_VPD_LTIN_ID_STRING) ||
+			    (tag == PCI_VPD_LTIN_RO_DATA) ||
+			    (tag == PCI_VPD_LTIN_RW_DATA)) {
+				if (pci_read_vpd(dev, off+1, 2,
+						 &header[1]) != 2)
+					return off + 1;
+				off += PCI_VPD_LRDT_TAG_SIZE +
+					pci_vpd_lrdt_size(header);
+			}
+		} else {
+			/* Short Resource Data Type Tag */
+			off += PCI_VPD_SRDT_TAG_SIZE +
+				pci_vpd_srdt_size(header);
+			tag = pci_vpd_srdt_tag(header);
+		}
+		if (tag == PCI_VPD_STIN_END)	/* End tag descriptor */
+			return off;
+		if ((tag != PCI_VPD_LTIN_ID_STRING) &&
+		    (tag != PCI_VPD_LTIN_RO_DATA) &&
+		    (tag != PCI_VPD_LTIN_RW_DATA)) {
+			dev_dbg(&dev->dev,
+				"invalid %s vpd tag %02x at offset %zu.",
+				(header[0] & PCI_VPD_LRDT) ? "large" : "short",
+				tag, off);
+			break;
+		}
+	}
+	return 0;
+}
+
 static void pci_vpd_pci22_release(struct pci_dev *dev)
 {
 	kfree(container_of(dev->vpd, struct pci_vpd_pci22, base));
@@ -436,6 +495,7 @@ static void pci_vpd_pci22_release(struct pci_dev *dev)
 static const struct pci_vpd_ops pci_vpd_pci22_ops = {
 	.read = pci_vpd_pci22_read,
 	.write = pci_vpd_pci22_write,
+	.size = pci_vpd_pci22_size,
 	.release = pci_vpd_pci22_release,
 };
 
@@ -469,9 +529,29 @@ static ssize_t pci_vpd_f0_write(struct pci_dev *dev, loff_t pos, size_t count,
 	return ret;
 }
 
+static size_t pci_vpd_f0_size(struct pci_dev *dev)
+{
+	struct pci_dev *tdev = pci_get_slot(dev->bus,
+					    PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
+	ssize_t len = 0;
+
+	if (!tdev)
+		return 0;
+
+	if (tdev->vpd) {
+		struct pci_vpd_pci22 *vpd =
+			container_of(dev->vpd, struct pci_vpd_pci22, base);
+
+		len = vpd->base.len;
+	}
+	pci_dev_put(tdev);
+	return len;
+}
+
 static const struct pci_vpd_ops pci_vpd_f0_ops = {
 	.read = pci_vpd_f0_read,
 	.write = pci_vpd_f0_write,
+	.size = pci_vpd_f0_size,
 	.release = pci_vpd_pci22_release,
 };
 
@@ -497,6 +577,7 @@ int pci_vpd_pci22_init(struct pci_dev *dev)
 	vpd->cap = cap;
 	vpd->busy = false;
 	dev->vpd = &vpd->base;
+	vpd->base.len = pci_vpd_size(dev);
 	return 0;
 }
 
