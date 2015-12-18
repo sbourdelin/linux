@@ -23,6 +23,7 @@
 #include <linux/highmem.h>
 #include <linux/memblock.h>
 #include <linux/slab.h>
+#include <linux/sort.h>
 #include <linux/iommu.h>
 #include <linux/io.h>
 #include <linux/vmalloc.h>
@@ -1122,6 +1123,21 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
 	spin_unlock_irqrestore(&mapping->lock, flags);
 }
 
+static int cmp_pfns(const void *a, const void *b)
+{
+	unsigned long a_pfn;
+	unsigned long b_pfn;
+
+	a_pfn = page_to_pfn(*(struct page **)a);
+	b_pfn = page_to_pfn(*(struct page **)b);
+
+	if (a_pfn < b_pfn)
+		return -1;
+	else if (a_pfn > b_pfn)
+		return 1;
+	return 0;
+}
+
 /* We'll try 2M, 1M, 64K, and finally 4K; array must end with 0! */
 static const int iommu_order_array[] = { 9, 8, 4, 0 };
 
@@ -1133,6 +1149,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 	int array_size = count * sizeof(struct page *);
 	int i = 0;
 	int order_idx = 0;
+	int first_order_zero = -1;
 
 	if (array_size <= PAGE_SIZE)
 		pages = kzalloc(array_size, GFP_KERNEL);
@@ -1171,6 +1188,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 		/* Drop down when we get small */
 		if (__fls(count) < order) {
 			order_idx++;
+			/* Don't update first_order_zero; no need to sort end */
 			continue;
 		}
 
@@ -1181,6 +1199,8 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 			/* Go down a notch at first sign of pressure */
 			if (!pages[i]) {
 				order_idx++;
+				if (iommu_order_array[order_idx] == 0)
+					first_order_zero = i;
 				continue;
 			}
 		} else {
@@ -1200,6 +1220,26 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 		i += 1 << order;
 		count -= 1 << order;
 	}
+
+	/*
+	 * If we folded under memory pressure, try one last ditch event to get
+	 * contiguous pages via sorting.  Under testing this sometimes helped
+	 * get a few more contiguous pages and didn't cost much compared to
+	 * the above allocations.
+	 *
+	 * Note that we only sort the order zero pages so that we don't mess
+	 * up the higher order allocations by sticking small pages in between
+	 * them.
+	 *
+	 * If someone wanted to optimize this more, they could insert extra
+	 * (out of order) single pages in places to help keep virtual and
+	 * physical pages aligned with each other.  As it is we often get
+	 * lucky and get the needed alignment but we're not guaranteed.
+	 */
+	if (first_order_zero >= 0)
+		sort(pages + first_order_zero,
+		     (size >> PAGE_SHIFT) - first_order_zero, sizeof(*pages),
+		     cmp_pfns, NULL);
 
 	return pages;
 error:
