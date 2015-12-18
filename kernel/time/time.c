@@ -322,10 +322,14 @@ EXPORT_SYMBOL(timespec_trunc);
  * -year/100+year/400 terms, and add 10.]
  *
  * This algorithm was first published by Gauss (I think).
+ *
+ * A leap second can be indicated by calling this function with sec as
+ * 60 (allowable under ISO 8601).  The leap second is treated the same
+ * as the preceding second since they don't exist in UNIX time.
  */
-time64_t mktime64(const unsigned int year0, const unsigned int mon0,
-		const unsigned int day, const unsigned int hour,
-		const unsigned int min, const unsigned int sec)
+time64_t mktime64(unsigned int year0, unsigned int mon0,
+		  unsigned int day, unsigned int hour,
+		  unsigned int min, unsigned int sec)
 {
 	unsigned int mon = mon0, year = year0;
 
@@ -334,6 +338,10 @@ time64_t mktime64(const unsigned int year0, const unsigned int mon0,
 		mon += 12;	/* Puts Feb last since it has leap day */
 		year -= 1;
 	}
+
+	/* Handle leap seconds */
+	if (sec == 60)
+		sec = 59;
 
 	return ((((time64_t)
 		  (year/4 - year/100 + year/400 + 367*mon/12 + day) +

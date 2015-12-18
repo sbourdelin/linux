@@ -39,17 +39,16 @@ static inline int timeval_compare(const struct timeval *lhs, const struct timeva
 	return lhs->tv_usec - rhs->tv_usec;
 }
 
-extern time64_t mktime64(const unsigned int year, const unsigned int mon,
-			const unsigned int day, const unsigned int hour,
-			const unsigned int min, const unsigned int sec);
+extern time64_t mktime64(unsigned int year, unsigned int mon,
+			 unsigned int day, unsigned int hour,
+			 unsigned int min, unsigned int sec);
 
 /**
  * Deprecated. Use mktime64().
  */
-static inline unsigned long mktime(const unsigned int year,
-			const unsigned int mon, const unsigned int day,
-			const unsigned int hour, const unsigned int min,
-			const unsigned int sec)
+static inline unsigned long mktime(unsigned int year, unsigned int mon,
+				   unsigned int day, unsigned int hour,
+				   unsigned int min, unsigned int sec)
 {
 	return mktime64(year, mon, day, hour, min, sec);
 }
