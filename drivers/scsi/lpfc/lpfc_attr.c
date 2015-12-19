@@ -2089,7 +2089,7 @@ static char *lpfc_soft_wwn_key = "C99G71SL8032A";
  * -EINVAL if the buffer does not contain a valid wwn
  * 0 success
  **/
-static size_t
+static ssize_t
 lpfc_wwn_set(const char *buf, size_t cnt, char wwn[])
 {
 	unsigned int i, j;
@@ -2570,7 +2570,7 @@ static DEVICE_ATTR(lpfc_xlane_lun_status, S_IRUGO,
  * -EPERM OAS is not enabled or not supported by this port.
  *
  */
-static size_t
+static ssize_t
 lpfc_oas_lun_state_set(struct lpfc_hba *phba, uint8_t vpt_wwpn[],
 		       uint8_t tgt_wwpn[], uint64_t lun, uint32_t oas_state)
 {
