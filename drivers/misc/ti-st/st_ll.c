@@ -128,7 +128,7 @@ unsigned long st_ll_getstate(struct st_data_s *ll)
 }
 
 /* called from ST Core, when a PM related packet arrives */
-unsigned long st_ll_sleep_state(struct st_data_s *st_data,
+long st_ll_sleep_state(struct st_data_s *st_data,
 	unsigned char cmd)
 {
 	switch (cmd) {
