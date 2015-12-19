@@ -149,7 +149,7 @@ void fhci_ep0_free(struct fhci_usb *usb)
  * data_mem	The data memory partition(BUS)
  * ring_len	TD ring length
  */
-u32 fhci_create_ep(struct fhci_usb *usb, enum fhci_mem_alloc data_mem,
+s32 fhci_create_ep(struct fhci_usb *usb, enum fhci_mem_alloc data_mem,
 			   u32 ring_len)
 {
 	struct endpoint *ep;
