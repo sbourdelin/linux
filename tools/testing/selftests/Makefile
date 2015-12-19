@@ -1,4 +1,5 @@
 TARGETS = breakpoints
+TARGETS += cgroupns
 TARGETS += cpu-hotplug
 TARGETS += efivarfs
 TARGETS += exec
