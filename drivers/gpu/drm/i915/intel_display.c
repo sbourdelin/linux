@@ -13470,6 +13470,13 @@ static int intel_atomic_commit(struct drm_device *dev,
 	drm_atomic_helper_swap_state(dev, state);
 	dev_priv->wm.config = to_intel_atomic_state(state)->wm_config;
 
+	/* Take a rpm wakeref for the duration of the commit. Lower level
+	 * functions should be acquiring the power wells for their own use,
+	 * we take this toplevel reference to prevent rpm suspend cycles
+	 * mid-commit.
+	 */
+	intel_runtime_pm_get(dev_priv);
+
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
 		struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 
@@ -13557,6 +13564,8 @@ static int intel_atomic_commit(struct drm_device *dev,
 
 	if (any_ms)
 		intel_modeset_check_state(dev, state);
+
+	intel_runtime_pm_put(dev_priv);
 
 	drm_atomic_state_free(state);
 
