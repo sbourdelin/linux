@@ -2953,7 +2953,7 @@ static const struct net_device_ops slic_netdev_ops = {
 	.ndo_change_mtu		= eth_change_mtu,
 };
 
-static u32 slic_card_locate(struct adapter *adapter)
+static s32 slic_card_locate(struct adapter *adapter)
 {
 	struct sliccard *card = slic_global.slic_card;
 	struct physcard *physcard = slic_global.phys_card;
