@@ -217,6 +217,20 @@ static inline int serial_index(struct uart_port *port)
 	return port->minor - 64;
 }
 
+#ifdef CONFIG_GPIOLIB
+int xr17v35x_gpio_init(struct pci_dev *dev,
+		       struct uart_8250_port *port);
+void xr17v35x_gpio_exit(struct uart_8250_port *port);
+#else
+static inline int xr17v35x_gpio_init(struct pci_dev *dev,
+				     struct uart_8250_port *port)
+{
+	return 0;
+}
+
+static void xr17v35x_gpio_exit(struct uart_8250_port *port) { }
+#endif
+
 #if 0
 #define DEBUG_INTR(fmt...)	printk(fmt)
 #else
