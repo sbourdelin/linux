@@ -3402,16 +3402,22 @@ out:
 static int unknown_module_param_cb(char *param, char *val, const char *modname,
 				   void *arg)
 {
-	struct module *mod = arg;
+	struct module *mod;
 	int ret;
 
 	if (strcmp(param, "async_probe") == 0) {
+		mod = arg;
+		if (!mod) {
+			ret = -ENOENT;
+			goto out;
+		}
 		mod->async_probe_requested = true;
 		return 0;
 	}
 
 	/* Check for magic 'dyndbg' arg */
 	ret = ddebug_dyndbg_module_param_cb(param, val, modname);
+out:
 	if (ret != 0)
 		pr_warn("%s: unknown parameter '%s' ignored\n", modname, param);
 	return 0;
@@ -3515,7 +3521,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 
 	/* Module is ready to execute: parsing args may do that. */
 	after_dashes = parse_args(mod->name, mod->args, mod->kp, mod->num_kp,
-				  -32768, 32767, NULL,
+				  -32768, 32767, mod,
 				  unknown_module_param_cb);
 	if (IS_ERR(after_dashes)) {
 		err = PTR_ERR(after_dashes);
