@@ -136,8 +136,8 @@ static int rockchip_efuse_probe(struct platform_device *pdev)
 
 	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
 			       GFP_KERNEL);
-	if (IS_ERR(context))
-		return PTR_ERR(context);
+	if (!context)
+		return -ENOMEM;
 
 	clk = devm_clk_get(dev, "pclk_efuse");
 	if (IS_ERR(clk))
