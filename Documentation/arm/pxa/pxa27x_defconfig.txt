@@ -1,0 +1,7 @@
+If you are reading this, because you are adding support for a new
+PXA27X board, please note that you should not create an additional
+defconfig in arch/arm/configs.
+
+Instead, please update arch/arm/configs/pxa27x-dt_defconfig so that
+a kernel built with this config after `make olddefconfig` boots your
+board.
