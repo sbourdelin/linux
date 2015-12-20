@@ -52,6 +52,93 @@ void mlx5e_fill_hwstamp(struct mlx5e_tstamp *tstamp,
 	hwts->hwtstamp = ns_to_ktime(nsec);
 }
 
+static int mlx5e_ptp_settime(struct ptp_clock_info *ptp,
+			     const struct timespec64 *ts)
+{
+	struct mlx5e_tstamp *tstamp = container_of(ptp, struct mlx5e_tstamp,
+						   ptp_info);
+	u64 ns = timespec64_to_ns(ts);
+	unsigned long flags;
+
+	write_lock_irqsave(&tstamp->lock, flags);
+	timecounter_init(&tstamp->clock, &tstamp->cycles, ns);
+	write_unlock_irqrestore(&tstamp->lock, flags);
+
+	return 0;
+}
+
+static int mlx5e_ptp_gettime(struct ptp_clock_info *ptp,
+			     struct timespec64 *ts)
+{
+	struct mlx5e_tstamp *tstamp = container_of(ptp, struct mlx5e_tstamp,
+						   ptp_info);
+	u64 ns;
+	unsigned long flags;
+
+	write_lock_irqsave(&tstamp->lock, flags);
+	ns = timecounter_read(&tstamp->clock);
+	write_unlock_irqrestore(&tstamp->lock, flags);
+
+	*ts = ns_to_timespec64(ns);
+
+	return 0;
+}
+
+static int mlx5e_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+{
+	struct mlx5e_tstamp *tstamp = container_of(ptp, struct mlx5e_tstamp,
+						   ptp_info);
+	unsigned long flags;
+
+	write_lock_irqsave(&tstamp->lock, flags);
+	timecounter_adjtime(&tstamp->clock, delta);
+	write_unlock_irqrestore(&tstamp->lock, flags);
+
+	return 0;
+}
+
+static int mlx5e_ptp_adjfreq(struct ptp_clock_info *ptp, s32 delta)
+{
+	u64 adj;
+	u32 diff;
+	int neg_adj = 0;
+	unsigned long flags;
+	struct mlx5e_tstamp *tstamp = container_of(ptp, struct mlx5e_tstamp,
+						  ptp_info);
+
+	if (delta < 0) {
+		neg_adj = 1;
+		delta = -delta;
+	}
+
+	adj = tstamp->nominal_c_mult;
+	adj *= delta;
+	diff = div_u64(adj, 1000000000ULL);
+
+	write_lock_irqsave(&tstamp->lock, flags);
+	timecounter_read(&tstamp->clock);
+	tstamp->cycles.mult = neg_adj ? tstamp->nominal_c_mult - diff :
+					tstamp->nominal_c_mult + diff;
+	write_unlock_irqrestore(&tstamp->lock, flags);
+
+	return 0;
+}
+
+static const struct ptp_clock_info mlx5e_ptp_clock_info = {
+	.owner		= THIS_MODULE,
+	.max_adj	= 100000000,
+	.n_alarm	= 0,
+	.n_ext_ts	= 0,
+	.n_per_out	= 0,
+	.n_pins		= 0,
+	.pps		= 0,
+	.adjfreq	= mlx5e_ptp_adjfreq,
+	.adjtime	= mlx5e_ptp_adjtime,
+	.gettime64	= mlx5e_ptp_gettime,
+	.settime64	= mlx5e_ptp_settime,
+	.enable		= NULL,
+};
+
 static cycle_t mlx5e_read_clock(const struct cyclecounter *cc)
 {
 	struct mlx5e_tstamp *tstamp = container_of(cc, struct mlx5e_tstamp,
@@ -117,6 +204,18 @@ void mlx5e_timestamp_init(struct mlx5e_priv *priv)
 
 	INIT_DELAYED_WORK(&tstamp->overflow_work, mlx5e_timestamp_overflow);
 	schedule_delayed_work(&tstamp->overflow_work, 0);
+
+	/* Configure the PHC */
+	tstamp->ptp_info = mlx5e_ptp_clock_info;
+	snprintf(tstamp->ptp_info.name, 16, "mlx5 ptp");
+
+	tstamp->ptp = ptp_clock_register(&tstamp->ptp_info,
+					 &priv->mdev->pdev->dev);
+	if (IS_ERR_OR_NULL(tstamp->ptp)) {
+		mlx5_core_warn(priv->mdev, "ptp_clock_register failed %ld\n",
+			       PTR_ERR(tstamp->ptp));
+		tstamp->ptp = NULL;
+	}
 }
 
 void mlx5e_timestamp_cleanup(struct mlx5e_priv *priv)
@@ -131,4 +230,9 @@ void mlx5e_timestamp_cleanup(struct mlx5e_priv *priv)
 	write_unlock(&tstamp->lock);
 
 	cancel_delayed_work_sync(&tstamp->overflow_work);
+
+	if (priv->tstamp.ptp) {
+		ptp_clock_unregister(priv->tstamp.ptp);
+		priv->tstamp.ptp = NULL;
+	}
 }

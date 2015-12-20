@@ -881,6 +881,8 @@ static int mlx5e_get_ts_info(struct net_device *dev,
 	}
 
 	info->phc_index = -1;
+	if (priv->tstamp.ptp)
+		info->phc_index = ptp_clock_index(priv->tstamp.ptp);
 
 	return 0;
 }
