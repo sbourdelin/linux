@@ -31,6 +31,10 @@
 #include "../amdtp-stream.h"
 #include "../iso-resources.h"
 
+struct snd_ff_spec {
+	const char *const name;
+};
+
 struct snd_ff {
 	struct snd_card *card;
 	struct fw_unit *unit;
@@ -38,5 +42,7 @@ struct snd_ff {
 
 	bool probed;
 	struct delayed_work dwork;
+
+	const struct snd_ff_spec *spec;
 };
 #endif
