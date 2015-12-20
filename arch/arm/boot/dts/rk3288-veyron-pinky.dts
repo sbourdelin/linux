@@ -121,8 +121,3 @@
 		     &sdmmc_wp_gpio &sdmmc_bus4>;
 	wp-gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>;
 };
-
-&tsadc {
-	/* Some connection is flaky making the tsadc hang the system */
-	status = "disabled";
-};
