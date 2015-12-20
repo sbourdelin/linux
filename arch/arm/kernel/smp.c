@@ -647,6 +647,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		break;
 
 	case IPI_CPU_BACKTRACE:
+		if (in_nmi()) {
+			nmi_cpu_backtrace(regs);
+			break;
+		}
+
 		irq_enter();
 		nmi_cpu_backtrace(regs);
 		irq_exit();
@@ -758,6 +763,7 @@ static void raise_nmi(cpumask_t *mask)
 	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
 		nmi_cpu_backtrace(NULL);
 
+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
 }
 

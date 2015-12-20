@@ -479,7 +479,14 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
 
 	nmi_enter();
 
-	/* nop. FIQ handlers for special arch/arm features can be added here. */
+	/*
+	 * Either the interrupt controller supports FIQ, meaning it will
+	 * do the right thing with this call, or we will end up treating a
+	 * spurious FIQ (which is normally fatal) as though it were an IRQ
+	 * which, although it risks deadlock, still gives us a sporting
+	 * chance of surviving long enough to log errors.
+	 */
+	handle_arch_irq(regs);
 
 	nmi_exit();
 
