@@ -36,6 +36,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
+#include <linux/virtio_ring.h>
 #include <xen/xenbus.h>
 #include <asm/xen/hypervisor.h>
 #include <xen/events.h>
@@ -123,14 +124,14 @@ int xb_write(const void *data, unsigned len)
 			avail = len;
 
 		/* Must write data /after/ reading the consumer index. */
-		mb();
+		virtio_mb(true);
 
 		memcpy(dst, data, avail);
 		data += avail;
 		len -= avail;
 
 		/* Other side must not see new producer until data is there. */
-		wmb();
+		virtio_wmb(true);
 		intf->req_prod += avail;
 
 		/* Implies mb(): other side will see the updated producer. */
@@ -180,14 +181,14 @@ int xb_read(void *data, unsigned len)
 			avail = len;
 
 		/* Must read data /after/ reading the producer index. */
-		rmb();
+		virtio_rmb(true);
 
 		memcpy(data, src, avail);
 		data += avail;
 		len -= avail;
 
 		/* Other side must not see free space until we've copied out */
-		mb();
+		virtio_mb(true);
 		intf->rsp_cons += avail;
 
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
