@@ -1935,6 +1935,77 @@ static int mlx5e_change_mtu(struct net_device *netdev, int new_mtu)
 	return err;
 }
 
+static int mlx5e_hwstamp_set(struct net_device *dev, struct ifreq *ifr)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct hwtstamp_config config;
+
+	if (!MLX5_CAP_GEN(priv->mdev, device_frequency_khz))
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))
+		return -EFAULT;
+
+	/* TX HW timestamp */
+	switch (config.tx_type) {
+	case HWTSTAMP_TX_OFF:
+	case HWTSTAMP_TX_ON:
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	/* RX HW timestamp */
+	switch (config.rx_filter) {
+	case HWTSTAMP_FILTER_NONE:
+		break;
+	case HWTSTAMP_FILTER_ALL:
+	case HWTSTAMP_FILTER_SOME:
+	case HWTSTAMP_FILTER_PTP_V1_L4_EVENT:
+	case HWTSTAMP_FILTER_PTP_V1_L4_SYNC:
+	case HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_L4_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L4_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:
+		config.rx_filter = HWTSTAMP_FILTER_ALL;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	priv->tstamp.hwtstamp_config.tx_type = config.tx_type;
+	priv->tstamp.hwtstamp_config.rx_filter = config.rx_filter;
+
+	return copy_to_user(ifr->ifr_data, &config,
+			    sizeof(config)) ? -EFAULT : 0;
+}
+
+static int mlx5e_hwstamp_get(struct net_device *dev, struct ifreq *ifr)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+
+	return copy_to_user(ifr->ifr_data, &priv->tstamp.hwtstamp_config,
+			    sizeof(priv->tstamp.hwtstamp_config)) ? -EFAULT : 0;
+}
+
+static int mlx5e_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	switch (cmd) {
+	case SIOCSHWTSTAMP:
+		return mlx5e_hwstamp_set(dev, ifr);
+	case SIOCGHWTSTAMP:
+		return mlx5e_hwstamp_get(dev, ifr);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static int mlx5e_set_vf_mac(struct net_device *dev, int vf, u8 *mac)
 {
 	struct mlx5e_priv *priv = netdev_priv(dev);
@@ -2018,7 +2089,8 @@ static struct net_device_ops mlx5e_netdev_ops = {
 	.ndo_vlan_rx_add_vid	 = mlx5e_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	 = mlx5e_vlan_rx_kill_vid,
 	.ndo_set_features        = mlx5e_set_features,
-	.ndo_change_mtu		 = mlx5e_change_mtu
+	.ndo_change_mtu		 = mlx5e_change_mtu,
+	.ndo_do_ioctl		 = mlx5e_ioctl,
 };
 
 static int mlx5e_check_required_hca_cap(struct mlx5_core_dev *mdev)
@@ -2273,6 +2345,7 @@ static void *mlx5e_create_netdev(struct mlx5_core_dev *mdev)
 	}
 
 	mlx5e_init_eth_addr(priv);
+	mlx5e_timestamp_init(priv);
 
 	err = register_netdev(netdev);
 	if (err) {
@@ -2286,6 +2359,7 @@ static void *mlx5e_create_netdev(struct mlx5_core_dev *mdev)
 	return priv;
 
 err_destroy_flow_tables:
+	mlx5e_timestamp_cleanup(priv);
 	mlx5e_destroy_flow_tables(priv);
 
 err_destroy_tirs:
@@ -2332,6 +2406,7 @@ static void mlx5e_destroy_netdev(struct mlx5_core_dev *mdev, void *vpriv)
 	mlx5e_disable_async_events(priv);
 	flush_scheduled_work();
 	unregister_netdev(netdev);
+	mlx5e_timestamp_cleanup(priv);
 	mlx5e_destroy_flow_tables(priv);
 	mlx5e_destroy_tirs(priv);
 	mlx5e_destroy_rqt(priv, MLX5E_SINGLE_RQ_RQT);

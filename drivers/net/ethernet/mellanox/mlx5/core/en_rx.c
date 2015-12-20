@@ -36,6 +36,11 @@
 #include <net/busy_poll.h>
 #include "en.h"
 
+static inline bool mlx5e_rx_hw_stamp(struct mlx5e_priv *priv)
+{
+	return priv->tstamp.hwtstamp_config.rx_filter == HWTSTAMP_FILTER_ALL;
+}
+
 static inline int mlx5e_alloc_rx_wqe(struct mlx5e_rq *rq,
 				     struct mlx5e_rx_wqe *wqe, u16 ix)
 {
@@ -189,6 +194,7 @@ static inline void mlx5e_build_rx_skb(struct mlx5_cqe64 *cqe,
 				      struct sk_buff *skb)
 {
 	struct net_device *netdev = rq->netdev;
+	struct mlx5e_priv *priv = netdev_priv(netdev);
 	u32 cqe_bcnt = be32_to_cpu(cqe->byte_cnt);
 	int lro_num_seg;
 
@@ -201,6 +207,10 @@ static inline void mlx5e_build_rx_skb(struct mlx5_cqe64 *cqe,
 		rq->stats.lro_packets++;
 		rq->stats.lro_bytes += cqe_bcnt;
 	}
+
+	if (mlx5e_rx_hw_stamp(priv))
+		mlx5e_fill_hwstamp(&priv->tstamp, skb_hwtstamps(skb),
+				   get_cqe_ts(cqe));
 
 	mlx5e_handle_csum(netdev, cqe, rq, skb);
 

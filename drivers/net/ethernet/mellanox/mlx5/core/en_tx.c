@@ -38,6 +38,12 @@
 #define MLX5E_SQ_STOP_ROOM (MLX5_SEND_WQE_MAX_WQEBBS +\
 			    MLX5E_SQ_NOPS_ROOM)
 
+static inline bool mlx5e_tx_hw_stamp(struct mlx5e_priv *priv, struct sk_buff *skb)
+{
+	return ((priv->tstamp.hwtstamp_config.tx_type == HWTSTAMP_TX_ON) &&
+		(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP));
+}
+
 void mlx5e_send_nop(struct mlx5e_sq *sq, bool notify_hw)
 {
 	struct mlx5_wq_cyc                *wq  = &sq->wq;
@@ -282,6 +288,9 @@ static netdev_tx_t mlx5e_sq_xmit(struct mlx5e_sq *sq, struct sk_buff *skb)
 
 	netdev_tx_sent_queue(sq->txq, wi->num_bytes);
 
+	if (mlx5e_tx_hw_stamp(sq->channel->priv, skb))
+		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+
 	if (unlikely(!mlx5e_sq_has_room_for(sq, MLX5E_SQ_STOP_ROOM))) {
 		netif_tx_stop_queue(sq->txq);
 		sq->stats.stopped++;
@@ -378,6 +387,14 @@ bool mlx5e_poll_tx_cq(struct mlx5e_cq *cq)
 				sq->stats.nop++;
 				sqcc++;
 				continue;
+			}
+
+			if (mlx5e_tx_hw_stamp(sq->channel->priv, skb)) {
+				struct skb_shared_hwtstamps hwts;
+
+				mlx5e_fill_hwstamp(&sq->cq.channel->priv->tstamp,
+						   &hwts, get_cqe_ts(cqe));
+				skb_tstamp_tx(skb, &hwts);
 			}
 
 			for (j = 0; j < wi->num_dma; j++) {
