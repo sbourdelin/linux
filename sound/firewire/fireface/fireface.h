@@ -35,8 +35,12 @@
 #define SND_FF_IN_MIDI_PORTS		2
 #define SND_FF_OUT_MIDI_PORTS		2
 
+#define SND_FF_STREAM_MODES		3
+
 struct snd_ff_spec {
 	const char *const name;
+	const unsigned int pcm_capture_channels[SND_FF_STREAM_MODES];
+	const unsigned int pcm_playback_channels[SND_FF_STREAM_MODES];
 };
 
 struct snd_ff {
@@ -63,6 +67,12 @@ struct snd_ff {
 	ktime_t next_ktime[SND_FF_OUT_MIDI_PORTS];
 	bool rx_midi_error[SND_FF_OUT_MIDI_PORTS];
 	unsigned int rx_bytes[SND_FF_OUT_MIDI_PORTS];
+
+	unsigned int substreams_counter;
+	struct amdtp_stream tx_stream;
+	struct amdtp_stream rx_stream;
+	struct fw_iso_resources tx_resources;
+	struct fw_iso_resources rx_resources;
 };
 
 #define SND_FF_ADDR_CONTROLLER_ADDR_HI	0x0000801003f4
@@ -71,6 +81,15 @@ struct snd_ff {
 #define SND_FF_ADDR_MIDI_RX_PORT_1	0x000080190000
 
 #define SND_FF_ADDR_MIDI_TX		0x000100000000
+
+enum snd_ff_clock_src {
+	SND_FF_CLOCK_SRC_INTERNAL,
+	SND_FF_CLOCK_SRC_SPDIF,
+	SND_FF_CLOCK_SRC_ADAT,
+	SND_FF_CLOCK_SRC_WORD,
+	SND_FF_CLOCK_SRC_LTC,
+	/* TODO: perhaps ADAT2 and TCO exists. */
+};
 
 int snd_ff_transaction_register(struct snd_ff *ff);
 int snd_ff_transaction_reregister(struct snd_ff *ff);
@@ -83,6 +102,15 @@ int amdtp_ff_add_pcm_hw_constraints(struct amdtp_stream *s,
 				    struct snd_pcm_runtime *runtime);
 int amdtp_ff_init(struct amdtp_stream *s, struct fw_unit *unit,
 		  enum amdtp_stream_direction dir);
+
+int snd_ff_stream_init_duplex(struct snd_ff *ff);
+void snd_ff_stream_destroy_duplex(struct snd_ff *ff);
+int snd_ff_stream_start_duplex(struct snd_ff *ff, unsigned int rate);
+void snd_ff_stream_stop_duplex(struct snd_ff *ff);
+void snd_ff_stream_update_duplex(struct snd_ff *ff);
+
+int snd_ff_stream_get_clock(struct snd_ff *ff, unsigned int *rate,
+			    enum snd_ff_clock_src *src);
 
 void snd_ff_proc_init(struct snd_ff *ff);
 

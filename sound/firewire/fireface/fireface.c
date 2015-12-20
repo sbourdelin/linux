@@ -18,6 +18,8 @@ MODULE_LICENSE("GPL v2");
 
 struct snd_ff_spec spec_ff400 = {
 	.name = "Fireface400",
+	.pcm_capture_channels = {18, 14, 10},
+	.pcm_playback_channels = {18, 14, 10},
 };
 
 static void name_card(struct snd_ff *ff)
@@ -110,6 +112,12 @@ static int snd_ff_probe(struct fw_unit *unit,
 
 	snd_ff_proc_init(ff);
 
+	err = snd_ff_stream_init_duplex(ff);
+	if (err < 0) {
+		snd_card_free(card);
+		return err;
+	}
+
 	/* Register this sound card later. */
 	INIT_DEFERRABLE_WORK(&ff->dwork, do_probe);
 	delay = msecs_to_jiffies(PROBE_DELAY_MS) +
@@ -133,6 +141,8 @@ static void snd_ff_update(struct fw_unit *unit)
 	}
 
 	snd_ff_transaction_reregister(ff);
+
+	snd_ff_stream_update_duplex(ff);
 }
 
 static void snd_ff_remove(struct fw_unit *unit)
