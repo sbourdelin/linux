@@ -47,8 +47,6 @@
 #define TIMER_COUNT_W_ACTIVE	(1 << 4)	/* not ready for write */
 #define TIMER_MATCH_W_ACTIVE	(1 << 0)	/* not ready for write */
 
-#define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
-
 #define timer_readl(addr)	readl_relaxed(regbase + addr)
 #define timer_writel(v, addr)	writel_relaxed(v, regbase + addr)
 
@@ -56,10 +54,10 @@ static void __iomem *regbase;
 
 static cycle_t vt8500_timer_read(struct clocksource *cs)
 {
-	int loops = msecs_to_loops(10);
 	timer_writel(3, TIMER_CTRL_VAL);
-	while ((timer_readl((TIMER_AS_VAL)) & TIMER_COUNT_R_ACTIVE) && --loops)
+	while (timer_readl(TIMER_AS_VAL) & TIMER_COUNT_R_ACTIVE)
 		cpu_relax();
+
 	return timer_readl(TIMER_COUNT_VAL);
 }
 
@@ -74,9 +72,8 @@ static struct clocksource clocksource = {
 static int vt8500_timer_set_next_event(unsigned long cycles,
 				    struct clock_event_device *evt)
 {
-	int loops = msecs_to_loops(10);
 	cycle_t alarm = clocksource.read(&clocksource) + cycles;
-	while ((timer_readl(TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE) && --loops)
+	while (timer_readl(TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
 		cpu_relax();
 	timer_writel((unsigned long)alarm, TIMER_MATCH_VAL);
 
