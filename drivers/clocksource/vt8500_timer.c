@@ -49,16 +49,18 @@
 
 #define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
 
+#define timer_readl(addr)	readl_relaxed(regbase + addr)
+#define timer_writel(v, addr)	writel_relaxed(v, regbase + addr)
+
 static void __iomem *regbase;
 
 static cycle_t vt8500_timer_read(struct clocksource *cs)
 {
 	int loops = msecs_to_loops(10);
-	writel(3, regbase + TIMER_CTRL_VAL);
-	while ((readl((regbase + TIMER_AS_VAL)) & TIMER_COUNT_R_ACTIVE)
-						&& --loops)
+	timer_writel(3, TIMER_CTRL_VAL);
+	while ((timer_readl((TIMER_AS_VAL)) & TIMER_COUNT_R_ACTIVE) && --loops)
 		cpu_relax();
-	return readl(regbase + TIMER_COUNT_VAL);
+	return timer_readl(TIMER_COUNT_VAL);
 }
 
 static struct clocksource clocksource = {
@@ -74,23 +76,22 @@ static int vt8500_timer_set_next_event(unsigned long cycles,
 {
 	int loops = msecs_to_loops(10);
 	cycle_t alarm = clocksource.read(&clocksource) + cycles;
-	while ((readl(regbase + TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
-						&& --loops)
+	while ((timer_readl(TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE) && --loops)
 		cpu_relax();
-	writel((unsigned long)alarm, regbase + TIMER_MATCH_VAL);
+	timer_writel((unsigned long)alarm, TIMER_MATCH_VAL);
 
 	if ((signed)(alarm - clocksource.read(&clocksource)) <= 16)
 		return -ETIME;
 
-	writel(1, regbase + TIMER_IER_VAL);
+	timer_writel(1, TIMER_IER_VAL);
 
 	return 0;
 }
 
 static int vt8500_shutdown(struct clock_event_device *evt)
 {
-	writel(readl(regbase + TIMER_CTRL_VAL) | 1, regbase + TIMER_CTRL_VAL);
-	writel(0, regbase + TIMER_IER_VAL);
+	timer_writel(timer_readl(TIMER_CTRL_VAL) | 1, TIMER_CTRL_VAL);
+	timer_writel(0, TIMER_IER_VAL);
 	return 0;
 }
 
@@ -106,7 +107,7 @@ static struct clock_event_device clockevent = {
 static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = dev_id;
-	writel(0xf, regbase + TIMER_STATUS_VAL);
+	timer_writel(0xf, TIMER_STATUS_VAL);
 	evt->event_handler(evt);
 
 	return IRQ_HANDLED;
@@ -136,9 +137,9 @@ static void __init vt8500_timer_init(struct device_node *np)
 		return;
 	}
 
-	writel(1, regbase + TIMER_CTRL_VAL);
-	writel(0xf, regbase + TIMER_STATUS_VAL);
-	writel(~0, regbase + TIMER_MATCH_VAL);
+	timer_writel(1, TIMER_CTRL_VAL);
+	timer_writel(0xf, TIMER_STATUS_VAL);
+	timer_writel(~0, TIMER_MATCH_VAL);
 
 	if (clocksource_register_hz(&clocksource, VT8500_TIMER_HZ))
 		pr_err("%s: vt8500_timer_init: clocksource_register failed for %s\n",
