@@ -76,6 +76,14 @@ int snd_ff_transaction_register(struct snd_ff *ff);
 int snd_ff_transaction_reregister(struct snd_ff *ff);
 void snd_ff_transaction_unregister(struct snd_ff *ff);
 
+int amdtp_ff_set_parameters(struct amdtp_stream *s, unsigned int rate,
+			    unsigned int pcm_channels);
+void amdtp_ff_set_pcm_format(struct amdtp_stream *s, snd_pcm_format_t format);
+int amdtp_ff_add_pcm_hw_constraints(struct amdtp_stream *s,
+				    struct snd_pcm_runtime *runtime);
+int amdtp_ff_init(struct amdtp_stream *s, struct fw_unit *unit,
+		  enum amdtp_stream_direction dir);
+
 void snd_ff_proc_init(struct snd_ff *ff);
 
 int snd_ff_create_midi_devices(struct snd_ff *ff);
