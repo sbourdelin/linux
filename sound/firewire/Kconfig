@@ -148,4 +148,11 @@ config SND_FIREWIRE_TASCAM
 	 To compile this driver as a module, choose M here: the module
 	 will be called snd-firewire-tascam.
 
+config SND_FIREFACE
+	tristate "RME Fireface series support"
+	select SND_FIREWIRE_LIB
+	help
+	 Say Y here to include support for RME fireface series.
+	  * Fireface 400
+
 endif # SND_FIREWIRE
