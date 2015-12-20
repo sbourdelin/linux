@@ -115,6 +115,10 @@ struct sock *dccp_create_openreq_child(const struct sock *sk,
 		newdp->dccps_isr = dreq->dreq_isr;
 		newdp->dccps_gsr = dreq->dreq_gsr;
 
+		newdp->dccps_hc_rx_ackvec = NULL;
+		newdp->dccps_hc_rx_ccid = NULL;
+		newdp->dccps_hc_tx_ccid = NULL;
+
 		/*
 		 * Activate features: initialise CCIDs, sequence windows etc.
 		 */
