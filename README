@@ -253,9 +253,9 @@ COMPILING the kernel:
 
    Please note that you can still run a.out user programs with this kernel.
 
- - Do a "make" to create a compressed kernel image. It is also
-   possible to do "make install" if you have lilo installed to suit the
-   kernel makefiles, but you may want to check your particular lilo setup first.
+ - Do a "make" to create a compressed kernel image. It is also possible to do
+   "make install" if your bootloader is configured to suit the kernel makefiles,
+   but you may want to check your particular setup first.
 
    To do the actual install, you have to be root, but none of the normal
    build should require that. Don't take the name of root in vain.
@@ -292,29 +292,13 @@ COMPILING the kernel:
    image (e.g. .../linux/arch/i386/boot/bzImage after compilation)
    to the place where your regular bootable kernel is found. 
 
- - Booting a kernel directly from a floppy without the assistance of a
-   bootloader such as LILO, is no longer supported.
+   The kernel image file is usually /vmlinuz, /boot/vmlinuz, /bzImage or
+   /boot/bzImage.  To use the new kernel, save a copy of the old image and copy
+   the new image over the old one.
 
-   If you boot Linux from the hard drive, chances are you use LILO, which
-   uses the kernel image as specified in the file /etc/lilo.conf.  The
-   kernel image file is usually /vmlinuz, /boot/vmlinuz, /bzImage or
-   /boot/bzImage.  To use the new kernel, save a copy of the old image
-   and copy the new image over the old one.  Then, you MUST RERUN LILO
-   to update the loading map!! If you don't, you won't be able to boot
-   the new kernel image.
-
-   Reinstalling LILO is usually a matter of running /sbin/lilo. 
-   You may wish to edit /etc/lilo.conf to specify an entry for your
-   old kernel image (say, /vmlinux.old) in case the new one does not
-   work.  See the LILO docs for more information. 
-
-   After reinstalling LILO, you should be all set.  Shutdown the system,
-   reboot, and enjoy!
-
-   If you ever need to change the default root device, video mode,
-   ramdisk size, etc.  in the kernel image, use the 'rdev' program (or
-   alternatively the LILO boot options when appropriate).  No need to
-   recompile the kernel to change these parameters. 
+   You may wish to edit your bootloader config to add an entry for your old
+   kernel image (say, /vmlinux.old) in case the new one does not work.  Refer to
+   your bootloader documentation for specific options.
 
  - Reboot with the new kernel and enjoy. 
 
