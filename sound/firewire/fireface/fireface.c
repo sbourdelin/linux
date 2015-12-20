@@ -71,6 +71,10 @@ static void do_probe(struct work_struct *work)
 	if (err < 0)
 		goto end;
 
+	err = snd_ff_create_hwdep_devices(ff);
+	if (err < 0)
+		goto end;
+
 	err = snd_card_register(ff->card);
 	if (err < 0)
 		goto end;
@@ -109,6 +113,7 @@ static int snd_ff_probe(struct fw_unit *unit,
 
 	mutex_init(&ff->mutex);
 	spin_lock_init(&ff->lock);
+	init_waitqueue_head(&ff->hwdep_wait);
 	dev_set_drvdata(&unit->device, ff);
 
 	ff->spec = (const struct snd_ff_spec *)entry->driver_data;

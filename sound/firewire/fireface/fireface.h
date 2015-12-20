@@ -73,6 +73,10 @@ struct snd_ff {
 	struct amdtp_stream rx_stream;
 	struct fw_iso_resources tx_resources;
 	struct fw_iso_resources rx_resources;
+
+	int dev_lock_count;
+	bool dev_lock_changed;
+	wait_queue_head_t hwdep_wait;
 };
 
 #define SND_FF_ADDR_CONTROLLER_ADDR_HI	0x0000801003f4
@@ -112,10 +116,16 @@ void snd_ff_stream_update_duplex(struct snd_ff *ff);
 int snd_ff_stream_get_clock(struct snd_ff *ff, unsigned int *rate,
 			    enum snd_ff_clock_src *src);
 
+void snd_ff_stream_lock_changed(struct snd_ff *ff);
+int snd_ff_stream_lock_try(struct snd_ff *ff);
+void snd_ff_stream_lock_release(struct snd_ff *ff);
+
 void snd_ff_proc_init(struct snd_ff *ff);
 
 int snd_ff_create_midi_devices(struct snd_ff *ff);
 
 int snd_ff_create_pcm_devices(struct snd_ff *ff);
+
+int snd_ff_create_hwdep_devices(struct snd_ff *ff);
 
 #endif

@@ -155,9 +155,15 @@ static int pcm_open(struct snd_pcm_substream *substream)
 	enum snd_ff_clock_src src;
 	int err;
 
-	err = pcm_init_hw_params(ff, substream);
+	err = snd_ff_stream_lock_try(ff);
 	if (err < 0)
 		return err;
+
+	err = pcm_init_hw_params(ff, substream);
+	if (err < 0) {
+		snd_ff_stream_lock_release(ff);
+		return err;
+	}
 
 	err = snd_ff_stream_get_clock(ff, &rate, &src);
 	if (src != SND_FF_CLOCK_SRC_INTERNAL ||
@@ -169,11 +175,14 @@ static int pcm_open(struct snd_pcm_substream *substream)
 
 	snd_pcm_set_sync(substream);
 
-	return err;
+	return 0;
 }
 
 static int pcm_close(struct snd_pcm_substream *substream)
 {
+	struct snd_ff *ff = substream->private_data;
+
+	snd_ff_stream_lock_release(ff);
 	return 0;
 }
 
