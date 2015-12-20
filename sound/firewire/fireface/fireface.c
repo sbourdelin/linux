@@ -40,6 +40,8 @@ static void ff_card_free(struct snd_card *card)
 	/* The workqueue for registration uses the memory block. */
 	cancel_work_sync(&ff->dwork.work);
 
+	snd_ff_transaction_unregister(ff);
+
 	fw_unit_put(ff->unit);
 
 	mutex_destroy(&ff->mutex);
@@ -53,6 +55,10 @@ static void do_probe(struct work_struct *work)
 	mutex_lock(&ff->mutex);
 
 	if (ff->card->shutdown || ff->probed)
+		goto end;
+
+	err = snd_ff_transaction_register(ff);
+	if (err < 0)
 		goto end;
 
 	err = snd_card_register(ff->card);
@@ -118,6 +124,8 @@ static void snd_ff_update(struct fw_unit *unit)
 				(get_jiffies_64() - fw_card->reset_jiffies);
 		mod_delayed_work(ff->dwork.wq, &ff->dwork, delay);
 	}
+
+	snd_ff_transaction_reregister(ff);
 }
 
 static void snd_ff_remove(struct fw_unit *unit)
