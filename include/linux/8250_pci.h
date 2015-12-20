@@ -35,3 +35,18 @@ pciserial_init_ports(struct pci_dev *dev, const struct pciserial_board *board);
 void pciserial_remove_ports(struct serial_private *priv);
 void pciserial_suspend_ports(struct serial_private *priv);
 void pciserial_resume_ports(struct serial_private *priv);
+
+struct uart_8250_port;
+
+#ifdef CONFIG_SERIAL_8250_EXAR_GPIO
+int xr17v35x_gpio_init(struct pci_dev *, struct uart_8250_port *, int);
+void xr17v35x_gpio_exit(struct uart_8250_port *);
+#else /* CONFIG_SERIAL_8250_EXAR_GPIO */
+static inline int xr17v35x_gpio_init(struct pci_dev *dev,
+				     struct uart_8250_port *port, int idx)
+{
+		return 0;
+}
+
+static inline void xr17v35x_gpio_exit(struct uart_8250_port *port) { }
+#endif /* CONFIG_SERIAL_8250_EXAR_GPIO */

@@ -1764,12 +1764,20 @@ xr17v35x_has_slave(struct serial_private *priv)
 	        (dev_id == PCI_DEVICE_ID_EXAR_XR17V8358));
 }
 
+static void pci_xr17v35x_exit(struct pci_dev *dev)
+{
+	struct serial_private *priv = pci_get_drvdata(dev);
+
+	xr17v35x_gpio_exit(serial8250_get_port(priv->line[0]));
+}
+
 static int
 pci_xr17v35x_setup(struct serial_private *priv,
 		  const struct pciserial_board *board,
 		  struct uart_8250_port *port, int idx)
 {
 	u8 __iomem *p;
+	int ret;
 
 	p = pci_ioremap_bar(priv->dev, 0);
 	if (p == NULL)
@@ -1807,7 +1815,11 @@ pci_xr17v35x_setup(struct serial_private *priv,
 	writeb(128, p + UART_EXAR_RXTRG);
 	iounmap(p);
 
-	return pci_default_setup(priv, board, port, idx);
+	ret = pci_default_setup(priv, board, port, idx);
+	if (ret)
+		return ret;
+
+	return xr17v35x_gpio_init(priv->dev, port, idx);
 }
 
 #define PCI_DEVICE_ID_COMMTECH_4222PCI335 0x0004
@@ -2407,6 +2419,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.setup		= pci_xr17v35x_setup,
+		.exit		= pci_xr17v35x_exit,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_EXAR,
@@ -2414,6 +2427,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.setup		= pci_xr17v35x_setup,
+		.exit		= pci_xr17v35x_exit,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_EXAR,
@@ -2421,6 +2435,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.setup		= pci_xr17v35x_setup,
+		.exit		= pci_xr17v35x_exit,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_EXAR,
@@ -2428,6 +2443,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.setup		= pci_xr17v35x_setup,
+		.exit		= pci_xr17v35x_exit,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_EXAR,
@@ -2435,6 +2451,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.setup		= pci_xr17v35x_setup,
+		.exit		= pci_xr17v35x_exit,
 	},
 	/*
 	 * Xircom cards
