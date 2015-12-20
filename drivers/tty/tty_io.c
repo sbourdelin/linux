@@ -126,6 +126,15 @@ struct ktermios tty_std_termios = {	/* for the benefit of tty drivers  */
 	.c_ospeed = 38400
 };
 
+/*
+ * There are many ways in which an attacker can get hold of a TTY's
+ * file descriptor, both through leaks from a privileged parent to
+ * a less privileged child and through other attacks. The system
+ * administrator can set this flag to reduce the impact of such
+ * attacks a lot.
+ */
+int sysctl_restrict_pushback __read_mostly;
+
 EXPORT_SYMBOL(tty_std_termios);
 
 /* This list gets poked at by procfs and various bits of boot up code. This
@@ -2270,8 +2279,9 @@ static int tiocsti(struct tty_struct *tty, char __user *p)
 {
 	char ch, mbz = 0;
 	struct tty_ldisc *ld;
+	bool needpriv = current->signal->tty != tty || sysctl_restrict_pushback;
 
-	if ((current->signal->tty != tty) && !capable(CAP_SYS_ADMIN))
+	if (needpriv && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	if (get_user(ch, p))
 		return -EFAULT;

@@ -674,3 +674,5 @@ static inline void proc_tty_unregister_driver(struct tty_driver *d) {}
 	} while (0)
 
 #endif
+
+extern int sysctl_restrict_pushback;

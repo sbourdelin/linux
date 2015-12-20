@@ -65,6 +65,7 @@
 #include <linux/sched/sysctl.h>
 #include <linux/kexec.h>
 #include <linux/bpf.h>
+#include <linux/tty.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -1172,6 +1173,15 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &one,
 	},
 #endif
+	{
+		.procname	= "restrict_pushback",
+		.data		= &sysctl_restrict_pushback,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 	{ }
 };
 
