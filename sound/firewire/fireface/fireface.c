@@ -108,6 +108,8 @@ static int snd_ff_probe(struct fw_unit *unit,
 	ff->spec = (const struct snd_ff_spec *)entry->driver_data;
 	name_card(ff);
 
+	snd_ff_proc_init(ff);
+
 	/* Register this sound card later. */
 	INIT_DEFERRABLE_WORK(&ff->dwork, do_probe);
 	delay = msecs_to_jiffies(PROBE_DELAY_MS) +
