@@ -325,6 +325,7 @@ struct nvdimm_bus *__nvdimm_bus_register(struct device *parent,
 	if (!nvdimm_bus)
 		return NULL;
 	INIT_LIST_HEAD(&nvdimm_bus->list);
+	INIT_LIST_HEAD(&nvdimm_bus->poison_list);
 	init_waitqueue_head(&nvdimm_bus->probe_wait);
 	nvdimm_bus->id = ida_simple_get(&nd_ida, 0, 0, GFP_KERNEL);
 	mutex_init(&nvdimm_bus->reconfig_mutex);
@@ -359,6 +360,67 @@ struct nvdimm_bus *__nvdimm_bus_register(struct device *parent,
 }
 EXPORT_SYMBOL_GPL(__nvdimm_bus_register);
 
+struct list_head *nvdimm_bus_get_poison_list(struct nvdimm_bus *nvdimm_bus)
+{
+	return &nvdimm_bus->poison_list;
+}
+EXPORT_SYMBOL_GPL(nvdimm_bus_get_poison_list);
+
+static int __add_poison(struct nvdimm_bus *nvdimm_bus, u64 addr, u64 length)
+{
+	struct nd_poison *pl;
+
+	pl = kzalloc(sizeof(*pl), GFP_KERNEL);
+	if (!pl)
+		return -ENOMEM;
+
+	pl->start = addr;
+	pl->length = length;
+	list_add_tail(&pl->list, &nvdimm_bus->poison_list);
+
+	return 0;
+}
+
+int nvdimm_bus_add_poison(struct nvdimm_bus *nvdimm_bus, u64 addr, u64 length)
+{
+	struct nd_poison *pl;
+
+	if (list_empty(&nvdimm_bus->poison_list))
+		return __add_poison(nvdimm_bus, addr, length);
+
+	/*
+	 * There is a chance this is a duplicate, check for those first.
+	 * This will be the common case as ARS_STATUS returns all known
+	 * errors in the SPA space, and we can't query it per region
+	 */
+	list_for_each_entry(pl, &nvdimm_bus->poison_list, list)
+		if (pl->start == addr) {
+			/* If length has changed, update this list entry */
+			if (pl->length != length)
+				pl->length = length;
+			return 0;
+		}
+
+	/*
+	 * If not a duplicate or a simple length update, add the entry as is,
+	 * as any overlapping ranges will get resolved when the list is consumed
+	 * and converted to badblocks
+	 */
+	return __add_poison(nvdimm_bus, addr, length);
+}
+EXPORT_SYMBOL_GPL(nvdimm_bus_add_poison);
+
+static void free_poison_list(struct list_head *poison_list)
+{
+	struct nd_poison *pl, *next;
+
+	list_for_each_entry_safe(pl, next, poison_list, list) {
+		list_del(&pl->list);
+		kfree(pl);
+	}
+	list_del_init(poison_list);
+}
+
 static int child_unregister(struct device *dev, void *data)
 {
 	/*
@@ -385,6 +447,7 @@ void nvdimm_bus_unregister(struct nvdimm_bus *nvdimm_bus)
 
 	nd_synchronize();
 	device_for_each_child(&nvdimm_bus->dev, NULL, child_unregister);
+	free_poison_list(&nvdimm_bus->poison_list);
 	nvdimm_bus_destroy_ndctl(nvdimm_bus);
 
 	device_unregister(&nvdimm_bus->dev);
