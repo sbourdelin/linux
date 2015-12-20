@@ -116,4 +116,6 @@ void snd_ff_proc_init(struct snd_ff *ff);
 
 int snd_ff_create_midi_devices(struct snd_ff *ff);
 
+int snd_ff_create_pcm_devices(struct snd_ff *ff);
+
 #endif

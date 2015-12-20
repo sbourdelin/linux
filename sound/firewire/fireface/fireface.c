@@ -67,6 +67,10 @@ static void do_probe(struct work_struct *work)
 	if (err < 0)
 		goto end;
 
+	err = snd_ff_create_pcm_devices(ff);
+	if (err < 0)
+		goto end;
+
 	err = snd_card_register(ff->card);
 	if (err < 0)
 		goto end;
