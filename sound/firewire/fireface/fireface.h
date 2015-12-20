@@ -35,5 +35,8 @@ struct snd_ff {
 	struct snd_card *card;
 	struct fw_unit *unit;
 	struct mutex mutex;
+
+	bool probed;
+	struct delayed_work dwork;
 };
 #endif
