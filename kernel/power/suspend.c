@@ -352,6 +352,16 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		goto Platform_wake;
 	}
 
+	/*
+	 * Flush console buffer if console_suspend_enabled cleared.
+	 * This will enable console flush if console_lock is taken
+	 * by nonboot cpus which will soon be disabled below.
+	 */
+	if (!console_suspend_enabled) {
+		console_lock();
+		console_unlock();
+	}
+
 	error = disable_nonboot_cpus();
 	if (error || suspend_test(TEST_CPUS))
 		goto Enable_cpus;
