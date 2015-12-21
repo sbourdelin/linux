@@ -751,6 +751,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
 		prev->lli.ctllo |= DWC_CTLL_INT_EN;
 
 	prev->lli.llp = 0;
+	prev->lli.ctllo &= ~(DWC_CTLL_LLP_D_EN | DWC_CTLL_LLP_S_EN);
 	first->txd.flags = flags;
 	first->total_len = len;
 
@@ -912,6 +913,7 @@ slave_sg_fromdev_fill_desc:
 		prev->lli.ctllo |= DWC_CTLL_INT_EN;
 
 	prev->lli.llp = 0;
+	prev->lli.ctllo &= ~(DWC_CTLL_LLP_D_EN | DWC_CTLL_LLP_S_EN);
 	first->total_len = total_len;
 
 	return &first->txd;
