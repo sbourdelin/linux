@@ -838,7 +838,7 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 
 	wl1271_info("Reading FW panic log");
 
-	block = kmalloc(wl->fw_mem_block_size, GFP_KERNEL);
+	block = kzalloc(wl->fw_mem_block_size, GFP_KERNEL);
 	if (!block)
 		return;
 
@@ -885,7 +885,6 @@ static void wl12xx_read_fwlog_panic(struct wl1271 *wl)
 			goto out;
 		}
 
-		memset(block, 0, wl->fw_mem_block_size);
 		ret = wlcore_read_hwaddr(wl, addr, block,
 					wl->fw_mem_block_size, false);
 
