@@ -738,11 +738,16 @@ static int au8522_probe(struct i2c_client *client,
 		return -EIO;
 	}
 
+	demod_config = kzalloc(sizeof(struct au8522_config), GFP_KERNEL);
+	if (!demod_config)
+		return -ENOMEM;
+
 	/* allocate memory for the internal state */
 	instance = au8522_get_state(&state, client->adapter, client->addr);
 	switch (instance) {
 	case 0:
 		printk(KERN_ERR "au8522_decoder allocation failed\n");
+		kfree(demod_config);
 		return -EIO;
 	case 1:
 		/* new demod instance */
@@ -754,12 +759,6 @@ static int au8522_probe(struct i2c_client *client,
 		break;
 	}
 
-	demod_config = kzalloc(sizeof(struct au8522_config), GFP_KERNEL);
-	if (demod_config == NULL) {
-		if (instance == 1)
-			kfree(state);
-		return -ENOMEM;
-	}
 	demod_config->demod_address = 0x8e >> 1;
 
 	state->config = demod_config;
