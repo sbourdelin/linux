@@ -108,6 +108,11 @@ struct irq_alloc_info {
 			struct IO_APIC_route_entry *ioapic_entry;
 		};
 #endif
+#if IS_ENABLED(CONFIG_VMD)
+		struct {
+			struct msi_desc	*desc;
+		};
+#endif
 #ifdef	CONFIG_DMAR_TABLE
 		struct {
 			int		dmar_id;
