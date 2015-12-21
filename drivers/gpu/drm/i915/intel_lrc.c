@@ -571,7 +571,7 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
 
-	if (request->ctx != ring->default_context)
+	if (!request->ctx->is_global_default)
 		intel_lr_context_pin(request);
 
 	i915_gem_request_reference(request);
@@ -660,17 +660,14 @@ static int execlists_move_to_gpu(struct drm_i915_gem_request *req,
 
 int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request)
 {
-	int ret;
+	int ret = 0;
 
 	request->ringbuf = request->ctx->engine[request->ring->id].ringbuf;
 
-	if (request->ctx != request->ring->default_context) {
+	if (!request->ctx->is_global_default)
 		ret = intel_lr_context_pin(request);
-		if (ret)
-			return ret;
-	}
 
-	return 0;
+	return ret;
 }
 
 static int logical_ring_wait_for_space(struct drm_i915_gem_request *req,
@@ -967,7 +964,7 @@ void intel_execlists_retire_requests(struct intel_engine_cs *ring)
 		struct drm_i915_gem_object *ctx_obj =
 				ctx->engine[ring->id].state;
 
-		if (ctx_obj && (ctx != ring->default_context))
+		if (ctx_obj && !ctx->is_global_default)
 			intel_lr_context_unpin(req);
 		list_del(&req->execlist_link);
 		i915_gem_request_unreference(req);
@@ -1916,6 +1913,8 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 
 static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *ring)
 {
+	struct intel_context *dctx = ring->default_context;
+	int ring_id = ring->id;
 	int ret;
 
 	/* Intentionally left blank. */
@@ -1936,15 +1935,14 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 	if (ret)
 		goto error;
 
-	ret = intel_lr_context_deferred_alloc(ring->default_context, ring);
+	ret = intel_lr_context_deferred_alloc(dctx, ring);
 	if (ret)
 		goto error;
 
 	/* As this is the default context, always pin it */
-	ret = intel_lr_context_do_pin(
-			ring,
-			ring->default_context->engine[ring->id].state,
-			ring->default_context->engine[ring->id].ringbuf);
+	ret = intel_lr_context_do_pin(ring,
+				      dctx->engine[ring_id].state,
+				      dctx->engine[ring_id].ringbuf);
 	if (ret) {
 		DRM_ERROR(
 			"Failed to pin and map ringbuffer %s: %d\n",
@@ -2479,7 +2477,7 @@ int intel_lr_context_deferred_alloc(struct intel_context *ctx,
 	ctx->engine[ring->id].ringbuf = ringbuf;
 	ctx->engine[ring->id].state = ctx_obj;
 
-	if (ctx != ring->default_context && ring->init_context) {
+	if (!ctx->is_global_default && ring->init_context) {
 		struct drm_i915_gem_request *req;
 
 		ret = i915_gem_request_alloc(ring,

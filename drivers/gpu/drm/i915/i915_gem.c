@@ -2677,10 +2677,8 @@ void i915_gem_request_free(struct kref *req_ref)
 		i915_gem_request_remove_from_client(req);
 
 	if (ctx) {
-		if (i915.enable_execlists) {
-			if (ctx != req->ring->default_context)
-				intel_lr_context_unpin(req);
-		}
+		if (i915.enable_execlists && !ctx->is_global_default)
+			intel_lr_context_unpin(req);
 
 		i915_gem_context_unreference(ctx);
 	}
@@ -4864,8 +4862,6 @@ i915_gem_init_hw(struct drm_device *dev)
 	/* Now it is safe to go back round and do everything else: */
 	for_each_ring(ring, dev_priv, i) {
 		struct drm_i915_gem_request *req;
-
-		WARN_ON(!ring->default_context);
 
 		ret = i915_gem_request_alloc(ring, ring->default_context, &req);
 		if (ret) {

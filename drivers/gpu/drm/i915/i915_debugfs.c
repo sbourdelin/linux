@@ -2037,13 +2037,11 @@ static int i915_dump_lrc(struct seq_file *m, void *unused)
 	if (ret)
 		return ret;
 
-	list_for_each_entry(ctx, &dev_priv->context_list, link) {
-		for_each_ring(ring, dev_priv, i) {
-			if (ring->default_context != ctx)
+	list_for_each_entry(ctx, &dev_priv->context_list, link)
+		if (!ctx->is_global_default)
+			for_each_ring(ring, dev_priv, i)
 				i915_dump_lrc_obj(m, ring,
 						  ctx->engine[i].state);
-		}
-	}
 
 	mutex_unlock(&dev->struct_mutex);
 
