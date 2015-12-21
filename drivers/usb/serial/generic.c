@@ -505,6 +505,10 @@ int usb_serial_generic_tiocmiwait(struct tty_struct *tty, unsigned long arg)
 			usb_serial_generic_msr_changed(tty, arg, &cnow));
 	if (!ret && !test_bit(ASYNCB_INITIALIZED, &port->port.flags))
 		ret = -EIO;
+	mutex_lock(&port->serial->disc_mutex);
+	if (port->serial->disconnected)
+		ret = -ENODEV;
+	mutex_unlock(&port->serial->disc_mutex);
 
 	return ret;
 }
