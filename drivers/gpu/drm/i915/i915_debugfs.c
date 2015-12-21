@@ -4445,14 +4445,7 @@ static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
 {
 	struct drm_device *dev = m->private;
 	int level;
-	int num_levels;
-
-	if (IS_CHERRYVIEW(dev))
-		num_levels = 3;
-	else if (IS_VALLEYVIEW(dev))
-		num_levels = 1;
-	else
-		num_levels = ilk_wm_max_level(dev) + 1;
+	int num_levels = to_i915(dev)->wm.max_level + 1;
 
 	drm_modeset_lock_all(dev);
 
@@ -4560,17 +4553,10 @@ static ssize_t wm_latency_write(struct file *file, const char __user *ubuf,
 	struct seq_file *m = file->private_data;
 	struct drm_device *dev = m->private;
 	uint16_t new[8] = { 0 };
-	int num_levels;
+	int num_levels = to_i915(dev)->wm.max_level + 1;
 	int level;
 	int ret;
 	char tmp[32];
-
-	if (IS_CHERRYVIEW(dev))
-		num_levels = 3;
-	else if (IS_VALLEYVIEW(dev))
-		num_levels = 1;
-	else
-		num_levels = ilk_wm_max_level(dev) + 1;
 
 	if (len >= sizeof(tmp))
 		return -EINVAL;
