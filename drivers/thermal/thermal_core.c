@@ -61,6 +61,12 @@ static DEFINE_MUTEX(thermal_governor_lock);
 
 static struct thermal_governor *def_governor;
 
+#ifdef CONFIG_THERMAL_BKUP_SHUTDOWN_DELAY_MS
+#define BKUP_SHUTDOWN_DELAY CONFIG_THERMAL_BKUP_SHUTDOWN_DELAY_MS
+#else
+#define BKUP_SHUTDOWN_DELAY 5000
+#endif
+
 static struct thermal_governor *__find_governor(const char *name)
 {
 	struct thermal_governor *pos;
@@ -423,6 +429,18 @@ static void handle_non_critical_trips(struct thermal_zone_device *tz,
 		       def_governor->throttle(tz, trip);
 }
 
+static void bkup_shutdown_func(struct work_struct *unused);
+static DECLARE_DELAYED_WORK(bkup_shutdown_work, bkup_shutdown_func);
+
+static void bkup_shutdown_func(struct work_struct *work)
+{
+	pr_warn("Orderly_poweroff has failed! Attempting kernel_power_off\n");
+	kernel_power_off();
+
+	pr_warn("kernel_power_off has failed! Attempting emergency_restart\n");
+	emergency_restart();
+}
+
 static void handle_critical_trips(struct thermal_zone_device *tz,
 				int trip, enum thermal_trip_type trip_type)
 {
@@ -443,6 +461,14 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
 		dev_emerg(&tz->device,
 			  "critical temperature reached(%d C),shutting down\n",
 			  tz->temperature / 1000);
+		/**
+		 * This is a backup option to shutdown the
+		 * system in case orderly_poweroff
+		 * fails
+		 */
+		schedule_delayed_work(&bkup_shutdown_work,
+				      msecs_to_jiffies(BKUP_SHUTDOWN_DELAY));
+
 		orderly_poweroff(true);
 	}
 }

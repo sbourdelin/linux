@@ -92,6 +92,15 @@ config THERMAL_DEFAULT_GOV_POWER_ALLOCATOR
 
 endchoice
 
+config THERMAL_BKUP_SHUTDOWN_DELAY_MS
+        int "Thermal shutdown  backup delay in milli-seconds"
+        depends on THERMAL
+        default "5000"
+        ---help---
+        The number of milliseconds to delay after orderly_poweroff call.
+
+        Default: 5000 (5 seconds)
+
 config THERMAL_GOV_FAIR_SHARE
 	bool "Fair-share thermal governor"
 	help
