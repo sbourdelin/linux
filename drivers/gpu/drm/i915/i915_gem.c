@@ -2759,10 +2759,11 @@ err:
 struct drm_i915_gem_request *
 i915_gem_request_alloc_anon(struct intel_engine_cs *ring)
 {
+	struct drm_i915_private *dev_priv = to_i915(ring->dev);
 	struct drm_i915_gem_request *req;
 	int err;
 
-	err = i915_gem_request_alloc(ring, ring->default_context, &req);
+	err = i915_gem_request_alloc(ring, dev_priv->kernel_context, &req);
 	return err ? ERR_PTR(err) : req;
 }
 
@@ -4845,7 +4846,7 @@ i915_gem_init_hw(struct drm_device *dev)
 	 */
 	init_unused_rings(dev);
 
-	BUG_ON(!dev_priv->ring[RCS].default_context);
+	BUG_ON(!dev_priv->kernel_context);
 
 	ret = i915_ppgtt_init_hw(dev);
 	if (ret) {

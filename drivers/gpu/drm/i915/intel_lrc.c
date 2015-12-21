@@ -1471,7 +1471,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *ring)
 	u8 next_context_status_buffer_hw;
 
 	lrc_setup_hardware_status_page(ring,
-				ring->default_context->engine[ring->id].state);
+				dev_priv->kernel_context->engine[ring->id].state);
 
 	I915_WRITE_IMR(ring, ~(ring->irq_enable_mask | ring->irq_keep_mask));
 	I915_WRITE(RING_HWSTAM(ring->mmio_base), 0xffffffff);
@@ -1913,7 +1913,8 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 
 static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *ring)
 {
-	struct intel_context *dctx = ring->default_context;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_context *dctx = dev_priv->kernel_context;
 	int ring_id = ring->id;
 	int ret;
 

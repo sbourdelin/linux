@@ -1943,7 +1943,7 @@ static int i915_context_status(struct seq_file *m, void *unused)
 		seq_puts(m, "HW context ");
 		describe_ctx(m, ctx);
 		for_each_ring(ring, dev_priv, i) {
-			if (ring->default_context == ctx)
+			if (dev_priv->kernel_context == ctx)
 				seq_printf(m, "(default context %s) ",
 					   ring->name);
 		}
