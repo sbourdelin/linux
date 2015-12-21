@@ -2368,18 +2368,33 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 	if (!uap)
 		return -ENOMEM;
 
-	uap->clk = devm_clk_get(&dev->dev, NULL);
-	if (IS_ERR(uap->clk))
-		return PTR_ERR(uap->clk);
+	/* ACPI only defines SBSA variant */
+	if (ACPI_COMPANION(&dev->dev)) {
+		/*
+		 * According to ARM ARMH0011 is currently the only mapping
+		 * of pl011 in ACPI and it's mapped to SBSA UART mode
+		 */
+		uap->vendor	= &vendor_sbsa;
+		uap->fifosize	= 32;
+		uap->port.ops	= &sbsa_uart_pops;
+		uap->fixed_baud = 115200;
 
-	uap->vendor = vendor;
-	uap->lcrh_rx = vendor->lcrh_rx;
-	uap->lcrh_tx = vendor->lcrh_tx;
-	uap->fifosize = vendor->get_fifosize(dev);
+		snprintf(uap->type, sizeof(uap->type), "SBSA");
+	} else {
+		uap->clk = devm_clk_get(&dev->dev, NULL);
+		if (IS_ERR(uap->clk))
+			return PTR_ERR(uap->clk);
+
+		uap->vendor = vendor;
+		uap->lcrh_rx = vendor->lcrh_rx;
+		uap->lcrh_tx = vendor->lcrh_tx;
+		uap->fifosize = vendor->get_fifosize(dev);
+		uap->port.ops = &amba_pl011_pops;
+
+		snprintf(uap->type, sizeof(uap->type), "PL011 rev%u",
+				amba_rev(dev));
+	}
 	uap->port.irq = dev->irq[0];
-	uap->port.ops = &amba_pl011_pops;
-
-	snprintf(uap->type, sizeof(uap->type), "PL011 rev%u", amba_rev(dev));
 
 	ret = pl011_setup_port(&dev->dev, uap, &dev->res, portnr);
 	if (ret)
