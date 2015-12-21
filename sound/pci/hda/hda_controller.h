@@ -125,6 +125,8 @@ struct azx {
 	int num_streams;
 	const int *jackpoll_ms; /* per-card jack poll interval */
 
+	char irq_descr[32]; /* Interrupt description */
+
 	/* Register interaction. */
 	const struct hda_controller_ops *ops;
 

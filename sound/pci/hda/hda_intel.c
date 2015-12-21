@@ -702,7 +702,7 @@ static int azx_acquire_irq(struct azx *chip, int do_disconnect)
 
 	if (request_irq(chip->pci->irq, azx_interrupt,
 			chip->msi ? 0 : IRQF_SHARED,
-			KBUILD_MODNAME, chip)) {
+			chip->irq_descr, chip)) {
 		dev_err(chip->card->dev,
 			"unable to grab IRQ %d, disabling device\n",
 			chip->pci->irq);
@@ -1548,6 +1548,8 @@ static int azx_create(struct snd_card *card, struct pci_dev *pci,
 	check_msi(chip);
 	chip->dev_index = dev;
 	chip->jackpoll_ms = jackpoll_ms;
+	snprintf(chip->irq_descr, sizeof(chip->irq_descr), "%s:%s",
+		 KBUILD_MODNAME, dev_name(&card->card_dev));
 	INIT_LIST_HEAD(&chip->pcm_list);
 	INIT_WORK(&hda->irq_pending_work, azx_irq_pending_work);
 	INIT_LIST_HEAD(&hda->list);
