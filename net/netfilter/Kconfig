@@ -603,6 +603,36 @@ config NETFILTER_XT_CONNMARK
 	ctmark), similarly to the packet mark (nfmark). Using this
 	target and match, you can set and match on this mark.
 
+config NETFILTER_XT_TCINDEX
+	tristate 'tc_index mark target and match support'
+	depends on NETFILTER_ADVANCED
+	depends on NET_SCHED
+	default n
+	---help---
+	This option adds the "TCINDEX" target and "tcindex" match.
+
+	tcindex matching allows you to match packets based on the "tc_index" value
+	in the packet.
+	The target allows you to create rules in the "mangle" table which alter
+	the tc_index field associated with the packet.
+
+	This is an alternative to setting the tc_index field based on the priority
+	fields of the incoming traffic.  In traffic control, this mark can be matched
+	using the tcindex filter.
+
+config NETFILTER_XT_CONNTCINDEX
+	tristate 'ct tc_index mark target and match support'
+	depends on NF_CONNTRACK
+	depends on NF_CONNTRACK_MARK
+	depends on NETFILTER_ADVANCED
+	depends on NET_SCHED
+	default n
+	---help---
+	This option adds the "CONNTCINDEX" target and "conntcindex" match.
+
+	Using this target and match, you can set and match on the tc_index mark in the
+	connection.  This can also be saved/restored to the packet tc_index mark.
+
 config NETFILTER_XT_SET
 	tristate 'set target and match support'
 	depends on IP_SET
