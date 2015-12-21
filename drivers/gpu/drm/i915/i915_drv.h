@@ -2271,6 +2271,8 @@ struct drm_i915_gem_request {
 int i915_gem_request_alloc(struct intel_engine_cs *ring,
 			   struct intel_context *ctx,
 			   struct drm_i915_gem_request **req_out);
+struct drm_i915_gem_request * __must_check
+	i915_gem_request_alloc_anon(struct intel_engine_cs *ring);
 void i915_gem_request_cancel(struct drm_i915_gem_request *req);
 void i915_gem_request_free(struct kref *req_ref);
 int i915_gem_request_add_to_client(struct drm_i915_gem_request *req,

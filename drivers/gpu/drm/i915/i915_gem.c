@@ -2751,6 +2751,21 @@ err:
 	return ret;
 }
 
+/*
+ * Allocate a request associated with the default context for the given
+ * ring. This can be used where the driver needs a request for internal
+ * purposes not directly related to a user batch submission.
+ */
+struct drm_i915_gem_request *
+i915_gem_request_alloc_anon(struct intel_engine_cs *ring)
+{
+	struct drm_i915_gem_request *req;
+	int err;
+
+	err = i915_gem_request_alloc(ring, ring->default_context, &req);
+	return err ? ERR_PTR(err) : req;
+}
+
 void i915_gem_request_cancel(struct drm_i915_gem_request *req)
 {
 	intel_ring_reserved_space_cancel(req->ringbuf);
@@ -3164,9 +3179,13 @@ __i915_gem_object_sync(struct drm_i915_gem_object *obj,
 			return 0;
 
 		if (*to_req == NULL) {
-			ret = i915_gem_request_alloc(to, to->default_context, to_req);
-			if (ret)
-				return ret;
+			struct drm_i915_gem_request *req;
+
+			req = i915_gem_request_alloc_anon(to);
+			if (IS_ERR(req))
+				return PTR_ERR(req);
+
+			*to_req = req;
 		}
 
 		trace_i915_gem_ring_sync_to(*to_req, from, from_req);
@@ -3366,9 +3385,9 @@ int i915_gpu_idle(struct drm_device *dev)
 		if (!i915.enable_execlists) {
 			struct drm_i915_gem_request *req;
 
-			ret = i915_gem_request_alloc(ring, ring->default_context, &req);
-			if (ret)
-				return ret;
+			req = i915_gem_request_alloc_anon(ring);
+			if (IS_ERR(req))
+				return PTR_ERR(req);
 
 			ret = i915_switch_context(req);
 			if (ret) {
@@ -4863,8 +4882,9 @@ i915_gem_init_hw(struct drm_device *dev)
 	for_each_ring(ring, dev_priv, i) {
 		struct drm_i915_gem_request *req;
 
-		ret = i915_gem_request_alloc(ring, ring->default_context, &req);
-		if (ret) {
+		req = i915_gem_request_alloc_anon(ring);
+		if (IS_ERR(req)) {
+			ret = PTR_ERR(req);
 			i915_gem_cleanup_ringbuffer(dev);
 			goto out;
 		}
