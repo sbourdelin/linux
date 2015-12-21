@@ -20,17 +20,6 @@
 
 #include "cxgb4.h"
 
-/* DCBx version control
- */
-static const char * const dcb_ver_array[] = {
-	"Unknown",
-	"DCBx-CIN",
-	"DCBx-CEE 1.01",
-	"DCBx-IEEE",
-	"", "", "",
-	"Auto Negotiated"
-};
-
 static inline bool cxgb4_dcb_state_synced(enum cxgb4_dcb_state state)
 {
 	if (state == CXGB4_DCB_STATE_FW_ALLSYNCED ||

@@ -70,6 +70,17 @@
 					    CXGB4_DCB_STATE_FW_ALLSYNCED); \
 	} while (0)
 
+/* DCBx version control
+ */
+static const char * const dcb_ver_array[] = {
+	"Unknown",
+	"DCBx-CIN",
+	"DCBx-CEE 1.01",
+	"DCBx-IEEE",
+	"", "", "",
+	"Auto Negotiated"
+};
+
 /* States we can be in for a port's Data Center Bridging.
  */
 enum cxgb4_dcb_state {
