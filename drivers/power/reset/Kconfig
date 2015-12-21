@@ -172,6 +172,5 @@ config POWER_RESET_ZX
 	depends on HAS_IOMEM
 	help
 	  Reboot support for ZTE SoCs.
-
 endif
 
