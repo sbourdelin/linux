@@ -342,6 +342,19 @@ next:
 	return 1;
 }
 
+static int cdc_eem_resume(struct usb_interface *intf)
+{
+	int ret = 0;
+	struct usbnet *dev = usb_get_intfdata(intf);
+
+	ret = usbnet_get_endpoints(dev, intf);
+	if (ret < 0)
+		goto err;
+	ret = usbnet_resume(intf);
+err:
+	return ret;
+}
+
 static const struct driver_info eem_info = {
 	.description =	"CDC EEM Device",
 	.flags =	FLAG_ETHER | FLAG_POINTTOPOINT,
@@ -371,6 +384,7 @@ static struct usb_driver eem_driver = {
 	.disconnect =	usbnet_disconnect,
 	.suspend =	usbnet_suspend,
 	.resume =	usbnet_resume,
+	.reset_resume =	cdc_eem_resume,
 	.disable_hub_initiated_lpm = 1,
 };
 
