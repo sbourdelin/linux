@@ -154,10 +154,9 @@ do {									\
  * radix_tree_gang_lookup_tag_slot
  * radix_tree_tagged
  *
- * The first 7 functions are able to be called locklessly, using RCU. The
- * caller must ensure calls to these functions are made within rcu_read_lock()
- * regions. Other readers (lock-free or otherwise) and modifications may be
- * running concurrently.
+ * The caller must ensure calls to these functions (other than
+ * radix_tree_tagged) are made within rcu_read_lock() regions. Other readers
+ * (lock-free or otherwise) and modifications may be running concurrently.
  *
  * It is still required that the caller manage the synchronization and lifetimes
  * of the items. So if RCU lock-free lookups are used, typically this would mean
