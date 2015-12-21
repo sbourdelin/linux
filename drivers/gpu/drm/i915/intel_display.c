@@ -2941,7 +2941,7 @@ unsigned long intel_plane_obj_offset(struct intel_plane *intel_plane,
 {
 	const struct i915_ggtt_view *view = &i915_ggtt_view_normal;
 	struct i915_vma *vma;
-	unsigned char *offset;
+	unsigned long offset;
 
 	if (intel_rotation_90_or_270(intel_plane->base.state->rotation))
 		view = &i915_ggtt_view_rotated;
@@ -2951,14 +2951,14 @@ unsigned long intel_plane_obj_offset(struct intel_plane *intel_plane,
 		view->type))
 		return -1;
 
-	offset = (unsigned char *)vma->node.start;
+	offset = vma->node.start;
 
 	if (plane == 1) {
 		offset += vma->ggtt_view.rotation_info.uv_start_page *
 			  PAGE_SIZE;
 	}
 
-	return (unsigned long)offset;
+	return offset;
 }
 
 static void skl_detach_scaler(struct intel_crtc *intel_crtc, int id)
