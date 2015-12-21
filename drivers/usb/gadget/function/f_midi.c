@@ -1213,8 +1213,10 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	midi->in_last_port = 0;
 
 	status = kfifo_alloc(&midi->in_req_fifo, midi->qlen, GFP_KERNEL);
-	if (status)
+	if (status) {
+		mutex_unlock(&opts->lock);
 		goto setup_fail;
+	}
 
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
