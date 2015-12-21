@@ -384,9 +384,6 @@ static struct irq_chip gic_chip = {
 	.irq_unmask		= gic_unmask_irq,
 	.irq_eoi		= gic_eoi_irq,
 	.irq_set_type		= gic_set_type,
-#ifdef CONFIG_SMP
-	.irq_set_affinity	= gic_set_affinity,
-#endif
 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
 	.flags			= IRQCHIP_SET_TYPE_MASKED |
@@ -1017,10 +1014,16 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 	gic->chip.name = kasprintf(GFP_KERNEL, "GIC-%d", gic_nr);
 
 	/* Initialize irq_chip */
-	if (static_key_true(&supports_deactivate) && gic_nr == 0) {
-		gic->chip.irq_mask = gic_eoimode1_mask_irq;
-		gic->chip.irq_eoi = gic_eoimode1_eoi_irq;
-		gic->chip.irq_set_vcpu_affinity = gic_irq_set_vcpu_affinity;
+	if (gic_nr == 0) {
+		if (IS_ENABLED(CONFIG_SMP))
+			gic->chip.irq_set_affinity = gic_set_affinity;
+
+		if (static_key_true(&supports_deactivate)) {
+			gic->chip.irq_mask = gic_eoimode1_mask_irq;
+			gic->chip.irq_eoi = gic_eoimode1_eoi_irq;
+			gic->chip.irq_set_vcpu_affinity =
+				gic_irq_set_vcpu_affinity;
+		}
 	}
 
 #ifdef CONFIG_GIC_NON_BANKED
