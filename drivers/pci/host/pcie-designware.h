@@ -79,5 +79,6 @@ void dw_pcie_msi_init(struct pcie_port *pp);
 int dw_pcie_link_up(struct pcie_port *pp);
 void dw_pcie_setup_rc(struct pcie_port *pp);
 int dw_pcie_host_init(struct pcie_port *pp);
+void dw_pcie_link_retrain(struct pcie_port *pp);
 
 #endif /* _PCIE_DESIGNWARE_H */
