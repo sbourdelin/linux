@@ -240,8 +240,11 @@ static int rtw_net_set_mac_address(struct net_device *pnetdev, void *p)
 	struct rtw_adapter *padapter = netdev_priv(pnetdev);
 	struct sockaddr *addr = p;
 
-	if (!padapter->bup)
-		ether_addr_copy(padapter->eeprompriv.mac_addr, addr->sa_data);
+	if (padapter->bup)
+		DBG_8723A_LEVEL(_drv_warning_, "Trying to set MAC address while bup =%d\n", padapter->bup);
+	ether_addr_copy(padapter->eeprompriv.mac_addr, addr->sa_data);
+	ether_addr_copy(pnetdev->dev_addr, addr->sa_data);
+
 	return 0;
 }
 
