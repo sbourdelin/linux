@@ -361,7 +361,7 @@ int drm_vblank_init(struct drm_device *dev, unsigned int num_crtcs)
 			    (unsigned long)vblank);
 	}
 
-	DRM_INFO("Supports vblank timestamp caching Rev 2 (21.10.2013).\n");
+	DRM_INFO("Supports vblank timestamp caching Rev 2 (20131021).\n");
 
 	/* Driver specific high-precision vblank timestamping supported? */
 	if (dev->driver->get_vblank_timestamp)
