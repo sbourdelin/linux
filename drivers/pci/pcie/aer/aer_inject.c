@@ -188,7 +188,9 @@ static int pci_read_aer(struct pci_bus *bus, unsigned int devfn, int where,
 	struct aer_error *err;
 	unsigned long flags;
 	struct pci_ops *ops;
+	struct pci_ops *my_ops;
 	int domain;
+	int rv;
 
 	spin_lock_irqsave(&inject_lock, flags);
 	if (size != sizeof(u32))
@@ -208,8 +210,19 @@ static int pci_read_aer(struct pci_bus *bus, unsigned int devfn, int where,
 	}
 out:
 	ops = __find_pci_bus_ops(bus);
+	/*
+	 * pci_lock must already be held, so we can directly
+	 * manipulate bus->ops.  Many config access functions,
+	 * including pci_generic_config_read() require the original
+	 * bus->ops be installed to function, so temporarily put them
+	 * back.
+	 */
+	my_ops = bus->ops;
+	bus->ops = ops;
+	rv = ops->read(bus, devfn, where, size, val);
+	bus->ops = my_ops;
 	spin_unlock_irqrestore(&inject_lock, flags);
-	return ops->read(bus, devfn, where, size, val);
+	return rv;
 }
 
 static int pci_write_aer(struct pci_bus *bus, unsigned int devfn, int where,
@@ -220,7 +233,9 @@ static int pci_write_aer(struct pci_bus *bus, unsigned int devfn, int where,
 	unsigned long flags;
 	int rw1cs;
 	struct pci_ops *ops;
+	struct pci_ops *my_ops;
 	int domain;
+	int rv;
 
 	spin_lock_irqsave(&inject_lock, flags);
 	if (size != sizeof(u32))
@@ -243,8 +258,19 @@ static int pci_write_aer(struct pci_bus *bus, unsigned int devfn, int where,
 	}
 out:
 	ops = __find_pci_bus_ops(bus);
+	/*
+	 * pci_lock must already be held, so we can directly
+	 * manipulate bus->ops.  Many config access functions,
+	 * including pci_generic_config_write() require the original
+	 * bus->ops be installed to function, so temporarily put them
+	 * back.
+	 */
+	my_ops = bus->ops;
+	bus->ops = ops;
+	rv = ops->write(bus, devfn, where, size, val);
+	bus->ops = my_ops;
 	spin_unlock_irqrestore(&inject_lock, flags);
-	return ops->write(bus, devfn, where, size, val);
+	return rv;
 }
 
 static struct pci_ops pci_ops_aer = {
