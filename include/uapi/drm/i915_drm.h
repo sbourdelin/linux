@@ -357,6 +357,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_HAS_GPU_RESET	 35
 #define I915_PARAM_HAS_RESOURCE_STREAMER 36
 #define I915_PARAM_HAS_EXEC_SOFTPIN	 37
+#define I915_PARAM_CREATE_VERSION	 38
 
 typedef struct drm_i915_getparam {
 	__s32 param;
@@ -456,6 +457,21 @@ struct drm_i915_gem_create {
 	 */
 	__u32 handle;
 	__u32 pad;
+	/**
+	 * Requested flags (currently used for placement
+	 * (which memory domain))
+	 *
+	 * You can request that the object be created from special memory
+	 * rather than regular system pages using this parameter. Such
+	 * irregular objects may have certain restrictions (such as CPU
+	 * access to a stolen object is verboten).
+	 *
+	 * This can be used in the future for other purposes too
+	 * e.g. specifying tiling/caching/madvise
+	 */
+	__u64 flags;
+#define I915_CREATE_PLACEMENT_STOLEN 	(1<<0) /* Cannot use CPU mmaps */
+#define __I915_CREATE_UNKNOWN_FLAGS	-(I915_CREATE_PLACEMENT_STOLEN << 1)
 };
 
 struct drm_i915_gem_pread {

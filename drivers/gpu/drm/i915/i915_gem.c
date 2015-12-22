@@ -392,6 +392,7 @@ static int
 i915_gem_create(struct drm_file *file,
 		struct drm_device *dev,
 		uint64_t size,
+		uint64_t flags,
 		uint32_t *handle_p)
 {
 	struct drm_i915_gem_object *obj;
@@ -402,8 +403,31 @@ i915_gem_create(struct drm_file *file,
 	if (size == 0)
 		return -EINVAL;
 
+	if (flags & __I915_CREATE_UNKNOWN_FLAGS)
+		return -EINVAL;
+
 	/* Allocate the new object */
-	obj = i915_gem_alloc_object(dev, size);
+	if (flags & I915_CREATE_PLACEMENT_STOLEN) {
+		mutex_lock(&dev->struct_mutex);
+		obj = i915_gem_object_create_stolen(dev, size);
+		if (!obj) {
+			mutex_unlock(&dev->struct_mutex);
+			return -ENOMEM;
+		}
+
+		/* Always clear fresh buffers before handing to userspace */
+		ret = i915_gem_object_clear(obj);
+		if (ret) {
+			drm_gem_object_unreference(&obj->base);
+			mutex_unlock(&dev->struct_mutex);
+			return ret;
+		}
+
+		mutex_unlock(&dev->struct_mutex);
+	} else {
+		obj = i915_gem_alloc_object(dev, size);
+	}
+
 	if (obj == NULL)
 		return -ENOMEM;
 
@@ -426,7 +450,7 @@ i915_gem_dumb_create(struct drm_file *file,
 	args->pitch = ALIGN(args->width * DIV_ROUND_UP(args->bpp, 8), 64);
 	args->size = args->pitch * args->height;
 	return i915_gem_create(file, dev,
-			       args->size, &args->handle);
+			       args->size, 0, &args->handle);
 }
 
 /**
@@ -439,7 +463,7 @@ i915_gem_create_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_create *args = data;
 
 	return i915_gem_create(file, dev,
-			       args->size, &args->handle);
+			       args->size, args->flags, &args->handle);
 }
 
 static inline int
