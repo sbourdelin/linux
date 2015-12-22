@@ -433,7 +433,7 @@ static bool ldm_validate_tocblocks(struct parsed_partitions *state,
 	tb[1] = kmalloc(sizeof(*tb[1]) * 3, GFP_KERNEL);
 	if (!tb[1]) {
 		ldm_crit("Out of memory.");
-		goto err;
+		return false;
 	}
 	tb[2] = (struct tocblock*)((u8*)tb[1] + sizeof(*tb[1]));
 	tb[3] = (struct tocblock*)((u8*)tb[2] + sizeof(*tb[2]));
