@@ -79,7 +79,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
 	oi = 0;
 	oo = 0;
 	do {
-		todo = min3(rx_cnt, ileft, (mi.length - oi) / 4);
+		todo = min3(rx_cnt, ileft, (u32)(mi.length - oi) / 4);
 		if (todo > 0) {
 			ileft -= todo;
 			writesl(ss->base + SS_RXFIFO, mi.addr + oi, todo);
@@ -94,7 +94,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
 		rx_cnt = SS_RXFIFO_SPACES(spaces);
 		tx_cnt = SS_TXFIFO_SPACES(spaces);
 
-		todo = min3(tx_cnt, oleft, (mo.length - oo) / 4);
+		todo = min3(tx_cnt, oleft, (u32)(mo.length - oo) / 4);
 		if (todo > 0) {
 			oleft -= todo;
 			readsl(ss->base + SS_TXFIFO, mo.addr + oo, todo);
@@ -216,7 +216,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 			 * todo is the number of consecutive 4byte word that we
 			 * can read from current SG
 			 */
-			todo = min3(rx_cnt, ileft / 4, (mi.length - oi) / 4);
+			todo = min3(rx_cnt, ileft / 4, (u32)(mi.length - oi) / 4);
 			if (todo > 0 && ob == 0) {
 				writesl(ss->base + SS_RXFIFO, mi.addr + oi,
 					todo);
@@ -231,7 +231,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 				 * pass, so it is why we min() with rx_cnt
 				 */
 				todo = min3(rx_cnt * 4 - ob, ileft,
-					    mi.length - oi);
+					    (u32)mi.length - oi);
 				memcpy(buf + ob, mi.addr + oi, todo);
 				ileft -= todo;
 				oi += todo;
@@ -260,7 +260,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 		if (tx_cnt == 0)
 			continue;
 		/* todo in 4bytes word */
-		todo = min3(tx_cnt, oleft / 4, (mo.length - oo) / 4);
+		todo = min3(tx_cnt, oleft / 4, (u32)(mo.length - oo) / 4);
 		if (todo > 0) {
 			readsl(ss->base + SS_TXFIFO, mo.addr + oo, todo);
 			oleft -= todo * 4;
@@ -284,7 +284,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 				 * no more than remaining buffer
 				 * no need to test against oleft
 				 */
-				todo = min(mo.length - oo, obl - obo);
+				todo = min((u32)mo.length - oo, obl - obo);
 				memcpy(mo.addr + oo, bufo + obo, todo);
 				oleft -= todo;
 				obo += todo;
