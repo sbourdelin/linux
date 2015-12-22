@@ -55,6 +55,9 @@ static bool cpu_cache_is_coherent(struct drm_device *dev,
 
 static bool cpu_write_needs_clflush(struct drm_i915_gem_object *obj)
 {
+	if (obj->base.write_domain == I915_GEM_DOMAIN_CPU)
+		return false;
+
 	if (!cpu_cache_is_coherent(obj->base.dev, obj->cache_level))
 		return true;
 
@@ -631,6 +634,99 @@ shmem_pread_slow(struct page *page, int shmem_page_offset, int page_length,
 	return ret ? - EFAULT : 0;
 }
 
+static inline uint64_t
+slow_user_access(struct io_mapping *mapping,
+		 uint64_t page_base, int page_offset,
+		 char __user *user_data,
+		 int length, bool pwrite)
+{
+	void __iomem *vaddr_inatomic;
+	void *vaddr;
+	uint64_t unwritten;
+
+	vaddr_inatomic = io_mapping_map_wc(mapping, page_base);
+	/* We can use the cpu mem copy function because this is X86. */
+	vaddr = (void __force *)vaddr_inatomic + page_offset;
+	if (pwrite)
+		unwritten = __copy_from_user(vaddr, user_data, length);
+	else
+		unwritten = __copy_to_user(user_data, vaddr, length);
+
+	io_mapping_unmap(vaddr_inatomic);
+	return unwritten;
+}
+
+static int
+i915_gem_gtt_copy(struct drm_device *dev,
+		   struct drm_i915_gem_object *obj, uint64_t size,
+		   uint64_t data_offset, uint64_t data_ptr)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	char __user *user_data;
+	uint64_t remain;
+	uint64_t offset, page_base;
+	int page_offset, page_length, ret = 0;
+
+	ret = i915_gem_obj_ggtt_pin(obj, 0, PIN_MAPPABLE);
+	if (ret)
+		goto out;
+
+	ret = i915_gem_object_set_to_gtt_domain(obj, false);
+	if (ret)
+		goto out_unpin;
+
+	ret = i915_gem_object_put_fence(obj);
+	if (ret)
+		goto out_unpin;
+
+	user_data = to_user_ptr(data_ptr);
+	remain = size;
+	offset = i915_gem_obj_ggtt_offset(obj) + data_offset;
+
+	mutex_unlock(&dev->struct_mutex);
+	if (likely(!i915.prefault_disable))
+		ret = fault_in_multipages_writeable(user_data, remain);
+
+	/*
+	 * page_offset = offset within page
+	 * page_base = page offset within aperture
+	 */
+	page_offset = offset_in_page(offset);
+	page_base = offset & PAGE_MASK;
+
+	while (remain > 0) {
+		/* page_length = bytes to copy for this page */
+		page_length = remain;
+		if ((page_offset + remain) > PAGE_SIZE)
+			page_length = PAGE_SIZE - page_offset;
+
+		/* This is a slow read/write as it tries to read from
+		 * and write to user memory which may result into page
+		 * faults
+		 */
+		ret = slow_user_access(dev_priv->gtt.mappable, page_base,
+				       page_offset, user_data,
+				       page_length, false);
+
+		if (ret) {
+			ret = -EFAULT;
+			break;
+		}
+
+		remain -= page_length;
+		user_data += page_length;
+		page_base += page_length;
+		page_offset = 0;
+	}
+
+	mutex_lock(&dev->struct_mutex);
+
+out_unpin:
+	i915_gem_object_ggtt_unpin(obj);
+out:
+	return ret;
+}
+
 static int
 i915_gem_shmem_pread(struct drm_device *dev,
 		     struct drm_i915_gem_object *obj,
@@ -754,17 +850,14 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
 		goto out;
 	}
 
-	/* prime objects have no backing filp to GEM pread/pwrite
-	 * pages from.
-	 */
-	if (!obj->base.filp) {
-		ret = -EINVAL;
-		goto out;
-	}
-
 	trace_i915_gem_object_pread(obj, args->offset, args->size);
 
-	ret = i915_gem_shmem_pread(dev, obj, args, file);
+	/* pread for non shmem backed objects */
+	if (!obj->base.filp && obj->tiling_mode == I915_TILING_NONE)
+		ret = i915_gem_gtt_copy(dev, obj, args->size,
+					args->offset, args->data_ptr);
+	else if (obj->base.filp)
+		ret = i915_gem_shmem_pread(dev, obj, args, file);
 
 out:
 	drm_gem_object_unreference(&obj->base);
@@ -806,10 +899,15 @@ i915_gem_gtt_pwrite_fast(struct drm_i915_private *i915,
 			 struct drm_i915_gem_pwrite *args,
 			 struct drm_file *file)
 {
+	struct drm_device *dev = obj->base.dev;
 	struct drm_mm_node node;
 	uint64_t remain, offset;
 	char __user *user_data;
 	int ret;
+	bool faulted = false;
+
+	if (obj->tiling_mode != I915_TILING_NONE)
+		return -EFAULT;
 
 	ret = i915_gem_obj_ggtt_pin(obj, 0, PIN_MAPPABLE | PIN_NONBLOCK);
 	if (ret) {
@@ -869,11 +967,29 @@ i915_gem_gtt_pwrite_fast(struct drm_i915_private *i915,
 		/* If we get a fault while copying data, then (presumably) our
 		 * source page isn't available.  Return the error and we'll
 		 * retry in the slow path.
+		 * If the object is non-shmem backed, we retry again with the
+		 * path that handles page fault.
 		 */
-		if (fast_user_write(i915->gtt.mappable, page_base,
-				    page_offset, user_data, page_length)) {
-			ret = -EFAULT;
-			goto out_flush;
+		if (faulted || fast_user_write(i915->gtt.mappable,
+						page_base, page_offset,
+						user_data, page_length)) {
+			if (!obj->base.filp) {
+				faulted = true;
+				mutex_unlock(&dev->struct_mutex);
+				if (slow_user_access(i915->gtt.mappable,
+						     page_base,
+						     page_offset, user_data,
+						     page_length, true)) {
+					ret = -EFAULT;
+					mutex_lock(&dev->struct_mutex);
+					goto out_flush;
+				}
+
+				mutex_lock(&dev->struct_mutex);
+			} else {
+				ret = -EFAULT;
+				goto out_flush;
+			}
 		}
 
 		remain -= page_length;
@@ -1140,14 +1256,6 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		goto out;
 	}
 
-	/* prime objects have no backing filp to GEM pread/pwrite
-	 * pages from.
-	 */
-	if (!obj->base.filp) {
-		ret = -EINVAL;
-		goto out;
-	}
-
 	trace_i915_gem_object_pwrite(obj, args->offset, args->size);
 
 	ret = -EFAULT;
@@ -1157,9 +1265,7 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	 * pread/pwrite currently are reading and writing from the CPU
 	 * perspective, requiring manual detiling by the client.
 	 */
-	if (obj->tiling_mode == I915_TILING_NONE &&
-	    obj->base.write_domain != I915_GEM_DOMAIN_CPU &&
-	    cpu_write_needs_clflush(obj)) {
+	if (!obj->base.filp || cpu_write_needs_clflush(obj)) {
 		ret = i915_gem_gtt_pwrite_fast(dev_priv, obj, args, file);
 		/* Note that the gtt paths might fail with non-page-backed user
 		 * pointers (e.g. gtt mappings when moving data between
@@ -1169,8 +1275,10 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	if (ret == -EFAULT || ret == -ENOSPC) {
 		if (obj->phys_handle)
 			ret = i915_gem_phys_pwrite(obj, args, file);
-		else
+		else if (obj->base.filp)
 			ret = i915_gem_shmem_pwrite(dev, obj, args, file);
+		else
+			ret = -ENODEV;
 	}
 
 out:
@@ -3933,9 +4041,7 @@ out:
 	 * object is now coherent at its new cache level (with respect
 	 * to the access domain).
 	 */
-	if (obj->cache_dirty &&
-	    obj->base.write_domain != I915_GEM_DOMAIN_CPU &&
-	    cpu_write_needs_clflush(obj)) {
+	if (obj->cache_dirty && cpu_write_needs_clflush(obj)) {
 		if (i915_gem_clflush_object(obj, true))
 			i915_gem_chipset_flush(obj->base.dev);
 	}
