@@ -547,7 +547,7 @@ u32 fhci_host_transaction(struct fhci_usb *usb, struct packet *pkt,
 void fhci_host_transmit_actual_frame(struct fhci_usb *usb);
 void fhci_tx_conf_interrupt(struct fhci_usb *usb);
 void fhci_push_dummy_bd(struct endpoint *ep);
-u32 fhci_create_ep(struct fhci_usb *usb, enum fhci_mem_alloc data_mem,
+int fhci_create_ep(struct fhci_usb *usb, enum fhci_mem_alloc data_mem,
 		   u32 ring_len);
 void fhci_init_ep_registers(struct fhci_usb *usb,
 			    struct endpoint *ep,
