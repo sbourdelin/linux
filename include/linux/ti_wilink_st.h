@@ -391,7 +391,7 @@ void st_ll_disable(struct st_data_s *);
  * of the chip.
  */
 unsigned long st_ll_getstate(struct st_data_s *);
-unsigned long st_ll_sleep_state(struct st_data_s *, unsigned char);
+int st_ll_sleep_state(struct st_data_s *, unsigned char);
 void st_ll_wakeup(struct st_data_s *);
 
 /*
