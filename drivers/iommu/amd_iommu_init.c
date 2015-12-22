@@ -2244,6 +2244,22 @@ bool amd_iommu_v2_supported(void)
 }
 EXPORT_SYMBOL(amd_iommu_v2_supported);
 
+static int amd_iommu_cnt;
+
+int amd_iommu_get_num_iommus(void)
+{
+	struct amd_iommu *iommu;
+
+	if (amd_iommu_cnt)
+		return amd_iommu_cnt;
+
+	for_each_iommu(iommu)
+		amd_iommu_cnt++;
+
+	return amd_iommu_cnt;
+}
+EXPORT_SYMBOL(amd_iommu_get_num_iommus);
+
 /****************************************************************************
  *
  * IOMMU EFR Performance Counter support functionality. This code allows
