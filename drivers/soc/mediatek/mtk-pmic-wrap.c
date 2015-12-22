@@ -443,10 +443,16 @@ static int pwrap_wait_for_state(struct pmic_wrapper *wrp,
 static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
 {
 	int ret;
+	u32 val;
 
 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-	if (ret)
+	if (ret) {
+		/* Clear vldclr bit if state is on the WACS_FSM_WFVLDCLR */
+		val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
+		if (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR)
+			pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
 		return ret;
+	}
 
 	pwrap_writel(wrp, (1 << 31) | ((adr >> 1) << 16) | wdata,
 			PWRAP_WACS2_CMD);
@@ -457,10 +463,16 @@ static int pwrap_write(struct pmic_wrapper *wrp, u32 adr, u32 wdata)
 static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
 {
 	int ret;
+	u32 val;
 
 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle);
-	if (ret)
+	if (ret) {
+		/* Clear vldclr bit if state is on the WACS_FSM_WFVLDCLR */
+		val = pwrap_readl(wrp, PWRAP_WACS2_RDATA);
+		if (PWRAP_GET_WACS_FSM(val) == PWRAP_WACS_FSM_WFVLDCLR)
+			pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
 		return ret;
+	}
 
 	pwrap_writel(wrp, (adr >> 1) << 16, PWRAP_WACS2_CMD);
 
