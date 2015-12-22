@@ -2333,6 +2333,8 @@ static const struct nla_policy nft_set_policy[NFTA_SET_MAX + 1] = {
 	[NFTA_SET_ID]			= { .type = NLA_U32 },
 	[NFTA_SET_TIMEOUT]		= { .type = NLA_U64 },
 	[NFTA_SET_GC_INTERVAL]		= { .type = NLA_U32 },
+	[NFTA_SET_USERDATA]		= { .type = NLA_BINARY,
+					    .len  = NFT_USERDATA_MAXLEN },
 };
 
 static const struct nla_policy nft_set_desc_policy[NFTA_SET_DESC_MAX + 1] = {
@@ -2493,6 +2495,9 @@ static int nf_tables_fill_set(struct sk_buff *skb, const struct nft_ctx *ctx,
 		if (nla_put_be32(skb, NFTA_SET_POLICY, htonl(set->policy)))
 			goto nla_put_failure;
 	}
+
+	if (nla_put(skb, NFTA_SET_USERDATA, set->udlen, set->udata))
+		goto nla_put_failure;
 
 	desc = nla_nest_start(skb, NFTA_SET_DESC);
 	if (desc == NULL)
@@ -2704,6 +2709,8 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	u64 timeout;
 	u32 ktype, dtype, flags, policy, gc_int;
 	struct nft_set_desc desc;
+	unsigned char udlen;
+	unsigned char *udata;
 	int err;
 
 	if (nla[NFTA_SET_TABLE] == NULL ||
@@ -2816,12 +2823,16 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	if (IS_ERR(ops))
 		return PTR_ERR(ops);
 
+	udlen = 0;
+	if (nla[NFTA_SET_USERDATA] != NULL)
+		udlen = nla_len(nla[NFTA_SET_USERDATA]);
+
 	size = 0;
 	if (ops->privsize != NULL)
 		size = ops->privsize(nla);
 
 	err = -ENOMEM;
-	set = kzalloc(sizeof(*set) + size, GFP_KERNEL);
+	set = kzalloc(sizeof(*set) + size + udlen, GFP_KERNEL);
 	if (set == NULL)
 		goto err1;
 
@@ -2829,6 +2840,12 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	err = nf_tables_set_alloc_name(&ctx, set, name);
 	if (err < 0)
 		goto err2;
+
+	udata = NULL;
+	if (nla[NFTA_SET_USERDATA] != NULL) {
+		udata = set->data + size;
+		nla_memcpy(udata, nla[NFTA_SET_USERDATA], udlen);
+	}
 
 	INIT_LIST_HEAD(&set->bindings);
 	write_pnet(&set->pnet, net);
@@ -2840,6 +2857,8 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	set->flags = flags;
 	set->size  = desc.size;
 	set->policy = policy;
+	set->udlen  = udlen;
+	set->udata  = udata;
 	set->timeout = timeout;
 	set->gc_int = gc_int;
 
