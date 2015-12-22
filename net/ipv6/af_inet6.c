@@ -60,6 +60,7 @@
 #ifdef CONFIG_IPV6_TUNNEL
 #include <net/ip6_tunnel.h>
 #endif
+#include <net/calipso.h>
 
 #include <asm/uaccess.h>
 #include <linux/mroute6.h>
@@ -971,13 +972,19 @@ static int __init inet6_init(void)
 	if (err)
 		goto sysctl_fail;
 #endif
+
+	err = calipso_init();
+	if (err)
+		goto calipso_fail;
 out:
 	return err;
 
+calipso_fail:
 #ifdef CONFIG_SYSCTL
+	ipv6_sysctl_unregister();
 sysctl_fail:
-	pingv6_exit();
 #endif
+	pingv6_exit();
 pingv6_fail:
 	ipv6_packet_cleanup();
 ipv6_packet_fail:
