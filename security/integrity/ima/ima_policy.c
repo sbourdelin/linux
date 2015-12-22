@@ -431,6 +431,9 @@ void ima_update_policy(void)
 {
 	struct list_head *first, *last, *policy;
 
+	if (list_empty(&ima_temp_rules))
+		return;
+
 	/* append current policy with the new rules */
 	first = (&ima_temp_rules)->next;
 	last = (&ima_temp_rules)->prev;
