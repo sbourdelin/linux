@@ -25,33 +25,7 @@
 #include <linux/of_pci.h>
 #include <linux/platform_device.h>
 
-struct gen_pci_cfg_bus_ops {
-	u32 bus_shift;
-	struct pci_ops ops;
-};
-
-struct gen_pci_cfg_windows {
-	struct resource				res;
-	struct resource				*bus_range;
-	void __iomem				**win;
-
-	struct gen_pci_cfg_bus_ops		*ops;
-};
-
-/*
- * ARM pcibios functions expect the ARM struct pci_sys_data as the PCI
- * sysdata.  Add pci_sys_data as the first element in struct gen_pci so
- * that when we use a gen_pci pointer as sysdata, it is also a pointer to
- * a struct pci_sys_data.
- */
-struct gen_pci {
-#ifdef CONFIG_ARM
-	struct pci_sys_data			sys;
-#endif
-	struct pci_host_bridge			host;
-	struct gen_pci_cfg_windows		cfg;
-	struct list_head			resources;
-};
+#include "pci-host-generic.h"
 
 static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
 					     unsigned int devfn,
@@ -208,18 +182,14 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
 	return 0;
 }
 
-static int gen_pci_probe(struct platform_device *pdev)
+int gen_pci_common_probe(struct platform_device *pdev,
+			 struct gen_pci *pci)
 {
 	int err;
 	const char *type;
-	const struct of_device_id *of_id;
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
-	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
 	struct pci_bus *bus, *child;
-
-	if (!pci)
-		return -ENOMEM;
 
 	type = of_get_property(np, "device_type", NULL);
 	if (!type || strcmp(type, "pci")) {
@@ -229,8 +199,6 @@ static int gen_pci_probe(struct platform_device *pdev)
 
 	of_pci_check_probe_only();
 
-	of_id = of_match_node(gen_pci_of_match, np);
-	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
 	pci->host.dev.parent = dev;
 	INIT_LIST_HEAD(&pci->host.windows);
 	INIT_LIST_HEAD(&pci->resources);
@@ -271,6 +239,21 @@ static int gen_pci_probe(struct platform_device *pdev)
 
 	pci_bus_add_devices(bus);
 	return 0;
+}
+
+static int gen_pci_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	const struct of_device_id *of_id;
+	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+
+	if (!pci)
+		return -ENOMEM;
+
+	of_id = of_match_node(gen_pci_of_match, dev->of_node);
+	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
+
+	return gen_pci_common_probe(pdev, pci);
 }
 
 static struct platform_driver gen_pci_driver = {
