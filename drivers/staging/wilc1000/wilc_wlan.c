@@ -1381,15 +1381,16 @@ void wilc_wlan_cleanup(struct net_device *dev)
 	ret = wilc->hif_func->hif_read_reg(wilc, WILC_GP_REG_0, &reg);
 	if (!ret) {
 		PRINT_ER("Error while reading reg\n");
-		release_bus(wilc, RELEASE_ALLOW_SLEEP);
+		goto unlock;
 	}
 	PRINT_ER("Writing ABORT reg\n");
 	ret = wilc->hif_func->hif_write_reg(wilc, WILC_GP_REG_0,
 					(reg | ABORT_INT));
 	if (!ret) {
 		PRINT_ER("Error while writing reg\n");
-		release_bus(wilc, RELEASE_ALLOW_SLEEP);
+		goto unlock;
 	}
+unlock:
 	release_bus(wilc, RELEASE_ALLOW_SLEEP);
 	wilc->hif_func->hif_deinit(NULL);
 }
