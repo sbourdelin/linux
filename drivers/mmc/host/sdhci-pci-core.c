@@ -729,6 +729,152 @@ enum amd_chipset_gen {
 	AMD_CHIPSET_UNKNOWN,
 };
 
+struct tuning_descriptor {
+	unsigned char tune_around;
+	bool this_tune_ok;
+	bool last_tune_ok;
+	bool valid_front_end;
+	unsigned char valid_front;
+	unsigned char valid_window_max;
+	unsigned char tune_low_max;
+	unsigned char tune_low;
+	unsigned char valid_window;
+	unsigned char tune_result;
+};
+
+#define AMD_EMMC_TUNE_REG 0xb8
+static struct tuning_descriptor tdescriptor;
+
+static int tuning_reset(struct sdhci_host *host)
+{
+	unsigned int val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	val = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	val |= SDHCI_CTRL_PRESET_VAL_ENABLE | SDHCI_CTRL_EXEC_TUNING;
+	sdhci_writew(host, val, SDHCI_HOST_CONTROL2);
+
+	val = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	val &= ~SDHCI_CTRL_EXEC_TUNING;
+	sdhci_writew(host, val, SDHCI_HOST_CONTROL2);
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return 0;
+}
+
+static int config_tuning_phase(struct sdhci_host *host, unsigned char phase)
+{
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
+	struct pci_dev *pdev = slot->chip->pdev;
+	unsigned int val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	pci_read_config_dword(pdev, AMD_EMMC_TUNE_REG, &val);
+	val &= ~0xf;
+	val |= (0x10800 | phase);
+	pci_write_config_dword(pdev, AMD_EMMC_TUNE_REG, val);
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return 0;
+}
+
+static int find_good_phase(struct sdhci_host *host)
+{
+	struct tuning_descriptor *td = &tdescriptor;
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
+	struct pci_dev *pdev = slot->chip->pdev;
+	unsigned int val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	if (td->this_tune_ok == false)
+		td->valid_front_end = 1;
+
+	if (td->valid_front_end)
+		td->valid_front = td->valid_front;
+	else if (td->this_tune_ok)
+		td->valid_front = td->valid_front + 1;
+
+	if ((!td->this_tune_ok && td->last_tune_ok) ||
+					(td->tune_around == 11)) {
+		if (td->valid_window > td->valid_window_max) {
+			td->valid_window_max = td->valid_window;
+			td->tune_low_max = td->tune_low;
+		}
+	}
+
+	if (td->this_tune_ok) {
+		if (!td->last_tune_ok)
+			td->tune_low = td->tune_around;
+		td->valid_window = td->valid_window + 1;
+	} else {
+		if (td->last_tune_ok)
+			td->valid_window = 0x0;
+	}
+
+	td->last_tune_ok = td->this_tune_ok;
+
+	if (td->tune_around == 11) {
+		if ((td->valid_front + td->valid_window) >
+						td->valid_window_max) {
+			if (td->valid_front > td->valid_window)
+				td->tune_result =
+				((td->valid_front - td->valid_window) >> 1);
+			else
+				td->tune_result = td->tune_low +
+				((td->valid_window + td->valid_front) >> 1);
+		} else {
+			td->tune_result =
+				td->tune_low_max + (td->valid_window_max >> 1);
+		}
+
+		if (td->tune_result > 0x0b)
+			td->tune_result = 0x0b;
+
+		pci_read_config_dword(pdev, AMD_EMMC_TUNE_REG, &val);
+		val &= ~0xf;
+		val |= (0x10800 | td->tune_result);
+		pci_write_config_dword(pdev, AMD_EMMC_TUNE_REG, val);
+	}
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return 0;
+}
+
+static int amd_execute_tuning(struct sdhci_host *host, u32 opcode)
+{
+	struct tuning_descriptor *td = &tdescriptor;
+
+	tuning_reset(host);
+
+	for (td->tune_around = 0; td->tune_around < 12; td->tune_around++) {
+
+		config_tuning_phase(host, td->tune_around);
+
+		if (mmc_send_tuning(host->mmc, opcode, NULL)) {
+			td->this_tune_ok = false;
+			host->mmc->need_retune = 0;
+			mdelay(4);
+		} else {
+			td->this_tune_ok = true;
+		}
+
+		find_good_phase(host);
+	}
+
+	host->mmc->retune_period = 0;
+
+	return 0;
+}
+
 static int amd_probe(struct sdhci_pci_chip *chip)
 {
 	struct pci_dev	*smbus_dev;
