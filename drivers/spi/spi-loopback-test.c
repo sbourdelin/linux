@@ -282,8 +282,34 @@ static struct spi_test spi_tests[] = {
 static int spi_loopback_test_probe(struct spi_device *spi)
 {
 	int ret;
+	char *msg;
 
-	dev_info(&spi->dev, "Executing spi-loopback-tests\n");
+	/*
+	 * Enable HW-loopback automatically if the master supports it
+	 * and we have the have_rx_buf unset (set means that we have
+	 * got an external loopback enabled, so no need to use SPI_LOOP)
+	 */
+	if (!check_rx_buf && (spi->master->mode_bits & SPI_LOOP)) {
+		spi->mode |= SPI_LOOP;
+		ret = spi_setup(spi);
+		if (ret) {
+			dev_err(&spi->dev,
+				"spi_setup failed to enable loopback: %i\n",
+				ret);
+			return ret;
+		}
+
+		/* force checking rx_buf for valid (loopback) data */
+		check_rx_buf = 1;
+
+		msg = "with SPI_LOOP support";
+	} else {
+		msg = (check_rx_buf) ?
+		      "with external loopback" :
+		      "without any loopback - rx_buf content is not checked";
+	}
+
+	dev_info(&spi->dev, "Executing spi-loopback-tests %s\n", msg);
 
 	ret = spi_test_run_tests(spi, spi_tests);
 
