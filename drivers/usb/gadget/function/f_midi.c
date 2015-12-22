@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/kfifo.h>
+#include <linux/spinlock.h>
 
 #include <sound/core.h>
 #include <sound/initval.h>
@@ -97,6 +98,7 @@ struct f_midi {
 	/* This fifo is used as a buffer ring for pre-allocated IN usb_requests */
 	DECLARE_KFIFO_PTR(in_req_fifo, struct usb_request *);
 	unsigned int in_last_port;
+	spinlock_t transmit_lock;
 };
 
 static inline struct f_midi *func_to_midi(struct usb_function *f)
@@ -574,11 +576,14 @@ static void f_midi_drop_out_substreams(struct f_midi *midi)
 static void f_midi_transmit(struct f_midi *midi)
 {
 	struct usb_ep *ep = midi->in_ep;
+	unsigned long flags;
 	bool active;
 
 	/* We only care about USB requests if IN endpoint is enabled */
 	if (!ep || !ep->enabled)
 		goto drop_out;
+
+	spin_lock_irqsave(&midi->transmit_lock, flags);
 
 	do {
 		struct usb_request *req = NULL;
@@ -591,14 +596,17 @@ static void f_midi_transmit(struct f_midi *midi)
 		len = kfifo_peek(&midi->in_req_fifo, &req);
 		if (len != 1) {
 			ERROR(midi, "%s: Couldn't get usb request\n", __func__);
+			spin_unlock_irqrestore(&midi->transmit_lock, flags);
 			goto drop_out;
 		}
 
 		/* If buffer overrun, then we ignore this transmission.
 		 * IMPORTANT: This will cause the user-space rawmidi device to block until a) usb
 		 * requests have been completed or b) snd_rawmidi_write() times out. */
-		if (req->length > 0)
+		if (req->length > 0) {
+			spin_unlock_irqrestore(&midi->transmit_lock, flags);
 			return;
+		}
 
 		for (i = midi->in_last_port; i < MAX_PORTS; i++) {
 			struct gmidi_in_port *port = midi->in_port[i];
@@ -649,6 +657,8 @@ static void f_midi_transmit(struct f_midi *midi)
 			}
 		}
 	} while (active);
+
+	spin_unlock_irqrestore(&midi->transmit_lock, flags);
 
 	return;
 
@@ -1254,6 +1264,8 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	status = kfifo_alloc(&midi->in_req_fifo, midi->qlen, GFP_KERNEL);
 	if (status)
 		goto setup_fail;
+
+	spin_lock_init(&midi->transmit_lock);
 
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
