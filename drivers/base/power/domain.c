@@ -196,7 +196,12 @@ static int __genpd_poweron(struct generic_pm_domain *genpd)
 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
 		genpd_sd_counter_inc(link->master);
 
+		mutex_unlock(&genpd->lock);
+
 		ret = genpd_poweron(link->master);
+
+		mutex_lock(&genpd->lock);
+
 		if (ret) {
 			genpd_sd_counter_dec(link->master);
 			goto err;
