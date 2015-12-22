@@ -41,7 +41,7 @@ int pci_iov_virtfn_devfn(struct pci_dev *dev, int vf_id)
  *
  * Update iov->offset and iov->stride when NumVFs is written.
  */
-static inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
+inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
 {
 	struct pci_sriov *iov = dev->sriov;
 
@@ -49,6 +49,7 @@ static inline void pci_iov_set_numvfs(struct pci_dev *dev, int nr_virtfn)
 	pci_read_config_word(dev, iov->pos + PCI_SRIOV_VF_OFFSET, &iov->offset);
 	pci_read_config_word(dev, iov->pos + PCI_SRIOV_VF_STRIDE, &iov->stride);
 }
+EXPORT_SYMBOL(pci_iov_set_numvfs);
 
 /*
  * The PF consumes one bus number.  NumVFs, First VF Offset, and VF Stride
@@ -112,6 +113,7 @@ resource_size_t pci_iov_resource_size(struct pci_dev *dev, int resno)
 
 	return dev->sriov->barsz[resno - PCI_IOV_RESOURCES];
 }
+EXPORT_SYMBOL(pci_iov_resource_size);
 
 static int virtfn_add(struct pci_dev *dev, int id, int reset)
 {
