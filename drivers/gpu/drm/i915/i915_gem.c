@@ -399,6 +399,7 @@ i915_gem_create(struct drm_file *file,
 		uint32_t *handle_p)
 {
 	struct drm_i915_gem_object *obj;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 	u32 handle;
 
@@ -411,6 +412,13 @@ i915_gem_create(struct drm_file *file,
 
 	/* Allocate the new object */
 	if (flags & I915_CREATE_PLACEMENT_STOLEN) {
+		if (!dev_priv->mm.nonvolatile_stolen) {
+			/* Stolen may be overwritten by external parties
+			 * so unsuitable for persistent user data.
+			 */
+			return -ENODEV;
+		}
+
 		mutex_lock(&dev->struct_mutex);
 		obj = i915_gem_object_create_stolen(dev, size);
 		if (IS_ERR(obj)) {

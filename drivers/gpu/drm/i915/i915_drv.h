@@ -1314,6 +1314,9 @@ struct i915_gem_mm {
 	 */
 	bool busy;
 
+	/* Intel RapidStart Technology info */
+	bool nonvolatile_stolen;
+
 	/* the indicator for dispatch video commands on two BSD rings */
 	int bsd_ring_dispatch_index;
 
@@ -3399,9 +3402,13 @@ intel_opregion_notify_adapter(struct drm_device *dev, pci_power_t state)
 #ifdef CONFIG_ACPI
 extern void intel_register_dsm_handler(void);
 extern void intel_unregister_dsm_handler(void);
+extern bool intel_detect_acpi_rst(void);
+extern int match_device(struct device *dev, void* ids);
 #else
 static inline void intel_register_dsm_handler(void) { return; }
 static inline void intel_unregister_dsm_handler(void) { return; }
+static inline bool intel_detect_acpi_rst(void) { return false; }
+static int match_device(struct device *dev, void* ids) { return 0; }
 #endif /* CONFIG_ACPI */
 
 /* modesetting */
