@@ -793,7 +793,7 @@ static int ipv6_renew_option(void *ohdr,
  * specified option type is not copied into the new set of options.
  *
  * The new set of options is allocated from the socket option memory
- * buffer of @sk.
+ * buffer of @sk.  If @sk is NULL, then kmalloc() is used instead.
  */
 static struct ipv6_txoptions *
 __ipv6_renew_options(struct sock *sk, struct ipv6_txoptions *opt,
@@ -828,7 +828,10 @@ __ipv6_renew_options(struct sock *sk, struct ipv6_txoptions *opt,
 		return NULL;
 
 	tot_len += sizeof(*opt2);
-	opt2 = sock_kmalloc(sk, tot_len, GFP_ATOMIC);
+	if (sk)
+		opt2 = sock_kmalloc(sk, tot_len, GFP_ATOMIC);
+	else
+		opt2 = kmalloc(tot_len, GFP_ATOMIC);
 	if (!opt2)
 		return ERR_PTR(-ENOBUFS);
 
@@ -872,7 +875,10 @@ __ipv6_renew_options(struct sock *sk, struct ipv6_txoptions *opt,
 
 	return opt2;
 out:
-	sock_kfree_s(sk, opt2, opt2->tot_len);
+	if (sk)
+		sock_kfree_s(sk, opt2, opt2->tot_len);
+	else
+		kfree(opt2);
 	return ERR_PTR(err);
 }
 
@@ -895,7 +901,7 @@ out:
  * copied into the new set of options.
  *
  * The new set of options is allocated from the socket option memory
- * buffer of @sk.
+ * buffer of @sk.  If @sk is NULL, then kmalloc() is used instead.
  */
 struct ipv6_txoptions *
 ipv6_renew_options_kern(struct sock *sk, struct ipv6_txoptions *opt,
@@ -925,7 +931,7 @@ ipv6_renew_options_kern(struct sock *sk, struct ipv6_txoptions *opt,
  * copied into the new set of options.
  *
  * The new set of options is allocated from the socket option memory
- * buffer of @sk.
+ * buffer of @sk.  If @sk is NULL, then kmalloc() is used instead.
  */
 struct ipv6_txoptions *
 ipv6_renew_options(struct sock *sk, struct ipv6_txoptions *opt,
