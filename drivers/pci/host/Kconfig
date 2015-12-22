@@ -172,4 +172,10 @@ config PCI_HISI
 	help
 	  Say Y here if you want PCIe controller support on HiSilicon HIP05 SoC
 
+config PCIE_HOST_THUNDER_PEM
+	bool "Cavium Thunder PCIe controller to off-chip devices"
+	depends on PCI_HOST_GENERIC && ARM64
+	help
+	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
+
 endmenu
