@@ -71,6 +71,8 @@ static struct extent_tree *__grab_extent_tree(struct inode *inode)
 		atomic_set(&et->refcount, 0);
 		et->count = 0;
 		atomic_inc(&sbi->total_ext_tree);
+	} else {
+		atomic_dec(&sbi->total_zombie_tree);
 	}
 	atomic_inc(&et->refcount);
 	up_write(&sbi->extent_tree_lock);
@@ -547,9 +549,13 @@ unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
 	unsigned int found;
 	unsigned int node_cnt = 0, tree_cnt = 0;
 	int remained;
+	bool do_free = false;
 
 	if (!test_opt(sbi, EXTENT_CACHE))
 		return 0;
+
+	if (!atomic_read(&sbi->total_zombie_tree))
+		goto free_node;
 
 	if (!down_write_trylock(&sbi->extent_tree_lock))
 		goto out;
@@ -580,6 +586,7 @@ unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
 	}
 	up_write(&sbi->extent_tree_lock);
 
+free_node:
 	/* 2. remove LRU extent entries */
 	if (!down_write_trylock(&sbi->extent_tree_lock))
 		goto out;
@@ -591,8 +598,12 @@ unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
 		if (!remained--)
 			break;
 		list_del_init(&en->list);
+		do_free = true;
 	}
 	spin_unlock(&sbi->extent_lock);
+
+	if (do_free == false)
+		goto unlock_out;
 
 	/*
 	 * reset ino for searching victims from beginning of global extent tree.
@@ -651,6 +662,7 @@ void f2fs_destroy_extent_tree(struct inode *inode)
 
 	if (inode->i_nlink && !is_bad_inode(inode) && et->count) {
 		atomic_dec(&et->refcount);
+		atomic_dec(&sbi->total_zombie_tree);
 		return;
 	}
 
