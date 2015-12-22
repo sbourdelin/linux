@@ -1280,3 +1280,12 @@ static int __init register_kernel_offset_dumper(void)
 	return 0;
 }
 __initcall(register_kernel_offset_dumper);
+
+/*
+ * This code is in lib/ and we do not link initcalls from there.
+ * Stash it here instead.
+ */
+#ifdef CONFIG_X86_TEST_EARLY_CMDLINE
+int test_early_cmdline(void);
+late_initcall(test_early_cmdline);
+#endif /* CONFIG_X86_TEST_EARLY_CMDLINE */
