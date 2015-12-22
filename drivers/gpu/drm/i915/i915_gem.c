@@ -410,9 +410,9 @@ i915_gem_create(struct drm_file *file,
 	if (flags & I915_CREATE_PLACEMENT_STOLEN) {
 		mutex_lock(&dev->struct_mutex);
 		obj = i915_gem_object_create_stolen(dev, size);
-		if (!obj) {
+		if (IS_ERR(obj)) {
 			mutex_unlock(&dev->struct_mutex);
-			return -ENOMEM;
+			return PTR_ERR(obj);
 		}
 
 		/* Always clear fresh buffers before handing to userspace */
@@ -428,8 +428,8 @@ i915_gem_create(struct drm_file *file,
 		obj = i915_gem_alloc_object(dev, size);
 	}
 
-	if (obj == NULL)
-		return -ENOMEM;
+	if (IS_ERR(obj))
+		return PTR_ERR(obj);
 
 	ret = drm_gem_handle_create(file, &obj->base, &handle);
 	/* drop reference from allocate - handle holds it now */
@@ -4505,14 +4505,16 @@ struct drm_i915_gem_object *i915_gem_alloc_object(struct drm_device *dev,
 	struct drm_i915_gem_object *obj;
 	struct address_space *mapping;
 	gfp_t mask;
+	int ret;
 
 	obj = i915_gem_object_alloc(dev);
 	if (obj == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
-	if (drm_gem_object_init(dev, &obj->base, size) != 0) {
+	ret = drm_gem_object_init(dev, &obj->base, size);
+	if (ret) {
 		i915_gem_object_free(obj);
-		return NULL;
+		return ERR_PTR(ret);
 	}
 
 	mask = GFP_HIGHUSER | __GFP_RECLAIMABLE;
