@@ -1930,7 +1930,8 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		spin_unlock_irqrestore(&host->lock, flags);
 		err = host->ops->platform_execute_tuning(host, opcode);
 		sdhci_runtime_pm_put(host);
-		return err;
+		if (err != EPERM)
+			return err;
 	}
 
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);

@@ -83,6 +83,7 @@ struct sdhci_pci_slot {
 				     struct mmc_card *card,
 				     unsigned int max_dtr, int host_drv,
 				     int card_drv, int *drv_type);
+	int (*platform_execute_tuning)(struct sdhci_host *host, u32 opcode);
 };
 
 struct sdhci_pci_chip {

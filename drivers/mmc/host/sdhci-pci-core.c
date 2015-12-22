@@ -905,8 +905,19 @@ static int amd_probe(struct sdhci_pci_chip *chip)
 	return 0;
 }
 
+static int amd_probe_slot(struct sdhci_pci_slot *slot)
+{
+	struct sdhci_host *host = slot->host;
+
+	if (host->quirks2 & SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD)
+		slot->platform_execute_tuning = amd_execute_tuning;
+
+	return 0;
+}
+
 static const struct sdhci_pci_fixes sdhci_amd = {
 	.probe		= amd_probe,
+	.probe_slot	= amd_probe_slot,
 };
 
 static const struct pci_device_id pci_ids[] = {
@@ -1508,6 +1519,17 @@ static int sdhci_pci_select_drive_strength(struct sdhci_host *host,
 					   card_drv, drv_type);
 }
 
+static int sdhci_pci_platform_execute_tuning(struct sdhci_host *host,
+					     u32 opcode)
+{
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
+
+	if (!slot->platform_execute_tuning)
+		return -EPERM;
+
+	return slot->platform_execute_tuning(host, opcode);
+}
+
 static const struct sdhci_ops sdhci_pci_ops = {
 	.set_clock	= sdhci_set_clock,
 	.enable_dma	= sdhci_pci_enable_dma,
@@ -1516,6 +1538,7 @@ static const struct sdhci_ops sdhci_pci_ops = {
 	.set_uhs_signaling = sdhci_set_uhs_signaling,
 	.hw_reset		= sdhci_pci_hw_reset,
 	.select_drive_strength	= sdhci_pci_select_drive_strength,
+	.platform_execute_tuning = sdhci_pci_platform_execute_tuning,
 };
 
 /*****************************************************************************\
