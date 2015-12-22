@@ -782,8 +782,6 @@ static int ur_release(struct inode *inode, struct file *file)
 
 static loff_t ur_llseek(struct file *file, loff_t offset, int whence)
 {
-	loff_t newpos;
-
 	if ((file->f_flags & O_ACCMODE) != O_RDONLY)
 		return -ESPIPE; /* seek allowed only for reader */
 	if (offset % PAGE_SIZE)
