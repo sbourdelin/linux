@@ -107,6 +107,7 @@ enum ip_conntrack_events {
 	IPCT_NATSEQADJ = IPCT_SEQADJ,
 	IPCT_SECMARK,		/* new security mark has been set */
 	IPCT_LABEL,		/* new connlabel has been set */
+	IPCT_TCINDEX,		/* new tc_index has been set */
 };
 
 enum ip_conntrack_expect_events {

@@ -314,6 +314,21 @@ nla_put_failure:
 #define ctnetlink_dump_mark(a, b) (0)
 #endif
 
+#if defined CONFIG_NET_SCHED && defined CONFIG_NF_CONNTRACK_MARK
+static inline int
+ctnetlink_dump_tcindex(struct sk_buff *skb, const struct nf_conn *ct)
+{
+	if (nla_put_be16(skb, CTA_TC_INDEX, htonl(ct->tc_index)))
+		goto nla_put_failure;
+	return 0;
+
+nla_put_failure:
+	return -1;
+}
+#else
+#define ctnetlink_dump_tcindex(a, b) (0)
+#endif
+
 #ifdef CONFIG_NF_CONNTRACK_SECMARK
 static inline int
 ctnetlink_dump_secctx(struct sk_buff *skb, const struct nf_conn *ct)
@@ -521,6 +536,7 @@ ctnetlink_fill_info(struct sk_buff *skb, u32 portid, u32 seq, u32 type,
 	    ctnetlink_dump_protoinfo(skb, ct) < 0 ||
 	    ctnetlink_dump_helpinfo(skb, ct) < 0 ||
 	    ctnetlink_dump_mark(skb, ct) < 0 ||
+	    ctnetlink_dump_tcindex(skb, ct) < 0 ||
 	    ctnetlink_dump_secctx(skb, ct) < 0 ||
 	    ctnetlink_dump_labels(skb, ct) < 0 ||
 	    ctnetlink_dump_id(skb, ct) < 0 ||
@@ -749,7 +765,13 @@ ctnetlink_conntrack_event(unsigned int events, struct nf_ct_event *item)
 	if ((events & (1 << IPCT_MARK) || ct->mark)
 	    && ctnetlink_dump_mark(skb, ct) < 0)
 		goto nla_put_failure;
-#endif
+
+#ifdef CONFIG_NET_SCHED
+	if ((events & (1 << IPCT_TCINDEX) || ct->tc_index) &&
+	    ctnetlink_dump_tcindex(skb, ct) < 0)
+		goto nla_put_failure;
+#endif /* CONFIG_NET_SCHED */
+#endif /* CONFIG_NF_CONNTRACK_MARK */
 	rcu_read_unlock();
 
 	nlmsg_end(skb, nlh);
@@ -1092,6 +1114,7 @@ static const struct nla_policy ct_nla_policy[CTA_MAX+1] = {
 				    .len = NF_CT_LABELS_MAX_SIZE },
 	[CTA_LABELS_MASK]	= { .type = NLA_BINARY,
 				    .len = NF_CT_LABELS_MAX_SIZE },
+	[CTA_TC_INDEX]		= { .type = NLA_U16 },
 };
 
 static int ctnetlink_flush_conntrack(struct net *net,
@@ -1697,7 +1720,12 @@ ctnetlink_change_conntrack(struct nf_conn *ct,
 #if defined(CONFIG_NF_CONNTRACK_MARK)
 	if (cda[CTA_MARK])
 		ct->mark = ntohl(nla_get_be32(cda[CTA_MARK]));
-#endif
+#ifdef CONFIG_NET_SCHED
+	if (cda[CTA_TC_INDEX])
+		ct->tc_index = ntohs(nla_get_be16(cda[CTA_TC_INDEX]));
+#endif /* CONFIG_NET_SCHED */
+#endif /* CONFIG_NF_CONNTRACK_MARK */
+
 
 	if (cda[CTA_SEQ_ADJ_ORIG] || cda[CTA_SEQ_ADJ_REPLY]) {
 		err = ctnetlink_change_seq_adj(ct, cda);
@@ -1824,7 +1852,11 @@ ctnetlink_create_conntrack(struct net *net,
 #if defined(CONFIG_NF_CONNTRACK_MARK)
 	if (cda[CTA_MARK])
 		ct->mark = ntohl(nla_get_be32(cda[CTA_MARK]));
-#endif
+#ifdef CONFIG_NET_SCHED
+	if (cda[CTA_TC_INDEX])
+		ct->tc_index = ntohs(nla_get_be16(cda[CTA_TC_INDEX]));
+#endif /* CONFIG_NET_SCHED */
+#endif /* CONFIG_NF_CONNTRACK_MARK */
 
 	/* setup master conntrack: this is a confirmed expectation */
 	if (cda[CTA_TUPLE_MASTER]) {
