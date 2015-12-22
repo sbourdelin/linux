@@ -64,11 +64,11 @@ u16 fhci_get_sof_timer_count(struct fhci_usb *usb)
 }
 
 /* initialize the endpoint zero */
-static u32 endpoint_zero_init(struct fhci_usb *usb,
+static int endpoint_zero_init(struct fhci_usb *usb,
 			      enum fhci_mem_alloc data_mem,
 			      u32 ring_len)
 {
-	u32 rc;
+	int rc;
 
 	rc = fhci_create_ep(usb, data_mem, ring_len);
 	if (rc)
