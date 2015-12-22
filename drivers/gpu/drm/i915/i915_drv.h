@@ -846,6 +846,12 @@ struct i915_ctx_hang_stats {
 	bool banned;
 };
 
+struct i915_stolen_node {
+	struct drm_mm_node base;
+	struct list_head mm_link;
+	struct drm_i915_gem_object *obj;
+};
+
 /* This must match up with the value previously used for execbuf2.rsvd1. */
 #define DEFAULT_CONTEXT_HANDLE 0
 
@@ -1255,6 +1261,13 @@ struct i915_gem_mm {
 	 * (presumably uncached) pages still attached.
 	 */
 	struct list_head unbound_list;
+
+	/**
+	 * List of stolen objects that have been marked as purgeable and
+	 * thus available for reaping if we need more space for a new
+	 * allocation. Ordered by time of marking purgeable.
+	 */
+	struct list_head stolen_list;
 
 	/** Usable portion of the GTT for GEM */
 	unsigned long stolen_base; /* limited to low memory (32-bit) */
@@ -2040,7 +2053,7 @@ struct drm_i915_gem_object {
 	struct list_head vma_list;
 
 	/** Stolen memory for this object, instead of being backed by shmem. */
-	struct drm_mm_node *stolen;
+	struct i915_stolen_node *stolen;
 	struct list_head global_list;
 
 	struct list_head ring_list[I915_NUM_RINGS];
@@ -2048,6 +2061,8 @@ struct drm_i915_gem_object {
 	struct list_head obj_exec_link;
 
 	struct list_head batch_pool_link;
+	/** Used to link an object to a list temporarily */
+	struct list_head tmp_link;
 
 	/**
 	 * This is set if the object is on the active lists (has pending
