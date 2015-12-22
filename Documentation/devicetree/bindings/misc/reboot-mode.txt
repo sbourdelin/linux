@@ -1,0 +1,41 @@
+Generic reboot mode communication driver
+
+This driver get reboot mode arguments from userspace
+and stores it in special register or ram . Then the
+bootloader will read it and take different action
+according the argument stored.
+
+Required properties:
+        - compatible = "reboot-mode" or other vendor compatible string;
+
+Each mode is represented as a sub-node of reboot_mode:
+
+Subnode required properties:
+        - linux,mode: reboot mode command,such as "loader","recovery", "fastboot".
+        - linux,magic: magic number for the mode, this is vendor specific.
+
+example:
+	reboot_mode {
+		compatible = "rockchip,reboot-mode";
+		rockchip,regmap = <&pmu>;
+		offset = <0x40>;
+		loader {
+			linux,mode = "loader";
+			linux,magic = <0x5242C301>;
+		};
+
+		maskrom {
+			linux,mode = "maskrom";
+			linux,magic = <0x5242C302>;
+		};
+
+		recovery {
+			linux,mode = "recovery";
+			linux,magic = <0x5242C303>;
+		};
+
+		fastboot {
+			linux,mode = "fastboot";
+			linux,magic = <0x5242C309>;
+		};
+        };
