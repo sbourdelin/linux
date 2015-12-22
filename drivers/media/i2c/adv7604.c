@@ -1944,6 +1944,7 @@ static int adv76xx_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 	u8 fmt_change_digital;
 	u8 fmt_change;
 	u8 tx_5v;
+	int ret;
 
 	if (irq_reg_0x43)
 		io_write(sd, 0x44, irq_reg_0x43);
@@ -1966,6 +1967,14 @@ static int adv76xx_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 			__func__, fmt_change, fmt_change_digital);
 
 		v4l2_subdev_notify_event(sd, &adv76xx_ev_fmt);
+
+		/* update timings */
+		ret = adv76xx_query_dv_timings(sd, &state->timings);
+		if (ret == -ENOLINK) {
+			/* no signal, fall back to default timings */
+			state->timings = (struct v4l2_dv_timings)
+				V4L2_DV_BT_CEA_640X480P59_94;
+		}
 
 		if (handled)
 			*handled = true;
