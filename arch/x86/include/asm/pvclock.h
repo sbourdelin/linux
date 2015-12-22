@@ -4,7 +4,7 @@
 #include <linux/clocksource.h>
 #include <asm/pvclock-abi.h>
 
-#ifdef CONFIG_PARAVIRT_CLOCK
+#if defined(CONFIG_PARAVIRT_CLOCK) && defined(CONFIG_KVM_GUEST)
 extern struct pvclock_vsyscall_time_info *pvclock_pvti_cpu0_va(void);
 #else
 static inline struct pvclock_vsyscall_time_info *pvclock_pvti_cpu0_va(void)
