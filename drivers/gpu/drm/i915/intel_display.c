@@ -2543,6 +2543,9 @@ intel_alloc_initial_plane_obj(struct intel_crtc *crtc,
 	if (IS_ERR(obj))
 		return false;
 
+	/* Not to be preserved across hibernation */
+	obj->internal_volatile = true;
+
 	obj->tiling_mode = plane_config->tiling;
 	if (obj->tiling_mode == I915_TILING_X)
 		obj->stride = fb->pitches[0];
