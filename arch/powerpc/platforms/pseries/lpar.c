@@ -913,3 +913,44 @@ int pSeries_lpar_resize_hpt(unsigned long shift)
 
 	return 0;
 }
+
+static ssize_t ppc64_pft_size_show(struct kobject *kobj,
+				   struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%llu\n", (unsigned long long)ppc64_pft_size);
+}
+
+static ssize_t ppc64_pft_size_store(struct kobject *kobj,
+				    struct kobj_attribute *attr,
+				    const char *buf, size_t count)
+{
+	unsigned long new_shift;
+	int rc;
+
+	pr_err("lpar: ppc64_pft_size_store() count=%zd\n", count);
+
+	if (kstrtoul(buf, 0, &new_shift))
+		return -EINVAL;
+
+	rc = pSeries_lpar_resize_hpt(new_shift);
+	if (rc < 0)
+		return rc;
+
+	return count;
+}
+
+static struct kobj_attribute ppc64_pft_size_attr =
+	__ATTR(ppc64_pft_size, 0600, ppc64_pft_size_show, ppc64_pft_size_store);
+
+static int __init pseries_lpar_sysfs(void)
+{
+	int rc;
+
+	rc = sysfs_create_file(mm_kobj, &ppc64_pft_size_attr.attr);
+	if (rc)
+		pr_err("lpar: unable to create ppc64_pft_size sysfs file (%d)\n",
+		       rc);
+
+	return 0;
+}
+machine_device_initcall(pseries, pseries_lpar_sysfs);
