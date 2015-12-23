@@ -1471,7 +1471,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *ring)
 	u8 next_context_status_buffer_hw;
 
 	lrc_setup_hardware_status_page(ring,
-				ring->default_context->engine[ring->id].state);
+				dev_priv->kernel_context->engine[ring->id].state);
 
 	I915_WRITE_IMR(ring, ~(ring->irq_enable_mask | ring->irq_keep_mask));
 	I915_WRITE(RING_HWSTAM(ring->mmio_base), 0xffffffff);
@@ -1913,6 +1913,9 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 
 static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *ring)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct intel_context *dctx = dev_priv->kernel_context;
+	int ring_id = ring->id;
 	int ret;
 
 	/* Intentionally left blank. */
@@ -1933,15 +1936,14 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 	if (ret)
 		goto error;
 
-	ret = intel_lr_context_deferred_alloc(ring->default_context, ring);
+	ret = intel_lr_context_deferred_alloc(dctx, ring);
 	if (ret)
 		goto error;
 
 	/* As this is the default context, always pin it */
-	ret = intel_lr_context_do_pin(
-			ring,
-			ring->default_context->engine[ring->id].state,
-			ring->default_context->engine[ring->id].ringbuf);
+	ret = intel_lr_context_do_pin(ring,
+				      dctx->engine[ring_id].state,
+				      dctx->engine[ring_id].ringbuf);
 	if (ret) {
 		DRM_ERROR(
 			"Failed to pin and map ringbuffer %s: %d\n",
