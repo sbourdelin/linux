@@ -190,7 +190,7 @@ EXPORT_SYMBOL_GPL(gpiod_get_direction);
 static int gpiochip_add_to_list(struct gpio_chip *chip)
 {
 	struct list_head *pos;
-	struct gpio_chip *iterator;
+	struct gpio_chip *iterator = NULL;
 	struct gpio_chip *previous = NULL;
 
 	if (list_empty(&gpio_chips)) {
