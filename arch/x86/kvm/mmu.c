@@ -2461,41 +2461,31 @@ static void __kvm_unsync_page(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
 	kvm_mmu_mark_parents_unsync(sp);
 }
 
-static void kvm_unsync_pages(struct kvm_vcpu *vcpu,  gfn_t gfn)
+static bool kvm_unsync_pages(struct kvm_vcpu *vcpu, gfn_t gfn,
+			     bool can_unsync)
 {
 	struct kvm_mmu_page *s;
-
-	for_each_gfn_indirect_valid_sp(vcpu->kvm, s, gfn) {
-		if (s->unsync)
-			continue;
-		WARN_ON(s->role.level != PT_PAGE_TABLE_LEVEL);
-		__kvm_unsync_page(vcpu, s);
-	}
-}
-
-static bool mmu_need_write_protect(struct kvm_vcpu *vcpu, gfn_t gfn,
-				   bool can_unsync)
-{
-	struct kvm_mmu_page *s;
-	bool need_unsync = false;
-
-	if (kvm_page_track_check_mode(vcpu, gfn, KVM_PAGE_TRACK_WRITE))
-		return true;
 
 	for_each_gfn_indirect_valid_sp(vcpu->kvm, s, gfn) {
 		if (!can_unsync)
 			return true;
 
-		if (s->role.level != PT_PAGE_TABLE_LEVEL)
-			return true;
-
-		if (!s->unsync)
-			need_unsync = true;
+		if (s->unsync)
+			continue;
+		WARN_ON(s->role.level != PT_PAGE_TABLE_LEVEL);
+		__kvm_unsync_page(vcpu, s);
 	}
-	if (need_unsync)
-		kvm_unsync_pages(vcpu, gfn);
 
 	return false;
+}
+
+static bool mmu_need_write_protect(struct kvm_vcpu *vcpu, gfn_t gfn,
+				   bool can_unsync)
+{
+	if (kvm_page_track_check_mode(vcpu, gfn, KVM_PAGE_TRACK_WRITE))
+		return true;
+
+	return kvm_unsync_pages(vcpu, gfn, can_unsync);
 }
 
 static bool kvm_is_mmio_pfn(pfn_t pfn)
