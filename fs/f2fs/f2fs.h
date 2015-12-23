@@ -547,6 +547,7 @@ struct dnode_of_data {
 	unsigned int ofs_in_node;	/* data offset in the node page */
 	bool inode_page_locked;		/* inode page is locked or not */
 	block_t	data_blkaddr;		/* block address of the node block */
+	bool node_changed;		/* is node block changed */
 };
 
 static inline void set_new_dnode(struct dnode_of_data *dn, struct inode *inode,

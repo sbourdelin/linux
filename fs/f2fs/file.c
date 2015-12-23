@@ -484,6 +484,7 @@ int truncate_data_blocks_range(struct dnode_of_data *dn, int count)
 		dec_valid_block_count(sbi, dn->inode, nr_free);
 		set_page_dirty(dn->node_page);
 		sync_inode_page(dn);
+		dn->node_changed = true;
 	}
 	dn->ofs_in_node = ofs;
 
