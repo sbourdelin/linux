@@ -4833,6 +4833,22 @@ void __weak pci_fixup_cardbus(struct pci_bus *bus)
 }
 EXPORT_SYMBOL(pci_fixup_cardbus);
 
+int cpu_near_dev(const struct pci_dev *pdev, unsigned offset)
+{
+	/* Start search from node device is on for optimal locality */
+	int localnode = pcibus_to_node(pdev->bus);
+	int cpu = cpumask_first(cpumask_of_node(localnode));
+
+	while (offset--) {
+		do {
+			cpu = (cpu + 1) % nr_cpu_ids;
+		} while (!cpu_online(cpu) || node_distance(cpu_to_node(cpu),
+			localnode) > RECLAIM_DISTANCE);
+	}
+
+	return cpu;
+}
+
 static int __init pci_setup(char *str)
 {
 	while (str) {
