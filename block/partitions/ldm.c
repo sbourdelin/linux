@@ -343,10 +343,8 @@ static bool ldm_validate_privheads(struct parsed_partitions *state,
 
 	ph[1] = kmalloc (sizeof (*ph[1]), GFP_KERNEL);
 	ph[2] = kmalloc (sizeof (*ph[2]), GFP_KERNEL);
-	if (!ph[1] || !ph[2]) {
-		ldm_crit ("Out of memory.");
+	if (!ph[1] || !ph[2])
 		goto out;
-	}
 
 	/* off[1 & 2] are relative to ph[0]->config_start */
 	ph[0]->config_start = 0;
@@ -431,10 +429,8 @@ static bool ldm_validate_tocblocks(struct parsed_partitions *state,
 	ph = &ldb->ph;
 	tb[0] = &ldb->toc;
 	tb[1] = kmalloc(sizeof(*tb[1]) * 3, GFP_KERNEL);
-	if (!tb[1]) {
-		ldm_crit("Out of memory.");
+	if (!tb[1])
 		return false;
-	}
 	tb[2] = (struct tocblock*)((u8*)tb[1] + sizeof(*tb[1]));
 	tb[3] = (struct tocblock*)((u8*)tb[2] + sizeof(*tb[2]));
 	/*
@@ -1239,10 +1235,8 @@ static bool ldm_ldmdb_add (u8 *data, int len, struct ldmdb *ldb)
 	BUG_ON (!data || !ldb);
 
 	vb = kmalloc (sizeof (*vb), GFP_KERNEL);
-	if (!vb) {
-		ldm_crit ("Out of memory.");
+	if (!vb)
 		return false;
-	}
 
 	if (!ldm_parse_vblk (data, len, vb)) {
 		kfree(vb);
@@ -1325,10 +1319,8 @@ static bool ldm_frag_add (const u8 *data, int size, struct list_head *frags)
 	}
 
 	f = kmalloc (sizeof (*f) + size*num, GFP_KERNEL);
-	if (!f) {
-		ldm_crit ("Out of memory.");
+	if (!f)
 		return false;
-	}
 
 	f->group = group;
 	f->num   = num;
@@ -1519,10 +1511,8 @@ int ldm_partition(struct parsed_partitions *state)
 		return 0;
 
 	ldb = kmalloc (sizeof (*ldb), GFP_KERNEL);
-	if (!ldb) {
-		ldm_crit ("Out of memory.");
+	if (!ldb)
 		goto out;
-	}
 
 	/* Parse and check privheads. */
 	if (!ldm_validate_privheads(state, &ldb->ph))
