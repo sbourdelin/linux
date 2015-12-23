@@ -2081,7 +2081,7 @@ static void init_shadow_page_table(struct kvm_mmu_page *sp)
 
 static void __clear_sp_write_flooding_count(struct kvm_mmu_page *sp)
 {
-	sp->write_flooding_count = 0;
+	atomic_set(&sp->write_flooding_count,  0);
 }
 
 static void clear_sp_write_flooding_count(u64 *spte)
@@ -2461,8 +2461,7 @@ static void __kvm_unsync_page(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
 	kvm_mmu_mark_parents_unsync(sp);
 }
 
-static bool kvm_unsync_pages(struct kvm_vcpu *vcpu, gfn_t gfn,
-			     bool can_unsync)
+static bool kvm_unsync_pages(struct kvm_vcpu *vcpu,  gfn_t gfn, bool can_unsync)
 {
 	struct kvm_mmu_page *s;
 
@@ -3419,6 +3418,23 @@ static bool page_fault_handle_page_track(struct kvm_vcpu *vcpu,
 	return false;
 }
 
+static void shadow_page_table_clear_flood(struct kvm_vcpu *vcpu, gva_t addr)
+{
+	struct kvm_shadow_walk_iterator iterator;
+	u64 spte;
+
+	if (!VALID_PAGE(vcpu->arch.mmu.root_hpa))
+		return;
+
+	walk_shadow_page_lockless_begin(vcpu);
+	for_each_shadow_entry_lockless(vcpu, addr, iterator, spte) {
+		clear_sp_write_flooding_count(iterator.sptep);
+		if (!is_shadow_present_pte(spte))
+			break;
+	}
+	walk_shadow_page_lockless_end(vcpu);
+}
+
 static int nonpaging_page_fault(struct kvm_vcpu *vcpu, gva_t gva,
 				u32 error_code, bool prefault)
 {
@@ -4246,7 +4262,8 @@ static bool detect_write_flooding(struct kvm_mmu_page *sp)
 	if (sp->role.level == PT_PAGE_TABLE_LEVEL)
 		return false;
 
-	return ++sp->write_flooding_count >= 3;
+	atomic_inc(&sp->write_flooding_count);
+	return atomic_read(&sp->write_flooding_count) >= 3;
 }
 
 /*
