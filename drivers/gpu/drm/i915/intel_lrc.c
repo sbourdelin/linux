@@ -571,7 +571,7 @@ static int execlists_context_queue(struct drm_i915_gem_request *request)
 	struct drm_i915_gem_request *cursor;
 	int num_elements = 0;
 
-	if (request->ctx != ring->default_context)
+	if (!request->ctx->is_global_default)
 		intel_lr_context_pin(request);
 
 	i915_gem_request_reference(request);
@@ -660,17 +660,14 @@ static int execlists_move_to_gpu(struct drm_i915_gem_request *req,
 
 int intel_logical_ring_alloc_request_extras(struct drm_i915_gem_request *request)
 {
-	int ret;
+	int ret = 0;
 
 	request->ringbuf = request->ctx->engine[request->ring->id].ringbuf;
 
-	if (request->ctx != request->ring->default_context) {
+	if (!request->ctx->is_global_default)
 		ret = intel_lr_context_pin(request);
-		if (ret)
-			return ret;
-	}
 
-	return 0;
+	return ret;
 }
 
 static int logical_ring_wait_for_space(struct drm_i915_gem_request *req,
@@ -967,7 +964,7 @@ void intel_execlists_retire_requests(struct intel_engine_cs *ring)
 		struct drm_i915_gem_object *ctx_obj =
 				ctx->engine[ring->id].state;
 
-		if (ctx_obj && (ctx != ring->default_context))
+		if (ctx_obj && !ctx->is_global_default)
 			intel_lr_context_unpin(req);
 		list_del(&req->execlist_link);
 		i915_gem_request_unreference(req);
@@ -2367,22 +2364,21 @@ void intel_lr_context_free(struct intel_context *ctx)
 {
 	int i;
 
-	for (i = 0; i < I915_NUM_RINGS; i++) {
+	for (i = I915_NUM_RINGS; --i >= 0; ) {
+		struct intel_ringbuffer *ringbuf = ctx->engine[i].ringbuf;
 		struct drm_i915_gem_object *ctx_obj = ctx->engine[i].state;
 
-		if (ctx_obj) {
-			struct intel_ringbuffer *ringbuf =
-					ctx->engine[i].ringbuf;
-			struct intel_engine_cs *ring = ringbuf->ring;
+		if (!ctx_obj)
+			continue;
 
-			if (ctx == ring->default_context) {
-				intel_unpin_ringbuffer_obj(ringbuf);
-				i915_gem_object_ggtt_unpin(ctx_obj);
-			}
-			WARN_ON(ctx->engine[ring->id].pin_count);
-			intel_ringbuffer_free(ringbuf);
-			drm_gem_object_unreference(&ctx_obj->base);
+		if (ctx->is_global_default) {
+			intel_unpin_ringbuffer_obj(ringbuf);
+			i915_gem_object_ggtt_unpin(ctx_obj);
 		}
+
+		WARN_ON(ctx->engine[i].pin_count);
+		intel_ringbuffer_free(ringbuf);
+		drm_gem_object_unreference(&ctx_obj->base);
 	}
 }
 
@@ -2443,7 +2439,7 @@ static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
  */
 
 int intel_lr_context_deferred_alloc(struct intel_context *ctx,
-				     struct intel_engine_cs *ring)
+				    struct intel_engine_cs *ring)
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_gem_object *ctx_obj;
@@ -2480,7 +2476,7 @@ int intel_lr_context_deferred_alloc(struct intel_context *ctx,
 	ctx->engine[ring->id].ringbuf = ringbuf;
 	ctx->engine[ring->id].state = ctx_obj;
 
-	if (ctx != ring->default_context && ring->init_context) {
+	if (!ctx->is_global_default && ring->init_context) {
 		struct drm_i915_gem_request *req;
 
 		ret = i915_gem_request_alloc(ring,
