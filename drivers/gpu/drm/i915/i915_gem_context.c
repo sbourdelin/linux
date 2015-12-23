@@ -236,16 +236,17 @@ __create_hw_context(struct drm_device *dev,
 	}
 
 	/* Default context will never have a file_priv */
-	if (file_priv != NULL) {
+	if (file_priv == NULL) {
+		ctx->is_global_default = true;
+		ret = DEFAULT_CONTEXT_HANDLE;
+	} else {
 		ret = idr_alloc(&file_priv->context_idr, ctx,
 				DEFAULT_CONTEXT_HANDLE, 0, GFP_KERNEL);
 		if (ret < 0)
 			goto err_out;
-	} else
-		ret = DEFAULT_CONTEXT_HANDLE;
-
-	ctx->file_priv = file_priv;
+	}
 	ctx->user_handle = ret;
+
 	/* NB: Mark all slices as needing a remap so that when the context first
 	 * loads it will restore whatever remap state already exists. If there
 	 * is no remap info, it will be a NOP. */
@@ -269,7 +270,6 @@ static struct intel_context *
 i915_gem_create_context(struct drm_device *dev,
 			struct drm_i915_file_private *file_priv)
 {
-	const bool is_global_default_ctx = file_priv == NULL;
 	struct intel_context *ctx;
 	int ret = 0;
 
@@ -279,8 +279,9 @@ i915_gem_create_context(struct drm_device *dev,
 	if (IS_ERR(ctx))
 		return ctx;
 
-	if (is_global_default_ctx && ctx->legacy_hw_ctx.rcs_state) {
-		/* We may need to do things with the shrinker which
+	if (ctx->is_global_default && ctx->legacy_hw_ctx.rcs_state) {
+		/*
+		 * We may need to do things with the shrinker which
 		 * require us to immediately switch back to the default
 		 * context. This can cause a problem as pinning the
 		 * default context also requires GTT space which may not
@@ -313,7 +314,7 @@ i915_gem_create_context(struct drm_device *dev,
 	return ctx;
 
 err_unpin:
-	if (is_global_default_ctx && ctx->legacy_hw_ctx.rcs_state)
+	if (ctx->is_global_default && ctx->legacy_hw_ctx.rcs_state)
 		i915_gem_object_ggtt_unpin(ctx->legacy_hw_ctx.rcs_state);
 err_destroy:
 	idr_remove(&file_priv->context_idr, ctx->user_handle);
@@ -381,6 +382,7 @@ int i915_gem_context_init(struct drm_device *dev)
 		}
 	}
 
+	/* NULL second parameter indicates this is the global default context */
 	ctx = i915_gem_create_context(dev, NULL);
 	if (IS_ERR(ctx)) {
 		DRM_ERROR("Failed to create default global context (error %ld)\n",
@@ -896,7 +898,7 @@ int i915_gem_context_destroy_ioctl(struct drm_device *dev, void *data,
 		return PTR_ERR(ctx);
 	}
 
-	idr_remove(&ctx->file_priv->context_idr, ctx->user_handle);
+	idr_remove(&file_priv->context_idr, ctx->user_handle);
 	i915_gem_context_unreference(ctx);
 	mutex_unlock(&dev->struct_mutex);
 
