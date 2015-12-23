@@ -1262,3 +1262,38 @@ void phy_ethtool_get_wol(struct phy_device *phydev, struct ethtool_wolinfo *wol)
 		phydev->drv->get_wol(phydev, wol);
 }
 EXPORT_SYMBOL(phy_ethtool_get_wol);
+
+int phy_get_sset_count(struct phy_device *phydev)
+{
+	int ret;
+
+	if (phydev->drv->get_sset_count &&
+	    phydev->drv->get_strings &&
+	    phydev->drv->get_stats) {
+		mutex_lock(&phydev->lock);
+		ret = phydev->drv->get_sset_count(phydev);
+		mutex_unlock(&phydev->lock);
+
+		return ret;
+	}
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(phy_get_sset_count);
+
+void phy_get_strings(struct phy_device *phydev, u8 *data)
+{
+	mutex_lock(&phydev->lock);
+	phydev->drv->get_strings(phydev, data);
+	mutex_unlock(&phydev->lock);
+}
+EXPORT_SYMBOL(phy_get_strings);
+
+void phy_get_stats(struct phy_device *phydev, struct ethtool_stats *stats,
+		   u64 *data)
+{
+	mutex_lock(&phydev->lock);
+	phydev->drv->get_stats(phydev, stats, data);
+	mutex_unlock(&phydev->lock);
+}
+EXPORT_SYMBOL(phy_get_stats);

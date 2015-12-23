@@ -204,6 +204,13 @@ static int __ethtool_get_sset_count(struct net_device *dev, int sset)
 	if (sset == ETH_SS_TUNABLES)
 		return ARRAY_SIZE(tunable_strings);
 
+	if (sset == ETH_SS_PHY_STATS) {
+		if (dev->phydev)
+			return phy_get_sset_count(dev->phydev);
+		else
+			return -EOPNOTSUPP;
+	}
+
 	if (ops->get_sset_count && ops->get_strings)
 		return ops->get_sset_count(dev, sset);
 	else
@@ -223,7 +230,10 @@ static void __ethtool_get_strings(struct net_device *dev,
 		       sizeof(rss_hash_func_strings));
 	else if (stringset == ETH_SS_TUNABLES)
 		memcpy(data, tunable_strings, sizeof(tunable_strings));
-	else
+	else if (stringset == ETH_SS_PHY_STATS) {
+		if (dev->phydev)
+			phy_get_strings(dev->phydev, data);
+	} else
 		/* ops->get_strings is valid because checked earlier */
 		ops->get_strings(dev, stringset, data);
 }
@@ -1401,6 +1411,45 @@ static int ethtool_get_stats(struct net_device *dev, void __user *useraddr)
 	return ret;
 }
 
+static int ethtool_get_phy_stats(struct net_device *dev, void __user *useraddr)
+{
+	struct ethtool_stats stats;
+	struct phy_device *phydev = dev->phydev;
+	u64 *data;
+	int ret, n_stats;
+
+	if (!phydev)
+		return -EOPNOTSUPP;
+
+	n_stats = phy_get_sset_count(phydev);
+
+	if (n_stats < 0)
+		return n_stats;
+	WARN_ON(n_stats == 0);
+
+	if (copy_from_user(&stats, useraddr, sizeof(stats)))
+		return -EFAULT;
+
+	stats.n_stats = n_stats;
+	data = kmalloc_array(n_stats, sizeof(u64), GFP_USER);
+	if (!data)
+		return -ENOMEM;
+
+	phy_get_stats(phydev, &stats, data);
+
+	ret = -EFAULT;
+	if (copy_to_user(useraddr, &stats, sizeof(stats)))
+		goto out;
+	useraddr += sizeof(stats);
+	if (copy_to_user(useraddr, data, stats.n_stats * sizeof(u64)))
+		goto out;
+	ret = 0;
+
+ out:
+	kfree(data);
+	return ret;
+}
+
 static int ethtool_get_perm_addr(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_perm_addr epaddr;
@@ -1779,6 +1828,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	case ETHTOOL_GSSET_INFO:
 	case ETHTOOL_GSTRINGS:
 	case ETHTOOL_GSTATS:
+	case ETHTOOL_GPHYSTATS:
 	case ETHTOOL_GTSO:
 	case ETHTOOL_GPERMADDR:
 	case ETHTOOL_GUFO:
@@ -1990,6 +2040,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_STUNABLE:
 		rc = ethtool_set_tunable(dev, useraddr);
+		break;
+	case ETHTOOL_GPHYSTATS:
+		rc = ethtool_get_phy_stats(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;
