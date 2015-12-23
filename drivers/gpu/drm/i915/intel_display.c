@@ -11779,6 +11779,7 @@ static bool intel_wm_need_update(struct drm_plane *plane,
 		return false;
 
 	if (cur->base.fb->modifier[0] != new->base.fb->modifier[0] ||
+	    cur->base.fb->pixel_format != new->base.fb->pixel_format ||
 	    cur->base.rotation != new->base.rotation ||
 	    drm_rect_width(&new->src) != drm_rect_width(&cur->src) ||
 	    drm_rect_height(&new->src) != drm_rect_height(&cur->src) ||
