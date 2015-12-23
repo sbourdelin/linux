@@ -335,16 +335,20 @@ static bool ldm_validate_privheads(struct parsed_partitions *state,
 	struct privhead *ph[3] = { ph1 };
 	Sector sect;
 	u8 *data;
-	bool result = false;
+	bool result;
 	long num_sects;
 	int i;
 
 	BUG_ON (!state || !ph1);
 
 	ph[1] = kmalloc (sizeof (*ph[1]), GFP_KERNEL);
+	if (!ph[1])
+		return false;
 	ph[2] = kmalloc (sizeof (*ph[2]), GFP_KERNEL);
-	if (!ph[1] || !ph[2])
-		goto out;
+	if (!ph[2]) {
+		result = false;
+		goto free_a_head;
+	}
 
 	/* off[1 & 2] are relative to ph[0]->config_start */
 	ph[0]->config_start = 0;
@@ -355,14 +359,15 @@ static bool ldm_validate_privheads(struct parsed_partitions *state,
 					&sect);
 		if (!data) {
 			ldm_crit ("Disk read failed.");
-			goto out;
+			result = false;
+			goto free_another_head;
 		}
 		result = ldm_parse_privhead (data, ph[i]);
 		put_dev_sector (sect);
 		if (!result) {
 			ldm_error ("Cannot find PRIVHEAD %d.", i+1); /* Log again */
 			if (i < 2)
-				goto out;	/* Already logged */
+				goto free_another_head;	/* Already logged */
 			else
 				break;	/* FIXME ignore for now, 3rd PH can fail on odd-sized disks */
 		}
@@ -373,30 +378,31 @@ static bool ldm_validate_privheads(struct parsed_partitions *state,
 	if ((ph[0]->config_start > num_sects) ||
 	   ((ph[0]->config_start + ph[0]->config_size) > num_sects)) {
 		ldm_crit ("Database extends beyond the end of the disk.");
-		goto out;
+		goto free_another_head;
 	}
 
 	if ((ph[0]->logical_disk_start > ph[0]->config_start) ||
 	   ((ph[0]->logical_disk_start + ph[0]->logical_disk_size)
 		    > ph[0]->config_start)) {
 		ldm_crit ("Disk and database overlap.");
-		goto out;
+		goto free_another_head;
 	}
 
 	if (!ldm_compare_privheads (ph[0], ph[1])) {
 		ldm_crit ("Primary and backup PRIVHEADs don't match.");
-		goto out;
+		goto free_another_head;
 	}
 	/* FIXME ignore this for now
 	if (!ldm_compare_privheads (ph[0], ph[2])) {
 		ldm_crit ("Primary and backup PRIVHEADs don't match.");
-		goto out;
+		goto free_another_head;
 	}*/
 	ldm_debug ("Validated PRIVHEADs successfully.");
 	result = true;
-out:
-	kfree (ph[1]);
-	kfree (ph[2]);
+free_another_head:
+	kfree(ph[2]);
+free_a_head:
+	kfree(ph[1]);
 	return result;
 }
 
