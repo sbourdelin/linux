@@ -158,6 +158,36 @@ static int vxlan_nla_put_addr(struct sk_buff *skb, int attr,
 		return nla_put_in_addr(skb, attr, ip->sin.sin_addr.s_addr);
 }
 
+#if IS_MODULE(CONFIG_IPV6)
+MODULE_SOFTDEP("pre: ipv6");
+
+/*
+ * IPv6 is permanent, so once we find it loaded we can just assume it always
+ * will be, and avoid walking the module_list every time we open a new vxlan
+ * device.
+ */
+static bool vxlan_ipv6_is_loaded(void)
+{
+	static bool ipv6_loaded = false;
+
+	if (!ipv6_loaded) {
+		mutex_lock(&module_mutex);
+		ipv6_loaded = !!find_module("ipv6");
+		mutex_unlock(&module_mutex);
+	}
+
+	return ipv6_loaded;
+}
+
+#elif IS_BUILTIN(CONFIG_IPV6)
+
+static bool vxlan_ipv6_is_loaded(void)
+{
+	return true;
+}
+
+#endif /* IS_{MODULE,BUILTIN}(CONFIG_IPV6) */
+
 #else /* !CONFIG_IPV6 */
 
 static inline
@@ -2628,6 +2658,9 @@ static struct socket *vxlan_create_sock(struct net *net, bool ipv6,
 	memset(&udp_conf, 0, sizeof(udp_conf));
 
 	if (ipv6) {
+		if (!vxlan_ipv6_is_loaded())
+			return ERR_PTR(-EAFNOSUPPORT);
+
 		udp_conf.family = AF_INET6;
 		udp_conf.use_udp6_rx_checksums =
 		    !(flags & VXLAN_F_UDP_ZERO_CSUM6_RX);
@@ -3259,7 +3292,7 @@ out1:
 	destroy_workqueue(vxlan_wq);
 	return rc;
 }
-late_initcall(vxlan_init_module);
+module_init(vxlan_init_module);
 
 static void __exit vxlan_cleanup_module(void)
 {
