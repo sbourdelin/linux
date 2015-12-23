@@ -12,13 +12,13 @@
  * more details.
  */
 
+#include <linux/errno.h>
 #include <linux/aer.h>
 #include <linux/bitops.h>
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
 #include <linux/cpu.h>
 #include <linux/delay.h>
-#include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/genhd.h>
 #include <linux/hdreg.h>
