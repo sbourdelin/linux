@@ -132,10 +132,19 @@ int kernel_active_single_step(void);
 
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 int reinstall_suspended_bps(struct pt_regs *regs);
+u64 signal_toggle_single_step(void);
+void signal_reinstall_single_step(u64 pstate);
 #else
 static inline int reinstall_suspended_bps(struct pt_regs *regs)
 {
 	return -ENODEV;
+}
+static u64 signal_toggle_single_step(void)
+{
+	return 0;
+}
+void signal_reinstall_single_step(void)
+{
 }
 #endif
 
