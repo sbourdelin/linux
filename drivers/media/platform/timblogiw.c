@@ -566,8 +566,8 @@ static void buffer_queue(struct videobuf_queue *vq, struct videobuf_buffer *vb)
 	desc = dmaengine_prep_slave_sg(fh->chan,
 		buf->sg, sg_elems, DMA_DEV_TO_MEM,
 		DMA_PREP_INTERRUPT);
+	spin_lock_irq(&fh->queue_lock);
 	if (!desc) {
-		spin_lock_irq(&fh->queue_lock);
 		list_del_init(&vb->queue);
 		vb->state = VIDEOBUF_PREPARED;
 		return;
@@ -576,8 +576,8 @@ static void buffer_queue(struct videobuf_queue *vq, struct videobuf_buffer *vb)
 	desc->callback_param = buf;
 	desc->callback = timblogiw_dma_cb;
 
+	spin_unlock_irq(&fh->queue_lock);
 	buf->cookie = desc->tx_submit(desc);
-
 	spin_lock_irq(&fh->queue_lock);
 }
 
