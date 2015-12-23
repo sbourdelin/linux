@@ -324,7 +324,11 @@ static struct platform_driver mt6397_regulator_driver = {
 	.probe = mt6397_regulator_probe,
 };
 
-module_platform_driver(mt6397_regulator_driver);
+static int __init mt6397_regulator_init(void)
+{
+	return platform_driver_register(&mt6397_regulator_driver);
+}
+arch_initcall(mt6397_regulator_init);
 
 MODULE_AUTHOR("Flora Fu <flora.fu@mediatek.com>");
 MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6397 PMIC");
