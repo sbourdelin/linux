@@ -93,6 +93,8 @@ static const struct ntb_dev_ops amd_ntb_ops = {
 	.peer_spad_addr		= amd_ntb_peer_spad_addr,
 	.peer_spad_read		= amd_ntb_peer_spad_read,
 	.peer_spad_write	= amd_ntb_peer_spad_write,
+	.flush_req		= amd_ntb_flush_req,
+	.peer_wakeup		= amd_ntb_wakeup_peer_side,
 };
 
 static int ndev_mw_to_bar(struct amd_ntb_dev *ndev, int idx)
@@ -489,7 +491,6 @@ static void amd_ack_SMU(struct amd_ntb_dev *ndev, u32 bit)
 	ndev->peer_sta |= bit;
 }
 
-#ifdef CONFIG_PM
 /*
  * flush the requests to peer side
  */
@@ -513,7 +514,42 @@ static int amd_flush_peer_requests(struct amd_ntb_dev *ndev)
 
 	return 0;
 }
-#endif
+
+static int amd_ntb_flush_req(struct ntb_dev *ntb)
+{
+	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
+
+	return amd_flush_peer_requests(ndev);
+}
+
+/*
+ * wake up the peer side
+ */
+static int amd_wakeup_peer_side(struct amd_ntb_dev *ndev)
+{
+	void __iomem *mmio = ndev->self_mmio;
+	u32 reg;
+
+	if (!amd_link_is_up(ndev)) {
+		dev_warn(ndev_dev(ndev), "link is down.\n");
+		return -EINVAL;
+	}
+
+	reg = NTB_READ_REG(mmio, PMSGTRIG);
+	reg |= 0x1;
+	NTB_WRITE_REG(mmio, reg, PMSGTRIG);
+
+	wait_for_completion(&ndev->wakeup_cmpl);
+
+	return 0;
+}
+
+static int amd_ntb_wakeup_peer_side(struct ntb_dev *ntb)
+{
+	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
+
+	return amd_wakeup_peer_side(ndev);
+}
 
 static void amd_handle_event(struct amd_ntb_dev *ndev, int vec)
 {
