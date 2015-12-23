@@ -1512,7 +1512,7 @@ int ldm_partition(struct parsed_partitions *state)
 
 	ldb = kmalloc (sizeof (*ldb), GFP_KERNEL);
 	if (!ldb)
-		goto out;
+		return -1;
 
 	/* Parse and check privheads. */
 	if (!ldm_validate_privheads(state, &ldb->ph))
