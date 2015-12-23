@@ -236,6 +236,12 @@ static int __init __mx25_clocks_init(void __iomem *ccm_base)
 	clk_set_parent(clk[per5_sel], clk[ahb]);
 
 	/*
+	 * set LCDC base clock (per 7) to highest possible frequency (UPLL)
+	 * to get best resolution for pixel clock
+	 */
+	clk_set_parent(clk[per7_sel], clk[upll]);
+
+	/*
 	 * Let's initially set up CLKO parent as ipg, since this configuration
 	 * is used on some imx25 board designs to clock the audio codec.
 	 */
