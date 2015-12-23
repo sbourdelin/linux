@@ -6695,7 +6695,21 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	       (flow_rx ? "RX" :
 	       (flow_tx ? "TX" : "None"))));
 
-	netif_carrier_on(netdev);
+	/*
+	 * In X540 NIC, there is a time span between reporting "link on"
+	 * and getting the speed and duplex. To a bonding driver in 802.3ad
+	 * mode, this time span will make it not work well if the time span
+	 * is big enough. To 82599_SFP NIC and other kinds of NICs, this
+	 * problem does not exist. As such, it is better for X540 to report
+	 * "link on" when the link speed is not IXGBE_LINK_SPEED_UNKNOWN.
+	 */
+	if ((hw->mac.type == ixgbe_mac_X540) &&
+	    (link_speed != IXGBE_LINK_SPEED_UNKNOWN)) {
+		netif_carrier_on(netdev);
+	} else {
+		netif_carrier_on(netdev);
+	}
+
 	ixgbe_check_vf_rate_limit(adapter);
 
 	/* enable transmits */
