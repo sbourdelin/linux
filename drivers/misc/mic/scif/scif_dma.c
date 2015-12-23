@@ -293,13 +293,13 @@ scif_add_mmu_notifier(struct mm_struct *mm, struct scif_endpt *ep)
 		 = kzalloc(sizeof(*mmn), GFP_KERNEL);
 
 	if (!mmn)
-		return ERR_PTR(ENOMEM);
+		return ERR_PTR(-ENOMEM);
 
 	scif_init_mmu_notifier(mmn, current->mm, ep);
 	if (mmu_notifier_register(&mmn->ep_mmu_notifier,
 				  current->mm)) {
 		kfree(mmn);
-		return ERR_PTR(EBUSY);
+		return ERR_PTR(-EBUSY);
 	}
 	list_add(&mmn->list, &ep->rma_info.mmn_list);
 	return mmn;
