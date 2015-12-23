@@ -1,22 +1,11 @@
-/*
- * Copyright 2014, Michael Ellerman, IBM Corp.
- * Licensed under GPLv2.
- */
-
-#ifndef _SELFTESTS_POWERPC_REG_H
-#define _SELFTESTS_POWERPC_REG_H
-
-#define __stringify_1(x)        #x
-#define __stringify(x)          __stringify_1(x)
-
 #define mfspr(rn)       ({unsigned long rval; \
-                         asm volatile("mfspr %0," __stringify(rn) \
-                                 : "=r" (rval)); rval; })
-#define mtspr(rn, v)    asm volatile("mtspr " __stringify(rn) ",%0" : \
-                                    : "r" ((unsigned long)(v)) \
-                                    : "memory")
+		        asm volatile("mfspr %0," _str(rn) \
+			            : "=r" (rval)); rval; })
+#define mtspr(rn, v)    asm volatile("mtspr " _str(rn) ",%0" : \
+		        	    : "r" ((unsigned long)(v)) \
+		                    : "memory")
 
-#define mb()		asm volatile("sync" : : : "memory");
+#define mb()            asm volatile("sync" : : : "memory");
 
 #define SPRN_MMCR2     769
 #define SPRN_MMCRA     770
@@ -46,4 +35,9 @@
 #define SPRN_SDAR      781
 #define SPRN_SIER      768
 
-#endif /* _SELFTESTS_POWERPC_REG_H */
+#define SPRN_TEXASR     0x82
+#define SPRN_TFIAR      0x81    /* Transaction Failure Inst Addr    */
+#define SPRN_TFHAR      0x80    /* Transaction Failure Handler Addr */
+#define TEXASR_FS       0x08000000
+#define SPRN_TAR        0x32f
+
