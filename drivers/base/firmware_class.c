@@ -291,34 +291,51 @@ static const char * const fw_path[] = {
 module_param_string(path, fw_path_para, sizeof(fw_path_para), 0644);
 MODULE_PARM_DESC(path, "customized firmware image search path with a higher priority than default path");
 
-static int fw_read_file_contents(struct file *file, struct firmware_buf *fw_buf)
+/*
+ * Read the contents of a file.
+ */
+static int fw_read_file(const char *path, void **_buf, size_t *_size)
 {
-	int size;
+	struct file *file;
+	size_t size;
 	char *buf;
 	int rc;
 
+	file = filp_open(path, O_RDONLY, 0);
+	if (IS_ERR(file))
+		return PTR_ERR(file);
+
+	rc = -EINVAL;
 	if (!S_ISREG(file_inode(file)->i_mode))
-		return -EINVAL;
+		goto err_file;
 	size = i_size_read(file_inode(file));
 	if (size <= 0)
-		return -EINVAL;
+		goto err_file;
+	rc = -ENOMEM;
 	buf = vmalloc(size);
 	if (!buf)
-		return -ENOMEM;
+		goto err_file;
+
 	rc = kernel_read(file, 0, buf, size);
+	if (rc < 0)
+		goto err_buf;
 	if (rc != size) {
-		if (rc > 0)
-			rc = -EIO;
-		goto fail;
+		rc = -EIO;
+		goto err_buf;
 	}
+
 	rc = security_kernel_fw_from_file(file, buf, size);
 	if (rc)
-		goto fail;
-	fw_buf->data = buf;
-	fw_buf->size = size;
+		goto err_buf;
+
+	*_buf = buf;
+	*_size = size;
 	return 0;
-fail:
+
+err_buf:
 	vfree(buf);
+err_file:
+	fput(file);
 	return rc;
 }
 
@@ -332,19 +349,21 @@ static void fw_finish_direct_load(struct device *device,
 }
 
 static int fw_get_filesystem_firmware(struct device *device,
-				       struct firmware_buf *buf)
+				      struct firmware_buf *buf)
 {
 	int i, len;
 	int rc = -ENOENT;
-	char *path;
+	char *path = NULL;
 
 	path = __getname();
 	if (!path)
 		return -ENOMEM;
 
+	/*
+	 * Try each possible firmware blob in turn till one doesn't produce
+	 * ENOENT.
+	 */
 	for (i = 0; i < ARRAY_SIZE(fw_path); i++) {
-		struct file *file;
-
 		/* skip the unset customized path */
 		if (!fw_path[i][0])
 			continue;
@@ -356,23 +375,20 @@ static int fw_get_filesystem_firmware(struct device *device,
 			break;
 		}
 
-		file = filp_open(path, O_RDONLY, 0);
-		if (IS_ERR(file))
-			continue;
-		rc = fw_read_file_contents(file, buf);
-		fput(file);
+		rc = fw_read_file(path, &buf->data, &buf->size);
 		if (rc == 0) {
 			dev_dbg(device, "system data: direct-loading firmware %s\n",
 				buf->fw_id);
 			fw_finish_direct_load(device, buf);
 			goto out;
-		} else
+		} else if (rc != -ENOENT) {
 			dev_warn(device, "system data, attempted to load %s, but failed with error %d\n",
 				 path, rc);
+			goto out;
+		}
 	}
 out:
 	__putname(path);
-
 	return rc;
 }
 
