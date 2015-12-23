@@ -1575,6 +1575,15 @@ int intel_connector_atomic_get_property(struct drm_connector *connector,
 					struct drm_property *property,
 					uint64_t *val);
 struct drm_crtc_state *intel_crtc_duplicate_state(struct drm_crtc *crtc);
+int intel_crtc_atomic_set_property(struct drm_crtc *crtc,
+				   struct drm_crtc_state *state,
+				   struct drm_property *property, uint64_t val);
+int
+intel_crtc_atomic_get_property(struct drm_crtc *crtc,
+			       const struct drm_crtc_state *state,
+			       struct drm_property *property,
+			       uint64_t *val);
+
 void intel_crtc_destroy_state(struct drm_crtc *crtc,
 			       struct drm_crtc_state *state);
 struct drm_atomic_state *intel_atomic_state_alloc(struct drm_device *dev);

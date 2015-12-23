@@ -3340,6 +3340,12 @@ static void intel_update_pipe_config(struct intel_crtc *crtc,
 	 * sized surface.
 	 */
 
+	/* Restore modeset values */
+	if (!crtc->config->pipe_src_w && crtc->config->pipe_src_h) {
+		crtc->config->pipe_src_w = adjusted_mode->crtc_hdisplay;
+		crtc->config->pipe_src_h = adjusted_mode->crtc_vdisplay;
+	}
+
 	I915_WRITE(PIPESRC(crtc->pipe),
 		   ((pipe_config->pipe_src_w - 1) << 16) |
 		   (pipe_config->pipe_src_h - 1));
@@ -12023,9 +12029,23 @@ static int intel_crtc_atomic_check(struct drm_crtc *crtc,
 	}
 
 	if (INTEL_INFO(dev)->gen >= 9) {
-		if (mode_changed)
-			ret = skl_update_scaler_crtc(pipe_config);
+		struct intel_connector *intel_connector;
+		for_each_intel_connector(dev, intel_connector) {
+			if (intel_connector->encoder->base.crtc  != crtc)
+				continue;
 
+			if ((intel_connector != NULL) && ((mode_changed) ||
+							  (pipe_config->update_pipe))) {
+				ret = skl_update_scaler_crtc(pipe_config);
+
+				if (HAS_GMCH_DISPLAY(dev))
+					intel_gmch_panel_fitting(intel_crtc, pipe_config,
+						 intel_connector->panel.fitting_mode);
+				else
+					intel_pch_panel_fitting(intel_crtc, pipe_config,
+						 intel_connector->panel.fitting_mode);
+			}
+		}
 		if (!ret)
 			ret = intel_atomic_setup_scalers(dev, intel_crtc,
 							 pipe_config);
@@ -13610,6 +13630,8 @@ static const struct drm_crtc_funcs intel_crtc_funcs = {
 	.page_flip = intel_crtc_page_flip,
 	.atomic_duplicate_state = intel_crtc_duplicate_state,
 	.atomic_destroy_state = intel_crtc_destroy_state,
+	.atomic_set_property = intel_crtc_atomic_set_property,
+	.atomic_get_property = intel_crtc_atomic_get_property,
 };
 
 static bool ibx_pch_dpll_get_hw_state(struct drm_i915_private *dev_priv,
@@ -14033,6 +14055,23 @@ static struct drm_plane *intel_primary_plane_create(struct drm_device *dev,
 	return &primary->base;
 }
 
+void intel_create_crtc_properties(struct drm_device *dev,
+				  struct intel_crtc *intel_crtc)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (!dev_priv->crtc_src_size_prop) {
+		dev_priv->crtc_src_size_prop =
+			drm_property_create_range(dev, DRM_MODE_PROP_ATOMIC,
+			"crtc_src_size", 0, UINT_MAX);
+	}
+
+	/*FIXME: Add modeseted values ?*/
+	if (dev_priv->crtc_src_size_prop)
+		drm_object_attach_property(&intel_crtc->base.base,
+				dev_priv->crtc_src_size_prop, 0);
+}
+
 void intel_create_rotation_property(struct drm_device *dev, struct intel_plane *plane)
 {
 	if (!dev->mode_config.rotation_property) {
@@ -14237,6 +14276,9 @@ static void intel_crtc_init(struct drm_device *dev, int pipe)
 					cursor, &intel_crtc_funcs);
 	if (ret)
 		goto fail;
+
+	if (INTEL_INFO(dev)->gen >= 9)
+		intel_create_crtc_properties(dev, intel_crtc);
 
 	drm_mode_crtc_set_gamma_size(&intel_crtc->base, 256);
 	for (i = 0; i < 256; i++) {

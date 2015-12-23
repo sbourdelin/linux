@@ -73,6 +73,72 @@ intel_connector_atomic_get_property(struct drm_connector *connector,
 	return -EINVAL;
 }
 
+/* intel_crtc_atomic_set_property - duplicate crtc state
+ * @crtc: drm crtc
+ *
+ * Allocates and returns a copy of the crtc state (both common and
+ * Intel-specific) for the specified crtc.
+ *
+ * Returns: The newly allocated crtc state, or NULL on failure.
+ */
+int
+intel_crtc_atomic_set_property(struct drm_crtc *crtc,
+			       struct drm_crtc_state *state,
+			       struct drm_property *property,
+			       uint64_t val)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	struct intel_crtc_state *intel_crtc_state = to_intel_crtc_state(state);
+	u32 pipe_src_size = ((intel_crtc_state->pipe_src_w << 16) |
+			     (intel_crtc_state->pipe_src_h));
+	struct drm_display_mode *adjusted_mode =
+		&intel_crtc->config->base.adjusted_mode;
+
+	if (property == dev_priv->crtc_src_size_prop) {
+		if (val != pipe_src_size) {
+			if (val) {
+				intel_crtc_state->pipe_src_w = (val >> 16);
+				intel_crtc_state->pipe_src_h = val & 0x0000ffff;
+			} else {
+
+				/* for 0 set standard modeset calculated values */
+				intel_crtc_state->pipe_src_w = adjusted_mode->hdisplay;
+				intel_crtc_state->pipe_src_h = adjusted_mode->vdisplay;
+			}
+			intel_crtc_state->update_pipe = true;
+		}
+	}
+	return 0;
+}
+
+/*
+ * intel_crtc_atomic_get_property - duplicate crtc state
+ * @crtc: drm crtc
+ *
+ * Get Crtc properties.
+ *
+ * Returns: The newly allocated crtc state, or NULL on failure.
+ */
+int
+intel_crtc_atomic_get_property(struct drm_crtc *crtc,
+			       const struct drm_crtc_state *state,
+			       struct drm_property *property,
+			       uint64_t *val)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_crtc_state *intel_crtc_state = to_intel_crtc_state(state);
+	u32 pipe_src_size = ((intel_crtc_state->pipe_src_w << 16) |
+		(intel_crtc_state->pipe_src_h));
+
+	if (property == dev_priv->crtc_src_size_prop) {
+		*val = pipe_src_size;
+	}
+	return 0;
+}
+
 /*
  * intel_crtc_duplicate_state - duplicate crtc state
  * @crtc: drm crtc

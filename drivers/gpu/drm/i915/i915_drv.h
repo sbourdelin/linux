@@ -1872,6 +1872,7 @@ struct drm_i915_private {
 
 	struct drm_property *broadcast_rgb_property;
 	struct drm_property *force_audio_property;
+	struct drm_property *crtc_src_size_prop;
 
 	/* hda/i915 audio component */
 	struct i915_audio_component *audio_component;
