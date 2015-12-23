@@ -191,6 +191,7 @@ static inline void *bio_data(struct bio *bio)
  * before it got to the driver and the driver won't own all of it
  */
 #define bio_for_each_segment_all(bvl, bio, i)				\
+	WARN_ON_ONCE(bio_flagged(bio, BIO_CLONED));			\
 	for (i = 0, bvl = (bio)->bi_io_vec; i < (bio)->bi_vcnt; i++, bvl++)
 
 static inline void bvec_iter_advance(struct bio_vec *bv, struct bvec_iter *iter,
