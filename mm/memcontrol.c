@@ -4782,7 +4782,7 @@ static void mem_cgroup_clear_mc(void)
 static int mem_cgroup_can_attach(struct cgroup_taskset *tset)
 {
 	struct cgroup_subsys_state *css;
-	struct mem_cgroup *memcg;
+	struct mem_cgroup *memcg = NULL;
 	struct mem_cgroup *from;
 	struct task_struct *leader, *p;
 	struct mm_struct *mm;
@@ -4805,7 +4805,7 @@ static int mem_cgroup_can_attach(struct cgroup_taskset *tset)
 		p = leader;
 		memcg = mem_cgroup_from_css(css);
 	}
-	if (!p)
+	if (!p || !memcg)
 		return 0;
 
 	/*
