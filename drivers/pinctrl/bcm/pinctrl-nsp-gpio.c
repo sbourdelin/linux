@@ -439,7 +439,8 @@ static int nsp_gpio_set_strength(struct nsp_gpio *chip, unsigned gpio,
 static int nsp_gpio_get_strength(struct nsp_gpio *chip, unsigned gpio,
 				 u16 *strength)
 {
-	unsigned int i, offset, shift;
+	unsigned int offset, shift;
+	int i;
 	u32 val;
 	unsigned long flags;
 
