@@ -18,6 +18,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/highmem.h>
+#include <linux/sysdata.h>
 #include <linux/firmware.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
@@ -37,6 +38,12 @@
 MODULE_AUTHOR("Manuel Estrada Sainz");
 MODULE_DESCRIPTION("Multi purpose firmware loading support");
 MODULE_LICENSE("GPL");
+
+static const struct sysdata_file_sync_reqs dfl_sync_reqs = {
+	.mode = SYNCDATA_SYNC,
+	.module = THIS_MODULE,
+	.gfp = GFP_KERNEL,
+};
 
 /* Builtin firmware support */
 
@@ -1272,6 +1279,182 @@ void release_firmware(const struct firmware *fw)
 }
 EXPORT_SYMBOL(release_firmware);
 
+static void sysdata_file_update(struct sysdata_file *sysdata)
+{
+	struct firmware *fw;
+	struct firmware_buf *buf;
+
+	if (!sysdata || !sysdata->priv)
+		return;
+
+	fw = sysdata->priv;
+	if (!fw->priv)
+		return;
+
+	buf = fw->priv;
+
+	sysdata->size = buf->size;
+	sysdata->data = buf->data;
+
+	pr_debug("%s: fw-%s buf=%p data=%p size=%u",
+		 __func__, buf->fw_id, buf, buf->data,
+		 (unsigned int)buf->size);
+}
+
+/*
+ * prepare firmware and firmware_buf structs;
+ * return 0 if a firmware is already assigned, 1 if need to load one,
+ * or a negative error code
+ */
+static int
+_request_sysdata_prepare(struct sysdata_file **sysdata_p, const char *name,
+			  struct device *device)
+{
+	struct sysdata_file *sysdata;
+	struct firmware *fw;
+	int ret;
+
+	*sysdata_p = sysdata = kzalloc(sizeof(*sysdata), GFP_KERNEL);
+	if (!sysdata) {
+		dev_err(device, "%s: kmalloc(struct sysdata) failed\n",
+			__func__);
+		return -ENOMEM;
+	}
+
+	ret = _request_firmware_prepare(&fw, name, device);
+	if (ret >= 0)
+		sysdata->priv = fw;
+
+	return ret;
+}
+
+/**
+ * release_sysdata_file: - release the resource associated with the sysdata file
+ * @sysdata_file: sysdata resource to release
+ **/
+void release_sysdata_file(const struct sysdata_file *sysdata)
+{
+	struct firmware *fw;
+
+	if (sysdata) {
+		if (sysdata->priv) {
+			fw = sysdata->priv;
+			release_firmware(fw);
+		}
+	}
+	kfree(sysdata);
+}
+EXPORT_SYMBOL_GPL(release_sysdata_file);
+
+/*
+ * sysdata_p is always set to be NULL unless a proper system
+ * data file was found.
+ */
+static int _sysdata_file_request(const struct sysdata_file **sysdata_p,
+				 const char *name,
+				 const struct sysdata_file_desc *desc,
+				 struct device *device)
+{
+	struct sysdata_file *sysdata = NULL;
+	struct firmware *fw = NULL;
+	int ret = -EINVAL;
+
+	if (!sysdata_p)
+		goto out;
+
+	if (!desc)
+		goto out;
+
+	if (!name || name[0] == '\0')
+		goto out;
+
+	ret = _request_sysdata_prepare(&sysdata, name, device);
+	if (ret <= 0) /* error or already assigned */
+		goto out;
+
+	fw = sysdata->priv;
+
+	ret = fw_get_filesystem_firmware(device, fw->priv);
+	if (ret && !desc->optional)
+		pr_err("Direct system data load for %s failed with error %d\n",
+		       name, ret);
+
+	if (!ret)
+		ret = assign_firmware_buf(fw, device, FW_OPT_UEVENT);
+
+ out:
+	if (ret < 0) {
+		release_sysdata_file(sysdata);
+		sysdata = NULL;
+	}
+
+	sysdata_file_update(sysdata);
+
+	*sysdata_p = sysdata;
+
+	return ret;
+}
+
+/**
+ * sysdata_file_request - synchronous request for a system data file
+ * @name: name of the system data file
+ * @desc: system data file descriptor, it provides all the requirements
+ * 	which must be met for the file being requested.
+ * @device: device for which firmware is being loaded
+ *
+ * This performs a synchronous system data file lookup with the requirements
+ * specified on @desc, if the file was found meeting the criteria requested
+ * 0 is returned. Access to the system data file data can be accessed through
+ * an optional callback set on the @desc. If the system data file is optional
+ * you must specify that on the @desc and if set you may provide an alternative
+ * callback which if set would be run if the system data file was not found.
+ *
+ * The system data file passed to the callbacks will always be NULL unless
+ * the it was found matching all the criteria on @desc. 0 is always returned
+ * if the file was found unless a callback was provided, in which case the
+ * callback's return value will be passed. Unless the desc->keep was set the
+ * kernel will release the system data file for you after your callbacks
+ * were processed.
+ *
+ * Reference counting is used during the duration of this call on both the
+ * device and module that made the request. This prevents any callers from
+ * freeing either the device or module prior to completion of this call.
+ */
+int sysdata_file_request(const char *name,
+			 const struct sysdata_file_desc *desc,
+			 struct device *device)
+{
+	const struct sysdata_file *sysdata;
+	const struct sysdata_file_sync_reqs *sync_reqs;
+	int ret;
+
+	if (!device || !desc || !name)
+		return -EINVAL;
+
+	if (desc->sync_reqs.mode != SYNCDATA_SYNC)
+		return -EINVAL;
+
+	sync_reqs = &dfl_sync_reqs;
+
+	__module_get(sync_reqs->module);
+	get_device(device);
+
+	ret = _sysdata_file_request(&sysdata, name, desc, device);
+	if (ret && desc->optional)
+		ret = desc_sync_opt_call_cb(desc);
+	else
+		ret = desc_sync_found_call_cb(desc, sysdata);
+
+	if (!desc->keep)
+		release_sysdata_file(sysdata);
+
+	put_device(device);
+	module_put(sync_reqs->module);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sysdata_file_request);
+
 /* Async support */
 struct firmware_work {
 	struct work_struct work;
@@ -1359,6 +1542,114 @@ request_firmware_nowait(
 	return 0;
 }
 EXPORT_SYMBOL(request_firmware_nowait);
+
+struct sysdata_file_work {
+	struct work_struct work;
+	const char *name;
+	struct sysdata_file_desc desc;
+	struct device *device;
+};
+
+static void request_sysdata_file_work_func(struct work_struct *work)
+{
+	struct sysdata_file_work *sys_work;
+	const struct sysdata_file_desc *desc;
+	const struct sysdata_file_sync_reqs *sync_reqs;
+	const struct sysdata_file *sysdata;
+	int ret;
+
+	sys_work = container_of(work, struct sysdata_file_work, work);
+	desc = &sys_work->desc;
+	sync_reqs = &desc->sync_reqs;
+
+	ret = _sysdata_file_request(&sysdata, sys_work->name,
+				    desc, sys_work->device);
+	if (ret && desc->optional)
+		desc_async_opt_call_cb(desc);
+	else
+		desc_async_found_call_cb(sysdata, desc);
+
+	if (!desc->keep)
+		release_sysdata_file(sysdata);
+
+	put_device(sys_work->device);
+	module_put(sync_reqs->module);
+
+	kfree_const(sys_work->name);
+	kfree(sys_work);
+}
+
+/**
+ * sysdata_file_request_async - asynchronous request for a system data file
+ * @name: name of the system data file
+ * @desc: system data file descriptor, it provides all the requirements
+ * 	which must be met for the file being requested.
+ * @device: device for which firmware is being loaded
+ *
+ * This performs an asynchronous system data file lookup with the requirements
+ * specified on @desc. The request for the actual system data file lookup will
+ * be scheduled with schedule_work() to be run at a later time. 0 is returned
+ * if we were able to schedlue the work to be run.
+ *
+ * Reference counting is used during the duration of this scheduled call on
+ * both the device and module that made the request. This prevents any callers
+ * from freeing either the device or module prior to completion of the
+ * scheduled work.
+ *
+ * Access to the system data file data can be accessed through an optional
+ * callback set on the @desc. If the system data file is optional you must
+ * specify that on the @desc and if set you may provide an alternative
+ * callback which if set would be run if the system data file was not found.
+ *
+ * The system data file passed to the callbacks will always be NULL unless
+ * the it was found matching all the criteria on @desc. Unless the desc->keep
+ * was set the kernel will release the system data file for you after your
+ * callbacks were processed on the scheduled work.
+ *
+ */
+int sysdata_file_request_async(const char *name,
+			       const struct sysdata_file_desc *desc,
+			       struct device *device)
+{
+	struct sysdata_file_work *sys_work;
+	const struct sysdata_file_sync_reqs *sync_reqs;
+
+	if (!device || !desc || !name)
+		return -EINVAL;
+
+	if (desc->sync_reqs.mode != SYNCDATA_ASYNC)
+		return -EINVAL;
+
+	sync_reqs = &desc->sync_reqs;
+
+	if (!sync_reqs->module)
+		return -EINVAL;
+
+	sys_work = kzalloc(sizeof(struct sysdata_file_work), sync_reqs->gfp);
+	if (!sys_work)
+		return -ENOMEM;
+
+	sys_work->device = device;
+	memcpy(&sys_work->desc, desc, sizeof(struct sysdata_file_desc));
+	sys_work->name = kstrdup_const(name, sync_reqs->gfp);
+	if (!sys_work->name) {
+		kfree(sys_work);
+		return -ENOMEM;
+	}
+
+	if (!try_module_get(sync_reqs->module)) {
+		kfree_const(sys_work->name);
+		kfree(sys_work);
+		return -EFAULT;
+	}
+
+	get_device(sys_work->device);
+	INIT_WORK(&sys_work->work, request_sysdata_file_work_func);
+	schedule_work(&sys_work->work);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(sysdata_file_request_async);
 
 #ifdef CONFIG_PM_SLEEP
 static ASYNC_DOMAIN_EXCLUSIVE(fw_cache_domain);
