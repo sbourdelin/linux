@@ -420,9 +420,9 @@ rsnd_ssi_quit_end:
 
 	rsnd_mod_power_off(mod);
 
-	ssi->usrcnt--;
-
-	if (ssi->usrcnt < 0)
+	if (ssi->usrcnt > 0)
+		ssi->usrcnt--;
+	else
 		dev_err(dev, "%s[%d] usrcnt error\n",
 			rsnd_mod_name(mod), rsnd_mod_id(mod));
 
