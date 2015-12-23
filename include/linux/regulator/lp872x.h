@@ -79,12 +79,14 @@ struct lp872x_regulator_data {
  * @update_config     : if LP872X_GENERAL_CFG register is updated, set true
  * @regulator_data    : platform regulator id and init data
  * @dvs               : dvs data for buck voltage control
+ * @enable_gpio       : gpio pin number for enable control
  */
 struct lp872x_platform_data {
 	u8 general_config;
 	bool update_config;
 	struct lp872x_regulator_data regulator_data[LP872X_MAX_REGULATORS];
 	struct lp872x_dvs *dvs;
+	int enable_gpio;
 };
 
 #endif

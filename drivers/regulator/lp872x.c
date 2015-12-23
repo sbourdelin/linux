@@ -726,6 +726,27 @@ static struct regulator_desc lp8725_regulator_desc[] = {
 	},
 };
 
+static int lp872x_init_enable(struct lp872x *lp)
+{
+	int ret, gpio;
+
+	if (!lp->pdata)
+		return -EINVAL;
+
+	gpio = lp->pdata->enable_gpio;
+	if (!gpio_is_valid(gpio))
+		return 0;
+
+	/* Always set enable GPIO high. */
+	ret = devm_gpio_request_one(lp->dev, gpio, GPIOF_OUT_INIT_HIGH, "LP872X EN");
+	if (ret) {
+		dev_err(lp->dev, "gpio request err: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
 static int lp872x_init_dvs(struct lp872x *lp)
 {
 	int ret, gpio;
@@ -763,14 +784,18 @@ static int lp872x_config(struct lp872x *lp)
 	int ret;
 
 	if (!pdata || !pdata->update_config)
-		goto init_dvs;
+		goto init_dvs_enable;
 
 	ret = lp872x_write_byte(lp, LP872X_GENERAL_CFG, pdata->general_config);
 	if (ret)
 		return ret;
 
-init_dvs:
-	return lp872x_init_dvs(lp);
+init_dvs_enable:
+	ret = lp872x_init_dvs(lp);
+	if (ret)
+		return ret;
+
+	return lp872x_init_enable(lp);
 }
 
 static struct regulator_init_data
@@ -874,6 +899,8 @@ static struct lp872x_platform_data
 	of_property_read_u8(np, "ti,dvs-vsel", (u8 *)&pdata->dvs->vsel);
 	of_property_read_u8(np, "ti,dvs-state", &dvs_state);
 	pdata->dvs->init_state = dvs_state ? DVS_HIGH : DVS_LOW;
+
+	pdata->enable_gpio = of_get_named_gpio(np, "ti,enable-gpio", 0);
 
 	if (of_get_child_count(np) == 0)
 		goto out;
