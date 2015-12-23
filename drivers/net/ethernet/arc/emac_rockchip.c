@@ -69,6 +69,10 @@ static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
 
 static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
 	{
+	  .grf_offset = 0x140,   .grf_mode_offset = 8,
+	  .grf_speed_offset = 9, .need_div_macclk = 1
+	}, /* rk3036 */
+	{
 	  .grf_offset = 0x154,   .grf_mode_offset = 0,
 	  .grf_speed_offset = 1, .need_div_macclk = 0
 	}, /* rk3066 */
@@ -79,8 +83,9 @@ static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
 };
 
 static const struct of_device_id emac_rockchip_dt_ids[] = {
-	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[0] },
-	{ .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[1] },
+	{ .compatible = "rockchip,rk3036-emac", .data = &emac_rockchip_dt_data[0] },
+	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[1] },
+	{ .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[2] },
 	{ /* Sentinel */ }
 };
 
