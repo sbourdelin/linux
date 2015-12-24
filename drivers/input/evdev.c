@@ -228,7 +228,7 @@ static int evdev_set_clk_type(struct evdev_client *client, unsigned int clkid)
 	return 0;
 }
 
-static void __pass_event(struct evdev_client *client,
+static int __pass_event(struct evdev_client *client,
 			 const struct input_event *event)
 {
 	client->buffer[client->head++] = *event;
@@ -247,12 +247,24 @@ static void __pass_event(struct evdev_client *client,
 		client->buffer[client->tail].value = 0;
 
 		client->packet_head = client->tail;
+
+		/*
+		 * Do not store SYN_REPORT as there is no device data in buffer
+		 * and return to avoid wakeup and changing packet_head.
+		 */
+		if (event->type == EV_SYN && event->code == SYN_REPORT) {
+			client->head--;
+			client->head &= client->bufsize - 1;
+			return 1;
+		}
 	}
 
 	if (event->type == EV_SYN && event->code == SYN_REPORT) {
 		client->packet_head = client->head;
 		kill_fasync(&client->fasync, SIGIO, POLL_IN);
 	}
+
+	return 0;
 }
 
 static void evdev_pass_values(struct evdev_client *client,
@@ -287,7 +299,8 @@ static void evdev_pass_values(struct evdev_client *client,
 		event.type = v->type;
 		event.code = v->code;
 		event.value = v->value;
-		__pass_event(client, &event);
+		if (__pass_event(client, &event))
+			wakeup = false;
 	}
 
 	spin_unlock(&client->buffer_lock);
