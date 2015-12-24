@@ -1,6 +1,6 @@
 /*
  * power/home/volume button support for
- * Microsoft Surface Pro 3 tablet.
+ * Microsoft Surface Pro Series tablet.
  *
  * Copyright (c) 2015 Intel Corporation.
  * All rights reserved.
@@ -19,9 +19,10 @@
 #include <linux/acpi.h>
 #include <acpi/button.h>
 
-#define SURFACE_BUTTON_HID		"MSHW0028"
+#define SURFACE_PRO3_BUTTON_HID		"MSHW0028"
+#define SURFACE_PRO4_BUTTON_HID		"MSHW0040"
 #define SURFACE_BUTTON_OBJ_NAME		"VGBI"
-#define SURFACE_BUTTON_DEVICE_NAME	"Surface Pro 3 Buttons"
+#define SURFACE_BUTTON_DEVICE_NAME	"Surface Pro Series Buttons"
 
 #define SURFACE_BUTTON_NOTIFY_PRESS_POWER	0xc6
 #define SURFACE_BUTTON_NOTIFY_RELEASE_POWER	0xc7
@@ -35,10 +36,10 @@
 #define SURFACE_BUTTON_NOTIFY_PRESS_VOLUME_DOWN	0xc2
 #define SURFACE_BUTTON_NOTIFY_RELEASE_VOLUME_DOWN	0xc3
 
-ACPI_MODULE_NAME("surface pro 3 button");
+ACPI_MODULE_NAME("surface pro series button");
 
 MODULE_AUTHOR("Chen Yu");
-MODULE_DESCRIPTION("Surface Pro3 Button Driver");
+MODULE_DESCRIPTION("Surface Pro Series Button Driver");
 MODULE_LICENSE("GPL v2");
 
 /*
@@ -54,7 +55,8 @@ MODULE_LICENSE("GPL v2");
  * acpi_driver.
  */
 static const struct acpi_device_id surface_button_device_ids[] = {
-	{SURFACE_BUTTON_HID,    0},
+	{SURFACE_PRO3_BUTTON_HID,    0},
+	{SURFACE_PRO4_BUTTON_HID,    0},
 	{"", 0},
 };
 MODULE_DEVICE_TABLE(acpi, surface_button_device_ids);
@@ -202,8 +204,8 @@ static SIMPLE_DEV_PM_OPS(surface_button_pm,
 		surface_button_suspend, surface_button_resume);
 
 static struct acpi_driver surface_button_driver = {
-	.name = "surface_pro3_button",
-	.class = "SurfacePro3",
+	.name = "surface_pro_button",
+	.class = "SurfacePro",
 	.ids = surface_button_device_ids,
 	.ops = {
 		.add = surface_button_add,
