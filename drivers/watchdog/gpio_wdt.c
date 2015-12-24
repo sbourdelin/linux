@@ -9,6 +9,8 @@
  * (at your option) any later version.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -54,7 +56,8 @@ static void gpio_wdt_hwping(unsigned long data)
 
 	if (priv->armed && time_after(jiffies, priv->last_jiffies +
 				      msecs_to_jiffies(wdd->timeout * 1000))) {
-		dev_crit(wdd->dev, "Timer expired. System will reboot soon!\n");
+		pr_crit("watchdog%d: Timer expired. System will reboot soon!\n",
+			wdd->id);
 		return;
 	}
 
