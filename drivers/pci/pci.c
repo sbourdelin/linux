@@ -20,6 +20,7 @@
 #include <linux/string.h>
 #include <linux/log2.h>
 #include <linux/pci-aspm.h>
+#include <linux/pci-acpi.h>
 #include <linux/pm_wakeup.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
@@ -4772,8 +4773,24 @@ int pci_get_new_domain_nr(void)
 void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
 {
 	static int use_dt_domains = -1;
-	int domain = of_get_pci_domain_nr(parent->of_node);
+	int domain;
 
+	/*
+	 * Handle ACPI early
+	 *
+	 * the companion is not set at this point, and ACPI sets parent to
+	 * NULL, we have to try to get the segment from acpi root info.
+	 */
+	if (!parent || !parent->of_node) {
+		struct acpi_pci_root_info *ci;
+
+		ci = acpi_pci_sysdata_to_root_info(bus->sysdata);
+		if (ci)
+			bus->domain_nr = ci->root->segment;
+		return;
+	}
+
+	domain = of_get_pci_domain_nr(parent->of_node);
 	/*
 	 * Check DT domain and use_dt_domains values.
 	 *
