@@ -1789,6 +1789,9 @@ enum nl80211_commands {
  *	thus it must not specify the number of iterations, only the interval
  *	between scans. The scan plans are executed sequentially.
  *	Each scan plan is a nested attribute of &enum nl80211_sched_scan_plan.
+ * @NL80211_ATTR_BSS_SELECT: nested attribute used with %NL80211_CMD_CONNECT
+ *	containing criteria for BSS selection to be done by driver and/or
+ *	firmware.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -2163,6 +2166,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MAX_SCAN_PLAN_INTERVAL,
 	NL80211_ATTR_MAX_SCAN_PLAN_ITERATIONS,
 	NL80211_ATTR_SCHED_SCAN_PLANS,
+
+	NL80211_ATTR_BSS_SELECT,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4396,12 +4401,15 @@ enum nl80211_feature_flags {
 /**
  * enum nl80211_ext_feature_index - bit index of extended features.
  * @NL80211_EXT_FEATURE_VHT_IBSS: This driver supports IBSS with VHT datarates.
+ * @NL80211_EXT_FEATURE_BSS_SELECT: This driver supports BSS selection criteria
+ *	to be given upon %NL80211_CMD_CONNECT.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
  */
 enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_VHT_IBSS,
+	NL80211_EXT_FEATURE_BSS_SELECT,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
@@ -4649,6 +4657,33 @@ enum nl80211_sched_scan_plan {
 	__NL80211_SCHED_SCAN_PLAN_AFTER_LAST,
 	NL80211_SCHED_SCAN_PLAN_MAX =
 		__NL80211_SCHED_SCAN_PLAN_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_attr_bss_select - attributes for bss selection.
+ *
+ * @__NL80211_ATTR_BSS_SELECT_INVALID: reserved.
+ * @NL80211_ATTR_BSS_SELECT_BAND_PREF: Required attribute indicating the
+ *	preferred band. The preference by itself still allows RSSI based
+ *	selection of BSS and as such is only a tie breaker. Value according
+ *	%enum nl80211_band.
+ * @NL80211_ATTR_BSS_SELECT_RSSI_ADJUST: When present the RSSI level for
+ *	the BSS in the preferred band is adjusted accordingly (u8).
+ * @NL80211_ATTR_BSS_SELECT_IGNORE_RSSI: flag attribute which can be used to
+ *	to have the BSS in the preferred band being selected regardless
+ *	of its RSSI level.
+ * @NL80211_ATTR_BSS_SELECT_MAX: highest bss select attribute number.
+ *@__NL80211_ATTR_BSS_SELECT_AFTER_LAST: internal use.
+ */
+enum nl80211_attr_bss_select {
+	__NL80211_ATTR_BSS_SELECT_INVALID,
+	NL80211_ATTR_BSS_SELECT_BAND_PREF,
+	NL80211_ATTR_BSS_SELECT_RSSI_ADJUST,
+	NL80211_ATTR_BSS_SELECT_IGNORE_RSSI,
+
+	/* keep last */
+	__NL80211_ATTR_BSS_SELECT_AFTER_LAST,
+	NL80211_ATTR_BSS_SELECT_MAX = __NL80211_ATTR_BSS_SELECT_AFTER_LAST - 1
 };
 
 #endif /* __LINUX_NL80211_H */

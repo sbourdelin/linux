@@ -1854,6 +1854,22 @@ struct cfg80211_ibss_params {
 };
 
 /**
+ * struct cfg80211_bss_selection - Connection parameters for BSS selection.
+ *
+ * @present: indicates whether parameters are set.
+ * @pref_band: preferred band.
+ * @rssi_adjust: adjustment for RSSI level of the preferred band.
+ * @ignore_rssi: indicates whether BSS in preferred band is to be selected
+ *	regardless its RSSI level.
+ */
+struct cfg80211_bss_selection {
+	bool present;
+	enum nl80211_band pref_band;
+	u8 rssi_adjust;
+	bool ignore_rssi;
+};
+
+/**
  * struct cfg80211_connect_params - Connection parameters
  *
  * This structure provides information needed to complete IEEE 802.11
@@ -1910,6 +1926,7 @@ struct cfg80211_connect_params {
 	struct ieee80211_ht_cap ht_capa_mask;
 	struct ieee80211_vht_cap vht_capa;
 	struct ieee80211_vht_cap vht_capa_mask;
+	struct cfg80211_bss_selection bss_select;
 };
 
 /**
