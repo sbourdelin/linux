@@ -463,6 +463,7 @@ void otg_reset_controller(void)
 int fsl_otg_start_host(struct otg_fsm *fsm, int on)
 {
 	struct usb_otg *otg = fsm->otg;
+	struct usb_bus *host = otg->host;
 	struct device *dev;
 	struct fsl_otg *otg_dev =
 		container_of(otg->usb_phy, struct fsl_otg, phy);
@@ -485,6 +486,7 @@ int fsl_otg_start_host(struct otg_fsm *fsm, int on)
 		else {
 			otg_reset_controller();
 			VDBG("host on......\n");
+			host->is_otg = 1;
 			if (dev->driver->pm && dev->driver->pm->resume) {
 				retval = dev->driver->pm->resume(dev);
 				if (fsm->id) {
@@ -510,8 +512,11 @@ int fsl_otg_start_host(struct otg_fsm *fsm, int on)
 		else {
 			VDBG("host off......\n");
 			if (dev && dev->driver) {
-				if (dev->driver->pm && dev->driver->pm->suspend)
+				if (dev->driver->pm &&
+					dev->driver->pm->suspend) {
+					host->is_otg = 1;
 					retval = dev->driver->pm->suspend(dev);
+				}
 				if (fsm->id)
 					/* default-b */
 					fsl_otg_drv_vbus(fsm, 0);
