@@ -28,8 +28,7 @@
 #include <asm/system_info.h>
 #include <asm/page.h>
 #include <asm/mach/arch.h>
-
-#include "atags.h"
+#include <asm/atags.h>
 
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 
