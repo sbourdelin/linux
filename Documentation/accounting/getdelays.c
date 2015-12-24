@@ -383,7 +383,7 @@ int main(int argc, char *argv[])
 	id = get_family_id(nl_sd);
 	if (!id) {
 		fprintf(stderr, "Error getting family id, errno %d\n", errno);
-		goto err;
+		goto close_socket;
 	}
 	PRINTF("family id %d\n", id);
 
@@ -394,13 +394,13 @@ int main(int argc, char *argv[])
 		PRINTF("Sent register cpumask, retval %d\n", rc);
 		if (rc < 0) {
 			fprintf(stderr, "error sending register cpumask\n");
-			goto err;
+			goto close_socket;
 		}
 	}
 
 	if (tid && containerset) {
 		fprintf(stderr, "Select either -t or -C, not both\n");
-		goto err;
+		goto close_socket;
 	}
 
 	/*
@@ -426,18 +426,18 @@ int main(int argc, char *argv[])
 		cfd = open(containerpath, O_RDONLY);
 		if (cfd < 0) {
 			perror("error opening container file");
-			goto err;
+			goto close_socket;
 		}
 		rc = send_cmd(nl_sd, id, mypid, CGROUPSTATS_CMD_GET,
 			      CGROUPSTATS_CMD_ATTR_FD, &cfd, sizeof(__u32));
 		if (rc < 0) {
 			perror("error sending cgroupstats command");
-			goto err;
+			goto close_container;
 		}
 	}
 	if (!maskset && !tid && !containerset) {
 		usage();
-		goto err;
+		goto check_container;
 	}
 
 	do {
@@ -536,11 +536,14 @@ done:
 		if (rc < 0)
 			err(rc, "error sending deregister cpumask\n");
 	}
-err:
+check_container:
+	if (cfd >= 0) {
+close_container:
+		close(cfd);
+	}
+close_socket:
 	close(nl_sd);
 	if (fd)
 		close(fd);
-	if (cfd)
-		close(cfd);
 	return 0;
 }
