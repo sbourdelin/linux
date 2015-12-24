@@ -63,4 +63,20 @@
 #define UTMI_PHY_EN             (1<<9)
 #define ULPI_PHY_CLK_SEL        (1<<10)
 #define PHY_CLK_VALID		(1<<17)
+
+struct ehci_fsl {
+	/* Save USB CTRL, need to restore after deep sleep. */
+	u32 usb_ctrl;
+	struct usb_hcd *hcd;
+	struct work_struct change_hcd_work;
+	/*
+	 * store current hcd state for otg;
+	 * have_hcd is true when host drv al already part of otg framework,
+	 * otherwise false;
+	 * hcd_add is true when otg framework wants to add host
+	 * drv as part of otg;flase when it wants to remove it
+	 */
+	unsigned have_hcd:1;
+	unsigned hcd_add:1;
+};
 #endif				/* _EHCI_FSL_H */
