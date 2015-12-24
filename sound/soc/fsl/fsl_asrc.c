@@ -116,6 +116,10 @@ static int fsl_asrc_request_pair(int channels, struct fsl_asrc_pair *pair)
 	} else if (asrc_priv->channel_avail < channels) {
 		dev_err(dev, "can't afford required channels: %d\n", channels);
 		ret = -EINVAL;
+	} else if (asrc_priv->channel_bits < 4 && channels % 2 != 0) {
+		dev_err(dev, "old version asrc can't support an odd \
+			      channel number\n");
+		ret = -EINVAL;
 	} else {
 		asrc_priv->channel_avail -= channels;
 		asrc_priv->pair[index] = pair;
