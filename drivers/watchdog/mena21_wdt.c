@@ -7,6 +7,9 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation
  */
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/types.h>
@@ -100,13 +103,14 @@ static int a21_wdt_set_timeout(struct watchdog_device *wdt,
 	struct a21_wdt_drv *drv = watchdog_get_drvdata(wdt);
 
 	if (timeout != 1 && timeout != 30) {
-		dev_err(wdt->dev, "Only 1 and 30 allowed as timeout\n");
+		pr_err("watchdog%d: Only 1 and 30 allowed as timeout\n",
+		       wdt->id);
 		return -EINVAL;
 	}
 
 	if (timeout == 30 && wdt->timeout == 1) {
-		dev_err(wdt->dev,
-			"Transition from fast to slow mode not allowed\n");
+		pr_err("watchdog%d: Transition from fast to slow mode not allowed\n",
+		       wdt->id);
 		return -EINVAL;
 	}
 
