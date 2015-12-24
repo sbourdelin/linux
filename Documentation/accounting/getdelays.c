@@ -74,12 +74,12 @@ char cpumask[100+6*MAX_CPUS];
 static void usage(void)
 {
 	fprintf(stderr, "getdelays [-dilv] [-w logfile] [-r bufsize] "
-			"[-m cpumask] [-t tgid] [-p pid]\n");
-	fprintf(stderr, "  -d: print delayacct stats\n");
-	fprintf(stderr, "  -i: print IO accounting (works only with -p)\n");
-	fprintf(stderr, "  -l: listen forever\n");
-	fprintf(stderr, "  -v: debug on\n");
-	fprintf(stderr, "  -C: container path\n");
+			"[-m cpumask] [-t tgid] [-p pid]\n"
+			"  -d: print delayacct stats\n"
+			"  -i: print IO accounting (works only with -p)\n"
+			"  -l: listen forever\n"
+			"  -v: debug on\n"
+			"  -C: container path\n");
 }
 
 /*
