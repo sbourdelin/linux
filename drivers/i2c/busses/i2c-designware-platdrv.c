@@ -230,6 +230,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	}
 
 	adap = &dev->adapter;
+	device_enable_async_suspend(&pdev->dev);
 	adap->owner = THIS_MODULE;
 	adap->class = I2C_CLASS_DEPRECATED;
 	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
