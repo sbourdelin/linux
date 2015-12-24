@@ -31,6 +31,7 @@
 #include <linux/mount.h>
 #include <linux/log2.h>
 #include <linux/quotaops.h>
+#include <linux/stringify.h>
 #include <asm/uaccess.h>
 #include "ext2.h"
 #include "xattr.h"
@@ -822,7 +823,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	blocksize = sb_min_blocksize(sb, BLOCK_SIZE);
 	if (!blocksize) {
-		ext2_msg(sb, KERN_ERR, "error: unable to set blocksize");
+		ext2_msg(sb, KERN_ERR,
+			 "error: unable to set filesystem block size "
+			 __stringify(BLOCK_SIZE));
 		goto failed_sbi;
 	}
 
@@ -921,7 +924,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	if (sbi->s_mount_opt & EXT2_MOUNT_DAX) {
 		if (blocksize != PAGE_SIZE) {
 			ext2_msg(sb, KERN_ERR,
-					"error: unsupported blocksize for dax");
+			 "error: unsupported filesystem block size %d for dax",
+				 blocksize);
 			goto failed_mount;
 		}
 		if (!sb->s_bdev->bd_disk->fops->direct_access) {
@@ -937,7 +941,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 
 		if (!sb_set_blocksize(sb, blocksize)) {
 			ext2_msg(sb, KERN_ERR,
-				"error: bad blocksize %d", blocksize);
+			 "error: bad filesystem block size %d", blocksize);
 			goto failed_sbi;
 		}
 
@@ -1007,14 +1011,15 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 
 	if (sb->s_blocksize != bh->b_size) {
 		if (!silent)
-			ext2_msg(sb, KERN_ERR, "error: unsupported blocksize");
+			ext2_msg(sb, KERN_ERR,
+				 "error: unsupported filesystem block size %lu",
+				 sb->s_blocksize);
 		goto failed_mount;
 	}
 
 	if (sb->s_blocksize != sbi->s_frag_size) {
 		ext2_msg(sb, KERN_ERR,
-			"error: fragsize %lu != blocksize %lu"
-			"(not supported yet)",
+	 "error: fragsize %lu != filesystem block size %lu (not supported yet)",
 			sbi->s_frag_size, sb->s_blocksize);
 		goto failed_mount;
 	}

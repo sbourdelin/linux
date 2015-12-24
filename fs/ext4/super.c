@@ -42,6 +42,7 @@
 
 #include <linux/kthread.h>
 #include <linux/freezer.h>
+#include <linux/stringify.h>
 
 #include "ext4.h"
 #include "ext4_extents.h"	/* Needed for trace points definition */
@@ -1829,8 +1830,9 @@ static int parse_options(char *options, struct super_block *sb,
 			BLOCK_SIZE << le32_to_cpu(sbi->s_es->s_log_block_size);
 
 		if (blocksize < PAGE_CACHE_SIZE) {
-			ext4_msg(sb, KERN_ERR, "can't mount with "
-				 "dioread_nolock if block size != PAGE_SIZE");
+			ext4_msg(sb, KERN_ERR,
+				"can't mount with dioread_nolock if filesystem block size %d != PAGE_SIZE",
+				blocksize);
 			return 0;
 		}
 	}
@@ -3226,7 +3228,9 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	ret = -EINVAL;
 	blocksize = sb_min_blocksize(sb, EXT4_MIN_BLOCK_SIZE);
 	if (!blocksize) {
-		ext4_msg(sb, KERN_ERR, "unable to set blocksize");
+		ext4_msg(sb, KERN_ERR,
+			 "unable to set filesystem block size "
+			 __stringify(EXT4_MIN_BLOCK_SIZE));
 		goto out_fail;
 	}
 
@@ -3446,14 +3450,15 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (blocksize < EXT4_MIN_BLOCK_SIZE ||
 	    blocksize > EXT4_MAX_BLOCK_SIZE) {
 		ext4_msg(sb, KERN_ERR,
-		       "Unsupported filesystem blocksize %d", blocksize);
+			 "Unsupported filesystem block size %d", blocksize);
 		goto failed_mount;
 	}
 
 	if (sbi->s_mount_opt & EXT4_MOUNT_DAX) {
 		if (blocksize != PAGE_SIZE) {
 			ext4_msg(sb, KERN_ERR,
-					"error: unsupported blocksize for dax");
+			 "error: unsupported filesystem block size %d for dax",
+				 blocksize);
 			goto failed_mount;
 		}
 		if (!sb->s_bdev->bd_disk->fops->direct_access) {
@@ -3472,7 +3477,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (sb->s_blocksize != blocksize) {
 		/* Validate the filesystem blocksize */
 		if (!sb_set_blocksize(sb, blocksize)) {
-			ext4_msg(sb, KERN_ERR, "bad block size %d",
+			ext4_msg(sb, KERN_ERR, "bad filesystem block size %d",
 					blocksize);
 			goto failed_mount;
 		}
@@ -3574,8 +3579,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (has_bigalloc) {
 		if (clustersize < blocksize) {
 			ext4_msg(sb, KERN_ERR,
-				 "cluster size (%d) smaller than "
-				 "block size (%d)", clustersize, blocksize);
+		 "cluster size (%d) smaller than filesystem block size (%d)",
+				clustersize, blocksize);
 			goto failed_mount;
 		}
 		sbi->s_cluster_bits = le32_to_cpu(es->s_log_cluster_size) -
@@ -3598,9 +3603,9 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		}
 	} else {
 		if (clustersize != blocksize) {
-			ext4_warning(sb, "fragment/cluster size (%d) != "
-				     "block size (%d)", clustersize,
-				     blocksize);
+			ext4_warning(sb,
+		 "fragment/cluster size (%d) != filesystem block size (%d)",
+				     clustersize, blocksize);
 			clustersize = blocksize;
 		}
 		if (sbi->s_blocks_per_group > blocksize * 8) {
@@ -3848,7 +3853,8 @@ no_journal:
 	if ((DUMMY_ENCRYPTION_ENABLED(sbi) || ext4_has_feature_encrypt(sb)) &&
 	    (blocksize != PAGE_CACHE_SIZE)) {
 		ext4_msg(sb, KERN_ERR,
-			 "Unsupported blocksize for fs encryption");
+		 "Unsupported filesystem block size %d for fs encryption",
+			 blocksize);
 		goto failed_mount_wq;
 	}
 
@@ -4191,7 +4197,8 @@ static journal_t *ext4_get_dev_journal(struct super_block *sb,
 	hblock = bdev_logical_block_size(bdev);
 	if (blocksize < hblock) {
 		ext4_msg(sb, KERN_ERR,
-			"blocksize too small for journal device");
+			"filesystem block size %d too small for journal device",
+			blocksize);
 		goto out_bdev;
 	}
 
