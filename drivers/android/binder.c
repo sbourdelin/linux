@@ -393,13 +393,15 @@ static int task_get_unused_fd_flags(struct binder_proc *proc, int flags)
 }
 
 /*
- * copied from fd_install
+ * copied from fd_install.
+ * This doesn't increment the file's usage count.
  */
 static void task_fd_install(
 	struct binder_proc *proc, unsigned int fd, struct file *file)
 {
-	if (proc->files)
-		__fd_install(proc->files, fd, file);
+	/* if proc->files==NULL, an fput() would be needed here */
+	BUG_ON(proc->files == NULL);
+	__fd_install(proc->files, fd, file);
 }
 
 /*
@@ -1661,6 +1663,10 @@ static void binder_transaction(struct binder_proc *proc,
 				return_error = BR_FAILED_REPLY;
 				goto err_get_unused_fd_failed;
 			}
+			/*
+			 * success here guarantees that the following
+			 * task_fd_install will see non-null target_proc->files
+			 */
 			target_fd = task_get_unused_fd_flags(target_proc, O_CLOEXEC);
 			if (target_fd < 0) {
 				fput(file);
@@ -1668,10 +1674,14 @@ static void binder_transaction(struct binder_proc *proc,
 				goto err_get_unused_fd_failed;
 			}
 			task_fd_install(target_proc, target_fd, file);
+			/*
+			 * task_fd_install didn't increment the usage count,
+			 * so the file belongs to target_proc now, we must
+			 * not touch it anymore.
+			 */
 			trace_binder_transaction_fd(t, fp->handle, target_fd);
 			binder_debug(BINDER_DEBUG_TRANSACTION,
 				     "        fd %d -> %d\n", fp->handle, target_fd);
-			/* TODO: fput? */
 			fp->handle = target_fd;
 		} break;
 
