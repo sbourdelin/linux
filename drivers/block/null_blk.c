@@ -342,13 +342,20 @@ static int null_rq_prep_fn(struct request_queue *q, struct request *req)
 static void null_request_fn(struct request_queue *q)
 {
 	struct request *rq;
+	bool irq = in_irq();
 
 	while ((rq = blk_fetch_request(q)) != NULL) {
 		struct nullb_cmd *cmd = rq->special;
 
-		spin_unlock_irq(q->queue_lock);
+		if (irq)
+			spin_unlock(q->queue_lock);
+		else
+			spin_unlock_irq(q->queue_lock);
 		null_handle_cmd(cmd);
-		spin_lock_irq(q->queue_lock);
+		if (irq)
+			spin_lock(q->queue_lock);
+		else
+			spin_lock_irq(q->queue_lock);
 	}
 }
 
