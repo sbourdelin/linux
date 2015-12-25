@@ -18,6 +18,8 @@ MODULE_LICENSE("GPL v2");
 #define WEISS_CATEGORY_ID	0x00
 #define LOUD_CATEGORY_ID	0x10
 
+#define PROBE_DELAY_MS		(2 * MSEC_PER_SEC)
+
 static int check_dice_category(struct fw_unit *unit)
 {
 	struct fw_device *device = fw_parent_device(unit);
@@ -192,6 +194,62 @@ static void dice_card_free(struct snd_card *card)
 	mutex_destroy(&dice->mutex);
 }
 
+static void do_registration(struct work_struct *work)
+{
+	struct snd_dice *dice = container_of(work, struct snd_dice, dwork.work);
+	int err;
+
+	if (dice->card->shutdown || dice->registered)
+		return;
+
+	err = snd_dice_transaction_init(dice);
+	if (err < 0)
+		goto end;
+
+	err = dice_read_params(dice);
+	if (err < 0)
+		goto end;
+
+	dice_card_strings(dice);
+
+	err = snd_dice_create_pcm(dice);
+	if (err < 0)
+		goto end;
+
+	err = snd_dice_create_midi(dice);
+	if (err < 0)
+		goto end;
+
+	err = snd_card_register(dice->card);
+	if (err < 0)
+		goto end;
+
+	dice->registered = true;
+
+	return;
+
+	/*
+	 * It's a difficult work to manage a race condition between workqueue,
+	 * unit event handlers and processes. The memory block for this sound
+	 * card is released as the same way that usual sound cards are going to
+	 * be released.
+	 */
+}
+
+static u64 calc_delay(struct snd_dice *dice)
+{
+	struct fw_card *fw_card = fw_parent_device(dice->unit)->card;
+	u64 delay, now;
+
+	now = get_jiffies_64();
+	delay = fw_card->reset_jiffies + msecs_to_jiffies(PROBE_DELAY_MS);
+
+	if (time_after64(now, delay))
+		return 0;
+
+	return delay - now;
+}
+
 static int dice_probe(struct fw_unit *unit, const struct ieee1394_device_id *id)
 {
 	struct snd_card *card;
@@ -205,29 +263,20 @@ static int dice_probe(struct fw_unit *unit, const struct ieee1394_device_id *id)
 	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
 			   sizeof(*dice), &card);
 	if (err < 0)
-		goto end;
+		return err;
 
 	dice = card->private_data;
 	dice->card = card;
 	dice->unit = fw_unit_get(unit);
 	card->private_free = dice_card_free;
+	dev_set_drvdata(&unit->device, dice);
 
 	spin_lock_init(&dice->lock);
 	mutex_init(&dice->mutex);
 	init_completion(&dice->clock_accepted);
 	init_waitqueue_head(&dice->hwdep_wait);
 
-	err = snd_dice_transaction_init(dice);
-	if (err < 0)
-		goto error;
-
-	err = dice_read_params(dice);
-	if (err < 0)
-		goto error;
-
-	dice_card_strings(dice);
-
-	err = snd_dice_create_pcm(dice);
+	err = snd_dice_stream_init_duplex(dice);
 	if (err < 0)
 		goto error;
 
@@ -237,23 +286,11 @@ static int dice_probe(struct fw_unit *unit, const struct ieee1394_device_id *id)
 
 	snd_dice_create_proc(dice);
 
-	err = snd_dice_create_midi(dice);
-	if (err < 0)
-		goto error;
+	/* Register this sound card later. */
+	INIT_DEFERRABLE_WORK(&dice->dwork, do_registration);
+	schedule_delayed_work(&dice->dwork, calc_delay(dice));
 
-	err = snd_dice_stream_init_duplex(dice);
-	if (err < 0)
-		goto error;
-
-	err = snd_card_register(card);
-	if (err < 0) {
-		snd_dice_stream_destroy_duplex(dice);
-		goto error;
-	}
-
-	dev_set_drvdata(&unit->device, dice);
-end:
-	return err;
+	return 0;
 error:
 	snd_card_free(card);
 	return err;
@@ -263,6 +300,13 @@ static void dice_remove(struct fw_unit *unit)
 {
 	struct snd_dice *dice = dev_get_drvdata(&unit->device);
 
+	/*
+	 * Confirm to stop the work for registration before going to release
+	 * the sound card. The work is not scheduled again because bus reset
+	 * handler is not called anymore.
+	 */
+	cancel_delayed_work_sync(&dice->dwork);
+
 	/* No need to wait for releasing card object in this context. */
 	snd_card_free_when_closed(dice->card);
 }
@@ -271,12 +315,22 @@ static void dice_bus_reset(struct fw_unit *unit)
 {
 	struct snd_dice *dice = dev_get_drvdata(&unit->device);
 
+	/* Postpone a workqueue for deferred registration. */
+	if (!dice->registered)
+		mod_delayed_work(dice->dwork.wq, &dice->dwork, calc_delay(dice));
+
 	/* The handler address register becomes initialized. */
 	snd_dice_transaction_reinit(dice);
 
-	mutex_lock(&dice->mutex);
-	snd_dice_stream_update_duplex(dice);
-	mutex_unlock(&dice->mutex);
+	/*
+	 * After registration, userspace can start packet streaming, then this
+	 * code block works fine.
+	 */
+	if (dice->registered) {
+		mutex_lock(&dice->mutex);
+		snd_dice_stream_update_duplex(dice);
+		mutex_unlock(&dice->mutex);
+	}
 }
 
 #define DICE_INTERFACE	0x000001
