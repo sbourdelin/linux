@@ -153,5 +153,7 @@ int snd_dice_create_midi(struct snd_dice *dice)
 	if ((midi_out_ports > 0) && (midi_in_ports > 0))
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_DUPLEX;
 
+	dice->rmidi_dev = rmidi;
+
 	return 0;
 }

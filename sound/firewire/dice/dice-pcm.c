@@ -426,5 +426,7 @@ int snd_dice_create_pcm(struct snd_dice *dice)
 	if (playback > 0)
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &playback_ops);
 
+	dice->pcm_dev = pcm;
+
 	return 0;
 }

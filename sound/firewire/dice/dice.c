@@ -202,27 +202,30 @@ static void do_registration(struct work_struct *work)
 	if (dice->card->shutdown || dice->registered)
 		return;
 
+	dice->pcm_dev = NULL;
+	dice->rmidi_dev = NULL;
+
 	err = snd_dice_transaction_init(dice);
 	if (err < 0)
-		goto end;
+		goto error;
 
 	err = dice_read_params(dice);
 	if (err < 0)
-		goto end;
+		goto error;
 
 	dice_card_strings(dice);
 
 	err = snd_dice_create_pcm(dice);
 	if (err < 0)
-		goto end;
+		goto error;
 
 	err = snd_dice_create_midi(dice);
 	if (err < 0)
-		goto end;
+		goto error;
 
 	err = snd_card_register(dice->card);
 	if (err < 0)
-		goto end;
+		goto error;
 
 	dice->registered = true;
 
@@ -234,6 +237,14 @@ static void do_registration(struct work_struct *work)
 	 * card is released as the same way that usual sound cards are going to
 	 * be released.
 	 */
+error:
+	snd_dice_transaction_destroy(dice);
+
+	if (dice->pcm_dev)
+		snd_device_free(dice->card, dice->pcm_dev);
+
+	if (dice->rmidi_dev)
+		snd_device_free(dice->card, dice->rmidi_dev);
 }
 
 static u64 calc_delay(struct snd_dice *dice)

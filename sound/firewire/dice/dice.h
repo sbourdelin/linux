@@ -47,6 +47,8 @@ struct snd_dice {
 
 	bool registered;
 	struct delayed_work dwork;
+	struct snd_pcm *pcm_dev;
+	struct snd_rawmidi *rmidi_dev;
 
 	/* Offsets for sub-addresses */
 	unsigned int global_offset;
