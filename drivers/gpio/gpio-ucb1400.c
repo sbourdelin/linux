@@ -46,7 +46,7 @@ static void ucb1400_gpio_set(struct gpio_chip *gc, unsigned off, int val)
 static int ucb1400_gpio_probe(struct platform_device *dev)
 {
 	struct ucb1400_gpio *ucb = dev_get_platdata(&dev->dev);
-	int err = 0;
+	int err;
 
 	if (!(ucb && ucb->gpio_offset)) {
 		err = -EINVAL;
