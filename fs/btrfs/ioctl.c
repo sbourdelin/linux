@@ -503,7 +503,7 @@ static noinline int create_subvol(struct inode *dir,
 	write_extent_buffer(leaf, root->fs_info->fsid, btrfs_header_fsid(),
 			    BTRFS_FSID_SIZE);
 	write_extent_buffer(leaf, root->fs_info->chunk_tree_uuid,
-			    btrfs_header_chunk_tree_uuid(leaf),
+			    btrfs_header_chunk_tree_uuid(),
 			    BTRFS_UUID_SIZE);
 	btrfs_mark_buffer_dirty(leaf);
 
@@ -1345,7 +1345,7 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 		if (!(inode->i_sb->s_flags & MS_ACTIVE))
 			break;
 
-		if (btrfs_defrag_cancelled(root->fs_info)) {
+		if (btrfs_defrag_cancelled()) {
 			btrfs_debug(root->fs_info, "defrag_file cancelled");
 			ret = -EAGAIN;
 			break;

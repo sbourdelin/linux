@@ -2910,7 +2910,7 @@ static inline unsigned long btrfs_header_fsid(void)
 	return offsetof(struct btrfs_header, fsid);
 }
 
-static inline unsigned long btrfs_header_chunk_tree_uuid(struct extent_buffer *eb)
+static inline unsigned long btrfs_header_chunk_tree_uuid(void)
 {
 	return offsetof(struct btrfs_header, chunk_tree_uuid);
 }
@@ -3148,7 +3148,7 @@ static inline int btrfs_super_csum_size(struct btrfs_super_block *s)
 	return btrfs_csum_sizes[t];
 }
 
-static inline unsigned long btrfs_leaf_data(struct extent_buffer *l)
+static inline unsigned long btrfs_leaf_data(void)
 {
 	return offsetof(struct btrfs_leaf, items);
 }
@@ -3352,11 +3352,11 @@ static inline struct btrfs_fs_info *btrfs_sb(struct super_block *sb)
 
 /* helper function to cast into the data area of the leaf. */
 #define btrfs_item_ptr(leaf, slot, type) \
-	((type *)(btrfs_leaf_data(leaf) + \
+	((type *)(btrfs_leaf_data() + \
 	btrfs_item_offset_nr(leaf, slot)))
 
 #define btrfs_item_ptr_offset(leaf, slot) \
-	((unsigned long)(btrfs_leaf_data(leaf) + \
+	((unsigned long)(btrfs_leaf_data() + \
 	btrfs_item_offset_nr(leaf, slot)))
 
 static inline bool btrfs_mixed_space_info(struct btrfs_space_info *space_info)
@@ -4374,7 +4374,7 @@ static inline int is_fstree(u64 rootid)
 	return 0;
 }
 
-static inline int btrfs_defrag_cancelled(struct btrfs_fs_info *fs_info)
+static inline int btrfs_defrag_cancelled(void)
 {
 	return signal_pending(current);
 }

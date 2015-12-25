@@ -3366,7 +3366,7 @@ static noinline int insert_new_root(struct btrfs_trans_handle *trans,
 			    BTRFS_FSID_SIZE);
 
 	write_extent_buffer(c, root->fs_info->chunk_tree_uuid,
-			    btrfs_header_chunk_tree_uuid(c), BTRFS_UUID_SIZE);
+			    btrfs_header_chunk_tree_uuid(), BTRFS_UUID_SIZE);
 
 	btrfs_set_node_key(c, &lower_key, 0);
 	btrfs_set_node_blockptr(c, 0, lower->start);
@@ -3502,7 +3502,7 @@ static noinline int split_node(struct btrfs_trans_handle *trans,
 	write_extent_buffer(split, root->fs_info->fsid,
 			    btrfs_header_fsid(), BTRFS_FSID_SIZE);
 	write_extent_buffer(split, root->fs_info->chunk_tree_uuid,
-			    btrfs_header_chunk_tree_uuid(split),
+			    btrfs_header_chunk_tree_uuid(),
 			    BTRFS_UUID_SIZE);
 
 	ret = tree_mod_log_eb_copy(root->fs_info, split, c, 0,
@@ -3664,14 +3664,14 @@ static noinline int __push_leaf_right(struct btrfs_trans_handle *trans,
 	/* make room in the right data area */
 	data_end = leaf_data_end(root, right);
 	memmove_extent_buffer(right,
-			      btrfs_leaf_data(right) + data_end - push_space,
-			      btrfs_leaf_data(right) + data_end,
+			      btrfs_leaf_data() + data_end - push_space,
+			      btrfs_leaf_data() + data_end,
 			      BTRFS_LEAF_DATA_SIZE(root) - data_end);
 
 	/* copy from the left data area */
-	copy_extent_buffer(right, left, btrfs_leaf_data(right) +
+	copy_extent_buffer(right, left, btrfs_leaf_data() +
 		     BTRFS_LEAF_DATA_SIZE(root) - push_space,
-		     btrfs_leaf_data(left) + leaf_data_end(root, left),
+		     btrfs_leaf_data() + leaf_data_end(root, left),
 		     push_space);
 
 	memmove_extent_buffer(right, btrfs_item_nr_offset(push_items),
@@ -3881,9 +3881,9 @@ static noinline int __push_leaf_left(struct btrfs_trans_handle *trans,
 	push_space = BTRFS_LEAF_DATA_SIZE(root) -
 		     btrfs_item_offset_nr(right, push_items - 1);
 
-	copy_extent_buffer(left, right, btrfs_leaf_data(left) +
+	copy_extent_buffer(left, right, btrfs_leaf_data() +
 		     leaf_data_end(root, left) - push_space,
-		     btrfs_leaf_data(right) +
+		     btrfs_leaf_data() +
 		     btrfs_item_offset_nr(right, push_items - 1),
 		     push_space);
 	old_left_nritems = btrfs_header_nritems(left);
@@ -3910,9 +3910,9 @@ static noinline int __push_leaf_left(struct btrfs_trans_handle *trans,
 	if (push_items < right_nritems) {
 		push_space = btrfs_item_offset_nr(right, push_items - 1) -
 						  leaf_data_end(root, right);
-		memmove_extent_buffer(right, btrfs_leaf_data(right) +
+		memmove_extent_buffer(right, btrfs_leaf_data() +
 				      BTRFS_LEAF_DATA_SIZE(root) - push_space,
-				      btrfs_leaf_data(right) +
+				      btrfs_leaf_data() +
 				      leaf_data_end(root, right), push_space);
 
 		memmove_extent_buffer(right, btrfs_item_nr_offset(0),
@@ -4057,8 +4057,8 @@ static noinline void copy_for_split(struct btrfs_trans_handle *trans,
 			   nritems * sizeof(struct btrfs_item));
 
 	copy_extent_buffer(right, l,
-		     btrfs_leaf_data(right) + BTRFS_LEAF_DATA_SIZE(root) -
-		     data_copy_size, btrfs_leaf_data(l) +
+		     btrfs_leaf_data() + BTRFS_LEAF_DATA_SIZE(root) -
+		     data_copy_size, btrfs_leaf_data() +
 		     leaf_data_end(root, l), data_copy_size);
 
 	rt_data_off = BTRFS_LEAF_DATA_SIZE(root) -
@@ -4283,7 +4283,7 @@ again:
 			    btrfs_header_fsid(), BTRFS_FSID_SIZE);
 
 	write_extent_buffer(right, fs_info->chunk_tree_uuid,
-			    btrfs_header_chunk_tree_uuid(right),
+			    btrfs_header_chunk_tree_uuid(),
 			    BTRFS_UUID_SIZE);
 
 	if (split == 0) {
@@ -4588,8 +4588,8 @@ void btrfs_truncate_item(struct btrfs_root *root, struct btrfs_path *path,
 
 	/* shift the data */
 	if (from_end) {
-		memmove_extent_buffer(leaf, btrfs_leaf_data(leaf) +
-			      data_end + size_diff, btrfs_leaf_data(leaf) +
+		memmove_extent_buffer(leaf, btrfs_leaf_data() +
+			      data_end + size_diff, btrfs_leaf_data() +
 			      data_end, old_data_start + new_size - data_end);
 	} else {
 		struct btrfs_disk_key disk_key;
@@ -4615,8 +4615,8 @@ void btrfs_truncate_item(struct btrfs_root *root, struct btrfs_path *path,
 			}
 		}
 
-		memmove_extent_buffer(leaf, btrfs_leaf_data(leaf) +
-			      data_end + size_diff, btrfs_leaf_data(leaf) +
+		memmove_extent_buffer(leaf, btrfs_leaf_data() +
+			      data_end + size_diff, btrfs_leaf_data() +
 			      data_end, old_data_start - data_end);
 
 		offset = btrfs_disk_key_offset(&disk_key);
@@ -4688,8 +4688,8 @@ void btrfs_extend_item(struct btrfs_root *root, struct btrfs_path *path,
 	}
 
 	/* shift the data */
-	memmove_extent_buffer(leaf, btrfs_leaf_data(leaf) +
-		      data_end - data_size, btrfs_leaf_data(leaf) +
+	memmove_extent_buffer(leaf, btrfs_leaf_data() +
+		      data_end - data_size, btrfs_leaf_data() +
 		      data_end, old_data - data_end);
 
 	data_end = old_data;
@@ -4770,8 +4770,8 @@ void setup_items_for_insert(struct btrfs_root *root, struct btrfs_path *path,
 			      (nritems - slot) * sizeof(struct btrfs_item));
 
 		/* shift the data */
-		memmove_extent_buffer(leaf, btrfs_leaf_data(leaf) +
-			      data_end - total_data, btrfs_leaf_data(leaf) +
+		memmove_extent_buffer(leaf, btrfs_leaf_data() +
+			      data_end - total_data, btrfs_leaf_data() +
 			      data_end, old_data - data_end);
 		data_end = old_data;
 	}
@@ -4961,9 +4961,9 @@ int btrfs_del_items(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 	if (slot + nr != nritems) {
 		int data_end = leaf_data_end(root, leaf);
 
-		memmove_extent_buffer(leaf, btrfs_leaf_data(leaf) +
+		memmove_extent_buffer(leaf, btrfs_leaf_data() +
 			      data_end + dsize,
-			      btrfs_leaf_data(leaf) + data_end,
+			      btrfs_leaf_data() + data_end,
 			      last_off - data_end);
 
 		for (i = slot + nr; i < nritems; i++) {
