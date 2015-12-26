@@ -592,6 +592,8 @@ config ASUS_WIRELESS
 	depends on ACPI
 	depends on INPUT
 	default m
+	select NEW_LEDS
+	select LEDS_CLASS
 	---help---
 	  The Asus Wireless Radio Control handles the airplane mode hotkey
 	  present on some Asus laptops.
