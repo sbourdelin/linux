@@ -7,6 +7,7 @@ config PPC32
 config 32BIT
 	bool
 	default y if PPC32
+	select ARCH_32BIT_OFF_T
 
 config 64BIT
 	bool
