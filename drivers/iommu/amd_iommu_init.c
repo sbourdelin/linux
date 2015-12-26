@@ -24,7 +24,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/interrupt.h>
 #include <linux/msi.h>
-#include <linux/amd-iommu.h>
+#include <asm/amd-iommu.h>
 #include <linux/export.h>
 #include <linux/iommu.h>
 #include <asm/pci-direct.h>

@@ -20,7 +20,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/amd-iommu.h>
+#include <asm/amd-iommu.h>
 #include <linux/bsearch.h>
 #include <linux/pci.h>
 #include <linux/slab.h>

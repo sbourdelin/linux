@@ -28,7 +28,7 @@
 #include <linux/iommu-helper.h>
 #include <linux/iommu.h>
 #include <linux/delay.h>
-#include <linux/amd-iommu.h>
+#include <asm/amd-iommu.h>
 #include <linux/notifier.h>
 #include <linux/export.h>
 #include <linux/irq.h>

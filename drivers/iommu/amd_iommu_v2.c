@@ -17,7 +17,7 @@
  */
 
 #include <linux/mmu_notifier.h>
-#include <linux/amd-iommu.h>
+#include <asm/amd-iommu.h>
 #include <linux/mm_types.h>
 #include <linux/profile.h>
 #include <linux/module.h>

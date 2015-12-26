@@ -24,7 +24,7 @@
 #include <linux/log2.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/amd-iommu.h>
+#include <asm/amd-iommu.h>
 #include <linux/notifier.h>
 #include <linux/compat.h>
 
