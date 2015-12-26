@@ -124,6 +124,26 @@ static bool rfkill_epo_lock_active;
 
 
 #ifdef CONFIG_RFKILL_LEDS
+static void airplane_mode_led_trigger_activate(struct led_classdev *led);
+
+static struct led_trigger airplane_mode_led_trigger = {
+	.name     = "rfkill-airplane-mode",
+	.activate = airplane_mode_led_trigger_activate,
+};
+
+static void airplane_mode_led_trigger_event(void)
+{
+	if (rfkill_global_states[RFKILL_TYPE_ALL].cur & RFKILL_BLOCK_ANY)
+		led_trigger_event(&airplane_mode_led_trigger, LED_FULL);
+	else
+		led_trigger_event(&airplane_mode_led_trigger, LED_OFF);
+}
+
+static void airplane_mode_led_trigger_activate(struct led_classdev *led)
+{
+	airplane_mode_led_trigger_event();
+}
+
 static void rfkill_led_trigger_event(struct rfkill *rfkill)
 {
 	struct led_trigger *trigger;
@@ -175,6 +195,10 @@ static void rfkill_led_trigger_unregister(struct rfkill *rfkill)
 	led_trigger_unregister(&rfkill->led_trigger);
 }
 #else
+static void airplane_mode_led_trigger_event(void)
+{
+}
+
 static void rfkill_led_trigger_event(struct rfkill *rfkill)
 {
 }
@@ -346,6 +370,7 @@ static void __rfkill_switch_all(const enum rfkill_type type, bool blocked)
 
 		for (i = 0; i < NUM_RFKILL_TYPES; i++)
 			rfkill_global_states[i].cur = blocked;
+		airplane_mode_led_trigger_event();
 	} else {
 		rfkill_global_states[type].cur = blocked;
 	}
@@ -1177,6 +1202,7 @@ static ssize_t rfkill_fop_write(struct file *file, const char __user *buf,
 			enum rfkill_type i;
 			for (i = 0; i < NUM_RFKILL_TYPES; i++)
 				rfkill_global_states[i].cur = ev.soft;
+			airplane_mode_led_trigger_event();
 		} else {
 			rfkill_global_states[ev.type].cur = ev.soft;
 		}
@@ -1291,6 +1317,10 @@ static int __init rfkill_init(void)
 		class_unregister(&rfkill_class);
 		goto out;
 	}
+#endif
+
+#ifdef CONFIG_RFKILL_LEDS
+	led_trigger_register(&airplane_mode_led_trigger);
 #endif
 
  out:
