@@ -112,6 +112,7 @@ int main(void)
   DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+  DEFINE(VCPU_CPTR_EL2,		offsetof(struct kvm_vcpu, arch.cptr_el2));
   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
 #endif
 #ifdef CONFIG_CPU_PM

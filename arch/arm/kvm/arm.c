@@ -316,10 +316,19 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
 	/* If the fp/simd registers are dirty save guest, restore host. */
-	if (vcpu_vfp_isdirty(vcpu))
+	if (vcpu_vfp_isdirty(vcpu)) {
+
 		vcpu_restore_host_vfp_state(vcpu);
 
-	/* Restore host FPEXC trashed in vcpu_load */
+		/*
+		 * For 32bit guest on arm64 save the guest fpexc register
+		 * in EL2 mode.
+		 */
+		if (vcpu_guest_is_32bit(vcpu))
+			vcpu_save_fpexc(vcpu);
+	}
+
+	/* For arm32 restore host FPEXC trashed in vcpu_load. */
 	vcpu_restore_host_fpexc(vcpu);
 
 	/*

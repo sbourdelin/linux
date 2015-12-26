@@ -19,24 +19,10 @@
 
 static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
 {
-	u64 val;
-
-	/*
-	 * We are about to set CPTR_EL2.TFP to trap all floating point
-	 * register accesses to EL2, however, the ARM ARM clearly states that
-	 * traps are only taken to EL2 if the operation would not otherwise
-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-	 */
-	val = vcpu->arch.hcr_el2;
-	if (!(val & HCR_RW)) {
-		write_sysreg(1 << 30, fpexc32_el2);
-		isb();
-	}
-	write_sysreg(val, hcr_el2);
+	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
 	write_sysreg(1 << 15, hstr_el2);
-	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
+	write_sysreg(vcpu->arch.cptr_el2, cptr_el2);
 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
 }
 
@@ -89,7 +75,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *host_ctxt;
 	struct kvm_cpu_context *guest_ctxt;
-	bool fp_enabled;
 	u64 exit_code;
 
 	vcpu = kern_hyp_va(vcpu);
@@ -119,8 +104,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
 	exit_code = __guest_enter(vcpu, host_ctxt);
 	/* And we're baaack! */
 
-	fp_enabled = __fpsimd_enabled();
-
 	__sysreg_save_state(guest_ctxt);
 	__sysreg32_save_state(vcpu);
 	__timer_save_state(vcpu);
@@ -130,11 +113,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
 	__deactivate_vm(vcpu);
 
 	__sysreg_restore_state(host_ctxt);
-
-	if (fp_enabled) {
-		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
-		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
-	}
 
 	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
 	__debug_cond_restore_host_state(vcpu);

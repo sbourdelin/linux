@@ -136,6 +136,7 @@ ENTRY(__fpsimd_guest_restore)
 	isb
 
 	mrs	x3, tpidr_el2
+	str	w2, [x3, #VCPU_CPTR_EL2]
 
 	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
 	kern_hyp_va x0
