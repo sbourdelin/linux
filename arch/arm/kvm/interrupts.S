@@ -116,22 +116,15 @@ ENTRY(__kvm_vcpu_run)
 	read_cp15_state store_to_vcpu = 0
 	write_cp15_state read_from_vcpu = 1
 
-	@ If the host kernel has not been configured with VFPv3 support,
-	@ then it is safer if we deny guests from using it as well.
-#ifdef CONFIG_VFPv3
-	@ Set FPEXC_EN so the guest doesn't trap floating point instructions
-	VFPFMRX r2, FPEXC		@ VMRS
-	push	{r2}
-	orr	r2, r2, #FPEXC_EN
-	VFPFMXR FPEXC, r2		@ VMSR
-#endif
+	@ Configure trapping of access to tracing and fp/simd registers
+	ldr r1, [vcpu, #VCPU_HCPTR]
+	mcr p15, 4, r1, c1, c1, 2
 
 	@ Configure Hyp-role
 	configure_hyp_role vmentry
 
 	@ Trap coprocessor CRx accesses
 	set_hstr vmentry
-	set_hcptr vmentry, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11))
 	set_hdcr vmentry
 
 	@ Write configured ID register into MIDR alias
@@ -170,23 +163,10 @@ __kvm_vcpu_return:
 	@ Don't trap coprocessor accesses for host kernel
 	set_hstr vmexit
 	set_hdcr vmexit
-	set_hcptr vmexit, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11)), after_vfp_restore
 
-#ifdef CONFIG_VFPv3
-	@ Switch VFP/NEON hardware state to the host's
-	add	r7, vcpu, #VCPU_VFP_GUEST
-	store_vfp_state r7
-	add	r7, vcpu, #VCPU_VFP_HOST
-	ldr	r7, [r7]
-	restore_vfp_state r7
-
-after_vfp_restore:
-	@ Restore FPEXC_EN which we clobbered on entry
-	pop	{r2}
-	VFPFMXR FPEXC, r2
-#else
-after_vfp_restore:
-#endif
+	@ Disable trace and fp/simd traps
+	mov r2, #0
+	mcr p15, 4, r2, c1, c1, 2
 
 	@ Reset Hyp-role
 	configure_hyp_role vmexit
@@ -482,8 +462,15 @@ guest_trap:
 switch_to_guest_vfp:
 	push	{r3-r7}
 
-	@ NEON/VFP used.  Turn on VFP access.
-	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
+	@ fp/simd was accessed, so disable trapping and save hcptr register
+	@ which is used across exits until next vcpu_load.
+	mrc     p15, 4, r2, c1, c1, 2
+	mov     r3, #(HCPTR_TCP(10) | HCPTR_TCP(11))
+	bic     r3, r2, r3
+	mcr     p15, 4, r3, c1, c1, 2
+	str     r3, [vcpu, #VCPU_HCPTR]
+
+	isb
 
 	@ Switch VFP/NEON hardware state to the guest's
 	add	r7, r0, #VCPU_VFP_HOST
