@@ -148,14 +148,14 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 		DEBPRINT("get_object_info for device failed\n");
 		return -ENODEV;
 	}
-	if (dinfo && (dinfo->valid & ACPI_VALID_ADR) &&
+	if ((dinfo->valid & ACPI_VALID_ADR) &&
 	    dinfo->address == addr) {
 		*pcidevfn = addr;
 		*handle = dev_handle;
 	} else {
 		DEBPRINT("get_object_info for device has wrong "
 			" address: %llu, should be %u\n",
-			dinfo ? (unsigned long long)dinfo->address : -1ULL,
+			(unsigned long long)dinfo->address,
 			(unsigned int)addr);
 		ret = -ENODEV;
 		goto free_info;
