@@ -424,7 +424,7 @@ static int vadc_measure_ref_points(struct vadc_priv *vadc)
 	prop = vadc_get_channel(vadc, VADC_REF_1250MV);
 	ret = vadc_do_conversion(vadc, prop, &read_1);
 	if (ret)
-		goto err;
+		goto report_failure;
 
 	/* Try with buffered 625mV channel first */
 	prop = vadc_get_channel(vadc, VADC_SPARE1);
@@ -433,11 +433,11 @@ static int vadc_measure_ref_points(struct vadc_priv *vadc)
 
 	ret = vadc_do_conversion(vadc, prop, &read_2);
 	if (ret)
-		goto err;
+		goto report_failure;
 
 	if (read_1 == read_2) {
 		ret = -EINVAL;
-		goto err;
+		goto report_failure;
 	}
 
 	vadc->graph[VADC_CALIB_ABSOLUTE].dy = read_1 - read_2;
@@ -447,23 +447,24 @@ static int vadc_measure_ref_points(struct vadc_priv *vadc)
 	prop = vadc_get_channel(vadc, VADC_VDD_VADC);
 	ret = vadc_do_conversion(vadc, prop, &read_1);
 	if (ret)
-		goto err;
+		goto report_failure;
 
 	prop = vadc_get_channel(vadc, VADC_GND_REF);
 	ret = vadc_do_conversion(vadc, prop, &read_2);
 	if (ret)
-		goto err;
+		goto report_failure;
 
 	if (read_1 == read_2) {
 		ret = -EINVAL;
-		goto err;
+		goto report_failure;
 	}
 
 	vadc->graph[VADC_CALIB_RATIOMETRIC].dy = read_1 - read_2;
 	vadc->graph[VADC_CALIB_RATIOMETRIC].gnd = read_2;
-err:
-	if (ret)
+	if (ret) {
+report_failure:
 		dev_err(vadc->dev, "measure reference points failed\n");
+	}
 
 	return ret;
 }
