@@ -126,8 +126,8 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 	u64 addr;
 	acpi_handle dev_handle;
 	acpi_status status;
-	struct acpi_device_info	*dinfo = NULL;
-	int ret = -ENODEV;
+	struct acpi_device_info	*dinfo;
+	int ret;
 
 	bus = pdev->bus->number;
 	devnum = PCI_SLOT(pdev->devfn);
@@ -140,13 +140,13 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 	dev_handle = ACPI_HANDLE(dev);
 	if (!dev_handle) {
 		DEBPRINT("no acpi handle for device\n");
-		goto err;
+		return -ENODEV;
 	}
 
 	status = acpi_get_object_info(dev_handle, &dinfo);
 	if (ACPI_FAILURE(status)) {
 		DEBPRINT("get_object_info for device failed\n");
-		goto err;
+		return -ENODEV;
 	}
 	if (dinfo && (dinfo->valid & ACPI_VALID_ADR) &&
 	    dinfo->address == addr) {
@@ -157,13 +157,14 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 			" address: %llu, should be %u\n",
 			dinfo ? (unsigned long long)dinfo->address : -1ULL,
 			(unsigned int)addr);
-		goto err;
+		ret = -ENODEV;
+		goto free_info;
 	}
 
 	DEBPRINT("for dev=0x%x.%x, addr=0x%llx, *handle=0x%p\n",
 		 devnum, func, (unsigned long long)addr, *handle);
 	ret = 0;
-err:
+free_info:
 	kfree(dinfo);
 	return ret;
 }
