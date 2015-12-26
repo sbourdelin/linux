@@ -235,3 +235,20 @@ Description:
 		write_same_max_bytes is 0, write same is not supported
 		by the device.
 
+What:		/sys/block/<disk>/<partition>/start
+Date:		October 2002
+Contact:	linux-block@vger.kernel.org
+Kernel Version:	2.5.43
+Description:
+		Starting position of the partition within the disk.
+		Measured in standard UNIX 512-byte sectors (not a
+		device-specific block size).
+
+What:		/sys/block/<disk>/<partition>/size
+Date:		October 2002
+Contact:	linux-block@vger.kernel.org
+Kernel Version:	2.5.43
+Description:
+		Size of the partition in standard UNIX 512-byte sectors
+		(not a device-specific block size).
+
