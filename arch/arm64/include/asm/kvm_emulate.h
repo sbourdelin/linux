@@ -299,4 +299,12 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	return data;		/* Leave LE untouched */
 }
 
+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu) {}
+static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+
+static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
 #endif /* __ARM64_KVM_EMULATE_H__ */

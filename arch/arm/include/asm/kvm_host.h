@@ -105,6 +105,12 @@ struct kvm_vcpu_arch {
 	/* HYP trapping configuration */
 	u32 hcr;
 
+	/* HYP Co-processor fp/simd and trace trapping configuration */
+	u32 hcptr;
+
+	/* Save host FPEXC register to later restore on vcpu put */
+	u32 host_fpexc;
+
 	/* Interrupt related fields */
 	u32 irq_lines;		/* IRQ and FIQ levels */
 

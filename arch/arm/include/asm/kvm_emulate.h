@@ -24,6 +24,8 @@
 #include <asm/kvm_mmio.h>
 #include <asm/kvm_arm.h>
 #include <asm/cputype.h>
+#include <asm/vfp.h>
+#include "../vfp/vfpinstr.h"
 
 unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
 unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
@@ -254,5 +256,45 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 		}
 	}
 }
+
+#ifdef CONFIG_VFPv3
+/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+{
+	u32 fpexc;
+
+	/* Save host fpexc, and enable guest access to fp unit */
+	fpexc = fmrx(FPEXC);
+	vcpu->arch.host_fpexc = fpexc;
+	fpexc |= FPEXC_EN;
+	fmxr(FPEXC, fpexc);
+
+	/* Configure HCPTR to trap on tracing and fp/simd access */
+	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+}
+
+/* Called from vcpu_put - restore host fpexc */
+static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+{
+	fmxr(FPEXC, vcpu->arch.host_fpexc);
+}
+
+/* If trap bits are reset then fp/simd registers are dirty */
+static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+{
+	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+}
+#else
+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.hcptr = HCPTR_TTA;
+}
+
+static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+#endif
 
 #endif /* __ARM_KVM_EMULATE_H__ */
