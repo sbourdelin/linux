@@ -1383,6 +1383,77 @@ static const struct ieee80211_ops wl1251_ops = {
 	.get_survey = wl1251_op_get_survey,
 };
 
+static ssize_t wl1251_sysfs_show_bt_coex_mode(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	struct wl1251 *wl = dev_get_drvdata(dev);
+	ssize_t len;
+
+	/* FIXME: what's the maximum length of buf? page size?*/
+	len = 500;
+
+	mutex_lock(&wl->mutex);
+	len = snprintf(buf, len, "%d\n\n%d - off\n%d - on\n%d - monoaudio\n",
+		       wl->bt_coex_mode,
+		       WL1251_BT_COEX_OFF,
+		       WL1251_BT_COEX_ENABLE,
+		       WL1251_BT_COEX_MONOAUDIO);
+	mutex_unlock(&wl->mutex);
+
+	return len;
+}
+
+static ssize_t wl1251_sysfs_store_bt_coex_mode(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t count)
+{
+	struct wl1251 *wl = dev_get_drvdata(dev);
+	unsigned long res;
+	int ret;
+
+	ret = kstrtoul(buf, 10, &res);
+
+	if (ret < 0) {
+		wl1251_warning("incorrect value written to bt_coex_mode");
+		return count;
+	}
+
+	mutex_lock(&wl->mutex);
+
+	if (res == wl->bt_coex_mode)
+		goto out;
+
+	switch (res) {
+	case WL1251_BT_COEX_OFF:
+	case WL1251_BT_COEX_ENABLE:
+	case WL1251_BT_COEX_MONOAUDIO:
+		wl->bt_coex_mode = res;
+		break;
+	default:
+		wl1251_warning("incorrect value written to bt_coex_mode");
+		goto out;
+	}
+
+	if (wl->state == WL1251_STATE_OFF)
+		goto out;
+
+	ret = wl1251_ps_elp_wakeup(wl);
+	if (ret < 0)
+		goto out;
+
+	wl1251_acx_sg_configure(wl, false);
+	wl1251_ps_elp_sleep(wl);
+
+out:
+	mutex_unlock(&wl->mutex);
+	return count;
+}
+
+static DEVICE_ATTR(bt_coex_mode, S_IRUGO | S_IWUSR,
+		   wl1251_sysfs_show_bt_coex_mode,
+		   wl1251_sysfs_store_bt_coex_mode);
+
 static int wl1251_read_eeprom_byte(struct wl1251 *wl, off_t offset, u8 *data)
 {
 	unsigned long timeout;
@@ -1467,6 +1538,7 @@ static int wl1251_register_hw(struct wl1251 *wl)
 
 int wl1251_init_ieee80211(struct wl1251 *wl)
 {
+	struct device *dev = wiphy_dev(wl->hw->wiphy);
 	int ret;
 
 	/* The tx descriptor buffer and the TKIP space */
@@ -1492,6 +1564,13 @@ int wl1251_init_ieee80211(struct wl1251 *wl)
 	ret = wl1251_register_hw(wl);
 	if (ret)
 		goto out;
+
+	/* Create sysfs file to control bt coex state */
+	ret = device_create_file(dev, &dev_attr_bt_coex_mode);
+	if (ret < 0) {
+		wl1251_error("failed to create sysfs file bt_coex_mode");
+		goto out;
+	}
 
 	wl1251_debugfs_init(wl);
 	wl1251_notice("initialized");
@@ -1549,6 +1628,7 @@ struct ieee80211_hw *wl1251_alloc_hw(void)
 	wl->beacon_int = WL1251_DEFAULT_BEACON_INT;
 	wl->dtim_period = WL1251_DEFAULT_DTIM_PERIOD;
 	wl->vif = NULL;
+	wl->bt_coex_mode = WL1251_BT_COEX_OFF;
 
 	for (i = 0; i < FW_TX_CMPLT_BLOCK_SIZE; i++)
 		wl->tx_frames[i] = NULL;
@@ -1584,6 +1664,10 @@ EXPORT_SYMBOL_GPL(wl1251_alloc_hw);
 
 int wl1251_free_hw(struct wl1251 *wl)
 {
+	struct device *dev = wiphy_dev(wl->hw->wiphy);
+
+	device_remove_file(dev, &dev_attr_bt_coex_mode);
+
 	ieee80211_unregister_hw(wl->hw);
 
 	wl1251_debugfs_exit(wl);
