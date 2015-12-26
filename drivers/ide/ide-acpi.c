@@ -132,9 +132,6 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 	bus = pdev->bus->number;
 	devnum = PCI_SLOT(pdev->devfn);
 	func = PCI_FUNC(pdev->devfn);
-	/* ACPI _ADR encoding for PCI bus: */
-	addr = (u64)(devnum << 16 | func);
-
 	DEBPRINT("ENTER: pci %02x:%02x.%01x\n", bus, devnum, func);
 
 	dev_handle = ACPI_HANDLE(dev);
@@ -148,6 +145,8 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 		DEBPRINT("get_object_info for device failed\n");
 		return -ENODEV;
 	}
+	/* ACPI _ADR encoding for PCI bus: */
+	addr = (u64)(devnum << 16 | func);
 	if ((dinfo->valid & ACPI_VALID_ADR) &&
 	    dinfo->address == addr) {
 		*pcidevfn = addr;
