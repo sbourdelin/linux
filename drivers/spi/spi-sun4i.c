@@ -79,6 +79,9 @@ struct sun4i_spi {
 	struct clk		*hclk;
 	struct clk		*mclk;
 
+	int			cur_max_speed;
+	int			cur_mclk;
+
 	struct completion	done;
 
 	const u8		*tx_buf;
@@ -227,11 +230,17 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 
 	sun4i_spi_write(sspi, SUN4I_CTL_REG, reg);
 
-	/* Ensure that we have a parent clock fast enough */
+	/*
+	 * Ensure that the parent clock is set to twice the max speed
+	 * of the spi device (possibly rounded up by the clk driver)
+	 */
 	mclk_rate = clk_get_rate(sspi->mclk);
-	if (mclk_rate < (2 * tfr->speed_hz)) {
-		clk_set_rate(sspi->mclk, 2 * tfr->speed_hz);
+	if (spi->max_speed_hz != sspi->cur_max_speed ||
+	    mclk_rate != sspi->cur_mclk) {
+		clk_set_rate(sspi->mclk, 2 * spi->max_speed_hz);
 		mclk_rate = clk_get_rate(sspi->mclk);
+		sspi->cur_mclk = mclk_rate;
+		sspi->cur_max_speed = spi->max_speed_hz;
 	}
 
 	/*
@@ -239,7 +248,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 	 *
 	 * We have two choices there. Either we can use the clock
 	 * divide rate 1, which is calculated thanks to this formula:
-	 * SPI_CLK = MOD_CLK / (2 ^ (cdr + 1))
+	 * SPI_CLK = MOD_CLK / (2 ^ cdr)
 	 * Or we can use CDR2, which is calculated with the formula:
 	 * SPI_CLK = MOD_CLK / (2 * (cdr + 1))
 	 * Wether we use the former or the latter is set through the
@@ -248,14 +257,11 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
 	 * First try CDR2, and if we can't reach the expected
 	 * frequency, fall back to CDR1.
 	 */
-	div = mclk_rate / (2 * tfr->speed_hz);
-	if (div <= (SUN4I_CLK_CTL_CDR2_MASK + 1)) {
-		if (div > 0)
-			div--;
-
+	div = DIV_ROUND_UP(mclk_rate, 2 * tfr->speed_hz) - 1;
+	if (div <= SUN4I_CLK_CTL_CDR2_MASK) {
 		reg = SUN4I_CLK_CTL_CDR2(div) | SUN4I_CLK_CTL_DRS;
 	} else {
-		div = ilog2(mclk_rate) - ilog2(tfr->speed_hz);
+		div = ilog2(roundup_pow_of_two(mclk_rate / tfr->speed_hz));
 		reg = SUN4I_CLK_CTL_CDR1(div);
 	}
 
