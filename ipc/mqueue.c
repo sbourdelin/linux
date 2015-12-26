@@ -786,7 +786,8 @@ SYSCALL_DEFINE4(mq_open, const char __user *, u_name, int, oflag, umode_t, mode,
 
 	audit_mq_open(oflag, mode, u_attr ? &attr : NULL);
 
-	if (IS_ERR(name = getname(u_name)))
+	name = getname(u_name);
+	if (IS_ERR(name))
 		return PTR_ERR(name);
 
 	fd = get_unused_fd_flags(O_CLOEXEC);
