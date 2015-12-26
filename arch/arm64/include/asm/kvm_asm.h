@@ -48,6 +48,11 @@ extern u64 __vgic_v3_get_ich_vtr_el2(void);
 
 extern u32 __kvm_get_mdcr_el2(void);
 
+extern void __fpsimd_prepare_fpexc32(void);
+extern void __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu);
+extern void __fpsimd_save_state(struct user_fpsimd_state *);
+extern void __fpsimd_restore_state(struct user_fpsimd_state *);
+
 #endif
 
 #endif /* __ARM_KVM_ASM_H__ */

@@ -26,6 +26,7 @@
 #include <linux/kvm_types.h>
 #include <asm/kvm.h>
 #include <asm/kvm_mmio.h>
+#include <asm/kvm_asm.h>
 
 #define __KVM_HAVE_ARCH_INTC_INITIALIZED
 
@@ -180,6 +181,7 @@ struct kvm_vcpu_arch {
 	/* HYP configuration */
 	u64 hcr_el2;
 	u32 mdcr_el2;
+	u32 cptr_el2;
 
 	/* Exception Information */
 	struct kvm_vcpu_fault_info fault;
@@ -338,7 +340,15 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
 static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
 
-static inline void vcpu_restore_host_vfp_state(struct kvm_vcpu *vcpu) {}
+static inline void vcpu_prepare_fpexc(void)
+{
+	kvm_call_hyp(__fpsimd_prepare_fpexc32);
+}
+
+static inline void vcpu_save_fpexc(struct kvm_vcpu *vcpu)
+{
+	kvm_call_hyp(__fpsimd_save_fpexc32, vcpu);
+}
 
 void kvm_arm_init_debug(void);
 void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);

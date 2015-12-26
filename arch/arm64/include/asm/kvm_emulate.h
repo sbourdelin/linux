@@ -299,12 +299,34 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	return data;		/* Leave LE untouched */
 }
 
-static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu) {}
+static inline bool vcpu_guest_is_32bit(struct kvm_vcpu *vcpu)
+{
+	return !(vcpu->arch.hcr_el2 & HCR_RW);
+}
+
+static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+{
+	/* For 32 bit guest enable access to fp/simd registers */
+	if (vcpu_guest_is_32bit(vcpu))
+		vcpu_prepare_fpexc();
+
+	vcpu->arch.cptr_el2 = CPTR_EL2_TTA | CPTR_EL2_TFP;
+}
+
 static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
 
 static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
 {
-	return false;
+	return !(vcpu->arch.cptr_el2 & CPTR_EL2_TFP);
+}
+
+static inline void vcpu_restore_host_vfp_state(struct kvm_vcpu *vcpu)
+{
+	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+
+	__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+	__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
 }
 
 #endif /* __ARM64_KVM_EMULATE_H__ */

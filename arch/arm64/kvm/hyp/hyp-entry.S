@@ -164,6 +164,32 @@ ENTRY(__hyp_do_panic)
 	eret
 ENDPROC(__hyp_do_panic)
 
+/**
+  * void __fpsimd_prepare_fpexc32(void) -
+  *	We may be entering the guest and set CPTR_EL2.TFP to trap all floating
+  *	point register accesses to EL2, however, the ARM manual clearly states
+  *	that traps are only taken to EL2 if the operation would not otherwise
+  *	trap to EL1.  Therefore, always make sure that for 32-bit guests,
+  *	we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+  */
+ENTRY(__fpsimd_prepare_fpexc32)
+	mov	x2, #(1 << 30)
+	msr	fpexc32_el2, x2
+	ret
+ENDPROC(__fpsimd_prepare_fpexc32)
+
+/**
+ * void __fpsimd_save_fpexc32(void) -
+ *	This function restores guest FPEXC to its vcpu context, we call this
+ *	function from vcpu_put.
+ */
+ENTRY(__fpsimd_save_fpexc32)
+	kern_hyp_va x0
+	mrs	x2, fpexc32_el2
+	str	x2, [x0, #VCPU_FPEXC32_EL2]
+	ret
+ENDPROC(__fpsimd_save_fpexc32)
+
 .macro invalid_vector	label, target = __hyp_panic
 	.align	2
 \label:

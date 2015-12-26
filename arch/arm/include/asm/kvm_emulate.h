@@ -284,6 +284,12 @@ static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
 {
 	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
 }
+
+static inline bool vcpu_guest_is_32bit(struct kvm_vcpu *vcpu)
+{
+	return true;
+}
+static inline void vcpu_save_fpexc(struct kvm_vcpu *vcpu) {}
 #else
 static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
 {
@@ -295,6 +301,12 @@ static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
 {
 	return false;
 }
+
+static inline bool vcpu_guest_is_32bit(struct kvm_vcpu *vcpu)
+{
+	return true;
+}
+static inline void vcpu_save_fpexc(struct kvm_vcpu *vcpu) {}
 #endif
 
 #endif /* __ARM_KVM_EMULATE_H__ */
