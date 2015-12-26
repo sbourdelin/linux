@@ -313,18 +313,18 @@ acpi_i2c_space_handler(u32 function, acpi_physical_address command,
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client) {
 		ret = AE_NO_MEMORY;
-		goto err;
+		goto free_ares;
 	}
 
 	if (!value64 || ares->type != ACPI_RESOURCE_TYPE_SERIAL_BUS) {
 		ret = AE_BAD_PARAMETER;
-		goto err;
+		goto free_client;
 	}
 
 	sb = &ares->data.i2c_serial_bus;
 	if (sb->type != ACPI_RESOURCE_SERIAL_TYPE_I2C) {
 		ret = AE_BAD_PARAMETER;
-		goto err;
+		goto free_client;
 	}
 
 	client->adapter = adapter;
@@ -405,9 +405,9 @@ acpi_i2c_space_handler(u32 function, acpi_physical_address command,
 	}
 
 	gsb->status = status;
-
- err:
+free_client:
 	kfree(client);
+free_ares:
 	ACPI_FREE(ares);
 	return ret;
 }
