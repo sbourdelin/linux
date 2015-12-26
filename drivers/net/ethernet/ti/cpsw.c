@@ -2448,8 +2448,10 @@ static int cpsw_probe(struct platform_device *pdev)
 
 	/* RX IRQ */
 	irq = platform_get_irq(pdev, 1);
-	if (irq < 0)
+	if (irq < 0) {
+		ret = -ENOENT;
 		goto clean_ale_ret;
+	}
 
 	priv->irqs_table[0] = irq;
 	ret = devm_request_irq(&pdev->dev, irq, cpsw_rx_interrupt,
@@ -2461,8 +2463,10 @@ static int cpsw_probe(struct platform_device *pdev)
 
 	/* TX IRQ */
 	irq = platform_get_irq(pdev, 2);
-	if (irq < 0)
+	if (irq < 0) {
+		ret = -ENOENT;
 		goto clean_ale_ret;
+	}
 
 	priv->irqs_table[1] = irq;
 	ret = devm_request_irq(&pdev->dev, irq, cpsw_tx_interrupt,
