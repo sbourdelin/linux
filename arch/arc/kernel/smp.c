@@ -22,6 +22,7 @@
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
 #include <linux/reboot.h>
+#include <linux/seq_file.h>
 #include <asm/processor.h>
 #include <asm/setup.h>
 #include <asm/mach_desc.h>
@@ -347,6 +348,32 @@ irqreturn_t do_IPI(int irq, void *dev_id)
 	} while (pending);
 
 	return IRQ_HANDLED;
+}
+
+void arch_do_IPI(unsigned int irq, struct pt_regs *regs)
+{
+	struct pt_regs *old_regs = set_irq_regs(regs);
+	unsigned int cpu = smp_processor_id();
+
+	__IRQ_STAT(cpu, ipi_irqs)++;
+
+	irq_enter();
+	do_IPI(irq, NULL);
+	irq_exit();
+
+	set_irq_regs(old_regs);
+}
+
+void show_ipi_list(struct seq_file *p, int prec)
+{
+	unsigned int cpu;
+
+	seq_printf(p, "%*s: ", prec - 1, "IPI");
+
+	for_each_online_cpu(cpu)
+		seq_printf(p, "%10u ", __IRQ_STAT(cpu, ipi_irqs));
+
+	seq_printf(p, " %s\n", "IPI");
 }
 
 /*

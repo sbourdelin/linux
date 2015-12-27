@@ -55,7 +55,10 @@ void arch_do_IRQ(unsigned int irq, struct pt_regs *regs)
 void (*handle_arch_irq)(unsigned int hwirq, struct pt_regs *) = NULL;
 void arch_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
-	handle_arch_irq(irq, regs);
+	if (irq == IPI_IRQ)
+		arch_do_IPI(irq, regs);
+	else
+		handle_arch_irq(irq, regs);
 }
 
 void __init set_handle_irq(void (*handle_irq)(unsigned int hwirq,
@@ -64,6 +67,14 @@ void __init set_handle_irq(void (*handle_irq)(unsigned int hwirq,
 	handle_arch_irq = handle_irq;
 }
 #endif
+
+int arch_show_interrupts(struct seq_file *p, int prec)
+{
+#ifdef CONFIG_SMP
+	show_ipi_list(p, prec);
+#endif
+	return 0;
+}
 
 /*
  * API called for requesting percpu interrupts - called by each CPU

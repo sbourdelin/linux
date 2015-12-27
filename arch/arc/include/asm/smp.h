@@ -14,11 +14,15 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/threads.h>
+#include <asm/ptrace.h>
 
 #define raw_smp_processor_id() (current_thread_info()->cpu)
 
 /* including cpumask.h leads to cyclic deps hence this Forward declaration */
 struct cpumask;
+
+/* including seq_file.h leads to cyclic deps hence this Forward declaration */
+struct seq_file;
 
 /*
  * APIs provided by arch SMP code to generic code
@@ -32,6 +36,8 @@ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
 extern void __init smp_init_cpus(void);
 extern void first_lines_of_secondary(void);
 extern const char *arc_platform_smp_cpuinfo(void);
+extern void arch_do_IPI(unsigned int irq, struct pt_regs *regs);
+extern void show_ipi_list(struct seq_file *, int);
 
 /*
  * API expected BY platform smp code (FROM arch smp code)
