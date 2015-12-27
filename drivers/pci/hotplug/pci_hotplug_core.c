@@ -45,10 +45,10 @@
 
 #define MY_NAME	"pci_hotplug"
 
-#define dbg(fmt, arg...) do { if (debug) printk(KERN_DEBUG "%s: %s: " fmt , MY_NAME , __func__ , ## arg); } while (0)
-#define err(format, arg...) printk(KERN_ERR "%s: " format , MY_NAME , ## arg)
-#define info(format, arg...) printk(KERN_INFO "%s: " format , MY_NAME , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "%s: " format , MY_NAME , ## arg)
+#define dbg(fmt, arg...) do { if (debug) printk(KERN_DEBUG "%s: %s: " fmt, MY_NAME, __func__, ## arg); } while (0)
+#define err(format, arg...) printk(KERN_ERR "%s: " format, MY_NAME, ## arg)
+#define info(format, arg...) printk(KERN_INFO "%s: " format, MY_NAME, ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "%s: " format, MY_NAME, ## arg)
 
 
 /* local variables */
@@ -64,7 +64,7 @@ static DEFINE_MUTEX(pci_hp_mutex);
 
 /* Weee, fun with macros... */
 #define GET_STATUS(name, type)	\
-static int get_##name(struct hotplug_slot *slot, type *value)		\
+static int get_##name(struct hotplug_slot *slot, type * value)		\
 {									\
 	struct hotplug_slot_ops *ops = slot->ops;			\
 	int retval = 0;							\
@@ -226,7 +226,7 @@ static ssize_t test_write_file(struct pci_slot *pci_slot, const char *buf,
 	u32 test;
 	int retval = 0;
 
-	ltest = simple_strtoul (buf, NULL, 10);
+	ltest = simple_strtoul(buf, NULL, 10);
 	test = (u32)(ltest & 0xffffffff);
 	dbg("test = %d\n", test);
 
