@@ -51,7 +51,6 @@ struct cyttsp_platform_data {
 	int (*init)(void);
 	void (*exit)(void);
 	char *name;
-	s16 irq_gpio;
 	u8 *bl_keys;
 };
 
