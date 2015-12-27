@@ -1130,7 +1130,7 @@ static ssize_t ssb_pci_attr_sprom_show(struct device *pcidev,
 				       struct device_attribute *attr,
 				       char *buf)
 {
-	struct pci_dev *pdev = container_of(pcidev, struct pci_dev, dev);
+	struct pci_dev *pdev = to_pci_dev(pcidev);
 	struct ssb_bus *bus;
 
 	bus = ssb_pci_dev_to_bus(pdev);
@@ -1144,7 +1144,7 @@ static ssize_t ssb_pci_attr_sprom_store(struct device *pcidev,
 					struct device_attribute *attr,
 					const char *buf, size_t count)
 {
-	struct pci_dev *pdev = container_of(pcidev, struct pci_dev, dev);
+	struct pci_dev *pdev = to_pci_dev(pcidev);
 	struct ssb_bus *bus;
 
 	bus = ssb_pci_dev_to_bus(pdev);
