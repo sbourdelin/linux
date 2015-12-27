@@ -138,7 +138,9 @@ void start_kernel_secondary(void)
 
 	pr_info("## CPU%u LIVE ##: Executing Code...\n", cpu);
 
+#ifndef CONFIG_CLKSRC_OF
 	arc_local_timer_setup();
+#endif
 
 	local_irq_enable();
 	preempt_disable();

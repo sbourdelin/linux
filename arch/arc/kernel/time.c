@@ -38,6 +38,7 @@
 #include <linux/init.h>
 #include <linux/timex.h>
 #include <linux/profile.h>
+#include <linux/clk-provider.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <asm/irq.h>
@@ -283,6 +284,13 @@ void __init time_init(void)
 		 */
 		clocksource_register_hz(&arc_counter, arc_get_core_freq());
 
+#ifdef CONFIG_COMMON_CLK
+	of_clk_init(NULL);
+#endif
+#ifdef CONFIG_CLKSRC_OF
+	clocksource_probe();
+#else
 	/* sets up the periodic event timer */
 	arc_local_timer_setup();
+#endif
 }
