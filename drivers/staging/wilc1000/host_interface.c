@@ -4570,7 +4570,7 @@ static void *host_int_ParseJoinBssParam(tstrNetworkInfo *ptstrNetworkInfo)
 				pNewJoinBssParam->rsn_grp_policy = pu8IEs[rsnIndex];
 				rsnIndex++;
 				jumpOffset = pu8IEs[rsnIndex] * 4;
-				pcipherCount = (pu8IEs[rsnIndex] > 3) ? 3 : pu8IEs[rsnIndex];
+				pcipherCount = min_t(u8, pu8IEs[rsnIndex], 3);
 				rsnIndex += 2;
 
 				for (i = pcipherTotalCount, j = 0; i < pcipherCount + pcipherTotalCount && i < 3; i++, j++)
@@ -4581,7 +4581,7 @@ static void *host_int_ParseJoinBssParam(tstrNetworkInfo *ptstrNetworkInfo)
 
 				jumpOffset = pu8IEs[rsnIndex] * 4;
 
-				authCount = (pu8IEs[rsnIndex] > 3) ? 3 : pu8IEs[rsnIndex];
+				authCount = min_t(u8, pu8IEs[rsnIndex], 3);
 				rsnIndex += 2;
 
 				for (i = authTotalCount, j = 0; i < authTotalCount + authCount; i++, j++)
