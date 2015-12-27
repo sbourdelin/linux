@@ -36,4 +36,9 @@ void arc_request_percpu_irq(int irq, int cpu,
                             irqreturn_t (*isr)(int irq, void *dev),
                             const char *irq_nm, void *percpu_dev);
 
+#ifdef CONFIG_HANDLE_DOMAIN_IRQ
+extern void set_handle_irq(void (*handle_irq)(unsigned int hwirq,
+					      struct pt_regs *));
+#endif
+
 #endif

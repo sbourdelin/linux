@@ -41,6 +41,7 @@ void __init init_IRQ(void)
  * "C" Entry point for any ARC ISR, called from low level vector handler
  * @irq is the vector number read from ICAUSE reg of on-chip intc
  */
+#ifndef CONFIG_HANDLE_DOMAIN_IRQ
 void arch_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
@@ -50,6 +51,19 @@ void arch_do_IRQ(unsigned int irq, struct pt_regs *regs)
 	irq_exit();
 	set_irq_regs(old_regs);
 }
+#else
+void (*handle_arch_irq)(unsigned int hwirq, struct pt_regs *) = NULL;
+void arch_do_IRQ(unsigned int irq, struct pt_regs *regs)
+{
+	handle_arch_irq(irq, regs);
+}
+
+void __init set_handle_irq(void (*handle_irq)(unsigned int hwirq,
+					      struct pt_regs *))
+{
+	handle_arch_irq = handle_irq;
+}
+#endif
 
 /*
  * API called for requesting percpu interrupts - called by each CPU
