@@ -214,7 +214,6 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_of_cpumask_add_table);
 /*
  * Works only for OPP v2 bindings.
  *
- * cpumask should be already set to mask of cpu_dev->id.
  * Returns -ENOENT if operating-points-v2 bindings aren't supported.
  */
 int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
@@ -235,9 +234,6 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask
 		goto put_cpu_node;
 
 	for_each_possible_cpu(cpu) {
-		if (cpu == cpu_dev->id)
-			continue;
-
 		tcpu_dev = get_cpu_device(cpu);
 		if (!tcpu_dev) {
 			dev_err(cpu_dev, "%s: failed to get cpu%d device\n",
