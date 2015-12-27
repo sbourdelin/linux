@@ -2667,7 +2667,7 @@ isert_reg_sig_mr(struct isert_conn *isert_conn,
 	memset(&sig_attrs, 0, sizeof(sig_attrs));
 	ret = isert_set_sig_attrs(se_cmd, &sig_attrs);
 	if (ret)
-		goto err;
+		return ret;
 
 	sig_attrs.check_mask = isert_set_prot_checks(se_cmd->prot_checks);
 
@@ -2695,7 +2695,7 @@ isert_reg_sig_mr(struct isert_conn *isert_conn,
 	ret = ib_post_send(isert_conn->qp, wr, &bad_wr);
 	if (ret) {
 		isert_err("fast registration failed, ret:%d\n", ret);
-		goto err;
+		return ret;
 	}
 	fr_desc->ind &= ~ISERT_SIG_KEY_VALID;
 
@@ -2713,8 +2713,7 @@ isert_reg_sig_mr(struct isert_conn *isert_conn,
 	isert_dbg("sig_sge: addr: 0x%llx  length: %u lkey: %x\n",
 		  rdma_wr->ib_sg[SIG].addr, rdma_wr->ib_sg[SIG].length,
 		  rdma_wr->ib_sg[SIG].lkey);
-err:
-	return ret;
+	return 0;
 }
 
 static int
