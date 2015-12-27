@@ -195,11 +195,6 @@ drbd_insert_fault(struct drbd_device *device, unsigned int type) {
 #endif
 }
 
-/* integer division, round _UP_ to the next integer */
-#define div_ceil(A, B) ((A)/(B) + ((A)%(B) ? 1 : 0))
-/* usual integer division */
-#define div_floor(A, B) ((A)/(B))
-
 extern struct ratelimit_state drbd_ratelimit_state;
 extern struct idr drbd_devices; /* RCU, updates: genl_lock() */
 extern struct list_head drbd_resources; /* RCU, updates: genl_lock() */
