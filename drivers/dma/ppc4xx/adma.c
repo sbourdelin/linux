@@ -3887,7 +3887,7 @@ static int ppc440spe_adma_setup_irqs(struct ppc440spe_adma_device *adev,
 	struct device_node *np;
 	int ret;
 
-	ofdev = container_of(adev->dev, struct platform_device, dev);
+	ofdev = to_platform_device(adev->dev);
 	np = ofdev->dev.of_node;
 	if (adev->id != PPC440SPE_XOR_ID) {
 		adev->err_irq = irq_of_parse_and_map(np, 1);
