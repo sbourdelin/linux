@@ -458,34 +458,17 @@ s32 wilc_parse_network_info(u8 *pu8MsgBuffer, tstrNetworkInfo **ppstrNetworkInfo
 
 /**
  *  @brief              Deallocates the parsed Network Info
- *  @details
  *  @param[in]  pstrNetworkInfo Network Info to be deallocated
- *  @return             Error code indicating success/failure
- *  @note
  *  @author		mabubakr
  *  @date		1 Mar 2012
- *  @version		1.0
  */
-s32 wilc_dealloc_network_info(tstrNetworkInfo *pstrNetworkInfo)
+void wilc_dealloc_network_info(tstrNetworkInfo *network_info)
 {
-	s32 s32Error = 0;
+	if (!network_info)
+		return;
 
-	if (pstrNetworkInfo) {
-		if (pstrNetworkInfo->pu8IEs) {
-			kfree(pstrNetworkInfo->pu8IEs);
-			pstrNetworkInfo->pu8IEs = NULL;
-		} else {
-			s32Error = -EFAULT;
-		}
-
-		kfree(pstrNetworkInfo);
-		pstrNetworkInfo = NULL;
-
-	} else {
-		s32Error = -EFAULT;
-	}
-
-	return s32Error;
+	kfree(network_info->pu8IEs);
+	kfree(network_info);
 }
 
 /**

@@ -130,7 +130,7 @@ typedef struct {
 s32 wilc_send_config_pkt(struct wilc *wilc, u8 mode, struct wid *wids,
 			 u32 count, u32 drv);
 s32 wilc_parse_network_info(u8 *pu8MsgBuffer, tstrNetworkInfo **ppstrNetworkInfo);
-s32 wilc_dealloc_network_info(tstrNetworkInfo *pstrNetworkInfo);
+void wilc_dealloc_network_info(tstrNetworkInfo *network_info);
 
 s32 wilc_parse_assoc_resp_info(u8 *pu8Buffer, u32 u32BufferLen,
 		       tstrConnectRespInfo **ppstrConnectRespInfo);
