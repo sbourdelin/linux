@@ -443,7 +443,7 @@ iser_reg_sig_mr(struct iscsi_iser_task *iser_task,
 	memset(sig_attrs, 0, sizeof(*sig_attrs));
 	ret = iser_set_sig_attrs(iser_task->sc, sig_attrs);
 	if (ret)
-		goto err;
+		return ret;
 
 	iser_set_prot_checks(iser_task->sc, &sig_attrs->check_mask);
 
@@ -475,8 +475,7 @@ iser_reg_sig_mr(struct iscsi_iser_task *iser_task,
 	iser_dbg("lkey=0x%x rkey=0x%x addr=0x%llx length=%u\n",
 		 sig_reg->sge.lkey, sig_reg->rkey, sig_reg->sge.addr,
 		 sig_reg->sge.length);
-err:
-	return ret;
+	return 0;
 }
 
 static int iser_fast_reg_mr(struct iscsi_iser_task *iser_task,
