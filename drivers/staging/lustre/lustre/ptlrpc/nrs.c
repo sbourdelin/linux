@@ -496,18 +496,9 @@ static void nrs_resource_put_safe(struct ptlrpc_nrs_resource **resp)
 	}
 
 	for (i = 0; i < NRS_RES_MAX; i++) {
-		if (pols[i] == NULL)
-			continue;
-
-		if (nrs == NULL) {
-			nrs = pols[i]->pol_nrs;
-			spin_lock(&nrs->nrs_lock);
-		}
-		nrs_policy_put_locked(pols[i]);
+		if (pols[i])
+			nrs_policy_put(pols[i]);
 	}
-
-	if (nrs != NULL)
-		spin_unlock(&nrs->nrs_lock);
 }
 
 /**
