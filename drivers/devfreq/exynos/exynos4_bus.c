@@ -566,8 +566,7 @@ static int exynos4_bus_target(struct device *dev, unsigned long *_freq,
 			      u32 flags)
 {
 	int err = 0;
-	struct platform_device *pdev = container_of(dev, struct platform_device,
-						    dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct busfreq_data *data = platform_get_drvdata(pdev);
 	struct dev_pm_opp *opp;
 	unsigned long freq;

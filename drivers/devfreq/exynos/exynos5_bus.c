@@ -85,8 +85,7 @@ static int exynos5_busfreq_int_target(struct device *dev, unsigned long *_freq,
 			      u32 flags)
 {
 	int err = 0;
-	struct platform_device *pdev = container_of(dev, struct platform_device,
-						    dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct busfreq_data_int *data = platform_get_drvdata(pdev);
 	struct dev_pm_opp *opp;
 	unsigned long old_freq, freq;
@@ -145,8 +144,7 @@ out:
 static int exynos5_int_get_dev_status(struct device *dev,
 				      struct devfreq_dev_status *stat)
 {
-	struct platform_device *pdev = container_of(dev, struct platform_device,
-						    dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct busfreq_data_int *data = platform_get_drvdata(pdev);
 	struct busfreq_ppmu_data *ppmu_data = &data->ppmu_data;
 	int busier_dmc;
@@ -370,8 +368,7 @@ static int exynos5_busfreq_int_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM_SLEEP
 static int exynos5_busfreq_int_resume(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev, struct platform_device,
-						    dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct busfreq_data_int *data = platform_get_drvdata(pdev);
 	struct busfreq_ppmu_data *ppmu_data = &data->ppmu_data;
 
