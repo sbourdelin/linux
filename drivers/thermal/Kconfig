@@ -185,6 +185,7 @@ config HISI_THERMAL
 
 config IMX_THERMAL
 	tristate "Temperature sensor driver for Freescale i.MX SoCs"
+	depends on ARCH_MXC || COMPILE_TEST
 	depends on CPU_THERMAL
 	depends on MFD_SYSCON
 	depends on OF
@@ -382,6 +383,7 @@ endmenu
 
 config QCOM_SPMI_TEMP_ALARM
 	tristate "Qualcomm SPMI PMIC Temperature Alarm"
+	depends on ARCH_QCOM || COMPILE_TEST
 	depends on OF && SPMI && IIO
 	select REGMAP_SPMI
 	help
