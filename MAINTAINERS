@@ -7019,11 +7019,11 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
 S:	Supported
 F:	arch/microblaze/
 
-MICROSOFT SURFACE PRO 3 BUTTON DRIVER
+MICROSOFT SURFACE PRO SERIES BUTTON DRIVER
 M:	Chen Yu <yu.c.chen@intel.com>
 L:	platform-driver-x86@vger.kernel.org
 S:	Supported
-F:	drivers/platform/x86/surfacepro3_button.c
+F:	drivers/platform/x86/surfacepro_button.c
 
 MICROTEK X6 SCANNER
 M:	Oliver Neukum <oliver@neukum.org>
