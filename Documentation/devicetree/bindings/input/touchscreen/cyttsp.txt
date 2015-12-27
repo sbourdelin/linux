@@ -1,0 +1,73 @@
+* Cypress cyttsp touchscreen controller
+
+Required properties:
+- compatible		: must be "cypress,cyttsp-i2c" or "cypress,cyttsp-spi"
+- reg			: Device address
+- spi-max-frequency 	: Maximum SPI clocking speed of the device (for cyttsp-spi)
+- interrupt-parent	: the phandle for the gpio controller
+			  (see interrupt binding[0]).
+- interrupts		: (gpio) interrupt to which the chip is connected
+			  (see interrupt binding[0]).
+- reset-gpios		: the reset gpio the chip is connected to
+			  (see GPIO binding[1] for more details).
+- maxx			: horizontal resolution of touchscreen (in pixels)
+- maxy			: vertical resolution of touchscreen (in pixels)
+- bootloader-key	: the bootloader key used to exit bootloader mode
+
+Optional properties:
+- use_hndshk		: enable handshake bit
+- act_dist		: active distance
+- act_intrvl		: active refresh interval in ms
+- tch_tmout		: active touch timeout in ms
+- lp_intrvl		: low power refresh interval in ms
+
+[0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+[1]: Documentation/devicetree/bindings/gpio/gpio.txt
+
+Example:
+	&i2c1 {
+		/* ... */
+		cyttsp@a {
+			compatible = "cypress,cyttsp-i2c";
+			reg = <0xa>;
+			interrupt-parent = <&msm_gpio>;
+			interrupts = <13 0x2008>;
+			reset-gpios = <&msm_gpio 12 0x00>;
+
+			maxx = <800>;
+			maxy = <480>;
+			bootloader-key = /bits/ 8 <0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08>;
+
+			use_hndshk;
+			act_dist = /bits/ 8 <0xF8>;
+			act_intrvl = /bits/ 8 <0x00>;
+			tch_tmout = /bits/ 8 <0xFF>;
+			lp_intrvl = /bits/ 8 <0x0A>;
+		};
+
+		/* ... */
+	};
+
+	&mcspi1 {
+		/* ... */
+		cyttsp@0 {
+			compatible = "cypress,cyttsp-spi";
+			spi-max-frequency = <6000000>;
+			reg = <0>;
+			interrupt-parent = <&msm_gpio>;
+			interrupts = <13 0x2008>;
+			reset-gpios = <&msm_gpio 12 0x00>;
+
+			maxx = <800>;
+			maxy = <480>;
+			bootloader-key = /bits/ 8 <0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08>;
+
+			use_hndshk;
+			act_dist = /bits/ 8 <0xF8>;
+			act_intrvl = /bits/ 8 <0x00>;
+			tch_tmout = /bits/ 8 <0xFF>;
+			lp_intrvl = /bits/ 8 <0x0A>;
+		};
+
+		/* ... */
+	};
