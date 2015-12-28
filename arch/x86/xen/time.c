@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/pvclock_gtod.h>
 #include <linux/timekeeper_internal.h>
+#include <linux/memblock.h>
 
 #include <asm/pvclock.h>
 #include <asm/xen/hypervisor.h>
@@ -403,6 +404,69 @@ static const struct pv_time_ops xen_time_ops __initconst = {
 	.sched_clock = xen_clocksource_read,
 };
 
+#ifdef CONFIG_XEN_TIME_VSYSCALL
+static struct pvclock_vsyscall_time_info *xen_clock __read_mostly;
+
+static int xen_setup_vsyscall_time_info(int cpu)
+{
+	struct pvclock_vsyscall_time_info *ti;
+	struct vcpu_register_time_memory_area t;
+	struct pvclock_vcpu_time_info *pvti;
+	unsigned long mem;
+	int ret, size;
+	u8 flags;
+
+	ret = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_time_memory_area,
+				 cpu, NULL);
+	if (ret == -ENOSYS) {
+		pr_debug("xen: vcpu_time_info placement not supported\n");
+		return -ENOTSUPP;
+	}
+
+	size = PAGE_ALIGN(sizeof(struct pvclock_vsyscall_time_info));
+	mem = memblock_alloc(size, PAGE_SIZE);
+	if (!mem)
+		return -ENOMEM;
+
+	ti = __va(mem);
+	memset(ti, 0, size);
+
+	t.addr.v = &ti[cpu].pvti;
+
+	ret = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_time_memory_area,
+				 cpu, &t);
+
+	if (ret) {
+		pr_debug("xen: cannot register vcpu_time_info err %d\n", ret);
+		memblock_free(mem, size);
+		return ret;
+	}
+
+	pvti = &ti[cpu].pvti;
+	flags = pvti->flags;
+
+	if (!(flags & PVCLOCK_TSC_STABLE_BIT)) {
+		pr_debug("xen: VCLOCK_PVCLOCK not supported\n");
+		memblock_free(mem, size);
+		return -ENOTSUPP;
+	}
+
+	xen_clock = ti;
+	pvclock_set_flags(PVCLOCK_TSC_STABLE_BIT);
+	pvclock_set_pvti_cpu0_va(xen_clock);
+
+	xen_clocksource.archdata.vclock_mode = VCLOCK_PVCLOCK;
+
+	return 0;
+}
+#else
+static int xen_setup_vsyscall_time_info(int cpu)
+{
+	return -1;
+}
+
+#endif	/* CONFIG_XEN_TIME_VSYSCALL */
+
 static void __init xen_time_init(void)
 {
 	int cpu = smp_processor_id();
@@ -430,6 +494,8 @@ static void __init xen_time_init(void)
 	xen_setup_runstate_info(cpu);
 	xen_setup_timer(cpu);
 	xen_setup_cpu_clockevents();
+
+	xen_setup_vsyscall_time_info(cpu);
 
 	if (xen_initial_domain())
 		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
