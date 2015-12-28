@@ -197,8 +197,6 @@ void snd_hdac_ext_bus_device_remove(struct hdac_ext_bus *ebus)
 	}
 }
 EXPORT_SYMBOL_GPL(snd_hdac_ext_bus_device_remove);
-#define dev_to_hdac(dev) (container_of((dev), \
-			struct hdac_device, dev))
 
 static inline struct hdac_ext_driver *get_edrv(struct device *dev)
 {
