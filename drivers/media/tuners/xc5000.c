@@ -1166,7 +1166,7 @@ static int xc_load_fw_and_init_tuner(struct dvb_frontend *fe, int force)
 
 		ret = xc5000_fwupload(fe, desired_fw, fw);
 		if (ret != 0)
-			goto err;
+			goto report_failure;
 
 		msleep(20);
 
@@ -1229,18 +1229,16 @@ static int xc_load_fw_and_init_tuner(struct dvb_frontend *fe, int force)
 		/* Default to "CABLE" mode */
 		ret = xc_write_reg(priv, XREG_SIGNALSOURCE, XC_RF_MODE_CABLE);
 		if (!ret)
-			break;
+			goto report_success;
 		printk(KERN_ERR "xc5000: can't set to cable mode.");
 	}
 
-err:
-	if (!ret)
-		printk(KERN_INFO "xc5000: Firmware %s loaded and running.\n",
-		       desired_fw->name);
-	else
-		printk(KERN_CONT " - too many retries. Giving up\n");
-
+report_failure:
+	pr_cont(" - too many retries. Giving up\n");
 	return ret;
+report_success:
+	pr_info("xc5000: Firmware %s loaded and running.\n", desired_fw->name);
+	return 0;
 }
 
 static void xc5000_do_timer_sleep(struct work_struct *timer_sleep)
