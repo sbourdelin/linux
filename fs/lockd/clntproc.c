@@ -476,9 +476,9 @@ static void nlmclnt_locks_init_private(struct file_lock *fl, struct nlm_host *ho
 	fl->fl_ops = &nlmclnt_lock_ops;
 }
 
-static int do_vfs_lock(struct file_lock *fl)
+static int do_vfs_lock(struct inode *inode, struct file_lock *fl)
 {
-	return locks_lock_file_wait(fl->fl_file, fl);
+	return locks_lock_inode_wait(inode, fl);
 }
 
 /*
@@ -508,6 +508,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	struct nlm_host	*host = req->a_host;
 	struct nlm_res	*resp = &req->a_res;
 	struct nlm_wait *block = NULL;
+	struct inode *inode = file_inode(fl->fl_file);
 	unsigned char fl_flags = fl->fl_flags;
 	unsigned char fl_type;
 	int status = -ENOLCK;
@@ -517,7 +518,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	req->a_args.state = nsm_local_state;
 
 	fl->fl_flags |= FL_ACCESS;
-	status = do_vfs_lock(fl);
+	status = do_vfs_lock(inode, fl);
 	fl->fl_flags = fl_flags;
 	if (status < 0)
 		goto out;
@@ -567,7 +568,7 @@ again:
 		}
 		/* Ensure the resulting lock will get added to granted list */
 		fl->fl_flags |= FL_SLEEP;
-		if (do_vfs_lock(fl) < 0)
+		if (do_vfs_lock(inode, fl) < 0)
 			printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n", __func__);
 		up_read(&host->h_rwsem);
 		fl->fl_flags = fl_flags;
@@ -597,7 +598,7 @@ out_unlock:
 	fl_type = fl->fl_type;
 	fl->fl_type = F_UNLCK;
 	down_read(&host->h_rwsem);
-	do_vfs_lock(fl);
+	do_vfs_lock(inode, fl);
 	up_read(&host->h_rwsem);
 	fl->fl_type = fl_type;
 	fl->fl_flags = fl_flags;
@@ -665,7 +666,7 @@ nlmclnt_unlock(struct nfs_open_context *ctx,
 	 */
 	fl->fl_flags |= FL_EXISTS;
 	down_read(&host->h_rwsem);
-	status = do_vfs_lock(fl);
+	status = do_vfs_lock(d_inode(ctx->dentry), fl);
 	up_read(&host->h_rwsem);
 	fl->fl_flags = fl_flags;
 	if (status == -ENOENT) {
