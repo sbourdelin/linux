@@ -31,7 +31,8 @@
 static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
 				       u8 *n, u8 *k, u8 *m, u8 *p)
 {
-	u8 div, calcm, calcp;
+	unsigned int div, calcm;
+	u8 calcp;
 
 	/* These clocks can only divide, so we will never be able to achieve
 	 * frequencies higher than the parent frequency */
@@ -50,8 +51,10 @@ static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
 		calcp = 3;
 
 	calcm = DIV_ROUND_UP(div, 1 << calcp);
+	if (calcm > 16)
+		calcm = 16;
 
-	*freq = (parent_rate >> calcp) / calcm;
+	*freq = DIV_ROUND_UP(parent_rate >> calcp, calcm);
 
 	/* we were called to round the frequency, we can now return */
 	if (n == NULL)
