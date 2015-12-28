@@ -267,7 +267,7 @@ static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
 	if (IS_ERR(inode))
 		return ERR_CAST(inode);
 
-	if (f2fs_has_inline_dots(inode)) {
+	if (f2fs_has_inline_dots(inode) && !f2fs_readonly(dir->i_sb)) {
 		err = __recover_dot_dentries(inode, dir->i_ino);
 		if (err)
 			goto err_out;
