@@ -510,27 +510,27 @@ static int m88rs6000t_get_rf_strength(struct dvb_frontend *fe, u16 *strength)
 
 	ret = regmap_read(dev->regmap, 0x5A, &val);
 	if (ret)
-		goto err;
+		goto report_failure;
 	RF_GC = val & 0x0f;
 
 	ret = regmap_read(dev->regmap, 0x5F, &val);
 	if (ret)
-		goto err;
+		goto report_failure;
 	IF_GC = val & 0x0f;
 
 	ret = regmap_read(dev->regmap, 0x3F, &val);
 	if (ret)
-		goto err;
+		goto report_failure;
 	TIA_GC = (val >> 4) & 0x07;
 
 	ret = regmap_read(dev->regmap, 0x77, &val);
 	if (ret)
-		goto err;
+		goto report_failure;
 	BB_GC = (val >> 4) & 0x0f;
 
 	ret = regmap_read(dev->regmap, 0x76, &val);
 	if (ret)
-		goto err;
+		goto report_failure;
 	PGA2_GC = val & 0x3f;
 	PGA2_cri = PGA2_GC >> 2;
 	PGA2_crf = PGA2_GC & 0x03;
@@ -562,9 +562,11 @@ static int m88rs6000t_get_rf_strength(struct dvb_frontend *fe, u16 *strength)
 	/* scale value to 0x0000-0xffff */
 	gain = clamp_val(gain, 1000U, 10500U);
 	*strength = (10500 - gain) * 0xffff / (10500 - 1000);
-err:
-	if (ret)
+
+	if (ret) {
+report_failure:
 		dev_dbg(&dev->client->dev, "failed=%d\n", ret);
+	}
 	return ret;
 }
 
