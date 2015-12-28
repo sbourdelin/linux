@@ -28,6 +28,48 @@ config BTRFS_FS
 
 	  If unsure, say N.
 
+choice
+         prompt "Choose Stripe Size"
+         default RS_1024
+         help
+           Allows you to select the size of the stripe, which is the smallest sized
+           data block to be replicated.
+           Selecting a larger size than your physical block size may lead to data
+           fragmentation in some cases.
+
+        config RS_512
+                 bool "512 bytes"
+
+        config RS_1024
+                 bool "1024 bytes"
+
+        config RS_2048
+                 bool "2048 bytes"
+
+        config RS_4096
+                 bool "4096 bytes"
+
+        config RS_8192
+                 bool "8192 bytes"
+
+        config RS_16384
+                 bool "16384 bytes"
+
+        config RS_32768
+                 bool "32768 bytes"
+
+endchoice
+
+config BTRFS_RAID_STRIPE
+        int
+        default 512 if RS_512
+        default 1024 if RS_1024
+        default 2048 if RS_2048
+        default 4096 if RS_4096
+        default 8192 if RS_8192
+        default 16384 if RS_16384
+        default 32768 if RS_32768
+
 config BTRFS_FS_POSIX_ACL
 	bool "Btrfs POSIX Access Control Lists"
 	depends on BTRFS_FS

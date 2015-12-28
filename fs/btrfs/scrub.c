@@ -63,6 +63,10 @@ struct scrub_ctx;
  */
 #define SCRUB_MAX_PAGES_PER_BLOCK	16	/* 64k per node/leaf/sector */
 
+#define STRIPE_LENGTH CONFIG_BTRFS_RAID_STRIPE
+
+#define BTRFS_STRIPE_LEN	(64 * STRIPE_LENGTH)
+
 struct scrub_recover {
 	atomic_t		refs;
 	struct btrfs_bio	*bbio;

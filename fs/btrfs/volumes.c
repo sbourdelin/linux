@@ -4360,7 +4360,7 @@ static const struct btrfs_raid_attr btrfs_raid_array[BTRFS_NR_RAID_TYPES] = {
 static u32 find_raid56_stripe_len(u32 data_devices, u32 dev_stripe_target)
 {
 	/* TODO allow them to set a preferred stripe size */
-	return 64 * 1024;
+	return BTRFS_STRIPE_LEN;
 }
 
 static void check_raid56_incompat_flag(struct btrfs_fs_info *info, u64 type)

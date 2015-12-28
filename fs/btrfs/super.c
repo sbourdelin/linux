@@ -64,6 +64,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/btrfs.h>
 
+#define STRIPE_LENGTH CONFIG_BTRFS_RAID_STRIPE
+
+#define BTRFS_STRIPE_LEN	(64 * STRIPE_LENGTH)
+
 static const struct super_operations btrfs_super_ops;
 static struct file_system_type btrfs_fs_type;
 

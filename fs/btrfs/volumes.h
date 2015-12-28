@@ -26,7 +26,9 @@
 
 extern struct mutex uuid_mutex;
 
-#define BTRFS_STRIPE_LEN	(64 * 1024)
+#define STRIPE_LENGTH CONFIG_BTRFS_RAID_STRIPE
+
+#define BTRFS_STRIPE_LEN	(64 * STRIPE_LENGTH)
 
 struct buffer_head;
 struct btrfs_pending_bios {
