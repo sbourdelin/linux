@@ -889,18 +889,17 @@ static int airspy_set_lna_gain(struct airspy *s)
 	ret = airspy_ctrl_msg(s, CMD_SET_LNA_AGC, 0, s->lna_gain_auto->val,
 			&u8tmp, 1);
 	if (ret)
-		goto err;
+		goto report_failure;
 
 	if (s->lna_gain_auto->val == false) {
 		ret = airspy_ctrl_msg(s, CMD_SET_LNA_GAIN, 0, s->lna_gain->val,
 				&u8tmp, 1);
 		if (ret)
-			goto err;
+			goto report_failure;
 	}
-err:
-	if (ret)
-		dev_dbg(s->dev, "failed=%d\n", ret);
-
+	return 0;
+report_failure:
+	dev_dbg(s->dev, "failed=%d\n", ret);
 	return ret;
 }
 
@@ -916,18 +915,17 @@ static int airspy_set_mixer_gain(struct airspy *s)
 	ret = airspy_ctrl_msg(s, CMD_SET_MIXER_AGC, 0, s->mixer_gain_auto->val,
 			&u8tmp, 1);
 	if (ret)
-		goto err;
+		goto report_failure;
 
 	if (s->mixer_gain_auto->val == false) {
 		ret = airspy_ctrl_msg(s, CMD_SET_MIXER_GAIN, 0,
 				s->mixer_gain->val, &u8tmp, 1);
 		if (ret)
-			goto err;
+			goto report_failure;
 	}
-err:
-	if (ret)
-		dev_dbg(s->dev, "failed=%d\n", ret);
-
+	return 0;
+report_failure:
+	dev_dbg(s->dev, "failed=%d\n", ret);
 	return ret;
 }
 
