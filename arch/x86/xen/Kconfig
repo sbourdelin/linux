@@ -37,6 +37,11 @@ config XEN_512GB
 	  It is always possible to change the default via specifying the
 	  boot parameter "xen_512gb_limit".
 
+config XEN_TIME_VSYSCALL
+	bool "Enable Xen support for pvclock vsyscall/vdso"
+	depends on XEN && PARAVIRT_CLOCK
+	def_bool n
+
 config XEN_SAVE_RESTORE
        bool
        depends on XEN
