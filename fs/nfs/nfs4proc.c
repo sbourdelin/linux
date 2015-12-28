@@ -5646,8 +5646,10 @@ static struct rpc_task *nfs4_do_unlck(struct file_lock *fl,
 	return rpc_run_task(&task_setup_data);
 }
 
-static int nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock *request)
+static int nfs4_proc_unlck(struct nfs_open_context *ctx,
+		int cmd, struct file_lock *request)
 {
+	struct nfs4_state *state = ctx->state;
 	struct inode *inode = state->inode;
 	struct nfs4_state_owner *sp = state->owner;
 	struct nfs_inode *nfsi = NFS_I(inode);
@@ -5683,7 +5685,7 @@ static int nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock *
 	status = -ENOMEM;
 	if (IS_ERR(seqid))
 		goto out;
-	task = nfs4_do_unlck(request, nfs_file_open_context(request->fl_file), lsp, seqid);
+	task = nfs4_do_unlck(request, ctx, lsp, seqid);
 	status = PTR_ERR(task);
 	if (IS_ERR(task))
 		goto out;
@@ -6107,7 +6109,7 @@ nfs4_proc_lock(struct nfs_open_context *ctx, int cmd, struct file_lock *request)
 
 	if (request->fl_type == F_UNLCK) {
 		if (state != NULL)
-			return nfs4_proc_unlck(state, cmd, request);
+			return nfs4_proc_unlck(ctx, cmd, request);
 		return 0;
 	}
 
