@@ -20,13 +20,12 @@
 #include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/ptrace.h>
+#include <linux/bitops.h>
 
 #include "decode.h"
 #include "decode-arm.h"
 
-#define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
-
-#define branch_displacement(insn) sign_extend(((insn) & 0xffffff) << 2, 25)
+#define branch_displacement(insn) sign_extend32(((insn) & 0xffffff) << 2, 25)
 
 /*
  * To avoid the complications of mimicing single-stepping on a
