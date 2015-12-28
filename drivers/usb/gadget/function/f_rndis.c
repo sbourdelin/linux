@@ -821,6 +821,7 @@ fail:
 	if (rndis->notify_req) {
 		kfree(rndis->notify_req->buf);
 		usb_ep_free_request(rndis->notify, rndis->notify_req);
+		rndis->notify_req = NULL;
 	}
 
 	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
@@ -948,6 +949,7 @@ static void rndis_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	kfree(rndis->notify_req->buf);
 	usb_ep_free_request(rndis->notify, rndis->notify_req);
+	rndis->notify_req = NULL;
 }
 
 static struct usb_function *rndis_alloc(struct usb_function_instance *fi)

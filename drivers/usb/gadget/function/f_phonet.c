@@ -569,8 +569,10 @@ static int pn_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 
 err_req:
-	for (i = 0; i < phonet_rxq_size && fp->out_reqv[i]; i++)
+	for (i = 0; i < phonet_rxq_size && fp->out_reqv[i]; i++) {
 		usb_ep_free_request(fp->out_ep, fp->out_reqv[i]);
+		fp->out_reqv[i] = NULL;
+	}
 	usb_free_all_descriptors(f);
 err:
 	ERROR(cdev, "USB CDC Phonet: cannot autoconfigure\n");
@@ -662,9 +664,12 @@ static void pn_unbind(struct usb_configuration *c, struct usb_function *f)
 	/* We are already disconnected */
 	if (fp->in_req)
 		usb_ep_free_request(fp->in_ep, fp->in_req);
-	for (i = 0; i < phonet_rxq_size; i++)
-		if (fp->out_reqv[i])
+	for (i = 0; i < phonet_rxq_size; i++) {
+		if (fp->out_reqv[i]) {
 			usb_ep_free_request(fp->out_ep, fp->out_reqv[i]);
+			fp->out_reqv[i] = NULL;
+		}
+	}
 
 	usb_free_all_descriptors(f);
 }

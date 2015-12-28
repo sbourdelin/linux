@@ -1459,6 +1459,7 @@ fail:
 	if (ncm->notify_req) {
 		kfree(ncm->notify_req->buf);
 		usb_ep_free_request(ncm->notify, ncm->notify_req);
+		ncm->notify_req = NULL;
 	}
 
 	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
@@ -1561,6 +1562,7 @@ static void ncm_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	kfree(ncm->notify_req->buf);
 	usb_ep_free_request(ncm->notify, ncm->notify_req);
+	ncm->notify_req = NULL;
 }
 
 static struct usb_function *ncm_alloc(struct usb_function_instance *fi)

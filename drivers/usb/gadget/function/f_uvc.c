@@ -736,8 +736,10 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 error:
 	v4l2_device_unregister(&uvc->v4l2_dev);
 
-	if (uvc->control_req)
+	if (uvc->control_req) {
 		usb_ep_free_request(cdev->gadget->ep0, uvc->control_req);
+		uvc->control_req = NULL;
+	}
 	kfree(uvc->control_buf);
 
 	usb_free_all_descriptors(f);
@@ -864,6 +866,7 @@ static void uvc_unbind(struct usb_configuration *c, struct usb_function *f)
 	v4l2_device_unregister(&uvc->v4l2_dev);
 
 	usb_ep_free_request(cdev->gadget->ep0, uvc->control_req);
+	uvc->control_req = NULL;
 	kfree(uvc->control_buf);
 
 	usb_free_all_descriptors(f);
