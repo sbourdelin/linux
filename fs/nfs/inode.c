@@ -699,6 +699,7 @@ static void nfs_init_lock_context(struct nfs_lock_context *l_ctx)
 	l_ctx->lockowner.l_owner = current->files;
 	l_ctx->lockowner.l_pid = current->tgid;
 	INIT_LIST_HEAD(&l_ctx->list);
+	l_ctx->flags = 0;
 	nfs_iocounter_init(&l_ctx->io_count);
 }
 
@@ -758,6 +759,27 @@ void nfs_put_lock_context(struct nfs_lock_context *l_ctx)
 	kfree(l_ctx);
 }
 EXPORT_SYMBOL_GPL(nfs_put_lock_context);
+
+void nfs_unlock_lock_context(struct nfs_lock_context *l_ctx)
+{
+	struct inode *inode = d_inode(l_ctx->open_context->dentry);
+	struct file_lock fl = {
+		.fl_type = F_UNLCK,
+		.fl_start = 0,
+		.fl_end = OFFSET_MAX,
+		.fl_owner = l_ctx->lockowner.l_owner,
+		.fl_pid = l_ctx->lockowner.l_pid,
+	};
+
+	fl.fl_flags = FL_POSIX | FL_CLOSE;
+	NFS_PROTO(inode)->lock(l_ctx->open_context, F_SETLK, &fl);
+	if (fl.fl_ops)
+		fl.fl_ops->fl_release_private(&fl);
+	fl.fl_flags = FL_FLOCK | FL_CLOSE;
+	NFS_PROTO(inode)->lock(l_ctx->open_context, F_SETLK, &fl);
+	if (fl.fl_ops)
+		fl.fl_ops->fl_release_private(&fl);
+}
 
 /**
  * nfs_close_context - Common close_context() routine NFSv2/v3
