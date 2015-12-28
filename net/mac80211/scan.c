@@ -16,6 +16,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
+#include <linux/pm_qos.h>
 #include <net/sch_generic.h>
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -66,23 +67,24 @@ ieee80211_bss_info_update(struct ieee80211_local *local,
 	struct cfg80211_bss *cbss;
 	struct ieee80211_bss *bss;
 	int clen, srlen;
-	struct cfg80211_inform_bss bss_meta = {};
+	enum nl80211_bss_scan_width scan_width;
+	s32 signal = 0;
 	bool signal_valid;
 
 	if (ieee80211_hw_check(&local->hw, SIGNAL_DBM))
-		bss_meta.signal = rx_status->signal * 100;
+		signal = rx_status->signal * 100;
 	else if (ieee80211_hw_check(&local->hw, SIGNAL_UNSPEC))
-		bss_meta.signal = (rx_status->signal * 100) / local->hw.max_signal;
+		signal = (rx_status->signal * 100) / local->hw.max_signal;
 
-	bss_meta.scan_width = NL80211_BSS_CHAN_WIDTH_20;
+	scan_width = NL80211_BSS_CHAN_WIDTH_20;
 	if (rx_status->flag & RX_FLAG_5MHZ)
-		bss_meta.scan_width = NL80211_BSS_CHAN_WIDTH_5;
+		scan_width = NL80211_BSS_CHAN_WIDTH_5;
 	if (rx_status->flag & RX_FLAG_10MHZ)
-		bss_meta.scan_width = NL80211_BSS_CHAN_WIDTH_10;
+		scan_width = NL80211_BSS_CHAN_WIDTH_10;
 
-	bss_meta.chan = channel;
-	cbss = cfg80211_inform_bss_frame_data(local->hw.wiphy, &bss_meta,
-					      mgmt, len, GFP_ATOMIC);
+	cbss = cfg80211_inform_bss_width_frame(local->hw.wiphy, channel,
+					       scan_width, mgmt, len, signal,
+					       GFP_ATOMIC);
 	if (!cbss)
 		return NULL;
 	/* In case the signal is invalid update the status */
@@ -1140,10 +1142,10 @@ int ieee80211_request_sched_scan_start(struct ieee80211_sub_if_data *sdata,
 	return ret;
 }
 
-int ieee80211_request_sched_scan_stop(struct ieee80211_local *local)
+int ieee80211_request_sched_scan_stop(struct ieee80211_sub_if_data *sdata)
 {
-	struct ieee80211_sub_if_data *sched_scan_sdata;
-	int ret = -ENOENT;
+	struct ieee80211_local *local = sdata->local;
+	int ret = 0;
 
 	mutex_lock(&local->mtx);
 
@@ -1155,10 +1157,8 @@ int ieee80211_request_sched_scan_stop(struct ieee80211_local *local)
 	/* We don't want to restart sched scan anymore. */
 	RCU_INIT_POINTER(local->sched_scan_req, NULL);
 
-	sched_scan_sdata = rcu_dereference_protected(local->sched_scan_sdata,
-						lockdep_is_held(&local->mtx));
-	if (sched_scan_sdata) {
-		ret = drv_sched_scan_stop(local, sched_scan_sdata);
+	if (rcu_access_pointer(local->sched_scan_sdata)) {
+		ret = drv_sched_scan_stop(local, sdata);
 		if (!ret)
 			RCU_INIT_POINTER(local->sched_scan_sdata, NULL);
 	}

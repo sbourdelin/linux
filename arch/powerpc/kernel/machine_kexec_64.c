@@ -30,21 +30,6 @@
 #include <asm/smp.h>
 #include <asm/hw_breakpoint.h>
 
-#ifdef CONFIG_PPC_BOOK3E
-int default_machine_kexec_prepare(struct kimage *image)
-{
-	int i;
-	/*
-	 * Since we use the kernel fault handlers and paging code to
-	 * handle the virtual mode, we must make sure no destination
-	 * overlaps kernel static data or bss.
-	 */
-	for (i = 0; i < image->nr_segments; i++)
-		if (image->segment[i].mem < __pa(_end))
-			return -ETXTBSY;
-	return 0;
-}
-#else
 int default_machine_kexec_prepare(struct kimage *image)
 {
 	int i;
@@ -110,7 +95,6 @@ int default_machine_kexec_prepare(struct kimage *image)
 
 	return 0;
 }
-#endif /* !CONFIG_PPC_BOOK3E */
 
 static void copy_segments(unsigned long ind)
 {
@@ -381,7 +365,6 @@ void default_machine_kexec(struct kimage *image)
 	/* NOTREACHED */
 }
 
-#ifndef CONFIG_PPC_BOOK3E
 /* Values we need to export to the second kernel via the device tree. */
 static unsigned long htab_base;
 static unsigned long htab_size;
@@ -428,4 +411,3 @@ static int __init export_htab_values(void)
 	return 0;
 }
 late_initcall(export_htab_values);
-#endif /* !CONFIG_PPC_BOOK3E */

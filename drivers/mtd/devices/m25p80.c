@@ -31,6 +31,7 @@
 struct m25p {
 	struct spi_device	*spi;
 	struct spi_nor		spi_nor;
+	struct mtd_info		mtd;
 	u8			command[MAX_CMD_SIZE];
 };
 
@@ -61,7 +62,8 @@ static int m25p_cmdsz(struct spi_nor *nor)
 	return 1 + nor->addr_width;
 }
 
-static int m25p80_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
+static int m25p80_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
+			int wr_en)
 {
 	struct m25p *flash = nor->priv;
 	struct spi_device *spi = flash->spi;
@@ -157,7 +159,7 @@ static int m25p80_erase(struct spi_nor *nor, loff_t offset)
 	struct m25p *flash = nor->priv;
 
 	dev_dbg(nor->dev, "%dKiB at 0x%08x\n",
-		flash->spi_nor.mtd.erasesize / 1024, (u32)offset);
+		flash->mtd.erasesize / 1024, (u32)offset);
 
 	/* Set up command buffer. */
 	flash->command[0] = nor->erase_opcode;
@@ -199,10 +201,11 @@ static int m25p_probe(struct spi_device *spi)
 	nor->read_reg = m25p80_read_reg;
 
 	nor->dev = &spi->dev;
-	nor->flash_node = spi->dev.of_node;
+	nor->mtd = &flash->mtd;
 	nor->priv = flash;
 
 	spi_set_drvdata(spi, flash);
+	flash->mtd.priv = nor;
 	flash->spi = spi;
 
 	if (spi->mode & SPI_RX_QUAD)
@@ -211,7 +214,7 @@ static int m25p_probe(struct spi_device *spi)
 		mode = SPI_NOR_DUAL;
 
 	if (data && data->name)
-		nor->mtd.name = data->name;
+		flash->mtd.name = data->name;
 
 	/* For some (historical?) reason many platforms provide two different
 	 * names in flash_platform_data: "name" and "type". Quite often name is
@@ -220,6 +223,8 @@ static int m25p_probe(struct spi_device *spi)
 	 */
 	if (data && data->type)
 		flash_name = data->type;
+	else if (!strcmp(spi->modalias, "spi-nor"))
+		flash_name = NULL; /* auto-detect */
 	else
 		flash_name = spi->modalias;
 
@@ -229,7 +234,7 @@ static int m25p_probe(struct spi_device *spi)
 
 	ppdata.of_node = spi->dev.of_node;
 
-	return mtd_device_parse_register(&nor->mtd, NULL, &ppdata,
+	return mtd_device_parse_register(&flash->mtd, NULL, &ppdata,
 			data ? data->parts : NULL,
 			data ? data->nr_parts : 0);
 }
@@ -240,7 +245,7 @@ static int m25p_remove(struct spi_device *spi)
 	struct m25p	*flash = spi_get_drvdata(spi);
 
 	/* Clean up MTD stuff. */
-	return mtd_device_unregister(&flash->spi_nor.mtd);
+	return mtd_device_unregister(&flash->mtd);
 }
 
 /*
@@ -284,24 +289,19 @@ static const struct spi_device_id m25p_ids[] = {
 	{"m25p40-nonjedec"},	{"m25p80-nonjedec"},	{"m25p16-nonjedec"},
 	{"m25p32-nonjedec"},	{"m25p64-nonjedec"},	{"m25p128-nonjedec"},
 
+	/*
+	 * Generic support for SPI NOR that can be identified by the JEDEC READ
+	 * ID opcode (0x9F). Use this, if possible.
+	 */
+	{"spi-nor"},
 	{ },
 };
 MODULE_DEVICE_TABLE(spi, m25p_ids);
 
-static const struct of_device_id m25p_of_table[] = {
-	/*
-	 * Generic compatibility for SPI NOR that can be identified by the
-	 * JEDEC READ ID opcode (0x9F). Use this, if possible.
-	 */
-	{ .compatible = "jedec,spi-nor" },
-	{}
-};
-MODULE_DEVICE_TABLE(of, m25p_of_table);
-
 static struct spi_driver m25p80_driver = {
 	.driver = {
 		.name	= "m25p80",
-		.of_match_table = m25p_of_table,
+		.owner	= THIS_MODULE,
 	},
 	.id_table	= m25p_ids,
 	.probe	= m25p_probe,

@@ -124,7 +124,7 @@ static int __init orion_nand_probe(struct platform_device *pdev)
 	}
 
 	mtd->priv = nc;
-	mtd->dev.parent = &pdev->dev;
+	mtd->owner = THIS_MODULE;
 
 	nc->priv = board;
 	nc->IO_ADDR_R = nc->IO_ADDR_W = io_base;
@@ -201,7 +201,6 @@ static const struct of_device_id orion_nand_of_match_table[] = {
 	{ .compatible = "marvell,orion-nand", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, orion_nand_of_match_table);
 #endif
 
 static struct platform_driver orion_nand_driver = {

@@ -33,7 +33,7 @@
 #include <linux/suspend.h>
 #include <linux/acpi.h>
 #include <asm/intel_pmc_ipc.h>
-#include <linux/platform_data/itco_wdt.h>
+#include <linux/mfd/lpc_ich.h>
 
 /*
  * IPC registers
@@ -96,18 +96,18 @@ static struct intel_pmc_ipc_dev {
 	struct completion cmd_complete;
 
 	/* The following PMC BARs share the same ACPI device with the IPC */
-	resource_size_t acpi_io_base;
+	void *acpi_io_base;
 	int acpi_io_size;
 	struct platform_device *tco_dev;
 
 	/* gcr */
-	resource_size_t gcr_base;
+	void *gcr_base;
 	int gcr_size;
 
 	/* punit */
-	resource_size_t punit_base;
+	void *punit_base;
 	int punit_size;
-	resource_size_t punit_base2;
+	void *punit_base2;
 	int punit_size2;
 	struct platform_device *punit_dev;
 } ipcdev;
@@ -210,15 +210,10 @@ static int intel_pmc_ipc_check_status(void)
 	return ret;
 }
 
-/**
- * intel_pmc_ipc_simple_command() - Simple IPC command
- * @cmd:	IPC command code.
- * @sub:	IPC command sub type.
- *
- * Send a simple IPC command to PMC when don't need to specify
- * input/output data and source/dest pointers.
- *
- * Return:	an IPC error code or 0 on success.
+/*
+ * intel_pmc_ipc_simple_command
+ * @cmd: command
+ * @sub: sub type
  */
 int intel_pmc_ipc_simple_command(int cmd, int sub)
 {
@@ -237,20 +232,16 @@ int intel_pmc_ipc_simple_command(int cmd, int sub)
 }
 EXPORT_SYMBOL_GPL(intel_pmc_ipc_simple_command);
 
-/**
- * intel_pmc_ipc_raw_cmd() - IPC command with data and pointers
- * @cmd:	IPC command code.
- * @sub:	IPC command sub type.
- * @in:		input data of this IPC command.
- * @inlen:	input data length in bytes.
- * @out:	output data of this IPC command.
- * @outlen:	output data length in dwords.
- * @sptr:	data writing to SPTR register.
- * @dptr:	data writing to DPTR register.
- *
- * Send an IPC command to PMC with input/output data and source/dest pointers.
- *
- * Return:	an IPC error code or 0 on success.
+/*
+ * intel_pmc_ipc_raw_cmd
+ * @cmd: command
+ * @sub: sub type
+ * @in: input data
+ * @inlen: input length in bytes
+ * @out: output data
+ * @outlen: output length in dwords
+ * @sptr: data writing to SPTR register
+ * @dptr: data writing to DPTR register
  */
 int intel_pmc_ipc_raw_cmd(u32 cmd, u32 sub, u8 *in, u32 inlen, u32 *out,
 			  u32 outlen, u32 dptr, u32 sptr)
@@ -287,18 +278,14 @@ int intel_pmc_ipc_raw_cmd(u32 cmd, u32 sub, u8 *in, u32 inlen, u32 *out,
 }
 EXPORT_SYMBOL_GPL(intel_pmc_ipc_raw_cmd);
 
-/**
- * intel_pmc_ipc_command() -  IPC command with input/output data
- * @cmd:	IPC command code.
- * @sub:	IPC command sub type.
- * @in:		input data of this IPC command.
- * @inlen:	input data length in bytes.
- * @out:	output data of this IPC command.
- * @outlen:	output data length in dwords.
- *
- * Send an IPC command to PMC with input/output data.
- *
- * Return:	an IPC error code or 0 on success.
+/*
+ * intel_pmc_ipc_command
+ * @cmd: command
+ * @sub: sub type
+ * @in: input data
+ * @inlen: input length in bytes
+ * @out: output data
+ * @outlen: output length in dwords
  */
 int intel_pmc_ipc_command(u32 cmd, u32 sub, u8 *in, u32 inlen,
 			  u32 *out, u32 outlen)
@@ -473,9 +460,9 @@ static struct resource tco_res[] = {
 	},
 };
 
-static struct itco_wdt_platform_data tco_info = {
+static struct lpc_ich_info tco_info = {
 	.name = "Apollo Lake SoC",
-	.version = 3,
+	.iTCO_version = 3,
 };
 
 static int ipc_create_punit_device(void)
@@ -493,11 +480,11 @@ static int ipc_create_punit_device(void)
 	pdev->dev.parent = ipcdev.dev;
 
 	res = punit_res;
-	res->start = ipcdev.punit_base;
+	res->start = (resource_size_t)ipcdev.punit_base;
 	res->end = res->start + ipcdev.punit_size - 1;
 
 	res = punit_res + PUNIT_RESOURCE_INTER;
-	res->start = ipcdev.punit_base2;
+	res->start = (resource_size_t)ipcdev.punit_base2;
 	res->end = res->start + ipcdev.punit_size2 - 1;
 
 	ret = platform_device_add_resources(pdev, punit_res,
@@ -535,15 +522,15 @@ static int ipc_create_tco_device(void)
 	pdev->dev.parent = ipcdev.dev;
 
 	res = tco_res + TCO_RESOURCE_ACPI_IO;
-	res->start = ipcdev.acpi_io_base + TCO_BASE_OFFSET;
+	res->start = (resource_size_t)ipcdev.acpi_io_base + TCO_BASE_OFFSET;
 	res->end = res->start + TCO_REGS_SIZE - 1;
 
 	res = tco_res + TCO_RESOURCE_SMI_EN_IO;
-	res->start = ipcdev.acpi_io_base + SMI_EN_OFFSET;
+	res->start = (resource_size_t)ipcdev.acpi_io_base + SMI_EN_OFFSET;
 	res->end = res->start + SMI_EN_SIZE - 1;
 
 	res = tco_res + TCO_RESOURCE_GCR_MEM;
-	res->start = ipcdev.gcr_base;
+	res->start = (resource_size_t)ipcdev.gcr_base;
 	res->end = res->start + ipcdev.gcr_size - 1;
 
 	ret = platform_device_add_resources(pdev, tco_res, ARRAY_SIZE(tco_res));
@@ -552,7 +539,8 @@ static int ipc_create_tco_device(void)
 		goto err;
 	}
 
-	ret = platform_device_add_data(pdev, &tco_info, sizeof(tco_info));
+	ret = platform_device_add_data(pdev, &tco_info,
+				       sizeof(struct lpc_ich_info));
 	if (ret) {
 		dev_err(ipcdev.dev, "Failed to add tco platform data\n");
 		goto err;
@@ -601,7 +589,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 		return -ENXIO;
 	}
 	size = resource_size(res);
-	ipcdev.acpi_io_base = res->start;
+	ipcdev.acpi_io_base = (void *)res->start;
 	ipcdev.acpi_io_size = size;
 	dev_info(&pdev->dev, "io res: %llx %x\n",
 		 (long long)res->start, (int)resource_size(res));
@@ -613,7 +601,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 		return -ENXIO;
 	}
 	size = resource_size(res);
-	ipcdev.punit_base = res->start;
+	ipcdev.punit_base = (void *)res->start;
 	ipcdev.punit_size = size;
 	dev_info(&pdev->dev, "punit data res: %llx %x\n",
 		 (long long)res->start, (int)resource_size(res));
@@ -625,7 +613,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 		return -ENXIO;
 	}
 	size = resource_size(res);
-	ipcdev.punit_base2 = res->start;
+	ipcdev.punit_base2 = (void *)res->start;
 	ipcdev.punit_size2 = size;
 	dev_info(&pdev->dev, "punit interface res: %llx %x\n",
 		 (long long)res->start, (int)resource_size(res));
@@ -649,7 +637,7 @@ static int ipc_plat_get_res(struct platform_device *pdev)
 	}
 	ipcdev.ipc_base = addr;
 
-	ipcdev.gcr_base = res->start + size;
+	ipcdev.gcr_base = (void *)(res->start + size);
 	ipcdev.gcr_size = PLAT_RESOURCE_GCR_SIZE;
 	dev_info(&pdev->dev, "ipc res: %llx %x\n",
 		 (long long)res->start, (int)resource_size(res));

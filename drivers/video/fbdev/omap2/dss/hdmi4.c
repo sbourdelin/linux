@@ -321,22 +321,9 @@ static int read_edid(u8 *buf, int len)
 	return r;
 }
 
-static void hdmi_start_audio_stream(struct omap_hdmi *hd)
-{
-	hdmi_wp_audio_enable(&hd->wp, true);
-	hdmi4_audio_start(&hd->core, &hd->wp);
-}
-
-static void hdmi_stop_audio_stream(struct omap_hdmi *hd)
-{
-	hdmi4_audio_stop(&hd->core, &hd->wp);
-	hdmi_wp_audio_enable(&hd->wp, false);
-}
-
 static int hdmi_display_enable(struct omap_dss_device *dssdev)
 {
 	struct omap_dss_device *out = &hdmi.output;
-	unsigned long flags;
 	int r = 0;
 
 	DSSDBG("ENTER hdmi_display_enable\n");
@@ -355,21 +342,7 @@ static int hdmi_display_enable(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
-	if (hdmi.audio_configured) {
-		r = hdmi4_audio_config(&hdmi.core, &hdmi.wp, &hdmi.audio_config,
-				       hdmi.cfg.timings.pixelclock);
-		if (r) {
-			DSSERR("Error restoring audio configuration: %d", r);
-			hdmi.audio_abort_cb(&hdmi.pdev->dev);
-			hdmi.audio_configured = false;
-		}
-	}
-
-	spin_lock_irqsave(&hdmi.audio_playing_lock, flags);
-	if (hdmi.audio_configured && hdmi.audio_playing)
-		hdmi_start_audio_stream(&hdmi);
 	hdmi.display_enabled = true;
-	spin_unlock_irqrestore(&hdmi.audio_playing_lock, flags);
 
 	mutex_unlock(&hdmi.lock);
 	return 0;
@@ -381,18 +354,16 @@ err0:
 
 static void hdmi_display_disable(struct omap_dss_device *dssdev)
 {
-	unsigned long flags;
-
 	DSSDBG("Enter hdmi_display_disable\n");
 
 	mutex_lock(&hdmi.lock);
 
-	spin_lock_irqsave(&hdmi.audio_playing_lock, flags);
-	hdmi_stop_audio_stream(&hdmi);
-	hdmi.display_enabled = false;
-	spin_unlock_irqrestore(&hdmi.audio_playing_lock, flags);
+	if (hdmi.audio_pdev && hdmi.audio_abort_cb)
+		hdmi.audio_abort_cb(&hdmi.audio_pdev->dev);
 
 	hdmi_power_off_full(dssdev);
+
+	hdmi.display_enabled = false;
 
 	mutex_unlock(&hdmi.lock);
 }
@@ -597,8 +568,6 @@ static int hdmi_audio_shutdown(struct device *dev)
 
 	mutex_lock(&hd->lock);
 	hd->audio_abort_cb = NULL;
-	hd->audio_configured = false;
-	hd->audio_playing = false;
 	mutex_unlock(&hd->lock);
 
 	return 0;
@@ -607,34 +576,25 @@ static int hdmi_audio_shutdown(struct device *dev)
 static int hdmi_audio_start(struct device *dev)
 {
 	struct omap_hdmi *hd = dev_get_drvdata(dev);
-	unsigned long flags;
 
 	WARN_ON(!hdmi_mode_has_audio(&hd->cfg));
+	WARN_ON(!hd->display_enabled);
 
-	spin_lock_irqsave(&hd->audio_playing_lock, flags);
+	hdmi_wp_audio_enable(&hd->wp, true);
+	hdmi4_audio_start(&hd->core, &hd->wp);
 
-	if (hd->display_enabled)
-		hdmi_start_audio_stream(hd);
-	hd->audio_playing = true;
-
-	spin_unlock_irqrestore(&hd->audio_playing_lock, flags);
 	return 0;
 }
 
 static void hdmi_audio_stop(struct device *dev)
 {
 	struct omap_hdmi *hd = dev_get_drvdata(dev);
-	unsigned long flags;
 
 	WARN_ON(!hdmi_mode_has_audio(&hd->cfg));
+	WARN_ON(!hd->display_enabled);
 
-	spin_lock_irqsave(&hd->audio_playing_lock, flags);
-
-	if (hd->display_enabled)
-		hdmi_stop_audio_stream(hd);
-	hd->audio_playing = false;
-
-	spin_unlock_irqrestore(&hd->audio_playing_lock, flags);
+	hdmi4_audio_stop(&hd->core, &hd->wp);
+	hdmi_wp_audio_enable(&hd->wp, false);
 }
 
 static int hdmi_audio_config(struct device *dev,
@@ -652,10 +612,7 @@ static int hdmi_audio_config(struct device *dev,
 
 	ret = hdmi4_audio_config(&hd->core, &hd->wp, dss_audio,
 				 hd->cfg.timings.pixelclock);
-	if (!ret) {
-		hd->audio_configured = true;
-		hd->audio_config = *dss_audio;
-	}
+
 out:
 	mutex_unlock(&hd->lock);
 
@@ -700,7 +657,6 @@ static int hdmi4_bind(struct device *dev, struct device *master, void *data)
 	dev_set_drvdata(&pdev->dev, &hdmi);
 
 	mutex_init(&hdmi.lock);
-	spin_lock_init(&hdmi.audio_playing_lock);
 
 	if (pdev->dev.of_node) {
 		r = hdmi_probe_of(pdev);

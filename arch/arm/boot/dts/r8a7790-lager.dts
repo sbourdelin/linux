@@ -174,14 +174,7 @@
 			  1800000 0>;
 	};
 
-	audio_clock: clock {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <11289600>;
-		clock-output-names = "audio_clock";
-	};
-
-	rsnd_ak4643: sound {
+	sound {
 		compatible = "simple-audio-card";
 
 		simple-audio-card,format = "left_j";
@@ -194,7 +187,7 @@
 
 		sndcodec: simple-audio-card,codec {
 			sound-dai = <&ak4643>;
-			clocks = <&audio_clock>;
+			system-clock-frequency = <11289600>;
 		};
 	};
 
@@ -340,11 +333,6 @@
 		renesas,groups = "msiof1_clk", "msiof1_sync", "msiof1_rx",
 				 "msiof1_tx";
 		renesas,function = "msiof1";
-	};
-
-	iic0_pins: iic0 {
-		renesas,groups = "iic0";
-		renesas,function = "iic0";
 	};
 
 	iic1_pins: iic1 {
@@ -522,8 +510,6 @@
 
 &iic0	{
 	status = "okay";
-	pinctrl-0 = <&iic0_pins>;
-	pinctrl-names = "default";
 };
 
 &iic1	{
@@ -562,7 +548,7 @@
 		compatible = "adi,adv7511w";
 		reg = <0x39>;
 		interrupt-parent = <&gpio1>;
-		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
+		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
 
 		adi,input-depth = <8>;
 		adi,input-colorspace = "rgb";

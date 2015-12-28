@@ -1177,8 +1177,7 @@ static void snd_mixer_oss_proc_write(struct snd_info_entry *entry,
 	struct snd_mixer_oss *mixer = entry->private_data;
 	char line[128], str[32], idxstr[16];
 	const char *cptr;
-	unsigned int idx;
-	int ch;
+	int ch, idx;
 	struct snd_mixer_oss_assign_table *tbl;
 	struct slot *slot;
 

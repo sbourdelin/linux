@@ -162,7 +162,7 @@ static int max_loop = MAX_LOOP_DEFAULT;
 static struct lloop_device *loop_dev;
 static struct gendisk **disks;
 static struct mutex lloop_mutex;
-static void *ll_iocontrol_magic;
+static void *ll_iocontrol_magic = NULL;
 
 static loff_t get_loop_size(struct lloop_device *lo, struct file *file)
 {
@@ -315,6 +315,7 @@ static unsigned int loop_get_bio(struct lloop_device *lo, struct bio **req)
 		if (page_count + (*bio)->bi_vcnt > LLOOP_MAX_SEGMENTS)
 			break;
 
+
 		page_count += (*bio)->bi_vcnt;
 		count++;
 		bio = &(*bio)->bi_next;
@@ -333,13 +334,11 @@ static unsigned int loop_get_bio(struct lloop_device *lo, struct bio **req)
 	return count;
 }
 
-static blk_qc_t loop_make_request(struct request_queue *q, struct bio *old_bio)
+static void loop_make_request(struct request_queue *q, struct bio *old_bio)
 {
 	struct lloop_device *lo = q->queuedata;
 	int rw = bio_rw(old_bio);
 	int inactive;
-
-	blk_queue_split(q, &old_bio, q->bio_split);
 
 	if (!lo)
 		goto err;
@@ -364,23 +363,20 @@ static blk_qc_t loop_make_request(struct request_queue *q, struct bio *old_bio)
 		goto err;
 	}
 	loop_add_bio(lo, old_bio);
-	return BLK_QC_T_NONE;
+	return;
 err:
-	bio_io_error(old_bio);
-	return BLK_QC_T_NONE;
+	cfs_bio_io_error(old_bio, old_bio->bi_iter.bi_size);
 }
+
 
 static inline void loop_handle_bio(struct lloop_device *lo, struct bio *bio)
 {
 	int ret;
-
 	ret = do_bio_lustrebacked(lo, bio);
 	while (bio) {
 		struct bio *tmp = bio->bi_next;
-
 		bio->bi_next = NULL;
-		bio->bi_error = ret;
-		bio_endio(bio);
+		cfs_bio_endio(bio, bio->bi_iter.bi_size, ret);
 		bio = tmp;
 	}
 }
@@ -431,7 +427,6 @@ static int loop_thread(void *data)
 		wait_event(lo->lo_bh_wait, loop_active(lo));
 		if (!atomic_read(&lo->lo_pending)) {
 			int exiting = 0;
-
 			spin_lock_irq(&lo->lo_lock);
 			exiting = (lo->lo_state == LLOOP_RUNDOWN);
 			spin_unlock_irq(&lo->lo_lock);

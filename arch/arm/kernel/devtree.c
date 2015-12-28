@@ -101,7 +101,6 @@ void __init arm_dt_init_cpu_maps(void)
 		if (of_property_read_u32(cpu, "reg", &hwid)) {
 			pr_debug(" * %s missing reg property\n",
 				     cpu->full_name);
-			of_node_put(cpu);
 			return;
 		}
 
@@ -109,10 +108,8 @@ void __init arm_dt_init_cpu_maps(void)
 		 * 8 MSBs must be set to 0 in the DT since the reg property
 		 * defines the MPIDR[23:0].
 		 */
-		if (hwid & ~MPIDR_HWID_BITMASK) {
-			of_node_put(cpu);
+		if (hwid & ~MPIDR_HWID_BITMASK)
 			return;
-		}
 
 		/*
 		 * Duplicate MPIDRs are a recipe for disaster.
@@ -122,11 +119,9 @@ void __init arm_dt_init_cpu_maps(void)
 		 * to avoid matching valid MPIDR[23:0] values.
 		 */
 		for (j = 0; j < cpuidx; j++)
-			if (WARN(tmp_map[j] == hwid,
-				 "Duplicate /cpu reg properties in the DT\n")) {
-				of_node_put(cpu);
+			if (WARN(tmp_map[j] == hwid, "Duplicate /cpu reg "
+						     "properties in the DT\n"))
 				return;
-			}
 
 		/*
 		 * Build a stashed array of MPIDR values. Numbering scheme
@@ -148,7 +143,6 @@ void __init arm_dt_init_cpu_maps(void)
 					       "max cores %u, capping them\n",
 					       cpuidx, nr_cpu_ids)) {
 			cpuidx = nr_cpu_ids;
-			of_node_put(cpu);
 			break;
 		}
 

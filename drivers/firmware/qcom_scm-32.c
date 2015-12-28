@@ -24,6 +24,7 @@
 #include <linux/err.h>
 #include <linux/qcom_scm.h>
 
+#include <asm/outercache.h>
 #include <asm/cacheflush.h>
 
 #include "qcom_scm.h"
@@ -218,7 +219,8 @@ static int __qcom_scm_call(const struct qcom_scm_command *cmd)
 	 * Flush the command buffer so that the secure world sees
 	 * the correct data.
 	 */
-	secure_flush_area(cmd, cmd->len);
+	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
+	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
 
 	ret = smc(cmd_addr);
 	if (ret < 0)
@@ -480,15 +482,15 @@ void __qcom_scm_cpu_power_down(u32 flags)
 int __qcom_scm_is_call_available(u32 svc_id, u32 cmd_id)
 {
 	int ret;
-	__le32 svc_cmd = cpu_to_le32((svc_id << 10) | cmd_id);
-	__le32 ret_val = 0;
+	u32 svc_cmd = (svc_id << 10) | cmd_id;
+	u32 ret_val = 0;
 
 	ret = qcom_scm_call(QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD, &svc_cmd,
 			sizeof(svc_cmd), &ret_val, sizeof(ret_val));
 	if (ret)
 		return ret;
 
-	return le32_to_cpu(ret_val);
+	return ret_val;
 }
 
 int __qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)

@@ -8,7 +8,6 @@
 
 config ARC
 	def_bool y
-	select ARCH_SUPPORTS_ATOMIC_RMW if ARC_HAS_LLSC
 	select BUILDTIME_EXTABLE_SORT
 	select COMMON_CLK
 	select CLONE_BACKWARDS
@@ -23,7 +22,6 @@ config ARC
 	select GENERIC_SMP_IDLE_THREAD
 	select HAVE_ARCH_KGDB
 	select HAVE_ARCH_TRACEHOOK
-	select HAVE_FUTEX_CMPXCHG
 	select HAVE_IOREMAP_PROT
 	select HAVE_KPROBES
 	select HAVE_KRETPROBES
@@ -76,10 +74,6 @@ config STACKTRACE_SUPPORT
 config HAVE_LATENCYTOP_SUPPORT
 	def_bool y
 
-config HAVE_ARCH_TRANSPARENT_HUGEPAGE
-	def_bool y
-	depends on ARC_MMU_V4
-
 source "init/Kconfig"
 source "kernel/Kconfig.freezer"
 
@@ -121,7 +115,6 @@ if ISA_ARCOMPACT
 
 config ARC_CPU_750D
 	bool "ARC750D"
-	select ARC_CANT_LLSC
 	help
 	  Support for ARC750 core
 
@@ -193,16 +186,6 @@ config NR_CPUS
 	int "Maximum number of CPUs (2-4096)"
 	range 2 4096
 	default "4"
-
-config ARC_SMP_HALT_ON_RESET
-	bool "Enable Halt-on-reset boot mode"
-	default y if ARC_UBOOT_SUPPORT
-	help
-	  In SMP configuration cores can be configured as Halt-on-reset
-	  or they could all start at same time. For Halt-on-reset, non
-	  masters are parked until Master kicks them so they can start of
-	  at designated entry point. For other case, all jump to common
-	  entry point and spin wait for Master's signal.
 
 endif	#SMP
 
@@ -292,8 +275,6 @@ choice
 	default ARC_MMU_V2 if ARC_CPU_750D
 	default ARC_MMU_V4 if ARC_CPU_HS
 
-if ISA_ARCOMPACT
-
 config ARC_MMU_V1
 	bool "MMU v1"
 	help
@@ -313,8 +294,6 @@ config ARC_MMU_V3
 	  Variable Page size (1k-16k), var JTLB size 128 x (2 or 4)
 	  Shared Address Spaces (SASID)
 
-endif
-
 config ARC_MMU_V4
 	bool "MMU v4"
 	depends on ISA_ARCV2
@@ -333,11 +312,11 @@ config ARC_PAGE_SIZE_8K
 
 config ARC_PAGE_SIZE_16K
 	bool "16KB"
-	depends on ARC_MMU_V3 || ARC_MMU_V4
+	depends on ARC_MMU_V3
 
 config ARC_PAGE_SIZE_4K
 	bool "4KB"
-	depends on ARC_MMU_V3 || ARC_MMU_V4
+	depends on ARC_MMU_V3
 
 endchoice
 
@@ -383,12 +362,7 @@ config ARC_CANT_LLSC
 config ARC_HAS_LLSC
 	bool "Insn: LLOCK/SCOND (efficient atomic ops)"
 	default y
-	depends on !ARC_CANT_LLSC
-
-config ARC_STAR_9000923308
-	bool "Workaround for llock/scond livelock"
-	default y
-	depends on ISA_ARCV2 && SMP && ARC_HAS_LLSC
+	depends on !ARC_CPU_750D && !ARC_CANT_LLSC
 
 config ARC_HAS_SWAPE
 	bool "Insn: SWAPE (endian-swap)"
@@ -402,10 +376,6 @@ config ARC_HAS_LL64
 	  Enable gcc to generate 64-bit load/store instructions
 	  ISA mandates even/odd registers to allow encoding of two
 	  dest operands with 2 possible source operands.
-	default y
-
-config ARC_HAS_DIV_REM
-	bool "Insn: div, divu, rem, remu"
 	default y
 
 config ARC_HAS_RTC
@@ -445,28 +415,6 @@ config LINUX_LINK_BASE
 	  However some customers have peripherals mapped at this addr, so
 	  Linux needs to be scooted a bit.
 	  If you don't know what the above means, leave this setting alone.
-
-config HIGHMEM
-	bool "High Memory Support"
-	help
-	  With ARC 2G:2G address split, only upper 2G is directly addressable by
-	  kernel. Enable this to potentially allow access to rest of 2G and PAE
-	  in future
-
-config ARC_HAS_PAE40
-	bool "Support for the 40-bit Physical Address Extension"
-	default n
-	depends on ISA_ARCV2
-	select HIGHMEM
-	help
-	  Enable access to physical memory beyond 4G, only supported on
-	  ARC cores with 40 bit Physical Addressing support
-
-config ARCH_PHYS_ADDR_T_64BIT
-	def_bool ARC_HAS_PAE40
-
-config ARCH_DMA_ADDR_T_64BIT
-	bool
 
 config ARC_CURR_IN_REG
 	bool "Dedicate Register r25 for current_task pointer"

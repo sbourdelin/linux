@@ -18,7 +18,6 @@
 
 #include "flow.h"
 #include "datapath.h"
-#include "flow_netlink.h"
 #include <linux/uaccess.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -57,21 +56,20 @@ static u16 range_n_bytes(const struct sw_flow_key_range *range)
 }
 
 void ovs_flow_mask_key(struct sw_flow_key *dst, const struct sw_flow_key *src,
-		       bool full, const struct sw_flow_mask *mask)
+		       const struct sw_flow_mask *mask)
 {
-	int start = full ? 0 : mask->range.start;
-	int len = full ? sizeof *dst : range_n_bytes(&mask->range);
-	const long *m = (const long *)((const u8 *)&mask->key + start);
-	const long *s = (const long *)((const u8 *)src + start);
-	long *d = (long *)((u8 *)dst + start);
+	const long *m = (const long *)((const u8 *)&mask->key +
+				mask->range.start);
+	const long *s = (const long *)((const u8 *)src +
+				mask->range.start);
+	long *d = (long *)((u8 *)dst + mask->range.start);
 	int i;
 
-	/* If 'full' is true then all of 'dst' is fully initialized. Otherwise,
-	 * if 'full' is false the memory outside of the 'mask->range' is left
-	 * uninitialized. This can be used as an optimization when further
-	 * operations on 'dst' only use contents within 'mask->range'.
+	/* The memory outside of the 'mask->range' are not set since
+	 * further operations on 'dst' only uses contents within
+	 * 'mask->range'.
 	 */
-	for (i = 0; i < len; i += sizeof(long))
+	for (i = 0; i < range_n_bytes(&mask->range); i += sizeof(long))
 		*d++ = *s++ & *m++;
 }
 
@@ -93,8 +91,7 @@ struct sw_flow *ovs_flow_alloc(void)
 
 	/* Initialize the default stat node. */
 	stats = kmem_cache_alloc_node(flow_stats_cache,
-				      GFP_KERNEL | __GFP_ZERO,
-				      node_online(0) ? 0 : NUMA_NO_NODE);
+				      GFP_KERNEL | __GFP_ZERO, 0);
 	if (!stats)
 		goto err;
 
@@ -146,8 +143,7 @@ static void flow_free(struct sw_flow *flow)
 
 	if (ovs_identifier_is_key(&flow->id))
 		kfree(flow->id.unmasked_key);
-	if (flow->sf_acts)
-		ovs_nla_free_flow_actions((struct sw_flow_actions __force *)flow->sf_acts);
+	kfree((struct sw_flow_actions __force *)flow->sf_acts);
 	for_each_node(node)
 		if (flow->stats[node])
 			kmem_cache_free(flow_stats_cache,
@@ -428,7 +424,7 @@ static u32 flow_hash(const struct sw_flow_key *key,
 
 static int flow_key_start(const struct sw_flow_key *key)
 {
-	if (key->tun_proto)
+	if (key->tun_key.ipv4_dst)
 		return 0;
 	else
 		return rounddown(offsetof(struct sw_flow_key, phy),
@@ -477,7 +473,7 @@ static struct sw_flow *masked_flow_lookup(struct table_instance *ti,
 	u32 hash;
 	struct sw_flow_key masked_key;
 
-	ovs_flow_mask_key(&masked_key, unmasked, false, mask);
+	ovs_flow_mask_key(&masked_key, unmasked, mask);
 	hash = flow_hash(&masked_key, &mask->range);
 	head = find_bucket(ti, hash);
 	hlist_for_each_entry_rcu(flow, head, flow_table.node[ti->node_ver]) {
@@ -756,7 +752,7 @@ int ovs_flow_init(void)
 	BUILD_BUG_ON(sizeof(struct sw_flow_key) % sizeof(long));
 
 	flow_cache = kmem_cache_create("sw_flow", sizeof(struct sw_flow)
-				       + (nr_node_ids
+				       + (num_possible_nodes()
 					  * sizeof(struct flow_stats *)),
 				       0, 0, NULL);
 	if (flow_cache == NULL)

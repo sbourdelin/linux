@@ -728,12 +728,11 @@ static int mkiss_open(struct tty_struct *tty)
 	dev->type = ARPHRD_AX25;
 
 	/* Perform the low-level AX25 initialization. */
-	err = ax_open(ax->dev);
-	if (err)
+	if ((err = ax_open(ax->dev))) {
 		goto out_free_netdev;
+	}
 
-	err = register_netdev(dev);
-	if (err)
+	if (register_netdev(dev))
 		goto out_free_buffers;
 
 	/* after register_netdev() - because else printk smashes the kernel */

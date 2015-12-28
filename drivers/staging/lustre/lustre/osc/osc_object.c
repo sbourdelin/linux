@@ -122,7 +122,7 @@ static void osc_object_free(const struct lu_env *env, struct lu_object *obj)
 	LASSERT(atomic_read(&osc->oo_nr_writes) == 0);
 
 	lu_object_fini(obj);
-	kmem_cache_free(osc_object_kmem, osc);
+	OBD_SLAB_FREE_PTR(osc, osc_object_kmem);
 }
 
 int osc_lvb_print(const struct lu_env *env, void *cookie,
@@ -147,6 +147,7 @@ static int osc_object_print(const struct lu_env *env, void *cookie,
 	osc_lvb_print(env, cookie, p, &oinfo->loi_lvb);
 	return 0;
 }
+
 
 static int osc_attr_get(const struct lu_env *env, struct cl_object *obj,
 			struct cl_attr *attr)
@@ -191,6 +192,7 @@ static int osc_object_glimpse(const struct lu_env *env,
 	lvb->lvb_blocks = oinfo->loi_lvb.lvb_blocks;
 	return 0;
 }
+
 
 void osc_object_set_contended(struct osc_object *obj)
 {
@@ -255,7 +257,7 @@ struct lu_object *osc_object_alloc(const struct lu_env *env,
 	struct osc_object *osc;
 	struct lu_object *obj;
 
-	osc = kmem_cache_alloc(osc_object_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(osc, osc_object_kmem, GFP_NOFS);
 	if (osc != NULL) {
 		obj = osc2lu(osc);
 		lu_object_init(obj, NULL, dev);

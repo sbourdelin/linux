@@ -1266,6 +1266,7 @@ static int wm8900_spi_remove(struct spi_device *spi)
 static struct spi_driver wm8900_spi_driver = {
 	.driver = {
 		.name	= "wm8900",
+		.owner	= THIS_MODULE,
 	},
 	.probe		= wm8900_spi_probe,
 	.remove		= wm8900_spi_remove,
@@ -1311,6 +1312,7 @@ MODULE_DEVICE_TABLE(i2c, wm8900_i2c_id);
 static struct i2c_driver wm8900_i2c_driver = {
 	.driver = {
 		.name = "wm8900",
+		.owner = THIS_MODULE,
 	},
 	.probe =    wm8900_i2c_probe,
 	.remove =   wm8900_i2c_remove,

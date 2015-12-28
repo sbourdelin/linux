@@ -1,7 +1,6 @@
 #ifndef _LINUX_DMA_MAPPING_H
 #define _LINUX_DMA_MAPPING_H
 
-#include <linux/sizes.h>
 #include <linux/string.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -146,9 +145,7 @@ static inline void arch_teardown_dma_ops(struct device *dev) { }
 
 static inline unsigned int dma_get_max_seg_size(struct device *dev)
 {
-	if (dev->dma_parms && dev->dma_parms->max_segment_size)
-		return dev->dma_parms->max_segment_size;
-	return SZ_64K;
+	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
 }
 
 static inline unsigned int dma_set_max_seg_size(struct device *dev,
@@ -157,15 +154,14 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
 	if (dev->dma_parms) {
 		dev->dma_parms->max_segment_size = size;
 		return 0;
-	}
-	return -EIO;
+	} else
+		return -EIO;
 }
 
 static inline unsigned long dma_get_seg_boundary(struct device *dev)
 {
-	if (dev->dma_parms && dev->dma_parms->segment_boundary_mask)
-		return dev->dma_parms->segment_boundary_mask;
-	return DMA_BIT_MASK(32);
+	return dev->dma_parms ?
+		dev->dma_parms->segment_boundary_mask : 0xffffffff;
 }
 
 static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
@@ -173,8 +169,8 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
 	if (dev->dma_parms) {
 		dev->dma_parms->segment_boundary_mask = mask;
 		return 0;
-	}
-	return -EIO;
+	} else
+		return -EIO;
 }
 
 #ifndef dma_max_pfn

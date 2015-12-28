@@ -153,6 +153,7 @@ static int timer16_setup(struct timer16_priv *p, struct platform_device *pdev)
 	int ret, irq;
 	unsigned int ch;
 
+	memset(p, 0, sizeof(*p));
 	p->pdev = pdev;
 
 	res[REG_CH] = platform_get_resource(p->pdev,

@@ -12,6 +12,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include <linux/module.h>
@@ -26,9 +30,12 @@
 #define WIDTH		240
 #define HEIGHT		320
 
+
 /* Init sequence taken from: Arduino Library for the Adafruit 2.2" display */
 static int init_display(struct fbtft_par *par)
 {
+	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
+
 	par->fbtftops.reset(par);
 
 	write_reg(par, 0xEF, 0x03, 0x80, 0x02);
@@ -91,6 +98,9 @@ static int init_display(struct fbtft_par *par)
 
 static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 {
+	fbtft_par_dbg(DEBUG_SET_ADDR_WIN, par,
+		"%s(xs=%d, ys=%d, xe=%d, ye=%d)\n", __func__, xs, ys, xe, ye);
+
 	/* Column address */
 	write_reg(par, 0x2A, xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
 
@@ -107,6 +117,8 @@ static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 static int set_var(struct fbtft_par *par)
 {
 	u8 val;
+
+	fbtft_par_dbg(DEBUG_INIT_DISPLAY, par, "%s()\n", __func__);
 
 	switch (par->info->var.rotate) {
 	case 270:
@@ -128,6 +140,7 @@ static int set_var(struct fbtft_par *par)
 	return 0;
 }
 
+
 static struct fbtft_display display = {
 	.regwidth = 8,
 	.width = WIDTH,
@@ -138,7 +151,6 @@ static struct fbtft_display display = {
 		.set_var = set_var,
 	},
 };
-
 FBTFT_REGISTER_DRIVER(DRVNAME, "ilitek,ili9340", &display);
 
 MODULE_ALIAS("spi:" DRVNAME);

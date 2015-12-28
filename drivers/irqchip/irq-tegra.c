@@ -24,13 +24,14 @@
 
 #include <linux/io.h>
 #include <linux/irq.h>
-#include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
 #include <linux/syscore_ops.h>
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+
+#include "irqchip.h"
 
 #define ICTLR_CPU_IEP_VFIQ	0x08
 #define ICTLR_CPU_IEP_FIR	0x14
@@ -214,50 +215,47 @@ static struct irq_chip tegra_ictlr_chip = {
 	.irq_unmask		= tegra_unmask,
 	.irq_retrigger		= tegra_retrigger,
 	.irq_set_wake		= tegra_set_wake,
-	.irq_set_type		= irq_chip_set_type_parent,
 	.flags			= IRQCHIP_MASK_ON_SUSPEND,
 #ifdef CONFIG_SMP
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 #endif
 };
 
-static int tegra_ictlr_domain_translate(struct irq_domain *d,
-					struct irq_fwspec *fwspec,
-					unsigned long *hwirq,
-					unsigned int *type)
+static int tegra_ictlr_domain_xlate(struct irq_domain *domain,
+				    struct device_node *controller,
+				    const u32 *intspec,
+				    unsigned int intsize,
+				    unsigned long *out_hwirq,
+				    unsigned int *out_type)
 {
-	if (is_of_node(fwspec->fwnode)) {
-		if (fwspec->param_count != 3)
-			return -EINVAL;
+	if (domain->of_node != controller)
+		return -EINVAL;	/* Shouldn't happen, really... */
+	if (intsize != 3)
+		return -EINVAL;	/* Not GIC compliant */
+	if (intspec[0] != GIC_SPI)
+		return -EINVAL;	/* No PPI should point to this domain */
 
-		/* No PPI should point to this domain */
-		if (fwspec->param[0] != 0)
-			return -EINVAL;
-
-		*hwirq = fwspec->param[1];
-		*type = fwspec->param[2];
-		return 0;
-	}
-
-	return -EINVAL;
+	*out_hwirq = intspec[1];
+	*out_type = intspec[2];
+	return 0;
 }
 
 static int tegra_ictlr_domain_alloc(struct irq_domain *domain,
 				    unsigned int virq,
 				    unsigned int nr_irqs, void *data)
 {
-	struct irq_fwspec *fwspec = data;
-	struct irq_fwspec parent_fwspec;
+	struct of_phandle_args *args = data;
+	struct of_phandle_args parent_args;
 	struct tegra_ictlr_info *info = domain->host_data;
 	irq_hw_number_t hwirq;
 	unsigned int i;
 
-	if (fwspec->param_count != 3)
+	if (args->args_count != 3)
 		return -EINVAL;	/* Not GIC compliant */
-	if (fwspec->param[0] != GIC_SPI)
+	if (args->args[0] != GIC_SPI)
 		return -EINVAL;	/* No PPI should point to this domain */
 
-	hwirq = fwspec->param[1];
+	hwirq = args->args[1];
 	if (hwirq >= (num_ictlrs * 32))
 		return -EINVAL;
 
@@ -269,10 +267,9 @@ static int tegra_ictlr_domain_alloc(struct irq_domain *domain,
 					      info->base[ictlr]);
 	}
 
-	parent_fwspec = *fwspec;
-	parent_fwspec.fwnode = domain->parent->fwnode;
-	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
-					    &parent_fwspec);
+	parent_args = *args;
+	parent_args.np = domain->parent->of_node;
+	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
 }
 
 static void tegra_ictlr_domain_free(struct irq_domain *domain,
@@ -288,9 +285,9 @@ static void tegra_ictlr_domain_free(struct irq_domain *domain,
 }
 
 static const struct irq_domain_ops tegra_ictlr_domain_ops = {
-	.translate	= tegra_ictlr_domain_translate,
-	.alloc		= tegra_ictlr_domain_alloc,
-	.free		= tegra_ictlr_domain_free,
+	.xlate	= tegra_ictlr_domain_xlate,
+	.alloc	= tegra_ictlr_domain_alloc,
+	.free	= tegra_ictlr_domain_free,
 };
 
 static int __init tegra_ictlr_init(struct device_node *node,

@@ -11,7 +11,6 @@
 #include <asm/cpu.h>
 #include <asm/smp.h>
 #include <asm/pci-direct.h>
-#include <asm/delay.h>
 
 #ifdef CONFIG_X86_64
 # include <asm/mmconfig.h>
@@ -115,7 +114,7 @@ static void init_amd_k6(struct cpuinfo_x86 *c)
 		const int K6_BUG_LOOP = 1000000;
 		int n;
 		void (*f_vide)(void);
-		u64 d, d2;
+		unsigned long d, d2;
 
 		printk(KERN_INFO "AMD K6 stepping B detected - ");
 
@@ -126,10 +125,10 @@ static void init_amd_k6(struct cpuinfo_x86 *c)
 
 		n = K6_BUG_LOOP;
 		f_vide = vide;
-		d = rdtsc();
+		rdtscl(d);
 		while (n--)
 			f_vide();
-		d2 = rdtsc();
+		rdtscl(d2);
 		d = d2-d;
 
 		if (d > 20*K6_BUG_LOOP)
@@ -352,7 +351,6 @@ static void amd_detect_cmp(struct cpuinfo_x86 *c)
 #ifdef CONFIG_SMP
 	unsigned bits;
 	int cpu = smp_processor_id();
-	unsigned int socket_id, core_complex_id;
 
 	bits = c->x86_coreid_bits;
 	/* Low order bits define the core id (index of core in socket) */
@@ -362,18 +360,6 @@ static void amd_detect_cmp(struct cpuinfo_x86 *c)
 	/* use socket ID also for last level cache */
 	per_cpu(cpu_llc_id, cpu) = c->phys_proc_id;
 	amd_get_topology(c);
-
-	/*
-	 * Fix percpu cpu_llc_id here as LLC topology is different
-	 * for Fam17h systems.
-	 */
-	 if (c->x86 != 0x17 || !cpuid_edx(0x80000006))
-		return;
-
-	socket_id	= (c->apicid >> bits) - 1;
-	core_complex_id	= (c->apicid & ((1 << bits) - 1)) >> 3;
-
-	per_cpu(cpu_llc_id, cpu) = (socket_id << 3) | core_complex_id;
 #endif
 }
 
@@ -520,9 +506,6 @@ static void bsp_init_amd(struct cpuinfo_x86 *c)
 		/* A random value per boot for bit slice [12:upper_bit) */
 		va_align.bits = get_random_int() & va_align.mask;
 	}
-
-	if (cpu_has(c, X86_FEATURE_MWAITX))
-		use_mwaitx_delay();
 }
 
 static void early_init_amd(struct cpuinfo_x86 *c)

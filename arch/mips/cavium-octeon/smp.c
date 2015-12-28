@@ -42,7 +42,7 @@ static irqreturn_t mailbox_interrupt(int irq, void *dev_id)
 	cvmx_write_csr(CVMX_CIU_MBOX_CLRX(coreid), action);
 
 	if (action & SMP_CALL_FUNCTION)
-		generic_smp_call_function_interrupt();
+		smp_call_function_interrupt();
 	if (action & SMP_RESCHEDULE_YOURSELF)
 		scheduler_ipi();
 

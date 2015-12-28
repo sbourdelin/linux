@@ -43,11 +43,6 @@
 	model = "Marvell Armada 1500 pro (BG2-Q) SoC";
 	compatible = "marvell,berlin2q", "marvell,berlin";
 
-	aliases {
-		serial0 = &uart0;
-		serial1 = &uart1;
-	};
-
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -58,17 +53,6 @@
 			device_type = "cpu";
 			next-level-cache = <&l2>;
 			reg = <0>;
-
-			clocks = <&chip_clk CLKID_CPU>;
-			clock-latency = <100000>;
-			/* Can be modified by the bootloader */
-			operating-points = <
-				/* kHz    uV */
-				1200000 1200000
-				1000000 1200000
-				800000  1200000
-				600000  1200000
-			>;
 		};
 
 		cpu@1 {
@@ -168,7 +152,7 @@
 		};
 
 		usb_phy2: phy@a2f400 {
-			compatible = "marvell,berlin2cd-usb-phy";
+			compatible = "marvell,berlin2-usb-phy";
 			reg = <0xa2f400 0x128>;
 			#phy-cells = <0>;
 			resets = <&chip_rst 0x104 14>;
@@ -186,7 +170,7 @@
 		};
 
 		usb_phy0: phy@b74000 {
-			compatible = "marvell,berlin2cd-usb-phy";
+			compatible = "marvell,berlin2-usb-phy";
 			reg = <0xb74000 0x128>;
 			#phy-cells = <0>;
 			resets = <&chip_rst 0x104 12>;
@@ -194,7 +178,7 @@
 		};
 
 		usb_phy1: phy@b78000 {
-			compatible = "marvell,berlin2cd-usb-phy";
+			compatible = "marvell,berlin2-usb-phy";
 			reg = <0xb78000 0x128>;
 			#phy-cells = <0>;
 			resets = <&chip_rst 0x104 13>;
@@ -491,13 +475,6 @@
 			phys = <&usb_phy1>;
 			phy-names = "usb-phy";
 			status = "disabled";
-		};
-
-		pwm: pwm@f20000 {
-			compatible = "marvell,berlin-pwm";
-			reg = <0xf20000 0x40>;
-			clocks = <&chip_clk CLKID_CFG>;
-			#pwm-cells = <3>;
 		};
 
 		apb@fc0000 {

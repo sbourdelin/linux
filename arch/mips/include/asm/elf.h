@@ -8,7 +8,6 @@
 #ifndef _ASM_ELF_H
 #define _ASM_ELF_H
 
-#include <linux/auxvec.h>
 #include <linux/fs.h>
 #include <uapi/linux/elf.h>
 
@@ -383,9 +382,7 @@ do {									\
    instruction set this cpu supports.  This could be done in userspace,
    but it's not easy, and we've already done it here.  */
 
-#define ELF_HWCAP	(elf_hwcap)
-extern unsigned int elf_hwcap;
-#include <asm/hwcap.h>
+#define ELF_HWCAP	(0)
 
 /*
  * This yields a string that ld.so will use to load implementation
@@ -419,12 +416,6 @@ extern const char *__elf_platform;
 #ifndef ELF_ET_DYN_BASE
 #define ELF_ET_DYN_BASE		(TASK_SIZE / 3 * 2)
 #endif
-
-#define ARCH_DLINFO							\
-do {									\
-	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-		    (unsigned long)current->mm->context.vdso);		\
-} while (0)
 
 #define ARCH_HAS_SETUP_ADDITIONAL_PAGES 1
 struct linux_binprm;

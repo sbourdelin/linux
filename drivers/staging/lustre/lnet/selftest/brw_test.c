@@ -134,14 +134,14 @@ brw_client_init(sfw_test_instance_t *tsi)
 static int
 brw_inject_one_error(void)
 {
-	struct timespec64 ts;
+	struct timeval tv;
 
 	if (brw_inject_errors <= 0)
 		return 0;
 
-	ktime_get_ts64(&ts);
+	do_gettimeofday(&tv);
 
-	if (((ts.tv_nsec / NSEC_PER_USEC) & 1) == 0)
+	if ((tv.tv_usec & 1) == 0)
 		return 0;
 
 	return brw_inject_errors--;

@@ -149,7 +149,8 @@ static struct inode *v9fs_qid_iget_dotl(struct super_block *sb,
 	unlock_new_inode(inode);
 	return inode;
 error:
-	iget_failed(inode);
+	unlock_new_inode(inode);
+	iput(inode);
 	return ERR_PTR(retval);
 
 }
@@ -828,6 +829,9 @@ v9fs_vfs_mknod_dotl(struct inode *dir, struct dentry *dentry, umode_t omode,
 	p9_debug(P9_DEBUG_VFS, " %lu,%pd mode: %hx MAJOR: %u MINOR: %u\n",
 		 dir->i_ino, dentry, omode,
 		 MAJOR(rdev), MINOR(rdev));
+
+	if (!new_valid_dev(rdev))
+		return -EINVAL;
 
 	v9ses = v9fs_inode2v9ses(dir);
 	dir_dentry = dentry->d_parent;

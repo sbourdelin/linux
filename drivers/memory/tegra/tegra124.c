@@ -9,6 +9,8 @@
 #include <linux/of.h>
 #include <linux/mm.h>
 
+#include <asm/cacheflush.h>
+
 #include <dt-bindings/memory/tegra124-mc.h>
 
 #include "mc.h"
@@ -1000,6 +1002,20 @@ static const struct tegra_smmu_swgroup tegra124_swgroups[] = {
 };
 
 #ifdef CONFIG_ARCH_TEGRA_124_SOC
+static void tegra124_flush_dcache(struct page *page, unsigned long offset,
+				  size_t size)
+{
+	phys_addr_t phys = page_to_phys(page) + offset;
+	void *virt = page_address(page) + offset;
+
+	__cpuc_flush_dcache_area(virt, size);
+	outer_flush_range(phys, phys + size);
+}
+
+static const struct tegra_smmu_ops tegra124_smmu_ops = {
+	.flush_dcache = tegra124_flush_dcache,
+};
+
 static const struct tegra_smmu_soc tegra124_smmu_soc = {
 	.clients = tegra124_mc_clients,
 	.num_clients = ARRAY_SIZE(tegra124_mc_clients),
@@ -1008,6 +1024,7 @@ static const struct tegra_smmu_soc tegra124_smmu_soc = {
 	.supports_round_robin_arbitration = true,
 	.supports_request_limit = true,
 	.num_asids = 128,
+	.ops = &tegra124_smmu_ops,
 };
 
 const struct tegra_mc_soc tegra124_mc_soc = {
@@ -1015,7 +1032,6 @@ const struct tegra_mc_soc tegra124_mc_soc = {
 	.num_clients = ARRAY_SIZE(tegra124_mc_clients),
 	.num_address_bits = 34,
 	.atom_size = 32,
-	.client_id_mask = 0x7f,
 	.smmu = &tegra124_smmu_soc,
 	.emem_regs = tegra124_mc_emem_regs,
 	.num_emem_regs = ARRAY_SIZE(tegra124_mc_emem_regs),
@@ -1023,6 +1039,18 @@ const struct tegra_mc_soc tegra124_mc_soc = {
 #endif /* CONFIG_ARCH_TEGRA_124_SOC */
 
 #ifdef CONFIG_ARCH_TEGRA_132_SOC
+static void tegra132_flush_dcache(struct page *page, unsigned long offset,
+				  size_t size)
+{
+	void *virt = page_address(page) + offset;
+
+	__flush_dcache_area(virt, size);
+}
+
+static const struct tegra_smmu_ops tegra132_smmu_ops = {
+	.flush_dcache = tegra132_flush_dcache,
+};
+
 static const struct tegra_smmu_soc tegra132_smmu_soc = {
 	.clients = tegra124_mc_clients,
 	.num_clients = ARRAY_SIZE(tegra124_mc_clients),
@@ -1030,8 +1058,8 @@ static const struct tegra_smmu_soc tegra132_smmu_soc = {
 	.num_swgroups = ARRAY_SIZE(tegra124_swgroups),
 	.supports_round_robin_arbitration = true,
 	.supports_request_limit = true,
-	.num_tlb_lines = 32,
 	.num_asids = 128,
+	.ops = &tegra132_smmu_ops,
 };
 
 const struct tegra_mc_soc tegra132_mc_soc = {
@@ -1039,7 +1067,6 @@ const struct tegra_mc_soc tegra132_mc_soc = {
 	.num_clients = ARRAY_SIZE(tegra124_mc_clients),
 	.num_address_bits = 34,
 	.atom_size = 32,
-	.client_id_mask = 0x7f,
 	.smmu = &tegra132_smmu_soc,
 };
 #endif /* CONFIG_ARCH_TEGRA_132_SOC */

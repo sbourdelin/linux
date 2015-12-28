@@ -67,7 +67,7 @@ static void __init rockchip_timer_init(void)
 	}
 
 	of_clk_init(NULL);
-	clocksource_probe();
+	clocksource_of_init();
 }
 
 static void __init rockchip_dt_init(void)

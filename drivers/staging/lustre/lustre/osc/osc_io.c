@@ -78,6 +78,7 @@ static struct osc_page *osc_cl_page_osc(struct cl_page *page)
 	return cl2osc_page(slice);
 }
 
+
 /*****************************************************************************
  *
  * io operations.
@@ -401,7 +402,7 @@ static int osc_io_setattr_start(const struct lu_env *env,
 	__u64 size = io->u.ci_setattr.sa_attr.lvb_size;
 	unsigned int ia_valid = io->u.ci_setattr.sa_valid;
 	int result = 0;
-	struct obd_info oinfo = { };
+	struct obd_info oinfo = { { { 0 } } };
 
 	/* truncate cache dirty pages first */
 	if (cl_io_is_trunc(io))
@@ -456,6 +457,7 @@ static int osc_io_setattr_start(const struct lu_env *env,
 		}
 
 		oinfo.oi_oa = oa;
+		oinfo.oi_capa = io->u.ci_setattr.sa_capa;
 		init_completion(&cbargs->opc_sync);
 
 		if (ia_valid & ATTR_SIZE)
@@ -516,7 +518,7 @@ static int osc_io_read_start(const struct lu_env *env,
 
 	if (!slice->cis_io->ci_noatime) {
 		cl_object_attr_lock(obj);
-		attr->cat_atime = ktime_get_real_seconds();
+		attr->cat_atime = LTIME_S(CURRENT_TIME);
 		rc = cl_object_attr_set(env, obj, attr, CAT_ATIME);
 		cl_object_attr_unlock(obj);
 	}
@@ -532,7 +534,7 @@ static int osc_io_write_start(const struct lu_env *env,
 
 	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_DELAY_SETTIME, 1);
 	cl_object_attr_lock(obj);
-	attr->cat_mtime = attr->cat_ctime = ktime_get_real_seconds();
+	attr->cat_mtime = attr->cat_ctime = LTIME_S(CURRENT_TIME);
 	rc = cl_object_attr_set(env, obj, attr, CAT_MTIME | CAT_CTIME);
 	cl_object_attr_unlock(obj);
 
@@ -562,6 +564,7 @@ static int osc_fsync_ost(const struct lu_env *env, struct osc_object *obj,
 
 	memset(oinfo, 0, sizeof(*oinfo));
 	oinfo->oi_oa = oa;
+	oinfo->oi_capa = fio->fi_capa;
 	init_completion(&cbargs->opc_sync);
 
 	rc = osc_sync_base(osc_export(obj), oinfo, osc_async_upcall, cbargs,
@@ -700,7 +703,7 @@ static void osc_req_completion(const struct lu_env *env,
 	struct osc_req *or;
 
 	or = cl2osc_req(slice);
-	kmem_cache_free(osc_req_kmem, or);
+	OBD_SLAB_FREE_PTR(or, osc_req_kmem);
 }
 
 /**
@@ -787,6 +790,7 @@ static const struct cl_req_operations osc_req_ops = {
 	.cro_completion = osc_req_completion
 };
 
+
 int osc_io_init(const struct lu_env *env,
 		struct cl_object *obj, struct cl_io *io)
 {
@@ -803,7 +807,7 @@ int osc_req_init(const struct lu_env *env, struct cl_device *dev,
 	struct osc_req *or;
 	int result;
 
-	or = kmem_cache_alloc(osc_req_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(or, osc_req_kmem, GFP_NOFS);
 	if (or != NULL) {
 		cl_req_slice_add(req, &or->or_cl, dev, &osc_req_ops);
 		result = 0;

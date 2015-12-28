@@ -46,6 +46,7 @@
 #include "lov_cl_internal.h"
 #include "lov_internal.h"
 
+
 struct kmem_cache *lov_lock_kmem;
 struct kmem_cache *lov_object_kmem;
 struct kmem_cache *lov_thread_kmem;
@@ -124,7 +125,7 @@ static void lov_req_completion(const struct lu_env *env,
 	struct lov_req *lr;
 
 	lr = cl2lov_req(slice);
-	kmem_cache_free(lov_req_kmem, lr);
+	OBD_SLAB_FREE_PTR(lr, lov_req_kmem);
 }
 
 static const struct cl_req_operations lov_req_ops = {
@@ -142,7 +143,7 @@ static void *lov_key_init(const struct lu_context *ctx,
 {
 	struct lov_thread_info *info;
 
-	info = kmem_cache_alloc(lov_thread_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(info, lov_thread_kmem, GFP_NOFS);
 	if (info != NULL)
 		INIT_LIST_HEAD(&info->lti_closure.clc_list);
 	else
@@ -154,9 +155,8 @@ static void lov_key_fini(const struct lu_context *ctx,
 			 struct lu_context_key *key, void *data)
 {
 	struct lov_thread_info *info = data;
-
 	LINVRNT(list_empty(&info->lti_closure.clc_list));
-	kmem_cache_free(lov_thread_kmem, info);
+	OBD_SLAB_FREE_PTR(info, lov_thread_kmem);
 }
 
 struct lu_context_key lov_key = {
@@ -170,7 +170,7 @@ static void *lov_session_key_init(const struct lu_context *ctx,
 {
 	struct lov_session *info;
 
-	info = kmem_cache_alloc(lov_session_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(info, lov_session_kmem, GFP_NOFS);
 	if (info == NULL)
 		info = ERR_PTR(-ENOMEM);
 	return info;
@@ -180,8 +180,7 @@ static void lov_session_key_fini(const struct lu_context *ctx,
 				 struct lu_context_key *key, void *data)
 {
 	struct lov_session *info = data;
-
-	kmem_cache_free(lov_session_kmem, info);
+	OBD_SLAB_FREE_PTR(info, lov_session_kmem);
 }
 
 struct lu_context_key lov_session_key = {
@@ -261,7 +260,7 @@ static int lov_req_init(const struct lu_env *env, struct cl_device *dev,
 	struct lov_req *lr;
 	int result;
 
-	lr = kmem_cache_alloc(lov_req_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(lr, lov_req_kmem, GFP_NOFS);
 	if (lr != NULL) {
 		cl_req_slice_add(req, &lr->lr_cl, dev, &lov_req_ops);
 		result = 0;
@@ -479,7 +478,7 @@ static struct lu_device *lov_device_alloc(const struct lu_env *env,
 	int rc;
 
 	ld = kzalloc(sizeof(*ld), GFP_NOFS);
-	if (!ld)
+	if (ld == NULL)
 		return ERR_PTR(-ENOMEM);
 
 	cl_device_init(&ld->ld_cl, t);

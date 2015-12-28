@@ -46,7 +46,6 @@ struct iio_dummy_state {
 	int event_irq;
 	int event_val;
 	bool event_en;
-	s64 event_timestamp;
 #endif /* CONFIG_IIO_SIMPLE_DUMMY_EVENTS */
 };
 
@@ -98,18 +97,18 @@ iio_simple_dummy_events_unregister(struct iio_dev *indio_dev)
 
 /**
  * enum iio_simple_dummy_scan_elements - scan index enum
- * @DUMMY_INDEX_VOLTAGE_0:         the single ended voltage channel
- * @DUMMY_INDEX_DIFFVOLTAGE_1M2:   first differential channel
- * @DUMMY_INDEX_DIFFVOLTAGE_3M4:   second differential channel
- * @DUMMY_INDEX_ACCELX:            acceleration channel
+ * @voltage0:		the single ended voltage channel
+ * @diffvoltage1m2:	first differential channel
+ * @diffvoltage3m4:	second differenial channel
+ * @accelx:		acceleration channel
  *
  * Enum provides convenient numbering for the scan index.
  */
 enum iio_simple_dummy_scan_elements {
-	DUMMY_INDEX_VOLTAGE_0,
-	DUMMY_INDEX_DIFFVOLTAGE_1M2,
-	DUMMY_INDEX_DIFFVOLTAGE_3M4,
-	DUMMY_INDEX_ACCELX,
+	voltage0,
+	diffvoltage1m2,
+	diffvoltage3m4,
+	accelx,
 };
 
 #ifdef CONFIG_IIO_SIMPLE_DUMMY_BUFFER
@@ -120,7 +119,6 @@ static inline int iio_simple_dummy_configure_buffer(struct iio_dev *indio_dev)
 {
 	return 0;
 };
-
 static inline
 void iio_simple_dummy_unconfigure_buffer(struct iio_dev *indio_dev)
 {};

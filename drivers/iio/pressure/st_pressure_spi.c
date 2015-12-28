@@ -56,6 +56,7 @@ MODULE_DEVICE_TABLE(spi, st_press_id_table);
 
 static struct spi_driver st_press_driver = {
 	.driver = {
+		.owner = THIS_MODULE,
 		.name = "st-press-spi",
 	},
 	.probe = st_press_spi_probe,

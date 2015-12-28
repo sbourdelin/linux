@@ -15,27 +15,20 @@
 #include <string.h>
 #include <linux/filter.h>
 #include <stddef.h>
-#include <stdbool.h>
-#include <sys/resource.h>
 #include "libbpf.h"
 
 #define MAX_INSNS 512
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
-#define MAX_FIXUPS 8
-
 struct bpf_test {
 	const char *descr;
 	struct bpf_insn	insns[MAX_INSNS];
-	int fixup[MAX_FIXUPS];
-	int prog_array_fixup[MAX_FIXUPS];
+	int fixup[32];
 	const char *errstr;
-	const char *errstr_unpriv;
 	enum {
-		UNDEF,
 		ACCEPT,
 		REJECT
-	} result, result_unpriv;
+	} result;
 	enum bpf_prog_type prog_type;
 };
 
@@ -103,7 +96,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "invalid BPF_LD_IMM insn",
-		.errstr_unpriv = "R1 pointer comparison",
 		.result = REJECT,
 	},
 	{
@@ -117,7 +109,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "invalid BPF_LD_IMM insn",
-		.errstr_unpriv = "R1 pointer comparison",
 		.result = REJECT,
 	},
 	{
@@ -228,7 +219,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "R0 !read_ok",
-		.errstr_unpriv = "R1 pointer comparison",
 		.result = REJECT,
 	},
 	{
@@ -304,9 +294,7 @@ static struct bpf_test tests[] = {
 			BPF_MOV64_REG(BPF_REG_0, BPF_REG_2),
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "R0 leaks addr",
 		.result = ACCEPT,
-		.result_unpriv = REJECT,
 	},
 	{
 		"check corrupted spill/fill",
@@ -322,7 +310,6 @@ static struct bpf_test tests[] = {
 
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "attempt to corrupt spilled",
 		.errstr = "corrupted spill",
 		.result = REJECT,
 	},
@@ -486,7 +473,6 @@ static struct bpf_test tests[] = {
 		},
 		.fixup = {3},
 		.errstr = "R0 invalid mem access",
-		.errstr_unpriv = "R0 leaks addr",
 		.result = REJECT,
 	},
 	{
@@ -509,8 +495,6 @@ static struct bpf_test tests[] = {
 			BPF_MOV64_IMM(BPF_REG_0, 0),
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "R1 pointer comparison",
-		.result_unpriv = REJECT,
 		.result = ACCEPT,
 	},
 	{
@@ -537,8 +521,6 @@ static struct bpf_test tests[] = {
 			BPF_MOV64_IMM(BPF_REG_0, 0),
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "R1 pointer comparison",
-		.result_unpriv = REJECT,
 		.result = ACCEPT,
 	},
 	{
@@ -573,8 +555,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.fixup = {24},
-		.errstr_unpriv = "R1 pointer comparison",
-		.result_unpriv = REJECT,
 		.result = ACCEPT,
 	},
 	{
@@ -623,8 +603,6 @@ static struct bpf_test tests[] = {
 			BPF_MOV64_IMM(BPF_REG_0, 0),
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "R1 pointer comparison",
-		.result_unpriv = REJECT,
 		.result = ACCEPT,
 	},
 	{
@@ -664,8 +642,6 @@ static struct bpf_test tests[] = {
 			BPF_MOV64_IMM(BPF_REG_0, 0),
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "R1 pointer comparison",
-		.result_unpriv = REJECT,
 		.result = ACCEPT,
 	},
 	{
@@ -723,7 +699,6 @@ static struct bpf_test tests[] = {
 		},
 		.fixup = {4},
 		.errstr = "different pointers",
-		.errstr_unpriv = "R1 pointer comparison",
 		.result = REJECT,
 	},
 	{
@@ -745,7 +720,6 @@ static struct bpf_test tests[] = {
 		},
 		.fixup = {6},
 		.errstr = "different pointers",
-		.errstr_unpriv = "R1 pointer comparison",
 		.result = REJECT,
 	},
 	{
@@ -768,7 +742,6 @@ static struct bpf_test tests[] = {
 		},
 		.fixup = {7},
 		.errstr = "different pointers",
-		.errstr_unpriv = "R1 pointer comparison",
 		.result = REJECT,
 	},
 	{
@@ -779,7 +752,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "invalid bpf_context access",
-		.errstr_unpriv = "R1 leaks addr",
 		.result = REJECT,
 	},
 	{
@@ -790,7 +762,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "invalid bpf_context access",
-		.errstr_unpriv = "R1 leaks addr",
 		.result = REJECT,
 	},
 	{
@@ -801,18 +772,16 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "invalid bpf_context access",
-		.errstr_unpriv = "R1 leaks addr",
 		.result = REJECT,
 	},
 	{
 		"check out of range skb->cb access",
 		.insns = {
 			BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_1,
-				    offsetof(struct __sk_buff, cb[0]) + 256),
+				    offsetof(struct __sk_buff, cb[60])),
 			BPF_EXIT_INSN(),
 		},
 		.errstr = "invalid bpf_context access",
-		.errstr_unpriv = "",
 		.result = REJECT,
 		.prog_type = BPF_PROG_TYPE_SCHED_ACT,
 	},
@@ -834,8 +803,6 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.result = ACCEPT,
-		.errstr_unpriv = "R1 leaks addr",
-		.result_unpriv = REJECT,
 	},
 	{
 		"write skb fields from tc_cls_act prog",
@@ -852,333 +819,8 @@ static struct bpf_test tests[] = {
 				    offsetof(struct __sk_buff, cb[3])),
 			BPF_EXIT_INSN(),
 		},
-		.errstr_unpriv = "",
-		.result_unpriv = REJECT,
 		.result = ACCEPT,
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
-	},
-	{
-		"PTR_TO_STACK store/load",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -10),
-			BPF_ST_MEM(BPF_DW, BPF_REG_1, 2, 0xfaceb00c),
-			BPF_LDX_MEM(BPF_DW, BPF_REG_0, BPF_REG_1, 2),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-	},
-	{
-		"PTR_TO_STACK store/load - bad alignment on off",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -8),
-			BPF_ST_MEM(BPF_DW, BPF_REG_1, 2, 0xfaceb00c),
-			BPF_LDX_MEM(BPF_DW, BPF_REG_0, BPF_REG_1, 2),
-			BPF_EXIT_INSN(),
-		},
-		.result = REJECT,
-		.errstr = "misaligned access off -6 size 8",
-	},
-	{
-		"PTR_TO_STACK store/load - bad alignment on reg",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -10),
-			BPF_ST_MEM(BPF_DW, BPF_REG_1, 8, 0xfaceb00c),
-			BPF_LDX_MEM(BPF_DW, BPF_REG_0, BPF_REG_1, 8),
-			BPF_EXIT_INSN(),
-		},
-		.result = REJECT,
-		.errstr = "misaligned access off -2 size 8",
-	},
-	{
-		"PTR_TO_STACK store/load - out of bounds low",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -80000),
-			BPF_ST_MEM(BPF_DW, BPF_REG_1, 8, 0xfaceb00c),
-			BPF_LDX_MEM(BPF_DW, BPF_REG_0, BPF_REG_1, 8),
-			BPF_EXIT_INSN(),
-		},
-		.result = REJECT,
-		.errstr = "invalid stack off=-79992 size=8",
-	},
-	{
-		"PTR_TO_STACK store/load - out of bounds high",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -8),
-			BPF_ST_MEM(BPF_DW, BPF_REG_1, 8, 0xfaceb00c),
-			BPF_LDX_MEM(BPF_DW, BPF_REG_0, BPF_REG_1, 8),
-			BPF_EXIT_INSN(),
-		},
-		.result = REJECT,
-		.errstr = "invalid stack off=0 size=8",
-	},
-	{
-		"unpriv: return pointer",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_0, BPF_REG_10),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-		.result_unpriv = REJECT,
-		.errstr_unpriv = "R0 leaks addr",
-	},
-	{
-		"unpriv: add const to pointer",
-		.insns = {
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, 8),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-		.result_unpriv = REJECT,
-		.errstr_unpriv = "R1 pointer arithmetic",
-	},
-	{
-		"unpriv: add pointer to pointer",
-		.insns = {
-			BPF_ALU64_REG(BPF_ADD, BPF_REG_1, BPF_REG_10),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-		.result_unpriv = REJECT,
-		.errstr_unpriv = "R1 pointer arithmetic",
-	},
-	{
-		"unpriv: neg pointer",
-		.insns = {
-			BPF_ALU64_IMM(BPF_NEG, BPF_REG_1, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-		.result_unpriv = REJECT,
-		.errstr_unpriv = "R1 pointer arithmetic",
-	},
-	{
-		"unpriv: cmp pointer with const",
-		.insns = {
-			BPF_JMP_IMM(BPF_JEQ, BPF_REG_1, 0, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-		.result_unpriv = REJECT,
-		.errstr_unpriv = "R1 pointer comparison",
-	},
-	{
-		"unpriv: cmp pointer with pointer",
-		.insns = {
-			BPF_JMP_REG(BPF_JEQ, BPF_REG_1, BPF_REG_10, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.result = ACCEPT,
-		.result_unpriv = REJECT,
-		.errstr_unpriv = "R10 pointer comparison",
-	},
-	{
-		"unpriv: check that printk is disallowed",
-		.insns = {
-			BPF_ST_MEM(BPF_DW, BPF_REG_10, -8, 0),
-			BPF_MOV64_REG(BPF_REG_1, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -8),
-			BPF_MOV64_IMM(BPF_REG_2, 8),
-			BPF_MOV64_REG(BPF_REG_3, BPF_REG_1),
-			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_trace_printk),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "unknown func 6",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: pass pointer to helper function",
-		.insns = {
-			BPF_ST_MEM(BPF_DW, BPF_REG_10, -8, 0),
-			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
-			BPF_LD_MAP_FD(BPF_REG_1, 0),
-			BPF_MOV64_REG(BPF_REG_3, BPF_REG_2),
-			BPF_MOV64_REG(BPF_REG_4, BPF_REG_2),
-			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_map_update_elem),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.fixup = {3},
-		.errstr_unpriv = "R4 leaks addr",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: indirectly pass pointer on stack to helper function",
-		.insns = {
-			BPF_STX_MEM(BPF_DW, BPF_REG_10, BPF_REG_10, -8),
-			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
-			BPF_LD_MAP_FD(BPF_REG_1, 0),
-			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_map_lookup_elem),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.fixup = {3},
-		.errstr = "invalid indirect read from stack off -8+0 size 8",
-		.result = REJECT,
-	},
-	{
-		"unpriv: mangle pointer on stack 1",
-		.insns = {
-			BPF_STX_MEM(BPF_DW, BPF_REG_10, BPF_REG_10, -8),
-			BPF_ST_MEM(BPF_W, BPF_REG_10, -8, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "attempt to corrupt spilled",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: mangle pointer on stack 2",
-		.insns = {
-			BPF_STX_MEM(BPF_DW, BPF_REG_10, BPF_REG_10, -8),
-			BPF_ST_MEM(BPF_B, BPF_REG_10, -1, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "attempt to corrupt spilled",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: read pointer from stack in small chunks",
-		.insns = {
-			BPF_STX_MEM(BPF_DW, BPF_REG_10, BPF_REG_10, -8),
-			BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_10, -8),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr = "invalid size",
-		.result = REJECT,
-	},
-	{
-		"unpriv: write pointer into ctx",
-		.insns = {
-			BPF_STX_MEM(BPF_DW, BPF_REG_1, BPF_REG_1, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "R1 leaks addr",
-		.result_unpriv = REJECT,
-		.errstr = "invalid bpf_context access",
-		.result = REJECT,
-	},
-	{
-		"unpriv: write pointer into map elem value",
-		.insns = {
-			BPF_ST_MEM(BPF_DW, BPF_REG_10, -8, 0),
-			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
-			BPF_LD_MAP_FD(BPF_REG_1, 0),
-			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_map_lookup_elem),
-			BPF_JMP_IMM(BPF_JEQ, BPF_REG_0, 0, 1),
-			BPF_STX_MEM(BPF_DW, BPF_REG_0, BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.fixup = {3},
-		.errstr_unpriv = "R0 leaks addr",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: partial copy of pointer",
-		.insns = {
-			BPF_MOV32_REG(BPF_REG_1, BPF_REG_10),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "R10 partial copy",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: pass pointer to tail_call",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_3, BPF_REG_1),
-			BPF_LD_MAP_FD(BPF_REG_2, 0),
-			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0, BPF_FUNC_tail_call),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.prog_array_fixup = {1},
-		.errstr_unpriv = "R3 leaks addr into helper",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: cmp map pointer with zero",
-		.insns = {
-			BPF_MOV64_IMM(BPF_REG_1, 0),
-			BPF_LD_MAP_FD(BPF_REG_1, 0),
-			BPF_JMP_IMM(BPF_JEQ, BPF_REG_1, 0, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.fixup = {1},
-		.errstr_unpriv = "R1 pointer comparison",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: write into frame pointer",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_10, BPF_REG_1),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr = "frame pointer is read only",
-		.result = REJECT,
-	},
-	{
-		"unpriv: cmp of frame pointer",
-		.insns = {
-			BPF_JMP_IMM(BPF_JEQ, BPF_REG_10, 0, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "R10 pointer comparison",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: cmp of stack pointer",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
-			BPF_JMP_IMM(BPF_JEQ, BPF_REG_2, 0, 0),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "R2 pointer comparison",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
-	},
-	{
-		"unpriv: obfuscate stack pointer",
-		.insns = {
-			BPF_MOV64_REG(BPF_REG_2, BPF_REG_10),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
-			BPF_ALU64_IMM(BPF_ADD, BPF_REG_2, -8),
-			BPF_MOV64_IMM(BPF_REG_0, 0),
-			BPF_EXIT_INSN(),
-		},
-		.errstr_unpriv = "R2 pointer arithmetic",
-		.result_unpriv = REJECT,
-		.result = ACCEPT,
 	},
 };
 
@@ -1195,24 +837,13 @@ static int probe_filter_length(struct bpf_insn *fp)
 
 static int create_map(void)
 {
+	long long key, value = 0;
 	int map_fd;
 
-	map_fd = bpf_create_map(BPF_MAP_TYPE_HASH,
-				sizeof(long long), sizeof(long long), 1024);
-	if (map_fd < 0)
+	map_fd = bpf_create_map(BPF_MAP_TYPE_HASH, sizeof(key), sizeof(value), 1024);
+	if (map_fd < 0) {
 		printf("failed to create map '%s'\n", strerror(errno));
-
-	return map_fd;
-}
-
-static int create_prog_array(void)
-{
-	int map_fd;
-
-	map_fd = bpf_create_map(BPF_MAP_TYPE_PROG_ARRAY,
-				sizeof(int), sizeof(int), 4);
-	if (map_fd < 0)
-		printf("failed to create prog_array '%s'\n", strerror(errno));
+	}
 
 	return map_fd;
 }
@@ -1220,17 +851,13 @@ static int create_prog_array(void)
 static int test(void)
 {
 	int prog_fd, i, pass_cnt = 0, err_cnt = 0;
-	bool unpriv = geteuid() != 0;
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		struct bpf_insn *prog = tests[i].insns;
 		int prog_type = tests[i].prog_type;
 		int prog_len = probe_filter_length(prog);
 		int *fixup = tests[i].fixup;
-		int *prog_array_fixup = tests[i].prog_array_fixup;
-		int expected_result;
-		const char *expected_errstr;
-		int map_fd = -1, prog_array_fd = -1;
+		int map_fd = -1;
 
 		if (*fixup) {
 			map_fd = create_map();
@@ -1240,31 +867,13 @@ static int test(void)
 				fixup++;
 			} while (*fixup);
 		}
-		if (*prog_array_fixup) {
-			prog_array_fd = create_prog_array();
-
-			do {
-				prog[*prog_array_fixup].imm = prog_array_fd;
-				prog_array_fixup++;
-			} while (*prog_array_fixup);
-		}
 		printf("#%d %s ", i, tests[i].descr);
 
 		prog_fd = bpf_prog_load(prog_type ?: BPF_PROG_TYPE_SOCKET_FILTER,
 					prog, prog_len * sizeof(struct bpf_insn),
 					"GPL", 0);
 
-		if (unpriv && tests[i].result_unpriv != UNDEF)
-			expected_result = tests[i].result_unpriv;
-		else
-			expected_result = tests[i].result;
-
-		if (unpriv && tests[i].errstr_unpriv)
-			expected_errstr = tests[i].errstr_unpriv;
-		else
-			expected_errstr = tests[i].errstr;
-
-		if (expected_result == ACCEPT) {
+		if (tests[i].result == ACCEPT) {
 			if (prog_fd < 0) {
 				printf("FAIL\nfailed to load prog '%s'\n",
 				       strerror(errno));
@@ -1279,7 +888,7 @@ static int test(void)
 				err_cnt++;
 				goto fail;
 			}
-			if (strstr(bpf_log_buf, expected_errstr) == 0) {
+			if (strstr(bpf_log_buf, tests[i].errstr) == 0) {
 				printf("FAIL\nunexpected error message: %s",
 				       bpf_log_buf);
 				err_cnt++;
@@ -1292,8 +901,6 @@ static int test(void)
 fail:
 		if (map_fd >= 0)
 			close(map_fd);
-		if (prog_array_fd >= 0)
-			close(prog_array_fd);
 		close(prog_fd);
 
 	}
@@ -1304,8 +911,5 @@ fail:
 
 int main(void)
 {
-	struct rlimit r = {1 << 20, 1 << 20};
-
-	setrlimit(RLIMIT_MEMLOCK, &r);
 	return test();
 }

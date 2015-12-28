@@ -68,12 +68,6 @@ static DEFINE_MUTEX(knav_dev_lock);
 	     idx < (kdev)->num_queues_in_use;			\
 	     idx++, inst = knav_queue_idx_to_inst(kdev, idx))
 
-/* All firmware file names end up here. List the firmware file names below.
- * Newest followed by older ones. Search is done from start of the array
- * until a firmware file is found.
- */
-const char *knav_acc_firmwares[] = {"ks2_qmss_pdsp_acc48.bin"};
-
 /**
  * knav_queue_notify: qmss queue notfier call
  *
@@ -1445,6 +1439,7 @@ static int knav_queue_init_pdsps(struct knav_device *kdev,
 	struct device *dev = kdev->dev;
 	struct knav_pdsp_info *pdsp;
 	struct device_node *child;
+	int ret;
 
 	for_each_child_of_node(pdsps, child) {
 		pdsp = devm_kzalloc(dev, sizeof(*pdsp), GFP_KERNEL);
@@ -1453,6 +1448,17 @@ static int knav_queue_init_pdsps(struct knav_device *kdev,
 			return -ENOMEM;
 		}
 		pdsp->name = knav_queue_find_name(child);
+		ret = of_property_read_string(child, "firmware",
+					      &pdsp->firmware);
+		if (ret < 0 || !pdsp->firmware) {
+			dev_err(dev, "unknown firmware for pdsp %s\n",
+				pdsp->name);
+			devm_kfree(dev, pdsp);
+			continue;
+		}
+		dev_dbg(dev, "pdsp name %s fw name :%s\n", pdsp->name,
+			pdsp->firmware);
+
 		pdsp->iram =
 			knav_queue_map_reg(kdev, child,
 					   KNAV_QUEUE_PDSP_IRAM_REG_INDEX);
@@ -1483,9 +1489,9 @@ static int knav_queue_init_pdsps(struct knav_device *kdev,
 		}
 		of_property_read_u32(child, "id", &pdsp->id);
 		list_add_tail(&pdsp->list, &kdev->pdsps);
-		dev_dbg(dev, "added pdsp %s: command %p, iram %p, regs %p, intd %p\n",
+		dev_dbg(dev, "added pdsp %s: command %p, iram %p, regs %p, intd %p, firmware %s\n",
 			pdsp->name, pdsp->command, pdsp->iram, pdsp->regs,
-			pdsp->intd);
+			pdsp->intd, pdsp->firmware);
 	}
 	return 0;
 }
@@ -1504,8 +1510,6 @@ static int knav_queue_stop_pdsp(struct knav_device *kdev,
 		dev_err(kdev->dev, "timed out on pdsp %s stop\n", pdsp->name);
 		return ret;
 	}
-	pdsp->loaded = false;
-	pdsp->started = false;
 	return 0;
 }
 
@@ -1514,29 +1518,14 @@ static int knav_queue_load_pdsp(struct knav_device *kdev,
 {
 	int i, ret, fwlen;
 	const struct firmware *fw;
-	bool found = false;
 	u32 *fwdata;
 
-	for (i = 0; i < ARRAY_SIZE(knav_acc_firmwares); i++) {
-		if (knav_acc_firmwares[i]) {
-			ret = request_firmware(&fw,
-					       knav_acc_firmwares[i],
-					       kdev->dev);
-			if (!ret) {
-				found = true;
-				break;
-			}
-		}
+	ret = request_firmware(&fw, pdsp->firmware, kdev->dev);
+	if (ret) {
+		dev_err(kdev->dev, "failed to get firmware %s for pdsp %s\n",
+			pdsp->firmware, pdsp->name);
+		return ret;
 	}
-
-	if (!found) {
-		dev_err(kdev->dev, "failed to get firmware for pdsp\n");
-		return -ENODEV;
-	}
-
-	dev_info(kdev->dev, "firmware file %s downloaded for PDSP\n",
-		 knav_acc_firmwares[i]);
-
 	writel_relaxed(pdsp->id + 1, pdsp->command + 0x18);
 	/* download the firmware */
 	fwdata = (u32 *)fw->data;
@@ -1594,24 +1583,16 @@ static int knav_queue_start_pdsps(struct knav_device *kdev)
 	int ret;
 
 	knav_queue_stop_pdsps(kdev);
-	/* now load them all. We return success even if pdsp
-	 * is not loaded as acc channels are optional on having
-	 * firmware availability in the system. We set the loaded
-	 * and stated flag and when initialize the acc range, check
-	 * it and init the range only if pdsp is started.
-	 */
+	/* now load them all */
 	for_each_pdsp(kdev, pdsp) {
 		ret = knav_queue_load_pdsp(kdev, pdsp);
-		if (!ret)
-			pdsp->loaded = true;
+		if (ret < 0)
+			return ret;
 	}
 
 	for_each_pdsp(kdev, pdsp) {
-		if (pdsp->loaded) {
-			ret = knav_queue_start_pdsp(kdev, pdsp);
-			if (!ret)
-				pdsp->started = true;
-		}
+		ret = knav_queue_start_pdsp(kdev, pdsp);
+		WARN_ON(ret);
 	}
 	return 0;
 }

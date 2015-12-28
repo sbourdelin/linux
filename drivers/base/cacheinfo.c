@@ -148,11 +148,7 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
 
 			if (sibling == cpu) /* skip itself */
 				continue;
-
 			sib_cpu_ci = get_cpu_cacheinfo(sibling);
-			if (!sib_cpu_ci->info_list)
-				continue;
-
 			sib_leaf = sib_cpu_ci->info_list + index;
 			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
 			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
@@ -163,9 +159,6 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
 
 static void free_cache_attributes(unsigned int cpu)
 {
-	if (!per_cpu_cacheinfo(cpu))
-		return;
-
 	cache_shared_cpu_map_remove(cpu);
 
 	kfree(per_cpu_cacheinfo(cpu));
@@ -521,7 +514,8 @@ static int cacheinfo_cpu_callback(struct notifier_block *nfb,
 		break;
 	case CPU_DEAD:
 		cache_remove_dev(cpu);
-		free_cache_attributes(cpu);
+		if (per_cpu_cacheinfo(cpu))
+			free_cache_attributes(cpu);
 		break;
 	}
 	return notifier_from_errno(rc);

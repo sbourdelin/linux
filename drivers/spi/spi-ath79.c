@@ -240,9 +240,14 @@ static int ath79_spi_probe(struct platform_device *pdev)
 	sp->bitbang.flags = SPI_CS_HIGH;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	sp->base = devm_ioremap_resource(&pdev->dev, r);
-	if (IS_ERR(sp->base)) {
-		ret = PTR_ERR(sp->base);
+	if (r == NULL) {
+		ret = -ENOENT;
+		goto err_put_master;
+	}
+
+	sp->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+	if (!sp->base) {
+		ret = -ENXIO;
 		goto err_put_master;
 	}
 

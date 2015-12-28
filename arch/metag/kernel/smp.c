@@ -312,7 +312,6 @@ void cpu_die(void)
 {
 	local_irq_disable();
 	idle_task_exit();
-	irq_ctx_exit(smp_processor_id());
 
 	(void)cpu_report_death();
 
@@ -367,7 +366,6 @@ asmlinkage void secondary_start_kernel(void)
 		panic("No TBI found!");
 
 	per_cpu_trap_init(cpu);
-	irq_ctx_init(cpu);
 
 	preempt_disable();
 

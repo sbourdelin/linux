@@ -33,20 +33,20 @@ static unsigned int hex(char c)
 	return c - 'A' + 10;
 }
 
-static size_t read_objdump_line(const char *line, size_t line_len, void *buf,
-			      size_t len)
+static void read_objdump_line(const char *line, size_t line_len, void **buf,
+			      size_t *len)
 {
 	const char *p;
-	size_t i, j = 0;
+	size_t i;
 
 	/* Skip to a colon */
 	p = strchr(line, ':');
 	if (!p)
-		return 0;
+		return;
 	i = p + 1 - line;
 
 	/* Read bytes */
-	while (j < len) {
+	while (*len) {
 		char c1, c2;
 
 		/* Skip spaces */
@@ -65,26 +65,20 @@ static size_t read_objdump_line(const char *line, size_t line_len, void *buf,
 		if (i < line_len && line[i] && !isspace(line[i]))
 			break;
 		/* Store byte */
-		*(unsigned char *)buf = (hex(c1) << 4) | hex(c2);
-		buf += 1;
-		j++;
+		*(unsigned char *)*buf = (hex(c1) << 4) | hex(c2);
+		*buf += 1;
+		*len -= 1;
 	}
-	/* return number of successfully read bytes */
-	return j;
 }
 
-static int read_objdump_output(FILE *f, void *buf, size_t *len, u64 start_addr)
+static int read_objdump_output(FILE *f, void **buf, size_t *len)
 {
 	char *line = NULL;
-	size_t line_len, off_last = 0;
+	size_t line_len;
 	ssize_t ret;
 	int err = 0;
-	u64 addr, last_addr = start_addr;
 
-	while (off_last < *len) {
-		size_t off, read_bytes, written_bytes;
-		unsigned char tmp[BUFSZ];
-
+	while (1) {
 		ret = getline(&line, &line_len, f);
 		if (feof(f))
 			break;
@@ -93,32 +87,8 @@ static int read_objdump_output(FILE *f, void *buf, size_t *len, u64 start_addr)
 			err = -1;
 			break;
 		}
-
-		/* read objdump data into temporary buffer */
-		read_bytes = read_objdump_line(line, ret, tmp, sizeof(tmp));
-		if (!read_bytes)
-			continue;
-
-		if (sscanf(line, "%"PRIx64, &addr) != 1)
-			continue;
-		if (addr < last_addr) {
-			pr_debug("addr going backwards, read beyond section?\n");
-			break;
-		}
-		last_addr = addr;
-
-		/* copy it from temporary buffer to 'buf' according
-		 * to address on current objdump line */
-		off = addr - start_addr;
-		if (off >= *len)
-			break;
-		written_bytes = MIN(read_bytes, *len - off);
-		memcpy(buf + off, tmp, written_bytes);
-		off_last = off + written_bytes;
+		read_objdump_line(line, ret, buf, len);
 	}
-
-	/* len returns number of bytes that could not be read */
-	*len -= off_last;
 
 	free(line);
 
@@ -133,7 +103,7 @@ static int read_via_objdump(const char *filename, u64 addr, void *buf,
 	FILE *f;
 	int ret;
 
-	fmt = "%s -z -d --start-address=0x%"PRIx64" --stop-address=0x%"PRIx64" %s";
+	fmt = "%s -d --start-address=0x%"PRIx64" --stop-address=0x%"PRIx64" %s";
 	ret = snprintf(cmd, sizeof(cmd), fmt, "objdump", addr, addr + len,
 		       filename);
 	if (ret <= 0 || (size_t)ret >= sizeof(cmd))
@@ -150,7 +120,7 @@ static int read_via_objdump(const char *filename, u64 addr, void *buf,
 		return -1;
 	}
 
-	ret = read_objdump_output(f, buf, &len, addr);
+	ret = read_objdump_output(f, &buf, &len);
 	if (len) {
 		pr_debug("objdump read too few bytes\n");
 		if (!ret)
@@ -160,18 +130,6 @@ static int read_via_objdump(const char *filename, u64 addr, void *buf,
 	pclose(f);
 
 	return ret;
-}
-
-static void dump_buf(unsigned char *buf, size_t len)
-{
-	size_t i;
-
-	for (i = 0; i < len; i++) {
-		pr_debug("0x%02x ", buf[i]);
-		if (i % 16 == 15)
-			pr_debug("\n");
-	}
-	pr_debug("\n");
 }
 
 static int read_object_code(u64 addr, size_t len, u8 cpumode,
@@ -276,10 +234,6 @@ static int read_object_code(u64 addr, size_t len, u8 cpumode,
 	/* The results should be identical */
 	if (memcmp(buf1, buf2, len)) {
 		pr_debug("Bytes read differ from those read by objdump\n");
-		pr_debug("buf1 (dso):\n");
-		dump_buf(buf1, len);
-		pr_debug("buf2 (objdump):\n");
-		dump_buf(buf2, len);
 		return -1;
 	}
 	pr_debug("Bytes read match those read by objdump\n");
@@ -473,7 +427,7 @@ static int do_test_code_reading(bool try_kcore)
 		symbol_conf.kallsyms_name = "/proc/kallsyms";
 
 	/* Load kernel map */
-	map = machine__kernel_map(machine);
+	map = machine->vmlinux_maps[MAP__FUNCTION];
 	ret = map__load(map, NULL);
 	if (ret < 0) {
 		pr_debug("map__load failed\n");
@@ -613,16 +567,16 @@ int test__code_reading(void)
 	case TEST_CODE_READING_OK:
 		return 0;
 	case TEST_CODE_READING_NO_VMLINUX:
-		pr_debug("no vmlinux\n");
+		fprintf(stderr, " (no vmlinux)");
 		return 0;
 	case TEST_CODE_READING_NO_KCORE:
-		pr_debug("no kcore\n");
+		fprintf(stderr, " (no kcore)");
 		return 0;
 	case TEST_CODE_READING_NO_ACCESS:
-		pr_debug("no access\n");
+		fprintf(stderr, " (no access)");
 		return 0;
 	case TEST_CODE_READING_NO_KERNEL_OBJ:
-		pr_debug("no kernel obj\n");
+		fprintf(stderr, " (no kernel obj)");
 		return 0;
 	default:
 		return -1;

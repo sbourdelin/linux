@@ -13,7 +13,7 @@
 /**
  * struct nfc_mei_phy
  *
- * @cldev: mei client device
+ * @device: mei device
  * @hdev:   nfc hci device
 
  * @send_wq: send completion wait queue
@@ -28,7 +28,7 @@
  *    and prevents normal operation.
  */
 struct nfc_mei_phy {
-	struct mei_cl_device *cldev;
+	struct mei_cl_device *device;
 	struct nfc_hci_dev *hdev;
 
 	wait_queue_head_t send_wq;

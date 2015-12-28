@@ -217,9 +217,6 @@ static bool mxs_phy_get_vbus_status(struct mxs_phy *mxs_phy)
 {
 	unsigned int vbus_value;
 
-	if (!mxs_phy->regmap_anatop)
-		return false;
-
 	if (mxs_phy->port_id == 0)
 		regmap_read(mxs_phy->regmap_anatop,
 			ANADIG_USB1_VBUS_DET_STAT,
@@ -506,7 +503,11 @@ static int mxs_phy_probe(struct platform_device *pdev)
 
 	device_set_wakeup_capable(&pdev->dev, true);
 
-	return usb_add_phy_dev(&mxs_phy->phy);
+	ret = usb_add_phy_dev(&mxs_phy->phy);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static int mxs_phy_remove(struct platform_device *pdev)

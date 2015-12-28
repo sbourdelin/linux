@@ -593,12 +593,11 @@ out:
 	next = bio_list_peek(&priv->list);
 	spin_unlock_irq(&priv->lock);
 
-	bio->bi_error = error;
-	bio_endio(bio);
+	bio_endio(bio, error);
 	return next;
 }
 
-static blk_qc_t ps3vram_make_request(struct request_queue *q, struct bio *bio)
+static void ps3vram_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct ps3_system_bus_device *dev = q->queuedata;
 	struct ps3vram_priv *priv = ps3_system_bus_get_drvdata(dev);
@@ -606,21 +605,17 @@ static blk_qc_t ps3vram_make_request(struct request_queue *q, struct bio *bio)
 
 	dev_dbg(&dev->core, "%s\n", __func__);
 
-	blk_queue_split(q, &bio, q->bio_split);
-
 	spin_lock_irq(&priv->lock);
 	busy = !bio_list_empty(&priv->list);
 	bio_list_add(&priv->list, bio);
 	spin_unlock_irq(&priv->lock);
 
 	if (busy)
-		return BLK_QC_T_NONE;
+		return;
 
 	do {
 		bio = ps3vram_do_bio(dev, bio);
 	} while (bio);
-
-	return BLK_QC_T_NONE;
 }
 
 static int ps3vram_probe(struct ps3_system_bus_device *dev)

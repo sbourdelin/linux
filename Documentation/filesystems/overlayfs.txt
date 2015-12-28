@@ -1,5 +1,4 @@
-Written by: Neil Brown
-Please see MAINTAINERS file for where to send questions.
+Written by: Neil Brown <neilb@suse.de>
 
 Overlay Filesystem
 ==================

@@ -30,6 +30,13 @@ struct ath10k_hif_sg_item {
 	u16 len;
 };
 
+struct ath10k_hif_cb {
+	int (*tx_completion)(struct ath10k *ar,
+			     struct sk_buff *wbuf);
+	int (*rx_completion)(struct ath10k *ar,
+			     struct sk_buff *wbuf);
+};
+
 struct ath10k_hif_ops {
 	/* send a scatter-gather list to the target */
 	int (*tx_sg)(struct ath10k *ar, u8 pipe_id,
@@ -58,7 +65,8 @@ struct ath10k_hif_ops {
 	void (*stop)(struct ath10k *ar);
 
 	int (*map_service_to_pipe)(struct ath10k *ar, u16 service_id,
-				   u8 *ul_pipe, u8 *dl_pipe);
+				   u8 *ul_pipe, u8 *dl_pipe,
+				   int *ul_is_polled, int *dl_is_polled);
 
 	void (*get_default_pipe)(struct ath10k *ar, u8 *ul_pipe, u8 *dl_pipe);
 
@@ -71,6 +79,9 @@ struct ath10k_hif_ops {
 	 * to be polled rather than interrupt-driven.
 	 */
 	void (*send_complete_check)(struct ath10k *ar, u8 pipe_id, int force);
+
+	void (*set_callbacks)(struct ath10k *ar,
+			      struct ath10k_hif_cb *callbacks);
 
 	u16 (*get_free_queue_number)(struct ath10k *ar, u8 pipe_id);
 
@@ -131,10 +142,13 @@ static inline void ath10k_hif_stop(struct ath10k *ar)
 
 static inline int ath10k_hif_map_service_to_pipe(struct ath10k *ar,
 						 u16 service_id,
-						 u8 *ul_pipe, u8 *dl_pipe)
+						 u8 *ul_pipe, u8 *dl_pipe,
+						 int *ul_is_polled,
+						 int *dl_is_polled)
 {
 	return ar->hif.ops->map_service_to_pipe(ar, service_id,
-						ul_pipe, dl_pipe);
+						ul_pipe, dl_pipe,
+						ul_is_polled, dl_is_polled);
 }
 
 static inline void ath10k_hif_get_default_pipe(struct ath10k *ar,
@@ -147,6 +161,12 @@ static inline void ath10k_hif_send_complete_check(struct ath10k *ar,
 						  u8 pipe_id, int force)
 {
 	ar->hif.ops->send_complete_check(ar, pipe_id, force);
+}
+
+static inline void ath10k_hif_set_callbacks(struct ath10k *ar,
+					    struct ath10k_hif_cb *callbacks)
+{
+	ar->hif.ops->set_callbacks(ar, callbacks);
 }
 
 static inline u16 ath10k_hif_get_free_queue_number(struct ath10k *ar,

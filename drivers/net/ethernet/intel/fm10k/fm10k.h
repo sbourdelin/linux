@@ -101,19 +101,12 @@ struct fm10k_tx_queue_stats {
 	u64 csum_err;
 	u64 tx_busy;
 	u64 tx_done_old;
-	u64 csum_good;
 };
 
 struct fm10k_rx_queue_stats {
 	u64 alloc_failed;
 	u64 csum_err;
 	u64 errors;
-	u64 csum_good;
-	u64 switch_errors;
-	u64 drops;
-	u64 pp_errors;
-	u64 link_errors;
-	u64 length_errors;
 };
 
 struct fm10k_ring {
@@ -258,7 +251,6 @@ struct fm10k_intfc {
 #define FM10K_FLAG_RSS_FIELD_IPV6_UDP		(u32)(1 << 2)
 #define FM10K_FLAG_RX_TS_ENABLED		(u32)(1 << 3)
 #define FM10K_FLAG_SWPRI_CONFIG			(u32)(1 << 4)
-#define FM10K_FLAG_DEBUG_STATS			(u32)(1 << 5)
 	int xcast_mode;
 
 	/* Tx fast path data */
@@ -285,17 +277,6 @@ struct fm10k_intfc {
 	u64 rx_drops_nic;
 	u64 rx_overrun_pf;
 	u64 rx_overrun_vf;
-
-	/* Debug Statistics */
-	u64 hw_sm_mbx_full;
-	u64 hw_csum_tx_good;
-	u64 hw_csum_rx_good;
-	u64 rx_switch_errors;
-	u64 rx_drops;
-	u64 rx_pp_errors;
-	u64 rx_link_errors;
-	u64 rx_length_errors;
-
 	u32 tx_timeout_count;
 
 	/* RX */

@@ -135,10 +135,9 @@ struct knav_pdsp_info {
 	};
 	void __iomem					*intd;
 	u32 __iomem					*iram;
+	const char					*firmware;
 	u32						id;
 	struct list_head				list;
-	bool						loaded;
-	bool						started;
 };
 
 struct knav_qmgr_info {

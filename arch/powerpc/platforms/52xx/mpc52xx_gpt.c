@@ -191,7 +191,7 @@ static struct irq_chip mpc52xx_gpt_irq_chip = {
 	.irq_set_type = mpc52xx_gpt_irq_set_type,
 };
 
-static void mpc52xx_gpt_irq_cascade(struct irq_desc *desc)
+void mpc52xx_gpt_irq_cascade(unsigned int virq, struct irq_desc *desc)
 {
 	struct mpc52xx_gpt_priv *gpt = irq_desc_get_handler_data(desc);
 	int sub_virq;
@@ -724,7 +724,7 @@ static int mpc52xx_gpt_probe(struct platform_device *ofdev)
 {
 	struct mpc52xx_gpt_priv *gpt;
 
-	gpt = devm_kzalloc(&ofdev->dev, sizeof *gpt, GFP_KERNEL);
+	gpt = kzalloc(sizeof *gpt, GFP_KERNEL);
 	if (!gpt)
 		return -ENOMEM;
 
@@ -732,8 +732,10 @@ static int mpc52xx_gpt_probe(struct platform_device *ofdev)
 	gpt->dev = &ofdev->dev;
 	gpt->ipb_freq = mpc5xxx_get_bus_frequency(ofdev->dev.of_node);
 	gpt->regs = of_iomap(ofdev->dev.of_node, 0);
-	if (!gpt->regs)
+	if (!gpt->regs) {
+		kfree(gpt);
 		return -ENOMEM;
+	}
 
 	dev_set_drvdata(&ofdev->dev, gpt);
 

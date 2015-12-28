@@ -103,7 +103,7 @@ axon_ram_irq_handler(int irq, void *dev)
  * axon_ram_make_request - make_request() method for block device
  * @queue, @bio: see blk_queue_make_request()
  */
-static blk_qc_t
+static void
 axon_ram_make_request(struct request_queue *queue, struct bio *bio)
 {
 	struct axon_ram_bank *bank = bio->bi_bdev->bd_disk->private_data;
@@ -120,7 +120,7 @@ axon_ram_make_request(struct request_queue *queue, struct bio *bio)
 	bio_for_each_segment(vec, bio, iter) {
 		if (unlikely(phys_mem + vec.bv_len > phys_end)) {
 			bio_io_error(bio);
-			return BLK_QC_T_NONE;
+			return;
 		}
 
 		user_mem = page_address(vec.bv_page) + vec.bv_offset;
@@ -132,8 +132,7 @@ axon_ram_make_request(struct request_queue *queue, struct bio *bio)
 		phys_mem += vec.bv_len;
 		transfered += vec.bv_len;
 	}
-	bio_endio(bio);
-	return BLK_QC_T_NONE;
+	bio_endio(bio, 0);
 }
 
 /**
@@ -142,14 +141,13 @@ axon_ram_make_request(struct request_queue *queue, struct bio *bio)
  */
 static long
 axon_ram_direct_access(struct block_device *device, sector_t sector,
-		       void __pmem **kaddr, unsigned long *pfn)
+		       void **kaddr, unsigned long *pfn, long size)
 {
 	struct axon_ram_bank *bank = device->bd_disk->private_data;
 	loff_t offset = (loff_t)sector << AXON_RAM_SECTOR_SHIFT;
-	void *addr = (void *)(bank->ph_addr + offset);
 
-	*kaddr = (void __pmem *)addr;
-	*pfn = virt_to_phys(addr) >> PAGE_SHIFT;
+	*kaddr = (void *)(bank->ph_addr + offset);
+	*pfn = virt_to_phys(*kaddr) >> PAGE_SHIFT;
 
 	return bank->size - offset;
 }

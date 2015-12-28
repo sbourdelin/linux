@@ -75,10 +75,8 @@ int skein_256_init(struct skein_256_ctx *ctx, size_t hash_bit_len)
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a MAC and/or tree hash operation */
-/*
- * [identical to skein_256_init() when key_bytes == 0 && \
- *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL]
- */
+/* [identical to skein_256_init() when key_bytes == 0 && \
+ *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
 int skein_256_init_ext(struct skein_256_ctx *ctx, size_t hash_bit_len,
 		       u64 tree_info, const u8 *key, size_t key_bytes)
 {
@@ -88,7 +86,7 @@ int skein_256_init_ext(struct skein_256_ctx *ctx, size_t hash_bit_len,
 	} cfg; /* config block */
 
 	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
-	skein_assert_ret(key_bytes == 0 || key, SKEIN_FAIL);
+	skein_assert_ret(key_bytes == 0 || key != NULL, SKEIN_FAIL);
 
 	/* compute the initial chaining values ctx->x[], based on key */
 	if (key_bytes == 0) { /* is there a key? */
@@ -303,10 +301,8 @@ int skein_512_init(struct skein_512_ctx *ctx, size_t hash_bit_len)
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a MAC and/or tree hash operation */
-/*
- * [identical to skein_512_init() when key_bytes == 0 && \
- *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL]
- */
+/* [identical to skein_512_init() when key_bytes == 0 && \
+ *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
 int skein_512_init_ext(struct skein_512_ctx *ctx, size_t hash_bit_len,
 		       u64 tree_info, const u8 *key, size_t key_bytes)
 {
@@ -316,7 +312,7 @@ int skein_512_init_ext(struct skein_512_ctx *ctx, size_t hash_bit_len,
 	} cfg;                              /* config block */
 
 	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
-	skein_assert_ret(key_bytes == 0 || key, SKEIN_FAIL);
+	skein_assert_ret(key_bytes == 0 || key != NULL, SKEIN_FAIL);
 
 	/* compute the initial chaining values ctx->x[], based on key */
 	if (key_bytes == 0) { /* is there a key? */
@@ -524,10 +520,8 @@ int skein_1024_init(struct skein_1024_ctx *ctx, size_t hash_bit_len)
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* init the context for a MAC and/or tree hash operation */
-/*
- * [identical to skein_1024_init() when key_bytes == 0 && \
- *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL]
- */
+/* [identical to skein_1024_init() when key_bytes == 0 && \
+ *	tree_info == SKEIN_CFG_TREE_INFO_SEQUENTIAL] */
 int skein_1024_init_ext(struct skein_1024_ctx *ctx, size_t hash_bit_len,
 			u64 tree_info, const u8 *key, size_t key_bytes)
 {
@@ -537,7 +531,7 @@ int skein_1024_init_ext(struct skein_1024_ctx *ctx, size_t hash_bit_len,
 	} cfg;                              /* config block */
 
 	skein_assert_ret(hash_bit_len > 0, SKEIN_BAD_HASHLEN);
-	skein_assert_ret(key_bytes == 0 || key, SKEIN_FAIL);
+	skein_assert_ret(key_bytes == 0 || key != NULL, SKEIN_FAIL);
 
 	/* compute the initial chaining values ctx->x[], based on key */
 	if (key_bytes == 0) { /* is there a key? */

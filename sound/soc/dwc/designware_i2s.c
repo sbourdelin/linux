@@ -131,32 +131,23 @@ static inline void i2s_clear_irqs(struct dw_i2s_dev *dev, u32 stream)
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		for (i = 0; i < 4; i++)
-			i2s_read_reg(dev->i2s_base, TOR(i));
+			i2s_write_reg(dev->i2s_base, TOR(i), 0);
 	} else {
 		for (i = 0; i < 4; i++)
-			i2s_read_reg(dev->i2s_base, ROR(i));
+			i2s_write_reg(dev->i2s_base, ROR(i), 0);
 	}
 }
 
 static void i2s_start(struct dw_i2s_dev *dev,
 		      struct snd_pcm_substream *substream)
 {
-	u32 i, irq;
+
 	i2s_write_reg(dev->i2s_base, IER, 1);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		for (i = 0; i < 4; i++) {
-			irq = i2s_read_reg(dev->i2s_base, IMR(i));
-			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
-		}
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		i2s_write_reg(dev->i2s_base, ITER, 1);
-	} else {
-		for (i = 0; i < 4; i++) {
-			irq = i2s_read_reg(dev->i2s_base, IMR(i));
-			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x03);
-		}
+	else
 		i2s_write_reg(dev->i2s_base, IRER, 1);
-	}
 
 	i2s_write_reg(dev->i2s_base, CER, 1);
 }
@@ -282,25 +273,23 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	config->sample_rate = params_rate(params);
 
-	if (dev->capability & DW_I2S_MASTER) {
-		if (dev->i2s_clk_cfg) {
-			ret = dev->i2s_clk_cfg(config);
-			if (ret < 0) {
-				dev_err(dev->dev, "runtime audio clk config fail\n");
-				return ret;
-			}
-		} else {
-			u32 bitclk = config->sample_rate *
-					config->data_width * 2;
+	if (dev->i2s_clk_cfg) {
+		ret = dev->i2s_clk_cfg(config);
+		if (ret < 0) {
+			dev_err(dev->dev, "runtime audio clk config fail\n");
+			return ret;
+		}
+	} else {
+		u32 bitclk = config->sample_rate * config->data_width * 2;
 
-			ret = clk_set_rate(dev->clk, bitclk);
-			if (ret) {
-				dev_err(dev->dev, "Can't set I2S clock rate: %d\n",
-					ret);
-				return ret;
-			}
+		ret = clk_set_rate(dev->clk, bitclk);
+		if (ret) {
+			dev_err(dev->dev, "Can't set I2S clock rate: %d\n",
+				ret);
+			return ret;
 		}
 	}
+
 	return 0;
 }
 
@@ -350,43 +339,12 @@ static int dw_i2s_trigger(struct snd_pcm_substream *substream,
 	return ret;
 }
 
-static int dw_i2s_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
-{
-	struct dw_i2s_dev *dev = snd_soc_dai_get_drvdata(cpu_dai);
-	int ret = 0;
-
-	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-	case SND_SOC_DAIFMT_CBM_CFM:
-		if (dev->capability & DW_I2S_SLAVE)
-			ret = 0;
-		else
-			ret = -EINVAL;
-		break;
-	case SND_SOC_DAIFMT_CBS_CFS:
-		if (dev->capability & DW_I2S_MASTER)
-			ret = 0;
-		else
-			ret = -EINVAL;
-		break;
-	case SND_SOC_DAIFMT_CBM_CFS:
-	case SND_SOC_DAIFMT_CBS_CFM:
-		ret = -EINVAL;
-		break;
-	default:
-		dev_dbg(dev->dev, "dwc : Invalid master/slave format\n");
-		ret = -EINVAL;
-		break;
-	}
-	return ret;
-}
-
 static struct snd_soc_dai_ops dw_i2s_dai_ops = {
 	.startup	= dw_i2s_startup,
 	.shutdown	= dw_i2s_shutdown,
 	.hw_params	= dw_i2s_hw_params,
 	.prepare	= dw_i2s_prepare,
 	.trigger	= dw_i2s_trigger,
-	.set_fmt	= dw_i2s_set_fmt,
 };
 
 static const struct snd_soc_component_driver dw_i2s_component = {
@@ -399,8 +357,7 @@ static int dw_i2s_suspend(struct snd_soc_dai *dai)
 {
 	struct dw_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
 
-	if (dev->capability & DW_I2S_MASTER)
-		clk_disable(dev->clk);
+	clk_disable(dev->clk);
 	return 0;
 }
 
@@ -408,8 +365,7 @@ static int dw_i2s_resume(struct snd_soc_dai *dai)
 {
 	struct dw_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
 
-	if (dev->capability & DW_I2S_MASTER)
-		clk_enable(dev->clk);
+	clk_enable(dev->clk);
 	return 0;
 }
 
@@ -485,14 +441,6 @@ static int dw_configure_dai(struct dw_i2s_dev *dev,
 				1 << (COMP1_RX_CHANNELS(comp1) + 1);
 		dw_i2s_dai->capture.formats = formats[idx];
 		dw_i2s_dai->capture.rates = rates;
-	}
-
-	if (COMP1_MODE_EN(comp1)) {
-		dev_dbg(dev->dev, "designware: i2s master mode supported\n");
-		dev->capability |= DW_I2S_MASTER;
-	} else {
-		dev_dbg(dev->dev, "designware: i2s slave mode supported\n");
-		dev->capability |= DW_I2S_SLAVE;
 	}
 
 	return 0;
@@ -581,7 +529,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 	struct snd_soc_dai_driver *dw_i2s_dai;
-	const char *clk_id;
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
@@ -603,35 +550,32 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		return PTR_ERR(dev->i2s_base);
 
 	dev->dev = &pdev->dev;
-
 	if (pdata) {
-		dev->capability = pdata->cap;
-		clk_id = NULL;
 		ret = dw_configure_dai_by_pd(dev, dw_i2s_dai, res, pdata);
-	} else {
-		clk_id = "i2sclk";
-		ret = dw_configure_dai_by_dt(dev, dw_i2s_dai, res);
-	}
-	if (ret < 0)
-		return ret;
-
-	if (dev->capability & DW_I2S_MASTER) {
-		if (pdata) {
-			dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
-			if (!dev->i2s_clk_cfg) {
-				dev_err(&pdev->dev, "no clock configure method\n");
-				return -ENODEV;
-			}
-		}
-		dev->clk = devm_clk_get(&pdev->dev, clk_id);
-
-		if (IS_ERR(dev->clk))
-			return PTR_ERR(dev->clk);
-
-		ret = clk_prepare_enable(dev->clk);
 		if (ret < 0)
 			return ret;
+
+		dev->capability = pdata->cap;
+		dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
+		if (!dev->i2s_clk_cfg) {
+			dev_err(&pdev->dev, "no clock configure method\n");
+			return -ENODEV;
+		}
+
+		dev->clk = devm_clk_get(&pdev->dev, NULL);
+	} else {
+		ret = dw_configure_dai_by_dt(dev, dw_i2s_dai, res);
+		if (ret < 0)
+			return ret;
+
+		dev->clk = devm_clk_get(&pdev->dev, "i2sclk");
 	}
+	if (IS_ERR(dev->clk))
+		return PTR_ERR(dev->clk);
+
+	ret = clk_prepare_enable(dev->clk);
+	if (ret < 0)
+		return ret;
 
 	dev_set_drvdata(&pdev->dev, dev);
 	ret = devm_snd_soc_register_component(&pdev->dev, &dw_i2s_component,
@@ -653,8 +597,7 @@ static int dw_i2s_probe(struct platform_device *pdev)
 	return 0;
 
 err_clk_disable:
-	if (dev->capability & DW_I2S_MASTER)
-		clk_disable_unprepare(dev->clk);
+	clk_disable_unprepare(dev->clk);
 	return ret;
 }
 
@@ -662,8 +605,7 @@ static int dw_i2s_remove(struct platform_device *pdev)
 {
 	struct dw_i2s_dev *dev = dev_get_drvdata(&pdev->dev);
 
-	if (dev->capability & DW_I2S_MASTER)
-		clk_disable_unprepare(dev->clk);
+	clk_disable_unprepare(dev->clk);
 
 	return 0;
 }

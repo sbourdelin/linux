@@ -8,7 +8,6 @@
 
 #include <linux/ceph/decode.h>
 #include <linux/ceph/auth.h>
-#include <linux/ceph/libceph.h>
 #include <linux/ceph/messenger.h>
 
 #include "crypto.h"
@@ -280,15 +279,6 @@ bad:
 	return -EINVAL;
 }
 
-static void ceph_x_authorizer_cleanup(struct ceph_x_authorizer *au)
-{
-	ceph_crypto_key_destroy(&au->session_key);
-	if (au->buf) {
-		ceph_buffer_put(au->buf);
-		au->buf = NULL;
-	}
-}
-
 static int ceph_x_build_authorizer(struct ceph_auth_client *ac,
 				   struct ceph_x_ticket_handler *th,
 				   struct ceph_x_authorizer *au)
@@ -307,7 +297,7 @@ static int ceph_x_build_authorizer(struct ceph_auth_client *ac,
 	ceph_crypto_key_destroy(&au->session_key);
 	ret = ceph_crypto_key_clone(&au->session_key, &th->session_key);
 	if (ret)
-		goto out_au;
+		return ret;
 
 	maxlen = sizeof(*msg_a) + sizeof(msg_b) +
 		ceph_x_encrypt_buflen(ticket_blob_len);
@@ -319,8 +309,8 @@ static int ceph_x_build_authorizer(struct ceph_auth_client *ac,
 	if (!au->buf) {
 		au->buf = ceph_buffer_new(maxlen, GFP_NOFS);
 		if (!au->buf) {
-			ret = -ENOMEM;
-			goto out_au;
+			ceph_crypto_key_destroy(&au->session_key);
+			return -ENOMEM;
 		}
 	}
 	au->service = th->service;
@@ -350,7 +340,7 @@ static int ceph_x_build_authorizer(struct ceph_auth_client *ac,
 	ret = ceph_x_encrypt(&au->session_key, &msg_b, sizeof(msg_b),
 			     p, end - p);
 	if (ret < 0)
-		goto out_au;
+		goto out_buf;
 	p += ret;
 	au->buf->vec.iov_len = p - au->buf->vec.iov_base;
 	dout(" built authorizer nonce %llx len %d\n", au->nonce,
@@ -358,8 +348,9 @@ static int ceph_x_build_authorizer(struct ceph_auth_client *ac,
 	BUG_ON(au->buf->vec.iov_len > maxlen);
 	return 0;
 
-out_au:
-	ceph_x_authorizer_cleanup(au);
+out_buf:
+	ceph_buffer_put(au->buf);
+	au->buf = NULL;
 	return ret;
 }
 
@@ -633,7 +624,8 @@ static void ceph_x_destroy_authorizer(struct ceph_auth_client *ac,
 {
 	struct ceph_x_authorizer *au = (void *)a;
 
-	ceph_x_authorizer_cleanup(au);
+	ceph_crypto_key_destroy(&au->session_key);
+	ceph_buffer_put(au->buf);
 	kfree(au);
 }
 
@@ -661,7 +653,8 @@ static void ceph_x_destroy(struct ceph_auth_client *ac)
 		remove_ticket_handler(ac, th);
 	}
 
-	ceph_x_authorizer_cleanup(&xi->auth_authorizer);
+	if (xi->auth_authorizer.buf)
+		ceph_buffer_put(xi->auth_authorizer.buf);
 
 	kfree(ac->private);
 	ac->private = NULL;
@@ -698,10 +691,8 @@ static int ceph_x_sign_message(struct ceph_auth_handshake *auth,
 			       struct ceph_msg *msg)
 {
 	int ret;
-
-	if (ceph_test_opt(from_msgr(msg->con->msgr), NOMSGSIGN))
+	if (!auth->authorizer)
 		return 0;
-
 	ret = calcu_signature((struct ceph_x_authorizer *)auth->authorizer,
 			      msg, &msg->footer.sig);
 	if (ret < 0)
@@ -716,9 +707,8 @@ static int ceph_x_check_message_signature(struct ceph_auth_handshake *auth,
 	__le64 sig_check;
 	int ret;
 
-	if (ceph_test_opt(from_msgr(msg->con->msgr), NOMSGSIGN))
+	if (!auth->authorizer)
 		return 0;
-
 	ret = calcu_signature((struct ceph_x_authorizer *)auth->authorizer,
 			      msg, &sig_check);
 	if (ret < 0)

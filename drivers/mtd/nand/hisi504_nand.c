@@ -590,8 +590,7 @@ static int hisi_nand_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
 }
 
 static int hisi_nand_write_page_hwecc(struct mtd_info *mtd,
-		struct nand_chip *chip, const uint8_t *buf, int oob_required,
-		int page)
+		struct nand_chip *chip, const uint8_t *buf, int oob_required)
 {
 	chip->write_buf(mtd, buf, mtd->writesize);
 	if (oob_required)
@@ -738,6 +737,7 @@ static int hisi_nfc_probe(struct platform_device *pdev)
 	}
 
 	mtd->priv		= chip;
+	mtd->owner		= THIS_MODULE;
 	mtd->name		= "hisi_nand";
 	mtd->dev.parent         = &pdev->dev;
 

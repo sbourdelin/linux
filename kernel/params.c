@@ -223,7 +223,7 @@ char *parse_args(const char *doing,
 		 int (*unknown)(char *param, char *val,
 				const char *doing, void *arg))
 {
-	char *param, *val, *err = NULL;
+	char *param, *val;
 
 	/* Chew leading spaces */
 	args = skip_spaces(args);
@@ -238,7 +238,7 @@ char *parse_args(const char *doing,
 		args = next_arg(args, &param, &val);
 		/* Stop at -- */
 		if (!val && strcmp(param, "--") == 0)
-			return err ?: args;
+			return args;
 		irq_was_disabled = irqs_disabled();
 		ret = parse_one(param, val, doing, params, num,
 				min_level, max_level, arg, unknown);
@@ -247,25 +247,24 @@ char *parse_args(const char *doing,
 				doing, param);
 
 		switch (ret) {
-		case 0:
-			continue;
 		case -ENOENT:
 			pr_err("%s: Unknown parameter `%s'\n", doing, param);
-			break;
+			return ERR_PTR(ret);
 		case -ENOSPC:
 			pr_err("%s: `%s' too large for parameter `%s'\n",
 			       doing, val ?: "", param);
+			return ERR_PTR(ret);
+		case 0:
 			break;
 		default:
 			pr_err("%s: `%s' invalid for parameter `%s'\n",
 			       doing, val ?: "", param);
-			break;
+			return ERR_PTR(ret);
 		}
-
-		err = ERR_PTR(ret);
 	}
 
-	return err;
+	/* All parsed OK. */
+	return NULL;
 }
 
 /* Lazy bastard, eh? */
@@ -326,11 +325,10 @@ int param_get_charp(char *buffer, const struct kernel_param *kp)
 }
 EXPORT_SYMBOL(param_get_charp);
 
-void param_free_charp(void *arg)
+static void param_free_charp(void *arg)
 {
 	maybe_kfree_parameter(*((char **)arg));
 }
-EXPORT_SYMBOL(param_free_charp);
 
 const struct kernel_param_ops param_ops_charp = {
 	.set = param_set_charp,

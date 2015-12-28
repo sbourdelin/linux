@@ -22,6 +22,10 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  General Public License for more details.
  *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+ *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
@@ -161,16 +165,8 @@ struct transaction {
 	u8 flags;
 };
 
-struct acpi_ec_query {
-	struct transaction transaction;
-	struct work_struct work;
-	struct acpi_ec_query_handler *handler;
-};
-
 static int acpi_ec_query(struct acpi_ec *ec, u8 *data);
 static void advance_transaction(struct acpi_ec *ec);
-static void acpi_ec_event_handler(struct work_struct *work);
-static void acpi_ec_event_processor(struct work_struct *work);
 
 struct acpi_ec *boot_ec, *first_ec;
 EXPORT_SYMBOL(first_ec);
@@ -441,31 +437,17 @@ static void acpi_ec_complete_query(struct acpi_ec *ec)
 
 static bool acpi_ec_guard_event(struct acpi_ec *ec)
 {
-	bool guarded = true;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ec->lock, flags);
-	/*
-	 * If firmware SCI_EVT clearing timing is "event", we actually
-	 * don't know when the SCI_EVT will be cleared by firmware after
-	 * evaluating _Qxx, so we need to re-check SCI_EVT after waiting an
-	 * acceptable period.
-	 *
-	 * The guarding period begins when EC_FLAGS_QUERY_PENDING is
-	 * flagged, which means SCI_EVT check has just been performed.
-	 * But if the current transaction is ACPI_EC_COMMAND_QUERY, the
-	 * guarding should have already been performed (via
-	 * EC_FLAGS_QUERY_GUARDING) and should not be applied so that the
-	 * ACPI_EC_COMMAND_QUERY transaction can be transitioned into
-	 * ACPI_EC_COMMAND_POLL state immediately.
-	 */
 	if (ec_event_clearing == ACPI_EC_EVT_TIMING_STATUS ||
 	    ec_event_clearing == ACPI_EC_EVT_TIMING_QUERY ||
 	    !test_bit(EC_FLAGS_QUERY_PENDING, &ec->flags) ||
 	    (ec->curr && ec->curr->command == ACPI_EC_COMMAND_QUERY))
-		guarded = false;
-	spin_unlock_irqrestore(&ec->lock, flags);
-	return guarded;
+		return false;
+
+	/*
+	 * Postpone the query submission to allow the firmware to proceed,
+	 * we shouldn't check SCI_EVT before the firmware reflagging it.
+	 */
+	return true;
 }
 
 static int ec_transaction_polled(struct acpi_ec *ec)
@@ -611,7 +593,6 @@ static int ec_guard(struct acpi_ec *ec)
 	unsigned long guard = usecs_to_jiffies(ec_polling_guard);
 	unsigned long timeout = ec->timestamp + guard;
 
-	/* Ensure guarding period before polling EC status */
 	do {
 		if (ec_busy_polling) {
 			/* Perform busy polling */
@@ -621,13 +602,11 @@ static int ec_guard(struct acpi_ec *ec)
 		} else {
 			/*
 			 * Perform wait polling
-			 * 1. Wait the transaction to be completed by the
-			 *    GPE handler after the transaction enters
-			 *    ACPI_EC_COMMAND_POLL state.
-			 * 2. A special guarding logic is also required
-			 *    for event clearing mode "event" before the
-			 *    transaction enters ACPI_EC_COMMAND_POLL
-			 *    state.
+			 *
+			 * For SCI_EVT clearing timing of "event",
+			 * performing guarding before re-checking the
+			 * SCI_EVT. Otherwise, such guarding is not needed
+			 * due to the old practices.
 			 */
 			if (!ec_transaction_polled(ec) &&
 			    !acpi_ec_guard_event(ec))
@@ -637,6 +616,7 @@ static int ec_guard(struct acpi_ec *ec)
 					       guard))
 				return 0;
 		}
+		/* Guard the register accesses for the polling modes */
 	} while (time_before(jiffies, timeout));
 	return -ETIME;
 }
@@ -945,23 +925,6 @@ acpi_ec_get_query_handler(struct acpi_ec_query_handler *handler)
 	return handler;
 }
 
-static struct acpi_ec_query_handler *
-acpi_ec_get_query_handler_by_value(struct acpi_ec *ec, u8 value)
-{
-	struct acpi_ec_query_handler *handler;
-	bool found = false;
-
-	mutex_lock(&ec->mutex);
-	list_for_each_entry(handler, &ec->list, node) {
-		if (value == handler->query_bit) {
-			found = true;
-			break;
-		}
-	}
-	mutex_unlock(&ec->mutex);
-	return found ? acpi_ec_get_query_handler(handler) : NULL;
-}
-
 static void acpi_ec_query_handler_release(struct kref *kref)
 {
 	struct acpi_ec_query_handler *handler =
@@ -997,15 +960,14 @@ int acpi_ec_add_query_handler(struct acpi_ec *ec, u8 query_bit,
 }
 EXPORT_SYMBOL_GPL(acpi_ec_add_query_handler);
 
-static void acpi_ec_remove_query_handlers(struct acpi_ec *ec,
-					  bool remove_all, u8 query_bit)
+void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit)
 {
 	struct acpi_ec_query_handler *handler, *tmp;
 	LIST_HEAD(free_list);
 
 	mutex_lock(&ec->mutex);
 	list_for_each_entry_safe(handler, tmp, &ec->list, node) {
-		if (remove_all || query_bit == handler->query_bit) {
+		if (query_bit == handler->query_bit) {
 			list_del_init(&handler->node);
 			list_add(&handler->node, &free_list);
 		}
@@ -1014,99 +976,62 @@ static void acpi_ec_remove_query_handlers(struct acpi_ec *ec,
 	list_for_each_entry_safe(handler, tmp, &free_list, node)
 		acpi_ec_put_query_handler(handler);
 }
-
-void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit)
-{
-	acpi_ec_remove_query_handlers(ec, false, query_bit);
-}
 EXPORT_SYMBOL_GPL(acpi_ec_remove_query_handler);
 
-static struct acpi_ec_query *acpi_ec_create_query(u8 *pval)
+static void acpi_ec_run(void *cxt)
 {
-	struct acpi_ec_query *q;
-	struct transaction *t;
+	struct acpi_ec_query_handler *handler = cxt;
 
-	q = kzalloc(sizeof (struct acpi_ec_query), GFP_KERNEL);
-	if (!q)
-		return NULL;
-	INIT_WORK(&q->work, acpi_ec_event_processor);
-	t = &q->transaction;
-	t->command = ACPI_EC_COMMAND_QUERY;
-	t->rdata = pval;
-	t->rlen = 1;
-	return q;
-}
-
-static void acpi_ec_delete_query(struct acpi_ec_query *q)
-{
-	if (q) {
-		if (q->handler)
-			acpi_ec_put_query_handler(q->handler);
-		kfree(q);
-	}
-}
-
-static void acpi_ec_event_processor(struct work_struct *work)
-{
-	struct acpi_ec_query *q = container_of(work, struct acpi_ec_query, work);
-	struct acpi_ec_query_handler *handler = q->handler;
-
+	if (!handler)
+		return;
 	ec_dbg_evt("Query(0x%02x) started", handler->query_bit);
 	if (handler->func)
 		handler->func(handler->data);
 	else if (handler->handle)
 		acpi_evaluate_object(handler->handle, NULL, NULL, NULL);
 	ec_dbg_evt("Query(0x%02x) stopped", handler->query_bit);
-	acpi_ec_delete_query(q);
+	acpi_ec_put_query_handler(handler);
 }
 
 static int acpi_ec_query(struct acpi_ec *ec, u8 *data)
 {
 	u8 value = 0;
 	int result;
-	struct acpi_ec_query *q;
-
-	q = acpi_ec_create_query(&value);
-	if (!q)
-		return -ENOMEM;
+	acpi_status status;
+	struct acpi_ec_query_handler *handler;
+	struct transaction t = {.command = ACPI_EC_COMMAND_QUERY,
+				.wdata = NULL, .rdata = &value,
+				.wlen = 0, .rlen = 1};
 
 	/*
 	 * Query the EC to find out which _Qxx method we need to evaluate.
 	 * Note that successful completion of the query causes the ACPI_EC_SCI
 	 * bit to be cleared (and thus clearing the interrupt source).
 	 */
-	result = acpi_ec_transaction(ec, &q->transaction);
-	if (!value)
-		result = -ENODATA;
+	result = acpi_ec_transaction(ec, &t);
 	if (result)
-		goto err_exit;
-
-	q->handler = acpi_ec_get_query_handler_by_value(ec, value);
-	if (!q->handler) {
-		result = -ENODATA;
-		goto err_exit;
-	}
-
-	/*
-	 * It is reported that _Qxx are evaluated in a parallel way on
-	 * Windows:
-	 * https://bugzilla.kernel.org/show_bug.cgi?id=94411
-	 *
-	 * Put this log entry before schedule_work() in order to make
-	 * it appearing before any other log entries occurred during the
-	 * work queue execution.
-	 */
-	ec_dbg_evt("Query(0x%02x) scheduled", value);
-	if (!schedule_work(&q->work)) {
-		ec_dbg_evt("Query(0x%02x) overlapped", value);
-		result = -EBUSY;
-	}
-
-err_exit:
-	if (result && q)
-		acpi_ec_delete_query(q);
+		return result;
 	if (data)
 		*data = value;
+	if (!value)
+		return -ENODATA;
+
+	mutex_lock(&ec->mutex);
+	list_for_each_entry(handler, &ec->list, node) {
+		if (value == handler->query_bit) {
+			/* have custom handler for this bit */
+			handler = acpi_ec_get_query_handler(handler);
+			ec_dbg_evt("Query(0x%02x) scheduled",
+				   handler->query_bit);
+			status = acpi_os_execute((handler->func) ?
+				OSL_NOTIFY_HANDLER : OSL_GPE_HANDLER,
+				acpi_ec_run, handler);
+			if (ACPI_FAILURE(status))
+				result = -EBUSY;
+			break;
+		}
+	}
+	mutex_unlock(&ec->mutex);
 	return result;
 }
 
@@ -1393,13 +1318,19 @@ static int acpi_ec_add(struct acpi_device *device)
 static int acpi_ec_remove(struct acpi_device *device)
 {
 	struct acpi_ec *ec;
+	struct acpi_ec_query_handler *handler, *tmp;
 
 	if (!device)
 		return -EINVAL;
 
 	ec = acpi_driver_data(device);
 	ec_remove_handlers(ec);
-	acpi_ec_remove_query_handlers(ec, true, 0);
+	mutex_lock(&ec->mutex);
+	list_for_each_entry_safe(handler, tmp, &ec->list, node) {
+		list_del(&handler->node);
+		kfree(handler);
+	}
+	mutex_unlock(&ec->mutex);
 	release_region(ec->data_addr, 1);
 	release_region(ec->command_addr, 1);
 	device->driver_data = NULL;

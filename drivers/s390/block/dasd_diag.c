@@ -21,7 +21,6 @@
 
 #include <asm/dasd.h>
 #include <asm/debug.h>
-#include <asm/diag.h>
 #include <asm/ebcdic.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -77,7 +76,6 @@ static inline int dia250(void *iob, int cmd)
 	int rc;
 
 	rc = 3;
-	diag_stat_inc(DIAG_STAT_X250);
 	asm volatile(
 		"	diag	2,%2,0x250\n"
 		"0:	ipm	%0\n"

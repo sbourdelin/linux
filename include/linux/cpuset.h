@@ -93,7 +93,7 @@ extern int current_cpuset_is_being_rebound(void);
 
 extern void rebuild_sched_domains(void);
 
-extern void cpuset_print_current_mems_allowed(void);
+extern void cpuset_print_task_mems_allowed(struct task_struct *p);
 
 /*
  * read_mems_allowed_begin is required when making decisions involving
@@ -104,9 +104,6 @@ extern void cpuset_print_current_mems_allowed(void);
  */
 static inline unsigned int read_mems_allowed_begin(void)
 {
-	if (!cpusets_enabled())
-		return 0;
-
 	return read_seqcount_begin(&current->mems_allowed_seq);
 }
 
@@ -118,9 +115,6 @@ static inline unsigned int read_mems_allowed_begin(void)
  */
 static inline bool read_mems_allowed_retry(unsigned int seq)
 {
-	if (!cpusets_enabled())
-		return false;
-
 	return read_seqcount_retry(&current->mems_allowed_seq, seq);
 }
 
@@ -225,7 +219,7 @@ static inline void rebuild_sched_domains(void)
 	partition_sched_domains(1, NULL, NULL);
 }
 
-static inline void cpuset_print_current_mems_allowed(void)
+static inline void cpuset_print_task_mems_allowed(struct task_struct *p)
 {
 }
 

@@ -187,7 +187,10 @@ static int rhashtable_rehash_one(struct rhashtable *ht, unsigned int old_hash)
 	head = rht_dereference_bucket(new_tbl->buckets[new_hash],
 				      new_tbl, new_hash);
 
-	RCU_INIT_POINTER(entry->next, head);
+	if (rht_is_a_nulls(head))
+		INIT_RHT_NULLS_HEAD(entry->next, ht, new_hash);
+	else
+		RCU_INIT_POINTER(entry->next, head);
 
 	rcu_assign_pointer(new_tbl->buckets[new_hash], entry);
 	spin_unlock(new_bucket_lock);
@@ -607,8 +610,6 @@ next:
 		iter->skip = 0;
 	}
 
-	iter->p = NULL;
-
 	/* Ensure we see any new tables. */
 	smp_rmb();
 
@@ -618,6 +619,8 @@ next:
 		iter->skip = 0;
 		return ERR_PTR(-EAGAIN);
 	}
+
+	iter->p = NULL;
 
 	return NULL;
 }

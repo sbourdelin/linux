@@ -17,7 +17,6 @@
 #include <linux/gfp.h>
 #include <linux/crash_dump.h>
 #include <linux/debug_locks.h>
-#include <asm/diag.h>
 #include <asm/ipl.h>
 #include <asm/smp.h>
 #include <asm/setup.h>
@@ -166,7 +165,7 @@ static struct ipl_parameter_block *dump_block_ccw;
 
 static struct sclp_ipl_info sclp_ipl_info;
 
-static inline int __diag308(unsigned long subcode, void *addr)
+int diag308(unsigned long subcode, void *addr)
 {
 	register unsigned long _addr asm("0") = (unsigned long) addr;
 	register unsigned long _rc asm("1") = 0;
@@ -178,12 +177,6 @@ static inline int __diag308(unsigned long subcode, void *addr)
 		: "+d" (_addr), "+d" (_rc)
 		: "d" (subcode) : "cc", "memory");
 	return _rc;
-}
-
-int diag308(unsigned long subcode, void *addr)
-{
-	diag_stat_inc(DIAG_STAT_X308);
-	return __diag308(subcode, addr);
 }
 EXPORT_SYMBOL_GPL(diag308);
 

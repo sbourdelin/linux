@@ -619,13 +619,6 @@ struct nft_xt {
 
 static struct nft_expr_type nft_match_type;
 
-static bool nft_match_cmp(const struct xt_match *match,
-			  const char *name, u32 rev, u32 family)
-{
-	return strcmp(match->name, name) == 0 && match->revision == rev &&
-	       (match->family == NFPROTO_UNSPEC || match->family == family);
-}
-
 static const struct nft_expr_ops *
 nft_match_select_ops(const struct nft_ctx *ctx,
 		     const struct nlattr * const tb[])
@@ -633,7 +626,7 @@ nft_match_select_ops(const struct nft_ctx *ctx,
 	struct nft_xt *nft_match;
 	struct xt_match *match;
 	char *mt_name;
-	u32 rev, family;
+	__u32 rev, family;
 
 	if (tb[NFTA_MATCH_NAME] == NULL ||
 	    tb[NFTA_MATCH_REV] == NULL ||
@@ -648,7 +641,8 @@ nft_match_select_ops(const struct nft_ctx *ctx,
 	list_for_each_entry(nft_match, &nft_match_list, head) {
 		struct xt_match *match = nft_match->ops.data;
 
-		if (nft_match_cmp(match, mt_name, rev, family)) {
+		if (strcmp(match->name, mt_name) == 0 &&
+		    match->revision == rev && match->family == family) {
 			if (!try_module_get(match->me))
 				return ERR_PTR(-ENOENT);
 
@@ -699,13 +693,6 @@ static LIST_HEAD(nft_target_list);
 
 static struct nft_expr_type nft_target_type;
 
-static bool nft_target_cmp(const struct xt_target *tg,
-			   const char *name, u32 rev, u32 family)
-{
-	return strcmp(tg->name, name) == 0 && tg->revision == rev &&
-	       (tg->family == NFPROTO_UNSPEC || tg->family == family);
-}
-
 static const struct nft_expr_ops *
 nft_target_select_ops(const struct nft_ctx *ctx,
 		      const struct nlattr * const tb[])
@@ -713,7 +700,7 @@ nft_target_select_ops(const struct nft_ctx *ctx,
 	struct nft_xt *nft_target;
 	struct xt_target *target;
 	char *tg_name;
-	u32 rev, family;
+	__u32 rev, family;
 
 	if (tb[NFTA_TARGET_NAME] == NULL ||
 	    tb[NFTA_TARGET_REV] == NULL ||
@@ -728,7 +715,8 @@ nft_target_select_ops(const struct nft_ctx *ctx,
 	list_for_each_entry(nft_target, &nft_target_list, head) {
 		struct xt_target *target = nft_target->ops.data;
 
-		if (nft_target_cmp(target, tg_name, rev, family)) {
+		if (strcmp(target->name, tg_name) == 0 &&
+		    target->revision == rev && target->family == family) {
 			if (!try_module_get(target->me))
 				return ERR_PTR(-ENOENT);
 

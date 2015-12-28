@@ -1,29 +1,30 @@
 /*
- * serial2002.c
- * Comedi driver for serial connected hardware
- *
- * COMEDI - Linux Control and Measurement Device Interface
- * Copyright (C) 2002 Anders Blomdell <anders.blomdell@control.lth.se>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
+    comedi/drivers/serial2002.c
+    Skeleton code for a Comedi driver
+
+    COMEDI - Linux Control and Measurement Device Interface
+    Copyright (C) 2002 Anders Blomdell <anders.blomdell@control.lth.se>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+*/
 
 /*
- * Driver: serial2002
- * Description: Driver for serial connected hardware
- * Devices:
- * Author: Anders Blomdell
- * Updated: Fri,  7 Jun 2002 12:56:45 -0700
- * Status: in development
- */
+Driver: serial2002
+Description: Driver for serial connected hardware
+Devices:
+Author: Anders Blomdell
+Updated: Fri,  7 Jun 2002 12:56:45 -0700
+Status: in development
+
+*/
 
 #include <linux/module.h>
 #include "../comedidev.h"
@@ -31,7 +32,6 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/ktime.h>
 
 #include <linux/termios.h>
 #include <asm/ioctls.h>
@@ -101,7 +101,7 @@ static long serial2002_tty_ioctl(struct file *f, unsigned op,
 	if (f->f_op->unlocked_ioctl)
 		return f->f_op->unlocked_ioctl(f, op, param);
 
-	return -ENOTTY;
+	return -ENOSYS;
 }
 
 static int serial2002_tty_write(struct file *f, unsigned char *buf, int count)
@@ -121,9 +121,9 @@ static int serial2002_tty_write(struct file *f, unsigned char *buf, int count)
 static void serial2002_tty_read_poll_wait(struct file *f, int timeout)
 {
 	struct poll_wqueues table;
-	ktime_t start, now;
+	struct timeval start, now;
 
-	start = ktime_get();
+	do_gettimeofday(&start);
 	poll_initwait(&table);
 	while (1) {
 		long elapsed;
@@ -134,8 +134,9 @@ static void serial2002_tty_read_poll_wait(struct file *f, int timeout)
 			    POLLHUP | POLLERR)) {
 			break;
 		}
-		now = ktime_get();
-		elapsed = ktime_us_delta(now, start);
+		do_gettimeofday(&now);
+		elapsed = 1000000 * (now.tv_sec - start.tv_sec) +
+			  now.tv_usec - start.tv_usec;
 		if (elapsed > timeout)
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -175,7 +176,7 @@ static int serial2002_tty_read(struct file *f, int timeout)
 					result = ch;
 					break;
 				}
-				usleep_range(100, 1000);
+				udelay(100);
 			}
 		}
 		set_fs(oldfs);

@@ -89,9 +89,4 @@
 			regulator-name = "ldo5";
 		};
 	};
-
-	usb_power_supply: usb_power_supply {
-		compatible = "x-powers,axp202-usb-power-supply";
-		status = "disabled";
-	};
 };

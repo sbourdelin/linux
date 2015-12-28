@@ -5,5 +5,4 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
 obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
 obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
 
-obj-$(CONFIG_KASAN)		+= kasan_init.o
-KASAN_SANITIZE_kasan_init.o	:= n
+CFLAGS_mmu.o			:= -I$(srctree)/scripts/dtc/libfdt/

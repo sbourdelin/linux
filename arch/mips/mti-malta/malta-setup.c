@@ -27,7 +27,6 @@
 #include <linux/time.h>
 
 #include <asm/fw/fw.h>
-#include <asm/mach-malta/malta-dtshim.h>
 #include <asm/mips-cm.h>
 #include <asm/mips-boards/generic.h>
 #include <asm/mips-boards/malta.h>
@@ -251,10 +250,8 @@ static void __init bonito_quirks_setup(void)
 void __init plat_mem_setup(void)
 {
 	unsigned int i;
-	void *fdt = __dtb_start;
 
-	fdt = malta_dt_shim(fdt);
-	__dt_setup_arch(fdt);
+	__dt_setup_arch(__dtb_start);
 
 	if (config_enabled(CONFIG_EVA))
 		/* EVA has already been configured in mach-malta/kernel-init.h */

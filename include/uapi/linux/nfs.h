@@ -7,8 +7,6 @@
 #ifndef _UAPI_LINUX_NFS_H
 #define _UAPI_LINUX_NFS_H
 
-#include <linux/types.h>
-
 #define NFS_PROGRAM	100003
 #define NFS_PORT	2049
 #define NFS_MAXDATA	8192
@@ -32,17 +30,6 @@
 #define NFS_MNT3_VERSION	3
 
 #define NFS_PIPE_DIRNAME "nfs"
-
-/* NFS ioctls */
-/* Let's follow btrfs lead on CLONE to avoid messing userspace */
-#define NFS_IOC_CLONE		_IOW(0x94, 9, int)
-#define NFS_IOC_CLONE_RANGE	_IOW(0x94, 13, int)
-
-struct nfs_ioctl_clone_range_args {
-	__s64 src_fd;
-	__u64 src_off, count;
-	__u64 dst_off;
-};
 
 /*
  * NFS stats. The good thing with these values is that NFSv3 errors are

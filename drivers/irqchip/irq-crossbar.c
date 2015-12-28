@@ -11,11 +11,12 @@
  */
 #include <linux/err.h>
 #include <linux/io.h>
-#include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/slab.h>
+
+#include "irqchip.h"
 
 #define IRQ_FREE	-1
 #define IRQ_RESERVED	-2
@@ -67,9 +68,7 @@ static struct irq_chip crossbar_chip = {
 	.irq_mask		= irq_chip_mask_parent,
 	.irq_unmask		= irq_chip_unmask_parent,
 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-	.irq_set_type		= irq_chip_set_type_parent,
-	.flags			= IRQCHIP_MASK_ON_SUSPEND |
-				  IRQCHIP_SKIP_SET_WAKE,
+	.irq_set_wake		= irq_chip_set_wake_parent,
 #ifdef CONFIG_SMP
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 #endif
@@ -78,12 +77,9 @@ static struct irq_chip crossbar_chip = {
 static int allocate_gic_irq(struct irq_domain *domain, unsigned virq,
 			    irq_hw_number_t hwirq)
 {
-	struct irq_fwspec fwspec;
+	struct of_phandle_args args;
 	int i;
 	int err;
-
-	if (!irq_domain_get_of_node(domain->parent))
-		return -EINVAL;
 
 	raw_spin_lock(&cb->lock);
 	for (i = cb->int_max - 1; i >= 0; i--) {
@@ -97,13 +93,13 @@ static int allocate_gic_irq(struct irq_domain *domain, unsigned virq,
 	if (i < 0)
 		return -ENODEV;
 
-	fwspec.fwnode = domain->parent->fwnode;
-	fwspec.param_count = 3;
-	fwspec.param[0] = 0;	/* SPI */
-	fwspec.param[1] = i;
-	fwspec.param[2] = IRQ_TYPE_LEVEL_HIGH;
+	args.np = domain->parent->of_node;
+	args.args_count = 3;
+	args.args[0] = 0;	/* SPI */
+	args.args[1] = i;
+	args.args[2] = IRQ_TYPE_LEVEL_HIGH;
 
-	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
+	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
 	if (err)
 		cb->irq_map[i] = IRQ_FREE;
 	else
@@ -115,16 +111,16 @@ static int allocate_gic_irq(struct irq_domain *domain, unsigned virq,
 static int crossbar_domain_alloc(struct irq_domain *d, unsigned int virq,
 				 unsigned int nr_irqs, void *data)
 {
-	struct irq_fwspec *fwspec = data;
+	struct of_phandle_args *args = data;
 	irq_hw_number_t hwirq;
 	int i;
 
-	if (fwspec->param_count != 3)
+	if (args->args_count != 3)
 		return -EINVAL;	/* Not GIC compliant */
-	if (fwspec->param[0] != 0)
+	if (args->args[0] != 0)
 		return -EINVAL;	/* No PPI should point to this domain */
 
-	hwirq = fwspec->param[1];
+	hwirq = args->args[1];
 	if ((hwirq + nr_irqs) > cb->max_crossbar_sources)
 		return -EINVAL;	/* Can't deal with this */
 
@@ -169,31 +165,28 @@ static void crossbar_domain_free(struct irq_domain *domain, unsigned int virq,
 	raw_spin_unlock(&cb->lock);
 }
 
-static int crossbar_domain_translate(struct irq_domain *d,
-				     struct irq_fwspec *fwspec,
-				     unsigned long *hwirq,
-				     unsigned int *type)
+static int crossbar_domain_xlate(struct irq_domain *d,
+				 struct device_node *controller,
+				 const u32 *intspec, unsigned int intsize,
+				 unsigned long *out_hwirq,
+				 unsigned int *out_type)
 {
-	if (is_of_node(fwspec->fwnode)) {
-		if (fwspec->param_count != 3)
-			return -EINVAL;
+	if (d->of_node != controller)
+		return -EINVAL;	/* Shouldn't happen, really... */
+	if (intsize != 3)
+		return -EINVAL;	/* Not GIC compliant */
+	if (intspec[0] != 0)
+		return -EINVAL;	/* No PPI should point to this domain */
 
-		/* No PPI should point to this domain */
-		if (fwspec->param[0] != 0)
-			return -EINVAL;
-
-		*hwirq = fwspec->param[1];
-		*type = fwspec->param[2];
-		return 0;
-	}
-
-	return -EINVAL;
+	*out_hwirq = intspec[1];
+	*out_type = intspec[2];
+	return 0;
 }
 
 static const struct irq_domain_ops crossbar_domain_ops = {
-	.alloc		= crossbar_domain_alloc,
-	.free		= crossbar_domain_free,
-	.translate	= crossbar_domain_translate,
+	.alloc	= crossbar_domain_alloc,
+	.free	= crossbar_domain_free,
+	.xlate	= crossbar_domain_xlate,
 };
 
 static int __init crossbar_of_init(struct device_node *node)

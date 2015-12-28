@@ -233,7 +233,7 @@ static void bt3c_receive(struct bt3c_info *info)
 		info->hdev->stat.byte_rx++;
 
 		/* Allocate packet */
-		if (!info->rx_skb) {
+		if (info->rx_skb == NULL) {
 			info->rx_state = RECV_WAIT_PACKET_TYPE;
 			info->rx_count = 0;
 			info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC);
@@ -270,6 +270,7 @@ static void bt3c_receive(struct bt3c_info *info)
 				/* Unknown packet */
 				BT_ERR("Unknown HCI packet with type 0x%02x received", bt_cb(info->rx_skb)->pkt_type);
 				info->hdev->stat.err_rx++;
+				clear_bit(HCI_RUNNING, &(info->hdev->flags));
 
 				kfree_skb(info->rx_skb);
 				info->rx_skb = NULL;
@@ -394,12 +395,17 @@ static int bt3c_hci_flush(struct hci_dev *hdev)
 
 static int bt3c_hci_open(struct hci_dev *hdev)
 {
+	set_bit(HCI_RUNNING, &(hdev->flags));
+
 	return 0;
 }
 
 
 static int bt3c_hci_close(struct hci_dev *hdev)
 {
+	if (!test_and_clear_bit(HCI_RUNNING, &(hdev->flags)))
+		return 0;
+
 	bt3c_hci_flush(hdev);
 
 	return 0;
@@ -421,7 +427,7 @@ static int bt3c_hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	case HCI_SCODATA_PKT:
 		hdev->stat.sco_tx++;
 		break;
-	}
+	};
 
 	/* Prepend skb with frame type */
 	memcpy(skb_push(skb, 1), &bt_cb(skb)->pkt_type, 1);
@@ -447,8 +453,7 @@ static int bt3c_load_firmware(struct bt3c_info *info,
 {
 	char *ptr = (char *) firmware;
 	char b[9];
-	unsigned int iobase, tmp;
-	unsigned long size, addr, fcs;
+	unsigned int iobase, size, addr, fcs, tmp;
 	int i, err = 0;
 
 	iobase = info->p_dev->resource[0]->start;
@@ -473,18 +478,15 @@ static int bt3c_load_firmware(struct bt3c_info *info,
 
 		memset(b, 0, sizeof(b));
 		memcpy(b, ptr + 2, 2);
-		if (kstrtoul(b, 16, &size) < 0)
-			return -EINVAL;
+		size = simple_strtoul(b, NULL, 16);
 
 		memset(b, 0, sizeof(b));
 		memcpy(b, ptr + 4, 8);
-		if (kstrtoul(b, 16, &addr) < 0)
-			return -EINVAL;
+		addr = simple_strtoul(b, NULL, 16);
 
 		memset(b, 0, sizeof(b));
 		memcpy(b, ptr + (size * 2) + 2, 2);
-		if (kstrtoul(b, 16, &fcs) < 0)
-			return -EINVAL;
+		fcs = simple_strtoul(b, NULL, 16);
 
 		memset(b, 0, sizeof(b));
 		for (tmp = 0, i = 0; i < size; i++) {

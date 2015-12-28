@@ -954,8 +954,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
 }
 
 static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
-		struct nand_chip *chip, const uint8_t *buf, int oob_required,
-		int page)
+		struct nand_chip *chip, const uint8_t *buf, int oob_required)
 {
 	struct atmel_nand_host *host = chip->priv;
 	uint32_t *eccpos = chip->ecc.layout->eccpos;
@@ -2006,8 +2005,7 @@ static int nfc_sram_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 
 	if (likely(!raw))
 		/* Need to write ecc into oob */
-		status = chip->ecc.write_page(mtd, chip, buf, oob_required,
-					      page);
+		status = chip->ecc.write_page(mtd, chip, buf, oob_required);
 
 	if (status < 0)
 		return status;
@@ -2128,7 +2126,7 @@ static int atmel_nand_probe(struct platform_device *pdev)
 
 	nand_chip->priv = host;		/* link the private data structures */
 	mtd->priv = nand_chip;
-	mtd->dev.parent = &pdev->dev;
+	mtd->owner = THIS_MODULE;
 
 	/* Set address of NAND IO lines */
 	nand_chip->IO_ADDR_R = host->io_base;

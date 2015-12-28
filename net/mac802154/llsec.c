@@ -55,7 +55,7 @@ void mac802154_llsec_destroy(struct mac802154_llsec *sec)
 
 		msl = container_of(sl, struct mac802154_llsec_seclevel, level);
 		list_del(&sl->list);
-		kzfree(msl);
+		kfree(msl);
 	}
 
 	list_for_each_entry_safe(dev, dn, &sec->table.devices, list) {
@@ -72,7 +72,7 @@ void mac802154_llsec_destroy(struct mac802154_llsec *sec)
 		mkey = container_of(key->key, struct mac802154_llsec_key, key);
 		list_del(&key->list);
 		llsec_key_put(mkey);
-		kzfree(key);
+		kfree(key);
 	}
 }
 
@@ -161,7 +161,7 @@ err_tfm:
 		if (key->tfm[i])
 			crypto_free_aead(key->tfm[i]);
 
-	kzfree(key);
+	kfree(key);
 	return NULL;
 }
 
@@ -176,7 +176,7 @@ static void llsec_key_release(struct kref *ref)
 		crypto_free_aead(key->tfm[i]);
 
 	crypto_free_blkcipher(key->tfm0);
-	kzfree(key);
+	kfree(key);
 }
 
 static struct mac802154_llsec_key*
@@ -267,7 +267,7 @@ int mac802154_llsec_key_add(struct mac802154_llsec *sec,
 	return 0;
 
 fail:
-	kzfree(new);
+	kfree(new);
 	return -ENOMEM;
 }
 
@@ -347,10 +347,10 @@ static void llsec_dev_free(struct mac802154_llsec_device *dev)
 				      devkey);
 
 		list_del(&pos->list);
-		kzfree(devkey);
+		kfree(devkey);
 	}
 
-	kzfree(dev);
+	kfree(dev);
 }
 
 int mac802154_llsec_dev_add(struct mac802154_llsec *sec,
@@ -401,7 +401,6 @@ int mac802154_llsec_dev_del(struct mac802154_llsec *sec, __le64 device_addr)
 
 	hash_del_rcu(&pos->bucket_s);
 	hash_del_rcu(&pos->bucket_hw);
-	list_del_rcu(&pos->dev.list);
 	call_rcu(&pos->rcu, llsec_dev_free_rcu);
 
 	return 0;
@@ -681,7 +680,7 @@ llsec_do_encrypt_auth(struct sk_buff *skb, const struct mac802154_llsec *sec,
 
 	rc = crypto_aead_encrypt(req);
 
-	kzfree(req);
+	kfree(req);
 
 	return rc;
 }
@@ -881,7 +880,7 @@ llsec_do_decrypt_auth(struct sk_buff *skb, const struct mac802154_llsec *sec,
 
 	rc = crypto_aead_decrypt(req);
 
-	kzfree(req);
+	kfree(req);
 	skb_trim(skb, skb->len - authlen);
 
 	return rc;
@@ -921,7 +920,7 @@ llsec_update_devkey_record(struct mac802154_llsec_device *dev,
 		if (!devkey)
 			list_add_rcu(&next->devkey.list, &dev->dev.keys);
 		else
-			kzfree(next);
+			kfree(next);
 
 		spin_unlock_bh(&dev->lock);
 	}

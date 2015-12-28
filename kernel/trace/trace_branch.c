@@ -36,11 +36,8 @@ probe_likely_condition(struct ftrace_branch_data *f, int val, int expect)
 	struct trace_branch *entry;
 	struct ring_buffer *buffer;
 	unsigned long flags;
-	int pc;
+	int cpu, pc;
 	const char *p;
-
-	if (current->trace_recursion & TRACE_BRANCH_BIT)
-		return;
 
 	/*
 	 * I would love to save just the ftrace_likely_data pointer, but
@@ -52,10 +49,10 @@ probe_likely_condition(struct ftrace_branch_data *f, int val, int expect)
 	if (unlikely(!tr))
 		return;
 
-	raw_local_irq_save(flags);
-	current->trace_recursion |= TRACE_BRANCH_BIT;
-	data = this_cpu_ptr(tr->trace_buffer.data);
-	if (atomic_read(&data->disabled))
+	local_irq_save(flags);
+	cpu = raw_smp_processor_id();
+	data = per_cpu_ptr(tr->trace_buffer.data, cpu);
+	if (atomic_inc_return(&data->disabled) != 1)
 		goto out;
 
 	pc = preempt_count();
@@ -84,8 +81,8 @@ probe_likely_condition(struct ftrace_branch_data *f, int val, int expect)
 		__buffer_unlock_commit(buffer, event);
 
  out:
-	current->trace_recursion &= ~TRACE_BRANCH_BIT;
-	raw_local_irq_restore(flags);
+	atomic_dec(&data->disabled);
+	local_irq_restore(flags);
 }
 
 static inline
@@ -125,14 +122,25 @@ void disable_branch_tracing(void)
 	mutex_unlock(&branch_tracing_mutex);
 }
 
+static void start_branch_trace(struct trace_array *tr)
+{
+	enable_branch_tracing(tr);
+}
+
+static void stop_branch_trace(struct trace_array *tr)
+{
+	disable_branch_tracing();
+}
+
 static int branch_trace_init(struct trace_array *tr)
 {
-	return enable_branch_tracing(tr);
+	start_branch_trace(tr);
+	return 0;
 }
 
 static void branch_trace_reset(struct trace_array *tr)
 {
-	disable_branch_tracing();
+	stop_branch_trace(tr);
 }
 
 static enum print_line_t trace_branch_print(struct trace_iterator *iter,

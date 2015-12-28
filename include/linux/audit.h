@@ -27,9 +27,6 @@
 #include <linux/ptrace.h>
 #include <uapi/linux/audit.h>
 
-#define AUDIT_INO_UNSET ((unsigned long)-1)
-#define AUDIT_DEV_UNSET ((dev_t)-1)
-
 struct audit_sig_info {
 	uid_t		uid;
 	pid_t		pid;
@@ -62,7 +59,6 @@ struct audit_krule {
 	struct audit_field	*inode_f; /* quick access to an inode field */
 	struct audit_watch	*watch;	/* associated watch */
 	struct audit_tree	*tree;	/* associated watched tree */
-	struct audit_fsnotify_mark	*exe;
 	struct list_head	rlist;	/* entry in audit_{watch,tree}.rules list */
 	struct list_head	list;	/* for AUDIT_LIST* purposes only */
 	u64			prio;
@@ -143,7 +139,7 @@ extern void __audit_inode_child(const struct inode *parent,
 extern void __audit_seccomp(unsigned long syscall, long signr, int code);
 extern void __audit_ptrace(struct task_struct *t);
 
-static inline bool audit_dummy_context(void)
+static inline int audit_dummy_context(void)
 {
 	void *p = current->audit_context;
 	return !p || *(int *)p;
@@ -345,9 +341,9 @@ static inline void audit_syscall_entry(int major, unsigned long a0,
 { }
 static inline void audit_syscall_exit(void *pt_regs)
 { }
-static inline bool audit_dummy_context(void)
+static inline int audit_dummy_context(void)
 {
-	return true;
+	return 1;
 }
 static inline struct filename *audit_reusename(const __user char *name)
 {
@@ -457,7 +453,7 @@ extern struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp
 extern __printf(2, 3)
 void audit_log_format(struct audit_buffer *ab, const char *fmt, ...);
 extern void		    audit_log_end(struct audit_buffer *ab);
-extern bool		    audit_string_contains_control(const char *string,
+extern int		    audit_string_contains_control(const char *string,
 							  size_t len);
 extern void		    audit_log_n_hex(struct audit_buffer *ab,
 					  const unsigned char *buf,

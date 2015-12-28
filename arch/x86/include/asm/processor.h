@@ -6,12 +6,12 @@
 /* Forward declaration, a strange C thing */
 struct task_struct;
 struct mm_struct;
-struct vm86;
 
+#include <asm/vm86.h>
 #include <asm/math_emu.h>
 #include <asm/segment.h>
 #include <asm/types.h>
-#include <uapi/asm/sigcontext.h>
+#include <asm/sigcontext.h>
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/page.h>
@@ -390,6 +390,9 @@ struct thread_struct {
 #endif
 	unsigned long		gs;
 
+	/* Floating point and extended processor state */
+	struct fpu		fpu;
+
 	/* Save middle states of ptrace breakpoints */
 	struct perf_event	*ptrace_bps[HBP_NUM];
 	/* Debug status used for traps, single steps, etc... */
@@ -400,22 +403,21 @@ struct thread_struct {
 	unsigned long		cr2;
 	unsigned long		trap_nr;
 	unsigned long		error_code;
-#ifdef CONFIG_VM86
+#ifdef CONFIG_X86_32
 	/* Virtual 86 mode info */
-	struct vm86		*vm86;
+	struct vm86_struct __user *vm86_info;
+	unsigned long		screen_bitmap;
+	unsigned long		v86flags;
+	unsigned long		v86mask;
+	unsigned long		saved_sp0;
+	unsigned int		saved_fs;
+	unsigned int		saved_gs;
 #endif
 	/* IO permissions: */
 	unsigned long		*io_bitmap_ptr;
 	unsigned long		iopl;
 	/* Max allowed port in the bitmap, in bytes: */
 	unsigned		io_bitmap_max;
-
-	/* Floating point and extended processor state */
-	struct fpu		fpu;
-	/*
-	 * WARNING: 'fpu' is dynamically-sized.  It *MUST* be at
-	 * the end.
-	 */
 };
 
 /*
@@ -556,12 +558,12 @@ static inline unsigned int cpuid_edx(unsigned int op)
 }
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
-static __always_inline void rep_nop(void)
+static inline void rep_nop(void)
 {
 	asm volatile("rep; nop" ::: "memory");
 }
 
-static __always_inline void cpu_relax(void)
+static inline void cpu_relax(void)
 {
 	rep_nop();
 }
@@ -645,6 +647,14 @@ static inline void update_debugctlmsr(unsigned long debugctlmsr)
 
 extern void set_task_blockstep(struct task_struct *task, bool on);
 
+/*
+ * from system description table in BIOS. Mostly for MCA use, but
+ * others may find it useful:
+ */
+extern unsigned int		machine_id;
+extern unsigned int		machine_submodel_id;
+extern unsigned int		BIOS_revision;
+
 /* Boot loader type from the setup header: */
 extern int			bootloader_type;
 extern int			bootloader_version;
@@ -706,6 +716,7 @@ static inline void spin_lock_prefetch(const void *x)
 
 #define INIT_THREAD  {							  \
 	.sp0			= TOP_OF_INIT_STACK,			  \
+	.vm86_info		= NULL,					  \
 	.sysenter_cs		= __KERNEL_CS,				  \
 	.io_bitmap_ptr		= NULL,					  \
 }

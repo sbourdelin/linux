@@ -619,7 +619,7 @@ static int cm_get_battery_temperature(struct charger_manager *cm,
 
 #ifdef CONFIG_THERMAL
 	if (cm->tzd_batt) {
-		ret = thermal_zone_get_temp(cm->tzd_batt, temp);
+		ret = thermal_zone_get_temp(cm->tzd_batt, (unsigned long *)temp);
 		if (!ret)
 			/* Calibrate temperature unit */
 			*temp /= 100;
@@ -1581,10 +1581,8 @@ static struct charger_desc *of_cm_parse_desc(struct device *dev)
 				cables = devm_kzalloc(dev, sizeof(*cables)
 						* chg_regs->num_cables,
 						GFP_KERNEL);
-				if (!cables) {
-					of_node_put(child);
+				if (!cables)
 					return ERR_PTR(-ENOMEM);
-				}
 
 				chg_regs->cables = cables;
 

@@ -1411,16 +1411,17 @@ gss_key_timeout(struct rpc_cred *rc)
 {
 	struct gss_cred *gss_cred = container_of(rc, struct gss_cred, gc_base);
 	struct gss_cl_ctx *ctx;
-	unsigned long timeout = jiffies + (gss_key_expire_timeo * HZ);
-	int ret = 0;
+	unsigned long now = jiffies;
+	unsigned long expire;
 
 	rcu_read_lock();
 	ctx = rcu_dereference(gss_cred->gc_ctx);
-	if (!ctx || time_after(timeout, ctx->gc_expiry))
-		ret = -EACCES;
+	if (ctx)
+		expire = ctx->gc_expiry - (gss_key_expire_timeo * HZ);
 	rcu_read_unlock();
-
-	return ret;
+	if (!ctx || time_after(now, expire))
+		return -EACCES;
+	return 0;
 }
 
 static int

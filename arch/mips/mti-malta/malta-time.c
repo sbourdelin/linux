@@ -119,24 +119,18 @@ void read_persistent_clock(struct timespec *ts)
 
 int get_c0_fdc_int(void)
 {
-	/*
-	 * Some cores claim the FDC is routable through the GIC, but it doesn't
-	 * actually seem to be connected for those Malta bitstreams.
-	 */
-	switch (current_cpu_type()) {
-	case CPU_INTERAPTIV:
-	case CPU_PROAPTIV:
-		return -1;
-	};
+	int mips_cpu_fdc_irq;
 
 	if (cpu_has_veic)
-		return -1;
+		mips_cpu_fdc_irq = -1;
 	else if (gic_present)
-		return gic_get_c0_fdc_int();
+		mips_cpu_fdc_irq = gic_get_c0_fdc_int();
 	else if (cp0_fdc_irq >= 0)
-		return MIPS_CPU_IRQ_BASE + cp0_fdc_irq;
+		mips_cpu_fdc_irq = MIPS_CPU_IRQ_BASE + cp0_fdc_irq;
 	else
-		return -1;
+		mips_cpu_fdc_irq = -1;
+
+	return mips_cpu_fdc_irq;
 }
 
 int get_c0_perfcount_int(void)
@@ -154,7 +148,6 @@ int get_c0_perfcount_int(void)
 
 	return mips_cpu_perf_irq;
 }
-EXPORT_SYMBOL_GPL(get_c0_perfcount_int);
 
 unsigned int get_c0_compare_int(void)
 {
@@ -172,17 +165,14 @@ unsigned int get_c0_compare_int(void)
 
 static void __init init_rtc(void)
 {
-	unsigned char freq, ctrl;
+	/* stop the clock whilst setting it up */
+	CMOS_WRITE(RTC_SET | RTC_24H, RTC_CONTROL);
 
-	/* Set 32KHz time base if not already set */
-	freq = CMOS_READ(RTC_FREQ_SELECT);
-	if ((freq & RTC_DIV_CTL) != RTC_REF_CLCK_32KHZ)
-		CMOS_WRITE(RTC_REF_CLCK_32KHZ, RTC_FREQ_SELECT);
+	/* 32KHz time base */
+	CMOS_WRITE(RTC_REF_CLCK_32KHZ, RTC_FREQ_SELECT);
 
-	/* Ensure SET bit is clear so RTC can run */
-	ctrl = CMOS_READ(RTC_CONTROL);
-	if (ctrl & RTC_SET)
-		CMOS_WRITE(ctrl & ~RTC_SET, RTC_CONTROL);
+	/* start the clock */
+	CMOS_WRITE(RTC_24H, RTC_CONTROL);
 }
 
 void __init plat_time_init(void)

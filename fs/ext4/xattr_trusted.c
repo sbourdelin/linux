@@ -13,9 +13,8 @@
 #include "xattr.h"
 
 static size_t
-ext4_xattr_trusted_list(const struct xattr_handler *handler,
-			struct dentry *dentry, char *list, size_t list_size,
-			const char *name, size_t name_len)
+ext4_xattr_trusted_list(struct dentry *dentry, char *list, size_t list_size,
+		const char *name, size_t name_len, int type)
 {
 	const size_t prefix_len = XATTR_TRUSTED_PREFIX_LEN;
 	const size_t total_len = prefix_len + name_len + 1;
@@ -32,9 +31,8 @@ ext4_xattr_trusted_list(const struct xattr_handler *handler,
 }
 
 static int
-ext4_xattr_trusted_get(const struct xattr_handler *handler,
-		       struct dentry *dentry, const char *name, void *buffer,
-		       size_t size)
+ext4_xattr_trusted_get(struct dentry *dentry, const char *name, void *buffer,
+		size_t size, int type)
 {
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
@@ -43,9 +41,8 @@ ext4_xattr_trusted_get(const struct xattr_handler *handler,
 }
 
 static int
-ext4_xattr_trusted_set(const struct xattr_handler *handler,
-		       struct dentry *dentry, const char *name,
-		       const void *value, size_t size, int flags)
+ext4_xattr_trusted_set(struct dentry *dentry, const char *name,
+		const void *value, size_t size, int flags, int type)
 {
 	if (strcmp(name, "") == 0)
 		return -EINVAL;

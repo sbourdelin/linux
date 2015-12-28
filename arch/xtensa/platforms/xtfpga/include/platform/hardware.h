@@ -12,15 +12,13 @@
  * This file contains the hardware configuration of the XTAVNET boards.
  */
 
-#include <asm/types.h>
-
 #ifndef __XTENSA_XTAVNET_HARDWARE_H
 #define __XTENSA_XTAVNET_HARDWARE_H
 
 /* Memory configuration. */
 
-#define PLATFORM_DEFAULT_MEM_START __XTENSA_UL(CONFIG_DEFAULT_MEM_START)
-#define PLATFORM_DEFAULT_MEM_SIZE  __XTENSA_UL(CONFIG_DEFAULT_MEM_SIZE)
+#define PLATFORM_DEFAULT_MEM_START CONFIG_DEFAULT_MEM_START
+#define PLATFORM_DEFAULT_MEM_SIZE  CONFIG_DEFAULT_MEM_SIZE
 
 /* Interrupt configuration. */
 

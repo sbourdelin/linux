@@ -148,7 +148,7 @@ snic_trc_init(void)
 
 	trc->max_idx = (tbuf_sz / SNIC_TRC_ENTRY_SZ);
 	trc->rd_idx = trc->wr_idx = 0;
-	trc->enable = true;
+	trc->enable = 1;
 	SNIC_INFO("Trace Facility Enabled.\n Trace Buffer SZ %lu Pages.\n",
 		  tbuf_sz / PAGE_SIZE);
 	ret = 0;
@@ -169,7 +169,7 @@ snic_trc_free(void)
 {
 	struct snic_trc *trc = &snic_glob->trc;
 
-	trc->enable = false;
+	trc->enable = 0;
 	snic_trc_debugfs_term();
 
 	if (trc->buf) {

@@ -34,26 +34,14 @@
 #include "../include/dpmng.h"
 #include "dpmng-cmd.h"
 
-/**
- * mc_get_version() - Retrieves the Management Complex firmware
- *			version information
- * @mc_io:		Pointer to opaque I/O object
- * @cmd_flags:		Command flags; one or more of 'MC_CMD_FLAG_'
- * @mc_ver_info:	Returned version information structure
- *
- * Return:	'0' on Success; Error code otherwise.
- */
-int mc_get_version(struct fsl_mc_io *mc_io,
-		   u32 cmd_flags,
-		   struct mc_version *mc_ver_info)
+int mc_get_version(struct fsl_mc_io *mc_io, struct mc_version *mc_ver_info)
 {
 	struct mc_command cmd = { 0 };
 	int err;
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPMNG_CMDID_GET_VERSION,
-					  cmd_flags,
-					  0);
+					  MC_CMD_PRI_LOW, 0);
 
 	/* send command to mc*/
 	err = mc_send_command(mc_io, &cmd);
@@ -68,25 +56,14 @@ int mc_get_version(struct fsl_mc_io *mc_io,
 	return 0;
 }
 
-/**
- * dpmng_get_container_id() - Get container ID associated with a given portal.
- * @mc_io:		Pointer to MC portal's I/O object
- * @cmd_flags:		Command flags; one or more of 'MC_CMD_FLAG_'
- * @container_id:	Requested container ID
- *
- * Return:	'0' on Success; Error code otherwise.
- */
-int dpmng_get_container_id(struct fsl_mc_io *mc_io,
-			   u32 cmd_flags,
-			   int *container_id)
+int dpmng_get_container_id(struct fsl_mc_io *mc_io, int *container_id)
 {
 	struct mc_command cmd = { 0 };
 	int err;
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPMNG_CMDID_GET_CONT_ID,
-					  cmd_flags,
-					  0);
+					  MC_CMD_PRI_LOW, 0);
 
 	/* send command to mc*/
 	err = mc_send_command(mc_io, &cmd);

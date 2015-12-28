@@ -202,16 +202,16 @@ struct dccp_service_list {
 #define DCCP_SERVICE_INVALID_VALUE htonl((__u32)-1)
 #define DCCP_SERVICE_CODE_IS_ABSENT		0
 
-static inline bool dccp_list_has_service(const struct dccp_service_list *sl,
+static inline int dccp_list_has_service(const struct dccp_service_list *sl,
 					const __be32 service)
 {
 	if (likely(sl != NULL)) {
 		u32 i = sl->dccpsl_nr;
 		while (i--)
 			if (sl->dccpsl_list[i] == service)
-				return true;
+				return 1;
 	}
-	return false;
+	return 0;
 }
 
 struct dccp_ackvec;

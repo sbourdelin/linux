@@ -41,11 +41,6 @@
 #define BCM6328_SERIAL_LED_SHIFT_DIR	BIT(16)
 #define BCM6328_LED_SHIFT_TEST		BIT(30)
 #define BCM6328_LED_TEST		BIT(31)
-#define BCM6328_INIT_MASK		(BCM6328_SERIAL_LED_EN | \
-					 BCM6328_SERIAL_LED_MUX  | \
-					 BCM6328_SERIAL_LED_CLK_NPOL | \
-					 BCM6328_SERIAL_LED_DATA_PPOL | \
-					 BCM6328_SERIAL_LED_SHIFT_DIR)
 
 #define BCM6328_LED_MODE_MASK		3
 #define BCM6328_LED_MODE_OFF		0
@@ -286,10 +281,11 @@ static int bcm6328_led(struct device *dev, struct device_node *nc, u32 reg,
 						    "linux,default-trigger",
 						    NULL);
 
-	spin_lock_irqsave(lock, flags);
 	if (!of_property_read_string(nc, "default-state", &state)) {
+		spin_lock_irqsave(lock, flags);
 		if (!strcmp(state, "on")) {
 			led->cdev.brightness = LED_FULL;
+			bcm6328_led_mode(led, BCM6328_LED_MODE_ON);
 		} else if (!strcmp(state, "keep")) {
 			void __iomem *mode;
 			unsigned long val, shift;
@@ -300,27 +296,20 @@ static int bcm6328_led(struct device *dev, struct device_node *nc, u32 reg,
 			else
 				mode = mem + BCM6328_REG_MODE_LO;
 
-			val = bcm6328_led_read(mode) >>
-			      BCM6328_LED_SHIFT(shift % 16);
+			val = bcm6328_led_read(mode) >> (shift % 16);
 			val &= BCM6328_LED_MODE_MASK;
-			if ((led->active_low && val == BCM6328_LED_MODE_ON) ||
-			    (!led->active_low && val == BCM6328_LED_MODE_OFF))
+			if (val == BCM6328_LED_MODE_ON)
 				led->cdev.brightness = LED_FULL;
-			else
+			else {
 				led->cdev.brightness = LED_OFF;
+				bcm6328_led_mode(led, BCM6328_LED_MODE_OFF);
+			}
 		} else {
 			led->cdev.brightness = LED_OFF;
+			bcm6328_led_mode(led, BCM6328_LED_MODE_OFF);
 		}
-	} else {
-		led->cdev.brightness = LED_OFF;
+		spin_unlock_irqrestore(lock, flags);
 	}
-
-	if ((led->active_low && led->cdev.brightness == LED_FULL) ||
-	    (!led->active_low && led->cdev.brightness == LED_OFF))
-		bcm6328_led_mode(led, BCM6328_LED_MODE_ON);
-	else
-		bcm6328_led_mode(led, BCM6328_LED_MODE_OFF);
-	spin_unlock_irqrestore(lock, flags);
 
 	led->cdev.brightness_set = bcm6328_led_set;
 	led->cdev.blink_set = bcm6328_blink_set;
@@ -371,17 +360,9 @@ static int bcm6328_leds_probe(struct platform_device *pdev)
 	bcm6328_led_write(mem + BCM6328_REG_LNKACTSEL_LO, 0);
 
 	val = bcm6328_led_read(mem + BCM6328_REG_INIT);
-	val &= ~(BCM6328_INIT_MASK);
+	val &= ~BCM6328_SERIAL_LED_EN;
 	if (of_property_read_bool(np, "brcm,serial-leds"))
 		val |= BCM6328_SERIAL_LED_EN;
-	if (of_property_read_bool(np, "brcm,serial-mux"))
-		val |= BCM6328_SERIAL_LED_MUX;
-	if (of_property_read_bool(np, "brcm,serial-clk-low"))
-		val |= BCM6328_SERIAL_LED_CLK_NPOL;
-	if (!of_property_read_bool(np, "brcm,serial-dat-low"))
-		val |= BCM6328_SERIAL_LED_DATA_PPOL;
-	if (!of_property_read_bool(np, "brcm,serial-shift-inv"))
-		val |= BCM6328_SERIAL_LED_SHIFT_DIR;
 	bcm6328_led_write(mem + BCM6328_REG_INIT, val);
 
 	for_each_available_child_of_node(np, child) {
@@ -392,7 +373,7 @@ static int bcm6328_leds_probe(struct platform_device *pdev)
 			continue;
 
 		if (reg >= BCM6328_LED_MAX_COUNT) {
-			dev_err(dev, "invalid LED (%u >= %d)\n", reg,
+			dev_err(dev, "invalid LED (>= %d)\n",
 				BCM6328_LED_MAX_COUNT);
 			continue;
 		}
@@ -403,10 +384,8 @@ static int bcm6328_leds_probe(struct platform_device *pdev)
 			rc = bcm6328_led(dev, child, reg, mem, lock,
 					 blink_leds, blink_delay);
 
-		if (rc < 0) {
-			of_node_put(child);
+		if (rc < 0)
 			return rc;
-		}
 	}
 
 	return 0;
@@ -416,7 +395,6 @@ static const struct of_device_id bcm6328_leds_of_match[] = {
 	{ .compatible = "brcm,bcm6328-leds", },
 	{ },
 };
-MODULE_DEVICE_TABLE(of, bcm6328_leds_of_match);
 
 static struct platform_driver bcm6328_leds_driver = {
 	.probe = bcm6328_leds_probe,

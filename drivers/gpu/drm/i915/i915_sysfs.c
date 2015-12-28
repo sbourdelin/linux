@@ -39,7 +39,7 @@ static u32 calc_residency(struct drm_device *dev, const u32 reg)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u64 raw_time; /* 32b value may overflow during fixed point math */
-	u64 units = 128ULL, div = 100000ULL;
+	u64 units = 128ULL, div = 100000ULL, bias = 100ULL;
 	u32 ret;
 
 	if (!intel_enable_rc6(dev))
@@ -49,19 +49,49 @@ static u32 calc_residency(struct drm_device *dev, const u32 reg)
 
 	/* On VLV and CHV, residency time is in CZ units rather than 1.28us */
 	if (IS_VALLEYVIEW(dev)) {
-		units = 1;
-		div = dev_priv->czclk_freq;
+		u32 clk_reg, czcount_30ns;
+
+		if (IS_CHERRYVIEW(dev))
+			clk_reg = CHV_CLK_CTL1;
+		else
+			clk_reg = VLV_CLK_CTL2;
+
+		czcount_30ns = I915_READ(clk_reg) >> CLK_CTL2_CZCOUNT_30NS_SHIFT;
+
+		if (!czcount_30ns) {
+			WARN(!czcount_30ns, "bogus CZ count value");
+			ret = 0;
+			goto out;
+		}
+
+		units = 0;
+		div = 1000000ULL;
+
+		if (IS_CHERRYVIEW(dev)) {
+			/* Special case for 320Mhz */
+			if (czcount_30ns == 1) {
+				div = 10000000ULL;
+				units = 3125ULL;
+			} else {
+				/* chv counts are one less */
+				czcount_30ns += 1;
+			}
+		}
+
+		if (units == 0)
+			units = DIV_ROUND_UP_ULL(30ULL * bias,
+						 (u64)czcount_30ns);
 
 		if (I915_READ(VLV_COUNTER_CONTROL) & VLV_COUNT_RANGE_HIGH)
 			units <<= 8;
-	} else if (IS_BROXTON(dev)) {
-		units = 1;
-		div = 1200;		/* 833.33ns */
+
+		div = div * bias;
 	}
 
 	raw_time = I915_READ(reg) * units;
 	ret = DIV_ROUND_UP_ULL(raw_time, div);
 
+out:
 	intel_runtime_pm_put(dev_priv);
 	return ret;
 }

@@ -18,16 +18,9 @@ extern int do_sys_settimeofday(const struct timespec *tv,
  * Kernel time accessors
  */
 unsigned long get_seconds(void);
-struct timespec64 current_kernel_time64(void);
+struct timespec current_kernel_time(void);
 /* does not take xtime_lock */
 struct timespec __current_kernel_time(void);
-
-static inline struct timespec current_kernel_time(void)
-{
-	struct timespec64 now = current_kernel_time64();
-
-	return timespec64_to_timespec(now);
-}
 
 /*
  * timespec based interfaces
@@ -152,6 +145,7 @@ static inline void getboottime(struct timespec *ts)
 }
 #endif
 
+#define do_posix_clock_monotonic_gettime(ts) ktime_get_ts(ts)
 #define ktime_get_real_ts64(ts)	getnstimeofday64(ts)
 
 /*
@@ -263,8 +257,8 @@ extern void timekeeping_inject_sleeptime64(struct timespec64 *delta);
 /*
  * PPS accessor
  */
-extern void ktime_get_raw_and_real_ts64(struct timespec64 *ts_raw,
-				        struct timespec64 *ts_real);
+extern void getnstime_raw_and_real(struct timespec *ts_raw,
+				   struct timespec *ts_real);
 
 /*
  * Persistent clock related interfaces

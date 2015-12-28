@@ -38,14 +38,7 @@
 #define CREATE_TRACE_POINTS
 #include "vsyscall_trace.h"
 
-static enum { EMULATE, NATIVE, NONE } vsyscall_mode =
-#if defined(CONFIG_LEGACY_VSYSCALL_NATIVE)
-	NATIVE;
-#elif defined(CONFIG_LEGACY_VSYSCALL_NONE)
-	NONE;
-#else
-	EMULATE;
-#endif
+static enum { EMULATE, NATIVE, NONE } vsyscall_mode = EMULATE;
 
 static int __init vsyscall_setup(char *str)
 {
@@ -284,7 +277,7 @@ static const char *gate_vma_name(struct vm_area_struct *vma)
 {
 	return "[vsyscall]";
 }
-static const struct vm_operations_struct gate_vma_ops = {
+static struct vm_operations_struct gate_vma_ops = {
 	.name = gate_vma_name,
 };
 static struct vm_area_struct gate_vma = {
@@ -297,7 +290,7 @@ static struct vm_area_struct gate_vma = {
 
 struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
 {
-#ifdef CONFIG_COMPAT
+#ifdef CONFIG_IA32_EMULATION
 	if (!mm || mm->context.ia32_compat)
 		return NULL;
 #endif

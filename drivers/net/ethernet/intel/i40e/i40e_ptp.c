@@ -43,8 +43,9 @@
 #define I40E_PTP_10GB_INCVAL 0x0333333333ULL
 #define I40E_PTP_1GB_INCVAL  0x2000000000ULL
 
-#define I40E_PRTTSYN_CTL1_TSYNTYPE_V1  BIT(I40E_PRTTSYN_CTL1_TSYNTYPE_SHIFT)
-#define I40E_PRTTSYN_CTL1_TSYNTYPE_V2  (2 << \
+#define I40E_PRTTSYN_CTL1_TSYNTYPE_V1  (0x1 << \
+					I40E_PRTTSYN_CTL1_TSYNTYPE_SHIFT)
+#define I40E_PRTTSYN_CTL1_TSYNTYPE_V2  (0x2 << \
 					I40E_PRTTSYN_CTL1_TSYNTYPE_SHIFT)
 
 /**
@@ -356,7 +357,7 @@ void i40e_ptp_rx_hwtstamp(struct i40e_pf *pf, struct sk_buff *skb, u8 index)
 
 	prttsyn_stat = rd32(hw, I40E_PRTTSYN_STAT_1);
 
-	if (!(prttsyn_stat & BIT(index)))
+	if (!(prttsyn_stat & (1 << index)))
 		return;
 
 	lo = rd32(hw, I40E_PRTTSYN_RXTIME_L(index));
@@ -618,8 +619,9 @@ static long i40e_ptp_create_clock(struct i40e_pf *pf)
 
 	/* Attempt to register the clock before enabling the hardware. */
 	pf->ptp_clock = ptp_clock_register(&pf->ptp_caps, &pf->pdev->dev);
-	if (IS_ERR(pf->ptp_clock))
+	if (IS_ERR(pf->ptp_clock)) {
 		return PTR_ERR(pf->ptp_clock);
+	}
 
 	/* clear the hwtstamp settings here during clock create, instead of
 	 * during regular init, so that we can maintain settings across a
@@ -674,8 +676,8 @@ void i40e_ptp_init(struct i40e_pf *pf)
 		struct timespec64 ts;
 		u32 regval;
 
-		if (pf->hw.debug_mask & I40E_DEBUG_LAN)
-			dev_info(&pf->pdev->dev, "PHC enabled\n");
+		dev_info(&pf->pdev->dev, "%s: added PHC on %s\n", __func__,
+			 netdev->name);
 		pf->flags |= I40E_FLAG_PTP;
 
 		/* Ensure the clocks are running. */

@@ -656,7 +656,7 @@ asmlinkage __visible void __init start_kernel(void)
 	key_init();
 	security_init();
 	dbg_late_init();
-	vfs_caches_init();
+	vfs_caches_init(totalram_pages);
 	signals_init();
 	/* rootfs populating might need page-writeback */
 	page_writeback_init();
@@ -877,6 +877,7 @@ static void __init do_initcalls(void)
 static void __init do_basic_setup(void)
 {
 	cpuset_init_smp();
+	usermodehelper_init();
 	shmem_init();
 	driver_init();
 	init_irq_proc();

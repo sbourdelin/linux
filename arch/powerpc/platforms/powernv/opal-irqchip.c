@@ -134,10 +134,9 @@ static void opal_handle_irq_work(struct irq_work *work)
 	opal_handle_events(be64_to_cpu(last_outstanding_events));
 }
 
-static int opal_event_match(struct irq_domain *h, struct device_node *node,
-			    enum irq_domain_bus_token bus_token)
+static int opal_event_match(struct irq_domain *h, struct device_node *node)
 {
-	return irq_domain_get_of_node(h) == node;
+	return h->of_node == node;
 }
 
 static int opal_event_xlate(struct irq_domain *h, struct device_node *np,

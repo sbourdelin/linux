@@ -52,7 +52,7 @@ static bool valid_pixelformat(u32 pixelformat)
 
 static u32 get_frame_type_flag(struct go7007_buffer *vb, int format)
 {
-	u8 *ptr = vb2_plane_vaddr(&vb->vb.vb2_buf, 0);
+	u8 *ptr = vb2_plane_vaddr(&vb->vb, 0);
 
 	switch (format) {
 	case V4L2_PIX_FMT_MJPEG:
@@ -369,7 +369,7 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 }
 
 static int go7007_queue_setup(struct vb2_queue *q,
-		const void *parg,
+		const struct v4l2_format *fmt,
 		unsigned int *num_buffers, unsigned int *num_planes,
 		unsigned int sizes[], void *alloc_ctxs[])
 {
@@ -386,9 +386,8 @@ static void go7007_buf_queue(struct vb2_buffer *vb)
 {
 	struct vb2_queue *vq = vb->vb2_queue;
 	struct go7007 *go = vb2_get_drv_priv(vq);
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct go7007_buffer *go7007_vb =
-		container_of(vbuf, struct go7007_buffer, vb);
+		container_of(vb, struct go7007_buffer, vb);
 	unsigned long flags;
 
 	spin_lock_irqsave(&go->spinlock, flags);
@@ -398,13 +397,12 @@ static void go7007_buf_queue(struct vb2_buffer *vb)
 
 static int go7007_buf_prepare(struct vb2_buffer *vb)
 {
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct go7007_buffer *go7007_vb =
-		container_of(vbuf, struct go7007_buffer, vb);
+		container_of(vb, struct go7007_buffer, vb);
 
 	go7007_vb->modet_active = 0;
 	go7007_vb->frame_offset = 0;
-	vb->planes[0].bytesused = 0;
+	vb->v4l2_planes[0].bytesused = 0;
 	return 0;
 }
 
@@ -412,15 +410,15 @@ static void go7007_buf_finish(struct vb2_buffer *vb)
 {
 	struct vb2_queue *vq = vb->vb2_queue;
 	struct go7007 *go = vb2_get_drv_priv(vq);
-	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct go7007_buffer *go7007_vb =
-		container_of(vbuf, struct go7007_buffer, vb);
+		container_of(vb, struct go7007_buffer, vb);
 	u32 frame_type_flag = get_frame_type_flag(go7007_vb, go->format);
+	struct v4l2_buffer *buf = &vb->v4l2_buf;
 
-	vbuf->flags &= ~(V4L2_BUF_FLAG_KEYFRAME | V4L2_BUF_FLAG_BFRAME |
+	buf->flags &= ~(V4L2_BUF_FLAG_KEYFRAME | V4L2_BUF_FLAG_BFRAME |
 			V4L2_BUF_FLAG_PFRAME);
-	vbuf->flags |= frame_type_flag;
-	vbuf->field = V4L2_FIELD_NONE;
+	buf->flags |= frame_type_flag;
+	buf->field = V4L2_FIELD_NONE;
 }
 
 static int go7007_start_streaming(struct vb2_queue *q, unsigned int count)

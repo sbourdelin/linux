@@ -12,6 +12,10 @@
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
  *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
+ *
  * The full GNU General Public License is included in this distribution in the
  * file called LICENSE.
  *
@@ -21,7 +25,7 @@
 #include "rtl_pci.h"
 #include "rtl_core.h"
 
-static void _rtl92e_parse_pci_configuration(struct pci_dev *pdev,
+static void rtl8192_parse_pci_configuration(struct pci_dev *pdev,
 					    struct net_device *dev)
 {
 	struct r8192_priv *priv = (struct r8192_priv *)rtllib_priv(dev);
@@ -41,7 +45,7 @@ static void _rtl92e_parse_pci_configuration(struct pci_dev *pdev,
 	pci_write_config_byte(pdev, 0x70f, tmp);
 }
 
-bool rtl92e_check_adapter(struct pci_dev *pdev, struct net_device *dev)
+bool rtl8192_pci_findadapter(struct pci_dev *pdev, struct net_device *dev)
 {
 	struct r8192_priv *priv = (struct r8192_priv *)rtllib_priv(dev);
 	u16 VenderID;
@@ -88,7 +92,7 @@ bool rtl92e_check_adapter(struct pci_dev *pdev, struct net_device *dev)
 		return false;
 	}
 
-	_rtl92e_parse_pci_configuration(pdev, dev);
+	rtl8192_parse_pci_configuration(pdev, dev);
 
 	return true;
 }

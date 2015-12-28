@@ -487,8 +487,6 @@ static int acpi_suspend_begin(suspend_state_t pm_state)
 		pr_err("ACPI does not support sleep state S%u\n", acpi_state);
 		return -ENOSYS;
 	}
-	if (acpi_state > ACPI_STATE_S1)
-		pm_set_suspend_via_firmware();
 
 	acpi_pm_start(acpi_state);
 	return 0;
@@ -524,7 +522,6 @@ static int acpi_suspend_enter(suspend_state_t pm_state)
 		if (error)
 			return error;
 		pr_info(PREFIX "Low-level resume complete\n");
-		pm_set_resume_via_firmware();
 		break;
 	}
 	trace_suspend_resume(TPS("acpi_suspend"), acpi_state, false);
@@ -635,16 +632,14 @@ static int acpi_freeze_prepare(void)
 	acpi_enable_wakeup_devices(ACPI_STATE_S0);
 	acpi_enable_all_wakeup_gpes();
 	acpi_os_wait_events_complete();
-	if (acpi_sci_irq_valid())
-		enable_irq_wake(acpi_sci_irq);
+	enable_irq_wake(acpi_gbl_FADT.sci_interrupt);
 	return 0;
 }
 
 static void acpi_freeze_restore(void)
 {
 	acpi_disable_wakeup_devices(ACPI_STATE_S0);
-	if (acpi_sci_irq_valid())
-		disable_irq_wake(acpi_sci_irq);
+	disable_irq_wake(acpi_gbl_FADT.sci_interrupt);
 	acpi_enable_all_runtime_gpes();
 }
 

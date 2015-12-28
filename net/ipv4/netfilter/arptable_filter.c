@@ -27,10 +27,13 @@ static const struct xt_table packet_filter = {
 
 /* The work comes in here from netfilter.c */
 static unsigned int
-arptable_filter_hook(void *priv, struct sk_buff *skb,
+arptable_filter_hook(const struct nf_hook_ops *ops, struct sk_buff *skb,
 		     const struct nf_hook_state *state)
 {
-	return arpt_do_table(skb, state, state->net->ipv4.arptable_filter);
+	const struct net *net = dev_net(state->in ? state->in : state->out);
+
+	return arpt_do_table(skb, ops->hooknum, state,
+			     net->ipv4.arptable_filter);
 }
 
 static struct nf_hook_ops *arpfilter_ops __read_mostly;

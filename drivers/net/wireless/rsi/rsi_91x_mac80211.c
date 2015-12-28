@@ -664,7 +664,6 @@ static int rsi_mac80211_set_key(struct ieee80211_hw *hw,
  * @tid: Traffic identifier.
  * @ssn: Pointer to ssn value.
  * @buf_size: Buffer size (for kernel version > 2.6.38).
- * @amsdu: is AMSDU in AMPDU allowed
  *
  * Return: status: 0 on success, negative error code on failure.
  */
@@ -674,8 +673,7 @@ static int rsi_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				     struct ieee80211_sta *sta,
 				     unsigned short tid,
 				     unsigned short *ssn,
-				     unsigned char buf_size,
-				     bool amsdu)
+				     unsigned char buf_size)
 {
 	int status = -EOPNOTSUPP;
 	struct rsi_hw *adapter = hw->priv;

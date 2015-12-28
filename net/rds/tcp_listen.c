@@ -38,7 +38,14 @@
 #include "rds.h"
 #include "tcp.h"
 
-int rds_tcp_keepalive(struct socket *sock)
+/*
+ * cheesy, but simple..
+ */
+static void rds_tcp_accept_worker(struct work_struct *work);
+static DECLARE_WORK(rds_tcp_listen_work, rds_tcp_accept_worker);
+static struct socket *rds_tcp_listen_sock;
+
+static int rds_tcp_keepalive(struct socket *sock)
 {
 	/* values below based on xs_udp_default_timeout */
 	int keepidle = 5; /* send a probe 'keepidle' secs after last data */
@@ -70,7 +77,7 @@ bail:
 	return ret;
 }
 
-int rds_tcp_accept_one(struct socket *sock)
+static int rds_tcp_accept_one(struct socket *sock)
 {
 	struct socket *new_sock = NULL;
 	struct rds_connection *conn;
@@ -78,9 +85,8 @@ int rds_tcp_accept_one(struct socket *sock)
 	struct inet_sock *inet;
 	struct rds_tcp_connection *rs_tcp;
 
-	ret = sock_create_kern(sock_net(sock->sk), sock->sk->sk_family,
-			       sock->sk->sk_type, sock->sk->sk_protocol,
-			       &new_sock);
+	ret = sock_create_lite(sock->sk->sk_family, sock->sk->sk_type,
+			       sock->sk->sk_protocol, &new_sock);
 	if (ret)
 		goto out;
 
@@ -102,35 +108,35 @@ int rds_tcp_accept_one(struct socket *sock)
 		 &inet->inet_saddr, ntohs(inet->inet_sport),
 		 &inet->inet_daddr, ntohs(inet->inet_dport));
 
-	conn = rds_conn_create(sock_net(sock->sk),
-			       inet->inet_saddr, inet->inet_daddr,
+	conn = rds_conn_create(inet->inet_saddr, inet->inet_daddr,
 			       &rds_tcp_transport, GFP_KERNEL);
 	if (IS_ERR(conn)) {
 		ret = PTR_ERR(conn);
 		goto out;
 	}
 	/* An incoming SYN request came in, and TCP just accepted it.
+	 * We always create a new conn for listen side of TCP, and do not
+	 * add it to the c_hash_list.
 	 *
 	 * If the client reboots, this conn will need to be cleaned up.
 	 * rds_tcp_state_change() will do that cleanup
 	 */
 	rs_tcp = (struct rds_tcp_connection *)conn->c_transport_data;
-	if (rs_tcp->t_sock &&
-	    ntohl(inet->inet_saddr) < ntohl(inet->inet_daddr)) {
-		struct sock *nsk = new_sock->sk;
+	WARN_ON(!rs_tcp || rs_tcp->t_sock);
 
-		nsk->sk_user_data = NULL;
-		nsk->sk_prot->disconnect(nsk, 0);
-		tcp_done(nsk);
-		new_sock = NULL;
+	/*
+	 * see the comment above rds_queue_delayed_reconnect()
+	 */
+	if (!rds_conn_transition(conn, RDS_CONN_DOWN, RDS_CONN_CONNECTING)) {
+		if (rds_conn_state(conn) == RDS_CONN_UP)
+			rds_tcp_stats_inc(s_tcp_listen_closed_stale);
+		else
+			rds_tcp_stats_inc(s_tcp_connect_raced);
+		rds_conn_drop(conn);
 		ret = 0;
 		goto out;
-	} else if (rs_tcp->t_sock) {
-		rds_tcp_restore_callbacks(rs_tcp->t_sock, rs_tcp);
-		conn->c_outgoing = 0;
 	}
 
-	rds_conn_transition(conn, RDS_CONN_DOWN, RDS_CONN_CONNECTING);
 	rds_tcp_set_callbacks(new_sock, conn);
 	rds_connect_complete(conn);
 	new_sock = NULL;
@@ -140,6 +146,12 @@ out:
 	if (new_sock)
 		sock_release(new_sock);
 	return ret;
+}
+
+static void rds_tcp_accept_worker(struct work_struct *work)
+{
+	while (rds_tcp_accept_one(rds_tcp_listen_sock) == 0)
+		cond_resched();
 }
 
 void rds_tcp_listen_data_ready(struct sock *sk)
@@ -162,20 +174,20 @@ void rds_tcp_listen_data_ready(struct sock *sk)
 	 * socket
 	 */
 	if (sk->sk_state == TCP_LISTEN)
-		rds_tcp_accept_work(sk);
+		queue_work(rds_wq, &rds_tcp_listen_work);
 
 out:
 	read_unlock(&sk->sk_callback_lock);
 	ready(sk);
 }
 
-struct socket *rds_tcp_listen_init(struct net *net)
+int rds_tcp_listen_init(void)
 {
 	struct sockaddr_in sin;
 	struct socket *sock = NULL;
 	int ret;
 
-	ret = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
+	ret = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
 	if (ret < 0)
 		goto out;
 
@@ -199,15 +211,17 @@ struct socket *rds_tcp_listen_init(struct net *net)
 	if (ret < 0)
 		goto out;
 
-	return sock;
+	rds_tcp_listen_sock = sock;
+	sock = NULL;
 out:
 	if (sock)
 		sock_release(sock);
-	return NULL;
+	return ret;
 }
 
-void rds_tcp_listen_stop(struct socket *sock)
+void rds_tcp_listen_stop(void)
 {
+	struct socket *sock = rds_tcp_listen_sock;
 	struct sock *sk;
 
 	if (!sock)
@@ -228,4 +242,5 @@ void rds_tcp_listen_stop(struct socket *sock)
 	/* wait for accepts to stop and close the socket */
 	flush_workqueue(rds_wq);
 	sock_release(sock);
+	rds_tcp_listen_sock = NULL;
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2005 - 2015 Emulex
+ * Copyright (C) 2005 - 2015 Avago Technologies
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -12,7 +12,7 @@
  * Contact Information:
  * linux-drivers@avagotech.com
  *
- * Emulex
+ * Avago Technologies
  * 3333 Susan Street
  * Costa Mesa, CA 92626
  */
@@ -1573,8 +1573,7 @@ beiscsi_phys_port_disp(struct device *dev, struct device_attribute *attr,
 
 void beiscsi_offload_cxn_v0(struct beiscsi_offload_params *params,
 			     struct wrb_handle *pwrb_handle,
-			     struct be_mem_descriptor *mem_descr,
-			     struct hwi_wrb_context *pwrb_context)
+			     struct be_mem_descriptor *mem_descr)
 {
 	struct iscsi_wrb *pwrb = pwrb_handle->pwrb;
 
@@ -1618,14 +1617,7 @@ void beiscsi_offload_cxn_v0(struct beiscsi_offload_params *params,
 		      max_burst_length) / 32]);
 
 	AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb, ptr2nextwrb,
-		      pwrb, pwrb_handle->wrb_index);
-	if (pwrb_context->plast_wrb)
-		AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb,
-			      ptr2nextwrb,
-			      pwrb_context->plast_wrb,
-			      pwrb_handle->wrb_index);
-	pwrb_context->plast_wrb = pwrb;
-
+		      pwrb, pwrb_handle->nxt_wrb_index);
 	AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb,
 		      session_state, pwrb, 0);
 	AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb, compltonack,
@@ -1645,8 +1637,7 @@ void beiscsi_offload_cxn_v0(struct beiscsi_offload_params *params,
 }
 
 void beiscsi_offload_cxn_v2(struct beiscsi_offload_params *params,
-			     struct wrb_handle *pwrb_handle,
-			     struct hwi_wrb_context *pwrb_context)
+			     struct wrb_handle *pwrb_handle)
 {
 	struct iscsi_wrb *pwrb = pwrb_handle->pwrb;
 
@@ -1661,14 +1652,7 @@ void beiscsi_offload_cxn_v2(struct beiscsi_offload_params *params,
 		      BE_TGT_CTX_UPDT_CMD);
 	AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb_v2,
 		      ptr2nextwrb,
-		      pwrb, pwrb_handle->wrb_index);
-	if (pwrb_context->plast_wrb)
-		AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb_v2,
-			      ptr2nextwrb,
-			      pwrb_context->plast_wrb,
-			      pwrb_handle->wrb_index);
-	pwrb_context->plast_wrb = pwrb;
-
+		      pwrb, pwrb_handle->nxt_wrb_index);
 	AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb_v2, wrb_idx,
 		      pwrb, pwrb_handle->wrb_index);
 	AMAP_SET_BITS(struct amap_iscsi_target_context_update_wrb_v2,

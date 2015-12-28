@@ -545,8 +545,7 @@ static void dmio_complete(unsigned long error, void *context)
 {
 	struct dm_buffer *b = context;
 
-	b->bio.bi_error = error ? -EIO : 0;
-	b->bio.bi_end_io(&b->bio);
+	b->bio.bi_end_io(&b->bio, error ? -EIO : 0);
 }
 
 static void use_dmio(struct dm_buffer *b, int rw, sector_t block,
@@ -576,16 +575,13 @@ static void use_dmio(struct dm_buffer *b, int rw, sector_t block,
 	b->bio.bi_end_io = end_io;
 
 	r = dm_io(&io_req, 1, &region, NULL);
-	if (r) {
-		b->bio.bi_error = r;
-		end_io(&b->bio);
-	}
+	if (r)
+		end_io(&b->bio, r);
 }
 
-static void inline_endio(struct bio *bio)
+static void inline_endio(struct bio *bio, int error)
 {
 	bio_end_io_t *end_fn = bio->bi_private;
-	int error = bio->bi_error;
 
 	/*
 	 * Reset the bio to free any attached resources
@@ -593,8 +589,7 @@ static void inline_endio(struct bio *bio)
 	 */
 	bio_reset(bio);
 
-	bio->bi_error = error;
-	end_fn(bio);
+	end_fn(bio, error);
 }
 
 static void use_inline_bio(struct dm_buffer *b, int rw, sector_t block,
@@ -666,14 +661,13 @@ static void submit_io(struct dm_buffer *b, int rw, sector_t block,
  * Set the error, clear B_WRITING bit and wake anyone who was waiting on
  * it.
  */
-static void write_endio(struct bio *bio)
+static void write_endio(struct bio *bio, int error)
 {
 	struct dm_buffer *b = container_of(bio, struct dm_buffer, bio);
 
-	b->write_error = bio->bi_error;
-	if (unlikely(bio->bi_error)) {
+	b->write_error = error;
+	if (unlikely(error)) {
 		struct dm_bufio_client *c = b->c;
-		int error = bio->bi_error;
 		(void)cmpxchg(&c->async_write_error, 0, error);
 	}
 
@@ -1032,11 +1026,11 @@ found_buffer:
  * The endio routine for reading: set the error, clear the bit and wake up
  * anyone waiting on the buffer.
  */
-static void read_endio(struct bio *bio)
+static void read_endio(struct bio *bio, int error)
 {
 	struct dm_buffer *b = container_of(bio, struct dm_buffer, bio);
 
-	b->read_error = bio->bi_error;
+	b->read_error = error;
 
 	BUG_ON(!test_bit(B_READING, &b->state));
 
@@ -1598,11 +1592,11 @@ struct dm_bufio_client *dm_bufio_client_create(struct block_device *bdev, unsign
 
 	c->bdev = bdev;
 	c->block_size = block_size;
-	c->sectors_per_block_bits = __ffs(block_size) - SECTOR_SHIFT;
-	c->pages_per_block_bits = (__ffs(block_size) >= PAGE_SHIFT) ?
-				  __ffs(block_size) - PAGE_SHIFT : 0;
-	c->blocks_per_page_bits = (__ffs(block_size) < PAGE_SHIFT ?
-				  PAGE_SHIFT - __ffs(block_size) : 0);
+	c->sectors_per_block_bits = ffs(block_size) - 1 - SECTOR_SHIFT;
+	c->pages_per_block_bits = (ffs(block_size) - 1 >= PAGE_SHIFT) ?
+				  ffs(block_size) - 1 - PAGE_SHIFT : 0;
+	c->blocks_per_page_bits = (ffs(block_size) - 1 < PAGE_SHIFT ?
+				  PAGE_SHIFT - (ffs(block_size) - 1) : 0);
 
 	c->aux_size = aux_size;
 	c->alloc_callback = alloc_callback;
@@ -1861,8 +1855,12 @@ static void __exit dm_bufio_exit(void)
 	cancel_delayed_work_sync(&dm_bufio_work);
 	destroy_workqueue(dm_bufio_wq);
 
-	for (i = 0; i < ARRAY_SIZE(dm_bufio_caches); i++)
-		kmem_cache_destroy(dm_bufio_caches[i]);
+	for (i = 0; i < ARRAY_SIZE(dm_bufio_caches); i++) {
+		struct kmem_cache *kc = dm_bufio_caches[i];
+
+		if (kc)
+			kmem_cache_destroy(kc);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(dm_bufio_cache_names); i++)
 		kfree(dm_bufio_cache_names[i]);

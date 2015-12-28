@@ -79,8 +79,6 @@ struct dentry *debugfs_create_u32(const char *name, umode_t mode,
 				  struct dentry *parent, u32 *value);
 struct dentry *debugfs_create_u64(const char *name, umode_t mode,
 				  struct dentry *parent, u64 *value);
-struct dentry *debugfs_create_ulong(const char *name, umode_t mode,
-				    struct dentry *parent, unsigned long *value);
 struct dentry *debugfs_create_x8(const char *name, umode_t mode,
 				 struct dentry *parent, u8 *value);
 struct dentry *debugfs_create_x16(const char *name, umode_t mode,
@@ -94,7 +92,7 @@ struct dentry *debugfs_create_size_t(const char *name, umode_t mode,
 struct dentry *debugfs_create_atomic_t(const char *name, umode_t mode,
 				     struct dentry *parent, atomic_t *value);
 struct dentry *debugfs_create_bool(const char *name, umode_t mode,
-				  struct dentry *parent, bool *value);
+				  struct dentry *parent, u32 *value);
 
 struct dentry *debugfs_create_blob(const char *name, umode_t mode,
 				  struct dentry *parent,
@@ -117,12 +115,6 @@ struct dentry *debugfs_create_devm_seqfile(struct device *dev, const char *name,
 							  void *data));
 
 bool debugfs_initialized(void);
-
-ssize_t debugfs_read_file_bool(struct file *file, char __user *user_buf,
-			       size_t count, loff_t *ppos);
-
-ssize_t debugfs_write_file_bool(struct file *file, const char __user *user_buf,
-				size_t count, loff_t *ppos);
 
 #else
 
@@ -245,7 +237,7 @@ static inline struct dentry *debugfs_create_atomic_t(const char *name, umode_t m
 
 static inline struct dentry *debugfs_create_bool(const char *name, umode_t mode,
 						 struct dentry *parent,
-						 bool *value)
+						 u32 *value)
 {
 	return ERR_PTR(-ENODEV);
 }
@@ -288,20 +280,6 @@ static inline struct dentry *debugfs_create_devm_seqfile(struct device *dev,
 							  void *data))
 {
 	return ERR_PTR(-ENODEV);
-}
-
-static inline ssize_t debugfs_read_file_bool(struct file *file,
-					     char __user *user_buf,
-					     size_t count, loff_t *ppos)
-{
-	return -ENODEV;
-}
-
-static inline ssize_t debugfs_write_file_bool(struct file *file,
-					      const char __user *user_buf,
-					      size_t count, loff_t *ppos)
-{
-	return -ENODEV;
 }
 
 #endif

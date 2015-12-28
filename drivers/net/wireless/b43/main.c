@@ -56,6 +56,7 @@
 #include "sysfs.h"
 #include "xmit.h"
 #include "lo.h"
+#include "pcmcia.h"
 #include "sdio.h"
 #include <linux/mmc/sdio_func.h>
 
@@ -119,7 +120,6 @@ MODULE_PARM_DESC(allhwsupport, "Enable support for all hardware (even it if over
 #ifdef CONFIG_B43_BCMA
 static const struct bcma_device_id b43_bcma_tbl[] = {
 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_80211, 0x11, BCMA_ANY_CLASS),
-	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_80211, 0x15, BCMA_ANY_CLASS),
 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_80211, 0x17, BCMA_ANY_CLASS),
 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_80211, 0x18, BCMA_ANY_CLASS),
 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_80211, 0x1C, BCMA_ANY_CLASS),
@@ -5849,9 +5849,12 @@ static int __init b43_init(void)
 	int err;
 
 	b43_debugfs_init();
-	err = b43_sdio_init();
+	err = b43_pcmcia_init();
 	if (err)
 		goto err_dfs_exit;
+	err = b43_sdio_init();
+	if (err)
+		goto err_pcmcia_exit;
 #ifdef CONFIG_B43_BCMA
 	err = bcma_driver_register(&b43_bcma_driver);
 	if (err)
@@ -5874,6 +5877,8 @@ err_bcma_driver_exit:
 err_sdio_exit:
 #endif
 	b43_sdio_exit();
+err_pcmcia_exit:
+	b43_pcmcia_exit();
 err_dfs_exit:
 	b43_debugfs_exit();
 	return err;
@@ -5888,6 +5893,7 @@ static void __exit b43_exit(void)
 	bcma_driver_unregister(&b43_bcma_driver);
 #endif
 	b43_sdio_exit();
+	b43_pcmcia_exit();
 	b43_debugfs_exit();
 }
 

@@ -51,7 +51,7 @@
 #define VIVID_MODULE_NAME "vivid"
 
 /* The maximum number of vivid devices */
-#define VIVID_MAX_DEVS CONFIG_VIDEO_VIVID_MAX_DEVS
+#define VIVID_MAX_DEVS 64
 
 MODULE_DESCRIPTION("Virtual Video Test Driver");
 MODULE_AUTHOR("Hans Verkuil");
@@ -1341,11 +1341,8 @@ static int vivid_remove(struct platform_device *pdev)
 	struct vivid_dev *dev;
 	unsigned i;
 
-
-	for (i = 0; i < n_devs; i++) {
+	for (i = 0; vivid_devs[i]; i++) {
 		dev = vivid_devs[i];
-		if (!dev)
-			continue;
 
 		if (dev->has_vid_cap) {
 			v4l2_info(&dev->v4l2_dev, "unregistering %s\n",

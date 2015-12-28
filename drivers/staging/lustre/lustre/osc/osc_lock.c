@@ -251,7 +251,7 @@ static void osc_lock_fini(const struct lu_env *env,
 	LASSERT(atomic_read(&ols->ols_pageref) == 0 ||
 		atomic_read(&ols->ols_pageref) == _PAGEREF_MAGIC);
 
-	kmem_cache_free(osc_lock_kmem, ols);
+	OBD_SLAB_FREE_PTR(ols, osc_lock_kmem);
 }
 
 static void osc_lock_build_policy(const struct lu_env *env,
@@ -1555,7 +1555,7 @@ int osc_lock_init(const struct lu_env *env,
 	struct osc_lock *clk;
 	int result;
 
-	clk = kmem_cache_alloc(osc_lock_kmem, GFP_NOFS | __GFP_ZERO);
+	OBD_SLAB_ALLOC_PTR_GFP(clk, osc_lock_kmem, GFP_NOFS);
 	if (clk != NULL) {
 		__u32 enqflags = lock->cll_descr.cld_enq_flags;
 

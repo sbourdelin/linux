@@ -339,12 +339,6 @@ static const struct regmap_config hda_regmap_cfg = {
 	.use_single_rw = true,
 };
 
-/**
- * snd_hdac_regmap_init - Initialize regmap for HDA register accesses
- * @codec: the codec object
- *
- * Returns zero for success or a negative error code.
- */
 int snd_hdac_regmap_init(struct hdac_device *codec)
 {
 	struct regmap *regmap;
@@ -358,10 +352,6 @@ int snd_hdac_regmap_init(struct hdac_device *codec)
 }
 EXPORT_SYMBOL_GPL(snd_hdac_regmap_init);
 
-/**
- * snd_hdac_regmap_init - Release the regmap from HDA codec
- * @codec: the codec object
- */
 void snd_hdac_regmap_exit(struct hdac_device *codec)
 {
 	if (codec->regmap) {
@@ -420,9 +410,8 @@ int snd_hdac_regmap_write_raw(struct hdac_device *codec, unsigned int reg,
 
 	err = reg_raw_write(codec, reg, val);
 	if (err == -EAGAIN) {
-		err = snd_hdac_power_up_pm(codec);
-		if (!err)
-			err = reg_raw_write(codec, reg, val);
+		snd_hdac_power_up_pm(codec);
+		err = reg_raw_write(codec, reg, val);
 		snd_hdac_power_down_pm(codec);
 	}
 	return err;
@@ -453,9 +442,8 @@ int snd_hdac_regmap_read_raw(struct hdac_device *codec, unsigned int reg,
 
 	err = reg_raw_read(codec, reg, val);
 	if (err == -EAGAIN) {
-		err = snd_hdac_power_up_pm(codec);
-		if (!err)
-			err = reg_raw_read(codec, reg, val);
+		snd_hdac_power_up_pm(codec);
+		err = reg_raw_read(codec, reg, val);
 		snd_hdac_power_down_pm(codec);
 	}
 	return err;

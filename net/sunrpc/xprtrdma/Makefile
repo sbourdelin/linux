@@ -5,4 +5,3 @@ rpcrdma-y := transport.o rpc_rdma.o verbs.o \
 	svc_rdma.o svc_rdma_transport.o \
 	svc_rdma_marshal.o svc_rdma_sendto.o svc_rdma_recvfrom.o \
 	module.o
-rpcrdma-$(CONFIG_SUNRPC_BACKCHANNEL) += backchannel.o

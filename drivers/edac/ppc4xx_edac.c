@@ -199,7 +199,6 @@ static const struct of_device_id ppc4xx_edac_match[] = {
 	},
 	{ }
 };
-MODULE_DEVICE_TABLE(of, ppc4xx_edac_match);
 
 static struct platform_driver ppc4xx_edac_driver = {
 	.probe			= ppc4xx_edac_probe,
@@ -921,7 +920,7 @@ static int ppc4xx_edac_init_csrows(struct mem_ctl_info *mci, u32 mcopt1)
 	 */
 
 	for (row = 0; row < mci->nr_csrows; row++) {
-		struct csrow_info *csi = mci->csrows[row];
+		struct csrow_info *csi = &mci->csrows[row];
 
 		/*
 		 * Get the configuration settings for this

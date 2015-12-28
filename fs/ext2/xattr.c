@@ -293,9 +293,10 @@ bad_block:	ext2_error(inode->i_sb, "ext2_xattr_list",
 			ext2_xattr_handler(entry->e_name_index);
 
 		if (handler) {
-			size_t size = handler->list(handler, dentry, buffer,
-						    rest, entry->e_name,
-						    entry->e_name_len);
+			size_t size = handler->list(dentry, buffer, rest,
+						    entry->e_name,
+						    entry->e_name_len,
+						    handler->flags);
 			if (buffer) {
 				if (size > rest) {
 					error = -ERANGE;

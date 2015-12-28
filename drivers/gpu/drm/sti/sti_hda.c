@@ -589,8 +589,7 @@ struct drm_encoder *sti_hda_best_encoder(struct drm_connector *connector)
 	return hda_connector->encoder;
 }
 
-static const
-struct drm_connector_helper_funcs sti_hda_connector_helper_funcs = {
+static struct drm_connector_helper_funcs sti_hda_connector_helper_funcs = {
 	.get_modes = sti_hda_connector_get_modes,
 	.mode_valid = sti_hda_connector_mode_valid,
 	.best_encoder = sti_hda_best_encoder,
@@ -612,7 +611,7 @@ static void sti_hda_connector_destroy(struct drm_connector *connector)
 	kfree(hda_connector);
 }
 
-static const struct drm_connector_funcs sti_hda_connector_funcs = {
+static struct drm_connector_funcs sti_hda_connector_funcs = {
 	.dpms = drm_atomic_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.detect = sti_hda_connector_detect,
@@ -784,6 +783,8 @@ struct platform_driver sti_hda_driver = {
 	.probe = sti_hda_probe,
 	.remove = sti_hda_remove,
 };
+
+module_platform_driver(sti_hda_driver);
 
 MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
 MODULE_DESCRIPTION("STMicroelectronics SoC DRM driver");
