@@ -1,0 +1,76 @@
+Qualcomm WCN36xx WiFi Binding
+
+This binding describes the Qualcomm WCN36xx WiFi hardware. The hardware block
+is part of the Qualcomm WCNSS core, a WiFi/BT/FM combo chip, found in a variety
+of Qualcomm platforms.
+
+- compatible:
+	Usage: required
+	Value type: <string>
+	Definition: must be one of:
+		    "qcom,wcn3620-wlan",
+		    "qcom,wcn3660-wlan",
+		    "qcom,wcn3680-wlan"
+
+- qcom,smd-channel:
+	Usage: required
+	Value type: <string>
+	Definition: standard SMD property specifying the SMD channel used for
+		    communication with the WiFi firmware
+
+- interrupts:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: should specify the two IRQs for tx and rx respectively
+
+- qcom,wcnss-mmio:
+	Usage: required
+	Value type: <prop-encoed-array>
+	Definition: should specify base address and size of the WiFi related
+		    registers of WCNSS
+
+- qcom,state:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: should specify the tx-enable and tx-ring-empty state
+		    references
+
+- qcom,state-names:
+	Usage: required
+	Value type: <stringlist>
+	Definition: name of the states, must be "tx-enable", "tx-rings-empty";
+
+- local-mac-address:
+	Usage: optional
+	Value type: <prop-encoded-array> encoded as array of hex numbers
+	Definition: specifies MAC address that was assigned to the network
+		    device described by the node containing this property.
+
+= EXAMPLE
+The following example represents a SMD node, with one edge representing the
+"pronto" subsystem, with the wcn3680 WiFi device described; as found on the
+8974 platform.
+
+smd {
+	compatible = "qcom,smd";
+
+	pronto {
+		interrupts = <0 142 1>;
+
+		qcom,ipc = <&apcs 8 17>;
+		qcom,smd-edge = <6>;
+
+		wifi {
+			compatible = "qcom,wcn3680-wlan";
+			qcom,smd-channels = "WLAN_CTRL";
+
+			interrupts = <0 145 0>, <0 146 0>;
+			interrupt-names = "tx", "rx";
+
+			qcom,wcnss-mmio = <0xfb000000 0x21b000>;
+
+			qcom,state = <&apps_smsm 10>, <&apps_smsm 9>;
+			qcom,state-names = "tx-enable", "tx-rings-empty";
+		};
+	};
+};
