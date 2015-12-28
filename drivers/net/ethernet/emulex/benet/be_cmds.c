@@ -2959,6 +2959,17 @@ flash:
 		} else if (status) {
 			dev_err(dev, "Flashing section type 0x%x failed\n",
 				img_type);
+
+			switch (addl_status(status)) {
+			case MCC_ADDL_STATUS_MISSING_SIGNATURE:
+				dev_err(dev,
+					"Digital signature missing in FW\n");
+				return -EINVAL;
+			case MCC_ADDL_STATUS_INVALID_SIGNATURE:
+				dev_err(dev,
+					"Invalid digital signature in FW\n");
+				return -EINVAL;
+			}
 			return -EFAULT;
 		}
 	}
