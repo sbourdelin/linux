@@ -6087,15 +6087,13 @@ static int nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *
 }
 
 static int
-nfs4_proc_lock(struct file *filp, int cmd, struct file_lock *request)
+nfs4_proc_lock(struct nfs_open_context *ctx, int cmd, struct file_lock *request)
 {
-	struct nfs_open_context *ctx;
 	struct nfs4_state *state;
 	unsigned long timeout = NFS4_LOCK_MINTIMEOUT;
 	int status;
 
 	/* verify open state */
-	ctx = nfs_file_open_context(filp);
 	state = ctx->state;
 
 	if (IS_GETLK(cmd)) {
