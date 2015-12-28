@@ -1303,7 +1303,7 @@ static int generic_set_freq(struct dvb_frontend *fe,
 
 	rc = r820t_set_tv_standard(priv, bw, type, std, delsys);
 	if (rc < 0)
-		goto err;
+		goto report_failure;
 
 	if ((type == V4L2_TUNER_ANALOG_TV) && (std == V4L2_STD_SECAM_LC))
 		lo_freq = freq - priv->int_freq;
@@ -1312,23 +1312,21 @@ static int generic_set_freq(struct dvb_frontend *fe,
 
 	rc = r820t_set_mux(priv, lo_freq);
 	if (rc < 0)
-		goto err;
+		goto report_failure;
 
 	rc = r820t_set_pll(priv, type, lo_freq);
 	if (rc < 0 || !priv->has_lock)
-		goto err;
+		goto report_failure;
 
 	rc = r820t_sysfreq_sel(priv, freq, type, std, delsys);
 	if (rc < 0)
-		goto err;
+		goto report_failure;
 
 	tuner_dbg("%s: PLL locked on frequency %d Hz, gain=%d\n",
 		  __func__, freq, r820t_read_gain(priv));
-
-err:
-
-	if (rc < 0)
-		tuner_dbg("%s: failed=%d\n", __func__, rc);
+	return 0;
+report_failure:
+	tuner_dbg("%s: failed=%d\n", __func__, rc);
 	return rc;
 }
 
