@@ -2439,6 +2439,8 @@ int nfs_permission(struct inode *inode, int mask)
 
 	nfs_inc_stats(inode, NFSIOS_VFSACCESS);
 
+	nfs_revalidate_inode(NFS_SERVER(inode),inode);
+
 	if ((mask & (MAY_READ | MAY_WRITE | MAY_EXEC)) == 0)
 		goto out;
 	/* Is this sys_access() ? */
