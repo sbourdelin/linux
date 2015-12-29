@@ -687,6 +687,7 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 	struct ffs_ep *ep;
 	char *data = NULL;
 	ssize_t ret, data_len = -EINVAL;
+	bool interrupted = false;
 	int halt;
 
 	/* Are we still active? */
@@ -829,26 +830,35 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 
 			spin_unlock_irq(&epfile->ffs->eps_lock);
 
-			if (unlikely(ret < 0)) {
-				/* nop */
-			} else if (unlikely(
+			if (unlikely(ret < 0))
+				goto error_mutex;
+
+			if (unlikely(
 				   wait_for_completion_interruptible(&done))) {
-				ret = -EINTR;
-				usb_ep_dequeue(ep->ep, req);
-			} else {
 				/*
-				 * XXX We may end up silently droping data
-				 * here.  Since data_len (i.e. req->length) may
-				 * be bigger than len (after being rounded up
-				 * to maxpacketsize), we may end up with more
-				 * data then user space has space for.
+				 * To avoid race condition with
+				 * ffs_epfile_io_complete, dequeue the request
+				 * first then check status. usb_ep_dequeue API
+				 * should guarantee no race condition with
+				 * req->complete callback.
 				 */
-				ret = ep->status;
-				if (io_data->read && ret > 0) {
-					ret = copy_to_iter(data, ret, &io_data->data);
-					if (!ret)
-						ret = -EFAULT;
-				}
+				usb_ep_dequeue(ep->ep, req);
+				interrupted = true;
+			}
+
+			/*
+			 * XXX We may end up silently droping data
+			 * here.  Since data_len (i.e. req->length) may
+			 * be bigger than len (after being rounded up
+			 * to maxpacketsize), we may end up with more
+			 * data then user space has space for.
+			 */
+			ret = ep->status < 0 && interrupted ?
+					-EINTR : ep->status;
+			if (io_data->read && ret > 0) {
+				ret = copy_to_iter(data, ret, &io_data->data);
+				if (!ret)
+					ret = -EFAULT;
 			}
 			kfree(data);
 		}
@@ -859,6 +869,7 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 
 error_lock:
 	spin_unlock_irq(&epfile->ffs->eps_lock);
+error_mutex:
 	mutex_unlock(&epfile->mutex);
 error:
 	kfree(data);
