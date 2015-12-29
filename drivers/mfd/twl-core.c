@@ -625,7 +625,7 @@ add_numbered_child(unsigned mod_no, const char *name, int num,
 	if (!pdev) {
 		dev_dbg(&twl->client->dev, "can't alloc dev\n");
 		status = -ENOMEM;
-		goto err;
+		goto report_failure;
 	}
 
 	pdev->dev.parent = &twl->client->dev;
@@ -634,7 +634,7 @@ add_numbered_child(unsigned mod_no, const char *name, int num,
 		status = platform_device_add_data(pdev, pdata, pdata_len);
 		if (status < 0) {
 			dev_dbg(&pdev->dev, "can't add platform_data\n");
-			goto err;
+			goto put_device;
 		}
 	}
 
@@ -647,21 +647,20 @@ add_numbered_child(unsigned mod_no, const char *name, int num,
 		status = platform_device_add_resources(pdev, r, irq1 ? 2 : 1);
 		if (status < 0) {
 			dev_dbg(&pdev->dev, "can't add irqs\n");
-			goto err;
+			goto put_device;
 		}
 	}
 
 	status = platform_device_add(pdev);
-	if (status == 0)
+	if (!status) {
 		device_init_wakeup(&pdev->dev, can_wakeup);
-
-err:
-	if (status < 0) {
-		platform_device_put(pdev);
-		dev_err(&twl->client->dev, "can't add %s dev\n", name);
-		return ERR_PTR(status);
+		return &pdev->dev;
 	}
-	return &pdev->dev;
+put_device:
+	platform_device_put(pdev);
+report_failure:
+	dev_err(&twl->client->dev, "can't add %s dev\n", name);
+	return ERR_PTR(status);
 }
 
 static inline struct device *add_child(unsigned mod_no, const char *name,
