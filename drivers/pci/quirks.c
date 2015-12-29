@@ -2161,6 +2161,16 @@ static void quirk_brcm_570x_limit_vpd(struct pci_dev *dev)
 	}
 }
 
+static void quirk_atheros_vpd(struct pci_dev *dev)
+{
+	/* Atheros WiFi cards hang when reading VPD */
+	if (dev->vpd)
+		dev->vpd->len = 0;
+}
+
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATHEROS, PCI_ANY_ID, quirk_atheros_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATTANSIC, PCI_ANY_ID, quirk_atheros_vpd);
+
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
 			PCI_DEVICE_ID_NX2_5706,
 			quirk_brcm_570x_limit_vpd);
