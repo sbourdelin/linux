@@ -1136,6 +1136,8 @@ int i915_driver_unload(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 
+	intel_runtime_pm_get(dev_priv);
+
 	intel_fbdev_fini(dev);
 
 	i915_audio_component_cleanup(dev_priv);
@@ -1143,6 +1145,7 @@ int i915_driver_unload(struct drm_device *dev)
 	ret = i915_gem_suspend(dev);
 	if (ret) {
 		DRM_ERROR("failed to idle hardware: %d\n", ret);
+		intel_runtime_pm_put(dev_priv);
 		return ret;
 	}
 
@@ -1221,6 +1224,9 @@ int i915_driver_unload(struct drm_device *dev)
 	kmem_cache_destroy(dev_priv->vmas);
 	kmem_cache_destroy(dev_priv->objects);
 	pci_dev_put(dev_priv->bridge_dev);
+
+	intel_runtime_pm_put(dev_priv);
+
 	kfree(dev_priv);
 
 	return 0;
