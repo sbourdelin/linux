@@ -219,6 +219,11 @@ void perf_event_attr__set_max_precise_ip(struct perf_event_attr *attr)
 	}
 }
 
+int __weak perf_evlist__arch_add_default(__maybe_unused struct perf_evlist *evlist)
+{
+	return -1;
+}
+
 int perf_evlist__add_default(struct perf_evlist *evlist)
 {
 	struct perf_event_attr attr = {
@@ -226,6 +231,9 @@ int perf_evlist__add_default(struct perf_evlist *evlist)
 		.config = PERF_COUNT_HW_CPU_CYCLES,
 	};
 	struct perf_evsel *evsel;
+
+	if (!perf_evlist__arch_add_default(evlist))
+		return 0;
 
 	event_attr_init(&attr);
 

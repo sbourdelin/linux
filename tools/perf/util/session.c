@@ -1130,10 +1130,11 @@ static void dump_sample(struct perf_evsel *evsel, union perf_event *event,
 }
 
 static struct machine *machines__find_for_cpumode(struct machines *machines,
-					       union perf_event *event,
-					       struct perf_sample *sample)
+						  union perf_event *event,
+						  struct perf_sample *sample,
+						  struct perf_evsel *evsel)
 {
-	const u8 cpumode = event->header.misc & PERF_RECORD_MISC_CPUMODE_MASK;
+	u8 cpumode = arch__get_cpumode(event, evsel, sample);
 	struct machine *machine;
 
 	if (perf_guest &&
@@ -1237,7 +1238,7 @@ static int machines__deliver_event(struct machines *machines,
 
 	evsel = perf_evlist__id2evsel(evlist, sample->id);
 
-	machine = machines__find_for_cpumode(machines, event, sample);
+	machine = machines__find_for_cpumode(machines, event, sample, evsel);
 
 	switch (event->header.type) {
 	case PERF_RECORD_SAMPLE:

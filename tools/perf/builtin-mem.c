@@ -61,13 +61,15 @@ static int
 dump_raw_samples(struct perf_tool *tool,
 		 union perf_event *event,
 		 struct perf_sample *sample,
-		 struct machine *machine)
+		 struct machine *machine,
+		 struct perf_evsel *evsel)
 {
 	struct perf_mem *mem = container_of(tool, struct perf_mem, tool);
 	struct addr_location al;
 	const char *fmt;
 
-	if (perf_event__preprocess_sample(event, machine, &al, sample) < 0) {
+	if (perf_event__preprocess_sample(event, machine, &al,
+					  sample, evsel) < 0) {
 		fprintf(stderr, "problem processing %d event, skipping it.\n",
 				event->header.type);
 		return -1;
@@ -111,10 +113,10 @@ out_put:
 static int process_sample_event(struct perf_tool *tool,
 				union perf_event *event,
 				struct perf_sample *sample,
-				struct perf_evsel *evsel __maybe_unused,
+				struct perf_evsel *evsel,
 				struct machine *machine)
 {
-	return dump_raw_samples(tool, event, sample, machine);
+	return dump_raw_samples(tool, event, sample, machine, evsel);
 }
 
 static int report_raw_events(struct perf_mem *mem)

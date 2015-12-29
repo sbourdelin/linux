@@ -1291,6 +1291,13 @@ void thread__find_addr_location(struct thread *thread,
 		al->sym = NULL;
 }
 
+u8 __weak arch__get_cpumode(const union perf_event *event,
+			    __maybe_unused struct perf_evsel *evsel,
+			    __maybe_unused struct perf_sample *sample)
+{
+	return event->header.misc & PERF_RECORD_MISC_CPUMODE_MASK;
+}
+
 /*
  * Callers need to drop the reference to al->thread, obtained in
  * machine__findnew_thread()
@@ -1298,14 +1305,16 @@ void thread__find_addr_location(struct thread *thread,
 int perf_event__preprocess_sample(const union perf_event *event,
 				  struct machine *machine,
 				  struct addr_location *al,
-				  struct perf_sample *sample)
+				  struct perf_sample *sample,
+				  struct perf_evsel *evsel)
 {
-	u8 cpumode = event->header.misc & PERF_RECORD_MISC_CPUMODE_MASK;
+	u8 cpumode;
 	struct thread *thread = machine__findnew_thread(machine, sample->pid,
 							sample->tid);
-
 	if (thread == NULL)
 		return -1;
+
+	al->cpumode = cpumode = arch__get_cpumode(event, evsel, sample);
 
 	dump_printf(" ... thread: %s:%d\n", thread__comm_str(thread), thread->tid);
 	/*

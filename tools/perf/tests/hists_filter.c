@@ -81,7 +81,7 @@ static int add_hist_entries(struct perf_evlist *evlist,
 			sample.ip = fake_samples[i].ip;
 
 			if (perf_event__preprocess_sample(&event, machine, &al,
-							  &sample) < 0)
+							  &sample, evsel) < 0)
 				goto out;
 
 			al.socket = fake_samples[i].socket;

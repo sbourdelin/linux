@@ -36,6 +36,11 @@ bool test_attr__enabled;
 bool perf_host  = true;
 bool perf_guest = false;
 
+bool perf_guest_only(void)
+{
+	return !perf_host && perf_guest;
+}
+
 void event_attr_init(struct perf_event_attr *attr)
 {
 	if (!perf_host)

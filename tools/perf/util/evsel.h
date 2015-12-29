@@ -399,4 +399,7 @@ typedef int (*attr__fprintf_f)(FILE *, const char *, const char *, void *);
 int perf_event_attr__fprintf(FILE *fp, struct perf_event_attr *attr,
 			     attr__fprintf_f attr__fprintf, void *priv);
 
+u64 arch__get_ip(struct perf_evsel *evsel, struct perf_sample *sample);
+u8 arch__get_cpumode(const union perf_event *event, struct perf_evsel *evsel,
+		     struct perf_sample *sample);
 #endif /* __PERF_EVSEL_H */

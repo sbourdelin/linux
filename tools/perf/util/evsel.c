@@ -1607,6 +1607,12 @@ static inline bool overflow(const void *endp, u16 max_size, const void *offset,
 #define OVERFLOW_CHECK_u64(offset) \
 	OVERFLOW_CHECK(offset, sizeof(u64), sizeof(u64))
 
+u64 __weak arch__get_ip(__maybe_unused struct perf_evsel *evsel,
+			struct perf_sample *sample)
+{
+	return sample->ip;
+}
+
 int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 			     struct perf_sample *data)
 {
@@ -1780,6 +1786,7 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 		OVERFLOW_CHECK(array, data->raw_size, max_size);
 		data->raw_data = (void *)array;
 		array = (void *)array + data->raw_size;
+		data->ip = arch__get_ip(evsel, data);
 	}
 
 	if (type & PERF_SAMPLE_BRANCH_STACK) {
