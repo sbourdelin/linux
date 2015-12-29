@@ -427,7 +427,7 @@ static void rrpc_lun_gc(struct work_struct *work)
 	if (nr_blocks_need < rrpc->nr_luns)
 		nr_blocks_need = rrpc->nr_luns;
 
-	spin_lock(&lun->lock);
+	spin_lock(&rlun->lock);
 	while (nr_blocks_need > lun->nr_free_blocks &&
 					!list_empty(&rlun->prio_list)) {
 		struct rrpc_block *rblock = block_prio_find_max(rlun);
@@ -436,7 +436,6 @@ static void rrpc_lun_gc(struct work_struct *work)
 		if (!rblock->nr_invalid_pages)
 			break;
 
-		list_del_init(&rblock->prio);
 
 		BUG_ON(!block_is_full(rrpc, rblock));
 
@@ -446,6 +445,8 @@ static void rrpc_lun_gc(struct work_struct *work)
 		if (!gcb)
 			break;
 
+		list_del_init(&rblock->prio);
+
 		gcb->rrpc = rrpc;
 		gcb->rblk = rblock;
 		INIT_WORK(&gcb->ws_gc, rrpc_block_gc);
@@ -454,7 +455,7 @@ static void rrpc_lun_gc(struct work_struct *work)
 
 		nr_blocks_need--;
 	}
-	spin_unlock(&lun->lock);
+	spin_unlock(&rlun->lock);
 
 	/* TODO: Hint that request queue can be started again */
 }
