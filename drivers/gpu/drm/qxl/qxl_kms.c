@@ -221,6 +221,9 @@ static int qxl_device_init(struct qxl_device *qdev,
 		kmalloc(qdev->n_mem_slots * sizeof(struct qxl_memslot),
 			GFP_KERNEL);
 
+	if (!qdev->memslots)
+		return -ENOMEM;
+
 	idr_init(&qdev->release_idr);
 	spin_lock_init(&qdev->release_idr_lock);
 	spin_lock_init(&qdev->release_lock);
