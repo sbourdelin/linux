@@ -2954,7 +2954,7 @@ static void cfq_arm_slice_timer(struct cfq_data *cfqd)
 	cfq_mark_cfqq_wait_request(cfqq);
 
 	if (group_idle)
-		sl = cfqd->cfq_group_idle;
+		sl = msecs_to_jiffies(cfqd->cfq_group_idle);
 	else
 		sl = cfqd->cfq_slice_idle;
 
