@@ -193,6 +193,84 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
  */
 #define xlate_dev_kmem_ptr(p)	p
 
+#ifdef CONFIG_ARM64_INDIRECT_PIO
+#define DEF_PCI_HOOK_pio(x)   x
+#else
+#define DEF_PCI_HOOK_pio(x)   NULL
+#endif
+
+/*
+ * This value is equal to PCIBIOS_MIN_IO
+ */
+#define LEGACY_ISA_PORT_MAX 0x1000
+
+extern struct arm64_isa_io {
+	u8 (*inb)(unsigned long port);
+	u16 (*inw)(unsigned long port);
+	u32 (*inl)(unsigned long port);
+	void (*outb)(u8 value, unsigned long port);
+	void (*outw)(u16 value, unsigned long port);
+	void (*outl)(u32 value, unsigned long port);
+} arm64_isa_io;
+
+#define inb inb
+static inline u8 inb(unsigned long port)
+{
+	if (DEF_PCI_HOOK_pio(arm64_isa_io.inb) &&
+	    port < LEGACY_ISA_PORT_MAX)
+		return arm64_isa_io.inb(port);
+	return readb(PCI_IOBASE + port);
+}
+
+#define inw inw
+static inline u16 inw(unsigned long port)
+{
+	if (DEF_PCI_HOOK_pio(arm64_isa_io.inw) &&
+	    port < LEGACY_ISA_PORT_MAX)
+		return arm64_isa_io.inw(port);
+	return readw(PCI_IOBASE + port);
+}
+
+#define inl inl
+static inline u32 inl(unsigned long port)
+{
+	if (DEF_PCI_HOOK_pio(arm64_isa_io.inl) &&
+	    port < LEGACY_ISA_PORT_MAX)
+		return arm64_isa_io.inl(port);
+	return readl(PCI_IOBASE + port);
+}
+
+#define outb outb
+static inline void outb(u8 val, unsigned long port)
+{
+	if (DEF_PCI_HOOK_pio(arm64_isa_io.outb) &&
+	    port < LEGACY_ISA_PORT_MAX)
+		arm64_isa_io.outb(val, port);
+	else
+		writeb(val, PCI_IOBASE + port);
+}
+
+#define outw outw
+static inline void outw(u16 val, unsigned long port)
+{
+	if (DEF_PCI_HOOK_pio(arm64_isa_io.outw) &&
+	    port < LEGACY_ISA_PORT_MAX)
+		arm64_isa_io.outw(val, port);
+	else
+		writew(val, PCI_IOBASE + port);
+}
+
+#define outl outl
+static inline void outl(u32 val, unsigned long port)
+{
+	if (DEF_PCI_HOOK_pio(arm64_isa_io.outl) &&
+	    port < LEGACY_ISA_PORT_MAX)
+		arm64_isa_io.outl(val, port);
+	else
+		writel(val, PCI_IOBASE + port);
+}
+
+
 #include <asm-generic/io.h>
 
 /*

@@ -381,3 +381,8 @@ static int __init topology_init(void)
 	return 0;
 }
 subsys_initcall(topology_init);
+
+#if defined(CONFIG_ARM64_INDIRECT_PIO)
+struct arm64_isa_io arm64_isa_io;
+EXPORT_SYMBOL_GPL(arm64_isa_io);
+#endif

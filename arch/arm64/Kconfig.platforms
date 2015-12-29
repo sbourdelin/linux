@@ -127,5 +127,8 @@ config ARCH_ZYNQMP
 	bool "Xilinx ZynqMP Family"
 	help
 	  This enables support for Xilinx ZynqMP Family
-
+config ARM64_INDIRECT_PIO
+	bool "ARM64 Indirect port I/O"
+	help
+	  This enables support for ARM64 indirect port I/O
 endmenu
