@@ -1508,9 +1508,8 @@ static int gen8_do_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *engine;
-	int i;
 
-	for_each_ring(engine, dev_priv, i) {
+	for_each_engine(engine, dev_priv) {
 		I915_WRITE(RING_RESET_CTL(engine->mmio_base),
 			   _MASKED_BIT_ENABLE(RESET_CTL_REQUEST_RESET));
 
@@ -1527,7 +1526,7 @@ static int gen8_do_reset(struct drm_device *dev)
 	return gen6_do_reset(dev);
 
 not_ready:
-	for_each_ring(engine, dev_priv, i)
+	for_each_engine(engine, dev_priv)
 		I915_WRITE(RING_RESET_CTL(engine->mmio_base),
 			   _MASKED_BIT_DISABLE(RESET_CTL_REQUEST_RESET));
 

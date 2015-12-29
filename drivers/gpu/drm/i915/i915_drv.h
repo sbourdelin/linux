@@ -1973,10 +1973,34 @@ static inline struct drm_i915_private *guc_to_i915(struct intel_guc *guc)
 	return container_of(guc, struct drm_i915_private, guc);
 }
 
-/* Iterate over initialised rings */
-#define for_each_ring(ring__, dev_priv__, i__) \
-	for ((i__) = 0; (i__) < I915_NUM_RINGS; (i__)++) \
-		for_each_if ((((ring__) = &(dev_priv__)->ring[(i__)]), intel_ring_initialized((ring__))))
+/* Helpers for the for_each_* macros below */
+#define	__INIT_ENGINE_PTR(engine, dev_priv)				\
+	({								\
+	 	struct intel_engine_cs *ep = (dev_priv)->ring;		\
+		(engine) = --ep;					\
+	})
+#define	__NEXT_ACTIVE_ENGINE(engine, dev_priv, nr)			\
+	({								\
+		struct intel_engine_cs *end = &(dev_priv)->ring[nr];	\
+		struct intel_engine_cs *ep = (engine);			\
+		bool in_range;						\
+		do {							\
+			in_range = ++(ep) < end;			\
+		} while (in_range && !intel_ring_initialized(ep));	\
+	 	(engine) = ep;						\
+		in_range;						\
+	})
+
+/* Iterate over initialised engines */
+#define for_each_engine(engine, dev_priv)				\
+	for (__INIT_ENGINE_PTR(engine, dev_priv);			\
+	     __NEXT_ACTIVE_ENGINE(engine, dev_priv, I915_NUM_RINGS); )
+
+/* Backwards compatibility: iterate over initialised "rings" */
+#define for_each_ring(engine, dev_priv, ring_id)			\
+	for (__INIT_ENGINE_PTR(engine, dev_priv);			\
+	     __NEXT_ACTIVE_ENGINE(engine, dev_priv, I915_NUM_RINGS) &&	\
+	     ((ring_id) = (engine)->id, true); )
 
 enum hdmi_force_audio {
 	HDMI_AUDIO_OFF_DVI = -2,	/* no aux data for HDMI-DVI converter */
