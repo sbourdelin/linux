@@ -1080,9 +1080,8 @@ static u32 vlv_wa_c0_ei(struct drm_i915_private *dev_priv, u32 pm_iir)
 static bool any_waiters(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *ring;
-	int i;
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		if (ring->irq_refcount)
 			return true;
 
@@ -2432,7 +2431,6 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 			       bool reset_completed)
 {
 	struct intel_engine_cs *ring;
-	int i;
 
 	/*
 	 * Notify all waiters for GPU completion events that reset state has
@@ -2442,7 +2440,7 @@ static void i915_error_wake_up(struct drm_i915_private *dev_priv,
 	 */
 
 	/* Wake up __wait_seqno, potentially holding dev->struct_mutex. */
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		wake_up_all(&ring->irq_queue);
 
 	/* Wake up intel_crtc_wait_for_pending_flips, holding crtc->mutex. */
@@ -2810,10 +2808,9 @@ semaphore_wait_to_signaller_ring(struct intel_engine_cs *ring, u32 ipehr, u64 of
 {
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 	struct intel_engine_cs *signaller;
-	int i;
 
 	if (INTEL_INFO(dev_priv->dev)->gen >= 8) {
-		for_each_ring(signaller, dev_priv, i) {
+		for_each_engine(signaller, dev_priv) {
 			if (ring == signaller)
 				continue;
 
@@ -2823,7 +2820,7 @@ semaphore_wait_to_signaller_ring(struct intel_engine_cs *ring, u32 ipehr, u64 of
 	} else {
 		u32 sync_bits = ipehr & MI_SEMAPHORE_SYNC_MASK;
 
-		for_each_ring(signaller, dev_priv, i) {
+		for_each_engine(signaller, dev_priv) {
 			if(ring == signaller)
 				continue;
 
@@ -2939,9 +2936,8 @@ static int semaphore_passed(struct intel_engine_cs *ring)
 static void semaphore_clear_deadlocks(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *ring;
-	int i;
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		ring->hangcheck.deadlock = 0;
 }
 

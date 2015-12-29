@@ -400,11 +400,11 @@ static void print_batch_pool_stats(struct seq_file *m,
 	struct drm_i915_gem_object *obj;
 	struct file_stats stats;
 	struct intel_engine_cs *ring;
-	int i, j;
+	int j;
 
 	memset(&stats, 0, sizeof(stats));
 
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		for (j = 0; j < ARRAY_SIZE(ring->batch_pool.cache_list); j++) {
 			list_for_each_entry(obj,
 					    &ring->batch_pool.cache_list[j],
@@ -641,13 +641,13 @@ static int i915_gem_batch_pool_info(struct seq_file *m, void *data)
 	struct drm_i915_gem_object *obj;
 	struct intel_engine_cs *ring;
 	int total = 0;
-	int ret, i, j;
+	int ret, j;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
 		return ret;
 
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		for (j = 0; j < ARRAY_SIZE(ring->batch_pool.cache_list); j++) {
 			int count;
 
@@ -685,14 +685,14 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
 	struct drm_i915_gem_request *req;
-	int ret, any, i;
+	int ret, any;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
 		return ret;
 
 	any = 0;
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		int count;
 
 		count = 0;
@@ -742,14 +742,14 @@ static int i915_gem_seqno_info(struct seq_file *m, void *data)
 	struct drm_device *dev = node->minor->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int ret, i;
+	int ret;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
 		return ret;
 	intel_runtime_pm_get(dev_priv);
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		i915_ring_seqno_info(m, ring);
 
 	intel_runtime_pm_put(dev_priv);
@@ -931,7 +931,7 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 		seq_printf(m, "Graphics Interrupt mask:		%08x\n",
 			   I915_READ(GTIMR));
 	}
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		if (INTEL_INFO(dev)->gen >= 6) {
 			seq_printf(m,
 				   "Graphics Interrupt mask (%s):	%08x\n",
@@ -1942,7 +1942,7 @@ static int i915_context_status(struct seq_file *m, void *unused)
 
 		seq_puts(m, "HW context ");
 		describe_ctx(m, ctx);
-		for_each_ring(ring, dev_priv, i) {
+		for_each_engine(ring, dev_priv) {
 			if (ring->default_context == ctx)
 				seq_printf(m, "(default context %s) ",
 					   ring->name);
@@ -2237,12 +2237,12 @@ static void gen8_ppgtt_info(struct seq_file *m, struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
 	struct i915_hw_ppgtt *ppgtt = dev_priv->mm.aliasing_ppgtt;
-	int unused, i;
+	int i;
 
 	if (!ppgtt)
 		return;
 
-	for_each_ring(ring, dev_priv, unused) {
+	for_each_engine(ring, dev_priv) {
 		seq_printf(m, "%s\n", ring->name);
 		for (i = 0; i < 4; i++) {
 			u64 pdp = I915_READ(GEN8_RING_PDP_UDW(ring, i));
@@ -2257,12 +2257,11 @@ static void gen6_ppgtt_info(struct seq_file *m, struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int i;
 
 	if (INTEL_INFO(dev)->gen == 6)
 		seq_printf(m, "GFX_MODE: 0x%08x\n", I915_READ(GFX_MODE));
 
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		seq_printf(m, "%s\n", ring->name);
 		if (INTEL_INFO(dev)->gen == 7)
 			seq_printf(m, "GFX_MODE: 0x%08x\n", I915_READ(RING_MODE_GEN7(ring)));
@@ -2325,9 +2324,8 @@ static int count_irq_waiters(struct drm_i915_private *i915)
 {
 	struct intel_engine_cs *ring;
 	int count = 0;
-	int i;
 
-	for_each_ring(ring, i915, i)
+	for_each_engine(ring, i915)
 		count += ring->irq_refcount;
 
 	return count;
@@ -3159,7 +3157,7 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 		kunmap_atomic(seqno);
 	} else {
 		seq_puts(m, "  Last signal:");
-		for_each_ring(ring, dev_priv, i)
+		for_each_engine(ring, dev_priv)
 			for (j = 0; j < num_rings; j++)
 				seq_printf(m, "0x%08x\n",
 					   I915_READ(ring->semaphore.mbox.signal[j]));
@@ -3167,10 +3165,9 @@ static int i915_semaphore_status(struct seq_file *m, void *unused)
 	}
 
 	seq_puts(m, "\nSync seqno:\n");
-	for_each_ring(ring, dev_priv, i) {
-		for (j = 0; j < num_rings; j++) {
+	for_each_engine(ring, dev_priv) {
+		for (j = 0; j < num_rings; j++)
 			seq_printf(m, "  0x%08x ", ring->semaphore.sync_seqno[j]);
-		}
 		seq_putc(m, '\n');
 	}
 	seq_putc(m, '\n');

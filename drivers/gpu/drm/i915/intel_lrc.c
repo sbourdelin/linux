@@ -2516,9 +2516,8 @@ void intel_lr_context_reset(struct drm_device *dev,
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int i;
 
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		struct drm_i915_gem_object *ctx_obj =
 				ctx->engine[ring->id].state;
 		struct intel_ringbuffer *ringbuf =

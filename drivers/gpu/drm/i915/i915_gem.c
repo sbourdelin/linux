@@ -2466,10 +2466,10 @@ i915_gem_init_seqno(struct drm_device *dev, u32 seqno)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int ret, i, j;
+	int ret, j;
 
 	/* Carefully retire all requests without writing to the rings */
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		ret = intel_ring_idle(ring);
 		if (ret)
 			return ret;
@@ -2477,7 +2477,7 @@ i915_gem_init_seqno(struct drm_device *dev, u32 seqno)
 	i915_gem_retire_requests(dev);
 
 	/* Finally reset hw state */
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		intel_ring_init_seqno(ring, seqno);
 
 		for (j = 0; j < ARRAY_SIZE(ring->semaphore.sync_seqno); j++)
@@ -2860,17 +2860,16 @@ void i915_gem_reset(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int i;
 
 	/*
 	 * Before we free the objects from the requests, we need to inspect
 	 * them for finding the guilty party. As the requests only borrow
 	 * their reference to the objects, the inspection must be done first.
 	 */
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		i915_gem_reset_ring_status(dev_priv, ring);
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		i915_gem_reset_ring_cleanup(dev_priv, ring);
 
 	i915_gem_context_reset(dev);
@@ -2938,9 +2937,8 @@ i915_gem_retire_requests(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
 	bool idle = true;
-	int i;
 
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		i915_gem_retire_requests_ring(ring);
 		idle &= list_empty(&ring->request_list);
 		if (i915.enable_execlists) {
@@ -2988,21 +2986,16 @@ i915_gem_idle_work_handler(struct work_struct *work)
 		container_of(work, typeof(*dev_priv), mm.idle_work.work);
 	struct drm_device *dev = dev_priv->dev;
 	struct intel_engine_cs *ring;
-	int i;
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		if (!list_empty(&ring->request_list))
 			return;
 
 	intel_mark_idle(dev);
 
 	if (mutex_trylock(&dev->struct_mutex)) {
-		struct intel_engine_cs *ring;
-		int i;
-
-		for_each_ring(ring, dev_priv, i)
+		for_each_engine(ring, dev_priv)
 			i915_gem_batch_pool_fini(&ring->batch_pool);
-
 		mutex_unlock(&dev->struct_mutex);
 	}
 }
@@ -3361,10 +3354,10 @@ int i915_gpu_idle(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int ret, i;
+	int ret;
 
 	/* Flush everything onto the inactive list. */
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		if (!i915.enable_execlists) {
 			struct drm_i915_gem_request *req;
 
@@ -4618,9 +4611,8 @@ i915_gem_stop_ringbuffers(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int i;
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		dev_priv->gt.stop_ring(ring);
 }
 
@@ -4791,7 +4783,7 @@ i915_gem_init_hw(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int ret, i, j;
+	int ret, j;
 
 	if (INTEL_INFO(dev)->gen < 6 && !intel_enable_gtt())
 		return -EIO;
@@ -4837,7 +4829,7 @@ i915_gem_init_hw(struct drm_device *dev)
 	}
 
 	/* Need to do basic initialisation of all rings first: */
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		ret = ring->init_hw(ring);
 		if (ret)
 			goto out;
@@ -4862,7 +4854,7 @@ i915_gem_init_hw(struct drm_device *dev)
 		goto out;
 
 	/* Now it is safe to go back round and do everything else: */
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		struct drm_i915_gem_request *req;
 
 		WARN_ON(!ring->default_context);
@@ -4880,7 +4872,8 @@ i915_gem_init_hw(struct drm_device *dev)
 
 		ret = i915_ppgtt_init_ring(req);
 		if (ret && ret != -EIO) {
-			DRM_ERROR("PPGTT enable ring #%d failed %d\n", i, ret);
+			DRM_ERROR("PPGTT enable %s failed %d\n",
+				  ring->name, ret);
 			i915_gem_request_cancel(req);
 			i915_gem_cleanup_ringbuffer(dev);
 			goto out;
@@ -4888,7 +4881,8 @@ i915_gem_init_hw(struct drm_device *dev)
 
 		ret = i915_gem_context_enable(req);
 		if (ret && ret != -EIO) {
-			DRM_ERROR("Context enable ring #%d failed %d\n", i, ret);
+			DRM_ERROR("Context enable %s failed %d\n",
+				  ring->name, ret);
 			i915_gem_request_cancel(req);
 			i915_gem_cleanup_ringbuffer(dev);
 			goto out;
@@ -4969,9 +4963,8 @@ i915_gem_cleanup_ringbuffer(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_engine_cs *ring;
-	int i;
 
-	for_each_ring(ring, dev_priv, i)
+	for_each_engine(ring, dev_priv)
 		dev_priv->gt.cleanup_ring(ring);
 
     if (i915.enable_execlists)

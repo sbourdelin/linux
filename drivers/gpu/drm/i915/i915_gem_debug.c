@@ -38,12 +38,11 @@ i915_verify_lists(struct drm_device *dev)
 	struct drm_i915_gem_object *obj;
 	struct intel_engine_cs *ring;
 	int err = 0;
-	int i;
 
 	if (warned)
 		return 0;
 
-	for_each_ring(ring, dev_priv, i) {
+	for_each_engine(ring, dev_priv) {
 		list_for_each_entry(obj, &ring->active_list, ring_list[ring->id]) {
 			if (obj->base.dev != dev ||
 			    !atomic_read(&obj->base.refcount.refcount)) {
