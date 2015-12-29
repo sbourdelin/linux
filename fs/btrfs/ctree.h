@@ -1816,6 +1816,9 @@ struct btrfs_fs_info {
 	 * and will be latter freed. Protected by fs_info->chunk_mutex.
 	 */
 	struct list_head pinned_chunks;
+
+	/* reference to inband de-duplication info */
+	struct btrfs_dedup_info *dedup_info;
 };
 
 struct btrfs_subvolume_writers {
