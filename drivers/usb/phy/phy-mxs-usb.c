@@ -93,39 +93,14 @@
 
 /* Do disconnection between PHY and controller without vbus */
 #define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
-
-/*
- * The PHY will be in messy if there is a wakeup after putting
- * bus to suspend (set portsc.suspendM) but before setting PHY to low
- * power mode (set portsc.phcd).
- */
-#define MXS_PHY_ABNORMAL_IN_SUSPEND		BIT(1)
-
-/*
- * The SOF sends too fast after resuming, it will cause disconnection
- * between host and high speed device.
- */
-#define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
-
-/*
- * IC has bug fixes logic, they include
- * MXS_PHY_ABNORMAL_IN_SUSPEND and MXS_PHY_SENDING_SOF_TOO_FAST
- * which are described at above flags, the RTL will handle it
- * according to different versions.
- */
-#define MXS_PHY_NEED_IP_FIX			BIT(3)
+#define MXS_PHY_NEED_IP_FIX			BIT(1)
 
 struct mxs_phy_data {
 	unsigned int flags;
 };
 
-static const struct mxs_phy_data imx23_phy_data = {
-	.flags = MXS_PHY_ABNORMAL_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
-};
-
 static const struct mxs_phy_data imx6q_phy_data = {
-	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
-		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
+	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
 		MXS_PHY_NEED_IP_FIX,
 };
 
@@ -151,7 +126,7 @@ static const struct of_device_id mxs_phy_dt_ids[] = {
 	{ .compatible = "fsl,imx6sx-usbphy", .data = &imx6sx_phy_data, },
 	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
 	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
-	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
+	{ .compatible = "fsl,imx23-usbphy", .data = NULL, },
 	{ .compatible = "fsl,vf610-usbphy", .data = &vf610_phy_data, },
 	{ .compatible = "fsl,imx6ul-usbphy", .data = &imx6ul_phy_data, },
 	{ /* sentinel */ }
