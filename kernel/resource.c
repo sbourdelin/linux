@@ -1356,7 +1356,7 @@ struct resource * __devm_request_region(struct device *dev,
 				struct resource *parent, resource_size_t start,
 				resource_size_t n, const char *name)
 {
-	struct region_devres *dr = NULL;
+	struct region_devres *dr;
 	struct resource *res;
 
 	dr = devres_alloc(devm_region_release, sizeof(struct region_devres),
