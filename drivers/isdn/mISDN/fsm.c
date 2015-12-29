@@ -34,6 +34,8 @@ mISDN_FsmNew(struct Fsm *fsm,
 
 	fsm->jumpmatrix = kzalloc(sizeof(FSMFNPTR) * fsm->state_count *
 				  fsm->event_count, GFP_KERNEL);
+	if (!fsm->jumpmatrix)
+		return;
 
 	for (i = 0; i < fncount; i++)
 		if ((fnlist[i].state >= fsm->state_count) ||
