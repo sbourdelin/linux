@@ -201,7 +201,7 @@ struct sk_buff *__skb_try_recv_datagram(struct sock *sk, unsigned int flags,
 					struct sk_buff **last)
 {
 	struct sk_buff_head *queue = &sk->sk_receive_queue;
-	struct sk_buff *skb;
+	struct sk_buff *skb, *next;
 	unsigned long cpu_flags;
 	/*
 	 * Caller is allowed not to check sk->sk_err before skb_recv_datagram()
@@ -222,7 +222,7 @@ struct sk_buff *__skb_try_recv_datagram(struct sock *sk, unsigned int flags,
 
 		*last = (struct sk_buff *)queue;
 		spin_lock_irqsave(&queue->lock, cpu_flags);
-		skb_queue_walk(queue, skb) {
+		skb_queue_walk_safe(queue, skb, next) {
 			*last = skb;
 			*peeked = skb->peeked;
 			if (flags & MSG_PEEK) {
