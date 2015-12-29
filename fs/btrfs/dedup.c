@@ -94,3 +94,119 @@ out:
 	}
 	return ret;
 }
+
+static int inmem_insert_hash(struct rb_root *root,
+			     struct btrfs_dedup_hash *hash, int hash_len)
+{
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct btrfs_dedup_hash *entry = NULL;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct btrfs_dedup_hash,
+				 hash_node);
+		if (memcmp(hash->hash, entry->hash, hash_len) < 0)
+			p = &(*p)->rb_left;
+		else if (memcmp(hash->hash, entry->hash, hash_len) > 0)
+			p = &(*p)->rb_right;
+		else
+			return 1;
+	}
+	rb_link_node(&hash->hash_node, parent, p);
+	rb_insert_color(&hash->hash_node, root);
+	return 0;
+}
+
+static int inmem_insert_bytenr(struct rb_root *root,
+			       struct btrfs_dedup_hash *hash)
+{
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct btrfs_dedup_hash *entry = NULL;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct btrfs_dedup_hash, bytenr_node);
+		if (hash->bytenr < entry->bytenr)
+			p = &(*p)->rb_left;
+		else if (hash->bytenr > entry->bytenr)
+			p = &(*p)->rb_right;
+		else
+			return 1;
+	}
+	rb_link_node(&hash->bytenr_node, parent, p);
+	rb_insert_color(&hash->bytenr_node, root);
+	return 0;
+}
+
+static void __inmem_del(struct btrfs_dedup_info *dedup_info,
+			struct btrfs_dedup_hash *hash)
+{
+	list_del(&hash->lru_list);
+	rb_erase(&hash->hash_node, &dedup_info->hash_root);
+	rb_erase(&hash->bytenr_node, &dedup_info->bytenr_root);
+
+	if (!WARN_ON(dedup_info->current_nr == 0))
+		dedup_info->current_nr--;
+
+	kfree(hash);
+}
+
+/*
+ * Insert a hash into in-memory dedup tree
+ * Will remove exceeding last recent use hash.
+ *
+ * If the hash mathced with existing one, we won't insert it, to
+ * save memory
+ */
+static int inmem_add(struct btrfs_dedup_info *dedup_info,
+			   struct btrfs_dedup_hash *hash)
+{
+	int ret = 0;
+	u16 type = dedup_info->hash_type;
+
+	spin_lock(&dedup_info->lock);
+	ret = inmem_insert_hash(&dedup_info->hash_root, hash,
+				btrfs_dedup_sizes[type]);
+	if (ret > 0) {
+		/* Same hash already in tree, don't insert */
+		kfree(hash);
+		ret = 0;
+		goto out;
+	}
+
+	inmem_insert_bytenr(&dedup_info->bytenr_root, hash);
+
+	list_add(&hash->lru_list, &dedup_info->lru_list);
+	dedup_info->current_nr++;
+
+	/* Remove the last dedup hash if we exceed limit */
+	while (dedup_info->current_nr > dedup_info->limit_nr) {
+		struct btrfs_dedup_hash *last;
+
+		last = list_entry(dedup_info->lru_list.prev,
+				  struct btrfs_dedup_hash, lru_list);
+		__inmem_del(dedup_info, last);
+	}
+out:
+	spin_unlock(&dedup_info->lock);
+	return 0;
+}
+
+int btrfs_dedup_add(struct btrfs_trans_handle *trans, struct btrfs_root *root,
+		    struct btrfs_dedup_hash *hash)
+{
+	struct btrfs_fs_info *fs_info = root->fs_info;
+	struct btrfs_dedup_info *dedup_info = fs_info->dedup_info;
+
+	if (!dedup_info || !hash)
+		return 0;
+
+	if (WARN_ON(hash->bytenr == 0))
+		return -EINVAL;
+
+	if (dedup_info->backend == BTRFS_DEDUP_BACKEND_INMEMORY)
+		return inmem_add(dedup_info, hash);
+	return -EINVAL;
+}
