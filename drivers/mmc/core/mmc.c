@@ -1256,7 +1256,7 @@ static int mmc_select_hs200(struct mmc_card *card)
 
 	/* If fails try again during next card power cycle */
 	if (err)
-		goto err;
+		goto report_failure;
 
 	mmc_select_driver_type(card);
 
@@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
 				   card->ext_csd.generic_cmd6_time,
 				   true, send_status, true);
 		if (err)
-			goto err;
+			goto report_failure;
 		old_timing = host->ios.timing;
 		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
 		if (!send_status) {
@@ -1289,10 +1289,11 @@ static int mmc_select_hs200(struct mmc_card *card)
 				mmc_set_timing(host, old_timing);
 		}
 	}
-err:
-	if (err)
+	if (err) {
+report_failure:
 		pr_err("%s: %s failed, error %d\n", mmc_hostname(card->host),
 		       __func__, err);
+	}
 	return err;
 }
 
