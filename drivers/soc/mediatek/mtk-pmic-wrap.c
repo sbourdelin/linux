@@ -892,6 +892,11 @@ static int pwrap_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	/*
+	 * Enable periodic status update which will be updated to PMIC
+	 * every selected time period.
+	 */
+	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
 	/* Initialize watchdog, may not be done by the bootloader */
 	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
 	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
