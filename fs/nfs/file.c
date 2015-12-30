@@ -743,6 +743,22 @@ static int do_vfs_lock(struct file *file, struct file_lock *fl)
 }
 
 static int
+defer_close_unlk(struct inode *inode, struct nfs_lock_context *l_ctx)
+{
+	struct nfs_io_counter *c = &l_ctx->io_count;
+	int status = 0;
+
+	if (test_bit(NFS_LOCK_CLOSE_UNLOCK, &l_ctx->flags))
+		return -EINPROGRESS;
+
+	if (atomic_read(&c->io_count) != 0) {
+		set_bit(NFS_LOCK_CLOSE_UNLOCK, &l_ctx->flags);
+		status = -EINPROGRESS;
+	}
+	return status;
+}
+
+static int
 do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
@@ -758,16 +774,16 @@ do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 
 	l_ctx = nfs_get_lock_context(nfs_file_open_context(filp));
 	if (!IS_ERR(l_ctx)) {
-		status = nfs_iocounter_wait(&l_ctx->io_count);
+		if (fl->fl_flags & FL_CLOSE)
+			status = defer_close_unlk(inode, l_ctx);
+		else
+			status = nfs_iocounter_wait(&l_ctx->io_count);
+
 		nfs_put_lock_context(l_ctx);
 		if (status < 0)
 			return status;
 	}
 
-	/* NOTE: special case
-	 * 	If we're signalled while cleaning up locks on process exit, we
-	 * 	still need to complete the unlock.
-	 */
 	/*
 	 * Use local locking if mounted with "-onolock" or with appropriate
 	 * "-olocal_lock="
