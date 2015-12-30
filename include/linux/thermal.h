@@ -472,7 +472,7 @@ static inline int thermal_zone_unbind_cooling_device(
 	struct thermal_cooling_device *cdev)
 { return -ENODEV; }
 static inline void thermal_zone_device_update(struct thermal_zone_device *tz,
-					      enum thermal_device_event_type)
+					      enum thermal_device_event_type type)
 { }
 static inline struct thermal_cooling_device *
 thermal_cooling_device_register(char *type, void *devdata,
