@@ -44,7 +44,18 @@ static void i915_save_display(struct drm_device *dev)
 		dev_priv->regfile.saveLVDS = I915_READ(LVDS);
 
 	/* Panel power sequencer */
-	if (HAS_PCH_SPLIT(dev)) {
+	if (IS_BROXTON(dev)) {
+		/*
+		 * TODO: BXT has 2 sets of PPS registers.
+		 * Correct Register for Broxton need to be identified
+		 * using VBT. hardcoding for now.
+		 *
+		 * There's also no divisor register on Broxton.
+		 */
+		dev_priv->regfile.savePP_CONTROL = I915_READ(BXT_PP_CONTROL(0));
+		dev_priv->regfile.savePP_ON_DELAYS = I915_READ(BXT_PP_ON_DELAYS(0));
+		dev_priv->regfile.savePP_OFF_DELAYS = I915_READ(BXT_PP_OFF_DELAYS(0));
+	} else if (HAS_PCH_SPLIT(dev)) {
 		dev_priv->regfile.savePP_CONTROL = I915_READ(PCH_PP_CONTROL);
 		dev_priv->regfile.savePP_ON_DELAYS = I915_READ(PCH_PP_ON_DELAYS);
 		dev_priv->regfile.savePP_OFF_DELAYS = I915_READ(PCH_PP_OFF_DELAYS);
@@ -79,7 +90,16 @@ static void i915_restore_display(struct drm_device *dev)
 		I915_WRITE(LVDS, dev_priv->regfile.saveLVDS & mask);
 
 	/* Panel power sequencer */
-	if (HAS_PCH_SPLIT(dev)) {
+	if (IS_BROXTON(dev)) {
+		/*
+		 * TODO: BXT has 2 sets of PPS registers.
+		 * Correct Register for Broxton need to be identified
+		 * using VBT. hardcoding for now
+		 */
+		I915_WRITE(BXT_PP_ON_DELAYS(0), dev_priv->regfile.savePP_ON_DELAYS);
+		I915_WRITE(BXT_PP_OFF_DELAYS(0), dev_priv->regfile.savePP_OFF_DELAYS);
+		I915_WRITE(BXT_PP_CONTROL(0), dev_priv->regfile.savePP_CONTROL);
+	} else if (HAS_PCH_SPLIT(dev)) {
 		I915_WRITE(PCH_PP_ON_DELAYS, dev_priv->regfile.savePP_ON_DELAYS);
 		I915_WRITE(PCH_PP_OFF_DELAYS, dev_priv->regfile.savePP_OFF_DELAYS);
 		I915_WRITE(PCH_PP_DIVISOR, dev_priv->regfile.savePP_DIVISOR);
