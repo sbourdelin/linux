@@ -1864,8 +1864,8 @@ static void __raid_recover_end_io(struct btrfs_raid_bio *rbio)
 					/*
 					 * Just the P stripe has failed, without
 					 * a bad data or Q stripe.
-					 * TODO, we should redo the xor here.
 					 */
+					run_xor(pointers, rbio->nr_data - 1, PAGE_CACHE_SIZE);
 					err = -EIO;
 					goto cleanup;
 				}
