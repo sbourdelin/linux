@@ -32,6 +32,7 @@
 #include "vhci_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_ux.h"
 
 char *usbip_progname = "usbipa";
 char *usbip_default_pid_file = "/var/run/usbipa";
@@ -78,6 +79,7 @@ static int recv_request_export(int sockfd, char *host, char *port)
 {
 	struct op_export_request req;
 	struct op_export_reply reply;
+	usbip_ux_t *ux;
 	int rhport = 0;
 	int error = 0;
 	int rc;
@@ -91,6 +93,12 @@ static int recv_request_export(int sockfd, char *host, char *port)
 		return -1;
 	}
 	PACK_OP_EXPORT_REQUEST(0, &req);
+
+	rc = usbip_ux_setup(sockfd, &ux);
+	if (rc) {
+		dbg("usbip_ux_setup failed: export");
+		return -1;
+	}
 
 	rhport = import_device(sockfd, &req.udev);
 	if (rhport < 0) {
@@ -125,6 +133,12 @@ static int recv_request_export(int sockfd, char *host, char *port)
 	}
 
 	dbg("export request busid %s: complete", req.udev.busid);
+
+	if (ux != NULL) {
+		usbip_ux_start(ux);
+		usbip_ux_join(ux);
+	}
+	usbip_ux_cleanup(&ux);
 
 	return 0;
 }

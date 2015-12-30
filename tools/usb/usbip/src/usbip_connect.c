@@ -30,6 +30,7 @@
 #include "usbip_host_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_ux.h"
 #include "usbip.h"
 
 static const char usbip_connect_usage_string[] =
@@ -140,6 +141,7 @@ static int export_device(char *busid, int sockfd)
 static int connect_device(char *host, char *busid)
 {
 	int sockfd;
+	usbip_ux_t *ux;
 	int rc;
 
 	rc = usbip_bind_device(busid);
@@ -154,15 +156,29 @@ static int connect_device(char *host, char *busid)
 		goto err_unbind_device;
 	}
 
-	rc = export_device(busid, sockfd);
-	if (rc < 0) {
-		err("export");
+	rc = usbip_ux_setup(sockfd, &ux);
+	if (rc) {
+		err("ux setup");
 		goto err_close_conn;
 	}
 
+	rc = export_device(busid, sockfd);
+	if (rc < 0) {
+		err("export");
+		goto err_cleanup_ux;
+	}
+
+	if (ux != NULL) {
+		usbip_ux_start(ux);
+		usbip_ux_join(ux);
+		usbip_unbind_device(busid);
+	}
+	usbip_ux_cleanup(&ux);
 	close(sockfd);
 
 	return 0;
+err_cleanup_ux:
+	usbip_ux_cleanup(&ux);
 err_close_conn:
 	close(sockfd);
 err_unbind_device:

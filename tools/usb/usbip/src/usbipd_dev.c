@@ -36,6 +36,7 @@
 #include "usbip_host_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_ux.h"
 #include "list.h"
 
 char *usbip_progname = "usbipd";
@@ -62,6 +63,7 @@ static int recv_request_import(int sockfd)
 	struct op_common reply;
 	struct usbip_exported_device *edev;
 	struct usbip_usb_device pdu_udev;
+	usbip_ux_t *ux;
 	struct list_head *i;
 	int found = 0;
 	int error = 0;
@@ -87,13 +89,20 @@ static int recv_request_import(int sockfd)
 	}
 
 	if (found) {
-		/* should set TCP_NODELAY for usbip */
-		usbip_net_set_nodelay(sockfd);
-
-		/* export device needs a TCP/IP socket descriptor */
-		rc = usbip_host_export_device(edev, sockfd);
-		if (rc < 0)
+		rc = usbip_ux_setup(sockfd, &ux);
+		if (rc) {
 			error = 1;
+		} else {
+			/* should set TCP_NODELAY for usbip */
+			usbip_net_set_nodelay(sockfd);
+
+			/* export device needs a TCP/IP socket descriptor */
+			rc = usbip_host_export_device(edev, sockfd);
+			if (rc < 0) {
+				usbip_ux_cleanup(&ux);
+				error = 1;
+			}
+		}
 	} else {
 		info("requested device not found: %s", req.busid);
 		error = 1;
@@ -103,11 +112,13 @@ static int recv_request_import(int sockfd)
 				      (!error ? ST_OK : ST_NA));
 	if (rc < 0) {
 		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_IMPORT);
+		usbip_ux_cleanup(&ux);
 		return -1;
 	}
 
 	if (error) {
 		dbg("import request busid %s: failed", req.busid);
+		usbip_ux_cleanup(&ux);
 		return -1;
 	}
 
@@ -117,10 +128,17 @@ static int recv_request_import(int sockfd)
 	rc = usbip_net_send(sockfd, &pdu_udev, sizeof(pdu_udev));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: devinfo");
+		usbip_ux_cleanup(&ux);
 		return -1;
 	}
 
 	dbg("import request busid %s: complete", req.busid);
+
+	if (ux != NULL) {
+		usbip_ux_start(ux);
+		usbip_ux_join(ux);
+	}
+	usbip_ux_cleanup(&ux);
 
 	return 0;
 }
