@@ -97,7 +97,9 @@ void stub_complete(struct urb *urb)
 
 	/* link a urb to the queue of tx. */
 	spin_lock_irqsave(&sdev->priv_lock, flags);
-	if (priv->unlinking) {
+	if (sdev->ud.tcp_socket == NULL) {
+		dev_info(&urb->dev->dev, "discard a urb for closed connection");
+	} else if (priv->unlinking) {
 		stub_enqueue_ret_unlink(sdev, priv->seqnum, urb->status);
 		stub_free_priv_and_urb(priv);
 	} else {
