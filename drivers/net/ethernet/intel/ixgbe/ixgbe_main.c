@@ -6652,8 +6652,15 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	 * time. To X540 NIC, there is a time span between link_up and
 	 * link_speed. As such, only continue if link_up and link_speed are
 	 * ready to X540 NIC.
+	 * The time span between link_up and link_speed is very important
+	 * when the X540 NIC acts as a slave in some virtual NICs, such as
+	 * a bonding driver in 802.3ad mode. When X540 NIC acts as an
+	 * independent interface, it is not necessary to synchronize link_up
+	 * and link_speed.
+	 * In the end, not continue if (X540 NIC && SLAVE && link_speed UNKNOWN)
 	 */
-	if (hw->mac.type == ixgbe_mac_X540)
+	if ((hw->mac.type == ixgbe_mac_X540) &&
+	    (netdev->flags & IFF_SLAVE))
 		if (link_speed == IXGBE_LINK_SPEED_UNKNOWN)
 			return;
 
