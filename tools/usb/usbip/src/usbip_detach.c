@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 #include <unistd.h>
 
 #include "vhci_driver.h"
@@ -32,6 +34,7 @@
 #include "usbip_network.h"
 #include "usbip.h"
 
+#ifndef AS_LIBRARY
 static const char usbip_detach_usage_string[] =
 	"usbip detach <args>\n"
 	"    -p, --port=<port>    " USBIP_VHCI_DRV_NAME
@@ -41,15 +44,15 @@ void usbip_detach_usage(void)
 {
 	printf("usage: %s", usbip_detach_usage_string);
 }
+#endif
 
-static int detach_port(char *port)
+int usbip_detach_port(char *port)
 {
 	int ret;
 	uint8_t portnum;
+	unsigned int i, port_len = strlen(port);
 
-	unsigned int port_len = strlen(port);
-
-	for (unsigned int i = 0; i < port_len; i++)
+	for (i = 0; i < port_len; i++)
 		if (!isdigit(port[i])) {
 			err("invalid port %s", port);
 			return -1;
@@ -80,6 +83,7 @@ static int detach_port(char *port)
 	return ret;
 }
 
+#ifndef AS_LIBRARY
 int usbip_detach(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -97,7 +101,7 @@ int usbip_detach(int argc, char *argv[])
 
 		switch (opt) {
 		case 'p':
-			ret = detach_port(optarg);
+			ret = usbip_detach_port(optarg);
 			goto out;
 		default:
 			goto err_out;
@@ -109,3 +113,4 @@ err_out:
 out:
 	return ret;
 }
+#endif

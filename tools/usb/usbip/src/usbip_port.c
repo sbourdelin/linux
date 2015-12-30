@@ -16,13 +16,16 @@
 
 #include "vhci_driver.h"
 #include "usbip_common.h"
+#include "usbip.h"
 
+#ifndef AS_LIBRARY
 void usbip_port_usage(void)
 {
 	printf("usage: usbip port\n");
 }
+#endif
 
-static int list_imported_devices(void)
+int usbip_list_imported_devices(void)
 {
 	int i;
 	struct usbip_imported_device *idev;
@@ -59,14 +62,16 @@ err_names_free:
 	return -1;
 }
 
+#ifndef AS_LIBRARY
 int usbip_port_show(__attribute__((unused)) int argc,
 		    __attribute__((unused)) char *argv[])
 {
 	int ret;
 
-	ret = list_imported_devices();
+	ret = usbip_list_imported_devices();
 	if (ret < 0)
 		err("list imported devices");
 
 	return ret;
 }
+#endif

@@ -33,6 +33,7 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip_ux.h"
+#include "usbipd.h"
 
 char *usbip_progname = "usbipa";
 char *usbip_default_pid_file = "/var/run/usbipa";

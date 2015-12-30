@@ -43,16 +43,12 @@
 
 #include "usbip_common.h"
 #include "usbip_network.h"
-#include "usbip_ux.h"
+#include "usbipd.h"
 #include "list.h"
-
-extern char *usbip_progname;
 
 #define MAXSOCKFD 20
 
 #define MAIN_LOOP_TIMEOUT 10
-
-extern char *usbip_default_pid_file;
 
 static const char usbip_version_string[] = PACKAGE_STRING;
 
@@ -137,8 +133,6 @@ static int do_accept(int listenfd, char *host, char *port)
 
 	return connfd;
 }
-
-extern int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port);
 
 int process_request(int listenfd)
 {
@@ -258,7 +252,7 @@ static struct addrinfo *do_getaddrinfo(char *host, int ai_family)
 static void signal_handler(int i)
 {
 	dbg("received '%s' signal", strsignal(i));
-	usbip_ux_interrupt_pgrp();
+	usbip_break_connections();
 }
 
 static void set_signal(void)
@@ -300,9 +294,6 @@ static void remove_pid_file(void)
 		unlink(pid_file);
 	}
 }
-
-extern int usbip_driver_open(void);
-extern void usbip_driver_close(void);
 
 static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 {

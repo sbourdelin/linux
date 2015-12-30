@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 
 #include "usbip_common.h"
 #include "utils.h"
@@ -37,6 +39,7 @@ enum unbind_status {
 	UNBIND_ST_FAILED
 };
 
+#ifndef AS_LIBRARY
 static const char usbip_bind_usage_string[] =
 	"usbip bind <args>\n"
 	"    -b, --busid=<busid>    Bind " USBIP_HOST_DRV_NAME ".ko to device "
@@ -46,6 +49,7 @@ void usbip_bind_usage(void)
 {
 	printf("usage: %s", usbip_bind_usage_string);
 }
+#endif
 
 /* call at unbound state */
 static int bind_usbip(char *busid)
@@ -183,6 +187,7 @@ int usbip_bind_device(char *busid)
 	return 0;
 }
 
+#ifndef AS_LIBRARY
 int usbip_bind(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -213,3 +218,4 @@ err_out:
 out:
 	return ret;
 }
+#endif

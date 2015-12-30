@@ -34,8 +34,15 @@ int usbip_port_show(int argc, char *argv[]);
 int usbip_connect(int argc, char *argv[]);
 int usbip_disconnect(int argc, char *argv[]);
 
+int usbip_attach_device(char *host, char *port, char *busid);
+int usbip_detach_port(char *port);
 int usbip_bind_device(char *busid);
 int usbip_unbind_device(char *busid);
+int usbip_list_imported_devices(void);
+int usbip_list_importable_devices(char *host, char *port);
+int usbip_list_devices(int parsable);
+int usbip_connect_device(char *host, char *port, char *busid);
+int usbip_disconnect_device(char *host, char *port, char *busid);
 
 void usbip_attach_usage(void);
 void usbip_detach_usage(void);
