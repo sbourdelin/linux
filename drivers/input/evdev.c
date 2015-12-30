@@ -276,13 +276,8 @@ static void evdev_pass_values(struct evdev_client *client,
 		if (__evdev_is_filtered(client, v->type, v->code))
 			continue;
 
-		if (v->type == EV_SYN && v->code == SYN_REPORT) {
-			/* drop empty SYN_REPORT */
-			if (client->packet_head == client->head)
-				continue;
-
+		if (v->type == EV_SYN && v->code == SYN_REPORT)
 			wakeup = true;
-		}
 
 		event.type = v->type;
 		event.code = v->code;
