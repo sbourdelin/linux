@@ -1251,7 +1251,6 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 
 		if (!port) {
 			status = -ENOMEM;
-			mutex_unlock(&opts->lock);
 			goto setup_fail;
 		}
 
@@ -1264,7 +1263,6 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	midi->id = kstrdup(opts->id, GFP_KERNEL);
 	if (opts->id && !midi->id) {
 		status = -ENOMEM;
-		mutex_unlock(&opts->lock);
 		goto setup_fail;
 	}
 	midi->in_ports = opts->in_ports;
@@ -1293,6 +1291,7 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	return &midi->func;
 
 setup_fail:
+	mutex_unlock(&opts->lock);
 	for (--i; i >= 0; i--)
 		kfree(midi->in_port[i]);
 	kfree(midi);
