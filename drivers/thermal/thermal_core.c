@@ -992,7 +992,7 @@ sustainable_power_store(struct device *dev, struct device_attribute *devattr,
 			const char *buf, size_t count)
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
-	u32 sustainable_power;
+	u32 sustainable_power, old_val;
 
 	if (!tz->tzp)
 		return -EIO;
@@ -1000,8 +1000,12 @@ sustainable_power_store(struct device *dev, struct device_attribute *devattr,
 	if (kstrtou32(buf, 10, &sustainable_power))
 		return -EINVAL;
 
+	old_val = tz->tzp->sustainable_power;
+
 	tz->tzp->sustainable_power = sustainable_power;
 
+	tz->tzp->k_po = (tz->tzp->kpo * sustainable_power) / old_val;
+	tz->tzp->k_pu = (tz->tzp->kpu * sustainable_power) / old_val;
 	return count;
 }
 static DEVICE_ATTR(sustainable_power, S_IWUSR | S_IRUGO, sustainable_power_show,
