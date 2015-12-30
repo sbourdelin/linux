@@ -98,6 +98,10 @@
  * The PHY will be in messy if there is a wakeup after putting
  * bus to suspend (set portsc.suspendM) but before setting PHY to low
  * power mode (set portsc.phcd).
+ *
+ * To work around this problem on mx23/mx28 user should pass
+ * "usbcore.autosuspend=-1" in the kernel command line for now, as
+ * we do not have a proper fix for this flag in the kernel yet.
  */
 #define MXS_PHY_ABNORMAL_IN_SUSPEND		BIT(1)
 
