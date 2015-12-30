@@ -6657,10 +6657,12 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	 * a bonding driver in 802.3ad mode. When X540 NIC acts as an
 	 * independent interface, it is not necessary to synchronize link_up
 	 * and link_speed.
-	 * In the end, not continue if (X540 NIC && SLAVE && link_speed UNKNOWN)
+	 * According to the suggestion from Rustad, Mark D, this behavior
+	 * perhaps is related to the copper phy. To make fiber phy more robust,
+	 * To all the interfaces as a slave, the link_speed is checked.
+	 * In the end, not continue if (SLAVE && link_speed UNKNOWN)
 	 */
-	if ((hw->mac.type == ixgbe_mac_X540) &&
-	    (netdev->flags & IFF_SLAVE))
+	if (netdev->flags & IFF_SLAVE)
 		if (link_speed == IXGBE_LINK_SPEED_UNKNOWN)
 			return;
 
