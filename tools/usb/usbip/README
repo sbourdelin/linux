@@ -98,6 +98,28 @@ Application-side: a machine runs an application software uses remote USB device.
 	- Unbind usbip-host.ko from the device.
 
 
+[Userspace Transmission]
+
+In usage shown above, once USB devices are imported or exported, USP/IP drivers send and receive URBs in kernel space. The usbip_ux.ko kernel module alternates the route to user space by forwarding USBs through USB/IP utilities (ie. usbip, usbipd, usbipa). When userspace transmission enabled, usbip attach and connect will continue executing until usbip detach or disconnect is exeuted.
+
+    app:# insmod usbip-core.ko
+    app:# insmod usbip-ux.ko
+    app:# insmod vhci-hcd.ko
+
+    app:# usbipa -D
+
+    dev:# insmod usbip-core.ko
+    dev:# insmod usbip-ux.ko
+    dev:# insmod usbip-host.ko
+
+    dev:# usbip connect --remote <host> --busid <busid>
+	- Continue running.
+	- Until disconnect command is executed in other terminal window.
+
+    dev:# usbip disconnect --remote <host> --busid <busid>
+	- Stops transission, quits connect command and disconnect device.
+
+
 [Example]
 ---------------------------
 	DEVICE SIDE
