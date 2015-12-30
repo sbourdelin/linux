@@ -57,7 +57,7 @@ void usbip_driver_close(void)
 	usbip_host_driver_close();
 }
 
-static int recv_request_import(int sockfd)
+static int recv_request_import(usbip_sock_t *sock)
 {
 	struct op_import_request req;
 	struct op_common reply;
@@ -72,7 +72,7 @@ static int recv_request_import(int sockfd)
 	memset(&req, 0, sizeof(req));
 	memset(&reply, 0, sizeof(reply));
 
-	rc = usbip_net_recv(sockfd, &req, sizeof(req));
+	rc = usbip_net_recv(sock, &req, sizeof(req));
 	if (rc < 0) {
 		dbg("usbip_net_recv failed: import request");
 		return -1;
@@ -89,15 +89,15 @@ static int recv_request_import(int sockfd)
 	}
 
 	if (found) {
-		rc = usbip_ux_setup(sockfd, &ux);
+		rc = usbip_ux_setup(sock, &ux);
 		if (rc) {
 			error = 1;
 		} else {
 			/* should set TCP_NODELAY for usbip */
-			usbip_net_set_nodelay(sockfd);
+			usbip_net_set_nodelay(sock->fd);
 
 			/* export device needs a TCP/IP socket descriptor */
-			rc = usbip_host_export_device(edev, sockfd);
+			rc = usbip_host_export_device(edev, sock->fd);
 			if (rc < 0) {
 				usbip_ux_cleanup(&ux);
 				error = 1;
@@ -108,7 +108,7 @@ static int recv_request_import(int sockfd)
 		error = 1;
 	}
 
-	rc = usbip_net_send_op_common(sockfd, OP_REP_IMPORT,
+	rc = usbip_net_send_op_common(sock, OP_REP_IMPORT,
 				      (!error ? ST_OK : ST_NA));
 	if (rc < 0) {
 		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_IMPORT);
@@ -125,7 +125,7 @@ static int recv_request_import(int sockfd)
 	memcpy(&pdu_udev, &edev->udev, sizeof(pdu_udev));
 	usbip_net_pack_usb_device(1, &pdu_udev);
 
-	rc = usbip_net_send(sockfd, &pdu_udev, sizeof(pdu_udev));
+	rc = usbip_net_send(sock, &pdu_udev, sizeof(pdu_udev));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: devinfo");
 		usbip_ux_cleanup(&ux);
@@ -143,7 +143,7 @@ static int recv_request_import(int sockfd)
 	return 0;
 }
 
-static int send_reply_devlist(int connfd)
+static int send_reply_devlist(usbip_sock_t *sock)
 {
 	struct usbip_exported_device *edev;
 	struct usbip_usb_device pdu_udev;
@@ -159,14 +159,14 @@ static int send_reply_devlist(int connfd)
 	}
 	info("exportable devices: %d", reply.ndev);
 
-	rc = usbip_net_send_op_common(connfd, OP_REP_DEVLIST, ST_OK);
+	rc = usbip_net_send_op_common(sock, OP_REP_DEVLIST, ST_OK);
 	if (rc < 0) {
 		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_DEVLIST);
 		return -1;
 	}
 	PACK_OP_DEVLIST_REPLY(1, &reply);
 
-	rc = usbip_net_send(connfd, &reply, sizeof(reply));
+	rc = usbip_net_send(sock, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: %#0x", OP_REP_DEVLIST);
 		return -1;
@@ -178,7 +178,7 @@ static int send_reply_devlist(int connfd)
 		memcpy(&pdu_udev, &edev->udev, sizeof(pdu_udev));
 		usbip_net_pack_usb_device(1, &pdu_udev);
 
-		rc = usbip_net_send(connfd, &pdu_udev, sizeof(pdu_udev));
+		rc = usbip_net_send(sock, &pdu_udev, sizeof(pdu_udev));
 		if (rc < 0) {
 			dbg("usbip_net_send failed: pdu_udev");
 			return -1;
@@ -189,7 +189,7 @@ static int send_reply_devlist(int connfd)
 			memcpy(&pdu_uinf, &edev->uinf[i], sizeof(pdu_uinf));
 			usbip_net_pack_usb_interface(1, &pdu_uinf);
 
-			rc = usbip_net_send(connfd, &pdu_uinf,
+			rc = usbip_net_send(sock, &pdu_uinf,
 					sizeof(pdu_uinf));
 			if (rc < 0) {
 				err("usbip_net_send failed: pdu_uinf");
@@ -201,20 +201,20 @@ static int send_reply_devlist(int connfd)
 	return 0;
 }
 
-static int recv_request_devlist(int connfd)
+static int recv_request_devlist(usbip_sock_t *sock)
 {
 	struct op_devlist_request req;
 	int rc;
 
 	memset(&req, 0, sizeof(req));
 
-	rc = usbip_net_recv(connfd, &req, sizeof(req));
+	rc = usbip_net_recv(sock, &req, sizeof(req));
 	if (rc < 0) {
 		dbg("usbip_net_recv failed: devlist request");
 		return -1;
 	}
 
-	rc = send_reply_devlist(connfd);
+	rc = send_reply_devlist(sock);
 	if (rc < 0) {
 		dbg("send_reply_devlist failed");
 		return -1;
@@ -223,12 +223,12 @@ static int recv_request_devlist(int connfd)
 	return 0;
 }
 
-int usbip_recv_pdu(int connfd, char *host, char *port)
+int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port)
 {
 	uint16_t code = OP_UNSPEC;
 	int ret;
 
-	ret = usbip_net_recv_op_common(connfd, &code);
+	ret = usbip_net_recv_op_common(sock, &code);
 	if (ret < 0) {
 		dbg("could not receive opcode: %#0x", code);
 		return -1;
@@ -240,13 +240,13 @@ int usbip_recv_pdu(int connfd, char *host, char *port)
 		return -1;
 	}
 
-	info("received request: %#0x(%d)", code, connfd);
+	info("received request: %#0x(%d)", code, sock->fd);
 	switch (code) {
 	case OP_REQ_DEVLIST:
-		ret = recv_request_devlist(connfd);
+		ret = recv_request_devlist(sock);
 		break;
 	case OP_REQ_IMPORT:
-		ret = recv_request_import(connfd);
+		ret = recv_request_import(sock);
 		break;
 	case OP_REQ_DEVINFO:
 	case OP_REQ_CRYPKEY:

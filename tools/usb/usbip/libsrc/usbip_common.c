@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  */
 
 #include <libudev.h>
@@ -283,3 +284,16 @@ void usbip_names_get_class(char *buff, size_t size, uint8_t class,
 
 	snprintf(buff, size, "%s / %s / %s (%02x/%02x/%02x)", c, s, p, class, subclass, protocol);
 }
+
+void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
+	ssize_t (*send)(void *arg, void *buf, size_t len),
+	ssize_t (*recv)(void *arg, void *buf, size_t len, int wait_all),
+	void (*shutdown)(void *arg))
+{
+	sock->fd = fd;
+	sock->arg = arg;
+	sock->send = send;
+	sock->recv = recv;
+	sock->shutdown = shutdown;
+}
+

@@ -56,7 +56,7 @@ extern char *usbip_default_pid_file;
 
 static const char usbip_version_string[] = PACKAGE_STRING;
 
-static const char usbipd_help_string =
+static const char usbipd_help_string[] =
 	"usage: %s [options]\n"
 	"\n"
 	"	-4, --ipv4\n"
@@ -123,7 +123,7 @@ static int do_accept(int listenfd, char *host, char *port)
 	rc = getnameinfo((struct sockaddr *)&ss, len, host, NI_MAXHOST,
 			 port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (rc)
-		err("getnameinfo: %s", gai_strerror(rc));
+		err("getnameinfo: %s", usbip_net_gai_strerror(rc));
 
 #ifdef HAVE_LIBWRAP
 	rc = tcpd_auth(connfd);
@@ -138,12 +138,13 @@ static int do_accept(int listenfd, char *host, char *port)
 	return connfd;
 }
 
-extern int usbip_recv_pdu(int connfd, char *host, char *port);
+extern int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port);
 
 int process_request(int listenfd)
 {
 	pid_t childpid;
 	int connfd;
+	usbip_sock_t sock;
 	char host[NI_MAXHOST], port[NI_MAXSERV];
 
 	connfd = do_accept(listenfd, host, port);
@@ -152,7 +153,8 @@ int process_request(int listenfd)
 	childpid = fork();
 	if (childpid == 0) {
 		close(listenfd);
-		usbip_recv_pdu(connfd, host, port);
+		usbip_sock_init(&sock, connfd, NULL, NULL, NULL, NULL);
+		usbip_recv_pdu(&sock, host, port);
 		close(connfd);
 		exit(0);
 	}
@@ -172,7 +174,7 @@ static void addrinfo_to_text(struct addrinfo *ai, char buf[],
 	rc = getnameinfo(ai->ai_addr, ai->ai_addrlen, hbuf, sizeof(hbuf),
 			 sbuf, sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 	if (rc)
-		err("getnameinfo: %s", gai_strerror(rc));
+		err("getnameinfo: %s", usbip_net_gai_strerror(rc));
 
 	snprintf(buf, buf_size, "%s:%s", hbuf, sbuf);
 }
@@ -246,7 +248,7 @@ static struct addrinfo *do_getaddrinfo(char *host, int ai_family)
 	rc = getaddrinfo(host, usbip_port_string, &hints, &ai_head);
 	if (rc) {
 		err("failed to get a network address %s: %s", usbip_port_string,
-		    gai_strerror(rc));
+		    usbip_net_gai_strerror(rc));
 		return NULL;
 	}
 

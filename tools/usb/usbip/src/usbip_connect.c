@@ -43,7 +43,7 @@ void usbip_connect_usage(void)
 	printf("usage: %s", usbip_connect_usage_string);
 }
 
-static int send_export_device(int sockfd, struct usbip_usb_device *udev)
+static int send_export_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 {
 	int rc;
 	struct op_export_request request;
@@ -54,7 +54,7 @@ static int send_export_device(int sockfd, struct usbip_usb_device *udev)
 	memset(&reply, 0, sizeof(reply));
 
 	/* send a request */
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_EXPORT, 0);
+	rc = usbip_net_send_op_common(sock, OP_REQ_EXPORT, 0);
 	if (rc < 0) {
 		err("send op_common");
 		return -1;
@@ -64,20 +64,20 @@ static int send_export_device(int sockfd, struct usbip_usb_device *udev)
 
 	PACK_OP_EXPORT_REQUEST(0, &request);
 
-	rc = usbip_net_send(sockfd, (void *) &request, sizeof(request));
+	rc = usbip_net_send(sock, (void *) &request, sizeof(request));
 	if (rc < 0) {
 		err("send op_export_request");
 		return -1;
 	}
 
 	/* receive a reply */
-	rc = usbip_net_recv_op_common(sockfd, &code);
+	rc = usbip_net_recv_op_common(sock, &code);
 	if (rc < 0) {
 		err("recv op_common");
 		return -1;
 	}
 
-	rc = usbip_net_recv(sockfd, (void *) &reply, sizeof(reply));
+	rc = usbip_net_recv(sock, (void *) &reply, sizeof(reply));
 	if (rc < 0) {
 		err("recv op_export_reply");
 		return -1;
@@ -94,7 +94,7 @@ static int send_export_device(int sockfd, struct usbip_usb_device *udev)
 	return 0;
 }
 
-static int export_device(char *busid, int sockfd)
+static int export_device(char *busid, usbip_sock_t *sock)
 {
 	int rc;
 	struct usbip_exported_device *edev;
@@ -119,14 +119,14 @@ static int export_device(char *busid, int sockfd)
 		return -1;
 	}
 
-	rc = send_export_device(sockfd, &edev->udev);
+	rc = send_export_device(sock, &edev->udev);
 	if (rc < 0) {
 		err("send export");
 		usbip_host_driver_close();
 		return -1;
 	}
 
-	rc = usbip_host_export_device(edev, sockfd);
+	rc = usbip_host_export_device(edev, sock->fd);
 	if (rc < 0) {
 		err("export device");
 		usbip_host_driver_close();
@@ -140,7 +140,7 @@ static int export_device(char *busid, int sockfd)
 
 static int connect_device(char *host, char *busid)
 {
-	int sockfd;
+	usbip_sock_t *sock;
 	usbip_ux_t *ux;
 	int rc;
 
@@ -150,19 +150,19 @@ static int connect_device(char *host, char *busid)
 		goto err_out;
 	}
 
-	sockfd = usbip_net_tcp_connect(host, usbip_port_string);
-	if (sockfd < 0) {
+	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	if (!sock) {
 		err("tcp connect");
 		goto err_unbind_device;
 	}
 
-	rc = usbip_ux_setup(sockfd, &ux);
+	rc = usbip_ux_setup(sock, &ux);
 	if (rc) {
 		err("ux setup");
 		goto err_close_conn;
 	}
 
-	rc = export_device(busid, sockfd);
+	rc = export_device(busid, sock);
 	if (rc < 0) {
 		err("export");
 		goto err_cleanup_ux;
@@ -174,13 +174,13 @@ static int connect_device(char *host, char *busid)
 		usbip_unbind_device(busid);
 	}
 	usbip_ux_cleanup(&ux);
-	close(sockfd);
+	usbip_net_tcp_close(sock);
 
 	return 0;
 err_cleanup_ux:
 	usbip_ux_cleanup(&ux);
 err_close_conn:
-	close(sockfd);
+	usbip_net_tcp_close(sock);
 err_unbind_device:
 	usbip_unbind_device(busid);
 err_out:

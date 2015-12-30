@@ -57,7 +57,11 @@ static void *usbip_ux_rx(void *arg)
 	char buf[BLEN];
 
 	while(good) {
-		received = recv(ux->sockfd, buf, BLEN, 0);
+		if (ux->sock->recv) {
+			received = ux->sock->recv(ux->sock->arg, buf, BLEN, 0);
+		} else {
+			received = recv(ux->sock->fd, buf, BLEN, 0);
+		}
 		if (received == 0) {
 			dbg("connection closed on sock:%p", ux->kaddr.sock);
 			break;
@@ -101,7 +105,11 @@ static void *usbip_ux_tx(void *arg)
 			break;
 		}
 		dump_buff(buf, reads, "ux sending");
-		sent = send(ux->sockfd, buf, reads, 0);
+		if (ux->sock->send) {
+			sent = ux->sock->send(ux->sock->arg, buf, reads);
+		} else {
+			sent = send(ux->sock->fd, buf, reads, 0);
+		}
 		if (sent < 0) {
 			dbg("connection closed on sock:%p", ux->kaddr.sock);
 			break;
@@ -112,7 +120,11 @@ static void *usbip_ux_tx(void *arg)
 		}
 	}
 	dbg("end of ux-tx for sock:%p", ux->kaddr.sock);
-	shutdown(ux->sockfd, SHUT_RDWR);
+	if (ux->sock->shutdown) {
+		ux->sock->shutdown(ux->sock->arg);
+	} else {
+		shutdown(ux->sock->fd, SHUT_RDWR);
+	}
 	return 0;
 }
 
@@ -120,7 +132,7 @@ static void *usbip_ux_tx(void *arg)
  * Setup user space mode.
  * Null will be set in ux if usbip_ux.ko is not installed.
  */
-int usbip_ux_setup(int sockfd, usbip_ux_t **uxp)
+int usbip_ux_setup(usbip_sock_t *sock, usbip_ux_t **uxp)
 {
 	usbip_ux_t *ux;
 	int fd, ret;
@@ -140,8 +152,8 @@ int usbip_ux_setup(int sockfd, usbip_ux_t **uxp)
 	}
 	ux->devfd = fd;
 	ux->started = 0;
-	ux->sockfd = sockfd;
-	ret = ioctl(ux->devfd, USBIP_UX_IOCSETSOCKFD, sockfd);
+	ux->sock = sock;
+	ret = ioctl(ux->devfd, USBIP_UX_IOCSETSOCKFD, sock->fd);
 	if (ret) {
 		dbg("failed to set sock fd");
 		goto err_free;

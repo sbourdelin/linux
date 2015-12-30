@@ -173,14 +173,16 @@ void usbip_net_pack_uint16_t(int pack, uint16_t *num);
 void usbip_net_pack_usb_device(int pack, struct usbip_usb_device *udev);
 void usbip_net_pack_usb_interface(int pack, struct usbip_usb_interface *uinf);
 
-ssize_t usbip_net_recv(int sockfd, void *buff, size_t bufflen);
-ssize_t usbip_net_send(int sockfd, void *buff, size_t bufflen);
-int usbip_net_send_op_common(int sockfd, uint32_t code, uint32_t status);
-int usbip_net_recv_op_common(int sockfd, uint16_t *code);
+ssize_t usbip_net_recv(usbip_sock_t *sock, void *buff, size_t bufflen);
+ssize_t usbip_net_send(usbip_sock_t *sock, void *buff, size_t bufflen);
+int usbip_net_send_op_common(usbip_sock_t *sock, uint32_t code, uint32_t status);
+int usbip_net_recv_op_common(usbip_sock_t *sock, uint16_t *code);
 int usbip_net_set_reuseaddr(int sockfd);
 int usbip_net_set_nodelay(int sockfd);
 int usbip_net_set_keepalive(int sockfd);
 int usbip_net_set_v6only(int sockfd);
-int usbip_net_tcp_connect(char *hostname, char *port);
+usbip_sock_t *usbip_net_tcp_connect(char *hostname, char *port);
+void usbip_net_tcp_close(usbip_sock_t *sock);
+const char *usbip_net_gai_strerror(int errcode);
 
 #endif /* __USBIP_NETWORK_H */

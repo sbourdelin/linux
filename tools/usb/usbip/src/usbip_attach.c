@@ -45,7 +45,7 @@ void usbip_attach_usage(void)
 	printf("usage: %s", usbip_attach_usage_string);
 }
 
-static int import_device(int sockfd, struct usbip_usb_device *udev)
+static int import_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 {
 	int rc;
 	int port;
@@ -63,7 +63,7 @@ static int import_device(int sockfd, struct usbip_usb_device *udev)
 		return -1;
 	}
 
-	rc = usbip_vhci_attach_device(port, sockfd, udev->busnum,
+	rc = usbip_vhci_attach_device(port, sock->fd, udev->busnum,
 				      udev->devnum, udev->speed);
 	if (rc < 0) {
 		err("import device");
@@ -76,7 +76,7 @@ static int import_device(int sockfd, struct usbip_usb_device *udev)
 	return port;
 }
 
-static int query_import_device(int sockfd, char *busid)
+static int query_import_device(usbip_sock_t *sock, char *busid)
 {
 	int rc;
 	struct op_import_request request;
@@ -87,7 +87,7 @@ static int query_import_device(int sockfd, char *busid)
 	memset(&reply, 0, sizeof(reply));
 
 	/* send a request */
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
+	rc = usbip_net_send_op_common(sock, OP_REQ_IMPORT, 0);
 	if (rc < 0) {
 		err("send op_common");
 		return -1;
@@ -97,20 +97,20 @@ static int query_import_device(int sockfd, char *busid)
 
 	PACK_OP_IMPORT_REQUEST(0, &request);
 
-	rc = usbip_net_send(sockfd, (void *) &request, sizeof(request));
+	rc = usbip_net_send(sock, (void *) &request, sizeof(request));
 	if (rc < 0) {
 		err("send op_import_request");
 		return -1;
 	}
 
 	/* receive a reply */
-	rc = usbip_net_recv_op_common(sockfd, &code);
+	rc = usbip_net_recv_op_common(sock, &code);
 	if (rc < 0) {
 		err("recv op_common");
 		return -1;
 	}
 
-	rc = usbip_net_recv(sockfd, (void *) &reply, sizeof(reply));
+	rc = usbip_net_recv(sock, (void *) &reply, sizeof(reply));
 	if (rc < 0) {
 		err("recv op_import_reply");
 		return -1;
@@ -125,29 +125,29 @@ static int query_import_device(int sockfd, char *busid)
 	}
 
 	/* import a device */
-	return import_device(sockfd, &reply.udev);
+	return import_device(sock, &reply.udev);
 }
 
 static int attach_device(char *host, char *busid)
 {
-	int sockfd;
+	usbip_sock_t *sock;
 	usbip_ux_t *ux;
 	int rc;
 	int rhport;
 
-	sockfd = usbip_net_tcp_connect(host, usbip_port_string);
-	if (sockfd < 0) {
+	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	if (!sock) {
 		err("tcp connect");
 		goto err_out;
 	}
 
-	rc = usbip_ux_setup(sockfd, &ux);
+	rc = usbip_ux_setup(sock, &ux);
 	if (rc) {
 		err("ux setup");
 		goto err_close_conn;
 	}
 
-	rhport = query_import_device(sockfd, busid);
+	rhport = query_import_device(sock, busid);
 	if (rhport < 0) {
 		err("query");
 		goto err_cleanup_ux;
@@ -164,13 +164,13 @@ static int attach_device(char *host, char *busid)
 		usbip_ux_join(ux);
 	}
 	usbip_ux_cleanup(&ux);
-	close(sockfd);
+	usbip_net_tcp_close(sock);
 
 	return 0;
 err_cleanup_ux:
 	usbip_ux_cleanup(&ux);
 err_close_conn:
-	close(sockfd);
+	usbip_net_tcp_close(sock);
 err_out:
 	return -1;
 }
