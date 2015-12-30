@@ -3004,7 +3004,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				 struct netdev_queue *txq)
 {
 	spinlock_t *root_lock = qdisc_lock(q);
-	bool contended;
+	bool contended = false;
 	int rc;
 
 	qdisc_pkt_len_init(skb);
@@ -3015,11 +3015,13 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 	 * This permits __QDISC___STATE_RUNNING owner to get the lock more
 	 * often and dequeue packets faster.
 	 */
-	contended = qdisc_is_running(q);
-	if (unlikely(contended))
-		spin_lock(&q->busylock);
+	if (!(q->flags & TCQ_F_NOLOCK)) {
+		contended = qdisc_is_running(q);
+		if (unlikely(contended))
+			spin_lock(&q->busylock);
+		spin_lock(root_lock);
+	}
 
-	spin_lock(root_lock);
 	if (unlikely(test_bit(__QDISC_STATE_DEACTIVATED, &q->state))) {
 		kfree_skb(skb);
 		rc = NET_XMIT_DROP;
@@ -3053,9 +3055,11 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 			__qdisc_run(q);
 		}
 	}
-	spin_unlock(root_lock);
-	if (unlikely(contended))
-		spin_unlock(&q->busylock);
+	if (!(q->flags & TCQ_F_NOLOCK)) {
+		spin_unlock(root_lock);
+		if (unlikely(contended))
+			spin_unlock(&q->busylock);
+	}
 	return rc;
 }
 
