@@ -223,7 +223,7 @@ static int read_record(int rhport, char *host, unsigned long host_len,
 
 static int open_hc_device(int mode)
 {
-	if (mode == OPEN_HC_FLAG_REOPEN) {
+	if (mode == OPEN_HC_MODE_REOPEN) {
 		udev_device_unref(vhci_driver->hc_device);
 	}
 
