@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,16 +40,17 @@ static ssize_t status_show(struct device *dev, struct device_attribute *attr,
 
 	/*
 	 * output example:
-	 * prt sta spd dev socket           local_busid
-	 * 000 004 000 000         c5a7bb80 1-2.3
-	 * 001 004 000 000         d8cee980 2-3.4
+	 * prt sta spd dev      socket           ux               local_busid
+	 * 000 004 000 00010002         c5a7bb80                0 1-2.3
+	 * 001 004 000 00020003         d8cee980                0 2-3.4
 	 *
 	 * IP address can be retrieved from a socket pointer address by looking
 	 * up /proc/net/{tcp,tcp6}. Also, a userland program may remember a
 	 * port number and its peer IP address.
 	 */
 	out += sprintf(out,
-		       "prt sta spd bus dev socket           local_busid\n");
+		       "prt sta spd dev      socket           "
+		       "ux               local_busid\n");
 
 	for (i = 0; i < VHCI_NPORTS; i++) {
 		struct vhci_device *vdev = port_to_vdev(i);
@@ -59,11 +61,19 @@ static ssize_t status_show(struct device *dev, struct device_attribute *attr,
 		if (vdev->ud.status == VDEV_ST_USED) {
 			out += sprintf(out, "%03u %08x ",
 				       vdev->speed, vdev->devid);
-			out += sprintf(out, "%16p ", vdev->ud.tcp_socket);
+			if (vdev->ud.tcp_socket)
+				out += sprintf(out, "%16p ", vdev->ud.tcp_socket);
+			else
+				out += sprintf(out, "%016x ", 0);
+			if (vdev->ud.ux)
+				out += sprintf(out, "%16p ", vdev->ud.ux);
+			else
+				out += sprintf(out, "%016x ", 0);
 			out += sprintf(out, "%s", dev_name(&vdev->udev->dev));
 
 		} else {
-			out += sprintf(out, "000 000 000 0000000000000000 0-0");
+			out += sprintf(out, "000 00000000 0000000000000000 "
+					    "0000000000000000 0-0");
 		}
 
 		out += sprintf(out, "\n");
@@ -173,10 +183,9 @@ static ssize_t store_attach(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
 	struct vhci_device *vdev;
-	struct socket *socket;
 	int sockfd = 0;
 	__u32 rhport = 0, devid = 0, speed = 0;
-	int err;
+	int ret;
 
 	/*
 	 * @rhport: port number of vhci_hcd
@@ -194,11 +203,6 @@ static ssize_t store_attach(struct device *dev, struct device_attribute *attr,
 	if (valid_args(rhport, speed) < 0)
 		return -EINVAL;
 
-	/* Extract socket from fd. */
-	socket = sockfd_lookup(sockfd, &err);
-	if (!socket)
-		return -EINVAL;
-
 	/* now need lock until setting vdev status as used */
 
 	/* begin a lock */
@@ -211,10 +215,15 @@ static ssize_t store_attach(struct device *dev, struct device_attribute *attr,
 		spin_unlock(&vdev->ud.lock);
 		spin_unlock(&the_controller->lock);
 
-		sockfd_put(socket);
-
 		dev_err(dev, "port %d already used\n", rhport);
 		return -EINVAL;
+	}
+
+	ret = usbip_trx_ops->link(&vdev->ud, sockfd);
+	if (ret) {
+		spin_unlock(&vdev->ud.lock);
+		spin_unlock(&the_controller->lock);
+		return ret;
 	}
 
 	dev_info(dev,
@@ -223,7 +232,6 @@ static ssize_t store_attach(struct device *dev, struct device_attribute *attr,
 
 	vdev->devid         = devid;
 	vdev->speed         = speed;
-	vdev->ud.tcp_socket = socket;
 	vdev->ud.status     = VDEV_ST_NOTASSIGNED;
 
 	spin_unlock(&vdev->ud.lock);

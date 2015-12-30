@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -205,7 +206,7 @@ static void vhci_rx_pdu(struct usbip_device *ud)
 	memset(&pdu, 0, sizeof(pdu));
 
 	/* receive a pdu header */
-	ret = usbip_recv(ud->tcp_socket, &pdu, sizeof(pdu));
+	ret = usbip_recv(ud, &pdu, sizeof(pdu));
 	if (ret < 0) {
 		if (ret == -ECONNRESET)
 			pr_info("connection reset by peer\n");
