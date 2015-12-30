@@ -711,6 +711,7 @@ static int
 do_getlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
+	struct nfs_open_context *ctx = nfs_file_open_context(filp);
 	int status = 0;
 	unsigned int saved_type = fl->fl_type;
 
@@ -728,7 +729,7 @@ do_getlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	if (is_local)
 		goto out_noconflict;
 
-	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	status = NFS_PROTO(inode)->lock(ctx, cmd, fl);
 out:
 	return status;
 out_noconflict:
@@ -745,6 +746,7 @@ static int
 do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
+	struct nfs_open_context *ctx = nfs_file_open_context(filp);
 	struct nfs_lock_context *l_ctx;
 	int status;
 
@@ -771,7 +773,7 @@ do_unlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	 * "-olocal_lock="
 	 */
 	if (!is_local)
-		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+		status = NFS_PROTO(inode)->lock(ctx, cmd, fl);
 	else
 		status = do_vfs_lock(filp, fl);
 	return status;
@@ -786,6 +788,7 @@ static int
 do_setlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 {
 	struct inode *inode = filp->f_mapping->host;
+	struct nfs_open_context *ctx = nfs_file_open_context(filp);
 	int status;
 
 	/*
@@ -801,7 +804,7 @@ do_setlk(struct file *filp, int cmd, struct file_lock *fl, int is_local)
 	 * "-olocal_lock="
 	 */
 	if (!is_local)
-		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+		status = NFS_PROTO(inode)->lock(ctx, cmd, fl);
 	else
 		status = do_vfs_lock(filp, fl);
 	if (status < 0)
