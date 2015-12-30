@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  *
  * This program is free software: you can redistribute it and/or modify
@@ -45,7 +46,6 @@ static int detach_port(char *port)
 {
 	int ret;
 	uint8_t portnum;
-	char path[PATH_MAX+1];
 
 	unsigned int port_len = strlen(port);
 
@@ -61,10 +61,7 @@ static int detach_port(char *port)
 
 	/* remove the port state file */
 
-	snprintf(path, PATH_MAX, VHCI_STATE_PATH"/port%d", portnum);
-
-	remove(path);
-	rmdir(VHCI_STATE_PATH);
+	usbip_vhci_delete_record(portnum);
 
 	ret = usbip_vhci_driver_open();
 	if (ret < 0) {
@@ -73,8 +70,10 @@ static int detach_port(char *port)
 	}
 
 	ret = usbip_vhci_detach_device(portnum);
-	if (ret < 0)
+	if (ret < 0) {
+		usbip_vhci_driver_close();
 		return -1;
+	}
 
 	usbip_vhci_driver_close();
 
