@@ -135,7 +135,7 @@ static int attach_device(char *host, char *busid)
 	int rc;
 	int rhport;
 
-	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, usbip_port_string);
 	if (!sock) {
 		err("tcp connect");
 		goto err_out;
@@ -164,13 +164,13 @@ static int attach_device(char *host, char *busid)
 		usbip_ux_join(ux);
 	}
 	usbip_ux_cleanup(&ux);
-	usbip_net_tcp_close(sock);
+	usbip_conn_ops.close(sock);
 
 	return 0;
 err_cleanup_ux:
 	usbip_ux_cleanup(&ux);
 err_close_conn:
-	usbip_net_tcp_close(sock);
+	usbip_conn_ops.close(sock);
 err_out:
 	return -1;
 }

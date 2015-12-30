@@ -132,7 +132,7 @@ static int list_importable_devices(char *host)
 	int rc;
 	usbip_sock_t *sock;
 
-	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, usbip_port_string);
 	if (!sock) {
 		err("could not connect to %s:%s: %s", host,
 		    usbip_port_string, usbip_net_gai_strerror(sock->fd));
@@ -143,11 +143,11 @@ static int list_importable_devices(char *host)
 	rc = get_importable_devices(host, sock);
 	if (rc < 0) {
 		err("failed to get device list from %s", host);
-		usbip_net_tcp_close(sock);
+		usbip_conn_ops.close(sock);
 		return -1;
 	}
 
-	usbip_net_tcp_close(sock);
+	usbip_conn_ops.close(sock);
 
 	return 0;
 }

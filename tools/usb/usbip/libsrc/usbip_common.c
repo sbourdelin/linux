@@ -297,3 +297,13 @@ void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
 	sock->shutdown = shutdown;
 }
 
+usbip_connection_operations_t usbip_conn_ops = {NULL, NULL};
+
+void usbip_conn_init(
+	usbip_sock_t *(*open)(char *host, char *port),
+	void (*close)(usbip_sock_t *sock))
+{
+	usbip_conn_ops.open = open;
+	usbip_conn_ops.close = close;
+}
+

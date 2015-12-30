@@ -150,7 +150,7 @@ static int connect_device(char *host, char *busid)
 		goto err_out;
 	}
 
-	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, usbip_port_string);
 	if (!sock) {
 		err("tcp connect");
 		goto err_unbind_device;
@@ -174,13 +174,13 @@ static int connect_device(char *host, char *busid)
 		usbip_unbind_device(busid);
 	}
 	usbip_ux_cleanup(&ux);
-	usbip_net_tcp_close(sock);
+	usbip_conn_ops.close(sock);
 
 	return 0;
 err_cleanup_ux:
 	usbip_ux_cleanup(&ux);
 err_close_conn:
-	usbip_net_tcp_close(sock);
+	usbip_conn_ops.close(sock);
 err_unbind_device:
 	usbip_unbind_device(busid);
 err_out:
