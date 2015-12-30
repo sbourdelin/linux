@@ -507,25 +507,35 @@ static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc *qdisc)
 static struct sk_buff *pfifo_fast_dequeue(struct Qdisc *qdisc)
 {
 	struct pfifo_fast_priv *priv = qdisc_priv(qdisc);
-	struct sk_buff *skb = NULL;
-	int band;
+	struct sk_buff *skb[8+1] = {NULL};
+	int band, i, elems = 0;
 
-	for (band = 0; band < PFIFO_FAST_BANDS && !skb; band++) {
+	if (this_cpu_ptr(qdisc->cpu_qstats)->qlen < 8)
+		return NULL;
+
+	for (band = 0; band < PFIFO_FAST_BANDS && !skb[0]; band++) {
 		struct alf_queue *q = band2list(priv, band);
 
 		if (alf_queue_empty(q))
 			continue;
 
-		alf_mc_dequeue(q, &skb, 1);
+		elems = alf_mc_dequeue(q, skb, 8);
+
+		/* link array of skbs for driver to process */
+		for (i = 0; i < elems; i++)
+			skb[i]->next = skb[i+1];
 	}
 
-	if (likely(skb)) {
-		qdisc_qstats_cpu_backlog_dec(qdisc, skb);
-		qdisc_bstats_cpu_update(qdisc, skb);
-		qdisc_qstats_cpu_qlen_dec(qdisc);
+	if (likely(skb[0])) {
+		for (i = 0; i < elems; i++) {
+			qdisc_qstats_cpu_backlog_dec(qdisc, skb[i]);
+			qdisc_bstats_cpu_update(qdisc, skb[i]);
+		}
+
+		this_cpu_ptr(qdisc->cpu_qstats)->qlen -= elems;
 	}
 
-	return skb;
+	return skb[0];
 }
 
 static void pfifo_fast_reset(struct Qdisc *qdisc)
@@ -579,7 +589,7 @@ static int pfifo_fast_init(struct Qdisc *qdisc, struct nlattr *opt)
 	}
 
 	/* Can by-pass the queue discipline */
-	qdisc->flags |= TCQ_F_CAN_BYPASS;
+	//qdisc->flags |= TCQ_F_CAN_BYPASS;
 	qdisc->flags |= TCQ_F_NOLOCK;
 	qdisc->flags |= TCQ_F_CPUSTATS;
 

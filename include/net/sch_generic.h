@@ -128,7 +128,7 @@ static inline void qdisc_run_end(struct Qdisc *qdisc)
 
 static inline bool qdisc_may_bulk(const struct Qdisc *qdisc)
 {
-	return qdisc->flags & TCQ_F_ONETXQUEUE;
+	return (qdisc->flags & TCQ_F_ONETXQUEUE) & !(qdisc->flags & TCQ_F_NOLOCK);
 }
 
 static inline int qdisc_avail_bulklimit(const struct netdev_queue *txq)
