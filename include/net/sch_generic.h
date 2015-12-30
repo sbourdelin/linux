@@ -44,6 +44,10 @@ struct qdisc_size_table {
 	u16			data[];
 };
 
+struct gso_cell {
+	struct sk_buff *skb;
+};
+
 struct Qdisc {
 	int 			(*enqueue)(struct sk_buff *skb, struct Qdisc *dev);
 	struct sk_buff *	(*dequeue)(struct Qdisc *dev);
@@ -88,6 +92,7 @@ struct Qdisc {
 
 	struct Qdisc		*next_sched;
 	struct sk_buff		*gso_skb;
+	struct gso_cell __percpu *gso_cpu_skb;
 	/*
 	 * For performance sake on SMP, we put highly modified fields at the end
 	 */
@@ -699,6 +704,22 @@ static inline struct sk_buff *qdisc_peek_dequeued(struct Qdisc *sch)
 	return sch->gso_skb;
 }
 
+static inline struct sk_buff *qdisc_peek_dequeued_cpu(struct Qdisc *sch)
+{
+	struct gso_cell *gso = this_cpu_ptr(sch->gso_cpu_skb);
+
+	if (!gso->skb) {
+		struct sk_buff *skb = sch->dequeue(sch);
+
+		if (skb) {
+			gso->skb = skb;
+			qdisc_qstats_cpu_qlen_inc(sch);
+		}
+	}
+
+	return gso->skb;
+}
+
 /* use instead of qdisc->dequeue() for all qdiscs queried with ->peek() */
 static inline struct sk_buff *qdisc_dequeue_peeked(struct Qdisc *sch)
 {
@@ -707,6 +728,21 @@ static inline struct sk_buff *qdisc_dequeue_peeked(struct Qdisc *sch)
 	if (skb) {
 		sch->gso_skb = NULL;
 		sch->q.qlen--;
+	} else {
+		skb = sch->dequeue(sch);
+	}
+
+	return skb;
+}
+
+static inline struct sk_buff *qdisc_dequeue_peeked_skb(struct Qdisc *sch)
+{
+	struct gso_cell *gso = this_cpu_ptr(sch->gso_cpu_skb);
+	struct sk_buff *skb = gso->skb;
+
+	if (skb) {
+		gso->skb = NULL;
+		qdisc_qstats_cpu_qlen_dec(sch);
 	} else {
 		skb = sch->dequeue(sch);
 	}

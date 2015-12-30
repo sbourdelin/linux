@@ -44,8 +44,7 @@ EXPORT_SYMBOL(default_qdisc_ops);
  * - ingress filtering is also serialized via qdisc root lock
  * - updates to tree and tree walking are only done under the rtnl mutex.
  */
-
-static inline int dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
+static inline int __dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 {
 	q->gso_skb = skb;
 	q->qstats.requeues++;
@@ -53,6 +52,24 @@ static inline int dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 	__netif_schedule(q);
 
 	return 0;
+}
+
+static inline int dev_requeue_cpu_skb(struct sk_buff *skb, struct Qdisc *q)
+{
+	this_cpu_ptr(q->gso_cpu_skb)->skb = skb;
+	qdisc_qstats_cpu_requeues_inc(q);
+	qdisc_qstats_cpu_qlen_inc(q);
+	__netif_schedule(q);
+
+	return 0;
+}
+
+static inline int dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
+{
+	if (q->flags & TCQ_F_NOLOCK)
+		return __dev_requeue_skb(skb, q);
+	else
+		return dev_requeue_cpu_skb(skb, q);
 }
 
 static void try_bulk_dequeue_skb(struct Qdisc *q,
@@ -664,6 +681,19 @@ static void qdisc_rcu_free(struct rcu_head *head)
 	if (qdisc_is_percpu_stats(qdisc)) {
 		free_percpu(qdisc->cpu_bstats);
 		free_percpu(qdisc->cpu_qstats);
+	}
+
+	if (qdisc->gso_cpu_skb) {
+		int i;
+
+		for_each_possible_cpu(i) {
+			struct gso_cell *cell;
+
+			cell = per_cpu_ptr(qdisc->gso_cpu_skb, i);
+			kfree_skb_list(cell->skb);
+		}
+
+		free_percpu(qdisc->gso_cpu_skb);
 	}
 
 	kfree((char *) qdisc - qdisc->padded);
