@@ -80,7 +80,7 @@ static int import_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 	return port;
 }
 
-static int query_import_device(usbip_sock_t *sock, char *busid)
+static int query_import_device(usbip_sock_t *sock, const char *busid)
 {
 	int rc;
 	struct op_import_request request;
@@ -132,7 +132,7 @@ static int query_import_device(usbip_sock_t *sock, char *busid)
 	return import_device(sock, &reply.udev);
 }
 
-int usbip_attach_device(char *host, char *port, char *busid)
+int usbip_attach_device(const char *host, const char *port, const char *busid)
 {
 	usbip_sock_t *sock;
 	usbip_ux_t *ux;

@@ -30,7 +30,7 @@
 extern char *usbip_progname;
 extern char *usbip_default_pid_file;
 
-int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port);
+int usbip_recv_pdu(usbip_sock_t *sock, const char *host, const char *port);
 inline void usbip_break_connections(void) { usbip_ux_interrupt_pgrp(); }
 int usbip_driver_open(void);
 void usbip_driver_close(void);

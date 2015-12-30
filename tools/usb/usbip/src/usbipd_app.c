@@ -76,7 +76,8 @@ static int import_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 	return port;
 }
 
-static int recv_request_export(usbip_sock_t *sock, char *host, char *port)
+static int recv_request_export(usbip_sock_t *sock,
+			       const char *host, const char *port)
 {
 	struct op_export_request req;
 	struct op_export_reply reply;
@@ -144,7 +145,7 @@ static int recv_request_export(usbip_sock_t *sock, char *host, char *port)
 	return 0;
 }
 
-static int unimport_device(char *host, struct usbip_usb_device *udev)
+static int unimport_device(const char *host, struct usbip_usb_device *udev)
 {
 	int rc;
 	struct usbip_imported_device *idev;
@@ -163,7 +164,7 @@ static int unimport_device(char *host, struct usbip_usb_device *udev)
 	return idev->port;
 }
 
-static int recv_request_unexport(usbip_sock_t *sock, char *host)
+static int recv_request_unexport(usbip_sock_t *sock, const char *host)
 {
 	struct op_unexport_request req;
 	struct op_unexport_reply reply;
@@ -215,7 +216,7 @@ static int recv_request_unexport(usbip_sock_t *sock, char *host)
 	return 0;
 }
 
-int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port)
+int usbip_recv_pdu(usbip_sock_t *sock, const char *host, const char *port)
 {
 	uint16_t code = OP_UNSPEC;
 	int ret;

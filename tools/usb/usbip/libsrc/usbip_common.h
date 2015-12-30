@@ -132,7 +132,7 @@ int usbip_names_init(char *);
 void usbip_names_free(void);
 void usbip_names_get_product(char *buff, size_t size, uint16_t vendor,
 			     uint16_t product);
-void usbip_names_get_class(char *buff, size_t size, uint8_t class,
+void usbip_names_get_class(char *buff, size_t size, uint8_t clazz,
 			   uint8_t subclass, uint8_t protocol);
 
 typedef struct usbip_sock {
@@ -149,14 +149,14 @@ void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
 	void (*shutdown)(void *arg));
 
 typedef struct usbip_connection_operations {
-	usbip_sock_t *(*open)(char *host, char *port);
+	usbip_sock_t *(*open)(const char *host, const char *port);
 	void (*close)(usbip_sock_t *sock);
 } usbip_connection_operations_t;
 
 extern usbip_connection_operations_t usbip_conn_ops;
 
 void usbip_conn_init(
-	usbip_sock_t *(*open)(char *host, char *port),
+	usbip_sock_t *(*open)(const char *host, const char *port),
 	void (*close)(usbip_sock_t *sock));
 
 #endif /* __USBIP_COMMON_H */

@@ -52,7 +52,7 @@ void usbip_bind_usage(void)
 #endif
 
 /* call at unbound state */
-static int bind_usbip(char *busid)
+static int bind_usbip(const char *busid)
 {
 	char attr_name[] = "bind";
 	char bind_attr_path[SYSFS_PATH_MAX];
@@ -73,7 +73,7 @@ static int bind_usbip(char *busid)
 }
 
 /* buggy driver may cause dead lock */
-static int unbind_other(char *busid)
+static int unbind_other(const char *busid)
 {
 	enum unbind_status status = UNBIND_ST_OK;
 
@@ -144,7 +144,7 @@ out:
 	return status;
 }
 
-int usbip_bind_device(char *busid)
+int usbip_bind_device(const char *busid)
 {
 	int rc;
 	struct udev *udev;

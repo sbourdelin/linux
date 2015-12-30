@@ -32,7 +32,7 @@
 /*
  * IPv6 Ready
  */
-static usbip_sock_t *net_tcp_open(char *hostname, char *service)
+static usbip_sock_t *net_tcp_open(const char *hostname, const char *service)
 {
 	struct addrinfo hints, *res, *rp;
 	int sockfd;

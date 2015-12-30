@@ -175,7 +175,7 @@ static int read_record(int rhport, char *host, unsigned long host_len,
 	int max_len[] = {(int)host_len, (int)port_len, SYSFS_BUS_ID_SIZE};
 	size_t buffer_len = host_len + port_len + SYSFS_BUS_ID_SIZE + 4;
 
-	buffer = malloc(buffer_len);
+	buffer = (char*)malloc(buffer_len);
 	if (!buffer)
 		return -1;
 
@@ -248,7 +248,8 @@ int usbip_vhci_driver_open(void)
 		return -1;
 	}
 
-	vhci_driver = calloc(1, sizeof(struct usbip_vhci_driver));
+	vhci_driver = (struct usbip_vhci_driver *)
+			calloc(1, sizeof(struct usbip_vhci_driver));
 
 	if (open_hc_device(OPEN_HC_MODE_FIRST)) {
 		goto err_free_driver;
@@ -325,7 +326,8 @@ struct usbip_imported_device *usbip_vhci_get_device(int port)
 	return NULL;
 }
 
-struct usbip_imported_device *usbip_vhci_find_device(char *host, char *busid)
+struct usbip_imported_device *usbip_vhci_find_device(
+				const char *host, const char *busid)
 {
 	int ret;
 	char rhost[NI_MAXHOST] = "unknown host";
@@ -457,7 +459,8 @@ int usbip_vhci_imported_device_dump(struct usbip_imported_device *idev)
 }
 
 #define MAX_BUFF 100
-int usbip_vhci_create_record(char *host, char *port, char *busid, int rhport)
+int usbip_vhci_create_record(const char *host, const char *port,
+			     const char *busid, int rhport)
 {
 	int fd;
 	char path[PATH_MAX+1];

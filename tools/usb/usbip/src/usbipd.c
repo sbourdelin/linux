@@ -229,7 +229,7 @@ static int listen_all_addrinfo(struct addrinfo *ai_head, int sockfdlist[],
 	return nsockfd;
 }
 
-static struct addrinfo *do_getaddrinfo(char *host, int ai_family)
+static struct addrinfo *do_getaddrinfo(const char *host, int ai_family)
 {
 	struct addrinfo hints, *ai_head;
 	int rc;
@@ -353,7 +353,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 
 	dbg("listening on %d address%s", nsockfd, (nsockfd == 1) ? "" : "es");
 
-	fds = calloc(nsockfd, sizeof(struct pollfd));
+	fds = (struct pollfd *)calloc(nsockfd, sizeof(struct pollfd));
 	for (i = 0; i < nsockfd; i++) {
 		fds[i].fd = sockfdlist[i];
 		fds[i].events = POLLIN;

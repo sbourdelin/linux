@@ -46,7 +46,7 @@ void usbip_detach_usage(void)
 }
 #endif
 
-int usbip_detach_port(char *port)
+int usbip_detach_port(const char *port)
 {
 	int ret;
 	uint8_t portnum;

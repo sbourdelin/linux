@@ -260,29 +260,29 @@ void usbip_names_get_product(char *buff, size_t size, uint16_t vendor,
 	snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
 }
 
-void usbip_names_get_class(char *buff, size_t size, uint8_t class,
+void usbip_names_get_class(char *buff, size_t size, uint8_t clazz,
 			   uint8_t subclass, uint8_t protocol)
 {
 	const char *c, *s, *p;
 
-	if (class == 0 && subclass == 0 && protocol == 0) {
-		snprintf(buff, size, "(Defined at Interface level) (%02x/%02x/%02x)", class, subclass, protocol);
+	if (clazz == 0 && subclass == 0 && protocol == 0) {
+		snprintf(buff, size, "(Defined at Interface level) (%02x/%02x/%02x)", clazz, subclass, protocol);
 		return;
 	}
 
-	p = names_protocol(class, subclass, protocol);
+	p = names_protocol(clazz, subclass, protocol);
 	if (!p)
 		p = "unknown protocol";
 
-	s = names_subclass(class, subclass);
+	s = names_subclass(clazz, subclass);
 	if (!s)
 		s = "unknown subclass";
 
-	c = names_class(class);
+	c = names_class(clazz);
 	if (!c)
 		c = "unknown class";
 
-	snprintf(buff, size, "%s / %s / %s (%02x/%02x/%02x)", c, s, p, class, subclass, protocol);
+	snprintf(buff, size, "%s / %s / %s (%02x/%02x/%02x)", c, s, p, clazz, subclass, protocol);
 }
 
 void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
@@ -300,7 +300,7 @@ void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
 usbip_connection_operations_t usbip_conn_ops = {NULL, NULL};
 
 void usbip_conn_init(
-	usbip_sock_t *(*open)(char *host, char *port),
+	usbip_sock_t *(*open)(const char *host, const char *port),
 	void (*close)(usbip_sock_t *sock))
 {
 	usbip_conn_ops.open = open;

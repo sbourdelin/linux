@@ -73,7 +73,8 @@ struct usbip_exported_device *usbip_exported_device_new(const char *sdevpath)
 	size_t size;
 	int i;
 
-	edev = calloc(1, sizeof(struct usbip_exported_device));
+	edev = (struct usbip_exported_device *)
+		calloc(1, sizeof(struct usbip_exported_device));
 
 	edev->sudev = udev_device_new_from_syspath(udev_context, sdevpath);
 	if (!edev->sudev) {
@@ -92,7 +93,7 @@ struct usbip_exported_device *usbip_exported_device_new(const char *sdevpath)
 		edev->udev.bNumInterfaces * sizeof(struct usbip_usb_interface);
 
 	edev_old = edev;
-	edev = realloc(edev, size);
+	edev = (struct usbip_exported_device *)realloc(edev, size);
 	if (!edev) {
 		edev = edev_old;
 		dbg("realloc failed");
@@ -172,7 +173,8 @@ int usbip_host_driver_open(void)
 		return -1;
 	}
 
-	host_driver = calloc(1, sizeof(*host_driver));
+	host_driver = (struct usbip_host_driver *)
+			calloc(1, sizeof(*host_driver));
 
 	host_driver->ndevs = 0;
 	INIT_LIST_HEAD(&host_driver->edev_list);
@@ -279,7 +281,7 @@ struct usbip_exported_device *usbip_host_get_device(int num)
 	return NULL;
 }
 
-struct usbip_exported_device *usbip_host_find_device(char *busid)
+struct usbip_exported_device *usbip_host_find_device(const char *busid)
 {
 	struct list_head *i;
 	struct usbip_exported_device *edev;
