@@ -113,6 +113,11 @@ static void vhost_init_is_le(struct vhost_virtqueue *vq)
 }
 #endif /* CONFIG_VHOST_CROSS_ENDIAN_LEGACY */
 
+static inline int vhost_iotlb_hash(u64 iova)
+{
+	return (iova >> PAGE_SHIFT) & (VHOST_IOTLB_SIZE - 1);
+}
+
 static void vhost_poll_func(struct file *file, wait_queue_head_t *wqh,
 			    poll_table *pt)
 {
@@ -384,8 +389,14 @@ void vhost_dev_init(struct vhost_dev *dev,
 	dev->memory = NULL;
 	dev->mm = NULL;
 	spin_lock_init(&dev->work_lock);
+	spin_lock_init(&dev->iotlb_lock);
+	mutex_init(&dev->iotlb_req_mutex);
 	INIT_LIST_HEAD(&dev->work_list);
 	dev->worker = NULL;
+	dev->iotlb_request = NULL;
+	dev->iotlb_ctx = NULL;
+	dev->iotlb_file = NULL;
+	dev->pending_request.flags.type = VHOST_IOTLB_INVALIDATE;
 
 	for (i = 0; i < dev->nvqs; ++i) {
 		vq = dev->vqs[i];
@@ -393,12 +404,17 @@ void vhost_dev_init(struct vhost_dev *dev,
 		vq->indirect = NULL;
 		vq->heads = NULL;
 		vq->dev = dev;
+		vq->iotlb_request = NULL;
 		mutex_init(&vq->mutex);
 		vhost_vq_reset(dev, vq);
 		if (vq->handle_kick)
 			vhost_poll_init(&vq->poll, vq->handle_kick,
 					POLLIN, dev);
 	}
+
+	init_completion(&dev->iotlb_completion);
+	for (i = 0; i < VHOST_IOTLB_SIZE; i++)
+		dev->iotlb[i].flags.valid = VHOST_IOTLB_INVALID;
 }
 EXPORT_SYMBOL_GPL(vhost_dev_init);
 
@@ -940,9 +956,10 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 {
 	struct file *eventfp, *filep = NULL;
 	struct eventfd_ctx *ctx = NULL;
+	struct vhost_iotlb_entry entry;
 	u64 p;
 	long r;
-	int i, fd;
+	int index, i, fd;
 
 	/* If you are not the owner, you can become one */
 	if (ioctl == VHOST_SET_OWNER) {
@@ -1007,6 +1024,80 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 			eventfd_ctx_put(ctx);
 		if (filep)
 			fput(filep);
+		break;
+	case VHOST_SET_IOTLB_FD:
+		r = get_user(fd, (int __user *)argp);
+		if (r < 0)
+			break;
+		eventfp = fd == -1 ? NULL : eventfd_fget(fd);
+		if (IS_ERR(eventfp)) {
+			r = PTR_ERR(eventfp);
+			break;
+		}
+		if (eventfp != d->iotlb_file) {
+			filep = d->iotlb_file;
+			d->iotlb_file = eventfp;
+			ctx = d->iotlb_ctx;
+			d->iotlb_ctx = eventfp ?
+				eventfd_ctx_fileget(eventfp) : NULL;
+		} else
+			filep = eventfp;
+		for (i = 0; i < d->nvqs; ++i) {
+			mutex_lock(&d->vqs[i]->mutex);
+			d->vqs[i]->iotlb_ctx = d->iotlb_ctx;
+			mutex_unlock(&d->vqs[i]->mutex);
+		}
+		if (ctx)
+			eventfd_ctx_put(ctx);
+		if (filep)
+			fput(filep);
+		break;
+	case VHOST_SET_IOTLB_REQUEST_ENTRY:
+		if (!access_ok(VERIFY_READ, argp, sizeof(*d->iotlb_request)))
+			return -EFAULT;
+		if (!access_ok(VERIFY_WRITE, argp, sizeof(*d->iotlb_request)))
+			return -EFAULT;
+		d->iotlb_request = argp;
+		for (i = 0; i < d->nvqs; ++i) {
+			mutex_lock(&d->vqs[i]->mutex);
+			d->vqs[i]->iotlb_request = argp;
+			mutex_unlock(&d->vqs[i]->mutex);
+		}
+		break;
+	case VHOST_UPDATE_IOTLB:
+		r = copy_from_user(&entry, argp, sizeof(entry));
+		if (r < 0) {
+			r = -EFAULT;
+			goto done;
+		}
+
+		index = vhost_iotlb_hash(entry.iova);
+
+		spin_lock(&d->iotlb_lock);
+		switch (entry.flags.type) {
+		case VHOST_IOTLB_UPDATE:
+			d->iotlb[index] = entry;
+			break;
+		case VHOST_IOTLB_INVALIDATE:
+			if (d->iotlb[index].iova == entry.iova)
+				d->iotlb[index] = entry;
+			break;
+		default:
+			r = -EINVAL;
+		}
+		spin_unlock(&d->iotlb_lock);
+
+		if (!r && entry.flags.type != VHOST_IOTLB_INVALIDATE) {
+			mutex_lock(&d->iotlb_req_mutex);
+			if (entry.iova == d->pending_request.iova &&
+			    d->pending_request.flags.type ==
+				VHOST_IOTLB_MISS) {
+				d->pending_request = entry;
+				complete(&d->iotlb_completion);
+			}
+			mutex_unlock(&d->iotlb_req_mutex);
+		}
+
 		break;
 	default:
 		r = -ENOIOCTLCMD;
@@ -1177,9 +1268,104 @@ int vhost_init_used(struct vhost_virtqueue *vq)
 }
 EXPORT_SYMBOL_GPL(vhost_init_used);
 
+static struct vhost_iotlb_entry vhost_iotlb_miss(struct vhost_virtqueue *vq,
+						 u64 iova)
+{
+	struct completion *c = &vq->dev->iotlb_completion;
+	struct vhost_iotlb_entry *pending = &vq->dev->pending_request;
+	struct vhost_iotlb_entry entry = {
+		.flags.valid = VHOST_IOTLB_INVALID,
+	};
+
+	mutex_lock(&vq->dev->iotlb_req_mutex);
+
+	if (!vq->iotlb_ctx)
+		goto err;
+
+	if (!vq->dev->iotlb_request)
+		goto err;
+
+	if (pending->flags.type == VHOST_IOTLB_MISS)
+		goto err;
+
+	pending->iova = iova & PAGE_MASK;
+	pending->flags.type = VHOST_IOTLB_MISS;
+
+	if (copy_to_user(vq->dev->iotlb_request, pending,
+			 sizeof(struct vhost_iotlb_entry))) {
+		goto err;
+	}
+
+	mutex_unlock(&vq->dev->iotlb_req_mutex);
+
+	eventfd_signal(vq->iotlb_ctx, 1);
+	wait_for_completion_interruptible(c);
+
+	mutex_lock(&vq->dev->iotlb_req_mutex);
+	entry = vq->dev->pending_request;
+	mutex_unlock(&vq->dev->iotlb_req_mutex);
+
+	return entry;
+err:
+	mutex_unlock(&vq->dev->iotlb_req_mutex);
+	return entry;
+}
+
+static int translate_iotlb(struct vhost_virtqueue *vq, u64 iova, u32 len,
+			   struct iovec iov[], int iov_size)
+{
+	struct vhost_iotlb_entry *entry;
+	struct vhost_iotlb_entry miss;
+	struct vhost_dev *dev = vq->dev;
+	int ret = 0;
+	u64 s = 0, size;
+
+	spin_lock(&dev->iotlb_lock);
+
+	while ((u64) len > s) {
+		if (unlikely(ret >= iov_size)) {
+			ret = -ENOBUFS;
+			break;
+		}
+		entry = &vq->dev->iotlb[vhost_iotlb_hash(iova)];
+		if ((entry->iova != (iova & PAGE_MASK)) ||
+		    (entry->flags.valid != VHOST_IOTLB_VALID)) {
+
+			spin_unlock(&dev->iotlb_lock);
+			miss = vhost_iotlb_miss(vq, iova);
+			spin_lock(&dev->iotlb_lock);
+
+			if (miss.flags.valid != VHOST_IOTLB_VALID ||
+			    miss.iova != (iova & PAGE_MASK)) {
+				ret = -EFAULT;
+				goto err;
+			}
+			entry = &miss;
+		}
+
+		if (entry->iova == (iova & PAGE_MASK)) {
+			size = entry->userspace_addr + entry->size - iova;
+			iov[ret].iov_base =
+				(void __user *)(entry->userspace_addr +
+						(iova & (PAGE_SIZE - 1)));
+			iov[ret].iov_len = min((u64)len - s, size);
+			s += size;
+			iova += size;
+			ret++;
+		} else {
+			BUG();
+		}
+	}
+
+err:
+	spin_unlock(&dev->iotlb_lock);
+	return ret;
+}
+
 static int translate_desc(struct vhost_virtqueue *vq, u64 addr, u32 len,
 			  struct iovec iov[], int iov_size)
 {
+#if 0
 	const struct vhost_memory_region *reg;
 	struct vhost_memory *mem;
 	struct iovec *_iov;
@@ -1209,6 +1395,8 @@ static int translate_desc(struct vhost_virtqueue *vq, u64 addr, u32 len,
 	}
 
 	return ret;
+#endif
+	return translate_iotlb(vq, addr, len, iov, iov_size);
 }
 
 /* Each buffer in the virtqueues is actually a chain of descriptors.  This

@@ -1083,7 +1083,7 @@ static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 		r = vhost_dev_ioctl(&n->dev, ioctl, argp);
 		if (r == -ENOIOCTLCMD)
 			r = vhost_vring_ioctl(&n->dev, ioctl, argp);
-		else
+		else if (ioctl != VHOST_UPDATE_IOTLB)
 			vhost_net_flush(n);
 		mutex_unlock(&n->dev.mutex);
 		return r;

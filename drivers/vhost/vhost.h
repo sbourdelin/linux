@@ -68,6 +68,8 @@ struct vhost_virtqueue {
 	struct eventfd_ctx *call_ctx;
 	struct eventfd_ctx *error_ctx;
 	struct eventfd_ctx *log_ctx;
+	struct eventfd_ctx *iotlb_ctx;
+	struct vhost_iotlb __user *iotlb_request;
 
 	struct vhost_poll poll;
 
@@ -116,6 +118,8 @@ struct vhost_virtqueue {
 #endif
 };
 
+#define VHOST_IOTLB_SIZE 1024
+
 struct vhost_dev {
 	struct vhost_memory *memory;
 	struct mm_struct *mm;
@@ -124,9 +128,18 @@ struct vhost_dev {
 	int nvqs;
 	struct file *log_file;
 	struct eventfd_ctx *log_ctx;
+	struct file *iotlb_file;
+	struct eventfd_ctx *iotlb_ctx;
+	struct mutex iotlb_req_mutex;
+	struct vhost_iotlb_entry __user *iotlb_request;
+	struct vhost_iotlb_entry pending_request;
+	struct completion iotlb_completion;
+	struct vhost_iotlb_entry request;
 	spinlock_t work_lock;
 	struct list_head work_list;
 	struct task_struct *worker;
+	spinlock_t iotlb_lock;
+	struct vhost_iotlb_entry iotlb[VHOST_IOTLB_SIZE];
 };
 
 void vhost_dev_init(struct vhost_dev *, struct vhost_virtqueue **vqs, int nvqs);
