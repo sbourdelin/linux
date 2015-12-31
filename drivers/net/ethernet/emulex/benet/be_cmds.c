@@ -4366,9 +4366,7 @@ int be_cmd_get_profile_config(struct be_adapter *adapter,
 	if (vf_res)
 		res->vf_if_cap_flags = vf_res->cap_flags;
 err:
-	if (cmd.va)
-		dma_free_coherent(&adapter->pdev->dev, cmd.size, cmd.va,
-				  cmd.dma);
+	dma_free_coherent(&adapter->pdev->dev, cmd.size, cmd.va, cmd.dma);
 	return status;
 }
 
@@ -4398,10 +4396,7 @@ static int be_cmd_set_profile_config(struct be_adapter *adapter, void *desc,
 	memcpy(req->desc, desc, size);
 
 	status = be_cmd_notify_wait(adapter, &wrb);
-
-	if (cmd.va)
-		dma_free_coherent(&adapter->pdev->dev, cmd.size, cmd.va,
-				  cmd.dma);
+	dma_free_coherent(&adapter->pdev->dev, cmd.size, cmd.va, cmd.dma);
 	return status;
 }
 
