@@ -922,7 +922,7 @@ static int nicvf_register_interrupts(struct nicvf *nic)
 		ret = request_irq(vector, nicvf_intr_handler,
 				  0, nic->irq_name[irq], nic->napi[irq]);
 		if (ret)
-			goto err;
+			goto report_failure;
 		nic->irq_allocated[irq] = true;
 	}
 
@@ -933,7 +933,7 @@ static int nicvf_register_interrupts(struct nicvf *nic)
 		ret = request_irq(vector, nicvf_rbdr_intr_handler,
 				  0, nic->irq_name[irq], nic);
 		if (ret)
-			goto err;
+			goto report_failure;
 		nic->irq_allocated[irq] = true;
 	}
 
@@ -944,13 +944,12 @@ static int nicvf_register_interrupts(struct nicvf *nic)
 	ret = request_irq(nic->msix_entries[irq].vector,
 			  nicvf_qs_err_intr_handler,
 			  0, nic->irq_name[irq], nic);
-	if (!ret)
+	if (!ret) {
 		nic->irq_allocated[irq] = true;
-
-err:
-	if (ret)
-		netdev_err(nic->netdev, "request_irq failed, vector %d\n", irq);
-
+		return 0;
+	}
+report_failure:
+	netdev_err(nic->netdev, "request_irq failed, vector %d\n", irq);
 	return ret;
 }
 
