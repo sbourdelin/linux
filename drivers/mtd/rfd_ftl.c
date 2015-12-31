@@ -359,17 +359,21 @@ static int move_block_contents(struct partition *part, int block_no, u_long *old
 	void *sector_data;
 	u16 *map;
 	size_t retlen;
-	int i, rc = -ENOMEM;
+	int i, rc;
 
 	part->is_reclaiming = 1;
 
 	sector_data = kmalloc(SECTOR_SIZE, GFP_KERNEL);
-	if (!sector_data)
+	if (!sector_data) {
+		rc = -ENOMEM;
 		goto err3;
+	}
 
 	map = kmalloc(part->header_size, GFP_KERNEL);
-	if (!map)
+	if (!map) {
+		rc = -ENOMEM;
 		goto err2;
+	}
 
 	rc = mtd_read(part->mbd.mtd, part->blocks[block_no].offset,
 		      part->header_size, &retlen, (u_char *)map);
