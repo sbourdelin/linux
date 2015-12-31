@@ -326,11 +326,11 @@ static void erase_callback(struct erase_info *erase)
 static int erase_block(struct partition *part, int block)
 {
 	struct erase_info *erase;
-	int rc = -ENOMEM;
+	int rc;
 
 	erase = kmalloc(sizeof(struct erase_info), GFP_KERNEL);
 	if (!erase)
-		goto err;
+		return -ENOMEM;
 
 	erase->mtd = part->mbd.mtd;
 	erase->callback = erase_callback;
@@ -349,8 +349,6 @@ static int erase_block(struct partition *part, int block)
 				(unsigned long long)erase->len, part->mbd.mtd->name);
 		kfree(erase);
 	}
-
-err:
 	return rc;
 }
 
