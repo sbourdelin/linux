@@ -25,6 +25,7 @@
 #ifndef __HCI_CORE_H
 #define __HCI_CORE_H
 
+#include <linux/leds.h>
 #include <net/bluetooth/hci.h>
 #include <net/bluetooth/hci_sock.h>
 
@@ -394,6 +395,12 @@ struct hci_dev {
 	__u32			rpa_timeout;
 	struct delayed_work	rpa_expired;
 	bdaddr_t		rpa;
+
+#ifdef CONFIG_BT_LEDS
+	struct led_trigger assoc_led, radio_led;
+	atomic_t assoc_led_active, radio_led_active;
+	atomic_t assoc_led_cnt, radio_led_cnt;
+#endif
 
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);

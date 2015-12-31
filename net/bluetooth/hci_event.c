@@ -35,6 +35,7 @@
 #include "a2mp.h"
 #include "amp.h"
 #include "smp.h"
+#include "led.h"
 
 #define ZERO_KEY "\x00\x00\x00\x00\x00\x00\x00\x00" \
 		 "\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -5239,6 +5240,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 
 	case HCI_EV_CONN_COMPLETE:
 		hci_conn_complete_evt(hdev, skb);
+		hci_led_assoc(hdev, true);
 		break;
 
 	case HCI_EV_CONN_REQUEST:
@@ -5246,6 +5248,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 		break;
 
 	case HCI_EV_DISCONN_COMPLETE:
+		hci_led_assoc(hdev, false);
 		hci_disconn_complete_evt(hdev, skb);
 		break;
 
