@@ -2032,6 +2032,11 @@ static int serial_imx_probe(struct platform_device *pdev)
 		 UCR1_TXMPTYEN | UCR1_RTSDEN);
 	writel_relaxed(reg, sport->port.membase + UCR1);
 
+	/* Disable data carrier detect before requesting interrupts */
+	reg = readl_relaxed(sport->port.membase + UCR3);
+	reg &= ~(UCR3_DCD);
+	writel_relaxed(reg, sport->port.membase + UCR3);
+
 	clk_disable_unprepare(sport->clk_ipg);
 
 	/*
