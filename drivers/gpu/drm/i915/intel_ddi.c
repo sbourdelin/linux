@@ -2014,15 +2014,18 @@ bool intel_ddi_get_hw_state(struct intel_encoder *encoder,
 	enum intel_display_power_domain power_domain;
 	u32 tmp;
 	int i;
+	bool ret = false;
 
 	power_domain = intel_display_port_power_domain(encoder);
 	if (!intel_display_power_is_enabled(dev_priv, power_domain))
-		return false;
+		return ret;
+
+	intel_runtime_pm_get(dev_priv);
 
 	tmp = I915_READ(DDI_BUF_CTL(port));
 
 	if (!(tmp & DDI_BUF_CTL_ENABLE))
-		return false;
+		goto out;
 
 	if (port == PORT_A) {
 		tmp = I915_READ(TRANS_DDI_FUNC_CTL(TRANSCODER_EDP));
@@ -2040,7 +2043,8 @@ bool intel_ddi_get_hw_state(struct intel_encoder *encoder,
 			break;
 		}
 
-		return true;
+		ret = true;
+		goto out;
 	} else {
 		for (i = TRANSCODER_A; i <= TRANSCODER_C; i++) {
 			tmp = I915_READ(TRANS_DDI_FUNC_CTL(i));
@@ -2048,17 +2052,19 @@ bool intel_ddi_get_hw_state(struct intel_encoder *encoder,
 			if ((tmp & TRANS_DDI_PORT_MASK)
 			    == TRANS_DDI_SELECT_PORT(port)) {
 				if ((tmp & TRANS_DDI_MODE_SELECT_MASK) == TRANS_DDI_MODE_SELECT_DP_MST)
-					return false;
+					goto out;
 
 				*pipe = i;
-				return true;
+				ret = true;
+				goto out;
 			}
 		}
 	}
 
 	DRM_DEBUG_KMS("No pipe for ddi port %c found\n", port_name(port));
-
-	return false;
+out:
+	intel_runtime_pm_put(dev_priv);
+	return ret;
 }
 
 void intel_ddi_enable_pipe_clock(struct intel_crtc *intel_crtc)
@@ -2510,7 +2516,10 @@ static bool hsw_ddi_wrpll_get_hw_state(struct drm_i915_private *dev_priv,
 	if (!intel_display_power_is_enabled(dev_priv, POWER_DOMAIN_PLLS))
 		return false;
 
+	intel_runtime_pm_get(dev_priv);
 	val = I915_READ(WRPLL_CTL(pll->id));
+	intel_runtime_pm_put(dev_priv);
+
 	hw_state->wrpll = val;
 
 	return val & WRPLL_PLL_ENABLE;
@@ -2525,7 +2534,10 @@ static bool hsw_ddi_spll_get_hw_state(struct drm_i915_private *dev_priv,
 	if (!intel_display_power_is_enabled(dev_priv, POWER_DOMAIN_PLLS))
 		return false;
 
+	intel_runtime_pm_get(dev_priv);
 	val = I915_READ(SPLL_CTL);
+	intel_runtime_pm_put(dev_priv);
+
 	hw_state->spll = val;
 
 	return val & SPLL_PLL_ENABLE;
@@ -2644,16 +2656,19 @@ static bool skl_ddi_pll_get_hw_state(struct drm_i915_private *dev_priv,
 	uint32_t val;
 	unsigned int dpll;
 	const struct skl_dpll_regs *regs = skl_dpll_regs;
+	bool ret = false;
 
 	if (!intel_display_power_is_enabled(dev_priv, POWER_DOMAIN_PLLS))
-		return false;
+		return ret;
 
 	/* DPLL0 is not part of the shared DPLLs, so pll->id is 0 for DPLL1 */
 	dpll = pll->id + 1;
 
+	intel_runtime_pm_get(dev_priv);
+
 	val = I915_READ(regs[pll->id].ctl);
 	if (!(val & LCPLL_PLL_ENABLE))
-		return false;
+		goto out;
 
 	val = I915_READ(DPLL_CTRL1);
 	hw_state->ctrl1 = (val >> (dpll * 6)) & 0x3f;
@@ -2664,7 +2679,10 @@ static bool skl_ddi_pll_get_hw_state(struct drm_i915_private *dev_priv,
 		hw_state->cfgcr2 = I915_READ(regs[pll->id].cfgcr2);
 	}
 
-	return true;
+	ret = true;
+out:
+	intel_runtime_pm_put(dev_priv);
+	return ret;
 }
 
 static void skl_shared_dplls_init(struct drm_i915_private *dev_priv)
@@ -2931,13 +2949,16 @@ static bool bxt_ddi_pll_get_hw_state(struct drm_i915_private *dev_priv,
 {
 	enum port port = (enum port)pll->id;	/* 1:1 port->PLL mapping */
 	uint32_t val;
+	bool ret = false;
 
 	if (!intel_display_power_is_enabled(dev_priv, POWER_DOMAIN_PLLS))
-		return false;
+		return ret;
+
+	intel_runtime_pm_get(dev_priv);
 
 	val = I915_READ(BXT_PORT_PLL_ENABLE(port));
 	if (!(val & PORT_PLL_ENABLE))
-		return false;
+		goto out;
 
 	hw_state->ebb0 = I915_READ(BXT_PORT_PLL_EBB_0(port));
 	hw_state->ebb0 &= PORT_PLL_P1_MASK | PORT_PLL_P2_MASK;
@@ -2984,7 +3005,10 @@ static bool bxt_ddi_pll_get_hw_state(struct drm_i915_private *dev_priv,
 				 I915_READ(BXT_PORT_PCS_DW12_LN23(port)));
 	hw_state->pcsdw12 &= LANE_STAGGER_MASK | LANESTAGGER_STRAP_OVRD;
 
-	return true;
+	ret = true;
+out:
+	intel_runtime_pm_put(dev_priv);
+	return ret;
 }
 
 static void bxt_shared_dplls_init(struct drm_i915_private *dev_priv)
