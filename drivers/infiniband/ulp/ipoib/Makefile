@@ -6,7 +6,8 @@ ib_ipoib-y					:= ipoib_main.o \
 						   ipoib_verbs.o \
 						   ipoib_vlan.o \
 						   ipoib_ethtool.o \
-						   ipoib_netlink.o
+						   ipoib_netlink.o \
+						   ipoib_ioctl.o
 ib_ipoib-$(CONFIG_INFINIBAND_IPOIB_CM)		+= ipoib_cm.o
 ib_ipoib-$(CONFIG_INFINIBAND_IPOIB_DEBUG)	+= ipoib_fs.o
 

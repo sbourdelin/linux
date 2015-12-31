@@ -434,6 +434,15 @@ struct ipoib_neigh {
 	unsigned long       alive;
 };
 
+/* ioctl API */
+#define IPOIBGETSGUID		SIOCDEVPRIVATE
+
+struct ipoib_ioctl_getsgid_data {
+	u64	gid;
+	u64	subnet_prefix;
+	int	fd;
+};
+
 #define IPOIB_UD_MTU(ib_mtu)		(ib_mtu - IPOIB_ENCAP_LEN)
 #define IPOIB_UD_BUF_SIZE(ib_mtu)	(ib_mtu + IB_GRH_BYTES)
 
@@ -452,6 +461,7 @@ void ipoib_del_neighs_by_gid(struct net_device *dev, u8 *gid);
 extern struct workqueue_struct *ipoib_workqueue;
 
 /* functions */
+struct list_head *ipoib_get_dev_list(struct ib_device *dev);
 
 int ipoib_poll(struct napi_struct *napi, int budget);
 void ipoib_ib_completion(struct ib_cq *cq, void *dev_ptr);
@@ -467,6 +477,7 @@ static inline void ipoib_put_ah(struct ipoib_ah *ah)
 int ipoib_open(struct net_device *dev);
 int ipoib_add_pkey_attr(struct net_device *dev);
 int ipoib_add_umcast_attr(struct net_device *dev);
+int ipoib_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 
 void ipoib_send(struct net_device *dev, struct sk_buff *skb,
 		struct ipoib_ah *address, u32 qpn);

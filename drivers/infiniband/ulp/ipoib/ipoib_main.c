@@ -1619,6 +1619,7 @@ static const struct net_device_ops ipoib_netdev_ops = {
 	.ndo_tx_timeout		 = ipoib_timeout,
 	.ndo_set_rx_mode	 = ipoib_set_mcast_list,
 	.ndo_get_iflink		 = ipoib_get_iflink,
+	.ndo_do_ioctl		 = ipoib_do_ioctl,
 };
 
 void ipoib_setup(struct net_device *dev)
@@ -1960,6 +1961,11 @@ static void ipoib_add_one(struct ib_device *device)
 	}
 
 	ib_set_client_data(device, &ipoib_client, dev_list);
+}
+
+struct list_head *ipoib_get_dev_list(struct ib_device *dev)
+{
+	return ib_get_client_data(dev, &ipoib_client);
 }
 
 static void ipoib_remove_one(struct ib_device *device, void *client_data)
