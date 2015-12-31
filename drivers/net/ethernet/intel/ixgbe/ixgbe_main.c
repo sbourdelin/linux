@@ -6642,6 +6642,11 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	if (netif_carrier_ok(netdev))
 		return;
 
+	/* For all slave interfaces, wait for the link_speed to be known. */
+	if ((netdev->flags & IFF_SLAVE) &&
+	    (link_speed == IXGBE_LINK_SPEED_UNKNOWN))
+		return;
+
 	adapter->flags2 &= ~IXGBE_FLAG2_SEARCH_FOR_SFP;
 
 	switch (hw->mac.type) {
