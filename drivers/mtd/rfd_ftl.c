@@ -366,13 +366,13 @@ static int move_block_contents(struct partition *part, int block_no, u_long *old
 	sector_data = kmalloc(SECTOR_SIZE, GFP_KERNEL);
 	if (!sector_data) {
 		rc = -ENOMEM;
-		goto err3;
+		goto reset_reclaim;
 	}
 
 	map = kmalloc(part->header_size, GFP_KERNEL);
 	if (!map) {
 		rc = -ENOMEM;
-		goto err2;
+		goto free_sector;
 	}
 
 	rc = mtd_read(part->mbd.mtd, part->blocks[block_no].offset,
@@ -385,8 +385,7 @@ static int move_block_contents(struct partition *part, int block_no, u_long *old
 		printk(KERN_ERR PREFIX "error reading '%s' at "
 			"0x%lx\n", part->mbd.mtd->name,
 			part->blocks[block_no].offset);
-
-		goto err;
+		goto free_map;
 	}
 
 	for (i=0; i<part->data_sectors_per_block; i++) {
@@ -417,7 +416,6 @@ static int move_block_contents(struct partition *part, int block_no, u_long *old
 		}
 		rc = mtd_read(part->mbd.mtd, addr, SECTOR_SIZE, &retlen,
 			      sector_data);
-
 		if (!rc && retlen != SECTOR_SIZE)
 			rc = -EIO;
 
@@ -425,24 +423,20 @@ static int move_block_contents(struct partition *part, int block_no, u_long *old
 			printk(KERN_ERR PREFIX "'%s': Unable to "
 				"read sector for relocation\n",
 				part->mbd.mtd->name);
-
-			goto err;
+			goto free_map;
 		}
 
 		rc = rfd_ftl_writesect((struct mtd_blktrans_dev*)part,
 				entry, sector_data);
-
 		if (rc)
-			goto err;
+			goto free_map;
 	}
-
-err:
+free_map:
 	kfree(map);
-err2:
+free_sector:
 	kfree(sector_data);
-err3:
+reset_reclaim:
 	part->is_reclaiming = 0;
-
 	return rc;
 }
 
