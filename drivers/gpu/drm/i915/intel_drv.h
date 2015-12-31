@@ -193,6 +193,10 @@ struct intel_panel {
 				      uint32_t hz);
 		void (*power)(struct intel_connector *, bool enable);
 	} backlight;
+
+	u32 blc_pwm_ctl;
+	u32 blc_pwm_freq;
+	u32 blc_pwm_duty;
 };
 
 struct intel_connector {

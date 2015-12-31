@@ -796,6 +796,16 @@ static void bxt_disable_backlight(struct intel_connector *connector)
 		val &= ~UTIL_PIN_ENABLE;
 		I915_WRITE(UTIL_PIN_CTL, val);
 	}
+
+	/* Saving BLC registers for PG0 gating */
+	panel->blc_pwm_ctl =
+		I915_READ(BXT_BLC_PWM_CTL(panel->backlight.controller));
+	panel->blc_pwm_freq =
+		I915_READ(BXT_BLC_PWM_FREQ(panel->backlight.controller));
+	panel->blc_pwm_duty =
+		I915_READ(BXT_BLC_PWM_DUTY(panel->backlight.controller));
+
+
 }
 
 static void pwm_disable_backlight(struct intel_connector *connector)
@@ -1022,6 +1032,14 @@ static void bxt_enable_backlight(struct intel_connector *connector)
 	struct intel_panel *panel = &connector->panel;
 	enum pipe pipe = intel_get_pipe_from_connector(connector);
 	u32 pwm_ctl, val;
+
+	/* Restore BLC registers if PG0 was gated */
+	I915_WRITE(BXT_BLC_PWM_CTL(panel->backlight.controller),
+				panel->blc_pwm_ctl);
+	I915_WRITE(BXT_BLC_PWM_FREQ(panel->backlight.controller),
+				panel->blc_pwm_freq);
+	I915_WRITE(BXT_BLC_PWM_DUTY(panel->backlight.controller),
+				panel->blc_pwm_duty);
 
 	/* To use 2nd set of backlight registers, utility pin has to be
 	 * enabled with PWM mode.
