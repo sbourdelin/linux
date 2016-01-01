@@ -252,22 +252,21 @@ static struct {
  */
 bool icmp_global_allow(void)
 {
-	u32 credit, delta, incr = 0, now = (u32)jiffies;
+	u32 credit, incr = 0, now = (u32)jiffies;
+	u32 delta = now - icmp_global.stamp;
 	bool rc = false;
+	/* Token bucket can be refilled every (HZ/50) jiffies if necessary. */
+	bool cbr = delta >= HZ / 50;
 
 	/* Check if token bucket is empty and cannot be refilled
 	 * without taking the spinlock.
 	 */
-	if (!icmp_global.credit) {
-		delta = min_t(u32, now - icmp_global.stamp, HZ);
-		if (delta < HZ / 50)
-			return false;
-	}
+	if (!icmp_global.credit && !cbr)
+		return false;
 
 	spin_lock(&icmp_global.lock);
-	delta = min_t(u32, now - icmp_global.stamp, HZ);
-	if (delta >= HZ / 50) {
-		incr = sysctl_icmp_msgs_per_sec * delta / HZ ;
+	if (cbr) {
+		incr = sysctl_icmp_msgs_per_sec * min_t(u32, delta, HZ) / HZ;
 		if (incr)
 			icmp_global.stamp = now;
 	}
