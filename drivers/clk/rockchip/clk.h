@@ -244,7 +244,7 @@ struct clk *rockchip_clk_register_inverter(const char *name,
 				void __iomem *reg, int shift, int flags,
 				spinlock_t *lock);
 
-#define PNAME(x) static const char *const x[] __initconst
+#define PNAME(x) static const char *const x[]
 
 enum rockchip_clk_branch_type {
 	branch_composite,
