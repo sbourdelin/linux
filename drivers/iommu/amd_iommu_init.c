@@ -2251,15 +2251,17 @@ EXPORT_SYMBOL(amd_iommu_v2_supported);
  *
  ****************************************************************************/
 
-u8 amd_iommu_pc_get_max_banks(u16 devid)
+u8 amd_iommu_pc_get_max_banks(void)
 {
 	struct amd_iommu *iommu;
 	u8 ret = 0;
 
-	/* locate the iommu governing the devid */
-	iommu = amd_iommu_rlookup_table[devid];
-	if (iommu)
+	for_each_iommu(iommu) {
+		if (!iommu->max_banks ||
+		    (ret && (iommu->max_banks != ret)))
+			return 0;
 		ret = iommu->max_banks;
+	}
 
 	return ret;
 }
@@ -2271,15 +2273,17 @@ bool amd_iommu_pc_supported(void)
 }
 EXPORT_SYMBOL(amd_iommu_pc_supported);
 
-u8 amd_iommu_pc_get_max_counters(u16 devid)
+u8 amd_iommu_pc_get_max_counters(void)
 {
 	struct amd_iommu *iommu;
 	u8 ret = 0;
 
-	/* locate the iommu governing the devid */
-	iommu = amd_iommu_rlookup_table[devid];
-	if (iommu)
+	for_each_iommu(iommu) {
+		if (!iommu->max_counters ||
+		    (ret && (iommu->max_counters != ret)))
+			return 0;
 		ret = iommu->max_counters;
+	}
 
 	return ret;
 }
