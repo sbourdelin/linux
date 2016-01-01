@@ -42,6 +42,7 @@ struct perf_amd_iommu {
 	u64 cntr_assign_mask;
 	raw_spinlock_t lock;
 	const struct attribute_group *attr_groups[4];
+	local64_t *prev_cnts;
 };
 
 #define format_group	attr_groups[0]
@@ -120,6 +121,8 @@ static struct amd_iommu_event_desc amd_iommu_v2_event_descs[] = {
 	AMD_IOMMU_EVENT_DESC(tlb_inv,                 "csource=0x13"),
 	{ /* end: all zeroes */ },
 };
+
+static u64 *perf_iommu_cnts;
 
 /*---------------------------------------------
  * sysfs cpumask attributes
@@ -418,10 +421,14 @@ static __init int _init_events_attrs(struct perf_amd_iommu *perf_iommu)
 
 static __init void amd_iommu_pc_exit(void)
 {
-	if (__perf_iommu.events_group != NULL) {
-		kfree(__perf_iommu.events_group);
-		__perf_iommu.events_group = NULL;
-	}
+	kfree(__perf_iommu.events_group);
+	__perf_iommu.events_group = NULL;
+
+	kfree(__perf_iommu.prev_cnts);
+	__perf_iommu.prev_cnts = NULL;
+
+	kfree(perf_iommu_cnts);
+	perf_iommu_cnts = NULL;
 }
 
 static __init int _init_perf_amd_iommu(
@@ -450,6 +457,17 @@ static __init int _init_perf_amd_iommu(
 	/* Init null attributes */
 	perf_iommu->null_group = NULL;
 	perf_iommu->pmu.attr_groups = perf_iommu->attr_groups;
+
+	perf_iommu->prev_cnts = kzalloc(sizeof(*perf_iommu->prev_cnts) *
+		(amd_iommu_get_num_iommus() * perf_iommu->max_banks *
+		perf_iommu->max_counters), GFP_KERNEL);
+	if (!perf_iommu->prev_cnts)
+		return -ENOMEM;
+
+	perf_iommu_cnts = kzalloc(sizeof(*perf_iommu_cnts) *
+				  amd_iommu_get_num_iommus(), GFP_KERNEL);
+	if (!perf_iommu_cnts)
+		return -ENOMEM;
 
 	ret = perf_pmu_register(&perf_iommu->pmu, name, -1);
 	if (ret) {
