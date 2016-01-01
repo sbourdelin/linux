@@ -148,18 +148,28 @@ static struct attribute_group amd_iommu_cpumask_group = {
 
 /*---------------------------------------------*/
 
+static inline
+int get_iommu_bnk_cnt_evt_idx(struct perf_amd_iommu *perf_iommu,
+				  int iommu_index, int bank_index,
+				  int cntr_index)
+{
+	int cntrs_per_iommu = perf_iommu->max_banks * perf_iommu->max_counters;
+	int index = (perf_iommu->max_counters * bank_index) + cntr_index;
+
+	return (cntrs_per_iommu * iommu_index) + index;
+}
+
 static int get_next_avail_iommu_bnk_cntr(struct perf_amd_iommu *perf_iommu)
 {
 	unsigned long flags;
 	int shift, bank, cntr, retval;
-	int max_banks = perf_iommu->max_banks;
-	int max_cntrs = perf_iommu->max_counters;
 
 	raw_spin_lock_irqsave(&perf_iommu->lock, flags);
 
-	for (bank = 0, shift = 0; bank < max_banks; bank++) {
-		for (cntr = 0; cntr < max_cntrs; cntr++) {
-			shift = bank + (bank*3) + cntr;
+	for (bank = 0, shift = 0; bank < perf_iommu->max_banks; bank++) {
+		for (cntr = 0; cntr < perf_iommu->max_counters; cntr++) {
+			shift = get_iommu_bnk_cnt_evt_idx(perf_iommu,
+							      0, bank, cntr);
 			if (perf_iommu->cntr_assign_mask & (1ULL<<shift)) {
 				continue;
 			} else {
