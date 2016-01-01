@@ -1890,6 +1890,8 @@ int udf_setup_indirect_aext(struct inode *inode, int block,
 		adsize = sizeof(struct short_ad);
 	else if (UDF_I(inode)->i_alloc_type == ICBTAG_FLAG_AD_LONG)
 		adsize = sizeof(struct long_ad);
+	else
+		adsize = 0;
 
 	neloc.logicalBlockNum = block;
 	neloc.partitionReferenceNum = epos->block.partitionReferenceNum;
