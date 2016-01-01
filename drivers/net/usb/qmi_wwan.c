@@ -286,7 +286,7 @@ static int qmi_wwan_cdc_wdm_manage_power(struct usb_interface *intf, int on)
 static int qmi_wwan_register_subdriver(struct usbnet *dev)
 {
 	int rv;
-	struct usb_driver *subdriver = NULL;
+	struct usb_driver *subdriver;
 	struct qmi_wwan_state *info = (void *)&dev->data;
 
 	/* collect bulk endpoints */
