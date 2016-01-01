@@ -345,7 +345,6 @@ static int qmi_wwan_bind(struct usbnet *dev, struct usb_interface *intf)
 	int status = -1;
 	u8 *buf = intf->cur_altsetting->extra;
 	int len = intf->cur_altsetting->extralen;
-	struct usb_interface_descriptor *desc = &intf->cur_altsetting->desc;
 	struct usb_cdc_union_desc *cdc_union;
 	struct usb_cdc_ether_desc *cdc_ether;
 	struct usb_driver *driver = driver_of(intf);
@@ -366,6 +365,8 @@ static int qmi_wwan_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	/* Use separate control and data interfaces if we found a CDC Union */
 	if (cdc_union) {
+		struct usb_interface_descriptor *desc = &intf->cur_altsetting->desc;
+
 		info->data = usb_ifnum_to_if(dev->udev,
 					     cdc_union->bSlaveInterface0);
 		if (desc->bInterfaceNumber != cdc_union->bMasterInterface0 ||
