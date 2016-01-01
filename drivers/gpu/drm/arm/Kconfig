@@ -10,7 +10,6 @@ config DRM_HDLCD
 	depends on DRM_ARM
 	depends on COMMON_CLK
 	select COMMON_CLK_SCPI
-	select DMA_CMA
 	select DRM_KMS_CMA_HELPER
 	select DRM_GEM_CMA_HELPER
 	help
