@@ -759,7 +759,7 @@ il_eeprom_init(struct il_priv *il)
 				 IL_EEPROM_ACCESS_TIMEOUT);
 		if (ret < 0) {
 			IL_ERR("Time out reading EEPROM[%d]\n", addr);
-			goto done;
+			goto release_semaphore;
 		}
 		r = _il_rd(il, CSR_EEPROM_REG);
 		e[addr / 2] = cpu_to_le16(r >> 16);
@@ -769,7 +769,7 @@ il_eeprom_init(struct il_priv *il)
 		 il_eeprom_query16(il, EEPROM_VERSION));
 
 	ret = 0;
-done:
+release_semaphore:
 	il->ops->eeprom_release_semaphore(il);
 
 	if (ret) {
