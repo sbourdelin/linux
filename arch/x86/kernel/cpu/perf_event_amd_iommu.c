@@ -12,12 +12,12 @@
  */
 
 #include <linux/perf_event.h>
+#include <linux/perf/perf_event_amd_iommu.h>
 #include <linux/module.h>
 #include <linux/cpumask.h>
 #include <linux/slab.h>
 
 #include "perf_event.h"
-#include "perf_event_amd_iommu.h"
 
 #define COUNTER_SHIFT		16
 
