@@ -880,18 +880,18 @@ static void if_spi_host_to_card_worker(struct work_struct *work)
 				&hiStatus);
 	if (err) {
 		netdev_err(priv->dev, "I/O error\n");
-		goto err;
+		goto report_failure;
 	}
 
 	if (hiStatus & IF_SPI_HIST_CMD_UPLOAD_RDY) {
 		err = if_spi_c2h_cmd(card);
 		if (err)
-			goto err;
+			goto report_failure;
 	}
 	if (hiStatus & IF_SPI_HIST_RX_UPLOAD_RDY) {
 		err = if_spi_c2h_data(card);
 		if (err)
-			goto err;
+			goto report_failure;
 	}
 
 	/*
@@ -940,9 +940,10 @@ static void if_spi_host_to_card_worker(struct work_struct *work)
 	if (hiStatus & IF_SPI_HIST_CARD_EVENT)
 		if_spi_e2h(card);
 
-err:
-	if (err)
+	if (err) {
+report_failure:
 		netdev_err(priv->dev, "%s: got error %d\n", __func__, err);
+	}
 
 	lbs_deb_leave(LBS_DEB_SPI);
 }
