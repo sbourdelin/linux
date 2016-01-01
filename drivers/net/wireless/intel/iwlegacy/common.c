@@ -734,7 +734,7 @@ il_eeprom_init(struct il_priv *il)
 	if (ret < 0) {
 		IL_ERR("EEPROM not found, EEPROM_GP=0x%08x\n", gp);
 		ret = -ENOENT;
-		goto err;
+		goto free_eeprom;
 	}
 
 	/* Make sure driver (instead of uCode) is allowed to read EEPROM */
@@ -742,7 +742,7 @@ il_eeprom_init(struct il_priv *il)
 	if (ret < 0) {
 		IL_ERR("Failed to acquire EEPROM semaphore.\n");
 		ret = -ENOENT;
-		goto err;
+		goto free_eeprom;
 	}
 
 	/* eeprom is an array of 16bit values */
@@ -772,9 +772,11 @@ il_eeprom_init(struct il_priv *il)
 done:
 	il->ops->eeprom_release_semaphore(il);
 
-err:
-	if (ret)
+	if (ret) {
+free_eeprom:
 		il_eeprom_free(il);
+	}
+
 	/* Reset chip to save power until we load uCode during "up". */
 	il_apm_stop(il);
 	return ret;
