@@ -261,13 +261,7 @@ static const struct file_operations ima_ascii_measurements_ops = {
 static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 				size_t datalen, loff_t *ppos)
 {
-	char *data = NULL;
 	ssize_t result;
-	int res;
-
-	res = mutex_lock_interruptible(&ima_write_mutex);
-	if (res)
-		return res;
 
 	if (datalen >= PAGE_SIZE)
 		datalen = PAGE_SIZE - 1;
@@ -286,15 +280,21 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 
 	result = -EFAULT;
 	if (copy_from_user(data, buf, datalen))
-		goto out;
+		goto out_free;
+
+	result = mutex_lock_interruptible(&ima_write_mutex);
+	if (result)
+		goto out_free;
 
 	result = ima_parse_add_rule(data);
-out:
-	if (result < 0)
-		valid_policy = 0;
-	kfree(data);
+
 	mutex_unlock(&ima_write_mutex);
 
+	if (result < 0)
+		valid_policy = 0;
+out_free:
+	kfree(data);
+out:
 	return result;
 }
 
