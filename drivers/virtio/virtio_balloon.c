@@ -589,7 +589,7 @@ static int virtballoon_restore(struct virtio_device *vdev)
 
 	virtio_device_ready(vdev);
 
-	fill_balloon(vb, towards_target(vb));
+	wake_up(&vb->config_change);
 	update_balloon_size(vb);
 	return 0;
 }
