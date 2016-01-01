@@ -372,7 +372,7 @@ static int cs35l32_i2c_probe(struct i2c_client *i2c_client,
 			dev_err(&i2c_client->dev, "could not allocate pdata\n");
 			return -ENOMEM;
 		}
-		if (i2c_client->dev.of_node) {
+		if (IS_ENABLED(CONFIG_OF) && i2c_client->dev.of_node) {
 			ret = cs35l32_handle_of_data(i2c_client,
 						     &cs35l32->pdata);
 			if (ret != 0)
