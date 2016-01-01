@@ -47,18 +47,14 @@
 #define TIMER_COUNT_W_ACTIVE	(1 << 4)	/* not ready for write */
 #define TIMER_MATCH_W_ACTIVE	(1 << 0)	/* not ready for write */
 
-#define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
-
 #define MIN_OSCR_DELTA		16
 
 static void __iomem *regbase;
 
 static cycle_t vt8500_timer_read(struct clocksource *cs)
 {
-	int loops = msecs_to_loops(10);
 	writel(3, regbase + TIMER_CTRL_VAL);
-	while ((readl((regbase + TIMER_AS_VAL)) & TIMER_COUNT_R_ACTIVE)
-						&& --loops)
+	while (readl(regbase + TIMER_AS_VAL) & TIMER_COUNT_R_ACTIVE)
 		cpu_relax();
 	return readl(regbase + TIMER_COUNT_VAL);
 }
@@ -74,10 +70,8 @@ static struct clocksource clocksource = {
 static int vt8500_timer_set_next_event(unsigned long cycles,
 				    struct clock_event_device *evt)
 {
-	int loops = msecs_to_loops(10);
 	cycle_t alarm = clocksource.read(&clocksource) + cycles;
-	while ((readl(regbase + TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
-						&& --loops)
+	while (readl(regbase + TIMER_AS_VAL) & TIMER_MATCH_W_ACTIVE)
 		cpu_relax();
 	writel((unsigned long)alarm, regbase + TIMER_MATCH_VAL);
 
