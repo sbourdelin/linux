@@ -946,7 +946,7 @@ err: /* Regular return falls through with err == 0 */
 
 static int read_xenbus_vif_flags(struct backend_info *be)
 {
-	struct xenvif *vif = be->vif;
+	struct xenvif *vif;
 	struct xenbus_device *dev = be->dev;
 	unsigned int rx_copy;
 	int err, val;
@@ -968,13 +968,14 @@ static int read_xenbus_vif_flags(struct backend_info *be)
 	if (xenbus_scanf(XBT_NIL, dev->otherend,
 			 "feature-rx-notify", "%d", &val) < 0)
 		val = 0;
+	vif = be->vif;
 	if (!val) {
 		/* - Reduce drain timeout to poll more frequently for
 		 *   Rx requests.
 		 * - Disable Rx stall detection.
 		 */
-		be->vif->drain_timeout = msecs_to_jiffies(30);
-		be->vif->stall_timeout = 0;
+		vif->drain_timeout = msecs_to_jiffies(30);
+		vif->stall_timeout = 0;
 	}
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg",
