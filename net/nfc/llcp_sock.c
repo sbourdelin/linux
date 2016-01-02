@@ -500,7 +500,7 @@ static int llcp_sock_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct nfc_llcp_sock *llcp_sock = nfc_llcp_sock(sk);
 	DECLARE_SOCKADDR(struct sockaddr_nfc_llcp *, llcp_addr, uaddr);
 
-	if (llcp_sock == NULL || llcp_sock->dev == NULL)
+	if (llcp_sock == NULL || sk->sk_state == LLCP_CLOSED)
 		return -EBADFD;
 
 	pr_debug("%p %d %d %d\n", sk, llcp_sock->target_idx,
