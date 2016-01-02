@@ -84,7 +84,7 @@ static inline bool dim_on_error(u8 error_id, const char *error_message)
 struct lld_global_vars_t {
 	bool dim_is_initialized;
 	bool mcm_is_initialized;
-	struct dim2_regs *dim2; /* DIM2 core base address */
+	struct dim2_regs __iomem *dim2; /* DIM2 core base address */
 	u32 dbr_map[DBR_MAP_SIZE];
 };
 
@@ -650,7 +650,7 @@ static bool channel_detach_buffers(struct dim_channel *ch, u16 buffers_number)
 /* -------------------------------------------------------------------------- */
 /* API */
 
-u8 dim_startup(void *dim_base_address, u32 mlb_clock)
+u8 dim_startup(void __iomem *dim_base_address, u32 mlb_clock)
 {
 	g.dim_is_initialized = false;
 
@@ -662,7 +662,7 @@ u8 dim_startup(void *dim_base_address, u32 mlb_clock)
 	if (mlb_clock >= 8)
 		return DIM_INIT_ERR_MLB_CLOCK;
 
-	g.dim2 = dim_base_address;
+	g.dim2 = (struct dim2_regs __iomem *)dim_base_address;
 	g.dbr_map[0] = 0;
 	g.dbr_map[1] = 0;
 
