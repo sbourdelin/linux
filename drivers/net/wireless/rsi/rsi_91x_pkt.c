@@ -26,12 +26,12 @@
  */
 int rsi_send_data_pkt(struct rsi_common *common, struct sk_buff *skb)
 {
-	struct rsi_hw *adapter = common->priv;
+	struct rsi_hw *adapter;
 	struct ieee80211_hdr *tmp_hdr;
 	struct ieee80211_tx_info *info;
 	struct skb_info *tx_params;
 	struct ieee80211_bss_conf *bss;
-	int status = -EINVAL;
+	int status;
 	u8 ieee80211_size = MIN_802_11_HDR_LEN;
 	u8 extnd_size;
 	__le16 *frame_desc;
@@ -41,8 +41,10 @@ int rsi_send_data_pkt(struct rsi_common *common, struct sk_buff *skb)
 	bss = &info->control.vif->bss_conf;
 	tx_params = (struct skb_info *)info->driver_data;
 
-	if (!bss->assoc)
+	if (!bss->assoc) {
+		status = -EINVAL;
 		goto err;
+	}
 
 	tmp_hdr = (struct ieee80211_hdr *)&skb->data[0];
 	seq_num = (le16_to_cpu(tmp_hdr->seq_ctrl) >> 4);
@@ -97,7 +99,7 @@ int rsi_send_data_pkt(struct rsi_common *common, struct sk_buff *skb)
 	frame_desc[7] = cpu_to_le16(((tx_params->tid & 0xf) << 4) |
 				    (skb->priority & 0xf) |
 				    (tx_params->sta_id << 8));
-
+	adapter = common->priv;
 	status = adapter->host_intf_write_pkt(common->priv,
 					      skb->data,
 					      skb->len);
