@@ -481,7 +481,9 @@ retry:
 		goto dput_and_out;
 
 	error = -EPERM;
-	if (!ns_capable(current_user_ns(), CAP_SYS_CHROOT))
+	if ((current->fs->users != 1 || !task_no_new_privs(current)
+	    || current_chrooted())
+	  && !ns_capable(current_user_ns(), CAP_SYS_CHROOT))
 		goto dput_and_out;
 	error = security_path_chroot(&path);
 	if (error)
