@@ -136,7 +136,7 @@ static int mei_nfc_if_version(struct nfc_mei_phy *phy)
 	if (bytes_recv < 0 || bytes_recv < sizeof(struct mei_nfc_reply)) {
 		pr_err("Could not read IF version\n");
 		r = -EIO;
-		goto err;
+		goto free_reply;
 	}
 
 	version = (struct mei_nfc_if_version *)reply->data;
@@ -144,8 +144,7 @@ static int mei_nfc_if_version(struct nfc_mei_phy *phy)
 	phy->fw_ivn = version->fw_ivn;
 	phy->vendor_id = version->vendor_id;
 	phy->radio_type = version->radio_type;
-
-err:
+free_reply:
 	kfree(reply);
 	return r;
 }
