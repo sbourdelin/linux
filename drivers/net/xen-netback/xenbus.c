@@ -941,7 +941,6 @@ static int connect_rings(struct backend_info *be, struct xenvif_queue *queue)
 		goto err;
 	}
 
-	err = 0;
 err: /* Regular return falls through with err == 0 */
 	kfree(xspath);
 	return err;
