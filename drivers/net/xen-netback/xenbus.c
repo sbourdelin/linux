@@ -933,13 +933,11 @@ static int connect_rings(struct backend_info *be, struct xenvif_queue *queue)
 	/* Map the shared frame, irq etc. */
 	err = xenvif_connect(queue, tx_ring_ref, rx_ring_ref,
 			     tx_evtchn, rx_evtchn);
-	if (err) {
+	if (err)
 		xenbus_dev_fatal(dev, err,
 				 "mapping shared-frames %lu/%lu port tx %u rx %u",
 				 tx_ring_ref, rx_ring_ref,
 				 tx_evtchn, rx_evtchn);
-		goto err;
-	}
 
 err: /* Regular return falls through with err == 0 */
 	kfree(xspath);
