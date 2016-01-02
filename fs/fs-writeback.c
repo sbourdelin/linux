@@ -1298,7 +1298,7 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 
 /*
  * Write out an inode's dirty pages. Either the caller has an active reference
- * on the inode or the inode has I_WILL_FREE set.
+ * on the inode or the inode has I_FREEING set.
  *
  * This function is designed to be called for writing back one inode which
  * we go e.g. from filesystem. Flusher thread uses __writeback_single_inode()
@@ -1311,17 +1311,13 @@ writeback_single_inode(struct inode *inode, struct bdi_writeback *wb,
 	int ret = 0;
 
 	spin_lock(&inode->i_lock);
-	if (!atomic_read(&inode->i_count))
-		WARN_ON(!(inode->i_state & (I_WILL_FREE|I_FREEING)));
-	else
-		WARN_ON(inode->i_state & I_WILL_FREE);
 
 	if (inode->i_state & I_SYNC) {
 		if (wbc->sync_mode != WB_SYNC_ALL)
 			goto out;
 		/*
 		 * It's a data-integrity sync. We must wait. Since callers hold
-		 * inode reference or inode has I_WILL_FREE set, it cannot go
+		 * inode reference or inode has I_FREEING set, it cannot go
 		 * away under us.
 		 */
 		__inode_wait_for_writeback(inode);
@@ -1446,7 +1442,7 @@ static long writeback_sb_inodes(struct super_block *sb,
 		 * kind writeout is handled by the freer.
 		 */
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_NEW | I_FREEING | I_WILL_FREE)) {
+		if (inode->i_state & (I_NEW | I_FREEING)) {
 			spin_unlock(&inode->i_lock);
 			redirty_tail(inode, wb);
 			continue;
@@ -2130,7 +2126,7 @@ static void wait_sb_inodes(struct super_block *sb)
 		struct address_space *mapping = inode->i_mapping;
 
 		spin_lock(&inode->i_lock);
-		if ((inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) ||
+		if ((inode->i_state & (I_FREEING|I_NEW)) ||
 		    (mapping->nrpages == 0)) {
 			spin_unlock(&inode->i_lock);
 			continue;
@@ -2301,7 +2297,7 @@ EXPORT_SYMBOL(sync_inodes_sb);
  * This function commits an inode to disk immediately if it is dirty. This is
  * primarily needed by knfsd.
  *
- * The caller must either have a ref on the inode or must have set I_WILL_FREE.
+ * The caller must either have a ref on the inode or must have set I_FREEING.
  */
 int write_inode_now(struct inode *inode, int sync)
 {

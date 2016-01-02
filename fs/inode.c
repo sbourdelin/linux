@@ -405,7 +405,7 @@ static void inode_lru_list_add(struct inode *inode)
 void inode_add_lru(struct inode *inode)
 {
 	if (!(inode->i_state & (I_DIRTY_ALL | I_SYNC |
-				I_FREEING | I_WILL_FREE)) &&
+				I_FREEING)) &&
 	    !atomic_read(&inode->i_count) && inode->i_sb->s_flags & MS_ACTIVE)
 		inode_lru_list_add(inode);
 }
@@ -600,7 +600,7 @@ again:
 			continue;
 
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_NEW | I_FREEING | I_WILL_FREE)) {
+		if (inode->i_state & (I_NEW | I_FREEING)) {
 			spin_unlock(&inode->i_lock);
 			continue;
 		}
@@ -646,7 +646,7 @@ int invalidate_inodes(struct super_block *sb, bool kill_dirty)
 	spin_lock(&sb->s_inode_list_lock);
 	list_for_each_entry_safe(inode, next, &sb->s_inodes, i_sb_list) {
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_NEW | I_FREEING | I_WILL_FREE)) {
+		if (inode->i_state & (I_NEW | I_FREEING)) {
 			spin_unlock(&inode->i_lock);
 			continue;
 		}
@@ -783,7 +783,7 @@ repeat:
 		if (!test(inode, data))
 			continue;
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_FREEING|I_WILL_FREE)) {
+		if (inode->i_state & (I_FREEING)) {
 			__wait_on_freeing_inode(inode);
 			goto repeat;
 		}
@@ -810,7 +810,7 @@ repeat:
 		if (inode->i_sb != sb)
 			continue;
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_FREEING|I_WILL_FREE)) {
+		if (inode->i_state & I_FREEING) {
 			__wait_on_freeing_inode(inode);
 			goto repeat;
 		}
@@ -1191,7 +1191,7 @@ EXPORT_SYMBOL(iunique);
 struct inode *igrab(struct inode *inode)
 {
 	spin_lock(&inode->i_lock);
-	if (!(inode->i_state & (I_FREEING|I_WILL_FREE))) {
+	if (!(inode->i_state & I_FREEING)) {
 		__iget(inode);
 		spin_unlock(&inode->i_lock);
 	} else {
@@ -1353,7 +1353,7 @@ int insert_inode_locked(struct inode *inode)
 			if (old->i_sb != sb)
 				continue;
 			spin_lock(&old->i_lock);
-			if (old->i_state & (I_FREEING|I_WILL_FREE)) {
+			if (old->i_state & I_FREEING) {
 				spin_unlock(&old->i_lock);
 				continue;
 			}
@@ -1396,7 +1396,7 @@ int insert_inode_locked4(struct inode *inode, unsigned long hashval,
 			if (!test(old, data))
 				continue;
 			spin_lock(&old->i_lock);
-			if (old->i_state & (I_FREEING|I_WILL_FREE)) {
+			if (old->i_state & I_FREEING) {
 				spin_unlock(&old->i_lock);
 				continue;
 			}
@@ -1460,16 +1460,14 @@ static void iput_final(struct inode *inode)
 		return;
 	}
 
+	inode->i_state |= I_FREEING;
 	if (!drop) {
-		inode->i_state |= I_WILL_FREE;
 		spin_unlock(&inode->i_lock);
 		write_inode_now(inode, 1);
 		spin_lock(&inode->i_lock);
 		WARN_ON(inode->i_state & I_NEW);
-		inode->i_state &= ~I_WILL_FREE;
 	}
 
-	inode->i_state |= I_FREEING;
 	if (!list_empty(&inode->i_lru))
 		inode_lru_list_del(inode);
 	spin_unlock(&inode->i_lock);

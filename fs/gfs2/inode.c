@@ -50,7 +50,7 @@ static int iget_test(struct inode *inode, void *opaque)
 
 	if (ip->i_no_addr == data->no_addr) {
 		if (data->non_block &&
-		    inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE)) {
+		    inode->i_state & (I_FREEING|I_CLEAR)) {
 			data->skipped = 1;
 			return 0;
 		}

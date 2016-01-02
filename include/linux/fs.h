@@ -1785,7 +1785,7 @@ struct super_operations {
  * I_DIRTY_DATASYNC and I_DIRTY_PAGES.
  *
  * Four bits define the lifetime of an inode.  Initially, inodes are I_NEW,
- * until that flag is cleared.  I_WILL_FREE, I_FREEING and I_CLEAR are set at
+ * until that flag is cleared.  I_FREEING and I_CLEAR are set at
  * various stages of removing an inode.
  *
  * Two bits are used for locking and completion notification, I_NEW and I_SYNC.
@@ -1801,20 +1801,17 @@ struct super_operations {
  *			New inodes set I_NEW.  If two processes both create
  *			the same inode, one of them will release its inode and
  *			wait for I_NEW to be released before returning.
- *			Inodes in I_WILL_FREE, I_FREEING or I_CLEAR state can
+ *			Inodes in I_FREEING or I_CLEAR state can
  *			also cause waiting on I_NEW, without I_NEW actually
  *			being set.  find_inode() uses this to prevent returning
  *			nearly-dead inodes.
- * I_WILL_FREE		Must be set when calling write_inode_now() if i_count
- *			is zero.  I_FREEING must be set when I_WILL_FREE is
- *			cleared.
  * I_FREEING		Set when inode is about to be freed but still has dirty
  *			pages or buffers attached or the inode itself is still
  *			dirty.
  * I_CLEAR		Added by clear_inode().  In this state the inode is
  *			clean and can be destroyed.  Inode keeps I_FREEING.
  *
- *			Inodes that are I_WILL_FREE, I_FREEING or I_CLEAR are
+ *			Inodes that are I_FREEING or I_CLEAR are
  *			prohibited for many purposes.  iget() must wait for
  *			the inode to be completely released, then create it
  *			anew.  Other functions will just ignore such inodes,
@@ -1834,26 +1831,24 @@ struct super_operations {
  *			wb stat updates to grab mapping->tree_lock.  See
  *			inode_switch_wb_work_fn() for details.
  *
- * Q: What is the difference between I_WILL_FREE and I_FREEING?
  */
 #define I_DIRTY_SYNC		(1 << 0)
 #define I_DIRTY_DATASYNC	(1 << 1)
 #define I_DIRTY_PAGES		(1 << 2)
 #define __I_NEW			3
 #define I_NEW			(1 << __I_NEW)
-#define I_WILL_FREE		(1 << 4)
-#define I_FREEING		(1 << 5)
-#define I_CLEAR			(1 << 6)
-#define __I_SYNC		7
+#define I_FREEING		(1 << 4)
+#define I_CLEAR			(1 << 5)
+#define __I_SYNC		6
 #define I_SYNC			(1 << __I_SYNC)
-#define I_REFERENCED		(1 << 8)
-#define __I_DIO_WAKEUP		9
+#define I_REFERENCED		(1 << 7)
+#define __I_DIO_WAKEUP		8
 #define I_DIO_WAKEUP		(1 << __I_DIO_WAKEUP)
-#define I_LINKABLE		(1 << 10)
-#define I_DIRTY_TIME		(1 << 11)
-#define __I_DIRTY_TIME_EXPIRED	12
+#define I_LINKABLE		(1 << 9)
+#define I_DIRTY_TIME		(1 << 10)
+#define __I_DIRTY_TIME_EXPIRED	11
 #define I_DIRTY_TIME_EXPIRED	(1 << __I_DIRTY_TIME_EXPIRED)
-#define I_WB_SWITCH		(1 << 13)
+#define I_WB_SWITCH		(1 << 12)
 
 #define I_DIRTY (I_DIRTY_SYNC | I_DIRTY_DATASYNC | I_DIRTY_PAGES)
 #define I_DIRTY_ALL (I_DIRTY | I_DIRTY_TIME)

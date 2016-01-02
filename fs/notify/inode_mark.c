@@ -158,11 +158,11 @@ void fsnotify_unmount_inodes(struct super_block *sb)
 
 		/*
 		 * We cannot __iget() an inode in state I_FREEING,
-		 * I_WILL_FREE, or I_NEW which is fine because by that point
+		 * or I_NEW which is fine because by that point
 		 * the inode cannot have any associated watches.
 		 */
 		spin_lock(&inode->i_lock);
-		if (inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) {
+		if (inode->i_state & (I_FREEING|I_NEW)) {
 			spin_unlock(&inode->i_lock);
 			continue;
 		}
@@ -191,7 +191,7 @@ void fsnotify_unmount_inodes(struct super_block *sb)
 		/* In case the dropping of a reference would nuke next_i. */
 		while (&next_i->i_sb_list != &sb->s_inodes) {
 			spin_lock(&next_i->i_lock);
-			if (!(next_i->i_state & (I_FREEING | I_WILL_FREE)) &&
+			if (!(next_i->i_state & I_FREEING) &&
 						atomic_read(&next_i->i_count)) {
 				__iget(next_i);
 				need_iput = next_i;

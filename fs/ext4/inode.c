@@ -4367,12 +4367,12 @@ static int other_inode_match(struct inode * inode, unsigned long ino,
 	struct other_inode *oi = (struct other_inode *) data;
 
 	if ((inode->i_ino != ino) ||
-	    (inode->i_state & (I_FREEING | I_WILL_FREE | I_NEW |
+	    (inode->i_state & (I_FREEING | I_NEW |
 			       I_DIRTY_SYNC | I_DIRTY_DATASYNC)) ||
 	    ((inode->i_state & I_DIRTY_TIME) == 0))
 		return 0;
 	spin_lock(&inode->i_lock);
-	if (((inode->i_state & (I_FREEING | I_WILL_FREE | I_NEW |
+	if (((inode->i_state & (I_FREEING | I_NEW |
 				I_DIRTY_SYNC | I_DIRTY_DATASYNC)) == 0) &&
 	    (inode->i_state & I_DIRTY_TIME)) {
 		struct ext4_inode_info	*ei = EXT4_I(inode);

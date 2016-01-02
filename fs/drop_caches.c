@@ -20,7 +20,7 @@ static void drop_pagecache_sb(struct super_block *sb, void *unused)
 	spin_lock(&sb->s_inode_list_lock);
 	list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
 		spin_lock(&inode->i_lock);
-		if ((inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) ||
+		if ((inode->i_state & (I_FREEING|I_NEW)) ||
 		    (inode->i_mapping->nrpages == 0)) {
 			spin_unlock(&inode->i_lock);
 			continue;
