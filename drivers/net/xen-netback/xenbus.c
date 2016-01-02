@@ -685,7 +685,7 @@ static void xen_net_rate_changed(struct xenbus_watch *watch,
 
 static int xen_register_watchers(struct xenbus_device *dev, struct xenvif *vif)
 {
-	int err = 0;
+	int err;
 	char *node;
 	unsigned maxlen;
 
