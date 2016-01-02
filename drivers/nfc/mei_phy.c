@@ -105,7 +105,7 @@ static int mei_nfc_if_version(struct nfc_mei_phy *phy)
 {
 
 	struct mei_nfc_cmd cmd;
-	struct mei_nfc_reply *reply = NULL;
+	struct mei_nfc_reply *reply;
 	struct mei_nfc_if_version *version;
 	size_t if_version_length;
 	int bytes_recv, r;
