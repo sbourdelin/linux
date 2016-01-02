@@ -173,8 +173,8 @@ static int mei_nfc_connect(struct nfc_mei_phy *phy)
 
 	reply = kzalloc(connect_resp_length, GFP_KERNEL);
 	if (!reply) {
-		kfree(cmd);
-		return -ENOMEM;
+		r = -ENOMEM;
+		goto free_cmd;
 	}
 
 	connect_resp = (struct mei_nfc_connect_resp *)reply->data;
@@ -189,7 +189,7 @@ static int mei_nfc_connect(struct nfc_mei_phy *phy)
 	r = mei_cldev_send(phy->cldev, (u8 *)cmd, connect_length);
 	if (r < 0) {
 		pr_err("Could not send connect cmd %d\n", r);
-		goto err;
+		goto free_reply;
 	}
 
 	bytes_recv = mei_cldev_recv(phy->cldev, (u8 *)reply,
@@ -197,7 +197,7 @@ static int mei_nfc_connect(struct nfc_mei_phy *phy)
 	if (bytes_recv < 0) {
 		r = bytes_recv;
 		pr_err("Could not read connect response %d\n", r);
-		goto err;
+		goto free_reply;
 	}
 
 	MEI_DUMP_NFC_HDR("connect reply", &reply->hdr);
@@ -210,11 +210,10 @@ static int mei_nfc_connect(struct nfc_mei_phy *phy)
 		connect_resp->me_hotfix, connect_resp->me_build);
 
 	r = 0;
-
-err:
+free_reply:
 	kfree(reply);
+free_cmd:
 	kfree(cmd);
-
 	return r;
 }
 
