@@ -173,7 +173,7 @@ struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 			memcpy(ui->data, ino->data, ui->data_len);
 			((char *)ui->data)[ui->data_len] = '\0';
 		} else if (ui->data_len != 0) {
-			err = 10;
+			err = -EINVAL;
 			goto out_invalid;
 		}
 		break;
@@ -181,14 +181,14 @@ struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 		inode->i_op  = &ubifs_dir_inode_operations;
 		inode->i_fop = &ubifs_dir_operations;
 		if (ui->data_len != 0) {
-			err = 11;
+			err = -EINVAL;
 			goto out_invalid;
 		}
 		break;
 	case S_IFLNK:
 		inode->i_op = &ubifs_symlink_inode_operations;
 		if (ui->data_len <= 0 || ui->data_len > UBIFS_MAX_INO_DATA) {
-			err = 12;
+			err = -EINVAL;
 			goto out_invalid;
 		}
 		ui->data = kmalloc(ui->data_len + 1, GFP_NOFS);
@@ -218,7 +218,7 @@ struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 		else if (ui->data_len == sizeof(dev->huge))
 			rdev = huge_decode_dev(le64_to_cpu(dev->huge));
 		else {
-			err = 13;
+			err = -EINVAL;
 			goto out_invalid;
 		}
 		memcpy(ui->data, ino->data, ui->data_len);
@@ -231,12 +231,12 @@ struct inode *ubifs_iget(struct super_block *sb, unsigned long inum)
 		inode->i_op = &ubifs_file_inode_operations;
 		init_special_inode(inode, inode->i_mode, 0);
 		if (ui->data_len != 0) {
-			err = 14;
+			err = -EINVAL;
 			goto out_invalid;
 		}
 		break;
 	default:
-		err = 15;
+		err = -EINVAL;
 		goto out_invalid;
 	}
 
