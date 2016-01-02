@@ -687,11 +687,12 @@ static int xen_register_watchers(struct xenbus_device *dev, struct xenvif *vif)
 {
 	int err = 0;
 	char *node;
-	unsigned maxlen = strlen(dev->nodename) + sizeof("/rate");
+	unsigned maxlen;
 
 	if (vif->credit_watch.node)
 		return -EADDRINUSE;
 
+	maxlen = strlen(dev->nodename) + sizeof("/rate");
 	node = kmalloc(maxlen, GFP_KERNEL);
 	if (!node)
 		return -ENOMEM;
