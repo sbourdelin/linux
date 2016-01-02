@@ -4112,7 +4112,7 @@ out:
 	}
 	if (handle)
 		ext4_journal_stop(handle);
-	if (do_retry) {
+	if (do_retry /* FIXME: ctx is invalid */ && 0) {
 		do_retry = 0;
 		goto retry;
 	}
