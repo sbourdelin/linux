@@ -596,7 +596,6 @@ err:
 static int abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 {
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
-	struct rtc_time *alarm_tm = &alarm->time;
 	unsigned long rtc_secs, alarm_secs;
 	struct rtc_time rtc_tm;
 	int ret;
@@ -610,7 +609,7 @@ static int abb5zes3_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	if (ret)
 		goto err;
 
-	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
+	ret = rtc_tm_to_time(&alarm->time, &alarm_secs);
 	if (ret)
 		goto err;
 
