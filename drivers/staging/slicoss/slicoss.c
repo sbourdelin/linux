@@ -2301,9 +2301,9 @@ static int slic_adapter_allocresources(struct adapter *adapter,
  */
 static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 {
-	struct sliccard *card = adapter->card;
+	struct sliccard *card;
 	struct net_device *dev = adapter->netdev;
-	__iomem struct slic_regs *slic_regs = adapter->slic_regs;
+	__iomem struct slic_regs *slic_regs;
 	struct slic_shmem *pshmem;
 	int rc;
 
@@ -2348,6 +2348,7 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 		adapter->queues_initialized = 1;
 	}
 
+	slic_regs = adapter->slic_regs;
 	slic_reg32_write(&slic_regs->slic_icr, ICR_INT_OFF, FLUSH);
 	mdelay(1);
 
@@ -2374,6 +2375,7 @@ static int slic_if_init(struct adapter *adapter, unsigned long *flags)
 	}
 
 	adapter->state = ADAPT_UP;
+	card = adapter->card;
 	if (!card->loadtimerset) {
 		setup_timer(&card->loadtimer, &slic_timer_load_check,
 			    (ulong)card);
