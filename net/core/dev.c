@@ -4579,7 +4579,7 @@ static struct sk_buff *napi_frags_skb(struct napi_struct *napi)
 	eth = skb_gro_header_fast(skb, 0);
 	if (unlikely(skb_gro_header_hard(skb, hlen))) {
 		eth = skb_gro_header_slow(skb, hlen, 0);
-		if (unlikely(!eth)) {
+		if (WARN_ON(!eth)) {
 			napi_reuse_skb(napi, skb);
 			return NULL;
 		}
