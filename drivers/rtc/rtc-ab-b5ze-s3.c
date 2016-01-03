@@ -816,7 +816,6 @@ static irqreturn_t _abb5zes3_rtc_interrupt(int irq, void *data)
 	struct i2c_client *client = data;
 	struct device *dev = &client->dev;
 	struct abb5zes3_rtc_data *rtc_data = dev_get_drvdata(dev);
-	struct rtc_device *rtc = rtc_data->rtc;
 	u8 regs[ABB5ZES3_CTRL_SEC_LEN];
 	int ret, handled = IRQ_NONE;
 
@@ -844,8 +843,7 @@ static irqreturn_t _abb5zes3_rtc_interrupt(int irq, void *data)
 	/* Check alarm flag */
 	if (regs[ABB5ZES3_REG_CTRL2] & ABB5ZES3_REG_CTRL2_AF) {
 		dev_dbg(dev, "RTC alarm!\n");
-
-		rtc_update_irq(rtc, 1, RTC_IRQF | RTC_AF);
+		rtc_update_irq(rtc_data->rtc, 1, RTC_IRQF | RTC_AF);
 
 		/* Acknowledge and disable the alarm */
 		_abb5zes3_rtc_clear_alarm(dev);
@@ -857,8 +855,7 @@ static irqreturn_t _abb5zes3_rtc_interrupt(int irq, void *data)
 	/* Check watchdog Timer A flag */
 	if (regs[ABB5ZES3_REG_CTRL2] & ABB5ZES3_REG_CTRL2_WTAF) {
 		dev_dbg(dev, "RTC timer!\n");
-
-		rtc_update_irq(rtc, 1, RTC_IRQF | RTC_AF);
+		rtc_update_irq(rtc_data->rtc, 1, RTC_IRQF | RTC_AF);
 
 		/*
 		 * Acknowledge and disable the alarm. Note: WTAF
