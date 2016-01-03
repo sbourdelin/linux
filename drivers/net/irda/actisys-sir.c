@@ -1,8 +1,8 @@
 /*********************************************************************
- *                
+ *
  * Filename:      actisys.c
  * Version:       1.1
- * Description:   Implementation for the ACTiSYS IR-220L and IR-220L+ 
+ * Description:   Implementation for the ACTiSYS IR-220L and IR-220L+
  *                dongles
  * Status:        Beta.
  * Authors:       Dag Brattli <dagb@cs.uit.no> (initially)
@@ -11,24 +11,23 @@
  * Created at:    Wed Oct 21 20:02:35 1998
  * Modified at:   Sun Oct 27 22:02:13 2002
  * Modified by:   Martin Diehl <mad@mdiehl.de>
- * 
+ *
  *     Copyright (c) 1998-1999 Dag Brattli, All Rights Reserved.
  *     Copyright (c) 1999 Jean Tourrilhes
  *     Copyright (c) 2002 Martin Diehl
- *      
- *     This program is free software; you can redistribute it and/or 
- *     modify it under the terms of the GNU General Public License as 
- *     published by the Free Software Foundation; either version 2 of 
+ *
+ *     This program is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of
  *     the License, or (at your option) any later version.
- *  
+ *
  *     Neither Dag Brattli nor University of Tromsø admit liability nor
- *     provide warranty for any of this software. This material is 
+ *     provide warranty for any of this software. This material is
  *     provided "AS-IS" and at no charge.
- *     
+ *
  ********************************************************************/
 
-/*
- * Changelog
+/* Changelog
  *
  * 0.8 -> 0.9999 - Jean
  *	o New initialisation procedure : much safer and correct
@@ -48,8 +47,7 @@
 
 #include "sir-dev.h"
 
-/* 
- * Define the timing of the pulses we send to the dongle (to reset it, and
+/* Define the timing of the pulses we send to the dongle (to reset it, and
  * to toggle speeds). Basically, the limit here is the propagation speed of
  * the signals through the serial port, the dongle being much faster.  Any
  * serial port support 115 kb/s, so we are sure that pulses 8.5 us wide can
@@ -121,7 +119,7 @@ static int actisys_open(struct sir_dev *dev)
 	sirdev_set_dtr_rts(dev, TRUE, TRUE);
 
 	/* Set the speeds we can accept */
-	qos->baud_rate.bits &= IR_9600|IR_19200|IR_38400|IR_57600|IR_115200;
+	qos->baud_rate.bits &= IR_9600 | IR_19200 | IR_38400 | IR_57600 | IR_115200;
 
 	/* Remove support for 38400 if this is not a 220L+ dongle */
 	if (dev->dongle_drv->type == IRDA_ACTISYS_DONGLE)
@@ -143,8 +141,7 @@ static int actisys_close(struct sir_dev *dev)
 	return 0;
 }
 
-/*
- * Function actisys_change_speed (task)
+/* Function actisys_change_speed (task)
  *
  *    Change speed of the ACTiSYS IR-220L and IR-220L+ type IrDA dongles.
  *    To cycle through the available baud rates, pulse RTS low for a few us.
@@ -169,11 +166,9 @@ static int actisys_change_speed(struct sir_dev *dev, unsigned speed)
 
 	/* dongle was already resetted from irda_request state machine,
 	 * we are in known state (dongle default)
-	 */
-
-	/* 
+	 *
 	 * Now, we can set the speed requested. Send RTS pulses until we
-         * reach the target speed 
+	 * reach the target speed
 	 */
 	for (i = 0; i < MAX_SPEEDS; i++) {
 		if (speed == baud_rates[i]) {
@@ -199,8 +194,7 @@ static int actisys_change_speed(struct sir_dev *dev, unsigned speed)
 	return ret;
 }
 
-/*
- * Function actisys_reset (task)
+/* Function actisys_reset (task)
  *
  *      Reset the Actisys type dongle. Warning, this function must only be
  *      called with a process context!
@@ -229,14 +223,14 @@ static int actisys_reset(struct sir_dev *dev)
 
 	/* Go back to normal mode */
 	sirdev_set_dtr_rts(dev, TRUE, TRUE);
-	
+
 	dev->speed = 9600;	/* That's the default */
 
 	return 0;
 }
 
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no> - Jean Tourrilhes <jt@hpl.hp.com>");
-MODULE_DESCRIPTION("ACTiSYS IR-220L and IR-220L+ dongle driver");	
+MODULE_DESCRIPTION("ACTiSYS IR-220L and IR-220L+ dongle driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("irda-dongle-2"); /* IRDA_ACTISYS_DONGLE */
 MODULE_ALIAS("irda-dongle-3"); /* IRDA_ACTISYS_PLUS_DONGLE */
