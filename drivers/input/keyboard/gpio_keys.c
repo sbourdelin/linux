@@ -226,22 +226,32 @@ static ssize_t gpio_keys_attr_store_helper(struct gpio_keys_drvdata *ddata,
 		goto out;
 
 	/* First validate */
-	for (i = 0; i < ddata->pdata->nbuttons; i++) {
-		struct gpio_button_data *bdata = &ddata->data[i];
+	for (i = 0; i < n_events; i++) {
+		int j;
 
-		if (bdata->button->type != type)
+		if (!test_bit(i, bits))
 			continue;
 
-		if (test_bit(bdata->button->code, bits) &&
-		    !bdata->button->can_disable) {
+		for (j = 0; j < ddata->pdata->nbuttons; j++) {
+			struct gpio_button_data *bdata = &ddata->data[j];
+
+			if (bdata->button->type != type)
+				continue;
+
+			if (bdata->button->code == i) {
+				if (!bdata->button->can_disable) {
+					error = -EINVAL;
+					goto out;
+				}
+				break;
+			}
+		}
+
+		if (j == ddata->pdata->nbuttons) {
 			error = -EINVAL;
 			goto out;
 		}
-	}
 
-	if (i == ddata->pdata->nbuttons) {
-		error = -EINVAL;
-		goto out;
 	}
 
 	mutex_lock(&ddata->disable_lock);
