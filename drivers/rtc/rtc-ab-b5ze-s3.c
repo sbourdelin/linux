@@ -326,7 +326,7 @@ static int _abb5zes3_rtc_read_timer(struct device *dev,
 				    struct rtc_wkalrm *alarm)
 {
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
-	struct rtc_time rtc_tm, *alarm_tm = &alarm->time;
+	struct rtc_time rtc_tm;
 	u8 regs[ABB5ZES3_TIMA_SEC_LEN + 1];
 	unsigned long rtc_secs;
 	unsigned int reg;
@@ -362,7 +362,7 @@ static int _abb5zes3_rtc_read_timer(struct device *dev,
 		goto err;
 
 	/* ... and convert back. */
-	rtc_time_to_tm(rtc_secs + timer_secs, alarm_tm);
+	rtc_time_to_tm(rtc_secs + timer_secs, &alarm->time);
 
 	ret = regmap_read(data->regmap, ABB5ZES3_REG_CTRL2, &reg);
 	if (ret) {
