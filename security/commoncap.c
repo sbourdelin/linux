@@ -658,7 +658,7 @@ int cap_inode_setxattr(struct dentry *dentry, const char *name,
 	}
 
 	if (!strncmp(name, XATTR_SECURITY_PREFIX,
-		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
+		     XATTR_SECURITY_PREFIX_LEN) &&
 	    !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	return 0;
@@ -684,7 +684,7 @@ int cap_inode_removexattr(struct dentry *dentry, const char *name)
 	}
 
 	if (!strncmp(name, XATTR_SECURITY_PREFIX,
-		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
+		     XATTR_SECURITY_PREFIX_LEN) &&
 	    !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	return 0;
