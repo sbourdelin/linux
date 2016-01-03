@@ -560,7 +560,7 @@ static int _abb5zes3_rtc_set_timer(struct device *dev, struct rtc_wkalrm *alarm,
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
 	u8 regs[ABB5ZES3_TIMA_SEC_LEN];
 	u8 mask = ABB5ZES3_REG_TIM_CLK_TAC0 | ABB5ZES3_REG_TIM_CLK_TAC1;
-	int ret = 0;
+	int ret;
 
 	/* Program given number of seconds to Timer A registers */
 	sec_to_timer_a(secs, &regs[0], &regs[1]);
