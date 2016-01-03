@@ -16,7 +16,7 @@ ext4_xattr_security_list(const struct xattr_handler *handler,
 			 struct dentry *dentry, char *list, size_t list_size,
 			 const char *name, size_t name_len)
 {
-	const size_t prefix_len = sizeof(XATTR_SECURITY_PREFIX)-1;
+	const size_t prefix_len = XATTR_SECURITY_PREFIX_LEN;
 	const size_t total_len = prefix_len + name_len + 1;
 
 
