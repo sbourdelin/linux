@@ -1723,7 +1723,8 @@ out_quotactl:
 			return -EFAULT;
 		return 0;
 	case LL_IOC_GET_CONNECT_FLAGS: {
-		return obd_iocontrol(cmd, sbi->ll_md_exp, 0, NULL, (void *)arg);
+		return obd_iocontrol(cmd, sbi->ll_md_exp, 0, NULL,
+				     (void __user *)arg);
 	}
 	case OBD_IOC_CHANGELOG_SEND:
 	case OBD_IOC_CHANGELOG_CLEAR:
@@ -1846,7 +1847,8 @@ out_quotactl:
 		return rc;
 	}
 	default:
-		return obd_iocontrol(cmd, sbi->ll_dt_exp, 0, NULL, (void *)arg);
+		return obd_iocontrol(cmd, sbi->ll_dt_exp, 0, NULL,
+				     (void __user *)arg);
 	}
 }
 
