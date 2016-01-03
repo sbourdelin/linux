@@ -382,7 +382,7 @@ static int _abb5zes3_rtc_read_alarm(struct device *dev,
 				    struct rtc_wkalrm *alarm)
 {
 	struct abb5zes3_rtc_data *data = dev_get_drvdata(dev);
-	struct rtc_time rtc_tm, *alarm_tm = &alarm->time;
+	struct rtc_time rtc_tm, *alarm_tm;
 	unsigned long rtc_secs, alarm_secs;
 	u8 regs[ABB5ZES3_ALRM_SEC_LEN];
 	unsigned int reg;
@@ -396,6 +396,7 @@ static int _abb5zes3_rtc_read_alarm(struct device *dev,
 		goto err;
 	}
 
+	alarm_tm = &alarm->time;
 	alarm_tm->tm_sec  = 0;
 	alarm_tm->tm_min  = bcd2bin(regs[0] & 0x7f);
 	alarm_tm->tm_hour = bcd2bin(regs[1] & 0x3f);
