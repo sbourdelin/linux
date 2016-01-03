@@ -5638,7 +5638,7 @@ static void qeth_core_remove_device(struct ccwgroup_device *gdev)
 static int qeth_core_set_online(struct ccwgroup_device *gdev)
 {
 	struct qeth_card *card = dev_get_drvdata(&gdev->dev);
-	int rc = 0;
+	int rc;
 	int def_discipline;
 
 	if (!card->discipline) {
