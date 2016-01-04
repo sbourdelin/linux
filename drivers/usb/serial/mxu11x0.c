@@ -833,20 +833,6 @@ static int mxu1_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (tty)
 		mxu1_set_termios(tty, port, NULL);
 
-	status = mxu1_send_ctrl_urb(serial, MXU1_OPEN_PORT,
-				    open_settings, MXU1_UART1_PORT);
-	if (status) {
-		dev_err(&port->dev, "cannot send open command: %d\n", status);
-		goto unlink_int_urb;
-	}
-
-	status = mxu1_send_ctrl_urb(serial, MXU1_START_PORT,
-				    0, MXU1_UART1_PORT);
-	if (status) {
-		dev_err(&port->dev, "cannot send start command: %d\n", status);
-		goto unlink_int_urb;
-	}
-
 	status = usb_serial_generic_open(tty, port);
 	if (status)
 		goto unlink_int_urb;
@@ -865,6 +851,13 @@ static void mxu1_close(struct usb_serial_port *port)
 
 	usb_serial_generic_close(port);
 	usb_kill_urb(port->interrupt_in_urb);
+
+	status = mxu1_send_ctrl_urb(port->serial, MXU1_STOP_PORT,
+				    0, MXU1_UART1_PORT);
+	if (status) {
+		dev_err(&port->dev, "failed to send stop port command: %d\n",
+			status);
+	}
 
 	status = mxu1_send_ctrl_urb(port->serial, MXU1_CLOSE_PORT,
 				    0, MXU1_UART1_PORT);
