@@ -123,7 +123,7 @@ dbg_qh(const char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 	ehci_dbg(ehci, "%s qh %p n%08x info %x %x qtd %x\n", label,
 		qh, hw->hw_next, hw->hw_info1, hw->hw_info2, hw->hw_current);
-	dbg_qtd("overlay", ehci, (struct ehci_qtd *) &hw->hw_qtd_next);
+	dbg_qtd("overlay", ehci, (struct ehci_qtd *)&hw->hw_qtd_next);
 }
 
 static void __maybe_unused
@@ -491,7 +491,7 @@ static void qh_lines(
 				(scratch >> 16) & 0x7fff,
 				scratch,
 				td->urb,
-				(u32) td->qtd_dma,
+				(u32)td->qtd_dma,
 				hc32_to_cpup(ehci, &td->hw_buf[0]));
 		if (size < temp)
 			temp = size;
