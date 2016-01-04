@@ -459,24 +459,6 @@ static void rrpc_lun_gc(struct work_struct *work)
 	/* TODO: Hint that request queue can be started again */
 }
 
-static void rrpc_gc_queue(struct work_struct *work)
-{
-	struct rrpc_block_gc *gcb = container_of(work, struct rrpc_block_gc,
-									ws_gc);
-	struct rrpc *rrpc = gcb->rrpc;
-	struct rrpc_block *rblk = gcb->rblk;
-	struct nvm_lun *lun = rblk->parent->lun;
-	struct rrpc_lun *rlun = &rrpc->luns[lun->id - rrpc->lun_offset];
-
-	spin_lock(&rlun->lock);
-	list_add_tail(&rblk->prio, &rlun->prio_list);
-	spin_unlock(&rlun->lock);
-
-	mempool_free(gcb, rrpc->gcb_pool);
-	pr_debug("nvm: block '%lu' is full, allow GC (sched)\n",
-							rblk->parent->id);
-}
-
 static const struct block_device_operations rrpc_fops = {
 	.owner		= THIS_MODULE,
 };
@@ -604,39 +586,30 @@ err:
 	return NULL;
 }
 
-static void rrpc_run_gc(struct rrpc *rrpc, struct rrpc_block *rblk)
-{
-	struct rrpc_block_gc *gcb;
-
-	gcb = mempool_alloc(rrpc->gcb_pool, GFP_ATOMIC);
-	if (!gcb) {
-		pr_err("rrpc: unable to queue block for gc.");
-		return;
-	}
-
-	gcb->rrpc = rrpc;
-	gcb->rblk = rblk;
-
-	INIT_WORK(&gcb->ws_gc, rrpc_gc_queue);
-	queue_work(rrpc->kgc_wq, &gcb->ws_gc);
-}
-
 static void rrpc_end_io_write(struct rrpc *rrpc, struct rrpc_rq *rrqd,
 						sector_t laddr, uint8_t npages)
 {
 	struct rrpc_addr *p;
 	struct rrpc_block *rblk;
 	struct nvm_lun *lun;
+	struct rrpc_lun *rlun;
 	int cmnt_size, i;
 
 	for (i = 0; i < npages; i++) {
 		p = &rrpc->trans_map[laddr + i];
 		rblk = p->rblk;
 		lun = rblk->parent->lun;
+		rlun = &rrpc->luns[lun->id - rrpc->lun_offset];
 
 		cmnt_size = atomic_inc_return(&rblk->data_cmnt_size);
-		if (unlikely(cmnt_size == rrpc->dev->pgs_per_blk))
-			rrpc_run_gc(rrpc, rblk);
+		if (unlikely(cmnt_size == rrpc->dev->pgs_per_blk)) {
+			pr_debug("nvm: block '%lu' is full, allow GC (sched)\n",
+							rblk->parent->id);
+			spin_lock(&rlun->lock);
+			list_add_tail(&rblk->prio, &rlun->prio_list);
+			spin_unlock(&rlun->lock);
+
+		}
 	}
 }
 
