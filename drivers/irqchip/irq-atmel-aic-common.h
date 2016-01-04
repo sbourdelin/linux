@@ -18,8 +18,6 @@
 
 #define AIC_IRQS_PER_CHIP	32
 
-int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val);
-
 struct irq_domain *__init aic_common_of_init(struct device_node *node,
 					     const char *name, int nirqs);
 

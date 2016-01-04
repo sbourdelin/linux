@@ -263,37 +263,40 @@ static int aic_retrigger(struct irq_data *d)
 	return 0;
 }
 
-int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val)
+static int aic_set_type(struct irq_data *d, unsigned int type)
 {
+	struct irq_domain *domain = d->domain;
+	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
 	struct aic_chip_data *aic = gc->private;
-	unsigned aic_type;
+	u32 val;
 
 	switch (type) {
 	case IRQ_TYPE_LEVEL_HIGH:
-		aic_type = AT91_AIC_SRCTYPE_HIGH;
+		val = AT91_AIC_SRCTYPE_HIGH;
 		break;
 	case IRQ_TYPE_EDGE_RISING:
-		aic_type = AT91_AIC_SRCTYPE_RISING;
+		val = AT91_AIC_SRCTYPE_RISING;
 		break;
 	case IRQ_TYPE_LEVEL_LOW:
 		if (!(d->mask & aic->ext_irqs))
 			return -EINVAL;
 
-		aic_type = AT91_AIC_SRCTYPE_LOW;
+		val = AT91_AIC_SRCTYPE_LOW;
 		break;
 	case IRQ_TYPE_EDGE_FALLING:
 		if (!(d->mask & aic->ext_irqs))
 			return -EINVAL;
 
-		aic_type = AT91_AIC_SRCTYPE_FALLING;
+		val = AT91_AIC_SRCTYPE_FALLING;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	*val &= ~AT91_AIC_SRCTYPE;
-	*val |= aic_type;
+	irq_gc_lock(bgc);
+	aic_update_smr(bgc, d->hwirq, ~AT91_AIC_SRCTYPE, val);
+	irq_gc_unlock(bgc);
 
 	return 0;
 }
@@ -376,6 +379,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		gc->chip_types[0].chip.irq_mask = aic_mask;
 		gc->chip_types[0].chip.irq_unmask = aic_unmask;
 		gc->chip_types[0].chip.irq_retrigger = aic_retrigger;
+		gc->chip_types[0].chip.irq_set_type = aic_set_type;
 		gc->private = &aic[i];
 	}
 

@@ -74,22 +74,6 @@ aic_handle(struct pt_regs *regs)
 		handle_domain_irq(aic_domain, irqnr, regs);
 }
 
-static int aic_set_type(struct irq_data *d, unsigned type)
-{
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-	unsigned int smr;
-	int ret;
-
-	smr = irq_reg_readl(gc, AT91_AIC_SMR(d->hwirq));
-	ret = aic_common_set_type(d, type, &smr);
-	if (ret)
-		return ret;
-
-	irq_reg_writel(gc, smr, AT91_AIC_SMR(d->hwirq));
-
-	return 0;
-}
-
 #ifdef CONFIG_PM
 static void aic_suspend(struct irq_data *d)
 {
@@ -173,7 +157,6 @@ static int __init aic_of_init(struct device_node *node,
 	gc = irq_get_domain_generic_chip(domain, 0);
 
 	gc->chip_types[0].regs.eoi = AT91_AIC_EOICR;
-	gc->chip_types[0].chip.irq_set_type = aic_set_type;
 	gc->chip_types[0].chip.irq_suspend = aic_suspend;
 	gc->chip_types[0].chip.irq_resume = aic_resume;
 	gc->chip_types[0].chip.irq_pm_shutdown = aic_pm_shutdown;

@@ -83,24 +83,6 @@ aic5_handle(struct pt_regs *regs)
 		handle_domain_irq(aic5_domain, irqnr, regs);
 }
 
-static int aic5_set_type(struct irq_data *d, unsigned type)
-{
-	struct irq_domain *domain = d->domain;
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
-	unsigned int smr;
-	int ret;
-
-	irq_gc_lock(bgc);
-	irq_reg_writel(bgc, d->hwirq, AT91_AIC5_SSR);
-	smr = irq_reg_readl(bgc, AT91_AIC5_SMR);
-	ret = aic_common_set_type(d, type, &smr);
-	if (!ret)
-		irq_reg_writel(bgc, smr, AT91_AIC5_SMR);
-	irq_gc_unlock(bgc);
-
-	return ret;
-}
-
 #ifdef CONFIG_PM
 static void aic5_suspend(struct irq_data *d)
 {
@@ -225,7 +207,6 @@ static int __init aic5_of_init(struct device_node *node,
 		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
 
 		gc->chip_types[0].regs.eoi = AT91_AIC5_EOICR;
-		gc->chip_types[0].chip.irq_set_type = aic5_set_type;
 		gc->chip_types[0].chip.irq_suspend = aic5_suspend;
 		gc->chip_types[0].chip.irq_resume = aic5_resume;
 		gc->chip_types[0].chip.irq_pm_shutdown = aic5_pm_shutdown;
