@@ -1773,6 +1773,63 @@ static int ethtool_get_per_queue_coalesce(struct net_device *dev,
 	return 0;
 }
 
+static int ethtool_set_per_queue_coalesce(struct net_device *dev,
+					  void __user *useraddr,
+					  struct ethtool_per_queue_op *per_queue_opt)
+{
+	int bit, i, ret = 0;
+	int queue_num = bitmap_weight(per_queue_opt->queue_mask, MAX_NUM_QUEUE);
+	struct ethtool_coalesce *backup = NULL, *tmp = NULL;
+	bool rollback = true;
+
+	if (!dev->ethtool_ops->set_per_queue_coalesce)
+		return -EOPNOTSUPP;
+
+	if (!dev->ethtool_ops->get_per_queue_coalesce)
+		rollback = false;
+
+	useraddr += sizeof(*per_queue_opt);
+
+	if (rollback)
+		tmp = backup = kmalloc(queue_num * sizeof(*backup), GFP_KERNEL);
+
+	for_each_set_bit(bit, per_queue_opt->queue_mask, MAX_NUM_QUEUE) {
+		struct ethtool_coalesce coalesce;
+
+		if (rollback) {
+			if (dev->ethtool_ops->get_per_queue_coalesce(dev, bit, tmp)) {
+				ret = -EFAULT;
+				goto roll_back;
+			}
+			tmp += sizeof(struct ethtool_coalesce);
+		}
+
+		if (copy_from_user(&coalesce, useraddr, sizeof(coalesce))) {
+			ret = -EFAULT;
+			goto roll_back;
+		}
+
+		ret = dev->ethtool_ops->set_per_queue_coalesce(dev, bit, &coalesce);
+		if (ret != 0)
+			goto roll_back;
+
+		useraddr += sizeof(coalesce);
+	}
+
+roll_back:
+	if (rollback) {
+		if (ret != 0) {
+			tmp = backup;
+			for_each_set_bit(i, per_queue_opt->queue_mask, bit - 1) {
+				dev->ethtool_ops->set_per_queue_coalesce(dev, i, tmp);
+				tmp += sizeof(struct ethtool_coalesce);
+			}
+		}
+		kfree(backup);
+	}
+	return ret;
+}
+
 static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_per_queue_op per_queue_opt;
@@ -1783,6 +1840,8 @@ static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
 	switch (per_queue_opt.sub_command) {
 	case ETHTOOL_GCOALESCE:
 		return ethtool_get_per_queue_coalesce(dev, useraddr, &per_queue_opt);
+	case ETHTOOL_SCOALESCE:
+		return ethtool_set_per_queue_coalesce(dev, useraddr, &per_queue_opt);
 	default:
 		return -EOPNOTSUPP;
 	};

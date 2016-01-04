@@ -208,6 +208,12 @@ static inline u32 ethtool_rxfh_indir_default(u32 index, u32 n_rx_rings)
  *	zero should return. But related unavailable fields should be set to ~0,
  *	which indicates RX or TX is not in the range.
  * 	Returns a negative error code or zero.
+ * @set_per_queue_coalesce: Set interrupt coalescing parameters per queue.
+ * 	It needs to do range check for the input queue number. Only if
+ * 	neither RX nor TX queue number is in the range, a negative error code
+ * 	returns. For the case that only RX or only TX is not in the range,
+ * 	zero should return. The related unavailable fields should be avoid.
+ * 	Returns a negative error code or zero.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -287,6 +293,8 @@ struct ethtool_ops {
 	int	(*set_tunable)(struct net_device *,
 			       const struct ethtool_tunable *, const void *);
 	int	(*get_per_queue_coalesce)(struct net_device *, int,
+					  struct ethtool_coalesce *);
+	int	(*set_per_queue_coalesce)(struct net_device *, int,
 					  struct ethtool_coalesce *);
 
 };
