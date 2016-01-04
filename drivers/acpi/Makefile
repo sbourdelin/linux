@@ -41,6 +41,7 @@ acpi-y				+= ec.o
 acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
 acpi-y				+= pci_root.o pci_link.o pci_irq.o
 acpi-$(CONFIG_PCI_MMCONFIG)	+= pci_mcfg.o
+acpi-$(CONFIG_ACPI_PCI_HOST_GENERIC) += pci_host_acpi.o
 acpi-y				+= acpi_lpss.o acpi_apd.o
 acpi-y				+= acpi_platform.o
 acpi-y				+= acpi_pnp.o
