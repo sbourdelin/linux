@@ -698,6 +698,8 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 	 */
 	spin_lock_irqsave(&ehci->lock, flags);
 	for (i = 0; i < ehci->periodic_size; i++) {
+		struct ehci_qh_hw *hw;
+
 		p = ehci->pshadow[i];
 		if (likely(!p.ptr))
 			continue;
@@ -707,104 +709,98 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 		size -= temp;
 		next += temp;
 
-		do {
-			struct ehci_qh_hw *hw;
-
-			switch (hc32_to_cpu(ehci, tag)) {
-			case Q_TYPE_QH:
-				hw = p.qh->hw;
-				temp = scnprintf(next, size, " qh%d-%04x/%p",
-						p.qh->ps.period,
-						hc32_to_cpup(ehci,
-							&hw->hw_info2)
-							/* uframe masks */
-							& (QH_CMASK | QH_SMASK),
-						p.qh);
-				size -= temp;
-				next += temp;
-				/* don't repeat what follows this qh */
-				for (temp = 0; temp < seen_count; temp++) {
-					if (seen[temp].ptr != p.ptr)
-						continue;
-					if (p.qh->qh_next.ptr) {
-						temp = scnprintf(next, size,
-							" ...");
-						size -= temp;
-						next += temp;
-					}
-					break;
-				}
-				/* show more info the first time around */
-				if (temp == seen_count) {
-					u32	scratch = hc32_to_cpup(ehci,
-							&hw->hw_info1);
-					struct ehci_qtd	*qtd;
-					char		*type = "";
-
-					/* count tds, get ep direction */
-					temp = 0;
-					list_for_each_entry(qtd,
-							&p.qh->qtd_list,
-							qtd_list) {
-						temp++;
-						switch ((hc32_to_cpu(ehci,
-							qtd->hw_token) >> 8)
-								& 0x03) {
-						case 0:
-							type = "out";
-							continue;
-						case 1:
-							type = "in";
-							continue;
-						}
-					}
-
-					temp = scnprintf(next, size,
-						" (%c%d ep%d%s "
-						"[%d/%d] q%d p%d)",
-						speed_char (scratch),
-						scratch & 0x007f,
-						(scratch >> 8) & 0x000f, type,
-						p.qh->ps.usecs,
-						p.qh->ps.c_usecs,
-						temp,
-						0x7ff & (scratch >> 16));
-
-					if (seen_count < DBG_SCHED_LIMIT)
-						seen[seen_count++].qh = p.qh;
-				} else {
-					temp = 0;
-				}
-				tag = Q_NEXT_TYPE(ehci, hw->hw_next);
-				p = p.qh->qh_next;
-				break;
-			case Q_TYPE_FSTN:
-				temp = scnprintf(next, size,
-					" fstn-%8x/%p", p.fstn->hw_prev,
-					p.fstn);
-				tag = Q_NEXT_TYPE(ehci, p.fstn->hw_next);
-				p = p.fstn->fstn_next;
-				break;
-			case Q_TYPE_ITD:
-				temp = scnprintf(next, size,
-					" itd/%p", p.itd);
-				tag = Q_NEXT_TYPE(ehci, p.itd->hw_next);
-				p = p.itd->itd_next;
-				break;
-			case Q_TYPE_SITD:
-				temp = scnprintf(next, size,
-					" sitd%d-%04x/%p",
-					p.sitd->stream->ps.period,
-					hc32_to_cpup(ehci, &p.sitd->hw_uframe)
-						& 0x0000ffff,
-					p.sitd);
-				tag = Q_NEXT_TYPE(ehci, p.sitd->hw_next);
-				p = p.sitd->sitd_next;
-				break;
-			}
+do_loop:
+		switch (hc32_to_cpu(ehci, tag)) {
+		case Q_TYPE_QH:
+			hw = p.qh->hw;
+			temp = scnprintf(next, size, " qh%d-%04x/%p",
+					p.qh->ps.period,
+					hc32_to_cpup(ehci, &hw->hw_info2)
+						/* uframe masks */
+						& (QH_CMASK | QH_SMASK),
+					p.qh);
 			size -= temp;
 			next += temp;
-		} while (p.ptr);
+			/* don't repeat what follows this qh */
+			for (temp = 0; temp < seen_count; temp++) {
+				if (seen[temp].ptr != p.ptr)
+					continue;
+				if (p.qh->qh_next.ptr) {
+					temp = scnprintf(next, size, " ...");
+					size -= temp;
+					next += temp;
+				}
+				break;
+			}
+			/* show more info the first time around */
+			if (temp == seen_count) {
+				u32	scratch = hc32_to_cpup(ehci,
+						&hw->hw_info1);
+				struct ehci_qtd	*qtd;
+				char		*type = "";
+
+				/* count tds, get ep direction */
+				temp = 0;
+				list_for_each_entry(qtd,
+						&p.qh->qtd_list,
+						qtd_list) {
+					temp++;
+					switch ((hc32_to_cpu(ehci,
+						qtd->hw_token) >> 8)
+							& 0x03) {
+					case 0:
+						type = "out";
+						continue;
+					case 1:
+						type = "in";
+						continue;
+					}
+				}
+
+				temp = scnprintf(next, size,
+					" (%c%d ep%d%s "
+					"[%d/%d] q%d p%d)",
+					speed_char (scratch),
+					scratch & 0x007f,
+					(scratch >> 8) & 0x000f, type,
+					p.qh->ps.usecs,
+					p.qh->ps.c_usecs,
+					temp,
+					(scratch >> 16) & 0x7ff);
+
+				if (seen_count < DBG_SCHED_LIMIT)
+					seen[seen_count++].qh = p.qh;
+			} else {
+				temp = 0;
+			}
+			tag = Q_NEXT_TYPE(ehci, hw->hw_next);
+			p = p.qh->qh_next;
+			break;
+		case Q_TYPE_FSTN:
+			temp = scnprintf(next, size, " fstn-%8x/%p",
+				p.fstn->hw_prev, p.fstn);
+			tag = Q_NEXT_TYPE(ehci, p.fstn->hw_next);
+			p = p.fstn->fstn_next;
+			break;
+		case Q_TYPE_ITD:
+			temp = scnprintf(next, size, " itd/%p", p.itd);
+			tag = Q_NEXT_TYPE(ehci, p.itd->hw_next);
+			p = p.itd->itd_next;
+			break;
+		case Q_TYPE_SITD:
+			temp = scnprintf(next, size, " sitd%d-%04x/%p",
+				p.sitd->stream->ps.period,
+				hc32_to_cpup(ehci, &p.sitd->hw_uframe)
+					& 0x0000ffff,
+				p.sitd);
+			tag = Q_NEXT_TYPE(ehci, p.sitd->hw_next);
+			p = p.sitd->sitd_next;
+			break;
+		}
+		size -= temp;
+		next += temp;
+		if (p.ptr)
+			goto do_loop;
 
 		temp = scnprintf(next, size, "\n");
 		size -= temp;
