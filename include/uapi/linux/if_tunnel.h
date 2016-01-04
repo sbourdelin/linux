@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <asm/byteorder.h>
+#include <linux/limits.h>
 
 
 #define SIOCGETTUNNEL   (SIOCDEVPRIVATE + 0)
@@ -27,6 +28,14 @@
 #define GRE_FLAGS	__cpu_to_be16(0x00F8)
 #define GRE_VERSION	__cpu_to_be16(0x0007)
 
+struct o_netns_parm {
+	__u8			o_netns_flag;
+	__u32			o_netns_fd;
+	char			netns[NAME_MAX];
+};
+#define TUNNEL_ONETNS_FLAG_GLOBAL	(1<<0)
+#define TUNNEL_ONETNS_FLAG_NETNS	(1<<1)
+
 struct ip_tunnel_parm {
 	char			name[IFNAMSIZ];
 	int			link;
@@ -35,6 +44,7 @@ struct ip_tunnel_parm {
 	__be32			i_key;
 	__be32			o_key;
 	struct iphdr		iph;
+	struct o_netns_parm	o_net;
 };
 
 enum {
@@ -57,6 +67,9 @@ enum {
 	IFLA_IPTUN_ENCAP_FLAGS,
 	IFLA_IPTUN_ENCAP_SPORT,
 	IFLA_IPTUN_ENCAP_DPORT,
+	IFLA_IPTUN_ONETNS_FLAGS,
+	IFLA_IPTUN_ONETNS_FD,
+	IFLA_IPTUN_ONETNS_NAME,
 	__IFLA_IPTUN_MAX,
 };
 #define IFLA_IPTUN_MAX	(__IFLA_IPTUN_MAX - 1)
@@ -113,6 +126,9 @@ enum {
 	IFLA_GRE_ENCAP_SPORT,
 	IFLA_GRE_ENCAP_DPORT,
 	IFLA_GRE_COLLECT_METADATA,
+	IFLA_GRE_ONETNS_FLAGS,
+	IFLA_GRE_ONETNS_FD,
+	IFLA_GRE_ONETNS_NAME,
 	__IFLA_GRE_MAX,
 };
 
@@ -128,6 +144,9 @@ enum {
 	IFLA_VTI_OKEY,
 	IFLA_VTI_LOCAL,
 	IFLA_VTI_REMOTE,
+	IFLA_VTI_ONETNS_FLAGS,
+	IFLA_VTI_ONETNS_FD,
+	IFLA_VTI_ONETNS_NAME,
 	__IFLA_VTI_MAX,
 };
 

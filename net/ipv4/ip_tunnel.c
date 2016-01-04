@@ -259,6 +259,16 @@ static struct hlist_head *ip_bucket(struct ip_tunnel_net *itn,
 	return &itn->tunnels[h];
 }
 
+static struct net *ip_tunnel_get_onet(struct net *inet,
+				      struct ip_tunnel_parm *parms)
+{
+	if (parms->o_net.o_netns_flag == 0)
+		return inet;
+	if (parms->o_net.o_netns_flag & TUNNEL_ONETNS_FLAG_GLOBAL)
+		return &init_net;
+	return get_net_ns_by_fd(parms->o_net.o_netns_fd);
+}
+
 static void ip_tunnel_add(struct ip_tunnel_net *itn, struct ip_tunnel *t)
 {
 	struct hlist_head *head = ip_bucket(itn, &t->parms);
@@ -330,7 +340,7 @@ static struct net_device *__ip_tunnel_create(struct net *net,
 
 	tunnel = netdev_priv(dev);
 	tunnel->parms = *parms;
-	tunnel->net = net;
+	tunnel->net = ip_tunnel_get_onet(net, &tunnel->parms);
 
 	err = register_netdevice(dev);
 	if (err)
@@ -818,6 +828,14 @@ static void ip_tunnel_update(struct ip_tunnel_net *itn,
 	t->parms.iph.daddr = p->iph.daddr;
 	t->parms.i_key = p->i_key;
 	t->parms.o_key = p->o_key;
+	if (strcmp(p->o_net.netns, t->parms.o_net.netns)) {
+		/* change the itn */
+		struct net *o_net = ip_tunnel_get_onet(dev_net(dev), p);
+
+		itn = net_generic(o_net, t->ip_tnl_net_id);
+		t->parms.o_net = p->o_net;
+		t->net = o_net;
+	}
 	if (dev->type != ARPHRD_ETHER) {
 		memcpy(dev->dev_addr, &p->iph.saddr, 4);
 		memcpy(dev->broadcast, &p->iph.daddr, 4);
@@ -1071,7 +1089,7 @@ int ip_tunnel_newlink(struct net_device *dev, struct nlattr *tb[],
 		      struct ip_tunnel_parm *p)
 {
 	struct ip_tunnel *nt;
-	struct net *net = dev_net(dev);
+	struct net *net = ip_tunnel_get_onet(dev_net(dev), p);
 	struct ip_tunnel_net *itn;
 	int mtu;
 	int err;
@@ -1169,7 +1187,7 @@ int ip_tunnel_init(struct net_device *dev)
 	}
 
 	tunnel->dev = dev;
-	tunnel->net = dev_net(dev);
+	tunnel->net = ip_tunnel_get_onet(dev_net(dev), &tunnel->parms);
 	strcpy(tunnel->parms.name, dev->name);
 	iph->version		= 4;
 	iph->ihl		= 5;
