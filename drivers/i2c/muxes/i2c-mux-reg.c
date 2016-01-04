@@ -21,7 +21,6 @@
 #include <linux/slab.h>
 
 struct regmux {
-	struct i2c_adapter **adap; /* child busses */
 	struct i2c_mux_reg_platform_data data;
 };
 
@@ -216,11 +215,9 @@ static int i2c_mux_reg_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	mux->adap = devm_kzalloc(&pdev->dev,
-				 sizeof(*mux->adap) * mux->data.n_values,
-				 GFP_KERNEL);
-	if (!mux->adap) {
-		dev_err(&pdev->dev, "Cannot allocate i2c_adapter structure");
+	ret = i2c_mux_reserve_adapters(muxc, mux->data.n_values);
+	if (ret) {
+		dev_err(&pdev->dev, "Cannot allocate i2c_adapter structures\n");
 		return -ENOMEM;
 	}
 
@@ -234,11 +231,9 @@ static int i2c_mux_reg_probe(struct platform_device *pdev)
 		nr = mux->data.base_nr ? (mux->data.base_nr + i) : 0;
 		class = mux->data.classes ? mux->data.classes[i] : 0;
 
-		mux->adap[i] = i2c_add_mux_adapter(muxc, &pdev->dev,
-						   nr, mux->data.values[i],
-						   class);
-		if (!mux->adap[i]) {
-			ret = -ENODEV;
+		ret = i2c_add_mux_adapter(muxc, &pdev->dev, nr,
+					  mux->data.values[i], class);
+		if (ret) {
 			dev_err(&pdev->dev, "Failed to add adapter %d\n", i);
 			goto add_adapter_failed;
 		}
@@ -250,8 +245,7 @@ static int i2c_mux_reg_probe(struct platform_device *pdev)
 	return 0;
 
 add_adapter_failed:
-	for (; i > 0; i--)
-		i2c_del_mux_adapter(mux->adap[i - 1]);
+	i2c_del_mux_adapters(muxc);
 
 	return ret;
 }
@@ -259,12 +253,8 @@ add_adapter_failed:
 static int i2c_mux_reg_remove(struct platform_device *pdev)
 {
 	struct i2c_mux_core *muxc = platform_get_drvdata(pdev);
-	struct regmux *mux = i2c_mux_priv(muxc);
-	int i;
 
-	for (i = 0; i < mux->data.n_values; i++)
-		i2c_del_mux_adapter(mux->adap[i]);
-
+	i2c_del_mux_adapters(muxc);
 	i2c_put_adapter(muxc->parent);
 
 	return 0;
