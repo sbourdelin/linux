@@ -15,18 +15,20 @@
  */
 
 #include <linux/errno.h>
+#include <linux/init.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/irqchip.h>
 #include <linux/irqdesc.h>
 #include <linux/irqdomain.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
 
 #include <asm/exception.h>
 #include <asm/mach/irq.h>
-
-#include "irq-atmel-aic-common.h"
 
 #define AIC_IRQS_PER_CHIP		32
 #define NR_AT91RM9200_IRQS		32
@@ -519,8 +521,8 @@ static void __init aic_hw_init(struct irq_domain *domain)
 	}
 }
 
-struct irq_domain *__init aic_common_of_init(struct device_node *node,
-					     const char *name)
+static int __init aic_of_init(struct device_node *node,
+			      struct device_node *parent)
 {
 	struct irq_chip_generic *gc;
 	struct irq_domain *domain;
@@ -531,15 +533,15 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 	int i;
 
 	if (aic_domain)
-		return ERR_PTR(-EEXIST);
+		return -EEXIST;
 
 	nchips = aic_get_num_chips(node);
 	if (nchips < 0)
-		return ERR_PTR(-EINVAL);
+		return -EINVAL;
 
 	reg_base = of_iomap(node, 0);
 	if (!reg_base)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 	aic = kcalloc(nchips, sizeof(*aic), GFP_KERNEL);
 	if (!aic) {
@@ -554,8 +556,8 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		goto err_free_aic;
 	}
 
-	ret = irq_alloc_domain_generic_chips(domain, AIC_IRQS_PER_CHIP, 1, name,
-					     handle_fasteoi_irq,
+	ret = irq_alloc_domain_generic_chips(domain, AIC_IRQS_PER_CHIP, 1,
+					     "atmel-aic", handle_fasteoi_irq,
 					     IRQ_NOREQUEST | IRQ_NOPROBE |
 					     IRQ_NOAUTOEN, 0, 0);
 	if (ret)
@@ -589,7 +591,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 	aic_hw_init(domain);
 	set_handle_irq(aic_handle);
 
-	return domain;
+	return 0;
 
 err_domain_remove:
 	irq_domain_remove(domain);
@@ -599,6 +601,9 @@ err_free_aic:
 
 err_iounmap:
 	iounmap(reg_base);
-
-	return ERR_PTR(ret);
+	return ret;
 }
+IRQCHIP_DECLARE(at91rm9200_aic, "atmel,at91rm9200-aic", aic_of_init);
+IRQCHIP_DECLARE(sama5d2_aic5, "atmel,sama5d2-aic", aic_of_init);
+IRQCHIP_DECLARE(sama5d3_aic5, "atmel,sama5d3-aic", aic_of_init);
+IRQCHIP_DECLARE(sama5d4_aic5, "atmel,sama5d4-aic", aic_of_init);

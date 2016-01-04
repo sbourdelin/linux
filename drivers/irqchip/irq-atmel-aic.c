@@ -31,8 +31,6 @@
 #include <asm/exception.h>
 #include <asm/mach/irq.h>
 
-#include "irq-atmel-aic-common.h"
-
 /* Number of irq lines managed by AIC */
 #define NR_AIC_IRQS	32
 
@@ -54,16 +52,3 @@
 #define AT91_AIC_EOICR			0x130
 #define AT91_AIC_SPU			0x134
 #define AT91_AIC_DCR			0x138
-
-static int __init aic_of_init(struct device_node *node,
-			      struct device_node *parent)
-{
-	struct irq_domain *domain;
-
-	domain = aic_common_of_init(node, "atmel-aic");
-	if (IS_ERR(domain))
-		return PTR_ERR(domain);
-
-	return 0;
-}
-IRQCHIP_DECLARE(at91rm9200_aic, "atmel,at91rm9200-aic", aic_of_init);
