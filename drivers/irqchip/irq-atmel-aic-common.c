@@ -243,6 +243,26 @@ static void aic_unmask(struct irq_data *d)
 	irq_gc_unlock(bgc);
 }
 
+static int aic_retrigger(struct irq_data *d)
+{
+	struct irq_domain *domain = d->domain;
+	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
+
+	/* Set interrupt */
+	irq_gc_lock(bgc);
+
+	if (aic_is_ssr_used()) {
+		irq_reg_writel(bgc, d->hwirq, aic_reg_data->ssr);
+		irq_reg_writel(bgc, 1, aic_reg_data->iscr);
+	} else {
+		irq_reg_writel(bgc, d->mask, aic_reg_data->iscr);
+	}
+
+	irq_gc_unlock(bgc);
+
+	return 0;
+}
+
 int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val)
 {
 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
@@ -355,6 +375,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		gc->chip_types[0].chip.irq_shutdown = aic_common_shutdown;
 		gc->chip_types[0].chip.irq_mask = aic_mask;
 		gc->chip_types[0].chip.irq_unmask = aic_unmask;
+		gc->chip_types[0].chip.irq_retrigger = aic_retrigger;
 		gc->private = &aic[i];
 	}
 
