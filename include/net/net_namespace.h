@@ -58,6 +58,7 @@ struct net {
 	struct list_head	list;		/* list of network namespaces */
 	struct list_head	cleanup_list;	/* namespaces on death row */
 	struct list_head	exit_list;	/* Use only net_mutex */
+	struct list_head	event_list;     /* net_device notifier list */
 
 	struct user_namespace   *user_ns;	/* Owning user namespace */
 	spinlock_t		nsid_lock;
@@ -379,5 +380,26 @@ static inline void fnhe_genid_bump(struct net *net)
 {
 	atomic_inc(&net->fnhe_genid);
 }
+
+#ifdef CONFIG_NET_NS
+static inline void net_add_event_list(struct list_head *head, struct net *net)
+{
+	if (!list_empty(&net->event_list))
+		list_add_tail(&net->event_list, head);
+}
+
+static inline void net_del_event_list(struct net *net)
+{
+	list_del_init(&net->event_list);
+}
+#else
+static inline void net_add_event_list(struct list_head *head, struct net *net)
+{
+}
+
+static inline void net_del_event_list(struct net *net)
+{
+}
+#endif
 
 #endif /* __NET_NET_NAMESPACE_H */
