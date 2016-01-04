@@ -324,7 +324,6 @@ void tcp_req_err(struct sock *sk, u32 seq)
 
 	if (seq != tcp_rsk(req)->snt_isn) {
 		NET_INC_STATS_BH(net, LINUX_MIB_OUTOFWINDOWICMPS);
-		reqsk_put(req);
 	} else {
 		/*
 		 * Still in SYN_RECV, just remove it silently.
@@ -332,9 +331,10 @@ void tcp_req_err(struct sock *sk, u32 seq)
 		 * created socket, and POSIX does not want network
 		 * errors returned from accept().
 		 */
-		NET_INC_STATS_BH(net, LINUX_MIB_LISTENDROPS);
 		inet_csk_reqsk_queue_drop(req->rsk_listener, req);
+		NET_INC_STATS_BH(net, LINUX_MIB_LISTENDROPS);
 	}
+	reqsk_put(req);
 }
 EXPORT_SYMBOL(tcp_req_err);
 
@@ -821,7 +821,6 @@ static void tcp_v4_reqsk_send_ack(const struct sock *sk, struct sk_buff *skb,
 static int tcp_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
 			      struct flowi *fl,
 			      struct request_sock *req,
-			      u16 queue_mapping,
 			      struct tcp_fastopen_cookie *foc,
 				  bool attach_req)
 {
@@ -839,7 +838,6 @@ static int tcp_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
 	if (skb) {
 		__tcp_v4_send_check(skb, ireq->ir_loc_addr, ireq->ir_rmt_addr);
 
-		skb_set_queue_mapping(skb, queue_mapping);
 		err = ip_build_and_send_pkt(skb, sk, ireq->ir_loc_addr,
 					    ireq->ir_rmt_addr,
 					    ireq->opt);
@@ -923,7 +921,8 @@ int tcp_md5_do_add(struct sock *sk, const union tcp_md5_addr *addr,
 	}
 
 	md5sig = rcu_dereference_protected(tp->md5sig_info,
-					   sock_owned_by_user(sk));
+					   sock_owned_by_user(sk) ||
+					   lockdep_is_held(&sk->sk_lock.slock));
 	if (!md5sig) {
 		md5sig = kmalloc(sizeof(*md5sig), gfp);
 		if (!md5sig)
@@ -1249,7 +1248,9 @@ EXPORT_SYMBOL(tcp_v4_conn_request);
  */
 struct sock *tcp_v4_syn_recv_sock(const struct sock *sk, struct sk_buff *skb,
 				  struct request_sock *req,
-				  struct dst_entry *dst)
+				  struct dst_entry *dst,
+				  struct request_sock *req_unhash,
+				  bool *own_req)
 {
 	struct inet_request_sock *ireq;
 	struct inet_sock *newinet;
@@ -1325,7 +1326,9 @@ struct sock *tcp_v4_syn_recv_sock(const struct sock *sk, struct sk_buff *skb,
 
 	if (__inet_inherit_port(sk, newsk) < 0)
 		goto put_and_exit;
-	__inet_hash_nolisten(newsk, NULL);
+	*own_req = inet_ehash_nolisten(newsk, req_to_sk(req_unhash));
+	if (*own_req)
+		tcp_move_syn(newtp, req);
 
 	return newsk;
 
@@ -1572,6 +1575,7 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	TCP_SKB_CB(skb)->ip_dsfield = ipv4_get_dsfield(iph);
 	TCP_SKB_CB(skb)->sacked	 = 0;
 
+lookup:
 	sk = __inet_lookup_skb(&tcp_hashinfo, skb, th->source, th->dest);
 	if (!sk)
 		goto no_tcp_socket;
@@ -1587,8 +1591,12 @@ process:
 		sk = req->rsk_listener;
 		if (tcp_v4_inbound_md5_hash(sk, skb))
 			goto discard_and_relse;
-		if (sk->sk_state == TCP_LISTEN)
+		if (likely(sk->sk_state == TCP_LISTEN)) {
 			nsk = tcp_check_req(sk, skb, req, false);
+		} else {
+			inet_csk_reqsk_queue_drop_and_put(sk, req);
+			goto lookup;
+		}
 		if (!nsk) {
 			reqsk_put(req);
 			goto discard_it;
@@ -2151,6 +2159,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 	__u16 destp = ntohs(inet->inet_dport);
 	__u16 srcp = ntohs(inet->inet_sport);
 	int rx_queue;
+	int state;
 
 	if (icsk->icsk_pending == ICSK_TIME_RETRANS ||
 	    icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
@@ -2168,17 +2177,18 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 		timer_expires = jiffies;
 	}
 
-	if (sk->sk_state == TCP_LISTEN)
+	state = sk_state_load(sk);
+	if (state == TCP_LISTEN)
 		rx_queue = sk->sk_ack_backlog;
 	else
-		/*
-		 * because we dont lock socket, we might find a transient negative value
+		/* Because we don't lock the socket,
+		 * we might find a transient negative value.
 		 */
 		rx_queue = max_t(int, tp->rcv_nxt - tp->copied_seq, 0);
 
 	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
 			"%08X %5u %8d %lu %d %pK %lu %lu %u %u %d",
-		i, src, srcp, dest, destp, sk->sk_state,
+		i, src, srcp, dest, destp, state,
 		tp->write_seq - tp->snd_una,
 		rx_queue,
 		timer_active,
@@ -2192,8 +2202,8 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 		jiffies_to_clock_t(icsk->icsk_ack.ato),
 		(icsk->icsk_ack.quick << 1) | icsk->icsk_ack.pingpong,
 		tp->snd_cwnd,
-		sk->sk_state == TCP_LISTEN ?
-		    (fastopenq ? fastopenq->max_qlen : 0) :
+		state == TCP_LISTEN ?
+		    fastopenq->max_qlen :
 		    (tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh));
 }
 

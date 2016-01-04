@@ -2296,7 +2296,7 @@ void __tcp_push_pending_frames(struct sock *sk, unsigned int cur_mss,
 		return;
 
 	if (tcp_write_xmit(sk, cur_mss, nonagle, 0,
-			   sk_gfp_atomic(sk, GFP_ATOMIC)))
+			   sk_gfp_mask(sk, GFP_ATOMIC)))
 		tcp_check_probe_timer(sk);
 }
 
@@ -2655,8 +2655,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 			net_dbg_ratelimited("retrans_out leaked\n");
 		}
 #endif
-		if (!tp->retrans_out)
-			tp->lost_retrans_low = tp->snd_nxt;
 		TCP_SKB_CB(skb)->sacked |= TCPCB_RETRANS;
 		tp->retrans_out += tcp_skb_pcount(skb);
 
@@ -2664,10 +2662,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		if (!tp->retrans_stamp)
 			tp->retrans_stamp = tcp_skb_timestamp(skb);
 
-		/* snd_nxt is stored to detect loss of retransmitted segment,
-		 * see tcp_input.c tcp_sacktag_write_queue().
-		 */
-		TCP_SKB_CB(skb)->ack_seq = tp->snd_nxt;
 	} else if (err != -EBUSY) {
 		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPRETRANSFAIL);
 	}
@@ -2969,9 +2963,7 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 	skb_reserve(skb, MAX_TCP_HEADER);
 
 	if (attach_req) {
-		skb->destructor = sock_edemux;
-		sock_hold(req_to_sk(req));
-		skb->sk = req_to_sk(req);
+		skb_set_owner_w(skb, req_to_sk(req));
 	} else {
 		/* sk is a const pointer, because we want to express multiple
 		 * cpu might call us concurrently.
@@ -3360,8 +3352,9 @@ void tcp_send_ack(struct sock *sk)
 	 * tcp_transmit_skb() will set the ownership to this
 	 * sock.
 	 */
-	buff = alloc_skb(MAX_TCP_HEADER, sk_gfp_atomic(sk, GFP_ATOMIC));
-	if (!buff) {
+	buff = alloc_skb(MAX_TCP_HEADER,
+			 sk_gfp_mask(sk, GFP_ATOMIC | __GFP_NOWARN));
+	if (unlikely(!buff)) {
 		inet_csk_schedule_ack(sk);
 		inet_csk(sk)->icsk_ack.ato = TCP_ATO_MIN;
 		inet_csk_reset_xmit_timer(sk, ICSK_TIME_DACK,
@@ -3383,7 +3376,7 @@ void tcp_send_ack(struct sock *sk)
 
 	/* Send it off, this clears delayed acks for us. */
 	skb_mstamp_get(&buff->skb_mstamp);
-	tcp_transmit_skb(sk, buff, 0, sk_gfp_atomic(sk, GFP_ATOMIC));
+	tcp_transmit_skb(sk, buff, 0, (__force gfp_t)0);
 }
 EXPORT_SYMBOL_GPL(tcp_send_ack);
 
@@ -3404,7 +3397,8 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 	struct sk_buff *skb;
 
 	/* We don't queue it, tcp_transmit_skb() sets ownership. */
-	skb = alloc_skb(MAX_TCP_HEADER, sk_gfp_atomic(sk, GFP_ATOMIC));
+	skb = alloc_skb(MAX_TCP_HEADER,
+			sk_gfp_mask(sk, GFP_ATOMIC | __GFP_NOWARN));
 	if (!skb)
 		return -1;
 
@@ -3416,8 +3410,8 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 	 */
 	tcp_init_nondata_skb(skb, tp->snd_una - !urgent, TCPHDR_ACK);
 	skb_mstamp_get(&skb->skb_mstamp);
-	NET_INC_STATS_BH(sock_net(sk), mib);
-	return tcp_transmit_skb(sk, skb, 0, GFP_ATOMIC);
+	NET_INC_STATS(sock_net(sk), mib);
+	return tcp_transmit_skb(sk, skb, 0, (__force gfp_t)0);
 }
 
 void tcp_send_window_probe(struct sock *sk)
@@ -3518,7 +3512,7 @@ int tcp_rtx_synack(const struct sock *sk, struct request_sock *req)
 	int res;
 
 	tcp_rsk(req)->txhash = net_tx_rndhash();
-	res = af_ops->send_synack(sk, NULL, &fl, req, 0, NULL, true);
+	res = af_ops->send_synack(sk, NULL, &fl, req, NULL, true);
 	if (!res) {
 		TCP_INC_STATS_BH(sock_net(sk), TCP_MIB_RETRANSSEGS);
 		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPSYNRETRANS);

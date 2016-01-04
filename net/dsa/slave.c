@@ -247,11 +247,10 @@ static int dsa_slave_port_vlan_add(struct net_device *dev,
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->parent;
-	u16 vid;
 	int err;
 
 	if (switchdev_trans_ph_prepare(trans)) {
-		if (!ds->drv->port_vlan_add || !ds->drv->port_pvid_set)
+		if (!ds->drv->port_vlan_prepare || !ds->drv->port_vlan_add)
 			return -EOPNOTSUPP;
 
 		/* If the requested port doesn't belong to the same bridge as
@@ -262,16 +261,14 @@ static int dsa_slave_port_vlan_add(struct net_device *dev,
 						  vlan->vid_end);
 		if (err)
 			return err;
+
+		err = ds->drv->port_vlan_prepare(ds, p->port, vlan, trans);
+		if (err)
+			return err;
 	} else {
-		for (vid = vlan->vid_begin; vid <= vlan->vid_end; ++vid) {
-			err = ds->drv->port_vlan_add(ds, p->port, vid,
-						     vlan->flags &
-						     BRIDGE_VLAN_INFO_UNTAGGED);
-			if (!err && vlan->flags & BRIDGE_VLAN_INFO_PVID)
-				err = ds->drv->port_pvid_set(ds, p->port, vid);
-			if (err)
-				return err;
-		}
+		err = ds->drv->port_vlan_add(ds, p->port, vlan, trans);
+		if (err)
+			return err;
 	}
 
 	return 0;
@@ -282,19 +279,11 @@ static int dsa_slave_port_vlan_del(struct net_device *dev,
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->parent;
-	u16 vid;
-	int err;
 
 	if (!ds->drv->port_vlan_del)
 		return -EOPNOTSUPP;
 
-	for (vid = vlan->vid_begin; vid <= vlan->vid_end; ++vid) {
-		err = ds->drv->port_vlan_del(ds, p->port, vid);
-		if (err)
-			return err;
-	}
-
-	return 0;
+	return ds->drv->port_vlan_del(ds, p->port, vlan);
 }
 
 static int dsa_slave_port_vlan_dump(struct net_device *dev,
@@ -378,31 +367,11 @@ static int dsa_slave_port_fdb_dump(struct net_device *dev,
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->parent;
-	unsigned char addr[ETH_ALEN] = { 0 };
-	u16 vid = 0;
-	int ret;
 
-	if (!ds->drv->port_fdb_getnext)
-		return -EOPNOTSUPP;
+	if (ds->drv->port_fdb_dump)
+		return ds->drv->port_fdb_dump(ds, p->port, fdb, cb);
 
-	for (;;) {
-		bool is_static;
-
-		ret = ds->drv->port_fdb_getnext(ds, p->port, addr, &vid,
-						&is_static);
-		if (ret < 0)
-			break;
-
-		fdb->addr = addr;
-		fdb->vid = vid;
-		fdb->ndm_state = is_static ? NUD_NOARP : NUD_REACHABLE;
-
-		ret = cb(&fdb->obj);
-		if (ret < 0)
-			break;
-	}
-
-	return ret == -ENOENT ? 0 : ret;
+	return -EOPNOTSUPP;
 }
 
 static int dsa_slave_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
@@ -453,7 +422,7 @@ static int dsa_slave_stp_update(struct net_device *dev, u8 state)
 }
 
 static int dsa_slave_port_attr_set(struct net_device *dev,
-				   struct switchdev_attr *attr,
+				   const struct switchdev_attr *attr,
 				   struct switchdev_trans *trans)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
@@ -1243,6 +1212,17 @@ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
 	return 0;
 }
 
+void dsa_slave_destroy(struct net_device *slave_dev)
+{
+	struct dsa_slave_priv *p = netdev_priv(slave_dev);
+
+	netif_carrier_off(slave_dev);
+	if (p->phy)
+		phy_disconnect(p->phy);
+	unregister_netdev(slave_dev);
+	free_netdev(slave_dev);
+}
+
 static bool dsa_slave_dev_check(struct net_device *dev)
 {
 	return dev->netdev_ops == &dsa_slave_netdev_ops;
@@ -1276,7 +1256,7 @@ int dsa_slave_netdevice_event(struct notifier_block *unused,
 			goto out;
 
 		err = dsa_slave_master_changed(dev);
-		if (err)
+		if (err && err != -EOPNOTSUPP)
 			netdev_warn(dev, "failed to reflect master change\n");
 
 		break;

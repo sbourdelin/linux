@@ -162,7 +162,7 @@ restart:
 			break;
 		}
 
-		hci_uart_tx_complete(hu, bt_cb(skb)->pkt_type);
+		hci_uart_tx_complete(hu, hci_skb_pkt_type(skb));
 		kfree_skb(skb);
 	}
 
@@ -248,7 +248,8 @@ static int hci_uart_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_uart *hu = hci_get_drvdata(hdev);
 
-	BT_DBG("%s: type %d len %d", hdev->name, bt_cb(skb)->pkt_type, skb->len);
+	BT_DBG("%s: type %d len %d", hdev->name, hci_skb_pkt_type(skb),
+	       skb->len);
 
 	hu->proto->enqueue(hu, skb);
 
@@ -586,6 +587,13 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 
 	hdev->bus = HCI_UART;
 	hci_set_drvdata(hdev, hu);
+
+	/* Only when vendor specific setup callback is provided, consider
+	 * the manufacturer information valid. This avoids filling in the
+	 * value for Ericsson when nothing is specified.
+	 */
+	if (hu->proto->setup)
+		hdev->manufacturer = hu->proto->manufacturer;
 
 	hdev->open  = hci_uart_open;
 	hdev->close = hci_uart_close;

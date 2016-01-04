@@ -134,11 +134,14 @@ static void fdb_del_hw_addr(struct net_bridge *br, const unsigned char *addr)
 static void fdb_del_external_learn(struct net_bridge_fdb_entry *f)
 {
 	struct switchdev_obj_port_fdb fdb = {
-		.obj.id = SWITCHDEV_OBJ_ID_PORT_FDB,
-		.addr = f->addr.addr,
+		.obj = {
+			.id = SWITCHDEV_OBJ_ID_PORT_FDB,
+			.flags = SWITCHDEV_F_DEFER,
+		},
 		.vid = f->vlan_id,
 	};
 
+	ether_addr_copy(fdb.addr, f->addr.addr);
 	switchdev_port_obj_del(f->dst->dev, &fdb.obj);
 }
 
@@ -492,7 +495,9 @@ static struct net_bridge_fdb_entry *fdb_find_rcu(struct hlist_head *head,
 static struct net_bridge_fdb_entry *fdb_create(struct hlist_head *head,
 					       struct net_bridge_port *source,
 					       const unsigned char *addr,
-					       __u16 vid)
+					       __u16 vid,
+					       unsigned char is_local,
+					       unsigned char is_static)
 {
 	struct net_bridge_fdb_entry *fdb;
 
@@ -501,8 +506,8 @@ static struct net_bridge_fdb_entry *fdb_create(struct hlist_head *head,
 		memcpy(fdb->addr.addr, addr, ETH_ALEN);
 		fdb->dst = source;
 		fdb->vlan_id = vid;
-		fdb->is_local = 0;
-		fdb->is_static = 0;
+		fdb->is_local = is_local;
+		fdb->is_static = is_static;
 		fdb->added_by_user = 0;
 		fdb->added_by_external_learn = 0;
 		fdb->updated = fdb->used = jiffies;
@@ -533,11 +538,10 @@ static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		fdb_delete(br, fdb);
 	}
 
-	fdb = fdb_create(head, source, addr, vid);
+	fdb = fdb_create(head, source, addr, vid, 1, 1);
 	if (!fdb)
 		return -ENOMEM;
 
-	fdb->is_local = fdb->is_static = 1;
 	fdb_add_hw_addr(br, addr);
 	fdb_notify(br, fdb, RTM_NEWNEIGH);
 	return 0;
@@ -594,7 +598,7 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 	} else {
 		spin_lock(&br->hash_lock);
 		if (likely(!fdb_find(head, addr, vid))) {
-			fdb = fdb_create(head, source, addr, vid);
+			fdb = fdb_create(head, source, addr, vid, 0, 0);
 			if (fdb) {
 				if (unlikely(added_by_user))
 					fdb->added_by_user = 1;
@@ -771,7 +775,7 @@ static int fdb_add_entry(struct net_bridge_port *source, const __u8 *addr,
 		if (!(flags & NLM_F_CREATE))
 			return -ENOENT;
 
-		fdb = fdb_create(head, source, addr, vid);
+		fdb = fdb_create(head, source, addr, vid, 0, 0);
 		if (!fdb)
 			return -ENOMEM;
 
@@ -1096,7 +1100,7 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 	head = &br->hash[br_mac_hash(addr, vid)];
 	fdb = fdb_find(head, addr, vid);
 	if (!fdb) {
-		fdb = fdb_create(head, p, addr, vid);
+		fdb = fdb_create(head, p, addr, vid, 0, 0);
 		if (!fdb) {
 			err = -ENOMEM;
 			goto err_unlock;

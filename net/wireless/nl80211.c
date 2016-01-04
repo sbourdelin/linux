@@ -479,6 +479,12 @@ nl80211_match_policy[NL80211_SCHED_SCAN_MATCH_ATTR_MAX + 1] = {
 	[NL80211_SCHED_SCAN_MATCH_ATTR_RSSI] = { .type = NLA_U32 },
 };
 
+static const struct nla_policy
+nl80211_plan_policy[NL80211_SCHED_SCAN_PLAN_MAX + 1] = {
+	[NL80211_SCHED_SCAN_PLAN_INTERVAL] = { .type = NLA_U32 },
+	[NL80211_SCHED_SCAN_PLAN_ITERATIONS] = { .type = NLA_U32 },
+};
+
 static int nl80211_prepare_wdev_dump(struct sk_buff *skb,
 				     struct netlink_callback *cb,
 				     struct cfg80211_registered_device **rdev,
@@ -1304,7 +1310,13 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 		    nla_put_u16(msg, NL80211_ATTR_MAX_SCHED_SCAN_IE_LEN,
 				rdev->wiphy.max_sched_scan_ie_len) ||
 		    nla_put_u8(msg, NL80211_ATTR_MAX_MATCH_SETS,
-			       rdev->wiphy.max_match_sets))
+			       rdev->wiphy.max_match_sets) ||
+		    nla_put_u32(msg, NL80211_ATTR_MAX_NUM_SCHED_SCAN_PLANS,
+				rdev->wiphy.max_sched_scan_plans) ||
+		    nla_put_u32(msg, NL80211_ATTR_MAX_SCAN_PLAN_INTERVAL,
+				rdev->wiphy.max_sched_scan_plan_interval) ||
+		    nla_put_u32(msg, NL80211_ATTR_MAX_SCAN_PLAN_ITERATIONS,
+				rdev->wiphy.max_sched_scan_plan_iterations))
 			goto nla_put_failure;
 
 		if ((rdev->wiphy.flags & WIPHY_FLAG_IBSS_RSN) &&
@@ -3420,12 +3432,6 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 					   wdev->iftype))
 		return -EINVAL;
 
-	if (info->attrs[NL80211_ATTR_ACL_POLICY]) {
-		params.acl = parse_acl_data(&rdev->wiphy, info);
-		if (IS_ERR(params.acl))
-			return PTR_ERR(params.acl);
-	}
-
 	if (info->attrs[NL80211_ATTR_SMPS_MODE]) {
 		params.smps_mode =
 			nla_get_u8(info->attrs[NL80211_ATTR_SMPS_MODE]);
@@ -3447,6 +3453,12 @@ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
 		}
 	} else {
 		params.smps_mode = NL80211_SMPS_OFF;
+	}
+
+	if (info->attrs[NL80211_ATTR_ACL_POLICY]) {
+		params.acl = parse_acl_data(&rdev->wiphy, info);
+		if (IS_ERR(params.acl))
+			return PTR_ERR(params.acl);
 	}
 
 	wdev_lock(wdev);
@@ -3956,10 +3968,13 @@ int cfg80211_check_station_change(struct wiphy *wiphy,
 				  struct station_parameters *params,
 				  enum cfg80211_station_type statype)
 {
-	if (params->listen_interval != -1)
+	if (params->listen_interval != -1 &&
+	    statype != CFG80211_STA_AP_CLIENT_UNASSOC)
 		return -EINVAL;
+
 	if (params->aid &&
-	    !(params->sta_flags_set & BIT(NL80211_STA_FLAG_TDLS_PEER)))
+	    !(params->sta_flags_set & BIT(NL80211_STA_FLAG_TDLS_PEER)) &&
+	    statype != CFG80211_STA_AP_CLIENT_UNASSOC)
 		return -EINVAL;
 
 	/* When you run into this, adjust the code below for the new flag */
@@ -4233,13 +4248,22 @@ static int nl80211_set_station(struct sk_buff *skb, struct genl_info *info)
 
 	memset(&params, 0, sizeof(params));
 
-	params.listen_interval = -1;
-
 	if (!rdev->ops->change_station)
 		return -EOPNOTSUPP;
 
+	/*
+	 * AID and listen_interval properties can be set only for unassociated
+	 * station. Include these parameters here and will check them in
+	 * cfg80211_check_station_change().
+	 */
 	if (info->attrs[NL80211_ATTR_STA_AID])
-		return -EINVAL;
+		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
+
+	if (info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL])
+		params.listen_interval =
+		     nla_get_u16(info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL]);
+	else
+		params.listen_interval = -1;
 
 	if (!info->attrs[NL80211_ATTR_MAC])
 		return -EINVAL;
@@ -4265,9 +4289,6 @@ static int nl80211_set_station(struct sk_buff *skb, struct genl_info *info)
 		params.ext_capab_len =
 			nla_len(info->attrs[NL80211_ATTR_STA_EXT_CAPABILITY]);
 	}
-
-	if (info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL])
-		return -EINVAL;
 
 	if (parse_station_flags(info, dev->ieee80211_ptr->iftype, &params))
 		return -EINVAL;
@@ -4338,6 +4359,8 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
 	struct net_device *dev = info->user_ptr[1];
 	struct station_parameters params;
 	u8 *mac_addr = NULL;
+	u32 auth_assoc = BIT(NL80211_STA_FLAG_AUTHENTICATED) |
+			 BIT(NL80211_STA_FLAG_ASSOCIATED);
 
 	memset(&params, 0, sizeof(params));
 
@@ -4449,10 +4472,23 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
 		/* allow authenticated/associated only if driver handles it */
 		if (!(rdev->wiphy.features &
 				NL80211_FEATURE_FULL_AP_CLIENT_STATE) &&
-		    params.sta_flags_mask &
-				(BIT(NL80211_STA_FLAG_AUTHENTICATED) |
-				 BIT(NL80211_STA_FLAG_ASSOCIATED)))
+		    params.sta_flags_mask & auth_assoc)
 			return -EINVAL;
+
+		/* Older userspace, or userspace wanting to be compatible with
+		 * !NL80211_FEATURE_FULL_AP_CLIENT_STATE, will not set the auth
+		 * and assoc flags in the mask, but assumes the station will be
+		 * added as associated anyway since this was the required driver
+		 * behaviour before NL80211_FEATURE_FULL_AP_CLIENT_STATE was
+		 * introduced.
+		 * In order to not bother drivers with this quirk in the API
+		 * set the flags in both the mask and set for new stations in
+		 * this case.
+		 */
+		if (!(params.sta_flags_mask & auth_assoc)) {
+			params.sta_flags_mask |= auth_assoc;
+			params.sta_flags_set |= auth_assoc;
+		}
 
 		/* must be last in here for error handling */
 		params.vlan = get_vlan(info, rdev);
@@ -4930,56 +4966,6 @@ static int nl80211_set_bss(struct sk_buff *skb, struct genl_info *info)
 	wdev_unlock(wdev);
 
 	return err;
-}
-
-static const struct nla_policy reg_rule_policy[NL80211_REG_RULE_ATTR_MAX + 1] = {
-	[NL80211_ATTR_REG_RULE_FLAGS]		= { .type = NLA_U32 },
-	[NL80211_ATTR_FREQ_RANGE_START]		= { .type = NLA_U32 },
-	[NL80211_ATTR_FREQ_RANGE_END]		= { .type = NLA_U32 },
-	[NL80211_ATTR_FREQ_RANGE_MAX_BW]	= { .type = NLA_U32 },
-	[NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN]	= { .type = NLA_U32 },
-	[NL80211_ATTR_POWER_RULE_MAX_EIRP]	= { .type = NLA_U32 },
-	[NL80211_ATTR_DFS_CAC_TIME]		= { .type = NLA_U32 },
-};
-
-static int parse_reg_rule(struct nlattr *tb[],
-	struct ieee80211_reg_rule *reg_rule)
-{
-	struct ieee80211_freq_range *freq_range = &reg_rule->freq_range;
-	struct ieee80211_power_rule *power_rule = &reg_rule->power_rule;
-
-	if (!tb[NL80211_ATTR_REG_RULE_FLAGS])
-		return -EINVAL;
-	if (!tb[NL80211_ATTR_FREQ_RANGE_START])
-		return -EINVAL;
-	if (!tb[NL80211_ATTR_FREQ_RANGE_END])
-		return -EINVAL;
-	if (!tb[NL80211_ATTR_FREQ_RANGE_MAX_BW])
-		return -EINVAL;
-	if (!tb[NL80211_ATTR_POWER_RULE_MAX_EIRP])
-		return -EINVAL;
-
-	reg_rule->flags = nla_get_u32(tb[NL80211_ATTR_REG_RULE_FLAGS]);
-
-	freq_range->start_freq_khz =
-		nla_get_u32(tb[NL80211_ATTR_FREQ_RANGE_START]);
-	freq_range->end_freq_khz =
-		nla_get_u32(tb[NL80211_ATTR_FREQ_RANGE_END]);
-	freq_range->max_bandwidth_khz =
-		nla_get_u32(tb[NL80211_ATTR_FREQ_RANGE_MAX_BW]);
-
-	power_rule->max_eirp =
-		nla_get_u32(tb[NL80211_ATTR_POWER_RULE_MAX_EIRP]);
-
-	if (tb[NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN])
-		power_rule->max_antenna_gain =
-			nla_get_u32(tb[NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN]);
-
-	if (tb[NL80211_ATTR_DFS_CAC_TIME])
-		reg_rule->dfs_cac_ms =
-			nla_get_u32(tb[NL80211_ATTR_DFS_CAC_TIME]);
-
-	return 0;
 }
 
 static int nl80211_req_set_reg(struct sk_buff *skb, struct genl_info *info)
@@ -5613,6 +5599,57 @@ out_err:
 	return err;
 }
 
+#ifdef CONFIG_CFG80211_CRDA_SUPPORT
+static const struct nla_policy reg_rule_policy[NL80211_REG_RULE_ATTR_MAX + 1] = {
+	[NL80211_ATTR_REG_RULE_FLAGS]		= { .type = NLA_U32 },
+	[NL80211_ATTR_FREQ_RANGE_START]		= { .type = NLA_U32 },
+	[NL80211_ATTR_FREQ_RANGE_END]		= { .type = NLA_U32 },
+	[NL80211_ATTR_FREQ_RANGE_MAX_BW]	= { .type = NLA_U32 },
+	[NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN]	= { .type = NLA_U32 },
+	[NL80211_ATTR_POWER_RULE_MAX_EIRP]	= { .type = NLA_U32 },
+	[NL80211_ATTR_DFS_CAC_TIME]		= { .type = NLA_U32 },
+};
+
+static int parse_reg_rule(struct nlattr *tb[],
+	struct ieee80211_reg_rule *reg_rule)
+{
+	struct ieee80211_freq_range *freq_range = &reg_rule->freq_range;
+	struct ieee80211_power_rule *power_rule = &reg_rule->power_rule;
+
+	if (!tb[NL80211_ATTR_REG_RULE_FLAGS])
+		return -EINVAL;
+	if (!tb[NL80211_ATTR_FREQ_RANGE_START])
+		return -EINVAL;
+	if (!tb[NL80211_ATTR_FREQ_RANGE_END])
+		return -EINVAL;
+	if (!tb[NL80211_ATTR_FREQ_RANGE_MAX_BW])
+		return -EINVAL;
+	if (!tb[NL80211_ATTR_POWER_RULE_MAX_EIRP])
+		return -EINVAL;
+
+	reg_rule->flags = nla_get_u32(tb[NL80211_ATTR_REG_RULE_FLAGS]);
+
+	freq_range->start_freq_khz =
+		nla_get_u32(tb[NL80211_ATTR_FREQ_RANGE_START]);
+	freq_range->end_freq_khz =
+		nla_get_u32(tb[NL80211_ATTR_FREQ_RANGE_END]);
+	freq_range->max_bandwidth_khz =
+		nla_get_u32(tb[NL80211_ATTR_FREQ_RANGE_MAX_BW]);
+
+	power_rule->max_eirp =
+		nla_get_u32(tb[NL80211_ATTR_POWER_RULE_MAX_EIRP]);
+
+	if (tb[NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN])
+		power_rule->max_antenna_gain =
+			nla_get_u32(tb[NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN]);
+
+	if (tb[NL80211_ATTR_DFS_CAC_TIME])
+		reg_rule->dfs_cac_ms =
+			nla_get_u32(tb[NL80211_ATTR_DFS_CAC_TIME]);
+
+	return 0;
+}
+
 static int nl80211_set_reg(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *tb[NL80211_REG_RULE_ATTR_MAX + 1];
@@ -5689,6 +5726,7 @@ static int nl80211_set_reg(struct sk_buff *skb, struct genl_info *info)
 	kfree(rd);
 	return r;
 }
+#endif /* CONFIG_CFG80211_CRDA_SUPPORT */
 
 static int validate_scan_freqs(struct nlattr *freqs)
 {
@@ -5974,27 +6012,124 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 	return err;
 }
 
+static int nl80211_abort_scan(struct sk_buff *skb, struct genl_info *info)
+{
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct wireless_dev *wdev = info->user_ptr[1];
+
+	if (!rdev->ops->abort_scan)
+		return -EOPNOTSUPP;
+
+	if (rdev->scan_msg)
+		return 0;
+
+	if (!rdev->scan_req)
+		return -ENOENT;
+
+	rdev_abort_scan(rdev, wdev);
+	return 0;
+}
+
+static int
+nl80211_parse_sched_scan_plans(struct wiphy *wiphy, int n_plans,
+			       struct cfg80211_sched_scan_request *request,
+			       struct nlattr **attrs)
+{
+	int tmp, err, i = 0;
+	struct nlattr *attr;
+
+	if (!attrs[NL80211_ATTR_SCHED_SCAN_PLANS]) {
+		u32 interval;
+
+		/*
+		 * If scan plans are not specified,
+		 * %NL80211_ATTR_SCHED_SCAN_INTERVAL must be specified. In this
+		 * case one scan plan will be set with the specified scan
+		 * interval and infinite number of iterations.
+		 */
+		if (!attrs[NL80211_ATTR_SCHED_SCAN_INTERVAL])
+			return -EINVAL;
+
+		interval = nla_get_u32(attrs[NL80211_ATTR_SCHED_SCAN_INTERVAL]);
+		if (!interval)
+			return -EINVAL;
+
+		request->scan_plans[0].interval =
+			DIV_ROUND_UP(interval, MSEC_PER_SEC);
+		if (!request->scan_plans[0].interval)
+			return -EINVAL;
+
+		if (request->scan_plans[0].interval >
+		    wiphy->max_sched_scan_plan_interval)
+			request->scan_plans[0].interval =
+				wiphy->max_sched_scan_plan_interval;
+
+		return 0;
+	}
+
+	nla_for_each_nested(attr, attrs[NL80211_ATTR_SCHED_SCAN_PLANS], tmp) {
+		struct nlattr *plan[NL80211_SCHED_SCAN_PLAN_MAX + 1];
+
+		if (WARN_ON(i >= n_plans))
+			return -EINVAL;
+
+		err = nla_parse(plan, NL80211_SCHED_SCAN_PLAN_MAX,
+				nla_data(attr), nla_len(attr),
+				nl80211_plan_policy);
+		if (err)
+			return err;
+
+		if (!plan[NL80211_SCHED_SCAN_PLAN_INTERVAL])
+			return -EINVAL;
+
+		request->scan_plans[i].interval =
+			nla_get_u32(plan[NL80211_SCHED_SCAN_PLAN_INTERVAL]);
+		if (!request->scan_plans[i].interval ||
+		    request->scan_plans[i].interval >
+		    wiphy->max_sched_scan_plan_interval)
+			return -EINVAL;
+
+		if (plan[NL80211_SCHED_SCAN_PLAN_ITERATIONS]) {
+			request->scan_plans[i].iterations =
+				nla_get_u32(plan[NL80211_SCHED_SCAN_PLAN_ITERATIONS]);
+			if (!request->scan_plans[i].iterations ||
+			    (request->scan_plans[i].iterations >
+			     wiphy->max_sched_scan_plan_iterations))
+				return -EINVAL;
+		} else if (i < n_plans - 1) {
+			/*
+			 * All scan plans but the last one must specify
+			 * a finite number of iterations
+			 */
+			return -EINVAL;
+		}
+
+		i++;
+	}
+
+	/*
+	 * The last scan plan must not specify the number of
+	 * iterations, it is supposed to run infinitely
+	 */
+	if (request->scan_plans[n_plans - 1].iterations)
+		return  -EINVAL;
+
+	return 0;
+}
+
 static struct cfg80211_sched_scan_request *
 nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 			 struct nlattr **attrs)
 {
 	struct cfg80211_sched_scan_request *request;
 	struct nlattr *attr;
-	int err, tmp, n_ssids = 0, n_match_sets = 0, n_channels, i;
-	u32 interval;
+	int err, tmp, n_ssids = 0, n_match_sets = 0, n_channels, i, n_plans = 0;
 	enum ieee80211_band band;
 	size_t ie_len;
 	struct nlattr *tb[NL80211_SCHED_SCAN_MATCH_ATTR_MAX + 1];
 	s32 default_match_rssi = NL80211_SCAN_RSSI_THOLD_OFF;
 
 	if (!is_valid_ie_attr(attrs[NL80211_ATTR_IE]))
-		return ERR_PTR(-EINVAL);
-
-	if (!attrs[NL80211_ATTR_SCHED_SCAN_INTERVAL])
-		return ERR_PTR(-EINVAL);
-
-	interval = nla_get_u32(attrs[NL80211_ATTR_SCHED_SCAN_INTERVAL]);
-	if (interval == 0)
 		return ERR_PTR(-EINVAL);
 
 	if (attrs[NL80211_ATTR_SCAN_FREQUENCIES]) {
@@ -6060,9 +6195,37 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	if (ie_len > wiphy->max_sched_scan_ie_len)
 		return ERR_PTR(-EINVAL);
 
+	if (attrs[NL80211_ATTR_SCHED_SCAN_PLANS]) {
+		/*
+		 * NL80211_ATTR_SCHED_SCAN_INTERVAL must not be specified since
+		 * each scan plan already specifies its own interval
+		 */
+		if (attrs[NL80211_ATTR_SCHED_SCAN_INTERVAL])
+			return ERR_PTR(-EINVAL);
+
+		nla_for_each_nested(attr,
+				    attrs[NL80211_ATTR_SCHED_SCAN_PLANS], tmp)
+			n_plans++;
+	} else {
+		/*
+		 * The scan interval attribute is kept for backward
+		 * compatibility. If no scan plans are specified and sched scan
+		 * interval is specified, one scan plan will be set with this
+		 * scan interval and infinite number of iterations.
+		 */
+		if (!attrs[NL80211_ATTR_SCHED_SCAN_INTERVAL])
+			return ERR_PTR(-EINVAL);
+
+		n_plans = 1;
+	}
+
+	if (!n_plans || n_plans > wiphy->max_sched_scan_plans)
+		return ERR_PTR(-EINVAL);
+
 	request = kzalloc(sizeof(*request)
 			+ sizeof(*request->ssids) * n_ssids
 			+ sizeof(*request->match_sets) * n_match_sets
+			+ sizeof(*request->scan_plans) * n_plans
 			+ sizeof(*request->channels) * n_channels
 			+ ie_len, GFP_KERNEL);
 	if (!request)
@@ -6089,6 +6252,18 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 				(void *)(request->channels + n_channels);
 	}
 	request->n_match_sets = n_match_sets;
+
+	if (n_match_sets)
+		request->scan_plans = (void *)(request->match_sets +
+					       n_match_sets);
+	else if (request->ie)
+		request->scan_plans = (void *)(request->ie + ie_len);
+	else if (n_ssids)
+		request->scan_plans = (void *)(request->ssids + n_ssids);
+	else
+		request->scan_plans = (void *)(request->channels + n_channels);
+
+	request->n_scan_plans = n_plans;
 
 	i = 0;
 	if (attrs[NL80211_ATTR_SCAN_FREQUENCIES]) {
@@ -6252,7 +6427,10 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 		request->delay =
 			nla_get_u32(attrs[NL80211_ATTR_SCHED_SCAN_DELAY]);
 
-	request->interval = interval;
+	err = nl80211_parse_sched_scan_plans(wiphy, n_plans, request, attrs);
+	if (err)
+		goto out_free;
+
 	request->scan_start = jiffies;
 
 	return request;
@@ -6362,8 +6540,7 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 	if (WARN_ON(!cac_time_ms))
 		cac_time_ms = IEEE80211_DFS_MIN_CAC_TIME_MS;
 
-	err = rdev->ops->start_radar_detection(&rdev->wiphy, dev, &chandef,
-					       cac_time_ms);
+	err = rdev_start_radar_detection(rdev, dev, &chandef, cac_time_ms);
 	if (!err) {
 		wdev->chandef = chandef;
 		wdev->cac_started = true;
@@ -6603,6 +6780,11 @@ static int nl80211_send_bss(struct sk_buff *msg, struct netlink_callback *cb,
 	    nla_put_u32(msg, NL80211_BSS_CHAN_WIDTH, res->scan_width) ||
 	    nla_put_u32(msg, NL80211_BSS_SEEN_MS_AGO,
 			jiffies_to_msecs(jiffies - intbss->ts)))
+		goto nla_put_failure;
+
+	if (intbss->ts_boottime &&
+	    nla_put_u64(msg, NL80211_BSS_LAST_SEEN_BOOTTIME,
+			intbss->ts_boottime))
 		goto nla_put_failure;
 
 	switch (rdev->wiphy.signal_type) {
@@ -7421,7 +7603,7 @@ static int nl80211_set_mcast_rate(struct sk_buff *skb, struct genl_info *info)
 	if (!nl80211_parse_mcast_rate(rdev, mcast_rate, nla_rate))
 		return -EINVAL;
 
-	err = rdev->ops->set_mcast_rate(&rdev->wiphy, dev, mcast_rate);
+	err = rdev_set_mcast_rate(rdev, dev, mcast_rate);
 
 	return err;
 }
@@ -8845,7 +9027,7 @@ static int nl80211_send_wowlan_tcp(struct sk_buff *msg,
 static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 				  struct cfg80211_sched_scan_request *req)
 {
-	struct nlattr *nd, *freqs, *matches, *match;
+	struct nlattr *nd, *freqs, *matches, *match, *scan_plans, *scan_plan;
 	int i;
 
 	if (!req)
@@ -8855,7 +9037,9 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 	if (!nd)
 		return -ENOBUFS;
 
-	if (nla_put_u32(msg, NL80211_ATTR_SCHED_SCAN_INTERVAL, req->interval))
+	if (req->n_scan_plans == 1 &&
+	    nla_put_u32(msg, NL80211_ATTR_SCHED_SCAN_INTERVAL,
+			req->scan_plans[0].interval * 1000))
 		return -ENOBUFS;
 
 	if (nla_put_u32(msg, NL80211_ATTR_SCHED_SCAN_DELAY, req->delay))
@@ -8881,6 +9065,23 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 		}
 		nla_nest_end(msg, matches);
 	}
+
+	scan_plans = nla_nest_start(msg, NL80211_ATTR_SCHED_SCAN_PLANS);
+	if (!scan_plans)
+		return -ENOBUFS;
+
+	for (i = 0; i < req->n_scan_plans; i++) {
+		scan_plan = nla_nest_start(msg, i + 1);
+		if (!scan_plan ||
+		    nla_put_u32(msg, NL80211_SCHED_SCAN_PLAN_INTERVAL,
+				req->scan_plans[i].interval) ||
+		    (req->scan_plans[i].iterations &&
+		     nla_put_u32(msg, NL80211_SCHED_SCAN_PLAN_ITERATIONS,
+				 req->scan_plans[i].iterations)))
+			return -ENOBUFS;
+		nla_nest_end(msg, scan_plan);
+	}
+	nla_nest_end(msg, scan_plans);
 
 	nla_nest_end(msg, nd);
 
@@ -9547,7 +9748,7 @@ static int nl80211_set_coalesce(struct sk_buff *skb, struct genl_info *info)
 
 	if (!info->attrs[NL80211_ATTR_COALESCE_RULE]) {
 		cfg80211_rdev_free_coalesce(rdev);
-		rdev->ops->set_coalesce(&rdev->wiphy, NULL);
+		rdev_set_coalesce(rdev, NULL);
 		return 0;
 	}
 
@@ -9575,7 +9776,7 @@ static int nl80211_set_coalesce(struct sk_buff *skb, struct genl_info *info)
 		i++;
 	}
 
-	err = rdev->ops->set_coalesce(&rdev->wiphy, &new_coalesce);
+	err = rdev_set_coalesce(rdev, &new_coalesce);
 	if (err)
 		goto error;
 
@@ -10737,6 +10938,7 @@ static const struct genl_ops nl80211_ops[] = {
 		.internal_flags = NL80211_FLAG_NEED_RTNL,
 		/* can be retrieved by unprivileged users */
 	},
+#ifdef CONFIG_CFG80211_CRDA_SUPPORT
 	{
 		.cmd = NL80211_CMD_SET_REG,
 		.doit = nl80211_set_reg,
@@ -10744,6 +10946,7 @@ static const struct genl_ops nl80211_ops[] = {
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_RTNL,
 	},
+#endif
 	{
 		.cmd = NL80211_CMD_REQ_SET_REG,
 		.doit = nl80211_req_set_reg,
@@ -10769,6 +10972,14 @@ static const struct genl_ops nl80211_ops[] = {
 	{
 		.cmd = NL80211_CMD_TRIGGER_SCAN,
 		.doit = nl80211_trigger_scan,
+		.policy = nl80211_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
+				  NL80211_FLAG_NEED_RTNL,
+	},
+	{
+		.cmd = NL80211_CMD_ABORT_SCAN,
+		.doit = nl80211_abort_scan,
 		.policy = nl80211_policy,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |

@@ -547,7 +547,6 @@ ip_vs_schedule(struct ip_vs_service *svc, struct sk_buff *skb,
 	return cp;
 }
 
-#ifdef CONFIG_SYSCTL
 static inline int ip_vs_addr_is_unicast(struct net *net, int af,
 					union nf_inet_addr *addr)
 {
@@ -557,7 +556,6 @@ static inline int ip_vs_addr_is_unicast(struct net *net, int af,
 #endif
 	return (inet_addr_type(net, addr->ip) == RTN_UNICAST);
 }
-#endif
 
 /*
  *  Pass or drop the packet.
@@ -1174,11 +1172,11 @@ drop:
 static unsigned int
 ip_vs_out(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, int af)
 {
-	struct net *net = ipvs->net;
 	struct ip_vs_iphdr iph;
 	struct ip_vs_protocol *pp;
 	struct ip_vs_proto_data *pd;
 	struct ip_vs_conn *cp;
+	struct sock *sk;
 
 	EnterFunction(11);
 
@@ -1186,13 +1184,12 @@ ip_vs_out(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, in
 	if (skb->ipvs_property)
 		return NF_ACCEPT;
 
+	sk = skb_to_full_sk(skb);
 	/* Bad... Do not break raw sockets */
-	if (unlikely(skb->sk != NULL && hooknum == NF_INET_LOCAL_OUT &&
+	if (unlikely(sk && hooknum == NF_INET_LOCAL_OUT &&
 		     af == AF_INET)) {
-		struct sock *sk = skb->sk;
-		struct inet_sock *inet = inet_sk(skb->sk);
 
-		if (inet && sk->sk_family == PF_INET && inet->nodefrag)
+		if (sk->sk_family == PF_INET && inet_sk(sk)->nodefrag)
 			return NF_ACCEPT;
 	}
 
@@ -1274,7 +1271,7 @@ ip_vs_out(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, in
 #ifdef CONFIG_IP_VS_IPV6
 				if (af == AF_INET6) {
 					if (!skb->dev)
-						skb->dev = net->loopback_dev;
+						skb->dev = ipvs->net->loopback_dev;
 					icmpv6_send(skb,
 						    ICMPV6_DEST_UNREACH,
 						    ICMPV6_PORT_UNREACH,
@@ -1684,6 +1681,7 @@ ip_vs_in(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, int
 	struct ip_vs_conn *cp;
 	int ret, pkts;
 	int conn_reuse_mode;
+	struct sock *sk;
 
 	/* Already marked as IPVS request or reply? */
 	if (skb->ipvs_property)
@@ -1711,12 +1709,11 @@ ip_vs_in(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, int
 	ip_vs_fill_iph_skb(af, skb, false, &iph);
 
 	/* Bad... Do not break raw sockets */
-	if (unlikely(skb->sk != NULL && hooknum == NF_INET_LOCAL_OUT &&
+	sk = skb_to_full_sk(skb);
+	if (unlikely(sk && hooknum == NF_INET_LOCAL_OUT &&
 		     af == AF_INET)) {
-		struct sock *sk = skb->sk;
-		struct inet_sock *inet = inet_sk(skb->sk);
 
-		if (inet && sk->sk_family == PF_INET && inet->nodefrag)
+		if (sk->sk_family == PF_INET && inet_sk(sk)->nodefrag)
 			return NF_ACCEPT;
 	}
 
@@ -1926,7 +1923,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After packet filtering, change source only for VS/NAT */
 	{
 		.hook		= ip_vs_reply4,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP_PRI_NAT_SRC - 2,
@@ -1936,7 +1932,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	 * applied to IPVS. */
 	{
 		.hook		= ip_vs_remote_request4,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP_PRI_NAT_SRC - 1,
@@ -1944,7 +1939,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* Before ip_vs_in, change source only for VS/NAT */
 	{
 		.hook		= ip_vs_local_reply4,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_LOCAL_OUT,
 		.priority	= NF_IP_PRI_NAT_DST + 1,
@@ -1952,7 +1946,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After mangle, schedule and forward local requests */
 	{
 		.hook		= ip_vs_local_request4,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_LOCAL_OUT,
 		.priority	= NF_IP_PRI_NAT_DST + 2,
@@ -1961,7 +1954,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	 * destined for 0.0.0.0/0, which is for incoming IPVS connections */
 	{
 		.hook		= ip_vs_forward_icmp,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_FORWARD,
 		.priority	= 99,
@@ -1969,7 +1961,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After packet filtering, change source only for VS/NAT */
 	{
 		.hook		= ip_vs_reply4,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_FORWARD,
 		.priority	= 100,
@@ -1978,7 +1969,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After packet filtering, change source only for VS/NAT */
 	{
 		.hook		= ip_vs_reply6,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP6_PRI_NAT_SRC - 2,
@@ -1988,7 +1978,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	 * applied to IPVS. */
 	{
 		.hook		= ip_vs_remote_request6,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.priority	= NF_IP6_PRI_NAT_SRC - 1,
@@ -1996,7 +1985,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* Before ip_vs_in, change source only for VS/NAT */
 	{
 		.hook		= ip_vs_local_reply6,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_OUT,
 		.priority	= NF_IP6_PRI_NAT_DST + 1,
@@ -2004,7 +1992,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After mangle, schedule and forward local requests */
 	{
 		.hook		= ip_vs_local_request6,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_LOCAL_OUT,
 		.priority	= NF_IP6_PRI_NAT_DST + 2,
@@ -2013,7 +2000,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	 * destined for 0.0.0.0/0, which is for incoming IPVS connections */
 	{
 		.hook		= ip_vs_forward_icmp_v6,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_FORWARD,
 		.priority	= 99,
@@ -2021,7 +2007,6 @@ static struct nf_hook_ops ip_vs_ops[] __read_mostly = {
 	/* After packet filtering, change source only for VS/NAT */
 	{
 		.hook		= ip_vs_reply6,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_FORWARD,
 		.priority	= 100,

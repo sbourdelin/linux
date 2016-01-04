@@ -103,8 +103,8 @@ static ssize_t i40e_dbg_dump_read(struct file *filp, char __user *buffer,
 	len = min_t(int, count, (i40e_dbg_dump_data_len - *ppos));
 
 	bytes_not_copied = copy_to_user(buffer, &i40e_dbg_dump_buf[*ppos], len);
-	if (bytes_not_copied < 0)
-		return bytes_not_copied;
+	if (bytes_not_copied)
+		return -EFAULT;
 
 	*ppos += len;
 	return len;
@@ -353,8 +353,8 @@ static ssize_t i40e_dbg_command_read(struct file *filp, char __user *buffer,
 	bytes_not_copied = copy_to_user(buffer, buf, len);
 	kfree(buf);
 
-	if (bytes_not_copied < 0)
-		return bytes_not_copied;
+	if (bytes_not_copied)
+		return -EFAULT;
 
 	*ppos = len;
 	return len;
@@ -953,24 +953,6 @@ static void i40e_dbg_dump_veb_all(struct i40e_pf *pf)
 	}
 }
 
-/**
- * i40e_dbg_cmd_fd_ctrl - Enable/disable FD sideband/ATR
- * @pf: the PF that would be altered
- * @flag: flag that needs enabling or disabling
- * @enable: Enable/disable FD SD/ATR
- **/
-static void i40e_dbg_cmd_fd_ctrl(struct i40e_pf *pf, u64 flag, bool enable)
-{
-	if (enable) {
-		pf->flags |= flag;
-	} else {
-		pf->flags &= ~flag;
-		pf->auto_disable_flags |= flag;
-	}
-	dev_info(&pf->pdev->dev, "requesting a PF reset\n");
-	i40e_do_reset_safe(pf, BIT(__I40E_PF_RESET_REQUESTED));
-}
-
 #define I40E_MAX_DEBUG_OUT_BUFFER (4096*4)
 /**
  * i40e_dbg_command_write - write into command datum
@@ -999,12 +981,10 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 	if (!cmd_buf)
 		return count;
 	bytes_not_copied = copy_from_user(cmd_buf, buffer, count);
-	if (bytes_not_copied < 0) {
+	if (bytes_not_copied) {
 		kfree(cmd_buf);
-		return bytes_not_copied;
+		return -EFAULT;
 	}
-	if (bytes_not_copied > 0)
-		count -= bytes_not_copied;
 	cmd_buf[count] = '\0';
 
 	cmd_buf_tmp = strchr(cmd_buf, '\n');
@@ -1155,8 +1135,10 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 			goto command_write_done;
 		}
 
+		spin_lock_bh(&vsi->mac_filter_list_lock);
 		f = i40e_add_filter(vsi, ma, vlan, false, false);
-		ret = i40e_sync_vsi_filters(vsi, true);
+		spin_unlock_bh(&vsi->mac_filter_list_lock);
+		ret = i40e_sync_vsi_filters(vsi);
 		if (f && !ret)
 			dev_info(&pf->pdev->dev,
 				 "add macaddr: %pM vlan=%d added to VSI %d\n",
@@ -1192,8 +1174,10 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 			goto command_write_done;
 		}
 
+		spin_lock_bh(&vsi->mac_filter_list_lock);
 		i40e_del_filter(vsi, ma, vlan, false, false);
-		ret = i40e_sync_vsi_filters(vsi, true);
+		spin_unlock_bh(&vsi->mac_filter_list_lock);
+		ret = i40e_sync_vsi_filters(vsi);
 		if (!ret)
 			dev_info(&pf->pdev->dev,
 				 "del macaddr: %pM vlan=%d removed from VSI %d\n",
@@ -1759,10 +1743,6 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 		raw_packet = NULL;
 		kfree(asc_packet);
 		asc_packet = NULL;
-	} else if (strncmp(cmd_buf, "fd-atr off", 10) == 0) {
-		i40e_dbg_cmd_fd_ctrl(pf, I40E_FLAG_FD_ATR_ENABLED, false);
-	} else if (strncmp(cmd_buf, "fd-atr on", 9) == 0) {
-		i40e_dbg_cmd_fd_ctrl(pf, I40E_FLAG_FD_ATR_ENABLED, true);
 	} else if (strncmp(cmd_buf, "fd current cnt", 14) == 0) {
 		dev_info(&pf->pdev->dev, "FD current total filter count for this interface: %d\n",
 			 i40e_get_current_fd_count(pf));
@@ -1989,8 +1969,6 @@ static ssize_t i40e_dbg_command_write(struct file *filp,
 		dev_info(&pf->pdev->dev, "  send indirect aq_cmd <flags> <opcode> <datalen> <retval> <cookie_h> <cookie_l> <param0> <param1> <param2> <param3> <buffer_len>\n");
 		dev_info(&pf->pdev->dev, "  add fd_filter <dest q_index> <flex_off> <pctype> <dest_vsi> <dest_ctl> <fd_status> <cnt_index> <fd_id> <packet_len> <packet>\n");
 		dev_info(&pf->pdev->dev, "  rem fd_filter <dest q_index> <flex_off> <pctype> <dest_vsi> <dest_ctl> <fd_status> <cnt_index> <fd_id> <packet_len> <packet>\n");
-		dev_info(&pf->pdev->dev, "  fd-atr off\n");
-		dev_info(&pf->pdev->dev, "  fd-atr on\n");
 		dev_info(&pf->pdev->dev, "  fd current cnt");
 		dev_info(&pf->pdev->dev, "  lldp start\n");
 		dev_info(&pf->pdev->dev, "  lldp stop\n");
@@ -2054,8 +2032,8 @@ static ssize_t i40e_dbg_netdev_ops_read(struct file *filp, char __user *buffer,
 	bytes_not_copied = copy_to_user(buffer, buf, len);
 	kfree(buf);
 
-	if (bytes_not_copied < 0)
-		return bytes_not_copied;
+	if (bytes_not_copied)
+		return -EFAULT;
 
 	*ppos = len;
 	return len;
@@ -2088,10 +2066,8 @@ static ssize_t i40e_dbg_netdev_ops_write(struct file *filp,
 	memset(i40e_dbg_netdev_ops_buf, 0, sizeof(i40e_dbg_netdev_ops_buf));
 	bytes_not_copied = copy_from_user(i40e_dbg_netdev_ops_buf,
 					  buffer, count);
-	if (bytes_not_copied < 0)
-		return bytes_not_copied;
-	else if (bytes_not_copied > 0)
-		count -= bytes_not_copied;
+	if (bytes_not_copied)
+		return -EFAULT;
 	i40e_dbg_netdev_ops_buf[count] = '\0';
 
 	buf_tmp = strchr(i40e_dbg_netdev_ops_buf, '\n');

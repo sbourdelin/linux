@@ -35,6 +35,9 @@
 #include <linux/mlx5/driver.h>
 #include <linux/mlx5/cmd.h>
 #include "mlx5_core.h"
+#ifdef CONFIG_MLX5_CORE_EN
+#include "eswitch.h"
+#endif
 
 enum {
 	MLX5_EQE_SIZE		= sizeof(struct mlx5_eqe),
@@ -287,6 +290,11 @@ static int mlx5_eq_int(struct mlx5_core_dev *dev, struct mlx5_eq *eq)
 			break;
 #endif
 
+#ifdef CONFIG_MLX5_CORE_EN
+		case MLX5_EVENT_TYPE_NIC_VPORT_CHANGE:
+			mlx5_eswitch_vport_event(dev->priv.eswitch, eqe);
+			break;
+#endif
 		default:
 			mlx5_core_warn(dev, "Unhandled event 0x%x on EQ 0x%x\n",
 				       eqe->type, eq->eqn);
@@ -382,10 +390,10 @@ int mlx5_create_map_eq(struct mlx5_core_dev *dev, struct mlx5_eq *eq, u8 vecidx,
 		 name, pci_name(dev->pdev));
 
 	eq->eqn = out.eq_number;
-	eq->irqn = vecidx;
+	eq->irqn = priv->msix_arr[vecidx].vector;
 	eq->dev = dev;
 	eq->doorbell = uar->map + MLX5_EQ_DOORBEL_OFFSET;
-	err = request_irq(priv->msix_arr[vecidx].vector, mlx5_msix_handler, 0,
+	err = request_irq(eq->irqn, mlx5_msix_handler, 0,
 			  priv->irq_info[vecidx].name, eq);
 	if (err)
 		goto err_eq;
@@ -421,12 +429,12 @@ int mlx5_destroy_unmap_eq(struct mlx5_core_dev *dev, struct mlx5_eq *eq)
 	int err;
 
 	mlx5_debug_eq_remove(dev, eq);
-	free_irq(dev->priv.msix_arr[eq->irqn].vector, eq);
+	free_irq(eq->irqn, eq);
 	err = mlx5_cmd_destroy_eq(dev, eq->eqn);
 	if (err)
 		mlx5_core_warn(dev, "failed to destroy a previously created eq: eqn %d\n",
 			       eq->eqn);
-	synchronize_irq(dev->priv.msix_arr[eq->irqn].vector);
+	synchronize_irq(eq->irqn);
 	mlx5_buf_free(dev, &eq->buf);
 
 	return err;
@@ -458,6 +466,11 @@ int mlx5_start_eqs(struct mlx5_core_dev *dev)
 
 	if (MLX5_CAP_GEN(dev, pg))
 		async_event_mask |= (1ull << MLX5_EVENT_TYPE_PAGE_FAULT);
+
+	if (MLX5_CAP_GEN(dev, port_type) == MLX5_CAP_PORT_TYPE_ETH &&
+	    MLX5_CAP_GEN(dev, vport_group_manager) &&
+	    mlx5_core_is_pf(dev))
+		async_event_mask |= (1ull << MLX5_EVENT_TYPE_NIC_VPORT_CHANGE);
 
 	err = mlx5_create_map_eq(dev, &table->cmd_eq, MLX5_EQ_VEC_CMD,
 				 MLX5_NUM_CMD_EQE, 1ull << MLX5_EVENT_TYPE_CMD,

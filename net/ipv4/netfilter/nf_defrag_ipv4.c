@@ -67,10 +67,9 @@ static unsigned int ipv4_conntrack_defrag(void *priv,
 					  const struct nf_hook_state *state)
 {
 	struct sock *sk = skb->sk;
-	struct inet_sock *inet = inet_sk(skb->sk);
 
-	if (sk && (sk->sk_family == PF_INET) &&
-	    inet->nodefrag)
+	if (sk && sk_fullsock(sk) && (sk->sk_family == PF_INET) &&
+	    inet_sk(sk)->nodefrag)
 		return NF_ACCEPT;
 
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
@@ -95,14 +94,12 @@ static unsigned int ipv4_conntrack_defrag(void *priv,
 static struct nf_hook_ops ipv4_defrag_ops[] = {
 	{
 		.hook		= ipv4_conntrack_defrag,
-		.owner		= THIS_MODULE,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_PRE_ROUTING,
 		.priority	= NF_IP_PRI_CONNTRACK_DEFRAG,
 	},
 	{
 		.hook           = ipv4_conntrack_defrag,
-		.owner          = THIS_MODULE,
 		.pf             = NFPROTO_IPV4,
 		.hooknum        = NF_INET_LOCAL_OUT,
 		.priority       = NF_IP_PRI_CONNTRACK_DEFRAG,

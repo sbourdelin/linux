@@ -11,7 +11,6 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-
 #include "hns_enet.h"
 
 #define HNS_PHY_PAGE_MDIX	0
@@ -194,9 +193,7 @@ static int hns_nic_set_settings(struct net_device *net_dev,
 {
 	struct hns_nic_priv *priv = netdev_priv(net_dev);
 	struct hnae_handle *h;
-	int link_stat;
 	u32 speed;
-	u8 duplex, autoneg;
 
 	if (!netif_running(net_dev))
 		return -ESRCH;
@@ -206,48 +203,35 @@ static int hns_nic_set_settings(struct net_device *net_dev,
 		return -ENODEV;
 
 	h = priv->ae_handle;
-	link_stat = hns_nic_get_link(net_dev);
-	duplex = cmd->duplex;
 	speed = ethtool_cmd_speed(cmd);
-	autoneg = cmd->autoneg;
-
-	if (!link_stat) {
-		if (duplex != (u8)DUPLEX_UNKNOWN || speed != (u32)SPEED_UNKNOWN)
-			return -EINVAL;
-
-		if (h->phy_if == PHY_INTERFACE_MODE_SGMII && h->phy_node) {
-			priv->phy->autoneg = autoneg;
-			return phy_start_aneg(priv->phy);
-		}
-	}
 
 	if (h->phy_if == PHY_INTERFACE_MODE_XGMII) {
-		if (autoneg != AUTONEG_DISABLE)
-			return -EINVAL;
-
-		if (speed != SPEED_10000 || duplex != DUPLEX_FULL)
+		if (cmd->autoneg == AUTONEG_ENABLE || speed != SPEED_10000 ||
+		    cmd->duplex != DUPLEX_FULL)
 			return -EINVAL;
 	} else if (h->phy_if == PHY_INTERFACE_MODE_SGMII) {
-		if (!h->phy_node && autoneg != AUTONEG_DISABLE)
+		if (!priv->phy && cmd->autoneg == AUTONEG_ENABLE)
 			return -EINVAL;
 
-		if (speed == SPEED_1000 && duplex == DUPLEX_HALF)
+		if (speed == SPEED_1000 && cmd->duplex == DUPLEX_HALF)
 			return -EINVAL;
+		if (priv->phy)
+			return phy_ethtool_sset(priv->phy, cmd);
 
-		if (speed != SPEED_10 && speed != SPEED_100 &&
-		    speed != SPEED_1000)
+		if ((speed != SPEED_10 && speed != SPEED_100 &&
+		     speed != SPEED_1000) || (cmd->duplex != DUPLEX_HALF &&
+		     cmd->duplex != DUPLEX_FULL))
 			return -EINVAL;
 	} else {
 		netdev_err(net_dev, "Not supported!");
 		return -ENOTSUPP;
 	}
 
-	if (priv->phy) {
-		return phy_ethtool_sset(priv->phy, cmd);
-	} else if (h->dev->ops->adjust_link && link_stat) {
-		h->dev->ops->adjust_link(h, speed, duplex);
+	if (h->dev->ops->adjust_link) {
+		h->dev->ops->adjust_link(h, (int)speed, cmd->duplex);
 		return 0;
 	}
+
 	netdev_err(net_dev, "Not supported!");
 	return -ENOTSUPP;
 }
@@ -1203,6 +1187,95 @@ static int hns_nic_nway_reset(struct net_device *netdev)
 	return ret;
 }
 
+static u32
+hns_get_rss_key_size(struct net_device *netdev)
+{
+	struct hns_nic_priv *priv = netdev_priv(netdev);
+	struct hnae_ae_ops *ops;
+	u32 ret;
+
+	if (AE_IS_VER1(priv->enet_ver)) {
+		netdev_err(netdev,
+			   "RSS feature is not supported on this hardware\n");
+		return -EOPNOTSUPP;
+	}
+
+	ops = priv->ae_handle->dev->ops;
+	ret = ops->get_rss_key_size(priv->ae_handle);
+
+	return ret;
+}
+
+static u32
+hns_get_rss_indir_size(struct net_device *netdev)
+{
+	struct hns_nic_priv *priv = netdev_priv(netdev);
+	struct hnae_ae_ops *ops;
+	u32 ret;
+
+	if (AE_IS_VER1(priv->enet_ver)) {
+		netdev_err(netdev,
+			   "RSS feature is not supported on this hardware\n");
+		return -EOPNOTSUPP;
+	}
+
+	ops = priv->ae_handle->dev->ops;
+	ret = ops->get_rss_indir_size(priv->ae_handle);
+
+	return ret;
+}
+
+static int
+hns_get_rss(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
+{
+	struct hns_nic_priv *priv = netdev_priv(netdev);
+	struct hnae_ae_ops *ops;
+	int ret;
+
+	if (AE_IS_VER1(priv->enet_ver)) {
+		netdev_err(netdev,
+			   "RSS feature is not supported on this hardware\n");
+		return -EOPNOTSUPP;
+	}
+
+	ops = priv->ae_handle->dev->ops;
+
+	if (!indir)
+		return 0;
+
+	ret = ops->get_rss(priv->ae_handle, indir, key, hfunc);
+
+	return 0;
+}
+
+static int
+hns_set_rss(struct net_device *netdev, const u32 *indir, const u8 *key,
+	    const u8 hfunc)
+{
+	struct hns_nic_priv *priv = netdev_priv(netdev);
+	struct hnae_ae_ops *ops;
+	int ret;
+
+	if (AE_IS_VER1(priv->enet_ver)) {
+		netdev_err(netdev,
+			   "RSS feature is not supported on this hardware\n");
+		return -EOPNOTSUPP;
+	}
+
+	ops = priv->ae_handle->dev->ops;
+
+	/* currently hfunc can only be Toeplitz hash */
+	if (key ||
+	    (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP))
+		return -EOPNOTSUPP;
+	if (!indir)
+		return 0;
+
+	ret = ops->set_rss(priv->ae_handle, indir, key, hfunc);
+
+	return 0;
+}
+
 static struct ethtool_ops hns_ethtool_ops = {
 	.get_drvinfo = hns_nic_get_drvinfo,
 	.get_link  = hns_nic_get_link,
@@ -1222,6 +1295,10 @@ static struct ethtool_ops hns_ethtool_ops = {
 	.get_regs_len = hns_get_regs_len,
 	.get_regs = hns_get_regs,
 	.nway_reset = hns_nic_nway_reset,
+	.get_rxfh_key_size = hns_get_rss_key_size,
+	.get_rxfh_indir_size = hns_get_rss_indir_size,
+	.get_rxfh = hns_get_rss,
+	.set_rxfh = hns_set_rss,
 };
 
 void hns_ethtool_set_ops(struct net_device *ndev)

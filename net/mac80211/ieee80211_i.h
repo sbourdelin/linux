@@ -34,6 +34,8 @@
 #include "sta_info.h"
 #include "debug.h"
 
+extern const struct cfg80211_ops mac80211_config_ops;
+
 struct ieee80211_local;
 
 /* Maximum number of broadcast/multicast frames to buffer when some of the
@@ -323,19 +325,15 @@ struct mesh_preq_queue {
 
 struct ieee80211_roc_work {
 	struct list_head list;
-	struct list_head dependents;
-
-	struct delayed_work work;
 
 	struct ieee80211_sub_if_data *sdata;
 
 	struct ieee80211_channel *chan;
 
 	bool started, abort, hw_begun, notified;
-	bool to_be_freed;
 	bool on_channel;
 
-	unsigned long hw_start_time;
+	unsigned long start_time;
 
 	u32 duration, req_duration;
 	struct sk_buff *frame;
@@ -500,6 +498,9 @@ struct ieee80211_if_managed {
 	 * only on couple of received frames.
 	 */
 	unsigned int count_beacon_signal;
+
+	/* Number of times beacon loss was invoked. */
+	unsigned int beacon_loss_count;
 
 	/*
 	 * Last Beacon frame signal strength average (ave_beacon_signal / 16)
@@ -1305,7 +1306,6 @@ struct ieee80211_local {
 	struct work_struct dynamic_ps_enable_work;
 	struct work_struct dynamic_ps_disable_work;
 	struct timer_list dynamic_ps_timer;
-	struct notifier_block network_latency_notifier;
 	struct notifier_block ifa_notifier;
 	struct notifier_block ifa6_notifier;
 
@@ -1331,6 +1331,7 @@ struct ieee80211_local {
 	/*
 	 * Remain-on-channel support
 	 */
+	struct delayed_work roc_work;
 	struct list_head roc_list;
 	struct work_struct hw_roc_start, hw_roc_done;
 	unsigned long hw_roc_start_time;
@@ -1479,6 +1480,10 @@ void ieee80211_bss_info_change_notify(struct ieee80211_sub_if_data *sdata,
 void ieee80211_configure_filter(struct ieee80211_local *local);
 u32 ieee80211_reset_erp_info(struct ieee80211_sub_if_data *sdata);
 
+u64 ieee80211_mgmt_tx_cookie(struct ieee80211_local *local);
+int ieee80211_attach_ack_skb(struct ieee80211_local *local, struct sk_buff *skb,
+			     u64 *cookie, gfp_t gfp);
+
 /* STA code */
 void ieee80211_sta_setup_sdata(struct ieee80211_sub_if_data *sdata);
 int ieee80211_mgd_auth(struct ieee80211_sub_if_data *sdata,
@@ -1491,10 +1496,8 @@ int ieee80211_mgd_disassoc(struct ieee80211_sub_if_data *sdata,
 			   struct cfg80211_disassoc_request *req);
 void ieee80211_send_pspoll(struct ieee80211_local *local,
 			   struct ieee80211_sub_if_data *sdata);
-void ieee80211_recalc_ps(struct ieee80211_local *local, s32 latency);
+void ieee80211_recalc_ps(struct ieee80211_local *local);
 void ieee80211_recalc_ps_vif(struct ieee80211_sub_if_data *sdata);
-int ieee80211_max_network_latency(struct notifier_block *nb,
-				  unsigned long data, void *dummy);
 int ieee80211_set_arp_filter(struct ieee80211_sub_if_data *sdata);
 void ieee80211_sta_work(struct ieee80211_sub_if_data *sdata);
 void ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
@@ -1571,20 +1574,26 @@ __ieee80211_request_sched_scan_start(struct ieee80211_sub_if_data *sdata,
 				     struct cfg80211_sched_scan_request *req);
 int ieee80211_request_sched_scan_start(struct ieee80211_sub_if_data *sdata,
 				       struct cfg80211_sched_scan_request *req);
-int ieee80211_request_sched_scan_stop(struct ieee80211_sub_if_data *sdata);
+int ieee80211_request_sched_scan_stop(struct ieee80211_local *local);
 void ieee80211_sched_scan_end(struct ieee80211_local *local);
 void ieee80211_sched_scan_stopped_work(struct work_struct *work);
 
-/* off-channel helpers */
+/* off-channel/mgmt-tx */
 void ieee80211_offchannel_stop_vifs(struct ieee80211_local *local);
 void ieee80211_offchannel_return(struct ieee80211_local *local);
 void ieee80211_roc_setup(struct ieee80211_local *local);
 void ieee80211_start_next_roc(struct ieee80211_local *local);
 void ieee80211_roc_purge(struct ieee80211_local *local,
 			 struct ieee80211_sub_if_data *sdata);
-void ieee80211_roc_notify_destroy(struct ieee80211_roc_work *roc, bool free);
-void ieee80211_sw_roc_work(struct work_struct *work);
-void ieee80211_handle_roc_started(struct ieee80211_roc_work *roc);
+int ieee80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+				struct ieee80211_channel *chan,
+				unsigned int duration, u64 *cookie);
+int ieee80211_cancel_remain_on_channel(struct wiphy *wiphy,
+				       struct wireless_dev *wdev, u64 cookie);
+int ieee80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
+		      struct cfg80211_mgmt_tx_params *params, u64 *cookie);
+int ieee80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
+				  struct wireless_dev *wdev, u64 cookie);
 
 /* channel switch handling */
 void ieee80211_csa_finalize_work(struct work_struct *work);
@@ -1766,11 +1775,8 @@ extern const void *const mac80211_wiphy_privid; /* for wiphy privid */
 int ieee80211_frame_duration(enum ieee80211_band band, size_t len,
 			     int rate, int erp, int short_preamble,
 			     int shift);
-void mac80211_ev_michael_mic_failure(struct ieee80211_sub_if_data *sdata, int keyidx,
-				     struct ieee80211_hdr *hdr, const u8 *tsc,
-				     gfp_t gfp);
 void ieee80211_set_wmm_default(struct ieee80211_sub_if_data *sdata,
-			       bool bss_notify);
+			       bool bss_notify, bool enable_qos);
 void ieee80211_xmit(struct ieee80211_sub_if_data *sdata,
 		    struct sta_info *sta, struct sk_buff *skb);
 
@@ -1963,7 +1969,7 @@ u8 *ieee80211_ie_build_ht_cap(u8 *pos, struct ieee80211_sta_ht_cap *ht_cap,
 			      u16 cap);
 u8 *ieee80211_ie_build_ht_oper(u8 *pos, struct ieee80211_sta_ht_cap *ht_cap,
 			       const struct cfg80211_chan_def *chandef,
-			       u16 prot_mode);
+			       u16 prot_mode, bool rifs_mode);
 u8 *ieee80211_ie_build_vht_cap(u8 *pos, struct ieee80211_sta_vht_cap *vht_cap,
 			       u32 cap);
 u8 *ieee80211_ie_build_vht_oper(u8 *pos, struct ieee80211_sta_vht_cap *vht_cap,

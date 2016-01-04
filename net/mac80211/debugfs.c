@@ -125,6 +125,7 @@ static const char *hw_flag_names[NUM_IEEE80211_HW_FLAGS + 1] = {
 	FLAG(TDLS_WIDER_BW),
 	FLAG(SUPPORTS_AMSDU_IN_AMPDU),
 	FLAG(BEACON_TX_STATUS),
+	FLAG(NEEDS_UNIQUE_STA_ADDR),
 
 	/* keep last for the build bug below */
 	(void *)0x1
@@ -151,7 +152,7 @@ static ssize_t hwflags_read(struct file *file, char __user *user_buf,
 
 	for (i = 0; i < NUM_IEEE80211_HW_FLAGS; i++) {
 		if (test_bit(i, local->hw.flags))
-			pos += scnprintf(pos, end - pos, "%s",
+			pos += scnprintf(pos, end - pos, "%s\n",
 					 hw_flag_names[i]);
 	}
 

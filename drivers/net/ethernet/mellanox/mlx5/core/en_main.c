@@ -32,6 +32,7 @@
 
 #include <linux/mlx5/flow_table.h>
 #include "en.h"
+#include "eswitch.h"
 
 struct mlx5e_rq_param {
 	u32                        rqc[MLX5_ST_SZ_DW(rqc)];
@@ -63,7 +64,7 @@ static void mlx5e_update_carrier(struct mlx5e_priv *priv)
 	u8 port_state;
 
 	port_state = mlx5_query_vport_state(mdev,
-		MLX5_QUERY_VPORT_STATE_IN_OP_MOD_VNIC_VPORT);
+		MLX5_QUERY_VPORT_STATE_IN_OP_MOD_VNIC_VPORT, 0);
 
 	if (port_state == VPORT_STATE_UP)
 		netif_carrier_on(priv->netdev);
@@ -442,12 +443,12 @@ static void mlx5e_disable_rq(struct mlx5e_rq *rq)
 
 static int mlx5e_wait_for_min_rx_wqes(struct mlx5e_rq *rq)
 {
+	unsigned long exp_time = jiffies + msecs_to_jiffies(20000);
 	struct mlx5e_channel *c = rq->channel;
 	struct mlx5e_priv *priv = c->priv;
 	struct mlx5_wq_ll *wq = &rq->wq;
-	int i;
 
-	for (i = 0; i < 1000; i++) {
+	while (time_before(jiffies, exp_time)) {
 		if (wq->cur_sz >= priv->params.min_rx_wqes)
 			return 0;
 
@@ -1020,6 +1021,7 @@ err_close_tx_cqs:
 
 err_napi_del:
 	netif_napi_del(&c->napi);
+	napi_hash_del(&c->napi);
 	kfree(c);
 
 	return err;
@@ -1033,6 +1035,10 @@ static void mlx5e_close_channel(struct mlx5e_channel *c)
 	mlx5e_close_cq(&c->rq.cq);
 	mlx5e_close_tx_cqs(c);
 	netif_napi_del(&c->napi);
+
+	napi_hash_del(&c->napi);
+	synchronize_rcu();
+
 	kfree(c);
 }
 
@@ -1332,6 +1338,42 @@ static int mlx5e_modify_tir_lro(struct mlx5e_priv *priv, int tt)
 	return err;
 }
 
+static int mlx5e_refresh_tir_self_loopback_enable(struct mlx5_core_dev *mdev,
+						  u32 tirn)
+{
+	void *in;
+	int inlen;
+	int err;
+
+	inlen = MLX5_ST_SZ_BYTES(modify_tir_in);
+	in = mlx5_vzalloc(inlen);
+	if (!in)
+		return -ENOMEM;
+
+	MLX5_SET(modify_tir_in, in, bitmask.self_lb_en, 1);
+
+	err = mlx5_core_modify_tir(mdev, tirn, in, inlen);
+
+	kvfree(in);
+
+	return err;
+}
+
+static int mlx5e_refresh_tirs_self_loopback_enable(struct mlx5e_priv *priv)
+{
+	int err;
+	int i;
+
+	for (i = 0; i < MLX5E_NUM_TT; i++) {
+		err = mlx5e_refresh_tir_self_loopback_enable(priv->mdev,
+							     priv->tirn[i]);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
 static int mlx5e_set_dev_port_mtu(struct net_device *netdev)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
@@ -1376,6 +1418,13 @@ int mlx5e_open_locked(struct net_device *netdev)
 		goto err_clear_state_opened_flag;
 	}
 
+	err = mlx5e_refresh_tirs_self_loopback_enable(priv);
+	if (err) {
+		netdev_err(netdev, "%s: mlx5e_refresh_tirs_self_loopback_enable failed, %d\n",
+			   __func__, err);
+		goto err_close_channels;
+	}
+
 	mlx5e_update_carrier(priv);
 	mlx5e_redirect_rqts(priv);
 
@@ -1383,6 +1432,8 @@ int mlx5e_open_locked(struct net_device *netdev)
 
 	return 0;
 
+err_close_channels:
+	mlx5e_close_channels(priv);
 err_clear_state_opened_flag:
 	clear_bit(MLX5E_STATE_OPENED, &priv->state);
 	return err;
@@ -1403,6 +1454,12 @@ static int mlx5e_open(struct net_device *netdev)
 int mlx5e_close_locked(struct net_device *netdev)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	/* May already be CLOSED in case a previous configuration operation
+	 * (e.g RX/TX queue size change) that involves close&open failed.
+	 */
+	if (!test_bit(MLX5E_STATE_OPENED, &priv->state))
+		return 0;
 
 	clear_bit(MLX5E_STATE_OPENED, &priv->state);
 
@@ -1837,7 +1894,7 @@ static int mlx5e_set_features(struct net_device *netdev,
 			mlx5e_disable_vlan_filter(priv);
 	}
 
-	return 0;
+	return err;
 }
 
 static int mlx5e_change_mtu(struct net_device *netdev, int new_mtu)
@@ -1849,6 +1906,8 @@ static int mlx5e_change_mtu(struct net_device *netdev, int new_mtu)
 	int err = 0;
 
 	mlx5_query_port_max_mtu(mdev, &max_mtu, 1);
+
+	max_mtu = MLX5E_HW2SW_MTU(max_mtu);
 
 	if (new_mtu > max_mtu) {
 		netdev_err(netdev,
@@ -1873,6 +1932,79 @@ static int mlx5e_change_mtu(struct net_device *netdev, int new_mtu)
 	return err;
 }
 
+static int mlx5e_set_vf_mac(struct net_device *dev, int vf, u8 *mac)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct mlx5_core_dev *mdev = priv->mdev;
+
+	return mlx5_eswitch_set_vport_mac(mdev->priv.eswitch, vf + 1, mac);
+}
+
+static int mlx5e_set_vf_vlan(struct net_device *dev, int vf, u16 vlan, u8 qos)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct mlx5_core_dev *mdev = priv->mdev;
+
+	return mlx5_eswitch_set_vport_vlan(mdev->priv.eswitch, vf + 1,
+					   vlan, qos);
+}
+
+static int mlx5_vport_link2ifla(u8 esw_link)
+{
+	switch (esw_link) {
+	case MLX5_ESW_VPORT_ADMIN_STATE_DOWN:
+		return IFLA_VF_LINK_STATE_DISABLE;
+	case MLX5_ESW_VPORT_ADMIN_STATE_UP:
+		return IFLA_VF_LINK_STATE_ENABLE;
+	}
+	return IFLA_VF_LINK_STATE_AUTO;
+}
+
+static int mlx5_ifla_link2vport(u8 ifla_link)
+{
+	switch (ifla_link) {
+	case IFLA_VF_LINK_STATE_DISABLE:
+		return MLX5_ESW_VPORT_ADMIN_STATE_DOWN;
+	case IFLA_VF_LINK_STATE_ENABLE:
+		return MLX5_ESW_VPORT_ADMIN_STATE_UP;
+	}
+	return MLX5_ESW_VPORT_ADMIN_STATE_AUTO;
+}
+
+static int mlx5e_set_vf_link_state(struct net_device *dev, int vf,
+				   int link_state)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct mlx5_core_dev *mdev = priv->mdev;
+
+	return mlx5_eswitch_set_vport_state(mdev->priv.eswitch, vf + 1,
+					    mlx5_ifla_link2vport(link_state));
+}
+
+static int mlx5e_get_vf_config(struct net_device *dev,
+			       int vf, struct ifla_vf_info *ivi)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct mlx5_core_dev *mdev = priv->mdev;
+	int err;
+
+	err = mlx5_eswitch_get_vport_config(mdev->priv.eswitch, vf + 1, ivi);
+	if (err)
+		return err;
+	ivi->linkstate = mlx5_vport_link2ifla(ivi->linkstate);
+	return 0;
+}
+
+static int mlx5e_get_vf_stats(struct net_device *dev,
+			      int vf, struct ifla_vf_stats *vf_stats)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct mlx5_core_dev *mdev = priv->mdev;
+
+	return mlx5_eswitch_get_vport_stats(mdev->priv.eswitch, vf + 1,
+					    vf_stats);
+}
+
 static struct net_device_ops mlx5e_netdev_ops = {
 	.ndo_open                = mlx5e_open,
 	.ndo_stop                = mlx5e_close,
@@ -1883,7 +2015,7 @@ static struct net_device_ops mlx5e_netdev_ops = {
 	.ndo_vlan_rx_add_vid	 = mlx5e_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	 = mlx5e_vlan_rx_kill_vid,
 	.ndo_set_features        = mlx5e_set_features,
-	.ndo_change_mtu		 = mlx5e_change_mtu,
+	.ndo_change_mtu		 = mlx5e_change_mtu
 };
 
 static int mlx5e_check_required_hca_cap(struct mlx5_core_dev *mdev)
@@ -1903,6 +2035,9 @@ static int mlx5e_check_required_hca_cap(struct mlx5_core_dev *mdev)
 			       "Not creating net device, some required device capabilities are missing\n");
 		return -ENOTSUPP;
 	}
+	if (!MLX5_CAP_ETH(mdev, self_lb_en_modifiable))
+		mlx5_core_warn(mdev, "Self loop back prevention is not supported\n");
+
 	return 0;
 }
 
@@ -1967,7 +2102,7 @@ static void mlx5e_set_netdev_dev_addr(struct net_device *netdev)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
 
-	mlx5_query_nic_vport_mac_address(priv->mdev, netdev->dev_addr);
+	mlx5_query_nic_vport_mac_address(priv->mdev, 0, netdev->dev_addr);
 }
 
 static void mlx5e_build_netdev(struct net_device *netdev)
@@ -1979,6 +2114,14 @@ static void mlx5e_build_netdev(struct net_device *netdev)
 
 	if (priv->params.num_tc > 1)
 		mlx5e_netdev_ops.ndo_select_queue = mlx5e_select_queue;
+
+	if (MLX5_CAP_GEN(mdev, vport_group_manager)) {
+		mlx5e_netdev_ops.ndo_set_vf_mac = mlx5e_set_vf_mac;
+		mlx5e_netdev_ops.ndo_set_vf_vlan = mlx5e_set_vf_vlan;
+		mlx5e_netdev_ops.ndo_get_vf_config = mlx5e_get_vf_config;
+		mlx5e_netdev_ops.ndo_set_vf_link_state = mlx5e_set_vf_link_state;
+		mlx5e_netdev_ops.ndo_get_vf_stats = mlx5e_get_vf_stats;
+	}
 
 	netdev->netdev_ops        = &mlx5e_netdev_ops;
 	netdev->watchdog_timeo    = 15 * HZ;
@@ -1998,6 +2141,7 @@ static void mlx5e_build_netdev(struct net_device *netdev)
 		netdev->vlan_features    |= NETIF_F_LRO;
 
 	netdev->hw_features       = netdev->vlan_features;
+	netdev->hw_features      |= NETIF_F_HW_VLAN_CTAG_TX;
 	netdev->hw_features      |= NETIF_F_HW_VLAN_CTAG_RX;
 	netdev->hw_features      |= NETIF_F_HW_VLAN_CTAG_FILTER;
 
@@ -2041,8 +2185,7 @@ static void *mlx5e_create_netdev(struct mlx5_core_dev *mdev)
 {
 	struct net_device *netdev;
 	struct mlx5e_priv *priv;
-	int nch = min_t(int, mdev->priv.eq_table.num_comp_vectors,
-			MLX5E_MAX_NUM_CHANNELS);
+	int nch = mlx5e_get_max_num_channels(mdev);
 	int err;
 
 	if (mlx5e_check_required_hca_cap(mdev))

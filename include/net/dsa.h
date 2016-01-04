@@ -16,6 +16,7 @@
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/phy.h>
 #include <linux/phy_fixed.h>
 #include <linux/ethtool.h>
@@ -64,6 +65,13 @@ struct dsa_chip_data {
 	 * NULL if there is only one switch chip.
 	 */
 	s8		*rtable;
+
+	/*
+	 * A switch may have a GPIO line tied to its reset pin. Parse
+	 * this from the device tree, and use it before performing
+	 * switch soft reset.
+	 */
+	struct gpio_desc *reset;
 };
 
 struct dsa_platform_data {
@@ -107,13 +115,6 @@ struct dsa_switch_tree {
 	 */
 	s8			cpu_switch;
 	s8			cpu_port;
-
-	/*
-	 * Link state polling.
-	 */
-	int			link_poll_needed;
-	struct work_struct	link_poll_work;
-	struct timer_list	link_poll_timer;
 
 	/*
 	 * Data for the individual switch chips.
@@ -198,7 +199,9 @@ static inline u8 dsa_upstream_port(struct dsa_switch *ds)
 }
 
 struct switchdev_trans;
+struct switchdev_obj;
 struct switchdev_obj_port_fdb;
+struct switchdev_obj_port_vlan;
 
 struct dsa_switch_driver {
 	struct list_head	list;
@@ -220,11 +223,6 @@ struct dsa_switch_driver {
 	int	(*phy_read)(struct dsa_switch *ds, int port, int regnum);
 	int	(*phy_write)(struct dsa_switch *ds, int port,
 			     int regnum, u16 val);
-
-	/*
-	 * Link state polling and IRQ handling.
-	 */
-	void	(*poll_link)(struct dsa_switch *ds);
 
 	/*
 	 * Link state adjustment (called from libphy)
@@ -308,11 +306,15 @@ struct dsa_switch_driver {
 	/*
 	 * VLAN support
 	 */
+	int	(*port_vlan_prepare)(struct dsa_switch *ds, int port,
+				     const struct switchdev_obj_port_vlan *vlan,
+				     struct switchdev_trans *trans);
+	int	(*port_vlan_add)(struct dsa_switch *ds, int port,
+				 const struct switchdev_obj_port_vlan *vlan,
+				 struct switchdev_trans *trans);
+	int	(*port_vlan_del)(struct dsa_switch *ds, int port,
+				 const struct switchdev_obj_port_vlan *vlan);
 	int	(*port_pvid_get)(struct dsa_switch *ds, int port, u16 *pvid);
-	int	(*port_pvid_set)(struct dsa_switch *ds, int port, u16 pvid);
-	int	(*port_vlan_add)(struct dsa_switch *ds, int port, u16 vid,
-				 bool untagged);
-	int	(*port_vlan_del)(struct dsa_switch *ds, int port, u16 vid);
 	int	(*vlan_getnext)(struct dsa_switch *ds, u16 *vid,
 				unsigned long *ports, unsigned long *untagged);
 
@@ -327,9 +329,9 @@ struct dsa_switch_driver {
 				struct switchdev_trans *trans);
 	int	(*port_fdb_del)(struct dsa_switch *ds, int port,
 				const struct switchdev_obj_port_fdb *fdb);
-	int	(*port_fdb_getnext)(struct dsa_switch *ds, int port,
-				    unsigned char *addr, u16 *vid,
-				    bool *is_static);
+	int	(*port_fdb_dump)(struct dsa_switch *ds, int port,
+				 struct switchdev_obj_port_fdb *fdb,
+				 int (*cb)(struct switchdev_obj *obj));
 };
 
 void register_switch_driver(struct dsa_switch_driver *type);

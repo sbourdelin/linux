@@ -155,6 +155,8 @@ static void dump_dev_cap_flags2(struct mlx4_dev *dev, u64 flags)
 		[27] = "Port beacon support",
 		[28] = "RX-ALL support",
 		[29] = "802.1ad offload support",
+		[31] = "Modifying loopback source checks using UPDATE_QP support",
+		[32] = "Loopback source checks support",
 	};
 	int i;
 
@@ -964,6 +966,10 @@ int mlx4_QUERY_DEV_CAP(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap)
 	MLX4_GET(field32, outbox, QUERY_DEV_CAP_EXT_2_FLAGS_OFFSET);
 	if (field32 & (1 << 16))
 		dev_cap->flags2 |= MLX4_DEV_CAP_FLAG2_UPDATE_QP;
+	if (field32 & (1 << 18))
+		dev_cap->flags2 |= MLX4_DEV_CAP_FLAG2_UPDATE_QP_SRC_CHECK_LB;
+	if (field32 & (1 << 19))
+		dev_cap->flags2 |= MLX4_DEV_CAP_FLAG2_LB_SRC_CHK;
 	if (field32 & (1 << 26))
 		dev_cap->flags2 |= MLX4_DEV_CAP_FLAG2_VLAN_CONTROL;
 	if (field32 & (1 << 20))
@@ -1098,6 +1104,7 @@ int mlx4_QUERY_PORT(struct mlx4_dev *dev, int port, struct mlx4_port_cap *port_c
 			goto out;
 
 		MLX4_GET(field, outbox, QUERY_PORT_SUPPORTED_TYPE_OFFSET);
+		port_cap->link_state = (field & 0x80) >> 7;
 		port_cap->supported_port_types = field & 3;
 		port_cap->suggested_type = (field >> 3) & 1;
 		port_cap->default_sense = (field >> 4) & 1;
@@ -1304,6 +1311,15 @@ int mlx4_QUERY_PORT_wrapper(struct mlx4_dev *dev, int slave,
 			port_type |= MLX4_PORT_LINK_UP_MASK;
 		else if (IFLA_VF_LINK_STATE_DISABLE == admin_link_state)
 			port_type &= ~MLX4_PORT_LINK_UP_MASK;
+		else if (IFLA_VF_LINK_STATE_AUTO == admin_link_state && mlx4_is_bonded(dev)) {
+			int other_port = (port == 1) ? 2 : 1;
+			struct mlx4_port_cap port_cap;
+
+			err = mlx4_QUERY_PORT(dev, other_port, &port_cap);
+			if (err)
+				goto out;
+			port_type |= (port_cap.link_state << 7);
+		}
 
 		MLX4_PUT(outbox->buf, port_type,
 			 QUERY_PORT_SUPPORTED_TYPE_OFFSET);
@@ -1319,7 +1335,7 @@ int mlx4_QUERY_PORT_wrapper(struct mlx4_dev *dev, int slave,
 		MLX4_PUT(outbox->buf, short_field,
 			 QUERY_PORT_CUR_MAX_PKEY_OFFSET);
 	}
-
+out:
 	return err;
 }
 
@@ -2840,3 +2856,19 @@ int set_phv_bit(struct mlx4_dev *dev, u8 port, int new_val)
 	return -EOPNOTSUPP;
 }
 EXPORT_SYMBOL(set_phv_bit);
+
+void mlx4_replace_zero_macs(struct mlx4_dev *dev)
+{
+	int i;
+	u8 mac_addr[ETH_ALEN];
+
+	dev->port_random_macs = 0;
+	for (i = 1; i <= dev->caps.num_ports; ++i)
+		if (!dev->caps.def_mac[i] &&
+		    dev->caps.port_type[i] == MLX4_PORT_TYPE_ETH) {
+			eth_random_addr(mac_addr);
+			dev->port_random_macs |= 1 << i;
+			dev->caps.def_mac[i] = mlx4_mac_to_u64(mac_addr);
+		}
+}
+EXPORT_SYMBOL_GPL(mlx4_replace_zero_macs);

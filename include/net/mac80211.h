@@ -482,7 +482,9 @@ struct ieee80211_event {
  *	Note that with TDLS this can be the case (channel is HT, protection must
  *	be used from this field) even when the BSS association isn't using HT.
  * @cqm_rssi_thold: Connection quality monitor RSSI threshold, a zero value
- *	implies disabled
+ *	implies disabled. As with the cfg80211 callback, a change here should
+ *	cause an event to be sent indicating where the current value is in
+ *	relation to the newly configured threshold.
  * @cqm_rssi_hyst: Connection quality monitor RSSI hysteresis
  * @arp_addr_list: List of IPv4 addresses for hardware ARP filtering. The
  *	may filter ARP queries targeted for other addresses than listed here.
@@ -1241,11 +1243,6 @@ enum ieee80211_smps_mode {
  * @flags: configuration flags defined above
  *
  * @listen_interval: listen interval in units of beacon interval
- * @max_sleep_period: the maximum number of beacon intervals to sleep for
- *	before checking the beacon for a TIM bit (managed mode only); this
- *	value will be only achievable between DTIM frames, the hardware
- *	needs to check for the multicast traffic bit in DTIM beacons.
- *	This variable is valid only when the CONF_PS flag is set.
  * @ps_dtim_period: The DTIM period of the AP we're connected to, for use
  *	in power saving. Power saving will not be enabled until a beacon
  *	has been received and the DTIM period is known.
@@ -1275,7 +1272,6 @@ enum ieee80211_smps_mode {
 struct ieee80211_conf {
 	u32 flags;
 	int power_level, dynamic_ps_timeout;
-	int max_sleep_period;
 
 	u16 listen_interval;
 	u8 ps_dtim_period;
@@ -1325,11 +1321,15 @@ struct ieee80211_channel_switch {
  *	interface. This flag should be set during interface addition,
  *	but may be set/cleared as late as authentication to an AP. It is
  *	only valid for managed/station mode interfaces.
+ * @IEEE80211_VIF_GET_NOA_UPDATE: request to handle NOA attributes
+ *	and send P2P_PS notification to the driver if NOA changed, even
+ *	this is not pure P2P vif.
  */
 enum ieee80211_vif_flags {
 	IEEE80211_VIF_BEACON_FILTER		= BIT(0),
 	IEEE80211_VIF_SUPPORTS_CQM_RSSI		= BIT(1),
 	IEEE80211_VIF_SUPPORTS_UAPSD		= BIT(2),
+	IEEE80211_VIF_GET_NOA_UPDATE		= BIT(3),
 };
 
 /**
@@ -1683,6 +1683,7 @@ struct ieee80211_sta_rates {
  * @tdls: indicates whether the STA is a TDLS peer
  * @tdls_initiator: indicates the STA is an initiator of the TDLS link. Only
  *	valid if the STA is a TDLS peer in the first place.
+ * @mfp: indicates whether the STA uses management frame protection or not.
  * @txq: per-TID data TX queues (if driver uses the TXQ abstraction)
  */
 struct ieee80211_sta {
@@ -1700,6 +1701,7 @@ struct ieee80211_sta {
 	struct ieee80211_sta_rates __rcu *rates;
 	bool tdls;
 	bool tdls_initiator;
+	bool mfp;
 
 	struct ieee80211_txq *txq[IEEE80211_NUM_TIDS];
 
@@ -1903,6 +1905,11 @@ struct ieee80211_txq {
  * @IEEE80211_HW_BEACON_TX_STATUS: The device/driver provides TX status
  *	for sent beacons.
  *
+ * @IEEE80211_HW_NEEDS_UNIQUE_STA_ADDR: Hardware (or driver) requires that each
+ *	station has a unique address, i.e. each station entry can be identified
+ *	by just its MAC address; this prevents, for example, the same station
+ *	from connecting to two virtual AP interfaces at the same time.
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -1938,6 +1945,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_TDLS_WIDER_BW,
 	IEEE80211_HW_SUPPORTS_AMSDU_IN_AMPDU,
 	IEEE80211_HW_BEACON_TX_STATUS,
+	IEEE80211_HW_NEEDS_UNIQUE_STA_ADDR,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
@@ -2005,8 +2013,10 @@ enum ieee80211_hw_flags {
  *	it shouldn't be set.
  *
  * @max_tx_aggregation_subframes: maximum number of subframes in an
- *	aggregate an HT driver will transmit, used by the peer as a
- *	hint to size its reorder buffer.
+ *	aggregate an HT driver will transmit. Though ADDBA will advertise
+ *	a constant value of 64 as some older APs can crash if the window
+ *	size is smaller (an example is LinkSys WRT120N with FW v1.0.07
+ *	build 002 Jun 18 2012).
  *
  * @offchannel_tx_hw_queue: HW queue ID to use for offchannel TX
  *	(if %IEEE80211_HW_QUEUE_CONTROL is set)
@@ -3174,18 +3184,24 @@ enum ieee80211_reconfig_type {
  *	The callback is optional and can sleep.
  *
  * @add_chanctx: Notifies device driver about new channel context creation.
+ *	This callback may sleep.
  * @remove_chanctx: Notifies device driver about channel context destruction.
+ *	This callback may sleep.
  * @change_chanctx: Notifies device driver about channel context changes that
  *	may happen when combining different virtual interfaces on the same
  *	channel context with different settings
+ *	This callback may sleep.
  * @assign_vif_chanctx: Notifies device driver about channel context being bound
  *	to vif. Possible use is for hw queue remapping.
+ *	This callback may sleep.
  * @unassign_vif_chanctx: Notifies device driver about channel context being
  *	unbound from vif.
+ *	This callback may sleep.
  * @switch_vif_chanctx: switch a number of vifs from one chanctx to
  *	another, as specified in the list of
  *	@ieee80211_vif_chanctx_switch passed to the driver, according
  *	to the mode defined in &ieee80211_chanctx_switch_mode.
+ *	This callback may sleep.
  *
  * @start_ap: Start operation on the AP interface, this is called after all the
  *	information in bss_conf is set and beacon can be retrieved. A channel
@@ -4857,6 +4873,28 @@ void ieee80211_sta_block_awake(struct ieee80211_hw *hw,
 void ieee80211_sta_eosp(struct ieee80211_sta *pubsta);
 
 /**
+ * ieee80211_send_eosp_nullfunc - ask mac80211 to send NDP with EOSP
+ * @pubsta: the station
+ * @tid: the tid of the NDP
+ *
+ * Sometimes the device understands that it needs to close
+ * the Service Period unexpectedly. This can happen when
+ * sending frames that are filling holes in the BA window.
+ * In this case, the device can ask mac80211 to send a
+ * Nullfunc frame with EOSP set. When that happens, the
+ * driver must have called ieee80211_sta_set_buffered() to
+ * let mac80211 know that there are no buffered frames any
+ * more, otherwise mac80211 will get the more_data bit wrong.
+ * The low level driver must have made sure that the frame
+ * will be sent despite the station being in power-save.
+ * Mac80211 won't call allow_buffered_frames().
+ * Note that calling this function, doesn't exempt the driver
+ * from closing the EOSP properly, it will still have to call
+ * ieee80211_sta_eosp when the NDP is sent.
+ */
+void ieee80211_send_eosp_nullfunc(struct ieee80211_sta *pubsta, int tid);
+
+/**
  * ieee80211_iter_keys - iterate keys programmed into the device
  * @hw: pointer obtained from ieee80211_alloc_hw()
  * @vif: virtual interface to iterate, may be %NULL for all
@@ -4882,6 +4920,30 @@ void ieee80211_iter_keys(struct ieee80211_hw *hw,
 				      struct ieee80211_key_conf *key,
 				      void *data),
 			 void *iter_data);
+
+/**
+ * ieee80211_iter_keys_rcu - iterate keys programmed into the device
+ * @hw: pointer obtained from ieee80211_alloc_hw()
+ * @vif: virtual interface to iterate, may be %NULL for all
+ * @iter: iterator function that will be called for each key
+ * @iter_data: custom data to pass to the iterator function
+ *
+ * This function can be used to iterate all the keys known to
+ * mac80211, even those that weren't previously programmed into
+ * the device. Note that due to locking reasons, keys of station
+ * in removal process will be skipped.
+ *
+ * This function requires being called in an RCU critical section,
+ * and thus iter must be atomic.
+ */
+void ieee80211_iter_keys_rcu(struct ieee80211_hw *hw,
+			     struct ieee80211_vif *vif,
+			     void (*iter)(struct ieee80211_hw *hw,
+					  struct ieee80211_vif *vif,
+					  struct ieee80211_sta *sta,
+					  struct ieee80211_key_conf *key,
+					  void *data),
+			     void *iter_data);
 
 /**
  * ieee80211_iter_chan_contexts_atomic - iterate channel contexts

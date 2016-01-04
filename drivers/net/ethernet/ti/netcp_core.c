@@ -1036,7 +1036,7 @@ netcp_tx_map_skb(struct sk_buff *skb, struct netcp_intf *netcp)
 	}
 
 	desc = knav_pool_desc_get(netcp->tx_pool);
-	if (unlikely(IS_ERR_OR_NULL(desc))) {
+	if (IS_ERR_OR_NULL(desc)) {
 		dev_err(netcp->ndev_dev, "out of TX desc\n");
 		dma_unmap_single(dev, dma_addr, pkt_len, DMA_TO_DEVICE);
 		return NULL;
@@ -1069,7 +1069,7 @@ netcp_tx_map_skb(struct sk_buff *skb, struct netcp_intf *netcp)
 		}
 
 		ndesc = knav_pool_desc_get(netcp->tx_pool);
-		if (unlikely(IS_ERR_OR_NULL(ndesc))) {
+		if (IS_ERR_OR_NULL(ndesc)) {
 			dev_err(netcp->ndev_dev, "out of TX desc for frags\n");
 			dma_unmap_page(dev, dma_addr, buf_len, DMA_TO_DEVICE);
 			goto free_descs;
@@ -1990,7 +1990,7 @@ static int netcp_create_interface(struct netcp_device *netcp_device,
 
 	/* NAPI register */
 	netif_napi_add(ndev, &netcp->rx_napi, netcp_rx_poll, NETCP_NAPI_WEIGHT);
-	netif_napi_add(ndev, &netcp->tx_napi, netcp_tx_poll, NETCP_NAPI_WEIGHT);
+	netif_tx_napi_add(ndev, &netcp->tx_napi, netcp_tx_poll, NETCP_NAPI_WEIGHT);
 
 	/* Register the network device */
 	ndev->dev_id		= 0;

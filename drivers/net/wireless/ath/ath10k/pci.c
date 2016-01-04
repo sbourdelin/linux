@@ -57,16 +57,12 @@ MODULE_PARM_DESC(reset_mode, "0: auto, 1: warm only (default: 0)");
 #define ATH10K_PCI_TARGET_WAIT 3000
 #define ATH10K_PCI_NUM_WARM_RESET_ATTEMPTS 3
 
-#define QCA988X_2_0_DEVICE_ID	(0x003c)
-#define QCA6164_2_1_DEVICE_ID	(0x0041)
-#define QCA6174_2_1_DEVICE_ID	(0x003e)
-#define QCA99X0_2_0_DEVICE_ID	(0x0040)
-
 static const struct pci_device_id ath10k_pci_id_table[] = {
 	{ PCI_VDEVICE(ATHEROS, QCA988X_2_0_DEVICE_ID) }, /* PCI-E QCA988X V2 */
 	{ PCI_VDEVICE(ATHEROS, QCA6164_2_1_DEVICE_ID) }, /* PCI-E QCA6164 V2.1 */
 	{ PCI_VDEVICE(ATHEROS, QCA6174_2_1_DEVICE_ID) }, /* PCI-E QCA6174 V2.1 */
 	{ PCI_VDEVICE(ATHEROS, QCA99X0_2_0_DEVICE_ID) }, /* PCI-E QCA99X0 V2 */
+	{ PCI_VDEVICE(ATHEROS, QCA9377_1_0_DEVICE_ID) }, /* PCI-E QCA9377 V1 */
 	{0}
 };
 
@@ -90,6 +86,9 @@ static const struct ath10k_pci_supp_chip ath10k_pci_supp_chips[] = {
 	{ QCA6174_2_1_DEVICE_ID, QCA6174_HW_3_2_CHIP_ID_REV },
 
 	{ QCA99X0_2_0_DEVICE_ID, QCA99X0_HW_2_0_CHIP_ID_REV },
+
+	{ QCA9377_1_0_DEVICE_ID, QCA9377_HW_1_0_CHIP_ID_REV },
+	{ QCA9377_1_0_DEVICE_ID, QCA9377_HW_1_1_CHIP_ID_REV },
 };
 
 static void ath10k_pci_buffer_cleanup(struct ath10k *ar);
@@ -108,8 +107,10 @@ static void ath10k_pci_htc_tx_cb(struct ath10k_ce_pipe *ce_state);
 static void ath10k_pci_htc_rx_cb(struct ath10k_ce_pipe *ce_state);
 static void ath10k_pci_htt_tx_cb(struct ath10k_ce_pipe *ce_state);
 static void ath10k_pci_htt_rx_cb(struct ath10k_ce_pipe *ce_state);
+static void ath10k_pci_htt_htc_rx_cb(struct ath10k_ce_pipe *ce_state);
+static void ath10k_pci_pktlog_rx_cb(struct ath10k_ce_pipe *ce_state);
 
-static const struct ce_attr host_ce_config_wlan[] = {
+static struct ce_attr host_ce_config_wlan[] = {
 	/* CE0: host->target HTC control and raw streams */
 	{
 		.flags = CE_ATTR_FLAGS,
@@ -125,7 +126,7 @@ static const struct ce_attr host_ce_config_wlan[] = {
 		.src_nentries = 0,
 		.src_sz_max = 2048,
 		.dest_nentries = 512,
-		.recv_cb = ath10k_pci_htc_rx_cb,
+		.recv_cb = ath10k_pci_htt_htc_rx_cb,
 	},
 
 	/* CE2: target->host WMI */
@@ -186,6 +187,7 @@ static const struct ce_attr host_ce_config_wlan[] = {
 		.src_nentries = 0,
 		.src_sz_max = 2048,
 		.dest_nentries = 128,
+		.recv_cb = ath10k_pci_pktlog_rx_cb,
 	},
 
 	/* CE9 target autonomous qcache memcpy */
@@ -214,7 +216,7 @@ static const struct ce_attr host_ce_config_wlan[] = {
 };
 
 /* Target firmware's Copy Engine configuration. */
-static const struct ce_pipe_config target_ce_config_wlan[] = {
+static struct ce_pipe_config target_ce_config_wlan[] = {
 	/* CE0: host->target HTC control and raw streams */
 	{
 		.pipenum = __cpu_to_le32(0),
@@ -327,7 +329,7 @@ static const struct ce_pipe_config target_ce_config_wlan[] = {
  * This table is derived from the CE_PCI TABLE, above.
  * It is passed to the Target at startup for use by firmware.
  */
-static const struct service_to_pipe target_service_to_ce_map_wlan[] = {
+static struct service_to_pipe target_service_to_ce_map_wlan[] = {
 	{
 		__cpu_to_le32(ATH10K_HTC_SVC_ID_WMI_DATA_VO),
 		__cpu_to_le32(PIPEDIR_OUT),	/* out = UL = host -> target */
@@ -827,6 +829,7 @@ static u32 ath10k_pci_targ_cpu_to_ce_addr(struct ath10k *ar, u32 addr)
 	switch (ar->hw_rev) {
 	case ATH10K_HW_QCA988X:
 	case ATH10K_HW_QCA6174:
+	case ATH10K_HW_QCA9377:
 		val = (ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS +
 					  CORE_CTRL_ADDRESS) &
 		       0x7ff) << 21;
@@ -910,24 +913,13 @@ static int ath10k_pci_diag_read_mem(struct ath10k *ar, u32 address, void *data,
 			goto done;
 
 		i = 0;
-		while (ath10k_ce_completed_send_next_nolock(ce_diag, NULL, &buf,
-							    &completed_nbytes,
-							    &id) != 0) {
+		while (ath10k_ce_completed_send_next_nolock(ce_diag,
+							    NULL) != 0) {
 			mdelay(1);
 			if (i++ > DIAG_ACCESS_CE_TIMEOUT_MS) {
 				ret = -EBUSY;
 				goto done;
 			}
-		}
-
-		if (nbytes != completed_nbytes) {
-			ret = -EIO;
-			goto done;
-		}
-
-		if (buf != (u32)address) {
-			ret = -EIO;
-			goto done;
 		}
 
 		i = 0;
@@ -1083,25 +1075,14 @@ static int ath10k_pci_diag_write_mem(struct ath10k *ar, u32 address,
 			goto done;
 
 		i = 0;
-		while (ath10k_ce_completed_send_next_nolock(ce_diag, NULL, &buf,
-							    &completed_nbytes,
-							    &id) != 0) {
+		while (ath10k_ce_completed_send_next_nolock(ce_diag,
+							    NULL) != 0) {
 			mdelay(1);
 
 			if (i++ > DIAG_ACCESS_CE_TIMEOUT_MS) {
 				ret = -EBUSY;
 				goto done;
 			}
-		}
-
-		if (nbytes != completed_nbytes) {
-			ret = -EIO;
-			goto done;
-		}
-
-		if (buf != ce_data) {
-			ret = -EIO;
-			goto done;
 		}
 
 		i = 0;
@@ -1159,13 +1140,9 @@ static void ath10k_pci_htc_tx_cb(struct ath10k_ce_pipe *ce_state)
 	struct ath10k *ar = ce_state->ar;
 	struct sk_buff_head list;
 	struct sk_buff *skb;
-	u32 ce_data;
-	unsigned int nbytes;
-	unsigned int transfer_id;
 
 	__skb_queue_head_init(&list);
-	while (ath10k_ce_completed_send_next(ce_state, (void **)&skb, &ce_data,
-					     &nbytes, &transfer_id) == 0) {
+	while (ath10k_ce_completed_send_next(ce_state, (void **)&skb) == 0) {
 		/* no need to call tx completion for NULL pointers */
 		if (skb == NULL)
 			continue;
@@ -1230,17 +1207,32 @@ static void ath10k_pci_htc_rx_cb(struct ath10k_ce_pipe *ce_state)
 	ath10k_pci_process_rx_cb(ce_state, ath10k_htc_rx_completion_handler);
 }
 
+static void ath10k_pci_htt_htc_rx_cb(struct ath10k_ce_pipe *ce_state)
+{
+	/* CE4 polling needs to be done whenever CE pipe which transports
+	 * HTT Rx (target->host) is processed.
+	 */
+	ath10k_ce_per_engine_service(ce_state->ar, 4);
+
+	ath10k_pci_process_rx_cb(ce_state, ath10k_htc_rx_completion_handler);
+}
+
+/* Called by lower (CE) layer when data is received from the Target.
+ * Only 10.4 firmware uses separate CE to transfer pktlog data.
+ */
+static void ath10k_pci_pktlog_rx_cb(struct ath10k_ce_pipe *ce_state)
+{
+	ath10k_pci_process_rx_cb(ce_state,
+				 ath10k_htt_rx_pktlog_completion_handler);
+}
+
 /* Called by lower (CE) layer when a send to HTT Target completes. */
 static void ath10k_pci_htt_tx_cb(struct ath10k_ce_pipe *ce_state)
 {
 	struct ath10k *ar = ce_state->ar;
 	struct sk_buff *skb;
-	u32 ce_data;
-	unsigned int nbytes;
-	unsigned int transfer_id;
 
-	while (ath10k_ce_completed_send_next(ce_state, (void **)&skb, &ce_data,
-					     &nbytes, &transfer_id) == 0) {
+	while (ath10k_ce_completed_send_next(ce_state, (void **)&skb) == 0) {
 		/* no need to call tx completion for NULL pointers */
 		if (!skb)
 			continue;
@@ -1513,6 +1505,7 @@ static void ath10k_pci_irq_msi_fw_mask(struct ath10k *ar)
 	switch (ar->hw_rev) {
 	case ATH10K_HW_QCA988X:
 	case ATH10K_HW_QCA6174:
+	case ATH10K_HW_QCA9377:
 		val = ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS +
 					CORE_CTRL_ADDRESS);
 		val &= ~CORE_CTRL_PCIE_REG_31_MASK;
@@ -1534,6 +1527,7 @@ static void ath10k_pci_irq_msi_fw_unmask(struct ath10k *ar)
 	switch (ar->hw_rev) {
 	case ATH10K_HW_QCA988X:
 	case ATH10K_HW_QCA6174:
+	case ATH10K_HW_QCA9377:
 		val = ath10k_pci_read32(ar, SOC_CORE_BASE_ADDRESS +
 					CORE_CTRL_ADDRESS);
 		val |= CORE_CTRL_PCIE_REG_31_MASK;
@@ -1624,7 +1618,6 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 	struct ath10k_pci *ar_pci;
 	struct ath10k_ce_pipe *ce_pipe;
 	struct ath10k_ce_ring *ce_ring;
-	struct ce_desc *ce_desc;
 	struct sk_buff *skb;
 	int i;
 
@@ -1637,10 +1630,6 @@ static void ath10k_pci_tx_pipe_cleanup(struct ath10k_pci_pipe *pci_pipe)
 		return;
 
 	if (!pci_pipe->buf_sz)
-		return;
-
-	ce_desc = ce_ring->shadow_base;
-	if (WARN_ON(!ce_desc))
 		return;
 
 	for (i = 0; i < ce_ring->nentries; i++) {
@@ -1816,12 +1805,8 @@ err_dma:
 static void ath10k_pci_bmi_send_done(struct ath10k_ce_pipe *ce_state)
 {
 	struct bmi_xfer *xfer;
-	u32 ce_data;
-	unsigned int nbytes;
-	unsigned int transfer_id;
 
-	if (ath10k_ce_completed_send_next(ce_state, (void **)&xfer, &ce_data,
-					  &nbytes, &transfer_id))
+	if (ath10k_ce_completed_send_next(ce_state, (void **)&xfer))
 		return;
 
 	xfer->tx_done = true;
@@ -1911,6 +1896,8 @@ static int ath10k_pci_get_num_banks(struct ath10k *ar)
 			return 9;
 		}
 		break;
+	case QCA9377_1_0_DEVICE_ID:
+		return 2;
 	}
 
 	ath10k_warn(ar, "unknown number of banks, assuming 1\n");
@@ -2056,6 +2043,29 @@ static int ath10k_pci_init_config(struct ath10k *ar)
 	}
 
 	return 0;
+}
+
+static void ath10k_pci_override_ce_config(struct ath10k *ar)
+{
+	struct ce_attr *attr;
+	struct ce_pipe_config *config;
+
+	/* For QCA6174 we're overriding the Copy Engine 5 configuration,
+	 * since it is currently used for other feature.
+	 */
+
+	/* Override Host's Copy Engine 5 configuration */
+	attr = &host_ce_config_wlan[5];
+	attr->src_sz_max = 0;
+	attr->dest_nentries = 0;
+
+	/* Override Target firmware's Copy Engine configuration */
+	config = &target_ce_config_wlan[5];
+	config->pipedir = __cpu_to_le32(PIPEDIR_OUT);
+	config->nbytes_max = __cpu_to_le32(2048);
+
+	/* Map from service/endpoint to Copy Engine */
+	target_service_to_ce_map_wlan[15].pipenum = __cpu_to_le32(1);
 }
 
 static int ath10k_pci_alloc_pipes(struct ath10k *ar)
@@ -2370,6 +2380,8 @@ static int ath10k_pci_chip_reset(struct ath10k *ar)
 	if (QCA_REV_988X(ar))
 		return ath10k_pci_qca988x_chip_reset(ar);
 	else if (QCA_REV_6174(ar))
+		return ath10k_pci_qca6174_chip_reset(ar);
+	else if (QCA_REV_9377(ar))
 		return ath10k_pci_qca6174_chip_reset(ar);
 	else if (QCA_REV_99X0(ar))
 		return ath10k_pci_qca99x0_chip_reset(ar);
@@ -3003,6 +3015,10 @@ static int ath10k_pci_probe(struct pci_dev *pdev,
 		hw_rev = ATH10K_HW_QCA99X0;
 		pci_ps = false;
 		break;
+	case QCA9377_1_0_DEVICE_ID:
+		hw_rev = ATH10K_HW_QCA9377;
+		pci_ps = true;
+		break;
 	default:
 		WARN_ON(1);
 		return -ENOTSUPP;
@@ -3044,6 +3060,9 @@ static int ath10k_pci_probe(struct pci_dev *pdev,
 		ath10k_err(ar, "failed to claim device: %d\n", ret);
 		goto err_core_destroy;
 	}
+
+	if (QCA_REV_6174(ar))
+		ath10k_pci_override_ce_config(ar);
 
 	ret = ath10k_pci_alloc_pipes(ar);
 	if (ret) {
@@ -3204,3 +3223,7 @@ MODULE_FIRMWARE(QCA6174_HW_3_0_FW_DIR "/" ATH10K_FW_API4_FILE);
 MODULE_FIRMWARE(QCA6174_HW_3_0_FW_DIR "/" ATH10K_FW_API5_FILE);
 MODULE_FIRMWARE(QCA6174_HW_3_0_FW_DIR "/" QCA6174_HW_3_0_BOARD_DATA_FILE);
 MODULE_FIRMWARE(QCA6174_HW_3_0_FW_DIR "/" ATH10K_BOARD_API2_FILE);
+
+/* QCA9377 1.0 firmware files */
+MODULE_FIRMWARE(QCA9377_HW_1_0_FW_DIR "/" ATH10K_FW_API5_FILE);
+MODULE_FIRMWARE(QCA9377_HW_1_0_FW_DIR "/" QCA9377_HW_1_0_BOARD_DATA_FILE);

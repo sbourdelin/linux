@@ -76,7 +76,6 @@
 #include <linux/igmp.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_bridge.h>
-#include <linux/mroute.h>
 #include <linux/netlink.h>
 #include <linux/tcp.h>
 
@@ -533,6 +532,11 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 
 	dev = rt->dst.dev;
 
+	/* for offloaded checksums cleanup checksum before fragmentation */
+	if (skb->ip_summed == CHECKSUM_PARTIAL &&
+	    (err = skb_checksum_help(skb)))
+		goto fail;
+
 	/*
 	 *	Point into the IP datagram header.
 	 */
@@ -657,9 +661,6 @@ slow_path_clean:
 	}
 
 slow_path:
-	/* for offloaded checksums cleanup checksum before fragmentation */
-	if ((skb->ip_summed == CHECKSUM_PARTIAL) && skb_checksum_help(skb))
-		goto fail;
 	iph = ip_hdr(skb);
 
 	left = skb->len - hlen;		/* Space per frame */
@@ -911,6 +912,7 @@ static int __ip_append_data(struct sock *sk,
 	if (transhdrlen &&
 	    length + fragheaderlen <= mtu &&
 	    rt->dst.dev->features & NETIF_F_V4_CSUM &&
+	    !(flags & MSG_MORE) &&
 	    !exthdrlen)
 		csummode = CHECKSUM_PARTIAL;
 
@@ -1596,7 +1598,6 @@ void ip_send_unicast_reply(struct sock *sk, struct sk_buff *skb,
 			  arg->csumoffset) = csum_fold(csum_add(nskb->csum,
 								arg->csum));
 		nskb->ip_summed = CHECKSUM_NONE;
-		skb_set_queue_mapping(nskb, skb_get_queue_mapping(skb));
 		ip_push_pending_frames(sk, &fl4);
 	}
 out:

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel 10 Gigabit PCI Express Linux driver
-  Copyright(c) 1999 - 2014 Intel Corporation.
+  Copyright(c) 1999 - 2015 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -116,12 +116,50 @@ static int __ixgbe_enable_sriov(struct ixgbe_adapter *adapter)
 			 * we want to disable the querying by default.
 			 */
 			adapter->vfinfo[i].rss_query_enabled = 0;
+
+			/* Untrust all VFs */
+			adapter->vfinfo[i].trusted = false;
+
+			/* set the default xcast mode */
+			adapter->vfinfo[i].xcast_mode = IXGBEVF_XCAST_MODE_NONE;
 		}
 
 		return 0;
 	}
 
 	return -ENOMEM;
+}
+
+/**
+ * ixgbe_get_vfs - Find and take references to all vf devices
+ * @adapter: Pointer to adapter struct
+ */
+static void ixgbe_get_vfs(struct ixgbe_adapter *adapter)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	u16 vendor = pdev->vendor;
+	struct pci_dev *vfdev;
+	int vf = 0;
+	u16 vf_id;
+	int pos;
+
+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_SRIOV);
+	if (!pos)
+		return;
+	pci_read_config_word(pdev, pos + PCI_SRIOV_VF_DID, &vf_id);
+
+	vfdev = pci_get_device(vendor, vf_id, NULL);
+	for (; vfdev; vfdev = pci_get_device(vendor, vf_id, vfdev)) {
+		if (!vfdev->is_virtfn)
+			continue;
+		if (vfdev->physfn != pdev)
+			continue;
+		if (vf >= adapter->num_vfs)
+			continue;
+		pci_dev_get(vfdev);
+		adapter->vfinfo[vf].vfdev = vfdev;
+		++vf;
+	}
 }
 
 /* Note this function is called when the user wants to enable SR-IOV
@@ -164,8 +202,10 @@ void ixgbe_enable_sriov(struct ixgbe_adapter *adapter)
 		}
 	}
 
-	if (!__ixgbe_enable_sriov(adapter))
+	if (!__ixgbe_enable_sriov(adapter)) {
+		ixgbe_get_vfs(adapter);
 		return;
+	}
 
 	/* If we have gotten to this point then there is no memory available
 	 * to manage the VF devices - print message and bail.
@@ -178,6 +218,7 @@ void ixgbe_enable_sriov(struct ixgbe_adapter *adapter)
 #endif /* #ifdef CONFIG_PCI_IOV */
 int ixgbe_disable_sriov(struct ixgbe_adapter *adapter)
 {
+	unsigned int num_vfs = adapter->num_vfs, vf;
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 gpie;
 	u32 vmdctl;
@@ -185,6 +226,16 @@ int ixgbe_disable_sriov(struct ixgbe_adapter *adapter)
 
 	/* set num VFs to 0 to prevent access to vfinfo */
 	adapter->num_vfs = 0;
+
+	/* put the reference to all of the vf devices */
+	for (vf = 0; vf < num_vfs; ++vf) {
+		struct pci_dev *vfdev = adapter->vfinfo[vf].vfdev;
+
+		if (!vfdev)
+			continue;
+		adapter->vfinfo[vf].vfdev = NULL;
+		pci_dev_put(vfdev);
+	}
 
 	/* free VF control structures */
 	kfree(adapter->vfinfo);
@@ -283,6 +334,7 @@ static int ixgbe_pci_sriov_enable(struct pci_dev *dev, int num_vfs)
 		e_dev_warn("Failed to enable PCI sriov: %d\n", err);
 		return err;
 	}
+	ixgbe_get_vfs(adapter);
 	ixgbe_sriov_reinit(adapter);
 
 	return num_vfs;
@@ -1001,6 +1053,59 @@ static int ixgbe_get_vf_rss_key(struct ixgbe_adapter *adapter,
 	return 0;
 }
 
+static int ixgbe_update_vf_xcast_mode(struct ixgbe_adapter *adapter,
+				      u32 *msgbuf, u32 vf)
+{
+	struct ixgbe_hw *hw = &adapter->hw;
+	int xcast_mode = msgbuf[1];
+	u32 vmolr, disable, enable;
+
+	/* verify the PF is supporting the correct APIs */
+	switch (adapter->vfinfo[vf].vf_api) {
+	case ixgbe_mbox_api_12:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	if (xcast_mode > IXGBEVF_XCAST_MODE_MULTI &&
+	    !adapter->vfinfo[vf].trusted) {
+		xcast_mode = IXGBEVF_XCAST_MODE_MULTI;
+	}
+
+	if (adapter->vfinfo[vf].xcast_mode == xcast_mode)
+		goto out;
+
+	switch (xcast_mode) {
+	case IXGBEVF_XCAST_MODE_NONE:
+		disable = IXGBE_VMOLR_BAM | IXGBE_VMOLR_ROMPE | IXGBE_VMOLR_MPE;
+		enable = 0;
+		break;
+	case IXGBEVF_XCAST_MODE_MULTI:
+		disable = IXGBE_VMOLR_MPE;
+		enable = IXGBE_VMOLR_BAM | IXGBE_VMOLR_ROMPE;
+		break;
+	case IXGBEVF_XCAST_MODE_ALLMULTI:
+		disable = 0;
+		enable = IXGBE_VMOLR_BAM | IXGBE_VMOLR_ROMPE | IXGBE_VMOLR_MPE;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	vmolr = IXGBE_READ_REG(hw, IXGBE_VMOLR(vf));
+	vmolr &= ~disable;
+	vmolr |= enable;
+	IXGBE_WRITE_REG(hw, IXGBE_VMOLR(vf), vmolr);
+
+	adapter->vfinfo[vf].xcast_mode = xcast_mode;
+
+out:
+	msgbuf[1] = xcast_mode;
+
+	return 0;
+}
+
 static int ixgbe_rcv_msg_from_vf(struct ixgbe_adapter *adapter, u32 vf)
 {
 	u32 mbx_size = IXGBE_VFMAILBOX_SIZE;
@@ -1063,6 +1168,9 @@ static int ixgbe_rcv_msg_from_vf(struct ixgbe_adapter *adapter, u32 vf)
 	case IXGBE_VF_GET_RSS_KEY:
 		retval = ixgbe_get_vf_rss_key(adapter, msgbuf, vf);
 		break;
+	case IXGBE_VF_UPDATE_XCAST_MODE:
+		retval = ixgbe_update_vf_xcast_mode(adapter, msgbuf, vf);
+		break;
 	default:
 		e_err(drv, "Unhandled Msg %8.8x\n", msgbuf[0]);
 		retval = IXGBE_ERR_MBX;
@@ -1122,6 +1230,17 @@ void ixgbe_disable_tx_rx(struct ixgbe_adapter *adapter)
 
 	IXGBE_WRITE_REG(hw, IXGBE_VFRE(0), 0);
 	IXGBE_WRITE_REG(hw, IXGBE_VFRE(1), 0);
+}
+
+static inline void ixgbe_ping_vf(struct ixgbe_adapter *adapter, int vf)
+{
+	struct ixgbe_hw *hw = &adapter->hw;
+	u32 ping;
+
+	ping = IXGBE_PF_CONTROL_MSG;
+	if (adapter->vfinfo[vf].clear_to_send)
+		ping |= IXGBE_VT_MSGTYPE_CTS;
+	ixgbe_write_mbx(hw, &ping, 1, vf);
 }
 
 void ixgbe_ping_all_vfs(struct ixgbe_adapter *adapter)
@@ -1416,6 +1535,28 @@ int ixgbe_ndo_set_vf_rss_query_en(struct net_device *netdev, int vf,
 	return 0;
 }
 
+int ixgbe_ndo_set_vf_trust(struct net_device *netdev, int vf, bool setting)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+
+	if (vf >= adapter->num_vfs)
+		return -EINVAL;
+
+	/* nothing to do */
+	if (adapter->vfinfo[vf].trusted == setting)
+		return 0;
+
+	adapter->vfinfo[vf].trusted = setting;
+
+	/* reset VF to reconfigure features */
+	adapter->vfinfo[vf].clear_to_send = false;
+	ixgbe_ping_vf(adapter, vf);
+
+	e_info(drv, "VF %u is %strusted\n", vf, setting ? "" : "not ");
+
+	return 0;
+}
+
 int ixgbe_ndo_get_vf_config(struct net_device *netdev,
 			    int vf, struct ifla_vf_info *ivi)
 {
@@ -1430,5 +1571,6 @@ int ixgbe_ndo_get_vf_config(struct net_device *netdev,
 	ivi->qos = adapter->vfinfo[vf].pf_qos;
 	ivi->spoofchk = adapter->vfinfo[vf].spoofchk_enabled;
 	ivi->rss_query_en = adapter->vfinfo[vf].rss_query_enabled;
+	ivi->trusted = adapter->vfinfo[vf].trusted;
 	return 0;
 }

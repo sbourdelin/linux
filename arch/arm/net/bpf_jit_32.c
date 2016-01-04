@@ -626,6 +626,7 @@ load_common:
 		case BPF_LD | BPF_B | BPF_IND:
 			load_order = 0;
 load_ind:
+			update_on_xread(ctx);
 			OP_IMM3(ARM_ADD, r_off, r_X, k, ctx);
 			goto load_common;
 		case BPF_LDX | BPF_IMM:
@@ -1060,7 +1061,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
 	}
 	build_epilogue(&ctx);
 
-	flush_icache_range((u32)ctx.target, (u32)(ctx.target + ctx.idx));
+	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
 
 #if __LINUX_ARM_ARCH__ < 7
 	if (ctx.imm_count)

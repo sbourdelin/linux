@@ -365,7 +365,7 @@ static irqreturn_t xgbe_isr(int irq, void *data)
 
 		/* Restart the device on a Fatal Bus Error */
 		if (XGMAC_GET_BITS(dma_ch_isr, DMA_CH_SR, FBE))
-			queue_work(pdata->dev_workqueue, &pdata->restart_work);
+			schedule_work(&pdata->restart_work);
 
 		/* Clear all interrupt signals */
 		XGMAC_DMA_IOWRITE(channel, DMA_CH_SR, dma_ch_isr);
@@ -1537,7 +1537,7 @@ static void xgbe_tx_timeout(struct net_device *netdev)
 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
 
 	netdev_warn(netdev, "tx timeout, device restarting\n");
-	queue_work(pdata->dev_workqueue, &pdata->restart_work);
+	schedule_work(&pdata->restart_work);
 }
 
 static struct rtnl_link_stats64 *xgbe_get_stats64(struct net_device *netdev,
@@ -1811,6 +1811,7 @@ static int xgbe_tx_poll(struct xgbe_channel *channel)
 	struct netdev_queue *txq;
 	int processed = 0;
 	unsigned int tx_packets = 0, tx_bytes = 0;
+	unsigned int cur;
 
 	DBGPR("-->xgbe_tx_poll\n");
 
@@ -1818,10 +1819,15 @@ static int xgbe_tx_poll(struct xgbe_channel *channel)
 	if (!ring)
 		return 0;
 
+	cur = ring->cur;
+
+	/* Be sure we get ring->cur before accessing descriptor data */
+	smp_rmb();
+
 	txq = netdev_get_tx_queue(netdev, channel->queue_index);
 
 	while ((processed < XGBE_TX_DESC_MAX_PROC) &&
-	       (ring->dirty != ring->cur)) {
+	       (ring->dirty != cur)) {
 		rdata = XGBE_GET_DESC_DATA(ring, ring->dirty);
 		rdesc = rdata->rdesc;
 
@@ -2018,7 +2024,6 @@ read_again:
 		skb->dev = netdev;
 		skb->protocol = eth_type_trans(skb, netdev);
 		skb_record_rx_queue(skb, channel->queue_index);
-		skb_mark_napi_id(skb, napi);
 
 		napi_gro_receive(napi, skb);
 

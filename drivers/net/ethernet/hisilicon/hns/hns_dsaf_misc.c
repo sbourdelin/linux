@@ -64,17 +64,10 @@ int cpld_set_led_id(struct hns_mac_cb *mac_cb,
 	switch (status) {
 	case HNAE_LED_ACTIVE:
 		mac_cb->cpld_led_value = dsaf_read_b(mac_cb->cpld_vaddr);
-		return 2;
-	case HNAE_LED_ON:
 		dsaf_set_bit(mac_cb->cpld_led_value, DSAF_LED_ANCHOR_B,
 			     CPLD_LED_ON_VALUE);
 		dsaf_write_b(mac_cb->cpld_vaddr, mac_cb->cpld_led_value);
-		break;
-	case HNAE_LED_OFF:
-		dsaf_set_bit(mac_cb->cpld_led_value, DSAF_LED_ANCHOR_B,
-			     CPLD_LED_DEFAULT_VALUE);
-		dsaf_write_b(mac_cb->cpld_vaddr, mac_cb->cpld_led_value);
-		break;
+		return 2;
 	case HNAE_LED_INACTIVE:
 		dsaf_set_bit(mac_cb->cpld_led_value, DSAF_LED_ANCHOR_B,
 			     CPLD_LED_DEFAULT_VALUE);
@@ -156,7 +149,11 @@ void hns_dsaf_ge_srst_by_port(struct dsaf_device *dsaf_dev, u32 port, u32 val)
 
 	if (port < DSAF_SERVICE_NW_NUM) {
 		reg_val_1  = 0x1 << port;
-		reg_val_2  = 0x1041041 << port;
+		/* there is difference between V1 and V2 in register.*/
+		if (AE_IS_VER1(dsaf_dev->dsaf_ver))
+			reg_val_2  = 0x1041041 << port;
+		else
+			reg_val_2  = 0x2082082 << port;
 
 		if (val == 0) {
 			dsaf_write_reg(dsaf_dev->sc_base,

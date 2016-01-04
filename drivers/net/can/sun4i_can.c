@@ -575,7 +575,6 @@ static int sun4i_can_err(struct net_device *dev, u8 isrc, u8 status)
 				cf->data[2] |= CAN_ERR_PROT_STUFF;
 				break;
 			default:
-				cf->data[2] |= CAN_ERR_PROT_UNSPEC;
 				cf->data[3] = (ecc & SUN4I_STA_ERR_SEG_CODE)
 					       >> 16;
 				break;
@@ -601,7 +600,7 @@ static int sun4i_can_err(struct net_device *dev, u8 isrc, u8 status)
 		stats->tx_errors++;
 		if (likely(skb)) {
 			cf->can_id |= CAN_ERR_LOSTARB;
-			cf->data[0] = (alc & 0x1f) >> 8;
+			cf->data[0] = (alc >> 8) & 0x1f;
 		}
 	}
 
@@ -854,4 +853,4 @@ module_platform_driver(sun4i_can_driver);
 MODULE_AUTHOR("Peter Chen <xingkongcp@gmail.com>");
 MODULE_AUTHOR("Gerhard Bertelsmann <info@gerhard-bertelsmann.de>");
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_DESCRIPTION(DRV_NAME "CAN driver for Allwinner SoCs (A10/A20)");
+MODULE_DESCRIPTION("CAN driver for Allwinner SoCs (A10/A20)");
