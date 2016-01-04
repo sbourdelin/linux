@@ -74,36 +74,6 @@ aic_handle(struct pt_regs *regs)
 		handle_domain_irq(aic_domain, irqnr, regs);
 }
 
-static void __init aic_hw_init(struct irq_domain *domain)
-{
-	struct irq_chip_generic *gc = irq_get_domain_generic_chip(domain, 0);
-	int i;
-
-	/*
-	 * Perform 8 End Of Interrupt Command to make sure AIC
-	 * will not Lock out nIRQ
-	 */
-	for (i = 0; i < 8; i++)
-		irq_reg_writel(gc, 0, AT91_AIC_EOICR);
-
-	/*
-	 * Spurious Interrupt ID in Spurious Vector Register.
-	 * When there is no current interrupt, the IRQ Vector Register
-	 * reads the value stored in AIC_SPU
-	 */
-	irq_reg_writel(gc, 0xffffffff, AT91_AIC_SPU);
-
-	/* No debugging in AIC: Debug (Protect) Control Register */
-	irq_reg_writel(gc, 0, AT91_AIC_DCR);
-
-	/* Disable and clear all interrupts initially */
-	irq_reg_writel(gc, 0xffffffff, AT91_AIC_IDCR);
-	irq_reg_writel(gc, 0xffffffff, AT91_AIC_ICCR);
-
-	for (i = 0; i < NR_AIC_IRQS; i++)
-		irq_reg_writel(gc, i, AT91_AIC_SVR(i));
-}
-
 static int __init aic_of_init(struct device_node *node,
 			      struct device_node *parent)
 {
@@ -117,7 +87,6 @@ static int __init aic_of_init(struct device_node *node,
 		return PTR_ERR(domain);
 
 	aic_domain = domain;
-	aic_hw_init(domain);
 	set_handle_irq(aic_handle);
 
 	return 0;

@@ -24,6 +24,8 @@
 
 #include "irq-atmel-aic-common.h"
 
+#define NR_AIC_IRQS			32
+
 #define AT91_AIC_SMR_BASE		0
 #define AT91_AIC_SVR_BASE		0x80
 #define AT91_AIC_IVR			0x100
@@ -431,6 +433,45 @@ static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 	}
 }
 
+static void __init aic_hw_init(struct irq_domain *domain)
+{
+	struct irq_chip_generic *gc = irq_get_domain_generic_chip(domain, 0);
+	int i;
+
+	/*
+	 * Perform 8 End Of Interrupt Command to make sure AIC
+	 * will not Lock out nIRQ
+	 */
+	for (i = 0; i < 8; i++)
+		irq_reg_writel(gc, 0, aic_reg_data->eoi);
+
+	/*
+	 * Spurious Interrupt ID in Spurious Vector Register.
+	 * When there is no current interrupt, the IRQ Vector Register
+	 * reads the value stored in AIC_SPU
+	 */
+	irq_reg_writel(gc, 0xffffffff, aic_reg_data->spu);
+
+	/* No debugging in AIC: Debug (Protect) Control Register */
+	irq_reg_writel(gc, 0, aic_reg_data->dcr);
+
+	/* Disable and clear all interrupts initially */
+	if (aic_is_ssr_used()) {
+		for (i = 0; i < domain->revmap_size; i++) {
+			irq_reg_writel(gc, i, aic_reg_data->ssr);
+			irq_reg_writel(gc, i, aic_reg_data->svr);
+			irq_reg_writel(gc, 1, aic_reg_data->idcr);
+			irq_reg_writel(gc, 1, aic_reg_data->iccr);
+		}
+	} else {
+		irq_reg_writel(gc, 0xffffffff, aic_reg_data->idcr);
+		irq_reg_writel(gc, 0xffffffff, aic_reg_data->iccr);
+
+		for (i = 0; i < NR_AIC_IRQS; i++)
+			irq_reg_writel(gc, i, aic_reg_data->svr + (i * 4));
+	}
+}
+
 struct irq_domain *__init aic_common_of_init(struct device_node *node,
 					     const char *name, int nirqs)
 {
@@ -492,6 +533,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 	}
 
 	aic_common_ext_irq_of_init(domain);
+	aic_hw_init(domain);
 
 	return domain;
 
