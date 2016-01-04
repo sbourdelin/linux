@@ -3852,7 +3852,7 @@ intel_dp_link_down(struct intel_dp *intel_dp)
 	intel_dp->DP = DP;
 }
 
-static bool
+bool
 intel_dp_get_dpcd(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
