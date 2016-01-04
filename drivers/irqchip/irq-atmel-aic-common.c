@@ -129,6 +129,63 @@ static const struct aic_reg_offset aic5_regs = {
 
 static const struct aic_reg_offset *aic_reg_data;
 
+static inline bool aic_is_ssr_used(void)
+{
+	return aic_reg_data->ssr != AT91_INVALID_OFFSET;
+}
+
+static void aic_update_smr(struct irq_chip_generic *gc, int hwirq,
+			   u32 mask, u32 val)
+{
+	int reg = aic_reg_data->smr;
+	u32 tmp = 0;
+
+	if (aic_is_ssr_used())
+		irq_reg_writel(gc, hwirq, aic_reg_data->ssr);
+	else
+		reg += hwirq * 4;
+
+	tmp = irq_reg_readl(gc, reg);
+	tmp &= mask;
+	tmp |= val;
+
+	irq_reg_writel(gc, tmp, reg);
+}
+
+static int aic_irq_domain_xlate(struct irq_domain *d, struct device_node *node,
+				const u32 *intspec, unsigned int intsize,
+				irq_hw_number_t *out_hwirq,
+				unsigned int *out_type)
+{
+	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, 0);
+	bool condition = (intsize < 3) ||
+			 (intspec[2] < AT91_AIC_IRQ_MIN_PRIORITY) ||
+			 (intspec[2] > AT91_AIC_IRQ_MAX_PRIORITY);
+
+	if (!gc || WARN_ON(condition))
+		return -EINVAL;
+
+	/*
+	 * intspec[0]: HW IRQ number
+	 * intspec[1]: IRQ flag
+	 * intspec[2]: IRQ priority
+	 */
+
+	*out_hwirq = intspec[0];
+	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+
+	irq_gc_lock(gc);
+	aic_update_smr(gc, *out_hwirq, ~AT91_AIC_PRIOR, intspec[2]);
+	irq_gc_unlock(gc);
+
+	return 0;
+}
+
+static const struct irq_domain_ops aic_irq_ops = {
+	.map	= irq_map_generic_chip,
+	.xlate	= aic_irq_domain_xlate,
+};
+
 static void aic_common_shutdown(struct irq_data *d)
 {
 	struct irq_chip_type *ct = irq_data_get_chip_type(d);
@@ -171,38 +228,6 @@ int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val)
 	return 0;
 }
 
-int aic_common_set_priority(int priority, unsigned *val)
-{
-	if (priority < AT91_AIC_IRQ_MIN_PRIORITY ||
-	    priority > AT91_AIC_IRQ_MAX_PRIORITY)
-		return -EINVAL;
-
-	*val &= ~AT91_AIC_PRIOR;
-	*val |= priority;
-
-	return 0;
-}
-
-int aic_common_irq_domain_xlate(struct irq_domain *d,
-				struct device_node *ctrlr,
-				const u32 *intspec,
-				unsigned int intsize,
-				irq_hw_number_t *out_hwirq,
-				unsigned int *out_type)
-{
-	if (WARN_ON(intsize < 3))
-		return -EINVAL;
-
-	if (WARN_ON((intspec[2] < AT91_AIC_IRQ_MIN_PRIORITY) ||
-		    (intspec[2] > AT91_AIC_IRQ_MAX_PRIORITY)))
-		return -EINVAL;
-
-	*out_hwirq = intspec[0];
-	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
-
-	return 0;
-}
-
 static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 {
 	struct device_node *node = irq_domain_get_of_node(domain);
@@ -231,7 +256,6 @@ static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 }
 
 struct irq_domain *__init aic_common_of_init(struct device_node *node,
-					     const struct irq_domain_ops *ops,
 					     const char *name, int nirqs)
 {
 	struct irq_chip_generic *gc;
@@ -254,8 +278,8 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		goto err_iounmap;
 	}
 
-	domain = irq_domain_add_linear(node, nchips * AIC_IRQS_PER_CHIP, ops,
-				       aic);
+	domain = irq_domain_add_linear(node, nchips * AIC_IRQS_PER_CHIP,
+				       &aic_irq_ops, aic);
 	if (!domain) {
 		ret = -ENOMEM;
 		goto err_free_aic;

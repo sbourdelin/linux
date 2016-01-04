@@ -248,40 +248,6 @@ static void __init aic5_hw_init(struct irq_domain *domain)
 	}
 }
 
-static int aic5_irq_domain_xlate(struct irq_domain *d,
-				 struct device_node *ctrlr,
-				 const u32 *intspec, unsigned int intsize,
-				 irq_hw_number_t *out_hwirq,
-				 unsigned int *out_type)
-{
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(d, 0);
-	unsigned smr;
-	int ret;
-
-	if (!bgc)
-		return -EINVAL;
-
-	ret = aic_common_irq_domain_xlate(d, ctrlr, intspec, intsize,
-					  out_hwirq, out_type);
-	if (ret)
-		return ret;
-
-	irq_gc_lock(bgc);
-	irq_reg_writel(bgc, *out_hwirq, AT91_AIC5_SSR);
-	smr = irq_reg_readl(bgc, AT91_AIC5_SMR);
-	ret = aic_common_set_priority(intspec[2], &smr);
-	if (!ret)
-		irq_reg_writel(bgc, intspec[2] | smr, AT91_AIC5_SMR);
-	irq_gc_unlock(bgc);
-
-	return ret;
-}
-
-static const struct irq_domain_ops aic5_irq_ops = {
-	.map	= irq_map_generic_chip,
-	.xlate	= aic5_irq_domain_xlate,
-};
-
 static int __init aic5_of_init(struct device_node *node,
 			       struct device_node *parent,
 			       int nirqs)
@@ -297,8 +263,7 @@ static int __init aic5_of_init(struct device_node *node,
 	if (aic5_domain)
 		return -EEXIST;
 
-	domain = aic_common_of_init(node, &aic5_irq_ops, "atmel-aic5",
-				    nirqs);
+	domain = aic_common_of_init(node, "atmel-aic5", nirqs);
 	if (IS_ERR(domain))
 		return PTR_ERR(domain);
 
