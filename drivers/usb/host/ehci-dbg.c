@@ -542,7 +542,7 @@ static ssize_t fill_async_buffer(struct debug_buffer *buf)
 		next += temp;
 
 		list_for_each_entry(qh, &ehci->async_unlink, unlink_node) {
-			if (size <= 0)
+			if (size == 0)
 				break;
 			qh_lines(ehci, qh, &next, &size);
 		}
