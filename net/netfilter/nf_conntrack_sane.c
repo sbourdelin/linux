@@ -176,16 +176,7 @@ static const struct nf_conntrack_expect_policy sane_exp_policy = {
 /* don't make this __exit, since it's called from __init ! */
 static void nf_conntrack_sane_fini(void)
 {
-	int i, j;
-
-	for (i = 0; i < ports_c; i++) {
-		for (j = 0; j < 2; j++) {
-			pr_debug("unregistering helper for pf: %d port: %d\n",
-				 sane[i][j].tuple.src.l3num, ports[i]);
-			nf_conntrack_helper_unregister(&sane[i][j]);
-		}
-	}
-
+	nf_conntrack_helpers_unregister(&sane[0][0], ports_c * 2);
 	kfree(sane_buffer);
 }
 
@@ -207,24 +198,17 @@ static int __init nf_conntrack_sane_init(void)
 				  SANE_PORT, ports[i], &sane_exp_policy, 0,
 				  sizeof(struct nf_ct_sane_master), help, NULL,
 				  THIS_MODULE);
-		ret = nf_conntrack_helper_register(&sane[i][0]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %d port: %d\n",
-			       sane[i][0].tuple.src.l3num, ports[i]);
-			nf_conntrack_sane_fini();
-			return ret;
-		}
 		nf_ct_helper_init(&sane[i][1], AF_INET6, IPPROTO_TCP, "sane",
 				  SANE_PORT, ports[i], &sane_exp_policy, 0,
 				  sizeof(struct nf_ct_sane_master), help, NULL,
 				  THIS_MODULE);
-		ret = nf_conntrack_helper_register(&sane[i][1]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %d port: %d\n",
-			       sane[i][1].tuple.src.l3num, ports[i]);
-			nf_conntrack_sane_fini();
-			return ret;
-		}
+	}
+
+	ret = nf_conntrack_helpers_register(&sane[0][0], ports_c * 2);
+	if (ret < 0) {
+		pr_err("failed to register helpers\n");
+		kfree(sane_buffer);
+		return ret;
 	}
 
 	return 0;

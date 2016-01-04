@@ -1616,15 +1616,8 @@ static const struct nf_conntrack_expect_policy sip_exp_policy[SIP_EXPECT_MAX + 1
 
 static void nf_conntrack_sip_fini(void)
 {
-	int i, j;
-
-	for (i = 0; i < ports_c; i++) {
-		for (j = 0; j < ARRAY_SIZE(sip[i]); j++) {
-			if (sip[i][j].me == NULL)
-				continue;
-			nf_conntrack_helper_unregister(&sip[i][j]);
-		}
-	}
+	nf_conntrack_helpers_unregister(&sip[0][0],
+					ports_c * ARRAY_SIZE(sip[0]));
 }
 
 static int __init nf_conntrack_sip_init(void)
@@ -1642,49 +1635,28 @@ static int __init nf_conntrack_sip_init(void)
 				  SIP_EXPECT_MAX,
 				  sizeof(struct nf_ct_sip_master), sip_help_udp,
 				  NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&sip[i][0]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       sip[i][0].tuple.src.l3num, ports[i]);
-			nf_conntrack_sip_fini();
-			return ret;
-		}
 		nf_ct_helper_init(&sip[i][1], AF_INET, IPPROTO_TCP, "sip",
 				  SIP_PORT, ports[i], &sip_exp_policy[0],
 				  SIP_EXPECT_MAX,
 				  sizeof(struct nf_ct_sip_master), sip_help_tcp,
 				  NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&sip[i][1]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       sip[i][1].tuple.src.l3num, ports[i]);
-			nf_conntrack_sip_fini();
-			return ret;
-		}
 		nf_ct_helper_init(&sip[i][2], AF_INET6, IPPROTO_UDP, "sip",
 				  SIP_PORT, ports[i], &sip_exp_policy[0],
 				  SIP_EXPECT_MAX,
 				  sizeof(struct nf_ct_sip_master), sip_help_udp,
 				  NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&sip[i][2]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       sip[i][2].tuple.src.l3num, ports[i]);
-			nf_conntrack_sip_fini();
-			return ret;
-		}
 		nf_ct_helper_init(&sip[i][3], AF_INET6, IPPROTO_TCP, "sip",
 				  SIP_PORT, ports[i], &sip_exp_policy[0],
 				  SIP_EXPECT_MAX,
 				  sizeof(struct nf_ct_sip_master), sip_help_tcp,
 				  NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&sip[i][3]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       sip[i][3].tuple.src.l3num, ports[i]);
-			nf_conntrack_sip_fini();
-			return ret;
-		}
+	}
+
+	ret = nf_conntrack_helpers_register(&sip[0][0],
+					    ports_c * ARRAY_SIZE(sip[0]));
+	if (ret < 0) {
+		pr_err("failed to register helpers\n");
+		return ret;
 	}
 	return 0;
 }

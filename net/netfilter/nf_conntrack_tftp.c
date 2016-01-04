@@ -106,12 +106,7 @@ static const struct nf_conntrack_expect_policy tftp_exp_policy = {
 
 static void nf_conntrack_tftp_fini(void)
 {
-	int i, j;
-
-	for (i = 0; i < ports_c; i++) {
-		for (j = 0; j < 2; j++)
-			nf_conntrack_helper_unregister(&tftp[i][j]);
-	}
+	nf_conntrack_helpers_unregister(&tftp[0][0], ports_c * 2);
 }
 
 static int __init nf_conntrack_tftp_init(void)
@@ -127,24 +122,17 @@ static int __init nf_conntrack_tftp_init(void)
 		nf_ct_helper_init(&tftp[i][0], AF_INET, IPPROTO_UDP, "tftp",
 				  TFTP_PORT, ports[i], &tftp_exp_policy, 0, 0,
 				  tftp_help, NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&tftp[i][0]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       tftp[i][0].tuple.src.l3num, ports[i]);
-			nf_conntrack_tftp_fini();
-			return ret;
-		}
 		nf_ct_helper_init(&tftp[i][1], AF_INET6, IPPROTO_UDP, "tftp",
 				  TFTP_PORT, ports[i], &tftp_exp_policy, 0, 0,
 				  tftp_help, NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&tftp[i][1]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       tftp[i][1].tuple.src.l3num, ports[i]);
-			nf_conntrack_tftp_fini();
-			return ret;
-		}
 	}
+
+	ret = nf_conntrack_helpers_register(&tftp[0][0], ports_c * 2);
+	if (ret < 0) {
+		pr_err("failed to register helpers\n");
+		return ret;
+	}
+
 	return 0;
 }
 

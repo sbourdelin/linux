@@ -582,18 +582,7 @@ static const struct nf_conntrack_expect_policy ftp_exp_policy = {
 /* don't make this __exit, since it's called from __init ! */
 static void nf_conntrack_ftp_fini(void)
 {
-	int i, j;
-	for (i = 0; i < ports_c; i++) {
-		for (j = 0; j < 2; j++) {
-			if (ftp[i][j].me == NULL)
-				continue;
-
-			pr_debug("unregistering helper for pf: %d port: %d\n",
-				 ftp[i][j].tuple.src.l3num, ports[i]);
-			nf_conntrack_helper_unregister(&ftp[i][j]);
-		}
-	}
-
+	nf_conntrack_helpers_unregister(&ftp[0][0], ports_c * 2);
 	kfree(ftp_buffer);
 }
 
@@ -615,24 +604,16 @@ static int __init nf_conntrack_ftp_init(void)
 				  FTP_PORT, ports[i], &ftp_exp_policy, 0,
 				  sizeof(struct nf_ct_ftp_master), help,
 				  nf_ct_ftp_from_nlattr, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&ftp[i][0]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %d port: %d\n",
-			       ftp[i][0].tuple.src.l3num, ports[i]);
-			nf_conntrack_ftp_fini();
-			return ret;
-		}
 		nf_ct_helper_init(&ftp[i][1], AF_INET6, IPPROTO_TCP, "ftp",
 				  FTP_PORT, ports[i], &ftp_exp_policy, 0,
 				  sizeof(struct nf_ct_ftp_master), help,
 				  nf_ct_ftp_from_nlattr, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&ftp[i][1]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %d port: %d\n",
-			       ftp[i][1].tuple.src.l3num, ports[i]);
-			nf_conntrack_ftp_fini();
-			return ret;
-		}
+	}
+	ret = nf_conntrack_helpers_register(&ftp[0][0], ports_c * 2);
+	if (ret < 0) {
+		pr_err("failed to register helpers\n");
+		kfree(ftp_buffer);
+		return ret;
 	}
 
 	return 0;

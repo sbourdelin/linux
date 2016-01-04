@@ -232,8 +232,6 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 static struct nf_conntrack_helper irc[MAX_PORTS] __read_mostly;
 static struct nf_conntrack_expect_policy irc_exp_policy;
 
-static void nf_conntrack_irc_fini(void);
-
 static int __init nf_conntrack_irc_init(void)
 {
 	int i, ret;
@@ -258,14 +256,15 @@ static int __init nf_conntrack_irc_init(void)
 		nf_ct_helper_init(&irc[i], AF_INET, IPPROTO_TCP, "irc",
 				  IRC_PORT, ports[i], &irc_exp_policy, 0, 0,
 				  help, NULL, THIS_MODULE);
-		ret = nf_conntrack_helper_register(&irc[i]);
-		if (ret < 0) {
-			pr_err("failed to register helper for pf: %u port: %u\n",
-			       irc[i].tuple.src.l3num, ports[i]);
-			nf_conntrack_irc_fini();
-			return ret;
-		}
 	}
+
+	ret = nf_conntrack_helpers_register(&irc[0], ports_c);
+	if (ret < 0) {
+		pr_err("failed to register helpers\n");
+		kfree(irc_buffer);
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -273,10 +272,7 @@ static int __init nf_conntrack_irc_init(void)
  * it is needed by the init function */
 static void nf_conntrack_irc_fini(void)
 {
-	int i;
-
-	for (i = 0; i < ports_c; i++)
-		nf_conntrack_helper_unregister(&irc[i]);
+	nf_conntrack_helpers_unregister(&irc[0], ports_c);
 	kfree(irc_buffer);
 }
 
