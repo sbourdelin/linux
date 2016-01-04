@@ -131,6 +131,7 @@
 #include <linux/ipsec.h>
 #include <net/cls_cgroup.h>
 #include <net/netprio_cgroup.h>
+#include <net/l3mdev_cgroup.h>
 #include <linux/sock_diag.h>
 
 #include <linux/filter.h>
@@ -1424,6 +1425,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 
 		sock_update_classid(&sk->sk_cgrp_data);
 		sock_update_netprioidx(&sk->sk_cgrp_data);
+		sock_update_l3mdev(sk);
 	}
 
 	return sk;

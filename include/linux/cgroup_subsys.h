@@ -58,6 +58,9 @@ SUBSYS(net_prio)
 SUBSYS(hugetlb)
 #endif
 
+#if IS_ENABLED(CONFIG_NET_L3_MASTER_DEV)
+SUBSYS(l3mdev)
+#endif
 /*
  * Subsystems that implement the can_fork() family of callbacks.
  */

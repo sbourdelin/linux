@@ -8,3 +8,15 @@ config NET_L3_MASTER_DEV
 	---help---
 	  This module provides glue between core networking code and device
 	  drivers to support L3 master devices like VRF.
+
+config CGROUP_L3MDEV
+	bool "L3 Master Device cgroup"
+	depends on CGROUPS
+	depends on NET_L3_MASTER_DEV
+	---help---
+	  Cgroup subsystem for assigning processes to an L3 domain.
+	  When a process is assigned to an l3mdev domain all AF_INET and
+	  AF_INET6 sockets opened by the process are bound to the L3 master
+	  device.
+
+
