@@ -1903,8 +1903,9 @@ static int i40e_get_per_queue_coalesce(struct net_device *netdev, int queue,
 	return __i40e_get_coalesce(netdev, ec, queue);
 }
 
-static int i40e_set_coalesce(struct net_device *netdev,
-			     struct ethtool_coalesce *ec)
+static int __i40e_set_coalesce(struct net_device *netdev,
+			       struct ethtool_coalesce *ec,
+			       int queue)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_q_vector *q_vector;
@@ -1912,6 +1913,7 @@ static int i40e_set_coalesce(struct net_device *netdev,
 	struct i40e_pf *pf = vsi->back;
 	struct i40e_hw *hw = &pf->hw;
 	u16 vector;
+	u16 intrl;
 	int i;
 
 	if (ec->tx_max_coalesced_frames_irq || ec->rx_max_coalesced_frames_irq)
@@ -1966,19 +1968,52 @@ static int i40e_set_coalesce(struct net_device *netdev,
 	else
 		vsi->tx_itr_setting &= ~I40E_ITR_DYNAMIC;
 
-	for (i = 0; i < vsi->num_q_vectors; i++, vector++) {
-		u16 intrl = INTRL_USEC_TO_REG(vsi->int_rate_limit);
+	if (queue < 0) {
+		for (i = 0; i < vsi->num_q_vectors; i++, vector++) {
+			intrl = INTRL_USEC_TO_REG(vsi->int_rate_limit);
 
-		q_vector = vsi->q_vectors[i];
+			q_vector = vsi->q_vectors[i];
+			q_vector->rx.itr = ITR_TO_REG(vsi->rx_itr_setting);
+			wr32(hw, I40E_PFINT_ITRN(0, vector - 1), q_vector->rx.itr);
+			q_vector->tx.itr = ITR_TO_REG(vsi->tx_itr_setting);
+			wr32(hw, I40E_PFINT_ITRN(1, vector - 1), q_vector->tx.itr);
+			wr32(hw, I40E_PFINT_RATEN(vector - 1), intrl);
+			i40e_flush(hw);
+		}
+	} else {
+		if (queue >= vsi->num_queue_pairs) {
+			netif_info(pf, drv, netdev, "Invalid queue value, queue range is 0 - %d\n", vsi->num_queue_pairs - 1);
+			return -EINVAL;
+		}
+		intrl = INTRL_USEC_TO_REG(vsi->int_rate_limit);
+
+		q_vector = vsi->rx_rings[queue]->q_vector;
+		vector = vsi->base_vector + q_vector->v_idx;
 		q_vector->rx.itr = ITR_TO_REG(vsi->rx_itr_setting);
 		wr32(hw, I40E_PFINT_ITRN(0, vector - 1), q_vector->rx.itr);
+
+		q_vector = vsi->tx_rings[queue]->q_vector;
+		vector = vsi->base_vector + q_vector->v_idx;
 		q_vector->tx.itr = ITR_TO_REG(vsi->tx_itr_setting);
 		wr32(hw, I40E_PFINT_ITRN(1, vector - 1), q_vector->tx.itr);
+
 		wr32(hw, I40E_PFINT_RATEN(vector - 1), intrl);
 		i40e_flush(hw);
 	}
 
 	return 0;
+}
+
+static int i40e_set_coalesce(struct net_device *netdev,
+			     struct ethtool_coalesce *ec)
+{
+	return __i40e_set_coalesce(netdev, ec, -1);
+}
+
+static int i40e_set_per_queue_coalesce(struct net_device *netdev, int queue,
+				       struct ethtool_coalesce *ec)
+{
+	return __i40e_set_coalesce(netdev, ec, queue);
 }
 
 /**
@@ -2820,6 +2855,7 @@ static const struct ethtool_ops i40e_ethtool_ops = {
 	.get_priv_flags		= i40e_get_priv_flags,
 	.set_priv_flags		= i40e_set_priv_flags,
 	.get_per_queue_coalesce	= i40e_get_per_queue_coalesce,
+	.set_per_queue_coalesce	= i40e_set_per_queue_coalesce,
 };
 
 void i40e_set_ethtool_ops(struct net_device *netdev)
