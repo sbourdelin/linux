@@ -73,7 +73,7 @@ static int fsl_pcie_check_link(struct pci_controller *hose)
 					       PCIE_LTSSM, 4, &val);
 		else
 			early_read_config_dword(hose, 0, 0, PCIE_LTSSM, &val);
-		if (val < PCIE_LTSSM_L0)
+		if (val != PCIE_LTSSM_L0)
 			return 1;
 	} else {
 		struct ccsr_pci __iomem *pci = hose->private_data;
