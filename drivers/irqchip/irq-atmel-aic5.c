@@ -306,9 +306,9 @@ static int __init aic5_of_init(struct device_node *node,
 		return PTR_ERR(domain);
 
 	aic5_domain = domain;
-	nchips = aic5_domain->revmap_size / 32;
+	nchips = aic5_domain->revmap_size / AIC_IRQS_PER_CHIP;
 	for (i = 0; i < nchips; i++) {
-		gc = irq_get_domain_generic_chip(domain, i * 32);
+		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
 
 		gc->chip_types[0].regs.eoi = AT91_AIC5_EOICR;
 		gc->chip_types[0].chip.irq_mask = aic5_mask;

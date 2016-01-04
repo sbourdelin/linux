@@ -16,6 +16,7 @@
 #ifndef __IRQ_ATMEL_AIC_COMMON_H
 #define __IRQ_ATMEL_AIC_COMMON_H
 
+#define AIC_IRQS_PER_CHIP	32
 
 int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val);
 

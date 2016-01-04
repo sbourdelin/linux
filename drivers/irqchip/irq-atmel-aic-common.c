@@ -135,7 +135,7 @@ static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 		}
 
 		aic = gc->private;
-		aic->ext_irqs |= (1 << (hwirq % 32));
+		aic->ext_irqs |= (1 << (hwirq % AIC_IRQS_PER_CHIP));
 	}
 }
 
@@ -151,7 +151,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 	int ret;
 	int i;
 
-	nchips = DIV_ROUND_UP(nirqs, 32);
+	nchips = DIV_ROUND_UP(nirqs, AIC_IRQS_PER_CHIP);
 
 	reg_base = of_iomap(node, 0);
 	if (!reg_base)
@@ -163,13 +163,14 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		goto err_iounmap;
 	}
 
-	domain = irq_domain_add_linear(node, nchips * 32, ops, aic);
+	domain = irq_domain_add_linear(node, nchips * AIC_IRQS_PER_CHIP, ops,
+				       aic);
 	if (!domain) {
 		ret = -ENOMEM;
 		goto err_free_aic;
 	}
 
-	ret = irq_alloc_domain_generic_chips(domain, 32, 1, name,
+	ret = irq_alloc_domain_generic_chips(domain, AIC_IRQS_PER_CHIP, 1, name,
 					     handle_fasteoi_irq,
 					     IRQ_NOREQUEST | IRQ_NOPROBE |
 					     IRQ_NOAUTOEN, 0, 0);
@@ -177,7 +178,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		goto err_domain_remove;
 
 	for (i = 0; i < nchips; i++) {
-		gc = irq_get_domain_generic_chip(domain, i * 32);
+		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
 
 		gc->reg_base = reg_base;
 

@@ -164,7 +164,7 @@ static void __init aic_hw_init(struct irq_domain *domain)
 	irq_reg_writel(gc, 0xffffffff, AT91_AIC_IDCR);
 	irq_reg_writel(gc, 0xffffffff, AT91_AIC_ICCR);
 
-	for (i = 0; i < 32; i++)
+	for (i = 0; i < NR_AIC_IRQS; i++)
 		irq_reg_writel(gc, i, AT91_AIC_SVR(i));
 }
 
