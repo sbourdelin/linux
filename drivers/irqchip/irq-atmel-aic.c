@@ -107,7 +107,6 @@ static void __init aic_hw_init(struct irq_domain *domain)
 static int __init aic_of_init(struct device_node *node,
 			      struct device_node *parent)
 {
-	struct irq_chip_generic *gc;
 	struct irq_domain *domain;
 
 	if (aic_domain)
@@ -118,8 +117,6 @@ static int __init aic_of_init(struct device_node *node,
 		return PTR_ERR(domain);
 
 	aic_domain = domain;
-	gc = irq_get_domain_generic_chip(domain, 0);
-
 	aic_hw_init(domain);
 	set_handle_irq(aic_handle);
 

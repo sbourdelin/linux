@@ -118,10 +118,7 @@ static int __init aic5_of_init(struct device_node *node,
 			       struct device_node *parent,
 			       int nirqs)
 {
-	struct irq_chip_generic *gc;
 	struct irq_domain *domain;
-	int nchips;
-	int i;
 
 	if (nirqs > NR_AIC5_IRQS)
 		return -EINVAL;
@@ -134,11 +131,6 @@ static int __init aic5_of_init(struct device_node *node,
 		return PTR_ERR(domain);
 
 	aic5_domain = domain;
-	nchips = aic5_domain->revmap_size / AIC_IRQS_PER_CHIP;
-	for (i = 0; i < nchips; i++) {
-		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
-	}
-
 	aic5_hw_init(domain);
 	set_handle_irq(aic5_handle);
 
