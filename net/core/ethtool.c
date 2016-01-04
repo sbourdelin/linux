@@ -1748,6 +1748,31 @@ out:
 	return ret;
 }
 
+static int ethtool_get_per_queue_coalesce(struct net_device *dev,
+					  void __user *useraddr,
+					  struct ethtool_per_queue_op *per_queue_opt)
+{
+	int bit, ret;
+
+	if (!dev->ethtool_ops->get_per_queue_coalesce)
+		return -EOPNOTSUPP;
+
+	useraddr += sizeof(*per_queue_opt);
+
+	for_each_set_bit(bit, per_queue_opt->queue_mask, MAX_NUM_QUEUE) {
+		struct ethtool_coalesce coalesce = { .cmd = ETHTOOL_GCOALESCE };
+
+		ret = dev->ethtool_ops->get_per_queue_coalesce(dev, bit, &coalesce);
+		if (ret != 0)
+			return ret;
+		if (copy_to_user(useraddr, &coalesce, sizeof(coalesce)))
+			return -EFAULT;
+		useraddr += sizeof(coalesce);
+	}
+
+	return 0;
+}
+
 static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_per_queue_op per_queue_opt;
@@ -1756,7 +1781,8 @@ static int ethtool_set_per_queue(struct net_device *dev, void __user *useraddr)
 		return -EFAULT;
 
 	switch (per_queue_opt.sub_command) {
-
+	case ETHTOOL_GCOALESCE:
+		return ethtool_get_per_queue_coalesce(dev, useraddr, &per_queue_opt);
 	default:
 		return -EOPNOTSUPP;
 	};
@@ -1768,7 +1794,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 {
 	struct net_device *dev = __dev_get_by_name(net, ifr->ifr_name);
 	void __user *useraddr = ifr->ifr_data;
-	u32 ethcmd;
+	u32 ethcmd, sub_cmd;
 	int rc;
 	netdev_features_t old_features;
 
@@ -1814,6 +1840,10 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	case ETHTOOL_GTUNABLE:
 		break;
 	case ETHTOOL_PERQUEUE:
+		if (copy_from_user(&sub_cmd, useraddr + sizeof(ethcmd), sizeof(sub_cmd)))
+			return -EFAULT;
+		if (sub_cmd == ETHTOOL_GCOALESCE)
+			break;
 	default:
 		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
 			return -EPERM;

@@ -201,6 +201,13 @@ static inline u32 ethtool_rxfh_indir_default(u32 index, u32 n_rx_rings)
  * @get_module_eeprom: Get the eeprom information from the plug-in module
  * @get_eee: Get Energy-Efficient (EEE) supported and status.
  * @set_eee: Set EEE status (enable/disable) as well as LPI timers.
+ * @get_per_queue_coalesce: Get interrupt coalescing parameters per queue.
+ *	It needs to do range check for the input queue number. Only if
+ *	neither RX nor TX queue number is in the range, a negative error code
+ *	returns. For the case that only RX or only TX is not in the range,
+ *	zero should return. But related unavailable fields should be set to ~0,
+ *	which indicates RX or TX is not in the range.
+ * 	Returns a negative error code or zero.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -279,7 +286,8 @@ struct ethtool_ops {
 			       const struct ethtool_tunable *, void *);
 	int	(*set_tunable)(struct net_device *,
 			       const struct ethtool_tunable *, const void *);
-
+	int	(*get_per_queue_coalesce)(struct net_device *, int,
+					  struct ethtool_coalesce *);
 
 };
 #endif /* _LINUX_ETHTOOL_H */
