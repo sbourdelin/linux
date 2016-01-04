@@ -142,7 +142,8 @@ static struct scomp_alg scomp = {
 	.base			= {
 		.cra_name	= "lzo",
 		.cra_driver_name= "lzo-scomp",
-		.cra_flags	= CRYPTO_ALG_TYPE_SCOMPRESS,
+		.cra_flags	= CRYPTO_ALG_TYPE_SCOMPRESS |
+					CRYPTO_ALG_SCOMPRESS_DECOMP_NOCTX,
 		.cra_module	= THIS_MODULE,
 	}
 };
