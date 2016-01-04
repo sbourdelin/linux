@@ -24,6 +24,32 @@
 
 #include "irq-atmel-aic-common.h"
 
+#define AT91_AIC_SMR_BASE		0
+#define AT91_AIC_SVR_BASE		0x80
+#define AT91_AIC_IVR			0x100
+#define AT91_AIC_ISR			0x108
+#define AT91_AIC_IECR			0x120
+#define AT91_AIC_IDCR			0x124
+#define AT91_AIC_ICCR			0x128
+#define AT91_AIC_ISCR			0x12c
+#define AT91_AIC_EOICR			0x130
+#define AT91_AIC_SPU			0x134
+#define AT91_AIC_DCR			0x138
+#define AT91_INVALID_OFFSET		(-1)
+
+#define AT91_AIC5_SSR			0x0
+#define AT91_AIC5_SMR			0x4
+#define AT91_AIC5_SVR			0x8
+#define AT91_AIC5_IVR			0x10
+#define AT91_AIC5_ISR			0x18
+#define AT91_AIC5_EOICR			0x38
+#define AT91_AIC5_SPU			0x3c
+#define AT91_AIC5_IECR			0x40
+#define AT91_AIC5_IDCR			0x44
+#define AT91_AIC5_ICCR			0x48
+#define AT91_AIC5_ISCR			0x4c
+#define AT91_AIC5_DCR			0x6c
+
 #define AT91_AIC_PRIOR			GENMASK(2, 0)
 #define AT91_AIC_IRQ_MIN_PRIORITY	0
 #define AT91_AIC_IRQ_MAX_PRIORITY	7
@@ -37,6 +63,71 @@
 struct aic_chip_data {
 	u32 ext_irqs;
 };
+
+/**
+ * struct aic_reg_offset
+ *
+ * @eoi:	End of interrupt command register
+ * @smr:	Source mode register
+ * @ssr:	Source select register
+ * @iscr:	Interrupt set command register
+ * @idcr:	Interrupt disable command register
+ * @iccr:	Interrupt clear command register
+ * @iecr:	Interrupt enable command register
+ * @spu:	Spurious interrupt vector register
+ * @dcr:	Debug control register
+ * @svr:	Source vector register
+ * @ivr:	Interrupt vector register
+ * @isr:	Interrupt status register
+ *
+ * Each value means register offset.
+ */
+struct aic_reg_offset {
+	int eoi;
+	int smr;
+	int ssr;
+	int iscr;
+	int idcr;
+	int iccr;
+	int iecr;
+	int spu;
+	int dcr;
+	int svr;
+	int ivr;
+	int isr;
+};
+
+static const struct aic_reg_offset aic_regs = {
+	.eoi	= AT91_AIC_EOICR,
+	.smr	= AT91_AIC_SMR_BASE,
+	.ssr	= AT91_INVALID_OFFSET,	/* No SSR exists */
+	.iscr	= AT91_AIC_ISCR,
+	.idcr	= AT91_AIC_IDCR,
+	.iccr	= AT91_AIC_ICCR,
+	.iecr	= AT91_AIC_IECR,
+	.spu	= AT91_AIC_SPU,
+	.dcr	= AT91_AIC_DCR,
+	.svr	= AT91_AIC_SVR_BASE,
+	.ivr	= AT91_AIC_IVR,
+	.isr	= AT91_AIC_ISR,
+};
+
+static const struct aic_reg_offset aic5_regs = {
+	.eoi	= AT91_AIC5_EOICR,
+	.smr	= AT91_AIC5_SMR,
+	.ssr	= AT91_AIC5_SSR,
+	.iscr	= AT91_AIC5_ISCR,
+	.idcr	= AT91_AIC5_IDCR,
+	.iccr	= AT91_AIC5_ICCR,
+	.iecr	= AT91_AIC5_IECR,
+	.spu	= AT91_AIC5_SPU,
+	.dcr	= AT91_AIC5_DCR,
+	.svr	= AT91_AIC5_SVR,
+	.ivr	= AT91_AIC5_IVR,
+	.isr	= AT91_AIC5_ISR,
+};
+
+static const struct aic_reg_offset *aic_reg_data;
 
 static void aic_common_shutdown(struct irq_data *d)
 {
