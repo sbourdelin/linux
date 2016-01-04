@@ -1,6 +1,5 @@
 /*
- * Atmel AT91 common AIC (Advanced Interrupt Controller) code shared by
- * irq-atmel-aic and irq-atmel-aic5 drivers
+ * Atmel AIC (Advanced Interrupt Controller) Driver
  *
  *  Copyright (C) 2004 SAN People
  *  Copyright (C) 2004 ATMEL
@@ -413,7 +412,8 @@ static void aic_pm_shutdown(struct irq_data *d)
 	if (aic_is_ssr_used()) {
 		irq_gc_lock(bgc);
 		for (i = 0; i < AIC_IRQS_PER_CHIP; i++) {
-			irq_reg_writel(bgc, i + gc->irq_base, aic_reg_data->ssr);
+			irq_reg_writel(bgc, i + gc->irq_base,
+				       aic_reg_data->ssr);
 			irq_reg_writel(bgc, 1, aic_reg_data->idcr);
 			irq_reg_writel(bgc, 1, aic_reg_data->iccr);
 		}
@@ -455,7 +455,7 @@ static int __init aic_get_num_chips(struct device_node *node)
 	return DIV_ROUND_UP(nirqs, AIC_IRQS_PER_CHIP);
 }
 
-static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
+static void __init aic_ext_irq_of_init(struct irq_domain *domain)
 {
 	struct device_node *node = irq_domain_get_of_node(domain);
 	struct irq_chip_generic *gc;
@@ -587,7 +587,7 @@ static int __init aic_of_init(struct device_node *node,
 	}
 
 	aic_domain = domain;
-	aic_common_ext_irq_of_init(domain);
+	aic_ext_irq_of_init(domain);
 	aic_hw_init(domain);
 	set_handle_irq(aic_handle);
 
