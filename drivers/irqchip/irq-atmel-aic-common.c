@@ -186,7 +186,7 @@ static const struct irq_domain_ops aic_irq_ops = {
 	.xlate	= aic_irq_domain_xlate,
 };
 
-static void aic_common_shutdown(struct irq_data *d)
+static void aic_irq_shutdown(struct irq_data *d)
 {
 	struct irq_chip_type *ct = irq_data_get_chip_type(d);
 
@@ -301,6 +301,109 @@ static int aic_set_type(struct irq_data *d, unsigned int type)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+
+enum aic_pm_mode {
+	AIC_PM_SUSPEND,
+	AIC_PM_RESUME,
+};
+
+static void aic_pm_ctrl_ssr(struct irq_data *d, enum aic_pm_mode mode)
+{
+	struct irq_domain *domain = d->domain;
+	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+	u32 mask;
+	u32 which;
+	int i;
+
+	if (mode == AIC_PM_SUSPEND)
+		which = gc->wake_active;
+	else
+		which = gc->mask_cache;
+
+	irq_gc_lock(bgc);
+
+	for (i = 0; i < AIC_IRQS_PER_CHIP; i++) {
+		mask = 1 << i;
+		if ((mask & gc->mask_cache) == (mask & gc->wake_active))
+			continue;
+
+		irq_reg_writel(bgc, i + gc->irq_base, aic_reg_data->ssr);
+
+		if (mask & which)
+			irq_reg_writel(bgc, 1, aic_reg_data->iecr);
+		else
+			irq_reg_writel(bgc, 1, aic_reg_data->idcr);
+	}
+
+	irq_gc_unlock(bgc);
+}
+
+static void aic_pm_ctrl(struct irq_data *d, enum aic_pm_mode mode)
+{
+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+	u32 mask_idcr;
+	u32 mask_iecr;
+
+	if (mode == AIC_PM_SUSPEND) {
+		mask_idcr = gc->mask_cache;
+		mask_iecr = gc->wake_active;
+	} else {
+		mask_idcr = gc->wake_active;
+		mask_iecr = gc->mask_cache;
+	}
+
+	irq_gc_lock(gc);
+	irq_reg_writel(gc, mask_idcr, aic_reg_data->idcr);
+	irq_reg_writel(gc, mask_iecr, aic_reg_data->iecr);
+	irq_gc_unlock(gc);
+}
+
+static void aic_suspend(struct irq_data *d)
+{
+	if (aic_is_ssr_used())
+		aic_pm_ctrl_ssr(d, AIC_PM_SUSPEND);
+	else
+		aic_pm_ctrl(d, AIC_PM_SUSPEND);
+}
+
+static void aic_resume(struct irq_data *d)
+{
+	if (aic_is_ssr_used())
+		aic_pm_ctrl_ssr(d, AIC_PM_RESUME);
+	else
+		aic_pm_ctrl(d, AIC_PM_RESUME);
+}
+
+static void aic_pm_shutdown(struct irq_data *d)
+{
+	struct irq_domain *domain = d->domain;
+	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+	int i;
+
+	if (aic_is_ssr_used()) {
+		irq_gc_lock(bgc);
+		for (i = 0; i < AIC_IRQS_PER_CHIP; i++) {
+			irq_reg_writel(bgc, i + gc->irq_base, aic_reg_data->ssr);
+			irq_reg_writel(bgc, 1, aic_reg_data->idcr);
+			irq_reg_writel(bgc, 1, aic_reg_data->iccr);
+		}
+		irq_gc_unlock(bgc);
+	} else {
+		irq_gc_lock(gc);
+		irq_reg_writel(gc, 0xffffffff, aic_reg_data->idcr);
+		irq_reg_writel(gc, 0xffffffff, aic_reg_data->iccr);
+		irq_gc_unlock(gc);
+	}
+}
+#else
+#define aic_suspend	NULL
+#define aic_resume	NULL
+#define aic_pm_shutdown	NULL
+#endif /* CONFIG_PM */
+
 static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 {
 	struct device_node *node = irq_domain_get_of_node(domain);
@@ -369,17 +472,21 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
 
 		gc->reg_base = reg_base;
-
 		gc->unused = 0;
 		gc->wake_enabled = ~0;
+
 		gc->chip_types[0].type = IRQ_TYPE_SENSE_MASK;
 		gc->chip_types[0].chip.irq_eoi = irq_gc_eoi;
 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
-		gc->chip_types[0].chip.irq_shutdown = aic_common_shutdown;
+		gc->chip_types[0].chip.irq_shutdown = aic_irq_shutdown;
 		gc->chip_types[0].chip.irq_mask = aic_mask;
 		gc->chip_types[0].chip.irq_unmask = aic_unmask;
 		gc->chip_types[0].chip.irq_retrigger = aic_retrigger;
 		gc->chip_types[0].chip.irq_set_type = aic_set_type;
+		gc->chip_types[0].chip.irq_suspend = aic_suspend;
+		gc->chip_types[0].chip.irq_resume = aic_resume;
+		gc->chip_types[0].chip.irq_pm_shutdown = aic_pm_shutdown;
+
 		gc->private = &aic[i];
 	}
 

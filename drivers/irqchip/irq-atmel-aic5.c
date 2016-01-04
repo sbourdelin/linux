@@ -83,74 +83,6 @@ aic5_handle(struct pt_regs *regs)
 		handle_domain_irq(aic5_domain, irqnr, regs);
 }
 
-#ifdef CONFIG_PM
-static void aic5_suspend(struct irq_data *d)
-{
-	struct irq_domain *domain = d->domain;
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-	int i;
-	u32 mask;
-
-	irq_gc_lock(bgc);
-	for (i = 0; i < AIC_IRQS_PER_CHIP; i++) {
-		mask = 1 << i;
-		if ((mask & gc->mask_cache) == (mask & gc->wake_active))
-			continue;
-
-		irq_reg_writel(bgc, i + gc->irq_base, AT91_AIC5_SSR);
-		if (mask & gc->wake_active)
-			irq_reg_writel(bgc, 1, AT91_AIC5_IECR);
-		else
-			irq_reg_writel(bgc, 1, AT91_AIC5_IDCR);
-	}
-	irq_gc_unlock(bgc);
-}
-
-static void aic5_resume(struct irq_data *d)
-{
-	struct irq_domain *domain = d->domain;
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-	int i;
-	u32 mask;
-
-	irq_gc_lock(bgc);
-	for (i = 0; i < AIC_IRQS_PER_CHIP; i++) {
-		mask = 1 << i;
-		if ((mask & gc->mask_cache) == (mask & gc->wake_active))
-			continue;
-
-		irq_reg_writel(bgc, i + gc->irq_base, AT91_AIC5_SSR);
-		if (mask & gc->mask_cache)
-			irq_reg_writel(bgc, 1, AT91_AIC5_IECR);
-		else
-			irq_reg_writel(bgc, 1, AT91_AIC5_IDCR);
-	}
-	irq_gc_unlock(bgc);
-}
-
-static void aic5_pm_shutdown(struct irq_data *d)
-{
-	struct irq_domain *domain = d->domain;
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-	int i;
-
-	irq_gc_lock(bgc);
-	for (i = 0; i < AIC_IRQS_PER_CHIP; i++) {
-		irq_reg_writel(bgc, i + gc->irq_base, AT91_AIC5_SSR);
-		irq_reg_writel(bgc, 1, AT91_AIC5_IDCR);
-		irq_reg_writel(bgc, 1, AT91_AIC5_ICCR);
-	}
-	irq_gc_unlock(bgc);
-}
-#else
-#define aic5_suspend		NULL
-#define aic5_resume		NULL
-#define aic5_pm_shutdown	NULL
-#endif /* CONFIG_PM */
-
 static void __init aic5_hw_init(struct irq_domain *domain)
 {
 	struct irq_chip_generic *gc = irq_get_domain_generic_chip(domain, 0);
@@ -207,9 +139,6 @@ static int __init aic5_of_init(struct device_node *node,
 		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
 
 		gc->chip_types[0].regs.eoi = AT91_AIC5_EOICR;
-		gc->chip_types[0].chip.irq_suspend = aic5_suspend;
-		gc->chip_types[0].chip.irq_resume = aic5_resume;
-		gc->chip_types[0].chip.irq_pm_shutdown = aic5_pm_shutdown;
 	}
 
 	aic5_hw_init(domain);

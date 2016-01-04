@@ -74,42 +74,6 @@ aic_handle(struct pt_regs *regs)
 		handle_domain_irq(aic_domain, irqnr, regs);
 }
 
-#ifdef CONFIG_PM
-static void aic_suspend(struct irq_data *d)
-{
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-
-	irq_gc_lock(gc);
-	irq_reg_writel(gc, gc->mask_cache, AT91_AIC_IDCR);
-	irq_reg_writel(gc, gc->wake_active, AT91_AIC_IECR);
-	irq_gc_unlock(gc);
-}
-
-static void aic_resume(struct irq_data *d)
-{
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-
-	irq_gc_lock(gc);
-	irq_reg_writel(gc, gc->wake_active, AT91_AIC_IDCR);
-	irq_reg_writel(gc, gc->mask_cache, AT91_AIC_IECR);
-	irq_gc_unlock(gc);
-}
-
-static void aic_pm_shutdown(struct irq_data *d)
-{
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-
-	irq_gc_lock(gc);
-	irq_reg_writel(gc, 0xffffffff, AT91_AIC_IDCR);
-	irq_reg_writel(gc, 0xffffffff, AT91_AIC_ICCR);
-	irq_gc_unlock(gc);
-}
-#else
-#define aic_suspend		NULL
-#define aic_resume		NULL
-#define aic_pm_shutdown		NULL
-#endif /* CONFIG_PM */
-
 static void __init aic_hw_init(struct irq_domain *domain)
 {
 	struct irq_chip_generic *gc = irq_get_domain_generic_chip(domain, 0);
@@ -157,9 +121,6 @@ static int __init aic_of_init(struct device_node *node,
 	gc = irq_get_domain_generic_chip(domain, 0);
 
 	gc->chip_types[0].regs.eoi = AT91_AIC_EOICR;
-	gc->chip_types[0].chip.irq_suspend = aic_suspend;
-	gc->chip_types[0].chip.irq_resume = aic_resume;
-	gc->chip_types[0].chip.irq_pm_shutdown = aic_pm_shutdown;
 
 	aic_hw_init(domain);
 	set_handle_irq(aic_handle);
