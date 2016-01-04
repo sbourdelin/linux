@@ -66,44 +66,17 @@
 #define AT91_AIC5_FFSR			0x58
 
 static int __init aic5_of_init(struct device_node *node,
-			       struct device_node *parent,
-			       int nirqs)
+			       struct device_node *parent)
 {
 	struct irq_domain *domain;
 
-	if (nirqs > NR_AIC5_IRQS)
-		return -EINVAL;
-
-	domain = aic_common_of_init(node, "atmel-aic5", nirqs);
+	domain = aic_common_of_init(node, "atmel-aic5");
 	if (IS_ERR(domain))
 		return PTR_ERR(domain);
 
 	return 0;
 }
 
-#define NR_SAMA5D2_IRQS		77
-
-static int __init sama5d2_aic5_of_init(struct device_node *node,
-				       struct device_node *parent)
-{
-	return aic5_of_init(node, parent, NR_SAMA5D2_IRQS);
-}
-IRQCHIP_DECLARE(sama5d2_aic5, "atmel,sama5d2-aic", sama5d2_aic5_of_init);
-
-#define NR_SAMA5D3_IRQS		48
-
-static int __init sama5d3_aic5_of_init(struct device_node *node,
-				       struct device_node *parent)
-{
-	return aic5_of_init(node, parent, NR_SAMA5D3_IRQS);
-}
-IRQCHIP_DECLARE(sama5d3_aic5, "atmel,sama5d3-aic", sama5d3_aic5_of_init);
-
-#define NR_SAMA5D4_IRQS		68
-
-static int __init sama5d4_aic5_of_init(struct device_node *node,
-				       struct device_node *parent)
-{
-	return aic5_of_init(node, parent, NR_SAMA5D4_IRQS);
-}
-IRQCHIP_DECLARE(sama5d4_aic5, "atmel,sama5d4-aic", sama5d4_aic5_of_init);
+IRQCHIP_DECLARE(sama5d2_aic5, "atmel,sama5d2-aic", aic5_of_init);
+IRQCHIP_DECLARE(sama5d3_aic5, "atmel,sama5d3-aic", aic5_of_init);
+IRQCHIP_DECLARE(sama5d4_aic5, "atmel,sama5d4-aic", aic5_of_init);

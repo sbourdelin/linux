@@ -16,9 +16,7 @@
 #ifndef __IRQ_ATMEL_AIC_COMMON_H
 #define __IRQ_ATMEL_AIC_COMMON_H
 
-#define AIC_IRQS_PER_CHIP	32
-
 struct irq_domain *__init aic_common_of_init(struct device_node *node,
-					     const char *name, int nirqs);
+					     const char *name);
 
 #endif /* __IRQ_ATMEL_AIC_COMMON_H */

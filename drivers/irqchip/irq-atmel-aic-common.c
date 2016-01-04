@@ -28,7 +28,11 @@
 
 #include "irq-atmel-aic-common.h"
 
-#define NR_AIC_IRQS			32
+#define AIC_IRQS_PER_CHIP		32
+#define NR_AT91RM9200_IRQS		32
+#define NR_SAMA5D2_IRQS			77
+#define NR_SAMA5D3_IRQS			48
+#define NR_SAMA5D4_IRQS			68
 
 #define AT91_AIC_SMR_BASE		0
 #define AT91_AIC_SVR_BASE		0x80
@@ -425,6 +429,30 @@ static void aic_pm_shutdown(struct irq_data *d)
 #define aic_pm_shutdown	NULL
 #endif /* CONFIG_PM */
 
+static int __init aic_get_num_chips(struct device_node *node)
+{
+	int nirqs;
+
+	/* Get total number of IRQs and configure register data */
+	if (of_device_is_compatible(node, "atmel,at91rm9200-aic")) {
+		nirqs = NR_AT91RM9200_IRQS;
+		aic_reg_data = &aic_regs;
+	} else if (of_device_is_compatible(node, "atmel,sama5d2-aic")) {
+		nirqs = NR_SAMA5D2_IRQS;
+		aic_reg_data = &aic5_regs;
+	} else if (of_device_is_compatible(node, "atmel,sama5d3-aic")) {
+		nirqs = NR_SAMA5D3_IRQS;
+		aic_reg_data = &aic5_regs;
+	} else if (of_device_is_compatible(node, "atmel,sama5d4-aic")) {
+		nirqs = NR_SAMA5D4_IRQS;
+		aic_reg_data = &aic5_regs;
+	} else {
+		return -EINVAL;
+	}
+
+	return DIV_ROUND_UP(nirqs, AIC_IRQS_PER_CHIP);
+}
+
 static void __init aic_common_ext_irq_of_init(struct irq_domain *domain)
 {
 	struct device_node *node = irq_domain_get_of_node(domain);
@@ -486,13 +514,13 @@ static void __init aic_hw_init(struct irq_domain *domain)
 		irq_reg_writel(gc, 0xffffffff, aic_reg_data->idcr);
 		irq_reg_writel(gc, 0xffffffff, aic_reg_data->iccr);
 
-		for (i = 0; i < NR_AIC_IRQS; i++)
+		for (i = 0; i < NR_AT91RM9200_IRQS; i++)
 			irq_reg_writel(gc, i, aic_reg_data->svr + (i * 4));
 	}
 }
 
 struct irq_domain *__init aic_common_of_init(struct device_node *node,
-					     const char *name, int nirqs)
+					     const char *name)
 {
 	struct irq_chip_generic *gc;
 	struct irq_domain *domain;
@@ -505,7 +533,9 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 	if (aic_domain)
 		return ERR_PTR(-EEXIST);
 
-	nchips = DIV_ROUND_UP(nirqs, AIC_IRQS_PER_CHIP);
+	nchips = aic_get_num_chips(node);
+	if (nchips < 0)
+		return ERR_PTR(-EINVAL);
 
 	reg_base = of_iomap(node, 0);
 	if (!reg_base)

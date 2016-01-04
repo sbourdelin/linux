@@ -60,7 +60,7 @@ static int __init aic_of_init(struct device_node *node,
 {
 	struct irq_domain *domain;
 
-	domain = aic_common_of_init(node, "atmel-aic", NR_AIC_IRQS);
+	domain = aic_common_of_init(node, "atmel-aic");
 	if (IS_ERR(domain))
 		return PTR_ERR(domain);
 
