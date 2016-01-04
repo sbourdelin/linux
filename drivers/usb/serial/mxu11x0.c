@@ -830,9 +830,6 @@ static int mxu1_open(struct tty_struct *tty, struct usb_serial_port *port)
 	usb_clear_halt(serial->dev, port->write_urb->pipe);
 	usb_clear_halt(serial->dev, port->read_urb->pipe);
 
-	if (tty)
-		mxu1_set_termios(tty, port, NULL);
-
 	status = usb_serial_generic_open(tty, port);
 	if (status)
 		goto unlink_int_urb;
