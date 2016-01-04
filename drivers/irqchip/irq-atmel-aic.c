@@ -188,7 +188,7 @@ static int aic_irq_domain_xlate(struct irq_domain *d,
 	if (ret)
 		return ret;
 
-	idx = intspec[0] / dgc->irqs_per_chip;
+	idx = intspec[0] / AIC_IRQS_PER_CHIP;
 	if (idx >= dgc->num_chips)
 		return -EINVAL;
 
