@@ -54,7 +54,8 @@ do {						\
 static void neigh_timer_handler(unsigned long arg);
 static void __neigh_notify(struct neighbour *n, int type, int flags);
 static void neigh_update_notify(struct neighbour *neigh);
-static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev);
+static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev,
+			 bool all_down);
 
 #ifdef CONFIG_PROC_FS
 static const struct file_operations neigh_stat_seq_fops;
@@ -192,7 +193,8 @@ static void pneigh_queue_purge(struct sk_buff_head *list)
 	}
 }
 
-static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev)
+static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev,
+			    bool all_down)
 {
 	int i;
 	struct neigh_hash_table *nht;
@@ -209,6 +211,12 @@ static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev)
 			if (dev && n->dev != dev) {
 				np = &n->next;
 				continue;
+			}
+			if (!dev && n->dev && all_down) {
+				if (n->dev->flags & IFF_UP) {
+					np = &n->next;
+					continue;
+				}
 			}
 			rcu_assign_pointer(*np,
 				   rcu_dereference_protected(n->next,
@@ -245,7 +253,7 @@ static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev)
 void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev)
 {
 	write_lock_bh(&tbl->lock);
-	neigh_flush_dev(tbl, dev);
+	neigh_flush_dev(tbl, dev, false);
 	write_unlock_bh(&tbl->lock);
 }
 EXPORT_SYMBOL(neigh_changeaddr);
@@ -253,8 +261,8 @@ EXPORT_SYMBOL(neigh_changeaddr);
 int neigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
 {
 	write_lock_bh(&tbl->lock);
-	neigh_flush_dev(tbl, dev);
-	pneigh_ifdown(tbl, dev);
+	neigh_flush_dev(tbl, dev, false);
+	pneigh_ifdown(tbl, dev, false);
 	write_unlock_bh(&tbl->lock);
 
 	del_timer_sync(&tbl->proxy_timer);
@@ -262,6 +270,19 @@ int neigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
 	return 0;
 }
 EXPORT_SYMBOL(neigh_ifdown);
+
+int neigh_ifdown_all(struct neigh_table *tbl)
+{
+	write_lock_bh(&tbl->lock);
+	neigh_flush_dev(tbl, NULL, true);
+	pneigh_ifdown(tbl, NULL, true);
+	write_unlock_bh(&tbl->lock);
+
+	del_timer_sync(&tbl->proxy_timer);
+	pneigh_queue_purge(&tbl->proxy_queue);
+	return 0;
+}
+EXPORT_SYMBOL(neigh_ifdown_all);
 
 static struct neighbour *neigh_alloc(struct neigh_table *tbl, struct net_device *dev)
 {
@@ -645,7 +666,8 @@ int pneigh_delete(struct neigh_table *tbl, struct net *net, const void *pkey,
 	return -ENOENT;
 }
 
-static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
+static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev,
+			 bool all_down)
 {
 	struct pneigh_entry *n, **np;
 	u32 h;
@@ -653,7 +675,9 @@ static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
 	for (h = 0; h <= PNEIGH_HASHMASK; h++) {
 		np = &tbl->phash_buckets[h];
 		while ((n = *np) != NULL) {
-			if (!dev || n->dev == dev) {
+			if ((!dev && !all_down) || (all_down && n->dev &&
+						    !(n->dev->flags & IFF_UP)) ||
+			    n->dev == dev) {
 				*np = n->next;
 				if (tbl->pdestructor)
 					tbl->pdestructor(n);
