@@ -209,26 +209,6 @@ static const struct irq_domain_ops aic_irq_ops = {
 	.xlate	= aic_irq_domain_xlate,
 };
 
-static void __init at91sam9260_aic_irq_fixup(struct device_node *root)
-{
-	aic_common_rtt_irq_fixup(root);
-}
-
-static void __init at91sam9g45_aic_irq_fixup(struct device_node *root)
-{
-	aic_common_rtt_irq_fixup(root);
-}
-
-static const struct of_device_id aic_irq_fixups[] __initconst = {
-	{ .compatible = "atmel,at91sam9g45", .data = at91sam9g45_aic_irq_fixup },
-	{ .compatible = "atmel,at91sam9rl", .data = at91sam9g45_aic_irq_fixup },
-	{ .compatible = "atmel,at91sam9260", .data = at91sam9260_aic_irq_fixup },
-	{ .compatible = "atmel,at91sam9261", .data = at91sam9260_aic_irq_fixup },
-	{ .compatible = "atmel,at91sam9263", .data = at91sam9260_aic_irq_fixup },
-	{ .compatible = "atmel,at91sam9g20", .data = at91sam9260_aic_irq_fixup },
-	{ /* sentinel */ },
-};
-
 static int __init aic_of_init(struct device_node *node,
 			      struct device_node *parent)
 {
@@ -242,8 +222,6 @@ static int __init aic_of_init(struct device_node *node,
 				    NR_AIC_IRQS);
 	if (IS_ERR(domain))
 		return PTR_ERR(domain);
-
-	aic_common_irq_fixup(aic_irq_fixups);
 
 	aic_domain = domain;
 	gc = irq_get_domain_generic_chip(domain, 0);
