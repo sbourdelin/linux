@@ -995,6 +995,16 @@ static void ipgre_netlink_parms(struct net_device *dev,
 
 		t->collect_md = true;
 	}
+	if (data[IFLA_GRE_ONETNS_FLAGS])
+		parms->o_net.o_netns_flag = nla_get_u8(
+						data[IFLA_GRE_ONETNS_FLAGS]);
+	if (data[IFLA_GRE_ONETNS_FD])
+		parms->o_net.o_netns_fd = nla_get_u32(
+						data[IFLA_GRE_ONETNS_FD]);
+	if (data[IFLA_GRE_ONETNS_NAME])
+		nla_strlcpy(parms->o_net.netns,
+			    data[IFLA_GRE_ONETNS_NAME],
+			    sizeof(parms->o_net.netns));
 }
 
 /* This function returns true when ENCAP attributes are present in the nl msg */
@@ -1128,6 +1138,12 @@ static size_t ipgre_get_size(const struct net_device *dev)
 		nla_total_size(2) +
 		/* IFLA_GRE_COLLECT_METADATA */
 		nla_total_size(0) +
+		/* IFLA_GRE_ONETNS_FLAGS */
+		nla_total_size(1) +
+		/* IFLA_GRE_ONETNS_FD */
+		nla_total_size(4) +
+		/* IFLA_GRE_ONETNS_NAME */
+		nla_total_size(NAME_MAX) +
 		0;
 }
 
@@ -1161,6 +1177,13 @@ static int ipgre_fill_info(struct sk_buff *skb, const struct net_device *dev)
 
 	if (t->collect_md) {
 		if (nla_put_flag(skb, IFLA_GRE_COLLECT_METADATA))
+			goto nla_put_failure;
+	}
+
+	if (p->o_net.o_netns_flag) {
+		if (nla_put_u8(skb, IFLA_GRE_ONETNS_FLAGS,
+			       p->o_net.o_netns_flag) ||
+		    nla_put_string(skb, IFLA_GRE_ONETNS_NAME, p->o_net.netns))
 			goto nla_put_failure;
 	}
 

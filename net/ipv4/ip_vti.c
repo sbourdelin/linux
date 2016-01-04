@@ -466,6 +466,15 @@ static void vti_netlink_parms(struct nlattr *data[],
 	if (data[IFLA_VTI_REMOTE])
 		parms->iph.daddr = nla_get_in_addr(data[IFLA_VTI_REMOTE]);
 
+	if (data[IFLA_VTI_ONETNS_FLAGS])
+		parms->o_net.o_netns_flag = nla_get_u8(
+						data[IFLA_VTI_ONETNS_FLAGS]);
+	if (data[IFLA_VTI_ONETNS_FD])
+		parms->o_net.o_netns_fd = nla_get_u32(data[IFLA_VTI_ONETNS_FD]);
+	if (data[IFLA_VTI_ONETNS_NAME])
+		nla_strlcpy(parms->o_net.netns, data[IFLA_VTI_ONETNS_NAME],
+			    sizeof(parms->o_net.netns));
+
 }
 
 static int vti_newlink(struct net *src_net, struct net_device *dev,
@@ -499,6 +508,12 @@ static size_t vti_get_size(const struct net_device *dev)
 		nla_total_size(4) +
 		/* IFLA_VTI_REMOTE */
 		nla_total_size(4) +
+		/* IFLA_VTI_ONETNS_FLAGS */
+		nla_total_size(1) +
+		/* IFLA_VTI_ONENTS_FD */
+		nla_total_size(4) +
+		/* IFLA_VTI_ONETNS_NAME */
+		nla_total_size(NAME_MAX) +
 		0;
 }
 
@@ -512,6 +527,12 @@ static int vti_fill_info(struct sk_buff *skb, const struct net_device *dev)
 	nla_put_be32(skb, IFLA_VTI_OKEY, p->o_key);
 	nla_put_in_addr(skb, IFLA_VTI_LOCAL, p->iph.saddr);
 	nla_put_in_addr(skb, IFLA_VTI_REMOTE, p->iph.daddr);
+	if (p->o_net.o_netns_flag) {
+		if (nla_put_u8(skb, IFLA_VTI_ONETNS_FLAGS,
+			       p->o_net.o_netns_flag) ||
+		    nla_put_string(skb, IFLA_VTI_ONETNS_NAME, p->o_net.netns))
+			return -EMSGSIZE;
+	}
 
 	return 0;
 }
