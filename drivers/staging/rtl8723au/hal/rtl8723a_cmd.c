@@ -93,11 +93,9 @@ int FillH2CCmd(struct rtw_adapter *padapter, u8 ElementID, u32 CmdLen,
 
 		if (h2c_cmd & BIT(7)) {
 			msgbox_ex_addr = REG_HMEBOX_EXT_0 + (h2c_box_num * EX_MESSAGE_BOX_SIZE);
-			h2c_cmd_ex = le16_to_cpu(h2c_cmd_ex);
 			rtl8723au_write16(padapter, msgbox_ex_addr, h2c_cmd_ex);
 		}
 		msgbox_addr = REG_HMEBOX_0 + (h2c_box_num * MESSAGE_BOX_SIZE);
-		h2c_cmd = le32_to_cpu(h2c_cmd);
 		rtl8723au_write32(padapter, msgbox_addr, h2c_cmd);
 
 		bcmd_down = true;
@@ -115,8 +113,6 @@ exit:
 
 int rtl8723a_set_rssi_cmd(struct rtw_adapter *padapter, u8 *param)
 {
-	*((u32 *)param) = cpu_to_le32(*((u32 *)param));
-
 	FillH2CCmd(padapter, RSSI_SETTING_EID, 3, param);
 
 	return _SUCCESS;
@@ -127,7 +123,7 @@ int rtl8723a_set_raid_cmd(struct rtw_adapter *padapter, u32 mask, u8 arg)
 	u8 buf[5];
 
 	memset(buf, 0, 5);
-	put_unaligned_le32(mask, buf);
+	memcpy(buf, &mask, 4);
 	buf[4]  = arg;
 
 	FillH2CCmd(padapter, MACID_CONFIG_EID, 5, buf);
