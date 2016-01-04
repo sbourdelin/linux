@@ -1503,6 +1503,7 @@ config CRYPTO_LZO
 	select CRYPTO_ALGAPI
 	select LZO_COMPRESS
 	select LZO_DECOMPRESS
+	select CRYPTO_COMPRESS2
 	help
 	  This is the LZO algorithm.
 
