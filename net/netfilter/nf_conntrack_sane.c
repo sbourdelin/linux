@@ -191,7 +191,7 @@ static void nf_conntrack_sane_fini(void)
 
 static int __init nf_conntrack_sane_init(void)
 {
-	int i, j = -1, ret = 0;
+	int i, ret = 0;
 
 	sane_buffer = kmalloc(65536, GFP_KERNEL);
 	if (!sane_buffer)
@@ -203,29 +203,27 @@ static int __init nf_conntrack_sane_init(void)
 	/* FIXME should be configurable whether IPv4 and IPv6 connections
 		 are tracked or not - YK */
 	for (i = 0; i < ports_c; i++) {
-		sane[i][0].tuple.src.l3num = PF_INET;
-		sane[i][1].tuple.src.l3num = PF_INET6;
-		for (j = 0; j < 2; j++) {
-			sane[i][j].data_len = sizeof(struct nf_ct_sane_master);
-			sane[i][j].tuple.src.u.tcp.port = htons(ports[i]);
-			sane[i][j].tuple.dst.protonum = IPPROTO_TCP;
-			sane[i][j].expect_policy = &sane_exp_policy;
-			sane[i][j].me = THIS_MODULE;
-			sane[i][j].help = help;
-			if (ports[i] == SANE_PORT)
-				sprintf(sane[i][j].name, "sane");
-			else
-				sprintf(sane[i][j].name, "sane-%d", ports[i]);
-
-			pr_debug("registering helper for pf: %d port: %d\n",
-				 sane[i][j].tuple.src.l3num, ports[i]);
-			ret = nf_conntrack_helper_register(&sane[i][j]);
-			if (ret) {
-				pr_err("failed to register helper for pf: %d port: %d\n",
-				       sane[i][j].tuple.src.l3num, ports[i]);
-				nf_conntrack_sane_fini();
-				return ret;
-			}
+		nf_ct_helper_init(&sane[i][0], AF_INET, IPPROTO_TCP, "sane",
+				  SANE_PORT, ports[i], &sane_exp_policy, 0,
+				  sizeof(struct nf_ct_sane_master), help, NULL,
+				  THIS_MODULE);
+		ret = nf_conntrack_helper_register(&sane[i][0]);
+		if (ret < 0) {
+			pr_err("failed to register helper for pf: %d port: %d\n",
+			       sane[i][0].tuple.src.l3num, ports[i]);
+			nf_conntrack_sane_fini();
+			return ret;
+		}
+		nf_ct_helper_init(&sane[i][1], AF_INET6, IPPROTO_TCP, "sane",
+				  SANE_PORT, ports[i], &sane_exp_policy, 0,
+				  sizeof(struct nf_ct_sane_master), help, NULL,
+				  THIS_MODULE);
+		ret = nf_conntrack_helper_register(&sane[i][1]);
+		if (ret < 0) {
+			pr_err("failed to register helper for pf: %d port: %d\n",
+			       sane[i][1].tuple.src.l3num, ports[i]);
+			nf_conntrack_sane_fini();
+			return ret;
 		}
 	}
 

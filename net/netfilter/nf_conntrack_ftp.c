@@ -599,7 +599,7 @@ static void nf_conntrack_ftp_fini(void)
 
 static int __init nf_conntrack_ftp_init(void)
 {
-	int i, j = -1, ret = 0;
+	int i, ret = 0;
 
 	ftp_buffer = kmalloc(65536, GFP_KERNEL);
 	if (!ftp_buffer)
@@ -611,30 +611,27 @@ static int __init nf_conntrack_ftp_init(void)
 	/* FIXME should be configurable whether IPv4 and IPv6 FTP connections
 		 are tracked or not - YK */
 	for (i = 0; i < ports_c; i++) {
-		ftp[i][0].tuple.src.l3num = PF_INET;
-		ftp[i][1].tuple.src.l3num = PF_INET6;
-		for (j = 0; j < 2; j++) {
-			ftp[i][j].data_len = sizeof(struct nf_ct_ftp_master);
-			ftp[i][j].tuple.src.u.tcp.port = htons(ports[i]);
-			ftp[i][j].tuple.dst.protonum = IPPROTO_TCP;
-			ftp[i][j].expect_policy = &ftp_exp_policy;
-			ftp[i][j].me = THIS_MODULE;
-			ftp[i][j].help = help;
-			ftp[i][j].from_nlattr = nf_ct_ftp_from_nlattr;
-			if (ports[i] == FTP_PORT)
-				sprintf(ftp[i][j].name, "ftp");
-			else
-				sprintf(ftp[i][j].name, "ftp-%d", ports[i]);
-
-			pr_debug("registering helper for pf: %d port: %d\n",
-				 ftp[i][j].tuple.src.l3num, ports[i]);
-			ret = nf_conntrack_helper_register(&ftp[i][j]);
-			if (ret) {
-				pr_err("failed to register helper for pf: %d port: %d\n",
-				       ftp[i][j].tuple.src.l3num, ports[i]);
-				nf_conntrack_ftp_fini();
-				return ret;
-			}
+		nf_ct_helper_init(&ftp[i][0], AF_INET, IPPROTO_TCP, "ftp",
+				  FTP_PORT, ports[i], &ftp_exp_policy, 0,
+				  sizeof(struct nf_ct_ftp_master), help,
+				  nf_ct_ftp_from_nlattr, THIS_MODULE);
+		ret = nf_conntrack_helper_register(&ftp[i][0]);
+		if (ret < 0) {
+			pr_err("failed to register helper for pf: %d port: %d\n",
+			       ftp[i][0].tuple.src.l3num, ports[i]);
+			nf_conntrack_ftp_fini();
+			return ret;
+		}
+		nf_ct_helper_init(&ftp[i][1], AF_INET6, IPPROTO_TCP, "ftp",
+				  FTP_PORT, ports[i], &ftp_exp_policy, 0,
+				  sizeof(struct nf_ct_ftp_master), help,
+				  nf_ct_ftp_from_nlattr, THIS_MODULE);
+		ret = nf_conntrack_helper_register(&ftp[i][1]);
+		if (ret < 0) {
+			pr_err("failed to register helper for pf: %d port: %d\n",
+			       ftp[i][1].tuple.src.l3num, ports[i]);
+			nf_conntrack_ftp_fini();
+			return ret;
 		}
 	}
 
