@@ -3826,6 +3826,9 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	if (!type)
 		type = nand_flash_ids;
 
+	if (!mtd->name && mtd->dev.parent)
+		mtd->name = dev_name(mtd->dev.parent);
+
 	for (; type->name != NULL; type++) {
 		if (is_full_id_nand(type)) {
 			if (find_full_id_nand(mtd, chip, type, id_data, &busw))
