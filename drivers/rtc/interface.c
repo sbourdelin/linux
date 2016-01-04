@@ -959,7 +959,7 @@ int rtc_read_offset(struct rtc_device *rtc, long *offset)
 		return -ENODEV;
 
 	if (!rtc->ops->set_offset) {
-		offset = 0;
+		*offset = 0;
 		return 0;
 	}
 
