@@ -63,9 +63,12 @@
 #define VOP_INTR_SET_TYPE(vop, name, type, v) \
 	do { \
 		int i, reg = 0; \
-		for (i = 0; i < vop->data->intr->nintrs; i++) { \
-			if (vop->data->intr->intrs[i] & type) \
+		const struct vop_intr *intr = vop->data->intr; \
+		for (i = 0; i < intr->nintrs; i++) { \
+			if (intr->intrs[i] & type) { \
 				reg |= (v) << i; \
+				reg |= intr->write_mask ? (1 << (i + 16)) : 0; \
+			} \
 		} \
 		VOP_INTR_SET(vop, name, reg); \
 	} while (0)

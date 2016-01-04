@@ -60,6 +60,7 @@ struct vop_ctrl {
 };
 
 struct vop_intr {
+	bool write_mask;
 	const int *intrs;
 	uint32_t nintrs;
 	struct vop_reg enable;
@@ -136,6 +137,7 @@ struct vop_data {
 };
 
 /* interrupt define */
+#define DUMMY_INTR			(0 << 0)
 #define DSP_HOLD_VALID_INTR		(1 << 0)
 #define FS_INTR				(1 << 1)
 #define LINE_FLAG_INTR			(1 << 2)
