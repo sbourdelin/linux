@@ -55,39 +55,14 @@
 #define AT91_AIC_SPU			0x134
 #define AT91_AIC_DCR			0x138
 
-static struct irq_domain *aic_domain;
-
-static asmlinkage void __exception_irq_entry
-aic_handle(struct pt_regs *regs)
-{
-	struct irq_domain_chip_generic *dgc = aic_domain->gc;
-	struct irq_chip_generic *gc = dgc->gc[0];
-	u32 irqnr;
-	u32 irqstat;
-
-	irqnr = irq_reg_readl(gc, AT91_AIC_IVR);
-	irqstat = irq_reg_readl(gc, AT91_AIC_ISR);
-
-	if (!irqstat)
-		irq_reg_writel(gc, 0, AT91_AIC_EOICR);
-	else
-		handle_domain_irq(aic_domain, irqnr, regs);
-}
-
 static int __init aic_of_init(struct device_node *node,
 			      struct device_node *parent)
 {
 	struct irq_domain *domain;
 
-	if (aic_domain)
-		return -EEXIST;
-
 	domain = aic_common_of_init(node, "atmel-aic", NR_AIC_IRQS);
 	if (IS_ERR(domain))
 		return PTR_ERR(domain);
-
-	aic_domain = domain;
-	set_handle_irq(aic_handle);
 
 	return 0;
 }

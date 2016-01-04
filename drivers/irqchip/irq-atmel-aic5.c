@@ -65,24 +65,6 @@
 #define AT91_AIC5_FFDR			0x54
 #define AT91_AIC5_FFSR			0x58
 
-static struct irq_domain *aic5_domain;
-
-static asmlinkage void __exception_irq_entry
-aic5_handle(struct pt_regs *regs)
-{
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(aic5_domain, 0);
-	u32 irqnr;
-	u32 irqstat;
-
-	irqnr = irq_reg_readl(bgc, AT91_AIC5_IVR);
-	irqstat = irq_reg_readl(bgc, AT91_AIC5_ISR);
-
-	if (!irqstat)
-		irq_reg_writel(bgc, 0, AT91_AIC5_EOICR);
-	else
-		handle_domain_irq(aic5_domain, irqnr, regs);
-}
-
 static int __init aic5_of_init(struct device_node *node,
 			       struct device_node *parent,
 			       int nirqs)
@@ -92,15 +74,9 @@ static int __init aic5_of_init(struct device_node *node,
 	if (nirqs > NR_AIC5_IRQS)
 		return -EINVAL;
 
-	if (aic5_domain)
-		return -EEXIST;
-
 	domain = aic_common_of_init(node, "atmel-aic5", nirqs);
 	if (IS_ERR(domain))
 		return PTR_ERR(domain);
-
-	aic5_domain = domain;
-	set_handle_irq(aic5_handle);
 
 	return 0;
 }

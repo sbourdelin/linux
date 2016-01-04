@@ -17,10 +17,14 @@
 #include <linux/errno.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/irqdesc.h>
 #include <linux/irqdomain.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
+
+#include <asm/exception.h>
+#include <asm/mach/irq.h>
 
 #include "irq-atmel-aic-common.h"
 
@@ -129,7 +133,22 @@ static const struct aic_reg_offset aic5_regs = {
 	.isr	= AT91_AIC5_ISR,
 };
 
+static struct irq_domain *aic_domain;
 static const struct aic_reg_offset *aic_reg_data;
+
+static asmlinkage void __exception_irq_entry
+aic_handle(struct pt_regs *regs)
+{
+	struct irq_chip_generic *gc = irq_get_domain_generic_chip(aic_domain,
+								  0);
+	u32 hwirq = irq_reg_readl(gc, aic_reg_data->ivr);
+	u32 status = irq_reg_readl(gc, aic_reg_data->isr);
+
+	if (!status)
+		irq_reg_writel(gc, 0, aic_reg_data->eoi);
+	else
+		handle_domain_irq(aic_domain, hwirq, regs);
+}
 
 static inline bool aic_is_ssr_used(void)
 {
@@ -483,6 +502,9 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 	int ret;
 	int i;
 
+	if (aic_domain)
+		return ERR_PTR(-EEXIST);
+
 	nchips = DIV_ROUND_UP(nirqs, AIC_IRQS_PER_CHIP);
 
 	reg_base = of_iomap(node, 0);
@@ -532,8 +554,10 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		gc->private = &aic[i];
 	}
 
+	aic_domain = domain;
 	aic_common_ext_irq_of_init(domain);
 	aic_hw_init(domain);
+	set_handle_irq(aic_handle);
 
 	return domain;
 
