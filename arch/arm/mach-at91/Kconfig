@@ -117,7 +117,7 @@ config SOC_SAM_V7
 
 config SOC_SAMA5
 	bool
-	select ATMEL_AIC5_IRQ
+	select ATMEL_AIC_IRQ
 	select ATMEL_SDRAMC
 	select MEMORY
 	select SOC_SAM_V7

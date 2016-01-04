@@ -67,13 +67,6 @@ config ATMEL_AIC_IRQ
 	select MULTI_IRQ_HANDLER
 	select SPARSE_IRQ
 
-config ATMEL_AIC5_IRQ
-	bool
-	select GENERIC_IRQ_CHIP
-	select IRQ_DOMAIN
-	select MULTI_IRQ_HANDLER
-	select SPARSE_IRQ
-
 config I8259
 	bool
 	select IRQ_DOMAIN
