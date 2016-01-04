@@ -2,6 +2,8 @@
 #define _CRYPTO_COMPRESS_H
 #include <linux/crypto.h>
 
+#define CRYPTO_ALG_SCOMPRESS_DECOMP_NOCTX CRYPTO_ALG_PRIVATE
+
 struct crypto_scomp {
 	struct crypto_tfm base;
 };
@@ -69,6 +71,12 @@ static inline int crypto_scomp_decompress(struct crypto_scomp *tfm,
 {
 	return crypto_scomp_alg(tfm)->decompress(tfm, src, slen,
 						dst, dlen, ctx);
+}
+
+static inline bool crypto_scomp_decomp_noctx(struct crypto_scomp *tfm)
+{
+	return crypto_scomp_tfm(tfm)->__crt_alg->cra_flags &
+			CRYPTO_ALG_SCOMPRESS_DECOMP_NOCTX;
 }
 
 extern int crypto_register_scomp(struct scomp_alg *alg);

@@ -104,6 +104,12 @@
 #define CRYPTO_ALG_INTERNAL		0x00002000
 
 /*
+ * Use this flag as type specific one. For example, it would be used
+ * to check if context is needed or not in CRYPTO_ALG_TYPE_SCOMPRESS.
+ */
+#define CRYPTO_ALG_PRIVATE		0x00004000
+
+/*
  * Transform masks and values (for crt_flags).
  */
 #define CRYPTO_TFM_REQ_MASK		0x000fff00

@@ -1289,6 +1289,8 @@ static int test_comp(struct crypto_tfm *tfm, void *ctx, int type,
 			break;
 
 		case 1:
+			if (crypto_scomp_decomp_noctx(crypto_scomp_cast(tfm)))
+				ctx = NULL;
 			ret = crypto_scomp_decompress(crypto_scomp_cast(tfm),
 						dtemplate[i].input, ilen,
 						result, &dlen, ctx);
