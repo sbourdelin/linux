@@ -185,10 +185,6 @@ static int __init aic_of_init(struct device_node *node,
 	gc = irq_get_domain_generic_chip(domain, 0);
 
 	gc->chip_types[0].regs.eoi = AT91_AIC_EOICR;
-	gc->chip_types[0].regs.enable = AT91_AIC_IECR;
-	gc->chip_types[0].regs.disable = AT91_AIC_IDCR;
-	gc->chip_types[0].chip.irq_mask = irq_gc_mask_disable_reg;
-	gc->chip_types[0].chip.irq_unmask = irq_gc_unmask_enable_reg;
 	gc->chip_types[0].chip.irq_retrigger = aic_retrigger;
 	gc->chip_types[0].chip.irq_set_type = aic_set_type;
 	gc->chip_types[0].chip.irq_suspend = aic_suspend;

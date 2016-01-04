@@ -193,6 +193,56 @@ static void aic_common_shutdown(struct irq_data *d)
 	ct->chip.irq_mask(d);
 }
 
+static void aic_mask(struct irq_data *d)
+{
+	struct irq_domain *domain = d->domain;
+	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+	u32 mask = d->mask;
+
+	/*
+	 * Disable interrupt. We always take the lock of the
+	 * first irq chip as all chips share the same registers.
+	 */
+	irq_gc_lock(bgc);
+
+	if (aic_is_ssr_used()) {
+		irq_reg_writel(gc, d->hwirq, aic_reg_data->ssr);
+		irq_reg_writel(gc, 1, aic_reg_data->idcr);
+	} else {
+		irq_reg_writel(gc, mask, aic_reg_data->idcr);
+	}
+
+	gc->mask_cache &= ~mask;
+
+	irq_gc_unlock(bgc);
+}
+
+static void aic_unmask(struct irq_data *d)
+{
+	struct irq_domain *domain = d->domain;
+	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+	u32 mask = d->mask;
+
+	/*
+	 * Enable interrupt. We always take the lock of the
+	 * first irq chip as all chips share the same registers.
+	 */
+	irq_gc_lock(bgc);
+
+	if (aic_is_ssr_used()) {
+		irq_reg_writel(gc, d->hwirq, aic_reg_data->ssr);
+		irq_reg_writel(gc, 1, aic_reg_data->iecr);
+	} else {
+		irq_reg_writel(gc, mask, aic_reg_data->iecr);
+	}
+
+	gc->mask_cache |= mask;
+
+	irq_gc_unlock(bgc);
+}
+
 int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val)
 {
 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
@@ -303,6 +353,8 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		gc->chip_types[0].chip.irq_eoi = irq_gc_eoi;
 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
 		gc->chip_types[0].chip.irq_shutdown = aic_common_shutdown;
+		gc->chip_types[0].chip.irq_mask = aic_mask;
+		gc->chip_types[0].chip.irq_unmask = aic_unmask;
 		gc->private = &aic[i];
 	}
 

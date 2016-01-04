@@ -83,40 +83,6 @@ aic5_handle(struct pt_regs *regs)
 		handle_domain_irq(aic5_domain, irqnr, regs);
 }
 
-static void aic5_mask(struct irq_data *d)
-{
-	struct irq_domain *domain = d->domain;
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-
-	/*
-	 * Disable interrupt on AIC5. We always take the lock of the
-	 * first irq chip as all chips share the same registers.
-	 */
-	irq_gc_lock(bgc);
-	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
-	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
-	gc->mask_cache &= ~d->mask;
-	irq_gc_unlock(bgc);
-}
-
-static void aic5_unmask(struct irq_data *d)
-{
-	struct irq_domain *domain = d->domain;
-	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-
-	/*
-	 * Enable interrupt on AIC5. We always take the lock of the
-	 * first irq chip as all chips share the same registers.
-	 */
-	irq_gc_lock(bgc);
-	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
-	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
-	gc->mask_cache |= d->mask;
-	irq_gc_unlock(bgc);
-}
-
 static int aic5_retrigger(struct irq_data *d)
 {
 	struct irq_domain *domain = d->domain;
@@ -273,8 +239,6 @@ static int __init aic5_of_init(struct device_node *node,
 		gc = irq_get_domain_generic_chip(domain, i * AIC_IRQS_PER_CHIP);
 
 		gc->chip_types[0].regs.eoi = AT91_AIC5_EOICR;
-		gc->chip_types[0].chip.irq_mask = aic5_mask;
-		gc->chip_types[0].chip.irq_unmask = aic5_unmask;
 		gc->chip_types[0].chip.irq_retrigger = aic5_retrigger;
 		gc->chip_types[0].chip.irq_set_type = aic5_set_type;
 		gc->chip_types[0].chip.irq_suspend = aic5_suspend;
