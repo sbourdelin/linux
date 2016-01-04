@@ -54,7 +54,9 @@ static void dbg_hcs_params(struct ehci_hcd *ehci, char *label)
 }
 #else
 
-static inline void dbg_hcs_params(struct ehci_hcd *ehci, char *label) {}
+static inline void dbg_hcs_params(struct ehci_hcd *ehci, char *label)
+{
+}
 
 #endif
 
@@ -94,7 +96,9 @@ static void dbg_hcc_params(struct ehci_hcd *ehci, char *label)
 }
 #else
 
-static inline void dbg_hcc_params(struct ehci_hcd *ehci, char *label) {}
+static inline void dbg_hcc_params(struct ehci_hcd *ehci, char *label)
+{
+}
 
 #endif
 
@@ -284,23 +288,32 @@ dbg_port_buf(char *buf, unsigned len, const char *label, int port, u32 status)
 #else
 static inline void __maybe_unused
 dbg_qh(char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
-{}
+{
+}
 
 static inline int __maybe_unused
 dbg_status_buf(char *buf, unsigned len, const char *label, u32 status)
-{ return 0; }
+{
+	return 0;
+}
 
 static inline int __maybe_unused
 dbg_command_buf(char *buf, unsigned len, const char *label, u32 command)
-{ return 0; }
+{
+	return 0;
+}
 
 static inline int __maybe_unused
 dbg_intr_buf(char *buf, unsigned len, const char *label, u32 enable)
-{ return 0; }
+{
+	return 0;
+}
 
 static inline int __maybe_unused
 dbg_port_buf(char *buf, unsigned len, const char *label, int port, u32 status)
-{ return 0; }
+{
+	return 0;
+}
 
 #endif	/* CONFIG_DYNAMIC_DEBUG */
 
@@ -327,8 +340,13 @@ dbg_port_buf(char *buf, unsigned len, const char *label, int port, u32 status)
 
 #ifdef STUB_DEBUG_FILES
 
-static inline void create_debug_files(struct ehci_hcd *bus) { }
-static inline void remove_debug_files(struct ehci_hcd *bus) { }
+static inline void create_debug_files(struct ehci_hcd *bus)
+{
+}
+
+static inline void remove_debug_files(struct ehci_hcd *bus)
+{
+}
 
 #else
 
@@ -404,12 +422,8 @@ static inline char token_mark(struct ehci_hcd *ehci, __hc32 token)
 	return '/';
 }
 
-static void qh_lines(
-	struct ehci_hcd *ehci,
-	struct ehci_qh *qh,
-	char **nextp,
-	unsigned *sizep
-)
+static void qh_lines(struct ehci_hcd *ehci, struct ehci_qh *qh,
+			char **nextp, unsigned *sizep)
 {
 	u32			scratch;
 	u32			hw_curr;
