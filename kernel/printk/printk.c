@@ -1662,7 +1662,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 			    const char *dict, size_t dictlen,
 			    const char *fmt, va_list args)
 {
-	static int recursion_bug;
+	static int recursion_bug_cpu = -1;
 	static char textbuf[LOG_LINE_MAX];
 	char *text = textbuf;
 	size_t text_len = 0;
@@ -1699,7 +1699,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 		 * it can be printed at the next appropriate moment:
 		 */
 		if (!oops_in_progress && !lockdep_recursing(current)) {
-			recursion_bug = 1;
+			recursion_bug_cpu = this_cpu;
 			local_irq_restore(flags);
 			return 0;
 		}
@@ -1710,15 +1710,18 @@ asmlinkage int vprintk_emit(int facility, int level,
 	raw_spin_lock(&logbuf_lock);
 	logbuf_cpu = this_cpu;
 
-	if (unlikely(recursion_bug)) {
-		static const char recursion_msg[] =
-			"BUG: recent printk recursion!";
+	if (unlikely(recursion_bug_cpu != -1)) {
+		static char recursion_msg[41];
+		size_t len;
 
-		recursion_bug = 0;
+		len = sprintf(recursion_msg,
+				"BUG: recent printk recursion on CPU%d!",
+				recursion_bug_cpu);
+
+		recursion_bug_cpu = -1;
 		/* emit KERN_CRIT message */
 		printed_len += log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
-					 NULL, 0, recursion_msg,
-					 strlen(recursion_msg));
+					 NULL, 0, recursion_msg, len);
 	}
 
 	nmi_message_lost = get_nmi_message_lost();
