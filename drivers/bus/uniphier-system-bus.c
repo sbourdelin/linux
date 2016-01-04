@@ -14,7 +14,7 @@
 
 #include <linux/io.h>
 #include <linux/log2.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
@@ -265,7 +265,6 @@ static const struct of_device_id uniphier_system_bus_match[] = {
 	{ .compatible = "socionext,uniphier-system-bus" },
 	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, uniphier_system_bus_match);
 
 static struct platform_driver uniphier_system_bus_driver = {
 	.probe		= uniphier_system_bus_probe,
@@ -274,8 +273,4 @@ static struct platform_driver uniphier_system_bus_driver = {
 		.of_match_table = uniphier_system_bus_match,
 	},
 };
-module_platform_driver(uniphier_system_bus_driver);
-
-MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-MODULE_DESCRIPTION("UniPhier System Bus driver");
-MODULE_LICENSE("GPL");
+builtin_platform_driver(uniphier_system_bus_driver);
