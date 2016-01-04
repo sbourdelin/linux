@@ -476,6 +476,7 @@ struct irq_domain *__init aic_common_of_init(struct device_node *node,
 		gc->wake_enabled = ~0;
 
 		gc->chip_types[0].type = IRQ_TYPE_SENSE_MASK;
+		gc->chip_types[0].regs.eoi = aic_reg_data->eoi;
 		gc->chip_types[0].chip.irq_eoi = irq_gc_eoi;
 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
 		gc->chip_types[0].chip.irq_shutdown = aic_irq_shutdown;

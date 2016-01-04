@@ -120,8 +120,6 @@ static int __init aic_of_init(struct device_node *node,
 	aic_domain = domain;
 	gc = irq_get_domain_generic_chip(domain, 0);
 
-	gc->chip_types[0].regs.eoi = AT91_AIC_EOICR;
-
 	aic_hw_init(domain);
 	set_handle_irq(aic_handle);
 
