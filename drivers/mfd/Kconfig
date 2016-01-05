@@ -1367,6 +1367,7 @@ config MFD_ARIZONA
 	select REGMAP
 	select REGMAP_IRQ
 	select MFD_CORE
+	select COMMON_CLK_ARIZONA
 	bool
 
 config MFD_ARIZONA_I2C
