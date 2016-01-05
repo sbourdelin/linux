@@ -162,7 +162,7 @@ struct pool {
 	void *mem;
 };
 
-static struct pool *pool_head;
+static struct pool *pool_head = NULL;
 
 static void *my_malloc(size_t size)
 {
@@ -201,6 +201,8 @@ void names_free(void)
 		pool = pool->next;
 		free(tmp);
 	}
+
+	pool_head = NULL;
 }
 
 static int new_vendor(const char *name, u_int16_t vendorid)

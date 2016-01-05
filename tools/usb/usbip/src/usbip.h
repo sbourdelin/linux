@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  *
  * This program is free software: you can redistribute it and/or modify
@@ -30,11 +31,19 @@ int usbip_list(int argc, char *argv[]);
 int usbip_bind(int argc, char *argv[]);
 int usbip_unbind(int argc, char *argv[]);
 int usbip_port_show(int argc, char *argv[]);
+int usbip_connect(int argc, char *argv[]);
+int usbip_disconnect(int argc, char *argv[]);
+
+int usbip_bind_device(char *busid);
+int usbip_unbind_device(char *busid);
 
 void usbip_attach_usage(void);
 void usbip_detach_usage(void);
 void usbip_list_usage(void);
 void usbip_bind_usage(void);
 void usbip_unbind_usage(void);
+void usbip_port_usage(void);
+void usbip_connect_usage(void);
+void usbip_disconnect_usage(void);
 
 #endif /* __USBIP_H */

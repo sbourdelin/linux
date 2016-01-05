@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  *
  * This program is free software: you can redistribute it and/or modify
@@ -40,23 +41,22 @@
 #include <signal.h>
 #include <poll.h>
 
-#include "usbip_host_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "list.h"
 
-#undef  PROGNAME
-#define PROGNAME "usbipd"
+extern char *usbip_progname;
+
 #define MAXSOCKFD 20
 
 #define MAIN_LOOP_TIMEOUT 10
 
-#define DEFAULT_PID_FILE "/var/run/" PROGNAME ".pid"
+extern char *usbip_default_pid_file;
 
 static const char usbip_version_string[] = PACKAGE_STRING;
 
 static const char usbipd_help_string[] =
-	"usage: usbipd [options]\n"
+	"usage: %s [options]\n"
 	"\n"
 	"	-4, --ipv4\n"
 	"		Bind to IPv4. Default is both.\n"
@@ -72,7 +72,7 @@ static const char usbipd_help_string[] =
 	"\n"
 	"	-PFILE, --pid FILE\n"
 	"		Write process id to FILE.\n"
-	"		If no FILE specified, use " DEFAULT_PID_FILE "\n"
+	"		If no FILE specified, use %s.\n"
 	"\n"
 	"	-tPORT, --tcp-port PORT\n"
 	"		Listen on TCP/IP port PORT.\n"
@@ -85,194 +85,7 @@ static const char usbipd_help_string[] =
 
 static void usbipd_help(void)
 {
-	printf("%s\n", usbipd_help_string);
-}
-
-static int recv_request_import(int sockfd)
-{
-	struct op_import_request req;
-	struct usbip_exported_device *edev;
-	struct usbip_usb_device pdu_udev;
-	struct list_head *i;
-	int found = 0;
-	int error = 0;
-	int rc;
-
-	memset(&req, 0, sizeof(req));
-
-	rc = usbip_net_recv(sockfd, &req, sizeof(req));
-	if (rc < 0) {
-		dbg("usbip_net_recv failed: import request");
-		return -1;
-	}
-	PACK_OP_IMPORT_REQUEST(0, &req);
-
-	list_for_each(i, &host_driver->edev_list) {
-		edev = list_entry(i, struct usbip_exported_device, node);
-		if (!strncmp(req.busid, edev->udev.busid, SYSFS_BUS_ID_SIZE)) {
-			info("found requested device: %s", req.busid);
-			found = 1;
-			break;
-		}
-	}
-
-	if (found) {
-		/* should set TCP_NODELAY for usbip */
-		usbip_net_set_nodelay(sockfd);
-
-		/* export device needs a TCP/IP socket descriptor */
-		rc = usbip_host_export_device(edev, sockfd);
-		if (rc < 0)
-			error = 1;
-	} else {
-		info("requested device not found: %s", req.busid);
-		error = 1;
-	}
-
-	rc = usbip_net_send_op_common(sockfd, OP_REP_IMPORT,
-				      (!error ? ST_OK : ST_NA));
-	if (rc < 0) {
-		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_IMPORT);
-		return -1;
-	}
-
-	if (error) {
-		dbg("import request busid %s: failed", req.busid);
-		return -1;
-	}
-
-	memcpy(&pdu_udev, &edev->udev, sizeof(pdu_udev));
-	usbip_net_pack_usb_device(1, &pdu_udev);
-
-	rc = usbip_net_send(sockfd, &pdu_udev, sizeof(pdu_udev));
-	if (rc < 0) {
-		dbg("usbip_net_send failed: devinfo");
-		return -1;
-	}
-
-	dbg("import request busid %s: complete", req.busid);
-
-	return 0;
-}
-
-static int send_reply_devlist(int connfd)
-{
-	struct usbip_exported_device *edev;
-	struct usbip_usb_device pdu_udev;
-	struct usbip_usb_interface pdu_uinf;
-	struct op_devlist_reply reply;
-	struct list_head *j;
-	int rc, i;
-
-	reply.ndev = 0;
-	/* number of exported devices */
-	list_for_each(j, &host_driver->edev_list) {
-		reply.ndev += 1;
-	}
-	info("exportable devices: %d", reply.ndev);
-
-	rc = usbip_net_send_op_common(connfd, OP_REP_DEVLIST, ST_OK);
-	if (rc < 0) {
-		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_DEVLIST);
-		return -1;
-	}
-	PACK_OP_DEVLIST_REPLY(1, &reply);
-
-	rc = usbip_net_send(connfd, &reply, sizeof(reply));
-	if (rc < 0) {
-		dbg("usbip_net_send failed: %#0x", OP_REP_DEVLIST);
-		return -1;
-	}
-
-	list_for_each(j, &host_driver->edev_list) {
-		edev = list_entry(j, struct usbip_exported_device, node);
-		dump_usb_device(&edev->udev);
-		memcpy(&pdu_udev, &edev->udev, sizeof(pdu_udev));
-		usbip_net_pack_usb_device(1, &pdu_udev);
-
-		rc = usbip_net_send(connfd, &pdu_udev, sizeof(pdu_udev));
-		if (rc < 0) {
-			dbg("usbip_net_send failed: pdu_udev");
-			return -1;
-		}
-
-		for (i = 0; i < edev->udev.bNumInterfaces; i++) {
-			dump_usb_interface(&edev->uinf[i]);
-			memcpy(&pdu_uinf, &edev->uinf[i], sizeof(pdu_uinf));
-			usbip_net_pack_usb_interface(1, &pdu_uinf);
-
-			rc = usbip_net_send(connfd, &pdu_uinf,
-					sizeof(pdu_uinf));
-			if (rc < 0) {
-				err("usbip_net_send failed: pdu_uinf");
-				return -1;
-			}
-		}
-	}
-
-	return 0;
-}
-
-static int recv_request_devlist(int connfd)
-{
-	struct op_devlist_request req;
-	int rc;
-
-	memset(&req, 0, sizeof(req));
-
-	rc = usbip_net_recv(connfd, &req, sizeof(req));
-	if (rc < 0) {
-		dbg("usbip_net_recv failed: devlist request");
-		return -1;
-	}
-
-	rc = send_reply_devlist(connfd);
-	if (rc < 0) {
-		dbg("send_reply_devlist failed");
-		return -1;
-	}
-
-	return 0;
-}
-
-static int recv_pdu(int connfd)
-{
-	uint16_t code = OP_UNSPEC;
-	int ret;
-
-	ret = usbip_net_recv_op_common(connfd, &code);
-	if (ret < 0) {
-		dbg("could not receive opcode: %#0x", code);
-		return -1;
-	}
-
-	ret = usbip_host_refresh_device_list();
-	if (ret < 0) {
-		dbg("could not refresh device list: %d", ret);
-		return -1;
-	}
-
-	info("received request: %#0x(%d)", code, connfd);
-	switch (code) {
-	case OP_REQ_DEVLIST:
-		ret = recv_request_devlist(connfd);
-		break;
-	case OP_REQ_IMPORT:
-		ret = recv_request_import(connfd);
-		break;
-	case OP_REQ_DEVINFO:
-	case OP_REQ_CRYPKEY:
-	default:
-		err("received an unknown opcode: %#0x", code);
-		ret = -1;
-	}
-
-	if (ret == 0)
-		info("request %#0x(%d): complete", code, connfd);
-	else
-		info("request %#0x(%d): failed", code, connfd);
-
-	return ret;
+	printf(usbipd_help_string, usbip_progname, usbip_default_pid_file);
 }
 
 #ifdef HAVE_LIBWRAP
@@ -291,12 +104,11 @@ static int tcpd_auth(int connfd)
 }
 #endif
 
-static int do_accept(int listenfd)
+static int do_accept(int listenfd, char *host, char *port)
 {
 	int connfd;
 	struct sockaddr_storage ss;
 	socklen_t len = sizeof(ss);
-	char host[NI_MAXHOST], port[NI_MAXSERV];
 	int rc;
 
 	memset(&ss, 0, sizeof(ss));
@@ -307,8 +119,8 @@ static int do_accept(int listenfd)
 		return -1;
 	}
 
-	rc = getnameinfo((struct sockaddr *)&ss, len, host, sizeof(host),
-			 port, sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV);
+	rc = getnameinfo((struct sockaddr *)&ss, len, host, NI_MAXHOST,
+			 port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
 	if (rc)
 		err("getnameinfo: %s", gai_strerror(rc));
 
@@ -325,18 +137,21 @@ static int do_accept(int listenfd)
 	return connfd;
 }
 
+extern int usbip_recv_pdu(int connfd, char *host, char *port);
+
 int process_request(int listenfd)
 {
 	pid_t childpid;
 	int connfd;
+	char host[NI_MAXHOST], port[NI_MAXSERV];
 
-	connfd = do_accept(listenfd);
+	connfd = do_accept(listenfd, host, port);
 	if (connfd < 0)
 		return -1;
 	childpid = fork();
 	if (childpid == 0) {
 		close(listenfd);
-		recv_pdu(connfd);
+		usbip_recv_pdu(connfd, host, port);
 		exit(0);
 	}
 	close(connfd);
@@ -481,6 +296,9 @@ static void remove_pid_file(void)
 	}
 }
 
+extern int usbip_driver_open(void);
+extern void usbip_driver_close(void);
+
 static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 {
 	struct addrinfo *ai_head;
@@ -491,7 +309,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 	struct timespec timeout;
 	sigset_t sigmask;
 
-	if (usbip_host_driver_open()) {
+	if (usbip_driver_open()) {
 		err("please load " USBIP_CORE_MOD_NAME ".ko and "
 		    USBIP_HOST_DRV_NAME ".ko!");
 		return -1;
@@ -500,7 +318,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 	if (daemonize) {
 		if (daemon(0, 0) < 0) {
 			err("daemonizing failed: %s", strerror(errno));
-			usbip_host_driver_close();
+			usbip_driver_close();
 			return -1;
 		}
 		umask(0);
@@ -525,7 +343,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 
 	ai_head = do_getaddrinfo(NULL, family);
 	if (!ai_head) {
-		usbip_host_driver_close();
+		usbip_driver_close();
 		return -1;
 	}
 	nsockfd = listen_all_addrinfo(ai_head, sockfdlist,
@@ -533,7 +351,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 	freeaddrinfo(ai_head);
 	if (nsockfd <= 0) {
 		err("failed to open a listening socket");
-		usbip_host_driver_close();
+		usbip_driver_close();
 		return -1;
 	}
 
@@ -574,7 +392,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 
 	info("shutting down " PROGNAME);
 	free(fds);
-	usbip_host_driver_close();
+	usbip_driver_close();
 
 	return 0;
 }
@@ -584,7 +402,6 @@ int main(int argc, char *argv[])
 	static const struct option longopts[] = {
 		{ "ipv4",     no_argument,       NULL, '4' },
 		{ "ipv6",     no_argument,       NULL, '6' },
-		{ "daemon",   no_argument,       NULL, 'D' },
 		{ "daemon",   no_argument,       NULL, 'D' },
 		{ "debug",    no_argument,       NULL, 'd' },
 		{ "pid",      optional_argument, NULL, 'P' },
@@ -636,7 +453,7 @@ int main(int argc, char *argv[])
 			cmd = cmd_help;
 			break;
 		case 'P':
-			pid_file = optarg ? optarg : DEFAULT_PID_FILE;
+			pid_file = optarg ? optarg : usbip_default_pid_file;
 			break;
 		case 't':
 			usbip_setup_port_number(optarg);

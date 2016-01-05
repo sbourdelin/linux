@@ -278,3 +278,19 @@ struct usbip_exported_device *usbip_host_get_device(int num)
 
 	return NULL;
 }
+
+struct usbip_exported_device *usbip_host_find_device(char *busid)
+{
+	struct list_head *i;
+	struct usbip_exported_device *edev;
+
+	list_for_each(i, &host_driver->edev_list) {
+		edev = list_entry(i, struct usbip_exported_device, node);
+		if (!strncmp(busid, edev->udev.busid, SYSFS_BUS_ID_SIZE)) {
+			return edev;
+		}
+	}
+
+	return NULL;
+}
+

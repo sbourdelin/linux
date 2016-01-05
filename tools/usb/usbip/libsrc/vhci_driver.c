@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2005-2007 Takahiro Hirofuchi
  */
 
 #include "usbip_common.h"
@@ -7,6 +8,8 @@
 #include <limits.h>
 #include <netdb.h>
 #include <libudev.h>
+#include <fcntl.h>
+#include <errno.h>
 #include "sysfs_utils.h"
 
 #undef  PROGNAME
@@ -215,6 +218,26 @@ static int read_record(int rhport, char *host, unsigned long host_len,
 	return 0;
 }
 
+#define OPEN_HC_MODE_FIRST	0
+#define OPEN_HC_MODE_REOPEN	1
+
+static int open_hc_device(int mode)
+{
+	if (mode == OPEN_HC_FLAG_REOPEN) {
+		udev_device_unref(vhci_driver->hc_device);
+	}
+
+	vhci_driver->hc_device =
+		udev_device_new_from_subsystem_sysname(udev_context,
+						       USBIP_VHCI_BUS_TYPE,
+						       USBIP_VHCI_DRV_NAME);
+	if (!vhci_driver->hc_device) {
+		err("udev_device_new_from_subsystem_sysname failed");
+		return -1;
+	}
+	return 0;
+}
+
 /* ---------------------------------------------------------------------- */
 
 int usbip_vhci_driver_open(void)
@@ -227,14 +250,8 @@ int usbip_vhci_driver_open(void)
 
 	vhci_driver = calloc(1, sizeof(struct usbip_vhci_driver));
 
-	/* will be freed in usbip_driver_close() */
-	vhci_driver->hc_device =
-		udev_device_new_from_subsystem_sysname(udev_context,
-						       USBIP_VHCI_BUS_TYPE,
-						       USBIP_VHCI_DRV_NAME);
-	if (!vhci_driver->hc_device) {
-		err("udev_device_new_from_subsystem_sysname failed");
-		goto err;
+	if (open_hc_device(OPEN_HC_MODE_FIRST)) {
+		goto err_free_driver;
 	}
 
 	vhci_driver->nports = get_nports();
@@ -242,13 +259,13 @@ int usbip_vhci_driver_open(void)
 	dbg("available ports: %d", vhci_driver->nports);
 
 	if (refresh_imported_device_list())
-		goto err;
+		goto err_unref_device;
 
 	return 0;
 
-err:
+err_unref_device:
 	udev_device_unref(vhci_driver->hc_device);
-
+err_free_driver:
 	if (vhci_driver)
 		free(vhci_driver);
 
@@ -277,7 +294,8 @@ void usbip_vhci_driver_close(void)
 
 int usbip_vhci_refresh_device_list(void)
 {
-
+	if (open_hc_device(OPEN_HC_MODE_REOPEN))
+		goto err;
 	if (refresh_imported_device_list())
 		goto err;
 
@@ -296,6 +314,34 @@ int usbip_vhci_get_free_port(void)
 	}
 
 	return -1;
+}
+
+struct usbip_imported_device *usbip_vhci_get_device(int port)
+{
+	for (int i = 0; i < vhci_driver->nports; i++) {
+		if (vhci_driver->idev[i].port == port)
+			return vhci_driver->idev + i;
+	}
+	return NULL;
+}
+
+struct usbip_imported_device *usbip_vhci_find_device(char *host, char *busid)
+{
+	int ret;
+	char rhost[NI_MAXHOST] = "unknown host";
+	char rserv[NI_MAXSERV] = "unknown port";
+	char rbusid[SYSFS_BUS_ID_SIZE];
+
+	for (int i = 0; i < vhci_driver->nports; i++) {
+		ret = read_record(vhci_driver->idev[i].port, rhost, NI_MAXHOST,
+				rserv, NI_MAXSERV, rbusid);
+		if (!ret &&
+			!strncmp(host, rhost, NI_MAXHOST) &&
+			!strncmp(busid, rbusid, SYSFS_BUS_ID_SIZE)) {
+			return vhci_driver->idev + i;
+		}
+	}
+	return NULL;
 }
 
 int usbip_vhci_attach_device2(uint8_t port, int sockfd, uint32_t devid,
@@ -406,6 +452,61 @@ int usbip_vhci_imported_device_dump(struct usbip_imported_device *idev)
 		printf("%10s -> remote bus/dev %03d/%03d\n", " ",
 		       idev->busnum, idev->devnum);
 	}
+
+	return 0;
+}
+
+#define MAX_BUFF 100
+int usbip_vhci_create_record(char *host, char *port, char *busid, int rhport)
+{
+	int fd;
+	char path[PATH_MAX+1];
+	char buff[MAX_BUFF+1];
+	int ret;
+
+	ret = mkdir(VHCI_STATE_PATH, 0700);
+	if (ret < 0) {
+		/* if VHCI_STATE_PATH exists, then it better be a directory */
+		if (errno == EEXIST) {
+			struct stat s;
+
+			ret = stat(VHCI_STATE_PATH, &s);
+			if (ret < 0)
+				return -1;
+			if (!(s.st_mode & S_IFDIR))
+				return -1;
+		} else
+			return -1;
+	}
+
+	snprintf(path, PATH_MAX, VHCI_STATE_PATH"/port%d", rhport);
+
+	fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU);
+	if (fd < 0)
+		return -1;
+
+	snprintf(buff, MAX_BUFF, "%s %s %s\n",
+			host, port, busid);
+
+	ret = write(fd, buff, strlen(buff));
+	if (ret != (ssize_t) strlen(buff)) {
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+int usbip_vhci_delete_record(int rhport)
+{
+	char path[PATH_MAX+1];
+
+	snprintf(path, PATH_MAX, VHCI_STATE_PATH"/port%d", rhport);
+
+	remove(path);
+	rmdir(VHCI_STATE_PATH);
 
 	return 0;
 }
