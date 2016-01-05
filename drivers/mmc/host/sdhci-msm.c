@@ -437,17 +437,14 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	u32 core_version, caps;
 	u8 core_major;
 
-	msm_host = devm_kzalloc(&pdev->dev, sizeof(*msm_host), GFP_KERNEL);
-	if (!msm_host)
-		return -ENOMEM;
-
-	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
-	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata, 0);
+	host = sdhci_pltfm_init(pdev, &msm_host->sdhci_msm_pdata,
+				sizeof(*msm_host));
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 
 	pltfm_host = sdhci_priv(host);
-	pltfm_host->priv = msm_host;
+	msm_host = sdhci_pltfm_priv(pltfm_host);
+	msm_host->sdhci_msm_pdata.ops = &sdhci_msm_ops;
 	msm_host->mmc = host->mmc;
 	msm_host->pdev = pdev;
 
@@ -570,7 +567,7 @@ static int sdhci_msm_remove(struct platform_device *pdev)
 {
 	struct sdhci_host *host = platform_get_drvdata(pdev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_msm_host *msm_host = pltfm_host->priv;
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
 	int dead = (readl_relaxed(host->ioaddr + SDHCI_INT_STATUS) ==
 		    0xffffffff);
 
