@@ -1257,6 +1257,7 @@ void r5l_exit_log(struct r5l_log *log)
 	md_unregister_thread(&log->reclaim_thread);
 	mempool_destroy(log->meta_pool);
 	bioset_free(log->bs);
+	mempool_destroy(log->io_pool);
 	kmem_cache_destroy(log->io_kc);
 	kfree(log);
 }
