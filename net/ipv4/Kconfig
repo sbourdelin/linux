@@ -430,7 +430,7 @@ config INET_TCP_DIAG
 
 config INET_UDP_DIAG
 	tristate "UDP: socket monitoring interface"
-	depends on INET_DIAG && (IPV6 || IPV6=n)
+	depends on INET_DIAG
 	default n
 	---help---
 	  Support for UDP socket monitoring interface used by the ss tool.
