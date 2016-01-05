@@ -372,8 +372,10 @@ int ext4_set_encryption_metadata(struct inode *inode,
 
 	handle = ext4_journal_start(inode, EXT4_HT_MISC,
 				    ext4_jbd2_credits_xattr(inode));
-	if (IS_ERR(handle))
-		return PTR_ERR(handle);
+	if (IS_ERR(handle)) {
+		res = PTR_ERR(handle);
+		goto errout;
+	}
 	res = ext4_xattr_set(inode, EXT4_XATTR_INDEX_ENCRYPTION,
 			     EXT4_XATTR_NAME_ENCRYPTION_CONTEXT, ctx,
 			     sizeof(struct ext4_encryption_context), 0);
