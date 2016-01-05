@@ -30,6 +30,7 @@
 #include "usbip_host_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_ux.h"
 #include "usbip.h"
 
 static const char usbip_disconnect_usage_string[] =
@@ -150,10 +151,12 @@ static int disconnect_device(char *host, char *busid)
 
 	close(sockfd);
 
-	rc = usbip_unbind_device(busid);
-	if (rc) {
-		err("unbind");
-		return -1;
+	if (!usbip_ux_installed()) {
+		rc = usbip_unbind_device(busid);
+		if (rc) {
+			err("unbind");
+			return -1;
+		}
 	}
 
 	return 0;

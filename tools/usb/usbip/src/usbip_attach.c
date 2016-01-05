@@ -32,6 +32,7 @@
 #include "vhci_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_ux.h"
 #include "usbip.h"
 
 static const char usbip_attach_usage_string[] =
@@ -130,31 +131,48 @@ static int query_import_device(int sockfd, char *busid)
 static int attach_device(char *host, char *busid)
 {
 	int sockfd;
+	usbip_ux_t *ux;
 	int rc;
 	int rhport;
 
 	sockfd = usbip_net_tcp_connect(host, usbip_port_string);
 	if (sockfd < 0) {
 		err("tcp connect");
-		return -1;
+		goto err_out;
+	}
+
+	rc = usbip_ux_setup(sockfd, &ux);
+	if (rc) {
+		err("ux setup");
+		goto err_close_conn;
 	}
 
 	rhport = query_import_device(sockfd, busid);
 	if (rhport < 0) {
 		err("query");
-		close(sockfd);
-		return -1;
+		goto err_cleanup_ux;
 	}
-
-	close(sockfd);
 
 	rc = usbip_vhci_create_record(host, usbip_port_string, busid, rhport);
 	if (rc < 0) {
 		err("record connection");
-		return -1;
+		goto err_cleanup_ux;
 	}
 
+	if (ux != NULL) {
+		usbip_ux_start(ux);
+		usbip_ux_join(ux);
+	}
+	usbip_ux_cleanup(&ux);
+	close(sockfd);
+
 	return 0;
+err_cleanup_ux:
+	usbip_ux_cleanup(&ux);
+err_close_conn:
+	close(sockfd);
+err_out:
+	return -1;
 }
 
 int usbip_attach(int argc, char *argv[])

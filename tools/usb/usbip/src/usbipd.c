@@ -43,6 +43,7 @@
 
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_ux.h"
 #include "list.h"
 
 extern char *usbip_progname;
@@ -55,7 +56,7 @@ extern char *usbip_default_pid_file;
 
 static const char usbip_version_string[] = PACKAGE_STRING;
 
-static const char usbipd_help_string[] =
+static const char usbipd_help_string =
 	"usage: %s [options]\n"
 	"\n"
 	"	-4, --ipv4\n"
@@ -152,6 +153,7 @@ int process_request(int listenfd)
 	if (childpid == 0) {
 		close(listenfd);
 		usbip_recv_pdu(connfd, host, port);
+		close(connfd);
 		exit(0);
 	}
 	close(connfd);
@@ -254,6 +256,7 @@ static struct addrinfo *do_getaddrinfo(char *host, int ai_family)
 static void signal_handler(int i)
 {
 	dbg("received '%s' signal", strsignal(i));
+	usbip_ux_interrupt_pgrp();
 }
 
 static void set_signal(void)
