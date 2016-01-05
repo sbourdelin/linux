@@ -1676,6 +1676,11 @@ found:
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      const struct intel_crtc_state *pipe_config)
 {
+	if (intel_dp->link_rate != pipe_config->port_clock ||
+	    intel_dp->lane_count != pipe_config->lane_count) {
+		intel_dp->train_set_valid = false;
+	}
+
 	intel_dp->link_rate = pipe_config->port_clock;
 	intel_dp->lane_count = pipe_config->lane_count;
 }

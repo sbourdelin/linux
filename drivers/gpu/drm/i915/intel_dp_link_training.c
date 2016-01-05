@@ -85,6 +85,9 @@ static bool
 intel_dp_reset_link_train(struct intel_dp *intel_dp,
 			uint8_t dp_train_pat)
 {
+	DRM_DEBUG_KMS("link training optimization: %s\n",
+		      yesno(intel_dp->train_set_valid));
+
 	if (!intel_dp->train_set_valid)
 		memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp_set_signal_levels(intel_dp);
