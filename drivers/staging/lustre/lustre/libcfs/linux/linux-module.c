@@ -98,30 +98,22 @@ int libcfs_ioctl_popdata(void *arg, void *data, int size)
 static int
 libcfs_psdev_open(struct inode *inode, struct file *file)
 {
-	int    rc = 0;
-
 	if (!inode)
 		return -EINVAL;
-	if (libcfs_psdev_ops.p_open != NULL)
-		rc = libcfs_psdev_ops.p_open(0, NULL);
-	else
-		return -EPERM;
-	return rc;
+
+	try_module_get(THIS_MODULE);
+	return 0;
 }
 
 /* called when closing /dev/device */
 static int
 libcfs_psdev_release(struct inode *inode, struct file *file)
 {
-	int    rc = 0;
-
 	if (!inode)
 		return -EINVAL;
-	if (libcfs_psdev_ops.p_close != NULL)
-		rc = libcfs_psdev_ops.p_close(0, NULL);
-	else
-		rc = -EPERM;
-	return rc;
+
+	module_put(THIS_MODULE);
+	return 0;
 }
 
 static long libcfs_ioctl(struct file *file,
