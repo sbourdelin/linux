@@ -1785,7 +1785,7 @@ static uint32_t ilk_compute_cur_wm(const struct intel_crtc_state *cstate,
 {
 	int bpp = pstate->base.fb ? pstate->base.fb->bits_per_pixel / 8 : 0;
 
-	if (!cstate->base.active || !pstate->visible)
+	if (!cstate->base.active)
 		return 0;
 
 	return ilk_wm_method2(ilk_pipe_pixel_rate(cstate),
