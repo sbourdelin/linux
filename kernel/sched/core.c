@@ -2159,6 +2159,9 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 
 	p->numa_group = NULL;
 #endif /* CONFIG_NUMA_BALANCING */
+#ifdef CONFIG_GETCPU_CACHE
+	INIT_LIST_HEAD(&p->getcpu_cache_head);
+#endif
 }
 
 DEFINE_STATIC_KEY_FALSE(sched_numa_balancing);

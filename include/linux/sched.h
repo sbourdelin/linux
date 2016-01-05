@@ -1375,6 +1375,11 @@ struct tlbflush_unmap_batch {
 	bool writable;
 };
 
+struct getcpu_cache_entry {
+	int32_t __user *cpu_cache;
+	struct list_head entry;
+};
+
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	void *stack;
@@ -1815,6 +1820,10 @@ struct task_struct {
 	unsigned long	task_state_change;
 #endif
 	int pagefault_disabled;
+#ifdef CONFIG_GETCPU_CACHE
+	/* list of struct getcpu_cache_entry */
+	struct list_head getcpu_cache_head;
+#endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
@@ -3190,5 +3199,39 @@ static inline unsigned long rlimit_max(unsigned int limit)
 {
 	return task_rlimit_max(current, limit);
 }
+
+#ifdef CONFIG_GETCPU_CACHE
+int getcpu_cache_fork(struct task_struct *t);
+void getcpu_cache_execve(struct task_struct *t);
+void getcpu_cache_exit(struct task_struct *t);
+void __getcpu_cache_handle_notify_resume(struct task_struct *t);
+static inline void getcpu_cache_set_notify_resume(struct task_struct *t)
+{
+	if (!list_empty(&t->getcpu_cache_head))
+		set_tsk_thread_flag(t, TIF_NOTIFY_RESUME);
+}
+static inline void getcpu_cache_handle_notify_resume(struct task_struct *t)
+{
+	if (!list_empty(&t->getcpu_cache_head))
+		__getcpu_cache_handle_notify_resume(t);
+}
+#else
+static inline int getcpu_cache_fork(struct task_struct *t)
+{
+	return 0;
+}
+static inline void getcpu_cache_execve(struct task_struct *t)
+{
+}
+static inline void getcpu_cache_exit(struct task_struct *t)
+{
+}
+static inline void getcpu_cache_set_notify_resume(struct task_struct *t)
+{
+}
+static inline void getcpu_cache_handle_notify_resume(struct task_struct *t)
+{
+}
+#endif
 
 #endif
