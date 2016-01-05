@@ -422,7 +422,7 @@ static struct device_driver *next_driver(struct klist_iter *i)
 	struct driver_private *drv_priv;
 
 	if (n) {
-		drv_priv = container_of(n, struct driver_private, knode_bus);
+		drv_priv = to_driver_private_bus(n);
 		return drv_priv->driver;
 	}
 	return NULL;
