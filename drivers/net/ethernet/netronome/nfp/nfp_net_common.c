@@ -1911,6 +1911,7 @@ static void nfp_net_set_rx_mode(struct net_device *netdev)
 static int nfp_net_change_mtu(struct net_device *netdev, int new_mtu)
 {
 	struct nfp_net *nn = netdev_priv(netdev);
+	int ret = 0;
 	u32 tmp;
 
 	nn_dbg(nn, "New MTU = %d\n", new_mtu);
@@ -1929,10 +1930,10 @@ static int nfp_net_change_mtu(struct net_device *netdev, int new_mtu)
 	/* restart if running */
 	if (netif_running(netdev)) {
 		nfp_net_netdev_close(netdev);
-		nfp_net_netdev_open(netdev);
+		ret = nfp_net_netdev_open(netdev);
 	}
 
-	return 0;
+	return ret;
 }
 
 static struct rtnl_link_stats64 *nfp_net_stat64(struct net_device *netdev,
