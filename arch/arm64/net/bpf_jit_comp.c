@@ -256,6 +256,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	const s32 imm = insn->imm;
 	const int i = insn - ctx->prog->insnsi;
 	const bool is64 = BPF_CLASS(code) == BPF_ALU64;
+	const int bits = is64 ? 64 : 32;
 	u8 jmp_cond;
 	s32 jmp_offset;
 
@@ -445,14 +446,20 @@ emit_bswap_uxt:
 		break;
 	case BPF_ALU | BPF_LSH | BPF_K:
 	case BPF_ALU64 | BPF_LSH | BPF_K:
+		if (imm < 0 || imm >= bits)
+			return -EINVAL;
 		emit(A64_LSL(is64, dst, dst, imm), ctx);
 		break;
 	case BPF_ALU | BPF_RSH | BPF_K:
 	case BPF_ALU64 | BPF_RSH | BPF_K:
+		if (imm < 0 || imm >= bits)
+			return -EINVAL;
 		emit(A64_LSR(is64, dst, dst, imm), ctx);
 		break;
 	case BPF_ALU | BPF_ARSH | BPF_K:
 	case BPF_ALU64 | BPF_ARSH | BPF_K:
+		if (imm < 0 || imm >= bits)
+			return -EINVAL;
 		emit(A64_ASR(is64, dst, dst, imm), ctx);
 		break;
 
