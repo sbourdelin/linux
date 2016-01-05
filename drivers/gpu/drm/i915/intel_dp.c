@@ -129,6 +129,7 @@ static void edp_panel_vdd_off(struct intel_dp *intel_dp, bool sync);
 static void vlv_init_panel_power_sequencer(struct intel_dp *intel_dp);
 static void vlv_steal_power_sequencer(struct drm_device *dev,
 				      enum pipe pipe);
+static void intel_dp_unset_edid(struct intel_dp *intel_dp);
 
 static unsigned int intel_dp_unused_lane_mask(int lane_count)
 {
@@ -4587,6 +4588,7 @@ intel_dp_set_edid(struct intel_dp *intel_dp)
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
 	struct edid *edid;
 
+	intel_dp_unset_edid(intel_dp);
 	edid = intel_dp_get_edid(intel_dp);
 	intel_connector->detect_edid = edid;
 
@@ -4607,9 +4609,10 @@ intel_dp_unset_edid(struct intel_dp *intel_dp)
 	intel_dp->has_audio = false;
 }
 
-static enum drm_connector_status
-intel_dp_detect(struct drm_connector *connector, bool force)
+static void
+intel_dp_long_pulse(struct intel_connector *intel_connector)
 {
+	struct drm_connector *connector = &intel_connector->base;
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct intel_encoder *intel_encoder = &intel_dig_port->base;
@@ -4618,17 +4621,6 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	enum intel_display_power_domain power_domain;
 	bool ret;
 	u8 sink_irq_vector;
-
-	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
-		      connector->base.id, connector->name);
-	intel_dp_unset_edid(intel_dp);
-
-	if (intel_dp->is_mst) {
-		/* MST devices are disconnected from a monitor POV */
-		if (intel_encoder->type != INTEL_OUTPUT_EDP)
-			intel_encoder->type = INTEL_OUTPUT_DISPLAYPORT;
-		return connector_status_disconnected;
-	}
 
 	power_domain = intel_display_port_aux_power_domain(intel_encoder);
 	intel_display_power_get(to_i915(dev), power_domain);
@@ -4653,14 +4645,8 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	intel_dp_probe_oui(intel_dp);
 
 	ret = intel_dp_probe_mst(intel_dp);
-	if (ret) {
-		/* if we are in MST mode then this connector
-		   won't appear connected or have anything with EDID on it */
-		if (intel_encoder->type != INTEL_OUTPUT_EDP)
-			intel_encoder->type = INTEL_OUTPUT_DISPLAYPORT;
-		status = connector_status_disconnected;
+	if (ret)
 		goto out;
-	}
 
 	/*
 	 * Clearing NACK and defer counts to get their exact values
@@ -4691,8 +4677,36 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 	}
 
 out:
+	if (status != connector_status_connected)
+		intel_dp_unset_edid(intel_dp);
 	intel_display_power_put(to_i915(dev), power_domain);
-	return status;
+	return;
+}
+
+static enum drm_connector_status
+intel_dp_detect(struct drm_connector *connector, bool force)
+{
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *intel_encoder = &intel_dig_port->base;
+	struct intel_connector *intel_connector = to_intel_connector(connector);
+
+	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
+		     connector->base.id, connector->name);
+
+	if (intel_dp->is_mst) {
+		/* MST devices are disconnected from a monitor POV */
+		if (intel_encoder->type != INTEL_OUTPUT_EDP)
+			intel_encoder->type = INTEL_OUTPUT_DISPLAYPORT;
+		return connector_status_disconnected;
+	}
+
+	intel_dp_long_pulse(intel_dp->attached_connector);
+
+	if (intel_connector->detect_edid)
+		return connector_status_connected;
+	else
+		return connector_status_disconnected;
 }
 
 static void
