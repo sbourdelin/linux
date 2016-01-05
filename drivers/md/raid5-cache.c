@@ -494,19 +494,19 @@ int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 	mutex_lock(&log->io_mutex);
 	/* meta + data */
 	reserve = (1 + write_disks) << (PAGE_SHIFT - 9);
-	if (!r5l_has_free_space(log, reserve)) {
-		spin_lock(&log->no_space_stripes_lock);
-		list_add_tail(&sh->log_list, &log->no_space_stripes);
-		spin_unlock(&log->no_space_stripes_lock);
-
-		r5l_wake_reclaim(log, reserve);
-
+	if (r5l_has_free_space(log, reserve)) {
 		ret = r5l_log_stripe(log, sh, data_pages, parity_pages);
 		if (ret) {
 			spin_lock_irq(&log->io_list_lock);
 			list_add_tail(&sh->log_list, &log->no_mem_stripes);
 			spin_unlock_irq(&log->io_list_lock);
 		}
+	} else {
+		spin_lock(&log->no_space_stripes_lock);
+		list_add_tail(&sh->log_list, &log->no_space_stripes);
+		spin_unlock(&log->no_space_stripes_lock);
+
+		r5l_wake_reclaim(log, reserve);
 	}
 
 	mutex_unlock(&log->io_mutex);
