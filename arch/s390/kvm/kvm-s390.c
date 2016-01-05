@@ -1195,7 +1195,6 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 		    (__u64) vcpu->arch.sie_block)
 			vcpu->kvm->arch.sca->cpu[vcpu->vcpu_id].sda = 0;
 	}
-	smp_mb();
 
 	if (kvm_is_ucontrol(vcpu->kvm))
 		gmap_free(vcpu->arch.gmap);
