@@ -47,7 +47,8 @@ int  usbip_vhci_refresh_device_list(void);
 
 int usbip_vhci_get_free_port(void);
 struct usbip_imported_device *usbip_vhci_get_device(int port);
-struct usbip_imported_device *usbip_vhci_find_device(char *host, char *busid);
+struct usbip_imported_device *usbip_vhci_find_device(
+                const char *host, const char *busid);
 int usbip_vhci_attach_device2(uint8_t port, int sockfd, uint32_t devid,
 		uint32_t speed);
 
@@ -57,7 +58,8 @@ int usbip_vhci_attach_device(uint8_t port, int sockfd, uint8_t busnum,
 
 int usbip_vhci_detach_device(uint8_t port);
 
-int usbip_vhci_create_record(char *host, char *port, char *busid, int rhport);
+int usbip_vhci_create_record(const char *host, const char *port,
+		const char *busid, int rhport);
 int usbip_vhci_delete_record(int rhport);
 
 int usbip_vhci_imported_device_dump(struct usbip_imported_device *idev);

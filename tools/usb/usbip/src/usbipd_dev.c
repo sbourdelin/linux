@@ -224,7 +224,7 @@ static int recv_request_devlist(usbip_sock_t *sock)
 	return 0;
 }
 
-int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port)
+int usbip_recv_pdu(usbip_sock_t *sock, const char *host, const char *port)
 {
 	uint16_t code = OP_UNSPEC;
 	int ret;

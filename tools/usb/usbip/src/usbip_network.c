@@ -222,7 +222,8 @@ int usbip_net_set_reuseaddr(int sockfd)
 	const int val = 1;
 	int ret;
 
-	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
+			 (const void*)&val, sizeof(val));
 	if (ret < 0)
 		dbg("setsockopt: SO_REUSEADDR");
 
@@ -234,7 +235,8 @@ int usbip_net_set_nodelay(int sockfd)
 	const int val = 1;
 	int ret;
 
-	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
+	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY,
+			 (const void*)&val, sizeof(val));
 	if (ret < 0)
 		dbg("setsockopt: TCP_NODELAY");
 
@@ -246,7 +248,8 @@ int usbip_net_set_keepalive(int sockfd)
 	const int val = 1;
 	int ret;
 
-	ret = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+	ret = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE,
+			 (const void*)&val, sizeof(val));
 	if (ret < 0)
 		dbg("setsockopt: SO_KEEPALIVE");
 
@@ -258,7 +261,8 @@ int usbip_net_set_v6only(int sockfd)
 	const int val = 1;
 	int ret;
 
-	ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &val, sizeof(val));
+	ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY,
+			 (const void*)&val, sizeof(val));
 	if (ret < 0)
 		dbg("setsockopt: IPV6_V6ONLY");
 

@@ -23,6 +23,8 @@
  *
  *	Copyright (C) 2005 Takahiro Hirofuchi
  *		- names_deinit() is added.
+ *	Copyright (C) 2015 Nobuo Iwata
+ *		- some modifications for portability.
  *
  */
 
@@ -38,7 +40,6 @@
 #include <ctype.h>
 
 #include "names.h"
-#include "usbip_common.h"
 
 struct vendor {
 	struct vendor *next;
@@ -52,8 +53,8 @@ struct product {
 	char name[1];
 };
 
-struct class {
-	struct class *next;
+struct clazz {
+	struct clazz *next;
 	u_int8_t classid;
 	char name[1];
 };
@@ -94,7 +95,7 @@ static unsigned int hashnum(unsigned int num)
 
 static struct vendor *vendors[HASHSZ] = { NULL, };
 static struct product *products[HASHSZ] = { NULL, };
-static struct class *classes[HASHSZ] = { NULL, };
+static struct clazz *classes[HASHSZ] = { NULL, };
 static struct subclass *subclasses[HASHSZ] = { NULL, };
 static struct protocol *protocols[HASHSZ] = { NULL, };
 
@@ -122,7 +123,7 @@ const char *names_product(u_int16_t vendorid, u_int16_t productid)
 
 const char *names_class(u_int8_t classid)
 {
-	struct class *c;
+	struct clazz *c;
 
 	c = classes[hashnum(classid)];
 	for (; c; c = c->next)
@@ -247,14 +248,14 @@ static int new_product(const char *name, u_int16_t vendorid,
 
 static int new_class(const char *name, u_int8_t classid)
 {
-	struct class *c;
+	struct clazz *c;
 	unsigned int h = hashnum(classid);
 
 	c = classes[h];
 	for (; c; c = c->next)
 		if (c->classid == classid)
 			return -1;
-	c = my_malloc(sizeof(struct class) + strlen(name));
+	c = my_malloc(sizeof(struct clazz) + strlen(name));
 	if (!c)
 		return -1;
 	strcpy(c->name, name);

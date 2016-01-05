@@ -98,7 +98,7 @@ static int send_export_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 	return 0;
 }
 
-static int export_device(char *busid, usbip_sock_t *sock)
+static int export_device(const char *busid, usbip_sock_t *sock)
 {
 	int rc;
 	struct usbip_exported_device *edev;
@@ -142,7 +142,7 @@ static int export_device(char *busid, usbip_sock_t *sock)
 	return 0;
 }
 
-int usbip_connect_device(char *host, char *port, char *busid)
+int usbip_connect_device(const char *host, const char *port, const char *busid)
 {
 	usbip_sock_t *sock;
 	usbip_ux_t *ux;

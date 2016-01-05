@@ -44,7 +44,7 @@ void usbip_unbind_usage(void)
 }
 #endif
 
-int usbip_unbind_device(char *busid)
+int usbip_unbind_device(const char *busid)
 {
 	char bus_type[] = "usb";
 	int rc, ret = -1;

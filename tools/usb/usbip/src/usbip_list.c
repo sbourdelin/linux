@@ -48,7 +48,7 @@ void usbip_list_usage(void)
 }
 #endif
 
-static int get_importable_devices(char *host, usbip_sock_t *sock)
+static int get_importable_devices(const char *host, usbip_sock_t *sock)
 {
 	char product_name[100];
 	char class_name[100];
@@ -130,7 +130,7 @@ static int get_importable_devices(char *host, usbip_sock_t *sock)
 	return 0;
 }
 
-int usbip_list_importable_devices(char *host, char* port)
+int usbip_list_importable_devices(const char *host, const char *port)
 {
 	int rc;
 	usbip_sock_t *sock;
@@ -156,7 +156,6 @@ int usbip_list_importable_devices(char *host, char* port)
 	usbip_names_free();
 
 	return 0;
-
 err_conn_close:
 	usbip_conn_ops.close(sock);
 err_names_free:
@@ -173,7 +172,7 @@ static void print_device(const char *busid, const char *vendor,
 		printf(" - busid %s (%.4s:%.4s)\n", busid, vendor, product);
 }
 
-static void print_product_name(char *product_name, int parsable)
+static void print_product_name(const char *product_name, int parsable)
 {
 	if (!parsable)
 		printf("   %s\n", product_name);
