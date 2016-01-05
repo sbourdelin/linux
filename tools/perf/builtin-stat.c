@@ -1826,6 +1826,7 @@ int cmd_stat(int argc, const char **argv, const char *prefix __maybe_unused)
 		csv_output = true;
 		if (!strcmp(csv_sep, "\\t"))
 			csv_sep = "\t";
+		setlocale(LC_NUMERIC, "C");
 	} else
 		csv_sep = DEFAULT_SEPARATOR;
 
