@@ -44,14 +44,9 @@
 #include "addr.h"
 #include "node.h"
 #include <net/genetlink.h>
+#include "netlink.h"
 
 #define TIPC_NAMETBL_SIZE 1024		/* must be a power of 2 */
-
-static const struct nla_policy
-tipc_nl_name_table_policy[TIPC_NLA_NAME_TABLE_MAX + 1] = {
-	[TIPC_NLA_NAME_TABLE_UNSPEC]	= { .type = NLA_UNSPEC },
-	[TIPC_NLA_NAME_TABLE_PUBL]	= { .type = NLA_NESTED }
-};
 
 /**
  * struct name_info - name sequence publication info

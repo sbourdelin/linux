@@ -42,18 +42,7 @@
 #include "node.h"
 #include "net.h"
 #include <net/genetlink.h>
-
-static const struct nla_policy tipc_nl_policy[TIPC_NLA_MAX + 1] = {
-	[TIPC_NLA_UNSPEC]	= { .type = NLA_UNSPEC, },
-	[TIPC_NLA_BEARER]	= { .type = NLA_NESTED, },
-	[TIPC_NLA_SOCK]		= { .type = NLA_NESTED, },
-	[TIPC_NLA_PUBL]		= { .type = NLA_NESTED, },
-	[TIPC_NLA_LINK]		= { .type = NLA_NESTED, },
-	[TIPC_NLA_MEDIA]	= { .type = NLA_NESTED, },
-	[TIPC_NLA_NODE]		= { .type = NLA_NESTED, },
-	[TIPC_NLA_NET]		= { .type = NLA_NESTED, },
-	[TIPC_NLA_NAME_TABLE]	= { .type = NLA_NESTED, }
-};
+#include "netlink.h"
 
 /* Users of the legacy API (tipc-config) can't handle that we add operations,
  * so we have a separate genl handling for the new API.
