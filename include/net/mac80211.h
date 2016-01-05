@@ -5408,12 +5408,14 @@ void ieee80211_report_wowlan_wakeup(struct ieee80211_vif *vif,
  * @skb: frame to be sent from within the driver
  * @band: the band to transmit on
  * @sta: optional pointer to get the station to send the frame to
+ * @use_minrate: use lowest rate
  *
  * Note: must be called under RCU lock
  */
 bool ieee80211_tx_prepare_skb(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif, struct sk_buff *skb,
-			      int band, struct ieee80211_sta **sta);
+			      int band, struct ieee80211_sta **sta,
+			      bool use_minrate);
 
 /**
  * struct ieee80211_noa_data - holds temporary data for tracking P2P NoA state

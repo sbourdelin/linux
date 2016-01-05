@@ -1513,7 +1513,8 @@ static int invoke_tx_handlers(struct ieee80211_tx_data *tx)
 
 bool ieee80211_tx_prepare_skb(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif, struct sk_buff *skb,
-			      int band, struct ieee80211_sta **sta)
+			      int band, struct ieee80211_sta **sta,
+			      bool use_minrate)
 {
 	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
@@ -1526,6 +1527,9 @@ bool ieee80211_tx_prepare_skb(struct ieee80211_hw *hw,
 	info->band = band;
 	info->control.vif = vif;
 	info->hw_queue = vif->hw_queue[skb_get_queue_mapping(skb)];
+
+	if (use_minrate)
+		info->flags |= IEEE80211_TX_CTL_USE_MINRATE;
 
 	if (invoke_tx_handlers(&tx))
 		return false;
