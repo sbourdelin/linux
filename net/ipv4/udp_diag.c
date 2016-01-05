@@ -35,35 +35,29 @@ static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
 			const struct nlmsghdr *nlh,
 			const struct inet_diag_req_v2 *req)
 {
-	int err = -EINVAL;
-	struct sock *sk;
+	struct sock *aux, *sk = NULL;
 	struct sk_buff *rep;
 	struct net *net = sock_net(in_skb->sk);
+	unsigned short hnum = ntohs(req->id.idiag_dport);
+	unsigned int slot = udp_hashfn(net, hnum, tbl->mask);
+	struct udp_hslot *hslot = &tbl->hash[slot];
+	struct hlist_nulls_node *node;
+	int err = -ENOENT;
 
-	if (req->sdiag_family == AF_INET)
-		sk = __udp4_lib_lookup(net,
-				req->id.idiag_src[0], req->id.idiag_sport,
-				req->id.idiag_dst[0], req->id.idiag_dport,
-				req->id.idiag_if, tbl, NULL);
-#if IS_ENABLED(CONFIG_IPV6)
-	else if (req->sdiag_family == AF_INET6)
-		sk = __udp6_lib_lookup(net,
-				(struct in6_addr *)req->id.idiag_src,
-				req->id.idiag_sport,
-				(struct in6_addr *)req->id.idiag_dst,
-				req->id.idiag_dport,
-				req->id.idiag_if, tbl, NULL);
-#endif
-	else
-		goto out_nosk;
-
-	err = -ENOENT;
+	spin_lock_bh(&hslot->lock);
+	sk_nulls_for_each(aux, node, &hslot->head) {
+		if (net_eq(sock_net(aux), net) &&
+		    !sock_diag_check_cookie(aux, req->id.idiag_cookie) &&
+		    (req->sdiag_family == AF_UNSPEC ||
+		     req->sdiag_family == aux->sk_family)) {
+			sk = aux;
+			sock_hold(sk);
+			break;
+		}
+	}
+	spin_unlock_bh(&hslot->lock);
 	if (!sk)
 		goto out_nosk;
-
-	err = sock_diag_check_cookie(sk, req->id.idiag_cookie);
-	if (err)
-		goto out;
 
 	err = -ENOMEM;
 	rep = nlmsg_new(sizeof(struct inet_diag_msg) +
