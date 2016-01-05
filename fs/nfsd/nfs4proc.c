@@ -2285,6 +2285,75 @@ static struct nfsd4_operation nfsd4_ops[] = {
 	},
 };
 
+/**
+ * nfsd4_spo_must_allow - Determine if the compound op contains an
+ * operation that is allowed to be sent with machine credentials
+ *
+ * @rqstp: a pointer to the struct svc_rqst
+ *
+ * nfsd4_spo_must_allow() allows check_nfsd_access() to succeed
+ * when the operation and/or the FH+operation(s) is part of what the
+ * client negotiated to be able to send with machine credentials.
+ * We keep some state so that FH+operation(s) can succeed despite
+ * check_nfsd_access() being called from fh_verify() as well as
+ * nfsd4_proc_compound().
+ */
+
+bool nfsd4_spo_must_allow(struct svc_rqst *rqstp)
+{
+	struct nfsd4_compoundres *resp = rqstp->rq_resp;
+	struct nfsd4_compoundargs *argp = rqstp->rq_argp;
+	struct nfsd4_op *this = &argp->ops[resp->opcnt - 1];
+	struct nfsd4_compound_state *cstate = &resp->cstate;
+	struct nfsd4_operation *thisd;
+	struct nfs4_op_map *allow = &cstate->clp->cl_spo_must_allow;
+	u32 opiter;
+
+	if (!cstate->minorversion)
+		return false;
+
+	thisd = OPDESC(this);
+
+	if (!(thisd->op_flags & OP_IS_PUTFH_LIKE)) {
+		if (cstate->spo_must_allowed == true)
+			/*
+			 * a prior putfh + op has set
+			 * spo_must_allow conditions
+			 */
+			return true;
+		/* evaluate op against spo_must_allow with no prior putfh */
+		if (test_bit(this->opnum, allow->u.longs) &&
+			cstate->clp->cl_mach_cred &&
+			nfsd4_mach_creds_match(cstate->clp, rqstp))
+			return true;
+		else
+			return false;
+	}
+	/*
+	 * this->opnum has PUTFH ramifications
+	 * scan forward to next putfh or end of compound op
+	 */
+	opiter = resp->opcnt;
+	while (opiter < argp->opcnt) {
+		this = &argp->ops[opiter++];
+		thisd = OPDESC(this);
+		if (thisd->op_flags & OP_IS_PUTFH_LIKE)
+			break;
+		if (test_bit(this->opnum, allow->u.longs) &&
+			cstate->clp->cl_mach_cred &&
+			nfsd4_mach_creds_match(cstate->clp, rqstp)) {
+			/*
+			 * the op covered by the fh is a
+			 * spo_must_allow operation
+			 */
+			cstate->spo_must_allowed = true;
+			return true;
+		}
+	}
+	cstate->spo_must_allowed = false;
+	return false;
+}
+
 int nfsd4_max_reply(struct svc_rqst *rqstp, struct nfsd4_op *op)
 {
 	struct nfsd4_operation *opdesc;
