@@ -104,7 +104,7 @@ static unsigned int blk_flush_policy(struct request *rq)
 		policy |= REQ_FSEQ_DATA;
 
 	if (blk_queue_flush(q)) {
-		if (rq->cmd_flags & REQ_FLUSH)
+		if (rq->cmd_flags & REQ_PREFLUSH)
 			policy |= REQ_FSEQ_PREFLUSH;
 		if (!blk_queue_fua(q) && (rq->cmd_flags & REQ_FUA))
 			policy |= REQ_FSEQ_POSTFLUSH;
@@ -393,7 +393,7 @@ void blk_insert_flush(struct request *rq)
 	 * @policy now records what operations need to be done.  Adjust
 	 * REQ_FLUSH and FUA for the driver.
 	 */
-	rq->cmd_flags &= ~REQ_FLUSH;
+	rq->cmd_flags &= ~REQ_PREFLUSH;
 	if (!blk_queue_fua(q))
 		rq->cmd_flags &= ~REQ_FUA;
 
