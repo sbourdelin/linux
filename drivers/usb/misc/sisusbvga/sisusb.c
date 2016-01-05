@@ -3054,10 +3054,9 @@ static int sisusb_probe(struct usb_interface *intf,
 
 	/* Allocate memory for our private */
 	sisusb = kzalloc(sizeof(*sisusb), GFP_KERNEL);
-	if (!sisusb) {
-		dev_err(&dev->dev, "Failed to allocate memory for private data\n");
+	if (!sisusb)
 		return -ENOMEM;
-	}
+
 	kref_init(&sisusb->kref);
 
 	mutex_init(&(sisusb->lock));
@@ -3084,7 +3083,6 @@ static int sisusb_probe(struct usb_interface *intf,
 	sisusb->ibufsize = SISUSB_IBUF_SIZE;
 	sisusb->ibuf = kmalloc(SISUSB_IBUF_SIZE, GFP_KERNEL);
 	if (!sisusb->ibuf) {
-		dev_err(&sisusb->sisusb_dev->dev, "Failed to allocate memory for input buffer");
 		retval = -ENOMEM;
 		goto error_2;
 	}
@@ -3095,7 +3093,6 @@ static int sisusb_probe(struct usb_interface *intf,
 		sisusb->obuf[i] = kmalloc(SISUSB_OBUF_SIZE, GFP_KERNEL);
 		if (!sisusb->obuf[i]) {
 			if (i == 0) {
-				dev_err(&sisusb->sisusb_dev->dev, "Failed to allocate memory for output buffer\n");
 				retval = -ENOMEM;
 				goto error_3;
 			}
@@ -3133,7 +3130,8 @@ static int sisusb_probe(struct usb_interface *intf,
 	/* Allocate our SiS_Pr */
 	sisusb->SiS_Pr = kmalloc(sizeof(struct SiS_Private), GFP_KERNEL);
 	if (!sisusb->SiS_Pr) {
-		dev_err(&sisusb->sisusb_dev->dev, "Failed to allocate SiS_Pr\n");
+		retval = -ENOMEM;
+		goto error_4;
 	}
 #endif
 
