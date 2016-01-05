@@ -204,6 +204,8 @@ struct mddev {
 #define MD_RELOAD_SB	7	/* Reload the superblock because another node
 				 * updated it.
 				 */
+#define MD_JOURNAL_NOT_INITIALIZED 8 /* hot add a journal, and journal isn't
+				      * ready to use yet */
 
 	int				suspended;
 	atomic_t			active_io;

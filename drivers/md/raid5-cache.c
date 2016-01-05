@@ -859,9 +859,17 @@ bool r5l_log_disk_error(struct r5conf *conf)
 	rcu_read_lock();
 	log = rcu_dereference(conf->log);
 
-	if (!log)
-		ret = test_bit(MD_HAS_JOURNAL, &conf->mddev->flags);
-	else
+	if (!log) {
+		ret = test_bit(MD_HAS_JOURNAL, &conf->mddev->flags) &&
+		      !test_bit(MD_JOURNAL_NOT_INITIALIZED, &conf->mddev->flags);
+		smp_mb__after_atomic();
+		/*
+		 * r5l_init_log sets ->log first and then clear INITIALIZED, we
+		 * check in reverse order to avoid race condition.
+		 */
+		log = rcu_dereference(conf->log);
+	}
+	if (log)
 		ret = test_bit(Faulty, &log->rdev->flags);
 	rcu_read_unlock();
 	return ret;
@@ -1242,6 +1250,8 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 		goto error;
 
 	rcu_assign_pointer(conf->log, log);
+	smp_mb__before_atomic();
+	clear_bit(MD_JOURNAL_NOT_INITIALIZED, &conf->mddev->flags);
 	return 0;
 
 error:

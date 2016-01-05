@@ -6895,8 +6895,16 @@ static int md_ioctl(struct block_device *bdev, fmode_t mode,
 			else if (!(info.state & (1<<MD_DISK_SYNC)))
 				/* Need to clear read-only for this */
 				break;
-			else
+			else {
+				if ((info.state & (1<<MD_DISK_JOURNAL)) &&
+				    !test_bit(MD_HAS_JOURNAL, &mddev->flags))
+					set_bit(MD_JOURNAL_NOT_INITIALIZED,
+						&mddev->flags);
 				err = add_new_disk(mddev, &info);
+				if (err)
+					clear_bit(MD_JOURNAL_NOT_INITIALIZED,
+						&mddev->flags);
+			}
 			goto unlock;
 		}
 		break;
