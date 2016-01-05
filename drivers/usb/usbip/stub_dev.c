@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +59,6 @@ static ssize_t store_sockfd(struct device *dev, struct device_attribute *attr,
 {
 	struct stub_device *sdev = dev_get_drvdata(dev);
 	int sockfd = 0;
-	struct socket *socket;
 	int rv;
 
 	if (!sdev) {
@@ -71,8 +71,6 @@ static ssize_t store_sockfd(struct device *dev, struct device_attribute *attr,
 		return -EINVAL;
 
 	if (sockfd != -1) {
-		int err;
-
 		dev_info(dev, "stub up\n");
 
 		spin_lock_irq(&sdev->ud.lock);
@@ -82,11 +80,9 @@ static ssize_t store_sockfd(struct device *dev, struct device_attribute *attr,
 			goto err;
 		}
 
-		socket = sockfd_lookup(sockfd, &err);
-		if (!socket)
+		rv = usbip_trx_ops->link(&sdev->ud, sockfd);
+		if (rv)
 			goto err;
-
-		sdev->ud.tcp_socket = socket;
 
 		spin_unlock_irq(&sdev->ud.lock);
 
@@ -162,11 +158,7 @@ static void stub_shutdown_connection(struct usbip_device *ud)
 	 * sk_wait_data returned though stub_rx thread was already finished by
 	 * step 1?
 	 */
-	if (ud->tcp_socket) {
-		dev_dbg(&sdev->udev->dev, "shutdown tcp_socket %p\n",
-			ud->tcp_socket);
-		kernel_sock_shutdown(ud->tcp_socket, SHUT_RDWR);
-	}
+	usbip_trx_ops->unlink(ud);
 
 	/* 1. stop threads */
 	if (ud->tcp_rx) {

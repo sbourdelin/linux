@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -322,7 +323,7 @@ void usbip_dump_header(struct usbip_header *pdu)
 EXPORT_SYMBOL_GPL(usbip_dump_header);
 
 /* Receive data over TCP/IP. */
-int usbip_recv(struct socket *sock, void *buf, int size)
+int usbip_recv(struct usbip_device *ud, void *buf, int size)
 {
 	int result;
 	struct msghdr msg;
@@ -335,26 +336,28 @@ int usbip_recv(struct socket *sock, void *buf, int size)
 
 	usbip_dbg_xmit("enter\n");
 
-	if (!sock || !buf || !size) {
-		pr_err("invalid arg, sock %p buff %p size %d\n", sock, buf,
-		       size);
+	if ((!ud->tcp_socket && !ud->ux) || !buf || !size) {
+		pr_err("invalid arg, sock %p ux %p buff %p size %d\n",
+			ud->tcp_socket, ud->ux, buf, size);
 		return -EINVAL;
 	}
 
 	do {
-		sock->sk->sk_allocation = GFP_NOIO;
 		iov.iov_base    = buf;
 		iov.iov_len     = size;
-		msg.msg_name    = NULL;
-		msg.msg_namelen = 0;
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
-		msg.msg_flags      = MSG_NOSIGNAL;
+		if (usbip_trx_ops->mode == USBIP_TRX_MODE_KERNEL) {
+			ud->tcp_socket->sk->sk_allocation = GFP_NOIO;
+			msg.msg_name    = NULL;
+			msg.msg_namelen = 0;
+			msg.msg_control = NULL;
+			msg.msg_controllen = 0;
+			msg.msg_flags      = MSG_NOSIGNAL;
+		}
 
-		result = kernel_recvmsg(sock, &msg, &iov, 1, size, MSG_WAITALL);
+		result = usbip_trx_ops->recvmsg(ud, &msg, &iov, 1, size, MSG_WAITALL);
 		if (result <= 0) {
-			pr_debug("receive sock %p buf %p size %u ret %d total %d\n",
-				 sock, buf, size, result, total);
+			pr_debug("receive sock %p ux %p buf %p size %u ret %d total %d\n",
+				 ud->tcp_socket, ud->ux, buf, size, result, total);
 			goto err;
 		}
 
@@ -637,7 +640,7 @@ int usbip_recv_iso(struct usbip_device *ud, struct urb *urb)
 	if (!buff)
 		return -ENOMEM;
 
-	ret = usbip_recv(ud->tcp_socket, buff, size);
+	ret = usbip_recv(ud, buff, size);
 	if (ret != size) {
 		dev_err(&urb->dev->dev, "recv iso_frame_descriptor, %d\n",
 			ret);
@@ -741,7 +744,7 @@ int usbip_recv_xbuff(struct usbip_device *ud, struct urb *urb)
 	if (!(size > 0))
 		return 0;
 
-	ret = usbip_recv(ud->tcp_socket, urb->transfer_buffer, size);
+	ret = usbip_recv(ud, urb->transfer_buffer, size);
 	if (ret != size) {
 		dev_err(&urb->dev->dev, "recv xbuf, %d\n", ret);
 		if (ud->side == USBIP_STUB) {
@@ -755,6 +758,52 @@ int usbip_recv_xbuff(struct usbip_device *ud, struct urb *urb)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(usbip_recv_xbuff);
+
+static int usbip_kernel_sendmsg(struct usbip_device *udev,
+        struct msghdr *msg, struct kvec *vec, size_t num, size_t len)
+{
+        return kernel_sendmsg(udev->tcp_socket, msg, vec,  num, len);
+}
+
+static int usbip_kernel_recvmsg(struct usbip_device *udev,
+        struct msghdr *msg, struct kvec *vec, size_t num, size_t len, int flags)
+{
+        return kernel_recvmsg(udev->tcp_socket, msg, vec, num, len, flags);
+}
+
+int usbip_kernel_link(struct usbip_device *udev, int sockfd)
+{
+	int err;
+
+        udev->tcp_socket = sockfd_lookup(sockfd, &err);
+        if (udev->tcp_socket == NULL) {
+                pr_debug("Fail to link sock %d\n", sockfd);
+                return -EINVAL;
+        }
+        return 0;
+}
+EXPORT_SYMBOL_GPL(usbip_kernel_link);
+
+static int usbip_kernel_unlink(struct usbip_device *udev)
+{
+        if (!udev->tcp_socket) {
+                pr_debug("Fail to unlink sock %p\n", udev->tcp_socket);
+                return -EBADF;
+        }
+        pr_debug("shutting down tcp_socket %p\n", udev->tcp_socket);
+        return kernel_sock_shutdown(udev->tcp_socket, SHUT_RDWR);
+}
+
+static struct usbip_trx_operations usbip_trx_kernel_ops = {
+	.mode = USBIP_TRX_MODE_KERNEL,
+	.sendmsg = usbip_kernel_sendmsg,
+	.recvmsg = usbip_kernel_recvmsg,
+	.link = usbip_kernel_link,
+	.unlink = usbip_kernel_unlink,
+};
+
+struct usbip_trx_operations *usbip_trx_ops = &usbip_trx_kernel_ops;
+EXPORT_SYMBOL_GPL(usbip_trx_ops);
 
 static int __init usbip_core_init(void)
 {

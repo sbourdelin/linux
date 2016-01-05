@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,6 +31,7 @@
 #include <linux/usb.h>
 #include <linux/wait.h>
 #include <uapi/linux/usbip.h>
+#include "usbip_ux.h"
 
 #define USBIP_VERSION "1.0.0"
 
@@ -56,7 +58,9 @@ enum {
 	usbip_debug_vhci_hc	= (1 << 9),
 	usbip_debug_vhci_rx	= (1 << 10),
 	usbip_debug_vhci_tx	= (1 << 11),
-	usbip_debug_vhci_sysfs  = (1 << 12)
+	usbip_debug_vhci_sysfs  = (1 << 12),
+
+	usbip_debug_ux		= (1 << 13)
 };
 
 #define usbip_dbg_flag_xmit	(usbip_debug_flag & usbip_debug_xmit)
@@ -67,6 +71,7 @@ enum {
 #define usbip_dbg_flag_stub_rx	(usbip_debug_flag & usbip_debug_stub_rx)
 #define usbip_dbg_flag_stub_tx	(usbip_debug_flag & usbip_debug_stub_tx)
 #define usbip_dbg_flag_vhci_sysfs  (usbip_debug_flag & usbip_debug_vhci_sysfs)
+#define usbip_dbg_flag_ux	(usbip_debug_flag & usbip_debug_ux)
 
 extern unsigned long usbip_debug_flag;
 extern struct device_attribute dev_attr_usbip_debug;
@@ -96,6 +101,8 @@ extern struct device_attribute dev_attr_usbip_debug;
 	usbip_dbg_with_flag(usbip_debug_vhci_tx, fmt , ##args)
 #define usbip_dbg_vhci_sysfs(fmt, args...) \
 	usbip_dbg_with_flag(usbip_debug_vhci_sysfs, fmt , ##args)
+#define usbip_dbg_ux(fmt, args...) \
+	usbip_dbg_with_flag(usbip_debug_ux, fmt , ##args)
 
 #define usbip_dbg_stub_cmp(fmt, args...) \
 	usbip_dbg_with_flag(usbip_debug_stub_cmp, fmt , ##args)
@@ -262,6 +269,7 @@ struct usbip_device {
 	spinlock_t lock;
 
 	struct socket *tcp_socket;
+	usbip_ux_t __rcu *ux;
 
 	struct task_struct *tcp_rx;
 	struct task_struct *tcp_tx;
@@ -298,7 +306,7 @@ struct usbip_device {
 void usbip_dump_urb(struct urb *purb);
 void usbip_dump_header(struct usbip_header *pdu);
 
-int usbip_recv(struct socket *sock, void *buf, int size);
+int usbip_recv(struct usbip_device *ud, void *buf, int size);
 
 void usbip_pack_pdu(struct usbip_header *pdu, struct urb *urb, int cmd,
 		    int pack);
@@ -331,5 +339,22 @@ static inline int interface_to_devnum(struct usb_interface *interface)
 
 	return udev->devnum;
 }
+
+#define USBIP_TRX_MODE_KERNEL	0
+#define USBIP_TRX_MODE_USER	1
+
+struct usbip_trx_operations {
+	int mode;
+	int (*sendmsg) (struct usbip_device *udev, struct msghdr *msg,
+			struct kvec *vec, size_t num, size_t len);
+	int (*recvmsg) (struct usbip_device *udev, struct msghdr *msg,
+			struct kvec *vec, size_t num, size_t len, int flags);
+	int (*link) (struct usbip_device *udev, int sockfd);
+	int (*unlink) (struct usbip_device *udev);
+};
+
+extern struct usbip_trx_operations *usbip_trx_ops;
+
+extern int usbip_kernel_link(struct usbip_device *udev, int sockfd);
 
 #endif /* __USBIP_COMMON_H */

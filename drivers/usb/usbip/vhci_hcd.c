@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -771,11 +772,7 @@ static void vhci_shutdown_connection(struct usbip_device *ud)
 {
 	struct vhci_device *vdev = container_of(ud, struct vhci_device, ud);
 
-	/* need this? see stub_dev.c */
-	if (ud->tcp_socket) {
-		pr_debug("shutdown tcp_socket %p\n", ud->tcp_socket);
-		kernel_sock_shutdown(ud->tcp_socket, SHUT_RDWR);
-	}
+	usbip_trx_ops->unlink(ud);
 
 	/* kill threads related to this sdev */
 	if (vdev->ud.tcp_rx) {
@@ -792,6 +789,8 @@ static void vhci_shutdown_connection(struct usbip_device *ud)
 	if (vdev->ud.tcp_socket) {
 		sockfd_put(vdev->ud.tcp_socket);
 		vdev->ud.tcp_socket = NULL;
+	} else if (ud->ux) {
+		ud->ux = NULL;
 	}
 	pr_info("release socket\n");
 

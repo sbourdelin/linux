@@ -14,6 +14,16 @@ config USBIP_CORE
 
 	  If unsure, say N.
 
+config USBIP_UX
+	tristate "USB/IP userspace URB transmission"
+	depends on USBIP_CORE
+	---help---
+	  This moves USB/IP URB transmission to userspace
+	  to apply SSL, WebSocket and etc.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called usbip-ux.
+
 config USBIP_VHCI_HCD
 	tristate "VHCI hcd"
 	depends on USBIP_CORE

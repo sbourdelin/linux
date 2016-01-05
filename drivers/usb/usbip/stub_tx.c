@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003-2008 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  *
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -260,7 +261,7 @@ static int stub_send_ret_submit(struct stub_device *sdev)
 			iovnum++;
 		}
 
-		ret = kernel_sendmsg(sdev->ud.tcp_socket, &msg,
+		ret = usbip_trx_ops->sendmsg(&sdev->ud, &msg,
 						iov,  iovnum, txsize);
 		if (ret != txsize) {
 			dev_err(&sdev->interface->dev,
@@ -335,7 +336,7 @@ static int stub_send_ret_unlink(struct stub_device *sdev)
 		iov[0].iov_len  = sizeof(pdu_header);
 		txsize += sizeof(pdu_header);
 
-		ret = kernel_sendmsg(sdev->ud.tcp_socket, &msg, iov,
+		ret = usbip_trx_ops->sendmsg(&sdev->ud, &msg, iov,
 				     1, txsize);
 		if (ret != txsize) {
 			dev_err(&sdev->interface->dev,
