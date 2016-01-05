@@ -145,14 +145,6 @@ static long libcfs_ioctl(struct file *file,
 		return -EINVAL;
 	}
 
-	/* Handle platform-dependent IOC requests */
-	switch (cmd) {
-	case IOC_LIBCFS_MEMHOG:
-		if (!capable(CFS_CAP_SYS_ADMIN))
-			return -EPERM;
-		/* go thought */
-	}
-
 	pfile.off = 0;
 	pfile.private_data = file->private_data;
 	if (libcfs_psdev_ops.p_ioctl != NULL)
