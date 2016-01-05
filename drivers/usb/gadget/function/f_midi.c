@@ -1163,24 +1163,25 @@ static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
 
 static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 {
-	struct f_midi *midi;
+	struct f_midi *midi = NULL;
 	struct f_midi_opts *opts;
-	int status, i;
+	int status;
+	int i = 0;
 
 	opts = container_of(fi, struct f_midi_opts, func_inst);
 
 	mutex_lock(&opts->lock);
 	/* sanity check */
 	if (opts->in_ports > MAX_PORTS || opts->out_ports > MAX_PORTS) {
-		mutex_unlock(&opts->lock);
-		return ERR_PTR(-EINVAL);
+		status = -EINVAL;
+		goto setup_fail;
 	}
 
 	/* allocate and initialize one new instance */
 	midi = kzalloc(sizeof(*midi), GFP_KERNEL);
 	if (!midi) {
-		mutex_unlock(&opts->lock);
-		return ERR_PTR(-ENOMEM);
+		status = -ENOMEM;
+		goto setup_fail;
 	}
 
 	for (i = 0; i < opts->in_ports; i++) {
@@ -1188,7 +1189,6 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 
 		if (!port) {
 			status = -ENOMEM;
-			mutex_unlock(&opts->lock);
 			goto setup_fail;
 		}
 
@@ -1202,7 +1202,6 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	midi->id = kstrdup(opts->id, GFP_KERNEL);
 	if (opts->id && !midi->id) {
 		status = -ENOMEM;
-		mutex_unlock(&opts->lock);
 		goto setup_fail;
 	}
 	midi->in_ports = opts->in_ports;
@@ -1229,6 +1228,7 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	return &midi->func;
 
 setup_fail:
+	mutex_unlock(&opts->lock);
 	for (--i; i >= 0; i--)
 		kfree(midi->in_port[i]);
 	kfree(midi);
