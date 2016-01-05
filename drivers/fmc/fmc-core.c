@@ -69,7 +69,7 @@ static struct bus_type fmc_bus_type = {
 
 static void fmc_release(struct device *dev)
 {
-	struct fmc_device *fmc = container_of(dev, struct fmc_device, dev);
+	struct fmc_device *fmc = to_fmc_device(dev);
 
 	kfree(fmc);
 }
@@ -82,13 +82,10 @@ static ssize_t fmc_read_eeprom(struct file *file, struct kobject *kobj,
 			   struct bin_attribute *bin_attr,
 			   char *buf, loff_t off, size_t count)
 {
-	struct device *dev;
-	struct fmc_device *fmc;
-	int eelen;
+	struct device *dev = kobj_to_dev(kobj);
+	struct fmc_device *fmc = to_fmc_device(dev);
+	int eelen = fmc->eeprom_len;
 
-	dev = container_of(kobj, struct device, kobj);
-	fmc = container_of(dev, struct fmc_device, dev);
-	eelen = fmc->eeprom_len;
 	if (off > eelen)
 		return -ESPIPE;
 	if (off == eelen)
@@ -103,11 +100,9 @@ static ssize_t fmc_write_eeprom(struct file *file, struct kobject *kobj,
 				struct bin_attribute *bin_attr,
 				char *buf, loff_t off, size_t count)
 {
-	struct device *dev;
-	struct fmc_device *fmc;
+	struct device *dev = kobj_to_dev(kobj);
+	struct fmc_device *fmc = to_fmc_device(dev);
 
-	dev = container_of(kobj, struct device, kobj);
-	fmc = container_of(dev, struct fmc_device, dev);
 	return fmc->op->write_ee(fmc, off, buf, count);
 }
 
