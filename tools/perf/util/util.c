@@ -663,3 +663,25 @@ fetch_kernel_version(unsigned int *puint, char *str,
 		*puint = (version << 16) + (patchlevel << 8) + sublevel;
 	return 0;
 }
+
+const char *perf_report_tip(void)
+{
+	const char *tips[] = {
+		"For a higher level overview, try: perf report --sort comm,dso",
+		"Group related events with: perf record -e '{cycles,instructions}'",
+		"Compare performance with: perf diff [<old file> <new file>]",
+		"Boolean options have negative forms like: perf report --no-children",
+		"Customize output of perf script with: perf script -F event,ip,sym",
+		"Generate a script for your data: perf script -g <lang>",
+		"Save output of perf stat using: perf stat record",
+		"Create archive of data to see it on other machine: perf archive",
+		"Search options using a keyword: perf report -h filter",
+		"Use parent filter to see specific call path: perf report -p <regex>",
+		"listing interested events using substring match: perf list cpu",
+		"To see list of saved events and attributes: perf evlist -v",
+		"Use --symfs <dir> if your symbol files are in non-standard location",
+		"To see callchains in a more compact form: perf report -g folded",
+	};
+
+	return tips[random() % ARRAY_SIZE(tips)];
+}
