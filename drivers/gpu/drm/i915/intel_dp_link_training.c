@@ -85,6 +85,25 @@ static bool
 intel_dp_reset_link_train(struct intel_dp *intel_dp,
 			uint8_t dp_train_pat)
 {
+	bool has_dpcd;
+	bool no_aux_handshake = false;
+
+	has_dpcd = intel_dp_get_dpcd(intel_dp);
+
+	/*
+	 * Source device can try to use drive current and pre-emphasis
+	 * parameters computed by the last "full" link training if the
+	 * DP_NO_AUX_HANDSHAKE_LINK_TRAINING bit is set to 1.
+	 */
+	if (has_dpcd) {
+		if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11) {
+			no_aux_handshake = (intel_dp->dpcd[DP_MAX_DOWNSPREAD] &
+					    DP_NO_AUX_HANDSHAKE_LINK_TRAINING);
+		}
+	}
+
+	intel_dp->train_set_valid &= no_aux_handshake;
+
 	DRM_DEBUG_KMS("link training optimization: %s\n",
 		      yesno(intel_dp->train_set_valid));
 
