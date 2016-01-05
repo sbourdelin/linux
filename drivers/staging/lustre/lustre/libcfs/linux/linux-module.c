@@ -116,11 +116,10 @@ libcfs_psdev_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long libcfs_ioctl(struct file *file,
-			 unsigned int cmd, unsigned long arg)
+static long
+libcfs_psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct cfs_psdev_file	 pfile;
-	int    rc = 0;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
@@ -135,15 +134,11 @@ static long libcfs_ioctl(struct file *file,
 
 	pfile.off = 0;
 	pfile.private_data = file->private_data;
-	if (libcfs_psdev_ops.p_ioctl != NULL)
-		rc = libcfs_psdev_ops.p_ioctl(&pfile, cmd, (void *)arg);
-	else
-		rc = -EPERM;
-	return rc;
+	return libcfs_ioctl(&pfile, cmd, (void __user *)arg);
 }
 
 static const struct file_operations libcfs_fops = {
-	.unlocked_ioctl	= libcfs_ioctl,
+	.unlocked_ioctl	= libcfs_psdev_ioctl,
 	.open		= libcfs_psdev_open,
 	.release	= libcfs_psdev_release,
 };

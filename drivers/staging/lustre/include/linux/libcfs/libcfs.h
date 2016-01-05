@@ -75,8 +75,8 @@ struct cfs_psdev_file {
 struct cfs_psdev_ops {
 	int (*p_read)(struct cfs_psdev_file *, char *, unsigned long);
 	int (*p_write)(struct cfs_psdev_file *, char *, unsigned long);
-	int (*p_ioctl)(struct cfs_psdev_file *, unsigned long, void *);
 };
+int libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd, void *arg);
 
 /*
  * Drop into debugger, if possible. Implementation is provided by platform.

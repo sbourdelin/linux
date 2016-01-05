@@ -140,7 +140,8 @@ static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
 	return err;
 }
 
-static int libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd, void *arg)
+int
+libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd, void *arg)
 {
 	char    *buf;
 	struct libcfs_ioctl_data *data;
@@ -168,7 +169,6 @@ out:
 struct cfs_psdev_ops libcfs_psdev_ops = {
 	NULL,
 	NULL,
-	libcfs_ioctl
 };
 
 static int proc_call_handler(void *data, int write, loff_t *ppos,
