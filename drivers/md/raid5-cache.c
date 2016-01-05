@@ -97,6 +97,7 @@ struct r5l_log {
 
 	bool need_cache_flush;
 	bool in_teardown;
+	bool force_flush_all_disks;
 };
 
 /*
@@ -526,10 +527,27 @@ void r5l_write_stripe_run(struct r5conf *conf)
 
 int r5l_handle_flush_request(struct r5conf *conf, struct bio *bio)
 {
-	struct r5l_log *log = ACCESS_ONCE(conf->log);
+	struct r5l_log *log;
 
-	if (!log)
+	/* raid5_remove_disk writes_pending check isn't helpful for flush */
+	rcu_read_lock();
+	log = rcu_dereference(conf->log);
+	if (!log) {
+		rcu_read_unlock();
 		return -ENODEV;
+	}
+
+	/*
+	 * If we add journal to array without journal before, the array might
+	 * run write requests before journal runs. such requests are not
+	 * protected by journal, so we can't skip flush.
+	 */
+	if (log->force_flush_all_disks) {
+		rcu_read_unlock();
+		md_flush_request(log->rdev->mddev, bio);
+		return 0;
+	}
+	rcu_read_unlock();
 	/*
 	 * we flush log disk cache first, then write stripe data to raid disks.
 	 * So if bio is finished, the log disk cache is flushed already. The
@@ -797,6 +815,8 @@ static void r5l_do_reclaim(struct r5l_log *log)
 	log->last_checkpoint = next_checkpoint;
 	log->last_cp_seq = next_cp_seq;
 	mutex_unlock(&log->io_mutex);
+
+	log->force_flush_all_disks = false;
 
 	r5l_run_no_space_stripes(log);
 }
@@ -1246,6 +1266,8 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 	INIT_LIST_HEAD(&log->no_space_stripes);
 	spin_lock_init(&log->no_space_stripes_lock);
 
+	if (test_bit(MD_JOURNAL_NOT_INITIALIZED, &conf->mddev->flags))
+		log->force_flush_all_disks = true;
 	if (r5l_load_log(log))
 		goto error;
 
