@@ -101,8 +101,8 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
 }
 EXPORT_SYMBOL(libcfs_deregister_ioctl);
 
-static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
-			    void *arg, struct libcfs_ioctl_data *data)
+static int
+libcfs_ioctl_int(unsigned long cmd, void *arg, struct libcfs_ioctl_data *data)
 {
 	int err = -EINVAL;
 
@@ -141,7 +141,7 @@ static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
 }
 
 int
-libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd, void *arg)
+libcfs_ioctl(unsigned long cmd, void *arg)
 {
 	char    *buf;
 	struct libcfs_ioctl_data *data;
@@ -159,17 +159,12 @@ libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd, void *arg)
 	}
 	data = (struct libcfs_ioctl_data *)buf;
 
-	err = libcfs_ioctl_int(pfile, cmd, arg, data);
+	err = libcfs_ioctl_int(cmd, arg, data);
 
 out:
 	LIBCFS_FREE(buf, 1024);
 	return err;
 }
-
-struct cfs_psdev_ops libcfs_psdev_ops = {
-	NULL,
-	NULL,
-};
 
 static int proc_call_handler(void *data, int write, loff_t *ppos,
 		void __user *buffer, size_t *lenp,
