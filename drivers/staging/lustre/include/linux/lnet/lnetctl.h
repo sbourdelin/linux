@@ -74,6 +74,5 @@ int jt_dbg_debug_file(int argc, char **argv);
 int jt_dbg_clear_debug_buf(int argc, char **argv);
 int jt_dbg_mark_debug_buf(int argc, char **argv);
 int jt_dbg_modules(int argc, char **argv);
-int jt_dbg_panic(int argc, char **argv);
 
 #endif

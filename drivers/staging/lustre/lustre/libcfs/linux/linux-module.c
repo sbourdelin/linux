@@ -147,11 +147,6 @@ static long libcfs_ioctl(struct file *file,
 
 	/* Handle platform-dependent IOC requests */
 	switch (cmd) {
-	case IOC_LIBCFS_PANIC:
-		if (!capable(CFS_CAP_SYS_BOOT))
-			return -EPERM;
-		panic("debugctl-invoked panic");
-		return 0;
 	case IOC_LIBCFS_MEMHOG:
 		if (!capable(CFS_CAP_SYS_ADMIN))
 			return -EPERM;

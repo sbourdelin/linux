@@ -250,10 +250,7 @@ static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
 	case IOC_LIBCFS_CLEAR_DEBUG:
 		libcfs_debug_clear_buffer();
 		return 0;
-	/*
-	 * case IOC_LIBCFS_PANIC:
-	 * Handled in arch/cfs_module.c
-	 */
+
 	case IOC_LIBCFS_MARK_DEBUG:
 		if (data->ioc_inlbuf1 == NULL ||
 		    data->ioc_inlbuf1[data->ioc_inllen1 - 1] != '\0')
