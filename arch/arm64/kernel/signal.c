@@ -399,18 +399,34 @@ static void do_signal(struct pt_regs *regs)
 	restore_saved_sigmask();
 }
 
-asmlinkage void do_notify_resume(struct pt_regs *regs,
-				 unsigned int thread_flags)
+asmlinkage void do_notify_resume(void)
 {
-	if (thread_flags & _TIF_SIGPENDING)
-		do_signal(regs);
+	struct pt_regs *regs = task_pt_regs(current);
+	unsigned long thread_flags;
 
-	if (thread_flags & _TIF_NOTIFY_RESUME) {
-		clear_thread_flag(TIF_NOTIFY_RESUME);
-		tracehook_notify_resume(regs);
+	for (;;) {
+		local_irq_disable();
+
+		thread_flags = READ_ONCE(current_thread_info()->flags);
+		if (!(thread_flags & _TIF_WORK_MASK))
+			break;
+
+		if (thread_flags & _TIF_NEED_RESCHED) {
+			schedule();
+			continue;
+		}
+
+		local_irq_enable();
+
+		if (thread_flags & _TIF_SIGPENDING)
+			do_signal(regs);
+
+		if (thread_flags & _TIF_NOTIFY_RESUME) {
+			clear_thread_flag(TIF_NOTIFY_RESUME);
+			tracehook_notify_resume(regs);
+		}
+
+		if (thread_flags & _TIF_FOREIGN_FPSTATE)
+			fpsimd_restore_current_state();
 	}
-
-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
-		fpsimd_restore_current_state();
-
 }

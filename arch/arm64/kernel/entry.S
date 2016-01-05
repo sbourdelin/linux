@@ -612,35 +612,17 @@ ret_fast_syscall:
 	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
 	and	x2, x1, #_TIF_SYSCALL_WORK
 	cbnz	x2, ret_fast_syscall_trace
-	and	x2, x1, #_TIF_WORK_MASK
-	cbnz	x2, work_pending
-	enable_step_tsk x1, x2
-	kernel_exit 0
+	b	ret_to_user
 ret_fast_syscall_trace:
 	enable_irq				// enable interrupts
 	b	__sys_trace_return_skipped	// we already saved x0
 
 /*
- * Ok, we need to do extra processing, enter the slow path.
- */
-work_pending:
-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
-	mov	x0, sp				// 'regs'
-	enable_irq				// enable interrupts for do_notify_resume()
-	bl	do_notify_resume
-	b	ret_to_user
-work_resched:
-	bl	schedule
-
-/*
  * "slow" syscall return path.
  */
 ret_to_user:
-	disable_irq				// disable interrupts
-	ldr	x1, [tsk, #TI_FLAGS]
-	and	x2, x1, #_TIF_WORK_MASK
-	cbnz	x2, work_pending
+	bl	do_notify_resume
+	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
 	enable_step_tsk x1, x2
 	kernel_exit 0
 ENDPROC(ret_to_user)
