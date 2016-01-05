@@ -1078,8 +1078,10 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	}
 	if (ctrl->stripe_size)
 		blk_queue_chunk_sectors(ns->queue, ctrl->stripe_size >> 9);
-	if (ctrl->vwc & NVME_CTRL_VWC_PRESENT)
-		blk_queue_flush(ns->queue, REQ_FLUSH | REQ_FUA);
+	if (ctrl->vwc & NVME_CTRL_VWC_PRESENT) {
+		queue_flag_set_unlocked(QUEUE_FLAG_FLUSH, ns->queue);
+		queue_flag_set_unlocked(QUEUE_FLAG_FUA, ns->queue);
+	}
 	blk_queue_virt_boundary(ns->queue, ctrl->page_size - 1);
 
 	disk->major = nvme_major;
