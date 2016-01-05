@@ -52,12 +52,12 @@ void usbip_driver_close(void)
 	usbip_vhci_driver_close();
 }
 
-static int import_device(int sockfd, struct usbip_usb_device *udev)
+static int import_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 {
 	int rc;
 	int port;
 
-	dbg("Sockfd:%d", sockfd);
+	dbg("Sockfd:%d", sock->fd);
 	port = usbip_vhci_get_free_port();
 	if (port < 0) {
 		err("no free port");
@@ -65,7 +65,7 @@ static int import_device(int sockfd, struct usbip_usb_device *udev)
 	}
 
 	dump_usb_device(udev);
-	rc = usbip_vhci_attach_device(port, sockfd, udev->busnum,
+	rc = usbip_vhci_attach_device(port, sock->fd, udev->busnum,
 					udev->devnum, udev->speed);
 	if (rc < 0) {
 		err("import device");
@@ -75,7 +75,7 @@ static int import_device(int sockfd, struct usbip_usb_device *udev)
 	return port;
 }
 
-static int recv_request_export(int sockfd, char *host, char *port)
+static int recv_request_export(usbip_sock_t *sock, char *host, char *port)
 {
 	struct op_export_request req;
 	struct op_export_reply reply;
@@ -87,26 +87,26 @@ static int recv_request_export(int sockfd, char *host, char *port)
 	memset(&req, 0, sizeof(req));
 	memset(&reply, 0, sizeof(reply));
 
-	rc = usbip_net_recv(sockfd, &req, sizeof(req));
+	rc = usbip_net_recv(sock, &req, sizeof(req));
 	if (rc < 0) {
 		dbg("usbip_net_recv failed: export request");
 		return -1;
 	}
 	PACK_OP_EXPORT_REQUEST(0, &req);
 
-	rc = usbip_ux_setup(sockfd, &ux);
+	rc = usbip_ux_setup(sock, &ux);
 	if (rc) {
 		dbg("usbip_ux_setup failed: export");
 		return -1;
 	}
 
-	rhport = import_device(sockfd, &req.udev);
+	rhport = import_device(sock, &req.udev);
 	if (rhport < 0) {
 		dbg("export request busid %s: failed", req.udev.busid);
 		error = 1;
 	}
 
-	rc = usbip_net_send_op_common(sockfd, OP_REP_EXPORT,
+	rc = usbip_net_send_op_common(sock, OP_REP_EXPORT,
 				      (!error ? ST_OK : ST_NA));
 	if (rc < 0) {
 		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_EXPORT);
@@ -120,7 +120,7 @@ static int recv_request_export(int sockfd, char *host, char *port)
 	}
 	PACK_OP_EXPORT_REPLY(0, &rep);
 
-	rc = usbip_net_send(sockfd, &reply, sizeof(reply));
+	rc = usbip_net_send(sock, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: export reply");
 		return -1;
@@ -162,7 +162,7 @@ static int unimport_device(char *host, struct usbip_usb_device *udev)
 	return idev->port;
 }
 
-static int recv_request_unexport(int sockfd, char *host)
+static int recv_request_unexport(usbip_sock_t *sock, char *host)
 {
 	struct op_unexport_request req;
 	struct op_unexport_reply reply;
@@ -173,7 +173,7 @@ static int recv_request_unexport(int sockfd, char *host)
 	memset(&req, 0, sizeof(req));
 	memset(&reply, 0, sizeof(reply));
 
-	rc = usbip_net_recv(sockfd, &req, sizeof(req));
+	rc = usbip_net_recv(sock, &req, sizeof(req));
 	if (rc < 0) {
 		dbg("usbip_net_recv failed: unexport request");
 		return -1;
@@ -185,7 +185,7 @@ static int recv_request_unexport(int sockfd, char *host)
 		error = 1;
 	}
 
-	rc = usbip_net_send_op_common(sockfd, OP_REP_UNEXPORT,
+	rc = usbip_net_send_op_common(sock, OP_REP_UNEXPORT,
 				      (!error ? ST_OK : ST_NA));
 	if (rc < 0) {
 		dbg("usbip_net_send_op_common failed: %#0x", OP_REP_UNEXPORT);
@@ -201,7 +201,7 @@ static int recv_request_unexport(int sockfd, char *host)
 	}
 	PACK_OP_UNEXPORT_REPLY(0, &rep);
 
-	rc = usbip_net_send(sockfd, &reply, sizeof(reply));
+	rc = usbip_net_send(sock, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: unexport reply");
 		return -1;
@@ -214,12 +214,12 @@ static int recv_request_unexport(int sockfd, char *host)
 	return 0;
 }
 
-int usbip_recv_pdu(int connfd, char *host, char *port)
+int usbip_recv_pdu(usbip_sock_t *sock, char *host, char *port)
 {
 	uint16_t code = OP_UNSPEC;
 	int ret;
 
-	ret = usbip_net_recv_op_common(connfd, &code);
+	ret = usbip_net_recv_op_common(sock, &code);
 	if (ret < 0) {
 		dbg("could not receive opcode: %#0x", code);
 		return -1;
@@ -231,13 +231,13 @@ int usbip_recv_pdu(int connfd, char *host, char *port)
 		return -1;
 	}
 
-	info("received request: %#0x(%d)", code, connfd);
+	info("received request: %#0x(%d)", code, sock->fd);
 	switch (code) {
 	case OP_REQ_EXPORT:
-		ret = recv_request_export(connfd, host, port);
+		ret = recv_request_export(sock, host, port);
 		break;
 	case OP_REQ_UNEXPORT:
-		ret = recv_request_unexport(connfd, host);
+		ret = recv_request_unexport(sock, host);
 		break;
 	default:
 		err("received an unknown opcode: %#0x", code);

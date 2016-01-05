@@ -12,14 +12,14 @@
 #include "usbip_common.h"
 
 typedef struct usbip_ux {
-	int sockfd;
+	usbip_sock_t *sock;
 	int devfd;
 	int started;
 	pthread_t tx, rx;
 	struct usbip_ux_kaddr kaddr;
 } usbip_ux_t;
 
-int usbip_ux_setup(int sockfd, usbip_ux_t **uxp);
+int usbip_ux_setup(usbip_sock_t *sock, usbip_ux_t **uxp);
 void usbip_ux_cleanup(usbip_ux_t **ux);
 int usbip_ux_start(usbip_ux_t *ux);
 void usbip_ux_join(usbip_ux_t *ux);

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2015 Nobuo Iwata
  */
 
 #ifndef __USBIP_COMMON_H
@@ -133,5 +134,18 @@ void usbip_names_get_product(char *buff, size_t size, uint16_t vendor,
 			     uint16_t product);
 void usbip_names_get_class(char *buff, size_t size, uint8_t class,
 			   uint8_t subclass, uint8_t protocol);
+
+typedef struct usbip_sock {
+	int fd;
+	void *arg;
+	ssize_t (*send)(void *arg, void *buf, size_t len);
+	ssize_t (*recv)(void *arg, void *buf, size_t len, int wait_all);
+	void (*shutdown)(void *arg);
+} usbip_sock_t;
+
+void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
+	ssize_t (*send)(void *arg, void *buf, size_t len),
+	ssize_t (*recv)(void *arg, void *buf, size_t len, int wait_all),
+	void (*shutdown)(void *arg));
 
 #endif /* __USBIP_COMMON_H */

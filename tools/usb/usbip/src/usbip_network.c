@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  *
  * This program is free software: you can redistribute it and/or modify
@@ -104,7 +105,7 @@ void usbip_net_pack_usb_interface(int pack __attribute__((unused)),
 	/* uint8_t members need nothing */
 }
 
-static ssize_t usbip_net_xmit(int sockfd, void *buff, size_t bufflen,
+static ssize_t usbip_net_xmit(usbip_sock_t *sock, void *buff, size_t bufflen,
 			      int sending)
 {
 	ssize_t nbytes;
@@ -114,13 +115,22 @@ static ssize_t usbip_net_xmit(int sockfd, void *buff, size_t bufflen,
 		return 0;
 
 	do {
-		if (sending)
-			nbytes = send(sockfd, buff, bufflen, 0);
-		else
-			nbytes = recv(sockfd, buff, bufflen, MSG_WAITALL);
-
-		if (nbytes <= 0)
+		if (sending) {
+			if (sock->send)
+				nbytes = sock->send(sock->arg, buff, bufflen);
+			else
+				nbytes = send(sock->fd, buff, bufflen, 0);
+		} else {
+			if (sock->recv)
+				nbytes = sock->recv(sock->arg, buff, bufflen, 1);
+			else
+				nbytes = recv(sock->fd, buff, bufflen, MSG_WAITALL);
+		}
+		if (nbytes <= 0) {
+			if (!sending && nbytes == 0)
+				dbg("received zero - broken connection?");
 			return -1;
+		}
 
 		buff	 = (void *)((intptr_t) buff + nbytes);
 		bufflen	-= nbytes;
@@ -131,17 +141,17 @@ static ssize_t usbip_net_xmit(int sockfd, void *buff, size_t bufflen,
 	return total;
 }
 
-ssize_t usbip_net_recv(int sockfd, void *buff, size_t bufflen)
+ssize_t usbip_net_recv(usbip_sock_t *sock, void *buff, size_t bufflen)
 {
-	return usbip_net_xmit(sockfd, buff, bufflen, 0);
+	return usbip_net_xmit(sock, buff, bufflen, 0);
 }
 
-ssize_t usbip_net_send(int sockfd, void *buff, size_t bufflen)
+ssize_t usbip_net_send(usbip_sock_t *sock, void *buff, size_t bufflen)
 {
-	return usbip_net_xmit(sockfd, buff, bufflen, 1);
+	return usbip_net_xmit(sock, buff, bufflen, 1);
 }
 
-int usbip_net_send_op_common(int sockfd, uint32_t code, uint32_t status)
+int usbip_net_send_op_common(usbip_sock_t *sock, uint32_t code, uint32_t status)
 {
 	struct op_common op_common;
 	int rc;
@@ -154,7 +164,7 @@ int usbip_net_send_op_common(int sockfd, uint32_t code, uint32_t status)
 
 	PACK_OP_COMMON(1, &op_common);
 
-	rc = usbip_net_send(sockfd, &op_common, sizeof(op_common));
+	rc = usbip_net_send(sock, &op_common, sizeof(op_common));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: %d", rc);
 		return -1;
@@ -163,14 +173,14 @@ int usbip_net_send_op_common(int sockfd, uint32_t code, uint32_t status)
 	return 0;
 }
 
-int usbip_net_recv_op_common(int sockfd, uint16_t *code)
+int usbip_net_recv_op_common(usbip_sock_t *sock, uint16_t *code)
 {
 	struct op_common op_common;
 	int rc;
 
 	memset(&op_common, 0, sizeof(op_common));
 
-	rc = usbip_net_recv(sockfd, &op_common, sizeof(op_common));
+	rc = usbip_net_recv(sock, &op_common, sizeof(op_common));
 	if (rc < 0) {
 		dbg("usbip_net_recv failed: %d", rc);
 		goto err;
@@ -258,10 +268,11 @@ int usbip_net_set_v6only(int sockfd)
 /*
  * IPv6 Ready
  */
-int usbip_net_tcp_connect(char *hostname, char *service)
+usbip_sock_t *usbip_net_tcp_connect(char *hostname, char *service)
 {
 	struct addrinfo hints, *res, *rp;
 	int sockfd;
+	usbip_sock_t *sock;
 	int ret;
 
 	memset(&hints, 0, sizeof(hints));
@@ -272,8 +283,8 @@ int usbip_net_tcp_connect(char *hostname, char *service)
 	ret = getaddrinfo(hostname, service, &hints, &res);
 	if (ret < 0) {
 		dbg("getaddrinfo: %s service %s: %s", hostname, service,
-		    gai_strerror(ret));
-		return ret;
+		    usbip_net_gai_strerror(ret));
+		return NULL;
 	}
 
 	/* try the addresses */
@@ -297,7 +308,32 @@ int usbip_net_tcp_connect(char *hostname, char *service)
 	freeaddrinfo(res);
 
 	if (!rp)
-		return EAI_SYSTEM;
+		return NULL;
 
-	return sockfd;
+	sock = (usbip_sock_t*)malloc(sizeof(usbip_sock_t));
+	if (!sock) {
+		dbg("Fail to malloc usbip_sock");
+		close(sockfd);
+		return NULL;
+	}
+	usbip_sock_init(sock, sockfd, NULL, NULL, NULL, NULL);
+
+	return sock;
+}
+
+void usbip_net_tcp_close(usbip_sock_t *sock)
+{
+	close(sock->fd);
+	free(sock);
+}
+
+static const char *s_unknown_error = "?";
+
+const char *usbip_net_gai_strerror(int errcode)
+{
+	const char *s = gai_strerror(errcode);
+	if (s == NULL) {
+		return s_unknown_error;
+	}
+	return s;
 }

@@ -28,7 +28,6 @@
 #include <string.h>
 
 #include <getopt.h>
-#include <netdb.h>
 #include <unistd.h>
 
 #include "usbip_common.h"
@@ -46,7 +45,7 @@ void usbip_list_usage(void)
 	printf("usage: %s", usbip_list_usage_string);
 }
 
-static int get_importable_devices(char *host, int sockfd)
+static int get_importable_devices(char *host, usbip_sock_t *sock)
 {
 	char product_name[100];
 	char class_name[100];
@@ -57,20 +56,20 @@ static int get_importable_devices(char *host, int sockfd)
 	unsigned int i;
 	int rc, j;
 
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_DEVLIST, 0);
+	rc = usbip_net_send_op_common(sock, OP_REQ_DEVLIST, 0);
 	if (rc < 0) {
 		dbg("usbip_net_send_op_common failed");
 		return -1;
 	}
 
-	rc = usbip_net_recv_op_common(sockfd, &code);
+	rc = usbip_net_recv_op_common(sock, &code);
 	if (rc < 0) {
 		dbg("usbip_net_recv_op_common failed");
 		return -1;
 	}
 
 	memset(&reply, 0, sizeof(reply));
-	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
+	rc = usbip_net_recv(sock, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("usbip_net_recv_op_devlist failed");
 		return -1;
@@ -89,7 +88,7 @@ static int get_importable_devices(char *host, int sockfd)
 
 	for (i = 0; i < reply.ndev; i++) {
 		memset(&udev, 0, sizeof(udev));
-		rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
+		rc = usbip_net_recv(sock, &udev, sizeof(udev));
 		if (rc < 0) {
 			dbg("usbip_net_recv failed: usbip_usb_device[%d]", i);
 			return -1;
@@ -106,7 +105,7 @@ static int get_importable_devices(char *host, int sockfd)
 		printf("%11s: %s\n", "", class_name);
 
 		for (j = 0; j < udev.bNumInterfaces; j++) {
-			rc = usbip_net_recv(sockfd, &uintf, sizeof(uintf));
+			rc = usbip_net_recv(sock, &uintf, sizeof(uintf));
 			if (rc < 0) {
 				err("usbip_net_recv failed: usbip_usb_intf[%d]",
 						j);
@@ -131,24 +130,24 @@ static int get_importable_devices(char *host, int sockfd)
 static int list_importable_devices(char *host)
 {
 	int rc;
-	int sockfd;
+	usbip_sock_t *sock;
 
-	sockfd = usbip_net_tcp_connect(host, usbip_port_string);
-	if (sockfd < 0) {
+	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	if (!sock) {
 		err("could not connect to %s:%s: %s", host,
-		    usbip_port_string, gai_strerror(sockfd));
+		    usbip_port_string, usbip_net_gai_strerror(sock->fd));
 		return -1;
 	}
 	dbg("connected to %s:%s", host, usbip_port_string);
 
-	rc = get_importable_devices(host, sockfd);
+	rc = get_importable_devices(host, sock);
 	if (rc < 0) {
 		err("failed to get device list from %s", host);
-		close(sockfd);
+		usbip_net_tcp_close(sock);
 		return -1;
 	}
 
-	close(sockfd);
+	usbip_net_tcp_close(sock);
 
 	return 0;
 }
