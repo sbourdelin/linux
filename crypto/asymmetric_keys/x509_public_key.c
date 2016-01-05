@@ -255,6 +255,9 @@ static int x509_validate_trust(struct x509_certificate *cert,
 	struct key *key;
 	int ret = 1;
 
+	if (!cert->akid_id || !cert->akid_skid)
+		return 1;
+	
 	if (!trust_keyring)
 		return -EOPNOTSUPP;
 
@@ -312,13 +315,13 @@ static int x509_key_preparse(struct key_preparsed_payload *prep)
 	cert->pub->algo = pkey_algo[cert->pub->pkey_algo];
 	cert->pub->id_type = PKEY_ID_X509;
 
-	/* Check the signature on the key if it appears to be self-signed */
-	if ((!cert->akid_skid && !cert->akid_id) ||
-	    asymmetric_key_id_same(cert->skid, cert->akid_skid) ||
+	/* See if we can derive the trustability of this certificate */
+	if (asymmetric_key_id_same(cert->skid, cert->akid_skid) ||
 	    asymmetric_key_id_same(cert->id, cert->akid_id)) {
-		ret = x509_check_signature(cert->pub, cert); /* self-signed */
-		if (ret < 0)
-			goto error_free_cert;
+		/* Self-signed.  We cannot evaluate the trustedness of this
+		 * cert, except by the fact that we obtained it from a trusted
+		 * location.
+		 */
 	} else if (!prep->trusted) {
 		ret = x509_validate_trust(cert, get_system_trusted_keyring());
 		if (!ret)
