@@ -55,7 +55,6 @@ static const char f_midi_longname[] = "MIDI Gadget";
  * USB <- IN endpoint  <- rawmidi
  */
 struct gmidi_in_port {
-	struct f_midi *midi;
 	int active;
 	uint8_t cable;
 	uint8_t state;
@@ -78,7 +77,6 @@ struct f_midi {
 
 	struct snd_rawmidi_substream *in_substream[MAX_PORTS];
 	struct snd_rawmidi_substream *out_substream[MAX_PORTS];
-	struct gmidi_in_port	*in_port[MAX_PORTS];
 
 	unsigned long		out_triggered;
 	struct tasklet_struct	tasklet;
@@ -87,6 +85,8 @@ struct f_midi {
 	int index;
 	char *id;
 	unsigned int buflen, qlen;
+
+	struct gmidi_in_port	in_ports_array[/* in_ports */];
 };
 
 static inline struct f_midi *func_to_midi(struct usb_function *f)
@@ -529,11 +529,11 @@ static void f_midi_transmit(struct f_midi *midi, struct usb_request *req)
 	req->length = 0;
 	req->complete = f_midi_complete;
 
-	for (i = 0; i < MAX_PORTS; i++) {
-		struct gmidi_in_port *port = midi->in_port[i];
+	for (i = 0; i < midi->in_ports; i++) {
+		struct gmidi_in_port *port = midi->in_ports_array + i;
 		struct snd_rawmidi_substream *substream = midi->in_substream[i];
 
-		if (!port || !port->active || !substream)
+		if (!port->active || !substream)
 			continue;
 
 		while (req->length + 3 < midi->buflen) {
@@ -568,12 +568,12 @@ static int f_midi_in_open(struct snd_rawmidi_substream *substream)
 {
 	struct f_midi *midi = substream->rmidi->private_data;
 
-	if (!midi->in_port[substream->number])
+	if (substream->number > midi->in_ports)
 		return -EINVAL;
 
 	VDBG(midi, "%s()\n", __func__);
 	midi->in_substream[substream->number] = substream;
-	midi->in_port[substream->number]->state = STATE_UNKNOWN;
+	midi->in_ports_array[substream->number].state = STATE_UNKNOWN;
 	return 0;
 }
 
@@ -589,11 +589,11 @@ static void f_midi_in_trigger(struct snd_rawmidi_substream *substream, int up)
 {
 	struct f_midi *midi = substream->rmidi->private_data;
 
-	if (!midi->in_port[substream->number])
+	if (substream->number > midi->in_ports)
 		return;
 
 	VDBG(midi, "%s() %d\n", __func__, up);
-	midi->in_port[substream->number]->active = up;
+	midi->in_ports_array[substream->number].active = up;
 	if (up)
 		tasklet_hi_schedule(&midi->tasklet);
 }
@@ -1073,8 +1073,6 @@ static void f_midi_free(struct usb_function *f)
 	opts = container_of(f->fi, struct f_midi_opts, func_inst);
 	kfree(midi->id);
 	mutex_lock(&opts->lock);
-	for (i = opts->in_ports - 1; i >= 0; --i)
-		kfree(midi->in_port[i]);
 	kfree(midi);
 	--opts->refcnt;
 	mutex_unlock(&opts->lock);
@@ -1101,7 +1099,7 @@ static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
 
 static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 {
-	struct f_midi *midi;
+	struct f_midi *midi = NULL;
 	struct f_midi_opts *opts;
 	int status, i;
 
@@ -1110,37 +1108,26 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	mutex_lock(&opts->lock);
 	/* sanity check */
 	if (opts->in_ports > MAX_PORTS || opts->out_ports > MAX_PORTS) {
-		mutex_unlock(&opts->lock);
-		return ERR_PTR(-EINVAL);
+		status = -EINVAL;
+		goto setup_fail;
 	}
 
 	/* allocate and initialize one new instance */
-	midi = kzalloc(sizeof(*midi), GFP_KERNEL);
+	midi = kzalloc(
+		sizeof(*midi) + opts->in_ports * sizeof(*midi->in_ports_array),
+		GFP_KERNEL);
 	if (!midi) {
-		mutex_unlock(&opts->lock);
-		return ERR_PTR(-ENOMEM);
+		status = -ENOMEM;
+		goto setup_fail;
 	}
 
-	for (i = 0; i < opts->in_ports; i++) {
-		struct gmidi_in_port *port = kzalloc(sizeof(*port), GFP_KERNEL);
-
-		if (!port) {
-			status = -ENOMEM;
-			mutex_unlock(&opts->lock);
-			goto setup_fail;
-		}
-
-		port->midi = midi;
-		port->active = 0;
-		port->cable = i;
-		midi->in_port[i] = port;
-	}
+	for (i = 0; i < opts->in_ports; i++)
+		midi->in_ports_array[i].cable = i;
 
 	/* set up ALSA midi devices */
 	midi->id = kstrdup(opts->id, GFP_KERNEL);
 	if (opts->id && !midi->id) {
 		status = -ENOMEM;
-		mutex_unlock(&opts->lock);
 		goto setup_fail;
 	}
 	midi->in_ports = opts->in_ports;
@@ -1161,8 +1148,7 @@ static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 	return &midi->func;
 
 setup_fail:
-	for (--i; i >= 0; i--)
-		kfree(midi->in_port[i]);
+	mutex_unlock(&opts->lock);
 	kfree(midi);
 	return ERR_PTR(status);
 }
