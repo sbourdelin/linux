@@ -71,29 +71,13 @@ static struct dentry *lnet_debugfs_root;
 /* called when opening /dev/device */
 static int libcfs_psdev_open(unsigned long flags, void *args)
 {
-	struct libcfs_device_userstate *ldu;
-
 	try_module_get(THIS_MODULE);
-
-	LIBCFS_ALLOC(ldu, sizeof(*ldu));
-	if (ldu != NULL) {
-		ldu->ldu_memhog_pages = 0;
-		ldu->ldu_memhog_root_page = NULL;
-	}
-	*(struct libcfs_device_userstate **)args = ldu;
-
 	return 0;
 }
 
 /* called when closing /dev/device */
 static int libcfs_psdev_release(unsigned long flags, void *args)
 {
-	struct libcfs_device_userstate *ldu;
-
-	ldu = (struct libcfs_device_userstate *)args;
-	if (ldu != NULL)
-		LIBCFS_FREE(ldu, sizeof(*ldu));
-
 	module_put(THIS_MODULE);
 	return 0;
 }
