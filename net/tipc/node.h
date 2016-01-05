@@ -51,7 +51,7 @@ enum {
 #define TIPC_NODE_CAPABILITIES TIPC_BCAST_SYNCH
 #define INVALID_BEARER_ID -1
 
-void tipc_node_stop(struct net *net);
+void tipc_node_stop_net(struct net *net);
 void tipc_node_check_dest(struct net *net, u32 onode,
 			  struct tipc_bearer *bearer,
 			  u16 capabilities, u32 signature,
@@ -75,5 +75,6 @@ int tipc_nl_node_dump_link(struct sk_buff *skb, struct netlink_callback *cb);
 int tipc_nl_node_reset_link_stats(struct sk_buff *skb, struct genl_info *info);
 int tipc_nl_node_get_link(struct sk_buff *skb, struct genl_info *info);
 int tipc_nl_node_set_link(struct sk_buff *skb, struct genl_info *info);
+int tipc_nl_peer_rm(struct sk_buff *skb, struct genl_info *info);
 
 #endif

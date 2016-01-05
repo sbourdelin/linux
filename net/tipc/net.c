@@ -135,7 +135,7 @@ void tipc_net_stop(struct net *net)
 			      tn->own_addr);
 	rtnl_lock();
 	tipc_bearer_stop(net);
-	tipc_node_stop(net);
+	tipc_node_stop_net(net);
 	rtnl_unlock();
 
 	pr_info("Left network mode\n");
