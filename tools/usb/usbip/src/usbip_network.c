@@ -268,7 +268,7 @@ int usbip_net_set_v6only(int sockfd)
 /*
  * IPv6 Ready
  */
-usbip_sock_t *usbip_net_tcp_connect(char *hostname, char *service)
+static usbip_sock_t *net_tcp_open(char *hostname, char *service)
 {
 	struct addrinfo hints, *res, *rp;
 	int sockfd;
@@ -321,10 +321,15 @@ usbip_sock_t *usbip_net_tcp_connect(char *hostname, char *service)
 	return sock;
 }
 
-void usbip_net_tcp_close(usbip_sock_t *sock)
+static void net_tcp_close(usbip_sock_t *sock)
 {
 	close(sock->fd);
 	free(sock);
+}
+
+void usbip_net_tcp_conn_init(void)
+{
+	usbip_conn_init(net_tcp_open, net_tcp_close);
 }
 
 static const char *s_unknown_error = "?";

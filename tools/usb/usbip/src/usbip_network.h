@@ -181,8 +181,7 @@ int usbip_net_set_reuseaddr(int sockfd);
 int usbip_net_set_nodelay(int sockfd);
 int usbip_net_set_keepalive(int sockfd);
 int usbip_net_set_v6only(int sockfd);
-usbip_sock_t *usbip_net_tcp_connect(char *hostname, char *port);
-void usbip_net_tcp_close(usbip_sock_t *sock);
+void usbip_net_tcp_conn_init(void);
 const char *usbip_net_gai_strerror(int errcode);
 
 #endif /* __USBIP_NETWORK_H */

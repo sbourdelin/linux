@@ -202,6 +202,7 @@ int main(int argc, char *argv[])
 				argc -= optind;
 				argv += optind;
 				optind = 0;
+				usbip_net_tcp_conn_init();
 				rc = run_command(&cmds[i], argc, argv);
 				goto out;
 			}

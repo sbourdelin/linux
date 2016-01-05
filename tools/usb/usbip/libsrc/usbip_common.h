@@ -148,4 +148,15 @@ void usbip_sock_init(usbip_sock_t *sock, int fd, void *arg,
 	ssize_t (*recv)(void *arg, void *buf, size_t len, int wait_all),
 	void (*shutdown)(void *arg));
 
+typedef struct usbip_connection_operations {
+	usbip_sock_t *(*open)(char *host, char *port);
+	void (*close)(usbip_sock_t *sock);
+} usbip_connection_operations_t;
+
+extern usbip_connection_operations_t usbip_conn_ops;
+
+void usbip_conn_init(
+	usbip_sock_t *(*open)(char *host, char *port),
+	void (*close)(usbip_sock_t *sock));
+
 #endif /* __USBIP_COMMON_H */

@@ -136,7 +136,7 @@ static int disconnect_device(char *host, char *busid)
 	usbip_sock_t *sock;
 	int rc;
 
-	sock = usbip_net_tcp_connect(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, usbip_port_string);
 	if (!sock) {
 		err("tcp connect");
 		return -1;
@@ -145,11 +145,11 @@ static int disconnect_device(char *host, char *busid)
 	rc = unexport_device(busid, sock);
 	if (rc < 0) {
 		err("unexport");
-		usbip_net_tcp_close(sock);
+		usbip_conn_ops.close(sock);
 		return -1;
 	}
 
-	usbip_net_tcp_close(sock);
+	usbip_conn_ops.close(sock);
 
 	if (!usbip_ux_installed()) {
 		rc = usbip_unbind_device(busid);
