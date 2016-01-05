@@ -21,19 +21,21 @@
 #include <libudev.h>
 
 #include <errno.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 #include <unistd.h>
 
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip.h"
 
+#ifndef AS_LIBRARY
 static const char usbip_list_usage_string[] =
 	"usbip list <args>\n"
 	"    -p, --parsable         Parsable list format\n"
@@ -44,6 +46,7 @@ void usbip_list_usage(void)
 {
 	printf("usage: %s", usbip_list_usage_string);
 }
+#endif
 
 static int get_importable_devices(char *host, usbip_sock_t *sock)
 {
@@ -127,33 +130,42 @@ static int get_importable_devices(char *host, usbip_sock_t *sock)
 	return 0;
 }
 
-static int list_importable_devices(char *host)
+int usbip_list_importable_devices(char *host, char* port)
 {
 	int rc;
 	usbip_sock_t *sock;
 
-	sock = usbip_conn_ops.open(host, usbip_port_string);
+	if (usbip_names_init(USBIDS_FILE))
+		err("failed to open %s", USBIDS_FILE);
+
+	sock = usbip_conn_ops.open(host, port);
 	if (!sock) {
 		err("could not connect to %s:%s: %s", host,
-		    usbip_port_string, usbip_net_gai_strerror(sock->fd));
-		return -1;
+		    port, usbip_net_gai_strerror(sock->fd));
+		goto err_names_free;
 	}
-	dbg("connected to %s:%s", host, usbip_port_string);
+	dbg("connected to %s:%s", host, port);
 
 	rc = get_importable_devices(host, sock);
 	if (rc < 0) {
 		err("failed to get device list from %s", host);
-		usbip_conn_ops.close(sock);
-		return -1;
+		goto err_conn_close;
 	}
 
 	usbip_conn_ops.close(sock);
+	usbip_names_free();
 
 	return 0;
+
+err_conn_close:
+	usbip_conn_ops.close(sock);
+err_names_free:
+	usbip_names_free();
+	return -1;
 }
 
 static void print_device(const char *busid, const char *vendor,
-			 const char *product, bool parsable)
+			 const char *product, int parsable)
 {
 	if (parsable)
 		printf("busid=%s#usbid=%.4s:%.4s#", busid, vendor, product);
@@ -161,13 +173,13 @@ static void print_device(const char *busid, const char *vendor,
 		printf(" - busid %s (%.4s:%.4s)\n", busid, vendor, product);
 }
 
-static void print_product_name(char *product_name, bool parsable)
+static void print_product_name(char *product_name, int parsable)
 {
 	if (!parsable)
 		printf("   %s\n", product_name);
 }
 
-static int list_devices(bool parsable)
+int usbip_list_devices(int parsable)
 {
 	struct udev *udev;
 	struct udev_enumerate *enumerate;
@@ -181,6 +193,9 @@ static int list_devices(bool parsable)
 	const char *busid;
 	char product_name[128];
 	int ret = -1;
+
+	if (usbip_names_init(USBIDS_FILE))
+		err("failed to open %s", USBIDS_FILE);
 
 	/* Create libudev context. */
 	udev = udev_new();
@@ -234,10 +249,12 @@ static int list_devices(bool parsable)
 err_out:
 	udev_enumerate_unref(enumerate);
 	udev_unref(udev);
+	usbip_names_free();
 
 	return ret;
 }
 
+#ifndef AS_LIBRARY
 int usbip_list(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -247,12 +264,11 @@ int usbip_list(int argc, char *argv[])
 		{ NULL,       0,                 NULL,  0  }
 	};
 
-	bool parsable = false;
+	int local = 0;
+	int remote = 0;
+	int parsable = 0;
 	int opt;
-	int ret = -1;
-
-	if (usbip_names_init(USBIDS_FILE))
-		err("failed to open %s", USBIDS_FILE);
+	char *host = NULL;
 
 	for (;;) {
 		opt = getopt_long(argc, argv, "pr:l", opts, NULL);
@@ -262,23 +278,27 @@ int usbip_list(int argc, char *argv[])
 
 		switch (opt) {
 		case 'p':
-			parsable = true;
+			parsable = 1;
 			break;
 		case 'r':
-			ret = list_importable_devices(optarg);
-			goto out;
+			remote = 1;
+			host = optarg;
+			break;
 		case 'l':
-			ret = list_devices(parsable);
-			goto out;
+			local = 1;
+			break;
 		default:
 			goto err_out;
 		}
 	}
+	if (remote && host != NULL) {
+		return usbip_list_importable_devices(host, usbip_port_string);
+	} else if (local) {
+		return usbip_list_devices(parsable);
+	}
 
 err_out:
 	usbip_list_usage();
-out:
-	usbip_names_free();
-
-	return ret;
+	return -1;
 }
+#endif

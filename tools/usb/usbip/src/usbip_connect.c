@@ -24,7 +24,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 #include <unistd.h>
 
 #include "usbip_host_driver.h"
@@ -33,6 +35,7 @@
 #include "usbip_ux.h"
 #include "usbip.h"
 
+#ifndef AS_LIBRARY
 static const char usbip_connect_usage_string[] =
 	"usbip connect <args>\n"
 	"    -r, --remote=<host>    Address of a remote computer\n"
@@ -42,6 +45,7 @@ void usbip_connect_usage(void)
 {
 	printf("usage: %s", usbip_connect_usage_string);
 }
+#endif
 
 static int send_export_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 {
@@ -138,7 +142,7 @@ static int export_device(char *busid, usbip_sock_t *sock)
 	return 0;
 }
 
-static int connect_device(char *host, char *busid)
+int usbip_connect_device(char *host, char *port, char *busid)
 {
 	usbip_sock_t *sock;
 	usbip_ux_t *ux;
@@ -150,7 +154,7 @@ static int connect_device(char *host, char *busid)
 		goto err_out;
 	}
 
-	sock = usbip_conn_ops.open(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, port);
 	if (!sock) {
 		err("tcp connect");
 		goto err_unbind_device;
@@ -187,6 +191,7 @@ err_out:
 	return -1;
 }
 
+#ifndef AS_LIBRARY
 int usbip_connect(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -220,7 +225,7 @@ int usbip_connect(int argc, char *argv[])
 	if (!host || !busid)
 		goto err_out;
 
-	ret = connect_device(host, busid);
+	ret = usbip_connect_device(host, usbip_port_string, busid);
 	goto out;
 
 err_out:
@@ -228,3 +233,4 @@ err_out:
 out:
 	return ret;
 }
+#endif

@@ -37,6 +37,7 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip_ux.h"
+#include "usbipd.h"
 #include "list.h"
 
 char *usbip_progname = "usbipd";

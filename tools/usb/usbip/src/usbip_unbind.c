@@ -23,13 +23,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 
 #include "usbip_common.h"
 #include "utils.h"
 #include "usbip.h"
 #include "sysfs_utils.h"
 
+#ifndef AS_LIBRARY
 static const char usbip_unbind_usage_string[] =
 	"usbip unbind <args>\n"
 	"    -b, --busid=<busid>    Unbind " USBIP_HOST_DRV_NAME ".ko from "
@@ -39,6 +42,7 @@ void usbip_unbind_usage(void)
 {
 	printf("usage: %s", usbip_unbind_usage_string);
 }
+#endif
 
 int usbip_unbind_device(char *busid)
 {
@@ -110,6 +114,7 @@ err_close_udev:
 	return ret;
 }
 
+#ifndef AS_LIBRARY
 int usbip_unbind(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -140,3 +145,4 @@ err_out:
 out:
 	return ret;
 }
+#endif

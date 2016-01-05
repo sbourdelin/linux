@@ -24,7 +24,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 #include <unistd.h>
 
 #include "usbip_host_driver.h"
@@ -33,6 +35,7 @@
 #include "usbip_ux.h"
 #include "usbip.h"
 
+#ifndef AS_LIBRARY
 static const char usbip_disconnect_usage_string[] =
 	"usbip disconnect <args>\n"
 	"    -r, --remote=<host>    Address of a remote computer\n"
@@ -42,6 +45,7 @@ void usbip_disconnect_usage(void)
 {
 	printf("usage: %s", usbip_disconnect_usage_string);
 }
+#endif
 
 static int send_unexport_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 {
@@ -131,12 +135,12 @@ static int unexport_device(char *busid, usbip_sock_t *sock)
 	return 0;
 }
 
-static int disconnect_device(char *host, char *busid)
+int usbip_disconnect_device(char *host, char *port, char *busid)
 {
 	usbip_sock_t *sock;
 	int rc;
 
-	sock = usbip_conn_ops.open(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, port);
 	if (!sock) {
 		err("tcp connect");
 		return -1;
@@ -162,6 +166,7 @@ static int disconnect_device(char *host, char *busid)
 	return 0;
 }
 
+#ifndef AS_LIBRARY
 int usbip_disconnect(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -195,7 +200,7 @@ int usbip_disconnect(int argc, char *argv[])
 	if (!host || !busid)
 		goto err_out;
 
-	ret = disconnect_device(host, busid);
+	ret = usbip_disconnect_device(host, usbip_port_string, busid);
 	goto out;
 
 err_out:
@@ -203,3 +208,4 @@ err_out:
 out:
 	return ret;
 }
+#endif

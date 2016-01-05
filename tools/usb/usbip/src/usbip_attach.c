@@ -25,7 +25,9 @@
 #include <string.h>
 
 #include <fcntl.h>
+#ifndef AS_LIBRARY
 #include <getopt.h>
+#endif
 #include <unistd.h>
 #include <errno.h>
 
@@ -35,6 +37,7 @@
 #include "usbip_ux.h"
 #include "usbip.h"
 
+#ifndef AS_LIBRARY
 static const char usbip_attach_usage_string[] =
 	"usbip attach <args>\n"
 	"    -r, --remote=<host>      The machine with exported USB devices\n"
@@ -44,6 +47,7 @@ void usbip_attach_usage(void)
 {
 	printf("usage: %s", usbip_attach_usage_string);
 }
+#endif
 
 static int import_device(usbip_sock_t *sock, struct usbip_usb_device *udev)
 {
@@ -128,14 +132,14 @@ static int query_import_device(usbip_sock_t *sock, char *busid)
 	return import_device(sock, &reply.udev);
 }
 
-static int attach_device(char *host, char *busid)
+int usbip_attach_device(char *host, char *port, char *busid)
 {
 	usbip_sock_t *sock;
 	usbip_ux_t *ux;
 	int rc;
 	int rhport;
 
-	sock = usbip_conn_ops.open(host, usbip_port_string);
+	sock = usbip_conn_ops.open(host, port);
 	if (!sock) {
 		err("tcp connect");
 		goto err_out;
@@ -153,7 +157,7 @@ static int attach_device(char *host, char *busid)
 		goto err_cleanup_ux;
 	}
 
-	rc = usbip_vhci_create_record(host, usbip_port_string, busid, rhport);
+	rc = usbip_vhci_create_record(host, port, busid, rhport);
 	if (rc < 0) {
 		err("record connection");
 		goto err_cleanup_ux;
@@ -175,6 +179,7 @@ err_out:
 	return -1;
 }
 
+#ifndef AS_LIBRARY
 int usbip_attach(int argc, char *argv[])
 {
 	static const struct option opts[] = {
@@ -208,7 +213,7 @@ int usbip_attach(int argc, char *argv[])
 	if (!host || !busid)
 		goto err_out;
 
-	ret = attach_device(host, busid);
+	ret = usbip_attach_device(host, usbip_port_string, busid);
 	goto out;
 
 err_out:
@@ -216,3 +221,4 @@ err_out:
 out:
 	return ret;
 }
+#endif
