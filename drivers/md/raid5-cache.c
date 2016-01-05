@@ -453,7 +453,7 @@ int r5l_write_stripe(struct r5conf *conf, struct stripe_head *sh)
 		return -EAGAIN;
 	/* Don't support stripe batch */
 	if (sh->log_io || !test_bit(R5_Wantwrite, &sh->dev[sh->pd_idx].flags) ||
-	    test_bit(STRIPE_SYNCING, &sh->state)) {
+	    test_bit(STRIPE_SYNCING, &sh->state) || sh->batch_head) {
 		/* the stripe is written to log, we start writing it to raid */
 		clear_bit(STRIPE_LOG_TRAPPED, &sh->state);
 		return -EAGAIN;
