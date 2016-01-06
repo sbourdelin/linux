@@ -50,6 +50,8 @@
 		gpio = <&gpio7 3 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_en>;
+		regulator-always-on;
+		regulator-boot-on;
 		regulator-name = "vcc_lcd";
 		vin-supply = <&vcc_io>;
 	};
