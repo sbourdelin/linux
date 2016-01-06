@@ -156,10 +156,10 @@ static void estimate_pid_constants(struct thermal_zone_device *tz,
 		return;
 
 	if (!tz->tzp->k_po_ratio || force)
-		tz->tzp->k_po_ratio = 1;
+		tz->tzp->k_po_ratio = 100;
 
 	if (!tz->tzp->k_pu_ratio || force)
-		tz->tzp->k_pu_ratio = 2;
+		tz->tzp->k_pu_ratio = 200;
 
 	if (!tz->tzp->k_i || force)
 		tz->tzp->k_i = int_to_frac(10) / 1000;
@@ -169,9 +169,9 @@ static void estimate_pid_constants(struct thermal_zone_device *tz,
 	 */
 
 	tz->tzp->k_po = int_to_frac(tz->tzp->k_po_ratio * sustainable_power) /
-				temperature_threshold;
+				temperature_threshold / 100;
 	tz->tzp->k_pu = int_to_frac(tz->tzp->k_pu_ratio * sustainable_power) /
-				temperature_threshold;
+				temperature_threshold / 100;
 }
 
 /**
