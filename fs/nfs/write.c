@@ -1296,6 +1296,7 @@ static void nfs_initiate_write(struct nfs_pgio_header *hdr,
 	int priority = flush_task_priority(how);
 
 	task_setup_data->priority = priority;
+	task_setup_data->flags |= RPC_TASK_TIMEOUT;
 	rpc_ops->write_setup(hdr, msg);
 
 	nfs4_state_protect_write(NFS_SERVER(hdr->inode)->nfs_client,
@@ -1578,7 +1579,7 @@ int nfs_initiate_commit(struct rpc_clnt *clnt, struct nfs_commit_data *data,
 		.callback_ops = call_ops,
 		.callback_data = data,
 		.workqueue = nfsiod_workqueue,
-		.flags = RPC_TASK_ASYNC | flags,
+		.flags = RPC_TASK_ASYNC | RPC_TASK_TIMEOUT | flags,
 		.priority = priority,
 	};
 	/* Set up the initial task struct.  */

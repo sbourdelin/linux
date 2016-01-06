@@ -191,7 +191,7 @@ static void nfs_initiate_read(struct nfs_pgio_header *hdr,
 	struct inode *inode = hdr->inode;
 	int swap_flags = IS_SWAPFILE(inode) ? NFS_RPC_SWAPFLAGS : 0;
 
-	task_setup_data->flags |= swap_flags;
+	task_setup_data->flags |= swap_flags | RPC_TASK_TIMEOUT;
 	rpc_ops->read_setup(hdr, msg);
 }
 
