@@ -237,12 +237,6 @@ scmd_printk(const char *, const struct scsi_cmnd *, const char *, ...);
 			sdev_dbg((scmd)->device, fmt, ##a);		   \
 	} while (0)
 
-enum scsi_target_state {
-	STARGET_CREATED = 1,
-	STARGET_RUNNING,
-	STARGET_DEL,
-};
-
 /*
  * scsi_target: representation of a scsi target, for now, this is only
  * used for single_lun devices. If no one has active IO to the target,
@@ -268,6 +262,8 @@ struct scsi_target {
 	unsigned int		expecting_lun_change:1;	/* A device has reported
 						 * a 3F/0E UA, other devices on
 						 * the same target will also. */
+	unsigned int		is_visible:1; /* visible in sysfs */
+	unsigned int		reaped:1; /* removed from target list */
 	/* commands actually active on LLD. */
 	atomic_t		target_busy;
 	atomic_t		target_blocked;
@@ -281,7 +277,6 @@ struct scsi_target {
 #define SCSI_DEFAULT_TARGET_BLOCKED	3
 
 	char			scsi_level;
-	enum scsi_target_state	state;
 	void 			*hostdata; /* available to low-level driver */
 	unsigned long		starget_data[0]; /* for the transport */
 	/* starget_data must be the last element!!!! */
