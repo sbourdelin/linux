@@ -9463,8 +9463,8 @@ int btrfs_can_relocate(struct btrfs_root *root, u64 bytenr)
 		 */
 		if (device->total_bytes > device->bytes_used + min_free &&
 		    !device->is_tgtdev_for_dev_replace) {
-			ret = find_free_dev_extent(trans, device, min_free,
-						   &dev_offset, NULL);
+			ret = find_free_dev_extent(trans->transaction, device,
+						   min_free, &dev_offset, NULL);
 			if (!ret)
 				dev_nr++;
 
@@ -10658,8 +10658,7 @@ static int btrfs_trim_free_extents(struct btrfs_device *device,
 			atomic_inc(&trans->use_count);
 		spin_unlock(&fs_info->trans_lock);
 
-		ret = find_free_dev_extent_start(trans, device, minlen, start,
-						 &start, &len);
+		ret = find_free_dev_extent(trans, device, minlen, &start, &len);
 		if (trans)
 			btrfs_put_transaction(trans);
 
