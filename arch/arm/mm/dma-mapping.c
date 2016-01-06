@@ -1159,6 +1159,13 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 	}
 
 	/*
+	 * Go straight to 4K chunks if it's sequential to ease the burden on
+	 * the memory manager and to leave bug chunks available for others.
+	 */
+	if (dma_get_attr(DMA_ATTR_SEQUENTIAL, attrs))
+		order_idx = ARRAY_SIZE(iommu_order_array) - 1;
+
+	/*
 	 * IOMMU can map any pages, so himem can also be used here
 	 */
 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
