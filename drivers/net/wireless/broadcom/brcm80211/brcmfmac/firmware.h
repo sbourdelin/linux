@@ -76,12 +76,14 @@ int brcmf_fw_get_firmwares_pcie(struct device *dev, u16 flags,
 				const char *code, const char *nvram,
 				void (*fw_cb)(struct device *dev,
 					      const struct firmware *fw,
-					      void *nvram_image, u32 nvram_len),
+					      void *nvram_image, u32 nvram_len,
+					      const char *alpha2),
 				u16 domain_nr, u16 bus_nr);
 int brcmf_fw_get_firmwares(struct device *dev, u16 flags,
 			   const char *code, const char *nvram,
 			   void (*fw_cb)(struct device *dev,
 					 const struct firmware *fw,
-					 void *nvram_image, u32 nvram_len));
+					 void *nvram_image, u32 nvram_len,
+					 const char *alpha2));
 
 #endif /* BRCMFMAC_FIRMWARE_H */

@@ -32,6 +32,19 @@ static char brcmf_firmware_path[BRCMF_FW_NAME_LEN];
 module_param_string(alternative_fw_path, brcmf_firmware_path,
 		    BRCMF_FW_NAME_LEN, 0440);
 
+struct brcmf_fw {
+	struct device *dev;
+	u16 flags;
+	const struct firmware *code;
+	const char *nvram_name;
+	u16 domain_nr;
+	u16 bus_nr;
+	char alpha2[2];
+	void (*done)(struct device *dev, const struct firmware *fw,
+		     void *nvram_image, u32 nvram_len, const char *alpha2);
+	struct completion *completion;
+};
+
 enum nvram_parser_state {
 	IDLE,
 	KEY,
@@ -65,6 +78,7 @@ struct nvram_parser {
 	u32 entry;
 	bool multi_dev_v1;
 	bool multi_dev_v2;
+	char alpha2[2];
 };
 
 /**
@@ -127,6 +141,11 @@ static enum nvram_parser_state brcmf_nvram_handle_key(struct nvram_parser *nvp)
 			nvp->multi_dev_v1 = true;
 		if (strncmp(&nvp->data[nvp->entry], "pcie/", 5) == 0)
 			nvp->multi_dev_v2 = true;
+		/* TODO: Use wl%d_country_code */
+		if (!strncmp(&nvp->data[nvp->entry], "wl0_country_code", 16)) {
+			nvp->alpha2[0] = nvp->data[nvp->pos + 1];
+			nvp->alpha2[1] = nvp->data[nvp->pos + 2];
+		}
 	} else if (!is_nvram_char(c) || c == ' ') {
 		brcmf_dbg(INFO, "warning: ln=%d:col=%d: '=' expected, skip invalid key entry\n",
 			  nvp->line, nvp->column);
@@ -364,7 +383,7 @@ fail:
  * End of buffer is completed with token identifying length of buffer.
  */
 static void *brcmf_fw_nvram_strip(const u8 *data, size_t data_len,
-				  u32 *new_length, u16 domain_nr, u16 bus_nr)
+				  u32 *new_length, struct brcmf_fw *fwctx)
 {
 	struct nvram_parser nvp;
 	u32 pad;
@@ -380,9 +399,14 @@ static void *brcmf_fw_nvram_strip(const u8 *data, size_t data_len,
 			break;
 	}
 	if (nvp.multi_dev_v1)
-		brcmf_fw_strip_multi_v1(&nvp, domain_nr, bus_nr);
+		brcmf_fw_strip_multi_v1(&nvp, fwctx->domain_nr, fwctx->bus_nr);
 	else if (nvp.multi_dev_v2)
-		brcmf_fw_strip_multi_v2(&nvp, domain_nr, bus_nr);
+		brcmf_fw_strip_multi_v2(&nvp, fwctx->domain_nr, fwctx->bus_nr);
+
+	if (nvp.alpha2[0]) {
+		fwctx->alpha2[0] = nvp.alpha2[0];
+		fwctx->alpha2[1] = nvp.alpha2[1];
+	}
 
 	if (nvp.nvram_len == 0) {
 		kfree(nvp.nvram);
@@ -411,17 +435,6 @@ void brcmf_fw_nvram_free(void *nvram)
 	kfree(nvram);
 }
 
-struct brcmf_fw {
-	struct device *dev;
-	u16 flags;
-	const struct firmware *code;
-	const char *nvram_name;
-	u16 domain_nr;
-	u16 bus_nr;
-	void (*done)(struct device *dev, const struct firmware *fw,
-		     void *nvram_image, u32 nvram_len);
-};
-
 static void brcmf_fw_request_nvram_done(const struct firmware *fw, void *ctx)
 {
 	struct brcmf_fw *fwctx = ctx;
@@ -445,7 +458,7 @@ static void brcmf_fw_request_nvram_done(const struct firmware *fw, void *ctx)
 
 	if (data)
 		nvram = brcmf_fw_nvram_strip(data, data_len, &nvram_length,
-					     fwctx->domain_nr, fwctx->bus_nr);
+					     fwctx);
 
 	if (raw_nvram)
 		bcm47xx_nvram_release_contents(data);
@@ -453,7 +466,7 @@ static void brcmf_fw_request_nvram_done(const struct firmware *fw, void *ctx)
 	if (!nvram && !(fwctx->flags & BRCMF_FW_REQ_NV_OPTIONAL))
 		goto fail;
 
-	fwctx->done(fwctx->dev, fwctx->code, nvram, nvram_length);
+	fwctx->done(fwctx->dev, fwctx->code, nvram, nvram_length, fwctx->alpha2[0] ? fwctx->alpha2 : NULL);
 	kfree(fwctx);
 	return;
 
@@ -475,7 +488,7 @@ static void brcmf_fw_request_code_done(const struct firmware *fw, void *ctx)
 
 	/* only requested code so done here */
 	if (!(fwctx->flags & BRCMF_FW_REQUEST_NVRAM)) {
-		fwctx->done(fwctx->dev, fw, NULL, 0);
+		fwctx->done(fwctx->dev, fw, NULL, 0, NULL);
 		kfree(fwctx);
 		return;
 	}
@@ -500,7 +513,8 @@ int brcmf_fw_get_firmwares_pcie(struct device *dev, u16 flags,
 				const char *code, const char *nvram,
 				void (*fw_cb)(struct device *dev,
 					      const struct firmware *fw,
-					      void *nvram_image, u32 nvram_len),
+					      void *nvram_image, u32 nvram_len,
+					      const char *alpha2),
 				u16 domain_nr, u16 bus_nr)
 {
 	struct brcmf_fw *fwctx;
@@ -533,7 +547,8 @@ int brcmf_fw_get_firmwares(struct device *dev, u16 flags,
 			   const char *code, const char *nvram,
 			   void (*fw_cb)(struct device *dev,
 					 const struct firmware *fw,
-					 void *nvram_image, u32 nvram_len))
+					 void *nvram_image, u32 nvram_len,
+					 const char *alpha2))
 {
 	return brcmf_fw_get_firmwares_pcie(dev, flags, code, nvram, fw_cb, 0,
 					   0);

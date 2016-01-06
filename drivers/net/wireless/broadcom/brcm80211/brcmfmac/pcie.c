@@ -1682,8 +1682,11 @@ static const struct brcmf_buscore_ops brcmf_pcie_buscore_ops = {
 	.write32 = brcmf_pcie_buscore_write32,
 };
 
+#include "core.h"
+#include "cfg80211.h"
+
 static void brcmf_pcie_setup(struct device *dev, const struct firmware *fw,
-			     void *nvram, u32 nvram_len)
+			     void *nvram, u32 nvram_len, const char *alpha2)
 {
 	struct brcmf_bus *bus = dev_get_drvdata(dev);
 	struct brcmf_pciedev *pcie_bus_dev = bus->bus_priv.pcie;
@@ -1734,8 +1737,17 @@ static void brcmf_pcie_setup(struct device *dev, const struct firmware *fw,
 	init_waitqueue_head(&devinfo->mbdata_resp_wait);
 
 	brcmf_pcie_intr_enable(devinfo);
-	if (brcmf_pcie_attach_bus(bus->dev) == 0)
+	if (brcmf_pcie_attach_bus(bus->dev) == 0) {
+		if (alpha2) {
+			struct brcmf_bus *bus_if = dev_get_drvdata(bus->dev);
+			struct brcmf_pub *drvr = bus_if->drvr;
+			struct brcmf_cfg80211_info *cfg = drvr->config;
+
+			regulatory_hint(cfg->wiphy, alpha2);
+		}
+
 		return;
+	}
 
 	brcmf_pcie_bus_console_read(devinfo);
 

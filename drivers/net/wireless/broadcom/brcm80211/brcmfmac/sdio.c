@@ -3928,7 +3928,8 @@ static const struct brcmf_bus_ops brcmf_sdio_bus_ops = {
 
 static void brcmf_sdio_firmware_callback(struct device *dev,
 					 const struct firmware *code,
-					 void *nvram, u32 nvram_len)
+					 void *nvram, u32 nvram_len,
+					 const char *alpha2)
 {
 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;

@@ -1159,7 +1159,8 @@ fail:
 
 static void brcmf_usb_probe_phase2(struct device *dev,
 				   const struct firmware *fw,
-				   void *nvram, u32 nvlen)
+				   void *nvram, u32 nvlen,
+				   const char *alpha2)
 {
 	struct brcmf_bus *bus = dev_get_drvdata(dev);
 	struct brcmf_usbdev_info *devinfo;
