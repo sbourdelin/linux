@@ -4009,7 +4009,6 @@ static ssize_t ipr_store_update_fw(struct device *dev,
 		return -EACCES;
 
 	len = snprintf(fname, 99, "%s", buf);
-	fname[len-1] = '\0';
 
 	if (request_firmware(&fw_entry, fname, &ioa_cfg->pdev->dev)) {
 		dev_err(&ioa_cfg->pdev->dev, "Firmware file %s not found\n", fname);
