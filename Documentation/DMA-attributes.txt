@@ -100,3 +100,14 @@ allocated by dma_alloc_attrs() function from individual pages if it can
 be mapped as contiguous chunk into device dma address space. By
 specifying this attribute the allocated buffer is forced to be contiguous
 also in physical memory.
+
+DMA_ATTR_SEQUENTIAL
+-------------------
+
+This is a hint to the DMA-mapping subsystem that access to the buffer
+will be mostly sequential instead of random access.  The DMA-mapping
+subsystem might use this information to make decisions on how hard it
+will work to optimize TLB efficiency.  If we know access is sequential
+and we don't have DMA_ATTR_FORCE_CONTIGUOUS then it's probably wiser
+for the DMA-mapping subsystem to allocate memory out of individual
+pages to avoid stressing the memory subsystem as much.
