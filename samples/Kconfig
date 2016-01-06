@@ -63,6 +63,14 @@ config SAMPLE_RPMSG_CLIENT
 	  to communicate with an AMP-configured remote processor over
 	  the rpmsg bus.
 
+config IMX_RPMSG_PINGPONG
+	tristate "Build imx rpmsg pingpong sample -- loadable modules only"
+	depends on RPMSG && m
+	help
+	  Build an imx rpmsg pingpong sample driver, which demonstrates
+	  the data transactions on the AMP-configured imx processor over
+	  the rpmsg bus.
+
 config SAMPLE_LIVEPATCH
 	tristate "Build live patching sample -- loadable modules only"
 	depends on LIVEPATCH && m
