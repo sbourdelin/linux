@@ -114,13 +114,20 @@ whilst temperature is low, and may lead to temperature overshooting.
 
 The default value for `k_pu` is:
 
-    2 * sustainable_power / (desired_temperature - switch_on_temp)
+    k_pu_ratio * sustainable_power / (desired_temperature - switch_on_temp)
 
 This means that at `switch_on_temp` the output of the controller's
-proportional term will be 2 * `sustainable_power`.  The default value
-for `k_po` is:
+proportional term will be k_pu_ratio * `sustainable_power`.
 
-    sustainable_power / (desired_temperature - switch_on_temp)
+The default value for `k_po` is:
+
+    k_po_ratio * sustainable_power / (desired_temperature - switch_on_temp)
+
+k_pu_ratio's default value is 2 and k_po_ratio's default value is 1.
+These two vairants mean the ratio value compared against sustainable power,
+so smaller ratio will result in thermal slower ramp. User can set these two
+ratio value from sys filesystem nodes, finally k_pu and k_po will be
+calculated by updated ratio value.
 
 Focusing on the proportional and feed forward values of the PID
 controller equation we have:
