@@ -7840,6 +7840,30 @@ define_netdev_printk_level(netdev_warn, KERN_WARNING);
 define_netdev_printk_level(netdev_notice, KERN_NOTICE);
 define_netdev_printk_level(netdev_info, KERN_INFO);
 
+static ATOMIC_NOTIFIER_HEAD(netdev_atomic_notifier_chain);
+
+int register_netdev_atomic_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&netdev_atomic_notifier_chain,
+					      nb);
+}
+EXPORT_SYMBOL_GPL(register_netdev_atomic_notifier);
+
+int unregister_netdev_atomic_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&netdev_atomic_notifier_chain,
+						nb);
+}
+EXPORT_SYMBOL_GPL(unregister_netdev_atomic_notifier);
+
+int call_netdev_atomic_notifiers(enum netdev_atomic_callback_type type,
+				 struct net_device *dev)
+{
+	return atomic_notifier_call_chain(&netdev_atomic_notifier_chain,
+					  type, dev);
+}
+EXPORT_SYMBOL_GPL(call_netdev_atomic_notifiers);
+
 static void __net_exit netdev_exit(struct net *net)
 {
 	kfree(net->dev_name_head);
