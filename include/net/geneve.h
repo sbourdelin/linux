@@ -1,6 +1,8 @@
 #ifndef __NET_GENEVE_H
 #define __NET_GENEVE_H  1
 
+#include <linux/netdevice.h>
+
 #ifdef CONFIG_INET
 #include <net/udp_tunnel.h>
 #endif
@@ -62,13 +64,10 @@ struct genevehdr {
 	struct geneve_opt options[];
 };
 
-#if IS_ENABLED(CONFIG_GENEVE)
-void geneve_get_rx_port(struct net_device *netdev);
-#else
 static inline void geneve_get_rx_port(struct net_device *netdev)
 {
+	call_netdevice_notifiers(NETDEV_REFRESH_OFFLOAD_GENEVE, netdev);
 }
-#endif
 
 #ifdef CONFIG_INET
 struct net_device *geneve_dev_create_fb(struct net *net, const char *name,
