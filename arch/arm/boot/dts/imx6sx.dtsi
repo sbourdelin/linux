@@ -1184,6 +1184,18 @@
 				status = "disabled";
 			};
 
+			mu: mu@02294000 { /* mu */
+				compatible = "fsl,imx6sx-mu";
+				reg = <0x02294000 0x4000>;
+				interrupts = <0 90 0x04>;
+				status = "disabled";
+			};
+
+			rpmsg: rpmsg{
+				compatible = "fsl,imx6sx-rpmsg";
+				status = "disabled";
+			};
+
 			uart6: serial@022a0000 {
 				compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
 				reg = <0x022a0000 0x4000>;
