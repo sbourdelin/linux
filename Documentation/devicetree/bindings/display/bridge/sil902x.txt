@@ -1,0 +1,31 @@
+sil902x HDMI bridge bindings
+
+Required properties:
+	- compatible: "sil,sil9022"
+	- reg: i2c address of the bridge
+	- reset-gpios: OF device-tree gpio specification for RST_N pin.
+
+Optional properties:
+	- interrupts-extended or interrupt-parent + interrupts: describe
+	  the interrupt line used to inform the host about hotplug events.
+
+Optional subnodes:
+	- video input: Device node can contain video input port node to
+	  connect the bridge to a display controller output (See this
+	  documentation [1]).
+
+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+
+Example:
+	hdmi-bridge@39 {
+		compatible = "sil,sil9022";
+		reg = <0x39>;
+		reset-gpios = <&gpx1 5 1 0 0>;
+		ports {
+			port@0 {
+				bridge_in: endpoint {
+					remote-endpoint = <&dc_out>;
+				};
+			};
+		};
+	};
