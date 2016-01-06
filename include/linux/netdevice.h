@@ -2224,7 +2224,7 @@ netdev_notifier_info_to_dev(const struct netdev_notifier_info *info)
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev);
 
 enum netdev_atomic_callback_type {
-	PLACEHOLDER = 0x1UL,
+	NETDEV_OFFLOAD_REFRESH_VXLAN = 0x1UL,
 };
 
 int register_netdev_atomic_notifier(struct notifier_block *nb);

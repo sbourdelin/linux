@@ -2468,7 +2468,7 @@ static struct device_type vxlan_type = {
  * supply the listening VXLAN udp ports. Callers are expected
  * to implement the ndo_add_vxlan_port.
  */
-void vxlan_get_rx_port(struct net_device *dev)
+static void vxlan_netdev_refresh_offload(struct net_device *dev)
 {
 	struct vxlan_sock *vs;
 	struct net *net = dev_net(dev);
@@ -2488,7 +2488,6 @@ void vxlan_get_rx_port(struct net_device *dev)
 	}
 	spin_unlock(&vn->sock_lock);
 }
-EXPORT_SYMBOL_GPL(vxlan_get_rx_port);
 
 /* Initialize the device structure. */
 static void vxlan_setup(struct net_device *dev)
@@ -3180,6 +3179,24 @@ static struct notifier_block vxlan_notifier_block __read_mostly = {
 	.notifier_call = vxlan_lowerdev_event,
 };
 
+static int vxlan_atomic_event(struct notifier_block *unused,
+			      unsigned long event, void *ptr)
+{
+	struct net_device *dev = ptr;
+
+	switch (event) {
+	case NETDEV_OFFLOAD_REFRESH_VXLAN:
+		vxlan_netdev_refresh_offload(dev);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block vxlan_atomic_notifier_block __read_mostly = {
+	.notifier_call = vxlan_atomic_event,
+};
+
 static __net_init int vxlan_init_net(struct net *net)
 {
 	struct vxlan_net *vn = net_generic(net, vxlan_net_id);
@@ -3241,17 +3258,24 @@ static int __init vxlan_init_module(void)
 	if (rc)
 		goto out1;
 
-	rc = register_netdevice_notifier(&vxlan_notifier_block);
+	rc = register_netdev_atomic_notifier(&vxlan_atomic_notifier_block);
 	if (rc)
 		goto out2;
 
-	rc = rtnl_link_register(&vxlan_link_ops);
+	rc = register_netdevice_notifier(&vxlan_notifier_block);
 	if (rc)
 		goto out3;
 
+	rc = rtnl_link_register(&vxlan_link_ops);
+	if (rc)
+		goto out4;
+
 	return 0;
-out3:
+
+out4:
 	unregister_netdevice_notifier(&vxlan_notifier_block);
+out3:
+	unregister_netdev_atomic_notifier(&vxlan_atomic_notifier_block);
 out2:
 	unregister_pernet_subsys(&vxlan_net_ops);
 out1:
@@ -3263,6 +3287,7 @@ late_initcall(vxlan_init_module);
 static void __exit vxlan_cleanup_module(void)
 {
 	rtnl_link_unregister(&vxlan_link_ops);
+	unregister_netdev_atomic_notifier(&vxlan_atomic_notifier_block);
 	unregister_netdevice_notifier(&vxlan_notifier_block);
 	destroy_workqueue(vxlan_wq);
 	unregister_pernet_subsys(&vxlan_net_ops);
