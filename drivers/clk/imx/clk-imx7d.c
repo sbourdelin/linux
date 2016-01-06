@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2015 Freescale Semiconductor, Inc.
+ * Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
  *
  * The code contained herein is licensed under the GNU General Public
  * License. You may obtain a copy of the GNU General Public License
@@ -692,6 +692,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
 	clks[IMX7D_ENET_AXI_ROOT_DIV] = imx_clk_divider("enet_axi_post_div", "enet_axi_pre_div", base + 0x8900, 0, 6);
 	clks[IMX7D_NAND_USDHC_BUS_ROOT_DIV] = imx_clk_divider("nand_usdhc_post_div", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
 	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider("ahb_post_div", "ahb_pre_div", base + 0x9000, 0, 6);
+	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2);
 	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider("dram_post_div", "dram_cg", base + 0x9880, 0, 3);
 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_DIV] = imx_clk_divider("dram_phym_alt_post_div", "dram_phym_alt_pre_div", base + 0xa000, 0, 3);
 	clks[IMX7D_DRAM_ALT_ROOT_DIV] = imx_clk_divider("dram_alt_post_div", "dram_alt_pre_div", base + 0xa080, 0, 3);
@@ -769,6 +770,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
 	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate2("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate2("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
 	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate2("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
+	clks[IMX7D_MU_ROOT_CLK] = imx_clk_gate2("mu_root_clk", "ipg_root_clk", base + 0x4270, 0);
 	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate2("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
 	clks[IMX7D_PCIE_CTRL_ROOT_CLK] = imx_clk_gate2("pcie_ctrl_root_clk", "pcie_ctrl_post_div", base + 0x4600, 0);
 	clks[IMX7D_PCIE_PHY_ROOT_CLK] = imx_clk_gate2("pcie_phy_root_clk", "pcie_phy_post_div", base + 0x4600, 0);
@@ -869,6 +871,10 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
 	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
 
 	imx_register_uart_clocks(uart_clks);
+
+	/* set the parent clock source of m4, then keep it enabled */
+	clk_set_parent(clks[IMX7D_ARM_M4_ROOT_SRC], clks[IMX7D_PLL_SYS_MAIN_240M_CLK]);
+	clk_prepare_enable(clks[IMX7D_ARM_M4_ROOT_CLK]);
 
 }
 CLK_OF_DECLARE(imx7d, "fsl,imx7d-ccm", imx7d_clocks_init);
