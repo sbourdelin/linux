@@ -91,6 +91,8 @@ static struct vport *vxlan_tnl_create(const struct vport_parms *parms)
 	struct vxlan_config conf = {
 		.no_share = true,
 		.flags = VXLAN_F_COLLECT_METADATA,
+		/* The maximum VXLAN payload to fit in an IPv6 packet */
+		.mtu = 65535 - VXLAN6_HEADROOM,
 	};
 
 	if (!options) {
