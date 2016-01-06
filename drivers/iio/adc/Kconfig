@@ -131,6 +131,17 @@ config AT91_ADC
 	  To compile this driver as a module, choose M here: the module will be
 	  called at91_adc.
 
+config AT91_ADC8xx
+	tristate "Atmel AT91 ADC 8xx"
+	depends on ARCH_AT91
+	depends on INPUT
+	help
+	  Say yes here to build support for Atmel ADC 8xx which is available
+	  from SAMA5D2 SoC family.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called at91_adc8xx.
+
 config AXP288_ADC
 	tristate "X-Powers AXP288 ADC driver"
 	depends on MFD_AXP20X
