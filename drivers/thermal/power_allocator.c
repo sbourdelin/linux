@@ -155,13 +155,11 @@ static void estimate_pid_constants(struct thermal_zone_device *tz,
 	if (!temperature_threshold)
 		return;
 
-	if (!tz->tzp->k_po || force)
-		tz->tzp->k_po = int_to_frac(sustainable_power) /
-			temperature_threshold;
+	if (!tz->tzp->k_po_ratio || force)
+		tz->tzp->k_po_ratio = 1;
 
-	if (!tz->tzp->k_pu || force)
-		tz->tzp->k_pu = int_to_frac(2 * sustainable_power) /
-			temperature_threshold;
+	if (!tz->tzp->k_pu_ratio || force)
+		tz->tzp->k_pu_ratio = 2;
 
 	if (!tz->tzp->k_i || force)
 		tz->tzp->k_i = int_to_frac(10) / 1000;
@@ -169,6 +167,11 @@ static void estimate_pid_constants(struct thermal_zone_device *tz,
 	 * The default for k_d and integral_cutoff is 0, so we can
 	 * leave them as they are.
 	 */
+
+	tz->tzp->k_po = int_to_frac(tz->tzp->k_po_ratio * sustainable_power) /
+				temperature_threshold;
+	tz->tzp->k_pu = int_to_frac(tz->tzp->k_pu_ratio * sustainable_power) /
+				temperature_threshold;
 }
 
 /**
@@ -202,6 +205,9 @@ static u32 pid_controller(struct thermal_zone_device *tz,
 
 	if (tz->tzp->sustainable_power) {
 		sustainable_power = tz->tzp->sustainable_power;
+		estimate_pid_constants(tz, sustainable_power,
+				       params->trip_switch_on, control_temp,
+				       false);
 	} else {
 		sustainable_power = estimate_sustainable_power(tz);
 		estimate_pid_constants(tz, sustainable_power,

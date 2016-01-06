@@ -309,13 +309,13 @@ struct thermal_zone_params {
 	 * Proportional parameter of the PID controller when
 	 * overshooting (i.e., when temperature is below the target)
 	 */
-	s32 k_po;
+	s32 k_po, k_po_ratio;
 
 	/*
 	 * Proportional parameter of the PID controller when
 	 * undershooting
 	 */
-	s32 k_pu;
+	s32 k_pu, k_pu_ratio;
 
 	/* Integral parameter of the PID controller */
 	s32 k_i;
