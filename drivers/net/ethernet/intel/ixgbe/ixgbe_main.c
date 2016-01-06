@@ -9084,6 +9084,8 @@ skip_sriov:
 		goto err_sw_init;
 	}
 
+	/* Set hw->addr to permanent mac address*/
+	ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
 	ixgbe_mac_set_default_filter(adapter);
 
 	setup_timer(&adapter->service_timer, &ixgbe_service_timer,
