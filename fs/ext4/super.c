@@ -4844,8 +4844,8 @@ static int ext4_statfs_project(struct super_block *sb,
 
 	qid = make_kqid_projid(projid);
 	dquot = dqget(sb, qid);
-	if (!dquot)
-		return -ESRCH;
+	if (IS_ERR(dquot))
+		return PTR_ERR(dquot);
 	spin_lock(&dq_data_lock);
 
 	limit = (dquot->dq_dqb.dqb_bsoftlimit ?
