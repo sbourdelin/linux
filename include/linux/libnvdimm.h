@@ -27,7 +27,7 @@ enum {
 	/* need to set a limit somewhere, but yes, this is likely overkill */
 	ND_IOCTL_MAX_BUFLEN = SZ_4M,
 	ND_CMD_MAX_ELEM = 4,
-	ND_CMD_MAX_ENVELOPE = 16,
+	ND_CMD_MAX_ENVELOPE = 256,
 	ND_CMD_ARS_STATUS_MAX = SZ_4K,
 	ND_MAX_MAPPINGS = 32,
 
