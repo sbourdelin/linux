@@ -419,6 +419,83 @@ static u32 truncate_msg(u16 *text_len, u16 *trunc_msg_len,
 	return msg_used_size(*text_len + *trunc_msg_len, 0, pad_len);
 }
 
+static u64 printk_try_real_ns(void)
+{
+	return ktime_try_real_ns();
+}
+
+static u64 printk_try_boot_ns(void)
+{
+	return ktime_try_boot_ns();
+}
+
+static u64 printk_try_tai_ns(void)
+{
+	return ktime_try_tai_ns();
+}
+
+/* default to local clock */
+static u64 last_time_stamp;
+static char *printk_clock = "local";
+static u64 (*printk_clock_fn)(void) = &local_clock;
+
+static u64 printk_get_timestamp(void)
+{
+	u64 ret = printk_clock_fn();
+
+	if (likely(ret != KTIME_MAX_NS))
+		last_time_stamp = ret;
+	return ret;
+}
+
+static int printk_clock_param_set(const char *val,
+				  const struct kernel_param *kp)
+{
+	char *printk_clock_new = strstrip((char *)val);
+	int ret;
+
+	/* check if change is needed */
+	if (!strcmp(printk_clock_new, printk_clock))
+		return 0;
+
+	if (!strncmp("local", printk_clock_new, 5)) {
+		ret = param_set_charp(printk_clock_new, kp);
+		if (ret)
+			return ret;
+		printk_clock_fn = &local_clock;
+	} else if (!strncmp("real", printk_clock_new, 4)) {
+		ret = param_set_charp(printk_clock_new, kp);
+		if (ret)
+			return ret;
+		printk_clock_fn = &printk_try_real_ns;
+	} else if (!strncmp("boot", printk_clock_new, 4)) {
+		ret = param_set_charp(printk_clock_new, kp);
+		if (ret)
+			return ret;
+		printk_clock_fn = &printk_try_boot_ns;
+	} else if (!strncmp("tai", printk_clock_new, 3)) {
+		ret = param_set_charp(printk_clock_new, kp);
+		if (ret)
+			return ret;
+		printk_clock_fn = &printk_try_tai_ns;
+	}
+
+	/* Did the clock change ? */
+	if (strcmp(printk_clock_new, printk_clock))
+		return -EINVAL;
+
+	pr_info("printk: timestamp set to %s clock.\n", printk_clock);
+	return 0;
+}
+
+static struct kernel_param_ops printk_clock_param_ops = {
+	.set =		printk_clock_param_set,
+	.get =		param_get_charp,
+};
+
+module_param_cb(clock, &printk_clock_param_ops, &printk_clock, 0644);
+MODULE_PARM_DESC(clock, "Clock used for printk timestamps.  Can be local (hardware/default), boot, real, or tai.\n");
+
 /* insert record into the buffer, discard old ones, update heads */
 static int log_store(int facility, int level,
 		     enum log_flags flags, u64 ts_nsec,
@@ -467,7 +544,7 @@ static int log_store(int facility, int level,
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
-		msg->ts_nsec = local_clock();
+		msg->ts_nsec = printk_get_timestamp();
 	memset(log_dict(msg) + dict_len, 0, pad_len);
 	msg->len = size;
 
@@ -1039,18 +1116,30 @@ module_param_named(time, printk_time, bool, S_IRUGO | S_IWUSR);
 
 static size_t print_time(u64 ts, char *buf)
 {
-	unsigned long rem_nsec;
+	unsigned long rem;
+	size_t size;
 
 	if (!printk_time)
 		return 0;
 
-	rem_nsec = do_div(ts, 1000000000);
+	if (ts == KTIME_MAX_NS)
+		ts = last_time_stamp;
 
-	if (!buf)
-		return snprintf(NULL, 0, "[%5lu.000000] ", (unsigned long)ts);
+	if (buf) {
+		size = INT_MAX;
+		rem = do_div(ts, 1000000000) / 1000;
+	} else {
+		size = 0;
+		rem = 0;
+	}
 
-	return sprintf(buf, "[%5lu.%06lu] ",
-		       (unsigned long)ts, rem_nsec / 1000);
+	if (ts != KTIME_MAX_NS) {
+		return snprintf(buf, size, "[%5lu.%06lu] ",
+			       (unsigned long)ts, rem);
+	}
+	/* return last_time_stamp with ?? warning */
+	return snprintf(buf, size, "[%5lu.%04lu??] ",
+		       (unsigned long)ts, rem);
 }
 
 static size_t print_prefix(const struct printk_log *msg, bool syslog, char *buf)
@@ -1613,7 +1702,7 @@ static bool cont_add(int facility, int level, const char *text, size_t len)
 		cont.facility = facility;
 		cont.level = level;
 		cont.owner = current;
-		cont.ts_nsec = local_clock();
+		cont.ts_nsec = printk_get_timestamp();
 		cont.flags = 0;
 		cont.cons = 0;
 		cont.flushed = false;

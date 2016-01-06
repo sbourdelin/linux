@@ -39,6 +39,8 @@ struct itimerspec64 {
 #define TIME64_MAX			((s64)~((u64)1 << 63))
 #define KTIME_MAX			((s64)~((u64)1 << 63))
 #define KTIME_SEC_MAX			(KTIME_MAX / NSEC_PER_SEC)
+/* Maximum value returned by ktime_to_ns() */
+#define KTIME_MAX_NS 			((u64)((U64_MAX>>1)))
 
 #if __BITS_PER_LONG == 64
 
