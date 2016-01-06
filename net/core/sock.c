@@ -1620,6 +1620,7 @@ void sk_setup_caps(struct sock *sk, struct dst_entry *dst)
 		}
 	}
 	sk->sk_gso_max_segs = max_segs;
+	sk->sk_sg_max_frags = dst->dev->sg_max_frags;
 }
 EXPORT_SYMBOL_GPL(sk_setup_caps);
 

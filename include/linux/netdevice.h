@@ -1513,6 +1513,8 @@ enum netdev_priv_flags {
  *			NIC for GSO
  *	@gso_min_segs:	Minimum number of segments that can be passed to the
  *			NIC for GSO
+ *     @sg_max_frags:  Maximum number of fragments that can be passed to the
+ *                     NIC for SG
  *
  *	@dcbnl_ops:	Data Center Bridging netlink ops
  *	@num_tc:	Number of traffic classes in the net device
@@ -1799,6 +1801,7 @@ struct net_device {
 	struct phy_device *phydev;
 	struct lock_class_key *qdisc_tx_busylock;
 	bool proto_down;
+	u16 sg_max_frags;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
@@ -3793,6 +3796,11 @@ static inline void netif_set_gso_max_size(struct net_device *dev,
 					  unsigned int size)
 {
 	dev->gso_max_size = size;
+}
+static inline void netif_set_sg_max_frags(struct net_device *dev,
+					u16 max)
+{
+	dev->sg_max_frags = min_t(u16, MAX_SKB_FRAGS, max);
 }
 
 static inline void skb_gso_error_unwind(struct sk_buff *skb, __be16 protocol,
