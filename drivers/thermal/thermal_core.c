@@ -1037,8 +1037,25 @@ static DEVICE_ATTR(sustainable_power, S_IWUSR | S_IRUGO, sustainable_power_show,
 	}								\
 	static DEVICE_ATTR(name, S_IWUSR | S_IRUGO, name##_show, name##_store)
 
-create_s32_tzp_attr(k_po);
-create_s32_tzp_attr(k_pu);
+
+#define create_s32_tzp_attr_ro(name)					\
+	static ssize_t							\
+	name##_show(struct device *dev, struct device_attribute *devattr, \
+		char *buf)						\
+	{								\
+	struct thermal_zone_device *tz = to_thermal_zone(dev);		\
+									\
+	if (tz->tzp)							\
+		return sprintf(buf, "%u\n", tz->tzp->name);		\
+	else								\
+		return -EIO;						\
+	}								\
+	static DEVICE_ATTR(name, S_IRUGO, name##_show, NULL)
+
+create_s32_tzp_attr_ro(k_po);
+create_s32_tzp_attr_ro(k_pu);
+create_s32_tzp_attr(k_po_ratio);
+create_s32_tzp_attr(k_pu_ratio);
 create_s32_tzp_attr(k_i);
 create_s32_tzp_attr(k_d);
 create_s32_tzp_attr(integral_cutoff);
@@ -1050,6 +1067,8 @@ static struct device_attribute *dev_tzp_attrs[] = {
 	&dev_attr_sustainable_power,
 	&dev_attr_k_po,
 	&dev_attr_k_pu,
+	&dev_attr_k_po_ratio,
+	&dev_attr_k_pu_ratio,
 	&dev_attr_k_i,
 	&dev_attr_k_d,
 	&dev_attr_integral_cutoff,
