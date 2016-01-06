@@ -44,6 +44,8 @@ static struct {
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
 static struct timekeeper shadow_timekeeper;
 
+/* printk may call ktime_get_with_offset() before timekeeping is initialized. */
+static int timekeeping_initialized;
 /**
  * struct tk_fast - NMI safe timekeeper
  * @seq:	Sequence counter for protecting updates. The lowest bit
@@ -704,14 +706,21 @@ static ktime_t *offsets[TK_OFFS_MAX] = {
 	[TK_OFFS_TAI]	= &tk_core.timekeeper.offs_tai,
 };
 
-ktime_t ktime_get_with_offset(enum tk_offsets offs)
+ktime_t ktime_get_with_offset(enum tk_offsets offs, int trylock)
 {
 	struct timekeeper *tk = &tk_core.timekeeper;
 	unsigned int seq;
 	ktime_t base, *offset = offsets[offs];
 	s64 nsecs;
+	unsigned long flags = 0;
+
+	if (unlikely(!timekeeping_initialized))
+		return ktime_set(0, 0);
 
 	WARN_ON(timekeeping_suspended);
+
+	if (trylock && !raw_spin_trylock_irqsave(&timekeeper_lock, flags))
+		return ktime_set(KTIME_MAX, 0);
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
@@ -719,6 +728,9 @@ ktime_t ktime_get_with_offset(enum tk_offsets offs)
 		nsecs = timekeeping_get_ns(&tk->tkr_mono);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
+
+	if (trylock)
+		raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
 
 	return ktime_add_ns(base, nsecs);
 
@@ -1267,6 +1279,7 @@ void __init timekeeping_init(void)
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+	timekeeping_initialized = 1;
 }
 
 /* time in seconds when suspend began for persistent clock */

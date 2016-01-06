@@ -166,7 +166,7 @@ enum tk_offsets {
 };
 
 extern ktime_t ktime_get(void);
-extern ktime_t ktime_get_with_offset(enum tk_offsets offs);
+extern ktime_t ktime_get_with_offset(enum tk_offsets offs, int trylock);
 extern ktime_t ktime_mono_to_any(ktime_t tmono, enum tk_offsets offs);
 extern ktime_t ktime_get_raw(void);
 extern u32 ktime_get_resolution_ns(void);
@@ -176,7 +176,16 @@ extern u32 ktime_get_resolution_ns(void);
  */
 static inline ktime_t ktime_get_real(void)
 {
-	return ktime_get_with_offset(TK_OFFS_REAL);
+	return ktime_get_with_offset(TK_OFFS_REAL, 0);
+}
+
+/**
+ * ktime_try_real - same as ktime_get_real, except return 0 if timekeeping is
+ * locked.
+ */
+static inline ktime_t ktime_try_real(void)
+{
+	return ktime_get_with_offset(TK_OFFS_REAL, 1);
 }
 
 /**
@@ -187,7 +196,16 @@ static inline ktime_t ktime_get_real(void)
  */
 static inline ktime_t ktime_get_boottime(void)
 {
-	return ktime_get_with_offset(TK_OFFS_BOOT);
+	return ktime_get_with_offset(TK_OFFS_BOOT, 0);
+}
+
+/**
+ * ktime_try_boottime - same as ktime_get_bootime, except return 0 if
+ * timekeeping is locked.
+ */
+static inline ktime_t ktime_try_boottime(void)
+{
+	return ktime_get_with_offset(TK_OFFS_BOOT, 1);
 }
 
 /**
@@ -195,7 +213,16 @@ static inline ktime_t ktime_get_boottime(void)
  */
 static inline ktime_t ktime_get_clocktai(void)
 {
-	return ktime_get_with_offset(TK_OFFS_TAI);
+	return ktime_get_with_offset(TK_OFFS_TAI, 0);
+}
+
+/**
+ * ktime_try_clocktai - same as ktime_get_clocktai, except return 0 if
+ * timekeeping is locked.
+ */
+static inline ktime_t ktime_try_clocktai(void)
+{
+	return ktime_get_with_offset(TK_OFFS_TAI, 1);
 }
 
 /**
@@ -216,14 +243,29 @@ static inline u64 ktime_get_real_ns(void)
 	return ktime_to_ns(ktime_get_real());
 }
 
+static inline u64 ktime_try_real_ns(void)
+{
+	return ktime_to_ns(ktime_try_real());
+}
+
 static inline u64 ktime_get_boot_ns(void)
 {
 	return ktime_to_ns(ktime_get_boottime());
 }
 
+static inline u64 ktime_try_boot_ns(void)
+{
+	return ktime_to_ns(ktime_try_boottime());
+}
+
 static inline u64 ktime_get_tai_ns(void)
 {
 	return ktime_to_ns(ktime_get_clocktai());
+}
+
+static inline u64 ktime_try_tai_ns(void)
+{
+	return ktime_to_ns(ktime_try_clocktai());
 }
 
 static inline u64 ktime_get_raw_ns(void)
