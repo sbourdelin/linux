@@ -86,6 +86,10 @@ static int acpi_nfit_ctl(struct nvdimm_bus_descriptor *nd_desc,
 	const u8 *uuid;
 	u32 offset;
 	int rc, i;
+	__u64 rev = 1, func = cmd;
+
+	struct nd_cmd_dsmcall_pkg *pkg = buf;
+	int dsm_call = (cmd == ND_CMD_CALL_DSM);
 
 	if (nvdimm) {
 		struct nfit_mem *nfit_mem = nvdimm_provider_data(nvdimm);
@@ -109,6 +113,8 @@ static int acpi_nfit_ctl(struct nvdimm_bus_descriptor *nd_desc,
 		handle = adev->handle;
 		dimm_name = "bus";
 	}
+	if (dsm_call)
+		dsm_mask = ~0UL;
 
 	if (!desc || (cmd && (desc->out_num + desc->in_num == 0)))
 		return -ENOTTY;
@@ -128,15 +134,25 @@ static int acpi_nfit_ctl(struct nvdimm_bus_descriptor *nd_desc,
 		in_buf.buffer.length += nd_cmd_in_size(nvdimm, cmd, desc,
 				i, buf);
 
-	if (IS_ENABLED(CONFIG_ACPI_NFIT_DEBUG)) {
-		dev_dbg(dev, "%s:%s cmd: %s input length: %d\n", __func__,
-				dimm_name, cmd_name, in_buf.buffer.length);
-		print_hex_dump_debug(cmd_name, DUMP_PREFIX_OFFSET, 4,
-				4, in_buf.buffer.pointer, min_t(u32, 128,
-					in_buf.buffer.length), true);
+	if (dsm_call) {
+		/* must skip over package wrapper */
+		in_buf.buffer.pointer = (void *) &pkg->dsm_buf;
+		in_buf.buffer.length = pkg->h.dsm_in;
+		/* for pass thru must use value sent in from user space. */
+		uuid = pkg->h.dsm_uuid;
+		rev  = pkg->h.dsm_rev;
+		func = pkg->h.dsm_fun_idx;
 	}
 
-	out_obj = acpi_evaluate_dsm(handle, uuid, 1, cmd, &in_obj);
+	if (IS_ENABLED(CONFIG_ACPI_NFIT_DEBUG)) {
+		dev_dbg(dev, "%s:%s cmd: %d: %llu input length: %d\n", __func__,
+				dimm_name, cmd, func, in_buf.buffer.length);
+		print_hex_dump_debug("nvdimm in  ", DUMP_PREFIX_OFFSET, 4, 4,
+			in_buf.buffer.pointer,
+			min_t(u32, 256, in_buf.buffer.length), true);
+	}
+
+	out_obj = acpi_evaluate_dsm(handle, uuid, rev, func, &in_obj);
 	if (!out_obj) {
 		dev_dbg(dev, "%s:%s _DSM failed cmd: %s\n", __func__, dimm_name,
 				cmd_name);
@@ -144,18 +160,28 @@ static int acpi_nfit_ctl(struct nvdimm_bus_descriptor *nd_desc,
 	}
 
 	if (out_obj->package.type != ACPI_TYPE_BUFFER) {
-		dev_dbg(dev, "%s:%s unexpected output object type cmd: %s type: %d\n",
-				__func__, dimm_name, cmd_name, out_obj->type);
+		dev_dbg(dev, "%s:%s unexpected output object type cmd: %s %llu, type: %d\n",
+			__func__, dimm_name, cmd_name, func, out_obj->type);
 		rc = -EINVAL;
 		goto out;
 	}
 
 	if (IS_ENABLED(CONFIG_ACPI_NFIT_DEBUG)) {
-		dev_dbg(dev, "%s:%s cmd: %s output length: %d\n", __func__,
-				dimm_name, cmd_name, out_obj->buffer.length);
-		print_hex_dump_debug(cmd_name, DUMP_PREFIX_OFFSET, 4,
-				4, out_obj->buffer.pointer, min_t(u32, 128,
-					out_obj->buffer.length), true);
+		dev_dbg(dev, "%s:%s cmd %d: %llu output length %d\n", __func__,
+				dimm_name, cmd, func, out_obj->buffer.length);
+		print_hex_dump_debug("nvdimm out ", DUMP_PREFIX_OFFSET, 4, 4,
+			out_obj->buffer.pointer,
+			min_t(u32, 256, out_obj->buffer.length), true);
+	}
+
+	if (dsm_call) {
+		pkg->h.dsm_size = out_obj->buffer.length;
+		memcpy(pkg->dsm_buf + pkg->h.dsm_in,
+			out_obj->buffer.pointer,
+			min(pkg->h.dsm_size, pkg->h.dsm_out));
+
+		ACPI_FREE(out_obj);
+		return 0;
 	}
 
 	for (i = 0, offset = 0; i < desc->out_num; i++) {
