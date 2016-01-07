@@ -239,18 +239,26 @@ static bool netvsc_set_hash(u32 *hash, struct sk_buff *skb)
 {
 	struct flow_keys flow;
 	int data_len;
+	u8 data[sizeof(flow.addrs) + sizeof(flow.ports)];
 
-	if (!skb_flow_dissect_flow_keys(skb, &flow, 0) ||
-	    !(flow.basic.n_proto == htons(ETH_P_IP) ||
-	      flow.basic.n_proto == htons(ETH_P_IPV6)))
+	if (!skb_flow_dissect_flow_keys(skb, &flow, 0))
 		return false;
 
-	if (flow.basic.ip_proto == IPPROTO_TCP)
-		data_len = 12;
+	if (flow.basic.n_proto == htons(ETH_P_IP))
+		data_len = sizeof(flow.addrs.v4addrs);
+	else if (flow.basic.n_proto == htons(ETH_P_IPV6))
+		data_len = sizeof(flow.addrs.v6addrs);
 	else
-		data_len = 8;
+		return false;
 
-	*hash = comp_hash(netvsc_hash_key, HASH_KEYLEN, &flow, data_len);
+	memcpy(data, &flow.addrs, data_len);
+
+	if (flow.basic.ip_proto == IPPROTO_TCP) {
+		memcpy(data + data_len, &flow.ports, sizeof(flow.ports));
+		data_len += sizeof(flow.ports);
+	}
+
+	*hash = comp_hash(netvsc_hash_key, HASH_KEYLEN, data, data_len);
 
 	return true;
 }
