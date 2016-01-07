@@ -176,9 +176,16 @@ static int report_events(int argc, const char **argv, struct perf_mem *mem)
 	 * there is no weight (cost) associated with stores, so don't print
 	 * the column
 	 */
-	if (!(mem->operation & MEM_OPERATION_LOAD))
-		rep_argv[i++] = "--sort=mem,sym,dso,symbol_daddr,"
-				"dso_daddr,tlb,locked";
+	if (!(mem->operation & MEM_OPERATION_LOAD)) {
+		if (mem->phys_addr)
+			rep_argv[i++] = "--sort=mem,sym,dso,symbol_daddr,"
+					"dso_daddr,tlb,locked,phys_daddr";
+		else
+			rep_argv[i++] = "--sort=mem,sym,dso,symbol_daddr,"
+					"dso_daddr,tlb,locked";
+	} else if (mem->phys_addr)
+		rep_argv[i++] = "--sort=local_weight,mem,sym,dso,symbol_daddr,"
+				"dso_daddr,snoop,tlb,locked,phys_daddr";
 
 	for (j = 1; j < argc; j++, i++)
 		rep_argv[i] = argv[j];
@@ -294,7 +301,7 @@ int cmd_mem(int argc, const char **argv, const char *prefix __maybe_unused)
 		   "separator for columns, no spaces will be added"
 		   " between columns '.' is reserved."),
 	OPT_BOOLEAN('f', "force", &mem.force, "don't complain, do it"),
-	OPT_BOOLEAN('p', "phys-data", &mem.phys_addr, "Record sample physical addresses"),
+	OPT_BOOLEAN('p', "phys-data", &mem.phys_addr, "Record/Report sample physical addresses"),
 	OPT_END()
 	};
 	const char *const mem_subcommands[] = { "record", "report", NULL };
