@@ -16,6 +16,7 @@ struct perf_mem {
 	bool			hide_unresolved;
 	bool			dump_raw;
 	bool			force;
+	bool			phys_addr;
 	int			operation;
 	const char		*cpu_list;
 	DECLARE_BITMAP(cpu_bitmap, MAX_NR_CPUS);
@@ -38,6 +39,9 @@ static int __cmd_record(int argc, const char **argv, struct perf_mem *mem)
 		rec_argv[i++] = "-W";
 
 	rec_argv[i++] = "-d";
+
+	if (mem->phys_addr)
+		rec_argv[i++] = "--phys-data";
 
 	if (mem->operation & MEM_OPERATION_LOAD) {
 		rec_argv[i++] = "-e";
@@ -290,6 +294,7 @@ int cmd_mem(int argc, const char **argv, const char *prefix __maybe_unused)
 		   "separator for columns, no spaces will be added"
 		   " between columns '.' is reserved."),
 	OPT_BOOLEAN('f', "force", &mem.force, "don't complain, do it"),
+	OPT_BOOLEAN('p', "phys-data", &mem.phys_addr, "Record sample physical addresses"),
 	OPT_END()
 	};
 	const char *const mem_subcommands[] = { "record", "report", NULL };
