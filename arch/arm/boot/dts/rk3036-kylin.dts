@@ -304,6 +304,11 @@
 
 	broken-cd;
 	bus-width = <4>;
+	cap-sd-highspeed;
+	sd-uhs-sdr12;
+	sd-uhs-sdr25;
+	sd-uhs-sdr50;
+	sd-uhs-sdr104;
 	cap-sdio-irq;
 	default-sample-phase = <90>;
 	keep-power-in-suspend;
