@@ -398,7 +398,6 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	if (ret)
 		goto cleanup_vga_switcheroo;
 
-	intel_power_domains_init_hw(dev_priv, false);
 
 	intel_csr_ucode_init(dev_priv);
 
@@ -1025,6 +1024,9 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	intel_irq_init(dev_priv);
 	intel_uncore_sanitize(dev);
+	intel_power_domains_init(dev_priv);
+	intel_init_dpio(dev_priv);
+	intel_power_domains_init_hw(dev_priv, false);
 
 	/* Try to make sure MCHBAR is enabled before poking at it */
 	intel_setup_mchbar(dev);
@@ -1049,20 +1051,16 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	intel_device_info_runtime_init(dev);
 
-	intel_init_dpio(dev_priv);
-
 	if (INTEL_INFO(dev)->num_pipes) {
 		ret = drm_vblank_init(dev, INTEL_INFO(dev)->num_pipes);
 		if (ret)
 			goto out_gem_unload;
 	}
 
-	intel_power_domains_init(dev_priv);
-
 	ret = i915_load_modeset_init(dev);
 	if (ret < 0) {
 		DRM_ERROR("failed to init modeset\n");
-		goto out_power_well;
+		goto out_vblank;
 	}
 
 	/*
@@ -1091,8 +1089,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	return 0;
 
-out_power_well:
-	intel_power_domains_fini(dev_priv);
+out_vblank:
 	drm_vblank_cleanup(dev);
 out_gem_unload:
 	WARN_ON(unregister_oom_notifier(&dev_priv->mm.oom_notifier));
@@ -1103,6 +1100,7 @@ out_gem_unload:
 
 	intel_teardown_gmbus(dev);
 	intel_teardown_mchbar(dev);
+	intel_power_domains_fini(dev_priv);
 	pm_qos_remove_request(&dev_priv->pm_qos);
 	destroy_workqueue(dev_priv->gpu_error.hangcheck_wq);
 out_freedpwq:
