@@ -25,13 +25,13 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
 	struct sun4i_cipher_req_ctx *ctx = ablkcipher_request_ctx(areq);
 	u32 mode = ctx->mode;
 	/* when activating SS, the default FIFO space is SS_RX_DEFAULT(32) */
-	u32 rx_cnt = SS_RX_DEFAULT;
-	u32 tx_cnt = 0;
+	size_t rx_cnt = SS_RX_DEFAULT;
+	size_t tx_cnt = 0;
 	u32 spaces;
 	u32 v;
 	int i, err = 0;
-	unsigned int ileft = areq->nbytes;
-	unsigned int oleft = areq->nbytes;
+	size_t ileft = areq->nbytes;
+	size_t oleft = areq->nbytes;
 	unsigned int todo;
 	struct sg_mapping_iter mi, mo;
 	unsigned int oi, oo; /* offset for in and out */
@@ -134,13 +134,13 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 	struct sun4i_cipher_req_ctx *ctx = ablkcipher_request_ctx(areq);
 	u32 mode = ctx->mode;
 	/* when activating SS, the default FIFO space is SS_RX_DEFAULT(32) */
-	u32 rx_cnt = SS_RX_DEFAULT;
-	u32 tx_cnt = 0;
+	size_t rx_cnt = SS_RX_DEFAULT;
+	size_t tx_cnt = 0;
 	u32 v;
 	u32 spaces;
 	int i, err = 0;
-	unsigned int ileft = areq->nbytes;
-	unsigned int oleft = areq->nbytes;
+	size_t ileft = areq->nbytes;
+	size_t oleft = areq->nbytes;
 	unsigned int todo;
 	struct sg_mapping_iter mi, mo;
 	unsigned int oi, oo;	/* offset for in and out */
@@ -148,7 +148,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 	char bufo[4 * SS_TX_MAX]; /* buffer for linearize SG dst */
 	unsigned int ob = 0;	/* offset in buf */
 	unsigned int obo = 0;	/* offset in bufo*/
-	unsigned int obl = 0;	/* length of data in bufo */
+	size_t obl = 0;	/* length of data in bufo */
 
 	if (areq->nbytes == 0)
 		return 0;
@@ -251,7 +251,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
 		spaces = readl(ss->base + SS_FCSR);
 		rx_cnt = SS_RXFIFO_SPACES(spaces);
 		tx_cnt = SS_TXFIFO_SPACES(spaces);
-		dev_dbg(ss->dev, "%x %u/%u %u/%u cnt=%u %u/%u %u/%u cnt=%u %u %u\n",
+		dev_dbg(ss->dev, "%x %u/%zu %zu/%u cnt=%zu %u/%zu %zu/%u cnt=%zu %u %u\n",
 			mode,
 			oi, mi.length, ileft, areq->nbytes, rx_cnt,
 			oo, mo.length, oleft, areq->nbytes, tx_cnt,
