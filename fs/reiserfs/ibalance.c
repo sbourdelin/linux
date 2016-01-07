@@ -850,6 +850,8 @@ int balance_internal(struct tree_balance *tb,
 		return order;
 	}
 
+	memset(&new_insert_key, 0, sizeof(new_insert_key));
+
 	k = 0;
 	if (tb->lnum[h] > 0) {
 		/*
