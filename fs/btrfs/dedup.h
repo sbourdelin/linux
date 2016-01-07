@@ -54,6 +54,8 @@ struct btrfs_dedup_hash {
 	u8 hash[];
 };
 
+struct btrfs_root;
+
 struct btrfs_dedup_info {
 	/* dedup blocksize */
 	u64 blocksize;
@@ -70,6 +72,12 @@ struct btrfs_dedup_info {
 	spinlock_t lock;
 	u64 limit_nr;
 	u64 current_nr;
+
+	/* for persist data like dedup-hash and dedup status */
+	struct btrfs_root *dedup_root;
+
+	/* on-disk mode only mutex */
+	struct mutex ondisk_lock;
 };
 
 struct btrfs_trans_handle;
