@@ -54,7 +54,7 @@ void rtc_time64_to_tm(time64_t time, struct rtc_time *tm)
 {
 	unsigned int month, year;
 	int secs;
-	unsigned long days;
+	unsigned long days, leaps;
 
 	/*
 	 * time must be positive
@@ -66,13 +66,16 @@ void rtc_time64_to_tm(time64_t time, struct rtc_time *tm)
 	tm->tm_wday = (days + 4) % 7;
 
 	year = 1970 + days / 365;
-	days -= (year - 1970) * 365
-		+ LEAPS_THRU_END_OF(year - 1)
-		- LEAPS_THRU_END_OF(1970 - 1);
-	if (days < 0) {
+	days -= (year - 1970) * 365;
+	leaps = LEAPS_THRU_END_OF(year - 1) - LEAPS_THRU_END_OF(1970 - 1);
+
+	while (days < leaps) {
 		year -= 1;
 		days += 365 + is_leap_year(year);
 	}
+
+	days -= leaps;
+
 	tm->tm_year = year - 1900;
 	tm->tm_yday = days + 1;
 
