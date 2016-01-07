@@ -48,6 +48,7 @@ extern struct kmem_cache *btrfs_bit_radix_cachep;
 extern struct kmem_cache *btrfs_path_cachep;
 extern struct kmem_cache *btrfs_free_space_cachep;
 struct btrfs_ordered_sum;
+struct btrfs_dedup_hash;
 
 #ifdef CONFIG_BTRFS_FS_RUN_SANITY_TESTS
 #define STATIC noinline
@@ -3435,7 +3436,8 @@ int btrfs_alloc_reserved_file_extent(struct btrfs_trans_handle *trans,
 				     struct btrfs_root *root,
 				     u64 root_objectid, u64 owner,
 				     u64 offset, u64 ram_bytes,
-				     struct btrfs_key *ins);
+				     struct btrfs_key *ins,
+				     struct btrfs_dedup_hash *hash);
 int btrfs_alloc_logged_file_extent(struct btrfs_trans_handle *trans,
 				   struct btrfs_root *root,
 				   u64 root_objectid, u64 owner, u64 offset,

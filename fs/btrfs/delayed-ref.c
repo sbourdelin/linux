@@ -812,7 +812,7 @@ int btrfs_add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 			       u64 bytenr, u64 num_bytes,
 			       u64 parent, u64 ref_root,
 			       u64 owner, u64 offset, u64 reserved, int action,
-			       int atomic)
+			       int atomic, struct btrfs_dedup_hash *hash)
 {
 	struct btrfs_delayed_data_ref *ref;
 	struct btrfs_delayed_ref_head *head_ref;
@@ -846,6 +846,7 @@ int btrfs_add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 	}
 
 	head_ref->extent_op = NULL;
+	ref->hash = hash;
 
 	delayed_refs = &trans->transaction->delayed_refs;
 

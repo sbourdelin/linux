@@ -36,6 +36,7 @@
 #include "math.h"
 #include "sysfs.h"
 #include "qgroup.h"
+#include "dedup.h"
 
 #undef SCRAMBLE_DELAYED_REFS
 
@@ -2089,7 +2090,7 @@ int btrfs_inc_extent_ref(struct btrfs_trans_handle *trans,
 		ret = btrfs_add_delayed_data_ref(fs_info, trans, bytenr,
 					num_bytes, parent, root_objectid,
 					owner, offset, 0,
-					BTRFS_ADD_DELAYED_REF, 0);
+					BTRFS_ADD_DELAYED_REF, 0, NULL);
 	}
 	return ret;
 }
@@ -2109,7 +2110,7 @@ int btrfs_inc_extent_ref_atomic(struct btrfs_trans_handle *trans,
 		return -EINVAL;
 	return btrfs_add_delayed_data_ref(fs_info, trans, bytenr,
 			num_bytes, parent, root_objectid,
-			owner, offset, 0, BTRFS_ADD_DELAYED_REF, 1);
+			owner, offset, 0, BTRFS_ADD_DELAYED_REF, 1, NULL);
 }
 
 static int __btrfs_inc_extent_ref(struct btrfs_trans_handle *trans,
@@ -2195,6 +2196,10 @@ static int run_delayed_data_ref(struct btrfs_trans_handle *trans,
 	if (node->type == BTRFS_SHARED_DATA_REF_KEY)
 		parent = ref->parent;
 	ref_root = ref->root;
+
+	/* Add dedup hash into hash tree and free it */
+	btrfs_dedup_add(trans, root, ref->hash);
+	kfree(ref->hash);
 
 	if (node->action == BTRFS_ADD_DELAYED_REF && insert_reserved) {
 		if (extent_op)
@@ -6854,7 +6859,8 @@ int btrfs_free_extent(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 						num_bytes,
 						parent, root_objectid, owner,
 						offset, 0,
-						BTRFS_DROP_DELAYED_REF, 0);
+						BTRFS_DROP_DELAYED_REF, 0,
+						NULL);
 	}
 	return ret;
 }
@@ -7786,7 +7792,8 @@ int btrfs_alloc_reserved_file_extent(struct btrfs_trans_handle *trans,
 				     struct btrfs_root *root,
 				     u64 root_objectid, u64 owner,
 				     u64 offset, u64 ram_bytes,
-				     struct btrfs_key *ins)
+				     struct btrfs_key *ins,
+				     struct btrfs_dedup_hash *hash)
 {
 	int ret;
 
@@ -7796,7 +7803,7 @@ int btrfs_alloc_reserved_file_extent(struct btrfs_trans_handle *trans,
 					 ins->offset, 0,
 					 root_objectid, owner, offset,
 					 ram_bytes, BTRFS_ADD_DELAYED_EXTENT,
-					 0);
+					 0, hash);
 	return ret;
 }
 

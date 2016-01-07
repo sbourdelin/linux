@@ -24,6 +24,7 @@
 #define BTRFS_ADD_DELAYED_EXTENT 3 /* record a full extent allocation */
 #define BTRFS_UPDATE_DELAYED_HEAD 4 /* not changing ref count on head ref */
 
+struct btrfs_dedup_hash;
 /*
  * XXX: Qu: I really hate the design that ref_head and tree/data ref shares the
  * same ref_node structure.
@@ -152,6 +153,12 @@ struct btrfs_delayed_data_ref {
 	u64 parent;
 	u64 objectid;
 	u64 offset;
+
+	/*
+	 * For dedup hash miss case, to add it into dedup tree at
+	 * run_delayed_ref() time.
+	 */
+	struct btrfs_dedup_hash *hash;
 };
 
 struct btrfs_delayed_ref_root {
@@ -249,7 +256,7 @@ int btrfs_add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 			       u64 bytenr, u64 num_bytes,
 			       u64 parent, u64 ref_root,
 			       u64 owner, u64 offset, u64 reserved, int action,
-			       int atomic);
+			       int atomic, struct btrfs_dedup_hash *hash);
 int btrfs_add_delayed_qgroup_reserve(struct btrfs_fs_info *fs_info,
 				     struct btrfs_trans_handle *trans,
 				     u64 ref_root, u64 bytenr, u64 num_bytes);
