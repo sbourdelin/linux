@@ -208,6 +208,8 @@ struct cxgbi_sock {
 	struct sk_buff *cpl_abort_req;
 	struct sk_buff *cpl_abort_rpl;
 	struct sk_buff *skb_ulp_lhdr;
+	struct sk_buff *skb_lro;	/* accumulated rx so far */
+	struct sk_buff *skb_lro_hold;	/* holds a partial pdu */
 	spinlock_t lock;
 	struct kref refcnt;
 	unsigned int state;
@@ -279,6 +281,7 @@ struct cxgbi_skb_tx_cb {
 
 enum cxgbi_skcb_flags {
 	SKCBF_TX_NEED_HDR,	/* packet needs a header */
+	SKCBF_RX_LRO,		/* received via lro */
 	SKCBF_RX_COALESCED,	/* received whole pdu */
 	SKCBF_RX_HDR,		/* received pdu header */
 	SKCBF_RX_DATA,		/* received pdu payload */
@@ -752,4 +755,5 @@ void cxgbi_ddp_page_size_factor(int *);
 void cxgbi_ddp_ppod_clear(struct cxgbi_pagepod *);
 void cxgbi_ddp_ppod_set(struct cxgbi_pagepod *, struct cxgbi_pagepod_hdr *,
 			struct cxgbi_gather_list *, unsigned int);
+
 #endif	/*__LIBCXGBI_H__*/
