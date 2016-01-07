@@ -1098,7 +1098,8 @@ static int ipmi_thread(void *data)
 			schedule();
 		else if (smi_result == SI_SM_IDLE) {
 			if (atomic_read(&smi_info->need_watch)) {
-				schedule_timeout_interruptible(100);
+				schedule_timeout_interruptible(
+							msecs_to_jiffies(100));
 			} else {
 				/* Wait to be woken up when we are needed. */
 				__set_current_state(TASK_INTERRUPTIBLE);
