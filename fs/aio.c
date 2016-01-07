@@ -1065,6 +1065,19 @@ static void aio_complete(struct kiocb *kiocb, long res, long res2)
 	unsigned tail, pos, head;
 	unsigned long	flags;
 
+	if (kiocb->ki_flags & IOCB_WRITE) {
+		struct file *f = kiocb->ki_filp;
+
+		/*
+		 * Tell lockdep we inherited freeze protection from submission
+		 * thread.
+		 */
+		percpu_rwsem_acquire(
+			&f->f_inode->i_sb->s_writers.rw_sem[SB_FREEZE_WRITE-1],
+			1, _THIS_IP_);
+		file_end_write(f);
+	}
+
 	/*
 	 * Special case handling for sync iocbs:
 	 *  - events go directly into the iocb for fast handling
@@ -1449,13 +1462,25 @@ rw_common:
 
 		len = ret;
 
-		if (rw == WRITE)
+		if (rw == WRITE) {
 			file_start_write(file);
+			req->ki_flags |= IOCB_WRITE;
+		}
 
 		ret = iter_op(req, &iter);
 
-		if (rw == WRITE)
-			file_end_write(file);
+		if (rw == WRITE) {
+			/*
+			 * We release freeze protection in aio_complete(). Fool
+			 * lockdep by telling it the lock got released so that
+			 * it doesn't complain about held lock when we return
+			 * to userspace.
+			 */
+			percpu_rwsem_release(
+				&file->f_inode->i_sb->s_writers.rw_sem[SB_FREEZE_WRITE-1],
+				1, _THIS_IP_);
+		}
+
 		kfree(iovec);
 		break;
 
