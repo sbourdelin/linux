@@ -5180,9 +5180,6 @@ static void __init wq_numa_init(void)
 		return;
 	}
 
-	wq_update_unbound_numa_attrs_buf = alloc_workqueue_attrs(GFP_KERNEL);
-	BUG_ON(!wq_update_unbound_numa_attrs_buf);
-
 	/*
 	 * We want masks of possible CPUs of each node which isn't readily
 	 * available.  Build one from cpu_to_node() which should have been
@@ -5207,6 +5204,9 @@ static void __init wq_numa_init(void)
 
 	wq_numa_possible_cpumask = tbl;
 	wq_numa_enabled = true;
+
+	wq_update_unbound_numa_attrs_buf = alloc_workqueue_attrs(GFP_KERNEL);
+	BUG_ON(!wq_update_unbound_numa_attrs_buf);
 }
 
 static int __init init_workqueues(void)
