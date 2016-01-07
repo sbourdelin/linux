@@ -302,8 +302,6 @@ uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 	uint64_t lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
 			LRC_PPHWSP_PN * PAGE_SIZE;
 
-	WARN_ON(lrca & 0xFFFFFFFF00000FFFULL);
-
 	desc |= lrca;
 	desc |= (u64)intel_execlists_ctx_id(ctx_obj) << GEN8_CTX_ID_SHIFT;
 
@@ -1001,6 +999,7 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	u64 lrca;
 	int ret = 0;
 
 	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
@@ -1008,6 +1007,12 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 			PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
 	if (ret)
 		return ret;
+
+	lrca = i915_gem_obj_ggtt_offset(ctx_obj) + LRC_PPHWSP_PN * PAGE_SIZE;
+	if (WARN_ON(lrca & 0xFFFFFFFF00000FFFULL)) {
+		ret = -EINVAL;
+		goto unpin_ctx_obj;
+	}
 
 	ret = intel_pin_and_map_ringbuffer_obj(ring->dev, ringbuf);
 	if (ret)
