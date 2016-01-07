@@ -760,7 +760,7 @@ static int osst_wait_ready(struct osst_tape * STp, struct osst_request ** aSRpnt
 #endif
 
 	if (initial_delay > 0)
-		msleep(jiffies_to_msecs(initial_delay));
+		schedule_timeout_uninterruptible(initial_delay);
 
 	memset(cmd, 0, MAX_COMMAND_SIZE);
 	cmd[0] = TEST_UNIT_READY;
