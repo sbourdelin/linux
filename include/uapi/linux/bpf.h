@@ -73,6 +73,7 @@ enum bpf_cmd {
 	BPF_PROG_LOAD,
 	BPF_OBJ_PIN,
 	BPF_OBJ_GET,
+	BPF_MAP_LOOKUP_PERCPU_ELEM,
 };
 
 enum bpf_map_type {
@@ -115,6 +116,7 @@ union bpf_attr {
 			__aligned_u64 next_key;
 		};
 		__u64		flags;
+		__u32		cpu;
 	};
 
 	struct { /* anonymous struct used by BPF_PROG_LOAD command */
