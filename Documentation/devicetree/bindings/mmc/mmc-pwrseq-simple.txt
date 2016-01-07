@@ -12,6 +12,7 @@ Optional properties:
 	at initialization and prior we start the power up procedure of the card.
 	They will be de-asserted right after the power has been provided to the
 	card.
+- ext-vcc-supply : Regulator to drive (independent) card VCC.
 - clocks : Must contain an entry for the entry in clock-names.
   See ../clocks/clock-bindings.txt for details.
 - clock-names : Must include the following entry:
@@ -19,9 +20,17 @@ Optional properties:
 
 Example:
 
+	wifi_regulator: wifi-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+		regulator-name = "wifi_regulator";
+	};
+
 	sdhci0_pwrseq {
 		compatible = "mmc-pwrseq-simple";
 		reset-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+		ext-vcc-supply = <&wifi_regulator>;
 		clocks = <&clk_32768_ck>;
 		clock-names = "ext_clock";
 	}
