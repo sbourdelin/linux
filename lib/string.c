@@ -631,6 +631,32 @@ bool sysfs_streq(const char *s1, const char *s2)
 EXPORT_SYMBOL(sysfs_streq);
 
 /**
+ * match_string - matches given string in an array
+ * @array:	array of strings
+ * @len:	number of strings in the array or 0 for NULL terminated arrays
+ * @string:	string to match with
+ *
+ * Return:
+ * index of a @string in the @array if matches, or %-ENODATA otherwise.
+ */
+int match_string(const char * const *array, size_t len, const char *string)
+{
+	int index = 0;
+	const char *item;
+
+	do {
+		item = array[index];
+		if (!item)
+			break;
+		if (!strcmp(item, string))
+			return index;
+	} while (++index < len || !len);
+
+	return -ENODATA;
+}
+EXPORT_SYMBOL(match_string);
+
+/**
  * strtobool - convert common user inputs into boolean values
  * @s: input string
  * @res: result
