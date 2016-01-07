@@ -342,4 +342,6 @@ int fetch_kernel_version(unsigned int *puint,
 #define KVER_FMT	"%d.%d.%d"
 #define KVER_PARAM(x)	KVER_VERSION(x), KVER_PATCHLEVEL(x), KVER_SUBLEVEL(x)
 
+const char *perf_report_tip(const char *dirname);
+
 #endif /* GIT_COMPAT_UTIL_H */
