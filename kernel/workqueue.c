@@ -5131,10 +5131,13 @@ int workqueue_sysfs_register(struct workqueue_struct *wq)
 
 	if (wq->flags & WQ_UNBOUND) {
 		struct device_attribute *attr;
+		int cnt = 0, i;
 
-		for (attr = wq_sysfs_unbound_attrs; attr->attr.name; attr++) {
+		for (attr = wq_sysfs_unbound_attrs; attr->attr.name; attr++, cnt++) {
 			ret = device_create_file(&wq_dev->dev, attr);
 			if (ret) {
+				for (attr = wq_sysfs_unbound_attrs, i = 0; i < cnt; attr++, i++)
+					device_remove_file(&wq_dev->dev, attr);
 				device_unregister(&wq_dev->dev);
 				wq->wq_dev = NULL;
 				return ret;
@@ -5160,6 +5163,11 @@ static void workqueue_sysfs_unregister(struct workqueue_struct *wq)
 	if (!wq->wq_dev)
 		return;
 
+	if (wq->flags & WQ_UNBOUND) {
+		struct device_attribute *attr;
+		for (attr = wq_sysfs_unbound_attrs; attr->attr.name; attr++)
+			device_remove_file(&wq_dev->dev, attr);
+	}
 	wq->wq_dev = NULL;
 	device_unregister(&wq_dev->dev);
 }
