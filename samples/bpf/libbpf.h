@@ -8,6 +8,7 @@ int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
 		   int max_entries);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
+int bpf_lookup_percpu_elem(int fd, void *key, void *value, unsigned int cpu);
 int bpf_delete_elem(int fd, void *key);
 int bpf_get_next_key(int fd, void *key, void *next_key);
 
