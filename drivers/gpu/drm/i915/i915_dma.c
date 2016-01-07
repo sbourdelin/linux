@@ -396,8 +396,6 @@ static int i915_load_modeset_init(struct drm_device *dev)
 	if (ret)
 		goto cleanup_vga_switcheroo;
 
-	intel_power_domains_init_hw(dev_priv);
-
 	ret = intel_irq_install(dev_priv);
 	if (ret)
 		goto cleanup_gem_stolen;
@@ -1025,6 +1023,8 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	intel_irq_init(dev_priv);
 	intel_uncore_sanitize(dev);
+	intel_power_domains_init(dev_priv);
+	intel_power_domains_init_hw(dev_priv);
 
 	/* Try to make sure MCHBAR is enabled before poking at it */
 	intel_setup_mchbar(dev);
@@ -1056,8 +1056,6 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 		if (ret)
 			goto out_gem_unload;
 	}
-
-	intel_power_domains_init(dev_priv);
 
 	ret = i915_load_modeset_init(dev);
 	if (ret < 0) {
