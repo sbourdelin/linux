@@ -53,6 +53,7 @@ enum perf_output_field {
 	PERF_OUTPUT_IREGS	    = 1U << 14,
 	PERF_OUTPUT_BRSTACK	    = 1U << 15,
 	PERF_OUTPUT_BRSTACKSYM	    = 1U << 16,
+	PERF_OUTPUT_PHYS_ADDR	    = 1U << 17,
 };
 
 struct output_option {
@@ -76,6 +77,7 @@ struct output_option {
 	{.str = "iregs", .field = PERF_OUTPUT_IREGS},
 	{.str = "brstack", .field = PERF_OUTPUT_BRSTACK},
 	{.str = "brstacksym", .field = PERF_OUTPUT_BRSTACKSYM},
+	{.str = "phys_addr", .field = PERF_OUTPUT_PHYS_ADDR},
 };
 
 /* default set to maintain compatibility with current format */
@@ -280,6 +282,11 @@ static int perf_evsel__check_attr(struct perf_evsel *evsel,
 	if (PRINT_FIELD(IREGS) &&
 		perf_evsel__check_stype(evsel, PERF_SAMPLE_REGS_INTR, "IREGS",
 					PERF_OUTPUT_IREGS))
+		return -EINVAL;
+
+	if (PRINT_FIELD(PHYS_ADDR) &&
+		perf_evsel__do_check_stype(evsel, PERF_SAMPLE_PHYS_ADDR, "PHYS_ADDR",
+					   PERF_OUTPUT_PHYS_ADDR, allow_user_set))
 		return -EINVAL;
 
 	return 0;
@@ -641,6 +648,9 @@ static void process_event(struct perf_script *script __maybe_unused, union perf_
 				    sample->raw_data, sample->raw_size);
 	if (PRINT_FIELD(ADDR))
 		print_sample_addr(event, sample, thread, attr);
+
+	if (PRINT_FIELD(PHYS_ADDR))
+		printf("%16" PRIx64, sample->phys_addr);
 
 	if (PRINT_FIELD(IP)) {
 		if (!symbol_conf.use_callchain)
@@ -1748,7 +1758,8 @@ int cmd_script(int argc, const char **argv, const char *prefix __maybe_unused)
 		     "comma separated output fields prepend with 'type:'. "
 		     "Valid types: hw,sw,trace,raw. "
 		     "Fields: comm,tid,pid,time,cpu,event,trace,ip,sym,dso,"
-		     "addr,symoff,period,iregs,brstack,brstacksym,flags", parse_output_fields),
+		     "addr,symoff,period,iregs,brstack,brstacksym,flags,phys_addr",
+		     parse_output_fields),
 	OPT_BOOLEAN('a', "all-cpus", &system_wide,
 		    "system-wide collection from all CPUs"),
 	OPT_STRING('S', "symbols", &symbol_conf.sym_list_str, "symbol[,symbol...]",
