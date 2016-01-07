@@ -111,22 +111,30 @@ static enum ucode_state
 load_microcode(struct mc_saved_data *mc_saved_data, unsigned long *initrd,
 	       unsigned long initrd_start, struct ucode_cpu_info *uci)
 {
-	struct microcode_intel *mc_saved_tmp[MAX_UCODE_COUNT];
+	struct microcode_intel **mc_saved_tmp;
 	unsigned int count = mc_saved_data->mc_saved_count;
+	enum ucode_state state;
+
+	mc_saved_tmp = kcalloc(MAX_UCODE_COUNT, sizeof(*mc_saved_tmp),
+		GFP_KERNEL);
+	if (!mc_saved_tmp)
+		return UCODE_ERROR;
 
 	if (!mc_saved_data->mc_saved) {
 		copy_initrd_ptrs(mc_saved_tmp, initrd, initrd_start, count);
 
-		return load_microcode_early(mc_saved_tmp, count, uci);
+		state = load_microcode_early(mc_saved_tmp, count, uci);
 	} else {
 #ifdef CONFIG_X86_32
 		microcode_phys(mc_saved_tmp, mc_saved_data);
-		return load_microcode_early(mc_saved_tmp, count, uci);
+		state = load_microcode_early(mc_saved_tmp, count, uci);
 #else
-		return load_microcode_early(mc_saved_data->mc_saved,
+		state = load_microcode_early(mc_saved_data->mc_saved,
 						    count, uci);
 #endif
 	}
+	kfree(mc_saved_tmp);
+	return state;
 }
 
 /*
