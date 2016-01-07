@@ -16,6 +16,7 @@
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables.h>
 #include <net/netfilter/nf_conntrack.h>
+#include <net/netfilter/nf_conntrack_acct.h>
 #include <net/netfilter/nf_conntrack_tuple.h>
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_ecache.h>
@@ -29,6 +30,19 @@ struct nft_ct {
 		enum nft_registers	sreg:8;
 	};
 };
+
+static u64 nft_ct_get_eval_counter(const struct nf_conn_counter *c,
+				   enum nft_ct_keys k,
+				   enum ip_conntrack_dir d)
+{
+	if (d == IP_CT_DIR_ORIGINAL ||
+	    d == IP_CT_DIR_REPLY)
+		return k == NFT_CT_BYTES ? atomic64_read(&c[d].bytes) :
+					   atomic64_read(&c[d].packets);
+
+	return nft_ct_get_eval_counter(c, k, IP_CT_DIR_ORIGINAL) +
+	       nft_ct_get_eval_counter(c, k, IP_CT_DIR_REPLY);
+}
 
 static void nft_ct_get_eval(const struct nft_expr *expr,
 			    struct nft_regs *regs,
@@ -112,6 +126,17 @@ static void nft_ct_get_eval(const struct nft_expr *expr,
 		if (size < NF_CT_LABELS_MAX_SIZE)
 			memset(((char *) dest) + size, 0,
 			       NF_CT_LABELS_MAX_SIZE - size);
+		return;
+	}
+	case NFT_CT_BYTES: /* fallthrough */
+	case NFT_CT_PKTS: {
+		const struct nf_conn_acct *acct = nf_conn_acct_find(ct);
+		u64 count = 0;
+
+		if (acct)
+			count = nft_ct_get_eval_counter(acct->counter,
+							priv->key, priv->dir);
+		memcpy(dest, &count, sizeof(count));
 		return;
 	}
 #endif
@@ -291,6 +316,13 @@ static int nft_ct_get_init(const struct nft_ctx *ctx,
 			return -EINVAL;
 		len = FIELD_SIZEOF(struct nf_conntrack_tuple, src.u.all);
 		break;
+	case NFT_CT_BYTES:
+	case NFT_CT_PKTS:
+		/* no direction? return sum of original + reply */
+		if (tb[NFTA_CT_DIRECTION] == NULL)
+			priv->dir = IP_CT_DIR_MAX;
+		len = sizeof(u64);
+		break;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -366,6 +398,13 @@ static int nft_ct_get_dump(struct sk_buff *skb, const struct nft_expr *expr)
 		goto nla_put_failure;
 
 	switch (priv->key) {
+	case NFT_CT_BYTES:
+	case NFT_CT_PKTS:
+		if ((priv->dir == IP_CT_DIR_ORIGINAL ||
+		     priv->dir == IP_CT_DIR_REPLY) &&
+		     nla_put_u8(skb, NFTA_CT_DIRECTION, priv->dir))
+			goto nla_put_failure;
+		break;
 	case NFT_CT_PROTOCOL:
 	case NFT_CT_SRC:
 	case NFT_CT_DST:
