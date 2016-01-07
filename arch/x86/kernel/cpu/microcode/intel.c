@@ -463,12 +463,17 @@ static DEFINE_MUTEX(x86_cpu_microcode_mutex);
  */
 int save_mc_for_early(u8 *mc)
 {
-	struct microcode_intel *mc_saved_tmp[MAX_UCODE_COUNT];
+	struct microcode_intel **mc_saved_tmp;
 	unsigned int mc_saved_count_init;
 	unsigned int mc_saved_count;
 	struct microcode_intel **mc_saved;
 	int ret = 0;
 	int i;
+
+	mc_saved_tmp = kcalloc(MAX_UCODE_COUNT, sizeof(*mc_saved_tmp),
+		GFP_KERNEL);
+	if (!mc_saved_tmp)
+		return -ENOMEM;
 
 	/*
 	 * Hold hotplug lock so mc_saved_data is not accessed by a CPU in
@@ -512,6 +517,7 @@ int save_mc_for_early(u8 *mc)
 out:
 	mutex_unlock(&x86_cpu_microcode_mutex);
 
+	kfree(mc_saved_tmp);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(save_mc_for_early);
