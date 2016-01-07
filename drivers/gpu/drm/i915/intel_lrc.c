@@ -298,28 +298,14 @@ uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 				     struct intel_engine_cs *ring)
 {
 	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
-	uint64_t desc;
+	uint64_t desc = ring->ctx_desc_template;
 	uint64_t lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
 			LRC_PPHWSP_PN * PAGE_SIZE;
 
 	WARN_ON(lrca & 0xFFFFFFFF00000FFFULL);
 
-	desc = GEN8_CTX_VALID;
-	desc |= GEN8_CTX_ADDRESSING_MODE(dev) << GEN8_CTX_ADDRESSING_MODE_SHIFT;
-	if (IS_GEN8(ctx_obj->base.dev))
-		desc |= GEN8_CTX_L3LLC_COHERENT;
-	desc |= GEN8_CTX_PRIVILEGE;
 	desc |= lrca;
 	desc |= (u64)intel_execlists_ctx_id(ctx_obj) << GEN8_CTX_ID_SHIFT;
-
-	/* TODO: WaDisableLiteRestore when we start using semaphore
-	 * signalling between Command Streamers */
-	/* desc |= GEN8_CTX_FORCE_RESTORE; */
-
-	/* WaEnableForceRestoreInCtxtDescForVCS:skl */
-	/* WaEnableForceRestoreInCtxtDescForVCS:bxt */
-	if (disable_lite_restore_wa(ring))
-		desc |= GEN8_CTX_FORCE_RESTORE;
 
 	return desc;
 }
@@ -543,7 +529,7 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 		}
 	}
 
-	if (disable_lite_restore_wa(ring)) {
+	if (ring->disable_lite_restore_wa) {
 		/* Prevent a ctx to preempt itself */
 		if ((status & GEN8_CTX_STATUS_ACTIVE_IDLE) &&
 		    (submit_contexts != 0))
@@ -1948,6 +1934,24 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 			ring->name, ret);
 		goto error;
 	}
+
+	ring->disable_lite_restore_wa = disable_lite_restore_wa(ring);
+
+	ring->ctx_desc_template = GEN8_CTX_VALID;
+	ring->ctx_desc_template |= GEN8_CTX_ADDRESSING_MODE(dev) <<
+				   GEN8_CTX_ADDRESSING_MODE_SHIFT;
+	if (IS_GEN8(dev))
+		ring->ctx_desc_template |= GEN8_CTX_L3LLC_COHERENT;
+	ring->ctx_desc_template |= GEN8_CTX_PRIVILEGE;
+
+	/* TODO: WaDisableLiteRestore when we start using semaphore
+	 * signalling between Command Streamers */
+	/* ring->ctx_desc_template |= GEN8_CTX_FORCE_RESTORE; */
+
+	/* WaEnableForceRestoreInCtxtDescForVCS:skl */
+	/* WaEnableForceRestoreInCtxtDescForVCS:bxt */
+	if (ring->disable_lite_restore_wa)
+		ring->ctx_desc_template |= GEN8_CTX_FORCE_RESTORE;
 
 	return 0;
 
