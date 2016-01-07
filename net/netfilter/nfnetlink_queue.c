@@ -34,6 +34,7 @@
 #include <net/tcp_states.h>
 #include <net/netfilter/nf_queue.h>
 #include <net/netns/generic.h>
+#include <net/ip.h>
 
 #include <linux/atomic.h>
 
@@ -678,6 +679,10 @@ nfqnl_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 	int err = -ENOBUFS;
 	struct net *net = entry->state.net;
 	struct nfnl_queue_net *q = nfnl_queue_pernet(net);
+	union {
+		struct inet_skb_parm h4;
+		struct inet6_skb_parm h6;
+	} header;
 
 	/* rcu_read_lock()ed by nf_hook_slow() */
 	queue = instance_lookup(q, queuenum);
@@ -702,6 +707,7 @@ nfqnl_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 		return __nfqnl_enqueue_packet(net, queue, entry);
 
 	nf_bridge_adjust_skb_data(skb);
+	memcpy(&header, skb->cb, sizeof(header));
 	segs = skb_gso_segment(skb, 0);
 	/* Does not use PTR_ERR to limit the number of error codes that can be
 	 * returned by nf_queue.  For instance, callers rely on -ESRCH to
@@ -713,6 +719,7 @@ nfqnl_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 	err = 0;
 	do {
 		struct sk_buff *nskb = segs->next;
+		memcpy(skb->cb, &header, sizeof(header));
 		if (err == 0)
 			err = __nfqnl_enqueue_packet_gso(net, queue,
 							segs, entry);

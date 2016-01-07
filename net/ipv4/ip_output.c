@@ -226,6 +226,7 @@ static int ip_finish_output_gso(struct net *net, struct sock *sk,
 	netdev_features_t features;
 	struct sk_buff *segs;
 	int ret = 0;
+	struct inet_skb_parm ipcb;
 
 	/* common case: locally created skb or seglen is <= mtu */
 	if (((IPCB(skb)->flags & IPSKB_FORWARDED) == 0) ||
@@ -239,6 +240,7 @@ static int ip_finish_output_gso(struct net *net, struct sock *sk,
 	 * 2) skb arrived via virtio-net, we thus get TSO/GSO skbs directly
 	 * from host network stack.
 	 */
+	ipcb = *IPCB(skb);
 	features = netif_skb_features(skb);
 	segs = skb_gso_segment(skb, features & ~NETIF_F_GSO_MASK);
 	if (IS_ERR_OR_NULL(segs)) {
@@ -253,6 +255,7 @@ static int ip_finish_output_gso(struct net *net, struct sock *sk,
 		int err;
 
 		segs->next = NULL;
+		*IPCB(segs) = ipcb;
 		err = ip_fragment(net, sk, segs, mtu, ip_finish_output2);
 
 		if (err && ret == 0)

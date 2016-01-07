@@ -166,7 +166,12 @@ static int xfrm_output2(struct net *net, struct sock *sk, struct sk_buff *skb)
 static int xfrm_output_gso(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct sk_buff *segs;
+	union {
+		struct inet_skb_parm h4;
+		struct inet6_skb_parm h6;
+	} header;
 
+	memcpy(&header, skb->cb, sizeof(header));
 	segs = skb_gso_segment(skb, 0);
 	kfree_skb(skb);
 	if (IS_ERR(segs))
@@ -179,6 +184,7 @@ static int xfrm_output_gso(struct net *net, struct sock *sk, struct sk_buff *skb
 		int err;
 
 		segs->next = NULL;
+		memcpy(skb->cb, &header, sizeof(header));
 		err = xfrm_output2(net, sk, segs);
 
 		if (unlikely(err)) {
