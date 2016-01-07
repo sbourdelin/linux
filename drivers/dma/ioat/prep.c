@@ -655,30 +655,41 @@ ioat_prep_pq_val(struct dma_chan *chan, dma_addr_t *pq, dma_addr_t *src,
 				     flags);
 }
 
+static char *ioat_alloc_scf(unsigned int src_cnt)
+{
+	if (!src_cnt || src_cnt > MAX_SCF)
+		return NULL;
+
+	return kzalloc(src_cnt, GFP_KERNEL);
+}
+
 struct dma_async_tx_descriptor *
 ioat_prep_pqxor(struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
 		 unsigned int src_cnt, size_t len, unsigned long flags)
 {
-	unsigned char scf[MAX_SCF];
+	unsigned char *scf;
 	dma_addr_t pq[2];
 	struct ioatdma_chan *ioat_chan = to_ioat_chan(chan);
+	struct dma_async_tx_descriptor *desc;
 
 	if (test_bit(IOAT_CHAN_DOWN, &ioat_chan->state))
 		return NULL;
 
-	if (src_cnt > MAX_SCF)
+	scf = ioat_alloc_scf(src_cnt);
+	if (!scf)
 		return NULL;
 
-	memset(scf, 0, src_cnt);
 	pq[0] = dst;
 	flags |= DMA_PREP_PQ_DISABLE_Q;
 	pq[1] = dst; /* specify valid address for disabled result */
 
-	return src_cnt_flags(src_cnt, flags) > 8 ?
+	desc = src_cnt_flags(src_cnt, flags) > 8 ?
 		__ioat_prep_pq16_lock(chan, NULL, pq, src, src_cnt, scf, len,
 				       flags) :
 		__ioat_prep_pq_lock(chan, NULL, pq, src, src_cnt, scf, len,
 				     flags);
+	kfree(scf);
+	return desc;
 }
 
 struct dma_async_tx_descriptor *
@@ -686,14 +697,16 @@ ioat_prep_pqxor_val(struct dma_chan *chan, dma_addr_t *src,
 		     unsigned int src_cnt, size_t len,
 		     enum sum_check_flags *result, unsigned long flags)
 {
-	unsigned char scf[MAX_SCF];
+	unsigned char *scf;
 	dma_addr_t pq[2];
 	struct ioatdma_chan *ioat_chan = to_ioat_chan(chan);
+	struct dma_async_tx_descriptor *desc;
 
 	if (test_bit(IOAT_CHAN_DOWN, &ioat_chan->state))
 		return NULL;
 
-	if (src_cnt > MAX_SCF)
+	scf = ioat_alloc_scf(src_cnt);
+	if (!scf)
 		return NULL;
 
 	/* the cleanup routine only sets bits on validate failure, it
@@ -701,16 +714,17 @@ ioat_prep_pqxor_val(struct dma_chan *chan, dma_addr_t *src,
 	 */
 	*result = 0;
 
-	memset(scf, 0, src_cnt);
 	pq[0] = src[0];
 	flags |= DMA_PREP_PQ_DISABLE_Q;
 	pq[1] = pq[0]; /* specify valid address for disabled result */
 
-	return src_cnt_flags(src_cnt, flags) > 8 ?
+	desc = src_cnt_flags(src_cnt, flags) > 8 ?
 		__ioat_prep_pq16_lock(chan, result, pq, &src[1], src_cnt - 1,
 				       scf, len, flags) :
 		__ioat_prep_pq_lock(chan, result, pq, &src[1], src_cnt - 1,
 				     scf, len, flags);
+	kfree(scf);
+	return desc;
 }
 
 struct dma_async_tx_descriptor *
