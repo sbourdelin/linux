@@ -1334,6 +1334,9 @@ static void __perf_event_header_size(struct perf_event *event, u64 sample_type)
 	if (sample_type & PERF_SAMPLE_TRANSACTION)
 		size += sizeof(data->txn);
 
+	if (sample_type & PERF_SAMPLE_PHYS_ADDR)
+		size += sizeof(data->phys_addr);
+
 	event->header_size = size;
 }
 
@@ -5407,6 +5410,9 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
+	if (sample_type & PERF_SAMPLE_PHYS_ADDR)
+		perf_output_put(handle, data->phys_addr);
+
 	if (!event->attr.watermark) {
 		int wakeup_events = event->attr.wakeup_events;
 
@@ -8213,6 +8219,11 @@ SYSCALL_DEFINE5(perf_event_open,
 		if (attr.sample_period & (1ULL << 63))
 			return -EINVAL;
 	}
+
+	/* Only privileged users can get kernel addresses */
+	if ((attr.sample_type & PERF_SAMPLE_PHYS_ADDR) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EACCES;
 
 	/*
 	 * In cgroup mode, the pid argument is used to pass the fd

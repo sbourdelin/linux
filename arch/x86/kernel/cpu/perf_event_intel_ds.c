@@ -993,6 +993,7 @@ static void setup_pebs_sample_data(struct perf_event *event,
 	u64 sample_type;
 	int fll, fst, dsrc;
 	int fl = event->hw.flags;
+	struct page *p = NULL;
 
 	if (pebs == NULL)
 		return;
@@ -1078,6 +1079,28 @@ static void setup_pebs_sample_data(struct perf_event *event,
 	    x86_pmu.intel_cap.pebs_format >= 1)
 		data->addr = pebs->dla;
 
+	if ((sample_type & PERF_SAMPLE_PHYS_ADDR) && (data->addr != 0)) {
+		if (data->addr >= TASK_SIZE) {
+			/* If it's vmalloc()d memory, leave phys_addr as 0 */
+			if (virt_addr_valid(data->addr) &&
+			    !(data->addr >= VMALLOC_START && data->addr < VMALLOC_END))
+				data->phys_addr = (u64)virt_to_phys((void *)data->addr);
+		} else {
+			/*
+			 * Walking the pages tables for user address.
+			 * Interrupts are disabled, so it prevents any tear down
+			 * of the page tables.
+			 * Try IRQ-safe __get_user_pages_fast first.
+			 * If failed, leave phys_addr as 0.
+			 */
+			if ((current->mm != NULL) &&
+			    (__get_user_pages_fast(data->addr, 1, 0, &p) == 1))
+				data->phys_addr = page_to_phys(p) + data->addr % PAGE_SIZE;
+
+			if (p)
+				put_page(p);
+		}
+	}
 	if (x86_pmu.intel_cap.pebs_format >= 2) {
 		/* Only set the TSX weight when no memory weight. */
 		if ((sample_type & PERF_SAMPLE_WEIGHT) && !fll)
