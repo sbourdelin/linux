@@ -493,6 +493,172 @@ int btrfs_dedup_disable(struct btrfs_fs_info *fs_info)
 }
 
 /*
+ * Return 0 for not found
+ * Return >0 for found and set bytenr_ret
+ * Return <0 for error
+ */
+static int ondisk_search_hash(struct btrfs_dedup_info *dedup_info, u8 *hash,
+			      u64 *bytenr_ret, u64 *num_bytes_ret)
+{
+	struct btrfs_path *path;
+	struct btrfs_key key;
+	struct btrfs_root *dedup_root = dedup_info->dedup_root;
+	u8 *buf = NULL;
+	u64 hash_key;
+	int hash_len = btrfs_dedup_sizes[dedup_info->hash_type];
+	int ret;
+
+	path = btrfs_alloc_path();
+	if (!path)
+		return -ENOMEM;
+
+	buf = kmalloc(hash_len, GFP_NOFS);
+	if (!buf) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	memcpy(&hash_key, hash + hash_len - 8, 8);
+	key.objectid = hash_key;
+	key.type = BTRFS_DEDUP_HASH_ITEM_KEY;
+	key.offset = (u64)-1;
+
+	ret = btrfs_search_slot(NULL, dedup_root, &key, path, 0, 0);
+	if (ret < 0)
+		goto out;
+	WARN_ON(ret == 0);
+	while (1) {
+		struct extent_buffer *node;
+		struct btrfs_dedup_hash_item *hash_item;
+		int slot;
+
+		ret = btrfs_previous_item(dedup_root, path, hash_key,
+					  BTRFS_DEDUP_HASH_ITEM_KEY);
+		if (ret < 0)
+			goto out;
+		if (ret > 0) {
+			ret = 0;
+			goto out;
+		}
+
+		node = path->nodes[0];
+		slot = path->slots[0];
+		btrfs_item_key_to_cpu(node, &key, slot);
+
+		if (key.type != BTRFS_DEDUP_HASH_ITEM_KEY ||
+		    memcmp(&key.objectid, hash + hash_len - 8, 8))
+			break;
+		hash_item = btrfs_item_ptr(node, slot,
+				struct btrfs_dedup_hash_item);
+		read_extent_buffer(node, buf, (unsigned long)(hash_item + 1),
+				   hash_len);
+		if (!memcmp(buf, hash, hash_len)) {
+			ret = 1;
+			*bytenr_ret = key.offset;
+			*num_bytes_ret = btrfs_dedup_hash_len(node, hash_item);
+			break;
+		}
+	}
+out:
+	kfree(buf);
+	btrfs_free_path(path);
+	return ret;
+}
+
+static int ondisk_search(struct inode *inode, u64 file_pos,
+			 struct btrfs_dedup_hash *hash)
+{
+	int ret;
+	struct btrfs_root *root = BTRFS_I(inode)->root;
+	struct btrfs_fs_info *fs_info = root->fs_info;
+	struct btrfs_trans_handle *trans = NULL;
+	struct btrfs_delayed_ref_root *delayed_refs;
+	struct btrfs_delayed_ref_head *head;
+	struct btrfs_dedup_info *dedup_info = fs_info->dedup_info;
+	u64 old_bytenr;
+	u64 bytenr;
+	u64 num_bytes;
+
+	/*
+	 * TODO: Opitmized the superhot mutex.
+	 */
+	mutex_lock(&dedup_info->ondisk_lock);
+	ret = ondisk_search_hash(dedup_info, hash->hash, &bytenr, &num_bytes);
+	mutex_unlock(&dedup_info->ondisk_lock);
+	if (ret <= 0)
+		goto out;
+
+	trans = btrfs_join_transaction(root);
+	if (IS_ERR(trans))
+		return PTR_ERR(trans);
+
+again:
+	delayed_refs = &trans->transaction->delayed_refs;
+
+	spin_lock(&delayed_refs->lock);
+	head = btrfs_find_delayed_ref_head(trans, bytenr);
+	if (!head || head->processing == 1) {
+		/*
+		 * Somebody else may be trying to run the refs, the found
+		 * duplicated extent may be freed, so here we just
+		 * choose to abort this dedup handle.
+		 * XXX: we need to find a better method to improve it.
+		 */
+		spin_unlock(&delayed_refs->lock);
+		ret = 0;
+		goto out;
+	}
+
+	ret = btrfs_delayed_ref_lock(trans, head);
+	spin_unlock(&delayed_refs->lock);
+	if (ret == -EAGAIN) {
+		mutex_lock(&dedup_info->ondisk_lock);
+		ret = ondisk_search_hash(dedup_info, hash->hash, &bytenr,
+					 &num_bytes);
+		mutex_unlock(&dedup_info->ondisk_lock);
+		if (ret <= 0)
+			goto out;
+		goto again;
+	}
+	/*
+	 * Still need to search the hash again to ensure the hash is not
+	 * deleted in run_delayed_refs
+	 */
+	old_bytenr = bytenr;
+	mutex_lock(&dedup_info->ondisk_lock);
+	ret = ondisk_search_hash(dedup_info, hash->hash, &bytenr, &num_bytes);
+	if (ret <= 0) {
+		mutex_unlock(&dedup_info->ondisk_lock);
+		mutex_unlock(&head->mutex);
+		goto out;
+	}
+
+	/* bytenr changed, we need to relock the delayed_ref head */
+	if (old_bytenr != bytenr) {
+		mutex_unlock(&dedup_info->ondisk_lock);
+		mutex_unlock(&head->mutex);
+		goto again;
+	}
+
+	/*
+	 * finally, we found the matching hash, increase extent ref right now
+	 * to avoid delayed ref run it
+	 */
+	btrfs_inc_extent_ref(trans, root, bytenr, num_bytes, 0,
+			     root->root_key.objectid,
+			     btrfs_ino(inode), file_pos);
+	hash->bytenr = bytenr;
+	hash->num_bytes = num_bytes;
+	mutex_unlock(&dedup_info->ondisk_lock);
+	mutex_unlock(&head->mutex);
+	ret = 1;
+out:
+	if (trans)
+		btrfs_end_transaction(trans, root);
+	return ret;
+}
+
+/*
  * Caller must ensure the corresponding ref head is not being run.
  */
 static struct inmem_hash *
@@ -646,7 +812,8 @@ int btrfs_dedup_search(struct inode *inode, u64 file_pos,
 
 	if (dedup_info->backend == BTRFS_DEDUP_BACKEND_INMEMORY)
 		ret = inmem_search(inode, file_pos, hash);
-
+	if (dedup_info->backend == BTRFS_DEDUP_BACKEND_ONDISK)
+		ret = ondisk_search(inode, file_pos, hash);
 	/* It's possible hash->bytenr/num_bytenr already changed */
 	if (ret == 0) {
 		hash->num_bytes = 0;
