@@ -303,11 +303,16 @@ get_matching_model_microcode(int cpu, unsigned long start,
 	enum ucode_state state = UCODE_OK;
 	unsigned int mc_size;
 	struct microcode_header_intel *mc_header;
-	struct microcode_intel *mc_saved_tmp[MAX_UCODE_COUNT];
+	struct microcode_intel **mc_saved_tmp;
 	unsigned int mc_saved_count = mc_saved_data->mc_saved_count;
 	int i;
 
-	while (leftover && mc_saved_count < ARRAY_SIZE(mc_saved_tmp)) {
+	mc_saved_tmp = kcalloc(MAX_UCODE_COUNT, sizeof(*mc_saved_tmp),
+		GFP_KERNEL);
+	if (!mc_saved_tmp)
+		return UCODE_ERROR;
+
+	while (leftover && mc_saved_count < MAX_UCODE_COUNT) {
 
 		if (leftover < sizeof(mc_header))
 			break;
@@ -352,6 +357,7 @@ get_matching_model_microcode(int cpu, unsigned long start,
 
 	mc_saved_data->mc_saved_count = mc_saved_count;
 out:
+	kfree(mc_saved_tmp);
 	return state;
 }
 
