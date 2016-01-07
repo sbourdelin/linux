@@ -147,6 +147,10 @@ struct metadata_dst *iptunnel_metadata_reply(struct metadata_dst *md,
 }
 EXPORT_SYMBOL_GPL(iptunnel_metadata_reply);
 
+/* csum_help should only be ever true if the protocol doesn't support LCO.
+ * If the tunnel uses udp_tunnel_xmit_skb(), then it gets LCO for free, and
+ * should always set csum_help to false.
+ */
 struct sk_buff *iptunnel_handle_offloads(struct sk_buff *skb,
 					 bool csum_help,
 					 int gso_type_mask)
