@@ -765,6 +765,40 @@ sort__tlb_cmp(struct hist_entry *left, struct hist_entry *right)
 	return (int64_t)(data_src_r.mem_dtlb - data_src_l.mem_dtlb);
 }
 
+static int64_t
+sort__phys_daddr_cmp(struct hist_entry *left, struct hist_entry *right)
+{
+	uint64_t l = 0, r = 0;
+
+	if (left->mem_info)
+		l = left->mem_info->daddr.phys_addr;
+	if (right->mem_info)
+		r = right->mem_info->daddr.phys_addr;
+
+	return (int64_t)(r - l);
+}
+
+static int hist_entry__phys_daddr_snprintf(struct hist_entry *he, char *bf,
+				    size_t size, unsigned int width)
+{
+	uint64_t addr = 0;
+	size_t ret = 0;
+	size_t len = BITS_PER_LONG / 4;
+
+	addr = he->mem_info->daddr.phys_addr;
+
+	ret += repsep_snprintf(bf + ret, size - ret, "[%c] ", he->level);
+
+	ret += repsep_snprintf(bf + ret, size - ret, "%-#.*llx", len, addr);
+
+	ret += repsep_snprintf(bf + ret, size - ret, "%-*s", width - ret, "");
+
+	if (ret > width)
+		bf[width] = '\0';
+
+	return width;
+}
+
 static const char * const tlb_access[] = {
 	"N/A",
 	"HIT",
@@ -1155,6 +1189,13 @@ struct sort_entry sort_mem_dcacheline = {
 	.se_width_idx	= HISTC_MEM_DCACHELINE,
 };
 
+struct sort_entry sort_mem_phys_daddr = {
+	.se_header	= "Data Physical Address",
+	.se_cmp		= sort__phys_daddr_cmp,
+	.se_snprintf	= hist_entry__phys_daddr_snprintf,
+	.se_width_idx	= HISTC_MEM_PHYS_DADDR,
+};
+
 static int64_t
 sort__abort_cmp(struct hist_entry *left, struct hist_entry *right)
 {
@@ -1342,6 +1383,7 @@ static struct sort_dimension memory_sort_dimensions[] = {
 	DIM(SORT_MEM_LVL, "mem", sort_mem_lvl),
 	DIM(SORT_MEM_SNOOP, "snoop", sort_mem_snoop),
 	DIM(SORT_MEM_DCACHELINE, "dcacheline", sort_mem_dcacheline),
+	DIM(SORT_MEM_PHYS_DADDR, "phys_daddr", sort_mem_phys_daddr),
 };
 
 #undef DIM
