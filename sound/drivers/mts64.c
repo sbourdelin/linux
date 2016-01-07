@@ -905,9 +905,10 @@ static void snd_mts64_detach(struct parport *p)
 }
 
 static struct parport_driver mts64_parport_driver = {
-	.name   = "mts64",
-	.attach = snd_mts64_attach,
-	.detach = snd_mts64_detach
+	.name		= "mts64",
+	.match_port	= snd_mts64_attach,
+	.detach		= snd_mts64_detach,
+	.devmodel	= true,
 };
 
 /*********************************************************************
@@ -935,6 +936,7 @@ static int snd_mts64_probe(struct platform_device *pdev)
 	struct snd_card *card = NULL;
 	struct mts64 *mts = NULL;
 	int err;
+	struct pardev_cb mts64_cb;
 
 	p = platform_get_drvdata(pdev);
 	platform_set_drvdata(pdev, NULL);
@@ -959,14 +961,16 @@ static int snd_mts64_probe(struct platform_device *pdev)
 	sprintf(card->longname,  "%s at 0x%lx, irq %i",
 		card->shortname, p->base, p->irq);
 
-	pardev = parport_register_device(p,                   /* port */
-					 DRIVER_NAME,         /* name */
-					 NULL,                /* preempt */
-					 NULL,                /* wakeup */
-					 snd_mts64_interrupt, /* ISR */
-					 PARPORT_DEV_EXCL,    /* flags */
-					 (void *)card);       /* private */
-	if (pardev == NULL) {
+	memset(&mts64_cb, 0, sizeof(mts64_cb));
+	mts64_cb.private = card;			/* private */
+	mts64_cb.irq_func = snd_mts64_interrupt;	/* ISR */
+	mts64_cb.flags = PARPORT_DEV_EXCL;		/* flags */
+
+	pardev = parport_register_dev_model(p,		   /* port */
+					    DRIVER_NAME,   /* name */
+					    &mts64_cb,   /* callbacks */
+					    device_count); /* device number */
+	if (!pardev) {
 		snd_printd("Cannot register pardevice\n");
 		err = -EIO;
 		goto __err;
