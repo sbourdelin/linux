@@ -1991,6 +1991,17 @@ static int bond_miimon_inspect(struct bonding *bond)
 
 		link_state = bond_check_dev_link(bond, slave->dev, 0);
 
+		if ((BMSR_LSTATUS == link_state) &&
+		    (BOND_MODE(bond) == BOND_MODE_8023AD)) {
+			rtnl_lock();
+			bond_update_speed_duplex(slave);
+			rtnl_unlock();
+			if ((slave->speed == SPEED_UNKNOWN) ||
+			    (slave->duplex == DUPLEX_UNKNOWN)) {
+				link_state = 0;
+				netdev_info(bond->dev, "In 802.3ad mode, it is not enough to up without speed and duplex");
+			}
+		}
 		switch (slave->link) {
 		case BOND_LINK_UP:
 			if (link_state)
