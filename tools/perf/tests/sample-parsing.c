@@ -45,6 +45,9 @@ static bool samples_same(const struct perf_sample *s1,
 	if (type & PERF_SAMPLE_ADDR)
 		COMP(addr);
 
+	if (type & PERF_SAMPLE_PHYS_ADDR)
+		COMP(phys_addr);
+
 	if (type & PERF_SAMPLE_ID)
 		COMP(id);
 
@@ -303,7 +306,7 @@ int test__sample_parsing(int subtest __maybe_unused)
 	 * were added.  Please actually update the test rather than just change
 	 * the condition below.
 	 */
-	if (PERF_SAMPLE_MAX > PERF_SAMPLE_REGS_INTR << 1) {
+	if (PERF_SAMPLE_MAX > PERF_SAMPLE_PHYS_ADDR << 1) {
 		pr_debug("sample format has changed, some new PERF_SAMPLE_ bit was introduced - test needs updating\n");
 		return -1;
 	}
