@@ -48,6 +48,10 @@ OPTIONS
 	option can be passed in record mode. It will be interpreted the same way as perf
 	record.
 
+-p::
+--phys-data::
+	Record/Report/Dump sample physical addresses
+
 SEE ALSO
 --------
 linkperf:perf-record[1], linkperf:perf-report[1]
