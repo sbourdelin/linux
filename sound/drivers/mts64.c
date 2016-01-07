@@ -743,7 +743,7 @@ static void snd_mts64_rawmidi_input_trigger(struct snd_rawmidi_substream *substr
 	if (up)
 		mts->mode[substream->number] |= MTS64_MODE_INPUT_TRIGGERED;
 	else
- 		mts->mode[substream->number] &= ~MTS64_MODE_INPUT_TRIGGERED;
+		mts->mode[substream->number] &= ~MTS64_MODE_INPUT_TRIGGERED;
 
 	spin_unlock_irqrestore(&mts->lock, flags);
 }
@@ -779,8 +779,8 @@ static int snd_mts64_rawmidi_create(struct snd_card *card)
 	rmidi->private_data = mts;
 	strcpy(rmidi->name, CARD_NAME);
 	rmidi->info_flags = SNDRV_RAWMIDI_INFO_OUTPUT |
-		            SNDRV_RAWMIDI_INFO_INPUT |
-                            SNDRV_RAWMIDI_INFO_DUPLEX;
+			    SNDRV_RAWMIDI_INFO_INPUT |
+			    SNDRV_RAWMIDI_INFO_DUPLEX;
 
 	mts->rmidi = rmidi;
 
@@ -803,7 +803,7 @@ static int snd_mts64_rawmidi_create(struct snd_card *card)
 		      &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT].substreams) {
 		substream = list_entry(list, struct snd_rawmidi_substream, list);
 		mts->midi_input_substream[substream->number] = substream;
-		switch(substream->number) {
+		switch (substream->number) {
 		case MTS64_SMPTE_SUBSTREAM:
 			strcpy(substream->name, "Miditerminal SMPTE");
 			break;
