@@ -2193,10 +2193,16 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
 		}
 	/* Fast path - was this the last TRB in the TD for this URB? */
 	} else if (event_trb == td->last_trb) {
-		if (td->urb_length_set && trb_comp_code == COMP_SHORT_TX)
-			return finish_td(xhci, td, event_trb, event, ep,
-					 status, false);
-
+		if (td->urb_length_set) {
+			xhci_warn(xhci, "last trb has length set\n");
+			if (trb_comp_code == COMP_SHORT_TX) {
+				xhci_warn(xhci, "and last trb is SHORT_TX, OK\n");
+				return finish_td(xhci, td, event_trb, event, ep,
+						 status, false);
+			} else {
+				xhci_warn(xhci, "FAIL, expected SHORT_TX last trb\n");
+			}
+		}
 		if (EVENT_TRB_LEN(le32_to_cpu(event->transfer_len)) != 0) {
 			td->urb->actual_length =
 				td->urb->transfer_buffer_length -
@@ -2250,7 +2256,7 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
 				EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
 
 		if (trb_comp_code == COMP_SHORT_TX) {
-			xhci_dbg(xhci, "mid bulk/intr SP, wait for last TRB event\n");
+			xhci_warn(xhci, "mid bulk/intr SP, wait for last TRB event\n");
 			td->urb_length_set = true;
 			return 0;
 		}
