@@ -694,11 +694,15 @@ static int apply_microcode_early(struct ucode_cpu_info *uci, bool early)
 int __init save_microcode_in_initrd_intel(void)
 {
 	unsigned int count = mc_saved_data.mc_saved_count;
-	struct microcode_intel *mc_saved[MAX_UCODE_COUNT];
+	struct microcode_intel **mc_saved;
 	int ret = 0;
 
 	if (count == 0)
 		return ret;
+
+	mc_saved = kcalloc(MAX_UCODE_COUNT, sizeof(*mc_saved), GFP_KERNEL);
+	if (!mc_saved)
+		return -ENOMEM;
 
 	copy_initrd_ptrs(mc_saved, mc_saved_in_initrd, initrd_start, count);
 	ret = save_microcode(&mc_saved_data, mc_saved, count);
@@ -707,6 +711,7 @@ int __init save_microcode_in_initrd_intel(void)
 
 	show_saved_mc();
 
+	kfree(mc_saved);
 	return ret;
 }
 
