@@ -1082,7 +1082,8 @@ struct option __record_options[] = {
 	OPT_BOOLEAN('q', "quiet", &quiet, "don't print any message"),
 	OPT_BOOLEAN('s', "stat", &record.opts.inherit_stat,
 		    "per thread counts"),
-	OPT_BOOLEAN('d', "data", &record.opts.sample_address, "Record the sample addresses"),
+	OPT_BOOLEAN('d', "data", &record.opts.sample_address, "Record the sample virtual addresses"),
+	OPT_BOOLEAN(0, "phys-data", &record.opts.sample_phys_addr, "Record the sample physical addresses"),
 	OPT_BOOLEAN_SET('T', "timestamp", &record.opts.sample_time,
 			&record.opts.sample_time_set,
 			"Record the sample timestamps"),
@@ -1222,6 +1223,13 @@ int cmd_record(int argc, const char **argv, const char *prefix __maybe_unused)
 		pr_err("Not enough memory for event selector list\n");
 		goto out_symbol_exit;
 	}
+
+	/*
+	 * Record the sample physical addr which also implies
+	 * the virtual addr is recorded.
+	 */
+	if (rec->opts.sample_phys_addr)
+		rec->opts.sample_address = true;
 
 	if (rec->opts.target.tid && !rec->opts.no_inherit_set)
 		rec->opts.no_inherit = true;
