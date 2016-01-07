@@ -477,6 +477,7 @@ bool cgroup_is_descendant(struct cgroup *cgrp, struct cgroup *ancestor)
 	}
 	return false;
 }
+EXPORT_SYMBOL_GPL(cgroup_is_descendant);
 
 static int notify_on_release(const struct cgroup *cgrp)
 {
