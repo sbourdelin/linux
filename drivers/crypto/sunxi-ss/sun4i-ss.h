@@ -162,7 +162,7 @@ struct sun4i_req_ctx {
 	u64 byte_count; /* number of bytes "uploaded" to the device */
 	u32 hash[5]; /* for storing SS_IVx register */
 	char buf[64];
-	unsigned int len;
+	size_t len;
 	struct sun4i_ss_ctx *ss;
 };
 
