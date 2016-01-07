@@ -216,6 +216,8 @@ tproxy.txt
 	- Transparent proxy support user guide.
 tuntap.txt
 	- TUN/TAP device driver, allowing user space Rx/Tx of packets.
+tx-offloads.txt
+	- Explanation of Transmit Offloads: Checksums, LCO, RCO
 udplite.txt
 	- UDP-Lite protocol (RFC 3828) introduction.
 vortex.txt
