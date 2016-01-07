@@ -588,6 +588,25 @@ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
 }
 
 /**
+ * phy_pseudo_interrupt - PHY pseudo interrupt handler
+ * @phydev: target phy_device struct
+ *
+ * Description: This is for phy pseudo interrupt such as
+ * USB interrupt pipe for USB-to-Ethernet devices.
+ * When a PHY pseudo interrupt occurs, i.e, USB interrupt pipe completion,
+ * the handler schedules a work task to clear the interrupt.
+ */
+void phy_pseudo_interrupt(struct phy_device *phydev)
+{
+	if (phydev->state != PHY_HALTED) {
+		atomic_inc(&phydev->irq_disable);
+
+		queue_work(system_power_efficient_wq, &phydev->phy_queue);
+	}
+}
+EXPORT_SYMBOL(phy_pseudo_interrupt);
+
+/**
  * phy_enable_interrupts - Enable the interrupts from the PHY side
  * @phydev: target phy_device struct
  */
@@ -640,12 +659,20 @@ phy_err:
 int phy_start_interrupts(struct phy_device *phydev)
 {
 	atomic_set(&phydev->irq_disable, 0);
-	if (request_irq(phydev->irq, phy_interrupt, 0, "phy_interrupt",
-			phydev) < 0) {
+
+	/* phydev->irq is bigger than zero when real H/W interrupt.
+	 * This avoids calling request_irq when pseudo interrupt such as
+	 * USB interrupt pipe for USB-to-Ethernet device.
+	 */
+	if ((phydev->irq > 0) &&
+	    (request_irq(phydev->irq, phy_interrupt, 0, "phy_interrupt",
+			 phydev) < 0)) {
 		pr_warn("%s: Can't get IRQ %d (PHY)\n",
 			phydev->bus->name, phydev->irq);
 		phydev->irq = PHY_POLL;
 		return 0;
+	} else if (phydev->irq == PHY_PSEUDO_INTERRUPT) {
+		phy_pseudo_interrupt(phydev);
 	}
 
 	return phy_enable_interrupts(phydev);
