@@ -105,7 +105,7 @@ static int portman_create(struct snd_card *card,
 	*rchip = NULL;
 
 	pm = kzalloc(sizeof(struct portman), GFP_KERNEL);
-	if (pm == NULL)
+	if (!pm)
 		return -ENOMEM;
 
 	/* Init chip specific data */
@@ -764,7 +764,7 @@ static int snd_portman_probe(struct platform_device *pdev)
 					 snd_portman_interrupt, /* ISR */
 					 PARPORT_DEV_EXCL,      /* flags */
 					 (void *)card);         /* private */
-	if (pardev == NULL) {
+	if (!pardev) {
 		snd_printd("Cannot register pardevice\n");
 		err = -EIO;
 		goto __err;
