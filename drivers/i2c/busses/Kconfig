@@ -42,6 +42,17 @@ config I2C_ALI15X3
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-ali15x3.
 
+config I2C_IMANAGER
+	tristate "Advantech iManager I2C Interface"
+	depends on MFD_IMANAGER
+	help
+	  This enables support for Advantech iManager I2C of some
+	  Advantech SOM, MIO, AIMB, and PCM modules/boards.
+	  Requires mfd-core and imanager-core to function properly.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called i2c-imanager.
+
 config I2C_AMD756
 	tristate "AMD 756/766/768/8111 and nVidia nForce"
 	depends on PCI
