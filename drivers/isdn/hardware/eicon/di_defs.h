@@ -103,6 +103,19 @@ typedef struct {
 	word                  features;
 	IDI_CALL              request;
 } DESCRIPTOR;
+
+extern void DIVA_DIDD_Read(void *, int);
+
+static inline DESCRIPTOR *di_alloc_descriptors(void)
+{
+	size_t len = MAX_DESCRIPTORS * sizeof(DESCRIPTOR);
+	DESCRIPTOR *d = kmalloc(len, GFP_KERNEL);
+
+	if (d)
+		DIVA_DIDD_Read(d, len);
+	return d;
+}
+
 /* descriptor type field coding */
 #define IDI_ADAPTER_S           1
 #define IDI_ADAPTER_PR          2

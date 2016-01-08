@@ -42,8 +42,6 @@ MODULE_LICENSE("GPL");
 extern int diddfunc_init(void);
 extern void diddfunc_finit(void);
 
-extern void DIVA_DIDD_Read(void *, int);
-
 static struct proc_dir_entry *proc_didd;
 struct proc_dir_entry *proc_net_eicon = NULL;
 

@@ -21,8 +21,6 @@ extern char *DRIVERRELEASE_MNT;
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
 
-extern void DIVA_DIDD_Read(void *, int);
-
 static dword notify_handle;
 static DESCRIPTOR DAdapter;
 static DESCRIPTOR MAdapter;
@@ -79,11 +77,9 @@ static int __init connect_didd(void)
 	IDI_SYNC_REQ req;
 	DESCRIPTOR *DIDD_Table;
 
-	DIDD_Table = kcalloc(MAX_DESCRIPTORS, sizeof(*DIDD_Table), GFP_KERNEL);
+	DIDD_Table = di_alloc_descriptors();
 	if (!DIDD_Table)
 		goto out;
-
-	DIVA_DIDD_Read(DIDD_Table, MAX_DESCRIPTORS * sizeof(*DIDD_Table));
 
 	for (x = 0; x < MAX_DESCRIPTORS; x++) {
 		if (DIDD_Table[x].type == IDI_DADAPTER) {	/* DADAPTER found */

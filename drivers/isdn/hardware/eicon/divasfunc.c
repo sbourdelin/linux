@@ -23,8 +23,6 @@
 
 static int debugmask;
 
-extern void DIVA_DIDD_Read(void *, int);
-
 extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
 
 extern char *DRIVERRELEASE_DIVAS;
@@ -160,11 +158,10 @@ static int __init connect_didd(void)
 	IDI_SYNC_REQ req;
 	DESCRIPTOR *DIDD_Table;
 
-	DIDD_Table = kcalloc(MAX_DESCRIPTORS, sizeof(*DIDD_Table), GFP_KERNEL);
+	DIDD_Table = di_alloc_descriptors();
 	if (!DIDD_Table)
 		goto out;
 
-	DIVA_DIDD_Read(DIDD_Table, MAX_DESCRIPTORS * sizeof(*DIDD_Table));
 	for (x = 0; x < MAX_DESCRIPTORS; x++) {
 		if (DIDD_Table[x].type == IDI_DADAPTER) {	/* DADAPTER found */
 			dadapter = 1;

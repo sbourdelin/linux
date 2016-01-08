@@ -57,8 +57,6 @@ static u16 diva_send_message(struct capi_ctr *,
 			     diva_os_message_buffer_s *);
 extern void diva_os_set_controller_struct(struct capi_ctr *);
 
-extern void DIVA_DIDD_Read(DESCRIPTOR *, int);
-
 /*
  * debug
  */
@@ -1055,11 +1053,9 @@ static int divacapi_connect_didd(void)
 	IDI_SYNC_REQ req;
 	DESCRIPTOR *DIDD_Table;
 
-	DIDD_Table = kcalloc(MAX_DESCRIPTORS, sizeof(*DIDD_Table), GFP_KERNEL);
+	DIDD_Table = di_alloc_descriptors();
 	if (!DIDD_Table)
 		goto out;
-
-	DIVA_DIDD_Read(DIDD_Table, MAX_DESCRIPTORS * sizeof(*DIDD_Table));
 
 	for (x = 0; x < MAX_DESCRIPTORS; x++) {
 		if (DIDD_Table[x].type == IDI_DIMAINT) {	/* MAINT found */
