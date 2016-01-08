@@ -890,6 +890,7 @@ struct intel_context {
 		struct intel_ringbuffer *ringbuf;
 		int pin_count;
 		u32 lrca;
+		struct page *lrc_state_page;
 	} engine[I915_NUM_RINGS];
 
 	struct list_head link;
