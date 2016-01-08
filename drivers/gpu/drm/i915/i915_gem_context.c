@@ -883,6 +883,9 @@ int i915_gem_context_destroy_ioctl(struct drm_device *dev, void *data,
 	struct intel_context *ctx;
 	int ret;
 
+	if (args->pad != 0)
+		return -EINVAL;
+
 	if (args->ctx_id == DEFAULT_CONTEXT_HANDLE)
 		return -ENOENT;
 
