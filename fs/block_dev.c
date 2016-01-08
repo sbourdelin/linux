@@ -1809,7 +1809,10 @@ void force_failure_partition(struct gendisk *disk, int partno)
 	if (!sb)
 		goto out;
 
-	unmap_dax_inodes(sb);
+	if (sb->s_op->force_failure)
+		sb->s_op->force_failure(sb);
+	else
+		unmap_dax_inodes(sb);
 	drop_super(sb);
  out:
 	bdput(bdev);
