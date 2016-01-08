@@ -52,6 +52,11 @@ void set_capacity_scale(unsigned int cpu, unsigned long capacity)
 	per_cpu(cpu_scale, cpu) = capacity;
 }
 
+bool arch_wants_init_cpu_capacity(void)
+{
+	return true;
+}
+
 #ifdef CONFIG_OF
 struct cpu_efficiency {
 	const char *compatible;
