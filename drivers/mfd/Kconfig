@@ -322,6 +322,26 @@ config MFD_INTEL_QUARK_I2C_GPIO
 	  their respective IO driver.
 	  The GPIO exports a total amount of 8 interrupt-capable GPIOs.
 
+config MFD_IMANAGER
+	tristate "Advantech iManager Embedded Controller"
+	depends on PCI
+	depends on X86
+	select MFD_CORE
+	help
+	  This is the core driver for Advantech iManager EC as found on some
+	  Advantech SOM, MIO, AIMB, and PCM modules/boards. The EC may provide
+	  functions like GPIO, I2C interface, HW monitoring, Watchdog, and
+	  backlight/brightness control.
+
+	  The following Advantech boards are supported:
+		* All SOM modules newer than SOM-5788
+		* MIO-5250/5251/5270/5271 and newer
+		* PCM-9388
+		* AIMB-274/231
+
+	  This driver can also be built as a module. If so, the module
+	  will be called imanager.
+
 config LPC_ICH
 	tristate "Intel ICH LPC"
 	depends on PCI

@@ -1,0 +1,33 @@
+Note
+====
+
+This is a set of platform drivers which provide support for multiple
+embedded features such as GPIO, I2C/SMBus, Hardware Monitoring, Watchdog,
+and Backlight/Brightness control. Those features are available on Advantech
+Embedded boards such as SOM, MIO, AIMB, and PCM.
+Datasheets of each product line can be downloaded from www.advantech.com
+
+Author:
+	Richard Vidal-Dorsch <richard.dorsch@advantech.com>
+
+
+Kernel driver imanager
+======================
+
+This driver provides a communication layer to the Advantech iManager EC
+firmware which is factory loaded onto ITE IT8518/28 chips. The type of
+communication is message based. Clients (gpio, i2c, hwmon etc. drivers)
+request data from Advantech iManager (polling, not interrupt driven). If
+a response is been received within a time frame, the data is been extracted
+from the message and then passed to the caller (clients).
+
+  Supported chips:
+  * Advantech EC based on ITE IT8518
+    Prefix: imanager
+    Addresses: 0x029e/0x029f
+    Datasheet: Available from ITE upon request
+  * Advantech EC based on ITE IT8528
+    Prefix: imanager
+    Addresses: 0x0299/0x29a
+    Datasheet: Available from ITE upon request
+
