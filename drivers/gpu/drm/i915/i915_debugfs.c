@@ -117,7 +117,7 @@ static u64 i915_gem_obj_total_ggtt_size(struct drm_i915_gem_object *obj)
 	u64 size = 0;
 	struct i915_vma *vma;
 
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, obj) {
 		if (i915_is_ggtt(vma->vm) &&
 		    drm_mm_node_allocated(&vma->node))
 			size += vma->node.size;
@@ -155,7 +155,7 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 		   obj->madv == I915_MADV_DONTNEED ? " purgeable" : "");
 	if (obj->base.name)
 		seq_printf(m, " (name: %d)", obj->base.name);
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, obj) {
 		if (vma->pin_count > 0)
 			pin_count++;
 	}
@@ -164,7 +164,7 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 		seq_printf(m, " (display)");
 	if (obj->fence_reg != I915_FENCE_REG_NONE)
 		seq_printf(m, " (fence: %d)", obj->fence_reg);
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, obj) {
 		seq_printf(m, " (%sgtt offset: %08llx, size: %08llx",
 			   i915_is_ggtt(vma->vm) ? "g" : "pp",
 			   vma->node.start, vma->node.size);
@@ -342,7 +342,7 @@ static int per_file_stats(int id, void *ptr, void *data)
 		stats->shared += obj->base.size;
 
 	if (USES_FULL_PPGTT(obj->base.dev)) {
-		list_for_each_entry(vma, &obj->vma_list, vma_link) {
+		i915_gem_obj_for_each_vma(vma, obj) {
 			struct i915_hw_ppgtt *ppgtt;
 
 			if (!drm_mm_node_allocated(&vma->node))
