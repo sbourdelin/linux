@@ -8,6 +8,7 @@
  *  Simple MMC power sequence management
  */
 #include <linux/clk.h>
+#include <linux/clk/clk-conf.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/device.h>
@@ -103,6 +104,10 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
 	pwrseq = kzalloc(sizeof(*pwrseq), GFP_KERNEL);
 	if (!pwrseq)
 		return ERR_PTR(-ENOMEM);
+
+	ret = of_clk_set_defaults(dev->of_node, false);
+	if (ret)
+		goto free;
 
 	pwrseq->ext_clk = clk_get(dev, "ext_clock");
 	if (IS_ERR(pwrseq->ext_clk) &&
