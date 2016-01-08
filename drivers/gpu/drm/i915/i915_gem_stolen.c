@@ -667,9 +667,12 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 	if (gtt_offset == I915_GTT_OFFSET_NONE)
 		return obj;
 
+	mutex_lock(&dev->struct_mutex);
+
 	vma = i915_gem_obj_lookup_or_create_vma(obj, ggtt);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
+		mutex_unlock(&dev->struct_mutex);
 		goto err;
 	}
 
@@ -694,6 +697,8 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 
 	list_add_tail(&obj->global_list, &dev_priv->mm.bound_list);
 	i915_gem_object_pin_pages(obj);
+
+	mutex_unlock(&dev->struct_mutex);
 
 	return obj;
 
