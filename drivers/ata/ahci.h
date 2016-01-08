@@ -198,6 +198,12 @@ enum {
 	PORT_CMD_ICC_PARTIAL	= (0x2 << 28), /* Put i/f in partial state */
 	PORT_CMD_ICC_SLUMBER	= (0x6 << 28), /* Put i/f in slumber state */
 
+	/* PORT SCR STAT bits */
+	PORT_SCR_STAT_IPM_MASK	  = (0xf << 8), /* i/f IPM state mask */
+	PORT_SCR_STAT_IPM_ACTIVE  = (0x1 << 8), /* i/f in active state */
+	PORT_SCR_STAT_IPM_PARTIAL = (0x2 << 8), /* i/f in partial state */
+	PORT_SCR_STAT_IPM_SLUMBER = (0x6 << 8), /* i/f in slumber state */
+
 	/* PORT_FBS bits */
 	PORT_FBS_DWE_OFFSET	= 16, /* FBS device with error offset */
 	PORT_FBS_ADO_OFFSET	= 12, /* FBS active dev optimization offset */

@@ -595,6 +595,58 @@ int ahci_stop_engine(struct ata_port *ap)
 	void __iomem *port_mmio = ahci_port_base(ap);
 	u32 tmp;
 
+	/*
+	 * On some controllers, stopping a port's DMA engine
+	 * while the port is in ALPM state (partial or slumber)
+	 * results in failures on subsequent DMA engine starts.
+	 * For those controllers, put the port back in active
+	 * state before stopping it's DMA engine.
+	 */
+	if (ap->flags2 & ATA_FLAG2_WAKE_BEFORE_STOP) {
+		u32 sts, retries = 10;
+		struct ahci_host_priv *hpriv = ap->host->private_data;
+
+		if (!(hpriv->cap & HOST_CAP_ALPM))
+			goto skip_wake_up;
+
+		tmp = readl(port_mmio + PORT_CMD);
+		if (!(tmp & PORT_CMD_ALPE))
+			goto skip_wake_up;
+
+		sts = readl(port_mmio + PORT_SCR_STAT) &
+			PORT_SCR_STAT_IPM_MASK;
+		if ((sts != PORT_SCR_STAT_IPM_PARTIAL) &&
+		    (sts != PORT_SCR_STAT_IPM_SLUMBER))
+			goto skip_wake_up;
+
+		tmp |= PORT_CMD_ICC_ACTIVE;
+		writel(tmp, port_mmio + PORT_CMD);
+
+		do {
+			/*
+			 * The exit latency for partial state is upto 10usec
+			 * whereas it is upto 10msec for slumber state. Use
+			 * this information to choose appropriate waiting
+			 * calls so the time spent in the loop is minimized.
+			 */
+			if (sts == PORT_SCR_STAT_IPM_PARTIAL)
+				udelay(1);
+			else
+				ata_msleep(ap, 1);
+			sts = readl(port_mmio + PORT_SCR_STAT) &
+				PORT_SCR_STAT_IPM_MASK;
+			if (sts == PORT_SCR_STAT_IPM_ACTIVE)
+				break;
+		} while (--retries);
+
+		if (!retries) {
+			dev_err(ap->host->dev,
+				"failed to wake up port\n");
+			return -EIO;
+		}
+	}
+
+skip_wake_up:
 	tmp = readl(port_mmio + PORT_CMD);
 
 	/* check if the HBA is idle */

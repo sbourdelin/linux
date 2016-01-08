@@ -5803,6 +5803,7 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 		ap->mwdma_mask = pi->mwdma_mask;
 		ap->udma_mask = pi->udma_mask;
 		ap->flags |= pi->flags;
+		ap->flags2 |= pi->flags2;
 		ap->link.flags |= pi->link_flags;
 		ap->ops = pi->port_ops;
 

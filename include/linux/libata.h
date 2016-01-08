@@ -236,6 +236,8 @@ enum {
 
 	/* bits 24:31 of ap->flags are reserved for LLD specific flags */
 
+	/* struct ata_port flags2 */
+	ATA_FLAG2_WAKE_BEFORE_STOP = (1 << 0), /* wake link before DMA stop */
 
 	/* struct ata_port pflags */
 	ATA_PFLAG_EH_PENDING	= (1 << 0), /* EH pending */
@@ -812,6 +814,7 @@ struct ata_port {
 	/* Flags owned by the EH context. Only EH should touch these once the
 	   port is active */
 	unsigned long		flags;	/* ATA_FLAG_xxx */
+	unsigned long		flags2; /* ATA_FLAG2_xxx */
 	/* Flags that change dynamically, protected by ap->lock */
 	unsigned int		pflags; /* ATA_PFLAG_xxx */
 	unsigned int		print_id; /* user visible unique port ID */
@@ -996,6 +999,7 @@ struct ata_port_operations {
 
 struct ata_port_info {
 	unsigned long		flags;
+	unsigned long		flags2;
 	unsigned long		link_flags;
 	unsigned long		pio_mask;
 	unsigned long		mwdma_mask;
