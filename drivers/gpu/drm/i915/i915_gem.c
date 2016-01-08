@@ -1135,11 +1135,6 @@ i915_gem_check_wedge(struct i915_gpu_error *error,
 	return 0;
 }
 
-static void fake_irq(unsigned long data)
-{
-	wake_up_process((struct task_struct *)data);
-}
-
 static bool missed_irq(struct drm_i915_private *dev_priv,
 		       struct intel_engine_cs *ring)
 {
@@ -1291,7 +1286,7 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 	}
 
 	for (;;) {
-		struct timer_list timer;
+		long sched_timeout;
 
 		prepare_to_wait(&ring->irq_queue, &wait, state);
 
@@ -1321,21 +1316,14 @@ int __i915_wait_request(struct drm_i915_gem_request *req,
 			break;
 		}
 
-		timer.function = NULL;
-		if (timeout || missed_irq(dev_priv, ring)) {
-			unsigned long expire;
+		if (timeout)
+			sched_timeout = timeout_expire - jiffies;
+		else if (missed_irq(dev_priv, ring))
+			sched_timeout = 1;
+		else
+			sched_timeout = MAX_SCHEDULE_TIMEOUT;
 
-			setup_timer_on_stack(&timer, fake_irq, (unsigned long)current);
-			expire = missed_irq(dev_priv, ring) ? jiffies + 1 : timeout_expire;
-			mod_timer(&timer, expire);
-		}
-
-		io_schedule();
-
-		if (timer.function) {
-			del_singleshot_timer_sync(&timer);
-			destroy_timer_on_stack(&timer);
-		}
+		io_schedule_timeout(sched_timeout);
 	}
 	if (!irq_test_in_progress)
 		ring->irq_put(ring);
