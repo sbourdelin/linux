@@ -21,12 +21,20 @@ config MTK_PMIC_WRAP
 	  hardware to connect the PMIC.
 
 config MTK_SCPSYS
-	bool "MediaTek SCPSYS Support"
-	depends on ARCH_MEDIATEK || COMPILE_TEST
-	default ARM64 && ARCH_MEDIATEK
+	bool
 	select REGMAP
 	select MTK_INFRACFG
 	select PM_GENERIC_DOMAINS if PM
 	help
-	  Say yes here to add support for the MediaTek SCPSYS power domain
+	  MediaTek SCPSYS power domain support.
+
+config MTK_SCPSYS_MT8173
+	bool "MediaTek MT8173 SCPSYS Support"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	select MTK_SCPSYS
+	default ARCH_MEDIATEK
+	help
+	  Say yes here to add support for the MT8173 SCPSYS power domain
 	  driver.
+	  The System Control Processor System (SCPSYS) has several power
+	  management related tasks in the system.
