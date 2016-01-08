@@ -336,6 +336,8 @@ struct nau8825 {
 
 int nau8825_enable_jack_detect(struct snd_soc_codec *codec,
 				struct snd_soc_jack *jack);
+int nau8825_init_wakeup(struct snd_soc_codec *codec);
+int nau8825_irq_wakeup(struct snd_soc_codec *codec, int on);
 
 
 #endif  /* __NAU8825_H__ */
