@@ -6320,8 +6320,14 @@ static void brcmf_cfg80211_reg_notifier(struct wiphy *wiphy,
 			brcmf_err("not a ISO3166 code\n");
 			return;
 		}
+
 	memset(&ccreq, 0, sizeof(ccreq));
-	ccreq.rev = cpu_to_le32(-1);
+	if (brcmf_fil_iovar_data_get(ifp, "country", &ccreq, sizeof(ccreq))) {
+		brcmf_err("could not obtain country info\n");
+		return;
+	}
+
+	memset(ccreq.country_abbrev, 0, sizeof(ccreq.country_abbrev));
 	memcpy(ccreq.ccode, req->alpha2, sizeof(req->alpha2));
 	if (brcmf_fil_iovar_data_set(ifp, "country", &ccreq, sizeof(ccreq))) {
 		brcmf_err("firmware rejected country setting\n");
