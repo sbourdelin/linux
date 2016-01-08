@@ -350,8 +350,6 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 	uint32_t *reg_state;
 
 	BUG_ON(!ctx_obj);
-	WARN_ON(!i915_gem_obj_is_pinned(ctx_obj));
-	WARN_ON(!i915_gem_obj_is_pinned(rb_obj));
 
 	page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
 	reg_state = kmap_atomic(page);
