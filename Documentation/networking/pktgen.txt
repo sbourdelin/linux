@@ -365,7 +365,7 @@ flowlen
 rate
 ratep
 
-xmit_mode <start_xmit|netif_receive>
+xmit_mode <start_xmit|netif_receive|queue_xmit>
 
 vlan_cfi
 vlan_id
