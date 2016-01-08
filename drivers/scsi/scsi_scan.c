@@ -315,7 +315,6 @@ static void scsi_target_destroy(struct scsi_target *starget)
 	struct Scsi_Host *shost = dev_to_shost(dev->parent);
 	unsigned long flags;
 
-	starget->state = STARGET_DEL;
 	transport_destroy_device(dev);
 	spin_lock_irqsave(shost->host_lock, flags);
 	if (shost->hostt->target_destroy)
@@ -380,19 +379,15 @@ static void scsi_target_reap_ref_release(struct kref *kref)
 	struct scsi_target *starget
 		= container_of(kref, struct scsi_target, reap_ref);
 
-	/*
-	 * if we get here and the target is still in the CREATED state that
-	 * means it was allocated but never made visible (because a scan
-	 * turned up no LUNs), so don't call device_del() on it.
-	 */
-	if (starget->state != STARGET_CREATED) {
+	if (starget->is_visible) {
+		starget->is_visible = false;
 		transport_remove_device(&starget->dev);
 		device_del(&starget->dev);
 	}
 	scsi_target_destroy(starget);
 }
 
-static void scsi_target_reap_ref_put(struct scsi_target *starget)
+void scsi_target_reap(struct scsi_target *starget)
 {
 	kref_put(&starget->reap_ref, scsi_target_reap_ref_release);
 }
@@ -438,7 +433,6 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 	starget->can_queue = 0;
 	INIT_LIST_HEAD(&starget->siblings);
 	INIT_LIST_HEAD(&starget->devices);
-	starget->state = STARGET_CREATED;
 	starget->scsi_level = SCSI_2;
 	starget->max_target_blocked = SCSI_DEFAULT_TARGET_BLOCKED;
  retry:
@@ -496,25 +490,6 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 	 */
 	msleep(1);
 	goto retry;
-}
-
-/**
- * scsi_target_reap - check to see if target is in use and destroy if not
- * @starget: target to be checked
- *
- * This is used after removing a LUN or doing a last put of the target
- * it checks atomically that nothing is using the target and removes
- * it if so.
- */
-void scsi_target_reap(struct scsi_target *starget)
-{
-	/*
-	 * serious problem if this triggers: STARGET_DEL is only set in the if
-	 * the reap_ref drops to zero, so we're trying to do another final put
-	 * on an already released kref
-	 */
-	BUG_ON(starget->state == STARGET_DEL);
-	scsi_target_reap_ref_put(starget);
 }
 
 /**
