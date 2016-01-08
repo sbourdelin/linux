@@ -976,7 +976,7 @@ compatibility.
 
     - bootargs : This zero-terminated string is passed as the kernel
       command line
-    - linux,stdout-path : This is the full path to your standard
+    - stdout-path : This is the full path to your standard
       console device if any. Typically, if you have serial devices on
       your board, you may want to put the full path to the one set as
       the default console in the firmware here, for the kernel to pick
