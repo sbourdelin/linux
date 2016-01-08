@@ -305,6 +305,11 @@ static int guc_ucode_xfer(struct drm_i915_private *dev_priv)
 
 	/* init WOPCM */
 	I915_WRITE(GUC_WOPCM_SIZE, GUC_WOPCM_SIZE_VALUE);
+	if (IS_BROXTON(dev))
+		I915_WRITE(GUC_WOPCM_SIZE, BXT_GUC_WOPCM_SIZE_VALUE);
+	else
+		I915_WRITE(GUC_WOPCM_SIZE, GUC_WOPCM_SIZE_VALUE);
+
 	I915_WRITE(DMA_GUC_WOPCM_OFFSET, GUC_WOPCM_OFFSET_VALUE);
 
 	/* Enable MIA caching. GuC clock gating is disabled. */
