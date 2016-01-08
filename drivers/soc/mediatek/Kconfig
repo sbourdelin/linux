@@ -38,3 +38,14 @@ config MTK_SCPSYS_MT8173
 	  driver.
 	  The System Control Processor System (SCPSYS) has several power
 	  management related tasks in the system.
+
+config MTK_SCPSYS_MT2701
+	bool "SCPSYS Support MediaTek MT2701"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	select MTK_SCPSYS
+	default ARCH_MEDIATEK
+	help
+	  Say yes here to add support for the MT2701 SCPSYS power domain
+	  driver.
+	  The System Control Processor System (SCPSYS) has several power
+	  management related tasks in the system.
