@@ -423,6 +423,7 @@ static int ext4_ioctl_setproject(struct file *filp, __u32 projid)
 {
 	if (projid != EXT4_DEF_PROJID)
 		return -EOPNOTSUPP;
+	return 0;
 }
 #endif
 
