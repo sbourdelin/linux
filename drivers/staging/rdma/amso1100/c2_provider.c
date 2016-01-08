@@ -361,7 +361,7 @@ static struct ib_mr *c2_get_dma_mr(struct ib_pd *pd, int acc)
 	}
 
 	for (i = 0; i < pbl_depth; i++)
-		page_list[i] = (i << page_shift);
+		page_list[i] = ((u64)i << page_shift);
 
 	mr = kmalloc(sizeof(*mr), GFP_KERNEL);
 	if (!mr) {
