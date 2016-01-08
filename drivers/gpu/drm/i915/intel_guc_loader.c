@@ -62,6 +62,9 @@
 #define I915_SKL_GUC_UCODE "i915/skl_guc_ver4.bin"
 MODULE_FIRMWARE(I915_SKL_GUC_UCODE);
 
+#define I915_BXT_GUC_UCODE "i915/bxt_guc_ver3.bin"
+MODULE_FIRMWARE(I915_BXT_GUC_UCODE);
+
 /* User-friendly representation of an enum */
 const char *intel_guc_fw_status_repr(enum intel_guc_fw_status status)
 {
@@ -587,6 +590,10 @@ void intel_guc_ucode_init(struct drm_device *dev)
 		fw_path = I915_SKL_GUC_UCODE;
 		guc_fw->guc_fw_major_wanted = 4;
 		guc_fw->guc_fw_minor_wanted = 3;
+	} else if (IS_BROXTON(dev)) {
+		fw_path = I915_BXT_GUC_UCODE;
+		guc_fw->guc_fw_major_wanted = 3;
+		guc_fw->guc_fw_minor_wanted = 0;
 	} else {
 		i915.enable_guc_submission = false;
 		fw_path = "";	/* unknown device */
