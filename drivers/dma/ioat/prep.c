@@ -21,6 +21,7 @@
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
 #include <linux/prefetch.h>
+#include <linux/percpu.h>
 #include "../dmaengine.h"
 #include "registers.h"
 #include "hw.h"
@@ -655,13 +656,22 @@ ioat_prep_pq_val(struct dma_chan *chan, dma_addr_t *pq, dma_addr_t *src,
 				     flags);
 }
 
+/*
+ * The scf scratch buffer is too large for an automatic variable, and
+ * we don't want to take the performance hit for dynamic allocation.
+ * Therefore, define per CPU buffers and use get_cpu_var()/put_cpu_var()
+ * to control preemption while the buffer is in use.
+ */
+static DEFINE_PER_CPU(unsigned char [MAX_SCF], ioat_scf);
+
 struct dma_async_tx_descriptor *
 ioat_prep_pqxor(struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
 		 unsigned int src_cnt, size_t len, unsigned long flags)
 {
-	unsigned char scf[MAX_SCF];
+	unsigned char *scf;
 	dma_addr_t pq[2];
 	struct ioatdma_chan *ioat_chan = to_ioat_chan(chan);
+	struct dma_async_tx_descriptor *desc;
 
 	if (test_bit(IOAT_CHAN_DOWN, &ioat_chan->state))
 		return NULL;
@@ -669,16 +679,21 @@ ioat_prep_pqxor(struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
 	if (src_cnt > MAX_SCF)
 		return NULL;
 
+	scf = get_cpu_var(ioat_scf);
+
 	memset(scf, 0, src_cnt);
 	pq[0] = dst;
 	flags |= DMA_PREP_PQ_DISABLE_Q;
 	pq[1] = dst; /* specify valid address for disabled result */
 
-	return src_cnt_flags(src_cnt, flags) > 8 ?
+	desc = src_cnt_flags(src_cnt, flags) > 8 ?
 		__ioat_prep_pq16_lock(chan, NULL, pq, src, src_cnt, scf, len,
 				       flags) :
 		__ioat_prep_pq_lock(chan, NULL, pq, src, src_cnt, scf, len,
 				     flags);
+
+	put_cpu_var(ioat_scf);
+	return desc;
 }
 
 struct dma_async_tx_descriptor *
@@ -686,15 +701,18 @@ ioat_prep_pqxor_val(struct dma_chan *chan, dma_addr_t *src,
 		     unsigned int src_cnt, size_t len,
 		     enum sum_check_flags *result, unsigned long flags)
 {
-	unsigned char scf[MAX_SCF];
+	unsigned char *scf;
 	dma_addr_t pq[2];
 	struct ioatdma_chan *ioat_chan = to_ioat_chan(chan);
+	struct dma_async_tx_descriptor *desc;
 
 	if (test_bit(IOAT_CHAN_DOWN, &ioat_chan->state))
 		return NULL;
 
 	if (src_cnt > MAX_SCF)
 		return NULL;
+
+	scf = get_cpu_var(ioat_scf);
 
 	/* the cleanup routine only sets bits on validate failure, it
 	 * does not clear bits on validate success... so clear it here
@@ -706,11 +724,14 @@ ioat_prep_pqxor_val(struct dma_chan *chan, dma_addr_t *src,
 	flags |= DMA_PREP_PQ_DISABLE_Q;
 	pq[1] = pq[0]; /* specify valid address for disabled result */
 
-	return src_cnt_flags(src_cnt, flags) > 8 ?
+	desc = src_cnt_flags(src_cnt, flags) > 8 ?
 		__ioat_prep_pq16_lock(chan, result, pq, &src[1], src_cnt - 1,
 				       scf, len, flags) :
 		__ioat_prep_pq_lock(chan, result, pq, &src[1], src_cnt - 1,
 				     scf, len, flags);
+
+	put_cpu_var(ioat_scf);
+	return desc;
 }
 
 struct dma_async_tx_descriptor *
