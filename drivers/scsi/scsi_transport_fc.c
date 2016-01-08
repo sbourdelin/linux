@@ -2081,7 +2081,7 @@ fc_timed_out(struct scsi_cmnd *scmd)
 {
 	struct fc_rport *rport = starget_to_rport(scsi_target(scmd->device));
 
-	if (rport->port_state == FC_PORTSTATE_BLOCKED)
+	if ((rport == NULL) || (rport->port_state == FC_PORTSTATE_BLOCKED))
 		return BLK_EH_RESET_TIMER;
 
 	return BLK_EH_NOT_HANDLED;
