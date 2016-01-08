@@ -52,8 +52,9 @@ static int pnx833x_wdt_alive;
 /* Set default timeout in MHZ.*/
 static int pnx833x_wdt_timeout = PNX_WATCHDOG_TIMEOUT;
 module_param(pnx833x_wdt_timeout, int, 0);
-MODULE_PARM_DESC(timeout, "Watchdog timeout in Mhz. (68Mhz clock), default="
-			__MODULE_STRING(PNX_TIMEOUT_VALUE) "(30 seconds).");
+MODULE_PARM_DESC(pnx833x_wdt_timeout,
+		 "Watchdog timeout in Mhz. (68Mhz clock), default="
+		 __MODULE_STRING(PNX_TIMEOUT_VALUE) "(30 seconds).");
 
 static bool nowayout = WATCHDOG_NOWAYOUT;
 module_param(nowayout, bool, 0);
