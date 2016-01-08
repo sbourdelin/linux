@@ -114,6 +114,8 @@ struct input_mask {
 #define EVIOCSKEYCODE		_IOW('E', 0x04, unsigned int[2])        /* set keycode */
 #define EVIOCSKEYCODE_V2	_IOW('E', 0x04, struct input_keymap_entry)
 
+#define EVIOCGBUFSIZE		_IOR('E', 0x05, unsigned int)		/* get device buffer size */
+
 #define EVIOCGNAME(len)		_IOC(_IOC_READ, 'E', 0x06, len)		/* get device name */
 #define EVIOCGPHYS(len)		_IOC(_IOC_READ, 'E', 0x07, len)		/* get physical location */
 #define EVIOCGUNIQ(len)		_IOC(_IOC_READ, 'E', 0x08, len)		/* get unique identifier */

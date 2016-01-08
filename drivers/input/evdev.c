@@ -1103,6 +1103,9 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 
 		return 0;
 
+	case EVIOCGBUFSIZE:
+		return put_user(client->bufsize, (unsigned int __user *)p);
+
 	case EVIOCRMFF:
 		return input_ff_erase(dev, (int)(unsigned long) p, file);
 
