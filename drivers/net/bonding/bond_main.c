@@ -1207,7 +1207,6 @@ static int bond_master_upper_dev_link(struct net_device *bond_dev,
 	err = netdev_master_upper_dev_link_private(slave_dev, bond_dev, slave);
 	if (err)
 		return err;
-	slave_dev->flags |= IFF_SLAVE;
 	rtmsg_ifinfo(RTM_NEWLINK, slave_dev, IFF_SLAVE, GFP_KERNEL);
 	return 0;
 }
@@ -1216,7 +1215,6 @@ static void bond_upper_dev_unlink(struct net_device *bond_dev,
 				  struct net_device *slave_dev)
 {
 	netdev_upper_dev_unlink(slave_dev, bond_dev);
-	slave_dev->flags &= ~IFF_SLAVE;
 	rtmsg_ifinfo(RTM_NEWLINK, slave_dev, IFF_SLAVE, GFP_KERNEL);
 }
 
@@ -1464,6 +1462,9 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 			goto err_restore_mtu;
 		}
 	}
+
+	/* set slave flag before open to prevent IPv6 addrconf */
+	slave_dev->flags |= IFF_SLAVE;
 
 	/* open the slave since the application closed it */
 	res = dev_open(slave_dev);
@@ -1725,6 +1726,7 @@ err_close:
 	dev_close(slave_dev);
 
 err_restore_mac:
+	slave_dev->flags &= ~IFF_SLAVE;
 	if (!bond->params.fail_over_mac ||
 	    BOND_MODE(bond) != BOND_MODE_ACTIVEBACKUP) {
 		/* XXX TODO - fom follow mode needs to change master's
@@ -1905,6 +1907,8 @@ static int __bond_release_one(struct net_device *bond_dev,
 
 	/* close slave before restoring its mac address */
 	dev_close(slave_dev);
+
+	slave_dev->flags &= ~IFF_SLAVE;
 
 	if (bond->params.fail_over_mac != BOND_FOM_ACTIVE ||
 	    BOND_MODE(bond) != BOND_MODE_ACTIVEBACKUP) {
