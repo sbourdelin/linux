@@ -28,6 +28,9 @@
 #include <linux/list.h>
 #include <linux/kallsyms.h>
 #include <linux/livepatch.h>
+#include <linux/elf.h>
+#include <linux/string.h>
+#include <linux/moduleloader.h>
 #include <asm/cacheflush.h>
 
 /**
@@ -204,74 +207,70 @@ static int klp_find_object_symbol(const char *objname, const char *name,
 	return -EINVAL;
 }
 
-/*
- * external symbols are located outside the parent object (where the parent
- * object is either vmlinux or the kmod being patched).
- */
-static int klp_find_external_symbol(struct module *pmod, const char *name,
-				    unsigned long *addr)
+static int klp_resolve_symbols(Elf_Shdr *relsec, struct module *pmod)
 {
-	const struct kernel_symbol *sym;
+	int i, len, ret = 0;
+	Elf_Rela *relas;
+	Elf_Sym *sym;
+	char *symname, *sym_objname;
 
-	/* first, check if it's an exported symbol */
-	preempt_disable();
-	sym = find_symbol(name, NULL, NULL, true, true);
-	if (sym) {
-		*addr = sym->value;
-		preempt_enable();
-		return 0;
+	relas = (Elf_Rela *) relsec->sh_addr;
+	/* For each rela in this .klp.rel. section */
+	for (i = 0; i < relsec->sh_size / sizeof(Elf_Rela); i++) {
+		sym = pmod->core_symtab + ELF_R_SYM(relas[i].r_info);
+		symname = pmod->core_strtab + sym->st_name;
+
+		len = strcspn(symname + KLP_TAG_LEN, ".");
+		sym_objname = strncmp(symname + KLP_TAG_LEN, "vmlinux", len) ?
+			kstrndup(symname + KLP_TAG_LEN, len, GFP_KERNEL) : NULL;
+		/* .klp.sym.objname.[symbol_name] */
+		symname += KLP_TAG_LEN + len + 1;
+
+		ret = klp_find_object_symbol(sym_objname, symname,
+					     KLP_SYMPOS(sym->st_other),
+					     (unsigned long *) &sym->st_value);
+		kfree(sym_objname);
+		if (ret)
+			return ret;
 	}
-	preempt_enable();
 
-	/*
-	 * Check if it's in another .o within the patch module. This also
-	 * checks that the external symbol is unique.
-	 */
-	return klp_find_object_symbol(pmod->name, name, 0, addr);
+	return ret;
 }
 
 static int klp_write_object_relocations(struct module *pmod,
 					struct klp_object *obj)
 {
-	int ret = 0;
-	unsigned long val;
-	struct klp_reloc *reloc;
+	int i, len, ret = 0;
+	char *secname;
+	const char *objname;
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
 		return -EINVAL;
 
-	if (WARN_ON(!obj->relocs))
-		return -EINVAL;
+	objname = klp_is_module(obj) ? obj->name : "vmlinux";
 
 	module_disable_ro(pmod);
+	/* For each klp rela section for this object */
+	for (i = 1; i < pmod->info->hdr->e_shnum; i++) {
+		if (!(pmod->info->sechdrs[i].sh_flags & SHF_RELA_LIVEPATCH))
+			continue;
 
-	for (reloc = obj->relocs; reloc->name; reloc++) {
-		/* discover the address of the referenced symbol */
-		if (reloc->external) {
-			if (reloc->sympos > 0) {
-				pr_err("non-zero sympos for external reloc symbol '%s' is not supported\n",
-				       reloc->name);
-				ret = -EINVAL;
-				goto out;
-			}
-			ret = klp_find_external_symbol(pmod, reloc->name, &val);
-		} else
-			ret = klp_find_object_symbol(obj->name,
-						     reloc->name,
-						     reloc->sympos,
-						     &val);
+		secname = pmod->info->secstrings + pmod->info->sechdrs[i].sh_name;
+		/* .klp.rel.[objname].section_name */
+		len = strcspn(secname + KLP_TAG_LEN, ".");
+
+		if (strncmp(objname, secname + KLP_TAG_LEN, len))
+			continue;
+
+		ret = klp_resolve_symbols(pmod->info->sechdrs + i, pmod);
 		if (ret)
 			goto out;
 
-		ret = klp_write_module_reloc(pmod, reloc->type, reloc->loc,
-					     val + reloc->addend);
-		if (ret) {
-			pr_err("relocation failed for symbol '%s' at 0x%016lx (%d)\n",
-			       reloc->name, val, ret);
+		ret = apply_relocate_add(pmod->info->sechdrs, pmod->core_strtab,
+					 pmod->info->index.sym, i, pmod);
+		if (ret)
 			goto out;
-		}
 	}
-
 out:
 	module_enable_ro(pmod);
 	return ret;
@@ -703,11 +702,9 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 	struct klp_func *func;
 	int ret;
 
-	if (obj->relocs) {
-		ret = klp_write_object_relocations(patch->mod, obj);
-		if (ret)
-			return ret;
-	}
+	ret = klp_write_object_relocations(patch->mod, obj);
+	if (ret)
+		return ret;
 
 	klp_for_each_func(obj, func) {
 		ret = klp_find_object_symbol(obj->name, func->old_name,

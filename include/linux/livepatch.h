@@ -65,27 +65,8 @@ struct klp_func {
 };
 
 /**
- * struct klp_reloc - relocation structure for live patching
- * @loc:	address where the relocation will be written
- * @sympos:	position in kallsyms to disambiguate symbols (optional)
- * @type:	ELF relocation type
- * @name:	name of the referenced symbol (for lookup/verification)
- * @addend:	offset from the referenced symbol
- * @external:	symbol is either exported or within the live patch module itself
- */
-struct klp_reloc {
-	unsigned long loc;
-	unsigned long sympos;
-	unsigned long type;
-	const char *name;
-	int addend;
-	int external;
-};
-
-/**
  * struct klp_object - kernel object structure for live patching
  * @name:	module name (or NULL for vmlinux)
- * @relocs:	relocation entries to be applied at load time
  * @funcs:	function entries for functions to be patched in the object
  * @kobj:	kobject for sysfs resources
  * @mod:	kernel module associated with the patched object
@@ -95,7 +76,6 @@ struct klp_reloc {
 struct klp_object {
 	/* external */
 	const char *name;
-	struct klp_reloc *relocs;
 	struct klp_func *funcs;
 
 	/* internal */
@@ -122,6 +102,19 @@ struct klp_patch {
 	struct kobject kobj;
 	enum klp_state state;
 };
+
+/*
+ * Livepatch-specific symbols and relocation
+ * sections are prefixed with a tag:
+ * .klp.rel. for relocation sections
+ * .klp.sym. for livepatch symbols
+ */
+#define KLP_TAG_LEN 9
+/*
+ * Livepatch-specific bits for specifying symbol
+ * positions in the Elf_Sym st_other field
+ */
+#define KLP_SYMPOS(o) (o >> 2) & 0xff
 
 #define klp_for_each_object(patch, obj) \
 	for (obj = patch->objs; obj->funcs; obj++)
