@@ -373,30 +373,18 @@ void core_tpg_del_initiator_node_acl(struct se_node_acl *acl)
  */
 int core_tpg_set_initiator_node_queue_depth(
 	struct se_portal_group *tpg,
-	unsigned char *initiatorname,
+	struct se_node_acl *acl,
 	u32 queue_depth,
 	int force)
 {
 	struct se_session *sess, *init_sess = NULL;
-	struct se_node_acl *acl;
 	unsigned long flags;
 	int dynamic_acl = 0;
 
-	mutex_lock(&tpg->acl_node_mutex);
-	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
-	if (!acl) {
-		pr_err("Access Control List entry for %s Initiator"
-			" Node %s does not exists for TPG %hu, ignoring"
-			" request.\n", tpg->se_tpg_tfo->get_fabric_name(),
-			initiatorname, tpg->se_tpg_tfo->tpg_get_tag(tpg));
-		mutex_unlock(&tpg->acl_node_mutex);
-		return -ENODEV;
-	}
 	if (acl->dynamic_node_acl) {
 		acl->dynamic_node_acl = 0;
 		dynamic_acl = 1;
 	}
-	mutex_unlock(&tpg->acl_node_mutex);
 
 	spin_lock_irqsave(&tpg->session_lock, flags);
 	list_for_each_entry(sess, &tpg->tpg_sess_list, sess_list) {
@@ -409,13 +397,12 @@ int core_tpg_set_initiator_node_queue_depth(
 				" operational.  To forcefully change the queue"
 				" depth and force session reinstatement"
 				" use the \"force=1\" parameter.\n",
-				tpg->se_tpg_tfo->get_fabric_name(), initiatorname);
+				tpg->se_tpg_tfo->get_fabric_name(),
+				acl->initiatorname);
 			spin_unlock_irqrestore(&tpg->session_lock, flags);
 
-			mutex_lock(&tpg->acl_node_mutex);
 			if (dynamic_acl)
 				acl->dynamic_node_acl = 1;
-			mutex_unlock(&tpg->acl_node_mutex);
 			return -EEXIST;
 		}
 		/*
@@ -466,13 +453,11 @@ int core_tpg_set_initiator_node_queue_depth(
 
 	pr_debug("Successfully changed queue depth to: %d for Initiator"
 		" Node: %s on %s Target Portal Group: %u\n", queue_depth,
-		initiatorname, tpg->se_tpg_tfo->get_fabric_name(),
+		acl->initiatorname, tpg->se_tpg_tfo->get_fabric_name(),
 		tpg->se_tpg_tfo->tpg_get_tag(tpg));
 
-	mutex_lock(&tpg->acl_node_mutex);
 	if (dynamic_acl)
 		acl->dynamic_node_acl = 1;
-	mutex_unlock(&tpg->acl_node_mutex);
 
 	return 0;
 }

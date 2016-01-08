@@ -726,10 +726,10 @@ static ssize_t lio_target_nacl_cmdsn_depth_store(struct config_item *item,
 	if (iscsit_get_tpg(tpg) < 0)
 		return -EINVAL;
 	/*
-	 * iscsit_tpg_set_initiator_node_queue_depth() assumes force=1
+	 * core_tpg_set_initiator_node_queue_depth() assumes force=1
 	 */
-	ret = iscsit_tpg_set_initiator_node_queue_depth(tpg,
-				config_item_name(acl_ci), cmdsn_depth, 1);
+	ret = core_tpg_set_initiator_node_queue_depth(se_tpg, se_nacl,
+						      cmdsn_depth, 1);
 
 	pr_debug("LIO_Target_ConfigFS: %s/%s Set CmdSN Window: %u for"
 		"InitiatorName: %s\n", config_item_name(wwn_ci),
