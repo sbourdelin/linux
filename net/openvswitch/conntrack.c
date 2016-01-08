@@ -199,7 +199,6 @@ static int ovs_ct_set_mark(struct sk_buff *skb, struct sw_flow_key *key,
 	struct nf_conn *ct;
 	u32 new_mark;
 
-
 	/* The connection could be invalid, in which case set_mark is no-op. */
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct)
@@ -375,6 +374,10 @@ static bool skb_nfct_cached(const struct net *net, const struct sk_buff *skb,
 	return true;
 }
 
+/* Pass 'skb' through conntrack in 'net', using zone configured in 'info', if
+ * not done already.  Update key with new CT state after passing the packet
+ * through conntrack.
+ */
 static int __ovs_ct_lookup(struct net *net, struct sw_flow_key *key,
 			   const struct ovs_conntrack_info *info,
 			   struct sk_buff *skb)
@@ -400,13 +403,13 @@ static int __ovs_ct_lookup(struct net *net, struct sw_flow_key *key,
 				    skb) != NF_ACCEPT)
 			return -ENOENT;
 
+		ovs_ct_update_key(skb, info, key, true);
+
 		if (ovs_ct_helper(skb, info->family) != NF_ACCEPT) {
 			WARN_ONCE(1, "helper rejected packet");
 			return -EINVAL;
 		}
 	}
-
-	ovs_ct_update_key(skb, info, key, true);
 
 	return 0;
 }
