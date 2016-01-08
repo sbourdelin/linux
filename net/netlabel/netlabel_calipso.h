@@ -124,5 +124,7 @@ static inline int netlbl_calipso_genl_init(void)
 int calipso_doi_add(struct calipso_doi *doi_def,
 		    struct netlbl_audit *audit_info);
 void calipso_doi_free(struct calipso_doi *doi_def);
+struct calipso_doi *calipso_doi_getdef(u32 doi);
+void calipso_doi_putdef(struct calipso_doi *doi_def);
 
 #endif
