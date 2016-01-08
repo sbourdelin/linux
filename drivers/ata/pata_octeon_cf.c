@@ -826,6 +826,30 @@ static unsigned int octeon_cf_qc_issue(struct ata_queued_cmd *qc)
 	return 0;
 }
 
+static unsigned long octeon_cf_mode_filter(struct ata_device *dev,
+						unsigned long mask)
+{
+	const char viking_model_num[] = "VRFDFC22048UCHC-TE";
+	unsigned char model_num[ATA_ID_PROD_LEN + 1];
+
+	if (dev->class != ATA_DEV_ATA)
+		return mask;
+
+	ata_id_c_string(dev->id, model_num, ATA_ID_PROD, sizeof(model_num));
+	/*
+	 * Viking flash with SMI controller causes read errors in
+	 * MWDMA modes.  Force PIO mode.
+	 */
+	if (strncmp(model_num, viking_model_num,
+				strlen(viking_model_num)) == 0) {
+		DPRINTK("Viking flash with SMI controller detected.");
+		DPRINTK("Forcing PIO mode.\n");
+		mask &= ATA_MASK_PIO;
+	}
+
+	return mask;
+}
+
 static struct ata_port_operations octeon_cf_ops = {
 	.inherits		= &ata_sff_port_ops,
 	.check_atapi_dma	= octeon_cf_check_atapi_dma,
@@ -835,6 +859,7 @@ static struct ata_port_operations octeon_cf_ops = {
 	.sff_irq_on		= octeon_cf_ata_port_noaction,
 	.sff_irq_clear		= octeon_cf_ata_port_noaction,
 	.cable_detect		= ata_cable_40wire,
+	.mode_filter		= octeon_cf_mode_filter,
 	.set_piomode		= octeon_cf_set_piomode,
 	.set_dmamode		= octeon_cf_set_dmamode,
 	.dev_config		= octeon_cf_dev_config,
