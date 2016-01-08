@@ -265,7 +265,8 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
 
 /**
  * intel_execlists_ctx_id() - get the Execlists Context ID
- * @ctx_obj: Logical Ring Context backing object.
+ * @ctx: Context to get the ID for
+ * @ring: Engine to get the ID for
  *
  * Do not confuse with ctx->id! Unfortunately we have a name overload
  * here: the old context ID we pass to userspace as a handler so that
@@ -275,14 +276,12 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
  *
  * Return: 20-bits globally unique context ID.
  */
-u32 intel_execlists_ctx_id(struct drm_i915_gem_object *ctx_obj)
+u32 intel_execlists_ctx_id(struct intel_context *ctx,
+			   struct intel_engine_cs *ring)
 {
-	u32 lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
-			LRC_PPHWSP_PN * PAGE_SIZE;
-
 	/* LRCA is required to be 4K aligned so the more significant 20 bits
 	 * are globally unique */
-	return lrca >> 12;
+	return ctx->engine[ring->id].lrca >> 12;
 }
 
 static bool disable_lite_restore_wa(struct intel_engine_cs *ring)
@@ -297,13 +296,11 @@ static bool disable_lite_restore_wa(struct intel_engine_cs *ring)
 uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 				     struct intel_engine_cs *ring)
 {
-	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
+	uint64_t lrca = ctx->engine[ring->id].lrca;
 	uint64_t desc = ring->ctx_desc_template;
-	uint64_t lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
-			LRC_PPHWSP_PN * PAGE_SIZE;
 
 	desc |= lrca;
-	desc |= (u64)intel_execlists_ctx_id(ctx_obj) << GEN8_CTX_ID_SHIFT;
+	desc |= (u64)intel_execlists_ctx_id(ctx, ring) << GEN8_CTX_ID_SHIFT;
 
 	return desc;
 }
@@ -461,9 +458,7 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
 					    execlist_link);
 
 	if (head_req != NULL) {
-		struct drm_i915_gem_object *ctx_obj =
-				head_req->ctx->engine[ring->id].state;
-		if (intel_execlists_ctx_id(ctx_obj) == request_id) {
+		if (intel_execlists_ctx_id(head_req->ctx, ring) == request_id) {
 			WARN(head_req->elsp_submitted == 0,
 			     "Never submitted head request\n");
 
@@ -994,15 +989,17 @@ int logical_ring_flush_all_caches(struct drm_i915_gem_request *req)
 }
 
 static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
-		struct drm_i915_gem_object *ctx_obj,
-		struct intel_ringbuffer *ringbuf)
+				   struct intel_context *ctx)
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
+	struct intel_ringbuffer *ringbuf = ctx->engine[ring->id].ringbuf;
 	u64 lrca;
-	int ret = 0;
+	int ret;
 
 	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+
 	ret = i915_gem_obj_ggtt_pin(ctx_obj, GEN8_LR_CONTEXT_ALIGN,
 			PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
 	if (ret)
@@ -1018,6 +1015,7 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	if (ret)
 		goto unpin_ctx_obj;
 
+	ctx->engine[ring->id].lrca = lrca;
 	ctx_obj->dirty = true;
 
 	/* Invalidate GuC TLB. */
@@ -1036,11 +1034,9 @@ static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 {
 	int ret = 0;
 	struct intel_engine_cs *ring = rq->ring;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct intel_ringbuffer *ringbuf = rq->ringbuf;
 
 	if (rq->ctx->engine[ring->id].pin_count++ == 0) {
-		ret = intel_lr_context_do_pin(ring, ctx_obj, ringbuf);
+		ret = intel_lr_context_do_pin(ring, rq->ctx);
 		if (ret)
 			goto reset_pin_count;
 	}
@@ -1062,6 +1058,7 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 		if (--rq->ctx->engine[ring->id].pin_count == 0) {
 			intel_unpin_ringbuffer_obj(ringbuf);
 			i915_gem_object_ggtt_unpin(ctx_obj);
+			rq->ctx->engine[ring->id].lrca = 0;
 		}
 	}
 }
@@ -1929,10 +1926,7 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 		goto error;
 
 	/* As this is the default context, always pin it */
-	ret = intel_lr_context_do_pin(
-			ring,
-			ring->default_context->engine[ring->id].state,
-			ring->default_context->engine[ring->id].ringbuf);
+	ret = intel_lr_context_do_pin(ring, ring->default_context);
 	if (ret) {
 		DRM_ERROR(
 			"Failed to pin and map ringbuffer %s: %d\n",
