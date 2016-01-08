@@ -78,6 +78,12 @@ struct se_node_acl *core_tpg_get_initiator_node_acl(
 
 	mutex_lock(&tpg->acl_node_mutex);
 	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
+	/*
+	 * Obtain the acl_kref now, which will be dropped upon the
+	 * release of se_sess memory within transport_free_session().
+	 */
+	if (acl)
+		kref_get(&acl->acl_kref);
 	mutex_unlock(&tpg->acl_node_mutex);
 
 	return acl;
