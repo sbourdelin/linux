@@ -1524,6 +1524,7 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 	int err;
 	long unsigned int groups = nladdr->nl_groups;
 	bool bound;
+	unsigned long nlgroups;
 
 	if (addr_len < sizeof(struct sockaddr_nl))
 		return -EINVAL;
@@ -1576,14 +1577,17 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 		}
 	}
 
-	if (!groups && (nlk->groups == NULL || !(u32)nlk->groups[0]))
+	if (nlk->groups == NULL)
+		return 0;
+	nlgroups = nlk->groups[0];
+	if (!groups && !(u32)nlgroups)
 		return 0;
 
 	netlink_table_grab();
 	netlink_update_subscriptions(sk, nlk->subscriptions +
 					 hweight32(groups) -
-					 hweight32(nlk->groups[0]));
-	nlk->groups[0] = (nlk->groups[0] & ~0xffffffffUL) | groups;
+					 hweight32(nlgroups));
+	nlk->groups[0] = (nlgroups & ~0xffffffffUL) | groups;
 	netlink_update_listeners(sk);
 	netlink_table_ungrab();
 
