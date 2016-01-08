@@ -5246,6 +5246,8 @@ i915_gem_object_get_dirty_page(struct drm_i915_gem_object *obj, int n)
 {
 	struct page *page;
 
+	WARN_ON_ONCE(!mutex_is_locked(&obj->base.dev->struct_mutex));
+
 	/* Only default objects have per-page dirty tracking */
 	if (WARN_ON(obj->ops != &i915_gem_object_ops))
 		return NULL;
