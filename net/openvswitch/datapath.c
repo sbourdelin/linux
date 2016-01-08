@@ -1915,6 +1915,28 @@ static struct vport *lookup_vport(struct net *net,
 		return ERR_PTR(-EINVAL);
 }
 
+/* Called with ovs_mutex */
+static void update_headroom(struct datapath *dp)
+{
+	int i;
+	struct vport *vport;
+	unsigned max_headroom = 0;
+
+	for (i = 0; i < DP_VPORT_HASH_BUCKETS; i++) {
+		hlist_for_each_entry_rcu(vport, &dp->ports[i], dp_hash_node)
+			if (vport->ops->type != OVS_VPORT_TYPE_INTERNAL &&
+			    vport->dev->needed_headroom > max_headroom)
+				max_headroom = vport->dev->needed_headroom;
+	}
+
+	dp->max_headroom = max_headroom;
+	for (i = 0; i < DP_VPORT_HASH_BUCKETS; i++) {
+		hlist_for_each_entry_rcu(vport, &dp->ports[i], dp_hash_node)
+			if (vport->ops->type == OVS_VPORT_TYPE_INTERNAL)
+				vport->dev->needed_headroom = max_headroom;
+	}
+}
+
 static int ovs_vport_cmd_new(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr **a = info->attrs;
@@ -1980,6 +2002,10 @@ restart:
 
 	err = ovs_vport_cmd_fill_info(vport, reply, info->snd_portid,
 				      info->snd_seq, 0, OVS_VPORT_CMD_NEW);
+
+	if (vport->ops->type != OVS_VPORT_TYPE_INTERNAL &&
+	    vport->dev->needed_headroom > dp->max_headroom)
+		update_headroom(dp);
 	BUG_ON(err < 0);
 	ovs_unlock();
 
@@ -2050,6 +2076,8 @@ static int ovs_vport_cmd_del(struct sk_buff *skb, struct genl_info *info)
 	struct sk_buff *reply;
 	struct vport *vport;
 	int err;
+	struct datapath *dp;
+	bool must_update_headroom = false;
 
 	reply = ovs_vport_cmd_alloc_info();
 	if (!reply)
@@ -2069,7 +2097,18 @@ static int ovs_vport_cmd_del(struct sk_buff *skb, struct genl_info *info)
 	err = ovs_vport_cmd_fill_info(vport, reply, info->snd_portid,
 				      info->snd_seq, 0, OVS_VPORT_CMD_DEL);
 	BUG_ON(err < 0);
+
+	/* check if the deletion of this port may change the dp max_headroom
+	 * before deleting the vport
+	 */
+	dp = vport->dp;
+	if (vport->ops->type != OVS_VPORT_TYPE_INTERNAL &&
+	    vport->dev->needed_headroom == dp->max_headroom)
+		must_update_headroom = true;
 	ovs_dp_detach_port(vport);
+
+	if (must_update_headroom)
+		update_headroom(dp);
 	ovs_unlock();
 
 	ovs_notify(&dp_vport_genl_family, reply, info);
