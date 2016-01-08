@@ -106,7 +106,7 @@ eb_lookup_vmas(struct eb_vmas *eb,
 	 * or create the VMA without using GFP_ATOMIC */
 	for (i = 0; i < args->buffer_count; i++) {
 		obj = to_intel_bo(idr_find(&file->object_idr, exec[i].handle));
-		if (obj == NULL) {
+		if (IS_ERR_OR_NULL(obj)) {
 			spin_unlock(&file->table_lock);
 			DRM_DEBUG("Invalid object handle %d at index %d\n",
 				   exec[i].handle, i);

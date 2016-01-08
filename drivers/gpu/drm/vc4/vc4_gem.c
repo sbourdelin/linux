@@ -494,7 +494,7 @@ vc4_cl_lookup_bos(struct drm_device *dev,
 	for (i = 0; i < exec->bo_count; i++) {
 		struct drm_gem_object *bo = idr_find(&file_priv->object_idr,
 						     handles[i]);
-		if (!bo) {
+		if (IS_ERR_OR_NULL(bo)) {
 			DRM_ERROR("Failed to look up GEM BO %d: %d\n",
 				  i, handles[i]);
 			ret = -EINVAL;

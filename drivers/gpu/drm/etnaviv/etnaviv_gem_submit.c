@@ -78,7 +78,7 @@ static int submit_lookup_objects(struct etnaviv_gem_submit *submit,
 		 * all under single table_lock just hit object_idr directly:
 		 */
 		obj = idr_find(&file->object_idr, bo->handle);
-		if (!obj) {
+		if (IS_ERR_OR_NULL(obj)) {
 			DRM_ERROR("invalid handle %u at index %u\n",
 				  bo->handle, i);
 			ret = -EINVAL;

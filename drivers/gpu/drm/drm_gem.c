@@ -294,18 +294,21 @@ drm_gem_handle_delete(struct drm_file *filp, u32 handle)
 	spin_lock(&filp->table_lock);
 
 	/* Check if we currently have a reference on the object */
-	obj = idr_find(&filp->object_idr, handle);
-	if (obj == NULL) {
+	obj = idr_replace(&filp->object_idr, ERR_PTR(-ENOENT), handle);
+	if (IS_ERR(obj)) {
 		spin_unlock(&filp->table_lock);
 		return -EINVAL;
 	}
 	dev = obj->dev;
+	spin_unlock(&filp->table_lock);
 
 	/* Release reference and decrement refcount. */
+	drm_gem_object_release_handle(handle, obj, filp);
+
+	spin_lock(&filp->table_lock);
 	idr_remove(&filp->object_idr, handle);
 	spin_unlock(&filp->table_lock);
 
-	drm_gem_object_release_handle(handle, obj, filp);
 	return 0;
 }
 EXPORT_SYMBOL(drm_gem_handle_delete);
@@ -597,7 +600,7 @@ drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
 
 	/* Check if we currently have a reference on the object */
 	obj = idr_find(&filp->object_idr, handle);
-	if (obj == NULL) {
+	if (IS_ERR_OR_NULL(obj)) {
 		spin_unlock(&filp->table_lock);
 		return NULL;
 	}

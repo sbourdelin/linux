@@ -90,7 +90,7 @@ static int submit_lookup_objects(struct msm_gem_submit *submit,
 		 * all under single table_lock just hit object_idr directly:
 		 */
 		obj = idr_find(&file->object_idr, submit_bo.handle);
-		if (!obj) {
+		if (IS_ERR_OR_NULL(obj)) {
 			DRM_ERROR("invalid handle %u at index %u\n", submit_bo.handle, i);
 			ret = -EINVAL;
 			goto out_unlock;
