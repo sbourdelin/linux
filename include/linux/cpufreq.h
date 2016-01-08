@@ -419,6 +419,8 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div,
 #endif
 }
 
+void cpufreq_init_cpu_capacity(void);
+
 /*********************************************************************
  *                          CPUFREQ GOVERNORS                        *
  *********************************************************************/

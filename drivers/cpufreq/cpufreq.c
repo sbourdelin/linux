@@ -2440,6 +2440,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	}
 
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
+	cpufreq_init_cpu_capacity();
 	pr_debug("driver %s up and running\n", driver_data->name);
 
 out:
