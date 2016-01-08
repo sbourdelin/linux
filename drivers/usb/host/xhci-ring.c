@@ -2337,6 +2337,20 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 	event_dma = le64_to_cpu(event->buffer);
 	trb_comp_code = GET_COMP_CODE(le32_to_cpu(event->transfer_len));
 	/* Look for common error cases */
+
+	if (trb_comp_code == COMP_SHORT_TX ||
+	    ep_ring->last_td_was_short) {
+		xhci_warn(xhci, "@%016llx %08x %08x %08x %08x %s\n",
+			  (unsigned long long) xhci_trb_virt_to_dma(
+				  xhci->event_ring->deq_seg,
+				  xhci->event_ring->dequeue),
+			  lower_32_bits(le64_to_cpu(event->buffer)),
+			  upper_32_bits(le64_to_cpu(event->buffer)),
+			  le32_to_cpu(event->transfer_len),
+			  le32_to_cpu(event->flags),
+			  ep_ring->last_td_was_short ? "last td short" : "");
+	}
+
 	switch (trb_comp_code) {
 	/* Skip codes that require special handling depending on
 	 * transfer type
