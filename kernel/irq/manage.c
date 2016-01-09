@@ -1272,6 +1272,8 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		goto out_mask;
 	}
 
+	*old_ptr = new;
+
 	if (!shared) {
 		ret = irq_request_resources(desc);
 		if (ret) {
@@ -1327,8 +1329,6 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 			pr_warning("irq %d uses trigger mode %u; requested %u\n",
 				   irq, nmsk, omsk);
 	}
-
-	*old_ptr = new;
 
 	irq_pm_install_action(desc, new);
 
