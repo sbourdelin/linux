@@ -469,7 +469,7 @@ bfa_ioim_profile_start(struct bfa_ioim_s *ioim)
 }
 
 bfa_status_t
-bfa_fcpim_profile_on(struct bfa_s *bfa, u32 time)
+bfa_fcpim_profile_on(struct bfa_s *bfa, u64 time)
 {
 	struct bfa_itnim_s *itnim;
 	struct bfa_fcpim_s *fcpim = BFA_FCPIM(bfa);
@@ -1479,8 +1479,8 @@ bfa_itnim_get_ioprofile(struct bfa_itnim_s *itnim,
 		return BFA_STATUS_IOPROFILE_OFF;
 
 	itnim->ioprofile.index = BFA_IOBUCKET_MAX;
-	itnim->ioprofile.io_profile_start_time =
-				bfa_io_profile_start_time(itnim->bfa);
+	itnim->ioprofile.io_profile_start_time = (u32)(time_t)
+					bfa_io_profile_start_time(itnim->bfa);
 	itnim->ioprofile.clock_res_mul = bfa_io_lat_clock_res_mul;
 	itnim->ioprofile.clock_res_div = bfa_io_lat_clock_res_div;
 	*ioprofile = itnim->ioprofile;
