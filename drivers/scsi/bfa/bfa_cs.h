@@ -33,13 +33,7 @@
 #define BFA_TRC_MAX	(4 * 1024)
 #endif
 
-#define BFA_TRC_TS(_trcm)                               \
-	({                                              \
-		struct timeval tv;                      \
-							\
-		do_gettimeofday(&tv);                   \
-		(tv.tv_sec*1000000+tv.tv_usec);         \
-	})
+#define BFA_TRC_TS(_trcm)	(ktime_get_ns() >> 10)
 
 #ifndef BFA_TRC_TS
 #define BFA_TRC_TS(_trcm)	((_trcm)->ticks++)
