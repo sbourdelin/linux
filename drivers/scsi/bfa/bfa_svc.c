@@ -3082,7 +3082,6 @@ bfa_fcport_attach(struct bfa_s *bfa, void *bfad, struct bfa_iocfc_cfg_s *cfg,
 	struct bfa_fcport_s *fcport = BFA_FCPORT_MOD(bfa);
 	struct bfa_port_cfg_s *port_cfg = &fcport->cfg;
 	struct bfa_fcport_ln_s *ln = &fcport->ln;
-	struct timeval tv;
 
 	fcport->bfa = bfa;
 	ln->fcport = fcport;
@@ -3095,8 +3094,7 @@ bfa_fcport_attach(struct bfa_s *bfa, void *bfad, struct bfa_iocfc_cfg_s *cfg,
 	/*
 	 * initialize time stamp for stats reset
 	 */
-	do_gettimeofday(&tv);
-	fcport->stats_reset_time = tv.tv_sec;
+	fcport->stats_reset_time = ktime_get_seconds();
 	fcport->stats_dma_ready = BFA_FALSE;
 
 	/*
@@ -3346,16 +3344,17 @@ __bfa_cb_fcport_stats_get(void *cbarg, bfa_boolean_t complete)
 	struct bfa_cb_pending_q_s *cb;
 	struct list_head *qe, *qen;
 	union bfa_fcport_stats_u *ret;
+	bool status_ok = (fcport->stats_status == BFA_STATUS_OK);
 
 	if (complete) {
-		struct timeval tv;
-		if (fcport->stats_status == BFA_STATUS_OK)
-			do_gettimeofday(&tv);
+		time64_t timestamp;
+		if (status_ok)
+			timestamp = ktime_get_seconds();
 
 		list_for_each_safe(qe, qen, &fcport->stats_pending_q) {
 			bfa_q_deq(&fcport->stats_pending_q, &qe);
 			cb = (struct bfa_cb_pending_q_s *)qe;
-			if (fcport->stats_status == BFA_STATUS_OK) {
+			if (status_ok) {
 				ret = (union bfa_fcport_stats_u *)cb->data;
 				/* Swap FC QoS or FCoE stats */
 				if (bfa_ioc_get_fcmode(&fcport->bfa->ioc))
@@ -3365,7 +3364,7 @@ __bfa_cb_fcport_stats_get(void *cbarg, bfa_boolean_t complete)
 					bfa_fcport_fcoe_stats_swap(&ret->fcoe,
 							&fcport->stats->fcoe);
 					ret->fcoe.secs_reset =
-					tv.tv_sec - fcport->stats_reset_time;
+					timestamp - fcport->stats_reset_time;
 				}
 			}
 			bfa_cb_queue_status(fcport->bfa, &cb->hcb_qe,
