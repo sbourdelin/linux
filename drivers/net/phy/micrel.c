@@ -476,7 +476,7 @@ static int ksz9031_config_init(struct phy_device *phydev)
 	 * properties in the MAC node. Walk up the tree of devices to
 	 * find a device with an OF node.
 	 */
-	dev_walker = &phydev->dev;
+	dev_walker = &phydev->mdio.dev;
 	do {
 		of_node = dev_walker->of_node;
 		dev_walker = dev_walker->parent;
