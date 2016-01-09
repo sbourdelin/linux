@@ -614,13 +614,16 @@ static int tc_mii_probe(struct net_device *dev)
 
 	/* find the first phy */
 	for (phy_addr = 0; phy_addr < PHY_MAX_ADDR; phy_addr++) {
-		if (lp->mii_bus->phy_map[phy_addr]) {
+		struct phy_device *tmp_phy;
+
+		tmp_phy = mdiobus_get_phy(lp->mii_bus, phy_addr);
+		if (tmp_phy) {
 			if (phydev) {
 				printk(KERN_ERR "%s: multiple PHYs found\n",
 				       dev->name);
 				return -EINVAL;
 			}
-			phydev = lp->mii_bus->phy_map[phy_addr];
+			phydev = tmp_phy;
 			break;
 		}
 	}
