@@ -434,7 +434,15 @@ void vc4_plane_async_set_fb(struct drm_plane *plane,
 extern struct platform_driver vc4_v3d_driver;
 int vc4_v3d_debugfs_ident(struct seq_file *m, void *unused);
 int vc4_v3d_debugfs_regs(struct seq_file *m, void *unused);
+
+#ifdef CONFIG_PM_SLEEP
 int vc4_v3d_set_power(struct vc4_dev *vc4, bool on);
+#else
+static inline int vc4_v3d_set_power(struct vc4_dev *vc4, bool on)
+{
+	return 0;
+}
+#endif
 
 /* vc4_validate.c */
 int
