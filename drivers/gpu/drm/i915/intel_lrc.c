@@ -183,6 +183,12 @@
 #define CTX_LRI_HEADER_2		0x41
 #define CTX_R_PWR_CLK_STATE		0x42
 #define CTX_GPGPU_CSR_BASE_ADDRESS	0x44
+#define CTX_TRTT_L3_PTR_DW0		0x202
+#define CTX_TRTT_L3_PTR_DW1		0x204
+#define CTX_TRTT_NULL_TILE		0x206
+#define CTX_TRTT_INVD_TILE		0x208
+#define CTX_TRTT_VA_MASKDATA		0x20A
+#define CTX_TRTT_TBL_CTL		0x20C
 
 #define GEN8_CTX_VALID (1<<0)
 #define GEN8_CTX_FORCE_PD_RESTORE (1<<1)
@@ -228,6 +234,8 @@ enum {
 static int intel_lr_context_pin(struct drm_i915_gem_request *rq);
 static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
 		struct drm_i915_gem_object *default_ctx_obj);
+static void populate_lr_context_trtt(struct intel_context *ctx,
+		uint32_t *reg_state);
 
 
 /**
@@ -388,6 +396,14 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 		ASSIGN_CTX_PDP(ppgtt, reg_state, 2);
 		ASSIGN_CTX_PDP(ppgtt, reg_state, 1);
 		ASSIGN_CTX_PDP(ppgtt, reg_state, 0);
+	}
+
+	if (ring->id == RCS && rq->ctx->trtt_info.update_trtt_params) {
+		/* The same page of the context object also contain fields
+		 * related for TRTT setup.
+		 */
+		populate_lr_context_trtt(rq->ctx, reg_state);
+		rq->ctx->trtt_info.update_trtt_params = 0;
 	}
 
 	kunmap_atomic(reg_state);
@@ -2232,6 +2248,31 @@ make_rpcs(struct drm_device *dev)
 	}
 
 	return rpcs;
+}
+
+static void
+populate_lr_context_trtt(struct intel_context *ctx, uint32_t *reg_state)
+{
+	unsigned long masked_l3_gfx_address =
+		ctx->trtt_info.l3_table_address & GEN9_TRTT_L3_GFXADDR_MASK;
+
+	ASSIGN_CTX_REG(reg_state, CTX_TRTT_L3_PTR_DW0, GEN9_TRTT_L3_POINTER_DW0,
+		       lower_32_bits(masked_l3_gfx_address));
+
+	ASSIGN_CTX_REG(reg_state, CTX_TRTT_L3_PTR_DW1, GEN9_TRTT_L3_POINTER_DW1,
+		       upper_32_bits(masked_l3_gfx_address));
+
+	ASSIGN_CTX_REG(reg_state, CTX_TRTT_NULL_TILE, GEN9_TRTT_NULL_TILE_REG,
+		       ctx->trtt_info.null_tile_val);
+
+	ASSIGN_CTX_REG(reg_state, CTX_TRTT_INVD_TILE, GEN9_TRTT_INVD_TILE_REG,
+		       ctx->trtt_info.invd_tile_val);
+
+	ASSIGN_CTX_REG(reg_state, CTX_TRTT_VA_MASKDATA, GEN9_TRTT_VA_MASKDATA,
+		       GEN9_TRVA_MASK_VALUE | GEN9_TRVA_DATA_VALUE);
+
+	ASSIGN_CTX_REG(reg_state, CTX_TRTT_TBL_CTL, GEN9_TRTT_TABLE_CONTROL,
+		       GEN9_TRTT_IN_GFX_VA_SPACE | GEN9_TRTT_ENABLE);
 }
 
 static int

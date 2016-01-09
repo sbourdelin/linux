@@ -357,6 +357,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_HAS_GPU_RESET	 35
 #define I915_PARAM_HAS_RESOURCE_STREAMER 36
 #define I915_PARAM_HAS_EXEC_SOFTPIN	 37
+#define I915_PARAM_HAS_TRTT		 38
 
 typedef struct drm_i915_getparam {
 	__s32 param;
@@ -1140,7 +1141,14 @@ struct drm_i915_gem_context_param {
 #define I915_CONTEXT_PARAM_BAN_PERIOD	0x1
 #define I915_CONTEXT_PARAM_NO_ZEROMAP	0x2
 #define I915_CONTEXT_PARAM_GTT_SIZE	0x3
+#define I915_CONTEXT_PARAM_ENABLE_TRTT	0x4
 	__u64 value;
+};
+
+struct drm_i915_gem_context_trtt_param {
+	__u64 l3_table_address;
+	__u32 invd_tile_val;
+	__u32 null_tile_val;
 };
 
 #endif /* _UAPI_I915_DRM_H_ */

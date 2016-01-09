@@ -146,6 +146,9 @@ static void i915_gem_context_clean(struct intel_context *ctx)
 		if (WARN_ON(__i915_vma_unbind_no_wait(vma)))
 			break;
 	}
+
+	if (ctx->flags & CONTEXT_USE_TRTT)
+		i915_gem_destroy_trtt_vma(ctx->trtt_info.vma);
 }
 
 void i915_gem_context_free(struct kref *ctx_ref)
@@ -510,6 +513,35 @@ i915_gem_context_get(struct drm_i915_file_private *file_priv, u32 id)
 		return ERR_PTR(-ENOENT);
 
 	return ctx;
+}
+
+static int
+i915_setup_trtt_ctx(struct intel_context *ctx,
+		    struct drm_i915_gem_context_trtt_param *trtt_params)
+{
+	if (ctx->flags & CONTEXT_USE_TRTT)
+		return -EEXIST;
+
+	/* basic sanity checks for the l3 table pointer */
+	if ((ctx->trtt_info.l3_table_address >= GEN9_TRTT_SEGMENT_START) &&
+	    (ctx->trtt_info.l3_table_address <
+			(GEN9_TRTT_SEGMENT_START + GEN9_TRTT_SEGMENT_SIZE)))
+		return -EINVAL;
+
+	if (ctx->trtt_info.l3_table_address & ~GEN9_TRTT_L3_GFXADDR_MASK)
+		return -EINVAL;
+
+	ctx->trtt_info.vma = i915_gem_setup_trtt_vma(&ctx->ppgtt->base);
+	if (IS_ERR(ctx->trtt_info.vma))
+		return PTR_ERR(ctx->trtt_info.vma);
+
+	ctx->trtt_info.null_tile_val = trtt_params->null_tile_val;
+	ctx->trtt_info.invd_tile_val = trtt_params->invd_tile_val;
+	ctx->trtt_info.l3_table_address = trtt_params->l3_table_address;
+	ctx->trtt_info.update_trtt_params = 1;
+
+	ctx->flags |= CONTEXT_USE_TRTT;
+	return 0;
 }
 
 static inline int
@@ -952,6 +984,7 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_i915_file_private *file_priv = file->driver_priv;
 	struct drm_i915_gem_context_param *args = data;
+	struct drm_i915_gem_context_trtt_param trtt_params;
 	struct intel_context *ctx;
 	int ret;
 
@@ -982,6 +1015,18 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 			ctx->flags &= ~CONTEXT_NO_ZEROMAP;
 			ctx->flags |= args->value ? CONTEXT_NO_ZEROMAP : 0;
 		}
+		break;
+	case I915_CONTEXT_PARAM_ENABLE_TRTT:
+		if (args->size < sizeof(trtt_params))
+			ret = -EINVAL;
+		else if (!HAS_TRTT(dev) || !USES_FULL_48BIT_PPGTT(dev))
+			ret = -ENODEV;
+		else if (copy_from_user(&trtt_params,
+					to_user_ptr(args->value),
+					sizeof(trtt_params)))
+			ret = -EFAULT;
+		else
+			ret = i915_setup_trtt_ctx(ctx, &trtt_params);
 		break;
 	default:
 		ret = -EINVAL;

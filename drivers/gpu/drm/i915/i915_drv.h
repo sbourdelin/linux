@@ -849,6 +849,7 @@ struct i915_ctx_hang_stats {
 #define DEFAULT_CONTEXT_HANDLE 0
 
 #define CONTEXT_NO_ZEROMAP (1<<0)
+#define CONTEXT_USE_TRTT   (1<<1)
 /**
  * struct intel_context - as the name implies, represents a context.
  * @ref: reference count.
@@ -890,6 +891,15 @@ struct intel_context {
 		struct intel_ringbuffer *ringbuf;
 		int pin_count;
 	} engine[I915_NUM_RINGS];
+
+	/* TRTT info */
+	struct {
+		uint32_t invd_tile_val;
+		uint32_t null_tile_val;
+		uint64_t l3_table_address;
+		struct i915_vma *vma;
+		bool update_trtt_params;
+	} trtt_info;
 
 	struct list_head link;
 };
@@ -2625,6 +2635,8 @@ struct drm_i915_cmd_table {
 #define HAS_CORE_RING_FREQ(dev)	(INTEL_INFO(dev)->gen >= 6 && \
 				 !IS_VALLEYVIEW(dev) && !IS_CHERRYVIEW(dev) && \
 				 !IS_BROXTON(dev))
+
+#define HAS_TRTT(dev)		(IS_GEN9(dev))
 
 #define INTEL_PCH_DEVICE_ID_MASK		0xff00
 #define INTEL_PCH_IBX_DEVICE_ID_TYPE		0x3b00
