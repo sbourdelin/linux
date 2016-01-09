@@ -1212,6 +1212,10 @@ struct bfa_itnim_ioprofile_s {
 	u32 clock_res_mul;
 	u32 clock_res_div;
 	u32 index;
+	/*
+	* Overflow in 2038 or 2106 depending on user space interpreting it as
+	* signed or unsigned.
+	*/
 	u32 io_profile_start_time;	/*  IO profile start time	*/
 	u32 iocomps[BFA_IOBUCKET_MAX];	/*  IO completed	*/
 	struct bfa_itnim_latency_s io_latency;

@@ -1479,7 +1479,8 @@ bfa_itnim_get_ioprofile(struct bfa_itnim_s *itnim,
 		return BFA_STATUS_IOPROFILE_OFF;
 
 	itnim->ioprofile.index = BFA_IOBUCKET_MAX;
-	itnim->ioprofile.io_profile_start_time = (u32)(time_t)
+	/* io_profile_start_time will overflow in 2038 or 2106 */
+	itnim->ioprofile.io_profile_start_time = (u32)
 					bfa_io_profile_start_time(itnim->bfa);
 	itnim->ioprofile.clock_res_mul = bfa_io_lat_clock_res_mul;
 	itnim->ioprofile.clock_res_div = bfa_io_lat_clock_res_div;
