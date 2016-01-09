@@ -38,7 +38,7 @@ struct vfsmount;
  * "quick string" -- eases parameter passing, but more importantly
  * saves "metadata" about the string (ie length and the hash).
  *
- * hash comes first so it snuggles against d_parent in the
+ * Hash comes first so it snuggles against d_parent in the
  * dentry.
  */
 struct qstr {
@@ -59,17 +59,19 @@ struct qstr {
 struct dentry_stat_t {
 	long nr_dentry;
 	long nr_unused;
-	long age_limit;          /* age in seconds */
-	long want_pages;         /* pages requested by system */
+	long age_limit;          /* Age in seconds */
+	long want_pages;         /* Pages requested by system */
 	long dummy[2];
 };
 extern struct dentry_stat_t dentry_stat;
 
-/* Name hashing routines. Initial hash value */
-/* Hash courtesy of the R5 hash in reiserfs modulo sign bits */
+/*
+ * Name hashing routines. Initial hash value.
+ * Hash courtesy of the R5 hash in reiserfs modulo sign bits
+ */
 #define init_name_hash()		0
 
-/* partial hash update function. Assume roughly 4 bits per character */
+/* Partial hash update function. Assume roughly 4 bits per character */
 static inline unsigned long
 partial_name_hash(unsigned long c, unsigned long prevhash)
 {
@@ -107,30 +109,29 @@ extern unsigned int full_name_hash(const unsigned char *, unsigned int);
 
 struct dentry {
 	/* RCU lookup touched fields */
-	unsigned int d_flags;		/* protected by d_lock */
-	seqcount_t d_seq;		/* per dentry seqlock */
-	struct hlist_bl_node d_hash;	/* lookup hash list */
-	struct dentry *d_parent;	/* parent directory */
+	unsigned int d_flags;		/* Protected by d_lock */
+	seqcount_t d_seq;		/* Per dentry seqlock */
+	struct hlist_bl_node d_hash;	/* Lookup hash list */
+	struct dentry *d_parent;	/* Parent directory */
 	struct qstr d_name;
 	struct inode *d_inode;		/* Where the name belongs to - NULL is
-					 * negative */
-	unsigned char d_iname[DNAME_INLINE_LEN];	/* small names */
+					 * negative
+					 */
+	unsigned char d_iname[DNAME_INLINE_LEN]; /* Small names */
 
 	/* Ref lookup also touches following */
-	struct lockref d_lockref;	/* per-dentry lock and refcount */
+	struct lockref d_lockref;	/* Per-dentry lock and refcount */
 	const struct dentry_operations *d_op;
 	struct super_block *d_sb;	/* The root of the dentry tree */
-	unsigned long d_time;		/* used by d_revalidate */
-	void *d_fsdata;			/* fs-specific data */
+	unsigned long d_time;		/* Used by d_revalidate */
+	void *d_fsdata;			/* Fs-specific data */
 
 	struct list_head d_lru;		/* LRU list */
-	struct list_head d_child;	/* child of parent list */
-	struct list_head d_subdirs;	/* our children */
-	/*
-	 * d_alias and d_rcu can share memory
-	 */
+	struct list_head d_child;	/* Child of parent list */
+	struct list_head d_subdirs;	/* Our children */
+	/* d_alias and d_rcu can share memory */
 	union {
-		struct hlist_node d_alias;	/* inode alias list */
+		struct hlist_node d_alias;	/* Inode alias list */
 	 	struct rcu_head d_rcu;
 	} d_u;
 };
@@ -143,7 +144,7 @@ struct dentry {
  */
 enum dentry_d_lock_class
 {
-	DENTRY_D_LOCK_NORMAL, /* implicitly used by plain spin_lock() APIs. */
+	DENTRY_D_LOCK_NORMAL, /* Implicitly used by plain spin_lock() APIs. */
 	DENTRY_D_LOCK_NESTED
 };
 
@@ -167,7 +168,7 @@ struct dentry_operations {
  * Locking rules for dentry_operations callbacks are to be found in
  * Documentation/filesystems/Locking. Keep it updated!
  *
- * FUrther descriptions are found in Documentation/filesystems/vfs.txt.
+ * Further descriptions are found in Documentation/filesystems/vfs.txt.
  * Keep it updated too!
  */
 
@@ -177,73 +178,84 @@ struct dentry_operations {
 #define DCACHE_OP_REVALIDATE		0x00000004
 #define DCACHE_OP_DELETE		0x00000008
 #define DCACHE_OP_PRUNE			0x00000010
-
+/*
+ * This dentry is possibly not currently connected to the dcache tree, in which
+ * case its parent will either be itself, or will have this flag as well. nfsd
+ * will not use a dentry with this bit set, but will first endeavour to clear
+ * the bit either by discovering that it is connected, or by performing lookup
+ * operations. Any filesystem which supports nfsd_operations MUST have a lookup
+ * function which, if it finds a directory inode with a DCACHE_DISCONNECTED
+ * dentry, will d_move that dentry into place and return that dentry rather than
+ * the passed one typically using d_splice_alias.
+ */
 #define	DCACHE_DISCONNECTED		0x00000020
-     /* This dentry is possibly not currently connected to the dcache tree, in
-      * which case its parent will either be itself, or will have this flag as
-      * well.  nfsd will not use a dentry with this bit set, but will first
-      * endeavour to clear the bit either by discovering that it is connected,
-      * or by performing lookup operations.   Any filesystem which supports
-      * nfsd_operations MUST have a lookup function which, if it finds a
-      * directory inode with a DCACHE_DISCONNECTED dentry, will d_move that
-      * dentry into place and return that dentry rather than the passed one,
-      * typically using d_splice_alias. */
-
-#define DCACHE_REFERENCED		0x00000040 /* Recently used, don't discard. */
-#define DCACHE_RCUACCESS		0x00000080 /* Entry has ever been RCU-visible */
-
+/* Recently used, don't discard. */
+#define DCACHE_REFERENCED		0x00000040
+/* Entry has ever been RCU-visible */
+#define DCACHE_RCUACCESS		0x00000080
 #define DCACHE_CANT_MOUNT		0x00000100
 #define DCACHE_GENOCIDE			0x00000200
 #define DCACHE_SHRINK_LIST		0x00000400
-
 #define DCACHE_OP_WEAK_REVALIDATE	0x00000800
-
+/*
+ * This dentry has been "silly renamed" and has to be deleted on the
+ * last dput()
+ */
 #define DCACHE_NFSFS_RENAMED		0x00001000
-     /* this dentry has been "silly renamed" and has to be deleted on the last
-      * dput() */
-#define DCACHE_COOKIE			0x00002000 /* For use by dcookie subsystem */
+/* For use by dcookie subsystem */
+#define DCACHE_COOKIE			0x00002000
+/* Parent inode is watched by some fsnotify listener */
 #define DCACHE_FSNOTIFY_PARENT_WATCHED	0x00004000
-     /* Parent inode is watched by some fsnotify listener */
-
 #define DCACHE_DENTRY_KILLED		0x00008000
-
-#define DCACHE_MOUNTED			0x00010000 /* is a mountpoint */
-#define DCACHE_NEED_AUTOMOUNT		0x00020000 /* handle automount on this dir */
-#define DCACHE_MANAGE_TRANSIT		0x00040000 /* manage transit from this dirent */
+/* Is a mountpoint */
+#define DCACHE_MOUNTED			0x00010000
+/* Handle automount on this dir */
+#define DCACHE_NEED_AUTOMOUNT		0x00020000
+/* Manage transit from this dirent */
+#define DCACHE_MANAGE_TRANSIT		0x00040000
 #define DCACHE_MANAGED_DENTRY \
 	(DCACHE_MOUNTED|DCACHE_NEED_AUTOMOUNT|DCACHE_MANAGE_TRANSIT)
 
 #define DCACHE_LRU_LIST			0x00080000
 
 #define DCACHE_ENTRY_TYPE		0x00700000
-#define DCACHE_MISS_TYPE		0x00000000 /* Negative dentry (maybe fallthru to nowhere) */
-#define DCACHE_WHITEOUT_TYPE		0x00100000 /* Whiteout dentry (stop pathwalk) */
-#define DCACHE_DIRECTORY_TYPE		0x00200000 /* Normal directory */
-#define DCACHE_AUTODIR_TYPE		0x00300000 /* Lookupless directory (presumed automount) */
-#define DCACHE_REGULAR_TYPE		0x00400000 /* Regular file type (or fallthru to such) */
-#define DCACHE_SPECIAL_TYPE		0x00500000 /* Other file type (or fallthru to such) */
-#define DCACHE_SYMLINK_TYPE		0x00600000 /* Symlink (or fallthru to such) */
+/* Negative dentry (maybe fallthru to nowhere) */
+#define DCACHE_MISS_TYPE		0x00000000
+/* Whiteout dentry (stop pathwalk) */
+#define DCACHE_WHITEOUT_TYPE		0x00100000
+/* Normal directory */
+#define DCACHE_DIRECTORY_TYPE		0x00200000
+/* Lookupless directory (presumed automount) */
+#define DCACHE_AUTODIR_TYPE		0x00300000
+/* Regular file type (or fallthru to such) */
+#define DCACHE_REGULAR_TYPE		0x00400000
+/* Other file type (or fallthru to such) */
+#define DCACHE_SPECIAL_TYPE		0x00500000
+/* Symlink (or fallthru to such) */
+#define DCACHE_SYMLINK_TYPE		0x00600000
 
 #define DCACHE_MAY_FREE			0x00800000
-#define DCACHE_FALLTHRU			0x01000000 /* Fall through to lower layer */
-#define DCACHE_OP_SELECT_INODE		0x02000000 /* Unioned entry: dcache op selects inode */
+/* Fall through to lower layer */
+#define DCACHE_FALLTHRU			0x01000000
+/* Unioned entry: dcache op selects inode */
+#define DCACHE_OP_SELECT_INODE		0x02000000
 
 extern seqlock_t rename_lock;
 
-/*
- * These are the low-level FS interfaces to the dcache..
- */
+/* These are the low-level FS interfaces to the dcache. */
 extern void d_instantiate(struct dentry *, struct inode *);
 extern struct dentry * d_instantiate_unique(struct dentry *, struct inode *);
 extern int d_instantiate_no_diralias(struct dentry *, struct inode *);
 extern void __d_drop(struct dentry *dentry);
 extern void d_drop(struct dentry *dentry);
 extern void d_delete(struct dentry *);
-extern void d_set_d_op(struct dentry *dentry, const struct dentry_operations *op);
+extern void d_set_d_op(struct dentry *dentry,
+			const struct dentry_operations *op);
 
-/* allocate/de-allocate */
+/* Allocate/de-allocate */
 extern struct dentry * d_alloc(struct dentry *, const struct qstr *);
-extern struct dentry * d_alloc_pseudo(struct super_block *, const struct qstr *);
+extern struct dentry *d_alloc_pseudo(struct super_block *,
+					const struct qstr *);
 extern struct dentry * d_splice_alias(struct inode *, struct dentry *);
 extern struct dentry * d_add_ci(struct dentry *, struct inode *, struct qstr *);
 extern struct dentry *d_find_any_alias(struct inode *inode);
@@ -254,7 +266,7 @@ extern void shrink_dcache_parent(struct dentry *);
 extern void shrink_dcache_for_umount(struct super_block *);
 extern void d_invalidate(struct dentry *);
 
-/* only used at mount-time */
+/* Only used at mount-time */
 extern struct dentry * d_make_root(struct inode *);
 
 /* <clickety>-<click> the ramfs-type tree */
@@ -265,12 +277,10 @@ extern void d_tmpfile(struct dentry *, struct inode *);
 extern struct dentry *d_find_alias(struct inode *);
 extern void d_prune_aliases(struct inode *);
 
-/* test whether we have any submounts in a subdir tree */
+/* Test whether we have any submounts in a subdir tree */
 extern int have_submounts(struct dentry *);
 
-/*
- * This adds the entry to the hash queues.
- */
+/* This adds the entry to the hash queues. */
 extern void d_rehash(struct dentry *);
 
 /**
@@ -281,7 +291,6 @@ extern void d_rehash(struct dentry *);
  * This adds the entry to the hash queues and initializes @inode.
  * The entry was actually filled in earlier during d_alloc().
  */
- 
 static inline void d_add(struct dentry *entry, struct inode *inode)
 {
 	d_instantiate(entry, inode);
@@ -296,23 +305,23 @@ static inline void d_add(struct dentry *entry, struct inode *inode)
  * This adds the entry to the hash queues and initializes @inode.
  * The entry was actually filled in earlier during d_alloc().
  */
-static inline struct dentry *d_add_unique(struct dentry *entry, struct inode *inode)
+static inline struct dentry *d_add_unique(struct dentry *entry,
+					struct inode *inode)
 {
-	struct dentry *res;
+	struct dentry *res = d_instantiate_unique(entry, inode);
 
-	res = d_instantiate_unique(entry, inode);
 	d_rehash(res != NULL ? res : entry);
 	return res;
 }
 
 extern void dentry_update_name_case(struct dentry *, struct qstr *);
 
-/* used for rename() and baskets */
+/* Used for rename() and baskets */
 extern void d_move(struct dentry *, struct dentry *);
 extern void d_exchange(struct dentry *, struct dentry *);
 extern struct dentry *d_ancestor(struct dentry *, struct dentry *);
 
-/* appendix may either be NULL or be used for transname suffixes */
+/* Appendix may either be NULL or be used for transname suffixes */
 extern struct dentry *d_lookup(const struct dentry *, const struct qstr *);
 extern struct dentry *d_hash_and_lookup(struct dentry *, struct qstr *);
 extern struct dentry *__d_lookup(const struct dentry *, const struct qstr *);
@@ -324,9 +333,7 @@ static inline unsigned d_count(const struct dentry *dentry)
 	return dentry->d_lockref.count;
 }
 
-/*
- * helper function for dentry_operations.d_dname() members
- */
+/* Helper function for dentry_operations.d_dname() members */
 extern __printf(4, 5)
 char *dynamic_dname(struct dentry *, char *, int, const char *, ...);
 extern char *simple_dname(struct dentry *, char *, int);
@@ -340,7 +347,7 @@ extern char *dentry_path(struct dentry *, char *, int);
 /* Allocation counts.. */
 
 /**
- *	dget, dget_dlock -	get a reference to a dentry
+ *	dget, dget_dlock - get a reference to a dentry
  *	@dentry: dentry to get a reference to
  *
  *	Given a dentry or %NULL pointer increment the reference count
@@ -364,7 +371,7 @@ static inline struct dentry *dget(struct dentry *dentry)
 extern struct dentry *dget_parent(struct dentry *dentry);
 
 /**
- *	d_unhashed -	is dentry hashed
+ *	d_unhashed - is dentry hashed
  *	@dentry: entry to check
  *
  *	Returns true if the dentry passed is not currently hashed.
@@ -404,9 +411,7 @@ static inline bool d_mountpoint(const struct dentry *dentry)
 	return dentry->d_flags & DCACHE_MOUNTED;
 }
 
-/*
- * Directory cache entry type accessor functions.
- */
+/* Directory cache entry type accessor functions. */
 static inline unsigned __d_entry_type(const struct dentry *dentry)
 {
 	unsigned type = READ_ONCE(dentry->d_flags);
@@ -461,7 +466,7 @@ static inline bool d_is_file(const struct dentry *dentry)
 
 static inline bool d_is_negative(const struct dentry *dentry)
 {
-	// TODO: check d_is_whiteout(dentry) also.
+	/* TODO: check d_is_whiteout(dentry) also. */
 	return d_is_miss(dentry);
 }
 
@@ -471,7 +476,8 @@ static inline bool d_is_positive(const struct dentry *dentry)
 }
 
 /**
- * d_really_is_negative - Determine if a dentry is really negative (ignoring fallthroughs)
+ * d_really_is_negative - Determine if a dentry is really negative (ignoring
+ * fallthroughs)
  * @dentry: The dentry in question
  *
  * Returns true if the dentry represents either an absent name or a name that
@@ -491,7 +497,8 @@ static inline bool d_really_is_negative(const struct dentry *dentry)
 }
 
 /**
- * d_really_is_positive - Determine if a dentry is really positive (ignoring fallthroughs)
+ * d_really_is_positive - Determine if a dentry is really positive (ignoring
+ * fallthroughs)
  * @dentry: The dentry in question
  *
  * Returns true if the dentry represents a name that maps to an inode
@@ -508,7 +515,7 @@ static inline bool d_really_is_positive(const struct dentry *dentry)
 	return dentry->d_inode != NULL;
 }
 
-static inline int simple_positive(struct dentry *dentry)
+static inline bool simple_positive(struct dentry *dentry)
 {
 	return d_really_is_positive(dentry) && !d_unhashed(dentry);
 }
@@ -519,7 +526,6 @@ static inline bool d_is_fallthru(const struct dentry *dentry)
 {
 	return dentry->d_flags & DCACHE_FALLTHRU;
 }
-
 
 extern int sysctl_vfs_cache_pressure;
 
@@ -564,9 +570,7 @@ static inline struct inode *d_inode_rcu(const struct dentry *dentry)
  */
 static inline struct inode *d_backing_inode(const struct dentry *upper)
 {
-	struct inode *inode = upper->d_inode;
-
-	return inode;
+	return upper->d_inode;
 }
 
 /**
