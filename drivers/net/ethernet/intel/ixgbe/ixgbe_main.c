@@ -6041,7 +6041,7 @@ static int ixgbe_open(struct net_device *netdev)
 
 	ixgbe_clear_vxlan_port(adapter);
 #ifdef CONFIG_IXGBE_VXLAN
-	vxlan_get_rx_port(netdev);
+	netdev_refresh_offloads(netdev);
 #endif
 
 	return 0;
@@ -7121,7 +7121,7 @@ static void ixgbe_service_task(struct work_struct *work)
 	rtnl_lock();
 	if (adapter->flags2 & IXGBE_FLAG2_VXLAN_REREG_NEEDED) {
 		adapter->flags2 &= ~IXGBE_FLAG2_VXLAN_REREG_NEEDED;
-		vxlan_get_rx_port(adapter->netdev);
+		netdev_refresh_offloads(adapter->netdev);
 	}
 	rtnl_unlock();
 #endif /* CONFIG_IXGBE_VXLAN */

@@ -1795,7 +1795,7 @@ static int nfp_net_netdev_open(struct net_device *netdev)
 	if (nn->ctrl & NFP_NET_CFG_CTRL_VXLAN) {
 		memset(&nn->vxlan_ports, 0, sizeof(nn->vxlan_ports));
 		memset(&nn->vxlan_usecnt, 0, sizeof(nn->vxlan_usecnt));
-		vxlan_get_rx_port(netdev);
+		netdev_refresh_offloads(netdev);
 	}
 
 	/* Step 3: Enable for kernel

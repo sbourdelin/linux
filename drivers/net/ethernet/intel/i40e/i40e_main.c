@@ -5344,11 +5344,8 @@ int i40e_open(struct net_device *netdev)
 						       TCP_FLAG_CWR) >> 16);
 	wr32(&pf->hw, I40E_GLLAN_TSOMSK_L, be32_to_cpu(TCP_FLAG_CWR) >> 16);
 
-#ifdef CONFIG_I40E_VXLAN
-	vxlan_get_rx_port(netdev);
-#endif
-#ifdef CONFIG_I40E_GENEVE
-	geneve_get_rx_port(netdev);
+#if defined(CONFIG_I40E_VXLAN) || defined(CONFIG_I40E_GENEVE)
+	netdev_refresh_offloads(netdev);
 #endif
 
 	return 0;

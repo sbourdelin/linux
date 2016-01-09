@@ -242,11 +242,6 @@ static inline netdev_features_t vxlan_features_check(struct sk_buff *skb,
 /* IPv6 header + UDP + VXLAN + Ethernet header */
 #define VXLAN6_HEADROOM (40 + 8 + 8 + 14)
 
-static inline void vxlan_get_rx_port(struct net_device *netdev)
-{
-	call_netdevice_notifiers(NETDEV_REFRESH_OFFLOADS, netdev);
-}
-
 static inline unsigned short vxlan_get_sk_family(struct vxlan_sock *vs)
 {
 	return vs->sock->sk->sk_family;

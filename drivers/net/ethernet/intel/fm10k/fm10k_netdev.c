@@ -558,7 +558,7 @@ int fm10k_open(struct net_device *netdev)
 
 #ifdef CONFIG_FM10K_VXLAN
 	/* update VXLAN port configuration */
-	vxlan_get_rx_port(netdev);
+	netdev_refresh_offloads(netdev);
 #endif
 
 	fm10k_up(interface);
