@@ -1856,13 +1856,13 @@ static int bfin_mii_bus_probe(struct platform_device *pdev)
 	rc = mdiobus_register(miibus);
 	if (rc) {
 		dev_err(&pdev->dev, "Cannot register MDIO bus!\n");
-		goto out_err_alloc;
+		goto out_err_mdiobus_register;
 	}
 
 	platform_set_drvdata(pdev, miibus);
 	return 0;
 
-out_err_irq_alloc:
+out_err_mdiobus_register:
 	mdiobus_free(miibus);
 out_err_alloc:
 	peripheral_free_list(pin_req);
