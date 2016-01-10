@@ -607,7 +607,7 @@ extern void tty_audit_add_data(struct tty_struct *tty, const void *data,
 extern void tty_audit_exit(void);
 extern void tty_audit_fork(struct signal_struct *sig);
 extern void tty_audit_tiocsti(struct tty_struct *tty, char ch);
-extern void tty_audit_push(struct tty_struct *tty);
+extern void tty_audit_push(void);
 extern int tty_audit_push_current(void);
 #else
 static inline void tty_audit_add_data(struct tty_struct *tty, const void *data,
