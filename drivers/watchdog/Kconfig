@@ -846,6 +846,18 @@ config ITCO_VENDOR_SUPPORT
 	  devices. At this moment we only have additional support for some
 	  SuperMicro Inc. motherboards.
 
+config IMANAGER_WDT
+	tristate "Advantech iManager Watchdog"
+	depends on MFD_IMANAGER
+	select WATCHDOG_CORE
+	help
+	  This driver provides support for Advantech iManager watchdog
+	  of Advantech SOM, MIO, AIMB, and PCM modules/boards.
+	  Requires mfd-core and imanager-core to function properly.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called imanager_wdt.
+
 config IT8712F_WDT
 	tristate "IT8712F (Smart Guardian) Watchdog Timer"
 	depends on X86
