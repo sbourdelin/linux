@@ -25,8 +25,6 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 
-#include <asm/efi.h>
-
 struct efi __read_mostly efi = {
 	.mps			= EFI_INVALID_TABLE_ADDR,
 	.acpi			= EFI_INVALID_TABLE_ADDR,
