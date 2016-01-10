@@ -1,0 +1,48 @@
+Kernel driver imanager_i2c
+==========================
+
+This platform driver provides support for iManager I2C/SMBus.
+
+This driver depends on imanager (mfd).
+
+Module Parameters
+-----------------
+
+* bus_frequency (unsigned short)
+Set desired bus frequency. Valid values (kHz) are:
+  50  Slow
+ 100  Standard (default)
+ 400  Fast
+
+
+Description
+-----------
+
+The Advantech iManager provides up to four SMBus controllers. One of them
+is configured for I2C compatibility.
+
+
+Process Call Support
+--------------------
+
+Not supported.
+
+
+I2C Block Read Support
+----------------------
+
+I2C block read is supported.
+
+
+SMBus 2.0 Support
+-----------------
+
+Several SMBus 2.0 features are supported.
+No PEC support.
+
+
+Interrupt Support
+-----------------
+
+No interrupt support available
+
