@@ -142,7 +142,9 @@ static void __speakup_paste_selection(struct work_struct *work)
 	struct tty_ldisc *ld;
 	DECLARE_WAITQUEUE(wait, current);
 
-	ld = tty_ldisc_ref_wait(tty);
+	ld = tty_ldisc_ref(tty);
+	if (!ld)
+		return;
 	tty_buffer_lock_exclusive(&vc->port);
 
 	add_wait_queue(&vc->paste_wait, &wait);
