@@ -33,6 +33,8 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#include <linux/of.h>
+#include <linux/gpio/consumer.h>
 
 #include "cyttsp_core.h"
 
@@ -57,6 +59,7 @@
 #define CY_DELAY_DFLT			20 /* ms */
 #define CY_DELAY_MAX			500
 #define CY_ACT_DIST_DFLT		0xF8
+#define CY_ACT_DIST_MASK		0x0F
 #define CY_HNDSHK_BIT			0x80
 /* device mode bits */
 #define CY_OPERATE_MODE			0x00
@@ -528,18 +531,136 @@ static void cyttsp_close(struct input_dev *dev)
 		cyttsp_disable(ts);
 }
 
+#ifdef CONFIG_OF
+static const struct cyttsp_platform_data *cyttsp_parse_dt(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	struct cyttsp_platform_data *pdata;
+	u32 dt_value;
+	int ret;
+	static const char err_msg[] =
+		"property not provided in the device tree";
+
+	if (!np)
+		return ERR_PTR(-ENOENT);
+
+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return ERR_PTR(-ENOMEM);
+
+	pdata->bl_keys = devm_kzalloc(dev, CY_NUM_BL_KEYS, GFP_KERNEL);
+	if (!pdata->bl_keys)
+		return ERR_PTR(-ENOMEM);
+
+	/* Set some default values */
+	pdata->act_dist = CY_ACT_DIST_DFLT;
+	pdata->act_intrvl = CY_ACT_INTRVL_DFLT;
+	pdata->tch_tmout = CY_TCH_TMOUT_DFLT;
+	pdata->lp_intrvl = CY_LP_INTRVL_DFLT;
+	pdata->name = "cyttsp";
+
+	ret = of_property_read_u32(np, "touchscreen-size-x", &pdata->maxx);
+	if (ret) {
+		dev_err(dev, "touchscreen-size-x %s\n", err_msg);
+		return ERR_PTR(ret);
+	}
+
+	ret = of_property_read_u32(np, "touchscreen-size-y", &pdata->maxy);
+	if (ret) {
+		dev_err(dev, "touchscreen-size-y %s\n", err_msg);
+		return ERR_PTR(ret);
+	}
+
+	pdata->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(pdata->reset_gpio)) {
+		ret = PTR_ERR(pdata->reset_gpio);
+		dev_err(dev, "error acquiring reset gpio: %d\n", ret);
+		return ERR_PTR(ret);
+	}
+
+	ret = of_property_read_u8_array(np, "bootloader-key",
+			pdata->bl_keys, CY_NUM_BL_KEYS);
+	if (ret) {
+		dev_err(dev, "bootloader-key %s\n", err_msg);
+		return ERR_PTR(ret);
+	}
+
+	if (!of_property_read_u32(np, "active-distance", &dt_value)) {
+		if (dt_value > 15) {
+			dev_err(dev, "active-distance (%u) must be [0-15]\n",
+				dt_value);
+			return ERR_PTR(-EINVAL);
+		}
+		pdata->act_dist &= ~CY_ACT_DIST_MASK;
+		pdata->act_dist |= (u8)dt_value;
+	}
+
+	if (!of_property_read_u32(np, "active-interval-ms", &dt_value)) {
+		if (dt_value > 255) {
+			dev_err(dev, "active-interval-ms (%u) must be [0-255]\n",
+				dt_value);
+			return ERR_PTR(-EINVAL);
+		}
+		pdata->act_intrvl = (u8)dt_value;
+	}
+
+	if (!of_property_read_u32(np, "lowpower-interval-ms", &dt_value)) {
+		if (dt_value > 2550) {
+			dev_err(dev, "lowpower-interval-ms (%u) must be [0-2550]\n",
+				dt_value);
+			return ERR_PTR(-EINVAL);
+		}
+		/* Register value is expressed in 0.01s / bit */
+		pdata->lp_intrvl = (u8)(dt_value/10);
+	}
+
+	if (!of_property_read_u32(np, "touch-timeout-ms", &dt_value)) {
+		if (dt_value > 2550) {
+			dev_err(dev, "touch-timeout-ms (%u) must be [0-2550]\n",
+				dt_value);
+			return ERR_PTR(-EINVAL);
+		}
+		/* Register value is expressed in 0.01s / bit */
+		pdata->tch_tmout = (u8)(dt_value/10);
+	}
+
+	return pdata;
+}
+#else
+static const struct cyttsp_platform_data *cyttsp_parse_dt(struct device *dev)
+{
+	return ERR_PTR(-ENOENT);
+}
+#endif
+
+static const struct cyttsp_platform_data *
+cyttsp_get_platform_data(struct device *dev)
+{
+	const struct cyttsp_platform_data *pdata;
+
+	pdata = dev_get_platdata(dev);
+	if (pdata)
+		return pdata;
+
+	pdata = cyttsp_parse_dt(dev);
+	if (!IS_ERR(pdata) || PTR_ERR(pdata) != -ENOENT)
+		return pdata;
+
+	dev_err(dev, "No platform data specified\n");
+	return ERR_PTR(-EINVAL);
+}
+
 struct cyttsp *cyttsp_probe(const struct cyttsp_bus_ops *bus_ops,
 			    struct device *dev, int irq, size_t xfer_buf_size)
 {
-	const struct cyttsp_platform_data *pdata = dev_get_platdata(dev);
+	const struct cyttsp_platform_data *pdata;
 	struct cyttsp *ts;
 	struct input_dev *input_dev;
 	int error;
 
-	if (!pdata || !pdata->name || irq <= 0) {
-		error = -EINVAL;
-		goto err_out;
-	}
+	pdata = cyttsp_get_platform_data(dev);
+	if (IS_ERR(pdata))
+		return ERR_CAST(pdata);
 
 	ts = kzalloc(sizeof(*ts) + xfer_buf_size, GFP_KERNEL);
 	input_dev = input_allocate_device();
@@ -550,7 +671,7 @@ struct cyttsp *cyttsp_probe(const struct cyttsp_bus_ops *bus_ops,
 
 	ts->dev = dev;
 	ts->input = input_dev;
-	ts->pdata = dev_get_platdata(dev);
+	ts->pdata = pdata;
 	ts->bus_ops = bus_ops;
 	ts->irq = irq;
 
@@ -618,7 +739,6 @@ err_platform_exit:
 err_free_mem:
 	input_free_device(input_dev);
 	kfree(ts);
-err_out:
 	return ERR_PTR(error);
 }
 EXPORT_SYMBOL_GPL(cyttsp_probe);

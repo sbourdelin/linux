@@ -29,6 +29,8 @@
 #ifndef _CYTTSP_H_
 #define _CYTTSP_H_
 
+#include <linux/gpio/consumer.h>
+
 #define CY_SPI_NAME "cyttsp-spi"
 #define CY_I2C_NAME "cyttsp-i2c"
 /* Active Power state scanning/processing refresh interval */
@@ -51,6 +53,7 @@ struct cyttsp_platform_data {
 	int (*init)(void);
 	void (*exit)(void);
 	char *name;
+	struct gpio_desc *reset_gpio;
 	u8 *bl_keys;
 };
 
