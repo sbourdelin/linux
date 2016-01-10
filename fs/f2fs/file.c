@@ -1374,10 +1374,10 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 		return ret;
 
 	if (f2fs_is_atomic_file(inode)) {
-		clear_inode_flag(F2FS_I(inode), FI_ATOMIC_FILE);
 		ret = commit_inmem_pages(inode, false);
 		if (ret)
 			goto err_out;
+		clear_inode_flag(F2FS_I(inode), FI_ATOMIC_FILE);
 	}
 
 	ret = f2fs_sync_file(filp, 0, LLONG_MAX, 0);
