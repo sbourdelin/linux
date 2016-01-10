@@ -110,6 +110,25 @@ int linux_spi_init(void *vp)
 	return ret;
 }
 
+static void linux_spi_msg_init(struct spi_message *msg, struct spi_transfer *tr,
+			       u32 len, u8 *tx, u8 *rx)
+{
+	spi_message_init(msg);
+	memset(tr, 0, sizeof(*tr));
+
+	msg->spi = wilc_spi_dev;
+	msg->is_dma_mapped = USE_SPI_DMA;
+
+	tr->tx_buf = tx;
+	tr->rx_buf = rx;
+
+	tr->len = len;
+	tr->speed_hz = SPEED;
+	tr->bits_per_word = 8;
+
+	spi_message_add_tail(tr, msg);
+}
+
 #if defined(PLAT_WMS8304)
 #define TXRX_PHASE_SIZE (4096)
 #endif
@@ -119,35 +138,20 @@ int linux_spi_init(void *vp)
 int linux_spi_write(u8 *b, u32 len)
 {
 	int ret;
+	struct spi_message msg;
+	struct spi_transfer tr;
 
 	if (len > 0 && b != NULL) {
 		int i = 0;
 		int blk = len / TXRX_PHASE_SIZE;
 		int remainder = len % TXRX_PHASE_SIZE;
 
-		char *r_buffer = kzalloc(TXRX_PHASE_SIZE, GFP_KERNEL);
-		if (!r_buffer)
-			return -ENOMEM;
-
 		if (blk) {
 			while (i < blk)	{
-				struct spi_message msg;
-				struct spi_transfer tr = {
-					.tx_buf = b + (i * TXRX_PHASE_SIZE),
-					.len = TXRX_PHASE_SIZE,
-					.speed_hz = SPEED,
-					.bits_per_word = 8,
-					.delay_usecs = 0,
-				};
+				linux_spi_msg_init(&msg, &tr, TXRX_PHASE_SIZE,
+						   b + (i * TXRX_PHASE_SIZE),
+						   NULL);
 
-				tr.rx_buf = r_buffer;
-
-				memset(&msg, 0, sizeof(msg));
-				spi_message_init(&msg);
-				msg.spi = wilc_spi_dev;
-				msg.is_dma_mapped = USE_SPI_DMA;
-
-				spi_message_add_tail(&tr, &msg);
 				ret = spi_sync(wilc_spi_dev, &msg);
 				if (ret < 0) {
 					PRINT_ER("SPI transaction failed\n");
@@ -157,28 +161,15 @@ int linux_spi_write(u8 *b, u32 len)
 			}
 		}
 		if (remainder) {
-			struct spi_message msg;
-			struct spi_transfer tr = {
-				.tx_buf = b + (blk * TXRX_PHASE_SIZE),
-				.len = remainder,
-				.speed_hz = SPEED,
-				.bits_per_word = 8,
-				.delay_usecs = 0,
-			};
-			tr.rx_buf = r_buffer;
+			linux_spi_msg_init(&msg, &tr, remainder,
+					   b + (blk * TXRX_PHASE_SIZE),
+					   NULL);
 
-			memset(&msg, 0, sizeof(msg));
-			spi_message_init(&msg);
-			msg.spi = wilc_spi_dev;
-			msg.is_dma_mapped = USE_SPI_DMA;                                /* rachel */
-
-			spi_message_add_tail(&tr, &msg);
 			ret = spi_sync(wilc_spi_dev, &msg);
 			if (ret < 0) {
 				PRINT_ER("SPI transaction failed\n");
 			}
 		}
-		kfree(r_buffer);
 	} else {
 		PRINT_ER("can't write data with the following length: %d\n", len);
 		PRINT_ER("FAILED due to NULL buffer or ZERO length check the following length: %d\n", len);
@@ -198,35 +189,16 @@ int linux_spi_write(u8 *b, u32 len)
 
 	int ret;
 	struct spi_message msg;
+	struct spi_transfer tr;
 
 	if (len > 0 && b != NULL) {
-		struct spi_transfer tr = {
-			.tx_buf = b,
-			.len = len,
-			.speed_hz = SPEED,
-			.delay_usecs = 0,
-		};
-		char *r_buffer = kzalloc(len, GFP_KERNEL);
-		if (!r_buffer)
-			return -ENOMEM;
-
-		tr.rx_buf = r_buffer;
-		PRINT_D(BUS_DBG, "Request writing %d bytes\n", len);
-
-		memset(&msg, 0, sizeof(msg));
-		spi_message_init(&msg);
-/* [[johnny add */
-		msg.spi = wilc_spi_dev;
-		msg.is_dma_mapped = USE_SPI_DMA;
-/* ]] */
-		spi_message_add_tail(&tr, &msg);
+		linux_spi_msg_init(&msg, &tr, len, b, NULL);
 
 		ret = spi_sync(wilc_spi_dev, &msg);
 		if (ret < 0) {
 			PRINT_ER("SPI transaction failed\n");
 		}
 
-		kfree(r_buffer);
 	} else {
 		PRINT_ER("can't write data with the following length: %d\n", len);
 		PRINT_ER("FAILED due to NULL buffer or ZERO length check the following length: %d\n", len);
@@ -247,6 +219,8 @@ int linux_spi_write(u8 *b, u32 len)
 int linux_spi_read(u8 *rb, u32 rlen)
 {
 	int ret;
+	struct spi_message msg;
+	struct spi_transfer tr;
 
 	if (rlen > 0) {
 		int i = 0;
@@ -254,28 +228,12 @@ int linux_spi_read(u8 *rb, u32 rlen)
 		int blk = rlen / TXRX_PHASE_SIZE;
 		int remainder = rlen % TXRX_PHASE_SIZE;
 
-		char *t_buffer = kzalloc(TXRX_PHASE_SIZE, GFP_KERNEL);
-		if (!t_buffer)
-			return -ENOMEM;
-
 		if (blk) {
 			while (i < blk)	{
-				struct spi_message msg;
-				struct spi_transfer tr = {
-					.rx_buf = rb + (i * TXRX_PHASE_SIZE),
-					.len = TXRX_PHASE_SIZE,
-					.speed_hz = SPEED,
-					.bits_per_word = 8,
-					.delay_usecs = 0,
-				};
-				tr.tx_buf = t_buffer;
+				linux_spi_msg_init(&msg, &tr, TXRX_PHASE_SIZE,
+						   NULL,
+						   rb + (i * TXRX_PHASE_SIZE));
 
-				memset(&msg, 0, sizeof(msg));
-				spi_message_init(&msg);
-				msg.spi = wilc_spi_dev;
-				msg.is_dma_mapped = USE_SPI_DMA;
-
-				spi_message_add_tail(&tr, &msg);
 				ret = spi_sync(wilc_spi_dev, &msg);
 				if (ret < 0) {
 					PRINT_ER("SPI transaction failed\n");
@@ -284,29 +242,14 @@ int linux_spi_read(u8 *rb, u32 rlen)
 			}
 		}
 		if (remainder) {
-			struct spi_message msg;
-			struct spi_transfer tr = {
-				.rx_buf = rb + (blk * TXRX_PHASE_SIZE),
-				.len = remainder,
-				.speed_hz = SPEED,
-				.bits_per_word = 8,
-				.delay_usecs = 0,
-			};
-			tr.tx_buf = t_buffer;
+			linux_spi_msg_init(&msg, &tr, remainder, NULL,
+					   rb + (blk * TXRX_PHASE_SIZE));
 
-			memset(&msg, 0, sizeof(msg));
-			spi_message_init(&msg);
-			msg.spi = wilc_spi_dev;
-			msg.is_dma_mapped = USE_SPI_DMA;                                /* rachel */
-
-			spi_message_add_tail(&tr, &msg);
 			ret = spi_sync(wilc_spi_dev, &msg);
 			if (ret < 0) {
 				PRINT_ER("SPI transaction failed\n");
 			}
 		}
-
-		kfree(t_buffer);
 	} else {
 		PRINT_ER("can't read data with the following length: %u\n", rlen);
 		ret = -1;
@@ -322,35 +265,16 @@ int linux_spi_read(u8 *rb, u32 rlen)
 {
 
 	int ret;
+	struct spi_message msg;
+	struct spi_transfer tr;
 
 	if (rlen > 0) {
-		struct spi_message msg;
-		struct spi_transfer tr = {
-			.rx_buf = rb,
-			.len = rlen,
-			.speed_hz = SPEED,
-			.delay_usecs = 0,
-
-		};
-		char *t_buffer = kzalloc(rlen, GFP_KERNEL);
-		if (!t_buffer)
-			return -ENOMEM;
-
-		tr.tx_buf = t_buffer;
-
-		memset(&msg, 0, sizeof(msg));
-		spi_message_init(&msg);
-/* [[ johnny add */
-		msg.spi = wilc_spi_dev;
-		msg.is_dma_mapped = USE_SPI_DMA;
-/* ]] */
-		spi_message_add_tail(&tr, &msg);
+		linux_spi_msg_init(&msg, &tr, rlen, NULL, rb);
 
 		ret = spi_sync(wilc_spi_dev, &msg);
 		if (ret < 0) {
 			PRINT_ER("SPI transaction failed\n");
 		}
-		kfree(t_buffer);
 	} else {
 		PRINT_ER("can't read data with the following length: %u\n", rlen);
 		ret = -1;
@@ -367,25 +291,12 @@ int linux_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 {
 
 	int ret;
+	struct spi_message msg;
+	struct spi_transfer tr;
 
 	if (rlen > 0) {
-		struct spi_message msg;
-		struct spi_transfer tr = {
-			.rx_buf = rb,
-			.tx_buf = wb,
-			.len = rlen,
-			.speed_hz = SPEED,
-			.bits_per_word = 8,
-			.delay_usecs = 0,
+		linux_spi_msg_init(&msg, &tr, rlen, wb, rb);
 
-		};
-
-		memset(&msg, 0, sizeof(msg));
-		spi_message_init(&msg);
-		msg.spi = wilc_spi_dev;
-		msg.is_dma_mapped = USE_SPI_DMA;
-
-		spi_message_add_tail(&tr, &msg);
 		ret = spi_sync(wilc_spi_dev, &msg);
 		if (ret < 0) {
 			PRINT_ER("SPI transaction failed\n");
