@@ -5390,6 +5390,19 @@ M:	Stanislaw Gruszka <stf_xl@wp.pl>
 S:	Maintained
 F:	drivers/usb/atm/ueagle-atm.c
 
+IMANAGER ADVANTECH EC DRIVER
+M:	Richard Vidal-Dorsch <richard.dorsch@advantech.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/mfd/imanager.txt
+F:	Documentation/hwmon/imanager
+F:	Documentation/i2c/busses/i2c-imanager
+F:	drivers/mfd/imanager-core.c
+F:	drivers/gpio/imanager-gpio.c
+F:	drivers/hwmon/imanager-hwmon.c
+F:	drivers/i2c/busses/imanager-i2c.c
+F:	drivers/video/backlight/imanager-bl.c
+F:	drivers/watchdog/imanager-wdt.c
+
 INA209 HARDWARE MONITOR DRIVER
 M:	Guenter Roeck <linux@roeck-us.net>
 L:	lm-sensors@lm-sensors.org
