@@ -1265,6 +1265,8 @@ int dw_dma_cyclic_start(struct dma_chan *chan)
 		return -EBUSY;
 	}
 
+	dwc_initialize(dwc);
+
 	dma_writel(dw, CLEAR.ERROR, dwc->mask);
 	dma_writel(dw, CLEAR.XFER, dwc->mask);
 
