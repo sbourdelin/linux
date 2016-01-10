@@ -152,8 +152,17 @@ static ktime_t timerfd_get_remaining(struct timerfd_ctx *ctx)
 
 	if (isalarm(ctx))
 		remaining = alarm_expires_remaining(&ctx->t.alarm);
-	else
+	else {
 		remaining = hrtimer_expires_remaining(&ctx->t.tmr);
+#ifdef CONFIG_TIME_LOW_RES
+		/* Expiry time was rounded up in hrtimer_start_range_ns()
+		 * to the next jiffies period to avoid short timeouts.
+		 * Subtract it here again to avoid userspace seeing higher
+		 * values than originally programmed. */
+		if (!(ctx->settime_flags & TFD_TIMER_ABSTIME))
+			remaining.tv64 -= hrtimer_resolution;
+#endif
+	}
 
 	return remaining.tv64 < 0 ? ktime_set(0, 0): remaining;
 }
