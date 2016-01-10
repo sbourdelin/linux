@@ -613,6 +613,18 @@ config SENSORS_CORETEMP
 	  sensor inside your CPU. Most of the family 6 CPUs
 	  are supported. Check Documentation/hwmon/coretemp for details.
 
+config SENSORS_IMANAGER
+	tristate "Advantech iManager Hardware Monitoring"
+	depends on MFD_IMANAGER
+	select HWMON_VID
+	help
+	  This enables support for Advantech iManager hardware monitoring
+	  of some Advantech SOM, MIO, AIMB, and PCM modules/boards.
+	  Requires mfd-core and imanager-core to function properly.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called imanager_hwmon.
+
 config SENSORS_IT87
 	tristate "ITE IT87xx and compatibles"
 	depends on !PPC
