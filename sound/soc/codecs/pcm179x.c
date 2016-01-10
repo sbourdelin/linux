@@ -74,7 +74,30 @@ struct pcm179x_private {
 	struct regmap *regmap;
 	unsigned int format;
 	unsigned int rate;
+#define PCM1795	1
+	unsigned int codec_model;
 };
+
+static int pcm179x_startup(struct snd_pcm_substream *substream,
+			    struct snd_soc_dai *dai)
+{
+	struct snd_soc_codec *codec = dai->codec;
+	struct pcm179x_private *priv = snd_soc_codec_get_drvdata(codec);
+	u64 formats;
+
+	switch (priv->codec_model) {
+	case PCM1795:
+		formats = PCM1795_FORMATS;
+		break;
+	default:
+		formats = PCM1792A_FORMATS;
+	}
+
+	snd_pcm_hw_constraint_mask64(substream->runtime,
+				     SNDRV_PCM_HW_PARAM_FORMAT, formats);
+
+	return 0;
+}
 
 static int pcm179x_set_dai_fmt(struct snd_soc_dai *codec_dai,
                              unsigned int format)
@@ -114,8 +137,10 @@ static int pcm179x_hw_params(struct snd_pcm_substream *substream,
 	switch (priv->format & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_RIGHT_J:
 		switch (params_width(params)) {
-		case 24:
 		case 32:
+			val = 1;
+			break;
+		case 24:
 			val = 2;
 			break;
 		case 16:
@@ -127,8 +152,10 @@ static int pcm179x_hw_params(struct snd_pcm_substream *substream,
 		break;
 	case SND_SOC_DAIFMT_I2S:
 		switch (params_width(params)) {
-		case 24:
 		case 32:
+			val = 4;
+			break;
+		case 24:
 			val = 5;
 			break;
 		case 16:
@@ -154,6 +181,7 @@ static int pcm179x_hw_params(struct snd_pcm_substream *substream,
 }
 
 static const struct snd_soc_dai_ops pcm179x_dai_ops = {
+	.startup	= pcm179x_startup,
 	.set_fmt	= pcm179x_set_dai_fmt,
 	.hw_params	= pcm179x_hw_params,
 	.digital_mute	= pcm179x_digital_mute,
@@ -189,13 +217,19 @@ static struct snd_soc_dai_driver pcm179x_dai = {
 		.stream_name = "Playback",
 		.channels_min = 2,
 		.channels_max = 2,
-		.rates = PCM1792A_RATES,
-		.formats = PCM1792A_FORMATS, },
+		.rates = PCM179X_RATES,
+		.formats = PCM179X_FORMATS, },
 	.ops = &pcm179x_dai_ops,
 };
 
+static const unsigned int codec_model = PCM1795;
+
 static const struct of_device_id pcm179x_of_match[] = {
 	{ .compatible = "ti,pcm1792a", },
+	{ .compatible = "ti,pcm1795",
+	  .data = &codec_model,
+	},
+	{ .compatible = "ti,pcm1796", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, pcm179x_of_match);
@@ -222,7 +256,18 @@ static struct snd_soc_codec_driver soc_codec_dev_pcm179x = {
 static int pcm179x_spi_probe(struct spi_device *spi)
 {
 	struct pcm179x_private *pcm179x;
+	struct device *dev = &spi->dev;
+	struct device_node *np = spi->dev.of_node;
+	const unsigned int *codec_model = NULL;
 	int ret;
+
+	if (np) {
+		const struct of_device_id *of_id;
+
+		of_id = of_match_device(pcm179x_of_match, dev);
+		if (of_id)
+			codec_model = of_id->data;
+	}
 
 	pcm179x = devm_kzalloc(&spi->dev, sizeof(struct pcm179x_private),
 				GFP_KERNEL);
@@ -237,6 +282,9 @@ static int pcm179x_spi_probe(struct spi_device *spi)
 		dev_err(&spi->dev, "Failed to register regmap: %d\n", ret);
 		return ret;
 	}
+
+	if (codec_model)
+		pcm179x->codec_model =  *codec_model;
 
 	return snd_soc_register_codec(&spi->dev,
 			&soc_codec_dev_pcm179x, &pcm179x_dai, 1);
