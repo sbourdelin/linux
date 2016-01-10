@@ -137,78 +137,71 @@ static void linux_spi_msg_init(struct spi_message *msg, struct spi_transfer *tr,
 
 int linux_spi_write(u8 *b, u32 len)
 {
-	int ret;
+	int ret, i;
+	int blk = len / TXRX_PHASE_SIZE;
+	int remainder = len % TXRX_PHASE_SIZE;
 	struct spi_message msg;
 	struct spi_transfer tr;
 
-	if (len > 0 && b != NULL) {
-		int i = 0;
-		int blk = len / TXRX_PHASE_SIZE;
-		int remainder = len % TXRX_PHASE_SIZE;
+	if (!len) {
+		PRINT_ER("Zero length write.\n");
+		return 0;
+	}
 
-		if (blk) {
-			while (i < blk)	{
-				linux_spi_msg_init(&msg, &tr, TXRX_PHASE_SIZE,
-						   b + (i * TXRX_PHASE_SIZE),
-						   NULL);
+	if (!b) {
+		PRINT_ER("Write buffer NULL.\n");
+		return 0;
+	}
 
-				ret = spi_sync(wilc_spi_dev, &msg);
-				if (ret < 0) {
-					PRINT_ER("SPI transaction failed\n");
-				}
-				i++;
-
-			}
+	for (i = 0; i < blk; i++) {
+		linux_spi_msg_init(&msg, &tr, TXRX_PHASE_SIZE,
+				   b + (i * TXRX_PHASE_SIZE),
+				   NULL);
+		ret = spi_sync(wilc_spi_dev, &msg);
+		if (ret < 0) {
+			PRINT_ER("SPI sync failed and returned %d.\n", ret);
+			return 0;
 		}
-		if (remainder) {
-			linux_spi_msg_init(&msg, &tr, remainder,
-					   b + (blk * TXRX_PHASE_SIZE),
-					   NULL);
+	}
 
-			ret = spi_sync(wilc_spi_dev, &msg);
-			if (ret < 0) {
-				PRINT_ER("SPI transaction failed\n");
-			}
-		}
-	} else {
-		PRINT_ER("can't write data with the following length: %d\n", len);
-		PRINT_ER("FAILED due to NULL buffer or ZERO length check the following length: %d\n", len);
-		ret = -1;
+	if (remainder) {
+		linux_spi_msg_init(&msg, &tr, remainder,
+				   b + (blk * TXRX_PHASE_SIZE),
+				   NULL);
+		ret = spi_sync(wilc_spi_dev, &msg);
+		if (ret < 0)
+			PRINT_ER("SPI sync failed and returned %d.\n", ret);
 	}
 
 	/* change return value to match WILC interface */
 	(ret < 0) ? (ret = 0) : (ret = 1);
-
 	return ret;
-
 }
 
 #else
 int linux_spi_write(u8 *b, u32 len)
 {
-
 	int ret;
 	struct spi_message msg;
 	struct spi_transfer tr;
 
-	if (len > 0 && b != NULL) {
-		linux_spi_msg_init(&msg, &tr, len, b, NULL);
-
-		ret = spi_sync(wilc_spi_dev, &msg);
-		if (ret < 0) {
-			PRINT_ER("SPI transaction failed\n");
-		}
-
-	} else {
-		PRINT_ER("can't write data with the following length: %d\n", len);
-		PRINT_ER("FAILED due to NULL buffer or ZERO length check the following length: %d\n", len);
-		ret = -1;
+	if (!len) {
+		PRINT_ER("Zero length write.\n");
+		return 0;
 	}
+
+	if (!b) {
+		PRINT_ER("Write buffer NULL.\n");
+		return 0;
+	}
+
+	linux_spi_msg_init(&msg, &tr, len, b, NULL);
+	ret = spi_sync(wilc_spi_dev, &msg);
+	if (ret < 0)
+		PRINT_ER("SPI sync failed and returned %d.\n", ret);
 
 	/* change return value to match WILC interface */
 	(ret < 0) ? (ret = 0) : (ret = 1);
-
-
 	return ret;
 }
 
