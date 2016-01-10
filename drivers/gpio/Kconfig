@@ -765,6 +765,14 @@ config GPIO_DLN2
 	  This driver can also be built as a module. If so, the module
 	  will be called gpio-dln2.
 
+config GPIO_IMANAGER
+	tristate "Advantech iManager GPIO support"
+	depends on MFD_IMANAGER
+	help
+	  Say yes here to support Advantech iManager GPIO functionality
+	  of some Advantech SOM, MIO, AIMB, and PCM modules/boards.
+	  Requires mfd-core and imanager-core to function properly.
+
 config GPIO_JANZ_TTL
 	tristate "Janz VMOD-TTL Digital IO Module"
 	depends on MFD_JANZ_CMODIO
