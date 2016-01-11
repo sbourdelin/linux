@@ -175,7 +175,7 @@ retry:
 				disk_addr >> SECTOR_SHIFT, end_io, par);
 		if (!bio)
 			return ERR_PTR(-ENOMEM);
-		bio->bi_rw = rw;
+		bio->bi_op = rw;
 	}
 	if (bio_add_page(bio, page, *len, offset) < *len) {
 		bio = bl_submit_bio(bio);
