@@ -102,6 +102,7 @@ struct ovs_skb_cb {
 	struct vport		*input_vport;
 	u16			mru;
 };
+
 #define OVS_CB(skb) ((struct ovs_skb_cb *)(skb)->cb)
 
 /**
@@ -172,7 +173,8 @@ static inline struct vport *ovs_vport_rcu(const struct datapath *dp, int port_no
 	return ovs_lookup_vport(dp, port_no);
 }
 
-static inline struct vport *ovs_vport_ovsl_rcu(const struct datapath *dp, int port_no)
+static inline struct vport *ovs_vport_ovsl_rcu(const struct datapath *dp,
+					       int port_no)
 {
 	WARN_ON_ONCE(!rcu_read_lock_held() && !lockdep_ovsl_is_held());
 	return ovs_lookup_vport(dp, port_no);
