@@ -804,6 +804,7 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 	if (!disk)
 		return -ENODEV;
 	if (part) {
+		module_put(disk->fops->owner);
 		put_disk(disk);
 		return -ENODEV;
 	}
@@ -820,6 +821,7 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 		ret = PTR_ERR(blkg);
 		rcu_read_unlock();
 		spin_unlock_irq(disk->queue->queue_lock);
+		module_put(disk->fops->owner);
 		put_disk(disk);
 		/*
 		 * If queue was bypassing, we should retry.  Do so after a
@@ -853,6 +855,7 @@ void blkg_conf_finish(struct blkg_conf_ctx *ctx)
 {
 	spin_unlock_irq(ctx->disk->queue->queue_lock);
 	rcu_read_unlock();
+	module_put(ctx->disk->fops->owner);
 	put_disk(ctx->disk);
 }
 EXPORT_SYMBOL_GPL(blkg_conf_finish);
