@@ -8,6 +8,7 @@ channel which can be either RGB, YUYV or BT656.
  - compatible: Must be one of the following
    - "renesas,rcar-gen2-vin" for R-Car Gen2 Series
    - "renesas,rcar-gen3-vin" for R-Car Gen3 Series
+   - "renesas,vin-r8a7795" for the R8A7795 device
    - "renesas,vin-r8a7794" for the R8A7794 device
    - "renesas,vin-r8a7793" for the R8A7793 device
    - "renesas,vin-r8a7791" for the R8A7791 device
