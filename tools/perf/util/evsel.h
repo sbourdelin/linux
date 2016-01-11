@@ -118,6 +118,7 @@ struct perf_evsel {
 	bool			per_pkg;
 	bool			precise_max;
 	bool			overwrite;
+	bool			tailsize;
 	/* parse modifier helper */
 	int			exclude_GH;
 	int			nr_members;
