@@ -43,6 +43,20 @@ int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags)
 	return syscall(__NR_bpf, BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
 }
 
+int bpf_update_elem_percpu(int fd, void *key, void *value,
+			   unsigned long long flags, unsigned cpu)
+{
+	union bpf_attr attr = {
+		.map_fd = fd,
+		.key = ptr_to_u64(key),
+		.value = ptr_to_u64(value),
+		.flags = flags,
+		.cpu = cpu
+	};
+
+	return syscall(__NR_bpf, BPF_MAP_UPDATE_ELEM_PERCPU, &attr, sizeof(attr));
+}
+
 int bpf_lookup_elem(int fd, void *key, void *value)
 {
 	union bpf_attr attr = {
@@ -52,6 +66,34 @@ int bpf_lookup_elem(int fd, void *key, void *value)
 	};
 
 	return syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
+}
+
+int bpf_lookup_elem_percpu(int fd, void *key, void *value, unsigned cpu)
+{
+	union bpf_attr attr = {
+		.map_fd = fd,
+		.key = ptr_to_u64(key),
+		.value = ptr_to_u64(value),
+		.cpu = cpu,
+	};
+
+	return syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM_PERCPU, &attr, sizeof(attr));
+}
+
+int bpf_lookup_elem_allcpu(int fd, void *key, void *value_percpu, void *value,
+			   int (*handle_one_cpu)(unsigned, void *, void *))
+{
+	unsigned cpu;
+	int ret;
+
+	for (cpu = 0; cpu < sysconf(_SC_NPROCESSORS_CONF); cpu++) {
+		ret = bpf_lookup_elem_percpu(fd, key, value_percpu, cpu);
+		if (!ret)
+			ret = handle_one_cpu(cpu, value_percpu, value);
+		if  (ret)
+			return ret;
+	}
+	return 0;
 }
 
 int bpf_delete_elem(int fd, void *key)

@@ -39,6 +39,11 @@ static int (*bpf_redirect)(int ifindex, int flags) =
 	(void *) BPF_FUNC_redirect;
 static int (*bpf_perf_event_output)(void *ctx, void *map, int index, void *data, int size) =
 	(void *) BPF_FUNC_perf_event_output;
+static void *(*bpf_map_lookup_elem_percpu)(void *map, void *key, unsigned cpu) =
+	(void *) BPF_FUNC_map_lookup_elem_percpu;
+static int (*bpf_map_update_elem_percpu)(void *map, void *key, void *value,
+				  unsigned long long flags, unsigned cpu) =
+	(void *) BPF_FUNC_map_update_elem_percpu;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
