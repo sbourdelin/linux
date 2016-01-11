@@ -1041,8 +1041,8 @@ static void print_slabinfo_header(struct seq_file *m)
 #else
 	seq_puts(m, "slabinfo - version: 2.1\n");
 #endif
-	seq_puts(m, "# name            <active_objs> <num_objs> <objsize> "
-		 "<objperslab> <pagesperslab>");
+	seq_puts(m, "# name                   <active_objs> <num_objs> <ratio> "
+		 "<objsize> <objperslab> <pagesperslab>");
 	seq_puts(m, " : tunables <limit> <batchcount> <sharedfactor>");
 	seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
 #ifdef CONFIG_DEBUG_SLAB
@@ -1093,15 +1093,18 @@ memcg_accumulate_slabinfo(struct kmem_cache *s, struct slabinfo *info)
 static void cache_show(struct kmem_cache *s, struct seq_file *m)
 {
 	struct slabinfo sinfo;
+	unsigned long ratio;
 
 	memset(&sinfo, 0, sizeof(sinfo));
 	get_slabinfo(s, &sinfo);
 
 	memcg_accumulate_slabinfo(s, &sinfo);
+	ratio = sinfo.num_objs ? sinfo.active_objs * 100 / sinfo.num_objs : 0;
 
-	seq_printf(m, "%-17s %6lu %6lu %6u %4u %4d",
-		   cache_name(s), sinfo.active_objs, sinfo.num_objs, s->size,
-		   sinfo.objects_per_slab, (1 << sinfo.cache_order));
+	seq_printf(m, "%-25s %6lu %6lu %6lu%% %6u %4u %4d",
+		   cache_name(s), sinfo.active_objs, sinfo.num_objs,
+		   ratio, s->size, sinfo.objects_per_slab,
+		   (1 << sinfo.cache_order));
 
 	seq_printf(m, " : tunables %4u %4u %4u",
 		   sinfo.limit, sinfo.batchcount, sinfo.shared);
