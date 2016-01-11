@@ -25,6 +25,7 @@
 struct usb_device;
 struct usb_driver;
 struct wusb_dev;
+struct devcie_node;
 
 /*-------------------------------------------------------------------------*/
 
@@ -616,6 +617,7 @@ struct usb_device {
 	struct usb3_lpm_parameters u1_params;
 	struct usb3_lpm_parameters u2_params;
 	unsigned lpm_disable_count;
+	struct device_node	*of_node; /* associated device tree node */
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 

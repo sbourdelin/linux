@@ -36,6 +36,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
+#include <linux/usb/of.h>
 
 #include <asm/io.h>
 #include <linux/scatterlist.h>
@@ -502,11 +503,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
 	dev->connect_time = jiffies;
 	dev->active_duration = -jiffies;
 #endif
-	if (root_hub)	/* Root hub always ok [and always wired] */
+	if (root_hub) {	/* Root hub always ok [and always wired] */
 		dev->authorized = 1;
-	else {
+		dev->of_node = bus->controller->of_node;
+	} else {
 		dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
 		dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
+		dev->dev.of_node = usb_of_get_child_node
+			(parent->of_node, dev->portnum);
 	}
 	return dev;
 }
