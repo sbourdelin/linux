@@ -5,7 +5,7 @@
 #include "bpf_helpers.h"
 
 struct bpf_map_def SEC("maps") my_map = {
-	.type = BPF_MAP_TYPE_ARRAY,
+	.type = BPF_MAP_TYPE_ARRAY_PERCPU,
 	.key_size = sizeof(u32),
 	.value_size = sizeof(long),
 	.max_entries = 256,
@@ -16,13 +16,14 @@ int bpf_prog1(struct __sk_buff *skb)
 {
 	int index = load_byte(skb, ETH_HLEN + offsetof(struct iphdr, protocol));
 	long *value;
+	unsigned cpu = bpf_get_smp_processor_id();
 
 	if (skb->pkt_type != PACKET_OUTGOING)
 		return 0;
 
-	value = bpf_map_lookup_elem(&my_map, &index);
+	value = bpf_map_lookup_elem_percpu(&my_map, &index, cpu);
 	if (value)
-		__sync_fetch_and_add(value, skb->len);
+		*value += skb->len;
 
 	return 0;
 }

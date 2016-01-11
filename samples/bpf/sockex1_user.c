@@ -6,6 +6,14 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+static int handle_one_cpu(unsigned cpu, void *val_cpu, void *val)
+{
+	long long *cnt = val;
+
+	*cnt += *(long *)val_cpu;
+	return 0;
+}
+
 int main(int ac, char **argv)
 {
 	char filename[256];
@@ -28,17 +36,21 @@ int main(int ac, char **argv)
 	(void) f;
 
 	for (i = 0; i < 5; i++) {
-		long long tcp_cnt, udp_cnt, icmp_cnt;
+		long cnt_percpu;
+		long long tcp_cnt = 0, udp_cnt = 0, icmp_cnt = 0;
 		int key;
 
 		key = IPPROTO_TCP;
-		assert(bpf_lookup_elem(map_fd[0], &key, &tcp_cnt) == 0);
+		assert(bpf_lookup_elem_allcpu(map_fd[0], &key,
+		       &cnt_percpu, &tcp_cnt, handle_one_cpu) == 0);
 
 		key = IPPROTO_UDP;
-		assert(bpf_lookup_elem(map_fd[0], &key, &udp_cnt) == 0);
+		assert(bpf_lookup_elem_allcpu(map_fd[0], &key,
+		       &cnt_percpu, &udp_cnt, handle_one_cpu) == 0);
 
 		key = IPPROTO_ICMP;
-		assert(bpf_lookup_elem(map_fd[0], &key, &icmp_cnt) == 0);
+		assert(bpf_lookup_elem_allcpu(map_fd[0], &key,
+		       &cnt_percpu, &icmp_cnt, handle_one_cpu) == 0);
 
 		printf("TCP %lld UDP %lld ICMP %lld bytes\n",
 		       tcp_cnt, udp_cnt, icmp_cnt);
