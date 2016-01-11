@@ -268,9 +268,12 @@ int __generic_block_fiemap(struct inode *inode,
 	 * since we expect isize to not change at all through the duration of
 	 * this call.
 	 */
-	if (len >= isize) {
+	if (start >= isize)
+		return 0;
+
+	if (start + len > isize) {
 		whole_file = true;
-		len = isize;
+		len = isize - start;
 	}
 
 	/*
