@@ -54,6 +54,36 @@ const struct bpf_func_proto bpf_map_lookup_elem_proto = {
 	.arg2_type	= ARG_PTR_TO_MAP_KEY,
 };
 
+static u64 bpf_map_lookup_elem_percpu(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
+{
+	/* verifier checked that R1 contains a valid pointer to bpf_map
+	 * and R2 points to a program stack and map->key_size bytes were
+	 * initialized
+	 */
+	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
+	void *key = (void *) (unsigned long) r2;
+	u32 cpu = (u32)(unsigned long) r3;
+	void *value;
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
+
+	value = map->ops->map_lookup_elem_percpu(map, key, cpu);
+
+	/* lookup() returns either pointer to element value or NULL
+	 * which is the meaning of PTR_TO_MAP_VALUE_OR_NULL type
+	 */
+	return (unsigned long) value;
+}
+
+const struct bpf_func_proto bpf_map_lookup_elem_percpu_proto = {
+	.func		= bpf_map_lookup_elem_percpu,
+	.gpl_only	= false,
+	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_PTR_TO_MAP_KEY,
+	.arg3_type	= ARG_ANYTHING,
+};
+
 static u64 bpf_map_update_elem(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
 {
 	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
@@ -73,6 +103,29 @@ const struct bpf_func_proto bpf_map_update_elem_proto = {
 	.arg2_type	= ARG_PTR_TO_MAP_KEY,
 	.arg3_type	= ARG_PTR_TO_MAP_VALUE,
 	.arg4_type	= ARG_ANYTHING,
+};
+
+static u64 bpf_map_update_elem_percpu(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
+{
+	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
+	void *key = (void *) (unsigned long) r2;
+	void *value = (void *) (unsigned long) r3;
+	u32 cpu = (u32)(unsigned long) r5;
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
+
+	return map->ops->map_update_elem_percpu(map, key, value, r4, cpu);
+}
+
+const struct bpf_func_proto bpf_map_update_elem_percpu_proto = {
+	.func		= bpf_map_update_elem_percpu,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_PTR_TO_MAP_KEY,
+	.arg3_type	= ARG_PTR_TO_MAP_VALUE,
+	.arg4_type	= ARG_ANYTHING,
+	.arg5_type	= ARG_ANYTHING,
 };
 
 static u64 bpf_map_delete_elem(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)

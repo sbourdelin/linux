@@ -769,6 +769,8 @@ const struct bpf_func_proto * __weak bpf_get_trace_printk_proto(void)
 {
 	return NULL;
 }
+const struct bpf_func_proto bpf_map_lookup_elem_percpu_proto __weak;
+const struct bpf_func_proto bpf_map_update_elem_percpu_proto __weak;
 
 /* Always built-in helper functions. */
 const struct bpf_func_proto bpf_tail_call_proto = {

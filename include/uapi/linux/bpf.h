@@ -270,6 +270,12 @@ enum bpf_func_id {
 	 */
 	BPF_FUNC_perf_event_output,
 	BPF_FUNC_skb_load_bytes,
+
+	/* void *map_lookup_elem(&map, &key, cpu) */
+	BPF_FUNC_map_lookup_elem_percpu,
+	/* int map_update_elem(&map, &key, &value, flags, cpu) */
+	BPF_FUNC_map_update_elem_percpu,
+
 	__BPF_FUNC_MAX_ID,
 };
 

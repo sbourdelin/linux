@@ -1752,8 +1752,12 @@ sk_filter_func_proto(enum bpf_func_id func_id)
 	switch (func_id) {
 	case BPF_FUNC_map_lookup_elem:
 		return &bpf_map_lookup_elem_proto;
+	case BPF_FUNC_map_lookup_elem_percpu:
+		return &bpf_map_lookup_elem_percpu_proto;
 	case BPF_FUNC_map_update_elem:
 		return &bpf_map_update_elem_proto;
+	case BPF_FUNC_map_update_elem_percpu:
+		return &bpf_map_update_elem_percpu_proto;
 	case BPF_FUNC_map_delete_elem:
 		return &bpf_map_delete_elem_proto;
 	case BPF_FUNC_get_prandom_u32:
