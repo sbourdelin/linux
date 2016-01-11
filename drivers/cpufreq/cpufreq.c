@@ -421,10 +421,15 @@ static void cpufreq_notify_post_transition(struct cpufreq_policy *policy,
 	cpufreq_notify_transition(policy, freqs, CPUFREQ_POSTCHANGE);
 }
 
+/*
+ * Callers must ensure proper mutual exclusion on policy (for transition_
+ * ongoing/transition_task handling). While holding policy->rwsem is
+ * sufficient, other scheme might work as well (e.g., cpufreq_governor.c
+ * holds timer_mutex while entering the path that generates transitions).
+ */
 void cpufreq_freq_transition_begin(struct cpufreq_policy *policy,
 		struct cpufreq_freqs *freqs)
 {
-
 	/*
 	 * Catch double invocations of _begin() which lead to self-deadlock.
 	 * ASYNC_NOTIFICATION drivers are left out because the cpufreq core
@@ -439,22 +444,19 @@ void cpufreq_freq_transition_begin(struct cpufreq_policy *policy,
 wait:
 	wait_event(policy->transition_wait, !policy->transition_ongoing);
 
-	spin_lock(&policy->transition_lock);
-
-	if (unlikely(policy->transition_ongoing)) {
-		spin_unlock(&policy->transition_lock);
+	if (unlikely(policy->transition_ongoing))
 		goto wait;
-	}
 
 	policy->transition_ongoing = true;
 	policy->transition_task = current;
-
-	spin_unlock(&policy->transition_lock);
 
 	cpufreq_notify_transition(policy, freqs, CPUFREQ_PRECHANGE);
 }
 EXPORT_SYMBOL_GPL(cpufreq_freq_transition_begin);
 
+/*
+ * As above, callers must ensure proper mutual exclusion on policy.
+ */
 void cpufreq_freq_transition_end(struct cpufreq_policy *policy,
 		struct cpufreq_freqs *freqs, int transition_failed)
 {
@@ -1057,7 +1059,6 @@ static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
 	kobject_init(&policy->kobj, &ktype_cpufreq);
 	INIT_LIST_HEAD(&policy->policy_list);
 	init_rwsem(&policy->rwsem);
-	spin_lock_init(&policy->transition_lock);
 	init_waitqueue_head(&policy->transition_wait);
 	init_completion(&policy->kobj_unregister);
 	INIT_WORK(&policy->update, handle_update);
