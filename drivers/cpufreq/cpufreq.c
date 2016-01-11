@@ -969,6 +969,7 @@ static int cpufreq_init_policy(struct cpufreq_policy *policy)
 
 	memcpy(&new_policy, policy, sizeof(*policy));
 
+	mutex_lock(&cpufreq_governor_mutex);
 	/* Update governor of new_policy to the governor used before hotplug */
 	gov = find_governor(policy->last_governor);
 	if (gov)
@@ -976,6 +977,7 @@ static int cpufreq_init_policy(struct cpufreq_policy *policy)
 				policy->governor->name, policy->cpu);
 	else
 		gov = CPUFREQ_DEFAULT_GOVERNOR;
+	mutex_unlock(&cpufreq_governor_mutex);
 
 	new_policy.governor = gov;
 
