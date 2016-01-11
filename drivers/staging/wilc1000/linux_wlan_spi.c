@@ -289,25 +289,27 @@ int linux_spi_read(u8 *rb, u32 rlen)
 
 int linux_spi_write_read(u8 *wb, u8 *rb, u32 rlen)
 {
-
 	int ret;
 	struct spi_message msg;
 	struct spi_transfer tr;
 
-	if (rlen > 0) {
-		linux_spi_msg_init(&msg, &tr, rlen, wb, rb);
-
-		ret = spi_sync(wilc_spi_dev, &msg);
-		if (ret < 0) {
-			PRINT_ER("SPI transaction failed\n");
-		}
-	} else {
-		PRINT_ER("can't read data with the following length: %u\n", rlen);
-		ret = -1;
+	if (!rlen) {
+		PRINT_ER("Zero length read/write.\n");
+		return 0;
 	}
+
+	if (!wb || !rb) {
+		PRINT_ER("Read or write buffer NULL.\n");
+		return 0;
+	}
+
+	linux_spi_msg_init(&msg, &tr, rlen, wb, rb);
+	ret = spi_sync(wilc_spi_dev, &msg);
+	if (ret < 0)
+		PRINT_ER("SPI sync failed and returned %d.\n", ret);
+
 	/* change return value to match WILC interface */
 	(ret < 0) ? (ret = 0) : (ret = 1);
-
 	return ret;
 }
 
