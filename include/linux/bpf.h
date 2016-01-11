@@ -153,9 +153,11 @@ struct bpf_array {
 	 */
 	enum bpf_prog_type owner_prog_type;
 	bool owner_jited;
+	bool percpu;
 	union {
 		char value[0] __aligned(8);
 		void *ptrs[0] __aligned(8);
+		void __percpu *pptrs[0] __aligned(8);
 	};
 };
 #define MAX_TAIL_CALL_CNT 32
