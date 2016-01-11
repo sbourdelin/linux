@@ -620,7 +620,8 @@ static int set_sctp(struct sk_buff *skb, struct sw_flow_key *flow_key,
 	return 0;
 }
 
-static int ovs_vport_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+static int ovs_vport_output(struct net *net, struct sock *sk,
+			    struct sk_buff *skb)
 {
 	struct ovs_frag_data *data = this_cpu_ptr(&ovs_frag_data_storage);
 	struct vport *vport = data->vport;
@@ -707,9 +708,8 @@ static void ovs_fragment(struct net *net, struct vport *vport,
 		unsigned long orig_dst;
 		struct rt6_info ovs_rt;
 
-		if (!v6ops) {
+		if (!v6ops)
 			goto err;
-		}
 
 		prepare_frag(vport, skb);
 		memset(&ovs_rt, 0, sizeof(ovs_rt));
