@@ -55,4 +55,14 @@ config SI7020
 	  To compile this driver as a module, choose M here: the module
 	  will be called si7020.
 
+config TH06
+        tristate "TH06 humidity and temperature sensor"
+        depends on I2C
+        help
+          Say yes here to build support for the TH06 measurement of
+          relative humidity and temperature.
+
+          To compile this driver as a module, choose M here: the module
+          will be called th06.
+
 endmenu
