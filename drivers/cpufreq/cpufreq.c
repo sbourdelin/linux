@@ -282,15 +282,15 @@ struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
 	if (WARN_ON(cpu >= nr_cpu_ids))
 		return NULL;
 
-	/* get the cpufreq driver */
 	read_lock_irqsave(&cpufreq_driver_lock, flags);
 
-	if (cpufreq_driver) {
-		/* get the CPU */
-		policy = cpufreq_cpu_get_raw(cpu);
-		if (policy)
-			kobject_get(&policy->kobj);
-	}
+	/*
+	 * If we get a policy, cpufreq_policy_free() didn't
+	 * yet run.
+	 */
+	policy = cpufreq_cpu_get_raw(cpu);
+	if (policy)
+		kobject_get(&policy->kobj);
 
 	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
