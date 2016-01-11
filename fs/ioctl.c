@@ -276,23 +276,21 @@ int __generic_block_fiemap(struct inode *inode,
 		len = isize - start;
 	}
 
-	/*
-	 * Some filesystems can't deal with being asked to map less than
-	 * blocksize, so make sure our len is at least block length.
-	 */
-	if (logical_to_blk(inode, len) == 0)
-		len = blk_to_logical(inode, 1);
-
 	start_blk = logical_to_blk(inode, start);
 	last_blk = logical_to_blk(inode, start + len - 1);
 
 	do {
-		/*
-		 * we set b_size to the total size we want so it will map as
-		 * many contiguous blocks as possible at once
-		 */
 		memset(&map_bh, 0, sizeof(struct buffer_head));
-		map_bh.b_size = len;
+		/*
+		 * Some filesystems would round down b_size to align
+		 * with block size, if len isn't aligned already, the last
+		 * block may not be returned. Let's round it up first.
+		 */
+		if (last_blk > start_blk)
+			map_bh.b_size = blk_to_logical(inode,
+						last_blk - start_blk + 1);
+		else
+			map_bh.b_size = blk_to_logical(inode, 1);
 
 		ret = get_block(inode, start_blk, &map_bh, 0);
 		if (ret)
