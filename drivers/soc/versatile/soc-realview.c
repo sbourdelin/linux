@@ -109,8 +109,10 @@ static int realview_soc_probe(struct platform_device *pdev)
 
 	ret = of_property_read_string(np, "compatible",
 				      &soc_dev_attr->soc_id);
-	if (ret)
+	if (ret) {
+		kfree(soc_dev_attr);
 		return -EINVAL;
+	}
 
 	soc_dev_attr->machine = "RealView";
 	soc_dev_attr->family = "Versatile";
