@@ -13,6 +13,7 @@
 #include <linux/blkdev.h>
 #include <linux/gfs2_ondisk.h>
 #include <linux/crc32.h>
+#include <linux/iomap.h>
 
 #include "gfs2.h"
 #include "incore.h"
@@ -584,6 +585,165 @@ static int gfs2_bmap_alloc(struct inode *inode, const sector_t lblock,
 	bh_map->b_size = dblks << inode->i_blkbits;
 	set_buffer_new(bh_map);
 	return 0;
+}
+
+/**
+ * hole_size - figure out the size of a hole
+ * @ip: The inode
+ * @lblock: The logical starting block number
+ * @mp: The metapath
+ *
+ * Returns: The hole size in bytes
+ *
+ */
+static u64 hole_size(struct inode *inode, sector_t lblock, struct metapath *mp)
+{
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(inode);
+	struct metapath mp_eof;
+	unsigned int end_of_metadata = ip->i_height - 1;
+	u64 factor = 1;
+	int hgt = end_of_metadata;
+	u64 holesz = 0, holestep;
+	const __be64 *first, *end, *ptr;
+	const struct buffer_head *bh;
+	u64 isize = i_size_read(inode);
+	int zeroptrs;
+	bool done = false;
+
+	/* Get another metapath, to the very last byte */
+	find_metapath(sdp, (isize - 1) >> inode->i_blkbits, &mp_eof,
+		      ip->i_height);
+	for (hgt = end_of_metadata; hgt >= 0 && !done; hgt--) {
+		bh = mp->mp_bh[hgt];
+		if (bh) {
+			zeroptrs = 0;
+			first = metapointer(hgt, mp);
+			end = (const __be64 *)(bh->b_data + bh->b_size);
+
+			for (ptr = first; ptr < end; ptr++) {
+				if (*ptr) {
+					done = true;
+					break;
+				} else {
+					zeroptrs++;
+				}
+			}
+		} else {
+			zeroptrs = sdp->sd_inptrs;
+		}
+		holestep = min(factor * zeroptrs,
+			       isize - (lblock + (zeroptrs * holesz)));
+		holesz += holestep;
+		if (lblock + holesz >= isize)
+			return holesz << inode->i_blkbits;
+
+		factor *= sdp->sd_inptrs;
+		if (hgt && (mp->mp_list[hgt - 1] < mp_eof.mp_list[hgt - 1]))
+			(mp->mp_list[hgt - 1])++;
+	}
+	return holesz << inode->i_blkbits;
+}
+
+/**
+ * __gfs2_io_map - Map blocks from an inode to disk blocks
+ * @mapping: The address space
+ * @pos: Starting position in bytes
+ * @length: Length to map, in bytes
+ * @iomap: The iomap structure
+ * @cmd: The iomap command
+ *
+ * Returns: errno
+ */
+
+int gfs2_iomap(struct address_space *mapping, loff_t pos, ssize_t length,
+	       struct iomap *iomap, int cmd)
+{
+	struct inode *inode = mapping->host;
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(&ip->i_inode);
+	unsigned int bsize = sdp->sd_sb.sb_bsize;
+	const u64 *arr = sdp->sd_heightsize;
+	__be64 *ptr;
+	sector_t lblock = pos >> sdp->sd_sb.sb_bsize_shift;
+	u64 size;
+	struct metapath mp;
+	int ret, eob;
+	unsigned int len;
+	struct buffer_head *bh;
+	u8 height;
+	loff_t isize = i_size_read(inode);
+
+	if (length == 0)
+		return -EINVAL;
+
+	iomap->offset = pos;
+	iomap->blkno = 0;
+	iomap->type = IOMAP_HOLE;
+	iomap->length = length;
+
+	if (pos >= isize)
+		return 0;
+
+	memset(mp.mp_bh, 0, sizeof(mp.mp_bh));
+	bmap_lock(ip, (cmd == IOMAP_RESERVE));
+	if (gfs2_is_dir(ip)) {
+		bsize = sdp->sd_jbsize;
+		arr = sdp->sd_jheightsize;
+	}
+
+	ret = gfs2_meta_inode_buffer(ip, &mp.mp_bh[0]);
+	if (ret)
+		goto out_release;
+
+	height = ip->i_height;
+	size = (lblock + 1) * bsize;
+	while (size > arr[height])
+		height++;
+	find_metapath(sdp, lblock, &mp, height);
+	ret = 1;
+	if (height > ip->i_height || gfs2_is_stuffed(ip))
+		goto do_alloc;
+	ret = lookup_metapath(ip, &mp);
+	if (ret < 0)
+		goto out_release;
+
+	if (ret != ip->i_height) {
+		if (cmd == IOMAP_RESERVE)
+			goto do_alloc;
+		iomap->length = hole_size(inode, lblock, &mp);
+		goto out_meta_hole;
+	}
+
+	ptr = metapointer(ip->i_height - 1, &mp);
+	iomap->blkno = be64_to_cpu(*ptr);
+	if (*ptr) {
+		iomap->type = IOMAP_MAPPED;
+	} else {
+		if (cmd == IOMAP_RESERVE)
+			goto do_alloc;
+		iomap->type = IOMAP_HOLE;
+	}
+	bh = mp.mp_bh[ip->i_height - 1];
+	len = gfs2_extent_length(bh->b_data, bh->b_size, ptr,
+				 length >> inode->i_blkbits, &eob);
+	iomap->length = len << sdp->sd_sb.sb_bsize_shift;
+	/* If we go past eof, round up to the nearest block */
+	if (iomap->offset + iomap->length >= isize)
+		iomap->length = (((isize - iomap->offset) + (bsize - 1)) &
+				 ~(bsize - 1));
+
+out_meta_hole:
+	ret = 0;
+out_release:
+	release_metapath(&mp);
+	bmap_unlock(ip, (cmd == IOMAP_RESERVE));
+	return ret;
+
+do_alloc:
+	/* Todo: Code an allocation path */
+	ret = -EINVAL;
+	goto out_release;
 }
 
 /**
