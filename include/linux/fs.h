@@ -2804,6 +2804,12 @@ extern int vfs_lstat(const char __user *, struct kstat *);
 extern int vfs_fstat(unsigned int, struct kstat *);
 extern int vfs_fstatat(int , const char __user *, struct kstat *, int);
 
+extern int __generic_iomap_fiemap(struct inode *inode,
+				  struct fiemap_extent_info *fieinfo,
+				  loff_t start, loff_t len);
+extern int generic_iomap_fiemap(struct inode *inode,
+				struct fiemap_extent_info *fieinfo, u64 start,
+				u64 len);
 extern int __generic_block_fiemap(struct inode *inode,
 				  struct fiemap_extent_info *fieinfo,
 				  loff_t start, loff_t len,

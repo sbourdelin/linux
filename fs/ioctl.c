@@ -15,6 +15,8 @@
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>
 #include <linux/falloc.h>
+#include <linux/iomap.h>
+
 #include "internal.h"
 
 #include <asm/ioctls.h>
@@ -249,6 +251,101 @@ static inline loff_t blk_to_logical(struct inode *inode, sector_t blk)
 {
 	return (blk << inode->i_blkbits);
 }
+
+/**
+ * __generic_iomap_fiemap - FIEMAP for iomap based inodes (no locking)
+ * @inode: the inode to map
+ * @fieinfo: the fiemap info struct that will be passed back to userspace
+ * @start: where to start mapping in the inode
+ * @len: how much space to map
+ *
+ * This does FIEMAP for iomap based inodes.  Basically it will just loop
+ * through iomap until we hit the number of extents we want to map, or we
+ * go past the end of the file and hit a hole.
+ *
+ * If it is possible to have data blocks beyond a hole past @inode->i_size, then
+ * please do not use this function, it will stop at the first unmapped block
+ * beyond i_size.
+ *
+ * If you use this function directly, you need to do your own locking. Use
+ * generic_iomap_fiemap if you want the locking done for you.
+ */
+
+int __generic_iomap_fiemap(struct inode *inode,
+			   struct fiemap_extent_info *fieinfo, loff_t start,
+			   loff_t len)
+{
+	struct iomap iom, prev_iom;
+	loff_t isize = i_size_read(inode);
+	int ret = 0;
+
+	ret = fiemap_check_flags(fieinfo, FIEMAP_FLAG_SYNC);
+	memset(&prev_iom, 0, sizeof(prev_iom));
+	if (len >= isize)
+		len = isize;
+
+	while ((ret == 0) && (start < isize) && len) {
+		memset(&iom, 0, sizeof(iom));
+		ret = inode->i_mapping->a_ops->iomap(inode->i_mapping, start,
+						     len, &iom, IOMAP_READ);
+		if (ret)
+			break;
+
+		if (!iomap_needs_allocation(&iom)) {
+			if (prev_iom.blkno)
+				ret = fiemap_fill_next_extent(fieinfo,
+							      prev_iom.offset,
+							      blk_to_logical(inode,
+							      prev_iom.blkno),
+							      prev_iom.length,
+							      FIEMAP_EXTENT_MERGED);
+			prev_iom = iom;
+		}
+		start += iom.length;
+		if (len < iom.length)
+			break;
+		len -= iom.length;
+		cond_resched();
+	}
+
+	if (prev_iom.blkno)
+		ret = fiemap_fill_next_extent(fieinfo, prev_iom.offset,
+					      blk_to_logical(inode,
+							     prev_iom.blkno),
+					      prev_iom.length,
+					      FIEMAP_EXTENT_MERGED |
+					      FIEMAP_EXTENT_LAST);
+	/* If ret is 1 then we just hit the end of the extent array */
+	if (ret == 1)
+		ret = 0;
+
+	return ret;
+}
+EXPORT_SYMBOL(__generic_iomap_fiemap);
+
+/**
+ * generic_iomap_fiemap - FIEMAP for block based inodes
+ * @inode: The inode to map
+ * @fieinfo: The mapping information
+ * @start: The initial block to map
+ * @len: The length of the extect to attempt to map
+ * @get_block: The block mapping function for the fs
+ *
+ * Calls __generic_block_fiemap to map the inode, after taking
+ * the inode's mutex lock.
+ */
+
+int generic_iomap_fiemap(struct inode *inode,
+			 struct fiemap_extent_info *fieinfo, u64 start,
+			 u64 len)
+{
+	int ret;
+	mutex_lock(&inode->i_mutex);
+	ret = __generic_iomap_fiemap(inode, fieinfo, start, len);
+	mutex_unlock(&inode->i_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(generic_iomap_fiemap);
 
 /**
  * __generic_block_fiemap - FIEMAP for block based inodes (no locking)
