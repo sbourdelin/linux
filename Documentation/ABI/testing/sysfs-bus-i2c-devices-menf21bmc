@@ -1,0 +1,14 @@
+What:		/sys/bus/i2c/devices/.../mode
+Date:		December 2015
+KernelVersion:	4.4
+Contact:	Andreas Werner <andreas.werner@men.de>
+Description:	Set and get the mode of the device.
+		The production mode cannot be set again if the device
+		is set to active once.
+
+		In production mode the BMC does not wait for BIOS life sign,
+		did not reset the CPU board on Watchdog timeout and allow the
+		programming of the HW Variant.
+
+		0 = production mode
+		1 = active mode
