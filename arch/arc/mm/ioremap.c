@@ -13,6 +13,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/cache.h>
+#include <linux/sizes.h>
 
 void __iomem *ioremap(unsigned long paddr, unsigned long size)
 {
@@ -80,7 +81,6 @@ void __iomem *ioremap_prot(phys_addr_t paddr, unsigned long size,
 }
 EXPORT_SYMBOL(ioremap_prot);
 
-
 void iounmap(const void __iomem *addr)
 {
 	if (addr >= (void __force __iomem *)ARC_UNCACHED_ADDR_SPACE)
@@ -89,3 +89,11 @@ void iounmap(const void __iomem *addr)
 	vfree((void *)(PAGE_MASK & (unsigned long __force)addr));
 }
 EXPORT_SYMBOL(iounmap);
+
+#ifdef CONFIG_PCI
+int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+{
+	return ioremap_nocache(phys_addr + offset,  SZ_64K);
+}
+EXPORT_SYMBOL_GPL(pci_ioremap_io);
+#endif
