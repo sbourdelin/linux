@@ -3032,8 +3032,9 @@ static int submit_bh_wbc(int rw, struct buffer_head *bh,
 		rw |= REQ_META;
 	if (buffer_prio(bh))
 		rw |= REQ_PRIO;
+	bio->bi_rw = rw;
 
-	submit_bio(rw, bio);
+	submit_bio(bio);
 	return 0;
 }
 
