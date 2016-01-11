@@ -3601,7 +3601,7 @@ static int be_open(struct net_device *netdev)
 	netif_tx_start_all_queues(netdev);
 #ifdef CONFIG_BE2NET_VXLAN
 	if (skyhawk_chip(adapter))
-		vxlan_get_rx_port(netdev);
+		netdev_refresh_offloads(netdev);
 #endif
 
 	return 0;

@@ -10286,7 +10286,7 @@ sp_rtnl_not_reset:
 			netdev_info(bp->dev,
 				    "Deleted vxlan dest port %d", port);
 			bp->vxlan_dst_port = 0;
-			vxlan_get_rx_port(bp->dev);
+			netdev_refresh_offloads(bp->dev);
 		}
 	}
 #endif
@@ -12492,7 +12492,7 @@ static int bnx2x_open(struct net_device *dev)
 
 #ifdef CONFIG_BNX2X_VXLAN
 	if (IS_PF(bp))
-		vxlan_get_rx_port(dev);
+		netdev_refresh_offloads(dev);
 #endif
 
 	return 0;

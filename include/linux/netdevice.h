@@ -2226,6 +2226,10 @@ netdev_notifier_info_to_dev(const struct netdev_notifier_info *info)
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev);
 
+static inline void netdev_refresh_offloads(struct net_device *netdev)
+{
+	call_netdevice_notifiers(NETDEV_REFRESH_OFFLOADS, netdev);
+}
 
 extern rwlock_t				dev_base_lock;		/* Device list lock */
 
