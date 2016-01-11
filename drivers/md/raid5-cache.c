@@ -540,7 +540,7 @@ int r5l_handle_flush_request(struct r5conf *conf, struct bio *bio)
 		bio_endio(bio);
 		return 0;
 	}
-	bio->bi_rw &= ~REQ_FLUSH;
+	bio->bi_rw &= ~REQ_PREFLUSH;
 	return -EAGAIN;
 }
 
