@@ -31,7 +31,25 @@
 #include <linux/tick.h>
 #include <trace/events/power.h>
 
+/**
+ * Iterate over governors
+ *
+ * cpufreq_governor_list is protected by cpufreq_governor_mutex.
+ */
+static LIST_HEAD(cpufreq_governor_list);
+static DEFINE_MUTEX(cpufreq_governor_mutex);
+#define for_each_governor(__governor)				\
+	list_for_each_entry(__governor, &cpufreq_governor_list, governor_list)
+
+/**
+ * The "cpufreq driver" - the arch- or hardware-dependent low
+ * level driver of CPUFreq support, and its spinlock (cpufreq_driver_lock).
+ * This lock also protects cpufreq_cpu_data array and cpufreq_policy_list.
+ */
+static struct cpufreq_driver *cpufreq_driver;
+static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 static LIST_HEAD(cpufreq_policy_list);
+static DEFINE_RWLOCK(cpufreq_driver_lock);
 
 static inline bool policy_is_inactive(struct cpufreq_policy *policy)
 {
@@ -85,21 +103,6 @@ static struct cpufreq_policy *first_policy(bool active)
 	for_each_suitable_policy(__policy, true)
 #define for_each_inactive_policy(__policy)		\
 	for_each_suitable_policy(__policy, false)
-
-/* Iterate over governors */
-static LIST_HEAD(cpufreq_governor_list);
-#define for_each_governor(__governor)				\
-	list_for_each_entry(__governor, &cpufreq_governor_list, governor_list)
-
-/**
- * The "cpufreq driver" - the arch- or hardware-dependent low
- * level driver of CPUFreq support, and its spinlock. This lock
- * also protects the cpufreq_cpu_data array.
- */
-static struct cpufreq_driver *cpufreq_driver;
-static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
-static DEFINE_RWLOCK(cpufreq_driver_lock);
-static DEFINE_MUTEX(cpufreq_governor_mutex);
 
 /* Flag to suspend/resume CPUFreq governors */
 static bool cpufreq_suspended;
