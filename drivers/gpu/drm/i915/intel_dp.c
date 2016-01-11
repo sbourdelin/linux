@@ -126,6 +126,7 @@ static struct intel_dp *intel_attached_dp(struct drm_connector *connector)
 static void intel_dp_link_down(struct intel_dp *intel_dp);
 static bool edp_panel_vdd_on(struct intel_dp *intel_dp);
 static void edp_panel_vdd_off(struct intel_dp *intel_dp, bool sync);
+static void edp_panel_off(struct intel_dp *intel_dp);
 static void vlv_init_panel_power_sequencer(struct intel_dp *intel_dp);
 static void vlv_steal_power_sequencer(struct drm_device *dev,
 				      enum pipe pipe);
@@ -595,6 +596,10 @@ static int edp_notify_handler(struct notifier_block *this, unsigned long code,
 		I915_WRITE(pp_div_reg, pp_div | 0x1F);
 		I915_WRITE(pp_ctrl_reg, PANEL_UNLOCK_REGS | PANEL_POWER_OFF);
 		msleep(intel_dp->panel_power_cycle_delay);
+	}
+	else
+	{
+		edp_panel_off(intel_dp);
 	}
 
 	pps_unlock(intel_dp);
@@ -5796,10 +5801,10 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	}
 	mutex_unlock(&dev->mode_config.mutex);
 
-	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev)) {
-		intel_dp->edp_notifier.notifier_call = edp_notify_handler;
-		register_reboot_notifier(&intel_dp->edp_notifier);
+	intel_dp->edp_notifier.notifier_call = edp_notify_handler;
+	register_reboot_notifier(&intel_dp->edp_notifier);
 
+	if (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev)) {
 		/*
 		 * Figure out the current pipe for the initial backlight setup.
 		 * If the current pipe isn't valid, try the PPS pipe, and if that
