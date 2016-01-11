@@ -12,3 +12,29 @@ Description:	Set and get the mode of the device.
 
 		0 = production mode
 		1 = active mode
+
+What:		/sys/bus/i2c/devices/.../hw_variant
+Date:		December 2015
+KernelVersion:	4.4
+Contact:	Andreas Werner <andreas.werner@men.de>
+Description:	Set and get the hardware variant ID.
+
+What:		/sys/bus/i2c/devices/.../pwrcycl_cnt
+Date:		December 2015
+KernelVersion:	4.4
+Contact:	Andreas Werner <andreas.werner@men.de>
+Description:	Read the BMC powercycle counter.
+
+What:		/sys/bus/i2c/devices/.../op_hrs_cnt
+Date:		December 2015
+KernelVersion:	4.4
+Contact:	Andreas Werner <andreas.werner@men.de>
+Description:	Read the operation hours counter
+
+What:		/sys/bus/i2c/devices/.../slot_address
+Date:		December 2015
+KernelVersion:	4.4
+Contact:	Andreas Werner <andreas.werner@men.de>
+Description:	Read the slot address of the board.
+		Slot address is the geographical address
+		in a CPCI rack/backplane.
