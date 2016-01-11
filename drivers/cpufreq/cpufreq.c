@@ -1950,6 +1950,9 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 	/* Don't start any governor operations if we are entering suspend */
 	if (cpufreq_suspended)
 		return 0;
+
+	lockdep_assert_held(&policy->rwsem);
+
 	/*
 	 * Governor might not be initiated here if ACPI _PPC changed
 	 * notification happened, so check it.
