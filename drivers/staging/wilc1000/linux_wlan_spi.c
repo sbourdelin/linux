@@ -4,8 +4,6 @@
 #include "linux_wlan_common.h"
 #include "linux_wlan_spi.h"
 
-#define USE_SPI_DMA     0       /* johnny add */
-
 #ifdef WILC_ASIC_A0
  #if defined(PLAT_PANDA_ES_OMAP4460)
   #define MIN_SPEED 12000000
@@ -109,7 +107,6 @@ static void linux_spi_msg_init(struct spi_message *msg, struct spi_transfer *tr,
 	memset(tr, 0, sizeof(*tr));
 
 	msg->spi = wilc_spi_dev;
-	msg->is_dma_mapped = USE_SPI_DMA;
 
 	tr->tx_buf = tx;
 	tr->rx_buf = rx;
