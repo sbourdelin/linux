@@ -28,6 +28,7 @@ struct machine {
 	pid_t		  pid;
 	u16		  id_hdr_size;
 	bool		  comm_exec;
+	bool		  allocated;
 	char		  *root_dir;
 	struct rb_root	  threads;
 	pthread_rwlock_t  threads_lock;
@@ -131,7 +132,7 @@ void machines__set_symbol_filter(struct machines *machines,
 void machines__set_comm_exec(struct machines *machines, bool comm_exec);
 
 struct machine *machine__new_host(void);
-int machine__init(struct machine *machine, const char *root_dir, pid_t pid);
+int machine__init(struct machine *machine, const char *root_dir, pid_t pid, bool allocated);
 void machine__exit(struct machine *machine);
 void machine__delete_threads(struct machine *machine);
 void machine__delete(struct machine *machine);

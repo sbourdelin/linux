@@ -1,3 +1,4 @@
+#include <asm/bug.h>
 #include "callchain.h"
 #include "debug.h"
 #include "event.h"
@@ -23,7 +24,7 @@ static void dsos__init(struct dsos *dsos)
 	pthread_rwlock_init(&dsos->lock, NULL);
 }
 
-int machine__init(struct machine *machine, const char *root_dir, pid_t pid)
+int machine__init(struct machine *machine, const char *root_dir, pid_t pid, bool allocated)
 {
 	memset(machine, 0, sizeof(*machine));
 	map_groups__init(&machine->kmaps, machine);
@@ -65,6 +66,7 @@ int machine__init(struct machine *machine, const char *root_dir, pid_t pid)
 	}
 
 	machine->current_tid = NULL;
+	machine->allocated = allocated;
 
 	return 0;
 }
@@ -74,7 +76,7 @@ struct machine *machine__new_host(void)
 	struct machine *machine = malloc(sizeof(*machine));
 
 	if (machine != NULL) {
-		machine__init(machine, "", HOST_KERNEL_ID);
+		machine__init(machine, "", HOST_KERNEL_ID, true);
 
 		if (machine__create_kernel_maps(machine) < 0)
 			goto out_delete;
@@ -137,12 +139,13 @@ void machine__exit(struct machine *machine)
 void machine__delete(struct machine *machine)
 {
 	machine__exit(machine);
-	free(machine);
+	WARN_ONCE((machine->allocated ? free(machine), 0 : -1),
+		  "WARNING: deleting a non-allocated machine. Skip.\n");
 }
 
 void machines__init(struct machines *machines)
 {
-	machine__init(&machines->host, "", HOST_KERNEL_ID);
+	machine__init(&machines->host, "", HOST_KERNEL_ID, false);
 	machines->guests = RB_ROOT;
 	machines->symbol_filter = NULL;
 }
@@ -163,7 +166,7 @@ struct machine *machines__add(struct machines *machines, pid_t pid,
 	if (machine == NULL)
 		return NULL;
 
-	if (machine__init(machine, root_dir, pid) != 0) {
+	if (machine__init(machine, root_dir, pid, true) != 0) {
 		free(machine);
 		return NULL;
 	}

@@ -35,8 +35,8 @@ int test__vmlinux_matches_kallsyms(int subtest __maybe_unused)
 	 * Init the machines that will hold kernel, modules obtained from
 	 * both vmlinux + .ko files and from /proc/kallsyms split by modules.
 	 */
-	machine__init(&kallsyms, "", HOST_KERNEL_ID);
-	machine__init(&vmlinux, "", HOST_KERNEL_ID);
+	machine__init(&kallsyms, "", HOST_KERNEL_ID, false);
+	machine__init(&vmlinux, "", HOST_KERNEL_ID, false);
 
 	/*
 	 * Step 2:
