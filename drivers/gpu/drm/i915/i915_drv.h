@@ -889,6 +889,8 @@ struct intel_context {
 		struct drm_i915_gem_object *state;
 		struct intel_ringbuffer *ringbuf;
 		int pin_count;
+		u32 lrc_offset;
+		u64 lrc_desc;
 	} engine[I915_NUM_RINGS];
 
 	struct list_head link;

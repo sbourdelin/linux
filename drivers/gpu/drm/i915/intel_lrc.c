@@ -265,7 +265,8 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
 
 /**
  * intel_execlists_ctx_id() - get the Execlists Context ID
- * @ctx_obj: Logical Ring Context backing object.
+ * @ctx: Context to get the ID for
+ * @ring: Engine to get the ID for
  *
  * Do not confuse with ctx->id! Unfortunately we have a name overload
  * here: the old context ID we pass to userspace as a handler so that
@@ -275,14 +276,12 @@ int intel_sanitize_enable_execlists(struct drm_device *dev, int enable_execlists
  *
  * Return: 20-bits globally unique context ID.
  */
-u32 intel_execlists_ctx_id(struct drm_i915_gem_object *ctx_obj)
+u32 intel_execlists_ctx_id(struct intel_context *ctx,
+			   struct intel_engine_cs *ring)
 {
-	u32 lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
-			LRC_PPHWSP_PN * PAGE_SIZE;
-
 	/* LRCA is required to be 4K aligned so the more significant 20 bits
 	 * are globally unique */
-	return lrca >> 12;
+	return ctx->engine[ring->id].lrc_offset >> 12;
 }
 
 static bool disable_lite_restore_wa(struct intel_engine_cs *ring)
@@ -297,31 +296,7 @@ static bool disable_lite_restore_wa(struct intel_engine_cs *ring)
 uint64_t intel_lr_context_descriptor(struct intel_context *ctx,
 				     struct intel_engine_cs *ring)
 {
-	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
-	uint64_t desc;
-	uint64_t lrca = i915_gem_obj_ggtt_offset(ctx_obj) +
-			LRC_PPHWSP_PN * PAGE_SIZE;
-
-	WARN_ON(lrca & 0xFFFFFFFF00000FFFULL);
-
-	desc = GEN8_CTX_VALID;
-	desc |= GEN8_CTX_ADDRESSING_MODE(dev) << GEN8_CTX_ADDRESSING_MODE_SHIFT;
-	if (IS_GEN8(ctx_obj->base.dev))
-		desc |= GEN8_CTX_L3LLC_COHERENT;
-	desc |= GEN8_CTX_PRIVILEGE;
-	desc |= lrca;
-	desc |= (u64)intel_execlists_ctx_id(ctx_obj) << GEN8_CTX_ID_SHIFT;
-
-	/* TODO: WaDisableLiteRestore when we start using semaphore
-	 * signalling between Command Streamers */
-	/* desc |= GEN8_CTX_FORCE_RESTORE; */
-
-	/* WaEnableForceRestoreInCtxtDescForVCS:skl */
-	/* WaEnableForceRestoreInCtxtDescForVCS:bxt */
-	if (disable_lite_restore_wa(ring))
-		desc |= GEN8_CTX_FORCE_RESTORE;
-
-	return desc;
+	return ctx->engine[ring->id].lrc_desc;
 }
 
 static void execlists_elsp_write(struct drm_i915_gem_request *rq0,
@@ -369,8 +344,6 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 	uint32_t *reg_state;
 
 	BUG_ON(!ctx_obj);
-	WARN_ON(!i915_gem_obj_is_pinned(ctx_obj));
-	WARN_ON(!i915_gem_obj_is_pinned(rb_obj));
 
 	page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
 	reg_state = kmap_atomic(page);
@@ -477,9 +450,7 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
 					    execlist_link);
 
 	if (head_req != NULL) {
-		struct drm_i915_gem_object *ctx_obj =
-				head_req->ctx->engine[ring->id].state;
-		if (intel_execlists_ctx_id(ctx_obj) == request_id) {
+		if (intel_execlists_ctx_id(head_req->ctx, ring) == request_id) {
 			WARN(head_req->elsp_submitted == 0,
 			     "Never submitted head request\n");
 
@@ -543,7 +514,7 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 		}
 	}
 
-	if (disable_lite_restore_wa(ring)) {
+	if (ring->disable_lite_restore_wa) {
 		/* Prevent a ctx to preempt itself */
 		if ((status & GEN8_CTX_STATUS_ACTIVE_IDLE) &&
 		    (submit_contexts != 0))
@@ -1010,14 +981,16 @@ int logical_ring_flush_all_caches(struct drm_i915_gem_request *req)
 }
 
 static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
-		struct drm_i915_gem_object *ctx_obj,
-		struct intel_ringbuffer *ringbuf)
+				   struct intel_context *ctx)
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	int ret = 0;
+	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
+	struct intel_ringbuffer *ringbuf = ctx->engine[ring->id].ringbuf;
+	int ret;
 
 	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+
 	ret = i915_gem_obj_ggtt_pin(ctx_obj, GEN8_LR_CONTEXT_ALIGN,
 			PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
 	if (ret)
@@ -1027,6 +1000,11 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	if (ret)
 		goto unpin_ctx_obj;
 
+	ctx->engine[ring->id].lrc_offset = i915_gem_obj_ggtt_offset(ctx_obj) +
+					   LRC_PPHWSP_PN * PAGE_SIZE;
+	ctx->engine[ring->id].lrc_desc = ring->ctx_desc_template |
+					 ctx->engine[ring->id].lrc_offset |
+					 ((u64)intel_execlists_ctx_id(ctx, ring) << GEN8_CTX_ID_SHIFT);
 	ctx_obj->dirty = true;
 
 	/* Invalidate GuC TLB. */
@@ -1045,11 +1023,9 @@ static int intel_lr_context_pin(struct drm_i915_gem_request *rq)
 {
 	int ret = 0;
 	struct intel_engine_cs *ring = rq->ring;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct intel_ringbuffer *ringbuf = rq->ringbuf;
 
 	if (rq->ctx->engine[ring->id].pin_count++ == 0) {
-		ret = intel_lr_context_do_pin(ring, ctx_obj, ringbuf);
+		ret = intel_lr_context_do_pin(ring, rq->ctx);
 		if (ret)
 			goto reset_pin_count;
 	}
@@ -1071,6 +1047,8 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 		if (--rq->ctx->engine[ring->id].pin_count == 0) {
 			intel_unpin_ringbuffer_obj(ringbuf);
 			i915_gem_object_ggtt_unpin(ctx_obj);
+			rq->ctx->engine[ring->id].lrc_offset = 0;
+			rq->ctx->engine[ring->id].lrc_desc = 0;
 		}
 	}
 }
@@ -1907,6 +1885,9 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 		ring->status_page.obj = NULL;
 	}
 
+	ring->disable_lite_restore_wa = false;
+	ring->ctx_desc_template = 0;
+
 	lrc_destroy_wa_ctx_obj(ring);
 	ring->dev = NULL;
 }
@@ -1929,6 +1910,24 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 	INIT_LIST_HEAD(&ring->execlist_retired_req_list);
 	spin_lock_init(&ring->execlist_lock);
 
+	ring->disable_lite_restore_wa = disable_lite_restore_wa(ring);
+
+	ring->ctx_desc_template = GEN8_CTX_VALID;
+	ring->ctx_desc_template |= GEN8_CTX_ADDRESSING_MODE(dev) <<
+				   GEN8_CTX_ADDRESSING_MODE_SHIFT;
+	if (IS_GEN8(dev))
+		ring->ctx_desc_template |= GEN8_CTX_L3LLC_COHERENT;
+	ring->ctx_desc_template |= GEN8_CTX_PRIVILEGE;
+
+	/* TODO: WaDisableLiteRestore when we start using semaphore
+	 * signalling between Command Streamers */
+	/* ring->ctx_desc_template |= GEN8_CTX_FORCE_RESTORE; */
+
+	/* WaEnableForceRestoreInCtxtDescForVCS:skl */
+	/* WaEnableForceRestoreInCtxtDescForVCS:bxt */
+	if (ring->disable_lite_restore_wa)
+		ring->ctx_desc_template |= GEN8_CTX_FORCE_RESTORE;
+
 	ret = i915_cmd_parser_init_ring(ring);
 	if (ret)
 		goto error;
@@ -1938,10 +1937,7 @@ static int logical_ring_init(struct drm_device *dev, struct intel_engine_cs *rin
 		goto error;
 
 	/* As this is the default context, always pin it */
-	ret = intel_lr_context_do_pin(
-			ring,
-			ring->default_context->engine[ring->id].state,
-			ring->default_context->engine[ring->id].ringbuf);
+	ret = intel_lr_context_do_pin(ring, ring->default_context);
 	if (ret) {
 		DRM_ERROR(
 			"Failed to pin and map ringbuffer %s: %d\n",
