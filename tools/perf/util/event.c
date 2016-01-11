@@ -413,7 +413,7 @@ int perf_event__synthesize_modules(struct perf_tool *tool,
 }
 
 static int __event__synthesize_thread(union perf_event *comm_event,
-				      union perf_event *mmap_event,
+				      union perf_event *mmap2_event,
 				      union perf_event *fork_event,
 				      pid_t pid, int full,
 					  perf_event__handler_t process,
@@ -436,7 +436,7 @@ static int __event__synthesize_thread(union perf_event *comm_event,
 		if (tgid == -1)
 			return -1;
 
-		return perf_event__synthesize_mmap_events(tool, mmap_event, pid, tgid,
+		return perf_event__synthesize_mmap_events(tool, mmap2_event, pid, tgid,
 							  process, machine, mmap_data,
 							  proc_map_timeout);
 	}
@@ -478,7 +478,7 @@ static int __event__synthesize_thread(union perf_event *comm_event,
 		rc = 0;
 		if (_pid == pid) {
 			/* process the parent's maps too */
-			rc = perf_event__synthesize_mmap_events(tool, mmap_event, pid, tgid,
+			rc = perf_event__synthesize_mmap_events(tool, mmap2_event, pid, tgid,
 						process, machine, mmap_data, proc_map_timeout);
 			if (rc)
 				break;
@@ -496,15 +496,15 @@ int perf_event__synthesize_thread_map(struct perf_tool *tool,
 				      bool mmap_data,
 				      unsigned int proc_map_timeout)
 {
-	union perf_event *comm_event, *mmap_event, *fork_event;
+	union perf_event *comm_event, *mmap2_event, *fork_event;
 	int err = -1, thread, j;
 
 	comm_event = malloc(sizeof(comm_event->comm) + machine->id_hdr_size);
 	if (comm_event == NULL)
 		goto out;
 
-	mmap_event = malloc(sizeof(mmap_event->mmap) + machine->id_hdr_size);
-	if (mmap_event == NULL)
+	mmap2_event = malloc(sizeof(mmap2_event->mmap2) + machine->id_hdr_size);
+	if (mmap2_event == NULL)
 		goto out_free_comm;
 
 	fork_event = malloc(sizeof(fork_event->fork) + machine->id_hdr_size);
@@ -513,7 +513,7 @@ int perf_event__synthesize_thread_map(struct perf_tool *tool,
 
 	err = 0;
 	for (thread = 0; thread < threads->nr; ++thread) {
-		if (__event__synthesize_thread(comm_event, mmap_event,
+		if (__event__synthesize_thread(comm_event, mmap2_event,
 					       fork_event,
 					       thread_map__pid(threads, thread), 0,
 					       process, tool, machine,
@@ -539,7 +539,7 @@ int perf_event__synthesize_thread_map(struct perf_tool *tool,
 
 			/* if not, generate events for it */
 			if (need_leader &&
-			    __event__synthesize_thread(comm_event, mmap_event,
+			    __event__synthesize_thread(comm_event, mmap2_event,
 						       fork_event,
 						       comm_event->comm.pid, 0,
 						       process, tool, machine,
@@ -551,7 +551,7 @@ int perf_event__synthesize_thread_map(struct perf_tool *tool,
 	}
 	free(fork_event);
 out_free_mmap:
-	free(mmap_event);
+	free(mmap2_event);
 out_free_comm:
 	free(comm_event);
 out:
@@ -567,7 +567,7 @@ int perf_event__synthesize_threads(struct perf_tool *tool,
 	DIR *proc;
 	char proc_path[PATH_MAX];
 	struct dirent dirent, *next;
-	union perf_event *comm_event, *mmap_event, *fork_event;
+	union perf_event *comm_event, *mmap2_event, *fork_event;
 	int err = -1;
 
 	if (machine__is_default_guest(machine))
@@ -577,8 +577,8 @@ int perf_event__synthesize_threads(struct perf_tool *tool,
 	if (comm_event == NULL)
 		goto out;
 
-	mmap_event = malloc(sizeof(mmap_event->mmap) + machine->id_hdr_size);
-	if (mmap_event == NULL)
+	mmap2_event = malloc(sizeof(mmap2_event->mmap2) + machine->id_hdr_size);
+	if (mmap2_event == NULL)
 		goto out_free_comm;
 
 	fork_event = malloc(sizeof(fork_event->fork) + machine->id_hdr_size);
@@ -601,7 +601,7 @@ int perf_event__synthesize_threads(struct perf_tool *tool,
  		 * We may race with exiting thread, so don't stop just because
  		 * one thread couldn't be synthesized.
  		 */
-		__event__synthesize_thread(comm_event, mmap_event, fork_event, pid,
+		__event__synthesize_thread(comm_event, mmap2_event, fork_event, pid,
 					   1, process, tool, machine, mmap_data,
 					   proc_map_timeout);
 	}
@@ -611,7 +611,7 @@ int perf_event__synthesize_threads(struct perf_tool *tool,
 out_free_fork:
 	free(fork_event);
 out_free_mmap:
-	free(mmap_event);
+	free(mmap2_event);
 out_free_comm:
 	free(comm_event);
 out:
