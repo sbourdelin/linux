@@ -2088,8 +2088,7 @@ static int gfs2_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		if (ret == 1)
 			ret = 0;
 	} else {
-		ret = __generic_block_fiemap(inode, fieinfo, start, len,
-					     gfs2_block_map);
+		ret = __generic_iomap_fiemap(inode, fieinfo, start, len);
 	}
 
 	gfs2_glock_dq_uninit(&gh);
