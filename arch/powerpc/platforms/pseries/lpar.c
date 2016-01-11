@@ -27,6 +27,8 @@
 #include <linux/console.h>
 #include <linux/export.h>
 #include <linux/jump_label.h>
+#include <linux/delay.h>
+#include <linux/stop_machine.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -793,4 +795,111 @@ int h_get_mpp_x(struct hvcall_mpp_x_data *mpp_x_data)
 	mpp_x_data->pool_spurr_cycles = retbuf[3];
 
 	return rc;
+}
+
+#define HPT_RESIZE_TIMEOUT	10000 /* ms */
+
+struct hpt_resize_state {
+	unsigned long shift;
+	int commit_rc;
+};
+
+static int pseries_lpar_resize_hpt_commit(void *data)
+{
+	struct hpt_resize_state *state = data;
+
+	state->commit_rc = plpar_resize_hpt_commit(0, state->shift);
+	if (state->commit_rc != H_SUCCESS)
+		return -EIO;
+
+	/* Hypervisor has transitioned the HTAB, update our globals */
+	ppc64_pft_size = state->shift;
+	htab_size_bytes = 1UL << ppc64_pft_size;
+	htab_hash_mask = (htab_size_bytes >> 7) - 1;
+
+	return 0;
+}
+
+/* Must be called in user context */
+int pseries_lpar_resize_hpt(unsigned long shift)
+{
+	struct hpt_resize_state state = {
+		.shift = shift,
+		.commit_rc = H_FUNCTION,
+	};
+	unsigned int delay, total_delay = 0;
+	int rc;
+	ktime_t t0, t1, t2;
+
+	might_sleep();
+
+	if (!firmware_has_feature(FW_FEATURE_HPT_RESIZE))
+		return -ENODEV;
+
+	printk(KERN_INFO "lpar: Attempting to resize HPT to shift %lu\n",
+	       shift);
+
+	t0 = ktime_get();
+
+	rc = plpar_resize_hpt_prepare(0, shift);
+	while (H_IS_LONG_BUSY(rc)) {
+		delay = get_longbusy_msecs(rc);
+		total_delay += delay;
+		if (total_delay > HPT_RESIZE_TIMEOUT) {
+			/* prepare call with shift==0 cancels an
+			 * in-progress resize */
+			rc = plpar_resize_hpt_prepare(0, 0);
+			if (rc != H_SUCCESS)
+				printk(KERN_WARNING
+				       "lpar: Unexpected error %d cancelling timed out HPT resize\n",
+				       rc);
+			return -ETIMEDOUT;
+		}
+		msleep(delay);
+		rc = plpar_resize_hpt_prepare(0, shift);
+	};
+
+	switch (rc) {
+	case H_SUCCESS:
+		/* Continue on */
+		break;
+
+	case H_PARAMETER:
+		return -EINVAL;
+	case H_RESOURCE:
+		return -EPERM;
+	default:
+		printk(KERN_WARNING
+		       "lpar: Unexpected error %d from H_RESIZE_HPT_PREPARE\n",
+		       rc);
+		return -EIO;
+	}
+
+	t1 = ktime_get();
+
+	rc = stop_machine(pseries_lpar_resize_hpt_commit, &state, NULL);
+
+	t2 = ktime_get();
+
+	if (rc != 0) {
+		switch (state.commit_rc) {
+		case H_PTEG_FULL:
+			printk(KERN_WARNING
+			       "lpar: Hash collision while resizing HPT\n");
+			return -ENOSPC;
+
+		default:
+			printk(KERN_WARNING
+			       "lpar: Unexpected error %d from H_RESIZE_HPT_COMMIT\n",
+			       state.commit_rc);
+			return -EIO;
+		};
+	}
+
+	printk(KERN_INFO
+	       "lpar: HPT resize to shift %lu complete (%lld ms / %lld ms)\n",
+	       shift, (long long) ktime_ms_delta(t1, t0),
+	       (long long) ktime_ms_delta(t2, t1));
+
+	return 0;
 }
