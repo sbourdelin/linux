@@ -269,8 +269,6 @@ static ssize_t show_sampling_rate_min_gov_pol				\
 	return sprintf(buf, "%u\n", dbs_data->min_sampling_rate);	\
 }
 
-extern struct mutex cpufreq_governor_lock;
-
 void gov_add_timers(struct cpufreq_policy *policy, unsigned int delay);
 void gov_cancel_work(struct cpu_common_dbs_info *shared);
 void dbs_check_cpu(struct dbs_data *dbs_data, int cpu);
