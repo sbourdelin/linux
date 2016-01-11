@@ -17,6 +17,8 @@
 #include <linux/filter.h>
 #include <linux/perf_event.h>
 
+#include "bpf_map.h"
+
 /* Called from syscall */
 static struct bpf_map *array_map_alloc(union bpf_attr *attr)
 {
@@ -115,12 +117,6 @@ static int array_map_update_elem(struct bpf_map *map, void *key, void *value,
 	return 0;
 }
 
-/* Called from syscall or from eBPF program */
-static int array_map_delete_elem(struct bpf_map *map, void *key)
-{
-	return -EINVAL;
-}
-
 /* Called when map->refcnt goes to zero, either from workqueue or from syscall */
 static void array_map_free(struct bpf_map *map)
 {
@@ -142,7 +138,7 @@ static const struct bpf_map_ops array_ops = {
 	.map_get_next_key = array_map_get_next_key,
 	.map_lookup_elem = array_map_lookup_elem,
 	.map_update_elem = array_map_update_elem,
-	.map_delete_elem = array_map_delete_elem,
+	.map_delete_elem = map_delete_elem_nop,
 };
 
 static struct bpf_map_type_list array_type __read_mostly = {
@@ -176,11 +172,6 @@ static void fd_array_map_free(struct bpf_map *map)
 	for (i = 0; i < array->map.max_entries; i++)
 		BUG_ON(array->ptrs[i] != NULL);
 	kvfree(array);
-}
-
-static void *fd_array_map_lookup_elem(struct bpf_map *map, void *key)
-{
-	return NULL;
 }
 
 /* only called from syscall */
@@ -262,7 +253,7 @@ static const struct bpf_map_ops prog_array_ops = {
 	.map_alloc = fd_array_map_alloc,
 	.map_free = fd_array_map_free,
 	.map_get_next_key = array_map_get_next_key,
-	.map_lookup_elem = fd_array_map_lookup_elem,
+	.map_lookup_elem = map_lookup_elem_nop,
 	.map_update_elem = fd_array_map_update_elem,
 	.map_delete_elem = fd_array_map_delete_elem,
 	.map_fd_get_ptr = prog_fd_array_get_ptr,
@@ -328,7 +319,7 @@ static const struct bpf_map_ops perf_event_array_ops = {
 	.map_alloc = fd_array_map_alloc,
 	.map_free = perf_event_array_map_free,
 	.map_get_next_key = array_map_get_next_key,
-	.map_lookup_elem = fd_array_map_lookup_elem,
+	.map_lookup_elem = map_lookup_elem_nop,
 	.map_update_elem = fd_array_map_update_elem,
 	.map_delete_elem = fd_array_map_delete_elem,
 	.map_fd_get_ptr = perf_event_fd_array_get_ptr,
