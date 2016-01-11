@@ -29,6 +29,7 @@
 #include <linux/jump_label.h>
 #include <linux/delay.h>
 #include <linux/stop_machine.h>
+#include <linux/debugfs.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -903,3 +904,28 @@ int pseries_lpar_resize_hpt(unsigned long shift)
 
 	return 0;
 }
+
+static int ppc64_pft_size_get(void *data, u64 *val)
+{
+	*val = ppc64_pft_size;
+	return 0;
+}
+
+static int ppc64_pft_size_set(void *data, u64 val)
+{
+	return  pseries_lpar_resize_hpt(val);
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(fops_ppc64_pft_size,
+			ppc64_pft_size_get, ppc64_pft_size_set,	"%llu\n");
+
+static int __init pseries_lpar_debugfs(void)
+{
+	if (!debugfs_create_file("pft-size", 0600, powerpc_debugfs_root,
+				 NULL, &fops_ppc64_pft_size)) {
+		pr_err("lpar: unable to create ppc64_pft_size debugsfs file\n");
+	}
+
+	return 0;
+}
+machine_device_initcall(pseries, pseries_lpar_debugfs);
