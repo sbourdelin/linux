@@ -1993,11 +1993,9 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 
 	pr_debug("%s: for CPU %u, event %u\n", __func__, policy->cpu, event);
 
-	mutex_lock(&cpufreq_governor_mutex);
 	if ((policy->governor_enabled && event == CPUFREQ_GOV_START)
 	    || (!policy->governor_enabled
 	    && (event == CPUFREQ_GOV_LIMITS || event == CPUFREQ_GOV_STOP))) {
-		mutex_unlock(&cpufreq_governor_mutex);
 		return -EBUSY;
 	}
 
@@ -2005,8 +2003,6 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 		policy->governor_enabled = false;
 	else if (event == CPUFREQ_GOV_START)
 		policy->governor_enabled = true;
-
-	mutex_unlock(&cpufreq_governor_mutex);
 
 	ret = policy->governor->governor(policy, event);
 
@@ -2017,12 +2013,10 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 			policy->governor->initialized--;
 	} else {
 		/* Restore original values */
-		mutex_lock(&cpufreq_governor_mutex);
 		if (event == CPUFREQ_GOV_STOP)
 			policy->governor_enabled = true;
 		else if (event == CPUFREQ_GOV_START)
 			policy->governor_enabled = false;
-		mutex_unlock(&cpufreq_governor_mutex);
 	}
 
 	if (((event == CPUFREQ_GOV_POLICY_INIT) && ret) ||
