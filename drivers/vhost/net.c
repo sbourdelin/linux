@@ -917,6 +917,12 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 
 		vhost_net_disable_vq(n, vq);
 		vq->private_data = sock;
+
+		if (sock)
+			vhost_set_is_le(vq);
+		else
+			vq->is_le = virtio_legacy_is_little_endian();
+
 		r = vhost_init_used(vq);
 		if (r)
 			goto err_used;
