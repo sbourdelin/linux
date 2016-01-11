@@ -506,6 +506,7 @@ static struct cpufreq_governor *find_governor(const char *str_governor)
 {
 	struct cpufreq_governor *t;
 
+	lockdep_assert_held(&cpufreq_governor_mutex);
 	for_each_governor(t)
 		if (!strncasecmp(str_governor, t->name, CPUFREQ_NAME_LEN))
 			return t;
@@ -693,6 +694,7 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy *policy,
 		goto out;
 	}
 
+	lockdep_assert_held(&cpufreq_governor_mutex);
 	for_each_governor(t) {
 		if (i >= (ssize_t) ((PAGE_SIZE / sizeof(char))
 		    - (CPUFREQ_NAME_LEN + 2)))
@@ -2025,6 +2027,7 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 	err = -EBUSY;
 	if (!find_governor(governor->name)) {
 		err = 0;
+		lockdep_assert_held(&cpufreq_governor_mutex);
 		list_add(&governor->governor_list, &cpufreq_governor_list);
 	}
 
