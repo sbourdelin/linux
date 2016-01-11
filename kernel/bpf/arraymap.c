@@ -139,6 +139,8 @@ static const struct bpf_map_ops array_ops = {
 	.map_lookup_elem = array_map_lookup_elem,
 	.map_update_elem = array_map_update_elem,
 	.map_delete_elem = map_delete_elem_nop,
+	.map_lookup_elem_percpu = map_lookup_elem_percpu_nop,
+	.map_update_elem_percpu = map_update_elem_percpu_nop,
 };
 
 static struct bpf_map_type_list array_type __read_mostly = {
@@ -258,6 +260,8 @@ static const struct bpf_map_ops prog_array_ops = {
 	.map_delete_elem = fd_array_map_delete_elem,
 	.map_fd_get_ptr = prog_fd_array_get_ptr,
 	.map_fd_put_ptr = prog_fd_array_put_ptr,
+	.map_lookup_elem_percpu = map_lookup_elem_percpu_nop,
+	.map_update_elem_percpu = map_update_elem_percpu_nop,
 };
 
 static struct bpf_map_type_list prog_array_type __read_mostly = {
@@ -324,6 +328,8 @@ static const struct bpf_map_ops perf_event_array_ops = {
 	.map_delete_elem = fd_array_map_delete_elem,
 	.map_fd_get_ptr = perf_event_fd_array_get_ptr,
 	.map_fd_put_ptr = perf_event_fd_array_put_ptr,
+	.map_lookup_elem_percpu = map_lookup_elem_percpu_nop,
+	.map_update_elem_percpu = map_update_elem_percpu_nop,
 };
 
 static struct bpf_map_type_list perf_event_array_type __read_mostly = {

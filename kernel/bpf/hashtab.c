@@ -14,6 +14,8 @@
 #include <linux/filter.h>
 #include <linux/vmalloc.h>
 
+#include "bpf_map.h"
+
 struct bucket {
 	struct hlist_head head;
 	raw_spinlock_t lock;
@@ -384,6 +386,8 @@ static const struct bpf_map_ops htab_ops = {
 	.map_lookup_elem = htab_map_lookup_elem,
 	.map_update_elem = htab_map_update_elem,
 	.map_delete_elem = htab_map_delete_elem,
+	.map_lookup_elem_percpu = map_lookup_elem_percpu_nop,
+	.map_update_elem_percpu = map_update_elem_percpu_nop,
 };
 
 static struct bpf_map_type_list htab_type __read_mostly = {
