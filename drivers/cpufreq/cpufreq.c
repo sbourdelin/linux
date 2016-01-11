@@ -694,7 +694,7 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy *policy,
 		goto out;
 	}
 
-	lockdep_assert_held(&cpufreq_governor_mutex);
+	mutex_lock(&cpufreq_governor_mutex);
 	for_each_governor(t) {
 		if (i >= (ssize_t) ((PAGE_SIZE / sizeof(char))
 		    - (CPUFREQ_NAME_LEN + 2)))
@@ -702,6 +702,7 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy *policy,
 		i += scnprintf(&buf[i], CPUFREQ_NAME_PLEN, "%s ", t->name);
 	}
 out:
+	mutex_unlock(&cpufreq_governor_mutex);
 	i += sprintf(&buf[i], "\n");
 	return i;
 }
