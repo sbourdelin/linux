@@ -70,6 +70,7 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_TIMER,
 	IPI_IRQ_WORK,
+	IPI_CPU_UP,
 };
 
 /*
@@ -627,6 +628,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
 	S(IPI_CPU_STOP, "CPU stop interrupts"),
 	S(IPI_TIMER, "Timer broadcast interrupts"),
 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+	S(IPI_CPU_UP, "Hotplug cpu up by ipi"),
 };
 
 static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
@@ -746,6 +748,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		irq_exit();
 		break;
 #endif
+       case IPI_CPU_UP:
+               break;
 
 	default:
 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
@@ -798,3 +802,9 @@ int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
 }
+
+void smp_send_cpuup(int cpu)
+{
+       smp_cross_call(cpumask_of(cpu), IPI_CPU_UP);
+}
+
