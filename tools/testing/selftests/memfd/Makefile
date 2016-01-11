@@ -2,7 +2,7 @@ CC = $(CROSS_COMPILE)gcc
 CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += -I../../../../include/uapi/
 CFLAGS += -I../../../../include/
-CFLAGS += -I../../../../usr/include/
+CFLAGS += -I$(INSTALL_HDR_PATH)/include/
 
 TEST_PROGS := memfd_test
 

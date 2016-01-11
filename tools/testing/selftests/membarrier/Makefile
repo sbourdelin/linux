@@ -1,4 +1,4 @@
-CFLAGS += -g -I../../../../usr/include/
+CFLAGS += -g -I$(INSTALL_HDR_PATH)/include/
 
 TEST_PROGS := membarrier_test
 

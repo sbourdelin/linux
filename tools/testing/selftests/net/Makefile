@@ -2,7 +2,7 @@
 
 CFLAGS = -Wall -O2 -g
 
-CFLAGS += -I../../../../usr/include/
+CFLAGS += -I$(INSTALL_HDR_PATH)/include/
 
 NET_PROGS = socket psock_fanout psock_tpacket
 
