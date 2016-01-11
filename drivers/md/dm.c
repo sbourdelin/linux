@@ -1016,7 +1016,7 @@ static void clone_endio(struct bio *bio)
 		}
 	}
 
-	if (unlikely(r == -EREMOTEIO && (bio->bi_rw & REQ_WRITE_SAME) &&
+	if (unlikely(r == -EREMOTEIO && (bio->bi_op == REQ_OP_WRITE_SAME) &&
 		     !bdev_get_queue(bio->bi_bdev)->limits.max_write_same_sectors))
 		disable_write_same(md);
 
@@ -1690,9 +1690,9 @@ static int __split_and_process_non_flush(struct clone_info *ci)
 	struct dm_target *ti;
 	unsigned len;
 
-	if (unlikely(bio->bi_rw & REQ_DISCARD))
+	if (unlikely(bio->bi_op == REQ_OP_DISCARD))
 		return __send_discard(ci);
-	else if (unlikely(bio->bi_rw & REQ_WRITE_SAME))
+	else if (unlikely(bio->bi_op == REQ_OP_WRITE_SAME))
 		return __send_write_same(ci);
 
 	ti = dm_table_find_target(ci->map, ci->sector);
