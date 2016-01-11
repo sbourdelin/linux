@@ -2791,6 +2791,12 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	dwc->gadget.name		= "dwc3-gadget";
 
 	/*
+	 * Set the otg flag if Controller in OTG mode for Ceritification Test
+	 */
+	if (dwc->dr_mode == USB_DR_MODE_OTG)
+		dwc->gadget.is_otg = 1;
+
+	/*
 	 * FIXME We might be setting max_speed to <SUPER, however versions
 	 * <2.20a of dwc3 have an issue with metastability (documented
 	 * elsewhere in this driver) which tells us we can't set max speed to
