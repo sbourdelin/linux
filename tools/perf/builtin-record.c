@@ -591,6 +591,26 @@ static void record__init_features(struct record *rec)
 }
 
 static void
+record__toggle_tailsize_evsels(struct record *rec, bool stop)
+{
+	struct perf_evsel *pos;
+	struct perf_evlist *evlist = rec->evlist;
+
+	evlist__for_each(evlist, pos) {
+		if (!pos->tailsize)
+			continue;
+		if (!pos->overwrite)
+			continue;
+		if (stop)
+			perf_evsel__disable(pos);
+		else
+			perf_evsel__enable(pos);
+	}
+
+	rec->tailsize_evt_stopped = stop;
+}
+
+static void
 record__finish_output(struct record *rec)
 {
 	struct perf_data_file *file = &rec->file;
@@ -925,6 +945,9 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 	for (;;) {
 		unsigned long long hits = rec->samples;
 
+		if (switch_output_started || done)
+			record__toggle_tailsize_evsels(rec, true);
+
 		if (record__mmap_read_all(rec) < 0) {
 			auxtrace_snapshot_disable();
 			err = -1;
@@ -943,7 +966,20 @@ static int __cmd_record(struct record *rec, int argc, const char **argv)
 		}
 
 		if (switch_output_started) {
+			/*
+			 * SIGUSR2 raise after or during record__mmap_read_all().
+			 * continue to read again.
+			 */
+			if (!rec->tailsize_evt_stopped)
+				continue;
+
 			switch_output_started = 0;
+			/* 
+			 * Reenable events in tailsize ring buffer after
+			 * record__mmap_read_all(): we have collected
+			 * data from it.
+			 */
+			record__toggle_tailsize_evsels(rec, false);
 
 			if (!quiet)
 				fprintf(stderr, "[ perf record: dump data: Woken up %ld times ]\n",
