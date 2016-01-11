@@ -86,9 +86,9 @@ static inline u8 dw_mci_exynos_get_ciu_div(struct dw_mci *host)
 		return EXYNOS4210_FIXED_CIU_CLK_DIV;
 	else if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		return SDMMC_CLKSEL_GET_DIV(mci_readl(host, CLKSEL64)) + 1;
+		return SDMMC_CLKSEL_GET_DIV(mci_readl(host, SDMMC_CLKSEL64)) + 1;
 	else
-		return SDMMC_CLKSEL_GET_DIV(mci_readl(host, CLKSEL)) + 1;
+		return SDMMC_CLKSEL_GET_DIV(mci_readl(host, SDMMC_CLKSEL)) + 1;
 }
 
 static int dw_mci_exynos_priv_init(struct dw_mci *host)
@@ -97,19 +97,19 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
-		mci_writel(host, MPSBEGIN0, 0);
-		mci_writel(host, MPSEND0, SDMMC_ENDING_SEC_NR_MAX);
-		mci_writel(host, MPSCTRL0, SDMMC_MPSCTRL_SECURE_WRITE_BIT |
+		mci_writel(host, SDMMC_MPSBEGIN0, 0);
+		mci_writel(host, SDMMC_MPSEND0, SDMMC_ENDING_SEC_NR_MAX);
+		mci_writel(host, SDMMC_MPSCTRL0, SDMMC_MPSCTRL_SECURE_WRITE_BIT |
 			   SDMMC_MPSCTRL_NON_SECURE_READ_BIT |
 			   SDMMC_MPSCTRL_VALID |
 			   SDMMC_MPSCTRL_NON_SECURE_WRITE_BIT);
 	}
 
 	if (priv->ctrl_type >= DW_MCI_TYPE_EXYNOS5420) {
-		priv->saved_strobe_ctrl = mci_readl(host, HS400_DLINE_CTRL);
-		priv->saved_dqs_en = mci_readl(host, HS400_DQS_EN);
+		priv->saved_strobe_ctrl = mci_readl(host, SDMMC_HS400_DLINE_CTRL);
+		priv->saved_dqs_en = mci_readl(host, SDMMC_HS400_DQS_EN);
 		priv->saved_dqs_en |= AXI_NON_BLOCKING_WR;
-		mci_writel(host, HS400_DQS_EN, priv->saved_dqs_en);
+		mci_writel(host, SDMMC_HS400_DQS_EN, priv->saved_dqs_en);
 		if (!priv->dqs_delay)
 			priv->dqs_delay =
 				DQS_CTRL_GET_RD_DELAY(priv->saved_strobe_ctrl);
@@ -134,17 +134,17 @@ static void dw_mci_exynos_set_clksel_timing(struct dw_mci *host, u32 timing)
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		clksel = mci_readl(host, CLKSEL64);
+		clksel = mci_readl(host, SDMMC_CLKSEL64);
 	else
-		clksel = mci_readl(host, CLKSEL);
+		clksel = mci_readl(host, SDMMC_CLKSEL);
 
 	clksel = (clksel & ~SDMMC_CLKSEL_TIMING_MASK) | timing;
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		mci_writel(host, CLKSEL64, clksel);
+		mci_writel(host, SDMMC_CLKSEL64, clksel);
 	else
-		mci_writel(host, CLKSEL, clksel);
+		mci_writel(host, SDMMC_CLKSEL, clksel);
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -182,16 +182,16 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		clksel = mci_readl(host, CLKSEL64);
+		clksel = mci_readl(host, SDMMC_CLKSEL64);
 	else
-		clksel = mci_readl(host, CLKSEL);
+		clksel = mci_readl(host, SDMMC_CLKSEL);
 
 	if (clksel & SDMMC_CLKSEL_WAKEUP_INT) {
 		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-			mci_writel(host, CLKSEL64, clksel);
+			mci_writel(host, SDMMC_CLKSEL64, clksel);
 		else
-			mci_writel(host, CLKSEL, clksel);
+			mci_writel(host, SDMMC_CLKSEL, clksel);
 	}
 
 	return 0;
@@ -214,10 +214,10 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
 	 */
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
-		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL64)))
+		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, SDMMC_CLKSEL64)))
 			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
 	 } else {
-		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
+		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, SDMMC_CLKSEL)))
 			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
 	}
 }
@@ -244,8 +244,8 @@ static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
 		dqs &= ~DATA_STROBE_EN;
 	}
 
-	mci_writel(host, HS400_DQS_EN, dqs);
-	mci_writel(host, HS400_DLINE_CTRL, strobe);
+	mci_writel(host, SDMMC_HS400_DQS_EN, dqs);
+	mci_writel(host, SDMMC_HS400_DLINE_CTRL, strobe);
 }
 
 static void dw_mci_exynos_adjust_clock(struct dw_mci *host, unsigned int wanted)
@@ -373,9 +373,9 @@ static inline u8 dw_mci_exynos_get_clksmpl(struct dw_mci *host)
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL64));
+		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, SDMMC_CLKSEL64));
 	else
-		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
+		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, SDMMC_CLKSEL));
 }
 
 static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
@@ -385,15 +385,15 @@ static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		clksel = mci_readl(host, CLKSEL64);
+		clksel = mci_readl(host, SDMMC_CLKSEL64);
 	else
-		clksel = mci_readl(host, CLKSEL);
+		clksel = mci_readl(host, SDMMC_CLKSEL);
 	clksel = SDMMC_CLKSEL_UP_SAMPLE(clksel, sample);
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		mci_writel(host, CLKSEL64, clksel);
+		mci_writel(host, SDMMC_CLKSEL64, clksel);
 	else
-		mci_writel(host, CLKSEL, clksel);
+		mci_writel(host, SDMMC_CLKSEL, clksel);
 }
 
 static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
@@ -404,18 +404,18 @@ static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		clksel = mci_readl(host, CLKSEL64);
+		clksel = mci_readl(host, SDMMC_CLKSEL64);
 	else
-		clksel = mci_readl(host, CLKSEL);
+		clksel = mci_readl(host, SDMMC_CLKSEL);
 
 	sample = (clksel + 1) & 0x7;
 	clksel = SDMMC_CLKSEL_UP_SAMPLE(clksel, sample);
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-		mci_writel(host, CLKSEL64, clksel);
+		mci_writel(host, SDMMC_CLKSEL64, clksel);
 	else
-		mci_writel(host, CLKSEL, clksel);
+		mci_writel(host, SDMMC_CLKSEL, clksel);
 
 	return sample;
 }
@@ -458,7 +458,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
 	start_smpl = dw_mci_exynos_get_clksmpl(host);
 
 	do {
-		mci_writel(host, TMOUT, ~0);
+		mci_writel(host, SDMMC_TMOUT, ~0);
 		smpl = dw_mci_exynos_move_next_clksmpl(host);
 
 		if (!mmc_send_tuning(mmc, opcode, NULL))

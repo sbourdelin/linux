@@ -190,22 +190,22 @@
 
 /* Register access macros */
 #define mci_readl(dev, reg)			\
-	readl_relaxed((dev)->regs + SDMMC_##reg)
+	readl_relaxed((dev)->regs + reg)
 #define mci_writel(dev, reg, value)			\
-	writel_relaxed((value), (dev)->regs + SDMMC_##reg)
+	writel_relaxed((value), (dev)->regs + reg)
 
 /* 16-bit FIFO access macros */
 #define mci_readw(dev, reg)			\
-	readw_relaxed((dev)->regs + SDMMC_##reg)
+	readw_relaxed((dev)->regs + reg)
 #define mci_writew(dev, reg, value)			\
-	writew_relaxed((value), (dev)->regs + SDMMC_##reg)
+	writew_relaxed((value), (dev)->regs + reg)
 
 /* 64-bit FIFO access macros */
 #ifdef readq
 #define mci_readq(dev, reg)			\
-	readq_relaxed((dev)->regs + SDMMC_##reg)
+	readq_relaxed((dev)->regs + reg)
 #define mci_writeq(dev, reg, value)			\
-	writeq_relaxed((value), (dev)->regs + SDMMC_##reg)
+	writeq_relaxed((value), (dev)->regs + reg)
 #else
 /*
  * Dummy readq implementation for architectures that don't define it.
@@ -216,9 +216,9 @@
  * rest of the code free from ifdefs.
  */
 #define mci_readq(dev, reg)			\
-	(*(volatile u64 __force *)((dev)->regs + SDMMC_##reg))
+	(*(volatile u64 __force *)((dev)->regs + reg))
 #define mci_writeq(dev, reg, value)			\
-	(*(volatile u64 __force *)((dev)->regs + SDMMC_##reg) = (value))
+	(*(volatile u64 __force *)((dev)->regs + reg) = (value))
 
 #define __raw_writeq(__value, __reg) \
 	(*(volatile u64 __force *)(__reg) = (__value))
