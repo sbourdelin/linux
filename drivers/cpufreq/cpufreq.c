@@ -1381,9 +1381,13 @@ static void cpufreq_offline_finish(unsigned int cpu)
 		return;
 	}
 
+	down_write(&policy->rwsem);
+
 	/* Only proceed for inactive policies */
-	if (!policy_is_inactive(policy))
+	if (!policy_is_inactive(policy)) {
+		up_write(&policy->rwsem);
 		return;
+	}
 
 	/* If cpu is last user of policy, free policy */
 	if (has_target()) {
@@ -1391,6 +1395,8 @@ static void cpufreq_offline_finish(unsigned int cpu)
 		if (ret)
 			pr_err("%s: Failed to exit governor\n", __func__);
 	}
+
+	up_write(&policy->rwsem);
 
 	/*
 	 * Perform the ->exit() even during light-weight tear-down,
