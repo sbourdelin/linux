@@ -43,12 +43,18 @@ static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 	bool need_csum = !!(skb_shinfo(skb)->gso_type &
 			    SKB_GSO_UDP_TUNNEL_CSUM);
 	bool remcsum = !!(skb_shinfo(skb)->gso_type & SKB_GSO_TUNNEL_REMCSUM);
-	bool offload_csum = false, dont_encap = (need_csum || remcsum);
+	bool offload_csum;
 
 	oldlen = (u16)~skb->len;
 
 	if (unlikely(!pskb_may_pull(skb, tnl_hlen)))
 		goto out;
+
+	/* Try to offload checksum if possible */
+	offload_csum = !!(need_csum &&
+			  ((skb->dev->features & NETIF_F_HW_CSUM) ||
+			   (skb->dev->features & (is_ipv6 ?
+			    NETIF_F_IPV6_CSUM : NETIF_F_IP_CSUM))));
 
 	skb->encapsulation = 0;
 	__skb_pull(skb, tnl_hlen);
@@ -56,14 +62,8 @@ static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 	skb_set_network_header(skb, skb_inner_network_offset(skb));
 	skb->mac_len = skb_inner_network_offset(skb);
 	skb->protocol = new_protocol;
-	skb->encap_hdr_csum = need_csum;
+	skb->encap_hdr_csum = need_csum && !offload_csum;
 	skb->remcsum_offload = remcsum;
-
-	/* Try to offload checksum if possible */
-	offload_csum = !!(need_csum &&
-			  ((skb->dev->features & NETIF_F_HW_CSUM) ||
-			   (skb->dev->features & (is_ipv6 ?
-			    NETIF_F_IPV6_CSUM : NETIF_F_IP_CSUM))));
 
 	/* segment inner packet. */
 	enc_features = skb->dev->hw_enc_features & features;
@@ -82,13 +82,10 @@ static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 		int len;
 		__be32 delta;
 
-		if (dont_encap) {
-			skb->encapsulation = 0;
-			skb->ip_summed = CHECKSUM_NONE;
-		} else {
-			/* Only set up inner headers if we might be offloading
-			 * inner checksum.
-			 */
+		/* Only set up inner headers if we might be offloading
+		 * inner checksum.
+		 */
+		if (!remcsum) {
 			skb_reset_inner_headers(skb);
 			skb->encapsulation = 1;
 		}
@@ -112,6 +109,17 @@ static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 		uh->check = ~csum_fold((__force __wsum)
 				       ((__force u32)uh->check +
 					(__force u32)delta));
+
+		if (skb->ip_summed == CHECKSUM_PARTIAL) {
+			uh->check = csum_fold(lco_csum(skb));
+			if (uh->check == 0)
+				uh->check = CSUM_MANGLED_0;
+			continue;
+		}
+
+		skb->encapsulation = 0;
+		skb->ip_summed = CHECKSUM_NONE;
+
 		if (offload_csum) {
 			skb->ip_summed = CHECKSUM_PARTIAL;
 			skb->csum_start = skb_transport_header(skb) - skb->head;
