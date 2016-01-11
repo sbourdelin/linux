@@ -1281,9 +1281,9 @@ rename_retry:
 
 static enum d_walk_ret check_mount(void *data, struct dentry *dentry)
 {
-	int *ret = data;
+	bool *ret = data;
 	if (d_mountpoint(dentry)) {
-		*ret = 1;
+		*ret = true;
 		return D_WALK_QUIT;
 	}
 	return D_WALK_CONTINUE;
@@ -1296,9 +1296,9 @@ static enum d_walk_ret check_mount(void *data, struct dentry *dentry)
  * Return true if the parent or its subdirectories contain
  * a mount point
  */
-int have_submounts(struct dentry *parent)
+bool have_submounts(struct dentry *parent)
 {
-	int ret = 0;
+	bool ret = false;
 
 	d_walk(parent, &ret, check_mount, NULL);
 

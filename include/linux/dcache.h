@@ -266,7 +266,7 @@ extern struct dentry *d_find_alias(struct inode *);
 extern void d_prune_aliases(struct inode *);
 
 /* test whether we have any submounts in a subdir tree */
-extern int have_submounts(struct dentry *);
+extern bool have_submounts(struct dentry *);
 
 /*
  * This adds the entry to the hash queues.
@@ -370,12 +370,12 @@ extern struct dentry *dget_parent(struct dentry *dentry);
  *	Returns true if the dentry passed is not currently hashed.
  */
  
-static inline int d_unhashed(const struct dentry *dentry)
+static inline bool d_unhashed(const struct dentry *dentry)
 {
 	return hlist_bl_unhashed(&dentry->d_hash);
 }
 
-static inline int d_unlinked(const struct dentry *dentry)
+static inline bool d_unlinked(const struct dentry *dentry)
 {
 	return d_unhashed(dentry) && !IS_ROOT(dentry);
 }
@@ -508,7 +508,7 @@ static inline bool d_really_is_positive(const struct dentry *dentry)
 	return dentry->d_inode != NULL;
 }
 
-static inline int simple_positive(struct dentry *dentry)
+static inline bool simple_positive(struct dentry *dentry)
 {
 	return d_really_is_positive(dentry) && !d_unhashed(dentry);
 }
