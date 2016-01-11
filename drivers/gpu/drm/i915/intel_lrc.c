@@ -338,14 +338,10 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 {
 	struct intel_engine_cs *ring = rq->ring;
 	struct i915_hw_ppgtt *ppgtt = rq->ctx->ppgtt;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct page *page;
 	uint32_t *reg_state;
 
-	BUG_ON(!ctx_obj);
-
-	page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
-	reg_state = kmap_atomic(page);
+	BUG_ON(!rq->ctx->engine[ring->id].lrc_state_page);
+	reg_state = kmap_atomic(rq->ctx->engine[ring->id].lrc_state_page);
 
 	reg_state[CTX_RING_TAIL+1] = rq->tail;
 	reg_state[CTX_RING_BUFFER_START+1] = rq->ringbuf->gtt_offset;
@@ -986,6 +982,7 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
 	struct intel_ringbuffer *ringbuf = ctx->engine[ring->id].ringbuf;
+	struct page *lrc_state_page;
 	int ret;
 
 	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
@@ -994,6 +991,12 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 			PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
 	if (ret)
 		return ret;
+
+	lrc_state_page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
+	if (WARN_ON(!lrc_state_page)) {
+		ret = -ENODEV;
+		goto unpin_ctx_obj;
+	}
 
 	ret = intel_pin_and_map_ringbuffer_obj(ring->dev, ringbuf);
 	if (ret)
@@ -1004,6 +1007,7 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	ctx->engine[ring->id].lrc_desc = ring->ctx_desc_template |
 					 ctx->engine[ring->id].lrc_offset |
 					 ((u64)intel_execlists_ctx_id(ctx, ring) << GEN8_CTX_ID_SHIFT);
+	ctx->engine[ring->id].lrc_state_page = lrc_state_page;
 	ctx_obj->dirty = true;
 
 	/* Invalidate GuC TLB. */
@@ -1048,6 +1052,7 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 			i915_gem_object_ggtt_unpin(ctx_obj);
 			rq->ctx->engine[ring->id].lrc_offset = 0;
 			rq->ctx->engine[ring->id].lrc_desc = 0;
+			rq->ctx->engine[ring->id].lrc_state_page = NULL;
 		}
 	}
 }

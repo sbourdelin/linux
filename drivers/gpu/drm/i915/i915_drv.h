@@ -891,6 +891,7 @@ struct intel_context {
 		int pin_count;
 		u32 lrc_offset;
 		u64 lrc_desc;
+		struct page *lrc_state_page;
 	} engine[I915_NUM_RINGS];
 
 	struct list_head link;
