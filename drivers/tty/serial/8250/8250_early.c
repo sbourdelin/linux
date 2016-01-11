@@ -145,3 +145,55 @@ EARLYCON_DECLARE(uart8250, early_serial8250_setup);
 EARLYCON_DECLARE(uart, early_serial8250_setup);
 OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
 OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
+
+
+#ifdef CONFIG_SERIAL_8250_RT288X
+
+static void __init rt288x_putc(struct uart_port *port, int c)
+{
+	unsigned int status;
+
+	serial8250_early_out(port, AU1x00_TX, c);
+
+	for (;;) {
+		status = serial8250_early_in(port, AU1x00_LSR);
+		if ((status & BOTH_EMPTY) == BOTH_EMPTY)
+			break;
+		cpu_relax();
+	}
+}
+
+static void __init early_rt288x_write(struct console *console,
+				      const char *s, unsigned int count)
+{
+	struct earlycon_device *device = console->data;
+	struct uart_port *port = &device->port;
+
+	uart_console_write(port, s, count, rt288x_putc);
+}
+
+static int __init early_rt288x_setup(struct earlycon_device *device,
+				     const char *options)
+{
+	struct uart_port *port = &device->port;
+	unsigned int ier;
+
+	if (!(device->port.membase || device->port.iobase))
+		return -ENODEV;
+
+	/* Don't support direct init or any line-setting options */
+	if (device->baud)
+		return -EINVAL;
+
+	/* assume the device was initialized, only mask interrupts */
+	ier = serial8250_early_in(port, AU1x00_IER);
+	serial8250_early_out(port, AU1x00_IER, ier);
+
+	device->con->write = early_rt288x_write;
+	return 0;
+}
+
+EARLYCON_DECLARE(rt288x, early_rt288x_setup);
+OF_EARLYCON_DECLARE(rt288x, "ralink,rt2880-uart", early_rt288x_setup);
+
+#endif /* CONFIG_SERIAL_8250_RT288X */

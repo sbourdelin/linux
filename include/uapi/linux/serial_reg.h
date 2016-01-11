@@ -376,5 +376,18 @@
 #define UART_EXAR_TXTRG		0x0a	/* Tx FIFO trigger level write-only */
 #define UART_EXAR_RXTRG		0x0b	/* Rx FIFO trigger level write-only */
 
+/*
+ * Register offsets for Au1x00/RT288x 8250-workalikes
+ */
+#define AU1x00_RX	0
+#define AU1x00_TX	1
+#define AU1x00_IER	2
+#define AU1x00_IIR	3
+#define AU1x00_FCR	4
+#define AU1x00_LCR	5
+#define AU1x00_MCR	6
+#define AU1x00_LSR	7
+#define AU1x00_MSR	8
+
 #endif /* _LINUX_SERIAL_REG_H */
 
