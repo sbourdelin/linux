@@ -22,6 +22,8 @@
 #include <linux/pci_regs.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
+#include <linux/delay.h>
+#include <linux/sizes.h>
 
 #include "pcie-designware.h"
 
@@ -704,6 +706,15 @@ static struct pci_ops dw_pcie_ops = {
 	.read = dw_pcie_rd_conf,
 	.write = dw_pcie_wr_conf,
 };
+
+void dw_pcie_link_retrain(struct pcie_port *pp)
+{
+	u32 val = 0;
+
+	dw_pcie_readl_rc(pp, PCI_EXP_LNKCTL+0x70, &val);
+	val = val | PCI_EXP_LNKCTL_RL;
+	dw_pcie_writel_rc(pp, val, PCI_EXP_LNKCTL+0x70);
+}
 
 void dw_pcie_setup_rc(struct pcie_port *pp)
 {
