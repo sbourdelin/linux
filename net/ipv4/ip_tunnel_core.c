@@ -178,8 +178,10 @@ struct sk_buff *iptunnel_handle_offloads(struct sk_buff *skb,
 		err = skb_checksum_help(skb);
 		if (unlikely(err))
 			goto error;
-	} else if (skb->ip_summed != CHECKSUM_PARTIAL)
+	} else if (skb->ip_summed != CHECKSUM_PARTIAL) {
+		skb->encapsulation = 0;
 		skb->ip_summed = CHECKSUM_NONE;
+	}
 
 	return skb;
 error:
