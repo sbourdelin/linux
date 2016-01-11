@@ -2100,7 +2100,7 @@ static void dm_request_fn(struct request_queue *q)
 
 		/* always use block 0 to find the target for flushes for now */
 		pos = 0;
-		if (!(rq->cmd_flags & REQ_FLUSH))
+		if (rq->op != REQ_OP_FLUSH)
 			pos = blk_rq_pos(rq);
 
 		ti = dm_table_find_target(map, pos);
@@ -2660,7 +2660,7 @@ static int dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	/* always use block 0 to find the target for flushes for now */
 	pos = 0;
-	if (!(rq->cmd_flags & REQ_FLUSH))
+	if (rq->op != REQ_OP_FLUSH)
 		pos = blk_rq_pos(rq);
 
 	ti = dm_table_find_target(map, pos);
