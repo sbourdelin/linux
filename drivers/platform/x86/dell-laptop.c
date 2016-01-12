@@ -1314,19 +1314,19 @@ static int kbd_set_state_safe(struct kbd_state *state, struct kbd_state *old)
 
 static int kbd_set_token_bit(u8 bit)
 {
-	int id;
+	struct calling_interface_token *token;
 	int ret;
 
 	if (bit >= ARRAY_SIZE(kbd_tokens))
 		return -EINVAL;
 
-	id = find_token_id(kbd_tokens[bit]);
-	if (id == -1)
+	token = dell_smbios_find_token(kbd_tokens[bit]);
+	if (!token)
 		return -EINVAL;
 
 	dell_smbios_get_buffer();
-	dell_smbios_buffer->input[0] = da_tokens[id].location;
-	dell_smbios_buffer->input[1] = da_tokens[id].value;
+	dell_smbios_buffer->input[0] = token->location;
+	dell_smbios_buffer->input[1] = token->value;
 	dell_smbios_send_request(1, 0);
 	ret = dell_smbios_buffer->output[0];
 	dell_smbios_release_buffer();
@@ -1336,19 +1336,19 @@ static int kbd_set_token_bit(u8 bit)
 
 static int kbd_get_token_bit(u8 bit)
 {
-	int id;
+	struct calling_interface_token *token;
 	int ret;
 	int val;
 
 	if (bit >= ARRAY_SIZE(kbd_tokens))
 		return -EINVAL;
 
-	id = find_token_id(kbd_tokens[bit]);
-	if (id == -1)
+	token = dell_smbios_find_token(kbd_tokens[bit]);
+	if (!token)
 		return -EINVAL;
 
 	dell_smbios_get_buffer();
-	dell_smbios_buffer->input[0] = da_tokens[id].location;
+	dell_smbios_buffer->input[0] = token->location;
 	dell_smbios_send_request(0, 0);
 	ret = dell_smbios_buffer->output[0];
 	val = dell_smbios_buffer->output[1];
@@ -1357,7 +1357,7 @@ static int kbd_get_token_bit(u8 bit)
 	if (ret)
 		return dell_smi_error(ret);
 
-	return (val == da_tokens[id].value);
+	return (val == token->value);
 }
 
 static int kbd_get_first_active_token_bit(void)
@@ -1459,7 +1459,7 @@ static inline void kbd_init_tokens(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(kbd_tokens); ++i)
-		if (find_token_id(kbd_tokens[i]) != -1)
+		if (dell_smbios_find_token(kbd_tokens[i]))
 			kbd_token_bits |= BIT(i);
 }
 
