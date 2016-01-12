@@ -1,0 +1,34 @@
+Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
+
+Required properties:
+ - compatible: "active-semi,act8945a-charger"
+ - active-semi,chglev-gpio = Specifies a gpio that uses to select
+   the charge current level.
+
+Optional properties:
+ - active-semi,battery_temperature: Indicates if it is allowed to check
+   the battery temperature. If it is missing, assume the battery temperature
+   is not allowed to check.
+ - active-semi,input_voltage_threshold: unit: mV;
+   Specifies the charger's input over-voltage threshold value;
+   The value can be: 6600, 7000, 7500, 8000; default: 6600
+ - active-semi,precondition_timeout: unit: minutes;
+   Specifies the charger's PRECONDITION safety timer setting value;
+   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
+   default: 40.
+ - active-semi,total_timeout: unit: hours;
+   Specifies the charger's total safety timer setting value;
+   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
+   default: 3.
+
+Example:
+
+	charger {
+		compatible = "active-semi,act8945a-charger";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_charger_chglev>;
+		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+		active-semi,input_voltage_threshold = <6600>;
+		active-semi,precondition_timeout = <40>;
+		active-semi,total_timeout = <3>;
+	};
