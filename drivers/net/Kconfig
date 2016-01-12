@@ -71,6 +71,21 @@ config DUMMY
 	  To compile this driver as a module, choose M here: the module
 	  will be called dummy.
 
+config DUMMY_COUNT
+        int "Number of dummy devices to pre-create at init time"
+        depends on DUMMY
+        default 1
+        help
+          Static number of dummy devices to be unconditionally pre-created
+          at init time.
+
+          This default value can be overwritten on the kernel command
+          line or with module-parameter dummy.numdummies.
+
+          The historic default is 1. If a mid-2007 version of iproute2
+          is used (v2.6.23 or later), it can be set to 0, since needed
+          dummy devices can be dynamically allocated via rtnetlink.
+
 config EQUALIZER
 	tristate "EQL (serial line load balancing) support"
 	---help---
