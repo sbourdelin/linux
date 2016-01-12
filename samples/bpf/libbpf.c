@@ -54,6 +54,19 @@ int bpf_lookup_elem(int fd, void *key, void *value)
 	return syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
 }
 
+int bpf_lookup_percpu_elem(int fd, void *key, void *value, unsigned int cpu)
+{
+	union bpf_attr attr = {
+		.map_fd = fd,
+		.key = ptr_to_u64(key),
+		.value = ptr_to_u64(value),
+		.cpu = cpu,
+	};
+
+	return syscall(__NR_bpf, BPF_MAP_LOOKUP_PERCPU_ELEM, &attr,
+		       sizeof(attr));
+}
+
 int bpf_delete_elem(int fd, void *key)
 {
 	union bpf_attr attr = {
