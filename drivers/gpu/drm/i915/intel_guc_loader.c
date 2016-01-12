@@ -624,10 +624,11 @@ void intel_guc_ucode_fini(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_guc_fw *guc_fw = &dev_priv->guc.guc_fw;
 
+	mutex_lock(&dev->struct_mutex);
 	direct_interrupts_to_host(dev_priv);
+	i915_guc_submission_disable(dev);
 	i915_guc_submission_fini(dev);
 
-	mutex_lock(&dev->struct_mutex);
 	if (guc_fw->guc_fw_obj)
 		drm_gem_object_unreference(&guc_fw->guc_fw_obj->base);
 	guc_fw->guc_fw_obj = NULL;
