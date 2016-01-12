@@ -1045,6 +1045,9 @@ static struct pci_driver vfio_pci_driver = {
 	.probe		= vfio_pci_probe,
 	.remove		= vfio_pci_remove,
 	.err_handler	= &vfio_err_handlers,
+	.driver = {
+		.manual_bind_only = true;
+	},
 };
 
 struct vfio_devices {

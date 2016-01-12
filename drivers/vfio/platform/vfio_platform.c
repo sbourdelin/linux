@@ -92,6 +92,7 @@ static struct platform_driver vfio_platform_driver = {
 	.remove		= vfio_platform_remove,
 	.driver	= {
 		.name	= "vfio-platform",
+		.manual_bind_only = true;
 	},
 };
 

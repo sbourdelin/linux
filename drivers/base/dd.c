@@ -491,6 +491,9 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
 	struct device *dev = data->dev;
 	bool async_allowed;
 
+	if (drv->manual_bind_only)
+		return 0;
+
 	/*
 	 * Check if device has already been claimed. This may
 	 * happen with driver loading, device discovery/registration,
@@ -631,6 +634,9 @@ static int __driver_attach(struct device *dev, void *data)
 	 * driver_probe_device() will spit a warning if there
 	 * is an error.
 	 */
+
+	if (drv->manual_bind_only)
+		return 0;
 
 	if (!driver_match_device(drv, dev))
 		return 0;

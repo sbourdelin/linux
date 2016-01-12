@@ -264,6 +264,7 @@ struct device_driver {
 	const char		*mod_name;	/* used for built-in modules */
 
 	bool suppress_bind_attrs;	/* disables bind/unbind via sysfs */
+	bool manual_bind_only;		/* prevent bind on driver_attach */
 	enum probe_type probe_type;
 
 	const struct of_device_id	*of_match_table;
