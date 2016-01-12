@@ -122,8 +122,8 @@ int nfs42_proc_deallocate(struct file *filep, loff_t offset, loff_t len)
 	if (!nfs_server_capable(inode, NFS_CAP_DEALLOCATE))
 		return -EOPNOTSUPP;
 
-	nfs_wb_all(inode);
 	mutex_lock(&inode->i_mutex);
+	nfs_wb_all(inode);
 
 	err = nfs42_proc_fallocate(&msg, filep, offset, len);
 	if (err == 0)
