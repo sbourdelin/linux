@@ -53,11 +53,11 @@ void dell_smbios_get_buffer(void)
 }
 EXPORT_SYMBOL_GPL(dell_smbios_get_buffer);
 
-void release_buffer(void)
+void dell_smbios_release_buffer(void)
 {
 	mutex_unlock(&buffer_mutex);
 }
-EXPORT_SYMBOL_GPL(release_buffer);
+EXPORT_SYMBOL_GPL(dell_smbios_release_buffer);
 
 int find_token_id(int tokenid)
 {

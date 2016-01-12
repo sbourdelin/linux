@@ -445,7 +445,7 @@ static int dell_rfkill_set(void *data, bool blocked)
 	ret = dell_smbios_buffer->output[0];
 
  out:
-	release_buffer();
+	dell_smbios_release_buffer();
 	return dell_smi_error(ret);
 }
 
@@ -487,7 +487,7 @@ static void dell_rfkill_query(struct rfkill *rfkill, void *data)
 	status = dell_smbios_buffer->output[1];
 
 	if (ret != 0 || !(status & BIT(0))) {
-		release_buffer();
+		dell_smbios_release_buffer();
 		return;
 	}
 
@@ -498,7 +498,7 @@ static void dell_rfkill_query(struct rfkill *rfkill, void *data)
 	ret = dell_smbios_buffer->output[0];
 	hwswitch = dell_smbios_buffer->output[1];
 
-	release_buffer();
+	dell_smbios_release_buffer();
 
 	if (ret != 0)
 		return;
@@ -533,7 +533,7 @@ static int dell_debugfs_show(struct seq_file *s, void *data)
 	hwswitch_ret = dell_smbios_buffer->output[0];
 	hwswitch_state = dell_smbios_buffer->output[1];
 
-	release_buffer();
+	dell_smbios_release_buffer();
 
 	seq_printf(s, "return:\t%d\n", ret);
 	seq_printf(s, "status:\t0x%X\n", status);
@@ -651,7 +651,7 @@ static void dell_update_rfkill(struct work_struct *ignored)
 	}
 
  out:
-	release_buffer();
+	dell_smbios_release_buffer();
 }
 static DECLARE_DELAYED_WORK(dell_rfkill_work, dell_update_rfkill);
 
@@ -714,7 +714,7 @@ static int __init dell_setup_rfkill(void)
 	dell_send_request(17, 11);
 	ret = dell_smbios_buffer->output[0];
 	status = dell_smbios_buffer->output[1];
-	release_buffer();
+	dell_smbios_release_buffer();
 
 	/* dell wireless info smbios call is not supported */
 	if (ret != 0)
@@ -885,7 +885,7 @@ static int dell_send_intensity(struct backlight_device *bd)
 
 	ret = dell_smi_error(dell_smbios_buffer->output[0]);
 
-	release_buffer();
+	dell_smbios_release_buffer();
 	return ret;
 }
 
@@ -911,7 +911,7 @@ static int dell_get_intensity(struct backlight_device *bd)
 	else
 		ret = dell_smbios_buffer->output[1];
 
-	release_buffer();
+	dell_smbios_release_buffer();
 	return ret;
 }
 
@@ -1185,7 +1185,7 @@ static int kbd_get_info(struct kbd_info *info)
 		info->days = (dell_smbios_buffer->output[3] >> 24) & 0xFF;
 
  out:
-	release_buffer();
+	dell_smbios_release_buffer();
 	return ret;
 }
 
@@ -1269,7 +1269,7 @@ static int kbd_get_state(struct kbd_state *state)
 	state->level = (dell_smbios_buffer->output[2] >> 16) & 0xFF;
 
  out:
-	release_buffer();
+	dell_smbios_release_buffer();
 	return ret;
 }
 
@@ -1287,7 +1287,7 @@ static int kbd_set_state(struct kbd_state *state)
 	dell_smbios_buffer->input[2] |= (state->level & 0xFF) << 16;
 	dell_send_request(4, 11);
 	ret = dell_smbios_buffer->output[0];
-	release_buffer();
+	dell_smbios_release_buffer();
 
 	return dell_smi_error(ret);
 }
@@ -1329,7 +1329,7 @@ static int kbd_set_token_bit(u8 bit)
 	dell_smbios_buffer->input[1] = da_tokens[id].value;
 	dell_send_request(1, 0);
 	ret = dell_smbios_buffer->output[0];
-	release_buffer();
+	dell_smbios_release_buffer();
 
 	return dell_smi_error(ret);
 }
@@ -1352,7 +1352,7 @@ static int kbd_get_token_bit(u8 bit)
 	dell_send_request(0, 0);
 	ret = dell_smbios_buffer->output[0];
 	val = dell_smbios_buffer->output[1];
-	release_buffer();
+	dell_smbios_release_buffer();
 
 	if (ret)
 		return dell_smi_error(ret);
@@ -2023,7 +2023,7 @@ static int __init dell_init(void)
 		dell_send_request(0, 2);
 		if (dell_smbios_buffer->output[0] == 0)
 			max_intensity = dell_smbios_buffer->output[3];
-		release_buffer();
+		dell_smbios_release_buffer();
 	}
 
 	if (max_intensity) {
