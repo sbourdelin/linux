@@ -84,9 +84,7 @@ int find_token_location(int tokenid)
 }
 EXPORT_SYMBOL_GPL(find_token_location);
 
-struct calling_interface_buffer *
-dell_send_request(struct calling_interface_buffer *buffer, int class,
-		  int select)
+struct calling_interface_buffer *dell_send_request(int class, int select)
 {
 	struct smi_cmd command;
 
