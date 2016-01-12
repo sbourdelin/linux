@@ -422,9 +422,37 @@ void print_oops_end_marker(void)
  */
 void oops_exit(void)
 {
+	static atomic_t oops_counter = ATOMIC_INIT(0);
+
 	do_oops_enter_exit();
 	print_oops_end_marker();
 	kmsg_dump(KMSG_DUMP_OOPS);
+
+	/*
+	 * Every time the system oopses, if the oops happens while a
+	 * reference to an object was held (e.g. in a VFS function),
+	 * the reference leaks. If the oops doesn't also leak memory,
+	 * repeated oopsing can cause the reference counter to wrap
+	 * around - in particular, on 32bit systems, f_count in
+	 * struct file is only 32 bits long and can realistically
+	 * wrap around.
+	 * This means that an oops, even if it's just caused by an
+	 * unexploitable-looking NULL pointer dereference or so,
+	 * could maybe be turned into a use-after-free through a
+	 * counter overincrement, and a use-after-free might be
+	 * exploitable.
+	 * To reduce the probability that this happens, place an
+	 * upper bound on how often the kernel may oops - after this
+	 * limit is reached, just panic.
+	 * The constant used as limit should be low enough to
+	 * mitigate this kind of exploitation attempt, but high
+	 * enough to avoid unnecessary panics.
+	 */
+	if (atomic_inc_return(&oops_counter) >= 0x100000 &&
+			panic_on_oops == 0) {
+		pr_emerg("oopsed too often, setting panic_on_oops=1\n");
+		panic_on_oops = 1;
+	}
 }
 
 #ifdef WANT_WARN_ON_SLOWPATH
