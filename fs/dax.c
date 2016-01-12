@@ -328,6 +328,8 @@ static int dax_insert_mapping(struct inode *inode, struct buffer_head *bh,
 		wmb_pmem();
 	}
 
+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+
 	error = vm_insert_mixed(vma, vaddr, pfn);
 
  out:
