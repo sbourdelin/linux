@@ -298,7 +298,7 @@ static struct rtnl_link_ops ifb_link_ops __read_mostly = {
  * Note that these legacy devices have one queue.
  * Prefer something like : ip link add ifb10 numtxqueues 8 type ifb
  */
-static int numifbs = 2;
+static int numifbs = CONFIG_IFB_COUNT;
 module_param(numifbs, int, 0);
 MODULE_PARM_DESC(numifbs, "Number of ifb devices");
 
