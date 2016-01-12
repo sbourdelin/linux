@@ -42,6 +42,8 @@ void dell_smbios_clear_buffer(void);
 void dell_smbios_get_buffer(void);
 void dell_smbios_release_buffer(void);
 
+struct calling_interface_token *dell_smbios_find_token(int tokenid);
+
 int find_token_id(int tokenid);
 int find_token_location(int tokenid);
 
