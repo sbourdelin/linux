@@ -31,8 +31,8 @@ struct calling_interface_structure {
 } __packed;
 
 static DEFINE_MUTEX(buffer_mutex);
-struct calling_interface_buffer *buffer;
-EXPORT_SYMBOL_GPL(buffer);
+struct calling_interface_buffer *dell_smbios_buffer;
+EXPORT_SYMBOL_GPL(dell_smbios_buffer);
 
 static int da_command_address;
 static int da_command_code;
@@ -42,7 +42,7 @@ EXPORT_SYMBOL_GPL(da_tokens);
 
 void clear_buffer(void)
 {
-	memset(buffer, 0, sizeof(struct calling_interface_buffer));
+	memset(dell_smbios_buffer, 0, sizeof(struct calling_interface_buffer));
 }
 EXPORT_SYMBOL_GPL(clear_buffer);
 
@@ -91,15 +91,15 @@ struct calling_interface_buffer *dell_send_request(int class, int select)
 	command.magic = SMI_CMD_MAGIC;
 	command.command_address = da_command_address;
 	command.command_code = da_command_code;
-	command.ebx = virt_to_phys(buffer);
+	command.ebx = virt_to_phys(dell_smbios_buffer);
 	command.ecx = 0x42534931;
 
-	buffer->class = class;
-	buffer->select = select;
+	dell_smbios_buffer->class = class;
+	dell_smbios_buffer->select = select;
 
 	dcdbas_smi_request(&command);
 
-	return buffer;
+	return dell_smbios_buffer;
 }
 EXPORT_SYMBOL_GPL(dell_send_request);
 
@@ -162,8 +162,8 @@ static int __init dell_smbios_init(void)
 	 * Allocate buffer below 4GB for SMI data--only 32-bit physical addr
 	 * is passed to SMI handler.
 	 */
-	buffer = (void *)__get_free_page(GFP_KERNEL | GFP_DMA32);
-	if (!buffer) {
+	dell_smbios_buffer = (void *)__get_free_page(GFP_KERNEL | GFP_DMA32);
+	if (!dell_smbios_buffer) {
 		ret = -ENOMEM;
 		goto fail_buffer;
 	}
@@ -178,7 +178,7 @@ fail_buffer:
 static void __exit dell_smbios_exit(void)
 {
 	kfree(da_tokens);
-	free_page((unsigned long)buffer);
+	free_page((unsigned long)dell_smbios_buffer);
 }
 
 subsys_initcall(dell_smbios_init);
