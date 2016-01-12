@@ -172,4 +172,12 @@ config PCI_HISI
 	help
 	  Say Y here if you want PCIe controller support on HiSilicon HIP05 SoC
 
+config PCIE_SNPSDEV
+	bool "Platform Driver for Synopsys Device"
+	depends on ARC && OF
+	select PCIEPORTBUS
+	select PCIE_DW
+	help
+	  Say Y here if you want to enable PCIe controller support on the
+	  Synopsys IP Prototyping Kits.
 endmenu
