@@ -84,7 +84,8 @@ int find_token_location(int tokenid)
 }
 EXPORT_SYMBOL_GPL(find_token_location);
 
-struct calling_interface_buffer *dell_send_request(int class, int select)
+struct calling_interface_buffer *dell_smbios_send_request(int class,
+							  int select)
 {
 	struct smi_cmd command;
 
@@ -101,7 +102,7 @@ struct calling_interface_buffer *dell_send_request(int class, int select)
 
 	return dell_smbios_buffer;
 }
-EXPORT_SYMBOL_GPL(dell_send_request);
+EXPORT_SYMBOL_GPL(dell_smbios_send_request);
 
 static void __init parse_da_table(const struct dmi_header *dm)
 {

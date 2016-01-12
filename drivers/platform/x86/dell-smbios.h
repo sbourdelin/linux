@@ -45,5 +45,6 @@ void dell_smbios_release_buffer(void);
 int find_token_id(int tokenid);
 int find_token_location(int tokenid);
 
-struct calling_interface_buffer *dell_send_request(int class, int select);
+struct calling_interface_buffer *dell_smbios_send_request(int class,
+							  int select);
 #endif
