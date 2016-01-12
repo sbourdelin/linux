@@ -867,15 +867,15 @@ static void dell_cleanup_rfkill(void)
 
 static int dell_send_intensity(struct backlight_device *bd)
 {
-	int token;
+	struct calling_interface_token *token;
 	int ret;
 
-	token = find_token_location(BRIGHTNESS_TOKEN);
-	if (token == -1)
+	token = dell_smbios_find_token(BRIGHTNESS_TOKEN);
+	if (!token)
 		return -ENODEV;
 
 	dell_smbios_get_buffer();
-	dell_smbios_buffer->input[0] = token;
+	dell_smbios_buffer->input[0] = token->location;
 	dell_smbios_buffer->input[1] = bd->props.brightness;
 
 	if (power_supply_is_system_supplied() > 0)
@@ -891,15 +891,15 @@ static int dell_send_intensity(struct backlight_device *bd)
 
 static int dell_get_intensity(struct backlight_device *bd)
 {
-	int token;
+	struct calling_interface_token *token;
 	int ret;
 
-	token = find_token_location(BRIGHTNESS_TOKEN);
-	if (token == -1)
+	token = dell_smbios_find_token(BRIGHTNESS_TOKEN);
+	if (!token)
 		return -ENODEV;
 
 	dell_smbios_get_buffer();
-	dell_smbios_buffer->input[0] = token;
+	dell_smbios_buffer->input[0] = token->location;
 
 	if (power_supply_is_system_supplied() > 0)
 		dell_smbios_send_request(0, 2);
@@ -1973,8 +1973,8 @@ static void kbd_led_exit(void)
 
 static int __init dell_init(void)
 {
+	struct calling_interface_token *token;
 	int max_intensity = 0;
-	int token;
 	int ret;
 
 	if (!dmi_check_system(dell_device_table))
@@ -2016,10 +2016,10 @@ static int __init dell_init(void)
 	if (acpi_video_get_backlight_type() != acpi_backlight_vendor)
 		return 0;
 
-	token = find_token_location(BRIGHTNESS_TOKEN);
-	if (token != -1) {
+	token = dell_smbios_find_token(BRIGHTNESS_TOKEN);
+	if (token) {
 		dell_smbios_get_buffer();
-		dell_smbios_buffer->input[0] = token;
+		dell_smbios_buffer->input[0] = token->location;
 		dell_smbios_send_request(0, 2);
 		if (dell_smbios_buffer->output[0] == 0)
 			max_intensity = dell_smbios_buffer->output[3];
