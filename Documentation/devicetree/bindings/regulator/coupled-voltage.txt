@@ -1,0 +1,18 @@
+Coupled voltage regulators
+
+Required properties:
+- compatible		: Must be "coupled-voltage-regulator".
+
+Optional properties:
+- vinX-supply		: Phandle to the regulators it aggregates
+
+Any property defined as part of the core regulator binding defined in
+regulator.txt can also be used.
+
+Example:
+	vcc_wifi: wifi_reg {
+		compatible = "coupled-voltage-regulator";
+		regulator-name = "vcc-wifi";
+		vin0-supply = <&reg_ldo3>;
+		vin1-supply = <&reg_ldo4>;
+	};
