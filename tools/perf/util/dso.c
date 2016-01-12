@@ -1063,6 +1063,7 @@ struct dso *dso__new(const char *name)
 		dso->needs_swap = DSO_SWAP__UNSET;
 		RB_CLEAR_NODE(&dso->rb_node);
 		dso->root = NULL;
+		dso->load_virtaddr = 0;
 		INIT_LIST_HEAD(&dso->node);
 		INIT_LIST_HEAD(&dso->data.open_entry);
 		pthread_mutex_init(&dso->lock, NULL);
@@ -1366,4 +1367,9 @@ int dso__strerror_load(struct dso *dso, char *buf, size_t buflen)
 	idx = errnum - __DSO_LOAD_ERRNO__START;
 	scnprintf(buf, buflen, "%s", dso_load__error_str[idx]);
 	return 0;
+}
+
+u64 dso__get_load_virtaddr(struct dso *dso)
+{
+	return dso->load_virtaddr;
 }

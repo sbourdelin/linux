@@ -166,7 +166,8 @@ struct dso {
 	const char	 *long_name;
 	u16		 long_name_len;
 	u16		 short_name_len;
-	void		*dwfl;			/* DWARF debug info */
+	u64		 load_virtaddr;		/* Load virtual address */
+	void		 *dwfl;			/* DWARF debug info */
 	struct auxtrace_cache *auxtrace_cache;
 
 	/* dso data file */

@@ -1273,8 +1273,12 @@ try_again:
 		 * Kernel maps might be changed when loading symbols so loading
 		 * must be done prior to using kernel maps.
 		 */
+		map__load(al->map, machine->symbol_filter);
+
+		/* exclude kernel kallsyms */
 		if (load_map)
-			map__load(al->map, machine->symbol_filter);
+			al->map->dso->load_virtaddr = 0;
+
 		al->addr = al->map->map_ip(al->map, al->addr);
 	}
 }

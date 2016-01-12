@@ -86,14 +86,17 @@ void map_groups__put(struct map_groups *mg);
 struct kmap *map__kmap(struct map *map);
 struct map_groups *map__kmaps(struct map *map);
 
+u64 dso__get_load_virtaddr(struct dso *dso);
 static inline u64 map__map_ip(struct map *map, u64 ip)
 {
-	return ip - map->start + map->pgoff;
+	return ip - map->start + map->pgoff +
+		dso__get_load_virtaddr(map->dso);
 }
 
 static inline u64 map__unmap_ip(struct map *map, u64 ip)
 {
-	return ip + map->start - map->pgoff;
+	return ip + map->start - map->pgoff -
+		dso__get_load_virtaddr(map->dso);
 }
 
 static inline u64 identity__map_ip(struct map *map __maybe_unused, u64 ip)

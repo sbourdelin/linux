@@ -15,6 +15,8 @@
 #define EM_AARCH64	183  /* ARM 64 bit */
 #endif
 
+static int elf_read_maps_ex(Elf * elf, bool exe, mapfn_t mapfn, void *data,
+			    struct map *map);
 
 #ifdef HAVE_CPLUS_DEMANGLE_SUPPORT
 extern char *cplus_demangle(const char *, int);
@@ -831,6 +833,10 @@ int dso__load_sym(struct dso *dso, struct map *map,
 	sec = syms_ss->symtab;
 	shdr = syms_ss->symshdr;
 
+	err = elf_read_maps_ex(elf, ehdr.e_type == ET_EXEC ||
+			       ehdr.e_type == ET_REL,
+			       NULL, NULL, map);
+
 	if (runtime_ss->opdsec)
 		opddata = elf_rawdata(runtime_ss->opdsec, NULL);
 
@@ -1116,6 +1122,13 @@ out_elf_end:
 
 static int elf_read_maps(Elf *elf, bool exe, mapfn_t mapfn, void *data)
 {
+
+	return elf_read_maps_ex(elf, exe, mapfn, data, NULL);
+}
+
+static int elf_read_maps_ex(Elf *elf, bool exe, mapfn_t mapfn, void *data,
+			    struct map *map)
+{
 	GElf_Phdr phdr;
 	size_t i, phdrnum;
 	int err;
@@ -1135,10 +1148,17 @@ static int elf_read_maps(Elf *elf, bool exe, mapfn_t mapfn, void *data)
 		} else {
 			if (!(phdr.p_flags & PF_R))
 				continue;
+			if (map && (phdr.p_flags & PF_X))
+				map->dso->load_virtaddr = phdr.p_vaddr;
 		}
+
 		sz = min(phdr.p_memsz, phdr.p_filesz);
 		if (!sz)
 			continue;
+
+		if (!mapfn)
+			continue;
+
 		err = mapfn(phdr.p_vaddr, sz, phdr.p_offset, data);
 		if (err)
 			return err;
