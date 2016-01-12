@@ -399,17 +399,21 @@ static void tipc_node_delete(struct tipc_node *node)
 	kfree_rcu(node, rcu);
 }
 
-void tipc_node_stop(struct net *net)
+static void tipc_node_stop(struct tipc_node *node)
+{
+	if (del_timer(&node->timer))
+		tipc_node_put(node);
+	tipc_node_put(node);
+}
+
+void tipc_node_stop_net(struct net *net)
 {
 	struct tipc_net *tn = net_generic(net, tipc_net_id);
 	struct tipc_node *node, *t_node;
 
 	spin_lock_bh(&tn->node_list_lock);
-	list_for_each_entry_safe(node, t_node, &tn->node_list, list) {
-		if (del_timer(&node->timer))
-			tipc_node_put(node);
-		tipc_node_put(node);
-	}
+	list_for_each_entry_safe(node, t_node, &tn->node_list, list)
+		tipc_node_stop(node);
 	spin_unlock_bh(&tn->node_list_lock);
 }
 
@@ -1527,6 +1531,50 @@ void tipc_rcv(struct net *net, struct sk_buff *skb, struct tipc_bearer *b)
 	tipc_node_put(n);
 discard:
 	kfree_skb(skb);
+}
+
+int tipc_nl_peer_rm(struct sk_buff *skb, struct genl_info *info)
+{
+	int err;
+	u32 addr;
+	struct net *net = sock_net(skb->sk);
+	struct nlattr *attrs[TIPC_NLA_NET_MAX + 1];
+	struct tipc_net *tn = net_generic(net, tipc_net_id);
+	struct tipc_node *peer;
+
+	/* We identify the peer by its net */
+	if (!info->attrs[TIPC_NLA_NET])
+		return -EINVAL;
+
+	err = nla_parse_nested(attrs, TIPC_NLA_NET_MAX,
+			       info->attrs[TIPC_NLA_NET],
+			       tipc_nl_net_policy);
+	if (err)
+		return err;
+
+	if (!attrs[TIPC_NLA_NET_ADDR])
+		return -EINVAL;
+
+	addr = nla_get_u32(attrs[TIPC_NLA_NET_ADDR]);
+
+	spin_lock_bh(&tn->node_list_lock);
+	list_for_each_entry_rcu(peer, &tn->node_list, list) {
+		if (peer->addr != addr)
+			continue;
+
+		if (peer->state == SELF_DOWN_PEER_DOWN ||
+		    peer->state == SELF_DOWN_PEER_LEAVING) {
+			tipc_node_stop(peer);
+
+			spin_unlock_bh(&tn->node_list_lock);
+			return 0;
+		}
+		spin_unlock_bh(&tn->node_list_lock);
+		return -EBUSY;
+	}
+	spin_unlock_bh(&tn->node_list_lock);
+
+	return -ENXIO;
 }
 
 int tipc_nl_node_dump(struct sk_buff *skb, struct netlink_callback *cb)

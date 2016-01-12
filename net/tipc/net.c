@@ -42,7 +42,7 @@
 #include "node.h"
 #include "bcast.h"
 
-static const struct nla_policy tipc_nl_net_policy[TIPC_NLA_NET_MAX + 1] = {
+const struct nla_policy tipc_nl_net_policy[TIPC_NLA_NET_MAX + 1] = {
 	[TIPC_NLA_NET_UNSPEC]	= { .type = NLA_UNSPEC },
 	[TIPC_NLA_NET_ID]	= { .type = NLA_U32 }
 };
@@ -139,7 +139,7 @@ void tipc_net_stop(struct net *net)
 			      tn->own_addr);
 	rtnl_lock();
 	tipc_bearer_stop(net);
-	tipc_node_stop(net);
+	tipc_node_stop_net(net);
 	rtnl_unlock();
 
 	pr_info("Left network mode\n");
