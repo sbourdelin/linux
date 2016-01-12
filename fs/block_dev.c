@@ -75,6 +75,7 @@ void kill_bdev(struct block_device *bdev)
 {
 	struct address_space *mapping = bdev->bd_inode->i_mapping;
 
+	sb_clear_inode_writeback(bdev->bd_inode);
 	if (mapping->nrpages == 0 && mapping->nrshadows == 0)
 		return;
 

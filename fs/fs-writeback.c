@@ -945,6 +945,37 @@ void inode_io_list_del(struct inode *inode)
 }
 
 /*
+ * mark an inode as under writeback on the sb
+ */
+void sb_mark_inode_writeback(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	unsigned long flags;
+
+	if (list_empty(&inode->i_wb_list)) {
+		spin_lock_irqsave(&sb->s_inode_wblist_lock, flags);
+		if (list_empty(&inode->i_wb_list))
+			list_add_tail(&inode->i_wb_list, &sb->s_inodes_wb);
+		spin_unlock_irqrestore(&sb->s_inode_wblist_lock, flags);
+	}
+}
+
+/*
+ * clear an inode as under writeback on the sb
+ */
+void sb_clear_inode_writeback(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	unsigned long flags;
+
+	if (!list_empty(&inode->i_wb_list)) {
+		spin_lock_irqsave(&sb->s_inode_wblist_lock, flags);
+		list_del_init(&inode->i_wb_list);
+		spin_unlock_irqrestore(&sb->s_inode_wblist_lock, flags);
+	}
+}
+
+/*
  * Redirty an inode: set its when-it-was dirtied timestamp and move it to the
  * furthest end of its superblock's dirty-inode list.
  *
@@ -1118,13 +1149,28 @@ static void __inode_wait_for_writeback(struct inode *inode)
 }
 
 /*
- * Wait for writeback on an inode to complete. Caller must have inode pinned.
+ * Wait for writeback on an inode to complete during eviction. Caller must have
+ * inode pinned.
  */
 void inode_wait_for_writeback(struct inode *inode)
 {
+	BUG_ON(!(inode->i_state & I_FREEING));
+
 	spin_lock(&inode->i_lock);
 	__inode_wait_for_writeback(inode);
 	spin_unlock(&inode->i_lock);
+
+	/*
+	 * For a bd_inode when we do inode_to_bdi we'll want to get the bdev for
+	 * the inode and then deref bdev->bd_disk, which at this point has been
+	 * set to NULL, so we would panic.  At the point we are dropping our
+	 * bd_inode we won't have any pages under writeback on the device so
+	 * this is safe.  But just in case we'll assert to make sure we don't
+	 * screw this up.
+	 */
+	if (!sb_is_blkdev_sb(inode->i_sb))
+		sb_clear_inode_writeback(inode);
+	BUG_ON(!list_empty(&inode->i_wb_list));
 }
 
 /*
@@ -2108,7 +2154,7 @@ EXPORT_SYMBOL(__mark_inode_dirty);
  */
 static void wait_sb_inodes(struct super_block *sb)
 {
-	struct inode *inode, *old_inode = NULL;
+	LIST_HEAD(sync_list);
 
 	/*
 	 * We need to be protected against the filesystem going from
@@ -2116,23 +2162,56 @@ static void wait_sb_inodes(struct super_block *sb)
 	 */
 	WARN_ON(!rwsem_is_locked(&sb->s_umount));
 
-	mutex_lock(&sb->s_sync_lock);
-	spin_lock(&sb->s_inode_list_lock);
-
 	/*
-	 * Data integrity sync. Must wait for all pages under writeback,
-	 * because there may have been pages dirtied before our sync
-	 * call, but which had writeout started before we write it out.
-	 * In which case, the inode may not be on the dirty list, but
-	 * we still have to wait for that writeout.
+	 * Data integrity sync. Must wait for all pages under writeback, because
+	 * there may have been pages dirtied before our sync call, but which had
+	 * writeout started before we write it out.  In which case, the inode
+	 * may not be on the dirty list, but we still have to wait for that
+	 * writeout.
+	 *
+	 * To avoid syncing inodes put under IO after we have started here,
+	 * splice the io list to a temporary list head and walk that. Newly
+	 * dirtied inodes will go onto the primary list so we won't wait for
+	 * them. This is safe to do as we are serialised by the s_sync_lock,
+	 * so we'll complete processing the complete list before the next
+	 * sync operation repeats the splice-and-walk process.
+	 *
+	 * s_inode_wblist_lock protects the wb list and is irq-safe as it is
+	 * acquired inside of the mapping lock by __test_set_page_writeback().
+	 * We cannot acquire i_lock while the wblist lock is held without
+	 * introducing irq inversion issues. Since s_inodes_wb is a subset of
+	 * s_inodes, use s_inode_list_lock to prevent inodes from disappearing
+	 * until we have a reference. Note that s_inode_wblist_lock protects the
+	 * local sync_list as well because inodes can be dropped from either
+	 * list by writeback completion.
 	 */
-	list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+	mutex_lock(&sb->s_sync_lock);
+
+	spin_lock(&sb->s_inode_list_lock);
+	spin_lock_irq(&sb->s_inode_wblist_lock);
+	list_splice_init(&sb->s_inodes_wb, &sync_list);
+
+	while (!list_empty(&sync_list)) {
+		struct inode *inode = list_first_entry(&sync_list, struct inode,
+						       i_wb_list);
 		struct address_space *mapping = inode->i_mapping;
 
+		list_del_init(&inode->i_wb_list);
+
+		/*
+		 * The mapping can be cleaned before we wait on the inode since
+		 * we do not have the mapping lock.
+		 */
+		if (!mapping_tagged(mapping, PAGECACHE_TAG_WRITEBACK))
+			continue;
+
+		spin_unlock_irq(&sb->s_inode_wblist_lock);
+
 		spin_lock(&inode->i_lock);
-		if ((inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) ||
-		    (mapping->nrpages == 0)) {
+		if (inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) {
 			spin_unlock(&inode->i_lock);
+
+			spin_lock_irq(&sb->s_inode_wblist_lock);
 			continue;
 		}
 		__iget(inode);
@@ -2140,29 +2219,39 @@ static void wait_sb_inodes(struct super_block *sb)
 		spin_unlock(&sb->s_inode_list_lock);
 
 		/*
-		 * We hold a reference to 'inode' so it couldn't have been
-		 * removed from s_inodes list while we dropped the
-		 * s_inode_list_lock.  We cannot iput the inode now as we can
-		 * be holding the last reference and we cannot iput it under
-		 * s_inode_list_lock. So we keep the reference and iput it
-		 * later.
-		 */
-		iput(old_inode);
-		old_inode = inode;
-
-		/*
 		 * We keep the error status of individual mapping so that
 		 * applications can catch the writeback error using fsync(2).
 		 * See filemap_fdatawait_keep_errors() for details.
 		 */
 		filemap_fdatawait_keep_errors(mapping);
-
 		cond_resched();
 
+		/*
+		 * The inode has been written back. Check whether we still have
+		 * pages under I/O and move the inode back to the primary list
+		 * if necessary. sb_mark_inode_writeback() might not have done
+		 * anything if the writeback tag hadn't been cleared from the
+		 * mapping by the time more wb had started.
+		 */
+		spin_lock_irq(&mapping->tree_lock);
+		if (mapping_tagged(mapping, PAGECACHE_TAG_WRITEBACK)) {
+			spin_lock(&sb->s_inode_wblist_lock);
+			if (list_empty(&inode->i_wb_list))
+				list_add_tail(&inode->i_wb_list, &sb->s_inodes_wb);
+			spin_unlock(&sb->s_inode_wblist_lock);
+		} else
+			WARN_ON(!list_empty(&inode->i_wb_list));
+		spin_unlock_irq(&mapping->tree_lock);
+
+		iput(inode);
+
 		spin_lock(&sb->s_inode_list_lock);
+		spin_lock_irq(&sb->s_inode_wblist_lock);
 	}
+
+	spin_unlock_irq(&sb->s_inode_wblist_lock);
 	spin_unlock(&sb->s_inode_list_lock);
-	iput(old_inode);
+
 	mutex_unlock(&sb->s_sync_lock);
 }
 
