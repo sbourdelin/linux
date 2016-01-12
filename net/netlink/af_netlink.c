@@ -1576,7 +1576,10 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 		}
 	}
 
-	if (!groups && (nlk->groups == NULL || !(u32)nlk->groups[0]))
+	if (WARN_ON(!nlk->groups))
+		return 0;
+
+	if (!groups && !(u32)nlk->groups[0])
 		return 0;
 
 	netlink_table_grab();
