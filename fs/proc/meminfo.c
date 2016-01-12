@@ -69,7 +69,10 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	 * low watermark worth of cache, needs to stay.
 	 */
 	pagecache = pages[LRU_ACTIVE_FILE] + pages[LRU_INACTIVE_FILE];
-	pagecache -= min(pagecache / 2, wmark_low);
+	/*
+	 * Do not Account shared memory as available memory
+	 */
+	pagecache -= global_page_state(NR_SHMEM);
 	available += pagecache;
 
 	/*
