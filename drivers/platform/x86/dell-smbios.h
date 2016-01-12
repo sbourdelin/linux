@@ -39,7 +39,7 @@ extern struct calling_interface_buffer *dell_smbios_buffer;
 extern struct calling_interface_token *da_tokens;
 
 void dell_smbios_clear_buffer(void);
-void get_buffer(void);
+void dell_smbios_get_buffer(void);
 void release_buffer(void);
 
 int find_token_id(int tokenid);

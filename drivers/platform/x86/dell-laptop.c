@@ -416,7 +416,7 @@ static int dell_rfkill_set(void *data, bool blocked)
 	int status;
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 
 	dell_send_request(17, 11);
 	ret = dell_smbios_buffer->output[0];
@@ -480,7 +480,7 @@ static void dell_rfkill_query(struct rfkill *rfkill, void *data)
 	int status;
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 
 	dell_send_request(17, 11);
 	ret = dell_smbios_buffer->output[0];
@@ -520,7 +520,7 @@ static int dell_debugfs_show(struct seq_file *s, void *data)
 	int status;
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 
 	dell_send_request(17, 11);
 	ret = dell_smbios_buffer->output[0];
@@ -618,7 +618,7 @@ static void dell_update_rfkill(struct work_struct *ignored)
 	int status;
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 
 	dell_send_request(17, 11);
 	ret = dell_smbios_buffer->output[0];
@@ -710,7 +710,7 @@ static int __init dell_setup_rfkill(void)
 	if (!force_rfkill && !whitelisted)
 		return 0;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 	dell_send_request(17, 11);
 	ret = dell_smbios_buffer->output[0];
 	status = dell_smbios_buffer->output[1];
@@ -874,7 +874,7 @@ static int dell_send_intensity(struct backlight_device *bd)
 	if (token == -1)
 		return -ENODEV;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 	dell_smbios_buffer->input[0] = token;
 	dell_smbios_buffer->input[1] = bd->props.brightness;
 
@@ -898,7 +898,7 @@ static int dell_get_intensity(struct backlight_device *bd)
 	if (token == -1)
 		return -ENODEV;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 	dell_smbios_buffer->input[0] = token;
 
 	if (power_supply_is_system_supplied() > 0)
@@ -1158,7 +1158,7 @@ static int kbd_get_info(struct kbd_info *info)
 	u8 units;
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 
 	dell_smbios_buffer->input[0] = 0x0;
 	dell_send_request(4, 11);
@@ -1246,7 +1246,7 @@ static int kbd_get_state(struct kbd_state *state)
 {
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 
 	dell_smbios_buffer->input[0] = 0x1;
 	dell_send_request(4, 11);
@@ -1277,7 +1277,7 @@ static int kbd_set_state(struct kbd_state *state)
 {
 	int ret;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 	dell_smbios_buffer->input[0] = 0x2;
 	dell_smbios_buffer->input[1] = BIT(state->mode_bit) & 0xFFFF;
 	dell_smbios_buffer->input[1] |= (state->triggers & 0xFF) << 16;
@@ -1324,7 +1324,7 @@ static int kbd_set_token_bit(u8 bit)
 	if (id == -1)
 		return -EINVAL;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 	dell_smbios_buffer->input[0] = da_tokens[id].location;
 	dell_smbios_buffer->input[1] = da_tokens[id].value;
 	dell_send_request(1, 0);
@@ -1347,7 +1347,7 @@ static int kbd_get_token_bit(u8 bit)
 	if (id == -1)
 		return -EINVAL;
 
-	get_buffer();
+	dell_smbios_get_buffer();
 	dell_smbios_buffer->input[0] = da_tokens[id].location;
 	dell_send_request(0, 0);
 	ret = dell_smbios_buffer->output[0];
@@ -2018,7 +2018,7 @@ static int __init dell_init(void)
 
 	token = find_token_location(BRIGHTNESS_TOKEN);
 	if (token != -1) {
-		get_buffer();
+		dell_smbios_get_buffer();
 		dell_smbios_buffer->input[0] = token;
 		dell_send_request(0, 2);
 		if (dell_smbios_buffer->output[0] == 0)

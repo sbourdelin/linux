@@ -46,12 +46,12 @@ void dell_smbios_clear_buffer(void)
 }
 EXPORT_SYMBOL_GPL(dell_smbios_clear_buffer);
 
-void get_buffer(void)
+void dell_smbios_get_buffer(void)
 {
 	mutex_lock(&buffer_mutex);
 	dell_smbios_clear_buffer();
 }
-EXPORT_SYMBOL_GPL(get_buffer);
+EXPORT_SYMBOL_GPL(dell_smbios_get_buffer);
 
 void release_buffer(void)
 {
