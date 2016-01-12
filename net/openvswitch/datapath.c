@@ -79,8 +79,8 @@ static const struct genl_multicast_group ovs_dp_vport_multicast_group = {
 	.name = OVS_VPORT_MCGROUP,
 };
 
-/* Check if need to build a reply message.
- * OVS userspace sets the NLM_F_ECHO flag if it needs the reply. */
+/* Check if need to build a reply message.*/
+/* OVS userspace sets the NLM_F_ECHO flag if it needs the reply. */
 static bool ovs_must_notify(struct genl_family *family, struct genl_info *info,
 			    unsigned int group)
 {
@@ -149,6 +149,7 @@ static struct datapath *get_dp_rcu(struct net *net, int dp_ifindex)
 
 	if (dev) {
 		struct vport *vport = ovs_internal_dev_get_vport(dev);
+
 		if (vport)
 			return vport->dp;
 	}
@@ -175,6 +176,7 @@ static inline struct datapath *get_dp(struct net *net, int dp_ifindex)
 const char *ovs_dp_name(const struct datapath *dp)
 {
 	struct vport *vport = ovs_vport_ovsl_rcu(dp, OVSP_LOCAL);
+
 	return ovs_vport_name(vport);
 }
 
@@ -344,7 +346,7 @@ static int queue_gso_packets(struct datapath *dp, struct sk_buff *skb,
 	*OVS_CB(skb) = ovs_cb;
 	if (IS_ERR(segs))
 		return PTR_ERR(segs);
-	if (segs == NULL)
+	if (!segs)
 		return -EINVAL;
 
 	if (gso_type & SKB_GSO_UDP) {
@@ -455,8 +457,8 @@ static int queue_userspace_packet(struct datapath *dp, struct sk_buff *skb,
 	}
 
 	/* Complete checksum if needed */
-	if (skb->ip_summed == CHECKSUM_PARTIAL &&
-	    (err = skb_checksum_help(skb)))
+	err = skb_checksum_help(skb);
+	if (skb->ip_summed == CHECKSUM_PARTIAL && err)
 		goto out;
 
 	/* Older versions of OVS user space enforce alignment of the last
@@ -516,9 +518,10 @@ static int queue_userspace_packet(struct datapath *dp, struct sk_buff *skb,
 		pad_packet(dp, user_skb);
 	}
 
-	/* Only reserve room for attribute header, packet data is added
-	 * in skb_zerocopy() */
-	if (!(nla = nla_reserve(user_skb, OVS_PACKET_ATTR_PACKET, 0))) {
+	/* Only reserve room for attribute header, packet data is addedi */
+	/* in skb_zerocopy() */
+	nla = nla_reserve(user_skb, OVS_PACKET_ATTR_PACKET, 0);
+	if (!nla) {
 		err = -ENOBUFS;
 		goto out;
 	}
@@ -531,7 +534,7 @@ static int queue_userspace_packet(struct datapath *dp, struct sk_buff *skb,
 	/* Pad OVS_PACKET_ATTR_PACKET if linear copy was performed */
 	pad_packet(dp, user_skb);
 
-	((struct nlmsghdr *) user_skb->data)->nlmsg_len = user_skb->len;
+	((struct nlmsghdr *)user_skb->data)->nlmsg_len = user_skb->len;
 
 	err = genlmsg_unicast(ovs_dp_get_net(dp), user_skb, upcall_info->portid);
 	user_skb = NULL;
@@ -577,9 +580,9 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 	skb_reset_mac_header(packet);
 	eth = eth_hdr(packet);
 
-	/* Normally, setting the skb 'protocol' field would be handled by a
-	 * call to eth_type_trans(), but it assumes there's a sending
-	 * device, which we may not have. */
+	/* Normally, setting the skb 'protocol' field would be handled by a */
+	/* call to eth_type_trans(), but it assumes there's a sending */
+	/* device, which we may not have. */
 	if (eth_proto_is_802_3(eth->h_proto))
 		packet->protocol = eth->h_proto;
 	else
@@ -685,7 +688,9 @@ static void get_dp_stats(const struct datapath *dp, struct ovs_dp_stats *stats,
 	stats->n_flows = ovs_flow_tbl_count(&dp->table);
 	mega_stats->n_masks = ovs_flow_tbl_num_masks(&dp->table);
 
-	stats->n_hit = stats->n_missed = stats->n_lost = 0;
+	stats->n_hit = 0;
+	stats->n_missed = 0;
+	stats->n_lost = 0;
 
 	for_each_possible_cpu(i) {
 		const struct dp_stats_percpu *percpu_stats;
@@ -765,11 +770,12 @@ static int ovs_flow_cmd_fill_stats(const struct sw_flow *flow,
 		return -EMSGSIZE;
 
 	if (stats.n_packets &&
-	    nla_put(skb, OVS_FLOW_ATTR_STATS, sizeof(struct ovs_flow_stats), &stats))
+	    nla_put(skb, OVS_FLOW_ATTR_STATS, sizeof(struct ovs_flow_stats),
+		    &stats))
 		return -EMSGSIZE;
 
 	if ((u8)ntohs(tcp_flags) &&
-	     nla_put_u8(skb, OVS_FLOW_ATTR_TCP_FLAGS, (u8)ntohs(tcp_flags)))
+	    nla_put_u8(skb, OVS_FLOW_ATTR_TCP_FLAGS, (u8)ntohs(tcp_flags)))
 		return -EMSGSIZE;
 
 	return 0;
@@ -800,9 +806,9 @@ static int ovs_flow_cmd_fill_actions(const struct sw_flow *flow,
 		err = ovs_nla_put_actions(sf_acts->actions,
 					  sf_acts->actions_len, skb);
 
-		if (!err)
+		if (!err) {
 			nla_nest_end(skb, start);
-		else {
+		} else {
 			if (skb_orig_len)
 				return err;
 
@@ -1310,8 +1316,9 @@ static int ovs_flow_cmd_del(struct sk_buff *skb, struct genl_info *info)
 	ovs_flow_tbl_remove(&dp->table, flow);
 	ovs_unlock();
 
-	reply = ovs_flow_cmd_alloc_info((const struct sw_flow_actions __force *) flow->sf_acts,
-					&flow->id, info, false, ufid_flags);
+	reply = ovs_flow_cmd_alloc_info((const struct sw_flow_actions __force *)
+					flow->sf_acts, &flow->id, info,
+					false, ufid_flags);
 	if (likely(reply)) {
 		if (likely(!IS_ERR(reply))) {
 			rcu_read_lock();	/*To keep RCU checker happy. */
@@ -1325,7 +1332,8 @@ static int ovs_flow_cmd_del(struct sk_buff *skb, struct genl_info *info)
 
 			ovs_notify(&dp_flow_genl_family, reply, info);
 		} else {
-			netlink_set_err(sock_net(skb->sk)->genl_sock, 0, 0, PTR_ERR(reply));
+			netlink_set_err(sock_net(skb->sk)->genl_sock, 0, 0,
+					PTR_ERR(reply));
 		}
 	}
 
@@ -1452,7 +1460,7 @@ static int ovs_dp_cmd_fill_info(struct datapath *dp, struct sk_buff *skb,
 	int err;
 
 	ovs_header = genlmsg_put(skb, portid, seq, &dp_datapath_genl_family,
-				   flags, cmd);
+				 flags, cmd);
 	if (!ovs_header)
 		goto error;
 
@@ -1464,11 +1472,11 @@ static int ovs_dp_cmd_fill_info(struct datapath *dp, struct sk_buff *skb,
 
 	get_dp_stats(dp, &dp_stats, &dp_megaflow_stats);
 	if (nla_put(skb, OVS_DP_ATTR_STATS, sizeof(struct ovs_dp_stats),
-			&dp_stats))
+		    &dp_stats))
 		goto nla_put_failure;
 
 	if (nla_put(skb, OVS_DP_ATTR_MEGAFLOW_STATS,
-			sizeof(struct ovs_dp_megaflow_stats),
+		    sizeof(struct ovs_dp_megaflow_stats),
 			&dp_megaflow_stats))
 		goto nla_put_failure;
 
@@ -1496,9 +1504,9 @@ static struct datapath *lookup_datapath(struct net *net,
 {
 	struct datapath *dp;
 
-	if (!a[OVS_DP_ATTR_NAME])
+	if (!a[OVS_DP_ATTR_NAME]) {
 		dp = get_dp(net, ovs_header->dp_ifindex);
-	else {
+	} else {
 		struct vport *vport;
 
 		vport = ovs_vport_locate(net, nla_data(a[OVS_DP_ATTR_NAME]));
@@ -1507,7 +1515,8 @@ static struct datapath *lookup_datapath(struct net *net,
 	return dp ? dp : ERR_PTR(-ENODEV);
 }
 
-static void ovs_dp_reset_user_features(struct sk_buff *skb, struct genl_info *info)
+static void ovs_dp_reset_user_features(struct sk_buff *skb,
+				       struct genl_info *info)
 {
 	struct datapath *dp;
 
@@ -1545,7 +1554,7 @@ static int ovs_dp_cmd_new(struct sk_buff *skb, struct genl_info *info)
 
 	err = -ENOMEM;
 	dp = kzalloc(sizeof(*dp), GFP_KERNEL);
-	if (dp == NULL)
+	if (!dp)
 		goto err_free_reply;
 
 	ovs_dp_set_net(dp, sock_net(skb->sk));
@@ -1561,8 +1570,8 @@ static int ovs_dp_cmd_new(struct sk_buff *skb, struct genl_info *info)
 		goto err_destroy_table;
 	}
 
-	dp->ports = kmalloc(DP_VPORT_HASH_BUCKETS * sizeof(struct hlist_head),
-			    GFP_KERNEL);
+	dp->ports = kmalloc_array(DP_VPORT_HASH_BUCKETS,
+				 sizeof(struct hlist_head), GFP_KERNEL)
 	if (!dp->ports) {
 		err = -ENOMEM;
 		goto err_destroy_percpu;
@@ -1897,7 +1906,8 @@ static struct vport *lookup_vport(struct net *net,
 		    ovs_header->dp_ifindex != get_dpifindex(vport->dp))
 			return ERR_PTR(-ENODEV);
 		return vport;
-	} else if (a[OVS_VPORT_ATTR_PORT_NO]) {
+	} else {
+		if (a[OVS_VPORT_ATTR_PORT_NO]) {
 		u32 port_no = nla_get_u32(a[OVS_VPORT_ATTR_PORT_NO]);
 
 		if (port_no >= DP_MAX_PORTS)
@@ -1911,8 +1921,9 @@ static struct vport *lookup_vport(struct net *net,
 		if (!vport)
 			return ERR_PTR(-ENODEV);
 		return vport;
-	} else
+	} else {
 		return ERR_PTR(-EINVAL);
+	}
 }
 
 static int ovs_vport_cmd_new(struct sk_buff *skb, struct genl_info *info)
@@ -2020,7 +2031,6 @@ static int ovs_vport_cmd_set(struct sk_buff *skb, struct genl_info *info)
 		if (err)
 			goto exit_unlock_free;
 	}
-
 
 	if (a[OVS_VPORT_ATTR_UPCALL_PID]) {
 		struct nlattr *ids = a[OVS_VPORT_ATTR_UPCALL_PID];
@@ -2218,7 +2228,6 @@ static int dp_register_genl(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(dp_genl_families); i++) {
-
 		err = genl_register_family(dp_genl_families[i]);
 		if (err)
 			goto error;
