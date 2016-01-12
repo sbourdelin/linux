@@ -315,6 +315,16 @@ config RTC_DRV_MAX8997
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-max8997.
 
+config RTC_DRV_MAX77XXX
+	tristate "Maxim MAX77XXX series generic RTC driver"
+	help
+	  If you say yes here you will get support for the generic RTC driver
+	  for Maxim Semiconductor MAX77XXX series of PMIC like MAX77620.
+	  This also supports the RTC driver for Maxim PMIC MaX20024 which
+	  is almost same as MAX77620.
+	  This driver can also be built as a module. If so, the module
+	  will be called rtc-max77xxx.
+
 config RTC_DRV_MAX77686
 	tristate "Maxim MAX77686"
 	depends on MFD_MAX77686
