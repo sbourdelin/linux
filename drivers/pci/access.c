@@ -337,8 +337,15 @@ static ssize_t pci_vpd_pci22_read(struct pci_dev *dev, loff_t pos, size_t count,
 	loff_t end = pos + count;
 	u8 *buf = arg;
 
-	if (pos < 0 || pos > vpd->base.len || end > vpd->base.len)
+	if (pos < 0)
 		return -EINVAL;
+
+	if (end > vpd->base.len) {
+		if (pos > vpd->base.len)
+			return 0;
+		end = vpd->base.len;
+		count = end - pos;
+	}
 
 	if (mutex_lock_killable(&vpd->lock))
 		return -EINTR;
@@ -554,6 +561,8 @@ int pci_vpd_pci22_init(struct pci_dev *dev)
 	dev->vpd = &vpd->base;
 	if (!(dev->dev_flags & PCI_DEV_FLAGS_VPD_REF_F0))
 		vpd->base.len = pci_vpd_pci22_size(dev);
+	else
+		vpd->base.len = 0;
 	return 0;
 }
 
