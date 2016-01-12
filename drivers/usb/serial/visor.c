@@ -584,6 +584,7 @@ static int treo_attach(struct usb_serial *serial)
 
 static int clie_5_attach(struct usb_serial *serial)
 {
+	struct device *dev = &serial->dev->dev;
 	struct usb_serial_port *port;
 	unsigned int pipe;
 	int j;
@@ -597,8 +598,11 @@ static int clie_5_attach(struct usb_serial *serial)
 	 */
 
 	/* some sanity check */
-	if (serial->num_ports < 2)
+	if (serial->num_ports < 2) {
+		dev_err(dev, "%s: number of ports %d is less than 2\n",
+		    __func__, serial->num_ports);
 		return -1;
+	}
 
 	/* port 0 now uses the modified endpoint Address */
 	port = serial->port[0];
@@ -607,7 +611,14 @@ static int clie_5_attach(struct usb_serial *serial)
 
 	pipe = usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress);
 	for (j = 0; j < ARRAY_SIZE(port->write_urbs); ++j)
-		port->write_urbs[j]->pipe = pipe;
+		if (port->write_urbs[j]) {
+			port->write_urbs[j]->pipe = pipe;
+		}
+		else {
+			dev_err(dev, "%s: write_urbs %d for port 0 was not allocated\n",
+			    __func__, j);
+			return -1;
+		}
 
 	return 0;
 }
