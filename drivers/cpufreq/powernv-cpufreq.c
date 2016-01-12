@@ -39,6 +39,7 @@
 #define PMSR_PSAFE_ENABLE	(1UL << 30)
 #define PMSR_SPR_EM_DISABLE	(1UL << 31)
 #define PMSR_MAX(x)		((x >> 32) & 0xFF)
+#define pir_to_chip_id(pir)	(((pir) >> 7) & 0x3f)
 
 static struct cpufreq_frequency_table powernv_freqs[POWERNV_MAX_PSTATES+1];
 static bool rebooting, throttled, occ_reset;
@@ -312,13 +313,14 @@ static inline unsigned int get_nominal_index(void)
 static void powernv_cpufreq_throttle_check(void *data)
 {
 	unsigned int cpu = smp_processor_id();
+	unsigned int chip_id = pir_to_chip_id(hard_smp_processor_id());
 	unsigned long pmsr;
 	int pmsr_pmax, i;
 
 	pmsr = get_pmspr(SPRN_PMSR);
 
 	for (i = 0; i < nr_chips; i++)
-		if (chips[i].id == cpu_to_chip_id(cpu))
+		if (chips[i].id == chip_id)
 			break;
 
 	/* Check for Pmax Capping */
@@ -558,7 +560,8 @@ static int init_chip_info(void)
 	unsigned int prev_chip_id = UINT_MAX;
 
 	for_each_possible_cpu(cpu) {
-		unsigned int id = cpu_to_chip_id(cpu);
+		unsigned int id =
+			pir_to_chip_id(get_hard_smp_processor_id(cpu));
 
 		if (prev_chip_id != id) {
 			prev_chip_id = id;
