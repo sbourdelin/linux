@@ -102,7 +102,7 @@ static void *next_cqe_sw(struct mlx5_ib_cq *cq)
 
 static enum ib_wc_opcode get_umr_comp(struct mlx5_ib_wq *wq, int idx)
 {
-	switch (wq->wr_data[idx]) {
+	switch (wq->swr_ctx[idx].wr_data) {
 	case MLX5_IB_WR_UMR:
 		return 0;
 
@@ -196,7 +196,7 @@ static void handle_responder(struct ib_wc *wc, struct mlx5_cqe64 *cqe,
 		}
 	} else {
 		wq	  = &qp->rq;
-		wc->wr_id = wq->wrid[wq->tail & (wq->wqe_cnt - 1)];
+		wc->wr_id = wq->rwr_ctx[wq->tail & (wq->wqe_cnt - 1)].wrid;
 		++wq->tail;
 	}
 	wc->byte_len = be32_to_cpu(cqe->byte_cnt);
@@ -364,9 +364,9 @@ static void handle_atomics(struct mlx5_ib_qp *qp, struct mlx5_cqe64 *cqe64,
 		if (idx == head)
 			break;
 
-		tail = qp->sq.w_list[idx].next;
+		tail = qp->sq.swr_ctx[idx].w_list.next;
 	} while (1);
-	tail = qp->sq.w_list[idx].next;
+	tail = qp->sq.swr_ctx[idx].w_list.next;
 	qp->sq.last_poll = tail;
 }
 
@@ -476,8 +476,8 @@ repoll:
 		idx = wqe_ctr & (wq->wqe_cnt - 1);
 		handle_good_req(wc, cqe64, wq, idx);
 		handle_atomics(*cur_qp, cqe64, wq->last_poll, idx);
-		wc->wr_id = wq->wrid[idx];
-		wq->tail = wq->wqe_head[idx] + 1;
+		wc->wr_id = wq->swr_ctx[idx].wrid;
+		wq->tail = wq->swr_ctx[idx].wqe_head + 1;
 		wc->status = IB_WC_SUCCESS;
 		break;
 	case MLX5_CQE_RESP_WR_IMM:
@@ -502,8 +502,8 @@ repoll:
 			wq = &(*cur_qp)->sq;
 			wqe_ctr = be16_to_cpu(cqe64->wqe_counter);
 			idx = wqe_ctr & (wq->wqe_cnt - 1);
-			wc->wr_id = wq->wrid[idx];
-			wq->tail = wq->wqe_head[idx] + 1;
+			wc->wr_id = wq->swr_ctx[idx].wrid;
+			wq->tail = wq->swr_ctx[idx].wqe_head + 1;
 		} else {
 			struct mlx5_ib_srq *srq;
 
@@ -514,7 +514,7 @@ repoll:
 				mlx5_ib_free_srq_wqe(srq, wqe_ctr);
 			} else {
 				wq = &(*cur_qp)->rq;
-				wc->wr_id = wq->wrid[wq->tail & (wq->wqe_cnt - 1)];
+				wc->wr_id = wq->rwr_ctx[wq->tail & (wq->wqe_cnt - 1)].wrid;
 				++wq->tail;
 			}
 		}

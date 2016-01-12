@@ -120,11 +120,24 @@ struct wr_list {
 	u16	next;
 };
 
+/* Please don't let this exceed a single cacheline */
+struct swr_ctx {
+	u64		wrid;
+	u32		wr_data;
+	struct wr_list	w_list;
+	u32		wqe_head;
+	u8		rsvd[12];
+}__packed;
+
+struct rwr_ctx {
+	u64		       wrid;
+}__packed;
+
 struct mlx5_ib_wq {
-	u64		       *wrid;
-	u32		       *wr_data;
-	struct wr_list	       *w_list;
-	unsigned	       *wqe_head;
+	union {
+		struct swr_ctx *swr_ctx;
+		struct rwr_ctx *rwr_ctx;
+	};
 	u16		        unsig_count;
 
 	/* serialize post to the work queue

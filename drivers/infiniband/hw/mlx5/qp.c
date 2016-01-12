@@ -788,14 +788,11 @@ static int create_kernel_qp(struct mlx5_ib_dev *dev,
 		goto err_free;
 	}
 
-	qp->sq.wrid = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wrid), GFP_KERNEL);
-	qp->sq.wr_data = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wr_data), GFP_KERNEL);
-	qp->rq.wrid = kmalloc(qp->rq.wqe_cnt * sizeof(*qp->rq.wrid), GFP_KERNEL);
-	qp->sq.w_list = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.w_list), GFP_KERNEL);
-	qp->sq.wqe_head = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wqe_head), GFP_KERNEL);
-
-	if (!qp->sq.wrid || !qp->sq.wr_data || !qp->rq.wrid ||
-	    !qp->sq.w_list || !qp->sq.wqe_head) {
+	qp->sq.swr_ctx = kcalloc(qp->sq.wqe_cnt, sizeof(*qp->sq.swr_ctx),
+				 GFP_KERNEL);
+	qp->rq.rwr_ctx = kcalloc(qp->rq.wqe_cnt, sizeof(*qp->sq.rwr_ctx),
+				 GFP_KERNEL);
+	if (!qp->sq.swr_ctx || !qp->rq.rwr_ctx) {
 		err = -ENOMEM;
 		goto err_wrid;
 	}
@@ -805,11 +802,8 @@ static int create_kernel_qp(struct mlx5_ib_dev *dev,
 
 err_wrid:
 	mlx5_db_free(dev->mdev, &qp->db);
-	kfree(qp->sq.wqe_head);
-	kfree(qp->sq.w_list);
-	kfree(qp->sq.wrid);
-	kfree(qp->sq.wr_data);
-	kfree(qp->rq.wrid);
+	kfree(qp->sq.swr_ctx);
+	kfree(qp->rq.rwr_ctx);
 
 err_free:
 	kvfree(*in);
@@ -825,11 +819,8 @@ err_uuar:
 static void destroy_qp_kernel(struct mlx5_ib_dev *dev, struct mlx5_ib_qp *qp)
 {
 	mlx5_db_free(dev->mdev, &qp->db);
-	kfree(qp->sq.wqe_head);
-	kfree(qp->sq.w_list);
-	kfree(qp->sq.wrid);
-	kfree(qp->sq.wr_data);
-	kfree(qp->rq.wrid);
+	kfree(qp->sq.swr_ctx);
+	kfree(qp->rq.rwr_ctx);
 	mlx5_buf_free(dev->mdev, &qp->buf);
 	free_uuar(&dev->mdev->priv.uuari, qp->bf->uuarn);
 }
@@ -2576,11 +2567,11 @@ static void finish_wqe(struct mlx5_ib_qp *qp,
 	if (unlikely(qp->wq_sig))
 		ctrl->signature = wq_sig(ctrl);
 
-	qp->sq.wrid[idx] = wr_id;
-	qp->sq.w_list[idx].opcode = mlx5_opcode;
-	qp->sq.wqe_head[idx] = qp->sq.head + nreq;
+	qp->sq.swr_ctx[idx].wrid = wr_id;
+	qp->sq.swr_ctx[idx].w_list.opcode = mlx5_opcode;
+	qp->sq.swr_ctx[idx].wqe_head = qp->sq.head + nreq;
 	qp->sq.cur_post += DIV_ROUND_UP(size * 16, MLX5_SEND_WQE_BB);
-	qp->sq.w_list[idx].next = qp->sq.cur_post;
+	qp->sq.swr_ctx[idx].w_list.next = qp->sq.cur_post;
 }
 
 
@@ -2661,7 +2652,7 @@ int mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 
 			case IB_WR_LOCAL_INV:
 				next_fence = MLX5_FENCE_MODE_INITIATOR_SMALL;
-				qp->sq.wr_data[idx] = IB_WR_LOCAL_INV;
+				qp->sq.swr_ctx[idx].wr_data = IB_WR_LOCAL_INV;
 				ctrl->imm = cpu_to_be32(wr->ex.invalidate_rkey);
 				set_linv_wr(qp, &seg, &size);
 				num_sge = 0;
@@ -2669,7 +2660,7 @@ int mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 
 			case IB_WR_REG_MR:
 				next_fence = MLX5_FENCE_MODE_INITIATOR_SMALL;
-				qp->sq.wr_data[idx] = IB_WR_REG_MR;
+				qp->sq.swr_ctx[idx].wr_data = IB_WR_REG_MR;
 				ctrl->imm = cpu_to_be32(reg_wr(wr)->key);
 				err = set_reg_wr(qp, reg_wr(wr), &seg, &size);
 				if (err) {
@@ -2680,7 +2671,7 @@ int mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				break;
 
 			case IB_WR_REG_SIG_MR:
-				qp->sq.wr_data[idx] = IB_WR_REG_SIG_MR;
+				qp->sq.swr_ctx[idx].wr_data = IB_WR_REG_SIG_MR;
 				mr = to_mmr(sig_handover_wr(wr)->sig_mr);
 
 				ctrl->imm = cpu_to_be32(mr->ibmr.rkey);
@@ -2782,7 +2773,7 @@ int mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				mlx5_ib_warn(dev, "bad opcode\n");
 				goto out;
 			}
-			qp->sq.wr_data[idx] = MLX5_IB_WR_UMR;
+			qp->sq.swr_ctx[idx].wr_data = MLX5_IB_WR_UMR;
 			ctrl->imm = cpu_to_be32(umr_wr(wr)->mkey);
 			set_reg_umr_segment(seg, wr);
 			seg += sizeof(struct mlx5_wqe_umr_ctrl_seg);
@@ -2930,7 +2921,7 @@ int mlx5_ib_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
 			set_sig_seg(sig, (qp->rq.max_gs + 1) << 2);
 		}
 
-		qp->rq.wrid[ind] = wr->wr_id;
+		qp->rq.rwr_ctx[ind].wrid = wr->wr_id;
 
 		ind = (ind + 1) & (qp->rq.wqe_cnt - 1);
 	}
