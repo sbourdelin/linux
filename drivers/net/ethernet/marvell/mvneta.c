@@ -33,6 +33,7 @@
 #include <linux/phy.h>
 #include <linux/clk.h>
 #include <linux/cpu.h>
+#include <net/hwbm.h>
 #include "mvneta_bm.h"
 
 /* Registers */
@@ -1016,11 +1017,12 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 static void mvneta_bm_update_mtu(struct mvneta_port *pp, int mtu)
 {
 	struct mvneta_bm_pool *bm_pool = pp->pool_long;
+	struct hwbm_pool *hwbm_pool = &bm_pool->hwbm_pool;
 	int num;
 
 	/* Release all buffers from long pool */
 	mvneta_bm_bufs_free(pp->bm_priv, bm_pool, 1 << pp->id);
-	if (bm_pool->buf_num) {
+	if (hwbm_pool->buf_num) {
 		WARN(1, "cannot free all buffers in pool %d\n",
 		     bm_pool->id);
 		goto bm_mtu_err;
@@ -1028,14 +1030,14 @@ static void mvneta_bm_update_mtu(struct mvneta_port *pp, int mtu)
 
 	bm_pool->pkt_size = MVNETA_RX_PKT_SIZE(mtu);
 	bm_pool->buf_size = MVNETA_RX_BUF_SIZE(bm_pool->pkt_size);
-	bm_pool->frag_size = SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) +
+	hwbm_pool->size = SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) +
 			  SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(bm_pool->pkt_size));
 
 	/* Fill entire long pool */
-	num = mvneta_bm_bufs_add(pp->bm_priv, bm_pool, bm_pool->size);
-	if (num != bm_pool->size) {
+	num = hwbm_pool_add(hwbm_pool, hwbm_pool->size);
+	if (num != hwbm_pool->size) {
 		WARN(1, "pool %d: %d of %d allocated\n",
-		     bm_pool->id, num, bm_pool->size);
+		     bm_pool->id, num, hwbm_pool->size);
 		goto bm_mtu_err;
 	}
 	mvneta_bm_pool_bufsize_set(pp, bm_pool->buf_size, bm_pool->id);
@@ -1715,6 +1717,14 @@ static void mvneta_txq_done(struct mvneta_port *pp,
 	}
 }
 
+void *mvneta_frag_alloc(unsigned int frag_size)
+{
+	if (likely(frag_size <= PAGE_SIZE))
+		return netdev_alloc_frag(frag_size);
+	else
+		return kmalloc(frag_size, GFP_ATOMIC);
+}
+
 /* Refill processing for SW buffer management */
 static int mvneta_rx_refill(struct mvneta_port *pp,
 			    struct mvneta_rx_desc *rx_desc)
@@ -1768,6 +1778,14 @@ static u32 mvneta_skb_tx_csum(struct mvneta_port *pp, struct sk_buff *skb)
 	}
 
 	return MVNETA_TX_L4_CSUM_NOT;
+}
+
+void mvneta_frag_free(unsigned int frag_size, void *data)
+{
+	if (likely(frag_size <= PAGE_SIZE))
+		skb_free_frag(data);
+	else
+		kfree(data);
 }
 
 /* Drop packets received by the RXQ and free buffers */
@@ -1880,7 +1898,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 		}
 
 		/* Refill processing */
-		err = bm_in_use ? mvneta_bm_pool_refill(pp->bm_priv, bm_pool) :
+		err = bm_in_use ? hwbm_pool_refill(&bm_pool->hwbm_pool) :
 				  mvneta_rx_refill(pp, rx_desc);
 		if (err) {
 			netdev_err(dev, "Linux processing - Can't refill\n");
@@ -1888,7 +1906,8 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 			goto err_drop_frame;
 		}
 
-		frag_size = bm_in_use ? bm_pool->frag_size : pp->frag_size;
+		frag_size = bm_in_use ? bm_pool->hwbm_pool.size :
+					pp->frag_size;
 
 		skb = build_skb(data, frag_size > PAGE_SIZE ? 0 : frag_size);
 
@@ -3946,11 +3965,6 @@ static int mvneta_probe(struct platform_device *pdev)
 	dev->priv_flags |= IFF_UNICAST_FLT;
 	dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
 
-	err = register_netdev(dev);
-	if (err < 0) {
-		dev_err(&pdev->dev, "failed to register\n");
-		goto err_free_stats;
-	}
 
 	pp->id = dev->ifindex;
 
@@ -3963,6 +3977,12 @@ static int mvneta_probe(struct platform_device *pdev)
 			dev_info(&pdev->dev, "use SW buffer management\n");
 			pp->bm_priv = NULL;
 		}
+	}
+
+	err = register_netdev(dev);
+	if (err < 0) {
+		dev_err(&pdev->dev, "failed to register\n");
+		goto err_free_stats;
 	}
 
 	err = mvneta_init(&pdev->dev, pp);
