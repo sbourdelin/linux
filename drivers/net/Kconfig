@@ -55,6 +55,21 @@ config BONDING
 	  To compile this driver as a module, choose M here: the module
 	  will be called bonding.
 
+config BONDING_COUNT
+        int "Number of bonding devices to pre-create at init time"
+        depends on BONDING
+        default 1
+        help
+          Static number of bonding devices to be unconditionally pre-created
+          at init time.
+
+          This default value can be overwritten on the kernel command
+          line or with module-parameter bonding.max_bonds.
+
+          The historic default is 1. If a mid-2007 version of iproute2
+          is used (v2.6.23 or later), it can be set to 0, since needed
+          bonding devices can be dynamically allocated via rtnetlink.
+
 config DUMMY
 	tristate "Dummy net driver support"
 	---help---

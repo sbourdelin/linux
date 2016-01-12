@@ -88,7 +88,7 @@
 
 /* monitor all links that often (in milliseconds). <=0 disables monitoring */
 
-static int max_bonds	= BOND_DEFAULT_MAX_BONDS;
+static int max_bonds	= CONFIG_BONDING_COUNT;
 static int tx_queues	= BOND_DEFAULT_TX_QUEUES;
 static int num_peer_notif = 1;
 static int miimon;
