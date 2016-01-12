@@ -954,8 +954,10 @@ void sb_mark_inode_writeback(struct inode *inode)
 
 	if (list_empty(&inode->i_wb_list)) {
 		spin_lock_irqsave(&sb->s_inode_wblist_lock, flags);
-		if (list_empty(&inode->i_wb_list))
+		if (list_empty(&inode->i_wb_list)) {
 			list_add_tail(&inode->i_wb_list, &sb->s_inodes_wb);
+			trace_sb_mark_inode_writeback(inode);
+		}
 		spin_unlock_irqrestore(&sb->s_inode_wblist_lock, flags);
 	}
 }
@@ -970,7 +972,10 @@ void sb_clear_inode_writeback(struct inode *inode)
 
 	if (!list_empty(&inode->i_wb_list)) {
 		spin_lock_irqsave(&sb->s_inode_wblist_lock, flags);
-		list_del_init(&inode->i_wb_list);
+		if (!list_empty(&inode->i_wb_list)) {
+			list_del_init(&inode->i_wb_list);
+			trace_sb_clear_inode_writeback(inode);
+		}
 		spin_unlock_irqrestore(&sb->s_inode_wblist_lock, flags);
 	}
 }
@@ -2202,8 +2207,10 @@ static void wait_sb_inodes(struct super_block *sb)
 		 * The mapping can be cleaned before we wait on the inode since
 		 * we do not have the mapping lock.
 		 */
-		if (!mapping_tagged(mapping, PAGECACHE_TAG_WRITEBACK))
+		if (!mapping_tagged(mapping, PAGECACHE_TAG_WRITEBACK)) {
+			trace_sb_clear_inode_writeback(inode);
 			continue;
+		}
 
 		spin_unlock_irq(&sb->s_inode_wblist_lock);
 
@@ -2239,8 +2246,10 @@ static void wait_sb_inodes(struct super_block *sb)
 			if (list_empty(&inode->i_wb_list))
 				list_add_tail(&inode->i_wb_list, &sb->s_inodes_wb);
 			spin_unlock(&sb->s_inode_wblist_lock);
-		} else
+		} else {
 			WARN_ON(!list_empty(&inode->i_wb_list));
+			trace_sb_clear_inode_writeback(inode);
+		}
 		spin_unlock_irq(&mapping->tree_lock);
 
 		iput(inode);
