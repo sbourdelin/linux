@@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
 	for (i = 0; i < dram->num_cs; i++) {
 		const struct mbus_dram_window *cs = dram->cs + i;
 
-		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
+		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
 			*target = dram->mbus_dram_target_id;
 			*attr = cs->mbus_attr;
 			return 0;
