@@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
 	return 0;
 }
 
+static bool validate_addr(unsigned long start, unsigned long end)
+{
+	/*
+	 * This check explicitly excludes most kernel memory. Most kernel
+	 * memory is mapped with a larger page size and breaking down the
+	 * larger page size without causing TLB conflicts is very difficult.
+	 *
+	 * If you need to call set_memory_* on a range, the recommendation is
+	 * to use vmalloc since that range is mapped with pages.
+	 */
+	if (start >= MODULES_VADDR && start < MODULES_END &&
+	    end >= MODULES_VADDR && end < MODULES_END)
+		return true;
+
+	if (is_vmalloc_addr(start) && is_vmalloc_addr(end))
+		return true;
+
+	return false;
+}
+
 static int change_memory_common(unsigned long addr, int numpages,
 				pgprot_t set_mask, pgprot_t clear_mask)
 {
@@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
 		WARN_ON_ONCE(1);
 	}
 
-	if (start < MODULES_VADDR || start >= MODULES_END)
-		return -EINVAL;
-
-	if (end < MODULES_VADDR || end >= MODULES_END)
+	if (!validate_addr(start, end))
 		return -EINVAL;
 
 	data.set_mask = set_mask;
