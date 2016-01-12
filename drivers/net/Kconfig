@@ -110,11 +110,24 @@ config IFB
 	  This is an intermediate driver that allows sharing of
 	  resources.
 	  To compile this driver as a module, choose M here: the module
-	  will be called ifb.  If you want to use more than one ifb
-	  device at a time, you need to compile this driver as a module.
-	  Instead of 'ifb', the devices will then be called 'ifb0',
-	  'ifb1' etc.
+	  will be called ifb.
+
 	  Look at the iproute2 documentation directory for usage etc
+
+config IFB_COUNT
+        int "Number of ifb devices to pre-create at init time"
+        depends on IFB
+        default 3
+        help
+          Static number of ifb devices to be unconditionally pre-created
+          at init time.
+
+          This default value can be overwritten on the kernel command
+          line or with module-parameter ifb.numifbs.
+
+          The historic default is 3. If a mid-2007 version of iproute2
+          is used (v2.6.23 or later), it can be set to 0, since needed
+          ifb devices can be dynamically allocated via rtnetlink.
 
 source "drivers/net/team/Kconfig"
 
