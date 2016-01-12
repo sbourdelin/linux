@@ -506,6 +506,9 @@ static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
 	struct arm_smmu_master *master = NULL;
 	struct device_node *dev_node = dev_get_dev_node(dev);
 
+	if (!dev_node)
+		return NULL;
+
 	spin_lock(&arm_smmu_devices_lock);
 	list_for_each_entry(smmu, &arm_smmu_devices, list) {
 		master = find_smmu_master(smmu, dev_node);
