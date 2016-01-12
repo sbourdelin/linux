@@ -72,31 +72,6 @@ struct calling_interface_token *dell_smbios_find_token(int tokenid)
 }
 EXPORT_SYMBOL_GPL(dell_smbios_find_token);
 
-int find_token_id(int tokenid)
-{
-	int i;
-
-	for (i = 0; i < da_num_tokens; i++) {
-		if (da_tokens[i].tokenID == tokenid)
-			return i;
-	}
-
-	return -1;
-}
-EXPORT_SYMBOL_GPL(find_token_id);
-
-int find_token_location(int tokenid)
-{
-	int id;
-
-	id = find_token_id(tokenid);
-	if (id == -1)
-		return -1;
-
-	return da_tokens[id].location;
-}
-EXPORT_SYMBOL_GPL(find_token_location);
-
 struct calling_interface_buffer *dell_smbios_send_request(int class,
 							  int select)
 {
