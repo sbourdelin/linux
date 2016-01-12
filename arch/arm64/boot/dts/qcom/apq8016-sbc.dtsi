@@ -268,9 +268,9 @@
 				default-state = "off";
 			};
 		};
-	};
-};
 
-&sdhc_1 {
-	status = "okay";
+		sdhci@07824000 {
+			status = "okay";
+		};
+	};
 };
