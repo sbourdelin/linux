@@ -325,6 +325,8 @@ static int btrfs_ioctl_setflags(struct file *file, void __user *arg)
 
 		if (root->fs_info->compress_type == BTRFS_COMPRESS_LZO)
 			comp = "lzo";
+		else if (root->fs_info->compress_type == BTRFS_COMPRESS_LZ4)
+			comp = "lz4";
 		else
 			comp = "zlib";
 		ret = btrfs_set_prop(inode, "btrfs.compression",
@@ -1455,6 +1457,8 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 
 	if (range->compress_type == BTRFS_COMPRESS_LZO) {
 		btrfs_set_fs_incompat(root->fs_info, COMPRESS_LZO);
+	} else if (range->compress_type == BTRFS_COMPRESS_LZ4) {
+		btrfs_set_fs_incompat(root->fs_info, COMPRESS_LZ4);
 	}
 
 	ret = defrag_count;
