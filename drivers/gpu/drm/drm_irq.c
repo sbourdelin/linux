@@ -936,8 +936,10 @@ u32 drm_vblank_count_and_time(struct drm_device *dev, unsigned int pipe,
 	int count = DRM_TIMESTAMP_MAXRETRIES;
 	u32 cur_vblank;
 
-	if (WARN_ON(pipe >= dev->num_crtcs))
+	if (WARN_ON(pipe >= dev->num_crtcs)) {
+		*vblanktime = (struct timeval) { 0 };
 		return 0;
+	}
 
 	/*
 	 * Vblank timestamps are read lockless. To ensure consistency the vblank
