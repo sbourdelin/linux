@@ -490,11 +490,13 @@ static int alua_check_sense(struct scsi_device *sdev,
 static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 {
 	struct scsi_sense_hdr sense_hdr;
+	struct alua_port_group *tmp_pg;
 	int len, k, off, valid_states = 0, bufflen = ALUA_RTPG_SIZE;
-	unsigned char *ucp, *buff;
+	unsigned char *desc, *buff;
 	unsigned err, retval;
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
+	unsigned long flags;
 
 	if (!pg->expiry) {
 		unsigned long transition_tmo = ALUA_FAILOVER_TIMEOUT * HZ;
@@ -596,16 +598,27 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	else
 		tpg_desc_tbl_off = 4;
 
-	for (k = tpg_desc_tbl_off, ucp = buff + tpg_desc_tbl_off;
+	for (k = tpg_desc_tbl_off, desc = buff + tpg_desc_tbl_off;
 	     k < len;
-	     k += off, ucp += off) {
+	     k += off, desc += off) {
+		u16 group_id = get_unaligned_be16(&desc[2]);
 
-		if (pg->group_id == get_unaligned_be16(&ucp[2])) {
-			pg->state = ucp[0] & 0x0f;
-			pg->pref = ucp[0] >> 7;
-			valid_states = ucp[1];
+		spin_lock_irqsave(&port_group_lock, flags);
+		list_for_each_entry(tmp_pg, &port_group_list, node) {
+			if (tmp_pg->group_id != group_id)
+				continue;
+			if (tmp_pg->device_id_len != pg->device_id_len)
+				continue;
+			if (strncmp(tmp_pg->device_id_str, pg->device_id_str,
+				    tmp_pg->device_id_len))
+				continue;
+			tmp_pg->state = desc[0] & 0x0f;
+			tmp_pg->pref = desc[0] >> 7;
+			if (tmp_pg == pg)
+				valid_states = desc[1];
 		}
-		off = 8 + (ucp[7] * 4);
+		spin_unlock_irqrestore(&port_group_lock, flags);
+		off = 8 + (desc[7] * 4);
 	}
 
 	sdev_printk(KERN_INFO, sdev,
