@@ -315,6 +315,11 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"Max Bytes",
 		NULL,
 	};
+	static const char * const force_frame_type[] = {
+		"Disabled",
+		"I Frame",
+		NULL,
+	};
 	static const char * const entropy_mode[] = {
 		"CAVLC",
 		"CABAC",
@@ -533,6 +538,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return header_mode;
 	case V4L2_CID_MPEG_VIDEO_MULTI_SLICE_MODE:
 		return multi_slice;
+	case V4L2_CID_MPEG_VIDEO_FORCE_FRAME_TYPE:
+		return force_frame_type;
 	case V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE:
 		return entropy_mode;
 	case V4L2_CID_MPEG_VIDEO_H264_LEVEL:
@@ -747,6 +754,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:		return "Horizontal MV Search Range";
 	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
 	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
+	case V4L2_CID_MPEG_VIDEO_FORCE_FRAME_TYPE:		return "Force an encoded frame type";
 
 	/* VPX controls */
 	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		return "VPX Number of Partitions";
@@ -1044,6 +1052,11 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
 	case V4L2_CID_DETECT_MD_MODE:
 		*type = V4L2_CTRL_TYPE_MENU;
+		break;
+	case V4L2_CID_MPEG_VIDEO_FORCE_FRAME_TYPE:
+		*type = V4L2_CTRL_TYPE_MENU;
+		*flags |= V4L2_CTRL_FLAG_WRITE_ONLY |
+			  V4L2_CTRL_FLAG_EXECUTE_ON_WRITE;
 		break;
 	case V4L2_CID_LINK_FREQ:
 		*type = V4L2_CTRL_TYPE_INTEGER_MENU;
