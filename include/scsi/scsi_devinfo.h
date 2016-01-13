@@ -38,4 +38,36 @@
 #define BLIST_NO_RSOC		0x20000000 /* don't try to issue RSOC */
 #define BLIST_MAX_1024		0x40000000 /* maximum 1024 sector cdb length */
 
+/* list of keys for the lists */
+enum {
+	SCSI_DEVINFO_GLOBAL = 0,
+	SCSI_DEVINFO_SPI,
+};
+
+extern int scsi_get_device_flags_keyed(struct scsi_device *sdev,
+				       const unsigned char *vendor,
+				       const unsigned char *model, int key);
+
+/**
+ * scsi_get_device_flags - get device specific flags from the dynamic
+ *                         device list.
+ * @sdev:       &scsi_device to get flags for
+ * @vendor:	vendor name
+ * @model:	model name
+ *
+ * Description:
+ *     Search the global scsi_dev_info_list (specified by list zero)
+ *     for an entry matching @vendor and @model, if found, return the
+ *     matching flags value, else return the host or global default
+ *     settings.  Called during scan time.
+ **/
+static inline int scsi_get_device_flags(struct scsi_device *sdev,
+					const unsigned char *vendor,
+					const unsigned char *model)
+{
+	return scsi_get_device_flags_keyed(sdev, vendor, model,
+					   SCSI_DEVINFO_GLOBAL);
+}
+
+
 #endif

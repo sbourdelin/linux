@@ -545,27 +545,6 @@ static int scsi_dev_info_list_add_str(char *dev_list)
 }
 
 /**
- * get_device_flags - get device specific flags from the dynamic device list.
- * @sdev:       &scsi_device to get flags for
- * @vendor:	vendor name
- * @model:	model name
- *
- * Description:
- *     Search the global scsi_dev_info_list (specified by list zero)
- *     for an entry matching @vendor and @model, if found, return the
- *     matching flags value, else return the host or global default
- *     settings.  Called during scan time.
- **/
-int scsi_get_device_flags(struct scsi_device *sdev,
-			  const unsigned char *vendor,
-			  const unsigned char *model)
-{
-	return scsi_get_device_flags_keyed(sdev, vendor, model,
-					   SCSI_DEVINFO_GLOBAL);
-}
-
-
-/**
  * scsi_get_device_flags_keyed - get device specific flags from the dynamic device list
  * @sdev:       &scsi_device to get flags for
  * @vendor:	vendor name
