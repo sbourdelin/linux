@@ -27,6 +27,7 @@
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_dh.h>
+#include <scsi/scsi_devinfo.h>
 
 #define ALUA_DH_NAME "alua"
 #define ALUA_DH_VER "1.3"
@@ -335,6 +336,10 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 	int rel_port = -1, group_id;
 	struct alua_port_group *pg, *old_pg = NULL;
 	bool pg_updated = false;
+	unsigned int bflags = scsi_get_device_flags_keyed(sdev,
+							  &sdev->inquiry[8],
+							  &sdev->inquiry[16],
+							  SCSI_DEVINFO_GLOBAL);
 
 	group_id = scsi_vpd_tpg_id(sdev, &rel_port);
 	if (group_id < 0) {
@@ -373,6 +378,8 @@ static int alua_check_vpd(struct scsi_device *sdev, struct alua_dh_data *h,
 		rcu_assign_pointer(h->pg, pg);
 		pg_updated = true;
 	}
+	if (bflags & BLIST_SYNC_ALUA)
+		pg->flags |= ALUA_SYNC_STPG;
 	alua_rtpg_queue(h->pg, sdev, NULL);
 	spin_unlock(&h->pg_lock);
 
