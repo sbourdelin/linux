@@ -133,21 +133,18 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	stb	r0, HSTATE_HWTHREAD_REQ(r13)
 
 	/*
-	 * For external and machine check interrupts, we need
-	 * to call the Linux handler to process the interrupt.
-	 * We do that by jumping to absolute address 0x500 for
-	 * external interrupts, or the machine_check_fwnmi label
-	 * for machine checks (since firmware might have patched
-	 * the vector area at 0x200).  The [h]rfid at the end of the
-	 * handler will return to the book3s_hv_interrupts.S code.
-	 * For other interrupts we do the rfid to get back
-	 * to the book3s_hv_interrupts.S code here.
+	 * For external interrupts we need to call the Linux
+	 * handler to process the interrupt. We do that by jumping
+	 * to absolute address 0x500 for external interrupts.
+	 * The [h]rfid at the end of the handler will return to
+	 * the book3s_hv_interrupts.S code. For other interrupts
+	 * we do the rfid to get back to the book3s_hv_interrupts.S
+	 * code here.
 	 */
 	ld	r8, 112+PPC_LR_STKOFF(r1)
 	addi	r1, r1, 112
 	ld	r7, HSTATE_HOST_MSR(r13)
 
-	cmpwi	cr1, r12, BOOK3S_INTERRUPT_MACHINE_CHECK
 	cmpwi	r12, BOOK3S_INTERRUPT_EXTERNAL
 	beq	11f
 	cmpwi	r12, BOOK3S_INTERRUPT_H_DOORBELL
@@ -162,15 +159,12 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	mtmsrd	r6, 1			/* Clear RI in MSR */
 	mtsrr0	r8
 	mtsrr1	r7
-	beq	cr1, 13f		/* machine check */
 	RFI
 
 	/* On POWER7, we have external interrupts set to use HSRR0/1 */
 11:	mtspr	SPRN_HSRR0, r8
 	mtspr	SPRN_HSRR1, r7
 	ba	0x500
-
-13:	b	machine_check_fwnmi
 
 14:	mtspr	SPRN_HSRR0, r8
 	mtspr	SPRN_HSRR1, r7
@@ -2390,15 +2384,13 @@ machine_check_realmode:
 	ld	r9, HSTATE_KVM_VCPU(r13)
 	li	r12, BOOK3S_INTERRUPT_MACHINE_CHECK
 	/*
-	 * Deliver unhandled/fatal (e.g. UE) MCE errors to guest through
-	 * machine check interrupt (set HSRR0 to 0x200). And for handled
-	 * errors (no-fatal), just go back to guest execution with current
-	 * HSRR0 instead of exiting guest. This new approach will inject
-	 * machine check to guest for fatal error causing guest to crash.
-	 *
-	 * The old code used to return to host for unhandled errors which
-	 * was causing guest to hang with soft lockups inside guest and
-	 * makes it difficult to recover guest instance.
+	 * Deliver unhandled/fatal (e.g. UE) MCE errors to guest either
+	 * through machine check interrupt (set HSRR0 to 0x200) or by
+	 * exiting the guest with KVM_EXIT_NMI exit reason if guest is
+	 * FWNMI capable. For handled errors (no-fatal), just go back
+	 * to guest execution with current HSRR0. This new approach
+	 * injects machine check errors in guest address space to guest
+	 * enabling guest kernel to suitably handle such errors.
 	 *
 	 * if we receive machine check with MSR(RI=0) then deliver it to
 	 * guest as machine check causing guest to crash.
@@ -2408,11 +2400,17 @@ machine_check_realmode:
 	beq	1f			/* Deliver a machine check to guest */
 	ld	r10, VCPU_PC(r9)
 	cmpdi	r3, 0		/* Did we handle MCE ? */
-	bne	2f	/* Continue guest execution. */
+	bne	3f	/* Continue guest execution. */
 	/* If not, deliver a machine check.  SRR0/1 are already set */
-1:	li	r10, BOOK3S_INTERRUPT_MACHINE_CHECK
+1:  /* Check if guest is capable of handling NMI exit */
+	ld  r3, VCPU_KVM(r9)
+	lbz  r3, KVM_FWNMI(r3)
+	cmpdi   r3, 1       /* FWNMI capable? */
+	bne 2f
+	b   mc_cont
+2:	li	r10, BOOK3S_INTERRUPT_MACHINE_CHECK
 	bl	kvmppc_msr_interrupt
-2:	b	fast_interrupt_c_return
+3:	b	fast_interrupt_c_return
 
 /*
  * Check the reason we woke from nap, and take appropriate action.
