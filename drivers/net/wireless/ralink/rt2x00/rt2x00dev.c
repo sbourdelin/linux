@@ -1204,6 +1204,7 @@ int rt2x00lib_start(struct rt2x00_dev *rt2x00dev)
 	rt2x00dev->intf_ap_count = 0;
 	rt2x00dev->intf_sta_count = 0;
 	rt2x00dev->intf_associated = 0;
+	rt2x00dev->is_monitoring = false;
 
 	/* Enable the radio */
 	retval = rt2x00lib_enable_radio(rt2x00dev);
