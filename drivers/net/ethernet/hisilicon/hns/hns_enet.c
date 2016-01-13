@@ -1802,7 +1802,7 @@ static int hns_nic_try_get_ae(struct net_device *ndev)
 	int ret;
 
 	h = hnae_get_handle(&priv->netdev->dev,
-			    priv->ae_name, priv->port_id, NULL);
+			    priv->ae_node, priv->port_id, NULL);
 	if (IS_ERR_OR_NULL(h)) {
 		ret = PTR_ERR(h);
 		dev_dbg(priv->dev, "has not handle, register notifier!\n");
@@ -1880,9 +1880,12 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
 	else
 		priv->enet_ver = AE_VERSION_2;
 
-	ret = of_property_read_string(node, "ae-name", &priv->ae_name);
-	if (ret)
-		goto out_read_string_fail;
+	priv->ae_node = (void *)of_parse_phandle(node, "ae-handle", 0);
+	if (IS_ERR_OR_NULL(priv->ae_node)) {
+		ret = PTR_ERR(priv->ae_node);
+		dev_err(dev, "not find ae-handle\n");
+		goto out_read_handle_fai;
+	}
 
 	ret = of_property_read_u32(node, "port-id", &priv->port_id);
 	if (ret)
@@ -1945,6 +1948,8 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
 
 out_notify_fail:
 	(void)cancel_work_sync(&priv->service_task);
+out_read_handle_fai:
+
 out_read_string_fail:
 	free_netdev(ndev);
 	return ret;
