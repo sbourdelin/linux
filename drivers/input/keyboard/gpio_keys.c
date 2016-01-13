@@ -649,6 +649,14 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 	for_each_child_of_node(node, pp) {
 		enum of_gpio_flags flags;
 
+		/* Ignore the button if status of node is disabled */
+		error = of_device_is_available(pp);
+		if (!error) {
+			dev_dbg(dev, "Button %s is ignored\n", pp->name);
+			pdata->nbuttons--;
+			continue;
+		}
+
 		button = &pdata->buttons[i++];
 
 		button->gpio = of_get_gpio_flags(pp, 0, &flags);
