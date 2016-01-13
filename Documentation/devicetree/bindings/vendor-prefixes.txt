@@ -231,6 +231,7 @@ toradex	Toradex AG
 toshiba	Toshiba Corporation
 toumaz	Toumaz
 tplink	TP-LINK Technologies Co., Ltd.
+uniwest	United Western Technologies Corp (UniWest)
 tronfy	Tronfy
 truly	Truly Semiconductors Limited
 upisemi	uPI Semiconductor Corp.
