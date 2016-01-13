@@ -237,6 +237,20 @@ module_param_named(roamoff, brcmf_roamoff, int, S_IRUSR);
 MODULE_PARM_DESC(roamoff, "do not use internal roaming engine");
 
 
+static u8 nl80211_band_to_fwil(enum nl80211_band band)
+{
+	switch (band) {
+	case NL80211_BAND_2GHZ:
+		return WLC_BAND_2G;
+	case NL80211_BAND_5GHZ:
+		return WLC_BAND_5G;
+	default:
+		WARN_ON(1);
+		break;
+	}
+	return 0;
+}
+
 static u16 chandef_to_chanspec(struct brcmu_d11inf *d11inf,
 			       struct cfg80211_chan_def *ch)
 {
@@ -1722,6 +1736,48 @@ enum nl80211_auth_type brcmf_war_auth_type(struct brcmf_if *ifp,
 	return type;
 }
 
+static void brcmf_set_join_pref(struct brcmf_if *ifp,
+				struct cfg80211_bss_selection *bss_select)
+{
+	struct brcmf_join_pref_params join_pref_params[2];
+	enum nl80211_band band;
+	int err, i = 0;
+
+	if (!bss_select->primitive) {
+		brcmf_c_set_joinpref_default(ifp);
+		return;
+	}
+
+	join_pref_params[i].len = 2;
+	join_pref_params[i].rssi_gain = 0;
+	switch (bss_select->primitive) {
+	case NL80211_BSS_SELECT_BAND_PREF:
+		join_pref_params[i].type = BRCMF_JOIN_PREF_BAND;
+		band = bss_select->param.band_pref;
+		join_pref_params[i].band = nl80211_band_to_fwil(band);
+		i++;
+		break;
+	case NL80211_BSS_SELECT_ADJUST_RSSI:
+		join_pref_params[i].type = BRCMF_JOIN_PREF_RSSI_DELTA;
+		band = bss_select->param.adjust.band;
+		join_pref_params[i].band = nl80211_band_to_fwil(band);
+		join_pref_params[i].rssi_gain = bss_select->param.adjust.delta;
+		i++;
+		break;
+	case NL80211_BSS_SELECT_RSSI:
+	default:
+		break;
+	}
+	join_pref_params[i].type = BRCMF_JOIN_PREF_RSSI;
+	join_pref_params[i].len = 2;
+	join_pref_params[i].rssi_gain = 0;
+	join_pref_params[i].band = 0;
+	err = brcmf_fil_iovar_data_set(ifp, "join_pref", join_pref_params,
+				       sizeof(join_pref_params));
+	if (err)
+		brcmf_err("Set join_pref error (%d)\n", err);
+}
+
 static s32
 brcmf_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev,
 		       struct cfg80211_connect_params *sme)
@@ -1857,6 +1913,8 @@ brcmf_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev,
 		memcpy(&ext_join_params->assoc_le.bssid, sme->bssid, ETH_ALEN);
 	else
 		eth_broadcast_addr(ext_join_params->assoc_le.bssid);
+
+	brcmf_set_join_pref(ifp, &sme->bss_select);
 
 	if (cfg->channel) {
 		ext_join_params->assoc_le.chanspec_num = cpu_to_le32(1);
@@ -5920,6 +5978,11 @@ static int brcmf_setup_wiphy(struct wiphy *wiphy, struct brcmf_if *ifp)
 	wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 	wiphy->cipher_suites = __wl_cipher_suites;
 	wiphy->n_cipher_suites = ARRAY_SIZE(__wl_cipher_suites);
+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_BSS_SELECT);
+	wiphy->bss_select_support = BIT(NL80211_BSS_SELECT_RSSI) |
+				    BIT(NL80211_BSS_SELECT_BAND_PREF) |
+				    BIT(NL80211_BSS_SELECT_ADJUST_RSSI);
+
 	wiphy->flags |= WIPHY_FLAG_PS_ON_BY_DEFAULT |
 			WIPHY_FLAG_OFFCHAN_TX |
 			WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL |
