@@ -4,6 +4,7 @@ Required properties:
 	- compatible = "gpio-keys";
 
 Optional properties:
+	- label: String, name of the gpio-keys input system.
 	- autorepeat: Boolean, Enable auto repeat feature of Linux input
 	  subsystem.
 
