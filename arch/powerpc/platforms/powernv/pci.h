@@ -4,15 +4,13 @@
 struct pci_dn;
 
 enum pnv_phb_type {
-	PNV_PHB_P5IOC2	= 0,
-	PNV_PHB_IODA1	= 1,
-	PNV_PHB_IODA2	= 2,
+	PNV_PHB_IODA1	= 0,
+	PNV_PHB_IODA2	= 1,
 };
 
 /* Precise PHB model for error management */
 enum pnv_phb_model {
 	PNV_PHB_MODEL_UNKNOWN,
-	PNV_PHB_MODEL_P5IOC2,
 	PNV_PHB_MODEL_P7IOC,
 	PNV_PHB_MODEL_PHB3,
 };
@@ -116,11 +114,6 @@ struct pnv_phb {
 	int (*unfreeze_pe)(struct pnv_phb *phb, int pe_no, int opt);
 
 	union {
-		struct {
-			struct iommu_table iommu_table;
-			struct iommu_table_group table_group;
-		} p5ioc2;
-
 		struct {
 			/* Global bridge info */
 			unsigned int		total_pe;
@@ -226,7 +219,6 @@ extern void pnv_pci_unlink_table_and_group(struct iommu_table *tbl,
 extern void pnv_pci_setup_iommu_table(struct iommu_table *tbl,
 				      void *tce_mem, u64 tce_size,
 				      u64 dma_offset, unsigned page_shift);
-extern void pnv_pci_init_p5ioc2_hub(struct device_node *np);
 extern void pnv_pci_init_ioda_hub(struct device_node *np);
 extern void pnv_pci_init_ioda2_phb(struct device_node *np);
 extern void pnv_pci_ioda_tce_invalidate(struct iommu_table *tbl,
