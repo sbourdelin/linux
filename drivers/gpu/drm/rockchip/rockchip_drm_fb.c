@@ -177,8 +177,28 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
 		crtc_funcs->wait_for_update(crtc);
 }
 
+static bool framebuffer_changed(struct drm_device *dev,
+				struct drm_atomic_state *old_state,
+				struct drm_crtc *crtc)
+{
+	struct drm_plane *plane;
+	struct drm_plane_state *old_plane_state;
+	int i;
+
+	for_each_plane_in_state(old_state, plane, old_plane_state, i) {
+		if (plane->state->crtc != crtc &&
+		    old_plane_state->crtc != crtc)
+			continue;
+
+		if (plane->state->fb != old_plane_state->fb)
+			return true;
+	}
+
+	return false;
+}
+
 static void
-rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
+rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_state *old_state)
 {
 	struct drm_crtc_state *old_crtc_state;
 	struct drm_crtc *crtc;
@@ -192,6 +212,9 @@ rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
 		old_crtc_state->enable = false;
 
 		if (!crtc->state->active)
+			continue;
+
+		if (!framebuffer_changed(dev, old_state, crtc))
 			continue;
 
 		ret = drm_crtc_vblank_get(crtc);
@@ -241,7 +264,7 @@ rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
 
 	drm_atomic_helper_commit_planes(dev, state, true);
 
-	rockchip_atomic_wait_for_complete(state);
+	rockchip_atomic_wait_for_complete(dev, state);
 
 	drm_atomic_helper_cleanup_planes(dev, state);
 
