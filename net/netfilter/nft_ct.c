@@ -31,9 +31,9 @@ struct nft_ct {
 	};
 };
 
-static u64 nft_ct_get_eval_counter(const struct nf_conn_counter *c,
-				   enum nft_ct_keys k,
-				   enum ip_conntrack_dir d)
+static u64 __maybe_unused nft_ct_get_eval_counter(const struct nf_conn_counter *c,
+						  enum nft_ct_keys k,
+						  enum ip_conntrack_dir d)
 {
 	if (d < IP_CT_DIR_MAX)
 		return k == NFT_CT_BYTES ? atomic64_read(&c[d].bytes) :
