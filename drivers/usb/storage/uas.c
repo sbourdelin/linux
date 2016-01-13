@@ -246,6 +246,27 @@ static void uas_xfer_data(struct urb *urb, struct scsi_cmnd *cmnd,
 	}
 }
 
+static void uas_evaluate_response_iu(struct response_iu *riu, struct scsi_cmnd *cmnd)
+{
+	u8 response_code = riu->response_code;
+
+	uas_log_cmd_state(cmnd, "response iu", response_code);
+	switch(response_code) {
+	case RC_INCORRECT_LUN:
+		cmnd->result = DID_BAD_TARGET << 16;
+		break;
+	case RC_TMF_SUCCEEDED:
+		cmnd->result = DID_OK << 16;
+		break;
+	case RC_TMF_NOT_SUPPORTED:
+		cmnd->result = DID_TARGET_FAILURE << 16;
+		break;
+	default:
+		cmnd->result = DID_ERROR << 16;
+		break;
+	}
+}
+
 static void uas_stat_cmplt(struct urb *urb)
 {
 	struct iu *iu = urb->transfer_buffer;
@@ -313,13 +334,8 @@ static void uas_stat_cmplt(struct urb *urb)
 		uas_xfer_data(urb, cmnd, SUBMIT_DATA_OUT_URB);
 		break;
 	case IU_ID_RESPONSE:
-		uas_log_cmd_state(cmnd, "unexpected response iu",
-				  ((struct response_iu *)iu)->response_code);
-		/* Error, cancel data transfers */
-		data_in_urb = usb_get_urb(cmdinfo->data_in_urb);
-		data_out_urb = usb_get_urb(cmdinfo->data_out_urb);
 		cmdinfo->state &= ~COMMAND_INFLIGHT;
-		cmnd->result = DID_ERROR << 16;
+		uas_evaluate_response_iu((struct response_iu *)iu, cmnd);
 		uas_try_complete(cmnd, __func__);
 		break;
 	default:
