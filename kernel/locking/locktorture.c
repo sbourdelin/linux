@@ -764,8 +764,10 @@ static void lock_torture_cleanup(void)
 		reader_tasks = NULL;
 	}
 
-	torture_stop_kthread(lock_torture_stats, stats_task);
-	lock_torture_stats_print();  /* -After- the stats thread is stopped! */
+	if (stats_task) {
+		torture_stop_kthread(lock_torture_stats, stats_task);
+		lock_torture_stats_print();  /* -After- the stats thread is stopped! */
+	}
 
 	if (atomic_read(&cxt.n_lock_torture_errors))
 		lock_torture_print_module_parms(cxt.cur_ops,
