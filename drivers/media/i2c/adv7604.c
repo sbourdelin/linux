@@ -31,6 +31,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/hdmi.h>
 #include <linux/i2c.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -1971,6 +1972,16 @@ static int adv76xx_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
 	return 0;
 }
 
+static irqreturn_t adv76xx_irq_handler(int irq, void *devid)
+{
+	struct adv76xx_state *state = devid;
+	bool handled;
+
+	adv76xx_isr(&state->sd, 0, &handled);
+
+	return IRQ_RETVAL(handled);
+}
+
 static int adv76xx_get_edid(struct v4l2_subdev *sd, struct v4l2_edid *edid)
 {
 	struct adv76xx_state *state = to_state(sd);
@@ -2833,8 +2844,7 @@ static int adv76xx_parse_dt(struct adv76xx_state *state)
 		state->pdata.op_656_range = 1;
 	}
 
-	/* Disable the interrupt for now as no DT-based board uses it. */
-	state->pdata.int1_config = ADV76XX_INT1_CONFIG_DISABLED;
+	state->pdata.int1_config = ADV76XX_INT1_CONFIG_ACTIVE_LOW;
 
 	/* Use the default I2C addresses. */
 	state->pdata.i2c_addresses[ADV7604_PAGE_AVLINK] = 0x42;
@@ -3223,6 +3233,16 @@ static int adv76xx_probe(struct i2c_client *client,
 		goto err_entity;
 	v4l2_info(sd, "%s found @ 0x%x (%s)\n", client->name,
 			client->addr << 1, client->adapter->name);
+
+	if (client->irq) {
+		err = devm_request_threaded_irq(&client->dev,
+						client->irq,
+						NULL, adv76xx_irq_handler,
+						IRQF_ONESHOT,
+						dev_name(&client->dev), state);
+		if (err)
+			goto err_entity;
+	}
 
 	err = v4l2_async_register_subdev(sd);
 	if (err)
