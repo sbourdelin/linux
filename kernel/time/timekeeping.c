@@ -44,6 +44,14 @@ static struct {
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
 static struct timekeeper shadow_timekeeper;
 
+static ktime_t *offsets[TK_OFFS_MAX] = {
+	[TK_OFFS_REAL]	= &tk_core.timekeeper.offs_real,
+	[TK_OFFS_BOOT]	= &tk_core.timekeeper.offs_boot,
+	[TK_OFFS_TAI]	= &tk_core.timekeeper.offs_tai,
+};
+
+static int timekeeping_initialized;
+
 /**
  * struct tk_fast - NMI safe timekeeper
  * @seq:	Sequence counter for protecting updates. The lowest bit
@@ -374,16 +382,22 @@ static void update_fast_timekeeper(struct tk_read_base *tkr, struct tk_fast *tkf
  * of the following timestamps. Callers need to be aware of that and
  * deal with it.
  */
-static __always_inline u64 __ktime_get_fast_ns(struct tk_fast *tkf)
+static __always_inline u64 __ktime_get_fast_ns(struct tk_fast *tkf,
+					       ktime_t *offset)
 {
 	struct tk_read_base *tkr;
 	unsigned int seq;
 	u64 now;
+	ktime_t base;
+
+	if (unlikely(!timekeeping_initialized))
+		return 0;
 
 	do {
 		seq = raw_read_seqcount_latch(&tkf->seq);
 		tkr = tkf->base + (seq & 0x01);
-		now = ktime_to_ns(tkr->base) + timekeeping_get_ns(tkr);
+		base = ktime_add(tkr->base, *offset);
+		now = ktime_to_ns(base) + timekeeping_get_ns(tkr);
 	} while (read_seqcount_retry(&tkf->seq, seq));
 
 	return now;
@@ -391,15 +405,37 @@ static __always_inline u64 __ktime_get_fast_ns(struct tk_fast *tkf)
 
 u64 ktime_get_mono_fast_ns(void)
 {
-	return __ktime_get_fast_ns(&tk_fast_mono);
+	ktime_t zero = ktime_set(0, 0);
+
+	return __ktime_get_fast_ns(&tk_fast_mono, &zero);
 }
 EXPORT_SYMBOL_GPL(ktime_get_mono_fast_ns);
 
 u64 ktime_get_raw_fast_ns(void)
 {
-	return __ktime_get_fast_ns(&tk_fast_raw);
+	ktime_t zero = ktime_set(0, 0);
+
+	return __ktime_get_fast_ns(&tk_fast_raw, &zero);
 }
 EXPORT_SYMBOL_GPL(ktime_get_raw_fast_ns);
+
+u64 ktime_get_boot_fast_ns(void)
+{
+	return __ktime_get_fast_ns(&tk_fast_raw, offsets[TK_OFFS_BOOT]);
+}
+EXPORT_SYMBOL_GPL(ktime_get_boot_fast_ns);
+
+u64 ktime_get_real_fast_ns(void)
+{
+	return __ktime_get_fast_ns(&tk_fast_raw, offsets[TK_OFFS_REAL]);
+}
+EXPORT_SYMBOL_GPL(ktime_get_real_fast_ns);
+
+u64 ktime_get_tai_fast_ns(void)
+{
+	return __ktime_get_fast_ns(&tk_fast_raw, offsets[TK_OFFS_TAI]);
+}
+EXPORT_SYMBOL_GPL(ktime_get_tai_fast_ns);
 
 /* Suspend-time cycles value for halted fast timekeeper. */
 static cycle_t cycles_at_suspend;
@@ -697,12 +733,6 @@ u32 ktime_get_resolution_ns(void)
 	return nsecs;
 }
 EXPORT_SYMBOL_GPL(ktime_get_resolution_ns);
-
-static ktime_t *offsets[TK_OFFS_MAX] = {
-	[TK_OFFS_REAL]	= &tk_core.timekeeper.offs_real,
-	[TK_OFFS_BOOT]	= &tk_core.timekeeper.offs_boot,
-	[TK_OFFS_TAI]	= &tk_core.timekeeper.offs_tai,
-};
 
 ktime_t ktime_get_with_offset(enum tk_offsets offs)
 {
@@ -1267,6 +1297,8 @@ void __init timekeeping_init(void)
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+
+	timekeeping_initialized = 1;
 }
 
 /* time in seconds when suspend began for persistent clock */
