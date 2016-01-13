@@ -28,6 +28,17 @@
 #define FUSE_TSENSOR_COMMON			0x180
 
 /*
+ * T210: Layout of bits in FUSE_TSENSOR_COMMON:
+ *    3                   2                   1                   0
+ *  1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |       BASE_FT       |      BASE_CP      | SHFT_FT | SHIFT_CP  |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * In chips prior to T210, this fuse was incorrectly sized as 26 bits,
+ * and didn't hold SHIFT_CP in [31:26]. Therefore these missing six bits
+ * were obtained via the FUSE_SPARE_REALIGNMENT_REG register [5:0].
+ *
  * T12x, etc: FUSE_TSENSOR_COMMON:
  *    3                   2                   1                   0
  *  1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
