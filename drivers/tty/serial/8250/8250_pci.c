@@ -841,17 +841,17 @@ static int pci_netmos_init(struct pci_dev *dev)
 		return 0;
 
 	switch (dev->device) { /* FALLTHROUGH on all */
-		case PCI_DEVICE_ID_NETMOS_9904:
-		case PCI_DEVICE_ID_NETMOS_9912:
-		case PCI_DEVICE_ID_NETMOS_9922:
-		case PCI_DEVICE_ID_NETMOS_9900:
-			num_serial = pci_netmos_9900_numports(dev);
-			break;
+	case PCI_DEVICE_ID_NETMOS_9904:
+	case PCI_DEVICE_ID_NETMOS_9912:
+	case PCI_DEVICE_ID_NETMOS_9922:
+	case PCI_DEVICE_ID_NETMOS_9900:
+		num_serial = pci_netmos_9900_numports(dev);
+		break;
 
-		default:
-			if (num_serial == 0) {
-				moan_device("unknown NetMos/Mostech device", dev);
-			}
+	default:
+		if (num_serial == 0) {
+			moan_device("unknown NetMos/Mostech device", dev);
+		}
 	}
 
 	if (num_serial == 0)
