@@ -9276,6 +9276,24 @@ static void ironlake_get_pfit_config(struct intel_crtc *crtc,
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t tmp;
+	int pipe;
+
+	/*
+	 * PF_CTL assumes panel fitter 0 is on pipe A, panel fitter 1 is on
+	 * pipe B, and panel fitter 2 is on pipe C, but firmware can init IVB
+	 * panel fitters to any arbitrary pipe (Macbook UEFI uses pfit 0 for
+	 * pipe C), so find and disable any other mappings.
+	 */
+	for (pipe = 0; pipe < INTEL_INFO(dev)->num_pipes; pipe++) {
+		tmp = I915_READ(PF_CTL(pipe));
+		if (IS_GEN7(dev) && (tmp & PF_ENABLE) &&
+		    PF_PIPE_SEL_IVB(pipe) != (tmp & PF_PIPE_SEL_MASK_IVB)) {
+			DRM_DEBUG_KMS("disabling initial panel fitter\n");
+			I915_WRITE(PF_CTL(pipe), 0);
+			I915_WRITE(PF_WIN_POS(pipe), 0);
+			I915_WRITE(PF_WIN_SZ(pipe), 0);
+		}
+	}
 
 	tmp = I915_READ(PF_CTL(crtc->pipe));
 
@@ -9283,14 +9301,6 @@ static void ironlake_get_pfit_config(struct intel_crtc *crtc,
 		pipe_config->pch_pfit.enabled = true;
 		pipe_config->pch_pfit.pos = I915_READ(PF_WIN_POS(crtc->pipe));
 		pipe_config->pch_pfit.size = I915_READ(PF_WIN_SZ(crtc->pipe));
-
-		/* We currently do not free assignements of panel fitters on
-		 * ivb/hsw (since we don't use the higher upscaling modes which
-		 * differentiates them) so just WARN about this case for now. */
-		if (IS_GEN7(dev)) {
-			WARN_ON((tmp & PF_PIPE_SEL_MASK_IVB) !=
-				PF_PIPE_SEL_IVB(crtc->pipe));
-		}
 	}
 }
 
