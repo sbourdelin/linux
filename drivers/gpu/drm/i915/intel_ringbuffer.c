@@ -2287,6 +2287,8 @@ int intel_ring_alloc_request_extras(struct drm_i915_gem_request *request)
 
 int intel_ring_reserve_space(struct drm_i915_gem_request *request)
 {
+	int ret;
+
 	/*
 	 * The first call merely notes the reserve request and is common for
 	 * all back ends. The subsequent localised _begin() call actually
@@ -2297,7 +2299,11 @@ int intel_ring_reserve_space(struct drm_i915_gem_request *request)
 	 */
 	intel_ring_reserved_space_reserve(request->ringbuf, MIN_SPACE_FOR_ADD_REQUEST);
 
-	return intel_ring_begin(request, 0);
+	ret = intel_ring_begin(request, 0);
+	if (ret)
+		intel_ring_reserved_space_cancel(request->ringbuf);
+
+	return ret;
 }
 
 void intel_ring_reserved_space_reserve(struct intel_ringbuffer *ringbuf, int size)
