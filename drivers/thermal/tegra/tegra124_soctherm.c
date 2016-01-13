@@ -205,6 +205,14 @@ static const struct of_device_id tegra124_soctherm_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra_soctherm_of_match);
 
+#ifdef CONFIG_PM_SLEEP
+static SIMPLE_DEV_PM_OPS(tegra124_soctherm_pm,
+			 soctherm_suspend, soctherm_resume);
+#define TEGRA124_SOC_THERM_PM      (&tegra124_soctherm_pm)
+#else
+#define TEGRA124_SOC_THERM_PM      NULL
+#endif
+
 static int tegra124_soctherm_probe(struct platform_device *pdev)
 {
 	return tegra_soctherm_probe(pdev,
@@ -218,6 +226,7 @@ static struct platform_driver tegra124_soctherm_driver = {
 	.remove = tegra_soctherm_remove,
 	.driver = {
 		.name = "tegra124_soctherm",
+		.pm = TEGRA124_SOC_THERM_PM,
 		.of_match_table = tegra124_soctherm_of_match,
 	},
 };

@@ -111,5 +111,10 @@ int tegra_soctherm_probe(struct platform_device *pdev,
 			 const struct tegra_soctherm_fuse *tfuse);
 int tegra_soctherm_remove(struct platform_device *pdev);
 
+#ifdef CONFIG_PM_SLEEP
+int soctherm_suspend(struct device *dev);
+int soctherm_resume(struct device *dev);
+#endif
+
 #endif
 

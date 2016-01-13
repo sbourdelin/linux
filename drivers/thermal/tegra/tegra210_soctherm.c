@@ -208,6 +208,14 @@ MODULE_DEVICE_TABLE(of, tegra_soctherm_of_match);
 
 #define TEGRA210_FUSE_CP_REV 0x90
 
+#ifdef CONFIG_PM_SLEEP
+static SIMPLE_DEV_PM_OPS(tegra210_soctherm_pm,
+			 soctherm_suspend, soctherm_resume);
+#define TEGRA210_SOC_THERM_PM      (&tegra210_soctherm_pm)
+#else
+#define TEGRA210_SOC_THERM_PM      NULL
+#endif
+
 static int tegra210_soctherm_probe(struct platform_device *pdev)
 {
 	u32 rev;
@@ -227,6 +235,7 @@ static struct platform_driver tegra210_soctherm_driver = {
 	.driver = {
 		.name = "tegra210_soctherm",
 		.owner = THIS_MODULE,
+		.pm = TEGRA210_SOC_THERM_PM,
 		.of_match_table = tegra210_soctherm_of_match,
 	},
 };
