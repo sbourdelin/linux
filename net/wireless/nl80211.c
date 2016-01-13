@@ -485,6 +485,13 @@ nl80211_plan_policy[NL80211_SCHED_SCAN_PLAN_MAX + 1] = {
 	[NL80211_SCHED_SCAN_PLAN_ITERATIONS] = { .type = NLA_U32 },
 };
 
+static const struct nla_policy
+nl80211_bss_select_policy[NL80211_ATTR_BSS_SELECT_MAX + 1] = {
+	[NL80211_ATTR_BSS_SELECT_PRIMITIVE] = { .type = NLA_U32 },
+	[NL80211_ATTR_BSS_SELECT_BAND_PREF] = { .type = NLA_U32 },
+	[NL80211_ATTR_BSS_SELECT_RSSI_ADJUST] = { .type = NLA_U8 },
+};
+
 static int nl80211_prepare_wdev_dump(struct sk_buff *skb,
 				     struct netlink_callback *cb,
 				     struct cfg80211_registered_device **rdev,
@@ -5773,6 +5780,53 @@ static int validate_scan_freqs(struct nlattr *freqs)
 	return n_channels;
 }
 
+static int parse_bss_select(struct nlattr *nla,
+			    struct cfg80211_bss_selection *bss_select)
+{
+	struct nlattr *attr[NL80211_ATTR_BSS_SELECT_MAX + 1];
+	enum nl80211_band band = NL80211_BAND_2GHZ;
+	int err;
+
+	if (!nla)
+		return 0;
+
+	err = nla_parse(attr, NL80211_ATTR_BSS_SELECT_MAX,
+			nla_data(nla), nla_len(nla), nl80211_bss_select_policy);
+	if (err)
+		return err;
+
+	if (!attr[NL80211_ATTR_BSS_SELECT_PRIMITIVE])
+		return -EINVAL;
+
+	bss_select->primitive =
+		nla_get_u32(attr[NL80211_ATTR_BSS_SELECT_PRIMITIVE]);
+
+	if (bss_select->primitive == NL80211_BSS_SELECT_BAND_PREF ||
+	    bss_select->primitive == NL80211_BSS_SELECT_ADJUST_RSSI) {
+		if (!attr[NL80211_ATTR_BSS_SELECT_BAND_PREF])
+			return -EINVAL;
+		band = nla_get_u32(attr[NL80211_ATTR_BSS_SELECT_BAND_PREF]);
+	}
+
+	switch (bss_select->primitive) {
+	case NL80211_BSS_SELECT_BAND_PREF:
+		bss_select->param.band_pref = band;
+		break;
+	case NL80211_BSS_SELECT_ADJUST_RSSI:
+		bss_select->param.adjust.band = band;
+		if (!attr[NL80211_ATTR_BSS_SELECT_RSSI_ADJUST])
+			return -EINVAL;
+		bss_select->param.adjust.delta =
+			nla_get_u8(attr[NL80211_ATTR_BSS_SELECT_RSSI_ADJUST]);
+		break;
+	case NL80211_BSS_SELECT_RSSI:
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static int nl80211_parse_random_mac(struct nlattr **attrs,
 				    u8 *mac_addr, u8 *mac_addr_mask)
 {
@@ -7996,6 +8050,18 @@ static int nl80211_connect(struct sk_buff *skb, struct genl_info *info)
 		    !(rdev->wiphy.features & NL80211_FEATURE_QUIET))
 			return -EINVAL;
 		connect.flags |= ASSOC_REQ_USE_RRM;
+	}
+
+	/* only do bss selection when no BSSID is specified. */
+	if (!connect.bssid &&
+	    wiphy_ext_feature_isset(&rdev->wiphy,
+				    NL80211_EXT_FEATURE_BSS_SELECT)) {
+		err = parse_bss_select(info->attrs[NL80211_ATTR_BSS_SELECT],
+				       &connect.bss_select);
+		if (err) {
+			kzfree(connkeys);
+			return err;
+		}
 	}
 
 	wdev_lock(dev->ieee80211_ptr);

@@ -1793,7 +1793,8 @@ enum nl80211_commands {
  *	extended feature %NL80211_EXT_FEATURE_BSS_SELECT. When used with
  *	%NL80211_CMD_GET_WIPHY is contains NLA_FLAG type according
  *	&enum nl80211_bss_select_primitive to indicate what primitives are
- *	supported.
+ *	supported. When used with %NL80211_CMD_CONNECT is contains the criteria
+ *	for BSS selection to be done by driver and/or firmware.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -4675,6 +4676,31 @@ enum nl80211_bss_select_primitive {
 	NL80211_BSS_SELECT_ADJUST_RSSI,
 	/* add other primitives before this one */
 	NUM_NL80211_BSS_SELECT
+};
+
+/**
+ * enum nl80211_attr_bss_select - attributes for bss selection.
+ *
+ * @__NL80211_ATTR_BSS_SELECT_INVALID: reserved.
+ * @NL80211_ATTR_BSS_SELECT_PRIMITIVE: Indicates what criteria are to
+ *	be used for bss selection. Value according
+ *	%enum nl80211_bss_select_primitive.
+ * @NL80211_ATTR_BSS_SELECT_BAND_PREF: Required attribute indicating the
+ *	preferred band. Value according %enum nl80211_band.
+ * @NL80211_ATTR_BSS_SELECT_RSSI_ADJUST: When present the value is to be
+ *	added to the RSSI level for BSS-es in the preferred band (s8).
+ * @NL80211_ATTR_BSS_SELECT_MAX: highest bss select attribute number.
+ *@__NL80211_ATTR_BSS_SELECT_AFTER_LAST: internal use.
+ */
+enum nl80211_attr_bss_select {
+	__NL80211_ATTR_BSS_SELECT_INVALID,
+	NL80211_ATTR_BSS_SELECT_PRIMITIVE,
+	NL80211_ATTR_BSS_SELECT_BAND_PREF,
+	NL80211_ATTR_BSS_SELECT_RSSI_ADJUST,
+
+	/* keep last */
+	__NL80211_ATTR_BSS_SELECT_AFTER_LAST,
+	NL80211_ATTR_BSS_SELECT_MAX = __NL80211_ATTR_BSS_SELECT_AFTER_LAST - 1
 };
 
 #endif /* __LINUX_NL80211_H */
