@@ -917,6 +917,9 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 
 		vhost_net_disable_vq(n, vq);
 		vq->private_data = sock;
+
+		vhost_adjust_vring_endian(vq);
+
 		r = vhost_init_used(vq);
 		if (r)
 			goto err_used;

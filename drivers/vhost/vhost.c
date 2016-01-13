@@ -123,6 +123,15 @@ static void vhost_disable_is_le(struct vhost_virtqueue *vq)
 	vq->is_le = virtio_legacy_is_little_endian();
 }
 
+void vhost_adjust_vring_endian(struct vhost_virtqueue *vq)
+{
+	if (!vq->private_data)
+		vhost_disable_is_le(vq);
+	else
+		vhost_enable_is_le(vq);
+}
+EXPORT_SYMBOL_GPL(vhost_adjust_vring_endian);
+
 static void vhost_poll_func(struct file *file, wait_queue_head_t *wqh,
 			    poll_table *pt)
 {
@@ -1166,12 +1175,9 @@ int vhost_init_used(struct vhost_virtqueue *vq)
 {
 	__virtio16 last_used_idx;
 	int r;
-	if (!vq->private_data) {
-		vhost_disable_is_le(vq);
-		return 0;
-	}
 
-	vhost_enable_is_le(vq);
+	if (!vq->private_data)
+		return 0;
 
 	r = vhost_update_used_flags(vq);
 	if (r)
