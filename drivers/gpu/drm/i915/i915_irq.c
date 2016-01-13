@@ -2793,8 +2793,9 @@ static void gen8_disable_vblank(struct drm_device *dev, unsigned int pipe)
 static bool
 ring_idle(struct intel_engine_cs *ring, u32 seqno)
 {
-	return (list_empty(&ring->request_list) ||
-		i915_seqno_passed(seqno, ring->last_submitted_seqno));
+	rmb(); /* Ordering against __i915_add_request() */
+	return (i915_seqno_passed(seqno, ring->last_submitted_seqno)
+		|| list_empty(&ring->request_list));
 }
 
 static bool
@@ -3039,8 +3040,8 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 
 		semaphore_clear_deadlocks(dev_priv);
 
-		seqno = ring->get_seqno(ring, false);
 		acthd = intel_ring_get_active_head(ring);
+		seqno = ring->get_seqno(ring, false);
 
 		if (ring->hangcheck.seqno == seqno) {
 			if (ring_idle(ring, seqno)) {

@@ -2584,6 +2584,17 @@ void __i915_add_request(struct drm_i915_gem_request *request,
 	 */
 	request->postfix = intel_ring_get_tail(ringbuf);
 
+	/* Hangcheck runs in irq context and might be even
+	 * on different CPU. So we need to the do last seqno and
+	 * list addition early with memory barrier. Otherwise hangcheck
+	 * might see active ring without any requests and
+	 * consider it falsely as a missed irq situation.
+	 */
+	request->previous_seqno = ring->last_submitted_seqno;
+	ring->last_submitted_seqno = request->seqno;
+	list_add_tail(&request->list, &ring->request_list);
+	wmb(); /* Flush last_submitted_seqno and request->list for hangcheck */
+
 	if (i915.enable_execlists)
 		ret = ring->emit_request(request);
 	else {
@@ -2605,9 +2616,6 @@ void __i915_add_request(struct drm_i915_gem_request *request,
 	request->batch_obj = obj;
 
 	request->emitted_jiffies = jiffies;
-	request->previous_seqno = ring->last_submitted_seqno;
-	ring->last_submitted_seqno = request->seqno;
-	list_add_tail(&request->list, &ring->request_list);
 
 	trace_i915_gem_request_add(request);
 
