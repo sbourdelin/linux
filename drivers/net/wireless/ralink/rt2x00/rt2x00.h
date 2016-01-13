@@ -844,11 +844,13 @@ struct rt2x00_dev {
 	 *  - Open sta interface count.
 	 *  - Association count.
 	 *  - Beaconing enabled count.
+	 *  - Whether the device is monitoring.
 	 */
 	unsigned int intf_ap_count;
 	unsigned int intf_sta_count;
 	unsigned int intf_associated;
 	unsigned int intf_beaconing;
+	bool is_monitoring;
 
 	/*
 	 * Interface combinations

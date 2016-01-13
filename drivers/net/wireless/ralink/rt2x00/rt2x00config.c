@@ -244,6 +244,16 @@ void rt2x00lib_config(struct rt2x00_dev *rt2x00dev,
 	    (ieee80211_flags & IEEE80211_CONF_CHANGE_PS))
 		cancel_delayed_work_sync(&rt2x00dev->autowakeup_work);
 
+	if (ieee80211_flags & IEEE80211_CONF_CHANGE_MONITOR) {
+		if (conf->flags & IEEE80211_CONF_MONITOR) {
+			rt2x00_dbg(rt2x00dev, "Monitor mode is enabled\n");
+			rt2x00dev->is_monitoring = true;
+		} else {
+			rt2x00_dbg(rt2x00dev, "Monitor mode is disabled\n");
+			rt2x00dev->is_monitoring = false;
+		}
+	}
+
 	/*
 	 * Start configuration.
 	 */
