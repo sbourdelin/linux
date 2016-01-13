@@ -3178,6 +3178,9 @@ struct wiphy_vendor_command {
  *	low rssi when a frame is heard on different channel, then it should set
  *	this variable to the maximal offset for which it can compensate.
  *	This value should be set in MHz.
+ * @bss_select_support: bitmask indicating the BSS selection criteria supported
+ *	by the driver in the .connect() callback. The bit position maps to the
+ *	criteria defined in &enum nl80211_bss_select_primitive.
  */
 struct wiphy {
 	/* assign these fields before you register the wiphy */
@@ -3299,6 +3302,8 @@ struct wiphy {
 
 	u8 max_num_csa_counters;
 	u8 max_adj_channel_rssi_comp;
+
+	u32 bss_select_support;
 
 	char priv[0] __aligned(NETDEV_ALIGN);
 };

@@ -1789,6 +1789,11 @@ enum nl80211_commands {
  *	thus it must not specify the number of iterations, only the interval
  *	between scans. The scan plans are executed sequentially.
  *	Each scan plan is a nested attribute of &enum nl80211_sched_scan_plan.
+ * @NL80211_ATTR_BSS_SELECT: nested attribute for driver supporting the
+ *	extended feature %NL80211_EXT_FEATURE_BSS_SELECT. When used with
+ *	%NL80211_CMD_GET_WIPHY is contains NLA_FLAG type according
+ *	&enum nl80211_bss_select_primitive to indicate what primitives are
+ *	supported.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -2163,6 +2168,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MAX_SCAN_PLAN_INTERVAL,
 	NL80211_ATTR_MAX_SCAN_PLAN_ITERATIONS,
 	NL80211_ATTR_SCHED_SCAN_PLANS,
+
+	NL80211_ATTR_BSS_SELECT,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4396,12 +4403,15 @@ enum nl80211_feature_flags {
 /**
  * enum nl80211_ext_feature_index - bit index of extended features.
  * @NL80211_EXT_FEATURE_VHT_IBSS: This driver supports IBSS with VHT datarates.
+ * @NL80211_EXT_FEATURE_BSS_SELECT: This driver supports BSS selection criteria
+ *	to be given upon %NL80211_CMD_CONNECT.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
  */
 enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_VHT_IBSS,
+	NL80211_EXT_FEATURE_BSS_SELECT,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
@@ -4649,6 +4659,22 @@ enum nl80211_sched_scan_plan {
 	__NL80211_SCHED_SCAN_PLAN_AFTER_LAST,
 	NL80211_SCHED_SCAN_PLAN_MAX =
 		__NL80211_SCHED_SCAN_PLAN_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_bss_select_primitive - primitives for bss selection.
+ *
+ * @NL80211_BSS_SELECT_RSSI:
+ * @NL80211_BSS_SELECT_BAND_PREF:
+ * @NL80211_BSS_SELECT_ADJUST_RSSI:
+ * @NUM_NL80211_BSS_SELECT: Must be kept last.
+ */
+enum nl80211_bss_select_primitive {
+	NL80211_BSS_SELECT_RSSI,
+	NL80211_BSS_SELECT_BAND_PREF,
+	NL80211_BSS_SELECT_ADJUST_RSSI,
+	/* add other primitives before this one */
+	NUM_NL80211_BSS_SELECT
 };
 
 #endif /* __LINUX_NL80211_H */
