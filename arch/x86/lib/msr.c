@@ -108,3 +108,21 @@ int msr_clear_bit(u32 msr, u8 bit)
 {
 	return __flip_bit(msr, bit, false);
 }
+
+int msr_rmwl_safe(u32 msr_no, u64 clear_mask, u64 set_mask)
+{
+	int err;
+	u64 val;
+
+	err = rdmsrl_safe(msr_no, &val);
+	if (err)
+		goto out;
+
+	val &= ~clear_mask;
+	val |= set_mask;
+
+	err = wrmsrl_safe(msr_no, val);
+
+out:
+	return err;
+}

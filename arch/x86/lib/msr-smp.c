@@ -221,6 +221,40 @@ int rdmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 *q)
 }
 EXPORT_SYMBOL(rdmsrl_safe_on_cpu);
 
+static void remote_rmwmsrl_safe(void *info)
+{
+	struct msr_action *ma = info;
+
+	ma->err = msr_rmwl_safe(ma->msr_no, ma->clear_mask, ma->set_mask);
+}
+
+/**
+ * rmwmsrl_safe_on_cpu: Perform a read/modify/write msr transaction on cpu
+ *
+ * @cpu:  target cpu
+ * @msr:  msr number
+ * @clear_mask: bitmask to change
+ * @set_mask: bits value for the mask
+ *
+ * Returns zero for success, a negative number on error.
+ */
+int rmwmsrl_safe_on_cpu(unsigned int cpu, u32 msr, u64 clear_mask, u64 set_mask)
+{
+	int err;
+	struct msr_action ma;
+
+	memset(&ma, 0, sizeof(ma));
+
+	ma.msr_no = msr;
+	ma.clear_mask = clear_mask;
+	ma.set_mask = set_mask;
+
+	err = smp_call_function_single(cpu, remote_rmwmsrl_safe, &ma, 1);
+
+	return err ? err : ma.err;
+}
+EXPORT_SYMBOL(rmwmsrl_safe_on_cpu);
+
 /*
  * These variants are significantly slower, but allows control over
  * the entire 32-bit GPR set.

@@ -27,6 +27,13 @@ struct msr_info {
 	int err;
 };
 
+struct msr_action {
+	u32 msr_no;
+	u64 clear_mask;
+	u64 set_mask;
+	int err;
+};
+
 struct msr_regs_info {
 	u32 *regs;
 	int err;
@@ -222,6 +229,7 @@ struct msr *msrs_alloc(void);
 void msrs_free(struct msr *msrs);
 int msr_set_bit(u32 msr, u8 bit);
 int msr_clear_bit(u32 msr, u8 bit);
+int msr_rmwl_safe(u32 msr_no, u64 clear_mask, u64 set_mask);
 
 #ifdef CONFIG_SMP
 int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h);
@@ -236,6 +244,7 @@ int rdmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 *q);
 int wrmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 q);
 int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
 int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
+int rmwmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 clear_mask, u64 set_mask);
 #else  /*  CONFIG_SMP  */
 static inline int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h)
 {
@@ -291,6 +300,10 @@ static inline int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8])
 static inline int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8])
 {
 	return wrmsr_safe_regs(regs);
+}
+static inline int rmwmsrl_safe_on_cpu(unsigned int cpu, u32 msr_no, u64 clear_mask, u64 set_mask)
+{
+	return msr_rmwl_safe(msr_no, clear_mask, set_mask);
 }
 #endif  /* CONFIG_SMP */
 #endif /* __ASSEMBLY__ */
