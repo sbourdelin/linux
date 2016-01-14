@@ -1541,7 +1541,9 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
+	clear_running_bw(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
+	add_running_bw(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1629,7 +1631,9 @@ static void pull_dl_task(struct rq *this_rq)
 			resched = true;
 
 			deactivate_task(src_rq, p, 0);
+			clear_running_bw(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
+			add_running_bw(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 
