@@ -1121,15 +1121,12 @@ ctx_err:
 int ocrdma_resize_cq(struct ib_cq *ibcq, int new_cnt,
 		     struct ib_udata *udata)
 {
-	int status = 0;
 	struct ocrdma_cq *cq = get_ocrdma_cq(ibcq);
 
-	if (new_cnt < 1 || new_cnt > cq->max_hw_cqe) {
-		status = -EINVAL;
-		return status;
-	}
+	if (new_cnt < 1 || new_cnt > cq->max_hw_cqe)
+		return -EINVAL;
 	ibcq->cqe = new_cnt;
-	return status;
+	return 0;
 }
 
 static void ocrdma_flush_cq(struct ocrdma_cq *cq)
