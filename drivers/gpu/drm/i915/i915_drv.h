@@ -1956,6 +1956,12 @@ struct drm_i915_private {
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch
 	 * will be rejected. Instead look for a better place.
 	 */
+
+	/* DMI data for memory bandwidth calculation */
+	struct {
+		uint16_t mem_channel;
+		uint16_t mem_speed;
+	} dmi;
 };
 
 static inline struct drm_i915_private *to_i915(const struct drm_device *dev)

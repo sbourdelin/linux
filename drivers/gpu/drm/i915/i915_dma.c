@@ -49,6 +49,7 @@
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
 #include <linux/oom.h>
+#include <linux/dmi.h>
 
 
 static int i915_getparam(struct drm_device *dev, void *data,
@@ -852,6 +853,21 @@ static void intel_init_dpio(struct drm_i915_private *dev_priv)
 	}
 }
 
+static void dmi_decode_memory_info(const struct dmi_header *hdr, void *priv)
+{
+	struct drm_i915_private *dev_priv = (struct drm_i915_private *) priv;
+	const u8 *data = (const u8 *) hdr;
+
+	if (hdr->type == 17 && hdr->length > 0x17) {
+
+		/* Found a memory channel */
+		dev_priv->dmi.mem_channel++;
+
+		/* Get the speed */
+		dev_priv->dmi.mem_speed = (uint16_t) (*((uint16_t *)(data + 0x15)));
+	}
+}
+
 /**
  * i915_driver_load - setup chip and create an initial config
  * @dev: DRM device
@@ -878,6 +894,9 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	dev->dev_private = dev_priv;
 	dev_priv->dev = dev;
+
+	/* walk the dmi device table for getting platform memory information */
+	dmi_walk(dmi_decode_memory_info, (void *) dev_priv);
 
 	/* Setup the write-once "constant" device info */
 	device_info = (struct intel_device_info *)&dev_priv->info;
