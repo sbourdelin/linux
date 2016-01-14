@@ -1626,6 +1626,12 @@ enum intel_pipe_crc_source {
 	INTEL_PIPE_CRC_SOURCE_MAX,
 };
 
+enum watermark_memory_wa {
+	WATERMARK_WA_NONE,
+	WATERMARK_WA_X_TILED,
+	WATERMARK_WA_Y_TILED,
+};
+
 struct intel_pipe_crc_entry {
 	uint32_t frame;
 	uint32_t crc[5];
@@ -1915,6 +1921,9 @@ struct drm_i915_private {
 
 		/* Committed wm config */
 		struct intel_wm_config config;
+
+		/* This stores if WaterMark memory workaround is needed */
+		enum watermark_memory_wa mem_wa;
 
 		/*
 		 * The skl_wm_values structure is a bit too big for stack

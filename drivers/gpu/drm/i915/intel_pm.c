@@ -3222,6 +3222,11 @@ static bool skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	if (latency == 0 || !cstate->base.active || !fb)
 		return false;
 
+	if (dev_priv->wm.mem_wa != WATERMARK_WA_NONE) {
+		if (fb->modifier[0] == I915_FORMAT_MOD_X_TILED)
+			latency += 15;
+	}
+
 	if (drm_rect_width(&intel_pstate->src)) {
 		width = drm_rect_width(&intel_pstate->src) >> 16;
 		height = drm_rect_height(&intel_pstate->src) >> 16;
@@ -3270,6 +3275,9 @@ static bool skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 				WARN(1, "Unsupported pixel depth for rotation");
 			}
 		}
+		if (dev_priv->wm.mem_wa == WATERMARK_WA_Y_TILED)
+			min_scanlines *= 2;
+
 		y_tile_minimum = plane_blocks_per_line * min_scanlines;
 		selected_result = max(method2, y_tile_minimum);
 	} else {
@@ -3721,6 +3729,83 @@ static void skl_set_plane_pixel_rate(struct drm_crtc *crtc)
 
 }
 
+static void
+skl_set_display_memory_wa(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_crtc *intel_crtc = NULL;
+	struct intel_plane *intel_plane = NULL;
+	uint32_t num_active_crtc = 0;
+	uint64_t max_pixel_rate_pipe = 0;
+	uint64_t display_bw = 0, available_bw = 0;
+	bool y_tile_enabled = false;
+	int memory_portion = 0;
+
+	for_each_intel_crtc(dev, intel_crtc) {
+		uint64_t max_pixel_rate_plane = 0;
+		uint64_t pipe_bw;
+		uint32_t num_active_plane = 0;
+		const struct intel_crtc_state *cstate = NULL;
+
+		if (!intel_crtc->active)
+			continue;
+		cstate = to_intel_crtc_state(intel_crtc->base.state);
+		num_active_crtc++;
+
+		for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
+			struct drm_plane *plane = &intel_plane->base;
+			struct drm_framebuffer *fb = plane->state->fb;
+			uint64_t plane_bw, interm_bw = 10000000;
+
+			if (fb == NULL)
+				continue;
+			if (plane->type == DRM_PLANE_TYPE_CURSOR)
+				continue;
+			num_active_plane++;
+
+			if (fb->modifier[0] == I915_FORMAT_MOD_Y_TILED)
+				y_tile_enabled = true;
+
+			/*
+			 * planeBW = pixel_rate(MHz) * BPP * plane downscale
+			 *		amount * pipe downscale amount;
+			 *
+			 * skl_pipe_pixel_rate return adjusted value according
+			 * to downscaling  amount
+			 * pixel rate is in KHz & downscale factor is multiplied
+			 * by 1000, so devide by 1000*1000
+			 */
+			interm_bw = skl_pipe_pixel_rate(cstate) *
+				drm_format_plane_cpp(fb->pixel_format, 0) *
+				skl_plane_downscale_amount(intel_plane);
+
+			if (fb->pixel_format == DRM_FORMAT_NV12)
+				interm_bw += skl_pipe_pixel_rate(cstate) *
+				drm_format_plane_cpp(fb->pixel_format, 1) *
+				skl_plane_downscale_amount(intel_plane);
+
+			plane_bw = DIV_ROUND_UP(interm_bw, (uint64_t) (1000 *
+						1000));
+			max_pixel_rate_plane = max(max_pixel_rate_plane,
+					plane_bw);
+		}
+		pipe_bw = max_pixel_rate_plane * num_active_plane;
+		max_pixel_rate_pipe = max(max_pixel_rate_pipe, pipe_bw);
+	}
+	display_bw = max_pixel_rate_pipe * num_active_crtc;
+
+
+	available_bw = dev_priv->dmi.mem_channel * dev_priv->dmi.mem_speed * 8;
+	memory_portion = DIV_ROUND_UP((display_bw * 100), available_bw);
+
+	if (y_tile_enabled && (memory_portion >= 20))
+		dev_priv->wm.mem_wa = WATERMARK_WA_Y_TILED;
+	else if (memory_portion >= 60)
+		dev_priv->wm.mem_wa = WATERMARK_WA_X_TILED;
+	else
+		dev_priv->wm.mem_wa = WATERMARK_WA_NONE;
+}
+
 static void skl_clear_wm(struct skl_wm_values *watermarks, enum pipe pipe)
 {
 	watermarks->wm_linetime[pipe] = 0;
@@ -3758,6 +3843,7 @@ static void skl_update_wm(struct drm_crtc *crtc)
 
 	/* Calculate plane pixel rate for each plane in advance */
 	skl_set_plane_pixel_rate(crtc);
+	skl_set_display_memory_wa(dev);
 
 	if (!skl_update_pipe_wm(crtc, &results->ddb, pipe_wm))
 		return;
