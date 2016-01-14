@@ -59,6 +59,7 @@
 #include "props.h"
 #include "sysfs.h"
 #include "qgroup.h"
+#include "dedup.h"
 
 #ifdef CONFIG_64BIT
 /* If we have a 32-bit userspace and 64-bit kernel, then the UAPI
@@ -3214,6 +3215,66 @@ out:
 	return ret;
 }
 
+static long btrfs_ioctl_dedup_ctl(struct btrfs_root *root, void __user *args)
+{
+	struct btrfs_ioctl_dedup_args *dargs;
+	struct btrfs_fs_info *fs_info = root->fs_info;
+	struct btrfs_dedup_info *dedup_info;
+	int ret;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	dargs = memdup_user(args, sizeof(*dargs));
+	if (IS_ERR(dargs)) {
+		ret = PTR_ERR(dargs);
+		return ret;
+	}
+
+	if (dargs->cmd >= BTRFS_DEDUP_CTL_LAST) {
+		ret = -EINVAL;
+		goto out;
+	}
+	switch (dargs->cmd) {
+	case BTRFS_DEDUP_CTL_ENABLE:
+		ret = btrfs_dedup_enable(fs_info, dargs->hash_type,
+					 dargs->backend, dargs->blocksize,
+					 dargs->limit_nr);
+		break;
+	case BTRFS_DEDUP_CTL_DISABLE:
+		ret = btrfs_dedup_disable(fs_info);
+		break;
+	case BTRFS_DEDUP_CTL_STATUS:
+		dedup_info = fs_info->dedup_info;
+		if (dedup_info) {
+			dargs->status = 1;
+			dargs->blocksize = dedup_info->blocksize;
+			dargs->backend = dedup_info->backend;
+			dargs->hash_type = dedup_info->hash_type;
+			dargs->limit_nr = dedup_info->limit_nr;
+			dargs->current_nr = dedup_info->current_nr;
+		} else {
+			dargs->status = 0;
+			dargs->blocksize = 0;
+			dargs->backend = 0;
+			dargs->hash_type = 0;
+			dargs->limit_nr = 0;
+			dargs->current_nr = 0;
+		}
+		if (copy_to_user(args, dargs, sizeof(*dargs)))
+			ret = -EFAULT;
+		else
+			ret = 0;
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+out:
+	kfree(dargs);
+	return ret;
+}
+
 static int clone_finish_inode_update(struct btrfs_trans_handle *trans,
 				     struct inode *inode,
 				     u64 endoff,
@@ -5576,6 +5637,8 @@ long btrfs_ioctl(struct file *file, unsigned int
 		return btrfs_ioctl_set_fslabel(file, argp);
 	case BTRFS_IOC_FILE_EXTENT_SAME:
 		return btrfs_ioctl_file_extent_same(file, argp);
+	case BTRFS_IOC_DEDUP_CTL:
+		return btrfs_ioctl_dedup_ctl(root, argp);
 	case BTRFS_IOC_GET_SUPPORTED_FEATURES:
 		return btrfs_ioctl_get_supported_features(file, argp);
 	case BTRFS_IOC_GET_FEATURES:
