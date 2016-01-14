@@ -864,7 +864,9 @@ static void update_curr_dl(struct rq *rq)
 
 	sched_rt_avg_update(rq, delta_exec);
 
-	delta_exec = grub_reclaim(delta_exec, rq, curr->dl.dl_bw);
+	if (unlikely(dl_se->flags & SCHED_FLAG_RECLAIM)) {
+		delta_exec = grub_reclaim(delta_exec, rq, curr->dl.dl_bw);
+	}
 	dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	trace_sched_stat_params_dl(curr, dl_se->runtime, dl_se->deadline);
 	if (dl_runtime_exceeded(dl_se)) {
