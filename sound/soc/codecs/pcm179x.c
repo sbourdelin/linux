@@ -91,14 +91,9 @@ static int pcm179x_digital_mute(struct snd_soc_dai *dai, int mute)
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct pcm179x_private *priv = snd_soc_codec_get_drvdata(codec);
-	int ret;
 
-	ret = regmap_update_bits(priv->regmap, PCM179X_SOFT_MUTE,
+	return regmap_update_bits(priv->regmap, PCM179X_SOFT_MUTE,
 				 PCM179X_MUTE_MASK, !!mute);
-	if (ret < 0)
-		return ret;
-
-	return 0;
 }
 
 static int pcm179x_hw_params(struct snd_pcm_substream *substream,
@@ -107,7 +102,7 @@ static int pcm179x_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct pcm179x_private *priv = snd_soc_codec_get_drvdata(codec);
-	int val = 0, ret;
+	int val = 0;
 
 	priv->rate = params_rate(params);
 
@@ -145,12 +140,8 @@ static int pcm179x_hw_params(struct snd_pcm_substream *substream,
 
 	val = val << PCM179X_FMT_SHIFT | PCM179X_ATLD_ENABLE;
 
-	ret = regmap_update_bits(priv->regmap, PCM179X_FMT_CONTROL,
+	return regmap_update_bits(priv->regmap, PCM179X_FMT_CONTROL,
 				 PCM179X_FMT_MASK | PCM179X_ATLD_ENABLE, val);
-	if (ret < 0)
-		return ret;
-
-	return 0;
 }
 
 static const struct snd_soc_dai_ops pcm179x_dai_ops = {
