@@ -185,6 +185,7 @@ void init_dl_rq(struct dl_rq *dl_rq)
 #else
 	init_dl_bw(&dl_rq->dl_bw);
 #endif
+	dl_rq->unusable_bw = (1 << 20) / 10;		// FIXME: allow to set this!
 }
 
 #ifdef CONFIG_SMP
@@ -825,7 +826,7 @@ extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
 
 u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * rq->dl.running_bw) >> 20;
+	return (delta * (rq->dl.unusable_bw + rq->dl.running_bw)) >> 20;
 }
 
 /*

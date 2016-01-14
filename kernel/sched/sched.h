@@ -524,6 +524,10 @@ struct dl_rq {
 	 * and decreased when a task blocks
 	 */
 	s64 running_bw;
+	/* This is the amount of utilization that GRUB can not
+         * reclaim (per runqueue)
+         */
+	s64 unusable_bw;
 
 	s64 this_bw;
 };
