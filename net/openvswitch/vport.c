@@ -426,6 +426,9 @@ u32 ovs_vport_find_upcall_portid(const struct vport *vport, struct sk_buff *skb)
 	return ids->ids[ids_index];
 }
 
+static DEFINE_PER_CPU(int, ovs_recursion);
+static const int ovs_recursion_limit = 8;
+
 /**
  *	ovs_vport_receive - pass up received packet to the datapath for processing
  *
@@ -442,6 +445,15 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 	struct sw_flow_key key;
 	int error;
 
+	preempt_disable();
+	if (__this_cpu_inc_return(ovs_recursion) > ovs_recursion_limit) {
+		net_crit_ratelimited("ovs: recursion limit reached on datapath %s, probable configuration error\n",
+				     ovs_dp_name(vport->dp));
+		error = -ENETDOWN;
+		kfree_skb(skb);
+		goto out;
+	}
+
 	OVS_CB(skb)->input_vport = vport;
 	OVS_CB(skb)->mru = 0;
 	if (unlikely(dev_net(skb->dev) != ovs_dp_get_net(vport->dp))) {
@@ -457,10 +469,14 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 	error = ovs_flow_key_extract(tun_info, skb, &key);
 	if (unlikely(error)) {
 		kfree_skb(skb);
-		return error;
+		goto out;
 	}
+
 	ovs_dp_process_packet(skb, &key);
-	return 0;
+out:
+	__this_cpu_dec(ovs_recursion);
+	preempt_enable();
+	return error;
 }
 EXPORT_SYMBOL_GPL(ovs_vport_receive);
 
