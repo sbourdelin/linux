@@ -2991,7 +2991,7 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	unsigned int headroom;
 	unsigned int len;
 	__be16 proto;
-	bool csum;
+	bool csum = !head_skb->encap_hdr_csum;
 	int sg = !!(features & NETIF_F_SG);
 	int nfrags = skb_shinfo(head_skb)->nr_frags;
 	int err = -ENOMEM;
@@ -3004,8 +3004,8 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 	if (unlikely(!proto))
 		return ERR_PTR(-EINVAL);
 
-	csum = !head_skb->encap_hdr_csum &&
-	    !!can_checksum_protocol(features, proto);
+	if (!head_skb->remcsum_offload)
+		csum &= !!can_checksum_protocol(features, proto);
 
 	headroom = skb_headroom(head_skb);
 	pos = skb_headlen(head_skb);
@@ -3098,8 +3098,9 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 		if (nskb->len == len + doffset)
 			goto perform_csum_check;
 
-		if (!sg && !nskb->remcsum_offload) {
-			nskb->ip_summed = CHECKSUM_NONE;
+		if (!sg) {
+			if (!nskb->remcsum_offload)
+				nskb->ip_summed = CHECKSUM_NONE;
 			SKB_GSO_CB(nskb)->csum =
 				skb_copy_and_csum_bits(head_skb, offset,
 						       skb_put(nskb, len),
@@ -3171,8 +3172,9 @@ skip_fraglist:
 		nskb->truesize += nskb->data_len;
 
 perform_csum_check:
-		if (!csum && !nskb->remcsum_offload) {
-			nskb->ip_summed = CHECKSUM_NONE;
+		if (!csum) {
+			if (!nskb->remcsum_offload)
+				nskb->ip_summed = CHECKSUM_NONE;
 			SKB_GSO_CB(nskb)->csum =
 				skb_checksum(nskb, doffset,
 					     nskb->len - doffset, 0);
