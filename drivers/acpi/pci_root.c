@@ -720,6 +720,61 @@ next:
 	}
 }
 
+#ifdef PCI_IOBASE
+/*
+ * The IO ports are mapped to a memory range, fixup IO resources to
+ * handle that
+ */
+static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
+{
+	struct resource_entry *entry;
+	struct resource iores;
+	resource_size_t iostart;
+	int err;
+
+	iores.flags = IORESOURCE_IO;
+	iores.start = (resource_size_t)-1;
+	iores.end = 0;
+	resource_list_for_each_entry(entry, &ci->resources) {
+		if (entry->res->flags & IORESOURCE_IO) {
+			iores.start = min(entry->res->start, iores.start);
+			iores.end = max(entry->res->end, iores.end);
+		}
+	}
+	if (iores.end == 0)
+		return 0;
+	iostart = iores.start;
+
+	resource_list_for_each_entry(entry, &ci->resources) {
+		if (entry->res->flags & IORESOURCE_IO) {
+			entry->res->start -= iostart;
+			entry->res->end -= iostart;
+			entry->offset -= iostart;
+		}
+	}
+	iores.start -= iostart;
+	iores.end -= iostart;
+
+	err = pci_remap_iospace(&iores, iostart);
+	if (err) {
+		pr_err("PCI: ACPI: err %d mapping IO %pR\n", err, &iores);
+		return -ENODEV;
+	}
+	pr_info(PREFIX "Mapped %pR at %#lx for IO.\n",
+			&iores, (unsigned long)iostart);
+	return 0;
+}
+#else
+/*
+ * The IO ports are mapped to a memory range, fixup IO resources to
+ * handle that
+ */
+static int acpi_pci_root_remap_iospace(struct acpi_pci_root_info *ci)
+{
+	return 0;
+}
+#endif /* PCI_IOBASE */
+
 int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
 {
 	int ret;
@@ -745,10 +800,13 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
 			else
 				entry->res->name = info->name;
 		}
-		acpi_pci_root_validate_resources(&device->dev, list,
+		ret = acpi_pci_root_remap_iospace(info);
+		if (ret >= 0) {
+			acpi_pci_root_validate_resources(&device->dev, list,
 						 IORESOURCE_MEM);
-		acpi_pci_root_validate_resources(&device->dev, list,
+			acpi_pci_root_validate_resources(&device->dev, list,
 						 IORESOURCE_IO);
+		}
 	}
 
 	return ret;
