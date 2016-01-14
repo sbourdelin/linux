@@ -594,6 +594,13 @@ static int i915_drm_suspend(struct drm_device *dev)
 		goto out;
 	}
 
+	/*
+	 * Clear any pending reset requests. They should be picked up
+	 * after resume when new work is submitted
+	 */
+	atomic_clear_mask(I915_RESET_IN_PROGRESS_FLAG,
+			  &dev_priv->gpu_error.reset_counter);
+
 	intel_guc_suspend(dev);
 
 	intel_suspend_gt_powersave(dev);
