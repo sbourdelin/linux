@@ -52,6 +52,10 @@ static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	lockdep_assert_held(&(rq_of_dl_rq(dl_rq))->lock);
 	dl_rq->running_bw += se_bw;
 	trace_sched_stat_running_bw_add(dl_task_of(dl_se), se_bw, dl_rq->running_bw);
+	if (dl_rq->running_bw > dl_rq->this_bw) {
+		WARN_ON(1);
+		dl_rq->running_bw = dl_rq->this_bw;
+	}
 }
 
 static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
@@ -65,6 +69,22 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 		WARN_ON(1);
 		dl_rq->running_bw = 0;
 	}
+}
+
+static void clear_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw -= se_bw;
+	WARN_ON(dl_rq->this_bw < 0);
+	if (dl_rq->this_bw < 0) dl_rq->this_bw = 0;
+}
+
+static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw += se_bw;
 }
 
 static void task_go_inactive(struct task_struct *p)
@@ -104,6 +124,7 @@ static void task_go_inactive(struct task_struct *p)
 		clear_running_bw(dl_se, dl_rq);
 		if (!dl_task(p)) {
 			__dl_clear_params(p);
+			clear_rq_bw(&p->dl, &rq->dl);
 		}
 		return;
 	}
@@ -117,6 +138,7 @@ static void task_go_inactive(struct task_struct *p)
 		clear_running_bw(dl_se, dl_rq);
 		if (!dl_task(p)) {
 			__dl_clear_params(p);
+			clear_rq_bw(&p->dl, &rq->dl);
 		}
 	} else {
 		get_task_struct(p);
@@ -587,6 +609,7 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	 */
 	if (dl_se->dl_new) {
 		setup_new_dl_entity(dl_se, pi_se);
+		add_rq_bw(dl_se, dl_rq);
 		add_running_bw(dl_se, dl_rq);
 		return;
 	}
@@ -891,6 +914,7 @@ static enum hrtimer_restart inactive_task_timer(struct hrtimer *timer)
 	}
 	if (!dl_task(p)) {
 		__dl_clear_params(p);
+		clear_rq_bw(&p->dl, &rq->dl);
 
 		goto unlock;
 	}
@@ -1200,9 +1224,11 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 		if (hrtimer_active(&p->dl.inactive_timer)) {
 			raw_spin_lock(&rq->lock);
 			clear_running_bw(&p->dl, &rq->dl);
+			clear_rq_bw(&p->dl, &rq->dl);
 			raw_spin_unlock(&rq->lock);
 			rq = cpu_rq(cpu);
 			raw_spin_lock(&rq->lock);
+			add_rq_bw(&p->dl, &rq->dl);
 			add_running_bw(&p->dl, &rq->dl);
 			raw_spin_unlock(&rq->lock);
 		}
@@ -1664,7 +1690,9 @@ retry:
 
 	deactivate_task(rq, next_task, 0);
 	clear_running_bw(&next_task->dl, &rq->dl);
+	clear_rq_bw(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
+	add_rq_bw(&next_task->dl, &later_rq->dl);
 	add_running_bw(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
@@ -1754,7 +1782,9 @@ static void pull_dl_task(struct rq *this_rq)
 
 			deactivate_task(src_rq, p, 0);
 			clear_running_bw(&p->dl, &src_rq->dl);
+			clear_rq_bw(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
+			add_rq_bw(&p->dl, &this_rq->dl);
 			add_running_bw(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
@@ -1860,9 +1890,10 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	 */
 	if (task_on_rq_queued(p))
 		task_go_inactive(p);
-	if (!hrtimer_active(&p->dl.inactive_timer))
+	if (!hrtimer_active(&p->dl.inactive_timer)) {
 		__dl_clear_params(p);
-	else if (!hrtimer_callback_running(&p->dl.inactive_timer))
+		clear_rq_bw(&p->dl, &rq->dl);
+	} else if (!hrtimer_callback_running(&p->dl.inactive_timer))
 		clear_running_bw(&p->dl, &rq->dl);
 
 	/*
