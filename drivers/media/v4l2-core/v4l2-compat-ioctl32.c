@@ -521,6 +521,9 @@ static int put_v4l2_buffer32(struct v4l2_buffer *kp, struct v4l2_buffer32 __user
 		if (num_planes == 0)
 			return 0;
 
+		if (put_user(kp->length, &up->length))
+			return -EFAULT;
+
 		uplane = (__force struct v4l2_plane __user *)kp->m.planes;
 		if (get_user(p, &up->m.planes))
 			return -EFAULT;
