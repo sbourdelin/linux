@@ -51,6 +51,7 @@
 
 /* SMCA settings */
 #define SMCA_THR_LVT_OFF	0xF000
+#define SMCA_MCAX_EN_OFF	0x1
 
 static const char * const th_names[] = {
 	"load_store",
@@ -316,6 +317,17 @@ void mce_amd_feature_init(struct cpuinfo_x86 *c)
 
 			if (mce_flags.smca) {
 				u32 smca_low = 0, smca_high = 0;
+				u32 smca_addr = 0;
+
+				/* Set MCAXEnable bit for each bank */
+				smca_addr = MSR_AMD64_SMCA_MCx_CONFIG(bank);
+				if (rdmsr_safe(smca_addr,
+					       &smca_low,
+					       &smca_high))
+					continue;
+
+				smca_high = (smca_high & ~SMCA_MCAX_EN_OFF) | 0x1;
+				wrmsr(smca_addr, smca_low, smca_high);
 
 				/* Gather LVT offset for thresholding */
 				if (rdmsr_safe(MSR_CU_DEF_ERR,
