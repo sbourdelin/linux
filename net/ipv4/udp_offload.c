@@ -116,6 +116,7 @@ static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 			skb->ip_summed = CHECKSUM_PARTIAL;
 			skb->csum_start = skb_transport_header(skb) - skb->head;
 			skb->csum_offset = offsetof(struct udphdr, check);
+			gso_reset_checksum(skb, ~uh->check);
 		} else {
 			uh->check = gso_make_checksum(skb, ~uh->check);
 

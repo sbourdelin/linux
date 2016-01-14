@@ -2161,6 +2161,11 @@ static inline int skb_checksum_start_offset(const struct sk_buff *skb)
 	return skb->csum_start - skb_headroom(skb);
 }
 
+static inline unsigned char *skb_checksum_start(const struct sk_buff *skb)
+{
+	return skb->head + skb->csum_start;
+}
+
 static inline int skb_transport_offset(const struct sk_buff *skb)
 {
 	return skb_transport_header(skb) - skb->data;
@@ -3573,6 +3578,14 @@ static inline int gso_pskb_expand_head(struct sk_buff *skb, int extra)
 	new_headroom = skb_headroom(skb);
 	SKB_GSO_CB(skb)->mac_offset += (new_headroom - headroom);
 	return 0;
+}
+
+static inline void gso_reset_checksum(struct sk_buff *skb, __wsum res)
+{
+	unsigned char *csum_start = skb_checksum_start(skb);
+
+	SKB_GSO_CB(skb)->csum = res;
+	SKB_GSO_CB(skb)->csum_start = csum_start - skb->head;
 }
 
 /* Compute the checksum for a gso segment. First compute the checksum value
