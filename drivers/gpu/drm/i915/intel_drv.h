@@ -627,6 +627,8 @@ struct intel_plane_wm_parameters {
 	u64 tiling;
 	unsigned int rotation;
 	uint16_t fifo_size;
+	 /* Stores the adjusted plane pixel rate for WM calculation */
+	uint32_t plane_pixel_rate;
 };
 
 struct intel_plane {
