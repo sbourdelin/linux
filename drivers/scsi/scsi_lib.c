@@ -1622,7 +1622,8 @@ static void scsi_softirq_done(struct request *rq)
 	INIT_LIST_HEAD(&cmd->eh_entry);
 
 	atomic_inc(&cmd->device->iodone_cnt);
-	if (cmd->result)
+	if (cmd->result &&
+	    cmd->result != ((DRIVER_SENSE << 24) | SAM_STAT_CHECK_CONDITION))
 		atomic_inc(&cmd->device->ioerr_cnt);
 
 	disposition = scsi_decide_disposition(cmd);
