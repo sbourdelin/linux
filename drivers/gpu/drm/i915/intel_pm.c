@@ -3103,7 +3103,9 @@ static bool skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	if (latency == 0 || !cstate->base.active || !fb)
 		return false;
 
-	bytes_per_pixel = drm_format_plane_cpp(fb->pixel_format, 0);
+	bytes_per_pixel = (fb->pixel_format == DRM_FORMAT_NV12) ?
+				drm_format_plane_cpp(fb->pixel_format, 1) :
+				drm_format_plane_cpp(fb->pixel_format, 0);
 	method1 = skl_wm_method1(skl_pipe_pixel_rate(cstate),
 				 bytes_per_pixel,
 				 latency);
