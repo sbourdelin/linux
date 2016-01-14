@@ -13,6 +13,17 @@ Required properties:
 - clock-names: Must include the following additional entries:
 	- "pcie_phy"
 
+Optional properties:
+- fsl,tx-deemph-gen1: Sets GPR8 value for Tx driver de-emphasis when PHY is
+  running at Gen1 rates.
+- fsl,tx-deemph-gen2-3p5db: Sets GPR8 value for Tx driver de-emphasis when
+  PHY is running at Gen2 (3.5db) rate.
+- fsl,tx-demmph-gen2-6db: Sets GPR8 value for Tx driver de-emphasis when
+  PHY is running at Gen2 (3.5db) rate.
+- fsl,tx-swing-full: Sets GPR8 value for Tx driver SWING_FULL.
+- fsl,tx-swing-low: Sets GPR8 value for launch amplitude of transmitter when
+  pipe0_tx_swing is set to 0.
+
 Example:
 
 	pcie@0x01000000 {
@@ -37,4 +48,6 @@ Example:
 		                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
 		clock-names = "pcie", "pcie_bus", "pcie_phy";
+		fsl,tx-swing-full = <103>;
+		fsl,tx-swing-low = <103>;
 	};
