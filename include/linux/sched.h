@@ -1341,6 +1341,7 @@ struct sched_dl_entity {
 	 * own bandwidth to be enforced, thus we need one timer per task.
 	 */
 	struct hrtimer dl_timer;
+	struct hrtimer inactive_timer;
 };
 
 union rcu_special {
