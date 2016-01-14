@@ -1452,9 +1452,6 @@ static void call_console_drivers(int level,
 			continue;
 		if (!con->write)
 			continue;
-		if (!cpu_online(smp_processor_id()) &&
-		    !(con->flags & CON_ANYTIME))
-			continue;
 		if (con->flags & CON_EXTENDED)
 			con->write(con, ext_text, ext_len);
 		else
@@ -1500,18 +1497,6 @@ static int have_callable_console(void)
 }
 
 /*
- * Can we actually use the console at this time on this cpu?
- *
- * Console drivers may assume that per-cpu resources have been allocated. So
- * unless they're explicitly marked as being able to cope (CON_ANYTIME) don't
- * call them until this CPU is officially up.
- */
-static inline int can_use_console(unsigned int cpu)
-{
-	return cpu_online(cpu) || have_callable_console();
-}
-
-/*
  * Try to get console ownership to actually show the kernel
  * messages from a 'printk'. Return true (and with the
  * console_lock held, and 'console_locked' set) if it
@@ -1519,21 +1504,7 @@ static inline int can_use_console(unsigned int cpu)
  */
 static int console_trylock_for_printk(void)
 {
-	unsigned int cpu = smp_processor_id();
-
-	if (!console_trylock())
-		return 0;
-	/*
-	 * If we can't use the console, we need to release the console
-	 * semaphore by hand to avoid flushing the buffer. We need to hold the
-	 * console semaphore in order to do this test safely.
-	 */
-	if (!can_use_console(cpu)) {
-		console_locked = 0;
-		up_console_sem();
-		return 0;
-	}
-	return 1;
+	return console_trylock();
 }
 
 int printk_delay_msec __read_mostly;
@@ -2177,10 +2148,23 @@ int is_console_locked(void)
 	return console_locked;
 }
 
-static void console_cont_flush(char *text, size_t size)
+/*
+ * Can we actually use the console at this time on this cpu?
+ *
+ * Console drivers may assume that per-cpu resources have been allocated. So
+ * unless they're explicitly marked as being able to cope (CON_ANYTIME) don't
+ * call them until this CPU is officially up.
+ */
+static inline int can_use_console(void)
+{
+	return cpu_online(smp_processor_id()) || have_callable_console();
+}
+
+static bool console_cont_flush(char *text, size_t size)
 {
 	unsigned long flags;
 	size_t len;
+	bool ret = true;
 
 	raw_spin_lock_irqsave(&logbuf_lock, flags);
 
@@ -2195,15 +2179,21 @@ static void console_cont_flush(char *text, size_t size)
 	if (console_seq < log_next_seq && !cont.cons)
 		goto out;
 
+	if (!can_use_console()) {
+		ret = false;
+		goto out;
+	}
+
 	len = cont_print_text(text, size);
 	raw_spin_unlock(&logbuf_lock);
 	stop_critical_timings();
 	call_console_drivers(cont.level, NULL, 0, text, len);
 	start_critical_timings();
 	local_irq_restore(flags);
-	return;
+	return ret;
 out:
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+	return ret;
 }
 
 /**
@@ -2227,7 +2217,7 @@ void console_unlock(void)
 	static u64 seen_seq;
 	unsigned long flags;
 	bool wake_klogd = false;
-	bool do_cond_resched, retry;
+	bool do_cond_resched, retry, aborted = false;
 
 	if (console_suspended) {
 		up_console_sem();
@@ -2248,7 +2238,12 @@ void console_unlock(void)
 	console_may_schedule = 0;
 
 	/* flush buffered message fragment immediately to console */
-	console_cont_flush(text, sizeof(text));
+	if (!console_cont_flush(text, sizeof(text))) {
+		console_locked = 0;
+		up_console_sem();
+		return;
+	}
+
 again:
 	for (;;) {
 		struct printk_log *msg;
@@ -2257,6 +2252,12 @@ again:
 		int level;
 
 		raw_spin_lock_irqsave(&logbuf_lock, flags);
+
+		if (!can_use_console()) {
+			aborted = true;
+			break;
+		}
+
 		if (seen_seq != log_next_seq) {
 			wake_klogd = true;
 			seen_seq = log_next_seq;
@@ -2337,7 +2338,7 @@ skip:
 	 * flush, no worries.
 	 */
 	raw_spin_lock(&logbuf_lock);
-	retry = console_seq != log_next_seq;
+	retry = !aborted && (console_seq != log_next_seq);
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
 	if (retry && console_trylock())
