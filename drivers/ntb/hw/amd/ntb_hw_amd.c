@@ -93,6 +93,7 @@ static const struct ntb_dev_ops amd_ntb_ops = {
 	.peer_spad_addr		= amd_ntb_peer_spad_addr,
 	.peer_spad_read		= amd_ntb_peer_spad_read,
 	.peer_spad_write	= amd_ntb_peer_spad_write,
+	.flush_req		= amd_ntb_flush_req,
 };
 
 static int ndev_mw_to_bar(struct amd_ntb_dev *ndev, int idx)
@@ -492,6 +493,37 @@ static void amd_ack_SMU(struct amd_ntb_dev *ndev, u32 bit)
 	ndev->peer_sta |= bit;
 }
 
+/*
+ * flush the requests to peer side
+ */
+static int amd_flush_peer_requests(struct amd_ntb_dev *ndev)
+{
+	void __iomem *mmio = ndev->self_mmio;
+	u32 reg;
+
+	if (!amd_link_is_up(ndev)) {
+		dev_err(ndev_dev(ndev), "link is down.\n");
+		return -EINVAL;
+	}
+
+	reg = readl(mmio + AMD_FLUSHTRIG_OFFSET);
+	reg |= 0x1;
+	writel(reg, mmio + AMD_FLUSHTRIG_OFFSET);
+
+	wait_for_completion(&ndev->flush_cmpl);
+
+	reinit_completion(&ndev->flush_cmpl);
+
+	return 0;
+}
+
+static int amd_ntb_flush_req(struct ntb_dev *ntb)
+{
+	struct amd_ntb_dev *ndev = ntb_ndev(ntb);
+
+	return amd_flush_peer_requests(ndev);
+}
+
 static void amd_handle_event(struct amd_ntb_dev *ndev, int vec)
 {
 	void __iomem *mmio = ndev->self_mmio;
@@ -506,7 +538,8 @@ static void amd_handle_event(struct amd_ntb_dev *ndev, int vec)
 	status &= AMD_EVENT_INTMASK;
 	switch (status) {
 	case AMD_PEER_FLUSH_EVENT:
-		dev_info(ndev_dev(ndev), "Flush is done.\n");
+		dev_dbg(ndev_dev(ndev), "Flush is done.\n");
+		complete(&ndev->flush_cmpl);
 		break;
 	case AMD_PEER_RESET_EVENT:
 		amd_ack_SMU(ndev, AMD_PEER_RESET_EVENT);
@@ -832,6 +865,7 @@ static inline void ndev_init_struct(struct amd_ntb_dev *ndev,
 	ndev->ntb.topo = NTB_TOPO_NONE;
 	ndev->ntb.ops = &amd_ntb_ops;
 	ndev->int_mask = AMD_EVENT_INTMASK;
+	init_completion(&ndev->flush_cmpl);
 	spin_lock_init(&ndev->db_mask_lock);
 }
 

@@ -210,6 +210,7 @@ static inline int ntb_ctx_ops_is_valid(const struct ntb_ctx_ops *ops)
  * @peer_spad_addr:	See ntb_peer_spad_addr().
  * @peer_spad_read:	See ntb_peer_spad_read().
  * @peer_spad_write:	See ntb_peer_spad_write().
+ * @flush_req:		See ntb_flush_request().
  */
 struct ntb_dev_ops {
 	int (*mw_count)(struct ntb_dev *ntb);
@@ -259,6 +260,8 @@ struct ntb_dev_ops {
 			      phys_addr_t *spad_addr);
 	u32 (*peer_spad_read)(struct ntb_dev *ntb, int idx);
 	int (*peer_spad_write)(struct ntb_dev *ntb, int idx, u32 val);
+
+	int (*flush_req)(struct ntb_dev *ntb);
 };
 
 static inline int ntb_dev_ops_is_valid(const struct ntb_dev_ops *ops)
@@ -978,6 +981,25 @@ static inline u32 ntb_peer_spad_read(struct ntb_dev *ntb, int idx)
 static inline int ntb_peer_spad_write(struct ntb_dev *ntb, int idx, u32 val)
 {
 	return ntb->ops->peer_spad_write(ntb, idx, val);
+}
+
+/**
+ * ntb_flush_requests() - flush all pending requests
+ * @ntb:	NTB device context.
+ *
+ * For some usage, one side of NTB need to first make sure that all previous
+ * requests have been completed and then execute next step such as power down,
+ * or device removed.
+ * NOTE: This function may go to sleep, so can't call it in interrupt context.
+ *
+ * Return: Zero on success, otherwise an error number.
+ */
+static inline int ntb_flush_requests(struct ntb_dev *ntb)
+{
+	if (!ntb->ops->flush_req)
+		return 0;
+
+	return ntb->ops->flush_req(ntb);
 }
 
 #endif

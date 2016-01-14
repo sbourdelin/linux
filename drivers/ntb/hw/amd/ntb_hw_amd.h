@@ -200,6 +200,8 @@ struct amd_ntb_dev {
 	unsigned int self_spad;
 	unsigned int peer_spad;
 
+	struct completion flush_cmpl;
+
 	struct delayed_work hb_timer;
 
 	struct dentry *debugfs_dir;
@@ -243,4 +245,5 @@ static int amd_ntb_peer_spad_addr(struct ntb_dev *ntb, int idx,
 					phys_addr_t *spad_addr);
 static u32 amd_ntb_peer_spad_read(struct ntb_dev *ntb, int idx);
 static int amd_ntb_peer_spad_write(struct ntb_dev *ntb, int idx, u32 val);
+static int amd_ntb_flush_req(struct ntb_dev *ntb);
 #endif
