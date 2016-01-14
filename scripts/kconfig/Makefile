@@ -81,6 +81,9 @@ simple-targets := oldconfig allnoconfig allyesconfig allmodconfig \
 PHONY += $(simple-targets)
 
 $(simple-targets): $(obj)/conf
+ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/scripts/check-configs.sh),)
+	$(Q)$(CONFIG_SHELL) $(srctree)/arch/$(SRCARCH)/scripts/check-configs.sh $@ $(srctree) $(ARCH)
+endif
 	$< $(silent) --$@ $(Kconfig)
 
 PHONY += oldnoconfig savedefconfig defconfig
