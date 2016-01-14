@@ -386,13 +386,11 @@ static void bdw_get_stolen_reserved(struct drm_i915_private *dev_priv,
 		*size = stolen_top - *base;
 }
 
-int i915_gem_init_stolen(struct drm_device *dev)
+int i915_gem_init_stolen_reserved(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	unsigned long reserved_total, reserved_base = 0, reserved_size;
+	unsigned long reserved_base = 0, reserved_size;
 	unsigned long stolen_top;
-
-	mutex_init(&dev_priv->mm.stolen_lock);
 
 #ifdef CONFIG_INTEL_IOMMU
 	if (intel_iommu_gfx_mapped && INTEL_INFO(dev)->gen < 8) {
@@ -458,9 +456,38 @@ int i915_gem_init_stolen(struct drm_device *dev)
 		return 0;
 	}
 
+	dev_priv->gtt.stolen_reserved_base = reserved_base;
+	dev_priv->gtt.stolen_reserved_size = reserved_size;
+
+	return 0;
+}
+
+int i915_gem_init_stolen(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	unsigned long reserved_total;
+	unsigned long stolen_top;
+
+	mutex_init(&dev_priv->mm.stolen_lock);
+
+#ifdef CONFIG_INTEL_IOMMU
+	if (intel_iommu_gfx_mapped && INTEL_INFO(dev)->gen < 8) {
+		DRM_INFO("DMAR active, disabling use of stolen memory\n");
+		return 0;
+	}
+#endif
+
+	if (dev_priv->gtt.stolen_size == 0)
+		return 0;
+
+	if (dev_priv->mm.stolen_base == 0)
+		return 0;
+
+	stolen_top = dev_priv->mm.stolen_base + dev_priv->gtt.stolen_size;
+
 	/* It is possible for the reserved area to end before the end of stolen
-	 * memory, so just consider the start. */
-	reserved_total = stolen_top - reserved_base;
+	* memory, so just consider the start. */
+	reserved_total = stolen_top - dev_priv->gtt.stolen_reserved_base;
 
 	DRM_DEBUG_KMS("Memory reserved for graphics device: %zuK, usable: %luK\n",
 		      dev_priv->gtt.stolen_size >> 10,
