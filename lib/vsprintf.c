@@ -529,6 +529,9 @@ char *special_hex_number(char *buf, char *end, unsigned long long num, int size)
 	return number(buf, end, num, spec);
 }
 
+#define special_hex_number_unsigned_long(buf, end, n) \
+	special_hex_number(buf, end, (unsigned long)n, sizeof(unsigned long))
+
 static void move_right(char *buf, char *end, unsigned len, unsigned spaces)
 {
 	size_t size;
@@ -684,7 +687,7 @@ char *symbol_string(char *buf, char *end, void *ptr,
 
 	return string(buf, end, sym, spec);
 #else
-	return special_hex_number(buf, end, value, sizeof(void *));
+	return special_hex_number_unsigned_long(buf, end, value);
 #endif
 }
 
@@ -1402,7 +1405,7 @@ char *clock(char *buf, char *end, struct clk *clk, struct printf_spec spec,
 #ifdef CONFIG_COMMON_CLK
 		return string(buf, end, __clk_get_name(clk), spec);
 #else
-		return special_hex_number(buf, end, (unsigned long)clk, sizeof(unsigned long));
+		return special_hex_number_unsigned_long(buf, end, clk);
 #endif
 	}
 }
