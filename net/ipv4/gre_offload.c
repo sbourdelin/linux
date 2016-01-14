@@ -53,8 +53,6 @@ static struct sk_buff *gre_gso_segment(struct sk_buff *skb,
 		goto out;
 
 	csum = !!(greh->flags & GRE_CSUM);
-	if (csum)
-		skb->encap_hdr_csum = 1;
 
 	/* setup inner skb. */
 	skb->protocol = greh->protocol;
