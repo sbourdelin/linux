@@ -25,6 +25,8 @@
 #include <linux/resource.h>
 #include <linux/types.h>
 
+#include <linux/platform_data/pci-dra7xx.h>
+
 #include "pcie-designware.h"
 
 /* PCIe controller wrapper DRA7XX configuration registers */
@@ -329,6 +331,61 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
 	return 0;
 }
 
+static int dra7xx_pcie_assert_reset(struct platform_device *pdev)
+{
+	int ret;
+	struct device *dev = &pdev->dev;
+	struct pci_dra7xx_platform_data *pdata = pdev->dev.platform_data;
+
+	if (!(pdata && pdata->assert_reset)) {
+		dev_err(dev, "platform data for assert reset not found!\n");
+		return -EINVAL;
+	}
+
+	ret = pdata->assert_reset(pdev, pdata->reset_name);
+	if (ret) {
+		dev_err(dev, "assert_reset failed: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int dra7xx_pcie_deassert_reset(struct platform_device *pdev)
+{
+	int ret;
+	struct device *dev = &pdev->dev;
+	struct pci_dra7xx_platform_data *pdata = pdev->dev.platform_data;
+
+	if (!(pdata && pdata->deassert_reset)) {
+		dev_err(dev, "platform data for deassert reset not found!\n");
+		return -EINVAL;
+	}
+
+	ret = pdata->deassert_reset(pdev, pdata->reset_name);
+	if (ret) {
+		dev_err(dev, "deassert_reset failed: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int dra7xx_pcie_reset(struct platform_device *pdev)
+{
+	int ret;
+
+	ret = dra7xx_pcie_assert_reset(pdev);
+	if (ret < 0)
+		return ret;
+
+	ret = dra7xx_pcie_deassert_reset(pdev);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
 static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 {
 	u32 reg;
@@ -346,6 +403,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
 	int gpio_sel;
 	enum of_gpio_flags flags;
 	unsigned long gpio_flags;
+
+	ret = dra7xx_pcie_reset(pdev);
+	if (ret)
+		return ret;
 
 	dra7xx = devm_kzalloc(dev, sizeof(*dra7xx), GFP_KERNEL);
 	if (!dra7xx)
@@ -457,6 +518,7 @@ static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
 	struct pcie_port *pp = &dra7xx->pp;
 	struct device *dev = &pdev->dev;
 	int count = dra7xx->phy_count;
+	int ret;
 
 	if (pp->irq_domain)
 		irq_domain_remove(pp->irq_domain);
@@ -466,6 +528,10 @@ static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
 		phy_power_off(dra7xx->phy[count]);
 		phy_exit(dra7xx->phy[count]);
 	}
+
+	ret = dra7xx_pcie_assert_reset(pdev);
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
