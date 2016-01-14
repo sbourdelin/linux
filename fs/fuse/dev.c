@@ -7,6 +7,7 @@
 */
 
 #include "fuse_i.h"
+#include "fuse_stacked.h"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -569,6 +570,8 @@ ssize_t fuse_simple_request(struct fuse_conn *fc, struct fuse_args *args)
 	if (!ret && args->out.argvar) {
 		BUG_ON(args->out.numargs != 1);
 		ret = req->out.args[0].size;
+		if (req->private_lower_rw_file != NULL)
+			args->out.lower_filp = req->private_lower_rw_file;
 	}
 	fuse_put_request(fc, req);
 
@@ -1934,6 +1937,7 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 	err = copy_out_args(cs, &req->out, nbytes);
 	fuse_copy_finish(cs);
 
+	fuse_setup_stacked_io(fc, req);
 	spin_lock(&fpq->lock);
 	clear_bit(FR_LOCKED, &req->flags);
 	if (!fpq->connected)
