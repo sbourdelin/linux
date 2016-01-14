@@ -408,6 +408,75 @@ DEFINE_EVENT(sched_stat_runtime, sched_stat_runtime,
 	     TP_ARGS(tsk, runtime, vruntime));
 
 /*
+ * Tracepoint for accounting running bandwidth of active SCHED_DEADLINE
+ * tasks (XXX specific to SCHED_FLAG_GRUB).
+ */
+DECLARE_EVENT_CLASS(sched_stat_running_bw,
+
+	TP_PROTO(struct task_struct *tsk, u64 tsk_bw, s64 running_bw),
+
+	TP_ARGS(tsk, tsk_bw, running_bw),
+
+	TP_STRUCT__entry(
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,	pid			)
+		__field( u64,	tsk_bw			)
+		__field( s64,	running_bw		)
+		__field( int,	cpu			)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+		__entry->cpu		= task_cpu(tsk);
+		__entry->pid		= tsk->pid;
+		__entry->tsk_bw		= tsk_bw;
+		__entry->running_bw	= running_bw;
+	),
+
+	TP_printk("comm=%s pid=%d cpu=%d tsk_bw=%Lu running_bw=%Ld ",
+			__entry->comm, __entry->pid, __entry->cpu,
+			(unsigned long long)__entry->tsk_bw,
+			(unsigned long long)__entry->running_bw)
+);
+
+DEFINE_EVENT(sched_stat_running_bw, sched_stat_running_bw_add,
+	     TP_PROTO(struct task_struct *tsk, u64 tsk_bw, s64 running_bw),
+	     TP_ARGS(tsk, tsk_bw, running_bw));
+
+DEFINE_EVENT(sched_stat_running_bw, sched_stat_running_bw_clear,
+	     TP_PROTO(struct task_struct *tsk, u64 tsk_bw, s64 running_bw),
+	     TP_ARGS(tsk, tsk_bw, running_bw));
+/*
+ * Tracepoint for showing actual parameters of SCHED_DEADLINE
+ * tasks.
+ */
+TRACE_EVENT(sched_stat_params_dl,
+
+	TP_PROTO(struct task_struct *tsk, s64 runtime, u64 deadline),
+
+	TP_ARGS(tsk, runtime, deadline),
+
+	TP_STRUCT__entry(
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,	pid			)
+		__field( s64,	runtime			)
+		__field( u64,	deadline		)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+		__entry->pid		= tsk->pid;
+		__entry->runtime	= runtime;
+		__entry->deadline	= deadline;
+	),
+
+	TP_printk("comm=%s pid=%d runtime=%Ld [ns] deadline=%Lu",
+			__entry->comm, __entry->pid,
+			__entry->runtime, __entry->deadline)
+);
+
+
+/*
  * Tracepoint for showing priority inheritance modifying a tasks
  * priority.
  */
