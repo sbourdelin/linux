@@ -63,9 +63,9 @@ static ssize_t mbox_test_signal_write(struct file *filp,
 	if (!tdev->signal)
 		return -ENOMEM;
 
-	ret = copy_from_user(tdev->signal, userbuf, count);
-	if (ret) {
+	if (copy_from_user(tdev->signal, userbuf, count)) {
 		kfree(tdev->signal);
+		tdev->signal = NULL;
 		return -EFAULT;
 	}
 
