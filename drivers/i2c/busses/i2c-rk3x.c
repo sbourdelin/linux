@@ -700,9 +700,9 @@ static int rk3x_i2c_v1_calc_clock(unsigned long clk_rate,
 
 	int ret = 0;
 
-	/* Support standard-mode and fast-mode */
-	if (WARN_ON(t_input->bus_freq_hz > 400000))
-		t_input->bus_freq_hz = 400000;
+	/* Support standard-mode, fast-mode and highspeed-mode */
+	if (WARN_ON(t_input->bus_freq_hz > 3400000))
+		t_input->bus_freq_hz = 3400000;
 
 	/* prevent scl_rate_khz from becoming 0 */
 	if (WARN_ON(t_input->bus_freq_hz < 1000))
@@ -732,6 +732,24 @@ static int rk3x_i2c_v1_calc_clock(unsigned long clk_rate,
 
 		spec_min_data_setup_ns = 100;
 		spec_max_data_hold_ns = 900;
+	} else if (t_input->bus_freq_hz <= 1700000) {
+		spec_min_low_ns = 320;
+		spec_min_high_ns = 120;
+
+		spec_min_setup_start_ns = 160;
+		spec_min_stop_setup_ns = 160;
+
+		spec_min_data_setup_ns = 10;
+		spec_max_data_hold_ns = 150;
+	} else {
+		spec_min_low_ns = 160;
+		spec_min_high_ns = 60;
+
+		spec_min_setup_start_ns = 160;
+		spec_min_stop_setup_ns = 160;
+
+		spec_min_data_setup_ns = 10;
+		spec_max_data_hold_ns = 70;
 	}
 
 	/* caculate min-divh and min-divl */
