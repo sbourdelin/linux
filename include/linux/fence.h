@@ -36,7 +36,6 @@ struct fence_ops;
 struct fence_cb;
 /**
  * struct fence_timeline_ops - fence context implementation ops
- * @driver_name:	name of the implementation
  * @has_signaled:	returns:
  *			  1 if pt has signaled
  *			  0 if pt has not signaled
@@ -49,8 +48,6 @@ struct fence_cb;
  * @pt_value_str:	fill str with the value of the sync_pt
  */
 struct fence_timeline_ops {
-	const char *driver_name;
-
 	/* required */
 	int (*has_signaled)(struct fence *fence);
 
@@ -80,6 +77,7 @@ struct fence_timeline_ops {
 struct fence_timeline {
 	struct kref		kref;
 	char			name[32];
+	char			drv_name[32];
 	const struct fence_timeline_ops *ops;
 	bool			destroyed;
 	int			value;
@@ -94,7 +92,8 @@ struct fence_timeline {
 
 struct fence_timeline *fence_timeline_create(unsigned num,
 					     struct fence_timeline_ops *ops,
-					     int size, const char *name);
+					     int size, const char *drv_name,
+					     const char *name);
 void fence_timeline_get(struct fence_timeline *timeline);
 void fence_timeline_put(struct fence_timeline *timeline);
 void fence_timeline_destroy(struct fence_timeline *timeline);
@@ -295,6 +294,7 @@ static inline void fence_put(struct fence *fence)
 
 int fence_signal(struct fence *fence);
 int fence_signal_locked(struct fence *fence);
+const char *fence_default_get_driver_name(struct fence *fence);
 bool fence_default_enable_signaling(struct fence *fence);
 signed long fence_default_wait(struct fence *fence, bool intr, signed long timeout);
 void fence_default_release(struct fence *fence);

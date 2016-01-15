@@ -56,6 +56,7 @@ EXPORT_SYMBOL(fence_context_alloc);
  * @num:	[in]	amount of contexts to allocate
  * @ops:	[in]	timeline ops of the caller
  * @size:	[in]	size to allocate struct fence_timeline
+ * @drv_name:	[in]	name of the driver
  * @name:	[in]	name of the timeline
  *
  * This function will return the new fence_timeline or NULL in case of error.
@@ -64,7 +65,8 @@ EXPORT_SYMBOL(fence_context_alloc);
  */
 struct fence_timeline *fence_timeline_create(unsigned num,
 					     struct fence_timeline_ops *ops,
-					     int size, const char *name)
+					     int size, const char *drv_name,
+					     const char *name)
 {
 	struct fence_timeline *timeline;
 
@@ -79,6 +81,7 @@ struct fence_timeline *fence_timeline_create(unsigned num,
 	timeline->ops = ops;
 	timeline->context = fence_context_alloc(1);
 	strlcpy(timeline->name, name, sizeof(timeline->name));
+	strlcpy(timeline->drv_name, drv_name, sizeof(timeline->drv_name));
 
 	INIT_LIST_HEAD(&timeline->child_list_head);
 	INIT_LIST_HEAD(&timeline->active_list_head);
@@ -437,6 +440,20 @@ fence_remove_callback(struct fence *fence, struct fence_cb *cb)
 	return ret;
 }
 EXPORT_SYMBOL(fence_remove_callback);
+
+/**
+ * fence_default_get_driver_name - default .get_driver_name op
+ * @fence:	[in]	the fence to get driver name
+ *
+ * This function returns the name of the driver that the fence belongs.
+ */
+const char *fence_default_get_driver_name(struct fence *fence)
+{
+	struct fence_timeline *parent = fence_parent(fence);
+
+	return parent->drv_name;
+}
+EXPORT_SYMBOL(fence_default_get_driver_name);
 
 /**
  * fence_default_enable_signaling - default op for .enable_signaling

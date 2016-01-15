@@ -77,7 +77,6 @@ static void sw_sync_fence_value_str(struct fence *fence,
 }
 
 static struct fence_timeline_ops sw_sync_timeline_ops = {
-	.driver_name = "sw_sync",
 	.has_signaled = sw_sync_fence_has_signaled,
 	.fill_driver_data = sw_sync_fill_driver_data,
 	.timeline_value_str = sw_sync_timeline_value_str,
@@ -89,7 +88,7 @@ struct sw_sync_timeline *sw_sync_timeline_create(const char *name)
 	struct sw_sync_timeline *obj = (struct sw_sync_timeline *)
 		fence_timeline_create(1, &sw_sync_timeline_ops,
 				     sizeof(struct sw_sync_timeline),
-				     name);
+				     "sw_sync", name);
 
 	return obj;
 }

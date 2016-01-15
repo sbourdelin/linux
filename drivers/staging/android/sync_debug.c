@@ -133,7 +133,7 @@ static void sync_print_obj(struct seq_file *s, struct fence_timeline *obj)
 	struct list_head *pos;
 	unsigned long flags;
 
-	seq_printf(s, "%s %s", obj->name, obj->ops->driver_name);
+	seq_printf(s, "%s %s", obj->name, obj->drv_name);
 
 	if (obj->ops->timeline_value_str) {
 		char value[64];
