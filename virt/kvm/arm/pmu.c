@@ -374,3 +374,12 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
 
 	pmc->perf_event = event;
 }
+
+int kvm_arm_support_pmu_v3(void)
+{
+	/* Check if HW_PERF_EVENTS are supported by checking the number of
+	 * hardware performance counters. This could ensure physical PMU and
+	 * PERF_EVENT driver existing.
+	 */
+	return perf_num_counters();
+}
