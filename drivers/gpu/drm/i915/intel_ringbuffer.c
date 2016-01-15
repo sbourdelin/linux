@@ -1988,6 +1988,7 @@ void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
 	else
 		iounmap(ringbuf->virtual_start);
 	ringbuf->virtual_start = NULL;
+	ringbuf->vma = NULL;
 	i915_gem_object_ggtt_unpin(ringbuf->obj);
 }
 
@@ -2053,6 +2054,8 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 			return -EINVAL;
 		}
 	}
+
+	ringbuf->vma = i915_gem_obj_to_ggtt(obj);
 
 	return 0;
 }
