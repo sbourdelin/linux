@@ -438,6 +438,28 @@ fence_remove_callback(struct fence *fence, struct fence_cb *cb)
 }
 EXPORT_SYMBOL(fence_remove_callback);
 
+/**
+ * fence_default_enable_signaling - default op for .enable_signaling
+ * @fence:	[in]	the fence to enable signaling
+ *
+ * This function checks if the fence was already signaled and if not
+ * adds it to the list of active fences.
+ */
+bool fence_default_enable_signaling(struct fence *fence)
+{
+	struct fence_timeline *timeline = fence_parent(fence);
+
+	if (!timeline)
+		return false;
+
+	if (fence->ops->signaled && fence->ops->signaled(fence))
+		return false;
+
+	list_add_tail(&fence->active_list, &timeline->active_list_head);
+	return true;
+}
+EXPORT_SYMBOL(fence_default_enable_signaling);
+
 struct default_wait_cb {
 	struct fence_cb base;
 	struct task_struct *task;
