@@ -19,6 +19,7 @@
 #include <linux/kvm.h>
 #include <linux/kvm_host.h>
 #include <linux/perf_event.h>
+#include <linux/uaccess.h>
 #include <asm/kvm_emulate.h>
 #include <kvm/arm_pmu.h>
 #include <kvm/arm_vgic.h>
@@ -382,4 +383,131 @@ int kvm_arm_support_pmu_v3(void)
 	 * PERF_EVENT driver existing.
 	 */
 	return perf_num_counters();
+}
+
+static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+{
+	if (kvm_arm_pmu_v3_ready(vcpu))
+		return -EBUSY;
+
+	if (kvm_arm_support_pmu_v3 <= 0)
+		return -ENODEV;
+
+	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
+	    !kvm_arm_pmu_irq_initialized(vcpu))
+		return -ENXIO;
+
+	kvm_pmu_vcpu_reset(vcpu);
+	vcpu->arch.pmu.ready = true;
+
+	return 0;
+}
+
+static int kvm_arm_pmu_irq_access(struct kvm_vcpu *vcpu,
+				  struct kvm_device_attr *attr,
+				  int *irq, bool is_set)
+{
+	if (!is_set) {
+		if (!kvm_arm_pmu_irq_initialized(vcpu))
+			return -ENODEV;
+
+		*irq = vcpu->arch.pmu.irq_num;
+	} else {
+		if (kvm_arm_pmu_irq_initialized(vcpu))
+			return -EBUSY;
+
+		kvm_debug("Set kvm ARM PMU irq: %d\n", *irq);
+		vcpu->arch.pmu.irq_num = *irq;
+	}
+
+	return 0;
+}
+
+static bool irq_is_invalid(struct kvm *kvm, int irq, bool is_ppi)
+{
+	int i;
+	struct kvm_vcpu *vcpu;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (!kvm_arm_pmu_irq_initialized(vcpu))
+			continue;
+
+		if (is_ppi) {
+			if (vcpu->arch.pmu.irq_num != irq)
+				return true;
+		} else {
+			if (vcpu->arch.pmu.irq_num == irq)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+
+int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+{
+	switch (attr->attr) {
+	case KVM_ARM_VCPU_PMU_V3_IRQ: {
+		int __user *uaddr = (int __user *)(long)attr->addr;
+		int reg;
+
+		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+			return -ENODEV;
+
+		if (get_user(reg, uaddr))
+			return -EFAULT;
+
+		/*
+		 * The PMU overflow interrupt could be a PPI or SPI, but for one
+		 * VM the interrupt type must be same for each vcpu. As a PPI,
+		 * the interrupt number is same for all vcpus, while as a SPI it
+		 * must be different for each vcpu.
+		 */
+		if (reg < VGIC_NR_SGIS || reg >= vcpu->kvm->arch.vgic.nr_irqs ||
+		    irq_is_invalid(vcpu->kvm, reg, reg < VGIC_NR_PRIVATE_IRQS))
+			return -EINVAL;
+
+		return kvm_arm_pmu_irq_access(vcpu, attr, &reg, true);
+	}
+	case KVM_ARM_VCPU_PMU_V3_INIT:
+		return kvm_arm_pmu_v3_init(vcpu);
+	}
+
+	return -ENXIO;
+}
+
+int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+{
+	int ret;
+
+	switch (attr->attr) {
+	case KVM_ARM_VCPU_PMU_V3_IRQ: {
+		int __user *uaddr = (int __user *)(long)attr->addr;
+		int reg = -1;
+
+		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+			return -ENODEV;
+
+		ret = kvm_arm_pmu_irq_access(vcpu, attr, &reg, false);
+		if (ret)
+			return ret;
+		return put_user(reg, uaddr);
+	}
+	}
+
+	return -ENXIO;
+}
+
+int kvm_arm_pmu_v3_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+{
+	switch (attr->attr) {
+	case KVM_ARM_VCPU_PMU_V3_IRQ:
+	case KVM_ARM_VCPU_PMU_V3_INIT:
+		if (kvm_arm_support_pmu_v3() > 0 &&
+		    test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+			return 0;
+	}
+
+	return -ENXIO;
 }
