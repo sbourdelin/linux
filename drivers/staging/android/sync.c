@@ -149,61 +149,62 @@ EXPORT_SYMBOL(sync_pt_free);
 
 static struct sync_fence *sync_fence_alloc(int size, const char *name)
 {
-	struct sync_fence *fence;
+	struct sync_fence *sync_fence;
 
-	fence = kzalloc(size, GFP_KERNEL);
-	if (!fence)
+	sync_fence = kzalloc(size, GFP_KERNEL);
+	if (!sync_fence)
 		return NULL;
 
-	fence->file = anon_inode_getfile("sync_fence", &sync_fence_fops,
-					 fence, 0);
-	if (IS_ERR(fence->file))
+	sync_fence->file = anon_inode_getfile("sync_fence", &sync_fence_fops,
+					      sync_fence, 0);
+	if (IS_ERR(sync_fence->file))
 		goto err;
 
-	kref_init(&fence->kref);
-	strlcpy(fence->name, name, sizeof(fence->name));
+	kref_init(&sync_fence->kref);
+	strlcpy(sync_fence->name, name, sizeof(sync_fence->name));
 
-	init_waitqueue_head(&fence->wq);
+	init_waitqueue_head(&sync_fence->wq);
 
-	return fence;
+	return sync_fence;
 
 err:
-	kfree(fence);
+	kfree(sync_fence);
 	return NULL;
 }
 
 static void fence_check_cb_func(struct fence *f, struct fence_cb *cb)
 {
 	struct sync_fence_cb *check;
-	struct sync_fence *fence;
+	struct sync_fence *sync_fence;
 
 	check = container_of(cb, struct sync_fence_cb, cb);
-	fence = check->fence;
+	sync_fence = check->sync_fence;
 
-	if (atomic_dec_and_test(&fence->status))
-		wake_up_all(&fence->wq);
+	if (atomic_dec_and_test(&sync_fence->status))
+		wake_up_all(&sync_fence->wq);
 }
 
 /* TODO: implement a create which takes more that one sync_pt */
 struct sync_fence *sync_fence_create_dma(const char *name, struct fence *pt)
 {
-	struct sync_fence *fence;
+	struct sync_fence *sync_fence;
 
-	fence = sync_fence_alloc(offsetof(struct sync_fence, cbs[1]), name);
-	if (!fence)
+	sync_fence = sync_fence_alloc(offsetof(struct sync_fence, cbs[1]),
+				      name);
+	if (!sync_fence)
 		return NULL;
 
-	fence->num_fences = 1;
-	atomic_set(&fence->status, 1);
+	sync_fence->num_fences = 1;
+	atomic_set(&sync_fence->status, 1);
 
-	fence->cbs[0].sync_pt = pt;
-	fence->cbs[0].fence = fence;
-	if (fence_add_callback(pt, &fence->cbs[0].cb, fence_check_cb_func))
-		atomic_dec(&fence->status);
+	sync_fence->cbs[0].sync_pt = pt;
+	sync_fence->cbs[0].sync_fence = sync_fence;
+	if (fence_add_callback(pt, &sync_fence->cbs[0].cb, fence_check_cb_func))
+		atomic_dec(&sync_fence->status);
 
-	sync_fence_debug_add(fence);
+	sync_fence_debug_add(sync_fence);
 
-	return fence;
+	return sync_fence;
 }
 EXPORT_SYMBOL(sync_fence_create_dma);
 
@@ -231,25 +232,26 @@ err:
 }
 EXPORT_SYMBOL(sync_fence_fdget);
 
-void sync_fence_put(struct sync_fence *fence)
+void sync_fence_put(struct sync_fence *sync_fence)
 {
-	fput(fence->file);
+	fput(sync_fence->file);
 }
 EXPORT_SYMBOL(sync_fence_put);
 
-void sync_fence_install(struct sync_fence *fence, int fd)
+void sync_fence_install(struct sync_fence *sync_fence, int fd)
 {
-	fd_install(fd, fence->file);
+	fd_install(fd, sync_fence->file);
 }
 EXPORT_SYMBOL(sync_fence_install);
 
-static void sync_fence_add_pt(struct sync_fence *fence,
+static void sync_fence_add_pt(struct sync_fence *sync_fence,
 			      int *i, struct fence *pt)
 {
-	fence->cbs[*i].sync_pt = pt;
-	fence->cbs[*i].fence = fence;
+	sync_fence->cbs[*i].sync_pt = pt;
+	sync_fence->cbs[*i].sync_fence = sync_fence;
 
-	if (!fence_add_callback(pt, &fence->cbs[*i].cb, fence_check_cb_func)) {
+	if (!fence_add_callback(pt, &sync_fence->cbs[*i].cb,
+				fence_check_cb_func)) {
 		fence_get(pt);
 		(*i)++;
 	}
@@ -259,15 +261,15 @@ struct sync_fence *sync_fence_merge(const char *name,
 				    struct sync_fence *a, struct sync_fence *b)
 {
 	int num_fences = a->num_fences + b->num_fences;
-	struct sync_fence *fence;
+	struct sync_fence *sync_fence;
 	int i, i_a, i_b;
 	unsigned long size = offsetof(struct sync_fence, cbs[num_fences]);
 
-	fence = sync_fence_alloc(size, name);
-	if (!fence)
+	sync_fence = sync_fence_alloc(size, name);
+	if (!sync_fence)
 		return NULL;
 
-	atomic_set(&fence->status, num_fences);
+	atomic_set(&sync_fence->status, num_fences);
 
 	/*
 	 * Assume sync_fence a and b are both ordered and have no
@@ -281,18 +283,18 @@ struct sync_fence *sync_fence_merge(const char *name,
 		struct fence *pt_b = b->cbs[i_b].sync_pt;
 
 		if (pt_a->context < pt_b->context) {
-			sync_fence_add_pt(fence, &i, pt_a);
+			sync_fence_add_pt(sync_fence, &i, pt_a);
 
 			i_a++;
 		} else if (pt_a->context > pt_b->context) {
-			sync_fence_add_pt(fence, &i, pt_b);
+			sync_fence_add_pt(sync_fence, &i, pt_b);
 
 			i_b++;
 		} else {
 			if (pt_a->seqno - pt_b->seqno <= INT_MAX)
-				sync_fence_add_pt(fence, &i, pt_a);
+				sync_fence_add_pt(sync_fence, &i, pt_a);
 			else
-				sync_fence_add_pt(fence, &i, pt_b);
+				sync_fence_add_pt(sync_fence, &i, pt_b);
 
 			i_a++;
 			i_b++;
@@ -300,17 +302,17 @@ struct sync_fence *sync_fence_merge(const char *name,
 	}
 
 	for (; i_a < a->num_fences; i_a++)
-		sync_fence_add_pt(fence, &i, a->cbs[i_a].sync_pt);
+		sync_fence_add_pt(sync_fence, &i, a->cbs[i_a].sync_pt);
 
 	for (; i_b < b->num_fences; i_b++)
-		sync_fence_add_pt(fence, &i, b->cbs[i_b].sync_pt);
+		sync_fence_add_pt(sync_fence, &i, b->cbs[i_b].sync_pt);
 
 	if (num_fences > i)
-		atomic_sub(num_fences - i, &fence->status);
-	fence->num_fences = i;
+		atomic_sub(num_fences - i, &sync_fence->status);
+	sync_fence->num_fences = i;
 
-	sync_fence_debug_add(fence);
-	return fence;
+	sync_fence_debug_add(sync_fence);
+	return sync_fence;
 }
 EXPORT_SYMBOL(sync_fence_merge);
 
@@ -326,10 +328,10 @@ int sync_fence_wake_up_wq(wait_queue_t *curr, unsigned mode,
 	return 1;
 }
 
-int sync_fence_wait_async(struct sync_fence *fence,
+int sync_fence_wait_async(struct sync_fence *sync_fence,
 			  struct sync_fence_waiter *waiter)
 {
-	int err = atomic_read(&fence->status);
+	int err = atomic_read(&sync_fence->status);
 	unsigned long flags;
 
 	if (err < 0)
@@ -339,13 +341,13 @@ int sync_fence_wait_async(struct sync_fence *fence,
 		return 1;
 
 	init_waitqueue_func_entry(&waiter->work, sync_fence_wake_up_wq);
-	waiter->work.private = fence;
+	waiter->work.private = sync_fence;
 
-	spin_lock_irqsave(&fence->wq.lock, flags);
-	err = atomic_read(&fence->status);
+	spin_lock_irqsave(&sync_fence->wq.lock, flags);
+	err = atomic_read(&sync_fence->status);
 	if (err > 0)
-		__add_wait_queue_tail(&fence->wq, &waiter->work);
-	spin_unlock_irqrestore(&fence->wq.lock, flags);
+		__add_wait_queue_tail(&sync_fence->wq, &waiter->work);
+	spin_unlock_irqrestore(&sync_fence->wq.lock, flags);
 
 	if (err < 0)
 		return err;
@@ -354,23 +356,23 @@ int sync_fence_wait_async(struct sync_fence *fence,
 }
 EXPORT_SYMBOL(sync_fence_wait_async);
 
-int sync_fence_cancel_async(struct sync_fence *fence,
+int sync_fence_cancel_async(struct sync_fence *sync_fence,
 			    struct sync_fence_waiter *waiter)
 {
 	unsigned long flags;
 	int ret = 0;
 
-	spin_lock_irqsave(&fence->wq.lock, flags);
+	spin_lock_irqsave(&sync_fence->wq.lock, flags);
 	if (!list_empty(&waiter->work.task_list))
 		list_del_init(&waiter->work.task_list);
 	else
 		ret = -ENOENT;
-	spin_unlock_irqrestore(&fence->wq.lock, flags);
+	spin_unlock_irqrestore(&sync_fence->wq.lock, flags);
 	return ret;
 }
 EXPORT_SYMBOL(sync_fence_cancel_async);
 
-int sync_fence_wait(struct sync_fence *fence, long timeout)
+int sync_fence_wait(struct sync_fence *sync_fence, long timeout)
 {
 	long ret;
 	int i;
@@ -380,28 +382,28 @@ int sync_fence_wait(struct sync_fence *fence, long timeout)
 	else
 		timeout = msecs_to_jiffies(timeout);
 
-	trace_sync_wait(fence, 1);
-	for (i = 0; i < fence->num_fences; ++i)
-		trace_sync_pt(fence->cbs[i].sync_pt);
-	ret = wait_event_interruptible_timeout(fence->wq,
-					       atomic_read(&fence->status) <= 0,
+	trace_sync_wait(sync_fence, 1);
+	for (i = 0; i < sync_fence->num_fences; ++i)
+		trace_sync_pt(sync_fence->cbs[i].sync_pt);
+	ret = wait_event_interruptible_timeout(sync_fence->wq,
+					       atomic_read(&sync_fence->status) <= 0,
 					       timeout);
-	trace_sync_wait(fence, 0);
+	trace_sync_wait(sync_fence, 0);
 
 	if (ret < 0) {
 		return ret;
 	} else if (ret == 0) {
 		if (timeout) {
-			pr_info("fence timeout on [%p] after %dms\n", fence,
-				jiffies_to_msecs(timeout));
+			pr_info("sync_fence timeout on [%p] after %dms\n",
+				sync_fence, jiffies_to_msecs(timeout));
 			sync_dump();
 		}
 		return -ETIME;
 	}
 
-	ret = atomic_read(&fence->status);
+	ret = atomic_read(&sync_fence->status);
 	if (ret) {
-		pr_info("fence error %ld on [%p]\n", ret, fence);
+		pr_info("sync_fence error %ld on [%p]\n", ret, sync_fence);
 		sync_dump();
 	}
 	return ret;
@@ -518,35 +520,37 @@ static const struct fence_ops sync_fence_ops = {
 
 static void sync_fence_free(struct kref *kref)
 {
-	struct sync_fence *fence = container_of(kref, struct sync_fence, kref);
+	struct sync_fence *sync_fence = container_of(kref, struct sync_fence,
+						     kref);
 	int i;
 
-	for (i = 0; i < fence->num_fences; ++i) {
-		fence_remove_callback(fence->cbs[i].sync_pt, &fence->cbs[i].cb);
-		fence_put(fence->cbs[i].sync_pt);
+	for (i = 0; i < sync_fence->num_fences; ++i) {
+		fence_remove_callback(sync_fence->cbs[i].sync_pt,
+				      &sync_fence->cbs[i].cb);
+		fence_put(sync_fence->cbs[i].sync_pt);
 	}
 
-	kfree(fence);
+	kfree(sync_fence);
 }
 
 static int sync_fence_file_release(struct inode *inode, struct file *file)
 {
-	struct sync_fence *fence = file->private_data;
+	struct sync_fence *sync_fence = file->private_data;
 
-	sync_fence_debug_remove(fence);
+	sync_fence_debug_remove(sync_fence);
 
-	kref_put(&fence->kref, sync_fence_free);
+	kref_put(&sync_fence->kref, sync_fence_free);
 	return 0;
 }
 
 static unsigned int sync_fence_poll(struct file *file, poll_table *wait)
 {
-	struct sync_fence *fence = file->private_data;
+	struct sync_fence *sync_fence = file->private_data;
 	int status;
 
-	poll_wait(file, &fence->wq, wait);
+	poll_wait(file, &sync_fence->wq, wait);
 
-	status = atomic_read(&fence->status);
+	status = atomic_read(&sync_fence->status);
 
 	if (!status)
 		return POLLIN;
@@ -555,17 +559,19 @@ static unsigned int sync_fence_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-static long sync_fence_ioctl_wait(struct sync_fence *fence, unsigned long arg)
+static long sync_fence_ioctl_wait(struct sync_fence *sync_fence,
+				  unsigned long arg)
 {
 	__s32 value;
 
 	if (copy_from_user(&value, (void __user *)arg, sizeof(value)))
 		return -EFAULT;
 
-	return sync_fence_wait(fence, value);
+	return sync_fence_wait(sync_fence, value);
 }
 
-static long sync_fence_ioctl_merge(struct sync_fence *fence, unsigned long arg)
+static long sync_fence_ioctl_merge(struct sync_fence *sync_fence,
+				   unsigned long arg)
 {
 	int fd = get_unused_fd_flags(O_CLOEXEC);
 	int err;
@@ -587,7 +593,7 @@ static long sync_fence_ioctl_merge(struct sync_fence *fence, unsigned long arg)
 	}
 
 	data.name[sizeof(data.name) - 1] = '\0';
-	fence3 = sync_fence_merge(data.name, fence, fence2);
+	fence3 = sync_fence_merge(data.name, sync_fence, fence2);
 	if (!fence3) {
 		err = -ENOMEM;
 		goto err_put_fence2;
@@ -646,7 +652,7 @@ static int sync_fill_pt_info(struct fence *fence, void *data, int size)
 	return info->len;
 }
 
-static long sync_fence_ioctl_fence_info(struct sync_fence *fence,
+static long sync_fence_ioctl_fence_info(struct sync_fence *sync_fence,
 					unsigned long arg)
 {
 	struct sync_fence_info_data *data;
@@ -667,15 +673,15 @@ static long sync_fence_ioctl_fence_info(struct sync_fence *fence,
 	if (!data)
 		return -ENOMEM;
 
-	strlcpy(data->name, fence->name, sizeof(data->name));
-	data->status = atomic_read(&fence->status);
+	strlcpy(data->name, sync_fence->name, sizeof(data->name));
+	data->status = atomic_read(&sync_fence->status);
 	if (data->status >= 0)
 		data->status = !data->status;
 
 	len = sizeof(struct sync_fence_info_data);
 
-	for (i = 0; i < fence->num_fences; ++i) {
-		struct fence *pt = fence->cbs[i].sync_pt;
+	for (i = 0; i < sync_fence->num_fences; ++i) {
+		struct fence *pt = sync_fence->cbs[i].sync_pt;
 
 		ret = sync_fill_pt_info(pt, (u8 *)data + len, size - len);
 
@@ -701,17 +707,17 @@ out:
 static long sync_fence_ioctl(struct file *file, unsigned int cmd,
 			     unsigned long arg)
 {
-	struct sync_fence *fence = file->private_data;
+	struct sync_fence *sync_fence = file->private_data;
 
 	switch (cmd) {
 	case SYNC_IOC_WAIT:
-		return sync_fence_ioctl_wait(fence, arg);
+		return sync_fence_ioctl_wait(sync_fence, arg);
 
 	case SYNC_IOC_MERGE:
-		return sync_fence_ioctl_merge(fence, arg);
+		return sync_fence_ioctl_merge(sync_fence, arg);
 
 	case SYNC_IOC_FENCE_INFO:
-		return sync_fence_ioctl_fence_info(fence, arg);
+		return sync_fence_ioctl_fence_info(sync_fence, arg);
 
 	default:
 		return -ENOTTY;

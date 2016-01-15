@@ -56,21 +56,21 @@ void sync_timeline_debug_remove(struct sync_timeline *obj)
 	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
 }
 
-void sync_fence_debug_add(struct sync_fence *fence)
+void sync_fence_debug_add(struct sync_fence *sync_fence)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&sync_fence_list_lock, flags);
-	list_add_tail(&fence->sync_fence_list, &sync_fence_list_head);
+	list_add_tail(&sync_fence->sync_fence_list, &sync_fence_list_head);
 	spin_unlock_irqrestore(&sync_fence_list_lock, flags);
 }
 
-void sync_fence_debug_remove(struct sync_fence *fence)
+void sync_fence_debug_remove(struct sync_fence *sync_fence)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&sync_fence_list_lock, flags);
-	list_del(&fence->sync_fence_list);
+	list_del(&sync_fence->sync_fence_list);
 	spin_unlock_irqrestore(&sync_fence_list_lock, flags);
 }
 
@@ -152,21 +152,22 @@ static void sync_print_obj(struct seq_file *s, struct sync_timeline *obj)
 	spin_unlock_irqrestore(&obj->child_list_lock, flags);
 }
 
-static void sync_print_fence(struct seq_file *s, struct sync_fence *fence)
+static void sync_print_sync_fence(struct seq_file *s,
+				  struct sync_fence *sync_fence)
 {
 	wait_queue_t *pos;
 	unsigned long flags;
 	int i;
 
-	seq_printf(s, "[%p] %s: %s\n", fence, fence->name,
-		   sync_status_str(atomic_read(&fence->status)));
+	seq_printf(s, "[%p] %s: %s\n", sync_fence, sync_fence->name,
+		   sync_status_str(atomic_read(&sync_fence->status)));
 
-	for (i = 0; i < fence->num_fences; ++i) {
-		sync_print_pt(s, fence->cbs[i].sync_pt, true);
+	for (i = 0; i < sync_fence->num_fences; ++i) {
+		sync_print_pt(s, sync_fence->cbs[i].sync_pt, true);
 	}
 
-	spin_lock_irqsave(&fence->wq.lock, flags);
-	list_for_each_entry(pos, &fence->wq.task_list, task_list) {
+	spin_lock_irqsave(&sync_fence->wq.lock, flags);
+	list_for_each_entry(pos, &sync_fence->wq.task_list, task_list) {
 		struct sync_fence_waiter *waiter;
 
 		if (pos->func != &sync_fence_wake_up_wq)
@@ -176,7 +177,7 @@ static void sync_print_fence(struct seq_file *s, struct sync_fence *fence)
 
 		seq_printf(s, "waiter %pF\n", waiter->callback);
 	}
-	spin_unlock_irqrestore(&fence->wq.lock, flags);
+	spin_unlock_irqrestore(&sync_fence->wq.lock, flags);
 }
 
 static int sync_debugfs_show(struct seq_file *s, void *unused)
@@ -201,10 +202,10 @@ static int sync_debugfs_show(struct seq_file *s, void *unused)
 
 	spin_lock_irqsave(&sync_fence_list_lock, flags);
 	list_for_each(pos, &sync_fence_list_head) {
-		struct sync_fence *fence =
+		struct sync_fence *sync_fence =
 			container_of(pos, struct sync_fence, sync_fence_list);
 
-		sync_print_fence(s, fence);
+		sync_print_sync_fence(s, sync_fence);
 		seq_puts(s, "\n");
 	}
 	spin_unlock_irqrestore(&sync_fence_list_lock, flags);
@@ -260,7 +261,7 @@ static long sw_sync_ioctl_create_fence(struct sw_sync_timeline *obj,
 	int fd = get_unused_fd_flags(O_CLOEXEC);
 	int err;
 	struct sync_pt *pt;
-	struct sync_fence *fence;
+	struct sync_fence *sync_fence;
 	struct sw_sync_create_fence_data data;
 
 	if (fd < 0)
@@ -278,8 +279,8 @@ static long sw_sync_ioctl_create_fence(struct sw_sync_timeline *obj,
 	}
 
 	data.name[sizeof(data.name) - 1] = '\0';
-	fence = sync_fence_create(data.name, pt);
-	if (!fence) {
+	sync_fence = sync_fence_create(data.name, pt);
+	if (!sync_fence) {
 		sync_pt_free(pt);
 		err = -ENOMEM;
 		goto err;
@@ -287,12 +288,12 @@ static long sw_sync_ioctl_create_fence(struct sw_sync_timeline *obj,
 
 	data.fence = fd;
 	if (copy_to_user((void __user *)arg, &data, sizeof(data))) {
-		sync_fence_put(fence);
+		sync_fence_put(sync_fence);
 		err = -EFAULT;
 		goto err;
 	}
 
-	sync_fence_install(fence, fd);
+	sync_fence_install(sync_fence, fd);
 
 	return 0;
 
