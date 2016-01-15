@@ -54,7 +54,6 @@ EXPORT_SYMBOL(fence_context_alloc);
 /**
  * fence_timeline_create - create a new fence_timeline
  * @num:	[in]	amount of contexts to allocate
- * @ops:	[in]	timeline ops of the caller
  * @size:	[in]	size to allocate struct fence_timeline
  * @drv_name:	[in]	name of the driver
  * @name:	[in]	name of the timeline
@@ -63,9 +62,8 @@ EXPORT_SYMBOL(fence_context_alloc);
  * It allocs and initializes a new fence_timeline with a proper fence context
  * number assigned to it.
  */
-struct fence_timeline *fence_timeline_create(unsigned num,
-					     struct fence_timeline_ops *ops,
-					     int size, const char *drv_name,
+struct fence_timeline *fence_timeline_create(unsigned num, int size,
+					     const char *drv_name,
 					     const char *name)
 {
 	struct fence_timeline *timeline;
@@ -78,7 +76,6 @@ struct fence_timeline *fence_timeline_create(unsigned num,
 		return NULL;
 
 	kref_init(&timeline->kref);
-	timeline->ops = ops;
 	timeline->context = fence_context_alloc(1);
 	strlcpy(timeline->name, name, sizeof(timeline->name));
 	strlcpy(timeline->drv_name, drv_name, sizeof(timeline->drv_name));

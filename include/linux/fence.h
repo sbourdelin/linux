@@ -30,22 +30,9 @@
 #include <linux/printk.h>
 #include <linux/rcupdate.h>
 
-struct fence_timeline;
 struct fence;
 struct fence_ops;
 struct fence_cb;
-/**
- * struct fence_timeline_ops - fence context implementation ops
- * @fill_driver_data:	write implementation specific driver data to data.
- *			  should return an error if there is not enough room
- *			  as specified by size.  This information is returned
- *			  to userspace by SYNC_IOC_FENCE_INFO.
- * @pt_value_str:	fill str with the value of the sync_pt
- */
-struct fence_timeline_ops {
-	/* optional */
-	int (*fill_driver_data)(struct fence *fence, void *data, int size);
-};
 
 /**
  * struct fence_timeline - timeline for software synchronization primitive
@@ -63,7 +50,6 @@ struct fence_timeline {
 	struct kref		kref;
 	char			name[32];
 	char			drv_name[32];
-	const struct fence_timeline_ops *ops;
 	bool			destroyed;
 	unsigned int		value;
 	int			context;
@@ -75,9 +61,8 @@ struct fence_timeline {
 #endif
 };
 
-struct fence_timeline *fence_timeline_create(unsigned num,
-					     struct fence_timeline_ops *ops,
-					     int size, const char *drv_name,
+struct fence_timeline *fence_timeline_create(unsigned num, int size,
+					     const char *drv_name,
 					     const char *name);
 void fence_timeline_get(struct fence_timeline *timeline);
 void fence_timeline_put(struct fence_timeline *timeline);
