@@ -621,6 +621,27 @@ void fence_default_release(struct fence *fence)
 EXPORT_SYMBOL(fence_default_release);
 
 /**
+ * fence_default_fill_driver_data - fence default .fill_driver_data ops
+ * @fence:	[in]	the fence to get the data from
+ * @data:	[out]	the data pointer to write the data
+ * @size:	[in]	the size of the allocated data
+ *
+ * This function return a driver data. In the case the fence seqno value.
+ * It is used at least by the sw_sync to send fence information to the
+ * userspace.
+ */
+int fence_default_fill_driver_data(struct fence *fence, void *data, int size)
+{
+	if (size < sizeof(fence->seqno))
+		return -ENOMEM;
+
+	memcpy(data, &fence->seqno, sizeof(fence->seqno));
+
+	return sizeof(fence->seqno);
+}
+EXPORT_SYMBOL(fence_default_fill_driver_data);
+
+/**
  * fence_default_value_str - default .fence_value_str fence ops
  * @fence:	[in]	the fence to get the value from
  * @str:	[out]	the string pointer to write the value

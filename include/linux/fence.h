@@ -285,6 +285,7 @@ bool fence_default_signaled(struct fence *fence);
 bool fence_default_enable_signaling(struct fence *fence);
 signed long fence_default_wait(struct fence *fence, bool intr, signed long timeout);
 void fence_default_release(struct fence *fence);
+int fence_default_fill_driver_data(struct fence *fence, void *data, int size);
 void fence_default_value_str(struct fence *fence, char *str, int size);
 void fence_default_timeline_value_str(struct fence *fence, char *str, int size);
 int fence_add_callback(struct fence *fence, struct fence_cb *cb,
