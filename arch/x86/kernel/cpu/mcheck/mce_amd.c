@@ -84,6 +84,14 @@ struct thresh_restart {
 
 static inline bool is_shared_bank(int bank)
 {
+	/*
+	 * For Fam17h and above, we shouldn't require this check.
+	 * Only the core that can see valid values on the MSRs has
+	 * control over the respective MCA bank
+	 */
+	if (mce_flags.smca)
+		return 0;
+
 	/* Bank 4 is for northbridge reporting and is thus shared */
 	return (bank == 4);
 }
