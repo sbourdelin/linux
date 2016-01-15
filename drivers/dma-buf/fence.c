@@ -166,7 +166,6 @@ EXPORT_SYMBOL(fence_timeline_destroy);
 void fence_timeline_signal(struct fence_timeline *timeline, unsigned int inc)
 {
 	unsigned long flags;
-	LIST_HEAD(signaled_pts);
 	struct fence *fence, *next;
 
 	spin_lock_irqsave(&timeline->lock, flags);
