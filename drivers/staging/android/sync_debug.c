@@ -85,39 +85,40 @@ static const char *sync_status_str(int status)
 	return "error";
 }
 
-static void sync_print_pt(struct seq_file *s, struct fence *pt, bool fence)
+static void sync_print_fence(struct seq_file *s, struct fence *fence, bool show)
 {
 	int status = 1;
+	struct fence_timeline *parent = fence_parent(fence);
 
-	if (fence_is_signaled_locked(pt))
-		status = pt->status;
+	if (fence_is_signaled_locked(fence))
+		status = fence->status;
 
-	seq_printf(s, "  %s%spt %s",
-		   fence && pt->ops->get_timeline_name ?
-		   pt->ops->get_timeline_name(pt) : "",
-		   fence ? "_" : "",
+	seq_printf(s, "  %s%sfence %s",
+		   show ? parent->name : "",
+		   show ? "_" : "",
 		   sync_status_str(status));
 
 	if (status <= 0) {
 		struct timespec64 ts64 =
-			ktime_to_timespec64(pt->timestamp);
+			ktime_to_timespec64(fence->timestamp);
 
 		seq_printf(s, "@%lld.%09ld", (s64)ts64.tv_sec, ts64.tv_nsec);
 	}
 
-	if ((!fence || pt->ops->timeline_value_str) &&
-	    pt->ops->fence_value_str) {
+	if ((!fence || fence->ops->timeline_value_str) &&
+		fence->ops->fence_value_str) {
 		char value[64];
 		bool success;
 
-		pt->ops->fence_value_str(pt, value, sizeof(value));
+		fence->ops->fence_value_str(fence, value, sizeof(value));
 		success = strlen(value);
 
 		if (success)
 			seq_printf(s, ": %s", value);
 
 		if (success && fence) {
-			pt->ops->timeline_value_str(pt, value, sizeof(value));
+			fence->ops->timeline_value_str(fence, value,
+						       sizeof(value));
 
 			if (strlen(value))
 				seq_printf(s, " / %s", value);
@@ -145,9 +146,9 @@ static void sync_print_obj(struct seq_file *s, struct fence_timeline *obj)
 
 	spin_lock_irqsave(&obj->lock, flags);
 	list_for_each(pos, &obj->child_list_head) {
-		struct sync_pt *pt = (struct sync_pt *)
+		struct fence *fence =
 			container_of(pos, struct fence, child_list);
-		sync_print_pt(s, &pt->base, false);
+		sync_print_fence(s, fence, false);
 	}
 	spin_unlock_irqrestore(&obj->lock, flags);
 }
@@ -163,7 +164,7 @@ static void sync_print_sync_fence(struct seq_file *s,
 		   sync_status_str(atomic_read(&sync_fence->status)));
 
 	for (i = 0; i < sync_fence->num_fences; ++i) {
-		sync_print_pt(s, sync_fence->cbs[i].fence, true);
+		sync_print_fence(s, sync_fence->cbs[i].fence, true);
 	}
 
 	spin_lock_irqsave(&sync_fence->wq.lock, flags);
@@ -260,7 +261,7 @@ static long sw_sync_ioctl_create_fence(struct sw_sync_timeline *obj,
 {
 	int fd = get_unused_fd_flags(O_CLOEXEC);
 	int err;
-	struct sync_pt *pt;
+	struct fence *fence;
 	struct sync_fence *sync_fence;
 	struct sw_sync_create_fence_data data;
 
@@ -272,16 +273,16 @@ static long sw_sync_ioctl_create_fence(struct sw_sync_timeline *obj,
 		goto err;
 	}
 
-	pt = sw_sync_pt_create(obj, data.value);
-	if (!pt) {
+	fence = sw_sync_pt_create(obj, data.value);
+	if (!fence) {
 		err = -ENOMEM;
 		goto err;
 	}
 
 	data.name[sizeof(data.name) - 1] = '\0';
-	sync_fence = sync_fence_create(data.name, pt);
+	sync_fence = sync_fence_create(data.name, fence);
 	if (!sync_fence) {
-		sync_pt_free(pt);
+		fence_put(fence);
 		err = -ENOMEM;
 		goto err;
 	}

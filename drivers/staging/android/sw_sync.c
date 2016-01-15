@@ -25,7 +25,7 @@
 
 #include "sw_sync.h"
 
-struct sync_pt *sw_sync_pt_create(struct sw_sync_timeline *obj, u32 value)
+struct fence *sw_sync_pt_create(struct sw_sync_timeline *obj, u32 value)
 {
 	struct sw_sync_pt *pt;
 
@@ -34,7 +34,7 @@ struct sync_pt *sw_sync_pt_create(struct sw_sync_timeline *obj, u32 value)
 
 	pt->value = value;
 
-	return (struct sync_pt *)pt;
+	return (struct fence *)pt;
 }
 EXPORT_SYMBOL(sw_sync_pt_create);
 
@@ -50,8 +50,7 @@ static int sw_sync_fence_has_signaled(struct fence *fence)
 static int sw_sync_fill_driver_data(struct fence *fence,
 				    void *data, int size)
 {
-	struct sync_pt *sync_pt = (struct sync_pt *)fence;
-	struct sw_sync_pt *pt = (struct sw_sync_pt *)sync_pt;
+	struct sw_sync_pt *pt = (struct sw_sync_pt *)fence;
 
 	if (size < sizeof(pt->value))
 		return -ENOMEM;

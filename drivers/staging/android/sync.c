@@ -39,7 +39,7 @@ struct fence *sync_pt_create(struct fence_timeline *obj, int size)
 	unsigned long flags;
 	struct fence *fence;
 
-	if (size < sizeof(struct sync_pt))
+	if (size < sizeof(*fence))
 		return NULL;
 
 	fence = kzalloc(size, GFP_KERNEL);
@@ -56,12 +56,6 @@ struct fence *sync_pt_create(struct fence_timeline *obj, int size)
 	return fence;
 }
 EXPORT_SYMBOL(sync_pt_create);
-
-void sync_pt_free(struct sync_pt *pt)
-{
-	fence_put(&pt->base);
-}
-EXPORT_SYMBOL(sync_pt_free);
 
 static struct sync_fence *sync_fence_alloc(int size, const char *name)
 {
@@ -101,7 +95,7 @@ static void fence_check_cb_func(struct fence *f, struct fence_cb *cb)
 }
 
 /* TODO: implement a create which takes more that one sync_pt */
-struct sync_fence *sync_fence_create_dma(const char *name, struct fence *pt)
+struct sync_fence *sync_fence_create_dma(const char *name, struct fence *fence)
 {
 	struct sync_fence *sync_fence;
 
@@ -113,9 +107,10 @@ struct sync_fence *sync_fence_create_dma(const char *name, struct fence *pt)
 	sync_fence->num_fences = 1;
 	atomic_set(&sync_fence->status, 1);
 
-	sync_fence->cbs[0].fence = pt;
+	sync_fence->cbs[0].fence = fence;
 	sync_fence->cbs[0].sync_fence = sync_fence;
-	if (fence_add_callback(pt, &sync_fence->cbs[0].cb, fence_check_cb_func))
+	if (fence_add_callback(fence, &sync_fence->cbs[0].cb,
+			       fence_check_cb_func))
 		atomic_dec(&sync_fence->status);
 
 	sync_fence_debug_add(sync_fence);
@@ -124,9 +119,9 @@ struct sync_fence *sync_fence_create_dma(const char *name, struct fence *pt)
 }
 EXPORT_SYMBOL(sync_fence_create_dma);
 
-struct sync_fence *sync_fence_create(const char *name, struct sync_pt *pt)
+struct sync_fence *sync_fence_create(const char *name, struct fence *fence)
 {
-	return sync_fence_create_dma(name, &pt->base);
+	return sync_fence_create_dma(name, fence);
 }
 EXPORT_SYMBOL(sync_fence_create);
 
@@ -161,14 +156,14 @@ void sync_fence_install(struct sync_fence *sync_fence, int fd)
 EXPORT_SYMBOL(sync_fence_install);
 
 static void sync_fence_add_pt(struct sync_fence *sync_fence,
-			      int *i, struct fence *pt)
+			      int *i, struct fence *fence)
 {
-	sync_fence->cbs[*i].fence = pt;
+	sync_fence->cbs[*i].fence = fence;
 	sync_fence->cbs[*i].sync_fence = sync_fence;
 
-	if (!fence_add_callback(pt, &sync_fence->cbs[*i].cb,
+	if (!fence_add_callback(fence, &sync_fence->cbs[*i].cb,
 				fence_check_cb_func)) {
-		fence_get(pt);
+		fence_get(fence);
 		(*i)++;
 	}
 }
@@ -300,7 +295,7 @@ int sync_fence_wait(struct sync_fence *sync_fence, long timeout)
 
 	trace_sync_wait(sync_fence, 1);
 	for (i = 0; i < sync_fence->num_fences; ++i)
-		trace_sync_pt(sync_fence->cbs[i].fence);
+		trace_fence(sync_fence->cbs[i].fence);
 	ret = wait_event_interruptible_timeout(sync_fence->wq,
 					       atomic_read(&sync_fence->status) <= 0,
 					       timeout);
@@ -589,9 +584,9 @@ static long sync_fence_ioctl_fence_info(struct sync_fence *sync_fence,
 	len = sizeof(struct sync_fence_info_data);
 
 	for (i = 0; i < sync_fence->num_fences; ++i) {
-		struct fence *pt = sync_fence->cbs[i].fence;
+		struct fence *fence = sync_fence->cbs[i].fence;
 
-		ret = sync_fill_pt_info(pt, (u8 *)data + len, size - len);
+		ret = sync_fill_pt_info(fence, (u8 *)data + len, size - len);
 
 		if (ret < 0)
 			goto out;

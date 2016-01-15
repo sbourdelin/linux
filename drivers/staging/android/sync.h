@@ -25,10 +25,6 @@
 
 struct sync_fence;
 
-struct sync_pt {
-	struct fence base;
-};
-
 struct sync_fence_cb {
 	struct fence_cb cb;
 	struct fence *fence;
@@ -89,23 +85,14 @@ static inline void sync_fence_waiter_init(struct sync_fence_waiter *waiter,
 struct fence *sync_pt_create(struct fence_timeline *parent, int size);
 
 /**
- * sync_pt_free() - frees a sync pt
- * @pt:		sync_pt to free
- *
- * This should only be called on sync_pts which have been created but
- * not added to a fence.
- */
-void sync_pt_free(struct sync_pt *pt);
-
-/**
  * sync_fence_create() - creates a sync fence
  * @name:	name of fence to create
- * @pt:		sync_pt to add to the fence
+ * @fence:	fence to add to the sync_fence
  *
- * Creates a fence containg @pt.  Once this is called, the fence takes
- * ownership of @pt.
+ * Creates a fence containg @fence.  Once this is called, the fence takes
+ * ownership of @fence.
  */
-struct sync_fence *sync_fence_create(const char *name, struct sync_pt *pt);
+struct sync_fence *sync_fence_create(const char *name, struct fence *fence);
 
 /**
  * sync_fence_create_dma() - creates a sync fence from dma-fence
