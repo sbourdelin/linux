@@ -26,10 +26,10 @@
 #include <linux/uaccess.h>
 #include <linux/anon_inodes.h>
 
-#include "sync.h"
+#include <linux/sync.h>
 
 #define CREATE_TRACE_POINTS
-#include "trace/sync.h"
+#include <trace/events/sync.h>
 
 static const struct file_operations sync_fence_fops;
 
@@ -280,7 +280,7 @@ int sync_fence_wait(struct sync_fence *sync_fence, long timeout)
 
 	trace_sync_wait(sync_fence, 1);
 	for (i = 0; i < sync_fence->num_fences; ++i)
-		trace_fence(sync_fence->cbs[i].fence);
+		trace_sync_fence(sync_fence->cbs[i].fence);
 	ret = wait_event_interruptible_timeout(sync_fence->wq,
 					       atomic_read(&sync_fence->status) <= 0,
 					       timeout);
@@ -395,6 +395,7 @@ static long sync_fence_ioctl_merge(struct sync_fence *sync_fence,
 
 	sync_fence_install(fence3, fd);
 	sync_fence_put(fence2);
+
 	return 0;
 
 err_put_fence3:

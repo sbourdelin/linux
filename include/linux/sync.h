@@ -20,8 +20,8 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <linux/fence.h>
-
-#include "uapi/sync.h"
+#include <linux/sync.h>
+#include <uapi/linux/sync.h>
 
 struct sync_fence;
 

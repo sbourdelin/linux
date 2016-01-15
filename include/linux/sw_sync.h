@@ -19,8 +19,8 @@
 
 #include <linux/types.h>
 #include <linux/kconfig.h>
-#include "sync.h"
-#include "uapi/sw_sync.h"
+#include <linux/sync.h>
+#include <uapi/linux/sw_sync.h>
 
 #if IS_ENABLED(CONFIG_SW_SYNC)
 struct fence_timeline *sw_sync_timeline_create(const char *name);

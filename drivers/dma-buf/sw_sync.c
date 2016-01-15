@@ -22,8 +22,7 @@
 #include <linux/miscdevice.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
-
-#include "sw_sync.h"
+#include <linux/sw_sync.h>
 
 static void sw_sync_cleanup(struct fence *fence, void *user_data)
 {

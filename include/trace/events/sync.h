@@ -1,11 +1,10 @@
 #undef TRACE_SYSTEM
-#define TRACE_INCLUDE_PATH ../../drivers/staging/android/trace
 #define TRACE_SYSTEM sync
 
 #if !defined(_TRACE_SYNC_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_SYNC_H
 
-#include "../sync.h"
+#include <linux/sync.h>
 #include <linux/tracepoint.h>
 
 TRACE_EVENT(sync_wait,
@@ -29,7 +28,7 @@ TRACE_EVENT(sync_wait,
 			__get_str(name), __entry->status)
 );
 
-TRACE_EVENT(fence,
+TRACE_EVENT(sync_fence,
 	TP_PROTO(struct fence *fence),
 
 	TP_ARGS(fence),
