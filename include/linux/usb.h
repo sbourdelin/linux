@@ -25,6 +25,7 @@
 struct usb_device;
 struct usb_driver;
 struct wusb_dev;
+struct device_node;
 
 /*-------------------------------------------------------------------------*/
 
@@ -536,6 +537,7 @@ struct usb3_lpm_parameters {
  *	to keep track of the number of functions that require USB 3.0 Link Power
  *	Management to be disabled for this usb_device.  This count should only
  *	be manipulated by those functions, with the bandwidth_mutex is held.
+ * @of_node: Associated device tree node
  *
  * Notes:
  * Usbcore drivers should not set usbdev->state directly.  Instead use
@@ -616,6 +618,7 @@ struct usb_device {
 	struct usb3_lpm_parameters u1_params;
 	struct usb3_lpm_parameters u2_params;
 	unsigned lpm_disable_count;
+	struct device_node	*of_node;
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
