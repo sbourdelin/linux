@@ -52,6 +52,131 @@ unsigned fence_context_alloc(unsigned num)
 EXPORT_SYMBOL(fence_context_alloc);
 
 /**
+ * fence_timeline_create - create a new fence_timeline
+ * @num:	[in]	amount of contexts to allocate
+ * @ops:	[in]	timeline ops of the caller
+ * @size:	[in]	size to allocate struct fence_timeline
+ * @name:	[in]	name of the timeline
+ *
+ * This function will return the new fence_timeline or NULL in case of error.
+ * It allocs and initializes a new fence_timeline with a proper fence context
+ * number assigned to it.
+ */
+struct fence_timeline *fence_timeline_create(unsigned num,
+					     struct fence_timeline_ops *ops,
+					     int size, const char *name)
+{
+	struct fence_timeline *timeline;
+
+	if (size < sizeof(*timeline))
+		return NULL;
+
+	timeline = kzalloc(size, GFP_KERNEL);
+	if (!timeline)
+		return NULL;
+
+	kref_init(&timeline->kref);
+	timeline->ops = ops;
+	timeline->context = fence_context_alloc(1);
+	strlcpy(timeline->name, name, sizeof(timeline->name));
+
+	INIT_LIST_HEAD(&timeline->child_list_head);
+	INIT_LIST_HEAD(&timeline->active_list_head);
+	spin_lock_init(&timeline->lock);
+
+	return timeline;
+}
+EXPORT_SYMBOL(fence_timeline_create);
+
+/**
+ * fence_timeline_free - free resources of fence_timeline
+ * @kref	[in]	the kref of the fence_timeline to be freed
+ *
+ * This function frees a fence_timeline which is matter of a simple
+ * call to kfree()
+ */
+static void fence_timeline_free(struct kref *kref)
+{
+	struct fence_timeline *timeline =
+		container_of(kref, struct fence_timeline, kref);
+
+	kfree(timeline);
+}
+
+/**
+ * fence_timeline_get - get a reference to the timeline
+ * @timeline	[in]	the fence_timeline to get a reference
+ *
+ * This function increase the refcnt for the given timeline.
+ */
+void fence_timeline_get(struct fence_timeline *timeline)
+{
+	kref_get(&timeline->kref);
+}
+EXPORT_SYMBOL(fence_timeline_get);
+
+/**
+ * fence_timeline_put - put a reference to the timeline
+ * @timeline	[in]	the fence_timeline to put a reference
+ *
+ * This function decreases the refcnt for the given timeline
+ * and frees it if gets to zero.
+ */
+void fence_timeline_put(struct fence_timeline *timeline)
+{
+	kref_put(&timeline->kref, fence_timeline_free);
+}
+EXPORT_SYMBOL(fence_timeline_put);
+
+/**
+ * fence_timeline_destroy - destroy a fence_timeline
+ * @timeline	[in]	the fence_timeline to destroy
+ *
+ * This function destroys a timeline. It signals any active fence first.
+ */
+void fence_timeline_destroy(struct fence_timeline *timeline)
+{
+	timeline->destroyed = true;
+	/*
+	 * Ensure timeline is marked as destroyed before
+	 * changing timeline's fences status.
+	 */
+	smp_wmb();
+
+	/*
+	 * signal any children that their parent is going away.
+	 */
+	fence_timeline_signal(timeline);
+	fence_timeline_put(timeline);
+}
+EXPORT_SYMBOL(fence_timeline_destroy);
+
+/**
+ * fence_timeline_signal - signal fences on a fence_timeline
+ * @timeline	[in]	the fence_timeline to signal fences
+ *
+ * This function signal fences on a given timeline and remove
+ * those from the active_list.
+ */
+void fence_timeline_signal(struct fence_timeline *timeline)
+{
+	unsigned long flags;
+	LIST_HEAD(signaled_pts);
+	struct fence *fence, *next;
+
+	spin_lock_irqsave(&timeline->lock, flags);
+
+	list_for_each_entry_safe(fence, next, &timeline->active_list_head,
+				 active_list) {
+		if (fence_is_signaled_locked(fence))
+			list_del_init(&fence->active_list);
+	}
+
+	spin_unlock_irqrestore(&timeline->lock, flags);
+}
+EXPORT_SYMBOL(fence_timeline_signal);
+
+/**
  * fence_signal_locked - signal completion of a fence
  * @fence: the fence to signal
  *

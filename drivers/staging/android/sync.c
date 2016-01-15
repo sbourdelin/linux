@@ -34,110 +34,26 @@
 static const struct fence_ops sync_fence_ops;
 static const struct file_operations sync_fence_fops;
 
-struct sync_timeline *sync_timeline_create(const struct sync_timeline_ops *ops,
-					   int size, const char *name)
-{
-	struct sync_timeline *obj;
-
-	if (size < sizeof(struct sync_timeline))
-		return NULL;
-
-	obj = kzalloc(size, GFP_KERNEL);
-	if (!obj)
-		return NULL;
-
-	kref_init(&obj->kref);
-	obj->ops = ops;
-	obj->context = fence_context_alloc(1);
-	strlcpy(obj->name, name, sizeof(obj->name));
-
-	INIT_LIST_HEAD(&obj->child_list_head);
-	INIT_LIST_HEAD(&obj->active_list_head);
-	spin_lock_init(&obj->child_list_lock);
-
-	sync_timeline_debug_add(obj);
-
-	return obj;
-}
-EXPORT_SYMBOL(sync_timeline_create);
-
-static void sync_timeline_free(struct kref *kref)
-{
-	struct sync_timeline *obj =
-		container_of(kref, struct sync_timeline, kref);
-
-	sync_timeline_debug_remove(obj);
-
-	kfree(obj);
-}
-
-static void sync_timeline_get(struct sync_timeline *obj)
-{
-	kref_get(&obj->kref);
-}
-
-static void sync_timeline_put(struct sync_timeline *obj)
-{
-	kref_put(&obj->kref, sync_timeline_free);
-}
-
-void sync_timeline_destroy(struct sync_timeline *obj)
-{
-	obj->destroyed = true;
-	/*
-	 * Ensure timeline is marked as destroyed before
-	 * changing timeline's fences status.
-	 */
-	smp_wmb();
-
-	/*
-	 * signal any children that their parent is going away.
-	 */
-	sync_timeline_signal(obj);
-	sync_timeline_put(obj);
-}
-EXPORT_SYMBOL(sync_timeline_destroy);
-
-void sync_timeline_signal(struct sync_timeline *obj)
+struct fence *sync_pt_create(struct fence_timeline *obj, int size)
 {
 	unsigned long flags;
-	LIST_HEAD(signaled_pts);
-	struct sync_pt *pt, *next;
-
-	trace_sync_timeline(obj);
-
-	spin_lock_irqsave(&obj->child_list_lock, flags);
-
-	list_for_each_entry_safe(pt, next, &obj->active_list_head,
-				 active_list) {
-		if (fence_is_signaled_locked(&pt->base))
-			list_del_init(&pt->active_list);
-	}
-
-	spin_unlock_irqrestore(&obj->child_list_lock, flags);
-}
-EXPORT_SYMBOL(sync_timeline_signal);
-
-struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size)
-{
-	unsigned long flags;
-	struct sync_pt *pt;
+	struct fence *fence;
 
 	if (size < sizeof(struct sync_pt))
 		return NULL;
 
-	pt = kzalloc(size, GFP_KERNEL);
-	if (!pt)
+	fence = kzalloc(size, GFP_KERNEL);
+	if (!fence)
 		return NULL;
 
-	spin_lock_irqsave(&obj->child_list_lock, flags);
-	sync_timeline_get(obj);
-	fence_init(&pt->base, &sync_fence_ops, &obj->child_list_lock,
+	spin_lock_irqsave(&obj->lock, flags);
+	fence_timeline_get(obj);
+	fence_init(fence, &sync_fence_ops, &obj->lock,
 		   obj->context, ++obj->value);
-	list_add_tail(&pt->child_list, &obj->child_list_head);
-	INIT_LIST_HEAD(&pt->active_list);
-	spin_unlock_irqrestore(&obj->child_list_lock, flags);
-	return pt;
+	list_add_tail(&fence->child_list, &obj->child_list_head);
+	INIT_LIST_HEAD(&fence->active_list);
+	spin_unlock_irqrestore(&obj->lock, flags);
+	return fence;
 }
 EXPORT_SYMBOL(sync_pt_create);
 
@@ -412,44 +328,40 @@ EXPORT_SYMBOL(sync_fence_wait);
 
 static const char *sync_fence_get_driver_name(struct fence *fence)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 
 	return parent->ops->driver_name;
 }
 
 static const char *sync_fence_get_timeline_name(struct fence *fence)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 
 	return parent->name;
 }
 
 static void sync_fence_release(struct fence *fence)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 	unsigned long flags;
 
 	spin_lock_irqsave(fence->lock, flags);
-	list_del(&pt->child_list);
-	if (!list_empty(&pt->active_list))
-		list_del(&pt->active_list);
+	list_del(&fence->child_list);
+	if (!list_empty(&fence->active_list))
+		list_del(&fence->active_list);
 
 	spin_unlock_irqrestore(fence->lock, flags);
 
-	sync_timeline_put(parent);
-	fence_free(&pt->base);
+	fence_timeline_put(parent);
+	fence_free(fence);
 }
 
 static bool sync_fence_signaled(struct fence *fence)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 	int ret;
 
-	ret = parent->ops->has_signaled(pt);
+	ret = parent->ops->has_signaled(fence);
 	if (ret < 0)
 		fence->status = ret;
 	return ret;
@@ -457,46 +369,42 @@ static bool sync_fence_signaled(struct fence *fence)
 
 static bool sync_fence_enable_signaling(struct fence *fence)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 
 	if (sync_fence_signaled(fence))
 		return false;
 
-	list_add_tail(&pt->active_list, &parent->active_list_head);
+	list_add_tail(&fence->active_list, &parent->active_list_head);
 	return true;
 }
 
 static int sync_fence_fill_driver_data(struct fence *fence,
 					  void *data, int size)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 
 	if (!parent->ops->fill_driver_data)
 		return 0;
-	return parent->ops->fill_driver_data(pt, data, size);
+	return parent->ops->fill_driver_data(fence, data, size);
 }
 
 static void sync_fence_value_str(struct fence *fence,
 				    char *str, int size)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 
-	if (!parent->ops->pt_value_str) {
+	if (!parent->ops->fence_value_str) {
 		if (size)
 			*str = 0;
 		return;
 	}
-	parent->ops->pt_value_str(pt, str, size);
+	parent->ops->fence_value_str(fence, str, size);
 }
 
 static void sync_fence_timeline_value_str(struct fence *fence,
 					     char *str, int size)
 {
-	struct sync_pt *pt = container_of(fence, struct sync_pt, base);
-	struct sync_timeline *parent = sync_pt_parent(pt);
+	struct fence_timeline *parent = fence_parent(fence);
 
 	if (!parent->ops->timeline_value_str) {
 		if (size)

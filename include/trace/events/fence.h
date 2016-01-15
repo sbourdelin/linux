@@ -48,6 +48,30 @@ TRACE_EVENT(fence_annotate_wait_on,
 		  __entry->waiting_context, __entry->waiting_seqno)
 );
 
+TRACE_EVENT(fence_timeline,
+	TP_PROTO(struct fence_timeline *timeline),
+
+	TP_ARGS(timeline),
+
+	TP_STRUCT__entry(
+			__string(name, timeline->name)
+			__array(char, value, 32)
+	),
+
+	TP_fast_assign(
+			__assign_str(name, timeline->name);
+			if (timeline->ops->timeline_value_str) {
+				timeline->ops->timeline_value_str(timeline,
+							__entry->value,
+							sizeof(__entry->value));
+			} else {
+				__entry->value[0] = '\0';
+			}
+	),
+
+	TP_printk("name=%s value=%s", __get_str(name), __entry->value)
+);
+
 DECLARE_EVENT_CLASS(fence,
 
 	TP_PROTO(struct fence *fence),

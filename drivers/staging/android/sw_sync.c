@@ -38,18 +38,19 @@ struct sync_pt *sw_sync_pt_create(struct sw_sync_timeline *obj, u32 value)
 }
 EXPORT_SYMBOL(sw_sync_pt_create);
 
-static int sw_sync_pt_has_signaled(struct sync_pt *sync_pt)
+static int sw_sync_fence_has_signaled(struct fence *fence)
 {
-	struct sw_sync_pt *pt = (struct sw_sync_pt *)sync_pt;
+	struct sw_sync_pt *pt = (struct sw_sync_pt *)fence;
 	struct sw_sync_timeline *obj =
-		(struct sw_sync_timeline *)sync_pt_parent(sync_pt);
+		(struct sw_sync_timeline *)fence_parent(fence);
 
 	return (pt->value > obj->value) ? 0 : 1;
 }
 
-static int sw_sync_fill_driver_data(struct sync_pt *sync_pt,
+static int sw_sync_fill_driver_data(struct fence *fence,
 				    void *data, int size)
 {
+	struct sync_pt *sync_pt = (struct sync_pt *)fence;
 	struct sw_sync_pt *pt = (struct sw_sync_pt *)sync_pt;
 
 	if (size < sizeof(pt->value))
@@ -60,34 +61,34 @@ static int sw_sync_fill_driver_data(struct sync_pt *sync_pt,
 	return sizeof(pt->value);
 }
 
-static void sw_sync_timeline_value_str(struct sync_timeline *sync_timeline,
+static void sw_sync_timeline_value_str(struct fence_timeline *fence_timeline,
 				       char *str, int size)
 {
 	struct sw_sync_timeline *timeline =
-		(struct sw_sync_timeline *)sync_timeline;
+		(struct sw_sync_timeline *)fence_timeline;
 	snprintf(str, size, "%d", timeline->value);
 }
 
-static void sw_sync_pt_value_str(struct sync_pt *sync_pt,
+static void sw_sync_fence_value_str(struct fence *fence,
 				 char *str, int size)
 {
-	struct sw_sync_pt *pt = (struct sw_sync_pt *)sync_pt;
+	struct sw_sync_pt *pt = (struct sw_sync_pt *)fence;
 
 	snprintf(str, size, "%d", pt->value);
 }
 
-static struct sync_timeline_ops sw_sync_timeline_ops = {
+static struct fence_timeline_ops sw_sync_timeline_ops = {
 	.driver_name = "sw_sync",
-	.has_signaled = sw_sync_pt_has_signaled,
+	.has_signaled = sw_sync_fence_has_signaled,
 	.fill_driver_data = sw_sync_fill_driver_data,
 	.timeline_value_str = sw_sync_timeline_value_str,
-	.pt_value_str = sw_sync_pt_value_str,
+	.fence_value_str = sw_sync_fence_value_str,
 };
 
 struct sw_sync_timeline *sw_sync_timeline_create(const char *name)
 {
 	struct sw_sync_timeline *obj = (struct sw_sync_timeline *)
-		sync_timeline_create(&sw_sync_timeline_ops,
+		fence_timeline_create(1, &sw_sync_timeline_ops,
 				     sizeof(struct sw_sync_timeline),
 				     name);
 
@@ -99,6 +100,6 @@ void sw_sync_timeline_inc(struct sw_sync_timeline *obj, u32 inc)
 {
 	obj->value += inc;
 
-	sync_timeline_signal(&obj->obj);
+	fence_timeline_signal(&obj->obj);
 }
 EXPORT_SYMBOL(sw_sync_timeline_inc);

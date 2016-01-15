@@ -23,7 +23,7 @@
 #include "uapi/sw_sync.h"
 
 struct sw_sync_timeline {
-	struct	sync_timeline	obj;
+	struct	fence_timeline	obj;
 
 	u32			value;
 };

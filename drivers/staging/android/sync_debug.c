@@ -38,21 +38,21 @@ static DEFINE_SPINLOCK(sync_timeline_list_lock);
 static LIST_HEAD(sync_fence_list_head);
 static DEFINE_SPINLOCK(sync_fence_list_lock);
 
-void sync_timeline_debug_add(struct sync_timeline *obj)
+void sync_timeline_debug_add(struct fence_timeline *obj)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&sync_timeline_list_lock, flags);
-	list_add_tail(&obj->sync_timeline_list, &sync_timeline_list_head);
+	list_add_tail(&obj->fence_timeline_list, &sync_timeline_list_head);
 	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
 }
 
-void sync_timeline_debug_remove(struct sync_timeline *obj)
+void sync_timeline_debug_remove(struct fence_timeline *obj)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&sync_timeline_list_lock, flags);
-	list_del(&obj->sync_timeline_list);
+	list_del(&obj->fence_timeline_list);
 	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
 }
 
@@ -127,7 +127,7 @@ static void sync_print_pt(struct seq_file *s, struct fence *pt, bool fence)
 	seq_puts(s, "\n");
 }
 
-static void sync_print_obj(struct seq_file *s, struct sync_timeline *obj)
+static void sync_print_obj(struct seq_file *s, struct fence_timeline *obj)
 {
 	struct list_head *pos;
 	unsigned long flags;
@@ -143,13 +143,13 @@ static void sync_print_obj(struct seq_file *s, struct sync_timeline *obj)
 
 	seq_puts(s, "\n");
 
-	spin_lock_irqsave(&obj->child_list_lock, flags);
+	spin_lock_irqsave(&obj->lock, flags);
 	list_for_each(pos, &obj->child_list_head) {
-		struct sync_pt *pt =
-			container_of(pos, struct sync_pt, child_list);
+		struct sync_pt *pt = (struct sync_pt *)
+			container_of(pos, struct fence, child_list);
 		sync_print_pt(s, &pt->base, false);
 	}
-	spin_unlock_irqrestore(&obj->child_list_lock, flags);
+	spin_unlock_irqrestore(&obj->lock, flags);
 }
 
 static void sync_print_sync_fence(struct seq_file *s,
@@ -189,9 +189,9 @@ static int sync_debugfs_show(struct seq_file *s, void *unused)
 
 	spin_lock_irqsave(&sync_timeline_list_lock, flags);
 	list_for_each(pos, &sync_timeline_list_head) {
-		struct sync_timeline *obj =
-			container_of(pos, struct sync_timeline,
-				     sync_timeline_list);
+		struct fence_timeline *obj =
+			container_of(pos, struct fence_timeline,
+				     fence_timeline_list);
 
 		sync_print_obj(s, obj);
 		seq_puts(s, "\n");
@@ -251,7 +251,7 @@ static int sw_sync_debugfs_release(struct inode *inode, struct file *file)
 {
 	struct sw_sync_timeline *obj = file->private_data;
 
-	sync_timeline_destroy(&obj->obj);
+	fence_timeline_destroy(&obj->obj);
 	return 0;
 }
 

@@ -30,9 +30,75 @@
 #include <linux/printk.h>
 #include <linux/rcupdate.h>
 
+struct fence_timeline;
 struct fence;
 struct fence_ops;
 struct fence_cb;
+/**
+ * struct fence_timeline_ops - fence context implementation ops
+ * @driver_name:	name of the implementation
+ * @has_signaled:	returns:
+ *			  1 if pt has signaled
+ *			  0 if pt has not signaled
+ *			 <0 on error
+ * @fill_driver_data:	write implementation specific driver data to data.
+ *			  should return an error if there is not enough room
+ *			  as specified by size.  This information is returned
+ *			  to userspace by SYNC_IOC_FENCE_INFO.
+ * @timeline_value_str: fill str with the value of the sync_timeline's counter
+ * @pt_value_str:	fill str with the value of the sync_pt
+ */
+struct fence_timeline_ops {
+	const char *driver_name;
+
+	/* required */
+	int (*has_signaled)(struct fence *fence);
+
+	/* optional */
+	int (*fill_driver_data)(struct fence *fence, void *data, int size);
+
+	/* optional */
+	void (*timeline_value_str)(struct fence_timeline *timeline, char *str,
+				   int size);
+
+	/* optional */
+	void (*fence_value_str)(struct fence *fence, char *str, int size);
+};
+
+/**
+ * struct fence_timeline - timeline for software synchronization primitive
+ * @kref: refcount for timeline lifetime
+ * @name: name of the timeline
+ * @ops: pointer to fence_timeline_ops of users
+ * @detroyed: if true, the destroy process has started
+ * @value: value of the last signaled fence
+ * @child_list_head: list of child fences
+ * @active_list_head: list of active(not signaled) fences
+ * @lock: to protect lists access
+ * @fences: list of all timelines created
+ */
+struct fence_timeline {
+	struct kref		kref;
+	char			name[32];
+	const struct fence_timeline_ops *ops;
+	bool			destroyed;
+	int			value;
+	int			context;
+	struct list_head	child_list_head;
+	struct list_head	active_list_head;
+	spinlock_t		lock;
+#ifdef CONFIG_DEBUG_FS
+	struct list_head        fence_timeline_list;
+#endif
+};
+
+struct fence_timeline *fence_timeline_create(unsigned num,
+					     struct fence_timeline_ops *ops,
+					     int size, const char *name);
+void fence_timeline_get(struct fence_timeline *timeline);
+void fence_timeline_put(struct fence_timeline *timeline);
+void fence_timeline_destroy(struct fence_timeline *timeline);
+void fence_timeline_signal(struct fence_timeline *timeline);
 
 /**
  * struct fence - software synchronization primitive
@@ -79,6 +145,8 @@ struct fence {
 	unsigned long flags;
 	ktime_t timestamp;
 	int status;
+	struct list_head child_list;
+	struct list_head active_list;
 };
 
 enum fence_flag_bits {
@@ -180,6 +248,13 @@ void fence_init(struct fence *fence, const struct fence_ops *ops,
 
 void fence_release(struct kref *kref);
 void fence_free(struct fence *fence);
+
+
+static inline struct fence_timeline *fence_parent(struct fence *fence)
+{
+	return container_of(fence->lock, struct fence_timeline,
+			    lock);
+}
 
 /**
  * fence_get - increases refcount of the fence
