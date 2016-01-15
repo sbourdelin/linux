@@ -778,11 +778,13 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 
 	local_rqfpr = kmalloc_array(MAX_FILER_IDX + 1, sizeof(unsigned int),
 				    GFP_KERNEL);
+	if (!local_rqfpr)
+		return 0;
 	local_rqfcr = kmalloc_array(MAX_FILER_IDX + 1, sizeof(unsigned int),
 				    GFP_KERNEL);
-	if (!local_rqfpr || !local_rqfcr) {
+	if (!local_rqfcr) {
 		ret = 0;
-		goto err;
+		goto free_fpr;
 	}
 
 	switch (class) {
@@ -802,7 +804,7 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 		netdev_err(priv->ndev,
 			   "Right now this class is not supported\n");
 		ret = 0;
-		goto err;
+		goto free_fcr;
 	}
 
 	for (i = 0; i < MAX_FILER_IDX + 1; i++) {
@@ -819,7 +821,7 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 		netdev_err(priv->ndev,
 			   "No parse rule found, can't create hash rules\n");
 		ret = 0;
-		goto err;
+		goto free_fcr;
 	}
 
 	/* If a match was found, then it begins the starting of a cluster rule
@@ -862,9 +864,9 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 			break;
 		priv->cur_filer_idx = priv->cur_filer_idx - 1;
 	}
-
-err:
+free_fcr:
 	kfree(local_rqfcr);
+free_fpr:
 	kfree(local_rqfpr);
 	return ret;
 }
