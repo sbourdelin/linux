@@ -116,7 +116,8 @@ static inline struct nd_blk_region_desc *to_blk_region_desc(
 
 }
 
-int nvdimm_bus_add_poison(struct nvdimm_bus *nvdimm_bus, u64 addr, u64 length);
+int nvdimm_bus_find_poison(struct nvdimm_bus *nvdimm_bus,
+		struct nd_region_desc *ndr_desc);
 struct nvdimm_bus *__nvdimm_bus_register(struct device *parent,
 		struct nvdimm_bus_descriptor *nfit_desc, struct module *module);
 #define nvdimm_bus_register(parent, desc) \
