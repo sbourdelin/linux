@@ -40,19 +40,11 @@ struct fence_cb;
  *			  should return an error if there is not enough room
  *			  as specified by size.  This information is returned
  *			  to userspace by SYNC_IOC_FENCE_INFO.
- * @timeline_value_str: fill str with the value of the sync_timeline's counter
  * @pt_value_str:	fill str with the value of the sync_pt
  */
 struct fence_timeline_ops {
 	/* optional */
 	int (*fill_driver_data)(struct fence *fence, void *data, int size);
-
-	/* optional */
-	void (*timeline_value_str)(struct fence_timeline *timeline, char *str,
-				   int size);
-
-	/* optional */
-	void (*fence_value_str)(struct fence *fence, char *str, int size);
 };
 
 /**
@@ -293,6 +285,8 @@ bool fence_default_signaled(struct fence *fence);
 bool fence_default_enable_signaling(struct fence *fence);
 signed long fence_default_wait(struct fence *fence, bool intr, signed long timeout);
 void fence_default_release(struct fence *fence);
+void fence_default_value_str(struct fence *fence, char *str, int size);
+void fence_default_timeline_value_str(struct fence *fence, char *str, int size);
 int fence_add_callback(struct fence *fence, struct fence_cb *cb,
 		       fence_func_t func);
 bool fence_remove_callback(struct fence *fence, struct fence_cb *cb);

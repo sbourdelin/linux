@@ -55,21 +55,15 @@ TRACE_EVENT(fence_timeline,
 
 	TP_STRUCT__entry(
 			__string(name, timeline->name)
-			__array(char, value, 32)
+			__field(unsigned int, value)
 	),
 
 	TP_fast_assign(
 			__assign_str(name, timeline->name);
-			if (timeline->ops->timeline_value_str) {
-				timeline->ops->timeline_value_str(timeline,
-							__entry->value,
-							sizeof(__entry->value));
-			} else {
-				__entry->value[0] = '\0';
-			}
+			__entry->value = timeline->value;
 	),
 
-	TP_printk("name=%s value=%s", __get_str(name), __entry->value)
+	TP_printk("name=%s value=%u", __get_str(name), __entry->value)
 );
 
 DECLARE_EVENT_CLASS(fence,

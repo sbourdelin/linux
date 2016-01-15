@@ -133,16 +133,7 @@ static void sync_print_obj(struct seq_file *s, struct fence_timeline *obj)
 	struct list_head *pos;
 	unsigned long flags;
 
-	seq_printf(s, "%s %s", obj->name, obj->drv_name);
-
-	if (obj->ops->timeline_value_str) {
-		char value[64];
-
-		obj->ops->timeline_value_str(obj, value, sizeof(value));
-		seq_printf(s, ": %s", value);
-	}
-
-	seq_puts(s, "\n");
+	seq_printf(s, "%s %s: %d\n", obj->name, obj->drv_name, obj->value);
 
 	spin_lock_irqsave(&obj->lock, flags);
 	list_for_each(pos, &obj->child_list_head) {

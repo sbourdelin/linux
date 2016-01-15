@@ -331,32 +331,6 @@ static int sync_fence_fill_driver_data(struct fence *fence,
 	return parent->ops->fill_driver_data(fence, data, size);
 }
 
-static void sync_fence_value_str(struct fence *fence,
-				    char *str, int size)
-{
-	struct fence_timeline *parent = fence_parent(fence);
-
-	if (!parent->ops->fence_value_str) {
-		if (size)
-			*str = 0;
-		return;
-	}
-	parent->ops->fence_value_str(fence, str, size);
-}
-
-static void sync_fence_timeline_value_str(struct fence *fence,
-					     char *str, int size)
-{
-	struct fence_timeline *parent = fence_parent(fence);
-
-	if (!parent->ops->timeline_value_str) {
-		if (size)
-			*str = 0;
-		return;
-	}
-	parent->ops->timeline_value_str(parent, str, size);
-}
-
 static const struct fence_ops sync_fence_ops = {
 	.get_driver_name = fence_default_get_driver_name,
 	.get_timeline_name = fence_default_get_timeline_name,
@@ -365,8 +339,8 @@ static const struct fence_ops sync_fence_ops = {
 	.wait = fence_default_wait,
 	.release = fence_default_release,
 	.fill_driver_data = sync_fence_fill_driver_data,
-	.fence_value_str = sync_fence_value_str,
-	.timeline_value_str = sync_fence_timeline_value_str,
+	.fence_value_str = fence_default_value_str,
+	.timeline_value_str = fence_default_timeline_value_str,
 };
 
 static void sync_fence_free(struct kref *kref)

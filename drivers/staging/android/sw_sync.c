@@ -51,26 +51,8 @@ static int sw_sync_fill_driver_data(struct fence *fence,
 	return sizeof(pt->value);
 }
 
-static void sw_sync_timeline_value_str(struct fence_timeline *fence_timeline,
-				       char *str, int size)
-{
-	struct sw_sync_timeline *timeline =
-		(struct sw_sync_timeline *)fence_timeline;
-	snprintf(str, size, "%d", timeline->value);
-}
-
-static void sw_sync_fence_value_str(struct fence *fence,
-				 char *str, int size)
-{
-	struct sw_sync_pt *pt = (struct sw_sync_pt *)fence;
-
-	snprintf(str, size, "%d", pt->value);
-}
-
 static struct fence_timeline_ops sw_sync_timeline_ops = {
 	.fill_driver_data = sw_sync_fill_driver_data,
-	.timeline_value_str = sw_sync_timeline_value_str,
-	.fence_value_str = sw_sync_fence_value_str,
 };
 
 struct sw_sync_timeline *sw_sync_timeline_create(const char *name)

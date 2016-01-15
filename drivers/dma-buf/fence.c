@@ -620,6 +620,37 @@ void fence_default_release(struct fence *fence)
 }
 EXPORT_SYMBOL(fence_default_release);
 
+/**
+ * fence_default_value_str - default .fence_value_str fence ops
+ * @fence:	[in]	the fence to get the value from
+ * @str:	[out]	the string pointer to write the value
+ * @size:	[in]	the size of the allocated string
+ *
+ * This functions returns a string containing the value of the fence.
+ */
+void fence_default_value_str(struct fence *fence, char *str, int size)
+{
+	snprintf(str, size, "%d", fence->seqno);
+}
+EXPORT_SYMBOL(fence_default_value_str);
+
+/**
+ * fence_default_timeline_value_str - default .timeline_value_str fence ops
+ * @fence:	[in]	the timeline child fence
+ * @str:	[out]	the string pointer to write the value
+ * @size:	[in]	the size of the allocated string
+ *
+ * This functions returns a string containing the value of the last signaled
+ * fence in this timeline.
+ */
+void fence_default_timeline_value_str(struct fence *fence, char *str, int size)
+{
+	struct fence_timeline *timeline = fence_parent(fence);
+
+	snprintf(str, size, "%d", timeline->value);
+}
+EXPORT_SYMBOL(fence_default_timeline_value_str);
+
 static bool
 fence_test_signaled_any(struct fence **fences, uint32_t count)
 {
