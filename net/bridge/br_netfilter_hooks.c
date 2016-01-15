@@ -999,6 +999,46 @@ static struct ctl_table brnf_table[] = {
 };
 #endif
 
+static void nf_br_saveroute(const struct sk_buff *skb,
+			    struct nf_queue_entry *entry)
+{
+}
+
+static int nf_br_reroute(struct sk_buff *skb,
+			 const struct nf_queue_entry *entry)
+{
+	return 0;
+}
+
+__sum16 nf_br_checksum(struct sk_buff *skb, unsigned int hook,
+		       unsigned int dataoff, u_int8_t protocol)
+{
+	return 0;
+}
+
+static __sum16 nf_br_checksum_partial(struct sk_buff *skb, unsigned int hook,
+				      unsigned int dataoff, unsigned int len,
+				      u_int8_t protocol)
+{
+	return 0;
+}
+
+static int nf_br_route(struct net *net, struct dst_entry **dst,
+		       struct flowi *fl, bool strict __always_unused)
+{
+	return 0;
+}
+
+static const struct nf_afinfo nf_br_afinfo = {
+	.family			= AF_BRIDGE,
+	.checksum		= nf_br_checksum,
+	.checksum_partial	= nf_br_checksum_partial,
+	.route			= nf_br_route,
+	.saveroute		= nf_br_saveroute,
+	.reroute		= nf_br_reroute,
+	.route_key_size		= 0,
+};
+
 static int __init br_netfilter_init(void)
 {
 	int ret;
@@ -1018,12 +1058,16 @@ static int __init br_netfilter_init(void)
 #endif
 	RCU_INIT_POINTER(nf_br_ops, &br_ops);
 	printk(KERN_NOTICE "Bridge firewalling registered\n");
+
+	nf_register_afinfo(&nf_br_afinfo);
+
 	return 0;
 }
 
 static void __exit br_netfilter_fini(void)
 {
 	RCU_INIT_POINTER(nf_br_ops, NULL);
+	nf_unregister_afinfo(&nf_br_afinfo);
 	nf_unregister_hooks(br_nf_ops, ARRAY_SIZE(br_nf_ops));
 #ifdef CONFIG_SYSCTL
 	unregister_net_sysctl_table(brnf_sysctl_header);
