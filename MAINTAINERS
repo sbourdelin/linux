@@ -75,6 +75,8 @@ Descriptions of section entries:
 	L: Mailing list that is relevant to this area
 	W: Web-page with status/info
 	Q: Patchwork web based patch tracking system site
+	B: Preferred method for reporting bugs; bug tracking system site
+	   or "List" for mailing list.
 	T: SCM tree type and location.
 	   Type is one of: git, hg, quilt, stgit, topgit
 	S: Status, one of the following:
@@ -3655,6 +3657,7 @@ L:	intel-gfx@lists.freedesktop.org
 L:	dri-devel@lists.freedesktop.org
 W:	https://01.org/linuxgraphics/
 Q:	http://patchwork.freedesktop.org/project/intel-gfx/
+B:	https://bugs.freedesktop.org/enter_bug.cgi?product=DRI&component=DRM/Intel
 T:	git git://anongit.freedesktop.org/drm-intel
 S:	Supported
 F:	drivers/gpu/drm/i915/
