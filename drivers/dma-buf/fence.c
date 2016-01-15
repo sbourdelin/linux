@@ -84,6 +84,8 @@ struct fence_timeline *fence_timeline_create(unsigned num, int size,
 	INIT_LIST_HEAD(&timeline->active_list_head);
 	spin_lock_init(&timeline->lock);
 
+	fence_timeline_debug_add(timeline);
+
 	return timeline;
 }
 EXPORT_SYMBOL(fence_timeline_create);
@@ -99,6 +101,8 @@ static void fence_timeline_free(struct kref *kref)
 {
 	struct fence_timeline *timeline =
 		container_of(kref, struct fence_timeline, kref);
+
+	fence_timeline_debug_remove(timeline);
 
 	kfree(timeline);
 }

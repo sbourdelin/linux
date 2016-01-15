@@ -184,15 +184,11 @@ int sync_fence_wait(struct sync_fence *fence, long timeout);
 
 #ifdef CONFIG_DEBUG_FS
 
-void sync_timeline_debug_add(struct fence_timeline *obj);
-void sync_timeline_debug_remove(struct fence_timeline *obj);
 void sync_fence_debug_add(struct sync_fence *fence);
 void sync_fence_debug_remove(struct sync_fence *fence);
 void sync_dump(void);
 
 #else
-# define sync_timeline_debug_add(obj)
-# define sync_timeline_debug_remove(obj)
 # define sync_fence_debug_add(fence)
 # define sync_fence_debug_remove(fence)
 # define sync_dump()

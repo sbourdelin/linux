@@ -33,28 +33,8 @@
 
 static struct dentry *dbgfs;
 
-static LIST_HEAD(sync_timeline_list_head);
-static DEFINE_SPINLOCK(sync_timeline_list_lock);
 static LIST_HEAD(sync_fence_list_head);
 static DEFINE_SPINLOCK(sync_fence_list_lock);
-
-void sync_timeline_debug_add(struct fence_timeline *obj)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&sync_timeline_list_lock, flags);
-	list_add_tail(&obj->fence_timeline_list, &sync_timeline_list_head);
-	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
-}
-
-void sync_timeline_debug_remove(struct fence_timeline *obj)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&sync_timeline_list_lock, flags);
-	list_del(&obj->fence_timeline_list);
-	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
-}
 
 void sync_fence_debug_add(struct sync_fence *sync_fence)
 {
@@ -74,76 +54,6 @@ void sync_fence_debug_remove(struct sync_fence *sync_fence)
 	spin_unlock_irqrestore(&sync_fence_list_lock, flags);
 }
 
-static const char *sync_status_str(int status)
-{
-	if (status == 0)
-		return "signaled";
-
-	if (status > 0)
-		return "active";
-
-	return "error";
-}
-
-static void sync_print_fence(struct seq_file *s, struct fence *fence, bool show)
-{
-	int status = 1;
-	struct fence_timeline *parent = fence_parent(fence);
-
-	if (fence_is_signaled_locked(fence))
-		status = fence->status;
-
-	seq_printf(s, "  %s%sfence %s",
-		   show ? parent->name : "",
-		   show ? "_" : "",
-		   sync_status_str(status));
-
-	if (status <= 0) {
-		struct timespec64 ts64 =
-			ktime_to_timespec64(fence->timestamp);
-
-		seq_printf(s, "@%lld.%09ld", (s64)ts64.tv_sec, ts64.tv_nsec);
-	}
-
-	if ((!fence || fence->ops->timeline_value_str) &&
-		fence->ops->fence_value_str) {
-		char value[64];
-		bool success;
-
-		fence->ops->fence_value_str(fence, value, sizeof(value));
-		success = strlen(value);
-
-		if (success)
-			seq_printf(s, ": %s", value);
-
-		if (success && fence) {
-			fence->ops->timeline_value_str(fence, value,
-						       sizeof(value));
-
-			if (strlen(value))
-				seq_printf(s, " / %s", value);
-		}
-	}
-
-	seq_puts(s, "\n");
-}
-
-static void sync_print_obj(struct seq_file *s, struct fence_timeline *obj)
-{
-	struct list_head *pos;
-	unsigned long flags;
-
-	seq_printf(s, "%s %s: %d\n", obj->name, obj->drv_name, obj->value);
-
-	spin_lock_irqsave(&obj->lock, flags);
-	list_for_each(pos, &obj->child_list_head) {
-		struct fence *fence =
-			container_of(pos, struct fence, child_list);
-		sync_print_fence(s, fence, false);
-	}
-	spin_unlock_irqrestore(&obj->lock, flags);
-}
-
 static void sync_print_sync_fence(struct seq_file *s,
 				  struct sync_fence *sync_fence)
 {
@@ -152,10 +62,10 @@ static void sync_print_sync_fence(struct seq_file *s,
 	int i;
 
 	seq_printf(s, "[%p] %s: %s\n", sync_fence, sync_fence->name,
-		   sync_status_str(atomic_read(&sync_fence->status)));
+		   fence_status_str(atomic_read(&sync_fence->status)));
 
 	for (i = 0; i < sync_fence->num_fences; ++i) {
-		sync_print_fence(s, sync_fence->cbs[i].fence, true);
+		fence_print(s, sync_fence->cbs[i].fence, true);
 	}
 
 	spin_lock_irqsave(&sync_fence->wq.lock, flags);
@@ -179,16 +89,7 @@ static int sync_debugfs_show(struct seq_file *s, void *unused)
 
 	seq_puts(s, "objs:\n--------------\n");
 
-	spin_lock_irqsave(&sync_timeline_list_lock, flags);
-	list_for_each(pos, &sync_timeline_list_head) {
-		struct fence_timeline *obj =
-			container_of(pos, struct fence_timeline,
-				     fence_timeline_list);
-
-		sync_print_obj(s, obj);
-		seq_puts(s, "\n");
-	}
-	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
+	fence_timeline_print_all(s);
 
 	seq_puts(s, "fences:\n--------------\n");
 

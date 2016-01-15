@@ -407,6 +407,24 @@ static inline signed long fence_wait(struct fence *fence, bool intr)
 
 unsigned fence_context_alloc(unsigned num);
 
+#ifdef CONFIG_DEBUG_FS
+
+void fence_timeline_debug_add(struct fence_timeline *obj);
+void fence_timeline_debug_remove(struct fence_timeline *obj);
+const char *fence_status_str(int status);
+void fence_print(struct seq_file *s, struct fence *fence, bool show);
+void fence_timeline_print(struct seq_file *s, struct fence_timeline *obj);
+void fence_timeline_print_all(struct seq_file* s);
+
+#else
+#define fence_timeline_debug_add(obj)
+#define fence_timeline_debug_remove(obj)
+#define fence_status_str(status)
+#define fence_print(s, fence, show)
+#define fence_timeline_print(s, obj)
+#define fence_timeline_print_all(s)
+#endif
+
 #define FENCE_TRACE(f, fmt, args...) \
 	do {								\
 		struct fence *__ff = (f);				\
