@@ -317,6 +317,7 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 	bool csum_verify;
 	char *secdata = NULL;
 	u32 seclen = 0;
+	int mac_header_len = 0;
 
 	size =    nlmsg_total_size(sizeof(struct nfgenmsg))
 		+ nla_total_size(sizeof(struct nfqnl_msg_packet_hdr))
@@ -352,6 +353,18 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 		    entskb->ip_summed == CHECKSUM_PARTIAL &&
 		    skb_checksum_help(entskb))
 			return NULL;
+
+#if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
+		if ((entry->state.pf == PF_BRIDGE) &&
+		    (entskb->dev && (entskb->data > skb_mac_header(entskb)))) {
+			/* push back the mac header into the data so that
+			 * it gets copied in
+			 */
+			mac_header_len =
+				(int)(entskb->data - skb_mac_header(entskb));
+			skb_push(entskb, mac_header_len);
+		}
+#endif
 
 		data_len = ACCESS_ONCE(queue->copy_range);
 		if (data_len > entskb->len)
@@ -542,6 +555,10 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
 	}
 
 	nlh->nlmsg_len = skb->len;
+
+	if (mac_header_len > 0)
+		skb_pull(entskb, mac_header_len);
+
 	return skb;
 
 nla_put_failure:
@@ -1070,11 +1087,28 @@ static int nfqnl_recv_verdict(struct net *net, struct sock *ctnl,
 
 	if (nfqa[NFQA_PAYLOAD]) {
 		u16 payload_len = nla_len(nfqa[NFQA_PAYLOAD]);
-		int diff = payload_len - entry->skb->len;
+		int diff = 0;
+		int mac_header_len = 0;
+#if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
+		if ((entry->state.pf == PF_BRIDGE) &&
+		    (entry->skb->dev &&
+		     (entry->skb->data > skb_mac_header(entry->skb)))) {
+			/* push back the mac header into the data so that
+			 * it gets copied in before mangling
+			 */
+			mac_header_len = (int)(entry->skb->data -
+					       skb_mac_header(entry->skb));
+			skb_push(entry->skb, mac_header_len);
+	}
+#endif
+		diff = payload_len - entry->skb->len;
 
 		if (nfqnl_mangle(nla_data(nfqa[NFQA_PAYLOAD]),
 				 payload_len, entry, diff) < 0)
 			verdict = NF_DROP;
+
+		if (mac_header_len > 0) /* pull mac header again */
+			skb_pull(entry->skb, mac_header_len);
 
 		if (ct && diff)
 			nfnl_ct->seq_adjust(entry->skb, ct, ctinfo, diff);
