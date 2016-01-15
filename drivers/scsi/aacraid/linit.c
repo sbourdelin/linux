@@ -706,7 +706,7 @@ static long aac_cfg_ioctl(struct file *file,
 	int ret;
 	struct aac_dev *aac;
 	aac = (struct aac_dev *)file->private_data;
-	if (!capable(CAP_SYS_RAWIO) || aac->adapter_shutdown)
+	if (!capable(CAP_SYS_RAWIO) || atomic_read(&aac->adapter_shutdown))
 		return -EPERM;
 	mutex_lock(&aac_mutex);
 	ret = aac_do_ioctl(file->private_data, cmd, (void __user *)arg);
@@ -1078,6 +1078,8 @@ static void __aac_shutdown(struct aac_dev * aac)
 	int i;
 	int cpu;
 
+	aac_send_shutdown(aac);
+
 	if (aac->aif_thread) {
 		int i;
 		/* Clear out events first */
@@ -1089,7 +1091,7 @@ static void __aac_shutdown(struct aac_dev * aac)
 		}
 		kthread_stop(aac->thread);
 	}
-	aac_send_shutdown(aac);
+
 	aac_adapter_disable_int(aac);
 	cpu = cpumask_first(cpu_online_mask);
 	if (aac->pdev->device == PMC_DEVICE_S6 ||
@@ -1474,7 +1476,7 @@ static int aac_resume(struct pci_dev *pdev)
 	* reset this flag to unblock ioctl() as it was set at
 	* aac_send_shutdown() to block ioctls from upperlayer
 	*/
-	aac->adapter_shutdown = 0;
+	atomic_set(&aac->adapter_shutdown, 0);
 	scsi_unblock_requests(shost);
 
 	return 0;
@@ -1553,9 +1555,8 @@ static pci_ers_result_t aac_pci_error_detected(struct pci_dev *pdev,
 	case pci_channel_io_normal:
 		return PCI_ERS_RESULT_CAN_RECOVER;
 	case pci_channel_io_frozen:
-
 		aac->handle_pci_error = 1;
-		aac->adapter_shutdown = 1;
+		atomic_set(&aac->adapter_shutdown, 1);
 
 		scsi_block_requests(aac->scsi_host_ptr);
 		aac_flush_ios(aac);
@@ -1567,7 +1568,7 @@ static pci_ers_result_t aac_pci_error_detected(struct pci_dev *pdev,
 		return PCI_ERS_RESULT_NEED_RESET;
 	case pci_channel_io_perm_failure:
 		aac->handle_pci_error = 1;
-		aac->adapter_shutdown = 1;
+		atomic_set(&aac->adapter_shutdown, 1);
 
 		aac_flush_ios(aac);
 		return PCI_ERS_RESULT_DISCONNECT;
@@ -1636,7 +1637,7 @@ static void aac_pci_resume(struct pci_dev *pdev)
 	 * reset this flag to unblock ioctl() as it was set
 	 * at aac_send_shutdown() to block ioctls from upperlayer
 	 */
-	aac->adapter_shutdown = 0;
+	atomic_set(&aac->adapter_shutdown, 0);
 	aac->handle_pci_error = 0;
 
 	shost_for_each_device(sdev, shost)

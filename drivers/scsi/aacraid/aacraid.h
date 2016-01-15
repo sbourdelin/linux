@@ -1234,7 +1234,7 @@ struct aac_dev
 	int			msi_enabled;	/* MSI/MSI-X enabled */
 	struct msix_entry	msixentry[AAC_MAX_MSIX];
 	struct aac_msix_ctx	aac_msix[AAC_MAX_MSIX]; /* context */
-	u8			adapter_shutdown;
+	atomic_t		adapter_shutdown;
 	u32			handle_pci_error;
 };
 
