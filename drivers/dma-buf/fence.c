@@ -136,7 +136,7 @@ EXPORT_SYMBOL(fence_timeline_put);
  * fence_timeline_destroy - destroy a fence_timeline
  * @timeline	[in]	the fence_timeline to destroy
  *
- * This function destroys a timeline. It signals any active fence first.
+ * This function destroys a timeline.
  */
 void fence_timeline_destroy(struct fence_timeline *timeline)
 {
@@ -147,10 +147,6 @@ void fence_timeline_destroy(struct fence_timeline *timeline)
 	 */
 	smp_wmb();
 
-	/*
-	 * signal any children that their parent is going away.
-	 */
-	fence_timeline_signal(timeline, 0);
 	fence_timeline_put(timeline);
 }
 EXPORT_SYMBOL(fence_timeline_destroy);
