@@ -3908,9 +3908,16 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	uint32_t logit = LOG_FCP;
 
 	/* Sanity check on return of outstanding command */
-	if (!(lpfc_cmd->pCmd))
+	spin_lock_irqsave(&phba->hbalock, flags);
+	if (!(lpfc_cmd->pCmd)) {
+		spin_unlock_irqrestore(&phba->hbalock, flags);
 		return;
+	}
 	cmd = lpfc_cmd->pCmd;
+	cmd->host_scribble = NULL;
+	lpfc_cmd->pCmd = NULL;
+	spin_unlock_irqrestore(&phba->hbalock, flags);
+
 	shost = cmd->device->host;
 
 	lpfc_cmd->result = (pIocbOut->iocb.un.ulpWord[4] & IOERR_PARAM_MASK);
@@ -4125,10 +4132,6 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	cmd->scsi_done(cmd);
 
 	if (phba->cfg_poll & ENABLE_FCP_RING_POLLING) {
-		spin_lock_irqsave(&phba->hbalock, flags);
-		lpfc_cmd->pCmd = NULL;
-		spin_unlock_irqrestore(&phba->hbalock, flags);
-
 		/*
 		 * If there is a thread waiting for command completion
 		 * wake up the thread.
@@ -4140,10 +4143,6 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 		lpfc_release_scsi_buf(phba, lpfc_cmd);
 		return;
 	}
-
-	spin_lock_irqsave(&phba->hbalock, flags);
-	lpfc_cmd->pCmd = NULL;
-	spin_unlock_irqrestore(&phba->hbalock, flags);
 
 	/*
 	 * If there is a thread waiting for command completion
