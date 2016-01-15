@@ -72,3 +72,7 @@ Rockchip platforms device tree bindings
 - Rockchip R88 board:
     Required root node properties:
       - compatible = "rockchip,r88", "rockchip,rk3368";
+
+- Tronsmart Orion R68
+    Required root node properties:
+      - compatible = "tronsmart,orion-r68", "rockchip,rk3368";
