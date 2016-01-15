@@ -806,6 +806,7 @@ static int gen8_init_workarounds(struct intel_engine_cs *ring)
 	 * invalidation occurs during a PSD flush.
 	 */
 	/* WaForceEnableNonCoherent:bdw,chv */
+	dev_priv->workarounds.WaForceEnableNonCoherent = 1;
 	/* WaHdcDisableFetchWhenMasked:bdw,chv */
 	WA_SET_BIT_MASKED(HDC_CHICKEN0,
 			  HDC_DONOT_FETCH_MEM_WHEN_MASKED |
@@ -1049,6 +1050,7 @@ static int skl_init_workarounds(struct intel_engine_cs *ring)
 		 * a TLB invalidation occurs during a PSD flush.
 		 */
 		/* WaForceEnableNonCoherent:skl */
+		dev_priv->workarounds.WaForceEnableNonCoherent = 1;
 		WA_SET_BIT_MASKED(HDC_CHICKEN0,
 				  HDC_FORCE_NON_COHERENT);
 

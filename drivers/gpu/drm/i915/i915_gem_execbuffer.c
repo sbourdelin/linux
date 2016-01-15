@@ -1397,6 +1397,10 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	if (!i915_gem_check_execbuffer(args))
 		return -EINVAL;
 
+	if ((args->flags & I915_EXEC_FORCE_NON_COHERENT) &&
+		INTEL_INFO(dev)->gen < 9)
+		return -EINVAL;
+
 	ret = validate_exec_list(dev, exec, args->buffer_count);
 	if (ret)
 		return ret;

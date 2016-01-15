@@ -172,6 +172,10 @@ static int i915_getparam(struct drm_device *dev, void *data,
 	case I915_PARAM_HAS_EXEC_SOFTPIN:
 		value = 1;
 		break;
+	case I915_PARAM_HAS_EXEC_FORCE_NON_COHERENT:
+		value = !dev_priv->workarounds.WaForceEnableNonCoherent &&
+			INTEL_INFO(dev)->gen >= 9;
+		break;
 	default:
 		DRM_DEBUG("Unknown parameter %d\n", param->param);
 		return -EINVAL;

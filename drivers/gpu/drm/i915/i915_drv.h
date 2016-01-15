@@ -1664,6 +1664,10 @@ struct i915_wa_reg {
 struct i915_workarounds {
 	struct i915_wa_reg reg[I915_MAX_WA_REGS];
 	u32 count;
+
+	struct {
+		unsigned int WaForceEnableNonCoherent:1;
+	};
 };
 
 struct i915_virtual_gpu {

@@ -853,6 +853,36 @@ int intel_logical_ring_reserve_space(struct drm_i915_gem_request *request)
 	return intel_logical_ring_begin(request, 0);
 }
 
+static inline int
+intel_lr_emit_force_non_coherent(struct i915_execbuffer_params *params,
+		struct drm_i915_gem_execbuffer2 *args, bool force)
+{
+	struct drm_device       *dev = params->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int ret;
+
+	if (dev_priv->workarounds.WaForceEnableNonCoherent)
+		return 0;
+
+	if (args->flags & I915_EXEC_FORCE_NON_COHERENT) {
+		struct intel_ringbuffer *ringbuf = params->request->ringbuf;
+
+		ret = intel_logical_ring_begin(params->request, 4);
+		if (ret)
+			return ret;
+
+		intel_logical_ring_emit(ringbuf, MI_NOOP);
+		intel_logical_ring_emit(ringbuf, MI_LOAD_REGISTER_IMM(1));
+		intel_logical_ring_emit(ringbuf, HDC_CHICKEN0.reg);
+		intel_logical_ring_emit(ringbuf, force ?
+				_MASKED_BIT_ENABLE(HDC_FORCE_NON_COHERENT) :
+				_MASKED_BIT_DISABLE(HDC_FORCE_NON_COHERENT));
+		intel_logical_ring_advance(ringbuf);
+	}
+
+	return 0;
+}
+
 /**
  * execlists_submission() - submit a batchbuffer for execution, Execlists style
  * @dev: DRM device.
@@ -933,10 +963,18 @@ int intel_execlists_submission(struct i915_execbuffer_params *params,
 		dev_priv->relative_constants_mode = instp_mode;
 	}
 
+	ret = intel_lr_emit_force_non_coherent(params, args, true);
+	if (ret)
+		return ret;
+
 	exec_start = params->batch_obj_vm_offset +
 		     args->batch_start_offset;
 
 	ret = ring->emit_bb_start(params->request, exec_start, params->dispatch_flags);
+	if (ret)
+		return ret;
+
+	ret = intel_lr_emit_force_non_coherent(params, args, false);
 	if (ret)
 		return ret;
 

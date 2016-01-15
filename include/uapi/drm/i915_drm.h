@@ -357,6 +357,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_HAS_GPU_RESET	 35
 #define I915_PARAM_HAS_RESOURCE_STREAMER 36
 #define I915_PARAM_HAS_EXEC_SOFTPIN	 37
+#define I915_PARAM_HAS_EXEC_FORCE_NON_COHERENT 38
 
 typedef struct drm_i915_getparam {
 	__s32 param;
@@ -782,7 +783,12 @@ struct drm_i915_gem_execbuffer2 {
  */
 #define I915_EXEC_RESOURCE_STREAMER     (1<<15)
 
-#define __I915_EXEC_UNKNOWN_FLAGS -(I915_EXEC_RESOURCE_STREAMER<<1)
+/**
+ * Tell the kernel that the batch buffer requires to disable IA-Coherency
+ */
+#define I915_EXEC_FORCE_NON_COHERENT    (1<<16)
+
+#define __I915_EXEC_UNKNOWN_FLAGS -(I915_EXEC_FORCE_NON_COHERENT<<1)
 
 #define I915_EXEC_CONTEXT_ID_MASK	(0xffffffff)
 #define i915_execbuffer2_set_context_id(eb2, context) \
