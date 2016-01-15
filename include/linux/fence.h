@@ -212,6 +212,9 @@ struct fence_ops {
 	void (*timeline_value_str)(struct fence *fence, char *str, int size);
 };
 
+struct fence *fence_create_on_timeline(struct fence_timeline *obj,
+				       const struct fence_ops *ops, int size,
+				       unsigned int value);
 void fence_init(struct fence *fence, const struct fence_ops *ops,
 		spinlock_t *lock, unsigned context, unsigned seqno);
 

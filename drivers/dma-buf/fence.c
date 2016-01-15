@@ -768,6 +768,44 @@ err_free_cb:
 EXPORT_SYMBOL(fence_wait_any_timeout);
 
 /**
+ * fence_create_on_timeline - create a fence and add it to the timeline
+ * or until timeout elapses
+ * @obj:	[in]	timeline object
+ * @ops:	[in]	fence_ops to use
+ * @size:	[in]	size to allocate struct fence
+ * @value:	[in]	value of this fence
+ *
+ * This function allocates a new fence and initialize it as a child of the
+ * fence_timeline provided. The value received is the seqno used to know
+ * when the fence is signaled.
+ *
+ * Returns NULL if fails to allocate memory or size is too small.
+ */
+struct fence *fence_create_on_timeline(struct fence_timeline *obj,
+				       const struct fence_ops *ops, int size,
+				       unsigned int value)
+{
+	unsigned long flags;
+	struct fence *fence;
+
+	if (size < sizeof(*fence))
+		return NULL;
+
+	fence = kzalloc(size, GFP_KERNEL);
+	if (!fence)
+		return NULL;
+
+	spin_lock_irqsave(&obj->lock, flags);
+	fence_timeline_get(obj);
+	fence_init(fence, ops, &obj->lock, obj->context, value);
+	list_add_tail(&fence->child_list, &obj->child_list_head);
+	INIT_LIST_HEAD(&fence->active_list);
+	spin_unlock_irqrestore(&obj->lock, flags);
+	return fence;
+}
+EXPORT_SYMBOL(fence_create_on_timeline);
+
+/**
  * fence_init - Initialize a custom fence.
  * @fence:	[in]	the fence to initialize
  * @ops:	[in]	the fence_ops for operations on this fence

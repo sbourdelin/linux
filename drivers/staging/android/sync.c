@@ -36,24 +36,8 @@ static const struct file_operations sync_fence_fops;
 
 struct fence *sync_pt_create(struct fence_timeline *obj, int size, u32 value)
 {
-	unsigned long flags;
-	struct fence *fence;
-
-	if (size < sizeof(*fence))
-		return NULL;
-
-	fence = kzalloc(size, GFP_KERNEL);
-	if (!fence)
-		return NULL;
-
-	spin_lock_irqsave(&obj->lock, flags);
-	fence_timeline_get(obj);
-	fence_init(fence, &sync_fence_ops, &obj->lock,
-		   obj->context, value);
-	list_add_tail(&fence->child_list, &obj->child_list_head);
-	INIT_LIST_HEAD(&fence->active_list);
-	spin_unlock_irqrestore(&obj->lock, flags);
-	return fence;
+	return fence_create_on_timeline(obj, &sync_fence_ops,
+					sizeof(struct fence), value);
 }
 EXPORT_SYMBOL(sync_pt_create);
 
