@@ -25,6 +25,7 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <linux/mm.h>
+#include <linux/pm_runtime.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
 #include "pci.h"
 
@@ -2999,6 +3000,18 @@ static void quirk_intel_ntb(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x0e08, quirk_intel_ntb);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x0e0d, quirk_intel_ntb);
+
+
+/*PCIe ports on Intel Broxton should support runtime PM*/
+static void quirk_pcie_enable_rtpm(struct pci_dev *dev)
+{
+	pm_runtime_put_noidle(&dev->dev);
+	pm_runtime_allow(&dev->dev);
+}
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_INTEL,
+	PCI_DEVICE_ID_INTEL_BXT_B0_PCIe_0, quirk_pcie_enable_rtpm);
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_INTEL,
+	PCI_DEVICE_ID_INTEL_BXT_B0_PCIe_1, quirk_pcie_enable_rtpm);
 
 static ktime_t fixup_debug_start(struct pci_dev *dev,
 				 void (*fn)(struct pci_dev *dev))
