@@ -37,25 +37,22 @@ static const struct fence_ops sw_sync_fence_ops = {
 	.timeline_value_str = fence_default_timeline_value_str,
 };
 
-struct fence *sw_sync_pt_create(struct sw_sync_timeline *obj, u32 value)
+struct fence *sw_sync_pt_create(struct fence_timeline *obj, u32 value)
 {
-	return fence_create_on_timeline(&obj->obj, &sw_sync_fence_ops,
+	return fence_create_on_timeline(obj, &sw_sync_fence_ops,
 					 sizeof(struct fence), value);
 }
 EXPORT_SYMBOL(sw_sync_pt_create);
 
-struct sw_sync_timeline *sw_sync_timeline_create(const char *name)
+struct fence_timeline *sw_sync_timeline_create(const char *name)
 {
-	struct sw_sync_timeline *obj = (struct sw_sync_timeline *)
-		fence_timeline_create(1, sizeof(struct sw_sync_timeline),
+	return fence_timeline_create(1, sizeof(struct fence_timeline),
 				     "sw_sync", name);
-
-	return obj;
 }
 EXPORT_SYMBOL(sw_sync_timeline_create);
 
-void sw_sync_timeline_inc(struct sw_sync_timeline *obj, u32 inc)
+void sw_sync_timeline_inc(struct fence_timeline *obj, u32 inc)
 {
-	fence_timeline_signal(&obj->obj, inc);
+	fence_timeline_signal(obj, inc);
 }
 EXPORT_SYMBOL(sw_sync_timeline_inc);
