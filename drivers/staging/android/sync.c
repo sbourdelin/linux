@@ -91,6 +91,8 @@ struct sync_fence *sync_fence_create_dma(const char *name, struct fence *fence)
 
 	sync_fence_debug_add(sync_fence);
 
+	fence_add_user_data(fence, sync_fence);
+
 	return sync_fence;
 }
 EXPORT_SYMBOL(sync_fence_create_dma);
@@ -100,6 +102,13 @@ struct sync_fence *sync_fence_create(const char *name, struct fence *fence)
 	return sync_fence_create_dma(name, fence);
 }
 EXPORT_SYMBOL(sync_fence_create);
+
+void sync_fence_cleanup(struct sync_fence *sync_fence)
+{
+	atomic_set(&sync_fence->status, -ENOENT);
+	wake_up_all(&sync_fence->wq);
+}
+EXPORT_SYMBOL(sync_fence_cleanup);
 
 struct sync_fence *sync_fence_fdget(int fd)
 {

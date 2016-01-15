@@ -98,6 +98,8 @@ struct sync_fence *sync_fence_create(const char *name, struct fence *fence);
  */
 struct sync_fence *sync_fence_create_dma(const char *name, struct fence *pt);
 
+void sync_fence_cleanup(struct sync_fence *sync_fence);
+
 /*
  * API for sync_fence consumers
  */

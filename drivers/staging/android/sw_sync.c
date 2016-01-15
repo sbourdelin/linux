@@ -25,6 +25,13 @@
 
 #include "sw_sync.h"
 
+static void sw_sync_cleanup(struct fence *fence, void *user_data)
+{
+	struct sync_fence *sync_fence = user_data;
+
+	sync_fence_cleanup(sync_fence);
+}
+
 static const struct fence_ops sw_sync_fence_ops = {
 	.get_driver_name = fence_default_get_driver_name,
 	.get_timeline_name = fence_default_get_timeline_name,
@@ -32,6 +39,7 @@ static const struct fence_ops sw_sync_fence_ops = {
 	.signaled = fence_default_signaled,
 	.wait = fence_default_wait,
 	.release = fence_default_release,
+	.cleanup = sw_sync_cleanup,
 	.fill_driver_data = fence_default_fill_driver_data,
 	.fence_value_str = fence_default_value_str,
 	.timeline_value_str = fence_default_timeline_value_str,
