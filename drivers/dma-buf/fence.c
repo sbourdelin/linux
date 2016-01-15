@@ -456,6 +456,20 @@ const char *fence_default_get_driver_name(struct fence *fence)
 EXPORT_SYMBOL(fence_default_get_driver_name);
 
 /**
+ * fence_default_get_timeline_name - default get_timeline_name op
+ * @fence:	[in]	the fence to retrieve timeline name
+ *
+ * This function returns the name of the timeline which the fence belongs to.
+ */
+const char *fence_default_get_timeline_name(struct fence *fence)
+{
+	struct fence_timeline *parent = fence_parent(fence);
+
+	return parent->name;
+}
+EXPORT_SYMBOL(fence_default_get_timeline_name);
+
+/**
  * fence_default_enable_signaling - default op for .enable_signaling
  * @fence:	[in]	the fence to enable signaling
  *

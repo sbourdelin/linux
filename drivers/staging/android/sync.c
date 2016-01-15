@@ -321,13 +321,6 @@ int sync_fence_wait(struct sync_fence *sync_fence, long timeout)
 }
 EXPORT_SYMBOL(sync_fence_wait);
 
-static const char *sync_fence_get_timeline_name(struct fence *fence)
-{
-	struct fence_timeline *parent = fence_parent(fence);
-
-	return parent->name;
-}
-
 static bool sync_fence_signaled(struct fence *fence)
 {
 	struct fence_timeline *parent = fence_parent(fence);
@@ -377,7 +370,7 @@ static void sync_fence_timeline_value_str(struct fence *fence,
 
 static const struct fence_ops sync_fence_ops = {
 	.get_driver_name = fence_default_get_driver_name,
-	.get_timeline_name = sync_fence_get_timeline_name,
+	.get_timeline_name = fence_default_get_timeline_name,
 	.enable_signaling = fence_default_enable_signaling,
 	.signaled = sync_fence_signaled,
 	.wait = fence_default_wait,
