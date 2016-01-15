@@ -1760,7 +1760,7 @@ static void megasas_set_dma_alignment(struct scsi_device *sdev)
 
 static int megasas_slave_configure(struct scsi_device *sdev)
 {
-	u16 pd_index = 0;
+	u16 pd_index = 0, ld_index;
 	struct megasas_instance *instance;
 
 	instance = megasas_lookup_instance(sdev->host->host_no);
@@ -1771,6 +1771,11 @@ static int megasas_slave_configure(struct scsi_device *sdev)
 				sdev->id;
 			if (instance->pd_list[pd_index].driveState !=
 				MR_PD_STATE_SYSTEM)
+				return -ENXIO;
+		} else {
+			ld_index = ((sdev->channel - MEGASAS_MAX_PD_CHANNELS) *
+				    MEGASAS_MAX_DEV_PER_CHANNEL) + sdev->id;
+			if (instance->ld_ids[ld_index] == 0xff)
 				return -ENXIO;
 		}
 	}
