@@ -22,6 +22,8 @@
  */
 #define SNOR_MFR_ATMEL		CFI_MFR_ATMEL
 #define SNOR_MFR_INTEL		CFI_MFR_INTEL
+/* Micron Manufacturer ID assigned by JEDEC */
+#define SNOR_MFR_MICRON_JEDEC	CFI_MFR_MICRON
 #define SNOR_MFR_MICRON		CFI_MFR_ST /* ST Micro <--> Micron */
 #define SNOR_MFR_MACRONIX	CFI_MFR_MACRONIX
 #define SNOR_MFR_SPANSION	CFI_MFR_AMD
