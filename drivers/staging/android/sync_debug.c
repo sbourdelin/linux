@@ -163,7 +163,7 @@ static void sync_print_sync_fence(struct seq_file *s,
 		   sync_status_str(atomic_read(&sync_fence->status)));
 
 	for (i = 0; i < sync_fence->num_fences; ++i) {
-		sync_print_pt(s, sync_fence->cbs[i].sync_pt, true);
+		sync_print_pt(s, sync_fence->cbs[i].fence, true);
 	}
 
 	spin_lock_irqsave(&sync_fence->wq.lock, flags);
