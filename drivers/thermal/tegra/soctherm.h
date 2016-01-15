@@ -108,5 +108,9 @@ int tegra_soctherm_calculate_tsensor_calibration(
 extern struct tegra_soctherm_soc tegra124_soctherm;
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_210_SOC
+extern struct tegra_soctherm_soc tegra210_soctherm;
+#endif
+
 #endif
 
