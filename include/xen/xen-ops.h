@@ -112,6 +112,7 @@ efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
 efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
 					unsigned long count, u64 *max_size,
 					int *reset_type);
+void xen_efi_runtime_setup(void);
 
 #ifdef CONFIG_PREEMPT
 

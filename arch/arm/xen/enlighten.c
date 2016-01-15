@@ -432,6 +432,11 @@ static int __init xen_guest_init(void)
 	if (xen_initial_domain())
 		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
 
+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+		if (efi_enabled(EFI_PARAVIRT))
+			xen_efi_runtime_setup();
+	}
+
 	return 0;
 }
 early_initcall(xen_guest_init);
