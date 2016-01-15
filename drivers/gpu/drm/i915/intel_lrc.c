@@ -390,14 +390,7 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 {
 	struct intel_engine_cs *ring = rq->ring;
 	struct i915_hw_ppgtt *ppgtt = rq->ctx->ppgtt;
-	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
-	struct page *page;
-	uint32_t *reg_state;
-
-	BUG_ON(!ctx_obj);
-
-	page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
-	reg_state = kmap_atomic(page);
+	uint32_t *reg_state = rq->ctx->engine[ring->id].lrc_reg_state;
 
 	reg_state[CTX_RING_TAIL+1] = rq->tail;
 	reg_state[CTX_RING_BUFFER_START+1] = rq->ringbuf->vma->node.start;
@@ -413,8 +406,6 @@ static int execlists_update_context(struct drm_i915_gem_request *rq)
 		ASSIGN_CTX_PDP(ppgtt, reg_state, 1);
 		ASSIGN_CTX_PDP(ppgtt, reg_state, 0);
 	}
-
-	kunmap_atomic(reg_state);
 
 	return 0;
 }
@@ -1041,6 +1032,8 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *ctx_obj = ctx->engine[ring->id].state;
 	struct intel_ringbuffer *ringbuf = ctx->engine[ring->id].ringbuf;
+	struct page *lrc_state_page;
+	uint32_t *lrc_reg_state;
 	int ret;
 
 	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
@@ -1050,12 +1043,25 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 	if (ret)
 		return ret;
 
+	lrc_state_page = i915_gem_object_get_dirty_page(ctx_obj, LRC_STATE_PN);
+	if (WARN_ON(!lrc_state_page)) {
+		ret = -ENODEV;
+		goto unpin_ctx_obj;
+	}
+
+	lrc_reg_state = kmap(lrc_state_page);
+	if (!lrc_reg_state) {
+		ret = -ENOMEM;
+		goto unpin_ctx_obj;
+	}
+
 	ret = intel_pin_and_map_ringbuffer_obj(ring->dev, ringbuf);
 	if (ret)
-		goto unpin_ctx_obj;
+		goto unmap_state_page;
 
 	ctx->engine[ring->id].lrc_vma = i915_gem_obj_to_ggtt(ctx_obj);
 	intel_lr_context_descriptor_update(ctx, ring);
+	ctx->engine[ring->id].lrc_reg_state = lrc_reg_state;
 	ctx_obj->dirty = true;
 
 	/* Invalidate GuC TLB. */
@@ -1064,6 +1070,8 @@ static int intel_lr_context_do_pin(struct intel_engine_cs *ring,
 
 	return ret;
 
+unmap_state_page:
+	kunmap(lrc_state_page);
 unpin_ctx_obj:
 	i915_gem_object_ggtt_unpin(ctx_obj);
 
@@ -1092,15 +1100,22 @@ void intel_lr_context_unpin(struct drm_i915_gem_request *rq)
 	struct intel_engine_cs *ring = rq->ring;
 	struct drm_i915_gem_object *ctx_obj = rq->ctx->engine[ring->id].state;
 	struct intel_ringbuffer *ringbuf = rq->ringbuf;
+	struct page *lrc_state_page;
 
-	if (ctx_obj) {
-		WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
-		if (--rq->ctx->engine[ring->id].pin_count == 0) {
-			intel_unpin_ringbuffer_obj(ringbuf);
-			i915_gem_object_ggtt_unpin(ctx_obj);
-			rq->ctx->engine[ring->id].lrc_vma = NULL;
-			rq->ctx->engine[ring->id].lrc_desc = 0;
-		}
+	WARN_ON(!mutex_is_locked(&ring->dev->struct_mutex));
+
+	if (!ctx_obj)
+		return;
+
+	if (--rq->ctx->engine[ring->id].pin_count == 0) {
+		lrc_state_page = i915_gem_object_get_dirty_page(ctx_obj,
+								LRC_STATE_PN);
+		kunmap(lrc_state_page);
+		intel_unpin_ringbuffer_obj(ringbuf);
+		i915_gem_object_ggtt_unpin(ctx_obj);
+		rq->ctx->engine[ring->id].lrc_vma = NULL;
+		rq->ctx->engine[ring->id].lrc_desc = 0;
+		rq->ctx->engine[ring->id].lrc_reg_state = NULL;
 	}
 }
 
