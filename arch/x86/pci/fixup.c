@@ -540,3 +540,15 @@ static void twinhead_reserve_killing_zone(struct pci_dev *dev)
         }
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x27B9, twinhead_reserve_killing_zone);
+
+/*
+ * Intel Broadwell EP. Prevent reading/updating BAR on Home Agent and PCU devices
+ * which are not real BARs, but still return non-null.
+ * This prevents a harmless warning message at boot.
+ */
+static void pci_bdwep_ha_bar(struct pci_dev *dev)
+{
+	dev->resource[0].flags |= IORESOURCE_PCI_FIXED;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x6fa0, pci_bdwep_ha_bar);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x6fc0, pci_bdwep_ha_bar);

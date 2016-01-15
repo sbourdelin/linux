@@ -214,7 +214,7 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		l = 0;
 
 	if (type == pci_bar_unknown) {
-		res->flags = decode_bar(dev, l);
+		res->flags |= decode_bar(dev, l);
 		res->flags |= IORESOURCE_SIZEALIGN;
 		if (res->flags & IORESOURCE_IO) {
 			l64 = l & PCI_BASE_ADDRESS_IO_MASK;
@@ -251,8 +251,10 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 
 	sz64 = pci_size(l64, sz64, mask64);
 	if (!sz64) {
-		dev_info(&dev->dev, FW_BUG "reg 0x%x: invalid BAR (can't size)\n",
-			 pos);
+		/* Don't print this message for a fixed BAR */
+		if (!(res->flags & IORESOURCE_PCI_FIXED))
+			dev_info(&dev->dev, FW_BUG "reg 0x%x: invalid BAR (can't size)\n",
+				 pos);
 		goto fail;
 	}
 
