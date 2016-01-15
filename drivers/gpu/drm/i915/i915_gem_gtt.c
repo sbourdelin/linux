@@ -1443,7 +1443,7 @@ static void gen8_dump_pdp(struct i915_page_directory_pointer *pdp,
 static void gen8_dump_ppgtt(struct i915_hw_ppgtt *ppgtt, struct seq_file *m)
 {
 	struct i915_address_space *vm = &ppgtt->base;
-	uint64_t start = ppgtt->base.start;
+	uint64_t start = 0;
 	uint64_t length = ppgtt->base.total;
 	gen8_pte_t scratch_pte = gen8_pte_encode(px_dma(vm->scratch_page),
 						 I915_CACHE_LLC, true);
@@ -1507,7 +1507,6 @@ static int gen8_ppgtt_init(struct i915_hw_ppgtt *ppgtt)
 	if (ret)
 		return ret;
 
-	ppgtt->base.start = 0;
 	ppgtt->base.cleanup = gen8_ppgtt_cleanup;
 	ppgtt->base.allocate_va_range = gen8_alloc_va_range;
 	ppgtt->base.insert_entries = gen8_ppgtt_insert_entries;
@@ -1560,7 +1559,7 @@ static void gen6_dump_ppgtt(struct i915_hw_ppgtt *ppgtt, struct seq_file *m)
 	gen6_pte_t scratch_pte;
 	uint32_t pd_entry;
 	uint32_t  pte, pde, temp;
-	uint32_t start = ppgtt->base.start, length = ppgtt->base.total;
+	uint32_t start = 0, length = ppgtt->base.total;
 
 	scratch_pte = vm->pte_encode(px_dma(vm->scratch_page),
 				     I915_CACHE_LLC, true, 0);
@@ -2086,7 +2085,6 @@ static int gen6_ppgtt_init(struct i915_hw_ppgtt *ppgtt)
 	ppgtt->base.unbind_vma = ppgtt_unbind_vma;
 	ppgtt->base.bind_vma = ppgtt_bind_vma;
 	ppgtt->base.cleanup = gen6_ppgtt_cleanup;
-	ppgtt->base.start = 0;
 	ppgtt->base.total = I915_PDES * GEN6_PTES * PAGE_SIZE;
 	ppgtt->debug_dump = gen6_dump_ppgtt;
 
@@ -2123,7 +2121,7 @@ static int __hw_ppgtt_init(struct drm_device *dev, struct i915_hw_ppgtt *ppgtt)
 static void i915_address_space_init(struct i915_address_space *vm,
 				    struct drm_i915_private *dev_priv)
 {
-	drm_mm_init(&vm->mm, vm->start, vm->total);
+	drm_mm_init(&vm->mm, 0, vm->total);
 	vm->dev = dev_priv->dev;
 	INIT_LIST_HEAD(&vm->active_list);
 	INIT_LIST_HEAD(&vm->inactive_list);
@@ -2312,8 +2310,7 @@ void i915_gem_suspend_gtt_mappings(struct drm_device *dev)
 	i915_check_and_clear_faults(dev);
 
 	dev_priv->gtt.base.clear_range(&dev_priv->gtt.base,
-				       dev_priv->gtt.base.start,
-				       dev_priv->gtt.base.total,
+				       0, dev_priv->gtt.base.total,
 				       true);
 
 	i915_ggtt_flush(dev_priv);
@@ -2681,7 +2678,6 @@ static void i915_gtt_color_adjust(struct drm_mm_node *node,
 }
 
 static int i915_gem_setup_global_gtt(struct drm_device *dev,
-				     u64 start,
 				     u64 mappable_end,
 				     u64 end)
 {
@@ -2703,11 +2699,9 @@ static int i915_gem_setup_global_gtt(struct drm_device *dev,
 
 	BUG_ON(mappable_end > end);
 
-	ggtt_vm->start = start;
-
 	/* Subtract the guard page before address space initialization to
 	 * shrink the range used by drm_mm */
-	ggtt_vm->total = end - start - PAGE_SIZE;
+	ggtt_vm->total = end - PAGE_SIZE;
 	i915_address_space_init(ggtt_vm, dev_priv);
 	ggtt_vm->total += PAGE_SIZE;
 
@@ -2773,8 +2767,7 @@ static int i915_gem_setup_global_gtt(struct drm_device *dev,
 		}
 
 		ppgtt->base.clear_range(&ppgtt->base,
-					ppgtt->base.start,
-					ppgtt->base.total,
+					0, ppgtt->base.total,
 					true);
 
 		dev_priv->mm.aliasing_ppgtt = ppgtt;
@@ -2793,7 +2786,7 @@ void i915_gem_init_global_gtt(struct drm_device *dev)
 	gtt_size = dev_priv->gtt.base.total;
 	mappable_size = dev_priv->gtt.mappable_end;
 
-	i915_gem_setup_global_gtt(dev, 0, mappable_size, gtt_size);
+	i915_gem_setup_global_gtt(dev, mappable_size, gtt_size);
 }
 
 void i915_global_gtt_cleanup(struct drm_device *dev)
@@ -3212,8 +3205,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 
 	/* First fill our portion of the GTT with scratch pages */
 	dev_priv->gtt.base.clear_range(&dev_priv->gtt.base,
-				       dev_priv->gtt.base.start,
-				       dev_priv->gtt.base.total,
+				       0, dev_priv->gtt.base.total,
 				       true);
 
 	/* Cache flush objects bound into GGTT and rebind them. */

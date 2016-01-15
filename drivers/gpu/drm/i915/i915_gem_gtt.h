@@ -273,7 +273,6 @@ struct i915_address_space {
 	struct drm_mm mm;
 	struct drm_device *dev;
 	struct list_head global_link;
-	u64 start;		/* Start offset always 0 for dri2 */
 	u64 total;		/* size addr space maps (ex. 2GB for ggtt) */
 
 	struct i915_page_scratch *scratch_page;

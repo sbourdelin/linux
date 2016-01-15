@@ -495,7 +495,7 @@ static int i915_gem_object_info(struct seq_file *m, void* data)
 
 	seq_printf(m, "%llu [%llu] gtt total\n",
 		   dev_priv->gtt.base.total,
-		   (u64)dev_priv->gtt.mappable_end - dev_priv->gtt.base.start);
+		   dev_priv->gtt.mappable_end);
 
 	seq_putc(m, '\n');
 	print_batch_pool_stats(m, dev_priv);
