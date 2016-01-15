@@ -46,6 +46,7 @@ ACPI_MODULE_NAME("bus");
 struct acpi_device *acpi_root;
 struct proc_dir_entry *acpi_root_dir;
 EXPORT_SYMBOL(acpi_root_dir);
+static u64 spcr_uart_addr;
 
 #ifdef CONFIG_X86
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
@@ -92,6 +93,17 @@ acpi_status acpi_bus_get_status_handle(acpi_handle handle,
 				       unsigned long long *sta)
 {
 	acpi_status status;
+
+	if (spcr_uart_addr != 0xffffffffffffffff) {
+		u64 addr;
+
+		status = acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL,
+					       &addr);
+		if (ACPI_SUCCESS(status) && (addr == spcr_uart_addr)) {
+			*sta = 0;
+			return AE_OK;
+		}
+	}
 
 	status = acpi_evaluate_integer(handle, "_STA", NULL, sta);
 	if (ACPI_SUCCESS(status))
@@ -1069,6 +1081,8 @@ EXPORT_SYMBOL_GPL(acpi_kobj);
 static int __init acpi_init(void)
 {
 	int result;
+	acpi_status status;
+	struct acpi_table_stao *stao_ptr;
 
 	if (acpi_disabled) {
 		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
@@ -1079,6 +1093,22 @@ static int __init acpi_init(void)
 	if (!acpi_kobj) {
 		printk(KERN_WARNING "%s: kset create error\n", __func__);
 		acpi_kobj = NULL;
+	}
+
+	/* If there is STAO table, check whether it needs to ignore the UART
+	 * device in SPCR table.
+	 */
+	spcr_uart_addr = 0xffffffffffffffff;
+	status = acpi_get_table(ACPI_SIG_STAO, 0,
+				(struct acpi_table_header **)&stao_ptr);
+	if (ACPI_SUCCESS(status)) {
+		if (stao_ptr->ignore_uart) {
+			struct acpi_table_spcr *spcr_ptr;
+
+			acpi_get_table(ACPI_SIG_SPCR, 0,
+				       (struct acpi_table_header **)&spcr_ptr);
+			spcr_uart_addr = spcr_ptr->serial_port.address;
+		}
 	}
 
 	init_acpi_device_notify();
