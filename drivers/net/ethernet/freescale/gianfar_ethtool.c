@@ -772,8 +772,7 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 	unsigned int cmp_rqfpr;
 	unsigned int *local_rqfpr;
 	unsigned int *local_rqfcr;
-	int i, k, l;
-	int j = MAX_FILER_IDX;
+	int i, j, k, l;
 	int ret = 1;
 
 	local_rqfpr = kmalloc_array(MAX_FILER_IDX + 1, sizeof(unsigned int),
@@ -807,7 +806,7 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow,
 		goto free_fcr;
 	}
 
-	for (i = 0; i < MAX_FILER_IDX + 1; i++) {
+	for (i = 0, j = MAX_FILER_IDX; i < MAX_FILER_IDX + 1; i++) {
 		local_rqfpr[j] = priv->ftp_rqfpr[i];
 		local_rqfcr[j] = priv->ftp_rqfcr[i];
 		j--;
