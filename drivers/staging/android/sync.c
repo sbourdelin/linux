@@ -34,7 +34,7 @@
 static const struct fence_ops sync_fence_ops;
 static const struct file_operations sync_fence_fops;
 
-struct fence *sync_pt_create(struct fence_timeline *obj, int size)
+struct fence *sync_pt_create(struct fence_timeline *obj, int size, u32 value)
 {
 	unsigned long flags;
 	struct fence *fence;
@@ -49,7 +49,7 @@ struct fence *sync_pt_create(struct fence_timeline *obj, int size)
 	spin_lock_irqsave(&obj->lock, flags);
 	fence_timeline_get(obj);
 	fence_init(fence, &sync_fence_ops, &obj->lock,
-		   obj->context, ++obj->value);
+		   obj->context, value);
 	list_add_tail(&fence->child_list, &obj->child_list_head);
 	INIT_LIST_HEAD(&fence->active_list);
 	spin_unlock_irqrestore(&obj->lock, flags);
@@ -321,17 +321,6 @@ int sync_fence_wait(struct sync_fence *sync_fence, long timeout)
 }
 EXPORT_SYMBOL(sync_fence_wait);
 
-static bool sync_fence_signaled(struct fence *fence)
-{
-	struct fence_timeline *parent = fence_parent(fence);
-	int ret;
-
-	ret = parent->ops->has_signaled(fence);
-	if (ret < 0)
-		fence->status = ret;
-	return ret;
-}
-
 static int sync_fence_fill_driver_data(struct fence *fence,
 					  void *data, int size)
 {
@@ -372,7 +361,7 @@ static const struct fence_ops sync_fence_ops = {
 	.get_driver_name = fence_default_get_driver_name,
 	.get_timeline_name = fence_default_get_timeline_name,
 	.enable_signaling = fence_default_enable_signaling,
-	.signaled = sync_fence_signaled,
+	.signaled = fence_default_signaled,
 	.wait = fence_default_wait,
 	.release = fence_default_release,
 	.fill_driver_data = sync_fence_fill_driver_data,

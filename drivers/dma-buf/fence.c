@@ -149,7 +149,7 @@ void fence_timeline_destroy(struct fence_timeline *timeline)
 	/*
 	 * signal any children that their parent is going away.
 	 */
-	fence_timeline_signal(timeline);
+	fence_timeline_signal(timeline, 0);
 	fence_timeline_put(timeline);
 }
 EXPORT_SYMBOL(fence_timeline_destroy);
@@ -157,17 +157,20 @@ EXPORT_SYMBOL(fence_timeline_destroy);
 /**
  * fence_timeline_signal - signal fences on a fence_timeline
  * @timeline	[in]	the fence_timeline to signal fences
+ * @inc		[in[	num to increment on timeline->value
  *
  * This function signal fences on a given timeline and remove
  * those from the active_list.
  */
-void fence_timeline_signal(struct fence_timeline *timeline)
+void fence_timeline_signal(struct fence_timeline *timeline, unsigned int inc)
 {
 	unsigned long flags;
 	LIST_HEAD(signaled_pts);
 	struct fence *fence, *next;
 
 	spin_lock_irqsave(&timeline->lock, flags);
+
+	timeline->value += inc;
 
 	list_for_each_entry_safe(fence, next, &timeline->active_list_head,
 				 active_list) {
@@ -468,6 +471,20 @@ const char *fence_default_get_timeline_name(struct fence *fence)
 	return parent->name;
 }
 EXPORT_SYMBOL(fence_default_get_timeline_name);
+
+/**
+ * fence_default_signaled - default .signaled fence ops
+ * @fence:	[in]	the fence to check if signaled or not
+ *
+ * This functions checks if a fence was signaled or not.
+ */
+bool fence_default_signaled(struct fence *fence)
+{
+	struct fence_timeline *timeline = fence_parent(fence);
+
+	return (fence->seqno > timeline->value) ? false : true;
+}
+EXPORT_SYMBOL(fence_default_signaled);
 
 /**
  * fence_default_enable_signaling - default op for .enable_signaling

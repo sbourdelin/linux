@@ -36,10 +36,6 @@ struct fence_ops;
 struct fence_cb;
 /**
  * struct fence_timeline_ops - fence context implementation ops
- * @has_signaled:	returns:
- *			  1 if pt has signaled
- *			  0 if pt has not signaled
- *			 <0 on error
  * @fill_driver_data:	write implementation specific driver data to data.
  *			  should return an error if there is not enough room
  *			  as specified by size.  This information is returned
@@ -48,9 +44,6 @@ struct fence_cb;
  * @pt_value_str:	fill str with the value of the sync_pt
  */
 struct fence_timeline_ops {
-	/* required */
-	int (*has_signaled)(struct fence *fence);
-
 	/* optional */
 	int (*fill_driver_data)(struct fence *fence, void *data, int size);
 
@@ -80,7 +73,7 @@ struct fence_timeline {
 	char			drv_name[32];
 	const struct fence_timeline_ops *ops;
 	bool			destroyed;
-	int			value;
+	unsigned int		value;
 	int			context;
 	struct list_head	child_list_head;
 	struct list_head	active_list_head;
@@ -97,7 +90,7 @@ struct fence_timeline *fence_timeline_create(unsigned num,
 void fence_timeline_get(struct fence_timeline *timeline);
 void fence_timeline_put(struct fence_timeline *timeline);
 void fence_timeline_destroy(struct fence_timeline *timeline);
-void fence_timeline_signal(struct fence_timeline *timeline);
+void fence_timeline_signal(struct fence_timeline *timeline, unsigned int inc);
 
 /**
  * struct fence - software synchronization primitive
@@ -296,6 +289,7 @@ int fence_signal(struct fence *fence);
 int fence_signal_locked(struct fence *fence);
 const char *fence_default_get_driver_name(struct fence *fence);
 const char *fence_default_get_timeline_name(struct fence *fence);
+bool fence_default_signaled(struct fence *fence);
 bool fence_default_enable_signaling(struct fence *fence);
 signed long fence_default_wait(struct fence *fence, bool intr, signed long timeout);
 void fence_default_release(struct fence *fence);
