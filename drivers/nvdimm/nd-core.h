@@ -43,6 +43,19 @@ struct nvdimm {
 	int id;
 };
 
+enum {
+	ND_ARS_START_SUCCESS = 0,
+	ND_ARS_START_UNSUPP = 1,
+	ND_ARS_START_INVALID_PARAM = 2,
+	ND_ARS_START_IN_PROGRESS = 3,
+};
+
+enum {
+	ND_ARS_STATUS_EXT_SUCCESS = 0,
+	ND_ARS_STATUS_EXT_IN_PROGRESS = 1,
+	ND_ARS_STATUS_EXT_NOT_DONE = 2,
+};
+
 bool is_nvdimm(struct device *dev);
 bool is_nd_pmem(struct device *dev);
 bool is_nd_blk(struct device *dev);

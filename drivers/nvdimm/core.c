@@ -542,15 +542,14 @@ static int ars_do_start(struct nvdimm_bus_descriptor *nd_desc,
 		if (rc)
 			return rc;
 		switch (cmd->status) {
-		case 0:
+		case ND_ARS_START_SUCCESS:
 			return 0;
-		case 1:
+		case ND_ARS_START_UNSUPP:
 			/* ARS unsupported, but we should never get here */
 			return 0;
-		case 2:
+		case ND_ARS_START_INVALID_PARAM:
 			return -EINVAL;
-		case 3:
-			/* ARS is in progress */
+		case ND_ARS_START_IN_PROGRESS:
 			msleep(1000);
 			break;
 		default:
@@ -572,14 +571,12 @@ static int ars_get_status(struct nvdimm_bus_descriptor *nd_desc,
 
 		/* Check extended status (Upper two bytes) */
 		switch (cmd->status >> 16) {
-		case 0:
+		case ND_ARS_STATUS_EXT_SUCCESS:
 			return 0;
-		case 1:
-			/* ARS is in progress */
+		case ND_ARS_STATUS_EXT_IN_PROGRESS:
 			msleep(1000);
 			break;
-		case 2:
-			/* No ARS performed for the current boot */
+		case ND_ARS_STATUS_EXT_NOT_DONE:
 			return 0;
 		default:
 			return -ENXIO;
