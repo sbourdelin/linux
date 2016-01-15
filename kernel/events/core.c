@@ -3786,7 +3786,43 @@ EXPORT_SYMBOL_GPL(perf_event_release_kernel);
  */
 static int perf_release(struct inode *inode, struct file *file)
 {
-	put_event(file->private_data);
+	struct perf_event *event = file->private_data, *child, *tmp;
+	LIST_HEAD(child_list);
+
+	/*
+	 * event::child_mutex nests inside ctx::lock, so move children
+	 * to a safe place first and avoid inversion
+	 */
+	mutex_lock(&event->child_mutex);
+	list_splice_init(&event->child_list, &child_list);
+	mutex_unlock(&event->child_mutex);
+
+	list_for_each_entry_safe(child, tmp, &child_list, child_list) {
+		struct perf_event_context *ctx;
+
+		/*
+		 * This is somewhat similar to perf_free_event(),
+		 * except for these events are alive and need
+		 * proper perf_remove_from_context().
+		 */
+		ctx = perf_event_ctx_lock(child);
+		perf_remove_from_context(child, true);
+		perf_event_ctx_unlock(child, ctx);
+
+		list_del(&child->child_list);
+
+		/* Children will have exactly one reference */
+		free_event(child);
+
+		/*
+		 * This matches the refcount bump in inherit_event();
+		 * this can't be the last reference.
+		 */
+		put_event(event);
+	}
+
+	/* Must be the last reference */
+	put_event(event);
 	return 0;
 }
 
