@@ -192,6 +192,7 @@ static inline int set_4byte(struct spi_nor *nor, const struct flash_info *info,
 
 	switch (JEDEC_MFR(info)) {
 	case SNOR_MFR_MICRON:
+	case SNOR_MFR_MICRON_JEDEC:
 		/* Some Micron need WREN command; all will accept it */
 		need_wren = true;
 	case SNOR_MFR_MACRONIX:
@@ -768,6 +769,7 @@ static const struct flash_info spi_nor_ids[] = {
 	{ "n25q512a",    INFO(0x20bb20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
 	{ "n25q512ax3",  INFO(0x20ba20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
 	{ "n25q00",      INFO(0x20ba21, 0, 64 * 1024, 2048, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
+	{ "mt35x512",    INFO(0x2c5b1a, 0, 128 * 1024, 512, SECT_4K | USE_FSR) },
 
 	/* PMC */
 	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
