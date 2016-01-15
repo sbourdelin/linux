@@ -49,8 +49,6 @@
 
 #include <asm/irq_regs.h>
 
-static struct workqueue_struct *perf_wq;
-
 typedef int (*remote_function_f)(void *);
 
 struct remote_function_call {
@@ -1535,39 +1533,8 @@ out:
  */
 static bool is_orphaned_event(struct perf_event *event)
 {
-	return event && !is_kernel_event(event) && !event->owner;
+	return event && !event->owner;
 }
-
-/*
- * Event has a parent but parent's task finished and it's
- * alive only because of children holding refference.
- */
-static bool is_orphaned_child(struct perf_event *event)
-{
-	return is_orphaned_event(event->parent);
-}
-
-static void orphans_remove_work(struct work_struct *work);
-
-static void schedule_orphans_remove(struct perf_event_context *ctx)
-{
-	if (!ctx->task || ctx->orphans_remove_sched || !perf_wq)
-		return;
-
-	if (queue_delayed_work(perf_wq, &ctx->orphans_remove, 1)) {
-		get_ctx(ctx);
-		ctx->orphans_remove_sched = true;
-	}
-}
-
-static int __init perf_workqueue_init(void)
-{
-	perf_wq = create_singlethread_workqueue("perf");
-	WARN(!perf_wq, "failed to create perf workqueue\n");
-	return perf_wq ? 0 : -1;
-}
-
-core_initcall(perf_workqueue_init);
 
 static inline int pmu_filter_match(struct perf_event *event)
 {
@@ -1628,9 +1595,6 @@ event_sched_out(struct perf_event *event,
 		ctx->nr_freq--;
 	if (event->attr.exclusive || !cpuctx->active_oncpu)
 		cpuctx->exclusive = 0;
-
-	if (is_orphaned_child(event))
-		schedule_orphans_remove(ctx);
 
 	perf_pmu_enable(event->pmu);
 }
@@ -1917,9 +1881,6 @@ event_sched_in(struct perf_event *event,
 
 	if (event->attr.exclusive)
 		cpuctx->exclusive = 1;
-
-	if (is_orphaned_child(event))
-		schedule_orphans_remove(ctx);
 
 out:
 	perf_pmu_enable(event->pmu);
@@ -3334,7 +3295,6 @@ static void __perf_event_init_context(struct perf_event_context *ctx)
 	INIT_LIST_HEAD(&ctx->flexible_groups);
 	INIT_LIST_HEAD(&ctx->event_list);
 	atomic_set(&ctx->refcount, 1);
-	INIT_DELAYED_WORK(&ctx->orphans_remove, orphans_remove_work);
 }
 
 static struct perf_event_context *
@@ -3776,6 +3736,47 @@ static void put_event(struct perf_event *event)
 
 int perf_event_release_kernel(struct perf_event *event)
 {
+	struct perf_event *child, *tmp;
+	LIST_HEAD(child_list);
+
+	if (!is_kernel_event(event))
+		perf_remove_from_owner(event);
+
+	event->owner = NULL;
+
+	/*
+	 * event::child_mutex nests inside ctx::lock, so move children
+	 * to a safe place first and avoid inversion
+	 */
+	mutex_lock(&event->child_mutex);
+	list_splice_init(&event->child_list, &child_list);
+	mutex_unlock(&event->child_mutex);
+
+	list_for_each_entry_safe(child, tmp, &child_list, child_list) {
+		struct perf_event_context *ctx;
+
+		/*
+		 * This is somewhat similar to perf_free_event(),
+		 * except for these events are alive and need
+		 * proper perf_remove_from_context().
+		 */
+		ctx = perf_event_ctx_lock(child);
+		perf_remove_from_context(child, true);
+		perf_event_ctx_unlock(child, ctx);
+
+		list_del(&child->child_list);
+
+		/* Children will have exactly one reference */
+		free_event(child);
+
+		/*
+		 * This matches the refcount bump in inherit_event();
+		 * this can't be the last reference.
+		 */
+		put_event(event);
+	}
+
+	/* Must be the last reference */
 	put_event(event);
 	return 0;
 }
@@ -3786,44 +3787,8 @@ EXPORT_SYMBOL_GPL(perf_event_release_kernel);
  */
 static int perf_release(struct inode *inode, struct file *file)
 {
-	put_event(file->private_data);
+	perf_event_release_kernel(file->private_data);
 	return 0;
-}
-
-/*
- * Remove all orphanes events from the context.
- */
-static void orphans_remove_work(struct work_struct *work)
-{
-	struct perf_event_context *ctx;
-	struct perf_event *event, *tmp;
-
-	ctx = container_of(work, struct perf_event_context,
-			   orphans_remove.work);
-
-	mutex_lock(&ctx->mutex);
-	list_for_each_entry_safe(event, tmp, &ctx->event_list, event_entry) {
-		struct perf_event *parent_event = event->parent;
-
-		if (!is_orphaned_child(event))
-			continue;
-
-		perf_remove_from_context(event, true);
-
-		mutex_lock(&parent_event->child_mutex);
-		list_del_init(&event->child_list);
-		mutex_unlock(&parent_event->child_mutex);
-
-		free_event(event);
-		put_event(parent_event);
-	}
-
-	raw_spin_lock_irq(&ctx->lock);
-	ctx->orphans_remove_sched = false;
-	raw_spin_unlock_irq(&ctx->lock);
-	mutex_unlock(&ctx->mutex);
-
-	put_ctx(ctx);
 }
 
 u64 perf_event_read_value(struct perf_event *event, u64 *enabled, u64 *running)
