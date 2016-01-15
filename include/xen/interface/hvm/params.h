@@ -34,6 +34,11 @@
  *                  Domain = val[47:32], Bus  = val[31:16],
  *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
  * val[63:56] == 2: val[7:0] is a vector number.
+ * val[63:56] == 3: val[15:8] is flag of event-channel interrupt:
+ *                      bit 0: interrupt is edge(1) or level(0) triggered
+ *                      bit 1: interrupt is active low(1) or high(0)
+ *                  val[7:0] is PPI number used by event-channel.
+ *                  This is only used by ARM/ARM64.
  * If val == 0 then CPU0 event-channel notifications are not delivered.
  */
 #define HVM_PARAM_CALLBACK_IRQ 0
