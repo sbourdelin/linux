@@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
 		return rc;
 	}
 	for (i = 0; i < nr_grant_frames; i++)
-		pfns[i] = page_to_pfn(pages[i]);
+		pfns[i] = page_to_xen_pfn(pages[i]);
 
 	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
 	if (!vaddr) {
