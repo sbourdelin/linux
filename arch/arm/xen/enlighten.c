@@ -32,6 +32,7 @@
 #include <linux/timekeeping.h>
 #include <linux/timekeeper_internal.h>
 #include <linux/acpi.h>
+#include <linux/efi.h>
 
 #include <linux/mm.h>
 
@@ -264,6 +265,19 @@ static int __init fdt_find_xen_node(unsigned long node, const char *uname,
 	return 0;
 }
 
+static int __init fdt_find_uefi_node(unsigned long node, const char *uname,
+				     int depth, void *data)
+{
+	bool *found = data;
+
+	if (depth != 2 || strcmp(uname, "uefi") != 0)
+		return 0;
+
+	*found = true;
+
+	return 1;
+}
+
 /*
  * see Documentation/devicetree/bindings/arm/xen.txt for the
  * documentation of the Xen Device Tree format.
@@ -271,6 +285,8 @@ static int __init fdt_find_xen_node(unsigned long node, const char *uname,
 #define GRANT_TABLE_PHYSADDR 0
 void __init xen_early_init(void)
 {
+	bool uefi_found = false;
+
 	of_scan_flat_dt(fdt_find_xen_node, NULL);
 	if (!xen_node.found) {
 		pr_debug("No Xen support\n");
@@ -295,6 +311,13 @@ void __init xen_early_init(void)
 
 	if (!console_set_on_cmdline && !xen_initial_domain())
 		add_preferred_console("hvc", 0, NULL);
+
+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+		/* Check if Xen support UEFI */
+		of_scan_flat_dt(fdt_find_uefi_node, &uefi_found);
+		if (uefi_found)
+			set_bit(EFI_PARAVIRT, &efi.flags);
+	}
 }
 
 static int __init xen_guest_init(void)
