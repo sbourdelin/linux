@@ -534,7 +534,7 @@ static void sync_fence_free(struct kref *kref)
 	kfree(fence);
 }
 
-static int sync_fence_release(struct inode *inode, struct file *file)
+static int sync_fence_file_release(struct inode *inode, struct file *file)
 {
 	struct sync_fence *fence = file->private_data;
 
@@ -724,7 +724,7 @@ static long sync_fence_ioctl(struct file *file, unsigned int cmd,
 }
 
 static const struct file_operations sync_fence_fops = {
-	.release = sync_fence_release,
+	.release = sync_fence_file_release,
 	.poll = sync_fence_poll,
 	.unlocked_ioctl = sync_fence_ioctl,
 	.compat_ioctl = sync_fence_ioctl,
