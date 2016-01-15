@@ -68,6 +68,9 @@ int badblocks_check(struct badblocks *bb, sector_t s, int sectors,
 	sector_t target = s + sectors;
 	unsigned seq;
 
+	if (!bb)
+		return 0;
+
 	if (bb->shift > 0) {
 		/* round the start down, and the end up */
 		s >>= bb->shift;
@@ -156,7 +159,7 @@ int badblocks_set(struct badblocks *bb, sector_t s, int sectors,
 	int rv = 0;
 	unsigned long flags;
 
-	if (bb->shift < 0)
+	if (!bb || bb->shift < 0)
 		/* badblocks are disabled */
 		return 0;
 
@@ -321,6 +324,9 @@ int badblocks_clear(struct badblocks *bb, sector_t s, int sectors)
 	sector_t target = s + sectors;
 	int rv = 0;
 
+	if (!bb)
+		return 0;
+
 	if (bb->shift > 0) {
 		/* When clearing we round the start up and the end down.
 		 * This should not matter as the shift should align with
@@ -415,7 +421,7 @@ EXPORT_SYMBOL_GPL(badblocks_clear);
  */
 void ack_all_badblocks(struct badblocks *bb)
 {
-	if (bb->page == NULL || bb->changed)
+	if (!bb || bb->page == NULL || bb->changed)
 		/* no point even trying */
 		return;
 	write_seqlock_irq(&bb->lock);
@@ -451,11 +457,13 @@ ssize_t badblocks_show(struct badblocks *bb, char *page, int unack)
 {
 	size_t len;
 	int i;
-	u64 *p = bb->page;
+	u64 *p;
 	unsigned seq;
 
-	if (bb->shift < 0)
-		return 0;
+	if (!bb || bb->shift < 0)
+		return sprintf(page, "\n");
+
+	p = bb->page;
 
 retry:
 	seq = read_seqbegin(&bb->lock);
@@ -503,6 +511,9 @@ ssize_t badblocks_store(struct badblocks *bb, const char *page, size_t len,
 	unsigned long long sector;
 	int length;
 	char newline;
+
+	if (!bb)
+		return -ENXIO;
 
 	switch (sscanf(page, "%llu %d%c", &sector, &length, &newline)) {
 	case 3:
