@@ -358,6 +358,6 @@ void sync_dump(void);
 # define sync_dump()
 #endif
 int sync_fence_wake_up_wq(wait_queue_t *curr, unsigned mode,
-				 int wake_flags, void *key);
+			  int wake_flags, void *key);
 
 #endif /* _LINUX_SYNC_H */
