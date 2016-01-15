@@ -1382,7 +1382,7 @@ static void tda998x_connector_destroy(struct drm_connector *connector)
 	drm_connector_cleanup(connector);
 }
 
-static const struct drm_connector_funcs tda998x_connector_funcs = {
+static const struct drm_connector_funcs tda998x_connector_atomic_funcs = {
 	.dpms = drm_atomic_helper_connector_dpms,
 	.reset = drm_atomic_helper_connector_reset,
 	.fill_modes = drm_helper_probe_single_connector_modes,
@@ -1392,14 +1392,27 @@ static const struct drm_connector_funcs tda998x_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
+static const struct drm_connector_funcs tda998x_connector_funcs = {
+	.dpms = drm_helper_connector_dpms,
+	.fill_modes = drm_helper_probe_single_connector_modes,
+	.detect = tda998x_connector_detect,
+	.destroy = tda998x_connector_destroy,
+};
+
 static int tda998x_bind(struct device *dev, struct device *master, void *data)
 {
 	struct tda998x_encoder_params *params = dev->platform_data;
 	struct i2c_client *client = to_i2c_client(dev);
 	struct drm_device *drm = data;
 	struct tda998x_priv *priv;
+	const struct drm_connector_funcs *connector_funcs;
 	u32 crtcs = 0;
 	int ret;
+
+	if (drm_core_check_feature(drm, DRIVER_ATOMIC))
+		connector_funcs = &tda998x_connector_atomic_funcs;
+	else
+		connector_funcs = &tda998x_connector_funcs;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -1437,7 +1450,7 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
 	drm_connector_helper_add(&priv->connector,
 				 &tda998x_connector_helper_funcs);
 	ret = drm_connector_init(drm, &priv->connector,
-				 &tda998x_connector_funcs,
+				 connector_funcs,
 				 DRM_MODE_CONNECTOR_HDMIA);
 	if (ret)
 		goto err_connector;
