@@ -69,4 +69,13 @@
 #define	ARMV8_EXCLUDE_EL0	(1 << 30)
 #define	ARMV8_INCLUDE_EL2	(1 << 27)
 
+/*
+ * PMUSERENR: user enable reg
+ */
+#define ARMV8_USERENR_MASK	0xf		/* Mask for writable bits */
+#define ARMV8_USERENR_EN	(1 << 0) /* PMU regs can be accessed at EL0 */
+#define ARMV8_USERENR_SW	(1 << 1) /* PMSWINC can be written at EL0 */
+#define ARMV8_USERENR_CR	(1 << 2) /* Cycle counter can be read at EL0 */
+#define ARMV8_USERENR_ER	(1 << 3) /* Event counter can be read at EL0 */
+
 #endif /* __ASM_PMU_H */
