@@ -116,6 +116,7 @@ struct fence {
 	int status;
 	struct list_head child_list;
 	struct list_head active_list;
+	void *priv;
 };
 
 enum fence_flag_bits {
@@ -146,6 +147,7 @@ struct fence_cb {
  * @enable_signaling: enable software signaling of fence.
  * @signaled: [optional] peek whether the fence is signaled, can be null.
  * @wait: custom wait implementation, or fence_default_wait.
+ * @cleanup: [optional] called when the timeline is destroyed
  * @release: [optional] called on destruction of fence, can be null
  * @fill_driver_data: [optional] callback to fill in free-form debug info
  * Returns amount of bytes filled, or -errno.
@@ -205,6 +207,7 @@ struct fence_ops {
 	bool (*enable_signaling)(struct fence *fence);
 	bool (*signaled)(struct fence *fence);
 	signed long (*wait)(struct fence *fence, bool intr, signed long timeout);
+	void (*cleanup)(struct fence *fence, void *user_data);
 	void (*release)(struct fence *fence);
 
 	int (*fill_driver_data)(struct fence *fence, void *data, int size);
@@ -217,6 +220,7 @@ struct fence *fence_create_on_timeline(struct fence_timeline *obj,
 				       unsigned int value);
 void fence_init(struct fence *fence, const struct fence_ops *ops,
 		spinlock_t *lock, unsigned context, unsigned seqno);
+void fence_add_user_data(struct fence *fence, void *user_data);
 
 void fence_release(struct kref *kref);
 void fence_free(struct fence *fence);

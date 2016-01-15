@@ -140,12 +140,24 @@ EXPORT_SYMBOL(fence_timeline_put);
  */
 void fence_timeline_destroy(struct fence_timeline *timeline)
 {
+	unsigned long flags;
+	struct fence *fence, *next;
+
 	timeline->destroyed = true;
 	/*
 	 * Ensure timeline is marked as destroyed before
 	 * changing timeline's fences status.
 	 */
 	smp_wmb();
+
+	spin_lock_irqsave(&timeline->lock, flags);
+	list_for_each_entry_safe(fence, next, &timeline->active_list_head,
+				 active_list) {
+		if (fence->ops->cleanup)
+			fence->ops->cleanup(fence, fence->priv);
+		list_del_init(&fence->active_list);
+	}
+	spin_unlock_irqrestore(&timeline->lock, flags);
 
 	fence_timeline_put(timeline);
 }
@@ -839,3 +851,15 @@ fence_init(struct fence *fence, const struct fence_ops *ops,
 	trace_fence_init(fence);
 }
 EXPORT_SYMBOL(fence_init);
+
+/**
+ * fence_add_user_data - add private user data
+ * @fence:	[in]	the fence to use
+ * @user_data:	[in]	the private data to store
+ *
+ * This function adds a private user data point to struct fence.
+ */
+void fence_add_user_data(struct fence *fence, void *user_data)
+{
+	fence->priv = user_data;
+}
