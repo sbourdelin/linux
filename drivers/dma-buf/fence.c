@@ -544,6 +544,34 @@ out:
 }
 EXPORT_SYMBOL(fence_default_wait);
 
+/**
+ * fence_default_release - default .release op
+ * @fence:	[in]	the fence to release
+ *
+ * This function removes the fence from the child_list * and active_list
+ * (if it was active) and drops its timeline ref. Finally it frees the
+ * fence.
+ */
+void fence_default_release(struct fence *fence)
+{
+	struct fence_timeline *timeline = fence_parent(fence);
+	unsigned long flags;
+
+	if (!timeline)
+		return;
+
+	spin_lock_irqsave(fence->lock, flags);
+	list_del(&fence->child_list);
+	if (!list_empty(&fence->active_list))
+		list_del(&fence->active_list);
+
+	spin_unlock_irqrestore(fence->lock, flags);
+
+	fence_timeline_put(timeline);
+	fence_free(fence);
+}
+EXPORT_SYMBOL(fence_default_release);
+
 static bool
 fence_test_signaled_any(struct fence **fences, uint32_t count)
 {

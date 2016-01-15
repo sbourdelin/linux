@@ -297,6 +297,7 @@ int fence_signal(struct fence *fence);
 int fence_signal_locked(struct fence *fence);
 bool fence_default_enable_signaling(struct fence *fence);
 signed long fence_default_wait(struct fence *fence, bool intr, signed long timeout);
+void fence_default_release(struct fence *fence);
 int fence_add_callback(struct fence *fence, struct fence_cb *cb,
 		       fence_func_t func);
 bool fence_remove_callback(struct fence *fence, struct fence_cb *cb);

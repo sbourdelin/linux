@@ -335,22 +335,6 @@ static const char *sync_fence_get_timeline_name(struct fence *fence)
 	return parent->name;
 }
 
-static void sync_fence_release(struct fence *fence)
-{
-	struct fence_timeline *parent = fence_parent(fence);
-	unsigned long flags;
-
-	spin_lock_irqsave(fence->lock, flags);
-	list_del(&fence->child_list);
-	if (!list_empty(&fence->active_list))
-		list_del(&fence->active_list);
-
-	spin_unlock_irqrestore(fence->lock, flags);
-
-	fence_timeline_put(parent);
-	fence_free(fence);
-}
-
 static bool sync_fence_signaled(struct fence *fence)
 {
 	struct fence_timeline *parent = fence_parent(fence);
@@ -404,7 +388,7 @@ static const struct fence_ops sync_fence_ops = {
 	.enable_signaling = fence_default_enable_signaling,
 	.signaled = sync_fence_signaled,
 	.wait = fence_default_wait,
-	.release = sync_fence_release,
+	.release = fence_default_release,
 	.fill_driver_data = sync_fence_fill_driver_data,
 	.fence_value_str = sync_fence_value_str,
 	.timeline_value_str = sync_fence_timeline_value_str,
