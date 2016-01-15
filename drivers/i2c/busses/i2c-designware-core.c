@@ -861,6 +861,7 @@ int i2c_dw_probe(struct dw_i2c_dev *dev)
 
 	init_completion(&dev->cmd_complete);
 	mutex_init(&dev->lock);
+	device_enable_async_suspend(dev->dev);
 
 	r = i2c_dw_init(dev);
 	if (r)
