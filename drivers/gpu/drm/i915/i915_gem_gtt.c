@@ -3179,6 +3179,13 @@ int i915_gem_gtt_init(struct drm_device *dev)
 	if (ret)
 		return ret;
 
+	if ((gtt->base.total - 1) >> 32) {
+		DRM_ERROR("We never expected a Global GTT with more than 32bits of address space! Found %lldM!\n",
+			  gtt->base.total >> 20);
+		gtt->base.total = 1ull << 32;
+		gtt->mappable_end = min(gtt->mappable_end, gtt->base.total);
+	}
+
 	/* GMADR is the PCI mmio aperture into the global GTT. */
 	DRM_INFO("Memory usable by graphics device = %lluM\n",
 		 gtt->base.total >> 20);
