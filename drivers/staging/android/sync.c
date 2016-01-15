@@ -31,15 +31,7 @@
 #define CREATE_TRACE_POINTS
 #include "trace/sync.h"
 
-static const struct fence_ops sync_fence_ops;
 static const struct file_operations sync_fence_fops;
-
-struct fence *sync_pt_create(struct fence_timeline *obj, int size, u32 value)
-{
-	return fence_create_on_timeline(obj, &sync_fence_ops,
-					sizeof(struct fence), value);
-}
-EXPORT_SYMBOL(sync_pt_create);
 
 static struct sync_fence *sync_fence_alloc(int size, const char *name)
 {
@@ -304,18 +296,6 @@ int sync_fence_wait(struct sync_fence *sync_fence, long timeout)
 	return ret;
 }
 EXPORT_SYMBOL(sync_fence_wait);
-
-static const struct fence_ops sync_fence_ops = {
-	.get_driver_name = fence_default_get_driver_name,
-	.get_timeline_name = fence_default_get_timeline_name,
-	.enable_signaling = fence_default_enable_signaling,
-	.signaled = fence_default_signaled,
-	.wait = fence_default_wait,
-	.release = fence_default_release,
-	.fill_driver_data = fence_default_fill_driver_data,
-	.fence_value_str = fence_default_value_str,
-	.timeline_value_str = fence_default_timeline_value_str,
-};
 
 static void sync_fence_free(struct kref *kref)
 {

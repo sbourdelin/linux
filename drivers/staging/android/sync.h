@@ -78,13 +78,6 @@ static inline void sync_fence_waiter_init(struct sync_fence_waiter *waiter,
 	waiter->callback = callback;
 }
 
-/*
- * API for fence_timeline implementers
- */
-
-struct fence *sync_pt_create(struct fence_timeline *parent, int size,
-			     u32 value);
-
 /**
  * sync_fence_create() - creates a sync fence
  * @name:	name of fence to create

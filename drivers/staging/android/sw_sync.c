@@ -25,16 +25,22 @@
 
 #include "sw_sync.h"
 
+static const struct fence_ops sw_sync_fence_ops = {
+	.get_driver_name = fence_default_get_driver_name,
+	.get_timeline_name = fence_default_get_timeline_name,
+	.enable_signaling = fence_default_enable_signaling,
+	.signaled = fence_default_signaled,
+	.wait = fence_default_wait,
+	.release = fence_default_release,
+	.fill_driver_data = fence_default_fill_driver_data,
+	.fence_value_str = fence_default_value_str,
+	.timeline_value_str = fence_default_timeline_value_str,
+};
+
 struct fence *sw_sync_pt_create(struct sw_sync_timeline *obj, u32 value)
 {
-	struct sw_sync_pt *pt;
-
-	pt = (struct sw_sync_pt *)
-		sync_pt_create(&obj->obj, sizeof(struct sw_sync_pt), value);
-
-	pt->value = value;
-
-	return (struct fence *)pt;
+	return fence_create_on_timeline(&obj->obj, &sw_sync_fence_ops,
+					 sizeof(struct fence), value);
 }
 EXPORT_SYMBOL(sw_sync_pt_create);
 
