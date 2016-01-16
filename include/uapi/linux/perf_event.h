@@ -38,7 +38,7 @@ enum perf_type_id {
 
 /*
  * Generalized performance event event_id types, used by the
- * attr.event_id parameter of the sys_perf_event_open()
+ * attr.config parameter of the sys_perf_event_open()
  * syscall:
  */
 enum perf_hw_id {
