@@ -981,6 +981,8 @@ static int snd_at73c213_probe(struct spi_device *spi)
 		goto out_card;
 	}
 
+	clk_enable(chip->ssc->clk);
+
 	retval = snd_at73c213_dev_init(card, spi);
 	if (retval)
 		goto out_ssc;
@@ -998,6 +1000,7 @@ static int snd_at73c213_probe(struct spi_device *spi)
 	goto out;
 
 out_ssc:
+	clk_disable(chip->ssc->clk);
 	ssc_free(chip->ssc);
 out_card:
 	snd_card_free(card);
@@ -1066,6 +1069,9 @@ out:
 	/* Stop DAC master clock. */
 	clk_disable(chip->board->dac_clk);
 
+	/* Stop SSC clock. */
+	clk_disable(chip->ssc->clk);
+
 	ssc_free(chip->ssc);
 	snd_card_free(card);
 
@@ -1080,6 +1086,7 @@ static int snd_at73c213_suspend(struct device *dev)
 	struct snd_at73c213 *chip = card->private_data;
 
 	ssc_writel(chip->ssc->regs, CR, SSC_BIT(CR_TXDIS));
+	clk_disable(chip->ssc->clk);
 	clk_disable(chip->board->dac_clk);
 
 	return 0;
@@ -1091,6 +1098,7 @@ static int snd_at73c213_resume(struct device *dev)
 	struct snd_at73c213 *chip = card->private_data;
 
 	clk_enable(chip->board->dac_clk);
+	clk_enable(chip->ssc->clk);
 	ssc_writel(chip->ssc->regs, CR, SSC_BIT(CR_TXEN));
 
 	return 0;
