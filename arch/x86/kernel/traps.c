@@ -92,8 +92,7 @@ static inline void conditional_sti(struct pt_regs *regs)
 static inline void preempt_conditional_sti(struct pt_regs *regs)
 {
 	preempt_count_inc();
-	if (regs->flags & X86_EFLAGS_IF)
-		local_irq_enable();
+	conditional_sti(regs);
 }
 
 static inline void conditional_cli(struct pt_regs *regs)
@@ -104,8 +103,7 @@ static inline void conditional_cli(struct pt_regs *regs)
 
 static inline void preempt_conditional_cli(struct pt_regs *regs)
 {
-	if (regs->flags & X86_EFLAGS_IF)
-		local_irq_disable();
+	conditional_cli(regs);
 	preempt_count_dec();
 }
 
