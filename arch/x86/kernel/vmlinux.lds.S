@@ -195,6 +195,12 @@ SECTIONS
 	:init
 #endif
 
+	.static_cpu_has : AT(ADDR(.static_cpu_has) - LOAD_OFFSET) {
+		__static_cpu_has_start = .;
+		*(.static_cpu_has)
+		__static_cpu_has_end = .;
+	}
+
 	INIT_DATA_SECTION(16)
 
 	.x86_cpu_dev.init : AT(ADDR(.x86_cpu_dev.init) - LOAD_OFFSET) {

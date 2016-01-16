@@ -412,7 +412,6 @@ extern const char * const x86_bug_flags[NBUGINTS*32];
 
 #if __GNUC__ >= 4 && defined(CONFIG_X86_FAST_FEATURE_TESTS)
 extern void warn_pre_alternatives(void);
-extern bool __static_cpu_has_safe(u16 bit);
 
 /*
  * Static testing of CPU features.  Used the same as boot_cpu_has().
@@ -502,10 +501,10 @@ static __always_inline __pure bool __static_cpu_has(u16 bit)
 		boot_cpu_has(bit)				\
 )
 
-static __always_inline __pure bool _static_cpu_has_safe(u16 bit)
+static __always_inline __pure bool _static_cpu_has_safe(u16 bit, __u32 *caps)
 {
 #ifdef CC_HAVE_ASM_GOTO
-		asm_volatile_goto("1: jmp %l[t_dynamic]\n"
+		asm_volatile_goto("1: jmp 6f\n"
 			 "2:\n"
 			 ".skip -(((5f-4f) - (2b-1b)) > 0) * "
 			         "((5f-4f) - (2b-1b)),0x90\n"
@@ -530,17 +529,22 @@ static __always_inline __pure bool _static_cpu_has_safe(u16 bit)
 			 " .byte 0\n"			/* repl len */
 			 " .byte 0\n"			/* pad len */
 			 ".previous\n"
-			 : : "i" (bit), "i" (X86_FEATURE_ALWAYS)
-			 : : t_dynamic, t_no);
+			 ".section .static_cpu_has,\"ax\"\n"
+			 "6: testl %2,%3\n"
+			 "   jnz %l[t_yes]\n"
+			 "   jmp %l[t_no]\n"
+			 ".previous\n"
+			 : : "i" (bit), "i" (X86_FEATURE_ALWAYS),
+			     "i" (1 << (bit & 31)), "m" (caps[bit/32])
+			 : : t_yes, t_no);
+	t_yes:
 		return true;
 	t_no:
 		return false;
-	t_dynamic:
-		return __static_cpu_has_safe(bit);
 #else
 		u8 flag;
 		/* Open-coded due to __stringify() in ALTERNATIVE() */
-		asm volatile("1: movb $2,%0\n"
+		asm volatile("1: jmp 7f\n"
 			     "2:\n"
 			     ".section .altinstructions,\"a\"\n"
 			     " .long 1b - .\n"		/* src offset */
@@ -572,9 +576,15 @@ static __always_inline __pure bool _static_cpu_has_safe(u16 bit)
 			     "5: movb $1,%0\n"
 			     "6:\n"
 			     ".previous\n"
+			     ".section .static_cpu_has,\"ax\"\n"
+			     "7: testl %3,%4\n"
+			     "   setnz %0\n"
+			     "   jmp 2b\n"
+			     ".previous\n"
 			     : "=qm" (flag)
-			     : "i" (bit), "i" (X86_FEATURE_ALWAYS));
-		return (flag == 2 ? __static_cpu_has_safe(bit) : flag);
+			     : "i" (bit), "i" (X86_FEATURE_ALWAYS),
+			       "i" (1 << (bit & 31)), "m" (caps[bit/32]));
+		return (flag != 0);
 #endif /* CC_HAVE_ASM_GOTO */
 }
 
@@ -582,7 +592,8 @@ static __always_inline __pure bool _static_cpu_has_safe(u16 bit)
 (								\
 	__builtin_constant_p(boot_cpu_has(bit)) ?		\
 		boot_cpu_has(bit) :				\
-		_static_cpu_has_safe(bit)			\
+		_static_cpu_has_safe(bit,			\
+			 &boot_cpu_data.x86_capability[0])	\
 )
 #else
 /*
