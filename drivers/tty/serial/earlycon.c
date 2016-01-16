@@ -216,7 +216,8 @@ static int __init param_setup_earlycon(char *buf)
 early_param("earlycon", param_setup_earlycon);
 
 int __init of_setup_earlycon(unsigned long addr,
-			     const struct earlycon_id *match)
+			     const struct earlycon_id *match,
+			     const char *options)
 {
 	int err;
 	struct uart_port *port = &early_console_dev.port;
@@ -227,8 +228,12 @@ int __init of_setup_earlycon(unsigned long addr,
 	port->uartclk = BASE_BAUD * 16;
 	port->membase = earlycon_map(addr, SZ_4K);
 
+	if (options) {
+		strlcpy(early_console_dev.options, options,
+			sizeof(early_console_dev.options));
+	}
 	earlycon_init(&early_console_dev, match->name);
-	err = match->setup(&early_console_dev, NULL);
+	err = match->setup(&early_console_dev, options);
 	if (err < 0)
 		return err;
 	if (!early_console_dev.con->write)
