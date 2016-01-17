@@ -2,7 +2,7 @@
 #define __LINUX_PWM_H
 
 #include <linux/err.h>
-#include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <linux/of.h>
 
 struct pwm_device;
@@ -100,7 +100,7 @@ struct pwm_device {
 	unsigned int pwm;
 	struct pwm_chip *chip;
 	void *chip_data;
-	struct mutex lock;
+	spinlock_t lock;
 
 	unsigned int period;
 	unsigned int duty_cycle;
