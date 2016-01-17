@@ -722,6 +722,15 @@ apicinterrupt IRQ_WORK_VECTOR			irq_work_interrupt		smp_irq_work_interrupt
  */
 #define CPU_TSS_IST(x) PER_CPU_VAR(cpu_tss) + (TSS_ist + ((x) - 1) * 8)
 
+        .macro prepare_error_code has_error_code:req
+	.if \has_error_code
+	movq	ORIG_RAX(%rsp), %rsi		/* get error code */
+	movq	$-1, ORIG_RAX(%rsp)		/* no syscall to restart */
+	.else
+	xorl	%esi, %esi			/* no error code */
+	.endif
+        .endm
+
 .macro idtentry sym do_sym has_error_code:req paranoid=0 shift_ist=-1
 ENTRY(\sym)
 	/* Sanity check */
@@ -759,12 +768,7 @@ ENTRY(\sym)
 
 	movq	%rsp, %rdi			/* pt_regs pointer */
 
-	.if \has_error_code
-	movq	ORIG_RAX(%rsp), %rsi		/* get error code */
-	movq	$-1, ORIG_RAX(%rsp)		/* no syscall to restart */
-	.else
-	xorl	%esi, %esi			/* no error code */
-	.endif
+        prepare_error_code \has_error_code      /* %rsi -> error code */
 
 	.if \shift_ist != -1
 	subq	$EXCEPTION_STKSZ, CPU_TSS_IST(\shift_ist)
@@ -799,13 +803,7 @@ ENTRY(\sym)
 
 	movq	%rsp, %rdi			/* pt_regs pointer */
 
-	.if \has_error_code
-	movq	ORIG_RAX(%rsp), %rsi		/* get error code */
-	movq	$-1, ORIG_RAX(%rsp)		/* no syscall to restart */
-	.else
-	xorl	%esi, %esi			/* no error code */
-	.endif
-
+        prepare_error_code \has_error_code      /* %rsi -> error code */
 	call	\do_sym
 
 	jmp	error_exit			/* %ebx: no swapgs flag */
