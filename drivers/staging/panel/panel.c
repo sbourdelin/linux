@@ -947,7 +947,8 @@ static void lcd_clear_fast_s(void)
 		lcd_send_serial(0x5F);	/* R/W=W, RS=1 */
 		lcd_send_serial(' ' & 0x0F);
 		lcd_send_serial((' ' >> 4) & 0x0F);
-		usleep_range(40, 100);	/* the shortest data takes at least 40 us */
+		/* the shortest data takes at least 40 us */
+		usleep_range(40, 100);
 	}
 	spin_unlock_irq(&pprt_lock);
 
@@ -1788,7 +1789,7 @@ static void phys_scan_contacts(void)
 	gndmask = PNL_PINPUT(r_str(pprt)) & scan_mask_i;
 
 	/* grounded inputs are signals 40-44 */
-	phys_read |= (pmask_t) gndmask << 40;
+	phys_read |= (pmask_t)gndmask << 40;
 
 	if (bitmask != gndmask) {
 		/*
@@ -1804,7 +1805,7 @@ static void phys_scan_contacts(void)
 
 			w_dtr(pprt, oldval & ~bitval);	/* enable this output */
 			bitmask = PNL_PINPUT(r_str(pprt)) & ~gndmask;
-			phys_read |= (pmask_t) bitmask << (5 * bit);
+			phys_read |= (pmask_t)bitmask << (5 * bit);
 		}
 		w_dtr(pprt, oldval);	/* disable all outputs */
 	}
