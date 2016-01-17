@@ -24,8 +24,8 @@ USB_GADGET_COMPOSITE_OPTIONS();
 #define DRIVER_DESC		"Printer Gadget"
 #define DRIVER_VERSION		"2015 FEB 17"
 
-static const char shortname [] = "printer";
-static const char driver_desc [] = DRIVER_DESC;
+static const char shortname[] = "printer";
+static const char driver_desc[] = DRIVER_DESC;
 
 #include "u_printer.h"
 
@@ -86,13 +86,13 @@ static const struct usb_descriptor_header *otg_desc[2];
 
 /* descriptors that are built on-demand */
 
-static char				product_desc [40] = DRIVER_DESC;
-static char				serial_num [40] = "1";
+static char				product_desc[40] = DRIVER_DESC;
+static char				serial_num[40] = "1";
 static char				pnp_string[PNP_STRING_LEN] =
 	"XXMFG:linux;MDL:g_printer;CLS:PRINTER;SN:1;";
 
 /* static strings, in UTF-8 */
-static struct usb_string		strings [] = {
+static struct usb_string		strings[] = {
 	[USB_GADGET_MANUFACTURER_IDX].s = "",
 	[USB_GADGET_PRODUCT_IDX].s = product_desc,
 	[USB_GADGET_SERIAL_IDX].s =	serial_num,
