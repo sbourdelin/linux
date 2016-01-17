@@ -42,6 +42,16 @@
 		 NETIF_MSG_RX_ERR | \
 		 NETIF_MSG_TX_ERR)
 
+static const char *ravb_rx_irqs[NUM_RX_QUEUE] = {
+	"ch0", /* RAVB_BE */
+	"ch1", /* RAVB_NC */
+};
+
+static const char *ravb_tx_irqs[NUM_TX_QUEUE] = {
+	"ch18", /* RAVB_BE */
+	"ch19", /* RAVB_NC */
+};
+
 int ravb_wait(struct net_device *ndev, enum ravb_reg reg, u32 mask, u32 value)
 {
 	int i;
@@ -372,6 +382,7 @@ static void ravb_emac_init(struct net_device *ndev)
 /* Device init function for Ethernet AVB */
 static int ravb_dmac_init(struct net_device *ndev)
 {
+	struct ravb_private *priv = netdev_priv(ndev);
 	int error;
 
 	/* Set CONFIG mode */
@@ -408,6 +419,12 @@ static int ravb_dmac_init(struct net_device *ndev)
 	ravb_write(ndev, TCCR_TFEN, TCCR);
 
 	/* Interrupt init: */
+	if (priv->chip_id == RCAR_GEN3) {
+		/* Clear DIL.DPLx */
+		ravb_write(ndev, 0, DIL);
+		/* Set queue specific interrupt */
+		ravb_write(ndev, CIE_CRIE | CIE_CTIE | CIE_CL0M, CIE);
+	}
 	/* Frame receive */
 	ravb_write(ndev, RIC0_FRE0 | RIC0_FRE1, RIC0);
 	/* Disable FIFO full warning */
@@ -651,7 +668,7 @@ static int ravb_stop_dma(struct net_device *ndev)
 }
 
 /* E-MAC interrupt handler */
-static void ravb_emac_interrupt(struct net_device *ndev)
+static void ravb_emac_interrupt_unlocked(struct net_device *ndev)
 {
 	struct ravb_private *priv = netdev_priv(ndev);
 	u32 ecsr, psr;
@@ -677,6 +694,18 @@ static void ravb_emac_interrupt(struct net_device *ndev)
 	}
 }
 
+static irqreturn_t ravb_emac_interrupt(int irq, void *dev_id)
+{
+	struct net_device *ndev = dev_id;
+	struct ravb_private *priv = netdev_priv(ndev);
+
+	spin_lock(&priv->lock);
+	ravb_emac_interrupt_unlocked(ndev);
+	mmiowb();
+	spin_unlock(&priv->lock);
+	return IRQ_HANDLED;
+}
+
 /* Error interrupt handler */
 static void ravb_error_interrupt(struct net_device *ndev)
 {
@@ -693,7 +722,7 @@ static void ravb_error_interrupt(struct net_device *ndev)
 		if (ris2 & RIS2_QFF0)
 			priv->stats[RAVB_BE].rx_over_errors++;
 
-		    /* Receive Descriptor Empty int */
+		/* Receive Descriptor Empty int */
 		if (ris2 & RIS2_QFF1)
 			priv->stats[RAVB_NC].rx_over_errors++;
 
@@ -755,7 +784,7 @@ static irqreturn_t ravb_interrupt(int irq, void *dev_id)
 
 	/* E-MAC status summary */
 	if (iss & ISS_MS) {
-		ravb_emac_interrupt(ndev);
+		ravb_emac_interrupt_unlocked(ndev);
 		result = IRQ_HANDLED;
 	}
 
@@ -771,6 +800,82 @@ static irqreturn_t ravb_interrupt(int irq, void *dev_id)
 	mmiowb();
 	spin_unlock(&priv->lock);
 	return result;
+}
+
+/* Descriptor IRQ/Error/Management interrupt handler */
+static irqreturn_t ravb_multi_interrupt(int irq, void *dev_id)
+{
+	struct net_device *ndev = dev_id;
+	struct ravb_private *priv = netdev_priv(ndev);
+	irqreturn_t result = IRQ_NONE;
+	u32 iss;
+
+	spin_lock(&priv->lock);
+	/* Get interrupt status */
+	iss = ravb_read(ndev, ISS);
+
+	/* Error status summary */
+	if (iss & ISS_ES) {
+		ravb_error_interrupt(ndev);
+		result = IRQ_HANDLED;
+	}
+
+	/* gPTP interrupt status summary */
+	if (iss & ISS_CGIS)
+		result = ravb_ptp_interrupt(ndev);
+
+	mmiowb();
+	spin_unlock(&priv->lock);
+	return result;
+}
+
+static irqreturn_t ravb_dmaq_interrupt(int irq, void *dev_id, int ravb_queue)
+{
+	struct net_device *ndev = dev_id;
+	struct ravb_private *priv = netdev_priv(ndev);
+	irqreturn_t result = IRQ_NONE;
+	u32 ris0, ric0, tis, tic;
+	int q = ravb_queue;
+
+	spin_lock(&priv->lock);
+
+	ris0 = ravb_read(ndev, RIS0);
+	ric0 = ravb_read(ndev, RIC0);
+	tis  = ravb_read(ndev, TIS);
+	tic  = ravb_read(ndev, TIC);
+
+	/* Timestamp updated */
+	if (tis & TIS_TFUF) {
+		ravb_write(ndev, TID_TFUD, TID);
+		ravb_get_tx_tstamp(ndev);
+		result = IRQ_HANDLED;
+	}
+
+	/* Best effort queue RX/TX */
+	if (((ris0 & ric0) & BIT(q)) ||
+	    ((tis  & tic)  & BIT(q))) {
+		if (napi_schedule_prep(&priv->napi[q])) {
+			/* Mask RX and TX interrupts */
+			ravb_write(ndev, BIT(q), RID0);
+			ravb_write(ndev, BIT(q), TID);
+			__napi_schedule(&priv->napi[q]);
+		}
+		result = IRQ_HANDLED;
+	}
+
+	mmiowb();
+	spin_unlock(&priv->lock);
+	return result;
+}
+
+static irqreturn_t ravb_be_interrupt(int irq, void *dev_id)
+{
+	return ravb_dmaq_interrupt(irq, dev_id, RAVB_BE);
+}
+
+static irqreturn_t ravb_nc_interrupt(int irq, void *dev_id)
+{
+	return ravb_dmaq_interrupt(irq, dev_id, RAVB_NC);
 }
 
 static int ravb_poll(struct napi_struct *napi, int budget)
@@ -812,8 +917,13 @@ static int ravb_poll(struct napi_struct *napi, int budget)
 
 	/* Re-enable RX/TX interrupts */
 	spin_lock_irqsave(&priv->lock, flags);
-	ravb_write(ndev, ravb_read(ndev, RIC0) | mask, RIC0);
-	ravb_write(ndev, ravb_read(ndev, TIC)  | mask,  TIC);
+	if (priv->chip_id == RCAR_GEN2) {
+		ravb_write(ndev, ravb_read(ndev, RIC0) | mask, RIC0);
+		ravb_write(ndev, ravb_read(ndev, TIC)  | mask, TIC);
+	} else {
+		ravb_write(ndev, mask, RIE0);
+		ravb_write(ndev, mask, TIE);
+	}
 	mmiowb();
 	spin_unlock_irqrestore(&priv->lock, flags);
 
@@ -1215,29 +1325,63 @@ static const struct ethtool_ops ravb_ethtool_ops = {
 	.get_ts_info		= ravb_get_ts_info,
 };
 
+static inline int req_irq(unsigned int irq, irq_handler_t handler,
+			  struct net_device *ndev, struct device *dev,
+			  const char *ch)
+{
+	char *name;
+	int error;
+
+	name = devm_kasprintf(dev, GFP_KERNEL, "%s:%s", ndev->name, ch);
+	error = request_irq(irq, handler, IRQF_SHARED, name, ndev);
+		netdev_err(ndev, "cannot request IRQ %s\n", name);
+
+	return error;
+}
+
 /* Network device open function for Ethernet AVB */
 static int ravb_open(struct net_device *ndev)
 {
 	struct ravb_private *priv = netdev_priv(ndev);
-	int error;
+	struct platform_device *pdev = priv->pdev;
+	struct device *dev = &pdev->dev;
+	int error, i;
 
 	napi_enable(&priv->napi[RAVB_BE]);
 	napi_enable(&priv->napi[RAVB_NC]);
 
-	error = request_irq(ndev->irq, ravb_interrupt, IRQF_SHARED, ndev->name,
-			    ndev);
-	if (error) {
-		netdev_err(ndev, "cannot request IRQ\n");
-		goto out_napi_off;
-	}
-
-	if (priv->chip_id == RCAR_GEN3) {
-		error = request_irq(priv->emac_irq, ravb_interrupt,
-				    IRQF_SHARED, ndev->name, ndev);
+	if (priv->chip_id == RCAR_GEN2) {
+		error = request_irq(ndev->irq, ravb_interrupt, IRQF_SHARED,
+				    ndev->name, ndev);
 		if (error) {
 			netdev_err(ndev, "cannot request IRQ\n");
-			goto out_free_irq;
+			goto out_napi_off;
 		}
+	} else {
+		error = req_irq(ndev->irq, ravb_multi_interrupt, ndev, dev,
+				"ch22:multi");
+		if (error)
+			goto out_napi_off;
+		error = req_irq(priv->emac_irq, ravb_emac_interrupt, ndev,
+				dev, "ch24:emac");
+		if (error)
+			goto out_free_irq;
+		error = req_irq(priv->rx_irqs[RAVB_BE], ravb_be_interrupt,
+				ndev, dev, "ch0:rx_be");
+		if (error)
+			goto out_free_irq;
+		error = req_irq(priv->tx_irqs[RAVB_BE], ravb_be_interrupt,
+				ndev, dev, "ch18:tx_be");
+		if (error)
+			goto out_free_irq;
+		error = req_irq(priv->rx_irqs[RAVB_NC], ravb_nc_interrupt,
+				ndev, dev, "ch1:rx_nc");
+		if (error)
+			goto out_free_irq;
+		error = req_irq(priv->tx_irqs[RAVB_NC], ravb_nc_interrupt,
+				ndev, dev, "ch19:tx_nc");
+		if (error)
+			goto out_free_irq;
 	}
 
 	/* Device init */
@@ -1268,6 +1412,10 @@ out_free_irq2:
 		free_irq(priv->emac_irq, ndev);
 out_free_irq:
 	free_irq(ndev->irq, ndev);
+	for (i = 0; i < NUM_RX_QUEUE; i++)
+		free_irq(priv->rx_irqs[i], ndev);
+	for (i = 0; i < NUM_TX_QUEUE; i++)
+		free_irq(priv->tx_irqs[i], ndev);
 out_napi_off:
 	napi_disable(&priv->napi[RAVB_NC]);
 	napi_disable(&priv->napi[RAVB_BE]);
@@ -1724,6 +1872,7 @@ static int ravb_probe(struct platform_device *pdev)
 	struct net_device *ndev;
 	int error, irq, q;
 	struct resource *res;
+	int i;
 
 	if (!np) {
 		dev_err(&pdev->dev,
@@ -1794,6 +1943,22 @@ static int ravb_probe(struct platform_device *pdev)
 			goto out_release;
 		}
 		priv->emac_irq = irq;
+		for (i = 0; i < NUM_RX_QUEUE; i++) {
+			irq = platform_get_irq_byname(pdev, ravb_rx_irqs[i]);
+			if (irq < 0) {
+				error = irq;
+				goto out_release;
+			}
+			priv->rx_irqs[i] = irq;
+		}
+		for (i = 0; i < NUM_TX_QUEUE; i++) {
+			irq = platform_get_irq_byname(pdev, ravb_tx_irqs[i]);
+			if (irq < 0) {
+				error = irq;
+				goto out_release;
+			}
+			priv->tx_irqs[i] = irq;
+		}
 	}
 
 	priv->chip_id = chip_id;
