@@ -167,7 +167,20 @@ static const struct sdhci_iproc_data iproc_data = {
 	.caps1 = 0x00000064,
 };
 
+static const struct sdhci_pltfm_data sdhci_bcm2835_pltfm_data = {
+	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+		| SDHCI_QUIRK_MISSING_CAPS,
+	.ops = &sdhci_iproc_ops,
+};
+
+static const struct sdhci_iproc_data bcm2835_data = {
+	.pdata = &sdhci_bcm2835_pltfm_data,
+	.caps = SDHCI_CAN_VDD_330,
+	.caps1 = 0x00000000,
+};
+
 static const struct of_device_id sdhci_iproc_of_match[] = {
+	{ .compatible = "brcm,bcm2835-sdhci", .data = &bcm2835_data },
 	{ .compatible = "brcm,sdhci-iproc-cygnus", .data = &iproc_data },
 	{ }
 };
@@ -180,6 +193,7 @@ static int sdhci_iproc_probe(struct platform_device *pdev)
 	struct sdhci_host *host;
 	struct sdhci_iproc_host *iproc_host;
 	struct sdhci_pltfm_host *pltfm_host;
+	struct device_node *np = pdev->dev.of_node;
 	int ret;
 
 	match = of_match_device(sdhci_iproc_of_match, &pdev->dev);
@@ -199,8 +213,10 @@ static int sdhci_iproc_probe(struct platform_device *pdev)
 	mmc_of_parse(host->mmc);
 	sdhci_get_of_property(pdev);
 
-	/* Enable EMMC 1/8V DDR capable */
-	host->mmc->caps |= MMC_CAP_1_8V_DDR;
+	if (of_device_is_compatible(np, "brcm,sdhci-iproc-cygnus")) {
+		/* Enable EMMC 1/8V DDR capable */
+		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+	}
 
 	pltfm_host->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(pltfm_host->clk)) {
