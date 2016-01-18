@@ -5940,6 +5940,7 @@ enum skl_disp_power_wells {
 #define  ILK_INTERNAL_GRAPHICS_DISABLE	(1 << 31)
 #define  ILK_INTERNAL_DISPLAY_DISABLE	(1 << 30)
 #define  ILK_DISPLAY_DEBUG_DISABLE	(1 << 29)
+#define  SKL_DISPLAY_PIPE_C_DISABLE	(1 << 28)
 #define  ILK_HDCP_DISABLE		(1 << 25)
 #define  ILK_eDP_A_DISABLE		(1 << 24)
 #define  HSW_CDCLK_LIMIT		(1 << 24)
@@ -5986,6 +5987,9 @@ enum skl_disp_power_wells {
 #define SKL_DFSM_CDCLK_LIMIT_540	(1 << 23)
 #define SKL_DFSM_CDCLK_LIMIT_450	(2 << 23)
 #define SKL_DFSM_CDCLK_LIMIT_337_5	(3 << 23)
+#define SKL_DFSM_PIPE_A_DISABLE		(1 << 30)
+#define SKL_DFSM_PIPE_B_DISABLE		(1 << 21)
+#define SKL_DFSM_PIPE_C_DISABLE		(1 << 28)
 
 #define FF_SLICE_CS_CHICKEN2			_MMIO(0x20e4)
 #define  GEN9_TSG_BARRIER_ACK_DISABLE		(1<<8)
