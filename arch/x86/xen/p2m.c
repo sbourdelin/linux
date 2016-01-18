@@ -291,7 +291,7 @@ void __init xen_build_dynamic_phys_to_machine(void)
 {
 	unsigned long pfn;
 
-	 if (xen_feature(XENFEAT_auto_translated_physmap))
+	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return;
 
 	xen_p2m_addr = (unsigned long *)xen_start_info->mfn_list;
