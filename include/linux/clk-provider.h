@@ -707,6 +707,23 @@ const char *of_clk_get_parent_name(struct device_node *np, int index);
 
 void of_clk_init(const struct of_device_id *matches);
 
+static inline int of_clk_mark_if_critical(struct device_node *np,
+					  int index, unsigned long *flags)
+{
+	struct property *prop;
+	const __be32 *cur;
+	uint32_t idx;
+
+	if (!np || !flags)
+		return -EINVAL;
+
+	of_property_for_each_u32(np, "critical-clock", prop, cur, idx)
+		if (index == idx)
+			*flags |= CLK_IS_CRITICAL;
+
+	return 0;
+}
+
 #else /* !CONFIG_OF */
 
 static inline int of_clk_add_provider(struct device_node *np,
@@ -741,6 +758,11 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
 						 int index)
 {
 	return NULL;
+}
+static inline int of_clk_mark_if_critical(struct device_node *np, int index,
+					  unsigned long *flags)
+{
+	return 0;
 }
 #define of_clk_init(matches) \
 	{ while (0); }
