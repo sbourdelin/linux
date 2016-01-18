@@ -125,7 +125,7 @@ int perf_output_begin(struct perf_output_handle *handle,
 	if (unlikely(!rb))
 		goto out;
 
-	if (unlikely(!rb->nr_pages))
+	if (unlikely(rb->paused))
 		goto out;
 
 	handle->rb    = rb;
@@ -244,6 +244,8 @@ ring_buffer_init(struct ring_buffer *rb, long watermark, int flags)
 	INIT_LIST_HEAD(&rb->event_list);
 	spin_lock_init(&rb->event_lock);
 	init_irq_work(&rb->irq_work, rb_irq_work);
+
+	rb->paused = rb->nr_pages ? 0 : 1;
 }
 
 static void ring_buffer_put_async(struct ring_buffer *rb)
