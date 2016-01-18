@@ -12,7 +12,6 @@
  */
 
 #include <linux/clk.h>
-#include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -81,7 +80,6 @@ struct atmel_isi {
 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
 	bool				enable_preview_path;
 
-	struct completion		complete;
 	/* ISI peripherial clock */
 	struct clk			*pclk;
 	unsigned int			irq;
@@ -281,49 +279,12 @@ static irqreturn_t isi_interrupt(int irq, void *dev_id)
 	mask = isi_readl(isi, ISI_INTMASK);
 	pending = status & mask;
 
-	if (pending & ISI_CTRL_SRST) {
-		complete(&isi->complete);
-		isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
-		ret = IRQ_HANDLED;
-	} else if (pending & ISI_CTRL_DIS) {
-		complete(&isi->complete);
-		isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
-		ret = IRQ_HANDLED;
-	} else {
-		if (likely(pending & ISI_SR_CXFR_DONE) ||
-				likely(pending & ISI_SR_PXFR_DONE))
-			ret = atmel_isi_handle_streaming(isi);
-	}
+	if (likely(pending & ISI_SR_CXFR_DONE) ||
+	    likely(pending & ISI_SR_PXFR_DONE))
+		ret = atmel_isi_handle_streaming(isi);
 
 	spin_unlock(&isi->lock);
 	return ret;
-}
-
-#define	WAIT_ISI_RESET		1
-#define	WAIT_ISI_DISABLE	0
-static int atmel_isi_wait_status(struct atmel_isi *isi, int wait_reset)
-{
-	unsigned long timeout;
-	/*
-	 * The reset or disable will only succeed if we have a
-	 * pixel clock from the camera.
-	 */
-	init_completion(&isi->complete);
-
-	if (wait_reset) {
-		isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
-		isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
-	} else {
-		isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
-		isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-	}
-
-	timeout = wait_for_completion_timeout(&isi->complete,
-			msecs_to_jiffies(500));
-	if (timeout == 0)
-		return -ETIMEDOUT;
-
-	return 0;
 }
 
 /* ------------------------------------------------------------------
@@ -493,8 +454,11 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
 	pm_runtime_get_sync(ici->v4l2_dev.dev);
 
 	/* Reset ISI */
-	ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
-	if (ret < 0) {
+	isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+
+	/* Check Reset status */
+	ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
+	if (ret) {
 		dev_err(icd->parent, "Reset ISI timed out\n");
 		pm_runtime_put(ici->v4l2_dev.dev);
 		return ret;
@@ -549,8 +513,11 @@ static void stop_streaming(struct vb2_queue *vq)
 			ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
 
 	/* Disable ISI and wait for it is done */
-	ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
-	if (ret < 0)
+	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+
+	/* Check Reset status */
+	ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
+	if (ret)
 		dev_err(icd->parent, "Disable ISI timed out\n");
 
 	pm_runtime_put(ici->v4l2_dev.dev);
