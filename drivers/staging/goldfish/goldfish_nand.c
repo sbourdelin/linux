@@ -27,6 +27,7 @@
 #include <linux/mutex.h>
 #include <linux/goldfish.h>
 #include <asm/div64.h>
+#include <linux/dma-mapping.h>
 
 #include "goldfish_nand_reg.h"
 
@@ -284,7 +285,8 @@ invalid_arg:
 static int nand_setup_cmd_params(struct platform_device *pdev,
 				 struct goldfish_nand *nand)
 {
-	u64 paddr;
+	void *addr;
+	dma_addr_t dma_handle;
 	unsigned char __iomem  *base = nand->base;
 
 	nand->cmd_params = devm_kzalloc(&pdev->dev,
@@ -292,9 +294,14 @@ static int nand_setup_cmd_params(struct platform_device *pdev,
 	if (!nand->cmd_params)
 		return -1;
 
-	paddr = __pa(nand->cmd_params);
-	writel((u32)(paddr >> 32), base + NAND_CMD_PARAMS_ADDR_HIGH);
-	writel((u32)paddr, base + NAND_CMD_PARAMS_ADDR_LOW);
+	addr = dma_alloc_coherent(&pdev->dev, sizeof(struct cmd_params),
+				  &dma_handle, GFP_KERNEL | GFP_DMA);
+	if (!addr) {
+		dev_err(&pdev->dev, "allocate buffer failed\n");
+		return -ENOMEM;
+	}
+	writel((u32)(dma_handle >> 32), base + NAND_CMD_PARAMS_ADDR_HIGH);
+	writel((u32)dma_handle, base + NAND_CMD_PARAMS_ADDR_LOW);
 	return 0;
 }
 
