@@ -1276,7 +1276,7 @@ int asd_post_escb_list(struct asd_ha_struct *asd_ha, struct asd_ascb *ascb,
  * @phy_id: the PHY id whose LED we want to manupulate
  * @op: 1 to turn on, 0 to turn off
  */
-void asd_turn_led(struct asd_ha_struct *asd_ha, int phy_id, int op)
+void asd_turn_led(struct asd_ha_struct *asd_ha, u32 phy_id, int op)
 {
 	if (phy_id < ASD_MAX_PHYS) {
 		u32 v = asd_read_reg_dword(asd_ha, LmCONTROL(phy_id));
@@ -1297,7 +1297,7 @@ void asd_turn_led(struct asd_ha_struct *asd_ha, int phy_id, int op)
  * First we output enable the LED, then we set the source
  * to be an external module.
  */
-void asd_control_led(struct asd_ha_struct *asd_ha, int phy_id, int op)
+void asd_control_led(struct asd_ha_struct *asd_ha, u32 phy_id, int op)
 {
 	if (phy_id < ASD_MAX_PHYS) {
 		u32 v;

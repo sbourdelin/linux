@@ -388,8 +388,8 @@ int  asd_post_escb_list(struct asd_ha_struct *asd_ha, struct asd_ascb *ascb,
 
 int  asd_init_post_escbs(struct asd_ha_struct *asd_ha);
 void asd_build_control_phy(struct asd_ascb *ascb, int phy_id, u8 subfunc);
-void asd_control_led(struct asd_ha_struct *asd_ha, int phy_id, int op);
-void asd_turn_led(struct asd_ha_struct *asd_ha, int phy_id, int op);
+void asd_control_led(struct asd_ha_struct *asd_ha, u32 phy_id, int op);
+void asd_turn_led(struct asd_ha_struct *asd_ha, u32 phy_id, int op);
 int  asd_enable_phys(struct asd_ha_struct *asd_ha, const u8 phy_mask);
 
 void asd_ascb_timedout(unsigned long data);
