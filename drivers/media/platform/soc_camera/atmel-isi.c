@@ -203,10 +203,27 @@ static int isi_hw_wait_status(struct atmel_isi *isi, int status_flag,
 	return 0;
 }
 
-static void isi_hw_initialize(struct atmel_isi *isi)
+static int isi_hw_initialize(struct atmel_isi *isi)
 {
 	u32 common_flags = isi->bus_param;
 	u32 cfg1 = 0;
+	int ret;
+
+	/* Reset ISI */
+	isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+
+	/* Check Reset status */
+	ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
+	if (ret) {
+		dev_err(isi->soc_host.icd->parent, "Reset ISI timed out\n");
+		return ret;
+	}
+
+	/* Disable all interrupts */
+	isi_writel(isi, ISI_INTDIS, (u32)~0UL);
+
+	/* Clear any pending interrupt */
+	isi_readl(isi, ISI_STATUS);
 
 	/* set bus param for ISI */
 	if (common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
@@ -229,6 +246,8 @@ static void isi_hw_initialize(struct atmel_isi *isi)
 
 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
 	isi_writel(isi, ISI_CFG1, cfg1);
+
+	return 0;
 }
 
 static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
@@ -453,27 +472,16 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	pm_runtime_get_sync(ici->v4l2_dev.dev);
 
-	/* Reset ISI */
-	isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
-
-	/* Check Reset status */
-	ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
+	ret = isi_hw_initialize(isi);
 	if (ret) {
-		dev_err(icd->parent, "Reset ISI timed out\n");
 		pm_runtime_put(ici->v4l2_dev.dev);
 		return ret;
 	}
-	/* Disable all interrupts */
-	isi_writel(isi, ISI_INTDIS, (u32)~0UL);
-
-	isi_hw_initialize(isi);
 
 	configure_geometry(isi, icd->user_width, icd->user_height,
 				icd->current_fmt);
 
 	spin_lock_irq(&isi->lock);
-	/* Clear any pending interrupt */
-	isi_readl(isi, ISI_STATUS);
 
 	if (count)
 		start_dma(isi, isi->active);
