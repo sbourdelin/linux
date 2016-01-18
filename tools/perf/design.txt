@@ -143,27 +143,26 @@ enum perf_sw_ids {
 
 Counters of the type PERF_TYPE_TRACEPOINT are available when the ftrace event
 tracer is available, and event_id values can be obtained from
-/debug/tracing/events/*/*/id
+/debug/tracing/events/*/*/id.
 
 
 Counters come in two flavours: counting counters and sampling
 counters.  A "counting" counter is one that is used for counting the
 number of events that occur, and is characterised by having
-irq_period = 0.
+sample_period = 0.
 
 
 A read() on a counter returns the current value of the counter and possible
 additional values as specified by 'read_format', each value is a u64 (8 bytes)
 in size.
 
-/*
- * Bits that can be set in hw_event.read_format to request that
- * reads on the counter should return the indicated quantities,
- * in increasing order of bit value, after the counter value.
- */
 enum perf_event_read_format {
-        PERF_FORMAT_TOTAL_TIME_ENABLED  =  1,
-        PERF_FORMAT_TOTAL_TIME_RUNNING  =  2,
+    PERF_FORMAT_TOTAL_TIME_ENABLED      = 1U << 0,
+    PERF_FORMAT_TOTAL_TIME_RUNNING      = 1U << 1,
+    PERF_FORMAT_ID              = 1U << 2,
+    PERF_FORMAT_GROUP           = 1U << 3,
+   
+    PERF_FORMAT_MAX = 1U << 4,      /* non-ABI */
 };
 
 Using these additional values one can establish the overcommit ratio for a
@@ -172,21 +171,37 @@ into account.
 
 
 A "sampling" counter is one that is set up to generate an interrupt
-every N events, where N is given by 'irq_period'.  A sampling counter
-has irq_period > 0. The record_type controls what data is recorded on each
+every N events, where N is given by 'sample_period'.  A sampling counter
+has sample_period > 0. The sample_type controls what data is recorded on each
 interrupt:
 
 /*
- * Bits that can be set in hw_event.record_type to request information
+ * Bits that can be set in attr.sample_type to request information
  * in the overflow packets.
  */
-enum perf_event_record_format {
-        PERF_RECORD_IP          = 1U << 0,
-        PERF_RECORD_TID         = 1U << 1,
-        PERF_RECORD_TIME        = 1U << 2,
-        PERF_RECORD_ADDR        = 1U << 3,
-        PERF_RECORD_GROUP       = 1U << 4,
-        PERF_RECORD_CALLCHAIN   = 1U << 5,
+enum perf_event_sample_format {
+    PERF_SAMPLE_IP              = 1U << 0,
+    PERF_SAMPLE_TID             = 1U << 1,
+    PERF_SAMPLE_TIME            = 1U << 2,
+    PERF_SAMPLE_ADDR            = 1U << 3,
+    PERF_SAMPLE_READ            = 1U << 4,
+    PERF_SAMPLE_CALLCHAIN           = 1U << 5,
+
+    PERF_SAMPLE_If              = 1U << 6,
+    PERF_SAMPLE_CPU             = 1U << 7,
+    PERF_SAMPLE_PERIOD          = 1U << 8,
+    PERF_SAMPLE_STREAM_ID           = 1U << 9,
+    PERF_SAMPLE_RAW             = 1U << 10,
+    PERF_SAMPLE_BRANCH_STACK        = 1U << 11,
+    PERF_SAMPLE_REGS_USER           = 1U << 12,
+    PERF_SAMPLE_STACK_USER          = 1U << 13,
+    PERF_SAMPLE_WEIGHT          = 1U << 14,
+    PERF_SAMPLE_DATA_SRC            = 1U << 15,
+    PERF_SAMPLE_IDENTIFIER          = 1U << 16,
+    PERF_SAMPLE_TRANSACTION         = 1U << 17,
+    PERF_SAMPLE_REGS_INTR           = 1U << 18,
+
+    PERF_SAMPLE_MAX = 1U << 19,     /* non-ABI */
 };
 
 Such (and other) events will be recorded in a ring-buffer, which is
@@ -222,7 +237,7 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
 way to request that counting of events be restricted to times when the
 CPU is in user, kernel and/or hypervisor mode.
 
-The 'mmap' and 'munmap' bits allow recording of PROT_EXEC mmap/munmap
+The 'mmap' bits allow recording of PROT_EXEC mmap
 operations, these can be used to relate userspace IP addresses to actual
 code, even after the mapping (or even the whole process) is gone,
 these events are recorded in the ring-buffer (see below).
@@ -286,43 +301,142 @@ as where the ring-buffer head is.
  * Structure of the page that can be mapped via mmap
  */
 struct perf_event_mmap_page {
-        __u32   version;                /* version number of this structure */
-        __u32   compat_version;         /* lowest version this is compat with */
+    __u32   version;        /* version number of this structure */
+    __u32   compat_version;     /* lowest version this is compat with */
+
+    /*
+     * Bits needed to read the hw events in user-space.
+     *
+     *   u32 seq, time_mult, time_shift, idx, width;
+     *   u64 count, enabled, running;
+     *   u64 cyc, time_offset;
+     *   s64 pmc = 0;
+     *
+     *   do {
+     *     seq = pc->lock;
+     *     barrier()
+     *
+     *     enabled = pc->time_enabled;
+     *     running = pc->time_running;
+     *
+     *     if (pc->cap_usr_time && enabled != running) {
+     *       cyc = rdtsc();
+     *       time_offset = pc->time_offset;
+     *       time_mult   = pc->time_mult;
+     *       time_shift  = pc->time_shift;
+     *     }
+     *
+     *     idx = pc->index;
+     *     count = pc->offset;
+     *     if (pc->cap_usr_rdpmc && idx) {
+     *       width = pc->pmc_width;
+     *       pmc = rdpmc(idx - 1);
+     *     }
+     *
+     *     barrier();
+     *   } while (pc->lock != seq);
+     *
+     * NOTE: for obvious reason this only works on self-monitoring
+     *       processes.
+     */
+    __u32   lock;           /* seqlock for synchronization */
+    __u32   index;          /* hardware event identifier */
+    __s64   offset;         /* add to hardware event value */
+    __u64   time_enabled;       /* time event active */
+    __u64   time_running;       /* time event on cpu */
+    union {
+        __u64   capabilities;
+        struct {
+            __u64   cap_bit0        : 1, /* Always 0, deprecated, see commit 860f085b74e9 */
+                cap_bit0_is_deprecated  : 1, /* Always 1, signals that bit 0 is zero */
+
+                cap_user_rdpmc      : 1, /* The RDPMC instruction can be used to read counts */
+                cap_user_time       : 1, /* The time_* fields are used */
+                cap_user_time_zero  : 1, /* The time_zero field is used */
+                cap_____res     : 59;
+        };
+    };
+
+    /*
+     * If cap_usr_rdpmc this field provides the bit-width of the value
+     * read using the rdpmc() or equivalent instruction. This can be used
+     * to sign extend the result like:
+     *
+     *   pmc <<= 64 - width;
+     *   pmc >>= 64 - width; // signed shift right
+     *   count += pmc;
+     */
+    __u16   pmc_width;
+
+    /*
+     * If cap_usr_time the below fields can be used to compute the time
+     * delta since time_enabled (in ns) using rdtsc or similar.
+     *
+     *   u64 quot, rem;
+     *   u64 delta;
+     *
+     *   quot = (cyc >> time_shift);
+     *   rem = cyc & ((1 << time_shift) - 1);
+     *   delta = time_offset + quot * time_mult +
+     *              ((rem * time_mult) >> time_shift);
+     *
+     * Where time_offset,time_mult,time_shift and cyc are read in the
+     * seqcount loop described above. This delta can then be added to
+     * enabled and possible running (if idx), improving the scaling:
+     *
+     *   enabled += delta;
+     *   if (idx)
+     *     running += delta;
+     *
+     *   quot = count / running;
+     *   rem  = count % running;
+     *   count = quot * enabled + (rem * enabled) / running;
+     */
+    __u16   time_shift;
+    __u32   time_mult;
+    __u64   time_offset;
+    /*
+     * If cap_usr_time_zero, the hardware clock (e.g. TSC) can be calculated
+     * from sample timestamps.
+     *
+     *   time = timestamp - time_zero;
+     *   quot = time / time_mult;
+     *   rem  = time % time_mult;
+     *   cyc = (quot << time_shift) + (rem << time_shift) / time_mult;
+     *
+     * And vice versa:
+     *
+     *   quot = cyc >> time_shift;
+     *   rem  = cyc & ((1 << time_shift) - 1);
+     *   timestamp = time_zero + quot * time_mult +
+     *               ((rem * time_mult) >> time_shift);
+     */
+    __u64   time_zero;
+    __u32   size;           /* Header size up to __reserved[] fields. */
 
         /*
-         * Bits needed to read the hw counters in user-space.
-         *
-         *   u32 seq;
-         *   s64 count;
-         *
-         *   do {
-         *     seq = pc->lock;
-         *
-         *     barrier()
-         *     if (pc->index) {
-         *       count = pmc_read(pc->index - 1);
-         *       count += pc->offset;
-         *     } else
-         *       goto regular_read;
-         *
-         *     barrier();
-         *   } while (pc->lock != seq);
-         *
-         * NOTE: for obvious reason this only works on self-monitoring
-         *       processes.
+         * Hole for extension of the self monitor capabilities
          */
-        __u32   lock;                   /* seqlock for synchronization */
-        __u32   index;                  /* hardware counter identifier */
-        __s64   offset;                 /* add to hardware counter value */
 
-        /*
-         * Control data for the mmap() data buffer.
-         *
-         * User-space reading this value should issue an rmb(), on SMP capable
-         * platforms, after reading this value -- see perf_event_wakeup().
-         */
-        __u32   data_head;              /* head in the data section */
+    __u8    __reserved[118*8+4];    /* align to 1k. */
+
+    /*
+     * Control data for the mmap() data buffer.
+     *
+     * User-space reading the @data_head value should issue an smp_rmb(),
+     * after reading this value.
+     *
+     * When the mapping is PROT_WRITE the @data_tail value should be
+     * written by userspace to reflect the last read data, after issueing
+     * an smp_mb() to separate the data read from the ->data_tail store.
+     * In this case the kernel will not over-write unread data.
+     *
+     * See perf_output_put_handle() for the data ordering.
+     */
+    __u64   data_head;      /* head in the data section */
+    __u64   data_tail;      /* user-space written tail */
 };
+
 
 NOTE: the hw-counter userspace bits are arch specific and are currently only
       implemented on powerpc.
@@ -331,7 +445,6 @@ The following 2^n pages are the ring-buffer which contains events of the form:
 
 #define PERF_RECORD_MISC_KERNEL          (1 << 0)
 #define PERF_RECORD_MISC_USER            (1 << 1)
-#define PERF_RECORD_MISC_OVERFLOW        (1 << 2)
 
 struct perf_event_header {
         __u32   type;
@@ -341,58 +454,195 @@ struct perf_event_header {
 
 enum perf_event_type {
 
-        /*
-         * The MMAP events record the PROT_EXEC mappings so that we can
-         * correlate userspace IPs to code. They have the following structure:
-         *
-         * struct {
-         *      struct perf_event_header        header;
-         *
-         *      u32                             pid, tid;
-         *      u64                             addr;
-         *      u64                             len;
-         *      u64                             pgoff;
-         *      char                            filename[];
-         * };
-         */
-        PERF_RECORD_MMAP                 = 1,
-        PERF_RECORD_MUNMAP               = 2,
+    /*
+     * If perf_event_attr.sample_id_all is set then all event types will
+     * have the sample_type selected fields related to where/when
+     * (identity) an event took place (TID, TIME, ID, STREAM_ID, CPU,
+     * IDENTIFIER) described in PERF_RECORD_SAMPLE below, it will be stashed
+     * just after the perf_event_header and the fields already present for
+     * the existing fields, i.e. at the end of the payload. That way a newer
+     * perf.data file will be supported by older perf tools, with these new
+     * optional fields being ignored.
+     *
+     * struct sample_id {
+     *  { u32           pid, tid; } && PERF_SAMPLE_TID
+     *  { u64           time;     } && PERF_SAMPLE_TIME
+     *  { u64           id;       } && PERF_SAMPLE_ID
+     *  { u64           stream_id;} && PERF_SAMPLE_STREAM_ID
+     *  { u32           cpu, res; } && PERF_SAMPLE_CPU
+     *  { u64           id;   } && PERF_SAMPLE_IDENTIFIER
+     * } && perf_event_attr::sample_id_all
+     *
+     * Note that PERF_SAMPLE_IDENTIFIER duplicates PERF_SAMPLE_ID.  The
+     * advantage of PERF_SAMPLE_IDENTIFIER is that its position is fixed
+     * relative to header.size.
+     */
 
-        /*
-         * struct {
-         *      struct perf_event_header        header;
-         *
-         *      u32                             pid, tid;
-         *      char                            comm[];
-         * };
-         */
-        PERF_RECORD_COMM                 = 3,
+    /*
+     * The MMAP events record the PROT_EXEC mappings so that we can
+     * correlate userspace IPs to code. They have the following structure:
+     *
+     * struct {
+     *  struct perf_event_header    header;
+     *
+     *  u32             pid, tid;
+     *  u64             addr;
+     *  u64             len;
+     *  u64             pgoff;
+     *  char                filename[];
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_MMAP            = 1,
 
-        /*
-         * When header.misc & PERF_RECORD_MISC_OVERFLOW the event_type field
-         * will be PERF_RECORD_*
-         *
-         * struct {
-         *      struct perf_event_header        header;
-         *
-         *      { u64                   ip;       } && PERF_RECORD_IP
-         *      { u32                   pid, tid; } && PERF_RECORD_TID
-         *      { u64                   time;     } && PERF_RECORD_TIME
-         *      { u64                   addr;     } && PERF_RECORD_ADDR
-         *
-         *      { u64                   nr;
-         *        { u64 event, val; }   cnt[nr];  } && PERF_RECORD_GROUP
-         *
-         *      { u16                   nr,
-         *                              hv,
-         *                              kernel,
-         *                              user;
-         *        u64                   ips[nr];  } && PERF_RECORD_CALLCHAIN
-         * };
-         */
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *  u64             id;
+     *  u64             lost;
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_LOST            = 2,
+
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *
+     *  u32             pid, tid;
+     *  char                comm[];
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_COMM            = 3,
+
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *  u32             pid, ppid;
+     *  u32             tid, ptid;
+     *  u64             time;
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_EXIT            = 4,
+
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *  u64             time;
+     *  u64             id;
+     *  u64             stream_id;
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_THROTTLE            = 5,
+    PERF_RECORD_UNTHROTTLE          = 6,
+
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *  u32             pid, ppid;
+     *  u32             tid, ptid;
+     *  u64             time;
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_FORK            = 7,
+
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *  u32             pid, tid;
+     *
+     *  struct read_format      values;
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_READ            = 8,
+
+    /*
+     * struct {
+     *  struct perf_event_header    header;
+     *
+     *  #
+     *  # Note that PERF_SAMPLE_IDENTIFIER duplicates PERF_SAMPLE_ID.
+     *  # The advantage of PERF_SAMPLE_IDENTIFIER is that its position
+     *  # is fixed relative to header.
+     *  #
+     *
+     *  { u64           id;   } && PERF_SAMPLE_IDENTIFIER
+     *  { u64           ip;   } && PERF_SAMPLE_IP
+     *  { u32           pid, tid; } && PERF_SAMPLE_TID
+     *  { u64           time;     } && PERF_SAMPLE_TIME
+     *  { u64           addr;     } && PERF_SAMPLE_ADDR
+     *  { u64           id;   } && PERF_SAMPLE_ID
+     *  { u64           stream_id;} && PERF_SAMPLE_STREAM_ID
+     *  { u32           cpu, res; } && PERF_SAMPLE_CPU
+     *  { u64           period;   } && PERF_SAMPLE_PERIOD
+     *
+     *  { struct read_format    values;   } && PERF_SAMPLE_READ
+     *
+     *  { u64           nr,
+     *    u64           ips[nr];  } && PERF_SAMPLE_CALLCHAIN
+     *
+     *  #
+     *  # The RAW record below is opaque data wrt the ABI
+     *  #
+     *  # That is, the ABI doesn't make any promises wrt to
+     *  # the stability of its content, it may vary depending
+     *  # on event, hardware, kernel version and phase of
+     *  # the moon.
+     *  #
+     *  # In other words, PERF_SAMPLE_RAW contents are not an ABI.
+     *  #
+     *
+     *  { u32           size;
+     *    char                  data[size];}&& PERF_SAMPLE_RAW
+     *
+     *  { u64                   nr;
+     *        { u64 from, to, flags } lbr[nr];} && PERF_SAMPLE_BRANCH_STACK
+     *
+     *  { u64           abi; # enum perf_sample_regs_abi
+     *    u64           regs[weight(mask)]; } && PERF_SAMPLE_REGS_USER
+     *
+     *  { u64           size;
+     *    char          data[size];
+     *    u64           dyn_size; } && PERF_SAMPLE_STACK_USER
+     *
+     *  { u64           weight;   } && PERF_SAMPLE_WEIGHT
+     *  { u64           data_src; } && PERF_SAMPLE_DATA_SRC
+     *  { u64           transaction; } && PERF_SAMPLE_TRANSACTION
+     * };
+     */
+    PERF_RECORD_SAMPLE          = 9,
+
+    /*
+     * The MMAP2 records are an augmented version of MMAP, they add
+     * maj, min, ino numbers to be used to uniquely identify each mapping
+     *
+     * struct {
+     *  struct perf_event_header    header;
+     *
+     *  u32             pid, tid;
+     *  u64             addr;
+     *  u64             len;
+     *  u64             pgoff;
+     *  u32             maj;
+     *  u32             min;
+     *  u64             ino;
+     *  u64             ino_generation;
+     *  u32             prot, flags;
+     *  char                filename[];
+     *  struct sample_id        sample_id;
+     * };
+     */
+    PERF_RECORD_MMAP2           = 10,
+
+    PERF_RECORD_MAX,            /* non-ABI */
 };
 
-NOTE: PERF_RECORD_CALLCHAIN is arch specific and currently only implemented
+NOTE: PERF_SAMPLE_CALLCHAIN is arch specific and currently only implemented
       on x86.
 
 Notification of new events is possible through poll()/select()/epoll() and
