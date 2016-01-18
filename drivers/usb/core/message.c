@@ -367,7 +367,8 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 	if (!io || !dev || !sg
 			|| usb_pipecontrol(pipe)
 			|| usb_pipeisoc(pipe)
-			|| nents <= 0)
+			|| nents <= 0
+			|| nents >= UINT_MAX / sizeof(*io->urbs))
 		return -EINVAL;
 
 	spin_lock_init(&io->lock);
