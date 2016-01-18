@@ -35,12 +35,6 @@ const u8 ALLFFMAC[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 /* boost value for RSSI_DELTA in preferred join selection */
 #define BRCMF_JOIN_PREF_RSSI_BOOST	8
 
-#define BRCMF_DEFAULT_TXGLOM_SIZE	32  /* max tx frames in glom chain */
-
-static int brcmf_sdiod_txglomsz = BRCMF_DEFAULT_TXGLOM_SIZE;
-module_param_named(txglomsz, brcmf_sdiod_txglomsz, int, 0);
-MODULE_PARM_DESC(txglomsz, "Maximum tx packet chain size [SDIO]");
-
 /* Debug level configuration. See debug.h for bits, sysfs modifiable */
 int brcmf_msg_level;
 module_param_named(debug, brcmf_msg_level, int, S_IRUSR | S_IWUSR);
@@ -234,7 +228,6 @@ int brcmf_mp_device_attach(struct brcmf_pub *drvr)
 		return -ENOMEM;
 	}
 
-	drvr->settings->sdiod_txglomsz = brcmf_sdiod_txglomsz;
 	drvr->settings->p2p_enable = !!brcmf_p2p_enable;
 	drvr->settings->feature_disable = brcmf_feature_disable;
 	drvr->settings->fcmode = brcmf_fcmode;

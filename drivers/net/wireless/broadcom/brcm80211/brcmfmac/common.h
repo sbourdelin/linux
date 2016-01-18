@@ -41,7 +41,6 @@ extern struct brcmf_mp_global_t brcmf_mp_global;
 /**
  * struct brcmf_mp_device - Device module paramaters.
  *
- * @sdiod_txglomsz: SDIO txglom size.
  * @joinboost_5g_rssi: 5g rssi booost for preferred join selection.
  * @p2p_enable: Legacy P2P0 enable (old wpa_supplicant).
  * @feature_disable: Feature_disable bitmask.
@@ -49,7 +48,6 @@ extern struct brcmf_mp_global_t brcmf_mp_global;
  * @roamoff: Firmware roaming off?
  */
 struct brcmf_mp_device {
-	int	sdiod_txglomsz;
 	int	joinboost_5g_rssi;
 	bool	p2p_enable;
 	int	feature_disable;
