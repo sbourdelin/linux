@@ -2576,8 +2576,13 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	}
 
 	ret = __clk_init(dev, hw->clk);
-	if (!ret)
+	if (!ret) {
+		if (core->flags & CLK_IS_CRITICAL) {
+			clk_core_prepare(core);
+			clk_core_enable(core);
+		}
 		return hw->clk;
+	}
 
 	__clk_free_clk(hw->clk);
 	hw->clk = NULL;
