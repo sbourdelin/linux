@@ -120,6 +120,11 @@ static int __down_trylock_console_sem(unsigned long ip)
 	up(&console_sem);\
 } while (0)
 
+int is_console_lock(raw_spinlock_t *lock)
+{
+	return &console_sem.lock == lock;
+}
+
 /*
  * This is used for debugging the mess that is the VT code by
  * keeping track if we have the console semaphore held. It's

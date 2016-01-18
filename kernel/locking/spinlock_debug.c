@@ -67,9 +67,20 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 	dump_stack();
 }
 
+extern int is_console_lock(raw_spinlock_t *lock);
+
 static void spin_bug(raw_spinlock_t *lock, const char *msg)
 {
 	if (!debug_locks_off())
+		return;
+
+	/*
+	 * If this function is called from a function like printk()
+	 * which is trying to obtain the console lock, then we should
+	 * not call printk() any more. Or it will cause an infinite
+	 * recursive cycle!
+	 */
+	if (unlikely(is_console_lock(lock)))
 		return;
 
 	spin_dump(lock, msg);
