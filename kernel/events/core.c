@@ -8550,10 +8550,8 @@ perf_event_create_kernel_counter(struct perf_event_attr *attr, int cpu,
 
 	event = perf_event_alloc(attr, cpu, task, NULL, NULL,
 				 overflow_handler, context, -1);
-	if (IS_ERR(event)) {
-		err = PTR_ERR(event);
-		goto err;
-	}
+	if (IS_ERR(event))
+		return event;
 
 	/* Mark owner so we could distinguish it from user events. */
 	event->owner = EVENT_OWNER_KERNEL;
@@ -8584,7 +8582,7 @@ perf_event_create_kernel_counter(struct perf_event_attr *attr, int cpu,
 
 err_free:
 	free_event(event);
-err:
+
 	return ERR_PTR(err);
 }
 EXPORT_SYMBOL_GPL(perf_event_create_kernel_counter);
