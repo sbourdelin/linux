@@ -999,6 +999,7 @@ static int aead_perform(struct aead_request *req, int encrypt,
 				GFP_KERNEL : GFP_ATOMIC;
 	enum dma_data_direction src_direction = DMA_BIDIRECTIONAL;
 	unsigned int lastlen;
+	bool shortbuf = false;
 
 	if (qmgr_stat_full(SEND_QID))
 		return -EAGAIN;
@@ -1052,6 +1053,8 @@ static int aead_perform(struct aead_request *req, int encrypt,
 			if (lastlen >= authsize)
 				crypt->icv_rev_aes = buf->phys_addr +
 						     buf->buf_len - authsize;
+			else
+				shortbuf = true;
 		}
 	}
 
@@ -1067,9 +1070,11 @@ static int aead_perform(struct aead_request *req, int encrypt,
 		if (lastlen >= authsize)
 			crypt->icv_rev_aes = buf->phys_addr +
 					     buf->buf_len - authsize;
+		else
+			shortbuf = true;
 	}
 
-	if (unlikely(lastlen < authsize)) {
+	if (unlikely(shortbuf)) {
 		/* The 12 hmac bytes are scattered,
 		 * we need to copy them into a safe buffer */
 		req_ctx->hmac_virt = dma_pool_alloc(buffer_pool, flags,
