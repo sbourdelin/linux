@@ -1,0 +1,11 @@
+Texas Intstruments ADS117x ADC
+
+Required properties:
+
+  - compatible : "ti,ads117x"
+
+Example:
+
+ads1178 {
+	compatible = "ti,ads117x";
+};
