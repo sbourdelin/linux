@@ -514,9 +514,14 @@ static int platform_drv_probe(struct device *_dev)
 
 	ret = dev_pm_domain_attach(_dev, true);
 	if (ret != -EPROBE_DEFER && drv->probe) {
+		bool wakeup = device_property_read_bool(_dev, "wakeup-source");
+
+		device_init_wakeup(_dev, wakeup);
 		ret = drv->probe(dev);
-		if (ret)
+		if (ret) {
+			device_init_wakeup(_dev, false);
 			dev_pm_domain_detach(_dev, true);
+		}
 	}
 
 	if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
@@ -540,6 +545,8 @@ static int platform_drv_remove(struct device *_dev)
 
 	if (drv->remove)
 		ret = drv->remove(dev);
+
+	device_init_wakeup(_dev, false);
 	dev_pm_domain_detach(_dev, true);
 
 	return ret;
