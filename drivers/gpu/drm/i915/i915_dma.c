@@ -814,6 +814,40 @@ static void intel_device_info_runtime_init(struct drm_device *dev)
 			DRM_INFO("Display fused off, disabling\n");
 			info->num_pipes = 0;
 		}
+	} else if (info->num_pipes > 0 && INTEL_INFO(dev)->gen == 9) {
+		u32 fuse_strap = I915_READ(FUSE_STRAP);
+		u32 dfsm = I915_READ(SKL_DFSM);
+		bool invalid;
+		int num_bits;
+
+		if (dfsm & SKL_DFSM_PIPE_A_DISABLE)
+			info->pipe_disabled_mask |= BIT(PIPE_A);
+		if (dfsm & SKL_DFSM_PIPE_B_DISABLE)
+			info->pipe_disabled_mask |= BIT(PIPE_B);
+		if (dfsm & SKL_DFSM_PIPE_C_DISABLE)
+			info->pipe_disabled_mask |= BIT(PIPE_C);
+
+		if (fuse_strap & SKL_DISPLAY_PIPE_C_DISABLE)
+			info->pipe_disabled_mask |= BIT(PIPE_C);
+
+		num_bits = hweight8(info->pipe_disabled_mask);
+
+		switch (info->pipe_disabled_mask) {
+			case BIT(PIPE_A):
+			case BIT(PIPE_B):
+			case BIT(PIPE_A) | BIT(PIPE_B):
+			case BIT(PIPE_A) | BIT(PIPE_C):
+				invalid = true;
+				break;
+			default:
+				invalid = false;
+		}
+
+		if (num_bits > info->num_pipes || invalid)
+			DRM_ERROR("invalid pipe fuse configuration: 0x%x\n",
+				  info->pipe_disabled_mask);
+		else
+			info->num_pipes -= num_bits;
 	}
 
 	/* Initialize slice/subslice/EU info */
