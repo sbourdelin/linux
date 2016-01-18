@@ -3864,6 +3864,15 @@ intel_dp_get_dpcd(struct intel_dp *intel_dp)
 	if (intel_dp->dpcd[DP_DPCD_REV] == 0)
 		return false; /* DPCD not present */
 
+	if (intel_dp_dpcd_read_wake(&intel_dp->aux, DP_SINK_COUNT,
+				    &intel_dp->sink_count, 1) < 0)
+		return false;
+
+	intel_dp->sink_count = DP_GET_SINK_COUNT(intel_dp->sink_count);
+
+	if (!intel_dp->sink_count)
+		return false;
+
 	/* Check if the panel supports PSR */
 	memset(intel_dp->psr_dpcd, 0, sizeof(intel_dp->psr_dpcd));
 	if (is_edp(intel_dp)) {
@@ -4371,14 +4380,9 @@ intel_dp_detect_dpcd(struct intel_dp *intel_dp)
 	/* If we're HPD-aware, SINK_COUNT changes dynamically */
 	if (intel_dp->dpcd[DP_DPCD_REV] >= 0x11 &&
 	    intel_dp->downstream_ports[0] & DP_DS_PORT_HPD) {
-		uint8_t reg;
 
-		if (intel_dp_dpcd_read_wake(&intel_dp->aux, DP_SINK_COUNT,
-					    &reg, 1) < 0)
-			return connector_status_unknown;
-
-		return DP_GET_SINK_COUNT(reg) ? connector_status_connected
-					      : connector_status_disconnected;
+		return intel_dp->sink_count ?
+		connector_status_connected : connector_status_disconnected;
 	}
 
 	/* If no HPD, poke DDC gently */
