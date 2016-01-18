@@ -701,6 +701,15 @@
 		resets = <&tegra_car 78>;
 		reset-names = "soctherm";
 		#thermal-sensor-cells = <1>;
+
+		hw-trip-points {
+			cpu {
+				thermtrip-temperature = <103000>;
+			};
+			gpu {
+				thermtrip-temperature = <101000>;
+			};
+		};
 	};
 
 	dfll: clock@0,70110000 {
