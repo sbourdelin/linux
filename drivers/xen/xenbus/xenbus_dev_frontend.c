@@ -186,7 +186,7 @@ static int queue_reply(struct list_head *queue, const void *data, size_t len)
 {
 	struct read_buffer *rb;
 
-	if (len == 0)
+	if (len == 0 || len >= UINT_MAX - sizeof(*rb))
 		return 0;
 
 	rb = kmalloc(sizeof(*rb) + len, GFP_KERNEL);
