@@ -21,8 +21,7 @@ static int regcache_flat_init(struct regmap *map)
 	int i;
 	unsigned int *cache;
 
-	map->cache = kcalloc(map->max_register + 1, sizeof(unsigned int),
-			     GFP_KERNEL);
+	map->cache = kzalloc(map->max_register + map->reg_stride, GFP_KERNEL);
 	if (!map->cache)
 		return -ENOMEM;
 
