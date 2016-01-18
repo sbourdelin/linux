@@ -1310,6 +1310,7 @@ static int packet_rcv_has_room(struct packet_sock *po, struct sk_buff *skb)
 
 static void packet_sock_destruct(struct sock *sk)
 {
+	skb_queue_purge(&sk->sk_receive_queue);
 	skb_queue_purge(&sk->sk_error_queue);
 
 	WARN_ON(atomic_read(&sk->sk_rmem_alloc));
