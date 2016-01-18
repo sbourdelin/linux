@@ -26,6 +26,15 @@ Required properties :
     of this property. See <dt-bindings/thermal/tegra124-soctherm.h> for a
     list of valid values when referring to thermal sensors.
 
+Optional properties:
+- hw-trip-points : A sub-node which is a container of hardware trip points
+    for each sensors.
+  * sensors: Sub-nodes which are used to describe the HW trip points info,
+        must be named as "cpu", "gpu", "mem", "pll".
+      Properties:
+      - thermtrip-temperature : Shutdown or reset temperature in millicelsius,
+        once the temperature of this sensor is higher than the
+        thermtrip-temperature, the system will be shutdown or reset.
 
 Example :
 
@@ -40,6 +49,21 @@ Example :
 		reset-names = "soctherm";
 
 		#thermal-sensor-cells = <1>;
+
+		hw-trip-points {
+			cpu {
+				thermtrip-temperature = <103000>;
+			};
+			gpu {
+				thermtrip-temperature = <103500>;
+			};
+			mem {
+				thermtrip-temperature = <103500>;
+			};
+			pll {
+				thermtrip-temperature = <105000>;
+			};
+		};
 	};
 
 Example: referring to thermal sensors :
