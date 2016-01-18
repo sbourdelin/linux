@@ -4568,6 +4568,25 @@ int pci_set_vga_state(struct pci_dev *dev, bool decode,
 	return 0;
 }
 
+/**
+ * pci_add_dma_alias - Allows to add multiple devfn aliases for given device
+ * @dev: the PCI device for which alias is added
+ * @devfn: alias slot and function
+ *
+ * This helper encodes 8-bit devfn as bit number in dma_alias_mask
+ */
+void pci_add_dma_alias(struct pci_dev *dev, u8 devfn)
+{
+	if (!dev->dma_alias_mask) {
+		dev->dma_alias_mask = kcalloc(BITS_TO_LONGS(U8_MAX),
+					      sizeof(long), GFP_KERNEL);
+		dev_warn(&dev->dev, "Unable to allocate DMA alias mask.\n");
+	}
+	if (dev->dma_alias_mask)
+		set_bit(devfn, dev->dma_alias_mask);
+}
+EXPORT_SYMBOL_GPL(pci_add_dma_alias);
+
 bool pci_device_is_present(struct pci_dev *pdev)
 {
 	u32 v;
