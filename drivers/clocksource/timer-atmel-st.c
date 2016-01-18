@@ -225,7 +225,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
 	if (IS_ERR(sclk))
 		panic(pr_fmt("Unable to get slow clock\n"));
 
-	clk_prepare_enable(sclk);
+	ret = clk_prepare_enable(sclk);
 	if (ret)
 		panic(pr_fmt("Could not enable slow clock\n"));
 
