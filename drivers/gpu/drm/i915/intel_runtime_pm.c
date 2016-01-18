@@ -572,8 +572,10 @@ static void assert_can_enable_dc6(struct drm_i915_private *dev_priv)
 	WARN_ONCE(!HAS_RUNTIME_PM(dev), "Runtime PM not enabled.\n");
 	WARN_ONCE(I915_READ(UTIL_PIN_CTL) & UTIL_PIN_ENABLE,
 		  "Backlight is not disabled.\n");
-	WARN_ONCE((I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC6),
-		  "DC6 already programmed to be enabled.\n");
+
+	/* Sometimes fw incorrectly modify our bits so just debug print this */
+	if ((I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC6))
+		  DRM_DEBUG_KMS("DC6 already programmed to be enabled.\n");
 
 	assert_csr_loaded(dev_priv);
 }
