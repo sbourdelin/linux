@@ -35,25 +35,25 @@ obj-$(CONFIG_MFD_T7L66XB)	+= t7l66xb.o tmio_core.o
 obj-$(CONFIG_MFD_TC6387XB)	+= tc6387xb.o tmio_core.o
 obj-$(CONFIG_MFD_TC6393XB)	+= tc6393xb.o tmio_core.o
 
-obj-$(CONFIG_MFD_ARIZONA)	+= arizona-core.o
-obj-$(CONFIG_MFD_ARIZONA)	+= arizona-irq.o
-obj-$(CONFIG_MFD_ARIZONA_I2C)	+= arizona-i2c.o
-obj-$(CONFIG_MFD_ARIZONA_SPI)	+= arizona-spi.o
+arizona-objs			:= arizona-core.o arizona-irq.o
 ifeq ($(CONFIG_MFD_WM5102),y)
-obj-$(CONFIG_MFD_ARIZONA)	+= wm5102-tables.o
+arizona-objs			+= wm5102-tables.o
 endif
 ifeq ($(CONFIG_MFD_WM5110),y)
-obj-$(CONFIG_MFD_ARIZONA)	+= wm5110-tables.o
+arizona-objs			+= wm5110-tables.o
 endif
 ifeq ($(CONFIG_MFD_WM8997),y)
-obj-$(CONFIG_MFD_ARIZONA)	+= wm8997-tables.o
+arizona-objs			+= wm8997-tables.o
 endif
 ifeq ($(CONFIG_MFD_WM8998),y)
-obj-$(CONFIG_MFD_ARIZONA)	+= wm8998-tables.o
+arizona-objs			+= wm8998-tables.o
 endif
 ifeq ($(CONFIG_MFD_CS47L24),y)
-obj-$(CONFIG_MFD_ARIZONA)	+= cs47l24-tables.o
+arizona-objs			+= cs47l24-tables.o
 endif
+obj-$(CONFIG_MFD_ARIZONA)	+= arizona.o
+obj-$(CONFIG_MFD_ARIZONA_I2C)	+= arizona-i2c.o
+obj-$(CONFIG_MFD_ARIZONA_SPI)	+= arizona-spi.o
 obj-$(CONFIG_MFD_WM8400)	+= wm8400-core.o
 wm831x-objs			:= wm831x-core.o wm831x-irq.o wm831x-otp.o
 wm831x-objs			+= wm831x-auxadc.o
