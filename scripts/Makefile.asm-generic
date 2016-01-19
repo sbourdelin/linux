@@ -21,3 +21,19 @@ all: $(patsubst %, $(obj)/%, $(generic-y))
 
 $(obj)/%.h:
 	$(call cmd,wrap)
+
+# Remove stale wrappers when the corresponding files are removed from
+# generic-y
+
+quiet_cmd_rmwrap = REMOVE  $(patsubst %.rm,%,$@)
+cmd_rmwrap = rm -f $(patsubst %.rm, %, $@)
+
+all: $(filter-out $(patsubst %, $(obj)/%.rm, $(generic-y)), \
+                  $(patsubst %, %.rm, $(wildcard $(obj)/*.h)))
+
+$(obj)/%.h.rm: FORCE
+	$(call cmd,rmwrap)
+
+.PHONY: $(PHONY)
+PHONY += FORCE
+FORCE: ;
