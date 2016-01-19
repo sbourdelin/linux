@@ -864,12 +864,29 @@ static void flush_pending_writes(struct r10conf *conf)
 
 		while (bio) { /* submit pending writes */
 			struct bio *next = bio->bi_next;
+			struct r10bio *r10_bio = bio->bi_private;
+			struct md_rdev *rdev = NULL;
+			int dev, slot, repl;
 			bio->bi_next = NULL;
+			dev = find_bio_disk(conf, r10_bio, bio, &slot, &repl);
+			if (repl)
+				rdev = conf->mirrors[dev].replacement;
+			if (!rdev) {
+				smp_rmb();
+				repl = 0;
+				rdev = conf->mirrors[dev].rdev;
+			}
 			if (unlikely((bio->bi_rw & REQ_DISCARD) &&
 			    !blk_queue_discard(bdev_get_queue(bio->bi_bdev))))
 				/* Just ignore it */
 				bio_endio(bio);
-			else
+			else if (test_bit(Faulty, &rdev->flags)) {
+				if (test_bit(Timeout, &rdev->flags))
+					bio->bi_error = -ETIMEDOUT;
+				else
+					bio->bi_error = -EIO;
+				bio_endio(bio);
+			} else
 				generic_make_request(bio);
 			bio = next;
 		}
@@ -1040,12 +1057,29 @@ static void raid10_unplug(struct blk_plug_cb *cb, bool from_schedule)
 
 	while (bio) { /* submit pending writes */
 		struct bio *next = bio->bi_next;
+		struct r10bio *r10_bio = bio->bi_private;
+		struct md_rdev *rdev = NULL;
+		int dev, slot, repl;
 		bio->bi_next = NULL;
+		dev = find_bio_disk(conf, r10_bio, bio, &slot, &repl);
+		if (repl)
+			rdev = conf->mirrors[dev].replacement;
+		if (!rdev) {
+			smp_rmb();
+			repl = 0;
+			rdev = conf->mirrors[dev].rdev;
+		}
 		if (unlikely((bio->bi_rw & REQ_DISCARD) &&
 		    !blk_queue_discard(bdev_get_queue(bio->bi_bdev))))
 			/* Just ignore it */
 			bio_endio(bio);
-		else
+		else if (test_bit(Faulty, &rdev->flags)) {
+			if (test_bit(Timeout, &rdev->flags))
+				bio->bi_error = -ETIMEDOUT;
+			else
+				bio->bi_error = -EIO;
+			bio_endio(bio);
+		} else
 			generic_make_request(bio);
 		bio = next;
 	}
