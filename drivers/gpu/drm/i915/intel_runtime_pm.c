@@ -470,9 +470,23 @@ static void gen9_set_dc_state_debugmask_memory_up(
 	}
 }
 
+static int gen9_dc_state_verified(struct drm_i915_private *dev_priv,
+				  u32 mask, u32 state)
+{
+	int i;
+
+	/* Observe the dc state with handful of reads */
+	for (i = 0; i < 3; i++) {
+		if (wait_for((I915_READ(DC_STATE_EN) & mask) == state, 100))
+			return false;
+	}
+
+	return true;
+}
+
 static void gen9_set_dc_state(struct drm_i915_private *dev_priv, uint32_t state)
 {
-	uint32_t val;
+	uint32_t val_pre, val;
 	uint32_t mask;
 
 	mask = DC_STATE_EN_UPTO_DC5;
@@ -491,13 +505,22 @@ static void gen9_set_dc_state(struct drm_i915_private *dev_priv, uint32_t state)
 	if (state & DC_STATE_EN_UPTO_DC5_DC6_MASK)
 		gen9_set_dc_state_debugmask_memory_up(dev_priv);
 
-	val = I915_READ(DC_STATE_EN);
+	val_pre = I915_READ(DC_STATE_EN);
 	DRM_DEBUG_KMS("Setting DC state from %02x to %02x\n",
-		      val & mask, state);
+		      val_pre & mask, state);
+	val = val_pre;
 	val &= ~mask;
 	val |= state;
 	I915_WRITE(DC_STATE_EN, val);
-	POSTING_READ(DC_STATE_EN);
+
+	if (gen9_dc_state_verified(dev_priv, mask, state) == false) {
+		DRM_ERROR("DC set timeout, from %02x to %02x, now %x\n",
+			  val_pre & mask, state, I915_READ(DC_STATE_EN));
+
+		i915.enable_dc = 0;
+		I915_WRITE(DC_STATE_EN, DC_STATE_DISABLE);
+		POSTING_READ(DC_STATE_EN);
+	}
 }
 
 void bxt_enable_dc9(struct drm_i915_private *dev_priv)
