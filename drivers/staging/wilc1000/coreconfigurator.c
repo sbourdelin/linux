@@ -591,7 +591,7 @@ s32 wilc_dealloc_assoc_resp_info(tstrConnectRespInfo *pstrConnectRespInfo)
 int wilc_send_config_pkt(struct wilc *wilc, u8 mode, struct wid *wids,
 			 u32 count, u32 drv)
 {
-	s32 counter = 0;
+	int counter;
 	int ret = 0;
 
 	if (mode == GET_CFG) {
