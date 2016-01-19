@@ -527,7 +527,7 @@ int efx_ef10_sriov_set_vf_mac(struct efx_nic *efx, int vf_i, u8 *mac)
 	return 0;
 
 fail:
-	memset(vf->mac, 0, ETH_ALEN);
+	eth_zero_addr(vf->mac);
 	return rc;
 }
 
