@@ -535,8 +535,10 @@ static int ci_otg_start_host(struct otg_fsm *fsm, int on)
 		ci_role_stop(ci);
 		ci_role_start(ci, CI_ROLE_HOST);
 	} else {
+		disable_irq(ci->irq);
 		ci_role_stop(ci);
 		ci_role_start(ci, CI_ROLE_GADGET);
+		enable_irq(ci->irq);
 	}
 	return 0;
 }
