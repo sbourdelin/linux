@@ -442,7 +442,7 @@ static void intel_fbc_schedule_activation(struct intel_crtc *crtc)
 	schedule_work(&work->work);
 }
 
-static void __intel_fbc_deactivate(struct drm_i915_private *dev_priv)
+static void intel_fbc_deactivate(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
 
@@ -452,26 +452,6 @@ static void __intel_fbc_deactivate(struct drm_i915_private *dev_priv)
 
 	if (fbc->active)
 		fbc->deactivate(dev_priv);
-}
-
-/*
- * intel_fbc_deactivate - deactivate FBC if it's associated with crtc
- * @crtc: the CRTC
- *
- * This function deactivates FBC if it's associated with the provided CRTC.
- */
-void intel_fbc_deactivate(struct intel_crtc *crtc)
-{
-	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
-	struct intel_fbc *fbc = &dev_priv->fbc;
-
-	if (!fbc_supported(dev_priv))
-		return;
-
-	mutex_lock(&fbc->lock);
-	if (fbc->crtc == crtc)
-		__intel_fbc_deactivate(dev_priv);
-	mutex_unlock(&fbc->lock);
 }
 
 static void set_no_fbc_reason(struct drm_i915_private *dev_priv,
@@ -920,7 +900,7 @@ void intel_fbc_pre_update(struct intel_crtc *crtc)
 	intel_fbc_update_state_cache(crtc);
 
 deactivate:
-	__intel_fbc_deactivate(dev_priv);
+	intel_fbc_deactivate(dev_priv);
 unlock:
 	mutex_unlock(&fbc->lock);
 }
@@ -953,7 +933,7 @@ static void __intel_fbc_post_update(struct intel_crtc *crtc)
 	    intel_fbc_reg_params_equal(&old_params, &fbc->params))
 		return;
 
-	__intel_fbc_deactivate(dev_priv);
+	intel_fbc_deactivate(dev_priv);
 	intel_fbc_schedule_activation(crtc);
 	fbc->no_fbc_reason = "FBC enabled (active or scheduled)";
 }
@@ -996,7 +976,7 @@ void intel_fbc_invalidate(struct drm_i915_private *dev_priv,
 	fbc->busy_bits |= intel_fbc_get_frontbuffer_bit(fbc) & frontbuffer_bits;
 
 	if (fbc->busy_bits)
-		__intel_fbc_deactivate(dev_priv);
+		intel_fbc_deactivate(dev_priv);
 
 	mutex_unlock(&fbc->lock);
 }
