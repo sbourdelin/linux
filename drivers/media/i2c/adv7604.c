@@ -2109,6 +2109,10 @@ static int adv76xx_set_edid(struct v4l2_subdev *sd, struct v4l2_edid *edid)
 	if (info->type == ADV7604) {
 		rep_write(sd, 0x76, spa_loc & 0xff);
 		rep_write_clr_set(sd, 0x77, 0x40, (spa_loc & 0x100) >> 2);
+	} else if (info->type == ADV7612) {
+		/* ADV7612 Software Manual Rev. A, p. 15 */
+		rep_write(sd, 0x70, spa_loc & 0xff);
+		rep_write_clr_set(sd, 0x71, 0x01, (spa_loc & 0x100) >> 8);
 	} else {
 		/* FIXME: Where is the SPA location LSB register ? */
 		rep_write_clr_set(sd, 0x71, 0x01, (spa_loc & 0x100) >> 8);
