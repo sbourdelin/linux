@@ -162,13 +162,16 @@ static int sa1100_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int sa1100_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct sa1100_rtc *info = dev_get_drvdata(dev);
-	unsigned long time;
+	time64_t time;
 	int ret;
 
-	ret = rtc_tm_to_time(tm, &time);
-	if (ret == 0)
-		writel_relaxed(time, info->rcnr);
-	return ret;
+	time = rtc_tm_to_time64(tm);
+	if (time > U32_MAX)
+		return -EINVAL;
+
+	writel_relaxed(time, info->rcnr);
+
+	return 0;
 }
 
 static int sa1100_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
