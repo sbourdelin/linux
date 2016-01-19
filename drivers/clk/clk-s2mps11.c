@@ -202,12 +202,6 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
 			ret = -ENOMEM;
 			goto err_reg;
 		}
-	}
-
-	for (i = 0; i < S2MPS11_CLKS_NUM; i++) {
-		/* Skip clocks not present on S2MPS14 */
-		if (i == S2MPS11_CLK_CP && hwid == S2MPS14X)
-			continue;
 		clk_table[i] = s2mps11_clks[i].clk;
 	}
 
