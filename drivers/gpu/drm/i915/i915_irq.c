@@ -2502,6 +2502,14 @@ static void i915_reset_and_wakeup(struct drm_device *dev)
 		 */
 		intel_runtime_pm_get(dev_priv);
 
+		/* Even if we hold the pm ref, we still might have inconsistent
+		 * power states due to driver failure. Trying to reset without
+		 * powers or with wrong dmc firmware state is futile. Flush
+		 * our power well and dc states ensuring that we reset with
+		 * powers enabled.
+		 */
+		intel_display_set_init_power(dev_priv, true);
+
 		intel_prepare_reset(dev);
 
 		/*
@@ -2513,6 +2521,8 @@ static void i915_reset_and_wakeup(struct drm_device *dev)
 		ret = i915_reset(dev);
 
 		intel_finish_reset(dev);
+
+		intel_display_set_init_power(dev_priv, false);
 
 		intel_runtime_pm_put(dev_priv);
 
