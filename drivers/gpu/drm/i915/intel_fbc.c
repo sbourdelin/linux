@@ -381,7 +381,15 @@ static void intel_fbc_work_fn(struct work_struct *__work)
 		container_of(__work, struct drm_i915_private, fbc.work.work);
 	struct intel_fbc_work *work = &dev_priv->fbc.work;
 	struct intel_crtc *crtc = dev_priv->fbc.crtc;
-	int delay_ms = 50;
+	struct drm_vblank_crtc *vblank = &dev_priv->dev->vblank[crtc->pipe];
+
+	mutex_lock(&dev_priv->fbc.lock);
+	if (drm_crtc_vblank_get(&crtc->base)) {
+		DRM_ERROR("vblank not available for FBC on pipe %c\n",
+			  pipe_name(crtc->pipe));
+		goto out;
+	}
+	mutex_unlock(&dev_priv->fbc.lock);
 
 retry:
 	/* Delay the actual enabling to let pageflipping cease and the
@@ -390,24 +398,25 @@ retry:
 	 * vblank to pass after disabling the FBC before we attempt
 	 * to modify the control registers.
 	 *
-	 * A more complicated solution would involve tracking vblanks
-	 * following the termination of the page-flipping sequence
-	 * and indeed performing the enable as a co-routine and not
-	 * waiting synchronously upon the vblank.
-	 *
 	 * WaFbcWaitForVBlankBeforeEnable:ilk,snb
+	 *
+	 * It is also worth mentioning that since work->scheduled_vblank can be
+	 * updated multiple times by the other threads, hitting the timeout is
+	 * not an error condition. We'll just end up hitting the "goto retry"
+	 * case below.
 	 */
-	wait_remaining_ms_from_jiffies(work->enable_jiffies, delay_ms);
+	wait_event_timeout(vblank->queue,
+		drm_crtc_vblank_count(&crtc->base) != work->scheduled_vblank,
+		msecs_to_jiffies(50));
 
 	mutex_lock(&dev_priv->fbc.lock);
 
 	/* Were we cancelled? */
 	if (!work->scheduled)
-		goto out;
+		goto out_put;
 
 	/* Were we delayed again while this function was sleeping? */
-	if (time_after(work->enable_jiffies + msecs_to_jiffies(delay_ms),
-		       jiffies)) {
+	if (drm_crtc_vblank_count(&crtc->base) == work->scheduled_vblank) {
 		mutex_unlock(&dev_priv->fbc.lock);
 		goto retry;
 	}
@@ -415,9 +424,10 @@ retry:
 	if (crtc->base.primary->fb == work->fb)
 		intel_fbc_activate(work->fb);
 
-	work->scheduled = false;
-
+out_put:
+	drm_crtc_vblank_put(&crtc->base);
 out:
+	work->scheduled = false;
 	mutex_unlock(&dev_priv->fbc.lock);
 }
 
@@ -434,13 +444,20 @@ static void intel_fbc_schedule_activation(struct intel_crtc *crtc)
 
 	WARN_ON(!mutex_is_locked(&dev_priv->fbc.lock));
 
+	if (drm_crtc_vblank_get(&crtc->base)) {
+		DRM_ERROR("vblank not available for FBC on pipe %c\n",
+			  pipe_name(crtc->pipe));
+		return;
+	}
+
 	/* It is useless to call intel_fbc_cancel_work() in this function since
 	 * we're not releasing fbc.lock, so it won't have an opportunity to grab
 	 * it to discover that it was cancelled. So we just update the expected
 	 * jiffy count. */
 	work->fb = crtc->base.primary->fb;
 	work->scheduled = true;
-	work->enable_jiffies = jiffies;
+	work->scheduled_vblank = drm_crtc_vblank_count(&crtc->base);
+	drm_crtc_vblank_put(&crtc->base);
 
 	schedule_work(&work->work);
 }
