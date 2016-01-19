@@ -1056,6 +1056,23 @@ int eeh_init(void)
 core_initcall_sync(eeh_init);
 
 /**
+ * eeh_available - Checks for the availability of EEH based on running
+ * architecture.
+ *
+ * This routine should be used in case we need to check if EEH is
+ * available in some situation, regardless if EEH is enabled or not.
+ * For example, if we hotplug-add a PCI device on a machine with no
+ * other PCI device, EEH won't be enabled, yet it's available if the
+ * arch supports it.
+ */
+static inline bool eeh_available(void)
+{
+	if (machine_is(pseries) || machine_is(powernv))
+		return true;
+	return false;
+}
+
+/**
  * eeh_add_device_early - Enable EEH for the indicated device node
  * @pdn: PCI device node for which to set up EEH
  *
@@ -1072,7 +1089,7 @@ void eeh_add_device_early(struct pci_dn *pdn)
 	struct pci_controller *phb;
 	struct eeh_dev *edev = pdn_to_eeh_dev(pdn);
 
-	if (!edev || !eeh_enabled())
+	if (!edev || !eeh_available())
 		return;
 
 	if (!eeh_has_flag(EEH_PROBE_MODE_DEVTREE))
