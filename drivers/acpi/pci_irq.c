@@ -439,9 +439,17 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
 		if (acpi_isa_register_gsi(dev))
 			dev_warn(&dev->dev, "PCI INT %c: no GSI\n",
 				 pin_name(pin));
+		rc = 0;
+		/*
+		 * Excluding the BIOS report the value 255, which meaning
+		 * "unknown" or "no connection" in PCI Local Bus Specification
+		 * Revision 3.0 February 3, 2004, P223.
+		 */
+		if (dev->irq == 0xFF)
+			rc = -EINVAL;
 
 		kfree(entry);
-		return 0;
+		return rc;
 	}
 
 	rc = acpi_register_gsi(&dev->dev, gsi, triggering, polarity);
