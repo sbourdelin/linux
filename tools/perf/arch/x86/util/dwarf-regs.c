@@ -55,26 +55,10 @@ struct pt_regs_offset {
 
 #define REG_OFFSET_END {.name = NULL, .offset = 0}
 
+/* TODO: switching by dwarf address size */
 #ifdef __x86_64__
-# define REG_OFFSET_NAME_64(n, r) {.name = n, .offset = offsetof(struct pt_regs, r)}
-# define REG_OFFSET_NAME_32(n, r) {.name = n, .offset = -1}
-#else
-# define REG_OFFSET_NAME_64(n, r) {.name = n, .offset = -1}
-# define REG_OFFSET_NAME_32(n, r) {.name = n, .offset = offsetof(struct pt_regs, r)}
-#endif
 
-static const struct pt_regs_offset x86_32_regoffset_table[] = {
-	REG_OFFSET_NAME_32("%ax",	eax),
-	REG_OFFSET_NAME_32("%cx",	ecx),
-	REG_OFFSET_NAME_32("%dx",	edx),
-	REG_OFFSET_NAME_32("%bx",	ebx),
-	REG_OFFSET_NAME_32("$stack",	esp),	/* Stack address instead of %sp */
-	REG_OFFSET_NAME_32("%bp",	ebp),
-	REG_OFFSET_NAME_32("%si",	esi),
-	REG_OFFSET_NAME_32("%di",	edi),
-	REG_OFFSET_END,
-};
-
+#define REG_OFFSET_NAME_64(n, r) {.name = n, .offset = offsetof(struct pt_regs, r)}
 static const struct pt_regs_offset x86_64_regoffset_table[] = {
 	REG_OFFSET_NAME_64("%ax",	rax),
 	REG_OFFSET_NAME_64("%dx",	rdx),
@@ -94,12 +78,24 @@ static const struct pt_regs_offset x86_64_regoffset_table[] = {
 	REG_OFFSET_NAME_64("%r15",	r15),
 	REG_OFFSET_END,
 };
-
-/* TODO: switching by dwarf address size */
-#ifdef __x86_64__
 #define regoffset_table x86_64_regoffset_table
+
 #else
+
+#define REG_OFFSET_NAME_32(n, r) {.name = n, .offset = offsetof(struct pt_regs, r)}
+static const struct pt_regs_offset x86_32_regoffset_table[] = {
+	REG_OFFSET_NAME_32("%ax",	eax),
+	REG_OFFSET_NAME_32("%cx",	ecx),
+	REG_OFFSET_NAME_32("%dx",	edx),
+	REG_OFFSET_NAME_32("%bx",	ebx),
+	REG_OFFSET_NAME_32("$stack",	esp),	/* Stack address instead of %sp */
+	REG_OFFSET_NAME_32("%bp",	ebp),
+	REG_OFFSET_NAME_32("%si",	esi),
+	REG_OFFSET_NAME_32("%di",	edi),
+	REG_OFFSET_END,
+};
 #define regoffset_table x86_32_regoffset_table
+
 #endif
 
 /* Minus 1 for the ending REG_OFFSET_END */
