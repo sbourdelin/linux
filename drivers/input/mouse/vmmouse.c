@@ -347,16 +347,10 @@ int vmmouse_detect(struct psmouse *psmouse, bool set_properties)
 		return -ENXIO;
 	}
 
-	if (!request_region(VMMOUSE_PROTO_PORT, 4, "vmmouse")) {
-		psmouse_dbg(psmouse, "VMMouse port in use.\n");
-		return -EBUSY;
-	}
-
 	/* Check if the device is present */
 	response = ~VMMOUSE_PROTO_MAGIC;
 	VMMOUSE_CMD(GETVERSION, 0, version, response, dummy1, dummy2);
 	if (response != VMMOUSE_PROTO_MAGIC || version == 0xffffffffU) {
-		release_region(VMMOUSE_PROTO_PORT, 4);
 		return -ENXIO;
 	}
 
@@ -365,8 +359,6 @@ int vmmouse_detect(struct psmouse *psmouse, bool set_properties)
 		psmouse->name = VMMOUSE_NAME;
 		psmouse->model = version;
 	}
-
-	release_region(VMMOUSE_PROTO_PORT, 4);
 
 	return 0;
 }
@@ -386,7 +378,6 @@ static void vmmouse_disconnect(struct psmouse *psmouse)
 	psmouse_reset(psmouse);
 	input_unregister_device(priv->abs_dev);
 	kfree(priv);
-	release_region(VMMOUSE_PROTO_PORT, 4);
 }
 
 /**
@@ -430,15 +421,10 @@ int vmmouse_init(struct psmouse *psmouse)
 	struct input_dev *rel_dev = psmouse->dev, *abs_dev;
 	int error;
 
-	if (!request_region(VMMOUSE_PROTO_PORT, 4, "vmmouse")) {
-		psmouse_dbg(psmouse, "VMMouse port in use.\n");
-		return -EBUSY;
-	}
-
 	psmouse_reset(psmouse);
 	error = vmmouse_enable(psmouse);
 	if (error)
-		goto release_region;
+		return error;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	abs_dev = input_allocate_device();
@@ -492,9 +478,6 @@ init_fail:
 	input_free_device(abs_dev);
 	kfree(priv);
 	psmouse->private = NULL;
-
-release_region:
-	release_region(VMMOUSE_PROTO_PORT, 4);
 
 	return error;
 }
