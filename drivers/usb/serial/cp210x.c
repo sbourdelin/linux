@@ -315,7 +315,7 @@ static int cp210x_get_config(struct usb_serial_port *port, u8 request,
 	int result, i, length;
 
 	/* Number of integers required to contain the array */
-	length = (((size - 1) | 3) + 1) / 4;
+	length = DIV_ROUND_UP(size, 4);
 
 	buf = kcalloc(length, sizeof(__le32), GFP_KERNEL);
 	if (!buf)
@@ -360,7 +360,7 @@ static int cp210x_set_config(struct usb_serial_port *port, u8 request,
 	int result, i, length;
 
 	/* Number of integers required to contain the array */
-	length = (((size - 1) | 3) + 1) / 4;
+	length = DIV_ROUND_UP(size, 4);
 
 	buf = kmalloc(length * sizeof(__le32), GFP_KERNEL);
 	if (!buf)
