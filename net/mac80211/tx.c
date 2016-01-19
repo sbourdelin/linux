@@ -2099,8 +2099,14 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 					mpp_lookup = true;
 			}
 
-			if (mpp_lookup)
+			if (mpp_lookup) {
 				mppath = mpp_path_lookup(sdata, skb->data);
+				if (mppath) {
+					spin_lock_bh(&mppath->state_lock);
+					mppath->exp_time = jiffies;
+					spin_unlock_bh(&mppath->state_lock);
+				}
+			}
 
 			if (mppath && mpath)
 				mesh_path_del(mpath->sdata, mpath->dst);
