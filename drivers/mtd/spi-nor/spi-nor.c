@@ -903,10 +903,19 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
 	return ERR_PTR(-ENODEV);
 }
 
+/*
+ * Micron multi-die devices do not support cross die boundary
+ * reads. Split the read request in to 1 read per die
+ */
+#define MIN_READ_BOUNDARY 0x2000000
+#define DIST_TO_BOUNDARY(x)	\
+		(MIN_READ_BOUNDARY - ((u32)x & (MIN_READ_BOUNDARY - 1)))
+
 static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 			size_t *retlen, u_char *buf)
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+	size_t read_len;
 	int ret;
 
 	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
@@ -915,7 +924,17 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 	if (ret)
 		return ret;
 
-	ret = nor->read(nor, from, len, retlen, buf);
+	do {
+		read_len = min(len, DIST_TO_BOUNDARY(from));
+
+		ret = nor->read(nor, from, read_len, retlen, buf);
+		if (ret)
+			break;
+
+		from += read_len;
+		buf += read_len;
+		len -= read_len;
+	} while (len > 0);
 
 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_READ);
 	return ret;
