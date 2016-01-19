@@ -26,10 +26,11 @@
 #include "dw_mmc.h"
 #include "dw_mmc-pltfm.h"
 
-static void dw_mci_pltfm_prepare_command(struct dw_mci *host, u32 *cmdr)
+inline void dw_mci_pltfm_prepare_command(struct dw_mci *host, u32 *cmdr)
 {
 	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
 }
+EXPORT_SYMBOL_GPL(dw_mci_pltfm_prepare_command);
 
 static const struct dw_mci_drv_data socfpga_drv_data = {
 	.prepare_command	= dw_mci_pltfm_prepare_command,
