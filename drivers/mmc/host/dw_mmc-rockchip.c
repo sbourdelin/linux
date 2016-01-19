@@ -9,6 +9,7 @@
 
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/clk.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/dw_mmc.h>
@@ -21,6 +22,8 @@
 #define RK3288_CLKGEN_DIV       2
 
 struct dw_mci_rockchip_priv_data {
+	struct pinctrl		*pinctrl;
+	struct pinctrl_state	*pins_default;
 	struct clk		*drv_clk;
 	struct clk		*sample_clk;
 	int			default_sample_phase;
@@ -78,6 +81,10 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
 	/* Make sure we use phases which we can enumerate with */
 	if (!IS_ERR(priv->sample_clk))
 		clk_set_phase(priv->sample_clk, priv->default_sample_phase);
+
+	/* Make sure we use correct pinctrl which we can enumerate with */
+	if (!IS_ERR(priv->pinctrl) && !IS_ERR(priv->pins_default))
+		pinctrl_select_state(priv->pinctrl, priv->pins_default);
 }
 
 #define NUM_PHASES			360
@@ -222,6 +229,14 @@ static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
 	priv->sample_clk = devm_clk_get(host->dev, "ciu-sample");
 	if (IS_ERR(priv->sample_clk))
 		dev_dbg(host->dev, "ciu_sample not available\n");
+
+	priv->pinctrl = devm_pinctrl_get(host->dev);
+	if (!IS_ERR(priv->pinctrl)) {
+		priv->pins_default = pinctrl_lookup_state(priv->pinctrl,
+							  "default");
+		if (IS_ERR(priv->pins_default))
+			dev_dbg(host->dev, "pinctrl not available\n");
+	}
 
 	host->priv = priv;
 
