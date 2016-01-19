@@ -316,6 +316,7 @@ int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 	u32 cmd_count = 0;
 	struct iscsi_cmd *cmd, *cmd_tmp;
 	struct iscsi_conn_recovery *cr;
+	bool aborted = false, tas = false;
 
 	/*
 	 * Allocate an struct iscsi_conn_recovery for this connection.
@@ -398,7 +399,7 @@ int iscsit_prepare_cmds_for_realligance(struct iscsi_conn *conn)
 
 		iscsit_free_all_datain_reqs(cmd);
 
-		transport_wait_for_tasks(&cmd->se_cmd);
+		transport_wait_for_tasks(&cmd->se_cmd, false, &aborted, &tas);
 		/*
 		 * Add the struct iscsi_cmd to the connection recovery cmd list
 		 */

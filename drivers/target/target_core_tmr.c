@@ -110,6 +110,7 @@ static int target_check_cdb_and_preempt(struct list_head *list,
 static bool __target_check_io_state(struct se_cmd *se_cmd)
 {
 	struct se_session *sess = se_cmd->se_sess;
+	bool ret;
 
 	assert_spin_locked(&sess->sess_cmd_lock);
 	WARN_ON_ONCE(!irqs_disabled());
@@ -129,10 +130,36 @@ static bool __target_check_io_state(struct se_cmd *se_cmd)
 		spin_unlock(&se_cmd->t_state_lock);
 		return false;
 	}
+	if (sess->sess_tearing_down || se_cmd->cmd_wait_set) {
+		pr_debug("Attempted to abort io tag: %llu already shutdown,"
+			" skipping\n", se_cmd->tag);
+		spin_unlock(&se_cmd->t_state_lock);
+		return false;
+	}
 	se_cmd->transport_state |= CMD_T_ABORTED;
 	spin_unlock(&se_cmd->t_state_lock);
 
-	return kref_get_unless_zero(&se_cmd->cmd_kref);
+	ret = kref_get_unless_zero(&se_cmd->cmd_kref);
+	if (ret)
+		se_cmd->cmd_wait_set = 1;
+	return ret;
+}
+
+static void target_tmr_put_cmd(struct se_cmd *se_cmd)
+{
+	unsigned long flags;
+	bool fabric_stop;
+
+	spin_lock_irqsave(&se_cmd->t_state_lock, flags);
+	fabric_stop = (se_cmd->transport_state & CMD_T_FABRIC_STOP);
+	spin_unlock_irqrestore(&se_cmd->t_state_lock, flags);
+
+	target_put_sess_cmd(se_cmd);
+
+	if (!fabric_stop) {
+		wait_for_completion(&se_cmd->cmd_wait_comp);
+		se_cmd->se_tfo->release_cmd(se_cmd);
+	}
 }
 
 void core_tmr_abort_task(
@@ -143,6 +170,7 @@ void core_tmr_abort_task(
 	struct se_cmd *se_cmd;
 	unsigned long flags;
 	u64 ref_tag;
+	bool aborted = false, tas = false;
 
 	spin_lock_irqsave(&se_sess->sess_cmd_lock, flags);
 	list_for_each_entry(se_cmd, &se_sess->sess_cmd_list, se_cmd_list) {
@@ -175,10 +203,10 @@ void core_tmr_abort_task(
 		spin_unlock_irqrestore(&se_sess->sess_cmd_lock, flags);
 
 		cancel_work_sync(&se_cmd->work);
-		transport_wait_for_tasks(se_cmd);
+		transport_wait_for_tasks(se_cmd, false, &aborted, &tas);
 
 		transport_cmd_finish_abort(se_cmd, true);
-		target_put_sess_cmd(se_cmd);
+		target_tmr_put_cmd(se_cmd);
 
 		printk("ABORT_TASK: Sending TMR_FUNCTION_COMPLETE for"
 				" ref_tag: %llu\n", ref_tag);
@@ -203,7 +231,7 @@ static void core_tmr_drain_tmr_list(
 	struct se_tmr_req *tmr_p, *tmr_pp;
 	struct se_cmd *cmd;
 	unsigned long flags;
-	bool rc;
+	bool rc, aborted = false, tas = false;
 	/*
 	 * Release all pending and outgoing TMRs aside from the received
 	 * LUN_RESET tmr..
@@ -252,8 +280,12 @@ static void core_tmr_drain_tmr_list(
 		spin_unlock(&sess->sess_cmd_lock);
 		if (!rc) {
 			printk("LUN_RESET TMR: non-zero kref_get_unless_zero\n");
+			spin_unlock(&sess->sess_cmd_lock);
 			continue;
 		}
+		cmd->cmd_wait_set = true;
+		spin_unlock(&sess->sess_cmd_lock);
+
 		list_move_tail(&tmr_p->tmr_list, &drain_tmr_list);
 	}
 	spin_unlock_irqrestore(&dev->se_tmr_lock, flags);
@@ -268,10 +300,10 @@ static void core_tmr_drain_tmr_list(
 			tmr_p->function, tmr_p->response, cmd->t_state);
 
 		cancel_work_sync(&cmd->work);
-		transport_wait_for_tasks(cmd);
+		transport_wait_for_tasks(cmd, false, &aborted, &tas);
 
 		transport_cmd_finish_abort(cmd, 1);
-		target_put_sess_cmd(cmd);
+		target_tmr_put_cmd(cmd);
 	}
 }
 
@@ -287,6 +319,7 @@ static void core_tmr_drain_state_list(
 	struct se_cmd *cmd, *next;
 	unsigned long flags;
 	int rc;
+	bool aborted = false, tas_set = false;
 
 	/*
 	 * Complete outstanding commands with TASK_ABORTED SAM status.
@@ -367,10 +400,10 @@ static void core_tmr_drain_state_list(
 		 * cancel_work_sync may block.
 		 */
 		cancel_work_sync(&cmd->work);
-		transport_wait_for_tasks(cmd);
+		transport_wait_for_tasks(cmd, false, &aborted, &tas_set);
 
 		core_tmr_handle_tas_abort(tmr_sess, cmd, tas);
-		target_put_sess_cmd(cmd);
+		target_tmr_put_cmd(cmd);
 	}
 }
 
