@@ -993,6 +993,13 @@ config GPIO_SODAVILLE
 	help
 	  Say Y here to support Intel Sodaville GPIO.
 
+config GPIO_EXAR
+	tristate "Support for GPIO pins on XR17V352/354/358"
+	depends on SERIAL_8250_PCI
+	help
+	  Selecting this option will enable handling of GPIO pins present
+	  on Exar XR17V352/354/358 chips.
+
 endmenu
 
 menu "SPI GPIO expanders"
