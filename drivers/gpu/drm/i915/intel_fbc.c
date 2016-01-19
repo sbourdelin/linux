@@ -1076,12 +1076,12 @@ static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 }
 
 /**
- * intel_fbc_disable_crtc - disable FBC if it's associated with crtc
+ * intel_fbc_disable - disable FBC if it's associated with crtc
  * @crtc: the CRTC
  *
  * This function disables FBC if it's associated with the provided CRTC.
  */
-void intel_fbc_disable_crtc(struct intel_crtc *crtc)
+void intel_fbc_disable(struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
 	struct intel_fbc *fbc = &dev_priv->fbc;
@@ -1099,12 +1099,12 @@ void intel_fbc_disable_crtc(struct intel_crtc *crtc)
 }
 
 /**
- * intel_fbc_disable - globally disable FBC
+ * intel_fbc_global_disable - globally disable FBC
  * @dev_priv: i915 device instance
  *
  * This function disables FBC regardless of which CRTC is associated with it.
  */
-void intel_fbc_disable(struct drm_i915_private *dev_priv)
+void intel_fbc_global_disable(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
 
