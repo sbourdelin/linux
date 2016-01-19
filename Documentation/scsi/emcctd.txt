@@ -1,0 +1,56 @@
+This file contains brief information about the EMC Cut-Through Driver (emcctd).
+The driver is currently maintained by Singhal, Maneesh (maneesh.singhal@emc.com)
+
+Last modified: Mon Jan 18 2016 by Maneesh Singhal
+
+BASICS
+
+Its a client driver implementation for EMC-Symmetrix GuestOS emulated
+Cut-Through Device. The Cut-Through Device PCI emulation is implemented for
+GuestOS environments in the HyperMax OS. GuestOS environments allows loading of
+any x86 compliant operating systems like Linux/FreeBSD etc.
+
+The client driver is a SCSI HBA implementation which interfaces with SCSI
+midlayer in the north-bound interfaces and connects with the emulated PCI device
+on the south side.
+
+The PCI vendor ID:product ID for emulated Cut-Through Device is 0x1120:0x1B00.
+
+VERSIONING
+
+The Version of the driver is maintained as 2.0.0.X, where 2 refers to the CTD
+protocol in use, and X refers to the ongoing version of the driver.
+
+
+SYSFS SUPPORT
+
+The driver creates the directory /sys/module/emcctd and populates it with
+version file and a directory for various parameters as described in MODULE
+PARAMETERS section.
+
+PROCFS SUPPORT
+
+The driver creates the directory /proc/emc and creates files emcctd_stats_x
+where 'x' refers to the PCI emulation number this client driver connected to.
+These files cotains WWN information and IO statistics for the particular PCI
+emulation.
+
+MODULE PARAMETERS
+
+The supported parameters which could add debuggability or change the runtime
+behavior of the driver are as following:
+
+ctd_debug=0 | 1		Enable driver debug messages(0=off, 1=on)
+
+max_luns=xx		Specify the maximum number of LUN's per
+			host(default=16384)
+
+cmd_per_lun=xx		Specify the maximum commands per lun(default=16)
+
+DEBUGGING HINTS
+
+Debugging code is now compiled in by default but debugging is turned off
+with the kernel module parameter debug_flag defaulting to 0.  To enable debug at
+module load time add ctd_debug=1 to the module load options.
+Debugging can also be enabled and disabled by writing a '0' (disable) or '1'
+(enable) to the sysfs file /sys/module/emcctd/parameters/ctd_debug

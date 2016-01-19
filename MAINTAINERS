@@ -6578,6 +6578,15 @@ F:	drivers/message/fusion/
 F:	drivers/scsi/mpt2sas/
 F:	drivers/scsi/mpt3sas/
 
+EMC Cut-Through Driver
+M:	fredette, matt <matt.fredette@emc.com>
+M:	Pirotte, Serge <serge.pirotte@emc.com>
+M:	Singh Animesh <Animesh.Singh@emc.com>
+M:	Singhal, Maneesh <Maneesh.Singhal@emc.com>
+L:	linux-scsi@vger.kernel.org
+S:	Maintained
+F:	drivers/scsis/emcctd/
+
 LSILOGIC/SYMBIOS/NCR 53C8XX and 53C1010 PCI-SCSI drivers
 M:	Matthew Wilcox <matthew@wil.cx>
 L:	linux-scsi@vger.kernel.org

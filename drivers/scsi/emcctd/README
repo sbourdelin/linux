@@ -1,0 +1,10 @@
+EMCCTD : Client driver implementation for EMC-Symmetrix GuestOS emulated
+Cut-Through Device. The Cut-Through Device PCI emulation is implemented for
+GuestOS environments in the HyperMax OS. GuestOS environments allows loading of
+any x86 compliant operating systems like Linux/FreeBSD etc.
+
+The client driver is a SCSI HBA implementation which interfaces with SCSI
+midlayer in the north-bound interfaces and connects with the emulated PCI device
+on the south side.
+
+The PCI vendor ID:product ID for emulated Cut-Through Device is 0x1120:0x1B00.
