@@ -215,10 +215,10 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
 		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
 		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL64)))
-			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
+			dw_mci_pltfm_prepare_command(host, cmdr);
 	 } else {
 		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
-			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
+			dw_mci_pltfm_prepare_command(host, cmdr);
 	}
 }
 
