@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <asm/hypervisor.h>
+#include <asm/vmware.h>
 
 #include "psmouse.h"
 #include "vmmouse.h"
@@ -84,21 +85,12 @@ struct vmmouse_data {
  * implementing the vmmouse protocol. Should never execute on
  * bare metal hardware.
  */
-#define VMMOUSE_CMD(cmd, in1, out1, out2, out3, out4)	\
-({							\
-	unsigned long __dummy1, __dummy2;		\
-	__asm__ __volatile__ ("inl %%dx" :		\
-		"=a"(out1),				\
-		"=b"(out2),				\
-		"=c"(out3),				\
-		"=d"(out4),				\
-		"=S"(__dummy1),				\
-		"=D"(__dummy2) :			\
-		"a"(VMMOUSE_PROTO_MAGIC),		\
-		"b"(in1),				\
-		"c"(VMMOUSE_PROTO_CMD_##cmd),		\
-		"d"(VMMOUSE_PROTO_PORT) :		\
-		"memory");		                \
+#define VMMOUSE_CMD(cmd, in1, out1, out2, out3, out4)		\
+({								\
+	unsigned long __dummy1, __dummy2;			\
+	VMW_PORT(VMMOUSE_PROTO_CMD_##cmd, in1, 0, 0,		\
+		 VMMOUSE_PROTO_PORT, VMMOUSE_PROTO_MAGIC,	\
+		 out1, out2, out3, out4, __dummy1, __dummy2);   \
 })
 
 /**
