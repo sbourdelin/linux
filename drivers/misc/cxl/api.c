@@ -367,3 +367,11 @@ void cxl_perst_reloads_same_image(struct cxl_afu *afu,
 	afu->adapter->perst_same_image = perst_reloads_same_image;
 }
 EXPORT_SYMBOL_GPL(cxl_perst_reloads_same_image);
+
+ssize_t cxl_read_adapter_vpd(struct pci_dev *afu_dev, void *buf, size_t count)
+{
+	struct device *parent = cxl_get_phys_dev(afu_dev);
+
+	return pci_read_vpd(to_pci_dev(parent), 0, count, buf);
+}
+EXPORT_SYMBOL_GPL(cxl_read_adapter_vpd);
