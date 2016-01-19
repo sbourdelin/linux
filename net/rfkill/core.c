@@ -673,16 +673,6 @@ static ssize_t soft_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(soft);
 
-static u8 user_state_from_blocked(unsigned long state)
-{
-	if (state & RFKILL_BLOCK_HW)
-		return RFKILL_USER_STATE_HARD_BLOCKED;
-	if (state & RFKILL_BLOCK_SW)
-		return RFKILL_USER_STATE_SOFT_BLOCKED;
-
-	return RFKILL_USER_STATE_UNBLOCKED;
-}
-
 static struct attribute *rfkill_dev_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_type.attr,
@@ -699,6 +689,16 @@ static void rfkill_release(struct device *dev)
 	struct rfkill *rfkill = to_rfkill(dev);
 
 	kfree(rfkill);
+}
+
+static u8 user_state_from_blocked(unsigned long state)
+{
+	if (state & RFKILL_BLOCK_HW)
+		return RFKILL_USER_STATE_HARD_BLOCKED;
+	if (state & RFKILL_BLOCK_SW)
+		return RFKILL_USER_STATE_SOFT_BLOCKED;
+
+	return RFKILL_USER_STATE_UNBLOCKED;
 }
 
 static int rfkill_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
