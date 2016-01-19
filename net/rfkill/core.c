@@ -683,46 +683,11 @@ static u8 user_state_from_blocked(unsigned long state)
 	return RFKILL_USER_STATE_UNBLOCKED;
 }
 
-static ssize_t state_show(struct device *dev, struct device_attribute *attr,
-			  char *buf)
-{
-	struct rfkill *rfkill = to_rfkill(dev);
-
-	return sprintf(buf, "%d\n", user_state_from_blocked(rfkill->state));
-}
-
-static ssize_t state_store(struct device *dev, struct device_attribute *attr,
-			   const char *buf, size_t count)
-{
-	struct rfkill *rfkill = to_rfkill(dev);
-	unsigned long state;
-	int err;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
-	err = kstrtoul(buf, 0, &state);
-	if (err)
-		return err;
-
-	if (state != RFKILL_USER_STATE_SOFT_BLOCKED &&
-	    state != RFKILL_USER_STATE_UNBLOCKED)
-		return -EINVAL;
-
-	mutex_lock(&rfkill_global_mutex);
-	rfkill_set_block(rfkill, state == RFKILL_USER_STATE_SOFT_BLOCKED);
-	mutex_unlock(&rfkill_global_mutex);
-
-	return count;
-}
-static DEVICE_ATTR_RW(state);
-
 static struct attribute *rfkill_dev_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_type.attr,
 	&dev_attr_index.attr,
 	&dev_attr_persistent.attr,
-	&dev_attr_state.attr,
 	&dev_attr_soft.attr,
 	&dev_attr_hard.attr,
 	NULL,
