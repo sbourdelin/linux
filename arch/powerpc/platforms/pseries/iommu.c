@@ -1224,8 +1224,10 @@ static int dma_set_mask_pSeriesLP(struct device *dev, u64 dma_mask)
 
 	pdev = to_pci_dev(dev);
 
-	/* only attempt to use a new window if 64-bit DMA is requested */
-	if (!disable_ddw && dma_mask == DMA_BIT_MASK(64)) {
+	/* We should check if EEH is enabled here, since DDW mechanism has
+	 * an intrinsic dependency of EEH config addr information. Also, we
+	 * only attempt to use a new window if 64-bit DMA is requested */
+	if (eeh_enabled() && !disable_ddw && dma_mask == DMA_BIT_MASK(64)) {
 		dn = pci_device_to_OF_node(pdev);
 		dev_dbg(dev, "node is %s\n", dn->full_name);
 
