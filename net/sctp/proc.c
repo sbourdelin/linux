@@ -491,6 +491,7 @@ static int sctp_remaddr_seq_show(struct seq_file *seq, void *v)
 	tsp = (struct sctp_transport *)v;
 	assoc = tsp->asoc;
 
+	rcu_read_lock();
 	list_for_each_entry_rcu(tsp, &assoc->peer.transport_addr_list,
 				transports) {
 		if (tsp->dead)
@@ -543,6 +544,7 @@ static int sctp_remaddr_seq_show(struct seq_file *seq, void *v)
 
 		seq_printf(seq, "\n");
 	}
+	rcu_read_unlock();
 
 	return 0;
 }
