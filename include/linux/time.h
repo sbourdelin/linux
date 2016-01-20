@@ -258,7 +258,7 @@ extern struct timeval ns_to_timeval(const s64 nsec);
  */
 static __always_inline void timespec_add_ns(struct timespec *a, u64 ns)
 {
-	a->tv_sec += __iter_div_u64_rem(a->tv_nsec + ns, NSEC_PER_SEC, &ns);
+	a->tv_sec += div_u64_rem64(a->tv_nsec + ns, NSEC_PER_SEC, &ns);
 	a->tv_nsec = ns;
 }
 

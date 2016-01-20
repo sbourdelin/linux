@@ -22,6 +22,15 @@ static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
 }
 
 /**
+ * div_s64_rem64 - unsigned 64bit divide with 32bit divisor with 64bit remainder
+ */
+static inline u64 div_u64_rem64(u64 dividend, u32 divisor, u64 *remainder)
+{
+	*remainder = dividend % divisor;
+	return dividend / divisor;
+}
+
+/**
  * div_s64_rem - signed 64bit divide with 32bit divisor with remainder
  */
 static inline s64 div_s64_rem(s64 dividend, s32 divisor, s32 *remainder)
@@ -62,6 +71,14 @@ static inline s64 div64_s64(s64 dividend, s64 divisor)
 
 #ifndef div_u64_rem
 static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
+{
+	*remainder = do_div(dividend, divisor);
+	return dividend;
+}
+#endif
+
+#ifndef div_u64_rem64
+static inline u64 div_u64_rem64(u64 dividend, u32 divisor, u64 *remainder)
 {
 	*remainder = do_div(dividend, divisor);
 	return dividend;
