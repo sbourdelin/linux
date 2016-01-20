@@ -87,9 +87,20 @@
 			regulator-max-microvolt = <3300000>;
 		};
 
-		reg_can_xcvr: regulator@2 {
+		reg_3v3_etn: regulator@2 {
 			compatible = "regulator-fixed";
 			reg = <2>;
+			regulator-name = "ETN 3V3";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_etn_phy>;
+			gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+		};
+
+		reg_can_xcvr: regulator@3 {
+			compatible = "regulator-fixed";
+			reg = <3>;
 			regulator-name = "CAN XCVR";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
@@ -98,9 +109,9 @@
 			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
 		};
 
-		reg_usbh1_vbus: regulator@3 {
+		reg_usbh1_vbus: regulator@4 {
 			compatible = "regulator-fixed";
-			reg = <3>;
+			reg = <4>;
 			regulator-name = "usbh1_vbus";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
@@ -110,9 +121,9 @@
 			enable-active-high;
 		};
 
-		reg_usbotg_vbus: regulator@4 {
+		reg_usbotg_vbus: regulator@5 {
 			compatible = "regulator-fixed";
-			reg = <4>;
+			reg = <5>;
 			regulator-name = "usbotg_vbus";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
@@ -204,13 +215,20 @@
 	phy-mode = "rmii";
 	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
 	phy-handle = <&phy0>;
+	phy-supply = <&reg_3v3_etn>;
 	mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
 	status = "okay";
 
-	phy0: ethernet-phy@0 {
-		interrupt-parent = <&gpio2>;
-		interrupts = <4>;
-		device_type = "ethernet-phy";
+	mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		phy0: ethernet-phy@0 {
+			compatible = "ethernet-phy-id0007.c0f1", "ethernet-phy-ieee802.3-c22";
+			reg = <0>;
+			interrupt-parent = <&gpio2>;
+			interrupts = <4>;
+		};
 	};
 };
 
@@ -307,6 +325,10 @@
 
 		pinctrl_can_xcvr: can-xcvrgrp {
 			fsl,pins = <MX53_PAD_DISP0_DAT0__GPIO4_21 0xe0>; /* Flexcan XCVR enable */
+		};
+
+		pinctrl_etn_phy: etn-phygrp {
+			fsl,pins = <MX53_PAD_EIM_D20__GPIO3_20 0xe0>; /* ETN PHY Power enable */
 		};
 
 		pinctrl_ds1339: ds1339grp {
