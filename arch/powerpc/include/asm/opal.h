@@ -273,6 +273,8 @@ void opal_free_sg_list(struct opal_sg_list *sg);
 
 extern int opal_error_code(int rc);
 
+ssize_t opal_msglog_copy(char *to, loff_t pos, size_t count);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_POWERPC_OPAL_H */

@@ -31,11 +31,11 @@ struct memcons {
 	__be32 in_cons;
 };
 
-static ssize_t opal_msglog_read(struct file *file, struct kobject *kobj,
-				struct bin_attribute *bin_attr, char *to,
-				loff_t pos, size_t count)
+static struct bin_attribute opal_msglog_attr;
+
+ssize_t opal_msglog_copy(char *to, loff_t pos, size_t count)
 {
-	struct memcons *mc = bin_attr->private;
+	struct memcons *mc = opal_msglog_attr.private;
 	const char *conbuf;
 	ssize_t ret;
 	size_t first_read = 0;
@@ -89,6 +89,13 @@ static ssize_t opal_msglog_read(struct file *file, struct kobject *kobj,
 	ret += first_read;
 out:
 	return ret;
+}
+
+static ssize_t opal_msglog_read(struct file *file, struct kobject *kobj,
+				struct bin_attribute *bin_attr, char *to,
+				loff_t pos, size_t count)
+{
+	return opal_msglog_copy(to, pos, count);
 }
 
 static struct bin_attribute opal_msglog_attr = {
