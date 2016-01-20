@@ -1299,7 +1299,7 @@
 				clocks = <&h32ck>;
 			};
 
-			watchdog@fc068640 {
+			watchdog: watchdog@fc068640 {
 				compatible = "atmel,sama5d4-wdt";
 				reg = <0xfc068640 0x10>;
 				clocks = <&clk32k>;
@@ -1351,7 +1351,7 @@
 			};
 
 
-			pinctrl@fc06a000 {
+			pinctrl: pinctrl@fc06a000 {
 				#address-cells = <1>;
 				#size-cells = <1>;
 				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
