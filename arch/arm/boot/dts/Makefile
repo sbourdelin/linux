@@ -303,8 +303,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6dl-sabrelite.dtb \
 	imx6dl-sabresd.dtb \
 	imx6dl-tx6dl-comtft.dtb \
-	imx6dl-tx6u-801x.dtb \
-	imx6dl-tx6u-811x.dtb \
+	imx6dl-tx6u-80xx.dtb \
+	imx6dl-tx6u-81xx.dtb \
 	imx6dl-udoo.dtb \
 	imx6dl-wandboard.dtb \
 	imx6dl-wandboard-revb1.dtb \
@@ -332,11 +332,11 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6q-sabresd.dtb \
 	imx6q-sbc6x.dtb \
 	imx6q-tbs2910.dtb \
-	imx6q-tx6q-1010.dtb \
-	imx6q-tx6q-1010-comtft.dtb \
 	imx6q-tx6q-1020.dtb \
 	imx6q-tx6q-1020-comtft.dtb \
-	imx6q-tx6q-1110.dtb \
+	imx6q-tx6q-10x0-comtft.dtb \
+	imx6q-tx6q-10x0.dtb \
+	imx6q-tx6q-11x0.dtb \
 	imx6q-udoo.dtb \
 	imx6q-wandboard.dtb \
 	imx6q-wandboard-revb1.dtb

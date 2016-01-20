@@ -14,11 +14,12 @@
 #include "imx6qdl-tx6.dtsi"
 
 / {
-	model = "Ka-Ro electronics TX6Q-1010 Module on CoMpact TFT";
+	model = "Ka-Ro electronics TX6Q-1010/-1030 Module on CoMpact TFT";
 	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
 
 	aliases {
-		display = &display;
+		display = &mxcfb0;
+		mxcfb0 = &mxcfb0;
 	};
 
 	backlight: backlight {
@@ -43,18 +44,17 @@
 		default-brightness-level = <50>;
 	};
 
-	display: display@di0 {
-		compatible = "fsl,imx-parallel-display";
-		interface-pix-fmt = "rgb24";
+	mxcfb0: fb@2 {
+		compatible = "fsl,mxc_sdc_fb";
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_disp0_1>;
+		pinctrl-0 = <&pinctrl_disp0_2>;
+		disp_dev = "lcd";
+		interface_pix_fmt = "RGB24";
+		mode_str = "";
+		default_bpp = <32>;
+		int_clk = <1>;
+		late_init = <0>;
 		status = "okay";
-
-		port {
-			display0_in: endpoint {
-				remote-endpoint = <&ipu1_di0_disp0>;
-			};
-		};
 
 		display-timings {
 			native-mode = <&ET070001DM6>;
@@ -75,7 +75,15 @@
 				pixelclk-active = <1>;
 			};
 		};
-        };
+	};
+
+	lcd: lcd@0 {
+		compatible = "fsl,lcd";
+		ipu_id = <0>;
+		disp_id = <0>;
+		default_ifmt = "RGB24";
+		status = "okay";
+	};
 };
 
 &can1 {
@@ -86,8 +94,8 @@
 	xceiver-supply = <&reg_3v3>;
 };
 
-&ipu1_di0_disp0 {
-	remote-endpoint = <&display0_in>;
+&ipu2 {
+	status = "disabled";
 };
 
 &kpp {
@@ -96,6 +104,14 @@
 
 &reg_can_xcvr {
 	status = "disabled";
+};
+
+&reg_lcd0_pwr {
+	status = "okay";
+};
+
+&reg_lcd1_pwr {
+	status = "okay";
 };
 
 &touchscreen {

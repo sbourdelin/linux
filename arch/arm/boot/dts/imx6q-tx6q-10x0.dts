@@ -10,15 +10,17 @@
  */
 
 /dts-v1/;
-#include "imx6dl.dtsi"
+#include "imx6q.dtsi"
 #include "imx6qdl-tx6.dtsi"
 
 / {
-	model = "Ka-Ro electronics TX6U-801x Module";
-	compatible = "karo,imx6dl-tx6dl", "fsl,imx6dl";
+	model = "Ka-Ro electronics TX6Q-1010/-1030 Module";
+	compatible = "karo,imx6q-tx6q", "fsl,imx6q";
 
 	aliases {
 		display = &display;
+		ipu1 = &ipu1;
+		ipu2 = &ipu2;
 	};
 
 	backlight: backlight {
@@ -169,9 +171,21 @@
 				pixelclk-active = <0>;
 			};
 		};
-        };
+	};
 };
 
 &ipu1_di0_disp0 {
 	remote-endpoint = <&display0_in>;
+};
+
+&ipu2 {
+	status = "disabled";
+};
+
+&reg_lcd0_pwr {
+	status = "okay";
+};
+
+&reg_lcd1_pwr {
+	status = "okay";
 };
