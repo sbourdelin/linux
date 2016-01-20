@@ -82,7 +82,6 @@ static int n_tracerouter_open(struct tty_struct *tty)
 			tr_data->opencalled = 1;
 			tty->disc_data      = tr_data;
 			tty->receive_room   = RECEIVE_ROOM;
-			tty_driver_flush_buffer(tty);
 			retval = 0;
 		}
 	}
@@ -102,7 +101,6 @@ static void n_tracerouter_close(struct tty_struct *tty)
 
 	mutex_lock(&routelock);
 	WARN_ON(tptr->kref_tty != tr_data->kref_tty);
-	tty_driver_flush_buffer(tty);
 	tty_kref_put(tr_data->kref_tty);
 	tr_data->kref_tty = NULL;
 	tr_data->opencalled = 0;
