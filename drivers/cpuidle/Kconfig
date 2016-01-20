@@ -25,6 +25,15 @@ config CPU_IDLE_GOV_MENU
 	bool "Menu governor (for tickless system)"
 	default y
 
+config CPU_IDLE_GOV_SCHED
+	bool "Sched idle governor"
+	select IRQ_TIMINGS
+	help
+	  Enables an irq timings tracking mechanism to track the wakeup sources
+	  of the platform.
+
+	  If you are unsure, it is safe to say N.
+
 config DT_IDLE_STATES
 	bool
 
