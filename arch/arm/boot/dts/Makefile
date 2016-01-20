@@ -303,6 +303,9 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6dl-sabrelite.dtb \
 	imx6dl-sabresd.dtb \
 	imx6dl-tx6dl-comtft.dtb \
+	imx6dl-tx6s-8034.dtb \
+	imx6dl-tx6s-8035.dtb \
+	imx6dl-tx6u-8033.dtb \
 	imx6dl-tx6u-80xx.dtb \
 	imx6dl-tx6u-81xx.dtb \
 	imx6dl-udoo.dtb \
@@ -334,6 +337,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6q-tbs2910.dtb \
 	imx6q-tx6q-1020.dtb \
 	imx6q-tx6q-1020-comtft.dtb \
+	imx6q-tx6q-1036.dtb \
 	imx6q-tx6q-10x0-comtft.dtb \
 	imx6q-tx6q-10x0.dtb \
 	imx6q-tx6q-11x0.dtb \
