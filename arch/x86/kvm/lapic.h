@@ -173,8 +173,8 @@ bool kvm_apic_pending_eoi(struct kvm_vcpu *vcpu, int vector);
 
 void wait_lapic_expire(struct kvm_vcpu *vcpu);
 
-bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
-			struct kvm_vcpu **dest_vcpu);
+bool kvm_intr_can_posting_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
+			       struct kvm_vcpu **dest_vcpu);
 int kvm_vector_2_index(u32 vector, u32 dest_vcpus,
 		       const unsigned long *bitmap, u32 bitmap_size);
 #endif

@@ -800,7 +800,22 @@ out:
 	return ret;
 }
 
-bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
+/*
+ * This routine tries to handler interrupts in posted mode, here is how
+ * it deals with different cases:
+ * - For single-destination interrupts, handle it in posted mode
+ * - Else if vector hashing is enabled and it is a lowest-priority
+ *   interrupt, handle it in posted mode and use the following mechanism
+ *   to find the destinaiton vCPU.
+ *	1. For lowest-priority interrupts, store all the possible
+ *	   destination vCPUs in an array.
+ *	2. Use "guest vector % max number of destination vCPUs" to find
+ *	   the right destination vCPU in the array for the lowest-priority
+ *	   interrupt.
+ * - Otherwise, use remapped mode to inject the interrupt.
+ */
+
+bool kvm_intr_can_posting_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 			struct kvm_vcpu **dest_vcpu)
 {
 	struct kvm_apic_map *map;
@@ -841,16 +856,44 @@ bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 		if (cid >= ARRAY_SIZE(map->logical_map))
 			goto out;
 
-		for_each_set_bit(i, &bitmap, 16) {
-			dst = map->logical_map[cid][i];
-			if (++r == 2)
+		if (kvm_vector_hashing_enabled() &&
+				kvm_lowest_prio_delivery(irq)) {
+			int idx = 0;
+			unsigned int dest_vcpus = 0;
+
+			dest_vcpus = hweight16(bitmap);
+			if (dest_vcpus == 0)
+				goto out;
+
+			idx = kvm_vector_2_index(irq->vector, dest_vcpus,
+						 &bitmap, 16);
+
+			/*
+			 * We may find a hardware disabled LAPIC here, if that
+			 * is the case, print out a error message once for each
+			 * guest and return
+			 */
+			dst = map->logical_map[cid][idx-1];
+			if (!dst && (kvm->arch.disabled_lapic_found == 0)) {
+				kvm->arch.disabled_lapic_found = 1;
+				printk(KERN_ERR
+					"Disabled LAPIC found during irq injection\n");
+				goto out;
+			}
+
+			*dest_vcpu = dst->vcpu;
+		} else {
+			for_each_set_bit(i, &bitmap, 16) {
+				dst = map->logical_map[cid][i];
+				if (++r == 2)
+					goto out;
+			}
+
+			if (dst && kvm_apic_present(dst->vcpu))
+				*dest_vcpu = dst->vcpu;
+			else
 				goto out;
 		}
-
-		if (dst && kvm_apic_present(dst->vcpu))
-			*dest_vcpu = dst->vcpu;
-		else
-			goto out;
 	}
 
 	ret = true;

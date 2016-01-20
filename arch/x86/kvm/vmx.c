@@ -10763,7 +10763,7 @@ static int vmx_update_pi_irte(struct kvm *kvm, unsigned int host_irq,
 		 */
 
 		kvm_set_msi_irq(e, &irq);
-		if (!kvm_intr_is_single_vcpu(kvm, &irq, &vcpu)) {
+		if (!kvm_intr_can_posting(kvm, &irq, &vcpu)) {
 			/*
 			 * Make sure the IRTE is in remapped mode if
 			 * we don't handle it in posted mode.
