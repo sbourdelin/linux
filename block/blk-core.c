@@ -744,6 +744,12 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	if (blkcg_init_queue(q))
 		goto fail_ref;
 
+	/*
+	 * assign a big initial bandwidth (10GB/s), so blk-throte doesn't start
+	 * slowly
+	 */
+	q->avg_bw[READ] = 10 * 1024 * 1024 * 2;
+	q->avg_bw[WRITE] = 10 * 1024 * 1024 * 2;
 	return q;
 
 fail_ref:
@@ -1903,6 +1909,46 @@ static inline int bio_check_eod(struct bio *bio, unsigned int nr_sectors)
 	return 0;
 }
 
+static void blk_update_bandwidth(struct request_queue *q,
+	struct hd_struct *p)
+{
+	unsigned long now = jiffies;
+	unsigned long last = q->bw_timestamp;
+	sector_t bw;
+	sector_t read_sect, write_sect, tmp_sect;
+
+	if (time_before(now, last + HZ / 5))
+		return;
+
+	if (cmpxchg(&q->bw_timestamp, last, now) != last)
+		return;
+
+	tmp_sect = part_stat_read(p, sectors[READ]);
+	read_sect = tmp_sect - q->last_sects[READ];
+	q->last_sects[READ] = tmp_sect;
+	tmp_sect = part_stat_read(p, sectors[WRITE]);
+	write_sect = tmp_sect - q->last_sects[WRITE];
+	q->last_sects[WRITE] = tmp_sect;
+
+	if (now - last > HZ)
+		return;
+	if (now == last)
+		return;
+
+	bw = read_sect * HZ;
+	sector_div(bw, now - last);
+	if (q->avg_bw[READ] < bw)
+		q->avg_bw[READ] += (bw - q->avg_bw[READ]) >> 3;
+	if (q->avg_bw[READ] > bw)
+		q->avg_bw[READ] -= (q->avg_bw[READ] - bw) >> 3;
+	bw = write_sect * HZ;
+	sector_div(bw, now - last);
+	if (q->avg_bw[WRITE] < bw)
+		q->avg_bw[WRITE] += (bw - q->avg_bw[WRITE]) >> 3;
+	if (q->avg_bw[WRITE] > bw)
+		q->avg_bw[WRITE] -= (q->avg_bw[WRITE] - bw) >> 3;
+}
+
 static noinline_for_stack bool
 generic_make_request_checks(struct bio *bio)
 {
@@ -1974,6 +2020,9 @@ generic_make_request_checks(struct bio *bio)
 	 * layer knows how to live with it.
 	 */
 	create_io_context(GFP_ATOMIC, q->node);
+
+	blk_update_bandwidth(q,
+		part->partno ? &part_to_disk(part)->part0 : part);
 
 	if (!blkcg_bio_issue_check(q, bio))
 		return false;

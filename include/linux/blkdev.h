@@ -464,6 +464,10 @@ struct request_queue {
 	struct bio_set		*bio_split;
 
 	bool			mq_sysfs_init_done;
+
+	unsigned long bw_timestamp;
+	sector_t avg_bw[2];
+	sector_t last_sects[2];
 };
 
 #define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
