@@ -244,6 +244,11 @@ SECTIONS
 	 */
 	.altinstr_replacement : AT(ADDR(.altinstr_replacement) - LOAD_OFFSET) {
 		*(.altinstr_replacement)
+		/*
+		 * Auxiliary section for misc instruction patching tasks. See
+		 * static_cpu_has(), for an example.
+		 */
+		*(.altinstr_aux)
 	}
 
 	/*
