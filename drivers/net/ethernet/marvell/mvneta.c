@@ -373,6 +373,8 @@ struct mvneta_port {
 
 	/* Core clock */
 	struct clk *clk;
+	/* AXI clock */
+	struct clk *clk_axi;
 	u8 mcast_count[256];
 	u16 tx_ring_size;
 	u16 rx_ring_size;
@@ -3615,6 +3617,10 @@ static int mvneta_probe(struct platform_device *pdev)
 
 	clk_prepare_enable(pp->clk);
 
+	pp->clk_axi = devm_clk_get(&pdev->dev, "axi");
+	if (!IS_ERR(pp->clk_axi))
+		clk_prepare_enable(pp->clk_axi);
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	pp->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(pp->base)) {
@@ -3727,6 +3733,7 @@ err_free_ports:
 	free_percpu(pp->ports);
 err_clk:
 	clk_disable_unprepare(pp->clk);
+	clk_disable_unprepare(pp->clk_axi);
 err_put_phy_node:
 	of_node_put(phy_node);
 err_free_irq:
@@ -3744,6 +3751,7 @@ static int mvneta_remove(struct platform_device *pdev)
 
 	unregister_netdev(dev);
 	clk_disable_unprepare(pp->clk);
+	clk_disable_unprepare(pp->clk_axi);
 	free_percpu(pp->ports);
 	free_percpu(pp->stats);
 	irq_dispose_mapping(dev->irq);
