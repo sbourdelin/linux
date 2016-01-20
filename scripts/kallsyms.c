@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
@@ -61,6 +62,7 @@ static int all_symbols = 0;
 static int absolute_percpu = 0;
 static char symbol_prefix_char = '\0';
 static unsigned long long kernel_start_addr = 0;
+static int text_relative = 0;
 
 int token_profit[0x10000];
 
@@ -74,7 +76,7 @@ static void usage(void)
 	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
 			"[--symbol-prefix=<prefix char>] "
 			"[--page-offset=<CONFIG_PAGE_OFFSET>] "
-			"< in.map > out.S\n");
+			"[--text-relative] < in.map > out.S\n");
 	exit(1);
 }
 
@@ -202,6 +204,7 @@ static int symbol_valid(struct sym_entry *s)
 	 */
 	static char *special_symbols[] = {
 		"kallsyms_addresses",
+		"kallsyms_offsets",
 		"kallsyms_num_syms",
 		"kallsyms_names",
 		"kallsyms_markers",
@@ -353,9 +356,34 @@ static void write_src(void)
 	 * .o files.  This prevents .tmp_kallsyms.o or any other
 	 * object from referencing them.
 	 */
-	output_label("kallsyms_addresses");
+	if (!text_relative)
+		output_label("kallsyms_addresses");
+	else
+		output_label("kallsyms_offsets");
+
 	for (i = 0; i < table_cnt; i++) {
-		if (!symbol_absolute(&table[i])) {
+		if (text_relative) {
+			long long offset;
+
+			if (symbol_absolute(&table[i])) {
+				offset = table[i].addr;
+				if (offset < 0 || offset > INT_MAX) {
+					fprintf(stderr, "kallsyms failure: "
+						"absolute symbol value %#llx out of range in relative mode\n",
+						table[i].addr);
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				offset = _text - table[i].addr - 1;
+				if (offset < INT_MIN || offset >= 0) {
+					fprintf(stderr, "kallsyms failure: "
+						"relative symbol value %#llx out of range in relative mode\n",
+						table[i].addr);
+					exit(EXIT_FAILURE);
+				}
+			}
+			printf("\t.long\t%#x\n", (int)offset);
+		} else if (!symbol_absolute(&table[i])) {
 			if (_text <= table[i].addr)
 				printf("\tPTR\t_text + %#llx\n",
 					table[i].addr - _text);
@@ -703,7 +731,9 @@ int main(int argc, char **argv)
 			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
 				const char *p = &argv[i][14];
 				kernel_start_addr = strtoull(p, NULL, 16);
-			} else
+			} else if (strcmp(argv[i], "--text-relative") == 0)
+				text_relative = 1;
+			else
 				usage();
 		}
 	} else if (argc != 1)
