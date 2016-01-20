@@ -461,7 +461,8 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
 
 static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
 {
-	unsigned int bpp, i, pre;
+	int bpp;
+	unsigned int i, pre;
 	unsigned long mpclk, pllref, tmp;
 	unsigned int m = 1, n = 1, target_mbps = 1000;
 	unsigned int max_mbps = dptdin_map[ARRAY_SIZE(dptdin_map) - 1].max_mbps;
