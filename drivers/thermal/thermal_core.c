@@ -461,6 +461,9 @@ static void thermal_tripped_notify(struct thermal_zone_device *tz,
 		kobject_uevent_env(&tz->device.kobj, KOBJ_CHANGE, msg);
 	}
 
+	if (tz->trips <= trip + 1)
+		goto unlock;
+
 	ret = tz->ops->get_trip_temp(tz, trip + 1, &upper_trip_temp);
 	if (ret)
 		goto unlock;
