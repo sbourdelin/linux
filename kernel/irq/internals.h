@@ -20,6 +20,49 @@ extern bool noirqdebug;
 
 extern struct irqaction chained_action;
 
+#ifdef CONFIG_IRQ_TIMINGS
+
+extern const struct irqtimings_ops *__irqtimings;
+
+static inline int alloc_irqtiming(unsigned int irq)
+{
+	if (__irqtimings->alloc)
+		return __irqtimings->alloc(irq);
+	return 0;
+}
+
+static inline void free_irqtiming(unsigned int irq)
+{
+	if (__irqtimings->free)
+		__irqtimings->free(irq);
+}
+
+static inline int setup_irqtiming(unsigned int irq, struct irqaction *act)
+{
+	if (__irqtimings->setup)
+		return __irqtimings->setup(irq, act);
+	return 0;
+}
+
+static inline void remove_irqtiming(unsigned int irq, void *dev_id)
+{
+	if (__irqtimings->remove)
+		__irqtimings->remove(irq, dev_id);
+}
+
+static inline void handle_irqtiming(unsigned int irq, void *dev_id)
+{
+	if (__irqtimings->handler)
+		__irqtimings->handler(irq, ktime_get(), dev_id);
+}
+#else
+static inline int alloc_irqtiming(unsigned int irq) { return 0; }
+static inline int setup_irqtiming(unsigned int irq, void *dev_id) { return 0; }
+static inline void free_irqtiming(unsigned int irq) {}
+static inline void remove_irqtiming(unsigned int irq, void *dev_id) { }
+static inline void handle_irqtiming(unsigned int irq, void *dev_id) { }
+#endif
+
 /*
  * Bits used by threaded handlers:
  * IRQTF_RUNTHREAD - signals that the interrupt handler thread should run

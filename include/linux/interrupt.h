@@ -123,6 +123,32 @@ struct irqaction {
 	struct proc_dir_entry	*dir;
 } ____cacheline_internodealigned_in_smp;
 
+#ifdef CONFIG_IRQ_TIMINGS
+/**
+ * struct irqt_ops - structure to be used by the subsystem to track
+ *                   irq timings
+ * @alloc:    called when an irqdesc is allocated
+ * @free:     called when an irqdesc is free
+ * @setup:    called when an irq is setup, this is called under lock
+ * @remove:   called when an irq is removed
+ * @handler:  called when an interrupt is handled
+ */
+struct irqtimings_ops {
+	int (*alloc)(unsigned int);
+	void (*free)(unsigned int);
+	int (*setup)(unsigned int, struct irqaction *act);
+	void (*remove)(unsigned int, void *dev_id);
+	irqt_handler_t handler;
+};
+
+/**
+ * This macro *must* be used by the subsystem interested by the irq
+ * timing information.
+ */
+#define DECLARE_IRQ_TIMINGS(__ops)				\
+	const struct irqtimings_ops *__irqtimings = __ops;
+#endif
+
 extern irqreturn_t no_action(int cpl, void *dev_id);
 
 extern int __must_check

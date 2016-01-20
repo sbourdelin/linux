@@ -157,6 +157,9 @@ static struct irq_desc *alloc_desc(int irq, int node, struct module *owner)
 	if (alloc_masks(desc, gfp, node))
 		goto err_kstat;
 
+	if (alloc_irqtiming(irq))
+		goto err_mask;
+
 	raw_spin_lock_init(&desc->lock);
 	lockdep_set_class(&desc->lock, &irq_desc_lock_class);
 
@@ -164,6 +167,8 @@ static struct irq_desc *alloc_desc(int irq, int node, struct module *owner)
 
 	return desc;
 
+err_mask:
+	free_masks(desc);
 err_kstat:
 	free_percpu(desc->kstat_irqs);
 err_desc:
@@ -187,6 +192,7 @@ static void free_desc(unsigned int irq)
 	delete_irq_desc(irq);
 	mutex_unlock(&sparse_irq_lock);
 
+	free_irqtiming(irq);
 	free_masks(desc);
 	free_percpu(desc->kstat_irqs);
 	kfree(desc);

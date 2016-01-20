@@ -165,6 +165,7 @@ irqreturn_t handle_irq_event_percpu(struct irq_desc *desc)
 			/* Fall through to add to randomness */
 		case IRQ_HANDLED:
 			flags |= action->flags;
+			handle_irqtiming(irq, action->dev_id);
 			break;
 
 		default:

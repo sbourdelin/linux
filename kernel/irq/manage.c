@@ -1282,13 +1282,17 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 
 		init_waitqueue_head(&desc->wait_for_threads);
 
+		ret = setup_irqtiming(irq, new);
+		if (ret)
+			goto out_mask;
+
 		/* Setup the type (level, edge polarity) if configured: */
 		if (new->flags & IRQF_TRIGGER_MASK) {
 			ret = __irq_set_trigger(desc,
 						new->flags & IRQF_TRIGGER_MASK);
 
 			if (ret)
-				goto out_mask;
+				goto out_irqtiming;
 		}
 
 		desc->istate &= ~(IRQS_AUTODETECT | IRQS_SPURIOUS_DISABLED | \
@@ -1373,6 +1377,8 @@ mismatch:
 	}
 	ret = -EBUSY;
 
+out_irqtiming:
+	remove_irqtiming(irq, new->dev_id);
 out_mask:
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 	free_cpumask_var(mask);
@@ -1480,6 +1486,8 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
 
 	/* Make sure it's not being used on another CPU: */
 	synchronize_irq(irq);
+
+	remove_irqtiming(irq, dev_id);
 
 #ifdef CONFIG_DEBUG_SHIRQ
 	/*
