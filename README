@@ -125,7 +125,7 @@ BUILD directory for the kernel:
 
    When compiling the kernel, all output files will per default be
    stored together with the kernel source code.
-   Using the option "make O=output/dir" allow you to specify an alternate
+   Using the option "make O=output/dir" allows you to specify an alternate
    place for the output files (including .config).
    Example:
 
