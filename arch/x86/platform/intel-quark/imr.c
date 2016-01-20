@@ -220,11 +220,12 @@ static int imr_dbgfs_state_show(struct seq_file *s, void *unused)
 		if (imr_is_enabled(&imr)) {
 			base = imr_to_phys(imr.addr_lo);
 			end = imr_to_phys(imr.addr_hi) + IMR_MASK;
+			size = end - base + 1;
 		} else {
 			base = 0;
 			end = 0;
+			size = 0;
 		}
-		size = end - base;
 		seq_printf(s, "imr%02i: base=%pa, end=%pa, size=0x%08zx "
 			   "rmask=0x%08x, wmask=0x%08x, %s, %s\n", i,
 			   &base, &end, size, imr.rmask, imr.wmask,
@@ -590,14 +591,17 @@ static void __init imr_fixup_memmap(struct imr_device *idev)
 	 * Setup a locked IMR around the physical extent of the kernel
 	 * from the beginning of the .text secton to the end of the
 	 * .rodata section as one physically contiguous block.
+	 *
+	 * We don't round up @size since it is already PAGE_SIZE aligned.
+	 * See vmlinux.lds.S for details.
 	 */
 	ret = imr_add_range(base, size, IMR_CPU, IMR_CPU, true);
 	if (ret < 0) {
 		pr_err("unable to setup IMR for kernel: (%p - %p)\n",
-			&_text, &__end_rodata);
+			&_text, &__end_rodata - 1);
 	} else {
 		pr_info("protecting kernel .text - .rodata: %zu KiB (%p - %p)\n",
-			size / 1024, &_text, &__end_rodata);
+			size / 1024, &_text, &__end_rodata - 1);
 	}
 
 }
