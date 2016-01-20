@@ -36,6 +36,7 @@
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/can.h>
 #include <linux/can/dev.h>
@@ -612,6 +613,10 @@ static int c_can_start(struct net_device *dev)
 	else
 		pinctrl_pm_select_default_state(priv->device);
 
+	err = regulator_enable(priv->reg_xceiver);
+	if (err)
+		return err;
+
 	return 0;
 }
 
@@ -626,6 +631,9 @@ static void c_can_stop(struct net_device *dev)
 
 	/* deactivate pins */
 	pinctrl_pm_select_sleep_state(dev->dev.parent);
+
+	regulator_disable(priv->reg_xceiver);
+
 	priv->can.state = CAN_STATE_STOPPED;
 }
 
@@ -1262,6 +1270,10 @@ int register_c_can_dev(struct net_device *dev)
 	 * in c_can_stop()
 	 */
 	pinctrl_pm_select_sleep_state(dev->dev.parent);
+
+	priv->reg_xceiver = devm_regulator_get(priv->device, "xceiver");
+	if (IS_ERR(priv->reg_xceiver))
+		return PTR_ERR(priv->reg_xceiver);
 
 	c_can_pm_runtime_enable(priv);
 
