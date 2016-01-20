@@ -89,6 +89,15 @@ struct __thermal_zone {
 };
 
 /***   DT thermal zone device callbacks   ***/
+static int of_thermal_null_get_temp(struct thermal_zone_device *tz,
+				       int *temp)
+{
+	/*
+	 * This function will be replaced with
+	 * of_thermal_get_temp() by thermal_zone_of_add_sensor()
+	 */
+	return -EAGAIN;
+}
 
 static int of_thermal_get_temp(struct thermal_zone_device *tz,
 			       int *temp)
@@ -383,6 +392,7 @@ static struct thermal_zone_device_ops of_thermal_ops = {
 	.get_mode = of_thermal_get_mode,
 	.set_mode = of_thermal_set_mode,
 
+	.get_temp      = of_thermal_null_get_temp,
 	.get_trip_type = of_thermal_get_trip_type,
 	.get_trip_temp = of_thermal_get_trip_temp,
 	.set_trip_temp = of_thermal_set_trip_temp,
@@ -549,7 +559,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
 		return;
 
 	mutex_lock(&tzd->lock);
-	tzd->ops->get_temp = NULL;
+	tzd->ops->get_temp = of_thermal_null_get_temp;
 	tzd->ops->get_trend = NULL;
 	tzd->ops->set_emul_temp = NULL;
 
