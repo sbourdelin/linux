@@ -12,6 +12,9 @@
 #include <linux/blk-cgroup.h>
 #include "blk.h"
 
+#define MAX_WEIGHT (1000)
+#define WEIGHT_RATIO_SHIFT (12)
+#define WEIGHT_RATIO (1 << WEIGHT_RATIO_SHIFT)
 /* Max dispatch from a group in 1 round */
 static int throtl_grp_quantum = 8;
 
@@ -74,6 +77,10 @@ struct throtl_service_queue {
 	unsigned int		nr_pending;	/* # queued in the tree */
 	unsigned long		first_pending_disptime;	/* disptime of the first tg */
 	struct timer_list	pending_timer;	/* fires on first_pending_disptime */
+
+	unsigned int		weight;
+	unsigned int		children_weight;
+	unsigned int		ratio;
 };
 
 enum tg_state_flags {
@@ -152,6 +159,9 @@ struct throtl_data
 
 	/* Work for dispatching throttled bios */
 	struct work_struct dispatch_work;
+
+	bool bw_based;
+	bool weight_based;
 };
 
 static void throtl_pending_timer_fn(unsigned long arg);
@@ -201,6 +211,15 @@ static struct throtl_data *sq_to_td(struct throtl_service_queue *sq)
 		return tg->td;
 	else
 		return container_of(sq, struct throtl_data, service_queue);
+}
+
+static inline uint64_t queue_bandwidth(struct throtl_data *td, int rw)
+{
+	uint64_t bw = td->queue->avg_bw[rw] * 512;
+
+	/* give extra bw, so cgroup can dispatch enough IO */
+	bw += bw >> 3;
+	return bw;
 }
 
 /**
@@ -371,6 +390,7 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	sq->parent_sq = &td->service_queue;
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && blkg->parent)
 		sq->parent_sq = &blkg_to_tg(blkg->parent)->service_queue;
+	sq->parent_sq->children_weight += sq->weight;
 	tg->td = td;
 }
 
@@ -386,7 +406,8 @@ static void tg_update_has_rules(struct throtl_grp *tg)
 
 	for (rw = READ; rw <= WRITE; rw++)
 		tg->has_rules[rw] = (parent_tg && parent_tg->has_rules[rw]) ||
-				    (tg->bps[rw] != -1 || tg->iops[rw] != -1);
+				    (tg->bps[rw] != -1 || tg->iops[rw] != -1 ||
+				     tg->service_queue.weight);
 }
 
 static void throtl_pd_online(struct blkg_policy_data *pd)
@@ -401,6 +422,10 @@ static void throtl_pd_online(struct blkg_policy_data *pd)
 static void throtl_pd_free(struct blkg_policy_data *pd)
 {
 	struct throtl_grp *tg = pd_to_tg(pd);
+	struct throtl_service_queue *sq = &tg->service_queue;
+
+	if (sq->parent_sq)
+		sq->parent_sq->children_weight -= sq->weight;
 
 	del_timer_sync(&tg->service_queue.pending_timer);
 	kfree(tg);
@@ -898,6 +923,48 @@ static void start_parent_slice_with_credit(struct throtl_grp *child_tg,
 
 }
 
+static void tg_update_bps(struct throtl_grp *tg)
+{
+	struct throtl_service_queue *sq, *parent_sq;
+
+	sq = &tg->service_queue;
+	parent_sq = sq->parent_sq;
+
+	if (!tg->td->weight_based || !parent_sq)
+		return;
+	sq->ratio = max_t(unsigned int,
+		parent_sq->ratio * sq->weight / parent_sq->children_weight,
+		1);
+
+	tg->bps[READ] = max_t(uint64_t,
+		(queue_bandwidth(tg->td, READ) * sq->ratio) >>
+			WEIGHT_RATIO_SHIFT,
+		1024);
+	tg->bps[WRITE] = max_t(uint64_t,
+		(queue_bandwidth(tg->td, WRITE) * sq->ratio) >>
+			WEIGHT_RATIO_SHIFT,
+		1024);
+}
+
+static void tg_update_ratio(struct throtl_grp *tg)
+{
+	struct throtl_data *td = tg->td;
+	struct cgroup_subsys_state *pos_css;
+	struct blkcg_gq *blkg;
+
+	blkg_for_each_descendant_pre(blkg, pos_css, td->queue->root_blkg) {
+		struct throtl_service_queue *sq;
+
+		tg = blkg_to_tg(blkg);
+		sq = &tg->service_queue;
+
+		if (!sq->parent_sq)
+			continue;
+
+		tg_update_bps(tg);
+	}
+}
+
 static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
@@ -1202,12 +1269,65 @@ static ssize_t tg_set_conf(struct kernfs_open_file *of,
 		v = -1;
 
 	tg = blkg_to_tg(ctx.blkg);
+	if (tg->td->weight_based) {
+		ret = -EBUSY;
+		goto out_finish;
+	}
 
 	if (is_u64)
 		*(u64 *)((void *)tg + of_cft(of)->private) = v;
 	else
 		*(unsigned int *)((void *)tg + of_cft(of)->private) = v;
+	tg->td->bw_based = true;
 
+	tg_conf_updated(tg);
+	ret = 0;
+out_finish:
+	blkg_conf_finish(&ctx);
+	return ret ?: nbytes;
+}
+
+static ssize_t tg_set_weight(struct kernfs_open_file *of,
+			   char *buf, size_t nbytes, loff_t off)
+{
+	struct blkcg *blkcg = css_to_blkcg(of_css(of));
+	struct blkg_conf_ctx ctx;
+	struct throtl_grp *tg;
+	int ret;
+	u64 v;
+	int old_weight;
+
+	ret = blkg_conf_prep(blkcg, &blkcg_policy_throtl, buf, &ctx);
+	if (ret)
+		return ret;
+
+	ret = -EINVAL;
+	if (sscanf(ctx.body, "%llu", &v) != 1)
+		goto out_finish;
+	if (v > MAX_WEIGHT)
+		v = MAX_WEIGHT;
+	if (v == 0)
+		v = 1;
+
+	tg = blkg_to_tg(ctx.blkg);
+	if (tg->td->bw_based) {
+		ret = -EBUSY;
+		goto out_finish;
+	}
+	tg->td->weight_based = true;
+
+	old_weight = tg->service_queue.weight;
+
+	tg->service_queue.weight = v;
+	if (tg->service_queue.parent_sq) {
+		struct throtl_service_queue *psq = tg->service_queue.parent_sq;
+		if (v > old_weight)
+			psq->children_weight += v - old_weight;
+		else if (v < old_weight)
+			psq->children_weight -= old_weight - v;
+	}
+
+	tg_update_ratio(tg);
 	tg_conf_updated(tg);
 	ret = 0;
 out_finish:
@@ -1228,6 +1348,12 @@ static ssize_t tg_set_conf_uint(struct kernfs_open_file *of,
 }
 
 static struct cftype throtl_legacy_files[] = {
+	{
+		.name = "throttle.weight",
+		.private = offsetof(struct throtl_grp, service_queue.weight),
+		.seq_show = tg_print_conf_uint,
+		.write = tg_set_weight,
+	},
 	{
 		.name = "throttle.read_bps_device",
 		.private = offsetof(struct throtl_grp, bps[READ]),
@@ -1313,6 +1439,10 @@ static ssize_t tg_set_max(struct kernfs_open_file *of,
 		return ret;
 
 	tg = blkg_to_tg(ctx.blkg);
+	if (tg->td->weight_based) {
+		ret = -EBUSY;
+		goto out_finish;
+	}
 
 	v[0] = tg->bps[READ];
 	v[1] = tg->bps[WRITE];
@@ -1358,6 +1488,7 @@ static ssize_t tg_set_max(struct kernfs_open_file *of,
 	tg->bps[WRITE] = v[1];
 	tg->iops[READ] = v[2];
 	tg->iops[WRITE] = v[3];
+	tg->td->bw_based = true;
 
 	tg_conf_updated(tg);
 	ret = 0;
@@ -1415,6 +1546,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	sq = &tg->service_queue;
 
+	tg_update_bps(tg);
 	while (true) {
 		/* throtl is FIFO - if bios are already queued, should queue */
 		if (sq->nr_queued[rw])
@@ -1563,6 +1695,7 @@ int blk_throtl_init(struct request_queue *q)
 
 	INIT_WORK(&td->dispatch_work, blk_throtl_dispatch_work_fn);
 	throtl_service_queue_init(&td->service_queue);
+	td->service_queue.ratio = WEIGHT_RATIO;
 
 	q->td = td;
 	td->queue = q;
