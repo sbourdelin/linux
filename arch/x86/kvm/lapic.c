@@ -675,6 +675,22 @@ bool kvm_apic_match_dest(struct kvm_vcpu *vcpu, struct kvm_lapic *source,
 	}
 }
 
+int kvm_vector_2_index(u32 vector, u32 dest_vcpus,
+		       const unsigned long *bitmap, u32 bitmap_size)
+{
+	u32 mod;
+	int i, idx = 0;
+
+	mod = vector % dest_vcpus;
+
+	for (i = 0; i <= mod; i++) {
+		idx = find_next_bit(bitmap, bitmap_size, idx) + 1;
+		BUG_ON(idx > bitmap_size);
+	}
+
+	return idx;
+}
+
 bool kvm_irq_delivery_to_apic_fast(struct kvm *kvm, struct kvm_lapic *src,
 		struct kvm_lapic_irq *irq, int *r, unsigned long *dest_map)
 {
@@ -727,21 +743,51 @@ bool kvm_irq_delivery_to_apic_fast(struct kvm *kvm, struct kvm_lapic *src,
 
 		dst = map->logical_map[cid];
 
-		if (kvm_lowest_prio_delivery(irq)) {
+		if (!kvm_lowest_prio_delivery(irq))
+			goto set_irq;
+
+		if (!kvm_vector_hashing_enabled()) {
 			int l = -1;
 			for_each_set_bit(i, &bitmap, 16) {
 				if (!dst[i])
 					continue;
 				if (l < 0)
 					l = i;
-				else if (kvm_apic_compare_prio(dst[i]->vcpu, dst[l]->vcpu) < 0)
+				else if (kvm_apic_compare_prio(dst[i]->vcpu,
+							dst[l]->vcpu) < 0)
 					l = i;
 			}
-
 			bitmap = (l >= 0) ? 1 << l : 0;
+		} else {
+			int idx = 0;
+			unsigned int dest_vcpus = 0;
+
+			dest_vcpus = hweight16(bitmap);
+			if (dest_vcpus == 0)
+				goto out;
+
+			idx = kvm_vector_2_index(irq->vector,
+				dest_vcpus, &bitmap, 16);
+
+			/*
+			 * We may find a hardware disabled LAPIC here, if that
+			 * is the case, print out a error message once for each
+			 * guest and return.
+			 */
+			if (!dst[idx-1] &&
+				(kvm->arch.disabled_lapic_found == 0)) {
+				kvm->arch.disabled_lapic_found = 1;
+				printk(KERN_ERR
+					"Disabled LAPIC found during irq injection\n");
+				goto out;
+			}
+
+			bitmap = 0;
+			__set_bit(idx-1, &bitmap);
 		}
 	}
 
+set_irq:
 	for_each_set_bit(i, &bitmap, 16) {
 		if (!dst[i])
 			continue;
