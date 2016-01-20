@@ -171,10 +171,11 @@ static inline void iproc_pcie_ob_write(struct iproc_pcie *pcie,
 }
 
 static inline bool iproc_pcie_device_is_valid(struct iproc_pcie *pcie,
+					      unsigned int busnum,
 					      unsigned int slot,
 					      unsigned int fn)
 {
-	if (slot > 0)
+	if ((pcie->type == IPROC_PCIE_PAXC || busnum == 0) && slot > 0)
 		return false;
 
 	/* PAXC can only support limited number of functions */
@@ -199,7 +200,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 	u32 val;
 	u16 offset;
 
-	if (!iproc_pcie_device_is_valid(pcie, slot, fn))
+	if (!iproc_pcie_device_is_valid(pcie, busno, slot, fn))
 		return NULL;
 
 	/* root complex access */
