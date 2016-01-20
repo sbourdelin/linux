@@ -175,6 +175,9 @@ static irqreturn_t idio_16_irq_handler(int irq, void *dev_id)
 	struct gpio_chip *const chip = &idio16gpio->chip;
 	int gpio;
 
+	if (!idio16gpio->irq_mask)
+		return IRQ_NONE;
+
 	for_each_set_bit(gpio, &idio16gpio->irq_mask, chip->ngpio)
 		generic_handle_irq(irq_find_mapping(chip->irqdomain, gpio));
 
