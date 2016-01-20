@@ -1476,7 +1476,7 @@ static bool s626_handle_eos_interrupt(struct comedi_device *dev)
 	 * first uint16_t in the buffer because it contains junk data
 	 * from the final ADC of the previous poll list scan.
 	 */
-	uint32_t *readaddr = (uint32_t *)devpriv->ana_buf.logical_base + 1;
+	uint32_t *readaddr = devpriv->ana_buf.logical_base + 1;
 	int i;
 
 	/* get the data and hand it over to comedi */
@@ -1567,7 +1567,7 @@ static void s626_reset_adc(struct comedi_device *dev, uint8_t *ppl)
 	s626_mc_disable(dev, S626_MC1_ERPS1, S626_P_MC1);
 
 	/* Set starting logical address to write RPS commands. */
-	rps = (uint32_t *)devpriv->rps_buf.logical_base;
+	rps = devpriv->rps_buf.logical_base;
 
 	/* Initialize RPS instruction pointer */
 	writel((uint32_t)devpriv->rps_buf.physical_base,
@@ -1772,7 +1772,7 @@ static int s626_ai_rinsn(struct comedi_device *dev,
 	 * first uint16_t in the buffer because it contains junk data from
 	 * the final ADC of the previous poll list scan.
 	 */
-	readaddr = (uint32_t *)devpriv->ana_buf.logical_base + 1;
+	readaddr = devpriv->ana_buf.logical_base + 1;
 
 	/*
 	 * Convert ADC data to 16-bit integer values and
@@ -2643,7 +2643,7 @@ static int s626_initialize(struct comedi_device *dev)
 	 * Cache Audio2's output DMA buffer logical address.  This is
 	 * where DAC data is buffered for A2 output DMA transfers.
 	 */
-	devpriv->dac_wbuf = (uint32_t *)devpriv->ana_buf.logical_base +
+	devpriv->dac_wbuf = devpriv->ana_buf.logical_base +
 			    S626_DAC_WDMABUF_OS;
 
 	/*
