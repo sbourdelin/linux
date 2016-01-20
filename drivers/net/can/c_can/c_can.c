@@ -36,6 +36,7 @@
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/can.h>
 #include <linux/can/dev.h>
@@ -588,6 +589,22 @@ static int c_can_chip_config(struct net_device *dev)
 	return c_can_set_bittiming(dev);
 }
 
+static inline int c_can_transceiver_enable(const struct c_can_priv *priv)
+{
+	if (!priv->reg_xceiver)
+		return 0;
+
+	return regulator_enable(priv->reg_xceiver);
+}
+
+static inline int c_can_transceiver_disable(const struct c_can_priv *priv)
+{
+	if (!priv->reg_xceiver)
+		return 0;
+
+	return regulator_disable(priv->reg_xceiver);
+}
+
 static int c_can_start(struct net_device *dev)
 {
 	struct c_can_priv *priv = netdev_priv(dev);
@@ -612,6 +629,10 @@ static int c_can_start(struct net_device *dev)
 	else
 		pinctrl_pm_select_default_state(priv->device);
 
+	err = c_can_transceiver_enable(priv);
+	if (err)
+		return err;
+
 	return 0;
 }
 
@@ -626,6 +647,9 @@ static void c_can_stop(struct net_device *dev)
 
 	/* deactivate pins */
 	pinctrl_pm_select_sleep_state(dev->dev.parent);
+
+	c_can_transceiver_disable(priv);
+
 	priv->can.state = CAN_STATE_STOPPED;
 }
 
@@ -1262,6 +1286,13 @@ int register_c_can_dev(struct net_device *dev)
 	 * in c_can_stop()
 	 */
 	pinctrl_pm_select_sleep_state(dev->dev.parent);
+
+	priv->reg_xceiver = devm_regulator_get(priv->device, "xceiver");
+	if (IS_ERR(priv->reg_xceiver)) {
+		if (PTR_ERR(priv->reg_xceiver) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		priv->reg_xceiver = NULL;
+	}
 
 	c_can_pm_runtime_enable(priv);
 

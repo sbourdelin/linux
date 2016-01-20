@@ -213,6 +213,7 @@ struct c_can_priv {
 	u32 comm_rcv_high;
 	u32 rxmasked;
 	u32 dlc[C_CAN_MSG_OBJ_TX_NUM];
+	struct regulator *reg_xceiver;
 };
 
 struct net_device *alloc_c_can_dev(void);
