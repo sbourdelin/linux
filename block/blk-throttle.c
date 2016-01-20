@@ -15,6 +15,9 @@
 #define MAX_WEIGHT (1000)
 #define WEIGHT_RATIO_SHIFT (12)
 #define WEIGHT_RATIO (1 << WEIGHT_RATIO_SHIFT)
+/* must less than the interval we update bandwidth */
+#define CGCHECK_TIME (msecs_to_jiffies(20))
+
 /* Max dispatch from a group in 1 round */
 static int throtl_grp_quantum = 8;
 
@@ -81,6 +84,9 @@ struct throtl_service_queue {
 	unsigned int		weight;
 	unsigned int		children_weight;
 	unsigned int		ratio;
+
+	unsigned long active_timestamp;
+	bool active;
 };
 
 enum tg_state_flags {
@@ -162,6 +168,7 @@ struct throtl_data
 
 	bool bw_based;
 	bool weight_based;
+	unsigned long last_check_timestamp;
 };
 
 static void throtl_pending_timer_fn(unsigned long arg);
@@ -390,7 +397,6 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	sq->parent_sq = &td->service_queue;
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && blkg->parent)
 		sq->parent_sq = &blkg_to_tg(blkg->parent)->service_queue;
-	sq->parent_sq->children_weight += sq->weight;
 	tg->td = td;
 }
 
@@ -424,7 +430,7 @@ static void throtl_pd_free(struct blkg_policy_data *pd)
 	struct throtl_grp *tg = pd_to_tg(pd);
 	struct throtl_service_queue *sq = &tg->service_queue;
 
-	if (sq->parent_sq)
+	if (sq->active && sq->parent_sq)
 		sq->parent_sq->children_weight -= sq->weight;
 
 	del_timer_sync(&tg->service_queue.pending_timer);
@@ -930,7 +936,7 @@ static void tg_update_bps(struct throtl_grp *tg)
 	sq = &tg->service_queue;
 	parent_sq = sq->parent_sq;
 
-	if (!tg->td->weight_based || !parent_sq)
+	if (!tg->td->weight_based || !parent_sq || !sq->active)
 		return;
 	sq->ratio = max_t(unsigned int,
 		parent_sq->ratio * sq->weight / parent_sq->children_weight,
@@ -965,6 +971,26 @@ static void tg_update_ratio(struct throtl_grp *tg)
 	}
 }
 
+static void tg_update_active_time(struct throtl_grp *tg)
+{
+	struct throtl_service_queue *sq = &tg->service_queue;
+	bool update_ratio = false;
+	unsigned long now = jiffies;
+
+	while (sq->parent_sq) {
+		sq->active_timestamp = now;
+		if (!sq->active) {
+			sq->parent_sq->children_weight += sq->weight;
+			sq->active = true;
+			update_ratio = true;
+		}
+		sq = sq->parent_sq;
+	};
+
+	if (update_ratio)
+		tg_update_ratio(tg);
+}
+
 static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
@@ -983,6 +1009,8 @@ static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 	sq->nr_queued[rw]--;
 
 	throtl_charge_bio(tg, bio);
+
+	tg_update_active_time(tg);
 
 	/*
 	 * If our parent is another tg, we just need to transfer @bio to
@@ -1319,7 +1347,7 @@ static ssize_t tg_set_weight(struct kernfs_open_file *of,
 	old_weight = tg->service_queue.weight;
 
 	tg->service_queue.weight = v;
-	if (tg->service_queue.parent_sq) {
+	if (tg->service_queue.active && tg->service_queue.parent_sq) {
 		struct throtl_service_queue *psq = tg->service_queue.parent_sq;
 		if (v > old_weight)
 			psq->children_weight += v - old_weight;
@@ -1524,6 +1552,39 @@ static struct blkcg_policy blkcg_policy_throtl = {
 	.pd_free_fn		= throtl_pd_free,
 };
 
+static void detect_inactive_cg(struct throtl_grp *tg)
+{
+	struct throtl_data *td = tg->td;
+	struct throtl_service_queue *sq = &tg->service_queue;
+	unsigned long now = jiffies;
+	struct cgroup_subsys_state *pos_css;
+	struct blkcg_gq *blkg;
+	bool update_ratio = false;
+
+	tg_update_active_time(tg);
+
+	if (time_before(now, td->last_check_timestamp))
+		return;
+	td->last_check_timestamp = now + CGCHECK_TIME;
+
+	blkg_for_each_descendant_post(blkg, pos_css, td->queue->root_blkg) {
+		tg = blkg_to_tg(blkg);
+		sq = &tg->service_queue;
+		if (sq->parent_sq &&
+		    time_before(sq->active_timestamp + CGCHECK_TIME, now) &&
+		    !(sq->nr_queued[READ] || sq->nr_queued[WRITE])) {
+			if (sq->active && sq->parent_sq) {
+				sq->active = false;
+				sq->parent_sq->children_weight -= sq->weight;
+				update_ratio = true;
+			}
+		}
+	}
+
+	if (update_ratio)
+		tg_update_ratio(tg);
+}
+
 bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		    struct bio *bio)
 {
@@ -1546,6 +1607,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 
 	sq = &tg->service_queue;
 
+	detect_inactive_cg(tg);
 	tg_update_bps(tg);
 	while (true) {
 		/* throtl is FIFO - if bios are already queued, should queue */
@@ -1696,6 +1758,7 @@ int blk_throtl_init(struct request_queue *q)
 	INIT_WORK(&td->dispatch_work, blk_throtl_dispatch_work_fn);
 	throtl_service_queue_init(&td->service_queue);
 	td->service_queue.ratio = WEIGHT_RATIO;
+	td->service_queue.active = true;
 
 	q->td = td;
 	td->queue = q;
