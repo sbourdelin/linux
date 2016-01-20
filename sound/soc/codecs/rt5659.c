@@ -4201,7 +4201,7 @@ struct i2c_driver rt5659_i2c_driver = {
 		.name = "rt5659",
 		.owner = THIS_MODULE,
 		.of_match_table = rt5659_of_match,
-		.acpi_match_table = ACPI_PTR(rt5659_acpi_match),
+		.acpi_match_table = rt5659_acpi_match,
 	},
 	.probe = rt5659_i2c_probe,
 	.remove = rt5659_i2c_remove,
