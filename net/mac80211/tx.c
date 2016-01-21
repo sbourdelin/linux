@@ -915,7 +915,7 @@ ieee80211_tx_h_fragment(struct ieee80211_tx_data *tx)
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_hdr *hdr = (void *)skb->data;
 	int frag_threshold = tx->local->hw.wiphy->frag_threshold;
-	int hdrlen;
+	int hdrlen = tx->hdrlen;
 	int fragnum;
 
 	/* no matter what happens, tx->skb moves to tx->skbs */
@@ -935,8 +935,6 @@ ieee80211_tx_h_fragment(struct ieee80211_tx_data *tx)
 	 */
 	if (WARN_ON(info->flags & IEEE80211_TX_CTL_AMPDU))
 		return TX_DROP;
-
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
 
 	/* internal error, why isn't DONTFRAG set? */
 	if (WARN_ON(skb->len + FCS_LEN <= frag_threshold))
@@ -1164,6 +1162,8 @@ ieee80211_tx_prepare(struct ieee80211_sub_if_data *sdata,
 	info->flags &= ~IEEE80211_TX_INTFL_NEED_TXPROCESSING;
 
 	hdr = (struct ieee80211_hdr *) skb->data;
+
+	tx->hdrlen = ieee80211_hdrlen(hdr->frame_control);
 
 	if (likely(sta)) {
 		if (!IS_ERR(sta))
