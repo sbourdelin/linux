@@ -18,7 +18,6 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
-#include <linux/regmap.h>
 #include <linux/reset.h>
 
 #define PWRAP_MT8135_BRIDGE_IORD_ARB_EN		0x4
@@ -366,7 +365,6 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
 struct pmic_wrapper {
 	struct device *dev;
 	void __iomem *base;
-	struct regmap *regmap;
 	int *regs;
 	enum pwrap_type type;
 	u32 arb_en_all;
@@ -473,16 +471,6 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
 	pwrap_writel(wrp, 1, PWRAP_WACS2_VLDCLR);
 
 	return 0;
-}
-
-static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
-{
-	return pwrap_read(context, adr, rdata);
-}
-
-static int pwrap_regmap_write(void *context, u32 adr, u32 wdata)
-{
-	return pwrap_write(context, adr, wdata);
 }
 
 static int pwrap_reset_spislave(struct pmic_wrapper *wrp)
@@ -780,15 +768,6 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static const struct regmap_config pwrap_regmap_config = {
-	.reg_bits = 16,
-	.val_bits = 16,
-	.reg_stride = 2,
-	.reg_read = pwrap_regmap_read,
-	.reg_write = pwrap_regmap_write,
-	.max_register = 0xffff,
-};
-
 static struct of_device_id of_pwrap_match_tbl[] = {
 	{
 		.compatible = "mediatek,mt8135-pwrap",
@@ -903,10 +882,6 @@ static int pwrap_probe(struct platform_device *pdev)
 			"mt-pmic-pwrap", wrp);
 	if (ret)
 		goto err_out2;
-
-	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
-	if (IS_ERR(wrp->regmap))
-		return PTR_ERR(wrp->regmap);
 
 	ret = of_platform_populate(np, NULL, NULL, wrp->dev);
 	if (ret) {
