@@ -1093,6 +1093,14 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 	case HV_X64_HCALL_NOTIFY_LONG_SPIN_WAIT:
 		kvm_vcpu_on_spin(vcpu);
 		break;
+	case HV_X64_HCALL_POST_MESSAGE:
+	case HV_X64_HCALL_SIGNAL_EVENT:
+		vcpu->run->exit_reason = KVM_EXIT_HYPERV;
+		vcpu->run->hyperv.type = KVM_EXIT_HYPERV_HCALL;
+		vcpu->run->hyperv.u.hcall.input = param;
+		vcpu->run->hyperv.u.hcall.params[0] = ingpa;
+		vcpu->run->hyperv.u.hcall.params[1] = outgpa;
+		return 0;
 	default:
 		res = HV_STATUS_INVALID_HYPERCALL_CODE;
 		break;
@@ -1100,12 +1108,19 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 
 set_result:
 	ret = res | (((u64)rep_done & 0xfff) << 32);
-	if (longmode) {
-		kvm_register_write(vcpu, VCPU_REGS_RAX, ret);
-	} else {
-		kvm_register_write(vcpu, VCPU_REGS_RDX, ret >> 32);
-		kvm_register_write(vcpu, VCPU_REGS_RAX, ret & 0xffffffff);
-	}
-
+	kvm_hv_hypercall_set_result(vcpu, ret);
 	return 1;
+}
+
+void kvm_hv_hypercall_set_result(struct kvm_vcpu *vcpu, u64 result)
+{
+	bool longmode;
+
+	longmode = is_64_bit_mode(vcpu);
+	if (longmode)
+		kvm_register_write(vcpu, VCPU_REGS_RAX, result);
+	else {
+		kvm_register_write(vcpu, VCPU_REGS_RDX, result >> 32);
+		kvm_register_write(vcpu, VCPU_REGS_RAX, result & 0xffffffff);
+	}
 }

@@ -6891,6 +6891,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 	} else
 		WARN_ON(vcpu->arch.pio.count || vcpu->mmio_needed);
 
+	if (unlikely(kvm_run->exit_reason == KVM_EXIT_HYPERV) &&
+	    kvm_run->hyperv.type == KVM_EXIT_HYPERV_HCALL)
+		kvm_hv_hypercall_set_result(vcpu,
+					    kvm_run->hyperv.u.hcall.result);
+
 	r = vcpu_run(vcpu);
 
 out:
