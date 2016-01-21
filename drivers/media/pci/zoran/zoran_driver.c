@@ -227,8 +227,8 @@ static int v4l_fbuffer_alloc(struct zoran_fh *fh)
 				ZR_DEVNAME(zr), __func__, i);
 
 		//udelay(20);
-		mem = kmalloc(fh->buffers.buffer_size,
-			      GFP_KERNEL | __GFP_NOWARN);
+		mem = (unsigned char *)__get_free_pages(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN,
+				get_order(fh->buffers.buffer_size));
 		if (!mem) {
 			dprintk(1,
 				KERN_ERR
@@ -272,7 +272,8 @@ static void v4l_fbuffer_free(struct zoran_fh *fh)
 		for (off = 0; off < fh->buffers.buffer_size;
 		     off += PAGE_SIZE)
 			ClearPageReserved(virt_to_page(mem + off));
-		kfree(fh->buffers.buffer[i].v4l.fbuffer);
+		free_pages((unsigned long)fh->buffers.buffer[i].v4l.fbuffer,
+				get_order(fh->buffers.buffer_size));
 		fh->buffers.buffer[i].v4l.fbuffer = NULL;
 	}
 
@@ -335,7 +336,8 @@ static int jpg_fbuffer_alloc(struct zoran_fh *fh)
 		fh->buffers.buffer[i].jpg.frag_tab_bus = virt_to_bus(mem);
 
 		if (fh->buffers.need_contiguous) {
-			mem = kmalloc(fh->buffers.buffer_size, GFP_KERNEL);
+			mem = (void *)__get_free_pages(GFP_KERNEL|__GFP_ZERO,
+					get_order(fh->buffers.buffer_size));
 			if (mem == NULL) {
 				dprintk(1,
 					KERN_ERR
@@ -407,7 +409,8 @@ static void jpg_fbuffer_free(struct zoran_fh *fh)
 				mem = bus_to_virt(le32_to_cpu(frag_tab));
 				for (off = 0; off < fh->buffers.buffer_size; off += PAGE_SIZE)
 					ClearPageReserved(virt_to_page(mem + off));
-				kfree(mem);
+				free_pages((unsigned long)mem,
+						get_order(fh->buffers.buffer_size));
 				buffer->jpg.frag_tab[0] = 0;
 				buffer->jpg.frag_tab[1] = 0;
 			}
