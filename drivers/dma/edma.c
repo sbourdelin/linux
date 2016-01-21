@@ -1680,9 +1680,22 @@ static void edma_issue_pending(struct dma_chan *chan)
 	spin_unlock_irqrestore(&echan->vchan.lock, flags);
 }
 
+#define EDMA_CCSTAT_ACTV (1 << 4)
+
+/*
+ * This limit exists to avoid a possible infinite loop when waiting for proof
+ * that a particular transfer is completed. This limit can be hit if there
+ * are large bursts to/from slow devices or the CPU is never able to catch
+ * the DMA hardware idle. On an AM335x transfering 48 bytes from the UART
+ * RX-FIFO, as many as 55 loops have been seen.
+ */
+#define EDMA_MAX_TR_WAIT_LOOPS 1000
+
 static u32 edma_residue(struct edma_desc *edesc)
 {
 	bool dst = edesc->direction == DMA_DEV_TO_MEM;
+	int loop_count = EDMA_MAX_TR_WAIT_LOOPS;
+	struct edma_chan *echan = edesc->echan;
 	struct edma_pset *pset = edesc->pset;
 	dma_addr_t done, pos;
 	int i;
@@ -1691,7 +1704,32 @@ static u32 edma_residue(struct edma_desc *edesc)
 	 * We always read the dst/src position from the first RamPar
 	 * pset. That's the one which is active now.
 	 */
-	pos = edma_get_position(edesc->echan->ecc, edesc->echan->slot[0], dst);
+	pos = edma_get_position(echan->ecc, echan->slot[0], dst);
+
+	/*
+	 * "pos" may represent a transfer request that is still being
+	 * processed by the EDMACC or EDMATC. We will busy wait until
+	 * any one of the situations occurs:
+	 *   1. the DMA hardware is idle
+	 *   2. a new transfer request is setup
+	 *   3. we hit the loop limit
+	 */
+	while (edma_read(echan->ecc, EDMA_CCSTAT) & EDMA_CCSTAT_ACTV) {
+		/* check if a new transfer request is setup */
+		if (edma_get_position(echan->ecc,
+				      echan->slot[0], dst) != pos) {
+			break;
+		}
+
+		if (!--loop_count) {
+			dev_dbg_ratelimited(echan->vchan.chan.device->dev,
+				"%s: timeout waiting for PaRAM update\n",
+				__func__);
+			break;
+		}
+
+		cpu_relax();
+	}
 
 	/*
 	 * Cyclic is simple. Just subtract pset[0].addr from pos.
