@@ -14,6 +14,7 @@
  *
  * Copyright 2010 Paul Mackerras, IBM Corp. <paulus@au1.ibm.com>
  * Copyright 2011 David Gibson, IBM Corporation <dwg@au1.ibm.com>
+ * Copyright 2016 Alexey Kardashevskiy, IBM Corporation <aik@au1.ibm.com>
  */
 
 #include <linux/types.h>
@@ -37,8 +38,7 @@
 #include <asm/kvm_host.h>
 #include <asm/udbg.h>
 #include <asm/iommu.h>
-
-#define TCES_PER_PAGE	(PAGE_SIZE / sizeof(u64))
+#include <asm/tce.h>
 
 static unsigned long kvmppc_stt_npages(unsigned long window_size)
 {
@@ -200,3 +200,109 @@ fail:
 	}
 	return ret;
 }
+
+long kvmppc_h_put_tce(struct kvm_vcpu *vcpu,
+		unsigned long liobn, unsigned long ioba,
+		unsigned long tce)
+{
+	long ret;
+	struct kvmppc_spapr_tce_table *stt;
+
+	stt = kvmppc_find_table(vcpu, liobn);
+	if (!stt)
+		return H_TOO_HARD;
+
+	ret = kvmppc_ioba_validate(stt, ioba, 1);
+	if (ret != H_SUCCESS)
+		return ret;
+
+	ret = kvmppc_tce_validate(stt, tce);
+	if (ret != H_SUCCESS)
+		return ret;
+
+	kvmppc_tce_put(stt, ioba >> IOMMU_PAGE_SHIFT_4K, tce);
+
+	return H_SUCCESS;
+}
+EXPORT_SYMBOL_GPL(kvmppc_h_put_tce);
+
+long kvmppc_h_put_tce_indirect(struct kvm_vcpu *vcpu,
+		unsigned long liobn, unsigned long ioba,
+		unsigned long tce_list, unsigned long npages)
+{
+	struct kvmppc_spapr_tce_table *stt;
+	long i, ret = H_SUCCESS, idx;
+	unsigned long entry, ua = 0;
+	u64 __user *tces, tce;
+
+	stt = kvmppc_find_table(vcpu, liobn);
+	if (!stt)
+		return H_TOO_HARD;
+
+	entry = ioba >> IOMMU_PAGE_SHIFT_4K;
+	/*
+	 * SPAPR spec says that the maximum size of the list is 512 TCEs
+	 * so the whole table fits in 4K page
+	 */
+	if (npages > 512)
+		return H_PARAMETER;
+
+	if (tce_list & (SZ_4K - 1))
+		return H_PARAMETER;
+
+	ret = kvmppc_ioba_validate(stt, ioba, npages);
+	if (ret != H_SUCCESS)
+		return ret;
+
+	idx = srcu_read_lock(&vcpu->kvm->srcu);
+	if (kvmppc_gpa_to_ua(vcpu->kvm, tce_list, &ua, NULL)) {
+		ret = H_TOO_HARD;
+		goto unlock_exit;
+	}
+	tces = (u64 __user *) ua;
+
+	for (i = 0; i < npages; ++i) {
+		if (get_user(tce, tces + i)) {
+			ret = H_PARAMETER;
+			goto unlock_exit;
+		}
+		tce = be64_to_cpu(tce);
+
+		ret = kvmppc_tce_validate(stt, tce);
+		if (ret != H_SUCCESS)
+			goto unlock_exit;
+
+		kvmppc_tce_put(stt, entry + i, tce);
+	}
+
+unlock_exit:
+	srcu_read_unlock(&vcpu->kvm->srcu, idx);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(kvmppc_h_put_tce_indirect);
+
+long kvmppc_h_stuff_tce(struct kvm_vcpu *vcpu,
+		unsigned long liobn, unsigned long ioba,
+		unsigned long tce_value, unsigned long npages)
+{
+	struct kvmppc_spapr_tce_table *stt;
+	long i, ret;
+
+	stt = kvmppc_find_table(vcpu, liobn);
+	if (!stt)
+		return H_TOO_HARD;
+
+	ret = kvmppc_ioba_validate(stt, ioba, npages);
+	if (ret != H_SUCCESS)
+		return ret;
+
+	if (tce_value & (TCE_PCI_WRITE | TCE_PCI_READ))
+		return H_PARAMETER;
+
+	for (i = 0; i < npages; ++i, ioba += IOMMU_PAGE_SIZE_4K)
+		kvmppc_tce_put(stt, ioba >> IOMMU_PAGE_SHIFT_4K, tce_value);
+
+	return H_SUCCESS;
+}
+EXPORT_SYMBOL_GPL(kvmppc_h_stuff_tce);
