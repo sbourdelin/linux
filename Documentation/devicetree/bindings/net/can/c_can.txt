@@ -18,6 +18,8 @@ Optional properties:
 			  RAMINIT register, register offset to the RAMINIT
 			  register and the CAN instance number (0 offset).
 
+- xceiver-supply: Regulator that powers the CAN transceiver
+
 Note: "ti,hwmods" field is used to fetch the base address and irq
 resources from TI, omap hwmod data base during device registration.
 Future plan is to migrate hwmod data base contents into device tree
