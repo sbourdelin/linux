@@ -4358,6 +4358,9 @@ static void gro_list_prepare(struct napi_struct *napi, struct sk_buff *skb)
 			diffs = memcmp(skb_mac_header(p),
 				       skb_mac_header(skb),
 				       maclen);
+		if (!diffs)
+			diffs = skb_metadata_dst_cmp(p, skb);
+
 		NAPI_GRO_CB(p)->same_flow = !diffs;
 	}
 }
@@ -4548,10 +4551,12 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 		break;
 
 	case GRO_MERGED_FREE:
-		if (NAPI_GRO_CB(skb)->free == NAPI_GRO_FREE_STOLEN_HEAD)
+		if (NAPI_GRO_CB(skb)->free == NAPI_GRO_FREE_STOLEN_HEAD) {
+			skb_dst_drop(skb);
 			kmem_cache_free(skbuff_head_cache, skb);
-		else
+		} else {
 			__kfree_skb(skb);
+		}
 		break;
 
 	case GRO_HELD:

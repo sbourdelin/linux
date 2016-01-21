@@ -44,6 +44,29 @@ static inline bool skb_valid_dst(const struct sk_buff *skb)
 	return dst && !(dst->flags & DST_METADATA);
 }
 
+static inline int skb_metadata_dst_cmp(struct sk_buff *skb_a,
+				       struct sk_buff *skb_b)
+{
+	const struct metadata_dst *a = skb_metadata_dst(skb_a);
+	const struct metadata_dst *b = skb_metadata_dst(skb_b);
+
+	if (!a != !b)
+		return 1;
+
+	if (!a)
+		return 0;
+
+	if (memcmp(&a->u.tun_info.key, &b->u.tun_info.key,
+		   sizeof(a->u.tun_info.key)))
+		return 1;
+
+	if (a->u.tun_info.options_len != b->u.tun_info.options_len)
+		return 1;
+
+	return memcmp(&a->u.tun_info + 1, &b->u.tun_info + 1,
+		      a->u.tun_info.options_len);
+}
+
 struct metadata_dst *metadata_dst_alloc(u8 optslen, gfp_t flags);
 struct metadata_dst __percpu *metadata_dst_alloc_percpu(u8 optslen, gfp_t flags);
 
