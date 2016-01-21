@@ -1106,21 +1106,70 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
 	return desc;
 }
 
+static int __rcar_dmac_device_config(struct dma_chan *chan,
+				     struct rcar_dmac_chan_slave *slave,
+				     phys_addr_t addr, size_t size,
+				     enum dma_data_direction dir,
+				     struct dma_attrs *attrs)
+{
+	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+	struct page *page;
+	size_t offset;
+
+	/* unmap old */
+	if (slave->slave_addr) {
+		dma_unmap_page_attrs(chan->device->dev, slave->slave_addr,
+				slave->xfer_size, dir, attrs);
+		slave->slave_addr = 0;
+		slave->xfer_size = 0;
+	}
+
+	/* map new */
+	if (addr) {
+		/* phys_to_page not available on all platforms */
+		page = pfn_to_page(addr >> PAGE_SHIFT);
+		offset = addr - page_to_phys(page);
+		slave->slave_addr = dma_map_page_attrs(chan->device->dev, page,
+				offset, size, dir, attrs);
+
+		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
+			dev_err(chan->device->dev,
+					"chan%u: failed to map %zx@%pap",
+					rchan->index, size, &addr);
+			return -EIO;
+		}
+
+		slave->xfer_size = size;
+	}
+
+	return 0;
+
+}
+
 static int rcar_dmac_device_config(struct dma_chan *chan,
 				   struct dma_slave_config *cfg)
 {
 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+	struct dma_attrs attrs;
+	int ret;
 
 	/*
 	 * We could lock this, but you shouldn't be configuring the
 	 * channel, while using it...
 	 */
-	rchan->src.slave_addr = cfg->src_addr;
-	rchan->dst.slave_addr = cfg->dst_addr;
-	rchan->src.xfer_size = cfg->src_addr_width;
-	rchan->dst.xfer_size = cfg->dst_addr_width;
 
-	return 0;
+	init_dma_attrs(&attrs);
+	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
+	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+
+	ret = __rcar_dmac_device_config(chan, &rchan->src, cfg->src_addr,
+			cfg->src_addr_width, DMA_FROM_DEVICE, &attrs);
+	if (!ret)
+		return ret;
+
+	ret = __rcar_dmac_device_config(chan, &rchan->dst, cfg->dst_addr,
+			cfg->dst_addr_width, DMA_TO_DEVICE, &attrs);
+	return ret;
 }
 
 static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
