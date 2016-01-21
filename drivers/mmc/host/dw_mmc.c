@@ -2949,12 +2949,6 @@ int dw_mci_probe(struct dw_mci *host)
 		}
 	}
 
-	if (host->pdata->num_slots < 1) {
-		dev_err(host->dev,
-			"Platform data must supply num_slots.\n");
-		return -ENODEV;
-	}
-
 	host->biu_clk = devm_clk_get(host->dev, "biu");
 	if (IS_ERR(host->biu_clk)) {
 		dev_dbg(host->dev, "biu clock not available\n");
