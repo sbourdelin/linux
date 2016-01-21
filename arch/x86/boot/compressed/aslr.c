@@ -160,8 +160,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	mem_avoid[1].size = initrd_size;
 
 	/* Avoid kernel command line. */
-	cmd_line  = (u64)real_mode->ext_cmd_line_ptr << 32;
-	cmd_line |= real_mode->hdr.cmd_line_ptr;
+	cmd_line = get_cmd_line_ptr();
 	/* Calculate size of cmd_line. */
 	ptr = (char *)(unsigned long)cmd_line;
 	for (cmd_line_size = 0; ptr[cmd_line_size++]; )

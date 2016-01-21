@@ -49,6 +49,7 @@ static inline void debug_putstr(const char *s)
 
 #if CONFIG_EARLY_PRINTK || CONFIG_RANDOMIZE_BASE
 /* cmdline.c */
+unsigned long get_cmd_line_ptr(void);
 int cmdline_find_option(const char *option, char *buffer, int bufsize);
 int cmdline_find_option_bool(const char *option);
 #endif
