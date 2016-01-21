@@ -1186,6 +1186,8 @@ static int hci_mgmt_cmd(struct hci_mgmt_chan *chan, struct sock *sk,
 
 	if (hdev && chan->hdev_init)
 		chan->hdev_init(sk, hdev);
+	else if (!hdev)
+		goto done;
 
 	cp = buf + sizeof(*hdr);
 
