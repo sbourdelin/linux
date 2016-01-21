@@ -784,6 +784,9 @@ void scsi_attach_vpd(struct scsi_device *sdev)
 	int pg83_supported = 0;
 	unsigned char __rcu *vpd_buf, *orig_vpd_buf = NULL;
 
+	if (sdev->scsi_level < SCSI_3)
+		return;
+
 	if (sdev->skip_vpd_pages)
 		return;
 retry_pg0:
