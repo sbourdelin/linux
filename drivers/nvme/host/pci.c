@@ -1528,9 +1528,6 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	snprintf(nvmeq->irqname, sizeof(nvmeq->irqname), "nvme%dq%d",
 			dev->instance, qid);
 	spin_lock_init(&nvmeq->q_lock);
-	nvmeq->cq_head = 0;
-	nvmeq->cq_phase = 1;
-	nvmeq->q_db = &dev->dbs[qid * 2 * dev->db_stride];
 	nvmeq->q_depth = depth;
 	nvmeq->qid = qid;
 	nvmeq->cq_vector = -1;
@@ -1561,8 +1558,9 @@ static int queue_request_irq(struct nvme_dev *dev, struct nvme_queue *nvmeq,
 				IRQF_SHARED, name, nvmeq);
 }
 
-static void nvme_init_queue(struct nvme_queue *nvmeq, u16 qid)
+static int nvme_init_queue(struct nvme_queue *nvmeq, u16 qid)
 {
+	int result;
 	struct nvme_dev *dev = nvmeq->dev;
 
 	spin_lock_irq(&nvmeq->q_lock);
@@ -1573,6 +1571,16 @@ static void nvme_init_queue(struct nvme_queue *nvmeq, u16 qid)
 	memset((void *)nvmeq->cqes, 0, CQ_SIZE(nvmeq->q_depth));
 	dev->online_queues++;
 	spin_unlock_irq(&nvmeq->q_lock);
+
+	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
+
+	if (result) {
+		spin_lock_irq(&nvmeq->q_lock);
+		nvmeq->cq_vector = -1;
+		dev->online_queues--;
+		spin_unlock_irq(&nvmeq->q_lock);
+	}
+	return result;
 }
 
 static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
@@ -1589,11 +1597,15 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 	if (result < 0)
 		goto release_cq;
 
-	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
+	/*
+	 * Init queue door bell ioremap address before enabling irq, if not,
+	 * a spurious interrupt triggered nvme_process_cq may access invalid
+	 * address
+	 */
+	result = nvme_init_queue(nvmeq, qid);
 	if (result < 0)
 		goto release_sq;
 
-	nvme_init_queue(nvmeq, qid);
 	return result;
 
  release_sq:
@@ -1789,11 +1801,9 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 		goto free_nvmeq;
 
 	nvmeq->cq_vector = 0;
-	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
-	if (result) {
-		nvmeq->cq_vector = -1;
+	result = nvme_init_queue(nvmeq, 0);
+	if (result)
 		goto free_nvmeq;
-	}
 
 	return result;
 
@@ -2445,6 +2455,9 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 			nvme_release_cmb(dev);
 	}
 
+	/* Deregister the admin queue's interrupt */
+	free_irq(dev->entry[0].vector, adminq);
+
 	size = db_bar_size(dev, nr_io_queues);
 	if (size > 8192) {
 		iounmap(dev->bar);
@@ -2459,9 +2472,6 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 		dev->dbs = ((void __iomem *)dev->bar) + 4096;
 		adminq->q_db = dev->dbs;
 	}
-
-	/* Deregister the admin queue's interrupt */
-	free_irq(dev->entry[0].vector, adminq);
 
 	/*
 	 * If we enable msix early due to not intx, disable it again before
@@ -2495,6 +2505,7 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	result = queue_request_irq(dev, adminq, adminq->irqname);
 	if (result) {
 		adminq->cq_vector = -1;
+		dev->online_queues--;
 		goto free_queues;
 	}
 
@@ -3163,7 +3174,6 @@ static void nvme_probe_work(struct work_struct *work)
 		goto disable;
 	}
 
-	nvme_init_queue(dev->queues[0], 0);
 	result = nvme_alloc_admin_tags(dev);
 	if (result)
 		goto disable;
