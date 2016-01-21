@@ -1250,7 +1250,7 @@ void ieee80211_send_auth(struct ieee80211_sub_if_data *sdata,
 		memcpy(skb_put(skb, extra_len), extra, extra_len);
 
 	if (auth_alg == WLAN_AUTH_SHARED_KEY && transaction == 3) {
-		hdrlen = ieee80211_hdrlen(mgmt->frame_control);
+		hdrlen = __ieee80211_hdrlen(&local->hw, mgmt->frame_control);
 		mgmt->frame_control |= cpu_to_le16(IEEE80211_FCTL_PROTECTED);
 		err = ieee80211_wep_encrypt(local, skb, hdrlen, key,
 					    key_len, key_idx);

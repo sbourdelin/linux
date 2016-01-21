@@ -1162,8 +1162,7 @@ ieee80211_tx_prepare(struct ieee80211_sub_if_data *sdata,
 	info->flags &= ~IEEE80211_TX_INTFL_NEED_TXPROCESSING;
 
 	hdr = (struct ieee80211_hdr *) skb->data;
-
-	tx->hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	tx->hdrlen = __ieee80211_hdrlen(&local->hw, hdr->frame_control);
 
 	if (likely(sta)) {
 		if (!IS_ERR(sta))
@@ -1795,7 +1794,7 @@ netdev_tx_t ieee80211_monitor_start_xmit(struct sk_buff *skb,
 		goto fail;
 
 	hdr = (struct ieee80211_hdr *)(skb->data + len_rthdr);
-	hdrlen = ieee80211_hdrlen(hdr->frame_control);
+	hdrlen = __ieee80211_hdrlen(&local->hw, hdr->frame_control);
 
 	if (skb->len < len_rthdr + hdrlen)
 		goto fail;
@@ -2020,6 +2019,7 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_chanctx_conf *chanctx_conf;
 	struct ieee80211_sub_if_data *ap_sdata;
 	enum ieee80211_band band;
+	int padsize = 0;
 	int ret;
 
 	if (IS_ERR(sta))
@@ -2237,6 +2237,10 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 		hdrlen += 2;
 	}
 
+	/* Check if HW require skb to be aligned */
+	if (ieee80211_hw_check(&sdata->local->hw, NEEDS_ALIGNED4_SKBS))
+		padsize = hdrlen & 3;
+
 	/*
 	 * Drop unicast frames to unauthorised stations unless they are
 	 * EAPOL frames from the local station.
@@ -2323,6 +2327,7 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 	h_pos -= skip_header_bytes;
 
 	head_need = hdrlen + encaps_len + meshhdrlen - skb_headroom(skb);
+	head_need += padsize;
 
 	/*
 	 * So we need to modify the skb header and hence need a copy of
@@ -2361,6 +2366,9 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 	}
 #endif
 
+	if (padsize)
+		skb_push(skb, padsize);
+
 	if (ieee80211_is_data_qos(fc)) {
 		__le16 *qos_control;
 
@@ -2374,8 +2382,8 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 	} else
 		memcpy(skb_push(skb, hdrlen), &hdr, hdrlen);
 
-	nh_pos += hdrlen;
-	h_pos += hdrlen;
+	nh_pos += hdrlen + padsize;
+	h_pos += hdrlen + padsize;
 
 	/* Update skb pointers to various headers since this modified frame
 	 * is going to go through Linux networking code that may potentially
@@ -2543,6 +2551,10 @@ void ieee80211_check_fast_xmit(struct sta_info *sta)
 		build.hdr_len += 2;
 		fc |= cpu_to_le16(IEEE80211_STYPE_QOS_DATA);
 	}
+
+	/* Check if aligned skb required */
+	if (ieee80211_hw_check(&local->hw, NEEDS_ALIGNED4_SKBS))
+		build.hdr_len += build.hdr_len & 3;
 
 	/* We store the key here so there's no point in using rcu_dereference()
 	 * but that's fine because the code that changes the pointers will call

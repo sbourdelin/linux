@@ -1470,6 +1470,17 @@ ieee80211_have_rx_timestamp(struct ieee80211_rx_status *status)
 	return status->flag & (RX_FLAG_MACTIME_START | RX_FLAG_MACTIME_END);
 }
 
+static inline unsigned int
+__ieee80211_hdrlen(struct ieee80211_hw *hw, __le16 fc) {
+	unsigned int hdrlen;
+
+	hdrlen = ieee80211_hdrlen(fc);
+	if (ieee80211_hw_check(hw, NEEDS_ALIGNED4_SKBS))
+		hdrlen += hdrlen & 3;
+
+	return hdrlen;
+}
+
 u64 ieee80211_calculate_rx_timestamp(struct ieee80211_local *local,
 				     struct ieee80211_rx_status *status,
 				     unsigned int mpdu_len,

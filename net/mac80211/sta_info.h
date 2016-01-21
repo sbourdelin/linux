@@ -268,8 +268,8 @@ struct ieee80211_fast_tx {
 	u8 hdr_len;
 	u8 sa_offs, da_offs, pn_offs;
 	u8 band;
-	u8 hdr[30 + 2 + IEEE80211_FAST_XMIT_MAX_IV +
-	       sizeof(rfc1042_header)];
+	u8 hdr[round_up(30 + 2 + IEEE80211_FAST_XMIT_MAX_IV +
+			sizeof(rfc1042_header), 4)];
 
 	struct rcu_head rcu_head;
 };

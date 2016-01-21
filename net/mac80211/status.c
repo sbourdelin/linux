@@ -683,8 +683,21 @@ void ieee80211_tx_monitor(struct ieee80211_local *local, struct sk_buff *skb,
 	struct sk_buff *skb2;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_sub_if_data *sdata;
+	struct ieee80211_hdr *hdr = (void *)skb->data;
 	struct net_device *prev_dev = NULL;
+	unsigned int padsize, hdrlen;
 	int rtap_len;
+
+	/* Remove padding if was added */
+	if (ieee80211_hw_check(&local->hw, NEEDS_ALIGNED4_SKBS)) {
+		hdrlen = ieee80211_hdrlen(hdr->frame_control);
+		padsize = hdrlen & 3;
+
+		if (padsize && skb->len > hdrlen + padsize) {
+			memmove(skb->data + padsize, skb->data, hdrlen);
+			skb_pull(skb, padsize);
+		}
+	}
 
 	/* send frame to monitor interfaces now */
 	rtap_len = ieee80211_tx_radiotap_len(info);
