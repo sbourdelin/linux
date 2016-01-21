@@ -524,9 +524,18 @@ static void build_skb_flow_key(struct flowi4 *fl4, const struct sk_buff *skb,
 {
 	const struct iphdr *iph = ip_hdr(skb);
 	int oif = skb->dev->ifindex;
+	struct net_device *master;
 	u8 tos = RT_TOS(iph->tos);
 	u8 prot = iph->protocol;
 	u32 mark = skb->mark;
+
+	if (netif_is_bond_slave(skb->dev)) {
+		rcu_read_lock();
+		master = netdev_master_upper_dev_get_rcu(skb->dev);
+		if (master)
+			oif = master->ifindex;
+		rcu_read_unlock();
+	}
 
 	__build_flow_key(fl4, sk, iph, oif, tos, prot, mark, 0);
 }
