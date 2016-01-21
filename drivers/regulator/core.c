@@ -26,6 +26,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio/consumer.h>
 #include <linux/of.h>
+#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/consumer.h>
@@ -2059,17 +2060,23 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 		}
 	}
 
+	if (rdev->desc->auto_runtime_pm) {
+		ret = pm_runtime_get_sync(rdev->dev.parent);
+		if (ret < 0)
+			goto err;
+	}
+
 	if (rdev->ena_pin) {
 		if (!rdev->ena_gpio_state) {
 			ret = regulator_ena_gpio_ctrl(rdev, true);
 			if (ret < 0)
-				return ret;
+				goto err_pm;
 			rdev->ena_gpio_state = 1;
 		}
 	} else if (rdev->desc->ops->enable) {
 		ret = rdev->desc->ops->enable(rdev);
 		if (ret < 0)
-			return ret;
+			goto err_pm;
 	} else {
 		return -EINVAL;
 	}
@@ -2084,6 +2091,12 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 	trace_regulator_enable_complete(rdev_get_name(rdev));
 
 	return 0;
+
+err_pm:
+	if (rdev->desc->auto_runtime_pm)
+		pm_runtime_put_autosuspend(rdev->dev.parent);
+err:
+	return ret;
 }
 
 /* locks held by regulator_enable() */
@@ -2176,6 +2189,9 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
 		if (ret != 0)
 			return ret;
 	}
+
+	if (rdev->desc->auto_runtime_pm)
+		pm_runtime_put_autosuspend(rdev->dev.parent);
 
 	/* cares about last_off_jiffy only if off_on_delay is required by
 	 * device.
