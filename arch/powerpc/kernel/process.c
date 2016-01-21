@@ -349,6 +349,14 @@ void flush_spe_to_thread(struct task_struct *tsk)
 		preempt_enable();
 	}
 }
+#else
+/*
+ * save_all() is going to test MSR_SPE, rather than pull in all the
+ * booke definitions all the time on a books kernel just ensure it exists
+ * but acts as a nop.
+ */
+
+#define MSR_SPE 0
 #endif /* CONFIG_SPE */
 
 static unsigned long msr_all_available;
@@ -440,12 +448,41 @@ void restore_math(struct pt_regs *regs)
 	regs->msr = msr;
 }
 
+void save_all(struct task_struct *tsk)
+{
+	unsigned long usermsr;
+
+	if (!tsk->thread.regs)
+		return;
+
+	usermsr = tsk->thread.regs->msr;
+
+	if ((usermsr & msr_all_available) == 0)
+		return;
+
+	msr_check_and_set(msr_all_available);
+
+	if (usermsr & MSR_FP)
+		__giveup_fpu(tsk);
+
+	if (usermsr & MSR_VEC)
+		__giveup_altivec(tsk);
+
+	if (usermsr & MSR_VSX)
+		__giveup_vsx(tsk);
+
+	if (usermsr & MSR_SPE)
+		__giveup_spe(tsk);
+
+	msr_check_and_clear(msr_all_available);
+}
+
 void flush_all_to_thread(struct task_struct *tsk)
 {
 	if (tsk->thread.regs) {
 		preempt_disable();
 		BUG_ON(tsk != current);
-		giveup_all(tsk);
+		save_all(tsk);
 
 #ifdef CONFIG_SPE
 		if (tsk->thread.regs->msr & MSR_SPE)
