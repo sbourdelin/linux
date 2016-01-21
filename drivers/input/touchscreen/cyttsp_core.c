@@ -541,11 +541,11 @@ struct cyttsp *cyttsp_probe(const struct cyttsp_bus_ops *bus_ops,
 		goto err_out;
 	}
 
-	ts = kzalloc(sizeof(*ts) + xfer_buf_size, GFP_KERNEL);
-	input_dev = input_allocate_device();
+	ts = devm_kzalloc(dev, sizeof(*ts) + xfer_buf_size, GFP_KERNEL);
+	input_dev = devm_input_allocate_device(dev);
 	if (!ts || !input_dev) {
 		error = -ENOMEM;
-		goto err_free_mem;
+		goto err_out;
 	}
 
 	ts->dev = dev;
@@ -562,7 +562,7 @@ struct cyttsp *cyttsp_probe(const struct cyttsp_bus_ops *bus_ops,
 		if (error) {
 			dev_err(ts->dev, "platform init failed, err: %d\n",
 				error);
-			goto err_free_mem;
+			goto err_out;
 		}
 	}
 
@@ -586,9 +586,9 @@ struct cyttsp *cyttsp_probe(const struct cyttsp_bus_ops *bus_ops,
 
 	input_mt_init_slots(input_dev, CY_MAX_ID, 0);
 
-	error = request_threaded_irq(ts->irq, NULL, cyttsp_irq,
-				     IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-				     pdata->name, ts);
+	error = devm_request_threaded_irq(dev, ts->irq, NULL, cyttsp_irq,
+					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+					  pdata->name, ts);
 	if (error) {
 		dev_err(ts->dev, "failed to request IRQ %d, err: %d\n",
 			ts->irq, error);
@@ -599,25 +599,20 @@ struct cyttsp *cyttsp_probe(const struct cyttsp_bus_ops *bus_ops,
 
 	error = cyttsp_power_on(ts);
 	if (error)
-		goto err_free_irq;
+		goto err_platform_exit;
 
 	error = input_register_device(input_dev);
 	if (error) {
 		dev_err(ts->dev, "failed to register input device: %d\n",
 			error);
-		goto err_free_irq;
+		goto err_platform_exit;
 	}
 
 	return ts;
 
-err_free_irq:
-	free_irq(ts->irq, ts);
 err_platform_exit:
 	if (pdata->exit)
 		pdata->exit();
-err_free_mem:
-	input_free_device(input_dev);
-	kfree(ts);
 err_out:
 	return ERR_PTR(error);
 }
@@ -625,11 +620,8 @@ EXPORT_SYMBOL_GPL(cyttsp_probe);
 
 void cyttsp_remove(struct cyttsp *ts)
 {
-	free_irq(ts->irq, ts);
-	input_unregister_device(ts->input);
 	if (ts->pdata->exit)
 		ts->pdata->exit();
-	kfree(ts);
 }
 EXPORT_SYMBOL_GPL(cyttsp_remove);
 
