@@ -1676,6 +1676,8 @@ void dwc2_hc_cleanup(struct dwc2_hsotg *hsotg, struct dwc2_host_chan *chan)
 
 	chan->xfer_started = 0;
 
+	list_del_init(&chan->split_order_list_entry);
+
 	/*
 	 * Clear channel interrupt enables and any unhandled channel interrupt
 	 * conditions
@@ -1868,6 +1870,10 @@ void dwc2_hc_start_transfer(struct dwc2_hsotg *hsotg,
 			ec_mc = 3;
 		else
 			ec_mc = 1;
+
+		/* Put ourselves on the list to keep order straight */
+		list_move_tail(&chan->split_order_list_entry,
+			       &hsotg->split_order);
 	} else {
 		if (dbg_hc(chan))
 			dev_vdbg(hsotg->dev, "no split\n");
