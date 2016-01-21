@@ -1654,6 +1654,34 @@ static void acpi_register_spi_devices(struct spi_master *master)
 static inline void acpi_register_spi_devices(struct spi_master *master) {}
 #endif /* CONFIG_ACPI */
 
+#ifdef CONFIG_SPI_SPIDEV_AUTO
+static void spidev_register_spi_devices(struct spi_master *master)
+{
+	struct spi_device *spi;
+	int err;
+	int i;
+
+	for (i = 0; i < master->num_chipselect; i++) {
+		spi = spi_alloc_device(master);
+		if (!spi)
+			return;
+
+		strlcpy(spi->modalias, "spidev", sizeof(spi->modalias));
+		spi->chip_select = i;
+
+		err = bus_for_each_dev(&spi_bus_type, NULL, spi, spi_dev_check);
+
+		if (!err)
+			err = spi_add_device(spi);
+
+		if (err)
+			spi_dev_put(spi);
+	}
+}
+#else
+static void spidev_register_spi_devices(struct spi_master *master) { }
+#endif
+
 static void spi_master_release(struct device *dev)
 {
 	struct spi_master *master;
@@ -1849,6 +1877,7 @@ int spi_register_master(struct spi_master *master)
 	/* Register devices from the device tree and ACPI */
 	of_register_spi_devices(master);
 	acpi_register_spi_devices(master);
+	spidev_register_spi_devices(master);
 done:
 	return status;
 }
