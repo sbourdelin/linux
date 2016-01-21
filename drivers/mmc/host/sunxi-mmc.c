@@ -816,6 +816,20 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		}
 	}
 
+	/*
+	 * TODO Support signal voltage switching
+	 *
+	 * Compared to Allwinner's kernel, recent updates in the mmc core
+	 * mean this should be as easy as setting the flags in cmd_val and
+	 * imask, and waiting for it to finish. However no boards support
+	 * this so this cannot be tested. Block it for now.
+	 */
+	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+		mrq->cmd->error = -EPERM;
+		mmc_request_done(mmc, mrq);
+		return;
+	}
+
 	if (cmd->opcode == MMC_GO_IDLE_STATE) {
 		cmd_val |= SDXC_SEND_INIT_SEQUENCE;
 		imask |= SDXC_COMMAND_DONE;
