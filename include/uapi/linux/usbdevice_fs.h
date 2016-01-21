@@ -154,6 +154,10 @@ struct usbdevfs_streams {
 	unsigned char eps[0];
 };
 
+struct usbdevfs_drop_privs {
+	unsigned long interface_allowed_mask;
+};
+
 #define USBDEVFS_CONTROL           _IOWR('U', 0, struct usbdevfs_ctrltransfer)
 #define USBDEVFS_CONTROL32           _IOWR('U', 0, struct usbdevfs_ctrltransfer32)
 #define USBDEVFS_BULK              _IOWR('U', 2, struct usbdevfs_bulktransfer)
@@ -187,5 +191,6 @@ struct usbdevfs_streams {
 #define USBDEVFS_DISCONNECT_CLAIM  _IOR('U', 27, struct usbdevfs_disconnect_claim)
 #define USBDEVFS_ALLOC_STREAMS     _IOR('U', 28, struct usbdevfs_streams)
 #define USBDEVFS_FREE_STREAMS      _IOR('U', 29, struct usbdevfs_streams)
+#define USBDEVFS_DROP_PRIVILEGES   _IOR('U', 30, struct usbdevfs_drop_privs)
 
 #endif /* _UAPI_LINUX_USBDEVICE_FS_H */
