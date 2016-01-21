@@ -782,7 +782,7 @@ void scsi_attach_vpd(struct scsi_device *sdev)
 	int vpd_len = SCSI_VPD_PG_LEN;
 	int pg80_supported = 0;
 	int pg83_supported = 0;
-	unsigned char __rcu *vpd_buf, *orig_vpd_buf = NULL;
+	unsigned char *vpd_buf;
 
 	if (sdev->scsi_level < SCSI_3)
 		return;
@@ -816,58 +816,60 @@ retry_pg0:
 	vpd_len = SCSI_VPD_PG_LEN;
 
 	if (pg80_supported) {
+		struct scsi_vpd_pg *vpd, *orig_vpd;
 retry_pg80:
-		vpd_buf = kmalloc(vpd_len, GFP_KERNEL);
-		if (!vpd_buf)
+		vpd = kmalloc(sizeof(*vpd) + vpd_len, GFP_KERNEL);
+		if (!vpd)
 			return;
 
-		result = scsi_vpd_inquiry(sdev, vpd_buf, 0x80, vpd_len);
+		result = scsi_vpd_inquiry(sdev, vpd->buf, 0x80, vpd_len);
 		if (result < 0) {
-			kfree(vpd_buf);
+			kfree(vpd);
 			return;
 		}
 		if (result > vpd_len) {
 			vpd_len = result;
-			kfree(vpd_buf);
+			kfree(vpd);
 			goto retry_pg80;
 		}
+		vpd->len = result;
+
 		mutex_lock(&sdev->inquiry_mutex);
-		orig_vpd_buf = sdev->vpd_pg80;
-		sdev->vpd_pg80_len = result;
-		rcu_assign_pointer(sdev->vpd_pg80, vpd_buf);
+		orig_vpd = rcu_dereference_protected(sdev->vpd_pg80, 1);
+		rcu_assign_pointer(sdev->vpd_pg80, vpd);
 		mutex_unlock(&sdev->inquiry_mutex);
-		synchronize_rcu();
-		if (orig_vpd_buf) {
-			kfree(orig_vpd_buf);
-			orig_vpd_buf = NULL;
-		}
+
+		if (orig_vpd)
+			kfree_rcu(orig_vpd, rcu);
 		vpd_len = SCSI_VPD_PG_LEN;
 	}
 
 	if (pg83_supported) {
+		struct scsi_vpd_pg *vpd, *orig_vpd;
 retry_pg83:
-		vpd_buf = kmalloc(vpd_len, GFP_KERNEL);
-		if (!vpd_buf)
+		vpd = kmalloc(sizeof(*vpd) + vpd_len, GFP_KERNEL);
+		if (!vpd)
 			return;
 
-		result = scsi_vpd_inquiry(sdev, vpd_buf, 0x83, vpd_len);
+		result = scsi_vpd_inquiry(sdev, vpd->buf, 0x83, vpd_len);
 		if (result < 0) {
-			kfree(vpd_buf);
+			kfree(vpd);
 			return;
 		}
 		if (result > vpd_len) {
 			vpd_len = result;
-			kfree(vpd_buf);
+			kfree(vpd);
 			goto retry_pg83;
 		}
+		vpd->len = result;
+
 		mutex_lock(&sdev->inquiry_mutex);
-		orig_vpd_buf = sdev->vpd_pg83;
-		sdev->vpd_pg83_len = result;
-		rcu_assign_pointer(sdev->vpd_pg83, vpd_buf);
+		orig_vpd = rcu_dereference_protected(sdev->vpd_pg83, 1);
+		rcu_assign_pointer(sdev->vpd_pg83, vpd);
 		mutex_unlock(&sdev->inquiry_mutex);
-		synchronize_rcu();
-		if (orig_vpd_buf)
-			kfree(orig_vpd_buf);
+
+		if (orig_vpd)
+			kfree_rcu(orig_vpd, rcu);
 	}
 }
 

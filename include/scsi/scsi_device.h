@@ -74,6 +74,13 @@ struct scsi_event {
 	 */
 };
 
+#define SCSI_VPD_PG_LEN                255
+struct scsi_vpd_pg {
+	struct rcu_head rcu;
+	int len;
+	unsigned char buf[0];
+};
+
 struct scsi_device {
 	struct Scsi_Host *host;
 	struct request_queue *request_queue;
@@ -116,11 +123,8 @@ struct scsi_device {
 	const char * model;		/* ... after scan; point to static string */
 	const char * rev;		/* ... "nullnullnullnull" before scan */
 
-#define SCSI_VPD_PG_LEN                255
-	int vpd_pg83_len;
-	unsigned char __rcu *vpd_pg83;
-	int vpd_pg80_len;
-	unsigned char __rcu *vpd_pg80;
+	struct scsi_vpd_pg __rcu *vpd_pg80;
+	struct scsi_vpd_pg __rcu *vpd_pg83;
 	unsigned char current_tag;	/* current tag */
 	struct scsi_target      *sdev_target;   /* used only for single_lun */
 

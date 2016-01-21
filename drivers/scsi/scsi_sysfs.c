@@ -761,13 +761,15 @@ show_vpd_##_page(struct file *filp, struct kobject *kobj,	\
 {									\
 	struct device *dev = container_of(kobj, struct device, kobj);	\
 	struct scsi_device *sdev = to_scsi_device(dev);			\
-	int ret;							\
-	if (!sdev->vpd_##_page)						\
-		return -EINVAL;						\
+	struct scsi_vpd_pg *vpd_pg;					\
+	ssize_t ret = -EINVAL;						\
+									\
 	rcu_read_lock();						\
-	ret = memory_read_from_buffer(buf, count, &off,			\
-				      rcu_dereference(sdev->vpd_##_page), \
-				       sdev->vpd_##_page##_len);	\
+	vpd_pg = rcu_dereference(sdev->vpd_##_page);			\
+	if (vpd_pg)							\
+		ret = memory_read_from_buffer(buf, count, &off,		\
+					      vpd_pg->buf,		\
+					      vpd_pg->len);		\
 	rcu_read_unlock();						\
 	return ret;						\
 }									\
