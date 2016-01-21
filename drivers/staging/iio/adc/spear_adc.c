@@ -288,7 +288,7 @@ static int spear_adc_probe(struct platform_device *pdev)
 	st->adc_base_spear3xx =
 		(struct adc_regs_spear3xx __iomem *)st->adc_base_spear6xx;
 
-	st->clk = clk_get(dev, NULL);
+	st->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(st->clk)) {
 		dev_err(dev, "failed getting clock\n");
 		goto errout1;
@@ -297,7 +297,7 @@ static int spear_adc_probe(struct platform_device *pdev)
 	ret = clk_prepare_enable(st->clk);
 	if (ret) {
 		dev_err(dev, "failed enabling clock\n");
-		goto errout2;
+		goto errout1;
 	}
 
 	irq = platform_get_irq(pdev, 0);
@@ -356,8 +356,6 @@ static int spear_adc_probe(struct platform_device *pdev)
 
 errout3:
 	clk_disable_unprepare(st->clk);
-errout2:
-	clk_put(st->clk);
 errout1:
 	iounmap(st->adc_base_spear6xx);
 	return ret;
