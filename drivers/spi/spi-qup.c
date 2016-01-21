@@ -127,6 +127,8 @@
 #define SPI_DELAY_THRESHOLD		1
 #define SPI_DELAY_RETRY			10
 
+static atomic_t spi_qup_next_id = ATOMIC_INIT(0);
+
 struct spi_qup {
 	void __iomem		*base;
 	struct device		*dev;
@@ -759,7 +761,7 @@ static int spi_qup_probe(struct platform_device *pdev)
 	struct device *dev;
 	void __iomem *base;
 	u32 max_freq, iomode, num_cs;
-	int ret, irq, size;
+	int ret, irq, size, bus_num;
 
 	dev = &pdev->dev;
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -816,7 +818,15 @@ static int spi_qup_probe(struct platform_device *pdev)
 	else
 		master->num_chipselect = num_cs;
 
-	master->bus_num = pdev->id;
+	if (dev->of_node)
+		bus_num = of_alias_get_id(dev->of_node, "spi");
+	else
+		bus_num = pdev->id;
+
+	if (bus_num < 0)
+		bus_num = atomic_inc_return(&spi_qup_next_id) - 1;
+
+	master->bus_num = bus_num;
 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP;
 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(4, 32);
 	master->max_speed_hz = max_freq;
