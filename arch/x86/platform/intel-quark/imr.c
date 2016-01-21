@@ -599,7 +599,7 @@ static void __init imr_fixup_memmap(struct imr_device *idev)
 	 * from the beginning of the .text secton to the end of the
 	 * .rodata section as one physically contiguous block.
 	 */
-	ret = imr_add_range(base, size, IMR_CPU, IMR_CPU, true);
+	ret = imr_add_range(base, size, IMR_CPU, IMR_CPU, false);
 	if (ret < 0) {
 		pr_err("unable to setup IMR for kernel: (%p - %p)\n",
 			&_text, &__end_rodata);
