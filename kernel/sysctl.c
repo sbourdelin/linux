@@ -112,6 +112,9 @@ extern int sysctl_nr_open_min, sysctl_nr_open_max;
 #ifndef CONFIG_MMU
 extern int sysctl_nr_trim_pages;
 #endif
+#ifdef CONFIG_USER_NS
+extern int sysctl_userns_restrict;
+#endif
 
 /* Constants used for minimum and  maximum */
 #ifdef CONFIG_LOCKUP_DETECTOR
@@ -805,6 +808,17 @@ static struct ctl_table kern_table[] = {
 	{
 		.procname	= "kptr_restrict",
 		.data		= &kptr_restrict,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax_cap_sysadmin,
+		.extra1		= &zero,
+		.extra2		= &two,
+	},
+#endif
+#ifdef CONFIG_USER_NS
+	{
+		.procname	= "userns_restrict",
+		.data		= &sysctl_userns_restrict,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax_cap_sysadmin,
