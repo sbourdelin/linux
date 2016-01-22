@@ -518,7 +518,7 @@ void xen_pmu_init(int cpu)
 
 	BUILD_BUG_ON(sizeof(struct xen_pmu_data) > PAGE_SIZE);
 
-	if (xen_hvm_domain())
+	if (xen_hvm_domain() && !xen_hvmlite)
 		return;
 
 	xenpmu_data = (struct xen_pmu_data *)get_zeroed_page(GFP_KERNEL);
@@ -556,7 +556,7 @@ void xen_pmu_finish(int cpu)
 {
 	struct xen_pmu_params xp;
 
-	if (xen_hvm_domain())
+	if (xen_hvm_domain() && !xen_hvmlite)
 		return;
 
 	xp.vcpu = cpu;
