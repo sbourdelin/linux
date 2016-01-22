@@ -110,7 +110,7 @@ int arch_gnttab_init(unsigned long nr_shared)
 	return arch_gnttab_valloc(&gnttab_shared_vm_area, nr_shared);
 }
 
-#ifdef CONFIG_XEN_PVH
+#ifdef CONFIG_XEN_PVHVM
 #include <xen/balloon.h>
 #include <xen/events.h>
 #include <linux/slab.h>
@@ -164,7 +164,7 @@ static int __init xlated_setup_gnttab_pages(void)
 
 static int __init xen_pvh_gnttab_setup(void)
 {
-	if (!xen_pvh_domain())
+	if (!xen_pvh_domain() && !xen_hvmlite)
 		return -ENODEV;
 
 	return xlated_setup_gnttab_pages();
