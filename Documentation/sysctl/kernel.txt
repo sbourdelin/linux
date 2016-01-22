@@ -385,7 +385,9 @@ to protect against uses of %pK in dmesg(8) if leaking kernel pointer
 values to unprivileged users is a concern.
 
 When kptr_restrict is set to (2), kernel pointers printed using
-%pK will be replaced with 0's regardless of privileges.
+%pK will be replaced with 0's regardless of privileges, and the value
+will be locked at "2", so that the root user cannot remove this
+restriction.
 
 ==============================================================
 

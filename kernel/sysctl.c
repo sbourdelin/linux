@@ -181,11 +181,6 @@ static int proc_taint(struct ctl_table *table, int write,
 			       void __user *buffer, size_t *lenp, loff_t *ppos);
 #endif
 
-#ifdef CONFIG_PRINTK
-static int proc_dointvec_minmax_sysadmin(struct ctl_table *table, int write,
-				void __user *buffer, size_t *lenp, loff_t *ppos);
-#endif
-
 static int proc_dointvec_minmax_coredump(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp, loff_t *ppos);
 #ifdef CONFIG_COREDUMP
@@ -803,7 +798,7 @@ static struct ctl_table kern_table[] = {
 		.data		= &dmesg_restrict,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec_minmax_sysadmin,
+		.proc_handler	= proc_dointvec_minmax_cap_sysadmin,
 		.extra1		= &zero,
 		.extra2		= &one,
 	},
@@ -812,7 +807,7 @@ static struct ctl_table kern_table[] = {
 		.data		= &kptr_restrict,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec_minmax_sysadmin,
+		.proc_handler	= proc_dointvec_minmax_cap_sysadmin,
 		.extra1		= &zero,
 		.extra2		= &two,
 	},
@@ -2217,16 +2212,29 @@ static int proc_taint(struct ctl_table *table, int write,
 	return err;
 }
 
-#ifdef CONFIG_PRINTK
-static int proc_dointvec_minmax_sysadmin(struct ctl_table *table, int write,
-				void __user *buffer, size_t *lenp, loff_t *ppos)
+int proc_dointvec_minmax_cap(int cap, struct ctl_table *table, int write,
+			     void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	if (write && !capable(CAP_SYS_ADMIN))
+	struct ctl_table table_copy;
+	int value;
+
+	/* Require init capabilities to make changes. */
+	if (write && !capable(cap))
 		return -EPERM;
 
-	return proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	/*
+	 * To deal with const sysctl tables, we make a copy to perform
+	 * the locking. When data is >1 and ==extra2, lock extra1 to
+	 * extra2 to stop the value from being changed any further at
+	 * runtime.
+	 */
+	table_copy = *table;
+	value = *(int *)table_copy.data;
+	if (value > 1 && value == *(int *)table_copy.extra2)
+		table_copy.extra1 = table_copy.extra2;
+
+	return proc_dointvec_minmax(&table_copy, write, buffer, lenp, ppos);
 }
-#endif
 
 struct do_proc_dointvec_minmax_conv_param {
 	int *min;

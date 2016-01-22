@@ -23,6 +23,7 @@
 
 #include <linux/list.h>
 #include <linux/rcupdate.h>
+#include <linux/capability.h>
 #include <linux/wait.h>
 #include <linux/rbtree.h>
 #include <uapi/linux/sysctl.h>
@@ -55,6 +56,23 @@ extern int proc_doulongvec_ms_jiffies_minmax(struct ctl_table *table, int,
 				      void __user *, size_t *, loff_t *);
 extern int proc_do_large_bitmap(struct ctl_table *, int,
 				void __user *, size_t *, loff_t *);
+extern int proc_dointvec_minmax_cap(int cap, struct ctl_table *table,
+				    int write, void __user *buffer,
+				    size_t *lenp, loff_t *ppos);
+static inline int proc_dointvec_minmax_cap_sysadmin(struct ctl_table *table,
+				    int write, void __user *buffer,
+				    size_t *lenp, loff_t *ppos)
+{
+	return proc_dointvec_minmax_cap(CAP_SYS_ADMIN, table, write, buffer,
+					lenp, ppos);
+}
+static inline int proc_dointvec_minmax_cap_ptrace(struct ctl_table *table,
+				    int write, void __user *buffer,
+				    size_t *lenp, loff_t *ppos)
+{
+	return proc_dointvec_minmax_cap(CAP_SYS_PTRACE, table, write, buffer,
+					lenp, ppos);
+}
 
 /*
  * Register a set of sysctl names by calling register_sysctl_table
