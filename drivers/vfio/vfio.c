@@ -343,7 +343,6 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group,
 	atomic_set(&group->opened, 0);
 	group->iommu_group = iommu_group;
 	group->noiommu = !iommu_present;
-
 	group->nb.notifier_call = vfio_iommu_group_notifier;
 
 	/*
@@ -767,7 +766,11 @@ int vfio_add_group_dev(struct device *dev,
 
 	group = vfio_group_get_from_iommu(iommu_group);
 	if (!group) {
+#ifdef CONFIG_VFIO_NOIOMMU
 		group = vfio_create_group(iommu_group, iommu_present(dev->bus));
+#else
+		group = vfio_create_group(iommu_group, true);
+#endif
 		if (IS_ERR(group)) {
 			iommu_group_put(iommu_group);
 			return PTR_ERR(group);
