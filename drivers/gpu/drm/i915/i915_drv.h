@@ -2437,6 +2437,7 @@ struct drm_i915_cmd_table {
 		BUILD_BUG(); \
 	__p; \
 })
+#define i915_dbg(DEV, args...)	dev_dbg(__I915__(DEV)->dev->dev, ##args)
 #define INTEL_INFO(p) 	(&__I915__(p)->info)
 #define INTEL_DEVID(p)	(INTEL_INFO(p)->device_id)
 #define INTEL_REVID(p)	(__I915__(p)->dev->pdev->revision)
