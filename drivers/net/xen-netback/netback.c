@@ -2192,5 +2192,5 @@ static void __exit netback_fini(void)
 }
 module_exit(netback_fini);
 
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("Dual MIT/GPL");
 MODULE_ALIAS("xen-backend:vif");
