@@ -637,7 +637,8 @@ xfs_qm_scall_getquota(
 	struct xfs_mount	*mp,
 	xfs_dqid_t		id,
 	uint			type,
-	struct qc_dqblk		*dst)
+	struct qc_dqblk		*dst,
+	uint			dqget_flags)
 {
 	struct xfs_dquot	*dqp;
 	int			error;
@@ -647,7 +648,7 @@ xfs_qm_scall_getquota(
 	 * we aren't passing the XFS_QMOPT_DOALLOC flag. If it doesn't
 	 * exist, we'll get ENOENT back.
 	 */
-	error = xfs_qm_dqget(mp, NULL, id, type, 0, &dqp);
+	error = xfs_qm_dqget(mp, NULL, id, type, dqget_flags, &dqp);
 	if (error)
 		return error;
 
@@ -661,6 +662,7 @@ xfs_qm_scall_getquota(
 	}
 
 	memset(dst, 0, sizeof(*dst));
+	dst->d_id = be32_to_cpu(dqp->q_core.d_id);
 	dst->d_spc_hardlimit =
 		XFS_FSB_TO_B(mp, be64_to_cpu(dqp->q_core.d_blk_hardlimit));
 	dst->d_spc_softlimit =
