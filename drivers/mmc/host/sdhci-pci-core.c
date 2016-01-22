@@ -330,6 +330,18 @@ static void spt_read_drive_strength(struct sdhci_host *host)
 	sdhci_pci_spt_drive_strength = 0x10 | ((val >> 12) & 0xf);
 }
 
+static int bxt_get_cd(struct sdhci_host *host)
+{
+	int gpio_cd = mmc_gpio_get_cd(host->mmc);
+
+	if (!gpio_cd)
+		return 0;
+
+	return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+}
+
+static const struct sdhci_ops bxt_ops;
+
 static int byt_emmc_probe_slot(struct sdhci_pci_slot *slot)
 {
 	slot->host->mmc->caps |= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE |
@@ -362,6 +374,10 @@ static int byt_sd_probe_slot(struct sdhci_pci_slot *slot)
 	slot->cd_con_id = NULL;
 	slot->cd_idx = 0;
 	slot->cd_override_level = true;
+	if (slot->chip->pdev->device == PCI_DEVICE_ID_INTEL_BXT_SD ||
+	    slot->chip->pdev->device == PCI_DEVICE_ID_INTEL_APL_SD)
+		slot->host->ops = &bxt_ops;
+
 	return 0;
 }
 
@@ -1361,6 +1377,17 @@ static int sdhci_pci_select_drive_strength(struct sdhci_host *host,
 	return slot->select_drive_strength(host, card, max_dtr, host_drv,
 					   card_drv, drv_type);
 }
+
+static const struct sdhci_ops bxt_ops = {
+	.set_clock	= sdhci_set_clock,
+	.enable_dma	= sdhci_pci_enable_dma,
+	.set_bus_width	= sdhci_pci_set_bus_width,
+	.reset		= sdhci_reset,
+	.set_uhs_signaling = sdhci_set_uhs_signaling,
+	.hw_reset		= sdhci_pci_hw_reset,
+	.select_drive_strength	= sdhci_pci_select_drive_strength,
+	.get_cd		= bxt_get_cd,
+};
 
 static const struct sdhci_ops sdhci_pci_ops = {
 	.set_clock	= sdhci_set_clock,
