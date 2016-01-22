@@ -34,6 +34,14 @@
 #define VIRTIO_SCSI_EVENT_LEN 8
 #define VIRTIO_SCSI_VQ_BASE 2
 
+#ifdef CONFIG_SCSI_MQ_DEFAULT
+static bool virtio_use_blk_mq = true;
+#else
+static bool virtio_use_blk_mq = false;
+#endif
+module_param_named(use_blk_mq, virtio_use_blk_mq, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(use_blk_mq, "Use blk-mq for virtio_scsi driver");
+
 /* Command queue element */
 struct virtio_scsi_cmd {
 	struct scsi_cmnd *sc;
@@ -975,6 +983,9 @@ static int virtscsi_probe(struct virtio_device *vdev)
 		sizeof(*vscsi) + sizeof(vscsi->req_vqs[0]) * num_queues);
 	if (!shost)
 		return -ENOMEM;
+
+	if (hostt == &virtscsi_host_template_multi)
+		shost->use_blk_mq = virtio_use_blk_mq;
 
 	sg_elems = virtscsi_config_get(vdev, seg_max) ?: 1;
 	shost->sg_tablesize = sg_elems;

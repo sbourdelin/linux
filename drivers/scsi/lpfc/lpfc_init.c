@@ -86,6 +86,13 @@ static struct scsi_transport_template *lpfc_transport_template = NULL;
 static struct scsi_transport_template *lpfc_vport_transport_template = NULL;
 static DEFINE_IDR(lpfc_hba_index);
 
+#ifdef CONFIG_SCSI_MQ_DEFAULT
+static bool lpfc_use_blk_mq = true;
+#else
+static bool lpfc_use_blk_mq = false;
+#endif
+module_param_named(use_blk_mq, lpfc_use_blk_mq, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(use_blk_mq, "Use blk-mq for lpfc driver");
 /**
  * lpfc_config_port_prep - Perform lpfc initialization prior to config port
  * @phba: pointer to lpfc hba data structure.
@@ -3316,6 +3323,7 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 	shost->this_id = -1;
 	shost->max_cmd_len = 16;
 	shost->nr_hw_queues = phba->cfg_fcp_io_channel;
+	shost->use_blk_mq = lpfc_use_blk_mq;
 	if (phba->sli_rev == LPFC_SLI_REV4) {
 		shost->dma_boundary =
 			phba->sli4_hba.pc_sli4_params.sge_supp_len-1;

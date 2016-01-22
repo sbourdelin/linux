@@ -83,6 +83,15 @@ static unsigned int fnic_max_qdepth = FNIC_DFLT_QUEUE_DEPTH;
 module_param(fnic_max_qdepth, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(fnic_max_qdepth, "Queue depth to report for each LUN");
 
+#ifdef CONFIG_SCSI_MQ_DEFAULT
+static bool fnic_use_blk_mq = true;
+#else
+static bool fnic_use_blk_mq = false;
+#endif
+
+module_param_named(use_blk_mq, fnic_use_blk_mq, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(use_blk_mq, "Use blk-mq for fnic");
+
 static struct libfc_function_template fnic_transport_template = {
 	.frame_send = fnic_send,
 	.lport_set_port_id = fnic_set_port_id,
@@ -567,6 +576,7 @@ static int fnic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		 host->host_no);
 
 	host->transportt = fnic_fc_transport;
+	host->use_blk_mq = fnic_use_blk_mq;
 
 	err = fnic_stats_debugfs_init(fnic);
 	if (err) {
