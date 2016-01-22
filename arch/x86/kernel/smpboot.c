@@ -199,7 +199,7 @@ static int enable_start_cpu0;
 /*
  * Activate a secondary processor.
  */
-static void notrace start_secondary(void *unused)
+void notrace start_secondary(void *unused)
 {
 	/*
 	 * Don't put *anything* before cpu_init(), SMP booting is too

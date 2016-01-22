@@ -666,7 +666,7 @@ ENTRY(setup_once_ref)
 __PAGE_ALIGNED_BSS
 	.align PAGE_SIZE
 #ifdef CONFIG_X86_PAE
-initial_pg_pmd:
+ENTRY(initial_pg_pmd)
 	.fill 1024*KPMDS,4,0
 #else
 ENTRY(initial_page_table)
