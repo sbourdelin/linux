@@ -190,6 +190,8 @@ static u32 seccomp_run_filters(struct seccomp_data *sd)
 		sd = &sd_local;
 	}
 
+	sd->prev_nr = current->seccomp.prev_nr;
+
 	/*
 	 * All filters in the list are evaluated and the lowest BPF return
 	 * value always takes priority (ignoring the DATA).
@@ -200,6 +202,9 @@ static u32 seccomp_run_filters(struct seccomp_data *sd)
 		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
 			ret = cur_ret;
 	}
+
+	current->seccomp.prev_nr = sd->nr;
+
 	return ret;
 }
 #endif /* CONFIG_SECCOMP_FILTER */
@@ -442,6 +447,11 @@ static long seccomp_attach_filter(unsigned int flags,
 		if (ret)
 			return ret;
 	}
+
+	/* Initialize the prev_nr field only once */
+	if (current->seccomp.filter == NULL)
+		current->seccomp.prev_nr =
+			syscall_get_nr(current, task_pt_regs(current));
 
 	/*
 	 * If there is an existing filter, make it the prev and don't drop its
