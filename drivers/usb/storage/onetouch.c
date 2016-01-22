@@ -69,7 +69,7 @@ struct usb_onetouch {
 		    vendorName, productName, useProtocol, useTransport, \
 		    initFunction, flags) \
 { USB_DEVICE_VER(id_vendor, id_product, bcdDeviceMin, bcdDeviceMax), \
-  .driver_info = (flags) }
+.driver_info = (flags) }
 
 static struct usb_device_id onetouch_usb_ids[] = {
 #	include "unusual_onetouch.h"
@@ -125,7 +125,7 @@ static void usb_onetouch_irq(struct urb *urb)
 	input_sync(dev);
 
 resubmit:
-	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	retval = usb_submit_urb(urb, GFP_ATOMIC);
 	if (retval)
 		dev_err(&dev->dev, "can't resubmit intr, %s-%s/input0, "
 			"retval %d\n", onetouch->udev->bus->bus_name,
