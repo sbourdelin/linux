@@ -645,6 +645,30 @@ struct start_info {
 	unsigned long nr_p2m_frames;/* # of pfns forming initial P->M table.  */
 };
 
+/*
+ * Start of day structure passed to PVH guests in %ebx.
+ *
+ * NOTE: nothing will be loaded at physical address 0, so
+ * a 0 value in any of the address fields should be treated
+ * as not present.
+ */
+struct hvm_start_info {
+#define HVM_START_MAGIC_VALUE 0x336ec578
+    uint32_t magic;             /* Contains the magic value 0x336ec578       */
+                                /* ("xEn3" with the 0x80 bit of the "E" set).*/
+    uint32_t flags;             /* SIF_xxx flags.                            */
+    uint32_t cmdline_paddr;     /* Physical address of the command line.     */
+    uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
+    uint32_t modlist_paddr;     /* Physical address of an array of           */
+                                /* hvm_modlist_entry.                        */
+};
+
+struct hvm_modlist_entry {
+    uint32_t paddr;             /* Physical address of the module.           */
+    uint32_t size;              /* Size of the module in bytes.              */
+};
+
+
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED      (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN      (1<<1)  /* Is this the initial control domain? */
