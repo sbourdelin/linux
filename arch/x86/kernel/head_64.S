@@ -75,12 +75,6 @@ startup_64:
 	leaq	_text(%rip), %rbp
 	subq	$_text - __START_KERNEL_map, %rbp
 
-	/* Is the address not 2M aligned? */
-	movq	%rbp, %rax
-	andl	$~PMD_PAGE_MASK, %eax
-	testl	%eax, %eax
-	jnz	bad_address
-
 	/*
 	 * Is the address too large?
 	 */
