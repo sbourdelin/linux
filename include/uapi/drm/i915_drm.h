@@ -1140,7 +1140,15 @@ struct drm_i915_gem_context_param {
 #define I915_CONTEXT_PARAM_BAN_PERIOD	0x1
 #define I915_CONTEXT_PARAM_NO_ZEROMAP	0x2
 #define I915_CONTEXT_PARAM_GTT_SIZE	0x3
+#define I915_CONTEXT_PARAM_TRTT		0x4
 	__u64 value;
+};
+
+struct drm_i915_gem_context_trtt_param {
+	__u64 segment_base_addr;
+	__u64 l3_table_address;
+	__u32 invd_tile_val;
+	__u32 null_tile_val;
 };
 
 #endif /* _UAPI_I915_DRM_H_ */

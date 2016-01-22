@@ -129,6 +129,10 @@ typedef uint64_t gen8_ppgtt_pml4e_t;
 #define GEN8_PPAT_ELLC_OVERRIDE		(0<<2)
 #define GEN8_PPAT(i, x)			((uint64_t) (x) << ((i) * 8))
 
+/* Fixed size segment */
+#define GEN9_TRTT_SEG_SIZE_SHIFT	44
+#define GEN9_TRTT_SEGMENT_SIZE		(1ULL << GEN9_TRTT_SEG_SIZE_SHIFT)
+
 enum i915_ggtt_view_type {
 	I915_GGTT_VIEW_NORMAL = 0,
 	I915_GGTT_VIEW_ROTATED,
@@ -559,4 +563,8 @@ size_t
 i915_ggtt_view_size(struct drm_i915_gem_object *obj,
 		    const struct i915_ggtt_view *view);
 
+struct i915_vma *
+intel_trtt_context_allocate_vma(struct i915_address_space *vm,
+				uint64_t segment_base_addr);
+void intel_trtt_context_destroy_vma(struct i915_vma *vma);
 #endif
