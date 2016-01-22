@@ -390,70 +390,80 @@ cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
 	if (cpumask_test_and_set_cpu(cpu, xen_cpu_initialized_map))
 		return 0;
 
-	ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
-	if (ctxt == NULL)
-		return -ENOMEM;
+	if (!xen_hvmlite) {
 
-	gdt = get_cpu_gdt_table(cpu);
+		ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
+		if (ctxt == NULL)
+			return -ENOMEM;
+
+		gdt = get_cpu_gdt_table(cpu);
 
 #ifdef CONFIG_X86_32
-	/* Note: PVH is not yet supported on x86_32. */
-	ctxt->user_regs.fs = __KERNEL_PERCPU;
-	ctxt->user_regs.gs = __KERNEL_STACK_CANARY;
+		/* Note: PVH is not yet supported on x86_32. */
+		ctxt->user_regs.fs = __KERNEL_PERCPU;
+		ctxt->user_regs.gs = __KERNEL_STACK_CANARY;
 #endif
-	memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
+		memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		ctxt->user_regs.eip = (unsigned long)cpu_bringup_and_idle;
-		ctxt->flags = VGCF_IN_KERNEL;
-		ctxt->user_regs.eflags = 0x1000; /* IOPL_RING1 */
-		ctxt->user_regs.ds = __USER_DS;
-		ctxt->user_regs.es = __USER_DS;
-		ctxt->user_regs.ss = __KERNEL_DS;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			ctxt->user_regs.eip =
+				(unsigned long)cpu_bringup_and_idle;
+			ctxt->flags = VGCF_IN_KERNEL;
+			ctxt->user_regs.eflags = 0x1000; /* IOPL_RING1 */
+			ctxt->user_regs.ds = __USER_DS;
+			ctxt->user_regs.es = __USER_DS;
+			ctxt->user_regs.ss = __KERNEL_DS;
 
-		xen_copy_trap_info(ctxt->trap_ctxt);
+			xen_copy_trap_info(ctxt->trap_ctxt);
 
-		ctxt->ldt_ents = 0;
+			ctxt->ldt_ents = 0;
 
-		BUG_ON((unsigned long)gdt & ~PAGE_MASK);
+			BUG_ON((unsigned long)gdt & ~PAGE_MASK);
 
-		gdt_mfn = arbitrary_virt_to_mfn(gdt);
-		make_lowmem_page_readonly(gdt);
-		make_lowmem_page_readonly(mfn_to_virt(gdt_mfn));
+			gdt_mfn = arbitrary_virt_to_mfn(gdt);
+			make_lowmem_page_readonly(gdt);
+			make_lowmem_page_readonly(mfn_to_virt(gdt_mfn));
 
-		ctxt->gdt_frames[0] = gdt_mfn;
-		ctxt->gdt_ents      = GDT_ENTRIES;
+			ctxt->gdt_frames[0] = gdt_mfn;
+			ctxt->gdt_ents      = GDT_ENTRIES;
 
-		ctxt->kernel_ss = __KERNEL_DS;
-		ctxt->kernel_sp = idle->thread.sp0;
+			ctxt->kernel_ss = __KERNEL_DS;
+			ctxt->kernel_sp = idle->thread.sp0;
 
 #ifdef CONFIG_X86_32
-		ctxt->event_callback_cs     = __KERNEL_CS;
-		ctxt->failsafe_callback_cs  = __KERNEL_CS;
+			ctxt->event_callback_cs     = __KERNEL_CS;
+			ctxt->failsafe_callback_cs  = __KERNEL_CS;
 #else
-		ctxt->gs_base_kernel = per_cpu_offset(cpu);
+			ctxt->gs_base_kernel = per_cpu_offset(cpu);
 #endif
-		ctxt->event_callback_eip    =
-					(unsigned long)xen_hypervisor_callback;
-		ctxt->failsafe_callback_eip =
-					(unsigned long)xen_failsafe_callback;
-		ctxt->user_regs.cs = __KERNEL_CS;
-		per_cpu(xen_cr3, cpu) = __pa(swapper_pg_dir);
-	}
+			ctxt->event_callback_eip    =
+				(unsigned long)xen_hypervisor_callback;
+			ctxt->failsafe_callback_eip =
+				(unsigned long)xen_failsafe_callback;
+			ctxt->user_regs.cs = __KERNEL_CS;
+			per_cpu(xen_cr3, cpu) = __pa(swapper_pg_dir);
+		}
 #ifdef CONFIG_XEN_PVH
-	else {
-		/*
-		 * The vcpu comes on kernel page tables which have the NX pte
-		 * bit set. This means before DS/SS is touched, NX in
-		 * EFER must be set. Hence the following assembly glue code.
-		 */
-		ctxt->user_regs.eip = (unsigned long)xen_pvh_early_cpu_init;
-		ctxt->user_regs.rdi = cpu;
-		ctxt->user_regs.rsi = true;  /* entry == true */
-	}
+		else {
+			/*
+			 * The vcpu comes on kernel page tables which have the
+			 * NX pte bit set. This means before DS/SS is touched,
+			 * NX in EFER must be set. Hence the following assembly
+			 * glue code.
+			 */
+			ctxt->user_regs.eip =
+				(unsigned long)xen_pvh_early_cpu_init;
+			ctxt->user_regs.rdi = cpu;
+			ctxt->user_regs.rsi = true;  /* entry == true */
+		}
 #endif
-	ctxt->user_regs.esp = idle->thread.sp0 - sizeof(struct pt_regs);
-	ctxt->ctrlreg[3] = xen_pfn_to_cr3(virt_to_gfn(swapper_pg_dir));
+		ctxt->user_regs.esp = idle->thread.sp0 - sizeof(struct pt_regs);
+		ctxt->ctrlreg[3] = xen_pfn_to_cr3(virt_to_gfn(swapper_pg_dir));
+	} else {
+		ctxt = NULL; /* To quiet down compiler */
+		BUG();
+	}
+
 	if (HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, ctxt))
 		BUG();
 
