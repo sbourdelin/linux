@@ -2949,12 +2949,6 @@ int dw_mci_probe(struct dw_mci *host)
 		}
 	}
 
-	if (host->pdata->num_slots < 1) {
-		dev_err(host->dev,
-			"Platform data must supply num_slots.\n");
-		return -ENODEV;
-	}
-
 	host->biu_clk = devm_clk_get(host->dev, "biu");
 	if (IS_ERR(host->biu_clk)) {
 		dev_dbg(host->dev, "biu clock not available\n");
@@ -3111,7 +3105,15 @@ int dw_mci_probe(struct dw_mci *host)
 	if (host->pdata->num_slots)
 		host->num_slots = host->pdata->num_slots;
 	else
-		host->num_slots = SDMMC_GET_SLOT_NUM(mci_readl(host, HCON));
+		host->num_slots = 1;
+
+	if (host->num_slots < 1 ||
+	    host->num_slots > SDMMC_GET_SLOT_NUM(mci_readl(host, HCON))) {
+		dev_err(host->dev,
+			"Platform data must supply correct num_slots.\n");
+		ret = -ENODEV;
+		goto err_clk_ciu;
+	}
 
 	/*
 	 * Enable interrupts for command done, data over, data empty,
