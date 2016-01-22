@@ -405,7 +405,7 @@ static void xen_teardown_msi_irq(unsigned int irq)
 
 int __init pci_xen_init(void)
 {
-	if (!xen_pv_domain() || xen_initial_domain())
+	if ((!xen_pv_domain() && !xen_hvmlite) || xen_initial_domain())
 		return -ENODEV;
 
 	printk(KERN_INFO "PCI: setting up Xen PCI frontend stub\n");
