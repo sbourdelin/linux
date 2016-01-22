@@ -25,6 +25,8 @@ config DEBUG_PAGEALLOC
 	  this option cannot be enabled in combination with hibernation as
 	  that would result in incorrect warnings of memory corruption after
 	  a resume because free pages are not saved to the suspend image.
+	  The feature can be disable with the kernel parameter
+	  debug_pagealloc=off.
 
 config PAGE_POISONING
 	bool

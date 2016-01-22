@@ -479,7 +479,7 @@ void prep_compound_page(struct page *page, unsigned int order)
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
 unsigned int _debug_guardpage_minorder;
-bool _debug_pagealloc_enabled __read_mostly;
+bool _debug_pagealloc_enabled __read_mostly = true;
 bool _debug_guardpage_enabled __read_mostly;
 
 static int __init early_debug_pagealloc(char *buf)
@@ -487,8 +487,8 @@ static int __init early_debug_pagealloc(char *buf)
 	if (!buf)
 		return -EINVAL;
 
-	if (strcmp(buf, "on") == 0)
-		_debug_pagealloc_enabled = true;
+	if (strcmp(buf, "off") == 0)
+		_debug_pagealloc_enabled = false;
 
 	return 0;
 }
