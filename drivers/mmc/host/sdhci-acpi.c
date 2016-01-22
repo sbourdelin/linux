@@ -146,6 +146,29 @@ static const struct sdhci_acpi_chip sdhci_acpi_chip_int = {
 	.ops = &sdhci_acpi_ops_int,
 };
 
+static int bxt_get_cd(struct sdhci_host *host)
+{
+	int gpio_cd = mmc_gpio_get_cd(host->mmc);
+
+	if (!gpio_cd)
+		return 0;
+
+	return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+}
+
+static const struct sdhci_ops sdhci_acpi_ops_bxt = {
+	.set_clock = sdhci_set_clock,
+	.enable_dma = sdhci_acpi_enable_dma,
+	.set_bus_width = sdhci_set_bus_width,
+	.reset = sdhci_reset,
+	.set_uhs_signaling = sdhci_set_uhs_signaling,
+	.get_cd = bxt_get_cd,
+};
+
+static const struct sdhci_acpi_chip sdhci_acpi_chip_bxt = {
+	.ops = &sdhci_acpi_ops_bxt,
+};
+
 static int sdhci_acpi_emmc_probe_slot(struct platform_device *pdev,
 				      const char *hid, const char *uid)
 {
@@ -234,6 +257,16 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sd = {
 	.probe_slot	= sdhci_acpi_sd_probe_slot,
 };
 
+static const struct sdhci_acpi_slot sdhci_acpi_slot_bxt_sd = {
+	.chip    = &sdhci_acpi_chip_bxt,
+	.flags   = SDHCI_ACPI_SD_CD | SDHCI_ACPI_SD_CD_OVERRIDE_LEVEL |
+		   SDHCI_ACPI_RUNTIME_PM,
+	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
+	.quirks2 = SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON |
+		   SDHCI_QUIRK2_STOP_WITH_TC,
+	.caps    = MMC_CAP_BUS_WIDTH_TEST | MMC_CAP_WAIT_WHILE_BUSY,
+};
+
 struct sdhci_acpi_uid_slot {
 	const char *hid;
 	const char *uid;
@@ -241,7 +274,7 @@ struct sdhci_acpi_uid_slot {
 };
 
 static const struct sdhci_acpi_uid_slot sdhci_acpi_uids[] = {
-	{ "80865ACA", NULL, &sdhci_acpi_slot_int_sd },
+	{ "80865ACA", NULL, &sdhci_acpi_slot_bxt_sd },
 	{ "80865ACC", NULL, &sdhci_acpi_slot_int_emmc },
 	{ "80865AD0", NULL, &sdhci_acpi_slot_int_sdio },
 	{ "80860F14" , "1" , &sdhci_acpi_slot_int_emmc },
