@@ -32,6 +32,7 @@ static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 		break;
 	/* allow to query information for dquots we "own" */
 	case Q_GETQUOTA:
+	case Q_GETNEXTQUOTA:
 	case Q_XGETQUOTA:
 	case Q_XGETNEXTQUOTA:
 		if ((type == USRQUOTA && uid_eq(current_euid(), make_kuid(current_user_ns(), id))) ||
@@ -218,6 +219,34 @@ static int quota_getquota(struct super_block *sb, int type, qid_t id,
 	if (ret)
 		return ret;
 	copy_to_if_dqblk(&idq, &fdq);
+	if (copy_to_user(addr, &idq, sizeof(struct if_dqblk)))
+		return -EFAULT;
+	return 0;
+}
+
+/*
+ * Return quota for next active quota >= this id, if any exists,
+ * otherwise return -ESRCH via ->get_nextdqblk
+ */
+static int quota_getnextquota(struct super_block *sb, int type, qid_t id,
+			  void __user *addr)
+{
+	struct kqid qid;
+	struct qc_dqblk fdq;
+	struct if_nextdqblk idq;
+	int ret;
+
+	if (!sb->s_qcop->get_nextdqblk)
+		return -ENOSYS;
+	qid = make_kqid(current_user_ns(), type, id);
+	if (!qid_valid(qid))
+		return -EINVAL;
+	ret = sb->s_qcop->get_nextdqblk(sb, qid, &fdq);
+	if (ret)
+		return ret;
+	/* struct if_nextdqblk is a superset of struct if_dqblk */
+	copy_to_if_dqblk((struct if_dqblk *)&idq, &fdq);
+	idq.dqb_id = fdq.d_id;
 	if (copy_to_user(addr, &idq, sizeof(idq)))
 		return -EFAULT;
 	return 0;
@@ -697,6 +726,8 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id,
 		return quota_setinfo(sb, type, addr);
 	case Q_GETQUOTA:
 		return quota_getquota(sb, type, id, addr);
+	case Q_GETNEXTQUOTA:
+		return quota_getnextquota(sb, type, id, addr);
 	case Q_SETQUOTA:
 		return quota_setquota(sb, type, id, addr);
 	case Q_SYNC:

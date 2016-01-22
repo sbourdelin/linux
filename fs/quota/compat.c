@@ -19,6 +19,19 @@ struct compat_if_dqblk {
 	compat_uint_t dqb_valid;
 };
 
+struct compat_if_nextdqblk {
+	compat_u64 dqb_bhardlimit;
+	compat_u64 dqb_bsoftlimit;
+	compat_u64 dqb_curspace;
+	compat_u64 dqb_ihardlimit;
+	compat_u64 dqb_isoftlimit;
+	compat_u64 dqb_curinodes;
+	compat_u64 dqb_btime;
+	compat_u64 dqb_itime;
+	compat_uint_t dqb_valid;
+	compat_uint_t dqb_id;
+};
+
 /* XFS structures */
 struct compat_fs_qfilestat {
 	compat_u64 dqb_bhardlimit;
@@ -46,6 +59,8 @@ asmlinkage long sys32_quotactl(unsigned int cmd, const char __user *special,
 	unsigned int cmds;
 	struct if_dqblk __user *dqblk;
 	struct compat_if_dqblk __user *compat_dqblk;
+	struct if_nextdqblk __user *nxtdqblk;
+	struct compat_if_nextdqblk __user *compat_nextdqblk;
 	struct fs_quota_stat __user *fsqstat;
 	struct compat_fs_quota_stat __user *compat_fsqstat;
 	compat_uint_t data;
@@ -64,6 +79,18 @@ asmlinkage long sys32_quotactl(unsigned int cmd, const char __user *special,
 		if (copy_in_user(compat_dqblk, dqblk, sizeof(*compat_dqblk)) ||
 			get_user(data, &dqblk->dqb_valid) ||
 			put_user(data, &compat_dqblk->dqb_valid))
+			ret = -EFAULT;
+		break;
+	case Q_GETNEXTQUOTA:
+		nxtdqblk = compat_alloc_user_space(sizeof(struct if_nextdqblk));
+		compat_nextdqblk = addr;
+		ret = sys_quotactl(cmd, special, id, nxtdqblk);
+		if (ret)
+			break;
+		if (copy_in_user(compat_nextdqblk, nxtdqblk,
+				 sizeof(*compat_nextdqblk)) ||
+			get_user(data, &nxtdqblk->dqb_valid) ||
+			put_user(data, &compat_nextdqblk->dqb_valid))
 			ret = -EFAULT;
 		break;
 	case Q_SETQUOTA:
