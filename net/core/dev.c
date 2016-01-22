@@ -4153,8 +4153,11 @@ ncls:
 		else
 			ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	} else {
+		if (deliver_exact)
+			goto inactive; /* bond or team inactive slave */
 drop:
 		atomic_long_inc(&skb->dev->rx_dropped);
+inactive:
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)
