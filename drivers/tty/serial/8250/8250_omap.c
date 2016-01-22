@@ -664,8 +664,14 @@ static void omap_8250_shutdown(struct uart_port *port)
 	up->ier = 0;
 	serial_out(up, UART_IER, 0);
 
-	if (up->dma)
+	if (up->dma) {
 		serial8250_release_dma(up);
+
+		if (priv->delayed_restore) {
+			priv->delayed_restore = 0;
+			omap8250_restore_regs(up);
+		}
+	}
 
 	/*
 	 * Disable break condition and FIFOs
