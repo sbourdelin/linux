@@ -961,6 +961,8 @@ int btrfs_reada_wait(void *handle)
 	struct reada_control *rc = handle;
 
 	while (atomic_read(&rc->elems)) {
+		if (!atomic_read(&works_cnt))
+			reada_start_machine(rc->root->fs_info);
 		wait_event_timeout(rc->wait, atomic_read(&rc->elems) == 0,
 				   5 * HZ);
 		dump_devs(rc->root->fs_info,
@@ -979,6 +981,8 @@ int btrfs_reada_wait(void *handle)
 	struct reada_control *rc = handle;
 
 	while (atomic_read(&rc->elems)) {
+		if (!atomic_read(&works_cnt))
+			reada_start_machine(rc->root->fs_info);
 		wait_event(rc->wait, atomic_read(&rc->elems) == 0);
 	}
 
