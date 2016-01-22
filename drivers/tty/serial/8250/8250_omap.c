@@ -630,7 +630,7 @@ static int omap_8250_startup(struct uart_port *port)
 	}
 #endif
 
-	ret = request_irq(port->irq, omap8250_irq, IRQF_SHARED,
+	ret = request_irq(port->irq, omap8250_irq, 0,
 			  dev_name(port->dev), port);
 	if (ret < 0)
 		goto err;
@@ -1112,8 +1112,14 @@ static int omap_8250_dma_handle_irq(struct uart_port *port, unsigned int iir)
 	unsigned char status;
 	int dma_err;
 
+	/*
+	 * It has been seen that spurious interrupts are generated when the
+	 * DMA engine is in use. By disabling timeout interrupts (~IER_RDI)
+	 * this phenomenon goes away, but this driver relies on the timeout
+	 * interrupts, so we just consume the spurious interrupts.
+	 */
 	if (iir & UART_IIR_NO_INT)
-		return 0;
+		return 1;
 
 	spin_lock(&port->lock);
 
