@@ -1,0 +1,52 @@
+dm-pref-path
+============
+
+dm-pref-path is a path selector module for device-mapper targets, which
+selects a user specified path for the incoming I/O.
+
+The key operations of this policy to select and return user specified
+path from the current discovered online/ healthy paths. If the user
+specified path do not exist in the online/ healthy path list due to
+path being currently in failed state or user has mentioned wrong device
+information, it will fall back to round-robin policy, where all the
+online/ healthy paths are given equal preference.
+
+The path selector name is 'pref-path'.
+
+Table parameters for each path: [<repeat_count>]
+
+Status for each path: <status> <fail-count>
+	<status>: 'A' if the path is active, 'F' if the path is failed.
+	<fail-count>: The number of path failures.
+
+Algorithm
+=========
+User is provided with an option to specify preferred path in DM
+Multipath configuration file (/etc/multipath.conf) under multipath{}
+section with a syntax "path_selector "pref-path 1 <device major>:<device minor>"".
+
+	1. The pref-path selector would search and return the matching user
+        preferred path from the online/ healthy path list for incoming I/O.
+
+	2. If the user preferred path do not exist in the online/ healthy
+        path list due to path being currently in failed state or user
+        has mentioned wrong device information, it will fall back to
+        round-robin policy, where all the online/ healthy paths are given
+        equal preference.
+
+	3. If the user preferred path comes back online/ healthy, pref-path
+        selector would find and return this path for incoming I/O.
+
+Examples
+========
+Consider 4 paths sdq, sdam, sdbh and sdcc, if user prefers path sdbh
+with major:minor number 67:176 which has throughput of 8GB/s over other
+paths of 4GB/s, pref-path policy will chose this sdbh path for all the
+incoming I/O's.
+
+# dmsetup table Test_Lun_2
+0 20971520 multipath 0 0 1 1 pref-path 0 4 1 66:80 10000 67:160 10000
+68:240 10000 8:240 10000
+
+# dmsetup status Test_Lun_2
+0 20971520 multipath 2 0 0 0 1 1 A 0 4 0 66:80 A 0 67:160 A 0 68:240 A
