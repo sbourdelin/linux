@@ -2576,7 +2576,7 @@ verbose_printk("btrfs: send_create_inode %llu\n", ino);
 	} else {
 		btrfs_warn(sctx->send_root->fs_info, "unexpected inode type %o",
 				(int)(mode & S_IFMT));
-		ret = -ENOTSUPP;
+		ret = -EOPNOTSUPP;
 		goto out;
 	}
 
