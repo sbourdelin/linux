@@ -453,6 +453,17 @@ config DEBUG_OBJECTS_ENABLE_DEFAULT
         help
           Debug objects boot parameter default value
 
+config DEBUG_OBJECTS_STATIC_ELEMENTS
+	int "debug_objects static element buffer size (100-10000)"
+	range 100 10000
+	default "500"
+	depends on DEBUG_OBJECTS
+	help
+	  How many static objects can be stored at early boot time. If this
+	  value is exceeded object debugging will stop with an message
+	  "Out of memory. ODEBUG disabled". Higher values will allocate a
+	  bigger static buffer, but this buffer will be released later on.
+
 config DEBUG_SLAB
 	bool "Debug slab memory allocations"
 	depends on DEBUG_KERNEL && SLAB && !KMEMCHECK
