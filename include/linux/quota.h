@@ -327,6 +327,7 @@ struct path;
 
 /* Structure for communicating via ->get_dqblk() & ->set_dqblk() */
 struct qc_dqblk {
+	u32 d_id;		/* user/group/project ID for this quota */
 	int d_fieldmask;	/* mask of fields to change in ->set_dqblk() */
 	u64 d_spc_hardlimit;	/* absolute limit on used space */
 	u64 d_spc_softlimit;	/* preferred limit on used space */
@@ -425,6 +426,8 @@ struct quotactl_ops {
 	int (*quota_sync)(struct super_block *, int);
 	int (*set_info)(struct super_block *, int, struct qc_info *);
 	int (*get_dqblk)(struct super_block *, struct kqid, struct qc_dqblk *);
+	int (*get_nextdqblk)(struct super_block *, struct kqid,
+			     struct qc_dqblk *);
 	int (*set_dqblk)(struct super_block *, struct kqid, struct qc_dqblk *);
 	int (*get_state)(struct super_block *, struct qc_state *);
 	int (*rm_xquota)(struct super_block *, unsigned int);
