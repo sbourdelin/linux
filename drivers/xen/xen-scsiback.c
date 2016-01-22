@@ -1915,6 +1915,6 @@ module_init(scsiback_init);
 module_exit(scsiback_exit);
 
 MODULE_DESCRIPTION("Xen SCSI backend driver");
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("Dual MIT/GPL");
 MODULE_ALIAS("xen-backend:vscsi");
 MODULE_AUTHOR("Juergen Gross <jgross@suse.com>");
