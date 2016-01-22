@@ -5567,7 +5567,7 @@ perf_event_read_event(struct perf_event *event,
 			struct task_struct *task)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	struct perf_read_event read_event = {
 		.header = {
 			.type = PERF_RECORD_READ,
@@ -5579,14 +5579,14 @@ perf_event_read_event(struct perf_event *event,
 	};
 	int ret;
 
-	perf_event_header__init_id(&read_event.header, &sample, event);
+	perf_event_header__init_id(&read_event.header, psample, event);
 	ret = perf_output_begin(&handle, event, read_event.header.size);
 	if (ret)
 		return;
 
 	perf_output_put(&handle, read_event);
 	perf_output_read(&handle, event);
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 }
@@ -5691,14 +5691,14 @@ static void perf_event_task_output(struct perf_event *event,
 {
 	struct perf_task_event *task_event = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data	sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	struct task_struct *task = task_event->task;
 	int ret, size = task_event->event_id.header.size;
 
 	if (!perf_event_task_match(event))
 		return;
 
-	perf_event_header__init_id(&task_event->event_id.header, &sample, event);
+	perf_event_header__init_id(&task_event->event_id.header, psample, event);
 
 	ret = perf_output_begin(&handle, event,
 				task_event->event_id.header.size);
@@ -5715,7 +5715,7 @@ static void perf_event_task_output(struct perf_event *event,
 
 	perf_output_put(&handle, task_event->event_id);
 
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 out:
@@ -5787,14 +5787,14 @@ static void perf_event_comm_output(struct perf_event *event,
 {
 	struct perf_comm_event *comm_event = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	int size = comm_event->event_id.header.size;
 	int ret;
 
 	if (!perf_event_comm_match(event))
 		return;
 
-	perf_event_header__init_id(&comm_event->event_id.header, &sample, event);
+	perf_event_header__init_id(&comm_event->event_id.header, psample, event);
 	ret = perf_output_begin(&handle, event,
 				comm_event->event_id.header.size);
 
@@ -5808,7 +5808,7 @@ static void perf_event_comm_output(struct perf_event *event,
 	__output_copy(&handle, comm_event->comm,
 				   comm_event->comm_size);
 
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 out:
@@ -5900,7 +5900,7 @@ static void perf_event_mmap_output(struct perf_event *event,
 {
 	struct perf_mmap_event *mmap_event = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	int size = mmap_event->event_id.header.size;
 	int ret;
 
@@ -5917,7 +5917,7 @@ static void perf_event_mmap_output(struct perf_event *event,
 		mmap_event->event_id.header.size += sizeof(mmap_event->flags);
 	}
 
-	perf_event_header__init_id(&mmap_event->event_id.header, &sample, event);
+	perf_event_header__init_id(&mmap_event->event_id.header, psample, event);
 	ret = perf_output_begin(&handle, event,
 				mmap_event->event_id.header.size);
 	if (ret)
@@ -5940,7 +5940,7 @@ static void perf_event_mmap_output(struct perf_event *event,
 	__output_copy(&handle, mmap_event->file_name,
 				   mmap_event->file_size);
 
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 out:
@@ -6105,7 +6105,7 @@ void perf_event_aux_event(struct perf_event *event, unsigned long head,
 			  unsigned long size, u64 flags)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	struct perf_aux_event {
 		struct perf_event_header	header;
 		u64				offset;
@@ -6123,14 +6123,14 @@ void perf_event_aux_event(struct perf_event *event, unsigned long head,
 	};
 	int ret;
 
-	perf_event_header__init_id(&rec.header, &sample, event);
+	perf_event_header__init_id(&rec.header, psample, event);
 	ret = perf_output_begin(&handle, event, rec.header.size);
 
 	if (ret)
 		return;
 
 	perf_output_put(&handle, rec);
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 }
@@ -6141,7 +6141,7 @@ void perf_event_aux_event(struct perf_event *event, unsigned long head,
 void perf_log_lost_samples(struct perf_event *event, u64 lost)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	int ret;
 
 	struct {
@@ -6156,7 +6156,7 @@ void perf_log_lost_samples(struct perf_event *event, u64 lost)
 		.lost		= lost,
 	};
 
-	perf_event_header__init_id(&lost_samples_event.header, &sample, event);
+	perf_event_header__init_id(&lost_samples_event.header, psample, event);
 
 	ret = perf_output_begin(&handle, event,
 				lost_samples_event.header.size);
@@ -6164,7 +6164,7 @@ void perf_log_lost_samples(struct perf_event *event, u64 lost)
 		return;
 
 	perf_output_put(&handle, lost_samples_event);
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 	perf_output_end(&handle);
 }
 
@@ -6192,7 +6192,7 @@ static void perf_event_switch_output(struct perf_event *event, void *data)
 {
 	struct perf_switch_event *se = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	int ret;
 
 	if (!perf_event_switch_match(event))
@@ -6211,7 +6211,7 @@ static void perf_event_switch_output(struct perf_event *event, void *data)
 					perf_event_tid(event, se->next_prev);
 	}
 
-	perf_event_header__init_id(&se->event_id.header, &sample, event);
+	perf_event_header__init_id(&se->event_id.header, psample, event);
 
 	ret = perf_output_begin(&handle, event, se->event_id.header.size);
 	if (ret)
@@ -6222,7 +6222,7 @@ static void perf_event_switch_output(struct perf_event *event, void *data)
 	else
 		perf_output_put(&handle, se->event_id);
 
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 }
@@ -6260,7 +6260,7 @@ static void perf_event_switch(struct task_struct *task,
 static void perf_log_throttle(struct perf_event *event, int enable)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	int ret;
 
 	struct {
@@ -6282,7 +6282,7 @@ static void perf_log_throttle(struct perf_event *event, int enable)
 	if (enable)
 		throttle_event.header.type = PERF_RECORD_UNTHROTTLE;
 
-	perf_event_header__init_id(&throttle_event.header, &sample, event);
+	perf_event_header__init_id(&throttle_event.header, psample, event);
 
 	ret = perf_output_begin(&handle, event,
 				throttle_event.header.size);
@@ -6290,14 +6290,14 @@ static void perf_log_throttle(struct perf_event *event, int enable)
 		return;
 
 	perf_output_put(&handle, throttle_event);
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 	perf_output_end(&handle);
 }
 
 static void perf_log_itrace_start(struct perf_event *event)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	struct perf_aux_event {
 		struct perf_event_header        header;
 		u32				pid;
@@ -6318,14 +6318,14 @@ static void perf_log_itrace_start(struct perf_event *event)
 	rec.pid	= perf_event_pid(event, current);
 	rec.tid	= perf_event_tid(event, current);
 
-	perf_event_header__init_id(&rec.header, &sample, event);
+	perf_event_header__init_id(&rec.header, psample, event);
 	ret = perf_output_begin(&handle, event, rec.header.size);
 
 	if (ret)
 		return;
 
 	perf_output_put(&handle, rec);
-	perf_event__output_id_sample(event, &handle, &sample);
+	perf_event__output_id_sample(event, &handle, psample);
 
 	perf_output_end(&handle);
 }
@@ -6634,13 +6634,13 @@ inline void perf_swevent_put_recursion_context(int rctx)
 
 void ___perf_sw_event(u32 event_id, u64 nr, struct pt_regs *regs, u64 addr)
 {
-	struct perf_sample_data data;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(pdata, temp);
 
 	if (WARN_ON_ONCE(!regs))
 		return;
 
-	perf_sample_data_init(&data, addr, 0);
-	do_perf_sw_event(PERF_TYPE_SOFTWARE, event_id, nr, &data, regs);
+	perf_sample_data_init(pdata, addr, 0);
+	do_perf_sw_event(PERF_TYPE_SOFTWARE, event_id, nr, pdata, regs);
 }
 
 void __perf_sw_event(u32 event_id, u64 nr, struct pt_regs *regs, u64 addr)
@@ -6892,7 +6892,7 @@ void perf_tp_event(u64 addr, u64 count, void *record, int entry_size,
 		   struct pt_regs *regs, struct hlist_head *head, int rctx,
 		   struct task_struct *task)
 {
-	struct perf_sample_data data;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(pdata, temp);
 	struct perf_event *event;
 
 	struct perf_raw_record raw = {
@@ -6900,12 +6900,12 @@ void perf_tp_event(u64 addr, u64 count, void *record, int entry_size,
 		.data = record,
 	};
 
-	perf_sample_data_init(&data, addr, 0);
-	data.raw = &raw;
+	perf_sample_data_init(pdata, addr, 0);
+	pdata->raw = &raw;
 
 	hlist_for_each_entry_rcu(event, head, hlist_entry) {
-		if (perf_tp_event_match(event, &data, regs))
-			perf_swevent_event(event, count, &data, regs);
+		if (perf_tp_event_match(event, pdata, regs))
+			perf_swevent_event(event, count, pdata, regs);
 	}
 
 	/*
@@ -6926,8 +6926,8 @@ void perf_tp_event(u64 addr, u64 count, void *record, int entry_size,
 				continue;
 			if (event->attr.config != entry->type)
 				continue;
-			if (perf_tp_event_match(event, &data, regs))
-				perf_swevent_event(event, count, &data, regs);
+			if (perf_tp_event_match(event, pdata, regs))
+				perf_swevent_event(event, count, pdata, regs);
 		}
 unlock:
 		rcu_read_unlock();
@@ -7074,13 +7074,13 @@ static void perf_event_free_bpf_prog(struct perf_event *event)
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 void perf_bp_event(struct perf_event *bp, void *data)
 {
-	struct perf_sample_data sample;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample, temp);
 	struct pt_regs *regs = data;
 
-	perf_sample_data_init(&sample, bp->attr.bp_addr, 0);
+	perf_sample_data_init(psample, bp->attr.bp_addr, 0);
 
 	if (!bp->hw.state && !perf_exclude_event(bp, regs))
-		perf_swevent_event(bp, 1, &sample, regs);
+		perf_swevent_event(bp, 1, psample, regs);
 }
 #endif
 
@@ -7091,7 +7091,7 @@ void perf_bp_event(struct perf_event *bp, void *data)
 static enum hrtimer_restart perf_swevent_hrtimer(struct hrtimer *hrtimer)
 {
 	enum hrtimer_restart ret = HRTIMER_RESTART;
-	struct perf_sample_data data;
+	DEFINE_PERF_SAMPLE_DATA_ALIGNED(pdata, temp);
 	struct pt_regs *regs;
 	struct perf_event *event;
 	u64 period;
@@ -7103,12 +7103,12 @@ static enum hrtimer_restart perf_swevent_hrtimer(struct hrtimer *hrtimer)
 
 	event->pmu->read(event);
 
-	perf_sample_data_init(&data, 0, event->hw.last_period);
+	perf_sample_data_init(pdata, 0, event->hw.last_period);
 	regs = get_irq_regs();
 
 	if (regs && !perf_exclude_event(event, regs)) {
 		if (!(event->attr.exclude_idle && is_idle_task(current)))
-			if (__perf_event_overflow(event, 1, &data, regs))
+			if (__perf_event_overflow(event, 1, pdata, regs))
 				ret = HRTIMER_NORESTART;
 	}
 

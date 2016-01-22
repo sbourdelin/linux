@@ -178,7 +178,7 @@ int perf_output_begin(struct perf_output_handle *handle,
 	handle->size = (1UL << page_shift) - offset;
 
 	if (unlikely(have_lost)) {
-		struct perf_sample_data sample_data;
+		DEFINE_PERF_SAMPLE_DATA_ALIGNED(psample_data, temp);
 
 		lost_event.header.size = sizeof(lost_event);
 		lost_event.header.type = PERF_RECORD_LOST;
@@ -187,9 +187,9 @@ int perf_output_begin(struct perf_output_handle *handle,
 		lost_event.lost        = local_xchg(&rb->lost, 0);
 
 		perf_event_header__init_id(&lost_event.header,
-					   &sample_data, event);
+					   psample_data, event);
 		perf_output_put(handle, lost_event);
-		perf_event__output_id_sample(event, handle, &sample_data);
+		perf_event__output_id_sample(event, handle, psample_data);
 	}
 
 	return 0;

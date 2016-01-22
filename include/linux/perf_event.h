@@ -797,6 +797,17 @@ struct perf_sample_data {
 	u64				stack_user_size;
 } ____cacheline_aligned;
 
+#ifdef CONFIG_WARN_DYNAMIC_STACK
+#define DEFINE_PERF_SAMPLE_DATA_ALIGNED(pn, an) \
+	u8 an[SMP_CACHE_BYTES - 1 + sizeof(struct perf_sample_data)]; \
+	struct perf_sample_data *pn = \
+		(struct perf_sample_data *)PTR_ALIGN(&an, SMP_CACHE_BYTES)
+#else
+#define DEFINE_PERF_SAMPLE_DATA_ALIGNED(pn, an) \
+	struct perf_sample_data an; \
+	struct perf_sample_data *pn = &an;
+#endif
+
 /* default value for data source */
 #define PERF_MEM_NA (PERF_MEM_S(OP, NA)   |\
 		    PERF_MEM_S(LVL, NA)   |\
