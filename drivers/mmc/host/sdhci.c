@@ -1612,7 +1612,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 static int sdhci_do_get_cd(struct sdhci_host *host)
 {
-	int gpio_cd = mmc_gpio_get_cd(host->mmc);
+	int gpio_cd;
 
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		return 0;
@@ -1621,10 +1621,14 @@ static int sdhci_do_get_cd(struct sdhci_host *host)
 	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
 		return 1;
 
+	if (host->ops->get_cd)
+		return host->ops->get_cd(host);
+
 	/*
 	 * Try slot gpio detect, if defined it take precedence
 	 * over build in controller functionality
 	 */
+	gpio_cd = mmc_gpio_get_cd(host->mmc);
 	if (!IS_ERR_VALUE(gpio_cd))
 		return !!gpio_cd;
 
