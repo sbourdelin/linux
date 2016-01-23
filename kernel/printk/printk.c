@@ -2213,7 +2213,7 @@ void console_unlock(void)
 	static u64 seen_seq;
 	unsigned long flags;
 	bool wake_klogd = false;
-	bool do_cond_resched, retry;
+	bool do_cond_resched, retry = false;
 
 	if (console_suspended) {
 		up_console_sem();
@@ -2246,7 +2246,8 @@ again:
 	}
 
 	/* flush buffered message fragment immediately to console */
-	console_cont_flush(text, sizeof(text));
+	if (!retry)
+		console_cont_flush(text, sizeof(text));
 
 	for (;;) {
 		struct printk_log *msg;
