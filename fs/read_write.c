@@ -1653,6 +1653,9 @@ next_file:
 		mnt_drop_write_file(dst_file);
 next_loop:
 		fdput(dst_fd);
+
+		if (fatal_signal_pending(current))
+			goto out;
 	}
 
 out:
