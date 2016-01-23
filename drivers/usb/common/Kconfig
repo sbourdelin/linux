@@ -11,5 +11,7 @@ config USB_SKELSWITCH
 	  appear as a generic USB device.
 
 	  Say Y if you intend to use a device that requires this initial switch.
+	  Devices that currently require this module:
+	   - Logitech G920 Racing Wheel
 
 endif # USB_COMMON
