@@ -78,6 +78,8 @@ if USB
 
 source "drivers/usb/core/Kconfig"
 
+source "drivers/usb/common/Kconfig"
+
 source "drivers/usb/mon/Kconfig"
 
 source "drivers/usb/wusbcore/Kconfig"

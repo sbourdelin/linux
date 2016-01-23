@@ -1,0 +1,15 @@
+#
+# USB common modules
+#
+
+if USB_COMMON
+
+config USB_SKELSWITCH
+	tristate "Simple USB module for basic device initialization"
+	help
+	  Simple module that performs basic initialization on devices that at first
+	  appear as a generic USB device.
+
+	  Say Y if you intend to use a device that requires this initial switch.
+
+endif # USB_COMMON
