@@ -2328,13 +2328,16 @@ perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
 		frame.next_frame	     = NULL;
 		frame.return_address = 0;
 
-		if (!access_ok(VERIFY_READ, fp, 16))
+		if (!access_ok(VERIFY_READ, fp, sizeof(frame)))
 			break;
 
-		bytes = __copy_from_user_nmi(&frame.next_frame, fp, 8);
+		bytes = __copy_from_user_nmi(&frame.next_frame, fp,
+						sizeof(frame.next_frame));
 		if (bytes != 0)
 			break;
-		bytes = __copy_from_user_nmi(&frame.return_address, fp+8, 8);
+		bytes = __copy_from_user_nmi(&frame.return_address,
+					fp + sizeof(frame.next_frame),
+					sizeof(frame.return_address));
 		if (bytes != 0)
 			break;
 
