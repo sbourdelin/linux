@@ -276,6 +276,7 @@ static void recover_bitmaps(struct md_thread *thread)
 dlm_unlock:
 		dlm_unlock_sync(bm_lockres);
 clear_bit:
+		lockres_free(bm_lockres);
 		clear_bit(slot, &cinfo->recovery_map);
 	}
 }
@@ -646,8 +647,10 @@ static int gather_all_resync_info(struct mddev *mddev, int total_slots)
 		bm_lockres = lockres_init(mddev, str, NULL, 1);
 		if (!bm_lockres)
 			return -ENOMEM;
-		if (i == (cinfo->slot_number - 1))
+		if (i == (cinfo->slot_number - 1)) {
+			lockres_free(bm_lockres);
 			continue;
+		}
 
 		bm_lockres->flags |= DLM_LKF_NOQUEUE;
 		ret = dlm_lock_sync(bm_lockres, DLM_LOCK_PW);
