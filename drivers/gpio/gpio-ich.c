@@ -384,6 +384,15 @@ static struct ichx_desc avoton_desc = {
 	.use_outlvl_cache = true,
 };
 
+/* Baytrail */
+static struct ichx_desc baytrail_desc = {
+	.ngpio = 96,
+	.regs = ichx_regs,
+	.reglen = ichx_reglen,
+	.have_blink = true,
+	.use_outlvl_cache = true,
+};
+
 static int ichx_gpio_request_regions(struct resource *res_base,
 						const char *name, u8 use_gpio)
 {
@@ -460,6 +469,9 @@ static int ichx_gpio_probe(struct platform_device *pdev)
 		break;
 	case AVOTON_GPIO:
 		ichx_priv.desc = &avoton_desc;
+		break;
+	case ICH_BAYTRAIL_GPIO:
+		ichx_priv.desc = &baytrail_desc;
 		break;
 	default:
 		return -ENODEV;

@@ -34,6 +34,7 @@ enum {
 	ICH_V10CORP_GPIO,
 	ICH_V10CONS_GPIO,
 	AVOTON_GPIO,
+	ICH_BAYTRAIL_GPIO,
 };
 
 struct lpc_ich_info {
