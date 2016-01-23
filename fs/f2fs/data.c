@@ -1587,13 +1587,21 @@ static int f2fs_write_end(struct file *file,
 
 	trace_f2fs_write_end(inode, pos, len, copied);
 
-	set_page_dirty(page);
-
 	if (pos + copied > i_size_read(inode)) {
 		i_size_write(inode, pos + copied);
 		mark_inode_dirty(inode);
-		update_inode_page(inode);
 	}
+
+	if (f2fs_has_inline_data(inode) &&
+			is_inode_flag_set(F2FS_I(inode), FI_DATA_EXIST)) {
+		int err = f2fs_write_inline_data(inode, page);
+		if (err)
+			set_page_dirty(page);
+	} else {
+		set_page_dirty(page);
+	}
+
+	f2fs_write_inode(inode, NULL);
 
 	f2fs_put_page(page, 1);
 	f2fs_update_time(F2FS_I_SB(inode), REQ_TIME);
