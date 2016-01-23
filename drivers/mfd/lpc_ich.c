@@ -510,6 +510,7 @@ static struct lpc_ich_info lpc_chipset_info[] = {
 	[LPC_BAYTRAIL] = {
 		.name = "Bay Trail SoC",
 		.iTCO_version = 3,
+		.gpio_version = ICH_BAYTRAIL_GPIO,
 	},
 	[LPC_COLETO] = {
 		.name = "Coleto Creek",
