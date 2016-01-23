@@ -438,6 +438,7 @@ static int nbd_thread_recv(struct nbd_device *nbd)
 	}
 
 	device_remove_file(disk_to_dev(nbd->disk), &pid_attr);
+	kobject_uevent(&disk_to_dev(nbd->disk)->kobj, KOBJ_CHANGE);
 
 	spin_lock_irqsave(&nbd->tasks_lock, flags);
 	nbd->task_recv = NULL;
