@@ -1026,6 +1026,18 @@ void iwl_chain_noise_calibration(struct iwl_priv *priv)
 
 	spin_unlock_bh(&priv->statistics.lock);
 
+	/* Sometimes firmware returns zero for chain noise and signal
+	 * even if chain is present and antenna is connected. This
+	 * often results in perfectly valid chains being disabled.
+	 * Ignore statistics if it contains zero noise for valid rx
+	 * chain: even with antenna disconnected we should hear some noise.
+	 */
+	if (((priv->nvm_data->valid_rx_ant & (1 << 0)) && chain_noise_a == 0) ||
+	    ((priv->nvm_data->valid_rx_ant & (2 << 0)) && chain_noise_b == 0) ||
+	    ((priv->nvm_data->valid_rx_ant & (3 << 0)) && chain_noise_c == 0)) {
+		return;
+	}
+
 	data->beacon_count++;
 
 	data->chain_noise_a = (chain_noise_a + data->chain_noise_a);
