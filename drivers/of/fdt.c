@@ -645,6 +645,41 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
 }
 
 /**
+ * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
+ *
+ * @node: the parent node
+ * @uname: the name of subnode
+ * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
+ */
+
+int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
+{
+	const void *blob = initial_boot_params;
+	int offset;
+	const char *pathp;
+
+	/* Find first subnode if it exists */
+	offset = fdt_first_subnode(blob, node);
+	if (offset < 0)
+		return -FDT_ERR_NOTFOUND;
+	pathp = fdt_get_name(blob, offset, NULL);
+	if (strncmp(pathp, uname, strlen(uname)) == 0)
+		return offset;
+
+	/* Find other subnodes */
+	do {
+		offset = fdt_next_subnode(blob, offset);
+		if (offset < 0)
+			return -FDT_ERR_NOTFOUND;
+		pathp = fdt_get_name(blob, offset, NULL);
+		if (strncmp(pathp, uname, strlen(uname)) == 0)
+			return offset;
+	} while (offset >= 0);
+
+	return -FDT_ERR_NOTFOUND;
+}
+
+/**
  * of_get_flat_dt_root - find the root node in the flat blob
  */
 unsigned long __init of_get_flat_dt_root(void)
