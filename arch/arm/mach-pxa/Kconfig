@@ -618,6 +618,7 @@ config PXA25x
 config PXA27x
 	bool
 	select CPU_XSCALE
+	select PINCTRL
 	help
 	  Select code specific to PXA27x variants
 
