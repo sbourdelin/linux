@@ -102,8 +102,8 @@ dw_dma_parse_dt(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct dw_dma_platform_data *pdata;
-	u32 tmp, arr[DW_DMA_MAX_NR_MASTERS];
 	u32 nr_channels;
+	u32 tmp;
 
 	if (!np) {
 		dev_err(&pdev->dev, "Missing DT data\n");
@@ -138,10 +138,8 @@ dw_dma_parse_dt(struct platform_device *pdev)
 		pdata->nr_masters = tmp;
 	}
 
-	if (!of_property_read_u32_array(np, "data_width", arr,
-				pdata->nr_masters))
-		for (tmp = 0; tmp < pdata->nr_masters; tmp++)
-			pdata->data_width[tmp] = arr[tmp];
+	if (!of_property_read_u32(np, "data-width", &tmp))
+		pdata->data_width = tmp;
 
 	return pdata;
 }

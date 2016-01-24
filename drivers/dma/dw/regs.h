@@ -285,7 +285,7 @@ struct dw_dma {
 
 	/* hardware configuration */
 	unsigned char		nr_masters;
-	unsigned char		data_width[DW_DMA_MAX_NR_MASTERS];
+	unsigned char		data_width;
 };
 
 static inline struct dw_dma_regs __iomem *__dw_regs(struct dw_dma *dw)
