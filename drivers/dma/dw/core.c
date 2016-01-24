@@ -265,7 +265,7 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
 
 	dwc_initialize(dwc);
 
-	channel_writel(dwc, LLP, first->txd.phys);
+	channel_writel(dwc, LLP, first->txd.phys | DWC_LLP_LMS(dwc->m_master));
 	channel_writel(dwc, CTL_LO,
 			DWC_CTLL_LLP_D_EN | DWC_CTLL_LLP_S_EN);
 	channel_writel(dwc, CTL_HI, 0);
@@ -431,7 +431,7 @@ static void dwc_scan_descriptors(struct dw_dma *dw, struct dw_dma_chan *dwc)
 		dwc->residue = desc->total_len;
 
 		/* Check first descriptors addr */
-		if (desc->txd.phys == llp) {
+		if (desc->txd.phys == DWC_LLP_LOC(llp)) {
 			spin_unlock_irqrestore(&dwc->lock, flags);
 			return;
 		}
@@ -756,7 +756,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
 		if (!first) {
 			first = desc;
 		} else {
-			lli_write(prev, llp, desc->txd.phys);
+			lli_write(prev, llp, desc->txd.phys | DWC_LLP_LMS(dwc->m_master));
 			list_add_tail(&desc->desc_node, &first->tx_list);
 		}
 		prev = desc;
@@ -853,7 +853,7 @@ slave_sg_todev_fill_desc:
 			if (!first) {
 				first = desc;
 			} else {
-				lli_write(prev, llp, desc->txd.phys);
+				lli_write(prev, llp, desc->txd.phys | DWC_LLP_LMS(dwc->m_master));
 				list_add_tail(&desc->desc_node, &first->tx_list);
 			}
 			prev = desc;
@@ -908,7 +908,7 @@ slave_sg_fromdev_fill_desc:
 			if (!first) {
 				first = desc;
 			} else {
-				lli_write(prev, llp, desc->txd.phys);
+				lli_write(prev, llp, desc->txd.phys | DWC_LLP_LMS(dwc->m_master));
 				list_add_tail(&desc->desc_node, &first->tx_list);
 			}
 			prev = desc;
@@ -1427,13 +1427,13 @@ struct dw_cyclic_desc *dw_dma_cyclic_prep(struct dma_chan *chan,
 		cdesc->desc[i] = desc;
 
 		if (last)
-			lli_write(last, llp, desc->txd.phys);
+			lli_write(last, llp, desc->txd.phys | DWC_LLP_LMS(dwc->m_master));
 
 		last = desc;
 	}
 
 	/* Let's make a cyclic list */
-	lli_write(last, llp, cdesc->desc[0]->txd.phys);
+	lli_write(last, llp, cdesc->desc[0]->txd.phys | DWC_LLP_LMS(dwc->m_master));
 
 	dev_dbg(chan2dev(&dwc->chan),
 			"cyclic prepared buf %pad len %zu period %zu periods %d\n",
@@ -1635,9 +1635,8 @@ int dw_dma_probe(struct dw_dma_chip *chip, struct dw_dma_platform_data *pdata)
 			dwc->block_size = pdata->block_size;
 
 			/* Check if channel supports multi block transfer */
-			channel_writel(dwc, LLP, 0xfffffffc);
-			dwc->nollp =
-				(channel_readl(dwc, LLP) & 0xfffffffc) == 0;
+			channel_writel(dwc, LLP, 0xffffffff);
+			dwc->nollp = DWC_LLP_LOC(channel_readl(dwc, LLP)) == 0;
 			channel_writel(dwc, LLP, 0);
 		}
 	}
