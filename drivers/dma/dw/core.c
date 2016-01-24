@@ -1468,8 +1468,9 @@ EXPORT_SYMBOL(dw_dma_cyclic_free);
 
 /*----------------------------------------------------------------------*/
 
-int dw_dma_probe(struct dw_dma_chip *chip, struct dw_dma_platform_data *pdata)
+int dw_dma_probe(struct dw_dma_chip *chip)
 {
+	struct dw_dma_platform_data	*pdata = chip->pdata;
 	struct dw_dma		*dw;
 	bool			autocfg = false;
 	unsigned int		dw_params;
