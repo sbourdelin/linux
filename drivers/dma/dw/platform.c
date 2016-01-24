@@ -32,14 +32,13 @@ static struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
 					struct of_dma *ofdma)
 {
 	struct dw_dma *dw = ofdma->of_dma_data;
-	struct dw_dma_slave slave = {
-		.dma_dev = dw->dma.dev,
-	};
+	struct dw_dma_slave slave;
 	dma_cap_mask_t cap;
 
 	if (dma_spec->args_count != 3)
 		return NULL;
 
+	slave.dma_dev = dw->dma.dev;
 	slave.src_id = dma_spec->args[0];
 	slave.dst_id = dma_spec->args[0];
 	slave.m_master = dma_spec->args[1];
@@ -62,13 +61,13 @@ static struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
 static bool dw_dma_acpi_filter(struct dma_chan *chan, void *param)
 {
 	struct acpi_dma_spec *dma_spec = param;
-	struct dw_dma_slave slave = {
-		.dma_dev = dma_spec->dev,
-		.src_id = dma_spec->slave_id,
-		.dst_id = dma_spec->slave_id,
-		.m_master = 1,
-		.p_master = 0,
-	};
+	struct dw_dma_slave slave;
+
+	slave.dma_dev = dma_spec->dev;
+	slave.src_id = dma_spec->slave_id;
+	slave.dst_id = dma_spec->slave_id;
+	slave.m_master = 1;
+	slave.p_master = 0;
 
 	return dw_dma_filter(chan, &slave);
 }
