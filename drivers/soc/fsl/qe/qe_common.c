@@ -194,7 +194,7 @@ unsigned long cpm_muram_alloc_common(unsigned long size, genpool_algo_t algo,
 		goto out2;
 	start = start - GENPOOL_OFFSET;
 	memset_io(cpm_muram_addr(start), 0, size);
-	entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+	entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
 	if (!entry)
 		goto out1;
 	entry->start = start;
