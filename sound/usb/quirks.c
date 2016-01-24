@@ -1202,40 +1202,48 @@ void snd_usb_endpoint_start_quirk(struct snd_usb_endpoint *ep)
 void snd_usb_set_interface_quirk(struct usb_device *dev)
 {
 	/*
-	 * "Playback Design" products need a 50ms delay after setting the
+	 * Products needing a 50ms delay after setting the
 	 * USB interface.
 	 */
-	if (le16_to_cpu(dev->descriptor.idVendor) == 0x23ba)
-		mdelay(50);
+	switch (le16_to_cpu(dev->descriptor.idVendor)) {
+		case 0x23ba: /* Playback Design */
+		case 0x0644: /* TEAC Corp. */
+			mdelay(50);
+	}
 }
 
 void snd_usb_ctl_msg_quirk(struct usb_device *dev, unsigned int pipe,
 			   __u8 request, __u8 requesttype, __u16 value,
 			   __u16 index, void *data, __u16 size)
 {
-	/*
-	 * "Playback Design" products need a 20ms delay after each
-	 * class compliant request
-	 */
-	if ((le16_to_cpu(dev->descriptor.idVendor) == 0x23ba) &&
-	    (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
-		mdelay(20);
+	if ((requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS) {
+		switch (le16_to_cpu(dev->descriptor.idVendor)) {
+			/*
+			 * "Playback Design"/"TEAC Corp." products need a 20ms delay after each
+			 * class compliant request
+			 */
+			case 0x23ba: /* "Playback Design" */
+			case 0x0644: /* TEAC Corp. */
+				mdelay(20);
+				return;
 
-	/* Marantz/Denon devices with USB DAC functionality need a delay
-	 * after each class compliant request
-	 */
-	if (is_marantz_denon_dac(USB_ID(le16_to_cpu(dev->descriptor.idVendor),
-					le16_to_cpu(dev->descriptor.idProduct)))
-	    && (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
-		mdelay(20);
+				/* Zoom R16/24 needs a tiny delay here, otherwise requests like
+				 * get/set frequency return as failed despite actually succeeding.
+				 */
+			case 0x1686:
+				/* restrict to 0x00dd */
+				if (le16_to_cpu(dev->descriptor.idProduct) == 0x00dd)
+					mdelay(1);
+				return;
+		}
 
-	/* Zoom R16/24 needs a tiny delay here, otherwise requests like
-	 * get/set frequency return as failed despite actually succeeding.
-	 */
-	if ((le16_to_cpu(dev->descriptor.idVendor) == 0x1686) &&
-	    (le16_to_cpu(dev->descriptor.idProduct) == 0x00dd) &&
-	    (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
-		mdelay(1);
+		/* Marantz/Denon devices with USB DAC functionality need a delay
+		 * after each class compliant request
+		 */
+		if (is_marantz_denon_dac(USB_ID(le16_to_cpu(dev->descriptor.idVendor),
+						le16_to_cpu(dev->descriptor.idProduct))))
+			mdelay(20);
+	}
 }
 
 /*
