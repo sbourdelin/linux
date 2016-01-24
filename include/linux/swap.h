@@ -252,6 +252,7 @@ struct swap_info_struct {
 void *workingset_eviction(struct address_space *mapping, struct page *page);
 bool workingset_refault(void *shadow);
 void workingset_activation(struct page *page);
+void workingset_release_shadow(void *shadow);
 extern struct list_lru workingset_shadow_nodes;
 
 static inline unsigned int workingset_node_pages(struct radix_tree_node *node)

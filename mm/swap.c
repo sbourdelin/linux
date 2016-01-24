@@ -270,6 +270,9 @@ static void __activate_page(struct page *page, struct lruvec *lruvec,
 
 		__count_vm_event(PGACTIVATE);
 		update_page_reclaim_stat(lruvec, file, 1);
+
+		if (file)
+			workingset_activation(page);
 	}
 }
 
@@ -375,8 +378,6 @@ void mark_page_accessed(struct page *page)
 		else
 			__lru_cache_activate_page(page);
 		ClearPageReferenced(page);
-		if (page_is_file_cache(page))
-			workingset_activation(page);
 	} else if (!PageReferenced(page)) {
 		SetPageReferenced(page);
 	}

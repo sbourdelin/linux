@@ -211,6 +211,10 @@ struct zone_reclaim_stat {
 struct lruvec {
 	struct list_head lists[NR_LRU_LISTS];
 	struct zone_reclaim_stat reclaim_stat;
+
+	/* Evictions & activations on the inactive file list */
+	atomic_long_t		inactive_age;
+
 #ifdef CONFIG_MEMCG
 	struct zone *zone;
 #endif
@@ -486,9 +490,6 @@ struct zone {
 	/* Fields commonly accessed by the page reclaim scanner */
 	spinlock_t		lru_lock;
 	struct lruvec		lruvec;
-
-	/* Evictions & activations on the inactive file list */
-	atomic_long_t		inactive_age;
 
 	/*
 	 * When free pages are below this point, additional steps are taken

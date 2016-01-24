@@ -52,6 +52,7 @@ static void clear_exceptional_entry(struct address_space *mapping,
 			goto unlock;
 		radix_tree_replace_slot(slot, NULL);
 		mapping->nrexceptional--;
+		workingset_release_shadow(entry);
 		if (!node)
 			goto unlock;
 		workingset_node_shadows_dec(node);

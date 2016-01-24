@@ -366,6 +366,42 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 }
 
 /*
+ * We restrict the id in the range of [1, 65535], so it can fit into
+ * an unsigned short.
+ */
+#define MEM_CGROUP_ID_SHIFT	16
+#define MEM_CGROUP_ID_MAX	((1 << MEM_CGROUP_ID_SHIFT) - 1)
+
+static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
+{
+	return memcg->css.id;
+}
+
+/*
+ * A helper function to get mem_cgroup from ID. must be called under
+ * rcu_read_lock().  The caller is responsible for calling
+ * css_tryget_online() if the mem_cgroup is used for charging. (dropping
+ * refcnt from swap can be called against removed memcg.)
+ */
+static inline struct mem_cgroup *mem_cgroup_from_id(unsigned short id)
+{
+	struct cgroup_subsys_state *css;
+
+	css = css_from_id(id, &memory_cgrp_subsys);
+	return mem_cgroup_from_css(css);
+}
+
+static inline void mem_cgroup_get(struct mem_cgroup *memcg)
+{
+	css_get(&memcg->css);
+}
+
+static inline void mem_cgroup_put(struct mem_cgroup *memcg)
+{
+	css_put(&memcg->css);
+}
+
+/*
  * For memory reclaim.
  */
 int mem_cgroup_select_victim_node(struct mem_cgroup *memcg);
@@ -588,6 +624,14 @@ static inline bool mem_cgroup_disabled(void)
 static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 {
 	return true;
+}
+
+static inline void mem_cgroup_get(struct mem_cgroup *memcg)
+{
+}
+
+static inline void mem_cgroup_put(struct mem_cgroup *memcg)
+{
 }
 
 static inline bool

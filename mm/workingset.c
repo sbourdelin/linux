@@ -142,7 +142,7 @@
  *		Implementation
  *
  * For each zone's file LRU lists, a counter for inactive evictions
- * and activations is maintained (zone->inactive_age).
+ * and activations is maintained (lruvec->inactive_age).
  *
  * On eviction, a snapshot of this counter (along with some bits to
  * identify the zone) is stored in the now empty page cache radix tree
@@ -152,8 +152,72 @@
  * refault distance will immediately activate the refaulting page.
  */
 
-static void *pack_shadow(unsigned long eviction, struct zone *zone)
+#ifdef CONFIG_MEMCG
+/*
+ * On 32-bit there is not much space left in radix tree slot after
+ * storing information about node, zone, and memory cgroup, so we
+ * disregard 10 least significant bits of eviction counter. This
+ * reduces refault distance accuracy to 4MB, which is still fine.
+ *
+ * With the default NODE_SHIFT (3) this leaves us 9 bits for storing
+ * eviction counter, hence maximal refault distance will be 2GB, which
+ * should be enough for 32-bit systems.
+ */
+#ifdef CONFIG_64BIT
+# define REFAULT_DISTANCE_GRANULARITY		0
+#else
+# define REFAULT_DISTANCE_GRANULARITY		10
+#endif
+
+static unsigned long pack_shadow_memcg(unsigned long eviction,
+				       struct mem_cgroup *memcg)
 {
+	if (mem_cgroup_disabled())
+		return eviction;
+
+	eviction >>= REFAULT_DISTANCE_GRANULARITY;
+	eviction = (eviction << MEM_CGROUP_ID_SHIFT) | mem_cgroup_id(memcg);
+	return eviction;
+}
+
+static unsigned long unpack_shadow_memcg(unsigned long entry,
+					 unsigned long *mask,
+					 struct mem_cgroup **memcg)
+{
+	if (mem_cgroup_disabled()) {
+		*memcg = NULL;
+		return entry;
+	}
+
+	rcu_read_lock();
+	*memcg = mem_cgroup_from_id(entry & MEM_CGROUP_ID_MAX);
+	rcu_read_unlock();
+
+	entry >>= MEM_CGROUP_ID_SHIFT;
+	entry <<= REFAULT_DISTANCE_GRANULARITY;
+	*mask >>= MEM_CGROUP_ID_SHIFT - REFAULT_DISTANCE_GRANULARITY;
+	return entry;
+}
+#else /* !CONFIG_MEMCG */
+static unsigned long pack_shadow_memcg(unsigned long eviction,
+				       struct mem_cgroup *memcg)
+{
+	return eviction;
+}
+
+static unsigned long unpack_shadow_memcg(unsigned long entry,
+					 unsigned long *mask,
+					 struct mem_cgroup **memcg)
+{
+	*memcg = NULL;
+	return entry;
+}
+#endif /* CONFIG_MEMCG */
+
+static void *pack_shadow(unsigned long eviction, struct zone *zone,
+			 struct mem_cgroup *memcg)
+{
+	eviction = pack_shadow_memcg(eviction, memcg);
 	eviction = (eviction << NODES_SHIFT) | zone_to_nid(zone);
 	eviction = (eviction << ZONES_SHIFT) | zone_idx(zone);
 	eviction = (eviction << RADIX_TREE_EXCEPTIONAL_SHIFT);
@@ -163,6 +227,7 @@ static void *pack_shadow(unsigned long eviction, struct zone *zone)
 
 static void unpack_shadow(void *shadow,
 			  struct zone **zone,
+			  struct mem_cgroup **memcg,
 			  unsigned long *distance)
 {
 	unsigned long entry = (unsigned long)shadow;
@@ -170,19 +235,23 @@ static void unpack_shadow(void *shadow,
 	unsigned long refault;
 	unsigned long mask;
 	int zid, nid;
+	struct lruvec *lruvec;
 
 	entry >>= RADIX_TREE_EXCEPTIONAL_SHIFT;
 	zid = entry & ((1UL << ZONES_SHIFT) - 1);
 	entry >>= ZONES_SHIFT;
 	nid = entry & ((1UL << NODES_SHIFT) - 1);
 	entry >>= NODES_SHIFT;
-	eviction = entry;
 
-	*zone = NODE_DATA(nid)->node_zones + zid;
-
-	refault = atomic_long_read(&(*zone)->inactive_age);
 	mask = ~0UL >> (NODES_SHIFT + ZONES_SHIFT +
 			RADIX_TREE_EXCEPTIONAL_SHIFT);
+
+	eviction = unpack_shadow_memcg(entry, &mask, memcg);
+
+	*zone = NODE_DATA(nid)->node_zones + zid;
+	lruvec = mem_cgroup_zone_lruvec(*zone, *memcg);
+
+	refault = atomic_long_read(&lruvec->inactive_age);
 	/*
 	 * The unsigned subtraction here gives an accurate distance
 	 * across inactive_age overflows in most cases.
@@ -213,10 +282,16 @@ static void unpack_shadow(void *shadow,
 void *workingset_eviction(struct address_space *mapping, struct page *page)
 {
 	struct zone *zone = page_zone(page);
+	struct mem_cgroup *memcg = page_memcg(page);
+	struct lruvec *lruvec;
 	unsigned long eviction;
 
-	eviction = atomic_long_inc_return(&zone->inactive_age);
-	return pack_shadow(eviction, zone);
+	if (!mem_cgroup_disabled())
+		mem_cgroup_get(memcg);
+
+	lruvec = mem_cgroup_zone_lruvec(zone, memcg);
+	eviction = atomic_long_inc_return(&lruvec->inactive_age);
+	return pack_shadow(eviction, zone, memcg);
 }
 
 /**
@@ -230,13 +305,22 @@ void *workingset_eviction(struct address_space *mapping, struct page *page)
  */
 bool workingset_refault(void *shadow)
 {
-	unsigned long refault_distance;
+	unsigned long refault_distance, nr_active;
 	struct zone *zone;
+	struct mem_cgroup *memcg;
+	struct lruvec *lruvec;
 
-	unpack_shadow(shadow, &zone, &refault_distance);
+	unpack_shadow(shadow, &zone, &memcg, &refault_distance);
 	inc_zone_state(zone, WORKINGSET_REFAULT);
 
-	if (refault_distance <= zone_page_state(zone, NR_ACTIVE_FILE)) {
+	if (!mem_cgroup_disabled()) {
+		lruvec = mem_cgroup_zone_lruvec(zone, memcg);
+		nr_active = mem_cgroup_get_lru_size(lruvec, LRU_ACTIVE_FILE);
+		mem_cgroup_put(memcg);
+	} else
+		nr_active = zone_page_state(zone, NR_ACTIVE_FILE);
+
+	if (refault_distance <= nr_active) {
 		inc_zone_state(zone, WORKINGSET_ACTIVATE);
 		return true;
 	}
@@ -249,7 +333,23 @@ bool workingset_refault(void *shadow)
  */
 void workingset_activation(struct page *page)
 {
-	atomic_long_inc(&page_zone(page)->inactive_age);
+	struct lruvec *lruvec;
+
+	lruvec = mem_cgroup_page_lruvec(page, page_zone(page));
+	atomic_long_inc(&lruvec->inactive_age);
+}
+
+void workingset_release_shadow(void *shadow)
+{
+	unsigned long refault_distance;
+	struct zone *zone;
+	struct mem_cgroup *memcg;
+
+	if (mem_cgroup_disabled())
+		return;
+
+	unpack_shadow(shadow, &zone, &memcg, &refault_distance);
+	mem_cgroup_put(memcg);
 }
 
 /*
@@ -348,6 +448,7 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 	for (i = 0; i < RADIX_TREE_MAP_SIZE; i++) {
 		if (node->slots[i]) {
 			BUG_ON(!radix_tree_exceptional_entry(node->slots[i]));
+			workingset_release_shadow(node->slots[i]);
 			node->slots[i] = NULL;
 			BUG_ON(node->count < (1U << RADIX_TREE_COUNT_SHIFT));
 			node->count -= 1U << RADIX_TREE_COUNT_SHIFT;
