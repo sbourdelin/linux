@@ -138,7 +138,7 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
 	u32 cfghi = DWC_CFGH_FIFO_MODE;
 	u32 cfglo = DWC_CFGL_CH_PRIOR(dwc->priority);
 
-	if (dwc->initialized == true)
+	if (test_bit(DW_DMA_IS_INITIALIZED, &dwc->flags))
 		return;
 
 	if (dws) {
@@ -163,7 +163,7 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
 	channel_set_bit(dw, MASK.BLOCK, dwc->mask);
 	channel_set_bit(dw, MASK.ERROR, dwc->mask);
 
-	dwc->initialized = true;
+	set_bit(DW_DMA_IS_INITIALIZED, &dwc->flags);
 }
 
 /*----------------------------------------------------------------------*/
@@ -1108,7 +1108,7 @@ static void dw_dma_off(struct dw_dma *dw)
 		cpu_relax();
 
 	for (i = 0; i < dw->dma.chancnt; i++)
-		dw->chan[i].initialized = false;
+		clear_bit(DW_DMA_IS_INITIALIZED, &dw->chan[i].flags);
 }
 
 static void dw_dma_on(struct dw_dma *dw)
@@ -1201,13 +1201,13 @@ static void dwc_free_chan_resources(struct dma_chan *chan)
 	spin_lock_irqsave(&dwc->lock, flags);
 	list_splice_init(&dwc->free_list, &list);
 	dwc->descs_allocated = 0;
-	dwc->initialized = false;
 
 	/* Disable interrupts */
 	channel_clear_bit(dw, MASK.XFER, dwc->mask);
 	channel_clear_bit(dw, MASK.BLOCK, dwc->mask);
 	channel_clear_bit(dw, MASK.ERROR, dwc->mask);
 
+	clear_bit(DW_DMA_IS_INITIALIZED, &dwc->flags);
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
 	/* Disable controller in case it was a last user */
