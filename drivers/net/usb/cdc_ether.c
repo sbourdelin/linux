@@ -462,6 +462,7 @@ static const struct driver_info wwan_info = {
 #define SAMSUNG_VENDOR_ID	0x04e8
 #define LENOVO_VENDOR_ID	0x17ef
 #define NVIDIA_VENDOR_ID	0x0955
+#define CINTERION_VENDOR_ID	0x1e2d
 
 static const struct usb_device_id	products[] = {
 /* BLACKLIST !!
@@ -704,6 +705,11 @@ static const struct usb_device_id	products[] = {
 }, {
 	/* Dell DW5580 modules */
 	USB_DEVICE_AND_INTERFACE_INFO(DELL_VENDOR_ID, 0x81ba, USB_CLASS_COMM,
+			USB_CDC_SUBCLASS_ETHERNET, USB_CDC_PROTO_NONE),
+	.driver_info = (kernel_ulong_t)&wwan_info,
+}, {
+	/* Cinterion modules */
+	USB_VENDOR_AND_INTERFACE_INFO(CINTERION_VENDOR_ID, USB_CLASS_COMM,
 			USB_CDC_SUBCLASS_ETHERNET, USB_CDC_PROTO_NONE),
 	.driver_info = (kernel_ulong_t)&wwan_info,
 }, {
