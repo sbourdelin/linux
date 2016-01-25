@@ -77,6 +77,8 @@ extern int nfs4_setup_slot_table(struct nfs4_slot_table *tbl,
 		unsigned int max_reqs, const char *queue);
 extern void nfs4_shutdown_slot_table(struct nfs4_slot_table *tbl);
 extern struct nfs4_slot *nfs4_alloc_slot(struct nfs4_slot_table *tbl);
+extern struct nfs4_slot *nfs4_lookup_slot(struct nfs4_slot_table *tbl, u32 slotid);
+extern bool nfs4_try_to_lock_slot(struct nfs4_slot_table *tbl, struct nfs4_slot *slot);
 extern void nfs4_free_slot(struct nfs4_slot_table *tbl, struct nfs4_slot *slot);
 extern void nfs4_slot_tbl_drain_complete(struct nfs4_slot_table *tbl);
 bool nfs41_wake_and_assign_slot(struct nfs4_slot_table *tbl,
@@ -123,6 +125,12 @@ static inline void nfs4_copy_sessionid(struct nfs4_sessionid *dst,
 		const struct nfs4_sessionid *src)
 {
 	memcpy(dst->data, src->data, NFS4_MAX_SESSIONID_LEN);
+}
+
+static inline bool nfs4_test_locked_slot(const struct nfs4_slot_table *tbl,
+		u32 slotid)
+{
+	return test_bit(slotid, tbl->used_slots) != 0;
 }
 
 #ifdef CONFIG_CRC32
