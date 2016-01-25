@@ -10,6 +10,7 @@ config STM
 
 config STM_DUMMY
 	tristate "Dummy STM driver"
+	depends on STM
 	help
 	  This is a simple dummy device that pretends to be an stm device
 	  and discards your data. Use for stm class testing.
@@ -18,6 +19,7 @@ config STM_DUMMY
 
 config STM_SOURCE_CONSOLE
 	tristate "Kernel console over STM devices"
+	depends on STM
 	help
 	  This is a kernel space trace source that sends kernel log
 	  messages to trace hosts over STM devices.
