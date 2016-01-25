@@ -429,8 +429,10 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
 			continue;
 
 		ret = fimc_md_parse_port_node(fmd, port, index);
-		if (ret < 0)
+		if (ret < 0) {
+			of_node_put(node);
 			goto rpm_put;
+		}
 		index++;
 	}
 
@@ -441,8 +443,10 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
 
 	for_each_child_of_node(ports, node) {
 		ret = fimc_md_parse_port_node(fmd, node, index);
-		if (ret < 0)
+		if (ret < 0) {
+			of_node_put(node);
 			break;
+		}
 		index++;
 	}
 rpm_put:
@@ -650,8 +654,10 @@ static int fimc_md_register_platform_entities(struct fimc_md *fmd,
 			ret = fimc_md_register_platform_entity(fmd, pdev,
 							plat_entity);
 		put_device(&pdev->dev);
-		if (ret < 0)
+		if (ret < 0) {
+			of_node_put(node);
 			break;
+		}
 	}
 
 	return ret;
