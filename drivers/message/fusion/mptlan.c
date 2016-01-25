@@ -734,6 +734,13 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 
         dma = pci_map_single(mpt_dev->pcidev, skb->data, skb->len,
 			     PCI_DMA_TODEVICE);
+	if (pci_dma_mapping_error(mpt_dev->pcidev, dma)) {
+		mpt_put_msg_frame(LanCtx, mpt_dev, mf);
+		netif_stop_queue(dev);
+
+		printk (KERN_ERR "%s: dma mapping failed\n", __func__);
+		return NETDEV_TX_BUSY;
+	}
 
 	priv->SendCtl[ctx].skb = skb;
 	priv->SendCtl[ctx].dma = dma;
@@ -1232,6 +1239,15 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 
 				dma = pci_map_single(mpt_dev->pcidev, skb->data,
 						     len, PCI_DMA_FROMDEVICE);
+				if (pci_dma_mapping_error(mpt_dev->pcidev, dma)) {
+					printk (KERN_WARNING
+						MYNAM "/%s: dma mapping failed\n",
+						__func__);
+					dev_kfree_skb(skb);
+					priv->mpt_rxfidx[++priv->mpt_rxfidx_tail] = ctx;
+					spin_unlock_irqrestore(&priv->rxfidx_lock, flags);
+					break;
+				}
 
 				priv->RcvCtl[ctx].skb = skb;
 				priv->RcvCtl[ctx].dma = dma;
