@@ -88,6 +88,9 @@ static const struct of_device_id arm_cci_matches[] = {
 #define CCI_PMU_MAX_HW_CNTRS(model) \
 	((model)->num_hw_cntrs + (model)->fixed_hw_cntrs)
 
+#define CCI_CNTRS_SYNC		true
+#define CCI_CNTRS_NOSYNC	false
+
 /* Types of interfaces that can generate events */
 enum {
 	CCI_IF_SLAVE,
@@ -640,11 +643,12 @@ void cci_pmu_sync_counters(struct cci_pmu *cci_pmu)
 }
 
 /* Should be called with cci_pmu->hw_events->pmu_lock held */
-static void __cci_pmu_enable(struct cci_pmu *cci_pmu)
+static void __cci_pmu_enable(struct cci_pmu *cci_pmu, bool sync)
 {
 	u32 val;
 
-	cci_pmu_sync_counters(cci_pmu);
+	if (sync)
+		cci_pmu_sync_counters(cci_pmu);
 
 	/* Enable all the PMU counters. */
 	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
@@ -960,7 +964,7 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
 	}
 
 	/* Enable the PMU and sync possibly overflowed counters */
-	__cci_pmu_enable(cci_pmu);
+	__cci_pmu_enable(cci_pmu, CCI_CNTRS_SYNC);
 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
 
 	return IRQ_RETVAL(handled);
@@ -1004,7 +1008,7 @@ static void cci_pmu_enable(struct pmu *pmu)
 		return;
 
 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-	__cci_pmu_enable(cci_pmu);
+	__cci_pmu_enable(cci_pmu, CCI_CNTRS_SYNC);
 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
 
 }
