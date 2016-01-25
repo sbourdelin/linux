@@ -150,6 +150,7 @@ config PWM_FSL_FTM
 	tristate "Freescale FlexTimer Module (FTM) PWM support"
 	depends on HAS_IOMEM
 	depends on OF
+	depends on HAS_IOMEM
 	select REGMAP_MMIO
 	help
 	  Generic FTM PWM framework driver for Freescale VF610 and
