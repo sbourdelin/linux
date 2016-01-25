@@ -1204,6 +1204,9 @@ _GLOBAL(ftrace_caller)
 	mflr    r3
 	std     r3, _NIP(r1)
 	std	r3, 16(r1)
+#ifdef CONFIG_LIVEPATCH
+	mr	r14,r3		/* remember old NIP */
+#endif
 	subi    r3, r3, MCOUNT_INSN_SIZE
 	mfmsr   r4
 	std     r4, _MSR(r1)
@@ -1220,7 +1223,10 @@ ftrace_call:
 	nop
 
 	ld	r3, _NIP(r1)
-	mtlr	r3
+	mtctr	r3		/* prepare to jump there */
+#ifdef CONFIG_LIVEPATCH
+	cmpd	r14,r3		/* has NIP been altered? */
+#endif
 
 	REST_8GPRS(0,r1)
 	REST_8GPRS(8,r1)
@@ -1233,6 +1239,27 @@ ftrace_call:
 	mtlr	r12
 	mr	r2,r0		/* restore callee's TOC */
 
+#ifdef CONFIG_LIVEPATCH
+	beq+	4f		/* likely(old_NIP == new_NIP) */
+
+	/* For a local call, restore this TOC after calling the patch function.
+	 * For a global call, it does not matter what we restore here,
+	 * since the global caller does its own restore right afterwards,
+	 * anyway. Just insert a KLP_return_helper frame in any case,
+	 * so a patch function can always count on the changed stack offsets.
+	 */
+	stdu	r1,-32(r1)	/* open new mini stack frame */
+	std	r0,24(r1)	/* save TOC now, unconditionally. */
+	bl	5f
+5:	mflr	r12
+	addi	r12,r12,(KLP_return_helper+4-.)@l
+	std	r12,LRSAVE(r1)
+	mtlr	r12
+	mfctr	r12		/* allow for TOC calculation in newfunc */
+	bctr
+4:
+#endif
+
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	stdu	r1, -112(r1)
 .globl ftrace_graph_call
@@ -1242,15 +1269,31 @@ _GLOBAL(ftrace_graph_stub)
 	addi	r1, r1, 112
 #endif
 
-	mflr	r0		/* move this LR to CTR */
-	mtctr	r0
-
 	ld	r0,LRSAVE(r1)	/* restore callee's lr at _mcount site */
 	mtlr	r0
 	bctr			/* jump after _mcount site */
 #endif /* CC_USING_MPROFILE_KERNEL */
 _GLOBAL(ftrace_stub)
 	blr
+
+#ifdef CONFIG_LIVEPATCH
+/* Helper function for local calls that are becoming global
+   due to live patching.
+   We can't simply patch the NOP after the original call,
+   because, depending on the consistency model, some kernel
+   threads may still have called the original, local function
+   *without* saving their TOC in the respective stack frame slot,
+   so the decision is made per-thread during function return by
+   maybe inserting a KLP_return_helper frame or not.
+*/
+KLP_return_helper:
+	ld	r2,24(r1)	/* restore TOC (saved by ftrace_caller) */
+	addi r1, r1, 32		/* destroy mini stack frame */
+	ld	r0,LRSAVE(r1)	/* get the real return address */
+	mtlr	r0
+	blr
+#endif
+
 #else
 _GLOBAL_TOC(_mcount)
 	/* Taken from output of objdump from lib64/glibc */
