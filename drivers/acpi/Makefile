@@ -46,6 +46,7 @@ acpi-y				+= acpi_pnp.o
 acpi-y				+= int340x_thermal.o
 acpi-y				+= power.o
 acpi-y				+= event.o
+acpi-$(CONFIG_ACPI_REDUCED_HARDWARE_ONLY) += evged.o
 acpi-y				+= sysfs.o
 acpi-y				+= property.o
 acpi-$(CONFIG_X86)		+= acpi_cmos_rtc.o
