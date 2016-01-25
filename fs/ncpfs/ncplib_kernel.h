@@ -148,7 +148,10 @@ int ncp__io2vol(unsigned char *, unsigned int *,
 int ncp__vol2io(unsigned char *, unsigned int *,
 				const unsigned char *, unsigned int, int);
 
-#define NCP_IO_TABLE(sb)	NULL
+static inline struct nls_table *NCP_IO_TABLE(struct super_block *sb)
+{
+	return NULL;
+}
 #define ncp_tolower(t, c)	tolower(c)
 #define ncp_toupper(t, c)	toupper(c)
 #define ncp_io2vol(S,m,i,n,k,U)	ncp__io2vol(m,i,n,k,U)
