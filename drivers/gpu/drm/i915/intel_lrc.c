@@ -764,18 +764,18 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 {
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
 	struct drm_i915_private *dev_priv = request->i915;
+	int i;
 
 	intel_logical_ring_advance(ringbuf);
 	request->tail = ringbuf->tail;
 
 	/*
-	 * Here we add two extra NOOPs as padding to avoid
+	 * Here we add extra NOOPs as padding to avoid
 	 * lite restore of a context with HEAD==TAIL.
-	 *
-	 * Caller must reserve WA_TAIL_DWORDS for us!
 	 */
-	intel_logical_ring_emit(ringbuf, MI_NOOP);
-	intel_logical_ring_emit(ringbuf, MI_NOOP);
+	for (i = 0; i < ringbuf->wa_tail_dwords; i++)
+		intel_logical_ring_emit(ringbuf, MI_NOOP);
+
 	intel_logical_ring_advance(ringbuf);
 
 	if (intel_ring_stopped(request->ring))
@@ -875,6 +875,16 @@ int intel_logical_ring_begin(struct drm_i915_gem_request *req, int num_dwords)
 				   dev_priv->mm.interruptible);
 	if (ret)
 		return ret;
+
+	if (IS_GEN8(req->ring->dev) || IS_GEN9(req->ring->dev))
+		/*
+		 * Reserve space for 2 NOOPs at the end of each request to be
+		 * used as a workaround for not being allowed to do lite
+		 * restore with HEAD==TAIL (WaIdleLiteRestore).
+		 */
+		req->ringbuf->wa_tail_dwords = 2;
+
+	num_dwords += req->ringbuf->wa_tail_dwords;
 
 	ret = logical_ring_prepare(req, num_dwords * sizeof(uint32_t));
 	if (ret)
@@ -1858,13 +1868,6 @@ static void bxt_a_set_seqno(struct intel_engine_cs *ring, u32 seqno)
 	intel_flush_status_page(ring, I915_GEM_HWS_INDEX);
 }
 
-/*
- * Reserve space for 2 NOOPs at the end of each request to be
- * used as a workaround for not being allowed to do lite
- * restore with HEAD==TAIL (WaIdleLiteRestore).
- */
-#define WA_TAIL_DWORDS 2
-
 static inline u32 hws_seqno_address(struct intel_engine_cs *engine)
 {
 	return engine->status_page.gfx_addr + I915_GEM_HWS_INDEX_ADDR;
@@ -1875,7 +1878,7 @@ static int gen8_emit_request(struct drm_i915_gem_request *request)
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
 	int ret;
 
-	ret = intel_logical_ring_begin(request, 6 + WA_TAIL_DWORDS);
+	ret = intel_logical_ring_begin(request, 6);
 	if (ret)
 		return ret;
 
@@ -1899,7 +1902,7 @@ static int gen8_emit_request_render(struct drm_i915_gem_request *request)
 	struct intel_ringbuffer *ringbuf = request->ringbuf;
 	int ret;
 
-	ret = intel_logical_ring_begin(request, 6 + WA_TAIL_DWORDS);
+	ret = intel_logical_ring_begin(request, 6);
 	if (ret)
 		return ret;
 

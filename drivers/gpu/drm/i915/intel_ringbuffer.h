@@ -122,6 +122,8 @@ struct intel_ringbuffer {
 	 * we can detect new retirements.
 	 */
 	u32 last_retired_head;
+
+	int wa_tail_dwords;
 };
 
 struct	intel_context;
