@@ -2132,6 +2132,16 @@ static void i915_address_space_init(struct i915_address_space *vm,
 	list_add_tail(&vm->global_link, &dev_priv->vm_list);
 }
 
+void gtt_write_workarounds(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	/* This function is for gtt related workarounds. This function is
+	 * called on driver load and after a GPU reset, so you can place
+	 * workarounds here even if they get overwritten by GPU reset.
+	 */
+}
+
 int i915_ppgtt_init(struct drm_device *dev, struct i915_hw_ppgtt *ppgtt)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -2148,6 +2158,8 @@ int i915_ppgtt_init(struct drm_device *dev, struct i915_hw_ppgtt *ppgtt)
 
 int i915_ppgtt_init_hw(struct drm_device *dev)
 {
+	gtt_write_workarounds(dev);
+
 	/* In the case of execlists, PPGTT is enabled by the context descriptor
 	 * and the PDPs are contained within the context itself.  We don't
 	 * need to do anything here. */
