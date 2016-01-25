@@ -150,6 +150,7 @@ int pcmcia_badge4_init(struct sa1111_dev *dev)
 	return ret;
 }
 
+#ifndef MODULE
 static int __init pcmv_setup(char *s)
 {
 	int v[4];
@@ -164,3 +165,4 @@ static int __init pcmv_setup(char *s)
 }
 
 __setup("pcmv=", pcmv_setup);
+#endif
