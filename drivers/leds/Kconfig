@@ -54,6 +54,7 @@ config LEDS_BCM6328
 	depends on LEDS_CLASS
 	depends on HAS_IOMEM
 	depends on OF
+	depends on HAS_IOMEM
 	help
 	  This option enables support for LEDs connected to the BCM6328
 	  LED HW controller accessed via MMIO registers.
@@ -63,6 +64,7 @@ config LEDS_BCM6358
 	depends on LEDS_CLASS
 	depends on HAS_IOMEM
 	depends on OF
+	depends on HAS_IOMEM
 	help
 	  This option enables support for LEDs connected to the BCM6358
 	  LED HW controller accessed via MMIO registers.
