@@ -304,8 +304,10 @@ static int cap11xx_init_leds(struct device *dev,
 		led->cdev.brightness = LED_OFF;
 
 		error = of_property_read_u32(child, "reg", &reg);
-		if (error != 0 || reg >= num_leds)
-			return -EINVAL;
+		if (error != 0 || reg >= num_leds) {
+			error = -EINVAL;
+			goto putchild;
+		}
 
 		led->reg = reg;
 		led->priv = priv;
@@ -314,13 +316,17 @@ static int cap11xx_init_leds(struct device *dev,
 
 		error = devm_led_classdev_register(dev, &led->cdev);
 		if (error)
-			return error;
+			goto putchild;
 
 		priv->num_leds++;
 		led++;
 	}
 
 	return 0;
+
+putchild:
+	of_node_put(child);
+	return error;
 }
 #else
 static int cap11xx_init_leds(struct device *dev,
