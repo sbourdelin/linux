@@ -503,10 +503,11 @@ static int evdev_open(struct inode *inode, struct file *file)
 	int error;
 
 	client = kzalloc(size, GFP_KERNEL | __GFP_NOWARN);
-	if (!client)
+	if (!client) {
 		client = vzalloc(size);
-	if (!client)
-		return -ENOMEM;
+		if (!client)
+			return -ENOMEM;
+	}
 
 	client->bufsize = bufsize;
 	spin_lock_init(&client->buffer_lock);
