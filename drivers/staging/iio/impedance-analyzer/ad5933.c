@@ -647,6 +647,7 @@ static void ad5933_work(struct work_struct *work)
 	__be16 buf[2];
 	int val[2];
 	unsigned char status;
+	int ret;
 
 	mutex_lock(&indio_dev->mlock);
 	if (st->state == AD5933_CTRL_INIT_START_FREQ) {
@@ -658,9 +659,9 @@ static void ad5933_work(struct work_struct *work)
 		return;
 	}
 
-	ad5933_i2c_read(st->client, AD5933_REG_STATUS, 1, &status);
+	ret = ad5933_i2c_read(st->client, AD5933_REG_STATUS, 1, &status);
 
-	if (status & AD5933_STAT_DATA_VALID) {
+	if (!ret && (status & AD5933_STAT_DATA_VALID)) {
 		int scan_count = bitmap_weight(indio_dev->active_scan_mask,
 					       indio_dev->masklength);
 		ad5933_i2c_read(st->client,
