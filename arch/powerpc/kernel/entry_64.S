@@ -1150,6 +1150,7 @@ _GLOBAL(_mcount)
 	mtlr	r0
 	bctr
 
+#ifndef CC_USING_MPROFILE_KERNEL
 _GLOBAL_TOC(ftrace_caller)
 	/* Taken from output of objdump from lib64/glibc */
 	mflr	r3
@@ -1171,6 +1172,83 @@ _GLOBAL(ftrace_graph_stub)
 	ld	r0, 128(r1)
 	mtlr	r0
 	addi	r1, r1, 112
+#else
+_GLOBAL(ftrace_caller)
+	std	r0,LRSAVE(r1)
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+	mflr	r0
+	bl	2f
+2:	mflr	r12
+	mtlr	r0
+	mr      r0,r2   /* save callee's TOC */
+	addis	r2,r12,(.TOC.-ftrace_caller-12)@ha
+	addi    r2,r2,(.TOC.-ftrace_caller-12)@l
+#else
+	mr	r0,r2
+#endif
+	ld	r12,LRSAVE(r1)	/* get caller's address */
+
+	stdu	r1,-SWITCH_FRAME_SIZE(r1)
+
+	std     r12, _LINK(r1)
+	SAVE_8GPRS(0,r1)
+	std	r0, 24(r1)	/* save TOC */
+	SAVE_8GPRS(8,r1)
+	SAVE_8GPRS(16,r1)
+	SAVE_8GPRS(24,r1)
+
+	addis	r3,r2,function_trace_op@toc@ha
+	addi	r3,r3,function_trace_op@toc@l
+	ld	r5,0(r3)
+
+	mflr    r3
+	std     r3, _NIP(r1)
+	std	r3, 16(r1)
+	subi    r3, r3, MCOUNT_INSN_SIZE
+	mfmsr   r4
+	std     r4, _MSR(r1)
+	mfctr   r4
+	std     r4, _CTR(r1)
+	mfxer   r4
+	std     r4, _XER(r1)
+	mr	r4, r12
+	addi    r6, r1 ,STACK_FRAME_OVERHEAD
+
+.globl ftrace_call
+ftrace_call:
+	bl	ftrace_stub
+	nop
+
+	ld	r3, _NIP(r1)
+	mtlr	r3
+
+	REST_8GPRS(0,r1)
+	REST_8GPRS(8,r1)
+	REST_8GPRS(16,r1)
+	REST_8GPRS(24,r1)
+
+	addi r1, r1, SWITCH_FRAME_SIZE
+
+	ld	r12, LRSAVE(r1)  /* get caller's address */
+	mtlr	r12
+	mr	r2,r0		/* restore callee's TOC */
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	stdu	r1, -112(r1)
+.globl ftrace_graph_call
+ftrace_graph_call:
+	b	ftrace_graph_stub
+_GLOBAL(ftrace_graph_stub)
+	addi	r1, r1, 112
+#endif
+
+	mflr	r0		/* move this LR to CTR */
+	mtctr	r0
+
+	ld	r0,LRSAVE(r1)	/* restore callee's lr at _mcount site */
+	mtlr	r0
+	bctr			/* jump after _mcount site */
+#endif /* CC_USING_MPROFILE_KERNEL */
 _GLOBAL(ftrace_stub)
 	blr
 #else

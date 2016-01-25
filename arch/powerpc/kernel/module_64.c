@@ -138,12 +138,25 @@ static u32 ppc64_stub_insns[] = {
 	0x4e800420			/* bctr */
 };
 
+#ifdef CC_USING_MPROFILE_KERNEL
+/* In case of _mcount calls or dynamic ftracing, Do not save the
+ * current callee's TOC (in R2) again into the original caller's stack
+ * frame during this trampoline hop. The stack frame already holds
+ * that of the original caller.  _mcount and ftrace_caller will take
+ * care of this TOC value themselves.
+ */
+#define SQUASH_TOC_SAVE_INSN(trampoline_addr) \
+	(((struct ppc64_stub_entry *)(trampoline_addr))->jump[2] = PPC_INST_NOP)
+#else
+#define SQUASH_TOC_SAVE_INSN(trampoline_addr)
+#endif
+
 #ifdef CONFIG_DYNAMIC_FTRACE
 
 static u32 ppc64_stub_mask[] = {
 	0xffff0000,
 	0xffff0000,
-	0xffffffff,
+	0x00000000,
 	0xffffffff,
 #if !defined(_CALL_ELF) || _CALL_ELF != 2
 	0xffffffff,
@@ -170,6 +183,9 @@ bool is_module_trampoline(u32 *p)
 		if ((insna & mask) != (insnb & mask))
 			return false;
 	}
+	if (insns[2] != ppc64_stub_insns[2] &&
+	    insns[2] != PPC_INST_NOP)
+		return false;
 
 	return true;
 }
@@ -619,6 +635,9 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 					return -ENOENT;
 				if (!restore_r2((u32 *)location + 1, me))
 					return -ENOEXEC;
+				/* Squash the TOC saver for profiler calls */
+				if (!strcmp("_mcount", strtab+sym->st_name))
+					SQUASH_TOC_SAVE_INSN(value);
 			} else
 				value += local_entry_offset(sym);
 
@@ -706,6 +725,10 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 	me->arch.tramp = stub_for_addr(sechdrs,
 				       (unsigned long)ftrace_caller,
 				       me);
+	/* ftrace_caller will take care of the TOC;
+	 * do not clobber original caller's value.
+	 */
+	SQUASH_TOC_SAVE_INSN(me->arch.tramp);
 #endif
 
 	return 0;

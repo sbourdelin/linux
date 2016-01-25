@@ -61,8 +61,11 @@ ftrace_modify_code(unsigned long ip, unsigned int old, unsigned int new)
 		return -EFAULT;
 
 	/* Make sure it is what we expect it to be */
-	if (replaced != old)
+	if (replaced != old) {
+		pr_err("%p: replaced (%#x) != old (%#x)",
+		(void *)ip, replaced, old);
 		return -EINVAL;
+	}
 
 	/* replace the text with the new text */
 	if (patch_instruction((unsigned int *)ip, new))
@@ -106,14 +109,16 @@ static int
 __ftrace_make_nop(struct module *mod,
 		  struct dyn_ftrace *rec, unsigned long addr)
 {
-	unsigned int op;
+	unsigned int op, op0, op1, pop;
 	unsigned long entry, ptr;
 	unsigned long ip = rec->ip;
 	void *tramp;
 
 	/* read where this goes */
-	if (probe_kernel_read(&op, (void *)ip, sizeof(int)))
+	if (probe_kernel_read(&op, (void *)ip, sizeof(int))) {
+		pr_err("Fetching opcode failed.\n");
 		return -EFAULT;
+	}
 
 	/* Make sure that that this is still a 24bit jump */
 	if (!is_bl_op(op)) {
@@ -158,10 +163,46 @@ __ftrace_make_nop(struct module *mod,
 	 *
 	 * Use a b +8 to jump over the load.
 	 */
-	op = 0x48000008;	/* b +8 */
 
-	if (patch_instruction((unsigned int *)ip, op))
+	pop = 0x48000008;	/* b +8 */
+
+	/*
+	 * Check what is in the next instruction. We can see ld r2,40(r1), but
+	 * on first pass after boot we will see mflr r0.
+	 */
+	if (probe_kernel_read(&op, (void *)(ip+4), MCOUNT_INSN_SIZE)) {
+		pr_err("Fetching op failed.\n");
+		return -EFAULT;
+	}
+
+	if (op != 0xe8410028) { /* ld r2,STACK_OFFSET(r1) */
+
+		if (probe_kernel_read(&op0, (void *)(ip-8), MCOUNT_INSN_SIZE)) {
+			pr_err("Fetching op0 failed.\n");
+			return -EFAULT;
+		}
+
+		if (probe_kernel_read(&op1, (void *)(ip-4), MCOUNT_INSN_SIZE)) {
+			pr_err("Fetching op1 failed.\n");
+			return -EFAULT;
+		}
+
+		/* mflr r0 ; std r0,LRSAVE(r1) */
+		if (op0 != 0x7c0802a6 && op1 != 0xf8010010) {
+			pr_err("Unexpected instructions around bl\n"
+				"when enabling dynamic ftrace!\t"
+				"(%08x,%08x,bl,%08x)\n", op0, op1, op);
+			return -EINVAL;
+		}
+
+		/* When using -mkernel_profile there is no load to jump over */
+		pop = PPC_INST_NOP;
+	}
+
+	if (patch_instruction((unsigned int *)ip, pop)) {
+		pr_err("Patching NOP failed.\n");
 		return -EPERM;
+	}
 
 	return 0;
 }
@@ -287,6 +328,13 @@ int ftrace_make_nop(struct module *mod,
 
 #ifdef CONFIG_MODULES
 #ifdef CONFIG_PPC64
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+			unsigned long addr)
+{
+	return ftrace_make_call(rec, addr);
+}
+#endif
 static int
 __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 {
@@ -338,7 +386,7 @@ __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 
 	return 0;
 }
-#else
+#else  /* !CONFIG_PPC64: */
 static int
 __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 {
