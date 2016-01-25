@@ -16,14 +16,21 @@
  */
 
 #include <linux/platform_device.h>
-#include <linux/usb/xhci_pdriver.h>
 
 #include "core.h"
+
+static struct property_entry dwc3_host_properties[] = {
+	PROPERTY_ENTRY_BOOL("usb3-lpm-capable"),
+	{ },
+};
+
+static struct property_set dwc3_host_pset = {
+	.properties = dwc3_host_properties,
+};
 
 int dwc3_host_init(struct dwc3 *dwc)
 {
 	struct platform_device	*xhci;
-	struct usb_xhci_pdata	pdata;
 	int			ret;
 
 	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
@@ -47,14 +54,12 @@ int dwc3_host_init(struct dwc3 *dwc)
 		goto err1;
 	}
 
-	memset(&pdata, 0, sizeof(pdata));
-
-	pdata.usb3_lpm_capable = dwc->usb3_lpm_capable;
-
-	ret = platform_device_add_data(xhci, &pdata, sizeof(pdata));
-	if (ret) {
-		dev_err(dwc->dev, "couldn't add platform data to xHCI device\n");
-		goto err1;
+	if (dwc->usb3_lpm_capable) {
+		ret = platform_device_add_properties(xhci, &dwc3_host_pset);
+		if (ret) {
+			dev_err(dwc->dev, "failed to add properties to xHCI\n");
+			goto err1;
+		}
 	}
 
 	phy_create_lookup(dwc->usb2_generic_phy, "usb2-phy",
