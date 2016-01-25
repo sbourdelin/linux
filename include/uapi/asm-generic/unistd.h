@@ -29,6 +29,10 @@
 #define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
 #endif
 
+#ifndef __SC_WRAP
+#define __SC_WRAP __SYSCALL
+#endif
+
 #define __NR_io_setup 0
 __SC_COMP(__NR_io_setup, sys_io_setup, compat_sys_io_setup)
 #define __NR_io_destroy 1

@@ -8,57 +8,6 @@
 #include <linux/compat.h>
 #include "entry.h"
 
-#define COMPAT_SYSCALL_WRAP1(name, ...) \
-	COMPAT_SYSCALL_WRAPx(1, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP2(name, ...) \
-	COMPAT_SYSCALL_WRAPx(2, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP3(name, ...) \
-	COMPAT_SYSCALL_WRAPx(3, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP4(name, ...) \
-	COMPAT_SYSCALL_WRAPx(4, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP5(name, ...) \
-	COMPAT_SYSCALL_WRAPx(5, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP6(name, ...) \
-	COMPAT_SYSCALL_WRAPx(6, _##name, __VA_ARGS__)
-
-#define __SC_COMPAT_TYPE(t, a) \
-	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
-
-#define __SC_COMPAT_CAST(t, a)						\
-({									\
-	long __ReS = a;							\
-									\
-	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
-		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
-	if (__TYPE_IS_L(t))						\
-		__ReS = (s32)a;						\
-	if (__TYPE_IS_UL(t))						\
-		__ReS = (u32)a;						\
-	if (__TYPE_IS_PTR(t))						\
-		__ReS = a & 0x7fffffff;					\
-	(t)__ReS;							\
-})
-
-/*
- * The COMPAT_SYSCALL_WRAP macro generates system call wrappers to be used by
- * compat tasks. These wrappers will only be used for system calls where only
- * the system call arguments need sign or zero extension or zeroing of the upper
- * 33 bits of pointers.
- * Note: since the wrapper function will afterwards call a system call which
- * again performs zero and sign extension for all system call arguments with
- * a size of less than eight bytes, these compat wrappers only touch those
- * system call arguments with a size of eight bytes ((unsigned) long and
- * pointers). Zero and sign extension for e.g. int parameters will be done by
- * the regular system call wrappers.
- */
-#define COMPAT_SYSCALL_WRAPx(x, name, ...)					\
-asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));			\
-asmlinkage long notrace compat_sys##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));\
-asmlinkage long notrace compat_sys##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))	\
-{										\
-	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));		\
-}
-
 COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
 COMPAT_SYSCALL_WRAP2(link, const char __user *, oldname, const char __user *, newname);
 COMPAT_SYSCALL_WRAP1(unlink, const char __user *, pathname);

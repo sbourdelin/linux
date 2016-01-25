@@ -718,4 +718,67 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
 #define is_compat_task() (0)
 
 #endif /* CONFIG_COMPAT */
+
+#ifdef CONFIG_COMPAT_WRAPPER
+
+#ifndef __TYPE_IS_PTR
+#define __TYPE_IS_PTR(t) (!__builtin_types_compatible_p(typeof(0?(t)0:0ULL), u64))
+#endif
+
+#ifndef __SC_COMPAT_TYPE
+#define __SC_COMPAT_TYPE(t, a) \
+	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
+#endif
+
+#ifndef __SC_COMPAT_CAST
+#define __SC_COMPAT_CAST(t, a) ({					\
+	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
+		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
+	((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)));		\
+})
+#endif
+
+#ifndef SYSCALL_DEFINE_WRAPx
+/*
+ * The SYSCALL_DEFINE_WRAP macro generates system call wrappers to be used by
+ * compat tasks. These wrappers will only be used for system calls where only
+ * the system call arguments need sign or zero extension or zeroing of upper
+ * bits of pointers.
+ * Note: since the wrapper function will afterwards call a system call which
+ * again performs zero and sign extension for all system call arguments with
+ * a size of less than eight bytes, these compat wrappers only touch those
+ * system call arguments with a size of eight bytes ((unsigned) long and
+ * pointers). Zero and sign extension for e.g. int parameters will be done by
+ * the regular system call wrappers.
+ */
+#define SYSCALL_DEFINE_WRAPx(x, name, ...)						\
+asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));				\
+asmlinkage long compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))			\
+		__attribute__((alias(__stringify(compat_SyS##name))));			\
+asmlinkage long compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));		\
+asmlinkage long compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))			\
+{											\
+	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));			\
+}											\
+SYSCALL_DEFINEx(x, name, __VA_ARGS__)
+#endif
+
+#define SYSCALL_DEFINE_WRAP1(name, ...) SYSCALL_DEFINE_WRAPx(1, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE_WRAP2(name, ...) SYSCALL_DEFINE_WRAPx(2, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE_WRAP3(name, ...) SYSCALL_DEFINE_WRAPx(3, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE_WRAP4(name, ...) SYSCALL_DEFINE_WRAPx(4, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE_WRAP5(name, ...) SYSCALL_DEFINE_WRAPx(5, _##name, __VA_ARGS__)
+#define SYSCALL_DEFINE_WRAP6(name, ...) SYSCALL_DEFINE_WRAPx(6, _##name, __VA_ARGS__)
+
+#else
+
+#define SYSCALL_DEFINE_WRAP1	SYSCALL_DEFINE1
+#define SYSCALL_DEFINE_WRAP2    SYSCALL_DEFINE2
+#define SYSCALL_DEFINE_WRAP3    SYSCALL_DEFINE3
+#define SYSCALL_DEFINE_WRAP4    SYSCALL_DEFINE4
+#define SYSCALL_DEFINE_WRAP5    SYSCALL_DEFINE5
+#define SYSCALL_DEFINE_WRAP6    SYSCALL_DEFINE6
+
+#endif /* CONFIG_COMPAT_WRAPPER */
+
 #endif /* _LINUX_COMPAT_H */

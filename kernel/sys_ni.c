@@ -16,6 +16,14 @@ asmlinkage long sys_ni_syscall(void)
 	return -ENOSYS;
 }
 
+#ifdef CONFIG_COMPAT_WRAPPER
+#define cond_syscall_wrapped(name)	\
+	cond_syscall(name);		\
+	cond_syscall(compat_##name);
+#else
+#define cond_syscall_wrapped	cond_syscall
+#endif
+
 cond_syscall(sys_quotactl);
 cond_syscall(sys32_quotactl);
 cond_syscall(sys_acct);
