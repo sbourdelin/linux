@@ -54,6 +54,7 @@
 #include <linux/jiffies.h>
 #include <linux/times.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/mount.h>
 #include <linux/uaccess.h>
 #include <asm/div64.h>
@@ -267,7 +268,7 @@ static DEFINE_MUTEX(acct_on_mutex);
  * should be written. If the filename is NULL, accounting will be
  * shutdown.
  */
-SYSCALL_DEFINE1(acct, const char __user *, name)
+SYSCALL_DEFINE_WRAP1(acct, const char __user *, name)
 {
 	int error = 0;
 

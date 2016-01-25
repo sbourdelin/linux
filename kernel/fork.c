@@ -1195,7 +1195,7 @@ static void copy_seccomp(struct task_struct *p)
 #endif
 }
 
-SYSCALL_DEFINE1(set_tid_address, int __user *, tidptr)
+SYSCALL_DEFINE_WRAP1(set_tid_address, int __user *, tidptr)
 {
 	current->clear_child_tid = tidptr;
 
@@ -1805,23 +1805,23 @@ SYSCALL_DEFINE0(vfork)
 
 #ifdef __ARCH_WANT_SYS_CLONE
 #ifdef CONFIG_CLONE_BACKWARDS
-SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
+SYSCALL_DEFINE_WRAP5(clone, unsigned long, clone_flags, unsigned long, newsp,
 		 int __user *, parent_tidptr,
 		 unsigned long, tls,
 		 int __user *, child_tidptr)
 #elif defined(CONFIG_CLONE_BACKWARDS2)
-SYSCALL_DEFINE5(clone, unsigned long, newsp, unsigned long, clone_flags,
+SYSCALL_DEFINE_WRAP5(clone, unsigned long, newsp, unsigned long, clone_flags,
 		 int __user *, parent_tidptr,
 		 int __user *, child_tidptr,
 		 unsigned long, tls)
 #elif defined(CONFIG_CLONE_BACKWARDS3)
-SYSCALL_DEFINE6(clone, unsigned long, clone_flags, unsigned long, newsp,
+SYSCALL_DEFINE_WRAP6(clone, unsigned long, clone_flags, unsigned long, newsp,
 		int, stack_size,
 		int __user *, parent_tidptr,
 		int __user *, child_tidptr,
 		unsigned long, tls)
 #else
-SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
+SYSCALL_DEFINE_WRAP5(clone, unsigned long, clone_flags, unsigned long, newsp,
 		 int __user *, parent_tidptr,
 		 int __user *, child_tidptr,
 		 unsigned long, tls)
@@ -1952,7 +1952,7 @@ static int unshare_fd(unsigned long unshare_flags, struct files_struct **new_fdp
  * constructed. Here we are modifying the current, active,
  * task_struct.
  */
-SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
+SYSCALL_DEFINE_WRAP1(unshare, unsigned long, unshare_flags)
 {
 	struct fs_struct *fs, *new_fs = NULL;
 	struct files_struct *fd, *new_fd = NULL;

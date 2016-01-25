@@ -26,6 +26,7 @@
 #include <linux/security.h>
 #include <linux/ima.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
 #include <linux/capability.h>
@@ -3533,7 +3534,7 @@ static int may_mknod(umode_t mode)
 	}
 }
 
-SYSCALL_DEFINE4(mknodat, int, dfd, const char __user *, filename, umode_t, mode,
+SYSCALL_DEFINE_WRAP4(mknodat, int, dfd, const char __user *, filename, umode_t, mode,
 		unsigned, dev)
 {
 	struct dentry *dentry;
@@ -3575,7 +3576,7 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE3(mknod, const char __user *, filename, umode_t, mode, unsigned, dev)
+SYSCALL_DEFINE_WRAP3(mknod, const char __user *, filename, umode_t, mode, unsigned, dev)
 {
 	return sys_mknodat(AT_FDCWD, filename, mode, dev);
 }
@@ -3606,7 +3607,7 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 }
 EXPORT_SYMBOL(vfs_mkdir);
 
-SYSCALL_DEFINE3(mkdirat, int, dfd, const char __user *, pathname, umode_t, mode)
+SYSCALL_DEFINE_WRAP3(mkdirat, int, dfd, const char __user *, pathname, umode_t, mode)
 {
 	struct dentry *dentry;
 	struct path path;
@@ -3631,7 +3632,7 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE2(mkdir, const char __user *, pathname, umode_t, mode)
+SYSCALL_DEFINE_WRAP2(mkdir, const char __user *, pathname, umode_t, mode)
 {
 	return sys_mkdirat(AT_FDCWD, pathname, mode);
 }
@@ -3759,7 +3760,7 @@ exit1:
 	return error;
 }
 
-SYSCALL_DEFINE1(rmdir, const char __user *, pathname)
+SYSCALL_DEFINE_WRAP1(rmdir, const char __user *, pathname)
 {
 	return do_rmdir(AT_FDCWD, pathname);
 }
@@ -3901,7 +3902,7 @@ slashes:
 	goto exit2;
 }
 
-SYSCALL_DEFINE3(unlinkat, int, dfd, const char __user *, pathname, int, flag)
+SYSCALL_DEFINE_WRAP3(unlinkat, int, dfd, const char __user *, pathname, int, flag)
 {
 	if ((flag & ~AT_REMOVEDIR) != 0)
 		return -EINVAL;
@@ -3912,7 +3913,7 @@ SYSCALL_DEFINE3(unlinkat, int, dfd, const char __user *, pathname, int, flag)
 	return do_unlinkat(dfd, pathname);
 }
 
-SYSCALL_DEFINE1(unlink, const char __user *, pathname)
+SYSCALL_DEFINE_WRAP1(unlink, const char __user *, pathname)
 {
 	return do_unlinkat(AT_FDCWD, pathname);
 }
@@ -3938,7 +3939,7 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 }
 EXPORT_SYMBOL(vfs_symlink);
 
-SYSCALL_DEFINE3(symlinkat, const char __user *, oldname,
+SYSCALL_DEFINE_WRAP3(symlinkat, const char __user *, oldname,
 		int, newdfd, const char __user *, newname)
 {
 	int error;
@@ -3969,7 +3970,7 @@ out_putname:
 	return error;
 }
 
-SYSCALL_DEFINE2(symlink, const char __user *, oldname, const char __user *, newname)
+SYSCALL_DEFINE_WRAP2(symlink, const char __user *, oldname, const char __user *, newname)
 {
 	return sys_symlinkat(oldname, AT_FDCWD, newname);
 }
@@ -4056,7 +4057,7 @@ EXPORT_SYMBOL(vfs_link);
  * with linux 2.0, and to avoid hard-linking to directories
  * and other special files.  --ADM
  */
-SYSCALL_DEFINE5(linkat, int, olddfd, const char __user *, oldname,
+SYSCALL_DEFINE_WRAP5(linkat, int, olddfd, const char __user *, oldname,
 		int, newdfd, const char __user *, newname, int, flags)
 {
 	struct dentry *new_dentry;
@@ -4121,7 +4122,7 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE2(link, const char __user *, oldname, const char __user *, newname)
+SYSCALL_DEFINE_WRAP2(link, const char __user *, oldname, const char __user *, newname)
 {
 	return sys_linkat(AT_FDCWD, oldname, AT_FDCWD, newname, 0);
 }
@@ -4309,7 +4310,7 @@ out:
 }
 EXPORT_SYMBOL(vfs_rename);
 
-SYSCALL_DEFINE5(renameat2, int, olddfd, const char __user *, oldname,
+SYSCALL_DEFINE_WRAP5(renameat2, int, olddfd, const char __user *, oldname,
 		int, newdfd, const char __user *, newname, unsigned int, flags)
 {
 	struct dentry *old_dentry, *new_dentry;
@@ -4452,13 +4453,13 @@ exit:
 	return error;
 }
 
-SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
+SYSCALL_DEFINE_WRAP4(renameat, int, olddfd, const char __user *, oldname,
 		int, newdfd, const char __user *, newname)
 {
 	return sys_renameat2(olddfd, oldname, newdfd, newname, 0);
 }
 
-SYSCALL_DEFINE2(rename, const char __user *, oldname, const char __user *, newname)
+SYSCALL_DEFINE_WRAP2(rename, const char __user *, oldname, const char __user *, newname)
 {
 	return sys_renameat2(AT_FDCWD, oldname, AT_FDCWD, newname, 0);
 }

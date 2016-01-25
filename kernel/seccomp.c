@@ -829,7 +829,7 @@ static long do_seccomp(unsigned int op, unsigned int flags,
 	}
 }
 
-SYSCALL_DEFINE3(seccomp, unsigned int, op, unsigned int, flags,
+SYSCALL_DEFINE_WRAP3(seccomp, unsigned int, op, unsigned int, flags,
 			 const char __user *, uargs)
 {
 	return do_seccomp(op, flags, uargs);

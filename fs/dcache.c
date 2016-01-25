@@ -15,6 +15,7 @@
  */
 
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
@@ -3244,7 +3245,7 @@ static void get_fs_root_and_pwd_rcu(struct fs_struct *fs, struct path *root,
  *		return NULL;
  *	}
  */
-SYSCALL_DEFINE2(getcwd, char __user *, buf, unsigned long, size)
+SYSCALL_DEFINE_WRAP2(getcwd, char __user *, buf, unsigned long, size)
 {
 	int error;
 	struct path pwd, root;

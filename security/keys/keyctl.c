@@ -14,6 +14,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/key.h>
 #include <linux/keyctl.h>
 #include <linux/fs.h>
@@ -57,7 +58,7 @@ static int key_get_type_from_user(char *type,
  * If successful, the new key's serial number is returned, otherwise an error
  * code is returned.
  */
-SYSCALL_DEFINE5(add_key, const char __user *, _type,
+SYSCALL_DEFINE_WRAP5(add_key, const char __user *, _type,
 		const char __user *, _description,
 		const void __user *, _payload,
 		size_t, plen,
@@ -155,7 +156,7 @@ SYSCALL_DEFINE5(add_key, const char __user *, _type,
  * passed to /sbin/request-key to aid with completing the request.  If the
  * _callout_info string is "" then it will be changed to "-".
  */
-SYSCALL_DEFINE4(request_key, const char __user *, _type,
+SYSCALL_DEFINE_WRAP4(request_key, const char __user *, _type,
 		const char __user *, _description,
 		const char __user *, _callout_info,
 		key_serial_t, destringid)

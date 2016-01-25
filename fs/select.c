@@ -17,6 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
@@ -954,7 +955,7 @@ static long do_restart_poll(struct restart_block *restart_block)
 	return ret;
 }
 
-SYSCALL_DEFINE3(poll, struct pollfd __user *, ufds, unsigned int, nfds,
+SYSCALL_DEFINE_WRAP3(poll, struct pollfd __user *, ufds, unsigned int, nfds,
 		int, timeout_msecs)
 {
 	struct timespec end_time, *to = NULL;

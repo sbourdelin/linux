@@ -259,6 +259,7 @@
 #include <linux/workqueue.h>
 #include <linux/irq.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/completion.h>
 
 #include <asm/processor.h>
@@ -1598,7 +1599,7 @@ const struct file_operations urandom_fops = {
 	.llseek = noop_llseek,
 };
 
-SYSCALL_DEFINE3(getrandom, char __user *, buf, size_t, count,
+SYSCALL_DEFINE_WRAP3(getrandom, char __user *, buf, size_t, count,
 		unsigned int, flags)
 {
 	if (flags & ~(GRND_NONBLOCK|GRND_RANDOM))

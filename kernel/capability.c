@@ -15,6 +15,7 @@
 #include <linux/export.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/pid_namespace.h>
 #include <linux/user_namespace.h>
 #include <asm/uaccess.h>
@@ -146,7 +147,7 @@ static inline int cap_get_target_pid(pid_t pid, kernel_cap_t *pEp,
  *
  * Returns 0 on success and < 0 on error.
  */
-SYSCALL_DEFINE2(capget, cap_user_header_t, header, cap_user_data_t, dataptr)
+SYSCALL_DEFINE_WRAP2(capget, cap_user_header_t, header, cap_user_data_t, dataptr)
 {
 	int ret = 0;
 	pid_t pid;
@@ -220,7 +221,7 @@ SYSCALL_DEFINE2(capget, cap_user_header_t, header, cap_user_data_t, dataptr)
  *
  * Returns 0 on success and < 0 on error.
  */
-SYSCALL_DEFINE2(capset, cap_user_header_t, header, const cap_user_data_t, data)
+SYSCALL_DEFINE_WRAP2(capset, cap_user_header_t, header, const cap_user_data_t, data)
 {
 	struct __user_cap_data_struct kdata[_KERNEL_CAPABILITY_U32S];
 	unsigned i, tocopy, copybytes;

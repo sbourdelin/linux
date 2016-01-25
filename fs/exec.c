@@ -111,7 +111,7 @@ bool path_noexec(const struct path *path)
  *
  * Also note that we take the address to load from from the file itself.
  */
-SYSCALL_DEFINE1(uselib, const char __user *, library)
+SYSCALL_DEFINE_WRAP1(uselib, const char __user *, library)
 {
 	struct linux_binfmt *fmt;
 	struct file *file;

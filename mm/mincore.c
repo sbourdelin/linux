@@ -12,6 +12,7 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
 #include <linux/hugetlb.h>
@@ -217,7 +218,7 @@ static long do_mincore(unsigned long addr, unsigned long pages, unsigned char *v
  *		mapped
  *  -EAGAIN - A kernel resource was temporarily unavailable.
  */
-SYSCALL_DEFINE3(mincore, unsigned long, start, size_t, len,
+SYSCALL_DEFINE_WRAP3(mincore, unsigned long, start, size_t, len,
 		unsigned char __user *, vec)
 {
 	long retval;

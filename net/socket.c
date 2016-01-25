@@ -1251,7 +1251,7 @@ out_release:
  *	Create a pair of connected sockets.
  */
 
-SYSCALL_DEFINE4(socketpair, int, family, int, type, int, protocol,
+SYSCALL_DEFINE_WRAP4(socketpair, int, family, int, type, int, protocol,
 		int __user *, usockvec)
 {
 	struct socket *sock1, *sock2;
@@ -1360,7 +1360,7 @@ out:
  *	the protocol layer (having also checked the address is ok).
  */
 
-SYSCALL_DEFINE3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
+SYSCALL_DEFINE_WRAP3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
 {
 	struct socket *sock;
 	struct sockaddr_storage address;
@@ -1422,7 +1422,7 @@ SYSCALL_DEFINE2(listen, int, fd, int, backlog)
  *	clean when we restucture accept also.
  */
 
-SYSCALL_DEFINE4(accept4, int, fd, struct sockaddr __user *, upeer_sockaddr,
+SYSCALL_DEFINE_WRAP4(accept4, int, fd, struct sockaddr __user *, upeer_sockaddr,
 		int __user *, upeer_addrlen, int, flags)
 {
 	struct socket *sock, *newsock;
@@ -1521,7 +1521,7 @@ SYSCALL_DEFINE3(accept, int, fd, struct sockaddr __user *, upeer_sockaddr,
  *	include the -EINPROGRESS status for such sockets.
  */
 
-SYSCALL_DEFINE3(connect, int, fd, struct sockaddr __user *, uservaddr,
+SYSCALL_DEFINE_WRAP3(connect, int, fd, struct sockaddr __user *, uservaddr,
 		int, addrlen)
 {
 	struct socket *sock;
@@ -1553,7 +1553,7 @@ out:
  *	name to user space.
  */
 
-SYSCALL_DEFINE3(getsockname, int, fd, struct sockaddr __user *, usockaddr,
+SYSCALL_DEFINE_WRAP3(getsockname, int, fd, struct sockaddr __user *, usockaddr,
 		int __user *, usockaddr_len)
 {
 	struct socket *sock;
@@ -1584,7 +1584,7 @@ out:
  *	name to user space.
  */
 
-SYSCALL_DEFINE3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
+SYSCALL_DEFINE_WRAP3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
 		int __user *, usockaddr_len)
 {
 	struct socket *sock;
@@ -1616,7 +1616,7 @@ SYSCALL_DEFINE3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
  *	the protocol.
  */
 
-SYSCALL_DEFINE6(sendto, int, fd, void __user *, buff, size_t, len,
+SYSCALL_DEFINE_WRAP6(sendto, int, fd, void __user *, buff, size_t, len,
 		unsigned int, flags, struct sockaddr __user *, addr,
 		int, addr_len)
 {

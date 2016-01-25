@@ -33,6 +33,7 @@
 #include <linux/sched.h> /* struct user */
 #include <linux/slab.h> /* struct kmem_cache */
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/types.h>
 #include <linux/anon_inodes.h>
 #include <linux/uaccess.h>
@@ -696,7 +697,7 @@ SYSCALL_DEFINE0(inotify_init)
 	return sys_inotify_init1(0);
 }
 
-SYSCALL_DEFINE3(inotify_add_watch, int, fd, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP3(inotify_add_watch, int, fd, const char __user *, pathname,
 		u32, mask)
 {
 	struct fsnotify_group *group;

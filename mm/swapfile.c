@@ -28,6 +28,7 @@
 #include <linux/mutex.h>
 #include <linux/capability.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/memcontrol.h>
 #include <linux/poll.h>
 #include <linux/oom.h>
@@ -1841,7 +1842,7 @@ static void reinsert_swap_info(struct swap_info_struct *p)
 	spin_unlock(&swap_lock);
 }
 
-SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+SYSCALL_DEFINE_WRAP1(swapoff, const char __user *, specialfile)
 {
 	struct swap_info_struct *p = NULL;
 	unsigned char *swap_map;
@@ -2383,7 +2384,7 @@ static bool swap_discardable(struct swap_info_struct *si)
 	return true;
 }
 
-SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
+SYSCALL_DEFINE_WRAP2(swapon, const char __user *, specialfile, int, swap_flags)
 {
 	struct swap_info_struct *p;
 	struct filename *name;

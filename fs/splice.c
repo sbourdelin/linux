@@ -1683,7 +1683,7 @@ COMPAT_SYSCALL_DEFINE4(vmsplice, int, fd, const struct compat_iovec __user *, io
 }
 #endif
 
-SYSCALL_DEFINE6(splice, int, fd_in, loff_t __user *, off_in,
+SYSCALL_DEFINE_WRAP6(splice, int, fd_in, loff_t __user *, off_in,
 		int, fd_out, loff_t __user *, off_out,
 		size_t, len, unsigned int, flags)
 {
@@ -2016,7 +2016,7 @@ static long do_tee(struct file *in, struct file *out, size_t len,
 	return ret;
 }
 
-SYSCALL_DEFINE4(tee, int, fdin, int, fdout, size_t, len, unsigned int, flags)
+SYSCALL_DEFINE_WRAP4(tee, int, fdin, int, fdout, size_t, len, unsigned int, flags)
 {
 	struct fd in;
 	int error;

@@ -33,6 +33,7 @@
 #include <linux/bootmem.h>
 #include <linux/memblock.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/kexec.h>
 #include <linux/kdb.h>
 #include <linux/ratelimit.h>
@@ -1420,7 +1421,7 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE3(syslog, int, type, char __user *, buf, int, len)
+SYSCALL_DEFINE_WRAP3(syslog, int, type, char __user *, buf, int, len)
 {
 	return do_syslog(type, buf, len, SYSLOG_FROM_READER);
 }

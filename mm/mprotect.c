@@ -18,6 +18,7 @@
 #include <linux/mempolicy.h>
 #include <linux/personality.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
 #include <linux/mmu_notifier.h>
@@ -344,7 +345,7 @@ fail:
 	return error;
 }
 
-SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
+SYSCALL_DEFINE_WRAP3(mprotect, unsigned long, start, size_t, len,
 		unsigned long, prot)
 {
 	unsigned long vm_flags, nstart, end, tmp, reqprot;

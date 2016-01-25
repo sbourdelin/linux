@@ -3475,7 +3475,7 @@ SYSCALL_DEFINE1(ssetmask, int, newmask)
 /*
  * For backwards compatibility.  Functionality superseded by sigaction.
  */
-SYSCALL_DEFINE2(signal, int, sig, __sighandler_t, handler)
+SYSCALL_DEFINE_WRAP2(signal, int, sig, __sighandler_t, handler)
 {
 	struct k_sigaction new_sa, old_sa;
 	int ret;
@@ -3556,7 +3556,7 @@ COMPAT_SYSCALL_DEFINE2(rt_sigsuspend, compat_sigset_t __user *, unewset, compat_
 #endif
 
 #ifdef CONFIG_OLD_SIGSUSPEND
-SYSCALL_DEFINE1(sigsuspend, old_sigset_t, mask)
+SYSCALL_DEFINE_WRAP1(sigsuspend, old_sigset_t, mask)
 {
 	sigset_t blocked;
 	siginitset(&blocked, mask);
@@ -3564,7 +3564,7 @@ SYSCALL_DEFINE1(sigsuspend, old_sigset_t, mask)
 }
 #endif
 #ifdef CONFIG_OLD_SIGSUSPEND3
-SYSCALL_DEFINE3(sigsuspend, int, unused1, int, unused2, old_sigset_t, mask)
+SYSCALL_DEFINE_WRAP3(sigsuspend, int, unused1, int, unused2, old_sigset_t, mask)
 {
 	sigset_t blocked;
 	siginitset(&blocked, mask);

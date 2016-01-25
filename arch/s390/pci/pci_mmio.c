@@ -6,6 +6,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
@@ -31,7 +32,7 @@ out:
 	return ret;
 }
 
-SYSCALL_DEFINE3(s390_pci_mmio_write, unsigned long, mmio_addr,
+SYSCALL_DEFINE_WRAP3(s390_pci_mmio_write, unsigned long, mmio_addr,
 		const void __user *, user_buffer, size_t, length)
 {
 	u8 local_buf[64];
@@ -71,7 +72,7 @@ out:
 	return ret;
 }
 
-SYSCALL_DEFINE3(s390_pci_mmio_read, unsigned long, mmio_addr,
+SYSCALL_DEFINE_WRAP3(s390_pci_mmio_read, unsigned long, mmio_addr,
 		void __user *, user_buffer, size_t, length)
 {
 	u8 local_buf[64];

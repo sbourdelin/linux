@@ -20,6 +20,7 @@
 
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/percpu.h>
@@ -3267,7 +3268,7 @@ EXPORT_SYMBOL(try_to_free_buffers);
  * Use of bdflush() is deprecated and will be removed in a future kernel.
  * The `flush-X' kernel threads fully replace bdflush daemons and this call.
  */
-SYSCALL_DEFINE2(bdflush, int, func, long, data)
+SYSCALL_DEFINE_WRAP2(bdflush, int, func, long, data)
 {
 	static int msg_count;
 

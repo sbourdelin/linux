@@ -6,6 +6,7 @@
 #include <linux/slab.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/user_namespace.h>
 #include <asm/uaccess.h>
 
@@ -187,7 +188,7 @@ int set_current_groups(struct group_info *group_info)
 
 EXPORT_SYMBOL(set_current_groups);
 
-SYSCALL_DEFINE2(getgroups, int, gidsetsize, gid_t __user *, grouplist)
+SYSCALL_DEFINE_WRAP2(getgroups, int, gidsetsize, gid_t __user *, grouplist)
 {
 	const struct cred *cred = current_cred();
 	int i;
@@ -224,7 +225,7 @@ bool may_setgroups(void)
  *	without another task interfering.
  */
 
-SYSCALL_DEFINE2(setgroups, int, gidsetsize, gid_t __user *, grouplist)
+SYSCALL_DEFINE_WRAP2(setgroups, int, gidsetsize, gid_t __user *, grouplist)
 {
 	struct group_info *group_info;
 	int retval;

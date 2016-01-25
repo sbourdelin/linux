@@ -18,6 +18,7 @@
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/capability.h>
 #include <linux/init.h>
 #include <linux/file.h>
@@ -283,7 +284,7 @@ static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
 
 static unsigned long do_brk(unsigned long addr, unsigned long len);
 
-SYSCALL_DEFINE1(brk, unsigned long, brk)
+SYSCALL_DEFINE_WRAP1(brk, unsigned long, brk)
 {
 	unsigned long retval;
 	unsigned long newbrk, oldbrk;
@@ -2631,7 +2632,7 @@ int vm_munmap(unsigned long start, size_t len)
 }
 EXPORT_SYMBOL(vm_munmap);
 
-SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
+SYSCALL_DEFINE_WRAP2(munmap, unsigned long, addr, size_t, len)
 {
 	profile_munmap(addr);
 	return vm_munmap(addr, len);
@@ -2641,7 +2642,7 @@ SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
 /*
  * Emulation of deprecated remap_file_pages() syscall.
  */
-SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
+SYSCALL_DEFINE_WRAP5(remap_file_pages, unsigned long, start, unsigned long, size,
 		unsigned long, prot, unsigned long, pgoff, unsigned long, flags)
 {
 

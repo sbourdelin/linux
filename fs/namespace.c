@@ -9,6 +9,7 @@
  */
 
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/export.h>
 #include <linux/capability.h>
 #include <linux/mnt_namespace.h>
@@ -1592,7 +1593,7 @@ static inline bool may_mount(void)
  * unixes. Our API is identical to OSF/1 to avoid making a mess of AMD
  */
 
-SYSCALL_DEFINE2(umount, char __user *, name, int, flags)
+SYSCALL_DEFINE_WRAP2(umount, char __user *, name, int, flags)
 {
 	struct path path;
 	struct mount *mnt;
@@ -1637,7 +1638,7 @@ out:
 /*
  *	The 2.0 compatible umount. No flags.
  */
-SYSCALL_DEFINE1(oldumount, char __user *, name)
+SYSCALL_DEFINE_WRAP1(oldumount, char __user *, name)
 {
 	return sys_umount(name, 0);
 }
@@ -2974,7 +2975,7 @@ EXPORT_SYMBOL(path_is_under);
  *    though, so you may need to say mount --bind /nfs/my_root /nfs/my_root
  *    first.
  */
-SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
+SYSCALL_DEFINE_WRAP2(pivot_root, const char __user *, new_root,
 		const char __user *, put_old)
 {
 	struct path new, old, parent_path, root_parent, root;

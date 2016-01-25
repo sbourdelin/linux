@@ -67,6 +67,7 @@ static struct vfsmount *shm_mnt;
 #include <linux/seq_file.h>
 #include <linux/magic.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/fcntl.h>
 #include <uapi/linux/memfd.h>
 
@@ -2921,7 +2922,7 @@ static int shmem_show_options(struct seq_file *seq, struct dentry *root)
 
 #define MFD_ALL_FLAGS (MFD_CLOEXEC | MFD_ALLOW_SEALING)
 
-SYSCALL_DEFINE2(memfd_create,
+SYSCALL_DEFINE_WRAP2(memfd_create,
 		const char __user *, uname,
 		unsigned int, flags)
 {

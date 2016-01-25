@@ -1,4 +1,5 @@
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -89,7 +90,7 @@ static long do_sys_name_to_handle(struct path *path,
  * enough space, the field is updated to return the minimum
  * value required.
  */
-SYSCALL_DEFINE5(name_to_handle_at, int, dfd, const char __user *, name,
+SYSCALL_DEFINE_WRAP5(name_to_handle_at, int, dfd, const char __user *, name,
 		struct file_handle __user *, handle, int __user *, mnt_id,
 		int, flag)
 {

@@ -13,6 +13,7 @@
 #include <linux/namei.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/pagemap.h>
 
 #include <asm/uaccess.h>
@@ -312,7 +313,7 @@ SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
 	return error;
 }
 
-SYSCALL_DEFINE4(readlinkat, int, dfd, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP4(readlinkat, int, dfd, const char __user *, pathname,
 		char __user *, buf, int, bufsiz)
 {
 	struct path path;
@@ -346,7 +347,7 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE3(readlink, const char __user *, path, char __user *, buf,
+SYSCALL_DEFINE_WRAP3(readlink, const char __user *, path, char __user *, buf,
 		int, bufsiz)
 {
 	return sys_readlinkat(AT_FDCWD, path, buf, bufsiz);

@@ -1,5 +1,6 @@
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/fdtable.h>
 #include <linux/string.h>
 #include <linux/random.h>
@@ -94,7 +95,7 @@ static int kcmp_lock(struct mutex *m1, struct mutex *m2)
 	return err;
 }
 
-SYSCALL_DEFINE5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
+SYSCALL_DEFINE_WRAP5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
 		unsigned long, idx1, unsigned long, idx2)
 {
 	struct task_struct *task1, *task2;

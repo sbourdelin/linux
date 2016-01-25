@@ -8,6 +8,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/mempolicy.h>
 #include <linux/page-isolation.h>
 #include <linux/hugetlb.h>
@@ -457,7 +458,7 @@ madvise_behavior_valid(int behavior)
  *  -EBADF  - map exists, but area maps something that isn't a file.
  *  -EAGAIN - a kernel resource was temporarily unavailable.
  */
-SYSCALL_DEFINE3(madvise, unsigned long, start, size_t, len_in, int, behavior)
+SYSCALL_DEFINE_WRAP3(madvise, unsigned long, start, size_t, len_in, int, behavior)
 {
 	unsigned long end, tmp;
 	struct vm_area_struct *vma, *prev;

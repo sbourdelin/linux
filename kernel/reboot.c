@@ -14,6 +14,7 @@
 #include <linux/reboot.h>
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/syscore_ops.h>
 #include <linux/uaccess.h>
 
@@ -277,7 +278,7 @@ static DEFINE_MUTEX(reboot_mutex);
  *
  * reboot doesn't sync: do that yourself before calling this.
  */
-SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+SYSCALL_DEFINE_WRAP4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 		void __user *, arg)
 {
 	struct pid_namespace *pid_ns = task_active_pid_ns(current);

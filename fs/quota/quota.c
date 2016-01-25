@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/capability.h>
 #include <linux/quotaops.h>
 #include <linux/types.h>
@@ -757,7 +758,7 @@ static struct super_block *quotactl_block(const char __user *special, int cmd)
  * calls. Maybe we need to add the process quotas etc. in the future,
  * but we probably should use rlimits for that.
  */
-SYSCALL_DEFINE4(quotactl, unsigned int, cmd, const char __user *, special,
+SYSCALL_DEFINE_WRAP4(quotactl, unsigned int, cmd, const char __user *, special,
 		qid_t, id, void __user *, addr)
 {
 	uint cmds, type;

@@ -14,6 +14,7 @@
 #include <linux/pagevec.h>
 #include <linux/mempolicy.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/sched.h>
 #include <linux/export.h>
 #include <linux/rmap.h>
@@ -640,12 +641,12 @@ static int do_mlock(unsigned long start, size_t len, vm_flags_t flags)
 	return 0;
 }
 
-SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
+SYSCALL_DEFINE_WRAP2(mlock, unsigned long, start, size_t, len)
 {
 	return do_mlock(start, len, VM_LOCKED);
 }
 
-SYSCALL_DEFINE3(mlock2, unsigned long, start, size_t, len, int, flags)
+SYSCALL_DEFINE_WRAP3(mlock2, unsigned long, start, size_t, len, int, flags)
 {
 	vm_flags_t vm_flags = VM_LOCKED;
 
@@ -658,7 +659,7 @@ SYSCALL_DEFINE3(mlock2, unsigned long, start, size_t, len, int, flags)
 	return do_mlock(start, len, vm_flags);
 }
 
-SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
+SYSCALL_DEFINE_WRAP2(munlock, unsigned long, start, size_t, len)
 {
 	int ret;
 

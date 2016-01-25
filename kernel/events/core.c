@@ -8258,7 +8258,7 @@ static int perf_event_set_clock(struct perf_event *event, clockid_t clk_id)
  * @cpu:		target cpu
  * @group_fd:		group leader event fd
  */
-SYSCALL_DEFINE5(perf_event_open,
+SYSCALL_DEFINE_WRAP5(perf_event_open,
 		struct perf_event_attr __user *, attr_uptr,
 		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
 {

@@ -11,6 +11,7 @@
  */
 #include <linux/bpf.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/slab.h>
 #include <linux/anon_inodes.h>
 #include <linux/file.h>
@@ -706,7 +707,7 @@ static int bpf_obj_get(const union bpf_attr *attr)
 	return bpf_obj_get_user(u64_to_ptr(attr->pathname));
 }
 
-SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
+SYSCALL_DEFINE_WRAP3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	union bpf_attr attr = {};
 	int err;

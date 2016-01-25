@@ -32,6 +32,7 @@
 #include <linux/security.h>
 #include <linux/seq_file.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/fcntl.h>
 #include <linux/rcupdate.h>
 #include <linux/capability.h>
@@ -947,7 +948,7 @@ EXPORT_SYMBOL(module_refcount);
 /* This exists whether we can unload or not */
 static void free_module(struct module *mod);
 
-SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
+SYSCALL_DEFINE_WRAP2(delete_module, const char __user *, name_user,
 		unsigned int, flags)
 {
 	struct module *mod;
@@ -3580,7 +3581,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	return err;
 }
 
-SYSCALL_DEFINE3(init_module, void __user *, umod,
+SYSCALL_DEFINE_WRAP3(init_module, void __user *, umod,
 		unsigned long, len, const char __user *, uargs)
 {
 	int err;
@@ -3600,7 +3601,7 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 	return load_module(&info, uargs, 0);
 }
 
-SYSCALL_DEFINE3(finit_module, int, fd, const char __user *, uargs, int, flags)
+SYSCALL_DEFINE_WRAP3(finit_module, int, fd, const char __user *, uargs, int, flags)
 {
 	int err;
 	struct load_info info = { };

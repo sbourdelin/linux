@@ -16,6 +16,7 @@
 #include <linux/security.h>
 #include <linux/evm.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/export.h>
 #include <linux/fsnotify.h>
 #include <linux/audit.h>
@@ -387,21 +388,21 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE5(setxattr, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP5(setxattr, const char __user *, pathname,
 		const char __user *, name, const void __user *, value,
 		size_t, size, int, flags)
 {
 	return path_setxattr(pathname, name, value, size, flags, LOOKUP_FOLLOW);
 }
 
-SYSCALL_DEFINE5(lsetxattr, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP5(lsetxattr, const char __user *, pathname,
 		const char __user *, name, const void __user *, value,
 		size_t, size, int, flags)
 {
 	return path_setxattr(pathname, name, value, size, flags, 0);
 }
 
-SYSCALL_DEFINE5(fsetxattr, int, fd, const char __user *, name,
+SYSCALL_DEFINE_WRAP5(fsetxattr, int, fd, const char __user *, name,
 		const void __user *,value, size_t, size, int, flags)
 {
 	struct fd f = fdget(fd);
@@ -487,19 +488,19 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE4(getxattr, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP4(getxattr, const char __user *, pathname,
 		const char __user *, name, void __user *, value, size_t, size)
 {
 	return path_getxattr(pathname, name, value, size, LOOKUP_FOLLOW);
 }
 
-SYSCALL_DEFINE4(lgetxattr, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP4(lgetxattr, const char __user *, pathname,
 		const char __user *, name, void __user *, value, size_t, size)
 {
 	return path_getxattr(pathname, name, value, size, 0);
 }
 
-SYSCALL_DEFINE4(fgetxattr, int, fd, const char __user *, name,
+SYSCALL_DEFINE_WRAP4(fgetxattr, int, fd, const char __user *, name,
 		void __user *, value, size_t, size)
 {
 	struct fd f = fdget(fd);
@@ -569,19 +570,19 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE3(listxattr, const char __user *, pathname, char __user *, list,
+SYSCALL_DEFINE_WRAP3(listxattr, const char __user *, pathname, char __user *, list,
 		size_t, size)
 {
 	return path_listxattr(pathname, list, size, LOOKUP_FOLLOW);
 }
 
-SYSCALL_DEFINE3(llistxattr, const char __user *, pathname, char __user *, list,
+SYSCALL_DEFINE_WRAP3(llistxattr, const char __user *, pathname, char __user *, list,
 		size_t, size)
 {
 	return path_listxattr(pathname, list, size, 0);
 }
 
-SYSCALL_DEFINE3(flistxattr, int, fd, char __user *, list, size_t, size)
+SYSCALL_DEFINE_WRAP3(flistxattr, int, fd, char __user *, list, size_t, size)
 {
 	struct fd f = fdget(fd);
 	ssize_t error = -EBADF;
@@ -634,19 +635,19 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE2(removexattr, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP2(removexattr, const char __user *, pathname,
 		const char __user *, name)
 {
 	return path_removexattr(pathname, name, LOOKUP_FOLLOW);
 }
 
-SYSCALL_DEFINE2(lremovexattr, const char __user *, pathname,
+SYSCALL_DEFINE_WRAP2(lremovexattr, const char __user *, pathname,
 		const char __user *, name)
 {
 	return path_removexattr(pathname, name, 0);
 }
 
-SYSCALL_DEFINE2(fremovexattr, int, fd, const char __user *, name)
+SYSCALL_DEFINE_WRAP2(fremovexattr, int, fd, const char __user *, name)
 {
 	struct fd f = fdget(fd);
 	int error = -EBADF;

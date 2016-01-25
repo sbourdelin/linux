@@ -642,7 +642,7 @@ error:
 	return retval;
 }
 
-SYSCALL_DEFINE3(getresuid, uid_t __user *, ruidp, uid_t __user *, euidp, uid_t __user *, suidp)
+SYSCALL_DEFINE_WRAP3(getresuid, uid_t __user *, ruidp, uid_t __user *, euidp, uid_t __user *, suidp)
 {
 	const struct cred *cred = current_cred();
 	int retval;
@@ -716,7 +716,7 @@ error:
 	return retval;
 }
 
-SYSCALL_DEFINE3(getresgid, gid_t __user *, rgidp, gid_t __user *, egidp, gid_t __user *, sgidp)
+SYSCALL_DEFINE_WRAP3(getresgid, gid_t __user *, rgidp, gid_t __user *, egidp, gid_t __user *, sgidp)
 {
 	const struct cred *cred = current_cred();
 	int retval;
@@ -1138,7 +1138,7 @@ static int override_release(char __user *release, size_t len)
 	return ret;
 }
 
-SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
+SYSCALL_DEFINE_WRAP1(newuname, struct new_utsname __user *, name)
 {
 	int errno = 0;
 
@@ -1212,7 +1212,7 @@ SYSCALL_DEFINE1(olduname, struct oldold_utsname __user *, name)
 }
 #endif
 
-SYSCALL_DEFINE2(sethostname, char __user *, name, int, len)
+SYSCALL_DEFINE_WRAP2(sethostname, char __user *, name, int, len)
 {
 	int errno;
 	char tmp[__NEW_UTS_LEN];
@@ -1263,7 +1263,7 @@ SYSCALL_DEFINE2(gethostname, char __user *, name, int, len)
  * Only setdomainname; getdomainname can be implemented by calling
  * uname()
  */
-SYSCALL_DEFINE2(setdomainname, char __user *, name, int, len)
+SYSCALL_DEFINE_WRAP2(setdomainname, char __user *, name, int, len)
 {
 	int errno;
 	char tmp[__NEW_UTS_LEN];
@@ -1445,7 +1445,7 @@ static int check_prlimit_permission(struct task_struct *task)
 	return -EPERM;
 }
 
-SYSCALL_DEFINE4(prlimit64, pid_t, pid, unsigned int, resource,
+SYSCALL_DEFINE_WRAP4(prlimit64, pid_t, pid, unsigned int, resource,
 		const struct rlimit64 __user *, new_rlim,
 		struct rlimit64 __user *, old_rlim)
 {
@@ -2072,7 +2072,7 @@ static int prctl_get_tid_address(struct task_struct *me, int __user **tid_addr)
 }
 #endif
 
-SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+SYSCALL_DEFINE_WRAP5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
 {
 	struct task_struct *me = current;
@@ -2273,7 +2273,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 	return error;
 }
 
-SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
+SYSCALL_DEFINE_WRAP3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
 		struct getcpu_cache __user *, unused)
 {
 	int err = 0;

@@ -27,6 +27,7 @@
 #include <linux/vmalloc.h>
 #include <linux/netlink.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/audit.h>
 #include <linux/signal.h>
 #include <linux/mutex.h>
@@ -849,7 +850,7 @@ out_putname:
 	return fd;
 }
 
-SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
+SYSCALL_DEFINE_WRAP1(mq_unlink, const char __user *, u_name)
 {
 	int err;
 	struct filename *name;

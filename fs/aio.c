@@ -1349,7 +1349,7 @@ out:
  *	implemented.  May fail with -EINVAL if the context pointed to
  *	is invalid.
  */
-SYSCALL_DEFINE1(io_destroy, aio_context_t, ctx)
+SYSCALL_DEFINE_WRAP1(io_destroy, aio_context_t, ctx)
 {
 	struct kioctx *ioctx = lookup_ioctx(ctx);
 	if (likely(NULL != ioctx)) {
@@ -1671,7 +1671,7 @@ lookup_kiocb(struct kioctx *ctx, struct iocb __user *iocb, u32 key)
  *	invalid.  May fail with -EAGAIN if the iocb specified was not
  *	cancelled.  Will fail with -ENOSYS if not implemented.
  */
-SYSCALL_DEFINE3(io_cancel, aio_context_t, ctx_id, struct iocb __user *, iocb,
+SYSCALL_DEFINE_WRAP3(io_cancel, aio_context_t, ctx_id, struct iocb __user *, iocb,
 		struct io_event __user *, result)
 {
 	struct kioctx *ctx;

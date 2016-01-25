@@ -334,7 +334,7 @@ SYSCALL_DEFINE4(fallocate, int, fd, int, mode, loff_t, offset, loff_t, len)
  * We do this by temporarily clearing all FS-related capabilities and
  * switching the fsuid/fsgid around to the real ones.
  */
-SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
+SYSCALL_DEFINE_WRAP3(faccessat, int, dfd, const char __user *, filename, int, mode)
 {
 	const struct cred *old_cred;
 	struct cred *override_cred;
@@ -410,12 +410,12 @@ out:
 	return res;
 }
 
-SYSCALL_DEFINE2(access, const char __user *, filename, int, mode)
+SYSCALL_DEFINE_WRAP2(access, const char __user *, filename, int, mode)
 {
 	return sys_faccessat(AT_FDCWD, filename, mode);
 }
 
-SYSCALL_DEFINE1(chdir, const char __user *, filename)
+SYSCALL_DEFINE_WRAP1(chdir, const char __user *, filename)
 {
 	struct path path;
 	int error;
@@ -466,7 +466,7 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE1(chroot, const char __user *, filename)
+SYSCALL_DEFINE_WRAP1(chroot, const char __user *, filename)
 {
 	struct path path;
 	int error;
@@ -541,7 +541,7 @@ SYSCALL_DEFINE2(fchmod, unsigned int, fd, umode_t, mode)
 	return err;
 }
 
-SYSCALL_DEFINE3(fchmodat, int, dfd, const char __user *, filename, umode_t, mode)
+SYSCALL_DEFINE_WRAP3(fchmodat, int, dfd, const char __user *, filename, umode_t, mode)
 {
 	struct path path;
 	int error;
@@ -559,7 +559,7 @@ retry:
 	return error;
 }
 
-SYSCALL_DEFINE2(chmod, const char __user *, filename, umode_t, mode)
+SYSCALL_DEFINE_WRAP2(chmod, const char __user *, filename, umode_t, mode)
 {
 	return sys_fchmodat(AT_FDCWD, filename, mode);
 }
@@ -606,7 +606,7 @@ retry_deleg:
 	return error;
 }
 
-SYSCALL_DEFINE5(fchownat, int, dfd, const char __user *, filename, uid_t, user,
+SYSCALL_DEFINE_WRAP5(fchownat, int, dfd, const char __user *, filename, uid_t, user,
 		gid_t, group, int, flag)
 {
 	struct path path;
@@ -638,12 +638,12 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE3(chown, const char __user *, filename, uid_t, user, gid_t, group)
+SYSCALL_DEFINE_WRAP3(chown, const char __user *, filename, uid_t, user, gid_t, group)
 {
 	return sys_fchownat(AT_FDCWD, filename, user, group, 0);
 }
 
-SYSCALL_DEFINE3(lchown, const char __user *, filename, uid_t, user, gid_t, group)
+SYSCALL_DEFINE_WRAP3(lchown, const char __user *, filename, uid_t, user, gid_t, group)
 {
 	return sys_fchownat(AT_FDCWD, filename, user, group,
 			    AT_SYMLINK_NOFOLLOW);
@@ -1058,7 +1058,7 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags,
  * For backward compatibility?  Maybe this should be moved
  * into arch/i386 instead?
  */
-SYSCALL_DEFINE2(creat, const char __user *, pathname, umode_t, mode)
+SYSCALL_DEFINE_WRAP2(creat, const char __user *, pathname, umode_t, mode)
 {
 	return sys_open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }

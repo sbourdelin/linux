@@ -32,6 +32,7 @@
 #include <linux/personality.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/audit.h>
 #include <linux/sched/sysctl.h>
 #include <linux/printk.h>
@@ -526,7 +527,7 @@ EXPORT_SYMBOL(vm_insert_page);
  *  to a regular file.  in this case, the unmapping will need
  *  to invoke file system routines that need the global lock.
  */
-SYSCALL_DEFINE1(brk, unsigned long, brk)
+SYSCALL_DEFINE_WRAP1(brk, unsigned long, brk)
 {
 	struct mm_struct *mm = current->mm;
 
@@ -1684,7 +1685,7 @@ int vm_munmap(unsigned long addr, size_t len)
 }
 EXPORT_SYMBOL(vm_munmap);
 
-SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
+SYSCALL_DEFINE_WRAP2(munmap, unsigned long, addr, size_t, len)
 {
 	return vm_munmap(addr, len);
 }
@@ -1760,7 +1761,7 @@ static unsigned long do_mremap(unsigned long addr,
 	return vma->vm_start;
 }
 
-SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
+SYSCALL_DEFINE_WRAP5(mremap, unsigned long, addr, unsigned long, old_len,
 		unsigned long, new_len, unsigned long, flags,
 		unsigned long, new_addr)
 {
