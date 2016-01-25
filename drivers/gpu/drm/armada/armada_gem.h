@@ -15,7 +15,7 @@ struct armada_gem_object {
 	struct drm_gem_object	obj;
 	void			*addr;
 	phys_addr_t		phys_addr;
-	resource_size_t		dev_addr;
+	dma_addr_t		dev_addr;
 	struct drm_mm_node	*linear;	/* for linear backed */
 	struct page		*page;		/* for page backed */
 	struct sg_table		*sgt;		/* for imported */
