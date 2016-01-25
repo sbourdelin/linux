@@ -29,9 +29,9 @@ rq_sched_info_dequeued(struct rq *rq, unsigned long long delta)
 	if (rq)
 		rq->rq_sched_info.run_delay += delta;
 }
-# define schedstat_inc(rq, field)	do { (rq)->field++; } while (0)
-# define schedstat_add(rq, field, amt)	do { (rq)->field += (amt); } while (0)
-# define schedstat_set(var, val)	do { var = (val); } while (0)
+# define schedstat_inc(rq, field)	do { if (static_branch_unlikely(&sched_schedstats)) { (rq)->field++; } } while (0)
+# define schedstat_add(rq, field, amt)	do { if (static_branch_unlikely(&sched_schedstats)) { (rq)->field += (amt); } } while (0)
+# define schedstat_set(var, val)	do { if (static_branch_unlikely(&sched_schedstats)) { var = (val); } } while (0)
 #else /* !CONFIG_SCHEDSTATS */
 static inline void
 rq_sched_info_arrive(struct rq *rq, unsigned long long delta)

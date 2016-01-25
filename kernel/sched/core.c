@@ -2196,6 +2196,61 @@ int sysctl_numa_balancing(struct ctl_table *table, int write,
 #endif
 #endif
 
+DEFINE_STATIC_KEY_FALSE(sched_schedstats);
+
+#ifdef CONFIG_SCHEDSTATS
+void set_schedstats(bool enabled)
+{
+	if (enabled)
+		static_branch_enable(&sched_schedstats);
+	else
+		static_branch_disable(&sched_schedstats);
+}
+
+static int __init setup_schedstats(char *str)
+{
+	int ret = 0;
+	if (!str)
+		goto out;
+
+	if (!strcmp(str, "enable")) {
+		set_schedstats(true);
+		ret = 1;
+	} else if (!strcmp(str, "disable")) {
+		set_schedstats(false);
+		ret = 1;
+	}
+out:
+	if (!ret)
+		pr_warn("Unable to parse numa_balancing=\n");
+
+	return ret;
+}
+__setup("schedstats=", setup_schedstats);
+
+#ifdef CONFIG_PROC_SYSCTL
+int sysctl_schedstats(struct ctl_table *table, int write,
+			 void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = static_branch_likely(&sched_schedstats);
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write)
+		set_schedstats(state);
+	return err;
+}
+#endif
+#endif
+
 /*
  * fork()/clone()-time setup:
  */
