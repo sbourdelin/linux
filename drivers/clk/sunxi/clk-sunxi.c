@@ -747,15 +747,24 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
 						   const struct factors_data *data)
 {
 	void __iomem *reg;
+	struct clk *clk;
 
 	reg = of_iomap(node, 0);
 	if (!reg) {
 		pr_err("Could not get registers for factors-clk: %s\n",
-		       node->name);
+		       of_node_full_name(node));
 		return NULL;
 	}
 
-	return sunxi_factors_register(node, data, &clk_lock, reg);
+	clk = sunxi_factors_register(node, data, &clk_lock, reg);
+
+	if (!clk) {
+		pr_err("Could not register factors-clk: %s\n",
+		       of_node_full_name(node));
+		iounmap(reg);
+	}
+
+	return clk;
 }
 
 
