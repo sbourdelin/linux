@@ -222,7 +222,7 @@ static enum pnfs_try_status
 bl_read_pagelist(struct nfs_pgio_header *header)
 {
 	struct pnfs_block_layout *bl = BLK_LSEG2EXT(header->lseg);
-	struct pnfs_block_dev_map map = { .start = NFS4_MAX_UINT64 };
+	struct pnfs_block_dev_map map = { .start = (sector_t)NFS4_MAX_UINT64 };
 	struct bio *bio = NULL;
 	struct pnfs_block_extent be;
 	sector_t isect, extent_length = 0;
@@ -279,7 +279,7 @@ bl_read_pagelist(struct nfs_pgio_header *header)
 			zero_user_segment(pages[i], pg_offset, pg_len);
 
 			/* invalidate map */
-			map.start = NFS4_MAX_UINT64;
+			map.start = (sector_t)NFS4_MAX_UINT64;
 		} else {
 			bio = do_add_page_to_bio(bio,
 						 header->page_array.npages - i,
@@ -365,7 +365,7 @@ static enum pnfs_try_status
 bl_write_pagelist(struct nfs_pgio_header *header, int sync)
 {
 	struct pnfs_block_layout *bl = BLK_LSEG2EXT(header->lseg);
-	struct pnfs_block_dev_map map = { .start = NFS4_MAX_UINT64 };
+	struct pnfs_block_dev_map map = { .start = (sector_t)NFS4_MAX_UINT64 };
 	struct bio *bio = NULL;
 	struct pnfs_block_extent be;
 	sector_t isect, extent_length = 0;
@@ -440,7 +440,7 @@ static void bl_free_layout_hdr(struct pnfs_layout_hdr *lo)
 
 	dprintk("%s enter\n", __func__);
 
-	err = ext_tree_remove(bl, true, 0, LLONG_MAX);
+	err = ext_tree_remove(bl, true, 0, (sector_t)LLONG_MAX);
 	WARN_ON(err);
 
 	kfree(bl);
@@ -705,7 +705,7 @@ bl_return_range(struct pnfs_layout_hdr *lo,
 
 		end = offset + (range->length >> SECTOR_SHIFT);
 	} else {
-		end = round_down(NFS4_MAX_UINT64, PAGE_SIZE);
+		end = round_down((sector_t)NFS4_MAX_UINT64, PAGE_SIZE);
 	}
 
 	ext_tree_remove(bl, range->iomode & IOMODE_RW, offset, end);
