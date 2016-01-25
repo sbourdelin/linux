@@ -419,6 +419,8 @@ static u32 truncate_msg(u16 *text_len, u16 *trunc_msg_len,
 	return msg_used_size(*text_len + *trunc_msg_len, 0, pad_len);
 }
 
+static u64 printk_get_ts(void);
+
 /* insert record into the buffer, discard old ones, update heads */
 static int log_store(int facility, int level,
 		     enum log_flags flags, u64 ts_nsec,
@@ -467,7 +469,7 @@ static int log_store(int facility, int level,
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
-		msg->ts_nsec = local_clock();
+		msg->ts_nsec = printk_get_ts();
 	memset(log_dict(msg) + dict_len, 0, pad_len);
 	msg->len = size;
 
@@ -1034,8 +1036,24 @@ static inline void boot_delay_msec(int level)
 }
 #endif
 
-static bool printk_time = IS_ENABLED(CONFIG_PRINTK_TIME);
-module_param_named(time, printk_time, bool, S_IRUGO | S_IWUSR);
+static int printk_time = IS_ENABLED(CONFIG_PRINTK_TIME);
+/* 0 = disabled, 1 = monotonic, 2 = real clock */
+module_param_named(time, printk_time, int, S_IRUGO | S_IWUSR);
+
+static u64 printk_get_ts(void)
+{
+	u64 mono, offset_real;
+
+	if (!printk_time)
+		return 0;
+
+	mono = ktime_get_log_ts(&offset_real);
+
+	if (printk_time == 1)
+		return mono;
+
+	return mono + offset_real;
+}
 
 static size_t print_time(u64 ts, char *buf)
 {
@@ -1613,7 +1631,7 @@ static bool cont_add(int facility, int level, const char *text, size_t len)
 		cont.facility = facility;
 		cont.level = level;
 		cont.owner = current;
-		cont.ts_nsec = local_clock();
+		cont.ts_nsec = printk_get_ts();
 		cont.flags = 0;
 		cont.cons = 0;
 		cont.flushed = false;
