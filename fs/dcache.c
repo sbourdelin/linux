@@ -461,6 +461,22 @@ static void dentry_lru_add(struct dentry *dentry)
 		d_lru_add(dentry);
 }
 
+/*
+ * Remove a dentry with references from the LRU.
+ *
+ * If we are on the shrink list, then we can get to try_prune_one_dentry() and
+ * lose our last reference through the parent walk. In this case, we need to
+ * remove ourselves from the shrink list, not the LRU.
+ */
+static void dentry_lru_del(struct dentry *dentry)
+{
+	if (dentry->d_flags & DCACHE_LRU_LIST) {
+		if (dentry->d_flags & DCACHE_SHRINK_LIST)
+			return d_shrink_del(dentry);
+		d_lru_del(dentry);
+	}
+}
+
 /**
  * d_drop - drop a dentry
  * @dentry: dentry to drop
@@ -1368,23 +1384,34 @@ static enum d_walk_ret select_collect(void *_data, struct dentry *dentry)
 	if (data->start == dentry)
 		goto out;
 
-	if (dentry->d_flags & DCACHE_SHRINK_LIST) {
+	/*
+	 * move only zero ref count dentries to the dispose list.
+	 *
+	 * Those which are presently on the shrink list, being processed
+	 * by shrink_dentry_list(), shouldn't be moved.  Otherwise the
+	 * loop in shrink_dcache_parent() might not make any progress
+	 * and loop forever.
+	 */
+	if (dentry->d_lockref.count) {
+		dentry_lru_del(dentry);
+	} else if (!(dentry->d_flags & DCACHE_SHRINK_LIST)) {
+		/*
+		 * We can't use d_lru_shrink_move() because we
+		 * need to get the global LRU lock and do the
+		 * LRU accounting.
+		 */
+		d_lru_del(dentry);
+		d_shrink_add(dentry, &data->dispose);
 		data->found++;
-	} else {
-		if (dentry->d_flags & DCACHE_LRU_LIST)
-			d_lru_del(dentry);
-		if (!dentry->d_lockref.count) {
-			d_shrink_add(dentry, &data->dispose);
-			data->found++;
-		}
+		ret = D_WALK_NORETRY;
 	}
 	/*
 	 * We can return to the caller if we have found some (this
 	 * ensures forward progress). We'll be coming back to find
 	 * the rest.
 	 */
-	if (!list_empty(&data->dispose))
-		ret = need_resched() ? D_WALK_QUIT : D_WALK_NORETRY;
+	if (data->found && need_resched())
+		ret = D_WALK_QUIT;
 out:
 	return ret;
 }
