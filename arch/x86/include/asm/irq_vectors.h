@@ -146,4 +146,6 @@
 #define NR_IRQS				NR_IRQS_LEGACY
 #endif
 
+#define IRQ_INVALID			(~0U)
+
 #endif /* _ASM_X86_IRQ_VECTORS_H */

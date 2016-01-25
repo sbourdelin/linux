@@ -198,6 +198,15 @@ extern void enable_percpu_irq(unsigned int irq, unsigned int type);
 extern bool irq_percpu_is_enabled(unsigned int irq);
 extern void irq_wake_thread(unsigned int irq, void *dev_id);
 
+static inline bool irq_is_valid(unsigned int irq)
+{
+#ifdef CONFIG_X86
+	if (irq == IRQ_INVALID)
+		return false;
+#endif
+	return true;
+}
+
 /* The following three functions are for the core kernel use only. */
 extern void suspend_device_irqs(void);
 extern void resume_device_irqs(void);

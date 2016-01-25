@@ -33,6 +33,7 @@
 #include <linux/pci.h>
 #include <linux/acpi.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 
 #define PREFIX "ACPI: "
 
@@ -436,7 +437,15 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
 	 * driver reported one, then use it. Exit in any case.
 	 */
 	if (gsi < 0) {
-		if (acpi_isa_register_gsi(dev))
+#ifdef CONFIG_X86
+		/*
+		 * The Interrupt Line value of 0xff is defined to mean "unknown"
+		 * or "no connection" (PCI 3.0, Section 6.2.4, footnote on page
+		 * 223), using ~0U as invalid IRQ.
+		 */
+		dev->irq = (dev->irq == 0xff) ? IRQ_INVALID : dev->irq;
+#endif
+		if (!irq_is_valid(dev->irq) || acpi_isa_register_gsi(dev))
 			dev_warn(&dev->dev, "PCI INT %c: no GSI\n",
 				 pin_name(pin));
 
