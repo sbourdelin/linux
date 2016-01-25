@@ -306,11 +306,19 @@ __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 	 * The load offset is different depending on the ABI. For simplicity
 	 * just mask it out when doing the compare.
 	 */
+#ifndef CC_USING_MPROFILE_KERNEL
 	if ((op[0] != 0x48000008) || ((op[1] & 0xffff0000) != 0xe8410000)) {
-		pr_err("Unexpected call sequence: %x %x\n", op[0], op[1]);
+		pr_err("Unexpected call sequence at %p: %x %x\n",
+		ip, op[0], op[1]);
 		return -EINVAL;
 	}
-
+#else
+	/* look for patched "NOP" on ppc64 with -mprofile-kernel */
+	if (op[0] != 0x60000000) {
+		pr_err("Unexpected call at %p: %x\n", ip, op[0]);
+		return -EINVAL;
+	}
+#endif
 	/* If we never set up a trampoline to ftrace_caller, then bail */
 	if (!rec->arch.mod->arch.tramp) {
 		pr_err("No ftrace trampoline\n");

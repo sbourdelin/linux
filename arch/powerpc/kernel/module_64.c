@@ -475,6 +475,20 @@ static unsigned long stub_for_addr(Elf64_Shdr *sechdrs,
 static int restore_r2(u32 *instruction, struct module *me)
 {
 	if (*instruction != PPC_INST_NOP) {
+#ifdef CC_USING_MPROFILE_KERNEL
+		/* -mprofile_kernel sequence starting with
+		 * mflr r0 and maybe std r0, LRSAVE(r1)
+		 */
+		if ((instruction[-3] == 0x7c0802a6 &&
+		    instruction[-2] == 0xf8010010) ||
+		    instruction[-2] == 0x7c0802a6) {
+			/* Nothing to be done here, it's an _mcount
+			 * call location and r2 will have to be
+			 * restored in the _mcount function.
+			 */
+			return 1;
+		};
+#endif
 		pr_err("%s: Expect noop after relocate, got %08x\n",
 		       me->name, *instruction);
 		return 0;
