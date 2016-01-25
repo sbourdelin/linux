@@ -1863,8 +1863,9 @@ static void frob_text(const struct module_layout *layout,
 {
 	BUG_ON((unsigned long)layout->base & (PAGE_SIZE-1));
 	BUG_ON((unsigned long)layout->text_size & (PAGE_SIZE-1));
-	set_memory((unsigned long)layout->base,
-		   layout->text_size >> PAGE_SHIFT);
+	if (layout->text_size)
+		set_memory((unsigned long)layout->base,
+			layout->text_size >> PAGE_SHIFT);
 }
 
 static void frob_rodata(const struct module_layout *layout,
@@ -1873,8 +1874,9 @@ static void frob_rodata(const struct module_layout *layout,
 	BUG_ON((unsigned long)layout->base & (PAGE_SIZE-1));
 	BUG_ON((unsigned long)layout->text_size & (PAGE_SIZE-1));
 	BUG_ON((unsigned long)layout->ro_size & (PAGE_SIZE-1));
-	set_memory((unsigned long)layout->base + layout->text_size,
-		   (layout->ro_size - layout->text_size) >> PAGE_SHIFT);
+	if (layout->ro_size > layout->text_size)
+		set_memory((unsigned long)layout->base + layout->text_size,
+			(layout->ro_size - layout->text_size) >> PAGE_SHIFT);
 }
 
 static void frob_writable_data(const struct module_layout *layout,
@@ -1883,8 +1885,9 @@ static void frob_writable_data(const struct module_layout *layout,
 	BUG_ON((unsigned long)layout->base & (PAGE_SIZE-1));
 	BUG_ON((unsigned long)layout->ro_size & (PAGE_SIZE-1));
 	BUG_ON((unsigned long)layout->size & (PAGE_SIZE-1));
-	set_memory((unsigned long)layout->base + layout->ro_size,
-		   (layout->size - layout->ro_size) >> PAGE_SHIFT);
+	if (layout->size > layout->ro_size)
+		set_memory((unsigned long)layout->base + layout->ro_size,
+			(layout->size - layout->ro_size) >> PAGE_SHIFT);
 }
 
 /* livepatching wants to disable read-only so it can frob module. */
