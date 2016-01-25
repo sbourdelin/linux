@@ -17,6 +17,7 @@
 #include <linux/dirent.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/compat.h>
 #include <linux/unistd.h>
 
 #include <asm/uaccess.h>
@@ -274,8 +275,13 @@ efault:
 	return -EFAULT;
 }
 
+#ifndef __ARCH_WANT_COMPAT_SYS_GETDENTS64
+SYSCALL_DEFINE_WRAP3(getdents64, unsigned int, fd,
+		struct linux_dirent64 __user *, dirent, unsigned int, count)
+#else
 SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 		struct linux_dirent64 __user *, dirent, unsigned int, count)
+#endif
 {
 	struct fd f;
 	struct linux_dirent64 __user * lastdirent;
