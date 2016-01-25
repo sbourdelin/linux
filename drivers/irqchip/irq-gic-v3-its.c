@@ -41,6 +41,8 @@
 
 #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
 #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
+#define ITS_FLAGS_DEVICE_NEEDS_FLUSHING		(1ULL << 2)
+#define ITS_FLAGS_INDIRECT_DEVICE_TABLE		(1ULL << 3)
 
 #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
 
@@ -71,6 +73,10 @@ struct its_node {
 	struct list_head	its_device_list;
 	u64			flags;
 	u32			ite_size;
+	u32			dev_table_idx;
+	u32			dev_table_shift;
+	u32			max_devid;
+	u32			order;
 };
 
 #define ITS_ITT_ALIGN		SZ_256
@@ -824,6 +830,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
 	u64 typer;
 	u32 ids;
 
+#define ITS_DEVICE_MAX_ORDER	min(MAX_ORDER-1, get_order(SZ_8M))
+
 	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375) {
 		/*
 		 * erratum 22375: only alloc 8MB table size
@@ -867,10 +875,10 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
 			 */
 			order = max(get_order((1UL << ids) * entry_size),
 				    order);
-			if (order >= MAX_ORDER) {
-				order = MAX_ORDER - 1;
-				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
-					node_name, order);
+			if (order >= ITS_DEVICE_MAX_ORDER) {
+				/* Update flags for two-level setup */
+				its->flags |= ITS_FLAGS_INDIRECT_DEVICE_TABLE;
+				order = ITS_DEVICE_MAX_ORDER;
 			}
 		}
 
@@ -909,6 +917,26 @@ retry_baser:
 		case SZ_64K:
 			val |= GITS_BASER_PAGE_SIZE_64K;
 			break;
+		}
+
+		/* Enable two-level (indirect) device table if it is required */
+		if ((type == GITS_BASER_TYPE_DEVICE) &&
+		    (its->flags & ITS_FLAGS_INDIRECT_DEVICE_TABLE)) {
+			u32 shift = ilog2(psz / entry_size);
+			u32 max_ids = ilog2(alloc_size >> 3) + shift;
+
+			if (ids > max_ids) {
+				pr_warn(
+					"ITS: @%pa DEVID too large reduce %u->%u\n",
+					&its->phys_base, ids, max_ids);
+			}
+			its->max_devid =  (1UL << max_ids) - 1;
+			its->order = get_order(psz);
+			its->dev_table_idx = i;
+			its->dev_table_shift = shift;
+			if (!(val & GITS_BASER_SHAREABILITY_MASK))
+				its->flags |= ITS_FLAGS_DEVICE_NEEDS_FLUSHING;
+			val |= GITS_BASER_INDIRECT;
 		}
 
 		val |= alloc_pages - 1;
@@ -1134,6 +1162,32 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
 	return its_dev;
 }
 
+static int its_alloc_device_table(struct its_node *its, u32 dev_id)
+{
+	u64 *devtbl = its->tables[its->dev_table_idx];
+	u32 alloc_size = (1 << its->order) * PAGE_SIZE;
+	u32 idx = dev_id >> its->dev_table_shift;
+	struct page *page;
+
+	/* Do nothing if the level-2 DEV-ITT entry was mapped earlier */
+	if (devtbl[idx])
+		return 0;
+
+	/* Allocate memory for level-2 device table & map to level-1 table */
+	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, its->order);
+	if (!page)
+		return -ENOMEM;
+
+	devtbl[idx] = page_to_phys(page) | GITS_BASER_VALID;
+
+	if (its->flags & ITS_FLAGS_DEVICE_NEEDS_FLUSHING) {
+		__flush_dcache_area(page_address(page), alloc_size);
+		__flush_dcache_area(devtbl + idx, sizeof(*devtbl));
+	}
+
+	return 0;
+}
+
 static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
 					    int nvecs)
 {
@@ -1146,6 +1200,20 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
 	int nr_lpis;
 	int nr_ites;
 	int sz;
+
+	if (dev_id > its->max_devid) {
+		pr_err("ITS: dev_id too large %d\n", dev_id);
+		return NULL;
+	}
+
+	/* Ensure memory for level-2 table is allocated for dev_id */
+	if (its->flags & ITS_FLAGS_INDIRECT_DEVICE_TABLE) {
+		int ret;
+
+		ret = its_alloc_device_table(its, dev_id);
+		if (ret)
+			return NULL;
+	}
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	/*

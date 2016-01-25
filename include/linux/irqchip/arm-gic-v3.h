@@ -206,6 +206,7 @@
 #define GITS_BASER_NR_REGS		8
 
 #define GITS_BASER_VALID		(1UL << 63)
+#define GITS_BASER_INDIRECT		(1UL << 62)
 #define GITS_BASER_nCnB			(0UL << 59)
 #define GITS_BASER_nC			(1UL << 59)
 #define GITS_BASER_RaWt			(2UL << 59)
