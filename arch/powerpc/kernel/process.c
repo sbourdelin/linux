@@ -822,7 +822,7 @@ static inline void __switch_to_tm(struct task_struct *prev)
  * don't know which of the checkpointed state and the transactional
  * state to use.
  */
-void restore_tm_state(struct pt_regs *regs)
+notrace void restore_tm_state(struct pt_regs *regs)
 {
 	unsigned long msr_diff;
 

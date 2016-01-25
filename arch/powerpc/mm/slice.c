@@ -76,8 +76,8 @@ static void slice_print_mask(const char *label, struct slice_mask mask) {}
 
 #endif
 
-static struct slice_mask slice_range_to_mask(unsigned long start,
-					     unsigned long len)
+static notrace struct slice_mask slice_range_to_mask(unsigned long start,
+						     unsigned long len)
 {
 	unsigned long end = start + len - 1;
 	struct slice_mask ret = { 0, 0 };
@@ -563,7 +563,7 @@ unsigned long arch_get_unmapped_area_topdown(struct file *filp,
 				       current->mm->context.user_psize, 1);
 }
 
-unsigned int get_slice_psize(struct mm_struct *mm, unsigned long addr)
+notrace unsigned int get_slice_psize(struct mm_struct *mm, unsigned long addr)
 {
 	unsigned char *hpsizes;
 	int index, mask_index;
@@ -644,7 +644,7 @@ void slice_set_user_psize(struct mm_struct *mm, unsigned int psize)
 	spin_unlock_irqrestore(&slice_convert_lock, flags);
 }
 
-void slice_set_range_psize(struct mm_struct *mm, unsigned long start,
+notrace void slice_set_range_psize(struct mm_struct *mm, unsigned long start,
 			   unsigned long len, unsigned int psize)
 {
 	struct slice_mask mask = slice_range_to_mask(start, len);

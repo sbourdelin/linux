@@ -825,7 +825,7 @@ void early_init_mmu_secondary(void)
 /*
  * Called by asm hashtable.S for doing lazy icache flush
  */
-unsigned int hash_page_do_lazy_icache(unsigned int pp, pte_t pte, int trap)
+notrace unsigned int hash_page_do_lazy_icache(unsigned int pp, pte_t pte, int trap)
 {
 	struct page *page;
 
@@ -846,7 +846,7 @@ unsigned int hash_page_do_lazy_icache(unsigned int pp, pte_t pte, int trap)
 }
 
 #ifdef CONFIG_PPC_MM_SLICES
-static unsigned int get_paca_psize(unsigned long addr)
+static notrace unsigned int get_paca_psize(unsigned long addr)
 {
 	u64 lpsizes;
 	unsigned char *hpsizes;
@@ -875,7 +875,7 @@ unsigned int get_paca_psize(unsigned long addr)
  * For now this makes the whole process use 4k pages.
  */
 #ifdef CONFIG_PPC_64K_PAGES
-void demote_segment_4k(struct mm_struct *mm, unsigned long addr)
+notrace void demote_segment_4k(struct mm_struct *mm, unsigned long addr)
 {
 	if (get_slice_psize(mm, addr) == MMU_PAGE_4K)
 		return;
@@ -897,7 +897,7 @@ void demote_segment_4k(struct mm_struct *mm, unsigned long addr)
  * Result is 0: full permissions, _PAGE_RW: read-only,
  * _PAGE_USER or _PAGE_USER|_PAGE_RW: no access.
  */
-static int subpage_protection(struct mm_struct *mm, unsigned long ea)
+static notrace int subpage_protection(struct mm_struct *mm, unsigned long ea)
 {
 	struct subpage_prot_table *spt = &mm->context.spt;
 	u32 spp = 0;
@@ -945,7 +945,7 @@ void hash_failure_debug(unsigned long ea, unsigned long access,
 		trap, vsid, ssize, psize, lpsize, pte);
 }
 
-static void check_paca_psize(unsigned long ea, struct mm_struct *mm,
+static notrace void check_paca_psize(unsigned long ea, struct mm_struct *mm,
 			     int psize, bool user_region)
 {
 	if (user_region) {
@@ -967,7 +967,7 @@ static void check_paca_psize(unsigned long ea, struct mm_struct *mm,
  * -1 - critical hash insertion error
  * -2 - access not permitted by subpage protection mechanism
  */
-int hash_page_mm(struct mm_struct *mm, unsigned long ea,
+notrace int hash_page_mm(struct mm_struct *mm, unsigned long ea,
 		 unsigned long access, unsigned long trap,
 		 unsigned long flags)
 {
@@ -1165,7 +1165,7 @@ bail:
 }
 EXPORT_SYMBOL_GPL(hash_page_mm);
 
-int hash_page(unsigned long ea, unsigned long access, unsigned long trap,
+notrace int hash_page(unsigned long ea, unsigned long access, unsigned long trap,
 	      unsigned long dsisr)
 {
 	unsigned long flags = 0;
@@ -1296,7 +1296,7 @@ out_exit:
 /* WARNING: This is called from hash_low_64.S, if you change this prototype,
  *          do not forget to update the assembly call site !
  */
-void flush_hash_page(unsigned long vpn, real_pte_t pte, int psize, int ssize,
+notrace void flush_hash_page(unsigned long vpn, real_pte_t pte, int psize, int ssize,
 		     unsigned long flags)
 {
 	unsigned long hash, index, shift, hidx, slot;
@@ -1444,7 +1444,7 @@ void low_hash_fault(struct pt_regs *regs, unsigned long address, int rc)
 	exception_exit(prev_state);
 }
 
-long hpte_insert_repeating(unsigned long hash, unsigned long vpn,
+notrace long hpte_insert_repeating(unsigned long hash, unsigned long vpn,
 			   unsigned long pa, unsigned long rflags,
 			   unsigned long vflags, int psize, int ssize)
 {
