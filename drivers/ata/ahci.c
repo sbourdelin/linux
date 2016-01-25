@@ -557,6 +557,35 @@ static int marvell_enable = 1;
 module_param(marvell_enable, int, 0644);
 MODULE_PARM_DESC(marvell_enable, "Marvell SATA via AHCI (1 = enabled)");
 
+static int lenovo_swraid = 1;
+module_param(lenovo_swraid, int, 0644);
+MODULE_PARM_DESC(lenovo_swraid, "SWRAID via SATA(RAID mode) (1 = enable (default))");
+
+static int lenovo_swraid_enable(struct pci_dev *pdev)
+{
+	if (!lenovo_swraid)
+		return 0;
+
+	/* Lenovo Gen6 Servers */
+	if (pdev->vendor == PCI_VENDOR_ID_INTEL &&
+	    (pdev->device == 0xa186 || pdev->device == 0xa206) &&
+	    pdev->subsystem_vendor == 0x1d49) {
+			dev_info(&pdev->dev,
+				  "Skip SATA controller for Lenovo SWRAID.\n");
+			return -ENODEV;
+	}
+
+	/* Lenovo Gen5 Servers */
+	if (pdev->vendor == PCI_VENDOR_ID_INTEL &&
+	    pdev->device == 0x8d06 &&
+	    pdev->subsystem_vendor == 0x17aa) {
+			dev_info(&pdev->dev,
+				  "Skip SATA controller for Lenovo SWRAID.\n");
+			return -ENODEV;
+	}
+
+	return 0;
+}
 
 static void ahci_pci_save_initial_config(struct pci_dev *pdev,
 					 struct ahci_host_priv *hpriv)
@@ -1464,6 +1493,10 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	   can drive them all so if both drivers are selected make sure
 	   AHCI stays out of the way */
 	if (pdev->vendor == PCI_VENDOR_ID_MARVELL && !marvell_enable)
+		return -ENODEV;
+
+	/* Let AHCI driver skip the Lenovo SWRAID controller. */
+	if (lenovo_swraid_enable(pdev))
 		return -ENODEV;
 
 	/* Apple BIOS on MCP89 prevents us using AHCI */
