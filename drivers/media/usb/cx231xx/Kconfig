@@ -1,13 +1,13 @@
 config VIDEO_CX231XX
 	tristate "Conexant cx231xx USB video capture support"
 	depends on VIDEO_DEV && I2C
+	depends on I2C_MUX
 	select VIDEO_TUNER
 	select VIDEO_TVEEPROM
 	depends on RC_CORE
 	select VIDEOBUF_VMALLOC
 	select VIDEO_CX25840
 	select VIDEO_CX2341X
-	select I2C_MUX
 
 	---help---
 	  This is a video4linux driver for Conexant 231xx USB based TV cards.
