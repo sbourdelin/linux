@@ -407,6 +407,9 @@ void intel_cpu_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
 
 	report = intel_get_cpu_fifo_underrun_reporting(dev_priv, pipe);
 
+	/* Increment the debugfs underrun counter */
+	atomic_inc(&to_intel_crtc(crtc)->cpu_fifo_underrun_count);
+
 	if (report)
 		DRM_ERROR_RATELIMITED("CPU pipe %c FIFO underrun\n",
 				      pipe_name(pipe));
@@ -426,6 +429,9 @@ void intel_pch_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
 	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pch_transcoder];
 	bool report = intel_get_pch_fifo_underrun_reporting(dev_priv,
 							    pch_transcoder);
+
+	/* Increment the debugfs underrun counter */
+	atomic_inc(&to_intel_crtc(crtc)->pch_fifo_underrun_count);
 
 	if (report)
 		DRM_ERROR_RATELIMITED("PCH transcoder %c FIFO underrun\n",

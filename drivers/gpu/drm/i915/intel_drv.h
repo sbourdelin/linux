@@ -589,6 +589,10 @@ struct intel_crtc {
 	/* reset counter value when the last flip was submitted */
 	unsigned int reset_counter;
 
+	/* fifo_underrun counters, used in debugfs only */
+	atomic_t cpu_fifo_underrun_count;
+	atomic_t pch_fifo_underrun_count;
+
 	/* Access to these should be protected by dev_priv->irq_lock. */
 	bool cpu_fifo_underrun_disabled;
 	bool pch_fifo_underrun_disabled;

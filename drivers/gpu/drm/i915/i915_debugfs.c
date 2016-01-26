@@ -3101,9 +3101,11 @@ static int i915_display_info(struct seq_file *m, void *unused)
 			intel_plane_info(m, crtc);
 		}
 
-		seq_printf(m, "\tunderrun reporting: cpu=%s pch=%s \n",
+		seq_printf(m, "\tunderrun reporting: cpu=%s (%d) pch=%s (%d) \n",
 			   yesno(!crtc->cpu_fifo_underrun_disabled),
-			   yesno(!crtc->pch_fifo_underrun_disabled));
+			   atomic_read(&crtc->cpu_fifo_underrun_count),
+			   yesno(!crtc->pch_fifo_underrun_disabled),
+			   atomic_read(&crtc->pch_fifo_underrun_count));
 	}
 
 	seq_printf(m, "\n");
