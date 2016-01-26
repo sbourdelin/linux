@@ -32,8 +32,64 @@ static struct xdbc_state xdbc_stat;
 static struct xdbc_state *xdbcp = &xdbc_stat;
 
 #ifdef DBC_DEBUG
-/* place holder */
-#define	xdbc_trace	printk
+#define	XDBC_DEBUG_BUF_SIZE	(PAGE_SIZE * 32)
+#define	MSG_MAX_LINE		128
+static char xdbc_debug_buf[XDBC_DEBUG_BUF_SIZE];
+static void xdbc_trace(const char *fmt, ...)
+{
+	int i, size;
+	va_list args;
+	static int pos;
+	char temp_buf[MSG_MAX_LINE];
+
+	if (pos >= XDBC_DEBUG_BUF_SIZE - 1)
+		return;
+
+	memset(temp_buf, 0, MSG_MAX_LINE);
+	va_start(args, fmt);
+	vsnprintf(temp_buf, MSG_MAX_LINE - 1, fmt, args);
+	va_end(args);
+
+	i = 0;
+	size = strlen(temp_buf);
+	while (i < size) {
+		xdbc_debug_buf[pos] = temp_buf[i];
+		pos++;
+		i++;
+
+		if (pos >= XDBC_DEBUG_BUF_SIZE - 1)
+			break;
+	}
+}
+
+static void xdbc_dump_debug_buffer(void)
+{
+	int index = 0;
+	int count = 0;
+	char dump_buf[MSG_MAX_LINE];
+
+	xdbc_trace("The end of DbC trace buffer\n");
+	pr_notice("DBC debug buffer:\n");
+	memset(dump_buf, 0, MSG_MAX_LINE);
+
+	while (index < XDBC_DEBUG_BUF_SIZE) {
+		if (!xdbc_debug_buf[index])
+			break;
+
+		if (xdbc_debug_buf[index] == '\n' ||
+				count >= MSG_MAX_LINE - 1) {
+			pr_notice("DBC: @%08x %s\n", index, dump_buf);
+			memset(dump_buf, 0, MSG_MAX_LINE);
+			count = 0;
+		} else {
+			dump_buf[count] = xdbc_debug_buf[index];
+			count++;
+		}
+
+		index++;
+	}
+}
+
 static void xdbc_dbg_dump_regs(char *str)
 {
 	if (!xdbcp->xdbc_reg) {
@@ -165,6 +221,7 @@ static void xdbc_dbg_dump_data(char *str)
 
 #else
 static inline void xdbc_trace(const char *fmt, ...) { }
+static inline void xdbc_dump_debug_buffer(void) { }
 static inline void xdbc_dbg_dump_regs(char *str) { }
 static inline void xdbc_dbg_dump_data(char *str) { }
 #endif	/* DBC_DEBUG */
@@ -819,6 +876,7 @@ int __init early_xdbc_init(char *s)
 		pr_notice("failed to setup xHCI DbC connection\n");
 		xdbcp->xhci_base = NULL;
 		xdbcp->xdbc_reg = NULL;
+		xdbc_dump_debug_buffer();
 		return ret;
 	}
 
