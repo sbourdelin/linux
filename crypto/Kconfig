@@ -1529,6 +1529,7 @@ config CRYPTO_LZ4HC
 	select CRYPTO_ALGAPI
 	select LZ4HC_COMPRESS
 	select LZ4_DECOMPRESS
+	select CRYPTO_COMPRESS2
 	help
 	  This is the LZ4 high compression mode algorithm.
 
