@@ -1,0 +1,47 @@
+UCS1002-2 Programmable USB Port Power Controller with Charger Emulation bindings
+
+Required properties:
+- compatible: "microchip,ucs1002"
+- reg: integer, the I2C address of the device.
+
+Required properties (if pin-ignore functionality is not set):
+- em-gpios: which GPIO to use for EM_EN pin.
+- pwr-gpios: which GPIO to use for PWR_EN pin.
+- m1-gpios: which GPIO to use for M1 pin.
+- m2-gpios: which GPIO to use for M2 pin.
+
+Optional properties:
+- interrupt-parent: the phandle of the interrupt controller that services
+    interrupts for this device.
+- interrupts: interrupt specifiers for two interrupt sources.
+    - First interrupt specifier is for A_DET interrupt.
+    - Second interrupt specifier is for ALERT interrupt.
+- microchip,current-limit: integer, maximum current in mA. Note that the default
+    value is based on the resistor on the COMM_SEL/ILIM pin and this value cannot
+    be changed to be higher than hardware set value. Accepted values are: 500000,
+    900000, 1000000, 1200000, 1500000, 1800000, 2000000, 2500000 (uA)
+- microchip,pin-ignore: boolean, if present uses I2C for configuration, otherwise,
+    we must provide EM_EN, M1 and M2 gpio mapping.
+
+Example (poll):
+
+	ucs1002: ucs1002@57 {
+		compatible = "microchip,ucs1002";
+		reg = <0x57>;
+		microchip,current-limit = <2000000>;
+		microchip,pin-ignore;
+	};
+
+Example (interrupts + pin control):
+
+	ucs1002: ucs1002@57 {
+		compatible = "microchip,ucs1002";
+		reg = <0x57>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <30 0>, <31 0>;
+		microchip,current-limit = <2000000>;
+		em-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+		m1-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+		m2-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+		pwr-gpios = <&gpio1 19 0>;
+	};
