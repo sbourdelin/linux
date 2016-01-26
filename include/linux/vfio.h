@@ -18,6 +18,8 @@
 #include <linux/poll.h>
 #include <uapi/linux/vfio.h>
 
+struct vfio_group;
+
 /**
  * struct vfio_device_ops - VFIO bus driver device callbacks
  *
@@ -42,6 +44,7 @@ struct vfio_device_ops {
 			 unsigned long arg);
 	int	(*mmap)(void *device_data, struct vm_area_struct *vma);
 	void	(*request)(void *device_data, unsigned int count);
+	void	(*set_group)(void *device_data, struct vfio_group *group);
 };
 
 extern struct iommu_group *vfio_iommu_group_get(struct device *dev);

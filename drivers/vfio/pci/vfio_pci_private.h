@@ -35,6 +35,7 @@ struct vfio_pci_irq_ctx {
 
 struct vfio_pci_device {
 	struct pci_dev		*pdev;
+	struct vfio_group	*vfio_group;
 	void __iomem		*barmap[PCI_STD_RESOURCE_END + 1];
 	u8			*pci_config_map;
 	u8			*vconfig;

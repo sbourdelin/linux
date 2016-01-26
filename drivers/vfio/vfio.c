@@ -548,6 +548,9 @@ struct vfio_device *vfio_group_create_device(struct vfio_group *group,
 	/* No need to get group_lock, caller has group reference */
 	vfio_group_get(group);
 
+	if (device->ops->set_group)
+		device->ops->set_group(device_data, group);
+
 	mutex_lock(&group->device_lock);
 	list_add(&device->group_next, &group->device_list);
 	mutex_unlock(&group->device_lock);
