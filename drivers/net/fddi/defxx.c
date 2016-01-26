@@ -434,19 +434,10 @@ static void dfx_port_read_long(DFX_board_t *bp, int offset, u32 *data)
 static void dfx_get_bars(struct device *bdev,
 			 resource_size_t *bar_start, resource_size_t *bar_len)
 {
-	int dfx_bus_pci = dev_is_pci(bdev);
 	int dfx_bus_eisa = DFX_BUS_EISA(bdev);
 	int dfx_bus_tc = DFX_BUS_TC(bdev);
 	int dfx_use_mmio = DFX_MMIO || dfx_bus_tc;
 
-	if (dfx_bus_pci) {
-		int num = dfx_use_mmio ? 0 : 1;
-
-		bar_start[0] = pci_resource_start(to_pci_dev(bdev), num);
-		bar_len[0] = pci_resource_len(to_pci_dev(bdev), num);
-		bar_start[2] = bar_start[1] = 0;
-		bar_len[2] = bar_len[1] = 0;
-	}
 	if (dfx_bus_eisa) {
 		unsigned long base_addr = to_eisa_device(bdev)->base_addr;
 		resource_size_t bar_lo;
@@ -476,13 +467,25 @@ static void dfx_get_bars(struct device *bdev,
 		bar_len[1] = PI_ESIC_K_BURST_HOLDOFF_LEN;
 		bar_start[2] = base_addr + PI_ESIC_K_ESIC_CSR;
 		bar_len[2] = PI_ESIC_K_ESIC_CSR_LEN;
-	}
-	if (dfx_bus_tc) {
+	} else if (dfx_bus_tc) {
 		bar_start[0] = to_tc_dev(bdev)->resource.start +
 			       PI_TC_K_CSR_OFFSET;
 		bar_len[0] = PI_TC_K_CSR_LEN;
-		bar_start[2] = bar_start[1] = 0;
-		bar_len[2] = bar_len[1] = 0;
+		bar_start[1] = 0;
+		bar_len[1] = 0;
+		bar_start[2] = 0;
+		bar_len[2] = 0;
+	} else {
+		/* Assume PCI */
+		int num = dfx_use_mmio ? 0 : 1;
+
+		WARN_ON(!dev_is_pci(bdev));
+		bar_start[0] = pci_resource_start(to_pci_dev(bdev), num);
+		bar_len[0] = pci_resource_len(to_pci_dev(bdev), num);
+		bar_start[1] = 0;
+		bar_len[1] = 0;
+		bar_start[2] = 0;
+		bar_len[2] = 0;
 	}
 }
 
