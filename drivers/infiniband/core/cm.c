@@ -53,9 +53,12 @@
 #include <rdma/ib_cm.h>
 #include "cm_msgs.h"
 
+#define DRV_VERSION "3.18.1"
+
 MODULE_AUTHOR("Sean Hefty");
 MODULE_DESCRIPTION("InfiniBand CM");
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_VERSION(DRV_VERSION);
 
 static void cm_add_one(struct ib_device *device);
 static void cm_remove_one(struct ib_device *device, void *client_data);
