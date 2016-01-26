@@ -101,6 +101,11 @@
 #define CRYPTO_ALG_INTERNAL		0x00002000
 
 /*
+ * Use this flag as algorithm type specific one.
+ */
+#define CRYPTO_ALG_PRIVATE		0x00004000
+
+/*
  * Transform masks and values (for crt_flags).
  */
 #define CRYPTO_TFM_REQ_MASK		0x000fff00
