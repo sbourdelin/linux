@@ -1106,14 +1106,13 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	if (rc) {
 		input_free_device(pdev->button_dev);
 		pdev->button_dev = NULL;
-		goto err_video_unreg;
+		video_unregister_device(&pdev->vdev);
+		goto err_unregister_v4l2_dev;
 	}
 #endif
 
 	return 0;
 
-err_video_unreg:
-	video_unregister_device(&pdev->vdev);
 err_unregister_v4l2_dev:
 	v4l2_device_unregister(&pdev->v4l2_dev);
 err_free_controls:
