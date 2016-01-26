@@ -77,6 +77,10 @@ enum fixed_addresses {
 #ifdef CONFIG_PROVIDE_OHCI1394_DMA_INIT
 	FIX_OHCI1394_BASE,
 #endif
+#ifdef CONFIG_EARLY_PRINTK_XDBC
+	FIX_XDBC_BASE,
+	FIX_XDBC_END = FIX_XDBC_BASE + 15,
+#endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif
