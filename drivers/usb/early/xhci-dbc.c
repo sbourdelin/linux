@@ -32,6 +32,9 @@
 static struct xdbc_state xdbc_stat;
 static struct xdbc_state *xdbcp = &xdbc_stat;
 
+static int early_xdbc_read(struct console *con, char *str, unsigned n);
+static void early_xdbc_write(struct console *con, const char *str, u32 n);
+
 #ifdef DBC_DEBUG
 #define	XDBC_DEBUG_BUF_SIZE	(PAGE_SIZE * 32)
 #define	MSG_MAX_LINE		128
@@ -860,8 +863,12 @@ int __init early_xdbc_init(char *s)
 {
 	u32 bus = 0, dev = 0, func = 0;
 	unsigned long dbgp_num = 0;
+	char *ping = "Press Y to continue...\n";
+	char pong[64];
+	int size;
 	u32 offset;
 	int ret;
+	int retry = 20;
 
 	if (!early_pci_allowed())
 		return -EPERM;
@@ -902,6 +909,21 @@ int __init early_xdbc_init(char *s)
 		xdbcp->xdbc_reg = NULL;
 		xdbc_dump_debug_buffer();
 		return ret;
+	}
+
+	while (retry > 0) {
+		early_xdbc_write(NULL, ping, strlen(ping));
+		size = early_xdbc_read(NULL, pong, 64);
+		if (size > 0) {
+			xdbc_trace("%s: pong message: %s\n", __func__, pong);
+			if (pong[0] == 'Y' || pong[0] == 'y')
+				break;
+		} else {
+			xdbc_trace("%s: pong message error %d\n",
+				__func__, size);
+		}
+
+		retry--;
 	}
 
 	return 0;
@@ -1325,6 +1347,11 @@ int xdbc_bulk_write(const char *bytes, int size)
  * Start a bulk-in or bulk-out transfer, wait until transfer completion
  * or error. Return the count of actually transferred bytes or error.
  */
+static int early_xdbc_read(struct console *con, char *str, unsigned n)
+{
+	return xdbc_bulk_read(str, n, 0);
+}
+
 static void early_xdbc_write(struct console *con, const char *str, u32 n)
 {
 	int chunk, ret;
