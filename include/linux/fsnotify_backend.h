@@ -16,6 +16,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/atomic.h>
+#include <linux/pid.h>
 
 /*
  * IN_* from inotfy.h lines up EXACTLY with FS_*, this is so we can easily
@@ -184,6 +185,7 @@ struct fsnotify_group {
 			int f_flags;
 			unsigned int max_marks;
 			struct user_struct *user;
+			struct pid *pid;
 		} fanotify_data;
 #endif /* CONFIG_FANOTIFY */
 	};
