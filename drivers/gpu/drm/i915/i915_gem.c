@@ -1954,8 +1954,8 @@ out:
 	return i915_gem_ret_to_vm_ret(dev_priv, ret);
 }
 
-static int
-i915_gem_cpu_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+static inline int
+__i915_gem_cpu_fault(struct vm_area_struct *vma, struct vm_fault *vmf, bool wc)
 {
 	struct drm_i915_gem_object *obj = to_intel_bo(vma->vm_private_data);
 	struct drm_device *dev = obj->base.dev;
@@ -1996,6 +1996,10 @@ i915_gem_cpu_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	ret = vm_insert_pfn(vma, (unsigned long)vmf->virtual_address,
 			    page_to_pfn(page));
 
+	if (ret == 0 && wc)
+		vma->vm_page_prot =
+			pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
+
 	intel_runtime_pm_put(dev_priv);
 
 	return i915_gem_ret_to_vm_ret(dev_priv, ret);
@@ -2006,6 +2010,18 @@ out:
 	intel_runtime_pm_put(dev_priv);
 
 	return i915_gem_ret_to_vm_ret(dev_priv, ret);
+}
+
+static int
+i915_gem_cpu_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	return __i915_gem_cpu_fault(vma, vmf, false);
+}
+
+static int
+i915_gem_cpu_wc_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	return __i915_gem_cpu_fault(vma, vmf, true);
 }
 
 /**
@@ -2138,6 +2154,12 @@ static const struct vm_operations_struct i915_gem_cpu_vm_ops = {
 	.close = drm_gem_vm_close,
 };
 
+static const struct vm_operations_struct i915_gem_cpu_wc_vm_ops = {
+	.fault = i915_gem_cpu_wc_fault,
+	.open = drm_gem_vm_open,
+	.close = drm_gem_vm_close,
+};
+
 static int
 i915_gem_mmap(struct drm_file *file,
 	      struct drm_device *dev,
@@ -2174,12 +2196,14 @@ i915_gem_mmap(struct drm_file *file,
 	if (ret)
 		goto out;
 
-	if (flags & I915_MMAP2_CPU) {
+	if (flags & I915_MMAP2_CPU_WC)
+		ret = drm_vma_node_set_vm_ops(&obj->base.vma_node,
+					      &i915_gem_cpu_wc_vm_ops);
+	else if (flags & I915_MMAP2_CPU)
 		ret = drm_vma_node_set_vm_ops(&obj->base.vma_node,
 					      &i915_gem_cpu_vm_ops);
-		if (ret)
-			goto out;
-	}
+	if (ret)
+		goto out;
 
 	*offset = drm_vma_node_offset_addr(&obj->base.vma_node);
 

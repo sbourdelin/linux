@@ -529,7 +529,8 @@ struct drm_i915_gem_mmap_gtt {
 	 */
 	__u64 offset;
 
-#define I915_MMAP2_CPU   0x1
+#define I915_MMAP2_CPU    0x1
+#define I915_MMAP2_CPU_WC 0x3
 	__u64 flags;
 };
 
