@@ -128,4 +128,5 @@ struct dma_map_ops mn10300_dma_ops = {
 	.map_sg			= mn10300_dma_map_sg,
 	.sync_single_for_device	= mn10300_dma_sync_single_for_device,
 	.sync_sg_for_device	= mn10300_dma_sync_sg_for_device,
+	.dma_supported		= mn10300_dma_supported,
 };
