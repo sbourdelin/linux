@@ -31,7 +31,7 @@
 #include <linux/i2c.h>
 #include <linux/gpio.h>
 
-#include <linux/spi/ad7879.h>
+#include <linux/input/ad7879.h>
 #include <linux/module.h>
 #include "ad7879.h"
 
@@ -170,7 +170,7 @@ static int ad7879_report(struct ad7879 *ts)
 	 * filter.  The combination of these two techniques provides a robust
 	 * solution, discarding the spurious noise in the signal and keeping
 	 * only the data of interest.  The size of both filters is
-	 * programmable. (dev.platform_data, see linux/spi/ad7879.h) Other
+	 * programmable. (dev.platform_data, see linux/input/ad7879.h) Other
 	 * user-programmable conversion controls include variable acquisition
 	 * time, and first conversion delay. Up to 16 averages can be taken
 	 * per conversion.
