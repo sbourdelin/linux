@@ -824,6 +824,31 @@ void drm_gem_vm_close(struct vm_area_struct *vma)
 }
 EXPORT_SYMBOL(drm_gem_vm_close);
 
+static int drm_gem_mmap_obj_ops(struct drm_gem_object *obj,
+				unsigned long obj_size,
+				const struct vm_operations_struct *vm_ops,
+				struct vm_area_struct *vma)
+{
+	/* Check for valid size. */
+	if (obj_size < vma->vm_end - vma->vm_start)
+		return -EINVAL;
+
+	vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_ops = vm_ops;
+	vma->vm_private_data = obj;
+	vma->vm_page_prot = pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
+
+	/* Take a ref for this mapping of the object, so that the fault
+	 * handler can dereference the mmap offset's pointer to the object.
+	 * This reference is cleaned up by the corresponding vm_close
+	 * (which should happen whether the vma was created by this call, or
+	 * by a vm_open due to mremap or partial unmap or whatever).
+	 */
+	drm_gem_object_reference(obj);
+
+	return 0;
+}
+
 /**
  * drm_gem_mmap_obj - memory map a GEM object
  * @obj: the GEM object to map
@@ -853,27 +878,11 @@ int drm_gem_mmap_obj(struct drm_gem_object *obj, unsigned long obj_size,
 {
 	struct drm_device *dev = obj->dev;
 
-	/* Check for valid size. */
-	if (obj_size < vma->vm_end - vma->vm_start)
-		return -EINVAL;
-
 	if (!dev->driver->gem_vm_ops)
 		return -EINVAL;
 
-	vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
-	vma->vm_ops = dev->driver->gem_vm_ops;
-	vma->vm_private_data = obj;
-	vma->vm_page_prot = pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
-
-	/* Take a ref for this mapping of the object, so that the fault
-	 * handler can dereference the mmap offset's pointer to the object.
-	 * This reference is cleaned up by the corresponding vm_close
-	 * (which should happen whether the vma was created by this call, or
-	 * by a vm_open due to mremap or partial unmap or whatever).
-	 */
-	drm_gem_object_reference(obj);
-
-	return 0;
+	return drm_gem_mmap_obj_ops(obj, obj_size, dev->driver->gem_vm_ops,
+				    vma);
 }
 EXPORT_SYMBOL(drm_gem_mmap_obj);
 
@@ -898,6 +907,7 @@ int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct drm_device *dev = priv->minor->dev;
 	struct drm_gem_object *obj = NULL;
 	struct drm_vma_offset_node *node;
+	const struct vm_operations_struct *vm_ops;
 	int ret;
 
 	if (drm_device_is_unplugged(dev))
@@ -932,8 +942,11 @@ int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EACCES;
 	}
 
-	ret = drm_gem_mmap_obj(obj, drm_vma_node_size(node) << PAGE_SHIFT,
-			       vma);
+	vm_ops = node->vm_ops;
+	if (!vm_ops)
+		vm_ops = dev->driver->gem_vm_ops;
+	ret = drm_gem_mmap_obj_ops(obj, drm_vma_node_size(node) << PAGE_SHIFT,
+				   vm_ops, vma);
 
 	drm_gem_object_unreference_unlocked(obj);
 

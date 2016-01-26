@@ -265,6 +265,7 @@ void drm_vma_offset_remove(struct drm_vma_offset_manager *mgr,
 		rb_erase(&node->vm_rb, &mgr->vm_addr_space_rb);
 		drm_mm_remove_node(&node->vm_node);
 		memset(&node->vm_node, 0, sizeof(node->vm_node));
+		node->vm_ops = NULL;
 	}
 
 	write_unlock(&mgr->vm_lock);

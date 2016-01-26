@@ -42,6 +42,7 @@ struct drm_vma_offset_node {
 	struct drm_mm_node vm_node;
 	struct rb_node vm_rb;
 	struct rb_root vm_files;
+	const struct vm_operations_struct *vm_ops;
 };
 
 struct drm_vma_offset_manager {
@@ -242,6 +243,18 @@ static inline int drm_vma_node_verify_access(struct drm_vma_offset_node *node,
 					     struct file *filp)
 {
 	return drm_vma_node_is_allowed(node, filp) ? 0 : -EACCES;
+}
+
+static inline int
+drm_vma_node_set_vm_ops(struct drm_vma_offset_node *node,
+			const struct vm_operations_struct *vm_ops)
+{
+	if (node->vm_ops && node->vm_ops != vm_ops)
+		return -ENODEV;
+
+	node->vm_ops = vm_ops;
+
+	return 0;
 }
 
 #endif /* __DRM_VMA_MANAGER_H__ */
