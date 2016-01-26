@@ -528,6 +528,9 @@ struct drm_i915_gem_mmap_gtt {
 	 * This is a fixed-size type for 32/64 compatibility.
 	 */
 	__u64 offset;
+
+#define I915_MMAP2_CPU   0x1
+	__u64 flags;
 };
 
 struct drm_i915_gem_set_domain {

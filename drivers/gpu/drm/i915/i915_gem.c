@@ -1954,6 +1954,60 @@ out:
 	return i915_gem_ret_to_vm_ret(dev_priv, ret);
 }
 
+static int
+i915_gem_cpu_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct drm_i915_gem_object *obj = to_intel_bo(vma->vm_private_data);
+	struct drm_device *dev = obj->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	bool write = !!(vmf->flags & FAULT_FLAG_WRITE);
+	pgoff_t page_offset;
+	struct page *page;
+	int ret;
+
+	/* We don't use vmf->pgoff since that has the fake offset */
+	page_offset = ((unsigned long)vmf->virtual_address - vma->vm_start) >>
+			PAGE_SHIFT;
+
+	trace_i915_gem_object_fault(obj, page_offset, true, write);
+
+	intel_runtime_pm_get(dev_priv);
+
+	ret = i915_mutex_lock_interruptible(dev);
+	if (ret)
+		goto out;
+
+	ret = i915_gem_object_set_to_cpu_domain(obj, write);
+	if (ret)
+		goto out_unlock;
+
+	ret = i915_gem_object_get_pages(obj);
+	if (ret)
+		goto out_unlock;
+
+	page = i915_gem_object_get_page(obj, page_offset);
+	if (!page) {
+		ret = -ERANGE;
+		goto out_unlock;
+	}
+
+	mutex_unlock(&dev->struct_mutex);
+
+	ret = vm_insert_pfn(vma, (unsigned long)vmf->virtual_address,
+			    page_to_pfn(page));
+
+	intel_runtime_pm_put(dev_priv);
+
+	return i915_gem_ret_to_vm_ret(dev_priv, ret);
+
+out_unlock:
+	mutex_unlock(&dev->struct_mutex);
+out:
+	intel_runtime_pm_put(dev_priv);
+
+	return i915_gem_ret_to_vm_ret(dev_priv, ret);
+}
+
 /**
  * i915_gem_release_mmap - remove physical page mappings
  * @obj: obj in question
@@ -2078,11 +2132,18 @@ static void i915_gem_object_free_mmap_offset(struct drm_i915_gem_object *obj)
 	drm_gem_free_mmap_offset(&obj->base);
 }
 
-int
-i915_gem_mmap_gtt(struct drm_file *file,
-		  struct drm_device *dev,
-		  uint32_t handle,
-		  uint64_t *offset)
+static const struct vm_operations_struct i915_gem_cpu_vm_ops = {
+	.fault = i915_gem_cpu_fault,
+	.open = drm_gem_vm_open,
+	.close = drm_gem_vm_close,
+};
+
+static int
+i915_gem_mmap(struct drm_file *file,
+	      struct drm_device *dev,
+	      uint32_t handle,
+	      uint32_t flags,
+	      uint64_t *offset)
 {
 	struct drm_i915_gem_object *obj;
 	int ret;
@@ -2103,9 +2164,22 @@ i915_gem_mmap_gtt(struct drm_file *file,
 		goto out;
 	}
 
+	if (!obj->base.filp && (flags & I915_MMAP2_CPU)) {
+		DRM_DEBUG("Attempting to mmap non-shm based object via CPU!\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
 	ret = i915_gem_object_create_mmap_offset(obj);
 	if (ret)
 		goto out;
+
+	if (flags & I915_MMAP2_CPU) {
+		ret = drm_vma_node_set_vm_ops(&obj->base.vma_node,
+					      &i915_gem_cpu_vm_ops);
+		if (ret)
+			goto out;
+	}
 
 	*offset = drm_vma_node_offset_addr(&obj->base.vma_node);
 
@@ -2114,6 +2188,15 @@ out:
 unlock:
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
+}
+
+int
+i915_gem_mmap_gtt(struct drm_file *file,
+		  struct drm_device *dev,
+		  uint32_t handle,
+		  uint64_t *offset)
+{
+	return i915_gem_mmap(file, dev, handle, 0, offset);
 }
 
 /**
@@ -2137,7 +2220,8 @@ i915_gem_mmap_gtt_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_i915_gem_mmap_gtt *args = data;
 
-	return i915_gem_mmap_gtt(file, dev, args->handle, &args->offset);
+	return i915_gem_mmap(file, dev, args->handle, args->flags,
+			     &args->offset);
 }
 
 /* Immediately discard the backing storage */
