@@ -440,9 +440,6 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
  * @devt: dev_t to free
  *
  * Free @devt which was allocated using blk_alloc_devt().
- *
- * CONTEXT:
- * Might sleep.
  */
 void blk_free_devt(dev_t devt)
 {
@@ -453,6 +450,27 @@ void blk_free_devt(dev_t devt)
 		spin_lock_bh(&ext_devt_lock);
 		idr_remove(&ext_devt_idr, blk_mangle_minor(MINOR(devt)));
 		spin_unlock_bh(&ext_devt_lock);
+	}
+}
+
+/**
+ * blk_disable_devt - keep a dev_t in an array, but replace corresponding
+ *                    partition pointer with NULL.  We need that to avoid
+ *                    allocation of the same dev_t, but still to indicate
+ *                    that partition is not available any more.
+ * @devt: dev_t to disable
+ *
+ * Disable @devt which was allocated using blk_alloc_devt().
+ */
+void blk_disable_devt(dev_t devt)
+{
+	if (devt == MKDEV(0, 0))
+		return;
+
+	if (MAJOR(devt) == BLOCK_EXT_MAJOR) {
+		spin_lock(&ext_devt_lock);
+		idr_replace(&ext_devt_idr, NULL, blk_mangle_minor(MINOR(devt)));
+		spin_unlock(&ext_devt_lock);
 	}
 }
 
@@ -669,6 +687,7 @@ void del_gendisk(struct gendisk *disk)
 		sysfs_remove_link(block_depr, dev_name(disk_to_dev(disk)));
 	pm_runtime_set_memalloc_noio(disk_to_dev(disk), false);
 	device_del(disk_to_dev(disk));
+	blk_disable_devt(disk_to_dev(disk)->devt);
 }
 EXPORT_SYMBOL(del_gendisk);
 
