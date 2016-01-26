@@ -305,6 +305,57 @@ static int vfio_msi_enable(struct vfio_pci_device *vdev, int nvec, bool msix)
 	return 0;
 }
 
+/**
+ * vfio_set_mapped_msi_addr: overwrites the msi physical address with an iova
+ *
+ * @pdev: vfio pci device handle
+ * @irq: irq linux number
+ * returns 0 upon success, < 0 on failure
+ */
+static int vfio_set_mapped_msi_addr(struct vfio_pci_device *vdev, int irq)
+{
+	phys_addr_t msi_addr;
+	dma_addr_t msi_iova;
+	struct vfio_group *group = vdev->vfio_group;
+	struct msi_msg msg;
+	int ret;
+
+	get_cached_msi_msg(irq, &msg);
+	msi_addr = (phys_addr_t)(msg.address_hi) << 32 |
+			(phys_addr_t)(msg.address_lo);
+
+	ret = vfio_group_alloc_map_reserved_iova(group, msi_addr,
+						 IOMMU_WRITE, &msi_iova);
+	if (ret)
+		goto out;
+
+	/* Re-program the msi-address with the iova */
+	msg.address_hi = (u32)(msi_iova >> 32);
+	msg.address_lo = (u32)(msi_iova & 0xffffffff);
+	pci_write_msi_msg(irq, &msg);
+
+out:
+	return ret;
+}
+
+/**
+ * vfio_unset_mapped_msi_addr: decrement the ref counter of the msi iova page
+ * associated to the linux irq (in case it is null unmaps and frees resources)
+ *
+ * @pdev: vfio pci device handle
+ * @irq: irq linux number
+ */
+static void vfio_unset_mapped_msi_addr(struct vfio_pci_device *vdev, int irq)
+{
+	dma_addr_t msi_iova;
+	struct vfio_group *group = vdev->vfio_group;
+	struct msi_msg msg;
+
+	get_cached_msi_msg(irq, &msg);
+	msi_iova = (u64)(msg.address_hi) << 32 | (u64)(msg.address_lo);
+	vfio_group_unmap_free_reserved_iova(group, msi_iova);
+}
+
 static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 				      int vector, int fd, bool msix)
 {
@@ -318,6 +369,7 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 		return -EINVAL;
 
 	if (vdev->ctx[vector].trigger) {
+		vfio_unset_mapped_msi_addr(vdev, irq);
 		free_irq(irq, vdev->ctx[vector].trigger);
 		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
 		kfree(vdev->ctx[vector].name);
@@ -355,11 +407,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 
 	ret = request_irq(irq, vfio_msihandler, 0,
 			  vdev->ctx[vector].name, trigger);
-	if (ret) {
-		kfree(vdev->ctx[vector].name);
-		eventfd_ctx_put(trigger);
-		return ret;
-	}
+	if (ret)
+		goto error_free;
 
 	vdev->ctx[vector].producer.token = trigger;
 	vdev->ctx[vector].producer.irq = irq;
@@ -369,9 +418,23 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
 		"irq bypass producer (token %p) registration fails: %d\n",
 		vdev->ctx[vector].producer.token, ret);
 
+	if (vfio_group_require_msi_mapping(vdev->vfio_group)) {
+		ret = vfio_set_mapped_msi_addr(vdev, irq);
+		if (ret)
+			goto error_free_irq;
+	}
+
 	vdev->ctx[vector].trigger = trigger;
 
 	return 0;
+
+error_free_irq:
+	free_irq(irq, vdev->ctx[vector].trigger);
+error_free:
+	kfree(vdev->ctx[vector].name);
+	eventfd_ctx_put(trigger);
+	return ret;
+
 }
 
 static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
