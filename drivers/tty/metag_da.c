@@ -230,7 +230,7 @@ static int put_channel_data(unsigned int chan)
 {
 	struct dashtty_port *dport;
 	struct tty_struct *tty;
-	int number_written;
+	int number_written = 0;
 	unsigned int count = 0;
 
 	dport = &dashtty_ports[chan];
