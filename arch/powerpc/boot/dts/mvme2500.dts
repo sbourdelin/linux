@@ -12,7 +12,7 @@
  * Copyright 2009 Freescale Semiconductor Inc.
  */
 
-/include/ "p2020si-pre.dtsi"
+/include/ "fsl/p2020si-pre.dtsi"
 
 / {
 	model = "MVME2500";
@@ -258,7 +258,7 @@
 	};
 };
 
-/include/ "p2020si-post.dtsi"
+/include/ "fsl/p2020si-post.dtsi"
 
 / {
 	soc@ffe00000 {
