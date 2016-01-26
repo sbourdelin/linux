@@ -212,6 +212,20 @@ struct nvm_tgt_instance {
 #define NVM_VERSION_MINOR 0
 #define NVM_VERSION_PATCH 0
 
+#define NVM_FIXED	0X0001
+#define NVM_NOALLOC	0X0002
+
+/* These are stolen from mman.h */
+#define _calc_nvm_trans(x, bit1, bit2) \
+	((bit1) <= (bit2) ? ((x) & (bit1)) * ((bit2) / (bit1)) \
+		: ((x) & (bit1)) / ((bit1) / (bit2)))
+
+static inline unsigned long
+calc_nvm_create_bits(__u32 c_flags)
+{
+	return _calc_nvm_trans(c_flags, NVM_C_FIXED, NVM_FIXED);
+}
+
 struct nvm_rq;
 typedef void (nvm_end_io_fn)(struct nvm_rq *);
 
@@ -271,6 +285,7 @@ struct nvm_lun {
 	spinlock_t lock;
 
 	struct nvm_block *blocks;
+	void *private;
 };
 
 enum {
@@ -341,6 +356,8 @@ struct nvm_dev {
 	unsigned long total_blocks;
 	int nr_luns;
 	unsigned max_pages_per_blk;
+
+	unsigned long *lun_map;
 
 	void *ppalist_pool;
 
@@ -424,7 +441,8 @@ static inline int ppa_to_slc(struct nvm_dev *dev, int slc_pg)
 
 typedef blk_qc_t (nvm_tgt_make_rq_fn)(struct request_queue *, struct bio *);
 typedef sector_t (nvm_tgt_capacity_fn)(void *);
-typedef void *(nvm_tgt_init_fn)(struct nvm_dev *, struct gendisk *, int, int);
+typedef void *(nvm_tgt_init_fn)(struct nvm_dev *, struct gendisk *, int, int,
+				unsigned long);
 typedef void (nvm_tgt_exit_fn)(void *);
 
 struct nvm_tgt_type {
@@ -461,7 +479,8 @@ typedef void (nvmm_flush_blk_fn)(struct nvm_dev *, struct nvm_block *);
 typedef int (nvmm_submit_io_fn)(struct nvm_dev *, struct nvm_rq *);
 typedef int (nvmm_erase_blk_fn)(struct nvm_dev *, struct nvm_block *,
 								unsigned long);
-typedef struct nvm_lun *(nvmm_get_lun_fn)(struct nvm_dev *, int);
+typedef struct nvm_lun *(nvmm_get_lun_fn)(struct nvm_dev *, int, unsigned long);
+typedef void (nvmm_put_lun_fn)(struct nvm_dev *, int);
 typedef void (nvmm_lun_info_print_fn)(struct nvm_dev *);
 
 typedef int (nvmm_get_area_fn)(struct nvm_dev *, sector_t *, sector_t);
@@ -488,6 +507,7 @@ struct nvmm_type {
 
 	/* Configuration management */
 	nvmm_get_lun_fn *get_lun;
+	nvmm_put_lun_fn *put_lun;
 
 	/* Statistics */
 	nvmm_lun_info_print_fn *lun_info_print;

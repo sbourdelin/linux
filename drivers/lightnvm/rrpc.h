@@ -86,6 +86,9 @@ struct rrpc_lun {
 					 */
 
 	struct work_struct ws_gc;
+	/* store a reverse map for garbage collection */
+	struct rrpc_rev_addr *rev_trans_map;
+	spinlock_t rev_lock;
 
 	spinlock_t lock;
 };
@@ -124,9 +127,6 @@ struct rrpc {
 	 * addresses are used when writing to the disk block device.
 	 */
 	struct rrpc_addr *trans_map;
-	/* also store a reverse map for garbage collection */
-	struct rrpc_rev_addr *rev_trans_map;
-	spinlock_t rev_lock;
 
 	struct rrpc_inflight inflights;
 

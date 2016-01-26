@@ -185,6 +185,9 @@ static int gennvm_block_map(u64 slba, u32 nlb, __le64 *entries, void *private)
 		lun_id = div_u64(pba, dev->sec_per_lun);
 		lun = &gn->luns[lun_id];
 
+		if (!test_bit(lun_id, dev->lun_map))
+			__set_bit(lun_id, dev->lun_map);
+
 		/* Calculate block offset into lun */
 		pba = pba - (dev->sec_per_lun * lun_id);
 		blk = &lun->vlun.blocks[div_u64(pba, dev->sec_per_blk)];
@@ -475,11 +478,45 @@ static int gennvm_erase_blk(struct nvm_dev *dev, struct nvm_block *blk,
 	return nvm_erase_ppa(dev, &addr, 1);
 }
 
-static struct nvm_lun *gennvm_get_lun(struct nvm_dev *dev, int lunid)
+static struct nvm_lun *gennvm_get_lun(struct nvm_dev *dev, int lunid,
+						unsigned long flags)
 {
 	struct gen_nvm *gn = dev->mp;
+	unsigned long *lun_map = dev->lun_map;
+	struct nvm_lun *lun =  NULL;
+	int id;
 
-	return &gn->luns[lunid].vlun;
+	if (WARN_ON(lunid >= dev->nr_luns))
+		return NULL;
+
+	if (flags & NVM_NOALLOC)
+		return &gn->luns[lunid].vlun;
+
+	spin_lock(&dev->lock);
+	if (flags & NVM_FIXED) {
+		if (test_and_set_bit(lunid, lun_map)) {
+			pr_err("gennvm: lun %u is inuse\n", lunid);
+			goto out;
+		} else {
+			lun = &gn->luns[lunid].vlun;
+			goto out;
+		}
+	}
+	id = find_next_zero_bit(lun_map, dev->nr_luns, 0);
+	if (id < dev->nr_luns) {
+		__set_bit(id, lun_map);
+		lun =  &gn->luns[id].vlun;
+	} else
+		pr_err("gennvm: dev %s has no free luns\n", dev->name);
+
+out:
+	spin_unlock(&dev->lock);
+	return lun;
+}
+
+static inline void gennvm_put_lun(struct nvm_dev *dev, int lunid)
+{
+	WARN_ON(!test_and_clear_bit(lunid, dev->lun_map));
 }
 
 static void gennvm_lun_info_print(struct nvm_dev *dev)
@@ -520,6 +557,7 @@ static struct nvmm_type gennvm = {
 	.erase_blk		= gennvm_erase_blk,
 
 	.get_lun		= gennvm_get_lun,
+	.put_lun		= gennvm_put_lun,
 	.lun_info_print		= gennvm_lun_info_print,
 
 	.get_area		= gennvm_get_area,

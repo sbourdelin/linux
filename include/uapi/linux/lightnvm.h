@@ -37,6 +37,9 @@
 
 #define NVM_CTRL_FILE "/dev/lightnvm/control"
 
+#define NVM_C_FIXED	0X0001  /* Interpret lun exactly */
+#define NVM_C_FLAGS	NVM_C_FIXED
+
 struct nvm_ioctl_info_tgt {
 	__u32 version[3];
 	__u32 reserved;

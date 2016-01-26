@@ -28,7 +28,6 @@
 #include <linux/miscdevice.h>
 #include <linux/lightnvm.h>
 #include <linux/sched/sysctl.h>
-#include <uapi/linux/lightnvm.h>
 
 static LIST_HEAD(nvm_targets);
 static LIST_HEAD(nvm_mgrs);
@@ -468,6 +467,11 @@ static int nvm_core_init(struct nvm_dev *dev)
 				dev->luns_per_chnl *
 				dev->nr_chnls;
 	dev->total_pages = dev->total_blocks * dev->pgs_per_blk;
+	dev->lun_map = kcalloc(BITS_TO_LONGS(dev->nr_luns),
+			sizeof(unsigned long), GFP_KERNEL);
+	if (!dev->lun_map)
+		return -ENOMEM;
+
 	INIT_LIST_HEAD(&dev->online_targets);
 	mutex_init(&dev->mlock);
 	spin_lock_init(&dev->lock);
@@ -610,6 +614,7 @@ void nvm_unregister(char *disk_name)
 	up_write(&nvm_lock);
 
 	nvm_exit(dev);
+	kfree(dev->lun_map);
 	kfree(dev);
 }
 EXPORT_SYMBOL(nvm_unregister);
@@ -626,6 +631,7 @@ static int nvm_create_target(struct nvm_dev *dev,
 	struct gendisk *tdisk;
 	struct nvm_tgt_type *tt;
 	struct nvm_target *t;
+	unsigned long flags;
 	void *targetdata;
 
 	if (!dev->mt) {
@@ -670,7 +676,8 @@ static int nvm_create_target(struct nvm_dev *dev,
 	tdisk->fops = &nvm_fops;
 	tdisk->queue = tqueue;
 
-	targetdata = tt->init(dev, tdisk, s->lun_begin, s->lun_end);
+	flags = calc_nvm_create_bits(create->flags);
+	targetdata = tt->init(dev, tdisk, s->lun_begin, s->lun_end, flags);
 	if (IS_ERR(targetdata))
 		goto err_init;
 
@@ -736,6 +743,15 @@ static int __nvm_configure_create(struct nvm_ioctl_create *create)
 		pr_err("nvm: config type not valid\n");
 		return -EINVAL;
 	}
+
+	if (create->flags) {
+		if (!(create->flags & NVM_C_FLAGS) ||
+			(create->flags & ~NVM_C_FLAGS)) {
+			pr_err("nvm: create flags not supported\n");
+			return -EINVAL;
+		}
+	}
+
 	s = &create->conf.s;
 
 	if (s->lun_begin > s->lun_end || s->lun_end > dev->nr_luns) {
@@ -824,15 +840,14 @@ static int nvm_configure_create(const char *val)
 	char opcode;
 	int lun_begin, lun_end, ret;
 
-	ret = sscanf(val, "%c %256s %256s %48s %u:%u", &opcode, create.dev,
-						create.tgtname, create.tgttype,
-						&lun_begin, &lun_end);
-	if (ret != 6) {
-		pr_err("nvm: invalid command. Use \"opcode device name tgttype lun_begin:lun_end\".\n");
+	ret = sscanf(val, "%c %256s %256s %48s %u:%u %u", &opcode, create.dev,
+					create.tgtname, create.tgttype,
+					&lun_begin, &lun_end, &create.flags);
+	if (ret != 7) {
+		pr_err("nvm: invalid command. Use \"opcode device name tgttype lun_begin:lun_end flags\".\n");
 		return -EINVAL;
 	}
 
-	create.flags = 0;
 	create.conf.type = NVM_CONFIG_TYPE_SIMPLE;
 	create.conf.s.lun_begin = lun_begin;
 	create.conf.s.lun_end = lun_end;
@@ -1001,11 +1016,6 @@ static long nvm_ioctl_dev_create(struct file *file, void __user *arg)
 	create.dev[DISK_NAME_LEN - 1] = '\0';
 	create.tgttype[NVM_TTYPE_NAME_MAX - 1] = '\0';
 	create.tgtname[DISK_NAME_LEN - 1] = '\0';
-
-	if (create.flags != 0) {
-		pr_err("nvm: no flags supported\n");
-		return -EINVAL;
-	}
 
 	return __nvm_configure_create(&create);
 }
