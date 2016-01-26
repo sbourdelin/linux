@@ -268,6 +268,45 @@ void vfio_unregister_iommu_driver(const struct vfio_iommu_driver_ops *ops)
 }
 EXPORT_SYMBOL_GPL(vfio_unregister_iommu_driver);
 
+int vfio_group_alloc_map_reserved_iova(struct vfio_group *group,
+				       phys_addr_t addr, int prot,
+				       dma_addr_t *iova)
+{
+	struct vfio_container *container = group->container;
+	const struct vfio_iommu_driver_ops *ops = container->iommu_driver->ops;
+	int ret;
+
+	if (!ops->alloc_map_reserved_iova)
+		return -EINVAL;
+
+	down_read(&container->group_lock);
+	ret = ops->alloc_map_reserved_iova(container->iommu_data,
+					   group->iommu_group,
+					   addr, prot, iova);
+	up_read(&container->group_lock);
+	return ret;
+
+}
+EXPORT_SYMBOL_GPL(vfio_group_alloc_map_reserved_iova);
+
+int vfio_group_unmap_free_reserved_iova(struct vfio_group *group,
+					dma_addr_t iova)
+{
+	struct vfio_container *container = group->container;
+	const struct vfio_iommu_driver_ops *ops = container->iommu_driver->ops;
+	int ret;
+
+	if (!ops->unmap_free_reserved_iova)
+		return -EINVAL;
+
+	down_read(&container->group_lock);
+	ret = ops->unmap_free_reserved_iova(container->iommu_data,
+					    group->iommu_group, iova);
+	up_read(&container->group_lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_group_unmap_free_reserved_iova);
+
 /**
  * Group minor allocation/free - both called with vfio.group_lock held
  */

@@ -75,7 +75,13 @@ struct vfio_iommu_driver_ops {
 					struct iommu_group *group);
 	void		(*detach_group)(void *iommu_data,
 					struct iommu_group *group);
-
+	int		(*alloc_map_reserved_iova)(void *iommu_data,
+						   struct iommu_group *group,
+						   phys_addr_t addr, int prot,
+						   dma_addr_t *iova);
+	int		(*unmap_free_reserved_iova)(void *iommu_data,
+						    struct iommu_group *group,
+						    dma_addr_t iova);
 };
 
 extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);
@@ -137,5 +143,31 @@ extern int vfio_virqfd_enable(void *opaque,
 			      void (*thread)(void *, void *),
 			      void *data, struct virqfd **pvirqfd, int fd);
 extern void vfio_virqfd_disable(struct virqfd **pvirqfd);
+
+/**
+ * vfio_group_alloc_map_reserved_iova: allocates a new iova page and map
+ * it onto the aligned physical page that contains a given physical addr.
+ * page size is the domain iommu page size.
+ *
+ * @group: vfio group handle
+ * @addr: physical address to map
+ * @prot: protection attribute
+ * @iova: returned iova that is mapped onto addr
+ *
+ * returns 0 on success, < 0 on failure
+ */
+extern int vfio_group_alloc_map_reserved_iova(struct vfio_group *group,
+					      phys_addr_t addr, int prot,
+					      dma_addr_t *iova);
+/**
+ * vfio_group_unmap_free_reserved_iova: unmap and free the reserved iova page
+ *
+ * @group: vfio group handle
+ * @iova: base iova, must be aligned on the IOMMU page size
+ *
+ * returns 0 on success, < 0 on failure
+ */
+extern int vfio_group_unmap_free_reserved_iova(struct vfio_group *group,
+					       dma_addr_t iova);
 
 #endif /* VFIO_H */

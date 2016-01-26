@@ -156,6 +156,19 @@ static void vfio_unlink_reserved_binding(struct vfio_domain *d,
 	rb_erase(&old->node, &d->reserved_binding_list);
 }
 
+static void vfio_reserved_binding_release(struct kref *kref)
+{
+	struct vfio_reserved_binding *b =
+		container_of(kref, struct vfio_reserved_binding, kref);
+	struct vfio_domain *d = b->domain;
+	unsigned long order = __ffs(b->size);
+
+	iommu_unmap(d->domain, b->iova, b->size);
+	free_iova(d->reserved_iova_domain, b->iova >> order);
+	vfio_unlink_reserved_binding(d, b);
+	kfree(b);
+}
+
 /*
  * This code handles mapping and unmapping of user data buffers
  * into DMA'ble space using the IOMMU
@@ -1034,6 +1047,138 @@ done:
 	mutex_unlock(&iommu->lock);
 }
 
+static struct vfio_domain *vfio_find_iommu_domain(void *iommu_data,
+						   struct iommu_group *group)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	struct vfio_group *g;
+	struct vfio_domain *d;
+
+	list_for_each_entry(d, &iommu->domain_list, next) {
+		list_for_each_entry(g, &d->group_list, next) {
+			if (g->iommu_group == group)
+				return d;
+		}
+	}
+	return NULL;
+}
+
+static int vfio_iommu_type1_alloc_map_reserved_iova(void *iommu_data,
+						    struct iommu_group *group,
+						    phys_addr_t addr, int prot,
+						    dma_addr_t *iova)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	struct vfio_domain *d;
+	uint64_t mask, iommu_page_size;
+	struct vfio_reserved_binding *b;
+	unsigned long order;
+	struct iova *p_iova;
+	phys_addr_t aligned_addr, offset;
+	int ret = 0;
+
+	order = __ffs(vfio_pgsize_bitmap(iommu));
+	iommu_page_size = (uint64_t)1 << order;
+	mask = iommu_page_size - 1;
+	aligned_addr = addr & ~mask;
+	offset = addr - aligned_addr;
+
+	mutex_lock(&iommu->lock);
+
+	d = vfio_find_iommu_domain(iommu_data, group);
+	if (!d) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	b = vfio_find_reserved_binding(d, aligned_addr, iommu_page_size);
+	if (b) {
+		ret = 0;
+		*iova = b->iova + offset;
+		kref_get(&b->kref);
+		goto unlock;
+	}
+
+	/* allocate a new reserved IOVA page and a new binding node */
+	p_iova = alloc_iova(d->reserved_iova_domain, 1,
+			    d->reserved_iova_domain->dma_32bit_pfn, true);
+	if (!p_iova) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
+	*iova = p_iova->pfn_lo << order;
+
+	b = kzalloc(sizeof(*b), GFP_KERNEL);
+	if (!b) {
+		ret = -ENOMEM;
+		goto free_iova_unlock;
+	}
+
+	ret = iommu_map(d->domain, *iova, aligned_addr, iommu_page_size, prot);
+	if (ret)
+		goto free_binding_iova_unlock;
+
+	kref_init(&b->kref);
+	kref_get(&b->kref);
+	b->domain = d;
+	b->addr = aligned_addr;
+	b->iova = *iova;
+	b->size = iommu_page_size;
+	vfio_link_reserved_binding(d, b);
+	*iova += offset;
+
+	goto unlock;
+
+free_binding_iova_unlock:
+	kfree(b);
+free_iova_unlock:
+	free_iova(d->reserved_iova_domain, *iova >> order);
+unlock:
+	mutex_unlock(&iommu->lock);
+	return ret;
+}
+
+static int vfio_iommu_type1_unmap_free_reserved_iova(void *iommu_data,
+						     struct iommu_group *group,
+						     dma_addr_t iova)
+{
+	struct vfio_iommu *iommu = iommu_data;
+	struct vfio_reserved_binding *b;
+	struct vfio_domain *d;
+	phys_addr_t aligned_addr;
+	dma_addr_t aligned_iova, iommu_page_size, mask, offset;
+	unsigned long order;
+	int ret = 0;
+
+	order = __ffs(vfio_pgsize_bitmap(iommu));
+	iommu_page_size = (uint64_t)1 << order;
+	mask = iommu_page_size - 1;
+	aligned_iova = iova & ~mask;
+	offset = iova - aligned_iova;
+
+	mutex_lock(&iommu->lock);
+
+	d = vfio_find_iommu_domain(iommu_data, group);
+	if (!d) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	aligned_addr = iommu_iova_to_phys(d->domain, aligned_iova);
+
+	b = vfio_find_reserved_binding(d, aligned_addr, iommu_page_size);
+	if (!b) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	kref_put(&b->kref, vfio_reserved_binding_release);
+
+unlock:
+	mutex_unlock(&iommu->lock);
+	return ret;
+}
+
 static void *vfio_iommu_type1_open(unsigned long arg)
 {
 	struct vfio_iommu *iommu;
@@ -1180,13 +1325,17 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 }
 
 static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
-	.name		= "vfio-iommu-type1",
-	.owner		= THIS_MODULE,
-	.open		= vfio_iommu_type1_open,
-	.release	= vfio_iommu_type1_release,
-	.ioctl		= vfio_iommu_type1_ioctl,
-	.attach_group	= vfio_iommu_type1_attach_group,
-	.detach_group	= vfio_iommu_type1_detach_group,
+	.name				= "vfio-iommu-type1",
+	.owner				= THIS_MODULE,
+	.open				= vfio_iommu_type1_open,
+	.release			= vfio_iommu_type1_release,
+	.ioctl				= vfio_iommu_type1_ioctl,
+	.attach_group			= vfio_iommu_type1_attach_group,
+	.detach_group			= vfio_iommu_type1_detach_group,
+	.alloc_map_reserved_iova	=
+		vfio_iommu_type1_alloc_map_reserved_iova,
+	.unmap_free_reserved_iova	=
+		vfio_iommu_type1_unmap_free_reserved_iova,
 };
 
 static int __init vfio_iommu_type1_init(void)
