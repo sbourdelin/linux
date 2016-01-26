@@ -262,7 +262,6 @@
 &sdio {
 	status = "okay";
 
-	broken-cd;
 	bus-width = <4>;
 	cap-sdio-irq;
 	default-sample-phase = <90>;

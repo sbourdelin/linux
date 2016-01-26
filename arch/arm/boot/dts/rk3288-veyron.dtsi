@@ -146,7 +146,6 @@
 &emmc {
 	status = "okay";
 
-	broken-cd;
 	bus-width = <8>;
 	cap-mmc-highspeed;
 	rockchip,default-sample-phase = <158>;
@@ -352,7 +351,6 @@
 &sdio0 {
 	status = "okay";
 
-	broken-cd;
 	bus-width = <4>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
