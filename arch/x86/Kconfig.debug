@@ -48,6 +48,18 @@ config EARLY_PRINTK_EFI
 	  This is useful for kernel debugging when your machine crashes very
 	  early before the console code is initialized.
 
+config EARLY_PRINTK_XDBC
+	bool "Early printk via xHCI debug port"
+	depends on EARLY_PRINTK && PCI
+	---help---
+	  Write kernel log output directly into the xHCI debug port.
+
+	  This is useful for kernel debugging when your machine crashes very
+	  early before the console code is initialized. For normal operation
+	  it is not recommended because it looks ugly and doesn't cooperate
+	  with klogd/syslogd or the X server. You should normally N here,
+	  unless you want to debug such a crash.
+
 config X86_PTDUMP_CORE
 	def_bool n
 

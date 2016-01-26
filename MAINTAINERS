@@ -11505,6 +11505,13 @@ S:	Supported
 F:	drivers/usb/host/xhci*
 F:	drivers/usb/host/pci-quirks*
 
+USB XHCI DEBUG PORT
+M:	Lu Baolu <baolu.lu@linux.intel.com>
+L:	linux-usb@vger.kernel.org
+S:	Supported
+F:	drivers/usb/early/xhci-dbc.c
+F:	include/linux/usb/xhci-dbc.h
+
 USB ZD1201 DRIVER
 L:	linux-wireless@vger.kernel.org
 W:	http://linux-lc100020.sourceforge.net
