@@ -365,6 +365,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 	err_printf(m, "Reset count: %u\n", error->reset_count);
 	err_printf(m, "Suspend count: %u\n", error->suspend_count);
 	err_printf(m, "PCI ID: 0x%04x\n", dev->pdev->device);
+	err_printf(m, "Revision: 0x%02x\n", dev->pdev->revision);
 	err_printf(m, "IOMMU enabled?: %d\n", error->iommu);
 
 	if (HAS_CSR(dev)) {
