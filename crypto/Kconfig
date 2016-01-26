@@ -84,7 +84,7 @@ config CRYPTO_RNG_DEFAULT
 	tristate
 	select CRYPTO_DRBG_MENU
 
-config CRYPTO_SCOMPRESS
+config CRYPTO_COMPRESS2
 	tristate
 	select CRYPTO_ALGAPI2
 
@@ -1503,7 +1503,6 @@ config CRYPTO_LZO
 	select CRYPTO_ALGAPI
 	select LZO_COMPRESS
 	select LZO_DECOMPRESS
-	select SCOMPRESS
 	help
 	  This is the LZO algorithm.
 
