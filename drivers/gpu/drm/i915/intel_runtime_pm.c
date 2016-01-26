@@ -418,15 +418,62 @@ static void hsw_set_power_well(struct drm_i915_private *dev_priv,
 	BXT_DISPLAY_POWERWELL_2_POWER_DOMAINS)) |	\
 	BIT(POWER_DOMAIN_INIT))
 
+
+static bool __gen9_power_well_enabled(struct drm_i915_private *dev_priv,
+				      const enum skl_disp_power_wells pw,
+				      const bool req)
+{
+	uint32_t mask = SKL_POWER_WELL_STATE(pw);
+
+	if (req)
+		mask |= SKL_POWER_WELL_REQ(pw);
+
+	return (I915_READ(HSW_PWR_WELL_DRIVER) & mask) == mask;
+}
+
+static bool gen9_power_well_enabled(struct drm_i915_private *dev_priv,
+				    const enum skl_disp_power_wells pw)
+{
+	return __gen9_power_well_enabled(dev_priv, pw, true);
+}
+
+static bool gen9_power_well_enabled_noreq(struct drm_i915_private *dev_priv,
+					  const enum skl_disp_power_wells pw)
+{
+	return __gen9_power_well_enabled(dev_priv, pw, false);
+}
+
+static bool gen9_pw1_enabled(struct drm_i915_private *dev_priv)
+{
+	/* DMC owns the pw1. Don't check for request */
+	return gen9_power_well_enabled_noreq(dev_priv, SKL_DISP_PW_1);
+}
+
+static u32 gen9_get_dc_state(struct drm_i915_private *dev_priv)
+{
+	if (gen9_pw1_enabled(dev_priv))
+		return I915_READ(DC_STATE_EN);
+
+	/* DMC should snoop this and wakeup */
+	I915_READ(DC_STATE_EN);
+
+	if (wait_for(gen9_pw1_enabled(dev_priv), 1))
+		DRM_ERROR("pw1 enabling timeout 0x%x\n",
+			  I915_READ(HSW_PWR_WELL_DRIVER));
+
+	return I915_READ(DC_STATE_EN);
+}
+
 static void assert_can_enable_dc9(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
+	const u32 dc_state = gen9_get_dc_state(dev_priv);
 
 	WARN(!IS_BROXTON(dev), "Platform doesn't support DC9.\n");
-	WARN((I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
-		"DC9 already programmed to be enabled.\n");
-	WARN(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
-		"DC5 still not disabled to enable DC9.\n");
+	WARN(dc_state & DC_STATE_EN_DC9,
+	     "DC9 already programmed to be enabled.\n");
+	WARN(dc_state & DC_STATE_EN_UPTO_DC5,
+	     "DC5 still not disabled to enable DC9.\n");
 	WARN(I915_READ(HSW_PWR_WELL_DRIVER), "Power well on.\n");
 	WARN(intel_irqs_enabled(dev_priv), "Interrupts not disabled yet.\n");
 
@@ -441,10 +488,12 @@ static void assert_can_enable_dc9(struct drm_i915_private *dev_priv)
 
 static void assert_can_disable_dc9(struct drm_i915_private *dev_priv)
 {
+	const u32 dc_state = gen9_get_dc_state(dev_priv);
+
 	WARN(intel_irqs_enabled(dev_priv), "Interrupts not disabled yet.\n");
-	WARN(!(I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
+	WARN(!(dc_state & DC_STATE_EN_DC9),
 		"DC9 already programmed to be disabled.\n");
-	WARN(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
+	WARN(dc_state & DC_STATE_EN_UPTO_DC5,
 		"DC5 still not disabled.\n");
 
 	 /*
@@ -491,13 +540,14 @@ static void gen9_set_dc_state(struct drm_i915_private *dev_priv, uint32_t state)
 	if (state & DC_STATE_EN_UPTO_DC5_DC6_MASK)
 		gen9_set_dc_state_debugmask_memory_up(dev_priv);
 
-	val = I915_READ(DC_STATE_EN);
+	val = gen9_get_dc_state(dev_priv);
 	DRM_DEBUG_KMS("Setting DC state from %02x to %02x\n",
 		      val & mask, state);
 	val &= ~mask;
 	val |= state;
 	I915_WRITE(DC_STATE_EN, val);
-	POSTING_READ(DC_STATE_EN);
+
+	WARN_ON((gen9_get_dc_state(dev_priv) & mask) != state);
 }
 
 void bxt_enable_dc9(struct drm_i915_private *dev_priv)
@@ -531,13 +581,13 @@ static void assert_can_enable_dc5(struct drm_i915_private *dev_priv)
 	struct drm_device *dev = dev_priv->dev;
 	bool pg2_enabled = intel_display_power_well_is_enabled(dev_priv,
 					SKL_DISP_PW_2);
+	const u32 dc_state = gen9_get_dc_state(dev_priv);
 
 	WARN_ONCE(!IS_SKYLAKE(dev) && !IS_KABYLAKE(dev),
 		  "Platform doesn't support DC5.\n");
 	WARN_ONCE(!HAS_RUNTIME_PM(dev), "Runtime PM not enabled.\n");
 	WARN_ONCE(pg2_enabled, "PG2 not disabled to enable DC5.\n");
-
-	WARN_ONCE((I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5),
+	WARN_ONCE(dc_state & DC_STATE_EN_UPTO_DC5,
 		  "DC5 already programmed to be enabled.\n");
 	assert_rpm_wakelock_held(dev_priv);
 
@@ -568,13 +618,14 @@ static void gen9_enable_dc5(struct drm_i915_private *dev_priv)
 static void assert_can_enable_dc6(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = dev_priv->dev;
+	const u32 dc_state = gen9_get_dc_state(dev_priv);
 
 	WARN_ONCE(!IS_SKYLAKE(dev) && !IS_KABYLAKE(dev),
 		  "Platform doesn't support DC6.\n");
 	WARN_ONCE(!HAS_RUNTIME_PM(dev), "Runtime PM not enabled.\n");
 	WARN_ONCE(I915_READ(UTIL_PIN_CTL) & UTIL_PIN_ENABLE,
 		  "Backlight is not disabled.\n");
-	WARN_ONCE((I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC6),
+	WARN_ONCE(dc_state & DC_STATE_EN_UPTO_DC6,
 		  "DC6 already programmed to be enabled.\n");
 
 	assert_csr_loaded(dev_priv);
@@ -589,7 +640,7 @@ static void assert_can_disable_dc6(struct drm_i915_private *dev_priv)
 	if (dev_priv->power_domains.initializing)
 		return;
 
-	WARN_ONCE(!(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC6),
+	WARN_ONCE(!(gen9_get_dc_state(dev_priv) & DC_STATE_EN_UPTO_DC6),
 		  "DC6 already programmed to be disabled.\n");
 }
 
@@ -732,10 +783,7 @@ static void hsw_power_well_disable(struct drm_i915_private *dev_priv,
 static bool skl_power_well_enabled(struct drm_i915_private *dev_priv,
 					struct i915_power_well *power_well)
 {
-	uint32_t mask = SKL_POWER_WELL_REQ(power_well->data) |
-		SKL_POWER_WELL_STATE(power_well->data);
-
-	return (I915_READ(HSW_PWR_WELL_DRIVER) & mask) == mask;
+	return gen9_power_well_enabled(dev_priv, power_well->data);
 }
 
 static void skl_power_well_sync_hw(struct drm_i915_private *dev_priv,
@@ -762,7 +810,11 @@ static void skl_power_well_disable(struct drm_i915_private *dev_priv,
 static bool gen9_dc_off_power_well_enabled(struct drm_i915_private *dev_priv,
 					   struct i915_power_well *power_well)
 {
-	return (I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5_DC6_MASK) == 0;
+	if (gen9_pw1_enabled(dev_priv))
+		return (I915_READ(DC_STATE_EN) &
+			DC_STATE_EN_UPTO_DC5_DC6_MASK) == 0;
+
+	return true;
 }
 
 static void gen9_dc_off_power_well_enable(struct drm_i915_private *dev_priv,
