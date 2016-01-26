@@ -297,6 +297,27 @@ bool intel_set_cpu_fifo_underrun_reporting(struct drm_i915_private *dev_priv,
 }
 
 /**
+ * intel_get_cpu_fifo_underrun_reporting - get cpu fifo underrrun reporting state
+ * @dev_priv: i915 device instance
+ * @pipe: (CPU) pipe to get state for
+ *
+ * This function gets the fifo underrun reporting state for @pipe.
+ *
+ * Returns true if underrun reporting is enabled for @pipe.
+ */
+bool intel_get_cpu_fifo_underrun_reporting(struct drm_i915_private *dev_priv,
+					   enum pipe pipe)
+{
+	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	bool ret;
+
+	ret = !intel_crtc->cpu_fifo_underrun_disabled;
+
+	return ret;
+}
+
+/**
  * intel_set_pch_fifo_underrun_reporting - set PCH fifo underrun reporting state
  * @dev_priv: i915 device instance
  * @pch_transcoder: the PCH transcoder (same as pipe on IVB and older)
@@ -342,6 +363,28 @@ bool intel_set_pch_fifo_underrun_reporting(struct drm_i915_private *dev_priv,
 
 	spin_unlock_irqrestore(&dev_priv->irq_lock, flags);
 	return old;
+}
+
+/**
+ * intel_get_pch_fifo_underrun_reporting - get PCH fifo underrun reporting state
+ * @dev_priv: i915 device instance
+ * @pch_transcoder: the PCH transcoder (same as pipe on IVB and older)
+ *
+ * This function shows whether PCH fifo underrun reporting is enabled for
+ * @pch_transcoder.
+ *
+ * Returns true if PCH underrun reporting is enabled for @pch_transcoder.
+ */
+bool intel_get_pch_fifo_underrun_reporting(struct drm_i915_private *dev_priv,
+					   enum transcoder pch_transcoder)
+{
+	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pch_transcoder];
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	bool ret;
+
+	ret = !intel_crtc->pch_fifo_underrun_disabled;
+
+	return ret;
 }
 
 /**
