@@ -29,6 +29,7 @@ config EARLY_PRINTK
 config EARLY_PRINTK_DBGP
 	bool "Early printk via EHCI debug port"
 	depends on EARLY_PRINTK && PCI
+	select USB_EARLY_PRINTK
 	---help---
 	  Write kernel log output directly into the EHCI debug port.
 
@@ -51,6 +52,7 @@ config EARLY_PRINTK_EFI
 config EARLY_PRINTK_XDBC
 	bool "Early printk via xHCI debug port"
 	depends on EARLY_PRINTK && PCI
+	select USB_EARLY_PRINTK
 	---help---
 	  Write kernel log output directly into the xHCI debug port.
 

@@ -19,6 +19,9 @@ config USB_EHCI_BIG_ENDIAN_MMIO
 config USB_EHCI_BIG_ENDIAN_DESC
 	bool
 
+config USB_EARLY_PRINTK
+	bool
+
 menuconfig USB_SUPPORT
 	bool "USB support"
 	depends on HAS_IOMEM

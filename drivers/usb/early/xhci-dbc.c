@@ -10,6 +10,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/console.h>
 #include <linux/pci_regs.h>
 #include <linux/pci_ids.h>
 #include <linux/bootmem.h>
@@ -1319,3 +1320,45 @@ int xdbc_bulk_write(const char *bytes, int size)
 
 	return ret;
 }
+
+/*
+ * Start a bulk-in or bulk-out transfer, wait until transfer completion
+ * or error. Return the count of actually transferred bytes or error.
+ */
+static void early_xdbc_write(struct console *con, const char *str, u32 n)
+{
+	int chunk, ret;
+	static char buf[XDBC_MAX_PACKET];
+	int use_cr = 0;
+
+	if (!xdbcp->xdbc_reg)
+		return;
+	memset(buf, 0, XDBC_MAX_PACKET);
+	while (n > 0) {
+		for (chunk = 0; chunk < XDBC_MAX_PACKET && n > 0;
+		     str++, chunk++, n--) {
+			if (!use_cr && *str == '\n') {
+				use_cr = 1;
+				buf[chunk] = '\r';
+				str--;
+				n++;
+				continue;
+			}
+			if (use_cr)
+				use_cr = 0;
+			buf[chunk] = *str;
+		}
+		if (chunk > 0) {
+			ret = xdbc_bulk_write(buf, chunk);
+			if (ret < 0)
+				break;
+		}
+	}
+}
+
+struct console early_xdbc_console = {
+	.name =		"earlyxdbc",
+	.write =	early_xdbc_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
+};

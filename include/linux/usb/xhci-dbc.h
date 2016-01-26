@@ -216,4 +216,9 @@ struct xdbc_state {
 #define	xdbc_read64(regs)	xhci_read_64(NULL, (regs))
 #define	xdbc_write64(val, regs)	xhci_write_64(NULL, (val), (regs))
 
+#ifdef CONFIG_EARLY_PRINTK_XDBC
+extern int early_xdbc_init(char *s);
+extern struct console early_xdbc_console;
+#endif /* CONFIG_EARLY_PRINTK_XDBC */
+
 #endif /* __LINUX_XHCI_DBC_H */
