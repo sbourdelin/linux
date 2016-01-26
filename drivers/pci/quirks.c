@@ -25,6 +25,7 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <linux/mm.h>
+#include <linux/iommu.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
 #include "pci.h"
 
@@ -3582,8 +3583,7 @@ int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 static void quirk_dma_func0_alias(struct pci_dev *dev)
 {
 	if (PCI_FUNC(dev->devfn) != 0) {
-		dev->dma_alias_devfn = PCI_DEVFN(PCI_SLOT(dev->devfn), 0);
-		dev->dev_flags |= PCI_DEV_FLAGS_DMA_ALIAS_DEVFN;
+		pci_enable_dma_alias(dev, PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
 	}
 }
 
@@ -3598,8 +3598,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_RICOH, 0xe476, quirk_dma_func0_alias);
 static void quirk_dma_func1_alias(struct pci_dev *dev)
 {
 	if (PCI_FUNC(dev->devfn) != 1) {
-		dev->dma_alias_devfn = PCI_DEVFN(PCI_SLOT(dev->devfn), 1);
-		dev->dev_flags |= PCI_DEV_FLAGS_DMA_ALIAS_DEVFN;
+		pci_enable_dma_alias(dev, PCI_DEVFN(PCI_SLOT(dev->devfn), 1));
 	}
 }
 
@@ -3667,11 +3666,10 @@ static void quirk_fixed_dma_alias(struct pci_dev *dev)
 
 	id = pci_match_id(fixed_dma_alias_tbl, dev);
 	if (id) {
-		dev->dma_alias_devfn = id->driver_data;
-		dev->dev_flags |= PCI_DEV_FLAGS_DMA_ALIAS_DEVFN;
-		dev_info(&dev->dev, "Enabling fixed DMA alias to %02x.%d\n",
-			 PCI_SLOT(dev->dma_alias_devfn),
-			 PCI_FUNC(dev->dma_alias_devfn));
+		pci_enable_dma_alias(dev, id->driver_data);
+		dev_info(&dev->dev, "Enabling fixed DMA alias to %02lx.%ld\n",
+			 PCI_SLOT(id->driver_data),
+			 PCI_FUNC(id->driver_data));
 	}
 }
 
