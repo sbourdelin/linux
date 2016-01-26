@@ -255,6 +255,8 @@ static void __iomem *xdbc_map_pci_mmio(u32 bus,
 	xdbcp->bar = bar;
 	xdbcp->xhci_base = base;
 	xdbcp->xhci_length = sz64;
+	xdbcp->vendor = read_pci_config_16(bus, dev, func, PCI_VENDOR_ID);
+	xdbcp->device = read_pci_config_16(bus, dev, func, PCI_DEVICE_ID);
 
 	if (length)
 		*length = sz64;
@@ -638,6 +640,52 @@ static int xdbc_mem_init(void)
 	return 0;
 }
 
+static void xdbc_reset_debug_port_callback(int cap_offset, void *data)
+{
+	u8 major;
+	u32 val, port_offset, port_count;
+	u32 cap_length;
+	void __iomem *ops_reg;
+	void __iomem *portsc;
+	int i;
+
+	val = readl(xdbcp->xhci_base + cap_offset);
+	major = (u8) XHCI_EXT_PORT_MAJOR(val);
+
+	/* only reset super-speed port */
+	if (major != 0x3)
+		return;
+
+	val = readl(xdbcp->xhci_base + cap_offset + 8);
+	port_offset = XHCI_EXT_PORT_OFF(val);
+	port_count = XHCI_EXT_PORT_COUNT(val);
+	xdbc_trace("Extcap Port offset %d count %d\n",
+			port_offset, port_count);
+
+	cap_length = readl(xdbcp->xhci_base) & 0xff;
+	ops_reg = xdbcp->xhci_base + cap_length;
+
+	port_offset--;
+	for (i = port_offset; i < (port_offset + port_count); i++) {
+		portsc = ops_reg + 0x400 + i * 0x10;
+		val = readl(portsc);
+		/* reset the port if CCS bit is cleared */
+		if (!(val & 0x1))
+			writel(val | (1 << 4), portsc);
+	}
+}
+
+static void xdbc_reset_debug_port(void)
+{
+	xdbc_walk_excap(xdbcp->bus,
+			xdbcp->dev,
+			xdbcp->func,
+			XHCI_EXT_CAPS_PROTOCOL,
+			false,
+			xdbc_reset_debug_port_callback,
+			NULL);
+}
+
 /*
  * xdbc_start: start DbC
  *
@@ -655,6 +703,10 @@ static int xdbc_start(void)
 		xdbc_trace("falied to initialize hardware\n");
 		return -ENODEV;
 	}
+
+	/* reset port to avoid bus hang */
+	if (xdbcp->vendor == PCI_VENDOR_ID_INTEL)
+		xdbc_reset_debug_port();
 
 	/* wait for port connection */
 	if (handshake(&xdbcp->xdbc_reg->portsc, PORTSC_CCS,
