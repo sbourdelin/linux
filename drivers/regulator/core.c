@@ -3980,6 +3980,7 @@ unset_supplies:
 scrub:
 	regulator_ena_gpio_free(rdev);
 	kfree(rdev->constraints);
+	rdev->constraints = NULL;
 wash:
 	device_unregister(&rdev->dev);
 	/* device core frees rdev */
