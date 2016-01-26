@@ -58,6 +58,7 @@ extern void *vfio_del_group_dev(struct device *dev);
 extern struct vfio_device *vfio_device_get_from_dev(struct device *dev);
 extern void vfio_device_put(struct vfio_device *device);
 extern void *vfio_device_data(struct vfio_device *device);
+extern bool vfio_group_require_msi_mapping(struct vfio_group *group);
 
 /**
  * struct vfio_iommu_driver_ops - VFIO IOMMU driver callbacks
@@ -85,6 +86,7 @@ struct vfio_iommu_driver_ops {
 	int		(*unmap_free_reserved_iova)(void *iommu_data,
 						    struct iommu_group *group,
 						    dma_addr_t iova);
+	bool		(*require_msi_mapping)(void *iommu_data);
 };
 
 extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);

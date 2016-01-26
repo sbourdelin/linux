@@ -1179,6 +1179,13 @@ unlock:
 	return ret;
 }
 
+static bool vfio_iommu_type1_require_msi_mapping(void *iommu_data)
+{
+	struct vfio_iommu *iommu = iommu_data;
+
+	return vfio_domains_require_msi_mapping(iommu);
+}
+
 static void *vfio_iommu_type1_open(unsigned long arg)
 {
 	struct vfio_iommu *iommu;
@@ -1336,6 +1343,7 @@ static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
 		vfio_iommu_type1_alloc_map_reserved_iova,
 	.unmap_free_reserved_iova	=
 		vfio_iommu_type1_unmap_free_reserved_iova,
+	.require_msi_mapping		= vfio_iommu_type1_require_msi_mapping,
 };
 
 static int __init vfio_iommu_type1_init(void)

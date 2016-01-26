@@ -793,6 +793,28 @@ static int vfio_iommu_group_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
+bool vfio_group_require_msi_mapping(struct vfio_group *group)
+{
+	struct vfio_container *container = group->container;
+	struct vfio_iommu_driver *driver;
+	bool ret;
+
+	down_read(&container->group_lock);
+
+	driver = container->iommu_driver;
+	if (!driver || !driver->ops || !driver->ops->require_msi_mapping) {
+		ret = -EINVAL;
+		goto up;
+	}
+
+	ret = driver->ops->require_msi_mapping(container->iommu_data);
+
+up:
+	up_read(&container->group_lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_group_require_msi_mapping);
+
 /**
  * VFIO driver API
  */
