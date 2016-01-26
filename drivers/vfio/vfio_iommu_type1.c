@@ -56,6 +56,7 @@ MODULE_PARM_DESC(disable_hugepages,
 struct vfio_iommu {
 	struct list_head	domain_list;
 	struct mutex		lock;
+	/* rb tree indexed by IOVA */
 	struct rb_root		dma_list;
 	bool			v2;
 	bool			nesting;
@@ -65,6 +66,8 @@ struct vfio_domain {
 	struct iommu_domain	*domain;
 	struct list_head	next;
 	struct list_head	group_list;
+	/* rb tree indexed by PA, for reserved bindings only */
+	struct rb_root		reserved_binding_list;
 	int			prot;		/* IOMMU_CACHE */
 	bool			fgsp;		/* Fine-grained super pages */
 };
@@ -77,10 +80,69 @@ struct vfio_dma {
 	int			prot;		/* IOMMU_READ/WRITE */
 };
 
+struct vfio_reserved_binding {
+	struct kref 		kref;
+	struct rb_node		node;
+	struct vfio_domain	*domain;
+	phys_addr_t		addr;
+	dma_addr_t		iova;
+	size_t			size;
+};
+
 struct vfio_group {
 	struct iommu_group	*iommu_group;
 	struct list_head	next;
 };
+
+/* Reserved binding RB-tree manipulation */
+
+static struct vfio_reserved_binding *vfio_find_reserved_binding(
+				    struct vfio_domain *d,
+				    phys_addr_t start, size_t size)
+{
+	struct rb_node *node = d->reserved_binding_list.rb_node;
+
+	while (node) {
+		struct vfio_reserved_binding *binding =
+			rb_entry(node, struct vfio_reserved_binding, node);
+
+		if (start + size <= binding->addr)
+			node = node->rb_left;
+		else if (start >= binding->addr + binding->size)
+			node = node->rb_right;
+		else
+			return binding;
+	}
+
+	return NULL;
+}
+
+static void vfio_link_reserved_binding(struct vfio_domain *d,
+				       struct vfio_reserved_binding *new)
+{
+	struct rb_node **link = &d->reserved_binding_list.rb_node;
+	struct rb_node *parent = NULL;
+	struct vfio_reserved_binding *binding;
+
+	while (*link) {
+		parent = *link;
+		binding = rb_entry(parent, struct vfio_reserved_binding, node);
+
+		if (new->addr + new->size <= binding->addr)
+			link = &(*link)->rb_left;
+		else
+			link = &(*link)->rb_right;
+	}
+
+	rb_link_node(&new->node, parent, link);
+	rb_insert_color(&new->node, &d->reserved_binding_list);
+}
+
+static void vfio_unlink_reserved_binding(struct vfio_domain *d,
+					 struct vfio_reserved_binding *old)
+{
+	rb_erase(&old->node, &d->reserved_binding_list);
+}
 
 /*
  * This code handles mapping and unmapping of user data buffers
@@ -784,6 +846,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 		ret = -ENOMEM;
 		goto out_free;
 	}
+	domain->reserved_binding_list = RB_ROOT;
 
 	group->iommu_group = iommu_group;
 
