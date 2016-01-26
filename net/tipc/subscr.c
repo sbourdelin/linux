@@ -293,11 +293,11 @@ static void tipc_subscrb_rcv_cb(struct net *net, int conid,
 	struct tipc_subscription *sub = NULL;
 	struct tipc_net *tn = net_generic(net, tipc_net_id);
 
-	tipc_subscrp_create(net, (struct tipc_subscr *)buf, subscriber, &sub);
-	if (sub)
-		tipc_nametbl_subscribe(sub);
-	else
-		tipc_conn_terminate(tn->topsrv, subscriber->conid);
+	if (tipc_subscrp_create(net, (struct tipc_subscr *)buf, subscriber,
+				&sub))
+		return tipc_conn_terminate(tn->topsrv, subscriber->conid);
+
+	tipc_nametbl_subscribe(sub);
 }
 
 /* Handle one request to establish a new subscriber */
