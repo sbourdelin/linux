@@ -470,6 +470,7 @@ static int nvm_core_init(struct nvm_dev *dev)
 	dev->total_pages = dev->total_blocks * dev->pgs_per_blk;
 	INIT_LIST_HEAD(&dev->online_targets);
 	mutex_init(&dev->mlock);
+	spin_lock_init(&dev->lock);
 
 	return 0;
 }

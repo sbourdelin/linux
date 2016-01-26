@@ -20,6 +20,60 @@
 
 #include "gennvm.h"
 
+static int gennvm_get_area(struct nvm_dev *dev, sector_t *begin_sect,
+							sector_t size)
+{
+	struct gen_nvm *gn = dev->mp;
+	struct gennvm_area *area, *prev;
+	sector_t begin = 0;
+	int page_size = dev->sec_size * dev->sec_per_pg;
+	sector_t max_sectors = (page_size * dev->total_pages) >> 9;
+
+	if (size > max_sectors)
+		return -EINVAL;
+	area = kmalloc(sizeof(struct gennvm_area), GFP_KERNEL);
+	if (!area)
+		return -ENOMEM;
+
+	spin_lock(&dev->lock);
+	list_for_each_entry(prev, &gn->area_list, list) {
+		if (begin + size > prev->begin) {
+			begin = prev->end;
+			continue;
+		}
+		break;
+	}
+
+	if ((begin + size) > max_sectors) {
+		spin_unlock(&dev->lock);
+		kfree(area);
+		return -EINVAL;
+	}
+
+	area->begin = *begin_sect =  begin;
+	area->end = begin + size;
+	list_add(&area->list, &prev->list);
+	spin_unlock(&dev->lock);
+	return 0;
+}
+
+static void gennvm_put_area(struct nvm_dev *dev, sector_t begin)
+{
+	struct gen_nvm *gn = dev->mp;
+	struct gennvm_area *area;
+
+	spin_lock(&dev->lock);
+	list_for_each_entry(area, &gn->area_list, list) {
+		if (area->begin == begin) {
+			list_del(&area->list);
+			spin_unlock(&dev->lock);
+			kfree(area);
+			return;
+		}
+	}
+	spin_unlock(&dev->lock);
+}
+
 static void gennvm_blocks_free(struct nvm_dev *dev)
 {
 	struct gen_nvm *gn = dev->mp;
@@ -230,6 +284,7 @@ static int gennvm_register(struct nvm_dev *dev)
 
 	gn->dev = dev;
 	gn->nr_luns = dev->nr_luns;
+	INIT_LIST_HEAD(&gn->area_list);
 	dev->mp = gn;
 
 	ret = gennvm_luns_init(dev, gn);
@@ -466,6 +521,10 @@ static struct nvmm_type gennvm = {
 
 	.get_lun		= gennvm_get_lun,
 	.lun_info_print		= gennvm_lun_info_print,
+
+	.get_area		= gennvm_get_area,
+	.put_area		= gennvm_put_area,
+
 };
 
 static int __init gennvm_module_init(void)
