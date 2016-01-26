@@ -1,0 +1,350 @@
+                    xHCI debug capability driver
+
+                 Lu Baolu <baolu.lu@linux.intel.com>
+
+                    Last-updated: September 2015
+
+
+	Contents:
+	---------
+	* What is xHCI DbC?
+	* Debug topologies
+	* Debug stacks
+	* Port Multiplexing
+	* Hardware initialization
+	* External reset
+	* Port reset
+	* Interrupt/DMA/Memory during early boot
+	* Endpoint STALL
+	* Debug device information
+	* How to use DbC early printk?
+	* Limitations
+
+	What is xHCI DbC?
+	-----------------
+
+The xHCI Debugging Capability defined in section 7.6 of xHCI spec 1.1
+provides an optional functionality that enables low-level system debug
+over USB. It provides a means of connecting two systems where one system
+is a Debug Host and the other a Debug Target (System Under Test). The
+Debug Capability provides an interface that is completely independent
+of the xHCI interface. A Debug Target enumerates as a USB debug device
+to the Debug Host, allowing a Debug Host to access a Debug Target through
+the standard USB software stack.
+
+	Debug topologies
+	----------------
+
+Multiple Debug Targets may be attached to a single Debug Host. Debug
+Targets may be connected to any downstream facing port below a Debug
+Host (i.e. anywhere in the fabric, root port or external hub puts).
+A Debug Target may only connect to a Debug Host through a Root Hub port
+of the target. That means connection of a Debug Target to a Debug Host
+through the ports of an external hub is not supported.
+
+Below is a typical connection between Debug Host and Debug target. Two
+Debug targets are connected to a single Debug host.
+
+
+         ________________                ________________
+        |   Debug Host   |              |  Debug Target  |
+        |________________|              |________________|
+        |xHC without DbC |              |  xHC with DbC  |
+        |or DbC disabled |              |     enabled    |
+        |________________|              |________________|
+            |P1|  |p2|                      |P1|  |p2|
+            |__|  |__|                      |__|  |__|
+              |    |                         |
+              |    |_________________________|
+              |_
+                |
+         _______|________                ________________
+        |       HUB      |              |  Debug Target  |
+        |________________|              |________________|
+        | Superspeed hub |              |  xHC with DbC  |
+        |                |              |     enabled    |
+        |________________|              |________________|
+            |P1|  |p2|                      |P1|  |p2|
+            |__|  |__|                      |__|  |__|
+                   |                         |
+                   |_________________________|
+
+	Debug stacks
+	------------
+
+Below is a software stack diagram of both Debug Host and Debug Target.
+
+         ________________                ________________
+        |   Debug Host   |              |  Debug Target  |
+        |________________|              |________________|
+        |   debug App    |              |                |
+        |                |              | system debug   |
+        |   usb_debug    |              |     hooks      |
+        |                |              |                |
+        |    usbcore     |              |                |
+        |                |              |debug capability|
+        |    xhci_hcd    |              |     driver     |
+        |________________|              |________________|
+        |xHC without DbC |              |  xHC with DbC  |
+        |or DbC disabled |              |     enabled    |
+        |________________|              |________________|
+            |P1|  |p2|                      |P1|  |p2|
+            |__|  |__|                      |__|  |__|
+                   |                         |
+                   |_________________________|
+
+
+	Port Multiplexing
+	-----------------
+
+A debug port is always multiplexed with the first xHCI root hub port.
+Whenever debug capability is supported and enabled, and the first root
+hub port is detected to be connected to a downstream super-speed port
+of a Debug Host, the root hub port is assigned to the debug capability
+and operating in an upstream facing mode. Otherwise, all root hub ports
+act as normal downstream facing ports. When the root port is assigned
+to debug capability, it appears through the xHCI as a fully functional
+root hub port that never sees a device attach.
+
+	Hardware initialization
+	-----------------------
+
+xHCI debug capability is initialized during early boot. "early_param"
+micro provides one option. It also provides a global function so that
+early code can call it to initialize the hardware.
+
+int __init early_xdbc_init(char *s)
+
+early_param("string", early_xdbc_init)
+
+Keep in mind that things such as interrupt, system memory, DMA memory,
+PCI configure space access, etc., are all different from a normal device
+driver.
+
+Software probes the debug capability and all its memory and register
+interfaces by walking through the xHCI extended capability List. Debug
+capability is implemented with the capability ID of 10.
+
+After a xHCI debug capability interface was detected, software could
+initialize the hardware so that debug host can enumerate it as a debug
+device. The USB debug device provided by xHC debug capacity experiences
+three modes: disabled mode, enumeration mode and run mode. In each mode,
+software and xHC itself should complete required steps to move it to the
+next mode. Below diagram describes the evolution of each mode.
+
+      __________             ___________             ___________
+     |          |           |           |           |           |
+     |          |           |           |           |           |
+     | Disabled | DbC enable|Enumeration| DbC run   |    Run    |
+     |   mode   |---------->|    mode   |---------->|    mode   |
+     |          |flag 0 to 1|           |flag 0 to 1|           |
+     |          |           |           |           |           |
+     |          |           |           |           |           |
+     |__________|           |___________|           |___________|
+
+To change DbC mode from disabled to enumeration, software should
+1) allocate and initialize all DbC memory data structures. All data
+structures required by a DbC are defined in 7.6 of the spec 1.1;
+2) initialize the registers. All registers required to be initialized
+in disabled mode are defined in 7.6.4.1 of the spec 1.1. With data
+structure and registers initialized, software can Set the debug
+capability enable (DCE) bit to 1 in the Debug Capability Control
+Register (DCCTRL) and DbC enters enumeration mode as soon as this
+bit is set.
+
+DbC hardware is responsible to change DbC mode from enumerate to run.
+As soon as DbC enters enumeration mode, DbC appears as a normal USB
+device which can be enumerated by debug host. Hence, DbC hardware
+should support a default control endpoint, which responds to standard
+USB requests, e.g. SET_ADDRESS, GET_DESCRIPTOR, GET_CONFIGURATION, etc.
+
+After DbC has been configure by debug host, it enters run mode, it's
+the working mode.
+
+	External reset
+	--------------
+
+External reset means DbC reset caused by something outside of DbC hardware
+and software. The external reset sources depends on the DbC System Bus
+Reset(SBR) bit in status register.
+
+If SBR reads 1, the reset source includes,
+
+1) Assertion of chip hardware reset;
+2) System bus reset (e.g. the assertion of PCI RST#);
+3) Transition from the PCI PM D3hot to D0.
+
+If SBR reads 0, the reset source includes,
+
+1) Assertion of chip hardware reset;
+2) Assertion of host controller reset;
+3) Light host controller Reset.
+
+Resetting the DbC shall clear Debug Capability Enable(DCE) bit to 0.
+Software can determing the reset event during runtime by checking the
+DCE bit. The debug device enters disabled mode after reset. DbC driver
+needs to follow above steps to re-initialize the hardware and bring
+the debug device to run state.
+
+	Port reset
+	----------
+
+Debug port resets itself when it detects reset signal from the debug
+host. Software can determine the port reset event by reading the DbC
+port control and staus registers.
+
+The debug device enters enumeration state as soon as the reset signal
+completes. DbC driver should follow above steps to bring the debug
+device into running mode.
+
+	Interrupt/DMA/Memory during early boot
+	--------------------------------------
+
+The driver code needs to take special care during early boot, especially
+when it comes to memory allocation, interrupt, DMA, device MMIO and PCI
+configuration space. This section defines the interfaces used in DbC driver
+for the prior aspects.
+
+All events generated by DbC are put in the event ring, software will
+periodically poll the Event Ring Not Empty bit in the Debug Capability
+Status Register (DCST) to check pending events. To do this, DbC driver
+should 1)poll the event ring after a transfer trb queued and wait until
+transfer completes, or 2) start a thread to do the periodically poll.
+
+A segment of fixed virtual address is reserved for MMIO access purpose.
+Debug capability driver will map the MMIO physical address (exposed in
+PCI BAR) with this fixed virtual address segment.
+
+Debug Capability needs contiguous memory for DMA purpose. The driver
+reserves DMA memory by stating arrays of PAGE_SIZE and ask the compiler
+to align the arrays to PAGE_SIZE.
+
+Base on the following reasons, the driver uses an outb to port 0x80 as
+an I/O delay: timer subsystem might not be ready yet when DbC starts
+to initialize; DbC driver is independent of OS as possible as it can.
+
+	Endpoint STALL
+	--------------
+
+Endpoint STALL happens when data buffer error, parameter Error,
+TRB error, vendor defined error, or undefined error is detected.
+A transfer event will be generated to notify software.
+
+To clear the STALL situation, debug host will send a ClearFeature
+(ENDPOINT_HALT) request. DbC will clear the halt transfer ring
+flag, clear any internal endpoint state, and move the TR dequeue
+pointer to the next TRB in transfer ring.
+
+DbC does not support Soft Retry. Driver must check and determine
+whether to retry the failed transfer.
+
+	Debug device information
+	------------------------
+
+When debug target boots with xHCI debug capability enabled, it appears
+to debug host as a debug device. The debug device is built using one
+interface which declares two bulk endpoints: an IN and an OUT.
+
+class code:	0xdc (diagnostic device, assigned by USB-IF)
+subclass code:	0x02 (debug device, assigned by USB-IF)
+Manufacturer:	"Linux"
+Product:	"Remote GDB"
+Serial:		"0001"
+
+The USB device ID:
+idVendor:	0x1d6b (Linux Foundation)
+idProduct:	0x0004
+
+	How to use DbC early printk?
+	----------------------------
+
+Before using any kernel functionalities based on DbC, users need to check
+whether debug port is supported by the xHCI host in the system.
+
+On a machine which supports USB3 debug port, a file named "debug_port_state"
+will be created under /sys/bus/pci/drivers/xhci_hcd/<pci_bus_name>/. Reading
+this file will show the state (disabled, enabled or configured) of the debug
+port. On a machine that doesn't support USB3 debug port, this file doesn't
+exist.
+
+On debug target system, user needs to enable the following kernel
+config option:
+
+    CONFIG_PCI
+    CONFIG_EARLY_PRINTK
+    CONFIG_EARLY_PRINTK_XDBC
+
+Users also need to add below kernel parameter:
+
+    "earlyprintk=xdbc"
+
+If there are multiple xHCI controllers in the system, user can append
+a host contoller index to this kernel parameter. The index is started
+from 0.
+
+On debug host side, user needs to make sure usb_debug module is included.
+
+On some platforms, such as Intel, you need to disable auto-pm of usb
+subsystem on debug host when you are debugging with DbC.
+
+#echo on | tee /sys/bus/usb/devices/*/power/control
+#echo on > /sys/bus/pci/devices/<xhci_pci_bus_name>/power/control
+
+Before starting the debug target, user could connect the debug port
+on debug target with a root port or port of external hub on the debug
+host. The cable used to connect these two ports should be a USB 3.0
+super-speed A-to-A debugging cable.
+
+During early boot of debug target, DbC hardware gets initialized. Debug
+host should be able to enuerate debug target as a debug device. Debug
+host will bind the debug device with usb_debug driver module and create
+a tty file for serial communication application.
+
+On Intel platform, if the debug target is connected with debug host,
+enabling DCE bit in command register might lead to a hung port state.
+In the hung state, the host system will not see a port connected status
+bit set. Hence debug target fails to be probed. Current DbC driver has
+a quirk for this. But this quirk has been only verified to work on some
+devices. In case that user finds this quirk doesn't work with his/her
+device, he/she can plug out and then plug in the debug cable for work
+around.
+
+If things go smoothly, user should be able to see below kernel message
+on debug host.
+
+# tail -f /var/log/kern.log
+
+[ 1815.983374] usb 4-3: new SuperSpeed USB device number 4 using xhci_hcd
+[ 1815.999595] usb 4-3: LPM exit latency is zeroed, disabling LPM.
+[ 1815.999899] usb 4-3: New USB device found, idVendor=1d6b, idProduct=0004
+[ 1815.999902] usb 4-3: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 1815.999903] usb 4-3: Product: Remote GDB
+[ 1815.999904] usb 4-3: Manufacturer: Linux
+[ 1815.999905] usb 4-3: SerialNumber: 0001
+[ 1816.000240] usb_debug 4-3:1.0: xhci_dbc converter detected
+[ 1816.000360] usb 4-3: xhci_dbc converter now attached to ttyUSB0
+
+After tty file being created, user needs to open serial communication
+application, such as minicom. After configuring minicom to open the
+tty file created above, user should be able to see below welcome message
+in minicom:
+
+Press Y to continue...
+
+After 'Y' key is pressed, debug target will go ahead with booting and
+all early printk messages should be routed to the minicom on debug
+host.
+
+	Limitations
+	-----------
+
+Early printk through DbC has been verified to work with Intel Sunrise Point
+chip with below known issues:
+
+1. DbC debug device doesn't support suspend/resume. Users need to disable
+auto-pm of the host controller on debug host.
+
+2. Early prink "keep" option doesn't support by current phase.
+
+3. After several restarts of debug target, debug host might fail to read
+the device descriptor of debug device. Users need to restart the debug host.

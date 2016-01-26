@@ -11511,6 +11511,7 @@ L:	linux-usb@vger.kernel.org
 S:	Supported
 F:	drivers/usb/early/xhci-dbc.c
 F:	include/linux/usb/xhci-dbc.h
+F:	Documentation/usb/xhci-dbc.txt
 
 USB ZD1201 DRIVER
 L:	linux-wireless@vger.kernel.org
