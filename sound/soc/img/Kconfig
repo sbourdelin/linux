@@ -50,3 +50,14 @@ config SND_SOC_IMG_PISTACHIO_INTERNAL_DAC
 	help
 	  Say Y or M if you want to add support for Pistachio internal DAC
 	  driver for Imagination Technologies Pistachio internal DAC device.
+
+config SND_SOC_IMG_PISTACHIO
+	tristate "Audio support for Pistachio SoC"
+	depends on SND_SOC_IMG
+	depends on COMMON_CLK
+	select SND_SOC_IMG_I2S_IN
+	select SND_SOC_IMG_I2S_OUT
+	select SND_SOC_IMG_PARALLEL_OUT
+	select SND_SOC_IMG_SPDIF_IN
+	select SND_SOC_IMG_SPDIF_OUT
+	select SND_SOC_IMG_PISTACHIO_INTERNAL_DAC
