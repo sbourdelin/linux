@@ -93,7 +93,16 @@ enum {
 	ROCKCHIP_VPU_DEC_CTRL_VP8_FRAME_HDR,
 };
 
-static struct rockchip_vpu_control controls[0];
+static struct rockchip_vpu_control controls[] = {
+	[ROCKCHIP_VPU_DEC_CTRL_VP8_FRAME_HDR] = {
+		.id = V4L2_CID_MPEG_VIDEO_VP8_FRAME_HDR,
+		.type = V4L2_CTRL_TYPE_PRIVATE,
+		.name = "VP8 Frame Header Parameters",
+		.max_reqs = VIDEO_MAX_FRAME,
+		.elem_size = sizeof(struct v4l2_ctrl_vp8_frame_hdr),
+		.can_store = true,
+	},
+};
 
 static inline const void *get_ctrl_ptr(struct rockchip_vpu_ctx *ctx,
 				       unsigned id)
@@ -954,6 +963,10 @@ static void rockchip_vpu_dec_prepare_run(struct rockchip_vpu_ctx *ctx)
 
 	v4l2_ctrl_apply_request(&ctx->ctrl_handler, src->request);
 
+	if (ctx->vpu_src_fmt->fourcc == V4L2_PIX_FMT_VP8_FRAME) {
+		ctx->run.vp8d.frame_hdr = get_ctrl_ptr(ctx,
+				ROCKCHIP_VPU_DEC_CTRL_VP8_FRAME_HDR);
+	}
 }
 
 static void rockchip_vpu_dec_run_done(struct rockchip_vpu_ctx *ctx,

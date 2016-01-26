@@ -254,7 +254,24 @@ void rockchip_vpu_hw_remove(struct rockchip_vpu_dev *vpu)
 	clk_disable_unprepare(vpu->aclk);
 }
 
-static const struct rockchip_vpu_codec_ops mode_ops[0];
+static const struct rockchip_vpu_codec_ops mode_ops[] = {
+	[RK3288_VPU_CODEC_VP8D] = {
+		.init = rockchip_vpu_vp8d_init,
+		.exit = rockchip_vpu_vp8d_exit,
+		.irq = rockchip_vdpu_irq,
+		.run = rockchip_vpu_vp8d_run,
+		.done = rockchip_vpu_run_done,
+		.reset = rockchip_vpu_dec_reset,
+	},
+	[RK3229_VPU_CODEC_VP8D] = {
+		.init = rockchip_vpu_vp8d_init,
+		.exit = rockchip_vpu_vp8d_exit,
+		.irq = rockchip_vdpu_irq,
+		.run = rockchip_vpu_vp8d_run,
+		.done = rockchip_vpu_run_done,
+		.reset = rockchip_vpu_dec_reset,
+	},
+};
 
 void rockchip_vpu_run(struct rockchip_vpu_ctx *ctx)
 {

@@ -56,6 +56,16 @@ struct rockchip_vpu_aux_buf {
 };
 
 /**
+ * struct rockchip_vpu_vp8d_hw_ctx - Context private data of VP8 decoder.
+ * @segment_map:	Segment map buffer.
+ * @prob_tbl:		Probability table buffer.
+ */
+struct rockchip_vpu_vp8d_hw_ctx {
+	struct rockchip_vpu_aux_buf segment_map;
+	struct rockchip_vpu_aux_buf prob_tbl;
+};
+
+/**
  * struct rockchip_vpu_hw_ctx - Context private data of hardware code.
  * @codec_ops:		Set of operations associated with current codec mode.
  */
@@ -63,6 +73,10 @@ struct rockchip_vpu_hw_ctx {
 	const struct rockchip_vpu_codec_ops *codec_ops;
 
 	/* Specific for particular codec modes. */
+	union {
+		struct rockchip_vpu_vp8d_hw_ctx vp8d;
+		/* Other modes will need different data. */
+	};
 };
 
 int rockchip_vpu_hw_probe(struct rockchip_vpu_dev *vpu);
@@ -74,5 +88,13 @@ void rockchip_vpu_deinit(struct rockchip_vpu_ctx *ctx);
 void rockchip_vpu_run(struct rockchip_vpu_ctx *ctx);
 
 void rockchip_vpu_power_on(struct rockchip_vpu_dev *vpu);
+
+/* for vp8 decoder */
+int rockchip_vdpu_irq(int irq, struct rockchip_vpu_dev *vpu);
+void rockchip_vpu_dec_reset(struct rockchip_vpu_ctx *ctx);
+
+int rockchip_vpu_vp8d_init(struct rockchip_vpu_ctx *ctx);
+void rockchip_vpu_vp8d_exit(struct rockchip_vpu_ctx *ctx);
+void rockchip_vpu_vp8d_run(struct rockchip_vpu_ctx *ctx);
 
 #endif /* RK3288_VPU_HW_H_ */
