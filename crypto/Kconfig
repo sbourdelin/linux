@@ -1492,6 +1492,7 @@ config CRYPTO_DEFLATE
 	select CRYPTO_ALGAPI
 	select ZLIB_INFLATE
 	select ZLIB_DEFLATE
+	select CRYPTO_COMPRESS2
 	help
 	  This is the Deflate algorithm (RFC1951), specified for use in
 	  IPSec with the IPCOMP protocol (RFC3173, RFC2394).
