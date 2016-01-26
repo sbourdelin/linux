@@ -1772,6 +1772,53 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
+static int
+i915_gem_ret_to_vm_ret(struct drm_i915_private *dev_priv, int ret)
+{
+	switch (ret) {
+	case -EIO:
+		/*
+		 * We eat errors when the gpu is terminally wedged to avoid
+		 * userspace unduly crashing (gl has no provisions for mmaps to
+		 * fail). But any other -EIO isn't ours (e.g. swap in failure)
+		 * and so needs to be reported.
+		 */
+		if (!i915_terminally_wedged(&dev_priv->gpu_error)) {
+			ret = VM_FAULT_SIGBUS;
+			break;
+		}
+	case -EAGAIN:
+		/*
+		 * EAGAIN means the gpu is hung and we'll wait for the error
+		 * handler to reset everything when re-faulting in
+		 * i915_mutex_lock_interruptible.
+		 */
+	case 0:
+	case -ERESTARTSYS:
+	case -EINTR:
+	case -EBUSY:
+		/*
+		 * EBUSY is ok: this just means that another thread
+		 * already did the job.
+		 */
+		ret = VM_FAULT_NOPAGE;
+		break;
+	case -ENOMEM:
+		ret = VM_FAULT_OOM;
+		break;
+	case -ENOSPC:
+	case -EFAULT:
+		ret = VM_FAULT_SIGBUS;
+		break;
+	default:
+		WARN_ONCE(ret, "unhandled error in page fault\n");
+		ret = VM_FAULT_SIGBUS;
+		break;
+	}
+
+	return ret;
+}
+
 /**
  * i915_gem_fault - fault a page into the GTT
  * @vma: VMA in question
@@ -1902,49 +1949,9 @@ unpin:
 unlock:
 	mutex_unlock(&dev->struct_mutex);
 out:
-	switch (ret) {
-	case -EIO:
-		/*
-		 * We eat errors when the gpu is terminally wedged to avoid
-		 * userspace unduly crashing (gl has no provisions for mmaps to
-		 * fail). But any other -EIO isn't ours (e.g. swap in failure)
-		 * and so needs to be reported.
-		 */
-		if (!i915_terminally_wedged(&dev_priv->gpu_error)) {
-			ret = VM_FAULT_SIGBUS;
-			break;
-		}
-	case -EAGAIN:
-		/*
-		 * EAGAIN means the gpu is hung and we'll wait for the error
-		 * handler to reset everything when re-faulting in
-		 * i915_mutex_lock_interruptible.
-		 */
-	case 0:
-	case -ERESTARTSYS:
-	case -EINTR:
-	case -EBUSY:
-		/*
-		 * EBUSY is ok: this just means that another thread
-		 * already did the job.
-		 */
-		ret = VM_FAULT_NOPAGE;
-		break;
-	case -ENOMEM:
-		ret = VM_FAULT_OOM;
-		break;
-	case -ENOSPC:
-	case -EFAULT:
-		ret = VM_FAULT_SIGBUS;
-		break;
-	default:
-		WARN_ONCE(ret, "unhandled error in i915_gem_fault: %i\n", ret);
-		ret = VM_FAULT_SIGBUS;
-		break;
-	}
-
 	intel_runtime_pm_put(dev_priv);
-	return ret;
+
+	return i915_gem_ret_to_vm_ret(dev_priv, ret);
 }
 
 /**
