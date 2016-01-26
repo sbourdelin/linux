@@ -75,6 +75,8 @@ Descriptions of section entries:
 	L: Mailing list that is relevant to this area
 	W: Web-page with status/info
 	Q: Patchwork web based patch tracking system site
+	B: Preferred method for reporting bugs; bug tracking system site
+	   or "List" for mailing list.
 	T: SCM tree type and location.
 	   Type is one of: git, hg, quilt, stgit, topgit
 	S: Status, one of the following:
