@@ -393,26 +393,23 @@ bool intel_get_pch_fifo_underrun_reporting(struct drm_i915_private *dev_priv,
  * @pipe: (CPU) pipe to set state for
  *
  * This handles a CPU fifo underrun interrupt, generating an underrun warning
- * into dmesg if underrun reporting is enabled and then disables the underrun
- * interrupt to avoid an irq storm.
+ * into dmesg if underrun reporting is enabled.
  */
 void intel_cpu_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
 					 enum pipe pipe)
 {
 	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pipe];
+	bool report;
 
 	/* We may be called too early in init, thanks BIOS! */
 	if (crtc == NULL)
 		return;
 
-	/* GMCH can't disable fifo underruns, filter them. */
-	if (HAS_GMCH_DISPLAY(dev_priv->dev) &&
-	    to_intel_crtc(crtc)->cpu_fifo_underrun_disabled)
-		return;
+	report = intel_get_cpu_fifo_underrun_reporting(dev_priv, pipe);
 
-	if (intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, false))
-		DRM_ERROR("CPU pipe %c FIFO underrun\n",
-			  pipe_name(pipe));
+	if (report)
+		DRM_ERROR_RATELIMITED("CPU pipe %c FIFO underrun\n",
+				      pipe_name(pipe));
 }
 
 /**
@@ -421,16 +418,18 @@ void intel_cpu_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
  * @pch_transcoder: the PCH transcoder (same as pipe on IVB and older)
  *
  * This handles a PCH fifo underrun interrupt, generating an underrun warning
- * into dmesg if underrun reporting is enabled and then disables the underrun
- * interrupt to avoid an irq storm.
+ * into dmesg if underrun reporting is enabled.
  */
 void intel_pch_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
 					 enum transcoder pch_transcoder)
 {
-	if (intel_set_pch_fifo_underrun_reporting(dev_priv, pch_transcoder,
-						  false))
-		DRM_ERROR("PCH transcoder %c FIFO underrun\n",
-			  transcoder_name(pch_transcoder));
+	struct drm_crtc *crtc = dev_priv->pipe_to_crtc_mapping[pch_transcoder];
+	bool report = intel_get_pch_fifo_underrun_reporting(dev_priv,
+							    pch_transcoder);
+
+	if (report)
+		DRM_ERROR_RATELIMITED("PCH transcoder %c FIFO underrun\n",
+				      transcoder_name(pch_transcoder));
 }
 
 /**
