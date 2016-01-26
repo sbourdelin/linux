@@ -108,6 +108,9 @@ static DEFINE_PER_CPU(struct perf_event *, watchdog_ev);
 #endif
 static unsigned long soft_lockup_nmi_warn;
 
+int debug_watchdog_lockups;
+EXPORT_SYMBOL_GPL(debug_watchdog_lockups);
+
 /* boot commands */
 /*
  * Should we panic when a soft-lockup or hard-lockup occurs:
@@ -358,6 +361,9 @@ static void watchdog_overflow_callback(struct perf_event *event,
 		else
 			dump_stack();
 
+		if (debug_watchdog_lockups)
+			__asm__ __volatile__ ("int $0x03");
+
 		/*
 		 * Perform all-CPU dump only once to avoid multiple hardlockups
 		 * generating interleaving traces
@@ -477,6 +483,9 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 			show_regs(regs);
 		else
 			dump_stack();
+
+		if (debug_watchdog_lockups)
+			__asm__ __volatile__ ("int $0x03");
 
 		if (softlockup_all_cpu_backtrace) {
 			/* Avoid generating two back traces for current
