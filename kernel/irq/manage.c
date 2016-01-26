@@ -1183,14 +1183,10 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	old = *old_ptr;
 	if (old) {
 		/*
-		 * Can't share interrupts unless both agree to and are
-		 * the same type (level, edge, polarity). So both flag
-		 * fields must have IRQF_SHARED set and the bits which
-		 * set the trigger type must match. Also all must
-		 * agree on ONESHOT.
+		 * Can't share interrupts unless both agree to and all
+		 * must agree on ONESHOT
 		 */
 		if (!((old->flags & new->flags) & IRQF_SHARED) ||
-		    ((old->flags ^ new->flags) & IRQF_TRIGGER_MASK) ||
 		    ((old->flags ^ new->flags) & IRQF_ONESHOT))
 			goto mismatch;
 
@@ -1201,6 +1197,15 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 
 		/* add new interrupt at end of irq queue */
 		do {
+			/*
+			 * If 'new' requests a trigger type it must match all
+			 * previously requested trigger types.
+			 */
+			if (((new->flags & IRQF_TRIGGER_MASK) &&
+			     (old->flags & IRQF_TRIGGER_MASK)) &&
+			    ((new->flags ^ old->flags) & IRQF_TRIGGER_MASK))
+				goto mismatch;
+
 			/*
 			 * Or all existing action->thread_mask bits,
 			 * so we can find the next zero bit for this
