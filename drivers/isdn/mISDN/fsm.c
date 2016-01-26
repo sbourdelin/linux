@@ -51,7 +51,7 @@ EXPORT_SYMBOL(mISDN_FsmNew);
 void
 mISDN_FsmFree(struct Fsm *fsm)
 {
-	kfree((void *) fsm->jumpmatrix);
+	kfree(fsm->jumpmatrix);
 }
 EXPORT_SYMBOL(mISDN_FsmFree);
 

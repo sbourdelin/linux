@@ -45,7 +45,7 @@ FsmNew(struct Fsm *fsm, struct FsmNode *fnlist, int fncount)
 void
 FsmFree(struct Fsm *fsm)
 {
-	kfree((void *) fsm->jumpmatrix);
+	kfree(fsm->jumpmatrix);
 }
 
 int
