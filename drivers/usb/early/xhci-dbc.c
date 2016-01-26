@@ -219,11 +219,21 @@ static void xdbc_dbg_dump_data(char *str)
 	xdbc_dbg_dump_string("String Descriptor:");
 }
 
+static void xdbc_dbg_dump_trb(struct xdbc_trb *trb, char *str)
+{
+	xdbc_trace("DBC trb: %s\n", str);
+	xdbc_trace("@%016llx %08x %08x %08x %08x\n", (u64)__pa(trb),
+				le32_to_cpu(trb->field[0]),
+				le32_to_cpu(trb->field[1]),
+				le32_to_cpu(trb->field[2]),
+				le32_to_cpu(trb->field[3]));
+}
 #else
 static inline void xdbc_trace(const char *fmt, ...) { }
 static inline void xdbc_dump_debug_buffer(void) { }
 static inline void xdbc_dbg_dump_regs(char *str) { }
 static inline void xdbc_dbg_dump_data(char *str) { }
+static inline void xdbc_dbg_dump_trb(struct xdbc_trb *trb, char *str) { }
 #endif	/* DBC_DEBUG */
 
 /*
@@ -334,6 +344,7 @@ static void *xdbc_get_page(dma_addr_t *dma_addr,
 	static char in_ring_page[PAGE_SIZE] __aligned(PAGE_SIZE);
 	static char out_ring_page[PAGE_SIZE] __aligned(PAGE_SIZE);
 	static char table_page[PAGE_SIZE] __aligned(PAGE_SIZE);
+	static char bulk_buf_page[PAGE_SIZE] __aligned(PAGE_SIZE);
 
 	switch (type) {
 	case XDBC_PAGE_EVENT:
@@ -347,6 +358,9 @@ static void *xdbc_get_page(dma_addr_t *dma_addr,
 		break;
 	case XDBC_PAGE_TABLE:
 		virt = (void *)table_page;
+		break;
+	case XDBC_PAGE_BUFFER:
+		virt = (void *)bulk_buf_page;
 		break;
 	default:
 		return NULL;
@@ -694,6 +708,12 @@ static int xdbc_mem_init(void)
 	dev_info = cpu_to_le32((XDBC_DEVICE_REV << 16) | XDBC_PRODUCT_ID);
 	writel(dev_info, &xdbcp->xdbc_reg->devinfo2);
 
+	/* get and store the transfer buffer */
+	xdbcp->out_buf = xdbc_get_page(&xdbcp->out_dma,
+			XDBC_PAGE_BUFFER);
+	xdbcp->in_buf = xdbcp->out_buf + XDBC_MAX_PACKET;
+	xdbcp->in_dma = xdbcp->out_dma + XDBC_MAX_PACKET;
+
 	return 0;
 }
 
@@ -789,6 +809,9 @@ static int xdbc_start(void)
 
 	xdbc_trace("root hub port number %d\n", DCST_DPN(status));
 
+	xdbcp->in_ep_state = EP_RUNNING;
+	xdbcp->out_ep_state = EP_RUNNING;
+
 	xdbc_trace("DbC is running now, control 0x%08x\n",
 			readl(&xdbcp->xdbc_reg->control));
 
@@ -881,4 +904,354 @@ int __init early_xdbc_init(char *s)
 	}
 
 	return 0;
+}
+
+static void xdbc_queue_trb(struct xdbc_ring *ring,
+		u32 field1, u32 field2, u32 field3, u32 field4)
+{
+	struct xdbc_trb *trb, *link_trb;
+
+	trb = ring->enqueue;
+	trb->field[0] = cpu_to_le32(field1);
+	trb->field[1] = cpu_to_le32(field2);
+	trb->field[2] = cpu_to_le32(field3);
+	trb->field[3] = cpu_to_le32(field4);
+
+	xdbc_dbg_dump_trb(trb, "enqueue trb");
+
+	++(ring->enqueue);
+	if (ring->enqueue >= &ring->segment->trbs[TRBS_PER_SEGMENT - 1]) {
+		link_trb = ring->enqueue;
+		if (ring->cycle_state)
+			link_trb->field[3] |= cpu_to_le32(TRB_CYCLE);
+		else
+			link_trb->field[3] &= cpu_to_le32(~TRB_CYCLE);
+
+		ring->enqueue = ring->segment->trbs;
+		ring->cycle_state ^= 1;
+	}
+}
+
+static void xdbc_ring_doorbell(int target)
+{
+	writel(DOOR_BELL_TARGET(target), &xdbcp->xdbc_reg->doorbell);
+}
+
+static void xdbc_handle_port_status(struct xdbc_trb *evt_trb)
+{
+	u32 port_reg;
+
+	port_reg = readl(&xdbcp->xdbc_reg->portsc);
+
+	if (port_reg & PORTSC_CSC) {
+		xdbc_trace("%s: connect status change event\n", __func__);
+		writel(port_reg | PORTSC_CSC, &xdbcp->xdbc_reg->portsc);
+		port_reg = readl(&xdbcp->xdbc_reg->portsc);
+	}
+
+	if (port_reg & PORTSC_PRC) {
+		xdbc_trace("%s: port reset change event\n", __func__);
+		writel(port_reg | PORTSC_PRC, &xdbcp->xdbc_reg->portsc);
+		port_reg = readl(&xdbcp->xdbc_reg->portsc);
+	}
+
+	if (port_reg & PORTSC_PLC) {
+		xdbc_trace("%s: port link status change event\n", __func__);
+		writel(port_reg | PORTSC_PLC, &xdbcp->xdbc_reg->portsc);
+		port_reg = readl(&xdbcp->xdbc_reg->portsc);
+	}
+
+	if (port_reg & PORTSC_CEC) {
+		xdbc_trace("%s: config error change\n", __func__);
+		writel(port_reg | PORTSC_CEC, &xdbcp->xdbc_reg->portsc);
+		port_reg = readl(&xdbcp->xdbc_reg->portsc);
+	}
+}
+
+static void xdbc_handle_tx_event(struct xdbc_trb *evt_trb)
+{
+	u32 comp_code;
+	u32 tx_dma_high, tx_dma_low;
+	u64 in_dma, out_dma;
+	size_t remain_length;
+	int ep_id;
+
+	tx_dma_low = le32_to_cpu(evt_trb->field[0]);
+	tx_dma_high = le32_to_cpu(evt_trb->field[1]);
+	comp_code = GET_COMP_CODE(le32_to_cpu(evt_trb->field[2]));
+	remain_length = EVENT_TRB_LEN(le32_to_cpu(evt_trb->field[2]));
+	ep_id = TRB_TO_EP_ID(le32_to_cpu(evt_trb->field[3]));
+	in_dma = __pa(xdbcp->in_pending);
+	out_dma = __pa(xdbcp->out_pending);
+
+	/*
+	 * Possible Completion Codes for DbC Transfer Event are Success,
+	 * Stall Error, USB Transaction Error, Babble Detected Error,
+	 * TRB Error, Short Packet, Undefined Error, Event Ring Full Error,
+	 * and Vendor Defined Error. TRB error, undefined error and vendor
+	 * defined error will result in HOT/HIT set and be handled the same
+	 * way as Stall error.
+	 */
+	switch (comp_code) {
+	case COMP_SUCCESS:
+		remain_length = 0;
+	case COMP_SHORT_TX:
+		xdbc_trace("%s: endpoint %d remains %d bytes\n", __func__,
+			ep_id, remain_length);
+		break;
+	case COMP_TRB_ERR:
+	case COMP_BABBLE:
+	case COMP_TX_ERR:
+	case COMP_STALL:
+	default:
+		xdbc_trace("%s: endpoint %d halted\n", __func__, ep_id);
+		if (ep_id == XDBC_EPID_OUT)
+			xdbcp->out_ep_state = EP_HALTED;
+		if (ep_id == XDBC_EPID_IN)
+			xdbcp->in_ep_state = EP_HALTED;
+
+		break;
+	}
+
+	if (lower_32_bits(in_dma) == tx_dma_low &&
+			upper_32_bits(in_dma) == tx_dma_high) {
+		xdbcp->in_complete = comp_code;
+		xdbcp->in_complete_length =
+				(remain_length > xdbcp->in_length) ?
+				0 : xdbcp->in_length - remain_length;
+	}
+
+	if (lower_32_bits(out_dma) == tx_dma_low &&
+			upper_32_bits(out_dma) == tx_dma_high) {
+		xdbcp->out_complete = comp_code;
+		xdbcp->out_complete_length =
+				(remain_length > xdbcp->out_length) ?
+				0 : xdbcp->out_length - remain_length;
+	}
+}
+
+static void xdbc_handle_events(void)
+{
+	struct xdbc_trb *evt_trb;
+	bool update_erdp = false;
+
+	evt_trb = xdbcp->evt_ring.dequeue;
+	while ((le32_to_cpu(evt_trb->field[3]) & TRB_CYCLE) ==
+			xdbcp->evt_ring.cycle_state) {
+		/*
+		 * Memory barrier to ensure software sees the trbs
+		 * enqueued by hardware.
+		 */
+		rmb();
+
+		xdbc_dbg_dump_trb(evt_trb, "event trb");
+
+		/* FIXME: Handle more event types. */
+		switch ((le32_to_cpu(evt_trb->field[3]) & TRB_TYPE_BITMASK)) {
+		case TRB_TYPE(TRB_PORT_STATUS):
+			xdbc_handle_port_status(evt_trb);
+			break;
+		case TRB_TYPE(TRB_TRANSFER):
+			xdbc_handle_tx_event(evt_trb);
+			break;
+		default:
+			break;
+		}
+
+		/* advance to the next trb */
+		++(xdbcp->evt_ring.dequeue);
+		if (xdbcp->evt_ring.dequeue ==
+				&xdbcp->evt_seg.trbs[TRBS_PER_SEGMENT]) {
+			xdbcp->evt_ring.dequeue = xdbcp->evt_seg.trbs;
+			xdbcp->evt_ring.cycle_state ^= 1;
+		}
+
+		evt_trb = xdbcp->evt_ring.dequeue;
+		update_erdp = true;
+	}
+
+	/* update event ring dequeue pointer */
+	if (update_erdp)
+		xdbc_write64(__pa(xdbcp->evt_ring.dequeue),
+				&xdbcp->xdbc_reg->erdp);
+}
+
+/*
+ * Check and dispatch events in event ring. It also checks status
+ * of hardware. This function will be called from multiple threads.
+ * An atomic lock is applied to protect the access of event ring.
+ */
+static int xdbc_check_event(void)
+{
+	/* event ring is under checking by other thread? */
+	if (!test_bit(XDBC_ATOMIC_EVENT, &xdbcp->atomic_flags) &&
+			!test_and_set_bit(XDBC_ATOMIC_EVENT,
+			&xdbcp->atomic_flags))
+		return 0;
+
+	xdbc_handle_events();
+
+	test_and_clear_bit(XDBC_ATOMIC_EVENT, &xdbcp->atomic_flags);
+
+	return 0;
+}
+
+#define	BULK_IN_COMPLETED(p)	((xdbcp->in_pending == (p)) && \
+				 xdbcp->in_complete)
+#define	BULK_OUT_COMPLETED(p)	((xdbcp->out_pending == (p)) && \
+				 xdbcp->out_complete)
+
+/*
+ * Wait for a bulk-in or bulk-out transfer completion or timed out.
+ * Return count of the actually transferred bytes or error.
+ */
+static int xdbc_wait_until_bulk_done(struct xdbc_trb *trb, int loops)
+{
+	int timeout = 0;
+	bool read;
+
+	if (trb != xdbcp->in_pending &&
+			trb != xdbcp->out_pending)
+		return -EINVAL;
+
+	read = (trb == xdbcp->in_pending);
+
+	do {
+		if (xdbc_check_event() < 0)
+			break;
+
+		if (read && BULK_IN_COMPLETED(trb)) {
+			if (xdbcp->in_ep_state == EP_HALTED)
+				return -EAGAIN;
+			else
+				return xdbcp->in_complete_length;
+		}
+
+		if (!read && BULK_OUT_COMPLETED(trb)) {
+			if (xdbcp->out_ep_state == EP_HALTED)
+				return -EAGAIN;
+			else
+				return xdbcp->out_complete_length;
+		}
+
+		xdbc_udelay(10);
+	} while ((timeout++ < loops) || !loops);
+
+	return -EIO;
+}
+
+static int xdbc_bulk_transfer(void *data, int size, int loops, bool read)
+{
+	u64 addr;
+	u32 length, control;
+	struct xdbc_trb *trb;
+	struct xdbc_ring *ring;
+	u32 cycle;
+	int ret;
+
+	if (size > XDBC_MAX_PACKET) {
+		xdbc_trace("%s: bad parameter, size %d", __func__, size);
+		return -EINVAL;
+	}
+
+	ring = (read ? &xdbcp->in_ring : &xdbcp->out_ring);
+	trb = ring->enqueue;
+	cycle = ring->cycle_state;
+
+	length = TRB_LEN(size);
+	control = TRB_TYPE(TRB_NORMAL) | TRB_IOC;
+
+	if (cycle)
+		control &= cpu_to_le32(~TRB_CYCLE);
+	else
+		control |= cpu_to_le32(TRB_CYCLE);
+
+	if (read) {
+		memset(xdbcp->in_buf, 0, XDBC_MAX_PACKET);
+		addr = xdbcp->in_dma;
+
+		xdbcp->in_pending = trb;
+		xdbcp->in_length = size;
+		xdbcp->in_complete = 0;
+		xdbcp->in_complete_length = 0;
+	} else {
+		memcpy(xdbcp->out_buf, data, size);
+		addr = xdbcp->out_dma;
+
+		xdbcp->out_pending = trb;
+		xdbcp->out_length = size;
+		xdbcp->out_complete = 0;
+		xdbcp->out_complete_length = 0;
+	}
+
+	xdbc_queue_trb(ring, lower_32_bits(addr),
+			upper_32_bits(addr),
+			length, control);
+
+	/*
+	 * Memory barrier to ensure hardware sees the trbs
+	 * enqueued above.
+	 */
+	wmb();
+	if (cycle)
+		trb->field[3] |= cpu_to_le32(cycle);
+	else
+		trb->field[3] &= cpu_to_le32(~TRB_CYCLE);
+
+	xdbc_ring_doorbell(read ? IN_EP_DOORBELL : OUT_EP_DOORBELL);
+
+	ret = xdbc_wait_until_bulk_done(trb, loops);
+
+	if (read)
+		xdbcp->in_pending = NULL;
+	else
+		xdbcp->out_pending = NULL;
+
+	if (ret > 0) {
+		if (read)
+			memcpy(data, xdbcp->in_buf, size);
+		else
+			memset(xdbcp->out_buf, 0, XDBC_MAX_PACKET);
+	} else {
+		xdbc_trace("%s: bulk %s transfer results in error %d\n",
+				__func__, read ? "in" : "out", ret);
+	}
+
+	return ret;
+}
+
+int xdbc_bulk_read(void *data, int size, int loops)
+{
+	int ret;
+
+	do {
+		if (!test_bit(XDBC_ATOMIC_BULKIN, &xdbcp->atomic_flags) &&
+				!test_and_set_bit(XDBC_ATOMIC_BULKIN,
+				&xdbcp->atomic_flags))
+			break;
+	} while (1);
+
+	ret = xdbc_bulk_transfer(data, size, loops, true);
+
+	test_and_clear_bit(XDBC_ATOMIC_BULKIN, &xdbcp->atomic_flags);
+
+	return ret;
+}
+
+int xdbc_bulk_write(const char *bytes, int size)
+{
+	int ret;
+
+	do {
+		if (!test_bit(XDBC_ATOMIC_BULKOUT, &xdbcp->atomic_flags) &&
+				!test_and_set_bit(XDBC_ATOMIC_BULKOUT,
+				&xdbcp->atomic_flags))
+			break;
+	} while (1);
+
+	ret = xdbc_bulk_transfer((void *)bytes, size, XDBC_LOOPS, false);
+
+	test_and_clear_bit(XDBC_ATOMIC_BULKOUT, &xdbcp->atomic_flags);
+
+	return ret;
 }
