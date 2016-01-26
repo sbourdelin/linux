@@ -56,6 +56,7 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 
 		list_add(&comm->list, &thread->comm_list);
 		atomic_set(&thread->refcnt, 1);
+		INIT_LIST_HEAD(&thread->node);
 		RB_CLEAR_NODE(&thread->rb_node);
 	}
 
@@ -71,6 +72,7 @@ void thread__delete(struct thread *thread)
 	struct comm *comm, *tmp;
 
 	BUG_ON(!RB_EMPTY_NODE(&thread->rb_node));
+	BUG_ON(!list_empty(&thread->node));
 
 	thread_stack__free(thread);
 
