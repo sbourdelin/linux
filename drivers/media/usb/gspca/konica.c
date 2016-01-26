@@ -243,7 +243,9 @@ static int sd_start(struct gspca_dev *gspca_dev)
 
 static void sd_stopN(struct gspca_dev *gspca_dev)
 {
+#if IS_ENABLED(CONFIG_INPUT)
 	struct sd *sd = (struct sd *) gspca_dev;
+#endif
 
 	konica_stream_off(gspca_dev);
 #if IS_ENABLED(CONFIG_INPUT)

@@ -837,11 +837,12 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 			u8 *data,			/* isoc packet */
 			int len)			/* iso packet length */
 {
-	struct sd *sd = (struct sd *) gspca_dev;
 	int pkt_type;
 
 	if (data[0] == 0x5a) {
 #if IS_ENABLED(CONFIG_INPUT)
+		struct sd *sd = (struct sd *) gspca_dev;
+
 		if (len > 20) {
 			u8 state = (data[20] & 0x80) ? 1 : 0;
 			if (sd->button_pressed != state) {
