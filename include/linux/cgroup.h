@@ -604,11 +604,11 @@ static inline struct cgroup *sock_cgroup_ptr(struct sock_cgroup_data *skcd)
 #endif
 }
 
-#else	/* CONFIG_CGROUP_DATA */
+#else	/* CONFIG_SOCK_CGROUP_DATA */
 
 static inline void cgroup_sk_alloc(struct sock_cgroup_data *skcd) {}
 static inline void cgroup_sk_free(struct sock_cgroup_data *skcd) {}
 
-#endif	/* CONFIG_CGROUP_DATA */
+#endif	/* CONFIG_SOCK_CGROUP_DATA */
 
 #endif /* _LINUX_CGROUP_H */
