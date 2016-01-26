@@ -180,16 +180,19 @@ static const struct ltr501_samp_table ltr501_ps_samp_table[] = {
 			{500000, 2000000}
 };
 
-static unsigned int ltr501_match_samp_freq(const struct ltr501_samp_table *tab,
-					   int len, int val, int val2)
+static int ltr501_match_samp_freq(const struct ltr501_samp_table *tab,
+					   int len, int val, int val2,
+					   int *ret)
 {
 	int i, freq;
 
 	freq = val * 1000000 + val2;
 
 	for (i = 0; i < len; i++) {
-		if (tab[i].freq_val == freq)
-			return i;
+		if (tab[i].freq_val == freq) {
+			*ret = i;
+			return 0;
+		}
 	}
 
 	return -EINVAL;
@@ -236,12 +239,12 @@ static int ltr501_als_write_samp_freq(struct ltr501_data *data,
 {
 	int i, ret;
 
-	i = ltr501_match_samp_freq(ltr501_als_samp_table,
+	ret = ltr501_match_samp_freq(ltr501_als_samp_table,
 				   ARRAY_SIZE(ltr501_als_samp_table),
-				   val, val2);
+				   val, val2, &i);
 
-	if (i < 0)
-		return i;
+	if (ret < 0)
+		return ret;
 
 	mutex_lock(&data->lock_als);
 	ret = regmap_field_write(data->reg_als_rate, i);
@@ -255,12 +258,12 @@ static int ltr501_ps_write_samp_freq(struct ltr501_data *data,
 {
 	int i, ret;
 
-	i = ltr501_match_samp_freq(ltr501_ps_samp_table,
+	ret = ltr501_match_samp_freq(ltr501_ps_samp_table,
 				   ARRAY_SIZE(ltr501_ps_samp_table),
-				   val, val2);
+				   val, val2, &i);
 
-	if (i < 0)
-		return i;
+	if (ret < 0)
+		return ret;
 
 	mutex_lock(&data->lock_ps);
 	ret = regmap_field_write(data->reg_ps_rate, i);
