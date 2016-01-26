@@ -1430,6 +1430,14 @@ void intel_gmch_remove(void)
 	if (--intel_private.refcount)
 		return;
 
+	if (intel_private.scratch_page) {
+		if (intel_private.needs_dmar)
+			pci_unmap_page(intel_private.pcidev,
+				       intel_private.scratch_page_dma,
+				       PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
+
+		__free_page(intel_private.scratch_page);
+	}
 	if (intel_private.pcidev)
 		pci_dev_put(intel_private.pcidev);
 	if (intel_private.bridge_dev)
