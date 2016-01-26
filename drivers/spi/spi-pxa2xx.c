@@ -1328,11 +1328,30 @@ static int pxa2xx_spi_get_port_id(struct acpi_device *adev)
 		port_id = devid;
 	return port_id;
 }
+
+static int pxa2xx_spi_fw_translate_cs(struct spi_master *master, unsigned cs)
+{
+	struct driver_data *drv_data = spi_master_get_devdata(master);
+
+	switch (drv_data->ssp_type) {
+	/*
+	 * For Atoms the Windows driver starts enumerating chip selects
+	 * from 1 instead of 0 so translate it here to match what Linux
+	 * expects.
+	 */
+	case LPSS_BYT_SSP:
+		return cs - 1;
+
+	default:
+		return cs;
+	}
+}
 #else /* !CONFIG_ACPI */
 static int pxa2xx_spi_get_port_id(struct acpi_device *adev)
 {
 	return -1;
 }
+#define pxa2xx_spi_fw_translate_cs	NULL
 #endif
 
 /*
@@ -1490,6 +1509,7 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
 	master->setup = setup;
 	master->transfer_one_message = pxa2xx_spi_transfer_one_message;
 	master->unprepare_transfer_hardware = pxa2xx_spi_unprepare_transfer;
+	master->fw_translate_cs = pxa2xx_spi_fw_translate_cs;
 	master->auto_runtime_pm = true;
 
 	drv_data->ssp_type = ssp->type;
