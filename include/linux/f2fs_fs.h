@@ -387,6 +387,11 @@ struct sit_journal {
 	__u8 reserved[SIT_JOURNAL_RESERVED];
 } __packed;
 
+struct f2fs_extra_info {
+	__le64 kbytes_written;
+	__u8 reserved[SUM_JOURNAL_SIZE - 10];
+} __packed;
+
 /* 4KB-sized summary block structure */
 struct f2fs_summary_block {
 	struct f2fs_summary entries[ENTRIES_IN_SUM];
@@ -398,6 +403,7 @@ struct f2fs_summary_block {
 	union {
 		struct nat_journal nat_j;
 		struct sit_journal sit_j;
+		struct f2fs_extra_info info;
 	};
 	struct summary_footer footer;
 } __packed;

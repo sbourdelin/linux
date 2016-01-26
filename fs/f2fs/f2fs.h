@@ -844,6 +844,10 @@ struct f2fs_sb_info {
 	struct list_head s_list;
 	struct mutex umount_mutex;
 	unsigned int shrinker_run_no;
+
+	/* For write statistics */
+	unsigned long sectors_written_start;
+	unsigned long long kbytes_written;
 };
 
 static inline void f2fs_update_time(struct f2fs_sb_info *sbi, int type)
