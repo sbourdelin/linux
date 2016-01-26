@@ -73,6 +73,11 @@
 #define XHCI_HLC               (1 << 19)
 #define XHCI_BLC               (1 << 20)
 
+/* Debug capability - section 7.6.8 */
+#define XHCI_DBC_DCCTRL		0x20
+#define XHCI_DBC_DCCTRL_DCR	(1 << 0)
+#define XHCI_DBC_DCCTRL_DCE	(1 << 31)
+
 /* command register values to disable interrupts and halt the HC */
 /* start/stop HC execution - do not write unless HC is halted*/
 #define XHCI_CMD_RUN		(1 << 0)
