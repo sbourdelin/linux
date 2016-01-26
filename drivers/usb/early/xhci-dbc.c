@@ -6,6 +6,9 @@
  * Author: Lu Baolu <baolu.lu@linux.intel.com>
  * Some code shared with EHCI debug port and xHCI driver.
  *
+ * Please read Documentation/usb/xhci-dbc.txt before you start to develop
+ * or use code in this file.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
