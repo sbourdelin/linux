@@ -880,6 +880,11 @@ int intel_logical_ring_begin(struct drm_i915_gem_request *req, int num_dwords)
 	if (ret)
 		return ret;
 
+	// If the ringbuffer is in stolen memory we need to be sure that the
+	// gpu is awake before writing to it
+	if (req->ringbuf->obj->stolen && num_dwords > 0)
+		assert_rpm_wakelock_held(dev_priv);
+
 	req->ringbuf->space -= num_dwords * sizeof(uint32_t);
 	return 0;
 }
