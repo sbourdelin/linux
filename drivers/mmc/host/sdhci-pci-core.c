@@ -101,7 +101,6 @@ static const struct sdhci_pci_fixes sdhci_ene_714 = {
 static const struct sdhci_pci_fixes sdhci_cafe = {
 	.quirks		= SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER |
 			  SDHCI_QUIRK_NO_BUSY_IRQ |
-			  SDHCI_QUIRK_BROKEN_CARD_DETECTION |
 			  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
 };
 
@@ -1611,6 +1610,10 @@ static struct sdhci_pci_slot *sdhci_pci_probe_slot(
 	host->ops = &sdhci_pci_ops;
 	host->quirks = chip->quirks;
 	host->quirks2 = chip->quirks2;
+
+	if ((chip->pdev->vendor == PCI_VENDOR_ID_MARVELL) &&
+	    (chip->pdev->device == PCI_DEVICE_ID_MARVELL_88ALP01_SD))
+	    host->mmc->caps |= MMC_CAP_NEEDS_POLL;
 
 	host->irq = pdev->irq;
 
