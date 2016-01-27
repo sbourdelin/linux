@@ -1395,12 +1395,15 @@ eb_select_ring(struct drm_i915_private *dev_priv,
 	}
 
 	if (user_ring_id == I915_EXEC_BSD && HAS_BSD2(dev_priv)) {
-		unsigned int bsd_idx = args->flags & I915_EXEC_BSD_MASK;
+		unsigned int bsd_idx = (args->flags & I915_EXEC_BSD_MASK) >>
+					I915_EXEC_BSD_SHIFT;
 
-		if (bsd_idx == I915_EXEC_BSD_DEFAULT) {
+		if (bsd_idx == (I915_EXEC_BSD_DEFAULT >> I915_EXEC_BSD_SHIFT)) {
 			bsd_idx = gen8_dispatch_bsd_ring(dev_priv, file);
-		} else if (bsd_idx >= I915_EXEC_BSD_RING1 &&
-			   bsd_idx <= I915_EXEC_BSD_RING2) {
+		} else if (bsd_idx >=
+			  (I915_EXEC_BSD_RING1 >> I915_EXEC_BSD_SHIFT) &&
+			  bsd_idx <=
+			  (I915_EXEC_BSD_RING2 >> I915_EXEC_BSD_SHIFT)) {
 			bsd_idx--;
 		} else {
 			DRM_DEBUG("execbuf with unknown bsd ring: %u\n",
