@@ -39,8 +39,7 @@ static int __init nios2_soc_device_init(void)
 		}
 	}
 
-	return of_platform_populate(NULL, of_default_bus_match_table,
-		NULL, NULL);
+	return of_platform_default_populate(NULL, NULL, NULL);
 }
 
 device_initcall(nios2_soc_device_init);
