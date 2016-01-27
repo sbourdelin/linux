@@ -140,8 +140,7 @@ static const struct sdhci_ops bcm2835_sdhci_ops = {
 };
 
 static const struct sdhci_pltfm_data bcm2835_sdhci_pdata = {
-	.quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
-		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
+	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
 	.ops = &bcm2835_sdhci_ops,
 };
 
@@ -155,6 +154,8 @@ static int bcm2835_sdhci_probe(struct platform_device *pdev)
 	host = sdhci_pltfm_init(pdev, &bcm2835_sdhci_pdata, 0);
 	if (IS_ERR(host))
 		return PTR_ERR(host);
+
+	host->mmc->caps |= MMC_CAP_NEEDS_POLL;
 
 	bcm2835_host = devm_kzalloc(&pdev->dev, sizeof(*bcm2835_host),
 					GFP_KERNEL);
