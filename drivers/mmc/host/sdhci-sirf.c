@@ -195,7 +195,9 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
 	priv = sdhci_pltfm_priv(pltfm_host);
 	priv->gpio_cd = gpio_cd;
 
-	sdhci_get_of_property(pdev);
+	ret = sdhci_get_of_property(pdev);
+	if (ret)
+		return ret;
 
 	ret = clk_prepare_enable(pltfm_host->clk);
 	if (ret)
