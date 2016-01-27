@@ -259,6 +259,8 @@ kernel-doc-nano-HOWTO.txt
 	- mini HowTo on generation and location of kernel documentation files.
 kernel-docs.txt
 	- listing of various WWW + books that document kernel internals.
+kernel-dot-emacs.txt
+	- emacs dot file for kernel coding style.
 kernel-parameters.txt
 	- summary listing of command line / boot prompt args for the kernel.
 kernel-per-CPU-kthreads.txt
