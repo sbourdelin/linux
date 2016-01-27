@@ -952,8 +952,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
 static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
 	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
 			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
-			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
+			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
 	.ops = &sdhci_esdhc_ops,
 };
 
@@ -1012,7 +1011,7 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
 		return ret;
 
 	if (!IS_ERR_VALUE(mmc_gpio_get_cd(host->mmc)))
-		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+		host->mmc->caps &= MMC_CAP_NEEDS_POLL;
 
 	return 0;
 }
@@ -1064,7 +1063,7 @@ static int sdhci_esdhc_imx_probe_nondt(struct platform_device *pdev,
 
 	case ESDHC_CD_CONTROLLER:
 		/* we have a working card_detect back */
-		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+		host->mmc->caps &= MMC_CAP_NEEDS_POLL;
 		break;
 
 	case ESDHC_CD_PERMANENT:
@@ -1103,6 +1102,8 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
 	host = sdhci_pltfm_init(pdev, &sdhci_esdhc_imx_pdata, 0);
 	if (IS_ERR(host))
 		return PTR_ERR(host);
+
+	host->mmc->caps |= MMC_CAP_NEEDS_POLL;
 
 	pltfm_host = sdhci_priv(host);
 
