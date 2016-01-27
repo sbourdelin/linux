@@ -304,6 +304,12 @@ static inline struct crypto_aead *crypto_aead_reqtfm(struct aead_request *req)
 	return __crypto_aead_cast(req->base.tfm);
 }
 
+static inline struct aead_request *aead_request_cast(
+					struct crypto_async_request *req)
+{
+	return container_of(req, struct aead_request, base);
+}
+
 /**
  * crypto_aead_encrypt() - encrypt plaintext
  * @req: reference to the aead_request handle that holds all information
