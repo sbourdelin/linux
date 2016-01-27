@@ -10,6 +10,10 @@ struct task_struct;
 extern int debug_locks;
 extern int debug_locks_silent;
 
+static inline void __debug_locks_on(void)
+{
+	debug_locks = 1;
+}
 
 static inline int __debug_locks_off(void)
 {
