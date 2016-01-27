@@ -177,16 +177,13 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
 		host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
 	}
 
-	sdhci_get_of_property(pdev);
+	ret = sdhci_get_of_property(pdev);
+	if (ret)
+		goto clk_disable_all;
+
 	pltfm_host = sdhci_priv(host);
 	pltfm_host->priv = sdhci_arasan;
 	pltfm_host->clk = clk_xin;
-
-	ret = mmc_of_parse(host->mmc);
-	if (ret) {
-		dev_err(&pdev->dev, "parsing dt failed (%u)\n", ret);
-		goto clk_disable_all;
-	}
 
 	ret = sdhci_add_host(host);
 	if (ret)
