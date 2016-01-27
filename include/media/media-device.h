@@ -323,6 +323,11 @@ struct media_device {
 	spinlock_t lock;
 	/* Serializes graph operations. */
 	struct mutex graph_mutex;
+	/*
+	 * Graph walk for power state walk. Access serialised using
+	 * graph_mutex.
+	 */
+	struct media_entity_graph pm_count_walk;
 
 	int (*link_notify)(struct media_link *link, u32 flags,
 			   unsigned int notification);
