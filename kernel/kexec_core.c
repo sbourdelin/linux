@@ -968,7 +968,7 @@ int crash_shrink_memory(unsigned long new_size)
 	crashk_res.end = end - 1;
 
 	insert_resource(&iomem_resource, ram_res);
-	crash_unmap_reserved_pages();
+	crash_unmap_reserved_pages(0);
 
 unlock:
 	mutex_unlock(&kexec_mutex);
@@ -1558,5 +1558,5 @@ int kernel_kexec(void)
 void __weak crash_map_reserved_pages(void)
 {}
 
-void __weak crash_unmap_reserved_pages(void)
+void __weak crash_unmap_reserved_pages(int error)
 {}

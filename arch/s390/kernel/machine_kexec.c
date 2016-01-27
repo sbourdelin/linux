@@ -49,7 +49,7 @@ static int machine_kdump_pm_cb(struct notifier_block *nb, unsigned long action,
 	case PM_POST_SUSPEND:
 	case PM_POST_HIBERNATION:
 		if (crashk_res.start)
-			crash_unmap_reserved_pages();
+			crash_unmap_reserved_pages(0);
 		break;
 	default:
 		return NOTIFY_DONE;
@@ -147,39 +147,34 @@ static int kdump_csum_valid(struct kimage *image)
 }
 
 /*
- * Map or unmap crashkernel memory
+ * Map crashkernel memory
  */
-static void crash_map_pages(int enable)
+void crash_map_reserved_pages(void)
 {
 	unsigned long size = resource_size(&crashk_res);
 
 	BUG_ON(crashk_res.start % KEXEC_CRASH_MEM_ALIGN ||
 	       size % KEXEC_CRASH_MEM_ALIGN);
-	if (enable)
-		vmem_add_mapping(crashk_res.start, size);
-	else {
-		vmem_remove_mapping(crashk_res.start, size);
-		if (size)
-			os_info_crashkernel_add(crashk_res.start, size);
-		else
-			os_info_crashkernel_add(0, 0);
-	}
-}
-
-/*
- * Map crashkernel memory
- */
-void crash_map_reserved_pages(void)
-{
-	crash_map_pages(1);
+	vmem_add_mapping(crashk_res.start, size);
 }
 
 /*
  * Unmap crashkernel memory
  */
-void crash_unmap_reserved_pages(void)
+void crash_unmap_reserved_pages(int error)
 {
-	crash_map_pages(0);
+	unsigned long size = resource_size(&crashk_res);
+
+	BUG_ON(crashk_res.start % KEXEC_CRASH_MEM_ALIGN ||
+	       size % KEXEC_CRASH_MEM_ALIGN);
+	vmem_remove_mapping(crashk_res.start, size);
+
+	if (error)
+		return;
+	if (size)
+		os_info_crashkernel_add(crashk_res.start, size);
+	else
+		os_info_crashkernel_add(0, 0);
 }
 
 /*
