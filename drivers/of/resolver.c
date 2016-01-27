@@ -40,8 +40,10 @@ static struct device_node *__of_find_node_by_full_name(struct device_node *node,
 
 	for_each_child_of_node(node, child) {
 		found = __of_find_node_by_full_name(child, full_name);
-		if (found != NULL)
+		if (found != NULL) {
+			of_node_put(child);
 			return found;
+		}
 	}
 
 	return NULL;
