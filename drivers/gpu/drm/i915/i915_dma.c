@@ -49,6 +49,7 @@
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
 #include <linux/oom.h>
+#include <linux/dmi.h>
 
 
 static int i915_getparam(struct drm_device *dev, void *data,
@@ -855,6 +856,49 @@ static void intel_init_dpio(struct drm_i915_private *dev_priv)
 	}
 }
 
+static void dmi_decode_memory_info(const struct dmi_header *hdr, void *priv)
+{
+	struct drm_i915_private *dev_priv = (struct drm_i915_private *) priv;
+	const u8 *data = (const u8 *) hdr;
+	uint16_t size, mem_speed;
+
+#define DMI_CONF_MEM_SPEED_OFFSET	0x20
+#define DMI_MEM_SPEED_OFFSET		0x15
+#define DMI_MEM_SIZE_OFFSET		0x0C
+
+	if (hdr->type == DMI_ENTRY_MEM_DEVICE) {
+		/* Found a memory channel ? */
+		size = (uint16_t) (*((uint16_t *)(data + DMI_MEM_SIZE_OFFSET)));
+		if (size == 0)
+			return;
+
+		dev_priv->dmi.mem_channel++;
+
+		/* Get the speed */
+		if (hdr->length > DMI_CONF_MEM_SPEED_OFFSET)
+			mem_speed =
+				(uint16_t) (*((uint16_t *)(data + DMI_CONF_MEM_SPEED_OFFSET)));
+		else if (hdr->length > DMI_MEM_SPEED_OFFSET)
+			mem_speed =
+				(uint16_t) (*((uint16_t *)(data + DMI_MEM_SPEED_OFFSET)));
+		else
+			mem_speed = -1;
+
+		/*
+		 * Check all channels have same speed
+		 * else mark speed as invalid
+		 */
+		if (dev_priv->dmi.mem_speed == 0) {
+			if (mem_speed > 0)
+				dev_priv->dmi.mem_speed = mem_speed;
+			else
+				dev_priv->dmi.mem_speed = -1;
+		} else if (dev_priv->dmi.mem_speed > 0 &&
+					dev_priv->dmi.mem_speed != mem_speed)
+			dev_priv->dmi.mem_speed = -1;
+	}
+}
+
 /**
  * i915_driver_load - setup chip and create an initial config
  * @dev: DRM device
@@ -881,6 +925,9 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	dev->dev_private = dev_priv;
 	dev_priv->dev = dev;
+
+	/* walk the dmi device table for getting platform memory information */
+	dmi_walk(dmi_decode_memory_info, (void *) dev_priv);
 
 	/* Setup the write-once "constant" device info */
 	device_info = (struct intel_device_info *)&dev_priv->info;
