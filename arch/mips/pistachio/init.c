@@ -128,7 +128,7 @@ static int __init plat_of_setup(void)
 	if (!of_have_populated_dt())
 		panic("Device tree not present");
 
-	if (of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL))
+	if (of_platform_default_populate(NULL, NULL, NULL))
 		panic("Failed to populate DT");
 
 	return 0;

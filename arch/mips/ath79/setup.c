@@ -248,7 +248,7 @@ void __init plat_time_init(void)
 
 static int __init ath79_setup(void)
 {
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 	if  (mips_machtype == ATH79_MACH_GENERIC_OF)
 		return 0;
 
