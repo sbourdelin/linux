@@ -120,6 +120,7 @@ config ARCH_VEXPRESS
 
 config ARCH_XGENE
 	bool "AppliedMicro X-Gene SOC Family"
+	depends on !ARM64_16K_PAGES
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
 
