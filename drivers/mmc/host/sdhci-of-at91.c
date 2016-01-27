@@ -194,11 +194,9 @@ static int sdhci_at91_probe(struct platform_device *pdev)
 	pltfm_host = sdhci_priv(host);
 	pltfm_host->priv = priv;
 
-	ret = mmc_of_parse(host->mmc);
+	ret = sdhci_get_of_property(pdev);
 	if (ret)
 		goto clocks_disable_unprepare;
-
-	sdhci_get_of_property(pdev);
 
 	pm_runtime_get_noresume(&pdev->dev);
 	pm_runtime_set_active(&pdev->dev);
