@@ -4181,7 +4181,7 @@ static void ironlake_pch_enable(struct drm_crtc *crtc)
 
 	intel_fdi_normal_train(crtc);
 
-	intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, true);
+	intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, !IS_GEN5(dev));
 
 	/* For PCH DP, enable TRANS_DP_CTL */
 	if (HAS_PCH_CPT(dev) && intel_crtc->config->has_dp_encoder) {
@@ -4930,6 +4930,13 @@ static void ironlake_crtc_enable(struct drm_crtc *crtc)
 	/* Must wait for vblank to avoid spurious PCH FIFO underruns */
 	if (intel_crtc->config->has_pch_encoder)
 		intel_wait_for_vblank(dev, pipe);
+	if (IS_GEN5(dev)) {
+		intel_wait_for_vblank(dev, pipe);
+		intel_wait_for_vblank(dev, pipe);
+		intel_wait_for_vblank(dev, pipe);
+		intel_wait_for_vblank(dev, pipe);
+		intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, true);
+	}
 	intel_set_pch_fifo_underrun_reporting(dev_priv, pipe, true);
 
 	intel_fbc_enable(intel_crtc);

@@ -236,6 +236,10 @@ void ilk_update_display_irq(struct drm_i915_private *dev_priv,
 		dev_priv->irq_mask = new_val;
 		I915_WRITE(DEIMR, dev_priv->irq_mask);
 		POSTING_READ(DEIMR);
+		I915_WRITE(DEIIR, dev_priv->irq_mask);
+		POSTING_READ(DEIIR);
+		I915_WRITE(DEIIR, dev_priv->irq_mask);
+		POSTING_READ(DEIIR);
 	}
 }
 
@@ -492,6 +496,10 @@ void ibx_display_interrupt_update(struct drm_i915_private *dev_priv,
 
 	I915_WRITE(SDEIMR, sdeimr);
 	POSTING_READ(SDEIMR);
+	I915_WRITE(SDEIIR, sdeimr);
+	POSTING_READ(SDEIIR);
+	I915_WRITE(SDEIIR, sdeimr);
+	POSTING_READ(SDEIIR);
 }
 
 static void
