@@ -1380,6 +1380,11 @@ static int i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		}
 	}
 
+	if ((priv->features & FEATURE_IRQ) && dev->irq_invalid) {
+		dev_warn(&dev->dev, "Interrupt line is invalid!\n");
+		priv->features &= ~FEATURE_IRQ;
+	}
+
 	if (priv->features & FEATURE_IRQ) {
 		init_waitqueue_head(&priv->waitq);
 
