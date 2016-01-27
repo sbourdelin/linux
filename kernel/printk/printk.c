@@ -1745,6 +1745,12 @@ asmlinkage void early_printk(const char *fmt, ...)
 }
 #endif
 
+int is_printk_lock(raw_spinlock_t *lock)
+{
+	return	(lock == &console_sem.lock) ||
+		(lock == &logbuf_lock)      ;
+}
+
 static int __add_preferred_console(char *name, int idx, char *options,
 				   char *brl_options)
 {
