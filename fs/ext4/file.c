@@ -196,99 +196,65 @@ out:
 static int ext4_dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	int result;
-	handle_t *handle = NULL;
 	struct inode *inode = file_inode(vma->vm_file);
 	struct super_block *sb = inode->i_sb;
 	bool write = vmf->flags & FAULT_FLAG_WRITE;
 
 	if (write) {
-		unsigned nblocks;
-		switch (vmf->flags & FAULT_FLAG_SIZE_MASK) {
-		case FAULT_FLAG_SIZE_PTE:
-			nblocks = EXT4_DATA_TRANS_BLOCKS(sb);
-			break;
-		case FAULT_FLAG_SIZE_PMD:
-			nblocks = ext4_chunk_trans_blocks(inode,
-						PMD_SIZE / PAGE_SIZE);
-			break;
-		default:
-			return VM_FAULT_FALLBACK;
-		}
-
 		sb_start_pagefault(sb);
 		file_update_time(vma->vm_file);
-		down_read(&EXT4_I(inode)->i_mmap_sem);
-		handle = ext4_journal_start_sb(sb, EXT4_HT_WRITE_PAGE, nblocks);
-	} else
-		down_read(&EXT4_I(inode)->i_mmap_sem);
+	}
 
-	if (IS_ERR(handle))
-		result = VM_FAULT_SIGBUS;
-	else
-		result = dax_fault(vma, vmf, ext4_dax_mmap_get_block, NULL);
+	down_read(&EXT4_I(inode)->i_mmap_sem);
+	result = dax_fault(vma, vmf, ext4_dax_mmap_get_block, NULL);
+	up_read(&EXT4_I(inode)->i_mmap_sem);
 
-	if (write) {
-		if (!IS_ERR(handle))
-			ext4_journal_stop(handle);
-		up_read(&EXT4_I(inode)->i_mmap_sem);
+	if (write)
 		sb_end_pagefault(sb);
-	} else
-		up_read(&EXT4_I(inode)->i_mmap_sem);
 
 	return result;
 }
 
 static int ext4_dax_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	int err;
+	int result;
 	struct inode *inode = file_inode(vma->vm_file);
+	struct super_block *sb = inode->i_sb;
+	handle_t *handle;
+	unsigned nblocks;
+
+	switch (vmf->flags & FAULT_FLAG_SIZE_MASK) {
+	case FAULT_FLAG_SIZE_PTE:
+		nblocks = EXT4_DATA_TRANS_BLOCKS(sb);
+		break;
+	case FAULT_FLAG_SIZE_PMD:
+		nblocks = ext4_chunk_trans_blocks(inode, PMD_SIZE / PAGE_SIZE);
+		break;
+	default:
+		return VM_FAULT_FALLBACK;
+	}
 
 	sb_start_pagefault(inode->i_sb);
 	file_update_time(vma->vm_file);
-	down_read(&EXT4_I(inode)->i_mmap_sem);
-	err = dax_mkwrite(vma, vmf, ext4_dax_mmap_get_block, NULL);
-	up_read(&EXT4_I(inode)->i_mmap_sem);
+
+	handle = ext4_journal_start_sb(sb, EXT4_HT_WRITE_PAGE, nblocks);
+	if (IS_ERR(handle)) {
+		result = VM_FAULT_SIGBUS;
+	} else {
+		down_write(&EXT4_I(inode)->i_mmap_sem);
+		result = dax_mkwrite(vma, vmf, ext4_dax_mmap_get_block, NULL);
+		up_write(&EXT4_I(inode)->i_mmap_sem);
+		ext4_journal_stop(handle);
+	}
+
 	sb_end_pagefault(inode->i_sb);
 
-	return err;
-}
-
-/*
- * Handle write fault for VM_MIXEDMAP mappings. Similarly to ext4_dax_mkwrite()
- * handler we check for races agaist truncate. Note that since we cycle through
- * i_mmap_sem, we are sure that also any hole punching that began before we
- * were called is finished by now and so if it included part of the file we
- * are working on, our pte will get unmapped and the check for pte_same() in
- * wp_pfn_shared() fails. Thus fault gets retried and things work out as
- * desired.
- */
-static int ext4_dax_pfn_mkwrite(struct vm_area_struct *vma,
-				struct vm_fault *vmf)
-{
-	struct inode *inode = file_inode(vma->vm_file);
-	struct super_block *sb = inode->i_sb;
-	loff_t size;
-	int ret;
-
-	sb_start_pagefault(sb);
-	file_update_time(vma->vm_file);
-	down_read(&EXT4_I(inode)->i_mmap_sem);
-	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	if (vmf->pgoff >= size)
-		ret = VM_FAULT_SIGBUS;
-	else
-		ret = dax_pfn_mkwrite(vma, vmf);
-	up_read(&EXT4_I(inode)->i_mmap_sem);
-	sb_end_pagefault(sb);
-
-	return ret;
+	return result;
 }
 
 static const struct vm_operations_struct ext4_dax_vm_ops = {
 	.fault		= ext4_dax_fault,
-	.huge_fault	= ext4_dax_fault,
 	.page_mkwrite	= ext4_dax_mkwrite,
-	.pfn_mkwrite	= ext4_dax_pfn_mkwrite,
 };
 #else
 #define ext4_dax_vm_ops	ext4_file_vm_ops

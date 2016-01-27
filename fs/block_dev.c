@@ -1722,12 +1722,17 @@ static const struct address_space_operations def_blk_aops = {
  *
  * Finally, unlike the filemap_page_mkwrite() case there is no
  * filesystem superblock to sync against freezing.  We still include a
- * pfn_mkwrite callback for dax drivers to receive write fault
+ * page_mkwrite callback for dax drivers to receive write fault
  * notifications.
  */
 static int blkdev_dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	return dax_fault(vma, vmf, blkdev_get_block, NULL);
+}
+
+static int blkdev_dax_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	return dax_mkwrite(vma, vmf, blkdev_get_block, NULL);
 }
 
 static void blkdev_vm_open(struct vm_area_struct *vma)
@@ -1754,8 +1759,7 @@ static const struct vm_operations_struct blkdev_dax_vm_ops = {
 	.open		= blkdev_vm_open,
 	.close		= blkdev_vm_close,
 	.fault		= blkdev_dax_fault,
-	.huge_fault	= blkdev_dax_fault,
-	.pfn_mkwrite	= blkdev_dax_fault,
+	.page_mkwrite	= blkdev_dax_mkwrite,
 };
 
 static const struct vm_operations_struct blkdev_default_vm_ops = {

@@ -12,8 +12,8 @@ int dax_zero_page_range(struct inode *, loff_t from, unsigned len, get_block_t);
 int dax_truncate_page(struct inode *, loff_t from, get_block_t);
 int dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t,
 		dax_iodone_t);
-int dax_pfn_mkwrite(struct vm_area_struct *, struct vm_fault *);
-#define dax_mkwrite(vma, vmf, gb, iod)		dax_fault(vma, vmf, gb, iod)
+int dax_mkwrite(struct vm_area_struct *, struct vm_fault *, get_block_t,
+		dax_iodone_t);
 
 static inline bool vma_is_dax(struct vm_area_struct *vma)
 {

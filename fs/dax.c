@@ -372,7 +372,7 @@ static int dax_radix_entry(struct address_space *mapping, pgoff_t index,
 
 	if (sector == NO_SECTOR) {
 		/*
-		 * This can happen during correct operation if our pfn_mkwrite
+		 * This can happen during correct operation if our page_mkwrite
 		 * fault raced against a hole punch operation.  If this
 		 * happens the pte that was hole punched will have been
 		 * unmapped and the radix tree entry will have been removed by
@@ -584,7 +584,6 @@ static int dax_pte_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	sector_t block;
 	pgoff_t size;
 	int error;
-	int major = 0;
 
 	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (vmf->pgoff >= size)
@@ -624,20 +623,8 @@ static int dax_pte_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	if (error)
 		goto unlock_page;
 
-	if (!buffer_mapped(&bh) && !buffer_unwritten(&bh) && !vmf->cow_page) {
-		if (vmf->flags & FAULT_FLAG_WRITE) {
-			error = get_block(inode, block, &bh, 1);
-			count_vm_event(PGMAJFAULT);
-			mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
-			major = VM_FAULT_MAJOR;
-			if (!error && (bh.b_size < PAGE_SIZE))
-				error = -EIO;
-			if (error)
-				goto unlock_page;
-		} else {
-			return dax_load_hole(mapping, page, vmf);
-		}
-	}
+	if (!buffer_mapped(&bh) && !buffer_unwritten(&bh) && !vmf->cow_page)
+		return dax_load_hole(mapping, page, vmf);
 
 	if (vmf->cow_page) {
 		struct page *new_page = vmf->cow_page;
@@ -655,16 +642,101 @@ static int dax_pte_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 								PAGE_SHIFT;
 			if (vmf->pgoff >= size) {
 				i_mmap_unlock_read(mapping);
-				error = -EIO;
-				goto out;
+				return VM_FAULT_SIGBUS;
 			}
 		}
 		return VM_FAULT_LOCKED;
 	}
 
-	/* Check we didn't race with a read fault installing a new page */
-	if (!page && major)
-		page = find_lock_page(mapping, vmf->pgoff);
+	/*
+	 * If we successfully insert a mapping to an unwritten extent, we
+	 * need to convert the unwritten extent.  If there is an error
+	 * inserting the mapping, the filesystem needs to leave it as
+	 * unwritten to prevent exposure of the stale underlying data to
+	 * userspace, but we still need to call the completion function so
+	 * the private resources on the mapping buffer can be released. We
+	 * indicate what the callback should do via the uptodate variable,
+	 * same as for normal BH based IO completions.
+	 */
+	error = dax_insert_mapping(inode, &bh, vma, vmf);
+	if (buffer_unwritten(&bh)) {
+		if (complete_unwritten)
+			complete_unwritten(&bh, !error);
+		else
+			WARN_ON_ONCE(!(vmf->flags & FAULT_FLAG_WRITE));
+	}
+
+ out:
+	if (error == -ENOMEM)
+		return VM_FAULT_OOM;
+	/* -EBUSY is fine, somebody else faulted on the same PTE */
+	if ((error < 0) && (error != -EBUSY))
+		return VM_FAULT_SIGBUS;
+	return VM_FAULT_NOPAGE;
+
+ unlock_page:
+	if (page) {
+		unlock_page(page);
+		page_cache_release(page);
+	}
+	goto out;
+}
+
+static int dax_pte_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
+			get_block_t get_block, dax_iodone_t complete_unwritten)
+{
+	struct file *file = vma->vm_file;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	struct page *page;
+	struct buffer_head bh;
+	unsigned blkbits = inode->i_blkbits;
+	sector_t block;
+	pgoff_t size;
+	int error;
+	int major = 0;
+
+	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (vmf->pgoff >= size)
+		return VM_FAULT_SIGBUS;
+
+	memset(&bh, 0, sizeof(bh));
+	block = (sector_t)vmf->pgoff << (PAGE_SHIFT - blkbits);
+	bh.b_bdev = inode->i_sb->s_bdev;
+	bh.b_size = PAGE_SIZE;
+
+ repeat:
+	page = find_get_page(mapping, vmf->pgoff);
+	if (page) {
+		if (!lock_page_or_retry(page, vma->vm_mm, vmf->flags)) {
+			page_cache_release(page);
+			return VM_FAULT_RETRY;
+		}
+		if (unlikely(page->mapping != mapping)) {
+			unlock_page(page);
+			page_cache_release(page);
+			goto repeat;
+		}
+		size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		if (unlikely(vmf->pgoff >= size)) {
+			/*
+			 * We have a struct page covering a hole in the file
+			 * from a read fault and we've raced with a truncate
+			 */
+			error = -EIO;
+			goto unlock_page;
+		}
+	}
+
+	error = get_block(inode, block, &bh, 1);
+	if (!error && (bh.b_size < PAGE_SIZE))
+		error = -EIO;		/* fs corruption? */
+	if (error)
+		goto unlock_page;
+
+	count_vm_event(PGMAJFAULT);
+	mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
+	major = VM_FAULT_MAJOR;
 
 	if (page) {
 		unmap_mapping_range(mapping, vmf->pgoff << PAGE_SHIFT,
@@ -675,16 +747,6 @@ static int dax_pte_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 		page = NULL;
 	}
 
-	/*
-	 * If we successfully insert the new mapping over an unwritten extent,
-	 * we need to ensure we convert the unwritten extent. If there is an
-	 * error inserting the mapping, the filesystem needs to leave it as
-	 * unwritten to prevent exposure of the stale underlying data to
-	 * userspace, but we still need to call the completion function so
-	 * the private resources on the mapping buffer can be released. We
-	 * indicate what the callback should do via the uptodate variable, same
-	 * as for normal BH based IO completions.
-	 */
 	error = dax_insert_mapping(inode, &bh, vma, vmf);
 	if (buffer_unwritten(&bh)) {
 		if (complete_unwritten)
@@ -734,22 +796,101 @@ static void __dax_dbg(struct buffer_head *bh, unsigned long address,
 
 #define dax_pmd_dbg(bh, address, reason)	__dax_dbg(bh, address, reason, "dax_pmd")
 
-static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
-		pmd_t *pmd, unsigned int flags, get_block_t get_block,
-		dax_iodone_t complete_unwritten)
+static int dax_insert_pmd_mapping(struct inode *inode, struct buffer_head *bh,
+			struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct blk_dax_ctl dax = {
+		.sector = to_sector(bh, inode),
+		.size = PMD_SIZE,
+	};
+	struct block_device *bdev = bh->b_bdev;
+	bool write = vmf->flags & FAULT_FLAG_WRITE;
+	unsigned long address = (unsigned long)vmf->virtual_address;
+	pgoff_t pgoff = linear_page_index(vma, address & PMD_MASK);
+	int major;
+	long length;
+
+	length = dax_map_atomic(bdev, &dax);
+	if (length < 0)
+		return VM_FAULT_SIGBUS;
+	if (length < PMD_SIZE) {
+		dax_pmd_dbg(bh, address, "dax-length too small");
+		goto unmap;
+	}
+
+	if (pfn_t_to_pfn(dax.pfn) & PG_PMD_COLOUR) {
+		dax_pmd_dbg(bh, address, "pfn unaligned");
+		goto unmap;
+	}
+
+	if (!pfn_t_devmap(dax.pfn)) {
+		dax_pmd_dbg(bh, address, "pfn not in memmap");
+		goto unmap;
+	}
+
+	if (buffer_unwritten(bh) || buffer_new(bh)) {
+		clear_pmem(dax.addr, PMD_SIZE);
+		wmb_pmem();
+		count_vm_event(PGMAJFAULT);
+		mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
+		major = VM_FAULT_MAJOR;
+	} else
+		major = 0;
+
+	dax_unmap_atomic(bdev, &dax);
+
+	/*
+	 * For PTE faults we insert a radix tree entry for reads, and
+	 * leave it clean.  Then on the first write we dirty the radix
+	 * tree entry via the dax_mkwrite() path.  This sequence
+	 * allows the dax_mkwrite() call to be simpler and avoid a
+	 * call into get_block() to translate the pgoff to a sector in
+	 * order to be able to create a new radix tree entry.
+	 *
+	 * The PMD path doesn't have an equivalent to
+	 * dax_mkwrite(), though, so for a read followed by a
+	 * write we traverse all the way through __dax_pmd_fault()
+	 * twice.  This means we can just skip inserting a radix tree
+	 * entry completely on the initial read and just wait until
+	 * the write to insert a dirty entry.
+	 */
+	if (write) {
+		int error = dax_radix_entry(vma->vm_file->f_mapping, pgoff,
+						dax.sector, true, true);
+		if (error) {
+			dax_pmd_dbg(bh, address, "PMD radix insertion failed");
+			goto fallback;
+		}
+	}
+
+	dev_dbg(part_to_dev(bdev->bd_part),
+			"%s: %s addr: %lx pfn: %lx sect: %llx\n",
+			__func__, current->comm, address,
+			pfn_t_to_pfn(dax.pfn),
+			(unsigned long long) dax.sector);
+	return major | vmf_insert_pfn_pmd(vma, address, vmf->pmd, dax.pfn,
+						write);
+ 
+ unmap:
+	dax_unmap_atomic(bdev, &dax);
+ fallback:
+	return VM_FAULT_FALLBACK;
+}
+
+static int dax_pmd_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+		get_block_t get_block, dax_iodone_t complete_unwritten)
 {
 	struct file *file = vma->vm_file;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	struct buffer_head bh;
 	unsigned blkbits = inode->i_blkbits;
+	unsigned long address = (unsigned long)vmf->virtual_address;
 	unsigned long pmd_addr = address & PMD_MASK;
-	bool write = flags & FAULT_FLAG_WRITE;
-	struct block_device *bdev;
+	bool write = vmf->flags & FAULT_FLAG_WRITE;
 	pgoff_t size, pgoff;
 	sector_t block;
-	int error, result = 0;
-	bool alloc = false;
+	int result = 0;
 
 	/* dax pmd mappings require pfn_t_devmap() */
 	if (!IS_ENABLED(CONFIG_FS_DAX_PMD))
@@ -757,7 +898,7 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 
 	/* Fall back to PTEs if we're going to COW */
 	if (write && !(vma->vm_flags & VM_SHARED)) {
-		split_huge_pmd(vma, pmd, address);
+		split_huge_pmd(vma, vmf->pmd, address);
 		dax_pmd_dbg(NULL, address, "cow write");
 		return VM_FAULT_FALLBACK;
 	}
@@ -791,14 +932,6 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	if (get_block(inode, block, &bh, 0) != 0)
 		return VM_FAULT_SIGBUS;
 
-	if (!buffer_mapped(&bh) && write) {
-		if (get_block(inode, block, &bh, 1) != 0)
-			return VM_FAULT_SIGBUS;
-		alloc = true;
-	}
-
-	bdev = bh.b_bdev;
-
 	/*
 	 * If the filesystem isn't willing to tell us the length of a hole,
 	 * just fall back to PTEs.  Calling get_block 512 times in a loop
@@ -807,17 +940,6 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	if (!buffer_size_valid(&bh) || bh.b_size < PMD_SIZE) {
 		dax_pmd_dbg(&bh, address, "allocated block too small");
 		return VM_FAULT_FALLBACK;
-	}
-
-	/*
-	 * If we allocated new storage, make sure no process has any
-	 * zero pages covering this hole
-	 */
-	if (alloc) {
-		loff_t lstart = pgoff << PAGE_SHIFT;
-		loff_t lend = lstart + PMD_SIZE - 1; /* inclusive */
-
-		truncate_pagecache_range(inode, lstart, lend);
 	}
 
 	i_mmap_lock_read(mapping);
@@ -839,9 +961,9 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 		goto fallback;
 	}
 
-	if (!write && !buffer_mapped(&bh) && buffer_uptodate(&bh)) {
+	if (!buffer_mapped(&bh) && buffer_uptodate(&bh)) {
 		spinlock_t *ptl;
-		pmd_t entry;
+		pmd_t entry, *pmd = vmf->pmd;
 		struct page *zero_page = get_huge_zero_page();
 
 		if (unlikely(!zero_page)) {
@@ -856,7 +978,7 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 			goto fallback;
 		}
 
-		dev_dbg(part_to_dev(bdev->bd_part),
+		dev_dbg(part_to_dev(bh.b_bdev->bd_part),
 				"%s: %s addr: %lx pfn: <zero> sect: %llx\n",
 				__func__, current->comm, address,
 				(unsigned long long) to_sector(&bh, inode));
@@ -867,74 +989,7 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 		result = VM_FAULT_NOPAGE;
 		spin_unlock(ptl);
 	} else {
-		struct blk_dax_ctl dax = {
-			.sector = to_sector(&bh, inode),
-			.size = PMD_SIZE,
-		};
-		long length = dax_map_atomic(bdev, &dax);
-
-		if (length < 0) {
-			result = VM_FAULT_SIGBUS;
-			goto out;
-		}
-		if (length < PMD_SIZE) {
-			dax_pmd_dbg(&bh, address, "dax-length too small");
-			dax_unmap_atomic(bdev, &dax);
-			goto fallback;
-		}
-		if (pfn_t_to_pfn(dax.pfn) & PG_PMD_COLOUR) {
-			dax_pmd_dbg(&bh, address, "pfn unaligned");
-			dax_unmap_atomic(bdev, &dax);
-			goto fallback;
-		}
-
-		if (!pfn_t_devmap(dax.pfn)) {
-			dax_unmap_atomic(bdev, &dax);
-			dax_pmd_dbg(&bh, address, "pfn not in memmap");
-			goto fallback;
-		}
-
-		if (buffer_unwritten(&bh) || buffer_new(&bh)) {
-			clear_pmem(dax.addr, PMD_SIZE);
-			wmb_pmem();
-			count_vm_event(PGMAJFAULT);
-			mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
-			result |= VM_FAULT_MAJOR;
-		}
-		dax_unmap_atomic(bdev, &dax);
-
-		/*
-		 * For PTE faults we insert a radix tree entry for reads, and
-		 * leave it clean.  Then on the first write we dirty the radix
-		 * tree entry via the dax_pfn_mkwrite() path.  This sequence
-		 * allows the dax_pfn_mkwrite() call to be simpler and avoid a
-		 * call into get_block() to translate the pgoff to a sector in
-		 * order to be able to create a new radix tree entry.
-		 *
-		 * The PMD path doesn't have an equivalent to
-		 * dax_pfn_mkwrite(), though, so for a read followed by a
-		 * write we traverse all the way through __dax_pmd_fault()
-		 * twice.  This means we can just skip inserting a radix tree
-		 * entry completely on the initial read and just wait until
-		 * the write to insert a dirty entry.
-		 */
-		if (write) {
-			error = dax_radix_entry(mapping, pgoff, dax.sector,
-					true, true);
-			if (error) {
-				dax_pmd_dbg(&bh, address,
-						"PMD radix insertion failed");
-				goto fallback;
-			}
-		}
-
-		dev_dbg(part_to_dev(bdev->bd_part),
-				"%s: %s addr: %lx pfn: %lx sect: %llx\n",
-				__func__, current->comm, address,
-				pfn_t_to_pfn(dax.pfn),
-				(unsigned long long) dax.sector);
-		result |= vmf_insert_pfn_pmd(vma, address, pmd,
-				dax.pfn, write);
+		result |= dax_insert_pmd_mapping(inode, &bh, vma, vmf);
 	}
 
  out:
@@ -950,10 +1005,96 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	result = VM_FAULT_FALLBACK;
 	goto out;
 }
+
+static int dax_pmd_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
+		get_block_t get_block, dax_iodone_t complete_unwritten)
+{
+	struct file *file = vma->vm_file;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	unsigned long address = (unsigned long)vmf->virtual_address;
+	struct buffer_head bh;
+	unsigned blkbits = inode->i_blkbits;
+	unsigned long pmd_addr = address & PMD_MASK;
+	struct block_device *bdev;
+	pgoff_t size, pgoff;
+	loff_t lstart, lend;
+	sector_t block;
+	int result = 0;
+
+	pgoff = linear_page_index(vma, pmd_addr);
+	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (pgoff >= size)
+		return VM_FAULT_SIGBUS;
+
+	memset(&bh, 0, sizeof(bh));
+	bh.b_bdev = inode->i_sb->s_bdev;
+	block = (sector_t)pgoff << (PAGE_SHIFT - blkbits);
+
+	bh.b_size = PMD_SIZE;
+
+	if (get_block(inode, block, &bh, 1) != 0)
+		return VM_FAULT_SIGBUS;
+
+	bdev = bh.b_bdev;
+
+	/*
+	 * If the filesystem isn't willing to tell us the length of a hole,
+	 * just fall back to PTEs.  Calling get_block 512 times in a loop
+	 * would be silly.
+	 */
+	if (!buffer_size_valid(&bh) || bh.b_size < PMD_SIZE) {
+		dax_pmd_dbg(&bh, address, "allocated block too small");
+		return VM_FAULT_FALLBACK;
+	}
+
+	/* Make sure no process has any zero pages covering this hole */
+	lstart = pgoff << PAGE_SHIFT;
+	lend = lstart + PMD_SIZE - 1; /* inclusive */
+	truncate_pagecache_range(inode, lstart, lend);
+
+	i_mmap_lock_read(mapping);
+
+	/*
+	 * If a truncate happened while we were allocating blocks, we may
+	 * leave blocks allocated to the file that are beyond EOF.  We can't
+	 * take i_mutex here, so just leave them hanging; they'll be freed
+	 * when the file is deleted.
+	 */
+	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	if (pgoff >= size) {
+		result = VM_FAULT_SIGBUS;
+		goto out;
+	}
+	if ((pgoff | PG_PMD_COLOUR) >= size) {
+		dax_pmd_dbg(&bh, address,
+				"offset + huge page size > file size");
+		goto fallback;
+	}
+
+	result |= dax_insert_pmd_mapping(inode, &bh, vma, vmf);
+
+ out:
+	i_mmap_unlock_read(mapping);
+
+	if (buffer_unwritten(&bh))
+		complete_unwritten(&bh, !(result & VM_FAULT_ERROR));
+
+	return result;
+
+ fallback:
+	count_vm_event(THP_FAULT_FALLBACK);
+	result = VM_FAULT_FALLBACK;
+	goto out;
+}
 #else /* !CONFIG_TRANSPARENT_HUGEPAGE */
-static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
-		pmd_t *pmd, unsigned int flags, get_block_t get_block,
-		dax_iodone_t complete_unwritten)
+static int dax_pmd_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+		get_block_t get_block, dax_iodone_t complete_unwritten)
+{
+	return VM_FAULT_FALLBACK;
+}
+static int dax_pmd_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
+			get_block_t get_block, dax_iodone_t complete_unwritten)
 {
 	return VM_FAULT_FALLBACK;
 }
@@ -978,13 +1119,11 @@ static int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 int dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 		get_block_t get_block, dax_iodone_t iodone)
 {
-	unsigned long address = (unsigned long)vmf->virtual_address;
 	switch (vmf->flags & FAULT_FLAG_SIZE_MASK) {
 	case FAULT_FLAG_SIZE_PTE:
 		return dax_pte_fault(vma, vmf, get_block, iodone);
 	case FAULT_FLAG_SIZE_PMD:
-		return dax_pmd_fault(vma, address, vmf->pmd, vmf->flags,
-						get_block, iodone);
+		return dax_pmd_fault(vma, vmf, get_block, iodone);
 	default:
 		return VM_FAULT_FALLBACK;
 	}
@@ -992,26 +1131,30 @@ int dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 EXPORT_SYMBOL_GPL(dax_fault);
 
 /**
- * dax_pfn_mkwrite - handle first write to DAX page
+ * dax_mkwrite - handle first write to a DAX page
  * @vma: The virtual memory area where the fault occurred
  * @vmf: The description of the fault
+ * @get_block: The filesystem method used to translate file offsets to blocks
+ * @iodone: The filesystem method used to convert unwritten blocks
+ *	to written so the data written to them is exposed.  This is required
+ *	by write faults for filesystems that will return unwritten extent
+ *	mappings from @get_block, but it is optional for reads as
+ *	dax_insert_mapping() will always zero unwritten blocks.  If the fs
+ *	does not support unwritten extents, then it should pass NULL.
  */
-int dax_pfn_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
+int dax_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
+		get_block_t get_block, dax_iodone_t iodone)
 {
-	struct file *file = vma->vm_file;
-
-	/*
-	 * We pass NO_SECTOR to dax_radix_entry() because we expect that a
-	 * RADIX_DAX_PTE entry already exists in the radix tree from a
-	 * previous call to __dax_fault().  We just want to look up that PTE
-	 * entry using vmf->pgoff and make sure the dirty tag is set.  This
-	 * saves us from having to make a call to get_block() here to look
-	 * up the sector.
-	 */
-	dax_radix_entry(file->f_mapping, vmf->pgoff, NO_SECTOR, false, true);
-	return VM_FAULT_NOPAGE;
+	switch (vmf->flags & FAULT_FLAG_SIZE_MASK) {
+	case FAULT_FLAG_SIZE_PTE:
+		return dax_pte_mkwrite(vma, vmf, get_block, iodone);
+	case FAULT_FLAG_SIZE_PMD:
+		return dax_pmd_mkwrite(vma, vmf, get_block, iodone);
+	default:
+		return VM_FAULT_FALLBACK;
+	}
 }
-EXPORT_SYMBOL_GPL(dax_pfn_mkwrite);
+EXPORT_SYMBOL_GPL(dax_mkwrite);
 
 /**
  * dax_zero_page_range - zero a range within a page of a DAX file
