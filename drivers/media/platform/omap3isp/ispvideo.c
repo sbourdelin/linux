@@ -1292,12 +1292,7 @@ static int isp_video_open(struct file *file)
 		goto done;
 	}
 
-	ret = media_entity_graph_walk_init(&handle->graph,
-					   &video->isp->media_dev);
-	if (ret)
-		goto done;
-
-	ret = omap3isp_pipeline_pm_use(&video->video.entity, 1, &handle->graph);
+	ret = v4l2_pipeline_pm_use(&video->video.entity, 1);
 	if (ret < 0) {
 		omap3isp_put(video->isp);
 		goto done;
@@ -1328,7 +1323,6 @@ static int isp_video_open(struct file *file)
 done:
 	if (ret < 0) {
 		v4l2_fh_del(&handle->vfh);
-		media_entity_graph_walk_cleanup(&handle->graph);
 		kfree(handle);
 	}
 
@@ -1348,8 +1342,7 @@ static int isp_video_release(struct file *file)
 	vb2_queue_release(&handle->queue);
 	mutex_unlock(&video->queue_lock);
 
-	omap3isp_pipeline_pm_use(&video->video.entity, 0, &handle->graph);
-	media_entity_graph_walk_cleanup(&handle->graph);
+	v4l2_pipeline_pm_use(&video->video.entity, 0);
 
 	/* Release the file handle. */
 	v4l2_fh_del(vfh);
