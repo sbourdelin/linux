@@ -484,6 +484,11 @@ static void dfx_get_bars(struct device *bdev,
 		bar_start[2] = bar_start[1] = 0;
 		bar_len[2] = bar_len[1] = 0;
 	}
+	if (!(dfx_bus_pci || dfx_bus_eisa || dfx_bus_tc)) {
+		dev_err(bdev, "invalid bus configuration\n");
+		bar_start[2] = bar_start[1] = bar_start[0] = 0;
+		bar_len[2] = bar_len[1] = bar_len[0] = 0;
+	}
 }
 
 static const struct net_device_ops dfx_netdev_ops = {
