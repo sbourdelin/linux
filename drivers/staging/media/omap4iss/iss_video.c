@@ -1009,13 +1009,7 @@ static int iss_video_open(struct file *file)
 		goto done;
 	}
 
-	ret = media_entity_graph_walk_init(&handle->graph,
-					   &video->iss->media_dev);
-	if (ret)
-		goto done;
-
-	ret = omap4iss_pipeline_pm_use(&video->video.entity, 1,
-				       &handle->graph);
+	ret = v4l2_pipeline_pm_use(&video->video.entity, 1);
 	if (ret < 0) {
 		omap4iss_put(video->iss);
 		goto done;
@@ -1054,7 +1048,6 @@ static int iss_video_open(struct file *file)
 done:
 	if (ret < 0) {
 		v4l2_fh_del(&handle->vfh);
-		media_entity_graph_walk_cleanup(&handle->graph);
 		kfree(handle);
 	}
 
@@ -1070,13 +1063,11 @@ static int iss_video_release(struct file *file)
 	/* Disable streaming and free the buffers queue resources. */
 	iss_video_streamoff(file, vfh, video->type);
 
-	omap4iss_pipeline_pm_use(&video->video.entity, 0, &handle->graph);
+	v4l2_pipeline_pm_use(&video->video.entity, 0);
 
 	/* Release the videobuf2 queue */
 	vb2_queue_release(&handle->queue);
 
-	/* Release the file handle. */
-	media_entity_graph_walk_cleanup(&handle->graph);
 	v4l2_fh_del(vfh);
 	kfree(handle);
 	file->private_data = NULL;
