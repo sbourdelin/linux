@@ -436,6 +436,16 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
 	 * driver reported one, then use it. Exit in any case.
 	 */
 	if (gsi < 0) {
+#ifdef CONFIG_X86
+		/*
+		 * For X86 architecture, The Interrupt Line value of 0xff is
+		 * defined to mean "unknown" or "no connection" (PCI 3.0,
+		 * Section 6.2.4, footnote on page 223). we flag the IRQ
+		 * as INVALID.
+		 */
+		if (dev->irq == 0xff)
+			dev->irq_invalid = 1;
+#endif
 		if (acpi_isa_register_gsi(dev))
 			dev_warn(&dev->dev, "PCI INT %c: no GSI\n",
 				 pin_name(pin));
