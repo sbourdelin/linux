@@ -1,0 +1,87 @@
+Pincontrol driver for MAX77620 Power management IC from Maxim Semiconductor.
+
+Device has 8 GPIO pins which can be configured as GPIO as well as the
+special IO functions.
+
+Please refer file <devicetree/bindings/pinctrl/pinctrl-bindings.txt>
+for details of the common pinctrl bindings used by client devices,
+including the meaning of the phrase "pin configuration node".
+
+Optional Pinmux properties:
+--------------------------
+Following properties are require if pin control setting is required at boot.
+- pinctrl-names: A pinctrl state named per <pinctrl-binding.txt>.
+- pinctrl[0...n]: Properties to contain the phandle for pinctrl states per
+		<pinctrl-binding.txt>.
+
+The pin configurations are defined as child of the pinctrl states node. Each
+sub-node have following properties:
+
+Required properties:
+- pins: List of pins. Valid values of pins properties are:
+		      gpio0, gpio1, gpio2, gpio3, gpio4, gpio5, gpio6, gpio7.
+
+Optional properties:
+Following are optional properties defined as pinmux DT binding document
+<pinctrl-bindings.txt>. Absence of properties will leave the configuration
+on default.
+	function,
+	drive-push-pull,
+	drive-open-drain,
+	bias-pull-up,
+	bias-pull-down.
+
+Valid values for function properties are:
+	gpio, lpm-control-in, fps-out, 32k-out, sd0-dvs-in, sd1-dvs-in,
+	reference-out
+
+Theres is also customised properties for the GPIO1, GPIO2 and GPIO3.
+The properties are required to configure these resource FPS parameters
+when system is in "active" state or in "suspend" state.
+Here "active" state means system is UP and working normally.
+"suspend" state means system enters into the suspend state.
+
+- maxim,active-fps-source:	     FPS source for the gpios in active state
+				     of the GPIO. Valid values are FPS_SRC_0,
+				     FPS_SRC_1, FPS_SRC_2 and FPS_SRC_NONE.
+				     Absence of this property will leave the pin
+				     on default.
+- maxim,active-fps-power-up-slot:    Power up slot on given FPS for active state.
+				     Valid values are 0 to 7.
+- maxim,active-fps-power-down-slot:  Power down slot on given FPS for active
+				     state. Valid values are 0 to 7.
+- maxim,suspend-fps-source:	     Suspend state FPS source. Valid values are
+				     same as maxim,active-fps-source.
+- maxim,suspend-fps-power-down-slot: Suspend state power down slot. Valid
+				     values are 0 to 7.
+- maxim,suspend-fps-power-up-slot: Suspend state power up slot. Valid values
+				     are 0 to 7.
+
+Example:
+--------
+#include <dt-bindings/mfd/max77620.h>
+...
+max77620@3c {
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&spmic_default>;
+
+	spmic_default: pinmux@0 {
+		pin_gpio0 {
+			pins = "gpio0";
+			function = "gpio";
+		};
+
+		pin_gpio1 {
+			pins = "gpio1";
+			function = "fps-out";
+			maxim,fps-source = <FPS_SRC_0>;
+		};
+
+		pin_gpio2 {
+			pins = "gpio2";
+			function = "fps-out";
+			maxim,fps-source = <FPS_SRC_1>;
+		};
+	};
+};
