@@ -199,7 +199,6 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
 	if (pdata) {
 		if (pdata->flags & PXA_FLAG_CARD_PERMANENT) {
 			/* on-chip device */
-			host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
 			host->mmc->caps |= MMC_CAP_NONREMOVABLE;
 		}
 
