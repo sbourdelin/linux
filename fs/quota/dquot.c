@@ -2565,6 +2565,30 @@ int dquot_get_dqblk(struct super_block *sb, struct kqid qid,
 }
 EXPORT_SYMBOL(dquot_get_dqblk);
 
+int dquot_get_next_dqblk(struct super_block *sb, struct kqid *qid,
+			 struct qc_dqblk *di)
+{
+	struct dquot *dquot;
+	struct quota_info *dqopt = sb_dqopt(sb);
+	int err;
+
+	if (!dqopt->ops[qid->type]->get_next_id)
+		return -ENOSYS;
+	mutex_lock(&dqopt->dqio_mutex);
+	err = dqopt->ops[qid->type]->get_next_id(sb, qid);
+	mutex_unlock(&dqopt->dqio_mutex);
+	if (err < 0)
+		return err;
+	dquot = dqget(sb, *qid);
+	if (IS_ERR(dquot))
+		return PTR_ERR(dquot);
+	do_get_dqblk(dquot, di);
+	dqput(dquot);
+
+	return 0;
+}
+EXPORT_SYMBOL(dquot_get_next_dqblk);
+
 #define VFS_QC_MASK \
 	(QC_SPACE | QC_SPC_SOFT | QC_SPC_HARD | \
 	 QC_INO_COUNT | QC_INO_SOFT | QC_INO_HARD | \
@@ -2765,6 +2789,7 @@ const struct quotactl_ops dquot_quotactl_ops = {
 	.get_state	= dquot_get_state,
 	.set_info	= dquot_set_dqinfo,
 	.get_dqblk	= dquot_get_dqblk,
+	.get_nextdqblk	= dquot_get_next_dqblk,
 	.set_dqblk	= dquot_set_dqblk
 };
 EXPORT_SYMBOL(dquot_quotactl_ops);
@@ -2776,6 +2801,7 @@ const struct quotactl_ops dquot_quotactl_sysfile_ops = {
 	.get_state	= dquot_get_state,
 	.set_info	= dquot_set_dqinfo,
 	.get_dqblk	= dquot_get_dqblk,
+	.get_nextdqblk	= dquot_get_next_dqblk,
 	.set_dqblk	= dquot_set_dqblk
 };
 EXPORT_SYMBOL(dquot_quotactl_sysfile_ops);
