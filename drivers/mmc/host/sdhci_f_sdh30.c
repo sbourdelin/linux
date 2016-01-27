@@ -132,7 +132,10 @@ static int sdhci_f_sdh30_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, host);
 
-	sdhci_get_of_property(pdev);
+	ret = sdhci_get_of_property(pdev);
+	if (ret)
+		goto err;
+
 	host->hw_name = "f_sdh30";
 	host->ops = &sdhci_f_sdh30_ops;
 	host->irq = irq;
