@@ -2928,6 +2928,51 @@ skl_get_total_relative_data_rate(const struct intel_crtc_state *cstate)
 	return total_data_rate;
 }
 
+static uint16_t
+skl_ddb_min_alloc(const struct intel_crtc *crtc,
+		const struct drm_plane *plane, int y)
+{
+	struct drm_framebuffer *fb = plane->state->fb;
+	struct intel_plane_state *pstate = to_intel_plane_state(plane->state);
+	uint32_t src_w, src_h;
+	uint32_t min_scanlines = 8;
+	uint8_t bytes_per_pixel;
+
+	/* For packed formats, no y-plane, return 0 */
+	if (y && !fb && !(fb->pixel_format == DRM_FORMAT_NV12))
+		return 0;
+
+	/* For Non Y-tile return 8-blocks */
+	if (!(fb->modifier[0] == I915_FORMAT_MOD_Y_TILED) &&
+	    !(fb->modifier[0] == I915_FORMAT_MOD_Yf_TILED))
+		return 8;
+
+	src_w = drm_rect_width(&pstate->src) >> 16;
+	src_h = drm_rect_height(&pstate->src) >> 16;
+
+	if (intel_rotation_90_or_270(plane->state->rotation))
+		swap(src_w, src_h);
+
+	bytes_per_pixel = y ? drm_format_plane_cpp(fb->pixel_format, 0) :
+		drm_format_plane_cpp(fb->pixel_format, 1);
+
+	if (intel_rotation_90_or_270(plane->state->rotation)) {
+		switch (bytes_per_pixel) {
+		case 1:
+			min_scanlines = 32;
+			break;
+		case 2:
+			min_scanlines = 16;
+			break;
+		case 8:
+			WARN(1, "Unsupported pixel depth for rotation");
+		}
+	}
+
+	return DIV_ROUND_UP((4 * src_w / (y ? 1 : 2) * bytes_per_pixel), 512) *
+							min_scanlines/4 + 3;
+}
+
 static void
 skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		      struct skl_ddb_allocation *ddb /* out */)
@@ -2964,7 +3009,6 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 	/* 1. Allocate the mininum required blocks for each active plane */
 	for_each_intel_plane_on_crtc(dev, intel_crtc, intel_plane) {
 		struct drm_plane *plane = &intel_plane->base;
-		struct drm_framebuffer *fb = plane->state->fb;
 		int id = skl_wm_plane_id(intel_plane);
 
 		if (!to_intel_plane_state(plane->state)->visible)
@@ -2973,9 +3017,9 @@ skl_allocate_pipe_ddb(struct intel_crtc_state *cstate,
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
-		minimum[id] = 8;
+		minimum[id] = skl_ddb_min_alloc(intel_crtc, plane, 0);
 		alloc_size -= minimum[id];
-		y_minimum[id] = (fb->pixel_format == DRM_FORMAT_NV12) ? 8 : 0;
+		y_minimum[id] = skl_ddb_min_alloc(intel_crtc, plane, 1);
 		alloc_size -= y_minimum[id];
 	}
 
