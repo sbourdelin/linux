@@ -3629,7 +3629,9 @@ static int ni_cdio_cmdtest(struct comedi_device *dev,
 	err |= comedi_check_trigger_arg_is(&cmd->convert_arg, 0);
 	err |= comedi_check_trigger_arg_is(&cmd->scan_end_arg,
 					   cmd->chanlist_len);
-	err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
+	err |= comedi_check_trigger_arg_max(&cmd->stop_arg,
+					    s->async->prealloc_bufsz /
+					    comedi_bytes_per_scan(s));
 
 	if (err)
 		return 3;
@@ -3706,6 +3708,7 @@ static int ni_cdo_inttrig(struct comedi_device *dev,
 
 static int ni_cdio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
+	struct ni_private *devpriv = dev->private;
 	const struct comedi_cmd *cmd = &s->async->cmd;
 	unsigned cdo_mode_bits;
 	int retval;
@@ -3729,6 +3732,10 @@ static int ni_cdio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	retval = ni_request_cdo_mite_channel(dev);
 	if (retval < 0)
 		return retval;
+
+	ni_cmd_set_mite_transfer(devpriv->cdo_mite_ring, s, cmd,
+				 s->async->prealloc_bufsz /
+				 comedi_bytes_per_scan(s));
 
 	s->async->inttrig = ni_cdo_inttrig;
 
