@@ -3017,8 +3017,16 @@ struct sk_buff *skb_segment(struct sk_buff *head_skb,
 		int size;
 
 		len = head_skb->len - offset;
-		if (len > mss)
-			len = mss;
+		if (len > mss) {
+			/* FIXME: A define is surely welcomed, but maybe
+			 * shinfo->txflags is better for this flag, but
+			 * we need to expand it then
+			 */
+			if (mss == 1)
+				len = list_skb->len;
+			else
+				len = mss;
+		}
 
 		hsize = skb_headlen(head_skb) - offset;
 		if (hsize < 0)

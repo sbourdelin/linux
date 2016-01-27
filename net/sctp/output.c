@@ -381,12 +381,14 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	struct sctp_transport *tp = packet->transport;
 	struct sctp_association *asoc = tp->asoc;
 	struct sctphdr *sh;
-	struct sk_buff *nskb;
+	struct sk_buff *nskb = NULL, *head = NULL;
 	struct sctp_chunk *chunk, *tmp;
-	struct sock *sk;
+	struct sock *sk = asoc->base.sk;
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
+	int pkt_size;
 	__u8 has_data = 0;
+	int gso = 0;
 	struct dst_entry *dst;
 	unsigned char *auth = NULL;	/* pointer to auth in skb data */
 
@@ -396,37 +398,44 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	if (list_empty(&packet->chunk_list))
 		return err;
 
-	/* Set up convenience variables... */
+	/* TODO: double check this */
 	chunk = list_entry(packet->chunk_list.next, struct sctp_chunk, list);
 	sk = chunk->skb->sk;
+	dst_hold(tp->dst);
+	sk_setup_caps(sk, tp->dst);
 
-	/* Allocate the new skb.  */
-	nskb = alloc_skb(packet->size + MAX_HEADER, GFP_ATOMIC);
-	if (!nskb)
+	if (packet->size > tp->pathmtu) {
+		WARN_ON(packet->ipfragok);
+		if (sk_can_gso(sk)) {
+			gso = 1;
+			pkt_size = packet->overhead;
+		} else {
+			/* Something nasty happened */
+			/* FIXME */
+			printk("Damn, we can't GSO and packet is too big %d for pmtu %d.\n",
+			       packet->size, tp->pathmtu);
+			goto nomem;
+		}
+	} else {
+		pkt_size = packet->size;
+	}
+
+	/* Allocate the head skb, or main one if not in GSO */
+	head = alloc_skb(pkt_size + MAX_HEADER, GFP_ATOMIC);
+	if (!head)
 		goto nomem;
+	if (gso) {
+		NAPI_GRO_CB(head)->last = head;
+	} else {
+		nskb = head;
+	}
 
 	/* Make sure the outbound skb has enough header room reserved. */
-	skb_reserve(nskb, packet->overhead + MAX_HEADER);
-
-	/* Set the owning socket so that we know where to get the
-	 * destination IP address.
-	 */
-	sctp_packet_set_owner_w(nskb, sk);
-
-	if (!sctp_transport_dst_check(tp)) {
-		sctp_transport_route(tp, NULL, sctp_sk(sk));
-		if (asoc && (asoc->param_flags & SPP_PMTUD_ENABLE)) {
-			sctp_assoc_sync_pmtu(sk, asoc);
-		}
-	}
-	dst = dst_clone(tp->dst);
-	if (!dst)
-		goto no_route;
-	skb_dst_set(nskb, dst);
+	skb_reserve(head, packet->overhead + MAX_HEADER);
 
 	/* Build the SCTP header.  */
-	sh = (struct sctphdr *)skb_push(nskb, sizeof(struct sctphdr));
-	skb_reset_transport_header(nskb);
+	sh = (struct sctphdr *)skb_push(head, sizeof(struct sctphdr));
+	skb_reset_transport_header(head);
 	sh->source = htons(packet->source_port);
 	sh->dest   = htons(packet->destination_port);
 
@@ -441,90 +450,164 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	sh->vtag     = htonl(packet->vtag);
 	sh->checksum = 0;
 
-	/**
-	 * 6.10 Bundling
-	 *
-	 *    An endpoint bundles chunks by simply including multiple
-	 *    chunks in one outbound SCTP packet.  ...
+	/* Set the owning socket so that we know where to get the
+	 * destination IP address.
 	 */
+	sctp_packet_set_owner_w(head, sk);
 
-	/**
-	 * 3.2  Chunk Field Descriptions
-	 *
-	 * The total length of a chunk (including Type, Length and
-	 * Value fields) MUST be a multiple of 4 bytes.  If the length
-	 * of the chunk is not a multiple of 4 bytes, the sender MUST
-	 * pad the chunk with all zero bytes and this padding is not
-	 * included in the chunk length field.  The sender should
-	 * never pad with more than 3 bytes.
-	 *
-	 * [This whole comment explains WORD_ROUND() below.]
-	 */
+	if (!sctp_transport_dst_check(tp)) {
+		sctp_transport_route(tp, NULL, sctp_sk(sk));
+		if (asoc && (asoc->param_flags & SPP_PMTUD_ENABLE)) {
+			sctp_assoc_sync_pmtu(sk, asoc);
+		}
+	}
+	dst = dst_clone(tp->dst);
+	if (!dst)
+		goto no_route;
+	skb_dst_set(head, dst);
 
 	pr_debug("***sctp_transmit_packet***\n");
 
-	list_for_each_entry_safe(chunk, tmp, &packet->chunk_list, list) {
-		list_del_init(&chunk->list);
-		if (sctp_chunk_is_data(chunk)) {
-			/* 6.3.1 C4) When data is in flight and when allowed
-			 * by rule C5, a new RTT measurement MUST be made each
-			 * round trip.  Furthermore, new RTT measurements
-			 * SHOULD be made no more than once per round-trip
-			 * for a given destination transport address.
-			 */
+	do {
+		/* Set up convenience variables... */
+		chunk = list_entry(packet->chunk_list.next, struct sctp_chunk, list);
+		WARN_ON(sk != chunk->skb->sk); /* XXX */
 
-			if (!chunk->resent && !tp->rto_pending) {
-				chunk->rtt_in_progress = 1;
-				tp->rto_pending = 1;
+		/* Calculate packet size, so it fits in PMTU. Leave
+		 * other chunks for the next packets. */
+		if (gso) {
+			pkt_size = packet->overhead;
+			list_for_each_entry(chunk, &packet->chunk_list, list) {
+				int padded = WORD_ROUND(chunk->skb->len);
+				if (pkt_size + padded > tp->pathmtu)
+					break;
+				pkt_size += padded;
 			}
 
-			has_data = 1;
+			/* Allocate the new skb.  */
+			nskb = alloc_skb(pkt_size + MAX_HEADER, GFP_ATOMIC);
+
+			/* Make sure the outbound skb has enough header room reserved. */
+			if (nskb)
+				skb_reserve(nskb, packet->overhead + MAX_HEADER);
+		}
+		if (!nskb)
+			goto nomem;
+
+		/**
+		 * 3.2  Chunk Field Descriptions
+		 *
+		 * The total length of a chunk (including Type, Length and
+		 * Value fields) MUST be a multiple of 4 bytes.  If the length
+		 * of the chunk is not a multiple of 4 bytes, the sender MUST
+		 * pad the chunk with all zero bytes and this padding is not
+		 * included in the chunk length field.  The sender should
+		 * never pad with more than 3 bytes.
+		 *
+		 * [This whole comment explains WORD_ROUND() below.]
+		 */
+
+		pkt_size -= packet->overhead;
+		list_for_each_entry_safe(chunk, tmp, &packet->chunk_list, list) {
+			list_del_init(&chunk->list);
+			if (sctp_chunk_is_data(chunk)) {
+				/* 6.3.1 C4) When data is in flight and when allowed
+				 * by rule C5, a new RTT measurement MUST be made each
+				 * round trip.  Furthermore, new RTT measurements
+				 * SHOULD be made no more than once per round-trip
+				 * for a given destination transport address.
+				 */
+
+				if (!chunk->resent && !tp->rto_pending) {
+					chunk->rtt_in_progress = 1;
+					tp->rto_pending = 1;
+				}
+
+				has_data = 1;
+			}
+
+			padding = WORD_ROUND(chunk->skb->len) - chunk->skb->len;
+			if (padding)
+				memset(skb_put(chunk->skb, padding), 0, padding);
+
+			/* if this is the auth chunk that we are adding,
+			 * store pointer where it will be added and put
+			 * the auth into the packet.
+			 */
+			if (chunk == packet->auth) {
+				auth = skb_tail_pointer(nskb);
+			}
+
+			memcpy(skb_put(nskb, chunk->skb->len),
+				       chunk->skb->data, chunk->skb->len);
+
+			pr_debug("*** Chunk:%p[%s] %s 0x%x, length:%d, chunk->skb->len:%d, "
+				 "rtt_in_progress:%d\n", chunk,
+				 sctp_cname(SCTP_ST_CHUNK(chunk->chunk_hdr->type)),
+				 chunk->has_tsn ? "TSN" : "No TSN",
+				 chunk->has_tsn ? ntohl(chunk->subh.data_hdr->tsn) : 0,
+				 ntohs(chunk->chunk_hdr->length), chunk->skb->len,
+				 chunk->rtt_in_progress);
+
+			/*
+			 * If this is a control chunk, this is our last
+			 * reference. Free data chunks after they've been
+			 * acknowledged or have failed.
+			 * Re-queue auth chunks if needed.
+			 */
+			pkt_size -= WORD_ROUND(chunk->skb->len);
+
+			if (chunk == packet->auth && !list_empty(&packet->chunk_list))
+				list_add(&chunk->list, &packet->chunk_list);
+			else if (!sctp_chunk_is_data(chunk))
+				sctp_chunk_free(chunk);
+
+			if (!pkt_size)
+				break;
 		}
 
-		padding = WORD_ROUND(chunk->skb->len) - chunk->skb->len;
-		if (padding)
-			memset(skb_put(chunk->skb, padding), 0, padding);
-
-		/* if this is the auth chunk that we are adding,
-		 * store pointer where it will be added and put
-		 * the auth into the packet.
+		/* SCTP-AUTH, Section 6.2
+		 *    The sender MUST calculate the MAC as described in RFC2104 [2]
+		 *    using the hash function H as described by the MAC Identifier and
+		 *    the shared association key K based on the endpoint pair shared key
+		 *    described by the shared key identifier.  The 'data' used for the
+		 *    computation of the AUTH-chunk is given by the AUTH chunk with its
+		 *    HMAC field set to zero (as shown in Figure 6) followed by all
+		 *    chunks that are placed after the AUTH chunk in the SCTP packet.
 		 */
-		if (chunk == packet->auth)
-			auth = skb_tail_pointer(nskb);
+		if (auth)
+			sctp_auth_calculate_hmac(asoc, nskb,
+						(struct sctp_auth_chunk *)auth,
+						GFP_ATOMIC);
 
-		memcpy(skb_put(nskb, chunk->skb->len),
-			       chunk->skb->data, chunk->skb->len);
-
-		pr_debug("*** Chunk:%p[%s] %s 0x%x, length:%d, chunk->skb->len:%d, "
-			 "rtt_in_progress:%d\n", chunk,
-			 sctp_cname(SCTP_ST_CHUNK(chunk->chunk_hdr->type)),
-			 chunk->has_tsn ? "TSN" : "No TSN",
-			 chunk->has_tsn ? ntohl(chunk->subh.data_hdr->tsn) : 0,
-			 ntohs(chunk->chunk_hdr->length), chunk->skb->len,
-			 chunk->rtt_in_progress);
-
-		/*
-		 * If this is a control chunk, this is our last
-		 * reference. Free data chunks after they've been
-		 * acknowledged or have failed.
+		/* Set up the IP options.  */
+		/* BUG: not implemented
+		 * For v4 this all lives somewhere in sk->sk_opt...
 		 */
-		if (!sctp_chunk_is_data(chunk))
-			sctp_chunk_free(chunk);
-	}
 
-	/* SCTP-AUTH, Section 6.2
-	 *    The sender MUST calculate the MAC as described in RFC2104 [2]
-	 *    using the hash function H as described by the MAC Identifier and
-	 *    the shared association key K based on the endpoint pair shared key
-	 *    described by the shared key identifier.  The 'data' used for the
-	 *    computation of the AUTH-chunk is given by the AUTH chunk with its
-	 *    HMAC field set to zero (as shown in Figure 6) followed by all
-	 *    chunks that are placed after the AUTH chunk in the SCTP packet.
-	 */
-	if (auth)
-		sctp_auth_calculate_hmac(asoc, nskb,
-					(struct sctp_auth_chunk *)auth,
-					GFP_ATOMIC);
+		/* Dump that on IP!  */
+		if (asoc) {
+			asoc->stats.opackets++;
+			if (asoc->peer.last_sent_to != tp)
+				/* Considering the multiple CPU scenario, this is a
+				 * "correcter" place for last_sent_to.  --xguo
+				 */
+				asoc->peer.last_sent_to = tp;
+		}
+
+
+		if (!gso ||
+		    skb_shinfo(head)->gso_segs >= sk->sk_gso_max_segs)
+//		    head->len + asoc->pathmtu >= sk->sk_gso_max_size)
+			break;
+
+		if (skb_gro_receive(&head, nskb))
+			goto nomem;
+		skb_shinfo(head)->gso_segs++;
+		/* FIXME: below is a lie */
+		skb_shinfo(head)->gso_size = 1;
+		nskb = NULL;
+	} while (!list_empty(&packet->chunk_list));
 
 	/* 2) Calculate the Adler-32 checksum of the whole packet,
 	 *    including the SCTP common header and all the
@@ -532,16 +615,21 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 *
 	 * Note: Adler-32 is no longer applicable, as has been replaced
 	 * by CRC32-C as described in <draft-ietf-tsvwg-sctpcsum-02.txt>.
+	 *
+	 * If it's a GSO packet, it's postponed to sctp_skb_segment.
 	 */
-	if (!sctp_checksum_disable) {
+	if (!sctp_checksum_disable || gso) {
 		if (!(dst->dev->features & NETIF_F_SCTP_CRC) ||
 		    (dst_xfrm(dst) != NULL) || packet->ipfragok) {
-			sh->checksum = sctp_compute_cksum(nskb, 0);
+			if (!gso)
+				sh->checksum = sctp_compute_cksum(head, 0);
+			else
+				head->ip_summed = CHECKSUM_UNNECESSARY;
 		} else {
 			/* no need to seed pseudo checksum for SCTP */
-			nskb->ip_summed = CHECKSUM_PARTIAL;
-			nskb->csum_start = skb_transport_header(nskb) - nskb->head;
-			nskb->csum_offset = offsetof(struct sctphdr, checksum);
+			head->ip_summed = CHECKSUM_PARTIAL;
+			head->csum_start = skb_transport_header(head) - head->head;
+			head->csum_offset = offsetof(struct sctphdr, checksum);
 		}
 	}
 
@@ -557,22 +645,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 * Note: The works for IPv6 layer checks this bit too later
 	 * in transmission.  See IP6_ECN_flow_xmit().
 	 */
-	tp->af_specific->ecn_capable(nskb->sk);
-
-	/* Set up the IP options.  */
-	/* BUG: not implemented
-	 * For v4 this all lives somewhere in sk->sk_opt...
-	 */
-
-	/* Dump that on IP!  */
-	if (asoc) {
-		asoc->stats.opackets++;
-		if (asoc->peer.last_sent_to != tp)
-			/* Considering the multiple CPU scenario, this is a
-			 * "correcter" place for last_sent_to.  --xguo
-			 */
-			asoc->peer.last_sent_to = tp;
-	}
+	tp->af_specific->ecn_capable(head->sk);
 
 	if (has_data) {
 		struct timer_list *timer;
@@ -589,16 +662,23 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 		}
 	}
 
-	pr_debug("***sctp_transmit_packet*** skb->len:%d\n", nskb->len);
+	pr_debug("***sctp_transmit_packet*** skb->len:%d\n", head->len);
 
-	nskb->ignore_df = packet->ipfragok;
-	tp->af_specific->sctp_xmit(nskb, tp);
+	head->ignore_df = packet->ipfragok;
+	printk("%s %d %d %d\n", __func__, head->len,
+	       packet->transport->pathmtu,
+	       packet->transport->pathmtu - packet->overhead);
+	if (gso)
+		skb_shinfo(head)->gso_type = SKB_GSO_SCTP;
+	tp->af_specific->sctp_xmit(head, tp);
 
 out:
 	sctp_packet_reset(packet);
+	sk_dst_reset(sk); /* FIXME: double check */
 	return err;
 no_route:
 	kfree_skb(nskb);
+	kfree_skb(head);
 
 	if (asoc)
 		IP_INC_STATS(sock_net(asoc->base.sk), IPSTATS_MIB_OUTNOROUTES);
@@ -635,7 +715,7 @@ nomem:
 static sctp_xmit_t sctp_packet_can_append_data(struct sctp_packet *packet,
 					   struct sctp_chunk *chunk)
 {
-	size_t datasize, rwnd, inflight, flight_size;
+	size_t datasize, rwnd, inflight, flight_size, maxsize;
 	struct sctp_transport *transport = packet->transport;
 	struct sctp_association *asoc = transport->asoc;
 	struct sctp_outq *q = &asoc->outqueue;
@@ -705,7 +785,15 @@ static sctp_xmit_t sctp_packet_can_append_data(struct sctp_packet *packet,
 	/* Check whether this chunk and all the rest of pending data will fit
 	 * or delay in hopes of bundling a full sized packet.
 	 */
-	if (chunk->skb->len + q->out_qlen >= transport->pathmtu - packet->overhead)
+	if (packet->ipfragok) {
+		/* Means chunk won't fit and needs fragmentation at
+		 * transport level, so we can't do GSO.
+		 */
+		maxsize = transport->pathmtu;
+	} else {
+		maxsize = transport->dst->dev->gso_max_size;
+	}
+	if (chunk->skb->len + q->out_qlen >= maxsize - packet->overhead)
 		/* Enough data queued to fill a packet */
 		return SCTP_XMIT_OK;
 
@@ -764,6 +852,8 @@ static sctp_xmit_t sctp_packet_will_fit(struct sctp_packet *packet,
 
 	/* Decide if we need to fragment or resubmit later. */
 	if (too_big) {
+		struct net_device *dev = packet->transport->dst->dev;
+
 		/* It's OK to fragmet at IP level if any one of the following
 		 * is true:
 		 * 	1. The packet is empty (meaning this chunk is greater
@@ -779,9 +869,11 @@ static sctp_xmit_t sctp_packet_will_fit(struct sctp_packet *packet,
 			 * actually hit this condition
 			 */
 			packet->ipfragok = 1;
-		} else {
+		} else if (psize + chunk_len > dev->gso_max_size - packet->overhead) {
+			/* Hit GSO limit, gotta flush */
 			retval = SCTP_XMIT_PMTU_FULL;
 		}
+		/* Otherwise it will fit in the GSO packet */
 	}
 
 	return retval;
