@@ -212,25 +212,28 @@ static int mlx5_cmd_set_fte(struct mlx5_core_dev *dev,
 	MLX5_SET(flow_context, in_flow_context, group_id, group_id);
 	MLX5_SET(flow_context, in_flow_context, flow_tag, fte->flow_tag);
 	MLX5_SET(flow_context, in_flow_context, action, fte->action);
-	MLX5_SET(flow_context, in_flow_context, destination_list_size,
-		 fte->dests_size);
 	in_match_value = MLX5_ADDR_OF(flow_context, in_flow_context,
 				      match_value);
 	memcpy(in_match_value, &fte->val, MLX5_ST_SZ_BYTES(fte_match_param));
 
-	in_dests = MLX5_ADDR_OF(flow_context, in_flow_context, destination);
-	list_for_each_entry(dst, &fte->node.children, node.list) {
-		unsigned int id;
+	if (fte->action & MLX5_FLOW_CONTEXT_ACTION_FWD_DEST) {
+		MLX5_SET(flow_context, in_flow_context, destination_list_size,
+			 fte->dests_size);
+		in_dests = MLX5_ADDR_OF(flow_context, in_flow_context, destination);
+		list_for_each_entry(dst, &fte->node.children, node.list) {
+			unsigned int id;
 
-		MLX5_SET(dest_format_struct, in_dests, destination_type,
-			 dst->dest_attr.type);
-		if (dst->dest_attr.type ==
-		    MLX5_FLOW_DESTINATION_TYPE_FLOW_TABLE)
-			id = dst->dest_attr.ft->id;
-		else
-			id = dst->dest_attr.tir_num;
-		MLX5_SET(dest_format_struct, in_dests, destination_id, id);
-		in_dests += MLX5_ST_SZ_BYTES(dest_format_struct);
+			MLX5_SET(dest_format_struct, in_dests, destination_type,
+				 dst->dest_attr.type);
+			if (dst->dest_attr.type ==
+			    MLX5_FLOW_DESTINATION_TYPE_FLOW_TABLE) {
+				id = dst->dest_attr.ft->id;
+			} else {
+				id = dst->dest_attr.tir_num;
+			}
+			MLX5_SET(dest_format_struct, in_dests, destination_id, id);
+			in_dests += MLX5_ST_SZ_BYTES(dest_format_struct);
+		}
 	}
 	memset(out, 0, sizeof(out));
 	err = mlx5_cmd_exec_check_status(dev, in, inlen, out,
