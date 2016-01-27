@@ -451,11 +451,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc = host->mmc;
 	msm_host->pdev = pdev;
 
-	ret = mmc_of_parse(host->mmc);
+	ret = sdhci_get_of_property(pdev);
 	if (ret)
 		goto pltfm_free;
-
-	sdhci_get_of_property(pdev);
 
 	/* Setup SDCC bus voter clock. */
 	msm_host->bus_clk = devm_clk_get(&pdev->dev, "bus");
