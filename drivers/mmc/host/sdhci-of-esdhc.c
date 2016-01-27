@@ -600,7 +600,9 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
 
 	esdhc_init(pdev, host);
 
-	sdhci_get_of_property(pdev);
+	ret = sdhci_get_of_property(pdev);
+	if (ret)
+		goto err;
 
 	pltfm_host = sdhci_priv(host);
 	esdhc = pltfm_host->priv;
@@ -628,11 +630,6 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
 		 */
 		host->quirks2 |= SDHCI_QUIRK2_BROKEN_HOST_CONTROL;
 	}
-
-	/* call to generic mmc_of_parse to support additional capabilities */
-	ret = mmc_of_parse(host->mmc);
-	if (ret)
-		goto err;
 
 	mmc_of_parse_voltage(np, &host->ocr_mask);
 
