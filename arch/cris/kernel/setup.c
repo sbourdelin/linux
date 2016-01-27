@@ -215,7 +215,7 @@ subsys_initcall(topology_init);
 
 static int __init cris_of_init(void)
 {
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 	return 0;
 }
 core_initcall(cris_of_init);
