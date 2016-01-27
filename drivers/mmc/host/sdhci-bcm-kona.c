@@ -269,9 +269,6 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
 		(mmc_gpio_get_cd(host->mmc) != -ENOSYS) ? 'Y' : 'N',
 		(mmc_gpio_get_ro(host->mmc) != -ENOSYS) ? 'Y' : 'N');
 
-	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
-		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-
 	dev_dbg(dev, "is_8bit=%c\n",
 		(host->mmc->caps & MMC_CAP_8_BIT_DATA) ? 'Y' : 'N');
 
