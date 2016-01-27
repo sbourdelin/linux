@@ -44,6 +44,7 @@ struct hash_testvec {
 	unsigned short psize;
 	unsigned char np;
 	unsigned char ksize;
+	unsigned char partial;
 };
 
 /*
@@ -772,7 +773,8 @@ static struct hash_testvec sha1_tv_template[] = {
 		.digest	= "\x97\x01\x11\xc4\xe7\x7b\xcc\x88\xcc\x20"
 			  "\x45\x9c\x02\xb6\x9b\x4a\xa8\xf5\x82\x17",
 		.np	= 4,
-		.tap	= { 63, 64, 31, 5 }
+		.tap	= { 63, 64, 31, 5 },
+		.partial = 1,
 	}, {
 		.plaintext = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-",
 		.psize	= 64,
