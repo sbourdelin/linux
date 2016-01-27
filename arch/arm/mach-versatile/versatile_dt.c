@@ -405,8 +405,7 @@ static void __init versatile_dt_init(void)
 	versatile_dt_pci_init();
 
 	platform_device_register(&versatile_flash_device);
-	of_platform_populate(NULL, of_default_bus_match_table,
-			     versatile_auxdata_lookup, NULL);
+	of_platform_default_populate(NULL, versatile_auxdata_lookup, NULL);
 }
 
 static const char *const versatile_dt_match[] __initconst = {

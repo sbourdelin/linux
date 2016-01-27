@@ -26,7 +26,7 @@ static void __init dove_init(void)
 #endif
 	BUG_ON(mvebu_mbus_dt_init(false));
 	dove_init_pmu();
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 }
 
 static const char * const dove_dt_compat[] __initconst = {

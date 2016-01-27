@@ -114,7 +114,7 @@ static void __init r8a7740_generic_init(void)
 	/* Shared attribute override enable, 32K*8way */
 	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
 #endif
-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+	of_platform_default_populate(NULL, NULL, NULL);
 }
 
 static const char *const r8a7740_boards_compat_dt[] __initconst = {
