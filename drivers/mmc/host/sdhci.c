@@ -145,7 +145,7 @@ static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
 {
 	u32 present;
 
-	if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) ||
+	if ((host->mmc->caps & MMC_CAP_NEEDS_POLL) ||
 	    (host->mmc->caps & MMC_CAP_NONREMOVABLE))
 		return;
 
@@ -1618,7 +1618,8 @@ static int sdhci_do_get_cd(struct sdhci_host *host)
 		return 0;
 
 	/* If nonremovable, assume that the card is always present. */
-	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+	if (host->mmc->caps & MMC_CAP_NONREMOVABLE ||
+	    host->mmc->caps & MMC_CAP_NEEDS_POLL)
 		return 1;
 
 	/*
@@ -1627,10 +1628,6 @@ static int sdhci_do_get_cd(struct sdhci_host *host)
 	 */
 	if (!IS_ERR_VALUE(gpio_cd))
 		return !!gpio_cd;
-
-	/* If polling, assume that the card is always present. */
-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
-		return 1;
 
 	/* Host native card detect */
 	return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
@@ -2658,7 +2655,7 @@ void sdhci_enable_irq_wakeups(struct sdhci_host *host)
 	val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
 	val |= mask ;
 	/* Avoid fake wake up */
-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+	if (host->mmc->caps & MMC_CAP_NEEDS_POLL)
 		val &= ~(SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE);
 	sdhci_writeb(host, val, SDHCI_WAKE_UP_CONTROL);
 }
@@ -3112,8 +3109,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (caps[0] & SDHCI_CAN_DO_HISPD)
 		mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
 
-	if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) &&
-	    !(mmc->caps & MMC_CAP_NONREMOVABLE) &&
+	if (!(mmc->caps & MMC_CAP_NONREMOVABLE) &&
 	    IS_ERR_VALUE(mmc_gpio_get_cd(host->mmc)))
 		mmc->caps |= MMC_CAP_NEEDS_POLL;
 
