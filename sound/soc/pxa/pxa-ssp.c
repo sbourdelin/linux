@@ -586,7 +586,7 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
 
 	switch (priv->dai_fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
-	       sspsp = pxa_ssp_read_reg(ssp, SSPSP);
+		sspsp = pxa_ssp_read_reg(ssp, SSPSP);
 
 		if ((pxa_ssp_get_scr(ssp) == 4) && (width == 16)) {
 			/* This is a special case where the bitclk is 64fs
