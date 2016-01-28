@@ -590,7 +590,8 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
 static int
 fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
 			 struct sk_buff *skb, struct net_device *ndev,
-			 struct bufdesc *bdp, int index)
+			 struct bufdesc *bdp, int index,
+			 unsigned short *pstatus)
 {
 	struct fec_enet_private *fep = netdev_priv(ndev);
 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
@@ -632,9 +633,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
 		ebdp->cbd_bdu = 0;
 		ebdp->cbd_esc = estatus;
 	}
-
-	bdp->cbd_sc = status;
-
+	*pstatus = status;
 	return 0;
 }
 
@@ -646,7 +645,10 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
 	int total_len, data_left;
 	struct bufdesc *bdp = txq->bd.cur;
+	struct bufdesc *first_bdp = bdp;
 	struct tso_t tso;
+	unsigned short status = 0;
+	unsigned short *pstatus = &status;
 	unsigned int index = 0;
 	int ret;
 
@@ -676,7 +678,8 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
 		/* prepare packet headers: MAC + IP + TCP */
 		hdr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
 		tso_build_hdr(skb, hdr, &tso, data_left, total_len == 0);
-		ret = fec_enet_txq_put_hdr_tso(txq, skb, ndev, bdp, index);
+		ret = fec_enet_txq_put_hdr_tso(txq, skb, ndev, bdp, index,
+					       pstatus);
 		if (ret)
 			goto err_release;
 
@@ -700,12 +703,23 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
 		}
 
 		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+		pstatus = &bdp->cbd_sc;
 	}
 
 	/* Save skb pointer */
 	txq->tx_skbuff[index] = skb;
-
 	skb_tx_timestamp(skb);
+	/* Make sure the updates to rest of the descriptor are performed before
+	 * transferring ownership.
+	 */
+	wmb();
+	/* Send it on its way.  Tell FEC it's ready, interrupt when done,
+	 */
+	first_bdp->cbd_sc = status;
+	/* Make sure ownership is transferred before the
+	 * update to txq->bd.cur.
+	 */
+	wmb();
 	txq->bd.cur = bdp;
 
 	/* Trigger transmission start */
