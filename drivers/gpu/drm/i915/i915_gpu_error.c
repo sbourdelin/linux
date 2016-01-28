@@ -305,31 +305,60 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 		   hangcheck_action_to_str(ring->hangcheck_action),
 		   ring->hangcheck_score);
 
-	err_printf(m, "  EXECLIST_STATUS: 0x%08x\n", ring->execlist_status);
-	err_printf(m, "  EXECLIST_CTX_ID: 0x%08x\n", ring->execlist_ctx_id);
-	err_printf(m, "  EXECLIST_CSBPTR: 0x%08x\n", ring->execlist_csb_raw_pointer);
-	err_printf(m, "  EXECLIST_CSB_WR: 0x%08x\n", ring->execlist_csb_write_pointer);
-	err_printf(m, "  EXECLIST_CSB_RD: 0x%08x\n", ring->execlist_csb_read_pointer);
+	{
+		u32 csb_rd = (ring->execlist_csb_raw_pointer >> 8) & 7;
 
+		err_printf(m, "  EXECLIST_STATUS: 0x%08x\n", ring->execlist_status);
+		err_printf(m, "  EXECLIST_CTX_ID: 0x%08x\n", ring->execlist_ctx_id);
+		err_printf(m, "  EXECLIST_CSBPTR: 0x%08x\n", ring->execlist_csb_raw_pointer);
+		err_printf(m, "  EXECLIST_CSB_WR: %d\n", ring->execlist_csb_write_pointer);
+		err_printf(m, "  EXECLIST_CSB_RD: %d\n", csb_rd);
+		err_printf(m, "  EXECLIST_SWL_RD: %d\n", ring->execlist_csb_read_pointer);
+
+		for (i = 1; i <= 6; ++i) {
+			int n = (ring->execlist_csb_write_pointer + i) % 6;
+			u32 ctxid = ring->execlist_ctx[n];
+			u32 csb = ring->execlist_csb[n];
+			u32 tag = 0;
+			char dot = '.';
+			err_printf(m, "  EXECLIST_CTX/CSB[%d]: ", n);
+
+			if (ctxid && i915.enable_guc_submission) {
+				/* GuC CtxID is ring + flags + (lrca >> 12) */
+				tag = ((ring_idx << 9) | 1);
+			}
+			if ((ctxid >> 20) != tag)
+				dot = '?';		/* flag unexpected value */
+			err_printf(m, "0x%03x%c%05x / ",
+				ctxid >> 20, dot, ctxid & 0x000fffff);
+
+/* CSB status bits */
 #define GEN8_CTX_STATUS_IDLE_ACTIVE	(1 << 0)
 #define GEN8_CTX_STATUS_PREEMPTED	(1 << 1)
 #define GEN8_CTX_STATUS_ELEMENT_SWITCH	(1 << 2)
 #define GEN8_CTX_STATUS_ACTIVE_IDLE	(1 << 3)
 #define GEN8_CTX_STATUS_COMPLETE	(1 << 4)
 #define GEN8_CTX_STATUS_LITE_RESTORE	(1 << 15)
+#define GEN8_CTX_STATUS_UNKNOWN		(~0x0000801f)	/* any other */
 
-	for (i = 1; i <= 6; ++i) {
-		int n = (ring->execlist_csb_write_pointer + i) % 6;
-		u32 csb = ring->execlist_csb[n];
-		err_printf(m, "  EXECLIST_CTX/CSB[%d]:  0x%08x  0x%08x  ",
-			n, ring->execlist_ctx[n], csb);
-		err_printf(m, "%s %s %s %s %s %s\n",
-			csb & GEN8_CTX_STATUS_IDLE_ACTIVE	? "I->A" : "    ",
-			csb & GEN8_CTX_STATUS_PREEMPTED		? "PRMT" : "    ",
-			csb & GEN8_CTX_STATUS_ELEMENT_SWITCH	? "ELSW" : "    ",
-			csb & GEN8_CTX_STATUS_ACTIVE_IDLE	? "A->I" : "    ",
-			csb & GEN8_CTX_STATUS_COMPLETE		? "DONE" : "    ",
-			csb & GEN8_CTX_STATUS_LITE_RESTORE	? "LITE" : "    ");
+			err_printf(m, "0x%08x | %s | %s | %s | %s | %s | %s | %s\n",
+				csb,
+				csb & GEN8_CTX_STATUS_IDLE_ACTIVE	? "I->A" : "    ",
+				csb & GEN8_CTX_STATUS_PREEMPTED		? "PRMT" : "    ",
+				csb & GEN8_CTX_STATUS_ELEMENT_SWITCH	? "ELSW" : "    ",
+				csb & GEN8_CTX_STATUS_ACTIVE_IDLE	? "A->I" : "    ",
+				csb & GEN8_CTX_STATUS_COMPLETE		? "DONE" : "    ",
+				csb & GEN8_CTX_STATUS_LITE_RESTORE	? "LITE" : "    ",
+				csb & GEN8_CTX_STATUS_UNKNOWN		? " +? " : "    ");
+
+			if (i != 6) {
+				if (n == csb_rd)
+					err_printf(m, "                  *RD*\n");
+				else if (n == ring->execlist_csb_read_pointer &&
+					 !i915.enable_guc_submission)
+					err_printf(m, "                  *SW*\n");
+			}
+		}
 	}
 }
 
@@ -491,9 +520,11 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		}
 
 		if ((obj = error->ring[i].req_ringbuffer)) {
-			err_printf(m, "%s --- ringbuffer = 0x%08x\n",
+			err_printf(m, "%s --- ringbuffer = 0x%08x (ctx_desc 0x%08x_%08x)\n",
 				   dev_priv->ring[i].name,
-				   lower_32_bits(obj->gtt_offset));
+				   lower_32_bits(obj->gtt_offset),
+				   upper_32_bits(error->ring[i].ctx_desc),
+				   lower_32_bits(error->ring[i].ctx_desc));
 			print_error_obj(m, obj);
 		}
 
@@ -1005,8 +1036,6 @@ static void i915_record_ring_state(struct drm_device *dev,
 		u32 status_pointer = I915_READ(RING_CONTEXT_STATUS_PTR(ring));
 		u8 write_pointer = status_pointer & 0x07;
 		u8 read_pointer = ring->next_context_status_buffer;
-		if (read_pointer > write_pointer)
-			write_pointer += 6;
 
 		ering->execlist_status = I915_READ(RING_EXECLIST_STATUS_LO(ring));
 		ering->execlist_ctx_id = I915_READ(RING_EXECLIST_STATUS_HI(ring));
@@ -1056,6 +1085,7 @@ static void i915_gem_record_rings(struct drm_device *dev,
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_request *request;
+	u64 ctx_desc;
 	int i, count;
 
 	for (i = 0; i < I915_NUM_RINGS; i++) {
@@ -1112,16 +1142,19 @@ static void i915_gem_record_rings(struct drm_device *dev,
 			 * for it to be useful (e.g. dump the context being
 			 * executed).
 			 */
-			if (request)
-				rbuf = request->ctx->engine[ring->id].ringbuf;
-			else
-				rbuf = dev_priv->kernel_context->engine[ring->id].ringbuf;
-		} else
+			struct intel_context *ctx = (request ? request->ctx :
+						     dev_priv->kernel_context);
+			ctx_desc = intel_lr_context_descriptor(ctx, ring);
+			rbuf = ctx->engine[ring->id].ringbuf;
+		} else {
+			ctx_desc = 0;
 			rbuf = ring->buffer;
+		}
 
 		error->ring[i].cpu_ring_head = rbuf->head;
 		error->ring[i].cpu_ring_tail = rbuf->tail;
 
+		error->ring[i].ctx_desc = ctx_desc;
 		error->ring[i].req_ringbuffer =
 			i915_error_ggtt_object_create(dev_priv, rbuf->obj);
 
