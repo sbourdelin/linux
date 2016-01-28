@@ -204,7 +204,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
 	 * allows only one device and supports a limited number of functions.
 	 */
 	if (pcie->type == IPROC_PCIE_PAXC)
-		if (slot > 0 || fn >= MAX_NUM_PAXC_PF)
+		if (slot > 0)
 			return NULL;
 
 	/* EP device access */
