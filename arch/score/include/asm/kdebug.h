@@ -3,4 +3,8 @@
 
 #include <asm-generic/kdebug.h>
 
+static inline void arch_breakpoint(void)
+{
+}
+
 #endif /* _ASM_SCORE_KDEBUG_H */
