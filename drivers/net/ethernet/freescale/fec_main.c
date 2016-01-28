@@ -1161,6 +1161,7 @@ static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
 			}
 			break;
 		}
+		bdp->cbd_sc = (bdp == txq->bd.last) ? BD_SC_WRAP : 0;
 
 		index = fec_enet_get_bd_index(bdp, &txq->bd);
 
