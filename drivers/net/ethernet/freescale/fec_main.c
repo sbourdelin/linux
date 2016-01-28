@@ -476,6 +476,8 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
 				estatus |= BD_ENET_TX_TS;
 		}
 	}
+	bdp->cbd_bufaddr = addr;
+	bdp->cbd_datlen = buflen;
 
 	if (fep->bufdesc_ex) {
 
@@ -499,8 +501,6 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
 	/* Save skb pointer */
 	txq->tx_skbuff[index] = skb;
 
-	bdp->cbd_datlen = buflen;
-	bdp->cbd_bufaddr = addr;
 	/* Make sure the updates to rest of the descriptor are performed before
 	 * transferring ownership.
 	 */
