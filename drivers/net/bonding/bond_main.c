@@ -2015,201 +2015,205 @@ static int bond_slave_info_query(struct net_device *bond_dev, struct ifslave *in
 /*-------------------------------- Monitoring -------------------------------*/
 
 /* called with rcu_read_lock() */
-static int bond_miimon_inspect(struct bonding *bond)
+static int bond_miimon_inspect_slave(struct bonding *bond, struct slave *slave,
+				     unsigned long event)
 {
-	int link_state, commit = 0;
-	struct list_head *iter;
-	struct slave *slave;
+	int link_state;
 	bool ignore_updelay;
 
-	ignore_updelay = !rcu_dereference(bond->curr_active_slave);
+	ignore_updelay = !rcu_dereference_rtnl(bond->curr_active_slave);
 
-	bond_for_each_slave_rcu(bond, slave, iter) {
-		slave->new_link = BOND_LINK_NOCHANGE;
+	slave->new_link = BOND_LINK_NOCHANGE;
 
-		link_state = bond_check_dev_link(bond, slave->dev, 0);
+	link_state = bond_check_dev_link(bond, slave->dev, 0);
 
-		switch (slave->link) {
-		case BOND_LINK_UP:
-			if (link_state)
-				continue;
+	switch (slave->link) {
+	case BOND_LINK_UP:
+		if (link_state)
+			return 0;
 
-			bond_set_slave_link_state(slave, BOND_LINK_FAIL,
-						  BOND_SLAVE_NOTIFY_LATER);
-			slave->delay = bond->params.downdelay;
-			if (slave->delay) {
-				netdev_info(bond->dev, "link status down for %sinterface %s, disabling it in %d ms\n",
-					    (BOND_MODE(bond) ==
-					     BOND_MODE_ACTIVEBACKUP) ?
-					     (bond_is_active_slave(slave) ?
-					      "active " : "backup ") : "",
-					    slave->dev->name,
-					    bond->params.downdelay * bond->params.miimon);
-			}
-			/*FALLTHRU*/
-		case BOND_LINK_FAIL:
-			if (link_state) {
-				/* recovered before downdelay expired */
-				bond_set_slave_link_state(slave, BOND_LINK_UP,
-							  BOND_SLAVE_NOTIFY_LATER);
-				slave->last_link_up = jiffies;
-				netdev_info(bond->dev, "link status up again after %d ms for interface %s\n",
-					    (bond->params.downdelay - slave->delay) *
-					    bond->params.miimon,
-					    slave->dev->name);
-				continue;
-			}
-
-			if (slave->delay <= 0) {
-				slave->new_link = BOND_LINK_DOWN;
-				commit++;
-				continue;
-			}
-
-			slave->delay--;
-			break;
-
-		case BOND_LINK_DOWN:
-			if (!link_state)
-				continue;
-
-			bond_set_slave_link_state(slave, BOND_LINK_BACK,
-						  BOND_SLAVE_NOTIFY_LATER);
-			slave->delay = bond->params.updelay;
-
-			if (slave->delay) {
-				netdev_info(bond->dev, "link status up for interface %s, enabling it in %d ms\n",
-					    slave->dev->name,
-					    ignore_updelay ? 0 :
-					    bond->params.updelay *
-					    bond->params.miimon);
-			}
-			/*FALLTHRU*/
-		case BOND_LINK_BACK:
-			if (!link_state) {
-				bond_set_slave_link_state(slave,
-							  BOND_LINK_DOWN,
-							  BOND_SLAVE_NOTIFY_LATER);
-				netdev_info(bond->dev, "link status down again after %d ms for interface %s\n",
-					    (bond->params.updelay - slave->delay) *
-					    bond->params.miimon,
-					    slave->dev->name);
-
-				continue;
-			}
-
-			if (ignore_updelay)
-				slave->delay = 0;
-
-			if (slave->delay <= 0) {
-				slave->new_link = BOND_LINK_UP;
-				commit++;
-				ignore_updelay = false;
-				continue;
-			}
-
-			slave->delay--;
-			break;
+		bond_set_slave_link_state(slave, BOND_LINK_FAIL,
+					  BOND_SLAVE_NOTIFY_LATER);
+		slave->delay = bond->params.downdelay;
+		if (slave->delay) {
+			netdev_info(bond->dev, "link status down for %sinterface %s, disabling it in %d ms\n",
+				    (BOND_MODE(bond) == BOND_MODE_ACTIVEBACKUP) ?
+				    (bond_is_active_slave(slave) ?
+				     "active " : "backup ") : "",
+				    slave->dev->name,
+				    bond->params.downdelay * bond->params.miimon);
 		}
+		/*FALLTHRU*/
+	case BOND_LINK_FAIL:
+		if (link_state) {
+			/* recovered before downdelay expired */
+			bond_set_slave_link_state(slave, BOND_LINK_UP,
+						  BOND_SLAVE_NOTIFY_LATER);
+			slave->last_link_up = jiffies;
+			netdev_info(bond->dev, "link status up again after %d ms for interface %s\n",
+				    (bond->params.downdelay - slave->delay) *
+				    bond->params.miimon, slave->dev->name);
+			return 0;
+		}
+
+		if (slave->delay <= 0) {
+			slave->new_link = BOND_LINK_DOWN;
+			return 1;
+		}
+
+		slave->delay--;
+		break;
+
+	case BOND_LINK_DOWN:
+		if (!link_state)
+			return 0;
+
+		bond_set_slave_link_state(slave, BOND_LINK_BACK,
+					  BOND_SLAVE_NOTIFY_LATER);
+		slave->delay = bond->params.updelay;
+
+		if (slave->delay) {
+			netdev_info(bond->dev, "link status up for interface %s, enabling it in %d ms\n",
+				    slave->dev->name, ignore_updelay ? 0 :
+				    bond->params.updelay * bond->params.miimon);
+		}
+		/*FALLTHRU*/
+	case BOND_LINK_BACK:
+		if (!link_state) {
+			bond_set_slave_link_state(slave, BOND_LINK_DOWN,
+						  BOND_SLAVE_NOTIFY_LATER);
+			netdev_info(bond->dev, "link status down again after %d ms for interface %s\n",
+				    (bond->params.updelay - slave->delay) *
+				    bond->params.miimon, slave->dev->name);
+
+			return 0;
+		}
+
+		if (ignore_updelay)
+			slave->delay = 0;
+
+		if (slave->delay <= 0) {
+			slave->new_link = BOND_LINK_UP;
+			return 1;
+		}
+
+		slave->delay--;
+		break;
 	}
 
+	return 0;
+}
+
+static int bond_miimon_inspect(struct bonding *bond)
+{
+	struct list_head *iter;
+	struct slave *slave;
+	int commit = 0;
+
+	bond_for_each_slave_rcu(bond, slave, iter)
+		commit += bond_miimon_inspect_slave(bond, slave, 0xFF);
+
 	return commit;
+}
+
+static void bond_miimon_commit_slave(struct bonding *bond, struct slave *slave)
+{
+	struct slave *primary;
+
+	switch (slave->new_link) {
+	case BOND_LINK_NOCHANGE:
+		return;
+
+	case BOND_LINK_UP:
+		bond_set_slave_link_state(slave, BOND_LINK_UP,
+					  BOND_SLAVE_NOTIFY_NOW);
+		slave->last_link_up = jiffies;
+
+		primary = rtnl_dereference(bond->primary_slave);
+		if (BOND_MODE(bond) == BOND_MODE_8023AD) {
+			/* prevent it from being the active one */
+			bond_set_backup_slave(slave);
+		} else if (BOND_MODE(bond) != BOND_MODE_ACTIVEBACKUP) {
+			/* make it immediately active */
+			bond_set_active_slave(slave);
+		} else if (slave != primary) {
+			/* prevent it from being the active one */
+			bond_set_backup_slave(slave);
+		}
+
+		netdev_info(bond->dev, "link status definitely up for interface %s, %u Mbps %s duplex\n",
+			    slave->dev->name,
+			    slave->speed == SPEED_UNKNOWN ? 0 : slave->speed,
+			    slave->duplex ? "full" : "half");
+
+		/* notify ad that the link status has changed */
+		if (BOND_MODE(bond) == BOND_MODE_8023AD)
+			bond_3ad_handle_link_change(slave, BOND_LINK_UP);
+
+		if (bond_is_lb(bond))
+			bond_alb_handle_link_change(bond, slave, BOND_LINK_UP);
+
+		if (BOND_MODE(bond) == BOND_MODE_XOR)
+			bond_update_slave_arr(bond, NULL);
+
+		if (!bond->curr_active_slave || slave == primary)
+			goto do_failover;
+
+		goto out;
+
+	case BOND_LINK_DOWN:
+		if (slave->link_failure_count < UINT_MAX)
+			slave->link_failure_count++;
+
+		bond_set_slave_link_state(slave, BOND_LINK_DOWN,
+					  BOND_SLAVE_NOTIFY_NOW);
+
+		if (BOND_MODE(bond) == BOND_MODE_ACTIVEBACKUP ||
+		    BOND_MODE(bond) == BOND_MODE_8023AD)
+			bond_set_slave_inactive_flags(slave,
+						      BOND_SLAVE_NOTIFY_NOW);
+
+		netdev_info(bond->dev, "link status definitely down for interface %s, disabling it\n",
+			    slave->dev->name);
+
+		if (BOND_MODE(bond) == BOND_MODE_8023AD)
+			bond_3ad_handle_link_change(slave, BOND_LINK_DOWN);
+
+		if (bond_is_lb(bond))
+			bond_alb_handle_link_change(bond, slave, BOND_LINK_DOWN);
+
+		if (BOND_MODE(bond) == BOND_MODE_XOR)
+			bond_update_slave_arr(bond, NULL);
+
+		if (slave == rcu_access_pointer(bond->curr_active_slave))
+			goto do_failover;
+
+		goto out;
+
+	default:
+		netdev_err(bond->dev, "invalid new link %d on slave %s\n",
+			   slave->new_link, slave->dev->name);
+		slave->new_link = BOND_LINK_NOCHANGE;
+
+		goto out;
+	}
+
+do_failover:
+	block_netpoll_tx();
+	bond_select_active_slave(bond);
+	unblock_netpoll_tx();
+
+out:
+	bond_set_carrier(bond);
 }
 
 static void bond_miimon_commit(struct bonding *bond)
 {
 	struct list_head *iter;
-	struct slave *slave, *primary;
+	struct slave *slave;
 
-	bond_for_each_slave(bond, slave, iter) {
-		switch (slave->new_link) {
-		case BOND_LINK_NOCHANGE:
-			continue;
-
-		case BOND_LINK_UP:
-			bond_set_slave_link_state(slave, BOND_LINK_UP,
-						  BOND_SLAVE_NOTIFY_NOW);
-			slave->last_link_up = jiffies;
-
-			primary = rtnl_dereference(bond->primary_slave);
-			if (BOND_MODE(bond) == BOND_MODE_8023AD) {
-				/* prevent it from being the active one */
-				bond_set_backup_slave(slave);
-			} else if (BOND_MODE(bond) != BOND_MODE_ACTIVEBACKUP) {
-				/* make it immediately active */
-				bond_set_active_slave(slave);
-			} else if (slave != primary) {
-				/* prevent it from being the active one */
-				bond_set_backup_slave(slave);
-			}
-
-			netdev_info(bond->dev, "link status definitely up for interface %s, %u Mbps %s duplex\n",
-				    slave->dev->name,
-				    slave->speed == SPEED_UNKNOWN ? 0 : slave->speed,
-				    slave->duplex ? "full" : "half");
-
-			/* notify ad that the link status has changed */
-			if (BOND_MODE(bond) == BOND_MODE_8023AD)
-				bond_3ad_handle_link_change(slave, BOND_LINK_UP);
-
-			if (bond_is_lb(bond))
-				bond_alb_handle_link_change(bond, slave,
-							    BOND_LINK_UP);
-
-			if (BOND_MODE(bond) == BOND_MODE_XOR)
-				bond_update_slave_arr(bond, NULL);
-
-			if (!bond->curr_active_slave || slave == primary)
-				goto do_failover;
-
-			continue;
-
-		case BOND_LINK_DOWN:
-			if (slave->link_failure_count < UINT_MAX)
-				slave->link_failure_count++;
-
-			bond_set_slave_link_state(slave, BOND_LINK_DOWN,
-						  BOND_SLAVE_NOTIFY_NOW);
-
-			if (BOND_MODE(bond) == BOND_MODE_ACTIVEBACKUP ||
-			    BOND_MODE(bond) == BOND_MODE_8023AD)
-				bond_set_slave_inactive_flags(slave,
-							      BOND_SLAVE_NOTIFY_NOW);
-
-			netdev_info(bond->dev, "link status definitely down for interface %s, disabling it\n",
-				    slave->dev->name);
-
-			if (BOND_MODE(bond) == BOND_MODE_8023AD)
-				bond_3ad_handle_link_change(slave,
-							    BOND_LINK_DOWN);
-
-			if (bond_is_lb(bond))
-				bond_alb_handle_link_change(bond, slave,
-							    BOND_LINK_DOWN);
-
-			if (BOND_MODE(bond) == BOND_MODE_XOR)
-				bond_update_slave_arr(bond, NULL);
-
-			if (slave == rcu_access_pointer(bond->curr_active_slave))
-				goto do_failover;
-
-			continue;
-
-		default:
-			netdev_err(bond->dev, "invalid new link %d on slave %s\n",
-				   slave->new_link, slave->dev->name);
-			slave->new_link = BOND_LINK_NOCHANGE;
-
-			continue;
-		}
-
-do_failover:
-		block_netpoll_tx();
-		bond_select_active_slave(bond);
-		unblock_netpoll_tx();
-	}
-
-	bond_set_carrier(bond);
+	bond_for_each_slave(bond, slave, iter)
+		bond_miimon_commit_slave(bond, slave);
 }
 
 /* bond_mii_monitor
@@ -3019,6 +3023,9 @@ static int bond_slave_netdev_event(unsigned long event,
 			bond_3ad_adapter_speed_duplex_changed(slave);
 		/* Fallthrough */
 	case NETDEV_DOWN:
+		if (bond_miimon_inspect_slave(bond, slave, event))
+			bond_miimon_commit_slave(bond, slave);
+
 		/* Refresh slave-array if applicable!
 		 * If the setup does not use miimon or arpmon (mode-specific!),
 		 * then these events will not cause the slave-array to be
