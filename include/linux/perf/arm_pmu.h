@@ -101,6 +101,7 @@ struct arm_pmu {
 	void		(*free_irq)(struct arm_pmu *);
 	int		(*map_event)(struct perf_event *event);
 	int		num_events;
+	int		event_mask;
 	atomic_t	active_events;
 	struct mutex	reserve_mutex;
 	u64		max_period;
@@ -119,8 +120,7 @@ int armpmu_map_event(struct perf_event *event,
 		     const unsigned (*event_map)[PERF_COUNT_HW_MAX],
 		     const unsigned (*cache_map)[PERF_COUNT_HW_CACHE_MAX]
 						[PERF_COUNT_HW_CACHE_OP_MAX]
-						[PERF_COUNT_HW_CACHE_RESULT_MAX],
-		     u32 raw_event_mask);
+						[PERF_COUNT_HW_CACHE_RESULT_MAX]);
 
 struct pmu_probe_info {
 	unsigned int cpuid;

@@ -79,9 +79,10 @@ armpmu_map_event(struct perf_event *event,
 		 const unsigned (*cache_map)
 				[PERF_COUNT_HW_CACHE_MAX]
 				[PERF_COUNT_HW_CACHE_OP_MAX]
-				[PERF_COUNT_HW_CACHE_RESULT_MAX],
-		 u32 raw_event_mask)
+				[PERF_COUNT_HW_CACHE_RESULT_MAX])
 {
+	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+	u32 raw_event_mask = armpmu->event_mask;
 	u64 config = event->attr.config;
 	int type = event->attr.type;
 
