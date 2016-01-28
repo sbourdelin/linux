@@ -84,4 +84,6 @@ static inline bool kvm_hv_has_stimer_pending(struct kvm_vcpu *vcpu)
 
 void kvm_hv_process_stimers(struct kvm_vcpu *vcpu);
 
+int kvm_hv_setup_tsc_page(struct kvm *kvm, bool has_master_clock);
+
 #endif

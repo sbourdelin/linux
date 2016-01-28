@@ -1231,9 +1231,7 @@ static void kvm_get_time_scale(uint32_t scaled_khz, uint32_t base_khz,
 		 __func__, base_khz, scaled_khz, shift, *pmultiplier);
 }
 
-#ifdef CONFIG_X86_64
 static atomic_t kvm_guest_has_master_clock = ATOMIC_INIT(0);
-#endif
 
 static DEFINE_PER_CPU(unsigned long, cpu_tsc_khz);
 static unsigned long max_tsc_khz;
@@ -1706,6 +1704,10 @@ static void kvm_gen_update_masterclock(struct kvm *kvm)
 
 	spin_unlock(&ka->pvclock_gtod_sync_lock);
 #endif
+
+	if (kvm->arch.hyperv.hv_tsc_page & HV_X64_MSR_TSC_REFERENCE_ENABLE)
+		kvm_hv_setup_tsc_page(kvm,
+				      atomic_read(&kvm_guest_has_master_clock));
 }
 
 static int kvm_guest_time_update(struct kvm_vcpu *v)

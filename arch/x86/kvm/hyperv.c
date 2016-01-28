@@ -756,6 +756,109 @@ static int kvm_hv_msr_set_crash_data(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
+static u64 calc_tsc_page_scale(u32 tsc_khz)
+{
+	/*
+	 * reftime (in 100ns) = tsc * tsc_scale / 2^64 + tsc_offset
+	 * so reftime_delta = (tsc_delta * tsc_scale) / 2^64
+	 * so tsc_scale = (2^64 * reftime_delta)/tsc_delta
+	 * so tsc_scale = (2^64 * 10 * 10^6) / tsc_hz = (2^64 * 10000) / tsc_khz
+	 */
+	u32 h, l;
+
+	/* Long division */
+	h = 10000;
+	l = do_shl32_div32(h, tsc_khz);
+	(void) do_shl32_div32(l, tsc_khz);
+
+	return ((u64)h << 32) | l;
+}
+
+/* If tsc_khz <= 10000, the scale doesn't fit in 64 bits.  */
+#define MIN_VALID_TSC_KHZ 10001
+
+static int write_tsc_page(struct kvm *kvm, u64 gfn,
+			  PHV_REFERENCE_TSC_PAGE tsc_ref)
+{
+	if (kvm_write_guest(kvm, gfn_to_gpa(gfn),
+			    tsc_ref, sizeof(*tsc_ref)))
+		return 1;
+	mark_page_dirty(kvm, gfn);
+	return 0;
+}
+
+static int read_tsc_page(struct kvm *kvm, u64 gfn,
+			 PHV_REFERENCE_TSC_PAGE tsc_ref)
+{
+	if (kvm_read_guest(kvm, gfn_to_gpa(gfn),
+			   tsc_ref, sizeof(*tsc_ref)))
+		return 1;
+	return 0;
+}
+
+static u64 calc_tsc_page_time(struct kvm_vcpu *vcpu,
+			      PHV_REFERENCE_TSC_PAGE tsc_ref)
+{
+
+	u64 tsc = kvm_read_l1_tsc(vcpu, rdtsc());
+
+	return mul_u64_u64_shr(tsc, tsc_ref->tsc_scale, 64)
+		+ tsc_ref->tsc_offset;
+}
+
+int kvm_hv_setup_tsc_page(struct kvm *kvm, bool has_master_clock)
+{
+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
+	struct kvm_hv *hv = &kvm->arch.hyperv;
+	HV_REFERENCE_TSC_PAGE tsc_ref = { 0 };
+	u32 tsc_khz;
+	int r;
+	u64 gfn, ref_time, tsc_scale, tsc_offset, tsc;
+
+	if (!(hv->hv_tsc_page & HV_X64_MSR_TSC_REFERENCE_ENABLE))
+		return 0;
+
+	gfn = hv->hv_tsc_page >> HV_X64_MSR_TSC_REFERENCE_ADDRESS_SHIFT;
+	kvm_debug("tsc page gfn 0x%llx\n", gfn);
+
+	tsc_khz = vcpu->arch.virtual_tsc_khz;
+	if (!has_master_clock || WARN_ON_ONCE(!tsc_khz) ||
+	    tsc_khz < MIN_VALID_TSC_KHZ) {
+		/* Use reference time MSR.  */
+		goto done;
+	}
+
+	r = read_tsc_page(kvm, gfn, &tsc_ref);
+	if (r) {
+		kvm_err("can't access tsc page gfn 0x%llx\n", gfn);
+		return r;
+	}
+
+	tsc_scale = calc_tsc_page_scale(tsc_khz);
+	ref_time = get_time_ref_counter(kvm);
+	tsc = kvm_read_l1_tsc(vcpu, rdtsc());
+
+	/* tsc_offset = reftime - tsc * tsc_scale / 2^64 */
+	tsc_offset = ref_time - mul_u64_u64_shr(tsc, tsc_scale, 64);
+	kvm_debug("tsc khz %u tsc %llu scale %llu offset %llu\n",
+		   tsc_khz, tsc, tsc_scale, tsc_offset);
+
+	tsc_ref.tsc_sequence++;
+	if (tsc_ref.tsc_sequence == 0xFFFFFFFF ||
+	    tsc_ref.tsc_sequence == 0)
+		tsc_ref.tsc_sequence = 1;
+
+	tsc_ref.tsc_scale = tsc_scale;
+	tsc_ref.tsc_offset = tsc_offset;
+
+	kvm_debug("tsc page calibration time %llu vs. reftime %llu\n",
+		  calc_tsc_page_time(vcpu, &tsc_ref),
+		  get_time_ref_counter(kvm));
+
+done:
+	return write_tsc_page(kvm, gfn, &tsc_ref);
+}
+
 static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 			     bool host)
 {
@@ -793,23 +896,11 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		mark_page_dirty(kvm, gfn);
 		break;
 	}
-	case HV_X64_MSR_REFERENCE_TSC: {
-		u64 gfn;
-		HV_REFERENCE_TSC_PAGE tsc_ref;
-
-		memset(&tsc_ref, 0, sizeof(tsc_ref));
+	case HV_X64_MSR_REFERENCE_TSC:
 		hv->hv_tsc_page = data;
-		if (!(data & HV_X64_MSR_TSC_REFERENCE_ENABLE))
-			break;
-		gfn = data >> HV_X64_MSR_TSC_REFERENCE_ADDRESS_SHIFT;
-		if (kvm_write_guest(
-				kvm,
-				gfn << HV_X64_MSR_TSC_REFERENCE_ADDRESS_SHIFT,
-				&tsc_ref, sizeof(tsc_ref)))
-			return 1;
-		mark_page_dirty(kvm, gfn);
+		if (hv->hv_tsc_page & HV_X64_MSR_TSC_REFERENCE_ENABLE)
+			kvm_make_request(KVM_REQ_MASTERCLOCK_UPDATE, vcpu);
 		break;
-	}
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
 		return kvm_hv_msr_set_crash_data(vcpu,
 						 msr - HV_X64_MSR_CRASH_P0,
