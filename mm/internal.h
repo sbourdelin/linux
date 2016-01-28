@@ -14,6 +14,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/personality.h>
 #include <linux/tracepoint-defs.h>
 
 /*
