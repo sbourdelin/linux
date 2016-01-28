@@ -24,4 +24,9 @@ enum die_val {
 
 extern void die(struct pt_regs *, const char *);
 
+
+static inline void arch_breakpoint(void)
+{
+}
+
 #endif
