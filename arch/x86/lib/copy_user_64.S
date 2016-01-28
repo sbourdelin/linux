@@ -232,12 +232,17 @@ ENDPROC(copy_user_enhanced_fast_string)
 
 /*
  * copy_user_nocache - Uncached memory copy with exception handling
- * This will force destination/source out of cache for more performance.
+ * This will force destination out of cache for more performance.
+ *
+ * Note: Cached memory copy is used when destination or size is not
+ * naturally aligned. That is:
+ *  - Require 8-byte alignment when size is 8 bytes or larger.
+ *  - Require 4-byte alignment when size is 4 bytes.
  */
 ENTRY(__copy_user_nocache)
 	ASM_STAC
 	cmpl $8,%edx
-	jb 20f		/* less then 8 bytes, go to byte copy loop */
+	jb 20f
 	ALIGN_DESTINATION
 	movl %edx,%ecx
 	andl $63,%edx
@@ -274,15 +279,28 @@ ENTRY(__copy_user_nocache)
 	decl %ecx
 	jnz 18b
 20:	andl %edx,%edx
-	jz 23f
+	jz 26f
+	movl %edi,%ecx
+	andl $3,%ecx
+	jnz 23f
 	movl %edx,%ecx
-21:	movb (%rsi),%al
-22:	movb %al,(%rdi)
+	andl $3,%edx
+	shrl $2,%ecx
+	jz 23f
+21:	movl (%rsi),%r8d
+22:	movnti %r8d,(%rdi)
+	leaq 4(%rsi),%rsi
+	leaq 4(%rdi),%rdi
+	andl %edx,%edx
+	jz 26f
+23:	movl %edx,%ecx
+24:	movb (%rsi),%al
+25:	movb %al,(%rdi)
 	incq %rsi
 	incq %rdi
 	decl %ecx
-	jnz 21b
-23:	xorl %eax,%eax
+	jnz 24b
+26:	xorl %eax,%eax
 	ASM_CLAC
 	sfence
 	ret
@@ -290,11 +308,13 @@ ENTRY(__copy_user_nocache)
 	.section .fixup,"ax"
 30:	shll $6,%ecx
 	addl %ecx,%edx
-	jmp 60f
+	jmp 70f
 40:	lea (%rdx,%rcx,8),%rdx
-	jmp 60f
-50:	movl %ecx,%edx
-60:	sfence
+	jmp 70f
+50:	lea (%rdx,%rcx,4),%rdx
+	jmp 70f
+60:	movl %ecx,%edx
+70:	sfence
 	jmp copy_user_handle_tail
 	.previous
 
@@ -318,4 +338,6 @@ ENTRY(__copy_user_nocache)
 	_ASM_EXTABLE(19b,40b)
 	_ASM_EXTABLE(21b,50b)
 	_ASM_EXTABLE(22b,50b)
+	_ASM_EXTABLE(24b,60b)
+	_ASM_EXTABLE(25b,60b)
 ENDPROC(__copy_user_nocache)
