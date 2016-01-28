@@ -4058,7 +4058,7 @@ EXPORT_SYMBOL_GPL(ring_buffer_read_prepare);
 void
 ring_buffer_read_prepare_sync(void)
 {
-	synchronize_sched();
+//	synchronize_sched();
 }
 EXPORT_SYMBOL_GPL(ring_buffer_read_prepare_sync);
 
