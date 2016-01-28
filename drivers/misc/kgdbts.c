@@ -980,10 +980,12 @@ static void kgdbts_run_tests(void)
 	int i;
 
 	ptr = strchr(config, 'F');
-	if (ptr)
+	if (ptr &&
+	    (!IS_ENABLED(CONFIG_DEBUG_RODATA) || !IS_ENABLED(CONFIG_KGDB_TESTS_ON_BOOT)))
 		fork_test = simple_strtol(ptr + 1, NULL, 10);
 	ptr = strchr(config, 'S');
-	if (ptr)
+	if (ptr &&
+	    (!IS_ENABLED(CONFIG_DEBUG_RODATA) || !IS_ENABLED(CONFIG_KGDB_TESTS_ON_BOOT)))
 		do_sys_open_test = simple_strtol(ptr + 1, NULL, 10);
 	ptr = strchr(config, 'N');
 	if (ptr)
