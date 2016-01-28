@@ -71,6 +71,7 @@ void ctrl_alt_del(void);
 extern char poweroff_cmd[POWEROFF_CMD_PATH_LEN];
 
 extern void orderly_poweroff(bool force);
+extern void emergency_poweroff(void);
 extern void orderly_reboot(void);
 
 /*

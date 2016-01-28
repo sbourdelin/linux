@@ -37,6 +37,15 @@ config OPROFILE_NMI_TIMER
 	def_bool y
 	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
 
+config EMERGENCY_POWEROFF_DELAY_MS
+	int "Emergency poweroff delay in milli-seconds"
+	default 0
+	help
+	  The number of milliseconds to delay before emergency
+	  poweroff kicks in.
+
+	  If set to 0 poweroff will happen immediately.
+
 config KPROBES
 	bool "Kprobes"
 	depends on MODULES

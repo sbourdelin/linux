@@ -469,6 +469,37 @@ void orderly_poweroff(bool force)
 }
 EXPORT_SYMBOL_GPL(orderly_poweroff);
 
+/**
+ * emergency_poweroff_func - emergency poweroff work after a known delay
+ * @work: work_struct associated with the emergency poweroff function
+ *
+ * This function is called in very critical situations to force
+ * a kernel poweroff after a configurable timeout value.
+ */
+static void emergency_poweroff_func(struct work_struct *work)
+{
+	pr_warn("Attempting kernel_power_off\n");
+	kernel_power_off();
+
+	pr_warn("kernel_power_off has failed! Attempting emergency_restart\n");
+	emergency_restart();
+}
+
+static DECLARE_DELAYED_WORK(emergency_poweroff_work, emergency_poweroff_func);
+
+/**
+ * emergency_poweroff - Trigger an emergency system poweroff
+ *
+ * This may be called from any critical situation to trigger a system shutdown
+ * after a known period of time. By default the delay is 0 millisecond
+ */
+void emergency_poweroff(void)
+{
+	schedule_delayed_work(&emergency_poweroff_work,
+			msecs_to_jiffies(CONFIG_EMERGENCY_POWEROFF_DELAY_MS));
+}
+EXPORT_SYMBOL_GPL(emergency_poweroff);
+
 static void reboot_work_func(struct work_struct *work)
 {
 	__orderly_reboot();
