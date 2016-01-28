@@ -73,6 +73,9 @@ perf: FORCE
 selftests: FORCE
 	$(call descend,testing/$@)
 
+selftests_run:
+	$(call descend,testing/selftests run_tests)
+
 turbostat x86_energy_perf_policy: FORCE
 	$(call descend,power/x86/$@)
 
