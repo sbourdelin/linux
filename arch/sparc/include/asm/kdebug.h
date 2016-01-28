@@ -5,4 +5,9 @@
 #else
 #include <asm/kdebug_32.h>
 #endif
+
+static inline void arch_breakpoint(void)
+{
+	asm("ta	$0x7d");
+}
 #endif
