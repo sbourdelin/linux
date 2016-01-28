@@ -1102,6 +1102,9 @@ fec_timeout(struct net_device *ndev)
 	int i;
 	uint events = 0;
 
+	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
+	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
+
 	for (i = 0; i < fep->num_tx_queues; i++) {
 		struct fec_enet_priv_tx_q *txq = fep->tx_queue[i];
 		int index;
@@ -1504,6 +1507,7 @@ fec_enet_interrupt(int irq, void *dev_id)
 
 	if (!int_events)
 		return IRQ_NONE;
+	fep->last_ievents = int_events;
 
 	if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
 		if (napi_schedule_prep(&fep->napi)) {
