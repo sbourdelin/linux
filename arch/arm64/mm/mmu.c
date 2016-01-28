@@ -313,7 +313,6 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
 				phys, virt, size, prot, late_alloc);
 }
 
-#ifdef CONFIG_DEBUG_RODATA
 static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 {
 	/*
@@ -347,13 +346,6 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
 	}
 
 }
-#else
-static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
-{
-	create_mapping(start, __phys_to_virt(start), end - start,
-			PAGE_KERNEL_EXEC);
-}
-#endif
 
 static void __init map_mem(void)
 {
@@ -410,7 +402,6 @@ static void __init map_mem(void)
 
 static void __init fixup_executable(void)
 {
-#ifdef CONFIG_DEBUG_RODATA
 	/* now that we are actually fully mapped, make the start/end more fine grained */
 	if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
 		unsigned long aligned_start = round_down(__pa(_stext),
@@ -428,10 +419,8 @@ static void __init fixup_executable(void)
 				aligned_end - __pa(__init_end),
 				PAGE_KERNEL);
 	}
-#endif
 }
 
-#ifdef CONFIG_DEBUG_RODATA
 void mark_rodata_ro(void)
 {
 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
@@ -439,7 +428,6 @@ void mark_rodata_ro(void)
 				PAGE_KERNEL_ROX);
 
 }
-#endif
 
 void fixup_init(void)
 {
