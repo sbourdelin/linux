@@ -19,4 +19,11 @@ enum die_val {
 	DIE_GPF,
 };
 
+static inline void arch_breakpoint(void)
+{
+	asm(".globl __arch_breakpoint; __arch_breakpoint: break");
+}
+extern u8 __arch_breakpoint;
+
+
 #endif /* _ASM_KDEBUG_H */
