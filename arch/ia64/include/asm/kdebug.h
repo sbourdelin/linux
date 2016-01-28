@@ -54,4 +54,8 @@ enum die_val {
 	DIE_KDUMP_LEAVE,
 };
 
+static inline void arch_breakpoint(void)
+{
+}
+
 #endif
