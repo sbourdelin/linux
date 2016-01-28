@@ -756,6 +756,7 @@ static void __device_release_driver(struct device *dev)
 
 		pm_runtime_put_sync(dev);
 
+		klist_remove(&dev->p->knode_driver);
 		if (dev->bus && dev->bus->remove)
 			dev->bus->remove(dev);
 		else if (drv->remove)
@@ -767,7 +768,6 @@ static void __device_release_driver(struct device *dev)
 			dev->pm_domain->dismiss(dev);
 		pm_runtime_reinit(dev);
 
-		klist_remove(&dev->p->knode_driver);
 		device_pm_check_callbacks(dev);
 		if (dev->bus)
 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
