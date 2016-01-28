@@ -386,6 +386,15 @@
 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
 	status = "okay";
+	phy-handle = <&ethphy>;
+	mdio {
+		#address-cells = <0>;
+		#size-cells = <1>;
+		ethphy: ethernet-phy@6 {
+			reg = <6>;
+			interrupts-extended = <&gpio1 28 IRQ_TYPE_LEVEL_LOW>;
+		};
+	};
 };
 
 &hdmi {
