@@ -3,7 +3,7 @@ srctree := $(patsubst %/,%,$(dir $(shell pwd)))
 srctree := $(patsubst %/,%,$(dir $(srctree)))
 endif
 
-include $(srctree)/tools//scripts/Makefile.include
+include $(srctree)/tools/scripts/Makefile.include
 
 define allow-override
   $(if $(or $(findstring environment,$(origin $(1))),\

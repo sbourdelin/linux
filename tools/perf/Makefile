@@ -35,6 +35,9 @@ endif
 #
 ifneq ($(O),)
   FULL_O := $(shell readlink -f $(O) || echo $(O))
+  saved-output := $(FULL_O)
+  FULL_O := $(shell mkdir -p $(FULL_O) && cd $(FULL_O) && /bin/pwd)
+  $(if $(FULL_O),, $(error failed to create output directory "$(saved-output)"))
 endif
 
 #
