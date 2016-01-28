@@ -271,33 +271,18 @@ static int gpio_regulator_probe(struct platform_device *pdev)
 	}
 
 	if (config->nr_gpios != 0) {
-		drvdata->gpios = kmemdup(config->gpios,
-					 config->nr_gpios * sizeof(struct gpio),
-					 GFP_KERNEL);
-		if (drvdata->gpios == NULL) {
-			dev_err(&pdev->dev, "Failed to allocate gpio data\n");
-			ret = -ENOMEM;
-			goto err_name;
-		}
+		drvdata->gpios = config->gpios;
 
 		drvdata->nr_gpios = config->nr_gpios;
 		ret = gpio_request_array(drvdata->gpios, drvdata->nr_gpios);
 		if (ret) {
 			dev_err(&pdev->dev,
 			"Could not obtain regulator setting GPIOs: %d\n", ret);
-			goto err_memstate;
+			goto err_name;
 		}
 	}
 
-	drvdata->states = kmemdup(config->states,
-				  config->nr_states *
-					 sizeof(struct gpio_regulator_state),
-				  GFP_KERNEL);
-	if (drvdata->states == NULL) {
-		dev_err(&pdev->dev, "Failed to allocate state data\n");
-		ret = -ENOMEM;
-		goto err_memgpio;
-	}
+	drvdata->states = config->states;
 	drvdata->nr_states = config->nr_states;
 
 	drvdata->desc.owner = THIS_MODULE;
@@ -317,7 +302,7 @@ static int gpio_regulator_probe(struct platform_device *pdev)
 	default:
 		dev_err(&pdev->dev, "No regulator type set\n");
 		ret = -EINVAL;
-		goto err_memgpio;
+		goto err_gpio;
 	}
 
 	/* build initial state from gpio init data. */
@@ -354,19 +339,15 @@ static int gpio_regulator_probe(struct platform_device *pdev)
 	if (IS_ERR(drvdata->dev)) {
 		ret = PTR_ERR(drvdata->dev);
 		dev_err(&pdev->dev, "Failed to register regulator: %d\n", ret);
-		goto err_stategpio;
+		goto err_gpio;
 	}
 
 	platform_set_drvdata(pdev, drvdata);
 
 	return 0;
 
-err_stategpio:
+err_gpio:
 	gpio_free_array(drvdata->gpios, drvdata->nr_gpios);
-err_memstate:
-	kfree(drvdata->states);
-err_memgpio:
-	kfree(drvdata->gpios);
 err_name:
 	kfree(drvdata->desc.name);
 err:
@@ -380,9 +361,6 @@ static int gpio_regulator_remove(struct platform_device *pdev)
 	regulator_unregister(drvdata->dev);
 
 	gpio_free_array(drvdata->gpios, drvdata->nr_gpios);
-
-	kfree(drvdata->states);
-	kfree(drvdata->gpios);
 
 	kfree(drvdata->desc.name);
 
