@@ -91,7 +91,8 @@ static inline void cputime_to_timespec(const cputime_t ct, struct timespec *val)
  */
 static inline cputime_t timeval_to_cputime(const struct timeval *val)
 {
-	u64 ret = val->tv_sec * NSEC_PER_SEC + val->tv_usec * NSEC_PER_USEC;
+	u64 ret = (u64)val->tv_sec * NSEC_PER_SEC +
+			val->tv_usec * NSEC_PER_USEC;
 	return (__force cputime_t) ret;
 }
 static inline void cputime_to_timeval(const cputime_t ct, struct timeval *val)
