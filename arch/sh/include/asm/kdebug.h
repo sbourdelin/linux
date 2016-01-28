@@ -14,4 +14,9 @@ enum die_val {
 extern void printk_address(unsigned long address, int reliable);
 extern void dump_mem(const char *str, unsigned long bottom, unsigned long top);
 
+static inline void arch_breakpoint(void)
+{
+	__asm__ __volatile__ ("trapa #0x3c\n");
+}
+
 #endif /* __ASM_SH_KDEBUG_H */
