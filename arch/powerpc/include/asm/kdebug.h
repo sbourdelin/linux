@@ -11,5 +11,10 @@ enum die_val {
 	DIE_SSTEP,
 };
 
+static inline void arch_breakpoint(void)
+{
+	asm(".long 0x7d821008"); /* twge r2, r2 */
+}
+
 #endif /* __KERNEL__ */
 #endif /* _ASM_POWERPC_KDEBUG_H */
