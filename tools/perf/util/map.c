@@ -431,6 +431,9 @@ u64 map__rip_2objdump(struct map *map, u64 rip)
 	if (map->dso->rel)
 		return rip - map->pgoff;
 
+	if (map->dso->kernel == DSO_TYPE_USER)
+		return rip + map->dso->text_offset;
+
 	return map->unmap_ip(map, rip) - map->reloc;
 }
 
@@ -453,6 +456,9 @@ u64 map__objdump_2mem(struct map *map, u64 ip)
 
 	if (map->dso->rel)
 		return map->unmap_ip(map, ip + map->pgoff);
+
+	if (map->dso->kernel == DSO_TYPE_USER)
+		return map->unmap_ip(map, ip - map->dso->text_offset);
 
 	return ip + map->reloc;
 }
