@@ -16,4 +16,16 @@ enum die_val {
 	DIE_UPROBE_XOL,
 };
 
+
+void arch_breakpoint(void)
+{
+	__asm__ __volatile__(
+		".globl breakinst\n\t"
+		".set\tnoreorder\n\t"
+		"nop\n"
+		"breakinst:\tbreak\n\t"
+		"nop\n\t"
+		".set\treorder");
+}
+
 #endif /* _ASM_MIPS_KDEBUG_H */
