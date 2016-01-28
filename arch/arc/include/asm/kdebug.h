@@ -16,4 +16,8 @@ enum die_val {
 	DIE_OOPS
 };
 
+static inline void arch_breakpoint(void)
+{
+	__asm__ __volatile__ ("trap_s	0x4\n");
+}
 #endif
