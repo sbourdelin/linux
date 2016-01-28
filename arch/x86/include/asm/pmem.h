@@ -45,6 +45,17 @@ static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
 	if (WARN(unwritten, "%s: fault copying %p <- %p unwritten: %d\n",
 				__func__, dst, src, unwritten))
 		BUG();
+
+	/*
+	 * Flush the caches when the request is not naturally aligned.
+	 * Non-temporal stores are not used for unaligned copy.
+	 */
+	if (((n >= 8) &&
+		(!IS_ALIGNED((unsigned long)dst, 8) || !IS_ALIGNED(n, 8))) ||
+	    ((n <  8) &&
+		(!IS_ALIGNED((unsigned long)dst, 4) || (n != 4)))) {
+		clflush_cache_range(dst, n);
+	}
 }
 
 /**
