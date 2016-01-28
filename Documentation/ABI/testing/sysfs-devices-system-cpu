@@ -271,3 +271,48 @@ Description:	Parameters for the CPU cache attributes
 			- WriteBack: data is written only to the cache line and
 				     the modified cache line is written to main
 				     memory only when it is replaced
+
+What:		/sys/devices/system/cpu/cpufreq/chip*/throttle_stats
+Date:		Jan 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	CPU Frequency throttle stat for the chip
+
+		This attribute gives the total number of events of max-frequency
+		throttling to any lower frequency in the turbo(above nominal) and
+		the sub-turbo (at and below nominal) range of frequencies.
+
+
+What:		/sys/devices/system/cpu/cpufreq/chip*/throttle_frequencies
+Date:		Jan 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	CPU Frequency throttle stat for all available frequencies in the chip
+
+		This attribute gives the throttle stats for each of the available
+		frequencies. The throttle stat of a frequency is the total
+		number of times the max frequency is reduced to that frequency.
+
+What:		/sys/devices/system/cpu/cpufreq/chip*/throttle_reasons/<reason_attributes>
+Date:		Jan 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	CPU Frequency throttle reason stat for the chip
+
+		This directory contains throttle reason files. Each file gives
+		the total number of times the max frequency is throttled, except
+		for 'unthrottle_count', which gives the total number of times
+		the max frequency is unthrottled after being throttled. Below
+		are the reason attributes.
+
+		cpu_over_temperature: Throttled due to cpu over temperature
+
+		occ_reset: Throttled due to reset of OCC
+
+		over_current: Throttled due to over current
+
+		power_cap: Throttled due to power capping
+
+		power_supply_failure: Throttled due to power supply failure
+
+		unthrottle_count: Unthrottled from any of the above reasons.
