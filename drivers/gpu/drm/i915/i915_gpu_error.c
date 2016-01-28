@@ -557,6 +557,24 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 			}
 		}
 
+		if ((obj = error->ring[i].wa_ctx)) {
+			u64 wa_ctx_offset = obj->gtt_offset;
+			u32 *wa_ctx_page = &obj->pages[0][0];
+
+			err_printf(m, "\n%s --- WA Ctx batch buffer = 0x%08llx\n",
+				   dev_priv->ring[i].name, wa_ctx_offset);
+			offset = 0;
+			for (elt = 0; elt < PAGE_SIZE/32; elt += 4) {
+				err_printf(m, "[%04x] %08x %08x %08x %08x\n",
+					   offset,
+					   wa_ctx_page[elt],
+					   wa_ctx_page[elt+1],
+					   wa_ctx_page[elt+2],
+					   wa_ctx_page[elt+3]);
+				offset += 16;
+			}
+		}
+
 		if ((obj = error->ring[i].ctx)) {
 			err_printf(m, "%s --- HW Context = 0x%08x\n",
 				   dev_priv->ring[i].name,
@@ -650,6 +668,8 @@ static void i915_error_state_free(struct kref *error_ref)
 		i915_error_object_free(error->ring[i].hws_page);
 		i915_error_object_free(error->ring[i].ctx);
 		kfree(error->ring[i].requests);
+		if (i == RCS)
+			i915_error_object_free(error->ring[i].wa_ctx);
 	}
 
 	i915_error_object_free(error->semaphore_obj);
@@ -1160,6 +1180,11 @@ static void i915_gem_record_rings(struct drm_device *dev,
 
 		error->ring[i].hws_page =
 			i915_error_ggtt_object_create(dev_priv, ring->status_page.obj);
+
+		if (INTEL_INFO(dev)->gen >= 8 && ring->id == RCS) {
+			error->ring[i].wa_ctx =
+				i915_error_ggtt_object_create(dev_priv, ring->wa_ctx.obj);
+		}
 
 		i915_gem_record_active_context(ring, error, &error->ring[i]);
 
