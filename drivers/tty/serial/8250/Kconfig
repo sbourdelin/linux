@@ -116,6 +116,17 @@ config SERIAL_8250_PCI
 	  Note that serial ports on NetMos 9835 Multi-I/O cards are handled
 	  by the parport_serial driver, enabled with CONFIG_PARPORT_SERIAL.
 
+config SERIAL_8250_F81504
+        tristate "Fintek F81504/508/512 16550 PCIE device support" if EXPERT
+        depends on SERIAL_8250 && MFD_FINTEK_F81504_CORE
+        default SERIAL_8250
+        select RATIONAL
+        help
+          This builds Fintek F81504/508/512 PCIE serial ports support.
+          You may be able to enable GPIO_F81504 to get GPIOLIB support if
+          the devices supported. Please enable MFD_FINTEK_F81504_CORE &
+          this with Y if you need a early console.
+
 config SERIAL_8250_HP300
 	tristate
 	depends on SERIAL_8250 && HP300
