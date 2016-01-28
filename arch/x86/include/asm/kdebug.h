@@ -3,6 +3,11 @@
 
 #include <linux/notifier.h>
 
+static inline void arch_breakpoint(void)
+{
+	asm("   int $3");
+}
+
 struct pt_regs;
 
 /* Grossly misnamed. */
