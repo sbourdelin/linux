@@ -110,6 +110,7 @@ int (*nat_q931_hook) (struct sk_buff *skb,
 
 static DEFINE_SPINLOCK(nf_h323_lock);
 static char *h323_buffer;
+#define CHECK_BOUND(p, n) ((void *)p + n - (void *)h323_buffer > 65536)
 
 static struct nf_conntrack_helper nf_conntrack_helper_h245;
 static struct nf_conntrack_helper nf_conntrack_helper_q931[];
@@ -246,6 +247,9 @@ static int get_h245_addr(struct nf_conn *ct, const unsigned char *data,
 	default:
 		return 0;
 	}
+
+	if (CHECK_BOUND(p, len + sizeof(__be16)))
+		return 0;
 
 	memcpy(addr, p, len);
 	memset((void *)addr + len, 0, sizeof(*addr) - len);
@@ -668,6 +672,9 @@ int get_h225_addr(struct nf_conn *ct, unsigned char *data,
 	default:
 		return 0;
 	}
+
+	if (CHECK_BOUND(p, len + sizeof(__be16)))
+		return 0;
 
 	memcpy(addr, p, len);
 	memset((void *)addr + len, 0, sizeof(*addr) - len);
