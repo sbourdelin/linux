@@ -23,6 +23,7 @@
 #include <linux/workqueue.h>
 
 #include <asm/irq_regs.h>
+#include <asm/kdebug.h>
 #include <linux/kvm_para.h>
 #include <linux/perf_event.h>
 #include <linux/kthread.h>
@@ -107,6 +108,9 @@ static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts_saved);
 static DEFINE_PER_CPU(struct perf_event *, watchdog_ev);
 #endif
 static unsigned long soft_lockup_nmi_warn;
+
+int debug_watchdog_lockups;
+EXPORT_SYMBOL_GPL(debug_watchdog_lockups);
 
 /* boot commands */
 /*
@@ -358,6 +362,9 @@ static void watchdog_overflow_callback(struct perf_event *event,
 		else
 			dump_stack();
 
+		if (debug_watchdog_lockups)
+			arch_breakpoint();
+
 		/*
 		 * Perform all-CPU dump only once to avoid multiple hardlockups
 		 * generating interleaving traces
@@ -477,6 +484,9 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 			show_regs(regs);
 		else
 			dump_stack();
+
+		if (debug_watchdog_lockups)
+			arch_breakpoint();
 
 		if (softlockup_all_cpu_backtrace) {
 			/* Avoid generating two back traces for current
