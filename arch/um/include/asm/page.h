@@ -46,8 +46,8 @@ typedef struct { unsigned long pgd; } pgd_t;
 			      smp_wmb(); \
 			      (to).pte_low = (from).pte_low; })
 #define pte_is_zero(pte) (!((pte).pte_low & ~_PAGE_NEWPAGE) && !(pte).pte_high)
-#define pte_set_val(pte, phys, prot) \
-	({ (pte).pte_high = (phys) >> 32; \
+#define pte_set_val(pte, phys, prot)				\
+	({ (pte).pte_high = 0;					\
 	   (pte).pte_low = (phys) | pgprot_val(prot); })
 
 #define pmd_val(x)	((x).pmd)
