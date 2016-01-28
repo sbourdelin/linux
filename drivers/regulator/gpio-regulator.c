@@ -263,11 +263,11 @@ static int gpio_regulator_probe(struct platform_device *pdev)
 			return PTR_ERR(config);
 	}
 
-	drvdata->desc.name = kstrdup(config->supply_name, GFP_KERNEL);
+	drvdata->desc.name = devm_kstrdup(&pdev->dev, config->supply_name,
+					  GFP_KERNEL);
 	if (drvdata->desc.name == NULL) {
 		dev_err(&pdev->dev, "Failed to allocate supply name\n");
-		ret = -ENOMEM;
-		goto err;
+		return -ENOMEM;
 	}
 
 	if (config->nr_gpios != 0) {
@@ -278,7 +278,7 @@ static int gpio_regulator_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(&pdev->dev,
 			"Could not obtain regulator setting GPIOs: %d\n", ret);
-			goto err_name;
+			return ret;
 		}
 	}
 
@@ -348,9 +348,7 @@ static int gpio_regulator_probe(struct platform_device *pdev)
 
 err_gpio:
 	gpio_free_array(drvdata->gpios, drvdata->nr_gpios);
-err_name:
-	kfree(drvdata->desc.name);
-err:
+
 	return ret;
 }
 
@@ -361,8 +359,6 @@ static int gpio_regulator_remove(struct platform_device *pdev)
 	regulator_unregister(drvdata->dev);
 
 	gpio_free_array(drvdata->gpios, drvdata->nr_gpios);
-
-	kfree(drvdata->desc.name);
 
 	return 0;
 }
