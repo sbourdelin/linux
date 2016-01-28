@@ -310,6 +310,17 @@ config HTC_I2CPLD
 	  This device provides input and output GPIOs through an I2C
 	  interface to one or more sub-chips.
 
+config MFD_FINTEK_F81504_CORE
+        tristate "Fintek F81504/508/512 PCIE-to-UART/GPIO MFD support"
+        depends on PCI
+        select MFD_CORE
+        default y
+        help
+          This driver generate F81504/508/512 UART & GPIO platform
+          device. It should enable CONFIG_GPIO_F81504 to get GPIOLIB
+          support and CONFIG_8250_F81504 to get serial ports support.
+          Please bulit-in kernel if you need early console support.
+
 config MFD_INTEL_QUARK_I2C_GPIO
 	tristate "Intel Quark MFD I2C GPIO"
 	depends on PCI
