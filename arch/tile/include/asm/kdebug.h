@@ -25,4 +25,10 @@ enum die_val {
 	DIE_COMPILED_BPT
 };
 
+static inline void arch_breakpoint(void)
+{
+	asm volatile (".quad %0\n\t"
+		      ::""(compiled_bpt));
+}
+
 #endif /* _ASM_TILE_KDEBUG_H */
