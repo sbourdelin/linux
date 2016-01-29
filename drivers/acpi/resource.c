@@ -127,8 +127,10 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
 	if (!acpi_dev_resource_len_valid(res->start, res->end, len, true))
 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
 
+#ifndef PCI_IOBASE
 	if (res->end >= 0x10003)
 		res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
+#endif
 
 	if (io_decode == ACPI_DECODE_16)
 		res->flags |= IORESOURCE_IO_16BIT_ADDR;
