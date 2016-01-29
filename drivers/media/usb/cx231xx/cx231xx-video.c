@@ -1836,7 +1836,6 @@ static int cx231xx_close(struct file *filp)
 
 	cx231xx_videodbg("users=%d\n", dev->users);
 
-	cx231xx_videodbg("users=%d\n", dev->users);
 	if (res_check(fh))
 		res_free(fh);
 
@@ -1870,13 +1869,6 @@ static int cx231xx_close(struct file *filp)
 				cx231xx_set_alt_setting(dev, INDEX_VANC, 0);
 			else
 				cx231xx_set_alt_setting(dev, INDEX_HANC, 0);
-
-			v4l2_fh_del(&fh->fh);
-			v4l2_fh_exit(&fh->fh);
-			kfree(fh);
-			dev->users--;
-			wake_up_interruptible(&dev->open);
-			return 0;
 		}
 
 	v4l2_fh_del(&fh->fh);
