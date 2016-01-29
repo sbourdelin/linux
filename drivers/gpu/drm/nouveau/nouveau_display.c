@@ -443,6 +443,12 @@ nouveau_display_create_properties(struct drm_device *dev)
 	/* -100..+100 */
 	disp->color_vibrance_property =
 		drm_property_create_range(dev, 0, "color vibrance", 0, 200);
+
+	if (!disp->underscan_hborder_property ||
+			!disp->underscan_vborder_property ||
+			!disp->vibrant_hue_property ||
+			!disp->color_vibrance_property)
+		return;
 }
 
 int
