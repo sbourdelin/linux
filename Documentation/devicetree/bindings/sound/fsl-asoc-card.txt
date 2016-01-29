@@ -43,7 +43,7 @@ Required properties:
 
   - audio-cpu		: The phandle of an CPU DAI controller
 
-  - audio-codec		: The phandle of an audio codec
+  - audio-codec	: The phandle of an audio codec
 
   - audio-routing	: A list of the connections between audio components.
 			  Each entry is a pair of strings, the first being the
