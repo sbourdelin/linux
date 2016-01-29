@@ -2003,7 +2003,9 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	i915_cmd_parser_fini_ring(ring);
 	i915_gem_batch_pool_fini(&ring->batch_pool);
 
-	lrc_teardown_hardware_status_page(ring);
+	/* Status page should have gone already */
+	WARN_ON(ring->status_page.page_addr);
+	WARN_ON(ring->status_page.obj);
 
 	ring->disable_lite_restore_wa = false;
 	ring->ctx_desc_template = 0;
@@ -2447,6 +2449,11 @@ void intel_lr_context_free(struct intel_context *ctx)
 			continue;
 
 		if (ctx == ctx->i915->kernel_context) {
+			/*
+			 * The HWSP is part of the kernel context
+			 * object in LRC mode, so tear it down now.
+			 */
+			lrc_teardown_hardware_status_page(ringbuf->ring);
 			intel_unpin_ringbuffer_obj(ringbuf);
 			i915_gem_object_ggtt_unpin(ctx_obj);
 		}
@@ -2517,12 +2524,19 @@ static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring)
 	POSTING_READ(RING_HWS_PGA(ring->mmio_base));
 }
 
+/* This should be called *before* the default context is destroyed */
 static void lrc_teardown_hardware_status_page(struct intel_engine_cs *ring)
 {
-	if (ring->status_page.obj) {
+	struct drm_i915_gem_object *dctx_obj = ring->status_page.obj;
+
+	WARN_ON(!dctx_obj);
+
+	if (ring->status_page.page_addr) {
 		kunmap(kmap_to_page(ring->status_page.page_addr));
-		ring->status_page.obj = NULL;
+		ring->status_page.page_addr = NULL;
 	}
+
+	ring->status_page.obj = NULL;
 }
 
 /**
