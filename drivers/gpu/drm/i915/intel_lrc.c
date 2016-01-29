@@ -227,9 +227,8 @@ enum {
 
 static int intel_lr_context_pin(struct intel_context *ctx,
 				struct intel_engine_cs *engine);
-static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
-		struct drm_i915_gem_object *default_ctx_obj);
-
+static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring);
+static void lrc_teardown_hardware_status_page(struct intel_engine_cs *ring);
 
 /**
  * intel_sanitize_enable_execlists() - sanitize i915.enable_execlists
@@ -1555,8 +1554,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *ring)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u8 next_context_status_buffer_hw;
 
-	lrc_setup_hardware_status_page(ring,
-				dev_priv->kernel_context->engine[ring->id].state);
+	lrc_setup_hardware_status_page(ring);
 
 	I915_WRITE_IMR(ring, ~(ring->irq_enable_mask | ring->irq_keep_mask));
 	I915_WRITE(RING_HWSTAM(ring->mmio_base), 0xffffffff);
@@ -2005,10 +2003,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	i915_cmd_parser_fini_ring(ring);
 	i915_gem_batch_pool_fini(&ring->batch_pool);
 
-	if (ring->status_page.obj) {
-		kunmap(kmap_to_page(ring->status_page.page_addr));
-		ring->status_page.obj = NULL;
-	}
+	lrc_teardown_hardware_status_page(ring);
 
 	ring->disable_lite_restore_wa = false;
 	ring->ctx_desc_template = 0;
@@ -2500,22 +2495,34 @@ uint32_t intel_lr_context_size(struct intel_engine_cs *ring)
 	return ret;
 }
 
-static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
-		struct drm_i915_gem_object *default_ctx_obj)
+static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring)
 {
-	struct drm_i915_private *dev_priv = ring->dev->dev_private;
+	struct drm_i915_private *dev_priv = to_i915(ring->dev);
+	struct intel_context *dctx = dev_priv->kernel_context;
+	struct drm_i915_gem_object *dctx_obj = dctx->engine[ring->id].state;
+	u64 dctx_addr = i915_gem_obj_ggtt_offset(dctx_obj);
 	struct page *page;
 
-	/* The HWSP is part of the default context object in LRC mode. */
-	ring->status_page.gfx_addr = i915_gem_obj_ggtt_offset(default_ctx_obj)
-			+ LRC_PPHWSP_PN * PAGE_SIZE;
-	page = i915_gem_object_get_page(default_ctx_obj, LRC_PPHWSP_PN);
+	/*
+	 * The HWSP is part of the default context object in LRC mode.
+	 * Note that it doesn't contribute to the refcount!
+	 */
+	page = i915_gem_object_get_page(dctx_obj, LRC_PPHWSP_PN);
 	ring->status_page.page_addr = kmap(page);
-	ring->status_page.obj = default_ctx_obj;
+	ring->status_page.gfx_addr = dctx_addr + LRC_PPHWSP_PN * PAGE_SIZE;
+	ring->status_page.obj = dctx_obj;
 
 	I915_WRITE(RING_HWS_PGA(ring->mmio_base),
 			(u32)ring->status_page.gfx_addr);
 	POSTING_READ(RING_HWS_PGA(ring->mmio_base));
+}
+
+static void lrc_teardown_hardware_status_page(struct intel_engine_cs *ring)
+{
+	if (ring->status_page.obj) {
+		kunmap(kmap_to_page(ring->status_page.page_addr));
+		ring->status_page.obj = NULL;
+	}
 }
 
 /**
