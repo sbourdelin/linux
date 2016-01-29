@@ -1836,9 +1836,20 @@ static int cx231xx_close(struct file *filp)
 
 	cx231xx_videodbg("users=%d\n", dev->users);
 
-	cx231xx_videodbg("users=%d\n", dev->users);
 	if (res_check(fh))
 		res_free(fh);
+
+	videobuf_stop(&fh->vb_vidq);
+	videobuf_mmap_free(&fh->vb_vidq);
+
+	/* the device is already disconnect,
+	 * free the remaining resources
+	 */
+	if (dev->state & DEV_DISCONNECTED) {
+		cx231xx_release_resources(dev);
+		fh->dev = NULL;
+		return 0;
+	}
 
 	/*
 	 * To workaround error number=-71 on EP0 for VideoGrabber,
@@ -1848,19 +1859,6 @@ static int cx231xx_close(struct file *filp)
 	 */
 	if (!dev->board.no_alt_vanc)
 		if (fh->type == V4L2_BUF_TYPE_VBI_CAPTURE) {
-			videobuf_stop(&fh->vb_vidq);
-			videobuf_mmap_free(&fh->vb_vidq);
-
-			/* the device is already disconnect,
-			   free the remaining resources */
-			if (dev->state & DEV_DISCONNECTED) {
-				if (atomic_read(&dev->devlist_count) > 0) {
-					cx231xx_release_resources(dev);
-					fh->dev = NULL;
-					return 0;
-				}
-				return 0;
-			}
 
 			/* do this before setting alternate! */
 			cx231xx_uninit_vbi_isoc(dev);
@@ -1870,29 +1868,11 @@ static int cx231xx_close(struct file *filp)
 				cx231xx_set_alt_setting(dev, INDEX_VANC, 0);
 			else
 				cx231xx_set_alt_setting(dev, INDEX_HANC, 0);
-
-			v4l2_fh_del(&fh->fh);
-			v4l2_fh_exit(&fh->fh);
-			kfree(fh);
-			dev->users--;
-			wake_up_interruptible(&dev->open);
-			return 0;
 		}
 
 	v4l2_fh_del(&fh->fh);
 	dev->users--;
 	if (!dev->users) {
-		videobuf_stop(&fh->vb_vidq);
-		videobuf_mmap_free(&fh->vb_vidq);
-
-		/* the device is already disconnect,
-		   free the remaining resources */
-		if (dev->state & DEV_DISCONNECTED) {
-			cx231xx_release_resources(dev);
-			fh->dev = NULL;
-			return 0;
-		}
-
 		/* Save some power by putting tuner to sleep */
 		call_all(dev, core, s_power, 0);
 
