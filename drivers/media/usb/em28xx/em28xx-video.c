@@ -1224,6 +1224,12 @@ static void scale_to_size(struct em28xx *dev,
 
 	*width = (((unsigned long)maxw) << 12) / (hscale + 4096L);
 	*height = (((unsigned long)maxh) << 12) / (vscale + 4096L);
+
+	/* Don't let width or height to be zero */
+	if (*width < 1)
+		*width = 1;
+	if (*height < 1)
+		*height = 1;
 }
 
 /* ------------------------------------------------------------------
@@ -1299,6 +1305,11 @@ static int vidioc_try_fmt_vid_cap(struct file *file, void *priv,
 		v4l_bound_align_image(&width, 48, maxw, 1, &height, 32, maxh,
 				      1, 0);
 	}
+	/* Avoid division by zero at size_to_scale */
+	if (width < 1)
+		width = 1;
+	if (height < 1)
+		height = 1;
 
 	size_to_scale(dev, width, height, &hscale, &vscale);
 	scale_to_size(dev, hscale, vscale, &width, &height);
