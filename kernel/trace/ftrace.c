@@ -5067,7 +5067,12 @@ static int ftrace_module_notify(struct notifier_block *self,
 
 struct notifier_block ftrace_module_nb = {
 	.notifier_call = ftrace_module_notify,
-	.priority = INT_MIN,	/* Run after anything that can remove kprobes */
+	/*
+	 * Run after anything that can remove kprobes and
+	 * after livepatch's going notifier, but run before
+	 * livepatch's coming notifier.
+	 */
+	.priority = INT_MIN+1,
 };
 
 void __init ftrace_init(void)
