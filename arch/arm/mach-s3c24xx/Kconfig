@@ -227,7 +227,7 @@ config ARCH_H1940
 
 config H1940BT
 	tristate "Control the state of H1940 bluetooth chip"
-	depends on ARCH_H1940
+	depends on ARCH_H1940 && NET
 	select RFKILL
 	help
 	  This is a simple driver that is able to control
