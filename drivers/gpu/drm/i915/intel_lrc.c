@@ -2006,7 +2006,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 	i915_gem_batch_pool_fini(&ring->batch_pool);
 
 	if (ring->status_page.obj) {
-		kunmap(sg_page(ring->status_page.obj->pages->sgl));
+		kunmap(kmap_to_page(ring->status_page.page_addr));
 		ring->status_page.obj = NULL;
 	}
 
