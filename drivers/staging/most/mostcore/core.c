@@ -51,6 +51,9 @@ struct most_c_obj {
 	atomic_t mbo_nq_level;
 	u16 channel_id;
 	bool is_poisoned;
+	/*
+	 * Synchronizes start & stop operation on the channel.
+	*/
 	struct mutex start_mutex;
 	int is_starving;
 	struct most_interface *iface;
@@ -59,6 +62,9 @@ struct most_c_obj {
 	bool keep_mbo;
 	bool enqueue_halt;
 	struct list_head fifo;
+	/*
+	 * Lock for FIFO operations.
+	*/
 	spinlock_t fifo_lock;
 	struct list_head halt_fifo;
 	struct list_head list;
@@ -66,6 +72,9 @@ struct most_c_obj {
 	struct most_c_aim_obj aim1;
 	struct list_head trash_fifo;
 	struct task_struct *hdm_enqueue_task;
+	/*
+	 * Synchronizes enqueue_task stop operation.
+	*/
 	struct mutex stop_task_mutex;
 	wait_queue_head_t hdm_fifo_wq;
 };
@@ -121,7 +130,7 @@ struct most_c_attr {
 #define to_channel_attr(a) container_of(a, struct most_c_attr, attr)
 
 #define MOST_CHNL_ATTR(_name, _mode, _show, _store) \
-		struct most_c_attr most_chnl_attr_##_name = \
+		static struct most_c_attr most_chnl_attr_##_name = \
 		__ATTR(_name, _mode, _show, _store)
 
 /**
@@ -335,7 +344,7 @@ static ssize_t show_channel_starving(struct most_c_obj *c,
 }
 
 #define create_show_channel_attribute(val) \
-	static MOST_CHNL_ATTR(val, S_IRUGO, show_##val, NULL)
+		MOST_CHNL_ATTR(val, S_IRUGO, show_##val, NULL)
 
 create_show_channel_attribute(available_directions);
 create_show_channel_attribute(available_datatypes);
@@ -484,7 +493,7 @@ static ssize_t store_set_packets_per_xact(struct most_c_obj *c,
 }
 
 #define create_channel_attribute(value) \
-	static MOST_CHNL_ATTR(value, S_IRUGO | S_IWUSR, \
+		MOST_CHNL_ATTR(value, S_IRUGO | S_IWUSR, \
 			      show_##value, \
 			      store_##value)
 
@@ -578,7 +587,7 @@ static void destroy_most_c_obj(struct most_c_obj *c)
  *		     ___I N S T A N C E___
  */
 #define MOST_INST_ATTR(_name, _mode, _show, _store) \
-		struct most_inst_attribute most_inst_attr_##_name = \
+		static struct most_inst_attribute most_inst_attr_##_name = \
 		__ATTR(_name, _mode, _show, _store)
 
 static struct list_head instance_list;
@@ -703,7 +712,7 @@ static ssize_t show_interface(struct most_inst_obj *instance_obj,
 }
 
 #define create_inst_attribute(value) \
-	static MOST_INST_ATTR(value, S_IRUGO, show_##value, NULL)
+		MOST_INST_ATTR(value, S_IRUGO, show_##value, NULL)
 
 create_inst_attribute(description);
 create_inst_attribute(interface);
@@ -1233,7 +1242,9 @@ static void arm_mbo(struct mbo *mbo)
 	unsigned long flags;
 	struct most_c_obj *c;
 
-	BUG_ON((!mbo) || (!mbo->context));
+	if (WARN_ON((!mbo) || (!mbo->context)))
+		return;
+
 	c = mbo->context;
 
 	if (c->is_poisoned) {
@@ -1348,7 +1359,8 @@ static void most_write_completion(struct mbo *mbo)
 {
 	struct most_c_obj *c;
 
-	BUG_ON((!mbo) || (!mbo->context));
+	if (WARN_ON((!mbo) || (!mbo->context)))
+		return;
 
 	c = mbo->context;
 	if (mbo->status == MBO_E_INVAL)
