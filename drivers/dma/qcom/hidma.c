@@ -101,26 +101,6 @@ static unsigned int nr_desc_prm;
 module_param(nr_desc_prm, uint, 0644);
 MODULE_PARM_DESC(nr_desc_prm, "number of descriptors (default: 0)");
 
-#define HIDMA_MAX_CHANNELS	64
-static int channel_idx[HIDMA_MAX_CHANNELS] = {
-	[0 ... (HIDMA_MAX_CHANNELS - 1)] = -1
-};
-
-/*
- * Each DMA channel is associated with an event channel for interrupt
- * delivery. The event channel index usually comes from the firmware through
- * ACPI/DT. When a HIDMA channel is executed in the guest machine context (QEMU)
- * the device tree gets auto-generated based on the memory and IRQ resources
- * this driver uses on the host machine. Any device specific paraemeter such as
- * channel-index gets ignored by the QEMU.
- * We are using this command line parameter to pass the event channel index to
- * the guest machine.
- */
-static unsigned int num_channel_idx;
-module_param_array_named(channel_idx, channel_idx, int, &num_channel_idx,
-			 0644);
-MODULE_PARM_DESC(channel_idx, "channel index array for the notifications");
-static atomic_t channel_ref_count;
 
 /* process completed descriptors */
 static void hidma_process_completed(struct hidma_chan *mchan)
@@ -592,7 +572,6 @@ static int hidma_probe(struct platform_device *pdev)
 	struct resource *trca_resource;
 	struct resource *evca_resource;
 	int chirq;
-	int current_channel_index = atomic_read(&channel_ref_count);
 	void __iomem *evca;
 	void __iomem *trca;
 	int rc;
@@ -668,22 +647,7 @@ static int hidma_probe(struct platform_device *pdev)
 		goto dmafree;
 	}
 
-	if (current_channel_index > HIDMA_MAX_CHANNELS) {
-		rc = -EINVAL;
-		goto dmafree;
-	}
-
-	dmadev->chidx = -1;
-	device_property_read_u32(&pdev->dev, "channel-index", &dmadev->chidx);
-
-	/* kernel command line override for the guest machine */
-	if (channel_idx[current_channel_index] != -1)
-		dmadev->chidx = channel_idx[current_channel_index];
-
-	if (dmadev->chidx == -1) {
-		rc = -EINVAL;
-		goto dmafree;
-	}
+	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
 
 	/* Set DMA mask to 64 bits. */
 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
@@ -724,7 +688,6 @@ static int hidma_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dmadev);
 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
 	pm_runtime_put_autosuspend(dmadev->ddev.dev);
-	atomic_inc(&channel_ref_count);
 	return 0;
 
 uninit:

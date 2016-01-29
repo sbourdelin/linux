@@ -51,7 +51,6 @@ Required properties:
 - reg: Addresses for the transfer and event channel
 - interrupts: Should contain the event interrupt
 - desc-count: Number of asynchronous requests this channel can handle
-- channel-index: The HW event channel completions will be delivered.
 - iommus: required a iommu node
 
 Example:
@@ -75,7 +74,6 @@ Hypervisor OS configuration:
 			interrupts = <0 389 0>;
 			desc-count = <10>;
 			iommus = <&system_mmu>;
-			channel-index = <4>;
 		};
 	};
 
@@ -87,6 +85,5 @@ Guest OS configuration:
 		      <0 0x5c0b0000 0x0 0x1000>;
 		interrupts = <0 389 0>;
 		desc-count = <10>;
-		channel-index = <4>;
 		iommus = <&system_mmu>;
 	};
