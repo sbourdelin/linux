@@ -1906,42 +1906,28 @@ static void spmi_find_bmc(void) { }
 #endif
 
 #ifdef CONFIG_DMI
-static int decode_dmi(const struct dmi_device *dmi_dev)
+static int decode_dmi(struct dmi_device *dmi_dev)
 {
-	struct dmi_header *dm = dmi_dev->device_data;
-	u8             *data = (u8 *) dm;
-	u8             len = dm->length;
-	unsigned short myaddr;
-	int            slave_addr;
+	struct dmi_dev_ipmi *ipmi_data = to_dmi_dev_ipmi(dmi_dev);
 
-	if (num_addrs >= MAX_SSIF_BMCS)
-		return -1;
+	if (!ipmi_data)
+		return -ENODEV;
 
-	if (len < 9)
-		return -1;
-
-	if (data[0x04] != 4) /* Not SSIF */
-		return -1;
-
-	if ((data[8] >> 1) == 0) {
-		/*
-		 * Some broken systems put the I2C address in
-		 * the slave address field.  We try to
-		 * accommodate them here.
-		 */
-		myaddr = data[6] >> 1;
-		slave_addr = 0;
-	} else {
-		myaddr = data[8] >> 1;
-		slave_addr = data[6];
+	if (!ipmi_data->good_data) {
+		pr_err(PFX "DMI data for this device was invalid.\n");
+		return -EINVAL;
 	}
 
-	return new_ssif_client(myaddr, NULL, 0, 0, SI_SMBIOS);
+	if (ipmi_data->type != IPMI_DMI_TYPE_SSIF)
+		return -ENODEV;
+
+	return new_ssif_client(ipmi_data->base_addr, NULL, 0,
+			       ipmi_data->slave_addr, SI_SMBIOS);
 }
 
 static void dmi_iterator(void)
 {
-	const struct dmi_device *dev = NULL;
+	struct dmi_device *dev = NULL;
 
 	while ((dev = dmi_find_device(DMI_DEV_TYPE_IPMI, NULL, dev)))
 		decode_dmi(dev);
