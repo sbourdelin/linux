@@ -2272,23 +2272,19 @@ static void spmi_find_bmc(void)
 #endif
 
 #ifdef CONFIG_DMI
-static void try_init_dmi(struct dmi_device *dmi_dev)
+static int dmi_ipmi_probe(struct platform_device *pdev)
 {
+	struct dmi_device *dmi_dev = to_dmi_device(pdev->dev.fwnode);
 	struct dmi_dev_ipmi *ipmi_data = to_dmi_dev_ipmi(dmi_dev);
 	struct smi_info *info;
 
-	if (!ipmi_data)
-		return;
-
-	if (!ipmi_data->good_data) {
-		pr_err(PFX "DMI data for this device was invalid.\n");
-		return;
-	}
+	if (!si_trydmi || !ipmi_data)
+		return -ENODEV;
 
 	info = smi_info_alloc();
 	if (!info) {
 		pr_err(PFX "Could not allocate SI data\n");
-		return;
+		return -ENOMEM;
 	}
 
 	info->addr_source = SI_SMBIOS;
@@ -2306,7 +2302,7 @@ static void try_init_dmi(struct dmi_device *dmi_dev)
 		break;
 	default:
 		kfree(info);
-		return;
+		return -EINVAL;
 	}
 
 	if (ipmi_data->is_io_space) {
@@ -2330,6 +2326,8 @@ static void try_init_dmi(struct dmi_device *dmi_dev)
 	if (info->irq)
 		info->irq_setup = std_irq_setup;
 
+	info->dev = &pdev->dev;
+
 	pr_info("ipmi_si: SMBIOS: %s %#lx regsize %d spacing %d irq %d\n",
 		 (info->io.addr_type == IPMI_IO_ADDR_SPACE) ? "io" : "mem",
 		 info->io.addr_data, info->io.regsize, info->io.regspacing,
@@ -2337,14 +2335,13 @@ static void try_init_dmi(struct dmi_device *dmi_dev)
 
 	if (add_smi(info))
 		kfree(info);
+
+	return 0;
 }
-
-static void dmi_find_bmc(void)
+#else
+static int dmi_ipmi_probe(struct platform_device *pdev)
 {
-	struct dmi_device *dev = NULL;
-
-	while ((dev = dmi_find_device(DMI_DEV_TYPE_IPMI, NULL, dev)))
-		try_init_dmi(dev);
+	return -ENODEV;
 }
 #endif /* CONFIG_DMI */
 
@@ -2729,7 +2726,10 @@ static int ipmi_probe(struct platform_device *dev)
 	if (of_ipmi_probe(dev) == 0)
 		return 0;
 
-	return acpi_ipmi_probe(dev);
+	if (acpi_ipmi_probe(dev) == 0)
+		return 0;
+
+	return dmi_ipmi_probe(dev);
 }
 
 static int ipmi_remove(struct platform_device *dev)
@@ -3446,7 +3446,7 @@ static int add_smi(struct smi_info *new_smi)
 	       si_to_str[new_smi->si_type]);
 	mutex_lock(&smi_infos_lock);
 	if (!is_new_interface(new_smi)) {
-		printk(KERN_CONT " duplicate interface\n");
+		printk(KERN_CONT ": duplicate interface\n");
 		rv = -EBUSY;
 		goto out_err;
 	}
@@ -3737,11 +3737,6 @@ static int init_ipmi_si(void)
 	}
 #endif
 
-#ifdef CONFIG_DMI
-	if (si_trydmi)
-		dmi_find_bmc();
-#endif
-
 #ifdef CONFIG_ACPI
 	if (si_tryacpi)
 		spmi_find_bmc();
@@ -3902,6 +3897,7 @@ static void cleanup_ipmi_si(void)
 }
 module_exit(cleanup_ipmi_si);
 
+MODULE_ALIAS("platform:dmi-ipmi-si");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Corey Minyard <minyard@mvista.com>");
 MODULE_DESCRIPTION("Interface to the IPMI driver for the KCS, SMIC, and BT"
