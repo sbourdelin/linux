@@ -551,6 +551,8 @@ static bool stop_ring(struct intel_engine_cs *ring)
 		I915_WRITE_MODE(ring, _MASKED_BIT_DISABLE(STOP_RING));
 	}
 
+	WARN_ON(!IS_GEN2(ring->dev) && (I915_READ_MODE(ring) & MODE_IDLE) == 0);
+
 	return (I915_READ_HEAD(ring) & HEAD_ADDR) == 0;
 }
 
@@ -2055,6 +2057,9 @@ static int init_phys_status_page(struct intel_engine_cs *ring)
 
 void intel_unpin_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
 {
+	if (!ringbuf->virtual_start)
+		return;
+
 	if (HAS_LLC(ringbuf->obj->base.dev) && !ringbuf->obj->stolen)
 		vunmap(ringbuf->virtual_start);
 	else
@@ -2132,12 +2137,6 @@ int intel_pin_and_map_ringbuffer_obj(struct drm_device *dev,
 	return 0;
 }
 
-static void intel_destroy_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
-{
-	drm_gem_object_unreference(&ringbuf->obj->base);
-	ringbuf->obj = NULL;
-}
-
 static int intel_alloc_ringbuffer_obj(struct drm_device *dev,
 				      struct intel_ringbuffer *ringbuf)
 {
@@ -2200,11 +2199,13 @@ intel_engine_create_ringbuffer(struct intel_engine_cs *engine, int size)
 }
 
 void
-intel_ringbuffer_free(struct intel_ringbuffer *ring)
+intel_ringbuffer_free(struct intel_ringbuffer *ringbuf)
 {
-	intel_destroy_ringbuffer_obj(ring);
-	list_del(&ring->link);
-	kfree(ring);
+	if (ringbuf->obj)
+		drm_gem_object_unreference(&ringbuf->obj->base);
+
+	list_del(&ringbuf->link);
+	kfree(ringbuf);
 }
 
 static int intel_init_ring_buffer(struct drm_device *dev,
@@ -2232,6 +2233,13 @@ static int intel_init_ring_buffer(struct drm_device *dev,
 	}
 	ring->buffer = ringbuf;
 
+	ret = intel_pin_and_map_ringbuffer_obj(dev, ringbuf);
+	if (ret) {
+		DRM_ERROR("Failed to pin and map ringbuffer %s: %d\n",
+				ring->name, ret);
+		goto error;
+	}
+
 	if (I915_NEED_GFX_HWS(dev)) {
 		ret = init_status_page(ring);
 		if (ret)
@@ -2241,14 +2249,6 @@ static int intel_init_ring_buffer(struct drm_device *dev,
 		ret = init_phys_status_page(ring);
 		if (ret)
 			goto error;
-	}
-
-	ret = intel_pin_and_map_ringbuffer_obj(dev, ringbuf);
-	if (ret) {
-		DRM_ERROR("Failed to pin and map ringbuffer %s: %d\n",
-				ring->name, ret);
-		intel_destroy_ringbuffer_obj(ringbuf);
-		goto error;
 	}
 
 	ret = i915_cmd_parser_init_ring(ring);
@@ -2264,19 +2264,16 @@ error:
 
 void intel_cleanup_ring_buffer(struct intel_engine_cs *ring)
 {
-	struct drm_i915_private *dev_priv;
+	struct intel_ringbuffer *ringbuf;
 
 	if (!intel_ring_initialized(ring))
 		return;
 
-	dev_priv = to_i915(ring->dev);
-
-	if (ring->buffer) {
+	ringbuf = ring->buffer;
+	if (ringbuf) {
 		intel_stop_ring_buffer(ring);
-		WARN_ON(!IS_GEN2(ring->dev) && (I915_READ_MODE(ring) & MODE_IDLE) == 0);
-
-		intel_unpin_ringbuffer_obj(ring->buffer);
-		intel_ringbuffer_free(ring->buffer);
+		intel_unpin_ringbuffer_obj(ringbuf);
+		intel_ringbuffer_free(ringbuf);
 		ring->buffer = NULL;
 	}
 
