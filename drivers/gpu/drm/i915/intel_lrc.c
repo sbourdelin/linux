@@ -1993,17 +1993,11 @@ static int gen8_init_rcs_context(struct drm_i915_gem_request *req)
  */
 void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 {
-	struct drm_i915_private *dev_priv;
-
 	if (!intel_ring_initialized(ring))
 		return;
 
-	dev_priv = ring->dev->dev_private;
-
-	if (ring->buffer) {
-		intel_logical_ring_stop(ring);
-		WARN_ON((I915_READ_MODE(ring) & MODE_IDLE) == 0);
-	}
+	/* should not be set in LRC mode */
+	WARN_ON(ring->buffer);
 
 	if (ring->cleanup)
 		ring->cleanup(ring);

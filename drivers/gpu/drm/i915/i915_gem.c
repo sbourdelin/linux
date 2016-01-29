@@ -4986,8 +4986,11 @@ int i915_gem_init(struct drm_device *dev)
 		goto out_unlock;
 
 	ret = dev_priv->gt.init_rings(dev);
-	if (ret)
+	if (ret) {
+		i915_gem_context_fini(dev);
+		/* XXX: anything else to be undone here? */
 		goto out_unlock;
+	}
 
 	ret = i915_gem_init_hw(dev);
 	if (ret == -EIO) {
