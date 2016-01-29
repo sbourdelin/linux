@@ -205,6 +205,41 @@ struct mips_elf_abiflags_v0 {
 #define MIPS_ABI_FP_64		6	/* -mips32r2 -mfp64 */
 #define MIPS_ABI_FP_64A		7	/* -mips32r2 -mfp64 -mno-odd-spreg */
 
+#define elf_check_arch_32(hdr)						\
+({									\
+	int __res = 1;							\
+	Elf32_Ehdr *__h = (hdr);					\
+									\
+	if (__h->e_machine != EM_MIPS)					\
+		__res = 0;						\
+	if (__h->e_ident[EI_CLASS] != ELFCLASS32)			\
+		__res = 0;						\
+	if ((__h->e_flags & EF_MIPS_ABI2) != 0)				\
+		__res = 0;						\
+	if (((__h->e_flags & EF_MIPS_ABI) != 0) &&			\
+	    ((__h->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_O32))		\
+		__res = 0;						\
+	if (__h->e_flags & __MIPS_O32_FP64_MUST_BE_ZERO)		\
+		__res = 0;						\
+									\
+	__res;								\
+})
+
+#define elf_check_arch_64(hdr)						\
+({									\
+	int __res = 1;							\
+	Elf64_Ehdr *__h = (hdr);					\
+									\
+	if (__h->e_machine != EM_MIPS)					\
+		__res = 0;						\
+	if (__h->e_ident[EI_CLASS] != ELFCLASS64)			\
+		__res = 0;						\
+									\
+	__res;								\
+})
+
+#define vmcore_elf64_check_arch(x)	(elf_check_arch_64(x) || vmcore_elf_check_arch_cross(x))
+
 #ifdef CONFIG_32BIT
 
 /*
@@ -222,25 +257,7 @@ struct mips_elf_abiflags_v0 {
 /*
  * This is used to ensure we don't load something for the wrong architecture.
  */
-#define elf_check_arch(hdr)						\
-({									\
-	int __res = 1;							\
-	struct elfhdr *__h = (hdr);					\
-									\
-	if (__h->e_machine != EM_MIPS)					\
-		__res = 0;						\
-	if (__h->e_ident[EI_CLASS] != ELFCLASS32)			\
-		__res = 0;						\
-	if ((__h->e_flags & EF_MIPS_ABI2) != 0)				\
-		__res = 0;						\
-	if (((__h->e_flags & EF_MIPS_ABI) != 0) &&			\
-	    ((__h->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_O32))		\
-		__res = 0;						\
-	if (__h->e_flags & __MIPS_O32_FP64_MUST_BE_ZERO)		\
-		__res = 0;						\
-									\
-	__res;								\
-})
+#define elf_check_arch(x)	elf_check_arch_32(x)
 
 /*
  * These are used to set parameters in the core dumps.
@@ -253,18 +270,7 @@ struct mips_elf_abiflags_v0 {
 /*
  * This is used to ensure we don't load something for the wrong architecture.
  */
-#define elf_check_arch(hdr)						\
-({									\
-	int __res = 1;							\
-	struct elfhdr *__h = (hdr);					\
-									\
-	if (__h->e_machine != EM_MIPS)					\
-		__res = 0;						\
-	if (__h->e_ident[EI_CLASS] != ELFCLASS64)			\
-		__res = 0;						\
-									\
-	__res;								\
-})
+#define elf_check_arch(x)	elf_check_arch_64(x)
 
 /*
  * These are used to set parameters in the core dumps.
