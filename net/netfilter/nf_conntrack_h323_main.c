@@ -110,6 +110,11 @@ int (*nat_q931_hook) (struct sk_buff *skb,
 
 static DEFINE_SPINLOCK(nf_h323_lock);
 static char *h323_buffer;
+static unsigned int h323_buffer_valid_bytes;
+/* check offset overflow and out of range data reference */
+#define CHECK_BOUND(p, n) ((n) > h323_buffer_valid_bytes ||		\
+			   ((void *)(p) + (n) - (void *)h323_buffer	\
+			    > h323_buffer_valid_bytes))
 
 static struct nf_conntrack_helper nf_conntrack_helper_h245;
 static struct nf_conntrack_helper nf_conntrack_helper_q931[];
@@ -145,6 +150,7 @@ static int get_tpkt_data(struct sk_buff *skb, unsigned int protoff,
 
 	if (*data == NULL) {	/* first TPKT */
 		/* Get first TPKT pointer */
+		h323_buffer_valid_bytes = tcpdatalen;
 		tpkt = skb_header_pointer(skb, tcpdataoff, tcpdatalen,
 					  h323_buffer);
 		BUG_ON(tpkt == NULL);
@@ -246,6 +252,9 @@ static int get_h245_addr(struct nf_conn *ct, const unsigned char *data,
 	default:
 		return 0;
 	}
+
+	if (CHECK_BOUND(p, len + sizeof(__be16)))
+		return 0;
 
 	memcpy(addr, p, len);
 	memset((void *)addr + len, 0, sizeof(*addr) - len);
@@ -668,6 +677,9 @@ int get_h225_addr(struct nf_conn *ct, unsigned char *data,
 	default:
 		return 0;
 	}
+
+	if (CHECK_BOUND(p, len + sizeof(__be16)))
+		return 0;
 
 	memcpy(addr, p, len);
 	memset((void *)addr + len, 0, sizeof(*addr) - len);
@@ -1248,6 +1260,7 @@ static unsigned char *get_udp_data(struct sk_buff *skb, unsigned int protoff,
 	if (dataoff >= skb->len)
 		return NULL;
 	*datalen = skb->len - dataoff;
+	h323_buffer_valid_bytes = *datalen;
 	return skb_header_pointer(skb, dataoff, *datalen, h323_buffer);
 }
 
