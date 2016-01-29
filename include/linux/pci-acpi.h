@@ -143,6 +143,22 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
 static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
 #endif	/* CONFIG_ACPI */
 
+#if defined(CONFIG_ACPI) && defined(CONFIG_ACPI_PCI_HOST_GENERIC)
+static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
+{
+	struct pci_bus *b = bridge->bus;
+	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)b->sysdata;
+
+	ACPI_COMPANION_SET(&bridge->dev, ci->bridge);
+}
+
+static inline u16 acpi_pci_get_segment(void *sysdata)
+{
+	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)sysdata;
+
+	return ci->root->segment;
+}
+#else
 static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
 {
 	/* leave it to the platform for now */
@@ -152,6 +168,7 @@ static inline u16 acpi_pci_get_segment(void *sysdata)
 {
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_ACPI_APEI
 extern bool aer_acpi_firmware_first(void);
