@@ -161,6 +161,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
 	struct device *dev = pci->host.dev.parent;
 	struct device_node *np = dev->of_node;
 	u32 sz = 1 << pci->cfg.ops->bus_shift;
+	void *window;
 
 	err = of_address_to_resource(np, 0, &pci->cfg.res);
 	if (err) {
@@ -186,14 +187,15 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
 		return -ENOMEM;
 
 	bus_range = pci->cfg.bus_range;
+	window = devm_ioremap(dev, pci->cfg.res.start,
+			      (bus_range->end - bus_range->start + 1) * sz);
+	if (!window)
+		return -ENOMEM;
+
 	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
 		u32 idx = busn - bus_range->start;
 
-		pci->cfg.win[idx] = devm_ioremap(dev,
-						 pci->cfg.res.start + idx * sz,
-						 sz);
-		if (!pci->cfg.win[idx])
-			return -ENOMEM;
+		pci->cfg.win[idx] = window + idx * sz;
 	}
 
 	return 0;
