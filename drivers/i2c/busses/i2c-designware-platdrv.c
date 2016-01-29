@@ -267,6 +267,7 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
 	i2c_del_adapter(&dev->adapter);
 
 	i2c_dw_disable(dev);
+	i2c_dw_plat_prepare_clk(dev, false);
 
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	pm_runtime_put_sync(&pdev->dev);
