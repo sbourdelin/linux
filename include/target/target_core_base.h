@@ -192,6 +192,7 @@ enum target_sc_flags_table {
 
 /* fabric independent task management function values */
 enum tcm_tmreq_table {
+	UNKNOWN_TMR		= 0,
 	TMR_ABORT_TASK		= 1,
 	TMR_ABORT_TASK_SET	= 2,
 	TMR_CLEAR_ACA		= 3,
