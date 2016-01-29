@@ -326,6 +326,17 @@ config SECTION_MISMATCH_WARN_ONLY
 # is preferred to always offer frame pointers as a config
 # option on the architecture (regardless of KERNEL_DEBUG):
 #
+config DEBUG_BREAK
+	bool "Set Breakpoint for Kernel BUGs"
+	depends on DEBUG_KERNEL && !S390
+	help
+	  Say Y here to enable the kernel to emit a breakpoint instruction
+	  anywhere a BUG() macro has been placed in the system kernel code
+	  intended to catch bugs.
+
+	  This option is used for triggering the OS to try enter a debugger
+	  if one is presently installed on the system.
+
 config ARCH_WANT_FRAME_POINTERS
 	bool
 	help
