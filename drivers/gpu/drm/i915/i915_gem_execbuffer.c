@@ -1133,7 +1133,7 @@ i915_gem_execbuffer_move_to_active(struct list_head *vmas,
 	}
 }
 
-void
+static void
 i915_gem_execbuffer_retire_commands(struct i915_execbuffer_params *params)
 {
 	/* Unconditionally force add_request to emit a full flush. */
@@ -1318,7 +1318,6 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
 	trace_i915_gem_ring_dispatch(params->request, params->dispatch_flags);
 
 	i915_gem_execbuffer_move_to_active(vmas, params->request);
-	i915_gem_execbuffer_retire_commands(params);
 
 	return 0;
 }
@@ -1616,8 +1615,10 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	}
 
 	ret = i915_gem_request_add_to_client(req, file);
-	if (ret)
+	if (ret) {
+		i915_gem_request_cancel(req);
 		goto err_batch_unpin;
+	}
 
 	/*
 	 * Save assorted stuff away to pass through to *_submission().
@@ -1634,6 +1635,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	params->request                 = req;
 
 	ret = dev_priv->gt.execbuf_submit(params, args, &eb->vmas);
+	i915_gem_execbuffer_retire_commands(params);
 
 err_batch_unpin:
 	/*
@@ -1649,14 +1651,6 @@ err:
 	/* the request owns the ref now */
 	i915_gem_context_unreference(ctx);
 	eb_destroy(eb);
-
-	/*
-	 * If the request was created but not successfully submitted then it
-	 * must be freed again. If it was submitted then it is being tracked
-	 * on the active request list and no clean up is required here.
-	 */
-	if (ret && !IS_ERR_OR_NULL(req))
-		i915_gem_request_cancel(req);
 
 	mutex_unlock(&dev->struct_mutex);
 

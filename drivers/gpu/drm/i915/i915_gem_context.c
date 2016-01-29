@@ -652,7 +652,6 @@ static int do_switch(struct drm_i915_gem_request *req)
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 	struct intel_context *from = ring->last_context;
 	u32 hw_flags = 0;
-	bool uninitialized = false;
 	int ret, i;
 
 	if (from != NULL && ring == &dev_priv->ring[RCS]) {
@@ -759,6 +758,15 @@ static int do_switch(struct drm_i915_gem_request *req)
 			to->remap_slice &= ~(1<<i);
 	}
 
+	if (!to->legacy_hw_ctx.initialized) {
+		if (ring->init_context) {
+			ret = ring->init_context(req);
+			if (ret)
+				goto unpin_out;
+		}
+		to->legacy_hw_ctx.initialized = true;
+	}
+
 	/* The backing object for the context is done after switching to the
 	 * *next* context. Therefore we cannot retire the previous context until
 	 * the next context has already started running. In fact, the below code
@@ -782,20 +790,9 @@ static int do_switch(struct drm_i915_gem_request *req)
 		i915_gem_context_unreference(from);
 	}
 
-	uninitialized = !to->legacy_hw_ctx.initialized;
-	to->legacy_hw_ctx.initialized = true;
-
 done:
 	i915_gem_context_reference(to);
 	ring->last_context = to;
-
-	if (uninitialized) {
-		if (ring->init_context) {
-			ret = ring->init_context(req);
-			if (ret)
-				DRM_ERROR("ring init context: %d\n", ret);
-		}
-	}
 
 	return 0;
 

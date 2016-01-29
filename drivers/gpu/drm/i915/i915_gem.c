@@ -3407,12 +3407,9 @@ int i915_gpu_idle(struct drm_device *dev)
 				return PTR_ERR(req);
 
 			ret = i915_switch_context(req);
-			if (ret) {
-				i915_gem_request_cancel(req);
-				return ret;
-			}
-
 			i915_add_request_no_flush(req);
+			if (ret)
+				return ret;
 		}
 
 		ret = intel_ring_idle(ring);
