@@ -2247,8 +2247,17 @@ static void srpt_cm_rej_recv(struct srpt_rdma_ch *ch,
 			     const u8 *private_data,
 			     u8 private_data_len)
 {
-	pr_info("Received CM REJ for ch %s-%d; reason %d.\n",
-		ch->sess_name, ch->qp->qp_num, reason);
+	char *priv = kmalloc(private_data_len * 3 + 1, GFP_KERNEL);
+	int i;
+
+	if (priv) {
+		priv[0] = '\0';
+		for (i = 0; i < private_data_len; i++)
+			sprintf(priv + 3 * i, "%02x ", private_data[i]);
+	}
+	pr_info("Received CM REJ for ch %s-%d; reason %d; private data %s.\n",
+		ch->sess_name, ch->qp->qp_num, reason, priv ? : "(?)");
+	kfree(priv);
 	srpt_drain_channel(ch);
 }
 
