@@ -278,6 +278,7 @@
 
 #define INTEL_SKL_GT3_IDS(info) \
 	INTEL_VGA_DEVICE(0x1926, info), /* ULT GT3 */ \
+	INTEL_VGA_DEVICE(0x1927, info), /* ULT GT3 */ \
 	INTEL_VGA_DEVICE(0x192B, info), /* Halo GT3 */ \
 	INTEL_VGA_DEVICE(0x192A, info)  /* SRV GT3 */
 
