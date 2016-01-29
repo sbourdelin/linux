@@ -103,6 +103,8 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 	lock->owner_cpu = -1;
 }
 
+extern int is_console_lock(raw_spinlock_t *lock);
+
 static void __spin_lock_debug(raw_spinlock_t *lock)
 {
 	u64 i;
@@ -113,11 +115,19 @@ static void __spin_lock_debug(raw_spinlock_t *lock)
 			return;
 		__delay(1);
 	}
-	/* lockup suspected: */
-	spin_dump(lock, "lockup suspected");
+
+	/*
+	 * If this function is called from printk(), then we should
+	 * not call printk() more. Or it will cause an infinite
+	 * recursive cycle!
+	 */
+	if (likely(!is_console_lock(lock))) {
+		/* lockup suspected: */
+		spin_dump(lock, "lockup suspected");
 #ifdef CONFIG_SMP
-	trigger_all_cpu_backtrace();
+		trigger_all_cpu_backtrace();
 #endif
+	}
 
 	/*
 	 * The trylock above was causing a livelock.  Give the lower level arch
