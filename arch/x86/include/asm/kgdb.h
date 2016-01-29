@@ -77,7 +77,7 @@ enum regnames {
 
 static inline void arch_kgdb_breakpoint(void)
 {
-	asm("   int $3");
+	asm volatile("int3");
 }
 #define BREAK_INSTR_SIZE	1
 #define CACHE_FLUSH_IS_SAFE	1
