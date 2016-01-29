@@ -173,7 +173,7 @@ static int intel_th_sw_init(struct sth_device *sth)
 	sth->stm.sw_start = reg & 0xffff;
 	sth->stm.sw_end = reg >> 16;
 
-	sth->sw_nmasters = sth->stm.sw_end - sth->stm.sw_start;
+	sth->sw_nmasters = sth->stm.sw_end - sth->stm.sw_start + 1;
 	dev_dbg(sth->dev, "sw_start: %x sw_end: %x masters: %x nchannels: %x\n",
 		sth->stm.sw_start, sth->stm.sw_end, sth->sw_nmasters,
 		sth->stm.sw_nchannels);
