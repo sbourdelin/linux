@@ -41,6 +41,16 @@ static struct dmi_memdev_info {
 } *dmi_memdev;
 static int dmi_memdev_nr;
 
+static void *dmi_zalloc(unsigned len)
+{
+	void *ret = dmi_alloc(len);
+
+	if (ret)
+		memset(ret, 0, len);
+
+	return ret;
+}
+
 static const char * __init dmi_string_nosave(const struct dmi_header *dm, u8 s)
 {
 	const u8 *bp = ((u8 *) dm) + dm->length;
@@ -242,6 +252,12 @@ static void __init dmi_save_type(const struct dmi_header *dm, int slot,
 	dmi_ident[slot] = s;
 }
 
+static void __init dmi_devices_list_add(struct dmi_device *dev)
+{
+	dev->fwnode.type = FWNODE_DMI;
+	list_add(&dev->list, &dmi_devices);
+}
+
 static void __init dmi_save_one_device(int type, const char *name)
 {
 	struct dmi_device *dev;
@@ -250,15 +266,14 @@ static void __init dmi_save_one_device(int type, const char *name)
 	if (dmi_find_device(type, name, NULL))
 		return;
 
-	dev = dmi_alloc(sizeof(*dev) + strlen(name) + 1);
+	dev = dmi_zalloc(sizeof(*dev) + strlen(name) + 1);
 	if (!dev)
 		return;
 
 	dev->type = type;
 	strcpy((char *)(dev + 1), name);
 	dev->name = (char *)(dev + 1);
-	dev->device_data = NULL;
-	list_add(&dev->list, &dmi_devices);
+	dmi_devices_list_add(dev);
 }
 
 static void __init dmi_save_devices(const struct dmi_header *dm)
@@ -287,15 +302,14 @@ static void __init dmi_save_oem_strings_devices(const struct dmi_header *dm)
 		if (devname == dmi_empty_string)
 			continue;
 
-		dev = dmi_alloc(sizeof(*dev));
+		dev = dmi_zalloc(sizeof(*dev));
 		if (!dev)
 			break;
 
 		dev->type = DMI_DEV_TYPE_OEM_STRING;
 		dev->name = devname;
-		dev->device_data = NULL;
 
-		list_add(&dev->list, &dmi_devices);
+		dmi_devices_list_add(dev);
 	}
 }
 
@@ -310,7 +324,7 @@ static void __init dmi_save_ipmi_device(const struct dmi_header *dm)
 
 	memcpy(data, dm, dm->length);
 
-	dev = dmi_alloc(sizeof(*dev));
+	dev = dmi_zalloc(sizeof(*dev));
 	if (!dev)
 		return;
 
@@ -318,7 +332,7 @@ static void __init dmi_save_ipmi_device(const struct dmi_header *dm)
 	dev->name = "IPMI controller";
 	dev->device_data = data;
 
-	list_add_tail(&dev->list, &dmi_devices);
+	dmi_devices_list_add(dev);
 }
 
 static void __init dmi_save_dev_pciaddr(int instance, int segment, int bus,
@@ -331,7 +345,7 @@ static void __init dmi_save_dev_pciaddr(int instance, int segment, int bus,
 	    segment == 0xFFFF && bus == 0xFF && devfn == 0xFF)
 		return;
 
-	dev = dmi_alloc(sizeof(*dev) + strlen(name) + 1);
+	dev = dmi_zalloc(sizeof(*dev) + strlen(name) + 1);
 	if (!dev)
 		return;
 
@@ -345,7 +359,7 @@ static void __init dmi_save_dev_pciaddr(int instance, int segment, int bus,
 	dev->dev.name = (char *)&dev[1];
 	dev->dev.device_data = dev;
 
-	list_add(&dev->dev.list, &dmi_devices);
+	dmi_devices_list_add(&dev->dev);
 }
 
 static void __init dmi_save_extended_devices(const struct dmi_header *dm)
