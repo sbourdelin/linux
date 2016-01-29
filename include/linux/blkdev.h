@@ -1633,6 +1633,16 @@ struct blk_dax_ctl {
 	pfn_t pfn;
 };
 
+#ifdef CONFIG_FS_DAX
+struct page *read_dax_sector(struct block_device *bdev, sector_t n);
+#else
+static inline struct page *read_dax_sector(struct block_device *bdev,
+		sector_t n)
+{
+	return ERR_PTR(-ENXIO);
+}
+#endif
+
 struct block_device_operations {
 	int (*open) (struct block_device *, fmode_t);
 	void (*release) (struct gendisk *, fmode_t);
