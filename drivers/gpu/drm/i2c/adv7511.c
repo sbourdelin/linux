@@ -648,6 +648,13 @@ adv7511_encoder_detect(struct drm_encoder *encoder,
 	return status;
 }
 
+static bool adv7511_encoder_mode_fixup(struct drm_encoder *encoder,
+					const struct drm_display_mode *mode,
+					struct drm_display_mode *adjusted_mode)
+{
+	return true;
+}
+
 static int adv7511_encoder_mode_valid(struct drm_encoder *encoder,
 				      struct drm_display_mode *mode)
 {
@@ -754,6 +761,7 @@ static void adv7511_encoder_mode_set(struct drm_encoder *encoder,
 
 static const struct drm_encoder_slave_funcs adv7511_encoder_funcs = {
 	.dpms = adv7511_encoder_dpms,
+	.mode_fixup = adv7511_encoder_mode_fixup,
 	.mode_valid = adv7511_encoder_mode_valid,
 	.mode_set = adv7511_encoder_mode_set,
 	.detect = adv7511_encoder_detect,
