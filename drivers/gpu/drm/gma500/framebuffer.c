@@ -681,6 +681,8 @@ static int psb_create_backlight_property(struct drm_device *dev)
 		return 0;
 
 	backlight = drm_property_create_range(dev, 0, "backlight", 0, 100);
+	if (!backlight)
+		return -ENOMEM;
 
 	dev_priv->backlight_property = backlight;
 
