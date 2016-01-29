@@ -27,7 +27,11 @@ do {								\
 #else
 #define BUG()							\
 do {								\
+#ifdef CONFIG_DEBUG_BREAK
+	asm volatile("int3");					\
+#else
 	asm volatile("ud2");					\
+#endif
 	unreachable();						\
 } while (0)
 #endif
