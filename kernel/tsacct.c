@@ -125,22 +125,22 @@ static void __acct_update_integrals(struct task_struct *tsk,
 {
 	if (likely(tsk->mm)) {
 		cputime_t time, dtime;
-		struct timeval value;
 		unsigned long flags;
-		u64 delta;
+		u64 delta, usecs;
 
 		local_irq_save(flags);
 		time = stime + utime;
 		dtime = time - tsk->acct_timexpd;
-		jiffies_to_timeval(cputime_to_jiffies(dtime), &value);
-		delta = value.tv_sec;
-		delta = delta * USEC_PER_SEC + value.tv_usec;
+		delta = cputime_to_jiffies(dtime);
 
 		if (delta == 0)
 			goto out;
+
+		usecs = jiffies_to_usecs(delta);
+
 		tsk->acct_timexpd = time;
-		tsk->acct_rss_mem1 += delta * get_mm_rss(tsk->mm);
-		tsk->acct_vm_mem1 += delta * tsk->mm->total_vm;
+		tsk->acct_rss_mem1 += usecs * get_mm_rss(tsk->mm);
+		tsk->acct_vm_mem1 += usecs * tsk->mm->total_vm;
 	out:
 		local_irq_restore(flags);
 	}
