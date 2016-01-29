@@ -524,10 +524,17 @@ static struct device_attribute *aac_dev_attrs[] = {
 
 static int aac_ioctl(struct scsi_device *sdev, int cmd, void __user * arg)
 {
-	struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
+	int ret;
+	struct aac_dev *aac = (struct aac_dev *)sdev->host->hostdata;
+
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
-	return aac_do_ioctl(dev, cmd, arg);
+
+	mutex_lock(&aac->ioctl_mutex);
+	ret = aac_do_ioctl(aac, cmd, arg);
+	mutex_unlock(&aac->ioctl_mutex);
+
+	return ret;
 }
 
 static int aac_eh_abort(struct scsi_cmnd* cmd)
@@ -704,13 +711,14 @@ static long aac_cfg_ioctl(struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
 	int ret;
-	struct aac_dev *aac;
-	aac = (struct aac_dev *)file->private_data;
-	if (!capable(CAP_SYS_RAWIO) || aac->adapter_shutdown)
+	struct aac_dev *aac = (struct aac_dev *)file->private_data;
+
+	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
-	mutex_lock(&aac_mutex);
-	ret = aac_do_ioctl(file->private_data, cmd, (void __user *)arg);
-	mutex_unlock(&aac_mutex);
+
+	mutex_lock(&aac->ioctl_mutex);
+	ret = aac_do_ioctl(aac, cmd, (void __user *)arg);
+	mutex_unlock(&aac->ioctl_mutex);
 
 	return ret;
 }
@@ -719,7 +727,10 @@ static long aac_cfg_ioctl(struct file *file,
 static long aac_compat_do_ioctl(struct aac_dev *dev, unsigned cmd, unsigned long arg)
 {
 	long ret;
-	mutex_lock(&aac_mutex);
+
+	if (dev->adapter_shutdown)
+		return -EACCES;
+
 	switch (cmd) {
 	case FSACTL_MINIPORT_REV_CHECK:
 	case FSACTL_SENDFIB:
@@ -753,23 +764,37 @@ static long aac_compat_do_ioctl(struct aac_dev *dev, unsigned cmd, unsigned long
 		ret = -ENOIOCTLCMD;
 		break;
 	}
-	mutex_unlock(&aac_mutex);
 	return ret;
 }
 
 static int aac_compat_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 {
-	struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
+	int ret;
+	struct aac_dev *aac = (struct aac_dev *)sdev->host->hostdata;
+
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
-	return aac_compat_do_ioctl(dev, cmd, (unsigned long)arg);
+
+	mutex_lock(&aac->ioctl_mutex);
+	ret = aac_compat_do_ioctl(aac, cmd, (unsigned long)arg);
+	mutex_unlock(&aac->ioctl_mutex);
+
+	return ret;
 }
 
 static long aac_compat_cfg_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
+	int ret;
+	struct aac_dev *aac = (struct aac_dev *)file->private_data;
+
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
-	return aac_compat_do_ioctl(file->private_data, cmd, arg);
+
+	mutex_lock(&aac->ioctl_mutex);
+	ret =  aac_compat_do_ioctl(aac, cmd, arg);
+	mutex_unlock(&aac->ioctl_mutex);
+
+	return ret;
 }
 #endif
 
@@ -1078,6 +1103,8 @@ static void __aac_shutdown(struct aac_dev * aac)
 	int i;
 	int cpu;
 
+	aac_send_shutdown(aac);
+
 	if (aac->aif_thread) {
 		int i;
 		/* Clear out events first */
@@ -1089,7 +1116,7 @@ static void __aac_shutdown(struct aac_dev * aac)
 		}
 		kthread_stop(aac->thread);
 	}
-	aac_send_shutdown(aac);
+
 	aac_adapter_disable_int(aac);
 	cpu = cpumask_first(cpu_online_mask);
 	if (aac->pdev->device == PMC_DEVICE_S6 ||
@@ -1193,7 +1220,7 @@ static int aac_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!aac->fibs)
 		goto out_free_host;
 	spin_lock_init(&aac->fib_lock);
-
+	mutex_init(&aac->ioctl_mutex);
 	/*
 	 *	Map in the registers from the adapter.
 	 */
@@ -1474,7 +1501,10 @@ static int aac_resume(struct pci_dev *pdev)
 	* reset this flag to unblock ioctl() as it was set at
 	* aac_send_shutdown() to block ioctls from upperlayer
 	*/
+	mutex_lock(&aac->ioctl_mutex);
 	aac->adapter_shutdown = 0;
+	mutex_unlock(&aac->ioctl_mutex);
+
 	scsi_unblock_requests(shost);
 
 	return 0;
@@ -1633,7 +1663,10 @@ static void aac_pci_resume(struct pci_dev *pdev)
 	 * reset this flag to unblock ioctl() as it was set
 	 * at aac_send_shutdown() to block ioctls from upperlayer
 	 */
+	mutex_lock(&aac->ioctl_mutex);
 	aac->adapter_shutdown = 0;
+	mutex_unlock(&aac->ioctl_mutex);
+
 	aac->handle_pci_error = 0;
 
 	shost_for_each_device(sdev, shost)
