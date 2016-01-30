@@ -124,26 +124,22 @@ static void __acct_update_integrals(struct task_struct *tsk,
 				    cputime_t utime, cputime_t stime)
 {
 	cputime_t time, dtime;
-	unsigned long flags;
 	u64 delta;
 
 	if (unlikely(!tsk->mm))
 		return;
 
-	local_irq_save(flags);
 	time = stime + utime;
 	dtime = time - tsk->acct_timexpd;
 	delta = cputime_to_nsecs(dtime);
 
 	if (delta < TICK_NSEC)
-		goto out;
+		return;
 
 	tsk->acct_timexpd = time;
 	/* The final unit will be Mbyte-usecs, see xacct_add_tsk */
 	tsk->acct_rss_mem1 += delta * get_mm_rss(tsk->mm) / 1024;
 	tsk->acct_vm_mem1 += delta * tsk->mm->total_vm / 1024;
-out:
-	local_irq_restore(flags);
 }
 
 /**
