@@ -335,4 +335,6 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 }
 #endif
 
+void pci_add_dma_alias(struct pci_dev *dev, u8 devfn);
+
 #endif /* DRIVERS_PCI_H */
