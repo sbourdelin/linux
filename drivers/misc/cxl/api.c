@@ -194,7 +194,7 @@ EXPORT_SYMBOL_GPL(cxl_start_context);
 
 int cxl_process_element(struct cxl_context *ctx)
 {
-	return ctx->pe;
+	return atomic_read(&ctx->external_pe);
 }
 EXPORT_SYMBOL_GPL(cxl_process_element);
 

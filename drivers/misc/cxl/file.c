@@ -226,9 +226,12 @@ out:
 static long afu_ioctl_process_element(struct cxl_context *ctx,
 				      int __user *upe)
 {
+	int out_pe;
+
 	pr_devel("%s: pe: %i\n", __func__, ctx->pe);
 
-	if (copy_to_user(upe, &ctx->pe, sizeof(__u32)))
+	out_pe = atomic_read(&ctx->external_pe);
+	if (copy_to_user(upe, &out_pe, sizeof(__u32)))
 		return -EFAULT;
 
 	return 0;
