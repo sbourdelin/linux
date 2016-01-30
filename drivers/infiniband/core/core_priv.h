@@ -37,6 +37,7 @@
 #include <linux/spinlock.h>
 
 #include <rdma/ib_verbs.h>
+#include <linux/cgroup_rdma.h>
 
 int  ib_device_register_sysfs(struct ib_device *device,
 			      int (*port_callback)(struct ib_device *,
@@ -91,5 +92,49 @@ int roce_rescan_device(struct ib_device *ib_dev);
 int ib_cache_setup_one(struct ib_device *device);
 void ib_cache_cleanup_one(struct ib_device *device);
 void ib_cache_release_one(struct ib_device *device);
+
+#ifdef CONFIG_CGROUP_RDMA
+
+void ib_device_register_rdmacg(struct ib_device *device);
+void ib_device_unregister_rdmacg(struct ib_device *device);
+
+int ib_rdmacg_try_charge(struct ib_rdmacg_object *cg_obj,
+			 struct ib_device *device,
+			 enum rdmacg_resource_pool_type type,
+			 int resource_index, int num);
+
+void ib_rdmacg_uncharge(struct ib_rdmacg_object *cg_obj,
+			struct ib_device *device,
+			enum rdmacg_resource_pool_type type,
+			int resource_index, int num);
+
+int ib_rdmacg_query_limit(struct ib_device *device,
+			  enum rdmacg_resource_pool_type type,
+			  int *limits, int max_count);
+#else
+static inline int ib_rdmacg_try_charge(struct ib_rdmacg_object *cg_obj,
+				       struct ib_device *device,
+				       enum rdmacg_resource_pool_type type,
+				       int resource_index, int num)
+{ return 0; }
+
+static inline void ib_rdmacg_uncharge(struct ib_rdmacg_object *cg_obj,
+				      struct ib_device *device,
+				      enum rdmacg_resource_pool_type type,
+				      int resource_index, int num)
+{ }
+
+static inline int ib_rdmacg_query_limit(struct ib_device *device,
+					enum rdmacg_resource_pool_type type,
+					int *limits, int max_count)
+{
+	int i;
+
+	for (i = 0; i < max_count; i++)
+		limits[i] = S32_MAX;
+
+	return 0;
+}
+#endif
 
 #endif /* _CORE_PRIV_H */

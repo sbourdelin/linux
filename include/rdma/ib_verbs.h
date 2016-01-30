@@ -55,6 +55,8 @@
 #include <linux/mmu_notifier.h>
 #include <asm/uaccess.h>
 
+#include <linux/cgroup_rdma.h>
+
 extern struct workqueue_struct *ib_wq;
 
 union ib_gid {
@@ -93,6 +95,19 @@ enum rdma_protocol_type {
 	RDMA_PROTOCOL_IBOE,
 	RDMA_PROTOCOL_IWARP,
 	RDMA_PROTOCOL_USNIC_UDP
+};
+
+enum rdma_resource_type {
+	RDMA_VERB_RESOURCE_UCTX,
+	RDMA_VERB_RESOURCE_AH,
+	RDMA_VERB_RESOURCE_PD,
+	RDMA_VERB_RESOURCE_CQ,
+	RDMA_VERB_RESOURCE_MR,
+	RDMA_VERB_RESOURCE_MW,
+	RDMA_VERB_RESOURCE_SRQ,
+	RDMA_VERB_RESOURCE_QP,
+	RDMA_VERB_RESOURCE_FLOW,
+	RDMA_VERB_RESOURCE_MAX,
 };
 
 __attribute_const__ enum rdma_transport_type
@@ -1231,6 +1246,12 @@ struct ib_fmr_attr {
 
 struct ib_umem;
 
+struct ib_rdmacg_object {
+#ifdef CONFIG_CGROUP_RDMA
+	struct rdma_cgroup	*cg;		/* owner rdma cgroup */
+#endif
+};
+
 struct ib_ucontext {
 	struct ib_device       *device;
 	struct list_head	pd_list;
@@ -1261,12 +1282,14 @@ struct ib_ucontext {
 	struct list_head	no_private_counters;
 	int                     odp_mrs_count;
 #endif
+	struct ib_rdmacg_object cg_obj;
 };
 
 struct ib_uobject {
 	u64			user_handle;	/* handle given to us by userspace */
 	struct ib_ucontext     *context;	/* associated user context */
 	void		       *object;		/* containing object */
+	struct ib_rdmacg_object cg_obj;
 	struct list_head	list;		/* link to context's list */
 	int			id;		/* index into kernel idr */
 	struct kref		ref;
@@ -1823,7 +1846,9 @@ struct ib_device {
 	u16                          is_switch:1;
 	u8                           node_type;
 	u8                           phys_port_cnt;
-
+#ifdef CONFIG_CGROUP_RDMA
+	struct rdmacg_device	     cg_device;
+#endif
 	/**
 	 * The following mandatory functions are used only at device
 	 * registration.  Keep functions such as these at the end of this
