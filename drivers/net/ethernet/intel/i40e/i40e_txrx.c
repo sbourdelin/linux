@@ -2363,7 +2363,8 @@ static void i40e_tx_enable_csum(struct sk_buff *skb, u32 *tx_flags,
 		}
 		if ((tx_ring->flags & I40E_TXR_FLAGS_OUTER_UDP_CSUM) &&
 		    (l4_tunnel == I40E_TXD_CTX_UDP_TUNNELING)        &&
-		    (*cd_tunneling & I40E_TXD_CTX_QW0_EXT_IP_MASK)) {
+		    (*cd_tunneling & I40E_TXD_CTX_QW0_EXT_IP_MASK)   &&
+		    oudph && oiph) {
 			oudph->check = ~csum_tcpudp_magic(oiph->saddr,
 					oiph->daddr,
 					(skb->len - skb_transport_offset(skb)),
