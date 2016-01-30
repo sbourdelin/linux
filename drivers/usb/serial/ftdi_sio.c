@@ -1319,11 +1319,11 @@ static __u32 get_ftdi_divisor(struct tty_struct *tty,
 		if (baud <= 3000000) {
 			__u16 product_id = le16_to_cpu(
 				port->serial->dev->descriptor.idProduct);
-			if (((FTDI_NDI_HUC_PID == product_id) ||
-			     (FTDI_NDI_SPECTRA_SCU_PID == product_id) ||
-			     (FTDI_NDI_FUTURE_2_PID == product_id) ||
-			     (FTDI_NDI_FUTURE_3_PID == product_id) ||
-			     (FTDI_NDI_AURORA_SCU_PID == product_id)) &&
+			if (((product_id == FTDI_NDI_HUC_PID)		||
+			     (product_id == FTDI_NDI_SPECTRA_SCU_PID)	||
+			     (product_id == FTDI_NDI_FUTURE_2_PID)	||
+			     (product_id == FTDI_NDI_FUTURE_3_PID)	||
+			     (product_id == FTDI_NDI_AURORA_SCU_PID))	&&
 			    (baud == 19200)) {
 				baud = 1200000;
 			}
@@ -2324,7 +2324,7 @@ no_c_cflag_changes:
 				    usb_sndctrlpipe(dev, 0),
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-				    0 , (FTDI_SIO_RTS_CTS_HS | priv->interface),
+				    0, (priv->interface | FTDI_SIO_RTS_CTS_HS),
 				    NULL, 0, WDR_TIMEOUT) < 0) {
 			dev_err(ddev, "urb failed to set to rts/cts flow control\n");
 		}
@@ -2353,8 +2353,8 @@ no_c_cflag_changes:
 					    usb_sndctrlpipe(dev, 0),
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-					    urb_value , (FTDI_SIO_XON_XOFF_HS
-							 | priv->interface),
+					    urb_value, (priv->interface |
+						    FTDI_SIO_XON_XOFF_HS),
 					    NULL, 0, WDR_TIMEOUT) < 0) {
 				dev_err(&port->dev, "urb failed to set to "
 					"xon/xoff flow control\n");
