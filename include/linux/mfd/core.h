@@ -14,6 +14,7 @@
 #ifndef MFD_CORE_H
 #define MFD_CORE_H
 
+#include <linux/kernel.h>
 #include <linux/platform_device.h>
 
 struct irq_domain;
@@ -80,6 +81,20 @@ struct mfd_cell {
 	const char * const	*parent_supplies;
 	int			num_parent_supplies;
 };
+
+/* Defne mfd cells with name and resource */
+#define DEFINE_MFD_CELL_NAME_RESOURCE(_name, _res)		\
+	{							\
+		.name = (_name),				\
+		.num_resources = ARRAY_SIZE((res)),		\
+		.resources = (_res),				\
+	}
+
+/* Defne mfd cells with name */
+#define DEFINE_MFD_CELL_NAME(_name)				\
+	{							\
+		.name = (_name),				\
+	}
 
 /*
  * Convenience functions for clients using shared cells.  Refcounting
