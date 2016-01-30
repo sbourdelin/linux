@@ -1411,7 +1411,7 @@ compat_copy_entry_to_user(struct ipt_entry *e, void __user **dstptr,
 {
 	struct xt_entry_target *t;
 	struct compat_ipt_entry __user *ce;
-	u_int16_t target_offset, next_offset;
+	u16 target_offset, next_offset;
 	compat_uint_t origsize;
 	const struct xt_entry_match *ematch;
 	int ret = 0;
@@ -2122,8 +2122,7 @@ EXPORT_SYMBOL(ipt_unregister_table);
 
 /* Returns 1 if the type and code is matched by the range, 0 otherwise */
 static inline bool
-icmp_type_code_match(u_int8_t test_type, u_int8_t min_code, u_int8_t max_code,
-		     u_int8_t type, u_int8_t code,
+icmp_type_code_match(u8 test_type, u8 min_code, u8 max_code, u8 type, u8 code,
 		     bool invert)
 {
 	return ((test_type == 0xFF) ||
