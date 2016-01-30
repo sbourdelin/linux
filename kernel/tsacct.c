@@ -123,26 +123,27 @@ void xacct_add_tsk(struct taskstats *stats, struct task_struct *p)
 static void __acct_update_integrals(struct task_struct *tsk,
 				    cputime_t utime, cputime_t stime)
 {
-	if (likely(tsk->mm)) {
-		cputime_t time, dtime;
-		unsigned long flags;
-		u64 delta;
+	cputime_t time, dtime;
+	unsigned long flags;
+	u64 delta;
 
-		local_irq_save(flags);
-		time = stime + utime;
-		dtime = time - tsk->acct_timexpd;
-		delta = cputime_to_nsecs(dtime);
+	if (unlikely(!tsk->mm))
+		return;
 
-		if (delta < TICK_NSEC)
-			goto out;
+	local_irq_save(flags);
+	time = stime + utime;
+	dtime = time - tsk->acct_timexpd;
+	delta = cputime_to_nsecs(dtime);
 
-		tsk->acct_timexpd = time;
-		/* The final unit will be Mbyte-usecs, see xacct_add_tsk */
-		tsk->acct_rss_mem1 += delta * get_mm_rss(tsk->mm) / 1024;
-		tsk->acct_vm_mem1 += delta * tsk->mm->total_vm / 1024;
-	out:
-		local_irq_restore(flags);
-	}
+	if (delta < TICK_NSEC)
+		goto out;
+
+	tsk->acct_timexpd = time;
+	/* The final unit will be Mbyte-usecs, see xacct_add_tsk */
+	tsk->acct_rss_mem1 += delta * get_mm_rss(tsk->mm) / 1024;
+	tsk->acct_vm_mem1 += delta * tsk->mm->total_vm / 1024;
+out:
+	local_irq_restore(flags);
 }
 
 /**
