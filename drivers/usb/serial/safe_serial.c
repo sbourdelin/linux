@@ -81,7 +81,7 @@
 #define CONFIG_USB_SERIAL_SAFE_PADDED 0
 #endif
 
-static bool safe = 1;
+static bool safe = true;
 static bool padded = CONFIG_USB_SERIAL_SAFE_PADDED;
 
 #define DRIVER_AUTHOR "sl@lineo.com, tbr@lineo.com, Johan Hovold <jhovold@gmail.com>"
@@ -278,7 +278,7 @@ static int safe_startup(struct usb_serial *serial)
 	case LINEO_SAFESERIAL_CRC:
 		break;
 	case LINEO_SAFESERIAL_CRC_PADDED:
-		padded = 1;
+		padded = true;
 		break;
 	default:
 		return -EINVAL;
