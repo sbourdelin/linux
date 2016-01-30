@@ -190,7 +190,7 @@ static int f81232_set_mctrl(struct usb_serial_port *port,
 
 	/* force enable interrupt with OUT2 */
 	mutex_lock(&priv->lock);
-	val = UART_MCR_OUT2 | priv->modem_control;
+	val = priv->modem_control | UART_MCR_OUT2;
 
 	if (clear & TIOCM_DTR)
 		val &= ~UART_MCR_DTR;
