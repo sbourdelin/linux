@@ -2683,6 +2683,7 @@ void clk_unregister(struct clk *clk)
 	if (clk->core->ops == &clk_nodrv_ops) {
 		pr_err("%s: unregistered clock: %s\n", __func__,
 		       clk->core->name);
+		clk_prepare_unlock();
 		return;
 	}
 	/*
