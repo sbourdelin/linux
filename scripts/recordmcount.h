@@ -266,7 +266,8 @@ static unsigned get_mcountsym(Elf_Sym const *const sym0,
 	if (symname[0] == '.')
 		++symname;  /* ppc64 hack */
 	if (strcmp(mcount, symname) == 0 ||
-	    (altmcount && strcmp(altmcount, symname) == 0) ||
+	    (altmcount && strcmp(altmcount, symname) == 0 &&
+	     (uses_altmcount = 1)) ||
 	    (strcmp(fentry, symname) == 0))
 		mcountsym = Elf_r_sym(relp);
 
