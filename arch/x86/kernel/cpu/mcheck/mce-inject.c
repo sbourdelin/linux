@@ -183,8 +183,7 @@ static void raise_mce(struct mce *m)
 		start = jiffies;
 		while (!cpumask_empty(mce_inject_cpumask)) {
 			if (!time_before(jiffies, start + 2*HZ)) {
-				printk(KERN_ERR
-				"Timeout waiting for mce inject %lx\n",
+				pr_err("Timeout waiting for mce inject %lx\n",
 					*cpumask_bits(mce_inject_cpumask));
 				break;
 			}
