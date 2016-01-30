@@ -432,8 +432,10 @@ early_recursion_flag:
 #ifdef CONFIG_EARLY_PRINTK
 early_idt_msg:
 	.asciz "PANIC: early exception %02lx rip %lx:%lx error %lx cr2 %lx\n"
+#ifdef CONFIG_KALLSYMS
 early_idt_ripmsg:
 	.asciz "RIP %s\n"
+#endif
 #endif /* CONFIG_EARLY_PRINTK */
 
 #define NEXT_PAGE(name) \
