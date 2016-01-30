@@ -119,15 +119,13 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
 	fclk = omap->pdata->get_fclk(omap->dm_timer);
 	if (!fclk) {
 		dev_err(chip->dev, "invalid pmtimer fclk\n");
-		mutex_unlock(&omap->mutex);
-		return -EINVAL;
+		goto err_einval;
 	}
 
 	clk_rate = clk_get_rate(fclk);
 	if (!clk_rate) {
 		dev_err(chip->dev, "invalid pmtimer fclk rate\n");
-		mutex_unlock(&omap->mutex);
-		return -EINVAL;
+		goto err_einval;
 	}
 
 	dev_dbg(chip->dev, "clk rate: %luHz\n", clk_rate);
@@ -142,12 +140,32 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
 	 * The non-active time is the remainder: (DM_TIMER_MAX-match_value)
 	 * clock cycles.
 	 *
+	 * NOTE: It is required that: load_value <= match_value < DM_TIMER_MAX
+	 *
 	 * References:
 	 *   OMAP4430/60/70 TRM sections 22.2.4.10 and 22.2.4.11
 	 *   AM335x Sitara TRM sections 20.1.3.5 and 20.1.3.6
 	 */
 	period_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, period_ns);
 	duty_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, duty_ns);
+
+	if (period_cycles < 2) {
+		dev_info(chip->dev,
+			"period %dns is too short for clock rate %luHz\n",
+			period_ns, clk_rate);
+		goto err_einval;
+	}
+	if (duty_cycles < 1) {
+		dev_dbg(chip->dev,
+			"duty cycle %dns is too short for clock rate %luHz, using minimum of 1 clock cycle\n",
+			duty_ns, clk_rate);
+		duty_cycles = 1;
+	} else if (duty_cycles >= period_cycles) {
+		dev_dbg(chip->dev,
+			"duty cycle %dns is too long for period %dns at clock rate %luHz, using maximum of 1 clock cycle less than period\n",
+			duty_ns, period_ns, clk_rate);
+		duty_cycles = period_cycles - 1;
+	}
 
 	load_value = (DM_TIMER_MAX - period_cycles) + 1;
 	match_value = load_value + duty_cycles - 1;
@@ -179,6 +197,11 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
 	mutex_unlock(&omap->mutex);
 
 	return 0;
+
+err_einval:
+	mutex_unlock(&omap->mutex);
+
+	return -EINVAL;
 }
 
 static int pwm_omap_dmtimer_set_polarity(struct pwm_chip *chip,
