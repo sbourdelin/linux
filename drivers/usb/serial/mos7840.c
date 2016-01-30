@@ -2039,7 +2039,7 @@ static int mos7810_check(struct usb_serial *serial)
 		/* Send the 1-bit test pattern out to MCS7810 test pin */
 		usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
 			MCS_WRREQ, MCS_WR_RTYPE,
-			(0x0300 | (((test_pattern >> i) & 0x0001) << 1)),
+			((((test_pattern >> i) & 0x0001) << 1) | 0x0300),
 			MODEM_CONTROL_REGISTER, NULL, 0, MOS_WDR_TIMEOUT);
 
 		/* Read the test pattern back */
@@ -2059,7 +2059,7 @@ static int mos7810_check(struct usb_serial *serial)
 
 	/* Restore MCR setting */
 	usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), MCS_WRREQ,
-		MCS_WR_RTYPE, 0x0300 | mcr_data, MODEM_CONTROL_REGISTER, NULL,
+		MCS_WR_RTYPE, mcr_data | 0x0300, MODEM_CONTROL_REGISTER, NULL,
 		0, MOS_WDR_TIMEOUT);
 
 	kfree(buf);
