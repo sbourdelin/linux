@@ -1054,6 +1054,18 @@ config CGROUP_PIDS
 	  since the PIDs limit only affects a process's ability to fork, not to
 	  attach to a cgroup.
 
+config CGROUP_RDMA
+	bool "RDMA controller"
+	help
+	  Provides enforcement of RDMA resources at RDMA/IB verb level and
+	  enforcement of any RDMA/IB capable hardware advertized resources.
+	  Its fairly easy for applications to exhaust RDMA resources, which
+	  can result into kernel consumers or other application consumers of
+	  RDMA resources left with no resources. RDMA controller is designed
+	  to stop this from happening.
+	  Attaching existing processes with active RDMA resources to the cgroup
+	  hierarchy will be allowed even if can cross the hierarchy's limit.
+
 config CGROUP_FREEZER
 	bool "Freezer controller"
 	help
