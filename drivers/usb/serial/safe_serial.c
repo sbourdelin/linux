@@ -76,13 +76,8 @@
 #include <linux/usb.h>
 #include <linux/usb/serial.h>
 
-
-#ifndef CONFIG_USB_SERIAL_SAFE_PADDED
-#define CONFIG_USB_SERIAL_SAFE_PADDED 0
-#endif
-
 static bool safe = true;
-static bool padded = CONFIG_USB_SERIAL_SAFE_PADDED;
+static bool padded = IS_ENABLED(CONFIG_USB_SERIAL_SAFE_PADDED);
 
 #define DRIVER_AUTHOR "sl@lineo.com, tbr@lineo.com, Johan Hovold <jhovold@gmail.com>"
 #define DRIVER_DESC "USB Safe Encapsulated Serial"
