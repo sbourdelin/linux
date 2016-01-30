@@ -49,6 +49,8 @@ $(obj)/signing_key.pem: $(obj)/x509.genkey
 	@echo "### needs to be run as root, and uses a hardware random"
 	@echo "### number generator if one is available."
 	@echo "###"
+	touch $(obj)/signing_key.pem
+	chmod 0600 $(obj)/signing_key.pem
 	openssl req -new -nodes -utf8 -$(CONFIG_MODULE_SIG_HASH) -days 36500 \
 		-batch -x509 -config $(obj)/x509.genkey \
 		-outform PEM -out $(obj)/signing_key.pem \
