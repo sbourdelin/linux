@@ -442,6 +442,7 @@ ipt_do_table(struct sk_buff *skb,
 	else return verdict;
 #endif
 }
+EXPORT_SYMBOL(ipt_do_table);
 
 /* Figures out from what hook each rule can be called: returns 0 if
    there are loops.  Puts hook bitmask in comefrom. */
@@ -2098,6 +2099,7 @@ out_free:
 out:
 	return ERR_PTR(ret);
 }
+EXPORT_SYMBOL(ipt_register_table);
 
 void ipt_unregister_table(struct net *net, struct xt_table *table)
 {
@@ -2116,6 +2118,7 @@ void ipt_unregister_table(struct net *net, struct xt_table *table)
 		module_put(table_owner);
 	xt_free_table_info(private);
 }
+EXPORT_SYMBOL(ipt_unregister_table);
 
 /* Returns 1 if the type and code is matched by the range, 0 otherwise */
 static inline bool
@@ -2269,8 +2272,5 @@ static void __exit ip_tables_fini(void)
 	unregister_pernet_subsys(&ip_tables_net_ops);
 }
 
-EXPORT_SYMBOL(ipt_register_table);
-EXPORT_SYMBOL(ipt_unregister_table);
-EXPORT_SYMBOL(ipt_do_table);
 module_init(ip_tables_init);
 module_exit(ip_tables_fini);
