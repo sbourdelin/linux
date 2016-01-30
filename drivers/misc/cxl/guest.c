@@ -878,6 +878,7 @@ void cxl_guest_remove_adapter(struct cxl *adapter)
 
 	cxl_sysfs_adapter_remove(adapter);
 
+	cxl_guest_remove_chardev(adapter);
 	device_unregister(&adapter->dev);
 }
 
@@ -915,6 +916,9 @@ struct cxl *cxl_guest_init_adapter(struct device_node *np, struct platform_devic
 	if ((rc = properties_look_ok(adapter)))
 		goto err1;
 
+	if ((rc = cxl_guest_add_chardev(adapter)))
+		goto err1;
+
 	/*
 	 * After we call this function we must not free the adapter directly,
 	 * even if it returns an error!
@@ -930,10 +934,25 @@ struct cxl *cxl_guest_init_adapter(struct device_node *np, struct platform_devic
 err_put1:
 	device_unregister(&adapter->dev);
 	free = false;
+	cxl_guest_remove_chardev(adapter);
 err1:
 	if (free)
 		free_adapter(adapter);
 	return ERR_PTR(rc);
+}
+
+void cxl_guest_reload_module(struct cxl *adapter)
+{
+	struct platform_device *pdev;
+	int afu;
+
+	for (afu = 0; afu < adapter->slices; afu++)
+		cxl_guest_remove_afu(adapter->afu[afu]);
+
+	pdev = adapter->guest->pdev;
+	cxl_guest_remove_adapter(adapter);
+
+	cxl_of_probe(pdev);
 }
 
 const struct cxl_backend_ops cxl_guest_ops = {
