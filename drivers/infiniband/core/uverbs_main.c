@@ -49,6 +49,7 @@
 #include <asm/uaccess.h>
 
 #include "uverbs.h"
+#include "core_priv.h"
 
 MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("InfiniBand userspace verbs access");
@@ -214,6 +215,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 	list_for_each_entry_safe(uobj, tmp, &context->ah_list, list) {
 		struct ib_ah *ah = uobj->object;
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, ah->pd->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_AH, 1);
 		idr_remove_uobj(&ib_uverbs_ah_idr, uobj);
 		ib_destroy_ah(ah);
 		kfree(uobj);
@@ -223,6 +227,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 	list_for_each_entry_safe(uobj, tmp, &context->mw_list, list) {
 		struct ib_mw *mw = uobj->object;
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, mw->pd->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_MW, 1);
 		idr_remove_uobj(&ib_uverbs_mw_idr, uobj);
 		ib_dealloc_mw(mw);
 		kfree(uobj);
@@ -231,6 +238,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 	list_for_each_entry_safe(uobj, tmp, &context->rule_list, list) {
 		struct ib_flow *flow_id = uobj->object;
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, flow_id->qp->pd->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_FLOW, 1);
 		idr_remove_uobj(&ib_uverbs_rule_idr, uobj);
 		ib_destroy_flow(flow_id);
 		kfree(uobj);
@@ -245,6 +255,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 		if (qp != qp->real_qp) {
 			ib_close_qp(qp);
 		} else {
+			ib_rdmacg_uncharge(&uobj->cg_obj, qp->pd->device,
+					   RDMACG_RESOURCE_POOL_VERB,
+					   RDMA_VERB_RESOURCE_QP, 1);
 			ib_uverbs_detach_umcast(qp, uqp);
 			ib_destroy_qp(qp);
 		}
@@ -257,6 +270,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 		struct ib_uevent_object *uevent =
 			container_of(uobj, struct ib_uevent_object, uobject);
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, srq->pd->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_SRQ, 1);
 		idr_remove_uobj(&ib_uverbs_srq_idr, uobj);
 		ib_destroy_srq(srq);
 		ib_uverbs_release_uevent(file, uevent);
@@ -269,6 +285,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 		struct ib_ucq_object *ucq =
 			container_of(uobj, struct ib_ucq_object, uobject);
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, cq->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_CQ, 1);
 		idr_remove_uobj(&ib_uverbs_cq_idr, uobj);
 		ib_destroy_cq(cq);
 		ib_uverbs_release_ucq(file, ev_file, ucq);
@@ -278,6 +297,9 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 	list_for_each_entry_safe(uobj, tmp, &context->mr_list, list) {
 		struct ib_mr *mr = uobj->object;
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, mr->pd->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_MR, 1);
 		idr_remove_uobj(&ib_uverbs_mr_idr, uobj);
 		ib_dereg_mr(mr);
 		kfree(uobj);
@@ -298,11 +320,17 @@ static int ib_uverbs_cleanup_ucontext(struct ib_uverbs_file *file,
 	list_for_each_entry_safe(uobj, tmp, &context->pd_list, list) {
 		struct ib_pd *pd = uobj->object;
 
+		ib_rdmacg_uncharge(&uobj->cg_obj, pd->device,
+				   RDMACG_RESOURCE_POOL_VERB,
+				   RDMA_VERB_RESOURCE_PD, 1);
 		idr_remove_uobj(&ib_uverbs_pd_idr, uobj);
 		ib_dealloc_pd(pd);
 		kfree(uobj);
 	}
 
+	ib_rdmacg_uncharge(&context->cg_obj, context->device,
+			   RDMACG_RESOURCE_POOL_VERB,
+			   RDMA_VERB_RESOURCE_UCTX, 1);
 	put_pid(context->tgid);
 
 	return context->device->dealloc_ucontext(context);
