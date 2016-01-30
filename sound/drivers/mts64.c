@@ -851,10 +851,21 @@ static int snd_mts64_probe_port(struct parport *p)
 {
 	struct pardevice *pardev;
 	int res;
+	struct pardev_cb pdev_cb = {
+		.preempt = NULL,
+		.wakeup = NULL,
+		.private = NULL,
+		.irq_func = NULL,
+		.flags = 0,
+	};
 
-	pardev = parport_register_device(p, DRIVER_NAME,
-					 NULL, NULL, NULL,
-					 0, NULL);
+	/*
+	* Specify the device number as SNDRV_CARDS + 1 so that the
+	* device id alloted to this temporary device will never clash
+	* with an actual device already registered.
+	*/
+	pardev = parport_register_dev_model(p, DRIVER_NAME, &pdev_cb,
+					    SNDRV_CARDS + 1);
 	if (!pardev)
 		return -EIO;
 
@@ -904,10 +915,20 @@ static void snd_mts64_detach(struct parport *p)
 	/* nothing to do here */
 }
 
+static int snd_mts64_dev_probe(struct pardevice *pardev)
+{
+	if (strcmp(pardev->name, DRIVER_NAME))
+		return -ENODEV;
+
+	return 0;
+}
+
 static struct parport_driver mts64_parport_driver = {
-	.name   = "mts64",
-	.attach = snd_mts64_attach,
-	.detach = snd_mts64_detach
+	.name		= "mts64",
+	.probe		= snd_mts64_dev_probe,
+	.match_port	= snd_mts64_attach,
+	.detach		= snd_mts64_detach,
+	.devmodel	= true,
 };
 
 /*********************************************************************
@@ -935,6 +956,12 @@ static int snd_mts64_probe(struct platform_device *pdev)
 	struct snd_card *card = NULL;
 	struct mts64 *mts = NULL;
 	int err;
+	struct pardev_cb mts64_cb = {
+		.preempt = NULL,
+		.wakeup = NULL,
+		.irq_func = snd_mts64_interrupt,	/* ISR */
+		.flags = PARPORT_DEV_EXCL,		/* flags */
+	};
 
 	p = platform_get_drvdata(pdev);
 	platform_set_drvdata(pdev, NULL);
@@ -959,13 +986,12 @@ static int snd_mts64_probe(struct platform_device *pdev)
 	sprintf(card->longname,  "%s at 0x%lx, irq %i",
 		card->shortname, p->base, p->irq);
 
-	pardev = parport_register_device(p,                   /* port */
-					 DRIVER_NAME,         /* name */
-					 NULL,                /* preempt */
-					 NULL,                /* wakeup */
-					 snd_mts64_interrupt, /* ISR */
-					 PARPORT_DEV_EXCL,    /* flags */
-					 (void *)card);       /* private */
+	mts64_cb.private = card;			 /* private */
+
+	pardev = parport_register_dev_model(p,		 /* port */
+					    DRIVER_NAME, /* name */
+					    &mts64_cb,	 /* callbacks */
+					    pdev->id);	 /* device number */
 	if (pardev == NULL) {
 		snd_printd("Cannot register pardevice\n");
 		err = -EIO;
