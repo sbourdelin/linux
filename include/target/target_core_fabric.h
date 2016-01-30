@@ -148,7 +148,7 @@ void	target_execute_cmd(struct se_cmd *cmd);
 
 int	transport_generic_free_cmd(struct se_cmd *, int);
 
-bool	transport_wait_for_tasks(struct se_cmd *);
+bool	transport_wait_for_tasks(struct se_cmd *, bool, bool *, bool *);
 int	transport_check_aborted_status(struct se_cmd *, int);
 int	transport_send_check_condition_and_sense(struct se_cmd *,
 		sense_reason_t, int);
