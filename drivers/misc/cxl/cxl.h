@@ -846,6 +846,7 @@ struct cxl_backend_ops {
 	int (*attach_process)(struct cxl_context *ctx, bool kernel,
 			u64 wed, u64 amr);
 	int (*detach_process)(struct cxl_context *ctx);
+	bool (*support_attributes)(const char *attr_name);
 	bool (*link_ok)(struct cxl *cxl);
 	void (*release_afu)(struct device *dev);
 	ssize_t (*afu_read_err_buffer)(struct cxl_afu *afu, char *buf,
