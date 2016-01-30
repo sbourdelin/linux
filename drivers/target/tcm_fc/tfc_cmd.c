@@ -107,8 +107,7 @@ void ft_release_cmd(struct se_cmd *se_cmd)
 
 int ft_check_stop_free(struct se_cmd *se_cmd)
 {
-	transport_generic_free_cmd(se_cmd, 0);
-	return 1;
+	return transport_generic_free_cmd(se_cmd, 0);
 }
 
 /*
@@ -179,6 +178,12 @@ int ft_queue_status(struct se_cmd *se_cmd)
 		return -ENOMEM;
 	}
 	lport->tt.exch_done(cmd->seq);
+	/*
+	 * Drop the extra ACK_KREF reference taken by target_submit_cmd()
+	 * ahead of ft_check_stop_free() -> transport_generic_free_cmd()
+	 * final se_cmd->cmd_kref put.
+	 */
+	target_put_sess_cmd(&cmd->se_cmd);
 	return 0;
 }
 
@@ -422,6 +427,12 @@ void ft_queue_tm_resp(struct se_cmd *se_cmd)
 	pr_debug("tmr fn %d resp %d fcp code %d\n",
 		  tmr->function, tmr->response, code);
 	ft_send_resp_code(cmd, code);
+	/*
+	 * Drop the extra ACK_KREF reference taken by target_submit_tmr()
+	 * ahead of ft_check_stop_free() -> transport_generic_free_cmd()
+	 * final se_cmd->cmd_kref put.
+	 */
+	target_put_sess_cmd(&cmd->se_cmd);
 }
 
 void ft_aborted_task(struct se_cmd *se_cmd)
