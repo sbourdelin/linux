@@ -562,6 +562,7 @@ static int sta_info_insert_finish(struct sta_info *sta) __acquires(RCU)
  out_err:
 	mutex_unlock(&local->sta_mtx);
 	rcu_read_lock();
+	kfree(sinfo);
 	return err;
 }
 
