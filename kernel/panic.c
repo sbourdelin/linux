@@ -119,6 +119,7 @@ void panic(const char *fmt, ...)
 
 	console_verbose();
 	bust_spinlocks(1);
+	console_reset_on_panic();
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);

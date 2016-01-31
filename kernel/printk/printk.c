@@ -2412,6 +2412,11 @@ void console_flush_on_panic(void)
 	console_unlock();
 }
 
+void console_reset_on_panic(void)
+{
+	zap_locks();
+}
+
 /*
  * Return the console tty driver structure and its associated index
  */
