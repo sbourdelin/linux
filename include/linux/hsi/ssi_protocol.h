@@ -27,6 +27,12 @@
 
 #include <linux/hsi/hsi.h>
 
+enum nokia_modem_state {
+	STATE_BOOT,
+	STATE_ON,
+	STATE_OFF,
+};
+
 static inline void ssip_slave_put_master(struct hsi_client *master)
 {
 }
@@ -35,6 +41,9 @@ struct hsi_client *ssip_slave_get_master(struct hsi_client *slave);
 int ssip_slave_start_tx(struct hsi_client *master);
 int ssip_slave_stop_tx(struct hsi_client *master);
 void ssip_reset_event(struct hsi_client *master);
+
+int ssip_notifier_register(struct hsi_client *master, struct notifier_block *nb);
+int ssip_notifier_unregister(struct hsi_client *master, struct notifier_block *nb);
 
 int ssip_slave_running(struct hsi_client *master);
 

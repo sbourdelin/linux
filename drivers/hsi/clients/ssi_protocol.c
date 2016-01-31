@@ -153,6 +153,7 @@ struct ssi_protocol {
 	atomic_t		tx_usecnt;
 	int			channel_id_cmd;
 	int			channel_id_data;
+	struct blocking_notifier_head	modem_state_notifier;
 };
 
 /* List of ssi protocol instances */
@@ -735,6 +736,7 @@ static void ssip_rx_waketest(struct hsi_client *cl, u32 cmd)
 	dev_dbg(&cl->device, "CMT is ONLINE\n");
 	netif_wake_queue(ssi->netdev);
 	netif_carrier_on(ssi->netdev);
+	blocking_notifier_call_chain(&ssi->modem_state_notifier, STATE_ON, NULL);
 }
 
 static void ssip_rx_ready(struct hsi_client *cl)
@@ -924,6 +926,7 @@ static int ssip_pn_open(struct net_device *dev)
 			err);
 		return err;
 	}
+	blocking_notifier_call_chain(&ssi->modem_state_notifier, STATE_BOOT, NULL);
 	dev_dbg(&cl->device, "Configuring SSI port\n");
 	hsi_setup(cl);
 	spin_lock_bh(&ssi->lock);
@@ -942,10 +945,13 @@ static int ssip_pn_open(struct net_device *dev)
 static int ssip_pn_stop(struct net_device *dev)
 {
 	struct hsi_client *cl = to_hsi_client(dev->dev.parent);
+	struct ssi_protocol *ssi = hsi_client_drvdata(cl);
 
 	ssip_reset(cl);
 	hsi_unregister_port_event(cl);
 	hsi_release_port(cl);
+
+	blocking_notifier_call_chain(&ssi->modem_state_notifier, STATE_OFF, NULL);
 
 	return 0;
 }
@@ -1037,6 +1043,20 @@ void ssip_reset_event(struct hsi_client *master)
 }
 EXPORT_SYMBOL_GPL(ssip_reset_event);
 
+int ssip_notifier_register(struct hsi_client *master, struct notifier_block *nb)
+{
+	struct ssi_protocol *ssi = hsi_client_drvdata(master);
+	return blocking_notifier_chain_register(&ssi->modem_state_notifier, nb);
+}
+EXPORT_SYMBOL_GPL(ssip_notifier_register);
+
+int ssip_notifier_unregister(struct hsi_client *master, struct notifier_block *nb)
+{
+	struct ssi_protocol *ssi = hsi_client_drvdata(master);
+	return blocking_notifier_chain_unregister(&ssi->modem_state_notifier, nb);
+}
+EXPORT_SYMBOL_GPL(ssip_notifier_unregister);
+
 static const struct net_device_ops ssip_pn_ops = {
 	.ndo_open	= ssip_pn_open,
 	.ndo_stop	= ssip_pn_stop,
@@ -1085,6 +1105,7 @@ static int ssi_protocol_probe(struct device *dev)
 	ssi->keep_alive.function = ssip_keep_alive;
 	INIT_LIST_HEAD(&ssi->txqueue);
 	INIT_LIST_HEAD(&ssi->cmdqueue);
+	BLOCKING_INIT_NOTIFIER_HEAD(&ssi->modem_state_notifier);
 	atomic_set(&ssi->tx_usecnt, 0);
 	hsi_client_set_drvdata(cl, ssi);
 	ssi->cl = cl;
