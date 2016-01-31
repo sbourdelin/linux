@@ -95,7 +95,7 @@ __be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
 		ports = __skb_header_pointer(skb, thoff + poff,
 					     sizeof(_ports), data, hlen, &_ports);
 		if (ports)
-			return *ports;
+			return get_unaligned_be32(ports);
 	}
 
 	return 0;
@@ -115,6 +115,10 @@ EXPORT_SYMBOL(__skb_flow_get_ports);
  * The function will try to retrieve individual keys into target specified
  * by flow_dissector from either the skbuff or a raw buffer specified by the
  * rest parameters.
+ *
+ * This function does not assume 4-byte alignment, but it does assume 2-byte
+ * alignment (false is returned for 1-byte alignment). get_unaligned_be32
+ * is called to get thirty-two values out of the packet.
  *
  * Caller must take care of zeroing target container memory.
  */
@@ -139,6 +143,11 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 		nhoff = skb_network_offset(skb);
 		hlen = skb_headlen(skb);
 	}
+
+#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+	if (WARN_ON(((u64)data & 0x1)))
+		return false;
+#endif
 
 	/* It is ensured by skb_flow_dissector_init() that control key will
 	 * be always present.
@@ -230,7 +239,7 @@ ipv6:
 			key_control->addr_type = FLOW_DISSECTOR_KEY_IPV6_ADDRS;
 		}
 
-		flow_label = ip6_flowlabel(iph);
+		flow_label = get_unaligned_be32(iph) & IPV6_FLOWLABEL_MASK;
 		if (flow_label) {
 			if (dissector_uses_key(flow_dissector,
 					       FLOW_DISSECTOR_KEY_FLOW_LABEL)) {
@@ -303,7 +312,7 @@ ipv6:
 			key_addrs = skb_flow_dissector_target(flow_dissector,
 							      FLOW_DISSECTOR_KEY_TIPC_ADDRS,
 							      target_container);
-			key_addrs->tipcaddrs.srcnode = hdr->srcnode;
+			key_addrs->tipcaddrs.srcnode = get_unaligned_be32(&hdr->srcnode);
 			key_control->addr_type = FLOW_DISSECTOR_KEY_TIPC_ADDRS;
 		}
 		goto out_good;
@@ -325,7 +334,7 @@ mpls:
 				key_keyid = skb_flow_dissector_target(flow_dissector,
 								      FLOW_DISSECTOR_KEY_MPLS_ENTROPY,
 								      target_container);
-				key_keyid->keyid = hdr[1].entry &
+				key_keyid->keyid = get_unaligned_be32(&hdr[1].entry) &
 					htonl(MPLS_LS_LABEL_MASK);
 			}
 
@@ -379,7 +388,7 @@ ip_proto_again:
 				key_keyid = skb_flow_dissector_target(flow_dissector,
 								      FLOW_DISSECTOR_KEY_GRE_KEYID,
 								      target_container);
-				key_keyid->keyid = *keyid;
+				key_keyid->keyid = get_unaligned_be32(keyid);
 			}
 			nhoff += 4;
 		}
