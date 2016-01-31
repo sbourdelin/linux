@@ -97,6 +97,7 @@ static LIST_HEAD(acpi_ioremaps);
 static DEFINE_MUTEX(acpi_ioremap_lock);
 
 static void __init acpi_osi_setup_late(void);
+static bool acpi_osi_setup_disabled(char *str);
 
 /*
  * The story of _OSI(Linux)
@@ -149,11 +150,13 @@ static u32 acpi_osi_handler(acpi_string interface, u32 supported)
 			osi_linux.dmi ? " via DMI" : "");
 	}
 
-	if (!strcmp("Darwin", interface)) {
+	if (!strcmp("Darwin", interface) &&
+	    !acpi_osi_setup_disabled(interface)) {
 		/*
 		 * Apple firmware will behave poorly if it receives positive
 		 * answers to "Darwin" and any other OS. Respond positively
-		 * to Darwin and then disable all other vendor strings.
+		 * to Darwin and then disable all other vendor strings if
+		 * acpi_osi="!Darwin" is not appended in cmdline.
 		 */
 		acpi_update_interfaces(ACPI_DISABLE_ALL_VENDOR_STRINGS);
 		supported = ACPI_UINT32_MAX;
@@ -1694,6 +1697,27 @@ static struct osi_setup_entry
 	{"3.0 _SCP Extensions", true},
 	{"Processor Aggregator Device", true},
 };
+
+static bool acpi_osi_setup_disabled(char *str)
+{
+	int i;
+	struct osi_setup_entry *osi;
+
+	if (!str)
+		return false;
+
+	for (i = 0; i < OSI_STRING_ENTRIES_MAX; i++) {
+		osi = &osi_setup_entries[i];
+		if (!strcmp(osi->string, str)) {
+			if (!osi->enable)
+				return true;
+			else
+				return false;
+		}
+	}
+
+	return false;
+}
 
 void __init acpi_osi_setup(char *str)
 {
