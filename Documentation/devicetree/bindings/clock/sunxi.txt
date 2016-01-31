@@ -29,6 +29,7 @@ Required properties:
 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
 	"allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
 	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+	"allwinner,sun8i-a83t-ahb1-clk" - for the AHB1 clock on A83T
 	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23

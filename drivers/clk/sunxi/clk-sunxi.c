@@ -344,6 +344,67 @@ static void sun6i_ahb1_recalc(struct factors_request *req)
 	req->rate >>= req->p;
 }
 
+
+#define SUN8I_A83T_AHB1_PARENT_PLL6	2
+/**
+ * sun8i_a83t_get_ahb_factors() - calculates m, p factors for AHB
+ * AHB rate is calculated as follows
+ * rate = parent_rate >> p
+ *
+ * if parent is pll6, then
+ * parent_rate = pll6 rate / (m + 1)
+ */
+
+static void sun8i_a83t_get_ahb1_factors(struct factors_request *req)
+{
+	u8 div, calcp, calcm = 1;
+
+	/*
+	 * clock can only divide, so we will never be able to achieve
+	 * frequencies higher than the parent frequency
+	 */
+	if (req->parent_rate && req->rate > req->parent_rate)
+		req->rate = req->parent_rate;
+
+	div = DIV_ROUND_UP(req->parent_rate, req->rate);
+
+	/* calculate pre-divider if parent is pll6 */
+	if (req->parent_index >= SUN8I_A83T_AHB1_PARENT_PLL6) {
+		if (div < 4)
+			calcp = 0;
+		else if (div / 2 < 4)
+			calcp = 1;
+		else if (div / 4 < 4)
+			calcp = 2;
+		else
+			calcp = 3;
+
+		calcm = DIV_ROUND_UP(div, 1 << calcp);
+	} else {
+		calcp = __roundup_pow_of_two(div);
+		calcp = calcp > 3 ? 3 : calcp;
+	}
+
+	req->rate = (req->parent_rate / calcm) >> calcp;
+	req->p = calcp;
+	req->m = calcm - 1;
+}
+
+/**
+ * sun8i_a83t_ahb1_recalc() - calculates AHB clock rate from m, p factors and
+ *			 parent index
+ */
+static void sun8i_a83t_ahb1_recalc(struct factors_request *req)
+{
+	req->rate = req->parent_rate;
+
+	/* apply pre-divider first if parent is pll6 */
+	if (req->parent_index >= SUN6I_AHB1_PARENT_PLL6)
+		req->rate /= req->m + 1;
+
+	/* clk divider */
+	req->rate >>= req->p;
+}
 /**
  * sun4i_get_apb1_factors() - calculates m, p factors for APB1
  * APB1 rate is calculated as follows
@@ -555,6 +616,14 @@ static const struct factors_data sun6i_ahb1_data __initconst = {
 	.recalc = sun6i_ahb1_recalc,
 };
 
+static const struct factors_data sun8i_a83t_ahb1_data __initconst = {
+	.mux = 12,
+	.muxmask = BIT(1) | BIT(0),
+	.table = &sun6i_ahb1_config,
+	.getter = sun8i_a83t_get_ahb1_factors,
+	.recalc = sun8i_a83t_ahb1_recalc,
+};
+
 static const struct factors_data sun4i_apb1_data __initconst = {
 	.mux = 24,
 	.muxmask = BIT(1) | BIT(0),
@@ -592,6 +661,12 @@ static void __init sun6i_ahb1_clk_setup(struct device_node *node)
 CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk",
 	       sun6i_ahb1_clk_setup);
 
+static void __init sun8i_a83t_ahb1_clk_setup(struct device_node *node)
+{
+	sunxi_factors_clk_setup(node, &sun8i_a83t_ahb1_data);
+}
+CLK_OF_DECLARE(sun8i_a83t_ahb1, "allwinner,sun8i-a83t-ahb1-clk",
+	       sun8i_a83t_ahb1_clk_setup);
 
 /**
  * sunxi_mux_clk_setup() - Setup function for muxes
