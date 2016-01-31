@@ -143,10 +143,10 @@ static __be32 *read_buf(struct nfsd4_compoundargs *argp, u32 nbytes)
 	 * Maybe we need a new page, maybe we have just run out
 	 */
 	unsigned int avail = (char *)argp->end - (char *)argp->p;
+	unsigned int copied = 0;
 	__be32 *p;
+
 	if (avail + argp->pagelen < nbytes)
-		return NULL;
-	if (avail + PAGE_SIZE < nbytes) /* need more than a page !! */
 		return NULL;
 	/* ok, we can do it with the current plus the next page */
 	if (nbytes <= sizeof(argp->tmp))
@@ -164,9 +164,19 @@ static __be32 *read_buf(struct nfsd4_compoundargs *argp, u32 nbytes)
 	 * guarantee p points to at least nbytes bytes.
 	 */
 	memcpy(p, argp->p, avail);
+	copied += avail;
+	nbytes -= avail;
+
+	while (nbytes > PAGE_SIZE) {
+		next_decode_page(argp);
+		memcpy(((char*)p) + copied, argp->p, PAGE_SIZE);
+		copied += PAGE_SIZE;
+		nbytes -= PAGE_SIZE;
+	}
+
 	next_decode_page(argp);
-	memcpy(((char*)p)+avail, argp->p, (nbytes - avail));
-	argp->p += XDR_QUADLEN(nbytes - avail);
+	memcpy(((char*)p) + copied, argp->p, nbytes);
+	argp->p += XDR_QUADLEN(nbytes);
 	return p;
 }
 
