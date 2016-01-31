@@ -125,6 +125,7 @@ struct console {
 	void	(*unblank)(void);
 	int	(*setup)(struct console *, char *);
 	int	(*match)(struct console *, char *name, int idx, char *options);
+	void	(*reset)(struct console *);
 	short	flags;
 	short	index;
 	int	cflag;

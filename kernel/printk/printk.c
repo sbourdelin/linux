@@ -1461,6 +1461,15 @@ static void call_console_drivers(int level,
 	}
 }
 
+static void reset_console_drivers(void)
+{
+	struct console *con;
+
+	for_each_console(con)
+		if ((con->flags & CON_ENABLED) && con->reset)
+			con->reset(con);
+}
+
 /*
  * Zap console related locks when oopsing.
  * To leave time for slow consoles to print a full oops,
@@ -2415,6 +2424,7 @@ void console_flush_on_panic(void)
 void console_reset_on_panic(void)
 {
 	zap_locks();
+	reset_console_drivers();
 }
 
 /*
