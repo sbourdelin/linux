@@ -13,6 +13,9 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 
+#define SPIN_DUMP_IN_PROGRESS	(1 << 31)
+#define DEFAULT_OWNER_CPU	(INT_MAX >> 1)
+
 void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 			  struct lock_class_key *key)
 {
@@ -26,7 +29,7 @@ void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 	lock->raw_lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
 	lock->magic = SPINLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
-	lock->owner_cpu = -1;
+	lock->owner_cpu = DEFAULT_OWNER_CPU;
 }
 
 EXPORT_SYMBOL(__raw_spin_lock_init);
@@ -44,7 +47,7 @@ void __rwlock_init(rwlock_t *lock, const char *name,
 	lock->raw_lock = (arch_rwlock_t) __ARCH_RW_LOCK_UNLOCKED;
 	lock->magic = RWLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
-	lock->owner_cpu = -1;
+	lock->owner_cpu = DEFAULT_OWNER_CPU;
 }
 
 EXPORT_SYMBOL(__rwlock_init);
@@ -52,6 +55,13 @@ EXPORT_SYMBOL(__rwlock_init);
 static void spin_dump(raw_spinlock_t *lock, const char *msg)
 {
 	struct task_struct *owner = NULL;
+
+	if (lock->owner_cpu & SPIN_DUMP_IN_PROGRESS)
+		panic("BUG: lock: %pS spin dump recursion on CPU#%d, %s/%d\n",
+				lock, raw_smp_processor_id(),
+				current->comm, task_pid_nr(current));
+
+	lock->owner_cpu |= SPIN_DUMP_IN_PROGRESS;
 
 	if (lock->owner && lock->owner != SPINLOCK_OWNER_INIT)
 		owner = lock->owner;
@@ -63,8 +73,10 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 		lock, lock->magic,
 		owner ? owner->comm : "<none>",
 		owner ? task_pid_nr(owner) : -1,
-		lock->owner_cpu);
+		lock->owner_cpu == DEFAULT_OWNER_CPU ? -1 : lock->owner_cpu);
 	dump_stack();
+
+	lock->owner_cpu &= ~SPIN_DUMP_IN_PROGRESS;
 }
 
 static void spin_bug(raw_spinlock_t *lock, const char *msg)
@@ -100,7 +112,7 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 	SPIN_BUG_ON(lock->owner_cpu != raw_smp_processor_id(),
 							lock, "wrong CPU");
 	lock->owner = SPINLOCK_OWNER_INIT;
-	lock->owner_cpu = -1;
+	lock->owner_cpu = DEFAULT_OWNER_CPU;
 }
 
 static void __spin_lock_debug(raw_spinlock_t *lock)
@@ -244,7 +256,7 @@ static inline void debug_write_unlock(rwlock_t *lock)
 	RWLOCK_BUG_ON(lock->owner_cpu != raw_smp_processor_id(),
 							lock, "wrong CPU");
 	lock->owner = SPINLOCK_OWNER_INIT;
-	lock->owner_cpu = -1;
+	lock->owner_cpu = DEFAULT_OWNER_CPU;
 }
 
 #if 0		/* This can cause lockups */
