@@ -47,6 +47,8 @@ CONTENTS
   5-3. IO
     5-3-1. IO Interface Files
     5-3-2. Writeback
+  5-4. RDMA
+    5-4-1. RDMA Interface Files
 P. Information on Kernel Programming
   P-1. Filesystem Support for Writeback
 D. Deprecated v1 Core Features
@@ -1084,6 +1086,47 @@ writeback as follows.
 	total available memory and applied the same way as
 	vm.dirty[_background]_ratio.
 
+5-4. RDMA
+
+The "rdma" controller regulates the distribution of RDMA resources.
+This controller implements both RDMA/IB verb level and RDMA HCA
+driver level resource distribution.
+
+5-4-1. RDMA Interface Files
+
+  rdma.verb.max
+	A readwrite file that exists for all the cgroups except root that
+	describes current configured verbs resource limit for a RDMA/IB device.
+
+	Lines are keyed by device name and are not ordered.
+	Each line contains space separated resource name and its configured
+	limit that can be distributed.
+
+	An example for mlx4 and ocrdma device follows.
+
+	  mlx4_0 mr=1000 qp=104 ah=2
+	  ocrdma1 mr=900 qp=89 cq=10
+
+  rdma.verb.current
+	A read-only file that describes current resource usage.
+	It exists for all the cgroup including root.
+
+	An example for mlx4 and ocrdma device follows.
+
+	  mlx4_0 mr=1000 qp=102 ah=2 flow=10 srq=0
+	  ocrdma1 mr=900 qp=79 cq=10 flow=0 srq=0
+
+  rdma.hw.max
+	A readwrite file that exists for all the cgroups except root that
+	describes current configured HCA hardware resource limit for a
+	RDMA/IB device.
+
+	Lines are keyed by device name and are not ordered.
+	Each line contains space separated resource name and its configured
+	limit that can be distributed.
+
+  rdma.hw.current
+	A read-only file that describes current resource usage.
 
 P. Information on Kernel Programming
 
