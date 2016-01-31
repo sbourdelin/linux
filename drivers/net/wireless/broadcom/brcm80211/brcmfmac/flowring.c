@@ -169,7 +169,7 @@ u32 brcmf_flowring_create(struct brcmf_flowring *flow, u8 da[ETH_ALEN],
 }
 
 
-u8 brcmf_flowring_tid(struct brcmf_flowring *flow, u8 flowid)
+u8 brcmf_flowring_tid(struct brcmf_flowring *flow, u16 flowid)
 {
 	struct brcmf_flowring_ring *ring;
 
@@ -179,7 +179,7 @@ u8 brcmf_flowring_tid(struct brcmf_flowring *flow, u8 flowid)
 }
 
 
-static void brcmf_flowring_block(struct brcmf_flowring *flow, u8 flowid,
+static void brcmf_flowring_block(struct brcmf_flowring *flow, u16 flowid,
 				 bool blocked)
 {
 	struct brcmf_flowring_ring *ring;
@@ -228,7 +228,7 @@ static void brcmf_flowring_block(struct brcmf_flowring *flow, u8 flowid,
 }
 
 
-void brcmf_flowring_delete(struct brcmf_flowring *flow, u8 flowid)
+void brcmf_flowring_delete(struct brcmf_flowring *flow, u16 flowid)
 {
 	struct brcmf_flowring_ring *ring;
 	u8 hash_idx;
@@ -253,7 +253,7 @@ void brcmf_flowring_delete(struct brcmf_flowring *flow, u8 flowid)
 }
 
 
-u32 brcmf_flowring_enqueue(struct brcmf_flowring *flow, u8 flowid,
+u32 brcmf_flowring_enqueue(struct brcmf_flowring *flow, u16 flowid,
 			   struct sk_buff *skb)
 {
 	struct brcmf_flowring_ring *ring;
@@ -279,7 +279,7 @@ u32 brcmf_flowring_enqueue(struct brcmf_flowring *flow, u8 flowid,
 }
 
 
-struct sk_buff *brcmf_flowring_dequeue(struct brcmf_flowring *flow, u8 flowid)
+struct sk_buff *brcmf_flowring_dequeue(struct brcmf_flowring *flow, u16 flowid)
 {
 	struct brcmf_flowring_ring *ring;
 	struct sk_buff *skb;
@@ -300,7 +300,7 @@ struct sk_buff *brcmf_flowring_dequeue(struct brcmf_flowring *flow, u8 flowid)
 }
 
 
-void brcmf_flowring_reinsert(struct brcmf_flowring *flow, u8 flowid,
+void brcmf_flowring_reinsert(struct brcmf_flowring *flow, u16 flowid,
 			     struct sk_buff *skb)
 {
 	struct brcmf_flowring_ring *ring;
@@ -311,7 +311,7 @@ void brcmf_flowring_reinsert(struct brcmf_flowring *flow, u8 flowid,
 }
 
 
-u32 brcmf_flowring_qlen(struct brcmf_flowring *flow, u8 flowid)
+u32 brcmf_flowring_qlen(struct brcmf_flowring *flow, u16 flowid)
 {
 	struct brcmf_flowring_ring *ring;
 
@@ -326,7 +326,7 @@ u32 brcmf_flowring_qlen(struct brcmf_flowring *flow, u8 flowid)
 }
 
 
-void brcmf_flowring_open(struct brcmf_flowring *flow, u8 flowid)
+void brcmf_flowring_open(struct brcmf_flowring *flow, u16 flowid)
 {
 	struct brcmf_flowring_ring *ring;
 
@@ -340,7 +340,7 @@ void brcmf_flowring_open(struct brcmf_flowring *flow, u8 flowid)
 }
 
 
-u8 brcmf_flowring_ifidx_get(struct brcmf_flowring *flow, u8 flowid)
+u8 brcmf_flowring_ifidx_get(struct brcmf_flowring *flow, u16 flowid)
 {
 	struct brcmf_flowring_ring *ring;
 	u8 hash_idx;
@@ -384,7 +384,7 @@ void brcmf_flowring_detach(struct brcmf_flowring *flow)
 	struct brcmf_pub *drvr = bus_if->drvr;
 	struct brcmf_flowring_tdls_entry *search;
 	struct brcmf_flowring_tdls_entry *remove;
-	u8 flowid;
+	u16 flowid;
 
 	for (flowid = 0; flowid < flow->nrofrings; flowid++) {
 		if (flow->rings[flowid])
@@ -408,7 +408,7 @@ void brcmf_flowring_configure_addr_mode(struct brcmf_flowring *flow, int ifidx,
 	struct brcmf_bus *bus_if = dev_get_drvdata(flow->dev);
 	struct brcmf_pub *drvr = bus_if->drvr;
 	u32 i;
-	u8 flowid;
+	u16 flowid;
 
 	if (flow->addr_mode[ifidx] != addr_mode) {
 		for (i = 0; i < ARRAY_SIZE(flow->hash); i++) {
@@ -434,7 +434,7 @@ void brcmf_flowring_delete_peer(struct brcmf_flowring *flow, int ifidx,
 	struct brcmf_flowring_tdls_entry *prev;
 	struct brcmf_flowring_tdls_entry *search;
 	u32 i;
-	u8 flowid;
+	u16 flowid;
 	bool sta;
 
 	sta = (flow->addr_mode[ifidx] == ADDR_INDIRECT);
