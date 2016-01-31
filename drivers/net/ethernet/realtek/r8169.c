@@ -8368,7 +8368,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->vlan_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO |
 		NETIF_F_HIGHDMA;
 
-	tp->cp_cmd |= RxChkSum | RxVlan;
 
 	/*
 	 * Pretend we are using VLANs; This bypasses a nasty bug where
