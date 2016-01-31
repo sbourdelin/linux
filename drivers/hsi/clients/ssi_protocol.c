@@ -916,6 +916,8 @@ static int ssip_pn_open(struct net_device *dev)
 	struct ssi_protocol *ssi = hsi_client_drvdata(cl);
 	int err;
 
+	netif_carrier_off(ssi->netdev);
+
 	err = hsi_claim_port(cl, 1);
 	if (err < 0) {
 		dev_err(&cl->device, "SSI port already claimed\n");
