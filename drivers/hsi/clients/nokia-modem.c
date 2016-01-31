@@ -33,7 +33,7 @@
 static unsigned int pm = 1;
 module_param(pm, int, 0400);
 MODULE_PARM_DESC(pm,
-	"Enable power management (0=disabled, 1=userland based [default], 2=kernel based)");
+	"Enable power management (1=userland based [default], 2=kernel based)");
 
 struct nokia_modem_device {
 	struct tasklet_struct	nokia_modem_rst_ind_tasklet;
@@ -197,6 +197,11 @@ static int nokia_modem_gpio_probe(struct device *dev)
 	struct device_node *np = dev->of_node;
 	struct nokia_modem_device *modem = dev_get_drvdata(dev);
 	int gpio_count, gpio_name_count, i, err;
+
+	if (pm != 1 && pm != 2) {
+		dev_err(dev, "invalid pm configuration!");
+		return -EINVAL;
+	}
 
 	gpio_count = of_gpio_count(np);
 
