@@ -154,6 +154,7 @@ struct ssi_protocol {
 	int			channel_id_cmd;
 	int			channel_id_data;
 	struct blocking_notifier_head	modem_state_notifier;
+	enum nokia_modem_type	modem_type;
 };
 
 /* List of ssi protocol instances */
@@ -1080,10 +1081,20 @@ static void ssip_pn_setup(struct net_device *dev)
 	dev->header_ops		= &phonet_header_ops;
 }
 
+static ssize_t show_rapuyama_version(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct hsi_client *cl = to_hsi_client(dev);
+	struct ssi_protocol *ssi = hsi_client_drvdata(cl);
+
+	return sprintf(buf, "%d", ssi->modem_type);
+}
+static DEVICE_ATTR(rapuyama_version, S_IRUGO, show_rapuyama_version, 0);
+
 static int ssi_protocol_probe(struct device *dev)
 {
 	static const char ifname[] = "phonet%d";
 	struct hsi_client *cl = to_hsi_client(dev);
+	struct ssi_protocol_platform_data *pdata = dev_get_platdata(dev);
 	struct ssi_protocol *ssi;
 	int err;
 
@@ -1092,6 +1103,8 @@ static int ssi_protocol_probe(struct device *dev)
 		dev_err(dev, "No memory for ssi protocol\n");
 		return -ENOMEM;
 	}
+
+	ssi->modem_type = pdata->type;
 
 	spin_lock_init(&ssi->lock);
 	init_timer_deferrable(&ssi->rx_wd);
@@ -1137,12 +1150,24 @@ static int ssi_protocol_probe(struct device *dev)
 		goto out1;
 	}
 
+	err = device_create_file(dev, &dev_attr_rapuyama_version);
+	if (err < 0) {
+		dev_err(dev, "Could not create sysfs file for rapuyama version");
+		goto out2;
+	}
+
+	err = sysfs_create_link(&dev->kobj, &pdata->nokia_modem_dev->kobj, "nokia-modem");
+	if (err < 0) {
+		dev_err(dev, "Could not create sysfs symlink to nokia-modem");
+		goto out3;
+	}
+
 	SET_NETDEV_DEV(ssi->netdev, dev);
 	netif_carrier_off(ssi->netdev);
 	err = register_netdev(ssi->netdev);
 	if (err < 0) {
 		dev_err(dev, "Register netdev failed (%d)\n", err);
-		goto out2;
+		goto out4;
 	}
 
 	list_add(&ssi->link, &ssip_list);
@@ -1151,6 +1176,10 @@ static int ssi_protocol_probe(struct device *dev)
 		ssi->channel_id_cmd, ssi->channel_id_data);
 
 	return 0;
+out4:
+	sysfs_remove_link(&dev->kobj, "nokia-modem");
+out3:
+	device_remove_file(dev, &dev_attr_rapuyama_version);
 out2:
 	free_netdev(ssi->netdev);
 out1:
@@ -1167,6 +1196,8 @@ static int ssi_protocol_remove(struct device *dev)
 	struct ssi_protocol *ssi = hsi_client_drvdata(cl);
 
 	list_del(&ssi->link);
+	sysfs_remove_link(&dev->kobj, "nokia-modem");
+	device_remove_file(dev, &dev_attr_rapuyama_version);
 	unregister_netdev(ssi->netdev);
 	ssip_free_cmds(ssi);
 	hsi_client_set_drvdata(cl, NULL);

@@ -33,6 +33,17 @@ enum nokia_modem_state {
 	STATE_OFF,
 };
 
+enum nokia_modem_type {
+	UNKNOWN = 0,
+	RAPUYAMA_V1,
+	RAPUYAMA_V2,
+};
+
+struct ssi_protocol_platform_data {
+	enum nokia_modem_type type;
+	struct device *nokia_modem_dev;
+};
+
 static inline void ssip_slave_put_master(struct hsi_client *master)
 {
 }

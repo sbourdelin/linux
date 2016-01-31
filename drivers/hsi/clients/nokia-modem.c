@@ -35,11 +35,6 @@ module_param(pm, int, 0400);
 MODULE_PARM_DESC(pm,
 	"Enable power management (0=disabled, 1=userland based [default], 2=kernel based)");
 
-enum nokia_modem_type {
-	RAPUYAMA_V1,
-	RAPUYAMA_V2,
-};
-
 struct nokia_modem_device {
 	struct tasklet_struct	nokia_modem_rst_ind_tasklet;
 	int			nokia_modem_rst_ind_irq;
@@ -285,6 +280,7 @@ static int nokia_modem_probe(struct device *dev)
 	struct hsi_port *port = hsi_get_port(cl);
 	int irq, pflags, err;
 	struct hsi_board_info ssip;
+	struct ssi_protocol_platform_data ssip_pdata;
 	struct hsi_board_info cmtspeech;
 
 	np = dev->of_node;
@@ -340,7 +336,9 @@ static int nokia_modem_probe(struct device *dev)
 	ssip.name = "ssi-protocol";
 	ssip.tx_cfg = cl->tx_cfg;
 	ssip.rx_cfg = cl->rx_cfg;
-	ssip.platform_data = NULL;
+	ssip_pdata.type = modem->type;
+	ssip_pdata.nokia_modem_dev = dev;
+	ssip.platform_data = &ssip_pdata;
 	ssip.archdata = NULL;
 
 	modem->ssi_protocol = hsi_new_client(port, &ssip);
