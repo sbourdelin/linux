@@ -352,6 +352,10 @@ int ib_register_device(struct ib_device *device,
 		goto out;
 	}
 
+#ifdef CONFIG_CGROUP_RDMA
+	ib_device_register_rdmacg(device);
+#endif
+
 	ret = ib_device_register_sysfs(device, port_callback);
 	if (ret) {
 		printk(KERN_WARNING "Couldn't register device %s with driver model\n",
@@ -404,6 +408,10 @@ void ib_unregister_device(struct ib_device *device)
 	up_read(&lists_rwsem);
 
 	mutex_unlock(&device_mutex);
+
+#ifdef CONFIG_CGROUP_RDMA
+	ib_device_unregister_rdmacg(device);
+#endif
 
 	ib_device_unregister_sysfs(device);
 	ib_cache_cleanup_one(device);
