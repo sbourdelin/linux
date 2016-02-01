@@ -28,6 +28,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
+#include <drm/drm_mode.h>
 #include <drm/drm_plane_helper.h>
 
 /**
@@ -388,6 +389,58 @@ int drm_atomic_set_mode_prop_for_crtc(struct drm_crtc_state *state,
 EXPORT_SYMBOL(drm_atomic_set_mode_prop_for_crtc);
 
 /**
+ * drm_atomic_replace_property_blob - replace a blob property
+ * @blob: a pointer to the member blob to be replaced
+ * @new_blob: the new blob to replace with
+ * @expected_size: the expected size of the new blob
+ * @replaced: whether the blob has been replaced
+ *
+ * RETURNS:
+ * Zero on success, error code on failure
+ */
+static int
+drm_atomic_replace_property_blob(struct drm_property_blob **blob,
+				 struct drm_property_blob *new_blob,
+				 size_t expected_size,
+				 bool *replaced)
+{
+	struct drm_property_blob *old_blob = *blob;
+
+	if (old_blob == new_blob)
+		return 0;
+
+	if (new_blob != NULL && new_blob->length != expected_size)
+		return -EINVAL;
+
+	if (old_blob != NULL)
+		drm_property_unreference_blob(old_blob);
+	*blob = new_blob;
+	*replaced = true;
+
+	return 0;
+}
+
+static int
+drm_atomic_replace_property_blob_from_id(struct drm_crtc *crtc,
+					 struct drm_property_blob **blob,
+					 uint64_t blob_id,
+					 size_t expected_size,
+					 bool *replaced)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property_blob *new_blob = NULL;
+
+	if (blob_id != 0) {
+		new_blob = drm_property_lookup_blob(dev, blob_id);
+		if (new_blob == NULL)
+			return -EINVAL;
+	}
+
+	return drm_atomic_replace_property_blob(blob, new_blob,
+						expected_size, replaced);
+}
+
+/**
  * drm_atomic_crtc_set_property - set property on CRTC
  * @crtc: the drm CRTC to set a property on
  * @state: the state object to update with the new property value
@@ -419,8 +472,47 @@ int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		ret = drm_atomic_set_mode_prop_for_crtc(state, mode);
 		drm_property_unreference_blob(mode);
 		return ret;
-	}
-	else if (crtc->funcs->atomic_set_property)
+	} else if (property == config->degamma_lut_property) {
+		bool replaced = false;
+		uint64_t lut_size = 0;
+
+		ret = drm_object_property_get_value(&crtc->base,
+					config->degamma_lut_size_property,
+					&lut_size);
+		if (ret == 0)
+			ret = drm_atomic_replace_property_blob_from_id(crtc,
+					&state->degamma_lut,
+					val,
+					lut_size * sizeof(struct drm_color_lut),
+					&replaced);
+		state->color_mgmt_changed = replaced;
+		return ret;
+	} else if (property == config->ctm_matrix_property) {
+		bool replaced = false;
+
+		ret = drm_atomic_replace_property_blob_from_id(crtc,
+					&state->ctm_matrix,
+					val,
+					sizeof(struct drm_color_ctm),
+							       &replaced);
+		state->color_mgmt_changed = replaced;
+		return ret;
+	} else if (property == config->gamma_lut_property) {
+		bool replaced = false;
+		uint64_t lut_size = 0;
+
+		ret = drm_object_property_get_value(&crtc->base,
+					config->gamma_lut_size_property,
+					&lut_size);
+		if (ret == 0)
+			ret = drm_atomic_replace_property_blob_from_id(crtc,
+					&state->gamma_lut,
+					val,
+					lut_size * sizeof(struct drm_color_lut),
+					&replaced);
+		state->color_mgmt_changed = replaced;
+		return ret;
+	} else if (crtc->funcs->atomic_set_property)
 		return crtc->funcs->atomic_set_property(crtc, state, property, val);
 	else
 		return -EINVAL;
@@ -456,6 +548,12 @@ drm_atomic_crtc_get_property(struct drm_crtc *crtc,
 		*val = state->active;
 	else if (property == config->prop_mode_id)
 		*val = (state->mode_blob) ? state->mode_blob->base.id : 0;
+	else if (property == config->degamma_lut_property)
+		*val = (state->degamma_lut) ? state->degamma_lut->base.id : 0;
+	else if (property == config->ctm_matrix_property)
+		*val = (state->ctm_matrix) ? state->ctm_matrix->base.id : 0;
+	else if (property == config->gamma_lut_property)
+		*val = (state->gamma_lut) ? state->gamma_lut->base.id : 0;
 	else if (crtc->funcs->atomic_get_property)
 		return crtc->funcs->atomic_get_property(crtc, state, property, val);
 	else
