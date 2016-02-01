@@ -314,11 +314,10 @@ static int __init ws16c48_probe(struct platform_device *pdev)
 	if (!ws16c48gpio)
 		return -ENOMEM;
 
-	if (!request_region(base, extent, name)) {
-		dev_err(dev, "Unable to lock %s port addresses (0x%X-0x%X)\n",
-			name, base, base + extent);
-		err = -EBUSY;
-		goto err_lock_io_port;
+	if (!devm_request_region(dev, base, extent, name)) {
+		dev_err(dev, "Unable to lock port addresses (0x%X-0x%X)\n",
+			base, base + extent);
+		return -EBUSY;
 	}
 
 	ws16c48gpio->chip.label = name;
@@ -342,7 +341,7 @@ static int __init ws16c48_probe(struct platform_device *pdev)
 	err = gpiochip_add_data(&ws16c48gpio->chip, ws16c48gpio);
 	if (err) {
 		dev_err(dev, "GPIO registering failed (%d)\n", err);
-		goto err_gpio_register;
+		return err;
 	}
 
 	/* Disable IRQ by default */
@@ -356,24 +355,20 @@ static int __init ws16c48_probe(struct platform_device *pdev)
 		handle_edge_irq, IRQ_TYPE_NONE);
 	if (err) {
 		dev_err(dev, "Could not add irqchip (%d)\n", err);
-		goto err_gpiochip_irqchip_add;
+		goto err_gpiochip_remove;
 	}
 
 	err = request_irq(irq, ws16c48_irq_handler, IRQF_SHARED, name,
 		ws16c48gpio);
 	if (err) {
 		dev_err(dev, "IRQ handler registering failed (%d)\n", err);
-		goto err_request_irq;
+		goto err_gpiochip_remove;
 	}
 
 	return 0;
 
-err_request_irq:
-err_gpiochip_irqchip_add:
+err_gpiochip_remove:
 	gpiochip_remove(&ws16c48gpio->chip);
-err_gpio_register:
-	release_region(base, extent);
-err_lock_io_port:
 	return err;
 }
 
@@ -383,7 +378,6 @@ static int ws16c48_remove(struct platform_device *pdev)
 
 	free_irq(ws16c48gpio->irq, ws16c48gpio);
 	gpiochip_remove(&ws16c48gpio->chip);
-	release_region(ws16c48gpio->base, ws16c48gpio->extent);
 
 	return 0;
 }
