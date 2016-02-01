@@ -39,13 +39,14 @@ static int ir_lirc_decode(struct rc_dev *dev, struct ir_raw_event ev)
 		return -EINVAL;
 
 	/* Packet start */
-	if (ev.reset) {
+	if (ev.reset && lirc->last_ev_is_pulse) {
 		/* Userspace expects a long space event before the start of
 		 * the signal to use as a sync.  This may be done with repeat
 		 * packets and normal samples.  But if a reset has been sent
 		 * then we assume that a long time has passed, so we send a
 		 * space with the maximum time value. */
 		sample = LIRC_SPACE(LIRC_VALUE_MASK);
+		lirc->last_ev_is_pulse = false;
 		IR_dprintk(2, "delivering reset sync space to lirc_dev\n");
 
 	/* Carrier reports */
@@ -84,6 +85,7 @@ static int ir_lirc_decode(struct rc_dev *dev, struct ir_raw_event ev)
 							(u64)LIRC_VALUE_MASK);
 
 			gap_sample = LIRC_SPACE(lirc->gap_duration);
+			lirc->last_ev_is_pulse = false;
 			lirc_buffer_write(dev->raw->lirc.drv->rbuf,
 						(unsigned char *) &gap_sample);
 			lirc->gap = false;
@@ -91,6 +93,8 @@ static int ir_lirc_decode(struct rc_dev *dev, struct ir_raw_event ev)
 
 		sample = ev.pulse ? LIRC_PULSE(ev.duration / 1000) :
 					LIRC_SPACE(ev.duration / 1000);
+		lirc->last_ev_is_pulse = ev.pulse;
+
 		IR_dprintk(2, "delivering %uus %s to lirc_dev\n",
 			   TO_US(ev.duration), TO_STR(ev.pulse));
 	}

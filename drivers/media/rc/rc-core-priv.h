@@ -112,7 +112,7 @@ struct ir_raw_event_ctrl {
 		u64 gap_duration;
 		bool gap;
 		bool send_timeout_reports;
-
+		bool last_ev_is_pulse;
 	} lirc;
 	struct xmp_dec {
 		int state;
