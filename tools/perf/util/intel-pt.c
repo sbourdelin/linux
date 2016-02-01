@@ -2013,6 +2013,7 @@ int intel_pt_process_auxtrace_info(union perf_event *event,
 	struct auxtrace_info_event *auxtrace_info = &event->auxtrace_info;
 	size_t min_sz = sizeof(u64) * INTEL_PT_PER_CPU_MMAPS;
 	struct intel_pt *pt;
+	struct list_head dead_thread;
 	int err;
 
 	if (auxtrace_info->header.size < sizeof(struct auxtrace_info_event) +
@@ -2153,6 +2154,9 @@ int intel_pt_process_auxtrace_info(union perf_event *event,
 	return 0;
 
 err_delete_thread:
+	RB_CLEAR_NODE(&pt->unknown_thread->rb_node);
+	INIT_LIST_HEAD(&dead_thread);
+	list_add(&pt->unknown_thread->node, &dead_thread);
 	thread__zput(pt->unknown_thread);
 err_free_queues:
 	intel_pt_log_disable();
