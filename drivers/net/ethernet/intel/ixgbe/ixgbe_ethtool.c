@@ -311,7 +311,7 @@ static int ixgbe_get_settings(struct net_device *netdev,
 		break;
 	}
 
-	if (netif_carrier_ok(netdev)) {
+	if (netif_carrier_ok(netdev) || (netdev->flags & IFF_SLAVE)) {
 		switch (adapter->link_speed) {
 		case IXGBE_LINK_SPEED_10GB_FULL:
 			ethtool_cmd_speed_set(ecmd, SPEED_10000);
