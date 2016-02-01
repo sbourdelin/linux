@@ -214,7 +214,7 @@ static int xen_smp_intr_init(unsigned int cpu)
 	 * The IRQ worker on PVHVM goes through the native path and uses the
 	 * IPI mechanism.
 	 */
-	if (xen_hvm_domain())
+	if (xen_hvm_domain() && !xen_hvmlite)
 		return 0;
 
 	callfunc_name = kasprintf(GFP_KERNEL, "irqwork%d", cpu);

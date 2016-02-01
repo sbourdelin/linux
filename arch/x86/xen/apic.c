@@ -6,6 +6,7 @@
 
 #include <xen/xen.h>
 #include <xen/interface/physdev.h>
+#include <xen/interface/vcpu.h>
 #include "xen-ops.h"
 #include "pmu.h"
 #include "smp.h"
@@ -78,6 +79,21 @@ static void xen_apic_write(u32 reg, u32 val)
 		return;
 	}
 
+	if (xen_hvmlite) {
+		switch (reg) {
+		case APIC_TASKPRI:
+		case APIC_SPIV:
+		case APIC_ESR:
+		case APIC_LVTT:
+		case APIC_LVT0:
+		case APIC_LVT1:
+		case APIC_LVTERR:
+			pr_debug("Unimplemented APIC register %x,"
+				 " value: %x\n", reg, val);
+			return;
+		}
+	}
+
 	/* Warn to see if there's any stray references */
 	WARN(1,"register: %x, value: %x\n", reg, val);
 }
@@ -100,7 +116,7 @@ static u32 xen_safe_apic_wait_icr_idle(void)
 
 static int xen_apic_probe_pv(void)
 {
-	if (xen_pv_domain())
+	if (xen_pv_domain() || xen_hvmlite)
 		return 1;
 
 	return 0;
@@ -142,6 +158,19 @@ static void xen_silent_inquire(int apicid)
 {
 }
 
+static int xen_cpu_present_to_apicid(int cpu)
+{
+	return cpu;
+}
+
+static int xen_wakeup_secondary_cpu(int cpu, unsigned long start_eip)
+{
+	if (!xen_hvmlite)
+		return -EINVAL;
+
+	return HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+}
+
 static struct apic xen_pv_apic = {
 	.name 				= "Xen PV",
 	.probe 				= xen_apic_probe_pv,
@@ -162,7 +191,7 @@ static struct apic xen_pv_apic = {
 
 	.ioapic_phys_id_map		= default_ioapic_phys_id_map, /* Used on 32-bit */
 	.setup_apic_routing		= NULL,
-	.cpu_present_to_apicid		= default_cpu_present_to_apicid,
+	.cpu_present_to_apicid		= xen_cpu_present_to_apicid,
 	.apicid_to_cpu_present		= physid_set_mask_of_physid, /* Used on 32-bit */
 	.check_phys_apicid_present	= default_check_phys_apicid_present, /* smp_sanity_check needs it */
 	.phys_pkg_id			= xen_phys_pkg_id, /* detect_ht */
@@ -180,6 +209,9 @@ static struct apic xen_pv_apic = {
 	.send_IPI_all 			= xen_send_IPI_all,
 	.send_IPI_self 			= xen_send_IPI_self,
 #endif
+
+	.wakeup_secondary_cpu	= xen_wakeup_secondary_cpu,
+
 	/* .wait_for_init_deassert- used  by AP bootup - smp_callin which we don't use */
 	.inquire_remote_apic		= xen_silent_inquire,
 
@@ -216,5 +248,8 @@ void __init xen_init_apic(void)
 		apic = &xen_pv_apic;
 
 	x86_platform.apic_post_init = xen_apic_check;
+
+	if (xen_hvmlite)
+		setup_force_cpu_cap(X86_FEATURE_APIC);
 }
 apic_driver(xen_pv_apic);
