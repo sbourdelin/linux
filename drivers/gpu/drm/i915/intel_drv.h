@@ -1149,6 +1149,8 @@ void intel_create_rotation_property(struct drm_device *dev,
 
 /* shared dpll functions */
 struct intel_shared_dpll *intel_crtc_to_shared_dpll(struct intel_crtc *crtc);
+void intel_enable_shared_dpll(struct intel_crtc *crtc);
+void intel_disable_shared_dpll(struct intel_crtc *crtc);
 void assert_shared_dpll(struct drm_i915_private *dev_priv,
 			struct intel_shared_dpll *pll,
 			bool state);

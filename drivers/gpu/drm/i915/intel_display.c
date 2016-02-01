@@ -1880,7 +1880,7 @@ static void intel_prepare_shared_dpll(struct intel_crtc *crtc)
  * The PCH PLL needs to be enabled before the PCH transcoder, since it
  * drives the transcoder clock.
  */
-static void intel_enable_shared_dpll(struct intel_crtc *crtc)
+void intel_enable_shared_dpll(struct intel_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -1910,7 +1910,7 @@ static void intel_enable_shared_dpll(struct intel_crtc *crtc)
 	pll->on = true;
 }
 
-static void intel_disable_shared_dpll(struct intel_crtc *crtc)
+void intel_disable_shared_dpll(struct intel_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
