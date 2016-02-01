@@ -993,9 +993,27 @@ mlx5_add_flow_rule(struct mlx5_flow_table *ft,
 		   u32 flow_tag,
 		   struct mlx5_flow_destination *dest)
 {
+	struct mlx5_flow_destination *my_dest = NULL;
 	struct mlx5_flow_group *g;
 	struct mlx5_flow_rule *rule;
 
+	if (!dest) {
+		struct mlx5_flow_table *next_ft;
+		struct fs_prio *prio;
+
+		fs_get_obj(prio, ft->node.parent);
+		next_ft = find_next_chained_ft(prio);
+		if (!next_ft) {
+			pr_warn("There is no next flow table\n");
+			return ERR_PTR(-EINVAL);
+		}
+		my_dest = kzalloc(sizeof(*my_dest), GFP_KERNEL);
+		if (!my_dest)
+			return ERR_PTR(-ENOMEM);
+		my_dest->type = MLX5_FLOW_DESTINATION_TYPE_FLOW_TABLE;
+		my_dest->ft = next_ft;
+		dest = my_dest;
+	}
 	nested_lock_ref_node(&ft->node, FS_MUTEX_GRANDPARENT);
 	fs_for_each_fg(g, ft)
 		if (compare_match_criteria(g->mask.match_criteria_enable,
@@ -1012,6 +1030,7 @@ mlx5_add_flow_rule(struct mlx5_flow_table *ft,
 				   match_value, action, flow_tag, dest);
 unlock:
 	unlock_ref_node(&ft->node);
+	kfree(my_dest);
 	return rule;
 }
 EXPORT_SYMBOL(mlx5_add_flow_rule);
