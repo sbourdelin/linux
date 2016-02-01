@@ -57,6 +57,15 @@ struct blk_mq_hw_ctx {
 
 	atomic_t		nr_active;
 
+	cpumask_var_t		cpu_service_mask; /* CPUs not yet serviced */
+	cpumask_var_t		cpu_pending_mask; /* CPUs with pending work */
+	cpumask_var_t		cpu_next_mask;	/* CPUs to be serviced */
+	int			tslice_us;	/* time slice in µs */
+	int			tslice_inc;	/* extend time slice */
+	int			tslice_inc_count;
+	unsigned long		tslice_expiration; /* in jiffies */
+	int			tslice_cpu;	/* cpu of time slice */
+
 	struct blk_mq_cpu_notifier	cpu_notifier;
 	struct kobject		kobj;
 

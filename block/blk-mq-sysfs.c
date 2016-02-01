@@ -247,6 +247,26 @@ static ssize_t blk_mq_hw_sysfs_cpus_show(struct blk_mq_hw_ctx *hctx, char *page)
 	return ret;
 }
 
+static ssize_t blk_mq_hw_sysfs_tslice_show(struct blk_mq_hw_ctx *hctx,
+					  char *page)
+{
+	return sprintf(page, "%u\n", hctx->tslice_us);
+}
+
+static ssize_t blk_mq_hw_sysfs_tslice_store(struct blk_mq_hw_ctx *hctx,
+					const char *page, size_t length)
+{
+	unsigned long long store;
+	int err;
+
+	err = kstrtoull(page, 10, &store);
+	if (err)
+		return -EINVAL;
+
+	hctx->tslice_us = (unsigned)store;
+	return length;
+}
+
 static struct blk_mq_ctx_sysfs_entry blk_mq_sysfs_dispatched = {
 	.attr = {.name = "dispatched", .mode = S_IRUGO },
 	.show = blk_mq_sysfs_dispatched_show,
@@ -305,6 +325,12 @@ static struct blk_mq_hw_ctx_sysfs_entry blk_mq_hw_sysfs_poll = {
 	.show = blk_mq_hw_sysfs_poll_show,
 };
 
+static struct blk_mq_hw_ctx_sysfs_entry blk_mq_hw_sysfs_tslice = {
+	.attr = {.name = "time_slice_us", .mode = S_IRUGO | S_IWUSR },
+	.show = blk_mq_hw_sysfs_tslice_show,
+	.store = blk_mq_hw_sysfs_tslice_store,
+};
+
 static struct attribute *default_hw_ctx_attrs[] = {
 	&blk_mq_hw_sysfs_queued.attr,
 	&blk_mq_hw_sysfs_run.attr,
@@ -314,6 +340,7 @@ static struct attribute *default_hw_ctx_attrs[] = {
 	&blk_mq_hw_sysfs_cpus.attr,
 	&blk_mq_hw_sysfs_active.attr,
 	&blk_mq_hw_sysfs_poll.attr,
+	&blk_mq_hw_sysfs_tslice.attr,
 	NULL,
 };
 
