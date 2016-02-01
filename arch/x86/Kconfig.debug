@@ -383,4 +383,9 @@ config PUNIT_ATOM_DEBUG
 	  The current power state can be read from
 	  /sys/kernel/debug/punit_atom/dev_power_state
 
+config ARCHINFO
+	tristate "x86 archinfo dumper module"
+	---help---
+	  Dump interesting x86 arch stuff.
+
 endmenu
