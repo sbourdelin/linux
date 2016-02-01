@@ -93,6 +93,13 @@ static const int bfq_stats_min_budgets = 194;
 static const int bfq_default_max_budget = 16 * 1024;
 static const int bfq_max_budget_async_rq = 4;
 
+/*
+ * Async to sync throughput distribution is controlled as follows:
+ * when an async request is served, the entity is charged the number
+ * of sectors of the request, multiplied by the factor below
+ */
+static const int bfq_async_charge_factor = 10;
+
 /* Default timeout values, in jiffies, approximating CFQ defaults. */
 static const int bfq_timeout_sync = HZ / 8;
 static int bfq_timeout_async = HZ / 25;
@@ -2440,10 +2447,12 @@ static struct request *bfq_find_next_rq(struct bfq_data *bfqd,
 	return bfq_choose_req(bfqd, next, prev, blk_rq_pos(last));
 }
 
+/* see the definition of bfq_async_charge_factor for details */
 static unsigned long bfq_serv_to_charge(struct request *rq,
 					struct bfq_queue *bfqq)
 {
-	return blk_rq_sectors(rq);
+	return blk_rq_sectors(rq) *
+		(1 + ((!bfq_bfqq_sync(bfqq)) * bfq_async_charge_factor));
 }
 
 /**
@@ -2779,13 +2788,22 @@ static void bfq_arm_slice_timer(struct bfq_data *bfqd)
 	 * We don't want to idle for seeks, but we do want to allow
 	 * fair distribution of slice time for a process doing back-to-back
 	 * seeks. So allow a little bit of time for him to submit a new rq.
+	 *
+	 * To prevent processes with (partly) seeky workloads from
+	 * being too ill-treated, grant them a small fraction of the
+	 * assigned budget before reducing the waiting time to
+	 * BFQ_MIN_TT. This happened to help reduce latency.
 	 */
 	sl = bfqd->bfq_slice_idle;
 	/*
-	 * Grant only minimum idle time if the queue has been seeky
-	 * for long enough.
+	 * Grant only minimum idle time if the queue either has been
+	 * seeky for long enough or has already proved to be
+	 * constantly seeky.
 	 */
-	if (bfq_sample_valid(bfqq->seek_samples) && BFQQ_SEEKY(bfqq))
+	if (bfq_sample_valid(bfqq->seek_samples) &&
+	    ((BFQQ_SEEKY(bfqq) && bfqq->entity.service >
+				  bfq_max_budget(bfqq->bfqd) / 8) ||
+	      bfq_bfqq_constantly_seeky(bfqq)))
 		sl = min(sl, msecs_to_jiffies(BFQ_MIN_TT));
 
 	bfqd->last_idling_start = ktime_get();
@@ -3109,6 +3127,16 @@ static bool bfq_update_peak_rate(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	}
 
 	/*
+	 * If the process has been served for a too short time
+	 * interval to let its possible sequential accesses prevail on
+	 * the initial seek time needed to move the disk head on the
+	 * first sector it requested, then give the process a chance
+	 * and for the moment return false.
+	 */
+	if (bfqq->entity.budget <= bfq_max_budget(bfqd) / 8)
+		return false;
+
+	/*
 	 * A process is considered ``slow'' (i.e., seeky, so that we
 	 * cannot treat it fairly in the service domain, as it would
 	 * slow down too much the other processes) if, when a slice
@@ -3175,9 +3203,20 @@ static void bfq_bfqq_expire(struct bfq_data *bfqd,
 	/*
 	 * As above explained, 'punish' slow (i.e., seeky), timed-out
 	 * and async queues, to favor sequential sync workloads.
+	 *
+	 * Processes doing I/O in the slower disk zones will tend to be
+	 * slow(er) even if not seeky. Hence, since the estimated peak
+	 * rate is actually an average over the disk surface, these
+	 * processes may timeout just for bad luck. To avoid punishing
+	 * them we do not charge a full budget to a process that
+	 * succeeded in consuming at least 2/3 of its budget.
 	 */
-	if (slow || reason == BFQ_BFQQ_BUDGET_TIMEOUT)
+	if (slow || (reason == BFQ_BFQQ_BUDGET_TIMEOUT &&
+		     bfq_bfqq_budget_left(bfqq) >=  bfqq->entity.budget / 3))
 		bfq_bfqq_charge_full_budget(bfqq);
+
+	if (BFQQ_SEEKY(bfqq) && reason == BFQ_BFQQ_BUDGET_TIMEOUT)
+		bfq_mark_bfqq_constantly_seeky(bfqq);
 
 	if (reason == BFQ_BFQQ_TOO_IDLE &&
 	    bfqq->entity.service <= 2 * bfqq->entity.budget / 10)
@@ -3914,6 +3953,8 @@ static void bfq_rq_enqueued(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfq_update_io_thinktime(bfqd, bic);
 	bfq_update_io_seektime(bfqd, bfqq, rq);
+	if (!BFQQ_SEEKY(bfqq))
+		bfq_clear_bfqq_constantly_seeky(bfqq);
 	if (bfqq->entity.service > bfq_max_budget(bfqd) / 8 ||
 	    !BFQQ_SEEKY(bfqq))
 		bfq_update_idle_window(bfqd, bfqq, bic);

@@ -384,6 +384,10 @@ enum bfqq_state_flags {
 					 * having consumed at most 2/10 of
 					 * its budget
 					 */
+	BFQ_BFQQ_FLAG_constantly_seeky,	/*
+					 * bfqq has proved to be slow and
+					 * seeky until budget timeout
+					 */
 };
 
 #define BFQ_BFQQ_FNS(name)						\
@@ -408,6 +412,7 @@ BFQ_BFQQ_FNS(idle_window);
 BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(budget_new);
 BFQ_BFQQ_FNS(IO_bound);
+BFQ_BFQQ_FNS(constantly_seeky);
 #undef BFQ_BFQQ_FNS
 
 /* Logging facilities. */
