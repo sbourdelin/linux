@@ -242,8 +242,16 @@ extern asmlinkage void dump_stack(void) __cold;
  * and other debug macros are compiled out unless either DEBUG is defined
  * or CONFIG_DYNAMIC_DEBUG is set.
  */
+#ifdef CONFIG_DEBUG_WARN
+#define pr_emerg(fmt, ...) \
+({								\
+	printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__);		\
+	BUG();							\
+})
+#else
 #define pr_emerg(fmt, ...) \
 	printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
+#endif
 #define pr_alert(fmt, ...) \
 	printk(KERN_ALERT pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_crit(fmt, ...) \
