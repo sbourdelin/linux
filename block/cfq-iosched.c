@@ -38,7 +38,9 @@
  * Even better for latency, BFQ explicitly privileges the I/O of two
  * classes of time-sensitive applications: interactive and soft
  * real-time. This feature enables BFQ to provide applications in
- * these classes with a very low latency.
+ * these classes with a very low latency. Finally, BFQ also features
+ * additional heuristics for preserving both a low latency and a high
+ * throughput on NCQ-capable, rotational or flash-based devices.
  *
  * With respect to the version of BFQ presented in [1], and in the
  * papers cited therein, this implementation adds a hierarchical
@@ -1278,9 +1280,15 @@ static void bfq_del_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfqd->busy_queues--;
 
-	if (!bfqq->dispatched)
+	if (!bfqq->dispatched) {
 		bfq_weights_tree_remove(bfqd, &bfqq->entity,
 					&bfqd->queue_weights_tree);
+		if (!blk_queue_nonrot(bfqd->queue)) {
+			bfqd->busy_in_flight_queues--;
+			if (bfq_bfqq_constantly_seeky(bfqq))
+				bfqd->const_seeky_busy_in_flight_queues--;
+		}
+	}
 	if (bfqq->wr_coeff > 1)
 		bfqd->wr_busy_queues--;
 
@@ -1303,9 +1311,16 @@ static void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	bfq_mark_bfqq_busy(bfqq);
 	bfqd->busy_queues++;
 
-	if (!bfqq->dispatched && bfqq->wr_coeff == 1)
-		bfq_weights_tree_add(bfqd, &bfqq->entity,
-				     &bfqd->queue_weights_tree);
+	if (!bfqq->dispatched) {
+		if (bfqq->wr_coeff == 1)
+			bfq_weights_tree_add(bfqd, &bfqq->entity,
+					     &bfqd->queue_weights_tree);
+		if (!blk_queue_nonrot(bfqd->queue)) {
+			bfqd->busy_in_flight_queues++;
+			if (bfq_bfqq_constantly_seeky(bfqq))
+				bfqd->const_seeky_busy_in_flight_queues++;
+		}
+	}
 	if (bfqq->wr_coeff > 1)
 		bfqd->wr_busy_queues++;
 }
@@ -4277,8 +4292,12 @@ static void bfq_bfqq_expire(struct bfq_data *bfqd,
 
 	bfqq->service_from_backlogged += bfqq->entity.service;
 
-	if (BFQQ_SEEKY(bfqq) && reason == BFQ_BFQQ_BUDGET_TIMEOUT)
+	if (BFQQ_SEEKY(bfqq) && reason == BFQ_BFQQ_BUDGET_TIMEOUT &&
+	    !bfq_bfqq_constantly_seeky(bfqq)) {
 		bfq_mark_bfqq_constantly_seeky(bfqq);
+		if (!blk_queue_nonrot(bfqd->queue))
+			bfqd->const_seeky_busy_in_flight_queues++;
+	}
 
 	if (reason == BFQ_BFQQ_TOO_IDLE &&
 	    bfqq->entity.service <= 2 * bfqq->entity.budget / 10)
@@ -4402,26 +4421,23 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 {
 	struct bfq_data *bfqd = bfqq->bfqd;
 	bool idling_boosts_thr, idling_boosts_thr_without_issues,
+		all_queues_seeky, on_hdd_and_not_all_queues_seeky,
+		idling_needed_for_service_guarantees,
 		asymmetric_scenario;
 
 	/*
 	 * The next variable takes into account the cases where idling
 	 * boosts the throughput.
 	 *
-	 * The value of the variable is computed considering that
-	 * idling is usually beneficial for the throughput if:
+	 * The value of the variable is computed considering, first, that
+	 * idling is virtually always beneficial for the throughput if:
 	 * (a) the device is not NCQ-capable, or
 	 * (b) regardless of the presence of NCQ, the device is rotational
-	 *     and the request pattern for bfqq is I/O-bound (possible
-	 *     throughput losses caused by granting idling to seeky queues
-	 *     are mitigated by the fact that, in all scenarios where
-	 *     boosting throughput is the best thing to do, i.e., in all
-	 *     symmetric scenarios, only a minimal idle time is allowed to
-	 *     seeky queues).
+	 *     and the request pattern for bfqq is I/O-bound and sequential.
 	 *
 	 * Secondly, and in contrast to the above item (b), idling an
 	 * NCQ-capable flash-based device would not boost the
-	 * throughput even with intense I/O; rather it would lower
+	 * throughput even with sequential I/O; rather it would lower
 	 * the throughput in proportion to how fast the device
 	 * is. Accordingly, the next variable is true if any of the
 	 * above conditions (a) and (b) is true, and, in particular,
@@ -4429,7 +4445,8 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 * device.
 	 */
 	idling_boosts_thr = !bfqd->hw_tag ||
-		(!blk_queue_nonrot(bfqd->queue) && bfq_bfqq_IO_bound(bfqq));
+		(!blk_queue_nonrot(bfqd->queue) && bfq_bfqq_IO_bound(bfqq) &&
+		 bfq_bfqq_idle_window(bfqq));
 
 	/*
 	 * The value of the next variable,
@@ -4470,36 +4487,87 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 		bfqd->wr_busy_queues == 0;
 
 	/*
-	 * There is then a case where idling must be performed not for
-	 * throughput concerns, but to preserve service guarantees. To
-	 * introduce it, we can note that allowing the drive to
-	 * enqueue more than one request at a time, and hence
-	 * delegating de facto final scheduling decisions to the
-	 * drive's internal scheduler, causes loss of control on the
-	 * actual request service order. In particular, the critical
-	 * situation is when requests from different processes happens
-	 * to be present, at the same time, in the internal queue(s)
-	 * of the drive. In such a situation, the drive, by deciding
-	 * the service order of the internally-queued requests, does
-	 * determine also the actual throughput distribution among
-	 * these processes. But the drive typically has no notion or
-	 * concern about per-process throughput distribution, and
-	 * makes its decisions only on a per-request basis. Therefore,
-	 * the service distribution enforced by the drive's internal
-	 * scheduler is likely to coincide with the desired
-	 * device-throughput distribution only in a completely
-	 * symmetric scenario where: (i) each of these processes must
-	 * get the same throughput as the others; (ii) all these
-	 * processes have the same I/O pattern (either sequential or
-	 * random).  In fact, in such a scenario, the drive will tend
-	 * to treat the requests of each of these processes in about
-	 * the same way as the requests of the others, and thus to
-	 * provide each of these processes with about the same
-	 * throughput (which is exactly the desired throughput
-	 * distribution). In contrast, in any asymmetric scenario,
-	 * device idling is certainly needed to guarantee that bfqq
-	 * receives its assigned fraction of the device throughput
-	 * (see [1] for details).
+	 * There are then two cases where idling must be performed not
+	 * for throughput concerns, but to preserve service
+	 * guarantees. In the description of these cases, we say, for
+	 * short, that a queue is sequential/random if the process
+	 * associated to the queue issues sequential/random requests
+	 * (in the second case the queue may be tagged as seeky or
+	 * even constantly_seeky).
+	 *
+	 * To introduce the first case, we note that, since
+	 * bfq_bfqq_idle_window(bfqq) is false if the device is
+	 * NCQ-capable and bfqq is random (see
+	 * bfq_update_idle_window()), then, from the above two
+	 * assignments it follows that
+	 * idling_boosts_thr_without_issues is false if the device is
+	 * NCQ-capable and bfqq is random. Therefore, for this case,
+	 * device idling would never be allowed if we used just
+	 * idling_boosts_thr_without_issues to decide whether to allow
+	 * it. And, beneficially, this would imply that throughput
+	 * would always be boosted also with random I/O on NCQ-capable
+	 * HDDs.
+	 *
+	 * But we must be careful on this point, to avoid an unfair
+	 * treatment for bfqq. In fact, because of the same above
+	 * assignments, idling_boosts_thr_without_issues is, on the
+	 * other hand, true if 1) the device is an HDD and bfqq is
+	 * sequential, and 2) there are no busy weight-raised
+	 * queues. As a consequence, if we used just
+	 * idling_boosts_thr_without_issues to decide whether to idle
+	 * the device, then with an HDD we might easily bump into a
+	 * scenario where queues that are sequential and I/O-bound
+	 * would enjoy idling, whereas random queues would not. The
+	 * latter might then get a low share of the device throughput,
+	 * simply because the former would get many requests served
+	 * after being set as in service, while the latter would not.
+	 *
+	 * To address this issue, we start by setting to true a
+	 * sentinel variable, on_hdd_and_not_all_queues_seeky, if the
+	 * device is rotational and not all queues with pending or
+	 * in-flight requests are constantly seeky (i.e., there are
+	 * active sequential queues, and bfqq might then be mistreated
+	 * if it does not enjoy idling because it is random).
+	 */
+	all_queues_seeky = bfq_bfqq_constantly_seeky(bfqq) &&
+			   bfqd->busy_in_flight_queues ==
+			   bfqd->const_seeky_busy_in_flight_queues;
+
+	on_hdd_and_not_all_queues_seeky =
+		!blk_queue_nonrot(bfqd->queue) && !all_queues_seeky;
+
+	/*
+	 * To introduce the second case where idling needs to be
+	 * performed to preserve service guarantees, we can note that
+	 * allowing the drive to enqueue more than one request at a
+	 * time, and hence delegating de facto final scheduling
+	 * decisions to the drive's internal scheduler, causes loss of
+	 * control on the actual request service order. In particular,
+	 * the critical situation is when requests from different
+	 * processes happens to be present, at the same time, in the
+	 * internal queue(s) of the drive. In such a situation, the
+	 * drive, by deciding the service order of the
+	 * internally-queued requests, does determine also the actual
+	 * throughput distribution among these processes. But the
+	 * drive typically has no notion or concern about per-process
+	 * throughput distribution, and makes its decisions only on a
+	 * per-request basis. Therefore, the service distribution
+	 * enforced by the drive's internal scheduler is likely to
+	 * coincide with the desired device-throughput distribution
+	 * only in a completely symmetric scenario where:
+	 * (i)  each of these processes must get the same throughput as
+	 *      the others;
+	 * (ii) all these processes have the same I/O pattern
+	 *	(either sequential or random).
+	 * In fact, in such a scenario, the drive will tend to treat
+	 * the requests of each of these processes in about the same
+	 * way as the requests of the others, and thus to provide
+	 * each of these processes with about the same throughput
+	 * (which is exactly the desired throughput distribution). In
+	 * contrast, in any asymmetric scenario, device idling is
+	 * certainly needed to guarantee that bfqq receives its
+	 * assigned fraction of the device throughput (see [1] for
+	 * details).
 	 *
 	 * We address this issue by controlling, actually, only the
 	 * symmetry sub-condition (i), i.e., provided that
@@ -4509,9 +4577,10 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 * is allowed, and the device tends to be prevented from
 	 * queueing many requests, possibly of several processes. The
 	 * reason for not controlling also sub-condition (ii) is that,
-	 * first, in the case of an HDD, idling is always performed
-	 * for I/O-bound processes (see the comments on
-	 * idling_boosts_thr above). Secondly, in the case of a
+	 * first, in the case of an HDD, the asymmetry in terms of
+	 * types of I/O patterns is already taken in to account in the
+	 * above sentinel variable
+	 * on_hdd_and_not_all_queues_seeky. Secondly, in the case of a
 	 * flash-based device, we prefer however to privilege
 	 * throughput (and idling lowers throughput for this type of
 	 * devices), for the following reasons:
@@ -4551,6 +4620,13 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 		!bfq_symmetric_scenario(bfqd);
 
 	/*
+	 * Combining the two cases above, we can now establish when
+	 * idling is actually needed to preserve service guarantees.
+	 */
+	idling_needed_for_service_guarantees =
+		(on_hdd_and_not_all_queues_seeky || asymmetric_scenario);
+
+	/*
 	 * We have now all the components we need to compute the return
 	 * value of the function, which is true only if both the following
 	 * conditions hold:
@@ -4559,7 +4635,8 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 *    is necessary to preserve service guarantees.
 	 */
 	return bfq_bfqq_sync(bfqq) &&
-		(idling_boosts_thr_without_issues || asymmetric_scenario);
+		(idling_boosts_thr_without_issues ||
+		 idling_needed_for_service_guarantees);
 }
 
 /*
@@ -5316,8 +5393,11 @@ static void bfq_rq_enqueued(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfq_update_io_thinktime(bfqd, bic);
 	bfq_update_io_seektime(bfqd, bfqq, rq);
-	if (!BFQQ_SEEKY(bfqq))
+	if (!BFQQ_SEEKY(bfqq) && bfq_bfqq_constantly_seeky(bfqq)) {
 		bfq_clear_bfqq_constantly_seeky(bfqq);
+		if (!blk_queue_nonrot(bfqd->queue))
+			bfqd->const_seeky_busy_in_flight_queues--;
+	}
 	if (bfqq->entity.service > bfq_max_budget(bfqd) / 8 ||
 	    !BFQQ_SEEKY(bfqq))
 		bfq_update_idle_window(bfqd, bfqq, bic);
@@ -5477,9 +5557,15 @@ static void bfq_completed_request(struct request_queue *q, struct request *rq)
 				     rq_io_start_time_ns(rq), rq->cmd_flags);
 #endif
 
-	if (!bfqq->dispatched && !bfq_bfqq_busy(bfqq))
+	if (!bfqq->dispatched && !bfq_bfqq_busy(bfqq)) {
 		bfq_weights_tree_remove(bfqd, &bfqq->entity,
 					&bfqd->queue_weights_tree);
+		if (!blk_queue_nonrot(bfqd->queue)) {
+			bfqd->busy_in_flight_queues--;
+			if (bfq_bfqq_constantly_seeky(bfqq))
+				bfqd->const_seeky_busy_in_flight_queues--;
+		}
+	}
 
 	if (sync) {
 		bfqd->sync_flight--;
@@ -5926,6 +6012,8 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 					      * video.
 					      */
 	bfqd->wr_busy_queues = 0;
+	bfqd->busy_in_flight_queues = 0;
+	bfqd->const_seeky_busy_in_flight_queues = 0;
 
 	/*
 	 * Begin by assuming, optimistically, that the device peak rate is
@@ -6302,7 +6390,7 @@ static int __init bfq_init(void)
 	if (ret)
 		goto err_pol_unreg;
 
-	pr_info("BFQ I/O-scheduler: v6");
+	pr_info("BFQ I/O-scheduler: v7r3");
 
 	return 0;
 
