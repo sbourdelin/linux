@@ -7,6 +7,7 @@
 
 #include <net/sch_generic.h>
 #include <net/pkt_sched.h>
+#include <net/switchdev.h>
 
 struct tcf_common {
 	struct hlist_node		tcfc_head;
@@ -108,6 +109,8 @@ struct tc_action_ops {
 			struct nlattr *est, struct tc_action *act, int ovr,
 			int bind);
 	int     (*walk)(struct sk_buff *, struct netlink_callback *, int, struct tc_action *);
+	int	(*offload_init)(struct tc_action *,
+				struct switchdev_obj_port_flow_act *);
 };
 
 int tcf_hash_search(struct tc_action *a, u32 index);

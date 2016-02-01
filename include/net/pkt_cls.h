@@ -130,6 +130,8 @@ tcf_exts_exec(struct sk_buff *skb, struct tcf_exts *exts,
 	return 0;
 }
 
+int tcf_exts_offload_init(struct tcf_exts *e,
+			  struct switchdev_obj_port_flow_act *actions);
 int tcf_exts_validate(struct net *net, struct tcf_proto *tp,
 		      struct nlattr **tb, struct nlattr *rate_tlv,
 		      struct tcf_exts *exts, bool ovr);

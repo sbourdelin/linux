@@ -29,6 +29,7 @@
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
 #include <net/pkt_cls.h>
+#include <net/switchdev.h>
 
 /* The list of all installed classifier types */
 static LIST_HEAD(tcf_proto_base);
@@ -550,6 +551,32 @@ int tcf_exts_validate(struct net *net, struct tcf_proto *tp, struct nlattr **tb,
 	return 0;
 }
 EXPORT_SYMBOL(tcf_exts_validate);
+
+int tcf_exts_offload_init(struct tcf_exts *e,
+			  struct switchdev_obj_port_flow_act *actions)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	struct tc_action *act;
+	int err = 0;
+
+	list_for_each_entry(act, &e->actions, list) {
+		if (!act->ops->offload_init) {
+			pr_err("Action %s doesn't have offload support\n",
+			       act->ops->kind);
+			err = -EINVAL;
+			break;
+		}
+		err = act->ops->offload_init(act, actions);
+		if (err)
+			break;
+	}
+
+	return err;
+#else
+	return -EOPNOTSUPP;
+#endif
+}
+EXPORT_SYMBOL(tcf_exts_offload_init);
 
 void tcf_exts_change(struct tcf_proto *tp, struct tcf_exts *dst,
 		     struct tcf_exts *src)
