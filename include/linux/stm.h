@@ -88,6 +88,9 @@ struct stm_data {
 	long			(*set_options)(struct stm_data *, unsigned int,
 					       unsigned int, unsigned int,
 					       unsigned long);
+	long			(*get_options)(struct stm_data *, unsigned int,
+					       unsigned int, unsigned int,
+					       u64 *);
 };
 
 int stm_register_device(struct device *parent, struct stm_data *stm_data,

@@ -46,5 +46,6 @@ struct stp_policy_id {
 #define STP_POLICY_ID_SET	_IOWR('%', 0, struct stp_policy_id)
 #define STP_POLICY_ID_GET	_IOR('%', 1, struct stp_policy_id)
 #define STP_SET_OPTIONS		_IOW('%', 2, __u64)
+#define STP_GET_OPTIONS		_IOR('%', 3, __u64)
 
 #endif /* _UAPI_LINUX_STM_H */
