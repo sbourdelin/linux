@@ -22,6 +22,7 @@
 #include <net/pkt_cls.h>
 #include <net/ip.h>
 #include <net/flow_dissector.h>
+#include <net/switchdev.h>
 
 struct fl_flow_key {
 	int	indev_ifindex;
@@ -56,6 +57,7 @@ struct cls_fl_head {
 	struct list_head filters;
 	struct rhashtable_params ht_params;
 	struct rcu_head rcu;
+	bool offload;
 };
 
 struct cls_fl_filter {
@@ -67,6 +69,7 @@ struct cls_fl_filter {
 	struct list_head list;
 	u32 handle;
 	struct rcu_head	rcu;
+	struct net_device *indev;
 };
 
 static unsigned short int fl_mask_range(const struct fl_flow_mask *mask)
@@ -123,6 +126,9 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 	struct fl_flow_key skb_key;
 	struct fl_flow_key skb_mkey;
 
+	if (head->offload)
+		return -1;
+
 	fl_clear_masked_range(&skb_key, &head->mask);
 	skb_key.indev_ifindex = skb->skb_iif;
 	/* skb_flow_dissect() does not set n_proto in case an unknown protocol,
@@ -174,6 +180,9 @@ static bool fl_destroy(struct tcf_proto *tp, bool force)
 		return false;
 
 	list_for_each_entry_safe(f, next, &head->filters, list) {
+		if (head->offload)
+			switchdev_port_flow_del(f->indev, (unsigned long)f);
+
 		list_del_rcu(&f->list);
 		call_rcu(&f->rcu, fl_destroy_filter);
 	}
@@ -396,9 +405,11 @@ static int fl_check_assign_mask(struct cls_fl_head *head,
 }
 
 static int fl_set_parms(struct net *net, struct tcf_proto *tp,
+			struct cls_fl_head *head,
 			struct cls_fl_filter *f, struct fl_flow_mask *mask,
 			unsigned long base, struct nlattr **tb,
-			struct nlattr *est, bool ovr)
+			struct nlattr *est, bool ovr,
+			struct switchdev_obj_port_flow_act *actions)
 {
 	struct tcf_exts e;
 	int err;
@@ -413,12 +424,32 @@ static int fl_set_parms(struct net *net, struct tcf_proto *tp,
 		tcf_bind_filter(tp, &f->res, base);
 	}
 
+	head->offload = nla_get_flag(tb[TCA_FLOWER_OFFLOAD]);
+
 	err = fl_set_key(net, tb, &f->key, &mask->key);
 	if (err)
 		goto errout;
 
 	fl_mask_update_range(mask);
 	fl_set_masked_key(&f->mkey, &f->key, mask);
+
+	if (head->offload) {
+		if (!f->key.indev_ifindex) {
+			pr_err("indev must be set when using offloaded filter\n");
+			err = -EINVAL;
+			goto errout;
+		}
+
+		f->indev = __dev_get_by_index(net, f->key.indev_ifindex);
+		if (!f->indev) {
+			err = -EINVAL;
+			goto errout;
+		}
+
+		err = tcf_exts_offload_init(&e, actions);
+		if (err)
+			goto errout;
+	}
 
 	tcf_exts_change(tp, &f->exts, &e);
 
@@ -459,6 +490,7 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	struct cls_fl_filter *fnew;
 	struct nlattr *tb[TCA_FLOWER_MAX + 1];
 	struct fl_flow_mask mask = {};
+	struct switchdev_obj_port_flow_act actions = {};
 	int err;
 
 	if (!tca[TCA_OPTIONS])
@@ -486,13 +518,25 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	}
 	fnew->handle = handle;
 
-	err = fl_set_parms(net, tp, fnew, &mask, base, tb, tca[TCA_RATE], ovr);
+	err = fl_set_parms(net, tp, head, fnew, &mask, base, tb,
+			   tca[TCA_RATE], ovr, &actions);
 	if (err)
 		goto errout;
 
 	err = fl_check_assign_mask(head, &mask);
 	if (err)
 		goto errout;
+
+	if (head->offload) {
+		err = switchdev_port_flow_add(fnew->indev,
+					      &head->dissector,
+					      &mask.key,
+					      &fnew->key,
+					      &actions,
+					      (unsigned long)fnew);
+		if (err)
+			goto errout;
+	}
 
 	err = rhashtable_insert_fast(&head->ht, &fnew->ht_node,
 				     head->ht_params);
@@ -505,6 +549,12 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	*arg = (unsigned long) fnew;
 
 	if (fold) {
+		if (head->offload) {
+			err = switchdev_port_flow_del(fold->indev,
+						      (unsigned long)fold);
+			if (err)
+				goto errout;
+		}
 		list_replace_rcu(&fold->list, &fnew->list);
 		tcf_unbind_filter(tp, &fold->res);
 		call_rcu(&fold->rcu, fl_destroy_filter);

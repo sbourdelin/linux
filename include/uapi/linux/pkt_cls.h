@@ -416,6 +416,7 @@ enum {
 	TCA_FLOWER_KEY_TCP_DST,		/* be16 */
 	TCA_FLOWER_KEY_UDP_SRC,		/* be16 */
 	TCA_FLOWER_KEY_UDP_DST,		/* be16 */
+	TCA_FLOWER_OFFLOAD,		/* flag */
 	__TCA_FLOWER_MAX,
 };
 
