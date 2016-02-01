@@ -2665,12 +2665,6 @@ static inline sector_t cfq_dist_from_last(struct cfq_data *cfqd,
 		return cfqd->last_position - blk_rq_pos(rq);
 }
 
-static inline int cfq_rq_close(struct cfq_data *cfqd, struct cfq_queue *cfqq,
-			       struct request *rq)
-{
-	return cfq_dist_from_last(cfqd, rq) <= CFQQ_CLOSE_THR;
-}
-
 /*
  * Determine whether we should enforce idle window for this queue.
  */
@@ -3700,13 +3694,6 @@ cfq_should_preempt(struct cfq_data *cfqd, struct cfq_queue *new_cfqq,
 
 	if (!cfqd->active_cic || !cfq_cfqq_wait_request(cfqq))
 		return false;
-
-	/*
-	 * if this request is as-good as one we would expect from the
-	 * current cfqq, let it preempt
-	 */
-	if (cfq_rq_close(cfqd, cfqq, rq))
-		return true;
 
 	return false;
 }
