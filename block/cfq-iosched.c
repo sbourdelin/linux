@@ -411,7 +411,6 @@ enum cfqq_state_flags {
 	CFQ_CFQQ_FLAG_prio_changed,	/* task priority has changed */
 	CFQ_CFQQ_FLAG_slice_new,	/* no requests dispatched in slice */
 	CFQ_CFQQ_FLAG_sync,		/* synchronous queue */
-	CFQ_CFQQ_FLAG_deep,		/* sync cfqq experienced large depth */
 	CFQ_CFQQ_FLAG_wait_busy,	/* Waiting for next request */
 };
 
@@ -438,7 +437,6 @@ CFQ_CFQQ_FNS(idle_window);
 CFQ_CFQQ_FNS(prio_changed);
 CFQ_CFQQ_FNS(slice_new);
 CFQ_CFQQ_FNS(sync);
-CFQ_CFQQ_FNS(deep);
 CFQ_CFQQ_FNS(wait_busy);
 #undef CFQ_CFQQ_FNS
 
@@ -3018,15 +3016,13 @@ static struct cfq_queue *cfq_select_queue(struct cfq_data *cfqd)
 	}
 
 	/*
-	 * This is a deep seek queue, but the device is much faster than
-	 * the queue can deliver, don't idle
+	 * The device is much faster than the queue can deliver: don't idle
 	 **/
 	if (CFQQ_SEEKY(cfqq) && cfq_cfqq_idle_window(cfqq) &&
 	    (cfq_cfqq_slice_new(cfqq) ||
-	    (cfqq->slice_end - jiffies > jiffies - cfqq->slice_start))) {
-		cfq_clear_cfqq_deep(cfqq);
+	     (time_after(cfqq->slice_end - jiffies,
+			 jiffies - cfqq->slice_start))))
 		cfq_clear_cfqq_idle_window(cfqq);
-	}
 
 	if (cfqq->dispatched && cfq_should_idle(cfqd, cfqq)) {
 		cfqq = NULL;
@@ -3604,14 +3600,10 @@ cfq_update_idle_window(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 
 	enable_idle = old_idle = cfq_cfqq_idle_window(cfqq);
 
-	if (cfqq->queued[0] + cfqq->queued[1] >= 4)
-		cfq_mark_cfqq_deep(cfqq);
-
 	if (cfqq->next_rq && (cfqq->next_rq->cmd_flags & REQ_NOIDLE))
 		enable_idle = 0;
 	else if (!atomic_read(&cic->icq.ioc->active_ref) ||
-		 !cfqd->cfq_slice_idle ||
-		 (!cfq_cfqq_deep(cfqq) && CFQQ_SEEKY(cfqq)))
+		 !cfqd->cfq_slice_idle || CFQQ_SEEKY(cfqq))
 		enable_idle = 0;
 	else if (sample_valid(cic->ttime.ttime_samples)) {
 		if (cic->ttime.ttime_mean > cfqd->cfq_slice_idle)
@@ -4105,11 +4097,6 @@ static void cfq_idle_slice_timer(unsigned long data)
 		 */
 		if (!RB_EMPTY_ROOT(&cfqq->sort_list))
 			goto out_kick;
-
-		/*
-		 * Queue depth flag is reset only when the idle didn't succeed
-		 */
-		cfq_clear_cfqq_deep(cfqq);
 	}
 expire:
 	cfq_slice_expired(cfqd, timed_out);
