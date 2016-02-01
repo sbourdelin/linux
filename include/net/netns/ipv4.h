@@ -115,5 +115,6 @@ struct netns_ipv4 {
 #endif
 #endif
 	atomic_t	rt_genid;
+	bool		needs_fib_flush;
 };
 #endif

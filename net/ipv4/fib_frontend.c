@@ -1161,8 +1161,19 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 	unsigned int flags;
 
 	if (event == NETDEV_UNREGISTER) {
-		fib_disable_ip(dev, event, true);
+		if (fib_sync_down_dev(dev, event, true))
+			net->ipv4.needs_fib_flush = true;
 		rt_flush_dev(dev);
+		return NOTIFY_DONE;
+	}
+
+	if (event == NETDEV_UNREGISTER_BATCH || event == NETDEV_DOWN_BATCH) {
+		if (net->ipv4.needs_fib_flush) {
+			fib_flush(net);
+			net->ipv4.needs_fib_flush = false;
+		}
+		rt_cache_flush(net);
+		arp_ifdown_all();
 		return NOTIFY_DONE;
 	}
 
@@ -1182,7 +1193,8 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 		rt_cache_flush(net);
 		break;
 	case NETDEV_DOWN:
-		fib_disable_ip(dev, event, false);
+		if (fib_sync_down_dev(dev, event, false))
+			net->ipv4.needs_fib_flush = true;
 		break;
 	case NETDEV_CHANGE:
 		flags = dev_get_flags(dev);
