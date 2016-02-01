@@ -5911,7 +5911,7 @@ commit_trans:
 	return btrfs_commit_transaction(trans, sctx->send_root);
 }
 
-static void btrfs_root_dec_send_in_progress(struct btrfs_root* root)
+static void btrfs_root_dec_send_in_progress(struct btrfs_root *root)
 {
 	spin_lock(&root->root_item_lock);
 	root->send_in_progress--;
