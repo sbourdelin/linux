@@ -101,7 +101,7 @@ struct bfq_sched_data {
  * @budget: budget used to calculate F_i; F_i = S_i + @budget / @weight.
  * @weight: weight of the queue
  * @parent: parent entity, for hierarchical scheduling.
- * @my_sched_data: for non-leaf nodes in the hierarchy, the
+ * @my_sched_data: for non-leaf nodes in the cgroup hierarchy, the
  *                 associated scheduler queue, %NULL on leaf nodes.
  * @sched_data: the scheduler queue this entity belongs to.
  * @ioprio: the ioprio in use.
@@ -110,10 +110,11 @@ struct bfq_sched_data {
  * @prio_changed: flag, true when the user requested a weight, ioprio or
  *		  ioprio_class change.
  *
- * A bfq_entity is used to represent a bfq_queue (leaf node in the upper
- * level scheduler). Each entity belongs to the sched_data of the parent
- * group hierarchy. Non-leaf entities have also their own sched_data,
- * stored in @my_sched_data.
+ * A bfq_entity is used to represent either a bfq_queue (leaf node in the
+ * cgroup hierarchy) or a bfq_group into the upper level scheduler.  Each
+ * entity belongs to the sched_data of the parent group in the cgroup
+ * hierarchy.  Non-leaf entities have also their own sched_data, stored
+ * in @my_sched_data.
  *
  * Each entity stores independently its priority values; this would
  * allow different weights on different devices, but this
@@ -124,13 +125,14 @@ struct bfq_sched_data {
  * update to take place the effective and the requested priority
  * values are synchronized.
  *
- * The weight value is calculated from the ioprio to export the same
- * interface as CFQ.  When dealing with  ``well-behaved'' queues (i.e.,
- * queues that do not spend too much time to consume their budget
- * and have true sequential behavior, and when there are no external
- * factors breaking anticipation) the relative weights at each level
- * of the hierarchy should be guaranteed.  All the fields are
- * protected by the queue lock of the containing bfqd.
+ * Unless cgroups are used, the weight value is calculated from the
+ * ioprio to export the same interface as CFQ.  When dealing with
+ * ``well-behaved'' queues (i.e., queues that do not spend too much
+ * time to consume their budget and have true sequential behavior, and
+ * when there are no external factors breaking anticipation) the
+ * relative weights at each level of the cgroups hierarchy should be
+ * guaranteed.  All the fields are protected by the queue lock of the
+ * containing bfqd.
  */
 struct bfq_entity {
 	struct rb_node rb_node;
@@ -155,6 +157,8 @@ struct bfq_entity {
 
 	int prio_changed;
 };
+
+struct bfq_group;
 
 /**
  * struct bfq_queue - leaf schedulable entity.
@@ -188,7 +192,11 @@ struct bfq_entity {
  * @pid: pid of the process owning the queue, used for logging purposes.
  *
  * A bfq_queue is a leaf request queue; it can be associated with an
- * io_context or more, if it is async.
+ * io_context or more, if it is async. @cgroup holds a reference to
+ * the cgroup, to be sure that it does not disappear while a bfqq
+ * still references it (mostly to avoid races between request issuing
+ * and task migration followed by cgroup destruction).  All the fields
+ * are protected by the queue lock of the containing bfqd.
  */
 struct bfq_queue {
 	atomic_t ref;
@@ -252,9 +260,8 @@ struct bfq_io_cq {
 	struct bfq_queue *bfqq[2];
 	struct bfq_ttime ttime;
 	int ioprio;
-
-#ifdef CONFIG_BFQ_GROUP_IOSCHED
-	uint64_t blkcg_id; /* the current blkcg ID */
+#ifdef CONFIG_CFQ_GROUP_IOSCHED
+	uint64_t blkcg_serial_nr; /* the current blkcg serial */
 #endif
 };
 
@@ -266,7 +273,7 @@ enum bfq_device_speed {
 /**
  * struct bfq_data - per device data structure.
  * @queue: request queue for the managed device.
- * @sched_data: root @bfq_sched_data for the device.
+ * @root_group: root bfq_group for the device.
  * @busy_queues: number of bfq_queues containing requests (including the
  *		 queue in service, even if it is idling).
  * @queued: number of queued requests.
@@ -319,7 +326,7 @@ enum bfq_device_speed {
 struct bfq_data {
 	struct request_queue *queue;
 
-	struct bfq_sched_data sched_data;
+	struct bfq_group *root_group;
 
 	int busy_queues;
 	int queued;
@@ -404,8 +411,35 @@ BFQ_BFQQ_FNS(IO_bound);
 #undef BFQ_BFQQ_FNS
 
 /* Logging facilities. */
-#define bfq_log_bfqq(bfqd, bfqq, fmt, args...) \
-	blk_add_trace_msg((bfqd)->queue, "bfq%d " fmt, (bfqq)->pid, ##args)
+#ifdef CONFIG_CFQ_GROUP_IOSCHED
+static struct bfq_group *bfqq_group(struct bfq_queue *bfqq);
+static struct blkcg_gq *bfqg_to_blkg(struct bfq_group *bfqg);
+
+#define bfq_log_bfqq(bfqd, bfqq, fmt, args...)	do {			\
+	char __pbuf[128];						\
+									\
+	blkg_path(bfqg_to_blkg(bfqq_group(bfqq)), __pbuf, sizeof(__pbuf)); \
+	blk_add_trace_msg((bfqd)->queue, "bfq%d%c %s " fmt, (bfqq)->pid, \
+			bfq_bfqq_sync((bfqq)) ? 'S' : 'A',		\
+			  __pbuf, ##args);				\
+} while (0)
+
+#define bfq_log_bfqg(bfqd, bfqg, fmt, args...)	do {			\
+	char __pbuf[128];						\
+									\
+	blkg_path(bfqg_to_blkg(bfqg), __pbuf, sizeof(__pbuf));		\
+	blk_add_trace_msg((bfqd)->queue, "%s " fmt, __pbuf, ##args);	\
+} while (0)
+
+#else /* CONFIG_CFQ_GROUP_IOSCHED */
+
+#define bfq_log_bfqq(bfqd, bfqq, fmt, args...)	\
+	blk_add_trace_msg((bfqd)->queue, "bfq%d%c " fmt, (bfqq)->pid,	\
+			bfq_bfqq_sync((bfqq)) ? 'S' : 'A',		\
+				##args)
+#define bfq_log_bfqg(bfqd, bfqg, fmt, args...)		do {} while (0)
+
+#endif /* CONFIG_CFQ_GROUP_IOSCHED */
 
 #define bfq_log(bfqd, fmt, args...) \
 	blk_add_trace_msg((bfqd)->queue, "bfq " fmt, ##args)
@@ -420,6 +454,107 @@ enum bfqq_expiration {
 	BFQ_BFQQ_BUDGET_EXHAUSTED,	/* budget consumed */
 	BFQ_BFQQ_NO_MORE_REQUESTS,	/* the queue has no more requests */
 };
+
+struct bfqg_stats {
+#ifdef CONFIG_CFQ_GROUP_IOSCHED
+	/* number of ios merged */
+	struct blkg_rwstat		merged;
+	/* total time spent on device in ns, may not be accurate w/ queueing */
+	struct blkg_rwstat		service_time;
+	/* total time spent waiting in scheduler queue in ns */
+	struct blkg_rwstat		wait_time;
+	/* number of IOs queued up */
+	struct blkg_rwstat		queued;
+	/* total disk time and nr sectors dispatched by this group */
+	struct blkg_stat		time;
+#ifdef CONFIG_DEBUG_BLK_CGROUP
+	/* sum of number of ios queued across all samples */
+	struct blkg_stat		avg_queue_size_sum;
+	/* count of samples taken for average */
+	struct blkg_stat		avg_queue_size_samples;
+	/* how many times this group has been removed from service tree */
+	struct blkg_stat		dequeue;
+	/* total time spent waiting for it to be assigned a timeslice. */
+	struct blkg_stat		group_wait_time;
+	/* time spent idling for this blkcg_gq */
+	struct blkg_stat		idle_time;
+	/* total time with empty current active q with other requests queued */
+	struct blkg_stat		empty_time;
+	/* fields after this shouldn't be cleared on stat reset */
+	uint64_t			start_group_wait_time;
+	uint64_t			start_idle_time;
+	uint64_t			start_empty_time;
+	uint16_t			flags;
+#endif	/* CONFIG_DEBUG_BLK_CGROUP */
+#endif	/* CONFIG_CFQ_GROUP_IOSCHED */
+};
+
+#ifdef CONFIG_CFQ_GROUP_IOSCHED
+
+/*
+ * struct bfq_group_data - per-blkcg storage for the blkio subsystem.
+ *
+ * @ps: @blkcg_policy_storage that this structure inherits
+ * @weight: weight of the bfq_group
+ */
+struct bfq_group_data {
+	/* must be the first member */
+	struct blkcg_policy_data pd;
+
+	unsigned short weight;
+};
+
+/**
+ * struct bfq_group - per (device, cgroup) data structure.
+ * @entity: schedulable entity to insert into the parent group sched_data.
+ * @sched_data: own sched_data, to contain child entities (they may be
+ *              both bfq_queues and bfq_groups).
+ * @bfqd: the bfq_data for the device this group acts upon.
+ * @async_bfqq: array of async queues for all the tasks belonging to
+ *              the group, one queue per ioprio value per ioprio_class,
+ *              except for the idle class that has only one queue.
+ * @async_idle_bfqq: async queue for the idle class (ioprio is ignored).
+ * @my_entity: pointer to @entity, %NULL for the toplevel group; used
+ *             to avoid too many special cases during group creation/
+ *             migration.
+ * @stats: stats for this bfqg.
+ *
+ * Each (device, cgroup) pair has its own bfq_group, i.e., for each cgroup
+ * there is a set of bfq_groups, each one collecting the lower-level
+ * entities belonging to the group that are acting on the same device.
+ *
+ * Locking works as follows:
+ *    o @bfqd is protected by the queue lock, RCU is used to access it
+ *      from the readers.
+ *    o All the other fields are protected by the @bfqd queue lock.
+ */
+struct bfq_group {
+	/* must be the first member */
+	struct blkg_policy_data pd;
+
+	struct bfq_entity entity;
+	struct bfq_sched_data sched_data;
+
+	void *bfqd;
+
+	struct bfq_queue *async_bfqq[2][IOPRIO_BE_NR];
+	struct bfq_queue *async_idle_bfqq;
+
+	struct bfq_entity *my_entity;
+
+	struct bfqg_stats stats;
+};
+
+#else
+struct bfq_group {
+	struct bfq_sched_data sched_data;
+
+	struct bfq_queue *async_bfqq[2][IOPRIO_BE_NR];
+	struct bfq_queue *async_idle_bfqq;
+
+	struct rb_root rq_pos_tree;
+};
+#endif
 
 static struct bfq_queue *bfq_entity_to_bfqq(struct bfq_entity *entity);
 
@@ -497,6 +632,7 @@ static void bfq_dispatch_insert(struct request_queue *q, struct request *rq);
 static struct bfq_queue *bfq_get_queue(struct bfq_data *bfqd,
 				       struct bio *bio, int is_sync,
 				       struct bfq_io_cq *bic, gfp_t gfp_mask);
+static void bfq_put_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 
 #endif /* _BFQ_H */
