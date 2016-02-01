@@ -97,6 +97,7 @@ static const int multicast_filter_limit = 32;
 
 #define RTL8169_TX_TIMEOUT	(6*HZ)
 #define RTL8169_PHY_TIMEOUT	(10*HZ)
+#define RTL8169_EE_TIMEOUT	2  /* 2ms Autoload from eeprom */
 
 /* write/read MMIO register */
 #define RTL_W8(reg, val8)	writeb ((val8), ioaddr + (reg))
@@ -5137,6 +5138,7 @@ static void rtl_hw_reset(struct rtl8169_private *tp)
 	RTL_W8(ChipCmd, CmdReset);
 
 	rtl_udelay_loop_wait_low(tp, &rtl_chipcmd_cond, 100, 100);
+	mdelay(RTL8169_EE_TIMEOUT);
 }
 
 static void rtl_request_uncached_firmware(struct rtl8169_private *tp)
@@ -8184,6 +8186,7 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_disable_link_state(pdev, PCIE_LINK_STATE_L0S | PCIE_LINK_STATE_L1 |
 				     PCIE_LINK_STATE_CLKPM);
 
+	mdelay(RTL8169_EE_TIMEOUT);
 	/* enable device (incl. PCI PM wakeup and hotplug setup) */
 	rc = pci_enable_device(pdev);
 	if (rc < 0) {
