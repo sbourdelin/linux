@@ -144,6 +144,13 @@ ENTRY(hvmlite_start_xen)
 	ljmp    $0x10, $_pa(startup_32)
 #endif
 
+#ifdef CONFIG_X86_32
+ENTRY(hvmlite_smp_32)
+        mov $_pa(boot_gdt_descr), %eax
+        lgdt (%eax)
+        jmp startup_32_smp
+#endif
+
 	.data
 gdt:
 	.word	gdt_end - gdt

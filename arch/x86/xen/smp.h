@@ -8,6 +8,10 @@ extern void xen_send_IPI_allbutself(int vector);
 extern void xen_send_IPI_all(int vector);
 extern void xen_send_IPI_self(int vector);
 
+#ifdef CONFIG_X86_32
+extern void hvmlite_smp_32(void);
+#endif
+
 #ifdef CONFIG_XEN_PVH
 extern void xen_pvh_early_cpu_init(int cpu, bool entry);
 #else

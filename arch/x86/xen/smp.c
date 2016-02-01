@@ -27,6 +27,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/vcpu.h>
 #include <xen/interface/xenpmu.h>
+#include <xen/interface/hvm/hvm_vcpu.h>
 
 #include <asm/xen/interface.h>
 #include <asm/xen/hypercall.h>
@@ -384,6 +385,7 @@ cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
 	struct vcpu_guest_context *ctxt;
 	struct desc_struct *gdt;
 	unsigned long gdt_mfn;
+	void *ctxt_arg;
 
 	/* used to tell cpu_init() that it can proceed with initialization */
 	cpumask_set_cpu(cpu, cpu_callout_mask);
@@ -392,7 +394,7 @@ cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
 
 	if (!xen_hvmlite) {
 
-		ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
+		ctxt_arg = ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
 		if (ctxt == NULL)
 			return -ENOMEM;
 
@@ -460,14 +462,59 @@ cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
 		ctxt->user_regs.esp = idle->thread.sp0 - sizeof(struct pt_regs);
 		ctxt->ctrlreg[3] = xen_pfn_to_cr3(virt_to_gfn(swapper_pg_dir));
 	} else {
-		ctxt = NULL; /* To quiet down compiler */
-		BUG();
+#ifdef CONFIG_XEN_PVHVM
+		struct vcpu_hvm_context *hctxt;
+
+		ctxt_arg = hctxt = kzalloc(sizeof(*hctxt), GFP_KERNEL);
+		if (hctxt == NULL)
+			return -ENOMEM;
+
+#ifdef CONFIG_X86_64
+		hctxt->mode = VCPU_HVM_MODE_64B;
+		hctxt->cpu_regs.x86_64.rip =
+			(unsigned long)secondary_startup_64;
+		hctxt->cpu_regs.x86_64.rsp = stack_start;
+
+		hctxt->cpu_regs.x86_64.cr0 =
+			X86_CR0_PG | X86_CR0_WP | X86_CR0_PE;
+		hctxt->cpu_regs.x86_64.cr4 = X86_CR4_PAE;
+		hctxt->cpu_regs.x86_64.cr3 =
+			xen_pfn_to_cr3(virt_to_mfn(init_level4_pgt));
+		hctxt->cpu_regs.x86_64.efer = EFER_LME | EFER_NX;
+#else
+		hctxt->mode = VCPU_HVM_MODE_32B;
+		/*
+		 * startup_32_smp expects GDT loaded so we can't jump
+		 * there directly.
+		 */
+		hctxt->cpu_regs.x86_32.eip =
+			(unsigned long)hvmlite_smp_32 - __START_KERNEL_map;
+
+		hctxt->cpu_regs.x86_32.cr0 = X86_CR0_PE;
+
+		hctxt->cpu_regs.x86_32.cs_base = 0;
+		hctxt->cpu_regs.x86_32.cs_limit = ~0u;
+		hctxt->cpu_regs.x86_32.cs_ar = 0xc9b;
+		hctxt->cpu_regs.x86_32.ds_base = 0;
+		hctxt->cpu_regs.x86_32.ds_limit = ~0u;
+		hctxt->cpu_regs.x86_32.ds_ar = 0xc93;
+		hctxt->cpu_regs.x86_32.es_base = 0;
+		hctxt->cpu_regs.x86_32.es_limit = ~0u;
+		hctxt->cpu_regs.x86_32.es_ar = 0xc93;
+		hctxt->cpu_regs.x86_32.ss_base = 0;
+		hctxt->cpu_regs.x86_32.ss_limit = ~0u;
+		hctxt->cpu_regs.x86_32.ss_ar = 0xc93;
+		hctxt->cpu_regs.x86_32.tr_base = 0;
+		hctxt->cpu_regs.x86_32.tr_limit = 0xff;
+		hctxt->cpu_regs.x86_32.tr_ar = 0x8b;
+#endif
+#endif
 	}
 
-	if (HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, ctxt))
+	if (HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, ctxt_arg))
 		BUG();
 
-	kfree(ctxt);
+	kfree(ctxt_arg);
 	return 0;
 }
 
