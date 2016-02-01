@@ -299,6 +299,7 @@ enum bfq_device_speed {
  * @root_group: root bfq_group for the device.
  * @busy_queues: number of bfq_queues containing requests (including the
  *		 queue in service, even if it is idling).
+ * @wr_busy_queues: number of weight-raised busy @bfq_queues.
  * @queued: number of queued requests.
  * @rq_in_driver: number of requests dispatched and waiting for completion.
  * @sync_flight: number of sync requests in the driver.
@@ -368,6 +369,7 @@ struct bfq_data {
 	struct bfq_group *root_group;
 
 	int busy_queues;
+	int wr_busy_queues;
 	int queued;
 	int rq_in_driver;
 	int sync_flight;
