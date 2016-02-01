@@ -128,6 +128,9 @@ struct sched_clock_data {
 	u64			tick_raw;
 	u64			tick_gtod;
 	u64			clock;
+#ifdef CONFIG_NO_HZ_COMMON
+	unsigned long		update;
+#endif
 };
 
 static DEFINE_PER_CPU_SHARED_ALIGNED(struct sched_clock_data, sched_clock_data);
@@ -153,6 +156,9 @@ void sched_clock_init(void)
 		scd->tick_raw = 0;
 		scd->tick_gtod = ktime_now;
 		scd->clock = ktime_now;
+#ifdef CONFIG_NO_HZ_COMMON
+		scd->update = READ_ONCE(jiffies);
+#endif
 	}
 
 	sched_clock_running = 1;
@@ -186,6 +192,27 @@ static inline u64 wrap_max(u64 x, u64 y)
 	return (s64)(x - y) > 0 ? x : y;
 }
 
+#ifdef CONFIG_NO_HZ_COMMON
+static inline unsigned long tick_pending(struct sched_clock_data *scd)
+{
+	return READ_ONCE(jiffies) - scd->update;
+}
+
+static inline void sched_clock_tick_update(struct sched_clock_data *scd)
+{
+	scd->update = READ_ONCE(jiffies);
+}
+#else
+static inline unsigned long tick_pending(struct sched_clock_data *scd)
+{
+	return 0;
+}
+
+static inline void sched_clock_tick_update(struct sched_clock_data *scd)
+{
+}
+#endif
+
 /*
  * update the percpu scd from the raw @now value
  *
@@ -194,7 +221,7 @@ static inline u64 wrap_max(u64 x, u64 y)
  */
 static u64 sched_clock_local(struct sched_clock_data *scd)
 {
-	u64 now, clock, old_clock, min_clock, max_clock;
+	u64 now, clock, old_clock, min_clock, max_clock, next_gtod;
 	s64 delta;
 
 again:
@@ -211,9 +238,10 @@ again:
 	 *		      scd->tick_gtod + TICK_NSEC);
 	 */
 
+	next_gtod = scd->tick_gtod + (tick_pending(scd) + 1) * TICK_NSEC;
 	clock = scd->tick_gtod + delta;
 	min_clock = wrap_max(scd->tick_gtod, old_clock);
-	max_clock = wrap_max(old_clock, scd->tick_gtod + TICK_NSEC);
+	max_clock = wrap_max(old_clock, next_gtod);
 
 	clock = wrap_max(clock, min_clock);
 	clock = wrap_min(clock, max_clock);
@@ -333,6 +361,7 @@ void sched_clock_tick(void)
 
 	scd->tick_raw = now;
 	scd->tick_gtod = now_gtod;
+	sched_clock_tick_update(scd);
 	sched_clock_local(scd);
 }
 
