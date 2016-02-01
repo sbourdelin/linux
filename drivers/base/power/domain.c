@@ -231,7 +231,7 @@ static int __genpd_poweron(struct generic_pm_domain *genpd, unsigned int depth)
  * genpd_poweron - Restore power to a given PM domain and its masters.
  * @genpd: PM domain to power up.
  */
-static int genpd_poweron(struct generic_pm_domain *genpd)
+static int __maybe_unused genpd_poweron(struct generic_pm_domain *genpd)
 {
 	int ret;
 
