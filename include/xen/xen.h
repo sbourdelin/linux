@@ -29,6 +29,12 @@ extern enum xen_domain_type xen_domain_type;
 #define xen_initial_domain()	(0)
 #endif	/* CONFIG_XEN_DOM0 */
 
+#ifdef CONFIG_XEN_PVHVM
+extern int xen_hvmlite;
+#else
+#define xen_hvmlite		(0)
+#endif
+
 #ifdef CONFIG_XEN_PVH
 /* This functionality exists only for x86. The XEN_PVHVM support exists
  * only in x86 world - hence on ARM it will be always disabled.

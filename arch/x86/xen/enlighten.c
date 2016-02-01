@@ -118,7 +118,8 @@ DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
  */
 DEFINE_PER_CPU(struct vcpu_info, xen_vcpu_info);
 
-enum xen_domain_type xen_domain_type = XEN_NATIVE;
+enum xen_domain_type xen_domain_type
+	__attribute__((section(".data"))) = XEN_NATIVE;
 EXPORT_SYMBOL_GPL(xen_domain_type);
 
 unsigned long *machine_to_phys_mapping = (void *)MACH2PHYS_VIRT_START;
@@ -170,6 +171,17 @@ struct tls_descs {
  * compare against.
  */
 static DEFINE_PER_CPU(struct tls_descs, shadow_tls_desc);
+
+#ifdef CONFIG_XEN_PVHVM
+/*
+ * HVMlite variables. These need to live in data segment since they are
+ * initialized before startup_{32|64}, which clear .bss, are invoked.
+ */
+int xen_hvmlite __attribute__((section(".data"))) = 0;
+struct hvm_start_info hvmlite_start_info __attribute__((section(".data")));
+uint hvmlite_start_info_sz = sizeof(hvmlite_start_info);
+struct boot_params xen_hvmlite_boot_params __attribute__((section(".data")));
+#endif
 
 static void clamp_max_cpus(void)
 {
@@ -1722,6 +1734,78 @@ asmlinkage __visible void __init xen_start_kernel(void)
 	x86_64_start_reservations((char *)__pa_symbol(&boot_params));
 #endif
 }
+
+#ifdef CONFIG_XEN_PVHVM
+static void __init hvmlite_bootparams(void)
+{
+	struct xen_memory_map memmap;
+	int i;
+
+	memset(&xen_hvmlite_boot_params, 0, sizeof(xen_hvmlite_boot_params));
+
+	memmap.nr_entries = ARRAY_SIZE(xen_hvmlite_boot_params.e820_map);
+	set_xen_guest_handle(memmap.buffer, xen_hvmlite_boot_params.e820_map);
+	if (HYPERVISOR_memory_op(XENMEM_memory_map, &memmap)) {
+		xen_raw_console_write("XENMEM_memory_map failed\n");
+		BUG();
+	}
+
+	xen_hvmlite_boot_params.e820_map[memmap.nr_entries].addr =
+		ISA_START_ADDRESS;
+	xen_hvmlite_boot_params.e820_map[memmap.nr_entries].size =
+		ISA_END_ADDRESS - ISA_START_ADDRESS;
+	xen_hvmlite_boot_params.e820_map[memmap.nr_entries++].type =
+		E820_RESERVED;
+
+	sanitize_e820_map(xen_hvmlite_boot_params.e820_map,
+			  ARRAY_SIZE(xen_hvmlite_boot_params.e820_map),
+			  &memmap.nr_entries);
+
+	xen_hvmlite_boot_params.e820_entries = memmap.nr_entries;
+	for (i = 0; i < xen_hvmlite_boot_params.e820_entries; i++)
+		e820_add_region(xen_hvmlite_boot_params.e820_map[i].addr,
+				xen_hvmlite_boot_params.e820_map[i].size,
+				xen_hvmlite_boot_params.e820_map[i].type);
+
+	xen_hvmlite_boot_params.hdr.cmd_line_ptr =
+		hvmlite_start_info.cmdline_paddr;
+
+	/* The first module is always ramdisk */
+	if (hvmlite_start_info.nr_modules) {
+		struct hvm_modlist_entry *modaddr =
+			__va(hvmlite_start_info.modlist_paddr);
+		xen_hvmlite_boot_params.hdr.ramdisk_image = modaddr->paddr;
+		xen_hvmlite_boot_params.hdr.ramdisk_size = modaddr->size;
+	}
+
+	/*
+	 * See Documentation/x86/boot.txt.
+	 *
+	 * Version 2.12 supports Xen entry point but we will use default x86/PC
+	 * environment (i.e. hardware_subarch 0).
+	 */
+	xen_hvmlite_boot_params.hdr.version = 0x212;
+	xen_hvmlite_boot_params.hdr.type_of_loader = 9; /* Xen loader */
+}
+
+/*
+ * This routine (and those that it might call) should not use
+ * anything that lives in .bss since that segment will be cleared later
+ */
+void __init xen_prepare_hvmlite(void)
+{
+	u32 eax, ecx, edx, msr;
+	u64 pfn;
+
+	xen_hvmlite = 1;
+
+	cpuid(xen_cpuid_base() + 2, &eax, &msr, &ecx, &edx);
+	pfn = __pa(hypercall_page);
+	wrmsr_safe(msr, (u32)pfn, (u32)(pfn >> 32));
+
+	hvmlite_bootparams();
+}
+#endif
 
 void __ref xen_hvm_init_shared_info(void)
 {
