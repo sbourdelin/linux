@@ -348,25 +348,30 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
 	}
 	xen_init_lock_cpu(0);
 
-	smp_store_boot_cpu_info();
-	cpu_data(0).x86_max_cores = 1;
+	if (!xen_hvmlite) {
+		smp_store_boot_cpu_info();
+		cpu_data(0).x86_max_cores = 1;
 
-	for_each_possible_cpu(i) {
-		zalloc_cpumask_var(&per_cpu(cpu_sibling_map, i), GFP_KERNEL);
-		zalloc_cpumask_var(&per_cpu(cpu_core_map, i), GFP_KERNEL);
-		zalloc_cpumask_var(&per_cpu(cpu_llc_shared_map, i), GFP_KERNEL);
+		for_each_possible_cpu(i) {
+			zalloc_cpumask_var(&per_cpu(cpu_sibling_map, i),
+					   GFP_KERNEL);
+			zalloc_cpumask_var(&per_cpu(cpu_core_map, i),
+					   GFP_KERNEL);
+			zalloc_cpumask_var(&per_cpu(cpu_llc_shared_map, i),
+					   GFP_KERNEL);
+		}
+		set_cpu_sibling_map(0);
+
+		if (!alloc_cpumask_var(&xen_cpu_initialized_map, GFP_KERNEL))
+			panic("could not allocate xen_cpu_initialized_map\n");
+
+		cpumask_copy(xen_cpu_initialized_map, cpumask_of(0));
 	}
-	set_cpu_sibling_map(0);
 
 	xen_pmu_init(0);
 
 	if (xen_smp_intr_init(0))
 		BUG();
-
-	if (!alloc_cpumask_var(&xen_cpu_initialized_map, GFP_KERNEL))
-		panic("could not allocate xen_cpu_initialized_map\n");
-
-	cpumask_copy(xen_cpu_initialized_map, cpumask_of(0));
 
 	/* Restrict the possible_map according to max_cpus. */
 	while ((num_possible_cpus() > 1) && (num_possible_cpus() > max_cpus)) {
@@ -375,8 +380,11 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
 		set_cpu_possible(cpu, false);
 	}
 
-	for_each_possible_cpu(cpu)
+	for_each_possible_cpu(cpu) {
 		set_cpu_present(cpu, true);
+		if (xen_hvmlite)
+			physid_set(cpu, phys_cpu_present_map);
+	}
 }
 
 static int
@@ -810,10 +818,15 @@ void __init xen_smp_init(void)
 
 static void __init xen_hvm_smp_prepare_cpus(unsigned int max_cpus)
 {
-	native_smp_prepare_cpus(max_cpus);
-	WARN_ON(xen_smp_intr_init(0));
+	if (xen_hvmlite)
+		xen_smp_prepare_cpus(max_cpus);
 
-	xen_init_lock_cpu(0);
+	native_smp_prepare_cpus(max_cpus);
+
+	if (!xen_hvmlite) {
+		WARN_ON(xen_smp_intr_init(0));
+		xen_init_lock_cpu(0);
+	}
 }
 
 static int xen_hvm_cpu_up(unsigned int cpu, struct task_struct *tidle)
@@ -836,8 +849,21 @@ static int xen_hvm_cpu_up(unsigned int cpu, struct task_struct *tidle)
 	*/
 	rc = xen_smp_intr_init(cpu);
 	WARN_ON(rc);
-	if (!rc)
-		rc =  native_cpu_up(cpu, tidle);
+
+	if (xen_hvmlite) {
+		rc = cpu_initialize_context(cpu, tidle);
+		if (rc) {
+			xen_smp_intr_free(cpu);
+			return rc;
+		}
+		xen_pmu_init(cpu);
+	}
+
+	if (!rc) {
+		rc = native_cpu_up(cpu, tidle);
+		if (rc && xen_hvmlite)
+			xen_pmu_finish(cpu);
+	}
 
 	/*
 	 * We must initialize the slowpath CPU kicker _after_ the native
@@ -861,4 +887,8 @@ void __init xen_hvm_smp_init(void)
 	smp_ops.send_call_func_ipi = xen_smp_send_call_function_ipi;
 	smp_ops.send_call_func_single_ipi = xen_smp_send_call_function_single_ipi;
 	smp_ops.smp_prepare_boot_cpu = xen_smp_prepare_boot_cpu;
+	if (xen_hvmlite) {
+		smp_ops.play_dead = xen_play_dead;
+		xen_fill_possible_map();
+	}
 }

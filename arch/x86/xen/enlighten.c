@@ -1925,6 +1925,8 @@ static void __init xen_hvm_guest_init(void)
 		xen_have_vector_callback = 1;
 	xen_hvm_smp_init();
 	register_cpu_notifier(&xen_hvm_cpu_notifier);
+	if (xen_hvmlite)
+		smp_found_config = 1;
 	xen_unplug_emulated_devices();
 	x86_init.irqs.intr_init = xen_init_IRQ;
 	xen_hvm_init_time_ops();
