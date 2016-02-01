@@ -516,6 +516,9 @@ static void *s_next(struct seq_file *m, void *p, loff_t *pos)
 
 static void *s_start(struct seq_file *m, loff_t *pos)
 {
+#ifdef	CONFIG_MODULES
+	mutex_lock(&module_mutex);
+#endif
 	if (!update_iter(m->private, *pos))
 		return NULL;
 	return m->private;
@@ -523,6 +526,9 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 
 static void s_stop(struct seq_file *m, void *p)
 {
+#ifdef	CONFIG_MODULES
+	mutex_unlock(&module_mutex);
+#endif
 }
 
 static int s_show(struct seq_file *m, void *p)
