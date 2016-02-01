@@ -7915,7 +7915,6 @@ static void rtl_wol_shutdown_quirk(struct rtl8169_private *tp)
 	case RTL_GIGA_MAC_VER_11:
 	case RTL_GIGA_MAC_VER_12:
 	case RTL_GIGA_MAC_VER_17:
-		pci_clear_master(tp->pci_dev);
 
 		RTL_W8(ChipCmd, CmdRxEnb);
 		/* PCI commit */
@@ -8256,7 +8255,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	rtl_ack_events(tp, 0xffff);
 
-	pci_set_master(pdev);
 
 	rtl_init_mdio_ops(tp);
 	rtl_init_pll_power_ops(tp);
