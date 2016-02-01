@@ -1439,11 +1439,16 @@ static int __dev_close(struct net_device *dev)
 int dev_close_many(struct list_head *head, bool unlink)
 {
 	struct net_device *dev, *tmp;
+	struct net *net, *net_tmp;
+	LIST_HEAD(net_head);
 
 	/* Remove the devices that don't need to be closed */
-	list_for_each_entry_safe(dev, tmp, head, close_list)
+	list_for_each_entry_safe(dev, tmp, head, close_list) {
 		if (!(dev->flags & IFF_UP))
 			list_del_init(&dev->close_list);
+		else
+			net_add_event_list(&net_head, dev_net(dev));
+	}
 
 	__dev_close_many(head);
 
@@ -1452,6 +1457,11 @@ int dev_close_many(struct list_head *head, bool unlink)
 		call_netdevice_notifiers(NETDEV_DOWN, dev);
 		if (unlink)
 			list_del_init(&dev->close_list);
+	}
+
+	list_for_each_entry_safe(net, net_tmp, &net_head, event_list) {
+		call_netdevice_notifiers(NETDEV_DOWN_BATCH, net->loopback_dev);
+		net_del_event_list(net);
 	}
 
 	return 0;
@@ -1572,8 +1582,12 @@ rollback:
 				call_netdevice_notifier(nb, NETDEV_GOING_DOWN,
 							dev);
 				call_netdevice_notifier(nb, NETDEV_DOWN, dev);
+				call_netdevice_notifier(nb, NETDEV_DOWN_BATCH,
+							dev);
 			}
 			call_netdevice_notifier(nb, NETDEV_UNREGISTER, dev);
+			call_netdevice_notifier(nb, NETDEV_UNREGISTER_BATCH,
+						dev);
 		}
 	}
 
@@ -1614,8 +1628,12 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 				call_netdevice_notifier(nb, NETDEV_GOING_DOWN,
 							dev);
 				call_netdevice_notifier(nb, NETDEV_DOWN, dev);
+				call_netdevice_notifier(nb, NETDEV_DOWN_BATCH,
+							dev);
 			}
 			call_netdevice_notifier(nb, NETDEV_UNREGISTER, dev);
+			call_netdevice_notifier(nb, NETDEV_UNREGISTER_BATCH,
+						dev);
 		}
 	}
 unlock:
@@ -6258,10 +6276,12 @@ void __dev_notify_flags(struct net_device *dev, unsigned int old_flags,
 		rtmsg_ifinfo(RTM_NEWLINK, dev, gchanges, GFP_ATOMIC);
 
 	if (changes & IFF_UP) {
-		if (dev->flags & IFF_UP)
+		if (dev->flags & IFF_UP) {
 			call_netdevice_notifiers(NETDEV_UP, dev);
-		else
+		} else {
 			call_netdevice_notifiers(NETDEV_DOWN, dev);
+			call_netdevice_notifiers(NETDEV_DOWN_BATCH, dev);
+		}
 	}
 
 	if (dev->flags & IFF_UP &&
@@ -6498,7 +6518,9 @@ static void net_set_todo(struct net_device *dev)
 static void rollback_registered_many(struct list_head *head)
 {
 	struct net_device *dev, *tmp;
+	struct net *net, *net_tmp;
 	LIST_HEAD(close_head);
+	LIST_HEAD(net_head);
 
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
@@ -6573,6 +6595,15 @@ static void rollback_registered_many(struct list_head *head)
 		/* Remove XPS queueing entries */
 		netif_reset_xps_queues_gt(dev, 0);
 #endif
+	}
+
+	list_for_each_entry(dev, head, unreg_list) {
+		net_add_event_list(&net_head, dev_net(dev));
+	}
+	list_for_each_entry_safe(net, net_tmp, &net_head, event_list) {
+		call_netdevice_notifiers(NETDEV_UNREGISTER_BATCH,
+					 net->loopback_dev);
+		net_del_event_list(net);
 	}
 
 	synchronize_net();
@@ -7136,6 +7167,7 @@ static void netdev_wait_allrefs(struct net_device *dev)
 
 			/* Rebroadcast unregister notification */
 			call_netdevice_notifiers(NETDEV_UNREGISTER, dev);
+			call_netdevice_notifiers(NETDEV_UNREGISTER_BATCH, dev);
 
 			__rtnl_unlock();
 			rcu_barrier();
@@ -7652,6 +7684,7 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	   the device is just moving and can keep their slaves up.
 	*/
 	call_netdevice_notifiers(NETDEV_UNREGISTER, dev);
+	call_netdevice_notifiers(NETDEV_UNREGISTER_BATCH, dev);
 	rcu_barrier();
 	call_netdevice_notifiers(NETDEV_UNREGISTER_FINAL, dev);
 	rtmsg_ifinfo(RTM_DELLINK, dev, ~0U, GFP_KERNEL);
