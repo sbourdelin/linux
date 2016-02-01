@@ -36,6 +36,7 @@
 #include <linux/tcp.h>
 #include <linux/mlx5/fs.h>
 #include "en.h"
+#include "en_switchdev.h"
 
 #define MLX5_SET_CFG(p, f, v) MLX5_SET(create_flow_group_in, p, f, v)
 
@@ -1202,12 +1203,18 @@ int mlx5e_create_flow_tables(struct mlx5e_priv *priv)
 	if (err)
 		goto err_destroy_vlan_flow_table;
 
-	err = mlx5e_add_vlan_rule(priv, MLX5E_VLAN_RULE_TYPE_UNTAGGED, 0);
+	err = mlx5e_create_offloads_flow_table(priv);
 	if (err)
 		goto err_destroy_main_flow_table;
 
+	err = mlx5e_add_vlan_rule(priv, MLX5E_VLAN_RULE_TYPE_UNTAGGED, 0);
+	if (err)
+		goto err_destroy_offloads_flow_table;
+
 	return 0;
 
+err_destroy_offloads_flow_table:
+	mlx5e_destroy_offloads_flow_table(priv);
 err_destroy_main_flow_table:
 	mlx5e_destroy_main_flow_table(priv);
 err_destroy_vlan_flow_table:
@@ -1219,6 +1226,7 @@ err_destroy_vlan_flow_table:
 void mlx5e_destroy_flow_tables(struct mlx5e_priv *priv)
 {
 	mlx5e_del_vlan_rule(priv, MLX5E_VLAN_RULE_TYPE_UNTAGGED, 0);
+	mlx5e_destroy_offloads_flow_table(priv);
 	mlx5e_destroy_main_flow_table(priv);
 	mlx5e_destroy_vlan_flow_table(priv);
 }

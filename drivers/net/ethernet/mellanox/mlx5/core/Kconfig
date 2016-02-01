@@ -19,3 +19,10 @@ config MLX5_CORE_EN
 	  Ethernet support in Mellanox Technologies ConnectX-4 NIC.
 	  Ethernet and Infiniband support in ConnectX-4 are currently mutually
 	  exclusive.
+
+config MLX5_EN_SWITCHDEV
+	bool "MLX5 EN switchdev support"
+	depends on MLX5_CORE_EN && NET_SWITCHDEV
+	default y
+	---help---
+	  Switchdev support in Mellanox Technologies ConnectX-4 NIC.

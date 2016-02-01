@@ -32,6 +32,7 @@
 
 #include <linux/mlx5/fs.h>
 #include "en.h"
+#include "en_switchdev.h"
 #include "eswitch.h"
 
 struct mlx5e_rq_param {
@@ -2178,6 +2179,7 @@ static void mlx5e_build_netdev(struct net_device *netdev)
 
 	netdev->priv_flags       |= IFF_UNICAST_FLT;
 
+	mlx5e_switchdev_init(netdev);
 	mlx5e_set_netdev_dev_addr(netdev);
 }
 

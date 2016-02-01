@@ -39,6 +39,8 @@
 #include <linux/mlx5/qp.h>
 #include <linux/mlx5/cq.h>
 #include <linux/mlx5/vport.h>
+#include <linux/rhashtable.h>
+#include <net/switchdev.h>
 #include "wq.h"
 #include "transobj.h"
 #include "mlx5_core.h"
@@ -497,8 +499,16 @@ struct mlx5e_flow_table {
 	struct mlx5_flow_group		**g;
 };
 
+struct mlx5e_offloads_flow_table {
+	struct mlx5_flow_table		*t;
+
+	struct rhashtable_params        ht_params;
+	struct rhashtable               ht;
+};
+
 struct mlx5e_flow_tables {
 	struct mlx5_flow_namespace	*ns;
+	struct mlx5e_offloads_flow_table      offloads;
 	struct mlx5e_flow_table		vlan;
 	struct mlx5e_flow_table		main;
 };
