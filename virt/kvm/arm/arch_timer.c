@@ -385,6 +385,9 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
 {
 	struct device_node *np;
 	int ret = -EINVAL;
+#ifdef CONFIG_ACPI_GTDT
+	struct arch_timer_data data;
+#endif
 
 	np = of_find_matching_node(NULL, arch_timer_of_match);
 	if (!np) {
@@ -397,6 +400,11 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
 	of_node_put(np);
 
 skip_of:
+#ifdef CONFIG_ACPI_GTDT
+	if (!*ppi && !gtdt_arch_timer_data_init(NULL, &data))
+		*ppi = data.virt_ppi;
+#endif
+
 	if (*ppi)
 		return 0;
 
