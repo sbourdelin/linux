@@ -659,6 +659,10 @@ struct drm_i915_display_funcs {
 	/* render clock increase/decrease */
 	/* display clock increase/decrease */
 	/* pll clock increase/decrease */
+
+	void (*load_degamma_lut)(struct drm_crtc *crtc);
+	void (*load_csc_matrix)(struct drm_crtc *crtc);
+	void (*load_gamma_lut)(struct drm_crtc *crtc);
 };
 
 enum forcewake_domain_id {
@@ -806,6 +810,11 @@ struct intel_device_info {
 	u8 has_slice_pg:1;
 	u8 has_subslice_pg:1;
 	u8 has_eu_pg:1;
+
+	struct color_luts {
+		u16 degamma_lut_size;
+		u16 gamma_lut_size;
+	} color;
 };
 
 #undef DEFINE_FLAG

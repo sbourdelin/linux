@@ -4854,7 +4854,7 @@ static void ironlake_crtc_enable(struct drm_crtc *crtc)
 	 * On ILK+ LUT must be loaded before the pipe is running but with
 	 * clocks enabled
 	 */
-	intel_color_load_gamma_lut(crtc);
+	intel_color_load_luts(crtc);
 
 	intel_update_watermarks(crtc);
 	intel_enable_pipe(intel_crtc);
@@ -4949,7 +4949,7 @@ static void haswell_crtc_enable(struct drm_crtc *crtc)
 	 * On ILK+ LUT must be loaded before the pipe is running but with
 	 * clocks enabled
 	 */
-	intel_color_load_gamma_lut(crtc);
+	intel_color_load_luts(crtc);
 
 	intel_ddi_set_pipe_settings(crtc);
 	if (!intel_crtc->config->has_dsi_encoder)
@@ -6164,7 +6164,7 @@ static void valleyview_crtc_enable(struct drm_crtc *crtc)
 
 	i9xx_pfit_enable(intel_crtc);
 
-	intel_color_load_gamma_lut(crtc);
+	intel_color_load_luts(crtc);
 
 	intel_enable_pipe(intel_crtc);
 
@@ -6217,7 +6217,7 @@ static void i9xx_crtc_enable(struct drm_crtc *crtc)
 
 	i9xx_pfit_enable(intel_crtc);
 
-	intel_color_load_gamma_lut(crtc);
+	intel_color_load_luts(crtc);
 
 	intel_update_watermarks(crtc);
 	intel_enable_pipe(intel_crtc);
@@ -11903,7 +11903,7 @@ static int intel_crtc_atomic_check(struct drm_crtc *crtc,
 
 static const struct drm_crtc_helper_funcs intel_helper_funcs = {
 	.mode_set_base_atomic = intel_pipe_set_base_atomic,
-	.load_lut = intel_color_load_gamma_lut,
+	.load_lut = intel_color_legacy_load_lut,
 	.atomic_begin = intel_begin_crtc_commit,
 	.atomic_flush = intel_finish_crtc_commit,
 	.atomic_check = intel_crtc_atomic_check,
@@ -13433,6 +13433,17 @@ static int intel_atomic_commit(struct drm_device *dev,
 			hw_check = true;
 		}
 
+		if (!modeset &&
+		    crtc->state->active &&
+		    crtc->state->color_mgmt_changed) {
+			/* Only update color management when not doing
+			 * a modeset as this will be done by
+			 * crtc_enable already.
+			 */
+			intel_color_set_csc(crtc);
+			intel_color_load_luts(crtc);
+		}
+
 		if (!modeset)
 			intel_pre_plane_update(intel_crtc);
 
@@ -13524,6 +13535,7 @@ out:
 static const struct drm_crtc_funcs intel_crtc_funcs = {
 	.gamma_set = intel_color_legacy_gamma_set,
 	.set_config = drm_atomic_helper_set_config,
+	.set_property = drm_atomic_helper_crtc_set_property,
 	.destroy = intel_crtc_destroy,
 	.page_flip = intel_crtc_page_flip,
 	.atomic_duplicate_state = intel_crtc_duplicate_state,

@@ -507,6 +507,8 @@ struct intel_crtc_state {
 	/* IVB sprite scaling w/a (WaCxSRDisabledForSpriteScaling:ivb) */
 	bool disable_lp_wm;
 
+	uint32_t gamma_mode;
+
 	struct {
 		/*
 		 * optimal watermarks, programmed post-vblank when this state
@@ -1622,9 +1624,11 @@ extern const struct drm_plane_helper_funcs intel_plane_helper_funcs;
 
 /* intel_color.c */
 void intel_color_init(struct drm_crtc *crtc);
+void intel_color_update(struct drm_crtc *crtc);
 void intel_color_set_csc(struct drm_crtc *crtc);
-void intel_color_load_gamma_lut(struct drm_crtc *crtc);
+void intel_color_load_luts(struct drm_crtc *crtc);
 void intel_color_legacy_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				  u16 *blue, uint32_t start, uint32_t size);
+void intel_color_legacy_load_lut(struct drm_crtc *crtc);
 
 #endif /* __INTEL_DRV_H__ */
