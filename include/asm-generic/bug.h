@@ -90,13 +90,25 @@ extern void warn_slowpath_null(const char *file, const int line);
 })
 #endif
 
+#ifdef CONFIG_DEBUG_WARN
 #ifndef WARN
-#define WARN(condition, format...) ({						\
+#define WARN(condition, format...) ({					\
+	int __ret_warn_on = !!(condition);				\
+	if (unlikely(__ret_warn_on))					\
+		__WARN_printf(format);					\
+	BUG();								\
+	unlikely(__ret_warn_on);					\
+})
+#endif
+#else
+#ifndef WARN
+#define WARN(condition, format...) ({					\
 	int __ret_warn_on = !!(condition);				\
 	if (unlikely(__ret_warn_on))					\
 		__WARN_printf(format);					\
 	unlikely(__ret_warn_on);					\
 })
+#endif
 #endif
 
 #define WARN_TAINT(condition, taint, format...) ({			\
