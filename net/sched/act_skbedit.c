@@ -23,6 +23,7 @@
 #include <linux/rtnetlink.h>
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
+#include <net/switchdev.h>
 
 #include <linux/tc_act/tc_skbedit.h>
 #include <net/tc_act/tc_skbedit.h>
@@ -173,6 +174,22 @@ nla_put_failure:
 	return -1;
 }
 
+static int tcf_skbedit_offload_init(struct tc_action *a,
+				    struct switchdev_obj_port_flow_act *obj)
+{
+	struct tcf_skbedit *d = a->priv;
+
+	if (d->flags == SKBEDIT_F_MARK) {
+		obj->actions |= BIT(SWITCHDEV_OBJ_PORT_FLOW_ACT_MARK);
+		obj->mark = d->mark;
+
+		return 0;
+	}
+
+	pr_err("Only 'mark' is supported for offloaded skbedit\n");
+	return -ENOTSUPP;
+}
+
 static struct tc_action_ops act_skbedit_ops = {
 	.kind		=	"skbedit",
 	.type		=	TCA_ACT_SKBEDIT,
@@ -180,6 +197,7 @@ static struct tc_action_ops act_skbedit_ops = {
 	.act		=	tcf_skbedit,
 	.dump		=	tcf_skbedit_dump,
 	.init		=	tcf_skbedit_init,
+	.offload_init	=	tcf_skbedit_offload_init,
 };
 
 MODULE_AUTHOR("Alexander Duyck, <alexander.h.duyck@intel.com>");
