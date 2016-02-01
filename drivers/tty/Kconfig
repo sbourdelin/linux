@@ -259,6 +259,16 @@ config MOXA_SMARTIO
 	  This driver can also be built as a module. The module will be called
 	  mxser. If you want to do that, say M here.
 
+config MOXA_SMARTIO_MUE
+	tristate "Moxa SmartIO MUE support"
+	depends on SERIAL_NONSTANDARD && PCI
+	help
+	  Say Y here if you have a Moxa SmartIO MUE multiport serial card
+	  and/or want to help develop a new version of this driver.
+
+	  This driver can also be built as a module. The module will be called
+	  mxupcie. If you want to do that, say M here.
+
 config SYNCLINK
 	tristate "Microgate SyncLink card support"
 	depends on SERIAL_NONSTANDARD && PCI && ISA_DMA_API

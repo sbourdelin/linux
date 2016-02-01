@@ -21,6 +21,7 @@ obj-$(CONFIG_CYCLADES)		+= cyclades.o
 obj-$(CONFIG_ISI)		+= isicom.o
 obj-$(CONFIG_MOXA_INTELLIO)	+= moxa.o
 obj-$(CONFIG_MOXA_SMARTIO)	+= mxser.o
+obj-$(CONFIG_MOXA_SMARTIO_MUE)  += mxupcie.o
 obj-$(CONFIG_NOZOMI)		+= nozomi.o
 obj-$(CONFIG_ROCKETPORT)	+= rocket.o
 obj-$(CONFIG_SYNCLINK_GT)	+= synclink_gt.o
