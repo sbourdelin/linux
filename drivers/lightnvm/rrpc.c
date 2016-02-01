@@ -733,6 +733,7 @@ static int rrpc_read_ppalist_rq(struct rrpc *rrpc, struct bio *bio,
 		} else {
 			BUG_ON(is_gc);
 			rrpc_unlock_laddr(rrpc, r);
+			rrpc_invalidate_range(rrpc, laddr, i + 1);
 			nvm_dev_dma_free(rrpc->dev, rqd->ppa_list,
 							rqd->dma_ppa_list);
 			return NVM_IO_DONE;
