@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
+#include <net/switchdev.h>
 #include <linux/tc_act/tc_gact.h>
 #include <net/tc_act/tc_gact.h>
 
@@ -183,6 +184,21 @@ nla_put_failure:
 	return -1;
 }
 
+static int tcf_gact_offload_init(struct tc_action *a,
+				 struct switchdev_obj_port_flow_act *obj)
+{
+	struct tcf_gact *gact = a->priv;
+
+	if (gact->tcf_action == TC_ACT_SHOT) {
+		obj->actions |= BIT(SWITCHDEV_OBJ_PORT_FLOW_ACT_DROP);
+
+		return 0;
+	}
+
+	pr_err("Only 'drop' is supported for offloaded gact\n");
+	return -ENOTSUPP;
+}
+
 static struct tc_action_ops act_gact_ops = {
 	.kind		=	"gact",
 	.type		=	TCA_ACT_GACT,
@@ -190,6 +206,7 @@ static struct tc_action_ops act_gact_ops = {
 	.act		=	tcf_gact,
 	.dump		=	tcf_gact_dump,
 	.init		=	tcf_gact_init,
+	.offload_init	=	tcf_gact_offload_init,
 };
 
 MODULE_AUTHOR("Jamal Hadi Salim(2002-4)");
