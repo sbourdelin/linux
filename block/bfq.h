@@ -88,8 +88,23 @@ struct bfq_sched_data {
 };
 
 /**
+ * struct bfq_weight_counter - counter of the number of all active entities
+ *                             with a given weight.
+ * @weight: weight of the entities that this counter refers to.
+ * @num_active: number of active entities with this weight.
+ * @weights_node: weights tree member (see bfq_data's @queue_weights_tree
+ *                and @group_weights_tree).
+ */
+struct bfq_weight_counter {
+	short int weight;
+	unsigned int num_active;
+	struct rb_node weights_node;
+};
+
+/**
  * struct bfq_entity - schedulable entity.
  * @rb_node: service_tree member.
+ * @weight_counter: pointer to the weight counter associated with this entity.
  * @on_st: flag, true if the entity is on a tree (either the active or
  *         the idle one of its service_tree).
  * @finish: B-WF2Q+ finish timestamp (aka F_i).
@@ -136,6 +151,7 @@ struct bfq_sched_data {
  */
 struct bfq_entity {
 	struct rb_node rb_node;
+	struct bfq_weight_counter *weight_counter;
 
 	int on_st;
 
@@ -332,6 +348,22 @@ enum bfq_device_speed {
  * struct bfq_data - per device data structure.
  * @queue: request queue for the managed device.
  * @root_group: root bfq_group for the device.
+ * @active_numerous_groups: number of bfq_groups containing more than one
+ *                          active @bfq_entity.
+ * @queue_weights_tree: rbtree of weight counters of @bfq_queues, sorted by
+ *                      weight. Used to keep track of whether all @bfq_queues
+ *                     have the same weight. The tree contains one counter
+ *                     for each distinct weight associated to some active
+ *                     and not weight-raised @bfq_queue (see the comments to
+ *                      the functions bfq_weights_tree_[add|remove] for
+ *                     further details).
+ * @group_weights_tree: rbtree of non-queue @bfq_entity weight counters, sorted
+ *                      by weight. Used to keep track of whether all
+ *                     @bfq_groups have the same weight. The tree contains
+ *                     one counter for each distinct weight associated to
+ *                     some active @bfq_group (see the comments to the
+ *                     functions bfq_weights_tree_[add|remove] for further
+ *                     details).
  * @busy_queues: number of bfq_queues containing requests (including the
  *		 queue in service, even if it is idling).
  * @wr_busy_queues: number of weight-raised busy @bfq_queues.
@@ -408,6 +440,13 @@ struct bfq_data {
 	struct request_queue *queue;
 
 	struct bfq_group *root_group;
+
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	int active_numerous_groups;
+#endif
+
+	struct rb_root queue_weights_tree;
+	struct rb_root group_weights_tree;
 
 	int busy_queues;
 	int wr_busy_queues;
@@ -630,6 +669,11 @@ struct bfq_group_data {
  *             to avoid too many special cases during group creation/
  *             migration.
  * @stats: stats for this bfqg.
+ * @active_entities: number of active entities belonging to the group;
+ *                   unused for the root group. Used to know whether there
+ *                   are groups with more than one active @bfq_entity
+ *                   (see the comments to the function
+ *                   bfq_bfqq_may_idle()).
  * @rq_pos_tree: rbtree sorted by next_request position, used when
  *               determining if two or more queues have interleaving
  *               requests (see bfq_find_close_cooperator()).
@@ -656,6 +700,8 @@ struct bfq_group {
 	struct bfq_queue *async_idle_bfqq;
 
 	struct bfq_entity *my_entity;
+
+	int active_entities;
 
 	struct rb_root rq_pos_tree;
 

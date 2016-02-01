@@ -500,6 +500,15 @@ up:
 	goto up;
 }
 
+static void bfq_weights_tree_add(struct bfq_data *bfqd,
+				 struct bfq_entity *entity,
+				 struct rb_root *root);
+
+static void bfq_weights_tree_remove(struct bfq_data *bfqd,
+				    struct bfq_entity *entity,
+				    struct rb_root *root);
+
+
 /**
  * bfq_active_insert - insert an entity in the active tree of its
  *                     group/device.
@@ -538,6 +547,16 @@ static void bfq_active_insert(struct bfq_service_tree *st,
 #endif
 	if (bfqq)
 		list_add(&bfqq->bfqq_list, &bfqq->bfqd->active_list);
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	else /* bfq_group */
+		bfq_weights_tree_add(bfqd, entity, &bfqd->group_weights_tree);
+
+	if (bfqg != bfqd->root_group) {
+		bfqg->active_entities++;
+		if (bfqg->active_entities == 2)
+			bfqd->active_numerous_groups++;
+	}
+#endif
 }
 
 /**
@@ -633,6 +652,17 @@ static void bfq_active_extract(struct bfq_service_tree *st,
 #endif
 	if (bfqq)
 		list_del(&bfqq->bfqq_list);
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	else /* bfq_group */
+		bfq_weights_tree_remove(bfqd, entity,
+					&bfqd->group_weights_tree);
+
+	if (bfqg != bfqd->root_group) {
+		bfqg->active_entities--;
+		if (bfqg->active_entities == 1)
+			bfqd->active_numerous_groups--;
+	}
+#endif
 }
 
 /**
@@ -730,6 +760,7 @@ __bfq_entity_update_weight_prio(struct bfq_service_tree *old_st,
 		struct bfq_queue *bfqq = bfq_entity_to_bfqq(entity);
 		unsigned short prev_weight, new_weight;
 		struct bfq_data *bfqd = NULL;
+		struct rb_root *root;
 #ifdef CONFIG_CFQ_GROUP_IOSCHED
 		struct bfq_sched_data *sd;
 		struct bfq_group *bfqg;
@@ -779,7 +810,26 @@ __bfq_entity_update_weight_prio(struct bfq_service_tree *old_st,
 		prev_weight = entity->weight;
 		new_weight = entity->orig_weight *
 			     (bfqq ? bfqq->wr_coeff : 1);
+		/*
+		 * If the weight of the entity changes, remove the entity
+		 * from its old weight counter (if there is a counter
+		 * associated with the entity), and add it to the counter
+		 * associated with its new weight.
+		 */
+		if (prev_weight != new_weight) {
+			root = bfqq ? &bfqd->queue_weights_tree :
+				      &bfqd->group_weights_tree;
+			bfq_weights_tree_remove(bfqd, entity, root);
+		}
 		entity->weight = new_weight;
+		/*
+		 * Add the entity to its weights tree only if it is
+		 * not associated with a weight-raised queue.
+		 */
+		if (prev_weight != new_weight &&
+		    (bfqq ? bfqq->wr_coeff == 1 : 1))
+			/* If we get here, root has been initialized. */
+			bfq_weights_tree_add(bfqd, entity, root);
 
 		new_st->wsum += entity->weight;
 
@@ -1228,6 +1278,9 @@ static void bfq_del_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 
 	bfqd->busy_queues--;
 
+	if (!bfqq->dispatched)
+		bfq_weights_tree_remove(bfqd, &bfqq->entity,
+					&bfqd->queue_weights_tree);
 	if (bfqq->wr_coeff > 1)
 		bfqd->wr_busy_queues--;
 
@@ -1250,6 +1303,9 @@ static void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 	bfq_mark_bfqq_busy(bfqq);
 	bfqd->busy_queues++;
 
+	if (!bfqq->dispatched && bfqq->wr_coeff == 1)
+		bfq_weights_tree_add(bfqd, &bfqq->entity,
+				     &bfqd->queue_weights_tree);
 	if (bfqq->wr_coeff > 1)
 		bfqd->wr_busy_queues++;
 }
@@ -1675,6 +1731,7 @@ static void bfq_pd_init(struct blkg_policy_data *pd)
 				   * in bfq_init_queue()
 				   */
 	bfqg->bfqd = bfqd;
+	bfqg->active_entities = 0;
 	bfqg->rq_pos_tree = RB_ROOT;
 }
 
@@ -2567,6 +2624,146 @@ static void bfq_pos_tree_add_move(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 		rb_insert_color(&bfqq->pos_node, bfqq->pos_root);
 	} else
 		bfqq->pos_root = NULL;
+}
+
+/*
+ * Tell whether there are active queues or groups with differentiated weights.
+ */
+static bool bfq_differentiated_weights(struct bfq_data *bfqd)
+{
+	/*
+	 * For weights to differ, at least one of the trees must contain
+	 * at least two nodes.
+	 */
+	return (!RB_EMPTY_ROOT(&bfqd->queue_weights_tree) &&
+		(bfqd->queue_weights_tree.rb_node->rb_left ||
+		 bfqd->queue_weights_tree.rb_node->rb_right)
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	       ) ||
+	       (!RB_EMPTY_ROOT(&bfqd->group_weights_tree) &&
+		(bfqd->group_weights_tree.rb_node->rb_left ||
+		 bfqd->group_weights_tree.rb_node->rb_right)
+#endif
+	       );
+}
+
+/*
+ * The following function returns true if every queue must receive the
+ * same share of the throughput (this condition is used when deciding
+ * whether idling may be disabled, see the comments in the function
+ * bfq_bfqq_may_idle()).
+ *
+ * Such a scenario occurs when:
+ * 1) all active queues have the same weight,
+ * 2) all active groups at the same level in the groups tree have the same
+ *    weight,
+ * 3) all active groups at the same level in the groups tree have the same
+ *    number of children.
+ *
+ * Unfortunately, keeping the necessary state for evaluating exactly the
+ * above symmetry conditions would be quite complex and time-consuming.
+ * Therefore this function evaluates, instead, the following stronger
+ * sub-conditions, for which it is much easier to maintain the needed
+ * state:
+ * 1) all active queues have the same weight,
+ * 2) all active groups have the same weight,
+ * 3) all active groups have at most one active child each.
+ * In particular, the last two conditions are always true if hierarchical
+ * support and the cgroups interface are not enabled, thus no state needs
+ * to be maintained in this case.
+ */
+static bool bfq_symmetric_scenario(struct bfq_data *bfqd)
+{
+	return
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+		!bfqd->active_numerous_groups &&
+#endif
+		!bfq_differentiated_weights(bfqd);
+}
+
+/*
+ * If the weight-counter tree passed as input contains no counter for
+ * the weight of the input entity, then add that counter; otherwise just
+ * increment the existing counter.
+ *
+ * Note that weight-counter trees contain few nodes in mostly symmetric
+ * scenarios. For example, if all queues have the same weight, then the
+ * weight-counter tree for the queues may contain at most one node.
+ * This holds even if low_latency is on, because weight-raised queues
+ * are not inserted in the tree.
+ * In most scenarios, the rate at which nodes are created/destroyed
+ * should be low too.
+ */
+static void bfq_weights_tree_add(struct bfq_data *bfqd,
+				 struct bfq_entity *entity,
+				 struct rb_root *root)
+{
+	struct rb_node **new = &(root->rb_node), *parent = NULL;
+
+	/*
+	 * Do not insert if the entity is already associated with a
+	 * counter, which happens if:
+	 *   1) the entity is associated with a queue,
+	 *   2) a request arrival has caused the queue to become both
+	 *      non-weight-raised, and hence change its weight, and
+	 *      backlogged; in this respect, each of the two events
+	 *      causes an invocation of this function,
+	 *   3) this is the invocation of this function caused by the
+	 *      second event. This second invocation is actually useless,
+	 *      and we handle this fact by exiting immediately. More
+	 *      efficient or clearer solutions might possibly be adopted.
+	 */
+	if (entity->weight_counter)
+		return;
+
+	while (*new) {
+		struct bfq_weight_counter *__counter = container_of(*new,
+						struct bfq_weight_counter,
+						weights_node);
+		parent = *new;
+
+		if (entity->weight == __counter->weight) {
+			entity->weight_counter = __counter;
+			goto inc_counter;
+		}
+		if (entity->weight < __counter->weight)
+			new = &((*new)->rb_left);
+		else
+			new = &((*new)->rb_right);
+	}
+
+	entity->weight_counter = kzalloc(sizeof(struct bfq_weight_counter),
+					 GFP_ATOMIC);
+	entity->weight_counter->weight = entity->weight;
+	rb_link_node(&entity->weight_counter->weights_node, parent, new);
+	rb_insert_color(&entity->weight_counter->weights_node, root);
+
+inc_counter:
+	entity->weight_counter->num_active++;
+}
+
+/*
+ * Decrement the weight counter associated with the entity, and, if the
+ * counter reaches 0, remove the counter from the tree.
+ * See the comments to the function bfq_weights_tree_add() for considerations
+ * about overhead.
+ */
+static void bfq_weights_tree_remove(struct bfq_data *bfqd,
+				    struct bfq_entity *entity,
+				    struct rb_root *root)
+{
+	if (!entity->weight_counter)
+		return;
+
+	entity->weight_counter->num_active--;
+	if (entity->weight_counter->num_active > 0)
+		goto reset_entity_pointer;
+
+	rb_erase(&entity->weight_counter->weights_node, root);
+	kfree(entity->weight_counter);
+
+reset_entity_pointer:
+	entity->weight_counter = NULL;
 }
 
 static struct request *bfq_find_next_rq(struct bfq_data *bfqd,
@@ -3541,17 +3738,21 @@ static void bfq_arm_slice_timer(struct bfq_data *bfqd)
 	 */
 	sl = bfqd->bfq_slice_idle;
 	/*
-	 * Unless the queue is being weight-raised, grant only minimum
-	 * idle time if the queue either has been seeky for long
-	 * enough or has already proved to be constantly seeky. A long
-	 * idling is preserved for a weight-raised queue, because it
-	 * is needed for guaranteeing to the queue its reserved share of
-	 * the throughput.
+	 * Unless the queue is being weight-raised or the scenario is
+	 * asymemtric, grant only minimum idle time if the queue
+	 * either has been seeky for long enough or has already proved
+	 * to be constantly seeky. A long idling is preserved for a
+	 * weight-raised queue, or, more in general, in an asymemtric
+	 * scenario, because a long idling is needed for guaranteeing
+	 * to a queue its reserved share of the throughput (in
+	 * particular, it is needed if the queue has a higher weight
+	 * than some other queue).
 	 */
 	if (bfq_sample_valid(bfqq->seek_samples) &&
 	    ((BFQQ_SEEKY(bfqq) && bfqq->entity.service >
 				  bfq_max_budget(bfqq->bfqd) / 8) ||
-	      bfq_bfqq_constantly_seeky(bfqq)) && bfqq->wr_coeff == 1)
+	      bfq_bfqq_constantly_seeky(bfqq)) && bfqq->wr_coeff == 1 &&
+		bfq_symmetric_scenario(bfqd))
 		sl = min(sl, msecs_to_jiffies(BFQ_MIN_TT));
 	else if (bfqq->wr_coeff > 1)
 		sl = sl * 3;
@@ -5250,6 +5451,10 @@ static void bfq_completed_request(struct request_queue *q, struct request *rq)
 				     rq_io_start_time_ns(rq), rq->cmd_flags);
 #endif
 
+	if (!bfqq->dispatched && !bfq_bfqq_busy(bfqq))
+		bfq_weights_tree_remove(bfqd, &bfqq->entity,
+					&bfqd->queue_weights_tree);
+
 	if (sync) {
 		bfqd->sync_flight--;
 		RQ_BIC(rq)->ttime.last_end_request = jiffies;
@@ -5647,10 +5852,16 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 		goto out_free;
 	bfq_init_root_group(bfqd->root_group, bfqd);
 	bfq_init_entity(&bfqd->oom_bfqq.entity, bfqd->root_group);
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	bfqd->active_numerous_groups = 0;
+#endif
 
 	init_timer(&bfqd->idle_slice_timer);
 	bfqd->idle_slice_timer.function = bfq_idle_slice_timer;
 	bfqd->idle_slice_timer.data = (unsigned long)bfqd;
+
+	bfqd->queue_weights_tree = RB_ROOT;
+	bfqd->group_weights_tree = RB_ROOT;
 
 	INIT_WORK(&bfqd->unplug_work, bfq_kick_queue);
 
