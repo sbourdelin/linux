@@ -190,6 +190,10 @@ struct bfq_group;
  *                         within an idle time slice; used only if the queue's
  *                         IO_bound has been cleared.
  * @pid: pid of the process owning the queue, used for logging purposes.
+ * @last_wr_start_finish: start time of the current weight-raising period if
+ *                        the @bfq-queue is being weight-raised, otherwise
+ *                        finish time of the last weight-raising period
+ * @wr_cur_max_time: current max raising time for this queue
  *
  * A bfq_queue is a leaf request queue; it can be associated with an
  * io_context or more, if it is async. @cgroup holds a reference to
@@ -231,6 +235,11 @@ struct bfq_queue {
 	unsigned int requests_within_timer;
 
 	pid_t pid;
+
+	/* weight-raising fields */
+	unsigned long wr_cur_max_time;
+	unsigned long last_wr_start_finish;
+	unsigned int wr_coeff;
 };
 
 /**
@@ -319,6 +328,19 @@ enum bfq_device_speed {
  *                             again idling to a queue which was marked as
  *                             non-I/O-bound (see the definition of the
  *                             IO_bound flag for further details).
+ * @low_latency: if set to true, low-latency heuristics are enabled.
+ * @bfq_wr_coeff: maximum factor by which the weight of a weight-raised
+ *                queue is multiplied.
+ * @bfq_wr_max_time: maximum duration of a weight-raising period (jiffies).
+ * @bfq_wr_min_idle_time: minimum idle period after which weight-raising
+ *			  may be reactivated for a queue (in jiffies).
+ * @bfq_wr_min_inter_arr_async: minimum period between request arrivals
+ *				after which weight-raising may be
+ *				reactivated for an already busy queue
+ *				(in jiffies).
+ * @RT_prod: cached value of the product R*T used for computing the maximum
+ *	     duration of the weight raising automatically.
+ * @device_speed: device-speed class for the low-latency heuristic.
  * @oom_bfqq: fallback dummy bfqq for extreme OOM conditions.
  *
  * All the fields are protected by the @queue lock.
@@ -367,6 +389,16 @@ struct bfq_data {
 	unsigned int bfq_timeout[2];
 
 	unsigned int bfq_requests_within_timer;
+
+	bool low_latency;
+
+	/* parameters of the low_latency heuristics */
+	unsigned int bfq_wr_coeff;
+	unsigned int bfq_wr_max_time;
+	unsigned int bfq_wr_min_idle_time;
+	unsigned long bfq_wr_min_inter_arr_async;
+	u64 RT_prod;
+	enum bfq_device_speed device_speed;
 
 	struct bfq_queue oom_bfqq;
 };
@@ -637,6 +669,8 @@ static void bfq_dispatch_insert(struct request_queue *q, struct request *rq);
 static struct bfq_queue *bfq_get_queue(struct bfq_data *bfqd,
 				       struct bio *bio, int is_sync,
 				       struct bfq_io_cq *bic, gfp_t gfp_mask);
+static void bfq_end_wr_async_queues(struct bfq_data *bfqd,
+				    struct bfq_group *bfqg);
 static void bfq_put_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
 static void bfq_exit_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 
