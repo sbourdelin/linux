@@ -439,7 +439,10 @@ void __init xen_init_time_ops(void)
 {
 	pv_time_ops = xen_time_ops;
 
-	x86_init.timers.timer_init = xen_time_init;
+	if (!xen_hvmlite)
+		x86_init.timers.timer_init = xen_time_init;
+	else
+		x86_init.timers.timer_init = x86_init_noop;
 	x86_init.timers.setup_percpu_clockev = x86_init_noop;
 	x86_cpuinit.setup_percpu_clockev = x86_init_noop;
 
