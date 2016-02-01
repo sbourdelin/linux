@@ -80,10 +80,17 @@ static ssize_t
 stp_policy_node_masters_show(struct config_item *item, char *page)
 {
 	struct stp_policy_node *policy_node = to_stp_policy_node(item);
+	struct stm_device *stm = policy_node->policy->stm;
+	int first_master, last_master;
 	ssize_t count;
 
-	count = sprintf(page, "%u %u\n", policy_node->first_master,
-			policy_node->last_master);
+	first_master = policy_node->first_master;
+	last_master = policy_node->last_master;
+
+	if (stm && stm->data->mstatic)
+		first_master = last_master = STM_STATIC_MASTERID;
+
+	count = sprintf(page, "%d %d\n", first_master, last_master);
 
 	return count;
 }
@@ -104,6 +111,13 @@ stp_policy_node_masters_store(struct config_item *item, const char *page,
 	mutex_lock(&stp_policy_subsys.su_mutex);
 	stm = policy_node->policy->stm;
 	if (!stm)
+		goto unlock;
+
+	/*
+	 * masterIDs are statically allocated in HW, no point in trying to
+	 * change their values.
+	 */
+	if (stm->data->mstatic)
 		goto unlock;
 
 	/* must be within [sw_start..sw_end], which is an inclusive range */
@@ -325,6 +339,7 @@ stp_policies_make(struct config_group *group, const char *name)
 	 * number of dot(s) are found in the <device_name>, the
 	 * first matched STM device name would be extracted.
 	 */
+
 	for (p = devname; ; p++) {
 		p = strchr(p, '.');
 		if (!p) {
