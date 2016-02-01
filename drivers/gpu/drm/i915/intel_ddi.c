@@ -707,6 +707,9 @@ intel_ddi_get_crtc_new_encoder(struct intel_crtc_state *crtc_state)
 	int i;
 
 	state = crtc_state->base.state;
+	/* Use get_crtc_encoder() for non-atomic paths */
+	if (!state)
+		return intel_ddi_get_crtc_encoder(crtc_state->base.crtc);
 
 	for_each_connector_in_state(state, connector, connector_state, i) {
 		if (connector_state->crtc != crtc_state->base.crtc)
