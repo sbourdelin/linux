@@ -72,7 +72,27 @@ enum {
 	REG_UIC_COMMAND_ARG_1			= 0x94,
 	REG_UIC_COMMAND_ARG_2			= 0x98,
 	REG_UIC_COMMAND_ARG_3			= 0x9C,
+
+/* DWC UFS HC specific Registers */
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+	DWC_UFS_REG_HCLKDIV			= 0xFC,
+#endif
 };
+
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+/* Link Status*/
+enum {
+	UFSHCD_LINK_IS_DOWN			= 1,
+	UFSHCD_LINK_IS_UP			= 2,
+};
+
+/* Clock Divider Values: Hex equivalent of frequency in MHz */
+enum {
+	UFSHCD_CLK_DIV_62_5			= 0x3e,
+	UFSHCD_CLK_DIV_125			= 0x7d,
+	UFSHCD_CLK_DIV_200			= 0xc8,
+};
+#endif
 
 /* Controller capability masks */
 enum {
@@ -207,6 +227,14 @@ enum {
 #define CONFIG_RESULT_CODE_MASK		0xFF
 #define GENERIC_ERROR_CODE_MASK		0xFF
 
+/* Selector Index */
+enum selector_index {
+	SELIND_LN0_TX		= 0x00,
+	SELIND_LN1_TX		= 0x01,
+	SELIND_LN0_RX		= 0x04,
+	SELIND_LN1_RX		= 0x05,
+};
+
 /* GenSelectorIndex calculation macros for M-PHY attributes */
 #define UIC_ARG_MPHY_TX_GEN_SEL_INDEX(lane) (lane)
 
@@ -273,6 +301,7 @@ enum {
 	UTP_CMD_TYPE_SCSI		= 0x0,
 	UTP_CMD_TYPE_UFS		= 0x1,
 	UTP_CMD_TYPE_DEV_MANAGE		= 0x2,
+	UTP_CMD_TYPE_UFS_STORAGE	= 0x11,
 };
 
 enum {

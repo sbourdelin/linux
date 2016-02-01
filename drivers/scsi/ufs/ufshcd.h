@@ -554,6 +554,10 @@ static inline bool ufshcd_can_autobkops_during_suspend(struct ufs_hba *hba)
 
 static inline bool ufshcd_is_intr_aggr_allowed(struct ufs_hba *hba)
 {
+/* DWC Core accepts both IRQ types but does not have this info in HW */
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+	return true;
+#endif
 	if ((hba->caps & UFSHCD_CAP_INTR_AGGR) &&
 	    !(hba->quirks & UFSHCD_QUIRK_BROKEN_INTR_AGGR))
 		return true;
@@ -587,6 +591,17 @@ int ufshcd_alloc_host(struct device *, struct ufs_hba **);
 void ufshcd_dealloc_host(struct ufs_hba *);
 int ufshcd_init(struct ufs_hba * , void __iomem * , unsigned int);
 void ufshcd_remove(struct ufs_hba *);
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+void ufshcd_dwc_program_clk_div(struct ufs_hba *, u32);
+int ufshcd_dwc_link_is_up(struct ufs_hba *);
+int ufshcd_dwc_connection_setup(struct ufs_hba *);
+int ufshcd_dwc_setup_20bit_rmmi_lane0(struct ufs_hba *);
+int ufshcd_dwc_setup_20bit_rmmi_lane1(struct ufs_hba *);
+int ufshcd_dwc_setup_20bit_rmmi(struct ufs_hba *);
+int ufshcd_dwc_setup_40bit_rmmi(struct ufs_hba *);
+int ufshcd_dwc_setup_mphy(struct ufs_hba *);
+int ufshcd_dwc_host_configuration(struct ufs_hba *);
+#endif
 
 /**
  * ufshcd_hba_stop - Send controller to reset state
