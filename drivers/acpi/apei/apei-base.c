@@ -536,6 +536,11 @@ int apei_resources_request(struct apei_resources *resources,
 		goto err_unmap_ioport;
 	}
 
+	/* Cleanup unmerged resources */
+	if (arch_apei_filter_addr)
+		apei_resources_fini(&arch_res);
+	apei_resources_fini(&nvs_resources);
+
 	return 0;
 err_unmap_ioport:
 	list_for_each_entry(res, &resources->ioport, list) {
