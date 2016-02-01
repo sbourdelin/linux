@@ -754,6 +754,7 @@ struct intel_dp {
 	uint32_t DP;
 	int link_rate;
 	uint8_t lane_count;
+	uint8_t sink_count;
 	bool has_audio;
 	enum hdmi_force_audio force_audio;
 	bool limited_color_range;
