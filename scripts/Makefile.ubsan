@@ -18,4 +18,9 @@ endif
       # -fsanitize=* options makes GCC less smart than usual and
       # increase number of 'maybe-uninitialized false-positives
       CFLAGS_UBSAN += $(call cc-option, -Wno-maybe-uninitialized)
+
+      KBUILD_CFLAGS += $(CFLAGS_UBSAN)
+      export DISABLE_UBSAN
+      DISABLE_UBSAN := $(call cc-option, -fno-sanitize=undefined)
+      DISABLE_UBSAN += $(call cc-option, -Wmaybe-uninitialized)
 endif

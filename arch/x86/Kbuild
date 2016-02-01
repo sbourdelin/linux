@@ -21,3 +21,5 @@ obj-y += platform/
 obj-y += net/
 
 obj-$(CONFIG_KEXEC_FILE) += purgatory/
+
+subdir-ccflags-$(CONFIG_UBSAN_ALIGNMENT) := $(call cc-option, -fno-sanitize=alignment)
