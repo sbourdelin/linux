@@ -168,6 +168,10 @@ struct bfq_group;
  * @ioprio_class: the ioprio_class in use.
  * @new_ioprio_class: when an ioprio_class change is requested, the new
  *                    ioprio_class value.
+ * @new_bfqq: shared bfq_queue if queue is cooperating with
+ *           one or more other queues.
+ * @pos_node: request-position tree member (see bfq_group's @rq_pos_tree).
+ * @pos_root: request-position tree root (see bfq_group's @rq_pos_tree).
  * @sort_list: sorted list of pending requests.
  * @next_rq: if fifo isn't expired, next request to serve.
  * @queued: nr of requests queued in @sort_list.
@@ -205,13 +209,16 @@ struct bfq_group;
  * @service_from_backlogged: cumulative service received from the @bfq_queue
  *                           since the last transition from idle to
  *                           backlogged
+ * @bic: pointer to the bfq_io_cq owning the bfq_queue, set to %NULL if the
+ *	 queue is shared
  *
  * A bfq_queue is a leaf request queue; it can be associated with an
- * io_context or more, if it is async. @cgroup holds a reference to
- * the cgroup, to be sure that it does not disappear while a bfqq
- * still references it (mostly to avoid races between request issuing
- * and task migration followed by cgroup destruction).  All the fields
- * are protected by the queue lock of the containing bfqd.
+ * io_context or more, if it  is  async or shared  between  cooperating
+ * processes. @cgroup holds a reference to the cgroup, to be sure that it
+ * does not disappear while a bfqq still references it (mostly to avoid
+ * races between request issuing and task migration followed by cgroup
+ * destruction).
+ * All the fields are protected by the queue lock of the containing bfqd.
  */
 struct bfq_queue {
 	atomic_t ref;
@@ -219,6 +226,11 @@ struct bfq_queue {
 
 	unsigned short ioprio, new_ioprio;
 	unsigned short ioprio_class, new_ioprio_class;
+
+	/* fields for cooperating queues handling */
+	struct bfq_queue *new_bfqq;
+	struct rb_node pos_node;
+	struct rb_root *pos_root;
 
 	struct rb_root sort_list;
 	struct request *next_rq;
@@ -246,6 +258,7 @@ struct bfq_queue {
 	unsigned int requests_within_timer;
 
 	pid_t pid;
+	struct bfq_io_cq *bic;
 
 	/* weight-raising fields */
 	unsigned long wr_cur_max_time;
@@ -277,6 +290,21 @@ struct bfq_ttime {
  * @ttime: associated @bfq_ttime struct
  * @ioprio: per (request_queue, blkcg) ioprio.
  * @blkcg_id: id of the blkcg the related io_cq belongs to.
+ * @wr_time_left: snapshot of the time left before weight raising ends
+ *                for the sync queue associated to this process; this
+ *		  snapshot is taken to remember this value while the weight
+ *		  raising is suspended because the queue is merged with a
+ *		  shared queue, and is used to set @raising_cur_max_time
+ *		  when the queue is split from the shared queue and its
+ *		  weight is raised again
+ * @saved_idle_window: same purpose as the previous field for the idle
+ *                     window
+ * @saved_IO_bound: same purpose as the previous two fields for the I/O
+ *                  bound classification of a queue
+ * @cooperations: counter of consecutive successful queue merges underwent
+ *                by any of the process' @bfq_queues
+ * @failed_cooperations: counter of consecutive failed queue merges of any
+ *                       of the process' @bfq_queues
  */
 struct bfq_io_cq {
 	struct io_cq icq; /* must be the first member */
@@ -286,6 +314,13 @@ struct bfq_io_cq {
 #ifdef CONFIG_CFQ_GROUP_IOSCHED
 	uint64_t blkcg_serial_nr; /* the current blkcg serial */
 #endif
+
+	unsigned int wr_time_left;
+	bool saved_idle_window;
+	bool saved_IO_bound;
+
+	unsigned int cooperations;
+	unsigned int failed_cooperations;
 };
 
 enum bfq_device_speed {
@@ -338,6 +373,12 @@ enum bfq_device_speed {
  *               they are charged for the whole allocated budget, to try
  *               to preserve a behavior reasonably fair among them, but
  *               without service-domain guarantees).
+ * @bfq_coop_thresh: number of queue merges after which a @bfq_queue is
+ *                   no more granted any weight-raising.
+ * @bfq_failed_cooperations: number of consecutive failed cooperation
+ *                           chances after which weight-raising is restored
+ *                           to a queue subject to more than bfq_coop_thresh
+ *                           queue merges.
  * @bfq_requests_within_timer: number of consecutive requests that must be
  *                             issued within the idle time slice to set
  *                             again idling to a queue which was marked as
@@ -407,6 +448,8 @@ struct bfq_data {
 	int bfq_max_budget_async_rq;
 	unsigned int bfq_timeout[2];
 
+	unsigned int bfq_coop_thresh;
+	unsigned int bfq_failed_cooperations;
 	unsigned int bfq_requests_within_timer;
 
 	bool low_latency;
@@ -445,6 +488,9 @@ enum bfqq_state_flags {
 					 * may need softrt-next-start
 					 * update
 					 */
+	BFQ_BFQQ_FLAG_coop,		/* bfqq is shared */
+	BFQ_BFQQ_FLAG_split_coop,	/* shared bfqq will be split */
+	BFQ_BFQQ_FLAG_just_split,	/* queue has just been split */
 };
 
 #define BFQ_BFQQ_FNS(name)						\
@@ -470,6 +516,9 @@ BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(budget_new);
 BFQ_BFQQ_FNS(IO_bound);
 BFQ_BFQQ_FNS(constantly_seeky);
+BFQ_BFQQ_FNS(coop);
+BFQ_BFQQ_FNS(split_coop);
+BFQ_BFQQ_FNS(just_split);
 BFQ_BFQQ_FNS(softrt_update);
 #undef BFQ_BFQQ_FNS
 
@@ -581,6 +630,9 @@ struct bfq_group_data {
  *             to avoid too many special cases during group creation/
  *             migration.
  * @stats: stats for this bfqg.
+ * @rq_pos_tree: rbtree sorted by next_request position, used when
+ *               determining if two or more queues have interleaving
+ *               requests (see bfq_find_close_cooperator()).
  *
  * Each (device, cgroup) pair has its own bfq_group, i.e., for each cgroup
  * there is a set of bfq_groups, each one collecting the lower-level
@@ -604,6 +656,8 @@ struct bfq_group {
 	struct bfq_queue *async_idle_bfqq;
 
 	struct bfq_entity *my_entity;
+
+	struct rb_root rq_pos_tree;
 
 	struct bfqg_stats stats;
 };
@@ -688,6 +742,27 @@ static void bfq_put_bfqd_unlock(struct bfq_data *bfqd, unsigned long *flags)
 {
 	spin_unlock_irqrestore(bfqd->queue->queue_lock, *flags);
 }
+
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+
+static struct bfq_group *bfq_bfqq_to_bfqg(struct bfq_queue *bfqq)
+{
+	struct bfq_entity *group_entity = bfqq->entity.parent;
+
+	if (!group_entity)
+		group_entity = &bfqq->bfqd->root_group->entity;
+
+	return container_of(group_entity, struct bfq_group, entity);
+}
+
+#else
+
+static struct bfq_group *bfq_bfqq_to_bfqg(struct bfq_queue *bfqq)
+{
+	return bfqq->bfqd->root_group;
+}
+
+#endif
 
 static void bfq_check_ioprio_change(struct bfq_io_cq *bic, struct bio *bio);
 static void bfq_put_queue(struct bfq_queue *bfqq);
