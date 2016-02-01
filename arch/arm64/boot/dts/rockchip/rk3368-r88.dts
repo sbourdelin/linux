@@ -211,6 +211,18 @@
 	status = "ok";
 };
 
+&grf {
+	io-domains {
+		compatible = "rockchip,rk3368-io-voltage-domain";
+
+		audio-supply = <&vcc_io>;
+		gpio30-supply = <&vcc_io>;
+		gpio1830-supply = <&vcc_io>;
+		sdcard-supply = <&vccio_sd>;
+		wifi-supply = <&vccio_wl>;
+	};
+};
+
 &i2c0 {
 	status = "okay";
 
@@ -328,6 +340,16 @@
 		host_vbus_drv: host-vbus-drv {
 			rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
+	};
+};
+
+&pmugrf {
+	io-domains {
+		compatible = "rockchip,rk3368-pmu-io-voltage-domain";
+		rockchip,grf = <&pmugrf>;
+
+		pmu-supply = <&vcc_io>;
+		vop-supply = <&vcc_io>;
 	};
 };
 
