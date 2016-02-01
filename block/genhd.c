@@ -703,7 +703,13 @@ static ssize_t disk_badblocks_store(struct device *dev,
  * @partno: returned partition index
  *
  * This function gets the structure containing partitioning
- * information for the given device @devt.
+ * information for the given device @devt and increases the kobj
+ * and disk owner module references.
+ *
+ * RETURNS:
+ * Resulting gendisk on success, NULL in case of failure. After usage
+ * disk must be put with put_gendisk() call, which also puts the module
+ * reference.
  */
 struct gendisk *get_gendisk(dev_t devt, int *partno)
 {
@@ -1286,6 +1292,17 @@ struct gendisk *alloc_disk(int minors)
 }
 EXPORT_SYMBOL(alloc_disk);
 
+/**
+ * alloc_disk_node - allocates disk for specified minors and node id.
+ *
+ * @minors: how many minors are expected for that disk before switching
+ *          to extended block range
+ * @node_id: memory node from which to allocate
+ *
+ * RETURNS:
+ * Resulting disk on success, NULL in case of failure.
+ * alloc_disk() and alloc_disk_node() are paired with put_disk() call.
+ */
 struct gendisk *alloc_disk_node(int minors, int node_id)
 {
 	struct gendisk *disk;
@@ -1330,6 +1347,16 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 }
 EXPORT_SYMBOL(alloc_disk_node);
 
+/**
+ * get_disk - increases the kobj and module references.
+ *
+ * @disk: disk for which references should be increased
+ *
+ * RETURNS:
+ * Resulting kobj of the disk on success, NULL in case of failure.
+ * After usage disk must be put with put_gendisk() call, which also
+ * puts the module reference.
+ */
 struct kobject *get_disk(struct gendisk *disk)
 {
 	struct module *owner;
@@ -1348,16 +1375,42 @@ struct kobject *get_disk(struct gendisk *disk)
 	return kobj;
 
 }
-
 EXPORT_SYMBOL(get_disk);
 
+/**
+ * put_disk - puts only kobj reference.
+ *
+ * @disk: disk to put
+ *
+ * This put_disk() is paired with alloc_disk().  Never call this
+ * if you get a disk using get_gendisk() or get_disk() calls.
+ */
 void put_disk(struct gendisk *disk)
 {
 	if (disk)
 		kobject_put(&disk_to_dev(disk)->kobj);
 }
-
 EXPORT_SYMBOL(put_disk);
+
+/**
+ * put_gendisk - puts kobj and disk owner module references.
+ *
+ * @disk: disk to put
+ *
+ * This put_gendisk() is paired with get_gendisk() and get_disk() calls.
+ * Never use this call if you just have allocated a disk using alloc_disk(),
+ * use put_disk() instead.
+ */
+void put_gendisk(struct gendisk *disk)
+{
+	if (disk) {
+		struct module *owner = disk->fops->owner;
+
+		put_disk(disk);
+		module_put(owner);
+	}
+}
+EXPORT_SYMBOL(put_gendisk);
 
 static void set_disk_ro_uevent(struct gendisk *gd, int ro)
 {
