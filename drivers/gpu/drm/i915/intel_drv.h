@@ -63,10 +63,25 @@
 	ret__;								\
 })
 
+#define _wait_for_atomic(COND, US) ({ \
+	unsigned long end__; \
+	int ret__ = 0; \
+	get_cpu(); \
+	end__ = (local_clock() >> 10) + (US) + 1; \
+	while (!(COND)) { \
+		if (time_after((unsigned long)(local_clock() >> 10), end__)) { \
+			ret__ = -ETIMEDOUT; \
+			break; \
+		} \
+		cpu_relax(); \
+	} \
+	put_cpu(); \
+	ret__; \
+})
+
 #define wait_for(COND, MS) _wait_for(COND, MS, 1)
-#define wait_for_atomic(COND, MS) _wait_for(COND, MS, 0)
-#define wait_for_atomic_us(COND, US) _wait_for((COND), \
-					       DIV_ROUND_UP((US), 1000), 0)
+#define wait_for_atomic(COND, MS) _wait_for_atomic(COND, (MS * 1000))
+#define wait_for_atomic_us(COND, US) _wait_for_atomic((COND), (US))
 
 #define KHz(x) (1000 * (x))
 #define MHz(x) KHz(1000 * (x))
