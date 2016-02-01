@@ -173,6 +173,8 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 
 	copy_bootdata(__va(real_mode_data));
 
+	setup_builtin_cmdline();
+
 	/*
 	 * Load microcode early on BSP.
 	 */
@@ -188,7 +190,10 @@ void __init x86_64_start_reservations(char *real_mode_data)
 {
 	/* version is always not zero if it is copied */
 	if (!boot_params.hdr.version)
+	{
 		copy_bootdata(__va(real_mode_data));
+		setup_builtin_cmdline();
+	}
 
 	reserve_ebda_region();
 

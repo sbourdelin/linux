@@ -124,7 +124,7 @@ asmlinkage void __init i386_start_kernel(void);
 #else
 asmlinkage void __init x86_64_start_kernel(char *real_mode);
 asmlinkage void __init x86_64_start_reservations(char *real_mode_data);
-
+void __init setup_builtin_cmdline(void);
 #endif /* __i386__ */
 #endif /* _SETUP */
 #else
