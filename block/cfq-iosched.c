@@ -3038,7 +3038,7 @@ static unsigned long bfq_calc_max_budget(u64 peak_rate, u64 timeout)
  * throughput. See the code for more details.
  */
 static bool bfq_update_peak_rate(struct bfq_data *bfqd, struct bfq_queue *bfqq,
-				 bool compensate)
+				 bool compensate, enum bfqq_expiration reason)
 {
 	u64 bw, usecs, expected, timeout;
 	ktime_t delta;
@@ -3074,10 +3074,23 @@ static bool bfq_update_peak_rate(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	 * the peak rate estimation.
 	 */
 	if (usecs > 20000) {
-		if (bw > bfqd->peak_rate) {
-			bfqd->peak_rate = bw;
+		if (bw > bfqd->peak_rate ||
+		   (!BFQQ_SEEKY(bfqq) &&
+		    reason == BFQ_BFQQ_BUDGET_TIMEOUT)) {
+			bfq_log(bfqd, "measured bw =%llu", bw);
+			/*
+			 * To smooth oscillations use a low-pass filter with
+			 * alpha=7/8, i.e.,
+			 * new_rate = (7/8) * old_rate + (1/8) * bw
+			 */
+			do_div(bw, 8);
+			if (bw == 0)
+				return 0;
+			bfqd->peak_rate *= 7;
+			do_div(bfqd->peak_rate, 8);
+			bfqd->peak_rate += bw;
 			update = 1;
-			bfq_log(bfqd, "new peak_rate=%llu", bw);
+			bfq_log(bfqd, "new peak_rate=%llu", bfqd->peak_rate);
 		}
 
 		update |= bfqd->peak_rate_samples == BFQ_PEAK_RATE_SAMPLES - 1;
@@ -3157,7 +3170,7 @@ static void bfq_bfqq_expire(struct bfq_data *bfqd,
 	 * Update disk peak rate for autotuning and check whether the
 	 * process is slow (see bfq_update_peak_rate).
 	 */
-	slow = bfq_update_peak_rate(bfqd, bfqq, compensate);
+	slow = bfq_update_peak_rate(bfqd, bfqq, compensate, reason);
 
 	/*
 	 * As above explained, 'punish' slow (i.e., seeky), timed-out
