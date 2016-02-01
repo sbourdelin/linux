@@ -1,3 +1,4 @@
+perf-y += syscall.o
 perf-y += sched-messaging.o
 perf-y += sched-pipe.o
 perf-y += mem-functions.o

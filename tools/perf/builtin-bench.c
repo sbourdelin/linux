@@ -9,10 +9,11 @@
 /*
  * Available benchmark collection list:
  *
- *  sched ... scheduler and IPC performance
- *  mem   ... memory access performance
- *  numa  ... NUMA scheduling and MM performance
- *  futex ... Futex performance
+ *  syscall ... syscall performance
+ *  sched   ... scheduler and IPC performance
+ *  mem     ... memory access performance
+ *  numa    ... NUMA scheduling and MM performance
+ *  futex   ... Futex performance
  */
 #include "perf.h"
 #include "util/util.h"
@@ -31,6 +32,12 @@ struct bench {
 	const char	*name;
 	const char	*summary;
 	bench_fn_t	fn;
+};
+
+static struct bench syscall_benchmarks[] = {
+	{ "null",	"Benchmark for NULL syscall workloads",		bench_syscall		},
+	{ "all",	"Run all syscall benchmarks",			NULL			},
+	{ NULL,		NULL,						NULL			}
 };
 
 #ifdef HAVE_LIBNUMA_SUPPORT
@@ -73,6 +80,7 @@ struct collection {
 };
 
 static struct collection collections[] = {
+	{ "syscall",	"syscall benchmarks",				syscall_benchmarks	},
 	{ "sched",	"Scheduler and IPC benchmarks",			sched_benchmarks	},
 	{ "mem",	"Memory access benchmarks",			mem_benchmarks		},
 #ifdef HAVE_LIBNUMA_SUPPORT
