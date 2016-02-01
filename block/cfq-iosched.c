@@ -4411,15 +4411,25 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 * The value of the variable is computed considering that
 	 * idling is usually beneficial for the throughput if:
 	 * (a) the device is not NCQ-capable, or
-	 * (b) regardless of the presence of NCQ, the request pattern
-	 *     for bfqq is I/O-bound (possible throughput losses
-	 *     caused by granting idling to seeky queues are mitigated
-	 *     by the fact that, in all scenarios where boosting
-	 *     throughput is the best thing to do, i.e., in all
-	 *     symmetric scenarios, only a minimal idle time is
-	 *     allowed to seeky queues).
+	 * (b) regardless of the presence of NCQ, the device is rotational
+	 *     and the request pattern for bfqq is I/O-bound (possible
+	 *     throughput losses caused by granting idling to seeky queues
+	 *     are mitigated by the fact that, in all scenarios where
+	 *     boosting throughput is the best thing to do, i.e., in all
+	 *     symmetric scenarios, only a minimal idle time is allowed to
+	 *     seeky queues).
+	 *
+	 * Secondly, and in contrast to the above item (b), idling an
+	 * NCQ-capable flash-based device would not boost the
+	 * throughput even with intense I/O; rather it would lower
+	 * the throughput in proportion to how fast the device
+	 * is. Accordingly, the next variable is true if any of the
+	 * above conditions (a) and (b) is true, and, in particular,
+	 * happens to be false if bfqd is an NCQ-capable flash-based
+	 * device.
 	 */
-	idling_boosts_thr = !bfqd->hw_tag || bfq_bfqq_IO_bound(bfqq);
+	idling_boosts_thr = !bfqd->hw_tag ||
+		(!blk_queue_nonrot(bfqd->queue) && bfq_bfqq_IO_bound(bfqq));
 
 	/*
 	 * The value of the next variable,
@@ -4491,38 +4501,54 @@ static bool bfq_bfqq_may_idle(struct bfq_queue *bfqq)
 	 * receives its assigned fraction of the device throughput
 	 * (see [1] for details).
 	 *
-	 * As for sub-condition (i), actually we check only whether
-	 * bfqq is being weight-raised. In fact, if bfqq is not being
-	 * weight-raised, we have that:
-	 * - if the process associated to bfqq is not I/O-bound, then
-	 *   it is not either latency- or throughput-critical; therefore
-	 *   idling is not needed for bfqq;
-	 * - if the process asociated to bfqq is I/O-bound, then
-	 *   idling is already granted to bfqq (see the comments on
-	 *   idling_boosts_thr).
+	 * We address this issue by controlling, actually, only the
+	 * symmetry sub-condition (i), i.e., provided that
+	 * sub-condition (i) holds, idling is not performed,
+	 * regardless of whether sub-condition (ii) holds. In other
+	 * words, only if sub-condition (i) does not hold, then idling
+	 * is allowed, and the device tends to be prevented from
+	 * queueing many requests, possibly of several processes. The
+	 * reason for not controlling also sub-condition (ii) is that,
+	 * first, in the case of an HDD, idling is always performed
+	 * for I/O-bound processes (see the comments on
+	 * idling_boosts_thr above). Secondly, in the case of a
+	 * flash-based device, we prefer however to privilege
+	 * throughput (and idling lowers throughput for this type of
+	 * devices), for the following reasons:
+	 * 1) differently from HDDs, the service time of random
+	 *    requests is not orders of magnitudes lower than the service
+	 *    time of sequential requests; thus, even if processes doing
+	 *    sequential I/O get a preferential treatment with respect to
+	 *    others doing random I/O, the consequences are not as
+	 *    dramatic as with HDDs;
+	 * 2) if a process doing random I/O does need strong
+	 *    throughput guarantees, it is hopefully already being
+	 *    weight-raised, or the user is likely to have assigned it a
+	 *    higher weight than the other processes (and thus
+	 *    sub-condition (i) is likely to be false, which triggers
+	 *    idling).
 	 *
-	 * We do not check sub-condition (ii) at all, i.e., the next
-	 * variable is true if and only if bfqq is being
-	 * weight-raised. We do not need to control sub-condition (ii)
-	 * for the following reason:
-	 * - if bfqq is being weight-raised, then idling is already
-	 *   guaranteed to bfqq by sub-condition (i);
-	 * - if bfqq is not being weight-raised, then idling is
-	 *   already guaranteed to bfqq (only) if it matters, i.e., if
-	 *   bfqq is associated to a currently I/O-bound process (see
-	 *   the above comment on sub-condition (i)).
+	 * According to the above considerations, the next variable is
+	 * true (only) if sub-condition (i) holds. To compute the
+	 * value of this variable, we not only use the return value of
+	 * the function bfq_symmetric_scenario(), but also check
+	 * whether bfqq is being weight-raised, because
+	 * bfq_symmetric_scenario() does not take into account also
+	 * weight-raised queues (see comments to
+	 * bfq_weights_tree_add()).
 	 *
 	 * As a side note, it is worth considering that the above
 	 * device-idling countermeasures may however fail in the
 	 * following unlucky scenario: if idling is (correctly)
-	 * disabled in a time period during which the symmetry
-	 * sub-condition holds, and hence the device is allowed to
+	 * disabled in a time period during which all symmetry
+	 * sub-conditions hold, and hence the device is allowed to
 	 * enqueue many requests, but at some later point in time some
 	 * sub-condition stops to hold, then it may become impossible
 	 * to let requests be served in the desired order until all
 	 * the requests already queued in the device have been served.
 	 */
-	asymmetric_scenario = bfqq->wr_coeff > 1;
+	asymmetric_scenario = bfqq->wr_coeff > 1 ||
+		!bfq_symmetric_scenario(bfqd);
 
 	/*
 	 * We have now all the components we need to compute the return
