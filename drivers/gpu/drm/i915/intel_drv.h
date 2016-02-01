@@ -815,6 +815,9 @@ struct intel_dp {
 	unsigned long compliance_test_type;
 	unsigned long compliance_test_data;
 	bool compliance_test_active;
+
+	/* Used to store pll config for upfront link training */
+	struct intel_shared_dpll_config upfront_pll_config;
 };
 
 struct intel_digital_port {
@@ -1034,6 +1037,8 @@ void intel_ddi_clock_get(struct intel_encoder *encoder,
 			 struct intel_crtc_state *pipe_config);
 void intel_ddi_set_vc_payload_alloc(struct drm_crtc *crtc, bool state);
 uint32_t ddi_signal_levels(struct intel_dp *intel_dp);
+int intel_ddi_upfront_link_train(struct intel_dp *intel_dp,
+				struct intel_crtc *crtc);
 
 /* intel_frontbuffer.c */
 void intel_fb_obj_invalidate(struct drm_i915_gem_object *obj,
@@ -1242,6 +1247,9 @@ bool intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			     struct intel_connector *intel_connector);
 void intel_dp_set_link_params(struct intel_dp *intel_dp,
 			      const struct intel_crtc_state *pipe_config);
+void intel_dp_update_dpcd_params(struct intel_dp *intel_dp);
+bool intel_dp_get_link_retry_params(struct intel_dp *intel_dp,
+				uint8_t *lane_count, uint8_t *link_bw);
 void intel_dp_start_link_train(struct intel_dp *intel_dp);
 void intel_dp_stop_link_train(struct intel_dp *intel_dp);
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode);
@@ -1249,6 +1257,8 @@ void intel_dp_encoder_destroy(struct drm_encoder *encoder);
 int intel_dp_sink_crc(struct intel_dp *intel_dp, u8 *crc);
 bool intel_dp_compute_config(struct intel_encoder *encoder,
 			     struct intel_crtc_state *pipe_config);
+void intel_dp_update_shared_dpll_config(struct intel_crtc_state *pipe_config,
+				struct intel_shared_dpll_config config);
 bool intel_dp_is_edp(struct drm_device *dev, enum port port);
 enum irqreturn intel_dp_hpd_pulse(struct intel_digital_port *intel_dig_port,
 				  bool long_hpd);

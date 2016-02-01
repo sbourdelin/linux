@@ -3217,6 +3217,108 @@ intel_ddi_init_hdmi_connector(struct intel_digital_port *intel_dig_port)
 	return connector;
 }
 
+static void intel_ddi_commit_upfront_pll_config(struct intel_dp *intel_dp,
+					struct intel_shared_dpll *pll)
+{
+	struct intel_shared_dpll_config tmp_config;
+
+	/*
+	 * The shared_dpll_config is computed in intel_get_shared_dpll().
+	 * It is committed to 'pll->config' here to be used in
+	 * intel_enable/disable_shared_dpll functions. Before committing.
+	 * save the existing config, so that once upfront link training is
+	 * done, the original value of 'pll->config' can be restored.
+	 */
+	tmp_config = pll->config;
+	pll->config = intel_dp->upfront_pll_config;
+	intel_dp->upfront_pll_config = tmp_config;
+}
+
+static struct intel_shared_dpll *intel_ddi_select_upfront_pll_config(
+			struct intel_dp *intel_dp, struct intel_crtc *crtc)
+{
+	if (!intel_ddi_pll_select(crtc, crtc->config))
+		return NULL;
+
+	return intel_crtc_to_shared_dpll(crtc);
+}
+
+static void intel_ddi_clear_upfront_pll_config(struct intel_dp *intel_dp,
+					struct intel_shared_dpll *pll)
+{
+	pll->config = intel_dp->upfront_pll_config;
+}
+
+int intel_ddi_upfront_link_train(struct intel_dp *intel_dp,
+				struct intel_crtc *crtc)
+{
+	struct intel_connector *connector = intel_dp->attached_connector;
+	struct intel_encoder *encoder = connector->encoder;
+	struct intel_shared_dpll *pll = NULL;
+	struct drm_crtc *drm_crtc = NULL;
+	struct intel_crtc_state *tmp_crtc_config;
+	uint8_t link_bw, lane_count;
+
+	if (!crtc) {
+		drm_crtc = intel_get_unused_crtc(&encoder->base);
+		if (!drm_crtc) {
+			DRM_ERROR("No crtc for upfront link training\n");
+			return -EINVAL;
+		}
+		encoder->base.crtc = drm_crtc;
+		crtc = to_intel_crtc(drm_crtc);
+	}
+
+	/* Initialize with Max Link rate & lane count supported by panel */
+	link_bw =  intel_dp->dpcd[DP_MAX_LINK_RATE];
+	lane_count = drm_dp_max_lane_count(intel_dp->dpcd);
+
+	/* Save the crtc->config */
+	tmp_crtc_config = crtc->config;
+
+	DRM_DEBUG_KMS("Using pipe %c\n", pipe_name(crtc->pipe));
+	do {
+		crtc->config->port_clock = drm_dp_bw_code_to_link_rate(link_bw);
+		crtc->config->lane_count = lane_count;
+
+		pll = intel_ddi_select_upfront_pll_config(intel_dp, crtc);
+		if (!pll) {
+			DRM_ERROR("Could not get shared DPLL\n");
+			goto exit;
+		}
+
+		intel_ddi_commit_upfront_pll_config(intel_dp, pll);
+
+		/* Enable PLL followed by port */
+		intel_enable_shared_dpll(crtc);
+		encoder->pre_enable(encoder);
+
+		/* Check if link training passed; if so update DPCD */
+		if (intel_dp->train_set_valid)
+			intel_dp_update_dpcd_params(intel_dp);
+
+		/* Disable port followed by PLL for next retry/clean up */
+		encoder->post_disable(encoder);
+		intel_disable_shared_dpll(crtc);
+
+		intel_ddi_clear_upfront_pll_config(intel_dp, pll);
+
+	} while (!intel_dp->train_set_valid &&
+		intel_dp_get_link_retry_params(intel_dp, &lane_count, &link_bw));
+exit:
+	/* Reset local associations made */
+	if (drm_crtc)
+		encoder->base.crtc = NULL;
+
+	/* Restore crtc config */
+	crtc->config = tmp_crtc_config;
+
+	DRM_DEBUG_KMS("Upfront link train %s: lanes:%d bw:%d\n",
+	intel_dp->train_set_valid ? "Passed" : "Failed", lane_count, link_bw);
+
+	return intel_dp->train_set_valid ? 0 : -1;
+}
+
 void intel_ddi_init(struct drm_device *dev, enum port port)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;

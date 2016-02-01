@@ -4234,16 +4234,45 @@ static void lpt_pch_enable(struct drm_crtc *crtc)
 	lpt_enable_pch_transcoder(dev_priv, cpu_transcoder);
 }
 
+static
+void intel_get_new_shared_dpll_config(struct drm_i915_private *dev_priv,
+				  struct intel_shared_dpll_config *shared_dpll)
+{
+	enum intel_dpll_id i;
+
+	/* Create a new shared dpll config by duplicating pll->config */
+	for (i = 0; i < dev_priv->num_shared_dpll; i++) {
+		struct intel_shared_dpll *pll = &dev_priv->shared_dplls[i];
+		shared_dpll[i] = pll->config;
+		shared_dpll[i].crtc_mask = 0;
+	}
+}
+
 struct intel_shared_dpll *intel_get_shared_dpll(struct intel_crtc *crtc,
 						struct intel_crtc_state *crtc_state)
 {
 	struct drm_i915_private *dev_priv = crtc->base.dev->dev_private;
 	struct intel_shared_dpll *pll;
 	struct intel_shared_dpll_config *shared_dpll;
+	struct intel_shared_dpll_config tmp_config[I915_NUM_PLLS];
 	enum intel_dpll_id i;
 	int max = dev_priv->num_shared_dpll;
 
-	shared_dpll = intel_atomic_get_shared_dpll_state(crtc_state->base.state);
+	/*
+	 * intel_get_shared_dpll needs a shared_dpll[] to store the computed
+	 * dpll_config values. For atomic path, it is stored in
+	 * intel_atomic_state->shared_dpll[], which is later committed to
+	 * dev_priv->shared_dpll[] in atomic commit. For non-atomic path,
+	 * (where intel_atomic_state does not exist) the dpll_config values
+	 * are stored in 'tmp_config[]' and copied to encoder structures
+	 * for later use.
+	 */
+	if (crtc_state->base.state) {
+		shared_dpll = intel_atomic_get_shared_dpll_state(crtc_state->base.state);
+	} else {
+		intel_get_new_shared_dpll_config(dev_priv, tmp_config);
+		shared_dpll = tmp_config;
+	}
 
 	if (HAS_PCH_IBX(dev_priv->dev)) {
 		/* Ironlake PCH has a fixed PLL->PCH pipe mapping. */
@@ -4273,6 +4302,7 @@ struct intel_shared_dpll *intel_get_shared_dpll(struct intel_crtc *crtc,
 		pll = &dev_priv->shared_dplls[i];
 		DRM_DEBUG_KMS("CRTC:%d using pre-allocated %s\n",
 			crtc->base.base.id, pll->name);
+
 		WARN_ON(shared_dpll[i].crtc_mask);
 
 		goto found;
@@ -4320,6 +4350,12 @@ found:
 			 pipe_name(crtc->pipe));
 
 	shared_dpll[i].crtc_mask |= 1 << crtc->pipe;
+
+	/*
+	 * For DP, this shared dpll config is saved to intel_dp,
+	 * and used by upfront link train logic subsequently.
+	 */
+	intel_dp_update_shared_dpll_config(crtc_state, shared_dpll[i]);
 
 	return pll;
 }
