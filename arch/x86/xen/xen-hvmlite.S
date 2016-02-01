@@ -145,6 +145,14 @@ ENTRY(hvmlite_start_xen)
 #endif
 
 #ifdef CONFIG_X86_32
+ENTRY(hvmlite_smp_32_hp)
+	movl $_pa(initial_page_table), %eax
+	movl %eax, %cr3
+	ljmp $__KERNEL_CS,$_pa(5f)
+5:
+	movl $X86_CR0_PE, %eax
+	movl %eax, %cr0
+
 ENTRY(hvmlite_smp_32)
         mov $_pa(boot_gdt_descr), %eax
         lgdt (%eax)
