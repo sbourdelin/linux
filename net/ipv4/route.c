@@ -751,12 +751,14 @@ static void __ip_do_redirect(struct rtable *rt, struct sk_buff *skb, struct flow
 		if (!(n->nud_state & NUD_VALID)) {
 			neigh_event_send(n, NULL);
 		} else {
+			rcu_read_lock();
 			if (fib_lookup(net, fl4, &res, 0) == 0) {
 				struct fib_nh *nh = &FIB_RES_NH(res);
 
 				update_or_create_fnhe(nh, fl4->daddr, new_gw,
 						      0, 0);
 			}
+			rcu_read_unlock();
 			if (kill_route)
 				rt->dst.obsolete = DST_OBSOLETE_KILL;
 			call_netevent_notifiers(NETEVENT_NEIGH_UPDATE, n);
