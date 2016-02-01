@@ -325,7 +325,8 @@ static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 
 	if (++tail == nvmeq->q_depth)
 		tail = 0;
-	writel(tail, nvmeq->q_db);
+	if (likely(nvmeq->cq_vector >= 0))
+		writel(tail, nvmeq->q_db);
 	nvmeq->sq_tail = tail;
 }
 
