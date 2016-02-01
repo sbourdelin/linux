@@ -332,13 +332,6 @@ struct cfq_data {
 	unsigned long workload_expires;
 	struct cfq_group *serving_group;
 
-	/*
-	 * Each priority tree is sorted by next_request position.  These
-	 * trees are used when determining if two or more queues are
-	 * interleaving requests (see cfq_close_cooperator).
-	 */
-	struct rb_root prio_trees[CFQ_PRIO_LISTS];
-
 	unsigned int busy_queues;
 	unsigned int busy_sync_queues;
 
@@ -418,8 +411,6 @@ enum cfqq_state_flags {
 	CFQ_CFQQ_FLAG_prio_changed,	/* task priority has changed */
 	CFQ_CFQQ_FLAG_slice_new,	/* no requests dispatched in slice */
 	CFQ_CFQQ_FLAG_sync,		/* synchronous queue */
-	CFQ_CFQQ_FLAG_coop,		/* cfqq is shared */
-	CFQ_CFQQ_FLAG_split_coop,	/* shared cfqq will be splitted */
 	CFQ_CFQQ_FLAG_deep,		/* sync cfqq experienced large depth */
 	CFQ_CFQQ_FLAG_wait_busy,	/* Waiting for next request */
 };
@@ -447,8 +438,6 @@ CFQ_CFQQ_FNS(idle_window);
 CFQ_CFQQ_FNS(prio_changed);
 CFQ_CFQQ_FNS(slice_new);
 CFQ_CFQQ_FNS(sync);
-CFQ_CFQQ_FNS(coop);
-CFQ_CFQQ_FNS(split_coop);
 CFQ_CFQQ_FNS(deep);
 CFQ_CFQQ_FNS(wait_busy);
 #undef CFQ_CFQQ_FNS
@@ -2274,67 +2263,6 @@ static void cfq_service_tree_add(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 	cfq_group_notify_queue_add(cfqd, cfqq->cfqg);
 }
 
-static struct cfq_queue *
-cfq_prio_tree_lookup(struct cfq_data *cfqd, struct rb_root *root,
-		     sector_t sector, struct rb_node **ret_parent,
-		     struct rb_node ***rb_link)
-{
-	struct rb_node **p, *parent;
-	struct cfq_queue *cfqq = NULL;
-
-	parent = NULL;
-	p = &root->rb_node;
-	while (*p) {
-		struct rb_node **n;
-
-		parent = *p;
-		cfqq = rb_entry(parent, struct cfq_queue, p_node);
-
-		/*
-		 * Sort strictly based on sector.  Smallest to the left,
-		 * largest to the right.
-		 */
-		if (sector > blk_rq_pos(cfqq->next_rq))
-			n = &(*p)->rb_right;
-		else if (sector < blk_rq_pos(cfqq->next_rq))
-			n = &(*p)->rb_left;
-		else
-			break;
-		p = n;
-		cfqq = NULL;
-	}
-
-	*ret_parent = parent;
-	if (rb_link)
-		*rb_link = p;
-	return cfqq;
-}
-
-static void cfq_prio_tree_add(struct cfq_data *cfqd, struct cfq_queue *cfqq)
-{
-	struct rb_node **p, *parent;
-	struct cfq_queue *__cfqq;
-
-	if (cfqq->p_root) {
-		rb_erase(&cfqq->p_node, cfqq->p_root);
-		cfqq->p_root = NULL;
-	}
-
-	if (cfq_class_idle(cfqq))
-		return;
-	if (!cfqq->next_rq)
-		return;
-
-	cfqq->p_root = &cfqd->prio_trees[cfqq->org_ioprio];
-	__cfqq = cfq_prio_tree_lookup(cfqd, cfqq->p_root,
-				      blk_rq_pos(cfqq->next_rq), &parent, &p);
-	if (!__cfqq) {
-		rb_link_node(&cfqq->p_node, parent, p);
-		rb_insert_color(&cfqq->p_node, cfqq->p_root);
-	} else
-		cfqq->p_root = NULL;
-}
-
 /*
  * Update cfqq's position in the service tree.
  */
@@ -2343,10 +2271,8 @@ static void cfq_resort_rr_list(struct cfq_data *cfqd, struct cfq_queue *cfqq)
 	/*
 	 * Resorting requires the cfqq to be on the RR list already.
 	 */
-	if (cfq_cfqq_on_rr(cfqq)) {
+	if (cfq_cfqq_on_rr(cfqq))
 		cfq_service_tree_add(cfqd, cfqq, 0);
-		cfq_prio_tree_add(cfqd, cfqq);
-	}
 }
 
 /*
@@ -2435,12 +2361,6 @@ static void cfq_add_rq_rb(struct request *rq)
 	 */
 	prev = cfqq->next_rq;
 	cfqq->next_rq = cfq_choose_req(cfqd, cfqq->next_rq, rq, cfqd->last_position);
-
-	/*
-	 * adjust priority tree position, if ->next_rq changes
-	 */
-	if (prev != cfqq->next_rq)
-		cfq_prio_tree_add(cfqd, cfqq);
 
 	BUG_ON(!cfqq->next_rq);
 }
@@ -2649,15 +2569,6 @@ __cfq_slice_expired(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 	cfq_clear_cfqq_wait_busy(cfqq);
 
 	/*
-	 * If this cfqq is shared between multiple processes, check to
-	 * make sure that those processes are still issuing I/Os within
-	 * the mean seek distance.  If not, it may be time to break the
-	 * queues apart again.
-	 */
-	if (cfq_cfqq_coop(cfqq) && CFQQ_SEEKY(cfqq))
-		cfq_mark_cfqq_split_coop(cfqq);
-
-	/*
 	 * store what was left of this slice, if the queue idled/timed out
 	 */
 	if (timed_out) {
@@ -2758,105 +2669,6 @@ static inline int cfq_rq_close(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 			       struct request *rq)
 {
 	return cfq_dist_from_last(cfqd, rq) <= CFQQ_CLOSE_THR;
-}
-
-static struct cfq_queue *cfqq_close(struct cfq_data *cfqd,
-				    struct cfq_queue *cur_cfqq)
-{
-	struct rb_root *root = &cfqd->prio_trees[cur_cfqq->org_ioprio];
-	struct rb_node *parent, *node;
-	struct cfq_queue *__cfqq;
-	sector_t sector = cfqd->last_position;
-
-	if (RB_EMPTY_ROOT(root))
-		return NULL;
-
-	/*
-	 * First, if we find a request starting at the end of the last
-	 * request, choose it.
-	 */
-	__cfqq = cfq_prio_tree_lookup(cfqd, root, sector, &parent, NULL);
-	if (__cfqq)
-		return __cfqq;
-
-	/*
-	 * If the exact sector wasn't found, the parent of the NULL leaf
-	 * will contain the closest sector.
-	 */
-	__cfqq = rb_entry(parent, struct cfq_queue, p_node);
-	if (cfq_rq_close(cfqd, cur_cfqq, __cfqq->next_rq))
-		return __cfqq;
-
-	if (blk_rq_pos(__cfqq->next_rq) < sector)
-		node = rb_next(&__cfqq->p_node);
-	else
-		node = rb_prev(&__cfqq->p_node);
-	if (!node)
-		return NULL;
-
-	__cfqq = rb_entry(node, struct cfq_queue, p_node);
-	if (cfq_rq_close(cfqd, cur_cfqq, __cfqq->next_rq))
-		return __cfqq;
-
-	return NULL;
-}
-
-/*
- * cfqd - obvious
- * cur_cfqq - passed in so that we don't decide that the current queue is
- * 	      closely cooperating with itself.
- *
- * So, basically we're assuming that that cur_cfqq has dispatched at least
- * one request, and that cfqd->last_position reflects a position on the disk
- * associated with the I/O issued by cur_cfqq.  I'm not sure this is a valid
- * assumption.
- */
-static struct cfq_queue *cfq_close_cooperator(struct cfq_data *cfqd,
-					      struct cfq_queue *cur_cfqq)
-{
-	struct cfq_queue *cfqq;
-
-	if (cfq_class_idle(cur_cfqq))
-		return NULL;
-	if (!cfq_cfqq_sync(cur_cfqq))
-		return NULL;
-	if (CFQQ_SEEKY(cur_cfqq))
-		return NULL;
-
-	/*
-	 * Don't search priority tree if it's the only queue in the group.
-	 */
-	if (cur_cfqq->cfqg->nr_cfqq == 1)
-		return NULL;
-
-	/*
-	 * We should notice if some of the queues are cooperating, eg
-	 * working closely on the same area of the disk. In that case,
-	 * we can group them together and don't waste time idling.
-	 */
-	cfqq = cfqq_close(cfqd, cur_cfqq);
-	if (!cfqq)
-		return NULL;
-
-	/* If new queue belongs to different cfq_group, don't choose it */
-	if (cur_cfqq->cfqg != cfqq->cfqg)
-		return NULL;
-
-	/*
-	 * It only makes sense to merge sync queues.
-	 */
-	if (!cfq_cfqq_sync(cfqq))
-		return NULL;
-	if (CFQQ_SEEKY(cfqq))
-		return NULL;
-
-	/*
-	 * Do not merge queues of different priority classes
-	 */
-	if (cfq_class_rt(cfqq) != cfq_class_rt(cur_cfqq))
-		return NULL;
-
-	return cfqq;
 }
 
 /*
@@ -3015,61 +2827,6 @@ cfq_prio_to_maxrq(struct cfq_data *cfqd, struct cfq_queue *cfqq)
 	WARN_ON(cfqq->ioprio >= IOPRIO_BE_NR);
 
 	return 2 * base_rq * (IOPRIO_BE_NR - cfqq->ioprio);
-}
-
-/*
- * Must be called with the queue_lock held.
- */
-static int cfqq_process_refs(struct cfq_queue *cfqq)
-{
-	int process_refs, io_refs;
-
-	io_refs = cfqq->allocated[READ] + cfqq->allocated[WRITE];
-	process_refs = cfqq->ref - io_refs;
-	BUG_ON(process_refs < 0);
-	return process_refs;
-}
-
-static void cfq_setup_merge(struct cfq_queue *cfqq, struct cfq_queue *new_cfqq)
-{
-	int process_refs, new_process_refs;
-	struct cfq_queue *__cfqq;
-
-	/*
-	 * If there are no process references on the new_cfqq, then it is
-	 * unsafe to follow the ->new_cfqq chain as other cfqq's in the
-	 * chain may have dropped their last reference (not just their
-	 * last process reference).
-	 */
-	if (!cfqq_process_refs(new_cfqq))
-		return;
-
-	/* Avoid a circular list and skip interim queue merges */
-	while ((__cfqq = new_cfqq->new_cfqq)) {
-		if (__cfqq == cfqq)
-			return;
-		new_cfqq = __cfqq;
-	}
-
-	process_refs = cfqq_process_refs(cfqq);
-	new_process_refs = cfqq_process_refs(new_cfqq);
-	/*
-	 * If the process for the cfqq has gone away, there is no
-	 * sense in merging the queues.
-	 */
-	if (process_refs == 0 || new_process_refs == 0)
-		return;
-
-	/*
-	 * Merge in the direction of the lesser amount of work.
-	 */
-	if (new_process_refs >= process_refs) {
-		cfqq->new_cfqq = new_cfqq;
-		new_cfqq->ref += process_refs;
-	} else {
-		new_cfqq->new_cfqq = cfqq;
-		cfqq->ref += new_process_refs;
-	}
 }
 
 static enum wl_type_t cfq_choose_wl_type(struct cfq_data *cfqd,
@@ -3255,19 +3012,6 @@ static struct cfq_queue *cfq_select_queue(struct cfq_data *cfqd)
 	 */
 	if (!RB_EMPTY_ROOT(&cfqq->sort_list))
 		goto keep_queue;
-
-	/*
-	 * If another queue has a request waiting within our mean seek
-	 * distance, let it run.  The expire code will check for close
-	 * cooperators and put the close queue at the front of the service
-	 * tree.  If possible, merge the expiring queue with the new cfqq.
-	 */
-	new_cfqq = cfq_close_cooperator(cfqd, cfqq);
-	if (new_cfqq) {
-		if (!cfqq->new_cfqq)
-			cfq_setup_merge(cfqq, new_cfqq);
-		goto expire;
-	}
 
 	/*
 	 * No requests pending. If the active queue still has requests in
@@ -3569,35 +3313,12 @@ static void cfq_put_queue(struct cfq_queue *cfqq)
 	cfqg_put(cfqg);
 }
 
-static void cfq_put_cooperator(struct cfq_queue *cfqq)
-{
-	struct cfq_queue *__cfqq, *next;
-
-	/*
-	 * If this queue was scheduled to merge with another queue, be
-	 * sure to drop the reference taken on that queue (and others in
-	 * the merge chain).  See cfq_setup_merge and cfq_merge_cfqqs.
-	 */
-	__cfqq = cfqq->new_cfqq;
-	while (__cfqq) {
-		if (__cfqq == cfqq) {
-			WARN(1, "cfqq->new_cfqq loop detected\n");
-			break;
-		}
-		next = __cfqq->new_cfqq;
-		cfq_put_queue(__cfqq);
-		__cfqq = next;
-	}
-}
-
 static void cfq_exit_cfqq(struct cfq_data *cfqd, struct cfq_queue *cfqq)
 {
 	if (unlikely(cfqq == cfqd->active_queue)) {
 		__cfq_slice_expired(cfqd, cfqq, 0);
 		cfq_schedule_dispatch(cfqd);
 	}
-
-	cfq_put_cooperator(cfqq);
 
 	cfq_put_queue(cfqq);
 }
@@ -4238,14 +3959,11 @@ static void cfq_completed_request(struct request_queue *q, struct request *rq)
 		 * - idle-priority queues
 		 * - async queues
 		 * - queues with still some requests queued
-		 * - when there is a close cooperator
 		 */
 		if (cfq_slice_used(cfqq) || cfq_class_idle(cfqq))
 			cfq_slice_expired(cfqd, 1);
-		else if (sync && cfqq_empty &&
-			 !cfq_close_cooperator(cfqd, cfqq)) {
+		else if (sync && cfqq_empty)
 			cfq_arm_slice_timer(cfqd);
-		}
 	}
 
 	if (!cfqd->rq_in_driver)
@@ -4311,38 +4029,6 @@ static void cfq_put_request(struct request *rq)
 	}
 }
 
-static struct cfq_queue *
-cfq_merge_cfqqs(struct cfq_data *cfqd, struct cfq_io_cq *cic,
-		struct cfq_queue *cfqq)
-{
-	cfq_log_cfqq(cfqd, cfqq, "merging with queue %p", cfqq->new_cfqq);
-	cic_set_cfqq(cic, cfqq->new_cfqq, 1);
-	cfq_mark_cfqq_coop(cfqq->new_cfqq);
-	cfq_put_queue(cfqq);
-	return cic_to_cfqq(cic, 1);
-}
-
-/*
- * Returns NULL if a new cfqq should be allocated, or the old cfqq if this
- * was the last process referring to said cfqq.
- */
-static struct cfq_queue *
-split_cfqq(struct cfq_io_cq *cic, struct cfq_queue *cfqq)
-{
-	if (cfqq_process_refs(cfqq) == 1) {
-		cfqq->pid = current->pid;
-		cfq_clear_cfqq_coop(cfqq);
-		cfq_clear_cfqq_split_coop(cfqq);
-		return cfqq;
-	}
-
-	cic_set_cfqq(cic, NULL, 1);
-
-	cfq_put_cooperator(cfqq);
-
-	cfq_put_queue(cfqq);
-	return NULL;
-}
 /*
  * Allocate cfq data structures associated with this request.
  */
@@ -4360,32 +4046,13 @@ cfq_set_request(struct request_queue *q, struct request *rq, struct bio *bio,
 
 	check_ioprio_changed(cic, bio);
 	check_blkcg_changed(cic, bio);
-new_queue:
+
 	cfqq = cic_to_cfqq(cic, is_sync);
 	if (!cfqq || cfqq == &cfqd->oom_cfqq) {
 		if (cfqq)
 			cfq_put_queue(cfqq);
 		cfqq = cfq_get_queue(cfqd, is_sync, cic, bio);
 		cic_set_cfqq(cic, cfqq, is_sync);
-	} else {
-		/*
-		 * If the queue was seeky for too long, break it apart.
-		 */
-		if (cfq_cfqq_coop(cfqq) && cfq_cfqq_split_coop(cfqq)) {
-			cfq_log_cfqq(cfqd, cfqq, "breaking apart cfqq");
-			cfqq = split_cfqq(cic, cfqq);
-			if (!cfqq)
-				goto new_queue;
-		}
-
-		/*
-		 * Check to see if this queue is scheduled to merge with
-		 * another, closely cooperating queue.  The merging of
-		 * queues happens here as it must be done in process context.
-		 * The reference on new_cfqq was taken in merge_cfqqs.
-		 */
-		if (cfqq->new_cfqq)
-			cfqq = cfq_merge_cfqqs(cfqd, cic, cfqq);
 	}
 
 	cfqq->allocated[rw]++;
@@ -4499,7 +4166,7 @@ static int cfq_init_queue(struct request_queue *q, struct elevator_type *e)
 {
 	struct cfq_data *cfqd;
 	struct blkcg_gq *blkg __maybe_unused;
-	int i, ret;
+	int ret;
 	struct elevator_queue *eq;
 
 	eq = elevator_alloc(q, e);
@@ -4539,14 +4206,6 @@ static int cfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	cfqd->root_group->weight = 2 * CFQ_WEIGHT_LEGACY_DFL;
 	cfqd->root_group->leaf_weight = 2 * CFQ_WEIGHT_LEGACY_DFL;
 #endif
-
-	/*
-	 * Not strictly needed (since RB_ROOT just clears the node and we
-	 * zeroed cfqd on alloc), but better be safe in case someone decides
-	 * to add magic to the rb code
-	 */
-	for (i = 0; i < CFQ_PRIO_LISTS; i++)
-		cfqd->prio_trees[i] = RB_ROOT;
 
 	/*
 	 * Our fallback cfqq if cfq_get_queue() runs into OOM issues.
