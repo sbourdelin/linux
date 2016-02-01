@@ -358,6 +358,8 @@ static void watchdog_overflow_callback(struct perf_event *event,
 		else
 			dump_stack();
 
+		WARN(1, "Watchdog detected hard LOCKUP on cpu %d", this_cpu);
+
 		/*
 		 * Perform all-CPU dump only once to avoid multiple hardlockups
 		 * generating interleaving traces
@@ -477,6 +479,9 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 			show_regs(regs);
 		else
 			dump_stack();
+
+		WARN(1, "Watchdog detected soft LOCKUP on cpu %d",
+			smp_processor_id());
 
 		if (softlockup_all_cpu_backtrace) {
 			/* Avoid generating two back traces for current
