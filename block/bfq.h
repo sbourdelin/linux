@@ -200,6 +200,7 @@ struct bfq_group;
  * @dispatched: number of requests on the dispatch list or inside driver.
  * @flags: status flags.
  * @bfqq_list: node for active/idle bfqq list inside our bfqd.
+ * @burst_list_node: node for the device's burst list.
  * @seek_samples: number of seeks sampled
  * @seek_total: sum of the distances of the seeks sampled
  * @seek_mean: mean seek distance
@@ -266,6 +267,8 @@ struct bfq_queue {
 
 	struct list_head bfqq_list;
 
+	struct hlist_node burst_list_node;
+
 	unsigned int seek_samples;
 	u64 seek_total;
 	sector_t seek_mean;
@@ -317,6 +320,11 @@ struct bfq_ttime {
  *                     window
  * @saved_IO_bound: same purpose as the previous two fields for the I/O
  *                  bound classification of a queue
+ * @saved_in_large_burst: same purpose as the previous fields for the
+ *                        value of the field keeping the queue's belonging
+ *                        to a large burst
+ * @was_in_burst_list: true if the queue belonged to a burst list
+ *                     before its merge with another cooperating queue
  * @cooperations: counter of consecutive successful queue merges underwent
  *                by any of the process' @bfq_queues
  * @failed_cooperations: counter of consecutive failed queue merges of any
@@ -334,6 +342,9 @@ struct bfq_io_cq {
 	unsigned int wr_time_left;
 	bool saved_idle_window;
 	bool saved_IO_bound;
+
+	bool saved_in_large_burst;
+	bool was_in_burst_list;
 
 	unsigned int cooperations;
 	unsigned int failed_cooperations;
@@ -441,6 +452,21 @@ enum bfq_device_speed {
  *                             again idling to a queue which was marked as
  *                             non-I/O-bound (see the definition of the
  *                             IO_bound flag for further details).
+ * @last_ins_in_burst: last time at which a queue entered the current
+ *                     burst of queues being activated shortly after
+ *                     each other; for more details about this and the
+ *                     following parameters related to a burst of
+ *                     activations, see the comments to the function
+ *                     @bfq_handle_burst.
+ * @bfq_burst_interval: reference time interval used to decide whether a
+ *                      queue has been activated shortly after
+ *                      @last_ins_in_burst.
+ * @burst_size: number of queues in the current burst of queue activations.
+ * @bfq_large_burst_thresh: maximum burst size above which the current
+ *			    queue-activation burst is deemed as 'large'.
+ * @large_burst: true if a large queue-activation burst is in progress.
+ * @burst_list: head of the burst list (as for the above fields, more details
+ *		in the comments to the function bfq_handle_burst).
  * @low_latency: if set to true, low-latency heuristics are enabled.
  * @bfq_wr_coeff: maximum factor by which the weight of a weight-raised
  *                queue is multiplied.
@@ -518,6 +544,13 @@ struct bfq_data {
 	unsigned int bfq_failed_cooperations;
 	unsigned int bfq_requests_within_timer;
 
+	unsigned long last_ins_in_burst;
+	unsigned long bfq_burst_interval;
+	int burst_size;
+	unsigned long bfq_large_burst_thresh;
+	bool large_burst;
+	struct hlist_head burst_list;
+
 	bool low_latency;
 
 	/* parameters of the low_latency heuristics */
@@ -545,6 +578,10 @@ enum bfqq_state_flags {
 					 * bfqq has timed-out at least once
 					 * having consumed at most 2/10 of
 					 * its budget
+					 */
+	BFQ_BFQQ_FLAG_in_large_burst,	/*
+					 * bfqq activated in a large burst,
+					 * see comments to bfq_handle_burst.
 					 */
 	BFQ_BFQQ_FLAG_constantly_seeky,	/*
 					 * bfqq has proved to be slow and
@@ -581,6 +618,7 @@ BFQ_BFQQ_FNS(idle_window);
 BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(budget_new);
 BFQ_BFQQ_FNS(IO_bound);
+BFQ_BFQQ_FNS(in_large_burst);
 BFQ_BFQQ_FNS(constantly_seeky);
 BFQ_BFQQ_FNS(coop);
 BFQ_BFQQ_FNS(split_coop);
