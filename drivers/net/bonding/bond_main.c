@@ -2022,6 +2022,7 @@ static int bond_miimon_inspect(struct bonding *bond)
 	struct slave *slave;
 	bool ignore_updelay;
 
+	rcu_read_lock();
 	ignore_updelay = !rcu_dereference(bond->curr_active_slave);
 
 	bond_for_each_slave_rcu(bond, slave, iter) {
@@ -2112,6 +2113,8 @@ static int bond_miimon_inspect(struct bonding *bond)
 			break;
 		}
 	}
+
+	rcu_read_unlock();
 
 	return commit;
 }
@@ -2231,12 +2234,9 @@ static void bond_mii_monitor(struct work_struct *work)
 	if (!bond_has_slaves(bond))
 		goto re_arm;
 
-	rcu_read_lock();
-
 	should_notify_peers = bond_should_notify_peers(bond);
 
 	if (bond_miimon_inspect(bond)) {
-		rcu_read_unlock();
 
 		/* Race avoidance with bond_close cancel of workqueue */
 		if (!rtnl_trylock()) {
@@ -2248,8 +2248,7 @@ static void bond_mii_monitor(struct work_struct *work)
 		bond_miimon_commit(bond);
 
 		rtnl_unlock();	/* might sleep, hold no other locks */
-	} else
-		rcu_read_unlock();
+	}
 
 re_arm:
 	if (bond->params.miimon)
