@@ -1219,6 +1219,10 @@ void arp_ifdown(struct net_device *dev)
 	neigh_ifdown(&arp_tbl, dev);
 }
 
+void arp_ifdown_all(void)
+{
+	neigh_ifdown_all(&arp_tbl);
+}
 
 /*
  *	Called once on startup.
