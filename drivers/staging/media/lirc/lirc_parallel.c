@@ -144,33 +144,29 @@ static void lirc_off(void)
 
 static unsigned int init_lirc_timer(void)
 {
-	struct timeval tv, now;
-	unsigned int level, newlevel, timeelapsed, newtimer;
+	ktime_t tm, now;
+	unsigned int elapsedus, level, newlevel, newtimer;
 	int count = 0;
 
-	do_gettimeofday(&tv);
-	tv.tv_sec++;                     /* wait max. 1 sec. */
+	tm = ktime_get();
 	level = lirc_get_timer();
 	do {
 		newlevel = lirc_get_timer();
 		if (level == 0 && newlevel != 0)
 			count++;
 		level = newlevel;
-		do_gettimeofday(&now);
-	} while (count < 1000 && (now.tv_sec < tv.tv_sec
-			     || (now.tv_sec == tv.tv_sec
-				 && now.tv_usec < tv.tv_usec)));
+		now = ktime_get();
+		elapsedus = ktime_us_delta(now, tm);
+	} while (count < 1000 && elapsedus < 1000000);/* wait max. 1 sec. */
 
-	timeelapsed = (now.tv_sec + 1 - tv.tv_sec)*1000000
-		     + (now.tv_usec - tv.tv_usec);
-	if (count >= 1000 && timeelapsed > 0) {
+	if (count >= 1000 && elapsedus > 0) {
 		if (default_timer == 0) {
 			/* autodetect timer */
-			newtimer = (1000000*count)/timeelapsed;
+			newtimer = (1000000*count)/elapsedus;
 			pr_info("%u Hz timer detected\n", newtimer);
 			return newtimer;
 		}
-		newtimer = (1000000*count)/timeelapsed;
+		newtimer = (1000000*count)/elapsedus;
 		if (abs(newtimer - default_timer) > default_timer/10) {
 			/* bad timer */
 			pr_notice("bad timer: %u Hz\n", newtimer);
@@ -220,10 +216,10 @@ static void rbuf_write(int signal)
 
 static void lirc_lirc_irq_handler(void *blah)
 {
-	struct timeval tv;
-	static struct timeval lasttv;
+	ktime_t tm;
+	static ktime_t lasttm;
 	static int init;
-	long signal;
+	long signal, elapsedus;
 	int data;
 	unsigned int level, newlevel;
 	unsigned int timeout;
@@ -244,16 +240,14 @@ static void lirc_lirc_irq_handler(void *blah)
 
 #ifdef LIRC_TIMER
 	if (init) {
-		do_gettimeofday(&tv);
-
-		signal = tv.tv_sec - lasttv.tv_sec;
+		tm = ktime_get();
+		elapsedus = ktime_us_delta(tm, lasttm);
+		signal = elapsedus/USEC_PER_SEC;
 		if (signal > 15)
 			/* really long time */
 			data = PULSE_MASK;
 		else
-			data = (int) (signal*1000000 +
-					 tv.tv_usec - lasttv.tv_usec +
-					 LIRC_SFH506_DELAY);
+			data = (int) (elapsedus + LIRC_SFH506_DELAY);
 
 		rbuf_write(data); /* space */
 	} else {
@@ -301,7 +295,7 @@ static void lirc_lirc_irq_handler(void *blah)
 			data = 1;
 		rbuf_write(PULSE_BIT|data); /* pulse */
 	}
-	do_gettimeofday(&lasttv);
+	lasttm = ktime_get();
 #else
 	/* add your code here */
 #endif
