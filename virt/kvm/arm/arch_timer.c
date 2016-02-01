@@ -381,9 +381,30 @@ static const struct of_device_id arch_timer_of_match[] = {
 	{},
 };
 
-int kvm_timer_hyp_init(void)
+static int kvm_timer_get_ppi(unsigned int *ppi)
 {
 	struct device_node *np;
+	int ret = -EINVAL;
+
+	np = of_find_matching_node(NULL, arch_timer_of_match);
+	if (!np) {
+		ret = -ENODEV;
+		*ppi = 0;
+		goto skip_of;
+	}
+
+	*ppi = irq_of_parse_and_map(np, VIRT_PPI);
+	of_node_put(np);
+
+skip_of:
+	if (*ppi)
+		return 0;
+
+	return ret;
+}
+
+int kvm_timer_hyp_init(void)
+{
 	unsigned int ppi;
 	int err;
 
@@ -391,17 +412,11 @@ int kvm_timer_hyp_init(void)
 	if (!timecounter)
 		return -ENODEV;
 
-	np = of_find_matching_node(NULL, arch_timer_of_match);
-	if (!np) {
-		kvm_err("kvm_arch_timer: can't find DT node\n");
-		return -ENODEV;
-	}
-
-	ppi = irq_of_parse_and_map(np, 2);
-	if (!ppi) {
-		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
-		err = -EINVAL;
-		goto out;
+	err = kvm_timer_get_ppi(&ppi);
+	if (err) {
+		kvm_err("kvm_arch_timer: can't find virtual timer info or "
+			"config virtual timer interrupt.\n");
+		return err;
 	}
 
 	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
@@ -409,7 +424,7 @@ int kvm_timer_hyp_init(void)
 	if (err) {
 		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
 			ppi, err);
-		goto out;
+		return err;
 	}
 
 	host_vtimer_irq = ppi;
@@ -426,14 +441,14 @@ int kvm_timer_hyp_init(void)
 		goto out_free;
 	}
 
-	kvm_info("%s IRQ%d\n", np->name, ppi);
+	kvm_info("timer IRQ%d.\n", ppi);
 	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
 
-	goto out;
+	return 0;
+
 out_free:
 	free_percpu_irq(ppi, kvm_get_running_vcpus());
-out:
-	of_node_put(np);
+
 	return err;
 }
 
