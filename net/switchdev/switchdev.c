@@ -1384,3 +1384,36 @@ void switchdev_port_fwd_mark_set(struct net_device *dev,
 	dev->offload_fwd_mark = mark;
 }
 EXPORT_SYMBOL_GPL(switchdev_port_fwd_mark_set);
+
+/* Must not be deferred, since deffering does shallow copy, which will not
+ * copy mask and key content
+ */
+int switchdev_port_flow_add(struct net_device *dev,
+			    struct flow_dissector *dissector,
+			    void *mask, void *key,
+			    struct switchdev_obj_port_flow_act *actions,
+			    unsigned long cookie)
+{
+	struct switchdev_obj_port_flow flow = {
+		.obj.id = SWITCHDEV_OBJ_ID_PORT_FLOW,
+		.cookie = cookie,
+		.dissector = dissector,
+		.mask = mask,
+		.key = key,
+		.actions = actions,
+	};
+
+	return switchdev_port_obj_add(dev, &flow.obj);
+}
+EXPORT_SYMBOL_GPL(switchdev_port_flow_add);
+
+int switchdev_port_flow_del(struct net_device *dev, unsigned long cookie)
+{
+	struct switchdev_obj_port_flow flow = {
+		.obj.id = SWITCHDEV_OBJ_ID_PORT_FLOW,
+		.cookie = cookie,
+	};
+
+	return switchdev_port_obj_del(dev, &flow.obj);
+}
+EXPORT_SYMBOL_GPL(switchdev_port_flow_del);

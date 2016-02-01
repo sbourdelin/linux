@@ -15,6 +15,7 @@
 #include <linux/notifier.h>
 #include <linux/list.h>
 #include <net/ip_fib.h>
+#include <net/flow_dissector.h>
 
 #define SWITCHDEV_F_NO_RECURSE		BIT(0)
 #define SWITCHDEV_F_SKIP_EOPNOTSUPP	BIT(1)
@@ -69,6 +70,7 @@ enum switchdev_obj_id {
 	SWITCHDEV_OBJ_ID_IPV4_FIB,
 	SWITCHDEV_OBJ_ID_PORT_FDB,
 	SWITCHDEV_OBJ_ID_PORT_MDB,
+	SWITCHDEV_OBJ_ID_PORT_FLOW,
 };
 
 struct switchdev_obj {
@@ -123,6 +125,30 @@ struct switchdev_obj_port_mdb {
 
 #define SWITCHDEV_OBJ_PORT_MDB(obj) \
 	container_of(obj, struct switchdev_obj_port_mdb, obj)
+
+/* SWITCHDEV_OBJ_ID_PORT_FLOW */
+enum switchdev_obj_port_flow_action {
+	SWITCHDEV_OBJ_PORT_FLOW_ACT_DROP = 0,
+	SWITCHDEV_OBJ_PORT_FLOW_ACT_MARK = 1,
+};
+
+struct switchdev_obj_port_flow_act {
+	u32 actions; /* Bitmap of requested actions */
+	u32 mark; /* Value for mark action - if requested */
+};
+
+struct switchdev_obj_port_flow {
+	struct switchdev_obj obj;
+
+	unsigned long cookie;
+	struct flow_dissector *dissector; /* Dissector for mask and keys */
+	void *mask; /* Flow keys mask */
+	void *key;  /* Flow keys */
+	struct switchdev_obj_port_flow_act *actions;
+};
+
+#define SWITCHDEV_OBJ_PORT_FLOW(obj) \
+	container_of(obj, struct switchdev_obj_port_flow, obj)
 
 void switchdev_trans_item_enqueue(struct switchdev_trans *trans,
 				  void *data, void (*destructor)(void const *),
@@ -223,6 +249,12 @@ void switchdev_port_fwd_mark_set(struct net_device *dev,
 				 struct net_device *group_dev,
 				 bool joining);
 
+int switchdev_port_flow_add(struct net_device *dev,
+			    struct flow_dissector *dissector,
+			    void *mask, void *key,
+			    struct switchdev_obj_port_flow_act *actions,
+			    unsigned long cookie);
+int switchdev_port_flow_del(struct net_device *dev, unsigned long cookie);
 #else
 
 static inline void switchdev_deferred_process(void)
@@ -347,6 +379,20 @@ static inline void switchdev_port_fwd_mark_set(struct net_device *dev,
 {
 }
 
+static inline int switchdev_port_flow_add(struct net_device *dev,
+					  struct flow_dissector *dissector,
+					  void *mask, void *key,
+					  struct switchdev_obj_port_flow_act *actions,
+					  unsigned long cookie)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int switchdev_port_flow_del(struct net_device *dev,
+					  unsigned long cookie)
+{
+	return -EOPNOTSUPP;
+}
 #endif
 
 #endif /* _LINUX_SWITCHDEV_H_ */
