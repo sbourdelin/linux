@@ -10402,6 +10402,27 @@ static int intel_modeset_setup_plane_state(struct drm_atomic_state *state,
 	return 0;
 }
 
+struct drm_crtc *intel_get_unused_crtc(struct drm_encoder *encoder)
+{
+	struct drm_crtc *possible_crtc;
+	struct drm_crtc *crtc = NULL;
+	struct drm_device *dev = encoder->dev;
+	int i = -1;
+
+	for_each_crtc(dev, possible_crtc) {
+		i++;
+		if (!(encoder->possible_crtcs & (1 << i)))
+			continue;
+		if (possible_crtc->state->enable)
+			continue;
+
+		crtc = possible_crtc;
+		break;
+	}
+
+	return crtc;
+}
+
 bool intel_get_load_detect_pipe(struct drm_connector *connector,
 				struct drm_display_mode *mode,
 				struct intel_load_detect_pipe *old,
@@ -10410,7 +10431,6 @@ bool intel_get_load_detect_pipe(struct drm_connector *connector,
 	struct intel_crtc *intel_crtc;
 	struct intel_encoder *intel_encoder =
 		intel_attached_encoder(connector);
-	struct drm_crtc *possible_crtc;
 	struct drm_encoder *encoder = &intel_encoder->base;
 	struct drm_crtc *crtc = NULL;
 	struct drm_device *dev = encoder->dev;
@@ -10419,7 +10439,7 @@ bool intel_get_load_detect_pipe(struct drm_connector *connector,
 	struct drm_atomic_state *state = NULL;
 	struct drm_connector_state *connector_state;
 	struct intel_crtc_state *crtc_state;
-	int ret, i = -1;
+	int ret;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s], [ENCODER:%d:%s]\n",
 		      connector->base.id, connector->name,
@@ -10461,21 +10481,10 @@ retry:
 		return true;
 	}
 
-	/* Find an unused one (if possible) */
-	for_each_crtc(dev, possible_crtc) {
-		i++;
-		if (!(encoder->possible_crtcs & (1 << i)))
-			continue;
-		if (possible_crtc->state->enable)
-			continue;
-
-		crtc = possible_crtc;
-		break;
-	}
-
 	/*
 	 * If we didn't find an unused CRTC, don't use any.
 	 */
+	crtc = intel_get_unused_crtc(encoder);
 	if (!crtc) {
 		DRM_DEBUG_KMS("no pipe available for load-detect\n");
 		goto fail;

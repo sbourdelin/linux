@@ -1109,6 +1109,7 @@ bool intel_get_load_detect_pipe(struct drm_connector *connector,
 void intel_release_load_detect_pipe(struct drm_connector *connector,
 				    struct intel_load_detect_pipe *old,
 				    struct drm_modeset_acquire_ctx *ctx);
+struct drm_crtc *intel_get_unused_crtc(struct drm_encoder *encoder);
 int intel_pin_and_fence_fb_obj(struct drm_plane *plane,
 			       struct drm_framebuffer *fb,
 			       const struct drm_plane_state *plane_state);
