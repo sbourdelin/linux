@@ -2955,6 +2955,9 @@ i915_gem_retire_requests_ring(struct intel_engine_cs *ring)
 		i915_gem_request_assign(&ring->trace_irq_req, NULL);
 	}
 
+	if (i915.enable_execlists)
+		intel_execlists_retire_requests(ring);
+
 	WARN_ON(i915_verify_lists(ring->dev));
 }
 
@@ -2973,8 +2976,6 @@ i915_gem_retire_requests(struct drm_device *dev)
 			spin_lock_irq(&ring->execlist_lock);
 			idle &= list_empty(&ring->execlist_queue);
 			spin_unlock_irq(&ring->execlist_lock);
-
-			intel_execlists_retire_requests(ring);
 		}
 	}
 
