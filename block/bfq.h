@@ -194,6 +194,17 @@ struct bfq_group;
  *                        the @bfq-queue is being weight-raised, otherwise
  *                        finish time of the last weight-raising period
  * @wr_cur_max_time: current max raising time for this queue
+ * @soft_rt_next_start: minimum time instant such that, only if a new
+ *                      request is enqueued after this time instant in an
+ *                      idle @bfq_queue with no outstanding requests, then
+ *                      the task associated with the queue it is deemed as
+ *                      soft real-time (see the comments to the function
+ *                      bfq_bfqq_softrt_next_start())
+ * @last_idle_bklogged: time of the last transition of the @bfq_queue from
+ *                      idle to backlogged
+ * @service_from_backlogged: cumulative service received from the @bfq_queue
+ *                           since the last transition from idle to
+ *                           backlogged
  *
  * A bfq_queue is a leaf request queue; it can be associated with an
  * io_context or more, if it is async. @cgroup holds a reference to
@@ -238,8 +249,11 @@ struct bfq_queue {
 
 	/* weight-raising fields */
 	unsigned long wr_cur_max_time;
+	unsigned long soft_rt_next_start;
 	unsigned long last_wr_start_finish;
 	unsigned int wr_coeff;
+	unsigned long last_idle_bklogged;
+	unsigned long service_from_backlogged;
 };
 
 /**
@@ -332,12 +346,15 @@ enum bfq_device_speed {
  * @bfq_wr_coeff: maximum factor by which the weight of a weight-raised
  *                queue is multiplied.
  * @bfq_wr_max_time: maximum duration of a weight-raising period (jiffies).
+ * @bfq_wr_rt_max_time: maximum duration for soft real-time processes.
  * @bfq_wr_min_idle_time: minimum idle period after which weight-raising
  *			  may be reactivated for a queue (in jiffies).
  * @bfq_wr_min_inter_arr_async: minimum period between request arrivals
  *				after which weight-raising may be
  *				reactivated for an already busy queue
  *				(in jiffies).
+ * @bfq_wr_max_softrt_rate: max service-rate for a soft real-time queue,
+ *			    sectors per second.
  * @RT_prod: cached value of the product R*T used for computing the maximum
  *	     duration of the weight raising automatically.
  * @device_speed: device-speed class for the low-latency heuristic.
@@ -395,8 +412,10 @@ struct bfq_data {
 	/* parameters of the low_latency heuristics */
 	unsigned int bfq_wr_coeff;
 	unsigned int bfq_wr_max_time;
+	unsigned int bfq_wr_rt_max_time;
 	unsigned int bfq_wr_min_idle_time;
 	unsigned long bfq_wr_min_inter_arr_async;
+	unsigned int bfq_wr_max_softrt_rate;
 	u64 RT_prod;
 	enum bfq_device_speed device_speed;
 
@@ -419,6 +438,10 @@ enum bfqq_state_flags {
 	BFQ_BFQQ_FLAG_constantly_seeky,	/*
 					 * bfqq has proved to be slow and
 					 * seeky until budget timeout
+					 */
+	BFQ_BFQQ_FLAG_softrt_update,	/*
+					 * may need softrt-next-start
+					 * update
 					 */
 };
 
@@ -445,6 +468,7 @@ BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(budget_new);
 BFQ_BFQQ_FNS(IO_bound);
 BFQ_BFQQ_FNS(constantly_seeky);
+BFQ_BFQQ_FNS(softrt_update);
 #undef BFQ_BFQQ_FNS
 
 /* Logging facilities. */
