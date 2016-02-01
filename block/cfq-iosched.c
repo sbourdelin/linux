@@ -109,9 +109,6 @@ struct kmem_cache *bfq_pool;
 #define BFQQ_SEEK_THR	 (sector_t)(8 * 1024)
 #define BFQQ_SEEKY(bfqq) ((bfqq)->seek_mean > BFQQ_SEEK_THR)
 
-/* Budget feedback step. */
-#define BFQ_BUDGET_STEP         128
-
 /* Min samples used for peak rate estimation (for autotuning). */
 #define BFQ_PEAK_RATE_SAMPLES	32
 
@@ -2753,36 +2750,6 @@ static int bfq_max_budget(struct bfq_data *bfqd)
 		return bfqd->bfq_max_budget;
 }
 
- /*
- * bfq_default_budget - return the default budget for @bfqq on @bfqd.
- * @bfqd: the device descriptor.
- * @bfqq: the queue to consider.
- *
- * We use 3/4 of the @bfqd maximum budget as the default value
- * for the max_budget field of the queues.  This lets the feedback
- * mechanism to start from some middle ground, then the behavior
- * of the process will drive the heuristics towards high values, if
- * it behaves as a greedy sequential reader, or towards small values
- * if it shows a more intermittent behavior.
- */
-static unsigned long bfq_default_budget(struct bfq_data *bfqd,
-					struct bfq_queue *bfqq)
-{
-	unsigned long budget;
-
-	/*
-	 * When we need an estimate of the peak rate we need to avoid
-	 * to give budgets that are too short due to previous measurements.
-	 * So, in the first 10 assignments use a ``safe'' budget value.
-	 */
-	if (bfqd->budgets_assigned < 194 && bfqd->bfq_user_max_budget == 0)
-		budget = bfq_default_max_budget;
-	else
-		budget = bfqd->bfq_max_budget;
-
-	return budget - budget / 4;
-}
-
 /*
  * Return min budget, which is a fraction of the current or default
  * max budget (trying with 1/32)
@@ -2951,13 +2918,51 @@ static void __bfq_bfqq_recalc_budget(struct bfq_data *bfqd,
 		 * for throughput.
 		 */
 		case BFQ_BFQQ_TOO_IDLE:
-			if (budget > min_budget + BFQ_BUDGET_STEP)
-				budget -= BFQ_BUDGET_STEP;
-			else
-				budget = min_budget;
+			/*
+			 * This is the only case where we may reduce
+			 * the budget: if there is no request of the
+			 * process still waiting for completion, then
+			 * we assume (tentatively) that the timer has
+			 * expired because the batch of requests of
+			 * the process could have been served with a
+			 * smaller budget.  Hence, betting that
+			 * process will behave in the same way when it
+			 * becomes backlogged again, we reduce its
+			 * next budget.  As long as we guess right,
+			 * this budget cut reduces the latency
+			 * experienced by the process.
+			 *
+			 * However, if there are still outstanding
+			 * requests, then the process may have not yet
+			 * issued its next request just because it is
+			 * still waiting for the completion of some of
+			 * the still outstanding ones.  So in this
+			 * subcase we do not reduce its budget, on the
+			 * contrary we increase it to possibly boost
+			 * the throughput, as discussed in the
+			 * comments to the BUDGET_TIMEOUT case.
+			 */
+			if (bfqq->dispatched > 0) /* still outstanding reqs */
+				budget = min(budget * 2, bfqd->bfq_max_budget);
+			else {
+				if (budget > 5 * min_budget)
+					budget -= 4 * min_budget;
+				else
+					budget = min_budget;
+			}
 			break;
 		case BFQ_BFQQ_BUDGET_TIMEOUT:
-			budget = bfq_default_budget(bfqd, bfqq);
+			/*
+			 * We double the budget here because: 1) it
+			 * gives the chance to boost the throughput if
+			 * this is not a seeky process (which may have
+			 * bumped into this timeout because of, e.g.,
+			 * ZBR), 2) together with charge_full_budget
+			 * it helps give seeky processes higher
+			 * timestamps, and hence be served less
+			 * frequently.
+			 */
+			budget = min(budget * 2, bfqd->bfq_max_budget);
 			break;
 		case BFQ_BFQQ_BUDGET_EXHAUSTED:
 			/*
@@ -2969,8 +2974,7 @@ static void __bfq_bfqq_recalc_budget(struct bfq_data *bfqd,
 			 * definitely increase the budget of this good
 			 * candidate to boost the disk throughput.
 			 */
-			budget = min(budget + 8 * BFQ_BUDGET_STEP,
-				     bfqd->bfq_max_budget);
+			budget = min(budget * 4, bfqd->bfq_max_budget);
 			break;
 		case BFQ_BFQQ_NO_MORE_REQUESTS:
 		       /*
@@ -3677,7 +3681,7 @@ static void bfq_init_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	bfq_mark_bfqq_IO_bound(bfqq);
 
 	/* Tentative initial value to trade off between thr and lat */
-	bfqq->max_budget = bfq_default_budget(bfqd, bfqq);
+	bfqq->max_budget = (2 * bfq_max_budget(bfqd)) / 3;
 	bfqq->pid = pid;
 }
 
