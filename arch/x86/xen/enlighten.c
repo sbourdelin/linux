@@ -1855,14 +1855,20 @@ static void __init init_hvm_pv_info(void)
 	minor = eax & 0xffff;
 	printk(KERN_INFO "Xen version %d.%d.\n", major, minor);
 
-	cpuid(base + 2, &pages, &msr, &ecx, &edx);
-
-	pfn = __pa(hypercall_page);
-	wrmsr_safe(msr, (u32)pfn, (u32)(pfn >> 32));
+	/* HVMlite set up hypercall page earlier in xen_prepare_hvmlite() */
+	if (xen_hvmlite) {
+		pv_info.name = "Xen HVMlite";
+		pv_info.paravirt_enabled = 1;
+		xen_init_apic();
+		machine_ops = xen_machine_ops;
+	} else {
+		pv_info.name = "Xen HVM";
+		cpuid(base + 2, &pages, &msr, &ecx, &edx);
+		pfn = __pa(hypercall_page);
+		wrmsr_safe(msr, (u32)pfn, (u32)(pfn >> 32));
+	}
 
 	xen_setup_features();
-
-	pv_info.name = "Xen HVM";
 
 	xen_domain_type = XEN_HVM_DOMAIN;
 }
