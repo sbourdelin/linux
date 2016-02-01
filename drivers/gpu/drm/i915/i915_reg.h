@@ -5756,7 +5756,8 @@ enum skl_disp_power_wells {
 /* legacy palette */
 #define _LGC_PALETTE_A           0x4a000
 #define _LGC_PALETTE_B           0x4a800
-#define LGC_PALETTE(pipe, i) _MMIO(_PIPE(pipe, _LGC_PALETTE_A, _LGC_PALETTE_B) + (i) * 4)
+#define _LGC_PALETTE_C           0x4b000
+#define LGC_PALETTE(pipe, i) _MMIO(_PIPE3(pipe, _LGC_PALETTE_A, _LGC_PALETTE_B, _LGC_PALETTE_C) + (i) * 4)
 
 #define _GAMMA_MODE_A		0x4a480
 #define _GAMMA_MODE_B		0x4ac80
