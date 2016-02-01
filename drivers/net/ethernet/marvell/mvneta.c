@@ -374,6 +374,7 @@ struct mvneta_port {
 	 * ensuring that the configuration remains coherent.
 	 */
 	spinlock_t lock;
+	bool is_stopping;
 
 	/* Core clock */
 	struct clk *clk;
@@ -2916,6 +2917,11 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
 	switch (action) {
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
+		/* Configuring the driver for a new CPU while the
+		 * driver is stopping is racy, so just avoid it.
+		 */
+		if (pp->is_stopping)
+			break;
 		netif_tx_stop_all_queues(pp->dev);
 
 		/* We have to synchronise on tha napi of each CPU
@@ -3054,9 +3060,17 @@ static int mvneta_stop(struct net_device *dev)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
 
+	/* Inform that we are stopping so we don't want to setup the
+	 * driver for new CPUs in the notifiers
+	 */
+	pp->is_stopping = true;
 	mvneta_stop_dev(pp);
 	mvneta_mdio_remove(pp);
 	unregister_cpu_notifier(&pp->cpu_notifier);
+	/* Now that the notifier are unregistered, we can clear the
+	 * flag
+	 */
+	pp->is_stopping = false;
 	on_each_cpu(mvneta_percpu_disable, pp, true);
 	free_percpu_irq(dev->irq, pp->ports);
 	mvneta_cleanup_rxqs(pp);
