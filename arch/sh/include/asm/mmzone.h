@@ -5,9 +5,7 @@
 
 #ifdef CONFIG_NEED_MULTIPLE_NODES
 #include <linux/numa.h>
-
-extern struct pglist_data *node_data[];
-#define NODE_DATA(nid)		(node_data[nid])
+#include  <asm-generic/mmzone.h>
 
 static inline int pfn_to_nid(unsigned long pfn)
 {

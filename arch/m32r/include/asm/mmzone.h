@@ -7,11 +7,9 @@
 #define _ASM_MMZONE_H_
 
 #include <asm/smp.h>
+#include  <asm-generic/mmzone.h>
 
 #ifdef CONFIG_DISCONTIGMEM
-
-extern struct pglist_data *node_data[];
-#define NODE_DATA(nid)		(node_data[nid])
 
 #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
