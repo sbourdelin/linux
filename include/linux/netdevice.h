@@ -632,6 +632,15 @@ struct rps_dev_flow {
 };
 #define RPS_NO_FILTER 0xffff
 
+struct rps_cpu_queue {
+	struct sk_buff_head skb_list;
+	int to_cpu;
+	struct rps_dev_flow *rflow;
+	struct net_device *dev;
+};
+#define RPS_CPU_QUEUES		2 /* Must be power of 2 */
+#define RPS_CPU_QUEUES_MASK	(RPS_CPU_QUEUES - 1)
+
 /*
  * The rps_dev_flow_table structure contains a table of flow mappings.
  */
@@ -2661,6 +2670,7 @@ struct softnet_data {
 	unsigned int		received_rps;
 #ifdef CONFIG_RPS
 	struct softnet_data	*rps_ipi_list;
+	struct rps_cpu_queue	local_rps_queue[RPS_CPU_QUEUES];
 #endif
 #ifdef CONFIG_NET_FLOW_LIMIT
 	struct sd_flow_limit __rcu *flow_limit;

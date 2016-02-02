@@ -3736,6 +3736,60 @@ drop:
 	return NET_RX_DROP;
 }
 
+static int enqueue_list_to_backlog(struct sk_buff_head *skb_list, int cpu,
+				   unsigned int *qtail, struct net_device *dev)
+{
+       unsigned int qlen, qlen_drop;
+       struct softnet_data *sd;
+       struct sk_buff *skb;
+       unsigned long flags;
+
+       sd = &per_cpu(softnet_data, cpu);
+
+       local_irq_save(flags);
+
+       rps_lock(sd);
+       if (!netif_running(dev))
+               goto drop;
+       qlen = skb_queue_len(&sd->input_pkt_queue);
+       /* NOTICE: Had to drop !skb_flow_limit(skb, qlen) check here */
+       if (qlen <= netdev_max_backlog) {
+               if (qlen) {
+enqueue:
+                       //__skb_queue_tail(&sd->input_pkt_queue, skb);
+                       skb_queue_splice_tail_init(skb_list,
+                                                  &sd->input_pkt_queue);
+                       input_queue_tail_incr_save(sd, qtail);
+                       rps_unlock(sd);
+                       local_irq_restore(flags);
+                       return NET_RX_SUCCESS;
+               }
+
+               /* Schedule NAPI for backlog device
+                * We can use non atomic operation since we own the queue lock
+                */
+               if (!__test_and_set_bit(NAPI_STATE_SCHED, &sd->backlog.state)) {
+                       if (!rps_ipi_queued(sd))
+                               ____napi_schedule(sd, &sd->backlog);
+               }
+               goto enqueue;
+       }
+
+drop:
+       qlen_drop = skb_queue_len(skb_list);
+       sd->dropped += qlen_drop;
+       rps_unlock(sd);
+
+       local_irq_restore(flags);
+
+       atomic_long_add(qlen_drop, &dev->rx_dropped);
+       while ((skb = __skb_dequeue(skb_list)) != NULL) {
+               __kfree_skb_defer(skb);
+       }
+       return NET_RX_DROP;
+}
+
+
 static int netif_rx_internal(struct sk_buff *skb)
 {
 	int ret;
@@ -4211,14 +4265,43 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
 #ifdef CONFIG_RPS
 	if (static_key_false(&rps_needed)) {
 		struct rps_dev_flow voidflow, *rflow = &voidflow;
-		int cpu = get_rps_cpu(skb->dev, skb, &rflow);
+		struct softnet_data *sd = this_cpu_ptr(&softnet_data);
+		struct rps_cpu_queue *lq; /* softnet cpu local queue (lq) */
 
-		if (cpu >= 0) {
-			ret = enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
+		int cpu = get_rps_cpu(skb->dev, skb, &rflow);
+		if (cpu < 0)
+			goto no_rps;
+
+		/* RPS destinated packet */
+		// XXX: is local_irq_disable needed here?
+		sd = this_cpu_ptr(&softnet_data);
+		lq = &sd->local_rps_queue[cpu & RPS_CPU_QUEUES_MASK];
+
+		if (lq->to_cpu == cpu && lq->dev == skb->dev) {
+			/* Bonus, RPS dest match prev CPU, q pkt for later */
+			__skb_queue_tail(&lq->skb_list, skb);
+			lq->rflow = rflow;
 			rcu_read_unlock();
-			return ret;
+			return NET_RX_SUCCESS;
 		}
+		if (unlikely(lq->to_cpu < 0))
+			goto init_localq;
+
+		/* No match, bulk enq to remote cpu backlog */
+		ret = enqueue_list_to_backlog(&lq->skb_list, lq->to_cpu,
+					      &lq->rflow->last_qtail, lq->dev);
+	init_localq: /* start new localq (lq) */
+		/* XXX: check if lq->skb_list was already re-init'ed */
+		skb_queue_head_init(&lq->skb_list);
+		__skb_queue_tail(&lq->skb_list, skb);
+		lq->rflow = rflow;
+		lq->to_cpu = cpu;
+		lq->dev = skb->dev;
+
+		rcu_read_unlock();
+		return ret;
 	}
+no_rps:
 #endif
 	ret = __netif_receive_skb(skb);
 	rcu_read_unlock();
@@ -4582,6 +4665,30 @@ gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(napi_gro_receive);
 
+static void rps_flush_local_queues(struct softnet_data *sd)
+{
+#ifdef CONFIG_RPS
+	int i;
+
+//	local_irq_disable(); //TEST
+//	if (!sd)
+	sd = this_cpu_ptr(&softnet_data);
+
+	/* Bulk flush any remaining locally queued packets for RPS */
+	for (i = 0; i < RPS_CPU_QUEUES; i++) {
+		struct rps_cpu_queue *lq = &sd->local_rps_queue[i];
+
+		if (skb_queue_empty(&lq->skb_list))
+			continue;
+
+		enqueue_list_to_backlog(&lq->skb_list, lq->to_cpu,
+					&lq->rflow->last_qtail, lq->dev);
+		// FAILS: lq->to_cpu = -1;
+	}
+//	local_irq_enable(); //TEST
+#endif
+}
+
 void napi_gro_receive_list(struct napi_struct *napi,
 			   struct sk_buff_head *skb_list,
 			   struct net_device *netdev)
@@ -4597,6 +4704,10 @@ void napi_gro_receive_list(struct napi_struct *napi,
 		skb_gro_reset_offset(skb);
 		napi_skb_finish(dev_gro_receive(napi, skb), skb);
 	}
+#ifdef CONFIG_RPS
+//	if (static_key_false(&rps_needed))
+//		rps_flush_local_queues(NULL);
+#endif
 }
 EXPORT_SYMBOL(napi_gro_receive_list);
 
@@ -4749,6 +4860,8 @@ static void net_rps_action_and_irq_enable(struct softnet_data *sd)
 		sd->rps_ipi_list = NULL;
 
 		local_irq_enable();
+
+//		rps_flush_local_queues(NULL);
 
 		/* Send pending IPI's to kick RPS processing on remote cpus. */
 		while (remsd) {
@@ -5178,6 +5291,8 @@ static void net_rx_action(struct softirq_action *h)
 
 	__kfree_skb_flush();
 	local_irq_disable();
+
+        rps_flush_local_queues(NULL);
 
 	list_splice_tail_init(&sd->poll_list, &list);
 	list_splice_tail(&repoll, &list);
@@ -8088,6 +8203,9 @@ static int __init net_dev_init(void)
 
 	for_each_possible_cpu(i) {
 		struct softnet_data *sd = &per_cpu(softnet_data, i);
+#ifdef CONFIG_RPS
+		int j;
+#endif
 
 		skb_queue_head_init(&sd->input_pkt_queue);
 		skb_queue_head_init(&sd->process_queue);
@@ -8097,6 +8215,15 @@ static int __init net_dev_init(void)
 		sd->csd.func = rps_trigger_softirq;
 		sd->csd.info = sd;
 		sd->cpu = i;
+		for (j = 0; j < RPS_CPU_QUEUES; j++) {
+			struct rps_cpu_queue *lq = &sd->local_rps_queue[j];
+
+			skb_queue_head_init(&lq->skb_list);
+			lq->to_cpu = -1;
+			// XXX: below not needed
+			lq->rflow = NULL;
+			lq->dev = NULL;
+		}
 #endif
 
 		sd->backlog.poll = process_backlog;
