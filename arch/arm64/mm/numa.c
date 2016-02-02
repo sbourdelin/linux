@@ -20,6 +20,7 @@
 #include <linux/bootmem.h>
 #include <linux/memblock.h>
 #include <linux/module.h>
+#include <linux/of.h>
 
 struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
 EXPORT_SYMBOL(node_data);
@@ -120,6 +121,15 @@ static void __init setup_node_to_cpumask_map(void)
 void numa_store_cpu_info(unsigned int cpu)
 {
 	map_cpu_to_node(cpu, numa_off ? 0 : cpu_to_node_map[cpu]);
+}
+
+void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+{
+	/* fallback to node 0 */
+	if (nid < 0 || nid >= MAX_NUMNODES)
+		nid = 0;
+
+	cpu_to_node_map[cpu] = nid;
 }
 
 /**
@@ -383,5 +393,12 @@ static int __init dummy_numa_init(void)
  */
 void __init arm64_numa_init(void)
 {
+	if (!numa_off) {
+#ifdef CONFIG_OF_NUMA
+		if (!numa_init(of_numa_init))
+			return;
+#endif
+	}
+
 	numa_init(dummy_numa_init);
 }
