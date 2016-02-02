@@ -485,6 +485,13 @@ choice
 		  Say Y here if you want kernel low-level debugging support
 		  on MMP UART3.
 
+	config DEBUG_MPS2_UART
+		bool "Kernel low-level debugging message via MPS2 UART0"
+		depends on ARCH_MPS2
+		help
+		  Say Y here if you want kernel low-level debugging support
+		  on MPS2 based platforms.
+
 	config DEBUG_MVEBU_UART0
 		bool "Kernel low-level debugging messages via MVEBU UART0 (old bootloaders)"
 		depends on ARCH_MVEBU
@@ -1415,6 +1422,7 @@ config DEBUG_LL_INCLUDE
 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
 	default "debug/bcm63xx.S" if DEBUG_BCM63XX_UART
 	default "debug/digicolor.S" if DEBUG_DIGICOLOR_UA0
+	default "debug/mps2.S" if DEBUG_MPS2_UART
 	default "mach/debug-macro.S"
 
 # Compatibility options for PL01x
@@ -1463,6 +1471,7 @@ config DEBUG_UART_PHYS
 	default 0x20201000 if DEBUG_BCM2835
 	default 0x3f201000 if DEBUG_BCM2836
 	default 0x3e000000 if DEBUG_BCM_KONA_UART
+	default 0x40004000 if DEBUG_MPS2_UART
 	default 0x4000e400 if DEBUG_LL_UART_EFM32
 	default 0x40081000 if DEBUG_LPC18XX_UART0
 	default 0x40090000 if DEBUG_LPC32XX
@@ -1539,7 +1548,8 @@ config DEBUG_UART_PHYS
 		DEBUG_S3C64XX_UART || \
 		DEBUG_BCM63XX_UART || DEBUG_ASM9260_UART || \
 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
-		DEBUG_AT91_UART
+		DEBUG_AT91_UART || \
+		DEBUG_MPS2_UART
 
 config DEBUG_UART_VIRT
 	hex "Virtual base address of debug UART"
