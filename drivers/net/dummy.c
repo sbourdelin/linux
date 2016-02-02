@@ -85,7 +85,8 @@ static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	dstats->tx_bytes += skb->len;
 	u64_stats_update_end(&dstats->syncp);
 
-	dev_kfree_skb(skb);
+	//dev_kfree_skb(skb);
+	napi_consume_skb(skb, 1);
 	return NETDEV_TX_OK;
 }
 
