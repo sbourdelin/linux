@@ -661,7 +661,7 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 					dev_err(dev,
 						"Failed to get gpio flags, error: %d\n",
 						error);
-				return ERR_PTR(error);
+				goto err_out;
 			}
 		} else {
 			button->active_low = flags & OF_GPIO_ACTIVE_LOW;
@@ -671,13 +671,15 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 
 		if (!gpio_is_valid(button->gpio) && !button->irq) {
 			dev_err(dev, "Found button without gpios or irqs\n");
-			return ERR_PTR(-EINVAL);
+			error = -EINVAL;
+			goto err_out;
 		}
 
 		if (of_property_read_u32(pp, "linux,code", &button->code)) {
 			dev_err(dev, "Button without keycode: 0x%x\n",
 				button->gpio);
-			return ERR_PTR(-EINVAL);
+			error = -EINVAL;
+			goto err_out;
 		}
 
 		button->desc = of_get_property(pp, "label", NULL);
@@ -700,6 +702,10 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 		return ERR_PTR(-EINVAL);
 
 	return pdata;
+
+err_out:
+	of_node_put(pp);
+	return ERR_PTR(error);
 }
 
 static const struct of_device_id gpio_keys_of_match[] = {
