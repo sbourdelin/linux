@@ -1244,7 +1244,6 @@ static struct platform_driver * const drivers[] = {
 static int __init mpc85xx_mc_init(void)
 {
 	int res = 0;
-	u32 pvr = 0;
 
 	printk(KERN_INFO "Freescale(R) MPC85xx EDAC driver, "
 	       "(C) 2006 Montavista Software\n");
@@ -1264,16 +1263,18 @@ static int __init mpc85xx_mc_init(void)
 		printk(KERN_WARNING EDAC_MOD_STR "drivers fail to register\n");
 
 #ifdef CONFIG_FSL_SOC_BOOKE
-	pvr = mfspr(SPRN_PVR);
+	{
+		u32 pvr = mfspr(SPRN_PVR);
 
-	if ((PVR_VER(pvr) == PVR_VER_E500V1) ||
-	    (PVR_VER(pvr) == PVR_VER_E500V2)) {
-		/*
-		 * need to clear HID1[RFXE] to disable machine check int
-		 * so we can catch it
-		 */
-		if (edac_op_state == EDAC_OPSTATE_INT)
-			on_each_cpu(mpc85xx_mc_clear_rfxe, NULL, 0);
+		if ((PVR_VER(pvr) == PVR_VER_E500V1) ||
+		    (PVR_VER(pvr) == PVR_VER_E500V2)) {
+			/*
+			 * need to clear HID1[RFXE] to disable machine check int
+			 * so we can catch it
+			 */
+			if (edac_op_state == EDAC_OPSTATE_INT)
+				on_each_cpu(mpc85xx_mc_clear_rfxe, NULL, 0);
+		}
 	}
 #endif
 
