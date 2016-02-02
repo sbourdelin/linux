@@ -134,6 +134,15 @@ int klp_unregister_patch(struct klp_patch *);
 int klp_enable_patch(struct klp_patch *);
 int klp_disable_patch(struct klp_patch *);
 
+/* Called from the module loader during module coming/going states */
+extern int klp_module_enable(struct module *mod);
+extern void klp_module_disable(struct module *mod);
+
+#else /* !CONFIG_LIVEPATCH */
+
+static inline int klp_module_enable(struct module *mod) { return 0; }
+static inline void klp_module_disable(struct module *mod) { }
+
 #endif /* CONFIG_LIVEPATCH */
 
 #endif /* _LINUX_LIVEPATCH_H_ */

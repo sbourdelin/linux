@@ -53,6 +53,7 @@
 #include <asm/sections.h>
 #include <linux/tracepoint.h>
 #include <linux/ftrace.h>
+#include <linux/livepatch.h>
 #include <linux/async.h>
 #include <linux/percpu.h>
 #include <linux/kmemleak.h>
@@ -981,6 +982,7 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 		mod->exit();
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_GOING, mod);
+	klp_module_disable(mod);
 	ftrace_release_mod(mod);
 
 	async_synchronize_full();
@@ -3297,6 +3299,7 @@ fail:
 	module_put(mod);
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_GOING, mod);
+	klp_module_disable(mod);
 	ftrace_release_mod(mod);
 	free_module(mod);
 	wake_up_all(&module_wq);
@@ -3375,6 +3378,10 @@ static int complete_formation(struct module *mod, struct load_info *info)
 	mutex_unlock(&module_mutex);
 
 	ftrace_module_enable(mod);
+	err = klp_module_enable(mod);
+	if (err)
+		goto out;
+
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_COMING, mod);
 	return 0;
@@ -3531,6 +3538,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_GOING, mod);
+	klp_module_disable(mod);
 
 	/* we can't deallocate the module until we clear memory protection */
 	module_disable_ro(mod);
