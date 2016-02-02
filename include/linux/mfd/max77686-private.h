@@ -407,12 +407,6 @@ enum max77686_irq {
 	MAX77686_PMICIRQ_140C,
 	MAX77686_PMICIRQ_120C,
 
-	MAX77686_RTCIRQ_RTC60S = 0,
-	MAX77686_RTCIRQ_RTCA1,
-	MAX77686_RTCIRQ_RTCA2,
-	MAX77686_RTCIRQ_SMPL,
-	MAX77686_RTCIRQ_RTC1S,
-	MAX77686_RTCIRQ_WTSR,
 };
 
 #define MAX77686_INT1_PWRONF_MSK	BIT(0)
@@ -427,24 +421,14 @@ enum max77686_irq {
 #define MAX77686_INT2_140C_MSK		BIT(0)
 #define MAX77686_INT2_120C_MSK		BIT(1)
 
-#define MAX77686_RTCINT_RTC60S_MSK	BIT(0)
-#define MAX77686_RTCINT_RTCA1_MSK	BIT(1)
-#define MAX77686_RTCINT_RTCA2_MSK	BIT(2)
-#define MAX77686_RTCINT_SMPL_MSK	BIT(3)
-#define MAX77686_RTCINT_RTC1S_MSK	BIT(4)
-#define MAX77686_RTCINT_WTSR_MSK	BIT(5)
-
 struct max77686_dev {
 	struct device *dev;
 	struct i2c_client *i2c; /* 0xcc / PMIC, Battery Control, and FLASH */
-	struct i2c_client *rtc; /* slave addr 0x0c */
 
 	unsigned long type;
 
 	struct regmap *regmap;		/* regmap for mfd */
-	struct regmap *rtc_regmap;	/* regmap for rtc */
 	struct regmap_irq_chip_data *irq_data;
-	struct regmap_irq_chip_data *rtc_irq_data;
 
 	int irq;
 	struct mutex irqlock;
