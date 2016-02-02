@@ -43,12 +43,13 @@ static inline bool mlx5e_rx_hw_stamp(struct mlx5e_tstamp *tstamp)
 
 static inline int mlx5e_alloc_rx_wqe(struct mlx5e_rq *rq,
 				     struct mlx5e_rx_wqe *wqe, u16 ix,
-				     struct napi_struct *napi)
+				     struct napi_struct *napi,
+				     unsigned int bulk_hint)
 {
 	struct sk_buff *skb;
 	dma_addr_t dma_addr;
 
-	skb = napi_alloc_skb(napi, rq->wqe_sz);
+	skb = napi_alloc_skb_hint(napi, rq->wqe_sz, bulk_hint);
 	if (unlikely(!skb))
 		return -ENOMEM;
 
@@ -77,7 +78,8 @@ err_free_skb:
 	return -ENOMEM;
 }
 
-bool mlx5e_post_rx_wqes(struct mlx5e_rq *rq, struct napi_struct *napi)
+bool mlx5e_post_rx_wqes(struct mlx5e_rq *rq, struct napi_struct *napi,
+			unsigned int hint)
 {
 	struct mlx5_wq_ll *wq = &rq->wq;
 
@@ -87,7 +89,7 @@ bool mlx5e_post_rx_wqes(struct mlx5e_rq *rq, struct napi_struct *napi)
 	while (!mlx5_wq_ll_is_full(wq)) {
 		struct mlx5e_rx_wqe *wqe = mlx5_wq_ll_get_wqe(wq, wq->head);
 
-		if (unlikely(mlx5e_alloc_rx_wqe(rq, wqe, wq->head, napi)))
+		if (unlikely(mlx5e_alloc_rx_wqe(rq, wqe, wq->head, napi, hint)))
 			break;
 
 		mlx5_wq_ll_push(wq, be16_to_cpu(wqe->next.next_wqe_index));
