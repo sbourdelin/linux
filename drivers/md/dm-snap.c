@@ -1102,6 +1102,7 @@ static void stop_merge(struct dm_snapshot *s)
 static int snapshot_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 {
 	struct dm_snapshot *s;
+	struct block_device *origin_bdev, *cow_bdev;
 	int i;
 	int r = -EINVAL;
 	char *origin_path, *cow_path;
@@ -1136,9 +1137,18 @@ static int snapshot_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad_origin;
 	}
 
+	origin_bdev = s->origin->bdev;
 	cow_path = argv[0];
 	argv++;
 	argc--;
+
+	/*check cow dev is available*/
+	cow_bdev = lookup_bdev(cow_path);
+	if(cow_bdev->bd_dev == origin_bdev->bd_dev){
+		ti->error = "Invalid COW device";
+		r = -EINVAL;
+		goto bad_cow;
+	}
 
 	r = dm_get_device(ti, cow_path, dm_table_get_mode(ti->table), &s->cow);
 	if (r) {
