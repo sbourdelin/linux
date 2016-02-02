@@ -137,7 +137,10 @@ struct bridge_vlan_info {
 /* Bridge multicast database attributes
  * [MDBA_MDB] = {
  *     [MDBA_MDB_ENTRY] = {
- *         [MDBA_MDB_ENTRY_INFO]
+ *         [MDBA_MDB_ENTRY_INFO] {
+ *		struct br_mdb_entry
+ *		[MDBA_MDB_ENTRY attributes]
+ *         }
  *     }
  * }
  * [MDBA_ROUTER] = {
@@ -162,6 +165,7 @@ enum {
 enum {
 	MDBA_MDB_ENTRY_UNSPEC,
 	MDBA_MDB_ENTRY_INFO,
+	MDBA_MDB_ENTRY_TIMER,
 	__MDBA_MDB_ENTRY_MAX,
 };
 #define MDBA_MDB_ENTRY_MAX (__MDBA_MDB_ENTRY_MAX - 1)
