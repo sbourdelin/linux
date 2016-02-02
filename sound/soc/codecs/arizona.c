@@ -1398,23 +1398,10 @@ static const int arizona_48k_bclk_rates[] = {
 	24576000,
 };
 
-static const unsigned int arizona_48k_rates[] = {
-	12000,
-	24000,
-	48000,
-	96000,
-	192000,
-	384000,
-	768000,
-	4000,
-	8000,
-	16000,
-	32000,
-	64000,
-	128000,
-	256000,
-	512000,
-};
+#define ARIZONA_48K_RATES 12000, 24000, 48000, 96000, 192000, 4000, 8000, \
+			  16000, 32000
+
+static const unsigned int arizona_48k_rates[] = { ARIZONA_48K_RATES };
 
 static const struct snd_pcm_hw_constraint_list arizona_48k_constraint = {
 	.count	= ARRAY_SIZE(arizona_48k_rates),
@@ -1443,15 +1430,9 @@ static const int arizona_44k1_bclk_rates[] = {
 	22579200,
 };
 
-static const unsigned int arizona_44k1_rates[] = {
-	11025,
-	22050,
-	44100,
-	88200,
-	176400,
-	352800,
-	705600,
-};
+#define ARIZONA_44K1_RATES 11025, 22050, 44100, 88200, 176400
+
+static const unsigned int arizona_44k1_rates[] = { ARIZONA_44K1_RATES };
 
 static const struct snd_pcm_hw_constraint_list arizona_44k1_constraint = {
 	.count	= ARRAY_SIZE(arizona_44k1_rates),
@@ -1485,6 +1466,15 @@ static int arizona_sr_vals[] = {
 	512000,
 };
 
+static const unsigned int arizona_rates[] = {
+	ARIZONA_48K_RATES, ARIZONA_44K1_RATES
+};
+
+static const struct snd_pcm_hw_constraint_list arizona_constraint = {
+	.count	= ARRAY_SIZE(arizona_rates),
+	.list	= arizona_rates,
+};
+
 static int arizona_startup(struct snd_pcm_substream *substream,
 			   struct snd_soc_dai *dai)
 {
@@ -1509,9 +1499,8 @@ static int arizona_startup(struct snd_pcm_substream *substream,
 	}
 
 	if (base_rate == 0)
-		return 0;
-
-	if (base_rate % 8000)
+		constraint = &arizona_constraint;
+	else if (base_rate % 8000)
 		constraint = &arizona_44k1_constraint;
 	else
 		constraint = &arizona_48k_constraint;
