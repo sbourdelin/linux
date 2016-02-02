@@ -7814,6 +7814,69 @@ static void intel_set_pipe_timings(struct intel_crtc *intel_crtc)
 		   (intel_crtc->config->pipe_src_h - 1));
 }
 
+static void intel_get_dsi_pipe_timings(struct intel_crtc *crtc,
+				   struct intel_crtc_state *pipe_config)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	enum transcoder cpu_transcoder = pipe_config->cpu_transcoder;
+	struct intel_encoder *encoder;
+	uint32_t tmp;
+
+	tmp = I915_READ(HTOTAL(cpu_transcoder));
+	pipe_config->base.adjusted_mode.crtc_hdisplay = (tmp & 0xffff) + 1;
+	pipe_config->base.adjusted_mode.crtc_htotal =
+						((tmp >> 16) & 0xffff) + 1;
+	tmp = I915_READ(HBLANK(cpu_transcoder));
+	pipe_config->base.adjusted_mode.crtc_hblank_start = (tmp & 0xffff) + 1;
+	pipe_config->base.adjusted_mode.crtc_hblank_end =
+						((tmp >> 16) & 0xffff) + 1;
+	tmp = I915_READ(HSYNC(cpu_transcoder));
+	pipe_config->base.adjusted_mode.crtc_hsync_start = (tmp & 0xffff) + 1;
+	pipe_config->base.adjusted_mode.crtc_hsync_end =
+						((tmp >> 16) & 0xffff) + 1;
+
+	tmp = I915_READ(VBLANK(cpu_transcoder));
+	pipe_config->base.adjusted_mode.crtc_vblank_start = (tmp & 0xffff) + 1;
+	pipe_config->base.adjusted_mode.crtc_vblank_end =
+						((tmp >> 16) & 0xffff) + 1;
+	tmp = I915_READ(VSYNC(cpu_transcoder));
+	pipe_config->base.adjusted_mode.crtc_vsync_start = (tmp & 0xffff) + 1;
+	pipe_config->base.adjusted_mode.crtc_vsync_end =
+						((tmp >> 16) & 0xffff) + 1;
+
+	if (I915_READ(PIPECONF(cpu_transcoder)) & PIPECONF_INTERLACE_MASK) {
+		pipe_config->base.adjusted_mode.flags |=
+						DRM_MODE_FLAG_INTERLACE;
+		pipe_config->base.adjusted_mode.crtc_vtotal += 1;
+		pipe_config->base.adjusted_mode.crtc_vblank_end += 1;
+	}
+
+
+	for_each_encoder_on_crtc(dev, &crtc->base, encoder) {
+		struct intel_dsi *intel_dsi =
+			enc_to_intel_dsi(&encoder->base);
+		enum port port;
+
+		pipe_config->pipe_bpp = intel_dsi->dsi_bpp;
+		for_each_dsi_port(port, intel_dsi->ports) {
+			pipe_config->base.adjusted_mode.crtc_hdisplay =
+				I915_READ(BXT_MIPI_TRANS_HACTIVE(port));
+			pipe_config->base.adjusted_mode.crtc_vdisplay =
+				I915_READ(BXT_MIPI_TRANS_VACTIVE(port));
+			pipe_config->base.adjusted_mode.crtc_vtotal =
+				I915_READ(BXT_MIPI_TRANS_VTOTAL(port));
+		}
+	}
+
+	tmp = I915_READ(PIPESRC(crtc->pipe));
+	pipe_config->pipe_src_h = (tmp & 0xffff) + 1;
+	pipe_config->pipe_src_w = ((tmp >> 16) & 0xffff) + 1;
+
+	pipe_config->base.mode.vdisplay = pipe_config->pipe_src_h;
+	pipe_config->base.mode.hdisplay = pipe_config->pipe_src_w;
+}
+
 static void intel_get_pipe_timings(struct intel_crtc *crtc,
 				   struct intel_crtc_state *pipe_config)
 {
@@ -9969,6 +10032,7 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum intel_display_power_domain pfit_domain;
 	uint32_t tmp;
+	bool is_dsi = false;
 
 	if (!intel_display_power_is_enabled(dev_priv,
 					 POWER_DOMAIN_PIPE(crtc->pipe)))
@@ -9999,17 +10063,48 @@ static bool haswell_get_pipe_config(struct intel_crtc *crtc,
 			pipe_config->cpu_transcoder = TRANSCODER_EDP;
 	}
 
+	if (dev_priv->vbt.has_mipi) {
+		enum port port_num = (dev_priv->vbt.dsi.port == DVO_PORT_MIPIA)
+					? PORT_A : PORT_C;
+		uint32_t dsi_ctrl = I915_READ(MIPI_CTRL(port_num));
+
+		tmp = I915_READ(BXT_MIPI_PORT_CTRL(port_num));
+		if (tmp & DPI_ENABLE) {
+			enum pipe trans_dsi_pipe;
+
+			switch (dsi_ctrl & BXT_PIPE_SELECT_MASK) {
+			default:
+				WARN(1, "unknown pipe linked to dsi transcoder\n");
+				return false;
+			case BXT_PIPE_SELECT_A:
+				trans_dsi_pipe = PIPE_A;
+				break;
+			case BXT_PIPE_SELECT_B:
+				trans_dsi_pipe = PIPE_B;
+				break;
+			case BXT_PIPE_SELECT_C:
+				trans_dsi_pipe = PIPE_C;
+				break;
+			}
+
+			if (trans_dsi_pipe == crtc->pipe)
+				is_dsi = true;
+		}
+	}
+
 	if (!intel_display_power_is_enabled(dev_priv,
 			POWER_DOMAIN_TRANSCODER(pipe_config->cpu_transcoder)))
 		return false;
 
-	tmp = I915_READ(PIPECONF(pipe_config->cpu_transcoder));
-	if (!(tmp & PIPECONF_ENABLE))
-		return false;
+	if (!is_dsi) {
+		tmp = I915_READ(PIPECONF(pipe_config->cpu_transcoder));
+		if (!(tmp & PIPECONF_ENABLE))
+			return false;
 
-	haswell_get_ddi_port_state(crtc, pipe_config);
-
-	intel_get_pipe_timings(crtc, pipe_config);
+		haswell_get_ddi_port_state(crtc, pipe_config);
+		intel_get_pipe_timings(crtc, pipe_config);
+	} else
+		intel_get_dsi_pipe_timings(crtc, pipe_config);
 
 	if (INTEL_INFO(dev)->gen >= 9) {
 		skl_init_scalers(dev, crtc, pipe_config);
