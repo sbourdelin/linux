@@ -2971,6 +2971,9 @@ i915_gem_object_get_dirty_page(struct drm_i915_gem_object *obj, int n);
 static inline struct page *
 i915_gem_object_get_page(struct drm_i915_gem_object *obj, int n)
 {
+#ifdef CONFIG_DRM_I915_DEBUG
+	WARN_ON_ONCE(!mutex_is_locked(&obj->base.dev->struct_mutex));
+#endif
 	if (WARN_ON(n >= obj->base.size >> PAGE_SHIFT))
 		return NULL;
 
