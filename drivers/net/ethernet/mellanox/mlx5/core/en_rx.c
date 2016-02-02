@@ -214,8 +214,6 @@ static inline void mlx5e_build_rx_skb(struct mlx5_cqe64 *cqe,
 
 	mlx5e_handle_csum(netdev, cqe, rq, skb);
 
-	skb->protocol = eth_type_trans(skb, netdev);
-
 	skb_record_rx_queue(skb, rq->ix);
 
 	if (likely(netdev->features & NETIF_F_RXHASH))
@@ -229,7 +227,14 @@ static inline void mlx5e_build_rx_skb(struct mlx5_cqe64 *cqe,
 int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 {
 	struct mlx5e_rq *rq = container_of(cq, struct mlx5e_rq, cq);
+	struct sk_buff_head rx_skb_list;
+	struct sk_buff *rx_skb;
 	int work_done;
+
+	/* Using SKB list infrastructure, even-though some instructions
+	 * could be saved by open-coding it on skb->next directly.
+	 */
+	__skb_queue_head_init(&rx_skb_list);
 
 	/* avoid accessing cq (dma coherent memory) if not needed */
 	if (!test_and_clear_bit(MLX5E_CQ_HAS_CQES, &cq->flags))
@@ -252,7 +257,6 @@ int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 		wqe_counter    = be16_to_cpu(wqe_counter_be);
 		wqe            = mlx5_wq_ll_get_wqe(&rq->wq, wqe_counter);
 		skb            = rq->skb[wqe_counter];
-		prefetch(skb->data);
 		rq->skb[wqe_counter] = NULL;
 
 		dma_unmap_single(rq->pdev,
@@ -265,14 +269,25 @@ int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 			dev_kfree_skb(skb);
 			goto wq_ll_pop;
 		}
+		prefetch(skb->data);
 
 		mlx5e_build_rx_skb(cqe, rq, skb);
 		rq->stats.packets++;
-		napi_gro_receive(cq->napi, skb);
+		__skb_queue_tail(&rx_skb_list, skb);
 
 wq_ll_pop:
 		mlx5_wq_ll_pop(&rq->wq, wqe_counter_be,
 			       &wqe->next.next_wqe_index);
+	}
+
+	while ((rx_skb = __skb_dequeue(&rx_skb_list)) != NULL) {
+		rx_skb->protocol = eth_type_trans(rx_skb, rq->netdev);
+		napi_gro_receive(cq->napi, rx_skb);
+
+		/* NOT FOR UPSTREAM INCLUSION:
+		 * How I did isolated testing of driver RX, I here called:
+		 *  napi_consume_skb(rx_skb, budget);
+		 */
 	}
 
 	mlx5_cqwq_update_db_record(&cq->wq);
