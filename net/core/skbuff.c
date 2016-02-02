@@ -483,13 +483,14 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
 				 gfp_t gfp_mask)
 {
 	struct napi_alloc_cache *nc = this_cpu_ptr(&napi_alloc_cache);
+	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	void *data;
 
 	len += NET_SKB_PAD + NET_IP_ALIGN;
 
-	if ((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
-	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA))) {
+	if (unlikely((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
+		     (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA)))) {
 		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
 		if (!skb)
 			goto skb_fail;
@@ -506,11 +507,37 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
 	if (unlikely(!data))
 		return NULL;
 
-	skb = __build_skb(data, len);
-	if (unlikely(!skb)) {
+#define BULK_ALLOC_SIZE 8
+	if (!nc->skb_count) {
+		nc->skb_count = kmem_cache_alloc_bulk(skbuff_head_cache,
+						      gfp_mask, BULK_ALLOC_SIZE,
+						      nc->skb_cache);
+	}
+	if (likely(nc->skb_count)) {
+		skb = (struct sk_buff *)nc->skb_cache[--nc->skb_count];
+	} else {
+		/* alloc bulk failed */
 		skb_free_frag(data);
 		return NULL;
 	}
+
+	len -= SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+	memset(skb, 0, offsetof(struct sk_buff, tail));
+	skb->truesize = SKB_TRUESIZE(len);
+	atomic_set(&skb->users, 1);
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + len;
+	skb->mac_header = (typeof(skb->mac_header))~0U;
+	skb->transport_header = (typeof(skb->transport_header))~0U;
+
+	/* make sure we initialize shinfo sequentially */
+	shinfo = skb_shinfo(skb);
+	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
+	atomic_set(&shinfo->dataref, 1);
+	kmemcheck_annotate_variable(shinfo->destructor_arg);
 
 	/* use OR instead of assignment to avoid clearing of bits in mask */
 	if (nc->page.pfmemalloc)
