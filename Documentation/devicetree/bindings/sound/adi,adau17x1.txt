@@ -12,10 +12,43 @@ Required properties:
  - reg:			The i2c address. Value depends on the state of ADDR0
 			and ADDR1, as wired in hardware.
 
+Optional properties:
+
+ - input-differential	bool to set if the input is differential
+ - digital-microphone	bool to set if there is a digital microphone connected
+			to the digmic/jackdet pin.
+ - micbias-vg		Microphone bias voltage
+	MICBIAS_0_90_AVDD - 0.9 * AVDD
+	MICBIAS_0_65_AVDD - 0.65 * AVDD
+
+Optional properties (ADAU1361/ADAU1461/ADAU1761/ADAU1961 only)
+
+ - jack-detection	If present, configures codec to use the digmic/jackdet
+			pin for jack detection. must provide one of
+			JACKDETECT_ACTIVE_LO or JACKDETECT_ACTIVE_HI followed
+			by debounce time in ms, which must be 5, 10, 20, or 40.
+
+ - lineout-mode		Set output mode of the lineout pins.
+ - headphone-mode	Set output mode of the headphone pins.
+
+The output mode must be one of:
+	OUTPUT_MODE_HEADPHONE           - Headphone output
+	OUTPUT_MODE_HEADPHONE_CAPLESS   - Capless headphone output
+	OUTPUT_MODE_LINE                - Line output
+
+
+
 Example:
+#include <dt-bindings/sound/adau17x1.h>
+
 	i2c_bus {
 		adau1361@38 {
 			compatible = "adi,adau1361";
 			reg = <0x38>;
+			input-differential;
+			jack-detection = <JACKDETECT_ACTIVE_LO 40>;
+			lineout-mode = <OUTPUT_MODE_LINE>;
+			headphone-mode = <OUTPUT_MODE_HEADPHONE>;
+			micbias-vg = <MICBIAS_0_90_AVDD>;
 		};
 	};
