@@ -32,6 +32,14 @@
 #include <linux/pfn_t.h>
 #include <linux/sizes.h>
 
+static struct block_device *dax_get_bdev(struct inode *inode)
+{
+	if (inode->i_sb->s_op->get_bdev)
+		return inode->i_sb->s_op->get_bdev(inode);
+	else
+		return inode->i_sb->s_bdev;
+}
+
 static long dax_map_atomic(struct block_device *bdev, struct blk_dax_ctl *dax)
 {
 	struct request_queue *q = bdev->bd_queue;
@@ -65,7 +73,7 @@ static void dax_unmap_atomic(struct block_device *bdev,
  */
 int dax_clear_blocks(struct inode *inode, sector_t block, long _size)
 {
-	struct block_device *bdev = inode->i_sb->s_bdev;
+	struct block_device *bdev = dax_get_bdev(inode);
 	struct blk_dax_ctl dax = {
 		.sector = block << (inode->i_blkbits - 9),
 		.size = _size,
@@ -246,7 +254,7 @@ ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
 	loff_t end = pos + iov_iter_count(iter);
 
 	memset(&bh, 0, sizeof(bh));
-	bh.b_bdev = inode->i_sb->s_bdev;
+	bh.b_bdev = dax_get_bdev(inode);
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ) {
 		struct address_space *mapping = inode->i_mapping;
@@ -468,7 +476,7 @@ int dax_writeback_mapping_range(struct address_space *mapping, loff_t start,
 		loff_t end)
 {
 	struct inode *inode = mapping->host;
-	struct block_device *bdev = inode->i_sb->s_bdev;
+	struct block_device *bdev = dax_get_bdev(inode);
 	pgoff_t start_index, end_index, pmd_index;
 	pgoff_t indices[PAGEVEC_SIZE];
 	struct pagevec pvec;
@@ -608,7 +616,7 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 
 	memset(&bh, 0, sizeof(bh));
 	block = (sector_t)vmf->pgoff << (PAGE_SHIFT - blkbits);
-	bh.b_bdev = inode->i_sb->s_bdev;
+	bh.b_bdev = dax_get_bdev(inode);
 	bh.b_size = PAGE_SIZE;
 
  repeat:
@@ -827,7 +835,7 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	}
 
 	memset(&bh, 0, sizeof(bh));
-	bh.b_bdev = inode->i_sb->s_bdev;
+	bh.b_bdev = dax_get_bdev(inode);
 	block = (sector_t)pgoff << (PAGE_SHIFT - blkbits);
 
 	bh.b_size = PMD_SIZE;
@@ -1080,7 +1088,7 @@ int dax_zero_page_range(struct inode *inode, loff_t from, unsigned length,
 	BUG_ON((offset + length) > PAGE_CACHE_SIZE);
 
 	memset(&bh, 0, sizeof(bh));
-	bh.b_bdev = inode->i_sb->s_bdev;
+	bh.b_bdev = dax_get_bdev(inode);
 	bh.b_size = PAGE_CACHE_SIZE;
 	err = get_block(inode, index, &bh, 0);
 	if (err < 0)

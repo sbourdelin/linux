@@ -156,6 +156,11 @@ blkdev_get_block(struct inode *inode, sector_t iblock,
 	return 0;
 }
 
+static struct block_device *blkdev_get_bdev(struct inode *inode)
+{
+	return I_BDEV(inode);
+}
+
 static struct inode *bdev_file_inode(struct file *file)
 {
 	return file->f_mapping->host;
@@ -569,6 +574,7 @@ static const struct super_operations bdev_sops = {
 	.alloc_inode = bdev_alloc_inode,
 	.destroy_inode = bdev_destroy_inode,
 	.drop_inode = generic_delete_inode,
+	.get_bdev = blkdev_get_bdev,
 	.evict_inode = bdev_evict_inode,
 };
 
