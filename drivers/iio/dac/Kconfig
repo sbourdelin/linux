@@ -206,4 +206,12 @@ config MCP4922
 	  To compile this driver as a module, choose M here: the module
 	  will be called mcp4922.
 
+config STX104
+	tristate "Apex Embedded Systems STX104 DAC driver"
+	depends on X86
+	help
+	  Say yes here to build support for the 2-channel DAC on the Apex Embedded
+	  Systems STX104 integrated analog PC/104 card. The base port address for
+	  the device may be configured via the stx104_base module parameter.
+
 endmenu
