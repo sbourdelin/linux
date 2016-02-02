@@ -461,6 +461,9 @@ static void intel_dsi_enable(struct intel_encoder *encoder)
 		intel_dsi_port_enable(encoder);
 	}
 
+	intel_display_power_get(dev_priv, POWER_DOMAIN_AUDIO);
+	intel_audio_codec_enable(encoder);
+
 	intel_panel_enable_backlight(intel_dsi->attached_connector);
 }
 
@@ -531,10 +534,15 @@ static void intel_dsi_enable_nop(struct intel_encoder *encoder)
 
 static void intel_dsi_pre_disable(struct intel_encoder *encoder)
 {
+	struct drm_device *dev = encoder->base.dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	enum port port;
 
 	DRM_DEBUG_KMS("\n");
+
+	intel_audio_codec_disable(encoder);
+	intel_display_power_put(dev_priv, POWER_DOMAIN_AUDIO);
 
 	intel_panel_disable_backlight(intel_dsi->attached_connector);
 
@@ -1235,6 +1243,11 @@ void intel_dsi_init(struct drm_device *dev)
 
 	intel_panel_init(&intel_connector->panel, fixed_mode, NULL);
 	intel_panel_setup_backlight(connector, INVALID_PIPE);
+
+	/* Enable Audio Power to fix use-count state machine */
+	port = (dev_priv->vbt.dsi.port == DVO_PORT_MIPIA) ? PORT_A : PORT_C;
+	if (I915_READ(BXT_MIPI_PORT_CTRL(port)) & DPI_ENABLE)
+		intel_display_power_get(dev_priv, POWER_DOMAIN_AUDIO);
 
 	return;
 
