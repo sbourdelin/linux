@@ -1336,7 +1336,8 @@ intel_hdmi_unset_edid(struct drm_connector *connector)
 	intel_hdmi->has_audio = false;
 	intel_hdmi->rgb_quant_range_selectable = false;
 
-	kfree(to_intel_connector(connector)->detect_edid);
+	if (!connector->override_edid)
+		kfree(to_intel_connector(connector)->detect_edid);
 	to_intel_connector(connector)->detect_edid = NULL;
 }
 
@@ -1354,6 +1355,9 @@ intel_hdmi_set_edid(struct drm_connector *connector, bool force)
 		edid = drm_get_edid(connector,
 				    intel_gmbus_get_adapter(dev_priv,
 				    intel_hdmi->ddc_bus));
+
+		if (!edid && connector->override_edid)
+			edid = (struct edid *) connector->edid_blob_ptr->data;
 
 		intel_display_power_put(dev_priv, POWER_DOMAIN_GMBUS);
 	}
