@@ -326,7 +326,7 @@ netdev_tx_t mlx5e_xmit(struct sk_buff *skb, struct net_device *dev)
 	return mlx5e_sq_xmit(sq, skb);
 }
 
-bool mlx5e_poll_tx_cq(struct mlx5e_cq *cq)
+bool mlx5e_poll_tx_cq(struct mlx5e_cq *cq, int napi_budget)
 {
 	struct mlx5e_sq *sq;
 	u32 dma_fifo_cc;
@@ -402,7 +402,7 @@ bool mlx5e_poll_tx_cq(struct mlx5e_cq *cq)
 			npkts++;
 			nbytes += wi->num_bytes;
 			sqcc += wi->num_wqebbs;
-			dev_kfree_skb(skb);
+			napi_consume_skb(skb, napi_budget);
 		} while (!last_wqe);
 	}
 
