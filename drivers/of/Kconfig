@@ -112,4 +112,15 @@ config OF_OVERLAY
 	  While this option is selected automatically when needed, you can
 	  enable it manually to improve device tree unit test coverage.
 
+config OF_NUMA
+	bool "Device Tree NUMA support"
+	depends on NUMA
+	depends on OF
+	depends on ARM64
+	default y
+	help
+	  Enable Device Tree NUMA support.
+	  This enables the numa mapping of cpu, memory, io and
+	  inter node distances using dt bindings.
+
 endif # OF

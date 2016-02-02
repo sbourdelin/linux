@@ -685,6 +685,10 @@ static inline int of_node_to_nid(struct device_node *device)
 }
 #endif
 
+#ifdef CONFIG_OF_NUMA
+extern int __init of_numa_init(void);
+#endif
+
 static inline struct device_node *of_find_matching_node(
 	struct device_node *from,
 	const struct of_device_id *matches)
