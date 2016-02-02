@@ -10393,8 +10393,9 @@ F:	drivers/staging/nvec/
 
 STAGING - PARALLEL LCD/KEYPAD PANEL DRIVER
 M:	Willy Tarreau <willy@haproxy.com>
+M:	Ksenija Stanojevic <ksenija.stanojevic@gmail.com>
 S:	Odd Fixes
-F:	drivers/staging/panel/
+F:	drivers/misc/
 
 STAGING - REALTEK RTL8712U DRIVERS
 M:	Larry Finger <Larry.Finger@lwfinger.net>
