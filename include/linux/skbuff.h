@@ -2391,14 +2391,25 @@ static inline void skb_free_frag(void *addr)
 	__free_page_frag(addr);
 }
 
+#define NAPI_SKB_CACHE_SIZE	64U /* Used in struct napi_alloc_cache */
+#define NAPI_SKB_BULK_ALLOC	 8U /* Default slab bulk alloc in NAPI */
+
 void *napi_alloc_frag(unsigned int fragsz);
-struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
-				 unsigned int length, gfp_t gfp_mask);
+struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
+				 unsigned int bulk_hint, gfp_t gfp_mask);
 static inline struct sk_buff *napi_alloc_skb(struct napi_struct *napi,
-					     unsigned int length)
+					     unsigned int len)
 {
-	return __napi_alloc_skb(napi, length, GFP_ATOMIC);
+	return __napi_alloc_skb(napi, len, NAPI_SKB_BULK_ALLOC, GFP_ATOMIC);
 }
+static inline struct sk_buff *napi_alloc_skb_hint(struct napi_struct *napi,
+						  unsigned int len,
+						  unsigned int bulk_hint)
+{
+	bulk_hint = bulk_hint ? : 1;
+	return __napi_alloc_skb(napi, len, bulk_hint, GFP_ATOMIC);
+}
+
 void napi_consume_skb(struct sk_buff *skb, int budget);
 
 void __kfree_skb_flush(void);

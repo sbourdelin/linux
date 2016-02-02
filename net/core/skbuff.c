@@ -347,8 +347,6 @@ struct sk_buff *build_skb(void *data, unsigned int frag_size)
 }
 EXPORT_SYMBOL(build_skb);
 
-#define NAPI_SKB_CACHE_SIZE	64
-
 struct napi_alloc_cache {
 	struct page_frag_cache page;
 	size_t skb_count;
@@ -480,9 +478,10 @@ EXPORT_SYMBOL(__netdev_alloc_skb);
  *	%NULL is returned if there is no free memory.
  */
 struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
-				 gfp_t gfp_mask)
+				 unsigned int bulk_hint, gfp_t gfp_mask)
 {
 	struct napi_alloc_cache *nc = this_cpu_ptr(&napi_alloc_cache);
+	unsigned int bulk_sz = min(bulk_hint, NAPI_SKB_CACHE_SIZE);
 	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	void *data;
@@ -507,10 +506,9 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
 	if (unlikely(!data))
 		return NULL;
 
-#define BULK_ALLOC_SIZE 8
 	if (!nc->skb_count) {
 		nc->skb_count = kmem_cache_alloc_bulk(skbuff_head_cache,
-						      gfp_mask, BULK_ALLOC_SIZE,
+						      gfp_mask, bulk_sz,
 						      nc->skb_cache);
 	}
 	if (likely(nc->skb_count)) {
