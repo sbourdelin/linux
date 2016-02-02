@@ -560,6 +560,10 @@ static void xenvif_rx_action(struct xenvif_queue *queue)
 	bool need_to_notify = false;
 
 	struct netrx_pending_operations npo = {
+		.copy_prod = 0,
+		.copy_cons = 0,
+		.meta_prod = 0,
+		.meta_cons = 0,
 		.copy  = queue->grant_copy_op,
 		.meta  = queue->meta,
 	};
