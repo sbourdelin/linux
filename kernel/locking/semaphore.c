@@ -259,5 +259,14 @@ static noinline void __sched __up(struct semaphore *sem)
 						struct semaphore_waiter, list);
 	list_del(&waiter->list);
 	waiter->up = true;
+
+	/*
+	 * Trying to acquire this sem->lock in wake_up_process() leads a
+	 * DEADLOCK unless we unlock it here. For example, it's possile
+	 * in the case that called from within printk() since
+	 * wake_up_process() might call printk().
+	 */
+	raw_spin_unlock_irq(&sem->lock);
 	wake_up_process(waiter->task);
+	raw_spin_lock_irq(&sem->lock);
 }
