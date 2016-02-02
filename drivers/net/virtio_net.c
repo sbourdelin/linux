@@ -146,6 +146,10 @@ struct virtnet_info {
 	virtio_net_ctrl_ack ctrl_status;
 	u8 ctrl_promisc;
 	u8 ctrl_allmulti;
+
+	/* Ethtool settings */
+	u8 duplex;
+	u32 speed;
 };
 
 struct padded_vnet_hdr {
@@ -1376,6 +1380,72 @@ static void virtnet_get_channels(struct net_device *dev,
 	channels->other_count = 0;
 }
 
+static bool virtnet_validate_speed(u32 speed)
+{
+	switch (speed) {
+	case SPEED_10:
+	case SPEED_100:
+	case SPEED_1000:
+	case SPEED_2500:
+	case SPEED_5000:
+	case SPEED_10000:
+	case SPEED_20000:
+	case SPEED_25000:
+	case SPEED_40000:
+	case SPEED_50000:
+	case SPEED_56000:
+	case SPEED_100000:
+	case SPEED_UNKNOWN:
+		return true;
+	}
+
+	return false;
+}
+
+static bool virtnet_validate_duplex(u8 duplex)
+{
+	switch (duplex) {
+	case DUPLEX_FULL:
+	case DUPLEX_UNKNOWN:
+		return true;
+	}
+
+	return false;
+}
+
+static int virtnet_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	u32 speed = ethtool_cmd_speed(cmd);
+
+	/* don't allow custom speed and duplex */
+	if (!virtnet_validate_speed(speed) ||
+	    !virtnet_validate_duplex(cmd->duplex))
+		return -EINVAL;
+	vi->speed = speed;
+	vi->duplex = cmd->duplex;
+
+	return 0;
+}
+
+static int virtnet_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+
+	ethtool_cmd_speed_set(cmd, vi->speed);
+	cmd->duplex = vi->duplex;
+
+	return 0;
+}
+
+static void virtnet_init_settings(struct net_device *dev)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+
+	vi->speed = SPEED_UNKNOWN;
+	vi->duplex = DUPLEX_UNKNOWN;
+}
+
 static const struct ethtool_ops virtnet_ethtool_ops = {
 	.get_drvinfo = virtnet_get_drvinfo,
 	.get_link = ethtool_op_get_link,
@@ -1383,6 +1453,8 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.set_channels = virtnet_set_channels,
 	.get_channels = virtnet_get_channels,
 	.get_ts_info = ethtool_op_get_ts_info,
+	.get_settings = virtnet_get_settings,
+	.set_settings = virtnet_set_settings,
 };
 
 #define MIN_MTU 68
@@ -1854,6 +1926,8 @@ static int virtnet_probe(struct virtio_device *vdev)
 #endif
 	netif_set_real_num_tx_queues(dev, vi->curr_queue_pairs);
 	netif_set_real_num_rx_queues(dev, vi->curr_queue_pairs);
+
+	virtnet_init_settings(dev);
 
 	err = register_netdev(dev);
 	if (err) {
