@@ -2905,9 +2905,19 @@ void i915_gem_vma_destroy(struct i915_vma *vma);
 	     vma = list_first_entry(&(obj)->vma_list, typeof(*vma), vma_link);\
 	     &vma->vma_link != (&(obj)->vma_list); \
 	     vma = list_next_entry(vma, vma_link))
+
+  #define i915_gem_obj_for_each_vma_safe(vma, next, obj) \
+	for (WARN_ON_ONCE(!mutex_is_locked(&(obj)->base.dev->struct_mutex)), \
+	     vma = list_first_entry(&(obj)->vma_list, typeof(*vma), vma_link), \
+	     next = list_next_entry(vma, vma_link); \
+	     &vma->vma_link != (&(obj)->vma_list); \
+	     vma = next, next = list_next_entry(next, vma_link))
 #else
   #define i915_gem_obj_for_each_vma(vma, obj) \
 		list_for_each_entry((vma), &(obj)->vma_list, vma_link)
+
+  #define i915_gem_obj_for_each_vma_safe(vma, next, obj) \
+	    list_for_each_entry_safe((vma), (next), &(obj)->vma_list, vma_link)
 #endif
 
 /* Flags used by pin/bind&friends. */

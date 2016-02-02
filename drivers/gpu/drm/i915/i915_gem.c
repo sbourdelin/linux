@@ -272,7 +272,7 @@ drop_pages(struct drm_i915_gem_object *obj)
 	int ret;
 
 	drm_gem_object_reference(&obj->base);
-	list_for_each_entry_safe(vma, next, &obj->vma_list, vma_link)
+	i915_gem_obj_for_each_vma_safe(vma, next, obj)
 		if (i915_vma_unbind(vma))
 			break;
 
@@ -3811,7 +3811,7 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 	 * catch the issue of the CS prefetch crossing page boundaries and
 	 * reading an invalid PTE on older architectures.
 	 */
-	list_for_each_entry_safe(vma, next, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma_safe(vma, next, obj) {
 		if (!drm_mm_node_allocated(&vma->node))
 			continue;
 
@@ -4557,7 +4557,7 @@ void i915_gem_free_object(struct drm_gem_object *gem_obj)
 
 	trace_i915_gem_object_destroy(obj);
 
-	list_for_each_entry_safe(vma, next, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma_safe(vma, next, obj) {
 		int ret;
 
 		vma->pin_count = 0;

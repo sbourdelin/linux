@@ -78,7 +78,7 @@ static void cancel_userptr(struct work_struct *work)
 		was_interruptible = dev_priv->mm.interruptible;
 		dev_priv->mm.interruptible = false;
 
-		list_for_each_entry_safe(vma, tmp, &obj->vma_list, vma_link) {
+		i915_gem_obj_for_each_vma_safe(vma, tmp, obj) {
 			int ret = i915_vma_unbind(vma);
 			WARN_ON(ret && ret != -EIO);
 		}

@@ -175,8 +175,7 @@ i915_gem_shrink(struct drm_i915_private *dev_priv,
 			drm_gem_object_reference(&obj->base);
 
 			/* For the unbound phase, this should be a no-op! */
-			list_for_each_entry_safe(vma, v,
-						 &obj->vma_list, vma_link)
+			i915_gem_obj_for_each_vma_safe(vma, v, obj)
 				if (i915_vma_unbind(vma))
 					break;
 
