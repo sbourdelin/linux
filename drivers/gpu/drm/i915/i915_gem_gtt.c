@@ -3237,7 +3237,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 	vm = &dev_priv->gtt.base;
 	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_list) {
 		flush = false;
-		list_for_each_entry(vma, &obj->vma_list, vma_link) {
+		i915_gem_obj_for_each_vma(vma, obj) {
 			if (vma->vm != vm)
 				continue;
 

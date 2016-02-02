@@ -2454,7 +2454,7 @@ i915_gem_object_retire__read(struct drm_i915_gem_object *obj, int ring)
 	list_move_tail(&obj->global_list,
 		       &to_i915(obj->base.dev)->mm.bound_list);
 
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, obj) {
 		if (!list_empty(&vma->mm_list))
 			list_move_tail(&vma->mm_list, &vma->vm->inactive_list);
 	}
@@ -3874,7 +3874,7 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 			 */
 		}
 
-		list_for_each_entry(vma, &obj->vma_list, vma_link) {
+		i915_gem_obj_for_each_vma(vma, obj) {
 			if (!drm_mm_node_allocated(&vma->node))
 				continue;
 
@@ -3884,7 +3884,7 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 		}
 	}
 
-	list_for_each_entry(vma, &obj->vma_list, vma_link)
+	i915_gem_obj_for_each_vma(vma, obj)
 		vma->node.color = cache_level;
 	obj->cache_level = cache_level;
 
@@ -4614,7 +4614,7 @@ struct i915_vma *i915_gem_obj_to_vma(struct drm_i915_gem_object *obj,
 				     struct i915_address_space *vm)
 {
 	struct i915_vma *vma;
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, obj) {
 		if (vma->ggtt_view.type == I915_GGTT_VIEW_NORMAL &&
 		    vma->vm == vm)
 			return vma;
@@ -4631,7 +4631,7 @@ struct i915_vma *i915_gem_obj_to_ggtt_view(struct drm_i915_gem_object *obj,
 	if (WARN_ONCE(!view, "no view specified"))
 		return ERR_PTR(-EINVAL);
 
-	list_for_each_entry(vma, &obj->vma_list, vma_link)
+	i915_gem_obj_for_each_vma(vma, obj)
 		if (vma->vm == ggtt &&
 		    i915_ggtt_view_equal(&vma->ggtt_view, view))
 			return vma;
@@ -5202,7 +5202,7 @@ u64 i915_gem_obj_offset(struct drm_i915_gem_object *o,
 
 	WARN_ON(vm == &dev_priv->mm.aliasing_ppgtt->base);
 
-	list_for_each_entry(vma, &o->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, o) {
 		if (i915_is_ggtt(vma->vm) &&
 		    vma->ggtt_view.type != I915_GGTT_VIEW_NORMAL)
 			continue;
@@ -5221,7 +5221,7 @@ u64 i915_gem_obj_ggtt_offset_view(struct drm_i915_gem_object *o,
 	struct i915_address_space *ggtt = i915_obj_to_ggtt(o);
 	struct i915_vma *vma;
 
-	list_for_each_entry(vma, &o->vma_list, vma_link)
+	i915_gem_obj_for_each_vma(vma, o)
 		if (vma->vm == ggtt &&
 		    i915_ggtt_view_equal(&vma->ggtt_view, view))
 			return vma->node.start;
@@ -5235,7 +5235,7 @@ bool i915_gem_obj_bound(struct drm_i915_gem_object *o,
 {
 	struct i915_vma *vma;
 
-	list_for_each_entry(vma, &o->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, o) {
 		if (i915_is_ggtt(vma->vm) &&
 		    vma->ggtt_view.type != I915_GGTT_VIEW_NORMAL)
 			continue;
@@ -5252,7 +5252,7 @@ bool i915_gem_obj_ggtt_bound_view(struct drm_i915_gem_object *o,
 	struct i915_address_space *ggtt = i915_obj_to_ggtt(o);
 	struct i915_vma *vma;
 
-	list_for_each_entry(vma, &o->vma_list, vma_link)
+	i915_gem_obj_for_each_vma(vma, o)
 		if (vma->vm == ggtt &&
 		    i915_ggtt_view_equal(&vma->ggtt_view, view) &&
 		    drm_mm_node_allocated(&vma->node))
@@ -5265,7 +5265,7 @@ bool i915_gem_obj_bound_any(struct drm_i915_gem_object *o)
 {
 	struct i915_vma *vma;
 
-	list_for_each_entry(vma, &o->vma_list, vma_link)
+	i915_gem_obj_for_each_vma(vma, o)
 		if (drm_mm_node_allocated(&vma->node))
 			return true;
 
@@ -5282,7 +5282,7 @@ unsigned long i915_gem_obj_size(struct drm_i915_gem_object *o,
 
 	BUG_ON(list_empty(&o->vma_list));
 
-	list_for_each_entry(vma, &o->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, o) {
 		if (i915_is_ggtt(vma->vm) &&
 		    vma->ggtt_view.type != I915_GGTT_VIEW_NORMAL)
 			continue;
@@ -5295,7 +5295,7 @@ unsigned long i915_gem_obj_size(struct drm_i915_gem_object *o,
 bool i915_gem_obj_is_pinned(struct drm_i915_gem_object *obj)
 {
 	struct i915_vma *vma;
-	list_for_each_entry(vma, &obj->vma_list, vma_link)
+	i915_gem_obj_for_each_vma(vma, obj)
 		if (vma->pin_count > 0)
 			return true;
 

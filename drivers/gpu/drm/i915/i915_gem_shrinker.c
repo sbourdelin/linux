@@ -52,7 +52,7 @@ static int num_vma_bound(struct drm_i915_gem_object *obj)
 	struct i915_vma *vma;
 	int count = 0;
 
-	list_for_each_entry(vma, &obj->vma_list, vma_link) {
+	i915_gem_obj_for_each_vma(vma, obj) {
 		if (drm_mm_node_allocated(&vma->node))
 			count++;
 		if (vma->pin_count)

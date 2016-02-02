@@ -2899,6 +2899,17 @@ struct drm_i915_gem_object *i915_gem_object_create_from_data(
 void i915_gem_free_object(struct drm_gem_object *obj);
 void i915_gem_vma_destroy(struct i915_vma *vma);
 
+#ifdef CONFIG_DRM_I915_DEBUG
+  #define i915_gem_obj_for_each_vma(vma, obj) \
+	for (WARN_ON_ONCE(!mutex_is_locked(&(obj)->base.dev->struct_mutex)), \
+	     vma = list_first_entry(&(obj)->vma_list, typeof(*vma), vma_link);\
+	     &vma->vma_link != (&(obj)->vma_list); \
+	     vma = list_next_entry(vma, vma_link))
+#else
+  #define i915_gem_obj_for_each_vma(vma, obj) \
+		list_for_each_entry((vma), &(obj)->vma_list, vma_link)
+#endif
+
 /* Flags used by pin/bind&friends. */
 #define PIN_MAPPABLE	(1<<0)
 #define PIN_NONBLOCK	(1<<1)
