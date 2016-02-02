@@ -223,8 +223,6 @@ static inline int pcibios_assign_all_busses(void)
 /* Minimum PCI I/O address, starting at the page boundary. */
 #define PCIBIOS_MIN_IO		PAGE_SIZE
 
-/* Use any cpu for PCI. */
-#define cpumask_of_pcibus(bus) cpu_online_mask
 
 /* implement the pci_ DMA API in terms of the generic device dma_ one */
 #include <asm-generic/pci-dma-compat.h>

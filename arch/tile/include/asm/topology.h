@@ -49,6 +49,9 @@ static inline const struct cpumask *cpumask_of_node(int node)
 
 #endif /* CONFIG_NUMA */
 
+/* Use any cpu for PCI. */
+#define cpumask_of_pcibus(bus) cpu_online_mask
+
 #include <asm-generic/topology.h>
 
 #ifdef CONFIG_SMP
