@@ -4582,6 +4582,24 @@ gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(napi_gro_receive);
 
+void napi_gro_receive_list(struct napi_struct *napi,
+			   struct sk_buff_head *skb_list,
+			   struct net_device *netdev)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(skb_list)) != NULL) {
+		skb->protocol = eth_type_trans(skb, netdev);
+
+		skb_mark_napi_id(skb, napi);
+		trace_napi_gro_receive_entry(skb);
+
+		skb_gro_reset_offset(skb);
+		napi_skb_finish(dev_gro_receive(napi, skb), skb);
+	}
+}
+EXPORT_SYMBOL(napi_gro_receive_list);
+
 static void napi_reuse_skb(struct napi_struct *napi, struct sk_buff *skb)
 {
 	if (unlikely(skb->pfmemalloc)) {

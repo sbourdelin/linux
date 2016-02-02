@@ -230,7 +230,6 @@ int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 {
 	struct mlx5e_rq *rq = container_of(cq, struct mlx5e_rq, cq);
 	struct sk_buff_head rx_skb_list;
-	struct sk_buff *rx_skb;
 	int work_done;
 
 	/* Using SKB list infrastructure, even-though some instructions
@@ -281,16 +280,7 @@ wq_ll_pop:
 		mlx5_wq_ll_pop(&rq->wq, wqe_counter_be,
 			       &wqe->next.next_wqe_index);
 	}
-
-	while ((rx_skb = __skb_dequeue(&rx_skb_list)) != NULL) {
-		rx_skb->protocol = eth_type_trans(rx_skb, rq->netdev);
-		napi_gro_receive(cq->napi, rx_skb);
-
-		/* NOT FOR UPSTREAM INCLUSION:
-		 * How I did isolated testing of driver RX, I here called:
-		 *  napi_consume_skb(rx_skb, budget);
-		 */
-	}
+	napi_gro_receive_list(cq->napi, &rx_skb_list, rq->netdev);
 
 	mlx5_cqwq_update_db_record(&cq->wq);
 
