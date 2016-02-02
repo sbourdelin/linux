@@ -520,8 +520,10 @@ affs_do_readpage_ofs(struct page *page, unsigned to)
 
 	while (pos < to) {
 		bh = affs_bread_ino(inode, bidx, 0);
-		if (IS_ERR(bh))
+		if (IS_ERR(bh)) {
+			kunmap(page);
 			return PTR_ERR(bh);
+		}
 		tmp = min(bsize - boff, to - pos);
 		BUG_ON(pos + tmp > to || tmp > bsize);
 		memcpy(data + pos, AFFS_DATA(bh) + boff, tmp);
