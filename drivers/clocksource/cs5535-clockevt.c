@@ -152,6 +152,18 @@ static int __init cs5535_mfgpt_init(void)
 	}
 	cs5535_event_clock = timer;
 
+	/* Set the clock scale and enable the event mode for CMP2 */
+	val = MFGPT_SCALE | (3 << 8);
+
+	cs5535_mfgpt_write(cs5535_event_clock, MFGPT_REG_SETUP, val);
+
+	/* Set up the clock event */
+	printk(KERN_INFO DRV_NAME
+		": Registering MFGPT timer as a clock event, using IRQ %d\n",
+		timer_irq);
+	clockevents_config_and_register(&cs5535_clockevent, MFGPT_HZ,
+					0xF, 0xFFFE);
+
 	/* Set up the IRQ on the MFGPT side */
 	if (cs5535_mfgpt_setup_irq(timer, MFGPT_CMP2, &timer_irq)) {
 		printk(KERN_ERR DRV_NAME ": Could not set up IRQ %d\n",
@@ -165,18 +177,6 @@ static int __init cs5535_mfgpt_init(void)
 		printk(KERN_ERR DRV_NAME ": Unable to set up the interrupt.\n");
 		goto err_irq;
 	}
-
-	/* Set the clock scale and enable the event mode for CMP2 */
-	val = MFGPT_SCALE | (3 << 8);
-
-	cs5535_mfgpt_write(cs5535_event_clock, MFGPT_REG_SETUP, val);
-
-	/* Set up the clock event */
-	printk(KERN_INFO DRV_NAME
-		": Registering MFGPT timer as a clock event, using IRQ %d\n",
-		timer_irq);
-	clockevents_config_and_register(&cs5535_clockevent, MFGPT_HZ,
-					0xF, 0xFFFE);
 
 	return 0;
 
