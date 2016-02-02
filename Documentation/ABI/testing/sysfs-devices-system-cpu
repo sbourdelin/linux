@@ -271,3 +271,69 @@ Description:	Parameters for the CPU cache attributes
 			- WriteBack: data is written only to the cache line and
 				     the modified cache line is written to main
 				     memory only when it is replaced
+
+What:		/sys/devices/system/cpu/cpufreq/chipX/
+Date:		Feb 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	POWERNV CPUFreq driver's frequency throttle stats directory for
+		the chip
+
+		This directory contains the CPU frequency throttle attributes
+		for the chip. It is named using the hardware chip-id in the
+		format of 'chip<hw-chip-id>'. This directory contains the below
+		set of attributes:
+		- throttle_table
+		- throttle_stats
+		- chip_mask
+
+What:		/sys/devices/system/cpu/cpufreq/chipX/throttle_table
+Date:		Feb 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	POWERNV CPUFreq driver's frequency throttle stats table for the
+		chip
+
+		This table gives the detailed information on number of times
+		Pmax is limited to different frequencies due to different
+		throttle reasons. This table contains all frequencies in rows
+		and all throttle reasons in columns. Each cell represents the
+		throttle count the Pmax was limited to the frequency in its row
+		and due to the reason in its column. The 'Unthrottle' column
+		here gives the count of unthrottling back to Pmax after the
+		frequency was throttled.
+		# cat /sys/devices/system/cpu/cpufreq/chip0/throttle_table
+		Frequency       Unthrottle      PowerCap        OverTemp        ...
+		4322000         0               0               0
+		4289000         0               0               0
+		4256000         0               0               0
+		4222000         0               0               0
+		4189000         0               0               0
+		4156000         3               0               3
+		4123000         0               0               0
+		...
+
+What:		/sys/devices/system/cpu/cpufreq/chipX/throttle_stats
+Date:		Feb 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	POWERNV CPUFreq driver's overall frequency throttle stats for
+		the chip
+
+		This attribute gives the total number of events of max
+		frequency throttling to any lower frequency in the turbo (above
+		nominal) and the sub-turbo (at and below nominal) range of
+		frequencies.
+		# cat /sys/devices/system/cpu/cpufreq/chip0/throttle_stat
+		turbo 7
+		sub-turbo 0
+
+What:		/sys/devices/system/cpu/cpufreq/chipX/chip_mask
+Date:		Feb 2016
+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
+		Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	POWERNV CPUFreq driver's attribute to show cpu mask of the chip
+
+		This attribute gives the list of cpus present in the chip.
+		# cat /sys/devices/system/cpu/cpufreq/chip0/chip_mask
+		0-31
