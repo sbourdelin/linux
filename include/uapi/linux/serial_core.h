@@ -261,4 +261,7 @@
 /* STM32 USART */
 #define PORT_STM32	113
 
+/* MPS2 UART */
+#define PORT_MPS2UART	114
+
 #endif /* _UAPILINUX_SERIAL_CORE_H */
