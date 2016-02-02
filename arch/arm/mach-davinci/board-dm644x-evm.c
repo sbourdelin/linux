@@ -314,7 +314,7 @@ evm_led_setup(struct i2c_client *client, int gpio, unsigned ngpio, void *c)
 	 */
 	evm_led_dev = platform_device_alloc("leds-gpio", 0);
 	platform_device_add_data(evm_led_dev,
-			&evm_led_data, sizeof evm_led_data);
+			&evm_led_data, sizeof(evm_led_data));
 
 	evm_led_dev->dev.parent = &client->dev;
 	status = platform_device_add(evm_led_dev);

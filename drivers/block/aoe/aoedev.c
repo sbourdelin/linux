@@ -313,8 +313,8 @@ flush(const char __user *str, size_t cnt, int exiting)
 	skipflags = DEVFL_GDALLOC | DEVFL_NEWSIZE | DEVFL_TKILL;
 
 	if (!exiting && cnt >= 3) {
-		if (cnt > sizeof buf)
-			cnt = sizeof buf;
+		if (cnt > sizeof(buf))
+			cnt = sizeof(buf);
 		if (copy_from_user(buf, str, cnt))
 			return -EFAULT;
 		all = !strncmp(buf, "all", 3);
@@ -453,7 +453,7 @@ aoedev_by_aoeaddr(ulong maj, int min, int do_alloc)
 		}
 	if (d || !do_alloc || minor_get(&sysminor, maj, min) < 0)
 		goto out;
-	d = kcalloc(1, sizeof *d, GFP_ATOMIC);
+	d = kcalloc(1, sizeof(*d), GFP_ATOMIC);
 	if (!d)
 		goto out;
 	d->targets = kcalloc(NTARGETS, sizeof(*d->targets), GFP_ATOMIC);

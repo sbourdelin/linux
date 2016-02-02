@@ -1321,12 +1321,12 @@ static int vidioc_querycap(struct file *file, void  *priv,
 	struct gspca_dev *gspca_dev = video_drvdata(file);
 
 	strlcpy((char *) cap->driver, gspca_dev->sd_desc->name,
-			sizeof cap->driver);
+			sizeof(cap->driver));
 	if (gspca_dev->dev->product != NULL) {
 		strlcpy((char *) cap->card, gspca_dev->dev->product,
-			sizeof cap->card);
+			sizeof(cap->card));
 	} else {
-		snprintf((char *) cap->card, sizeof cap->card,
+		snprintf((char *) cap->card, sizeof(cap->card),
 			"USB Camera (%04x:%04x)",
 			le16_to_cpu(gspca_dev->dev->descriptor.idVendor),
 			le16_to_cpu(gspca_dev->dev->descriptor.idProduct));
@@ -1350,7 +1350,7 @@ static int vidioc_enum_input(struct file *file, void *priv,
 	input->type = V4L2_INPUT_TYPE_CAMERA;
 	input->status = gspca_dev->cam.input_flags;
 	strlcpy(input->name, gspca_dev->sd_desc->name,
-		sizeof input->name);
+		sizeof(input->name));
 	return 0;
 }
 
@@ -1445,7 +1445,7 @@ static int vidioc_querybuf(struct file *file, void *priv,
 		return -EINVAL;
 
 	frame = &gspca_dev->frame[v4l2_buf->index];
-	memcpy(v4l2_buf, &frame->v4l2_buf, sizeof *v4l2_buf);
+	memcpy(v4l2_buf, &frame->v4l2_buf, sizeof(*v4l2_buf));
 	return 0;
 }
 
@@ -1721,7 +1721,7 @@ static int vidioc_dqbuf(struct file *file, void *priv,
 	gspca_dev->fr_o = (i + 1) % GSPCA_MAX_FRAMES;
 
 	frame->v4l2_buf.flags &= ~V4L2_BUF_FLAG_DONE;
-	memcpy(v4l2_buf, &frame->v4l2_buf, sizeof *v4l2_buf);
+	memcpy(v4l2_buf, &frame->v4l2_buf, sizeof(*v4l2_buf));
 	PDEBUG(D_FRAM, "dqbuf %d", j);
 	ret = 0;
 
@@ -1822,7 +1822,7 @@ static int read_alloc(struct gspca_dev *gspca_dev,
 	if (gspca_dev->nframes == 0) {
 		struct v4l2_requestbuffers rb;
 
-		memset(&rb, 0, sizeof rb);
+		memset(&rb, 0, sizeof(rb));
 		rb.count = gspca_dev->nbufread;
 		rb.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		rb.memory = GSPCA_MEMORY_READ;
@@ -1831,7 +1831,7 @@ static int read_alloc(struct gspca_dev *gspca_dev,
 			PDEBUG(D_STREAM, "read reqbuf err %d", ret);
 			goto out;
 		}
-		memset(&v4l2_buf, 0, sizeof v4l2_buf);
+		memset(&v4l2_buf, 0, sizeof(v4l2_buf));
 		v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		v4l2_buf.memory = GSPCA_MEMORY_READ;
 		for (i = 0; i < gspca_dev->nbufread; i++) {
@@ -1913,7 +1913,7 @@ static ssize_t dev_read(struct file *file, char __user *data,
 	timestamp.tv_sec--;
 	n = 2;
 	for (;;) {
-		memset(&v4l2_buf, 0, sizeof v4l2_buf);
+		memset(&v4l2_buf, 0, sizeof(v4l2_buf));
 		v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		v4l2_buf.memory = GSPCA_MEMORY_READ;
 		ret = vidioc_dqbuf(file, gspca_dev, &v4l2_buf);
@@ -2021,8 +2021,8 @@ int gspca_dev_probe2(struct usb_interface *intf,
 		sd_desc->name, id->idVendor, id->idProduct);
 
 	/* create the device */
-	if (dev_size < sizeof *gspca_dev)
-		dev_size = sizeof *gspca_dev;
+	if (dev_size < sizeof(*gspca_dev))
+		dev_size = sizeof(*gspca_dev);
 	gspca_dev = kzalloc(dev_size, GFP_KERNEL);
 	if (!gspca_dev) {
 		pr_err("couldn't kzalloc gspca struct\n");

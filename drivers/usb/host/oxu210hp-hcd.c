@@ -204,19 +204,19 @@ dbg_port_buf(char *buf, unsigned len, const char *label, int port, u32 status)
 /* functions have the "wrong" filename when they're output... */
 #define dbg_status(oxu, label, status) { \
 	char _buf[80]; \
-	dbg_status_buf(_buf, sizeof _buf, label, status); \
+	dbg_status_buf(_buf, sizeof(_buf), label, status); \
 	oxu_dbg(oxu, "%s\n", _buf); \
 }
 
 #define dbg_cmd(oxu, label, command) { \
 	char _buf[80]; \
-	dbg_command_buf(_buf, sizeof _buf, label, command); \
+	dbg_command_buf(_buf, sizeof(_buf), label, command); \
 	oxu_dbg(oxu, "%s\n", _buf); \
 }
 
 #define dbg_port(oxu, label, port, status) { \
 	char _buf[80]; \
-	dbg_port_buf(_buf, sizeof _buf, label, port, status); \
+	dbg_port_buf(_buf, sizeof(_buf), label, port, status); \
 	oxu_dbg(oxu, "%s\n", _buf); \
 }
 
@@ -549,7 +549,7 @@ static void oxu_buf_free(struct oxu_hcd *oxu, struct ehci_qtd *qtd)
 
 static inline void ehci_qtd_init(struct ehci_qtd *qtd, dma_addr_t dma)
 {
-	memset(qtd, 0, sizeof *qtd);
+	memset(qtd, 0, sizeof(*qtd));
 	qtd->qtd_dma = dma;
 	qtd->hw_token = cpu_to_le32(QTD_STS_HALT);
 	qtd->hw_next = EHCI_LIST_END;
@@ -585,7 +585,7 @@ static struct ehci_qtd *ehci_qtd_alloc(struct oxu_hcd *oxu)
 
 	if (i < QTD_NUM) {
 		qtd = (struct ehci_qtd *) &oxu->mem->qtd_pool[i];
-		memset(qtd, 0, sizeof *qtd);
+		memset(qtd, 0, sizeof(*qtd));
 
 		qtd->hw_token = cpu_to_le32(QTD_STS_HALT);
 		qtd->hw_next = EHCI_LIST_END;
@@ -642,7 +642,7 @@ static struct ehci_qh *oxu_qh_alloc(struct oxu_hcd *oxu)
 
 	if (i < QHEAD_NUM) {
 		qh = (struct ehci_qh *) &oxu->mem->qh_pool[i];
-		memset(qh, 0, sizeof *qh);
+		memset(qh, 0, sizeof(*qh));
 
 		kref_init(&qh->kref);
 		qh->oxu = oxu;

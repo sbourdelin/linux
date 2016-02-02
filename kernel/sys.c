@@ -1546,7 +1546,7 @@ static void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 	cputime_t tgutime, tgstime, utime, stime;
 	unsigned long maxrss = 0;
 
-	memset((char *)r, 0, sizeof (*r));
+	memset((char *)r, 0, sizeof(*r));
 	utime = stime = 0;
 
 	if (who == RUSAGE_THREAD) {

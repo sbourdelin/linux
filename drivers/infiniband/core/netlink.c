@@ -63,7 +63,7 @@ int ibnl_add_client(int index, int nops,
 	struct ibnl_client *cur;
 	struct ibnl_client *nl_client;
 
-	nl_client = kmalloc(sizeof *nl_client, GFP_KERNEL);
+	nl_client = kmalloc(sizeof(*nl_client), GFP_KERNEL);
 	if (!nl_client)
 		return -ENOMEM;
 

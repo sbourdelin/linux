@@ -576,7 +576,7 @@ static void sierra_net_status(struct usbnet *dev, struct urb *urb)
 
 	dev_dbg(&dev->udev->dev, "%s", __func__);
 
-	if (urb->actual_length < sizeof *event)
+	if (urb->actual_length < sizeof(*event))
 		return;
 
 	/* Add cases to handle other standard notifications. */
@@ -688,7 +688,7 @@ static int sierra_net_bind(struct usbnet *dev, struct usb_interface *intf)
 		return -ENODEV;
 	}
 	/* Initialize sierra private data */
-	priv = kzalloc(sizeof *priv, GFP_KERNEL);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 

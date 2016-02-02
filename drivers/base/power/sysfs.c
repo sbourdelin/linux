@@ -115,9 +115,9 @@ static ssize_t control_store(struct device * dev, struct device_attribute *attr,
 	if (cp)
 		len = cp - buf;
 	device_lock(dev);
-	if (len == sizeof ctrl_auto - 1 && strncmp(buf, ctrl_auto, len) == 0)
+	if (len == sizeof(ctrl_auto) - 1 && strncmp(buf, ctrl_auto, len) == 0)
 		pm_runtime_allow(dev);
-	else if (len == sizeof ctrl_on - 1 && strncmp(buf, ctrl_on, len) == 0)
+	else if (len == sizeof(ctrl_on) - 1 && strncmp(buf, ctrl_on, len) == 0)
 		pm_runtime_forbid(dev);
 	else
 		n = -EINVAL;
@@ -355,11 +355,11 @@ wake_store(struct device * dev, struct device_attribute *attr,
 	cp = memchr(buf, '\n', n);
 	if (cp)
 		len = cp - buf;
-	if (len == sizeof _enabled - 1
-			&& strncmp(buf, _enabled, sizeof _enabled - 1) == 0)
+	if (len == sizeof(_enabled) - 1
+			&& strncmp(buf, _enabled, sizeof(_enabled) - 1) == 0)
 		device_set_wakeup_enable(dev, 1);
-	else if (len == sizeof _disabled - 1
-			&& strncmp(buf, _disabled, sizeof _disabled - 1) == 0)
+	else if (len == sizeof(_disabled) - 1
+			&& strncmp(buf, _disabled, sizeof(_disabled) - 1) == 0)
 		device_set_wakeup_enable(dev, 0);
 	else
 		return -EINVAL;
@@ -576,9 +576,9 @@ static ssize_t async_store(struct device *dev, struct device_attribute *attr,
 	cp = memchr(buf, '\n', n);
 	if (cp)
 		len = cp - buf;
-	if (len == sizeof _enabled - 1 && strncmp(buf, _enabled, len) == 0)
+	if (len == sizeof(_enabled) - 1 && strncmp(buf, _enabled, len) == 0)
 		device_enable_async_suspend(dev);
-	else if (len == sizeof _disabled - 1 &&
+	else if (len == sizeof(_disabled) - 1 &&
 		 strncmp(buf, _disabled, len) == 0)
 		device_disable_async_suspend(dev);
 	else

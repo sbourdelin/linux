@@ -96,7 +96,7 @@ void show(unsigned long ps)
 		return;
 	printf("%luMB: ", ps >> 20);
 	fflush(stdout);
-	snprintf(buf, sizeof buf,
+	snprintf(buf, sizeof(buf),
 		"cat /sys/kernel/mm/hugepages/hugepages-%lukB/free_hugepages",
 		ps >> 10);
 	system(buf);
@@ -112,7 +112,7 @@ unsigned long read_sysfs(int warn, char *fmt, ...)
 	unsigned long val = 0;
 
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof buf, fmt, ap);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
 	f = fopen(buf, "r");

@@ -811,7 +811,7 @@ acpi_video_init_brightness(struct acpi_video_device *device)
 		goto out;
 	}
 
-	br->levels = kmalloc((obj->package.count + 2) * sizeof *(br->levels),
+	br->levels = kmalloc((obj->package.count + 2) * sizeof(*(br->levels)),
 				GFP_KERNEL);
 	if (!br->levels) {
 		result = -ENOMEM;

@@ -532,7 +532,7 @@ static void handle_sdma_errors(struct ipath_devdata *dd, ipath_err_t errs)
 
 	if (ipath_debug & __IPATH_DBG) {
 		char msg[128];
-		ipath_decode_err(dd, msg, sizeof msg, errs &
+		ipath_decode_err(dd, msg, sizeof(msg), errs &
 			INFINIPATH_E_SDMAERRS);
 		ipath_dbg("errors %lx (%s)\n", (unsigned long)errs, msg);
 	}
@@ -642,13 +642,13 @@ static int handle_errors(struct ipath_devdata *dd, ipath_err_t errs)
 	 */
 	errs &= dd->ipath_errormask & ~dd->ipath_maskederrs;
 
-	supp_msgs = handle_frequent_errors(dd, errs, msg, (u32)sizeof msg,
+	supp_msgs = handle_frequent_errors(dd, errs, msg, (u32)sizeof(msg),
 		&noprint);
 
 	/* do these first, they are most important */
 	if (errs & INFINIPATH_E_HARDWARE) {
 		/* reuse same msg buf */
-		dd->ipath_f_handle_hwerrors(dd, msg, sizeof msg);
+		dd->ipath_f_handle_hwerrors(dd, msg, sizeof(msg));
 	} else {
 		u64 mask;
 		for (log_idx = 0; log_idx < IPATH_EEP_LOG_CNT; ++log_idx) {
@@ -695,7 +695,7 @@ static int handle_errors(struct ipath_devdata *dd, ipath_err_t errs)
 		dd->ipath_errormask &= ~dd->ipath_maskederrs;
 		ipath_write_kreg(dd, dd->ipath_kregs->kr_errormask,
 				 dd->ipath_errormask);
-		s_iserr = ipath_decode_err(dd, msg, sizeof msg,
+		s_iserr = ipath_decode_err(dd, msg, sizeof(msg),
 					   dd->ipath_maskederrs);
 
 		if (dd->ipath_maskederrs &
@@ -780,7 +780,7 @@ static int handle_errors(struct ipath_devdata *dd, ipath_err_t errs)
 		if (ipath_debug & __IPATH_DBG)
 			mask &= ~INFINIPATH_E_SDMADISABLED;
 
-		ipath_decode_err(dd, msg, sizeof msg, errs & ~mask);
+		ipath_decode_err(dd, msg, sizeof(msg), errs & ~mask);
 	} else
 		/* so we don't need if (!noprint) at strlcat's below */
 		*msg = 0;

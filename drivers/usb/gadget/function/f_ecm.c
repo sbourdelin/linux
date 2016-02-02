@@ -102,7 +102,7 @@ static inline unsigned ecm_bitrate(struct usb_gadget *g)
 
 static struct usb_interface_assoc_descriptor
 ecm_iad_descriptor = {
-	.bLength =		sizeof ecm_iad_descriptor,
+	.bLength =		sizeof(ecm_iad_descriptor),
 	.bDescriptorType =	USB_DT_INTERFACE_ASSOCIATION,
 
 	/* .bFirstInterface =	DYNAMIC, */
@@ -115,7 +115,7 @@ ecm_iad_descriptor = {
 
 
 static struct usb_interface_descriptor ecm_control_intf = {
-	.bLength =		sizeof ecm_control_intf,
+	.bLength =		sizeof(ecm_control_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
@@ -128,7 +128,7 @@ static struct usb_interface_descriptor ecm_control_intf = {
 };
 
 static struct usb_cdc_header_desc ecm_header_desc = {
-	.bLength =		sizeof ecm_header_desc,
+	.bLength =		sizeof(ecm_header_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_HEADER_TYPE,
 
@@ -144,7 +144,7 @@ static struct usb_cdc_union_desc ecm_union_desc = {
 };
 
 static struct usb_cdc_ether_desc ecm_desc = {
-	.bLength =		sizeof ecm_desc,
+	.bLength =		sizeof(ecm_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ETHERNET_TYPE,
 
@@ -159,7 +159,7 @@ static struct usb_cdc_ether_desc ecm_desc = {
 /* the default data interface has no endpoints ... */
 
 static struct usb_interface_descriptor ecm_data_nop_intf = {
-	.bLength =		sizeof ecm_data_nop_intf,
+	.bLength =		sizeof(ecm_data_nop_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	.bInterfaceNumber =	1,
@@ -174,7 +174,7 @@ static struct usb_interface_descriptor ecm_data_nop_intf = {
 /* ... but the "real" data interface has two bulk endpoints */
 
 static struct usb_interface_descriptor ecm_data_intf = {
-	.bLength =		sizeof ecm_data_intf,
+	.bLength =		sizeof(ecm_data_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	.bInterfaceNumber =	1,
@@ -295,7 +295,7 @@ static struct usb_endpoint_descriptor ss_ecm_notify_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor ss_ecm_intr_comp_desc = {
-	.bLength =		sizeof ss_ecm_intr_comp_desc,
+	.bLength =		sizeof(ss_ecm_intr_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 3 values can be tweaked if necessary */
@@ -323,7 +323,7 @@ static struct usb_endpoint_descriptor ss_ecm_out_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor ss_ecm_bulk_comp_desc = {
-	.bLength =		sizeof ss_ecm_bulk_comp_desc,
+	.bLength =		sizeof(ss_ecm_bulk_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 2 values can be tweaked if necessary */
@@ -399,7 +399,7 @@ static void ecm_do_notify(struct f_ecm *ecm)
 		else
 			event->wValue = cpu_to_le16(0);
 		event->wLength = 0;
-		req->length = sizeof *event;
+		req->length = sizeof(*event);
 
 		DBG(cdev, "notify connect %s\n",
 				ecm->is_open ? "true" : "false");
@@ -413,7 +413,7 @@ static void ecm_do_notify(struct f_ecm *ecm)
 		req->length = ECM_STATUS_BYTECOUNT;
 
 		/* SPEED_CHANGE data is up/down speeds in bits/sec */
-		data = req->buf + sizeof *event;
+		data = req->buf + sizeof(*event);
 		data[0] = cpu_to_le32(ecm_bitrate(cdev->gadget));
 		data[1] = data[0];
 

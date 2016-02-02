@@ -223,7 +223,7 @@ static void release_tid(struct c4iw_rdev *rdev, u32 hwtid, struct sk_buff *skb)
 {
 	struct cpl_tid_release *req;
 
-	skb = get_skb(skb, sizeof *req, GFP_KERNEL);
+	skb = get_skb(skb, sizeof(*req), GFP_KERNEL);
 	if (!skb)
 		return;
 	req = (struct cpl_tid_release *) skb_put(skb, sizeof(*req));
@@ -528,7 +528,7 @@ static int send_halfclose(struct c4iw_ep *ep, gfp_t gfp)
 {
 	struct cpl_close_con_req *req;
 	struct sk_buff *skb;
-	int wrlen = roundup(sizeof *req, 16);
+	int wrlen = roundup(sizeof(*req), 16);
 
 	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	skb = get_skb(NULL, wrlen, gfp);
@@ -549,7 +549,7 @@ static int send_halfclose(struct c4iw_ep *ep, gfp_t gfp)
 static int send_abort(struct c4iw_ep *ep, struct sk_buff *skb, gfp_t gfp)
 {
 	struct cpl_abort_req *req;
-	int wrlen = roundup(sizeof *req, 16);
+	int wrlen = roundup(sizeof(*req), 16);
 
 	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	skb = get_skb(skb, wrlen, gfp);
@@ -861,7 +861,7 @@ static void send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
 	mpalen = sizeof(*mpa) + ep->plen;
 	if (mpa_rev_to_use == 2)
 		mpalen += sizeof(struct mpa_v2_conn_params);
-	wrlen = roundup(mpalen + sizeof *req, 16);
+	wrlen = roundup(mpalen + sizeof(*req), 16);
 	skb = get_skb(skb, wrlen, GFP_KERNEL);
 	if (!skb) {
 		connect_reply_upcall(ep, -ENOMEM);
@@ -954,7 +954,7 @@ static int send_mpa_reject(struct c4iw_ep *ep, const void *pdata, u8 plen)
 	mpalen = sizeof(*mpa) + plen;
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn)
 		mpalen += sizeof(struct mpa_v2_conn_params);
-	wrlen = roundup(mpalen + sizeof *req, 16);
+	wrlen = roundup(mpalen + sizeof(*req), 16);
 
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);
 	if (!skb) {
@@ -1034,7 +1034,7 @@ static int send_mpa_reply(struct c4iw_ep *ep, const void *pdata, u8 plen)
 	mpalen = sizeof(*mpa) + plen;
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn)
 		mpalen += sizeof(struct mpa_v2_conn_params);
-	wrlen = roundup(mpalen + sizeof *req, 16);
+	wrlen = roundup(mpalen + sizeof(*req), 16);
 
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);
 	if (!skb) {
@@ -1308,7 +1308,7 @@ static int update_rx_credits(struct c4iw_ep *ep, u32 credits)
 {
 	struct cpl_rx_data_ack *req;
 	struct sk_buff *skb;
-	int wrlen = roundup(sizeof *req, 16);
+	int wrlen = roundup(sizeof(*req), 16);
 
 	PDBG("%s ep %p tid %u credits %u\n", __func__, ep, ep->hwtid, credits);
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);

@@ -282,7 +282,7 @@ void ipath_uc_rcv(struct ipath_ibdev *dev, struct ipath_ib_header *hdr,
 	 */
 	opcode = be32_to_cpu(ohdr->bth[0]) >> 24;
 
-	memset(&wc, 0, sizeof wc);
+	memset(&wc, 0, sizeof(wc));
 
 	/* Compare the PSN verses the expected PSN. */
 	if (unlikely(ipath_cmp24(psn, qp->r_psn) != 0)) {

@@ -106,7 +106,7 @@ int ocrdma_query_device(struct ib_device *ibdev, struct ib_device_attr *attr,
 	if (uhw->inlen || uhw->outlen)
 		return -EINVAL;
 
-	memset(attr, 0, sizeof *attr);
+	memset(attr, 0, sizeof(*attr));
 	memcpy(&attr->fw_ver, &dev->attr.fw_ver[0],
 	       min(sizeof(dev->attr.fw_ver), sizeof(attr->fw_ver)));
 	ocrdma_get_guid(dev, (u8 *)&attr->sys_image_guid);

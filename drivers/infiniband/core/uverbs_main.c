@@ -487,7 +487,7 @@ void ib_uverbs_comp_handler(struct ib_cq *cq, void *cq_context)
 		return;
 	}
 
-	entry = kmalloc(sizeof *entry, GFP_ATOMIC);
+	entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
 	if (!entry) {
 		spin_unlock_irqrestore(&file->lock, flags);
 		return;
@@ -520,7 +520,7 @@ static void ib_uverbs_async_handler(struct ib_uverbs_file *file,
 		return;
 	}
 
-	entry = kmalloc(sizeof *entry, GFP_ATOMIC);
+	entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
 	if (!entry) {
 		spin_unlock_irqrestore(&file->async_file->lock, flags);
 		return;
@@ -693,10 +693,10 @@ static ssize_t ib_uverbs_write(struct file *filp, const char __user *buf,
 	int srcu_key;
 	ssize_t ret;
 
-	if (count < sizeof hdr)
+	if (count < sizeof(hdr))
 		return -EINVAL;
 
-	if (copy_from_user(&hdr, buf, sizeof hdr))
+	if (copy_from_user(&hdr, buf, sizeof(hdr)))
 		return -EFAULT;
 
 	srcu_key = srcu_read_lock(&file->device->disassociate_srcu);
@@ -1080,7 +1080,7 @@ static void ib_uverbs_add_one(struct ib_device *device)
 	if (!device->alloc_ucontext)
 		return;
 
-	uverbs_dev = kzalloc(sizeof *uverbs_dev, GFP_KERNEL);
+	uverbs_dev = kzalloc(sizeof(*uverbs_dev), GFP_KERNEL);
 	if (!uverbs_dev)
 		return;
 

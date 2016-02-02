@@ -683,7 +683,7 @@ static int mthca_init_hca(struct mthca_dev *mdev)
 	mdev->eq_table.inta_pin = adapter.inta_pin;
 	if (!mthca_is_memfree(mdev))
 		mdev->rev_id = adapter.revision_id;
-	memcpy(mdev->board_id, adapter.board_id, sizeof mdev->board_id);
+	memcpy(mdev->board_id, adapter.board_id, sizeof(mdev->board_id));
 
 	return 0;
 
@@ -964,7 +964,7 @@ static int __mthca_init_one(struct pci_dev *pdev, int hca_type)
 	/* We can handle large RDMA requests, so allow larger segments. */
 	dma_set_max_seg_size(&pdev->dev, 1024 * 1024 * 1024);
 
-	mdev = (struct mthca_dev *) ib_alloc_device(sizeof *mdev);
+	mdev = (struct mthca_dev *) ib_alloc_device(sizeof(*mdev));
 	if (!mdev) {
 		dev_err(&pdev->dev, "Device struct alloc failed, "
 			"aborting.\n");

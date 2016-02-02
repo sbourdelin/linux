@@ -66,7 +66,7 @@ MODULE_LICENSE("GPL");
 USB_GADGET_COMPOSITE_OPTIONS();
 
 static struct usb_device_descriptor gfs_dev_desc = {
-	.bLength		= sizeof gfs_dev_desc,
+	.bLength		= sizeof(gfs_dev_desc),
 	.bDescriptorType	= USB_DT_DEVICE,
 
 	/* .bcdUSB = DYNAMIC */

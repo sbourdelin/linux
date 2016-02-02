@@ -488,7 +488,7 @@ static int sd_get_jcomp(struct gspca_dev *gspca_dev,
 {
 	struct sd *sd = (struct sd *) gspca_dev;
 
-	memset(jcomp, 0, sizeof *jcomp);
+	memset(jcomp, 0, sizeof(*jcomp));
 	jcomp->quality = v4l2_ctrl_g_ctrl(sd->jpegqual);
 	jcomp->jpeg_markers = V4L2_JPEG_MARKER_DHT
 			| V4L2_JPEG_MARKER_DQT;

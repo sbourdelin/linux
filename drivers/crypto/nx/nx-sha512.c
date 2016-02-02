@@ -50,7 +50,7 @@ static int nx_sha512_init(struct shash_desc *desc)
 {
 	struct sha512_state *sctx = shash_desc_ctx(desc);
 
-	memset(sctx, 0, sizeof *sctx);
+	memset(sctx, 0, sizeof(*sctx));
 
 	sctx->state[0] = __cpu_to_be64(SHA512_H0);
 	sctx->state[1] = __cpu_to_be64(SHA512_H1);

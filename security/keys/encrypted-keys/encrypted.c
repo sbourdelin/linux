@@ -47,8 +47,8 @@ static const char key_format_ecryptfs[] = "ecryptfs";
 static unsigned int ivsize;
 static int blksize;
 
-#define KEY_TRUSTED_PREFIX_LEN (sizeof (KEY_TRUSTED_PREFIX) - 1)
-#define KEY_USER_PREFIX_LEN (sizeof (KEY_USER_PREFIX) - 1)
+#define KEY_TRUSTED_PREFIX_LEN (sizeof(KEY_TRUSTED_PREFIX) - 1)
+#define KEY_USER_PREFIX_LEN (sizeof(KEY_USER_PREFIX) - 1)
 #define KEY_ECRYPTFS_DESC_LEN 16
 #define HASH_SIZE SHA256_DIGEST_SIZE
 #define MAX_DATA_SIZE 4096
@@ -482,7 +482,7 @@ static int derived_key_encrypt(struct encrypted_key_payload *epayload,
 		goto out;
 	dump_decrypted_data(epayload);
 
-	memset(pad, 0, sizeof pad);
+	memset(pad, 0, sizeof(pad));
 	sg_init_table(sg_in, 2);
 	sg_set_buf(&sg_in[0], epayload->decrypted_data,
 		   epayload->decrypted_datalen);
@@ -513,7 +513,7 @@ static int datablob_hmac_append(struct encrypted_key_payload *epayload,
 		goto out;
 
 	digest = epayload->format + epayload->datablob_len;
-	ret = calc_hmac(digest, derived_key, sizeof derived_key,
+	ret = calc_hmac(digest, derived_key, sizeof(derived_key),
 			epayload->format, epayload->datablob_len);
 	if (!ret)
 		dump_hmac(NULL, digest, HASH_SIZE);
@@ -543,11 +543,11 @@ static int datablob_hmac_verify(struct encrypted_key_payload *epayload,
 	} else
 		p = epayload->format;
 
-	ret = calc_hmac(digest, derived_key, sizeof derived_key, p, len);
+	ret = calc_hmac(digest, derived_key, sizeof(derived_key), p, len);
 	if (ret < 0)
 		goto out;
 	ret = memcmp(digest, epayload->format + epayload->datablob_len,
-		     sizeof digest);
+		     sizeof(digest));
 	if (ret) {
 		ret = -EINVAL;
 		dump_hmac("datablob",
@@ -577,13 +577,13 @@ static int derived_key_decrypt(struct encrypted_key_payload *epayload,
 		goto out;
 	dump_encrypted_data(epayload, encrypted_datalen);
 
-	memset(pad, 0, sizeof pad);
+	memset(pad, 0, sizeof(pad));
 	sg_init_table(sg_in, 1);
 	sg_init_table(sg_out, 2);
 	sg_set_buf(sg_in, epayload->encrypted_data, encrypted_datalen);
 	sg_set_buf(&sg_out[0], epayload->decrypted_data,
 		   epayload->decrypted_datalen);
-	sg_set_buf(&sg_out[1], pad, sizeof pad);
+	sg_set_buf(&sg_out[1], pad, sizeof(pad));
 
 	ret = crypto_blkcipher_decrypt(&desc, sg_out, sg_in, encrypted_datalen);
 	crypto_free_blkcipher(desc.tfm);
@@ -695,7 +695,7 @@ static int encrypted_key_decrypt(struct encrypted_key_payload *epayload,
 	if (ret < 0)
 		goto out;
 
-	ret = derived_key_decrypt(epayload, derived_key, sizeof derived_key);
+	ret = derived_key_decrypt(epayload, derived_key, sizeof(derived_key));
 	if (ret < 0)
 		pr_err("encrypted_key: failed to decrypt key (%d)\n", ret);
 out:
@@ -923,7 +923,7 @@ static long encrypted_read(const struct key *key, char __user *buffer,
 	if (ret < 0)
 		goto out;
 
-	ret = derived_key_encrypt(epayload, derived_key, sizeof derived_key);
+	ret = derived_key_encrypt(epayload, derived_key, sizeof(derived_key));
 	if (ret < 0)
 		goto out;
 

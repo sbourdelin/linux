@@ -311,7 +311,7 @@ static void init_port(struct mthca_dev *dev, int port)
 	int err;
 	struct mthca_init_ib_param param;
 
-	memset(&param, 0, sizeof param);
+	memset(&param, 0, sizeof(param));
 
 	param.port_width = dev->limits.port_width_cap;
 	param.vl_cap     = dev->limits.vl_cap;
@@ -396,7 +396,7 @@ static int to_ib_qp_access_flags(int mthca_flags)
 static void to_ib_ah_attr(struct mthca_dev *dev, struct ib_ah_attr *ib_ah_attr,
 				struct mthca_qp_path *path)
 {
-	memset(ib_ah_attr, 0, sizeof *ib_ah_attr);
+	memset(ib_ah_attr, 0, sizeof(*ib_ah_attr));
 	ib_ah_attr->port_num 	  = (be32_to_cpu(path->port_pkey) >> 24) & 0x3;
 
 	if (ib_ah_attr->port_num == 0 || ib_ah_attr->port_num > dev->limits.num_ports)
@@ -417,7 +417,7 @@ static void to_ib_ah_attr(struct mthca_dev *dev, struct ib_ah_attr *ib_ah_attr,
 		ib_ah_attr->grh.flow_label =
 			be32_to_cpu(path->sl_tclass_flowlabel) & 0xfffff;
 		memcpy(ib_ah_attr->grh.dgid.raw,
-			path->rgid, sizeof ib_ah_attr->grh.dgid.raw);
+			path->rgid, sizeof(ib_ah_attr->grh.dgid.raw));
 	}
 }
 
@@ -559,7 +559,7 @@ static int __mthca_modify_qp(struct ib_qp *ibqp,
 	}
 	qp_param = mailbox->buf;
 	qp_context = &qp_param->context;
-	memset(qp_param, 0, sizeof *qp_param);
+	memset(qp_param, 0, sizeof(*qp_param));
 
 	qp_context->flags      = cpu_to_be32((to_mthca_state(new_state) << 28) |
 					     (to_mthca_st(qp->transport) << 16));

@@ -386,7 +386,7 @@ int mpc5200_audio_dma_create(struct platform_device *op)
 	}
 
 	/* Allocate and initialize the driver private data */
-	psc_dma = kzalloc(sizeof *psc_dma, GFP_KERNEL);
+	psc_dma = kzalloc(sizeof(*psc_dma), GFP_KERNEL);
 	if (!psc_dma) {
 		ret = -ENOMEM;
 		goto out_unmap;
@@ -394,7 +394,7 @@ int mpc5200_audio_dma_create(struct platform_device *op)
 
 	/* Get the PSC ID */
 	prop = of_get_property(op->dev.of_node, "cell-index", &size);
-	if (!prop || size < sizeof *prop) {
+	if (!prop || size < sizeof(*prop)) {
 		ret = -ENODEV;
 		goto out_free;
 	}
@@ -404,11 +404,11 @@ int mpc5200_audio_dma_create(struct platform_device *op)
 	psc_dma->id = be32_to_cpu(*prop);
 	psc_dma->irq = irq;
 	psc_dma->psc_regs = regs;
-	psc_dma->fifo_regs = regs + sizeof *psc_dma->psc_regs;
+	psc_dma->fifo_regs = regs + sizeof(*psc_dma->psc_regs);
 	psc_dma->dev = &op->dev;
 	psc_dma->playback.psc_dma = psc_dma;
 	psc_dma->capture.psc_dma = psc_dma;
-	snprintf(psc_dma->name, sizeof psc_dma->name, "PSC%u", psc_dma->id);
+	snprintf(psc_dma->name, sizeof(psc_dma->name), "PSC%u", psc_dma->id);
 
 	/* Find the address of the fifo data registers and setup the
 	 * DMA tasks */

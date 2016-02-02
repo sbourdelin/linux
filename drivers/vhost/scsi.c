@@ -1488,21 +1488,21 @@ vhost_scsi_ioctl(struct file *f,
 
 	switch (ioctl) {
 	case VHOST_SCSI_SET_ENDPOINT:
-		if (copy_from_user(&backend, argp, sizeof backend))
+		if (copy_from_user(&backend, argp, sizeof(backend)))
 			return -EFAULT;
 		if (backend.reserved != 0)
 			return -EOPNOTSUPP;
 
 		return vhost_scsi_set_endpoint(vs, &backend);
 	case VHOST_SCSI_CLEAR_ENDPOINT:
-		if (copy_from_user(&backend, argp, sizeof backend))
+		if (copy_from_user(&backend, argp, sizeof(backend)))
 			return -EFAULT;
 		if (backend.reserved != 0)
 			return -EOPNOTSUPP;
 
 		return vhost_scsi_clear_endpoint(vs, &backend);
 	case VHOST_SCSI_GET_ABI_VERSION:
-		if (copy_to_user(argp, &abi_version, sizeof abi_version))
+		if (copy_to_user(argp, &abi_version, sizeof(abi_version)))
 			return -EFAULT;
 		return 0;
 	case VHOST_SCSI_SET_EVENTS_MISSED:
@@ -1521,11 +1521,11 @@ vhost_scsi_ioctl(struct file *f,
 		return 0;
 	case VHOST_GET_FEATURES:
 		features = VHOST_SCSI_FEATURES;
-		if (copy_to_user(featurep, &features, sizeof features))
+		if (copy_to_user(featurep, &features, sizeof(features)))
 			return -EFAULT;
 		return 0;
 	case VHOST_SET_FEATURES:
-		if (copy_from_user(&features, featurep, sizeof features))
+		if (copy_from_user(&features, featurep, sizeof(features)))
 			return -EFAULT;
 		return vhost_scsi_set_features(vs, features);
 	default:

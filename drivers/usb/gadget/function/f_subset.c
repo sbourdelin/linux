@@ -77,7 +77,7 @@ static inline struct f_gether *func_to_geth(struct usb_function *f)
 /* interface descriptor: */
 
 static struct usb_interface_descriptor subset_data_intf = {
-	.bLength =		sizeof subset_data_intf,
+	.bLength =		sizeof(subset_data_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
@@ -90,7 +90,7 @@ static struct usb_interface_descriptor subset_data_intf = {
 };
 
 static struct usb_cdc_header_desc mdlm_header_desc = {
-	.bLength =		sizeof mdlm_header_desc,
+	.bLength =		sizeof(mdlm_header_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_HEADER_TYPE,
 
@@ -98,7 +98,7 @@ static struct usb_cdc_header_desc mdlm_header_desc = {
 };
 
 static struct usb_cdc_mdlm_desc mdlm_desc = {
-	.bLength =		sizeof mdlm_desc,
+	.bLength =		sizeof(mdlm_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_MDLM_TYPE,
 
@@ -124,7 +124,7 @@ static u8 mdlm_detail_desc[] = {
 };
 
 static struct usb_cdc_ether_desc ether_desc = {
-	.bLength =		sizeof ether_desc,
+	.bLength =		sizeof(ether_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ETHERNET_TYPE,
 
@@ -213,7 +213,7 @@ static struct usb_endpoint_descriptor ss_subset_out_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor ss_subset_bulk_comp_desc = {
-	.bLength =		sizeof ss_subset_bulk_comp_desc,
+	.bLength =		sizeof(ss_subset_bulk_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 2 values can be tweaked if necessary */

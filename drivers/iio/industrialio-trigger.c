@@ -267,7 +267,7 @@ struct iio_poll_func
 	va_list vargs;
 	struct iio_poll_func *pf;
 
-	pf = kmalloc(sizeof *pf, GFP_KERNEL);
+	pf = kmalloc(sizeof(*pf), GFP_KERNEL);
 	if (pf == NULL)
 		return NULL;
 	va_start(vargs, fmt);
@@ -445,7 +445,7 @@ static void iio_trig_subirqunmask(struct irq_data *d)
 static struct iio_trigger *viio_trigger_alloc(const char *fmt, va_list vargs)
 {
 	struct iio_trigger *trig;
-	trig = kzalloc(sizeof *trig, GFP_KERNEL);
+	trig = kzalloc(sizeof(*trig), GFP_KERNEL);
 	if (trig) {
 		int i;
 		trig->dev.type = &iio_trig_type;

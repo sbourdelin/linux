@@ -1107,7 +1107,7 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
-	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
+	memcpy(buf + 8, common->inquiry_string, sizeof(common->inquiry_string));
 	return 36;
 }
 

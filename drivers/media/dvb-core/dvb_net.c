@@ -577,8 +577,8 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 			__be16 utype = htons(priv->ule_sndu_type);
 			const u8 *tail;
 			struct kvec iov[3] = {
-				{ &ulen, sizeof ulen },
-				{ &utype, sizeof utype },
+				{ &ulen, sizeof(ulen) },
+				{ &utype, sizeof(utype) },
 				{ priv->ule_skb->data, priv->ule_skb->len - 4 }
 			};
 			u32 ule_crc = ~0L, expected_crc;

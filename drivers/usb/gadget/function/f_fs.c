@@ -402,7 +402,7 @@ static ssize_t __ffs_ep0_read_events(struct ffs_data *ffs, char __user *buf,
 	 * we reserve.
 	 */
 	struct usb_functionfs_event events[ARRAY_SIZE(ffs->ev.types)];
-	const size_t size = n * sizeof *events;
+	const size_t size = n * sizeof(*events);
 	unsigned i = 0;
 
 	memset(events, 0, size);
@@ -418,7 +418,7 @@ static ssize_t __ffs_ep0_read_events(struct ffs_data *ffs, char __user *buf,
 	ffs->ev.count -= n;
 	if (ffs->ev.count)
 		memmove(ffs->ev.types, ffs->ev.types + n,
-			ffs->ev.count * sizeof *ffs->ev.types);
+			ffs->ev.count * sizeof(*ffs->ev.types));
 
 	spin_unlock_irq(&ffs->ev.waitq.lock);
 	mutex_unlock(&ffs->mutex);
@@ -1440,7 +1440,7 @@ static void ffs_data_closed(struct ffs_data *ffs)
 
 static struct ffs_data *ffs_data_new(void)
 {
-	struct ffs_data *ffs = kzalloc(sizeof *ffs, GFP_KERNEL);
+	struct ffs_data *ffs = kzalloc(sizeof(*ffs), GFP_KERNEL);
 	if (unlikely(!ffs))
 		return NULL;
 
@@ -1765,7 +1765,7 @@ static int __must_check ffs_do_single_desc(char *data, unsigned len,
 	case USB_DT_INTERFACE: {
 		struct usb_interface_descriptor *ds = (void *)_ds;
 		pr_vdebug("interface descriptor\n");
-		if (length != sizeof *ds)
+		if (length != sizeof(*ds))
 			goto inv_length;
 
 		__entity(INTERFACE, ds->bInterfaceNumber);
@@ -1798,7 +1798,7 @@ static int __must_check ffs_do_single_desc(char *data, unsigned len,
 	case USB_DT_INTERFACE_ASSOCIATION: {
 		struct usb_interface_assoc_descriptor *ds = (void *)_ds;
 		pr_vdebug("interface association descriptor\n");
-		if (length != sizeof *ds)
+		if (length != sizeof(*ds))
 			goto inv_length;
 		if (ds->iFunction)
 			__entity(STRING, ds->iFunction);

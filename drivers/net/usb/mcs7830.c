@@ -344,7 +344,7 @@ static void mcs7830_hif_update_multicast_hash(struct usbnet *dev)
 {
 	struct mcs7830_data *data = mcs7830_get_data(dev);
 	mcs7830_set_reg_async(dev, HIF_REG_MULTICAST_HASH,
-				sizeof data->multi_filter,
+				sizeof(data->multi_filter),
 				data->multi_filter);
 }
 
@@ -361,7 +361,7 @@ static void mcs7830_data_set_multicast(struct net_device *net)
 	struct usbnet *dev = netdev_priv(net);
 	struct mcs7830_data *data = mcs7830_get_data(dev);
 
-	memset(data->multi_filter, 0, sizeof data->multi_filter);
+	memset(data->multi_filter, 0, sizeof(data->multi_filter));
 
 	data->config = HIF_REG_CONFIG_TXENABLE;
 

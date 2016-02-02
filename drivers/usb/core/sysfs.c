@@ -428,11 +428,11 @@ static ssize_t level_store(struct device *dev, struct device_attribute *attr,
 
 	usb_lock_device(udev);
 
-	if (len == sizeof on_string - 1 &&
+	if (len == sizeof(on_string) - 1 &&
 			strncmp(buf, on_string, len) == 0)
 		usb_disable_autosuspend(udev);
 
-	else if (len == sizeof auto_string - 1 &&
+	else if (len == sizeof(auto_string) - 1 &&
 			strncmp(buf, auto_string, len) == 0)
 		usb_enable_autosuspend(udev);
 

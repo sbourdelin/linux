@@ -956,7 +956,7 @@ static void jpeg_define(u8 *jpeg_hdr,
 			int height,
 			int width)
 {
-	memcpy(jpeg_hdr, jpeg_head, sizeof jpeg_head);
+	memcpy(jpeg_hdr, jpeg_head, sizeof(jpeg_head));
 	jpeg_hdr[JPEG_HEIGHT_OFFSET + 0] = height >> 8;
 	jpeg_hdr[JPEG_HEIGHT_OFFSET + 1] = height;
 	jpeg_hdr[JPEG_HEIGHT_OFFSET + 2] = width >> 8;
@@ -1460,7 +1460,7 @@ static void set_dqt(struct gspca_dev *gspca_dev, u8 q)
 		jpeg_set_qual(sd->jpeg_hdr, jpeg_q[q]);
 	else
 		memcpy(&sd->jpeg_hdr[JPEG_QT0_OFFSET - 1],
-			DQT[q], sizeof DQT[0]);
+			DQT[q], sizeof(DQT[0]));
 }
 
 /* set the JPEG compression quality factor */
@@ -4141,7 +4141,7 @@ static int sd_isoc_init(struct gspca_dev *gspca_dev)
 				ARRAY_SIZE(cx_sensor_init));
 		reg_w_buf(gspca_dev, cx_bridge_init,
 				ARRAY_SIZE(cx_bridge_init));
-		bulk_w(gspca_dev, 0x03, color_null, sizeof color_null);
+		bulk_w(gspca_dev, 0x03, color_null, sizeof(color_null));
 		reg_w(gspca_dev, 0x59, 0x40);
 	} else {
 		reg_w(gspca_dev, TP6800_R12_SIF_ADDR_S, 0x21);
@@ -4501,7 +4501,7 @@ static void soi763a_6810_start(struct gspca_dev *gspca_dev)
 	};
 
 	reg_w(gspca_dev, 0x22, gspca_dev->alt);
-	bulk_w(gspca_dev, 0x03, color_null, sizeof color_null);
+	bulk_w(gspca_dev, 0x03, color_null, sizeof(color_null));
 	reg_w(gspca_dev, 0x59, 0x40);
 	if (sd->sensor == SENSOR_CX0342)
 		setexposure(gspca_dev, v4l2_ctrl_g_ctrl(gspca_dev->exposure),
@@ -4838,7 +4838,7 @@ static int sd_get_jcomp(struct gspca_dev *gspca_dev,
 
 	if (sd->sensor != SENSOR_SOI763A)
 		return -ENOTTY;
-	memset(jcomp, 0, sizeof *jcomp);
+	memset(jcomp, 0, sizeof(*jcomp));
 	jcomp->quality = v4l2_ctrl_g_ctrl(sd->jpegqual);
 	jcomp->jpeg_markers = V4L2_JPEG_MARKER_DHT
 			| V4L2_JPEG_MARKER_DQT;

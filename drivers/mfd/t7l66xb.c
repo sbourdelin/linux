@@ -317,7 +317,7 @@ static int t7l66xb_probe(struct platform_device *dev)
 	if (!iomem)
 		return -EINVAL;
 
-	t7l66xb = kzalloc(sizeof *t7l66xb, GFP_KERNEL);
+	t7l66xb = kzalloc(sizeof(*t7l66xb), GFP_KERNEL);
 	if (!t7l66xb)
 		return -ENOMEM;
 

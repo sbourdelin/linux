@@ -55,7 +55,7 @@ static void ipath_update_pio_bufs(struct ipath_devdata *);
 const char *ipath_get_unit_name(int unit)
 {
 	static char iname[16];
-	snprintf(iname, sizeof iname, "infinipath%u", unit);
+	snprintf(iname, sizeof(iname), "infinipath%u", unit);
 	return iname;
 }
 
@@ -1121,7 +1121,7 @@ static void ipath_rcv_hdrerr(struct ipath_devdata *dd,
 {
 	char emsg[128];
 
-	get_rhf_errstring(eflags, emsg, sizeof emsg);
+	get_rhf_errstring(eflags, emsg, sizeof(emsg));
 	ipath_cdbg(PKT, "RHFerrs %x hdrqtail=%x typ=%u "
 		   "tlen=%x opcode=%x egridx=%x: %s\n",
 		   eflags, l,

@@ -474,7 +474,7 @@ static int ipath_tid_update(struct ipath_portdata *pd, struct file *fp,
 			goto cleanup;
 		}
 		if (copy_to_user((void __user *) (unsigned long) ti->tidmap,
-				 tidmap, sizeof tidmap)) {
+				 tidmap, sizeof(tidmap))) {
 			ret = -EFAULT;
 			goto cleanup;
 		}
@@ -525,7 +525,7 @@ static int ipath_tid_free(struct ipath_portdata *pd, unsigned subport,
 	}
 
 	if (copy_from_user(tidmap, (void __user *)(unsigned long)ti->tidmap,
-			   sizeof tidmap)) {
+			   sizeof(tidmap))) {
 		ret = -EFAULT;
 		goto done;
 	}

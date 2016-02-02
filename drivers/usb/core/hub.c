@@ -799,7 +799,7 @@ int usb_hub_clear_tt_buffer(struct urb *urb)
 	 * since each TT has "at least two" buffers that can need it (and
 	 * there can be many TTs per hub).  even if they're uncommon.
 	 */
-	clear = kmalloc(sizeof *clear, GFP_ATOMIC);
+	clear = kmalloc(sizeof(*clear), GFP_ATOMIC);
 	if (clear == NULL) {
 		dev_err(&udev->dev, "can't save CLEAR_TT_BUFFER state\n");
 		/* FIXME recover somehow ... RESET_TT? */
@@ -3723,7 +3723,7 @@ static int usb_req_set_sel(struct usb_device *udev, enum usb3_link_state state)
 	 * which may be initiated by an error path of a mass storage driver.
 	 * Therefore, use GFP_NOIO.
 	 */
-	sel_values = kmalloc(sizeof *(sel_values), GFP_NOIO);
+	sel_values = kmalloc(sizeof(*(sel_values)), GFP_NOIO);
 	if (!sel_values)
 		return -ENOMEM;
 
@@ -3736,7 +3736,7 @@ static int usb_req_set_sel(struct usb_device *udev, enum usb3_link_state state)
 			USB_REQ_SET_SEL,
 			USB_RECIP_DEVICE,
 			0, 0,
-			sel_values, sizeof *(sel_values),
+			sel_values, sizeof(*(sel_values)),
 			USB_CTRL_SET_TIMEOUT);
 	kfree(sel_values);
 	return ret;
@@ -4601,13 +4601,13 @@ check_highspeed(struct usb_hub *hub, struct usb_device *udev, int port1)
 	if (udev->quirks & USB_QUIRK_DEVICE_QUALIFIER)
 		return;
 
-	qual = kmalloc(sizeof *qual, GFP_KERNEL);
+	qual = kmalloc(sizeof(*qual), GFP_KERNEL);
 	if (qual == NULL)
 		return;
 
 	status = usb_get_descriptor(udev, USB_DT_DEVICE_QUALIFIER, 0,
-			qual, sizeof *qual);
-	if (status == sizeof *qual) {
+			qual, sizeof(*qual));
+	if (status == sizeof(*qual)) {
 		dev_info(&udev->dev, "not running at top speed; "
 			"connect to a high speed hub\n");
 		/* hub LEDs are probably harder to miss than syslog */

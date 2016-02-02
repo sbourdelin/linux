@@ -131,7 +131,7 @@ static int rds_ib_add_ipaddr(struct rds_ib_device *rds_ibdev, __be32 ipaddr)
 {
 	struct rds_ib_ipaddr *i_ipaddr;
 
-	i_ipaddr = kmalloc(sizeof *i_ipaddr, GFP_KERNEL);
+	i_ipaddr = kmalloc(sizeof(*i_ipaddr), GFP_KERNEL);
 	if (!i_ipaddr)
 		return -ENOMEM;
 

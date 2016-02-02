@@ -31,7 +31,7 @@ MPI mpi_alloc(unsigned nlimbs)
 {
 	MPI a;
 
-	a = kmalloc(sizeof *a, GFP_KERNEL);
+	a = kmalloc(sizeof(*a), GFP_KERNEL);
 	if (!a)
 		return a;
 

@@ -584,11 +584,11 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 		 * image, the 14th and 15th byte after the EOF seem to
 		 * correspond to the center of the image.
 		 */
-		lum_offset = 24 + sizeof pac_sof_marker;
+		lum_offset = 24 + sizeof(pac_sof_marker);
 		footer_length = 26;
 
 		/* Finish decoding current frame */
-		n = (sof - data) - (footer_length + sizeof pac_sof_marker);
+		n = (sof - data) - (footer_length + sizeof(pac_sof_marker));
 		if (n < 0) {
 			gspca_dev->image_len += n;
 			n = 0;

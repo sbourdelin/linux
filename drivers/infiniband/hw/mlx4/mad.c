@@ -193,7 +193,7 @@ static void update_sm_ah(struct mlx4_ib_dev *dev, u8 port_num, u16 lid, u8 sl)
 	if (!dev->send_agent[port_num - 1][0])
 		return;
 
-	memset(&ah_attr, 0, sizeof ah_attr);
+	memset(&ah_attr, 0, sizeof(ah_attr));
 	ah_attr.dlid     = lid;
 	ah_attr.sl       = sl;
 	ah_attr.port_num = port_num;
@@ -371,7 +371,7 @@ static void forward_trap(struct mlx4_ib_dev *dev, u8 port_num, const struct ib_m
 		 * it's OK for our devices).
 		 */
 		spin_lock_irqsave(&dev->sm_lock, flags);
-		memcpy(send_buf->mad, mad, sizeof *mad);
+		memcpy(send_buf->mad, mad, sizeof(*mad));
 		if ((send_buf->ah = dev->sm_ah[port_num - 1]))
 			ret = ib_post_send_mad(send_buf, NULL);
 		else
@@ -508,7 +508,7 @@ int mlx4_ib_send_to_slave(struct mlx4_ib_dev *dev, int slave, u8 port,
 
 	/* create ah. Just need an empty one with the port num for the post send.
 	 * The driver will set the force loopback bit in post_send */
-	memset(&attr, 0, sizeof attr);
+	memset(&attr, 0, sizeof(attr));
 	attr.port_num = port;
 	if (is_eth) {
 		memcpy(&attr.grh.dgid.raw[0], &grh->dgid.raw[0], 16);
@@ -540,8 +540,8 @@ int mlx4_ib_send_to_slave(struct mlx4_ib_dev *dev, int slave, u8 port,
 
 	/* copy over to tunnel buffer */
 	if (grh)
-		memcpy(&tun_mad->grh, grh, sizeof *grh);
-	memcpy(&tun_mad->mad, mad, sizeof *mad);
+		memcpy(&tun_mad->grh, grh, sizeof(*grh));
+	memcpy(&tun_mad->mad, mad, sizeof(*mad));
 
 	/* adjust tunnel data */
 	tun_mad->hdr.pkey_index = cpu_to_be16(tun_pkey_ix);
@@ -859,7 +859,7 @@ static int iboe_process_mad(struct ib_device *ibdev, int mad_flags, u8 port_num,
 	}
 	mutex_unlock(&dev->counters_table[port_num - 1].mutex);
 	if (stats_avail) {
-		memset(out_mad->data, 0, sizeof out_mad->data);
+		memset(out_mad->data, 0, sizeof(out_mad->data));
 		switch (counter_stats.counter_mode & 0xf) {
 		case 0:
 			edit_counter(&counter_stats,
@@ -1014,8 +1014,8 @@ static void handle_slaves_guid_change(struct mlx4_ib_dev *dev, u8 port_num,
 	if (!mlx4_is_mfunc(dev->dev) || !mlx4_is_master(dev->dev))
 		return;
 
-	in_mad  = kmalloc(sizeof *in_mad, GFP_KERNEL);
-	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
+	in_mad  = kmalloc(sizeof(*in_mad), GFP_KERNEL);
+	out_mad = kmalloc(sizeof(*out_mad), GFP_KERNEL);
 	if (!in_mad || !out_mad) {
 		mlx4_ib_warn(&dev->ib_dev, "failed to allocate memory for guid info mads\n");
 		goto out;
@@ -1026,8 +1026,8 @@ static void handle_slaves_guid_change(struct mlx4_ib_dev *dev, u8 port_num,
 	for (i = 0; i < 4; i++) {
 		if (change_bitmap && (!((change_bitmap >> (8 * i)) & 0xff)))
 			continue;
-		memset(in_mad, 0, sizeof *in_mad);
-		memset(out_mad, 0, sizeof *out_mad);
+		memset(in_mad, 0, sizeof(*in_mad));
+		memset(out_mad, 0, sizeof(*out_mad));
 
 		in_mad->base_version  = 1;
 		in_mad->mgmt_class    = IB_MGMT_CLASS_SUBN_LID_ROUTED;
@@ -1259,7 +1259,7 @@ int mlx4_ib_send_to_wire(struct mlx4_ib_dev *dev, int slave, u8 port,
 				   sizeof (struct mlx4_mad_snd_buf),
 				   DMA_TO_DEVICE);
 
-	memcpy(&sqp_mad->payload, mad, sizeof *mad);
+	memcpy(&sqp_mad->payload, mad, sizeof(*mad));
 
 	ib_dma_sync_single_for_device(&dev->ib_dev,
 				      sqp->tx_ring[wire_tx_ix].buf.map,
@@ -1634,7 +1634,7 @@ static int create_pv_sqp(struct mlx4_ib_demux_pv_ctx *ctx,
 
 	tun_qp = &ctx->qp[qp_type];
 
-	memset(&qp_init_attr, 0, sizeof qp_init_attr);
+	memset(&qp_init_attr, 0, sizeof(qp_init_attr));
 	qp_init_attr.init_attr.send_cq = ctx->cq;
 	qp_init_attr.init_attr.recv_cq = ctx->cq;
 	qp_init_attr.init_attr.sq_sig_type = IB_SIGNAL_ALL_WR;
@@ -1667,7 +1667,7 @@ static int create_pv_sqp(struct mlx4_ib_demux_pv_ctx *ctx,
 		return ret;
 	}
 
-	memset(&attr, 0, sizeof attr);
+	memset(&attr, 0, sizeof(attr));
 	attr.qp_state = IB_QPS_INIT;
 	ret = 0;
 	if (create_tun)
@@ -2020,7 +2020,7 @@ static int mlx4_ib_alloc_demux_ctx(struct mlx4_ib_dev *dev,
 		goto err_mcg;
 	}
 
-	snprintf(name, sizeof name, "mlx4_ibt%d", port);
+	snprintf(name, sizeof(name), "mlx4_ibt%d", port);
 	ctx->wq = create_singlethread_workqueue(name);
 	if (!ctx->wq) {
 		pr_err("Failed to create tunnelling WQ for port %d\n", port);
@@ -2028,7 +2028,7 @@ static int mlx4_ib_alloc_demux_ctx(struct mlx4_ib_dev *dev,
 		goto err_wq;
 	}
 
-	snprintf(name, sizeof name, "mlx4_ibud%d", port);
+	snprintf(name, sizeof(name), "mlx4_ibud%d", port);
 	ctx->ud_wq = create_singlethread_workqueue(name);
 	if (!ctx->ud_wq) {
 		pr_err("Failed to create up/down WQ for port %d\n", port);

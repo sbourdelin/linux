@@ -518,7 +518,7 @@ static int tmiofb_ioctl(struct fb_info *fbi,
 		void __user *argp = (void __user *) arg;
 
 		tmiofb_vblank(fbi, &vblank);
-		if (copy_to_user(argp, &vblank, sizeof vblank))
+		if (copy_to_user(argp, &vblank, sizeof(vblank)))
 			return -EFAULT;
 		return 0;
 	}

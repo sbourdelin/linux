@@ -52,7 +52,7 @@ static int mthca_update_rate(struct mthca_dev *dev, u8 port_num)
 	struct ib_port_attr *tprops = NULL;
 	int                  ret;
 
-	tprops = kmalloc(sizeof *tprops, GFP_KERNEL);
+	tprops = kmalloc(sizeof(*tprops), GFP_KERNEL);
 	if (!tprops)
 		return -ENOMEM;
 
@@ -81,7 +81,7 @@ static void update_sm_ah(struct mthca_dev *dev,
 	if (!dev->send_agent[port_num - 1][0])
 		return;
 
-	memset(&ah_attr, 0, sizeof ah_attr);
+	memset(&ah_attr, 0, sizeof(ah_attr));
 	ah_attr.dlid     = lid;
 	ah_attr.sl       = sl;
 	ah_attr.port_num = port_num;
@@ -181,7 +181,7 @@ static void forward_trap(struct mthca_dev *dev,
 		 * it's OK for our devices).
 		 */
 		spin_lock_irqsave(&dev->sm_lock, flags);
-		memcpy(send_buf->mad, mad, sizeof *mad);
+		memcpy(send_buf->mad, mad, sizeof(*mad));
 		if ((send_buf->ah = dev->sm_ah[port_num - 1]))
 			ret = ib_post_send_mad(send_buf, NULL);
 		else

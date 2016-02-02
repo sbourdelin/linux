@@ -34,7 +34,7 @@
 /* There is only one interface. */
 
 struct usb_interface_descriptor fsg_intf_desc = {
-	.bLength =		sizeof fsg_intf_desc,
+	.bLength =		sizeof(fsg_intf_desc),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	.bNumEndpoints =	2,		/* Adjusted during fsg_bind() */

@@ -1776,7 +1776,7 @@ static struct usb_request *pch_udc_alloc_request(struct usb_ep *usbep,
 		return NULL;
 	ep = container_of(usbep, struct pch_udc_ep, ep);
 	dev = ep->dev;
-	req = kzalloc(sizeof *req, gfp);
+	req = kzalloc(sizeof(*req), gfp);
 	if (!req)
 		return NULL;
 	req->req.dma = DMA_ADDR_INVALID;
@@ -2098,7 +2098,7 @@ static void pch_udc_init_setup_buff(struct pch_udc_stp_dma_desc *td_stp)
 	if (!td_stp)
 		return;
 	td_stp->reserved = ++pky_marker;
-	memset(&td_stp->request, 0xFF, sizeof td_stp->request);
+	memset(&td_stp->request, 0xFF, sizeof(td_stp->request));
 	td_stp->status = PCH_UDC_BS_HST_RDY;
 }
 
@@ -2656,7 +2656,7 @@ static void pch_udc_svc_intf_interrupt(struct pch_udc_dev *dev)
 							 UDC_DEVSTS_ALT_SHIFT;
 	dev->set_cfg_not_acked = 1;
 	/* Construct the usb request for gadget driver and inform it */
-	memset(&dev->setup_data, 0 , sizeof dev->setup_data);
+	memset(&dev->setup_data, 0 , sizeof(dev->setup_data));
 	dev->setup_data.bRequest = USB_REQ_SET_INTERFACE;
 	dev->setup_data.bRequestType = USB_RECIP_INTERFACE;
 	dev->setup_data.wValue = cpu_to_le16(dev->cfg_data.cur_alt);
@@ -2695,7 +2695,7 @@ static void pch_udc_svc_cfg_interrupt(struct pch_udc_dev *dev)
 	dev->cfg_data.cur_cfg = (dev_stat & UDC_DEVSTS_CFG_MASK) >>
 				UDC_DEVSTS_CFG_SHIFT;
 	/* make usb request for gadget driver */
-	memset(&dev->setup_data, 0 , sizeof dev->setup_data);
+	memset(&dev->setup_data, 0 , sizeof(dev->setup_data));
 	dev->setup_data.bRequest = USB_REQ_SET_CONFIGURATION;
 	dev->setup_data.wValue = cpu_to_le16(dev->cfg_data.cur_cfg);
 	/* program the NE registers */
@@ -2886,7 +2886,7 @@ static void pch_udc_pcd_reinit(struct pch_udc_dev *dev)
 	INIT_LIST_HEAD(&dev->gadget.ep_list);
 
 	/* Initialize the endpoints structures */
-	memset(dev->ep, 0, sizeof dev->ep);
+	memset(dev->ep, 0, sizeof(dev->ep));
 	for (i = 0; i < PCH_UDC_EP_NUM; i++) {
 		struct pch_udc_ep *ep = &dev->ep[i];
 		ep->dev = dev;
@@ -3144,7 +3144,7 @@ static int pch_udc_probe(struct pci_dev *pdev,
 	struct pch_udc_dev	*dev;
 
 	/* init */
-	dev = kzalloc(sizeof *dev, GFP_KERNEL);
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
 		pr_err("%s: no memory for device structure\n", __func__);
 		return -ENOMEM;

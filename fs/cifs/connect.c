@@ -3705,7 +3705,7 @@ remote_path_check:
 		goto mount_fail_check;
 
 	/* now, hang the tcon off of the superblock */
-	tlink = kzalloc(sizeof *tlink, GFP_KERNEL);
+	tlink = kzalloc(sizeof(*tlink), GFP_KERNEL);
 	if (tlink == NULL) {
 		rc = -ENOMEM;
 		goto mount_fail_check;

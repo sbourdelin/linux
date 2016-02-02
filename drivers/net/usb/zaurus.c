@@ -166,7 +166,7 @@ static int blan_mdlm_bind(struct usbnet *dev, struct usb_interface *intf)
 				goto bad_desc;
 			}
 			desc = (void *) buf;
-			if (desc->bLength != sizeof *desc) {
+			if (desc->bLength != sizeof(*desc)) {
 				dev_dbg(&intf->dev, "MDLM len %u\n",
 					desc->bLength);
 				goto bad_desc;
@@ -187,11 +187,11 @@ static int blan_mdlm_bind(struct usbnet *dev, struct usb_interface *intf)
 			detail = (void *) buf;
 			switch (detail->bGuidDescriptorType) {
 			case 0:			/* "SAFE" */
-				if (detail->bLength != (sizeof *detail + 2))
+				if (detail->bLength != (sizeof(*detail) + 2))
 					goto bad_detail;
 				break;
 			case 1:			/* "BLAN" */
-				if (detail->bLength != (sizeof *detail + 3))
+				if (detail->bLength != (sizeof(*detail) + 3))
 					goto bad_detail;
 				break;
 			default:

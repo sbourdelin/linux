@@ -146,7 +146,7 @@ static int oprofile_perf_create_files(struct dentry *root)
 		struct dentry *dir;
 		char buf[4];
 
-		snprintf(buf, sizeof buf, "%d", i);
+		snprintf(buf, sizeof(buf), "%d", i);
 		dir = oprofilefs_mkdir(root, buf);
 		oprofilefs_create_ulong(dir, "enabled", &counter_config[i].enabled);
 		oprofilefs_create_ulong(dir, "event", &counter_config[i].event);

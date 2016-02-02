@@ -361,8 +361,8 @@ static ssize_t show_serial(struct device *dev,
 {
 	struct ipath_devdata *dd = dev_get_drvdata(dev);
 
-	buf[sizeof dd->ipath_serial] = '\0';
-	memcpy(buf, dd->ipath_serial, sizeof dd->ipath_serial);
+	buf[sizeof(dd->ipath_serial)] = '\0';
+	memcpy(buf, dd->ipath_serial, sizeof(dd->ipath_serial));
 	strcat(buf, "\n");
 	return strlen(buf);
 }

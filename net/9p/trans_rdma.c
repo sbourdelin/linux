@@ -455,7 +455,7 @@ static int rdma_request(struct p9_client *client, struct p9_req_t *req)
 	}
 
 	/* Allocate an fcall for the reply */
-	rpl_context = kmalloc(sizeof *rpl_context, GFP_NOFS);
+	rpl_context = kmalloc(sizeof(*rpl_context), GFP_NOFS);
 	if (!rpl_context) {
 		err = -ENOMEM;
 		goto recv_error;
@@ -484,7 +484,7 @@ static int rdma_request(struct p9_client *client, struct p9_req_t *req)
 
 dont_need_post_recv:
 	/* Post the request */
-	c = kmalloc(sizeof *c, GFP_NOFS);
+	c = kmalloc(sizeof(*c), GFP_NOFS);
 	if (!c) {
 		err = -ENOMEM;
 		goto send_error;
@@ -709,7 +709,7 @@ rdma_create_trans(struct p9_client *client, const char *addr, char *args)
 		goto error;
 
 	/* Create the Queue Pair */
-	memset(&qp_attr, 0, sizeof qp_attr);
+	memset(&qp_attr, 0, sizeof(qp_attr));
 	qp_attr.event_handler = qp_event_handler;
 	qp_attr.qp_context = client;
 	qp_attr.cap.max_send_wr = opts.sq_depth;

@@ -120,7 +120,7 @@ void bit_map_clear(struct bit_map *t, int offset, int len)
 void bit_map_init(struct bit_map *t, unsigned long *map, int size)
 {
 	bitmap_zero(map, size);
-	memset(t, 0, sizeof *t);
+	memset(t, 0, sizeof(*t));
 	spin_lock_init(&t->lock);
 	t->map = map;
 	t->size = size;

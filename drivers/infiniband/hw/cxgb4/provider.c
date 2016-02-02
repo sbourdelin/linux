@@ -317,7 +317,7 @@ static int c4iw_query_device(struct ib_device *ibdev, struct ib_device_attr *pro
 		return -EINVAL;
 
 	dev = to_c4iw_dev(ibdev);
-	memset(props, 0, sizeof *props);
+	memset(props, 0, sizeof(*props));
 	memcpy(&props->sys_image_guid, dev->rdev.lldi.ports[0]->dev_addr, 6);
 	props->hw_ver = CHELSIO_CHIP_RELEASE(dev->rdev.lldi.adapter_type);
 	props->fw_ver = dev->rdev.lldi.fw_vers;
@@ -452,7 +452,7 @@ static int c4iw_get_mib(struct ib_device *ibdev,
 	struct c4iw_dev *c4iw_dev = to_c4iw_dev(ibdev);
 
 	cxgb4_get_tcp_stats(c4iw_dev->rdev.lldi.pdev, &v4, &v6);
-	memset(stats, 0, sizeof *stats);
+	memset(stats, 0, sizeof(*stats));
 	stats->iw.tcpInSegs = v4.tcp_in_segs + v6.tcp_in_segs;
 	stats->iw.tcpOutSegs = v4.tcp_out_segs + v6.tcp_out_segs;
 	stats->iw.tcpRetransSegs = v4.tcp_retrans_segs + v6.tcp_retrans_segs;

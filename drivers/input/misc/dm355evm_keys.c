@@ -179,7 +179,7 @@ static int dm355evm_keys_probe(struct platform_device *pdev)
 	int			status;
 
 	/* allocate instance struct and input dev */
-	keys = kzalloc(sizeof *keys, GFP_KERNEL);
+	keys = kzalloc(sizeof(*keys), GFP_KERNEL);
 	input = input_allocate_device();
 	if (!keys || !input) {
 		status = -ENOMEM;

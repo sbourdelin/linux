@@ -1871,7 +1871,7 @@ int rio_init_mports(void)
 		goto no_disc;
 	}
 
-	work = kcalloc(n, sizeof *work, GFP_KERNEL);
+	work = kcalloc(n, sizeof(*work), GFP_KERNEL);
 	if (!work) {
 		pr_err("RIO: no memory for work struct\n");
 		destroy_workqueue(rio_wq);

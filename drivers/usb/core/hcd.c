@@ -448,7 +448,7 @@ rh_string(int id, struct usb_hcd const *hcd, u8 *data, unsigned len)
 		break;
 	case 3:
 		/* Manufacturer */
-		snprintf (buf, sizeof buf, "%s %s %s", init_utsname()->sysname,
+		snprintf (buf, sizeof(buf), "%s %s %s", init_utsname()->sysname,
 			init_utsname()->release, hcd->driver->description);
 		s = buf;
 		break;
@@ -581,16 +581,16 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 			case HCD_USB31:
 			case HCD_USB3:
 				bufp = ss_rh_config_descriptor;
-				len = sizeof ss_rh_config_descriptor;
+				len = sizeof(ss_rh_config_descriptor);
 				break;
 			case HCD_USB25:
 			case HCD_USB2:
 				bufp = hs_rh_config_descriptor;
-				len = sizeof hs_rh_config_descriptor;
+				len = sizeof(hs_rh_config_descriptor);
 				break;
 			case HCD_USB11:
 				bufp = fs_rh_config_descriptor;
-				len = sizeof fs_rh_config_descriptor;
+				len = sizeof(fs_rh_config_descriptor);
 				break;
 			default:
 				goto error;
@@ -1059,7 +1059,7 @@ static int register_root_hub(struct usb_hcd *hcd)
 	usb_dev->devnum = devnum;
 	usb_dev->bus->devnum_next = devnum + 1;
 	memset (&usb_dev->bus->devmap.devicemap, 0,
-			sizeof usb_dev->bus->devmap.devicemap);
+			sizeof(usb_dev->bus->devmap.devicemap));
 	set_bit (devnum, usb_dev->bus->devmap.devicemap);
 	usb_set_device_state(usb_dev, USB_STATE_ADDRESS);
 
@@ -1067,7 +1067,7 @@ static int register_root_hub(struct usb_hcd *hcd)
 
 	usb_dev->ep0.desc.wMaxPacketSize = cpu_to_le16(64);
 	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
-	if (retval != sizeof usb_dev->descriptor) {
+	if (retval != sizeof(usb_dev->descriptor)) {
 		mutex_unlock(&usb_bus_list_lock);
 		dev_dbg (parent_dev, "can't read %s device descriptor %d\n",
 				dev_name(&usb_dev->dev), retval);

@@ -238,7 +238,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 		while(len2 < idlen && retval > 0) {
 			char tmp[4];
 			retval = parport_read (port, tmp,
-					       min(sizeof tmp, idlen-len2));
+					       min(sizeof(tmp), idlen-len2));
 			if (retval < 0)
 				return retval;
 			len2 += retval;

@@ -52,7 +52,7 @@
 USB_GADGET_COMPOSITE_OPTIONS();
 
 static struct usb_device_descriptor msg_device_desc = {
-	.bLength =		sizeof msg_device_desc,
+	.bLength =		sizeof(msg_device_desc),
 	.bDescriptorType =	USB_DT_DEVICE,
 
 	/* .bcdUSB = DYNAMIC */

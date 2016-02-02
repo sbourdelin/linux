@@ -514,8 +514,8 @@ alloc_group_attrs(ssize_t (*show)(struct mlx4_port *,
 				  GFP_KERNEL);
 		if (!element)
 			goto err;
-		if (snprintf(element->name, sizeof (element->name),
-			     "%d", i) >= sizeof (element->name)) {
+		if (snprintf(element->name, sizeof(element->name),
+			     "%d", i) >= sizeof(element->name)) {
 			kfree(element);
 			goto err;
 		}
@@ -643,7 +643,7 @@ static int add_port(struct mlx4_ib_dev *dev, int port_num, int slave)
 	int is_eth = rdma_port_get_link_layer(&dev->ib_dev, port_num) ==
 			IB_LINK_LAYER_ETHERNET;
 
-	p = kzalloc(sizeof *p, GFP_KERNEL);
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
 
@@ -713,7 +713,7 @@ static int register_one_pkey_tree(struct mlx4_ib_dev *dev, int slave)
 	struct mlx4_port *mport;
 	struct mlx4_active_ports actv_ports;
 
-	get_name(dev, name, slave, sizeof name);
+	get_name(dev, name, slave, sizeof(name));
 
 	dev->pkeys.device_parent[slave] =
 		kobject_create_and_add(name, kobject_get(dev->iov_parent));

@@ -222,7 +222,7 @@ static int pl022_dummy_probe(struct spi_device *spi)
 
 	dev_info(&spi->dev, "probing dummy SPI device\n");
 
-	p_dummy = kzalloc(sizeof *p_dummy, GFP_KERNEL);
+	p_dummy = kzalloc(sizeof(*p_dummy), GFP_KERNEL);
 	if (!p_dummy)
 		return -ENOMEM;
 

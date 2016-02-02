@@ -316,7 +316,7 @@ static int ads7846_read12_ser(struct device *dev, unsigned command)
 	struct ser_req *req;
 	int status;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return -ENOMEM;
 
@@ -390,7 +390,7 @@ static int ads7845_read12_ser(struct device *dev, unsigned command)
 	struct ads7845_ser_req *req;
 	int status;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return -ENOMEM;
 

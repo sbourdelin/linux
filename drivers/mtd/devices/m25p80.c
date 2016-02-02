@@ -132,7 +132,7 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
 	dummy /= 8;
 
 	spi_message_init(&m);
-	memset(t, 0, (sizeof t));
+	memset(t, 0, (sizeof(t)));
 
 	flash->command[0] = nor->read_opcode;
 	m25p_addr2cmd(nor, from, flash->command);

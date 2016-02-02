@@ -99,7 +99,7 @@ static int sha1_final(struct shash_desc *desc, u8 *out)
 		dst[i] = cpu_to_be32(sctx->state[i]);
 
 	/* Wipe context */
-	memset(sctx, 0, sizeof *sctx);
+	memset(sctx, 0, sizeof(*sctx));
 
 	return 0;
 }

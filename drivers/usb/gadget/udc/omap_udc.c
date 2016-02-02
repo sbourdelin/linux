@@ -2150,7 +2150,7 @@ static void proc_ep_show(struct seq_file *s, struct omap_ep *ep)
 	use_ep(ep, 0);
 
 	if (use_dma && ep->has_dma)
-		snprintf(buf, sizeof buf, "(%cxdma%d lch%d) ",
+		snprintf(buf, sizeof(buf), "(%cxdma%d lch%d) ",
 			(ep->bEndpointAddress & USB_DIR_IN) ? 't' : 'r',
 			ep->dma_channel - 1, ep->lch);
 	else
@@ -2570,8 +2570,8 @@ omap_ep_setup(char *name, u8 addr, u8 type,
 	BUG_ON(buf > 2048);
 
 	/* set up driver data structures */
-	BUG_ON(strlen(name) >= sizeof ep->name);
-	strlcpy(ep->name, name, sizeof ep->name);
+	BUG_ON(strlen(name) >= sizeof(ep->name));
+	strlcpy(ep->name, name, sizeof(ep->name));
 	INIT_LIST_HEAD(&ep->queue);
 	INIT_LIST_HEAD(&ep->iso);
 	ep->bEndpointAddress = addr;

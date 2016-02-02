@@ -810,7 +810,7 @@ static int sl811h_urb_enqueue(
 
 	/* avoid all allocations within spinlocks */
 	if (!hep->hcpriv) {
-		ep = kzalloc(sizeof *ep, mem_flags);
+		ep = kzalloc(sizeof(*ep), mem_flags);
 		if (ep == NULL)
 			return -ENOMEM;
 	}

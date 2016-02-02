@@ -74,10 +74,10 @@ static int min_bytes_needed(unsigned long val)
 	int c = 0;
 	int i;
 
-	for (i = (sizeof val * 8) - 1; i >= 0; --i, ++c)
+	for (i = (sizeof(val) * 8) - 1; i >= 0; --i, ++c)
 		if (val & (1UL << i))
 			break;
-	c = (sizeof val * 8) - c;
+	c = (sizeof(val) * 8) - c;
 	if (!c || (c % 8))
 		c = (c + 8) / 8;
 	else
@@ -3892,7 +3892,7 @@ int snd_soc_of_get_dai_link_codecs(struct device *dev,
 		return num_codecs;
 	}
 	component = devm_kzalloc(dev,
-				 sizeof *component * num_codecs,
+				 sizeof(*component) * num_codecs,
 				 GFP_KERNEL);
 	if (!component)
 		return -ENOMEM;

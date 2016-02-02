@@ -742,13 +742,13 @@ static int pl2303_ioctl(struct tty_struct *tty,
 
 	switch (cmd) {
 	case TIOCGSERIAL:
-		memset(&ser, 0, sizeof ser);
+		memset(&ser, 0, sizeof(ser));
 		ser.type = PORT_16654;
 		ser.line = port->minor;
 		ser.port = port->port_number;
 		ser.baud_base = 460800;
 
-		if (copy_to_user((void __user *)arg, &ser, sizeof ser))
+		if (copy_to_user((void __user *)arg, &ser, sizeof(ser)))
 			return -EFAULT;
 
 		return 0;

@@ -599,7 +599,7 @@ static struct usb_gadget_strings *fn_strings[] = {
 };
 
 static struct usb_qualifier_descriptor devqual_desc = {
-	.bLength = sizeof devqual_desc,
+	.bLength = sizeof(devqual_desc),
 	.bDescriptorType = USB_DT_DEVICE_QUALIFIER,
 
 	.bcdUSB = cpu_to_le16(0x200),
@@ -611,7 +611,7 @@ static struct usb_qualifier_descriptor devqual_desc = {
 };
 
 static struct usb_interface_assoc_descriptor iad_desc = {
-	.bLength = sizeof iad_desc,
+	.bLength = sizeof(iad_desc),
 	.bDescriptorType = USB_DT_INTERFACE_ASSOCIATION,
 
 	.bFirstInterface = 0,
@@ -623,7 +623,7 @@ static struct usb_interface_assoc_descriptor iad_desc = {
 
 /* Audio Control Interface */
 static struct usb_interface_descriptor std_ac_if_desc = {
-	.bLength = sizeof std_ac_if_desc,
+	.bLength = sizeof(std_ac_if_desc),
 	.bDescriptorType = USB_DT_INTERFACE,
 
 	.bAlternateSetting = 0,
@@ -635,7 +635,7 @@ static struct usb_interface_descriptor std_ac_if_desc = {
 
 /* Clock source for IN traffic */
 static struct uac_clock_source_descriptor in_clk_src_desc = {
-	.bLength = sizeof in_clk_src_desc,
+	.bLength = sizeof(in_clk_src_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC2_CLOCK_SOURCE,
@@ -647,7 +647,7 @@ static struct uac_clock_source_descriptor in_clk_src_desc = {
 
 /* Clock source for OUT traffic */
 static struct uac_clock_source_descriptor out_clk_src_desc = {
-	.bLength = sizeof out_clk_src_desc,
+	.bLength = sizeof(out_clk_src_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC2_CLOCK_SOURCE,
@@ -659,7 +659,7 @@ static struct uac_clock_source_descriptor out_clk_src_desc = {
 
 /* Input Terminal for USB_OUT */
 static struct uac2_input_terminal_descriptor usb_out_it_desc = {
-	.bLength = sizeof usb_out_it_desc,
+	.bLength = sizeof(usb_out_it_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_INPUT_TERMINAL,
@@ -673,7 +673,7 @@ static struct uac2_input_terminal_descriptor usb_out_it_desc = {
 
 /* Input Terminal for I/O-In */
 static struct uac2_input_terminal_descriptor io_in_it_desc = {
-	.bLength = sizeof io_in_it_desc,
+	.bLength = sizeof(io_in_it_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_INPUT_TERMINAL,
@@ -687,7 +687,7 @@ static struct uac2_input_terminal_descriptor io_in_it_desc = {
 
 /* Ouput Terminal for USB_IN */
 static struct uac2_output_terminal_descriptor usb_in_ot_desc = {
-	.bLength = sizeof usb_in_ot_desc,
+	.bLength = sizeof(usb_in_ot_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_OUTPUT_TERMINAL,
@@ -701,7 +701,7 @@ static struct uac2_output_terminal_descriptor usb_in_ot_desc = {
 
 /* Ouput Terminal for I/O-Out */
 static struct uac2_output_terminal_descriptor io_out_ot_desc = {
-	.bLength = sizeof io_out_ot_desc,
+	.bLength = sizeof(io_out_ot_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_OUTPUT_TERMINAL,
@@ -714,21 +714,21 @@ static struct uac2_output_terminal_descriptor io_out_ot_desc = {
 };
 
 static struct uac2_ac_header_descriptor ac_hdr_desc = {
-	.bLength = sizeof ac_hdr_desc,
+	.bLength = sizeof(ac_hdr_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_MS_HEADER,
 	.bcdADC = cpu_to_le16(0x200),
 	.bCategory = UAC2_FUNCTION_IO_BOX,
-	.wTotalLength = sizeof in_clk_src_desc + sizeof out_clk_src_desc
-			 + sizeof usb_out_it_desc + sizeof io_in_it_desc
-			+ sizeof usb_in_ot_desc + sizeof io_out_ot_desc,
+	.wTotalLength = sizeof(in_clk_src_desc) + sizeof(out_clk_src_desc)
+			 + sizeof(usb_out_it_desc) + sizeof(io_in_it_desc)
+			+ sizeof(usb_in_ot_desc) + sizeof(io_out_ot_desc),
 	.bmControls = 0,
 };
 
 /* Audio Streaming OUT Interface - Alt0 */
 static struct usb_interface_descriptor std_as_out_if0_desc = {
-	.bLength = sizeof std_as_out_if0_desc,
+	.bLength = sizeof(std_as_out_if0_desc),
 	.bDescriptorType = USB_DT_INTERFACE,
 
 	.bAlternateSetting = 0,
@@ -740,7 +740,7 @@ static struct usb_interface_descriptor std_as_out_if0_desc = {
 
 /* Audio Streaming OUT Interface - Alt1 */
 static struct usb_interface_descriptor std_as_out_if1_desc = {
-	.bLength = sizeof std_as_out_if1_desc,
+	.bLength = sizeof(std_as_out_if1_desc),
 	.bDescriptorType = USB_DT_INTERFACE,
 
 	.bAlternateSetting = 1,
@@ -752,7 +752,7 @@ static struct usb_interface_descriptor std_as_out_if1_desc = {
 
 /* Audio Stream OUT Intface Desc */
 static struct uac2_as_header_descriptor as_out_hdr_desc = {
-	.bLength = sizeof as_out_hdr_desc,
+	.bLength = sizeof(as_out_hdr_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_AS_GENERAL,
@@ -765,7 +765,7 @@ static struct uac2_as_header_descriptor as_out_hdr_desc = {
 
 /* Audio USB_OUT Format */
 static struct uac2_format_type_i_descriptor as_out_fmt1_desc = {
-	.bLength = sizeof as_out_fmt1_desc,
+	.bLength = sizeof(as_out_fmt1_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype = UAC_FORMAT_TYPE,
 	.bFormatType = UAC_FORMAT_TYPE_I,
@@ -793,7 +793,7 @@ static struct usb_endpoint_descriptor hs_epout_desc = {
 
 /* CS AS ISO OUT Endpoint */
 static struct uac2_iso_endpoint_descriptor as_iso_out_desc = {
-	.bLength = sizeof as_iso_out_desc,
+	.bLength = sizeof(as_iso_out_desc),
 	.bDescriptorType = USB_DT_CS_ENDPOINT,
 
 	.bDescriptorSubtype = UAC_EP_GENERAL,
@@ -805,7 +805,7 @@ static struct uac2_iso_endpoint_descriptor as_iso_out_desc = {
 
 /* Audio Streaming IN Interface - Alt0 */
 static struct usb_interface_descriptor std_as_in_if0_desc = {
-	.bLength = sizeof std_as_in_if0_desc,
+	.bLength = sizeof(std_as_in_if0_desc),
 	.bDescriptorType = USB_DT_INTERFACE,
 
 	.bAlternateSetting = 0,
@@ -817,7 +817,7 @@ static struct usb_interface_descriptor std_as_in_if0_desc = {
 
 /* Audio Streaming IN Interface - Alt1 */
 static struct usb_interface_descriptor std_as_in_if1_desc = {
-	.bLength = sizeof std_as_in_if1_desc,
+	.bLength = sizeof(std_as_in_if1_desc),
 	.bDescriptorType = USB_DT_INTERFACE,
 
 	.bAlternateSetting = 1,
@@ -829,7 +829,7 @@ static struct usb_interface_descriptor std_as_in_if1_desc = {
 
 /* Audio Stream IN Intface Desc */
 static struct uac2_as_header_descriptor as_in_hdr_desc = {
-	.bLength = sizeof as_in_hdr_desc,
+	.bLength = sizeof(as_in_hdr_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 
 	.bDescriptorSubtype = UAC_AS_GENERAL,
@@ -842,7 +842,7 @@ static struct uac2_as_header_descriptor as_in_hdr_desc = {
 
 /* Audio USB_IN Format */
 static struct uac2_format_type_i_descriptor as_in_fmt1_desc = {
-	.bLength = sizeof as_in_fmt1_desc,
+	.bLength = sizeof(as_in_fmt1_desc),
 	.bDescriptorType = USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype = UAC_FORMAT_TYPE,
 	.bFormatType = UAC_FORMAT_TYPE_I,
@@ -870,7 +870,7 @@ static struct usb_endpoint_descriptor hs_epin_desc = {
 
 /* CS AS ISO IN Endpoint */
 static struct uac2_iso_endpoint_descriptor as_iso_in_desc = {
-	.bLength = sizeof as_iso_in_desc,
+	.bLength = sizeof(as_iso_in_desc),
 	.bDescriptorType = USB_DT_CS_ENDPOINT,
 
 	.bDescriptorSubtype = UAC_EP_GENERAL,
@@ -1297,7 +1297,7 @@ in_rq_cur(struct usb_function *fn, const struct usb_ctrlrequest *cr)
 		else if (entity_id == USB_OUT_CLK_ID)
 			c.dCUR = c_srate;
 
-		value = min_t(unsigned, w_length, sizeof c);
+		value = min_t(unsigned, w_length, sizeof(c));
 		memcpy(req->buf, &c, value);
 	} else if (control_selector == UAC2_CS_CONTROL_CLOCK_VALID) {
 		*(u8 *)req->buf = 1;
@@ -1343,7 +1343,7 @@ in_rq_range(struct usb_function *fn, const struct usb_ctrlrequest *cr)
 		r.dRES = 0;
 		r.wNumSubRanges = 1;
 
-		value = min_t(unsigned, w_length, sizeof r);
+		value = min_t(unsigned, w_length, sizeof(r));
 		memcpy(req->buf, &r, value);
 	} else {
 		dev_err(&uac2->pdev.dev,

@@ -94,7 +94,7 @@ static int apply_r_mips_hi16_rel(struct module *me, u32 *location, Elf_Addr v)
 	 * the carry we need to add.  Save the information, and let LO16 do the
 	 * actual relocation.
 	 */
-	n = kmalloc(sizeof *n, GFP_KERNEL);
+	n = kmalloc(sizeof(*n), GFP_KERNEL);
 	if (!n)
 		return -ENOMEM;
 

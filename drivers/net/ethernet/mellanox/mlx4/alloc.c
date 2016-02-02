@@ -632,7 +632,7 @@ int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 
 		if (BITS_PER_LONG == 64) {
 			struct page **pages;
-			pages = kmalloc(sizeof *pages * buf->nbufs, gfp);
+			pages = kmalloc(sizeof(*pages) * buf->nbufs, gfp);
 			if (!pages)
 				goto err_free;
 			for (i = 0; i < buf->nbufs; ++i)
@@ -681,7 +681,7 @@ static struct mlx4_db_pgdir *mlx4_alloc_db_pgdir(struct device *dma_device,
 {
 	struct mlx4_db_pgdir *pgdir;
 
-	pgdir = kzalloc(sizeof *pgdir, gfp);
+	pgdir = kzalloc(sizeof(*pgdir), gfp);
 	if (!pgdir)
 		return NULL;
 

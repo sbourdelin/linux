@@ -655,7 +655,7 @@ static int lm8323_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	lm = kzalloc(sizeof *lm, GFP_KERNEL);
+	lm = kzalloc(sizeof(*lm), GFP_KERNEL);
 	idev = input_allocate_device();
 	if (!lm || !idev) {
 		err = -ENOMEM;

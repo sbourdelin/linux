@@ -2312,7 +2312,7 @@ static int mce_device_create(unsigned int cpu)
 	if (!mce_available(&boot_cpu_data))
 		return -EIO;
 
-	dev = kzalloc(sizeof *dev, GFP_KERNEL);
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
 	dev->id  = cpu;

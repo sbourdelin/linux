@@ -641,7 +641,7 @@ static int init_housekeeping(struct ipath_devdata *dd, int reinit)
 				    INFINIPATH_R_BOARDID_SHIFT) &
 				   INFINIPATH_R_BOARDID_MASK);
 
-	ret = dd->ipath_f_get_boardname(dd, boardn, sizeof boardn);
+	ret = dd->ipath_f_get_boardname(dd, boardn, sizeof(boardn));
 
 	snprintf(dd->ipath_boardversion, sizeof(dd->ipath_boardversion),
 		 "ChipABI %u.%u, %s, InfiniPath%u %u.%u, PCI %u, "

@@ -65,7 +65,7 @@ static ssize_t aoedisk_show_netif(struct device *dev,
 	struct aoeif *ifp, *e;
 	char *p;
 
-	memset(nds, 0, sizeof nds);
+	memset(nds, 0, sizeof(nds));
 	nd = nds;
 	ne = nd + ARRAY_SIZE(nds);
 	t = d->targets;
@@ -409,7 +409,7 @@ aoeblk_gdalloc(void *vp)
 	gd->fops = &aoe_bdops;
 	gd->private_data = d;
 	set_capacity(gd, d->ssize);
-	snprintf(gd->disk_name, sizeof gd->disk_name, "etherd/e%ld.%d",
+	snprintf(gd->disk_name, sizeof(gd->disk_name), "etherd/e%ld.%d",
 		d->aoemajor, d->aoeminor);
 
 	d->flags &= ~DEVFL_GDALLOC;

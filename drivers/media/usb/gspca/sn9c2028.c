@@ -910,14 +910,14 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 
 		/* finish decoding current frame */
 		n = sof - data;
-		if (n > sizeof sn9c2028_sof_marker)
-			n -= sizeof sn9c2028_sof_marker;
+		if (n > sizeof(sn9c2028_sof_marker))
+			n -= sizeof(sn9c2028_sof_marker);
 		else
 			n = 0;
 		gspca_frame_add(gspca_dev, LAST_PACKET, data, n);
 		/* Start next frame. */
 		gspca_frame_add(gspca_dev, FIRST_PACKET,
-			sn9c2028_sof_marker, sizeof sn9c2028_sof_marker);
+			sn9c2028_sof_marker, sizeof(sn9c2028_sof_marker));
 		len -= sof - data;
 		data = sof;
 	}

@@ -311,8 +311,8 @@ static void find_caller_pc_and_caller_sp(CallerLocation *location,
 			 * prevent any problems.
 			 */
 			unsigned int bytes_to_prefetch = 4096 - (pc & 4095);
-			if (bytes_to_prefetch > sizeof prefetched_bundles)
-				bytes_to_prefetch = sizeof prefetched_bundles;
+			if (bytes_to_prefetch > sizeof(prefetched_bundles))
+				bytes_to_prefetch = sizeof(prefetched_bundles);
 
 			if (!read_memory_func(prefetched_bundles, pc,
 					      bytes_to_prefetch,
@@ -641,7 +641,7 @@ bool backtrace_next(BacktraceIterator *state)
 	}
 
 	/* Try to read the frame linkage data chaining to the next function. */
-	if (!state->read_memory_func(&next_frame, state->fp, sizeof next_frame,
+	if (!state->read_memory_func(&next_frame, state->fp, sizeof(next_frame),
 				     state->read_memory_func_extra)) {
 		return false;
 	}

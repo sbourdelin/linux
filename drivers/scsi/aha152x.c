@@ -730,7 +730,7 @@ struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *setup)
 		return NULL;
 	}
 
-	memset(HOSTDATA(shpnt), 0, sizeof *HOSTDATA(shpnt));
+	memset(HOSTDATA(shpnt), 0, sizeof(*HOSTDATA(shpnt)));
 	INIT_LIST_HEAD(&HOSTDATA(shpnt)->host_list);
 
 	/* need to have host registered before triggering any interrupt */

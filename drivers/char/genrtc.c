@@ -276,7 +276,7 @@ static int gen_rtc_ioctl(struct file *file,
 	    if (get_rtc_pll(&pll))
 	 	    return -EINVAL;
 	    else
-		    return copy_to_user(argp, &pll, sizeof pll) ? -EFAULT : 0;
+		    return copy_to_user(argp, &pll, sizeof(pll)) ? -EFAULT : 0;
 
 	case RTC_PLL_SET:
 		if (!capable(CAP_SYS_TIME))

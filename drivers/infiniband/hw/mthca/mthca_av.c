@@ -161,7 +161,7 @@ int mthca_create_ah(struct mthca_dev *dev,
 	ah->type = MTHCA_AH_PCI_POOL;
 
 	if (mthca_is_memfree(dev)) {
-		ah->av   = kmalloc(sizeof *ah->av, GFP_ATOMIC);
+		ah->av   = kmalloc(sizeof(*ah->av), GFP_ATOMIC);
 		if (!ah->av)
 			return -ENOMEM;
 
@@ -175,7 +175,7 @@ int mthca_create_ah(struct mthca_dev *dev,
 		if (index == -1)
 			goto on_hca_fail;
 
-		av = kmalloc(sizeof *av, GFP_ATOMIC);
+		av = kmalloc(sizeof(*av), GFP_ATOMIC);
 		if (!av)
 			goto on_hca_fail;
 
@@ -298,7 +298,7 @@ int mthca_ah_query(struct ib_ah *ibah, struct ib_ah_attr *attr)
 	if (ah->type == MTHCA_AH_ON_HCA)
 		return -ENOSYS;
 
-	memset(attr, 0, sizeof *attr);
+	memset(attr, 0, sizeof(*attr));
 	attr->dlid          = be16_to_cpu(ah->av->dlid);
 	attr->sl            = be32_to_cpu(ah->av->sl_tclass_flowlabel) >> 28;
 	attr->port_num      = be32_to_cpu(ah->av->port_pd) >> 24;

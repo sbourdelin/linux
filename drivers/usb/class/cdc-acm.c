@@ -154,7 +154,7 @@ static inline int acm_set_control(struct acm *acm, int control)
 }
 
 #define acm_set_line(acm, line) \
-	acm_ctrl_msg(acm, USB_CDC_REQ_SET_LINE_CODING, 0, line, sizeof *(line))
+	acm_ctrl_msg(acm, USB_CDC_REQ_SET_LINE_CODING, 0, line, sizeof(*(line)))
 #define acm_send_break(acm, ms) \
 	acm_ctrl_msg(acm, USB_CDC_REQ_SEND_BREAK, ms, NULL, 0)
 
@@ -1008,8 +1008,8 @@ static void acm_tty_set_termios(struct tty_struct *tty,
 	if (newctrl != acm->ctrlout)
 		acm_set_control(acm, acm->ctrlout = newctrl);
 
-	if (memcmp(&acm->line, &newline, sizeof newline)) {
-		memcpy(&acm->line, &newline, sizeof newline);
+	if (memcmp(&acm->line, &newline, sizeof(newline))) {
+		memcpy(&acm->line, &newline, sizeof(newline));
 		dev_dbg(&acm->control->dev, "%s - set line: %d %d %d %d\n",
 			__func__,
 			le32_to_cpu(newline.dwDTERate),

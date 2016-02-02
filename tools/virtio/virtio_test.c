@@ -47,8 +47,8 @@ bool vq_notify(struct virtqueue *vq)
 	struct vq_info *info = vq->priv;
 	unsigned long long v = 1;
 	int r;
-	r = write(info->kick, &v, sizeof v);
-	assert(r == sizeof v);
+	r = write(info->kick, &v, sizeof(v));
+	assert(r == sizeof(v));
 	return true;
 }
 
@@ -113,7 +113,7 @@ static void vq_info_add(struct vdev_info *dev, int num)
 static void vdev_info_init(struct vdev_info* dev, unsigned long long features)
 {
 	int r;
-	memset(dev, 0, sizeof *dev);
+	memset(dev, 0, sizeof(*dev));
 	dev->vdev.features = features;
 	dev->buf_size = 1024;
 	dev->buf = malloc(dev->buf_size);
@@ -123,10 +123,10 @@ static void vdev_info_init(struct vdev_info* dev, unsigned long long features)
 	r = ioctl(dev->control, VHOST_SET_OWNER, NULL);
 	assert(r >= 0);
 	dev->mem = malloc(offsetof(struct vhost_memory, regions) +
-			  sizeof dev->mem->regions[0]);
+			  sizeof(dev->mem->regions[0]));
 	assert(dev->mem);
 	memset(dev->mem, 0, offsetof(struct vhost_memory, regions) +
-                          sizeof dev->mem->regions[0]);
+                          sizeof(dev->mem->regions[0]));
 	dev->mem->nregions = 1;
 	dev->mem->regions[0].guest_phys_addr = (long)dev->buf;
 	dev->mem->regions[0].userspace_addr = (long)dev->buf;
@@ -146,7 +146,7 @@ static void wait_for_interrupt(struct vdev_info *dev)
 	poll(dev->fds, dev->nvqs, -1);
 	for (i = 0; i < dev->nvqs; ++i)
 		if (dev->fds[i].revents & POLLIN) {
-			read(dev->fds[i].fd, &val, sizeof val);
+			read(dev->fds[i].fd, &val, sizeof(val));
 		}
 }
 

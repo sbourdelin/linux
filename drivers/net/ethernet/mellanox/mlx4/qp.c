@@ -174,7 +174,7 @@ static int __mlx4_qp_modify(struct mlx4_dev *dev, struct mlx4_mtt *mtt,
 			cpu_to_be16(mlx4_qp_roce_entropy(dev, qp->qpn));
 
 	*(__be32 *) mailbox->buf = cpu_to_be32(optpar);
-	memcpy(mailbox->buf + 8, context, sizeof *context);
+	memcpy(mailbox->buf + 8, context, sizeof(*context));
 
 	((struct mlx4_qp_context *) (mailbox->buf + 8))->local_qpn =
 		cpu_to_be32(qp->qpn);
@@ -888,7 +888,7 @@ int mlx4_qp_query(struct mlx4_dev *dev, struct mlx4_qp *qp,
 			   MLX4_CMD_QUERY_QP, MLX4_CMD_TIME_CLASS_A,
 			   MLX4_CMD_WRAPPED);
 	if (!err)
-		memcpy(context, mailbox->buf + 8, sizeof *context);
+		memcpy(context, mailbox->buf + 8, sizeof(*context));
 
 	mlx4_free_cmd_mailbox(dev, mailbox);
 	return err;

@@ -593,7 +593,7 @@ static int tvp5150_g_sliced_vbi_cap(struct v4l2_subdev *sd,
 	int line;
 
 	v4l2_dbg(1, debug, sd, "g_sliced_vbi_cap\n");
-	memset(cap, 0, sizeof *cap);
+	memset(cap, 0, sizeof(*cap));
 
 	while (regs->reg != (u16)-1 ) {
 		for (line=regs->type.ini_line;line<=regs->type.end_line;line++) {

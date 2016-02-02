@@ -2523,7 +2523,7 @@ static void selinux_bprm_committed_creds(struct linux_binprm *bprm)
 	 */
 	rc = avc_has_perm(osid, sid, SECCLASS_PROCESS, PROCESS__SIGINH, NULL);
 	if (rc) {
-		memset(&itimer, 0, sizeof itimer);
+		memset(&itimer, 0, sizeof(itimer));
 		for (i = 0; i < 3; i++)
 			do_setitimer(i, &itimer, NULL);
 		spin_lock_irq(&current->sighand->siglock);
@@ -3025,7 +3025,7 @@ static int selinux_inode_setotherxattr(struct dentry *dentry, const char *name)
 	const struct cred *cred = current_cred();
 
 	if (!strncmp(name, XATTR_SECURITY_PREFIX,
-		     sizeof XATTR_SECURITY_PREFIX - 1)) {
+		     sizeof(XATTR_SECURITY_PREFIX) - 1)) {
 		if (!strcmp(name, XATTR_NAME_CAPS)) {
 			if (!capable(CAP_SETFCAP))
 				return -EPERM;

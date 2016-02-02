@@ -289,7 +289,7 @@ nosy_open(struct inode *inode, struct file *file)
 	if (lynx == NULL)
 		return -ENODEV;
 
-	client = kmalloc(sizeof *client, GFP_KERNEL);
+	client = kmalloc(sizeof(*client), GFP_KERNEL);
 	if (client == NULL)
 		goto fail;
 
@@ -366,7 +366,7 @@ nosy_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		stats.lost_packet_count  = client->buffer.lost_packet_count;
 		spin_unlock_irq(client_list_lock);
 
-		if (copy_to_user((void __user *) arg, &stats, sizeof stats))
+		if (copy_to_user((void __user *) arg, &stats, sizeof(stats)))
 			return -EFAULT;
 		else
 			return 0;
@@ -547,7 +547,7 @@ add_card(struct pci_dev *dev, const struct pci_device_id *unused)
 	}
 	pci_set_master(dev);
 
-	lynx = kzalloc(sizeof *lynx, GFP_KERNEL);
+	lynx = kzalloc(sizeof(*lynx), GFP_KERNEL);
 	if (lynx == NULL) {
 		dev_err(&dev->dev, "Failed to allocate control structure\n");
 		ret = -ENOMEM;

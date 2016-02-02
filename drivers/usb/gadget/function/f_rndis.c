@@ -111,7 +111,7 @@ static unsigned int bitrate(struct usb_gadget *g)
 /* interface descriptor: */
 
 static struct usb_interface_descriptor rndis_control_intf = {
-	.bLength =		sizeof rndis_control_intf,
+	.bLength =		sizeof(rndis_control_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
@@ -124,7 +124,7 @@ static struct usb_interface_descriptor rndis_control_intf = {
 };
 
 static struct usb_cdc_header_desc header_desc = {
-	.bLength =		sizeof header_desc,
+	.bLength =		sizeof(header_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_HEADER_TYPE,
 
@@ -132,7 +132,7 @@ static struct usb_cdc_header_desc header_desc = {
 };
 
 static struct usb_cdc_call_mgmt_descriptor call_mgmt_descriptor = {
-	.bLength =		sizeof call_mgmt_descriptor,
+	.bLength =		sizeof(call_mgmt_descriptor),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_CALL_MANAGEMENT_TYPE,
 
@@ -141,7 +141,7 @@ static struct usb_cdc_call_mgmt_descriptor call_mgmt_descriptor = {
 };
 
 static struct usb_cdc_acm_descriptor rndis_acm_descriptor = {
-	.bLength =		sizeof rndis_acm_descriptor,
+	.bLength =		sizeof(rndis_acm_descriptor),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ACM_TYPE,
 
@@ -159,7 +159,7 @@ static struct usb_cdc_union_desc rndis_union_desc = {
 /* the data interface has two bulk endpoints */
 
 static struct usb_interface_descriptor rndis_data_intf = {
-	.bLength =		sizeof rndis_data_intf,
+	.bLength =		sizeof(rndis_data_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
@@ -173,7 +173,7 @@ static struct usb_interface_descriptor rndis_data_intf = {
 
 static struct usb_interface_assoc_descriptor
 rndis_iad_descriptor = {
-	.bLength =		sizeof rndis_iad_descriptor,
+	.bLength =		sizeof(rndis_iad_descriptor),
 	.bDescriptorType =	USB_DT_INTERFACE_ASSOCIATION,
 
 	.bFirstInterface =	0, /* XXX, hardcoded */
@@ -291,7 +291,7 @@ static struct usb_endpoint_descriptor ss_notify_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor ss_intr_comp_desc = {
-	.bLength =		sizeof ss_intr_comp_desc,
+	.bLength =		sizeof(ss_intr_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 3 values can be tweaked if necessary */
@@ -319,7 +319,7 @@ static struct usb_endpoint_descriptor ss_out_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor ss_bulk_comp_desc = {
-	.bLength =		sizeof ss_bulk_comp_desc,
+	.bLength =		sizeof(ss_bulk_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 2 values can be tweaked if necessary */

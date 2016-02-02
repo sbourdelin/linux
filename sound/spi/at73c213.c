@@ -970,7 +970,7 @@ static int snd_at73c213_probe(struct spi_device *spi)
 	}
 
 	/* Allocate "card" using some unused identifiers. */
-	snprintf(id, sizeof id, "at73c213_%d", board->ssc_id);
+	snprintf(id, sizeof(id), "at73c213_%d", board->ssc_id);
 	retval = snd_card_new(&spi->dev, -1, id, THIS_MODULE,
 			      sizeof(struct snd_at73c213), &card);
 	if (retval < 0)

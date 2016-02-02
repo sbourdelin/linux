@@ -452,8 +452,8 @@ static int mlx4_ib_query_device(struct ib_device *ibdev,
 
 	resp.response_length = offsetof(typeof(resp), response_length) +
 		sizeof(resp.response_length);
-	in_mad  = kzalloc(sizeof *in_mad, GFP_KERNEL);
-	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
+	in_mad  = kzalloc(sizeof(*in_mad), GFP_KERNEL);
+	out_mad = kmalloc(sizeof(*out_mad), GFP_KERNEL);
 	if (!in_mad || !out_mad)
 		goto out;
 
@@ -465,7 +465,7 @@ static int mlx4_ib_query_device(struct ib_device *ibdev,
 	if (err)
 		goto out;
 
-	memset(props, 0, sizeof *props);
+	memset(props, 0, sizeof(*props));
 
 	have_ib_ports = num_ib_ports(dev->dev);
 
@@ -588,8 +588,8 @@ static int ib_link_query_port(struct ib_device *ibdev, u8 port,
 	int mad_ifc_flags = MLX4_MAD_IFC_IGNORE_KEYS;
 	int err = -ENOMEM;
 
-	in_mad  = kzalloc(sizeof *in_mad, GFP_KERNEL);
-	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
+	in_mad  = kzalloc(sizeof(*in_mad), GFP_KERNEL);
+	out_mad = kmalloc(sizeof(*out_mad), GFP_KERNEL);
 	if (!in_mad || !out_mad)
 		goto out;
 
@@ -736,7 +736,7 @@ int __mlx4_ib_query_port(struct ib_device *ibdev, u8 port,
 {
 	int err;
 
-	memset(props, 0, sizeof *props);
+	memset(props, 0, sizeof(*props));
 
 	err = mlx4_ib_port_link_layer(ibdev, port) == IB_LINK_LAYER_INFINIBAND ?
 		ib_link_query_port(ibdev, port, props, netw_view) :
@@ -762,8 +762,8 @@ int __mlx4_ib_query_gid(struct ib_device *ibdev, u8 port, int index,
 	int clear = 0;
 	int mad_ifc_flags = MLX4_MAD_IFC_IGNORE_KEYS;
 
-	in_mad  = kzalloc(sizeof *in_mad, GFP_KERNEL);
-	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
+	in_mad  = kzalloc(sizeof(*in_mad), GFP_KERNEL);
+	out_mad = kmalloc(sizeof(*out_mad), GFP_KERNEL);
 	if (!in_mad || !out_mad)
 		goto out;
 
@@ -839,8 +839,8 @@ int __mlx4_ib_query_pkey(struct ib_device *ibdev, u8 port, u16 index,
 	int mad_ifc_flags = MLX4_MAD_IFC_IGNORE_KEYS;
 	int err = -ENOMEM;
 
-	in_mad  = kzalloc(sizeof *in_mad, GFP_KERNEL);
-	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
+	in_mad  = kzalloc(sizeof(*in_mad), GFP_KERNEL);
+	out_mad = kmalloc(sizeof(*out_mad), GFP_KERNEL);
 	if (!in_mad || !out_mad)
 		goto out;
 
@@ -1211,7 +1211,7 @@ static struct ib_pd *mlx4_ib_alloc_pd(struct ib_device *ibdev,
 	struct mlx4_ib_pd *pd;
 	int err;
 
-	pd = kmalloc(sizeof *pd, GFP_KERNEL);
+	pd = kmalloc(sizeof(*pd), GFP_KERNEL);
 	if (!pd)
 		return ERR_PTR(-ENOMEM);
 
@@ -1250,7 +1250,7 @@ static struct ib_xrcd *mlx4_ib_alloc_xrcd(struct ib_device *ibdev,
 	if (!(to_mdev(ibdev)->dev->caps.flags & MLX4_DEV_CAP_FLAG_XRC))
 		return ERR_PTR(-ENOSYS);
 
-	xrcd = kmalloc(sizeof *xrcd, GFP_KERNEL);
+	xrcd = kmalloc(sizeof(*xrcd), GFP_KERNEL);
 	if (!xrcd)
 		return ERR_PTR(-ENOMEM);
 
@@ -1298,7 +1298,7 @@ static int add_gid_entry(struct ib_qp *ibqp, union ib_gid *gid)
 	struct mlx4_ib_dev *mdev = to_mdev(ibqp->device);
 	struct mlx4_ib_gid_entry *ge;
 
-	ge = kzalloc(sizeof *ge, GFP_KERNEL);
+	ge = kzalloc(sizeof(*ge), GFP_KERNEL);
 	if (!ge)
 		return -ENOMEM;
 
@@ -1916,8 +1916,8 @@ static int init_node_data(struct mlx4_ib_dev *dev)
 	int mad_ifc_flags = MLX4_MAD_IFC_IGNORE_KEYS;
 	int err = -ENOMEM;
 
-	in_mad  = kzalloc(sizeof *in_mad, GFP_KERNEL);
-	out_mad = kmalloc(sizeof *out_mad, GFP_KERNEL);
+	in_mad  = kzalloc(sizeof(*in_mad), GFP_KERNEL);
+	out_mad = kmalloc(sizeof(*out_mad), GFP_KERNEL);
 	if (!in_mad || !out_mad)
 		goto out;
 
@@ -2233,7 +2233,7 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	if (num_ports == 0)
 		return NULL;
 
-	ibdev = (struct mlx4_ib_dev *) ib_alloc_device(sizeof *ibdev);
+	ibdev = (struct mlx4_ib_dev *) ib_alloc_device(sizeof(*ibdev));
 	if (!ibdev) {
 		dev_err(&dev->persist->pdev->dev,
 			"Device struct alloc failed\n");
@@ -2877,14 +2877,14 @@ static void mlx4_ib_event(struct mlx4_dev *dev, void *ibdev_ptr,
 		break;
 
 	case MLX4_DEV_EVENT_PORT_MGMT_CHANGE:
-		ew = kmalloc(sizeof *ew, GFP_ATOMIC);
+		ew = kmalloc(sizeof(*ew), GFP_ATOMIC);
 		if (!ew) {
 			pr_err("failed to allocate memory for events work\n");
 			break;
 		}
 
 		INIT_WORK(&ew->work, handle_port_mgmt_change_event);
-		memcpy(&ew->ib_eqe, eqe, sizeof *eqe);
+		memcpy(&ew->ib_eqe, eqe, sizeof(*eqe));
 		ew->ib_dev = ibdev;
 		/* need to queue only for port owner, which uses GEN_EQE */
 		if (mlx4_is_master(dev))

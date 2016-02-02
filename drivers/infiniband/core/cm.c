@@ -630,7 +630,7 @@ static struct cm_id_private * cm_insert_remote_sidr(struct cm_id_private
 		else {
 			int cmp;
 			cmp = memcmp(port_gid, &cur_cm_id_priv->av.dgid,
-				     sizeof *port_gid);
+				     sizeof(*port_gid));
 			if (cmp < 0)
 				link = &(*link)->rb_left;
 			else if (cmp > 0)
@@ -649,7 +649,7 @@ static void cm_reject_sidr_req(struct cm_id_private *cm_id_priv,
 {
 	struct ib_cm_sidr_rep_param param;
 
-	memset(&param, 0, sizeof param);
+	memset(&param, 0, sizeof(param));
 	param.status = status;
 	ib_send_cm_sidr_rep(&cm_id_priv->id, &param);
 }
@@ -661,7 +661,7 @@ struct ib_cm_id *ib_create_cm_id(struct ib_device *device,
 	struct cm_id_private *cm_id_priv;
 	int ret;
 
-	cm_id_priv = kzalloc(sizeof *cm_id_priv, GFP_KERNEL);
+	cm_id_priv = kzalloc(sizeof(*cm_id_priv), GFP_KERNEL);
 	if (!cm_id_priv)
 		return ERR_PTR(-ENOMEM);
 
@@ -748,7 +748,7 @@ static struct cm_timewait_info * cm_create_timewait_info(__be32 local_id)
 {
 	struct cm_timewait_info *timewait_info;
 
-	timewait_info = kzalloc(sizeof *timewait_info, GFP_KERNEL);
+	timewait_info = kzalloc(sizeof(*timewait_info), GFP_KERNEL);
 	if (!timewait_info)
 		return ERR_PTR(-ENOMEM);
 
@@ -847,7 +847,7 @@ retest:
 		spin_unlock_irq(&cm_id_priv->lock);
 		ib_send_cm_rej(cm_id, IB_CM_REJ_TIMEOUT,
 			       &cm_id_priv->id.device->node_guid,
-			       sizeof cm_id_priv->id.device->node_guid,
+			       sizeof(cm_id_priv->id.device->node_guid),
 			       NULL, 0);
 		break;
 	case IB_CM_REQ_RCVD:
@@ -1293,7 +1293,7 @@ static void cm_format_paths_from_req(struct cm_req_msg *req_msg,
 					    struct ib_sa_path_rec *primary_path,
 					    struct ib_sa_path_rec *alt_path)
 {
-	memset(primary_path, 0, sizeof *primary_path);
+	memset(primary_path, 0, sizeof(*primary_path));
 	primary_path->dgid = req_msg->primary_local_gid;
 	primary_path->sgid = req_msg->primary_remote_gid;
 	primary_path->dlid = req_msg->primary_local_lid;
@@ -1315,7 +1315,7 @@ static void cm_format_paths_from_req(struct cm_req_msg *req_msg,
 	primary_path->service_id = req_msg->service_id;
 
 	if (req_msg->alt_local_lid) {
-		memset(alt_path, 0, sizeof *alt_path);
+		memset(alt_path, 0, sizeof(*alt_path));
 		alt_path->dgid = req_msg->alt_local_gid;
 		alt_path->sgid = req_msg->alt_remote_gid;
 		alt_path->dlid = req_msg->alt_local_lid;
@@ -1667,7 +1667,7 @@ static int cm_req_handler(struct cm_work *work)
 		}
 		work->path[0].gid_type = gid_attr.gid_type;
 		ib_send_cm_rej(cm_id, IB_CM_REJ_INVALID_GID,
-			       &work->path[0].sgid, sizeof work->path[0].sgid,
+			       &work->path[0].sgid, sizeof(work->path[0].sgid),
 			       NULL, 0);
 		goto rejected;
 	}
@@ -1676,7 +1676,7 @@ static int cm_req_handler(struct cm_work *work)
 		if (ret) {
 			ib_send_cm_rej(cm_id, IB_CM_REJ_INVALID_ALT_GID,
 				       &work->path[0].sgid,
-				       sizeof work->path[0].sgid, NULL, 0);
+				       sizeof(work->path[0].sgid), NULL, 0);
 			goto rejected;
 		}
 	}
@@ -2762,7 +2762,7 @@ static void cm_format_path_from_lap(struct cm_id_private *cm_id_priv,
 				    struct ib_sa_path_rec *path,
 				    struct cm_lap_msg *lap_msg)
 {
-	memset(path, 0, sizeof *path);
+	memset(path, 0, sizeof(*path));
 	path->dgid = lap_msg->alt_local_gid;
 	path->sgid = lap_msg->alt_remote_gid;
 	path->dlid = lap_msg->alt_local_lid;
@@ -3263,7 +3263,7 @@ static void cm_process_send_error(struct ib_mad_send_buf *msg,
 	enum ib_cm_state state;
 	int ret;
 
-	memset(&cm_event, 0, sizeof cm_event);
+	memset(&cm_event, 0, sizeof(cm_event));
 	cm_id_priv = msg->context[0];
 
 	/* Discard old sends or ones without a response. */
@@ -3413,7 +3413,7 @@ static int cm_establish(struct ib_cm_id *cm_id)
 	if (!cm_dev)
 		return -ENODEV;
 
-	work = kmalloc(sizeof *work, GFP_ATOMIC);
+	work = kmalloc(sizeof(*work), GFP_ATOMIC);
 	if (!work)
 		return -ENOMEM;
 
@@ -3560,7 +3560,7 @@ static void cm_recv_handler(struct ib_mad_agent *mad_agent,
 	atomic_long_inc(&port->counter_group[CM_RECV].
 			counter[attr_id - CM_ATTR_ID_OFFSET]);
 
-	work = kmalloc(sizeof *work + sizeof(struct ib_sa_path_rec) * paths,
+	work = kmalloc(sizeof(*work) + sizeof(struct ib_sa_path_rec) * paths,
 		       GFP_KERNEL);
 	if (!work) {
 		ib_free_recv_mad(mad_recv_wc);
@@ -3880,7 +3880,7 @@ static void cm_add_one(struct ib_device *ib_device)
 		if (!rdma_cap_ib_cm(ib_device, i))
 			continue;
 
-		port = kzalloc(sizeof *port, GFP_KERNEL);
+		port = kzalloc(sizeof(*port), GFP_KERNEL);
 		if (!port)
 			goto error1;
 
@@ -3985,7 +3985,7 @@ static int __init ib_cm_init(void)
 {
 	int ret;
 
-	memset(&cm, 0, sizeof cm);
+	memset(&cm, 0, sizeof(cm));
 	INIT_LIST_HEAD(&cm.device_list);
 	rwlock_init(&cm.device_lock);
 	spin_lock_init(&cm.lock);
@@ -3995,7 +3995,7 @@ static int __init ib_cm_init(void)
 	cm.remote_qp_table = RB_ROOT;
 	cm.remote_sidr_table = RB_ROOT;
 	idr_init(&cm.local_id_table);
-	get_random_bytes(&cm.random_id_operand, sizeof cm.random_id_operand);
+	get_random_bytes(&cm.random_id_operand, sizeof(cm.random_id_operand));
 	INIT_LIST_HEAD(&cm.timewait_list);
 
 	ret = class_register(&cm_class);

@@ -502,7 +502,7 @@ static int radeon_crtc_page_flip(struct drm_crtc *crtc,
 	unsigned long flags;
 	int r;
 
-	work = kzalloc(sizeof *work, GFP_KERNEL);
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
 	if (work == NULL)
 		return -ENOMEM;
 

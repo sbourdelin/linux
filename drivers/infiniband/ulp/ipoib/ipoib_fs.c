@@ -97,7 +97,7 @@ static void ipoib_mcg_seq_stop(struct seq_file *file, void *iter_ptr)
 static int ipoib_mcg_seq_show(struct seq_file *file, void *iter_ptr)
 {
 	struct ipoib_mcast_iter *iter = iter_ptr;
-	char gid_buf[sizeof "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"];
+	char gid_buf[sizeof("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")];
 	union ib_gid mgid;
 	unsigned long created;
 	unsigned int queuelen, complete, send_only;
@@ -196,7 +196,7 @@ static void ipoib_path_seq_stop(struct seq_file *file, void *iter_ptr)
 static int ipoib_path_seq_show(struct seq_file *file, void *iter_ptr)
 {
 	struct ipoib_path_iter *iter = iter_ptr;
-	char gid_buf[sizeof "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"];
+	char gid_buf[sizeof("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")];
 	struct ipoib_path path;
 	int rate;
 
@@ -262,15 +262,15 @@ static const struct file_operations ipoib_path_fops = {
 void ipoib_create_debug_files(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
-	char name[IFNAMSIZ + sizeof "_path"];
+	char name[IFNAMSIZ + sizeof("_path")];
 
-	snprintf(name, sizeof name, "%s_mcg", dev->name);
+	snprintf(name, sizeof(name), "%s_mcg", dev->name);
 	priv->mcg_dentry = debugfs_create_file(name, S_IFREG | S_IRUGO,
 					       ipoib_root, dev, &ipoib_mcg_fops);
 	if (!priv->mcg_dentry)
 		ipoib_warn(priv, "failed to create mcg debug file\n");
 
-	snprintf(name, sizeof name, "%s_path", dev->name);
+	snprintf(name, sizeof(name), "%s_path", dev->name);
 	priv->path_dentry = debugfs_create_file(name, S_IFREG | S_IRUGO,
 						ipoib_root, dev, &ipoib_path_fops);
 	if (!priv->path_dentry)

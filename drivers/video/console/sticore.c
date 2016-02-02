@@ -284,7 +284,7 @@ static char default_sti_path[21] __read_mostly;
 static int sti_setup(char *str)
 {
 	if (str)
-		strlcpy (default_sti_path, str, sizeof (default_sti_path));
+		strlcpy (default_sti_path, str, sizeof(default_sti_path));
 	
 	return 1;
 }
@@ -733,7 +733,7 @@ static int sti_read_rom(int wordmode, struct sti_struct *sti,
 	struct sti_rom *raw = NULL;
 	unsigned long revno;
 
-	cooked = kmalloc(sizeof *cooked, GFP_KERNEL);
+	cooked = kmalloc(sizeof(*cooked), GFP_KERNEL);
 	if (!cooked)
 		goto out_err;
 

@@ -151,7 +151,7 @@ static int testdev_ffs_ifnum(FILE *fd)
 		if (fread(u.buf + 1, (unsigned char)u.buf[0] - 1, 1, fd) != 1)
 			return -1;
 
-		if (u.intf.bLength == sizeof u.intf
+		if (u.intf.bLength == sizeof(u.intf)
 		 && u.intf.bDescriptorType == USB_DT_INTERFACE
 		 && u.intf.bNumEndpoints == 2
 		 && u.intf.bInterfaceClass == USB_CLASS_VENDOR_SPEC
@@ -165,10 +165,10 @@ static int testdev_ifnum(FILE *fd)
 {
 	struct usb_device_descriptor dev;
 
-	if (fread(&dev, sizeof dev, 1, fd) != 1)
+	if (fread(&dev, sizeof(dev), 1, fd) != 1)
 		return -1;
 
-	if (dev.bLength != sizeof dev || dev.bDescriptorType != USB_DT_DEVICE)
+	if (dev.bLength != sizeof(dev) || dev.bDescriptorType != USB_DT_DEVICE)
 		return -1;
 
 	/* FX2 with (tweaked) bulksrc firmware */
@@ -265,7 +265,7 @@ static int find_testdev(const char *name, const struct stat *sb, int flag)
 	if (ifnum < 0)
 		return 0;
 
-	entry = calloc(1, sizeof *entry);
+	entry = calloc(1, sizeof(*entry));
 	if (!entry)
 		goto nomem;
 
@@ -330,8 +330,8 @@ restart:
 			char	buf [80];
 			int	err = errno;
 
-			if (strerror_r (errno, buf, sizeof buf)) {
-				snprintf (buf, sizeof buf, "error %d", err);
+			if (strerror_r (errno, buf, sizeof(buf))) {
+				snprintf (buf, sizeof(buf), "error %d", err);
 				errno = err;
 			}
 			printf ("%s test %d --> %d (%s)\n",
@@ -516,7 +516,7 @@ usage:
 		fprintf (stderr, "%s: %s may see only control tests\n",
 				argv [0], device);
 
-		memset (&dev, 0, sizeof dev);
+		memset (&dev, 0, sizeof(dev));
 		dev.name = device;
 		dev.param = param;
 		dev.forever = forever;

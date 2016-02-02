@@ -101,7 +101,7 @@ static void handle_vq_kick(struct vhost_work *work)
 
 static int vhost_test_open(struct inode *inode, struct file *f)
 {
-	struct vhost_test *n = kmalloc(sizeof *n, GFP_KERNEL);
+	struct vhost_test *n = kmalloc(sizeof(*n), GFP_KERNEL);
 	struct vhost_dev *dev;
 	struct vhost_virtqueue **vqs;
 
@@ -268,17 +268,17 @@ static long vhost_test_ioctl(struct file *f, unsigned int ioctl,
 	int r;
 	switch (ioctl) {
 	case VHOST_TEST_RUN:
-		if (copy_from_user(&test, argp, sizeof test))
+		if (copy_from_user(&test, argp, sizeof(test)))
 			return -EFAULT;
 		return vhost_test_run(n, test);
 	case VHOST_GET_FEATURES:
 		features = VHOST_FEATURES;
-		if (copy_to_user(featurep, &features, sizeof features))
+		if (copy_to_user(featurep, &features, sizeof(features)))
 			return -EFAULT;
 		return 0;
 	case VHOST_SET_FEATURES:
 		printk(KERN_ERR "1\n");
-		if (copy_from_user(&features, featurep, sizeof features))
+		if (copy_from_user(&features, featurep, sizeof(features)))
 			return -EFAULT;
 		printk(KERN_ERR "2\n");
 		if (features & ~VHOST_FEATURES)

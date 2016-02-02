@@ -98,7 +98,7 @@ static ssize_t atomic_stats_read(struct file *file, char __user *buf,
 				 size_t count, loff_t *ppos)
 {
 	return simple_read_from_buffer(buf, count, ppos, &ipath_stats,
-				       sizeof ipath_stats);
+				       sizeof(ipath_stats));
 }
 
 static const struct file_operations atomic_stats_ops = {
@@ -116,7 +116,7 @@ static ssize_t atomic_counters_read(struct file *file, char __user *buf,
 	dd->ipath_f_read_counters(dd, &counters);
 
 	return simple_read_from_buffer(buf, count, ppos, &counters,
-				       sizeof counters);
+				       sizeof(counters));
 }
 
 static const struct file_operations atomic_counters_ops = {
@@ -229,7 +229,7 @@ static int create_device_files(struct super_block *sb,
 	char unit[10];
 	int ret;
 
-	snprintf(unit, sizeof unit, "%02d", dd->ipath_unit);
+	snprintf(unit, sizeof(unit), "%02d", dd->ipath_unit);
 	ret = create_file(unit, S_IFDIR|S_IRUGO|S_IXUGO, sb->s_root, &dir,
 			  &simple_dir_operations, dd);
 	if (ret) {
@@ -296,7 +296,7 @@ static int remove_device_files(struct super_block *sb,
 
 	root = dget(sb->s_root);
 	inode_lock(d_inode(root));
-	snprintf(unit, sizeof unit, "%02d", dd->ipath_unit);
+	snprintf(unit, sizeof(unit), "%02d", dd->ipath_unit);
 	dir = lookup_one_len(unit, root, strlen(unit));
 
 	if (IS_ERR(dir)) {

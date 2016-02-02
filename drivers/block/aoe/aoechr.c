@@ -85,9 +85,9 @@ revalidate(const char __user *str, size_t size)
 	struct sk_buff *skb;
 	char buf[16];
 
-	if (size >= sizeof buf)
+	if (size >= sizeof(buf))
 		return -EINVAL;
-	buf[sizeof buf - 1] = '\0';
+	buf[sizeof(buf) - 1] = '\0';
 	if (copy_from_user(buf, str, size))
 		return -EFAULT;
 

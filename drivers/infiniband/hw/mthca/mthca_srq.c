@@ -97,7 +97,7 @@ static void mthca_tavor_init_srq_context(struct mthca_dev *dev,
 					 struct mthca_srq *srq,
 					 struct mthca_tavor_srq_context *context)
 {
-	memset(context, 0, sizeof *context);
+	memset(context, 0, sizeof(*context));
 
 	context->wqe_base_ds = cpu_to_be64(1 << (srq->wqe_shift - 4));
 	context->state_pd    = cpu_to_be32(pd->pd_num);
@@ -117,7 +117,7 @@ static void mthca_arbel_init_srq_context(struct mthca_dev *dev,
 {
 	int logsize, max;
 
-	memset(context, 0, sizeof *context);
+	memset(context, 0, sizeof(*context));
 
 	/*
 	 * Put max in a temporary variable to work around gcc bug
@@ -155,7 +155,7 @@ static int mthca_alloc_srq_buf(struct mthca_dev *dev, struct mthca_pd *pd,
 	if (pd->ibpd.uobject)
 		return 0;
 
-	srq->wrid = kmalloc(srq->max * sizeof (u64), GFP_KERNEL);
+	srq->wrid = kmalloc(srq->max * sizeof(u64), GFP_KERNEL);
 	if (!srq->wrid)
 		return -ENOMEM;
 

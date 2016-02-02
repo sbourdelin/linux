@@ -666,7 +666,7 @@ struct v4l2_m2m_dev *v4l2_m2m_init(const struct v4l2_m2m_ops *m2m_ops)
 			WARN_ON(!m2m_ops->job_abort))
 		return ERR_PTR(-EINVAL);
 
-	m2m_dev = kzalloc(sizeof *m2m_dev, GFP_KERNEL);
+	m2m_dev = kzalloc(sizeof(*m2m_dev), GFP_KERNEL);
 	if (!m2m_dev)
 		return ERR_PTR(-ENOMEM);
 
@@ -707,7 +707,7 @@ struct v4l2_m2m_ctx *v4l2_m2m_ctx_init(struct v4l2_m2m_dev *m2m_dev,
 	struct v4l2_m2m_queue_ctx *out_q_ctx, *cap_q_ctx;
 	int ret;
 
-	m2m_ctx = kzalloc(sizeof *m2m_ctx, GFP_KERNEL);
+	m2m_ctx = kzalloc(sizeof(*m2m_ctx), GFP_KERNEL);
 	if (!m2m_ctx)
 		return ERR_PTR(-ENOMEM);
 

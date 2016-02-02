@@ -273,7 +273,7 @@ static ssize_t av7110_ir_proc_write(struct file *file, const char __user *buffer
 {
 	char *page;
 	u32 ir_config;
-	int size = sizeof ir_config + sizeof av_list[0]->ir.key_map;
+	int size = sizeof(ir_config) + sizeof(av_list[0]->ir.key_map);
 	int i;
 
 	if (count < size)
@@ -288,11 +288,11 @@ static ssize_t av7110_ir_proc_write(struct file *file, const char __user *buffer
 		return -EFAULT;
 	}
 
-	memcpy(&ir_config, page, sizeof ir_config);
+	memcpy(&ir_config, page, sizeof(ir_config));
 
 	for (i = 0; i < av_cnt; i++) {
 		/* keymap */
-		memcpy(av_list[i]->ir.key_map, page + sizeof ir_config,
+		memcpy(av_list[i]->ir.key_map, page + sizeof(ir_config),
 			sizeof(av_list[i]->ir.key_map));
 		/* protocol, inversion, address */
 		ir_protocol[i] = ir_config & 0x0001;
@@ -362,7 +362,7 @@ int av7110_ir_init(struct av7110 *av7110)
 	}
 	input_dev->dev.parent = &av7110->dev->pci->dev;
 	/* initial keymap */
-	memcpy(av7110->ir.key_map, default_key_map, sizeof av7110->ir.key_map);
+	memcpy(av7110->ir.key_map, default_key_map, sizeof(av7110->ir.key_map));
 	input_register_keys(&av7110->ir);
 	err = input_register_device(input_dev);
 	if (err) {

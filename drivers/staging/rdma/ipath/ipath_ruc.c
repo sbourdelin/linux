@@ -321,7 +321,7 @@ again:
 		goto serr;
 	}
 
-	memset(&wc, 0, sizeof wc);
+	memset(&wc, 0, sizeof(wc));
 	send_status = IB_WC_SUCCESS;
 
 	sqp->s_sge.sge = wqe->sg_list[0];
@@ -709,7 +709,7 @@ void ipath_send_complete(struct ipath_qp *qp, struct ipath_swqe *wqe,
 	    status != IB_WC_SUCCESS) {
 		struct ib_wc wc;
 
-		memset(&wc, 0, sizeof wc);
+		memset(&wc, 0, sizeof(wc));
 		wc.wr_id = wqe->wr.wr_id;
 		wc.status = status;
 		wc.opcode = ib_ipath_wc_opcode[wqe->wr.opcode];

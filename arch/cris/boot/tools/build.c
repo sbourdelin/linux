@@ -141,7 +141,7 @@ int main(int argc, char ** argv)
 		minor_root = DEFAULT_MINOR_ROOT;
 	}
 	fprintf(stderr, "Root device is (%d, %d)\n", major_root, minor_root);
-	for (i=0;i<sizeof buf; i++) buf[i]=0;
+	for (i=0;i<sizeof(buf); i++) buf[i]=0;
 	if ((id=open(argv[1],O_RDONLY,0))<0)
 		die("Unable to open 'boot'");
 	if (read(id,buf,MINIX_HEADER) != MINIX_HEADER)
@@ -158,7 +158,7 @@ int main(int argc, char ** argv)
 		die("Non-Minix header of 'boot'");
 	if (((long *) buf)[7] != 0)
 		die("Illegal symbol table in 'boot'");
-	i=read(id,buf,sizeof buf);
+	i=read(id,buf,sizeof(buf));
 	fprintf(stderr,"Boot sector %d bytes.\n",i);
 	if (i != 512)
 		die("Boot block must be exactly 512 bytes");
@@ -187,7 +187,7 @@ int main(int argc, char ** argv)
 		die("Non-Minix header of 'setup'");
 	if (((long *) buf)[7] != 0)
 		die("Illegal symbol table in 'setup'");
-	for (i=0 ; (c=read(id,buf,sizeof buf))>0 ; i+=c )
+	for (i=0 ; (c=read(id,buf,sizeof(buf)))>0 ; i+=c )
 #ifdef __BIG_KERNEL__
 	{
 		if (!i) {
@@ -217,7 +217,7 @@ int main(int argc, char ** argv)
 	if (setup_sectors < SETUP_SECTS)
 		setup_sectors = SETUP_SECTS;
 	fprintf(stderr,"Setup is %d bytes.\n",i);
-	for (c=0 ; c<sizeof(buf) ; c++)
+	for (c=0 ; c<sizeof(buf); c++)
 		buf[c] = '\0';
 	while (i < setup_sectors * 512) {
 		c = setup_sectors * 512 - i;

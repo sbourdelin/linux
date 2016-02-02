@@ -89,7 +89,7 @@ static void ipath_ud_loopback(struct ipath_qp *sqp, struct ipath_swqe *swqe)
 	 * present on the wire.
 	 */
 	length = swqe->length;
-	memset(&wc, 0, sizeof wc);
+	memset(&wc, 0, sizeof(wc));
 	wc.byte_len = length + sizeof(struct ib_grh);
 
 	if (swqe->wr.opcode == IB_WR_SEND_WITH_IMM) {

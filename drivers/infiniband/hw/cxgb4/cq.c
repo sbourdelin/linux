@@ -42,7 +42,7 @@ static int destroy_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
 	struct sk_buff *skb;
 	int ret;
 
-	wr_len = sizeof *res_wr + sizeof *res;
+	wr_len = sizeof(*res_wr) + sizeof(*res);
 	skb = alloc_skb(wr_len, GFP_KERNEL);
 	if (!skb)
 		return -ENOMEM;
@@ -109,7 +109,7 @@ static int create_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
 	memset(cq->queue, 0, cq->memsize);
 
 	/* build fw_ri_res_wr */
-	wr_len = sizeof *res_wr + sizeof *res;
+	wr_len = sizeof(*res_wr) + sizeof(*res);
 
 	skb = alloc_skb(wr_len, GFP_KERNEL);
 	if (!skb) {
@@ -915,7 +915,7 @@ struct ib_cq *c4iw_create_cq(struct ib_device *ibdev,
 	if (hwentries < 64)
 		hwentries = 64;
 
-	memsize = hwentries * sizeof *chp->cq.queue;
+	memsize = hwentries * sizeof(*chp->cq.queue);
 
 	/*
 	 * memsize must be a multiple of the page size if its a user cq.
@@ -943,10 +943,10 @@ struct ib_cq *c4iw_create_cq(struct ib_device *ibdev,
 		goto err2;
 
 	if (ucontext) {
-		mm = kmalloc(sizeof *mm, GFP_KERNEL);
+		mm = kmalloc(sizeof(*mm), GFP_KERNEL);
 		if (!mm)
 			goto err3;
-		mm2 = kmalloc(sizeof *mm2, GFP_KERNEL);
+		mm2 = kmalloc(sizeof(*mm2), GFP_KERNEL);
 		if (!mm2)
 			goto err4;
 

@@ -53,7 +53,7 @@ void gigaset_dbg_buffer(enum debuglevel level, const unsigned char *msg,
 {
 	unsigned char outbuf[80];
 	unsigned char c;
-	size_t space = sizeof outbuf - 1;
+	size_t space = sizeof(outbuf) - 1;
 	unsigned char *out = outbuf;
 	size_t numin = len;
 
@@ -1077,7 +1077,7 @@ struct gigaset_driver *gigaset_initdriver(unsigned minor, unsigned minors,
 	unsigned long flags;
 	unsigned i;
 
-	drv = kmalloc(sizeof *drv, GFP_KERNEL);
+	drv = kmalloc(sizeof(*drv), GFP_KERNEL);
 	if (!drv)
 		return NULL;
 
@@ -1090,7 +1090,7 @@ struct gigaset_driver *gigaset_initdriver(unsigned minor, unsigned minors,
 	drv->owner = owner;
 	INIT_LIST_HEAD(&drv->list);
 
-	drv->cs = kmalloc(minors * sizeof *drv->cs, GFP_KERNEL);
+	drv->cs = kmalloc(minors * sizeof(*drv->cs), GFP_KERNEL);
 	if (!drv->cs)
 		goto error;
 

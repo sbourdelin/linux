@@ -89,7 +89,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 	    init_attr->attr.max_sge >  dev->dev->caps.max_srq_sge)
 		return ERR_PTR(-EINVAL);
 
-	srq = kmalloc(sizeof *srq, GFP_KERNEL);
+	srq = kmalloc(sizeof(*srq), GFP_KERNEL);
 	if (!srq)
 		return ERR_PTR(-ENOMEM);
 
@@ -109,7 +109,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 	if (pd->uobject) {
 		struct mlx4_ib_create_srq ucmd;
 
-		if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd)) {
+		if (ib_copy_from_udata(&ucmd, udata, sizeof(ucmd))) {
 			err = -EFAULT;
 			goto err_srq;
 		}
@@ -197,7 +197,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 	srq->ibsrq.ext.xrc.srq_num = srq->msrq.srqn;
 
 	if (pd->uobject)
-		if (ib_copy_to_udata(udata, &srq->msrq.srqn, sizeof (__u32))) {
+		if (ib_copy_to_udata(udata, &srq->msrq.srqn, sizeof(__u32))) {
 			err = -EFAULT;
 			goto err_wrid;
 		}

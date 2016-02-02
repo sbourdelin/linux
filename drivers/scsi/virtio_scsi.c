@@ -646,7 +646,7 @@ static int virtscsi_tmf(struct virtio_scsi *vscsi, struct virtio_scsi_cmd *cmd)
 
 	cmd->comp = &comp;
 	if (virtscsi_kick_cmd(&vscsi->ctrl_vq, cmd,
-			      sizeof cmd->req.tmf, sizeof cmd->resp.tmf) < 0)
+			      sizeof(cmd->req.tmf), sizeof(cmd->resp.tmf)) < 0)
 		goto out;
 
 	wait_for_completion(&comp);

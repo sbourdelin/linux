@@ -1635,7 +1635,7 @@ alloc_recv_buffer(unsigned int size)
 {
 	struct etrax_recv_buffer *buffer;
 
-	buffer = kmalloc(sizeof *buffer + size, GFP_ATOMIC);
+	buffer = kmalloc(sizeof(*buffer) + size, GFP_ATOMIC);
 	if (!buffer)
 		return NULL;
 
@@ -1695,7 +1695,7 @@ static unsigned int handle_descr_data(struct e100_serial *info,
 				      struct etrax_dma_descr *descr,
 				      unsigned int recvl)
 {
-	struct etrax_recv_buffer *buffer = phys_to_virt(descr->buf) - sizeof *buffer;
+	struct etrax_recv_buffer *buffer = phys_to_virt(descr->buf) - sizeof(*buffer);
 
 	if (info->recv_cnt + recvl > 65536) {
 		printk(KERN_WARNING
@@ -2764,7 +2764,7 @@ shutdown(struct e100_serial * info)
 
 	for (i = 0; i < SERIAL_RECV_DESCRIPTORS; i++)
 		if (descr[i].buf) {
-			buffer = phys_to_virt(descr[i].buf) - sizeof *buffer;
+			buffer = phys_to_virt(descr[i].buf) - sizeof(*buffer);
 			kfree(buffer);
 			descr[i].buf = 0;
 		}

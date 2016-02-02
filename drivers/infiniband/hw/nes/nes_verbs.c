@@ -566,7 +566,7 @@ static struct ib_ucontext *nes_alloc_ucontext(struct ib_device *ibdev,
 	}
 
 
-	memset(&uresp, 0, sizeof uresp);
+	memset(&uresp, 0, sizeof(uresp));
 
 	uresp.max_qps = nesibdev->max_qp;
 	uresp.max_pds = nesibdev->max_pd;
@@ -574,7 +574,7 @@ static struct ib_ucontext *nes_alloc_ucontext(struct ib_device *ibdev,
 	uresp.virtwq = nesadapter->virtwq;
 	uresp.kernel_ver = NES_ABI_KERNEL_VER;
 
-	nes_ucontext = kzalloc(sizeof *nes_ucontext, GFP_KERNEL);
+	nes_ucontext = kzalloc(sizeof(*nes_ucontext), GFP_KERNEL);
 	if (!nes_ucontext)
 		return ERR_PTR(-ENOMEM);
 
@@ -585,7 +585,7 @@ static struct ib_ucontext *nes_alloc_ucontext(struct ib_device *ibdev,
 			PAGE_SIZE;
 
 
-	if (ib_copy_to_udata(udata, &uresp, sizeof uresp)) {
+	if (ib_copy_to_udata(udata, &uresp, sizeof(uresp))) {
 		kfree(nes_ucontext);
 		return ERR_PTR(-EFAULT);
 	}
@@ -1297,7 +1297,7 @@ static struct ib_qp *nes_create_qp(struct ib_pd *ibpd,
 				uresp.actual_rq_size = rq_size;
 				uresp.qp_id = nesqp->hwqp.qp_id;
 				uresp.nes_drv_opt = nes_drv_opt;
-				if (ib_copy_to_udata(udata, &uresp, sizeof uresp)) {
+				if (ib_copy_to_udata(udata, &uresp, sizeof(uresp))) {
 					nes_free_resource(nesadapter, nesadapter->allocated_qps, qp_num);
 					nes_free_qp_mem(nesdev, nesqp,virt_wqs);
 					kfree(nesqp->allocated_buffer);
@@ -1680,7 +1680,7 @@ static struct ib_cq *nes_create_cq(struct ib_device *ibdev,
 		resp.cq_id = nescq->hw_cq.cq_number;
 		resp.cq_size = nescq->hw_cq.cq_size;
 		resp.mmap_db_index = 0;
-		if (ib_copy_to_udata(udata, &resp, sizeof resp - sizeof resp.reserved)) {
+		if (ib_copy_to_udata(udata, &resp, sizeof(resp) - sizeof(resp.reserved))) {
 			nes_free_resource(nesadapter, nesadapter->allocated_cqs, cq_num);
 			kfree(nescq);
 			return ERR_PTR(-EFAULT);
@@ -3502,7 +3502,7 @@ static int nes_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *entry)
 
 		if (u64temp) {
 			nesqp = (struct nes_qp *)(unsigned long)u64temp;
-			memset(entry, 0, sizeof *entry);
+			memset(entry, 0, sizeof(*entry));
 			if (cqe.cqe_words[NES_CQE_ERROR_CODE_IDX] == 0) {
 				entry->status = IB_WC_SUCCESS;
 			} else {

@@ -280,7 +280,7 @@ static int send_write(struct svcxprt_rdma *xprt, struct svc_rqst *rqstp,
 	}
 
 	/* Prepare WRITE WR */
-	memset(&write_wr, 0, sizeof write_wr);
+	memset(&write_wr, 0, sizeof(write_wr));
 	ctxt->wr_op = IB_WR_RDMA_WRITE;
 	write_wr.wr.wr_id = (unsigned long)ctxt;
 	write_wr.wr.sg_list = &sge[0];
@@ -542,7 +542,7 @@ static int send_reply(struct svcxprt_rdma *rdma,
 		pr_err("svcrdma: Too many sges (%d)\n", sge_no);
 		goto err;
 	}
-	memset(&send_wr, 0, sizeof send_wr);
+	memset(&send_wr, 0, sizeof(send_wr));
 	ctxt->wr_op = IB_WR_SEND;
 	send_wr.wr_id = (unsigned long)ctxt;
 	send_wr.sg_list = ctxt->sge;

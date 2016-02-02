@@ -488,7 +488,7 @@ static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 				error("decompressor failed");
 		} else if (compress_name) {
 			if (!message) {
-				snprintf(msg_buf, sizeof msg_buf,
+				snprintf(msg_buf, sizeof(msg_buf),
 					 "compression method %s not configured",
 					 compress_name);
 				message = msg_buf;

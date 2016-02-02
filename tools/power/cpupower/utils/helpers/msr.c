@@ -34,7 +34,7 @@ int read_msr(int cpu, unsigned int idx, unsigned long long *val)
 		return -1;
 	if (lseek(fd, idx, SEEK_CUR) == -1)
 		goto err;
-	if (read(fd, val, sizeof *val) != sizeof *val)
+	if (read(fd, val, sizeof(*val)) != sizeof(*val))
 		goto err;
 	close(fd);
 	return 0;
@@ -63,7 +63,7 @@ int write_msr(int cpu, unsigned int idx, unsigned long long val)
 		return -1;
 	if (lseek(fd, idx, SEEK_CUR) == -1)
 		goto err;
-	if (write(fd, &val, sizeof val) != sizeof val)
+	if (write(fd, &val, sizeof(val)) != sizeof(val))
 		goto err;
 	close(fd);
 	return 0;

@@ -1189,7 +1189,7 @@ struct usb_request *musb_alloc_request(struct usb_ep *ep, gfp_t gfp_flags)
 	struct musb		*musb = musb_ep->musb;
 	struct musb_request	*request = NULL;
 
-	request = kzalloc(sizeof *request, gfp_flags);
+	request = kzalloc(sizeof(*request), gfp_flags);
 	if (!request) {
 		dev_dbg(musb->controller, "not enough memory\n");
 		return NULL;
@@ -1744,7 +1744,7 @@ init_peripheral_ep(struct musb *musb, struct musb_ep *ep, u8 epnum, int is_in)
 {
 	struct musb_hw_ep	*hw_ep = musb->endpoints + epnum;
 
-	memset(ep, 0, sizeof *ep);
+	memset(ep, 0, sizeof(*ep));
 
 	ep->current_epnum = epnum;
 	ep->musb = musb;

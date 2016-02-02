@@ -646,7 +646,7 @@ pxa_ep_alloc_request(struct usb_ep *_ep, gfp_t gfp_flags)
 {
 	struct pxa27x_request *req;
 
-	req = kzalloc(sizeof *req, gfp_flags);
+	req = kzalloc(sizeof(*req), gfp_flags);
 	if (!req)
 		return NULL;
 
@@ -2299,7 +2299,7 @@ static void irq_udc_reset(struct pxa_udc *udc)
 		stop_activity(udc, udc->driver);
 	}
 	udc->gadget.speed = USB_SPEED_FULL;
-	memset(&udc->stats, 0, sizeof udc->stats);
+	memset(&udc->stats, 0, sizeof(udc->stats));
 
 	nuke(ep, -EPROTO);
 	ep_write_UDCCSR(ep, UDCCSR0_FTF | UDCCSR0_OPC);

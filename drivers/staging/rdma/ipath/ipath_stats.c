@@ -148,13 +148,13 @@ static void ipath_qcheck(struct ipath_devdata *dd)
 
 	*buf = 0;
 	if (pd->port_hdrqfull != dd->ipath_p0_hdrqfull) {
-		blen = snprintf(buf, sizeof buf, "port 0 hdrqfull %u",
+		blen = snprintf(buf, sizeof(buf), "port 0 hdrqfull %u",
 				pd->port_hdrqfull -
 				dd->ipath_p0_hdrqfull);
 		dd->ipath_p0_hdrqfull = pd->port_hdrqfull;
 	}
 	if (ipath_stats.sps_etidfull != dd->ipath_last_tidfull) {
-		blen += snprintf(buf + blen, sizeof buf - blen,
+		blen += snprintf(buf + blen, sizeof(buf) - blen,
 				 "%srcvegrfull %llu",
 				 blen ? ", " : "",
 				 (unsigned long long)
@@ -172,7 +172,7 @@ static void ipath_qcheck(struct ipath_devdata *dd)
 
 	if ((ipath_debug & (__IPATH_PKTDBG | __IPATH_DBG)) &&
 	    ipath_stats.sps_hdrqfull != last_tot_hdrqfull) {
-		blen += snprintf(buf + blen, sizeof buf - blen,
+		blen += snprintf(buf + blen, sizeof(buf) - blen,
 				 "%shdrqfull %llu (all ports)",
 				 blen ? ", " : "",
 				 (unsigned long long)
@@ -300,7 +300,7 @@ void ipath_get_faststats(unsigned long opaque)
 	    && time_after(jiffies, dd->ipath_unmasktime)) {
 		char ebuf[256];
 		int iserr;
-		iserr = ipath_decode_err(dd, ebuf, sizeof ebuf,
+		iserr = ipath_decode_err(dd, ebuf, sizeof(ebuf),
 					 dd->ipath_maskederrs);
 		if (dd->ipath_maskederrs &
 		    ~(INFINIPATH_E_RRCVEGRFULL | INFINIPATH_E_RRCVHDRFULL |

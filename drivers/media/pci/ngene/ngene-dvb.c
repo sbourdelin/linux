@@ -138,7 +138,7 @@ void *tsin_exchange(void *priv, void *buf, u32 len, u32 clock, u32 flags)
 
 	if (dev->ci.en && chan->number == 2) {
 		while (len >= 188) {
-			if (memcmp(buf, fill_ts, sizeof fill_ts) != 0) {
+			if (memcmp(buf, fill_ts, sizeof(fill_ts)) != 0) {
 				if (dvb_ringbuffer_free(&dev->tsin_rbuf) >= 188) {
 					dvb_ringbuffer_write(&dev->tsin_rbuf, buf, 188);
 					wake_up(&dev->tsin_rbuf.queue);

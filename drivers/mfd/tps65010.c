@@ -162,7 +162,7 @@ static void show_chgstatus(const char *label, u8 chgstatus)
 {
 	char buf [100];
 
-	dbg_chgstat(buf, sizeof buf, chgstatus);
+	dbg_chgstat(buf, sizeof(buf), chgstatus);
 	pr_debug("%s: %s %s", DRIVER_NAME, label, buf);
 }
 
@@ -170,7 +170,7 @@ static void show_regstatus(const char *label, u8 regstatus)
 {
 	char buf [100];
 
-	dbg_regstat(buf, sizeof buf, regstatus);
+	dbg_regstat(buf, sizeof(buf), regstatus);
 	pr_debug("%s: %s %s", DRIVER_NAME, label, buf);
 }
 
@@ -178,7 +178,7 @@ static void show_chgconfig(int por, const char *label, u8 chgconfig)
 {
 	char buf [100];
 
-	dbg_chgconf(por, buf, sizeof buf, chgconfig);
+	dbg_chgconf(por, buf, sizeof(buf), chgconfig);
 	pr_debug("%s: %s %s", DRIVER_NAME, label, buf);
 }
 
@@ -223,22 +223,22 @@ static int dbg_show(struct seq_file *s, void *_)
 	 * that reading chgstat and regstat may ack IRQs...
 	 */
 	value = i2c_smbus_read_byte_data(tps->client, TPS_CHGCONFIG);
-	dbg_chgconf(tps->por, buf, sizeof buf, value);
+	dbg_chgconf(tps->por, buf, sizeof(buf), value);
 	seq_printf(s, "chgconfig %s", buf);
 
 	value = i2c_smbus_read_byte_data(tps->client, TPS_CHGSTATUS);
-	dbg_chgstat(buf, sizeof buf, value);
+	dbg_chgstat(buf, sizeof(buf), value);
 	seq_printf(s, "chgstat   %s", buf);
 	value = i2c_smbus_read_byte_data(tps->client, TPS_MASK1);
-	dbg_chgstat(buf, sizeof buf, value);
+	dbg_chgstat(buf, sizeof(buf), value);
 	seq_printf(s, "mask1     %s", buf);
 	/* ignore ackint1 */
 
 	value = i2c_smbus_read_byte_data(tps->client, TPS_REGSTATUS);
-	dbg_regstat(buf, sizeof buf, value);
+	dbg_regstat(buf, sizeof(buf), value);
 	seq_printf(s, "regstat   %s", buf);
 	value = i2c_smbus_read_byte_data(tps->client, TPS_MASK2);
-	dbg_regstat(buf, sizeof buf, value);
+	dbg_regstat(buf, sizeof(buf), value);
 	seq_printf(s, "mask2     %s\n", buf);
 	/* ignore ackint2 */
 

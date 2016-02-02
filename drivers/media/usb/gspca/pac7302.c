@@ -801,11 +801,11 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 		 * image, the 14th and 15th byte after the EOF seem to
 		 * correspond to the center of the image.
 		 */
-		lum_offset = 61 + sizeof pac_sof_marker;
+		lum_offset = 61 + sizeof(pac_sof_marker);
 		footer_length = 74;
 
 		/* Finish decoding current frame */
-		n = (sof - data) - (footer_length + sizeof pac_sof_marker);
+		n = (sof - data) - (footer_length + sizeof(pac_sof_marker));
 		if (n < 0) {
 			gspca_dev->image_len += n;
 			n = 0;
@@ -832,7 +832,7 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 		/* Start the new frame with the jpeg header */
 		/* The PAC7302 has the image rotated 90 degrees */
 		gspca_frame_add(gspca_dev, FIRST_PACKET,
-				jpeg_header, sizeof jpeg_header);
+				jpeg_header, sizeof(jpeg_header));
 	}
 	gspca_frame_add(gspca_dev, INTER_PACKET, data, len);
 }

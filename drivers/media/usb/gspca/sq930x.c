@@ -683,7 +683,7 @@ static void mt9v111_init(struct gspca_dev *gspca_dev)
 		{0x02, 0x01, 0xae, 0x01, 0x00, 0x00, 0x00},
 	};
 
-	reg_wb(gspca_dev, 0x001b, 0x0000, cmd_001b, sizeof cmd_001b);
+	reg_wb(gspca_dev, 0x001b, 0x0000, cmd_001b, sizeof(cmd_001b));
 	for (i = 0; i < ARRAY_SIZE(cmd_011b); i++) {
 		reg_wb(gspca_dev, 0x001b, 0x0000, cmd_011b[i],
 				ARRAY_SIZE(cmd_011b[0]));

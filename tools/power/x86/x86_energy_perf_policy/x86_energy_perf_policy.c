@@ -199,9 +199,9 @@ unsigned long long get_msr(int cpu, int offset)
 		exit(1);
 	}
 
-	retval = pread(fd, &msr, sizeof msr, offset);
+	retval = pread(fd, &msr, sizeof(msr), offset);
 
-	if (retval != sizeof msr) {
+	if (retval != sizeof(msr)) {
 		printf("pread cpu%d 0x%x = %d\n", cpu, offset, retval);
 		exit(-2);
 	}
@@ -223,15 +223,15 @@ unsigned long long  put_msr(int cpu, unsigned long long new_msr, int offset)
 		exit(1);
 	}
 
-	retval = pread(fd, &old_msr, sizeof old_msr, offset);
-	if (retval != sizeof old_msr) {
+	retval = pread(fd, &old_msr, sizeof(old_msr), offset);
+	if (retval != sizeof(old_msr)) {
 		perror("pwrite");
 		printf("pread cpu%d 0x%x = %d\n", cpu, offset, retval);
 		exit(-2);
 	}
 
-	retval = pwrite(fd, &new_msr, sizeof new_msr, offset);
-	if (retval != sizeof new_msr) {
+	retval = pwrite(fd, &new_msr, sizeof(new_msr), offset);
+	if (retval != sizeof(new_msr)) {
 		perror("pwrite");
 		printf("pwrite cpu%d 0x%x = %d\n", cpu, offset, retval);
 		exit(-2);

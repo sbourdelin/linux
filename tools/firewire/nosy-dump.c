@@ -149,7 +149,7 @@ subaction_create(uint32_t *data, size_t length)
 	struct subaction *sa;
 
 	/* we put the ack in the subaction struct for easy access. */
-	sa = malloc(sizeof *sa - sizeof sa->packet + length);
+	sa = malloc(sizeof(*sa) - sizeof(sa->packet) + length);
 	if (!sa)
 		exit(EXIT_FAILURE);
 	sa->ack = data[length / 4 - 1];
@@ -181,7 +181,7 @@ link_transaction_lookup(int request_node, int response_node, int tlabel)
 			return t;
 	}
 
-	t = malloc(sizeof *t);
+	t = malloc(sizeof(*t));
 	if (!t)
 		exit(EXIT_FAILURE);
 	t->request_node = request_node;
@@ -985,13 +985,13 @@ int main(int argc, const char *argv[])
 
 	while (run) {
 		if (input != NULL) {
-			if (fread(&length, sizeof length, 1, input) != 1)
+			if (fread(&length, sizeof(length), 1, input) != 1)
 				return 0;
 			fread(buf, 1, length, input);
 		} else {
 			poll(pollfds, 2, -1);
 			if (pollfds[1].revents) {
-				read(STDIN_FILENO, &c, sizeof c);
+				read(STDIN_FILENO, &c, sizeof(c));
 				switch (c) {
 				case 'q':
 					if (output != NULL)
@@ -1001,13 +1001,13 @@ int main(int argc, const char *argv[])
 			}
 
 			if (pollfds[0].revents)
-				length = read(fd, buf, sizeof buf);
+				length = read(fd, buf, sizeof(buf));
 			else
 				continue;
 		}
 
 		if (output != NULL) {
-			fwrite(&length, sizeof length, 1, output);
+			fwrite(&length, sizeof(length), 1, output);
 			fwrite(buf, 1, length, output);
 		}
 

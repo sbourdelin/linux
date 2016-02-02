@@ -824,7 +824,7 @@ int mthca_init_cq(struct mthca_dev *dev, int nent,
 	init_waitqueue_head(&cq->wait);
 	mutex_init(&cq->mutex);
 
-	memset(cq_context, 0, sizeof *cq_context);
+	memset(cq_context, 0, sizeof(*cq_context));
 	cq_context->flags           = cpu_to_be32(MTHCA_CQ_STATUS_OK      |
 						  MTHCA_CQ_STATE_DISARMED |
 						  MTHCA_CQ_FLAG_TR);

@@ -2294,7 +2294,7 @@ static int mlx4_init_hca(struct mlx4_dev *dev)
 		dev->caps.rx_checksum_flags_port[2] = params.rx_csum_flags_port_2;
 	}
 	priv->eq_table.inta_pin = adapter.inta_pin;
-	memcpy(dev->board_id, adapter.board_id, sizeof dev->board_id);
+	memcpy(dev->board_id, adapter.board_id, sizeof(dev->board_id));
 
 	return 0;
 
@@ -2766,7 +2766,7 @@ static void mlx4_enable_msi_x(struct mlx4_dev *dev)
 		if (nreq > MAX_MSIX)
 			nreq = MAX_MSIX;
 
-		entries = kcalloc(nreq, sizeof *entries, GFP_KERNEL);
+		entries = kcalloc(nreq, sizeof(*entries), GFP_KERNEL);
 		if (!entries)
 			goto no_msi;
 

@@ -164,7 +164,7 @@ int mpi_powm(MPI res, MPI base, MPI exp, MPI mod)
 		if (!xp)
 			goto enomem;
 
-		memset(&karactx, 0, sizeof karactx);
+		memset(&karactx, 0, sizeof(karactx));
 		negative_result = (ep[0] & 1) && base->sign;
 
 		i = esize - 1;

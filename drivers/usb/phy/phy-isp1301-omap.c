@@ -1496,11 +1496,11 @@ isp1301_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	if (the_transceiver)
 		return 0;
 
-	isp = kzalloc(sizeof *isp, GFP_KERNEL);
+	isp = kzalloc(sizeof(*isp), GFP_KERNEL);
 	if (!isp)
 		return 0;
 
-	isp->phy.otg = kzalloc(sizeof *isp->phy.otg, GFP_KERNEL);
+	isp->phy.otg = kzalloc(sizeof(*isp->phy.otg), GFP_KERNEL);
 	if (!isp->phy.otg) {
 		kfree(isp);
 		return 0;

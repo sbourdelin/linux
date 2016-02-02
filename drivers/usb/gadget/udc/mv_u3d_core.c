@@ -680,7 +680,7 @@ mv_u3d_alloc_request(struct usb_ep *_ep, gfp_t gfp_flags)
 {
 	struct mv_u3d_req *req = NULL;
 
-	req = kzalloc(sizeof *req, gfp_flags);
+	req = kzalloc(sizeof(*req), gfp_flags);
 	if (!req)
 		return NULL;
 

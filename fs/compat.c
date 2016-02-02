@@ -212,7 +212,7 @@ COMPAT_SYSCALL_DEFINE2(newfstat, unsigned int, fd,
 static int put_compat_statfs(struct compat_statfs __user *ubuf, struct kstatfs *kbuf)
 {
 	
-	if (sizeof ubuf->f_blocks == 4) {
+	if (sizeof(ubuf->f_blocks) == 4) {
 		if ((kbuf->f_blocks | kbuf->f_bfree | kbuf->f_bavail |
 		     kbuf->f_bsize | kbuf->f_frsize) & 0xffffffff00000000ULL)
 			return -EOVERFLOW;
@@ -267,7 +267,7 @@ COMPAT_SYSCALL_DEFINE2(fstatfs, unsigned int, fd, struct compat_statfs __user *,
 
 static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstatfs *kbuf)
 {
-	if (sizeof ubuf->f_blocks == 4) {
+	if (sizeof(ubuf->f_blocks) == 4) {
 		if ((kbuf->f_blocks | kbuf->f_bfree | kbuf->f_bavail |
 		     kbuf->f_bsize | kbuf->f_frsize) & 0xffffffff00000000ULL)
 			return -EOVERFLOW;
@@ -693,7 +693,7 @@ static void *do_ncp_super_data_conv(void *raw_data)
 		n->file_mode = c_n->file_mode;
 		n->gid = c_n->gid;
 		n->uid = c_n->uid;
-		memmove (n->mounted_vol, c_n->mounted_vol, (sizeof (c_n->mounted_vol) + 3 * sizeof (unsigned int)));
+		memmove (n->mounted_vol, c_n->mounted_vol, (sizeof(c_n->mounted_vol) + 3 * sizeof (unsigned int)));
 		n->wdog_pid = c_n->wdog_pid;
 		n->mounted_uid = c_n->mounted_uid;
 	} else if (version == 4) {

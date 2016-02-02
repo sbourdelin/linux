@@ -43,7 +43,7 @@ static struct xhci_segment *xhci_segment_alloc(struct xhci_hcd *xhci,
 	dma_addr_t	dma;
 	int		i;
 
-	seg = kzalloc(sizeof *seg, flags);
+	seg = kzalloc(sizeof(*seg), flags);
 	if (!seg)
 		return NULL;
 
@@ -365,7 +365,7 @@ static struct xhci_ring *xhci_ring_alloc(struct xhci_hcd *xhci,
 	struct xhci_ring	*ring;
 	int ret;
 
-	ring = kzalloc(sizeof *(ring), flags);
+	ring = kzalloc(sizeof(*(ring)), flags);
 	if (!ring)
 		return NULL;
 
@@ -2375,7 +2375,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 			GFP_KERNEL);
 	if (!xhci->dcbaa)
 		goto fail;
-	memset(xhci->dcbaa, 0, sizeof *(xhci->dcbaa));
+	memset(xhci->dcbaa, 0, sizeof(*(xhci->dcbaa)));
 	xhci->dcbaa->dma = dma;
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"// Device context base array address = 0x%llx (DMA), %p (virt)",

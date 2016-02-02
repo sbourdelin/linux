@@ -104,7 +104,7 @@ at25_ee_read(
 	}
 
 	spi_message_init(&m);
-	memset(t, 0, sizeof t);
+	memset(t, 0, sizeof(t));
 
 	t[0].tx_buf = command;
 	t[0].len = at25->addrlen + 1;

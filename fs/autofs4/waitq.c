@@ -105,7 +105,7 @@ static void autofs4_notify_daemon(struct autofs_sb_info *sbi,
 	DPRINTK("wait id = 0x%08lx, name = %.*s, type=%d",
 		(unsigned long) wq->wait_queue_token, wq->name.len, wq->name.name, type);
 
-	memset(&pkt,0,sizeof pkt); /* For security reasons */
+	memset(&pkt,0,sizeof(pkt)); /* For security reasons */
 
 	pkt.hdr.proto_version = sbi->version;
 	pkt.hdr.type = type;

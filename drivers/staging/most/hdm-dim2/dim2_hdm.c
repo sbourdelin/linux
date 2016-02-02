@@ -70,7 +70,7 @@ static DECLARE_TASKLET(dim2_tasklet, dim2_tasklet_fn, 0);
  * @data_type: channel data type
  */
 struct hdm_channel {
-	char name[sizeof "caNNN"];
+	char name[sizeof("caNNN")];
 	bool is_initialized;
 	struct dim_channel ch;
 	struct list_head pending_list;	/* before dim_enqueue_buffer() */
@@ -98,7 +98,7 @@ struct dim2_hdm {
 	struct hdm_channel hch[DMA_CHANNELS];
 	struct most_channel_capability capabilities[DMA_CHANNELS];
 	struct most_interface most_iface;
-	char name[16 + sizeof "dim2-"];
+	char name[16 + sizeof("dim2-")];
 	void *io_base;
 	unsigned int irq_ahb0;
 	int clk_speed;

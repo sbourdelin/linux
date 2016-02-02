@@ -602,7 +602,7 @@ musb_read_setup(struct musb *musb, struct usb_ctrlrequest *req)
 	struct musb_request	*r;
 	void __iomem		*regs = musb->control_ep->regs;
 
-	musb_read_fifo(&musb->endpoints[0], sizeof *req, (u8 *)req);
+	musb_read_fifo(&musb->endpoints[0], sizeof(*req), (u8 *)req);
 
 	/* NOTE:  earlier 2.6 versions changed setup packets to host
 	 * order, but now USB packets always stay in USB byte order.

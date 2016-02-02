@@ -712,7 +712,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		return -ENOTTY;
 	}
 	return copy_to_user((void __user *)arg,
-			    &wtime, sizeof wtime) ? -EFAULT : 0;
+			    &wtime, sizeof(wtime)) ? -EFAULT : 0;
 }
 
 static long rtc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)

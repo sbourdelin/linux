@@ -129,7 +129,7 @@ int ipoib_vlan_add(struct net_device *pdev, unsigned short pkey)
 
 	ppriv = netdev_priv(pdev);
 
-	snprintf(intf_name, sizeof intf_name, "%s.%04x",
+	snprintf(intf_name, sizeof(intf_name), "%s.%04x",
 		 ppriv->dev->name, pkey);
 	priv = ipoib_intf_alloc(intf_name);
 	if (!priv)

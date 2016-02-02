@@ -519,7 +519,7 @@ cciss_proc_write(struct file *file, const char __user *buf,
 		return PTR_ERR(buffer);
 
 #ifdef CONFIG_CISS_SCSI_TAPE
-	if (strncmp(ENGAGE_SCSI, buffer, sizeof ENGAGE_SCSI - 1) == 0) {
+	if (strncmp(ENGAGE_SCSI, buffer, sizeof(ENGAGE_SCSI) - 1) == 0) {
 		struct seq_file *seq = file->private_data;
 		ctlr_info_t *h = seq->private;
 

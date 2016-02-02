@@ -65,7 +65,7 @@ struct ib_mr *ipath_get_dma_mr(struct ib_pd *pd, int acc)
 	struct ipath_mr *mr;
 	struct ib_mr *ret;
 
-	mr = kzalloc(sizeof *mr, GFP_KERNEL);
+	mr = kzalloc(sizeof(*mr), GFP_KERNEL);
 	if (!mr) {
 		ret = ERR_PTR(-ENOMEM);
 		goto bail;
@@ -86,13 +86,13 @@ static struct ipath_mr *alloc_mr(int count,
 
 	/* Allocate struct plus pointers to first level page tables. */
 	m = (count + IPATH_SEGSZ - 1) / IPATH_SEGSZ;
-	mr = kmalloc(sizeof *mr + m * sizeof mr->mr.map[0], GFP_KERNEL);
+	mr = kmalloc(sizeof(*mr) + m * sizeof(mr->mr.map[0]), GFP_KERNEL);
 	if (!mr)
 		goto done;
 
 	/* Allocate first level page tables. */
 	for (; i < m; i++) {
-		mr->mr.map[i] = kmalloc(sizeof *mr->mr.map[0], GFP_KERNEL);
+		mr->mr.map[i] = kmalloc(sizeof(*mr->mr.map[0]), GFP_KERNEL);
 		if (!mr->mr.map[i])
 			goto bail;
 	}
@@ -233,13 +233,13 @@ struct ib_fmr *ipath_alloc_fmr(struct ib_pd *pd, int mr_access_flags,
 
 	/* Allocate struct plus pointers to first level page tables. */
 	m = (fmr_attr->max_pages + IPATH_SEGSZ - 1) / IPATH_SEGSZ;
-	fmr = kmalloc(sizeof *fmr + m * sizeof fmr->mr.map[0], GFP_KERNEL);
+	fmr = kmalloc(sizeof(*fmr) + m * sizeof(fmr->mr.map[0]), GFP_KERNEL);
 	if (!fmr)
 		goto bail;
 
 	/* Allocate first level page tables. */
 	for (; i < m; i++) {
-		fmr->mr.map[i] = kmalloc(sizeof *fmr->mr.map[0],
+		fmr->mr.map[i] = kmalloc(sizeof(*fmr->mr.map[0]),
 					 GFP_KERNEL);
 		if (!fmr->mr.map[i])
 			goto bail;

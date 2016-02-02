@@ -129,7 +129,7 @@ struct ib_ah *mlx4_ib_create_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr)
 	struct mlx4_ib_ah *ah;
 	struct ib_ah *ret;
 
-	ah = kzalloc(sizeof *ah, GFP_ATOMIC);
+	ah = kzalloc(sizeof(*ah), GFP_ATOMIC);
 	if (!ah)
 		return ERR_PTR(-ENOMEM);
 
@@ -161,7 +161,7 @@ int mlx4_ib_query_ah(struct ib_ah *ibah, struct ib_ah_attr *ah_attr)
 	struct mlx4_ib_ah *ah = to_mah(ibah);
 	enum rdma_link_layer ll;
 
-	memset(ah_attr, 0, sizeof *ah_attr);
+	memset(ah_attr, 0, sizeof(*ah_attr));
 	ah_attr->port_num = be32_to_cpu(ah->av.ib.port_pd) >> 24;
 	ll = rdma_port_get_link_layer(ibah->device, ah_attr->port_num);
 	if (ll == IB_LINK_LAYER_ETHERNET)

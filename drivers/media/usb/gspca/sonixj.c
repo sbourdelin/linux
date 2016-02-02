@@ -1862,7 +1862,7 @@ static void setcontrast(struct gspca_dev *gspca_dev)
 	contrast[3] = 0;
 	contrast[4] = k2 / 5;			/* blue */
 	contrast[5] = 0;
-	reg_w(gspca_dev, 0x84, contrast, sizeof contrast);
+	reg_w(gspca_dev, 0x84, contrast, sizeof(contrast));
 }
 
 static void setcolors(struct gspca_dev *gspca_dev)
@@ -1890,7 +1890,7 @@ static void setcolors(struct gspca_dev *gspca_dev)
 		reg8a[i * 2] = v;
 		reg8a[i * 2 + 1] = (v >> 8) & 0x0f;
 	}
-	reg_w(gspca_dev, 0x8a, reg8a, sizeof reg8a);
+	reg_w(gspca_dev, 0x8a, reg8a, sizeof(reg8a));
 }
 
 static void setredblue(struct gspca_dev *gspca_dev)
@@ -1944,10 +1944,10 @@ static void setgamma(struct gspca_dev *gspca_dev)
 	}
 
 	val = sd->gamma->val;
-	for (i = 0; i < sizeof gamma; i++)
+	for (i = 0; i < sizeof(gamma); i++)
 		gamma[i] = gamma_base[i]
 			+ delta[i] * (val - GAMMA_DEF) / 32;
-	reg_w(gspca_dev, 0x20, gamma, sizeof gamma);
+	reg_w(gspca_dev, 0x20, gamma, sizeof(gamma));
 }
 
 static void setexposure(struct gspca_dev *gspca_dev)
@@ -2241,7 +2241,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
 	}
 	reg_w(gspca_dev, 0x9a, reg9a, 6);
 
-	reg_w(gspca_dev, 0xd4, regd4, sizeof regd4);
+	reg_w(gspca_dev, 0xd4, regd4, sizeof(regd4));
 
 	reg_w(gspca_dev, 0x03, &sn9c1xx[3], 0x0f);
 
@@ -2334,7 +2334,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
 
 /*fixme: 8 times with all zeroes and 1 or 2 times with normal values */
 	for (i = 0; i < 8; i++)
-		reg_w(gspca_dev, 0x84, reg84, sizeof reg84);
+		reg_w(gspca_dev, 0x84, reg84, sizeof(reg84));
 	switch (sd->sensor) {
 	case SENSOR_ADCM1700:
 	case SENSOR_OV7660:
@@ -2360,7 +2360,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
 	}
 	setsharpness(gspca_dev);
 
-	reg_w(gspca_dev, 0x84, reg84, sizeof reg84);
+	reg_w(gspca_dev, 0x84, reg84, sizeof(reg84));
 	reg_w1(gspca_dev, 0x05, 0x20);		/* red */
 	reg_w1(gspca_dev, 0x07, 0x20);		/* green */
 	reg_w1(gspca_dev, 0x06, 0x20);		/* blue */

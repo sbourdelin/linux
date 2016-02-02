@@ -895,8 +895,7 @@ mwifiex_config_scan(struct mwifiex_private *priv,
 			wildcard_ssid_tlv->header.type =
 				cpu_to_le16(TLV_TYPE_WILDCARDSSID);
 			wildcard_ssid_tlv->header.len = cpu_to_le16(
-				(u16) (ssid_len + sizeof(wildcard_ssid_tlv->
-							 max_ssid_length)));
+				(u16) (ssid_len + sizeof(wildcard_ssid_tlv->max_ssid_length)));
 
 			/*
 			 * max_ssid_length = 0 tells firmware to perform

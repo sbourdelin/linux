@@ -643,7 +643,7 @@ static struct usb_request *usbhsg_ep_alloc_request(struct usb_ep *ep,
 {
 	struct usbhsg_request *ureq;
 
-	ureq = kzalloc(sizeof *ureq, gfp_flags);
+	ureq = kzalloc(sizeof(*ureq), gfp_flags);
 	if (!ureq)
 		return NULL;
 

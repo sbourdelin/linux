@@ -254,7 +254,7 @@ static struct f_audio_buf *f_audio_buffer_alloc(int buf_size)
 {
 	struct f_audio_buf *copy_buf;
 
-	copy_buf = kzalloc(sizeof *copy_buf, GFP_ATOMIC);
+	copy_buf = kzalloc(sizeof(*copy_buf), GFP_ATOMIC);
 	if (!copy_buf)
 		return ERR_PTR(-ENOMEM);
 

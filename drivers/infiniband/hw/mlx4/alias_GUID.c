@@ -513,7 +513,7 @@ static int set_guid_rec(struct ib_device *ibdev,
 		goto new_schedule;
 	}
 
-	callback_context = kmalloc(sizeof *callback_context, GFP_KERNEL);
+	callback_context = kmalloc(sizeof(*callback_context), GFP_KERNEL);
 	if (!callback_context) {
 		err = -ENOMEM;
 		resched_delay = HZ * 5;
@@ -754,7 +754,7 @@ static void alias_guid_work(struct work_struct *work)
 						alias_guid);
 	struct mlx4_ib_dev *dev = container_of(ib_sriov, struct mlx4_ib_dev, sriov);
 
-	rec = kzalloc(sizeof *rec, GFP_KERNEL);
+	rec = kzalloc(sizeof(*rec), GFP_KERNEL);
 	if (!rec) {
 		pr_err("alias_guid_work: No Memory\n");
 		return;
@@ -841,7 +841,7 @@ int mlx4_ib_init_alias_guid_service(struct mlx4_ib_dev *dev)
 	if (!mlx4_is_master(dev->dev))
 		return 0;
 	dev->sriov.alias_guid.sa_client =
-		kzalloc(sizeof *dev->sriov.alias_guid.sa_client, GFP_KERNEL);
+		kzalloc(sizeof(*dev->sriov.alias_guid.sa_client), GFP_KERNEL);
 	if (!dev->sriov.alias_guid.sa_client)
 		return -ENOMEM;
 
@@ -865,8 +865,7 @@ int mlx4_ib_init_alias_guid_service(struct mlx4_ib_dev *dev)
 			/* mark each val as it was deleted */
 			memset(dev->sriov.alias_guid.ports_guid[i].
 				all_rec_per_port[j].all_recs, 0xFF,
-				sizeof(dev->sriov.alias_guid.ports_guid[i].
-				all_rec_per_port[j].all_recs));
+				sizeof(dev->sriov.alias_guid.ports_guid[i].all_rec_per_port[j].all_recs));
 		}
 		INIT_LIST_HEAD(&dev->sriov.alias_guid.ports_guid[i].cb_list);
 		/*prepare the records, set them to be allocated by sm*/
@@ -879,7 +878,7 @@ int mlx4_ib_init_alias_guid_service(struct mlx4_ib_dev *dev)
 		dev->sriov.alias_guid.ports_guid[i].parent = &dev->sriov.alias_guid;
 		dev->sriov.alias_guid.ports_guid[i].port  = i;
 
-		snprintf(alias_wq_name, sizeof alias_wq_name, "alias_guid%d", i);
+		snprintf(alias_wq_name, sizeof(alias_wq_name), "alias_guid%d", i);
 		dev->sriov.alias_guid.ports_guid[i].wq =
 			create_singlethread_workqueue(alias_wq_name);
 		if (!dev->sriov.alias_guid.ports_guid[i].wq) {

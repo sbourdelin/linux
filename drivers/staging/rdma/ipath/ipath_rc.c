@@ -948,7 +948,7 @@ static int do_rc_ack(struct ipath_qp *qp, u32 aeth, u32 psn, int opcode,
 		/* Post a send completion queue entry if requested. */
 		if (!(qp->s_flags & IPATH_S_SIGNAL_REQ_WR) ||
 		    (wqe->wr.send_flags & IB_SEND_SIGNALED)) {
-			memset(&wc, 0, sizeof wc);
+			memset(&wc, 0, sizeof(wc));
 			wc.wr_id = wqe->wr.wr_id;
 			wc.status = IB_WC_SUCCESS;
 			wc.opcode = ib_ipath_wc_opcode[wqe->wr.opcode];
@@ -1665,7 +1665,7 @@ void ipath_rc_rcv(struct ipath_ibdev *dev, struct ipath_ib_header *hdr,
 		break;
 	}
 
-	memset(&wc, 0, sizeof wc);
+	memset(&wc, 0, sizeof(wc));
 
 	/* OK, process the packet. */
 	switch (opcode) {

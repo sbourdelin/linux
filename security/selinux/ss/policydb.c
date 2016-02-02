@@ -1056,7 +1056,7 @@ static int context_read_and_validate(struct context *c,
 	__le32 buf[3];
 	int rc;
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc) {
 		printk(KERN_ERR "SELinux: context truncated\n");
 		goto out;
@@ -1122,7 +1122,7 @@ static int perm_read(struct policydb *p, struct hashtab *h, void *fp)
 	if (!perdatum)
 		goto bad;
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc)
 		goto bad;
 
@@ -1156,7 +1156,7 @@ static int common_read(struct policydb *p, struct hashtab *h, void *fp)
 	if (!comdatum)
 		goto bad;
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc)
 		goto bad;
 
@@ -1285,8 +1285,7 @@ static int read_cons_helper(struct policydb *p,
 					return rc;
 				if (p->policyvers >=
 					POLICYDB_VERSION_CONSTRAINT_NAMES) {
-						e->type_names = kzalloc(sizeof
-						(*e->type_names),
+						e->type_names = kzalloc(sizeof(*e->type_names),
 						GFP_KERNEL);
 					if (!e->type_names)
 						return -ENOMEM;
@@ -1520,7 +1519,7 @@ static int mls_read_level(struct mls_level *lp, void *fp)
 
 	memset(lp, 0, sizeof(*lp));
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc) {
 		printk(KERN_ERR "SELinux: mls: truncated level\n");
 		return rc;
@@ -1599,7 +1598,7 @@ static int sens_read(struct policydb *p, struct hashtab *h, void *fp)
 	if (!levdatum)
 		goto bad;
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc)
 		goto bad;
 
@@ -1641,7 +1640,7 @@ static int cat_read(struct policydb *p, struct hashtab *h, void *fp)
 	if (!catdatum)
 		goto bad;
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc)
 		goto bad;
 

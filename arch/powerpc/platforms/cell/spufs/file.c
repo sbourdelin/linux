@@ -477,7 +477,7 @@ __spufs_regs_read(struct spu_context *ctx, char __user *buffer,
 {
 	struct spu_lscsa *lscsa = ctx->csa.lscsa;
 	return simple_read_from_buffer(buffer, size, pos,
-				      lscsa->gprs, sizeof lscsa->gprs);
+				      lscsa->gprs, sizeof(lscsa->gprs));
 }
 
 static ssize_t
@@ -668,7 +668,7 @@ static ssize_t spufs_mbox_stat_read(struct file *file, char __user *buf,
 
 	spu_release(ctx);
 
-	if (copy_to_user(buf, &mbox_stat, sizeof mbox_stat))
+	if (copy_to_user(buf, &mbox_stat, sizeof(mbox_stat)))
 		return -EFAULT;
 
 	return 4;
@@ -817,7 +817,7 @@ static ssize_t spufs_ibox_stat_read(struct file *file, char __user *buf,
 	ibox_stat = (ctx->ops->mbox_stat_read(ctx) >> 16) & 0xff;
 	spu_release(ctx);
 
-	if (copy_to_user(buf, &ibox_stat, sizeof ibox_stat))
+	if (copy_to_user(buf, &ibox_stat, sizeof(ibox_stat)))
 		return -EFAULT;
 
 	return 4;
@@ -967,7 +967,7 @@ static ssize_t spufs_wbox_stat_read(struct file *file, char __user *buf,
 	wbox_stat = (ctx->ops->mbox_stat_read(ctx) >> 8) & 0xff;
 	spu_release(ctx);
 
-	if (copy_to_user(buf, &wbox_stat, sizeof wbox_stat))
+	if (copy_to_user(buf, &wbox_stat, sizeof(wbox_stat)))
 		return -EFAULT;
 
 	return 4;
@@ -1695,11 +1695,11 @@ static ssize_t spufs_mfc_write(struct file *file, const char __user *buffer,
 	struct mfc_dma_command cmd;
 	int ret = -EINVAL;
 
-	if (size != sizeof cmd)
+	if (size != sizeof(cmd))
 		goto out;
 
 	ret = -EFAULT;
-	if (copy_from_user(&cmd, buffer, sizeof cmd))
+	if (copy_from_user(&cmd, buffer, sizeof(cmd)))
 		goto out;
 
 	ret = spufs_check_valid_dma(&cmd);
@@ -2038,7 +2038,7 @@ static ssize_t __spufs_mbox_info_read(struct spu_context *ctx,
 
 	data = ctx->csa.prob.pu_mb_R;
 
-	return simple_read_from_buffer(buf, len, pos, &data, sizeof data);
+	return simple_read_from_buffer(buf, len, pos, &data, sizeof(data));
 }
 
 static ssize_t spufs_mbox_info_read(struct file *file, char __user *buf,
@@ -2078,7 +2078,7 @@ static ssize_t __spufs_ibox_info_read(struct spu_context *ctx,
 
 	data = ctx->csa.priv2.puint_mb_R;
 
-	return simple_read_from_buffer(buf, len, pos, &data, sizeof data);
+	return simple_read_from_buffer(buf, len, pos, &data, sizeof(data));
 }
 
 static ssize_t spufs_ibox_info_read(struct file *file, char __user *buf,
@@ -2173,7 +2173,7 @@ static ssize_t __spufs_dma_info_read(struct spu_context *ctx,
 	}
 
 	return simple_read_from_buffer(buf, len, pos, &info,
-				sizeof info);
+				sizeof(info));
 }
 
 static ssize_t spufs_dma_info_read(struct file *file, char __user *buf,
@@ -2207,7 +2207,7 @@ static ssize_t __spufs_proxydma_info_read(struct spu_context *ctx,
 {
 	struct spu_proxydma_info info;
 	struct mfc_cq_sr *qp, *puqp;
-	int ret = sizeof info;
+	int ret = sizeof(info);
 	int i;
 
 	if (len < ret)
@@ -2230,7 +2230,7 @@ static ssize_t __spufs_proxydma_info_read(struct spu_context *ctx,
 	}
 
 	return simple_read_from_buffer(buf, len, pos, &info,
-				sizeof info);
+				sizeof(info));
 }
 
 static ssize_t spufs_proxydma_info_read(struct file *file, char __user *buf,

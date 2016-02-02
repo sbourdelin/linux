@@ -212,14 +212,14 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
 	}
 
 	if (!user) {
-		wq->sq.sw_sq = kzalloc(wq->sq.size * sizeof *wq->sq.sw_sq,
+		wq->sq.sw_sq = kzalloc(wq->sq.size * sizeof(*wq->sq.sw_sq),
 				 GFP_KERNEL);
 		if (!wq->sq.sw_sq) {
 			ret = -ENOMEM;
 			goto free_rq_qid;
 		}
 
-		wq->rq.sw_rq = kzalloc(wq->rq.size * sizeof *wq->rq.sw_rq,
+		wq->rq.sw_rq = kzalloc(wq->rq.size * sizeof(*wq->rq.sw_rq),
 				 GFP_KERNEL);
 		if (!wq->rq.sw_rq) {
 			ret = -ENOMEM;
@@ -280,7 +280,7 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
 	wq->rq.msn = 1;
 
 	/* build fw_ri_res_wr */
-	wr_len = sizeof *res_wr + 2 * sizeof *res;
+	wr_len = sizeof(*res_wr) + 2 * sizeof(*res);
 
 	skb = alloc_skb(wr_len, GFP_KERNEL);
 	if (!skb) {
@@ -409,7 +409,7 @@ static int build_immd(struct t4_sq *sq, struct fw_ri_immd *immdp,
 			rem -= len;
 		}
 	}
-	len = roundup(plen + sizeof *immdp, 16) - (plen + sizeof *immdp);
+	len = roundup(plen + sizeof(*immdp), 16) - (plen + sizeof(*immdp));
 	if (len)
 		memset(dstp, 0, len);
 	immdp->op = FW_RI_DATA_IMMD;
@@ -493,7 +493,7 @@ static int build_rdma_send(struct t4_sq *sq, union t4_wr *wqe,
 					 T4_MAX_SEND_INLINE, &plen);
 			if (ret)
 				return ret;
-			size = sizeof wqe->send + sizeof(struct fw_ri_immd) +
+			size = sizeof(wqe->send) + sizeof(struct fw_ri_immd) +
 			       plen;
 		} else {
 			ret = build_isgl((__be64 *)sq->queue,
@@ -502,7 +502,7 @@ static int build_rdma_send(struct t4_sq *sq, union t4_wr *wqe,
 					 wr->sg_list, wr->num_sge, &plen);
 			if (ret)
 				return ret;
-			size = sizeof wqe->send + sizeof(struct fw_ri_isgl) +
+			size = sizeof(wqe->send) + sizeof(struct fw_ri_isgl) +
 			       wr->num_sge * sizeof(struct fw_ri_sge);
 		}
 	} else {
@@ -510,7 +510,7 @@ static int build_rdma_send(struct t4_sq *sq, union t4_wr *wqe,
 		wqe->send.u.immd_src[0].r1 = 0;
 		wqe->send.u.immd_src[0].r2 = 0;
 		wqe->send.u.immd_src[0].immdlen = 0;
-		size = sizeof wqe->send + sizeof(struct fw_ri_immd);
+		size = sizeof(wqe->send) + sizeof(struct fw_ri_immd);
 		plen = 0;
 	}
 	*len16 = DIV_ROUND_UP(size, 16);
@@ -536,7 +536,7 @@ static int build_rdma_write(struct t4_sq *sq, union t4_wr *wqe,
 					 T4_MAX_WRITE_INLINE, &plen);
 			if (ret)
 				return ret;
-			size = sizeof wqe->write + sizeof(struct fw_ri_immd) +
+			size = sizeof(wqe->write) + sizeof(struct fw_ri_immd) +
 			       plen;
 		} else {
 			ret = build_isgl((__be64 *)sq->queue,
@@ -545,7 +545,7 @@ static int build_rdma_write(struct t4_sq *sq, union t4_wr *wqe,
 					 wr->sg_list, wr->num_sge, &plen);
 			if (ret)
 				return ret;
-			size = sizeof wqe->write + sizeof(struct fw_ri_isgl) +
+			size = sizeof(wqe->write) + sizeof(struct fw_ri_isgl) +
 			       wr->num_sge * sizeof(struct fw_ri_sge);
 		}
 	} else {
@@ -553,7 +553,7 @@ static int build_rdma_write(struct t4_sq *sq, union t4_wr *wqe,
 		wqe->write.u.immd_src[0].r1 = 0;
 		wqe->write.u.immd_src[0].r2 = 0;
 		wqe->write.u.immd_src[0].immdlen = 0;
-		size = sizeof wqe->write + sizeof(struct fw_ri_immd);
+		size = sizeof(wqe->write) + sizeof(struct fw_ri_immd);
 		plen = 0;
 	}
 	*len16 = DIV_ROUND_UP(size, 16);
@@ -586,7 +586,7 @@ static int build_rdma_read(union t4_wr *wqe, struct ib_send_wr *wr, u8 *len16)
 	}
 	wqe->read.r2 = 0;
 	wqe->read.r5 = 0;
-	*len16 = DIV_ROUND_UP(sizeof wqe->read, 16);
+	*len16 = DIV_ROUND_UP(sizeof(wqe->read), 16);
 	return 0;
 }
 
@@ -600,7 +600,7 @@ static int build_rdma_recv(struct c4iw_qp *qhp, union t4_recv_wr *wqe,
 			 &wqe->recv.isgl, wr->sg_list, wr->num_sge, NULL);
 	if (ret)
 		return ret;
-	*len16 = DIV_ROUND_UP(sizeof wqe->recv +
+	*len16 = DIV_ROUND_UP(sizeof(wqe->recv) +
 			      wr->num_sge * sizeof(struct fw_ri_sge), 16);
 	return 0;
 }
@@ -675,7 +675,7 @@ static int build_inv_stag(union t4_wr *wqe, struct ib_send_wr *wr,
 {
 	wqe->inv.stag_inv = cpu_to_be32(wr->ex.invalidate_rkey);
 	wqe->inv.r2 = 0;
-	*len16 = DIV_ROUND_UP(sizeof wqe->inv, 16);
+	*len16 = DIV_ROUND_UP(sizeof(wqe->inv), 16);
 	return 0;
 }
 
@@ -1079,20 +1079,20 @@ static void post_terminate(struct c4iw_qp *qhp, struct t4_cqe *err_cqe,
 	PDBG("%s qhp %p qid 0x%x tid %u\n", __func__, qhp, qhp->wq.sq.qid,
 	     qhp->ep->hwtid);
 
-	skb = alloc_skb(sizeof *wqe, gfp);
+	skb = alloc_skb(sizeof(*wqe), gfp);
 	if (!skb)
 		return;
 	set_wr_txq(skb, CPL_PRIORITY_DATA, qhp->ep->txq_idx);
 
 	wqe = (struct fw_ri_wr *)__skb_put(skb, sizeof(*wqe));
-	memset(wqe, 0, sizeof *wqe);
+	memset(wqe, 0, sizeof(*wqe));
 	wqe->op_compl = cpu_to_be32(FW_WR_OP_V(FW_RI_INIT_WR));
 	wqe->flowid_len16 = cpu_to_be32(
 		FW_WR_FLOWID_V(qhp->ep->hwtid) |
 		FW_WR_LEN16_V(DIV_ROUND_UP(sizeof(*wqe), 16)));
 
 	wqe->u.terminate.type = FW_RI_TYPE_TERMINATE;
-	wqe->u.terminate.immdlen = cpu_to_be32(sizeof *term);
+	wqe->u.terminate.immdlen = cpu_to_be32(sizeof(*term));
 	term = (struct terminate_message *)wqe->u.terminate.termmsg;
 	if (qhp->attr.layer_etype == (LAYER_MPA|DDP_LLP)) {
 		term->layer_etype = qhp->attr.layer_etype;
@@ -1200,13 +1200,13 @@ static int rdma_fini(struct c4iw_dev *rhp, struct c4iw_qp *qhp,
 	PDBG("%s qhp %p qid 0x%x tid %u\n", __func__, qhp, qhp->wq.sq.qid,
 	     ep->hwtid);
 
-	skb = alloc_skb(sizeof *wqe, GFP_KERNEL);
+	skb = alloc_skb(sizeof(*wqe), GFP_KERNEL);
 	if (!skb)
 		return -ENOMEM;
 	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
 
 	wqe = (struct fw_ri_wr *)__skb_put(skb, sizeof(*wqe));
-	memset(wqe, 0, sizeof *wqe);
+	memset(wqe, 0, sizeof(*wqe));
 	wqe->op_compl = cpu_to_be32(
 		FW_WR_OP_V(FW_RI_INIT_WR) |
 		FW_WR_COMPL_F);
@@ -1230,14 +1230,14 @@ out:
 static void build_rtr_msg(u8 p2p_type, struct fw_ri_init *init)
 {
 	PDBG("%s p2p_type = %d\n", __func__, p2p_type);
-	memset(&init->u, 0, sizeof init->u);
+	memset(&init->u, 0, sizeof(init->u));
 	switch (p2p_type) {
 	case FW_RI_INIT_P2PTYPE_RDMA_WRITE:
 		init->u.write.opcode = FW_RI_RDMA_WRITE_WR;
 		init->u.write.stag_sink = cpu_to_be32(1);
 		init->u.write.to_sink = cpu_to_be64(1);
 		init->u.write.u.immd_src[0].op = FW_RI_DATA_IMMD;
-		init->u.write.len16 = DIV_ROUND_UP(sizeof init->u.write +
+		init->u.write.len16 = DIV_ROUND_UP(sizeof(init->u.write) +
 						   sizeof(struct fw_ri_immd),
 						   16);
 		break;
@@ -1247,7 +1247,7 @@ static void build_rtr_msg(u8 p2p_type, struct fw_ri_init *init)
 		init->u.read.to_src_lo = cpu_to_be32(1);
 		init->u.read.stag_sink = cpu_to_be32(1);
 		init->u.read.to_sink_lo = cpu_to_be32(1);
-		init->u.read.len16 = DIV_ROUND_UP(sizeof init->u.read, 16);
+		init->u.read.len16 = DIV_ROUND_UP(sizeof(init->u.read), 16);
 		break;
 	}
 }
@@ -1261,7 +1261,7 @@ static int rdma_init(struct c4iw_dev *rhp, struct c4iw_qp *qhp)
 	PDBG("%s qhp %p qid 0x%x tid %u ird %u ord %u\n", __func__, qhp,
 	     qhp->wq.sq.qid, qhp->ep->hwtid, qhp->ep->ird, qhp->ep->ord);
 
-	skb = alloc_skb(sizeof *wqe, GFP_KERNEL);
+	skb = alloc_skb(sizeof(*wqe), GFP_KERNEL);
 	if (!skb) {
 		ret = -ENOMEM;
 		goto out;
@@ -1275,7 +1275,7 @@ static int rdma_init(struct c4iw_dev *rhp, struct c4iw_qp *qhp)
 	set_wr_txq(skb, CPL_PRIORITY_DATA, qhp->ep->txq_idx);
 
 	wqe = (struct fw_ri_wr *)__skb_put(skb, sizeof(*wqe));
-	memset(wqe, 0, sizeof *wqe);
+	memset(wqe, 0, sizeof(*wqe));
 	wqe->op_compl = cpu_to_be32(
 		FW_WR_OP_V(FW_RI_INIT_WR) |
 		FW_WR_COMPL_F);
@@ -1706,28 +1706,28 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
 		goto err2;
 
 	if (udata) {
-		mm1 = kmalloc(sizeof *mm1, GFP_KERNEL);
+		mm1 = kmalloc(sizeof(*mm1), GFP_KERNEL);
 		if (!mm1) {
 			ret = -ENOMEM;
 			goto err3;
 		}
-		mm2 = kmalloc(sizeof *mm2, GFP_KERNEL);
+		mm2 = kmalloc(sizeof(*mm2), GFP_KERNEL);
 		if (!mm2) {
 			ret = -ENOMEM;
 			goto err4;
 		}
-		mm3 = kmalloc(sizeof *mm3, GFP_KERNEL);
+		mm3 = kmalloc(sizeof(*mm3), GFP_KERNEL);
 		if (!mm3) {
 			ret = -ENOMEM;
 			goto err5;
 		}
-		mm4 = kmalloc(sizeof *mm4, GFP_KERNEL);
+		mm4 = kmalloc(sizeof(*mm4), GFP_KERNEL);
 		if (!mm4) {
 			ret = -ENOMEM;
 			goto err6;
 		}
 		if (t4_sq_onchip(&qhp->wq.sq)) {
-			mm5 = kmalloc(sizeof *mm5, GFP_KERNEL);
+			mm5 = kmalloc(sizeof(*mm5), GFP_KERNEL);
 			if (!mm5) {
 				ret = -ENOMEM;
 				goto err7;
@@ -1758,7 +1758,7 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
 		uresp.rq_db_gts_key = ucontext->key;
 		ucontext->key += PAGE_SIZE;
 		spin_unlock(&ucontext->mmap_lock);
-		ret = ib_copy_to_udata(udata, &uresp, sizeof uresp);
+		ret = ib_copy_to_udata(udata, &uresp, sizeof(uresp));
 		if (ret)
 			goto err8;
 		mm1->key = uresp.sq_key;
@@ -1832,7 +1832,7 @@ int c4iw_ib_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 	if (!attr_mask)
 		return 0;
 
-	memset(&attrs, 0, sizeof attrs);
+	memset(&attrs, 0, sizeof(attrs));
 	qhp = to_c4iw_qp(ibqp);
 	rhp = qhp->rhp;
 
@@ -1877,8 +1877,8 @@ int c4iw_ib_query_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 {
 	struct c4iw_qp *qhp = to_c4iw_qp(ibqp);
 
-	memset(attr, 0, sizeof *attr);
-	memset(init_attr, 0, sizeof *init_attr);
+	memset(attr, 0, sizeof(*attr));
+	memset(init_attr, 0, sizeof(*init_attr));
 	attr->qp_state = to_ib_qp_state(qhp->attr.state);
 	init_attr->cap.max_send_wr = qhp->attr.sq_num_entries;
 	init_attr->cap.max_recv_wr = qhp->attr.rq_num_entries;

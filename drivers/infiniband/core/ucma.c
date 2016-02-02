@@ -62,7 +62,7 @@ static struct ctl_table ucma_ctl_table[] = {
 	{
 		.procname	= "max_backlog",
 		.data		= &max_backlog,
-		.maxlen		= sizeof max_backlog,
+		.maxlen		= sizeof(max_backlog),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
@@ -379,7 +379,7 @@ static ssize_t ucma_get_event(struct ucma_file *file, const char __user *inbuf,
 	struct ucma_event *uevent;
 	int ret = 0;
 
-	if (out_len < sizeof uevent->resp)
+	if (out_len < sizeof(uevent->resp))
 		return -ENOSPC;
 
 	if (copy_from_user(&cmd, inbuf, sizeof(cmd)))
@@ -414,7 +414,7 @@ static ssize_t ucma_get_event(struct ucma_file *file, const char __user *inbuf,
 	}
 
 	if (copy_to_user((void __user *)(unsigned long)cmd.response,
-			 &uevent->resp, sizeof uevent->resp)) {
+			 &uevent->resp, sizeof(uevent->resp))) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -809,7 +809,7 @@ static ssize_t ucma_query_route(struct ucma_file *file,
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 
-	memset(&resp, 0, sizeof resp);
+	memset(&resp, 0, sizeof(resp));
 	addr = (struct sockaddr *) &ctx->cm_id->route.addr.src_addr;
 	memcpy(&resp.src_addr, addr, addr->sa_family == AF_INET ?
 				     sizeof(struct sockaddr_in) :
@@ -862,7 +862,7 @@ static ssize_t ucma_query_addr(struct ucma_context *ctx,
 	if (out_len < sizeof(resp))
 		return -ENOSPC;
 
-	memset(&resp, 0, sizeof resp);
+	memset(&resp, 0, sizeof(resp));
 
 	addr = (struct sockaddr *) &ctx->cm_id->route.addr.src_addr;
 	resp.src_size = rdma_addr_size(addr);
@@ -922,7 +922,7 @@ static ssize_t ucma_query_gid(struct ucma_context *ctx,
 	if (out_len < sizeof(resp))
 		return -ENOSPC;
 
-	memset(&resp, 0, sizeof resp);
+	memset(&resp, 0, sizeof(resp));
 
 	ucma_query_device_addr(ctx->cm_id, &resp);
 
@@ -1143,7 +1143,7 @@ static ssize_t ucma_init_qp_attr(struct ucma_file *file,
 		return PTR_ERR(ctx);
 
 	resp.qp_attr_mask = 0;
-	memset(&qp_attr, 0, sizeof qp_attr);
+	memset(&qp_attr, 0, sizeof(qp_attr));
 	qp_attr.qp_state = cmd.qp_state;
 	ret = rdma_init_qp_attr(ctx->cm_id, &qp_attr, &resp.qp_attr_mask);
 	if (ret)
@@ -1219,7 +1219,7 @@ static int ucma_set_ib_path(struct ucma_context *ctx,
 	if (ret)
 		return ret;
 
-	memset(&event, 0, sizeof event);
+	memset(&event, 0, sizeof(event));
 	event.event = RDMA_CM_EVENT_ROUTE_RESOLVED;
 	return ucma_event_handler(ctx->cm_id, &event);
 }
@@ -1621,7 +1621,7 @@ static int ucma_open(struct inode *inode, struct file *filp)
 {
 	struct ucma_file *file;
 
-	file = kmalloc(sizeof *file, GFP_KERNEL);
+	file = kmalloc(sizeof(*file), GFP_KERNEL);
 	if (!file)
 		return -ENOMEM;
 

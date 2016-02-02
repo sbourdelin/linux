@@ -171,7 +171,7 @@ int dump_fpu (struct pt_regs * regs, elf_fpregset_t *r)
 	if (regs == NULL)
 		return 0;
 
-	memcpy(r, regs->fr, sizeof *r);
+	memcpy(r, regs->fr, sizeof(*r));
 	return 1;
 }
 

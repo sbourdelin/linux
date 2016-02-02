@@ -33,7 +33,7 @@ static struct dbgp {
 } dbgp;
 
 static struct usb_device_descriptor device_desc = {
-	.bLength = sizeof device_desc,
+	.bLength = sizeof(device_desc),
 	.bDescriptorType = USB_DT_DEVICE,
 	.bcdUSB = cpu_to_le16(0x0200),
 	.bDeviceClass =	USB_CLASS_VENDOR_SPEC,
@@ -43,7 +43,7 @@ static struct usb_device_descriptor device_desc = {
 };
 
 static struct usb_debug_descriptor dbg_desc = {
-	.bLength = sizeof dbg_desc,
+	.bLength = sizeof(dbg_desc),
 	.bDescriptorType = USB_DT_DEBUG,
 };
 
@@ -348,13 +348,13 @@ static int dbgp_setup(struct usb_gadget *gadget,
 		switch (value>>8) {
 		case USB_DT_DEVICE:
 			dev_dbg(&dbgp.gadget->dev, "setup: desc device\n");
-			len = sizeof device_desc;
+			len = sizeof(device_desc);
 			data = &device_desc;
 			device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
 			break;
 		case USB_DT_DEBUG:
 			dev_dbg(&dbgp.gadget->dev, "setup: desc debug\n");
-			len = sizeof dbg_desc;
+			len = sizeof(dbg_desc);
 			data = &dbg_desc;
 			break;
 		default:

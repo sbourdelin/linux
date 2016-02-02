@@ -426,7 +426,7 @@ int __init mcpm_sync_init(
 {
 	unsigned int i, j, mpidr, this_cluster;
 
-	BUILD_BUG_ON(MCPM_SYNC_CLUSTER_SIZE * MAX_NR_CLUSTERS != sizeof mcpm_sync);
+	BUILD_BUG_ON(MCPM_SYNC_CLUSTER_SIZE * MAX_NR_CLUSTERS != sizeof(mcpm_sync));
 	BUG_ON((unsigned long)&mcpm_sync & (__CACHE_WRITEBACK_GRANULE - 1));
 
 	/*

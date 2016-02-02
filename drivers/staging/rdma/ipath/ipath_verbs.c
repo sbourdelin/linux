@@ -1729,7 +1729,7 @@ static struct ib_pd *ipath_alloc_pd(struct ib_device *ibdev,
 	 * we allow allocations of more than we report for this value.
 	 */
 
-	pd = kmalloc(sizeof *pd, GFP_KERNEL);
+	pd = kmalloc(sizeof(*pd), GFP_KERNEL);
 	if (!pd) {
 		ret = ERR_PTR(-ENOMEM);
 		goto bail;
@@ -1803,7 +1803,7 @@ static struct ib_ah *ipath_create_ah(struct ib_pd *pd,
 		goto bail;
 	}
 
-	ah = kmalloc(sizeof *ah, GFP_ATOMIC);
+	ah = kmalloc(sizeof(*ah), GFP_ATOMIC);
 	if (!ah) {
 		ret = ERR_PTR(-ENOMEM);
 		goto bail;
@@ -1918,7 +1918,7 @@ static struct ib_ucontext *ipath_alloc_ucontext(struct ib_device *ibdev,
 	struct ipath_ucontext *context;
 	struct ib_ucontext *ret;
 
-	context = kmalloc(sizeof *context, GFP_KERNEL);
+	context = kmalloc(sizeof(*context), GFP_KERNEL);
 	if (!context) {
 		ret = ERR_PTR(-ENOMEM);
 		goto bail;
@@ -2028,7 +2028,7 @@ int ipath_register_ib_device(struct ipath_devdata *dd)
 	unsigned i;
 	int ret;
 
-	idev = (struct ipath_ibdev *)ib_alloc_device(sizeof *idev);
+	idev = (struct ipath_ibdev *)ib_alloc_device(sizeof(*idev));
 	if (idev == NULL) {
 		ret = -ENOMEM;
 		goto bail;
@@ -2037,7 +2037,7 @@ int ipath_register_ib_device(struct ipath_devdata *dd)
 	dev = &idev->ibdev;
 
 	if (dd->ipath_sdma_descq_cnt) {
-		tx = kmalloc_array(dd->ipath_sdma_descq_cnt, sizeof *tx,
+		tx = kmalloc_array(dd->ipath_sdma_descq_cnt, sizeof(*tx),
 				   GFP_KERNEL);
 		if (tx == NULL) {
 			ret = -ENOMEM;

@@ -53,7 +53,7 @@ struct ib_ucontext *ehca_alloc_ucontext(struct ib_device *device,
 {
 	struct ehca_ucontext *my_context;
 
-	my_context = kzalloc(sizeof *my_context, GFP_KERNEL);
+	my_context = kzalloc(sizeof(*my_context), GFP_KERNEL);
 	if (!my_context) {
 		ehca_err(device, "Out of memory device=%p", device);
 		return ERR_PTR(-ENOMEM);

@@ -65,7 +65,7 @@ static void rds_iw_add_one(struct ib_device *device)
 	if (device->node_type != RDMA_NODE_RNIC)
 		return;
 
-	rds_iwdev = kmalloc(sizeof *rds_iwdev, GFP_KERNEL);
+	rds_iwdev = kmalloc(sizeof(*rds_iwdev), GFP_KERNEL);
 	if (!rds_iwdev)
 		return;
 

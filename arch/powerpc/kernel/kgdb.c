@@ -175,15 +175,15 @@ static int kgdb_singlestep(struct pt_regs *regs)
 
 	if (thread_info != exception_thread_info) {
 		/* Save the original current_thread_info. */
-		memcpy(backup_current_thread_info, exception_thread_info, sizeof *thread_info);
-		memcpy(exception_thread_info, thread_info, sizeof *thread_info);
+		memcpy(backup_current_thread_info, exception_thread_info, sizeof(*thread_info));
+		memcpy(exception_thread_info, thread_info, sizeof(*thread_info));
 	}
 
 	kgdb_handle_exception(0, SIGTRAP, 0, regs);
 
 	if (thread_info != exception_thread_info)
 		/* Restore current_thread_info lastly. */
-		memcpy(exception_thread_info, backup_current_thread_info, sizeof *thread_info);
+		memcpy(exception_thread_info, backup_current_thread_info, sizeof(*thread_info));
 
 	return 1;
 }

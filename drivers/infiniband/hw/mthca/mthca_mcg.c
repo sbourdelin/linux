@@ -157,7 +157,7 @@ int mthca_multicast_attach(struct ib_qp *ibqp, union ib_gid *gid, u16 lid)
 			mthca_err(dev, "READ_MGM failed (%d)\n", err);
 			goto out;
 		}
-		memset(mgm, 0, sizeof *mgm);
+		memset(mgm, 0, sizeof(*mgm));
 		memcpy(mgm->gid, gid->raw, 16);
 	}
 

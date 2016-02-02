@@ -409,7 +409,7 @@ static void hwerr_crcbits(struct ipath_devdata *dd, ipath_err_t hwerrs,
 	 */
 	if (crcbits) {
 		u16 ctrl0, ctrl1;
-		snprintf(bitsmsg, sizeof bitsmsg,
+		snprintf(bitsmsg, sizeof(bitsmsg),
 			 "[HT%s lane %s CRC (%llx); powercycle to completely clear]",
 			 !(crcbits & _IPATH_HTLINK1_CRCBITS) ?
 			 "0 (A)" : (!(crcbits & _IPATH_HTLINK0_CRCBITS)
@@ -589,7 +589,7 @@ static void ipath_ht_handle_hwerrors(struct ipath_devdata *dd, char *msg,
 		bits = (u32) ((hwerrs >>
 			       INFINIPATH_HWE_HTCMEMPARITYERR_SHIFT) &
 			      INFINIPATH_HWE_HTCMEMPARITYERR_MASK);
-		snprintf(bitsmsg, sizeof bitsmsg, "[HTC Parity Errs %x] ",
+		snprintf(bitsmsg, sizeof(bitsmsg), "[HTC Parity Errs %x] ",
 			 bits);
 		strlcat(msg, bitsmsg, msgl);
 	}
@@ -618,7 +618,7 @@ static void ipath_ht_handle_hwerrors(struct ipath_devdata *dd, char *msg,
 			 INFINIPATH_HWE_HTAPLL_RFSLIP)
 
 	if (hwerrs & _IPATH_PLL_FAIL) {
-		snprintf(bitsmsg, sizeof bitsmsg,
+		snprintf(bitsmsg, sizeof(bitsmsg),
 			 "[PLL failed (%llx), InfiniPath hardware unusable]",
 			 (unsigned long long) (hwerrs & _IPATH_PLL_FAIL));
 		strlcat(msg, bitsmsg, msgl);

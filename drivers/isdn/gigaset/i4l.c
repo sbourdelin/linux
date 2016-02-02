@@ -243,7 +243,7 @@ static int command_from_LL(isdn_ctrl *cntrl)
 		dev_kfree_skb(bcs->rx_skb);
 		gigaset_new_rx_skb(bcs);
 
-		commands = kzalloc(AT_NUM * (sizeof *commands), GFP_ATOMIC);
+		commands = kzalloc(AT_NUM * (sizeof(*commands)), GFP_ATOMIC);
 		if (!commands) {
 			gigaset_free_channel(bcs);
 			dev_err(cs->dev, "ISDN_CMD_DIAL: out of memory\n");
@@ -487,12 +487,12 @@ int gigaset_isdn_icall(struct at_state_t *at_state)
 	}
 	if (at_state->str_var[STR_NMBR]) {
 		strlcpy(response.parm.setup.phone, at_state->str_var[STR_NMBR],
-			sizeof response.parm.setup.phone);
+			sizeof(response.parm.setup.phone));
 	} else
 		response.parm.setup.phone[0] = 0;
 	if (at_state->str_var[STR_ZCPN]) {
 		strlcpy(response.parm.setup.eazmsn, at_state->str_var[STR_ZCPN],
-			sizeof response.parm.setup.eazmsn);
+			sizeof(response.parm.setup.eazmsn));
 	} else
 		response.parm.setup.eazmsn[0] = 0;
 
@@ -624,14 +624,14 @@ int gigaset_isdn_regdev(struct cardstate *cs, const char *isdnid)
 {
 	isdn_if *iif;
 
-	iif = kmalloc(sizeof *iif, GFP_KERNEL);
+	iif = kmalloc(sizeof(*iif), GFP_KERNEL);
 	if (!iif) {
 		pr_err("out of memory\n");
 		return -ENOMEM;
 	}
 
-	if (snprintf(iif->id, sizeof iif->id, "%s_%u", isdnid, cs->minor_index)
-	    >= sizeof iif->id) {
+	if (snprintf(iif->id, sizeof(iif->id), "%s_%u", isdnid, cs->minor_index)
+	    >= sizeof(iif->id)) {
 		pr_err("ID too long: %s\n", isdnid);
 		kfree(iif);
 		return -EINVAL;

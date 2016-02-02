@@ -108,7 +108,7 @@ static int mlx4_buddy_init(struct mlx4_buddy *buddy, int max_order)
 
 	buddy->bits = kcalloc(buddy->max_order + 1, sizeof (long *),
 			      GFP_KERNEL);
-	buddy->num_free = kcalloc((buddy->max_order + 1), sizeof *buddy->num_free,
+	buddy->num_free = kcalloc((buddy->max_order + 1), sizeof(*buddy->num_free),
 				  GFP_KERNEL);
 	if (!buddy->bits || !buddy->num_free)
 		goto err_out;
@@ -796,7 +796,7 @@ int mlx4_buf_write_mtt(struct mlx4_dev *dev, struct mlx4_mtt *mtt,
 	int err;
 	int i;
 
-	page_list = kmalloc(buf->npages * sizeof *page_list,
+	page_list = kmalloc(buf->npages * sizeof(*page_list),
 			    gfp);
 	if (!page_list)
 		return -ENOMEM;
@@ -1056,7 +1056,7 @@ int mlx4_fmr_alloc(struct mlx4_dev *dev, u32 pd, u32 access, int max_pages,
 		return -EINVAL;
 
 	/* All MTTs must fit in the same page */
-	if (max_pages * sizeof *fmr->mtts > PAGE_SIZE)
+	if (max_pages * sizeof(*fmr->mtts) > PAGE_SIZE)
 		return -EINVAL;
 
 	fmr->page_shift = page_shift;

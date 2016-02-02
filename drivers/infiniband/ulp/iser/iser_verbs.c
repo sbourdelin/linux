@@ -439,7 +439,7 @@ static int iser_create_ib_conn_res(struct ib_conn *ib_conn)
 	device = ib_conn->device;
 	ib_dev = device->ib_device;
 
-	memset(&init_attr, 0, sizeof init_attr);
+	memset(&init_attr, 0, sizeof(init_attr));
 
 	mutex_lock(&ig.connlist_mutex);
 	/* select the CQ with the minimal number of usages */
@@ -516,7 +516,7 @@ struct iser_device *iser_device_find_by_ib_device(struct rdma_cm_id *cma_id)
 		if (device->ib_device->node_guid == cma_id->device->node_guid)
 			goto inc_refcnt;
 
-	device = kzalloc(sizeof *device, GFP_KERNEL);
+	device = kzalloc(sizeof(*device), GFP_KERNEL);
 	if (device == NULL)
 		goto out;
 
@@ -805,7 +805,7 @@ static void iser_route_handler(struct rdma_cm_id *cma_id)
 	if (ret)
 		goto failure;
 
-	memset(&conn_param, 0, sizeof conn_param);
+	memset(&conn_param, 0, sizeof(conn_param));
 	conn_param.responder_resources = device->ib_device->attrs.max_qp_rd_atom;
 	conn_param.initiator_depth     = 1;
 	conn_param.retry_count	       = 7;

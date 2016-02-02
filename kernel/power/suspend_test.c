@@ -84,7 +84,7 @@ repeat:
 	}
 	rtc_tm_to_time(&alm.time, &now);
 
-	memset(&alm, 0, sizeof alm);
+	memset(&alm, 0, sizeof(alm));
 	rtc_time_to_tm(now + TEST_SUSPEND_SECONDS, &alm.time);
 	alm.enabled = true;
 

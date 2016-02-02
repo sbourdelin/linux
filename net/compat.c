@@ -243,7 +243,7 @@ int put_cmsg_compat(struct msghdr *kmsg, int level, int type, int len, void *dat
 	cmhdr.cmsg_type = type;
 	cmhdr.cmsg_len = cmlen;
 
-	if (copy_to_user(cm, &cmhdr, sizeof cmhdr))
+	if (copy_to_user(cm, &cmhdr, sizeof(cmhdr)))
 		return -EFAULT;
 	if (copy_to_user(CMSG_COMPAT_DATA(cm), data, cmlen - sizeof(struct compat_cmsghdr)))
 		return -EFAULT;

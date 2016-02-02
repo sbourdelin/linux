@@ -3427,7 +3427,7 @@ isdn_tty_parse_at(modem_info *info)
 				isdn_tty_modem_result(RESULT_NO_CARRIER, info);
 				return;
 			}
-			isdn_tty_getdial(++p, ds, sizeof ds);
+			isdn_tty_getdial(++p, ds, sizeof(ds));
 			p += strlen(p);
 			if (!strlen(m->msn))
 				isdn_tty_modem_result(RESULT_NO_MSN_EAZ, info);

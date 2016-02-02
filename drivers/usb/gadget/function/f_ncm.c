@@ -146,7 +146,7 @@ static struct usb_cdc_ncm_ntb_parameters ntb_parameters = {
 #define NCM_STATUS_BYTECOUNT		16	/* 8 byte header + data */
 
 static struct usb_interface_assoc_descriptor ncm_iad_desc = {
-	.bLength =		sizeof ncm_iad_desc,
+	.bLength =		sizeof(ncm_iad_desc),
 	.bDescriptorType =	USB_DT_INTERFACE_ASSOCIATION,
 
 	/* .bFirstInterface =	DYNAMIC, */
@@ -160,7 +160,7 @@ static struct usb_interface_assoc_descriptor ncm_iad_desc = {
 /* interface descriptor: */
 
 static struct usb_interface_descriptor ncm_control_intf = {
-	.bLength =		sizeof ncm_control_intf,
+	.bLength =		sizeof(ncm_control_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
@@ -172,7 +172,7 @@ static struct usb_interface_descriptor ncm_control_intf = {
 };
 
 static struct usb_cdc_header_desc ncm_header_desc = {
-	.bLength =		sizeof ncm_header_desc,
+	.bLength =		sizeof(ncm_header_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_HEADER_TYPE,
 
@@ -188,7 +188,7 @@ static struct usb_cdc_union_desc ncm_union_desc = {
 };
 
 static struct usb_cdc_ether_desc ecm_desc = {
-	.bLength =		sizeof ecm_desc,
+	.bLength =		sizeof(ecm_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ETHERNET_TYPE,
 
@@ -203,7 +203,7 @@ static struct usb_cdc_ether_desc ecm_desc = {
 #define NCAPS	(USB_CDC_NCM_NCAP_ETH_FILTER | USB_CDC_NCM_NCAP_CRC_MODE)
 
 static struct usb_cdc_ncm_desc ncm_desc = {
-	.bLength =		sizeof ncm_desc,
+	.bLength =		sizeof(ncm_desc),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_NCM_TYPE,
 
@@ -215,7 +215,7 @@ static struct usb_cdc_ncm_desc ncm_desc = {
 /* the default data interface has no endpoints ... */
 
 static struct usb_interface_descriptor ncm_data_nop_intf = {
-	.bLength =		sizeof ncm_data_nop_intf,
+	.bLength =		sizeof(ncm_data_nop_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	.bInterfaceNumber =	1,
@@ -230,7 +230,7 @@ static struct usb_interface_descriptor ncm_data_nop_intf = {
 /* ... but the "real" data interface has two bulk endpoints */
 
 static struct usb_interface_descriptor ncm_data_intf = {
-	.bLength =		sizeof ncm_data_intf,
+	.bLength =		sizeof(ncm_data_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	.bInterfaceNumber =	1,
@@ -495,7 +495,7 @@ static void ncm_do_notify(struct f_ncm *ncm)
 		else
 			event->wValue = cpu_to_le16(0);
 		event->wLength = 0;
-		req->length = sizeof *event;
+		req->length = sizeof(*event);
 
 		DBG(cdev, "notify connect %s\n",
 				ncm->is_open ? "true" : "false");
@@ -509,7 +509,7 @@ static void ncm_do_notify(struct f_ncm *ncm)
 		req->length = NCM_STATUS_BYTECOUNT;
 
 		/* SPEED_CHANGE data is up/down speeds in bits/sec */
-		data = req->buf + sizeof *event;
+		data = req->buf + sizeof(*event);
 		data[0] = cpu_to_le32(ncm_bitrate(cdev->gadget));
 		data[1] = data[0];
 
@@ -657,8 +657,8 @@ static int ncm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 
 		if (w_length == 0 || w_value != 0 || w_index != ncm->ctrl_id)
 			goto invalid;
-		value = w_length > sizeof ntb_parameters ?
-			sizeof ntb_parameters : w_length;
+		value = w_length > sizeof(ntb_parameters) ?
+			sizeof(ntb_parameters) : w_length;
 		memcpy(req->buf, &ntb_parameters, value);
 		VDBG(cdev, "Host asked NTB parameters\n");
 		break;

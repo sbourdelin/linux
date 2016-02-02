@@ -265,7 +265,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 #undef NEW_AUX_ENT
 	/* AT_NULL is zero; clear the rest too */
 	memset(&elf_info[ei_index], 0,
-	       sizeof current->mm->saved_auxv - ei_index * sizeof elf_info[0]);
+	       sizeof(current->mm->saved_auxv) - ei_index * sizeof(elf_info[0]));
 
 	/* And advance past the AT_NULL entry.  */
 	ei_index += 2;
@@ -1297,7 +1297,7 @@ static unsigned long vma_dump_size(struct vm_area_struct *vma,
 			u32 cmp;
 			char elfmag[SELFMAG];
 		} magic;
-		BUILD_BUG_ON(SELFMAG != sizeof word);
+		BUILD_BUG_ON(SELFMAG != sizeof(word));
 		magic.elfmag[EI_MAG0] = ELFMAG0;
 		magic.elfmag[EI_MAG1] = ELFMAG1;
 		magic.elfmag[EI_MAG2] = ELFMAG2;

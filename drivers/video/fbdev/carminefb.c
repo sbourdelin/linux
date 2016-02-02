@@ -545,7 +545,7 @@ static int alloc_carmine_fb(void __iomem *regs, void __iomem *smem_base,
 	struct fb_info *info;
 	struct carmine_fb *par;
 
-	info = framebuffer_alloc(sizeof *par, device);
+	info = framebuffer_alloc(sizeof(*par), device);
 	if (!info)
 		return -ENOMEM;
 
@@ -618,7 +618,7 @@ static int carminefb_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 		return ret;
 
 	ret = -ENOMEM;
-	hw = kzalloc(sizeof *hw, GFP_KERNEL);
+	hw = kzalloc(sizeof(*hw), GFP_KERNEL);
 	if (!hw)
 		goto err_enable_pci;
 

@@ -362,7 +362,7 @@ static int br2684_setfilt(struct atm_vcc *atmvcc, void __user * arg)
 	struct br2684_vcc *brvcc;
 	struct br2684_filter_set fs;
 
-	if (copy_from_user(&fs, arg, sizeof fs))
+	if (copy_from_user(&fs, arg, sizeof(fs)))
 		return -EFAULT;
 	if (fs.ifspec.method != BR2684_FIND_BYNOTHING) {
 		/*
@@ -536,7 +536,7 @@ static int br2684_regvcc(struct atm_vcc *atmvcc, void __user * arg)
 	struct atm_backend_br2684 be;
 	int err;
 
-	if (copy_from_user(&be, arg, sizeof be))
+	if (copy_from_user(&be, arg, sizeof(be)))
 		return -EFAULT;
 	brvcc = kzalloc(sizeof(struct br2684_vcc), GFP_KERNEL);
 	if (!brvcc)
@@ -668,7 +668,7 @@ static int br2684_create(void __user *arg)
 
 	pr_debug("\n");
 
-	if (copy_from_user(&ni, arg, sizeof ni))
+	if (copy_from_user(&ni, arg, sizeof(ni)))
 		return -EFAULT;
 
 	if (ni.media & BR2684_FLAG_ROUTED)

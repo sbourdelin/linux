@@ -1748,7 +1748,7 @@ pxa25x_udc_irq(int irq, void *_dev)
 			} else {
 				DBG(DBG_VERBOSE, "USB reset end\n");
 				dev->gadget.speed = USB_SPEED_FULL;
-				memset(&dev->stats, 0, sizeof dev->stats);
+				memset(&dev->stats, 0, sizeof(dev->stats));
 				/* driver and endpoints are still reset */
 			}
 

@@ -388,7 +388,7 @@ static char *cpio_replace_env(char *new_location)
 	       (end = strchr(start + 2, '}'))) {
 		*start = *end = 0;
 		var = getenv(start + 2);
-		snprintf(expanded, sizeof expanded, "%s%s%s",
+		snprintf(expanded, sizeof(expanded), "%s%s%s",
 			 new_location, var ? var : "", end + 1);
 		strcpy(new_location, expanded);
 	}

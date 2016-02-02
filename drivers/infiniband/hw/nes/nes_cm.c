@@ -3000,7 +3000,7 @@ int nes_cm_disconn(struct nes_qp *nesqp)
 {
 	struct disconn_work *work;
 
-	work = kzalloc(sizeof *work, GFP_ATOMIC);
+	work = kzalloc(sizeof(*work), GFP_ATOMIC);
 	if (!work)
 		return -ENOMEM;  /* Timer will clean up */
 

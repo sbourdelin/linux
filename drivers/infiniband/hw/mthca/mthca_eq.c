@@ -479,7 +479,7 @@ static int mthca_create_eq(struct mthca_dev *dev,
 	eq->nent = roundup_pow_of_two(max(nent, 2));
 	npages = ALIGN(eq->nent * MTHCA_EQ_ENTRY_SIZE, PAGE_SIZE) / PAGE_SIZE;
 
-	eq->page_list = kmalloc(npages * sizeof *eq->page_list,
+	eq->page_list = kmalloc(npages * sizeof(*eq->page_list),
 				GFP_KERNEL);
 	if (!eq->page_list)
 		goto err_out;
@@ -487,7 +487,7 @@ static int mthca_create_eq(struct mthca_dev *dev,
 	for (i = 0; i < npages; ++i)
 		eq->page_list[i].buf = NULL;
 
-	dma_list = kmalloc(npages * sizeof *dma_list, GFP_KERNEL);
+	dma_list = kmalloc(npages * sizeof(*dma_list), GFP_KERNEL);
 	if (!dma_list)
 		goto err_out_free;
 
@@ -524,7 +524,7 @@ static int mthca_create_eq(struct mthca_dev *dev,
 	if (err)
 		goto err_out_free_eq;
 
-	memset(eq_context, 0, sizeof *eq_context);
+	memset(eq_context, 0, sizeof(*eq_context));
 	eq_context->flags           = cpu_to_be32(MTHCA_EQ_STATUS_OK   |
 						  MTHCA_EQ_OWNER_HW    |
 						  MTHCA_EQ_STATE_ARMED |

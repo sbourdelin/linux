@@ -38,7 +38,7 @@
 static inline void ehci_qtd_init(struct ehci_hcd *ehci, struct ehci_qtd *qtd,
 				  dma_addr_t dma)
 {
-	memset (qtd, 0, sizeof *qtd);
+	memset (qtd, 0, sizeof(*qtd));
 	qtd->qtd_dma = dma;
 	qtd->hw_token = cpu_to_hc32(ehci, QTD_STS_HALT);
 	qtd->hw_next = EHCI_LIST_END(ehci);
@@ -82,14 +82,14 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, gfp_t flags)
 	struct ehci_qh		*qh;
 	dma_addr_t		dma;
 
-	qh = kzalloc(sizeof *qh, GFP_ATOMIC);
+	qh = kzalloc(sizeof(*qh), GFP_ATOMIC);
 	if (!qh)
 		goto done;
 	qh->hw = (struct ehci_qh_hw *)
 		dma_pool_alloc(ehci->qh_pool, flags, &dma);
 	if (!qh->hw)
 		goto fail;
-	memset(qh->hw, 0, sizeof *qh->hw);
+	memset(qh->hw, 0, sizeof(*qh->hw));
 	qh->qh_dma = dma;
 	// INIT_LIST_HEAD (&qh->qh_list);
 	INIT_LIST_HEAD (&qh->qtd_list);
@@ -139,7 +139,7 @@ static void ehci_mem_cleanup (struct ehci_hcd *ehci)
 
 	if (ehci->periodic)
 		dma_free_coherent (ehci_to_hcd(ehci)->self.controller,
-			ehci->periodic_size * sizeof (u32),
+			ehci->periodic_size * sizeof(u32),
 			ehci->periodic, ehci->periodic_dma);
 	ehci->periodic = NULL;
 

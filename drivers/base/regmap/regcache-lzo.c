@@ -162,7 +162,7 @@ static int regcache_lzo_init(struct regmap *map)
 
 	/* allocate the lzo blocks and initialize them */
 	for (i = 0; i < blkcount; i++) {
-		lzo_blocks[i] = kzalloc(sizeof **lzo_blocks,
+		lzo_blocks[i] = kzalloc(sizeof(**lzo_blocks),
 					GFP_KERNEL);
 		if (!lzo_blocks[i]) {
 			kfree(sync_bmp);

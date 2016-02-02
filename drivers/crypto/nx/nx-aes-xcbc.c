@@ -171,7 +171,7 @@ static int nx_xcbc_init(struct shash_desc *desc)
 {
 	struct xcbc_state *sctx = shash_desc_ctx(desc);
 
-	memset(sctx, 0, sizeof *sctx);
+	memset(sctx, 0, sizeof(*sctx));
 
 	return 0;
 }

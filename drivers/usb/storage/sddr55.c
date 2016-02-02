@@ -813,16 +813,16 @@ static int sddr55_transport(struct scsi_cmnd *srb, struct us_data *us)
 			     info->sense_data[12],
 			     info->sense_data[13]);
 
-		memcpy (ptr, info->sense_data, sizeof info->sense_data);
+		memcpy (ptr, info->sense_data, sizeof(info->sense_data));
 		ptr[0] = 0x70;
 		ptr[7] = 11;
-		usb_stor_set_xfer_buf (ptr, sizeof info->sense_data, srb);
-		memset (info->sense_data, 0, sizeof info->sense_data);
+		usb_stor_set_xfer_buf (ptr, sizeof(info->sense_data), srb);
+		memset (info->sense_data, 0, sizeof(info->sense_data));
 
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
-	memset (info->sense_data, 0, sizeof info->sense_data);
+	memset (info->sense_data, 0, sizeof(info->sense_data));
 
 	/* Dummy up a response for INQUIRY since SDDR55 doesn't
 	   respond to INQUIRY commands */
@@ -890,7 +890,7 @@ static int sddr55_transport(struct scsi_cmnd *srb, struct us_data *us)
 
 	if (srb->cmnd[0] == MODE_SENSE_10) {
 
-		memcpy(ptr, mode_page_01, sizeof mode_page_01);
+		memcpy(ptr, mode_page_01, sizeof(mode_page_01));
 		ptr[3] = (info->read_only || info->force_read_only) ? 0x80 : 0;
 		usb_stor_set_xfer_buf(ptr, sizeof(mode_page_01), srb);
 

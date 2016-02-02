@@ -724,7 +724,7 @@ static int mpc52xx_gpt_probe(struct platform_device *ofdev)
 {
 	struct mpc52xx_gpt_priv *gpt;
 
-	gpt = devm_kzalloc(&ofdev->dev, sizeof *gpt, GFP_KERNEL);
+	gpt = devm_kzalloc(&ofdev->dev, sizeof(*gpt), GFP_KERNEL);
 	if (!gpt)
 		return -ENOMEM;
 

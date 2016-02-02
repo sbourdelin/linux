@@ -531,7 +531,7 @@ int autofs4_expire_run(struct super_block *sb,
 	struct dentry *dentry;
 	int ret = 0;
 
-	memset(&pkt,0,sizeof pkt);
+	memset(&pkt,0,sizeof(pkt));
 
 	pkt.hdr.proto_version = sbi->version;
 	pkt.hdr.type = autofs_ptype_expire;

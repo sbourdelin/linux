@@ -333,7 +333,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
 /*jfm: win trace - many writes here to reg 0x64*/
 
 	/* initialize the MI sensor */
-	for (i = 0; i < sizeof mi_data; i++)
+	for (i = 0; i < sizeof(mi_data); i++)
 		mi_w(gspca_dev, i + 1, mi_data[i]);
 
 	data[0] = 0x00;

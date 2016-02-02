@@ -271,7 +271,7 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
 	struct rt6_info *rt;
 	int ret;
 
-	memset(&fl6, 0, sizeof fl6);
+	memset(&fl6, 0, sizeof(fl6));
 	fl6.daddr = dst_in->sin6_addr;
 	fl6.saddr = src_in->sin6_addr;
 	fl6.flowi6_oif = addr->bound_dev_if;
@@ -447,7 +447,7 @@ int rdma_resolve_ip(struct rdma_addr_client *client,
 	struct addr_req *req;
 	int ret = 0;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return -ENOMEM;
 

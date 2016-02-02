@@ -111,7 +111,7 @@ nc_vendor_read(struct usbnet *dev, u8 req, u8 regnum, u16 *retval_ptr)
 				     USB_DIR_IN | USB_TYPE_VENDOR |
 				     USB_RECIP_DEVICE,
 				     0, regnum, retval_ptr,
-				     sizeof *retval_ptr);
+				     sizeof(*retval_ptr));
 	if (status > 0)
 		status = 0;
 	if (!status)
@@ -399,8 +399,8 @@ static int net1080_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 	skb_pull(skb, hdr_len);
 
 	trailer = (struct nc_trailer *)
-		(skb->data + skb->len - sizeof *trailer);
-	skb_trim(skb, skb->len - sizeof *trailer);
+		(skb->data + skb->len - sizeof(*trailer));
+	skb_trim(skb, skb->len - sizeof(*trailer));
 
 	if ((packet_len & 0x01) == 0) {
 		if (skb->data [packet_len] != PAD_BYTE) {
@@ -475,15 +475,15 @@ net1080_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
 
 encapsulate:
 	/* header first */
-	header = (struct nc_header *) skb_push(skb, sizeof *header);
-	header->hdr_len = cpu_to_le16(sizeof (*header));
+	header = (struct nc_header *) skb_push(skb, sizeof(*header));
+	header->hdr_len = cpu_to_le16(sizeof(*header));
 	header->packet_len = cpu_to_le16(len);
 	header->packet_id = cpu_to_le16((u16)dev->xid++);
 
 	/* maybe pad; then trailer */
-	if (!((skb->len + sizeof *trailer) & 0x01))
+	if (!((skb->len + sizeof(*trailer)) & 0x01))
 		*skb_put(skb, 1) = PAD_BYTE;
-	trailer = (struct nc_trailer *) skb_put(skb, sizeof *trailer);
+	trailer = (struct nc_trailer *) skb_put(skb, sizeof(*trailer));
 	put_unaligned(header->packet_id, &trailer->packet_id);
 #if 0
 	netdev_dbg(dev->net, "frame >tx h %d p %d id %d\n",

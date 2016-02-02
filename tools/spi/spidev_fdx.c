@@ -24,7 +24,7 @@ static void do_read(int fd, int len)
 		len = 2;
 	else if (len > sizeof(buf))
 		len = sizeof(buf);
-	memset(buf, 0, sizeof buf);
+	memset(buf, 0, sizeof(buf));
 
 	status = read(fd, buf, len);
 	if (status < 0) {
@@ -51,11 +51,11 @@ static void do_msg(int fd, int len)
 	unsigned char		buf[32], *bp;
 	int			status;
 
-	memset(xfer, 0, sizeof xfer);
-	memset(buf, 0, sizeof buf);
+	memset(xfer, 0, sizeof(xfer));
+	memset(buf, 0, sizeof(buf));
 
-	if (len > sizeof buf)
-		len = sizeof buf;
+	if (len > sizeof(buf))
+		len = sizeof(buf);
 
 	buf[0] = 0xaa;
 	xfer[0].tx_buf = (unsigned long)buf;

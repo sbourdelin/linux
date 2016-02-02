@@ -146,7 +146,7 @@ static int mthca_buddy_init(struct mthca_buddy *buddy, int max_order)
 
 	buddy->bits = kzalloc((buddy->max_order + 1) * sizeof (long *),
 			      GFP_KERNEL);
-	buddy->num_free = kcalloc((buddy->max_order + 1), sizeof *buddy->num_free,
+	buddy->num_free = kcalloc((buddy->max_order + 1), sizeof(*buddy->num_free),
 				  GFP_KERNEL);
 	if (!buddy->bits || !buddy->num_free)
 		goto err_out;
@@ -214,7 +214,7 @@ static struct mthca_mtt *__mthca_alloc_mtt(struct mthca_dev *dev, int size,
 	if (size <= 0)
 		return ERR_PTR(-EINVAL);
 
-	mtt = kmalloc(sizeof *mtt, GFP_KERNEL);
+	mtt = kmalloc(sizeof(*mtt), GFP_KERNEL);
 	if (!mtt)
 		return ERR_PTR(-ENOMEM);
 
@@ -470,7 +470,7 @@ int mthca_mr_alloc(struct mthca_dev *dev, u32 pd, int buffer_size_shift,
 	mpt_entry->length    = cpu_to_be64(total_size);
 
 	memset(&mpt_entry->lkey, 0,
-	       sizeof *mpt_entry - offsetof(struct mthca_mpt_entry, lkey));
+	       sizeof(*mpt_entry) - offsetof(struct mthca_mpt_entry, lkey));
 
 	if (mr->mtt)
 		mpt_entry->mtt_seg =
@@ -580,7 +580,7 @@ int mthca_fmr_alloc(struct mthca_dev *dev, u32 pd,
 
 	/* For Arbel, all MTTs must fit in the same page. */
 	if (mthca_is_memfree(dev) &&
-	    mr->attr.max_pages * sizeof *mr->mem.arbel.mtts > PAGE_SIZE)
+	    mr->attr.max_pages * sizeof(*mr->mem.arbel.mtts) > PAGE_SIZE)
 		return -EINVAL;
 
 	mr->maps = 0;
@@ -602,7 +602,7 @@ int mthca_fmr_alloc(struct mthca_dev *dev, u32 pd,
 		BUG_ON(!mr->mem.arbel.mpt);
 	} else
 		mr->mem.tavor.mpt = dev->mr_table.tavor_fmr.mpt_base +
-			sizeof *(mr->mem.tavor.mpt) * idx;
+			sizeof(*(mr->mem.tavor.mpt)) * idx;
 
 	mr->mtt = __mthca_alloc_mtt(dev, list_len, dev->mr_table.fmr_mtt_buddy);
 	if (IS_ERR(mr->mtt)) {
@@ -637,7 +637,7 @@ int mthca_fmr_alloc(struct mthca_dev *dev, u32 pd,
 	mpt_entry->key       = cpu_to_be32(key);
 	mpt_entry->pd        = cpu_to_be32(pd);
 	memset(&mpt_entry->start, 0,
-	       sizeof *mpt_entry - offsetof(struct mthca_mpt_entry, start));
+	       sizeof(*mpt_entry) - offsetof(struct mthca_mpt_entry, start));
 	mpt_entry->mtt_seg   = cpu_to_be64(dev->mr_table.mtt_base + mtt_seg);
 
 	if (0) {

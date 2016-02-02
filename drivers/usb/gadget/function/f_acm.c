@@ -95,7 +95,7 @@ static inline struct f_acm *port_to_acm(struct gserial *p)
 
 static struct usb_interface_assoc_descriptor
 acm_iad_descriptor = {
-	.bLength =		sizeof acm_iad_descriptor,
+	.bLength =		sizeof(acm_iad_descriptor),
 	.bDescriptorType =	USB_DT_INTERFACE_ASSOCIATION,
 
 	/* .bFirstInterface =	DYNAMIC, */
@@ -252,7 +252,7 @@ static struct usb_endpoint_descriptor acm_ss_out_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor acm_ss_bulk_comp_desc = {
-	.bLength =              sizeof acm_ss_bulk_comp_desc,
+	.bLength =              sizeof(acm_ss_bulk_comp_desc),
 	.bDescriptorType =      USB_DT_SS_ENDPOINT_COMP,
 };
 

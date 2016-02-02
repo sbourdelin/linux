@@ -428,7 +428,7 @@ struct ib_fmr *mlx4_ib_fmr_alloc(struct ib_pd *pd, int acc,
 	struct mlx4_ib_fmr *fmr;
 	int err = -ENOMEM;
 
-	fmr = kmalloc(sizeof *fmr, GFP_KERNEL);
+	fmr = kmalloc(sizeof(*fmr), GFP_KERNEL);
 	if (!fmr)
 		return ERR_PTR(-ENOMEM);
 

@@ -113,7 +113,7 @@ static void *vb2_dma_sg_alloc(void *alloc_ctx, unsigned long size,
 
 	if (WARN_ON(alloc_ctx == NULL))
 		return NULL;
-	buf = kzalloc(sizeof *buf, GFP_KERNEL);
+	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
 		return NULL;
 
@@ -237,7 +237,7 @@ static void *vb2_dma_sg_get_userptr(void *alloc_ctx, unsigned long vaddr,
 	struct frame_vector *vec;
 
 	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
-	buf = kzalloc(sizeof *buf, GFP_KERNEL);
+	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
 		return NULL;
 

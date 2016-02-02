@@ -1019,7 +1019,7 @@ static int ultrastor_host_reset(struct scsi_cmnd * SCpnt)
        Even bigger deal with new_eh! 
      */
 
-    memset((unsigned char *)config.aborted, 0, sizeof config.aborted);
+    memset((unsigned char *)config.aborted, 0, sizeof(config.aborted));
 #if ULTRASTOR_MAX_CMDS == 1
     config.mscp_busy = 0;
 #else

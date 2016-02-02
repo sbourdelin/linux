@@ -335,14 +335,14 @@ struct ib_mad_agent *ib_register_mad_agent(struct ib_device *device,
 	}
 
 	/* Allocate structures */
-	mad_agent_priv = kzalloc(sizeof *mad_agent_priv, GFP_KERNEL);
+	mad_agent_priv = kzalloc(sizeof(*mad_agent_priv), GFP_KERNEL);
 	if (!mad_agent_priv) {
 		ret = ERR_PTR(-ENOMEM);
 		goto error1;
 	}
 
 	if (mad_reg_req) {
-		reg_req = kmemdup(mad_reg_req, sizeof *reg_req, GFP_KERNEL);
+		reg_req = kmemdup(mad_reg_req, sizeof(*reg_req), GFP_KERNEL);
 		if (!reg_req) {
 			ret = ERR_PTR(-ENOMEM);
 			goto error3;
@@ -463,7 +463,7 @@ static int register_snoop_agent(struct ib_mad_qp_info *qp_info,
 	if (i == qp_info->snoop_table_size) {
 		/* Grow table. */
 		new_snoop_table = krealloc(qp_info->snoop_table,
-					   sizeof mad_snoop_priv *
+					   sizeof(mad_snoop_priv) *
 					   (qp_info->snoop_table_size + 1),
 					   GFP_ATOMIC);
 		if (!new_snoop_table) {
@@ -511,7 +511,7 @@ struct ib_mad_agent *ib_register_mad_snoop(struct ib_device *device,
 		goto error1;
 	}
 	/* Allocate structures */
-	mad_snoop_priv = kzalloc(sizeof *mad_snoop_priv, GFP_KERNEL);
+	mad_snoop_priv = kzalloc(sizeof(*mad_snoop_priv), GFP_KERNEL);
 	if (!mad_snoop_priv) {
 		ret = ERR_PTR(-ENOMEM);
 		goto error1;
@@ -695,7 +695,7 @@ static void snoop_recv(struct ib_mad_qp_info *qp_info,
 static void build_smp_wc(struct ib_qp *qp, struct ib_cqe *cqe, u16 slid,
 		u16 pkey_index, u8 port_num, struct ib_wc *wc)
 {
-	memset(wc, 0, sizeof *wc);
+	memset(wc, 0, sizeof(*wc));
 	wc->wr_cqe = cqe;
 	wc->status = IB_WC_SUCCESS;
 	wc->opcode = IB_WC_RECV;
@@ -817,7 +817,7 @@ static int handle_outgoing_dr_smp(struct ib_mad_agent_private *mad_agent_priv,
 			goto out;
 	}
 
-	local = kmalloc(sizeof *local, GFP_ATOMIC);
+	local = kmalloc(sizeof(*local), GFP_ATOMIC);
 	if (!local) {
 		ret = -ENOMEM;
 		dev_err(&device->dev, "No memory for ib_mad_local_private\n");
@@ -949,11 +949,11 @@ static int alloc_send_rmpp_list(struct ib_mad_send_wr_private *send_wr,
 
 	/* Allocate data segments. */
 	for (left = send_buf->data_len + pad; left > 0; left -= seg_size) {
-		seg = kmalloc(sizeof (*seg) + seg_size, gfp_mask);
+		seg = kmalloc(sizeof(*seg) + seg_size, gfp_mask);
 		if (!seg) {
 			dev_err(&send_buf->mad_agent->device->dev,
 				"alloc_send_rmpp_segs: RMPP mem alloc failed for len %zd, gfp %#x\n",
-				sizeof (*seg) + seg_size, gfp_mask);
+				sizeof(*seg) + seg_size, gfp_mask);
 			free_send_rmpp_list(send_wr);
 			return -ENOMEM;
 		}
@@ -1017,7 +1017,7 @@ struct ib_mad_send_buf * ib_create_send_mad(struct ib_mad_agent *mad_agent,
 			return ERR_PTR(-EINVAL);
 
 	size = rmpp_active ? hdr_len : mad_size;
-	buf = kzalloc(sizeof *mad_send_wr + size, gfp_mask);
+	buf = kzalloc(sizeof(*mad_send_wr) + size, gfp_mask);
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
 
@@ -1365,7 +1365,7 @@ static int method_in_use(struct ib_mad_mgmt_method_table **method,
 static int allocate_method_table(struct ib_mad_mgmt_method_table **method)
 {
 	/* Allocate management method table */
-	*method = kzalloc(sizeof **method, GFP_ATOMIC);
+	*method = kzalloc(sizeof(**method), GFP_ATOMIC);
 	if (!*method) {
 		pr_err("No memory for ib_mad_mgmt_method_table\n");
 		return -ENOMEM;
@@ -1460,7 +1460,7 @@ static int add_nonoui_reg_req(struct ib_mad_reg_req *mad_reg_req,
 	class = &port_priv->version[mad_reg_req->mgmt_class_version].class;
 	if (!*class) {
 		/* Allocate management class table for "new" class version */
-		*class = kzalloc(sizeof **class, GFP_ATOMIC);
+		*class = kzalloc(sizeof(**class), GFP_ATOMIC);
 		if (!*class) {
 			dev_err(&agent_priv->agent.device->dev,
 				"No memory for ib_mad_mgmt_class_table\n");
@@ -1527,7 +1527,7 @@ static int add_oui_reg_req(struct ib_mad_reg_req *mad_reg_req,
 				mad_reg_req->mgmt_class_version].vendor;
 	if (!*vendor_table) {
 		/* Allocate mgmt vendor class table for "new" class version */
-		vendor = kzalloc(sizeof *vendor, GFP_ATOMIC);
+		vendor = kzalloc(sizeof(*vendor), GFP_ATOMIC);
 		if (!vendor) {
 			dev_err(&agent_priv->agent.device->dev,
 				"No memory for ib_mad_mgmt_vendor_class_table\n");
@@ -1538,7 +1538,7 @@ static int add_oui_reg_req(struct ib_mad_reg_req *mad_reg_req,
 	}
 	if (!(*vendor_table)->vendor_class[vclass]) {
 		/* Allocate table for this management vendor class */
-		vendor_class = kzalloc(sizeof *vendor_class, GFP_ATOMIC);
+		vendor_class = kzalloc(sizeof(*vendor_class), GFP_ATOMIC);
 		if (!vendor_class) {
 			dev_err(&agent_priv->agent.device->dev,
 				"No memory for ib_mad_mgmt_vendor_class\n");
@@ -2545,7 +2545,7 @@ static bool ib_mad_send_error(struct ib_mad_port_private *port_priv,
 		struct ib_qp_attr *attr;
 
 		/* Transition QP to RTS and fail offending send */
-		attr = kmalloc(sizeof *attr, GFP_KERNEL);
+		attr = kmalloc(sizeof(*attr), GFP_KERNEL);
 		if (attr) {
 			attr->qp_state = IB_QPS_RTS;
 			attr->cur_qp_state = IB_QPS_SQE;
@@ -2964,7 +2964,7 @@ static int ib_mad_port_start(struct ib_mad_port_private *port_priv)
 	struct ib_qp *qp;
 	u16 pkey_index;
 
-	attr = kmalloc(sizeof *attr, GFP_KERNEL);
+	attr = kmalloc(sizeof(*attr), GFP_KERNEL);
 	if (!attr) {
 		dev_err(&port_priv->device->dev,
 			"Couldn't kmalloc ib_qp_attr\n");
@@ -3079,7 +3079,7 @@ static int create_mad_qp(struct ib_mad_qp_info *qp_info,
 	struct ib_qp_init_attr	qp_init_attr;
 	int ret;
 
-	memset(&qp_init_attr, 0, sizeof qp_init_attr);
+	memset(&qp_init_attr, 0, sizeof(qp_init_attr));
 	qp_init_attr.send_cq = qp_info->port_priv->cq;
 	qp_init_attr.recv_cq = qp_info->port_priv->cq;
 	qp_init_attr.sq_sig_type = IB_SIGNAL_ALL_WR;
@@ -3127,7 +3127,7 @@ static int ib_mad_port_open(struct ib_device *device,
 	int ret, cq_size;
 	struct ib_mad_port_private *port_priv;
 	unsigned long flags;
-	char name[sizeof "ib_mad123"];
+	char name[sizeof("ib_mad123")];
 	int has_smi;
 
 	if (WARN_ON(rdma_max_mad_size(device, port_num) < IB_MGMT_MAD_SIZE))
@@ -3138,7 +3138,7 @@ static int ib_mad_port_open(struct ib_device *device,
 		return -EFAULT;
 
 	/* Create new device info */
-	port_priv = kzalloc(sizeof *port_priv, GFP_KERNEL);
+	port_priv = kzalloc(sizeof(*port_priv), GFP_KERNEL);
 	if (!port_priv) {
 		dev_err(&device->dev, "No memory for ib_mad_port_private\n");
 		return -ENOMEM;
@@ -3180,7 +3180,7 @@ static int ib_mad_port_open(struct ib_device *device,
 	if (ret)
 		goto error7;
 
-	snprintf(name, sizeof name, "ib_mad%d", port_num);
+	snprintf(name, sizeof(name), "ib_mad%d", port_num);
 	port_priv->wq = create_singlethread_workqueue(name);
 	if (!port_priv->wq) {
 		ret = -ENOMEM;

@@ -36,8 +36,8 @@ void notify(int fd)
 	int r;
 
 	vmexit();
-	r = write(fd, &v, sizeof v);
-	assert(r == sizeof v);
+	r = write(fd, &v, sizeof(v));
+	assert(r == sizeof(v));
 	vmentry();
 }
 
@@ -47,8 +47,8 @@ void wait_for_notify(int fd)
 	int r;
 
 	vmexit();
-	r = read(fd, &v, sizeof v);
-	assert(r == sizeof v);
+	r = read(fd, &v, sizeof(v));
+	assert(r == sizeof(v));
 	vmentry();
 }
 

@@ -620,8 +620,8 @@ static void handle_rx(struct vhost_net *net)
 
 		num_buffers = cpu_to_vhost16(vq, headcount);
 		if (likely(mergeable) &&
-		    copy_to_iter(&num_buffers, sizeof num_buffers,
-				 &fixup) != sizeof num_buffers) {
+		    copy_to_iter(&num_buffers, sizeof(num_buffers),
+				 &fixup) != sizeof(num_buffers)) {
 			vq_err(vq, "Failed num_buffers write");
 			vhost_discard_vq_desc(vq, headcount);
 			break;
@@ -679,9 +679,9 @@ static int vhost_net_open(struct inode *inode, struct file *f)
 	struct vhost_virtqueue **vqs;
 	int i;
 
-	n = kmalloc(sizeof *n, GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
+	n = kmalloc(sizeof(*n), GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
 	if (!n) {
-		n = vmalloc(sizeof *n);
+		n = vmalloc(sizeof(*n));
 		if (!n)
 			return -ENOMEM;
 	}
@@ -814,7 +814,7 @@ static struct socket *get_raw_socket(int fd)
 		struct sockaddr_ll sa;
 		char  buf[MAX_ADDR_LEN];
 	} uaddr;
-	int uaddr_len = sizeof uaddr, r;
+	int uaddr_len = sizeof(uaddr), r;
 	struct socket *sock = sockfd_lookup(fd, &r);
 
 	if (!sock)
@@ -1060,16 +1060,16 @@ static long vhost_net_ioctl(struct file *f, unsigned int ioctl,
 
 	switch (ioctl) {
 	case VHOST_NET_SET_BACKEND:
-		if (copy_from_user(&backend, argp, sizeof backend))
+		if (copy_from_user(&backend, argp, sizeof(backend)))
 			return -EFAULT;
 		return vhost_net_set_backend(n, backend.index, backend.fd);
 	case VHOST_GET_FEATURES:
 		features = VHOST_NET_FEATURES;
-		if (copy_to_user(featurep, &features, sizeof features))
+		if (copy_to_user(featurep, &features, sizeof(features)))
 			return -EFAULT;
 		return 0;
 	case VHOST_SET_FEATURES:
-		if (copy_from_user(&features, featurep, sizeof features))
+		if (copy_from_user(&features, featurep, sizeof(features)))
 			return -EFAULT;
 		if (features & ~VHOST_NET_FEATURES)
 			return -EOPNOTSUPP;

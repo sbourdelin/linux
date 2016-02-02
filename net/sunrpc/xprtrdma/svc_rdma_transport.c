@@ -642,7 +642,7 @@ static void sq_comp_handler(struct ib_cq *cq, void *cq_context)
 static struct svcxprt_rdma *rdma_create_xprt(struct svc_serv *serv,
 					     int listener)
 {
-	struct svcxprt_rdma *cma_xprt = kzalloc(sizeof *cma_xprt, GFP_KERNEL);
+	struct svcxprt_rdma *cma_xprt = kzalloc(sizeof(*cma_xprt), GFP_KERNEL);
 
 	if (!cma_xprt)
 		return NULL;
@@ -1090,7 +1090,7 @@ static struct svc_xprt *svc_rdma_accept(struct svc_xprt *xprt)
 		goto errout;
 	}
 
-	memset(&qp_attr, 0, sizeof qp_attr);
+	memset(&qp_attr, 0, sizeof(qp_attr));
 	qp_attr.event_handler = qp_event_handler;
 	qp_attr.qp_context = &newxprt->sc_xprt;
 	qp_attr.cap.max_send_wr = newxprt->sc_sq_depth;
@@ -1182,7 +1182,7 @@ static struct svc_xprt *svc_rdma_accept(struct svc_xprt *xprt)
 
 	/* Accept Connection */
 	set_bit(RDMAXPRT_CONN_PENDING, &newxprt->sc_flags);
-	memset(&conn_param, 0, sizeof conn_param);
+	memset(&conn_param, 0, sizeof(conn_param));
 	conn_param.responder_resources = 0;
 	conn_param.initiator_depth = newxprt->sc_ord;
 	ret = rdma_accept(newxprt->sc_cm_id, &conn_param);
@@ -1455,7 +1455,7 @@ void svc_rdma_send_error(struct svcxprt_rdma *xprt, struct rpcrdma_msg *rmsgp,
 	ctxt->sge[0].length = length;
 
 	/* Prepare SEND WR */
-	memset(&err_wr, 0, sizeof err_wr);
+	memset(&err_wr, 0, sizeof(err_wr));
 	ctxt->wr_op = IB_WR_SEND;
 	err_wr.wr_id = (unsigned long)ctxt;
 	err_wr.sg_list = ctxt->sge;

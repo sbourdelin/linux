@@ -136,7 +136,7 @@ static struct mcast_group *mcast_find(struct mcast_port *port,
 
 	while (node) {
 		group = rb_entry(node, struct mcast_group, node);
-		ret = memcmp(mgid->raw, group->rec.mgid.raw, sizeof *mgid);
+		ret = memcmp(mgid->raw, group->rec.mgid.raw, sizeof(*mgid));
 		if (!ret)
 			return group;
 
@@ -162,7 +162,7 @@ static struct mcast_group *mcast_insert(struct mcast_port *port,
 		cur_group = rb_entry(parent, struct mcast_group, node);
 
 		ret = memcmp(group->rec.mgid.raw, cur_group->rec.mgid.raw,
-			     sizeof group->rec.mgid);
+			     sizeof(group->rec.mgid));
 		if (ret < 0)
 			link = &(*link)->rb_left;
 		else if (ret > 0)
@@ -286,7 +286,7 @@ static int cmp_rec(struct ib_sa_mcmember_rec *src,
 	/* MGID must already match */
 
 	if (comp_mask & IB_SA_MCMEMBER_REC_PORT_GID &&
-	    memcmp(&src->port_gid, &dst->port_gid, sizeof src->port_gid))
+	    memcmp(&src->port_gid, &dst->port_gid, sizeof(src->port_gid)))
 		return -EINVAL;
 	if (comp_mask & IB_SA_MCMEMBER_REC_QKEY && src->qkey != dst->qkey)
 		return -EINVAL;
@@ -566,7 +566,7 @@ static struct mcast_group *acquire_group(struct mcast_port *port,
 	unsigned long flags;
 	int is_mgid0;
 
-	is_mgid0 = !memcmp(&mgid0, mgid, sizeof mgid0);
+	is_mgid0 = !memcmp(&mgid0, mgid, sizeof(mgid0));
 	if (!is_mgid0) {
 		spin_lock_irqsave(&port->lock, flags);
 		group = mcast_find(port, mgid);
@@ -575,7 +575,7 @@ static struct mcast_group *acquire_group(struct mcast_port *port,
 		spin_unlock_irqrestore(&port->lock, flags);
 	}
 
-	group = kzalloc(sizeof *group, gfp_mask);
+	group = kzalloc(sizeof(*group), gfp_mask);
 	if (!group)
 		return NULL;
 
@@ -626,7 +626,7 @@ ib_sa_join_multicast(struct ib_sa_client *client,
 	if (!dev)
 		return ERR_PTR(-ENODEV);
 
-	member = kmalloc(sizeof *member, gfp_mask);
+	member = kmalloc(sizeof(*member), gfp_mask);
 	if (!member)
 		return ERR_PTR(-ENOMEM);
 
@@ -747,7 +747,7 @@ int ib_init_ah_from_mcmember(struct ib_device *device, u8 port_num,
 	if (ret)
 		return ret;
 
-	memset(ah_attr, 0, sizeof *ah_attr);
+	memset(ah_attr, 0, sizeof(*ah_attr));
 	ah_attr->dlid = be16_to_cpu(rec->mlid);
 	ah_attr->sl = rec->sl;
 	ah_attr->port_num = port_num;
@@ -821,7 +821,7 @@ static void mcast_add_one(struct ib_device *device)
 	int i;
 	int count = 0;
 
-	dev = kmalloc(sizeof *dev + device->phys_port_cnt * sizeof *port,
+	dev = kmalloc(sizeof(*dev) + device->phys_port_cnt * sizeof(*port),
 		      GFP_KERNEL);
 	if (!dev)
 		return;

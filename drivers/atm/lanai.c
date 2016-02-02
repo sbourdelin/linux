@@ -2127,7 +2127,7 @@ static int lanai_dev_open(struct atm_dev *atmdev)
 	lanai->nbound = 0;
 #endif
 	lanai->cbrvcc = NULL;
-	memset(&lanai->stats, 0, sizeof lanai->stats);
+	memset(&lanai->stats, 0, sizeof(lanai->stats));
 	spin_lock_init(&lanai->endtxlock);
 	spin_lock_init(&lanai->servicelock);
 	atmdev->ci_range.vpi_bits = 0;

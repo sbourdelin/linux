@@ -215,7 +215,7 @@ static int ad7877_read(struct spi_device *spi, u16 reg)
 	struct ser_req *req;
 	int status, ret;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return -ENOMEM;
 
@@ -246,7 +246,7 @@ static int ad7877_write(struct spi_device *spi, u16 reg, u16 val)
 	struct ser_req *req;
 	int status;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return -ENOMEM;
 
@@ -273,7 +273,7 @@ static int ad7877_read_adc(struct spi_device *spi, unsigned command)
 	int sample;
 	int i;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req)
 		return -ENOMEM;
 

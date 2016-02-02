@@ -1037,7 +1037,7 @@ static void ib_cache_update(struct ib_device *device,
 
 	table = ports_table[port - rdma_start_port(device)];
 
-	tprops = kmalloc(sizeof *tprops, GFP_KERNEL);
+	tprops = kmalloc(sizeof(*tprops), GFP_KERNEL);
 	if (!tprops)
 		return;
 
@@ -1048,8 +1048,8 @@ static void ib_cache_update(struct ib_device *device,
 		goto err;
 	}
 
-	pkey_cache = kmalloc(sizeof *pkey_cache + tprops->pkey_tbl_len *
-			     sizeof *pkey_cache->table, GFP_KERNEL);
+	pkey_cache = kmalloc(sizeof(*pkey_cache) + tprops->pkey_tbl_len *
+			     sizeof(*pkey_cache->table), GFP_KERNEL);
 	if (!pkey_cache)
 		goto err;
 
@@ -1135,7 +1135,7 @@ static void ib_cache_event(struct ib_event_handler *handler,
 	    event->event == IB_EVENT_SM_CHANGE   ||
 	    event->event == IB_EVENT_CLIENT_REREGISTER ||
 	    event->event == IB_EVENT_GID_CHANGE) {
-		work = kmalloc(sizeof *work, GFP_ATOMIC);
+		work = kmalloc(sizeof(*work), GFP_ATOMIC);
 		if (work) {
 			INIT_WORK(&work->work, ib_cache_task);
 			work->device   = event->device;
@@ -1153,9 +1153,9 @@ int ib_cache_setup_one(struct ib_device *device)
 	rwlock_init(&device->cache.lock);
 
 	device->cache.pkey_cache =
-		kzalloc(sizeof *device->cache.pkey_cache *
+		kzalloc(sizeof(*device->cache.pkey_cache) *
 			(rdma_end_port(device) - rdma_start_port(device) + 1), GFP_KERNEL);
-	device->cache.lmc_cache = kmalloc(sizeof *device->cache.lmc_cache *
+	device->cache.lmc_cache = kmalloc(sizeof(*device->cache.lmc_cache) *
 					  (rdma_end_port(device) -
 					   rdma_start_port(device) + 1),
 					  GFP_KERNEL);

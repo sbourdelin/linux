@@ -814,18 +814,18 @@ void ipath_get_eeprom_info(struct ipath_devdata *dd)
 		 * elsewhere for backward-compatibility.
 		 */
 		char *snp = dd->ipath_serial;
-		memcpy(snp, ifp->if_sprefix, sizeof ifp->if_sprefix);
-		snp[sizeof ifp->if_sprefix] = '\0';
+		memcpy(snp, ifp->if_sprefix, sizeof(ifp->if_sprefix));
+		snp[sizeof(ifp->if_sprefix)] = '\0';
 		len = strlen(snp);
 		snp += len;
-		len = (sizeof dd->ipath_serial) - len;
-		if (len > sizeof ifp->if_serial) {
-			len = sizeof ifp->if_serial;
+		len = (sizeof(dd->ipath_serial)) - len;
+		if (len > sizeof(ifp->if_serial)) {
+			len = sizeof(ifp->if_serial);
 		}
 		memcpy(snp, ifp->if_serial, len);
 	} else
 		memcpy(dd->ipath_serial, ifp->if_serial,
-		       sizeof ifp->if_serial);
+		       sizeof(ifp->if_serial));
 	if (!strstr(ifp->if_comment, "Tested successfully"))
 		ipath_dev_err(dd, "Board SN %s did not pass functional "
 			"test: %s\n", dd->ipath_serial,

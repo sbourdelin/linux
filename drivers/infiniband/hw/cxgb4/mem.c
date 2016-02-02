@@ -129,7 +129,7 @@ static int _c4iw_write_mem_inline(struct c4iw_rdev *rdev, u32 addr, u32 len,
 
 		copy_len = len > C4IW_MAX_INLINE_SIZE ? C4IW_MAX_INLINE_SIZE :
 			   len;
-		wr_len = roundup(sizeof *req + sizeof *sc +
+		wr_len = roundup(sizeof(*req) + sizeof(*sc) +
 				 roundup(copy_len, T4_ULPTX_MIN_IO), 16);
 
 		skb = alloc_skb(wr_len, GFP_KERNEL);
@@ -508,7 +508,7 @@ struct ib_mr *c4iw_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 		for (k = 0; k < len; ++k) {
 			pages[i++] = cpu_to_be64(sg_dma_address(sg) +
 				mhp->umem->page_size * k);
-			if (i == PAGE_SIZE / sizeof *pages) {
+			if (i == PAGE_SIZE / sizeof(*pages)) {
 				err = write_pbl(&mhp->rhp->rdev,
 				      pages,
 				      mhp->attr.pbl_addr + (n << 3), i);

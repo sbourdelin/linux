@@ -763,7 +763,7 @@ struct eth_dev *gether_setup_name(struct usb_gadget *g,
 	struct net_device	*net;
 	int			status;
 
-	net = alloc_etherdev(sizeof *dev);
+	net = alloc_etherdev(sizeof(*dev));
 	if (!net)
 		return ERR_PTR(-ENOMEM);
 

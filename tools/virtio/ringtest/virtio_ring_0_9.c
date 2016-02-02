@@ -73,12 +73,12 @@ void alloc_ring(void)
 	host.used_idx = 0;
 	host.called_used_idx = -1;
 	guest.num_free = ring_size;
-	data = malloc(ring_size * sizeof *data);
+	data = malloc(ring_size * sizeof(*data));
 	if (!data) {
 		perror("Unable to allocate data buffer.\n");
 		exit(3);
 	}
-	memset(data, 0, ring_size * sizeof *data);
+	memset(data, 0, ring_size * sizeof(*data));
 }
 
 /* guest side */

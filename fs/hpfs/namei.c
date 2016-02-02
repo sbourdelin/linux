@@ -43,7 +43,7 @@ static int hpfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	dnode = hpfs_alloc_dnode(dir->i_sb, fno, &dno, &qbh0);
 	if (!dnode)
 		goto bail1;
-	memset(&dee, 0, sizeof dee);
+	memset(&dee, 0, sizeof(dee));
 	dee.directory = 1;
 	if (!(mode & 0222)) dee.read_only = 1;
 	/*dee.archive = 0;*/
@@ -145,7 +145,7 @@ static int hpfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, b
 	fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh);
 	if (!fnode)
 		goto bail;
-	memset(&dee, 0, sizeof dee);
+	memset(&dee, 0, sizeof(dee));
 	if (!(mode & 0222)) dee.read_only = 1;
 	dee.archive = 1;
 	dee.hidden = name[0] == '.';
@@ -232,7 +232,7 @@ static int hpfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, de
 	fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh);
 	if (!fnode)
 		goto bail;
-	memset(&dee, 0, sizeof dee);
+	memset(&dee, 0, sizeof(dee));
 	if (!(mode & 0222)) dee.read_only = 1;
 	dee.archive = 1;
 	dee.hidden = name[0] == '.';
@@ -309,7 +309,7 @@ static int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *sy
 	fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh);
 	if (!fnode)
 		goto bail;
-	memset(&dee, 0, sizeof dee);
+	memset(&dee, 0, sizeof(dee));
 	dee.archive = 1;
 	dee.hidden = name[0] == '.';
 	dee.fnode = cpu_to_le32(fno);

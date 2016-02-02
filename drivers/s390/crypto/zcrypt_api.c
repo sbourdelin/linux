@@ -1357,10 +1357,10 @@ static int zcrypt_rng_data_read(struct hwrng *rng, u32 *data)
 			rc = zcrypt_rng((char *) zcrypt_rng_buffer);
 		if (rc < 0)
 			return -EIO;
-		zcrypt_rng_buffer_index = rc / sizeof *data;
+		zcrypt_rng_buffer_index = rc / sizeof(*data);
 	}
 	*data = zcrypt_rng_buffer[--zcrypt_rng_buffer_index];
-	return sizeof *data;
+	return sizeof(*data);
 }
 
 static struct hwrng zcrypt_rng_dev = {

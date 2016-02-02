@@ -93,14 +93,14 @@ int crisv32_pinmux_alloc(int port, int first_pin, int last_pin,
 int crisv32_pinmux_alloc_fixed(enum fixed_function function)
 {
 	int ret = -EINVAL;
-	char saved[sizeof pins];
+	char saved[sizeof(pins)];
 	unsigned long flags;
 	reg_pinmux_rw_hwprot hwprot;
 
 	spin_lock_irqsave(&pinmux_lock, flags);
 
 	/* Save internal data for recovery */
-	memcpy(saved, pins, sizeof pins);
+	memcpy(saved, pins, sizeof(pins));
 
 	crisv32_pinmux_init();	/* Must be done before we read rw_hwprot */
 
@@ -168,7 +168,7 @@ int crisv32_pinmux_alloc_fixed(enum fixed_function function)
 	if (!ret)
 		REG_WR(pinmux, regi_pinmux, rw_hwprot, hwprot);
 	else
-		memcpy(pins, saved, sizeof pins);
+		memcpy(pins, saved, sizeof(pins));
 
 	spin_unlock_irqrestore(&pinmux_lock, flags);
 
@@ -228,14 +228,14 @@ int crisv32_pinmux_dealloc(int port, int first_pin, int last_pin)
 int crisv32_pinmux_dealloc_fixed(enum fixed_function function)
 {
 	int ret = -EINVAL;
-	char saved[sizeof pins];
+	char saved[sizeof(pins)];
 	unsigned long flags;
 	reg_pinmux_rw_hwprot hwprot;
 
 	spin_lock_irqsave(&pinmux_lock, flags);
 
 	/* Save internal data for recovery */
-	memcpy(saved, pins, sizeof pins);
+	memcpy(saved, pins, sizeof(pins));
 
 	crisv32_pinmux_init();	/* Must be done before we read rw_hwprot */
 
@@ -303,7 +303,7 @@ int crisv32_pinmux_dealloc_fixed(enum fixed_function function)
 	if (!ret)
 		REG_WR(pinmux, regi_pinmux, rw_hwprot, hwprot);
 	else
-		memcpy(pins, saved, sizeof pins);
+		memcpy(pins, saved, sizeof(pins));
 
 	spin_unlock_irqrestore(&pinmux_lock, flags);
 

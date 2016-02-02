@@ -96,7 +96,7 @@ int s390_sha_final(struct shash_desc *desc, u8 *out)
 	/* copy digest to out */
 	memcpy(out, ctx->state, crypto_shash_digestsize(desc->tfm));
 	/* wipe context */
-	memset(ctx, 0, sizeof *ctx);
+	memset(ctx, 0, sizeof(*ctx));
 
 	return 0;
 }

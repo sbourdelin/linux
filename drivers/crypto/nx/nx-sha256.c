@@ -50,7 +50,7 @@ static int nx_crypto_ctx_sha256_init(struct crypto_tfm *tfm)
 static int nx_sha256_init(struct shash_desc *desc) {
 	struct sha256_state *sctx = shash_desc_ctx(desc);
 
-	memset(sctx, 0, sizeof *sctx);
+	memset(sctx, 0, sizeof(*sctx));
 
 	sctx->state[0] = __cpu_to_be32(SHA256_H0);
 	sctx->state[1] = __cpu_to_be32(SHA256_H1);

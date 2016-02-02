@@ -147,7 +147,7 @@ static int rds_iw_add_cm_id(struct rds_iw_device *rds_iwdev, struct rdma_cm_id *
 {
 	struct rds_iw_cm_id *i_cm_id;
 
-	i_cm_id = kmalloc(sizeof *i_cm_id, GFP_KERNEL);
+	i_cm_id = kmalloc(sizeof(*i_cm_id), GFP_KERNEL);
 	if (!i_cm_id)
 		return -ENOMEM;
 

@@ -62,7 +62,7 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 	u32 clk, spd, prop;
 	int ret;
 
-	memset(port, 0, sizeof *port);
+	memset(port, 0, sizeof(*port));
 	if (of_property_read_u32(np, "clock-frequency", &clk)) {
 
 		/* Get clk rate through clk driver if present */

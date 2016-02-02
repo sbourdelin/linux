@@ -195,7 +195,7 @@ again:
 	case STATE_BODY_BIT_START:
 		if (eq_margin(ev.duration, RC6_BIT_START, RC6_UNIT / 2)) {
 			/* Discard LSB's that won't fit in data->body */
-			if (data->count++ < CHAR_BIT * sizeof data->body) {
+			if (data->count++ < CHAR_BIT * sizeof(data->body)) {
 				data->body <<= 1;
 				if (ev.pulse)
 					data->body |= 1;
@@ -235,7 +235,7 @@ again:
 			break;
 
 		case RC6_MODE_6A:
-			if (data->count > CHAR_BIT * sizeof data->body) {
+			if (data->count > CHAR_BIT * sizeof(data->body)) {
 				IR_dprintk(1, "RC6 too many (%u) data bits\n",
 					data->count);
 				goto out;

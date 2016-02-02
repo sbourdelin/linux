@@ -188,14 +188,14 @@ int rndis_command(struct usbnet *dev, struct rndis_msg_hdr *buf, int buflen)
 				struct rndis_keepalive_c *msg = (void *)buf;
 
 				msg->msg_type = cpu_to_le32(RNDIS_MSG_KEEPALIVE_C);
-				msg->msg_len = cpu_to_le32(sizeof *msg);
+				msg->msg_len = cpu_to_le32(sizeof(*msg));
 				msg->status = cpu_to_le32(RNDIS_STATUS_SUCCESS);
 				retval = usb_control_msg(dev->udev,
 					usb_sndctrlpipe(dev->udev, 0),
 					USB_CDC_SEND_ENCAPSULATED_COMMAND,
 					USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 					0, master_ifnum,
-					msg, sizeof *msg,
+					msg, sizeof(*msg),
 					RNDIS_CONTROL_TIMEOUT_MS);
 				if (unlikely(retval < 0))
 					dev_dbg(&info->control->dev,
@@ -251,9 +251,9 @@ static int rndis_query(struct usbnet *dev, struct usb_interface *intf,
 
 	u.buf = buf;
 
-	memset(u.get, 0, sizeof *u.get + in_len);
+	memset(u.get, 0, sizeof(*u.get) + in_len);
 	u.get->msg_type = cpu_to_le32(RNDIS_MSG_QUERY);
-	u.get->msg_len = cpu_to_le32(sizeof *u.get + in_len);
+	u.get->msg_len = cpu_to_le32(sizeof(*u.get) + in_len);
 	u.get->oid = cpu_to_le32(oid);
 	u.get->len = cpu_to_le32(in_len);
 	u.get->offset = cpu_to_le32(20);
@@ -326,7 +326,7 @@ generic_rndis_bind(struct usbnet *dev, struct usb_interface *intf, int flags)
 		goto fail;
 
 	u.init->msg_type = cpu_to_le32(RNDIS_MSG_INIT);
-	u.init->msg_len = cpu_to_le32(sizeof *u.init);
+	u.init->msg_len = cpu_to_le32(sizeof(*u.init));
 	u.init->major_version = cpu_to_le32(1);
 	u.init->minor_version = cpu_to_le32(0);
 
@@ -395,7 +395,7 @@ generic_rndis_bind(struct usbnet *dev, struct usb_interface *intf, int flags)
 
 	/* Check physical medium */
 	phym = NULL;
-	reply_len = sizeof *phym;
+	reply_len = sizeof(*phym);
 	retval = rndis_query(dev, intf, u.buf,
 			     RNDIS_OID_GEN_PHYSICAL_MEDIUM,
 			     0, (void **) &phym, &reply_len);
@@ -431,13 +431,13 @@ generic_rndis_bind(struct usbnet *dev, struct usb_interface *intf, int flags)
 	memcpy(net->dev_addr, bp, ETH_ALEN);
 
 	/* set a nonzero filter to enable data transfers */
-	memset(u.set, 0, sizeof *u.set);
+	memset(u.set, 0, sizeof(*u.set));
 	u.set->msg_type = cpu_to_le32(RNDIS_MSG_SET);
-	u.set->msg_len = cpu_to_le32(4 + sizeof *u.set);
+	u.set->msg_len = cpu_to_le32(4 + sizeof(*u.set));
 	u.set->oid = cpu_to_le32(RNDIS_OID_GEN_CURRENT_PACKET_FILTER);
 	u.set->len = cpu_to_le32(4);
-	u.set->offset = cpu_to_le32((sizeof *u.set) - 8);
-	*(__le32 *)(u.buf + sizeof *u.set) = cpu_to_le32(RNDIS_DEFAULT_FILTER);
+	u.set->offset = cpu_to_le32((sizeof(*u.set)) - 8);
+	*(__le32 *)(u.buf + sizeof(*u.set)) = cpu_to_le32(RNDIS_DEFAULT_FILTER);
 
 	retval = rndis_command(dev, u.header, CONTROL_BUFFER_SIZE);
 	if (unlikely(retval < 0)) {
@@ -451,9 +451,9 @@ generic_rndis_bind(struct usbnet *dev, struct usb_interface *intf, int flags)
 	return retval;
 
 halt_fail_and_release:
-	memset(u.halt, 0, sizeof *u.halt);
+	memset(u.halt, 0, sizeof(*u.halt));
 	u.halt->msg_type = cpu_to_le32(RNDIS_MSG_HALT);
-	u.halt->msg_len = cpu_to_le32(sizeof *u.halt);
+	u.halt->msg_len = cpu_to_le32(sizeof(*u.halt));
 	(void) rndis_command(dev, (void *)u.halt, CONTROL_BUFFER_SIZE);
 fail_and_release:
 	usb_set_intfdata(info->data, NULL);
@@ -478,7 +478,7 @@ void rndis_unbind(struct usbnet *dev, struct usb_interface *intf)
 	halt = kzalloc(CONTROL_BUFFER_SIZE, GFP_KERNEL);
 	if (halt) {
 		halt->msg_type = cpu_to_le32(RNDIS_MSG_HALT);
-		halt->msg_len = cpu_to_le32(sizeof *halt);
+		halt->msg_len = cpu_to_le32(sizeof(*halt));
 		(void) rndis_command(dev, (void *)halt, CONTROL_BUFFER_SIZE);
 		kfree(halt);
 	}
@@ -519,7 +519,7 @@ int rndis_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 		skb_pull(skb, 8 + data_offset);
 
 		/* at most one packet left? */
-		if (likely((data_len - skb->len) <= sizeof *hdr)) {
+		if (likely((data_len - skb->len) <= sizeof(*hdr))) {
 			skb_trim(skb, data_len);
 			break;
 		}
@@ -528,7 +528,7 @@ int rndis_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 		skb2 = skb_clone(skb, GFP_ATOMIC);
 		if (unlikely(!skb2))
 			break;
-		skb_pull(skb, msg_len - sizeof *hdr);
+		skb_pull(skb, msg_len - sizeof(*hdr));
 		skb_trim(skb2, data_len);
 		usbnet_skb_return(dev, skb2);
 	}
@@ -549,13 +549,13 @@ rndis_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
 		int	room = skb_headroom(skb);
 
 		/* enough head room as-is? */
-		if (unlikely((sizeof *hdr) <= room))
+		if (unlikely((sizeof(*hdr)) <= room))
 			goto fill;
 
 		/* enough room, but needs to be readjusted? */
 		room += skb_tailroom(skb);
-		if (likely((sizeof *hdr) <= room)) {
-			skb->data = memmove(skb->head + sizeof *hdr,
+		if (likely((sizeof(*hdr)) <= room)) {
+			skb->data = memmove(skb->head + sizeof(*hdr),
 					    skb->data, len);
 			skb_set_tail_pointer(skb, len);
 			goto fill;
@@ -563,7 +563,7 @@ rndis_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
 	}
 
 	/* create a new skb, with the correct size (and tailpad) */
-	skb2 = skb_copy_expand(skb, sizeof *hdr, 1, flags);
+	skb2 = skb_copy_expand(skb, sizeof(*hdr), 1, flags);
 	dev_kfree_skb_any(skb);
 	if (unlikely(!skb2))
 		return skb2;
@@ -573,8 +573,8 @@ rndis_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
 	 * packets; Linux minimizes wasted bandwidth through tx queues.
 	 */
 fill:
-	hdr = (void *) __skb_push(skb, sizeof *hdr);
-	memset(hdr, 0, sizeof *hdr);
+	hdr = (void *) __skb_push(skb, sizeof(*hdr));
+	memset(hdr, 0, sizeof(*hdr));
 	hdr->msg_type = cpu_to_le32(RNDIS_MSG_PACKET);
 	hdr->msg_len = cpu_to_le32(skb->len);
 	hdr->data_offset = cpu_to_le32(sizeof(*hdr) - 8);

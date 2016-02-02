@@ -44,7 +44,7 @@ static inline struct f_eem *func_to_eem(struct usb_function *f)
 /* interface descriptor: */
 
 static struct usb_interface_descriptor eem_intf = {
-	.bLength =		sizeof eem_intf,
+	.bLength =		sizeof(eem_intf),
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	/* .bInterfaceNumber = DYNAMIC */
@@ -130,7 +130,7 @@ static struct usb_endpoint_descriptor eem_ss_out_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor eem_ss_bulk_comp_desc = {
-	.bLength =		sizeof eem_ss_bulk_comp_desc,
+	.bLength =		sizeof(eem_ss_bulk_comp_desc),
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 2 values can be tweaked if necessary */

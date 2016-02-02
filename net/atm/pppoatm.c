@@ -400,7 +400,7 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, void __user *arg)
 	 * prototypical one used to initialize them
 	 */
 	static const DECLARE_TASKLET(tasklet_proto, pppoatm_wakeup_sender, 0);
-	if (copy_from_user(&be, arg, sizeof be))
+	if (copy_from_user(&be, arg, sizeof(be)))
 		return -EFAULT;
 	if (be.encaps != PPPOATM_ENCAPS_AUTODETECT &&
 	    be.encaps != PPPOATM_ENCAPS_VC && be.encaps != PPPOATM_ENCAPS_LLC)

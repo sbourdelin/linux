@@ -347,10 +347,10 @@ static long vhost_dev_alloc_iovecs(struct vhost_dev *dev)
 
 	for (i = 0; i < dev->nvqs; ++i) {
 		vq = dev->vqs[i];
-		vq->indirect = kmalloc(sizeof *vq->indirect * UIO_MAXIOV,
+		vq->indirect = kmalloc(sizeof(*vq->indirect) * UIO_MAXIOV,
 				       GFP_KERNEL);
-		vq->log = kmalloc(sizeof *vq->log * UIO_MAXIOV, GFP_KERNEL);
-		vq->heads = kmalloc(sizeof *vq->heads * UIO_MAXIOV, GFP_KERNEL);
+		vq->log = kmalloc(sizeof(*vq->log) * UIO_MAXIOV, GFP_KERNEL);
+		vq->heads = kmalloc(sizeof(*vq->heads) * UIO_MAXIOV, GFP_KERNEL);
 		if (!vq->indirect || !vq->log || !vq->heads)
 			goto err_nomem;
 	}
@@ -631,11 +631,11 @@ static int vq_access_ok(struct vhost_virtqueue *vq, unsigned int num,
 			struct vring_used __user *used)
 {
 	size_t s = vhost_has_feature(vq, VIRTIO_RING_F_EVENT_IDX) ? 2 : 0;
-	return access_ok(VERIFY_READ, desc, num * sizeof *desc) &&
+	return access_ok(VERIFY_READ, desc, num * sizeof(*desc)) &&
 	       access_ok(VERIFY_READ, avail,
-			 sizeof *avail + num * sizeof *avail->ring + s) &&
+			 sizeof(*avail) + num * sizeof(*avail->ring) + s) &&
 	       access_ok(VERIFY_WRITE, used,
-			sizeof *used + num * sizeof *used->ring + s);
+			sizeof(*used) + num * sizeof(*used->ring) + s);
 }
 
 /* Can we log writes? */
@@ -656,8 +656,8 @@ static int vq_log_access_ok(struct vhost_virtqueue *vq,
 	return vq_memory_access_ok(log_base, vq->memory,
 				   vhost_has_feature(vq, VHOST_F_LOG_ALL)) &&
 		(!vq->log_used || log_access_ok(log_base, vq->log_addr,
-					sizeof *vq->used +
-					vq->num * sizeof *vq->used->ring + s));
+					sizeof(*vq->used) +
+					vq->num * sizeof(*vq->used->ring) + s));
 }
 
 /* Can we start vq? */
@@ -706,7 +706,7 @@ static long vhost_set_memory(struct vhost_dev *d, struct vhost_memory __user *m)
 
 	memcpy(newmem, &mem, size);
 	if (copy_from_user(newmem->regions, m->regions,
-			   mem.nregions * sizeof *m->regions)) {
+			   mem.nregions * sizeof(*m->regions))) {
 		kvfree(newmem);
 		return -EFAULT;
 	}
@@ -761,7 +761,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 			r = -EBUSY;
 			break;
 		}
-		if (copy_from_user(&s, argp, sizeof s)) {
+		if (copy_from_user(&s, argp, sizeof(s))) {
 			r = -EFAULT;
 			break;
 		}
@@ -778,7 +778,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 			r = -EBUSY;
 			break;
 		}
-		if (copy_from_user(&s, argp, sizeof s)) {
+		if (copy_from_user(&s, argp, sizeof(s))) {
 			r = -EFAULT;
 			break;
 		}
@@ -793,11 +793,11 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 	case VHOST_GET_VRING_BASE:
 		s.index = idx;
 		s.num = vq->last_avail_idx;
-		if (copy_to_user(argp, &s, sizeof s))
+		if (copy_to_user(argp, &s, sizeof(s)))
 			r = -EFAULT;
 		break;
 	case VHOST_SET_VRING_ADDR:
-		if (copy_from_user(&a, argp, sizeof a)) {
+		if (copy_from_user(&a, argp, sizeof(a))) {
 			r = -EFAULT;
 			break;
 		}
@@ -839,8 +839,8 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 			/* Also validate log access for used ring if enabled. */
 			if ((a.flags & (0x1 << VHOST_VRING_F_LOG)) &&
 			    !log_access_ok(vq->log_base, a.log_guest_addr,
-					   sizeof *vq->used +
-					   vq->num * sizeof *vq->used->ring)) {
+					   sizeof(*vq->used) +
+					   vq->num * sizeof(*vq->used->ring))) {
 				r = -EINVAL;
 				break;
 			}
@@ -853,7 +853,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 		vq->used = (void __user *)(unsigned long)a.used_user_addr;
 		break;
 	case VHOST_SET_VRING_KICK:
-		if (copy_from_user(&f, argp, sizeof f)) {
+		if (copy_from_user(&f, argp, sizeof(f))) {
 			r = -EFAULT;
 			break;
 		}
@@ -869,7 +869,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 			filep = eventfp;
 		break;
 	case VHOST_SET_VRING_CALL:
-		if (copy_from_user(&f, argp, sizeof f)) {
+		if (copy_from_user(&f, argp, sizeof(f))) {
 			r = -EFAULT;
 			break;
 		}
@@ -888,7 +888,7 @@ long vhost_vring_ioctl(struct vhost_dev *d, int ioctl, void __user *argp)
 			filep = eventfp;
 		break;
 	case VHOST_SET_VRING_ERR:
-		if (copy_from_user(&f, argp, sizeof f)) {
+		if (copy_from_user(&f, argp, sizeof(f))) {
 			r = -EFAULT;
 			break;
 		}
@@ -960,7 +960,7 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 		r = vhost_set_memory(d, argp);
 		break;
 	case VHOST_SET_LOG_BASE:
-		if (copy_from_user(&p, argp, sizeof p)) {
+		if (copy_from_user(&p, argp, sizeof(p))) {
 			r = -EFAULT;
 			break;
 		}
@@ -1126,7 +1126,7 @@ static int vhost_update_used_flags(struct vhost_virtqueue *vq)
 		used = &vq->used->flags;
 		log_write(vq->log_base, vq->log_addr +
 			  (used - (void __user *)vq->used),
-			  sizeof vq->used->flags);
+			  sizeof(vq->used->flags));
 		if (vq->log_ctx)
 			eventfd_signal(vq->log_ctx, 1);
 	}
@@ -1145,7 +1145,7 @@ static int vhost_update_avail_event(struct vhost_virtqueue *vq, u16 avail_event)
 		used = vhost_avail_event(vq);
 		log_write(vq->log_base, vq->log_addr +
 			  (used - (void __user *)vq->used),
-			  sizeof *vhost_avail_event(vq));
+			  sizeof(*vhost_avail_event(vq)));
 		if (vq->log_ctx)
 			eventfd_signal(vq->log_ctx, 1);
 	}
@@ -1167,7 +1167,7 @@ int vhost_init_used(struct vhost_virtqueue *vq)
 	if (r)
 		return r;
 	vq->signalled_used_valid = false;
-	if (!access_ok(VERIFY_READ, &vq->used->idx, sizeof vq->used->idx))
+	if (!access_ok(VERIFY_READ, &vq->used->idx, sizeof(vq->used->idx)))
 		return -EFAULT;
 	r = __get_user(last_used_idx, &vq->used->idx);
 	if (r)
@@ -1245,11 +1245,11 @@ static int get_indirect(struct vhost_virtqueue *vq,
 	int ret;
 
 	/* Sanity check */
-	if (unlikely(len % sizeof desc)) {
+	if (unlikely(len % sizeof(desc))) {
 		vq_err(vq, "Invalid length in indirect descriptor: "
 		       "len 0x%llx not multiple of 0x%zx\n",
 		       (unsigned long long)len,
-		       sizeof desc);
+		       sizeof(desc));
 		return -EINVAL;
 	}
 
@@ -1265,7 +1265,7 @@ static int get_indirect(struct vhost_virtqueue *vq,
 	 * architectures only need a compiler barrier here. */
 	read_barrier_depends();
 
-	count = len / sizeof desc;
+	count = len / sizeof(desc);
 	/* Buffers are chained via a 16 bit next field, so
 	 * we can have at most 2^16 of these. */
 	if (unlikely(count > USHRT_MAX + 1)) {
@@ -1285,12 +1285,12 @@ static int get_indirect(struct vhost_virtqueue *vq,
 		if (unlikely(copy_from_iter(&desc, sizeof(desc), &from) !=
 			     sizeof(desc))) {
 			vq_err(vq, "Failed indirect descriptor: idx %d, %zx\n",
-			       i, (size_t)vhost64_to_cpu(vq, indirect->addr) + i * sizeof desc);
+			       i, (size_t)vhost64_to_cpu(vq, indirect->addr) + i * sizeof(desc));
 			return -EINVAL;
 		}
 		if (unlikely(desc.flags & cpu_to_vhost16(vq, VRING_DESC_F_INDIRECT))) {
 			vq_err(vq, "Nested indirect descriptor: idx %d, %zx\n",
-			       i, (size_t)vhost64_to_cpu(vq, indirect->addr) + i * sizeof desc);
+			       i, (size_t)vhost64_to_cpu(vq, indirect->addr) + i * sizeof(desc));
 			return -EINVAL;
 		}
 
@@ -1404,7 +1404,7 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 			       i, vq->num, head);
 			return -EINVAL;
 		}
-		ret = __copy_from_user(&desc, vq->desc + i, sizeof desc);
+		ret = __copy_from_user(&desc, vq->desc + i, sizeof(desc));
 		if (unlikely(ret)) {
 			vq_err(vq, "Failed to get descriptor: idx %d addr %p\n",
 			       i, vq->desc + i);
@@ -1500,7 +1500,7 @@ static int __vhost_add_used_n(struct vhost_virtqueue *vq,
 			vq_err(vq, "Failed to write used len");
 			return -EFAULT;
 		}
-	} else if (__copy_to_user(used, heads, count * sizeof *used)) {
+	} else if (__copy_to_user(used, heads, count * sizeof(*used))) {
 		vq_err(vq, "Failed to write used");
 		return -EFAULT;
 	}
@@ -1511,7 +1511,7 @@ static int __vhost_add_used_n(struct vhost_virtqueue *vq,
 		log_write(vq->log_base,
 			  vq->log_addr +
 			   ((void __user *)used - (void __user *)vq->used),
-			  count * sizeof *used);
+			  count * sizeof(*used));
 	}
 	old = vq->last_used_idx;
 	new = (vq->last_used_idx += count);
@@ -1552,7 +1552,7 @@ int vhost_add_used_n(struct vhost_virtqueue *vq, struct vring_used_elem *heads,
 		/* Log used index update. */
 		log_write(vq->log_base,
 			  vq->log_addr + offsetof(struct vring_used, idx),
-			  sizeof vq->used->idx);
+			  sizeof(vq->used->idx));
 		if (vq->log_ctx)
 			eventfd_signal(vq->log_ctx, 1);
 	}

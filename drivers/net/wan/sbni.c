@@ -660,7 +660,7 @@ send_frame( struct net_device  *dev )
 		nl->state |= FL_WAIT_ACK;
 	}
 
-	outsb( dev->base_addr + DAT, (u8 *)&crc, sizeof crc );
+	outsb( dev->base_addr + DAT, (u8 *)&crc, sizeof(crc));
 
 do_send:
 	outb( inb( dev->base_addr + CSR0 ) & ~TR_REQ, dev->base_addr + CSR0 );
@@ -1323,7 +1323,7 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 		flags.rxl	= nl->cur_rxl_index;
 		flags.fixed_rxl	= nl->delta_rxl == 0;
 
-		if (copy_to_user( ifr->ifr_data, &flags, sizeof flags ))
+		if (copy_to_user( ifr->ifr_data, &flags, sizeof(flags)))
 			error = -EFAULT;
 		break;
 
@@ -1352,7 +1352,7 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 		if (!capable(CAP_NET_ADMIN))
 			return  -EPERM;
 
-		if (copy_from_user( slave_name, ifr->ifr_data, sizeof slave_name ))
+		if (copy_from_user( slave_name, ifr->ifr_data, sizeof(slave_name)))
 			return -EFAULT;
 		slave_dev = dev_get_by_name(&init_net, slave_name );
 		if( !slave_dev  ||  !(slave_dev->flags & IFF_UP) ) {

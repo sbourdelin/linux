@@ -306,19 +306,19 @@ dbg_port_buf (char *buf, unsigned len, const char *label, int port, u32 status)
 /* functions have the "wrong" filename when they're output... */
 #define dbg_status(ehci, label, status) { \
 	char _buf [80]; \
-	dbg_status_buf (_buf, sizeof _buf, label, status); \
+	dbg_status_buf (_buf, sizeof(_buf), label, status); \
 	ehci_dbg (ehci, "%s\n", _buf); \
 }
 
 #define dbg_cmd(ehci, label, command) { \
 	char _buf [80]; \
-	dbg_command_buf (_buf, sizeof _buf, label, command); \
+	dbg_command_buf (_buf, sizeof(_buf), label, command); \
 	ehci_dbg (ehci, "%s\n", _buf); \
 }
 
 #define dbg_port(ehci, label, port, status) { \
 	char _buf [80]; \
-	dbg_port_buf (_buf, sizeof _buf, label, port, status); \
+	dbg_port_buf (_buf, sizeof(_buf), label, port, status); \
 	ehci_dbg (ehci, "%s\n", _buf); \
 }
 
@@ -635,7 +635,7 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 	unsigned		i;
 	__hc32			tag;
 
-	seen = kmalloc(DBG_SCHED_LIMIT * sizeof *seen, GFP_ATOMIC);
+	seen = kmalloc(DBG_SCHED_LIMIT * sizeof(*seen), GFP_ATOMIC);
 	if (!seen)
 		return 0;
 	seen_count = 0;
@@ -875,19 +875,19 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 	next += temp;
 
 	/* Operational Registers */
-	temp = dbg_status_buf (scratch, sizeof scratch, label,
+	temp = dbg_status_buf (scratch, sizeof(scratch), label,
 			ehci_readl(ehci, &ehci->regs->status));
 	temp = scnprintf (next, size, fmt, temp, scratch);
 	size -= temp;
 	next += temp;
 
-	temp = dbg_command_buf (scratch, sizeof scratch, label,
+	temp = dbg_command_buf (scratch, sizeof(scratch), label,
 			ehci_readl(ehci, &ehci->regs->command));
 	temp = scnprintf (next, size, fmt, temp, scratch);
 	size -= temp;
 	next += temp;
 
-	temp = dbg_intr_buf (scratch, sizeof scratch, label,
+	temp = dbg_intr_buf (scratch, sizeof(scratch), label,
 			ehci_readl(ehci, &ehci->regs->intr_enable));
 	temp = scnprintf (next, size, fmt, temp, scratch);
 	size -= temp;
@@ -899,7 +899,7 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 	next += temp;
 
 	for (i = 1; i <= HCS_N_PORTS (ehci->hcs_params); i++) {
-		temp = dbg_port_buf (scratch, sizeof scratch, label, i,
+		temp = dbg_port_buf (scratch, sizeof(scratch), label, i,
 				ehci_readl(ehci,
 					&ehci->regs->port_status[i - 1]));
 		temp = scnprintf (next, size, fmt, temp, scratch);

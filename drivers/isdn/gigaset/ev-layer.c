@@ -1472,7 +1472,7 @@ static void do_action(int action, struct cardstate *cs,
 		else if (cs->gotfwver != 1) {
 			cs->cmd_result = -ENOENT;
 		} else {
-			memcpy(ev->arg, cs->fwver, sizeof cs->fwver);
+			memcpy(ev->arg, cs->fwver, sizeof(cs->fwver));
 			cs->cmd_result = 0;
 		}
 		cs->waiting = 0;

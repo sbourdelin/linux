@@ -727,7 +727,7 @@ int dm_kcopyd_copy(struct dm_kcopyd_client *kc, struct dm_io_region *from,
 		job->pages = NULL;
 		job->rw = READ;
 	} else {
-		memset(&job->source, 0, sizeof job->source);
+		memset(&job->source, 0, sizeof(job->source));
 		job->source.count = job->dests[0].count;
 		job->pages = &zero_page_list;
 

@@ -177,7 +177,7 @@ static struct ib_ucm_context *ib_ucm_ctx_alloc(struct ib_ucm_file *file)
 {
 	struct ib_ucm_context *ctx;
 
-	ctx = kzalloc(sizeof *ctx, GFP_KERNEL);
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return NULL;
 
@@ -353,7 +353,7 @@ static int ib_ucm_event_handler(struct ib_cm_id *cm_id,
 
 	ctx = cm_id->context;
 
-	uevent = kzalloc(sizeof *uevent, GFP_KERNEL);
+	uevent = kzalloc(sizeof(*uevent), GFP_KERNEL);
 	if (!uevent)
 		goto err1;
 
@@ -611,7 +611,7 @@ static ssize_t ib_ucm_init_qp_attr(struct ib_ucm_file *file,
 		return PTR_ERR(ctx);
 
 	resp.qp_attr_mask = 0;
-	memset(&qp_attr, 0, sizeof qp_attr);
+	memset(&qp_attr, 0, sizeof(qp_attr));
 	qp_attr.qp_state = cmd.qp_state;
 	result = ib_cm_init_qp_attr(ctx->cm_id, &qp_attr, &resp.qp_attr_mask);
 	if (result)
@@ -1255,7 +1255,7 @@ static void ib_ucm_add_one(struct ib_device *device)
 	if (!device->alloc_ucontext || !rdma_cap_ib_cm(device, 1))
 		return;
 
-	ucm_dev = kzalloc(sizeof *ucm_dev, GFP_KERNEL);
+	ucm_dev = kzalloc(sizeof(*ucm_dev), GFP_KERNEL);
 	if (!ucm_dev)
 		return;
 

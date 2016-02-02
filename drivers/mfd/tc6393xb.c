@@ -622,7 +622,7 @@ static int tc6393xb_probe(struct platform_device *dev)
 	if (!iomem)
 		return -EINVAL;
 
-	tc6393xb = kzalloc(sizeof *tc6393xb, GFP_KERNEL);
+	tc6393xb = kzalloc(sizeof(*tc6393xb), GFP_KERNEL);
 	if (!tc6393xb) {
 		ret = -ENOMEM;
 		goto err_kzalloc;

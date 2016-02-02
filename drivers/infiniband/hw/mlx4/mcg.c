@@ -168,7 +168,7 @@ static struct mcast_group *mcast_find(struct mlx4_ib_demux_ctx *ctx,
 
 	while (node) {
 		group = rb_entry(node, struct mcast_group, node);
-		ret = memcmp(mgid->raw, group->rec.mgid.raw, sizeof *mgid);
+		ret = memcmp(mgid->raw, group->rec.mgid.raw, sizeof(*mgid));
 		if (!ret)
 			return group;
 
@@ -193,7 +193,7 @@ static struct mcast_group *mcast_insert(struct mlx4_ib_demux_ctx *ctx,
 		cur_group = rb_entry(parent, struct mcast_group, node);
 
 		ret = memcmp(group->rec.mgid.raw, cur_group->rec.mgid.raw,
-			     sizeof group->rec.mgid);
+			     sizeof(group->rec.mgid));
 		if (ret < 0)
 			link = &(*link)->rb_left;
 		else if (ret > 0)
@@ -256,7 +256,7 @@ static int send_join_to_wire(struct mcast_group *group, struct ib_sa_mad *sa_mad
 	int ret;
 
 	/* we rely on a mad request as arrived from a VF */
-	memcpy(&mad, sa_mad, sizeof mad);
+	memcpy(&mad, sa_mad, sizeof(mad));
 
 	/* fix port GID to be the real one (slave 0) */
 	sa_mad_data->port_gid.global.interface_id = group->demux->guid_cache[0];
@@ -282,7 +282,7 @@ static int send_leave_to_wire(struct mcast_group *group, u8 join_state)
 	struct ib_sa_mcmember_data *sa_data = (struct ib_sa_mcmember_data *)&mad.data;
 	int ret;
 
-	memset(&mad, 0, sizeof mad);
+	memset(&mad, 0, sizeof(mad));
 	mad.mad_hdr.base_version = 1;
 	mad.mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
 	mad.mad_hdr.class_version = 2;
@@ -323,7 +323,7 @@ static int send_reply_to_slave(int slave, struct mcast_group *group,
 	struct ib_sa_mcmember_data *req_sa_data = (struct ib_sa_mcmember_data *)&req_sa_mad->data;
 	int ret;
 
-	memset(&mad, 0, sizeof mad);
+	memset(&mad, 0, sizeof(mad));
 	mad.mad_hdr.base_version = 1;
 	mad.mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
 	mad.mad_hdr.class_version = 2;
@@ -343,7 +343,7 @@ static int send_reply_to_slave(int slave, struct mcast_group *group,
 	/* reconstruct VF's requested join_state and port_gid */
 	sa_data->scope_join_state &= 0xf0;
 	sa_data->scope_join_state |= (group->func[slave].join_state & 0x0f);
-	memcpy(&sa_data->port_gid, &req_sa_data->port_gid, sizeof req_sa_data->port_gid);
+	memcpy(&sa_data->port_gid, &req_sa_data->port_gid, sizeof(req_sa_data->port_gid));
 
 	ret = send_mad_to_slave(slave, group->demux, (struct ib_mad *)&mad);
 	return ret;
@@ -452,7 +452,7 @@ static int release_group(struct mcast_group *group, int from_timeout_handler)
 			}
 		}
 
-		nzgroup = memcmp(&group->rec.mgid, &mgid0, sizeof mgid0);
+		nzgroup = memcmp(&group->rec.mgid, &mgid0, sizeof(mgid0));
 		if (nzgroup)
 			del_sysfs_port_mcg_attr(ctx->dev, ctx->port, &group->dentry.attr);
 		if (!list_empty(&group->pending_list))
@@ -553,7 +553,7 @@ static void mlx4_ib_mcg_timeout_handler(struct work_struct *work)
 			--group->func[req->func].num_pend_reqs;
 			mutex_unlock(&group->lock);
 			kfree(req);
-			if (memcmp(&group->rec.mgid, &mgid0, sizeof mgid0)) {
+			if (memcmp(&group->rec.mgid, &mgid0, sizeof(mgid0))) {
 				if (release_group(group, 1))
 					return;
 			} else {
@@ -699,7 +699,7 @@ static void mlx4_ib_mcg_work_handler(struct work_struct *work)
 					--rc;
 			} else if (!resp_join_state)
 					++rc;
-			memcpy(&group->rec, group->response_sa_mad.data, sizeof group->rec);
+			memcpy(&group->rec, group->response_sa_mad.data, sizeof(group->rec));
 		}
 		group->state = MCAST_IDLE;
 	}
@@ -757,7 +757,7 @@ static struct mcast_group *search_relocate_mgid0_group(struct mlx4_ib_demux_ctx 
 		group = list_entry(pos, struct mcast_group, mgid0_list);
 		mutex_lock(&group->lock);
 		if (group->last_req_tid == tid) {
-			if (memcmp(new_mgid, &mgid0, sizeof mgid0)) {
+			if (memcmp(new_mgid, &mgid0, sizeof(mgid0))) {
 				group->rec.mgid = *new_mgid;
 				sprintf(group->name, "%016llx%016llx",
 						be64_to_cpu(group->rec.mgid.global.subnet_prefix),
@@ -818,7 +818,7 @@ static struct mcast_group *acquire_group(struct mlx4_ib_demux_ctx *ctx,
 	int is_mgid0;
 	int i;
 
-	is_mgid0 = !memcmp(&mgid0, mgid, sizeof mgid0);
+	is_mgid0 = !memcmp(&mgid0, mgid, sizeof(mgid0));
 	if (!is_mgid0) {
 		group = mcast_find(ctx, mgid);
 		if (group)
@@ -828,7 +828,7 @@ static struct mcast_group *acquire_group(struct mlx4_ib_demux_ctx *ctx,
 	if (!create)
 		return ERR_PTR(-ENOENT);
 
-	group = kzalloc(sizeof *group, gfp_mask);
+	group = kzalloc(sizeof(*group), gfp_mask);
 	if (!group)
 		return ERR_PTR(-ENOMEM);
 
@@ -949,7 +949,7 @@ int mlx4_ib_mcg_multiplex_handler(struct ib_device *ibdev, int port,
 	case IB_MGMT_METHOD_SET:
 		may_create = 1;
 	case IB_SA_METHOD_DELETE:
-		req = kzalloc(sizeof *req, GFP_KERNEL);
+		req = kzalloc(sizeof(*req), GFP_KERNEL);
 		if (!req)
 			return -ENOMEM;
 
@@ -1142,7 +1142,7 @@ void mlx4_ib_mcg_port_cleanup(struct mlx4_ib_demux_ctx *ctx, int destroy_wq)
 		return;
 	}
 
-	work = kmalloc(sizeof *work, GFP_KERNEL);
+	work = kmalloc(sizeof(*work), GFP_KERNEL);
 	if (!work) {
 		ctx->flushing = 0;
 		mcg_warn("failed allocating work for cleanup\n");
@@ -1204,7 +1204,7 @@ static int push_deleteing_req(struct mcast_group *group, int slave)
 	if (!group->func[slave].join_state)
 		return 0;
 
-	req = kzalloc(sizeof *req, GFP_KERNEL);
+	req = kzalloc(sizeof(*req), GFP_KERNEL);
 	if (!req) {
 		mcg_warn_group(group, "failed allocation - may leave stall groups\n");
 		return -ENOMEM;

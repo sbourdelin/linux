@@ -185,7 +185,7 @@ struct ib_cq *mlx4_ib_create_cq(struct ib_device *ibdev,
 	if (attr->flags & ~CQ_CREATE_FLAGS_SUPPORTED)
 		return ERR_PTR(-EINVAL);
 
-	cq = kmalloc(sizeof *cq, GFP_KERNEL);
+	cq = kmalloc(sizeof(*cq), GFP_KERNEL);
 	if (!cq)
 		return ERR_PTR(-ENOMEM);
 
@@ -202,7 +202,7 @@ struct ib_cq *mlx4_ib_create_cq(struct ib_device *ibdev,
 	if (context) {
 		struct mlx4_ib_create_cq ucmd;
 
-		if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd)) {
+		if (ib_copy_from_udata(&ucmd, udata, sizeof(ucmd))) {
 			err = -EFAULT;
 			goto err_cq;
 		}
@@ -251,7 +251,7 @@ struct ib_cq *mlx4_ib_create_cq(struct ib_device *ibdev,
 	cq->mcq.event = mlx4_ib_cq_event;
 
 	if (context)
-		if (ib_copy_to_udata(udata, &cq->mcq.cqn, sizeof (__u32))) {
+		if (ib_copy_to_udata(udata, &cq->mcq.cqn, sizeof(__u32))) {
 			err = -EFAULT;
 			goto err_dbmap;
 		}
@@ -288,7 +288,7 @@ static int mlx4_alloc_resize_buf(struct mlx4_ib_dev *dev, struct mlx4_ib_cq *cq,
 	if (cq->resize_buf)
 		return -EBUSY;
 
-	cq->resize_buf = kmalloc(sizeof *cq->resize_buf, GFP_ATOMIC);
+	cq->resize_buf = kmalloc(sizeof(*cq->resize_buf), GFP_ATOMIC);
 	if (!cq->resize_buf)
 		return -ENOMEM;
 
@@ -313,10 +313,10 @@ static int mlx4_alloc_resize_umem(struct mlx4_ib_dev *dev, struct mlx4_ib_cq *cq
 	if (cq->resize_umem)
 		return -EBUSY;
 
-	if (ib_copy_from_udata(&ucmd, udata, sizeof ucmd))
+	if (ib_copy_from_udata(&ucmd, udata, sizeof(ucmd)))
 		return -EFAULT;
 
-	cq->resize_buf = kmalloc(sizeof *cq->resize_buf, GFP_ATOMIC);
+	cq->resize_buf = kmalloc(sizeof(*cq->resize_buf), GFP_ATOMIC);
 	if (!cq->resize_buf)
 		return -ENOMEM;
 
@@ -964,7 +964,7 @@ void __mlx4_ib_cq_clean(struct mlx4_ib_cq *cq, u32 qpn, struct mlx4_ib_srq *srq)
 			dest += cqe_inc;
 
 			owner_bit = dest->owner_sr_opcode & MLX4_CQE_OWNER_MASK;
-			memcpy(dest, cqe, sizeof *cqe);
+			memcpy(dest, cqe, sizeof(*cqe));
 			dest->owner_sr_opcode = owner_bit |
 				(dest->owner_sr_opcode & ~MLX4_CQE_OWNER_MASK);
 		}

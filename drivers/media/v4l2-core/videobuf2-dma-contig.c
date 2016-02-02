@@ -143,7 +143,7 @@ static void *vb2_dc_alloc(void *alloc_ctx, unsigned long size,
 	struct device *dev = conf->dev;
 	struct vb2_dc_buf *buf;
 
-	buf = kzalloc(sizeof *buf, GFP_KERNEL);
+	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
 
@@ -497,7 +497,7 @@ static void *vb2_dc_get_userptr(void *alloc_ctx, unsigned long vaddr,
 		return ERR_PTR(-EINVAL);
 	}
 
-	buf = kzalloc(sizeof *buf, GFP_KERNEL);
+	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
 
@@ -725,7 +725,7 @@ void *vb2_dma_contig_init_ctx(struct device *dev)
 {
 	struct vb2_dc_conf *conf;
 
-	conf = kzalloc(sizeof *conf, GFP_KERNEL);
+	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
 	if (!conf)
 		return ERR_PTR(-ENOMEM);
 

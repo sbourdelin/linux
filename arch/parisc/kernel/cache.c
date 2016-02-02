@@ -239,7 +239,7 @@ parisc_cache_init(void)
 
 #ifndef CONFIG_PA20
 	if (pdc_btlb_info(&btlb_info) < 0) {
-		memset(&btlb_info, 0, sizeof btlb_info);
+		memset(&btlb_info, 0, sizeof(btlb_info));
 	}
 #endif
 

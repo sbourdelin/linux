@@ -379,8 +379,8 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 
 		/* finish decoding current frame */
 		n = sof - data;
-		if (n > sizeof pac_sof_marker)
-			n -= sizeof pac_sof_marker;
+		if (n > sizeof(pac_sof_marker))
+			n -= sizeof(pac_sof_marker);
 		else
 			n = 0;
 		gspca_frame_add(gspca_dev, LAST_PACKET,

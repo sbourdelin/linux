@@ -130,8 +130,8 @@ aoehdr_atainit(struct aoedev *d, struct aoetgt *t, struct aoe_hdr *h)
 {
 	u32 host_tag = newtag(d);
 
-	memcpy(h->src, t->ifp->nd->dev_addr, sizeof h->src);
-	memcpy(h->dst, t->addr, sizeof h->dst);
+	memcpy(h->src, t->ifp->nd->dev_addr, sizeof(h->src));
+	memcpy(h->dst, t->addr, sizeof(h->dst));
 	h->type = __constant_cpu_to_be16(ETH_P_AOE);
 	h->verfl = AOE_HVER;
 	h->major = cpu_to_be16(d->aoemajor);
@@ -424,19 +424,19 @@ aoecmd_cfg_pkts(ushort aoemajor, unsigned char aoeminor, struct sk_buff_head *qu
 		if (!is_aoe_netif(ifp))
 			goto cont;
 
-		skb = new_skb(sizeof *h + sizeof *ch);
+		skb = new_skb(sizeof(*h) + sizeof(*ch));
 		if (skb == NULL) {
 			printk(KERN_INFO "aoe: skb alloc failure\n");
 			goto cont;
 		}
-		skb_put(skb, sizeof *h + sizeof *ch);
+		skb_put(skb, sizeof(*h) + sizeof(*ch));
 		skb->dev = ifp;
 		__skb_queue_tail(queue, skb);
 		h = (struct aoe_hdr *) skb_mac_header(skb);
-		memset(h, 0, sizeof *h + sizeof *ch);
+		memset(h, 0, sizeof(*h) + sizeof(*ch));
 
-		memset(h->dst, 0xff, sizeof h->dst);
-		memcpy(h->src, ifp->dev_addr, sizeof h->src);
+		memset(h->dst, 0xff, sizeof(h->dst));
+		memcpy(h->src, ifp->dev_addr, sizeof(h->src));
 		h->type = __constant_cpu_to_be16(ETH_P_AOE);
 		h->verfl = AOE_HVER;
 		h->major = cpu_to_be16(aoemajor);
@@ -482,8 +482,8 @@ resend(struct aoedev *d, struct frame *f)
 	f->tag = n;
 	fhash(f);
 	h->tag = cpu_to_be32(n);
-	memcpy(h->dst, t->addr, sizeof h->dst);
-	memcpy(h->src, t->ifp->nd->dev_addr, sizeof h->src);
+	memcpy(h->dst, t->addr, sizeof(h->dst));
+	memcpy(h->src, t->ifp->nd->dev_addr, sizeof(h->src));
 
 	skb->dev = t->ifp->nd;
 	skb = skb_clone(skb, GFP_ATOMIC);
@@ -562,7 +562,7 @@ ejectif(struct aoetgt *t, struct aoeif *ifp)
 
 	nd = ifp->nd;
 	e = t->ifs + NAOEIFS - 1;
-	n = (e - ifp) * sizeof *ifp;
+	n = (e - ifp) * sizeof(*ifp);
 	memmove(ifp, ifp+1, n);
 	e->nd = NULL;
 	dev_put(nd);
@@ -1374,7 +1374,7 @@ aoecmd_ata_rsp(struct sk_buff *skb)
 	aoemajor = be16_to_cpu(get_unaligned(&h->major));
 	d = aoedev_by_aoeaddr(aoemajor, h->minor, 0);
 	if (d == NULL) {
-		snprintf(ebuf, sizeof ebuf, "aoecmd_ata_rsp: ata response "
+		snprintf(ebuf, sizeof(ebuf), "aoecmd_ata_rsp: ata response "
 			"for unknown device %d.%d\n",
 			aoemajor, h->minor);
 		aoechr_error(ebuf);
@@ -1453,7 +1453,7 @@ aoecmd_ata_id(struct aoedev *d)
 	skb = f->skb;
 	h = (struct aoe_hdr *) skb_mac_header(skb);
 	ah = (struct aoe_atahdr *) (h+1);
-	skb_put(skb, sizeof *h + sizeof *ah);
+	skb_put(skb, sizeof(*h) + sizeof(*ah));
 	memset(h, 0, skb->len);
 	f->tag = aoehdr_atainit(d, t, h);
 	fhash(f);
@@ -1521,7 +1521,7 @@ addtgt(struct aoedev *d, char *addr, ulong nframes)
 		goto nomem;
 	t->nframes = nframes;
 	t->d = d;
-	memcpy(t->addr, addr, sizeof t->addr);
+	memcpy(t->addr, addr, sizeof(t->addr));
 	t->ifp = t->ifs;
 	aoecmd_wreset(t);
 	t->maxout = t->nframes / 2;

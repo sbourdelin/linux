@@ -350,7 +350,7 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 
 	ebitmap_init(e);
 
-	rc = next_entry(buf, fp, sizeof buf);
+	rc = next_entry(buf, fp, sizeof(buf));
 	if (rc < 0)
 		goto out;
 

@@ -230,7 +230,7 @@ int put_cmsg(struct msghdr * msg, int level, int type, int len, void *data)
 	cmhdr.cmsg_len = cmlen;
 
 	err = -EFAULT;
-	if (copy_to_user(cm, &cmhdr, sizeof cmhdr))
+	if (copy_to_user(cm, &cmhdr, sizeof(cmhdr)))
 		goto out;
 	if (copy_to_user(CMSG_DATA(cm), data, cmlen - sizeof(struct cmsghdr)))
 		goto out;

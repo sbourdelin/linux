@@ -903,7 +903,7 @@ static struct ehca_qp *internal_create_qp(
 		resp.fw_handle_ofs = (u32)
 			(my_qp->galpas.user.fw_handle & (PAGE_SIZE - 1));
 
-		if (ib_copy_to_udata(udata, &resp, sizeof resp)) {
+		if (ib_copy_to_udata(udata, &resp, sizeof(resp))) {
 			ehca_err(pd->device, "Copy to udata failed");
 			ret = -EINVAL;
 			goto create_qp_exit8;

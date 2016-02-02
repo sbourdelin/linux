@@ -433,7 +433,7 @@ static struct usb_function *loopback_alloc(struct usb_function_instance *fi)
 	struct f_loopback	*loop;
 	struct f_lb_opts	*lb_opts;
 
-	loop = kzalloc(sizeof *loop, GFP_KERNEL);
+	loop = kzalloc(sizeof(*loop), GFP_KERNEL);
 	if (!loop)
 		return ERR_PTR(-ENOMEM);
 

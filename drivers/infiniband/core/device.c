@@ -152,14 +152,14 @@ static int alloc_name(char *name)
 			continue;
 		if (i < 0 || i >= PAGE_SIZE * 8)
 			continue;
-		snprintf(buf, sizeof buf, name, i);
+		snprintf(buf, sizeof(buf), name, i);
 		if (!strncmp(buf, device->name, IB_DEVICE_NAME_MAX))
 			set_bit(i, inuse);
 	}
 
 	i = find_first_zero_bit(inuse, PAGE_SIZE * 8);
 	free_page((unsigned long) inuse);
-	snprintf(buf, sizeof buf, name, i);
+	snprintf(buf, sizeof(buf), name, i);
 
 	if (__ib_device_get_by_name(buf))
 		return -ENFILE;
@@ -253,7 +253,7 @@ static int add_client_context(struct ib_device *device, struct ib_client *client
 	struct ib_client_data *context;
 	unsigned long flags;
 
-	context = kmalloc(sizeof *context, GFP_KERNEL);
+	context = kmalloc(sizeof(*context), GFP_KERNEL);
 	if (!context) {
 		printk(KERN_WARNING "Couldn't allocate client context for %s/%s\n",
 		       device->name, client->name);
@@ -844,7 +844,7 @@ int ib_find_gid(struct ib_device *device, union ib_gid *gid,
 			ret = ib_query_gid(device, port, i, &tmp_gid, NULL);
 			if (ret)
 				return ret;
-			if (!memcmp(&tmp_gid, gid, sizeof *gid)) {
+			if (!memcmp(&tmp_gid, gid, sizeof(*gid))) {
 				*port_num = port;
 				if (index)
 					*index = i;

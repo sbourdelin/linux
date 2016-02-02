@@ -625,7 +625,7 @@ static int rndis_query_response(struct rndis_params *params,
 			r)) {
 		/* OID not supported */
 		resp->Status = cpu_to_le32(RNDIS_STATUS_NOT_SUPPORTED);
-		resp->MessageLength = cpu_to_le32(sizeof *resp);
+		resp->MessageLength = cpu_to_le32(sizeof(*resp));
 		resp->InformationBufferLength = cpu_to_le32(0);
 		resp->InformationBufferOffset = cpu_to_le32(0);
 	} else
@@ -996,7 +996,7 @@ void rndis_add_hdr(struct sk_buff *skb)
 	if (!skb)
 		return;
 	header = (void *)skb_push(skb, sizeof(*header));
-	memset(header, 0, sizeof *header);
+	memset(header, 0, sizeof(*header));
 	header->MessageType = cpu_to_le32(RNDIS_MSG_PACKET);
 	header->MessageLength = cpu_to_le32(skb->len);
 	header->DataOffset = cpu_to_le32(36);

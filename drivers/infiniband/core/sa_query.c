@@ -868,7 +868,7 @@ static void update_sm_ah(struct work_struct *work)
 		return;
 	}
 
-	new_ah = kmalloc(sizeof *new_ah, GFP_KERNEL);
+	new_ah = kmalloc(sizeof(*new_ah), GFP_KERNEL);
 	if (!new_ah) {
 		printk(KERN_WARNING "Couldn't allocate new SM AH\n");
 		return;
@@ -882,7 +882,7 @@ static void update_sm_ah(struct work_struct *work)
 			 IB_DEFAULT_PKEY_FULL, &new_ah->pkey_index))
 		printk(KERN_ERR "Couldn't find index for default PKey\n");
 
-	memset(&ah_attr, 0, sizeof ah_attr);
+	memset(&ah_attr, 0, sizeof(ah_attr));
 	ah_attr.dlid     = port_attr.sm_lid;
 	ah_attr.sl       = port_attr.sm_sl;
 	ah_attr.port_num = port->port_num;
@@ -1005,7 +1005,7 @@ int ib_init_ah_from_path(struct ib_device *device, u8 port_num,
 	int use_roce;
 	struct net_device *ndev = NULL;
 
-	memset(ah_attr, 0, sizeof *ah_attr);
+	memset(ah_attr, 0, sizeof(*ah_attr));
 	ah_attr->dlid = be16_to_cpu(rec->dlid);
 	ah_attr->sl = rec->sl;
 	ah_attr->src_path_bits = be16_to_cpu(rec->slid) &
@@ -1137,7 +1137,7 @@ static void init_mad(struct ib_sa_mad *mad, struct ib_mad_agent *agent)
 {
 	unsigned long flags;
 
-	memset(mad, 0, sizeof *mad);
+	memset(mad, 0, sizeof(*mad));
 
 	mad->mad_hdr.base_version  = IB_MGMT_BASE_VERSION;
 	mad->mad_hdr.mgmt_class    = IB_MGMT_CLASS_SUBN_ADM;
@@ -1704,7 +1704,7 @@ static void ib_sa_add_one(struct ib_device *device)
 	s = rdma_start_port(device);
 	e = rdma_end_port(device);
 
-	sa_dev = kzalloc(sizeof *sa_dev +
+	sa_dev = kzalloc(sizeof(*sa_dev) +
 			 (e - s + 1) * sizeof (struct ib_sa_port),
 			 GFP_KERNEL);
 	if (!sa_dev)
@@ -1794,7 +1794,7 @@ static int __init ib_sa_init(void)
 {
 	int ret;
 
-	get_random_bytes(&tid, sizeof tid);
+	get_random_bytes(&tid, sizeof(tid));
 
 	atomic_set(&ib_nl_sa_request_seq, 0);
 

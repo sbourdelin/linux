@@ -1002,8 +1002,7 @@ static int get_string(struct usb_composite_dev *cdev,
 		struct usb_os_string *b = buf;
 		b->bLength = sizeof(*b);
 		b->bDescriptorType = USB_DT_STRING;
-		compiletime_assert(
-			sizeof(b->qwSignature) == sizeof(cdev->qw_sign),
+		compiletime_assert(sizeof(b->qwSignature) == sizeof(cdev->qw_sign),
 			"qwSignature size must be equal to qw_sign");
 		memcpy(&b->qwSignature, cdev->qw_sign, sizeof(b->qwSignature));
 		b->bMS_VendorCode = cdev->b_vendor_code;
@@ -1508,7 +1507,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				cdev->desc.bcdUSB = cpu_to_le16(0x0200);
 			}
 
-			value = min(w_length, (u16) sizeof cdev->desc);
+			value = min(w_length, (u16) sizeof(cdev->desc));
 			memcpy(req->buf, &cdev->desc, value);
 			break;
 		case USB_DT_DEVICE_QUALIFIER:
@@ -2067,7 +2066,7 @@ static int composite_bind(struct usb_gadget *gadget,
 	struct usb_composite_driver	*composite = to_cdriver(gdriver);
 	int				status = -ENOMEM;
 
-	cdev = kzalloc(sizeof *cdev, GFP_KERNEL);
+	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev)
 		return status;
 

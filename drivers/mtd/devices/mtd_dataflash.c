@@ -481,7 +481,7 @@ static ssize_t otp_read(struct spi_device *spi, unsigned base,
 	 */
 	scratch[0] = OP_READ_SECURITY;
 
-	memset(&t, 0, sizeof t);
+	memset(&t, 0, sizeof(t));
 	t.tx_buf = scratch;
 	t.rx_buf = scratch;
 	t.len = l;
@@ -567,7 +567,7 @@ static int dataflash_write_user_otp(struct mtd_info *mtd,
 
 	spi_message_init(&m);
 
-	memset(&t, 0, sizeof t);
+	memset(&t, 0, sizeof(t));
 	t.tx_buf = scratch;
 	t.len = l;
 	spi_message_add_tail(&t, &m);
@@ -628,7 +628,7 @@ static int add_dataflash_otp(struct spi_device *spi, char *name, int nr_pages,
 	char				*otp_tag = "";
 	int				err = 0;
 
-	priv = kzalloc(sizeof *priv, GFP_KERNEL);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 

@@ -188,21 +188,21 @@ static void vp_get(struct virtio_device *vdev, unsigned offset,
 	switch (len) {
 	case 1:
 		b = ioread8(vp_dev->device + offset);
-		memcpy(buf, &b, sizeof b);
+		memcpy(buf, &b, sizeof(b));
 		break;
 	case 2:
 		w = cpu_to_le16(ioread16(vp_dev->device + offset));
-		memcpy(buf, &w, sizeof w);
+		memcpy(buf, &w, sizeof(w));
 		break;
 	case 4:
 		l = cpu_to_le32(ioread32(vp_dev->device + offset));
-		memcpy(buf, &l, sizeof l);
+		memcpy(buf, &l, sizeof(l));
 		break;
 	case 8:
 		l = cpu_to_le32(ioread32(vp_dev->device + offset));
-		memcpy(buf, &l, sizeof l);
-		l = cpu_to_le32(ioread32(vp_dev->device + offset + sizeof l));
-		memcpy(buf + sizeof l, &l, sizeof l);
+		memcpy(buf, &l, sizeof(l));
+		l = cpu_to_le32(ioread32(vp_dev->device + offset + sizeof(l)));
+		memcpy(buf + sizeof(l), &l, sizeof(l));
 		break;
 	default:
 		BUG();
@@ -223,22 +223,22 @@ static void vp_set(struct virtio_device *vdev, unsigned offset,
 
 	switch (len) {
 	case 1:
-		memcpy(&b, buf, sizeof b);
+		memcpy(&b, buf, sizeof(b));
 		iowrite8(b, vp_dev->device + offset);
 		break;
 	case 2:
-		memcpy(&w, buf, sizeof w);
+		memcpy(&w, buf, sizeof(w));
 		iowrite16(le16_to_cpu(w), vp_dev->device + offset);
 		break;
 	case 4:
-		memcpy(&l, buf, sizeof l);
+		memcpy(&l, buf, sizeof(l));
 		iowrite32(le32_to_cpu(l), vp_dev->device + offset);
 		break;
 	case 8:
-		memcpy(&l, buf, sizeof l);
+		memcpy(&l, buf, sizeof(l));
 		iowrite32(le32_to_cpu(l), vp_dev->device + offset);
-		memcpy(&l, buf + sizeof l, sizeof l);
-		iowrite32(le32_to_cpu(l), vp_dev->device + offset + sizeof l);
+		memcpy(&l, buf + sizeof(l), sizeof(l));
+		iowrite32(le32_to_cpu(l), vp_dev->device + offset + sizeof(l));
 		break;
 	default:
 		BUG();

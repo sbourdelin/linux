@@ -46,7 +46,7 @@ USB_GADGET_COMPOSITE_OPTIONS();
 USB_ETHERNET_MODULE_PARAMETERS();
 
 static struct usb_device_descriptor device_desc = {
-	.bLength =		sizeof device_desc,
+	.bLength =		sizeof(device_desc),
 	.bDescriptorType =	USB_DT_DEVICE,
 
 	/* .bcdUSB = DYNAMIC */

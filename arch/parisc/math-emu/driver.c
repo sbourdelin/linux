@@ -92,7 +92,7 @@ handle_fpe(struct pt_regs *regs)
 	 */
 	__u64 frcopy[36];
 
-	memcpy(frcopy, regs->fr, sizeof regs->fr);
+	memcpy(frcopy, regs->fr, sizeof(regs->fr));
 	frcopy[32] = 0;
 
 	memcpy(&orig_sw, frcopy, sizeof(orig_sw));
@@ -114,7 +114,7 @@ handle_fpe(struct pt_regs *regs)
 		printk(KERN_DEBUG "\n");
 	}
 
-	memcpy(regs->fr, frcopy, sizeof regs->fr);
+	memcpy(regs->fr, frcopy, sizeof(regs->fr));
 	if (signalcode != 0) {
 	    si.si_signo = signalcode >> 24;
 	    si.si_errno = 0;

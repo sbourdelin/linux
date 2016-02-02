@@ -60,7 +60,7 @@ void ovs_flow_mask_key(struct sw_flow_key *dst, const struct sw_flow_key *src,
 		       bool full, const struct sw_flow_mask *mask)
 {
 	int start = full ? 0 : mask->range.start;
-	int len = full ? sizeof *dst : range_n_bytes(&mask->range);
+	int len = full ? sizeof(*dst) : range_n_bytes(&mask->range);
 	const long *m = (const long *)((const u8 *)&mask->key + start);
 	const long *s = (const long *)((const u8 *)src + start);
 	long *d = (long *)((u8 *)dst + start);

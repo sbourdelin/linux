@@ -134,7 +134,7 @@ struct ipath_mmap_info *ipath_create_mmap_info(struct ipath_ibdev *dev,
 					       void *obj) {
 	struct ipath_mmap_info *ip;
 
-	ip = kmalloc(sizeof *ip, GFP_KERNEL);
+	ip = kmalloc(sizeof(*ip), GFP_KERNEL);
 	if (!ip)
 		goto bail;
 

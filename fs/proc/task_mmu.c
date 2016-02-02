@@ -724,7 +724,7 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		.private = &mss,
 	};
 
-	memset(&mss, 0, sizeof mss);
+	memset(&mss, 0, sizeof(mss));
 
 #ifdef CONFIG_SHMEM
 	if (vma->vm_file && shmem_mapping(vma->vm_file->f_mapping)) {

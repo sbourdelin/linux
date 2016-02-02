@@ -147,16 +147,16 @@ static int vp_request_msix_vectors(struct virtio_device *vdev, int nvectors,
 
 	vp_dev->msix_vectors = nvectors;
 
-	vp_dev->msix_entries = kmalloc(nvectors * sizeof *vp_dev->msix_entries,
+	vp_dev->msix_entries = kmalloc(nvectors * sizeof(*vp_dev->msix_entries),
 				       GFP_KERNEL);
 	if (!vp_dev->msix_entries)
 		goto error;
-	vp_dev->msix_names = kmalloc(nvectors * sizeof *vp_dev->msix_names,
+	vp_dev->msix_names = kmalloc(nvectors * sizeof(*vp_dev->msix_names),
 				     GFP_KERNEL);
 	if (!vp_dev->msix_names)
 		goto error;
 	vp_dev->msix_affinity_masks
-		= kzalloc(nvectors * sizeof *vp_dev->msix_affinity_masks,
+		= kzalloc(nvectors * sizeof(*vp_dev->msix_affinity_masks),
 			  GFP_KERNEL);
 	if (!vp_dev->msix_affinity_masks)
 		goto error;
@@ -176,7 +176,7 @@ static int vp_request_msix_vectors(struct virtio_device *vdev, int nvectors,
 
 	/* Set the vector used for configuration */
 	v = vp_dev->msix_used_vectors;
-	snprintf(vp_dev->msix_names[v], sizeof *vp_dev->msix_names,
+	snprintf(vp_dev->msix_names[v], sizeof(*vp_dev->msix_names),
 		 "%s-config", name);
 	err = request_irq(vp_dev->msix_entries[v].vector,
 			  vp_config_changed, 0, vp_dev->msix_names[v],
@@ -195,7 +195,7 @@ static int vp_request_msix_vectors(struct virtio_device *vdev, int nvectors,
 	if (!per_vq_vectors) {
 		/* Shared vector for all VQs */
 		v = vp_dev->msix_used_vectors;
-		snprintf(vp_dev->msix_names[v], sizeof *vp_dev->msix_names,
+		snprintf(vp_dev->msix_names[v], sizeof(*vp_dev->msix_names),
 			 "%s-virtqueues", name);
 		err = request_irq(vp_dev->msix_entries[v].vector,
 				  vp_vring_interrupt, 0, vp_dev->msix_names[v],
@@ -228,7 +228,7 @@ static struct virtqueue *vp_setup_vq(struct virtio_device *vdev, unsigned index,
 				     u16 msix_vec)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-	struct virtio_pci_vq_info *info = kmalloc(sizeof *info, GFP_KERNEL);
+	struct virtio_pci_vq_info *info = kmalloc(sizeof(*info), GFP_KERNEL);
 	struct virtqueue *vq;
 	unsigned long flags;
 
@@ -304,7 +304,7 @@ static int vp_try_to_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 	u16 msix_vec;
 	int i, err, nvectors, allocated_vectors;
 
-	vp_dev->vqs = kmalloc(nvqs * sizeof *vp_dev->vqs, GFP_KERNEL);
+	vp_dev->vqs = kmalloc(nvqs * sizeof(*vp_dev->vqs), GFP_KERNEL);
 	if (!vp_dev->vqs)
 		return -ENOMEM;
 
@@ -353,7 +353,7 @@ static int vp_try_to_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 
 		/* allocate per-vq irq if available and necessary */
 		snprintf(vp_dev->msix_names[msix_vec],
-			 sizeof *vp_dev->msix_names,
+			 sizeof(*vp_dev->msix_names),
 			 "%s-%s",
 			 dev_name(&vp_dev->vdev.dev), names[i]);
 		err = request_irq(vp_dev->msix_entries[msix_vec].vector,

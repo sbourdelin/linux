@@ -79,17 +79,17 @@ void alloc_ring(void)
 	int ret;
 	int i;
 
-	ret = posix_memalign((void **)&ring, 0x1000, ring_size * sizeof *ring);
+	ret = posix_memalign((void **)&ring, 0x1000, ring_size * sizeof(*ring));
 	if (ret) {
 		perror("Unable to allocate ring buffer.\n");
 		exit(3);
 	}
-	event = malloc(sizeof *event);
+	event = malloc(sizeof(*event));
 	if (!event) {
 		perror("Unable to allocate event buffer.\n");
 		exit(3);
 	}
-	memset(event, 0, sizeof *event);
+	memset(event, 0, sizeof(*event));
 	guest.avail_idx = 0;
 	guest.kicked_avail_idx = -1;
 	guest.last_used_idx = 0;
@@ -102,12 +102,12 @@ void alloc_ring(void)
 		ring[i] = desc;
 	}
 	guest.num_free = ring_size;
-	data = malloc(ring_size * sizeof *data);
+	data = malloc(ring_size * sizeof(*data));
 	if (!data) {
 		perror("Unable to allocate data buffer.\n");
 		exit(3);
 	}
-	memset(data, 0, ring_size * sizeof *data);
+	memset(data, 0, ring_size * sizeof(*data));
 }
 
 /* guest side */

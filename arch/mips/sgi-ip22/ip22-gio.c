@@ -358,7 +358,7 @@ static void ip22_check_gio(int slotno, unsigned long addr, int irq)
 		}
 		printk(KERN_INFO "GIO: slot %d : %s (id %x)\n",
 		       slotno, name, id);
-		gio_dev = kzalloc(sizeof *gio_dev, GFP_KERNEL);
+		gio_dev = kzalloc(sizeof(*gio_dev), GFP_KERNEL);
 		gio_dev->name = name;
 		gio_dev->slotno = slotno;
 		gio_dev->id.id = id;

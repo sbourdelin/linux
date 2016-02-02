@@ -673,8 +673,8 @@ static int setup_clipping(struct saa7134_dev *dev, struct v4l2_clip *clips,
 		row[rows].disable  = (1 << i);
 		rows++;
 	}
-	sort(col, cols, sizeof col[0], cliplist_cmp, NULL);
-	sort(row, rows, sizeof row[0], cliplist_cmp, NULL);
+	sort(col, cols, sizeof(col[0]), cliplist_cmp, NULL);
+	sort(row, rows, sizeof(row[0]), cliplist_cmp, NULL);
 	set_cliplist(dev,0x380,col,cols,"cols");
 	set_cliplist(dev,0x384,row,rows,"rows");
 	return 0;

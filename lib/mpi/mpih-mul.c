@@ -385,7 +385,7 @@ mpihelp_mul_karatsuba_case(mpi_ptr_t prodp,
 				return -ENOMEM;
 		} else {
 			if (!ctx->next) {
-				ctx->next = kzalloc(sizeof *ctx, GFP_KERNEL);
+				ctx->next = kzalloc(sizeof(*ctx), GFP_KERNEL);
 				if (!ctx->next)
 					return -ENOMEM;
 			}
@@ -488,7 +488,7 @@ mpihelp_mul(mpi_ptr_t prodp, mpi_ptr_t up, mpi_size_t usize,
 		return 0;
 	}
 
-	memset(&ctx, 0, sizeof ctx);
+	memset(&ctx, 0, sizeof(ctx));
 	if (mpihelp_mul_karatsuba_case(prodp, up, usize, vp, vsize, &ctx) < 0)
 		return -ENOMEM;
 	mpihelp_release_karatsuba_ctx(&ctx);

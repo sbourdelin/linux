@@ -164,7 +164,7 @@ int usbnet_get_ethernet_addr(struct usbnet *dev, int iMACAddress)
 	int 		tmp = -1, ret;
 	unsigned char	buf [13];
 
-	ret = usb_string(dev->udev, iMACAddress, buf, sizeof buf);
+	ret = usb_string(dev->udev, iMACAddress, buf, sizeof(buf));
 	if (ret == 12)
 		tmp = hex2bin(dev->net->dev_addr, buf, 6);
 	if (tmp < 0) {
@@ -1011,11 +1011,11 @@ void usbnet_get_drvinfo (struct net_device *net, struct ethtool_drvinfo *info)
 {
 	struct usbnet *dev = netdev_priv(net);
 
-	strlcpy (info->driver, dev->driver_name, sizeof info->driver);
-	strlcpy (info->version, DRIVER_VERSION, sizeof info->version);
+	strlcpy (info->driver, dev->driver_name, sizeof(info->driver));
+	strlcpy (info->version, DRIVER_VERSION, sizeof(info->version));
 	strlcpy (info->fw_version, dev->driver_info->description,
-		sizeof info->fw_version);
-	usb_make_path (dev->udev, info->bus_info, sizeof info->bus_info);
+		sizeof(info->fw_version));
+	usb_make_path (dev->udev, info->bus_info, sizeof(info->bus_info));
 }
 EXPORT_SYMBOL_GPL(usbnet_get_drvinfo);
 
@@ -1659,7 +1659,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	dev->net = net;
 	strcpy (net->name, "usb%d");
-	memcpy (net->dev_addr, node_id, sizeof node_id);
+	memcpy (net->dev_addr, node_id, sizeof(node_id));
 
 	/* rx and tx sides can use different message sizes;
 	 * bind() should set rx_urb_size in that case.

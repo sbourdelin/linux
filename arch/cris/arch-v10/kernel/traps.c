@@ -119,7 +119,7 @@ handle_BUG(struct pt_regs *regs)
 	unsigned char c;
 	unsigned long irp = regs->irp;
 
-	if (__copy_from_user(&f, (const void __user *)(irp - 8), sizeof f))
+	if (__copy_from_user(&f, (const void __user *)(irp - 8), sizeof(f)))
 		return;
 	if (f.prefix != BUG_PREFIX || f.magic != BUG_MAGIC)
 		return;

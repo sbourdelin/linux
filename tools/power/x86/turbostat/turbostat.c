@@ -274,10 +274,10 @@ int get_msr(int cpu, off_t offset, unsigned long long *msr)
 	if (fd < 0)
 		err(-1, "%s open failed, try chown or chmod +r /dev/cpu/*/msr, or run as root", pathname);
 
-	retval = pread(fd, msr, sizeof *msr, offset);
+	retval = pread(fd, msr, sizeof(*msr), offset);
 	close(fd);
 
-	if (retval != sizeof *msr)
+	if (retval != sizeof(*msr))
 		err(-1, "%s offset 0x%llx read failed", pathname, (unsigned long long)offset);
 
 	return 0;

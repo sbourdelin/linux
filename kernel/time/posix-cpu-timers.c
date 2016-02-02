@@ -1301,7 +1301,7 @@ static int do_cpu_nanosleep(const clockid_t which_clock, int flags,
 	/*
 	 * Set up a temporary timer and then wait for it to go off.
 	 */
-	memset(&timer, 0, sizeof timer);
+	memset(&timer, 0, sizeof(timer));
 	spin_lock_init(&timer.it_lock);
 	timer.it_clock = which_clock;
 	timer.it_overrun = -1;
@@ -1310,7 +1310,7 @@ static int do_cpu_nanosleep(const clockid_t which_clock, int flags,
 	if (!error) {
 		static struct itimerspec zero_it;
 
-		memset(it, 0, sizeof *it);
+		memset(it, 0, sizeof(*it));
 		it->it_value = *rqtp;
 
 		spin_lock_irq(&timer.it_lock);
@@ -1403,7 +1403,7 @@ static int posix_cpu_nsleep(const clockid_t which_clock, int flags,
 		/*
 		 * Report back to the user the time still remaining.
 		 */
-		if (rmtp && copy_to_user(rmtp, &it.it_value, sizeof *rmtp))
+		if (rmtp && copy_to_user(rmtp, &it.it_value, sizeof(*rmtp)))
 			return -EFAULT;
 
 		restart_block->fn = posix_cpu_nsleep_restart;
@@ -1430,7 +1430,7 @@ static long posix_cpu_nsleep_restart(struct restart_block *restart_block)
 		/*
 		 * Report back to the user the time still remaining.
 		 */
-		if (rmtp && copy_to_user(rmtp, &it.it_value, sizeof *rmtp))
+		if (rmtp && copy_to_user(rmtp, &it.it_value, sizeof(*rmtp)))
 			return -EFAULT;
 
 		restart_block->nanosleep.expires = timespec_to_ns(&t);

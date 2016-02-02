@@ -418,7 +418,7 @@ static void setcolors(struct gspca_dev *gspca_dev, s32 val)
 	/* I2cc[1] = I2cc[2] = green; */
 	if (sd->sensor == SENSOR_PAS106) {
 		i2c_w(gspca_dev, PAS106_REG13, &i2cflags, 1, 3);
-		i2c_w(gspca_dev, PAS106_REG9, I2cc, sizeof I2cc, 1);
+		i2c_w(gspca_dev, PAS106_REG9, I2cc, sizeof(I2cc), 1);
 	}
 /*	PDEBUG(D_CONF , "Etoms red %d blue %d green %d",
 		I2cc[3], I2cc[0], green); */
@@ -511,22 +511,22 @@ static void Et_init1(struct gspca_dev *gspca_dev)
 	/* set the sensor */
 	if (gspca_dev->cam.cam_mode[(int) gspca_dev->curr_mode].priv) {
 		I2c0[0] = 0x06;
-		i2c_w(gspca_dev, PAS106_REG2, I2c0, sizeof I2c0, 1);
-		i2c_w(gspca_dev, PAS106_REG9, I2c2, sizeof I2c2, 1);
+		i2c_w(gspca_dev, PAS106_REG2, I2c0, sizeof(I2c0), 1);
+		i2c_w(gspca_dev, PAS106_REG9, I2c2, sizeof(I2c2), 1);
 		value = 0x06;
 		i2c_w(gspca_dev, PAS106_REG2, &value, 1, 1);
-		i2c_w(gspca_dev, PAS106_REG3, I2c3, sizeof I2c3, 1);
+		i2c_w(gspca_dev, PAS106_REG3, I2c3, sizeof(I2c3), 1);
 		/* value = 0x1f; */
 		value = 0x04;
 		i2c_w(gspca_dev, PAS106_REG0e, &value, 1, 1);
 	} else {
 		I2c0[0] = 0x0a;
 
-		i2c_w(gspca_dev, PAS106_REG2, I2c0, sizeof I2c0, 1);
-		i2c_w(gspca_dev, PAS106_REG9, I2c2, sizeof I2c2, 1);
+		i2c_w(gspca_dev, PAS106_REG2, I2c0, sizeof(I2c0), 1);
+		i2c_w(gspca_dev, PAS106_REG9, I2c2, sizeof(I2c2), 1);
 		value = 0x0a;
 		i2c_w(gspca_dev, PAS106_REG2, &value, 1, 1);
-		i2c_w(gspca_dev, PAS106_REG3, I2c3, sizeof I2c3, 1);
+		i2c_w(gspca_dev, PAS106_REG3, I2c3, sizeof(I2c3), 1);
 		value = 0x04;
 		/* value = 0x10; */
 		i2c_w(gspca_dev, PAS106_REG0e, &value, 1, 1);
@@ -540,7 +540,7 @@ static void Et_init1(struct gspca_dev *gspca_dev)
 /*	value = 0x22; */
 /*	i2c_w(gspca_dev, PAS106_REG5, &value, 1, 1); */
 	/* magnetude and sign bit for DAC */
-	i2c_w(gspca_dev, PAS106_REG7, I2c4, sizeof I2c4, 1);
+	i2c_w(gspca_dev, PAS106_REG7, I2c4, sizeof(I2c4), 1);
 	/* now set by fifo the whole colors setting */
 	reg_w(gspca_dev, ET_G_RED, GainRGBG, 6);
 	setcolors(gspca_dev, getcolors(gspca_dev));

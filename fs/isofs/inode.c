@@ -628,7 +628,7 @@ static int isofs_fill_super(struct super_block *s, void *data, int silent)
 		 * ISO CDs can match hdp->id==HS_STANDARD_ID as well. To ensure
 		 * proper identification in this case, we first check for ISO.
 		 */
-		if (strncmp (vdp->id, ISO_STANDARD_ID, sizeof vdp->id) == 0) {
+		if (strncmp (vdp->id, ISO_STANDARD_ID, sizeof(vdp->id)) == 0) {
 			if (isonum_711(vdp->type) == ISO_VD_END)
 				break;
 			if (isonum_711(vdp->type) == ISO_VD_PRIMARY) {
@@ -663,7 +663,7 @@ static int isofs_fill_super(struct super_block *s, void *data, int silent)
 			}
 #endif
 		} else {
-			if (strncmp (hdp->id, HS_STANDARD_ID, sizeof hdp->id) == 0) {
+			if (strncmp (hdp->id, HS_STANDARD_ID, sizeof(hdp->id)) == 0) {
 				if (isonum_711(hdp->type) != ISO_VD_PRIMARY)
 					goto out_freebh;
 

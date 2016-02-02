@@ -214,11 +214,11 @@ static int TSS_checkhmac1(unsigned char *buffer,
 	if (ret < 0)
 		goto out;
 	ret = crypto_shash_update(&sdesc->shash, (const u8 *)&result,
-				  sizeof result);
+				  sizeof(result));
 	if (ret < 0)
 		goto out;
 	ret = crypto_shash_update(&sdesc->shash, (const u8 *)&ordinal,
-				  sizeof ordinal);
+				  sizeof(ordinal));
 	if (ret < 0)
 		goto out;
 	va_start(argp, keylen);
@@ -306,11 +306,11 @@ static int TSS_checkhmac2(unsigned char *buffer,
 	if (ret < 0)
 		goto out;
 	ret = crypto_shash_update(&sdesc->shash, (const u8 *)&result,
-				  sizeof result);
+				  sizeof(result));
 	if (ret < 0)
 		goto out;
 	ret = crypto_shash_update(&sdesc->shash, (const u8 *)&ordinal,
-				  sizeof ordinal);
+				  sizeof(ordinal));
 	if (ret < 0)
 		goto out;
 
@@ -476,7 +476,7 @@ static int tpm_seal(struct tpm_buf *tb, uint16_t keytype,
 	int i;
 
 	/* alloc some work space for all the hashes */
-	td = kmalloc(sizeof *td, GFP_KERNEL);
+	td = kmalloc(sizeof(*td), GFP_KERNEL);
 	if (!td)
 		return -ENOMEM;
 
@@ -665,7 +665,7 @@ static int key_seal(struct trusted_key_payload *p,
 	struct tpm_buf *tb;
 	int ret;
 
-	tb = kzalloc(sizeof *tb, GFP_KERNEL);
+	tb = kzalloc(sizeof(*tb), GFP_KERNEL);
 	if (!tb)
 		return -ENOMEM;
 
@@ -691,7 +691,7 @@ static int key_unseal(struct trusted_key_payload *p,
 	struct tpm_buf *tb;
 	int ret;
 
-	tb = kzalloc(sizeof *tb, GFP_KERNEL);
+	tb = kzalloc(sizeof(*tb), GFP_KERNEL);
 	if (!tb)
 		return -ENOMEM;
 
@@ -922,7 +922,7 @@ static struct trusted_key_options *trusted_options_alloc(void)
 	if (tpm2 < 0)
 		return NULL;
 
-	options = kzalloc(sizeof *options, GFP_KERNEL);
+	options = kzalloc(sizeof(*options), GFP_KERNEL);
 	if (options) {
 		/* set any non-zero defaults */
 		options->keytype = SRK_keytype;
@@ -938,10 +938,10 @@ static struct trusted_key_payload *trusted_payload_alloc(struct key *key)
 	struct trusted_key_payload *p = NULL;
 	int ret;
 
-	ret = key_payload_reserve(key, sizeof *p);
+	ret = key_payload_reserve(key, sizeof(*p));
 	if (ret < 0)
 		return p;
-	p = kzalloc(sizeof *p, GFP_KERNEL);
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	if (p)
 		p->migratable = 1; /* migratable by default */
 	return p;

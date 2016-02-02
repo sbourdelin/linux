@@ -77,7 +77,7 @@ static inline struct f_hidg *func_to_hidg(struct usb_function *f)
 /*                           Static descriptors                            */
 
 static struct usb_interface_descriptor hidg_interface_desc = {
-	.bLength		= sizeof hidg_interface_desc,
+	.bLength		= sizeof(hidg_interface_desc),
 	.bDescriptorType	= USB_DT_INTERFACE,
 	/* .bInterfaceNumber	= DYNAMIC */
 	.bAlternateSetting	= 0,
@@ -89,7 +89,7 @@ static struct usb_interface_descriptor hidg_interface_desc = {
 };
 
 static struct hid_descriptor hidg_desc = {
-	.bLength			= sizeof hidg_desc,
+	.bLength			= sizeof(hidg_desc),
 	.bDescriptorType		= HID_DT_HID,
 	.bcdHID				= 0x0101,
 	.bCountryCode			= 0x00,

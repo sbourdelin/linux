@@ -329,7 +329,7 @@ int pstore_mkfile(enum pstore_type_id type, char *psname, u64 id, int count,
 		goto fail;
 	inode->i_mode = S_IFREG | 0444;
 	inode->i_fop = &pstore_file_operations;
-	private = kmalloc(sizeof *private + size, GFP_KERNEL);
+	private = kmalloc(sizeof(*private) + size, GFP_KERNEL);
 	if (!private)
 		goto fail_alloc;
 	private->type = type;

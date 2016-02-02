@@ -230,7 +230,7 @@ static int spi_ppc4xx_setup(struct spi_device *spi)
 	}
 
 	if (cs == NULL) {
-		cs = kzalloc(sizeof *cs, GFP_KERNEL);
+		cs = kzalloc(sizeof(*cs), GFP_KERNEL);
 		if (!cs)
 			return -ENOMEM;
 		spi->controller_state = cs;
@@ -391,7 +391,7 @@ static int spi_ppc4xx_of_probe(struct platform_device *op)
 	int num_gpios;
 	const unsigned int *clk;
 
-	master = spi_alloc_master(dev, sizeof *hw);
+	master = spi_alloc_master(dev, sizeof(*hw));
 	if (master == NULL)
 		return -ENOMEM;
 	master->dev.of_node = np;

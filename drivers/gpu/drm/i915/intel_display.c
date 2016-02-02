@@ -6504,7 +6504,7 @@ struct intel_connector *intel_connector_alloc(void)
 {
 	struct intel_connector *connector;
 
-	connector = kzalloc(sizeof *connector, GFP_KERNEL);
+	connector = kzalloc(sizeof(*connector), GFP_KERNEL);
 	if (!connector)
 		return NULL;
 
@@ -12336,7 +12336,7 @@ clear_intel_crtc_state(struct intel_crtc_state *crtc_state)
 	ddi_pll_sel = crtc_state->ddi_pll_sel;
 	force_thru = crtc_state->pch_pfit.force_thru;
 
-	memset(crtc_state, 0, sizeof *crtc_state);
+	memset(crtc_state, 0, sizeof(*crtc_state));
 
 	crtc_state->base = tmp_state;
 	crtc_state->scaler_state = scaler_state;

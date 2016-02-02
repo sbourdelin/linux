@@ -608,7 +608,7 @@ ep_read_iter(struct kiocb *iocb, struct iov_iter *to)
 		if (value >= 0 && copy_to_iter(buf, value, to))
 			value = -EFAULT;
 	} else {
-		struct kiocb_priv *priv = kzalloc(sizeof *priv, GFP_KERNEL);
+		struct kiocb_priv *priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 		value = -ENOMEM;
 		if (!priv)
 			goto fail;
@@ -676,7 +676,7 @@ ep_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	} else if (is_sync_kiocb(iocb)) {
 		value = ep_io(epdata, buf, len);
 	} else {
-		struct kiocb_priv *priv = kzalloc(sizeof *priv, GFP_KERNEL);
+		struct kiocb_priv *priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 		value = -ENOMEM;
 		if (priv) {
 			value = ep_aio(iocb, priv, epdata, buf, len);
@@ -892,7 +892,7 @@ static int setup_req (struct usb_ep *ep, struct usb_request *req, u16 len)
 		DBG (dev, "ep0 request busy!\n");
 		return -EBUSY;
 	}
-	if (len > sizeof (dev->rbuf))
+	if (len > sizeof(dev->rbuf))
 		req->buf = kmalloc(len, GFP_ATOMIC);
 	if (req->buf == NULL) {
 		req->buf = dev->rbuf;
@@ -992,7 +992,7 @@ ep0_read (struct file *fd, char __user *buf, size_t len, loff_t *ptr)
 	}
 
 	/* else normal: return event data */
-	if (len < sizeof dev->event [0]) {
+	if (len < sizeof(dev->event[0])) {
 		retval = -EINVAL;
 		goto done;
 	}
@@ -1103,7 +1103,7 @@ next_event (struct dev_data *dev, enum usb_gadgetfs_event_type type)
 	VDEBUG(dev, "event[%d] = %d\n", dev->ev_next, type);
 	event = &dev->event [dev->ev_next++];
 	BUG_ON (dev->ev_next > N_EVENT);
-	memset (event, 0, sizeof *event);
+	memset (event, 0, sizeof(*event));
 	event->type = type;
 	return event;
 }
@@ -1255,7 +1255,7 @@ static void make_qualifier (struct dev_data *dev)
 	struct usb_qualifier_descriptor		qual;
 	struct usb_device_descriptor		*desc;
 
-	qual.bLength = sizeof qual;
+	qual.bLength = sizeof(qual);
 	qual.bDescriptorType = USB_DT_DEVICE_QUALIFIER;
 	qual.bcdUSB = cpu_to_le16 (0x0200);
 
@@ -1270,7 +1270,7 @@ static void make_qualifier (struct dev_data *dev)
 	qual.bNumConfigurations = 1;
 	qual.bRESERVED = 0;
 
-	memcpy (dev->rbuf, &qual, sizeof qual);
+	memcpy (dev->rbuf, &qual, sizeof(qual));
 }
 
 static int
@@ -1346,7 +1346,7 @@ gadgetfs_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		switch (w_value >> 8) {
 
 		case USB_DT_DEVICE:
-			value = min (w_length, (u16) sizeof *dev->dev);
+			value = min (w_length, (u16) sizeof(*dev->dev));
 			dev->dev->bMaxPacketSize0 = dev->gadget->ep0->maxpacket;
 			req->buf = dev->dev;
 			break;
@@ -1550,7 +1550,7 @@ static int activate_ep_files (struct dev_data *dev)
 		mutex_init(&data->lock);
 		init_waitqueue_head (&data->wait);
 
-		strncpy (data->name, ep->name, sizeof (data->name) - 1);
+		strncpy (data->name, ep->name, sizeof(data->name) - 1);
 		atomic_set (&data->count, 1);
 		data->dev = dev;
 		get_dev (dev);

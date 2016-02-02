@@ -67,10 +67,10 @@ static int if_version(struct cardstate *cs, unsigned arg[4])
 
 	switch (cmd) {
 	case GIGVER_DRIVER:
-		memcpy(arg, version, sizeof version);
+		memcpy(arg, version, sizeof(version));
 		return 0;
 	case GIGVER_COMPAT:
-		memcpy(arg, compat, sizeof compat);
+		memcpy(arg, compat, sizeof(compat));
 		return 0;
 	case GIGVER_FWBASE:
 		cs->waiting = 1;
@@ -212,13 +212,13 @@ static int if_ioctl(struct tty_struct *tty,
 			break;
 		case GIGASET_VERSION:
 			retval = copy_from_user(version,
-						(unsigned __user *) arg, sizeof version)
+						(unsigned __user *) arg, sizeof(version))
 				? -EFAULT : 0;
 			if (retval >= 0)
 				retval = if_version(cs, version);
 			if (retval >= 0)
 				retval = copy_to_user((unsigned __user *) arg,
-						      version, sizeof version)
+						      version, sizeof(version))
 					? -EFAULT : 0;
 			break;
 		default:

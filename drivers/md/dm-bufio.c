@@ -1852,8 +1852,8 @@ static int __init dm_bufio_init(void)
 	dm_bufio_allocated_vmalloc = 0;
 	dm_bufio_current_allocated = 0;
 
-	memset(&dm_bufio_caches, 0, sizeof dm_bufio_caches);
-	memset(&dm_bufio_cache_names, 0, sizeof dm_bufio_cache_names);
+	memset(&dm_bufio_caches, 0, sizeof(dm_bufio_caches));
+	memset(&dm_bufio_cache_names, 0, sizeof(dm_bufio_cache_names));
 
 	mem = (__u64)((totalram_pages - totalhigh_pages) *
 		      DM_BUFIO_MEMORY_PERCENT / 100) << PAGE_SHIFT;

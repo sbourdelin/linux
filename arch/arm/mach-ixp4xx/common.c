@@ -348,7 +348,7 @@ static struct pxa2xx_udc_mach_info ixp4xx_udc_info;
 
 void __init ixp4xx_set_udc_info(struct pxa2xx_udc_mach_info *info)
 {
-	memcpy(&ixp4xx_udc_info, info, sizeof *info);
+	memcpy(&ixp4xx_udc_info, info, sizeof(*info));
 }
 
 static struct resource ixp4xx_udc_resources[] = {

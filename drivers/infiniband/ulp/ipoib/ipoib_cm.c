@@ -354,14 +354,14 @@ static int ipoib_cm_nonsrq_init_rx(struct net_device *dev, struct ib_cm_id *cm_i
 	int ret;
 	int i;
 
-	rx->rx_ring = vzalloc(ipoib_recvq_size * sizeof *rx->rx_ring);
+	rx->rx_ring = vzalloc(ipoib_recvq_size * sizeof(*rx->rx_ring));
 	if (!rx->rx_ring) {
 		printk(KERN_WARNING "%s: failed to allocate CM non-SRQ ring (%d entries)\n",
 		       priv->ca->name, ipoib_recvq_size);
 		return -ENOMEM;
 	}
 
-	t = kmalloc(sizeof *t, GFP_KERNEL);
+	t = kmalloc(sizeof(*t), GFP_KERNEL);
 	if (!t) {
 		ret = -ENOMEM;
 		goto err_free;
@@ -428,7 +428,7 @@ static int ipoib_cm_send_rep(struct net_device *dev, struct ib_cm_id *cm_id,
 	data.mtu = cpu_to_be32(IPOIB_CM_BUF_SIZE);
 
 	rep.private_data = &data;
-	rep.private_data_len = sizeof data;
+	rep.private_data_len = sizeof(data);
 	rep.flow_control = 0;
 	rep.rnr_retry_count = req->rnr_retry_count;
 	rep.srq = ipoib_cm_has_srq(dev);
@@ -446,7 +446,7 @@ static int ipoib_cm_req_handler(struct ib_cm_id *cm_id, struct ib_cm_event *even
 	int ret;
 
 	ipoib_dbg(priv, "REQ arrived\n");
-	p = kzalloc(sizeof *p, GFP_KERNEL);
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
 	p->dev = dev;
@@ -654,7 +654,7 @@ void ipoib_cm_handle_rx_wc(struct net_device *dev, struct ib_wc *wc)
 	}
 
 	ipoib_cm_dma_unmap_rx(priv, frags, rx_ring[wr_id].mapping);
-	memcpy(rx_ring[wr_id].mapping, mapping, (frags + 1) * sizeof *mapping);
+	memcpy(rx_ring[wr_id].mapping, mapping, (frags + 1) * sizeof(*mapping));
 
 	ipoib_dbg_data(priv, "received %d bytes, SLID 0x%04x\n",
 		       wc->byte_len, wc->slid);
@@ -1061,7 +1061,7 @@ static int ipoib_cm_send_req(struct net_device *dev,
 	req.qp_num			= qp->qp_num;
 	req.qp_type			= qp->qp_type;
 	req.private_data		= &data;
-	req.private_data_len		= sizeof data;
+	req.private_data_len		= sizeof(data);
 	req.flow_control		= 0;
 
 	req.starting_psn		= 0; /* FIXME */
@@ -1111,14 +1111,14 @@ static int ipoib_cm_tx_init(struct ipoib_cm_tx *p, u32 qpn,
 	struct ipoib_dev_priv *priv = netdev_priv(p->dev);
 	int ret;
 
-	p->tx_ring = __vmalloc(ipoib_sendq_size * sizeof *p->tx_ring,
+	p->tx_ring = __vmalloc(ipoib_sendq_size * sizeof(*p->tx_ring),
 			       GFP_NOIO, PAGE_KERNEL);
 	if (!p->tx_ring) {
 		ipoib_warn(priv, "failed to allocate tx ring\n");
 		ret = -ENOMEM;
 		goto err_tx;
 	}
-	memset(p->tx_ring, 0, ipoib_sendq_size * sizeof *p->tx_ring);
+	memset(p->tx_ring, 0, ipoib_sendq_size * sizeof(*p->tx_ring));
 
 	p->qp = ipoib_cm_create_tx_qp(p->dev, p);
 	if (IS_ERR(p->qp)) {
@@ -1270,7 +1270,7 @@ struct ipoib_cm_tx *ipoib_cm_create_tx(struct net_device *dev, struct ipoib_path
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ipoib_cm_tx *tx;
 
-	tx = kzalloc(sizeof *tx, GFP_ATOMIC);
+	tx = kzalloc(sizeof(*tx), GFP_ATOMIC);
 	if (!tx)
 		return NULL;
 
@@ -1320,7 +1320,7 @@ static void ipoib_cm_tx_start(struct work_struct *work)
 		list_del_init(&p->list);
 		neigh = p->neigh;
 		qpn = IPOIB_QPN(neigh->daddr);
-		memcpy(&pathrec, &p->path->pathrec, sizeof pathrec);
+		memcpy(&pathrec, &p->path->pathrec, sizeof(pathrec));
 
 		spin_unlock_irqrestore(&priv->lock, flags);
 		netif_tx_unlock_bh(dev);
@@ -1508,7 +1508,7 @@ static void ipoib_cm_create_srq(struct net_device *dev, int max_sge)
 		return;
 	}
 
-	priv->cm.srq_ring = vzalloc(ipoib_recvq_size * sizeof *priv->cm.srq_ring);
+	priv->cm.srq_ring = vzalloc(ipoib_recvq_size * sizeof(*priv->cm.srq_ring));
 	if (!priv->cm.srq_ring) {
 		printk(KERN_WARNING "%s: failed to allocate CM SRQ ring (%d entries)\n",
 		       priv->ca->name, ipoib_recvq_size);

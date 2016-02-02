@@ -1378,7 +1378,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 
 	rg->paddr = 0;
 	rg->vaddr = NULL;
-	memset(&rg->vrfb, 0, sizeof rg->vrfb);
+	memset(&rg->vrfb, 0, sizeof(rg->vrfb));
 	rg->size = 0;
 	rg->type = 0;
 	rg->alloc = false;

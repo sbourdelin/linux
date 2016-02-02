@@ -982,7 +982,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 		struct kvm_assigned_pci_dev assigned_dev;
 
 		r = -EFAULT;
-		if (copy_from_user(&assigned_dev, argp, sizeof assigned_dev))
+		if (copy_from_user(&assigned_dev, argp, sizeof(assigned_dev)))
 			goto out;
 		r = kvm_vm_ioctl_assign_device(kvm, &assigned_dev);
 		if (r)
@@ -997,7 +997,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 		struct kvm_assigned_irq assigned_irq;
 
 		r = -EFAULT;
-		if (copy_from_user(&assigned_irq, argp, sizeof assigned_irq))
+		if (copy_from_user(&assigned_irq, argp, sizeof(assigned_irq)))
 			goto out;
 		r = kvm_vm_ioctl_assign_irq(kvm, &assigned_irq);
 		if (r)
@@ -1008,7 +1008,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 		struct kvm_assigned_irq assigned_irq;
 
 		r = -EFAULT;
-		if (copy_from_user(&assigned_irq, argp, sizeof assigned_irq))
+		if (copy_from_user(&assigned_irq, argp, sizeof(assigned_irq)))
 			goto out;
 		r = kvm_vm_ioctl_deassign_dev_irq(kvm, &assigned_irq);
 		if (r)
@@ -1019,7 +1019,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 		struct kvm_assigned_pci_dev assigned_dev;
 
 		r = -EFAULT;
-		if (copy_from_user(&assigned_dev, argp, sizeof assigned_dev))
+		if (copy_from_user(&assigned_dev, argp, sizeof(assigned_dev)))
 			goto out;
 		r = kvm_vm_ioctl_deassign_device(kvm, &assigned_dev);
 		if (r)
@@ -1029,7 +1029,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 	case KVM_ASSIGN_SET_MSIX_NR: {
 		struct kvm_assigned_msix_nr entry_nr;
 		r = -EFAULT;
-		if (copy_from_user(&entry_nr, argp, sizeof entry_nr))
+		if (copy_from_user(&entry_nr, argp, sizeof(entry_nr)))
 			goto out;
 		r = kvm_vm_ioctl_set_msix_nr(kvm, &entry_nr);
 		if (r)
@@ -1039,7 +1039,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 	case KVM_ASSIGN_SET_MSIX_ENTRY: {
 		struct kvm_assigned_msix_entry entry;
 		r = -EFAULT;
-		if (copy_from_user(&entry, argp, sizeof entry))
+		if (copy_from_user(&entry, argp, sizeof(entry)))
 			goto out;
 		r = kvm_vm_ioctl_set_msix_entry(kvm, &entry);
 		if (r)
@@ -1050,7 +1050,7 @@ long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 		struct kvm_assigned_pci_dev assigned_dev;
 
 		r = -EFAULT;
-		if (copy_from_user(&assigned_dev, argp, sizeof assigned_dev))
+		if (copy_from_user(&assigned_dev, argp, sizeof(assigned_dev)))
 			goto out;
 		r = kvm_vm_ioctl_set_pci_irq_mask(kvm, &assigned_dev);
 		break;

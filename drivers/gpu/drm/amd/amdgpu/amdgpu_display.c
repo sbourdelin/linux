@@ -169,7 +169,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 	u64 base;
 	int i, r;
 
-	work = kzalloc(sizeof *work, GFP_KERNEL);
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
 	if (work == NULL)
 		return -ENOMEM;
 

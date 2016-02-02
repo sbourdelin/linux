@@ -609,7 +609,7 @@ struct mthca_mailbox *mthca_alloc_mailbox(struct mthca_dev *dev,
 {
 	struct mthca_mailbox *mailbox;
 
-	mailbox = kmalloc(sizeof *mailbox, gfp_mask);
+	mailbox = kmalloc(sizeof(*mailbox), gfp_mask);
 	if (!mailbox)
 		return ERR_PTR(-ENOMEM);
 

@@ -1223,7 +1223,7 @@ static int pdc_ata_init_one(struct pci_dev *pdev,
 		dev_err(&pdev->dev, "failed to allocate host\n");
 		return -ENOMEM;
 	}
-	hpriv = devm_kzalloc(&pdev->dev, sizeof *hpriv, GFP_KERNEL);
+	hpriv = devm_kzalloc(&pdev->dev, sizeof(*hpriv), GFP_KERNEL);
 	if (!hpriv)
 		return -ENOMEM;
 	spin_lock_init(&hpriv->hard_reset_lock);

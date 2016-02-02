@@ -273,7 +273,7 @@ static int get_fpdu_info(struct nes_device *nesdev, struct nes_qp *nesqp,
 
 		/* See if we have all of the fpdu */
 		frag_tot = 0;
-		memset(&frags, 0, sizeof frags);
+		memset(&frags, 0, sizeof(frags));
 		for (i = 0; i < MAX_FPDU_FRAGS; i++) {
 			frags[i].physaddr = cb->busaddr;
 			frags[i].physaddr += skb->data - cb->data_start;
@@ -728,7 +728,7 @@ static int nes_change_quad_hash(struct nes_device *nesdev,
 		goto chg_qh_err;
 	}
 
-	qh_chg = kmalloc(sizeof *qh_chg, GFP_ATOMIC);
+	qh_chg = kmalloc(sizeof(*qh_chg), GFP_ATOMIC);
 	if (qh_chg == NULL) {
 		nes_debug(NES_DBG_PAU, "Failed to get a cqp_request.\n");
 		ret = -ENOMEM;

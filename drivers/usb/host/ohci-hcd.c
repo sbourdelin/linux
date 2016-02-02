@@ -986,7 +986,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 	ohci_mem_cleanup (ohci);
 	if (ohci->hcca) {
 		dma_free_coherent (hcd->self.controller,
-				sizeof *ohci->hcca,
+				sizeof(*ohci->hcca),
 				ohci->hcca, ohci->hcca_dma);
 		ohci->hcca = NULL;
 		ohci->hcca_dma = 0;

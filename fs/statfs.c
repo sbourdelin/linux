@@ -110,7 +110,7 @@ static int do_statfs_native(struct kstatfs *st, struct statfs __user *p)
 	if (sizeof(buf) == sizeof(*st))
 		memcpy(&buf, st, sizeof(*st));
 	else {
-		if (sizeof buf.f_blocks == 4) {
+		if (sizeof(buf.f_blocks) == 4) {
 			if ((st->f_blocks | st->f_bfree | st->f_bavail |
 			     st->f_bsize | st->f_frsize) &
 			    0xffffffff00000000ULL)

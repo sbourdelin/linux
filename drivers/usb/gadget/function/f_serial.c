@@ -114,7 +114,7 @@ static struct usb_endpoint_descriptor gser_ss_out_desc = {
 };
 
 static struct usb_ss_ep_comp_descriptor gser_ss_bulk_comp_desc = {
-	.bLength =              sizeof gser_ss_bulk_comp_desc,
+	.bLength =              sizeof(gser_ss_bulk_comp_desc),
 	.bDescriptorType =      USB_DT_SS_ENDPOINT_COMP,
 };
 

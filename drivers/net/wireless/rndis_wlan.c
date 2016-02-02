@@ -729,9 +729,9 @@ static int rndis_query_oid(struct usbnet *dev, u32 oid, void *data, int *len)
 
 	mutex_lock(&priv->command_lock);
 
-	memset(u.get, 0, sizeof *u.get);
+	memset(u.get, 0, sizeof(*u.get));
 	u.get->msg_type = cpu_to_le32(RNDIS_MSG_QUERY);
-	u.get->msg_len = cpu_to_le32(sizeof *u.get);
+	u.get->msg_len = cpu_to_le32(sizeof(*u.get));
 	u.get->oid = cpu_to_le32(oid);
 
 	priv->current_command_oid = oid;
@@ -813,7 +813,7 @@ static int rndis_set_oid(struct usbnet *dev, u32 oid, const void *data,
 
 	mutex_lock(&priv->command_lock);
 
-	memset(u.set, 0, sizeof *u.set);
+	memset(u.set, 0, sizeof(*u.set));
 	u.set->msg_type = cpu_to_le32(RNDIS_MSG_SET);
 	u.set->msg_len = cpu_to_le32(sizeof(*u.set) + len);
 	u.set->oid = cpu_to_le32(oid);

@@ -133,9 +133,9 @@ lpfc_config_port_prep(struct lpfc_hba *phba)
 
 		lpfc_read_nv(phba, pmb);
 		memset((char*)mb->un.varRDnvp.rsvd3, 0,
-			sizeof (mb->un.varRDnvp.rsvd3));
+			sizeof(mb->un.varRDnvp.rsvd3));
 		memcpy((char*)mb->un.varRDnvp.rsvd3, licensed,
-			 sizeof (licensed));
+			 sizeof(licensed));
 
 		rc = lpfc_sli_issue_mbox(phba, pmb, MBX_POLL);
 
@@ -214,7 +214,7 @@ lpfc_config_port_prep(struct lpfc_hba *phba)
 
 	if (lpfc_is_LC_HBA(phba->pcidev->device))
 		memcpy(phba->RandomData, (char *)&mb->un.varWords[24],
-						sizeof (phba->RandomData));
+						sizeof(phba->RandomData));
 
 	/* Get adapter VPD information */
 	lpfc_vpd_data = kmalloc(DMP_VPD_SIZE, GFP_KERNEL);
@@ -3496,7 +3496,7 @@ void lpfc_host_attrib_init(struct Scsi_Host *shost)
 	fc_host_supported_fc4s(shost)[7] = 1;
 
 	lpfc_vport_symbolic_node_name(vport, fc_host_symbolic_name(shost),
-				 sizeof fc_host_symbolic_name(shost));
+				 sizeof(fc_host_symbolic_name(shost)));
 
 	fc_host_supported_speeds(shost) = 0;
 	if (phba->lmt & LMT_32Gb)

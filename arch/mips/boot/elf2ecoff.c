@@ -77,8 +77,8 @@ static void copy(int out, int in, off_t offset, off_t size)
 	remaining = size;
 	while (remaining) {
 		cur = remaining;
-		if (cur > sizeof ibuf)
-			cur = sizeof ibuf;
+		if (cur > sizeof(ibuf))
+			cur = sizeof(ibuf);
 		remaining -= cur;
 		if ((count = read(in, ibuf, cur)) != cur) {
 			fprintf(stderr, "copy: read: %s\n",
@@ -302,8 +302,8 @@ int main(int argc, char *argv[])
 	}
 
 	/* Read the header, which is at the beginning of the file... */
-	i = read(infile, &ex, sizeof ex);
-	if (i != sizeof ex) {
+	i = read(infile, &ex, sizeof(ex));
+	if (i != sizeof(ex)) {
 		fprintf(stderr, "ex: %s: %s.\n",
 			argv[1],
 			i ? strerror(errno) : "End of file reached");
@@ -425,7 +425,7 @@ int main(int argc, char *argv[])
 	eah.data_start = data.vaddr;
 	eah.bss_start = bss.vaddr;
 	eah.gprmask = 0xf3fffffe;
-	memset(&eah.cprmask, '\0', sizeof eah.cprmask);
+	memset(&eah.cprmask, '\0', sizeof(eah.cprmask));
 	eah.gp_value = 0;	/* unused. */
 
 	if (format_bigendian)
@@ -440,10 +440,10 @@ int main(int argc, char *argv[])
 	efh.f_timdat = 0;	/* bogus */
 	efh.f_symptr = 0;
 	efh.f_nsyms = 0;
-	efh.f_opthdr = sizeof eah;
+	efh.f_opthdr = sizeof(eah);
 	efh.f_flags = 0x100f;	/* Stripped, not sharable. */
 
-	memset(esecs, 0, sizeof esecs);
+	memset(esecs, 0, sizeof(esecs));
 	strcpy(esecs[0].s_name, ".text");
 	strcpy(esecs[1].s_name, ".data");
 	strcpy(esecs[2].s_name, ".bss");
@@ -511,8 +511,8 @@ int main(int argc, char *argv[])
 	if (must_convert_endian)
 		convert_ecoff_filehdr(&efh);
 	/* Write the headers... */
-	i = write(outfile, &efh, sizeof efh);
-	if (i != sizeof efh) {
+	i = write(outfile, &efh, sizeof(efh));
+	if (i != sizeof(efh)) {
 		perror("efh: write");
 		exit(1);
 
@@ -527,8 +527,8 @@ int main(int argc, char *argv[])
 
 	if (must_convert_endian)
 		convert_ecoff_aouthdr(&eah);
-	i = write(outfile, &eah, sizeof eah);
-	if (i != sizeof eah) {
+	i = write(outfile, &eah, sizeof(eah));
+	if (i != sizeof(eah)) {
 		perror("eah: write");
 		exit(1);
 	}
@@ -576,13 +576,12 @@ int main(int argc, char *argv[])
 				fprintf(stderr,
 					"Warning: %ld byte intersegment gap.\n",
 					gap);
-				memset(obuf, 0, sizeof obuf);
+				memset(obuf, 0, sizeof(obuf));
 				while (gap) {
 					int count =
 					    write(outfile, obuf,
 						  (gap >
-						   sizeof obuf ? sizeof
-						   obuf : gap));
+						   sizeof(obuf) ? sizeof(obuf) : gap));
 					if (count < 0) {
 						fprintf(stderr,
 							"Error writing gap: %s\n",
@@ -607,7 +606,7 @@ int main(int argc, char *argv[])
 	 */
 	{
 		char obuf[4096];
-		memset(obuf, 0, sizeof obuf);
+		memset(obuf, 0, sizeof(obuf));
 		if (write(outfile, obuf, sizeof(obuf)) != sizeof(obuf)) {
 			fprintf(stderr, "Error writing PROM padding: %s\n",
 				strerror(errno));

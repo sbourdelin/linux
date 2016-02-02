@@ -59,7 +59,7 @@ static long rtc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		wtime.tm_wday = bcd2bin(rtc->bcd_dow)-1;
 		rtc->ctrl = 0;
 		local_irq_restore(flags);
-		return copy_to_user(argp, &wtime, sizeof wtime) ?
+		return copy_to_user(argp, &wtime, sizeof(wtime)) ?
 								-EFAULT : 0;
 	}
 	case RTC_SET_TIME:	/* Set the RTC */
