@@ -635,6 +635,9 @@ i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,
 	if (!drm_mm_initialized(&dev_priv->mm.stolen))
 		return NULL;
 
+	if (WARN_ON_ONCE(!mutex_is_locked(&dev->struct_mutex)))
+		return NULL;
+
 	DRM_DEBUG_KMS("creating preallocated stolen object: stolen_offset=%x, gtt_offset=%x, size=%x\n",
 			stolen_offset, gtt_offset, size);
 
