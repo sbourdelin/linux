@@ -61,7 +61,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	if (!info)
 		return ION_CMA_ALLOCATE_FAILED;
 
-	info->cpu_addr = dma_alloc_coherent(dev, len, &(info->handle),
+	info->cpu_addr = dmam_alloc_coherent(dev, len, &(info->handle),
 						GFP_HIGHUSER | __GFP_ZERO);
 
 	if (!info->cpu_addr) {
@@ -71,7 +71,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 
 	info->table = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
 	if (!info->table)
-		goto free_mem;
+		goto err;
 
 	if (dma_get_sgtable(dev, info->table, info->cpu_addr, info->handle,
 			    len))
@@ -83,8 +83,6 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 
 free_table:
 	kfree(info->table);
-free_mem:
-	dma_free_coherent(dev, len, info->cpu_addr, info->handle);
 err:
 	kfree(info);
 	return ION_CMA_ALLOCATE_FAILED;
@@ -96,9 +94,6 @@ static void ion_cma_free(struct ion_buffer *buffer)
 	struct device *dev = cma_heap->dev;
 	struct ion_cma_buffer_info *info = buffer->priv_virt;
 
-	dev_dbg(dev, "Release buffer %p\n", buffer);
-	/* release memory */
-	dma_free_coherent(dev, buffer->size, info->cpu_addr, info->handle);
 	/* release sg table */
 	sg_free_table(info->table);
 	kfree(info->table);
