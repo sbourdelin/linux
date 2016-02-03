@@ -2565,6 +2565,33 @@ int usb_config_do_bind(struct usb_configuration *c)
 }
 EXPORT_SYMBOL_GPL(usb_config_do_bind);
 
+/**
+ * composite_prep_vendor_descs - for each function in each configuration call
+ *	prep_vendor_descs() callback.
+ * @cdev: composite device
+ */
+int composite_prep_vendor_descs(struct usb_composite_dev *cdev)
+{
+	struct usb_configuration *c;
+	struct usb_function *f;
+	int ret;
+
+	list_for_each_entry(c, &cdev->configs, list)
+		list_for_each_entry(f, &c->functions, list) {
+			if (!usb_function_is_new_api(f))
+				continue;
+			if (f->prep_vendor_descs) {
+				ret = f->prep_vendor_descs(f);
+				if (ret)
+					return ret;
+			}
+
+		}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(composite_prep_vendor_descs);
+
 static int composite_bind(struct usb_gadget *gadget,
 		struct usb_gadget_driver *gdriver)
 {
@@ -2592,6 +2619,10 @@ static int composite_bind(struct usb_gadget *gadget,
 	 * power state and consumption, etc
 	 */
 	status = composite->bind(cdev);
+	if (status < 0)
+		goto fail;
+
+	status = composite_prep_vendor_descs(cdev);
 	if (status < 0)
 		goto fail;
 
