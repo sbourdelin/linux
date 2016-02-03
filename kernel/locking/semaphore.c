@@ -37,7 +37,7 @@ static noinline void __down(struct semaphore *sem);
 static noinline int __down_interruptible(struct semaphore *sem);
 static noinline int __down_killable(struct semaphore *sem);
 static noinline int __down_timeout(struct semaphore *sem, long timeout);
-static noinline void __up(struct semaphore *sem);
+static noinline struct task_struct *__up(struct semaphore *sem);
 
 /**
  * down - acquire the semaphore
@@ -178,13 +178,23 @@ EXPORT_SYMBOL(down_timeout);
 void up(struct semaphore *sem)
 {
 	unsigned long flags;
+	struct task_struct *p = NULL;
 
 	raw_spin_lock_irqsave(&sem->lock, flags);
 	if (likely(list_empty(&sem->wait_list)))
 		sem->count++;
 	else
-		__up(sem);
+		p = __up(sem);
 	raw_spin_unlock_irqrestore(&sem->lock, flags);
+
+	/*
+	 * wake_up_process() needs not to be protected by a spinlock.
+	 * Thus move it from the protected region to here. What is
+	 * worse, this unnecessary protection can cause a deadlock by
+	 * acquiring the same sem->lock within wake_up_process().
+	 */
+	if (unlikely(p))
+		wake_up_process(p);
 }
 EXPORT_SYMBOL(up);
 
@@ -253,11 +263,11 @@ static noinline int __sched __down_timeout(struct semaphore *sem, long timeout)
 	return __down_common(sem, TASK_UNINTERRUPTIBLE, timeout);
 }
 
-static noinline void __sched __up(struct semaphore *sem)
+static noinline struct task_struct *__sched __up(struct semaphore *sem)
 {
 	struct semaphore_waiter *waiter = list_first_entry(&sem->wait_list,
 						struct semaphore_waiter, list);
 	list_del(&waiter->list);
 	waiter->up = true;
-	wake_up_process(waiter->task);
+	return waiter->task;
 }
