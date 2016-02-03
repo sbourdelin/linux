@@ -43,6 +43,8 @@
 
 #define RING_SIZE_MIN 64
 #define LINKCHANGE_INT (2 * HZ)
+/* Extra delay for RNDIS_STATUS_NETWORK_CHANGE: */
+#define LINKCHANGE_DELAY (8 * HZ)
 static int ring_size = 128;
 module_param(ring_size, int, S_IRUGO);
 MODULE_PARM_DESC(ring_size, "Ring buffer size (# of pages)");
@@ -964,6 +966,7 @@ static void netvsc_link_change(struct work_struct *w)
 		return;
 	}
 	ndev_ctx->last_reconfig = jiffies;
+	delay = LINKCHANGE_INT;
 
 	spin_lock_irqsave(&ndev_ctx->lock, flags);
 	if (!list_empty(&ndev_ctx->reconfig_events)) {
@@ -1009,8 +1012,11 @@ static void netvsc_link_change(struct work_struct *w)
 			netif_tx_stop_all_queues(net);
 			event->event = RNDIS_STATUS_MEDIA_CONNECT;
 			spin_lock_irqsave(&ndev_ctx->lock, flags);
-			list_add_tail(&event->list, &ndev_ctx->reconfig_events);
+			list_add(&event->list, &ndev_ctx->reconfig_events);
 			spin_unlock_irqrestore(&ndev_ctx->lock, flags);
+
+			ndev_ctx->last_reconfig += LINKCHANGE_DELAY;
+			delay = LINKCHANGE_INT + LINKCHANGE_DELAY;
 			reschedule = true;
 		}
 		break;
@@ -1025,7 +1031,7 @@ static void netvsc_link_change(struct work_struct *w)
 	 * second, handle next reconfig event in 2 seconds.
 	 */
 	if (reschedule)
-		schedule_delayed_work(&ndev_ctx->dwork, LINKCHANGE_INT);
+		schedule_delayed_work(&ndev_ctx->dwork, delay);
 }
 
 static void netvsc_free_netdev(struct net_device *netdev)
