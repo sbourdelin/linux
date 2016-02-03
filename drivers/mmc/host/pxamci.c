@@ -651,7 +651,7 @@ static int pxamci_probe(struct platform_device *pdev)
 	if (!r || irq < 0)
 		return -ENXIO;
 
-	r = request_mem_region(r->start, SZ_4K, DRIVER_NAME);
+	r = devm_request_mem_region(&pdev->dev, r->start, SZ_4K, DRIVER_NAME);
 	if (!r)
 		return -EBUSY;
 
@@ -834,7 +834,6 @@ out:
 	}
 	if (mmc)
 		mmc_free_host(mmc);
-	release_resource(r);
 	return ret;
 }
 
