@@ -3014,6 +3014,7 @@ static int bond_slave_netdev_event(unsigned long event,
 		break;
 	case NETDEV_UP:
 	case NETDEV_CHANGE:
+	case NETDEV_CHANGELOWERSTATE:
 		bond_update_speed_duplex(slave);
 		if (BOND_MODE(bond) == BOND_MODE_8023AD)
 			bond_3ad_adapter_speed_duplex_changed(slave);
