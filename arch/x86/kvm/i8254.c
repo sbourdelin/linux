@@ -239,13 +239,7 @@ static void kvm_pit_ack_irq(struct kvm_irq_ack_notifier *kian)
 	int value;
 
 	spin_lock(&ps->inject_lock);
-	value = atomic_dec_return(&ps->pending);
-	if (value < 0)
-		/* spurious acks can be generated if, for example, the
-		 * PIC is being reset.  Handle it gracefully here
-		 */
-		atomic_inc(&ps->pending);
-	else if (value > 0)
+	if (atomic_add_unless(&ps->pending, -1, 0))
 		/* in this case, we had multiple outstanding pit interrupts
 		 * that we needed to inject.  Reinject
 		 */
