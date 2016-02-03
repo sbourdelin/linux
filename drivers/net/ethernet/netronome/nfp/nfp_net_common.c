@@ -1921,17 +1921,17 @@ static int nfp_net_change_mtu(struct net_device *netdev, int new_mtu)
 		return -EINVAL;
 	}
 
+	if (netif_running(netdev))
+		nfp_net_netdev_close(netdev);
+
 	netdev->mtu = new_mtu;
 
 	/* Freelist buffer size rounded up to the nearest 1K */
 	tmp = new_mtu + ETH_HLEN + VLAN_HLEN + NFP_NET_MAX_PREPEND;
 	nn->fl_bufsz = roundup(tmp, 1024);
 
-	/* restart if running */
-	if (netif_running(netdev)) {
-		nfp_net_netdev_close(netdev);
+	if (netif_running(netdev))
 		ret = nfp_net_netdev_open(netdev);
-	}
 
 	return ret;
 }
