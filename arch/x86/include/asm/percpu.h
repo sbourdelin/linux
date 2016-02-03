@@ -4,9 +4,15 @@
 #ifdef CONFIG_X86_64
 #define __percpu_seg		gs
 #define __percpu_mov_op		movq
+# ifdef __SEG_GS
+#  define __percpu_addrspace	__seg_gs
+# endif
 #else
 #define __percpu_seg		fs
 #define __percpu_mov_op		movl
+# ifdef __SEG_FS
+#  define __percpu_addrspace	__seg_fs
+# endif
 #endif
 
 #ifdef __ASSEMBLY__
@@ -46,6 +52,17 @@
 
 #ifdef CONFIG_SMP
 #define __percpu_prefix		"%%"__stringify(__percpu_seg)":"
+
+#ifdef __percpu_addrspace
+/* Produce an address-space lvalue for VAR.  */
+#define __percpu_as(VAR) \
+  (*(typeof(VAR) __kernel __force __percpu_addrspace *)(uintptr_t)&(VAR))
+
+/* We cannot allow __my_cpu_offset to recurse through this_cpu_read, as
+   this will change based on CONFIG_X86_64, with which games are played
+   in 32-bit compatibility files.  */
+#define __my_cpu_offset		(__percpu_as(this_cpu_off) + 0)
+#else
 #define __my_cpu_offset		this_cpu_read(this_cpu_off)
 
 /*
@@ -60,9 +77,11 @@
 		     : "m" (this_cpu_off), "0" (ptr));	\
 	(typeof(*(ptr)) __kernel __force *)tcp_ptr__;	\
 })
+#endif /* __percpu_addrspace */
 #else
 #define __percpu_prefix		""
-#endif
+#undef __percpu_addrspace
+#endif /* SMP */
 
 #define __percpu_arg(x)		__percpu_prefix "%" #x
 
@@ -86,7 +105,14 @@
  * don't give an lvalue though). */
 extern void __bad_percpu_size(void);
 
-#define percpu_to_op(op, var, val)			\
+#ifdef __percpu_addrspace
+#define percpu_to_op(op, cop, var, val)			\
+do {							\
+	typeof(var) pto_tmp__ = (val);			\
+	__percpu_as(var) cop pto_tmp__;			\
+} while (0)
+#else
+#define percpu_to_op(op, cop, var, val)			\
 do {							\
 	typedef typeof(var) pto_T__;			\
 	if (0) {					\
@@ -118,11 +144,15 @@ do {							\
 	default: __bad_percpu_size();			\
 	}						\
 } while (0)
+#endif /* __percpu_addrspace */
 
 /*
  * Generate a percpu add to memory instruction and optimize code
  * if one is added or subtracted.
  */
+#ifdef __percpu_addrspace
+#define percpu_add_op(var, val)  percpu_to_op("add", +=, var, val)
+#else
 #define percpu_add_op(var, val)						\
 do {									\
 	typedef typeof(var) pao_T__;					\
@@ -178,7 +208,9 @@ do {									\
 	default: __bad_percpu_size();					\
 	}								\
 } while (0)
+#endif /* __percpu_addrspace */
 
+/* ??? Note that percpu_from_op is only ever used with mov.  */
 #define percpu_from_op(op, var)				\
 ({							\
 	typeof(var) pfo_ret__;				\
@@ -237,35 +269,19 @@ do {									\
 	pfo_ret__;					\
 })
 
-#define percpu_unary_op(op, var)			\
-({							\
-	switch (sizeof(var)) {				\
-	case 1:						\
-		asm(op "b "__percpu_arg(0)		\
-		    : "+m" (var));			\
-		break;					\
-	case 2:						\
-		asm(op "w "__percpu_arg(0)		\
-		    : "+m" (var));			\
-		break;					\
-	case 4:						\
-		asm(op "l "__percpu_arg(0)		\
-		    : "+m" (var));			\
-		break;					\
-	case 8:						\
-		asm(op "q "__percpu_arg(0)		\
-		    : "+m" (var));			\
-		break;					\
-	default: __bad_percpu_size();			\
-	}						\
-})
-
 /*
  * Add return operation
  */
+#ifdef __percpu_addrspace
+#define percpu_add_return_op(var, val)			\
+({							\
+	typeof(var) pto_tmp__ = (val);			\
+	__percpu_as(var) += pto_tmp__;			\
+})
+#else
 #define percpu_add_return_op(var, val)					\
 ({									\
-	typeof(var) paro_ret__ = val;					\
+	typeof(var) paro_ret__ = (val);					\
 	switch (sizeof(var)) {						\
 	case 1:								\
 		asm("xaddb %0, "__percpu_arg(1)				\
@@ -292,6 +308,7 @@ do {									\
 	paro_ret__ += val;						\
 	paro_ret__;							\
 })
+#endif /* __percpu_addrspace */
 
 /*
  * xchg is implemented using cmpxchg without a lock prefix. xchg is
@@ -390,41 +407,47 @@ do {									\
  */
 #define this_cpu_read_stable(var)	percpu_stable_op("mov", var)
 
+#ifdef __percpu_addrspace
+#define raw_cpu_read_1(pcp)		({ __percpu_as(pcp); })
+#define raw_cpu_read_2(pcp)		({ __percpu_as(pcp); })
+#define raw_cpu_read_4(pcp)		({ __percpu_as(pcp); })
+#else
 #define raw_cpu_read_1(pcp)		percpu_from_op("mov", pcp)
 #define raw_cpu_read_2(pcp)		percpu_from_op("mov", pcp)
 #define raw_cpu_read_4(pcp)		percpu_from_op("mov", pcp)
+#endif
 
-#define raw_cpu_write_1(pcp, val)	percpu_to_op("mov", (pcp), val)
-#define raw_cpu_write_2(pcp, val)	percpu_to_op("mov", (pcp), val)
-#define raw_cpu_write_4(pcp, val)	percpu_to_op("mov", (pcp), val)
+#define raw_cpu_write_1(pcp, val)	percpu_to_op("mov", =, (pcp), val)
+#define raw_cpu_write_2(pcp, val)	percpu_to_op("mov", =, (pcp), val)
+#define raw_cpu_write_4(pcp, val)	percpu_to_op("mov", =, (pcp), val)
 #define raw_cpu_add_1(pcp, val)		percpu_add_op((pcp), val)
 #define raw_cpu_add_2(pcp, val)		percpu_add_op((pcp), val)
 #define raw_cpu_add_4(pcp, val)		percpu_add_op((pcp), val)
-#define raw_cpu_and_1(pcp, val)		percpu_to_op("and", (pcp), val)
-#define raw_cpu_and_2(pcp, val)		percpu_to_op("and", (pcp), val)
-#define raw_cpu_and_4(pcp, val)		percpu_to_op("and", (pcp), val)
-#define raw_cpu_or_1(pcp, val)		percpu_to_op("or", (pcp), val)
-#define raw_cpu_or_2(pcp, val)		percpu_to_op("or", (pcp), val)
-#define raw_cpu_or_4(pcp, val)		percpu_to_op("or", (pcp), val)
+#define raw_cpu_and_1(pcp, val)		percpu_to_op("and", &=, (pcp), val)
+#define raw_cpu_and_2(pcp, val)		percpu_to_op("and", &=, (pcp), val)
+#define raw_cpu_and_4(pcp, val)		percpu_to_op("and", &=, (pcp), val)
+#define raw_cpu_or_1(pcp, val)		percpu_to_op("or", |=, (pcp), val)
+#define raw_cpu_or_2(pcp, val)		percpu_to_op("or", |=, (pcp), val)
+#define raw_cpu_or_4(pcp, val)		percpu_to_op("or", |=, (pcp), val)
 #define raw_cpu_xchg_1(pcp, val)	percpu_xchg_op(pcp, val)
 #define raw_cpu_xchg_2(pcp, val)	percpu_xchg_op(pcp, val)
 #define raw_cpu_xchg_4(pcp, val)	percpu_xchg_op(pcp, val)
 
-#define this_cpu_read_1(pcp)		percpu_from_op("mov", pcp)
-#define this_cpu_read_2(pcp)		percpu_from_op("mov", pcp)
-#define this_cpu_read_4(pcp)		percpu_from_op("mov", pcp)
-#define this_cpu_write_1(pcp, val)	percpu_to_op("mov", (pcp), val)
-#define this_cpu_write_2(pcp, val)	percpu_to_op("mov", (pcp), val)
-#define this_cpu_write_4(pcp, val)	percpu_to_op("mov", (pcp), val)
-#define this_cpu_add_1(pcp, val)	percpu_add_op((pcp), val)
-#define this_cpu_add_2(pcp, val)	percpu_add_op((pcp), val)
-#define this_cpu_add_4(pcp, val)	percpu_add_op((pcp), val)
-#define this_cpu_and_1(pcp, val)	percpu_to_op("and", (pcp), val)
-#define this_cpu_and_2(pcp, val)	percpu_to_op("and", (pcp), val)
-#define this_cpu_and_4(pcp, val)	percpu_to_op("and", (pcp), val)
-#define this_cpu_or_1(pcp, val)		percpu_to_op("or", (pcp), val)
-#define this_cpu_or_2(pcp, val)		percpu_to_op("or", (pcp), val)
-#define this_cpu_or_4(pcp, val)		percpu_to_op("or", (pcp), val)
+#define this_cpu_read_1(pcp)		raw_cpu_read_1(pcp)
+#define this_cpu_read_2(pcp)		raw_cpu_read_2(pcp)
+#define this_cpu_read_4(pcp)		raw_cpu_read_4(pcp)
+#define this_cpu_write_1(pcp, val)	raw_cpu_write_1(pcp, val)
+#define this_cpu_write_2(pcp, val)	raw_cpu_write_2(pcp, val)
+#define this_cpu_write_4(pcp, val)	raw_cpu_write_4(pcp, val)
+#define this_cpu_add_1(pcp, val)	raw_cpu_add_1(pcp, val)
+#define this_cpu_add_2(pcp, val)	raw_cpu_add_2(pcp, val)
+#define this_cpu_add_4(pcp, val)	raw_cpu_add_4(pcp, val)
+#define this_cpu_and_1(pcp, val)	raw_cpu_and_1(pcp, val)
+#define this_cpu_and_2(pcp, val)	raw_cpu_and_2(pcp, val)
+#define this_cpu_and_4(pcp, val)	raw_cpu_and_4(pcp, val)
+#define this_cpu_or_1(pcp, val)		raw_cpu_or_1(pcp, val)
+#define this_cpu_or_2(pcp, val)		raw_cpu_or_2(pcp, val)
+#define this_cpu_or_4(pcp, val)		raw_cpu_or_4(pcp, val)
 #define this_cpu_xchg_1(pcp, nval)	percpu_xchg_op(pcp, nval)
 #define this_cpu_xchg_2(pcp, nval)	percpu_xchg_op(pcp, nval)
 #define this_cpu_xchg_4(pcp, nval)	percpu_xchg_op(pcp, nval)
@@ -464,20 +487,24 @@ do {									\
  * 32 bit must fall back to generic operations.
  */
 #ifdef CONFIG_X86_64
+#ifdef __percpu_addrspace
+#define raw_cpu_read_8(pcp)			({ __percpu_as(pcp); })
+#else
 #define raw_cpu_read_8(pcp)			percpu_from_op("mov", pcp)
-#define raw_cpu_write_8(pcp, val)		percpu_to_op("mov", (pcp), val)
-#define raw_cpu_add_8(pcp, val)			percpu_add_op((pcp), val)
-#define raw_cpu_and_8(pcp, val)			percpu_to_op("and", (pcp), val)
-#define raw_cpu_or_8(pcp, val)			percpu_to_op("or", (pcp), val)
+#endif
+#define raw_cpu_write_8(pcp, val)		percpu_to_op("mov", =, (pcp), val)
+#define raw_cpu_add_8(pcp, val)			percpu_add_op(pcp, val)
+#define raw_cpu_and_8(pcp, val)			percpu_to_op("and", &=, (pcp), val)
+#define raw_cpu_or_8(pcp, val)			percpu_to_op("or", |=, (pcp), val)
 #define raw_cpu_add_return_8(pcp, val)		percpu_add_return_op(pcp, val)
 #define raw_cpu_xchg_8(pcp, nval)		percpu_xchg_op(pcp, nval)
 #define raw_cpu_cmpxchg_8(pcp, oval, nval)	percpu_cmpxchg_op(pcp, oval, nval)
 
-#define this_cpu_read_8(pcp)			percpu_from_op("mov", pcp)
-#define this_cpu_write_8(pcp, val)		percpu_to_op("mov", (pcp), val)
-#define this_cpu_add_8(pcp, val)		percpu_add_op((pcp), val)
-#define this_cpu_and_8(pcp, val)		percpu_to_op("and", (pcp), val)
-#define this_cpu_or_8(pcp, val)			percpu_to_op("or", (pcp), val)
+#define this_cpu_read_8(pcp)			raw_cpu_read_8(pcp)
+#define this_cpu_write_8(pcp, val)		raw_cpu_write_8(pcp, val)
+#define this_cpu_add_8(pcp, val)		raw_cpu_add_8(pcp, val)
+#define this_cpu_and_8(pcp, val)		raw_cpu_and_8(pcp, val)
+#define this_cpu_or_8(pcp, val)			raw_cpu_or_8(pcp, val)
 #define this_cpu_add_return_8(pcp, val)		percpu_add_return_op(pcp, val)
 #define this_cpu_xchg_8(pcp, nval)		percpu_xchg_op(pcp, nval)
 #define this_cpu_cmpxchg_8(pcp, oval, nval)	percpu_cmpxchg_op(pcp, oval, nval)
