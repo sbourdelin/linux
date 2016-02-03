@@ -73,14 +73,6 @@ static struct usb_endpoint_descriptor eem_fs_out_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *eem_fs_function[] = {
-	/* CDC EEM control descriptors */
-	(struct usb_descriptor_header *) &eem_intf,
-	(struct usb_descriptor_header *) &eem_fs_in_desc,
-	(struct usb_descriptor_header *) &eem_fs_out_desc,
-	NULL,
-};
-
 /* high speed support: */
 
 static struct usb_endpoint_descriptor eem_hs_in_desc = {
@@ -99,14 +91,6 @@ static struct usb_endpoint_descriptor eem_hs_out_desc = {
 	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
-};
-
-static struct usb_descriptor_header *eem_hs_function[] = {
-	/* CDC EEM control descriptors */
-	(struct usb_descriptor_header *) &eem_intf,
-	(struct usb_descriptor_header *) &eem_hs_in_desc,
-	(struct usb_descriptor_header *) &eem_hs_out_desc,
-	NULL,
 };
 
 /* super speed support: */
@@ -138,15 +122,16 @@ static struct usb_ss_ep_comp_descriptor eem_ss_bulk_comp_desc = {
 	/* .bmAttributes =	0, */
 };
 
-static struct usb_descriptor_header *eem_ss_function[] = {
-	/* CDC EEM control descriptors */
-	(struct usb_descriptor_header *) &eem_intf,
-	(struct usb_descriptor_header *) &eem_ss_in_desc,
-	(struct usb_descriptor_header *) &eem_ss_bulk_comp_desc,
-	(struct usb_descriptor_header *) &eem_ss_out_desc,
-	(struct usb_descriptor_header *) &eem_ss_bulk_comp_desc,
-	NULL,
-};
+USB_COMPOSITE_ENDPOINT(ep_in, &eem_fs_in_desc, &eem_hs_in_desc,
+		&eem_ss_in_desc, &eem_ss_bulk_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_out, &eem_fs_out_desc, &eem_hs_out_desc,
+		&eem_ss_out_desc, &eem_ss_bulk_comp_desc);
+
+USB_COMPOSITE_ALTSETTING(intf0alt0, &eem_intf, &ep_in, &ep_out);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+
+USB_COMPOSITE_DESCRIPTORS(eem_descs, &intf0);
 
 /* string descriptors: */
 
@@ -190,65 +175,46 @@ static int eem_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct usb_composite_dev *cdev = f->config->cdev;
 	struct net_device	*net;
 
-	/* we know alt == 0, so this is an activation or a reset */
-	if (alt != 0)
-		goto fail;
+	eem->port.in_ep = usb_function_get_ep(f, intf, 0);
+	if (!eem->port.in_ep)
+		return -ENODEV;
 
-	if (intf == eem->ctrl_id) {
-		DBG(cdev, "reset eem\n");
-		gether_disconnect(&eem->port);
+	eem->port.out_ep = usb_function_get_ep(f, intf, 1);
+	if (!eem->port.out_ep)
+		return -ENODEV;
 
-		if (!eem->port.in_ep->desc || !eem->port.out_ep->desc) {
-			DBG(cdev, "init eem\n");
-			if (config_ep_by_speed(cdev->gadget, f,
-					       eem->port.in_ep) ||
-			    config_ep_by_speed(cdev->gadget, f,
-					       eem->port.out_ep)) {
-				eem->port.in_ep->desc = NULL;
-				eem->port.out_ep->desc = NULL;
-				goto fail;
-			}
-		}
-
-		/* zlps should not occur because zero-length EEM packets
-		 * will be inserted in those cases where they would occur
-		 */
-		eem->port.is_zlp_ok = 1;
-		eem->port.cdc_filter = DEFAULT_FILTER;
-		DBG(cdev, "activate eem\n");
-		net = gether_connect(&eem->port);
-		if (IS_ERR(net))
-			return PTR_ERR(net);
-	} else
-		goto fail;
+	/* zlps should not occur because zero-length EEM packets
+	 * will be inserted in those cases where they would occur
+	 */
+	eem->port.is_zlp_ok = 1;
+	eem->port.cdc_filter = DEFAULT_FILTER;
+	DBG(cdev, "activate eem\n");
+	net = gether_connect(&eem->port);
+	if (IS_ERR(net))
+		return PTR_ERR(net);
 
 	return 0;
-fail:
-	return -EINVAL;
 }
 
-static void eem_disable(struct usb_function *f)
+static void eem_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_eem		*eem = func_to_eem(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	DBG(cdev, "eem deactivated\n");
 
-	if (eem->port.in_ep->enabled)
-		gether_disconnect(&eem->port);
+	gether_disconnect(&eem->port);
 }
 
 /*-------------------------------------------------------------------------*/
 
 /* EEM function driver setup/binding */
 
-static int eem_bind(struct usb_configuration *c, struct usb_function *f)
+static int eem_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_eem		*eem = func_to_eem(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
 	struct usb_string	*us;
 	int			status;
-	struct usb_ep		*ep;
 
 	struct f_eem_opts	*eem_opts;
 
@@ -276,53 +242,7 @@ static int eem_bind(struct usb_configuration *c, struct usb_function *f)
 		return PTR_ERR(us);
 	eem_intf.iInterface = us[0].id;
 
-	/* allocate instance-specific interface IDs */
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	eem->ctrl_id = status;
-	eem_intf.bInterfaceNumber = status;
-
-	status = -ENODEV;
-
-	/* allocate instance-specific endpoints */
-	ep = usb_ep_autoconfig(cdev->gadget, &eem_fs_in_desc);
-	if (!ep)
-		goto fail;
-	eem->port.in_ep = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, &eem_fs_out_desc);
-	if (!ep)
-		goto fail;
-	eem->port.out_ep = ep;
-
-	status = -ENOMEM;
-
-	/* support all relevant hardware speeds... we expect that when
-	 * hardware is dual speed, all bulk-capable endpoints work at
-	 * both speeds
-	 */
-	eem_hs_in_desc.bEndpointAddress = eem_fs_in_desc.bEndpointAddress;
-	eem_hs_out_desc.bEndpointAddress = eem_fs_out_desc.bEndpointAddress;
-
-	eem_ss_in_desc.bEndpointAddress = eem_fs_in_desc.bEndpointAddress;
-	eem_ss_out_desc.bEndpointAddress = eem_fs_out_desc.bEndpointAddress;
-
-	status = usb_assign_descriptors(f, eem_fs_function, eem_hs_function,
-			eem_ss_function);
-	if (status)
-		goto fail;
-
-	DBG(cdev, "CDC Ethernet (EEM): %s speed IN/%s OUT/%s\n",
-			gadget_is_superspeed(c->cdev->gadget) ? "super" :
-			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
-			eem->port.in_ep->name, eem->port.out_ep->name);
-	return 0;
-
-fail:
-	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
-
-	return status;
+	return usb_function_set_descs(f, &eem_descs);
 }
 
 static void eem_cmd_complete(struct usb_ep *ep, struct usb_request *req)
@@ -604,13 +524,6 @@ static void eem_free(struct usb_function *f)
 	mutex_unlock(&opts->lock);
 }
 
-static void eem_unbind(struct usb_configuration *c, struct usb_function *f)
-{
-	DBG(c->cdev, "eem unbind\n");
-
-	usb_free_all_descriptors(f);
-}
-
 static struct usb_function *eem_alloc(struct usb_function_instance *fi)
 {
 	struct f_eem	*eem;
@@ -631,11 +544,10 @@ static struct usb_function *eem_alloc(struct usb_function_instance *fi)
 
 	eem->port.func.name = "cdc_eem";
 	/* descriptors are per-instance copies */
-	eem->port.func.bind = eem_bind;
-	eem->port.func.unbind = eem_unbind;
+	eem->port.func.prep_descs = eem_prep_descs;
 	eem->port.func.set_alt = eem_set_alt;
+	eem->port.func.clear_alt = eem_clear_alt;
 	eem->port.func.setup = eem_setup;
-	eem->port.func.disable = eem_disable;
 	eem->port.func.free_func = eem_free;
 	eem->port.wrap = eem_wrap;
 	eem->port.unwrap = eem_unwrap;
