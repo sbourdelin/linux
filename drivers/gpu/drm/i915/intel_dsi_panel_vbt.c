@@ -435,6 +435,7 @@ struct drm_panel *vbt_panel_init(struct intel_dsi *intel_dsi, u16 panel_id)
 	intel_dsi->bw_timer = mipi_config->dbi_bw_timer;
 	intel_dsi->video_frmt_cfg_bits =
 		mipi_config->bta_enabled ? DISABLE_VIDEO_BTA : 0;
+	intel_dsi->dsi_bpp = bits_per_pixel;
 
 	pclk = mode->clock;
 
