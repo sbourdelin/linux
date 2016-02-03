@@ -1524,6 +1524,7 @@ EXPORT_SYMBOL_GPL(_mwifiex_dbg);
 static int
 mwifiex_init_module(void)
 {
+	mwifiex_platform_drv_init();
 #ifdef CONFIG_DEBUG_FS
 	mwifiex_debugfs_init();
 #endif
@@ -1538,6 +1539,7 @@ mwifiex_init_module(void)
 static void
 mwifiex_cleanup_module(void)
 {
+	mwifiex_platform_drv_exit();
 #ifdef CONFIG_DEBUG_FS
 	mwifiex_debugfs_remove();
 #endif

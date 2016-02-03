@@ -2131,11 +2131,10 @@ int mwifiex_sta_init_cmd(struct mwifiex_private *priv, u8 first_sta, bool init)
 		 * The cal-data can be read from device tree and/or
 		 * a configuration file and downloaded to firmware.
 		 */
-		adapter->dt_node =
-				of_find_node_by_name(NULL, "marvell_cfgdata");
+		adapter->dt_node = mwifiex_plt_dev->dev.of_node;
 		if (adapter->dt_node) {
 			ret = mwifiex_dnld_dt_cfgdata(priv, adapter->dt_node,
-						      "marvell,caldata");
+						      "mwifiex,caldata");
 			if (ret)
 				return -1;
 		}

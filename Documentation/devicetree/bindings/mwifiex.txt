@@ -1,0 +1,29 @@
+mwifiex
+------
+
+Required properties:
+
+  - name : must be "mwifiex"
+  - compatible : must be "marvell,mwifiex"
+
+Optional properties:
+
+  - mwifiex,caldata* : A series of properties with marvell,caldata prefix,
+  		      represent Calibration data downloaded to the device during
+		      initialization. This is an array of unsigned values.
+
+
+Example:
+
+Tx power limit calibration data is configured in below example.
+The calibration data is an array of unsigned values, the length
+can vary between hw versions.
+
+mwifiex {
+	compatible = "marvell,mwifiex";
+
+	mwifiex,caldata_00_txpwrlimit_2g_cfg_set = /bits/ 8 <
+0x01 0x00 0x06 0x00 0x08 0x02 0x89 0x01 ...>;
+
+};
+
