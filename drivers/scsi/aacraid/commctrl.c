@@ -857,6 +857,9 @@ int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 
 	mutex_lock(&dev->ioctl_mutex);
 
+	if (dev->adapter_shutdown)
+		return -EACCES;
+
 	/*
 	 *	HBA gets first crack
 	 */

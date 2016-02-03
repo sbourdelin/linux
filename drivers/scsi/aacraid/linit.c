@@ -703,7 +703,7 @@ static int aac_cfg_open(struct inode *inode, struct file *file)
 static long aac_cfg_ioctl(struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
-	if (!capable(CAP_SYS_RAWIO) || aac->adapter_shutdown)
+	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 	return aac_do_ioctl(file->private_data, cmd, (void __user *)arg);
 }
@@ -1069,6 +1069,8 @@ static void __aac_shutdown(struct aac_dev * aac)
 	int i;
 	int cpu;
 
+	aac_send_shutdown(aac);
+
 	if (aac->aif_thread) {
 		int i;
 		/* Clear out events first */
@@ -1080,7 +1082,6 @@ static void __aac_shutdown(struct aac_dev * aac)
 		}
 		kthread_stop(aac->thread);
 	}
-	aac_send_shutdown(aac);
 	aac_adapter_disable_int(aac);
 	cpu = cpumask_first(cpu_online_mask);
 	if (aac->pdev->device == PMC_DEVICE_S6 ||
