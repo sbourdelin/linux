@@ -373,6 +373,9 @@ static int zero_bind(struct usb_composite_dev *cdev)
 	status = usb_add_function(&sourcesink_driver, func_ss);
 	if (status)
 		goto err_free_otg_desc;
+	status = usb_config_do_bind(&sourcesink_driver);
+	if (status)
+		goto err_free_otg_desc;
 
 	usb_ep_autoconfig_reset(cdev->gadget);
 	status = usb_add_function(&loopback_driver, func_lb);
