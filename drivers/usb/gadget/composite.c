@@ -246,12 +246,12 @@ done:
 }
 EXPORT_SYMBOL_GPL(usb_add_function);
 
+static void disable_function(struct usb_function *f);
+
 void usb_remove_function(struct usb_configuration *c, struct usb_function *f)
 {
-	if (f->disable)
-		f->disable(f);
+	disable_function(f);
 
-	bitmap_zero(f->endpoints, 32);
 	list_del(&f->list);
 	if (f->unbind)
 		f->unbind(c, f);
@@ -942,6 +942,46 @@ static void device_qual(struct usb_composite_dev *cdev)
 
 /*-------------------------------------------------------------------------*/
 
+/**
+ * disable_interface - disable all endpoints in given interface
+ * @f: USB function
+ * @i: interface index in function
+ */
+static void disable_interface(struct usb_function *f, unsigned i)
+{
+	struct usb_composite_intf *intf;
+	struct usb_composite_altset *alt;
+	int e;
+
+	intf = f->descs->intfs[i];
+	if (intf->cur_altset < 0)
+		return;
+
+	alt = intf->altsets[intf->cur_altset];
+	for (e = 0; e < alt->eps_num; ++e)
+		usb_ep_disable(alt->eps[e]->ep);
+
+	intf->cur_altset = -1;
+}
+
+/**
+ * disable_function - disable all endpoints in given function
+ * @f: USB function
+ */
+static void disable_function(struct usb_function *f)
+{
+	int i;
+
+	if (usb_function_is_new_api(f))
+		for (i = 0; i < f->descs->intfs_num; ++i)
+			disable_interface(f, i);
+
+	if (f->disable)
+		f->disable(f);
+
+	bitmap_zero(f->endpoints, 32);
+}
+
 static void reset_config(struct usb_composite_dev *cdev)
 {
 	struct usb_function		*f;
@@ -949,10 +989,7 @@ static void reset_config(struct usb_composite_dev *cdev)
 	DBG(cdev, "reset config\n");
 
 	list_for_each_entry(f, &cdev->config->functions, list) {
-		if (f->disable)
-			f->disable(f);
-
-		bitmap_zero(f->endpoints, 32);
+		disable_function(f);
 	}
 	cdev->config = NULL;
 	cdev->delayed_status = 0;
