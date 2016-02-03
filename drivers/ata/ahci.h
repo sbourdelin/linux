@@ -252,6 +252,10 @@ enum {
 #endif
 	AHCI_HFLAG_WAKE_BEFORE_STOP	= (1 << 22), /* wake before DMA stop */
 
+	AHCI_HFLAG_CAVIUM_ERRATA_22536	= (1 << 23), /* Thunder HOST_IRQ_STAT
+						      *	is not Level or EDGE
+						      */
+
 	/* ap->flags bits */
 
 	AHCI_FLAG_COMMON		= ATA_FLAG_SATA | ATA_FLAG_PIO_DMA |

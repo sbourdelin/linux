@@ -1952,6 +1952,55 @@ static irqreturn_t ahci_single_level_irq_intr(int irq, void *dev_instance)
 	return IRQ_RETVAL(rc);
 }
 
+
+static irqreturn_t ahci_level_irq_with_errata(int irq, void *dev_instance)
+{
+	struct ata_host *host = dev_instance;
+	struct ahci_host_priv *hpriv;
+	unsigned int rc = 0;
+	void __iomem *mmio;
+	u32 irq_stat, irq_masked;
+	unsigned int handled = 1;
+
+	VPRINTK("ENTER\n");
+
+	hpriv = host->private_data;
+	mmio = hpriv->mmio;
+
+	/* sigh.  0xffffffff is a valid return from h/w */
+	irq_stat = readl(mmio + HOST_IRQ_STAT);
+	if (!irq_stat)
+		return IRQ_NONE;
+redo:
+
+	irq_masked = irq_stat & hpriv->port_map;
+
+	spin_lock(&host->lock);
+
+	rc = ahci_handle_port_intr(host, irq_masked);
+
+	if (!rc)
+		handled = 0;
+
+	writel(irq_stat, mmio + HOST_IRQ_STAT);
+
+	/* Due to ERRATA#22536, ThunderX need to handle
+	 * HOST_IRQ_STAT differently.
+	 * Work around is to make sure all pending IRQs
+	 * are served before leaving handler
+	 */
+	irq_stat = readl(mmio + HOST_IRQ_STAT);
+
+	spin_unlock(&host->lock);
+
+	if (irq_stat)
+		goto redo;
+
+	VPRINTK("EXIT\n");
+
+	return IRQ_RETVAL(handled);
+}
+
 unsigned int ahci_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
@@ -2540,6 +2589,9 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
 	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
 		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
 				       IRQF_SHARED, sht);
+	else if (hpriv->flags & AHCI_HFLAG_CAVIUM_ERRATA_22536)
+		rc = ata_host_activate(host, irq, ahci_level_irq_with_errata,
+					IRQF_SHARED, sht);
 	else
 		rc = ata_host_activate(host, irq, ahci_single_level_irq_intr,
 				       IRQF_SHARED, sht);
