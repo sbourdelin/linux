@@ -650,6 +650,26 @@ static void usb_function_free_vendor_descs(struct usb_function *f)
 }
 
 /**
+ * usb_interface_id_to_index - if interface with a specified id belongs
+ *	to given USB function, return its index within descriptors array
+ *	of this function
+ * @f: USB function
+ * @id: id number of interface
+ *
+ * Returns interface index on success, else negative errno.
+ */
+static int usb_interface_id_to_index(struct usb_function *f, u8 id)
+{
+	int i;
+
+	for (i = 0; i < f->descs->intfs_num; ++i)
+		if (f->descs->intfs[i]->id == id)
+			return i;
+
+	return -EINVAL;
+}
+
+/**
  * usb_interface_id() - allocate an unused interface ID
  * @config: configuration associated with the interface
  * @function: function handling the interface
@@ -995,6 +1015,65 @@ static void reset_config(struct usb_composite_dev *cdev)
 	cdev->delayed_status = 0;
 }
 
+/**
+ * set_alt() - select specified altsetting in given interface
+ * @f: USB function
+ * @i: interface id number
+ * @a: altsetting number
+ *
+ * This function has different behavior depending on which API is used by
+ * given USB function. For functions using old API behavior stays unchanged,
+ * while for functions using new API index of interface in function is
+ * calculated and endpoints are configured and enabled before calling
+ * set_alt() callback.
+ */
+static int set_alt(struct usb_function *f, unsigned i, unsigned a)
+{
+	struct usb_composite_dev *cdev = f->config->cdev;
+	struct usb_composite_altset *alt;
+	struct usb_composite_ep *ep;
+	int e, ret = -EINVAL;
+
+	/* To be removed after switch to new API */
+	if (!usb_function_is_new_api(f))
+		return f->set_alt(f, i, a);
+
+	i = usb_interface_id_to_index(f, i);
+	if (i < 0)
+		return i;
+
+	disable_interface(f, i);
+
+	if (a >= f->descs->intfs[i]->altsets_num)
+		return -EINVAL;
+
+	alt = f->descs->intfs[i]->altsets[a];
+	for (e = 0; e < alt->eps_num; ++e) {
+		ep = alt->eps[e];
+		ret = config_ep_by_speed(cdev->gadget, f, ep->ep);
+		if (ret)
+			goto err;
+		ret = usb_ep_enable(ep->ep);
+		if (ret)
+			goto err;
+	}
+
+	f->descs->intfs[i]->cur_altset = a;
+	ret = f->set_alt(f, i, a);
+	if (ret == USB_GADGET_DELAYED_STATUS)
+		goto out;
+	if (ret < 0)
+		goto err;
+
+	return 0;
+err:
+	for (e = 0; e < alt->eps_num; ++e)
+		usb_ep_disable(alt->eps[e]->ep);
+	f->descs->intfs[i]->cur_altset = -1;
+out:
+	return ret;
+}
+
 static int set_config(struct usb_composite_dev *cdev,
 		const struct usb_ctrlrequest *ctrl, unsigned number)
 {
@@ -1074,7 +1153,7 @@ static int set_config(struct usb_composite_dev *cdev,
 			set_bit(addr, f->endpoints);
 		}
 
-		result = f->set_alt(f, tmp, 0);
+		result = set_alt(f, tmp, 0);
 		if (result < 0) {
 			DBG(cdev, "interface %d (%s/%p) alt 0 --> %d\n",
 					tmp, f->name, f, result);
@@ -1975,7 +2054,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			break;
 		if (w_value && !f->set_alt)
 			break;
-		value = f->set_alt(f, w_index, w_value);
+		value = set_alt(f, w_index, w_value);
 		if (value == USB_GADGET_DELAYED_STATUS) {
 			DBG(cdev,
 			 "%s: interface %d (%s) requested delayed status\n",
