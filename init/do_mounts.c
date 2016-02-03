@@ -505,7 +505,9 @@ void __init change_floppy(char *fmt, ...)
 		termios.c_lflag |= ICANON;
 		sys_ioctl(fd, TCSETSF, (long)&termios);
 		sys_close(fd);
-	}
+	} else
+		pr_err("Warning: unable to open /dev/console.\n");
+
 }
 #endif
 
