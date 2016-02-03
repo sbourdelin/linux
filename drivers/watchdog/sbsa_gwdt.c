@@ -16,18 +16,22 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * This SBSA Generic watchdog driver is a single stage timeout version.
+ * This SBSA Generic watchdog driver is a two stages version.
  * Since this watchdog timer has two stages, and each stage is determined
  * by WOR. So the timeout is (WOR * 2).
- * When first timeout is reached, WS0 is triggered, the interrupt
- * triggered by WS0 will be ignored, then the second watch period starts;
- * when second timeout is reached, then WS1 is triggered, system reset.
+ * When the first stage(the half timeout) is reached, WS0 interrupt is
+ * triggered, at this moment the second watch period starts;
+ * In the WS0 interrupt routine, panic will be triggered for saving the
+ * system context.
+ * If the system is getting into trouble and cannot be reset by panic or
+ * restart properly by the kdump kernel(if supported), then the second
+ * stage (the timeout) will be reached, system will be reset by WS1.
  *
  * More details about the hardware specification of this device:
  * ARM DEN0029B - Server Base System Architecture (SBSA)
  *
  * SBSA GWDT: |--------WOR-------WS0--------WOR-------WS1
- *            |----------------timeout----------------reset
+ *            |--half_timeout--(panic)--half_timeout--reset
  *
  */
 
@@ -83,6 +87,13 @@ module_param(timeout, uint, 0);
 MODULE_PARM_DESC(timeout,
 		 "Watchdog timeout in seconds. (>=0, default="
 		 __MODULE_STRING(DEFAULT_TIMEOUT) ")");
+
+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+static bool panic_enabled = true;
+module_param(panic_enabled, bool, 0);
+MODULE_PARM_DESC(panic_enabled,
+		 "enable panic at half timeout. (default=true)");
+#endif
 
 static bool nowayout = WATCHDOG_NOWAYOUT;
 module_param(nowayout, bool, S_IRUGO);
@@ -159,6 +170,16 @@ static int sbsa_gwdt_stop(struct watchdog_device *wdd)
 	return 0;
 }
 
+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+static irqreturn_t sbsa_gwdt_interrupt(int irq, void *dev_id)
+{
+	if (panic_enabled)
+		panic("SBSA Watchdog half timeout");
+
+	return IRQ_HANDLED;
+}
+#endif
+
 static struct watchdog_info sbsa_gwdt_info = {
 	.identity	= "SBSA Generic Watchdog",
 	.options	= WDIOF_SETTIMEOUT |
@@ -186,6 +207,9 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 	struct resource *res;
 	u32 status;
 	int ret;
+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+	int irq;
+#endif
 
 	gwdt = devm_kzalloc(dev, sizeof(*gwdt), GFP_KERNEL);
 	if (!gwdt)
@@ -201,6 +225,14 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 	rf_base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(rf_base))
 		return PTR_ERR(rf_base);
+
+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		dev_err(dev, "unable to get ws0 interrupt.\n");
+		return irq;
+	}
+#endif
 
 	/*
 	 * Get the frequency of system counter from the cp15 interface of ARM
@@ -228,6 +260,14 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 		dev_warn(dev, "System reset by WDT.\n");
 		wdd->bootstatus |= WDIOF_CARDRESET;
 	}
+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+	ret = devm_request_irq(dev, irq, sbsa_gwdt_interrupt, 0,
+			       pdev->name, gwdt);
+	if (ret) {
+		dev_err(dev, "unable to request IRQ %d\n", irq);
+		return ret;
+	}
+#endif
 
 	ret = watchdog_register_device(wdd);
 	if (ret)
@@ -242,6 +282,10 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 
 	dev_info(dev, "Initialized with %ds timeout @ %u Hz%s\n", wdd->timeout,
 		 gwdt->clk, status & SBSA_GWDT_WCS_EN ? " [enabled]" : "");
+#ifdef CONFIG_ARM_SBSA_WATCHDOG_PANIC
+	dev_info(dev, "Half timeout panic %s.\n",
+		 panic_enabled ? "enabled" : "disabled");
+#endif
 
 	return 0;
 }

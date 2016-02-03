@@ -218,6 +218,16 @@ config ARM_SBSA_WATCHDOG
 	  To compile this driver as module, choose M here: The module
 	  will be called sbsa_gwdt.
 
+config ARM_SBSA_WATCHDOG_PANIC
+	bool "ARM SBSA Generic Watchdog triggers panic at the half timeout"
+	depends on ARM_SBSA_WATCHDOG
+	help
+	  ARM SBSA Generic Watchdog will trigger panic in the first signal
+	  (WS0) interrupt routine when the half timeout is reached.
+	  This function can help administrator to backup the system context
+	  info by panic console output or kdump (if supported).
+	  But user can skip panic by setting moduleparam panic_enabled as 0.
+
 config ASM9260_WATCHDOG
 	tristate "Alphascale ASM9260 watchdog"
 	depends on MACH_ASM9260

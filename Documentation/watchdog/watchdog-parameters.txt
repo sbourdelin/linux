@@ -286,6 +286,7 @@ nowayout: Watchdog cannot be stopped once started
 -------------------------------------------------
 sbsa_gwdt:
 timeout: Watchdog timeout in seconds. (default 20s)
+panic_enabled: Enable panic at half timeout. (default=true)
 nowayout: Watchdog cannot be stopped once started
 	(default=kernel config parameter)
 -------------------------------------------------
