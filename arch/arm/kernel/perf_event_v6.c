@@ -481,7 +481,7 @@ static void armv6mpcore_pmu_disable_event(struct perf_event *event)
 static int armv6_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv6_perf_map,
-				&armv6_perf_cache_map, 0xFF);
+				&armv6_perf_cache_map);
 }
 
 static void armv6pmu_init(struct arm_pmu *cpu_pmu)
@@ -494,6 +494,7 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
 	cpu_pmu->get_event_idx	= armv6pmu_get_event_idx;
 	cpu_pmu->start		= armv6pmu_start;
 	cpu_pmu->stop		= armv6pmu_stop;
+	cpu_pmu->event_mask	= 0xFF;
 	cpu_pmu->map_event	= armv6_map_event;
 	cpu_pmu->num_events	= 3;
 	cpu_pmu->max_period	= (1LLU << 32) - 1;
@@ -531,7 +532,7 @@ static int armv6_1176_pmu_init(struct arm_pmu *cpu_pmu)
 static int armv6mpcore_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv6mpcore_perf_map,
-				&armv6mpcore_perf_cache_map, 0xFF);
+				&armv6mpcore_perf_cache_map);
 }
 
 static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
@@ -545,6 +546,7 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
 	cpu_pmu->get_event_idx	= armv6pmu_get_event_idx;
 	cpu_pmu->start		= armv6pmu_start;
 	cpu_pmu->stop		= armv6pmu_stop;
+	cpu_pmu->event_mask	= 0xFF;
 	cpu_pmu->map_event	= armv6mpcore_map_event;
 	cpu_pmu->num_events	= 3;
 	cpu_pmu->max_period	= (1LLU << 32) - 1;

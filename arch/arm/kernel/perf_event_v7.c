@@ -1042,7 +1042,7 @@ static int armv7pmu_get_event_idx(struct pmu_hw_events *cpuc,
 	int idx;
 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
-	unsigned long evtype = hwc->config_base & ARMV7_EVTYPE_EVENT;
+	unsigned long evtype = hwc->config_base & cpu_pmu->event_mask;
 
 	/* Always place a cycle counter into the cycle counter. */
 	if (evtype == ARMV7_PERFCTR_CPU_CYCLES) {
@@ -1109,55 +1109,55 @@ static void armv7pmu_reset(void *info)
 static int armv7_a8_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv7_a8_perf_map,
-				&armv7_a8_perf_cache_map, 0xFF);
+				&armv7_a8_perf_cache_map);
 }
 
 static int armv7_a9_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv7_a9_perf_map,
-				&armv7_a9_perf_cache_map, 0xFF);
+				&armv7_a9_perf_cache_map);
 }
 
 static int armv7_a5_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv7_a5_perf_map,
-				&armv7_a5_perf_cache_map, 0xFF);
+				&armv7_a5_perf_cache_map);
 }
 
 static int armv7_a15_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv7_a15_perf_map,
-				&armv7_a15_perf_cache_map, 0xFF);
+				&armv7_a15_perf_cache_map);
 }
 
 static int armv7_a7_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv7_a7_perf_map,
-				&armv7_a7_perf_cache_map, 0xFF);
+				&armv7_a7_perf_cache_map);
 }
 
 static int armv7_a12_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &armv7_a12_perf_map,
-				&armv7_a12_perf_cache_map, 0xFF);
+				&armv7_a12_perf_cache_map);
 }
 
 static int krait_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &krait_perf_map,
-				&krait_perf_cache_map, 0xFFFFF);
+				&krait_perf_cache_map);
 }
 
 static int krait_map_event_no_branch(struct perf_event *event)
 {
 	return armpmu_map_event(event, &krait_perf_map_no_branch,
-				&krait_perf_cache_map, 0xFFFFF);
+				&krait_perf_cache_map);
 }
 
 static int scorpion_map_event(struct perf_event *event)
 {
 	return armpmu_map_event(event, &scorpion_perf_map,
-				&scorpion_perf_cache_map, 0xFFFFF);
+				&scorpion_perf_cache_map);
 }
 
 static void armv7pmu_init(struct arm_pmu *cpu_pmu)
@@ -1196,6 +1196,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_cortex_a8";
+	cpu_pmu->event_mask	= ARMV7_EVTYPE_EVENT;
 	cpu_pmu->map_event	= armv7_a8_map_event;
 	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
 	return armv7_probe_num_events(cpu_pmu);
@@ -1205,6 +1206,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_cortex_a9";
+	cpu_pmu->event_mask	= ARMV7_EVTYPE_EVENT;
 	cpu_pmu->map_event	= armv7_a9_map_event;
 	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
 	return armv7_probe_num_events(cpu_pmu);
@@ -1214,6 +1216,7 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_cortex_a5";
+	cpu_pmu->event_mask	= ARMV7_EVTYPE_EVENT;
 	cpu_pmu->map_event	= armv7_a5_map_event;
 	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
 	return armv7_probe_num_events(cpu_pmu);
@@ -1223,6 +1226,7 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_cortex_a15";
+	cpu_pmu->event_mask	= ARMV7_EVTYPE_EVENT;
 	cpu_pmu->map_event	= armv7_a15_map_event;
 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
 	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
@@ -1233,6 +1237,7 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_cortex_a7";
+	cpu_pmu->event_mask	= ARMV7_EVTYPE_EVENT;
 	cpu_pmu->map_event	= armv7_a7_map_event;
 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
 	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
@@ -1243,6 +1248,7 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_cortex_a12";
+	cpu_pmu->event_mask	= ARMV7_EVTYPE_EVENT;
 	cpu_pmu->map_event	= armv7_a12_map_event;
 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
 	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
@@ -1628,6 +1634,7 @@ static int krait_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_krait";
+	cpu_pmu->event_mask	= 0xFFFFF;
 	/* Some early versions of Krait don't support PC write events */
 	if (of_property_read_bool(cpu_pmu->plat_device->dev.of_node,
 				  "qcom,no-pc-write"))
@@ -1957,6 +1964,7 @@ static int scorpion_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_scorpion";
+	cpu_pmu->event_mask	= 0xFFFFF;
 	cpu_pmu->map_event	= scorpion_map_event;
 	cpu_pmu->reset		= scorpion_pmu_reset;
 	cpu_pmu->enable		= scorpion_pmu_enable_event;
@@ -1970,6 +1978,7 @@ static int scorpion_mp_pmu_init(struct arm_pmu *cpu_pmu)
 {
 	armv7pmu_init(cpu_pmu);
 	cpu_pmu->name		= "armv7_scorpion_mp";
+	cpu_pmu->event_mask	= 0xFFFFF;
 	cpu_pmu->map_event	= scorpion_map_event;
 	cpu_pmu->reset		= scorpion_pmu_reset;
 	cpu_pmu->enable		= scorpion_pmu_enable_event;
