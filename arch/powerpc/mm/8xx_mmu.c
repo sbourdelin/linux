@@ -181,3 +181,10 @@ void set_context(unsigned long id, pgd_t *pgd)
 	/* sync */
 	mb();
 }
+
+void flush_instruction_cache(void)
+{
+	isync();
+	mtspr(SPRN_IC_CST, IDC_INVALL);
+	isync();
+}
