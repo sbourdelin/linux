@@ -12,20 +12,10 @@ Date:		Dec 2014
 KernelVersion:	3.20
 Description:	Control descriptors
 
-What:		/config/usb-gadget/gadget/functions/uvc.name/control/class
-Date:		Dec 2014
-KernelVersion:	3.20
-Description:	Class descriptors
-
-What:		/config/usb-gadget/gadget/functions/uvc.name/control/class/ss
-Date:		Dec 2014
-KernelVersion:	3.20
-Description:	Super speed control class descriptors
-
-What:		/config/usb-gadget/gadget/functions/uvc.name/control/class/fs
-Date:		Dec 2014
-KernelVersion:	3.20
-Description:	Full speed control class descriptors
+What:		/config/usb-gadget/gadget/functions/uvc.name/control/desc
+Date:		Jan 2015
+KernelVersion:	4.4
+Description:	Control class descriptors
 
 What:		/config/usb-gadget/gadget/functions/uvc.name/control/terminal
 Date:		Dec 2014
@@ -109,25 +99,10 @@ Date:		Dec 2014
 KernelVersion:	3.20
 Description:	Streaming descriptors
 
-What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/class
-Date:		Dec 2014
-KernelVersion:	3.20
+What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/desc
+Date:		Jan 2015
+KernelVersion:	4,4
 Description:	Streaming class descriptors
-
-What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/class/ss
-Date:		Dec 2014
-KernelVersion:	3.20
-Description:	Super speed streaming class descriptors
-
-What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/class/hs
-Date:		Dec 2014
-KernelVersion:	3.20
-Description:	High speed streaming class descriptors
-
-What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/class/fs
-Date:		Dec 2014
-KernelVersion:	3.20
-Description:	Full speed streaming class descriptors
 
 What:		/config/usb-gadget/gadget/functions/uvc.name/streaming/color_matching
 Date:		Dec 2014

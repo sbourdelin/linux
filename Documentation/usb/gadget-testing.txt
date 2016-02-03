@@ -674,11 +674,8 @@ There are also "control" and "streaming" subdirectories, each of which contain
 a number of their subdirectories. There are some sane defaults provided, but
 the user must provide the following:
 
-	control header - create in control/header, link from control/class/fs
-			and/or control/class/ss
-	streaming header - create in streaming/header, link from
-			streaming/class/fs and/or streaming/class/hs and/or
-			streaming/class/ss
+	control header - create in control/header, link from control/desc
+	streaming header - create in streaming/header, link from streaming/desc
 	format description - create in streaming/mjpeg and/or
 			streaming/uncompressed
 	frame description - create in streaming/mjpeg/<format> and/or in
@@ -690,8 +687,7 @@ in each line. The rules stated above are best illustrated with an example:
 
 # mkdir functions/uvc.usb0/control/header/h
 # cd functions/uvc.usb0/control/header/h
-# ln -s header/h class/fs
-# ln -s header/h class/ss
+# ln -s header/h desc
 # mkdir -p functions/uvc.usb0/streaming/uncompressed/u/360p
 # cat <<EOF > functions/uvc.usb0/streaming/uncompressed/u/360p/dwFrameInterval
 666666
@@ -702,12 +698,8 @@ EOF
 # mkdir functions/uvc.usb0/streaming/header/h
 # cd functions/uvc.usb0/streaming/header/h
 # ln -s ../../uncompressed/u
-# cd ../../class/fs
-# ln -s ../../header/h
-# cd ../../class/hs
-# ln -s ../../header/h
-# cd ../../class/ss
-# ln -s ../../header/h
+# cd ../../desc
+# ln -s ../header/h
 
 
 Testing the UVC function
