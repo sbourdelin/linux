@@ -194,6 +194,56 @@ static int apply_r_mips_pc16_rel(struct module *me, u32 *location, Elf_Addr v)
 	return 0;
 }
 
+static int apply_r_mips_pc21_rel(struct module *me, u32 *location, Elf_Addr v)
+{
+	long offset;
+
+	if (v % 4) {
+		pr_err("module %s: dangerous R_MIPS_PC21 REL relocation\n",
+		       me->name);
+		return -ENOEXEC;
+	}
+
+	/* retrieve & sign extend implicit addend */
+	offset = *location & 0x1fffff;
+	offset |= (offset & BIT(20)) ? (~0l & ~0x1fffffl) : 0;
+
+	offset += ((long)v - (long)location) >> 2;
+	if ((offset >> 20) > 0 || (offset >> 20) < -1) {
+		pr_err("module %s: relocation overflow\n", me->name);
+		return -ENOEXEC;
+	}
+
+	*location = (*location & ~0x001fffff) | (offset & 0x001fffff);
+
+	return 0;
+}
+
+static int apply_r_mips_pc26_rel(struct module *me, u32 *location, Elf_Addr v)
+{
+	long offset;
+
+	if (v % 4) {
+		pr_err("module %s: dangerous R_MIPS_PC26 REL relocation\n",
+		       me->name);
+		return -ENOEXEC;
+	}
+
+	/* retrieve & sign extend implicit addend */
+	offset = *location & 0x3ffffff;
+	offset |= (offset & BIT(25)) ? (~0l & ~0x3ffffffl) : 0;
+
+	offset += ((long)v - (long)location) >> 2;
+	if ((offset >> 25) > 0 || (offset >> 25) < -1) {
+		pr_err("module %s: relocation overflow\n", me->name);
+		return -ENOEXEC;
+	}
+
+	*location = (*location & ~0x03ffffff) | (offset & 0x03ffffff);
+
+	return 0;
+}
+
 static int (*reloc_handlers_rel[]) (struct module *me, u32 *location,
 				Elf_Addr v) = {
 	[R_MIPS_NONE]		= apply_r_mips_none,
@@ -202,6 +252,8 @@ static int (*reloc_handlers_rel[]) (struct module *me, u32 *location,
 	[R_MIPS_HI16]		= apply_r_mips_hi16_rel,
 	[R_MIPS_LO16]		= apply_r_mips_lo16_rel,
 	[R_MIPS_PC16]		= apply_r_mips_pc16_rel,
+	[R_MIPS_PC21_S2]	= apply_r_mips_pc21_rel,
+	[R_MIPS_PC26_S2]	= apply_r_mips_pc26_rel,
 };
 
 int apply_relocate(Elf_Shdr *sechdrs, const char *strtab,
