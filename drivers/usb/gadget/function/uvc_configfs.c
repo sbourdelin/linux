@@ -2245,7 +2245,7 @@ end:									\
 	return ret;							\
 }									\
 									\
-UVC_ATTR(f_uvc_opts_, cname, aname)
+UVC_ATTR(f_uvc_opts_, cname, cname)
 
 #define identity_conv(x) (x)
 
