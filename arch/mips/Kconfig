@@ -2848,11 +2848,14 @@ config HW_HAS_EISA
 	bool
 config HW_HAS_PCI
 	bool
+config MIPS_GENERIC_PCI
+	bool
 
 config PCI
 	bool "Support for PCI controller"
 	depends on HW_HAS_PCI
 	select PCI_DOMAINS
+	select PCI_DOMAINS_GENERIC if MIPS_GENERIC_PCI
 	select NO_GENERIC_PCI_IOPORT_MAP
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
@@ -2872,6 +2875,9 @@ config HT_PCI
 	  linked at HT. Choose Y for Loongson-3 based machines.
 
 config PCI_DOMAINS
+	bool
+
+config PCI_DOMAINS_GENERIC
 	bool
 
 source "drivers/pci/Kconfig"
