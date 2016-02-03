@@ -514,7 +514,8 @@ static int btmrvl_check_device_tree(struct btmrvl_private *priv)
 	int ret;
 	u32 val;
 
-	for_each_compatible_node(dt_node, NULL, "btmrvl,cfgdata") {
+	dt_node = btmrvl_plt_dev->dev.of_node;
+	if (dt_node) {
 		ret = of_property_read_u32(dt_node, "btmrvl,gpio-gap", &val);
 		if (!ret)
 			priv->btmrvl_dev.gpio_gap = val;
@@ -733,6 +734,8 @@ struct btmrvl_private *btmrvl_add_card(void *card)
 		goto err_adapter;
 	}
 
+	btmrvl_platform_drv_init();
+
 	btmrvl_init_adapter(priv);
 
 	BT_DBG("Starting kthread...");
@@ -775,6 +778,8 @@ int btmrvl_remove_card(struct btmrvl_private *priv)
 #ifdef CONFIG_DEBUG_FS
 	btmrvl_debugfs_remove(hdev);
 #endif
+
+	btmrvl_platform_drv_exit();
 
 	hci_unregister_dev(hdev);
 
