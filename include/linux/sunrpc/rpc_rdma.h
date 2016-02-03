@@ -93,6 +93,12 @@ struct rpcrdma_msg {
 			__be32 rm_pempty[3];	/* 3 empty chunk lists */
 		} rm_padded;
 
+		struct {
+			__be32 rm_err;
+			__be32 rm_vers_low;
+			__be32 rm_vers_hi;
+		} rm_error;
+
 		__be32 rm_chunks[0];	/* read, write and reply chunks */
 
 	} rm_body;
@@ -102,11 +108,15 @@ struct rpcrdma_msg {
  * Smallest RPC/RDMA header: rm_xid through rm_type, then rm_nochunks
  */
 #define RPCRDMA_HDRLEN_MIN	(sizeof(__be32) * 7)
+#define RPCRDMA_HDRLEN_ERR	(sizeof(__be32) * 5)
 
 enum rpcrdma_errcode {
 	ERR_VERS = 1,
 	ERR_CHUNK = 2
 };
+
+#define err_vers	cpu_to_be32(ERR_VERS)
+#define err_chunk	cpu_to_be32(ERR_CHUNK)
 
 struct rpcrdma_err_vers {
 	uint32_t rdma_vers_low;	/* Version range supported by peer */
@@ -118,7 +128,8 @@ enum rpcrdma_proc {
 	RDMA_NOMSG = 1,		/* An RPC call or reply msg - separate body */
 	RDMA_MSGP = 2,		/* An RPC call or reply msg with padding */
 	RDMA_DONE = 3,		/* Client signals reply completion */
-	RDMA_ERROR = 4		/* An RPC RDMA encoding error */
+	RDMA_ERROR = 4,		/* An RPC RDMA encoding error */
+	RDMA_LAST
 };
 
 #define rdma_msg	cpu_to_be32(RDMA_MSG)
