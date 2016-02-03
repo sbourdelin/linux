@@ -12,11 +12,19 @@ Optional properties:
 
   - btmrvl,gpio-gap : gpio and gap (in msecs) combination to be
 		      configured.
+  - interrupt-parent: phandle of the parent interrupt controller
+  - interrupts : interrupt number to the cpu
+  - gpios: specify GPIO respectively. gpio here is board specific pin.
+	   while above gpio-gap represents the device side pin used to
+	   wakeup host.
+  - pinctrl-names : a pinctrl state named "default" must be defined
+  - pinctrl-0 : pin control group to be used for this controller
 
 Example:
 
-GPIO pin 13 and gap 100ms are configured for host wakeup, calibration
-data is also available in below example.
+GPIO pin 119 and gap 100ms are configured for host wakeup,
+pin 13 is configured so that firmware can wakeup host using this device side
+pin, calibration data is also available in below example.
 
 btmrvl {
 	compatible = "marvell,btmrvl";
@@ -26,4 +34,9 @@ btmrvl {
 		0x00 0x00 0xba 0xce 0xc0 0xc6 0x2d 0x00 0x00 0x00 0x00 0x00
 		0x00 0x00 0xf0 0x00>;
 	btmrvl,gpio-gap = <0x0d64>;
+	interrupt-parent = <&pio>;
+	interrupts = <119 IRQ_TYPE_LEVEL_LOW>;
+	gpios = <&pio 119 GPIO_ACTIVE_HIGH>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&wake_pins>;
 };
