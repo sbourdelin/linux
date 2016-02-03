@@ -189,24 +189,17 @@ static struct uac_iso_endpoint_descriptor as_iso_out_desc = {
 	.wLockDelay =		__constant_cpu_to_le16(1),
 };
 
-static struct usb_descriptor_header *f_audio_desc[] = {
-	(struct usb_descriptor_header *)&ac_interface_desc,
-	(struct usb_descriptor_header *)&ac_header_desc,
+USB_COMPOSITE_ENDPOINT(ep_out, &as_out_ep_desc,
+		&as_out_ep_desc, NULL, NULL);
 
-	(struct usb_descriptor_header *)&input_terminal_desc,
-	(struct usb_descriptor_header *)&output_terminal_desc,
-	(struct usb_descriptor_header *)&feature_unit_desc,
+USB_COMPOSITE_ALTSETTING(intf0alt0, &ac_interface_desc);
+USB_COMPOSITE_ALTSETTING(intf1alt0, &as_interface_alt_0_desc);
+USB_COMPOSITE_ALTSETTING(intf1alt1, &as_interface_alt_1_desc, &ep_out);
 
-	(struct usb_descriptor_header *)&as_interface_alt_0_desc,
-	(struct usb_descriptor_header *)&as_interface_alt_1_desc,
-	(struct usb_descriptor_header *)&as_header_desc,
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+USB_COMPOSITE_INTERFACE(intf1, &intf1alt0, &intf1alt1);
 
-	(struct usb_descriptor_header *)&as_type_i_desc,
-
-	(struct usb_descriptor_header *)&as_out_ep_desc,
-	(struct usb_descriptor_header *)&as_iso_out_desc,
-	NULL,
-};
+USB_COMPOSITE_DESCRIPTORS(uac1_descs, &intf0, &intf1);
 
 enum {
 	STR_AC_IF,
@@ -573,7 +566,7 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_audio		*audio = func_to_audio(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
-	struct usb_ep *out_ep = audio->out_ep;
+	struct usb_ep *out_ep;
 	struct usb_request *req;
 	struct f_uac1_opts *opts;
 	int req_buf_size, req_count, audio_buf_size;
@@ -588,11 +581,12 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	if (intf == 1) {
 		if (alt == 1) {
-			err = config_ep_by_speed(cdev->gadget, f, out_ep);
-			if (err)
-				return err;
+			out_ep = usb_function_get_ep(f, intf, 0);
+			if (!out_ep)
+				return -ENODEV;
 
-			usb_ep_enable(out_ep);
+			audio->out_ep = out_ep;
+
 			audio->copy_buf = f_audio_buffer_alloc(audio_buf_size);
 			if (IS_ERR(audio->copy_buf))
 				return -ENOMEM;
@@ -636,7 +630,8 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	return err;
 }
 
-static void f_audio_disable(struct usb_function *f)
+static void f_audio_clear_alt(struct usb_function *f,
+		unsigned intf, unsigned alt)
 {
 	return;
 }
@@ -664,25 +659,11 @@ static void f_audio_build_desc(struct f_audio *audio)
 }
 
 /* audio function driver setup/binding */
-static int
-f_audio_bind(struct usb_configuration *c, struct usb_function *f)
+static int f_audio_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_audio		*audio = func_to_audio(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
 	struct usb_string	*us;
-	int			status;
-	struct usb_ep		*ep = NULL;
-	struct f_uac1_opts	*audio_opts;
 
-	audio_opts = container_of(f->fi, struct f_uac1_opts, func_inst);
-	audio->card.gadget = c->cdev->gadget;
-	/* set up ASLA audio devices */
-	if (!audio_opts->bound) {
-		status = gaudio_setup(&audio->card);
-		if (status < 0)
-			return status;
-		audio_opts->bound = true;
-	}
 	us = usb_gstrings_attach(cdev, uac1_strings, ARRAY_SIZE(strings_uac1));
 	if (IS_ERR(us))
 		return PTR_ERR(us);
@@ -694,41 +675,47 @@ f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	as_interface_alt_0_desc.iInterface = us[STR_AS_IF_ALT0].id;
 	as_interface_alt_1_desc.iInterface = us[STR_AS_IF_ALT1].id;
 
+	return usb_function_set_descs(f, &uac1_descs);
+}
+
+static int f_audio_prep_vendor_descs(struct usb_function *f)
+{
+	struct usb_composite_dev *cdev = f->config->cdev;
+	struct f_audio		*audio = func_to_audio(f);
+	struct f_uac1_opts	*audio_opts;
+	int			status;
+
+	audio_opts = container_of(f->fi, struct f_uac1_opts, func_inst);
+	audio->card.gadget = cdev->gadget;
+
+	/* set up ASLA audio devices */
+	if (!audio_opts->bound) {
+		status = gaudio_setup(&audio->card);
+		if (status < 0)
+			return status;
+		audio_opts->bound = true;
+	}
 
 	f_audio_build_desc(audio);
 
-	/* allocate instance-specific interface IDs, and patch descriptors */
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	ac_interface_desc.bInterfaceNumber = status;
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&ac_header_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&input_terminal_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&output_terminal_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&feature_unit_desc);
 
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	as_interface_alt_0_desc.bInterfaceNumber = status;
-	as_interface_alt_1_desc.bInterfaceNumber = status;
+	usb_altset_add_vendor_desc(f, 1, 1,
+			(struct usb_descriptor_header *)&as_header_desc);
+	usb_altset_add_vendor_desc(f, 1, 1,
+			(struct usb_descriptor_header *)&as_type_i_desc);
 
-	status = -ENODEV;
+	usb_ep_add_vendor_desc(f, 1, 1, 0,
+			(struct usb_descriptor_header *)&as_iso_out_desc);
 
-	/* allocate instance-specific endpoints */
-	ep = usb_ep_autoconfig(cdev->gadget, &as_out_ep_desc);
-	if (!ep)
-		goto fail;
-	audio->out_ep = ep;
-	audio->out_ep->desc = &as_out_ep_desc;
-
-	status = -ENOMEM;
-
-	/* copy descriptors, and track endpoint copies */
-	status = usb_assign_descriptors(f, f_audio_desc, f_audio_desc, NULL);
-	if (status)
-		goto fail;
 	return 0;
-
-fail:
-	gaudio_cleanup(&audio->card);
-	return status;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -938,11 +925,6 @@ static void f_audio_free(struct usb_function *f)
 	mutex_unlock(&opts->lock);
 }
 
-static void f_audio_unbind(struct usb_configuration *c, struct usb_function *f)
-{
-	usb_free_all_descriptors(f);
-}
-
 static struct usb_function *f_audio_alloc(struct usb_function_instance *fi)
 {
 	struct f_audio *audio;
@@ -962,11 +944,11 @@ static struct usb_function *f_audio_alloc(struct usb_function_instance *fi)
 	INIT_LIST_HEAD(&audio->play_queue);
 	spin_lock_init(&audio->lock);
 
-	audio->card.func.bind = f_audio_bind;
-	audio->card.func.unbind = f_audio_unbind;
+	audio->card.func.prep_descs = f_audio_prep_descs;
+	audio->card.func.prep_vendor_descs = f_audio_prep_vendor_descs;
 	audio->card.func.set_alt = f_audio_set_alt;
+	audio->card.func.clear_alt = f_audio_clear_alt;
 	audio->card.func.setup = f_audio_setup;
-	audio->card.func.disable = f_audio_disable;
 	audio->card.func.free_func = f_audio_free;
 
 	control_selector_init(audio);
