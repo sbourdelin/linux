@@ -10,6 +10,7 @@
 #define GZERO_QLEN		32
 #define GZERO_ISOC_INTERVAL	4
 #define GZERO_ISOC_MAXPACKET	1024
+#define GZERO_ISOC_ENABLED	1
 #define GZERO_SS_BULK_QLEN	1
 #define GZERO_SS_ISO_QLEN	8
 
@@ -19,6 +20,7 @@ struct usb_zero_options {
 	unsigned isoc_maxpacket;
 	unsigned isoc_mult;
 	unsigned isoc_maxburst;
+	unsigned isoc_enabled;
 	unsigned bulk_buflen;
 	unsigned qlen;
 	unsigned ss_bulk_qlen;
@@ -32,6 +34,7 @@ struct f_ss_opts {
 	unsigned isoc_maxpacket;
 	unsigned isoc_mult;
 	unsigned isoc_maxburst;
+	unsigned isoc_enabled;
 	unsigned bulk_buflen;
 	unsigned bulk_qlen;
 	unsigned iso_qlen;

@@ -49,6 +49,7 @@ struct f_sourcesink {
 	unsigned isoc_maxpacket;
 	unsigned isoc_mult;
 	unsigned isoc_maxburst;
+	unsigned isoc_enabled;
 	unsigned buflen;
 	unsigned bulk_qlen;
 	unsigned iso_qlen;
@@ -336,16 +337,27 @@ sourcesink_bind(struct usb_configuration *c, struct usb_function *f)
 
 	/* allocate bulk endpoints */
 	ss->in_ep = usb_ep_autoconfig(cdev->gadget, &fs_source_desc);
-	if (!ss->in_ep) {
-autoconf_fail:
-		ERROR(cdev, "%s: can't autoconfigure on %s\n",
-			f->name, cdev->gadget->name);
-		return -ENODEV;
-	}
+	if (!ss->in_ep)
+		goto autoconf_fail;
 
 	ss->out_ep = usb_ep_autoconfig(cdev->gadget, &fs_sink_desc);
 	if (!ss->out_ep)
 		goto autoconf_fail;
+
+	/* support high speed hardware */
+	hs_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
+	hs_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
+
+	/* support super speed hardware */
+	ss_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
+	ss_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
+
+	if (!ss->isoc_enabled) {
+		fs_source_sink_descs[FS_ALT_IFC_1_OFFSET] = NULL;
+		hs_source_sink_descs[HS_ALT_IFC_1_OFFSET] = NULL;
+		ss_source_sink_descs[SS_ALT_IFC_1_OFFSET] = NULL;
+		goto no_iso;
+	}
 
 	/* sanity check the isoc module parameters */
 	if (ss->isoc_interval < 1)
@@ -368,30 +380,14 @@ autoconf_fail:
 	/* allocate iso endpoints */
 	ss->iso_in_ep = usb_ep_autoconfig(cdev->gadget, &fs_iso_source_desc);
 	if (!ss->iso_in_ep)
-		goto no_iso;
+		goto autoconf_fail;
 
 	ss->iso_out_ep = usb_ep_autoconfig(cdev->gadget, &fs_iso_sink_desc);
-	if (!ss->iso_out_ep) {
-		usb_ep_autoconfig_release(ss->iso_in_ep);
-		ss->iso_in_ep = NULL;
-no_iso:
-		/*
-		 * We still want to work even if the UDC doesn't have isoc
-		 * endpoints, so null out the alt interface that contains
-		 * them and continue.
-		 */
-		fs_source_sink_descs[FS_ALT_IFC_1_OFFSET] = NULL;
-		hs_source_sink_descs[HS_ALT_IFC_1_OFFSET] = NULL;
-		ss_source_sink_descs[SS_ALT_IFC_1_OFFSET] = NULL;
-	}
+	if (!ss->iso_out_ep)
+		goto autoconf_fail;
 
 	if (ss->isoc_maxpacket > 1024)
 		ss->isoc_maxpacket = 1024;
-
-	/* support high speed hardware */
-	hs_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
-	hs_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
-
 	/*
 	 * Fill in the HS isoc descriptors from the module parameters.
 	 * We assume that the user knows what they are doing and won't
@@ -407,12 +403,6 @@ no_iso:
 	hs_iso_sink_desc.wMaxPacketSize |= ss->isoc_mult << 11;
 	hs_iso_sink_desc.bInterval = ss->isoc_interval;
 	hs_iso_sink_desc.bEndpointAddress = fs_iso_sink_desc.bEndpointAddress;
-
-	/* support super speed hardware */
-	ss_source_desc.bEndpointAddress =
-		fs_source_desc.bEndpointAddress;
-	ss_sink_desc.bEndpointAddress =
-		fs_sink_desc.bEndpointAddress;
 
 	/*
 	 * Fill in the SS isoc descriptors from the module parameters.
@@ -436,6 +426,7 @@ no_iso:
 		(ss->isoc_mult + 1) * (ss->isoc_maxburst + 1);
 	ss_iso_sink_desc.bEndpointAddress = fs_iso_sink_desc.bEndpointAddress;
 
+no_iso:
 	ret = usb_assign_descriptors(f, fs_source_sink_descs,
 			hs_source_sink_descs, ss_source_sink_descs);
 	if (ret)
@@ -448,6 +439,11 @@ no_iso:
 			ss->iso_in_ep ? ss->iso_in_ep->name : "<none>",
 			ss->iso_out_ep ? ss->iso_out_ep->name : "<none>");
 	return 0;
+
+autoconf_fail:
+	ERROR(cdev, "%s: can't autoconfigure on %s\n",
+			f->name, cdev->gadget->name);
+	return -ENODEV;
 }
 
 static void
@@ -857,6 +853,7 @@ static struct usb_function *source_sink_alloc_func(
 	ss->isoc_maxpacket = ss_opts->isoc_maxpacket;
 	ss->isoc_mult = ss_opts->isoc_mult;
 	ss->isoc_maxburst = ss_opts->isoc_maxburst;
+	ss->isoc_enabled = ss_opts->isoc_enabled;
 	ss->buflen = ss_opts->bulk_buflen;
 	ss->bulk_qlen = ss_opts->bulk_qlen;
 	ss->iso_qlen = ss_opts->iso_qlen;
@@ -1106,6 +1103,44 @@ end:
 
 CONFIGFS_ATTR(f_ss_opts_, isoc_maxburst);
 
+static ssize_t f_ss_opts_isoc_enabled_show(struct config_item *item, char *page)
+{
+	struct f_ss_opts *opts = to_f_ss_opts(item);
+	int result;
+
+	mutex_lock(&opts->lock);
+	result = sprintf(page, "%u\n", opts->isoc_enabled);
+	mutex_unlock(&opts->lock);
+
+	return result;
+}
+
+static ssize_t f_ss_opts_isoc_enabled_store(struct config_item *item,
+				       const char *page, size_t len)
+{
+	struct f_ss_opts *opts = to_f_ss_opts(item);
+	int ret;
+	bool enabled;
+
+	mutex_lock(&opts->lock);
+	if (opts->refcnt) {
+		ret = -EBUSY;
+		goto end;
+	}
+
+	ret = strtobool(page, &enabled);
+	if (ret)
+		goto end;
+
+	opts->isoc_enabled = enabled;
+	ret = len;
+end:
+	mutex_unlock(&opts->lock);
+	return ret;
+}
+
+CONFIGFS_ATTR(f_ss_opts_, isoc_enabled);
+
 static ssize_t f_ss_opts_bulk_buflen_show(struct config_item *item, char *page)
 {
 	struct f_ss_opts *opts = to_f_ss_opts(item);
@@ -1226,6 +1261,7 @@ static struct configfs_attribute *ss_attrs[] = {
 	&f_ss_opts_attr_isoc_maxpacket,
 	&f_ss_opts_attr_isoc_mult,
 	&f_ss_opts_attr_isoc_maxburst,
+	&f_ss_opts_attr_isoc_enabled,
 	&f_ss_opts_attr_bulk_buflen,
 	&f_ss_opts_attr_bulk_qlen,
 	&f_ss_opts_attr_iso_qlen,
