@@ -11,7 +11,9 @@ Optional properties:
   - mwifiex,caldata* : A series of properties with marvell,caldata prefix,
   		      represent Calibration data downloaded to the device during
 		      initialization. This is an array of unsigned values.
-
+  - mwifiex,chip-gpio : Chip's wakeup gpio pin number. This needs to be downloaded
+			to to firmware. Chip notifies wifi wakeup signal to SOC
+			through this pin.
 
 Example:
 
@@ -24,6 +26,6 @@ mwifiex {
 
 	mwifiex,caldata_00_txpwrlimit_2g_cfg_set = /bits/ 8 <
 0x01 0x00 0x06 0x00 0x08 0x02 0x89 0x01 ...>;
-
+	mwifiex,chip-gpio = <3>;
 };
 

@@ -2111,6 +2111,7 @@ int mwifiex_sta_init_cmd(struct mwifiex_private *priv, u8 first_sta, bool init)
 	enum state_11d_t state_11d;
 	struct mwifiex_ds_11n_tx_cfg tx_cfg;
 	u8 sdio_sp_rx_aggr_enable;
+	u32 data;
 
 	if (first_sta) {
 		if (priv->adapter->iface_type == MWIFIEX_PCIE) {
@@ -2133,6 +2134,14 @@ int mwifiex_sta_init_cmd(struct mwifiex_private *priv, u8 first_sta, bool init)
 		 */
 		adapter->dt_node = mwifiex_plt_dev->dev.of_node;
 		if (adapter->dt_node) {
+			if (of_property_read_u32(adapter->dt_node,
+						 "mwifiex,chip-gpio",
+						 &data) == 0) {
+				mwifiex_dbg(adapter, INFO,
+					    "chip_gpio = 0x%x\n", data);
+				adapter->hs_cfg.gpio = data;
+			}
+
 			ret = mwifiex_dnld_dt_cfgdata(priv, adapter->dt_node,
 						      "mwifiex,caldata");
 			if (ret)
