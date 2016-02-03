@@ -327,6 +327,314 @@ int usb_function_activate(struct usb_function *function)
 EXPORT_SYMBOL_GPL(usb_function_activate);
 
 /**
+ * usb_function_set_descs - assing descriptors to USB function
+ * @f: USB function
+ * @descs: USB descriptors to be assigned to function
+ *
+ * This function is to be called from prep_desc() callback to provide
+ * descriptors needed during bind process. It does a deep copy of
+ * descriptors hierarchy.
+ *
+ * Returns zero on success, else negative errno.
+ */
+int usb_function_set_descs(struct usb_function *f,
+		struct usb_composite_descs *descs)
+{
+	struct usb_composite_descs *descs_c;
+	struct usb_composite_intf *intf, *intf_c;
+	struct usb_composite_altset *altset, *altset_c;
+	struct usb_composite_ep *ep, *ep_c;
+	int i, a, e;
+	size_t size;
+	void *mem;
+
+	if (!descs->intfs_num)
+		return -EINVAL;
+
+	size = sizeof(*descs);
+
+	size += descs->intfs_num *
+		(sizeof(*descs->intfs) + sizeof(**descs->intfs));
+	for (i = 0; i < descs->intfs_num; ++i) {
+		intf = descs->intfs[i];
+		if (!intf->altsets_num)
+			return -EINVAL;
+		size += intf->altsets_num *
+			(sizeof(*intf->altsets) + sizeof(**intf->altsets));
+		for (a = 0; a < intf->altsets_num; ++a) {
+			altset = intf->altsets[a];
+			size += sizeof(*altset->alt.desc);
+			size += altset->eps_num *
+				(sizeof(*altset->eps) + sizeof(**altset->eps));
+			for (e = 0; e < altset->eps_num; ++e) {
+				ep = altset->eps[e];
+				if (ep->fs.desc)
+					size += sizeof(*ep->fs.desc);
+				if (ep->hs.desc)
+					size += sizeof(*ep->hs.desc);
+				if (ep->ss.desc) {
+					if (!ep->ss_comp.desc)
+						return -EINVAL;
+					size += sizeof(*ep->ss.desc) +
+						sizeof(*ep->ss_comp.desc);
+				}
+			}
+		}
+	}
+
+	mem = kzalloc(size, GFP_KERNEL);
+	if (!mem)
+		return -ENOMEM;
+
+	f->descs = descs_c = mem;
+	mem += sizeof(*descs_c);
+	INIT_LIST_HEAD(&descs_c->vendor_descs);
+	descs_c->intfs_num = descs->intfs_num;
+	descs_c->intfs = mem;
+	mem += descs_c->intfs_num * sizeof(*descs_c->intfs);
+
+	for (i = 0; i < f->descs->intfs_num; ++i) {
+		intf = descs->intfs[i];
+		descs_c->intfs[i] = intf_c = mem;
+		mem += sizeof(*intf_c);
+		intf_c->altsets_num = intf->altsets_num;
+		intf_c->altsets = mem;
+		mem += intf_c->altsets_num * sizeof(*intf_c->altsets);
+
+		for (a = 0; a < intf->altsets_num; ++a) {
+			altset = intf->altsets[a];
+			intf_c->altsets[a] = altset_c = mem;
+			mem += sizeof(*altset_c);
+			INIT_LIST_HEAD(&altset_c->vendor_descs);
+			altset_c->alt.desc = mem;
+			mem += sizeof(*altset->alt.desc);
+			memcpy(altset_c->alt.desc, altset->alt.desc,
+				sizeof(*altset->alt.desc));
+			altset_c->eps_num = altset->eps_num;
+			altset_c->eps = mem;
+			mem += altset_c->eps_num * sizeof(*altset_c->eps);
+
+			for (e = 0; e < altset->eps_num; ++e) {
+				ep = altset->eps[e];
+				altset_c->eps[e] = ep_c = mem;
+				mem += sizeof(*ep_c);
+				INIT_LIST_HEAD(&ep_c->vendor_descs);
+				if (ep->fs.desc) {
+					ep_c->fs.desc = mem;
+					mem += sizeof(*ep_c->fs.desc);
+					memcpy(ep_c->fs.desc, ep->fs.desc,
+						sizeof(*ep_c->fs.desc));
+					descs_c->fullspeed = true;
+				}
+				if (ep->hs.desc) {
+					ep_c->hs.desc = mem;
+					mem += sizeof(*ep_c->hs.desc);
+					memcpy(ep_c->hs.desc, ep->hs.desc,
+						sizeof(*ep_c->hs.desc));
+					descs_c->highspeed = true;
+				}
+				if (ep->ss.desc) {
+					ep_c->ss.desc = mem;
+					mem += sizeof(*ep_c->ss.desc);
+					memcpy(ep_c->ss.desc, ep->ss.desc,
+						sizeof(*ep_c->ss.desc));
+					descs_c->superspeed = true;
+				}
+				if (ep->ss_comp.desc) {
+					ep_c->ss_comp.desc = mem;
+					mem += sizeof(*ep_c->ss_comp.desc);
+					memcpy(ep_c->ss_comp.desc,
+						ep->ss_comp.desc,
+						sizeof(*ep_c->ss_comp.desc));
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(usb_function_set_descs);
+
+/**
+ * usb_function_free_descs - frees descriptors assinged to function
+ * @f: USB function
+ */
+static inline void usb_function_free_descs(struct usb_function *f)
+{
+	kfree(f->descs);
+	f->descs = NULL;
+}
+
+/**
+ * usb_function_add_vendor_desc - add vendor specific descriptor to USB
+ *	function
+ * @f: USB function
+ * @desc: descriptor to be attached
+ *
+ * Descriptor is copied and attached at the end of linked list.
+ *
+ * Returns zero on success, else negative errno.
+ */
+int usb_function_add_vendor_desc(struct usb_function *f,
+		const struct usb_descriptor_header *desc)
+{
+	struct usb_composite_vendor_desc *vd;
+	void *mem;
+
+	if (!f->descs)
+		return -ENODEV;
+
+	mem = kmalloc(sizeof(*vd) + desc->bLength, GFP_KERNEL);
+	if (!mem)
+		return -ENOMEM;
+
+	vd = mem;
+	vd->desc = mem + sizeof(*vd);
+
+	memcpy(vd->desc, desc, desc->bLength);
+
+	list_add_tail(&vd->list, &f->descs->vendor_descs);
+	f->descs->vendor_descs_num++;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(usb_function_add_vendor_desc);
+
+/**
+ * usb_ep_add_vendor_desc - add vendor specific descriptor to altsetting
+ * @f: USB function
+ * @i: index of interface in function
+ * @a: index of altsetting in interface
+ * @desc: descriptor to be attached
+ *
+ * Descriptor is copied and attached at the end of linked list.
+ *
+ * Returns zero on success, else negative errno.
+ */
+int usb_altset_add_vendor_desc(struct usb_function *f, int i, int a,
+		const struct usb_descriptor_header *desc)
+{
+	struct usb_composite_vendor_desc *vd;
+	struct usb_composite_altset *alt;
+	void *mem;
+
+	if (!f->descs)
+		return -ENODEV;
+	if (f->descs->intfs_num <= i)
+		return -ENODEV;
+	if (f->descs->intfs[i]->altsets_num <= a)
+		return -ENODEV;
+
+	mem = kmalloc(sizeof(*vd) + desc->bLength, GFP_KERNEL);
+	if (!mem)
+		return -ENOMEM;
+
+	vd = mem;
+	vd->desc = mem + sizeof(*vd);
+
+	memcpy(vd->desc, desc, desc->bLength);
+
+	alt = f->descs->intfs[i]->altsets[a];
+	list_add_tail(&vd->list, &alt->vendor_descs);
+	alt->vendor_descs_num++;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(usb_altset_add_vendor_desc);
+
+/**
+ * usb_ep_add_vendor_desc - add vendor specific descriptor to endpoint
+ * @f: USB function
+ * @i: index of interface in function
+ * @a: index of altsetting in interface
+ * @e: index of endpoint in altsetting
+ * @desc: descriptor to be attached
+ *
+ * Descriptor is copied and attached at the end of linked list.
+ *
+ * Returns zero on success, else negative errno.
+ */
+int usb_ep_add_vendor_desc(struct usb_function *f, int i, int a, int e,
+		const struct usb_descriptor_header *desc)
+{
+	struct usb_composite_vendor_desc *vd;
+	struct usb_composite_ep *ep;
+	void *mem;
+
+	if (!f->descs)
+		return -ENODEV;
+	if (f->descs->intfs_num <= i)
+		return -ENODEV;
+	if (f->descs->intfs[i]->altsets_num <= a)
+		return -ENODEV;
+	if (f->descs->intfs[i]->altsets[a]->eps_num <= e)
+		return -ENODEV;
+
+	mem = kmalloc(sizeof(*vd) + desc->bLength, GFP_KERNEL);
+	if (!mem)
+		return -ENOMEM;
+
+	vd = mem;
+	vd->desc = mem + sizeof(*vd);
+
+	memcpy(vd->desc, desc, desc->bLength);
+
+	ep = f->descs->intfs[i]->altsets[a]->eps[e];
+	list_add_tail(&vd->list, &ep->vendor_descs);
+	ep->vendor_descs_num++;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(usb_ep_add_vendor_desc);
+
+/**
+ * free_vendor_descs - removes and frees all vendor descriptors from
+ *	given list
+ * @vendor_descs: handle to the list of descriptors
+ */
+static inline void free_vendor_descs(struct list_head *vendor_descs)
+{
+	while (!list_empty(vendor_descs)) {
+		struct usb_composite_vendor_desc *d;
+
+		d = list_first_entry(vendor_descs,
+				struct usb_composite_vendor_desc, list);
+		list_del(&d->list);
+		kfree(d);
+	}
+}
+
+/**
+ * usb_function_free_vendor_descs - frees vendor specific descriptors
+ *	assinged to function
+ * @f: USB function
+ */
+static void usb_function_free_vendor_descs(struct usb_function *f)
+{
+	struct usb_composite_intf *intf;
+	struct usb_composite_altset *alt;
+	int i, a, e;
+
+	if (!f->descs)
+		return;
+
+	free_vendor_descs(&f->descs->vendor_descs);
+	f->descs->vendor_descs_num = 0;
+	for (i = 0; i < f->descs->intfs_num; ++i) {
+		intf = f->descs->intfs[i];
+		for (a = 0; a < intf->altsets_num; ++a) {
+			alt = intf->altsets[a];
+			free_vendor_descs(&alt->vendor_descs);
+			alt->vendor_descs_num = 0;
+			for (e = 0; e < alt->eps_num; ++e) {
+				free_vendor_descs(&alt->eps[e]->vendor_descs);
+				alt->eps[e]->vendor_descs_num = 0;
+			}
+		}
+	}
+}
+
+/**
  * usb_interface_id() - allocate an unused interface ID
  * @config: configuration associated with the interface
  * @function: function handling the interface
@@ -1893,6 +2201,38 @@ static ssize_t suspended_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(suspended);
 
+/**
+ * composite_free_descs - free entity descriptors for all functions in all
+ *	configurations, allocated with usb_function_set_descs()
+ * @cdev: composite device
+ */
+void composite_free_descs(struct usb_composite_dev *cdev)
+{
+	struct usb_configuration *c;
+	struct usb_function *f;
+
+	list_for_each_entry(c, &cdev->configs, list)
+		list_for_each_entry(f, &c->functions, list)
+			usb_function_free_descs(f);
+}
+EXPORT_SYMBOL_GPL(composite_free_descs);
+
+/**
+ * composite_free_descs - free vendor and class specific descriptors for all
+ *	functions in all configurations.
+ * @cdev: composite device
+ */
+void composite_free_vendor_descs(struct usb_composite_dev *cdev)
+{
+	struct usb_configuration *c;
+	struct usb_function *f;
+
+	list_for_each_entry(c, &cdev->configs, list)
+		list_for_each_entry(f, &c->functions, list)
+			usb_function_free_vendor_descs(f);
+}
+EXPORT_SYMBOL_GPL(composite_free_vendor_descs);
+
 static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 {
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
@@ -1903,6 +2243,9 @@ static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 	 * state protected by cdev->lock.
 	 */
 	WARN_ON(cdev->config);
+
+	composite_free_vendor_descs(cdev);
+	composite_free_descs(cdev);
 
 	while (!list_empty(&cdev->configs)) {
 		struct usb_configuration	*c;

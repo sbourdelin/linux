@@ -178,6 +178,43 @@ struct usb_composite_descs {
 	unsigned superspeed:1;
 };
 
+/*
+ * Macros to be used to create USB descriptors hierarchy.
+ */
+
+#define USB_COMPOSITE_ENDPOINT(_name, _fs_desc, _hs_desc, _ss_desc, _ss_comp) \
+	static struct usb_composite_ep _name = { \
+		.fs = { .desc = _fs_desc, }, \
+		.hs = { .desc = _hs_desc, }, \
+		.ss = { .desc = _ss_desc, }, \
+		.ss_comp = { .desc = _ss_comp, }, \
+		.vendor_descs = LIST_HEAD_INIT(_name.vendor_descs), \
+	}
+
+#define __EP_ARRAY(...) ((struct usb_composite_ep*[]){ __VA_ARGS__ })
+#define USB_COMPOSITE_ALTSETTING(_name, _desc, ...) \
+	static struct usb_composite_altset _name = { \
+		.alt = { .desc = _desc, }, \
+		.eps = __EP_ARRAY(__VA_ARGS__), \
+		.eps_num = ARRAY_SIZE(__EP_ARRAY(__VA_ARGS__)), \
+		.vendor_descs = LIST_HEAD_INIT(_name.vendor_descs), \
+	}
+
+#define __ALTSET_ARRAY(...) ((struct usb_composite_altset*[]){ __VA_ARGS__ })
+#define USB_COMPOSITE_INTERFACE(_name, ...) \
+	static struct usb_composite_intf _name = { \
+		.altsets = __ALTSET_ARRAY(__VA_ARGS__), \
+		.altsets_num = ARRAY_SIZE(__ALTSET_ARRAY(__VA_ARGS__)), \
+	}
+
+#define __INTF_ARRAY(...) ((struct usb_composite_intf*[]){ __VA_ARGS__ })
+#define USB_COMPOSITE_DESCRIPTORS(_name, ...) \
+	static struct usb_composite_descs _name = { \
+		.intfs = __INTF_ARRAY(__VA_ARGS__), \
+		.intfs_num = ARRAY_SIZE(__INTF_ARRAY(__VA_ARGS__)), \
+		.vendor_descs = LIST_HEAD_INIT(_name.vendor_descs), \
+	}
+
 /**
  * struct usb_os_desc_ext_prop - describes one "Extended Property"
  * @entry: used to keep a list of extended properties
@@ -363,6 +400,18 @@ int usb_add_function(struct usb_configuration *, struct usb_function *);
 int usb_function_deactivate(struct usb_function *);
 int usb_function_activate(struct usb_function *);
 
+int usb_function_set_descs(struct usb_function *f,
+		struct usb_composite_descs *descs);
+
+int usb_function_add_vendor_desc(struct usb_function *f,
+		const struct usb_descriptor_header *desc);
+
+int usb_altset_add_vendor_desc(struct usb_function *f, int i, int a,
+		const struct usb_descriptor_header *desc);
+
+int usb_ep_add_vendor_desc(struct usb_function *f, int i, int a, int e,
+		const struct usb_descriptor_header *desc);
+
 int usb_interface_id(struct usb_configuration *, struct usb_function *);
 
 int config_ep_by_speed(struct usb_gadget *g, struct usb_function *f,
@@ -538,6 +587,9 @@ extern int composite_dev_prepare(struct usb_composite_driver *composite,
 extern int composite_os_desc_req_prepare(struct usb_composite_dev *cdev,
 					 struct usb_ep *ep0);
 void composite_dev_cleanup(struct usb_composite_dev *cdev);
+
+void composite_free_descs(struct usb_composite_dev *cdev);
+void composite_free_vendor_descs(struct usb_composite_dev *cdev);
 
 static inline struct usb_composite_driver *to_cdriver(
 		struct usb_gadget_driver *gdrv)
