@@ -58,7 +58,8 @@ static u32 calc_residency(struct drm_device *dev,
 	} else if (IS_BROXTON(dev)) {
 		units = 1;
 		div = 1200;		/* 833.33ns */
-	}
+	} else if (IS_SKYLAKE(dev))
+		units = 133ULL;
 
 	raw_time = I915_READ(reg) * units;
 	ret = DIV_ROUND_UP_ULL(raw_time, div);
