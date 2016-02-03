@@ -76,13 +76,6 @@ static struct usb_endpoint_descriptor fs_loop_sink_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *fs_loopback_descs[] = {
-	(struct usb_descriptor_header *) &loopback_intf,
-	(struct usb_descriptor_header *) &fs_loop_sink_desc,
-	(struct usb_descriptor_header *) &fs_loop_source_desc,
-	NULL,
-};
-
 /* high speed support: */
 
 static struct usb_endpoint_descriptor hs_loop_source_desc = {
@@ -99,13 +92,6 @@ static struct usb_endpoint_descriptor hs_loop_sink_desc = {
 
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
-};
-
-static struct usb_descriptor_header *hs_loopback_descs[] = {
-	(struct usb_descriptor_header *) &loopback_intf,
-	(struct usb_descriptor_header *) &hs_loop_source_desc,
-	(struct usb_descriptor_header *) &hs_loop_sink_desc,
-	NULL,
 };
 
 /* super speed support: */
@@ -142,14 +128,17 @@ static struct usb_ss_ep_comp_descriptor ss_loop_sink_comp_desc = {
 	.wBytesPerInterval =	0,
 };
 
-static struct usb_descriptor_header *ss_loopback_descs[] = {
-	(struct usb_descriptor_header *) &loopback_intf,
-	(struct usb_descriptor_header *) &ss_loop_source_desc,
-	(struct usb_descriptor_header *) &ss_loop_source_comp_desc,
-	(struct usb_descriptor_header *) &ss_loop_sink_desc,
-	(struct usb_descriptor_header *) &ss_loop_sink_comp_desc,
-	NULL,
-};
+USB_COMPOSITE_ENDPOINT(ep_source, &fs_loop_source_desc, &hs_loop_source_desc,
+		&ss_loop_source_desc, &ss_loop_source_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_sink, &fs_loop_sink_desc, &hs_loop_sink_desc,
+		&ss_loop_sink_desc, &ss_loop_sink_comp_desc);
+
+USB_COMPOSITE_ALTSETTING(altset0, &loopback_intf, &ep_source, &ep_sink);
+
+USB_COMPOSITE_INTERFACE(intf0, &altset0);
+
+USB_COMPOSITE_DESCRIPTORS(loopback_descs, &intf0);
+
 
 /* function-specific strings: */
 
@@ -170,18 +159,10 @@ static struct usb_gadget_strings *loopback_strings[] = {
 
 /*-------------------------------------------------------------------------*/
 
-static int loopback_bind(struct usb_configuration *c, struct usb_function *f)
+static int loopback_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_loopback	*loop = func_to_loop(f);
-	int			id;
-	int ret;
-
-	/* allocate interface ID(s) */
-	id = usb_interface_id(c, f);
-	if (id < 0)
-		return id;
-	loopback_intf.bInterfaceNumber = id;
+	struct usb_composite_dev *cdev = f->config->cdev;
+	int id;
 
 	id = usb_string_id(cdev);
 	if (id < 0)
@@ -189,40 +170,7 @@ static int loopback_bind(struct usb_configuration *c, struct usb_function *f)
 	strings_loopback[0].id = id;
 	loopback_intf.iInterface = id;
 
-	/* allocate endpoints */
-
-	loop->in_ep = usb_ep_autoconfig(cdev->gadget, &fs_loop_source_desc);
-	if (!loop->in_ep) {
-autoconf_fail:
-		ERROR(cdev, "%s: can't autoconfigure on %s\n",
-			f->name, cdev->gadget->name);
-		return -ENODEV;
-	}
-
-	loop->out_ep = usb_ep_autoconfig(cdev->gadget, &fs_loop_sink_desc);
-	if (!loop->out_ep)
-		goto autoconf_fail;
-
-	/* support high speed hardware */
-	hs_loop_source_desc.bEndpointAddress =
-		fs_loop_source_desc.bEndpointAddress;
-	hs_loop_sink_desc.bEndpointAddress = fs_loop_sink_desc.bEndpointAddress;
-
-	/* support super speed hardware */
-	ss_loop_source_desc.bEndpointAddress =
-		fs_loop_source_desc.bEndpointAddress;
-	ss_loop_sink_desc.bEndpointAddress = fs_loop_sink_desc.bEndpointAddress;
-
-	ret = usb_assign_descriptors(f, fs_loopback_descs, hs_loopback_descs,
-			ss_loopback_descs);
-	if (ret)
-		return ret;
-
-	DBG(cdev, "%s speed %s: IN/%s, OUT/%s\n",
-	    (gadget_is_superspeed(c->cdev->gadget) ? "super" :
-	     (gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full")),
-			f->name, loop->in_ep->name, loop->out_ep->name);
-	return 0;
+	return usb_function_set_descs(f, &loopback_descs);
 }
 
 static void lb_free_func(struct usb_function *f)
@@ -235,7 +183,6 @@ static void lb_free_func(struct usb_function *f)
 	opts->refcnt--;
 	mutex_unlock(&opts->lock);
 
-	usb_free_all_descriptors(f);
 	kfree(func_to_loop(f));
 }
 
@@ -283,15 +230,6 @@ static void loopback_complete(struct usb_ep *ep, struct usb_request *req)
 	case -ESHUTDOWN:		/* disconnect from host */
 		break;
 	}
-}
-
-static void disable_loopback(struct f_loopback *loop)
-{
-	struct usb_composite_dev	*cdev;
-
-	cdev = loop->function.config->cdev;
-	disable_endpoints(cdev, loop->in_ep, loop->out_ep, NULL, NULL);
-	VDBG(cdev, "%s disabled\n", loop->function.name);
 }
 
 static inline struct usb_request *lb_alloc_ep_req(struct usb_ep *ep, int len)
@@ -348,69 +286,29 @@ fail:
 	return result;
 }
 
-static int enable_endpoint(struct usb_composite_dev *cdev,
-			   struct f_loopback *loop, struct usb_ep *ep)
-{
-	int					result;
-
-	result = config_ep_by_speed(cdev->gadget, &(loop->function), ep);
-	if (result)
-		goto out;
-
-	result = usb_ep_enable(ep);
-	if (result < 0)
-		goto out;
-	ep->driver_data = loop;
-	result = 0;
-
-out:
-	return result;
-}
-
-static int
-enable_loopback(struct usb_composite_dev *cdev, struct f_loopback *loop)
-{
-	int					result = 0;
-
-	result = enable_endpoint(cdev, loop, loop->in_ep);
-	if (result)
-		goto out;
-
-	result = enable_endpoint(cdev, loop, loop->out_ep);
-	if (result)
-		goto disable_in;
-
-	result = alloc_requests(cdev, loop);
-	if (result)
-		goto disable_out;
-
-	DBG(cdev, "%s enabled\n", loop->function.name);
-	return 0;
-
-disable_out:
-	usb_ep_disable(loop->out_ep);
-disable_in:
-	usb_ep_disable(loop->in_ep);
-out:
-	return result;
-}
-
 static int loopback_set_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
 	struct f_loopback	*loop = func_to_loop(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
-	/* we know alt is zero */
-	disable_loopback(loop);
-	return enable_loopback(cdev, loop);
+	loop->in_ep = usb_function_get_ep(f, intf, 0);
+	if (!loop->in_ep)
+		return -ENODEV;
+	loop->in_ep->driver_data = loop;
+
+	loop->out_ep = usb_function_get_ep(f, intf, 1);
+	if (!loop->out_ep)
+		return -ENODEV;
+	loop->out_ep->driver_data = loop;
+
+	return alloc_requests(cdev, loop);
 }
 
-static void loopback_disable(struct usb_function *f)
+static void loopback_clear_alt(struct usb_function *f,
+		unsigned intf, unsigned alt)
 {
 	struct f_loopback	*loop = func_to_loop(f);
-
-	disable_loopback(loop);
 
 	free_ep_req(loop->out_ep, loop->out_req);
 	usb_ep_free_request(loop->in_ep, loop->in_req);
@@ -437,9 +335,9 @@ static struct usb_function *loopback_alloc(struct usb_function_instance *fi)
 		loop->qlen = 32;
 
 	loop->function.name = "loopback";
-	loop->function.bind = loopback_bind;
+	loop->function.prep_descs = loopback_prep_descs;
 	loop->function.set_alt = loopback_set_alt;
-	loop->function.disable = loopback_disable;
+	loop->function.clear_alt = loopback_clear_alt;
 	loop->function.strings = loopback_strings;
 
 	loop->function.free_func = lb_free_func;
