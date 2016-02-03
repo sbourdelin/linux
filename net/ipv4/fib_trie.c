@@ -1430,6 +1430,8 @@ found:
 				    flp->flowi4_oif != nh->nh_oif)
 					continue;
 			}
+			if (flp->flowi4_not_oif && flp->flowi4_not_oif == nh->nh_oif)
+				continue;
 
 			if (!(fib_flags & FIB_LOOKUP_NOREF))
 				atomic_inc(&fi->fib_clntref);

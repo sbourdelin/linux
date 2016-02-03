@@ -26,6 +26,7 @@ struct flowi_tunnel {
 
 struct flowi_common {
 	int	flowic_oif;
+	int	flowic_not_oif;
 	int	flowic_iif;
 	__u32	flowic_mark;
 	__u8	flowic_tos;
@@ -67,6 +68,7 @@ union flowi_uli {
 struct flowi4 {
 	struct flowi_common	__fl_common;
 #define flowi4_oif		__fl_common.flowic_oif
+#define flowi4_not_oif		__fl_common.flowic_not_oif
 #define flowi4_iif		__fl_common.flowic_iif
 #define flowi4_mark		__fl_common.flowic_mark
 #define flowi4_tos		__fl_common.flowic_tos
@@ -125,6 +127,7 @@ static inline void flowi4_update_output(struct flowi4 *fl4, int oif, __u8 tos,
 struct flowi6 {
 	struct flowi_common	__fl_common;
 #define flowi6_oif		__fl_common.flowic_oif
+#define flowi6_not_oif		__fl_common.flowic_not_oif
 #define flowi6_iif		__fl_common.flowic_iif
 #define flowi6_mark		__fl_common.flowic_mark
 #define flowi6_tos		__fl_common.flowic_tos

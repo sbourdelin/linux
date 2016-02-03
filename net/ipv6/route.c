@@ -467,6 +467,7 @@ static inline struct rt6_info *rt6_device_match(struct net *net,
 						    struct rt6_info *rt,
 						    const struct in6_addr *saddr,
 						    int oif,
+						    int not_oif,
 						    int flags)
 {
 	struct rt6_info *local = NULL;
@@ -477,6 +478,9 @@ static inline struct rt6_info *rt6_device_match(struct net *net,
 
 	for (sprt = rt; sprt; sprt = sprt->dst.rt6_next) {
 		struct net_device *dev = sprt->dst.dev;
+
+		if (not_oif && dev->ifindex == not_oif)
+			continue;
 
 		if (oif) {
 			if (dev->ifindex == oif)
@@ -856,7 +860,7 @@ static struct rt6_info *ip6_pol_route_lookup(struct net *net,
 	fn = fib6_lookup(&table->tb6_root, &fl6->daddr, &fl6->saddr);
 restart:
 	rt = fn->leaf;
-	rt = rt6_device_match(net, rt, &fl6->saddr, fl6->flowi6_oif, flags);
+	rt = rt6_device_match(net, rt, &fl6->saddr, fl6->flowi6_oif, fl6->flowi6_not_oif, flags);
 	if (rt->rt6i_nsiblings && fl6->flowi6_oif == 0)
 		rt = rt6_multipath_select(rt, fl6, fl6->flowi6_oif, flags);
 	if (rt == net->ipv6.ip6_null_entry) {
