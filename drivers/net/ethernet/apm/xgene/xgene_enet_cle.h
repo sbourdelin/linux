@@ -34,6 +34,7 @@
 #define SPPTR0			0x0104
 #define DFCLSRESDBPTR0		0x0108
 #define DFCLSRESDB00		0x010c
+#define RSS_CTRL0		0x0000013c
 
 #define CLE_CMD_TO		10	/* ms */
 #define CLE_PKTRAM_SIZE		256	/* bytes */
@@ -108,6 +109,9 @@
 
 enum xgene_cle_ptree_nodes {
 	PKT_TYPE_NODE,
+	PKT_PROT_NODE,
+	RSS_IPV4_TCP_NODE,
+	RSS_IPV4_UDP_NODE,
 	LAST_NODE,
 	MAX_NODES
 };
@@ -147,6 +151,8 @@ enum xgene_cle_parser {
 #define XGENE_CLE_DRAM(type)	(((type) & 0xf) << 28)
 enum xgene_cle_dram_type {
 	PKT_RAM,
+	RSS_IDT,
+	RSS_IPV4_HASH_SKEY,
 	PTREE_RAM = 0xc,
 	AVL_RAM,
 	DB_RAM
@@ -160,12 +166,58 @@ enum xgene_cle_cmd_type {
 	CLE_CMD_AVL_SRCH = 32
 };
 
+enum xgene_cle_ipv4_rss_hashtype {
+	RSS_IPV4_8B,
+	RSS_IPV4_12B,
+};
+
+enum xgene_cle_prot_type {
+	XGENE_CLE_TCP,
+	XGENE_CLE_UDP,
+	XGENE_CLE_ESP,
+	XGENE_CLE_OTHER
+};
+
+enum xgene_cle_prot_version {
+	XGENE_CLE_IPV4,
+};
+
 enum xgene_cle_ptree_dbptrs {
 	DB_RES_DROP,
 	DB_RES_DEF,
 	DB_RES_ACCEPT,
 	DB_MAX_PTRS
 };
+
+/* RSS sideband signal info */
+#define XGENE_CLE_SB_IPFRAG_WIDTH	1
+#define XGENE_CLE_SB_IPFRAG_SHIFT	0
+#define XGENE_CLE_SB_IPPROT_WIDTH	2
+#define XGENE_CLE_SB_IPPROT_SHIFT	1
+#define XGENE_CLE_SB_IPVER_WIDTH	1
+#define XGENE_CLE_SB_IPVER_SHIFT	3
+#define XGENE_CLE_SB_HDRLEN_WIDTH	12
+#define XGENE_CLE_SB_HDRLEN_SHIFT	4
+
+/* RSS indirection table */
+#define XGENE_CLE_IDT_ENTRIES		128
+#define XGENE_CLE_IDT_DSTQID_WIDTH	12
+#define XGENE_CLE_IDT_DSTQID_SHIFT	0
+#define XGENE_CLE_IDT_FPSEL_WIDTH	4
+#define XGENE_CLE_IDT_FPSEL_SHIFT	12
+#define XGENE_CLE_IDT_NFPSEL_WIDTH	4
+#define XGENE_CLE_IDT_NFPSEL_SHIFT	16
+
+/* RSS access macros */
+#define XGENE_CLE_RSS_MASK(field)	(((2 << \
+					(XGENE_CLE_##field##_WIDTH - 1)) - 1) \
+					<< XGENE_CLE_##field##_SHIFT)
+#define XGENE_CLE_RSS_RD(field, word)	(((word) & \
+					XGENE_CLE_RSS_MASK(field)) >> \
+					XGENE_CLE_##field##_SHIFT)
+#define XGENE_CLE_RSS_WR(field, word)	(((word) << \
+					XGENE_CLE_##field##_SHIFT) & \
+					XGENE_CLE_RSS_MASK(field))
 
 struct xgene_cle_ptree_branch {
 	bool valid;
