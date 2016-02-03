@@ -358,4 +358,37 @@ tcf_match_indev(struct sk_buff *skb, int ifindex)
 }
 #endif /* CONFIG_NET_CLS_IND */
 
+struct tc_cls_u32_knode {
+	struct tcf_exts *exts;
+	u8 fshift;
+	u32 handle;
+	u32 val;
+	u32 mask;
+	u32 link_handle;
+	struct tc_u32_sel *sel;
+};
+
+struct tc_cls_u32_hnode {
+	u32 handle;
+	u32 prio;
+	unsigned int divisor;
+};
+
+enum {
+	TC_CLSU32_NEW_KNODE,
+	TC_CLSU32_REPLACE_KNODE,
+	TC_CLSU32_DELETE_KNODE,
+	TC_CLSU32_NEW_HNODE,
+	TC_CLSU32_REPLACE_HNODE,
+};
+
+struct tc_cls_u32_offload {
+	/* knode values */
+	int command;
+	union {
+		struct tc_cls_u32_knode knode;
+		struct tc_cls_u32_hnode hnode;
+	};
+};
+
 #endif
