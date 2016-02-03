@@ -688,6 +688,26 @@ int usb_get_interface_id(struct usb_function *f, int i)
 }
 EXPORT_SYMBOL_GPL(usb_get_interface_id);
 
+int usb_get_endpoint_address(struct usb_function *f, int i, int a, int e)
+{
+	struct usb_composite_ep *ep;
+
+	if (!f->descs)
+		return -ENODEV;
+	if (f->descs->intfs_num <= i)
+		return -ENODEV;
+	if (f->descs->intfs[i]->altsets_num <= a)
+		return -ENODEV;
+	if (f->descs->intfs[i]->altsets[a]->eps_num <= e)
+		return -ENODEV;
+	ep = f->descs->intfs[i]->altsets[a]->eps[e];
+	if (!ep->ep)
+		return -ENODEV;
+
+	return ep->ep->address;
+}
+EXPORT_SYMBOL_GPL(usb_get_endpoint_address);
+
 /**
  * usb_function_get_ep - obtains endpoint of given index from active
  *	altsetting of given interface
