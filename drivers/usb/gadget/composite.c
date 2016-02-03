@@ -670,6 +670,39 @@ static int usb_interface_id_to_index(struct usb_function *f, u8 id)
 }
 
 /**
+ * usb_function_get_ep - obtains endpoint of given index from active
+ *	altsetting of given interface
+ * @f: USB function
+ * @i: index of interface in given function
+ * @e: index of endpoint in active altsetting of given interface
+ *
+ * This function is designed to be used in set_alt() callback, when
+ * new altsetting is selected. It allows to obtain endpoints assigned
+ * to altsetting during autoconfig process.
+ *
+ * Returns pointer to endpoint on success or NULL on failure.
+ */
+struct usb_ep *usb_function_get_ep(struct usb_function *f, int i, int e)
+{
+	struct usb_composite_altset *altset;
+	int selected_altset;
+
+	if (!f->descs)
+		return NULL;
+	if (i >= f->descs->intfs_num)
+		return NULL;
+
+	selected_altset = f->descs->intfs[i]->cur_altset;
+	altset = f->descs->intfs[i]->altsets[selected_altset];
+
+	if (e >= altset->eps_num)
+		return NULL;
+
+	return altset->eps[e]->ep;
+}
+EXPORT_SYMBOL_GPL(usb_function_get_ep);
+
+/**
  * usb_interface_id() - allocate an unused interface ID
  * @config: configuration associated with the interface
  * @function: function handling the interface
