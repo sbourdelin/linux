@@ -162,29 +162,19 @@ pn_hs_source_desc = {
 	.wMaxPacketSize =	cpu_to_le16(512),
 };
 
-static struct usb_descriptor_header *fs_pn_function[] = {
-	(struct usb_descriptor_header *) &pn_control_intf_desc,
-	(struct usb_descriptor_header *) &pn_header_desc,
-	(struct usb_descriptor_header *) &pn_phonet_desc,
-	(struct usb_descriptor_header *) &pn_union_desc,
-	(struct usb_descriptor_header *) &pn_data_nop_intf_desc,
-	(struct usb_descriptor_header *) &pn_data_intf_desc,
-	(struct usb_descriptor_header *) &pn_fs_sink_desc,
-	(struct usb_descriptor_header *) &pn_fs_source_desc,
-	NULL,
-};
+USB_COMPOSITE_ENDPOINT(ep_sink, &pn_fs_sink_desc,
+		&pn_hs_sink_desc, NULL, NULL);
+USB_COMPOSITE_ENDPOINT(ep_source, &pn_fs_source_desc,
+		&pn_hs_source_desc, NULL, NULL);
 
-static struct usb_descriptor_header *hs_pn_function[] = {
-	(struct usb_descriptor_header *) &pn_control_intf_desc,
-	(struct usb_descriptor_header *) &pn_header_desc,
-	(struct usb_descriptor_header *) &pn_phonet_desc,
-	(struct usb_descriptor_header *) &pn_union_desc,
-	(struct usb_descriptor_header *) &pn_data_nop_intf_desc,
-	(struct usb_descriptor_header *) &pn_data_intf_desc,
-	(struct usb_descriptor_header *) &pn_hs_sink_desc,
-	(struct usb_descriptor_header *) &pn_hs_source_desc,
-	NULL,
-};
+USB_COMPOSITE_ALTSETTING(intf0alt0, &pn_control_intf_desc);
+USB_COMPOSITE_ALTSETTING(intf1alt0, &pn_data_nop_intf_desc);
+USB_COMPOSITE_ALTSETTING(intf1alt1, &pn_data_intf_desc, &ep_sink, &ep_source);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+USB_COMPOSITE_INTERFACE(intf1, &intf1alt0, &intf1alt1);
+
+USB_COMPOSITE_DESCRIPTORS(phonet_descs, &intf0, &intf1);
 
 /*-------------------------------------------------------------------------*/
 
@@ -391,8 +381,6 @@ static void __pn_reset(struct usb_function *f)
 	netif_carrier_off(dev);
 	port->usb = NULL;
 
-	usb_ep_disable(fp->out_ep);
-	usb_ep_disable(fp->in_ep);
 	if (fp->rx.skb) {
 		dev_kfree_skb_irq(fp->rx.skb);
 		fp->rx.skb = NULL;
@@ -402,20 +390,13 @@ static void __pn_reset(struct usb_function *f)
 static int pn_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_phonet *fp = func_to_pn(f);
-	struct usb_gadget *gadget = fp->function.config->cdev->gadget;
+	int status, i;
 
-	if (intf == pn_control_intf_desc.bInterfaceNumber)
-		/* control interface, no altsetting */
-		return (alt > 0) ? -EINVAL : 0;
-
-	if (intf == pn_data_intf_desc.bInterfaceNumber) {
+	if (intf == 0) {
 		struct net_device *dev = fp->dev;
 		struct phonet_port *port = netdev_priv(dev);
 
 		/* data intf (0: inactive, 1: active) */
-		if (alt > 1)
-			return -EINVAL;
-
 		spin_lock(&port->lock);
 
 		if (fp->in_ep->enabled)
@@ -424,72 +405,81 @@ static int pn_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		if (alt == 1) {
 			int i;
 
-			if (config_ep_by_speed(gadget, f, fp->in_ep) ||
-			    config_ep_by_speed(gadget, f, fp->out_ep)) {
-				fp->in_ep->desc = NULL;
-				fp->out_ep->desc = NULL;
-				spin_unlock(&port->lock);
-				return -EINVAL;
-			}
-			usb_ep_enable(fp->out_ep);
-			usb_ep_enable(fp->in_ep);
+			fp->out_ep = usb_function_get_ep(f, intf, 0);
+			if (!fp->out_ep)
+				return -ENODEV;
+			fp->in_ep = usb_function_get_ep(f, intf, 1);
+			if (!fp->out_ep)
+				return -ENODEV;
 
 			port->usb = fp;
 			fp->out_ep->driver_data = fp;
 			fp->in_ep->driver_data = fp;
+
+			/* Incoming USB requests */
+			status = -ENOMEM;
+			for (i = 0; i < phonet_rxq_size; i++) {
+				struct usb_request *req;
+
+				req = usb_ep_alloc_request(fp->out_ep, GFP_KERNEL);
+				if (!req)
+					goto err_req;
+
+				req->complete = pn_rx_complete;
+				fp->out_reqv[i] = req;
+			}
+
+			/* Outgoing USB requests */
+			fp->in_req = usb_ep_alloc_request(fp->in_ep, GFP_KERNEL);
+			if (!fp->in_req)
+				goto err_req;
 
 			netif_carrier_on(dev);
 			for (i = 0; i < phonet_rxq_size; i++)
 				pn_rx_submit(fp, fp->out_reqv[i], GFP_ATOMIC);
 		}
 		spin_unlock(&port->lock);
-		return 0;
 	}
 
-	return -EINVAL;
+	return 0;
+
+err_req:
+	for (i = 0; i < phonet_rxq_size && fp->out_reqv[i]; i++)
+		usb_ep_free_request(fp->out_ep, fp->out_reqv[i]);
+	return status;
 }
 
-static int pn_get_alt(struct usb_function *f, unsigned intf)
-{
-	struct f_phonet *fp = func_to_pn(f);
-
-	if (intf == pn_control_intf_desc.bInterfaceNumber)
-		return 0;
-
-	if (intf == pn_data_intf_desc.bInterfaceNumber) {
-		struct phonet_port *port = netdev_priv(fp->dev);
-		u8 alt;
-
-		spin_lock(&port->lock);
-		alt = port->usb != NULL;
-		spin_unlock(&port->lock);
-		return alt;
-	}
-
-	return -EINVAL;
-}
-
-static void pn_disconnect(struct usb_function *f)
+static void pn_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_phonet *fp = func_to_pn(f);
 	struct phonet_port *port = netdev_priv(fp->dev);
 	unsigned long flags;
+	int i;
 
 	/* remain disabled until set_alt */
 	spin_lock_irqsave(&port->lock, flags);
 	__pn_reset(f);
 	spin_unlock_irqrestore(&port->lock, flags);
+
+	/* We are already disconnected */
+	if (fp->in_req)
+		usb_ep_free_request(fp->in_ep, fp->in_req);
+	for (i = 0; i < phonet_rxq_size; i++)
+		if (fp->out_reqv[i])
+			usb_ep_free_request(fp->out_ep, fp->out_reqv[i]);
 }
 
 /*-------------------------------------------------------------------------*/
 
-static int pn_bind(struct usb_configuration *c, struct usb_function *f)
+static int pn_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct usb_gadget *gadget = cdev->gadget;
-	struct f_phonet *fp = func_to_pn(f);
-	struct usb_ep *ep;
-	int status, i;
+	return usb_function_set_descs(f, &phonet_descs);
+}
+
+static int pn_prep_vendor_descs(struct usb_function *f)
+{
+	struct usb_composite_dev *cdev = f->config->cdev;
+	int status, intf0_id, intf1_id;
 
 	struct f_phonet_opts *phonet_opts;
 
@@ -503,78 +493,29 @@ static int pn_bind(struct usb_configuration *c, struct usb_function *f)
 	 * with regard to phonet_opts->bound access
 	 */
 	if (!phonet_opts->bound) {
-		gphonet_set_gadget(phonet_opts->net, gadget);
+		gphonet_set_gadget(phonet_opts->net, cdev->gadget);
 		status = gphonet_register_netdev(phonet_opts->net);
 		if (status)
 			return status;
 		phonet_opts->bound = true;
 	}
 
-	/* Reserve interface IDs */
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto err;
-	pn_control_intf_desc.bInterfaceNumber = status;
-	pn_union_desc.bMasterInterface0 = status;
+	intf0_id = usb_get_interface_id(f, 0);
+	intf1_id = usb_get_interface_id(f, 1);
 
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto err;
-	pn_data_nop_intf_desc.bInterfaceNumber = status;
-	pn_data_intf_desc.bInterfaceNumber = status;
-	pn_union_desc.bSlaveInterface0 = status;
+	pn_union_desc.bMasterInterface0 = intf0_id;
+	pn_union_desc.bSlaveInterface0 = intf1_id;
 
-	/* Reserve endpoints */
-	status = -ENODEV;
-	ep = usb_ep_autoconfig(gadget, &pn_fs_sink_desc);
-	if (!ep)
-		goto err;
-	fp->out_ep = ep;
+	pn_data_intf_desc.bInterfaceNumber = intf1_id;
 
-	ep = usb_ep_autoconfig(gadget, &pn_fs_source_desc);
-	if (!ep)
-		goto err;
-	fp->in_ep = ep;
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&pn_header_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&pn_phonet_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&pn_union_desc);
 
-	pn_hs_sink_desc.bEndpointAddress = pn_fs_sink_desc.bEndpointAddress;
-	pn_hs_source_desc.bEndpointAddress = pn_fs_source_desc.bEndpointAddress;
-
-	/* Do not try to bind Phonet twice... */
-	status = usb_assign_descriptors(f, fs_pn_function, hs_pn_function,
-			NULL);
-	if (status)
-		goto err;
-
-	/* Incoming USB requests */
-	status = -ENOMEM;
-	for (i = 0; i < phonet_rxq_size; i++) {
-		struct usb_request *req;
-
-		req = usb_ep_alloc_request(fp->out_ep, GFP_KERNEL);
-		if (!req)
-			goto err_req;
-
-		req->complete = pn_rx_complete;
-		fp->out_reqv[i] = req;
-	}
-
-	/* Outgoing USB requests */
-	fp->in_req = usb_ep_alloc_request(fp->in_ep, GFP_KERNEL);
-	if (!fp->in_req)
-		goto err_req;
-
-	INFO(cdev, "USB CDC Phonet function\n");
-	INFO(cdev, "using %s, OUT %s, IN %s\n", cdev->gadget->name,
-		fp->out_ep->name, fp->in_ep->name);
 	return 0;
-
-err_req:
-	for (i = 0; i < phonet_rxq_size && fp->out_reqv[i]; i++)
-		usb_ep_free_request(fp->out_ep, fp->out_reqv[i]);
-	usb_free_all_descriptors(f);
-err:
-	ERROR(cdev, "USB CDC Phonet: cannot autoconfigure\n");
-	return status;
 }
 
 static inline struct f_phonet_opts *to_f_phonet_opts(struct config_item *item)
@@ -654,21 +595,6 @@ static void phonet_free(struct usb_function *f)
 	kfree(phonet);
 }
 
-static void pn_unbind(struct usb_configuration *c, struct usb_function *f)
-{
-	struct f_phonet *fp = func_to_pn(f);
-	int i;
-
-	/* We are already disconnected */
-	if (fp->in_req)
-		usb_ep_free_request(fp->in_ep, fp->in_req);
-	for (i = 0; i < phonet_rxq_size; i++)
-		if (fp->out_reqv[i])
-			usb_ep_free_request(fp->out_ep, fp->out_reqv[i]);
-
-	usb_free_all_descriptors(f);
-}
-
 static struct usb_function *phonet_alloc(struct usb_function_instance *fi)
 {
 	struct f_phonet *fp;
@@ -684,11 +610,10 @@ static struct usb_function *phonet_alloc(struct usb_function_instance *fi)
 
 	fp->dev = opts->net;
 	fp->function.name = "phonet";
-	fp->function.bind = pn_bind;
-	fp->function.unbind = pn_unbind;
+	fp->function.prep_descs = pn_prep_descs;
+	fp->function.prep_vendor_descs = pn_prep_vendor_descs;
 	fp->function.set_alt = pn_set_alt;
-	fp->function.get_alt = pn_get_alt;
-	fp->function.disable = pn_disconnect;
+	fp->function.clear_alt = pn_clear_alt;
 	fp->function.free_func = phonet_free;
 	spin_lock_init(&fp->rx.lock);
 
