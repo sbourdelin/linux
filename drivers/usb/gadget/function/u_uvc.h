@@ -34,8 +34,7 @@ struct f_uvc_opts {
 	 * uvc_ss_control_cls arrays respectively. Legacy gadgets must
 	 * override them in their gadget bind callback.
 	 */
-	const struct uvc_descriptor_header * const	*fs_control;
-	const struct uvc_descriptor_header * const	*ss_control;
+	const struct uvc_descriptor_header * const	*control;
 
 	/*
 	 * Streaming descriptors array pointers for full-speed, high-speed and
@@ -43,9 +42,7 @@ struct f_uvc_opts {
 	 * for configfs-based gadgets. Legacy gadgets must initialize them in
 	 * their gadget bind callback.
 	 */
-	const struct uvc_descriptor_header * const	*fs_streaming;
-	const struct uvc_descriptor_header * const	*hs_streaming;
-	const struct uvc_descriptor_header * const	*ss_streaming;
+	const struct uvc_descriptor_header * const	*streaming;
 
 	/* Default control descriptors for configfs-based gadgets. */
 	struct uvc_camera_terminal_descriptor		uvc_camera_terminal;
@@ -60,8 +57,7 @@ struct f_uvc_opts {
 	 * descriptors. Used by configfs only, must not be touched by legacy
 	 * gadgets.
 	 */
-	struct uvc_descriptor_header			*uvc_fs_control_cls[5];
-	struct uvc_descriptor_header			*uvc_ss_control_cls[5];
+	struct uvc_descriptor_header			*uvc_control_cls[5];
 
 	/*
 	 * Streaming descriptors for full-speed, high-speed and super-speed.
@@ -69,9 +65,7 @@ struct f_uvc_opts {
 	 * arrays are allocated at runtime as the number of descriptors isn't
 	 * known in advance.
 	 */
-	struct uvc_descriptor_header			**uvc_fs_streaming_cls;
-	struct uvc_descriptor_header			**uvc_hs_streaming_cls;
-	struct uvc_descriptor_header			**uvc_ss_streaming_cls;
+	struct uvc_descriptor_header			**uvc_streaming_cls;
 
 	/*
 	 * Read/write access to configfs attributes is handled by configfs.

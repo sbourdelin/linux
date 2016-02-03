@@ -278,7 +278,7 @@ static const struct uvc_color_matching_descriptor uvc_color_matching = {
 	.bMatrixCoefficients	= 4,
 };
 
-static const struct uvc_descriptor_header * const uvc_fs_control_cls[] = {
+static const struct uvc_descriptor_header * const uvc_control_cls[] = {
 	(const struct uvc_descriptor_header *) &uvc_control_header,
 	(const struct uvc_descriptor_header *) &uvc_camera_terminal,
 	(const struct uvc_descriptor_header *) &uvc_processing,
@@ -286,39 +286,7 @@ static const struct uvc_descriptor_header * const uvc_fs_control_cls[] = {
 	NULL,
 };
 
-static const struct uvc_descriptor_header * const uvc_ss_control_cls[] = {
-	(const struct uvc_descriptor_header *) &uvc_control_header,
-	(const struct uvc_descriptor_header *) &uvc_camera_terminal,
-	(const struct uvc_descriptor_header *) &uvc_processing,
-	(const struct uvc_descriptor_header *) &uvc_output_terminal,
-	NULL,
-};
-
-static const struct uvc_descriptor_header * const uvc_fs_streaming_cls[] = {
-	(const struct uvc_descriptor_header *) &uvc_input_header,
-	(const struct uvc_descriptor_header *) &uvc_format_yuv,
-	(const struct uvc_descriptor_header *) &uvc_frame_yuv_360p,
-	(const struct uvc_descriptor_header *) &uvc_frame_yuv_720p,
-	(const struct uvc_descriptor_header *) &uvc_format_mjpg,
-	(const struct uvc_descriptor_header *) &uvc_frame_mjpg_360p,
-	(const struct uvc_descriptor_header *) &uvc_frame_mjpg_720p,
-	(const struct uvc_descriptor_header *) &uvc_color_matching,
-	NULL,
-};
-
-static const struct uvc_descriptor_header * const uvc_hs_streaming_cls[] = {
-	(const struct uvc_descriptor_header *) &uvc_input_header,
-	(const struct uvc_descriptor_header *) &uvc_format_yuv,
-	(const struct uvc_descriptor_header *) &uvc_frame_yuv_360p,
-	(const struct uvc_descriptor_header *) &uvc_frame_yuv_720p,
-	(const struct uvc_descriptor_header *) &uvc_format_mjpg,
-	(const struct uvc_descriptor_header *) &uvc_frame_mjpg_360p,
-	(const struct uvc_descriptor_header *) &uvc_frame_mjpg_720p,
-	(const struct uvc_descriptor_header *) &uvc_color_matching,
-	NULL,
-};
-
-static const struct uvc_descriptor_header * const uvc_ss_streaming_cls[] = {
+static const struct uvc_descriptor_header * const uvc_streaming_cls[] = {
 	(const struct uvc_descriptor_header *) &uvc_input_header,
 	(const struct uvc_descriptor_header *) &uvc_format_yuv,
 	(const struct uvc_descriptor_header *) &uvc_frame_yuv_360p,
@@ -385,11 +353,8 @@ webcam_bind(struct usb_composite_dev *cdev)
 	uvc_opts->streaming_maxburst = streaming_maxburst;
 	uvc_set_trace_param(trace);
 
-	uvc_opts->fs_control = uvc_fs_control_cls;
-	uvc_opts->ss_control = uvc_ss_control_cls;
-	uvc_opts->fs_streaming = uvc_fs_streaming_cls;
-	uvc_opts->hs_streaming = uvc_hs_streaming_cls;
-	uvc_opts->ss_streaming = uvc_ss_streaming_cls;
+	uvc_opts->control = uvc_control_cls;
+	uvc_opts->streaming = uvc_streaming_cls;
 
 	/* Allocate string descriptor numbers ... note that string contents
 	 * can be overridden by the composite_dev glue.

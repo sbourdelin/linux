@@ -509,7 +509,7 @@ static struct config_item_type uvcg_terminal_grp_type = {
 /* control/class/{fs} */
 static struct uvcg_control_class {
 	struct config_group	group;
-} uvcg_control_class_fs, uvcg_control_class_ss;
+} uvcg_control_class;
 
 
 static inline struct uvc_descriptor_header
@@ -518,11 +518,8 @@ static inline struct uvc_descriptor_header
 	struct uvcg_control_class *cl = container_of(to_config_group(i),
 		struct uvcg_control_class, group);
 
-	if (cl == &uvcg_control_class_fs)
-		return o->uvc_fs_control_cls;
-
-	if (cl == &uvcg_control_class_ss)
-		return o->uvc_ss_control_cls;
+	if (cl == &uvcg_control_class)
+		return o->uvc_control_cls;
 
 	return NULL;
 }
@@ -619,26 +616,12 @@ static struct config_item_type uvcg_control_class_type = {
 	.ct_owner	= THIS_MODULE,
 };
 
-static struct config_group *uvcg_control_class_default_groups[] = {
-	&uvcg_control_class_fs.group,
-	&uvcg_control_class_ss.group,
-	NULL,
-};
-
 /* control/class */
-static struct uvcg_control_class_grp {
-	struct config_group	group;
-} uvcg_control_class_grp;
-
-static struct config_item_type uvcg_control_class_grp_type = {
-	.ct_owner = THIS_MODULE,
-};
-
 static struct config_group *uvcg_control_default_groups[] = {
 	&uvcg_control_header_grp.group,
 	&uvcg_processing_grp.group,
 	&uvcg_terminal_grp.group,
-	&uvcg_control_class_grp.group,
+	&uvcg_control_class.group,
 	NULL,
 };
 
@@ -1797,7 +1780,7 @@ static struct config_item_type uvcg_color_matching_grp_type = {
 /* streaming/class/{fs|hs|ss} */
 static struct uvcg_streaming_class {
 	struct config_group	group;
-} uvcg_streaming_class_fs, uvcg_streaming_class_hs, uvcg_streaming_class_ss;
+} uvcg_streaming_class;
 
 
 static inline struct uvc_descriptor_header
@@ -1806,14 +1789,8 @@ static inline struct uvc_descriptor_header
 	struct uvcg_streaming_class *cl = container_of(to_config_group(i),
 		struct uvcg_streaming_class, group);
 
-	if (cl == &uvcg_streaming_class_fs)
-		return &o->uvc_fs_streaming_cls;
-
-	if (cl == &uvcg_streaming_class_hs)
-		return &o->uvc_hs_streaming_cls;
-
-	if (cl == &uvcg_streaming_class_ss)
-		return &o->uvc_ss_streaming_cls;
+	if (cl == &uvcg_streaming_class)
+		return &o->uvc_streaming_cls;
 
 	return NULL;
 }
@@ -2145,28 +2122,13 @@ static struct config_item_type uvcg_streaming_class_type = {
 	.ct_owner	= THIS_MODULE,
 };
 
-static struct config_group *uvcg_streaming_class_default_groups[] = {
-	&uvcg_streaming_class_fs.group,
-	&uvcg_streaming_class_hs.group,
-	&uvcg_streaming_class_ss.group,
-	NULL,
-};
-
 /* streaming/class */
-static struct uvcg_streaming_class_grp {
-	struct config_group	group;
-} uvcg_streaming_class_grp;
-
-static struct config_item_type uvcg_streaming_class_grp_type = {
-	.ct_owner = THIS_MODULE,
-};
-
 static struct config_group *uvcg_streaming_default_groups[] = {
 	&uvcg_streaming_header_grp.group,
 	&uvcg_uncompressed_grp.group,
 	&uvcg_mjpeg_grp.group,
 	&uvcg_color_matching_grp.group,
-	&uvcg_streaming_class_grp.group,
+	&uvcg_streaming_class.group,
 	NULL,
 };
 
@@ -2312,16 +2274,9 @@ int uvcg_attach_configfs(struct f_uvc_opts *opts)
 			uvcg_terminal_default_groups,
 			"terminal",
 			&uvcg_terminal_grp_type);
-	config_group_init_type_name(&uvcg_control_class_fs.group,
-				    "fs",
+	config_group_init_type_name(&uvcg_control_class.group,
+				    "desc",
 				    &uvcg_control_class_type);
-	config_group_init_type_name(&uvcg_control_class_ss.group,
-				    "ss",
-				    &uvcg_control_class_type);
-	uvcg_init_group(&uvcg_control_class_grp.group,
-			uvcg_control_class_default_groups,
-			"class",
-			&uvcg_control_class_grp_type);
 	uvcg_init_group(&uvcg_control_grp.group,
 			uvcg_control_default_groups,
 			"control",
@@ -2342,19 +2297,9 @@ int uvcg_attach_configfs(struct f_uvc_opts *opts)
 			uvcg_color_matching_default_groups,
 			"color_matching",
 			&uvcg_color_matching_grp_type);
-	config_group_init_type_name(&uvcg_streaming_class_fs.group,
-				    "fs",
+	config_group_init_type_name(&uvcg_streaming_class.group,
+				    "desc",
 				    &uvcg_streaming_class_type);
-	config_group_init_type_name(&uvcg_streaming_class_hs.group,
-				    "hs",
-				    &uvcg_streaming_class_type);
-	config_group_init_type_name(&uvcg_streaming_class_ss.group,
-				    "ss",
-				    &uvcg_streaming_class_type);
-	uvcg_init_group(&uvcg_streaming_class_grp.group,
-			uvcg_streaming_class_default_groups,
-			"class",
-			&uvcg_streaming_class_grp_type);
 	uvcg_init_group(&uvcg_streaming_grp.group,
 			uvcg_streaming_default_groups,
 			"streaming",

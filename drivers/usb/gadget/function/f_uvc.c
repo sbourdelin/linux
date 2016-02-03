@@ -467,26 +467,9 @@ uvc_copy_descriptors(struct uvc_device *uvc, enum usb_device_speed speed)
 	unsigned int bytes;
 	void *mem;
 
-	switch (speed) {
-	case USB_SPEED_SUPER:
-		uvc_control_desc = uvc->desc.ss_control;
-		uvc_streaming_cls = uvc->desc.ss_streaming;
-		uvc_streaming_std = uvc_ss_streaming;
-		break;
-
-	case USB_SPEED_HIGH:
-		uvc_control_desc = uvc->desc.fs_control;
-		uvc_streaming_cls = uvc->desc.hs_streaming;
-		uvc_streaming_std = uvc_hs_streaming;
-		break;
-
-	case USB_SPEED_FULL:
-	default:
-		uvc_control_desc = uvc->desc.fs_control;
-		uvc_streaming_cls = uvc->desc.fs_streaming;
-		uvc_streaming_std = uvc_fs_streaming;
-		break;
-	}
+	uvc_control_desc = uvc->desc.control;
+	uvc_streaming_cls = uvc->desc.streaming;
+	uvc_streaming_std = uvc_ss_streaming;
 
 	if (!uvc_control_desc || !uvc_streaming_cls)
 		return ERR_PTR(-ENODEV);
@@ -817,24 +800,14 @@ static struct usb_function_instance *uvc_alloc_inst(void)
 	md->bTransferCharacteristics	= 1;
 	md->bMatrixCoefficients		= 4;
 
-	/* Prepare fs control class descriptors for configfs-based gadgets */
-	ctl_cls = opts->uvc_fs_control_cls;
-	ctl_cls[0] = NULL;	/* assigned elsewhere by configfs */
-	ctl_cls[1] = (struct uvc_descriptor_header *)cd;
-	ctl_cls[2] = (struct uvc_descriptor_header *)pd;
-	ctl_cls[3] = (struct uvc_descriptor_header *)od;
-	ctl_cls[4] = NULL;	/* NULL-terminate */
-	opts->fs_control =
-		(const struct uvc_descriptor_header * const *)ctl_cls;
-
 	/* Prepare hs control class descriptors for configfs-based gadgets */
-	ctl_cls = opts->uvc_ss_control_cls;
+	ctl_cls = opts->uvc_control_cls;
 	ctl_cls[0] = NULL;	/* assigned elsewhere by configfs */
 	ctl_cls[1] = (struct uvc_descriptor_header *)cd;
 	ctl_cls[2] = (struct uvc_descriptor_header *)pd;
 	ctl_cls[3] = (struct uvc_descriptor_header *)od;
 	ctl_cls[4] = NULL;	/* NULL-terminate */
-	opts->ss_control =
+	opts->control =
 		(const struct uvc_descriptor_header * const *)ctl_cls;
 
 	opts->streaming_interval = 1;
@@ -884,27 +857,14 @@ static struct usb_function *uvc_alloc(struct usb_function_instance *fi)
 	opts = fi_to_f_uvc_opts(fi);
 
 	mutex_lock(&opts->lock);
-	if (opts->uvc_fs_streaming_cls) {
-		strm_cls = opts->uvc_fs_streaming_cls;
-		opts->fs_streaming =
-			(const struct uvc_descriptor_header * const *)strm_cls;
-	}
-	if (opts->uvc_hs_streaming_cls) {
-		strm_cls = opts->uvc_hs_streaming_cls;
-		opts->hs_streaming =
-			(const struct uvc_descriptor_header * const *)strm_cls;
-	}
-	if (opts->uvc_ss_streaming_cls) {
-		strm_cls = opts->uvc_ss_streaming_cls;
-		opts->ss_streaming =
+	if (opts->uvc_streaming_cls) {
+		strm_cls = opts->uvc_streaming_cls;
+		opts->streaming =
 			(const struct uvc_descriptor_header * const *)strm_cls;
 	}
 
-	uvc->desc.fs_control = opts->fs_control;
-	uvc->desc.ss_control = opts->ss_control;
-	uvc->desc.fs_streaming = opts->fs_streaming;
-	uvc->desc.hs_streaming = opts->hs_streaming;
-	uvc->desc.ss_streaming = opts->ss_streaming;
+	uvc->desc.control = opts->control;
+	uvc->desc.streaming = opts->streaming;
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
 
