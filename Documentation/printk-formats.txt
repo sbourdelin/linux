@@ -193,7 +193,7 @@ IPv4/IPv6 addresses (generic, with port, flowinfo, scope):
 	%piS	001.002.003.004	or 00010002000300040005000600070008
 	%pISc	1.2.3.4		or 1:2:3:4:5:6:7:8
 	%pISpc	1.2.3.4:12345	or [1:2:3:4:5:6:7:8]:12345
-	%p[Ii]S[pfschnbl]
+	%p[Ii]S[pfsachnbl]
 
 	For printing an IP address without the need to distinguish whether it's
 	of type AF_INET or AF_INET6, a pointer to a valid 'struct sockaddr',
@@ -201,7 +201,9 @@ IPv4/IPv6 addresses (generic, with port, flowinfo, scope):
 
 	The additional 'p', 'f', and 's' specifiers are used to specify port
 	(IPv4, IPv6), flowinfo (IPv6) and scope (IPv6). Ports have a ':' prefix,
-	flowinfo a '/' and scope a '%', each followed by the actual value.
+	flowinfo a '/' and scope a '%', each followed by the actual value. If 'a'
+	is given, 'p', 'f', and 's' are activated or deactivated depending on
+	whether or not the sockaddr has a non-zero port, flowinfo, and scope.
 
 	In case of an IPv6 address the compressed IPv6 address as described by
 	http://tools.ietf.org/html/rfc5952 is being used if the additional
