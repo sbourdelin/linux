@@ -2077,7 +2077,13 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		if (!f)
 			break;
 		/* lots of interfaces only need altsetting zero... */
-		value = f->get_alt ? f->get_alt(f, w_index) : 0;
+		if (usb_function_is_new_api(f)) {
+			value = usb_interface_id_to_index(f, intf);
+			if (value >= 0)
+				value = f->descs->intfs[value]->cur_altset;
+		} else {
+			value = f->get_alt ? f->get_alt(f, w_index) : 0;
+		}
 		if (value < 0)
 			break;
 		*((u8 *)req->buf) = value;
