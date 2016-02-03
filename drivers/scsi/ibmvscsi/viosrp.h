@@ -38,6 +38,8 @@
 #define SRP_VERSION "16.a"
 #define SRP_MAX_IU_LEN	256
 #define SRP_MAX_LOC_LEN 32
+#define SRP_MAD_VERSION_1 1
+#define SRP_MAD_OS_LINUX 2
 
 union srp_iu {
 	struct srp_login_req login_req;
