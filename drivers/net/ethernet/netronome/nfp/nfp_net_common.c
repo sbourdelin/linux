@@ -1259,22 +1259,19 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 
 		meta_len = rxd->rxd.meta_len_dd & PCIE_DESC_RX_META_LEN_MASK;
 		data_len = le16_to_cpu(rxd->rxd.data_len);
+		/* For dynamic offset data_len includes meta_len, adjust */
+		if (nn->rx_offset == NFP_NET_CFG_RX_OFFSET_DYNAMIC)
+			data_len -= meta_len;
+		else
+			meta_len = nn->rx_offset;
 
-		if (WARN_ON_ONCE(data_len > nn->fl_bufsz)) {
+		if (WARN_ON_ONCE(meta_len + data_len > nn->fl_bufsz)) {
 			dev_kfree_skb_any(skb);
 			continue;
 		}
 
-		if (nn->rx_offset == NFP_NET_CFG_RX_OFFSET_DYNAMIC) {
-			/* The packet data starts after the metadata */
-			skb_reserve(skb, meta_len);
-		} else {
-			/* The packet data starts at a fixed offset */
-			skb_reserve(skb, nn->rx_offset);
-		}
-
-		/* Adjust the SKB for the dynamic meta data pre-pended */
-		skb_put(skb, data_len - meta_len);
+		skb_reserve(skb, meta_len);
+		skb_put(skb, data_len);
 
 		nfp_net_set_hash(nn->netdev, skb, rxd);
 
