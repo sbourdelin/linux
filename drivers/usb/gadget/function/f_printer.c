@@ -135,13 +135,6 @@ static struct usb_endpoint_descriptor fs_ep_out_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK
 };
 
-static struct usb_descriptor_header *fs_printer_function[] = {
-	(struct usb_descriptor_header *) &intf_desc,
-	(struct usb_descriptor_header *) &fs_ep_in_desc,
-	(struct usb_descriptor_header *) &fs_ep_out_desc,
-	NULL
-};
-
 /*
  * usb 2.0 devices need to expose both high speed and full speed
  * descriptors, unless they only run at full speed.
@@ -167,13 +160,6 @@ static struct usb_qualifier_descriptor dev_qualifier = {
 	.bcdUSB =		cpu_to_le16(0x0200),
 	.bDeviceClass =		USB_CLASS_PRINTER,
 	.bNumConfigurations =	1
-};
-
-static struct usb_descriptor_header *hs_printer_function[] = {
-	(struct usb_descriptor_header *) &intf_desc,
-	(struct usb_descriptor_header *) &hs_ep_in_desc,
-	(struct usb_descriptor_header *) &hs_ep_out_desc,
-	NULL
 };
 
 /*
@@ -204,14 +190,16 @@ static struct usb_ss_ep_comp_descriptor ss_ep_out_comp_desc = {
 	.bDescriptorType =      USB_DT_SS_ENDPOINT_COMP,
 };
 
-static struct usb_descriptor_header *ss_printer_function[] = {
-	(struct usb_descriptor_header *) &intf_desc,
-	(struct usb_descriptor_header *) &ss_ep_in_desc,
-	(struct usb_descriptor_header *) &ss_ep_in_comp_desc,
-	(struct usb_descriptor_header *) &ss_ep_out_desc,
-	(struct usb_descriptor_header *) &ss_ep_out_comp_desc,
-	NULL
-};
+USB_COMPOSITE_ENDPOINT(ep_in, &fs_ep_in_desc, &hs_ep_in_desc,
+		&ss_ep_in_desc, &ss_ep_in_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_out, &fs_ep_out_desc, &hs_ep_out_desc,
+		&ss_ep_out_desc, &ss_ep_out_comp_desc);
+
+USB_COMPOSITE_ALTSETTING(intf0alt0, &intf_desc, &ep_in, &ep_out);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+
+USB_COMPOSITE_DESCRIPTORS(printer_descs, &intf0);
 
 /* maxpacket and other transfer characteristics vary by speed. */
 static inline struct usb_endpoint_descriptor *ep_desc(struct usb_gadget *gadget,
@@ -764,86 +752,6 @@ static const struct file_operations printer_io_operations = {
 
 /*-------------------------------------------------------------------------*/
 
-static int
-set_printer_interface(struct printer_dev *dev)
-{
-	int			result = 0;
-
-	dev->in_ep->desc = ep_desc(dev->gadget, &fs_ep_in_desc, &hs_ep_in_desc,
-				&ss_ep_in_desc);
-	dev->in_ep->driver_data = dev;
-
-	dev->out_ep->desc = ep_desc(dev->gadget, &fs_ep_out_desc,
-				    &hs_ep_out_desc, &ss_ep_out_desc);
-	dev->out_ep->driver_data = dev;
-
-	result = usb_ep_enable(dev->in_ep);
-	if (result != 0) {
-		DBG(dev, "enable %s --> %d\n", dev->in_ep->name, result);
-		goto done;
-	}
-
-	result = usb_ep_enable(dev->out_ep);
-	if (result != 0) {
-		DBG(dev, "enable %s --> %d\n", dev->in_ep->name, result);
-		goto done;
-	}
-
-done:
-	/* on error, disable any endpoints  */
-	if (result != 0) {
-		(void) usb_ep_disable(dev->in_ep);
-		(void) usb_ep_disable(dev->out_ep);
-		dev->in_ep->desc = NULL;
-		dev->out_ep->desc = NULL;
-	}
-
-	/* caller is responsible for cleanup on error */
-	return result;
-}
-
-static void printer_reset_interface(struct printer_dev *dev)
-{
-	unsigned long	flags;
-
-	if (dev->interface < 0)
-		return;
-
-	DBG(dev, "%s\n", __func__);
-
-	if (dev->in_ep->desc)
-		usb_ep_disable(dev->in_ep);
-
-	if (dev->out_ep->desc)
-		usb_ep_disable(dev->out_ep);
-
-	spin_lock_irqsave(&dev->lock, flags);
-	dev->in_ep->desc = NULL;
-	dev->out_ep->desc = NULL;
-	dev->interface = -1;
-	spin_unlock_irqrestore(&dev->lock, flags);
-}
-
-/* Change our operational Interface. */
-static int set_interface(struct printer_dev *dev, unsigned number)
-{
-	int			result = 0;
-
-	/* Free the current interface */
-	printer_reset_interface(dev);
-
-	result = set_printer_interface(dev);
-	if (result)
-		printer_reset_interface(dev);
-	else
-		dev->interface = number;
-
-	if (!result)
-		INFO(dev, "Using interface %x\n", number);
-
-	return result;
-}
-
 static void printer_soft_reset(struct printer_dev *dev)
 {
 	struct usb_request	*req;
@@ -1008,55 +916,64 @@ unknown:
 	return value;
 }
 
-static int printer_func_bind(struct usb_configuration *c,
-		struct usb_function *f)
+static int printer_func_prep_descs(struct usb_function *f)
 {
-	struct usb_gadget *gadget = c->cdev->gadget;
+	return usb_function_set_descs(f, &printer_descs);
+}
+
+static int printer_func_prep_vendor_descs(struct usb_function *f)
+{
 	struct printer_dev *dev = func_to_printer(f);
 	struct device *pdev;
-	struct usb_composite_dev *cdev = c->cdev;
-	struct usb_ep *in_ep;
-	struct usb_ep *out_ep = NULL;
-	struct usb_request *req;
 	dev_t devt;
-	int id;
 	int ret;
-	u32 i;
 
-	id = usb_interface_id(c, f);
-	if (id < 0)
-		return id;
-	intf_desc.bInterfaceNumber = id;
+	dev->interface = usb_get_interface_id(f, 0);
 
-	/* finish hookup to lower layer ... */
-	dev->gadget = gadget;
-
-	/* all we really need is bulk IN/OUT */
-	in_ep = usb_ep_autoconfig(cdev->gadget, &fs_ep_in_desc);
-	if (!in_ep) {
-autoconf_fail:
-		dev_err(&cdev->gadget->dev, "can't autoconfigure on %s\n",
-			cdev->gadget->name);
-		return -ENODEV;
+		/* Setup the sysfs files for the printer gadget. */
+	devt = MKDEV(major, dev->minor);
+	pdev = device_create(usb_gadget_class, NULL, devt,
+				  NULL, "g_printer%d", dev->minor);
+	if (IS_ERR(pdev)) {
+		ERROR(dev, "Failed to create device: g_printer\n");
+		return PTR_ERR(pdev);
 	}
 
-	out_ep = usb_ep_autoconfig(cdev->gadget, &fs_ep_out_desc);
-	if (!out_ep)
-		goto autoconf_fail;
+	/*
+	 * Register a character device as an interface to a user mode
+	 * program that handles the printer specific functionality.
+	 */
+	cdev_init(&dev->printer_cdev, &printer_io_operations);
+	dev->printer_cdev.owner = THIS_MODULE;
+	ret = cdev_add(&dev->printer_cdev, devt, 1);
+	if (ret) {
+		ERROR(dev, "Failed to open char device\n");
+		device_destroy(usb_gadget_class, devt);
+	}
 
-	/* assumes that all endpoints are dual-speed */
-	hs_ep_in_desc.bEndpointAddress = fs_ep_in_desc.bEndpointAddress;
-	hs_ep_out_desc.bEndpointAddress = fs_ep_out_desc.bEndpointAddress;
-	ss_ep_in_desc.bEndpointAddress = fs_ep_in_desc.bEndpointAddress;
-	ss_ep_out_desc.bEndpointAddress = fs_ep_out_desc.bEndpointAddress;
+	return ret;
+}
 
-	ret = usb_assign_descriptors(f, fs_printer_function,
-			hs_printer_function, ss_printer_function);
-	if (ret)
-		return ret;
+static int printer_func_set_alt(struct usb_function *f,
+		unsigned intf, unsigned alt)
+{
+	struct printer_dev *dev = func_to_printer(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
+	struct usb_request *req;
+	int i, ret = -ENOTSUPP;
 
-	dev->in_ep = in_ep;
-	dev->out_ep = out_ep;
+	/* finish hookup to lower layer ... */
+	dev->gadget = cdev->gadget;
+
+	dev->in_ep = usb_function_get_ep(f, intf, 0);
+	if (!dev->in_ep)
+		return -ENODEV;
+	dev->out_ep = usb_function_get_ep(f, intf, 1);
+	if (!dev->out_ep)
+		return -ENODEV;
+
+	dev->in_ep->driver_data = dev;
+	dev->out_ep->driver_data = dev;
 
 	ret = -ENOMEM;
 	for (i = 0; i < dev->q_len; i++) {
@@ -1073,32 +990,7 @@ autoconf_fail:
 		list_add(&req->list, &dev->rx_reqs);
 	}
 
-	/* Setup the sysfs files for the printer gadget. */
-	devt = MKDEV(major, dev->minor);
-	pdev = device_create(usb_gadget_class, NULL, devt,
-				  NULL, "g_printer%d", dev->minor);
-	if (IS_ERR(pdev)) {
-		ERROR(dev, "Failed to create device: g_printer\n");
-		ret = PTR_ERR(pdev);
-		goto fail_rx_reqs;
-	}
-
-	/*
-	 * Register a character device as an interface to a user mode
-	 * program that handles the printer specific functionality.
-	 */
-	cdev_init(&dev->printer_cdev, &printer_io_operations);
-	dev->printer_cdev.owner = THIS_MODULE;
-	ret = cdev_add(&dev->printer_cdev, devt, 1);
-	if (ret) {
-		ERROR(dev, "Failed to open char device\n");
-		goto fail_cdev_add;
-	}
-
 	return 0;
-
-fail_cdev_add:
-	device_destroy(usb_gadget_class, devt);
 
 fail_rx_reqs:
 	while (!list_empty(&dev->rx_reqs)) {
@@ -1115,28 +1007,44 @@ fail_tx_reqs:
 	}
 
 	return ret;
-
 }
 
-static int printer_func_set_alt(struct usb_function *f,
+static void printer_func_clear_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
 	struct printer_dev *dev = func_to_printer(f);
-	int ret = -ENOTSUPP;
-
-	if (!alt)
-		ret = set_interface(dev, intf);
-
-	return ret;
-}
-
-static void printer_func_disable(struct usb_function *f)
-{
-	struct printer_dev *dev = func_to_printer(f);
+	struct usb_request	*req;
 
 	DBG(dev, "%s\n", __func__);
 
-	printer_reset_interface(dev);
+	/* we must already have been disconnected ... no i/o may be active */
+	WARN_ON(!list_empty(&dev->tx_reqs_active));
+	WARN_ON(!list_empty(&dev->rx_reqs_active));
+
+	/* Free all memory for this driver. */
+	while (!list_empty(&dev->tx_reqs)) {
+		req = container_of(dev->tx_reqs.next, struct usb_request,
+				list);
+		list_del(&req->list);
+		printer_req_free(dev->in_ep, req);
+	}
+
+	if (dev->current_rx_req != NULL)
+		printer_req_free(dev->out_ep, dev->current_rx_req);
+
+	while (!list_empty(&dev->rx_reqs)) {
+		req = container_of(dev->rx_reqs.next,
+				struct usb_request, list);
+		list_del(&req->list);
+		printer_req_free(dev->out_ep, req);
+	}
+
+	while (!list_empty(&dev->rx_buffers)) {
+		req = container_of(dev->rx_buffers.next,
+				struct usb_request, list);
+		list_del(&req->list);
+		printer_req_free(dev->out_ep, req);
+	}
 }
 
 static inline struct f_printer_opts
@@ -1333,45 +1241,12 @@ static void gprinter_free(struct usb_function *f)
 static void printer_func_unbind(struct usb_configuration *c,
 		struct usb_function *f)
 {
-	struct printer_dev	*dev;
-	struct usb_request	*req;
-
-	dev = func_to_printer(f);
+	struct printer_dev *dev = func_to_printer(f);
 
 	device_destroy(usb_gadget_class, MKDEV(major, dev->minor));
 
 	/* Remove Character Device */
 	cdev_del(&dev->printer_cdev);
-
-	/* we must already have been disconnected ... no i/o may be active */
-	WARN_ON(!list_empty(&dev->tx_reqs_active));
-	WARN_ON(!list_empty(&dev->rx_reqs_active));
-
-	/* Free all memory for this driver. */
-	while (!list_empty(&dev->tx_reqs)) {
-		req = container_of(dev->tx_reqs.next, struct usb_request,
-				list);
-		list_del(&req->list);
-		printer_req_free(dev->in_ep, req);
-	}
-
-	if (dev->current_rx_req != NULL)
-		printer_req_free(dev->out_ep, dev->current_rx_req);
-
-	while (!list_empty(&dev->rx_reqs)) {
-		req = container_of(dev->rx_reqs.next,
-				struct usb_request, list);
-		list_del(&req->list);
-		printer_req_free(dev->out_ep, req);
-	}
-
-	while (!list_empty(&dev->rx_buffers)) {
-		req = container_of(dev->rx_buffers.next,
-				struct usb_request, list);
-		list_del(&req->list);
-		printer_req_free(dev->out_ep, req);
-	}
-	usb_free_all_descriptors(f);
 }
 
 static struct usb_function *gprinter_alloc(struct usb_function_instance *fi)
@@ -1400,11 +1275,12 @@ static struct usb_function *gprinter_alloc(struct usb_function_instance *fi)
 	mutex_unlock(&opts->lock);
 
 	dev->function.name = "printer";
-	dev->function.bind = printer_func_bind;
+	dev->function.prep_descs = printer_func_prep_descs;
+	dev->function.prep_vendor_descs = printer_func_prep_vendor_descs;
 	dev->function.setup = printer_func_setup;
 	dev->function.unbind = printer_func_unbind;
 	dev->function.set_alt = printer_func_set_alt;
-	dev->function.disable = printer_func_disable;
+	dev->function.clear_alt = printer_func_clear_alt;
 	dev->function.req_match = gprinter_req_match;
 	dev->function.free_func = gprinter_free;
 
