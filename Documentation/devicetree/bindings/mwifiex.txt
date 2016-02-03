@@ -14,6 +14,11 @@ Optional properties:
   - mwifiex,chip-gpio : Chip's wakeup gpio pin number. This needs to be downloaded
 			to to firmware. Chip notifies wifi wakeup signal to SOC
 			through this pin.
+  - interrupt-parent: phandle of the parent interrupt controller
+  - interrupts : interrupt number to the cpu
+  - gpios: specify SOC's wakeup GPIO
+  - pinctrl-names : a pinctrl state named "default" must be defined
+  - pinctrl-0 : pin control group to be used for this controller
 
 Example:
 
@@ -27,5 +32,10 @@ mwifiex {
 	mwifiex,caldata_00_txpwrlimit_2g_cfg_set = /bits/ 8 <
 0x01 0x00 0x06 0x00 0x08 0x02 0x89 0x01 ...>;
 	mwifiex,chip-gpio = <3>;
+	interrupt-parent = <&pio>;
+	interrupts = <38 IRQ_TYPE_LEVEL_LOW>;
+	gpios = <&pio 38 GPIO_ACTIVE_HIGH>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&wake_pins>;
 };
 
