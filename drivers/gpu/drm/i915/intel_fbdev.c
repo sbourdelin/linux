@@ -114,6 +114,20 @@ static struct fb_ops intelfb_ops = {
 	.fb_debug_leave = drm_fb_helper_debug_leave,
 };
 
+static bool intel_fbdev_active(struct intel_fbdev *ifbdev)
+{
+	struct fb_info *info;
+
+	if (ifbdev == NULL)
+		return false;
+
+	info = ifbdev->helper.fbdev;
+	if (!info->screen_base)
+		return false;
+
+	return info->state == FBINFO_STATE_RUNNING;
+}
+
 static int intelfb_alloc(struct drm_fb_helper *helper,
 			 struct drm_fb_helper_surface_size *sizes)
 {
@@ -753,6 +767,8 @@ void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous
 		return;
 
 	info = ifbdev->helper.fbdev;
+	if (!info->screen_base)
+		return;
 
 	if (synchronous) {
 		/* Flush any pending work to turn the console on, and then
@@ -794,29 +810,24 @@ void intel_fbdev_set_suspend(struct drm_device *dev, int state, bool synchronous
 
 void intel_fbdev_output_poll_changed(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	if (dev_priv->fbdev)
+	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	if (intel_fbdev_active(dev_priv->fbdev))
 		drm_fb_helper_hotplug_event(&dev_priv->fbdev->helper);
 }
 
 void intel_fbdev_restore_mode(struct drm_device *dev)
 {
-	int ret;
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_fbdev *ifbdev = dev_priv->fbdev;
-	struct drm_fb_helper *fb_helper;
+	struct intel_fbdev *ifbdev = to_i915(dev)->fbdev;
 
-	if (!ifbdev)
+	if (!intel_fbdev_active(ifbdev))
 		return;
 
-	fb_helper = &ifbdev->helper;
-
-	ret = drm_fb_helper_restore_fbdev_mode_unlocked(fb_helper);
-	if (ret) {
-		DRM_DEBUG("failed to restore crtc mode\n");
-	} else {
-		mutex_lock(&fb_helper->dev->struct_mutex);
+	if (drm_fb_helper_restore_fbdev_mode_unlocked(&ifbdev->helper) == 0) {
+		mutex_lock(&dev->struct_mutex);
 		intel_fb_obj_invalidate(ifbdev->fb->obj, ORIGIN_GTT);
-		mutex_unlock(&fb_helper->dev->struct_mutex);
+		mutex_unlock(&dev->struct_mutex);
+	} else {
+		DRM_DEBUG("failed to restore crtc mode\n");
 	}
 }
