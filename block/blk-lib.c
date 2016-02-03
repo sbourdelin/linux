@@ -19,7 +19,9 @@ static void bio_batch_end_io(struct bio *bio)
 {
 	struct bio_batch *bb = bio->bi_private;
 
-	if (bio->bi_error && bio->bi_error != -EOPNOTSUPP)
+	/* ignore -EOPNOTSUPP only when issue a discard request */
+	if (bio->bi_error && (!(bio->bi_rw & REQ_DISCARD) ||
+			(bio->bi_error != -EOPNOTSUPP)))
 		bb->error = bio->bi_error;
 	if (atomic_dec_and_test(&bb->done))
 		complete(bb->wait);
