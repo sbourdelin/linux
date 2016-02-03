@@ -420,6 +420,7 @@ int usb_altset_add_vendor_desc(struct usb_function *f, int i, int a,
 int usb_ep_add_vendor_desc(struct usb_function *f, int i, int a, int e,
 		const struct usb_descriptor_header *desc);
 
+
 int usb_interface_id(struct usb_configuration *, struct usb_function *);
 
 int config_ep_by_speed(struct usb_gadget *g, struct usb_function *f,
@@ -509,6 +510,8 @@ int usb_add_config(struct usb_composite_dev *,
 
 void usb_remove_config(struct usb_composite_dev *,
 		struct usb_configuration *);
+
+int usb_config_do_bind(struct usb_configuration *c);
 
 /* predefined index for usb_composite_driver */
 enum {

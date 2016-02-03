@@ -327,6 +327,21 @@ int usb_function_activate(struct usb_function *function)
 EXPORT_SYMBOL_GPL(usb_function_activate);
 
 /**
+ * usb_function_is_new_api - checks if USB function uses new API
+ * @f: USB function
+ *
+ * This function is added temporarily to allow both old and new function API
+ * to coexist. It function will be removed after converting all USB functions
+ * in kernel to new API.
+ *
+ * Returns true if function uses new API.
+ */
+static inline bool usb_function_is_new_api(struct usb_function *f)
+{
+	return !!f->prep_descs;
+}
+
+/**
  * usb_function_set_descs - assing descriptors to USB function
  * @f: USB function
  * @descs: USB descriptors to be assigned to function
@@ -1108,6 +1123,12 @@ int usb_add_config(struct usb_composite_dev *cdev,
 		goto done;
 
 	status = bind(config);
+	if (status < 0)
+		goto out;
+
+	status = usb_config_do_bind(config);
+
+out:
 	if (status < 0) {
 		while (!list_empty(&config->functions)) {
 			struct usb_function		*f;
@@ -2402,6 +2423,147 @@ void composite_dev_cleanup(struct usb_composite_dev *cdev)
 	cdev->next_string_id = 0;
 	device_remove_file(&cdev->gadget->dev, &dev_attr_suspended);
 }
+
+/**
+ * usb_cmp_ep_descs - compare descriptors of two endpoints
+ *
+ * As currently during autoconfig procedure we take into consideration only
+ * FullSpeed and SuperSpeed Companion descriptors, we need to compare only
+ * these descriptors. It they are the same, endpoints are identical from
+ * autoconfig point of view.
+ */
+static int usb_cmp_ep_descs(struct usb_composite_ep *ep1,
+		struct usb_composite_ep *ep2)
+{
+	if (ep1->fs.desc->bLength != ep2->fs.desc->bLength)
+		return 0;
+	if (usb_endpoint_dir_in(ep1->fs.desc) ^
+			usb_endpoint_dir_in(ep2->fs.desc))
+		return 0;
+	if (ep1->fs.desc->bmAttributes != ep2->fs.desc->bmAttributes)
+		return 0;
+	if (ep1->fs.desc->wMaxPacketSize != ep2->fs.desc->wMaxPacketSize)
+		return 0;
+	if (ep1->fs.desc->bInterval != ep2->fs.desc->bInterval)
+		return 0;
+
+	if (ep1->fs.desc->bLength != USB_DT_ENDPOINT_AUDIO_SIZE)
+		goto ss_comp;
+
+	if (ep1->fs.desc->bRefresh != ep2->fs.desc->bRefresh)
+		return 0;
+	if (ep1->fs.desc->bSynchAddress != ep2->fs.desc->bSynchAddress)
+		return 0;
+
+ss_comp:
+	if (!ep1->ss_comp.desc ^ !ep2->ss_comp.desc)
+		return 0;
+	if (!ep1->ss_comp.desc)
+		return 1;
+
+	if (ep1->ss_comp.desc->bMaxBurst != ep2->ss_comp.desc->bMaxBurst)
+		return 0;
+	if (ep1->ss_comp.desc->bmAttributes != ep2->ss_comp.desc->bmAttributes)
+		return 0;
+	if (ep1->ss_comp.desc->wBytesPerInterval !=
+			ep2->ss_comp.desc->wBytesPerInterval)
+		return 0;
+
+	return 1;
+}
+
+/**
+ * ep_update_address() - update endpoint address in descriptors
+ * @ep: composite endpoint with assigned hardware ep
+ *
+ * This function should be called after setting ep->ep to endpoint obtained
+ * from usb_ep_autoconfig_ss(), to update endpoint address in descriptors for
+ * all supported speeds.
+ */
+static inline void ep_update_address(struct usb_composite_ep *ep)
+{
+	if (ep->fs.desc)
+		ep->hs.desc->bEndpointAddress = ep->ep->address;
+	if (ep->hs.desc)
+		ep->hs.desc->bEndpointAddress = ep->ep->address;
+	if (ep->ss.desc)
+		ep->ss.desc->bEndpointAddress = ep->ep->address;
+}
+
+/**
+ * interface_do_bind() - bind interface to UDC
+ * @c: USB configuration
+ * @f: USB function in configuration c
+ * @intf: USB interface in function f
+ *
+ * For now we use only simple interface-level ep aucoconfig solver.
+ * We share endpoints between altsettings where it's possible.
+ */
+static int interface_do_bind(struct usb_configuration *c,
+		struct usb_function *f, struct usb_composite_intf *intf)
+{
+	struct usb_composite_altset *alt, *altx;
+	struct usb_composite_ep *ep, *epx;
+	int a, e, ax, ex;
+
+	intf->id = usb_interface_id(c, f);
+	intf->cur_altset = -1;
+
+	for (a = 0; a < intf->altsets_num; ++a) {
+		alt = intf->altsets[a];
+		alt->alt.desc->bInterfaceNumber = intf->id;
+		for (e = 0; e < alt->eps_num; ++e) {
+			ep = alt->eps[e];
+			if (ep->ep)
+				continue;
+			ep->ep = usb_ep_autoconfig_ss(c->cdev->gadget,
+					ep->fs.desc, ep->ss_comp.desc);
+			if (!ep->ep)
+				return -ENODEV;
+			ep_update_address(ep);
+			/* Try endpoint for other altsets */
+			for (ax = a + 1; ax < intf->altsets_num; ++ax) {
+				altx = intf->altsets[ax];
+				for (ex = 0; ex < altx->eps_num; ++ex) {
+					epx = altx->eps[ex];
+					if (usb_cmp_ep_descs(ep, epx)) {
+						epx->ep = ep->ep;
+						ep_update_address(epx);
+					}
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * config_do_bind() - bind configuration to UDC
+ * @c: USB configuration
+ *
+ * Bind the all functions in configuration to UDC.
+ */
+int usb_config_do_bind(struct usb_configuration *c)
+{
+	struct usb_function *f;
+	struct usb_composite_intf *intf;
+	int i, ret;
+
+	list_for_each_entry(f, &c->functions, list) {
+		if (!usb_function_is_new_api(f))
+			continue;
+		for (i = 0; i < f->descs->intfs_num; ++i) {
+			intf = f->descs->intfs[i];
+			ret = interface_do_bind(c, f, intf);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(usb_config_do_bind);
 
 static int composite_bind(struct usb_gadget *gadget,
 		struct usb_gadget_driver *gdriver)
