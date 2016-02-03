@@ -600,9 +600,11 @@ extern int composite_os_desc_req_prepare(struct usb_composite_dev *cdev,
 void composite_dev_cleanup(struct usb_composite_dev *cdev);
 
 int composite_prep_vendor_descs(struct usb_composite_dev *cdev);
+int composite_generate_old_descs(struct usb_composite_dev *cdev);
 
 void composite_free_descs(struct usb_composite_dev *cdev);
 void composite_free_vendor_descs(struct usb_composite_dev *cdev);
+void composite_free_old_descs(struct usb_composite_dev *cdev);
 
 static inline struct usb_composite_driver *to_cdriver(
 		struct usb_gadget_driver *gdrv)

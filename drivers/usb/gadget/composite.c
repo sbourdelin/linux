@@ -2254,6 +2254,30 @@ void composite_free_vendor_descs(struct usb_composite_dev *cdev)
 }
 EXPORT_SYMBOL_GPL(composite_free_vendor_descs);
 
+/**
+ * composite_free_old_descs - for all functions implementing new API free old
+ *	descriptors arrays.
+ * @cdev: composite device
+ */
+void composite_free_old_descs(struct usb_composite_dev *cdev)
+{
+	struct usb_configuration *c;
+	struct usb_function *f;
+
+	list_for_each_entry(c, &cdev->configs, list)
+		list_for_each_entry(f, &c->functions, list) {
+			if (!usb_function_is_new_api(f))
+				continue;
+			kfree(f->fs_descriptors);
+			kfree(f->hs_descriptors);
+			kfree(f->ss_descriptors);
+			f->fs_descriptors = NULL;
+			f->hs_descriptors = NULL;
+			f->ss_descriptors = NULL;
+		}
+}
+EXPORT_SYMBOL_GPL(composite_free_old_descs);
+
 static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 {
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
@@ -2265,6 +2289,7 @@ static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 	 */
 	WARN_ON(cdev->config);
 
+	composite_free_old_descs(cdev);
 	composite_free_vendor_descs(cdev);
 	composite_free_descs(cdev);
 
@@ -2592,6 +2617,152 @@ int composite_prep_vendor_descs(struct usb_composite_dev *cdev)
 }
 EXPORT_SYMBOL_GPL(composite_prep_vendor_descs);
 
+/*
+ * function_add_desc() - Add given descriptor to descriptor arrays for
+ *	each supported speed, in proper version for each speed.
+ *
+ * @f - USB function
+ * @idx - pointer to index of descriptor in fs and hs array
+ * @idx_ss - pointer to index of descriptor in ss array
+ * @fs - descriptor for FS
+ * @hs - descriptor for HS
+ * @ss - descriptor for SS
+ *
+ * Indexes are automatically incremented.
+ *
+ * This function will be removed after converting all USB functions
+ * in kernel to new API.
+ */
+static inline void function_add_desc(struct usb_function *f,
+		int *idx, int *idx_ss,
+		struct usb_descriptor_header *fs,
+		struct usb_descriptor_header *hs,
+		struct usb_descriptor_header *ss) {
+	if (f->config->fullspeed)
+		f->fs_descriptors[*idx] = fs;
+	if (f->config->highspeed)
+		f->hs_descriptors[*idx] = hs;
+	if (f->config->superspeed)
+		f->ss_descriptors[*idx_ss] = ss;
+	++(*idx);
+	++(*idx_ss);
+}
+
+/*
+ * function_generate_old_descs() - generate descriptors array for each speed
+ *
+ * Allocate arrays of needed size and assign to them USB descriptors.
+ *
+ * This is temporary solution allowing coexistence to both old and new function
+ * API. It will be removed after converting all functions in kernel to new API.
+ */
+static int function_generate_old_descs(struct usb_function *f)
+{
+	struct usb_composite_intf *intf;
+	struct usb_composite_altset *alt;
+	struct usb_composite_ep *ep;
+	struct usb_composite_vendor_desc *vd;
+	int cnt, eps, i, a, e, idx, idx_ss;
+
+	cnt = f->descs->vendor_descs_num;
+	eps = 0;
+
+	for (i = 0; i < f->descs->intfs_num; ++i) {
+		intf = f->descs->intfs[i];
+		for (a = 0; a < intf->altsets_num; ++a) {
+			alt = intf->altsets[a];
+			cnt += alt->vendor_descs_num + 1;
+			eps += alt->eps_num;
+			for (e = 0; e < alt->eps_num; ++e)
+				cnt += alt->eps[e]->vendor_descs_num + 1;
+		}
+	}
+
+	if (f->config->fullspeed) {
+		f->fs_descriptors = kzalloc((cnt + 1) *
+				sizeof(*f->fs_descriptors), GFP_KERNEL);
+		if (!f->fs_descriptors)
+			return -ENOMEM;
+	}
+	if (f->config->highspeed) {
+		f->hs_descriptors = kzalloc((cnt + 1) *
+				sizeof(*f->hs_descriptors), GFP_KERNEL);
+		if (!f->hs_descriptors)
+			goto err;
+	}
+	if (f->config->superspeed) {
+		f->ss_descriptors = kzalloc((cnt + eps + 1) *
+				sizeof(*f->ss_descriptors), GFP_KERNEL);
+		if (!f->ss_descriptors)
+			goto err;
+	}
+
+	idx = 0;
+	idx_ss = 0;
+	list_for_each_entry(vd, &f->descs->vendor_descs, list)
+		function_add_desc(f, &idx, &idx_ss,
+				vd->desc, vd->desc, vd->desc);
+	for (i = 0; i < f->descs->intfs_num; ++i) {
+		intf = f->descs->intfs[i];
+		for (a = 0; a < intf->altsets_num; ++a) {
+			alt = intf->altsets[a];
+			function_add_desc(f, &idx, &idx_ss, alt->alt.header,
+					alt->alt.header, alt->alt.header);
+			list_for_each_entry(vd, &alt->vendor_descs, list)
+				function_add_desc(f, &idx, &idx_ss,
+						vd->desc, vd->desc, vd->desc);
+			for (e = 0; e < alt->eps_num; ++e) {
+				ep = alt->eps[e];
+				function_add_desc(f, &idx, &idx_ss,
+						ep->fs.header, ep->hs.header,
+						ep->ss.header);
+				if (f->config->superspeed)
+					f->ss_descriptors[idx_ss++] =
+							ep->ss_comp.header;
+				list_for_each_entry(vd,
+						&ep->vendor_descs, list)
+					function_add_desc(f, &idx, &idx_ss,
+						vd->desc, vd->desc, vd->desc);
+			}
+		}
+	}
+
+	return 0;
+
+err:
+	kfree(f->ss_descriptors);
+	f->ss_descriptors = NULL;
+	kfree(f->hs_descriptors);
+	f->hs_descriptors = NULL;
+	kfree(f->fs_descriptors);
+	f->fs_descriptors = NULL;
+
+	return -ENOMEM;
+}
+
+/*
+ * composite_generate_old_descs() - generate descriptors arrays for each
+ *	function in each configuraion
+ */
+int composite_generate_old_descs(struct usb_composite_dev *cdev)
+{
+	struct usb_configuration *c;
+	struct usb_function *f;
+	int ret;
+
+	list_for_each_entry(c, &cdev->configs, list)
+		list_for_each_entry(f, &c->functions, list) {
+			if (!usb_function_is_new_api(f))
+				continue;
+			ret = function_generate_old_descs(f);
+			if (ret)
+				return ret;
+		}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(composite_generate_old_descs);
+
 static int composite_bind(struct usb_gadget *gadget,
 		struct usb_gadget_driver *gdriver)
 {
@@ -2623,6 +2794,10 @@ static int composite_bind(struct usb_gadget *gadget,
 		goto fail;
 
 	status = composite_prep_vendor_descs(cdev);
+	if (status < 0)
+		goto fail;
+
+	status = composite_generate_old_descs(cdev);
 	if (status < 0)
 		goto fail;
 
