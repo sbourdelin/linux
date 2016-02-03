@@ -42,6 +42,7 @@
 #include <linux/io-mapping.h>
 #include <linux/delay.h>
 #include <linux/kmod.h>
+#include <net/devlink.h>
 
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/doorbell.h>
@@ -2847,8 +2848,13 @@ no_msi:
 
 static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 {
+	struct devlink *devlink = priv_to_devlink(mlx4_priv(dev));
 	struct mlx4_port_info *info = &mlx4_priv(dev)->port[port];
-	int err = 0;
+	int err;
+
+	err = devlink_port_register(devlink, &info->devlink_port, port);
+	if (err)
+		return err;
 
 	info->dev = dev;
 	info->port = port;
@@ -2873,6 +2879,7 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 	err = device_create_file(&dev->persist->pdev->dev, &info->port_attr);
 	if (err) {
 		mlx4_err(dev, "Failed to create file for port %d\n", port);
+		devlink_port_unregister(&info->devlink_port);
 		info->port = -1;
 	}
 
@@ -3646,21 +3653,23 @@ err_disable_pdev:
 
 static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
+	struct devlink *devlink;
 	struct mlx4_priv *priv;
 	struct mlx4_dev *dev;
 	int ret;
 
 	printk_once(KERN_INFO "%s", mlx4_version);
 
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv)
+	devlink = devlink_alloc(NULL, sizeof(*priv));
+	if (!devlink)
 		return -ENOMEM;
+	priv = devlink_priv(devlink);
 
 	dev       = &priv->dev;
 	dev->persist = kzalloc(sizeof(*dev->persist), GFP_KERNEL);
 	if (!dev->persist) {
-		kfree(priv);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err_devlink_free;
 	}
 	dev->persist->pdev = pdev;
 	dev->persist->dev = dev;
@@ -3669,14 +3678,24 @@ static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	mutex_init(&dev->persist->device_state_mutex);
 	mutex_init(&dev->persist->interface_state_mutex);
 
-	ret =  __mlx4_init_one(pdev, id->driver_data, priv);
-	if (ret) {
-		kfree(dev->persist);
-		kfree(priv);
-	} else {
-		pci_save_state(pdev);
-	}
+	set_devlink_dev(devlink, &pdev->dev);
+	ret = devlink_register(devlink);
+	if (ret)
+		goto err_persist_free;
 
+	ret =  __mlx4_init_one(pdev, id->driver_data, priv);
+	if (ret)
+		goto err_devlink_unregister;
+
+	pci_save_state(pdev);
+	return 0;
+
+err_devlink_unregister:
+	devlink_unregister(devlink);
+err_persist_free:
+	kfree(dev->persist);
+err_devlink_free:
+	devlink_free(devlink);
 	return ret;
 }
 
@@ -3777,6 +3796,7 @@ static void mlx4_remove_one(struct pci_dev *pdev)
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev  *dev  = persist->dev;
 	struct mlx4_priv *priv = mlx4_priv(dev);
+	struct devlink *devlink = priv_to_devlink(priv);
 	int active_vfs = 0;
 
 	mutex_lock(&persist->interface_state_mutex);
@@ -3807,8 +3827,9 @@ static void mlx4_remove_one(struct pci_dev *pdev)
 
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
+	devlink_unregister(devlink);
 	kfree(dev->persist);
-	kfree(priv);
+	devlink_free(devlink);
 	pci_set_drvdata(pdev, NULL);
 }
 
