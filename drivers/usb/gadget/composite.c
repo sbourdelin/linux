@@ -981,6 +981,9 @@ static void disable_interface(struct usb_function *f, unsigned i)
 	for (e = 0; e < alt->eps_num; ++e)
 		usb_ep_disable(alt->eps[e]->ep);
 
+	if (f->clear_alt)
+		f->clear_alt(f, i, intf->cur_altset);
+
 	intf->cur_altset = -1;
 }
 
@@ -992,12 +995,13 @@ static void disable_function(struct usb_function *f)
 {
 	int i;
 
-	if (usb_function_is_new_api(f))
+	if (usb_function_is_new_api(f)) {
 		for (i = 0; i < f->descs->intfs_num; ++i)
 			disable_interface(f, i);
-
-	if (f->disable)
-		f->disable(f);
+	} else {
+		if (f->disable)
+			f->disable(f);
+	}
 
 	bitmap_zero(f->endpoints, 32);
 }

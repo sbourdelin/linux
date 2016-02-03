@@ -308,6 +308,8 @@ struct usb_os_desc_table {
  *	initialize usb_ep.driver data at this time (when it is used).
  *	Note that setting an interface to its current altsetting resets
  *	interface state, and that all interfaces have a disabled state.
+ * @clear_alt: (REQUIRED) Clears altsetting, frees all ep requiests and other
+ *	resources allocated by set_alt.
  * @get_alt: Returns the active altsetting.  If this is not provided,
  *	then only altsetting zero is supported.
  * @disable: (REQUIRED) Indicates the function should be disabled.  Reasons
@@ -379,6 +381,8 @@ struct usb_function {
 
 	/* runtime state management */
 	int			(*set_alt)(struct usb_function *,
+					unsigned interface, unsigned alt);
+	void			(*clear_alt)(struct usb_function *,
 					unsigned interface, unsigned alt);
 	int			(*get_alt)(struct usb_function *,
 					unsigned interface);
