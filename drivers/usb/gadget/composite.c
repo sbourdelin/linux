@@ -181,6 +181,8 @@ ep_found:
 }
 EXPORT_SYMBOL_GPL(config_ep_by_speed);
 
+static inline bool usb_function_is_new_api(struct usb_function *f);
+
 /**
  * usb_add_function() - add a function to a configuration
  * @config: the configuration
@@ -198,14 +200,11 @@ EXPORT_SYMBOL_GPL(config_ep_by_speed);
 int usb_add_function(struct usb_configuration *config,
 		struct usb_function *function)
 {
-	int	value = -EINVAL;
+	int value;
 
 	DBG(config->cdev, "adding '%s'/%p to config '%s'/%p\n",
 			function->name, function,
 			config->label, config);
-
-	if (!function->set_alt || !function->disable)
-		goto done;
 
 	function->config = config;
 	list_add_tail(&function->list, &config->functions);
@@ -216,13 +215,22 @@ int usb_add_function(struct usb_configuration *config,
 			goto done;
 	}
 
+	value = -EINVAL;
+
+	if (!function->set_alt)
+		goto done;
+
+	if (usb_function_is_new_api(function))
+		goto new_api;
+
+	if (!function->disable)
+		goto done;
+
 	/* REVISIT *require* function->bind? */
 	if (function->bind) {
 		value = function->bind(config, function);
-		if (value < 0) {
-			list_del(&function->list);
-			function->config = NULL;
-		}
+		if (value < 0)
+			goto done;
 	} else
 		value = 0;
 
@@ -238,10 +246,33 @@ int usb_add_function(struct usb_configuration *config,
 	if (!config->superspeed && function->ss_descriptors)
 		config->superspeed = true;
 
-done:
+	goto done;
+
+new_api:
+	if (!function->prep_descs)
+		goto done;
+
+	if (!function->clear_alt)
+		goto done;
+
+	value = function->prep_descs(function);
 	if (value)
+		goto done;
+
+	if (!config->fullspeed && function->descs->fullspeed)
+		config->fullspeed = true;
+	if (!config->highspeed && function->descs->highspeed)
+		config->highspeed = true;
+	if (!config->superspeed && function->descs->superspeed)
+		config->superspeed = true;
+
+done:
+	if (value) {
+		list_del(&function->list);
+		function->config = NULL;
 		DBG(config->cdev, "adding '%s'/%p --> %d\n",
 				function->name, function, value);
+	}
 	return value;
 }
 EXPORT_SYMBOL_GPL(usb_add_function);
