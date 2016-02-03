@@ -59,6 +59,7 @@ struct f_hidg {
 	bool				write_pending;
 	wait_queue_head_t		write_queue;
 	struct usb_request		*req;
+	struct usb_request		**out_reqs;
 
 	int				minor;
 	struct cdev			cdev;
@@ -490,6 +491,7 @@ static void hidg_disable(struct usb_function *f)
 {
 	struct f_hidg *hidg = func_to_hidg(f);
 	struct f_hidg_req_list *list, *next;
+	int i;
 
 	usb_ep_disable(hidg->in_ep);
 	usb_ep_disable(hidg->out_ep);
@@ -498,6 +500,12 @@ static void hidg_disable(struct usb_function *f)
 		list_del(&list->list);
 		kfree(list);
 	}
+
+	for (i = 0; i < hidg->qlen; ++i) {
+		kfree(hidg->out_reqs[i]->buf);
+		kfree(hidg->out_reqs[i]);
+	}
+	kfree(hidg->out_reqs);
 }
 
 static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
@@ -547,11 +555,14 @@ static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		/*
 		 * allocate a bunch of read buffers and queue them all at once.
 		 */
+		hidg->out_reqs = kzalloc(hidg->qlen *
+				sizeof(*hidg->out_reqs), GFP_KERNEL);
 		for (i = 0; i < hidg->qlen && status == 0; i++) {
 			struct usb_request *req =
 					hidg_alloc_ep_req(hidg->out_ep,
 							  hidg->report_length);
 			if (req) {
+				hidg->out_reqs[i] = req;
 				req->complete = hidg_set_report_complete;
 				req->context  = hidg;
 				status = usb_ep_queue(hidg->out_ep, req,
@@ -562,9 +573,18 @@ static int hidg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			} else {
 				usb_ep_disable(hidg->out_ep);
 				status = -ENOMEM;
-				goto fail;
+				goto free_req;
 			}
 		}
+	}
+
+free_req:
+	if (status < 0) {
+		while (i--) {
+			kfree(hidg->out_reqs[i]->buf);
+			kfree(hidg->out_reqs[i]);
+		}
+		kfree(hidg->out_reqs);
 	}
 
 fail:
