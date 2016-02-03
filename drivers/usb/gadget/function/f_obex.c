@@ -34,7 +34,6 @@ struct f_obex {
 	struct gserial			port;
 	u8				ctrl_id;
 	u8				data_id;
-	u8				cur_alt;
 	u8				port_num;
 };
 
@@ -144,19 +143,6 @@ static struct usb_endpoint_descriptor obex_hs_ep_in_desc = {
 	.wMaxPacketSize		= cpu_to_le16(512),
 };
 
-static struct usb_descriptor_header *hs_function[] = {
-	(struct usb_descriptor_header *) &obex_control_intf,
-	(struct usb_descriptor_header *) &obex_cdc_header_desc,
-	(struct usb_descriptor_header *) &obex_desc,
-	(struct usb_descriptor_header *) &obex_cdc_union_desc,
-
-	(struct usb_descriptor_header *) &obex_data_nop_intf,
-	(struct usb_descriptor_header *) &obex_data_intf,
-	(struct usb_descriptor_header *) &obex_hs_ep_in_desc,
-	(struct usb_descriptor_header *) &obex_hs_ep_out_desc,
-	NULL,
-};
-
 /* Full-Speed Support */
 
 static struct usb_endpoint_descriptor obex_fs_ep_in_desc = {
@@ -175,18 +161,19 @@ static struct usb_endpoint_descriptor obex_fs_ep_out_desc = {
 	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *fs_function[] = {
-	(struct usb_descriptor_header *) &obex_control_intf,
-	(struct usb_descriptor_header *) &obex_cdc_header_desc,
-	(struct usb_descriptor_header *) &obex_desc,
-	(struct usb_descriptor_header *) &obex_cdc_union_desc,
+USB_COMPOSITE_ENDPOINT(ep_in, &obex_fs_ep_in_desc,
+		&obex_hs_ep_in_desc, NULL, NULL);
+USB_COMPOSITE_ENDPOINT(ep_out, &obex_fs_ep_out_desc,
+		&obex_hs_ep_out_desc, NULL, NULL);
 
-	(struct usb_descriptor_header *) &obex_data_nop_intf,
-	(struct usb_descriptor_header *) &obex_data_intf,
-	(struct usb_descriptor_header *) &obex_fs_ep_in_desc,
-	(struct usb_descriptor_header *) &obex_fs_ep_out_desc,
-	NULL,
-};
+USB_COMPOSITE_ALTSETTING(intf0alt0, &obex_control_intf);
+USB_COMPOSITE_ALTSETTING(intf1alt0, &obex_data_nop_intf);
+USB_COMPOSITE_ALTSETTING(intf1alt1, &obex_data_intf, &ep_in, &ep_out);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+USB_COMPOSITE_INTERFACE(intf1, &intf1alt0, &intf1alt1);
+
+USB_COMPOSITE_DESCRIPTORS(obex_descs, &intf0, &intf1);
 
 /*-------------------------------------------------------------------------*/
 
@@ -195,67 +182,33 @@ static int obex_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct f_obex		*obex = func_to_obex(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
-	if (intf == obex->ctrl_id) {
-		if (alt != 0)
-			goto fail;
+	if (intf == 0) {
 		/* NOP */
 		dev_dbg(&cdev->gadget->dev,
 			"reset obex ttyGS%d control\n", obex->port_num);
-
-	} else if (intf == obex->data_id) {
-		if (alt > 1)
-			goto fail;
-
-		if (obex->port.in->enabled) {
-			dev_dbg(&cdev->gadget->dev,
-				"reset obex ttyGS%d\n", obex->port_num);
-			gserial_disconnect(&obex->port);
-		}
-
-		if (!obex->port.in->desc || !obex->port.out->desc) {
-			dev_dbg(&cdev->gadget->dev,
-				"init obex ttyGS%d\n", obex->port_num);
-			if (config_ep_by_speed(cdev->gadget, f,
-					       obex->port.in) ||
-			    config_ep_by_speed(cdev->gadget, f,
-					       obex->port.out)) {
-				obex->port.out->desc = NULL;
-				obex->port.in->desc = NULL;
-				goto fail;
-			}
-		}
-
-		if (alt == 1) {
-			dev_dbg(&cdev->gadget->dev,
+	} else if (intf == 1 && alt == 1) {
+		dev_dbg(&cdev->gadget->dev,
 				"activate obex ttyGS%d\n", obex->port_num);
-			gserial_connect(&obex->port, obex->port_num);
-		}
 
-	} else
-		goto fail;
+		obex->port.in = usb_function_get_ep(f, intf, 0);
+		if (!obex->port.in)
+			return -ENODEV;
+		obex->port.out = usb_function_get_ep(f, intf, 1);
+		if (!obex->port.out)
+			return -ENODEV;
 
-	obex->cur_alt = alt;
+		gserial_connect(&obex->port, obex->port_num);
+	}
 
 	return 0;
-
-fail:
-	return -EINVAL;
 }
 
-static int obex_get_alt(struct usb_function *f, unsigned intf)
+static void obex_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_obex		*obex = func_to_obex(f);
 
-	return obex->cur_alt;
-}
-
-static void obex_disable(struct usb_function *f)
-{
-	struct f_obex	*obex = func_to_obex(f);
-	struct usb_composite_dev *cdev = f->config->cdev;
-
-	dev_dbg(&cdev->gadget->dev, "obex ttyGS%d disable\n", obex->port_num);
-	gserial_disconnect(&obex->port);
+	if (intf == 1 && alt == 1)
+		gserial_disconnect(&obex->port);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -303,15 +256,12 @@ static inline bool can_support_obex(struct usb_configuration *c)
 	return true;
 }
 
-static int obex_bind(struct usb_configuration *c, struct usb_function *f)
+static int obex_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_obex		*obex = func_to_obex(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
 	struct usb_string	*us;
-	int			status;
-	struct usb_ep		*ep;
 
-	if (!can_support_obex(c))
+	if (!can_support_obex(f->config))
 		return -EINVAL;
 
 	us = usb_gstrings_attach(cdev, obex_strings,
@@ -322,63 +272,31 @@ static int obex_bind(struct usb_configuration *c, struct usb_function *f)
 	obex_data_nop_intf.iInterface = us[OBEX_DATA_IDX].id;
 	obex_data_intf.iInterface = us[OBEX_DATA_IDX].id;
 
-	/* allocate instance-specific interface IDs, and patch descriptors */
+	return usb_function_set_descs(f, &obex_descs);
+}
 
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	obex->ctrl_id = status;
+static int obex_prep_vendor_descs(struct usb_function *f)
+{
+	struct f_obex		*obex = func_to_obex(f);
+	int			intf0_id, intf1_id;
 
-	obex_control_intf.bInterfaceNumber = status;
-	obex_cdc_union_desc.bMasterInterface0 = status;
+	intf0_id = usb_get_interface_id(f, 0);
+	intf1_id = usb_get_interface_id(f, 1);
 
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	obex->data_id = status;
+	obex->ctrl_id = intf0_id;
+	obex->data_id = intf1_id;
 
-	obex_data_nop_intf.bInterfaceNumber = status;
-	obex_data_intf.bInterfaceNumber = status;
-	obex_cdc_union_desc.bSlaveInterface0 = status;
+	obex_cdc_union_desc.bMasterInterface0 = intf0_id;
+	obex_cdc_union_desc.bSlaveInterface0 = intf1_id;
 
-	/* allocate instance-specific endpoints */
-
-	status = -ENODEV;
-	ep = usb_ep_autoconfig(cdev->gadget, &obex_fs_ep_in_desc);
-	if (!ep)
-		goto fail;
-	obex->port.in = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, &obex_fs_ep_out_desc);
-	if (!ep)
-		goto fail;
-	obex->port.out = ep;
-
-	/* support all relevant hardware speeds... we expect that when
-	 * hardware is dual speed, all bulk-capable endpoints work at
-	 * both speeds
-	 */
-
-	obex_hs_ep_in_desc.bEndpointAddress =
-		obex_fs_ep_in_desc.bEndpointAddress;
-	obex_hs_ep_out_desc.bEndpointAddress =
-		obex_fs_ep_out_desc.bEndpointAddress;
-
-	status = usb_assign_descriptors(f, fs_function, hs_function, NULL);
-	if (status)
-		goto fail;
-
-	dev_dbg(&cdev->gadget->dev, "obex ttyGS%d: %s speed IN/%s OUT/%s\n",
-		obex->port_num,
-		gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
-		obex->port.in->name, obex->port.out->name);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&obex_cdc_header_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&obex_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&obex_cdc_union_desc);
 
 	return 0;
-
-fail:
-	ERROR(cdev, "%s/%p: can't bind, err %d\n", f->name, f, status);
-
-	return status;
 }
 
 static inline struct f_serial_opts *to_f_serial_opts(struct config_item *item)
@@ -454,11 +372,6 @@ static void obex_free(struct usb_function *f)
 	kfree(obex);
 }
 
-static void obex_unbind(struct usb_configuration *c, struct usb_function *f)
-{
-	usb_free_all_descriptors(f);
-}
-
 static struct usb_function *obex_alloc(struct usb_function_instance *fi)
 {
 	struct f_obex	*obex;
@@ -478,11 +391,10 @@ static struct usb_function *obex_alloc(struct usb_function_instance *fi)
 
 	obex->port.func.name = "obex";
 	/* descriptors are per-instance copies */
-	obex->port.func.bind = obex_bind;
-	obex->port.func.unbind = obex_unbind;
+	obex->port.func.prep_descs = obex_prep_descs;
+	obex->port.func.prep_vendor_descs = obex_prep_vendor_descs;
 	obex->port.func.set_alt = obex_set_alt;
-	obex->port.func.get_alt = obex_get_alt;
-	obex->port.func.disable = obex_disable;
+	obex->port.func.clear_alt = obex_clear_alt;
 	obex->port.func.free_func = obex_free;
 	obex->port.func.bind_deactivated = true;
 
