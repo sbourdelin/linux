@@ -293,6 +293,10 @@ struct usb_os_desc_table {
  *	can expose more than one interface. If an interface is a member of
  *	an IAD, only the first interface of IAD has its entry in the table.
  * @os_desc_n: Number of entries in os_desc_table
+ * @prep_descs: Returns standard function descriptors (interface and endpoint
+ *	descritptors).
+ * @prep_vendor_descs: Attaches vendor or class specific descriptors to
+ *	standard descriptors.
  * @bind: Before the gadget can register, all of its functions bind() to the
  *	available resources including string and interface identifiers used
  *	in interface or class descriptors; endpoints; I/O buffers; and so on.
@@ -360,6 +364,10 @@ struct usb_function {
 	 * we can't restructure things to avoid mismatching.
 	 * Related:  unbind() may kfree() but bind() won't...
 	 */
+
+	/* new function API*/
+	int			(*prep_descs)(struct usb_function *);
+	int			(*prep_vendor_descs)(struct usb_function *);
 
 	/* configuration management:  bind/unbind */
 	int			(*bind)(struct usb_configuration *,
