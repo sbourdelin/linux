@@ -16,6 +16,7 @@
  *  Copyright (C) 2001 Rusty Russell.
  *  Copyright (C) 2003, 2004 Ralf Baechle (ralf@linux-mips.org)
  *  Copyright (C) 2005 Thiemo Seufer
+ *  Copyright (C) 2015 Imagination Technologies Ltd.
  */
 
 #include <linux/elf.h>
@@ -65,6 +66,27 @@ static int apply_r_mips_lo16_rela(struct module *me, u32 *location, Elf_Addr v)
 	return 0;
 }
 
+static int apply_r_mips_pc16_rela(struct module *me, u32 *location, Elf_Addr v)
+{
+	long offset;
+
+	if (v % 4) {
+		pr_err("module %s: dangerous R_MIPS_PC16 RELA relocation\n",
+		       me->name);
+		return -ENOEXEC;
+	}
+
+	offset = ((long)v - (long)location) >> 2;
+	if (offset != (int16_t)offset) {
+		pr_err("module %s: relocation overflow\n", me->name);
+		return -ENOEXEC;
+	}
+
+	*location = (*location & ~0xffff) | (offset & 0xffff);
+
+	return 0;
+}
+
 static int apply_r_mips_64_rela(struct module *me, u32 *location, Elf_Addr v)
 {
 	*(Elf_Addr *)location = v;
@@ -90,6 +112,48 @@ static int apply_r_mips_highest_rela(struct module *me, u32 *location,
 	return 0;
 }
 
+static int apply_r_mips_pc21_rela(struct module *me, u32 *location, Elf_Addr v)
+{
+	long offset;
+
+	if (v % 4) {
+		pr_err("module %s: dangerous R_MIPS_PC21 RELA relocation\n",
+		       me->name);
+		return -ENOEXEC;
+	}
+
+	offset = ((long)v - (long)location) >> 2;
+	if ((offset >> 20) > 0 || (offset >> 20) < -1) {
+		pr_err("module %s: relocation overflow\n", me->name);
+		return -ENOEXEC;
+	}
+
+	*location = (*location & ~0x001fffff) | (offset & 0x001fffff);
+
+	return 0;
+}
+
+static int apply_r_mips_pc26_rela(struct module *me, u32 *location, Elf_Addr v)
+{
+	long offset;
+
+	if (v % 4) {
+		pr_err("module %s: dangerous R_MIPS_PC26 RELA relocation\n",
+		       me->name);
+		return -ENOEXEC;
+	}
+
+	offset = ((long)v - (long)location) >> 2;
+	if ((offset >> 25) > 0 || (offset >> 25) < -1) {
+		pr_err("module %s: relocation overflow\n", me->name);
+		return -ENOEXEC;
+	}
+
+	*location = (*location & ~0x03ffffff) | (offset & 0x03ffffff);
+
+	return 0;
+}
+
 static int (*reloc_handlers_rela[]) (struct module *me, u32 *location,
 				Elf_Addr v) = {
 	[R_MIPS_NONE]		= apply_r_mips_none,
@@ -97,9 +161,12 @@ static int (*reloc_handlers_rela[]) (struct module *me, u32 *location,
 	[R_MIPS_26]		= apply_r_mips_26_rela,
 	[R_MIPS_HI16]		= apply_r_mips_hi16_rela,
 	[R_MIPS_LO16]		= apply_r_mips_lo16_rela,
+	[R_MIPS_PC16]		= apply_r_mips_pc16_rela,
 	[R_MIPS_64]		= apply_r_mips_64_rela,
 	[R_MIPS_HIGHER]		= apply_r_mips_higher_rela,
-	[R_MIPS_HIGHEST]	= apply_r_mips_highest_rela
+	[R_MIPS_HIGHEST]	= apply_r_mips_highest_rela,
+	[R_MIPS_PC21_S2]	= apply_r_mips_pc21_rela,
+	[R_MIPS_PC26_S2]	= apply_r_mips_pc26_rela,
 };
 
 int apply_relocate_add(Elf_Shdr *sechdrs, const char *strtab,
