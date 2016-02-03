@@ -52,7 +52,7 @@ static int nfp_net_debugfs_rx_q_read(struct seq_file *file, void *data)
 	if (!rx_ring->r_vec || !rx_ring->r_vec->nfp_net)
 		goto out;
 	nn = rx_ring->r_vec->nfp_net;
-	if (!netif_running(nn->netdev))
+	if (!(nn->ctrl & NFP_NET_CFG_CTRL_ENABLE))
 		goto out;
 
 	rxd_cnt = rx_ring->cnt;
@@ -127,7 +127,7 @@ static int nfp_net_debugfs_tx_q_read(struct seq_file *file, void *data)
 	if (!tx_ring->r_vec || !tx_ring->r_vec->nfp_net)
 		goto out;
 	nn = tx_ring->r_vec->nfp_net;
-	if (!netif_running(nn->netdev))
+	if (!(nn->ctrl & NFP_NET_CFG_CTRL_ENABLE))
 		goto out;
 
 	txd_cnt = tx_ring->cnt;
