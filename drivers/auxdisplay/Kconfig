@@ -119,4 +119,11 @@ config CFAG12864B_RATE
 	  If you compile this as a module, you can still override this
 	  value using the module parameters.
 
+config ASCII_LCD
+	tristate "ASCII LCD Display"
+	default y if MIPS_MALTA
+	help
+	  Enable this to support simple memory mapped ASCII LCD displays such
+	  as those found on the MIPS Malta & Boston development boards.
+
 endif # AUXDISPLAY
