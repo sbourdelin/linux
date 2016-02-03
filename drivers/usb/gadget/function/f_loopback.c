@@ -35,6 +35,9 @@ struct f_loopback {
 	struct usb_ep		*in_ep;
 	struct usb_ep		*out_ep;
 
+	struct usb_request	*in_req;
+	struct usb_request	*out_req;
+
 	unsigned                qlen;
 	unsigned                buflen;
 };
@@ -249,30 +252,25 @@ static void loopback_complete(struct usb_ep *ep, struct usb_request *req)
 			 * We received some data from the host so let's
 			 * queue it so host can read the from our in ep
 			 */
-			struct usb_request *in_req = req->context;
-
-			in_req->zero = (req->actual < req->length);
-			in_req->length = req->actual;
+			loop->in_req->zero = (req->actual < req->length);
+			loop->in_req->length = req->actual;
+			req = loop->in_req;
 			ep = loop->in_ep;
-			req = in_req;
 		} else {
 			/*
 			 * We have just looped back a bunch of data
 			 * to host. Now let's wait for some more data.
 			 */
-			req = req->context;
+			req = loop->out_req;
 			ep = loop->out_ep;
 		}
 
 		/* queue the buffer back to host or for next bunch of data */
 		status = usb_ep_queue(ep, req, GFP_ATOMIC);
-		if (status == 0) {
-			return;
-		} else {
+		if (status < 0)
 			ERROR(cdev, "Unable to loop back buffer to %s: %d\n",
 			      ep->name, status);
-			goto free_req;
-		}
+		break;
 
 		/* "should never get here" */
 	default:
@@ -280,20 +278,10 @@ static void loopback_complete(struct usb_ep *ep, struct usb_request *req)
 				status, req->actual, req->length);
 		/* FALLTHROUGH */
 
-	/* NOTE:  since this driver doesn't maintain an explicit record
-	 * of requests it submitted (just maintains qlen count), we
-	 * rely on the hardware driver to clean up on disconnect or
-	 * endpoint disable.
-	 */
 	case -ECONNABORTED:		/* hardware forced ep reset */
 	case -ECONNRESET:		/* request dequeued */
 	case -ESHUTDOWN:		/* disconnect from host */
-free_req:
-		usb_ep_free_request(ep == loop->in_ep ?
-				    loop->out_ep : loop->in_ep,
-				    req->context);
-		free_ep_req(ep, req);
-		return;
+		break;
 	}
 }
 
@@ -316,7 +304,6 @@ static inline struct usb_request *lb_alloc_ep_req(struct usb_ep *ep, int len)
 static int alloc_requests(struct usb_composite_dev *cdev,
 			  struct f_loopback *loop)
 {
-	struct usb_request *in_req, *out_req;
 	int i;
 	int result = 0;
 
@@ -329,23 +316,21 @@ static int alloc_requests(struct usb_composite_dev *cdev,
 	for (i = 0; i < loop->qlen && result == 0; i++) {
 		result = -ENOMEM;
 
-		in_req = usb_ep_alloc_request(loop->in_ep, GFP_ATOMIC);
-		if (!in_req)
+		loop->in_req = usb_ep_alloc_request(loop->in_ep, GFP_ATOMIC);
+		if (!loop->in_req)
 			goto fail;
 
-		out_req = lb_alloc_ep_req(loop->out_ep, 0);
-		if (!out_req)
+		loop->out_req = lb_alloc_ep_req(loop->out_ep, 0);
+		if (!loop->out_req)
 			goto fail_in;
 
-		in_req->complete = loopback_complete;
-		out_req->complete = loopback_complete;
+		loop->in_req->complete = loopback_complete;
+		loop->out_req->complete = loopback_complete;
 
-		in_req->buf = out_req->buf;
+		loop->in_req->buf = loop->out_req->buf;
 		/* length will be set in complete routine */
-		in_req->context = out_req;
-		out_req->context = in_req;
 
-		result = usb_ep_queue(loop->out_ep, out_req, GFP_ATOMIC);
+		result = usb_ep_queue(loop->out_ep, loop->out_req, GFP_ATOMIC);
 		if (result) {
 			ERROR(cdev, "%s queue req --> %d\n",
 					loop->out_ep->name, result);
@@ -356,9 +341,9 @@ static int alloc_requests(struct usb_composite_dev *cdev,
 	return 0;
 
 fail_out:
-	free_ep_req(loop->out_ep, out_req);
+	free_ep_req(loop->out_ep, loop->out_req);
 fail_in:
-	usb_ep_free_request(loop->in_ep, in_req);
+	usb_ep_free_request(loop->in_ep, loop->in_req);
 fail:
 	return result;
 }
@@ -426,6 +411,9 @@ static void loopback_disable(struct usb_function *f)
 	struct f_loopback	*loop = func_to_loop(f);
 
 	disable_loopback(loop);
+
+	free_ep_req(loop->out_ep, loop->out_req);
+	usb_ep_free_request(loop->in_ep, loop->in_req);
 }
 
 static struct usb_function *loopback_alloc(struct usb_function_instance *fi)
