@@ -1358,6 +1358,11 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 				goto err_purge_funcs;
 			}
 		}
+
+		ret = usb_config_do_bind(c);
+		if (ret)
+			goto err_purge_funcs;
+
 		usb_ep_autoconfig_reset(cdev->gadget);
 	}
 	if (cdev->use_os_string) {
@@ -1366,10 +1371,23 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 			goto err_purge_funcs;
 	}
 
+	ret = composite_prep_vendor_descs(cdev);
+	if (ret < 0)
+		goto err_free_vendor_descs;
+
+	ret = composite_generate_old_descs(cdev);
+	if (ret < 0)
+		goto err_free_old_descs;
+
 	usb_ep_autoconfig_reset(cdev->gadget);
 	return 0;
 
+err_free_old_descs:
+	composite_free_old_descs(cdev);
+err_free_vendor_descs:
+	composite_free_vendor_descs(cdev);
 err_purge_funcs:
+	composite_free_descs(cdev);
 	purge_configs_funcs(gi);
 err_comp_cleanup:
 	composite_dev_cleanup(cdev);
@@ -1385,6 +1403,10 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
 
 	cdev = get_gadget_data(gadget);
 	gi = container_of(cdev, struct gadget_info, cdev);
+
+	composite_free_old_descs(cdev);
+	composite_free_vendor_descs(cdev);
+	composite_free_descs(cdev);
 
 	kfree(otg_desc[0]);
 	otg_desc[0] = NULL;
