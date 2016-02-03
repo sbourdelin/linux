@@ -2170,10 +2170,7 @@ void kvm_apic_accept_events(struct kvm_vcpu *vcpu)
 	if (test_bit(KVM_APIC_INIT, &pe)) {
 		kvm_lapic_reset(vcpu, true);
 		kvm_vcpu_reset(vcpu, true);
-		if (kvm_vcpu_is_bsp(apic->vcpu))
-			vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
-		else
-			vcpu->arch.mp_state = KVM_MP_STATE_INIT_RECEIVED;
+		vcpu->arch.mp_state = KVM_MP_STATE_INIT_RECEIVED;
 	}
 	if (test_bit(KVM_APIC_SIPI, &pe) &&
 	    vcpu->arch.mp_state == KVM_MP_STATE_INIT_RECEIVED) {
