@@ -44,6 +44,11 @@ struct f_sourcesink {
 	struct usb_ep		*iso_out_ep;
 	int			cur_alt;
 
+	struct usb_request	**in_reqs;
+	struct usb_request	**out_reqs;
+	struct usb_request	**iso_in_reqs;
+	struct usb_request	**iso_out_reqs;
+
 	unsigned pattern;
 	unsigned isoc_interval;
 	unsigned isoc_maxpacket;
@@ -550,7 +555,6 @@ static void source_sink_complete(struct usb_ep *ep, struct usb_request *req)
 				req->actual, req->length);
 		if (ep == ss->out_ep)
 			check_read_data(ss, req);
-		free_ep_req(ep, req);
 		return;
 
 	case -EOVERFLOW:		/* buffer overrun on read means that
@@ -579,7 +583,7 @@ static int source_sink_start_ep(struct f_sourcesink *ss, bool is_in,
 		bool is_iso, int speed)
 {
 	struct usb_ep		*ep;
-	struct usb_request	*req;
+	struct usb_request	**reqs;
 	int			i, size, qlen, status = 0;
 
 	if (is_iso) {
@@ -604,19 +608,23 @@ static int source_sink_start_ep(struct f_sourcesink *ss, bool is_in,
 		qlen = ss->bulk_qlen;
 		size = 0;
 	}
-
+	
+	reqs = kzalloc(qlen * sizeof(*reqs), GFP_ATOMIC);
+	
 	for (i = 0; i < qlen; i++) {
-		req = ss_alloc_ep_req(ep, size);
-		if (!req)
-			return -ENOMEM;
+		reqs[i] = ss_alloc_ep_req(ep, size);
+		if (!reqs[i]) {
+			status = -ENOMEM;
+			goto err;
+		}
 
-		req->complete = source_sink_complete;
+		reqs[i]->complete = source_sink_complete;
 		if (is_in)
-			reinit_write_data(ep, req);
+			reinit_write_data(ep, reqs[i]);
 		else if (ss->pattern != 2)
-			memset(req->buf, 0x55, req->length);
+			memset(reqs[i]->buf, 0x55, reqs[i]->length);
 
-		status = usb_ep_queue(ep, req, GFP_ATOMIC);
+		status = usb_ep_queue(ep, reqs[i], GFP_ATOMIC);
 		if (status) {
 			struct usb_composite_dev	*cdev;
 
@@ -624,11 +632,29 @@ static int source_sink_start_ep(struct f_sourcesink *ss, bool is_in,
 			ERROR(cdev, "start %s%s %s --> %d\n",
 			      is_iso ? "ISO-" : "", is_in ? "IN" : "OUT",
 			      ep->name, status);
-			free_ep_req(ep, req);
-			return status;
+			free_ep_req(ep, reqs[i]);
+			goto err;
+		}
+
+		if (is_iso) {
+			if (is_in)
+				ss->iso_in_reqs = reqs;
+			else
+				ss->iso_out_reqs = reqs;
+		} else {
+			if (is_in)
+				ss->in_reqs = reqs;
+			else
+				ss->out_reqs = reqs;
 		}
 	}
 
+	return status;
+
+err:
+	while (--i)
+		free_ep_req(ep, reqs[i]);
+	kfree(reqs);
 	return status;
 }
 
@@ -754,8 +780,21 @@ static int sourcesink_get_alt(struct usb_function *f, unsigned intf)
 static void sourcesink_disable(struct usb_function *f)
 {
 	struct f_sourcesink	*ss = func_to_ss(f);
+	int i;
 
 	disable_source_sink(ss);
+
+	for (i = 0; i < ss->bulk_qlen; ++i) {
+		free_ep_req(ss->in_ep, ss->in_reqs[i]);
+		free_ep_req(ss->out_ep, ss->out_reqs[i]);
+	}
+
+	if (ss->iso_in_ep) {
+		for (i = 0; i < ss->iso_qlen; ++i) {
+			free_ep_req(ss->iso_in_ep, ss->iso_in_reqs[i]);
+			free_ep_req(ss->iso_out_ep, ss->iso_out_reqs[i]);
+		}
+	}
 }
 
 /*-------------------------------------------------------------------------*/
