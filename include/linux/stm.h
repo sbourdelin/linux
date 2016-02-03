@@ -18,6 +18,11 @@
 #include <linux/device.h>
 
 /**
+ * The masterIDs are statically set in hardware and can't be queried
+ */
+#define STM_STATIC_MASTERID -1
+
+/**
  * enum stp_packet_type - STP packets that an STM driver sends
  */
 enum stp_packet_type {
@@ -46,6 +51,8 @@ struct stm_device;
  * struct stm_data - STM device description and callbacks
  * @name:		device name
  * @stm:		internal structure, only used by stm class code
+ * @mstatic:		true if masterIDs are assigned in HW.  If so @sw_start
+ *			and @sw_end are set to '1' by the core.
  * @sw_start:		first STP master available to software
  * @sw_end:		last STP master available to software
  * @sw_nchannels:	number of STP channels per master
@@ -71,6 +78,7 @@ struct stm_device;
 struct stm_data {
 	const char		*name;
 	struct stm_device	*stm;
+	bool			mstatic;
 	unsigned int		sw_start;
 	unsigned int		sw_end;
 	unsigned int		sw_nchannels;
