@@ -57,6 +57,128 @@
 struct usb_configuration;
 
 /**
+ * struct usb_composite_vendor_desc - vendor specific descriptor
+ * @desc: pointer to vendor specific descriptor
+ * @list: descriptor list element
+ *
+ * It's designed to be element of vendor specific descriptor list,
+ * which can be attached to function, interface (per altsetting) or
+ * endpoint.
+ */
+struct usb_composite_vendor_desc {
+	struct usb_descriptor_header *desc;
+	struct list_head list;
+};
+
+/**
+ * struct usb_composite_ep - representation of USB endpoint
+ * @fs.desc: FullSpeed descriptor
+ * @hs.desc: HighSpeed descriptor
+ * @ss.desc: SuperSpeed descriptor
+ * @ss_comp.desc: SuperSpeed Companion descriptor
+ * @vendor_descs: list of vendor specific descriptors
+ * @vendor_descs_num: count of vendor specific descriptors
+ * @ep: pointer to endpoint obtained during bind process
+ *
+ * We have pointer to each descriptor in union with pointer to descriptor
+ * header in order to avoid casting in many places in code, because in
+ * some situations we want to have access to fields of particular type
+ * of descriptor, while in other situations we want to treat all types
+ * of descriptors in the same way.
+ */
+struct usb_composite_ep {
+	union {
+		struct usb_descriptor_header *header;
+		struct usb_endpoint_descriptor *desc;
+	} fs;
+
+	union {
+		struct usb_descriptor_header *header;
+		struct usb_endpoint_descriptor *desc;
+	} hs;
+
+	union {
+		struct usb_descriptor_header *header;
+		struct usb_endpoint_descriptor *desc;
+	} ss;
+
+	union {
+		struct usb_descriptor_header *header;
+		struct usb_ss_ep_comp_descriptor *desc;
+	} ss_comp;
+
+	struct list_head vendor_descs;
+	int vendor_descs_num;
+
+	struct usb_ep *ep;
+};
+
+/**
+ * struct usb_composite_altset - representation of USB altsetting
+ * @alt.desc: interface (altsetting) descriptor
+ * @eps: array of endpoints in altsetting
+ * @eps_num: number of endpoints
+ * @vendor_descs: list of vendor specific descriptors
+ * @vendor_descs_num: count of vendor specific descriptors
+ *
+ * We have pointer to alt descriptor in union with pointer to descriptor
+ * header in order to avoid casting in many places in code, because in
+ * some situations we want to have access to fields of particular type
+ * of descriptor, while in other situations we want to treat all types
+ * of descriptors in the same way.
+ */
+struct usb_composite_altset {
+	union {
+		struct usb_descriptor_header *header;
+		struct usb_interface_descriptor *desc;
+	} alt;
+
+	struct usb_composite_ep **eps;
+	int eps_num;
+
+	struct list_head vendor_descs;
+	int vendor_descs_num;
+};
+
+/**
+ * struct usb_composite_intf - representation of USB interface
+ * @altsets: array of altsettings in interface
+ * @altsets_num: number of altsettings
+ * @cur_altset: number of currently selected altsetting
+ * @id: id number of interface in configuraion (value of
+ *	bInterfaceNumber in interface descriptor)
+ */
+struct usb_composite_intf {
+	struct usb_composite_altset **altsets;
+	int altsets_num;
+
+	int cur_altset;
+	u8 id;
+};
+
+/**
+ * struct usb_composite_descs - representation of USB descriptors
+ * @intfs: array of interfaces in function
+ * @intfs_num: number of interfaces
+ * @vendor_descs: list of vendor specific descriptors
+ * @vendor_descs_num: count of vendor specific descriptors
+ * @fullspeed: descriptors support FullSpeed
+ * @highspeed: descriptors support HighSpeed
+ * @superspeed: descriptors support SuperSpeed
+ */
+struct usb_composite_descs {
+	struct usb_composite_intf **intfs;
+	int intfs_num;
+
+	struct list_head vendor_descs;
+	int vendor_descs_num;
+
+	unsigned fullspeed:1;
+	unsigned highspeed:1;
+	unsigned superspeed:1;
+};
+
+/**
  * struct usb_os_desc_ext_prop - describes one "Extended Property"
  * @entry: used to keep a list of extended properties
  * @type: Extended Property type
@@ -126,6 +248,8 @@ struct usb_os_desc_table {
  *	string identifiers assigned during @bind(). If this
  *	pointer is null after initiation, the function will not
  *	be available at super speed.
+ * @descs: structure containing information about descriptors and endpoints
+ *	assigned during gadget bind.
  * @config: assigned when @usb_add_function() is called; this is the
  *	configuration with which this function is associated.
  * @os_desc_table: Table of (interface id, os descriptors) pairs. The function
@@ -186,6 +310,8 @@ struct usb_function {
 	struct usb_descriptor_header	**fs_descriptors;
 	struct usb_descriptor_header	**hs_descriptors;
 	struct usb_descriptor_header	**ss_descriptors;
+
+	struct usb_composite_descs	*descs;
 
 	struct usb_configuration	*config;
 
