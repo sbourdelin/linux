@@ -236,16 +236,13 @@ static void kvm_pit_ack_irq(struct kvm_irq_ack_notifier *kian)
 {
 	struct kvm_kpit_state *ps = container_of(kian, struct kvm_kpit_state,
 						 irq_ack_notifier);
-	int value;
 
-	spin_lock(&ps->inject_lock);
+	atomic_set(&ps->irq_ack, 1);
 	if (atomic_add_unless(&ps->pending, -1, 0))
 		/* in this case, we had multiple outstanding pit interrupts
 		 * that we needed to inject.  Reinject
 		 */
 		queue_kthread_work(&ps->pit->worker, &ps->pit->expired);
-	ps->irq_ack = 1;
-	spin_unlock(&ps->inject_lock);
 }
 
 void __kvm_migrate_pit_timer(struct kvm_vcpu *vcpu)
@@ -276,34 +273,25 @@ static void pit_do_work(struct kthread_work *work)
 	struct kvm_vcpu *vcpu;
 	int i;
 	struct kvm_kpit_state *ps = &pit->pit_state;
-	int inject = 0;
 
-	/* Try to inject pending interrupts when
-	 * last one has been acked.
+	if (!atomic_xchg(&ps->irq_ack, 0))
+		return;
+
+	kvm_set_irq(kvm, kvm->arch.vpit->irq_source_id, 0, 1, false);
+	kvm_set_irq(kvm, kvm->arch.vpit->irq_source_id, 0, 0, false);
+
+	/*
+	 * Provides NMI watchdog support via Virtual Wire mode.
+	 * The route is: PIT -> LVT0 in NMI mode.
+	 *
+	 * Note: Our Virtual Wire implementation does not follow
+	 * the MP specification.  We propagate a PIT interrupt to all
+	 * VCPUs and only when LVT0 is in NMI mode.  The interrupt can
+	 * also be simultaneously delivered through PIC and IOAPIC.
 	 */
-	spin_lock(&ps->inject_lock);
-	if (ps->irq_ack) {
-		ps->irq_ack = 0;
-		inject = 1;
-	}
-	spin_unlock(&ps->inject_lock);
-	if (inject) {
-		kvm_set_irq(kvm, kvm->arch.vpit->irq_source_id, 0, 1, false);
-		kvm_set_irq(kvm, kvm->arch.vpit->irq_source_id, 0, 0, false);
-
-		/*
-		 * Provides NMI watchdog support via Virtual Wire mode.
-		 * The route is: PIT -> PIC -> LVT0 in NMI mode.
-		 *
-		 * Note: Our Virtual Wire implementation is simplified, only
-		 * propagating PIT interrupts to all VCPUs when they have set
-		 * LVT0 to NMI delivery. Other PIC interrupts are just sent to
-		 * VCPU0, and only if its LVT0 is in EXTINT mode.
-		 */
-		if (atomic_read(&kvm->arch.vapics_in_nmi_mode) > 0)
-			kvm_for_each_vcpu(i, vcpu, kvm)
-				kvm_apic_nmi_wd_deliver(vcpu);
-	}
+	if (atomic_read(&kvm->arch.vapics_in_nmi_mode) > 0)
+		kvm_for_each_vcpu(i, vcpu, kvm)
+			kvm_apic_nmi_wd_deliver(vcpu);
 }
 
 static enum hrtimer_restart pit_timer_fn(struct hrtimer *data)
@@ -321,6 +309,12 @@ static enum hrtimer_restart pit_timer_fn(struct hrtimer *data)
 		return HRTIMER_RESTART;
 	} else
 		return HRTIMER_NORESTART;
+}
+
+static void kvm_pit_reset_reinject(struct kvm_pit *pit)
+{
+	atomic_set(&pit->pit_state.pending, 0);
+	atomic_set(&pit->pit_state.irq_ack, 1);
 }
 
 static void create_pit_timer(struct kvm *kvm, u32 val, int is_period)
@@ -345,8 +339,7 @@ static void create_pit_timer(struct kvm *kvm, u32 val, int is_period)
 	ps->timer.function = pit_timer_fn;
 	ps->kvm = ps->pit->kvm;
 
-	atomic_set(&ps->pending, 0);
-	ps->irq_ack = 1;
+	kvm_pit_reset_reinject(ps->pit);
 
 	/*
 	 * Do not allow the guest to program periodic timers with small
@@ -646,18 +639,15 @@ void kvm_pit_reset(struct kvm_pit *pit)
 	}
 	mutex_unlock(&pit->pit_state.lock);
 
-	atomic_set(&pit->pit_state.pending, 0);
-	pit->pit_state.irq_ack = 1;
+	kvm_pit_reset_reinject(pit);
 }
 
 static void pit_mask_notifer(struct kvm_irq_mask_notifier *kimn, bool mask)
 {
 	struct kvm_pit *pit = container_of(kimn, struct kvm_pit, mask_notifier);
 
-	if (!mask) {
-		atomic_set(&pit->pit_state.pending, 0);
-		pit->pit_state.irq_ack = 1;
-	}
+	if (!mask)
+		kvm_pit_reset_reinject(pit);
 }
 
 static const struct kvm_io_device_ops pit_dev_ops = {
@@ -691,7 +681,6 @@ struct kvm_pit *kvm_create_pit(struct kvm *kvm, u32 flags)
 
 	mutex_init(&pit->pit_state.lock);
 	mutex_lock(&pit->pit_state.lock);
-	spin_lock_init(&pit->pit_state.inject_lock);
 
 	pid = get_pid(task_tgid(current));
 	pid_nr = pid_vnr(pid);
