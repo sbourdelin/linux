@@ -65,6 +65,7 @@
 #include "trap.h"
 #include "emad.h"
 #include "reg.h"
+#include "txheader.h"
 
 static LIST_HEAD(mlxsw_core_driver_list);
 static DEFINE_SPINLOCK(mlxsw_core_driver_list_lock);
@@ -1099,7 +1100,11 @@ static int mlxsw_core_reg_access_emad(struct mlxsw_core *mlxsw_core,
 
 	dev_dbg(mlxsw_core->bus_info->dev, "EMAD send (tid=%llx)\n",
 		mlxsw_core->emad.tid);
-	mlxsw_core_buf_dump_dbg(mlxsw_core, skb->data, skb->len);
+	devlink_hwmsg_notify(priv_to_devlink(mlxsw_core),
+			     skb->data + MLXSW_TXHDR_LEN,
+			     skb->len - MLXSW_TXHDR_LEN,
+			     DEVLINK_HWMSG_TYPE_MLX_EMAD,
+			     DEVLINK_HWMSG_DIR_TO_HW, GFP_KERNEL);
 
 	err = mlxsw_emad_transmit(mlxsw_core, skb, &tx_info);
 	if (!err) {
@@ -1109,9 +1114,11 @@ static int mlxsw_core_reg_access_emad(struct mlxsw_core *mlxsw_core,
 
 		dev_dbg(mlxsw_core->bus_info->dev, "EMAD recv (tid=%llx)\n",
 			mlxsw_core->emad.tid - 1);
-		mlxsw_core_buf_dump_dbg(mlxsw_core,
-					mlxsw_core->emad.resp_skb->data,
-					mlxsw_core->emad.resp_skb->len);
+		devlink_hwmsg_notify(priv_to_devlink(mlxsw_core),
+				     mlxsw_core->emad.resp_skb->data,
+				     mlxsw_core->emad.resp_skb->len,
+				     DEVLINK_HWMSG_TYPE_MLX_EMAD,
+				     DEVLINK_HWMSG_DIR_FROM_HW, GFP_KERNEL);
 
 		dev_kfree_skb(mlxsw_core->emad.resp_skb);
 	}

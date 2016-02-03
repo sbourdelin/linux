@@ -40,7 +40,7 @@ enum devlink_command {
 };
 
 enum devlink_hwmsg_type {
-	DEVLINK_HWMSG_TYPE_TMP, /* temporary, until first message type is introduced */
+	DEVLINK_HWMSG_TYPE_MLX_EMAD, /* Mellanox EMAD packet */
 };
 
 enum devlink_hwmsg_dir {
