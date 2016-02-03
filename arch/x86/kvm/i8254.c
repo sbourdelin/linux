@@ -237,6 +237,9 @@ static void kvm_pit_ack_irq(struct kvm_irq_ack_notifier *kian)
 	struct kvm_kpit_state *ps = container_of(kian, struct kvm_kpit_state,
 						 irq_ack_notifier);
 
+	if (!ps->reinject)
+		return;
+
 	atomic_set(&ps->irq_ack, 1);
 	if (atomic_add_unless(&ps->pending, -1, 0))
 		/* in this case, we had multiple outstanding pit interrupts
@@ -274,7 +277,7 @@ static void pit_do_work(struct kthread_work *work)
 	int i;
 	struct kvm_kpit_state *ps = &pit->pit_state;
 
-	if (!atomic_xchg(&ps->irq_ack, 0))
+	if (ps->reinject && !atomic_xchg(&ps->irq_ack, 0))
 		return;
 
 	kvm_set_irq(kvm, kvm->arch.vpit->irq_source_id, 0, 1, false);
@@ -299,10 +302,10 @@ static enum hrtimer_restart pit_timer_fn(struct hrtimer *data)
 	struct kvm_kpit_state *ps = container_of(data, struct kvm_kpit_state, timer);
 	struct kvm_pit *pt = ps->kvm->arch.vpit;
 
-	if (ps->reinject || !atomic_read(&ps->pending)) {
+	if (ps->reinject)
 		atomic_inc(&ps->pending);
-		queue_kthread_work(&pt->worker, &pt->expired);
-	}
+
+	queue_kthread_work(&pt->worker, &pt->expired);
 
 	if (ps->is_periodic) {
 		hrtimer_add_expires_ns(&ps->timer, ps->period);
