@@ -155,12 +155,9 @@ struct uvc_device
 		const struct uvc_descriptor_header * const *streaming;
 	} desc;
 
-	unsigned int control_intf;
 	struct usb_ep *control_ep;
 	struct usb_request *control_req;
 	void *control_buf;
-
-	unsigned int streaming_intf;
 
 	/* Events */
 	unsigned int event_length;
