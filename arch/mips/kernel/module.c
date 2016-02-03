@@ -183,13 +183,25 @@ out_danger:
 	return -ENOEXEC;
 }
 
+static int apply_r_mips_pc16_rel(struct module *me, u32 *location, Elf_Addr v)
+{
+	u16 val;
+
+	val = *location;
+	val += (v - (Elf_Addr)location) >> 2;
+	*location = (*location & 0xffff0000) | val;
+
+	return 0;
+}
+
 static int (*reloc_handlers_rel[]) (struct module *me, u32 *location,
 				Elf_Addr v) = {
 	[R_MIPS_NONE]		= apply_r_mips_none,
 	[R_MIPS_32]		= apply_r_mips_32_rel,
 	[R_MIPS_26]		= apply_r_mips_26_rel,
 	[R_MIPS_HI16]		= apply_r_mips_hi16_rel,
-	[R_MIPS_LO16]		= apply_r_mips_lo16_rel
+	[R_MIPS_LO16]		= apply_r_mips_lo16_rel,
+	[R_MIPS_PC16]		= apply_r_mips_pc16_rel,
 };
 
 int apply_relocate(Elf_Shdr *sechdrs, const char *strtab,
