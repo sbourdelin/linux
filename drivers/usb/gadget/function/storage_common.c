@@ -70,15 +70,6 @@ struct usb_endpoint_descriptor fsg_fs_bulk_out_desc = {
 };
 EXPORT_SYMBOL_GPL(fsg_fs_bulk_out_desc);
 
-struct usb_descriptor_header *fsg_fs_function[] = {
-	(struct usb_descriptor_header *) &fsg_intf_desc,
-	(struct usb_descriptor_header *) &fsg_fs_bulk_in_desc,
-	(struct usb_descriptor_header *) &fsg_fs_bulk_out_desc,
-	NULL,
-};
-EXPORT_SYMBOL_GPL(fsg_fs_function);
-
-
 /*
  * USB 2.0 devices need to expose both high speed and full speed
  * descriptors, unless they only run at full speed.
@@ -107,15 +98,6 @@ struct usb_endpoint_descriptor fsg_hs_bulk_out_desc = {
 	.bInterval =		1,	/* NAK every 1 uframe */
 };
 EXPORT_SYMBOL_GPL(fsg_hs_bulk_out_desc);
-
-
-struct usb_descriptor_header *fsg_hs_function[] = {
-	(struct usb_descriptor_header *) &fsg_intf_desc,
-	(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
-	(struct usb_descriptor_header *) &fsg_hs_bulk_out_desc,
-	NULL,
-};
-EXPORT_SYMBOL_GPL(fsg_hs_function);
 
 struct usb_endpoint_descriptor fsg_ss_bulk_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
@@ -152,17 +134,6 @@ struct usb_ss_ep_comp_descriptor fsg_ss_bulk_out_comp_desc = {
 	/*.bMaxBurst =		DYNAMIC, */
 };
 EXPORT_SYMBOL_GPL(fsg_ss_bulk_out_comp_desc);
-
-struct usb_descriptor_header *fsg_ss_function[] = {
-	(struct usb_descriptor_header *) &fsg_intf_desc,
-	(struct usb_descriptor_header *) &fsg_ss_bulk_in_desc,
-	(struct usb_descriptor_header *) &fsg_ss_bulk_in_comp_desc,
-	(struct usb_descriptor_header *) &fsg_ss_bulk_out_desc,
-	(struct usb_descriptor_header *) &fsg_ss_bulk_out_comp_desc,
-	NULL,
-};
-EXPORT_SYMBOL_GPL(fsg_ss_function);
-
 
  /*-------------------------------------------------------------------------*/
 

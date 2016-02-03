@@ -233,6 +233,17 @@ static const char fsg_string_interface[] = "Mass Storage";
 #include "storage_common.h"
 #include "f_mass_storage.h"
 
+USB_COMPOSITE_ENDPOINT(ep_in, &fsg_fs_bulk_in_desc, &fsg_hs_bulk_in_desc,
+                &fsg_ss_bulk_in_desc, &fsg_ss_bulk_in_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_out, &fsg_fs_bulk_out_desc, &fsg_hs_bulk_out_desc,
+                &fsg_ss_bulk_out_desc, &fsg_ss_bulk_out_comp_desc);
+
+USB_COMPOSITE_ALTSETTING(intf0alt0, &fsg_intf_desc, &ep_in, &ep_out);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+
+USB_COMPOSITE_DESCRIPTORS(fsg_descs, &intf0);
+
 /* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
 static struct usb_string		fsg_strings[] = {
 	{FSG_STRING_INTERFACE,		fsg_string_interface},
@@ -324,8 +335,6 @@ struct fsg_dev {
 	struct usb_function	function;
 	struct usb_gadget	*gadget;	/* Copy of cdev->gadget */
 	struct fsg_common	*common;
-
-	u16			interface_number;
 
 	unsigned int		bulk_in_enabled:1;
 	unsigned int		bulk_out_enabled:1;
@@ -522,7 +531,7 @@ static int fsg_setup(struct usb_function *f,
 		if (ctrl->bRequestType !=
 		    (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 			break;
-		if (w_index != fsg->interface_number || w_value != 0 ||
+		if (w_index != usb_get_interface_id(f, 0) || w_value != 0 ||
 				w_length != 0)
 			return -EDOM;
 
@@ -538,7 +547,7 @@ static int fsg_setup(struct usb_function *f,
 		if (ctrl->bRequestType !=
 		    (USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 			break;
-		if (w_index != fsg->interface_number || w_value != 0 ||
+		if (w_index != usb_get_interface_id(f, 0) || w_value != 0 ||
 				w_length != 1)
 			return -EDOM;
 		VDBG(fsg, "get max LUN\n");
@@ -2328,18 +2337,26 @@ reset:
 static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct fsg_dev *fsg = fsg_from_func(f);
+
+	fsg->bulk_in = usb_function_get_ep(f, intf, 0);
+	if (!fsg->bulk_in)
+		return -ENODEV;
+
+	fsg->bulk_out = usb_function_get_ep(f, intf, 1);
+	if (!fsg->bulk_out)
+		return -ENODEV;
+
 	fsg->common->new_fsg = fsg;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
 	return USB_GADGET_DELAYED_STATUS;
 }
 
-static void fsg_disable(struct usb_function *f)
+static void fsg_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct fsg_dev *fsg = fsg_from_func(f);
 	fsg->common->new_fsg = NULL;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
 }
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -3025,13 +3042,11 @@ static void fsg_common_release(struct kref *ref)
 
 /*-------------------------------------------------------------------------*/
 
-static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
+static int fsg_prep_descs(struct usb_function *f)
 {
 	struct fsg_dev		*fsg = fsg_from_func(f);
 	struct fsg_common	*common = fsg->common;
-	struct usb_gadget	*gadget = c->cdev->gadget;
-	int			i;
-	struct usb_ep		*ep;
+	struct usb_gadget	*gadget = f->config->cdev->gadget;
 	unsigned		max_burst;
 	int			ret;
 	struct fsg_opts		*opts;
@@ -3045,7 +3060,7 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 
 	opts = fsg_opts_from_func_inst(f->fi);
 	if (!opts->no_configfs) {
-		ret = fsg_common_set_cdev(fsg->common, c->cdev,
+		ret = fsg_common_set_cdev(fsg->common, f->config->cdev,
 					  fsg->common->can_stall);
 		if (ret)
 			return ret;
@@ -3057,58 +3072,12 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 
 	fsg->gadget = gadget;
 
-	/* New interface */
-	i = usb_interface_id(c, f);
-	if (i < 0)
-		goto fail;
-	fsg_intf_desc.bInterfaceNumber = i;
-	fsg->interface_number = i;
-
-	/* Find all the endpoints we will use */
-	ep = usb_ep_autoconfig(gadget, &fsg_fs_bulk_in_desc);
-	if (!ep)
-		goto autoconf_fail;
-	fsg->bulk_in = ep;
-
-	ep = usb_ep_autoconfig(gadget, &fsg_fs_bulk_out_desc);
-	if (!ep)
-		goto autoconf_fail;
-	fsg->bulk_out = ep;
-
-	/* Assume endpoint addresses are the same for both speeds */
-	fsg_hs_bulk_in_desc.bEndpointAddress =
-		fsg_fs_bulk_in_desc.bEndpointAddress;
-	fsg_hs_bulk_out_desc.bEndpointAddress =
-		fsg_fs_bulk_out_desc.bEndpointAddress;
-
 	/* Calculate bMaxBurst, we know packet size is 1024 */
 	max_burst = min_t(unsigned, FSG_BUFLEN / 1024, 15);
-
-	fsg_ss_bulk_in_desc.bEndpointAddress =
-		fsg_fs_bulk_in_desc.bEndpointAddress;
 	fsg_ss_bulk_in_comp_desc.bMaxBurst = max_burst;
-
-	fsg_ss_bulk_out_desc.bEndpointAddress =
-		fsg_fs_bulk_out_desc.bEndpointAddress;
 	fsg_ss_bulk_out_comp_desc.bMaxBurst = max_burst;
 
-	ret = usb_assign_descriptors(f, fsg_fs_function, fsg_hs_function,
-			fsg_ss_function);
-	if (ret)
-		goto autoconf_fail;
-
-	return 0;
-
-autoconf_fail:
-	ERROR(fsg, "unable to autoconfigure all endpoints\n");
-	i = -ENOTSUPP;
-fail:
-	/* terminate the thread */
-	if (fsg->common->state != FSG_STATE_TERMINATED) {
-		raise_exception(fsg->common, FSG_STATE_EXIT);
-		wait_for_completion(&fsg->common->thread_notifier);
-	}
-	return i;
+	return usb_function_set_descs(f, &fsg_descs);
 }
 
 /****************************** ALLOCATE FUNCTION *************************/
@@ -3125,8 +3094,6 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 		/* FIXME: make interruptible or killable somehow? */
 		wait_event(common->fsg_wait, common->fsg != fsg);
 	}
-
-	usb_free_all_descriptors(&fsg->function);
 }
 
 static inline struct fsg_lun_opts *to_fsg_lun_opts(struct config_item *item)
@@ -3529,11 +3496,11 @@ static struct usb_function *fsg_alloc(struct usb_function_instance *fi)
 	mutex_unlock(&opts->lock);
 
 	fsg->function.name	= FSG_DRIVER_DESC;
-	fsg->function.bind	= fsg_bind;
+	fsg->function.prep_descs	= fsg_prep_descs;
 	fsg->function.unbind	= fsg_unbind;
 	fsg->function.setup	= fsg_setup;
 	fsg->function.set_alt	= fsg_set_alt;
-	fsg->function.disable	= fsg_disable;
+	fsg->function.clear_alt	= fsg_clear_alt;
 	fsg->function.free_func	= fsg_free;
 
 	fsg->common               = common;

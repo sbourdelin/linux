@@ -190,17 +190,14 @@ extern struct usb_interface_descriptor fsg_intf_desc;
 
 extern struct usb_endpoint_descriptor fsg_fs_bulk_in_desc;
 extern struct usb_endpoint_descriptor fsg_fs_bulk_out_desc;
-extern struct usb_descriptor_header *fsg_fs_function[];
 
 extern struct usb_endpoint_descriptor fsg_hs_bulk_in_desc;
 extern struct usb_endpoint_descriptor fsg_hs_bulk_out_desc;
-extern struct usb_descriptor_header *fsg_hs_function[];
 
 extern struct usb_endpoint_descriptor fsg_ss_bulk_in_desc;
 extern struct usb_ss_ep_comp_descriptor fsg_ss_bulk_in_comp_desc;
 extern struct usb_endpoint_descriptor fsg_ss_bulk_out_desc;
 extern struct usb_ss_ep_comp_descriptor fsg_ss_bulk_out_comp_desc;
-extern struct usb_descriptor_header *fsg_ss_function[];
 
 void fsg_lun_close(struct fsg_lun *curlun);
 int fsg_lun_open(struct fsg_lun *curlun, const char *filename);
