@@ -36,6 +36,7 @@
 #include <linux/mlx4/cmd.h>
 #include <linux/module.h>
 #include <linux/cache.h>
+#include <net/devlink.h>
 
 #include "fw.h"
 #include "icm.h"
@@ -2734,6 +2735,8 @@ static int mlx4_ACCESS_REG(struct mlx4_dev *dev, u16 reg_id,
 {
 	struct mlx4_cmd_mailbox *inbox, *outbox;
 	struct mlx4_access_reg *inbuf, *outbuf;
+	struct mlx4_priv *priv = mlx4_priv(dev);
+	struct devlink *devlink = priv_to_devlink(priv);
 	int err;
 
 	inbox = mlx4_alloc_cmd_mailbox(dev);
@@ -2760,6 +2763,9 @@ static int mlx4_ACCESS_REG(struct mlx4_dev *dev, u16 reg_id,
 			    ((0x3) << 12));
 
 	memcpy(inbuf->reg_data, reg_data, reg_len);
+	devlink_hwmsg_notify(devlink, reg_data, reg_len,
+			     DEVLINK_HWMSG_TYPE_MLX_CMD_REG,
+			     DEVLINK_HWMSG_DIR_TO_HW, GFP_KERNEL);
 	err = mlx4_cmd_box(dev, inbox->dma, outbox->dma, 0, 0,
 			   MLX4_CMD_ACCESS_REG, MLX4_CMD_TIME_CLASS_C,
 			   MLX4_CMD_WRAPPED);
@@ -2775,6 +2781,9 @@ static int mlx4_ACCESS_REG(struct mlx4_dev *dev, u16 reg_id,
 	}
 
 	memcpy(reg_data, outbuf->reg_data, reg_len);
+	devlink_hwmsg_notify(devlink, reg_data, reg_len,
+			     DEVLINK_HWMSG_TYPE_MLX_CMD_REG,
+			     DEVLINK_HWMSG_DIR_FROM_HW, GFP_KERNEL);
 out:
 	mlx4_free_cmd_mailbox(dev, inbox);
 	mlx4_free_cmd_mailbox(dev, outbox);

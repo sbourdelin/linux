@@ -41,6 +41,7 @@ enum devlink_command {
 
 enum devlink_hwmsg_type {
 	DEVLINK_HWMSG_TYPE_MLX_EMAD, /* Mellanox EMAD packet */
+	DEVLINK_HWMSG_TYPE_MLX_CMD_REG, /* Mellanox CMD iface register access */
 };
 
 enum devlink_hwmsg_dir {
