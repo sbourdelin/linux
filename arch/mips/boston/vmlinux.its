@@ -1,0 +1,23 @@
+/ {
+	images {
+		fdt@boston {
+			description = "img,boston Device Tree";
+			data = /incbin/("boot/dts/img/boston.dtb");
+			type = "flat_dt";
+			arch = "mips";
+			compression = "none";
+			hash@1 {
+				algo = "sha1";
+			};
+		};
+	};
+
+	configurations {
+		default = "conf@boston";
+		conf@boston {
+			description = "Boot Linux kernel";
+			kernel = "kernel@0";
+			fdt = "fdt@boston";
+		};
+	};
+};
