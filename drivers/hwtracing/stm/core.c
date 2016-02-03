@@ -571,6 +571,17 @@ stm_char_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						    options);
 
 		break;
+
+	case STP_GET_OPTIONS:
+		if (stm_data->get_options)
+			err = stm_data->get_options(stm_data,
+						    stmf->output.master,
+						    stmf->output.channel,
+						    stmf->output.nr_chans,
+						    &options);
+
+		return copy_to_user((void __user *)arg, &options, sizeof(u64));
+
 	default:
 		break;
 	}
