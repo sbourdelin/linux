@@ -1041,20 +1041,7 @@ struct net_device *gether_connect(struct gether *link)
 		return ERR_PTR(-EINVAL);
 
 	link->in_ep->driver_data = dev;
-	result = usb_ep_enable(link->in_ep);
-	if (result != 0) {
-		DBG(dev, "enable %s --> %d\n",
-			link->in_ep->name, result);
-		goto fail0;
-	}
-
 	link->out_ep->driver_data = dev;
-	result = usb_ep_enable(link->out_ep);
-	if (result != 0) {
-		DBG(dev, "enable %s --> %d\n",
-			link->out_ep->name, result);
-		goto fail1;
-	}
 
 	if (result == 0)
 		result = alloc_requests(dev, link, qlen(dev->gadget,
@@ -1082,14 +1069,8 @@ struct net_device *gether_connect(struct gether *link)
 		netif_carrier_on(dev->net);
 		if (netif_running(dev->net))
 			eth_start(dev, GFP_ATOMIC);
-
-	/* on error, disable any endpoints  */
-	} else {
-		(void) usb_ep_disable(link->out_ep);
-fail1:
-		(void) usb_ep_disable(link->in_ep);
 	}
-fail0:
+
 	/* caller is responsible for cleanup on error */
 	if (result < 0)
 		return ERR_PTR(result);
@@ -1123,11 +1104,7 @@ void gether_disconnect(struct gether *link)
 	netif_stop_queue(dev->net);
 	netif_carrier_off(dev->net);
 
-	/* disable endpoints, forcing (synchronous) completion
-	 * of all pending i/o.  then free the request objects
-	 * and forget about the endpoints.
-	 */
-	usb_ep_disable(link->in_ep);
+	/* free the request objects and forget about the endpoints. */
 	spin_lock(&dev->req_lock);
 	while (!list_empty(&dev->tx_reqs)) {
 		req = container_of(dev->tx_reqs.next,
@@ -1141,7 +1118,6 @@ void gether_disconnect(struct gether *link)
 	spin_unlock(&dev->req_lock);
 	link->in_ep->desc = NULL;
 
-	usb_ep_disable(link->out_ep);
 	spin_lock(&dev->req_lock);
 	while (!list_empty(&dev->rx_reqs)) {
 		req = container_of(dev->rx_reqs.next,
