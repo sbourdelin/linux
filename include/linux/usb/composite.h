@@ -487,6 +487,7 @@ struct usb_composite_dev {
 	 * while the deactivation count is nonzero.
 	 */
 	unsigned			deactivations;
+	spinlock_t			deactivation_lock;
 
 	/* the composite driver won't complete the control transfer's
 	 * data/status stages till delayed_status is zero.
