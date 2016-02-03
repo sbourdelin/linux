@@ -154,17 +154,6 @@ static struct usb_endpoint_descriptor fs_subset_out_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *fs_eth_function[] = {
-	(struct usb_descriptor_header *) &subset_data_intf,
-	(struct usb_descriptor_header *) &mdlm_header_desc,
-	(struct usb_descriptor_header *) &mdlm_desc,
-	(struct usb_descriptor_header *) &mdlm_detail_desc,
-	(struct usb_descriptor_header *) &ether_desc,
-	(struct usb_descriptor_header *) &fs_subset_in_desc,
-	(struct usb_descriptor_header *) &fs_subset_out_desc,
-	NULL,
-};
-
 /* high speed support: */
 
 static struct usb_endpoint_descriptor hs_subset_in_desc = {
@@ -181,17 +170,6 @@ static struct usb_endpoint_descriptor hs_subset_out_desc = {
 
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
-};
-
-static struct usb_descriptor_header *hs_eth_function[] = {
-	(struct usb_descriptor_header *) &subset_data_intf,
-	(struct usb_descriptor_header *) &mdlm_header_desc,
-	(struct usb_descriptor_header *) &mdlm_desc,
-	(struct usb_descriptor_header *) &mdlm_detail_desc,
-	(struct usb_descriptor_header *) &ether_desc,
-	(struct usb_descriptor_header *) &hs_subset_in_desc,
-	(struct usb_descriptor_header *) &hs_subset_out_desc,
-	NULL,
 };
 
 /* super speed support: */
@@ -221,18 +199,16 @@ static struct usb_ss_ep_comp_descriptor ss_subset_bulk_comp_desc = {
 	/* .bmAttributes =	0, */
 };
 
-static struct usb_descriptor_header *ss_eth_function[] = {
-	(struct usb_descriptor_header *) &subset_data_intf,
-	(struct usb_descriptor_header *) &mdlm_header_desc,
-	(struct usb_descriptor_header *) &mdlm_desc,
-	(struct usb_descriptor_header *) &mdlm_detail_desc,
-	(struct usb_descriptor_header *) &ether_desc,
-	(struct usb_descriptor_header *) &ss_subset_in_desc,
-	(struct usb_descriptor_header *) &ss_subset_bulk_comp_desc,
-	(struct usb_descriptor_header *) &ss_subset_out_desc,
-	(struct usb_descriptor_header *) &ss_subset_bulk_comp_desc,
-	NULL,
-};
+USB_COMPOSITE_ENDPOINT(ep_in, &fs_subset_in_desc, &hs_subset_in_desc,
+		&ss_subset_in_desc, &ss_subset_bulk_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_out, &fs_subset_out_desc, &hs_subset_out_desc,
+		&ss_subset_out_desc, &ss_subset_bulk_comp_desc);
+
+USB_COMPOSITE_ALTSETTING(intf0alt0, &subset_data_intf, &ep_in, &ep_out);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+
+USB_COMPOSITE_DESCRIPTORS(subset_descs, &intf0);
 
 /* string descriptors: */
 
@@ -260,26 +236,20 @@ static int geth_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct usb_composite_dev *cdev = f->config->cdev;
 	struct net_device	*net;
 
-	/* we know alt == 0, so this is an activation or a reset */
-
-	if (geth->port.in_ep->enabled) {
-		DBG(cdev, "reset cdc subset\n");
-		gether_disconnect(&geth->port);
-	}
-
 	DBG(cdev, "init + activate cdc subset\n");
-	if (config_ep_by_speed(cdev->gadget, f, geth->port.in_ep) ||
-	    config_ep_by_speed(cdev->gadget, f, geth->port.out_ep)) {
-		geth->port.in_ep->desc = NULL;
-		geth->port.out_ep->desc = NULL;
-		return -EINVAL;
-	}
+
+	geth->port.in_ep = usb_function_get_ep(f, intf, 0);
+	if (!geth->port.in_ep)
+		return -ENODEV;
+	geth->port.out_ep = usb_function_get_ep(f, intf, 1);
+	if (!geth->port.out_ep)
+		return -ENODEV;
 
 	net = gether_connect(&geth->port);
 	return PTR_ERR_OR_ZERO(net);
 }
 
-static void geth_disable(struct usb_function *f)
+static void geth_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_gether	*geth = func_to_geth(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
@@ -292,14 +262,26 @@ static void geth_disable(struct usb_function *f)
 
 /* serial function driver setup/binding */
 
-static int
-geth_bind(struct usb_configuration *c, struct usb_function *f)
+static int geth_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_gether		*geth = func_to_geth(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
 	struct usb_string	*us;
+
+	us = usb_gstrings_attach(cdev, geth_strings,
+				 ARRAY_SIZE(geth_string_defs));
+	if (IS_ERR(us))
+		return PTR_ERR(us);
+
+	subset_data_intf.iInterface = us[0].id;
+	ether_desc.iMACAddress = us[1].id;
+
+	return usb_function_set_descs(f, &subset_descs);
+}
+
+static int geth_prep_vendor_descs(struct usb_function *f)
+{
+	struct usb_composite_dev *cdev = f->config->cdev;
 	int			status;
-	struct usb_ep		*ep;
 
 	struct f_gether_opts	*gether_opts;
 
@@ -322,63 +304,16 @@ geth_bind(struct usb_configuration *c, struct usb_function *f)
 		gether_opts->bound = true;
 	}
 
-	us = usb_gstrings_attach(cdev, geth_strings,
-				 ARRAY_SIZE(geth_string_defs));
-	if (IS_ERR(us))
-		return PTR_ERR(us);
+	subset_data_intf.bInterfaceNumber = usb_get_interface_id(f, 0);
 
-	subset_data_intf.iInterface = us[0].id;
-	ether_desc.iMACAddress = us[1].id;
-
-	/* allocate instance-specific interface IDs */
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	subset_data_intf.bInterfaceNumber = status;
-
-	status = -ENODEV;
-
-	/* allocate instance-specific endpoints */
-	ep = usb_ep_autoconfig(cdev->gadget, &fs_subset_in_desc);
-	if (!ep)
-		goto fail;
-	geth->port.in_ep = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, &fs_subset_out_desc);
-	if (!ep)
-		goto fail;
-	geth->port.out_ep = ep;
-
-	/* support all relevant hardware speeds... we expect that when
-	 * hardware is dual speed, all bulk-capable endpoints work at
-	 * both speeds
-	 */
-	hs_subset_in_desc.bEndpointAddress = fs_subset_in_desc.bEndpointAddress;
-	hs_subset_out_desc.bEndpointAddress =
-		fs_subset_out_desc.bEndpointAddress;
-
-	ss_subset_in_desc.bEndpointAddress = fs_subset_in_desc.bEndpointAddress;
-	ss_subset_out_desc.bEndpointAddress =
-		fs_subset_out_desc.bEndpointAddress;
-
-	status = usb_assign_descriptors(f, fs_eth_function, hs_eth_function,
-			ss_eth_function);
-	if (status)
-		goto fail;
-
-	/* NOTE:  all that is done without knowing or caring about
-	 * the network link ... which is unavailable to this code
-	 * until we're activated via set_alt().
-	 */
-
-	DBG(cdev, "CDC Subset: %s speed IN/%s OUT/%s\n",
-			gadget_is_superspeed(c->cdev->gadget) ? "super" :
-			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
-			geth->port.in_ep->name, geth->port.out_ep->name);
-	return 0;
-
-fail:
-	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&mdlm_header_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&mdlm_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&mdlm_detail_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&ether_desc);
 
 	return status;
 }
@@ -460,12 +395,6 @@ static void geth_free(struct usb_function *f)
 	kfree(eth);
 }
 
-static void geth_unbind(struct usb_configuration *c, struct usb_function *f)
-{
-	geth_string_defs[0].id = 0;
-	usb_free_all_descriptors(f);
-}
-
 static struct usb_function *geth_alloc(struct usb_function_instance *fi)
 {
 	struct f_gether	*geth;
@@ -496,10 +425,10 @@ static struct usb_function *geth_alloc(struct usb_function_instance *fi)
 	geth->port.cdc_filter = DEFAULT_FILTER;
 
 	geth->port.func.name = "cdc_subset";
-	geth->port.func.bind = geth_bind;
-	geth->port.func.unbind = geth_unbind;
+	geth->port.func.prep_descs = geth_prep_descs;
+	geth->port.func.prep_vendor_descs = geth_prep_vendor_descs;
 	geth->port.func.set_alt = geth_set_alt;
-	geth->port.func.disable = geth_disable;
+	geth->port.func.clear_alt = geth_clear_alt;
 	geth->port.func.free_func = geth_free;
 
 	return &geth->port.func;
