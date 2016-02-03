@@ -29,6 +29,7 @@
 #include <linux/crc32.h>
 #include <linux/usb/usbnet.h>
 #include <linux/slab.h>
+#include <linux/of_device.h>
 #include "smsc75xx.h"
 
 #define SMSC_CHIPNAME			"smsc75xx"
@@ -761,6 +762,8 @@ static int smsc75xx_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 
 static void smsc75xx_init_mac_address(struct usbnet *dev)
 {
+	const void *address;
+
 	/* try reading mac address from EEPROM */
 	if (smsc75xx_read_eeprom(dev, EEPROM_MAC_OFFSET, ETH_ALEN,
 			dev->net->dev_addr) == 0) {
@@ -770,6 +773,13 @@ static void smsc75xx_init_mac_address(struct usbnet *dev)
 				  "MAC address read from EEPROM\n");
 			return;
 		}
+	}
+
+	address = of_get_property(dev->udev->dev.of_node,
+				  "local-mac-address", NULL);
+	if (address) {
+		memcpy(dev->net->dev_addr, address, ETH_ALEN);
+		return;
 	}
 
 	/* no eeprom, or eeprom values are invalid. generate random MAC */
