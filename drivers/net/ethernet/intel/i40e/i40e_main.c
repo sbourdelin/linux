@@ -5306,6 +5306,13 @@ exit:
 	return ret;
 }
 
+static int __i40e_setup_tc(struct net_device *netdev, u32 handle, u8 tc)
+{
+	if (handle != TC_H_ROOT)
+		return -EINVAL;
+	return i40e_setup_tc(netdev, tc);
+}
+
 /**
  * i40e_open - Called when a network interface is made active
  * @netdev: network interface device structure
@@ -8890,7 +8897,7 @@ static const struct net_device_ops i40e_netdev_ops = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= i40e_netpoll,
 #endif
-	.ndo_setup_tc		= i40e_setup_tc,
+	.ndo_setup_tc		= __i40e_setup_tc,
 #ifdef I40E_FCOE
 	.ndo_fcoe_enable	= i40e_fcoe_enable,
 	.ndo_fcoe_disable	= i40e_fcoe_disable,
