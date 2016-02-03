@@ -83,3 +83,48 @@ config SCSI_UFS_QCOM
 
 	  Select this if you have UFS controller on QCOM chipset.
 	  If unsure, say N.
+
+config SCSI_UFS_DWC_HOOKS
+	bool "DesignWare hooks to UFS controller"
+	depends on SCSI_UFSHCD
+	---help---
+	  This selects the DesignWare hooks for the UFS host controller.
+
+	  Select this if you have a DesignWare UFS controller.
+	  If unsure, say N.
+
+config SCSI_UFS_DWC_PLAT
+	tristate "DesignWare UFS controller platform glue driver"
+	depends on SCSI_UFS_DWC_HOOKS && SCSI_UFSHCD_PLATFORM
+	---help---
+	  This selects the DesignWare UFS host controller platform glue driver.
+
+	  Select this if you have a DesignWare UFS controller on Platform bus.
+	  If unsure, say N.
+
+config SCSI_UFS_DWC_MPHY_TC
+	bool "Support for the Synopsys MPHY Test Chip"
+	depends on SCSI_UFS_DWC_HOOKS && (SCSI_UFSHCD_PCI || SCSI_UFS_DWC_PLAT)
+	---help---
+	  This selects the support for the Synopsys MPHY Test Chip.
+
+	  Select this if you have a Synopsys MPHY Test Chip.
+	  If unsure, say N.
+
+config SCSI_UFS_DWC_20BIT_RMMI
+	bool "20-bit RMMI MPHY"
+	depends on SCSI_UFS_DWC_MPHY_TC
+	---help---
+	  This specifies that the Synopsys MPHY supports 40-bit RMMI operations.
+
+	  Select this if you are using a 40-bit RMMI Synopsys MPHY.
+	  If unsure, say N.
+
+config SCSI_UFS_DWC_40BIT_RMMI
+	bool "40-bit RMMI MPHY"
+	depends on SCSI_UFS_DWC_MPHY_TC
+	---help---
+	  This specifies that the Synopsys MPHY supports 40-bit RMMI operations.
+
+	  Select this if you are using a 40-bit RMMI Synopsys MPHY.
+	  If unsure, say N.

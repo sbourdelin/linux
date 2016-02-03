@@ -34,6 +34,9 @@
  */
 
 #include "ufshcd.h"
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+#include "ufshcd-dwc.h"
+#endif
 #include <linux/pci.h>
 #include <linux/pm_runtime.h>
 
@@ -82,6 +85,16 @@ static int ufshcd_pci_runtime_idle(struct device *dev)
 #define ufshcd_pci_runtime_resume	NULL
 #define ufshcd_pci_runtime_idle	NULL
 #endif /* CONFIG_PM */
+
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+/**
+ * struct ufs_hba_dwc_vops - UFS DWC specific variant operations
+ */
+static struct ufs_hba_variant_ops ufs_dwc_pci_hba_vops = {
+	.name                   = "dwc-pci",
+	.custom_probe_hba	= ufshcd_dwc_configuration,
+};
+#endif
 
 /**
  * ufshcd_pci_shutdown - main function to put the controller in reset state
@@ -144,6 +157,9 @@ ufshcd_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	INIT_LIST_HEAD(&hba->clk_list_head);
 
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+	hba->vops = &ufs_dwc_pci_hba_vops;
+#endif
 	err = ufshcd_init(hba, mmio_base, pdev->irq);
 	if (err) {
 		dev_err(&pdev->dev, "Initialization failed\n");
@@ -167,6 +183,10 @@ static const struct dev_pm_ops ufshcd_pci_pm_ops = {
 
 static const struct pci_device_id ufshcd_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SAMSUNG, 0xC00C, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+#ifdef CONFIG_SCSI_UFS_DWC_HOOKS
+	{ PCI_VENDOR_ID_SYNOPSYS, 0xB101, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_SYNOPSYS, 0xB102, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+#endif
 	{ }	/* terminate list */
 };
 

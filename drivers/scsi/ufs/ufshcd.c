@@ -104,13 +104,6 @@ enum {
 	UFSHCD_CAN_QUEUE	= 32,
 };
 
-/* UFSHCD states */
-enum {
-	UFSHCD_STATE_RESET,
-	UFSHCD_STATE_ERROR,
-	UFSHCD_STATE_OPERATIONAL,
-};
-
 /* UFSHCD error handling flags */
 enum {
 	UFSHCD_EH_IN_PROGRESS = (1 << 0),
@@ -138,8 +131,6 @@ enum {
 #define ufshcd_clear_eh_in_progress(h) \
 	(h->eh_flags &= ~UFSHCD_EH_IN_PROGRESS)
 
-#define ufshcd_set_ufs_dev_active(h) \
-	((h)->curr_dev_pwr_mode = UFS_ACTIVE_PWR_MODE)
 #define ufshcd_set_ufs_dev_sleep(h) \
 	((h)->curr_dev_pwr_mode = UFS_SLEEP_PWR_MODE)
 #define ufshcd_set_ufs_dev_poweroff(h) \
@@ -2083,7 +2074,7 @@ static void ufshcd_host_memory_configure(struct ufs_hba *hba)
  *
  * Returns 0 on success, non-zero value on failure
  */
-static int ufshcd_dme_link_startup(struct ufs_hba *hba)
+int ufshcd_dme_link_startup(struct ufs_hba *hba)
 {
 	struct uic_command uic_cmd = {0};
 	int ret;
@@ -2096,6 +2087,7 @@ static int ufshcd_dme_link_startup(struct ufs_hba *hba)
 			"dme-link-startup: error code %d\n", ret);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(ufshcd_dme_link_startup);
 
 static inline void ufshcd_add_delay_before_dme_cmd(struct ufs_hba *hba)
 {
@@ -2531,7 +2523,7 @@ static int ufshcd_config_pwr_mode(struct ufs_hba *hba,
  *
  * Set fDeviceInit flag and poll until device toggles it.
  */
-static int ufshcd_complete_dev_init(struct ufs_hba *hba)
+int ufshcd_complete_dev_init(struct ufs_hba *hba)
 {
 	int i, retries, err = 0;
 	bool flag_res = 1;
@@ -2575,6 +2567,7 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 out:
 	return err;
 }
+EXPORT_SYMBOL_GPL(ufshcd_complete_dev_init);
 
 /**
  * ufshcd_make_hba_operational - Make UFS controller operational
@@ -2588,7 +2581,7 @@ out:
  *
  * Returns 0 on success, non-zero value on failure
  */
-static int ufshcd_make_hba_operational(struct ufs_hba *hba)
+int ufshcd_make_hba_operational(struct ufs_hba *hba)
 {
 	int err = 0;
 	u32 reg;
@@ -2629,6 +2622,7 @@ static int ufshcd_make_hba_operational(struct ufs_hba *hba)
 out:
 	return err;
 }
+EXPORT_SYMBOL_GPL(ufshcd_make_hba_operational);
 
 /**
  * ufshcd_hba_enable - initialize the controller
@@ -2804,7 +2798,7 @@ out:
  * not respond with NOP IN UPIU within timeout of %NOP_OUT_TIMEOUT
  * and we retry sending NOP OUT for %NOP_OUT_RETRIES iterations.
  */
-static int ufshcd_verify_dev_init(struct ufs_hba *hba)
+int ufshcd_verify_dev_init(struct ufs_hba *hba)
 {
 	int err = 0;
 	int retries;
@@ -2827,6 +2821,7 @@ static int ufshcd_verify_dev_init(struct ufs_hba *hba)
 		dev_err(hba->dev, "%s: NOP OUT failed %d\n", __func__, err);
 	return err;
 }
+EXPORT_SYMBOL_GPL(ufshcd_verify_dev_init);
 
 /**
  * ufshcd_set_queue_depth - set lun queue depth
@@ -5666,7 +5661,16 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	 */
 	ufshcd_set_ufs_dev_poweroff(hba);
 
-	async_schedule(ufshcd_async_scan, hba);
+	/* Hook for specific hardware config initialization */
+	if (hba->vops->custom_probe_hba) {
+		err = ufshcd_vops_custom_probe_hba(hba);
+		if (err) {
+			dev_err(hba->dev, "Host controller config failed\n");
+			goto out_remove_scsi_host;
+		}
+	}
+	else
+		async_schedule(ufshcd_async_scan, hba);
 
 	return 0;
 
