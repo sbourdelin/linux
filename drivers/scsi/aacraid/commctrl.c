@@ -855,6 +855,8 @@ int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 {
 	int status;
 
+	mutex_lock(&dev->ioctl_mutex);
+
 	/*
 	 *	HBA gets first crack
 	 */
@@ -890,6 +892,8 @@ int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 		status = -ENOTTY;
 		break;
 	}
+	mutex_unlock(&dev->ioctl_mutex);
+
 	return status;
 }
 
