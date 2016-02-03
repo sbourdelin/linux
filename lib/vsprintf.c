@@ -1189,7 +1189,7 @@ char *ip6_addr_string_sa(char *buf, char *end, const struct sockaddr_in6 *sa,
 		*p++ = ':';
 		p = number(p, pend, ntohs(sa->sin6_port), spec);
 	}
-	if (have_f) {
+	if (have_f && (sa->sin6_flowinfo & IPV6_FLOWINFO_MASK)) {
 		*p++ = '/';
 		p = number(p, pend, ntohl(sa->sin6_flowinfo &
 					  IPV6_FLOWINFO_MASK), spec);
