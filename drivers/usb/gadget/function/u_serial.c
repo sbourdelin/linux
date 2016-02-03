@@ -1439,15 +1439,7 @@ int gserial_connect(struct gserial *gser, u8 port_num)
 		return -EBUSY;
 	}
 
-	/* activate the endpoints */
-	status = usb_ep_enable(gser->in);
-	if (status < 0)
-		return status;
 	gser->in->driver_data = port;
-
-	status = usb_ep_enable(gser->out);
-	if (status < 0)
-		goto fail_out;
 	gser->out->driver_data = port;
 
 	/* then tell the tty glue that I/O can work */
@@ -1478,10 +1470,6 @@ int gserial_connect(struct gserial *gser, u8 port_num)
 	status = gs_console_connect(port_num);
 	spin_unlock_irqrestore(&port->port_lock, flags);
 
-	return status;
-
-fail_out:
-	usb_ep_disable(gser->in);
 	return status;
 }
 EXPORT_SYMBOL_GPL(gserial_connect);
@@ -1518,10 +1506,6 @@ void gserial_disconnect(struct gserial *gser)
 			tty_hangup(port->port.tty);
 	}
 	spin_unlock_irqrestore(&port->port_lock, flags);
-
-	/* disable endpoints, aborting down any active I/O */
-	usb_ep_disable(gser->out);
-	usb_ep_disable(gser->in);
 
 	/* finally, free any unused/unusable I/O buffers */
 	spin_lock_irqsave(&port->port_lock, flags);
