@@ -425,6 +425,8 @@ int usb_ep_add_vendor_desc(struct usb_function *f, int i, int a, int e,
 		const struct usb_descriptor_header *desc);
 
 
+int usb_get_interface_id(struct usb_function *f, int i);
+
 struct usb_ep *usb_function_get_ep(struct usb_function *f, int intf, int ep);
 
 int usb_interface_id(struct usb_configuration *, struct usb_function *);

@@ -670,6 +670,25 @@ static int usb_interface_id_to_index(struct usb_function *f, u8 id)
 }
 
 /**
+ * usb_get_interface_id - get id number of interface at given index in
+ *	USB function
+ * @f: USB function
+ * @i: index of interface in function
+ *
+ * Returns interface id on success, else negative errno.
+ */
+int usb_get_interface_id(struct usb_function *f, int i)
+{
+	if (!f->descs)
+		return -ENODEV;
+	if (f->descs->intfs_num <= i)
+		return -ENODEV;
+
+	return f->descs->intfs[i]->id;
+}
+EXPORT_SYMBOL_GPL(usb_get_interface_id);
+
+/**
  * usb_function_get_ep - obtains endpoint of given index from active
  *	altsetting of given interface
  * @f: USB function
