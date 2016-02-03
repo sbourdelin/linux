@@ -1345,7 +1345,7 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 			s = usb_gstrings_attach(&gi->cdev, cfg->gstrings, 1);
 			if (IS_ERR(s)) {
 				ret = PTR_ERR(s);
-				goto err_comp_cleanup;
+				goto err_purge_funcs;
 			}
 			c->iConfiguration = s[0].id;
 		}
