@@ -315,7 +315,7 @@ static inline struct list_head *classhashentry(struct lockdep_subclass_key *key)
 
 static struct list_head __chainhash_table[CHAINHASH_SIZE];
 
-static struct list_head *chainhashentry(unsigned long chain)
+static __maybe_unused struct list_head * chainhashentry(unsigned long chain)
 {
 	if (unlikely(!lockdep_initialized))
 		lockdep_init();
