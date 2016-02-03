@@ -214,25 +214,6 @@ static struct usb_endpoint_descriptor fs_ecm_out_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *ecm_fs_function[] = {
-	/* CDC ECM control descriptors */
-	(struct usb_descriptor_header *) &ecm_iad_descriptor,
-	(struct usb_descriptor_header *) &ecm_control_intf,
-	(struct usb_descriptor_header *) &ecm_header_desc,
-	(struct usb_descriptor_header *) &ecm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
-
-	/* NOTE: status endpoint might need to be removed */
-	(struct usb_descriptor_header *) &fs_ecm_notify_desc,
-
-	/* data interface, altsettings 0 and 1 */
-	(struct usb_descriptor_header *) &ecm_data_nop_intf,
-	(struct usb_descriptor_header *) &ecm_data_intf,
-	(struct usb_descriptor_header *) &fs_ecm_in_desc,
-	(struct usb_descriptor_header *) &fs_ecm_out_desc,
-	NULL,
-};
-
 /* high speed support: */
 
 static struct usb_endpoint_descriptor hs_ecm_notify_desc = {
@@ -261,25 +242,6 @@ static struct usb_endpoint_descriptor hs_ecm_out_desc = {
 	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
-};
-
-static struct usb_descriptor_header *ecm_hs_function[] = {
-	/* CDC ECM control descriptors */
-	(struct usb_descriptor_header *) &ecm_iad_descriptor,
-	(struct usb_descriptor_header *) &ecm_control_intf,
-	(struct usb_descriptor_header *) &ecm_header_desc,
-	(struct usb_descriptor_header *) &ecm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
-
-	/* NOTE: status endpoint might need to be removed */
-	(struct usb_descriptor_header *) &hs_ecm_notify_desc,
-
-	/* data interface, altsettings 0 and 1 */
-	(struct usb_descriptor_header *) &ecm_data_nop_intf,
-	(struct usb_descriptor_header *) &ecm_data_intf,
-	(struct usb_descriptor_header *) &hs_ecm_in_desc,
-	(struct usb_descriptor_header *) &hs_ecm_out_desc,
-	NULL,
 };
 
 /* super speed support: */
@@ -331,27 +293,21 @@ static struct usb_ss_ep_comp_descriptor ss_ecm_bulk_comp_desc = {
 	/* .bmAttributes =	0, */
 };
 
-static struct usb_descriptor_header *ecm_ss_function[] = {
-	/* CDC ECM control descriptors */
-	(struct usb_descriptor_header *) &ecm_iad_descriptor,
-	(struct usb_descriptor_header *) &ecm_control_intf,
-	(struct usb_descriptor_header *) &ecm_header_desc,
-	(struct usb_descriptor_header *) &ecm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
+USB_COMPOSITE_ENDPOINT(ep_notify, &fs_ecm_notify_desc, &hs_ecm_notify_desc,
+		&ss_ecm_notify_desc, &ss_ecm_intr_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_in, &fs_ecm_in_desc, &hs_ecm_in_desc,
+		&ss_ecm_in_desc, &ss_ecm_bulk_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_out, &fs_ecm_out_desc, &hs_ecm_out_desc,
+		&ss_ecm_out_desc, &ss_ecm_bulk_comp_desc);
 
-	/* NOTE: status endpoint might need to be removed */
-	(struct usb_descriptor_header *) &ss_ecm_notify_desc,
-	(struct usb_descriptor_header *) &ss_ecm_intr_comp_desc,
+USB_COMPOSITE_ALTSETTING(intf0alt0, &ecm_control_intf, &ep_notify);
+USB_COMPOSITE_ALTSETTING(intf1alt0, &ecm_data_nop_intf);
+USB_COMPOSITE_ALTSETTING(intf1alt1, &ecm_data_intf, &ep_in, &ep_out);
 
-	/* data interface, altsettings 0 and 1 */
-	(struct usb_descriptor_header *) &ecm_data_nop_intf,
-	(struct usb_descriptor_header *) &ecm_data_intf,
-	(struct usb_descriptor_header *) &ss_ecm_in_desc,
-	(struct usb_descriptor_header *) &ss_ecm_bulk_comp_desc,
-	(struct usb_descriptor_header *) &ss_ecm_out_desc,
-	(struct usb_descriptor_header *) &ss_ecm_bulk_comp_desc,
-	NULL,
-};
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+USB_COMPOSITE_INTERFACE(intf1, &intf1alt0, &intf1alt1);
+
+USB_COMPOSITE_DESCRIPTORS(ecm_descs, &intf0, &intf1);
 
 /* string descriptors: */
 
@@ -537,47 +493,43 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	/* Control interface has only altsetting 0 */
-	if (intf == ecm->ctrl_id) {
-		if (alt != 0)
-			goto fail;
+	if (intf == 0) {
+		/* NOTE:  a status/notification endpoint is *OPTIONAL* but we
+		 * don't treat it that way.  It's simpler, and some newer CDC
+		 * profiles (wireless handsets) no longer treat it as optional.
+		 */
 
 		VDBG(cdev, "reset ecm control %d\n", intf);
-		usb_ep_disable(ecm->notify);
-		if (!(ecm->notify->desc)) {
-			VDBG(cdev, "init ecm ctrl %d\n", intf);
-			if (config_ep_by_speed(cdev->gadget, f, ecm->notify))
-				goto fail;
-		}
-		usb_ep_enable(ecm->notify);
 
+		ecm->notify = usb_function_get_ep(f, intf, 0);
+		if (!ecm->notify)
+			return -ENODEV;
+
+		/* allocate notification request and buffer */
+		ecm->notify_req = usb_ep_alloc_request(ecm->notify, GFP_KERNEL);
+		if (!ecm->notify_req)
+			return -ENOMEM;
+		ecm->notify_req->buf = kmalloc(ECM_STATUS_BYTECOUNT,
+				GFP_KERNEL);
+		if (!ecm->notify_req->buf) {
+			usb_ep_free_request(ecm->notify, ecm->notify_req);
+			return -ENOMEM;
+		}
+		ecm->notify_req->context = ecm;
+		ecm->notify_req->complete = ecm_notify_complete;
 	/* Data interface has two altsettings, 0 and 1 */
-	} else if (intf == ecm->data_id) {
-		if (alt > 1)
-			goto fail;
-
-		if (ecm->port.in_ep->enabled) {
-			DBG(cdev, "reset ecm\n");
-			gether_disconnect(&ecm->port);
-		}
-
-		if (!ecm->port.in_ep->desc ||
-		    !ecm->port.out_ep->desc) {
-			DBG(cdev, "init ecm\n");
-			if (config_ep_by_speed(cdev->gadget, f,
-					       ecm->port.in_ep) ||
-			    config_ep_by_speed(cdev->gadget, f,
-					       ecm->port.out_ep)) {
-				ecm->port.in_ep->desc = NULL;
-				ecm->port.out_ep->desc = NULL;
-				goto fail;
-			}
-		}
-
+	} else if (intf == 1) {
 		/* CDC Ethernet only sends data in non-default altsettings.
 		 * Changing altsettings resets filters, statistics, etc.
 		 */
 		if (alt == 1) {
 			struct net_device	*net;
+			ecm->port.in_ep = usb_function_get_ep(f, intf, 0);
+			if (!ecm->port.in_ep)
+				return -ENODEV;
+			ecm->port.out_ep = usb_function_get_ep(f, intf, 1);
+			if (!ecm->port.out_ep)
+				return -ENODEV;
 
 			/* Enable zlps by default for ECM conformance;
 			 * override for musb_hdrc (avoids txdma ovhead).
@@ -598,38 +550,24 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		 * just guarantee that a speed notification is always sent.
 		 */
 		ecm_notify(ecm);
-	} else
-		goto fail;
+	}
 
 	return 0;
-fail:
-	return -EINVAL;
 }
 
-/* Because the data interface supports multiple altsettings,
- * this ECM function *MUST* implement a get_alt() method.
- */
-static int ecm_get_alt(struct usb_function *f, unsigned intf)
+static void ecm_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
-	struct f_ecm		*ecm = func_to_ecm(f);
-
-	if (intf == ecm->ctrl_id)
-		return 0;
-	return ecm->port.in_ep->enabled ? 1 : 0;
-}
-
-static void ecm_disable(struct usb_function *f)
-{
-	struct f_ecm		*ecm = func_to_ecm(f);
+	struct f_ecm            *ecm = func_to_ecm(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	DBG(cdev, "ecm deactivated\n");
 
-	if (ecm->port.in_ep->enabled)
+	if (intf == 0) {
+		kfree(ecm->notify_req->buf);
+		usb_ep_free_request(ecm->notify, ecm->notify_req);
+	} else if (intf == 1 && alt == 1) {
 		gether_disconnect(&ecm->port);
-
-	usb_ep_disable(ecm->notify);
-	ecm->notify->desc = NULL;
+	}
 }
 
 /*-------------------------------------------------------------------------*/
@@ -676,19 +614,32 @@ static void ecm_close(struct gether *geth)
 
 /* ethernet function driver setup/binding */
 
-static int
-ecm_bind(struct usb_configuration *c, struct usb_function *f)
+static int ecm_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_ecm		*ecm = func_to_ecm(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
 	struct usb_string	*us;
-	int			status;
-	struct usb_ep		*ep;
-
-	struct f_ecm_opts	*ecm_opts;
 
 	if (!can_support_ecm(cdev->gadget))
 		return -EINVAL;
+
+	us = usb_gstrings_attach(cdev, ecm_strings,
+			ARRAY_SIZE(ecm_string_defs));
+	if (IS_ERR(us))
+		return PTR_ERR(us);
+	ecm_control_intf.iInterface = us[0].id;
+	ecm_data_intf.iInterface = us[2].id;
+	ecm_desc.iMACAddress = us[1].id;
+	ecm_iad_descriptor.iFunction = us[3].id;
+
+	return usb_function_set_descs(f, &ecm_descs);
+}
+
+static int ecm_prep_vendor_descs(struct usb_function *f)
+{
+	struct f_ecm		*ecm = func_to_ecm(f);
+	struct f_ecm_opts	*ecm_opts;
+	struct usb_composite_dev *cdev = f->config->cdev;
+	int			status, intf0_id, intf1_id;
 
 	ecm_opts = container_of(f->fi, struct f_ecm_opts, func_inst);
 
@@ -709,86 +660,26 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 		ecm_opts->bound = true;
 	}
 
-	us = usb_gstrings_attach(cdev, ecm_strings,
-				 ARRAY_SIZE(ecm_string_defs));
-	if (IS_ERR(us))
-		return PTR_ERR(us);
-	ecm_control_intf.iInterface = us[0].id;
-	ecm_data_intf.iInterface = us[2].id;
-	ecm_desc.iMACAddress = us[1].id;
-	ecm_iad_descriptor.iFunction = us[3].id;
+	intf0_id = usb_get_interface_id(f, 0);
+	intf1_id = usb_get_interface_id(f, 1);
 
-	/* allocate instance-specific interface IDs */
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	ecm->ctrl_id = status;
-	ecm_iad_descriptor.bFirstInterface = status;
+	ecm->ctrl_id = intf0_id;
+	ecm->data_id = intf1_id;
 
-	ecm_control_intf.bInterfaceNumber = status;
-	ecm_union_desc.bMasterInterface0 = status;
+	ecm_iad_descriptor.bFirstInterface = intf0_id;
 
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	ecm->data_id = status;
+	ecm_union_desc.bMasterInterface0 = intf0_id;
+	ecm_union_desc.bSlaveInterface0 = intf1_id;
 
-	ecm_data_nop_intf.bInterfaceNumber = status;
-	ecm_data_intf.bInterfaceNumber = status;
-	ecm_union_desc.bSlaveInterface0 = status;
+	usb_function_add_vendor_desc(f,
+			(struct usb_descriptor_header *)&ecm_iad_descriptor);
 
-	status = -ENODEV;
-
-	/* allocate instance-specific endpoints */
-	ep = usb_ep_autoconfig(cdev->gadget, &fs_ecm_in_desc);
-	if (!ep)
-		goto fail;
-	ecm->port.in_ep = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, &fs_ecm_out_desc);
-	if (!ep)
-		goto fail;
-	ecm->port.out_ep = ep;
-
-	/* NOTE:  a status/notification endpoint is *OPTIONAL* but we
-	 * don't treat it that way.  It's simpler, and some newer CDC
-	 * profiles (wireless handsets) no longer treat it as optional.
-	 */
-	ep = usb_ep_autoconfig(cdev->gadget, &fs_ecm_notify_desc);
-	if (!ep)
-		goto fail;
-	ecm->notify = ep;
-
-	status = -ENOMEM;
-
-	/* allocate notification request and buffer */
-	ecm->notify_req = usb_ep_alloc_request(ep, GFP_KERNEL);
-	if (!ecm->notify_req)
-		goto fail;
-	ecm->notify_req->buf = kmalloc(ECM_STATUS_BYTECOUNT, GFP_KERNEL);
-	if (!ecm->notify_req->buf)
-		goto fail;
-	ecm->notify_req->context = ecm;
-	ecm->notify_req->complete = ecm_notify_complete;
-
-	/* support all relevant hardware speeds... we expect that when
-	 * hardware is dual speed, all bulk-capable endpoints work at
-	 * both speeds
-	 */
-	hs_ecm_in_desc.bEndpointAddress = fs_ecm_in_desc.bEndpointAddress;
-	hs_ecm_out_desc.bEndpointAddress = fs_ecm_out_desc.bEndpointAddress;
-	hs_ecm_notify_desc.bEndpointAddress =
-		fs_ecm_notify_desc.bEndpointAddress;
-
-	ss_ecm_in_desc.bEndpointAddress = fs_ecm_in_desc.bEndpointAddress;
-	ss_ecm_out_desc.bEndpointAddress = fs_ecm_out_desc.bEndpointAddress;
-	ss_ecm_notify_desc.bEndpointAddress =
-		fs_ecm_notify_desc.bEndpointAddress;
-
-	status = usb_assign_descriptors(f, ecm_fs_function, ecm_hs_function,
-			ecm_ss_function);
-	if (status)
-		goto fail;
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&ecm_header_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&ecm_union_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+			(struct usb_descriptor_header *)&ecm_desc);
 
 	/* NOTE:  all that is done without knowing or caring about
 	 * the network link ... which is unavailable to this code
@@ -798,22 +689,7 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 	ecm->port.open = ecm_open;
 	ecm->port.close = ecm_close;
 
-	DBG(cdev, "CDC Ethernet: %s speed IN/%s OUT/%s NOTIFY/%s\n",
-			gadget_is_superspeed(c->cdev->gadget) ? "super" :
-			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
-			ecm->port.in_ep->name, ecm->port.out_ep->name,
-			ecm->notify->name);
 	return 0;
-
-fail:
-	if (ecm->notify_req) {
-		kfree(ecm->notify_req->buf);
-		usb_ep_free_request(ecm->notify, ecm->notify_req);
-	}
-
-	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
-
-	return status;
 }
 
 static inline struct f_ecm_opts *to_f_ecm_opts(struct config_item *item)
@@ -897,18 +773,6 @@ static void ecm_free(struct usb_function *f)
 	mutex_unlock(&opts->lock);
 }
 
-static void ecm_unbind(struct usb_configuration *c, struct usb_function *f)
-{
-	struct f_ecm		*ecm = func_to_ecm(f);
-
-	DBG(c->cdev, "ecm unbind\n");
-
-	usb_free_all_descriptors(f);
-
-	kfree(ecm->notify_req->buf);
-	usb_ep_free_request(ecm->notify, ecm->notify_req);
-}
-
 static struct usb_function *ecm_alloc(struct usb_function_instance *fi)
 {
 	struct f_ecm	*ecm;
@@ -940,12 +804,11 @@ static struct usb_function *ecm_alloc(struct usb_function_instance *fi)
 
 	ecm->port.func.name = "cdc_ethernet";
 	/* descriptors are per-instance copies */
-	ecm->port.func.bind = ecm_bind;
-	ecm->port.func.unbind = ecm_unbind;
+	ecm->port.func.prep_descs = ecm_prep_descs;
+	ecm->port.func.prep_vendor_descs = ecm_prep_vendor_descs;
 	ecm->port.func.set_alt = ecm_set_alt;
-	ecm->port.func.get_alt = ecm_get_alt;
+	ecm->port.func.clear_alt = ecm_clear_alt;
 	ecm->port.func.setup = ecm_setup;
-	ecm->port.func.disable = ecm_disable;
 	ecm->port.func.free_func = ecm_free;
 
 	return &ecm->port.func;
