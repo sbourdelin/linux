@@ -185,20 +185,6 @@ static struct usb_endpoint_descriptor acm_fs_out_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *acm_fs_function[] = {
-	(struct usb_descriptor_header *) &acm_iad_descriptor,
-	(struct usb_descriptor_header *) &acm_control_interface_desc,
-	(struct usb_descriptor_header *) &acm_header_desc,
-	(struct usb_descriptor_header *) &acm_call_mgmt_descriptor,
-	(struct usb_descriptor_header *) &acm_descriptor,
-	(struct usb_descriptor_header *) &acm_union_desc,
-	(struct usb_descriptor_header *) &acm_fs_notify_desc,
-	(struct usb_descriptor_header *) &acm_data_interface_desc,
-	(struct usb_descriptor_header *) &acm_fs_in_desc,
-	(struct usb_descriptor_header *) &acm_fs_out_desc,
-	NULL,
-};
-
 /* high speed support: */
 static struct usb_endpoint_descriptor acm_hs_notify_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
@@ -223,20 +209,6 @@ static struct usb_endpoint_descriptor acm_hs_out_desc = {
 	.wMaxPacketSize =	cpu_to_le16(512),
 };
 
-static struct usb_descriptor_header *acm_hs_function[] = {
-	(struct usb_descriptor_header *) &acm_iad_descriptor,
-	(struct usb_descriptor_header *) &acm_control_interface_desc,
-	(struct usb_descriptor_header *) &acm_header_desc,
-	(struct usb_descriptor_header *) &acm_call_mgmt_descriptor,
-	(struct usb_descriptor_header *) &acm_descriptor,
-	(struct usb_descriptor_header *) &acm_union_desc,
-	(struct usb_descriptor_header *) &acm_hs_notify_desc,
-	(struct usb_descriptor_header *) &acm_data_interface_desc,
-	(struct usb_descriptor_header *) &acm_hs_in_desc,
-	(struct usb_descriptor_header *) &acm_hs_out_desc,
-	NULL,
-};
-
 static struct usb_endpoint_descriptor acm_ss_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
@@ -256,22 +228,20 @@ static struct usb_ss_ep_comp_descriptor acm_ss_bulk_comp_desc = {
 	.bDescriptorType =      USB_DT_SS_ENDPOINT_COMP,
 };
 
-static struct usb_descriptor_header *acm_ss_function[] = {
-	(struct usb_descriptor_header *) &acm_iad_descriptor,
-	(struct usb_descriptor_header *) &acm_control_interface_desc,
-	(struct usb_descriptor_header *) &acm_header_desc,
-	(struct usb_descriptor_header *) &acm_call_mgmt_descriptor,
-	(struct usb_descriptor_header *) &acm_descriptor,
-	(struct usb_descriptor_header *) &acm_union_desc,
-	(struct usb_descriptor_header *) &acm_hs_notify_desc,
-	(struct usb_descriptor_header *) &acm_ss_bulk_comp_desc,
-	(struct usb_descriptor_header *) &acm_data_interface_desc,
-	(struct usb_descriptor_header *) &acm_ss_in_desc,
-	(struct usb_descriptor_header *) &acm_ss_bulk_comp_desc,
-	(struct usb_descriptor_header *) &acm_ss_out_desc,
-	(struct usb_descriptor_header *) &acm_ss_bulk_comp_desc,
-	NULL,
-};
+USB_COMPOSITE_ENDPOINT(ep_notify, &acm_fs_notify_desc, &acm_hs_notify_desc,
+		&acm_hs_notify_desc, &acm_ss_bulk_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_in, &acm_fs_in_desc, &acm_hs_in_desc,
+		&acm_ss_in_desc, &acm_ss_bulk_comp_desc);
+USB_COMPOSITE_ENDPOINT(ep_out, &acm_fs_out_desc, &acm_hs_out_desc,
+		&acm_ss_out_desc, &acm_ss_bulk_comp_desc);
+
+USB_COMPOSITE_ALTSETTING(intf0alt0, &acm_control_interface_desc, &ep_notify);
+USB_COMPOSITE_ALTSETTING(intf1alt0, &acm_data_interface_desc, &ep_in, &ep_out);
+
+USB_COMPOSITE_INTERFACE(intf0, &intf0alt0);
+USB_COMPOSITE_INTERFACE(intf1, &intf1alt0);
+
+USB_COMPOSITE_DESCRIPTORS(acm_descs, &intf0, &intf1);
 
 /* string descriptors: */
 
@@ -420,6 +390,8 @@ invalid:
 	return value;
 }
 
+static void acm_cdc_notify_complete(struct usb_ep *ep, struct usb_request *req);
+
 static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_acm		*acm = func_to_acm(f);
@@ -427,51 +399,49 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* we know alt == 0, so this is an activation or a reset */
 
-	if (intf == acm->ctrl_id) {
+	if (intf == 0) {
 		dev_vdbg(&cdev->gadget->dev,
 				"reset acm control interface %d\n", intf);
-		usb_ep_disable(acm->notify);
 
-		if (!acm->notify->desc)
-			if (config_ep_by_speed(cdev->gadget, f, acm->notify))
-				return -EINVAL;
+		acm->notify = usb_function_get_ep(f, intf, 0);
+		if (!acm->notify)
+			return -ENODEV;
 
-		usb_ep_enable(acm->notify);
+		/* allocate notification */
+		acm->notify_req = gs_alloc_req(acm->notify,
+				sizeof(struct usb_cdc_notification) + 2,
+				GFP_KERNEL);
+		if (!acm->notify_req)
+			return -ENOMEM;
 
-	} else if (intf == acm->data_id) {
-		if (acm->notify->enabled) {
-			dev_dbg(&cdev->gadget->dev,
-				"reset acm ttyGS%d\n", acm->port_num);
-			gserial_disconnect(&acm->port);
-		}
-		if (!acm->port.in->desc || !acm->port.out->desc) {
-			dev_dbg(&cdev->gadget->dev,
+		acm->notify_req->complete = acm_cdc_notify_complete;
+		acm->notify_req->context = acm;
+	} else if (intf == 1) {
+		dev_dbg(&cdev->gadget->dev,
 				"activate acm ttyGS%d\n", acm->port_num);
-			if (config_ep_by_speed(cdev->gadget, f,
-					       acm->port.in) ||
-			    config_ep_by_speed(cdev->gadget, f,
-					       acm->port.out)) {
-				acm->port.in->desc = NULL;
-				acm->port.out->desc = NULL;
-				return -EINVAL;
-			}
-		}
-		gserial_connect(&acm->port, acm->port_num);
 
-	} else
-		return -EINVAL;
+		acm->port.in = usb_function_get_ep(f, intf, 0);
+		if (!acm->port.in)
+			return -ENODEV;
+		acm->port.out = usb_function_get_ep(f, intf, 1);
+		if (!acm->port.out)
+			return -ENODEV;
+
+		gserial_connect(&acm->port, acm->port_num);
+	}
 
 	return 0;
 }
 
-static void acm_disable(struct usb_function *f)
+static void acm_clear_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_acm	*acm = func_to_acm(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	dev_dbg(&cdev->gadget->dev, "acm ttyGS%d deactivated\n", acm->port_num);
 	gserial_disconnect(&acm->port);
-	usb_ep_disable(acm->notify);
+
+	gs_free_req(acm->notify, acm->notify_req);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -602,15 +572,10 @@ static int acm_send_break(struct gserial *port, int duration)
 
 /*-------------------------------------------------------------------------*/
 
-/* ACM function driver setup/binding */
-static int
-acm_bind(struct usb_configuration *c, struct usb_function *f)
+static int acm_prep_descs(struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = c->cdev;
-	struct f_acm		*acm = func_to_acm(f);
+	struct usb_composite_dev *cdev = f->config->cdev;
 	struct usb_string	*us;
-	int			status;
-	struct usb_ep		*ep;
 
 	/* REVISIT might want instance-specific strings to help
 	 * distinguish instances ...
@@ -625,96 +590,39 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	acm_data_interface_desc.iInterface = us[ACM_DATA_IDX].id;
 	acm_iad_descriptor.iFunction = us[ACM_IAD_IDX].id;
 
-	/* allocate instance-specific interface IDs, and patch descriptors */
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	acm->ctrl_id = status;
-	acm_iad_descriptor.bFirstInterface = status;
-
-	acm_control_interface_desc.bInterfaceNumber = status;
-	acm_union_desc .bMasterInterface0 = status;
-
-	status = usb_interface_id(c, f);
-	if (status < 0)
-		goto fail;
-	acm->data_id = status;
-
-	acm_data_interface_desc.bInterfaceNumber = status;
-	acm_union_desc.bSlaveInterface0 = status;
-	acm_call_mgmt_descriptor.bDataInterface = status;
-
-	status = -ENODEV;
-
-	/* allocate instance-specific endpoints */
-	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_in_desc);
-	if (!ep)
-		goto fail;
-	acm->port.in = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_out_desc);
-	if (!ep)
-		goto fail;
-	acm->port.out = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_notify_desc);
-	if (!ep)
-		goto fail;
-	acm->notify = ep;
-
-	/* allocate notification */
-	acm->notify_req = gs_alloc_req(ep,
-			sizeof(struct usb_cdc_notification) + 2,
-			GFP_KERNEL);
-	if (!acm->notify_req)
-		goto fail;
-
-	acm->notify_req->complete = acm_cdc_notify_complete;
-	acm->notify_req->context = acm;
-
-	/* support all relevant hardware speeds... we expect that when
-	 * hardware is dual speed, all bulk-capable endpoints work at
-	 * both speeds
-	 */
-	acm_hs_in_desc.bEndpointAddress = acm_fs_in_desc.bEndpointAddress;
-	acm_hs_out_desc.bEndpointAddress = acm_fs_out_desc.bEndpointAddress;
-	acm_hs_notify_desc.bEndpointAddress =
-		acm_fs_notify_desc.bEndpointAddress;
-
-	acm_ss_in_desc.bEndpointAddress = acm_fs_in_desc.bEndpointAddress;
-	acm_ss_out_desc.bEndpointAddress = acm_fs_out_desc.bEndpointAddress;
-
-	status = usb_assign_descriptors(f, acm_fs_function, acm_hs_function,
-			acm_ss_function);
-	if (status)
-		goto fail;
-
-	dev_dbg(&cdev->gadget->dev,
-		"acm ttyGS%d: %s speed IN/%s OUT/%s NOTIFY/%s\n",
-		acm->port_num,
-		gadget_is_superspeed(c->cdev->gadget) ? "super" :
-		gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
-		acm->port.in->name, acm->port.out->name,
-		acm->notify->name);
-	return 0;
-
-fail:
-	if (acm->notify_req)
-		gs_free_req(acm->notify, acm->notify_req);
-
-	ERROR(cdev, "%s/%p: can't bind, err %d\n", f->name, f, status);
-
-	return status;
+	return usb_function_set_descs(f, &acm_descs);
 }
 
-static void acm_unbind(struct usb_configuration *c, struct usb_function *f)
+static int acm_prep_vendor_descs(struct usb_function *f)
 {
 	struct f_acm		*acm = func_to_acm(f);
+	int			intf0_id, intf1_id;
 
-	acm_string_defs[0].id = 0;
-	usb_free_all_descriptors(f);
-	if (acm->notify_req)
-		gs_free_req(acm->notify, acm->notify_req);
+	intf0_id = usb_get_interface_id(f, 0);
+	intf1_id = usb_get_interface_id(f, 1);
+
+	acm->ctrl_id = intf0_id;
+	acm->data_id = intf1_id;
+
+	acm_iad_descriptor.bFirstInterface = intf0_id;
+
+	acm_call_mgmt_descriptor.bDataInterface = intf1_id;
+	acm_union_desc.bMasterInterface0 = intf0_id;
+	acm_union_desc.bSlaveInterface0 = intf1_id;
+
+	usb_function_add_vendor_desc(f,
+		(struct usb_descriptor_header *)&acm_iad_descriptor);
+
+	usb_altset_add_vendor_desc(f, 0, 0,
+		(struct usb_descriptor_header *)&acm_header_desc);
+	usb_altset_add_vendor_desc(f, 0, 0,
+		(struct usb_descriptor_header *) &acm_call_mgmt_descriptor);
+	usb_altset_add_vendor_desc(f, 0, 0,
+		(struct usb_descriptor_header *)&acm_descriptor);
+	usb_altset_add_vendor_desc(f, 0, 0,
+		(struct usb_descriptor_header *)&acm_union_desc);
+
+	return 0;
 }
 
 static void acm_free_func(struct usb_function *f)
@@ -742,14 +650,14 @@ static struct usb_function *acm_alloc_func(struct usb_function_instance *fi)
 	acm->port.func.name = "acm";
 	acm->port.func.strings = acm_strings;
 	/* descriptors are per-instance copies */
-	acm->port.func.bind = acm_bind;
+	acm->port.func.prep_descs = acm_prep_descs;
+	acm->port.func.prep_vendor_descs = acm_prep_vendor_descs;
 	acm->port.func.set_alt = acm_set_alt;
+	acm->port.func.clear_alt = acm_clear_alt;
 	acm->port.func.setup = acm_setup;
-	acm->port.func.disable = acm_disable;
 
 	opts = container_of(fi, struct f_serial_opts, func_inst);
 	acm->port_num = opts->port_num;
-	acm->port.func.unbind = acm_unbind;
 	acm->port.func.free_func = acm_free_func;
 
 	return &acm->port.func;
