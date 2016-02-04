@@ -1326,6 +1326,11 @@ static int do_end_io(struct multipath *m, struct request *clone,
 	if (noretry_error(error))
 		return error;
 
+	/* do not retry in case of WRITE SAME not supporting */
+	if ((clone->cmd_flags & REQ_WRITE_SAME) &&
+			!clone->q->limits.max_write_same_sectors)
+		return -EOPNOTSUPP;
+
 	if (mpio->pgpath)
 		fail_path(mpio->pgpath);
 
