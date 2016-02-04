@@ -284,6 +284,9 @@ struct au0828_dev {
 	struct media_entity input_ent[AU0828_MAX_INPUT];
 	struct media_pad input_pad[AU0828_MAX_INPUT];
 	struct media_entity_notify entity_notify;
+	struct media_entity *tuner;
+	struct media_link *active_link;
+	struct media_entity *active_link_owner;
 #endif
 };
 
