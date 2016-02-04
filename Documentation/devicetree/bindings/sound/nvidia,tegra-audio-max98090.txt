@@ -15,7 +15,7 @@ Required properties:
   sinks are the MAX98090's pins (as documented in its binding), and the jacks
   on the board:
 
-  * Headphones
+  * Headphone Jack
   * Speakers
   * Mic Jack
   * Int Mic
@@ -36,8 +36,8 @@ sound {
 	nvidia,model = "NVIDIA Tegra Venice2";
 
 	nvidia,audio-routing =
-		"Headphones", "HPR",
-		"Headphones", "HPL",
+		"Headphone Jack", "HPR",
+		"Headphone Jack", "HPL",
 		"Speakers", "SPKR",
 		"Speakers", "SPKL",
 		"Mic Jack", "MICBIAS",
