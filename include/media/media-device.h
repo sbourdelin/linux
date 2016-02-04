@@ -264,6 +264,12 @@
 struct ida;
 struct device;
 
+struct media_entity_notify {
+	struct list_head list;
+	void *notify_data;
+	void (*notify)(struct media_entity *entity, void *notify_data);
+};
+
 /**
  * struct media_device - Media device
  * @dev:	Parent device
@@ -318,6 +324,9 @@ struct media_device {
 	struct list_head interfaces;
 	struct list_head pads;
 	struct list_head links;
+
+	/* notify callback list invoked when a new entity is registered */
+	struct list_head entity_notify;
 
 	/* Protects the graph objects creation/removal */
 	spinlock_t lock;
@@ -497,6 +506,11 @@ int __must_check media_device_register_entity(struct media_device *mdev,
  */
 void media_device_unregister_entity(struct media_entity *entity);
 
+int __must_check media_device_register_entity_notify(struct media_device *mdev,
+					struct media_entity_notify *nptr);
+void media_device_unregister_entity_notify(struct media_device *mdev,
+					struct media_entity_notify *nptr);
+
 /**
  * media_device_get_devres() -	get media device as device resource
  *				creates if one doesn't exist
@@ -550,6 +564,17 @@ static inline int media_device_register_entity(struct media_device *mdev,
 	return 0;
 }
 static inline void media_device_unregister_entity(struct media_entity *entity)
+{
+}
+static inline int media_device_register_entity_notify(
+					struct media_device *mdev,
+					struct media_entity_notify *nptr)
+{
+	return 0;
+}
+static inline void media_device_unregister_entity_notify(
+					struct media_device *mdev,
+					struct media_entity_notify *nptr)
 {
 }
 static inline struct media_device *media_device_get_devres(struct device *dev)
