@@ -1147,8 +1147,8 @@
 		nvidia,model = "NVIDIA Tegra Venice2";
 
 		nvidia,audio-routing =
-			"Headphones", "HPR",
-			"Headphones", "HPL",
+			"Headphone Jack", "HPR",
+			"Headphone Jack", "HPL",
 			"Speakers", "SPKR",
 			"Speakers", "SPKL",
 			"Mic Jack", "MICBIAS",
