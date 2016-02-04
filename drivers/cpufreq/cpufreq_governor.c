@@ -17,6 +17,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/export.h>
+#include <linux/irq_work.h>
 #include <linux/kernel_stat.h>
 #include <linux/slab.h>
 
