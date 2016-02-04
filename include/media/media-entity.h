@@ -832,6 +832,12 @@ media_entity_graph_walk_next(struct media_entity_graph *graph);
  */
 __must_check int media_entity_pipeline_start(struct media_entity *entity,
 					     struct media_pipeline *pipe);
+/**
+ * non-locking __media_entity_pipeline_start() can be called from
+ * code paths that hold the graph_mutex
+ */
+__must_check int __media_entity_pipeline_start(struct media_entity *entity,
+					       struct media_pipeline *pipe);
 
 /**
  * media_entity_pipeline_stop - Mark a pipeline as not streaming
@@ -846,6 +852,12 @@ __must_check int media_entity_pipeline_start(struct media_entity *entity,
  * streaming.
  */
 void media_entity_pipeline_stop(struct media_entity *entity);
+
+/**
+ * non-locking __media_entity_pipeline_stop() can be called from
+ * code paths that hold the graph_mutex
+ */
+void __media_entity_pipeline_stop(struct media_entity *entity);
 
 /**
  * media_devnode_create() - creates and initializes a device node interface
