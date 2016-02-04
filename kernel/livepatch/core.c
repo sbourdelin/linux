@@ -28,6 +28,9 @@
 #include <linux/list.h>
 #include <linux/kallsyms.h>
 #include <linux/livepatch.h>
+#include <linux/elf.h>
+#include <linux/string.h>
+#include <linux/moduleloader.h>
 #include <asm/cacheflush.h>
 
 /**
@@ -85,6 +88,166 @@ static bool klp_is_module(struct klp_object *obj)
 static bool klp_is_object_loaded(struct klp_object *obj)
 {
 	return !obj->name || obj->mod;
+}
+
+/*
+ * Check if a livepatch symbol is formatted properly.
+ *
+ * See Documentation/livepatch/module-elf-format.txt for a
+ * detailed outline of requirements.
+ */
+static int klp_check_symbol_format(struct module *pmod, Elf_Sym *sym)
+{
+	size_t len;
+	char *s, *objname, *symname;
+
+	if (sym->st_shndx != SHN_LIVEPATCH)
+		return -EINVAL;
+
+	/*
+	 * Livepatch symbol names must follow this format:
+	 * .klp.sym.objname.symbol_name,sympos
+	 */
+	s = pmod->strtab + sym->st_name;
+	/* [.klp.sym.]objname.symbol_name,sympos */
+	if (!s || strncmp(s, KLP_SYM_PREFIX, KLP_SYM_PREFIX_LEN))
+		return -EINVAL;
+
+	/* .klp.sym.[objname].symbol_name,sympos */
+	objname = s + KLP_SYM_PREFIX_LEN;
+	len = strcspn(objname, ".");
+	if (!(len > 0))
+		return -EINVAL;
+
+	/* .klp.sym.objname.symbol_name,[sympos] */
+	if (!strchr(s, ','))
+		return -EINVAL;
+
+	/* .klp.sym.objname.[symbol_name],sympos */
+	symname = objname + len + 1;
+	len = strcspn(symname, ",");
+	if (!(len > 0))
+		return -EINVAL;
+
+	return 0;
+}
+
+/*
+ * Check if a livepatch relocation section is formatted properly.
+ *
+ * See Documentation/livepatch/module-elf-format.txt for a
+ * detailed outline of requirements.
+ */
+static int klp_check_relasec_format(struct module *pmod, Elf_Shdr *relasec)
+{
+	char *secname;
+	size_t len;
+
+	secname = pmod->klp_info->secstrings + relasec->sh_name;
+	/* [.klp.rela.]objname.section_name */
+	if (!secname || strncmp(secname, KLP_RELASEC_PREFIX,
+				KLP_RELASEC_PREFIX_LEN))
+		return -EINVAL;
+
+	/* .klp.rela.[objname].section_name */
+	len = strcspn(secname + KLP_RELASEC_PREFIX_LEN, ".");
+	if (!(len > 0))
+		return -EINVAL;
+
+	return 0;
+}
+
+/*
+ * Check if obj->name matches the objname encoded in the rela
+ * section name (.klp.rela.[objname].section_name)
+ *
+ * Must pass klp_check_relasec_format() before calling this.
+ */
+static bool klp_relasec_matches_object(struct module *pmod, Elf_Shdr *relasec,
+				       struct klp_object *obj)
+{
+	size_t len;
+	const char *obj_objname, *sec_objname, *secname;
+
+	secname = pmod->klp_info->secstrings + relasec->sh_name;
+	/* .klp.rela.[objname].section_name */
+	sec_objname = secname + KLP_RELASEC_PREFIX_LEN;
+	obj_objname = klp_is_module(obj) ? obj->name : "vmlinux";
+
+	/* Get length of the objname encoded in the section name */
+	len = strcspn(sec_objname, ".");
+
+	if (strlen(obj_objname) != len)
+		return false;
+
+	return strncmp(sec_objname, obj_objname, len) ? false : true;
+}
+
+/*
+ * klp_get_* helper functions
+ *
+ * klp_get_* functions extract different components of the name
+ * of a livepatch symbol. The full symbol name from the strtab
+ * is passed in as parameter @s, and @result is filled in with
+ * the extracted component.
+ *
+ * These functions assume a correctly formatted symbol and the
+ * klp_check_symbol_format() test *must* pass before calling any
+ * of these functions.
+ */
+
+/* .klp.sym.[objname].symbol_name,sympos */
+static int klp_get_sym_objname(char *s, char **result)
+{
+	size_t len;
+	char *objname, *objname_start;
+
+	/* .klp.sym.[objname].symbol_name,sympos */
+	objname_start = s + KLP_SYM_PREFIX_LEN;
+	len = strcspn(objname_start, ".");
+	objname = kstrndup(objname_start, len, GFP_KERNEL);
+	if (objname == NULL)
+		return -ENOMEM;
+
+	/* klp_find_object_symbol() treats NULL as vmlinux */
+	if (!strcmp(objname, "vmlinux")) {
+		*result = NULL;
+		kfree(objname);
+	} else
+		*result = objname;
+
+	return 0;
+}
+
+/* .klp.sym.objname.[symbol_name],sympos */
+static int klp_get_symbol_name(char *s, char **result)
+{
+	size_t len;
+	char *objname, *symname;
+
+	/* .klp.sym.[objname].symbol_name,sympos */
+	objname = s + KLP_SYM_PREFIX_LEN;
+	len = strcspn(objname, ".");
+
+	/* .klp.sym.objname.[symbol_name],sympos */
+	symname = objname + len + 1;
+	len = strcspn(symname, ",");
+
+	*result = kstrndup(symname, len, GFP_KERNEL);
+	if (*result == NULL)
+		return -ENOMEM;
+
+	return 0;
+}
+
+/* .klp.sym.objname.symbol_name,[sympos] */
+static int klp_get_sympos(char *s, unsigned long *result)
+{
+	char *sympos;
+
+	/* .klp.sym.symbol_name,[sympos] */
+	sympos = strchr(s, ',') + 1;
+	return kstrtol(sympos, 10, result);
 }
 
 /* sets obj->mod if object is not vmlinux and module is found */
@@ -204,74 +367,83 @@ static int klp_find_object_symbol(const char *objname, const char *name,
 	return -EINVAL;
 }
 
-/*
- * external symbols are located outside the parent object (where the parent
- * object is either vmlinux or the kmod being patched).
- */
-static int klp_find_external_symbol(struct module *pmod, const char *name,
-				    unsigned long *addr)
+static int klp_resolve_symbols(Elf_Shdr *relasec, struct module *pmod)
 {
-	const struct kernel_symbol *sym;
+	int i, ret = 0;
+	Elf_Rela *relas;
+	Elf_Sym *sym;
+	char *s, *symbol_name, *sym_objname;
+	unsigned long sympos;
 
-	/* first, check if it's an exported symbol */
-	preempt_disable();
-	sym = find_symbol(name, NULL, NULL, true, true);
-	if (sym) {
-		*addr = sym->value;
-		preempt_enable();
-		return 0;
+	relas = (Elf_Rela *) relasec->sh_addr;
+	/* For each rela in this .klp.rela. section */
+	for (i = 0; i < relasec->sh_size / sizeof(Elf_Rela); i++) {
+		sym = pmod->symtab + ELF_R_SYM(relas[i].r_info);
+
+		/* Check if the symbol is formatted correctly */
+		ret = klp_check_symbol_format(pmod, sym);
+		if (ret)
+			goto out;
+		/* Format: .klp.sym.objname.symbol_name,sympos */
+		s = pmod->strtab + sym->st_name;
+		ret = klp_get_symbol_name(s, &symbol_name);
+		if (ret)
+			goto out;
+		ret = klp_get_sym_objname(s, &sym_objname);
+		if (ret)
+			goto free_symbol_name;
+		ret = klp_get_sympos(s, &sympos);
+		if (ret)
+			goto free_objname;
+
+		ret = klp_find_object_symbol(sym_objname, symbol_name, sympos,
+					     (unsigned long *) &sym->st_value);
+free_objname:
+		kfree(sym_objname);
+free_symbol_name:
+		kfree(symbol_name);
+		if (ret)
+			goto out;
 	}
-	preempt_enable();
-
-	/*
-	 * Check if it's in another .o within the patch module. This also
-	 * checks that the external symbol is unique.
-	 */
-	return klp_find_object_symbol(pmod->name, name, 0, addr);
+out:
+	return ret;
 }
 
 static int klp_write_object_relocations(struct module *pmod,
 					struct klp_object *obj)
 {
-	int ret = 0;
-	unsigned long val;
-	struct klp_reloc *reloc;
+	int i, ret = 0;
+	Elf_Shdr *sec;
 
 	if (WARN_ON(!klp_is_object_loaded(obj)))
 		return -EINVAL;
 
-	if (WARN_ON(!obj->relocs))
-		return -EINVAL;
-
 	module_disable_ro(pmod);
+	/* For each klp relocation section */
+	for (i = 1; i < pmod->klp_info->hdr.e_shnum; i++) {
+		sec = pmod->klp_info->sechdrs + i;
+		if (!(sec->sh_flags & SHF_RELA_LIVEPATCH))
+			continue;
 
-	for (reloc = obj->relocs; reloc->name; reloc++) {
-		/* discover the address of the referenced symbol */
-		if (reloc->external) {
-			if (reloc->sympos > 0) {
-				pr_err("non-zero sympos for external reloc symbol '%s' is not supported\n",
-				       reloc->name);
-				ret = -EINVAL;
-				goto out;
-			}
-			ret = klp_find_external_symbol(pmod, reloc->name, &val);
-		} else
-			ret = klp_find_object_symbol(obj->name,
-						     reloc->name,
-						     reloc->sympos,
-						     &val);
+		/* Check if the klp section is formatted correctly */
+		ret = klp_check_relasec_format(pmod, sec);
 		if (ret)
 			goto out;
 
-		ret = klp_write_module_reloc(pmod, reloc->type, reloc->loc,
-					     val + reloc->addend);
-		if (ret) {
-			pr_err("relocation failed for symbol '%s' at 0x%016lx (%d)\n",
-			       reloc->name, val, ret);
-			goto out;
-		}
-	}
+		/* Check if the klp section belongs to obj */
+		if (!klp_relasec_matches_object(pmod, sec, obj))
+			continue;
 
+		/* Resolve all livepatch syms referenced in this rela section */
+		ret = klp_resolve_symbols(sec, pmod);
+		if (ret)
+			goto out;
+
+		ret = apply_relocate_add(pmod->klp_info->sechdrs, pmod->strtab,
+					 pmod->klp_info->symndx, i, pmod);
+		if (ret)
+			goto out;
+	}
 out:
 	module_enable_ro(pmod);
 	return ret;
@@ -703,11 +875,9 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 	struct klp_func *func;
 	int ret;
 
-	if (obj->relocs) {
-		ret = klp_write_object_relocations(patch->mod, obj);
-		if (ret)
-			return ret;
-	}
+	ret = klp_write_object_relocations(patch->mod, obj);
+	if (ret)
+		return ret;
 
 	klp_for_each_func(obj, func) {
 		ret = klp_find_object_symbol(obj->name, func->old_name,
@@ -841,6 +1011,9 @@ EXPORT_SYMBOL_GPL(klp_unregister_patch);
 int klp_register_patch(struct klp_patch *patch)
 {
 	int ret;
+
+	if (!is_livepatch_module(patch->mod))
+		return -EINVAL;
 
 	if (!klp_initialized())
 		return -ENODEV;
