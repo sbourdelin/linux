@@ -3424,6 +3424,54 @@ static void ibx_hpd_irq_setup(struct drm_device *dev)
 	I915_WRITE(PCH_PORT_HOTPLUG, hotplug);
 }
 
+/*
+ * For BXT invert bit has to be set based on AOB design
+ * for HPD detection logic, update it based on VBT fields.
+ */
+static void bxt_hpd_set_invert(struct drm_device *dev, u32 hotplug_port)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int i, reg_val, val = 0;
+
+	for (i = 0; i < dev_priv->vbt.child_dev_num; i++) {
+
+		/* Proceed only if invert bit is set */
+		if (dev_priv->vbt.child_dev[i].common.hpd_invert == 0)
+			continue;
+
+		/*
+		 * Convert dvo_port to PORT_X and set appropriate bit
+		 * only if hotplug is enabled on that port
+		 */
+		switch (dev_priv->vbt.child_dev[i].common.dvo_port) {
+		case DVO_PORT_DPA:
+		case DVO_PORT_HDMIA:
+			if (hotplug_port & BXT_DE_PORT_HP_DDIA)
+				val |= BXT_DDIA_HPD_INVERT;
+			break;
+		case DVO_PORT_DPB:
+		case DVO_PORT_HDMIB:
+			if (hotplug_port & BXT_DE_PORT_HP_DDIB)
+				val |= BXT_DDIB_HPD_INVERT;
+			break;
+		case DVO_PORT_DPC:
+		case DVO_PORT_HDMIC:
+			if (hotplug_port & BXT_DE_PORT_HP_DDIC)
+				val |= BXT_DDIC_HPD_INVERT;
+			break;
+		default:
+			DRM_ERROR("HPD invert set for invalid dvo port %d\n",
+				   dev_priv->vbt.child_dev[i].common.dvo_port);
+			break;
+		}
+	}
+	reg_val = I915_READ(BXT_HOTPLUG_CTL);
+	DRM_DEBUG_KMS("Invert bit setting: hp_ctl:%x hp_port:%x val:%x\n",
+				reg_val, hotplug_port, val);
+	reg_val &= ~BXT_DDI_HPD_INVERT_MASK;
+	I915_WRITE(BXT_HOTPLUG_CTL, reg_val | val);
+}
+
 static void spt_hpd_irq_setup(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -3494,6 +3542,7 @@ static void bxt_hpd_irq_setup(struct drm_device *dev)
 	hotplug |= PORTC_HOTPLUG_ENABLE | PORTB_HOTPLUG_ENABLE |
 		PORTA_HOTPLUG_ENABLE;
 	I915_WRITE(PCH_PORT_HOTPLUG, hotplug);
+	bxt_hpd_set_invert(dev, enabled_irqs);
 }
 
 static void ibx_irq_postinstall(struct drm_device *dev)
