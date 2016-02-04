@@ -59,6 +59,10 @@ static void i915_save_display(struct drm_device *dev)
 	/* save FBC interval */
 	if (HAS_FBC(dev) && INTEL_INFO(dev)->gen <= 4 && !IS_G4X(dev))
 		dev_priv->regfile.saveFBC_CONTROL = I915_READ(FBC_CONTROL);
+
+	if (IS_BROXTON(dev))
+		dev_priv->regfile.saveHOTPLUG = I915_READ(PCH_PORT_HOTPLUG);
+
 }
 
 static void i915_restore_display(struct drm_device *dev)
@@ -97,6 +101,9 @@ static void i915_restore_display(struct drm_device *dev)
 	/* restore FBC interval */
 	if (HAS_FBC(dev) && INTEL_INFO(dev)->gen <= 4 && !IS_G4X(dev))
 		I915_WRITE(FBC_CONTROL, dev_priv->regfile.saveFBC_CONTROL);
+
+	if (IS_BROXTON(dev))
+		I915_WRITE(PCH_PORT_HOTPLUG, dev_priv->regfile.saveHOTPLUG);
 
 	i915_redisable_vga(dev);
 }

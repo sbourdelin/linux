@@ -1061,6 +1061,7 @@ struct i915_suspend_saved_registers {
 	uint64_t saveFENCE[I915_MAX_NUM_FENCES];
 	u32 savePCH_PORT_HOTPLUG;
 	u16 saveGCDGMBUS;
+	u32 saveHOTPLUG;
 };
 
 struct vlv_s0ix_state {
