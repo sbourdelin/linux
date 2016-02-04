@@ -101,7 +101,7 @@ static struct snd_soc_jack tegra_max98090_hp_jack;
 
 static struct snd_soc_jack_pin tegra_max98090_hp_jack_pins[] = {
 	{
-		.pin = "Headphones",
+		.pin = "Headphone Jack",
 		.mask = SND_JACK_HEADPHONE,
 	},
 };
@@ -130,14 +130,14 @@ static struct snd_soc_jack_gpio tegra_max98090_mic_jack_gpio = {
 };
 
 static const struct snd_soc_dapm_widget tegra_max98090_dapm_widgets[] = {
-	SND_SOC_DAPM_HP("Headphones", NULL),
+	SND_SOC_DAPM_HP("Headphone Jack", NULL),
 	SND_SOC_DAPM_SPK("Speakers", NULL),
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
 	SND_SOC_DAPM_MIC("Int Mic", NULL),
 };
 
 static const struct snd_kcontrol_new tegra_max98090_controls[] = {
-	SOC_DAPM_PIN_SWITCH("Headphones"),
+	SOC_DAPM_PIN_SWITCH("Headphone Jack"),
 	SOC_DAPM_PIN_SWITCH("Speakers"),
 	SOC_DAPM_PIN_SWITCH("Mic Jack"),
 	SOC_DAPM_PIN_SWITCH("Int Mic"),
@@ -148,7 +148,7 @@ static int tegra_max98090_asoc_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_max98090 *machine = snd_soc_card_get_drvdata(rtd->card);
 
 	if (gpio_is_valid(machine->gpio_hp_det)) {
-		snd_soc_card_jack_new(rtd->card, "Headphones",
+		snd_soc_card_jack_new(rtd->card, "Headphone Jack",
 				      SND_JACK_HEADPHONE,
 				      &tegra_max98090_hp_jack,
 				      tegra_max98090_hp_jack_pins,
