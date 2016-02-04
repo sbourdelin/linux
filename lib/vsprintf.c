@@ -1145,7 +1145,7 @@ static noinline_for_stack
 char *ip6_addr_string_sa(char *buf, char *end, const struct sockaddr_in6 *sa,
 			 struct printf_spec spec, const char *fmt)
 {
-	bool have_p = false, have_s = false, have_f = false, have_c = false;
+	bool have_p = false, have_s = false, have_f = false, have_c = false, have_a = false;
 	char ip6_addr[sizeof("[xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:255.255.255.255]") +
 		      sizeof(":12345") + sizeof("/123456789") +
 		      sizeof("%1234567890")];
@@ -1169,7 +1169,16 @@ char *ip6_addr_string_sa(char *buf, char *end, const struct sockaddr_in6 *sa,
 		case 'c':
 			have_c = true;
 			break;
+		case 'a':
+			have_a = true;
+			break;
 		}
+	}
+
+	if (have_a) {
+		have_p = sa->sin6_port;
+		have_s = sa->sin6_scope_id;
+		have_f = sa->sin6_flowinfo & IPV6_FLOWINFO_MASK;
 	}
 
 	if (have_p || have_s || have_f) {
@@ -1207,7 +1216,7 @@ static noinline_for_stack
 char *ip4_addr_string_sa(char *buf, char *end, const struct sockaddr_in *sa,
 			 struct printf_spec spec, const char *fmt)
 {
-	bool have_p = false;
+	bool have_p = false, have_a = false;
 	char *p, ip4_addr[sizeof("255.255.255.255") + sizeof(":12345")];
 	char *pend = ip4_addr + sizeof(ip4_addr);
 	const u8 *addr = (const u8 *) &sa->sin_addr.s_addr;
@@ -1225,8 +1234,14 @@ char *ip4_addr_string_sa(char *buf, char *end, const struct sockaddr_in *sa,
 		case 'b':
 			fmt4[2] = *fmt;
 			break;
+		case 'a':
+			have_a = true;
+			break;
 		}
 	}
+
+	if (have_a)
+		have_p = sa->sin_port;
 
 	p = ip4_string(ip4_addr, addr, fmt4);
 	if (have_p) {
