@@ -272,15 +272,20 @@ error:
 	return ret;
 }
 
-void media_devnode_unregister(struct media_devnode *mdev)
+int __must_check media_devnode_start_unregister(struct media_devnode *mdev)
 {
-	/* Check if mdev was ever registered at all */
-	if (!media_devnode_is_registered(mdev))
-		return;
-
 	mutex_lock(&media_devnode_lock);
+	if (!media_devnode_is_registered(mdev)) {
+		mutex_unlock(&media_devnode_lock);
+		return -EINVAL;
+	}
 	clear_bit(MEDIA_FLAG_REGISTERED, &mdev->flags);
 	mutex_unlock(&media_devnode_lock);
+	return 0;
+}
+
+void media_devnode_unregister(struct media_devnode *mdev)
+{
 	device_unregister(&mdev->dev);
 }
 

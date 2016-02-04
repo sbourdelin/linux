@@ -120,6 +120,23 @@ int __must_check media_devnode_register(struct media_devnode *mdev,
 					struct module *owner);
 
 /**
+ * media_devnode_start_unregister - start unregister on a media device node
+ * @mdev: the device node to start unregister
+ *
+ * This clears the MEDIA_FLAG_REGISTERED bit to indicate that unregister
+ * is in progress.
+ *
+ * This function can safely be called if the device node has never been
+ * registered or has already been unregistered.
+ *
+ * Zero is returned on success.
+ *
+ * -EINVAL is returned if the device node has never been
+ * registered or has already been unregistered.
+ */
+int __must_check media_devnode_start_unregister(struct media_devnode *mdev);
+
+/**
  * media_devnode_unregister - unregister a media device node
  * @mdev: the device node to unregister
  *

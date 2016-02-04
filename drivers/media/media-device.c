@@ -747,17 +747,17 @@ void media_device_unregister(struct media_device *mdev)
 	struct media_entity *next;
 	struct media_interface *intf, *tmp_intf;
 	struct media_entity_notify *notify, *nextp;
+	int ret;
 
 	if (mdev == NULL)
 		return;
 
-	spin_lock(&mdev->lock);
-
-	/* Check if mdev was ever registered at all */
-	if (!media_devnode_is_registered(&mdev->devnode)) {
-		spin_unlock(&mdev->lock);
+	/* Start unregister - continue if necessary */
+	ret = media_devnode_start_unregister(&mdev->devnode);
+	if (ret)
 		return;
-	}
+
+	spin_lock(&mdev->lock);
 
 	/* Remove all entities from the media device */
 	list_for_each_entry_safe(entity, next, &mdev->entities, graph_obj.list)
