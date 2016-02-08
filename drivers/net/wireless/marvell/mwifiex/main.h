@@ -37,6 +37,16 @@
 #include <linux/idr.h>
 #include <linux/inetdevice.h>
 #include <linux/devcoredump.h>
+#include <linux/err.h>
+#include <linux/gpio.h>
+#include <linux/gfp.h>
+#include <linux/interrupt.h>
+#include <linux/io.h>
+#include <linux/of_gpio.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
+#include <linux/slab.h>
 
 #include "decl.h"
 #include "ioctl.h"
@@ -47,6 +57,7 @@
 #include "sdio.h"
 
 extern const char driver_version[];
+extern struct platform_device *mwifiex_plt_dev;
 
 struct mwifiex_adapter;
 struct mwifiex_private;
@@ -1594,6 +1605,9 @@ void mwifiex_process_tx_pause_event(struct mwifiex_private *priv,
 void mwifiex_process_multi_chan_event(struct mwifiex_private *priv,
 				      struct sk_buff *event_skb);
 void mwifiex_multi_chan_resync(struct mwifiex_adapter *adapter);
+
+int mwifiex_platform_drv_init(void);
+void mwifiex_platform_drv_exit(void);
 
 #ifdef CONFIG_DEBUG_FS
 void mwifiex_debugfs_init(void);
