@@ -1158,6 +1158,76 @@ struct i2c_client *i2c_new_dummy(struct i2c_adapter *adapter, u16 address)
 }
 EXPORT_SYMBOL_GPL(i2c_new_dummy);
 
+static void devm_i2c_dummy_release(struct device *dev, void *res)
+{
+	i2c_unregister_device(*(struct i2c_client **)res);
+}
+
+/**
+ * devm_i2c_new_dummy - Resource managed i2c_new_dummy()
+ * @dev: Device pointer for which this resouce belongs to.
+ * @adapter: the adapter managing the device
+ * @address: seven bit address to be used
+ * Context: can sleep
+ *
+ * This returns the new i2c client. Returns a valid pointer to struct
+ * i2c_client or NULL to indicate error. The i2c_cleint automatically
+ * be released when the device is unbound.
+ */
+struct i2c_client *devm_i2c_new_dummy(struct device *dev,
+				      struct i2c_adapter *adapter,
+				      u16 address)
+{
+	struct i2c_client **ptr, *i2c_dummy;
+
+	ptr = devres_alloc(devm_i2c_dummy_release, sizeof(*ptr),
+			   GFP_KERNEL);
+	if (!ptr)
+		return NULL;
+
+	i2c_dummy = i2c_new_dummy(adapter, address);
+	if (i2c_dummy) {
+		*ptr = i2c_dummy;
+		devres_add(dev, ptr);
+	} else {
+		devres_free(ptr);
+	}
+
+	return i2c_dummy;
+}
+EXPORT_SYMBOL_GPL(devm_i2c_new_dummy);
+
+static int devm_i2c_client_match(struct device *dev, void *res, void *data)
+{
+	struct i2c_client **r = res;
+
+	if (!r || !*r) {
+		WARN_ON(!r || !*r);
+		return 0;
+	}
+	return *r == data;
+}
+
+/**
+ * devm_i2c_unregister_device - Resource managed i2c_unregister_device()
+ * @dev: Device for which which resource was allocated.
+ * @client: i2c client to free
+ *
+ * Unregister a dummy i2c with devm_i2c_unregister_device().
+ * Normally this function will not need to be called and the resource
+ * management code will ensure that the resource is freed.
+ */
+void devm_i2c_unregister_device(struct device *dev, struct i2c_client *client)
+{
+	int rc;
+
+	rc = devres_release(dev, devm_i2c_dummy_release, devm_i2c_client_match,
+			    client);
+	if (rc != 0)
+		WARN_ON(rc);
+}
+EXPORT_SYMBOL_GPL(devm_i2c_unregister_device);
+
 /* ------------------------------------------------------------------------- */
 
 /* I2C bus adapters -- one roots each I2C or SMBUS segment */
