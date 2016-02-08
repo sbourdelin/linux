@@ -1276,15 +1276,26 @@ static noinline_for_stack int ethtool_get_channels(struct net_device *dev,
 static noinline_for_stack int ethtool_set_channels(struct net_device *dev,
 						   void __user *useraddr)
 {
-	struct ethtool_channels channels;
+	struct ethtool_channels channels, max;
 	u32 max_rx = 0;
 	int ret;
 
-	if (!dev->ethtool_ops->set_channels)
+	if (!dev->ethtool_ops->set_channels || !dev->ethtool_ops->get_channels)
 		return -EOPNOTSUPP;
 
 	if (copy_from_user(&channels, useraddr, sizeof(channels)))
 		return -EFAULT;
+
+	ret = dev->ethtool_ops->get_channels(dev, &max);
+	if (ret)
+		return ret;
+
+	/* ensure new counts are within the maximums */
+	if ((channels.rx_count > max.max_rx) ||
+	    (channels.tx_count > max.max_tx) ||
+	    (channels.combined_count > max.max_combined) ||
+	    (channels.other_count > max.max_other))
+		return -EINVAL;
 
 	/* ensure the new Rx count fits within the configured Rx flow
 	 * indirection table settings */
