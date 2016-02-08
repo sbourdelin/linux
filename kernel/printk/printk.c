@@ -2235,6 +2235,7 @@ void console_unlock(void)
 	unsigned long flags;
 	bool wake_klogd = false;
 	bool do_cond_resched, retry;
+	unsigned cnt;
 
 	if (console_suspended) {
 		up_console_sem();
@@ -2257,6 +2258,7 @@ void console_unlock(void)
 	/* flush buffered message fragment immediately to console */
 	console_cont_flush(text, sizeof(text));
 again:
+	cnt = 5;
 	for (;;) {
 		struct printk_log *msg;
 		size_t ext_len = 0;
@@ -2283,6 +2285,9 @@ again:
 skip:
 		if (console_seq == log_next_seq)
 			break;
+
+		if (--cnt == 0)
+			break;	/* Someone else printk's like crazy */
 
 		msg = log_from_idx(console_idx);
 		if (msg->flags & LOG_NOCONS) {
@@ -2350,6 +2355,26 @@ skip:
 	if (retry && console_trylock())
 		goto again;
 
+	if (cnt == 0) {
+		/*
+		 * Other CPU(s) printk like crazy, filling log_buf[].
+		 * Try to get rid of the "honor" of servicing their data:
+		 * give _them_ time to grab console_sem and start working.
+		 */
+		cnt = 9999;
+		while (--cnt != 0) {
+			cpu_relax();
+			if (console_seq == log_next_seq) {
+				/* Good, other CPU entered "for(;;)" loop */
+				goto out;
+			}
+		}
+		/* No one seems to be willing to take it... */
+		if (console_trylock())
+			goto again; /* we took it */
+		/* Nope, someone else holds console_sem! Good */
+	}
+out:
 	if (wake_klogd)
 		wake_up_klogd();
 }
