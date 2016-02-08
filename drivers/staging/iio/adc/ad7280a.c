@@ -117,7 +117,7 @@
  */
 #define POLYNOM		0x2F
 #define POLYNOM_ORDER	8
-#define HIGHBIT		(1 << (POLYNOM_ORDER - 1))
+#define HIGHBIT		BIT((POLYNOM_ORDER - 1))
 
 struct ad7280_state {
 	struct spi_device		*spi;
@@ -388,7 +388,7 @@ static ssize_t ad7280_show_balance_sw(struct device *dev,
 
 	return sprintf(buf, "%d\n",
 		       !!(st->cb_mask[this_attr->address >> 8] &
-		       (1 << ((this_attr->address & 0xFF) + 2))));
+		       BIT(((this_attr->address & 0xFF) + 2))));
 }
 
 static ssize_t ad7280_store_balance_sw(struct device *dev,
