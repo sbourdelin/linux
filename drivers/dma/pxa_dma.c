@@ -53,6 +53,7 @@
 
 #define DRCMR_MAPVLD	BIT(7)	/* Map Valid (read / write) */
 #define DRCMR_CHLNUM	0x1f	/* mask for Channel Number (read / write) */
+#define DRCMR_MAXREQST	0x7fff	/* Maximum requestor line */
 
 #define DDADR_DESCADDR	0xfffffff0	/* Address of next descriptor (mask) */
 #define DDADR_STOP	BIT(0)	/* Stop (read / write) */
@@ -473,7 +474,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
 		return;
 
 	/* clear the channel mapping in DRCMR */
-	if (chan->drcmr <= DRCMR_CHLNUM) {
+	if (chan->drcmr <= DRCMR_MAXREQST) {
 		reg = pxad_drcmr(chan->drcmr);
 		writel_relaxed(0, chan->phy->base + reg);
 	}
@@ -518,7 +519,7 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
 		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
 		phy, phy->idx, misaligned);
 
-	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
+	if (phy->vchan->drcmr <= DRCMR_MAXREQST) {
 		reg = pxad_drcmr(phy->vchan->drcmr);
 		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
 	}
@@ -916,7 +917,7 @@ static void pxad_get_config(struct pxad_chan *chan,
 		dev_addr = chan->cfg.src_addr;
 		*dev_src = dev_addr;
 		*dcmd |= PXA_DCMD_INCTRGADDR;
-		if (chan->drcmr <= DRCMR_CHLNUM)
+		if (chan->drcmr <= DRCMR_MAXREQST)
 			*dcmd |= PXA_DCMD_FLOWSRC;
 	}
 	if (dir == DMA_MEM_TO_DEV) {
@@ -925,7 +926,7 @@ static void pxad_get_config(struct pxad_chan *chan,
 		dev_addr = chan->cfg.dst_addr;
 		*dev_dst = dev_addr;
 		*dcmd |= PXA_DCMD_INCSRCADDR;
-		if (chan->drcmr <= DRCMR_CHLNUM)
+		if (chan->drcmr <= DRCMR_MAXREQST)
 			*dcmd |= PXA_DCMD_FLOWTRG;
 	}
 	if (dir == DMA_MEM_TO_MEM)
