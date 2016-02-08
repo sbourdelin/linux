@@ -589,6 +589,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
 	struct device_node *msi_controller_node;
 	struct device_node *msi_np = *np;
 	u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
+	u32 masked_rid_base;
 	int msi_map_len;
 	bool matched;
 	u32 rid_out = rid_in;
@@ -654,7 +655,8 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
 	if (!matched)
 		return rid_out;
 
-	rid_out = masked_rid + msi_base;
+	masked_rid_base = map_mask & rid_base;
+	rid_out = msi_base + (masked_rid - masked_rid_base);
 	dev_dbg(dev,
 		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
 		dev_name(parent_dev), map_mask, rid_base, msi_base,
