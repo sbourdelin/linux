@@ -312,13 +312,10 @@ boot := arch/arm/boot
 archprepare:
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
 
-# Convert bzImage to zImage
-bzImage: zImage
-
 BOOT_TARGETS	= zImage Image xipImage bootpImage uImage
 INSTALL_TARGETS	= zinstall uinstall install
 
-PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS)
+PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS)
 
 bootpImage uImage: zImage
 zImage: Image
