@@ -1,3 +1,9 @@
+* Add sysfs rescan attribute for fsl-mc bus, and dprc device. The rescan will
+  trigger the fsl-mc bus, dprc driver to re-discover the objects under fsl-mc
+  bus and dprc.X container. Hence this feature actually verifies the
+  functionality of fsl-mc bus, and dprc driver, and it helps moving
+  fsl-mc bus out of staging.
+
 * Decide if multiple root fsl-mc buses will be supported per Linux instance,
   and if so add support for this.
 
