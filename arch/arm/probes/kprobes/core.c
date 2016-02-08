@@ -570,10 +570,10 @@ void __kprobes jprobe_return(void)
 		:
 		: "r" (kcb->jprobe_saved_regs.ARM_sp),
 		  "I" (sizeof(struct pt_regs) * 2),
-		  "J" (offsetof(struct pt_regs, ARM_sp)),
-		  "J" (offsetof(struct pt_regs, ARM_pc)),
-		  "J" (offsetof(struct pt_regs, ARM_cpsr)),
-		  "J" (offsetof(struct pt_regs, ARM_lr))
+		  "I" (offsetof(struct pt_regs, ARM_sp)),
+		  "I" (offsetof(struct pt_regs, ARM_pc)),
+		  "I" (offsetof(struct pt_regs, ARM_cpsr)),
+		  "I" (offsetof(struct pt_regs, ARM_lr))
 		: "memory", "cc");
 }
 
