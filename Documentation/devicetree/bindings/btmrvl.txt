@@ -3,7 +3,7 @@ btmrvl
 
 Required properties:
 
-  - compatible : must be "btmrvl,cfgdata"
+  - compatible : must be "marvell,btmrvl"
 
 Optional properties:
 
@@ -15,11 +15,11 @@ Optional properties:
 
 Example:
 
-GPIO pin 13 is configured as a wakeup source and GAP is set to 100 msecs
-in below example.
+GPIO pin 13 and gap 100ms are configured for host wakeup, calibration
+data is also available in below example.
 
 btmrvl {
-	compatible = "btmrvl,cfgdata";
+	compatible = "marvell,btmrvl";
 
 	btmrvl,cal-data = /bits/ 8 <
 		0x37 0x01 0x1c 0x00 0xff 0xff 0xff 0xff 0x01 0x7f 0x04 0x02

@@ -22,7 +22,21 @@
 #include <linux/kthread.h>
 #include <linux/bitops.h>
 #include <linux/slab.h>
+#include <linux/err.h>
+#include <linux/gpio.h>
+#include <linux/gfp.h>
+#include <linux/interrupt.h>
+#include <linux/io.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <net/bluetooth/bluetooth.h>
+
+extern struct platform_device *btmrvl_plt_dev;
 
 #define BTM_HEADER_LEN			4
 #define BTM_UPLD_SIZE			2312
@@ -174,6 +188,8 @@ int btmrvl_enable_ps(struct btmrvl_private *priv);
 int btmrvl_prepare_command(struct btmrvl_private *priv);
 int btmrvl_enable_hs(struct btmrvl_private *priv);
 void btmrvl_firmware_dump(struct btmrvl_private *priv);
+int btmrvl_platform_drv_init(void);
+void btmrvl_platform_drv_exit(void);
 
 #ifdef CONFIG_DEBUG_FS
 void btmrvl_debugfs_init(struct hci_dev *hdev);
