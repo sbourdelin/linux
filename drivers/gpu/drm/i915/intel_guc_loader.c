@@ -597,39 +597,29 @@ void intel_guc_ucode_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_uc_fw *guc_fw = &dev_priv->guc.guc_fw;
-	const char *fw_path;
+	const char *fw_path = NULL;
+
+	guc_fw->uc_dev = dev;
+	guc_fw->uc_fw_path = NULL;
+	guc_fw->fetch_status = UC_FIRMWARE_NONE;
+	guc_fw->load_status = UC_FIRMWARE_NONE;
 
 	if (!HAS_GUC_SCHED(dev))
 		i915.enable_guc_submission = false;
 
-	if (!HAS_GUC_UCODE(dev)) {
-		fw_path = NULL;
-	} else if (IS_SKYLAKE(dev)) {
+	if (!HAS_GUC_UCODE(dev))
+		return;
+
+	if (IS_SKYLAKE(dev)) {
 		fw_path = I915_SKL_GUC_UCODE;
 		guc_fw->major_ver_wanted = 4;
 		guc_fw->minor_ver_wanted = 3;
-	} else {
-		i915.enable_guc_submission = false;
-		fw_path = "";	/* unknown device */
 	}
-
-	if (!i915.enable_guc_submission)
-		return;
-
-	guc_fw->uc_dev = dev;
-	guc_fw->uc_fw_path = fw_path;
-	guc_fw->fetch_status = UC_FIRMWARE_NONE;
-	guc_fw->load_status = UC_FIRMWARE_NONE;
 
 	if (fw_path == NULL)
 		return;
 
-	if (*fw_path == '\0') {
-		DRM_ERROR("No GuC firmware known for this platform\n");
-		guc_fw->fetch_status = UC_FIRMWARE_FAIL;
-		return;
-	}
-
+	guc_fw->uc_fw_path = fw_path;
 	guc_fw->fetch_status = UC_FIRMWARE_PENDING;
 	DRM_DEBUG_DRIVER("GuC firmware pending, path %s\n", fw_path);
 	intel_uc_fw_fetch(dev, guc_fw);
