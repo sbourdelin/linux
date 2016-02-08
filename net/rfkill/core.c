@@ -89,6 +89,7 @@ struct rfkill_data {
 	struct mutex		mtx;
 	wait_queue_head_t	read_wait;
 	bool			input_handler;
+	bool			is_apm_owner;
 };
 
 
@@ -123,7 +124,7 @@ static struct {
 } rfkill_global_states[NUM_RFKILL_TYPES];
 
 static bool rfkill_epo_lock_active;
-
+static bool rfkill_apm_owned;
 
 #ifdef CONFIG_RFKILL_LEDS
 static struct led_trigger rfkill_apm_led_trigger;
@@ -350,7 +351,8 @@ static void rfkill_update_global_state(enum rfkill_type type, bool blocked)
 
 	for (i = 0; i < NUM_RFKILL_TYPES; i++)
 		rfkill_global_states[i].cur = blocked;
-	rfkill_apm_led_trigger_event(blocked);
+	if (!rfkill_apm_owned)
+		rfkill_apm_led_trigger_event(blocked);
 }
 
 #ifdef CONFIG_RFKILL_INPUT
@@ -1183,6 +1185,7 @@ static ssize_t rfkill_fop_read(struct file *file, char __user *buf,
 static ssize_t rfkill_fop_write(struct file *file, const char __user *buf,
 				size_t count, loff_t *pos)
 {
+	struct rfkill_data *data = file->private_data;
 	struct rfkill *rfkill;
 	struct rfkill_event ev;
 
@@ -1199,13 +1202,41 @@ static ssize_t rfkill_fop_write(struct file *file, const char __user *buf,
 	if (copy_from_user(&ev, buf, count))
 		return -EFAULT;
 
-	if (ev.op != RFKILL_OP_CHANGE && ev.op != RFKILL_OP_CHANGE_ALL)
+	if (ev.op < RFKILL_OP_CHANGE)
 		return -EINVAL;
 
 	if (ev.type >= NUM_RFKILL_TYPES)
 		return -EINVAL;
 
 	mutex_lock(&rfkill_global_mutex);
+
+	if (ev.op == RFKILL_OP_AIRPLANE_MODE_ACQUIRE) {
+		if (rfkill_apm_owned && !data->is_apm_owner) {
+			count = -EACCES;
+		} else {
+			rfkill_apm_owned = true;
+			data->is_apm_owner = true;
+		}
+	}
+
+	if (ev.op == RFKILL_OP_AIRPLANE_MODE_RELEASE) {
+		if (rfkill_apm_owned && !data->is_apm_owner) {
+			count = -EACCES;
+		} else {
+			bool state = rfkill_global_states[RFKILL_TYPE_ALL].cur;
+
+			rfkill_apm_owned = false;
+			data->is_apm_owner = false;
+			rfkill_apm_led_trigger_event(state);
+		}
+	}
+
+	if (ev.op == RFKILL_OP_AIRPLANE_MODE_CHANGE) {
+		if (rfkill_apm_owned && data->is_apm_owner)
+			rfkill_apm_led_trigger_event(ev.soft);
+		else
+			count = -EACCES;
+	}
 
 	if (ev.op == RFKILL_OP_CHANGE_ALL)
 		rfkill_update_global_state(ev.type, ev.soft);
@@ -1230,7 +1261,17 @@ static int rfkill_fop_release(struct inode *inode, struct file *file)
 	struct rfkill_int_event *ev, *tmp;
 
 	mutex_lock(&rfkill_global_mutex);
+
+	if (data->is_apm_owner) {
+		bool state = rfkill_global_states[RFKILL_TYPE_ALL].cur;
+
+		rfkill_apm_owned = false;
+		data->is_apm_owner = false;
+		rfkill_apm_led_trigger_event(state);
+	}
+
 	list_del(&data->list);
+
 	mutex_unlock(&rfkill_global_mutex);
 
 	mutex_destroy(&data->mtx);
