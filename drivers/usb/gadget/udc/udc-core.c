@@ -442,6 +442,39 @@ err1:
 EXPORT_SYMBOL_GPL(usb_add_gadget_udc_release);
 
 /**
+ * usb_get_gadget_udc_name - get the name of the first UDC controller
+ * @dst_name
+ * @len
+ * This functions returns the name of the first UDC controller in the system.
+ * Please note that this interface is usefull only for legacy drivers which
+ * assume that there is only one UDC controller in the system and they need to
+ * get its name before initialization. There is no guarantee that the UDC
+ * of the returned name will be still available, when gadget driver registers
+ * itself.
+ *
+ * Returns zero on success, negative errno otherwise.
+ */
+int usb_get_gadget_udc_name(char *dst_name, int len)
+{
+	struct usb_udc *udc;
+	int ret = -ENODEV;
+
+	mutex_lock(&udc_lock);
+	list_for_each_entry(udc, &udc_list, list) {
+		const char *name = dev_name(&udc->dev);
+		/* For now we take the first one */
+		if (!udc->driver && strlen(name) + 1 <= len) {
+			strcpy(dst_name, name);
+			ret = 0;
+			break;
+		}
+	}
+	mutex_unlock(&udc_lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(usb_get_gadget_udc_name);
+
+/**
  * usb_add_gadget_udc - adds a new gadget to the udc class driver list
  * @parent: the parent device to this udc. Usually the controller
  * driver's device.

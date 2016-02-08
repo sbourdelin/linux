@@ -227,7 +227,7 @@ static void put_ep (struct ep_data *data)
  * implicitly, starting with the driver name and then endpoint names.
  */
 
-static const char *CHIP;
+static char CHIP[32];
 
 /*----------------------------------------------------------------------*/
 
@@ -1697,28 +1697,6 @@ static struct usb_gadget_driver gadgetfs_driver = {
 };
 
 /*----------------------------------------------------------------------*/
-
-static void gadgetfs_nop(struct usb_gadget *arg) { }
-
-static int gadgetfs_probe(struct usb_gadget *gadget,
-		struct usb_gadget_driver *driver)
-{
-	CHIP = gadget->name;
-	return -EISNAM;
-}
-
-static struct usb_gadget_driver probe_driver = {
-	.max_speed	= USB_SPEED_HIGH,
-	.bind		= gadgetfs_probe,
-	.unbind		= gadgetfs_nop,
-	.setup		= (void *)gadgetfs_nop,
-	.disconnect	= gadgetfs_nop,
-	.driver	= {
-		.name		= "nop",
-	},
-};
-
-
 /* DEVICE INITIALIZATION
  *
  *     fd = open ("/dev/gadget/$CHIP", O_RDWR)
@@ -1968,10 +1946,7 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 	if (the_device)
 		return -ESRCH;
 
-	/* fake probe to determine $CHIP */
-	CHIP = NULL;
-	usb_gadget_probe_driver(&probe_driver);
-	if (!CHIP)
+	if (usb_get_gadget_udc_name(CHIP, sizeof(CHIP)) != 0)
 		return -ENODEV;
 
 	/* superblock */
