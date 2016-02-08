@@ -452,6 +452,16 @@ static int sunxi_pinctrl_gpio_direction_input(struct gpio_chip *chip,
 	return pinctrl_gpio_direction_input(chip->base + offset);
 }
 
+int sunxi_pinctrl_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	int ret = pinctrl_gpio_direction_input(chip->base + offset);
+
+	if (ret)
+		return ret;
+
+	return pinctrl_request_gpio(chip->base + offset);
+}
+
 static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	struct sunxi_pinctrl *pctl = gpiochip_get_data(chip);
@@ -946,7 +956,7 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
 
 	last_pin = pctl->desc->pins[pctl->desc->npins - 1].pin.number;
 	pctl->chip->owner = THIS_MODULE;
-	pctl->chip->request = gpiochip_generic_request,
+	pctl->chip->request = sunxi_pinctrl_gpio_request,
 	pctl->chip->free = gpiochip_generic_free,
 	pctl->chip->direction_input = sunxi_pinctrl_gpio_direction_input,
 	pctl->chip->direction_output = sunxi_pinctrl_gpio_direction_output,
