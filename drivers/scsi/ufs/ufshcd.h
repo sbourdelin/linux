@@ -76,6 +76,13 @@ enum dev_cmd_type {
 	DEV_CMD_TYPE_QUERY		= 0x1,
 };
 
+/* UFSHCD states */
+enum {
+	UFSHCD_STATE_RESET,
+	UFSHCD_STATE_ERROR,
+	UFSHCD_STATE_OPERATIONAL,
+};
+
 /**
  * struct uic_command - UIC command structure
  * @command: UIC command
@@ -124,6 +131,8 @@ enum uic_link_state {
 				    UIC_LINK_ACTIVE_STATE)
 #define ufshcd_set_link_hibern8(hba) ((hba)->uic_link_state = \
 				    UIC_LINK_HIBERN8_STATE)
+#define ufshcd_set_ufs_dev_active(h) \
+	((h)->curr_dev_pwr_mode = UFS_ACTIVE_PWR_MODE)
 
 /*
  * UFS Power management levels.
@@ -283,6 +292,7 @@ struct ufs_hba_variant_ops {
 	int     (*suspend)(struct ufs_hba *, enum ufs_pm_op);
 	int     (*resume)(struct ufs_hba *, enum ufs_pm_op);
 	void	(*dbg_register_dump)(struct ufs_hba *hba);
+	int	(*custom_probe_hba)(struct ufs_hba *hba);
 };
 
 /* clock gating state  */
@@ -634,6 +644,10 @@ extern int ufshcd_dme_set_attr(struct ufs_hba *hba, u32 attr_sel,
 			       u8 attr_set, u32 mib_val, u8 peer);
 extern int ufshcd_dme_get_attr(struct ufs_hba *hba, u32 attr_sel,
 			       u32 *mib_val, u8 peer);
+int ufshcd_dme_link_startup(struct ufs_hba *hba);
+int ufshcd_make_hba_operational(struct ufs_hba *hba);
+int ufshcd_verify_dev_init(struct ufs_hba *hba);
+int ufshcd_complete_dev_init(struct ufs_hba *hba);
 
 /* UIC command interfaces for DME primitives */
 #define DME_LOCAL	0
@@ -786,6 +800,14 @@ static inline void ufshcd_vops_dbg_register_dump(struct ufs_hba *hba)
 {
 	if (hba->vops && hba->vops->dbg_register_dump)
 		hba->vops->dbg_register_dump(hba);
+}
+
+static inline int ufshcd_vops_custom_probe_hba(struct ufs_hba *hba)
+{
+	if (hba->vops && hba->vops->custom_probe_hba)
+		return hba->vops->custom_probe_hba(hba);
+
+	return 0;
 }
 
 #endif /* End of Header */
