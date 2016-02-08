@@ -130,7 +130,16 @@ the objects involved in creating a network interfaces.
     via a config file passed to the MC when firmware starts
     it.  There is also a Linux user space tool called "restool"
     that can be used to create/destroy containers and objects
-    dynamically.
+    dynamically. The kernel side restool driver communicates with
+    user space restool via ioctl. Restool relies on allocator driver
+    to allocate dpmcp resources, enumerates fsl-mc bus to find root dprc
+    objects of interest. When the user space restool program sends a request
+    to restool driver to create a dp* objects in MC firmware, an interrupt
+    will be triggered by MC firmware and the dprc driver's interrupt handler
+    shall process the interrupt (synchronizing the objects in MC firmware and
+    objects in Linux kernel). Though small, restool driver helps verify all
+    the functionality of fsl-mc bus, dprc driver, allocator driver,
+    and MC flib API.
 
 -DPAA2 Objects for an Ethernet Network Interface
 

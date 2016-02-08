@@ -5,10 +5,24 @@
   fsl-mc bus out of staging.
 
 * Decide if multiple root fsl-mc buses will be supported per Linux instance,
-  and if so add support for this.
+  and if so add support for this. No matter fsl-mc bus support multiple root
+  dprc or not, restool driver is designed to support multiple root if fsl-mc
+  bus is ready some day later. If there is only one root dprc, restool driver
+  works fine.
+
+* Add at least one driver utilizing fsl-mc bus. Restool driver is a very
+  small and simple driver, which interacts with fsl-mc bus, dprc driver,
+  allocator driver. Restool relies on allocator driver to allocate
+  dpmcp resources, enumerates fsl-mc bus to find root dprc objects of interest.
+  When the user space restool program sends a request to restool driver to
+  create a dp* objects in MC firmware, an interrupt will be triggered by
+  MC firmware and the dprc driver's interrupt handler shall process the
+  interrupt. Though small, restool driver helps verify all the functionality
+  of fsl-mc bus, dprc driver, allocator driver, and MC flib API. Restool
+  driver helps in moving fsl-mc bus out of staging branch.
 
 * Add at least one device driver for a DPAA2 object (child device of the
-  fsl-mc bus).  Most likely candidate for this is adding DPAA2 Ethernet
+  fsl-mc bus). Most likely candidate for this is adding DPAA2 Ethernet
   driver support, which depends on drivers for several objects: DPNI,
   DPIO, DPMAC.  Other pre-requisites include:
 
