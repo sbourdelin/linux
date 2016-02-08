@@ -22,6 +22,7 @@
 #include <linux/pci_regs.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
+#include <linux/delay.h>
 
 #include "pcie-designware.h"
 
@@ -379,6 +380,25 @@ static struct msi_controller dw_pcie_msi_chip = {
 	.setup_irqs = dw_msi_setup_irqs,
 	.teardown_irq = dw_msi_teardown_irq,
 };
+
+int dw_pcie_check_link_is_up(struct pcie_port *pp, int max_ret, int sleep_min,
+								int sleep_max)
+{
+	int retries;
+
+	/* check if the link is up or not */
+	for (retries = 0; retries < max_ret; retries++) {
+		if (dw_pcie_link_up(pp)) {
+			dev_info(pp->dev, "link up\n");
+			return 0;
+		}
+		usleep_range(sleep_min, sleep_max);
+	}
+
+	dev_err(pp->dev, "phy link never came up\n");
+
+	return 1;
+}
 
 int dw_pcie_link_up(struct pcie_port *pp)
 {
