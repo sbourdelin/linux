@@ -315,13 +315,17 @@ archprepare:
 BOOT_TARGETS	= zImage Image xipImage bootpImage uImage
 INSTALL_TARGETS	= zinstall uinstall install
 
-PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS)
+PHONY += $(BOOT_TARGETS) $(INSTALL_TARGETS) __build_images
 
-bootpImage uImage: zImage
-zImage: Image
+$(BOOT_TARGETS): __build_images
+	@:
 
-$(BOOT_TARGETS): vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+__build_images: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) \
+	$(addprefix $(boot)/, \
+		$(sort $(filter $(BOOT_TARGETS),$(MAKECMDGOALS)) \
+			$(if $(filter all,$(MAKECMDGOALS)), $(KBUILD_IMAGE)) \
+			$(if $(MAKECMDGOALS),,$(KBUILD_IMAGE))))
 
 $(INSTALL_TARGETS):
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
