@@ -17,3 +17,6 @@ mc-bus-driver-objs := mc-bus.o \
 		      irq-gic-v3-its-fsl-mc-msi.o \
 		      dpmcp.o \
 		      dpbp.o
+
+# MC restool kernel support
+obj-$(CONFIG_FSL_MC_RESTOOL) += mc-restool.o
