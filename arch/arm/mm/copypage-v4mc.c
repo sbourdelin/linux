@@ -45,23 +45,23 @@ mc_copy_user_page(void *from, void *to)
 {
 	asm volatile(
 	"stmfd	sp!, {r4, lr}			@ 2\n\
-	mov	r4, %2				@ 1\n\
-	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
-1:	mcr	p15, 0, %1, c7, c6, 1		@ 1   invalidate D line\n\
-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
-	ldmia	%0!, {r2, r3, ip, lr}		@ 4+1\n\
-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
-	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
-	mcr	p15, 0, %1, c7, c6, 1		@ 1   invalidate D line\n\
-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
-	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
+	mov	r4, %0				@ 1\n\
+	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
+1:	mcr	p15, 0, r1, c7, c6, 1		@ 1   invalidate D line\n\
+	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+	ldmia	r0!, {r2, r3, ip, lr}		@ 4+1\n\
+	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
+	mcr	p15, 0, r1, c7, c6, 1		@ 1   invalidate D line\n\
+	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
 	subs	r4, r4, #1			@ 1\n\
-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
-	ldmneia	%0!, {r2, r3, ip, lr}		@ 4\n\
+	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
+	ldmneia	r0!, {r2, r3, ip, lr}		@ 4\n\
 	bne	1b				@ 1\n\
 	ldmfd	sp!, {r4, pc}			@ 3"
 	:
-	: "r" (from), "r" (to), "I" (PAGE_SIZE / 64));
+	: "I" (PAGE_SIZE / 64));
 }
 
 void v4_mc_copy_user_highpage(struct page *to, struct page *from,
