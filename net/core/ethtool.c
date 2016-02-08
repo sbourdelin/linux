@@ -642,6 +642,39 @@ void netdev_rss_key_fill(void *buffer, size_t len)
 }
 EXPORT_SYMBOL(netdev_rss_key_fill);
 
+static inline int ethool_get_max_rxfh_channel(struct net_device *dev, u32 *max)
+{
+	u32 dev_size, current_max = 0;
+	u32 *indir;
+	int ret, i;
+
+	if (!dev->ethtool_ops->get_rxfh_indir_size ||
+	    !dev->ethtool_ops->get_rxfh)
+		return -EOPNOTSUPP;
+	dev_size = dev->ethtool_ops->get_rxfh_indir_size(dev);
+	if (dev_size == 0)
+		return -EOPNOTSUPP;
+
+	indir = kcalloc(dev_size, sizeof(indir[0]), GFP_USER);
+	if (!indir)
+		return -ENOMEM;
+
+	ret = dev->ethtool_ops->get_rxfh(dev, indir, NULL, NULL);
+	if (ret)
+		goto out;
+
+	for (i = dev_size; i--;) {
+		if (indir[i] > current_max)
+			current_max = indir[i];
+	}
+
+	*max = current_max;
+
+out:
+	kfree(indir);
+	return ret;
+}
+
 static noinline_for_stack int ethtool_get_rxfh_indir(struct net_device *dev,
 						     void __user *useraddr)
 {
@@ -738,6 +771,14 @@ static noinline_for_stack int ethtool_set_rxfh_indir(struct net_device *dev,
 	}
 
 	ret = ops->set_rxfh(dev, indir, NULL, ETH_RSS_HASH_NO_CHANGE);
+	if (ret)
+		goto out;
+
+	/* indicate whether rxfh was set to default */
+	if (user_size == 0)
+		dev->priv_flags &= ~IFF_RXFH_CONFIGURED;
+	else
+		dev->priv_flags |= IFF_RXFH_CONFIGURED;
 
 out:
 	kfree(indir);
@@ -897,6 +938,14 @@ static noinline_for_stack int ethtool_set_rxfh(struct net_device *dev,
 	}
 
 	ret = ops->set_rxfh(dev, indir, hkey, rxfh.hfunc);
+	if (ret)
+		goto out;
+
+	/* indicate whether rxfh was set to default */
+	if (rxfh.indir_size == 0)
+		dev->priv_flags &= ~IFF_RXFH_CONFIGURED;
+	else if (rxfh.indir_size != ETH_RXFH_INDIR_NO_CHANGE)
+		dev->priv_flags |= IFF_RXFH_CONFIGURED;
 
 out:
 	kfree(rss_config);
@@ -1228,12 +1277,22 @@ static noinline_for_stack int ethtool_set_channels(struct net_device *dev,
 						   void __user *useraddr)
 {
 	struct ethtool_channels channels;
+	u32 max_rx = 0;
+	int ret;
 
 	if (!dev->ethtool_ops->set_channels)
 		return -EOPNOTSUPP;
 
 	if (copy_from_user(&channels, useraddr, sizeof(channels)))
 		return -EFAULT;
+
+	/* ensure the new Rx count fits within the configured Rx flow
+	 * indirection table settings */
+	if (netif_is_rxfh_configured(dev) &&
+	    ethtool_get_max_rxfh_channel(dev, &max_rx) &&
+	    ((channels.rx_count > max_rx) ||
+	     (channels.combined_count > max_rx))
+	    return -EINVAL;
 
 	return dev->ethtool_ops->set_channels(dev, &channels);
 }
