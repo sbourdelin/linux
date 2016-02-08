@@ -349,20 +349,7 @@ static void __init relocate_initrd(void)
 		relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
 }
 
-static void __init early_reserve_initrd(void)
-{
-	/* Assume only end is not page aligned */
-	u64 ramdisk_image = get_ramdisk_image();
-	u64 ramdisk_size  = get_ramdisk_size();
-	u64 ramdisk_end   = PAGE_ALIGN(ramdisk_image + ramdisk_size);
-
-	if (!boot_params.hdr.type_of_loader ||
-	    !ramdisk_image || !ramdisk_size)
-		return;		/* No initrd provided by bootloader */
-
-	memblock_reserve(ramdisk_image, ramdisk_end - ramdisk_image);
-}
-static void __init reserve_initrd(void)
+static void __init reserve_initrd(bool early)
 {
 	/* Assume only end is not page aligned */
 	u64 ramdisk_image = get_ramdisk_image();
@@ -373,6 +360,11 @@ static void __init reserve_initrd(void)
 	if (!boot_params.hdr.type_of_loader ||
 	    !ramdisk_image || !ramdisk_size)
 		return;		/* No initrd provided by bootloader */
+
+	if (early) {
+		memblock_reserve(ramdisk_image, ramdisk_end - ramdisk_image);
+		return;
+	}
 
 	initrd_start = 0;
 
@@ -398,10 +390,7 @@ static void __init reserve_initrd(void)
 	memblock_free(ramdisk_image, ramdisk_end - ramdisk_image);
 }
 #else
-static void __init early_reserve_initrd(void)
-{
-}
-static void __init reserve_initrd(void)
+static void __init reserve_initrd(bool early)
 {
 }
 #endif /* CONFIG_BLK_DEV_INITRD */
@@ -850,7 +839,7 @@ void __init setup_arch(char **cmdline_p)
 	memblock_reserve(__pa_symbol(_text),
 			 (unsigned long)__bss_stop - (unsigned long)_text);
 
-	early_reserve_initrd();
+	reserve_initrd(true);
 
 	/*
 	 * At this point everything still needed from the boot loader
@@ -1135,7 +1124,7 @@ void __init setup_arch(char **cmdline_p)
 	/* Allocate bigger log buffer */
 	setup_log_buf(1);
 
-	reserve_initrd();
+	reserve_initrd(false);
 
 #if defined(CONFIG_ACPI) && defined(CONFIG_BLK_DEV_INITRD)
 	acpi_initrd_override((void *)initrd_start, initrd_end - initrd_start);
