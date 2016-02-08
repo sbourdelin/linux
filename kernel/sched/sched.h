@@ -519,6 +519,14 @@ struct dl_rq {
 #else
 	struct dl_bw dl_bw;
 #endif
+
+	/*
+	 * ac_bw keeps track of per rq admitted bandwidth. It only changes
+	 * when a new task is admitted, it dies, it changes scheduling policy
+	 * or is migrated to another rq. It is used to correctly save/resore
+	 * total_bw on root_domain changes.
+	 */
+	u64 ac_bw;
 };
 
 #ifdef CONFIG_SMP
@@ -719,6 +727,20 @@ DECLARE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 #define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 #define raw_rq()		raw_cpu_ptr(&runqueues)
+
+static inline
+void __dl_sub_ac(struct rq *rq, u64 tsk_bw)
+{
+	WARN_ON(rq->dl.ac_bw == 0);
+
+	rq->dl.ac_bw -= tsk_bw;
+}
+
+static inline
+void __dl_add_ac(struct rq *rq, u64 tsk_bw)
+{
+	rq->dl.ac_bw += tsk_bw;
+}
 
 static inline u64 __rq_clock_broken(struct rq *rq)
 {

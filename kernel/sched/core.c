@@ -2449,7 +2449,9 @@ static int dl_overflow(struct task_struct *p, int policy,
 	} else if (dl_policy(policy) && task_has_dl_policy(p) &&
 		   !__dl_overflow(dl_b, cpus, p->dl.dl_bw, new_bw)) {
 		__dl_clear(dl_b, p->dl.dl_bw);
+		__dl_sub_ac(task_rq(p), p->dl.dl_bw);
 		__dl_add(dl_b, new_bw);
+		__dl_add_ac(task_rq(p), new_bw);
 		err = 0;
 	} else if (!dl_policy(policy) && task_has_dl_policy(p)) {
 		__dl_clear(dl_b, p->dl.dl_bw);

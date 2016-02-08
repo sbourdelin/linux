@@ -83,6 +83,7 @@ void init_dl_rq(struct dl_rq *dl_rq)
 #else
 	init_dl_bw(&dl_rq->dl_bw);
 #endif
+	dl_rq->ac_bw = 0;
 }
 
 #ifdef CONFIG_SMP
@@ -278,8 +279,10 @@ static struct rq *dl_task_offline_migration(struct rq *rq, struct task_struct *p
 	 * By now the task is replenished and enqueued; migrate it.
 	 */
 	deactivate_task(rq, p, 0);
+	__dl_sub_ac(rq, p->dl.dl_bw);
 	set_task_cpu(p, later_rq->cpu);
 	activate_task(later_rq, p, 0);
+	__dl_add_ac(later_rq, p->dl.dl_bw);
 
 	if (!fallback)
 		resched_curr(later_rq);
@@ -506,6 +509,7 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	 */
 	if (dl_se->dl_new) {
 		setup_new_dl_entity(dl_se, pi_se);
+		__dl_add_ac(rq, dl_se->dl_bw);
 		return;
 	}
 
@@ -955,6 +959,9 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 		return;
 	}
 
+	if (p->on_rq == TASK_ON_RQ_MIGRATING)
+		__dl_add_ac(rq, p->dl.dl_bw);
+
 	/*
 	 * If p is throttled, we do nothing. In fact, if it exhausted
 	 * its budget it needs a replenishment and, since it now is on
@@ -980,6 +987,8 @@ static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
 	update_curr_dl(rq);
 	__dequeue_task_dl(rq, p, flags);
+	if (p->on_rq == TASK_ON_RQ_MIGRATING)
+		__dl_sub_ac(rq, p->dl.dl_bw);
 }
 
 /*
@@ -1218,6 +1227,8 @@ static void task_fork_dl(struct task_struct *p)
 static void task_dead_dl(struct task_struct *p)
 {
 	struct dl_bw *dl_b = dl_bw_of(task_cpu(p));
+
+	__dl_sub_ac(task_rq(p), p->dl.dl_bw);
 
 	/*
 	 * Since we are TASK_DEAD we won't slip out of the domain!
@@ -1511,8 +1522,10 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
+	__dl_sub_ac(rq, next_task->dl.dl_bw);
 	set_task_cpu(next_task, later_rq->cpu);
 	activate_task(later_rq, next_task, 0);
+	__dl_add_ac(later_rq, next_task->dl.dl_bw);
 	ret = 1;
 
 	resched_curr(later_rq);
@@ -1599,8 +1612,10 @@ static void pull_dl_task(struct rq *this_rq)
 			resched = true;
 
 			deactivate_task(src_rq, p, 0);
+			__dl_sub_ac(src_rq, p->dl.dl_bw);
 			set_task_cpu(p, this_cpu);
 			activate_task(this_rq, p, 0);
+			__dl_add_ac(this_rq, p->dl.dl_bw);
 			dmin = p->dl.deadline;
 
 			/* Is there any other task even earlier? */
@@ -1704,6 +1719,9 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	 */
 	if (!start_dl_timer(p))
 		__dl_clear_params(p);
+
+	if (dl_prio(p->normal_prio))
+		__dl_sub_ac(rq, p->dl.dl_bw);
 
 	/*
 	 * Since this might be the only -deadline task on the rq,
