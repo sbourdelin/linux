@@ -1683,6 +1683,7 @@ static void rq_online_dl(struct rq *rq)
 	if (rq->dl.overloaded)
 		dl_set_overload(rq);
 
+	__dl_add(&rq->rd->dl_bw, rq->dl.ac_bw);
 	cpudl_set_freecpu(&rq->rd->cpudl, rq->cpu);
 	if (rq->dl.dl_nr_running > 0)
 		cpudl_set(&rq->rd->cpudl, rq->cpu, rq->dl.earliest_dl.curr, 1);
@@ -1696,6 +1697,7 @@ static void rq_offline_dl(struct rq *rq)
 
 	cpudl_set(&rq->rd->cpudl, rq->cpu, 0, 0);
 	cpudl_clear_freecpu(&rq->rd->cpudl, rq->cpu);
+	__dl_clear(&rq->rd->dl_bw, rq->dl.ac_bw);
 }
 
 void __init init_sched_dl_class(void)
