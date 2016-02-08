@@ -2006,9 +2006,15 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			done = musb_rx_dma_in_inventra_cppi41(c, hw_ep, qh,
 							      urb, xfer_len,
 							      iso_err);
-			if (done)
+			if (done) {
+				/* Don't call msub_advance_schedule()
+				 * immediately after receiving an endpoint RX
+				 * interrupt without waiting for the DMA
+				 * transfer to complete.
+				 */
+				done = false;
 				goto finish;
-			else
+			} else
 				dev_err(musb->controller, "error: rx_dma failed\n");
 		}
 
