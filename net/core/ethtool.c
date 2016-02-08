@@ -1297,6 +1297,11 @@ static noinline_for_stack int ethtool_set_channels(struct net_device *dev,
 	    (channels.other_count > max.max_other))
 		return -EINVAL;
 
+	/* can't set combined and separate channels at the same time */
+	if ((channels.combined_count &&
+	     (channels.rx_count || channels.tx_count))
+	    return -EINVAL;
+
 	/* ensure the new Rx count fits within the configured Rx flow
 	 * indirection table settings */
 	if (netif_is_rxfh_configured(dev) &&
