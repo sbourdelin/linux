@@ -385,11 +385,11 @@ int kvm_timer_hyp_init(void)
 {
 	struct device_node *np;
 	unsigned int ppi;
+	struct arch_timer_kvm_info *info;
 	int err;
 
-	timecounter = arch_timer_get_timecounter();
-	if (!timecounter)
-		return -ENODEV;
+	info = arch_timer_get_kvm_info();
+	timecounter = &info->timecounter;
 
 	np = of_find_matching_node(NULL, arch_timer_of_match);
 	if (!np) {
