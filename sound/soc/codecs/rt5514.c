@@ -574,7 +574,7 @@ static int rt5514_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	bclk_ms = frame_size > 32;
+	bclk_ms = frame_size >> 32;
 	rt5514->bclk = rt5514->lrck * (32 << bclk_ms);
 
 	dev_dbg(dai->dev, "bclk is %dHz and lrck is %dHz\n",
