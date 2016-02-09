@@ -86,7 +86,7 @@ int fsl_udc_clk_finalize(struct platform_device *pdev)
 	int ret = 0;
 
 	/* workaround ENGcm09152 for i.MX35 */
-	if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
+	if (pdata->workaround & FSL_USB2_WORKAROUND_ENGCM09152) {
 		unsigned int v;
 		struct resource *res = platform_get_resource
 			(pdev, IORESOURCE_MEM, 0);

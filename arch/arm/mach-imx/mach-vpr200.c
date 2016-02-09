@@ -238,7 +238,7 @@ static const iomux_v3_cfg_t vpr200_pads[] __initconst = {
 static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
 	.operating_mode	= FSL_USB2_DR_DEVICE,
 	.phy_mode	= FSL_USB2_PHY_UTMI,
-	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
+	.workaround	= FSL_USB2_WORKAROUND_ENGCM09152,
 };
 
 static int vpr200_usbh_init(struct platform_device *pdev)
