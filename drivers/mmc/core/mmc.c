@@ -345,14 +345,14 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 	/* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
 	card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
-	if (card->csd.structure == 3) {
-		if (card->ext_csd.raw_ext_csd_structure > 2) {
-			pr_err("%s: unrecognised EXT_CSD structure "
-				"version %d\n", mmc_hostname(card->host),
-					card->ext_csd.raw_ext_csd_structure);
-			err = -EINVAL;
-			goto out;
-		}
+
+	if (card->csd.structure == 3 &&
+	    card->ext_csd.raw_ext_csd_structure > 2) {
+		pr_err("%s: unrecognised EXT_CSD structure version %d\n",
+		       mmc_hostname(card->host),
+		       card->ext_csd.raw_ext_csd_structure);
+		err = -EINVAL;
+		goto out;
 	}
 
 	np = mmc_of_find_child_device(card->host, 0);
