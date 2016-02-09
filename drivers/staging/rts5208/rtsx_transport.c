@@ -56,10 +56,10 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
 			return 0;
 		cnt = min(buflen, scsi_bufflen(srb) - *offset);
 		if (dir == TO_XFER_BUF)
-			memcpy((unsigned char *) scsi_sglist(srb) + *offset,
+			memcpy((unsigned char *)scsi_sglist(srb) + *offset,
 			       buffer, cnt);
 		else
-			memcpy(buffer, (unsigned char *) scsi_sglist(srb) +
+			memcpy(buffer, (unsigned char *)scsi_sglist(srb) +
 			       *offset, cnt);
 		*offset += cnt;
 
@@ -73,7 +73,7 @@ unsigned int rtsx_stor_access_xfer_buf(unsigned char *buffer,
 	 */
 	} else {
 		struct scatterlist *sg =
-				(struct scatterlist *) scsi_sglist(srb)
+				(struct scatterlist *)scsi_sglist(srb)
 				+ *index;
 
 		/* This loop handles a single s-g list entry, which may
