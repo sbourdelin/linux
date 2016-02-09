@@ -69,6 +69,8 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
 	__set_fixmap(idx, 0, FIXMAP_PAGE_CLEAR)
 #endif
 
+void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+
 /* Return a pointer with offset calculated */
 static inline unsigned long __set_fixmap_offset(enum fixed_addresses idx,
 						phys_addr_t phys,
