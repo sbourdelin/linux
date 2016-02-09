@@ -453,6 +453,8 @@ struct dwc3_event_buffer {
  * @flags: endpoint flags (wedged, stalled, ...)
  * @number: endpoint number (1 - 15)
  * @type: set to bmAttributes & USB_ENDPOINT_XFERTYPE_MASK
+ * @resource_assigned: indicates that a transfer resource is assigned
+ *	to this endpoint
  * @resource_index: Resource transfer index
  * @interval: the interval on which the ISOC transfer is started
  * @name: a human readable name e.g. ep1out-bulk
@@ -485,6 +487,7 @@ struct dwc3_ep {
 
 	u8			number;
 	u8			type;
+	unsigned		resource_assigned:1;
 	u8			resource_index;
 	u32			interval;
 

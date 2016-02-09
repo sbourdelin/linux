@@ -385,6 +385,30 @@ static void dwc3_free_trb_pool(struct dwc3_ep *dep)
 	dep->trb_pool_dma = 0;
 }
 
+static void dwc3_gadget_reset_xfer_resource_for_ep(struct dwc3 *dwc,
+						   int num,
+						   int direction)
+{
+	struct dwc3_ep *dep;
+	int idx;
+
+	idx = (num << 1) | direction;
+	dep = dwc->eps[idx];
+	dep->resource_assigned = 0;
+}
+
+static void dwc3_gadget_reset_xfer_resources(struct dwc3 *dwc, bool do_ep0)
+{
+	int i;
+	int first_ep = do_ep0 ? 0 : 1;
+
+	for (i = first_ep; i < dwc->num_out_eps; i++)
+		dwc3_gadget_reset_xfer_resource_for_ep(dwc, i, 0);
+
+	for (i = first_ep; i < dwc->num_in_eps; i++)
+		dwc3_gadget_reset_xfer_resource_for_ep(dwc, i, 1);
+}
+
 static int dwc3_gadget_start_config(struct dwc3 *dwc, struct dwc3_ep *dep)
 {
 	struct dwc3_gadget_ep_cmd_params params;
@@ -401,6 +425,8 @@ static int dwc3_gadget_start_config(struct dwc3 *dwc, struct dwc3_ep *dep)
 			dwc->start_config_issued = true;
 			cmd |= DWC3_DEPCMD_PARAM(2);
 		}
+
+		dwc3_gadget_reset_xfer_resources(dwc, !dep->number);
 
 		return dwc3_send_gadget_ep_cmd(dwc, 0, cmd, &params);
 	}
@@ -516,9 +542,13 @@ static int __dwc3_gadget_ep_enable(struct dwc3_ep *dep,
 		struct dwc3_trb	*trb_st_hw;
 		struct dwc3_trb	*trb_link;
 
-		ret = dwc3_gadget_set_xfer_resource(dwc, dep);
-		if (ret)
-			return ret;
+		if (!dep->resource_assigned) {
+			ret = dwc3_gadget_set_xfer_resource(dwc, dep);
+			if (ret)
+				return ret;
+
+			dep->resource_assigned = 1;
+		}
 
 		dep->endpoint.desc = desc;
 		dep->comp_desc = comp_desc;
