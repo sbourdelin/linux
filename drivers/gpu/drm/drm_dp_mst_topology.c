@@ -2446,7 +2446,8 @@ bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp
 		DRM_DEBUG_KMS("payload: vcpi %d already allocated for pbn %d - requested pbn %d\n", port->vcpi.vcpi, port->vcpi.pbn, pbn);
 		if (pbn == port->vcpi.pbn) {
 			*slots = port->vcpi.num_slots;
-			return true;
+			ret = 0;
+			goto out;
 		}
 	}
 
@@ -2458,10 +2459,10 @@ bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp
 	DRM_DEBUG_KMS("initing vcpi for %d %d\n", pbn, port->vcpi.num_slots);
 	*slots = port->vcpi.num_slots;
 
-	drm_dp_put_port(port);
-	return true;
+	ret = 0;
 out:
-	return false;
+	drm_dp_put_port(port);
+	return ret == 0;
 }
 EXPORT_SYMBOL(drm_dp_mst_allocate_vcpi);
 
