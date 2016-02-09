@@ -682,6 +682,8 @@ static void clk_core_disable(struct clk_core *core)
 	if (--core->enable_count > 0)
 		return;
 
+	core->flags &= ~CLK_BOOT_ON_FIRST_ENABLE;
+
 	trace_clk_disable(core);
 
 	if (core->ops->disable)
@@ -729,7 +731,8 @@ static int clk_core_enable(struct clk_core *core)
 	if (WARN_ON(core->prepare_count == 0))
 		return -ESHUTDOWN;
 
-	if (core->enable_count == 0) {
+	if (core->enable_count == 0 ||
+	    (core->flags & CLK_BOOT_ON_FIRST_ENABLE)) {
 		ret = clk_core_enable(core->parent);
 
 		if (ret)
@@ -748,6 +751,10 @@ static int clk_core_enable(struct clk_core *core)
 		}
 	}
 
+	if (core->flags & CLK_BOOT_ON_FIRST_ENABLE) {
+		core->flags &= ~CLK_BOOT_ON_FIRST_ENABLE;
+		return 0;
+	}
 	core->enable_count++;
 	return 0;
 }
@@ -2512,6 +2519,15 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	core->min_rate = 0;
 	core->max_rate = ULONG_MAX;
 	hw->core = core;
+
+	/* clocks can be enabled before being registered. This makes
+	 * their enable_count inherently incorrect. During register,
+	 * check to see if the clk is already enabled.
+	 */
+	if (clk_core_is_enabled(core)) {
+		core->enable_count++;
+		core->flags |= CLK_BOOT_ON_FIRST_ENABLE;
+	}
 
 	/* allocate local copy in case parent_names is __initdata */
 	core->parent_names = kcalloc(core->num_parents, sizeof(char *),
