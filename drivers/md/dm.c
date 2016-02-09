@@ -2731,6 +2731,8 @@ static int dm_init_request_based_blk_mq_queue(struct mapped_device *md,
 	int err;
 
 	md->tag_set = kzalloc(sizeof(struct blk_mq_tag_set), GFP_KERNEL);
+	if (!md->tag_set)
+		return -ENOMEM;
 	md->tag_set->ops = &dm_mq_ops;
 	md->tag_set->queue_depth = dm_get_blk_mq_queue_depth();
 	md->tag_set->numa_node = NUMA_NO_NODE;
