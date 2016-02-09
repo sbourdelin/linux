@@ -12,4 +12,14 @@ config TYPEC_UCSI
 	  registers and data structures used to interface with the USB Type-C
 	  connectors on a system.
 
+if TYPEC_UCSI
+
+config TYPEC_UCSI_ACPI
+	tristate "UCSI ACPI Driver"
+	depends on ACPI
+	help
+	  Driver for ACPI enumerated UCSI devices.
+
+endif
+
 endmenu
