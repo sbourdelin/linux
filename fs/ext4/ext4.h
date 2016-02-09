@@ -567,6 +567,7 @@ enum {
 #define EXT4_GET_BLOCKS_CONVERT_UNWRITTEN	0x0100
 	/* Write zeros to newly created written extents */
 #define EXT4_GET_BLOCKS_ZERO			0x0200
+#define EXT4_GET_BLOCKS_CACHE			0x0400
 #define EXT4_GET_BLOCKS_CREATE_ZERO		(EXT4_GET_BLOCKS_CREATE |\
 					EXT4_GET_BLOCKS_ZERO)
 

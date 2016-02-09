@@ -4328,7 +4328,13 @@ int ext4_ext_map_blocks(handle_t *handle, struct inode *inode,
 		 * we split out initialized portions during a write.
 		 */
 		ee_len = ext4_ext_get_actual_len(ex);
+		if (flags & EXT4_GET_BLOCKS_CACHE) {
+			unsigned int status = EXTENT_STATUS_WRITTEN;
 
+			if (ext4_ext_is_unwritten(ex))
+				status = EXTENT_STATUS_UNWRITTEN;
+			ext4_es_cache_extent(inode, ee_block, ee_len, ee_start, status);
+		}
 		trace_ext4_ext_show_extent(inode, ee_block, ee_start, ee_len);
 
 		/* if found extent covers block, simply return it */

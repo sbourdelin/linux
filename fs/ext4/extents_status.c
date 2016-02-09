@@ -811,7 +811,7 @@ int ext4_es_lookup_extent(struct inode *inode, ext4_lblk_t lblk,
 		else if (lblk > ext4_es_end(es1))
 			node = node->rb_right;
 		else {
-			found = 1;
+			found = 2;
 			break;
 		}
 	}
