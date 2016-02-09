@@ -647,6 +647,10 @@ extern const struct clk_ops clk_gpio_gate_ops;
 struct clk *clk_register_gpio_gate(struct device *dev, const char *name,
 		const char *parent_name, unsigned gpio, bool active_low,
 		unsigned long flags);
+struct clk_hw *clk_hw_register_gpio_gate(struct device *dev, const char *name,
+		const char *parent_name, unsigned gpio, bool active_low,
+		unsigned long flags);
+void clk_hw_unregister_gpio_gate(struct clk_hw *hw);
 
 void of_gpio_clk_gate_setup(struct device_node *node);
 
@@ -664,6 +668,10 @@ extern const struct clk_ops clk_gpio_mux_ops;
 struct clk *clk_register_gpio_mux(struct device *dev, const char *name,
 		const char * const *parent_names, u8 num_parents, unsigned gpio,
 		bool active_low, unsigned long flags);
+struct clk_hw *clk_hw_register_gpio_mux(struct device *dev, const char *name,
+		const char * const *parent_names, u8 num_parents, unsigned gpio,
+		bool active_low, unsigned long flags);
+void clk_hw_unregister_gpio_mux(struct clk_hw *hw);
 
 void of_gpio_mux_clk_setup(struct device_node *node);
 
