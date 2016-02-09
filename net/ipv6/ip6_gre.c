@@ -678,6 +678,7 @@ static netdev_tx_t ip6gre_xmit2(struct sk_buff *skb,
 				tunnel->err_time + IP6TUNNEL_ERR_TIMEO)) {
 			tunnel->err_count--;
 
+			memset(IPCB(skb), 0, sizeof(*IPCB(skb)));
 			dst_link_failure(skb);
 		} else
 			tunnel->err_count = 0;
