@@ -172,6 +172,23 @@ void pcibios_fixup_bus(struct pci_bus *b)
 
 void pcibios_add_bus(struct pci_bus *bus)
 {
+	const struct dmi_device *dmi;
+	struct dmi_dev_onboard *dslot;
+
+	dmi = NULL;
+	while ((dmi = dmi_find_device(DMI_DEV_TYPE_DEV_SLOT,
+				      NULL, dmi)) != NULL) {
+		dslot = dmi->device_data;
+		if (dslot->segment == pci_domain_nr(bus) &&
+		    dslot->bus == bus->number) {
+			dev_info(&bus->dev, "Found SMBIOS Slot %s\n",
+				 dslot->dev.name);
+			pci_create_slot(bus, dslot->devfn,
+					dslot->dev.name,
+					NULL);
+		}
+	}
+
 	acpi_pci_add_bus(bus);
 }
 
