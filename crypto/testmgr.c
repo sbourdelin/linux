@@ -2015,6 +2015,10 @@ static const struct alg_test_desc alg_test_descs[] = {
 			}
 		}
 	}, {
+		.alg = "authenc(digest_null,rfc3686(ctr(aes)))",
+		.test = alg_test_null,
+		.fips_allowed = 1,
+	}, {
 		.alg = "authenc(hmac(md5),ecb(cipher_null))",
 		.test = alg_test_aead,
 		.suite = {
@@ -2678,6 +2682,7 @@ static const struct alg_test_desc alg_test_descs[] = {
 	}, {
 		.alg = "digest_null",
 		.test = alg_test_null,
+		.fips_allowed = 1,
 	}, {
 		.alg = "drbg_nopr_ctr_aes128",
 		.test = alg_test_drbg,
