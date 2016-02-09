@@ -173,14 +173,14 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT)) {
 		dev_dbg(rtsx_dev(chip), "-- command was aborted\n");
 		srb->result = DID_ABORT << 16;
-		goto Handle_Errors;
+		goto handle_errors;
 	}
 
 	/* if there is a transport error, reset and don't auto-sense */
 	if (result == TRANSPORT_ERROR) {
 		dev_dbg(rtsx_dev(chip), "-- transport indicates error, resetting\n");
 		srb->result = DID_ERROR << 16;
-		goto Handle_Errors;
+		goto handle_errors;
 	}
 
 	srb->result = SAM_STAT_GOOD;
@@ -204,7 +204,7 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 	 * by issuing a port reset.  If that fails, try a class-specific
 	 * device reset.
 	 */
-Handle_Errors:
+handle_errors:
 	return;
 }
 
