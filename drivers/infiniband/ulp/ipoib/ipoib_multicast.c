@@ -456,7 +456,7 @@ out_locked:
 	return status;
 }
 
-static void ipoib_mcast_join(struct net_device *dev, struct ipoib_mcast *mcast)
+static int ipoib_mcast_join(struct net_device *dev, struct ipoib_mcast *mcast)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ib_sa_multicast *multicast;
@@ -465,6 +465,10 @@ static void ipoib_mcast_join(struct net_device *dev, struct ipoib_mcast *mcast)
 	};
 	ib_sa_comp_mask comp_mask;
 	int ret = 0;
+
+	if (!priv->broadcast ||
+	    !test_bit(IPOIB_FLAG_OPER_UP, &priv->flags))
+		return -EINVAL;
 
 	ipoib_dbg_mcast(priv, "joining MGID %pI6\n", mcast->mcmember.mgid.raw);
 
@@ -539,6 +543,7 @@ static void ipoib_mcast_join(struct net_device *dev, struct ipoib_mcast *mcast)
 		spin_unlock_irq(&priv->lock);
 		complete(&mcast->done);
 	}
+	return 0;
 }
 
 void ipoib_mcast_join_task(struct work_struct *work)
@@ -621,7 +626,8 @@ void ipoib_mcast_join_task(struct work_struct *work)
 				init_completion(&mcast->done);
 				set_bit(IPOIB_MCAST_FLAG_BUSY, &mcast->flags);
 				spin_unlock_irq(&priv->lock);
-				ipoib_mcast_join(dev, mcast);
+				if (!ipoib_mcast_join(dev, mcast))
+					return;
 				spin_lock_irq(&priv->lock);
 			} else if (!delay_until ||
 				 time_before(mcast->delay_until, delay_until))
