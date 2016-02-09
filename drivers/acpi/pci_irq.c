@@ -477,6 +477,14 @@ void acpi_pci_irq_disable(struct pci_dev *dev)
 	if (!pin || !pci_has_managed_irq(dev))
 		return;
 
+	/* Keep IOAPIC pin configuration when suspending */
+	if (dev->dev.power.is_prepared)
+		return;
+#ifdef CONFIG_PM
+	if (dev->dev.power.runtime_status == RPM_SUSPENDING)
+		return;
+#endif
+
 	entry = acpi_pci_irq_lookup(dev, pin);
 	if (!entry)
 		return;
