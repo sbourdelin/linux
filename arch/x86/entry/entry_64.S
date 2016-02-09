@@ -771,7 +771,7 @@ trace_apicinterrupt \num \sym
 .endm
 
 #ifdef CONFIG_SMP
-apicinterrupt3 IRQ_MOVE_CLEANUP_VECTOR		irq_move_cleanup_interrupt	smp_irq_move_cleanup_interrupt
+apicinterrupt IRQ_MOVE_CLEANUP_VECTOR		irq_move_cleanup_interrupt	smp_irq_move_cleanup_interrupt
 apicinterrupt3 REBOOT_VECTOR			reboot_interrupt		smp_reboot_interrupt
 #endif
 

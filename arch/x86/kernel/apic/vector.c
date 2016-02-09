@@ -20,6 +20,7 @@
 #include <asm/i8259.h>
 #include <asm/desc.h>
 #include <asm/irq_remapping.h>
+#include <asm/trace/irq_vectors.h>
 
 struct apic_chip_data {
 	struct irq_cfg		cfg;
@@ -532,11 +533,9 @@ void send_cleanup_vector(struct irq_cfg *cfg)
 		__send_cleanup_vector(data);
 }
 
-asmlinkage __visible void smp_irq_move_cleanup_interrupt(void)
+static void __smp_irq_move_cleanup_interrupt(void)
 {
 	unsigned vector, me;
-
-	entering_ack_irq();
 
 	me = smp_processor_id();
 	for (vector = FIRST_EXTERNAL_VECTOR; vector < NR_VECTORS; vector++) {
@@ -587,7 +586,21 @@ asmlinkage __visible void smp_irq_move_cleanup_interrupt(void)
 unlock:
 		raw_spin_unlock(&desc->lock);
 	}
+}
 
+asmlinkage __visible void smp_irq_move_cleanup_interrupt(void)
+{
+	entering_ack_irq();
+	__smp_irq_move_cleanup_interrupt();
+	exiting_irq();
+}
+
+asmlinkage __visible void smp_trace_irq_move_cleanup_interrupt(void)
+{
+	entering_ack_irq();
+	trace_irq_move_cleanup_entry(IRQ_MOVE_CLEANUP_VECTOR);
+	__smp_irq_move_cleanup_interrupt();
+	trace_irq_move_cleanup_exit(IRQ_MOVE_CLEANUP_VECTOR);
 	exiting_irq();
 }
 
