@@ -369,13 +369,20 @@ static struct generic_pm_domain imx6q_arm_domain = {
 	.name = "ARM",
 };
 
+static struct genpd_power_state imx6q_arm_domain_states[] = {
+	{
+		.power_off_latency_ns = 25000,
+		.power_on_latency_ns = 2000000,
+	},
+};
+
 static struct pu_domain imx6q_pu_domain = {
 	.base = {
 		.name = "PU",
 		.power_off = imx6q_pm_pu_power_off,
 		.power_on = imx6q_pm_pu_power_on,
-		.power_off_latency_ns = 25000,
-		.power_on_latency_ns = 2000000,
+		.states = imx6q_arm_domain_states,
+		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
 	},
 };
 
