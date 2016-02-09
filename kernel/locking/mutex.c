@@ -531,6 +531,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 	struct task_struct *task = current;
 	struct mutex_waiter waiter;
 	unsigned long flags;
+	bool  acquired = false;	/* True if the lock is acquired */
 	int ret;
 
 	preempt_disable();
@@ -561,7 +562,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 
 	lock_contended(&lock->dep_map, ip);
 
-	for (;;) {
+	while (!acquired) {
 		/*
 		 * Lets try to take the lock again - this is needed even if
 		 * we get here for the first time (shortly after failing to
@@ -596,6 +597,12 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 		/* didn't get the lock, go to sleep: */
 		spin_unlock_mutex(&lock->wait_lock, flags);
 		schedule_preempt_disabled();
+
+		/*
+		 * Optimistically spinning on the mutex without the wait lock
+		 */
+		acquired = mutex_optimistic_spin(lock, ww_ctx, use_ww_ctx,
+						 true);
 		spin_lock_mutex(&lock->wait_lock, flags);
 	}
 	__set_task_state(task, TASK_RUNNING);
@@ -605,6 +612,9 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 	if (likely(list_empty(&lock->wait_list)))
 		atomic_set(&lock->count, 0);
 	debug_mutex_free_waiter(&waiter);
+
+	if (acquired)
+		goto unlock;
 
 skip_wait:
 	/* got the lock - cleanup and rejoice! */
@@ -616,6 +626,7 @@ skip_wait:
 		ww_mutex_set_context_slowpath(ww, ww_ctx);
 	}
 
+unlock:
 	spin_unlock_mutex(&lock->wait_lock, flags);
 	preempt_enable();
 	return 0;
