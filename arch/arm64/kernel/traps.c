@@ -146,7 +146,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
 static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 {
 	struct stackframe frame;
-	unsigned long irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+	unsigned long irq_stack_ptr = IRQ_STACK_PTR(raw_smp_processor_id());
 	int skip;
 
 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
