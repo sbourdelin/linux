@@ -112,6 +112,12 @@ DEFINE_IRQ_VECTOR_EVENT(deferred_error_apic);
  */
 DEFINE_IRQ_VECTOR_EVENT(thermal_apic);
 
+/*
+ * irq_move_cleanup - called when entering/exiting an IRQ move cleanup
+ * vector handler.
+ */
+DEFINE_IRQ_VECTOR_EVENT(irq_move_cleanup);
+
 #undef TRACE_INCLUDE_PATH
 #define TRACE_INCLUDE_PATH .
 #define TRACE_INCLUDE_FILE irq_vectors
