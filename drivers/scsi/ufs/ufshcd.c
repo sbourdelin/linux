@@ -1476,7 +1476,7 @@ static int ufshcd_wait_for_dev_cmd(struct ufs_hba *hba,
 	if (!time_left) {
 		err = -ETIMEDOUT;
 		if (!ufshcd_clear_cmd(hba, lrbp->task_tag))
-			/* sucessfully cleared the command, retry if needed */
+			/* successfully cleared the command, retry if needed */
 			err = -EAGAIN;
 	}
 
@@ -2563,7 +2563,7 @@ out:
  * To bring UFS host controller to operational state,
  * 1. Enable required interrupts
  * 2. Configure interrupt aggregation
- * 3. Program UTRL and UTMRL base addres
+ * 3. Program UTRL and UTMRL base address
  * 4. Configure run-stop-registers
  *
  * Returns 0 on success, non-zero value on failure
