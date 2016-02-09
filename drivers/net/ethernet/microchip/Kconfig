@@ -5,7 +5,6 @@
 config NET_VENDOR_MICROCHIP
 	bool "Microchip devices"
 	default y
-	depends on SPI
 	---help---
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
@@ -28,6 +27,7 @@ config ENC28J60
 
 config ENC28J60_WRITEVERIFY
 	bool "Enable write verify"
+	depends on SPI
 	depends on ENC28J60
 	---help---
 	  Enable the verify after the buffer write useful for debugging purpose.
@@ -41,5 +41,26 @@ config ENCX24J600
 
       To compile this driver as a module, choose M here. The module will be
       called encx24j600.
+
+config MCHP9352
+	tristate "LAN9352 embedded ethernet support"
+	depends on HAS_IOMEM
+	select CRC32
+	select MII
+	select PHYLIB
+	---help---
+	  LAN9352 is a switch product but this driver only support
+	  it as a simple ethernet controller. i.e. No switch features
+	  are supported yet.
+
+	  May support LAN9250, LAN9311, and LAN9312, but these products
+	  were not tested.
+
+	  Say Y here if you want support for MICROCHIP LAN9352 as a simple
+	  ethernet controller.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called mchp9352.
+
 
 endif # NET_VENDOR_MICROCHIP
