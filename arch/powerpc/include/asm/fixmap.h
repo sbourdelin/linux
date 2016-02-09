@@ -52,11 +52,18 @@ enum fixed_addresses {
 	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,
 #endif
 #ifdef CONFIG_PPC_8xx
-	/* For IMMR we need an aligned 512K area */
 	FIX_IMMR_START,
+#ifdef CONFIG_PPC_4K_PAGES
+	/* For IMMR we need an aligned 4M area (full PGD entry) */
+	FIX_IMMR_TOP = (FIX_IMMR_START - 1 + ((4 * 1024 * 1024) / PAGE_SIZE)) &
+		       ~(((4 * 1024 * 1024) / PAGE_SIZE) - 1),
+	FIX_IMMR_BASE = FIX_IMMR_TOP - 1 + ((4 * 1024 * 1024) / PAGE_SIZE),
+#else
+	/* For IMMR we need an aligned 512K area */
 	FIX_IMMR_TOP = (FIX_IMMR_START - 1 + ((512 * 1024) / PAGE_SIZE)) &
 		       ~(((512 * 1024) / PAGE_SIZE) - 1),
 	FIX_IMMR_BASE = FIX_IMMR_TOP - 1 + ((512 * 1024) / PAGE_SIZE),
+#endif
 #endif
 	/* FIX_PCIE_MCFG, */
 	__end_of_fixed_addresses
