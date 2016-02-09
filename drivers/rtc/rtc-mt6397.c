@@ -404,6 +404,12 @@ static const struct of_device_id mt6397_rtc_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, mt6397_rtc_of_match);
 
+static const struct platform_device_id mt6397_rtc_id[] = {
+	{"mt6397-rtc", 0},
+	{ /* sentinel */ },
+};
+MODULE_DEVICE_TABLE(platform, mt6397_rtc_id);
+
 static struct platform_driver mtk_rtc_driver = {
 	.driver = {
 		.name = "mt6397-rtc",
@@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
 	},
 	.probe	= mtk_rtc_probe,
 	.remove = mtk_rtc_remove,
+	.id_table = mt6397_rtc_id,
 };
 
 module_platform_driver(mtk_rtc_driver);
@@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
 MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
-MODULE_ALIAS("platform:mt6397-rtc");
