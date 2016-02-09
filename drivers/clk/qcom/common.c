@@ -27,8 +27,7 @@
 
 struct qcom_cc {
 	struct qcom_reset_controller reset;
-	struct clk_onecell_data data;
-	struct clk *clks[];
+	struct clk_hw_onecell_data data;
 };
 
 const
@@ -102,8 +101,8 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
 	struct device_node *clocks_node;
 	struct clk_fixed_factor *factor;
 	struct clk_fixed_rate *fixed;
-	struct clk *clk;
 	struct clk_init_data init_data = { };
+	int ret;
 
 	clocks_node = of_find_node_by_path("/clocks");
 	if (clocks_node)
@@ -122,9 +121,9 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
 		init_data.flags = CLK_IS_ROOT;
 		init_data.ops = &clk_fixed_rate_ops;
 
-		clk = devm_clk_register(dev, &fixed->hw);
-		if (IS_ERR(clk))
-			return PTR_ERR(clk);
+		ret = devm_clk_hw_register(dev, &fixed->hw);
+		if (ret)
+			return ret;
 	}
 	of_node_put(node);
 
@@ -142,9 +141,9 @@ static int _qcom_cc_register_board_clk(struct device *dev, const char *path,
 		init_data.flags = 0;
 		init_data.ops = &clk_fixed_factor_ops;
 
-		clk = devm_clk_register(dev, &factor->hw);
-		if (IS_ERR(clk))
-			return PTR_ERR(clk);
+		ret = devm_clk_hw_register(dev, &factor->hw);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -180,36 +179,34 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 {
 	int i, ret;
 	struct device *dev = &pdev->dev;
-	struct clk *clk;
-	struct clk_onecell_data *data;
-	struct clk **clks;
+	struct clk_hw_onecell_data *data;
+	struct clk_hw **hws;
 	struct qcom_reset_controller *reset;
 	struct qcom_cc *cc;
 	size_t num_clks = desc->num_clks;
 	struct clk_regmap **rclks = desc->clks;
 
-	cc = devm_kzalloc(dev, sizeof(*cc) + sizeof(*clks) * num_clks,
+	cc = devm_kzalloc(dev, sizeof(*cc) + sizeof(*hws) * num_clks,
 			  GFP_KERNEL);
 	if (!cc)
 		return -ENOMEM;
 
-	clks = cc->clks;
 	data = &cc->data;
-	data->clks = clks;
-	data->clk_num = num_clks;
+	data->num = num_clks;
+	hws = data->hws;
 
 	for (i = 0; i < num_clks; i++) {
 		if (!rclks[i]) {
-			clks[i] = ERR_PTR(-ENOENT);
+			hws[i] = ERR_PTR(-ENOENT);
 			continue;
 		}
-		clk = devm_clk_register_regmap(dev, rclks[i]);
-		if (IS_ERR(clk))
-			return PTR_ERR(clk);
-		clks[i] = clk;
+		ret = devm_clk_register_regmap(dev, rclks[i]);
+		if (ret)
+			return ret;
+		hws[i] = &rclks[i]->hw;
 	}
 
-	ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get, data);
+	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get, data);
 	if (ret)
 		return ret;
 
