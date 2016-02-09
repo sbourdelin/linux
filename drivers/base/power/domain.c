@@ -1230,12 +1230,6 @@ static int genpd_alloc_default_state(struct generic_pm_domain *genpd)
 		goto err;
 	}
 
-	genpd->states[0].power_on_latency_ns =
-				genpd->power_on_latency_ns;
-
-	genpd->states[0].power_off_latency_ns =
-				genpd->power_off_latency_ns;
-
 	genpd->state_count = 1;
 	genpd->state_idx = 0;
 
