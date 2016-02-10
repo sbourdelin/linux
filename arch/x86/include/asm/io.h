@@ -36,6 +36,7 @@
 
 #define ARCH_HAS_IOREMAP_WC
 #define ARCH_HAS_IOREMAP_WT
+#define ARCH_HAS_VALID_PHYS_ADDR_RANGE
 
 #include <linux/string.h>
 #include <linux/compiler.h>
@@ -326,6 +327,8 @@ extern void __iomem *ioremap_wc(resource_size_t offset, unsigned long size);
 extern void __iomem *ioremap_wt(resource_size_t offset, unsigned long size);
 
 extern bool is_early_ioremap_ptep(pte_t *ptep);
+extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
+extern int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
 
 #ifdef CONFIG_XEN
 #include <xen/xen.h>

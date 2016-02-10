@@ -624,6 +624,30 @@ void __init init_mem_mapping(void)
 	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
 }
 
+/**
+ * valid_phys_addr_range - check phys addr for /dev/mem read and write
+ *
+ * Return true if a target physical address is marked as IORESOURCE_MEM.
+ */
+int valid_phys_addr_range(phys_addr_t addr, size_t size)
+{
+	return (region_intersects(addr, size, IORESOURCE_MEM,
+				  IORES_DESC_NONE) == REGION_INTERSECTS);
+}
+
+/**
+ * valid_mmap_phys_addr_range - check phys addr for /dev/mem mmap
+ *
+ * Return true if a target physical address is marked as IORESOURCE_MEM.
+ */
+int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
+{
+	resource_size_t addr = pfn << PAGE_SHIFT;
+
+	return (region_intersects(addr, size, IORESOURCE_MEM,
+				  IORES_DESC_NONE) == REGION_INTERSECTS);
+}
+
 /*
  * devmem_is_allowed() checks to see if /dev/mem access to a certain address
  * is valid. The argument is a physical page number.
