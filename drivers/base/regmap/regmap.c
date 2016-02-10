@@ -1692,7 +1692,7 @@ int regmap_raw_write(struct regmap *map, unsigned int reg,
 EXPORT_SYMBOL_GPL(regmap_raw_write);
 
 /**
- * regmap_field_write(): Write a value to a single register field
+ * _regmap_field_write(): Write a value to a single register field
  *
  * @field: Register field to write to
  * @val: Value to be written
@@ -1700,12 +1700,14 @@ EXPORT_SYMBOL_GPL(regmap_raw_write);
  * A value of zero will be returned on success, a negative errno will
  * be returned in error cases.
  */
-int regmap_field_write(struct regmap_field *field, unsigned int val)
+int _regmap_field_write(struct regmap_field *field, unsigned int val,
+			bool *change, bool async, bool force)
 {
-	return regmap_update_bits(field->regmap, field->reg,
-				field->mask, val << field->shift);
+	return regmap_raw_update_bits(field->regmap, field->reg,
+				      field->mask, val << field->shift,
+				      change, async, force);
 }
-EXPORT_SYMBOL_GPL(regmap_field_write);
+EXPORT_SYMBOL_GPL(_regmap_field_write);
 
 /**
  * regmap_field_update_bits():	Perform a read/modify/write cycle
@@ -1718,14 +1720,17 @@ EXPORT_SYMBOL_GPL(regmap_field_write);
  * A value of zero will be returned on success, a negative errno will
  * be returned in error cases.
  */
-int regmap_field_update_bits(struct regmap_field *field, unsigned int mask, unsigned int val)
+int _regmap_field_update_bits(struct regmap_field *field,
+			      unsigned int mask, unsigned int val,
+			      bool *change, bool async, bool force)
 {
 	mask = (mask << field->shift) & field->mask;
 
-	return regmap_update_bits(field->regmap, field->reg,
-				  mask, val << field->shift);
+	return regmap_raw_update_bits(field->regmap, field->reg,
+				      mask, val << field->shift,
+				      change, async, force);
 }
-EXPORT_SYMBOL_GPL(regmap_field_update_bits);
+EXPORT_SYMBOL_GPL(_regmap_field_update_bits);
 
 /**
  * regmap_fields_write(): Write a value to a single register field with port ID
