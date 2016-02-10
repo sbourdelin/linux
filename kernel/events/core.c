@@ -5103,9 +5103,10 @@ static void __perf_event_header__init_id(struct perf_event_header *header,
 		data->tid_entry.tid = perf_event_tid(event, current);
 	}
 
-	if (sample_type & PERF_SAMPLE_TIME)
-		data->time = perf_event_clock(event);
-
+	if (sample_type & PERF_SAMPLE_TIME) {
+		if (data->time == 0)
+			data->time = perf_event_clock(event);
+	}
 	if (sample_type & (PERF_SAMPLE_ID | PERF_SAMPLE_IDENTIFIER))
 		data->id = primary_event_id(event);
 
@@ -5557,7 +5558,9 @@ perf_event_read_event(struct perf_event *event,
 			struct task_struct *task)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	struct perf_read_event read_event = {
 		.header = {
 			.type = PERF_RECORD_READ,
@@ -5681,7 +5684,9 @@ static void perf_event_task_output(struct perf_event *event,
 {
 	struct perf_task_event *task_event = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data	sample;
+	struct perf_sample_data	sample = {
+		.time = 0,
+	};
 	struct task_struct *task = task_event->task;
 	int ret, size = task_event->event_id.header.size;
 
@@ -5777,7 +5782,9 @@ static void perf_event_comm_output(struct perf_event *event,
 {
 	struct perf_comm_event *comm_event = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	int size = comm_event->event_id.header.size;
 	int ret;
 
@@ -5890,7 +5897,9 @@ static void perf_event_mmap_output(struct perf_event *event,
 {
 	struct perf_mmap_event *mmap_event = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	int size = mmap_event->event_id.header.size;
 	int ret;
 
@@ -6095,7 +6104,9 @@ void perf_event_aux_event(struct perf_event *event, unsigned long head,
 			  unsigned long size, u64 flags)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	struct perf_aux_event {
 		struct perf_event_header	header;
 		u64				offset;
@@ -6131,7 +6142,9 @@ void perf_event_aux_event(struct perf_event *event, unsigned long head,
 void perf_log_lost_samples(struct perf_event *event, u64 lost)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	int ret;
 
 	struct {
@@ -6182,7 +6195,9 @@ static void perf_event_switch_output(struct perf_event *event, void *data)
 {
 	struct perf_switch_event *se = data;
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	int ret;
 
 	if (!perf_event_switch_match(event))
@@ -6250,7 +6265,9 @@ static void perf_event_switch(struct task_struct *task,
 static void perf_log_throttle(struct perf_event *event, int enable)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	int ret;
 
 	struct {
@@ -6287,7 +6304,9 @@ static void perf_log_throttle(struct perf_event *event, int enable)
 static void perf_log_itrace_start(struct perf_event *event)
 {
 	struct perf_output_handle handle;
-	struct perf_sample_data sample;
+	struct perf_sample_data sample = {
+		.time = 0,
+	};
 	struct perf_aux_event {
 		struct perf_event_header        header;
 		u32				pid;
@@ -6458,6 +6477,7 @@ static void perf_swevent_overflow(struct perf_event *event, u64 overflow,
 		return;
 
 	for (; overflow; overflow--) {
+		data->time = 0;
 		if (__perf_event_overflow(event, throttle,
 					    data, regs)) {
 			/*
@@ -6598,6 +6618,7 @@ static void do_perf_sw_event(enum perf_type_id type, u32 event_id,
 		goto end;
 
 	hlist_for_each_entry_rcu(event, head, hlist_entry) {
+		data->time = 0;
 		if (perf_swevent_match(event, type, event_id, data, regs))
 			perf_swevent_event(event, nr, data, regs);
 	}
