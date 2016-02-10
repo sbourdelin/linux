@@ -17,33 +17,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __USBIP_H
-#define __USBIP_H
+#ifndef __USBIPD_H
+#define __USBIPD_H
+
+#include "usbip_common.h"
 
 #ifdef HAVE_CONFIG_H
 #include "../config.h"
 #endif
 
-/* usbip commands */
-int usbip_attach(int argc, char *argv[]);
-int usbip_detach(int argc, char *argv[]);
-int usbip_list(int argc, char *argv[]);
-int usbip_bind(int argc, char *argv[]);
-int usbip_unbind(int argc, char *argv[]);
-int usbip_port_show(int argc, char *argv[]);
-int usbip_connect(int argc, char *argv[]);
-int usbip_disconnect(int argc, char *argv[]);
+extern char *usbip_progname;
+extern char *usbip_default_pid_file;
 
-int usbip_bind_device(char *busid);
-int usbip_unbind_device(char *busid);
+int usbip_recv_pdu(int connfd, char *host, char *port);
+int usbip_driver_open(void);
+void usbip_driver_close(void);
 
-void usbip_attach_usage(void);
-void usbip_detach_usage(void);
-void usbip_list_usage(void);
-void usbip_bind_usage(void);
-void usbip_unbind_usage(void);
-void usbip_port_usage(void);
-void usbip_connect_usage(void);
-void usbip_disconnect_usage(void);
-
-#endif /* __USBIP_H */
+#endif /* __USBIPD_H */

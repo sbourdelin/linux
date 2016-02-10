@@ -24,81 +24,48 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <fcntl.h>
 #include <getopt.h>
 #include <unistd.h>
-#include <errno.h>
 
-#include "vhci_driver.h"
+#include "usbip_host_driver.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip.h"
 
-static const char usbip_attach_usage_string[] =
-	"usbip attach <args>\n"
-	"    -r, --remote=<host>      The machine with exported USB devices\n"
-	"    -b, --busid=<busid>    Busid of the device on <host>\n";
+static const char usbip_disconnect_usage_string[] =
+	"usbip disconnect <args>\n"
+	"    -r, --remote=<host>    Address of a remote computer\n"
+	"    -b, --busid=<busid>    Bus ID of a device to be disconnected\n";
 
-void usbip_attach_usage(void)
+void usbip_disconnect_usage(void)
 {
-	printf("usage: %s", usbip_attach_usage_string);
+	printf("usage: %s", usbip_disconnect_usage_string);
 }
 
-static int import_device(int sockfd, struct usbip_usb_device *udev)
+static int send_unexport_device(int sockfd, struct usbip_usb_device *udev)
 {
 	int rc;
-	int port;
-
-	rc = usbip_vhci_driver_open();
-	if (rc < 0) {
-		err("open vhci_driver");
-		return -1;
-	}
-
-	port = usbip_vhci_get_free_port();
-	if (port < 0) {
-		err("no free port");
-		usbip_vhci_driver_close();
-		return -1;
-	}
-
-	rc = usbip_vhci_attach_device(port, sockfd, udev->busnum,
-				      udev->devnum, udev->speed);
-	if (rc < 0) {
-		err("import device");
-		usbip_vhci_driver_close();
-		return -1;
-	}
-
-	usbip_vhci_driver_close();
-
-	return port;
-}
-
-static int query_import_device(int sockfd, char *busid)
-{
-	int rc;
-	struct op_import_request request;
-	struct op_import_reply   reply;
-	uint16_t code = OP_REP_IMPORT;
+	struct op_unexport_request request;
+	struct op_unexport_reply   reply;
+	uint16_t code = OP_REP_UNEXPORT;
 
 	memset(&request, 0, sizeof(request));
 	memset(&reply, 0, sizeof(reply));
 
 	/* send a request */
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
+	rc = usbip_net_send_op_common(sockfd, OP_REQ_UNEXPORT, 0);
 	if (rc < 0) {
 		err("send op_common");
 		return -1;
 	}
 
-	strncpy(request.busid, busid, SYSFS_BUS_ID_SIZE-1);
+	memcpy(&request.udev, udev, sizeof(struct usbip_usb_device));
 
-	PACK_OP_IMPORT_REQUEST(0, &request);
+	PACK_OP_UNEXPORT_REQUEST(0, &request);
 
 	rc = usbip_net_send(sockfd, (void *) &request, sizeof(request));
 	if (rc < 0) {
-		err("send op_import_request");
+		err("send op_export_request");
 		return -1;
 	}
 
@@ -111,27 +78,62 @@ static int query_import_device(int sockfd, char *busid)
 
 	rc = usbip_net_recv(sockfd, (void *) &reply, sizeof(reply));
 	if (rc < 0) {
-		err("recv op_import_reply");
+		err("recv op_unexport_reply");
 		return -1;
 	}
 
-	PACK_OP_IMPORT_REPLY(0, &reply);
+	PACK_OP_EXPORT_REPLY(0, &reply);
 
 	/* check the reply */
-	if (strncmp(reply.udev.busid, busid, SYSFS_BUS_ID_SIZE)) {
-		err("recv different busid %s", reply.udev.busid);
+	if (reply.returncode) {
+		err("recv error return %d", reply.returncode);
 		return -1;
 	}
 
-	/* import a device */
-	return import_device(sockfd, &reply.udev);
+	return 0;
 }
 
-static int attach_device(char *host, char *busid)
+static int unexport_device(char *busid, int sockfd)
+{
+	int rc;
+	struct usbip_exported_device *edev;
+
+	rc = usbip_host_driver_open();
+	if (rc < 0) {
+		err("open host_driver");
+		return -1;
+	}
+
+	rc = usbip_host_refresh_device_list();
+	if (rc < 0) {
+		err("could not refresh device list");
+		usbip_host_driver_close();
+		return -1;
+	}
+
+	edev = usbip_host_find_device(busid);
+	if (edev == NULL) {
+		err("find device");
+		usbip_host_driver_close();
+		return -1;
+	}
+
+	rc = send_unexport_device(sockfd, &edev->udev);
+	if (rc < 0) {
+		err("send unexport");
+		usbip_host_driver_close();
+		return -1;
+	}
+
+	usbip_host_driver_close();
+
+	return 0;
+}
+
+static int disconnect_device(char *host, char *busid)
 {
 	int sockfd;
 	int rc;
-	int rhport;
 
 	sockfd = usbip_net_tcp_connect(host, usbip_port_string);
 	if (sockfd < 0) {
@@ -139,25 +141,25 @@ static int attach_device(char *host, char *busid)
 		return -1;
 	}
 
-	rhport = query_import_device(sockfd, busid);
-	if (rhport < 0) {
-		err("query");
+	rc = unexport_device(busid, sockfd);
+	if (rc < 0) {
+		err("unexport");
 		close(sockfd);
 		return -1;
 	}
 
 	close(sockfd);
 
-	rc = usbip_vhci_create_record(host, usbip_port_string, busid, rhport);
-	if (rc < 0) {
-		err("record connection");
+	rc = usbip_unbind_device(busid);
+	if (rc) {
+		err("unbind");
 		return -1;
 	}
 
 	return 0;
 }
 
-int usbip_attach(int argc, char *argv[])
+int usbip_disconnect(int argc, char *argv[])
 {
 	static const struct option opts[] = {
 		{ "remote", required_argument, NULL, 'r' },
@@ -190,11 +192,11 @@ int usbip_attach(int argc, char *argv[])
 	if (!host || !busid)
 		goto err_out;
 
-	ret = attach_device(host, busid);
+	ret = disconnect_device(host, busid);
 	goto out;
 
 err_out:
-	usbip_attach_usage();
+	usbip_disconnect_usage();
 out:
 	return ret;
 }

@@ -2,7 +2,8 @@
  * command structure borrowed from udev
  * (git://git.kernel.org/pub/scm/linux/hotplug/udev.git)
  *
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2015 Nobuo Iwata
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  *
  * This program is free software: you can redistribute it and/or modify
@@ -76,6 +77,18 @@ static const struct command cmds[] = {
 		.usage = usbip_detach_usage
 	},
 	{
+		.name  = "connect",
+		.fn    = usbip_connect,
+		.help  = "Connect a USB device to a remote computer",
+		.usage = usbip_connect_usage
+	},
+	{
+		.name  = "disconnect",
+		.fn    = usbip_disconnect,
+		.help  = "Disconnect a USB device from a remote computer",
+		.usage = usbip_disconnect_usage
+	},
+	{
 		.name  = "list",
 		.fn    = usbip_list,
 		.help  = "List exportable or local USB devices",
@@ -97,7 +110,7 @@ static const struct command cmds[] = {
 		.name  = "port",
 		.fn    = usbip_port_show,
 		.help  = "Show imported USB devices",
-		.usage = NULL
+		.usage = usbip_port_usage
 	},
 	{ NULL, NULL, NULL, NULL }
 };
