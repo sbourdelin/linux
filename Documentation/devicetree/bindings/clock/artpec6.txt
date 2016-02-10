@@ -1,0 +1,14 @@
+* Clock bindings for Axis ARTPEC-6 chip
+
+Required properties:
+- compatible: Should be "axis,artpec6-pll1-clock"
+- #clock-cells: Should be <1>
+
+Examples:
+
+pll1_clk: pll1_clk {
+	#clock-cells = <1>;
+	compatible = "axis,artpec6-pll1-clock";
+	clocks = <&ext_clk>;
+	status = "okay";
+};
