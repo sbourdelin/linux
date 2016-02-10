@@ -494,6 +494,32 @@ unlock:
 EXPORT_SYMBOL_GPL(pwm_set_polarity);
 
 /**
+ * pwm_capture() - capture and report a PWM signal
+ * @pwm: PWM device
+ * @channel: PWM capture channel to use
+ * @buf: buffer to place output message into
+ *
+ * Returns: 0 on success or a negative error code on failure.
+ */
+int pwm_capture(struct pwm_device *pwm, int channel, char *buf)
+{
+	int err;
+
+	if (!pwm || !pwm->chip->ops)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->capture)
+		return -ENOSYS;
+
+	mutex_lock(&pwm->lock);
+	err = pwm->chip->ops->capture(pwm->chip, pwm, channel, buf);
+	mutex_unlock(&pwm->lock);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(pwm_capture);
+
+/**
  * pwm_enable() - start a PWM output toggling
  * @pwm: PWM device
  *
