@@ -79,6 +79,11 @@ struct reg_sequence {
 #define regmap_field_update_bits(field, mask, val)\
 	_regmap_field_update_bits(field, mask, val, NULL, false, false)
 
+#define regmap_fields_write(field, id, val)\
+	_regmap_fields_write(field, id, val, NULL, false, false)
+#define regmap_fields_update_bits(field, id, mask, val)\
+	_regmap_fields_update_bits(field,  id, mask, val, NULL, false, false)
+
 #ifdef CONFIG_REGMAP
 
 enum regmap_endian {
@@ -782,14 +787,16 @@ int _regmap_field_write(struct regmap_field *field, unsigned int val,
 int _regmap_field_update_bits(struct regmap_field *field,
 			      unsigned int mask, unsigned int val,
 			      bool *change, bool async, bool force);
-int regmap_fields_write(struct regmap_field *field, unsigned int id,
-			unsigned int val);
+int _regmap_fields_write(struct regmap_field *field,
+			 unsigned int id, unsigned int val,
+			 bool *change, bool async, bool force);
 int regmap_fields_force_write(struct regmap_field *field, unsigned int id,
 			unsigned int val);
 int regmap_fields_read(struct regmap_field *field, unsigned int id,
 		       unsigned int *val);
-int regmap_fields_update_bits(struct regmap_field *field,  unsigned int id,
-			      unsigned int mask, unsigned int val);
+int _regmap_fields_update_bits(struct regmap_field *field,  unsigned int id,
+			       unsigned int mask, unsigned int val,
+			       bool *change, bool async, bool force);
 
 /**
  * Description of an IRQ for the generic regmap irq_chip.
