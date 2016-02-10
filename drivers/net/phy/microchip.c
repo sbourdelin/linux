@@ -106,6 +106,14 @@ static int lan88xx_set_wol(struct phy_device *phydev,
 	return 0;
 }
 
+static int lan88xx_config_init(struct phy_device *phydev)
+{
+	phydev->supported &= phydev->drv->features;
+	phydev->advertising &= phydev->drv->features;
+
+	return 0;
+}
+
 static struct phy_driver microchip_phy_driver[] = {
 {
 	.phy_id		= 0x0007c130,
@@ -119,7 +127,7 @@ static struct phy_driver microchip_phy_driver[] = {
 	.probe		= lan88xx_probe,
 	.remove		= lan88xx_remove,
 
-	.config_init	= genphy_config_init,
+	.config_init	= lan88xx_config_init,
 	.config_aneg	= genphy_config_aneg,
 	.read_status	= genphy_read_status,
 
