@@ -79,9 +79,6 @@ static void dlpar_free_drconf_property(struct property *prop)
 static struct property *dlpar_clone_drconf_property(struct device_node *dn)
 {
 	struct property *prop, *new_prop;
-	struct of_drconf_cell *lmbs;
-	u32 num_lmbs, *p;
-	int i;
 
 	prop = of_find_property(dn, "ibm,dynamic-memory", NULL);
 	if (!prop)
@@ -99,46 +96,7 @@ static struct property *dlpar_clone_drconf_property(struct device_node *dn)
 	}
 
 	new_prop->length = prop->length;
-
-	/* Convert the property to cpu endian-ness */
-	p = new_prop->value;
-	*p = be32_to_cpu(*p);
-
-	num_lmbs = *p++;
-	lmbs = (struct of_drconf_cell *)p;
-
-	for (i = 0; i < num_lmbs; i++) {
-		lmbs[i].base_addr = be64_to_cpu(lmbs[i].base_addr);
-		lmbs[i].drc_index = be32_to_cpu(lmbs[i].drc_index);
-		lmbs[i].flags = be32_to_cpu(lmbs[i].flags);
-	}
-
 	return new_prop;
-}
-
-static void dlpar_update_drconf_property(struct device_node *dn,
-					 struct property *prop)
-{
-	struct of_drconf_cell *lmbs;
-	u32 num_lmbs, *p;
-	int i;
-
-	/* Convert the property back to BE */
-	p = prop->value;
-	num_lmbs = *p;
-	*p = cpu_to_be32(*p);
-	p++;
-
-	lmbs = (struct of_drconf_cell *)p;
-	for (i = 0; i < num_lmbs; i++) {
-		lmbs[i].base_addr = cpu_to_be64(lmbs[i].base_addr);
-		lmbs[i].drc_index = cpu_to_be32(lmbs[i].drc_index);
-		lmbs[i].flags = cpu_to_be32(lmbs[i].flags);
-	}
-
-	rtas_hp_event = true;
-	of_update_property(dn, prop);
-	rtas_hp_event = false;
 }
 
 static int dlpar_update_device_tree_lmb(struct of_drconf_cell *lmb)
@@ -160,18 +118,23 @@ static int dlpar_update_device_tree_lmb(struct of_drconf_cell *lmb)
 	}
 
 	p = prop->value;
-	num_lmbs = *p++;
+	num_lmbs = be32_to_cpu(*p);
+	p++;
 	lmbs = (struct of_drconf_cell *)p;
 
 	for (i = 0; i < num_lmbs; i++) {
-		if (lmbs[i].drc_index == lmb->drc_index) {
-			lmbs[i].flags = lmb->flags;
-			lmbs[i].aa_index = lmb->aa_index;
+		u32 this_drc_index = be32_to_cpu(lmbs[i].drc_index);
 
-			dlpar_update_drconf_property(dn, prop);
+		if (this_drc_index == lmb->drc_index) {
+			lmbs[i].flags = cpu_to_be32(lmb->flags);
+			lmbs[i].aa_index = cpu_to_be32(lmb->aa_index);
 			break;
 		}
 	}
+
+	rtas_hp_event = true;
+	of_update_property(dn, prop);
+	rtas_hp_event = false;
 
 	of_node_put(dn);
 	return 0;
@@ -701,6 +664,26 @@ static int dlpar_memory_add_by_index(u32 drc_index, struct property *prop)
 	return rc;
 }
 
+static void drconf_property_to_cpu(struct property *prop)
+{
+	struct of_drconf_cell *lmbs;
+	int i, num_lmbs;
+	u32 *p;
+
+	/* Convert the property to cpu endian-ness */
+	p = prop->value;
+	*p = be32_to_cpu(*p);
+
+	num_lmbs = *p++;
+	lmbs = (struct of_drconf_cell *)p;
+
+	for (i = 0; i < num_lmbs; i++) {
+		lmbs[i].base_addr = be64_to_cpu(lmbs[i].base_addr);
+		lmbs[i].drc_index = be32_to_cpu(lmbs[i].drc_index);
+		lmbs[i].flags = be32_to_cpu(lmbs[i].flags);
+	}
+}
+
 int dlpar_memory(struct pseries_hp_errorlog *hp_elog)
 {
 	struct device_node *dn;
@@ -724,6 +707,8 @@ int dlpar_memory(struct pseries_hp_errorlog *hp_elog)
 		rc = -EINVAL;
 		goto dlpar_memory_out;
 	}
+
+	drconf_property_to_cpu(prop);
 
 	switch (hp_elog->action) {
 	case PSERIES_HP_ELOG_ACTION_ADD:
