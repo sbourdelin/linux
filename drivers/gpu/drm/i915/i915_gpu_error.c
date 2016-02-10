@@ -247,6 +247,7 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 				  int ring_idx)
 {
 	struct drm_i915_error_ring *ring = &error->ring[ring_idx];
+	int i;
 
 	if (!ring->valid)
 		return;
@@ -288,7 +289,6 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 		err_printf(m, "  GFX_MODE: 0x%08x\n", ring->vm_info.gfx_mode);
 
 		if (INTEL_INFO(dev)->gen >= 8) {
-			int i;
 			for (i = 0; i < 4; i++)
 				err_printf(m, "  PDP%d: 0x%016llx\n",
 					   i, ring->vm_info.pdp[i]);
@@ -304,6 +304,19 @@ static void i915_ring_error_state(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  hangcheck: %s [%d]\n",
 		   hangcheck_action_to_str(ring->hangcheck_action),
 		   ring->hangcheck_score);
+
+	if (i915.enable_execlists) {
+		err_printf(m, "  EXECLIST_STATUS: 0x%08x\n", ring->execlist_status);
+		err_printf(m, "  EXECLIST_CTX_ID: 0x%08x\n", ring->execlist_ctx_id);
+		err_printf(m, "  EXECLIST_CSBPTR: 0x%08x\n", ring->execlist_csb_raw_pointer);
+		err_printf(m, "  EXECLIST_CSB_WR: 0x%08x\n", ring->execlist_csb_write_pointer);
+		err_printf(m, "  EXECLIST_CSB_RD: 0x%08x\n", ring->execlist_csb_read_pointer);
+
+		for (i = 0; i < 6; i++) {
+			err_printf(m, "  EXECLIST_CSB[%d]: 0x%08x\n", i, ring->execlist_csb[i]);
+			err_printf(m, "  EXECLIST_CTX[%d]: 0x%08x\n", i, ring->execlist_ctx[i]);
+		}
+	}
 }
 
 void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
@@ -965,8 +978,27 @@ static void i915_record_ring_state(struct drm_device *dev,
 					I915_READ(GEN8_RING_PDP_LDW(ring, i));
 			}
 	}
-}
 
+	if (i915.enable_execlists) {
+		int i;
+		u32 status_pointer = I915_READ(RING_CONTEXT_STATUS_PTR(ring));
+		u8 write_pointer = GEN8_CSB_WRITE_PTR(status_pointer);
+		u8 read_pointer = ring->next_context_status_buffer;
+		if (read_pointer > write_pointer)
+			write_pointer += GEN8_CSB_ENTRIES;
+
+		ering->execlist_status = I915_READ(RING_EXECLIST_STATUS_LO(ring));
+		ering->execlist_ctx_id = I915_READ(RING_EXECLIST_STATUS_HI(ring));
+		ering->execlist_csb_raw_pointer = status_pointer;
+		ering->execlist_csb_write_pointer = write_pointer;
+		ering->execlist_csb_read_pointer = read_pointer;
+
+		for (i = 0; i < GEN8_CSB_ENTRIES; i++) {
+			ering->execlist_csb[i] = I915_READ(RING_CONTEXT_STATUS_BUF_LO(ring, i));
+			ering->execlist_ctx[i] = I915_READ(RING_CONTEXT_STATUS_BUF_HI(ring, i));
+		}
+	}
+}
 
 static void i915_gem_record_active_context(struct intel_engine_cs *ring,
 					   struct drm_i915_error_state *error,
