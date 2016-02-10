@@ -2653,27 +2653,42 @@ static int _regmap_update_bits(struct regmap *map, unsigned int reg,
 }
 
 /**
- * regmap_update_bits: Perform a read/modify/write cycle on the register map
+ * regmap_raw_update_bits: Perform a read/modify/write cycle on the register map
  *
  * @map: Register map to update
  * @reg: Register to update
  * @mask: Bitmask to change
  * @val: New value for bitmask
+ * @change: Boolean indicating if a write was done
+ * @async: Boolean indicating asynchronously
+ * @force: Boolean indicating use force update
+ *
+ * if async was true,
+ * With most buses the read must be done synchronously so this is most
+ * useful for devices with a cache which do not need to interact with
+ * the hardware to determine the current register value.
  *
  * Returns zero for success, a negative number on error.
  */
-int regmap_update_bits(struct regmap *map, unsigned int reg,
-		       unsigned int mask, unsigned int val)
+int regmap_raw_update_bits(struct regmap *map, unsigned int reg,
+			   unsigned int mask, unsigned int val,
+			   bool *change, bool async, bool force)
 {
 	int ret;
 
 	map->lock(map->lock_arg);
-	ret = _regmap_update_bits(map, reg, mask, val, NULL, false);
+
+	map->async = async ? true : false;
+
+	ret = _regmap_update_bits(map, reg, mask, val, change, force);
+
+	map->async = false;
+
 	map->unlock(map->lock_arg);
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(regmap_update_bits);
+EXPORT_SYMBOL_GPL(regmap_raw_update_bits);
 
 /**
  * regmap_write_bits: Perform a read/modify/write cycle on the register map
@@ -2697,102 +2712,6 @@ int regmap_write_bits(struct regmap *map, unsigned int reg,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(regmap_write_bits);
-
-/**
- * regmap_update_bits_async: Perform a read/modify/write cycle on the register
- *                           map asynchronously
- *
- * @map: Register map to update
- * @reg: Register to update
- * @mask: Bitmask to change
- * @val: New value for bitmask
- *
- * With most buses the read must be done synchronously so this is most
- * useful for devices with a cache which do not need to interact with
- * the hardware to determine the current register value.
- *
- * Returns zero for success, a negative number on error.
- */
-int regmap_update_bits_async(struct regmap *map, unsigned int reg,
-			     unsigned int mask, unsigned int val)
-{
-	int ret;
-
-	map->lock(map->lock_arg);
-
-	map->async = true;
-
-	ret = _regmap_update_bits(map, reg, mask, val, NULL, false);
-
-	map->async = false;
-
-	map->unlock(map->lock_arg);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(regmap_update_bits_async);
-
-/**
- * regmap_update_bits_check: Perform a read/modify/write cycle on the
- *                           register map and report if updated
- *
- * @map: Register map to update
- * @reg: Register to update
- * @mask: Bitmask to change
- * @val: New value for bitmask
- * @change: Boolean indicating if a write was done
- *
- * Returns zero for success, a negative number on error.
- */
-int regmap_update_bits_check(struct regmap *map, unsigned int reg,
-			     unsigned int mask, unsigned int val,
-			     bool *change)
-{
-	int ret;
-
-	map->lock(map->lock_arg);
-	ret = _regmap_update_bits(map, reg, mask, val, change, false);
-	map->unlock(map->lock_arg);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(regmap_update_bits_check);
-
-/**
- * regmap_update_bits_check_async: Perform a read/modify/write cycle on the
- *                                 register map asynchronously and report if
- *                                 updated
- *
- * @map: Register map to update
- * @reg: Register to update
- * @mask: Bitmask to change
- * @val: New value for bitmask
- * @change: Boolean indicating if a write was done
- *
- * With most buses the read must be done synchronously so this is most
- * useful for devices with a cache which do not need to interact with
- * the hardware to determine the current register value.
- *
- * Returns zero for success, a negative number on error.
- */
-int regmap_update_bits_check_async(struct regmap *map, unsigned int reg,
-				   unsigned int mask, unsigned int val,
-				   bool *change)
-{
-	int ret;
-
-	map->lock(map->lock_arg);
-
-	map->async = true;
-
-	ret = _regmap_update_bits(map, reg, mask, val, change, false);
-
-	map->async = false;
-
-	map->unlock(map->lock_arg);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(regmap_update_bits_check_async);
 
 void regmap_async_complete_cb(struct regmap_async *async, int ret)
 {
