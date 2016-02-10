@@ -8289,18 +8289,20 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	case RTL_GIGA_MAC_VER_49:
 	case RTL_GIGA_MAC_VER_50:
 	case RTL_GIGA_MAC_VER_51:
-		if (rtl_eri_read(tp, 0xdc, ERIAR_EXGMAC) & MagicPacket_v2)
-			tp->features |= RTL_FEATURE_WOL;
-		if ((RTL_R8(Config3) & LinkUp) != 0)
-			tp->features |= RTL_FEATURE_WOL;
+		if (rtl_eri_read(tp, 0xdc, ERIAR_EXGMAC) & MagicPacket_v2) {
+			if ((RTL_R8(Config5) & (UWF | BWF | MWF)) != 0) {
+				if ((RTL_R8(Config3) & LinkUp) != 0)
+					tp->features |= RTL_FEATURE_WOL;
+			}
+		}
 		break;
 	default:
-		if ((RTL_R8(Config3) & (LinkUp | MagicPacket)) != 0)
-			tp->features |= RTL_FEATURE_WOL;
+		if ((RTL_R8(Config3) & (LinkUp | MagicPacket)) != 0) {
+			if ((RTL_R8(Config5) & (UWF | BWF | MWF)) != 0)
+				tp->features |= RTL_FEATURE_WOL;
+		}
 		break;
 	}
-	if ((RTL_R8(Config5) & (UWF | BWF | MWF)) != 0)
-		tp->features |= RTL_FEATURE_WOL;
 	tp->features |= rtl_try_msi(tp, cfg);
 	RTL_W8(Cfg9346, Cfg9346_Lock);
 
