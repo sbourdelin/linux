@@ -256,6 +256,11 @@ int main(void)
 	DEFINE(PACA_TRAP_SAVE, offsetof(struct paca_struct, trap_save));
 	DEFINE(PACA_NAPSTATELOST, offsetof(struct paca_struct, nap_state_lost));
 	DEFINE(PACA_SPRG_VDSO, offsetof(struct paca_struct, sprg_vdso));
+#else /* CONFIG_PPC64 */
+	DEFINE(PACA_STARTTIME, offsetof(struct thread_info, starttime));
+	DEFINE(PACA_STARTTIME_USER, offsetof(struct thread_info, starttime_user));
+	DEFINE(PACA_USER_TIME, offsetof(struct thread_info, user_time));
+	DEFINE(PACA_SYSTEM_TIME, offsetof(struct thread_info, system_time));
 #endif /* CONFIG_PPC64 */
 
 	/* RTAS */
