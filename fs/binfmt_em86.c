@@ -24,7 +24,8 @@
 
 static int load_em86(struct linux_binprm *bprm)
 {
-	char *interp, *i_name, *i_arg;
+	const char *i_name;
+	char *interp;
 	struct file * file;
 	int retval;
 	struct elfhdr	elf_ex;
@@ -55,7 +56,6 @@ static int load_em86(struct linux_binprm *bprm)
 	 */
 	interp = EM86_INTERP;
 	i_name = EM86_I_NAME;
-	i_arg = NULL;		/* We reserve the right to add an arg later */
 
 	/*
 	 * Splice in (1) the interpreter's name for argv[0]
@@ -65,15 +65,11 @@ static int load_em86(struct linux_binprm *bprm)
 	 * This is done in reverse order, because of how the
 	 * user environment and arguments are stored.
 	 */
-	remove_arg_zero(bprm);
+	retval = remove_arg_zero(bprm);
+	if (retval < 0) return retval;
 	retval = copy_strings_kernel(1, &bprm->filename, bprm);
 	if (retval < 0) return retval; 
 	bprm->argc++;
-	if (i_arg) {
-		retval = copy_strings_kernel(1, &i_arg, bprm);
-		if (retval < 0) return retval; 
-		bprm->argc++;
-	}
 	retval = copy_strings_kernel(1, &i_name, bprm);
 	if (retval < 0)	return retval;
 	bprm->argc++;
