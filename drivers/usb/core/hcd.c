@@ -1428,12 +1428,15 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
 
 void usb_hcd_unmap_urb_setup_for_dma(struct usb_hcd *hcd, struct urb *urb)
 {
-	if (urb->transfer_flags & URB_SETUP_MAP_SINGLE)
+	if (urb->transfer_flags & URB_SETUP_MAP_SINGLE) {
+#ifdef CONFIG_HAS_DMA
 		dma_unmap_single(hcd->self.controller,
 				urb->setup_dma,
 				sizeof(struct usb_ctrlrequest),
 				DMA_TO_DEVICE);
-	else if (urb->transfer_flags & URB_SETUP_MAP_LOCAL)
+#endif
+		WARN_ON_NO_DMA();
+	} else if (urb->transfer_flags & URB_SETUP_MAP_LOCAL)
 		hcd_free_coherent(urb->dev->bus,
 				&urb->setup_dma,
 				(void **) &urb->setup_packet,
@@ -1460,27 +1463,37 @@ void usb_hcd_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 	usb_hcd_unmap_urb_setup_for_dma(hcd, urb);
 
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
-	if (urb->transfer_flags & URB_DMA_MAP_SG)
+	if (urb->transfer_flags & URB_DMA_MAP_SG) {
+#ifdef CONFIG_HAS_DMA
 		dma_unmap_sg(hcd->self.controller,
 				urb->sg,
 				urb->num_sgs,
 				dir);
-	else if (urb->transfer_flags & URB_DMA_MAP_PAGE)
+#endif
+		WARN_ON_NO_DMA();
+	} else if (urb->transfer_flags & URB_DMA_MAP_PAGE) {
+#ifdef CONFIG_HAS_DMA
 		dma_unmap_page(hcd->self.controller,
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
-	else if (urb->transfer_flags & URB_DMA_MAP_SINGLE)
+#endif
+		WARN_ON_NO_DMA();
+	} else if (urb->transfer_flags & URB_DMA_MAP_SINGLE) {
+#ifdef CONFIG_HAS_DMA
 		dma_unmap_single(hcd->self.controller,
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
-	else if (urb->transfer_flags & URB_MAP_LOCAL)
+#endif
+		WARN_ON_NO_DMA();
+	} else if (urb->transfer_flags & URB_MAP_LOCAL) {
 		hcd_free_coherent(urb->dev->bus,
 				&urb->transfer_dma,
 				&urb->transfer_buffer,
 				urb->transfer_buffer_length,
 				dir);
+	}
 
 	/* Make it safe to call this routine more than once */
 	urb->transfer_flags &= ~(URB_DMA_MAP_SG | URB_DMA_MAP_PAGE |
@@ -1513,6 +1526,7 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 		if (hcd->self.uses_pio_for_control)
 			return ret;
 		if (hcd->self.uses_dma) {
+#ifdef CONFIG_HAS_DMA
 			urb->setup_dma = dma_map_single(
 					hcd->self.controller,
 					urb->setup_packet,
@@ -1522,6 +1536,10 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 						urb->setup_dma))
 				return -EAGAIN;
 			urb->transfer_flags |= URB_SETUP_MAP_SINGLE;
+#else
+			WARN_ON_NO_DMA();
+			return -EINVAL;
+#endif
 		} else if (hcd->driver->flags & HCD_LOCAL_MEM) {
 			ret = hcd_alloc_coherent(
 					urb->dev->bus, mem_flags,
@@ -1540,6 +1558,7 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 	    && !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP)) {
 		if (hcd->self.uses_dma) {
 			if (urb->num_sgs) {
+#ifdef CONFIG_HAS_DMA
 				int n;
 
 				/* We don't support sg for isoc transfers ! */
@@ -1561,7 +1580,12 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 				if (n != urb->num_sgs)
 					urb->transfer_flags |=
 							URB_DMA_SG_COMBINED;
+#else
+				WARN_ON_NO_DMA();
+				ret = -EINVAL;
+#endif
 			} else if (urb->sg) {
+#ifdef CONFIG_HAS_DMA
 				struct scatterlist *sg = urb->sg;
 				urb->transfer_dma = dma_map_page(
 						hcd->self.controller,
@@ -1574,10 +1598,15 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 					ret = -EAGAIN;
 				else
 					urb->transfer_flags |= URB_DMA_MAP_PAGE;
+#else
+				WARN_ON_NO_DMA();
+				ret = -EINVAL;
+#endif
 			} else if (is_vmalloc_addr(urb->transfer_buffer)) {
 				WARN_ONCE(1, "transfer buffer not dma capable\n");
 				ret = -EAGAIN;
 			} else {
+#ifdef CONFIG_HAS_DMA
 				urb->transfer_dma = dma_map_single(
 						hcd->self.controller,
 						urb->transfer_buffer,
@@ -1588,6 +1617,10 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 					ret = -EAGAIN;
 				else
 					urb->transfer_flags |= URB_DMA_MAP_SINGLE;
+#else
+				WARN_ON_NO_DMA();
+				ret = -EINVAL;
+#endif
 			}
 		} else if (hcd->driver->flags & HCD_LOCAL_MEM) {
 			ret = hcd_alloc_coherent(
