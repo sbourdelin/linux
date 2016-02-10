@@ -45,6 +45,16 @@ radiotap headers and used to control injection:
    number of retries when either IEEE80211_RADIOTAP_RATE or
    IEEE80211_RADIOTAP_MCS was used
 
+ * IEEE80211_RADIOTAP_VHT
+
+   VHT rate for the transmission (only for devices without own rate control).
+   Also some flags are parsed
+
+   IEEE80211_TX_RC_SHORT_GI: use short guard interval
+   IEEE80211_TX_RC_40_MHZ_WIDTH: send in HT40 mode
+   IEEE80211_TX_RC_80_MHZ_WIDTH: send in HT80 mode
+   IEEE80211_TX_RC_160_MHZ_WIDTH: send in HT160 mode
+
 The injection code can also skip all other currently defined radiotap fields
 facilitating replay of captured radiotap headers directly.
 
