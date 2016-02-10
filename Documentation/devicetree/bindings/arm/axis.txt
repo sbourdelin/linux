@@ -1,0 +1,8 @@
+Axis Communications AB
+ARTPEC series SoC Device Tree Bindings
+
+
+ARTPEC-6 ARM SoC
+
+Required root node properties:
+    - compatible = "axis,artpec6-dev-board", "axis,artpec6";
