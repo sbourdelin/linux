@@ -23,7 +23,7 @@ static inline void __invpcid(unsigned long pcid, unsigned long addr,
 	 * invpcid (%rcx), %rax in long mode.
 	 */
 	asm volatile (".byte 0x66, 0x0f, 0x38, 0x82, 0x01"
-		      : : "m" (desc), "a" (type), "c" (desc) : "memory");
+		      : : "m" (*desc), "a" (type), "c" (desc) : "memory");
 }
 
 #define INVPCID_TYPE_INDIV_ADDR		0
