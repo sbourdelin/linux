@@ -1330,12 +1330,13 @@ dump_knl_turbo_ratio_limits(void)
 
 	get_msr(base_cpu, MSR_NHM_TURBO_RATIO_LIMIT, &msr);
 
-	fprintf(stderr, "cpu%d: MSR_NHM_TURBO_RATIO_LIMIT: 0x%08llx\n",
+	fprintf(stderr, "cpu%d: MSR_TURBO_RATIO_LIMIT: 0x%08llx\n",
 		base_cpu, msr);
 
 	/**
 	 * Turbo encoding in KNL is as follows:
-	 * [7:0] -- Base value of number of active cores of bucket 1.
+	 * [0] -- Reserved
+	 * [7:1] -- Base value of number of active cores of bucket 1.
 	 * [15:8] -- Base value of freq ratio of bucket 1.
 	 * [20:16] -- +ve delta of number of active cores of bucket 2.
 	 * i.e. active cores of bucket 2 =
@@ -1354,8 +1355,8 @@ dump_knl_turbo_ratio_limits(void)
 	 * [60:56]-- +ve delta of number of active cores of bucket 7.
 	 * [63:61]-- -ve delta of freq ratio of bucket 7.
 	 */
-	cores = msr & 0xFF;
-	ratio = (msr >> 8) && 0xFF;
+	cores = (msr & 0xFF) >> 1;
+	ratio = (msr >> 8) & 0xFF;
 	if (ratio > 0)
 		fprintf(stderr,
 			"%d * %.0f = %.0f MHz max turbo %d active cores\n",
@@ -1363,8 +1364,8 @@ dump_knl_turbo_ratio_limits(void)
 
 	for (i = 16; i < 64; i = i + 8) {
 		delta_cores = (msr >> i) & 0x1F;
-		delta_ratio = (msr >> (i + 5)) && 0x7;
-		if (!delta_cores || !delta_ratio)
+		delta_ratio = (msr >> (i + 5)) & 0x7;
+		if (!delta_cores)
 			return;
 		cores = cores + delta_cores;
 		ratio = ratio - delta_ratio;
@@ -1889,6 +1890,7 @@ int has_nhm_turbo_ratio_limit(unsigned int family, unsigned int model)
 	/* Nehalem compatible, but do not include turbo-ratio limit support */
 	case 0x2E:	/* Nehalem-EX Xeon - Beckton */
 	case 0x2F:	/* Westmere-EX Xeon - Eagleton */
+	case 0x57:	/* PHI - Knights Landing (different MSR definition) */
 		return 0;
 	default:
 		return 1;
