@@ -568,6 +568,7 @@ struct drm_i915_error_state {
 		} *req_ringbuffer, *hw_ringbuffer, *batchbuffer, *wa_batchbuffer, *ctx, *hws_page;
 
 		struct drm_i915_error_request {
+			uint64_t ctx_desc;
 			long jiffies;
 			u32 seqno;
 			u32 tail;
