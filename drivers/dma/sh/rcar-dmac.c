@@ -1106,21 +1106,68 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
 	return desc;
 }
 
+static int rcar_dmac_set_slave_addr(struct dma_chan *chan,
+				     struct rcar_dmac_chan_slave *slave,
+				     phys_addr_t addr, size_t size)
+{
+	struct dma_attrs attrs;
+	enum dma_data_direction dir;
+
+	init_dma_attrs(&attrs);
+	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
+	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+
+	/*
+	 * We can't know the direction at this time, see documentation for
+	 * 'direction' in struct dma_slave_config.
+	 */
+	dir = DMA_BIDIRECTIONAL;
+
+	if (slave->xfer_size) {
+		dma_unmap_resource(chan->device->dev, slave->slave_addr,
+				slave->xfer_size, dir, &attrs);
+		slave->slave_addr = 0;
+		slave->xfer_size = 0;
+	}
+
+	if (size) {
+		slave->slave_addr = dma_map_resource(chan->device->dev, addr,
+				size, dir, &attrs);
+
+		if (dma_mapping_error(chan->device->dev, slave->slave_addr)) {
+			struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+
+			dev_err(chan->device->dev,
+					"chan%u: failed to map %zx@%pap",
+					rchan->index, size, &addr);
+			return -EIO;
+		}
+
+		slave->xfer_size = size;
+	}
+
+	return 0;
+}
+
 static int rcar_dmac_device_config(struct dma_chan *chan,
 				   struct dma_slave_config *cfg)
 {
 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
+	int ret;
 
 	/*
 	 * We could lock this, but you shouldn't be configuring the
 	 * channel, while using it...
 	 */
-	rchan->src.slave_addr = cfg->src_addr;
-	rchan->dst.slave_addr = cfg->dst_addr;
-	rchan->src.xfer_size = cfg->src_addr_width;
-	rchan->dst.xfer_size = cfg->dst_addr_width;
 
-	return 0;
+	ret = rcar_dmac_set_slave_addr(chan, &rchan->src, cfg->src_addr,
+			cfg->src_addr_width);
+	if (ret)
+		return ret;
+
+	ret = rcar_dmac_set_slave_addr(chan, &rchan->dst, cfg->dst_addr,
+			cfg->dst_addr_width);
+	return ret;
 }
 
 static int rcar_dmac_chan_terminate_all(struct dma_chan *chan)
