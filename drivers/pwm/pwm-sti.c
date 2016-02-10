@@ -279,6 +279,13 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 				pwm->hwpwm);
 			goto out;
 		}
+
+		ret = regmap_field_write(pc->pwm_cpt_en, 1);
+		if (ret) {
+			dev_err(dev, "failed to enable PWM capture:%d\n",
+				pwm->hwpwm);
+			goto out;
+		}
 	}
 	pc->en_count++;
 out:
@@ -296,6 +303,7 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 		return;
 	}
 	regmap_field_write(pc->pwm_out_en, 0);
+	regmap_field_write(pc->pwm_cpt_en, 0);
 
 	clk_disable(pc->pwm_clk);
 	clk_disable(pc->cpt_clk);
@@ -491,6 +499,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
 						 reg_fields[PWM_OUT_EN]);
 	if (IS_ERR(pc->pwm_out_en))
 		return PTR_ERR(pc->pwm_out_en);
+
+	pc->pwm_cpt_en = devm_regmap_field_alloc(dev, pc->regmap,
+						 reg_fields[PWM_CPT_EN]);
+	if (IS_ERR(pc->pwm_cpt_en))
+		return PTR_ERR(pc->pwm_cpt_en);
 
 	pc->pwm_cpt_int_en = devm_regmap_field_alloc(dev, pc->regmap,
 						 reg_fields[PWM_CPT_INT_EN]);
