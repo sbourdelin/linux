@@ -191,7 +191,7 @@ static struct rrpc_block *rrpc_get_blk(struct rrpc *rrpc, struct rrpc_lun *rlun,
 		return NULL;
 	}
 
-	rblk = &rlun->blocks[blk->id];
+	rblk = rrpc_get_rblk(rlun, blk->id);
 	list_add_tail(&rblk->list, &rlun->open_list);
 	spin_unlock(&lun->lock);
 
