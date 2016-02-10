@@ -39,7 +39,7 @@ static bool kernfs_lockdep(struct kernfs_node *kn)
 #endif
 }
 
-static int kernfs_name_locked(struct kernfs_node *kn, char *buf, size_t buflen)
+static size_t kernfs_name_locked(struct kernfs_node *kn, char *buf, size_t buflen)
 {
 	return strlcpy(buf, kn->parent ? kn->name : "/", buflen);
 }
@@ -80,7 +80,7 @@ static char * __must_check kernfs_path_locked(struct kernfs_node *kn, char *buf,
  *
  * This function can be called from any context.
  */
-int kernfs_name(struct kernfs_node *kn, char *buf, size_t buflen)
+size_t kernfs_name(struct kernfs_node *kn, char *buf, size_t buflen)
 {
 	unsigned long flags;
 	int ret;
