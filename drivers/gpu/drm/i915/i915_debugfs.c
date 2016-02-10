@@ -2495,19 +2495,22 @@ static int i915_guc_info(struct seq_file *m, void *data)
 	mutex_unlock(&dev->struct_mutex);
 
 	seq_printf(m, "GuC total action count: %llu\n", guc.action_count);
-	seq_printf(m, "GuC action failure count: %u\n", guc.action_fail);
 	seq_printf(m, "GuC last action command: 0x%x\n", guc.action_cmd);
 	seq_printf(m, "GuC last action status: 0x%x\n", guc.action_status);
-	seq_printf(m, "GuC last action error code: %d\n", guc.action_err);
+
+	seq_printf(m, "GuC action failure count: %u\n", guc.action_fail_count);
+	seq_printf(m, "GuC last failed action: 0x%x\n", guc.action_fail_cmd);
+	seq_printf(m, "GuC last failed status: 0x%x\n", guc.action_fail_status);
+	seq_printf(m, "GuC last error code: %d\n", guc.action_err);
 
 	seq_printf(m, "\nGuC submissions:\n");
 	for_each_ring(ring, dev_priv, i) {
-		seq_printf(m, "\t%-24s: %10llu, last seqno 0x%08x\n",
-			ring->name, guc.submissions[ring->guc_id],
-			guc.last_seqno[ring->guc_id]);
-		total += guc.submissions[ring->guc_id];
+		seq_printf(m, "\t%-24s: %10llu, last %-8s 0x%08x %9d\n",
+			   ring->name, guc.submissions[i], "seqno",
+			   guc.last_seqno[i], guc.last_seqno[i]);
+		total += guc.submissions[i];
 	}
-	seq_printf(m, "\t%s: %llu\n", "Total", total);
+	seq_printf(m, "\t%s: %10llu\n", "Total regular", total);
 
 	seq_printf(m, "\nGuC execbuf client @ %p:\n", guc.execbuf_client);
 	i915_guc_client_info(m, dev_priv, &client);
