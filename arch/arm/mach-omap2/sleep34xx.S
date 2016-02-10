@@ -264,6 +264,12 @@ ENTRY(omap3_do_wfi)
 	nop
 	nop
 	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 
 /*
  * This function implements the erratum ID i581 WA:
