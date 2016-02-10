@@ -386,6 +386,330 @@ static int __ethtool_set_flags(struct net_device *dev, u32 data)
 	return 0;
 }
 
+static void convert_legacy_u32_to_link_mode(unsigned long *dst, u32 legacy_u32)
+{
+	bitmap_zero(dst, __ETHTOOL_LINK_MODE_MASK_NBITS);
+	dst[0] = legacy_u32;
+}
+
+/* return false if src had higher bits set. lower bits always updated. */
+static bool convert_link_mode_to_legacy_u32(u32 *legacy_u32,
+					    const unsigned long *src)
+{
+	bool retval = true;
+
+	/* TODO: following test will soon always be true */
+	if (__ETHTOOL_LINK_MODE_MASK_NBITS > 32) {
+		__ETHTOOL_DECLARE_LINK_MODE_MASK(ext);
+
+		bitmap_zero(ext, __ETHTOOL_LINK_MODE_MASK_NBITS);
+		bitmap_fill(ext, 32);
+		bitmap_complement(ext, ext, __ETHTOOL_LINK_MODE_MASK_NBITS);
+		if (bitmap_intersects(ext, src,
+				      __ETHTOOL_LINK_MODE_MASK_NBITS)) {
+			/* src mask goes beyond bit 31 */
+			retval = false;
+		}
+	}
+	*legacy_u32 = src[0];
+	return retval;
+}
+
+/* return false if legacy contained non-0 deprecated fields
+ * transceiver/maxtxpkt/maxrxpkt. rest of ksettings always updated
+ */
+static bool
+convert_legacy_settings_to_ksettings(struct ethtool_ksettings *ksettings,
+				     const struct ethtool_cmd *legacy_settings)
+{
+	bool retval = true;
+
+	memset(ksettings, 0, sizeof(*ksettings));
+
+	/* This is used to tell users that driver is still using these
+	 * deprecated legacy fields, and they should not use
+	 * %ETHTOOL_GSETTINGS/%ETHTOOL_SSETTINGS
+	 */
+	if (legacy_settings->transceiver ||
+	    legacy_settings->maxtxpkt ||
+	    legacy_settings->maxrxpkt)
+		retval = false;
+
+	convert_legacy_u32_to_link_mode(ksettings->link_modes.supported,
+					legacy_settings->supported);
+	convert_legacy_u32_to_link_mode(ksettings->link_modes.advertising,
+					legacy_settings->advertising);
+	convert_legacy_u32_to_link_mode(ksettings->link_modes.lp_advertising,
+					legacy_settings->lp_advertising);
+	ksettings->parent.speed = ethtool_cmd_speed(legacy_settings);
+	ksettings->parent.duplex = legacy_settings->duplex;
+	ksettings->parent.port = legacy_settings->port;
+	ksettings->parent.phy_address = legacy_settings->phy_address;
+	ksettings->parent.autoneg = legacy_settings->autoneg;
+	ksettings->parent.mdio_support = legacy_settings->mdio_support;
+	ksettings->parent.eth_tp_mdix = legacy_settings->eth_tp_mdix;
+	ksettings->parent.eth_tp_mdix_ctrl = legacy_settings->eth_tp_mdix_ctrl;
+	return retval;
+}
+
+/* return false if ksettings link modes had higher bits
+ * set. legacy_settings always updated (best effort)
+ */
+static bool
+convert_ksettings_to_legacy_settings(struct ethtool_cmd *legacy_settings,
+				     const struct ethtool_ksettings *ksettings)
+{
+	bool retval = true;
+
+	memset(legacy_settings, 0, sizeof(*legacy_settings));
+	/* this also clears the deprecated fields in legacy structure:
+	 * __u8		transceiver;
+	 * __u32	maxtxpkt;
+	 * __u32	maxrxpkt;
+	 */
+
+	retval &= convert_link_mode_to_legacy_u32(
+		&legacy_settings->supported,
+		ksettings->link_modes.supported);
+	retval &= convert_link_mode_to_legacy_u32(
+		&legacy_settings->advertising,
+		ksettings->link_modes.advertising);
+	retval &= convert_link_mode_to_legacy_u32(
+		&legacy_settings->lp_advertising,
+		ksettings->link_modes.lp_advertising);
+	ethtool_cmd_speed_set(legacy_settings, ksettings->parent.speed);
+	legacy_settings->duplex = ksettings->parent.duplex;
+	legacy_settings->port = ksettings->parent.port;
+	legacy_settings->phy_address = ksettings->parent.phy_address;
+	legacy_settings->autoneg = ksettings->parent.autoneg;
+	legacy_settings->mdio_support = ksettings->parent.mdio_support;
+	legacy_settings->eth_tp_mdix = ksettings->parent.eth_tp_mdix;
+	legacy_settings->eth_tp_mdix_ctrl = ksettings->parent.eth_tp_mdix_ctrl;
+	return retval;
+}
+
+/* number of 32-bit words to store the user's link mode bitmaps */
+#define __ETHTOOL_LINK_MODE_MASK_NU32			\
+	DIV_ROUND_UP(__ETHTOOL_LINK_MODE_MASK_NBITS, 32)
+
+/* layout of the struct passed from/to userland */
+struct ethtool_usettings {
+	struct ethtool_settings parent;
+	struct {
+		__u32 supported[__ETHTOOL_LINK_MODE_MASK_NU32];
+		__u32 advertising[__ETHTOOL_LINK_MODE_MASK_NU32];
+		__u32 lp_advertising[__ETHTOOL_LINK_MODE_MASK_NU32];
+	} link_modes;
+};
+
+/* Internal kernel helper to query a device ethtool_settings.
+ *
+ * Backward compatibility note: for compatibility with legacy drivers
+ * that implement only the ethtool_cmd API, this has to work with both
+ * drivers implementing get_ksettings API and drivers implementing
+ * get_settings API. When drivers implement get_settings and report
+ * ethtool_cmd deprecated fields (transceiver/maxrxpkt/maxtxpkt),
+ * these fields are silently ignored because the resulting struct
+ * ethtool_settings does not report them.
+ */
+int __ethtool_get_ksettings(struct net_device *dev,
+			    struct ethtool_ksettings *ksettings)
+{
+	int err;
+	struct ethtool_cmd cmd;
+
+	ASSERT_RTNL();
+
+	if (dev->ethtool_ops->get_ksettings) {
+		memset(ksettings, 0, sizeof(*ksettings));
+		return dev->ethtool_ops->get_ksettings(dev, ksettings);
+	}
+
+	/* driver doesn't support %ethtool_ksettings API. revert to
+	 * legacy %ethtool_cmd API, unless it's not supported either.
+	 * TODO: remove when ethtool_ops::get_settings disappears internally
+	 */
+	err = __ethtool_get_settings(dev, &cmd);
+	if (err < 0)
+		return err;
+
+	/* we ignore deprecated fields transceiver/maxrxpkt/maxtxpkt
+	 */
+	convert_legacy_settings_to_ksettings(ksettings, &cmd);
+	return err;
+}
+EXPORT_SYMBOL(__ethtool_get_ksettings);
+
+/* convert ethtool_usettings in user space to a kernel internal
+ * ethtool_ksettings. return 0 on success, errno on error.
+ */
+static int load_ksettings_from_user(struct ethtool_ksettings *to,
+				    const void __user *from)
+{
+	struct ethtool_usettings usettings;
+
+	if (copy_from_user(&usettings, from, sizeof(usettings)))
+		return -EFAULT;
+
+	memcpy(&to->parent, &usettings.parent, sizeof(to->parent));
+	bitmap_from_u32array(to->link_modes.supported,
+			     __ETHTOOL_LINK_MODE_MASK_NBITS,
+			     usettings.link_modes.supported,
+			     __ETHTOOL_LINK_MODE_MASK_NU32);
+	bitmap_from_u32array(to->link_modes.advertising,
+			     __ETHTOOL_LINK_MODE_MASK_NBITS,
+			     usettings.link_modes.advertising,
+			     __ETHTOOL_LINK_MODE_MASK_NU32);
+	bitmap_from_u32array(to->link_modes.lp_advertising,
+			     __ETHTOOL_LINK_MODE_MASK_NBITS,
+			     usettings.link_modes.lp_advertising,
+			     __ETHTOOL_LINK_MODE_MASK_NU32);
+
+	return 0;
+}
+
+/* convert a kernel internal ethtool_ksettings to ethtool_usettings in
+ * user space. return 0 on success, errno on error.
+ */
+static int store_ksettings_for_user(void __user *to,
+				    const struct ethtool_ksettings *from)
+{
+	struct ethtool_usettings usettings;
+
+	memcpy(&usettings.parent, &from->parent, sizeof(usettings));
+	bitmap_to_u32array(usettings.link_modes.supported,
+			   __ETHTOOL_LINK_MODE_MASK_NU32,
+			   from->link_modes.supported,
+			   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_to_u32array(usettings.link_modes.advertising,
+			   __ETHTOOL_LINK_MODE_MASK_NU32,
+			   from->link_modes.advertising,
+			   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_to_u32array(usettings.link_modes.lp_advertising,
+			   __ETHTOOL_LINK_MODE_MASK_NU32,
+			   from->link_modes.lp_advertising,
+			   __ETHTOOL_LINK_MODE_MASK_NBITS);
+
+	if (copy_to_user(to, &usettings, sizeof(usettings)))
+		return -EFAULT;
+
+	return 0;
+}
+
+/* Query device for its ethtool_settings.
+ *
+ * Backward compatibility note: this function must fail when driver
+ * does not implement ethtool::get_ksettings, even if legacy
+ * ethtool_ops::get_settings is implemented. This tells new versions
+ * of ethtool that they should use the legacy API %ETHTOOL_GSET for
+ * this driver, so that they can correctly access the ethtool_cmd
+ * deprecated fields (transceiver/maxrxpkt/maxtxpkt), until no driver
+ * implements ethtool_ops::get_settings anymore.
+ */
+static int ethtool_get_ksettings(struct net_device *dev, void __user *useraddr)
+{
+	int err = 0;
+	struct ethtool_ksettings ksettings;
+
+	if (!dev->ethtool_ops->get_ksettings)
+		return -EOPNOTSUPP;
+
+	/* handle bitmap nbits handshake */
+	if (copy_from_user(&ksettings.parent, useraddr,
+			   sizeof(ksettings.parent)))
+		return -EFAULT;
+
+	if (__ETHTOOL_LINK_MODE_MASK_NU32
+	    != ksettings.parent.link_mode_masks_nwords) {
+		/* wrong link mode nbits requested */
+		memset(&ksettings, 0, sizeof(ksettings));
+		/* keep cmd field reset to 0 */
+		/* send back number of words required as negative val */
+		compiletime_assert(__ETHTOOL_LINK_MODE_MASK_NU32 <= S8_MAX,
+				   "need too many bits for link modes!");
+		ksettings.parent.link_mode_masks_nwords
+			= -((s8)__ETHTOOL_LINK_MODE_MASK_NU32);
+
+		/* copy the base fields back to user, not the link
+		 * mode bitmaps
+		 */
+		if (copy_to_user(useraddr, &ksettings.parent,
+				 sizeof(ksettings.parent)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	/* handshake successful: user/kernel agree on
+	 * link_mode_masks_nwords
+	 */
+
+	memset(&ksettings, 0, sizeof(ksettings));
+	err = dev->ethtool_ops->get_ksettings(dev, &ksettings);
+	if (err < 0)
+		return err;
+
+	/* make sure we tell the right values to user */
+	ksettings.parent.cmd = ETHTOOL_GSETTINGS;
+	ksettings.parent.link_mode_masks_nwords
+		= __ETHTOOL_LINK_MODE_MASK_NU32;
+
+	return store_ksettings_for_user(useraddr, &ksettings);
+}
+
+/* Update device ethtool_settings.
+ *
+ * Backward compatibility note: this function must fail when driver
+ * does not implement ethtool::set_ksettings, even if legacy
+ * ethtool_ops::set_settings is implemented. This tells new versions
+ * of ethtool that they should use the legacy API %ETHTOOL_SSET for
+ * this driver, so that they can correctly update the ethtool_cmd
+ * deprecated fields (transceiver/maxrxpkt/maxtxpkt), until no driver
+ * implements ethtool_ops::get_settings anymore.
+ */
+static int ethtool_set_ksettings(struct net_device *dev, void __user *useraddr)
+{
+	int err;
+	struct ethtool_ksettings ksettings;
+
+	if (!dev->ethtool_ops->set_ksettings)
+		return -EOPNOTSUPP;
+
+	/* make sure nbits field has expected value */
+	if (copy_from_user(&ksettings.parent, useraddr,
+			   sizeof(ksettings.parent)))
+		return -EFAULT;
+
+	if (__ETHTOOL_LINK_MODE_MASK_NU32
+	    != ksettings.parent.link_mode_masks_nwords)
+		return -EINVAL;
+
+	/* copy the whole structure, now that we know it has expected
+	 * format
+	 */
+	err = load_ksettings_from_user(&ksettings, useraddr);
+	if (err)
+		return err;
+
+	/* re-check nwords field, just in case */
+	if (__ETHTOOL_LINK_MODE_MASK_NU32
+	    != ksettings.parent.link_mode_masks_nwords)
+		return -EINVAL;
+
+	return dev->ethtool_ops->set_ksettings(dev, &ksettings);
+}
+
+/* Internal kernel helper to query a device ethtool_cmd settings.
+ *
+ * Note about transition to ethtool_settings API: We do not need (or
+ * want) this function to support "dev" instances that implement the
+ * ethtool_settings API as we will update the drivers calling this
+ * function to call __ethtool_get_ksettings instead, before the first
+ * drivers implement ethtool_ops::get_ksettings.
+ *
+ * TODO 1: at least make this function static when no driver is using it
+ * TODO 2: remove when ethtool_ops::get_settings disappears internally
+ */
 int __ethtool_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	ASSERT_RTNL();
@@ -399,29 +723,107 @@ int __ethtool_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 }
 EXPORT_SYMBOL(__ethtool_get_settings);
 
+static void
+warn_incomplete_ethtool_legacy_settings_conversion(const char *details)
+{
+	char name[sizeof(current->comm)];
+
+	pr_info_once("warning: `%s' uses legacy ethtool settings API, %s\n",
+		     get_task_comm(name, current), details);
+}
+
+/* Query device for its ethtool_cmd settings.
+ *
+ * Backward compatibility note: for compatibility with legacy ethtool,
+ * this has to work with both drivers implementing get_ksettings API
+ * and drivers implementing get_settings API. When drivers implement
+ * get_ksettings and report higher link mode bits, a kernel warning is
+ * logged once (with name of 1st driver/device) to recommend user to
+ * upgrade ethtool, but the command is successful (only the lower link
+ * mode bits reported back to user).
+ */
 static int ethtool_get_settings(struct net_device *dev, void __user *useraddr)
 {
-	int err;
 	struct ethtool_cmd cmd;
 
-	err = __ethtool_get_settings(dev, &cmd);
-	if (err < 0)
-		return err;
+	ASSERT_RTNL();
+
+	if (dev->ethtool_ops->get_ksettings) {
+		/* First, use ksettings API if it is supported */
+		int err;
+		struct ethtool_ksettings ksettings;
+
+		memset(&ksettings, 0, sizeof(ksettings));
+		err = dev->ethtool_ops->get_ksettings(dev, &ksettings);
+		if (err < 0)
+			return err;
+		if (!convert_ksettings_to_legacy_settings(&cmd, &ksettings))
+			warn_incomplete_ethtool_legacy_settings_conversion(
+				"link modes are only partially reported");
+
+		/* send a sensible cmd tag back to user */
+		cmd.cmd = ETHTOOL_GSET;
+	} else {
+		int err;
+		/* TODO: return -EOPNOTSUPP when
+		 * ethtool_ops::get_settings disappears internally
+		 */
+
+		/* driver doesn't support %ethtool_ksettings
+		 * API. revert to legacy %ethtool_cmd API, unless it's
+		 * not supported either.
+		 */
+		err = __ethtool_get_settings(dev, &cmd);
+		if (err < 0)
+			return err;
+	}
 
 	if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
 		return -EFAULT;
+
 	return 0;
 }
 
+/* Update device settings with given ethtool_cmd.
+ *
+ * Backward compatibility note: for compatibility with legacy ethtool,
+ * this has to work with both drivers implementing set_ksettings API
+ * and drivers implementing set_settings API. When drivers implement
+ * set_ksettings and user's request updates deprecated ethtool_cmd
+ * fields (transceiver/maxrxpkt/maxtxpkt), a kernel warning is logged
+ * once (with name of 1st driver/device) to recommend user to upgrade
+ * ethtool, and the request is rejected.
+ */
 static int ethtool_set_settings(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_cmd cmd;
 
-	if (!dev->ethtool_ops->set_settings)
-		return -EOPNOTSUPP;
+	ASSERT_RTNL();
 
 	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
 		return -EFAULT;
+
+	/* first, try new %ethtool_ksettings API. */
+	if (dev->ethtool_ops->set_ksettings) {
+		struct ethtool_ksettings ksettings;
+
+		if (!convert_legacy_settings_to_ksettings(&ksettings, &cmd))
+			return -EINVAL;
+
+		ksettings.parent.cmd = ETHTOOL_SSETTINGS;
+		ksettings.parent.link_mode_masks_nwords
+			= __ETHTOOL_LINK_MODE_MASK_NU32;
+		return dev->ethtool_ops->set_ksettings(dev, &ksettings);
+	}
+
+	/* legacy %ethtool_cmd API */
+
+	/* TODO: return -EOPNOTSUPP when ethtool_ops::get_settings
+	 * disappears internally
+	 */
+
+	if (!dev->ethtool_ops->set_settings)
+		return -EOPNOTSUPP;
 
 	return dev->ethtool_ops->set_settings(dev, &cmd);
 }
@@ -2069,6 +2471,12 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_GPHYSTATS:
 		rc = ethtool_get_phy_stats(dev, useraddr);
+		break;
+	case ETHTOOL_GSETTINGS:
+		rc = ethtool_get_ksettings(dev, useraddr);
+		break;
+	case ETHTOOL_SSETTINGS:
+		rc = ethtool_set_ksettings(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;
