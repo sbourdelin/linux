@@ -486,11 +486,11 @@ int i915_guc_wq_check_space(struct i915_guc_client *gc)
 	if (CIRC_SPACE(gc->wq_tail, gc->wq_head, gc->wq_size) >= size)
 		return 0;
 
-	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
-	desc = base + gc->proc_desc_offset;
-
 	while (timeout_counter-- > 0) {
+		base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
+		desc = base + gc->proc_desc_offset;
 		gc->wq_head = desc->head;
+		kunmap_atomic(base);
 
 		if (CIRC_SPACE(gc->wq_tail, gc->wq_head, gc->wq_size) >= size) {
 			ret = 0;
@@ -500,8 +500,6 @@ int i915_guc_wq_check_space(struct i915_guc_client *gc)
 		if (timeout_counter)
 			usleep_range(1000, 2000);
 	};
-
-	kunmap_atomic(base);
 
 	return ret;
 }
@@ -730,6 +728,8 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 	client->client_obj = obj;
 	client->wq_offset = GUC_DB_SIZE;
 	client->wq_size = GUC_WQ_SIZE;
+	client->wq_head = GUC_WQ_SIZE - 1;
+	client->wq_tail = 0;
 
 	client->doorbell_offset = select_doorbell_cacheline(guc);
 
