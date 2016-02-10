@@ -24,6 +24,7 @@
 	__PAGE_ALIGNED_DATA
 
 	.globl vdso_start, vdso_end
+	.section .rodata
 	.balign PAGE_SIZE
 vdso_start:
 	.incbin "arch/arm64/kernel/vdso/vdso.so"
