@@ -1310,7 +1310,10 @@ static int packet_rcv_has_room(struct packet_sock *po, struct sk_buff *skb)
 
 static void packet_sock_destruct(struct sock *sk)
 {
+	/* Purge queues */
+
 	skb_queue_purge(&sk->sk_error_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
 	WARN_ON(atomic_read(&sk->sk_rmem_alloc));
 	WARN_ON(atomic_read(&sk->sk_wmem_alloc));
@@ -2049,6 +2052,9 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (!net_eq(dev_net(dev), sock_net(sk)))
 		goto drop;
 
+	if (sock_flag(sk, SOCK_DEAD))
+		goto drop;
+
 	skb->dev = dev;
 
 	if (dev->header_ops) {
@@ -2111,7 +2117,6 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (pskb_trim(skb, snaplen))
 		goto drop_n_acct;
 
-	skb_set_owner_r(skb, sk);
 	skb->dev = NULL;
 	skb_dst_drop(skb);
 
@@ -2119,6 +2124,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	nf_reset(skb);
 
 	spin_lock(&sk->sk_receive_queue.lock);
+	skb_set_owner_r(skb, sk);
 	po->stats.stats1.tp_packets++;
 	sock_skb_set_dropcount(sk, skb);
 	__skb_queue_tail(&sk->sk_receive_queue, skb);
@@ -3028,9 +3034,6 @@ static int packet_release(struct socket *sock)
 	sock_orphan(sk);
 	sock->sk = NULL;
 
-	/* Purge queues */
-
-	skb_queue_purge(&sk->sk_receive_queue);
 	packet_free_pending(po);
 	sk_refcnt_debug_release(sk);
 
