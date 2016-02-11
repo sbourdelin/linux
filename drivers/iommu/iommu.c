@@ -1557,6 +1557,28 @@ int iommu_domain_set_attr(struct iommu_domain *domain,
 }
 EXPORT_SYMBOL_GPL(iommu_domain_set_attr);
 
+int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
+				     dma_addr_t iova, size_t size,
+				     unsigned long order)
+{
+	int ret;
+
+	if (!domain->ops->alloc_reserved_iova_domain)
+		return -EINVAL;
+	ret = domain->ops->alloc_reserved_iova_domain(domain, iova,
+						      size, order);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_alloc_reserved_iova_domain);
+
+void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+{
+	if (!domain->ops->free_reserved_iova_domain)
+		return;
+	domain->ops->free_reserved_iova_domain(domain);
+}
+EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
+
 void iommu_get_dm_regions(struct device *dev, struct list_head *list)
 {
 	const struct iommu_ops *ops = dev->bus->iommu_ops;

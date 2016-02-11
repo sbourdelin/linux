@@ -195,6 +195,12 @@ struct iommu_ops {
 	int (*domain_set_windows)(struct iommu_domain *domain, u32 w_count);
 	/* Get the number of windows per domain */
 	u32 (*domain_get_windows)(struct iommu_domain *domain);
+	/* allocates the reserved iova domain */
+	int (*alloc_reserved_iova_domain)(struct iommu_domain *domain,
+					  dma_addr_t iova, size_t size,
+					  unsigned long order);
+	/* frees the reserved iova domain */
+	void (*free_reserved_iova_domain)(struct iommu_domain *domain);
 
 #ifdef CONFIG_OF_IOMMU
 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
@@ -266,6 +272,10 @@ extern int iommu_domain_get_attr(struct iommu_domain *domain, enum iommu_attr,
 				 void *data);
 extern int iommu_domain_set_attr(struct iommu_domain *domain, enum iommu_attr,
 				 void *data);
+extern int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
+					    dma_addr_t iova, size_t size,
+					    unsigned long order);
+extern void iommu_free_reserved_iova_domain(struct iommu_domain *domain);
 struct device *iommu_device_create(struct device *parent, void *drvdata,
 				   const struct attribute_group **groups,
 				   const char *fmt, ...) __printf(4, 5);
@@ -538,6 +548,17 @@ static inline int iommu_device_link(struct device *dev, struct device *link)
 }
 
 static inline void iommu_device_unlink(struct device *dev, struct device *link)
+{
+}
+
+static int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
+					    dma_addr_t iova, size_t size,
+					    unsigned long order)
+{
+	return -EINVAL;
+}
+
+static void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
 {
 }
 
