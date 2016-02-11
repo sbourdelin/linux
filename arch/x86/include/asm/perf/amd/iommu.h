@@ -24,15 +24,12 @@
 #define PC_MAX_SPEC_BNKS			64
 #define PC_MAX_SPEC_CNTRS			16
 
-/* iommu pc reg masks*/
-#define IOMMU_BASE_DEVID			0x0000
-
 /* amd_iommu_init.c external support functions */
 bool amd_iommu_pc_supported(void);
 
-u8 amd_iommu_pc_get_max_banks(u16 devid);
+u8 amd_iommu_pc_get_max_banks(void);
 
-u8 amd_iommu_pc_get_max_counters(u16 devid);
+u8 amd_iommu_pc_get_max_counters(void);
 
 int amd_iommu_pc_set_reg_val(u16 devid, u8 bank, u8 cntr, u8 fxn, u64 *value);
 
