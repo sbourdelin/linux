@@ -50,6 +50,7 @@
 #include <net/ip6_checksum.h>
 #endif
 #include <net/dst_metadata.h>
+#include <net/nsh.h>
 
 #define VXLAN_VERSION	"0.1"
 
@@ -1168,14 +1169,7 @@ static void vxlan_rcv(struct vxlan_sock *vs, struct sk_buff *skb,
 	if (!vxlan)
 		goto drop;
 
-	skb_reset_mac_header(skb);
 	skb_scrub_packet(skb, !net_eq(vxlan->net, dev_net(vxlan->dev)));
-	skb->protocol = eth_type_trans(skb, vxlan->dev);
-	skb_postpull_rcsum(skb, eth_hdr(skb), ETH_HLEN);
-
-	/* Ignore packet loops (and multicast echo) */
-	if (ether_addr_equal(eth_hdr(skb)->h_source, vxlan->dev->dev_addr))
-		goto drop;
 
 	/* Get data from the outer IP header */
 	if (vxlan_get_sk_family(vs) == AF_INET) {
@@ -1195,13 +1189,57 @@ static void vxlan_rcv(struct vxlan_sock *vs, struct sk_buff *skb,
 		tun_dst = NULL;
 	}
 
+	switch (md->gpe_np) {
+	case VXLAN_GPE_NP_IPv4:
+		skb->protocol = htons(ETH_P_IP);
+		goto skip_l2;
+#if IS_ENABLED(CONFIG_IPV6)
+	case VXLAN_GPE_NP_IPv6:
+		skb->protocol = htons(ETH_P_IPV6);
+		goto skip_l2;
+#endif
+#if IS_ENABLED(CONFIG_MPLS)
+	case VXLAN_GPE_NP_MPLS:
+		skb->protocol = htons(ETH_P_MPLS_UC);
+		goto skip_l2;
+#endif
+#if IS_ENABLED(CONFIG_NET_NSH)
+	case VXLAN_GPE_NP_NSH:
+		{
+			u_char next_proto;
+
+			if (nsh_decap(skb, NULL, NULL, &next_proto) < 0)
+				goto drop;
+
+			if (next_proto != NSH_NEXT_PROTO_ETH)
+				goto skip_l2;
+		}
+		break;
+#endif
+	case VXLAN_GPE_NP_ETH:
+		/* GPE with next proto eth is equivalent to vanilla vxlan. */
+	default:
+		break;
+	}
+
+	skb_reset_mac_header(skb);
+	skb->protocol = eth_type_trans(skb, vxlan->dev);
+	skb_postpull_rcsum(skb, eth_hdr(skb), ETH_HLEN);
+
+	/* Ignore packet loops (and multicast echo) */
+	if (ether_addr_equal(eth_hdr(skb)->h_source, vxlan->dev->dev_addr))
+		goto drop;
+
 	if ((vxlan->flags & VXLAN_F_LEARN) &&
 	    vxlan_snoop(skb->dev, &saddr, eth_hdr(skb)->h_source))
 		goto drop;
 
+skip_l2:
 	skb_reset_network_header(skb);
+
 	/* In flow-based mode, GBP is carried in dst_metadata */
-	if (!(vs->flags & VXLAN_F_COLLECT_METADATA))
+	if (!(vs->flags & VXLAN_F_COLLECT_METADATA) &&
+	    !(vs->flags & VXLAN_F_GPE))
 		skb->mark = md->gbp;
 
 	if (oip6)
@@ -1252,6 +1290,10 @@ static int vxlan_udp_encap_recv(struct sock *sk, struct sk_buff *skb)
 	struct vxlan_metadata _md;
 	struct vxlan_metadata *md = &_md;
 
+	vs = rcu_dereference_sk_user_data(sk);
+	if (!vs)
+		goto drop;
+
 	/* Need Vxlan and inner Ethernet header to be present */
 	if (!pskb_may_pull(skb, VXLAN_HLEN))
 		goto error;
@@ -1267,13 +1309,12 @@ static int vxlan_udp_encap_recv(struct sock *sk, struct sk_buff *skb)
 		goto bad_flags;
 	}
 
-	if (iptunnel_pull_header(skb, VXLAN_HLEN, htons(ETH_P_TEB)))
+	/* If GPE, protocol will be set once next proto examined. */
+	if (iptunnel_pull_header(skb, VXLAN_HLEN,
+				 vs->flags & VXLAN_F_GPE ?
+				 htons(ETH_P_IP) : htons(ETH_P_TEB)))
 		goto drop;
 	vxh = (struct vxlanhdr *)(udp_hdr(skb) + 1);
-
-	vs = rcu_dereference_sk_user_data(sk);
-	if (!vs)
-		goto drop;
 
 	if ((flags & VXLAN_HF_RCO) && (vs->flags & VXLAN_F_REMCSUM_RX)) {
 		vxh = vxlan_remcsum(skb, vxh, sizeof(struct vxlanhdr), vni,
@@ -1316,6 +1357,16 @@ static int vxlan_udp_encap_recv(struct sock *sk, struct sk_buff *skb)
 			md->gbp |= VXLAN_GBP_POLICY_APPLIED;
 
 		flags &= ~VXLAN_GBP_USED_BITS;
+	}
+
+	if (vs->flags & VXLAN_F_GPE) {
+		/* Next protocol is required */
+		if (!(flags & VXLAN_HF_GPE_NP))
+			goto bad_flags;
+
+		md->gpe_np = flags & VXLAN_GPE_NP_MASK;
+
+		flags &= ~VXLAN_GPE_USED_BITS;
 	}
 
 	if (flags || vni & ~VXLAN_VNI_MASK) {
@@ -1664,6 +1715,37 @@ static bool route_shortcircuit(struct net_device *dev, struct sk_buff *skb)
 	return false;
 }
 
+static void vxlan_build_gpe_hdr(struct vxlanhdr *vxh, __be16 proto)
+{
+	u32 next_proto;
+
+	switch (proto) {
+#if IS_ENABLED(CONFIG_NET_NSH)
+	case htons(ETH_P_NSH):
+		next_proto = VXLAN_GPE_NP_NSH;
+		break;
+#endif
+	case htons(ETH_P_IP):
+		next_proto = VXLAN_GPE_NP_IPv4;
+		break;
+#if IS_ENABLED(CONFIG_IPV6)
+	case htons(ETH_P_IPV6):
+		next_proto = VXLAN_GPE_NP_IPv6;
+		break;
+#endif
+#if IS_ENABLED(CONFIG_MPLS)
+	case htons(ETH_P_MPLS_UC):
+		next_proto = VXLAN_GPE_NP_MPLS;
+		break;
+#endif
+	default:
+		next_proto = VXLAN_GPE_NP_ETH;
+		break;
+	}
+
+	vxh->vx_flags |= htonl(VXLAN_HF_GPE_NP | next_proto);
+}
+
 static void vxlan_build_gbp_hdr(struct vxlanhdr *vxh, u32 vxflags,
 				struct vxlan_metadata *md)
 {
@@ -1749,6 +1831,9 @@ static int vxlan_build_skb(struct sk_buff *skb, struct dst_entry *dst,
 
 	if (vxflags & VXLAN_F_GBP)
 		vxlan_build_gbp_hdr(vxh, vxflags, md);
+
+	if (vxflags & VXLAN_F_GPE)
+		vxlan_build_gpe_hdr(vxh, skb->protocol);
 
 	skb_set_inner_protocol(skb, htons(ETH_P_TEB));
 	return 0;
@@ -2072,6 +2157,26 @@ static netdev_tx_t vxlan_xmit(struct sk_buff *skb, struct net_device *dev)
 	bool did_rsc = false;
 	struct vxlan_rdst *rdst, *fdst = NULL;
 	struct vxlan_fdb *f;
+
+	if (vxlan->flags & VXLAN_F_GPE) {
+		switch (skb->protocol) {
+#if IS_ENABLED(CONFIG_NET_NSH)
+		case htons(ETH_P_NSH):
+#endif
+#if IS_ENABLED(CONFIG_IPV6)
+		case htons(ETH_P_IPV6):
+#endif
+#if IS_ENABLED(CONFIG_MPLS)
+		case htons(ETH_P_MPLS_UC):
+#endif
+		case htons(ETH_P_IP):
+			vxlan_xmit_one(skb, dev, &vxlan->default_dst, false);
+			return NETDEV_TX_OK;
+		default:
+			/* Assume L2 and look for FDB entry */
+			break;
+		}
+	}
 
 	info = skb_tunnel_info(skb);
 
@@ -2475,6 +2580,7 @@ static const struct nla_policy vxlan_policy[IFLA_VXLAN_MAX + 1] = {
 	[IFLA_VXLAN_REMCSUM_RX]	= { .type = NLA_U8 },
 	[IFLA_VXLAN_GBP]	= { .type = NLA_FLAG, },
 	[IFLA_VXLAN_REMCSUM_NOPARTIAL]	= { .type = NLA_FLAG },
+	[IFLA_VXLAN_GPE]	= { .type = NLA_FLAG, },
 };
 
 static int vxlan_validate(struct nlattr *tb[], struct nlattr *data[])
@@ -2895,6 +3001,9 @@ static int vxlan_newlink(struct net *src_net, struct net_device *dev,
 	if (data[IFLA_VXLAN_REMCSUM_NOPARTIAL])
 		conf.flags |= VXLAN_F_REMCSUM_NOPARTIAL;
 
+	if (data[IFLA_VXLAN_GPE])
+		conf.flags |= VXLAN_F_GPE;
+
 	err = vxlan_dev_configure(src_net, dev, &conf);
 	switch (err) {
 	case -ENODEV:
@@ -3035,6 +3144,10 @@ static int vxlan_fill_info(struct sk_buff *skb, const struct net_device *dev)
 
 	if (vxlan->flags & VXLAN_F_REMCSUM_NOPARTIAL &&
 	    nla_put_flag(skb, IFLA_VXLAN_REMCSUM_NOPARTIAL))
+		goto nla_put_failure;
+
+	if (vxlan->flags & VXLAN_F_GPE &&
+	    nla_put_flag(skb, IFLA_VXLAN_GPE))
 		goto nla_put_failure;
 
 	return 0;

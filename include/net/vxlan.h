@@ -121,7 +121,43 @@ struct vxlanhdr_gbp {
 
 struct vxlan_metadata {
 	u32		gbp;
+	u8              gpe_np;
 };
+
+/*
+ * VXLAN Generic Protocol Extension:
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |R|R|Ver|I|P|R|O|       Reserved                |Next Protocol  |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                VXLAN Network Identifier (VNI) |   Reserved    |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * Ver            Version, initially 0
+ * I = 1	  VXLAN Network Identifier (VNI) present
+ * P = 1          Next Protocol field is present
+ * O = 1          OAM
+ * Next Protocol  Indicates the protocol header immediately following
+ *                the VXLAN GPE header.
+ *
+ * https://tools.ietf.org/html/draft-ietf-nvo3-vxlan-gpe-01
+ *
+ * Use struct vxlanhdr above with some extra defines:
+ */
+#define VXLAN_HF_GPE_OAM BIT(25) /* GPE OAM bit */
+#define VXLAN_HF_GPE_NP  BIT(26) /* GPE protocol bit */
+
+#define VXLAN_GPE_NP_MASK (0xFF)
+
+#define VXLAN_GPE_NP_IPv4 0x1
+#define VXLAN_GPE_NP_IPv6 0x2
+#define VXLAN_GPE_NP_ETH  0x3
+#define VXLAN_GPE_NP_NSH  0x4
+#define VXLAN_GPE_NP_MPLS  0x5
+
+#define VXLAN_GPE_USED_BITS (VXLAN_HF_GPE_NP  | \
+			     VXLAN_HF_GPE_OAM | \
+			     VXLAN_GPE_NP_MASK)
+
 
 /* per UDP socket information */
 struct vxlan_sock {
@@ -204,6 +240,7 @@ struct vxlan_dev {
 #define VXLAN_F_GBP			0x800
 #define VXLAN_F_REMCSUM_NOPARTIAL	0x1000
 #define VXLAN_F_COLLECT_METADATA	0x2000
+#define VXLAN_F_GPE			0x4000
 
 /* Flags that are used in the receive path. These flags must match in
  * order for a socket to be shareable
@@ -212,7 +249,8 @@ struct vxlan_dev {
 					 VXLAN_F_UDP_ZERO_CSUM6_RX |	\
 					 VXLAN_F_REMCSUM_RX |		\
 					 VXLAN_F_REMCSUM_NOPARTIAL |	\
-					 VXLAN_F_COLLECT_METADATA)
+					 VXLAN_F_COLLECT_METADATA |     \
+					 VXLAN_F_GPE)
 
 struct net_device *vxlan_dev_create(struct net *net, const char *name,
 				    u8 name_assign_type, struct vxlan_config *conf);
