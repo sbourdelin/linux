@@ -1,0 +1,16 @@
+* Clock bindings for Axis ARTPEC-6 chip
+
+Required properties:
+- #clock-cells: Should be <0>
+- compatible: Should be "axis,artpec6-pll1-clock"
+- reg: Address and length of the DEVSTAT register.
+- clocks: The PLL's input clock.
+
+Examples:
+
+pll1_clk: pll1_clk {
+	#clock-cells = <0>;
+	compatible = "axis,artpec6-pll1-clock";
+	reg = <0xf8000000 4>;
+	clocks = <&ext_clk>;
+};
