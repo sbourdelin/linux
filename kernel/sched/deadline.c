@@ -726,6 +726,9 @@ static void update_curr_dl(struct rq *rq)
 	if (!dl_task(curr) || !on_dl_rq(dl_se))
 		return;
 
+	/* Kick a cpufreq update to prevent it from stalling. */
+	cpufreq_trigger_update(rq_clock(rq));
+
 	/*
 	 * Consumed budget is computed considering the time as
 	 * observed by schedulable tasks (excluding time spent
