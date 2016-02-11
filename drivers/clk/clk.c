@@ -2782,6 +2782,14 @@ void __clk_put(struct clk *clk)
 	    clk->max_rate < clk->core->req_rate)
 		clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
 
+	/*
+	 * before calling clk_put, all calls to clk_prepare and clk_enable from
+	 * a given user must be balanced with calls to clk_disable and
+	 * clk_unprepare by that same user
+	 */
+	WARN_ON_ONCE(clk->prepare_count);
+	WARN_ON_ONCE(clk->enable_count);
+
 	owner = clk->core->owner;
 	kref_put(&clk->core->ref, __clk_release);
 
