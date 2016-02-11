@@ -619,14 +619,16 @@ EXPORT_SYMBOL_GPL(serial8250_em485_init);
  */
 void serial8250_em485_destroy(struct uart_8250_port *p)
 {
-	if (p->em485 == NULL)
+	struct uart_8250_em485 *em485 = p->em485;
+
+	if (!em485)
 		return;
 
-	del_timer(&p->em485->start_tx_timer);
-	del_timer(&p->em485->stop_tx_timer);
+	del_timer(&em485->start_tx_timer);
+	del_timer(&em485->stop_tx_timer);
 
-	kfree(p->em485);
 	p->em485 = NULL;
+	kfree(em485);
 }
 EXPORT_SYMBOL_GPL(serial8250_em485_destroy);
 
