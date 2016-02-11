@@ -97,6 +97,8 @@ struct r5l_log {
 
 	bool need_cache_flush;
 	bool in_teardown;
+
+	int bypass_full_stripe;
 };
 
 /*
@@ -446,6 +448,7 @@ int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 	int reserve;
 	int i;
 	int ret = 0;
+	int fua = 0;
 
 	if (!log)
 		return -EAGAIN;
@@ -462,6 +465,8 @@ int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 
 		if (!test_bit(R5_Wantwrite, &sh->dev[i].flags))
 			continue;
+		if (test_bit(R5_WantFUA, &sh->dev[i].flags))
+			fua = 1;
 		write_disks++;
 		/* checksum is already calculated in last run */
 		if (test_bit(STRIPE_LOG_TRAPPED, &sh->state))
@@ -471,6 +476,10 @@ int r5l_write_stripe(struct r5l_log *log, struct stripe_head *sh)
 						    addr, PAGE_SIZE);
 		kunmap_atomic(addr);
 	}
+
+	if (log->bypass_full_stripe && (write_disks == sh->disks) && (!fua))
+		return -EAGAIN;   /* bypass journal device */
+
 	parity_pages = 1 + !!(sh->qd_idx >= 0);
 	data_pages = write_disks - parity_pages;
 
@@ -524,7 +533,7 @@ void r5l_write_stripe_run(struct r5l_log *log)
 
 int r5l_handle_flush_request(struct r5l_log *log, struct bio *bio)
 {
-	if (!log)
+	if (!log || log->bypass_full_stripe)
 		return -ENODEV;
 	/*
 	 * we flush log disk cache first, then write stripe data to raid disks.
@@ -1186,6 +1195,69 @@ ioerr:
 	return ret;
 }
 
+static ssize_t
+r5l_show_bypass_full_stripe(struct mddev *mddev, char *page)
+{
+	struct r5conf *conf;
+	int ret = 0;
+
+	spin_lock(&mddev->lock);
+	conf = mddev->private;
+	if (conf) {
+		if (conf->log)
+			ret = sprintf(page, "%d\n",
+				      conf->log->bypass_full_stripe);
+		else
+			ret = sprintf(page, "n/a\n");
+	}
+	spin_unlock(&mddev->lock);
+	return ret;
+}
+
+static ssize_t
+r5l_store_bypass_full_stripe(struct mddev *mddev, const char *page, size_t len)
+{
+	struct r5conf *conf;
+	int err = 0;
+	unsigned int val;
+
+	if (len >= PAGE_SIZE)
+		return -EINVAL;
+	if (kstrtouint(page, 10, &val))
+		return -EINVAL;
+
+	if (val > 1)
+		val = 1;
+
+	err = mddev_lock(mddev);
+	if (err)
+		return err;
+	mddev_suspend(mddev);
+
+	/*
+	 * We do not flush when journal is on, add extra flush for previous writes
+	 */
+	if (val == 0)
+		md_flush_request(mddev, NULL);
+
+	conf = mddev->private;
+	if (conf) {
+		if (conf->log) {
+			conf->log->bypass_full_stripe = val;
+		} else
+			err = -EINVAL;
+	} else
+		err = -ENODEV;
+	mddev_resume(mddev);
+	mddev_unlock(mddev);
+	return err ?: len;
+}
+
+struct md_sysfs_entry
+r5l_bypass_full_stripe = __ATTR(r5l_bypass_full_stripe, S_IRUGO | S_IWUSR,
+				r5l_show_bypass_full_stripe,
+				r5l_store_bypass_full_stripe);
+
 int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 {
 	struct r5l_log *log;
@@ -1227,6 +1299,7 @@ int r5l_init_log(struct r5conf *conf, struct md_rdev *rdev)
 	if (!log->meta_pool)
 		goto out_mempool;
 
+	log->bypass_full_stripe = 0;
 	log->reclaim_thread = md_register_thread(r5l_reclaim_thread,
 						 log->rdev->mddev, "reclaim");
 	if (!log->reclaim_thread)
