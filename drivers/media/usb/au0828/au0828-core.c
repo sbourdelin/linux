@@ -279,9 +279,9 @@ static int au0828_create_media_graph(struct au0828_dev *dev)
 		return -EINVAL;
 
 	if (tuner) {
+		/* create tuner to decoder link in deactivated state */
 		ret = media_create_pad_link(tuner, TUNER_PAD_OUTPUT,
-					    decoder, 0,
-					    MEDIA_LNK_FL_ENABLED);
+					    decoder, 0, 0);
 		if (ret)
 			return ret;
 	}
