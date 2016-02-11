@@ -1,0 +1,29 @@
+Axis Communications AB
+ARTPEC series SoC Device Tree Bindings
+
+ARTPEC-6 ARM SoC
+================
+
+Required root node properties:
+- compatible = "axis,artpec6";
+
+ARTPEC-6 DMA Configuration
+--------------------------
+
+The DMA configuration unit muxes dma request lines between single and burst
+alternatives.
+
+Required properties:
+- compatible: axis,artpec6-dmacfg
+- reg: Address and length of DMACFG register.
+
+Example:
+	dmacfg {
+		compatible = "axis,artpec6-dmacfg";
+		reg = <0xf8000010 4>;
+	};
+
+ARTPEC-6 Development board:
+---------------------------
+Required root node properties:
+- compatible = "axis,artpec6-dev-board", "axis,artpec6";
