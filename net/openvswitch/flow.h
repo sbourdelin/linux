@@ -48,6 +48,7 @@ struct sk_buff;
 
 struct ovs_tunnel_info {
 	struct metadata_dst	*tun_dst;
+	struct dst_cache	dst_cache;
 };
 
 #define OVS_SW_FLOW_KEY_METADATA_SIZE			\

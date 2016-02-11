@@ -1698,6 +1698,7 @@ static void ovs_nla_free_set_action(const struct nlattr *a)
 	case OVS_KEY_ATTR_TUNNEL_INFO:
 		ovs_tun = nla_data(ovs_key);
 		dst_release((struct dst_entry *)ovs_tun->tun_dst);
+		dst_cache_destroy(&ovs_tun->dst_cache);
 		break;
 	}
 }
@@ -1928,6 +1929,7 @@ static int validate_and_copy_set_tun(const struct nlattr *attr,
 {
 	struct sw_flow_match match;
 	struct sw_flow_key key;
+	struct dst_cache dst_cache;
 	struct metadata_dst *tun_dst;
 	struct ip_tunnel_info *tun_info;
 	struct ovs_tunnel_info *ovs_tun;
@@ -1959,15 +1961,24 @@ static int validate_and_copy_set_tun(const struct nlattr *attr,
 	if (!tun_dst)
 		return -ENOMEM;
 
+	err = dst_cache_init(&dst_cache, GFP_KERNEL);
+	if (err) {
+		dst_release((struct dst_entry *)tun_dst);
+		return err;
+	}
+
 	a = __add_action(sfa, OVS_KEY_ATTR_TUNNEL_INFO, NULL,
 			 sizeof(*ovs_tun), log);
 	if (IS_ERR(a)) {
 		dst_release((struct dst_entry *)tun_dst);
+		dst_cache_destroy(&dst_cache);
 		return PTR_ERR(a);
 	}
 
 	ovs_tun = nla_data(a);
 	ovs_tun->tun_dst = tun_dst;
+	ovs_tun->dst_cache = dst_cache;
+	tun_dst->u.tun_info.dst_cache = &ovs_tun->dst_cache;
 
 	tun_info = &tun_dst->u.tun_info;
 	tun_info->mode = IP_TUNNEL_INFO_TX;

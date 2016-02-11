@@ -1861,6 +1861,7 @@ static void vxlan_encap_bypass(struct sk_buff *skb, struct vxlan_dev *src_vxlan,
 static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			   struct vxlan_rdst *rdst, bool did_rsc)
 {
+	struct dst_cache *dst_cache;
 	struct ip_tunnel_info *info;
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 	struct sock *sk;
@@ -1886,6 +1887,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		dst_port = rdst->remote_port ? rdst->remote_port : vxlan->cfg.dst_port;
 		vni = rdst->remote_vni;
 		dst = &rdst->remote_ip;
+		dst_cache = &rdst->dst_cache;
 	} else {
 		if (!info) {
 			WARN_ONCE(1, "%s: Missing encapsulation instructions\n",
@@ -1900,6 +1902,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		else
 			remote_ip.sin6.sin6_addr = info->key.u.ipv6.dst;
 		dst = &remote_ip;
+		dst_cache = info->dst_cache;
 	}
 
 	if (vxlan_addr_any(dst)) {
@@ -1958,9 +1961,9 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			udp_sum = !!(flags & VXLAN_F_UDP_CSUM);
 		}
 
-		use_cache = use_cache && rdst && !skb->mark;
+		use_cache = use_cache && dst_cache && !skb->mark;
 		if (use_cache)
-			rt = dst_cache_get_ip4(&rdst->dst_cache, &saddr);
+			rt = dst_cache_get_ip4(dst_cache, &saddr);
 		else
 			rt = NULL;
 
@@ -1977,8 +1980,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			}
 
 			if (use_cache)
-				dst_cache_set_ip4(&rdst->dst_cache, &rt->dst,
-						  saddr);
+				dst_cache_set_ip4(dst_cache, &rt->dst, saddr);
 		}
 
 		if (rt->dst.dev == dev) {
@@ -2022,9 +2024,9 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			goto drop;
 		sk = vxlan->vn6_sock->sock->sk;
 
-		use_cache = rdst && !skb->mark;
+		use_cache = dst_cache && !skb->mark;
 		if (use_cache)
-			ndst = dst_cache_get_ip6(&rdst->dst_cache, &saddr);
+			ndst = dst_cache_get_ip6(dst_cache, &saddr);
 		else
 			ndst = NULL;
 
@@ -2040,8 +2042,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			}
 
 			if (use_cache)
-				dst_cache_set_ip6(&rdst->dst_cache, ndst,
-						  &saddr);
+				dst_cache_set_ip6(dst_cache, ndst, &saddr);
 		}
 
 		if (ndst->dev == dev) {
