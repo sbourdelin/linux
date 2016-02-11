@@ -451,6 +451,8 @@ static struct arch_timer_kvm_info arch_timer_kvm_info;
 
 struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 {
+	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
+
 	return &arch_timer_kvm_info;
 }
 
