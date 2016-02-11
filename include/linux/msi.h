@@ -323,6 +323,10 @@ static inline struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
 {
 	return NULL;
 }
+static struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
+{
+	return NULL;
+}
 #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
 
 #endif /* LINUX_MSI_H */
