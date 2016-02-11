@@ -980,6 +980,63 @@ end_led:
 	return 0;
 }
 
+/*
+ * Rename a DT property from legacy to upstream accepted name.
+ * The value is copied from old legacy name to new name.
+ */
+static void __init octeon_fdt_renameprop(int node, const char *old, const char *new)
+{
+	const u32 *pv;
+	u32 v;
+
+	pv = fdt_getprop(initial_boot_params, node, old, NULL);
+	if (pv) {
+		v = *pv;
+		fdt_delprop(initial_boot_params, node, old);
+		fdt_setprop_u32(initial_boot_params, node, new, v);
+	}
+}
+
+/*
+ * This function is called for every machine type to replace legacy entries
+ * in the device tree blob passed from older firmwares.
+ * It is impractical to change the DTB in shipped devices, but to support newer
+ * kernels with upstreamed drivers and DT bindings some massaging of the DTB
+ * must be done.
+ */
+int __init octeon_handle_legacy_device_tree(void)
+{
+	const char *alias_prop;
+	int aliases;
+
+	if (fdt_check_header(initial_boot_params))
+		panic("Corrupt Device Tree.");
+
+	aliases = fdt_path_offset(initial_boot_params, "/aliases");
+	if (aliases < 0) {
+		pr_err("Error: No /aliases node in device tree.");
+		return -EINVAL;
+	}
+
+	/* MMC */
+	alias_prop = fdt_getprop(initial_boot_params, aliases,
+				 "emmc", NULL);
+	if (alias_prop) {
+		int mmc = fdt_path_offset(initial_boot_params, alias_prop);
+		int slot = fdt_first_subnode(initial_boot_params, mmc);
+
+		while (slot > 0) {
+			octeon_fdt_renameprop(slot, "cavium,bus-max-width",
+					      "bus-width");
+			octeon_fdt_renameprop(slot, "spi-max-frequency",
+					      "max-frequency");
+			slot = fdt_next_subnode(initial_boot_params, slot);
+		}
+	}
+	return 0;
+}
+
+
 static int __init octeon_publish_devices(void)
 {
 	return of_platform_bus_probe(NULL, octeon_ids, NULL);

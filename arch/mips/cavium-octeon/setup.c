@@ -1080,6 +1080,7 @@ void __init prom_free_prom_memory(void)
 }
 
 int octeon_prune_device_tree(void);
+int octeon_handle_legacy_device_tree(void);
 
 extern const char __appended_dtb;
 extern const char __dtb_octeon_3xxx_begin;
@@ -1111,6 +1112,8 @@ void __init device_tree_init(void)
 	}
 
 	initial_boot_params = (void *)fdt;
+
+	octeon_handle_legacy_device_tree();
 
 	if (do_prune) {
 		octeon_prune_device_tree();
