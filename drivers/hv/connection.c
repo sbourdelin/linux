@@ -485,5 +485,5 @@ void vmbus_set_event(struct vmbus_channel *channel)
 			(child_relid >> 5));
 	}
 
-	hv_do_hypercall(HVCALL_SIGNAL_EVENT, channel->sig_event, NULL);
+	hv_do_hypercall(HV_X64_HCALL_SIGNAL_EVENT, channel->sig_event, NULL);
 }
