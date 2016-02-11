@@ -363,6 +363,7 @@ struct arm_smmu_reserved_binding {
 	dma_addr_t		iova;
 	size_t			size;
 };
+static void arm_smmu_unmap_reserved(struct iommu_domain *domain);
 
 static struct iommu_ops arm_smmu_ops;
 
@@ -1057,6 +1058,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
 	 * already been detached.
 	 */
 	arm_smmu_destroy_domain_context(domain);
+	arm_smmu_unmap_reserved(domain);
 	kfree(smmu_domain);
 }
 
@@ -1547,19 +1549,23 @@ unlock:
 	return ret;
 }
 
-static void arm_smmu_free_reserved_iova_domain(struct iommu_domain *domain)
+static void __arm_smmu_free_reserved_iova_domain(struct arm_smmu_domain *sd)
 {
-	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-	struct iova_domain *iovad = smmu_domain->reserved_iova_domain;
+	struct iova_domain *iovad = sd->reserved_iova_domain;
 
 	if (!iovad)
 		return;
 
-	mutex_lock(&smmu_domain->reserved_mutex);
-
 	put_iova_domain(iovad);
 	kfree(iovad);
+}
 
+static void arm_smmu_free_reserved_iova_domain(struct iommu_domain *domain)
+{
+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+
+	mutex_lock(&smmu_domain->reserved_mutex);
+	__arm_smmu_free_reserved_iova_domain(smmu_domain);
 	mutex_unlock(&smmu_domain->reserved_mutex);
 }
 
@@ -1672,6 +1678,24 @@ static void arm_smmu_put_single_reserved(struct iommu_domain *domain,
 	kref_put(&b->kref, reserved_binding_release);
 
 unlock:
+	mutex_unlock(&smmu_domain->reserved_mutex);
+}
+
+static void arm_smmu_unmap_reserved(struct iommu_domain *domain)
+{
+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+	struct rb_node *node;
+
+	mutex_lock(&smmu_domain->reserved_mutex);
+	while ((node = rb_first(&smmu_domain->reserved_binding_list))) {
+		struct arm_smmu_reserved_binding *b =
+			rb_entry(node, struct arm_smmu_reserved_binding, node);
+
+		while (!kref_put(&b->kref, reserved_binding_release))
+			;
+	}
+	smmu_domain->reserved_binding_list = RB_ROOT;
+	__arm_smmu_free_reserved_iova_domain(smmu_domain);
 	mutex_unlock(&smmu_domain->reserved_mutex);
 }
 
