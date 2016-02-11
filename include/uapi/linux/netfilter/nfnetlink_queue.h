@@ -30,6 +30,11 @@ struct nfqnl_msg_packet_timestamp {
 	__aligned_be64	usec;
 };
 
+struct nfqnl_msg_vlan {
+	__be16                  proto;
+	__u16                   tci;
+} __attribute__ ((packed));
+
 enum nfqnl_attr_type {
 	NFQA_UNSPEC,
 	NFQA_PACKET_HDR,
@@ -50,6 +55,8 @@ enum nfqnl_attr_type {
 	NFQA_UID,			/* __u32 sk uid */
 	NFQA_GID,			/* __u32 sk gid */
 	NFQA_SECCTX,			/* security context string */
+	NFQA_VLAN,                      /* packet vlan info */
+	NFQA_L2HDR,                     /* full L2 header */
 
 	__NFQA_MAX
 };
