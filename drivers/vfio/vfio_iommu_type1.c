@@ -36,6 +36,8 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/workqueue.h>
+#include <linux/irqdomain.h>
+#include <linux/msi.h>
 
 #define DRIVER_VERSION  "0.2"
 #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
@@ -754,6 +756,31 @@ static int vfio_bus_type(struct device *dev, void *data)
 	return 0;
 }
 
+/**
+ * vfio_msi_parent_irq_remapping_capable: returns whether the device msi-parent
+ * controller supports IRQ remapping, aka interrupt translation
+ *
+ * @dev: device handle
+ * @data: unused
+ * returns 0 if irq remapping is supported or -1 if not supported.
+ */
+static int vfio_msi_parent_irq_remapping_capable(struct device *dev, void *data)
+{
+	struct irq_domain *domain;
+	struct msi_domain_info *info;
+
+	domain = dev_get_msi_domain(dev);
+	if (!domain)
+		return 0;
+
+	info = msi_get_domain_info(domain);
+
+	if (!(info->flags & MSI_FLAG_IRQ_REMAPPING))
+		return -1;
+
+	return 0;
+}
+
 static int vfio_iommu_replay(struct vfio_iommu *iommu,
 			     struct vfio_domain *domain)
 {
@@ -848,7 +875,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	struct vfio_group *group, *g;
 	struct vfio_domain *domain, *d;
 	struct bus_type *bus = NULL;
-	int ret;
+	int ret, irq_remapping;
 
 	mutex_lock(&iommu->lock);
 
@@ -870,6 +897,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	}
 
 	group->iommu_group = iommu_group;
+
+	/*
+	 * Determine if all the devices of the group has an MSI-parent that
+	 * supports irq remapping
+	 */
+	irq_remapping = !iommu_group_for_each_dev(iommu_group, &bus,
+				       vfio_msi_parent_irq_remapping_capable);
 
 	/* Determine bus_type in order to allocate a domain */
 	ret = iommu_group_for_each_dev(iommu_group, &bus, vfio_bus_type);
@@ -899,7 +933,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 	list_add(&group->next, &domain->group_list);
 
 	if (!allow_unsafe_interrupts &&
-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) && !irq_remapping)) {
 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
 		       __func__);
 		ret = -EPERM;
