@@ -137,7 +137,7 @@ static struct saw_vreg *saw_get_drv(struct platform_device *pdev,
 	struct saw_vreg *vreg = NULL;
 	struct device_node *cpu_node, *saw_node;
 	int cpu;
-	bool found;
+	bool found = 0;
 
 	for_each_possible_cpu(cpu) {
 		cpu_node = of_cpu_device_node_get(cpu);
