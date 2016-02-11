@@ -209,6 +209,11 @@ enum ib_device_cap_flags {
 	 * by hardware.
 	 */
 	IB_DEVICE_CROSS_CHANNEL		= (1 << 27),
+	/*
+	 * Device supports RDMA access to memory registered by
+	 * other locally connected devices (e.g. GPU).
+	 */
+	IB_DEVICE_PEER_MEMORY			= (1 << 28),
 	IB_DEVICE_MANAGED_FLOW_STEERING		= (1 << 29),
 	IB_DEVICE_SIGNATURE_HANDOVER		= (1 << 30),
 	IB_DEVICE_ON_DEMAND_PAGING		= (1 << 31),
