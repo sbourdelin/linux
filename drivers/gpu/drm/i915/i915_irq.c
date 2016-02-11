@@ -4556,7 +4556,10 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 
 	pm_qos_add_request(&dev_priv->pm_qos, PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
 
-	if (IS_GEN2(dev_priv)) {
+	if (INTEL_INFO(dev_priv)->gen >= 9) {
+		dev->max_vblank_count = 0;
+		dev->driver->get_vblank_counter = g4x_get_vblank_counter;
+	} else if (IS_GEN2(dev_priv)) {
 		dev->max_vblank_count = 0;
 		dev->driver->get_vblank_counter = i8xx_get_vblank_counter;
 	} else if (IS_G4X(dev_priv) || INTEL_INFO(dev_priv)->gen >= 5) {
@@ -4572,7 +4575,7 @@ void intel_irq_init(struct drm_i915_private *dev_priv)
 	 * Gen2 doesn't have a hardware frame counter and so depends on
 	 * vblank interrupts to produce sane vblank seuquence numbers.
 	 */
-	if (!IS_GEN2(dev_priv))
+	if (!IS_GEN2(dev_priv) && !INTEL_INFO(dev_priv)->gen >= 9)
 		dev->vblank_disable_immediate = true;
 
 	dev->driver->get_vblank_timestamp = i915_get_vblank_timestamp;
