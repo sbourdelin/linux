@@ -524,6 +524,7 @@ static void gre_fb_xmit(struct sk_buff *skb, struct net_device *dev)
 	int tunnel_hlen;
 	__be16 df, flags;
 	int err;
+	bool use_cache;
 
 	tun_info = skb_tunnel_info(skb);
 	if (unlikely(!tun_info || !(tun_info->mode & IP_TUNNEL_INFO_TX) ||
@@ -531,9 +532,19 @@ static void gre_fb_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto err_free_skb;
 
 	key = &tun_info->key;
-	rt = gre_get_rt(skb, dev, &fl, key);
-	if (IS_ERR(rt))
-		goto err_free_skb;
+
+	use_cache = !skb->mark && tun_info->dst_cache;
+	rt = use_cache ? dst_cache_get_ip4(tun_info->dst_cache, &fl.saddr) :
+			 NULL;
+
+	if (!rt) {
+		rt = gre_get_rt(skb, dev, &fl, key);
+		if (IS_ERR(rt))
+			goto err_free_skb;
+		if (use_cache)
+			dst_cache_set_ip4(tun_info->dst_cache, &rt->dst,
+					  fl.saddr);
+	}
 
 	tunnel_hlen = ip_gre_calc_hlen(key->tun_flags);
 
