@@ -271,6 +271,31 @@ static void snd_seq_midisynth_delete(struct seq_midisynth *msynth)
 	snd_midi_event_free(msynth->parser);
 }
 
+static ssize_t
+client_number_show_attr(struct device *dev,
+		     struct device_attribute *attr, char *buf)
+{
+	struct snd_seq_device *device = container_of(dev, struct snd_seq_device, dev);
+	struct snd_card *card = device->card;
+	struct seq_midisynth_client *client;
+
+	client = card ? synths[card->number] : NULL;
+	return snprintf(buf, PAGE_SIZE, "%i\n", client ? client->seq_client : -1);
+}
+
+static DEVICE_ATTR(client, S_IRUGO, client_number_show_attr, NULL);
+
+static ssize_t
+device_number_show_attr(struct device *dev,
+		     struct device_attribute *attr, char *buf)
+{
+	struct snd_seq_device *device = container_of(dev, struct snd_seq_device, dev);
+
+	return snprintf(buf, PAGE_SIZE, "%i\n", device->device);
+}
+
+static DEVICE_ATTR(device, S_IRUGO, device_number_show_attr, NULL);
+
 /* register new midi synth port */
 static int
 snd_seq_midisynth_probe(struct device *_dev)
@@ -287,6 +312,7 @@ snd_seq_midisynth_probe(struct device *_dev)
 	struct snd_card *card = dev->card;
 	int device = dev->device;
 	unsigned int input_count = 0, output_count = 0;
+	int error;
 
 	if (snd_BUG_ON(!card || device < 0 || device >= SNDRV_RAWMIDI_DEVICES))
 		return -EINVAL;
@@ -331,6 +357,16 @@ snd_seq_midisynth_probe(struct device *_dev)
 			mutex_unlock(&register_mutex);
 			kfree(info);
 			return -ENOMEM;
+		}
+		error = device_create_file(&dev->dev, &dev_attr_client);
+		if (error >= 0)
+			error = device_create_file(&dev->dev, &dev_attr_device);
+		if (error < 0) {
+			snd_seq_delete_kernel_client(client->seq_client);
+			kfree(client);
+			mutex_unlock(&register_mutex);
+			kfree(info);
+			return error;
 		}
 	}
 
@@ -451,6 +487,8 @@ snd_seq_midisynth_remove(struct device *_dev)
 	kfree(msynth);
 	client->num_ports--;
 	if (client->num_ports <= 0) {
+		device_remove_file(&dev->dev, &dev_attr_client);
+		device_remove_file(&dev->dev, &dev_attr_device);
 		snd_seq_delete_kernel_client(client->seq_client);
 		synths[card->number] = NULL;
 		kfree(client);
