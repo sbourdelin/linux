@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 
 #include <linux/irqchip.h>
+#include <linux/irqchip/arm-gic-common.h>
 #include <linux/irqchip/arm-gic-v3.h>
 
 #include <asm/cputype.h>
@@ -52,6 +53,8 @@ struct gic_chip_data {
 
 static struct gic_chip_data gic_data __read_mostly;
 static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
+
+static struct gic_kvm_info gic_v3_kvm_info;
 
 #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
 #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
@@ -811,6 +814,37 @@ static void gicv3_enable_quirks(void)
 #endif
 }
 
+static void __init gic_of_setup_kvm_info(struct device_node *node)
+{
+	int ret;
+	struct resource r;
+	u32 gicv_idx;
+
+	gic_v3_kvm_info.type = GIC_V3;
+
+	gic_v3_kvm_info.maint_irq = irq_of_parse_and_map(node, 0);
+
+	if (of_property_read_u32(node, "#redistributor-regions",
+				 &gicv_idx))
+		gicv_idx = 1;
+
+	gicv_idx += 3;	/* Also skip GICD, GICC, GICH */
+	ret = of_address_to_resource(node, gicv_idx, &r);
+	if (!ret) {
+		if (!PAGE_ALIGNED(r.start))
+			pr_warn("GICV physical address 0x%llx not page aligned\n",
+				(unsigned long long)r.start);
+		else if (!PAGE_ALIGNED(resource_size(&r)))
+			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+				(unsigned long long)resource_size(&r),
+				PAGE_SIZE);
+		else
+			gic_v3_kvm_info.vcpu = r;
+	}
+
+	gic_set_kvm_info(&gic_v3_kvm_info);
+}
+
 static int __init gic_of_init(struct device_node *node, struct device_node *parent)
 {
 	void __iomem *dist_base;
@@ -907,6 +941,8 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 	gic_dist_init();
 	gic_cpu_init();
 	gic_cpu_pm_init();
+
+	gic_of_setup_kvm_info(node);
 
 	return 0;
 
