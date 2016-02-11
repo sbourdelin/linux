@@ -201,6 +201,21 @@ struct iommu_ops {
 					  unsigned long order);
 	/* frees the reserved iova domain */
 	void (*free_reserved_iova_domain)(struct iommu_domain *domain);
+	/**
+	 * allocate a reserved iova page and bind it onto the page that
+	 * contains a physical address (@addr), returns the @iova bound to
+	 * @addr. In case the 2 pages already are bound simply return @iova
+	 * and increment a ref count.
+	 */
+	int (*get_single_reserved)(struct iommu_domain *domain,
+					 phys_addr_t addr, int prot,
+					 dma_addr_t *iova);
+	/**
+	 * decrement a ref count of the iova page. If null, unmap the iova page
+	 * and release the iova
+	 */
+	void (*put_single_reserved)(struct iommu_domain *domain,
+					   dma_addr_t iova);
 
 #ifdef CONFIG_OF_IOMMU
 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
@@ -276,6 +291,11 @@ extern int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
 					    dma_addr_t iova, size_t size,
 					    unsigned long order);
 extern void iommu_free_reserved_iova_domain(struct iommu_domain *domain);
+extern int iommu_get_single_reserved(struct iommu_domain *domain,
+				     phys_addr_t paddr, int prot,
+				     dma_addr_t *iova);
+extern void iommu_put_single_reserved(struct iommu_domain *domain,
+				      dma_addr_t iova);
 struct device *iommu_device_create(struct device *parent, void *drvdata,
 				   const struct attribute_group **groups,
 				   const char *fmt, ...) __printf(4, 5);
@@ -559,6 +579,17 @@ static int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
 }
 
 static void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+{
+}
+
+static int iommu_get_single_reserved(struct iommu_domain *domain,
+				     phys_addr_t paddr, int prot,
+				     dma_addr_t *iova)
+{
+	return -EINVAL;
+}
+static void iommu_put_single_reserved(struct iommu_domain *domain,
+				      dma_addr_t iova)
 {
 }
 
