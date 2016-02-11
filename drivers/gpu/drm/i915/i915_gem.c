@@ -1428,6 +1428,11 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 	list_del_init(&request->list);
 	i915_gem_request_remove_from_client(request);
 
+	if (request->previous_ctx) {
+		intel_lr_context_unpin(request->previous_ctx, request->ring);
+		request->previous_ctx = NULL;
+	}
+
 	i915_gem_request_unreference(request);
 }
 

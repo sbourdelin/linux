@@ -783,6 +783,21 @@ intel_logical_ring_advance_and_submit(struct drm_i915_gem_request *request)
 	if (intel_ring_stopped(engine))
 		return 0;
 
+	/*
+	 * Pin the previous context on this engine to ensure it is not
+	 * prematurely unpinned in GuC mode.
+	 * Previous context will be unpinned when this request is retired,
+	 * ensuring the GPU has switched out from the previous context and into
+	 * a new context at that point.
+	 */
+	if (i915.enable_guc_submission && engine->last_context) {
+		request->previous_ctx = engine->last_context;
+		intel_lr_context_pin(request->previous_ctx, engine);
+	}
+
+	/*
+	 * Track and pin the last context submitted on an engine.
+	 */
 	if (engine->last_context != request->ctx) {
 		if (engine->last_context)
 			intel_lr_context_unpin(engine->last_context, engine);
