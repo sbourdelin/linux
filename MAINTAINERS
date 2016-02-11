@@ -7136,6 +7136,15 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
 S:	Supported
 F:	arch/microblaze/
 
+MICROCHIP LAN9352 ETHERNET DRIVER
+M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
+M:	Bryan Whitehead <Bryan.Whitehead@microchip.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/net/mchp9352.txt
+F:	drivers/net/ethernet/microchip/mchp9352.h
+F:	drivers/net/ethernet/microchip/mchp9352.c
+
 MICROSOFT SURFACE PRO 3 BUTTON DRIVER
 M:	Chen Yu <yu.c.chen@intel.com>
 L:	platform-driver-x86@vger.kernel.org

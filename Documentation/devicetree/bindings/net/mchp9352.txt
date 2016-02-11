@@ -1,0 +1,31 @@
+* Microchip LAN9352 Controller
+
+Required properties:
+- compatible : Should be "microchip,lan9352"
+- reg : Address and length of the io space for Microchip LAN
+- interrupts : Should contain Microchip LAN interrupt line
+- interrupt-parent : Should be the phandle for the interrupt controller
+  that services interrupts for this device
+- phy-mode : See ethernet.txt file in the same directory
+
+Optional properties:
+- reg-shift : Specify the quantity to shift the register offsets by
+- reg-io-width : Specify the size (in bytes) of the IO accesses that
+  should be performed on the device.  Valid value for Microchip LAN is
+  2 or 4.  If it's omitted or invalid, the size would be 2.
+- microchip,irq-active-high : Indicates the IRQ polarity is active-high
+- microchip,irq-push-pull : Indicates the IRQ type is push-pull
+- microchip,save-mac-address : Indicates that mac address needs to be saved
+  before resetting the controller
+
+Examples:
+
+lan9220@f4000000 {
+	compatible = "microchip,lan9352";
+	reg = <0xf4000000 0x2000000>;
+	phy-mode = "mii";
+	interrupt-parent = <&gpio1>;
+	interrupts = <31>;
+	reg-io-width = <4>;
+	microchip,irq-push-pull;
+};

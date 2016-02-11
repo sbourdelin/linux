@@ -5,7 +5,6 @@
 config NET_VENDOR_MICROCHIP
 	bool "Microchip devices"
 	default y
-	depends on SPI
 	---help---
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
@@ -28,6 +27,7 @@ config ENC28J60
 
 config ENC28J60_WRITEVERIFY
 	bool "Enable write verify"
+	depends on SPI
 	depends on ENC28J60
 	---help---
 	  Enable the verify after the buffer write useful for debugging purpose.
@@ -41,5 +41,35 @@ config ENCX24J600
 
       To compile this driver as a module, choose M here. The module will be
       called encx24j600.
+
+config MCHP9352
+	tristate "LAN9352 embedded ethernet support"
+	depends on HAS_IOMEM
+	select CRC32
+	select MII
+	select PHYLIB
+	---help---
+	  The LAN9352 is a 2-Port 10/100 Managed Ethernet Switch with
+	  16-Bit Non-PCI CPU Interface. The CPU interface includes a basic
+	  ethernet controller interface whose virtual phy is connected
+	  internally to a 3rd port on the embedded switch.
+
+	  This driver only operates as a simple ethernet controller
+	  on the CPU interface. Since this interface is connected directly
+	  to the embedded switch, the result is that traffic can be sent and
+	  received on both physical ports.
+
+	  No managed switch features are yet supported by this driver.
+	  1588 features are not yet supported by this driver.
+
+	  May support LAN9250, LAN9311, and LAN9312, but these products
+	  were not tested.
+
+	  Say Y here if you want support for MICROCHIP LAN9352 as a simple
+	  ethernet controller.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called mchp9352.
+
 
 endif # NET_VENDOR_MICROCHIP
