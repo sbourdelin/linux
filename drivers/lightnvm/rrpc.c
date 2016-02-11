@@ -119,8 +119,9 @@ static int block_is_full(struct rrpc *rrpc, struct rrpc_block *rblk)
 static u64 block_to_addr(struct rrpc *rrpc, struct rrpc_block *rblk)
 {
 	struct nvm_block *blk = rblk->parent;
+	int lun_blk = blk->id % rrpc->nr_luns;
 
-	return blk->id * rrpc->dev->pgs_per_blk;
+	return lun_blk * rrpc->dev->pgs_per_blk;
 }
 
 static struct ppa_addr linear_to_generic_addr(struct nvm_dev *dev,
@@ -191,7 +192,7 @@ static struct rrpc_block *rrpc_get_blk(struct rrpc *rrpc, struct rrpc_lun *rlun,
 		return NULL;
 	}
 
-	rblk = &rlun->blocks[blk->id];
+	rblk = rrpc_get_rblk(rlun, blk->id);
 	list_add_tail(&rblk->list, &rlun->open_list);
 	spin_unlock(&lun->lock);
 
