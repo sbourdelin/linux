@@ -44,6 +44,17 @@ struct thread_info {
 						   <0 => BUG */
 	unsigned long	local_flags;		/* private flags for thread */
 
+#if defined(CONFIG_VIRT_CPU_ACCOUNTING_NATIVE) && defined(CONFIG_PPC32)
+	/* Stuff for accurate time accounting */
+	unsigned long user_time;	/* accumulated usermode TB ticks */
+	unsigned long system_time;	/* accumulated system TB ticks */
+	unsigned long user_time_scaled;	/* accumulated usermode SPURR ticks */
+	unsigned long starttime;	/* TB value snapshot */
+	unsigned long starttime_user;	/* TB value on exit to usermode */
+	unsigned long startspurr;	/* SPURR value snapshot */
+	unsigned long utime_sspurr;	/* ->user_time when ->startspurr set */
+#endif
+
 	/* low level flags - has atomic operations done on it */
 	unsigned long	flags ____cacheline_aligned_in_smp;
 };

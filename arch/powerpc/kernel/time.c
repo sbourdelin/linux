@@ -165,7 +165,13 @@ DEFINE_PER_CPU(unsigned long, cputime_scaled_last_delta);
 
 cputime_t cputime_one_jiffy;
 
+#ifdef CONFIG_PPC_SPLPAR
 void (*dtl_consumer)(struct dtl_entry *, u64);
+#endif
+
+#ifdef CONFIG_PPC32
+#define get_paca()	task_thread_info(tsk)
+#endif
 
 static void calc_cputime_factors(void)
 {
@@ -185,7 +191,7 @@ static void calc_cputime_factors(void)
  * Read the SPURR on systems that have it, otherwise the PURR,
  * or if that doesn't exist return the timebase value passed in.
  */
-static u64 read_spurr(u64 tb)
+static unsigned long read_spurr(unsigned long tb)
 {
 	if (cpu_has_feature(CPU_FTR_SPURR))
 		return mfspr(SPRN_SPURR);
@@ -294,11 +300,12 @@ static inline u64 calculate_stolen_time(u64 stop_tb)
  * Account time for a transition between system, hard irq
  * or soft irq state.
  */
-static u64 vtime_delta(struct task_struct *tsk,
-			u64 *sys_scaled, u64 *stolen)
+static unsigned long vtime_delta(struct task_struct *tsk,
+				 unsigned long *sys_scaled,
+				 unsigned long *stolen)
 {
-	u64 now, nowscaled, deltascaled;
-	u64 udelta, delta, user_scaled;
+	unsigned long now, nowscaled, deltascaled;
+	unsigned long udelta, delta, user_scaled;
 
 	WARN_ON_ONCE(!irqs_disabled());
 
@@ -343,7 +350,7 @@ static u64 vtime_delta(struct task_struct *tsk,
 
 void vtime_account_system(struct task_struct *tsk)
 {
-	u64 delta, sys_scaled, stolen;
+	unsigned long delta, sys_scaled, stolen;
 
 	delta = vtime_delta(tsk, &sys_scaled, &stolen);
 	account_system_time(tsk, 0, delta, sys_scaled);
@@ -354,7 +361,7 @@ EXPORT_SYMBOL_GPL(vtime_account_system);
 
 void vtime_account_idle(struct task_struct *tsk)
 {
-	u64 delta, sys_scaled, stolen;
+	unsigned long delta, sys_scaled, stolen;
 
 	delta = vtime_delta(tsk, &sys_scaled, &stolen);
 	account_idle_time(delta + stolen);
@@ -380,6 +387,23 @@ void vtime_account_user(struct task_struct *tsk)
 	get_paca()->utime_sspurr = 0;
 	account_user_time(tsk, utime, utimescaled);
 }
+
+#ifdef CONFIG_PPC32
+/*
+ * Called from the context switch with interrupts disabled, to charge all
+ * accumulated times to the current process, and to prepare accounting on
+ * the next process.
+ */
+void arch_vtime_task_switch(struct task_struct *prev)
+{
+	struct thread_info *pi = task_thread_info(prev);
+	struct thread_info *ni = task_thread_info(current);
+
+	ni->starttime = pi->starttime;
+	ni->system_time = 0;
+	ni->user_time = 0;
+}
+#endif /* CONFIG_PPC32 */
 
 #else /* ! CONFIG_VIRT_CPU_ACCOUNTING_NATIVE */
 #define calc_cputime_factors()
