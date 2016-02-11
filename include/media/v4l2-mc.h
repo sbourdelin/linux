@@ -14,6 +14,11 @@
  * GNU General Public License for more details.
  */
 
+#ifndef _V4L2_MC_H
+#define _V4L2_MC_H
+
+#include <media/v4l2-dev.h>
+
 /**
  * enum tuner_pad_index - tuner pad index for MEDIA_ENT_F_TUNER
  *
@@ -89,3 +94,63 @@ enum demod_pad_index {
 	DEMOD_PAD_VBI_OUT,
 	DEMOD_NUM_PADS
 };
+
+/**
+ * v4l_enable_media_source() -	Hold media source for exclusive use
+ *				if free
+ *
+ * @vdev - poniter to struct video_device
+ *
+ * This interface calls enable_source handler to determine if
+ * media source is free for use. The enable_source handler is
+ * responsible for checking is the media source is free and
+ * start a pipeline between the media source and the media
+ * entity associated with the video device. This interface
+ * should be called from v4l2-core and dvb-core interfaces
+ * that change the source configuration.
+ *
+ * Return: returns zero on success or a negative error code.
+ */
+#ifdef CONFIG_MEDIA_CONTROLLER
+int v4l_enable_media_source(struct video_device *vdev);
+#else
+static int v4l_enable_media_source(struct video_device *vdev) { return 0; }
+#endif
+
+/**
+ * v4l_disable_media_source() -	Release media source
+ *
+ * @vdev - poniter to struct video_device
+ *
+ * This interface calls disable_source handler to release
+ * the media source. The disable_source handler stops the
+ * active media pipeline between the media source and the
+ * media entity associated with the video device.
+ *
+ * Return: returns zero on success or a negative error code.
+ */
+#ifdef CONFIG_MEDIA_CONTROLLER
+void v4l_disable_media_source(struct video_device *vdev);
+#else
+static void v4l_disable_media_source(struct video_device *vdev) { return; }
+#endif
+
+/*
+ * v4l_vb2q_enable_media_tuner -  Hold media source for exclusive use
+ *				  if free.
+ * @q - pointer to struct vb2_queue
+ *
+ * Wrapper for v4l_enable_media_source(). This function should
+ * be called from v4l2-core to enable the media source with
+ * pointer to struct vb2_queue as the input argument. Some
+ * v4l2-core interfaces don't have access to video device and
+ * this interface finds the struct video_device for the q and
+ * calls v4l_enable_media_source().
+ */
+#ifdef CONFIG_MEDIA_CONTROLLER
+int v4l_vb2q_enable_media_source(struct vb2_queue *q);
+#else
+static int v4l_vb2q_enable_media_source(struct vb2_queue *q) { return 0; }
+#endif
+
+#endif /* _V4L2_MC_H */
