@@ -59,6 +59,7 @@ struct sched_param {
 #include <linux/gfp.h>
 #include <linux/magic.h>
 #include <linux/cgroup-defs.h>
+#include <linux/ftrace_caller.h>
 
 #include <asm/processor.h>
 
@@ -182,7 +183,17 @@ extern void update_cpu_load_nohz(int active);
 static inline void update_cpu_load_nohz(int active) { }
 #endif
 
-extern unsigned long get_parent_ip(unsigned long addr);
+static inline unsigned long get_parent_ip(void)
+{
+	unsigned long addr = CALLER_ADDR0;
+
+	if (!in_lock_functions(addr))
+		return addr;
+	addr = CALLER_ADDR1;
+	if (!in_lock_functions(addr))
+		return addr;
+	return CALLER_ADDR2;
+}
 
 extern void dump_cpu_task(int cpu);
 
