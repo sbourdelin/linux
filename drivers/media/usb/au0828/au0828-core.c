@@ -228,7 +228,8 @@ static int au0828_media_device_init(struct au0828_dev *dev,
 	if (!mdev)
 		return -ENOMEM;
 
-	if (!media_devnode_is_registered(&mdev->devnode)) {
+	/* check if media device is already initialized */
+	if (!mdev->dev) {
 		mdev->dev = &udev->dev;
 
 		if (udev->product)
@@ -322,6 +323,27 @@ static int au0828_create_media_graph(struct au0828_dev *dev)
 			if (ret)
 				return ret;
 			break;
+		}
+	}
+#endif
+	return 0;
+}
+
+static int au0828_media_device_register(struct au0828_dev *dev,
+					struct usb_device *udev)
+{
+#ifdef CONFIG_MEDIA_CONTROLLER
+	int ret;
+
+	if (dev->media_dev &&
+		!media_devnode_is_registered(&dev->media_dev->devnode)) {
+
+		/* register media device */
+		ret = media_device_register(dev->media_dev);
+		if (ret) {
+			dev_err(&udev->dev,
+				"Media Device Register Error: %d\n", ret);
+			return ret;
 		}
 	}
 #endif
@@ -455,7 +477,7 @@ static int au0828_usb_probe(struct usb_interface *interface,
 	}
 
 #ifdef CONFIG_MEDIA_CONTROLLER
-	retval = media_device_register(dev->media_dev);
+	retval = au0828_media_device_register(dev, usbdev);
 #endif
 
 done:
