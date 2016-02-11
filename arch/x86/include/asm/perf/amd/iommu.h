@@ -25,6 +25,8 @@
 #define PC_MAX_SPEC_CNTRS			16
 
 /* amd_iommu_init.c external support functions */
+int amd_iommu_get_num_iommus(void);
+
 bool amd_iommu_pc_supported(void);
 
 u8 amd_iommu_pc_get_max_banks(void);
