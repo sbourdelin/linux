@@ -33,9 +33,10 @@ u8 amd_iommu_pc_get_max_banks(void);
 
 u8 amd_iommu_pc_get_max_counters(void);
 
-int amd_iommu_pc_set_reg_val(u16 devid, u8 bank, u8 cntr, u8 fxn, u64 *value);
+int amd_iommu_pc_set_reg(u16 devid, u8 bank, u8 cntr, u8 fxn, u64 *value);
 
-int amd_iommu_pc_get_set_reg_val(u16 devid, u8 bank, u8 cntr, u8 fxn,
-				 u64 *value, bool is_write);
+int amd_iommu_pc_set_counters(u8 bank, u8 cntr, int num, u64 *value);
+
+int amd_iommu_pc_get_counters(u8 bank, u8 cntr, int num, u64 *value);
 
 #endif /*_PERF_EVENT_AMD_IOMMU_H_*/

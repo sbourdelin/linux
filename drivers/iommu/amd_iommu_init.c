@@ -1133,6 +1133,8 @@ static int __init init_iommu_all(struct acpi_table_header *table)
 	return 0;
 }
 
+static int iommu_pc_get_set_reg(struct amd_iommu *iommu, u8 bank, u8 cntr,
+				u8 fxn, u64 *value, bool is_write);
 
 static void init_iommu_perf_ctr(struct amd_iommu *iommu)
 {
@@ -1144,8 +1146,8 @@ static void init_iommu_perf_ctr(struct amd_iommu *iommu)
 	amd_iommu_pc_present = true;
 
 	/* Check if the performance counters can be written to */
-	if ((0 != amd_iommu_pc_get_set_reg_val(0, 0, 0, 0, &val, true)) ||
-	    (0 != amd_iommu_pc_get_set_reg_val(0, 0, 0, 0, &val2, false)) ||
+	if ((iommu_pc_get_set_reg(iommu, 0, 0, 0, &val, true)) ||
+	    (iommu_pc_get_set_reg(iommu, 0, 0, 0, &val2, false)) ||
 	    (val != val2)) {
 		pr_err("AMD-Vi: Unable to write to IOMMU perf counter.\n");
 		amd_iommu_pc_present = false;
@@ -2294,19 +2296,15 @@ u8 amd_iommu_pc_get_max_counters(void)
 }
 EXPORT_SYMBOL(amd_iommu_pc_get_max_counters);
 
-int amd_iommu_pc_get_set_reg_val(u16 devid, u8 bank, u8 cntr, u8 fxn,
-				    u64 *value, bool is_write)
+static int iommu_pc_get_set_reg(struct amd_iommu *iommu, u8 bank, u8 cntr,
+				u8 fxn, u64 *value, bool is_write)
 {
-	struct amd_iommu *iommu;
 	u32 offset;
 	u32 max_offset_lim;
 
 	/* Make sure the IOMMU PC resource is available */
 	if (!amd_iommu_pc_present)
 		return -ENODEV;
-
-	/* Locate the iommu associated with the device ID */
-	iommu = amd_iommu_rlookup_table[devid];
 
 	/* Check for valid iommu and pc register indexing */
 	if (WARN_ON((iommu == NULL) || (fxn > 0x28) || (fxn & 7)))
@@ -2332,4 +2330,95 @@ int amd_iommu_pc_get_set_reg_val(u16 devid, u8 bank, u8 cntr, u8 fxn,
 
 	return 0;
 }
-EXPORT_SYMBOL(amd_iommu_pc_get_set_reg_val);
+
+int amd_iommu_pc_set_reg(u16 devid, u8 bank, u8 cntr, u8 fxn, u64 *value)
+{
+	struct amd_iommu *iommu;
+	int ret, i = 0, j = 0;
+
+	for_each_iommu(iommu) {
+		ret = iommu_pc_get_set_reg(iommu, bank, cntr, fxn, value, true);
+		if (ret)
+			goto err_out;
+		i++;
+	}
+
+	return 0;
+err_out:
+	/* Revert all the PC registers previously set */
+	for_each_iommu(iommu) {
+		if (i == j)
+			break;
+		iommu_pc_get_set_reg(iommu, bank, cntr, fxn, 0, true);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(amd_iommu_pc_set_reg);
+
+int amd_iommu_pc_set_counters(u8 bank, u8 cntr, int num, u64 *value)
+{
+	struct amd_iommu *iommu;
+	int ret, i = 0, j = 0;
+
+	if (num > amd_iommus_present)
+		return -EINVAL;
+
+	for_each_iommu(iommu) {
+		ret = iommu_pc_get_set_reg(iommu, bank, cntr,
+					   IOMMU_PC_COUNTER_REG,
+					   &value[i], true);
+		if (ret)
+			goto err_out;
+		if (i++ == amd_iommus_present)
+			break;
+	}
+
+	return 0;
+err_out:
+	/* Revert all the PC counters previously set */
+	for_each_iommu(iommu) {
+		if (i == j)
+			break;
+		iommu_pc_get_set_reg(iommu, bank, cntr, IOMMU_PC_COUNTER_REG,
+				     0, true);
+		j++;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(amd_iommu_pc_set_counters);
+
+int amd_iommu_pc_get_counters(u8 bank, u8 cntr, int num, u64 *value)
+{
+	struct amd_iommu *iommu;
+	int i = 0, ret;
+
+	if (!num)
+		return -EINVAL;
+
+	/*
+	 * Here, we read the specified counters on all IOMMUs,
+	 * which should have been programmed the same way and
+	 * aggregate the counter values.
+	 */
+	for_each_iommu(iommu) {
+		u64 tmp;
+
+		if (i >= num)
+			return -EINVAL;
+
+		ret = iommu_pc_get_set_reg(iommu, bank, cntr,
+					   IOMMU_PC_COUNTER_REG,
+					   &tmp, false);
+		if (ret)
+			return ret;
+
+		/* IOMMU pc counter register is only 48 bits */
+		value[i] = tmp & GENMASK_ULL(48, 0);
+
+		i++;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(amd_iommu_pc_get_counters);

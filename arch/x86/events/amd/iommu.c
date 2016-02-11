@@ -42,6 +42,13 @@ struct perf_amd_iommu {
 	u64 cntr_assign_mask;
 	raw_spinlock_t lock;
 	const struct attribute_group *attr_groups[4];
+
+	/*
+	 * This is a 3D array used to store the previous count values
+	 * from each performance counter of each bank of each IOMMU.
+	 * I.E. size of array = (num iommus * num banks * num counters)
+	 */
+	local64_t *prev_cnts;
 };
 
 #define format_group	attr_groups[0]
@@ -120,6 +127,12 @@ static struct amd_iommu_event_desc amd_iommu_v2_event_descs[] = {
 	AMD_IOMMU_EVENT_DESC(tlb_inv,                 "csource=0x13"),
 	{ /* end: all zeroes */ },
 };
+
+/*
+ * This is an array used to temporary hold the current values
+ * read from a particular perf counter from each IOMMU.
+ */
+static u64 *perf_iommu_cnts;
 
 /*---------------------------------------------
  * sysfs cpumask attributes
@@ -255,44 +268,42 @@ static void perf_iommu_enable_event(struct perf_event *ev)
 	u64 reg = 0ULL;
 
 	reg = csource;
-	amd_iommu_pc_get_set_reg_val(devid,
-			_GET_BANK(ev), _GET_CNTR(ev) ,
-			 IOMMU_PC_COUNTER_SRC_REG, &reg, true);
+	amd_iommu_pc_set_reg(devid, _GET_BANK(ev), _GET_CNTR(ev),
+			     IOMMU_PC_COUNTER_SRC_REG, &reg);
 
-	reg = 0ULL | devid | (_GET_DEVID_MASK(ev) << 32);
+	reg = devid | (_GET_DEVID_MASK(ev) << 32);
 	if (reg)
-		reg |= (1UL << 31);
-	amd_iommu_pc_get_set_reg_val(devid,
-			_GET_BANK(ev), _GET_CNTR(ev) ,
-			 IOMMU_PC_DEVID_MATCH_REG, &reg, true);
+		reg |= BIT(31);
+	amd_iommu_pc_set_reg(devid, _GET_BANK(ev), _GET_CNTR(ev),
+			     IOMMU_PC_DEVID_MATCH_REG, &reg);
 
-	reg = 0ULL | _GET_PASID(ev) | (_GET_PASID_MASK(ev) << 32);
+	reg = _GET_PASID(ev) | (_GET_PASID_MASK(ev) << 32);
 	if (reg)
-		reg |= (1UL << 31);
-	amd_iommu_pc_get_set_reg_val(devid,
-			_GET_BANK(ev), _GET_CNTR(ev) ,
-			 IOMMU_PC_PASID_MATCH_REG, &reg, true);
+		reg |= BIT(31);
+	amd_iommu_pc_set_reg(devid, _GET_BANK(ev), _GET_CNTR(ev),
+			     IOMMU_PC_PASID_MATCH_REG, &reg);
 
-	reg = 0ULL | _GET_DOMID(ev) | (_GET_DOMID_MASK(ev) << 32);
+	reg = _GET_DOMID(ev) | (_GET_DOMID_MASK(ev) << 32);
 	if (reg)
-		reg |= (1UL << 31);
-	amd_iommu_pc_get_set_reg_val(devid,
-			_GET_BANK(ev), _GET_CNTR(ev) ,
-			 IOMMU_PC_DOMID_MATCH_REG, &reg, true);
+		reg |= BIT(31);
+	amd_iommu_pc_set_reg(devid, _GET_BANK(ev), _GET_CNTR(ev),
+			     IOMMU_PC_DOMID_MATCH_REG, &reg);
 }
 
 static void perf_iommu_disable_event(struct perf_event *event)
 {
 	u64 reg = 0ULL;
 
-	amd_iommu_pc_get_set_reg_val(_GET_DEVID(event),
-			_GET_BANK(event), _GET_CNTR(event),
-			IOMMU_PC_COUNTER_SRC_REG, &reg, true);
+	amd_iommu_pc_set_reg(_GET_DEVID(event), _GET_BANK(event),
+			     _GET_CNTR(event), IOMMU_PC_COUNTER_SRC_REG, &reg);
 }
 
 static void perf_iommu_start(struct perf_event *event, int flags)
 {
 	struct hw_perf_event *hwc = &event->hw;
+	struct perf_amd_iommu *perf_iommu = container_of(event->pmu,
+							 struct perf_amd_iommu,
+							 pmu);
 
 	pr_debug("perf: amd_iommu:perf_iommu_start\n");
 	if (WARN_ON_ONCE(!(hwc->state & PERF_HES_STOPPED)))
@@ -302,10 +313,19 @@ static void perf_iommu_start(struct perf_event *event, int flags)
 	hwc->state = 0;
 
 	if (flags & PERF_EF_RELOAD) {
-		u64 prev_raw_count =  local64_read(&hwc->prev_count);
-		amd_iommu_pc_get_set_reg_val(_GET_DEVID(event),
-				_GET_BANK(event), _GET_CNTR(event),
-				IOMMU_PC_COUNTER_REG, &prev_raw_count, true);
+		int i;
+
+		for (i = 0; i < amd_iommu_get_num_iommus(); i++) {
+			int index = get_iommu_bnk_cnt_evt_idx(perf_iommu, i,
+							      _GET_BANK(event),
+							      _GET_CNTR(event));
+
+			perf_iommu_cnts[i] = local64_read(&perf_iommu->prev_cnts[index]);
+		}
+
+		amd_iommu_pc_set_counters(_GET_BANK(event), _GET_CNTR(event),
+					  amd_iommu_get_num_iommus(),
+					  perf_iommu_cnts);
 	}
 
 	perf_iommu_enable_event(event);
@@ -315,29 +335,45 @@ static void perf_iommu_start(struct perf_event *event, int flags)
 
 static void perf_iommu_read(struct perf_event *event)
 {
-	u64 count = 0ULL;
-	u64 prev_raw_count = 0ULL;
+	int i;
 	u64 delta = 0ULL;
 	struct hw_perf_event *hwc = &event->hw;
-	pr_debug("perf: amd_iommu:perf_iommu_read\n");
+	struct perf_amd_iommu *perf_iommu = container_of(event->pmu,
+							 struct perf_amd_iommu,
+							 pmu);
 
-	amd_iommu_pc_get_set_reg_val(_GET_DEVID(event),
-				_GET_BANK(event), _GET_CNTR(event),
-				IOMMU_PC_COUNTER_REG, &count, false);
-
-	/* IOMMU pc counter register is only 48 bits */
-	count &= 0xFFFFFFFFFFFFULL;
-
-	prev_raw_count =  local64_read(&hwc->prev_count);
-	if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
-					count) != prev_raw_count)
+	if (amd_iommu_pc_get_counters(_GET_BANK(event), _GET_CNTR(event),
+				      amd_iommu_get_num_iommus(),
+				      perf_iommu_cnts))
 		return;
 
-	/* Handling 48-bit counter overflowing */
-	delta = (count << COUNTER_SHIFT) - (prev_raw_count << COUNTER_SHIFT);
-	delta >>= COUNTER_SHIFT;
-	local64_add(delta, &event->count);
+	/*
+	 * Now we re-aggregating event counts and prev-counts
+	 * from all IOMMUs
+	 */
+	local64_set(&hwc->prev_count, 0);
 
+	for (i = 0; i < amd_iommu_get_num_iommus(); i++) {
+		int indx = get_iommu_bnk_cnt_evt_idx(perf_iommu, i,
+						     _GET_BANK(event),
+						     _GET_CNTR(event));
+		u64 prev_raw_count = local64_read(&perf_iommu->prev_cnts[indx]);
+
+		/* IOMMU pc counter register is only 48 bits */
+		perf_iommu_cnts[i] &= GENMASK_ULL(48, 0);
+
+		/*
+		 * Since we do not enable counter overflow interrupts,
+		 * we do not have to worry about prev_count changing on us
+		 */
+		local64_set(&perf_iommu->prev_cnts[indx], perf_iommu_cnts[i]);
+		local64_add(prev_raw_count, &hwc->prev_count);
+
+		/* Handle 48-bit counter overflow */
+		delta = (perf_iommu_cnts[i] << COUNTER_SHIFT) - (prev_raw_count << COUNTER_SHIFT);
+		delta >>= COUNTER_SHIFT;
+		local64_add(delta, &event->count);
+	}
 }
 
 static void perf_iommu_stop(struct perf_event *event, int flags)
@@ -427,10 +463,14 @@ static __init int _init_events_attrs(struct perf_amd_iommu *perf_iommu)
 
 static __init void amd_iommu_pc_exit(void)
 {
-	if (__perf_iommu.events_group != NULL) {
-		kfree(__perf_iommu.events_group);
-		__perf_iommu.events_group = NULL;
-	}
+	kfree(__perf_iommu.events_group);
+	__perf_iommu.events_group = NULL;
+
+	kfree(__perf_iommu.prev_cnts);
+	__perf_iommu.prev_cnts = NULL;
+
+	kfree(perf_iommu_cnts);
+	perf_iommu_cnts = NULL;
 }
 
 static __init int _init_perf_amd_iommu(
@@ -459,6 +499,18 @@ static __init int _init_perf_amd_iommu(
 	/* Init null attributes */
 	perf_iommu->null_group = NULL;
 	perf_iommu->pmu.attr_groups = perf_iommu->attr_groups;
+
+	perf_iommu->prev_cnts = kzalloc(sizeof(*perf_iommu->prev_cnts) *
+					amd_iommu_get_num_iommus() *
+					perf_iommu->max_banks *
+					perf_iommu->max_counters, GFP_KERNEL);
+	if (!perf_iommu->prev_cnts)
+		return -ENOMEM;
+
+	perf_iommu_cnts = kzalloc(sizeof(*perf_iommu_cnts) * amd_iommu_get_num_iommus(),
+				  GFP_KERNEL);
+	if (!perf_iommu_cnts)
+		return -ENOMEM;
 
 	ret = perf_pmu_register(&perf_iommu->pmu, name, -1);
 	if (ret) {
