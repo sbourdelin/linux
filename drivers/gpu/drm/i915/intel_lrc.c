@@ -269,6 +269,9 @@ logical_ring_init_platform_invariants(struct intel_engine_cs *ring)
 {
 	struct drm_device *dev = ring->dev;
 
+	if (IS_GEN8(dev) || IS_GEN9(dev))
+		ring->idle_lite_restore_wa = ~0;
+
 	ring->disable_lite_restore_wa = (IS_SKL_REVID(dev, 0, SKL_REVID_B0) ||
 					IS_BXT_REVID(dev, 0, BXT_REVID_A1)) &&
 					(ring->id == VCS || ring->id == VCS2);
@@ -424,7 +427,7 @@ static void execlists_submit_requests(struct drm_i915_gem_request *rq0,
 static void execlists_context_unqueue(struct intel_engine_cs *ring)
 {
 	struct drm_i915_gem_request *req0 = NULL, *req1 = NULL;
-	struct drm_i915_gem_request *cursor = NULL, *tmp = NULL;
+	struct drm_i915_gem_request *cursor, *tmp;
 
 	assert_spin_locked(&ring->execlist_lock);
 
@@ -433,9 +436,6 @@ static void execlists_context_unqueue(struct intel_engine_cs *ring)
 	 * without the irqs may get lost and a GPU Hang may occur.
 	 */
 	WARN_ON(!intel_irqs_enabled(ring->dev->dev_private));
-
-	if (list_empty(&ring->execlist_queue))
-		return;
 
 	/* Try to read in pairs */
 	list_for_each_entry_safe(cursor, tmp, &ring->execlist_queue,
@@ -451,37 +451,35 @@ static void execlists_context_unqueue(struct intel_engine_cs *ring)
 			req0 = cursor;
 		} else {
 			req1 = cursor;
+			WARN_ON(req1->elsp_submitted);
 			break;
 		}
 	}
 
-	if (IS_GEN8(ring->dev) || IS_GEN9(ring->dev)) {
+	if (unlikely(!req0))
+		return;
+
+	if (req0->elsp_submitted & ring->idle_lite_restore_wa) {
 		/*
-		 * WaIdleLiteRestore: make sure we never cause a lite
-		 * restore with HEAD==TAIL
+		 * WaIdleLiteRestore: make sure we never cause a lite restore
+		 * with HEAD==TAIL.
+		 *
+		 * Apply the wa NOOPS to prevent ring:HEAD == req:TAIL as we
+		 * resubmit the request. See gen8_emit_request() for where we
+		 * prepare the padding after the end of the request.
 		 */
-		if (req0->elsp_submitted) {
-			/*
-			 * Apply the wa NOOPS to prevent ring:HEAD == req:TAIL
-			 * as we resubmit the request. See gen8_emit_request()
-			 * for where we prepare the padding after the end of the
-			 * request.
-			 */
-			struct intel_ringbuffer *ringbuf;
+		struct intel_ringbuffer *ringbuf;
 
-			ringbuf = req0->ctx->engine[ring->id].ringbuf;
-			req0->tail += 8;
-			req0->tail &= ringbuf->size - 1;
-		}
+		ringbuf = req0->ctx->engine[ring->id].ringbuf;
+		req0->tail += 8;
+		req0->tail &= ringbuf->size - 1;
 	}
-
-	WARN_ON(req1 && req1->elsp_submitted);
 
 	execlists_submit_requests(req0, req1);
 }
 
-static bool execlists_check_remove_request(struct intel_engine_cs *ring,
-					   u32 request_id)
+static unsigned int
+execlists_check_remove_request(struct intel_engine_cs *ring, u32 request_id)
 {
 	struct drm_i915_gem_request *head_req;
 
@@ -491,20 +489,21 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
 					    struct drm_i915_gem_request,
 					    execlist_link);
 
-	if (head_req != NULL) {
-		if (intel_execlists_ctx_id(head_req->ctx, ring) == request_id) {
-			WARN(head_req->elsp_submitted == 0,
-			     "Never submitted head request\n");
+	if (!head_req)
+		return 0;
 
-			if (--head_req->elsp_submitted <= 0) {
-				list_move_tail(&head_req->execlist_link,
-					       &ring->execlist_retired_req_list);
-				return true;
-			}
-		}
-	}
+	if (unlikely(intel_execlists_ctx_id(head_req->ctx, ring) != request_id))
+		return 0;
 
-	return false;
+	WARN(head_req->elsp_submitted == 0, "Never submitted head request\n");
+
+	if (--head_req->elsp_submitted > 0)
+		return 0;
+
+	list_move_tail(&head_req->execlist_link,
+		       &ring->execlist_retired_req_list);
+
+	return 1;
 }
 
 static u32 get_context_status(struct intel_engine_cs *ring, u8 read_pointer,
@@ -551,7 +550,7 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 		if (status & GEN8_CTX_STATUS_IDLE_ACTIVE)
 			continue;
 
-		if (status & GEN8_CTX_STATUS_PREEMPTED) {
+		if (unlikely(status & GEN8_CTX_STATUS_PREEMPTED)) {
 			if (status & GEN8_CTX_STATUS_LITE_RESTORE) {
 				if (execlists_check_remove_request(ring, status_id))
 					WARN(1, "Lite Restored request removed from queue\n");
@@ -559,21 +558,16 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 				WARN(1, "Preemption without Lite Restore\n");
 		}
 
-		if ((status & GEN8_CTX_STATUS_ACTIVE_IDLE) ||
-		    (status & GEN8_CTX_STATUS_ELEMENT_SWITCH)) {
-			if (execlists_check_remove_request(ring, status_id))
-				submit_contexts++;
-		}
+		if (status & (GEN8_CTX_STATUS_ACTIVE_IDLE |
+		    GEN8_CTX_STATUS_ELEMENT_SWITCH))
+			submit_contexts +=
+				execlists_check_remove_request(ring, status_id);
 	}
 
-	if (ring->disable_lite_restore_wa) {
-		/* Prevent a ctx to preempt itself */
-		if ((status & GEN8_CTX_STATUS_ACTIVE_IDLE) &&
-		    (submit_contexts != 0))
-			execlists_context_unqueue(ring);
-	} else if (submit_contexts != 0) {
+	if (submit_contexts && (!ring->disable_lite_restore_wa ||
+	    (ring->disable_lite_restore_wa && (status &
+	    GEN8_CTX_STATUS_ACTIVE_IDLE))))
 		execlists_context_unqueue(ring);
-	}
 
 	spin_unlock(&ring->execlist_lock);
 
@@ -2013,6 +2007,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *ring)
 		ring->status_page.obj = NULL;
 	}
 
+	ring->idle_lite_restore_wa = 0;
 	ring->disable_lite_restore_wa = false;
 	ring->ctx_desc_template = 0;
 
