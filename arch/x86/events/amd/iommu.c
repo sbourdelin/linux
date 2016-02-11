@@ -15,9 +15,9 @@
 #include <linux/module.h>
 #include <linux/cpumask.h>
 #include <linux/slab.h>
+#include <asm/perf/amd/iommu.h>
 
 #include "../../kernel/cpu/perf_event.h"
-#include "iommu.h"
 
 #define COUNTER_SHIFT		16
 

@@ -27,6 +27,8 @@
 #include <linux/amd-iommu.h>
 #include <linux/export.h>
 #include <linux/iommu.h>
+#include <asm/perf/amd/iommu.h>
+
 #include <asm/pci-direct.h>
 #include <asm/iommu.h>
 #include <asm/gart.h>
