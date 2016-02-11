@@ -19,6 +19,7 @@
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_pci.h>
+#include "irq-gic-common.h"
 
 static void its_mask_msi_irq(struct irq_data *d)
 {
@@ -37,7 +38,7 @@ static struct irq_chip its_msi_irq_chip = {
 	.irq_unmask		= its_unmask_msi_irq,
 	.irq_mask		= its_mask_msi_irq,
 	.irq_eoi		= irq_chip_eoi_parent,
-	.irq_write_msi_msg	= pci_msi_domain_write_msg,
+	.irq_write_msi_msg	= gic_pci_msi_domain_write_msg,
 };
 
 struct its_pci_alias {

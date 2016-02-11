@@ -35,4 +35,9 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
 void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
 		void *data);
 
+int gic_set_msi_addr(struct irq_data *data, struct msi_msg *msg);
+void gic_unset_msi_addr(struct irq_data *data);
+void gic_pci_msi_domain_write_msg(struct irq_data *irq_data,
+				  struct msi_msg *msg);
+
 #endif /* _IRQ_GIC_COMMON_H */
