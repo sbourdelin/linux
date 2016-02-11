@@ -4831,6 +4831,26 @@ cleanup_render_ring:
 	return ret;
 }
 
+static void
+i915_gem_cleanup_engines(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	struct intel_engine_cs *ring;
+	int i;
+
+	for_each_ring(ring, dev_priv, i)
+		dev_priv->gt.cleanup_ring(ring);
+
+	if (i915.enable_execlists) {
+		/*
+		 * Neither the BIOS, ourselves or any other kernel
+		 * expects the system to be in execlists mode on startup,
+		 * so we need to reset the GPU back to legacy mode.
+		 */
+		intel_gpu_reset(dev);
+	}
+}
+
 int
 i915_gem_init_hw(struct drm_device *dev)
 {
@@ -5008,24 +5028,12 @@ out_unlock:
 	return ret;
 }
 
-void
-i915_gem_cleanup_engines(struct drm_device *dev)
+void i915_gem_fini(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_engine_cs *ring;
-	int i;
+	lockdep_assert_held(&dev->struct_mutex);
 
-	for_each_ring(ring, dev_priv, i)
-		dev_priv->gt.cleanup_ring(ring);
-
-	if (i915.enable_execlists) {
-		/*
-		 * Neither the BIOS, ourselves or any other kernel
-		 * expects the system to be in execlists mode on startup,
-		 * so we need to reset the GPU back to legacy mode.
-		 */
-		intel_gpu_reset(dev);
-	}
+	i915_gem_context_fini(dev);
+	i915_gem_cleanup_engines(dev);
 }
 
 static void
