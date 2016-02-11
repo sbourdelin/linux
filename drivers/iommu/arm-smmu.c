@@ -349,8 +349,19 @@ struct arm_smmu_domain {
 	struct mutex			init_mutex; /* Protects smmu pointer */
 	struct iommu_domain		domain;
 	struct iova_domain		*reserved_iova_domain;
-	/* protects reserved domain manipulation */
+	/* rb tree indexed by PA, for reserved bindings only */
+	struct rb_root			reserved_binding_list;
+	/* protects reserved domain and rbtree manipulation */
 	struct mutex			reserved_mutex;
+};
+
+struct arm_smmu_reserved_binding {
+	struct kref		kref;
+	struct rb_node		node;
+	struct arm_smmu_domain	*domain;
+	phys_addr_t		addr;
+	dma_addr_t		iova;
+	size_t			size;
 };
 
 static struct iommu_ops arm_smmu_ops;
@@ -398,6 +409,57 @@ static struct device_node *dev_get_dev_node(struct device *dev)
 	}
 
 	return dev->of_node;
+}
+
+/* Reserved binding RB-tree manipulation */
+
+static struct arm_smmu_reserved_binding *find_reserved_binding(
+				    struct arm_smmu_domain *d,
+				    phys_addr_t start, size_t size)
+{
+	struct rb_node *node = d->reserved_binding_list.rb_node;
+
+	while (node) {
+		struct arm_smmu_reserved_binding *binding =
+			rb_entry(node, struct arm_smmu_reserved_binding, node);
+
+		if (start + size <= binding->addr)
+			node = node->rb_left;
+		else if (start >= binding->addr + binding->size)
+			node = node->rb_right;
+		else
+			return binding;
+	}
+
+	return NULL;
+}
+
+static void link_reserved_binding(struct arm_smmu_domain *d,
+				  struct arm_smmu_reserved_binding *new)
+{
+	struct rb_node **link = &d->reserved_binding_list.rb_node;
+	struct rb_node *parent = NULL;
+	struct arm_smmu_reserved_binding *binding;
+
+	while (*link) {
+		parent = *link;
+		binding = rb_entry(parent, struct arm_smmu_reserved_binding,
+				   node);
+
+		if (new->addr + new->size <= binding->addr)
+			link = &(*link)->rb_left;
+		else
+			link = &(*link)->rb_right;
+	}
+
+	rb_link_node(&new->node, parent, link);
+	rb_insert_color(&new->node, &d->reserved_binding_list);
+}
+
+static void unlink_reserved_binding(struct arm_smmu_domain *d,
+				    struct arm_smmu_reserved_binding *old)
+{
+	rb_erase(&old->node, &d->reserved_binding_list);
 }
 
 static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
@@ -981,6 +1043,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
 	mutex_init(&smmu_domain->init_mutex);
 	mutex_init(&smmu_domain->reserved_mutex);
 	spin_lock_init(&smmu_domain->pgtbl_lock);
+	smmu_domain->reserved_binding_list = RB_ROOT;
 
 	return &smmu_domain->domain;
 }
