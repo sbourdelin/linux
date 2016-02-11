@@ -507,17 +507,16 @@ static bool execlists_check_remove_request(struct intel_engine_cs *ring,
 	return false;
 }
 
-static void get_context_status(struct intel_engine_cs *ring,
-			       u8 read_pointer,
-			       u32 *status, u32 *context_id)
+static u32 get_context_status(struct intel_engine_cs *ring, u8 read_pointer,
+			      u32 *context_id)
 {
 	struct drm_i915_private *dev_priv = ring->dev->dev_private;
 
-	if (WARN_ON(read_pointer >= GEN8_CSB_ENTRIES))
-		return;
+	read_pointer %= GEN8_CSB_ENTRIES;
 
-	*status = I915_READ(RING_CONTEXT_STATUS_BUF_LO(ring, read_pointer));
 	*context_id = I915_READ(RING_CONTEXT_STATUS_BUF_HI(ring, read_pointer));
+
+	return I915_READ(RING_CONTEXT_STATUS_BUF_LO(ring, read_pointer));
 }
 
 /**
@@ -547,9 +546,7 @@ void intel_lrc_irq_handler(struct intel_engine_cs *ring)
 	spin_lock(&ring->execlist_lock);
 
 	while (read_pointer < write_pointer) {
-
-		get_context_status(ring, ++read_pointer % GEN8_CSB_ENTRIES,
-				   &status, &status_id);
+		status = get_context_status(ring, ++read_pointer, &status_id);
 
 		if (status & GEN8_CTX_STATUS_IDLE_ACTIVE)
 			continue;
