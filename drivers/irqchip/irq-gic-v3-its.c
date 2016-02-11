@@ -1540,6 +1540,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
 		inner_domain->parent = parent;
 		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
 		info->ops = &its_msi_domain_ops;
+		info->flags |= MSI_FLAG_IRQ_REMAPPING;
 		info->data = its;
 		inner_domain->host_data = info;
 	}
