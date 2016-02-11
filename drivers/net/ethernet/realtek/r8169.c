@@ -1675,11 +1675,9 @@ static void __rtl8169_check_link_status(struct net_device *dev,
 		/* This is to cancel a scheduled suspend if there's one. */
 		if (pm)
 			pm_request_resume(&tp->pci_dev->dev);
-		netif_carrier_on(dev);
 		if (net_ratelimit())
 			netif_info(tp, ifup, dev, "link up\n");
 	} else {
-		netif_carrier_off(dev);
 		netif_info(tp, ifdown, dev, "link down\n");
 		if (pm)
 			pm_schedule_suspend(&tp->pci_dev->dev, 5000);
@@ -8439,7 +8437,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (pci_dev_run_wake(pdev))
 		pm_runtime_put_noidle(&pdev->dev);
 
-	netif_carrier_off(dev);
 
 out:
 	return rc;
