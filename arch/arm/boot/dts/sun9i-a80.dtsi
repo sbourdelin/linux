@@ -395,7 +395,7 @@
 		};
 
 		apbs: clk@0800141c {
-			compatible = "allwinner,sun8i-a23-apb0-clk";
+			compatible = "allwinner,sun9i-a80-apbs-clk";
 			reg = <0x0800141c 0x4>;
 			#clock-cells = <0>;
 			clocks = <&ahbs>;
