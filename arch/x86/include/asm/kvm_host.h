@@ -754,6 +754,8 @@ struct kvm_arch {
 
 	bool irqchip_split;
 	u8 nr_reserved_ioapic_pins;
+
+	void *arch_data;
 };
 
 struct kvm_vm_stat {
