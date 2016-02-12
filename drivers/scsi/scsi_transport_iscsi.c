@@ -79,7 +79,8 @@ struct iscsi_internal {
 	struct transport_container session_cont;
 };
 
-static atomic_t iscsi_session_nr; /* sysfs session id for next new session */
+static DEFINE_IDA(iscsi_session_id_ida);
+
 static struct workqueue_struct *iscsi_eh_timer_workq;
 
 static DEFINE_IDA(iscsi_sess_ida);
@@ -2074,7 +2075,12 @@ int iscsi_add_session(struct iscsi_cls_session *session, unsigned int target_id)
 	int err;
 
 	ihost = shost->shost_data;
-	session->sid = atomic_add_return(1, &iscsi_session_nr);
+	session->sid = ida_simple_get(&iscsi_session_id_ida, 0, 0, GFP_KERNEL);
+	if (session->sid < 0) {
+		iscsi_cls_session_printk(KERN_ERR, session,
+					 "Failure in Session ID Allocation\n");
+		return session->sid;
+	}
 
 	if (target_id == ISCSI_MAX_TARGET) {
 		id = ida_simple_get(&iscsi_sess_ida, 0, 0, GFP_KERNEL);
@@ -2082,7 +2088,8 @@ int iscsi_add_session(struct iscsi_cls_session *session, unsigned int target_id)
 		if (id < 0) {
 			iscsi_cls_session_printk(KERN_ERR, session,
 					"Failure in Target ID Allocation\n");
-			return id;
+			err = id;
+			goto release_session_id_ida;
 		}
 		session->target_id = (unsigned int)id;
 		session->ida_used = true;
@@ -2109,6 +2116,8 @@ int iscsi_add_session(struct iscsi_cls_session *session, unsigned int target_id)
 release_ida:
 	if (session->ida_used)
 		ida_simple_remove(&iscsi_sess_ida, session->target_id);
+release_session_id_ida:
+	ida_simple_remove(&iscsi_session_id_ida, session->target_id);
 
 	return err;
 }
@@ -2214,6 +2223,7 @@ void iscsi_free_session(struct iscsi_cls_session *session)
 {
 	ISCSI_DBG_TRANS_SESSION(session, "Freeing session\n");
 	iscsi_session_event(session, ISCSI_KEVENT_DESTROY_SESSION);
+	ida_simple_remove(&iscsi_session_id_ida, session->target_id);
 	put_device(&session->dev);
 }
 EXPORT_SYMBOL_GPL(iscsi_free_session);
@@ -4524,8 +4534,6 @@ static __init int iscsi_transport_init(void)
 	printk(KERN_INFO "Loading iSCSI transport class v%s.\n",
 		ISCSI_TRANSPORT_VERSION);
 
-	atomic_set(&iscsi_session_nr, 0);
-
 	err = class_register(&iscsi_transport_class);
 	if (err)
 		return err;
@@ -4598,6 +4606,7 @@ static void __exit iscsi_transport_exit(void)
 	class_unregister(&iscsi_endpoint_class);
 	class_unregister(&iscsi_iface_class);
 	class_unregister(&iscsi_transport_class);
+	ida_destroy(&iscsi_session_id_ida);
 }
 
 module_init(iscsi_transport_init);
