@@ -21,7 +21,7 @@
 #include <linux/platform_device.h>
 
 static struct clk *sun8i_a23_apb0_register(struct device_node *node,
-					   void __iomem *reg)
+					   void __iomem *reg, u8 div_flags)
 {
 	const char *clk_name = node->name;
 	const char *clk_parent;
@@ -36,7 +36,7 @@ static struct clk *sun8i_a23_apb0_register(struct device_node *node,
 
 	/* The A23 APB0 clock is a standard 2 bit wide divider clock */
 	clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
-				   0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+				   0, 2, div_flags, NULL);
 	if (IS_ERR(clk))
 		return clk;
 
@@ -52,7 +52,7 @@ err_unregister:
 	return ERR_PTR(ret);
 }
 
-static void sun8i_a23_apb0_setup(struct device_node *node)
+static void sun9i_a80_apbs_setup(struct device_node *node)
 {
 	void __iomem *reg;
 	struct resource res;
@@ -60,18 +60,11 @@ static void sun8i_a23_apb0_setup(struct device_node *node)
 
 	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
 	if (IS_ERR(reg)) {
-		/*
-		 * This happens with clk nodes instantiated through mfd,
-		 * as those do not have their resources assigned in the
-		 * device tree. Do not print an error in this case.
-		 */
-		if (PTR_ERR(reg) != -EINVAL)
-			pr_err("Could not get registers for a23-apb0-clk\n");
-
+		pr_err("Could not get registers for a80-apbs-clk\n");
 		return;
 	}
 
-	clk = sun8i_a23_apb0_register(node, reg);
+	clk = sun8i_a23_apb0_register(node, reg, 0);
 	if (IS_ERR(clk))
 		goto err_unmap;
 
@@ -82,8 +75,8 @@ err_unmap:
 	of_address_to_resource(node, 0, &res);
 	release_mem_region(res.start, resource_size(&res));
 }
-CLK_OF_DECLARE(sun8i_a23_apb0, "allwinner,sun8i-a23-apb0-clk",
-	       sun8i_a23_apb0_setup);
+CLK_OF_DECLARE(sun9i_a80_apbs, "allwinner,sun9i-a80-apbs-clk",
+	       sun9i_a80_apbs_setup);
 
 static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
 {
@@ -97,7 +90,7 @@ static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
 	if (IS_ERR(reg))
 		return PTR_ERR(reg);
 
-	clk = sun8i_a23_apb0_register(np, reg);
+	clk = sun8i_a23_apb0_register(np, reg, CLK_DIVIDER_POWER_OF_TWO);
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
