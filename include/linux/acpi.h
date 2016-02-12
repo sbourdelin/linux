@@ -218,6 +218,8 @@ int acpi_numa_init (void);
 
 int acpi_table_init (void);
 int acpi_table_parse(char *id, acpi_tbl_table_handler handler);
+int acpi_table_parse2(char *id, int (*handler)(struct acpi_table_header *table,
+					       void *data), void *data);
 int __init acpi_parse_entries(char *id, unsigned long table_size,
 			      acpi_tbl_entry_handler handler,
 			      struct acpi_table_header *table_header,
@@ -632,6 +634,12 @@ static inline int acpi_check_region(resource_size_t start, resource_size_t n,
 struct acpi_table_header;
 static inline int acpi_table_parse(char *id,
 				int (*handler)(struct acpi_table_header *))
+{
+	return -ENODEV;
+}
+
+int acpi_table_parse2(char *id, int (*handler)(struct acpi_table_header *table,
+					       void *data), void *data)
 {
 	return -ENODEV;
 }

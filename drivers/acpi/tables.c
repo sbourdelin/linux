@@ -40,7 +40,7 @@ static char *mps_inti_flags_trigger[] = { "dfl", "edge", "res", "level" };
 
 static struct acpi_table_desc initial_tables[ACPI_MAX_TABLES] __initdata;
 
-static int acpi_apic_instance __initdata;
+static int acpi_apic_instance;
 
 /*
  * Disable table checksum verification for the early stage due to the size
@@ -374,6 +374,60 @@ acpi_table_parse_madt(enum acpi_madt_type id,
 }
 
 /**
+ * acpi_table_parse2 - find table with @id, run @handler on it
+ * @id: table id to find
+ * @handler: handler to run
+ * @data: data to pass to handler
+ *
+ * Scan the ACPI System Descriptor Table (STD) for a table matching @id,
+ * run @handler on it.
+ *
+ * How it differs from acpi_table_parse()
+ * 1. It respect the return value of the handler function
+ * 2. It has additional data argument to make closures
+ * 3. It can be called from everywhere from the kernel (no __init)
+ *
+ * Return: the value returned by the handler if table found, -errno if not.
+ */
+int acpi_table_parse2(char *id,
+	int (*handler)(struct acpi_table_header *table, void *data), void *data)
+{
+	struct acpi_table_header *table = NULL;
+	acpi_size tbl_size;
+	int err;
+
+	if (acpi_disabled)
+		return -ENODEV;
+
+	if (!id || !handler)
+		return -EINVAL;
+
+	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
+		acpi_get_table_with_size(id, acpi_apic_instance, &table,
+					 &tbl_size);
+	else
+		acpi_get_table_with_size(id, 0, &table, &tbl_size);
+
+	if (table) {
+		err = handler(table, data);
+		early_acpi_os_unmap_memory(table, tbl_size);
+		return err;
+	} else
+		return -ENODEV;
+
+}
+
+/*
+ * 1. fix the signature
+ * 2. always return 0, don't respect the value returned from the handler
+ */
+static int legacy_acpi_table_handler(struct acpi_table_header *table, void *d)
+{
+	((acpi_tbl_table_handler)d)(table);
+	return 0;
+}
+
+/**
  * acpi_table_parse - find table with @id, run @handler on it
  * @id: table id to find
  * @handler: handler to run
@@ -385,26 +439,7 @@ acpi_table_parse_madt(enum acpi_madt_type id,
  */
 int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 {
-	struct acpi_table_header *table = NULL;
-	acpi_size tbl_size;
-
-	if (acpi_disabled)
-		return -ENODEV;
-
-	if (!id || !handler)
-		return -EINVAL;
-
-	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
-		acpi_get_table_with_size(id, acpi_apic_instance, &table, &tbl_size);
-	else
-		acpi_get_table_with_size(id, 0, &table, &tbl_size);
-
-	if (table) {
-		handler(table);
-		early_acpi_os_unmap_memory(table, tbl_size);
-		return 0;
-	} else
-		return -ENODEV;
+	return acpi_table_parse2(id, legacy_acpi_table_handler, handler);
 }
 
 /* 
