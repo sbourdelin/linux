@@ -1025,6 +1025,7 @@ static int xgbe_config_rx_mode(struct xgbe_prv_data *pdata)
 static int xgbe_read_mmd_regs(struct xgbe_prv_data *pdata, int prtad,
 			      int mmd_reg)
 {
+	unsigned long flags;
 	unsigned int mmd_address;
 	int mmd_data;
 
@@ -1042,10 +1043,10 @@ static int xgbe_read_mmd_regs(struct xgbe_prv_data *pdata, int prtad,
 	 * register offsets must therefore be adjusted by left shifting the
 	 * offset 2 bits and reading 32 bits of data.
 	 */
-	mutex_lock(&pdata->xpcs_mutex);
+	spin_lock_irqsave(&pdata->xpcs_lock, flags);
 	XPCS_IOWRITE(pdata, PCS_MMD_SELECT << 2, mmd_address >> 8);
 	mmd_data = XPCS_IOREAD(pdata, (mmd_address & 0xff) << 2);
-	mutex_unlock(&pdata->xpcs_mutex);
+	spin_unlock_irqrestore(&pdata->xpcs_lock, flags);
 
 	return mmd_data;
 }
@@ -1054,6 +1055,7 @@ static void xgbe_write_mmd_regs(struct xgbe_prv_data *pdata, int prtad,
 				int mmd_reg, int mmd_data)
 {
 	unsigned int mmd_address;
+	unsigned long flags;
 
 	if (mmd_reg & MII_ADDR_C45)
 		mmd_address = mmd_reg & ~MII_ADDR_C45;
@@ -1069,10 +1071,10 @@ static void xgbe_write_mmd_regs(struct xgbe_prv_data *pdata, int prtad,
 	 * register offsets must therefore be adjusted by left shifting the
 	 * offset 2 bits and reading 32 bits of data.
 	 */
-	mutex_lock(&pdata->xpcs_mutex);
+	spin_lock_irqsave(&pdata->xpcs_lock, flags);
 	XPCS_IOWRITE(pdata, PCS_MMD_SELECT << 2, mmd_address >> 8);
 	XPCS_IOWRITE(pdata, (mmd_address & 0xff) << 2, mmd_data);
-	mutex_unlock(&pdata->xpcs_mutex);
+	spin_unlock_irqrestore(&pdata->xpcs_lock, flags);
 }
 
 static int xgbe_tx_complete(struct xgbe_ring_desc *rdesc)
