@@ -137,10 +137,15 @@ struct console {
 
 #ifdef CONFIG_ACPI_SPCR_TABLE
 int acpi_console_match(struct console *c, char **options);
+bool acpi_console_sbsa_32bit(void);
 #else
 static inline int acpi_console_match(struct console *c, char **options)
 {
 	return -ENODEV;
+}
+static inline bool acpi_console_sbsa_32bit(void)
+{
+	return false;
 }
 #endif
 
