@@ -3723,25 +3723,25 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	} else {
 		/* Nojournal mode, all journal mount options are illegal */
 		if (test_opt2(sb, EXPLICIT_JOURNAL_CHECKSUM)) {
-			ext4_msg(sb, KERN_ERR, "can't mount with "
-				 "journal_checksum, fs mounted w/o journal");
+			ext4_msg(sb, KERN_ERR, "can't mount with option "
+				 "journal_checksum, fs has no journal");
 			goto failed_mount_wq;
 		}
 		if (test_opt(sb, JOURNAL_ASYNC_COMMIT)) {
-			ext4_msg(sb, KERN_ERR, "can't mount with "
-				 "journal_async_commit, fs mounted w/o journal");
+			ext4_msg(sb, KERN_ERR, "can't mount with option "
+				 "journal_async_commit, fs has no journal");
 			goto failed_mount_wq;
 		}
 		if (sbi->s_commit_interval != JBD2_DEFAULT_MAX_COMMIT_AGE*HZ) {
-			ext4_msg(sb, KERN_ERR, "can't mount with "
-				 "commit=%lu, fs mounted w/o journal",
+			ext4_msg(sb, KERN_ERR, "can't mount with option "
+				 "commit=%lu, fs has no journal",
 				 sbi->s_commit_interval / HZ);
 			goto failed_mount_wq;
 		}
 		if (EXT4_MOUNT_DATA_FLAGS &
 		    (sbi->s_mount_opt ^ sbi->s_def_mount_opt)) {
-			ext4_msg(sb, KERN_ERR, "can't mount with "
-				 "data=, fs mounted w/o journal");
+			ext4_msg(sb, KERN_ERR, "can't mount with option "
+				 "data=, fs has no journal");
 			goto failed_mount_wq;
 		}
 		sbi->s_def_mount_opt &= EXT4_MOUNT_JOURNAL_CHECKSUM;
