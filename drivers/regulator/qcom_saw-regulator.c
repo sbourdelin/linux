@@ -186,8 +186,8 @@ static int qcom_saw_regulator_probe(struct platform_device *pdev)
 
 	vreg->regmap = syscon_node_to_regmap(saw_np);
 	of_node_put(saw_np);
-	if (IS_ERR(config.regmap))
-		return PTR_ERR(config.regmap);
+	if (IS_ERR(vreg->regmap))
+		return PTR_ERR(vreg->regmap);
 
 	snprintf(name, sizeof(name), "krait%d", cpu);
 
