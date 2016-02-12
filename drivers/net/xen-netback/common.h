@@ -243,6 +243,7 @@ struct xenvif {
 	u8 ip_csum:1;
 	u8 ipv6_csum:1;
 	u8 multicast_control:1;
+	u8 hash_extra:1;
 
 	/* Is this interface disabled? True when backend discovers
 	 * frontend is rogue.
