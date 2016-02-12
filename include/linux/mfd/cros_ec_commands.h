@@ -286,6 +286,9 @@ enum host_event_code {
 	/* Hang detect logic detected a hang and warm rebooted the AP */
 	EC_HOST_EVENT_HANG_REBOOT = 21,
 
+	/* PD MCU triggering host event */
+	EC_HOST_EVENT_PD_MCU = 22,
+
 	/*
 	 * The high bit of the event mask is not used as a host event code.  If
 	 * it reads back as set, then the entire event mask should be
@@ -2273,6 +2276,13 @@ struct ec_params_ext_power_current_limit {
 	uint32_t limit; /* in mA */
 } __packed;
 
+struct ec_params_external_power_limit_v1 {
+	uint16_t current_lim; /* in mA, or EC_POWER_LIMIT_NONE to clear limit */
+	uint16_t voltage_lim; /* in mV, or EC_POWER_LIMIT_NONE to clear limit */
+} __packed;
+
+#define EC_POWER_LIMIT_NONE 0xffff
+
 /*****************************************************************************/
 /* Smart battery pass-through */
 
@@ -2527,8 +2537,6 @@ struct ec_params_reboot_ec {
  */
 #define EC_CMD_VERSION0 0xdc
 
-#endif  /* !__ACPI__ */
-
 /*****************************************************************************/
 /*
  * PD commands
@@ -2538,16 +2546,51 @@ struct ec_params_reboot_ec {
 
 /* EC to PD MCU exchange status command */
 #define EC_CMD_PD_EXCHANGE_STATUS 0x100
+#define EC_VER_PD_EXCHANGE_STATUS 2
+
+enum pd_charge_state {
+	PD_CHARGE_NO_CHANGE = 0, /* Don't change charge state */
+	PD_CHARGE_NONE,          /* No charging allowed */
+	PD_CHARGE_5V,            /* 5V charging only */
+	PD_CHARGE_MAX            /* Charge at max voltage */
+};
 
 /* Status of EC being sent to PD */
+#define EC_STATUS_HIBERNATING	(1 << 0)
+
 struct ec_params_pd_status {
-	int8_t batt_soc; /* battery state of charge */
+	uint8_t status;       /* EC status */
+	int8_t batt_soc;      /* battery state of charge */
+	uint8_t charge_state; /* charging state (from enum pd_charge_state) */
 } __packed;
 
 /* Status of PD being sent back to EC */
+#define PD_STATUS_HOST_EVENT      (1 << 0) /* Forward host event to AP */
+#define PD_STATUS_IN_RW           (1 << 1) /* Running RW image */
+#define PD_STATUS_JUMPED_TO_IMAGE (1 << 2) /* Current image was jumped to */
+#define PD_STATUS_TCPC_ALERT_0    (1 << 3) /* Alert active in port 0 TCPC */
+#define PD_STATUS_TCPC_ALERT_1    (1 << 4) /* Alert active in port 1 TCPC */
+#define PD_STATUS_TCPC_ALERT_2    (1 << 5) /* Alert active in port 2 TCPC */
+#define PD_STATUS_TCPC_ALERT_3    (1 << 6) /* Alert active in port 3 TCPC */
+#define PD_STATUS_EC_INT_ACTIVE  (PD_STATUS_TCPC_ALERT_0 | \
+				      PD_STATUS_TCPC_ALERT_1 | \
+				      PD_STATUS_HOST_EVENT)
 struct ec_response_pd_status {
-	int8_t status;        /* PD MCU status */
-	uint32_t curr_lim_ma; /* input current limit */
+	uint32_t curr_lim_ma;       /* input current limit */
+	uint16_t status;            /* PD MCU status */
+	int8_t active_charge_port;  /* active charging port */
+} __packed;
+
+/* AP to PD MCU host event status command, cleared on read */
+#define EC_CMD_PD_HOST_EVENT_STATUS 0x104
+
+/* PD MCU host event status bits */
+#define PD_EVENT_UPDATE_DEVICE     (1 << 0)
+#define PD_EVENT_POWER_CHANGE      (1 << 1)
+#define PD_EVENT_IDENTITY_RECEIVED (1 << 2)
+#define PD_EVENT_DATA_SWAP         (1 << 3)
+struct ec_response_host_event_status {
+	uint32_t status;      /* PD MCU host event status */
 } __packed;
 
 /* Set USB type-C port role and muxes */
@@ -2559,6 +2602,7 @@ enum usb_pd_control_role {
 	USB_PD_CTRL_ROLE_TOGGLE_OFF = 2,
 	USB_PD_CTRL_ROLE_FORCE_SINK = 3,
 	USB_PD_CTRL_ROLE_FORCE_SOURCE = 4,
+	USB_PD_CTRL_ROLE_COUNT
 };
 
 enum usb_pd_control_mux {
@@ -2568,13 +2612,283 @@ enum usb_pd_control_mux {
 	USB_PD_CTRL_MUX_DP = 3,
 	USB_PD_CTRL_MUX_DOCK = 4,
 	USB_PD_CTRL_MUX_AUTO = 5,
+	USB_PD_CTRL_MUX_COUNT
+};
+
+enum usb_pd_control_swap {
+	USB_PD_CTRL_SWAP_NONE = 0,
+	USB_PD_CTRL_SWAP_DATA = 1,
+	USB_PD_CTRL_SWAP_POWER = 2,
+	USB_PD_CTRL_SWAP_VCONN = 3,
+	USB_PD_CTRL_SWAP_COUNT
 };
 
 struct ec_params_usb_pd_control {
 	uint8_t port;
 	uint8_t role;
 	uint8_t mux;
+	uint8_t swap;
 } __packed;
+
+#define PD_CTRL_RESP_ENABLED_COMMS      (1 << 0) /* Communication enabled */
+#define PD_CTRL_RESP_ENABLED_CONNECTED  (1 << 1) /* Device connected */
+#define PD_CTRL_RESP_ENABLED_PD_CAPABLE (1 << 2) /* Partner is PD capable */
+
+#define PD_CTRL_RESP_ROLE_POWER         (1 << 0) /* 0=SNK/1=SRC */
+#define PD_CTRL_RESP_ROLE_DATA          (1 << 1) /* 0=UFP/1=DFP */
+#define PD_CTRL_RESP_ROLE_VCONN         (1 << 2) /* Vconn status */
+#define PD_CTRL_RESP_ROLE_DR_POWER      (1 << 3) /* Partner is dualrole power */
+#define PD_CTRL_RESP_ROLE_DR_DATA       (1 << 4) /* Partner is dualrole data */
+#define PD_CTRL_RESP_ROLE_USB_COMM      (1 << 5) /* Partner USB comm capable */
+#define PD_CTRL_RESP_ROLE_EXT_POWERED   (1 << 6) /* Partner externally powerd */
+
+struct ec_response_usb_pd_control {
+	uint8_t enabled;
+	uint8_t role;
+	uint8_t polarity;
+	uint8_t state;
+} __packed;
+
+struct ec_response_usb_pd_control_v1 {
+	uint8_t enabled;
+	uint8_t role;
+	uint8_t polarity;
+	char state[32];
+} __packed;
+
+#define EC_CMD_USB_PD_PORTS 0x102
+
+struct ec_response_usb_pd_ports {
+	uint8_t num_ports;
+} __packed;
+
+#define EC_CMD_USB_PD_POWER_INFO 0x103
+
+#define PD_POWER_CHARGING_PORT 0xff
+struct ec_params_usb_pd_power_info {
+	uint8_t port;
+} __packed;
+
+enum usb_chg_type {
+	USB_CHG_TYPE_NONE,
+	USB_CHG_TYPE_PD,
+	USB_CHG_TYPE_C,
+	USB_CHG_TYPE_PROPRIETARY,
+	USB_CHG_TYPE_BC12_DCP,
+	USB_CHG_TYPE_BC12_CDP,
+	USB_CHG_TYPE_BC12_SDP,
+	USB_CHG_TYPE_OTHER,
+	USB_CHG_TYPE_VBUS,
+	USB_CHG_TYPE_UNKNOWN,
+};
+enum usb_power_roles {
+	USB_PD_PORT_POWER_DISCONNECTED,
+	USB_PD_PORT_POWER_SOURCE,
+	USB_PD_PORT_POWER_SINK,
+	USB_PD_PORT_POWER_SINK_NOT_CHARGING,
+};
+
+struct usb_chg_measures {
+	uint16_t voltage_max;
+	uint16_t voltage_now;
+	uint16_t current_max;
+	uint16_t current_lim;
+} __packed;
+
+struct ec_response_usb_pd_power_info {
+	uint8_t role;
+	uint8_t type;
+	uint8_t dualrole;
+	uint8_t reserved1;
+	struct usb_chg_measures meas;
+	uint32_t max_power;
+} __packed;
+
+/* Write USB-PD device FW */
+#define EC_CMD_USB_PD_FW_UPDATE 0x110
+
+enum usb_pd_fw_update_cmds {
+	USB_PD_FW_REBOOT,
+	USB_PD_FW_FLASH_ERASE,
+	USB_PD_FW_FLASH_WRITE,
+	USB_PD_FW_ERASE_SIG,
+};
+
+struct ec_params_usb_pd_fw_update {
+	uint16_t dev_id;
+	uint8_t cmd;
+	uint8_t port;
+	uint32_t size;     /* Size to write in bytes */
+	/* Followed by data to write */
+} __packed;
+
+/* Write USB-PD Accessory RW_HASH table entry */
+#define EC_CMD_USB_PD_RW_HASH_ENTRY 0x111
+/* RW hash is first 20 bytes of SHA-256 of RW section */
+#define PD_RW_HASH_SIZE 20
+struct ec_params_usb_pd_rw_hash_entry {
+	uint16_t dev_id;
+	uint8_t dev_rw_hash[PD_RW_HASH_SIZE];
+	uint8_t reserved;        /* For alignment of current_image */
+	uint32_t current_image;  /* One of ec_current_image */
+} __packed;
+
+/* Read USB-PD Accessory info */
+#define EC_CMD_USB_PD_DEV_INFO 0x112
+
+struct ec_params_usb_pd_info_request {
+	uint8_t port;
+} __packed;
+
+/* Read USB-PD Device discovery info */
+#define EC_CMD_USB_PD_DISCOVERY 0x113
+struct ec_params_usb_pd_discovery_entry {
+	uint16_t vid;  /* USB-IF VID */
+	uint16_t pid;  /* USB-IF PID */
+	uint8_t ptype; /* product type (hub,periph,cable,ama) */
+} __packed;
+
+/* Override default charge behavior */
+#define EC_CMD_PD_CHARGE_PORT_OVERRIDE 0x114
+
+/* Negative port parameters have special meaning */
+enum usb_pd_override_ports {
+	OVERRIDE_DONT_CHARGE = -2,
+	OVERRIDE_OFF = -1,
+	/* [0, CONFIG_USB_PD_PORT_COUNT): Port# */
+};
+
+struct ec_params_charge_port_override {
+	int16_t override_port; /* Override port# */
+} __packed;
+
+/* Read (and delete) one entry of PD event log */
+#define EC_CMD_PD_GET_LOG_ENTRY 0x115
+
+struct ec_response_pd_log {
+	uint32_t timestamp; /* relative timestamp in milliseconds */
+	uint8_t type;       /* event type : see PD_EVENT_xx below */
+	uint8_t size_port;  /* [7:5] port number [4:0] payload size in bytes */
+	uint16_t data;      /* type-defined data payload */
+	uint8_t payload[0]; /* optional additional data payload: 0..16 bytes */
+} __packed;
+
+
+/* The timestamp is the microsecond counter shifted to get about a ms. */
+#define PD_LOG_TIMESTAMP_SHIFT 10 /* 1 LSB = 1024us */
+
+#define PD_LOG_SIZE_MASK  0x1f
+#define PD_LOG_PORT_MASK  0xe0
+#define PD_LOG_PORT_SHIFT    5
+#define PD_LOG_PORT_SIZE(port, size) (((port) << PD_LOG_PORT_SHIFT) | \
+				      ((size) & PD_LOG_SIZE_MASK))
+#define PD_LOG_PORT(size_port) ((size_port) >> PD_LOG_PORT_SHIFT)
+#define PD_LOG_SIZE(size_port) ((size_port) & PD_LOG_SIZE_MASK)
+
+/* PD event log : entry types */
+/* PD MCU events */
+#define PD_EVENT_MCU_BASE       0x00
+#define PD_EVENT_MCU_CHARGE             (PD_EVENT_MCU_BASE+0)
+#define PD_EVENT_MCU_CONNECT            (PD_EVENT_MCU_BASE+1)
+/* Reserved for custom board event */
+#define PD_EVENT_MCU_BOARD_CUSTOM       (PD_EVENT_MCU_BASE+2)
+/* PD generic accessory events */
+#define PD_EVENT_ACC_BASE       0x20
+#define PD_EVENT_ACC_RW_FAIL   (PD_EVENT_ACC_BASE+0)
+#define PD_EVENT_ACC_RW_ERASE  (PD_EVENT_ACC_BASE+1)
+/* PD power supply events */
+#define PD_EVENT_PS_BASE        0x40
+#define PD_EVENT_PS_FAULT      (PD_EVENT_PS_BASE+0)
+/* PD video dongles events */
+#define PD_EVENT_VIDEO_BASE     0x60
+#define PD_EVENT_VIDEO_DP_MODE (PD_EVENT_VIDEO_BASE+0)
+#define PD_EVENT_VIDEO_CODEC   (PD_EVENT_VIDEO_BASE+1)
+/* Returned in the "type" field, when there is no entry available */
+#define PD_EVENT_NO_ENTRY       0xff
+
+/*
+ * PD_EVENT_MCU_CHARGE event definition :
+ * the payload is "struct usb_chg_measures"
+ * the data field contains the port state flags as defined below :
+ */
+/* Port partner is a dual role device */
+#define CHARGE_FLAGS_DUAL_ROLE         (1 << 15)
+/* Port is the pending override port */
+#define CHARGE_FLAGS_DELAYED_OVERRIDE  (1 << 14)
+/* Port is the override port */
+#define CHARGE_FLAGS_OVERRIDE          (1 << 13)
+/* Charger type */
+#define CHARGE_FLAGS_TYPE_SHIFT               3
+#define CHARGE_FLAGS_TYPE_MASK       (0xf << CHARGE_FLAGS_TYPE_SHIFT)
+/* Power delivery role */
+#define CHARGE_FLAGS_ROLE_MASK         (7 <<  0)
+
+/*
+ * PD_EVENT_PS_FAULT data field flags definition :
+ */
+#define PS_FAULT_OCP                          1
+#define PS_FAULT_FAST_OCP                     2
+#define PS_FAULT_OVP                          3
+#define PS_FAULT_DISCH                        4
+
+/*
+ * PD_EVENT_VIDEO_CODEC payload is "struct mcdp_info".
+ */
+struct mcdp_version {
+	uint8_t major;
+	uint8_t minor;
+	uint16_t build;
+} __packed;
+
+struct mcdp_info {
+	uint8_t family[2];
+	uint8_t chipid[2];
+	struct mcdp_version irom;
+	struct mcdp_version fw;
+} __packed;
+
+/* struct mcdp_info field decoding */
+#define MCDP_CHIPID(chipid) ((chipid[0] << 8) | chipid[1])
+#define MCDP_FAMILY(family) ((family[0] << 8) | family[1])
+
+/* Get/Set USB-PD Alternate mode info */
+#define EC_CMD_USB_PD_GET_AMODE 0x116
+struct ec_params_usb_pd_get_mode_request {
+	uint16_t svid_idx; /* SVID index to get */
+	uint8_t port;      /* port */
+} __packed;
+
+struct ec_params_usb_pd_get_mode_response {
+	uint16_t svid;   /* SVID */
+	uint16_t opos;    /* Object Position */
+	uint32_t vdo[6]; /* Mode VDOs */
+} __packed;
+
+#define EC_CMD_USB_PD_SET_AMODE 0x117
+
+enum pd_mode_cmd {
+	PD_EXIT_MODE = 0,
+	PD_ENTER_MODE = 1,
+	/* Not a command.  Do NOT remove. */
+	PD_MODE_CMD_COUNT,
+};
+
+struct ec_params_usb_pd_set_mode_request {
+	uint32_t cmd;  /* enum pd_mode_cmd */
+	uint16_t svid; /* SVID to set */
+	uint8_t opos;  /* Object Position */
+	uint8_t port;  /* port */
+} __packed;
+
+/* Ask the PD MCU to record a log of a requested type */
+#define EC_CMD_PD_WRITE_LOG_ENTRY 0x118
+
+struct ec_params_pd_write_log_entry {
+	uint8_t type; /* event type : see PD_EVENT_xx above */
+	uint8_t port; /* port#, or 0 for events unrelated to a given port */
+} __packed;
+
+#endif  /* !__ACPI__ */
 
 /*****************************************************************************/
 /*
