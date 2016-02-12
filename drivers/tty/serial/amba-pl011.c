@@ -2286,12 +2286,34 @@ static int __init pl011_console_setup(struct console *co, char *options)
 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
 }
 
+static int __init pl011_console_acpi_match(struct console *co,
+					   struct acpi_table_spcr *spcr)
+{
+	struct uart_amba_port *uap = amba_ports[co->index < 0 ? 0 : co->index];
+
+	if (uap->vendor->access_32b) {
+		if (spcr->interface_type != ACPI_DBG2_ARM_SBSA_32BIT)
+			return -ENODEV;
+	} else {
+		if (spcr->interface_type != ACPI_DBG2_ARM_PL011 &&
+		    spcr->interface_type != ACPI_DBG2_ARM_SBSA_GENERIC)
+			return -ENODEV;
+	}
+
+	if (spcr->serial_port.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY ||
+	    spcr->serial_port.address != (u64)uap->port.mapbase)
+		return -ENODEV;
+
+	return 0;
+}
+
 static struct uart_driver amba_reg;
 static struct console amba_console = {
 	.name		= "ttyAMA",
 	.write		= pl011_console_write,
 	.device		= uart_console_device,
 	.setup		= pl011_console_setup,
+	.acpi_match	= pl011_console_acpi_match,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
 	.data		= &amba_reg,
