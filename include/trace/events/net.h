@@ -180,7 +180,7 @@ DECLARE_EVENT_CLASS(net_dev_rx_verbose_template,
 		__entry->protocol = ntohs(skb->protocol);
 		__entry->ip_summed = skb->ip_summed;
 		__entry->hash = skb->hash;
-		__entry->l4_hash = skb->l4_hash;
+		__entry->l4_hash = skb->hash_type == PKT_HASH_TYPE_L4;
 		__entry->len = skb->len;
 		__entry->data_len = skb->data_len;
 		__entry->truesize = skb->truesize;

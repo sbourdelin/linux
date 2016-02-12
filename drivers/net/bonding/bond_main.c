@@ -3173,7 +3173,7 @@ u32 bond_xmit_hash(struct bonding *bond, struct sk_buff *skb)
 	u32 hash;
 
 	if (bond->params.xmit_policy == BOND_XMIT_POLICY_ENCAP34 &&
-	    skb->l4_hash)
+	    skb_has_l4_hash(skb))
 		return skb->hash;
 
 	if (bond->params.xmit_policy == BOND_XMIT_POLICY_LAYER2 ||

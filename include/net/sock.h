@@ -1828,7 +1828,7 @@ static inline void sock_poll_wait(struct file *filp,
 static inline void skb_set_hash_from_sk(struct sk_buff *skb, struct sock *sk)
 {
 	if (sk->sk_txhash) {
-		skb->l4_hash = 1;
+		skb->hash_type = PKT_HASH_TYPE_L4;
 		skb->hash = sk->sk_txhash;
 	}
 }
