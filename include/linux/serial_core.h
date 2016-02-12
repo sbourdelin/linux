@@ -24,6 +24,7 @@
 #include <linux/compiler.h>
 #include <linux/interrupt.h>
 #include <linux/circ_buf.h>
+#include <linux/mod_devicetable.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
 #include <linux/tty.h>
@@ -340,26 +341,16 @@ struct earlycon_device {
 	unsigned int baud;
 };
 
-struct earlycon_id {
-	char	name[16];
-	char	compatible[128];
-	int	(*setup)(struct earlycon_device *, const char *options);
-} __aligned(32);
+extern const struct of_device_id __earlycon_of_table[];
 
-extern const struct earlycon_id __earlycon_table[];
-extern const struct earlycon_id __earlycon_table_end[];
+#define OF_EARLYCON_DECLARE(name, compat, fn)				\
+	_OF_DECLARE_WITH_NAME(earlycon, name, compat, fn, void *)
 
-#define OF_EARLYCON_DECLARE(_name, compat, fn)				\
-	static const struct earlycon_id __UNIQUE_ID(__earlycon_##_name)	\
-	     __used __section(__earlycon_table)				\
-		= { .name = __stringify(_name),				\
-		    .compatible = compat,				\
-		    .setup = fn  }
-
-#define EARLYCON_DECLARE(_name, fn)	OF_EARLYCON_DECLARE(_name, "", fn)
+#define EARLYCON_DECLARE(_name, fn)	\
+	OF_EARLYCON_DECLARE(_name, "-earlycon-dummy-compat-string-", fn)
 
 extern int setup_earlycon(char *buf);
-extern int of_setup_earlycon(const struct earlycon_id *match,
+extern int of_setup_earlycon(const struct of_device_id *match,
 			     unsigned long node,
 			     const char *options);
 

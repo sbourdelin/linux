@@ -802,7 +802,7 @@ static int __init early_init_dt_scan_chosen_serial(void)
 	int offset;
 	const char *p, *q, *options = NULL;
 	int l;
-	const struct earlycon_id *match;
+	const struct of_device_id *match;
 	const void *fdt = initial_boot_params;
 
 	offset = fdt_path_offset(fdt, "/chosen");
@@ -829,10 +829,7 @@ static int __init early_init_dt_scan_chosen_serial(void)
 		return 0;
 	}
 
-	for (match = __earlycon_table; match < __earlycon_table_end; match++) {
-		if (!match->compatible[0])
-			continue;
-
+	for (match = __earlycon_of_table; match->compatible[0]; match++) {
 		if (fdt_node_check_compatible(fdt, offset, match->compatible))
 			continue;
 
