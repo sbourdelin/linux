@@ -88,6 +88,41 @@ exit:
 	return ret;
 }
 
+static int cros_ec_check_features(struct cros_ec_dev *ec, int feature)
+{
+	struct cros_ec_command *msg;
+	int ret;
+
+	if (ec->features[0] == -1U && ec->features[1] == -1U) {
+		/* features bitmap not read yet */
+
+		msg = kmalloc(sizeof(*msg) + sizeof(ec->features), GFP_KERNEL);
+		if (!msg)
+			return -ENOMEM;
+
+		msg->version = 0;
+		msg->command = EC_CMD_GET_FEATURES + ec->cmd_offset;
+		msg->insize = sizeof(ec->features);
+		msg->outsize = 0;
+
+		ret = cros_ec_cmd_xfer(ec->ec_dev, msg);
+		if ((ret < 0) || msg->result != EC_RES_SUCCESS) {
+			dev_warn(ec->dev, "cannot get EC features: %d/%d\n",
+				 ret, msg->result);
+			memset(ec->features, 0, sizeof(ec->features));
+		}
+
+		memcpy(ec->features, msg->data, sizeof(ec->features));
+
+		dev_dbg(ec->dev, "EC features %08x %08x\n",
+			ec->features[0], ec->features[1]);
+
+		kfree(msg);
+	}
+
+	return ec->features[feature / 32] & EC_FEATURE_MASK_0(feature);
+}
+
 static int cros_ec_has_cmd_usb_pd_ports(struct cros_ec_dev *ec)
 {
 	struct cros_ec_command *msg;
@@ -263,6 +298,8 @@ static int ec_device_probe(struct platform_device *pdev)
 	ec->ec_dev = dev_get_drvdata(dev->parent);
 	ec->dev = dev;
 	ec->cmd_offset = ec_platform->cmd_offset;
+	ec->features[0] = -1U; /* Not cached yet */
+	ec->features[1] = -1U; /* Not cached yet */
 	device_initialize(&ec->class_dev);
 	cdev_init(&ec->cdev, &fops);
 
@@ -301,7 +338,8 @@ static int ec_device_probe(struct platform_device *pdev)
 	}
 
 	/* check whether this EC instance has the PD charge manager */
-	if (cros_ec_has_cmd_usb_pd_ports(ec)) {
+	if (cros_ec_check_features(ec, EC_FEATURE_USB_PD) ||
+	    cros_ec_has_cmd_usb_pd_ports(ec)) {
 		retval = mfd_add_devices(dev, 0, cros_usb_pd_charger_devs,
 					 ARRAY_SIZE(cros_usb_pd_charger_devs),
 					 NULL, 0, NULL);
