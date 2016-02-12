@@ -1560,6 +1560,9 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (ahci_broken_devslp(pdev))
 		hpriv->flags |= AHCI_HFLAG_NO_DEVSLP;
 
+	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
+		ahci_thunderx_init(&pdev->dev, hpriv);
+
 	/* save initial config */
 	ahci_pci_save_initial_config(pdev, hpriv);
 
