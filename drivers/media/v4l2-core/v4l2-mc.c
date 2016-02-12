@@ -79,7 +79,7 @@ struct media_device * __v4l2_mc_usb_media_device_init(struct usb_device *udev,
 		strlcpy(mdev->model, "unknown model", sizeof(mdev->model));
 	if (udev->serial)
 		strlcpy(mdev->serial, udev->serial, sizeof(mdev->serial));
-	strcpy(mdev->bus_info, udev->devpath);
+	usb_make_path(udev, mdev->bus_info, sizeof(mdev->bus_info));
 	mdev->hw_revision = le16_to_cpu(udev->descriptor.bcdDevice);
 	mdev->driver_version = LINUX_VERSION_CODE;
 
