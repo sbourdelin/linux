@@ -410,18 +410,6 @@ static u32 dsa_slave_br_port_mask(struct dsa_switch *ds,
 	return mask;
 }
 
-static int dsa_slave_stp_update(struct net_device *dev, u8 state)
-{
-	struct dsa_slave_priv *p = netdev_priv(dev);
-	struct dsa_switch *ds = p->parent;
-	int ret = -EOPNOTSUPP;
-
-	if (ds->drv->port_stp_update)
-		ret = ds->drv->port_stp_update(ds, p->port, state);
-
-	return ret;
-}
-
 static int dsa_slave_port_attr_set(struct net_device *dev,
 				   const struct switchdev_attr *attr,
 				   struct switchdev_trans *trans)
@@ -551,11 +539,6 @@ static int dsa_slave_bridge_port_leave(struct net_device *dev)
 						 dsa_slave_br_port_mask(ds, p->bridge_dev));
 
 	p->bridge_dev = NULL;
-
-	/* Port left the bridge, put in BR_STATE_DISABLED by the bridge layer,
-	 * so allow it to be in BR_STATE_FORWARDING to be kept functional
-	 */
-	dsa_slave_stp_update(dev, BR_STATE_FORWARDING);
 
 	return ret;
 }
