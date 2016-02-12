@@ -2781,6 +2781,7 @@ static struct rpc_xprt *xs_setup_local(struct xprt_create *args)
 	xprt->prot = 0;
 	xprt->tsh_size = sizeof(rpc_fraghdr) / sizeof(u32);
 	xprt->max_payload = RPC_MAX_FRAGMENT_SIZE;
+	xprt->max_bc_payload = PAGE_SIZE;
 
 	xprt->bind_timeout = XS_BIND_TO;
 	xprt->reestablish_timeout = XS_TCP_INIT_REEST_TO;
@@ -2852,6 +2853,7 @@ static struct rpc_xprt *xs_setup_udp(struct xprt_create *args)
 	xprt->tsh_size = 0;
 	/* XXX: header size can vary due to auth type, IPv6, etc. */
 	xprt->max_payload = (1U << 16) - (MAX_HEADER << 3);
+	xprt->max_bc_payload = PAGE_SIZE;
 
 	xprt->bind_timeout = XS_BIND_TO;
 	xprt->reestablish_timeout = XS_UDP_REEST_TO;
@@ -2931,6 +2933,7 @@ static struct rpc_xprt *xs_setup_tcp(struct xprt_create *args)
 	xprt->prot = IPPROTO_TCP;
 	xprt->tsh_size = sizeof(rpc_fraghdr) / sizeof(u32);
 	xprt->max_payload = RPC_MAX_FRAGMENT_SIZE;
+	xprt->max_bc_payload = PAGE_SIZE;
 
 	xprt->bind_timeout = XS_BIND_TO;
 	xprt->reestablish_timeout = XS_TCP_INIT_REEST_TO;
@@ -3000,6 +3003,7 @@ static struct rpc_xprt *xs_setup_bc_tcp(struct xprt_create *args)
 	xprt->prot = IPPROTO_TCP;
 	xprt->tsh_size = sizeof(rpc_fraghdr) / sizeof(u32);
 	xprt->max_payload = RPC_MAX_FRAGMENT_SIZE;
+	xprt->max_bc_payload = PAGE_SIZE;
 	xprt->timeout = &xs_tcp_default_timeout;
 
 	/* backchannel */

@@ -179,6 +179,7 @@ struct rpc_xprt {
 
 	size_t			max_payload;	/* largest RPC payload size,
 						   in bytes */
+	size_t			max_bc_payload;	/* max bytes per bc payload */
 	unsigned int		tsh_size;	/* size of transport specific
 						   header */
 

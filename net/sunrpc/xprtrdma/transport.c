@@ -402,6 +402,7 @@ xprt_setup_rdma(struct xprt_create *args)
 	xprt->max_payload <<= PAGE_SHIFT;
 	dprintk("RPC:       %s: transport data payload maximum: %zu bytes\n",
 		__func__, xprt->max_payload);
+	xprt->max_bc_payload = cdata.inline_rsize - RPCRDMA_HDRLEN_MIN;
 
 	if (!try_module_get(THIS_MODULE))
 		goto out4;
