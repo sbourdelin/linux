@@ -280,6 +280,7 @@ struct rpcrdma_req {
 	struct rpcrdma_regbuf	*rl_rdmabuf;
 	struct rpcrdma_regbuf	*rl_sendbuf;
 	struct rpcrdma_mr_seg	rl_segments[RPCRDMA_MAX_SEGS];
+	struct rpc_task		*rl_task;
 
 	struct list_head	rl_all;
 	bool			rl_backchannel;

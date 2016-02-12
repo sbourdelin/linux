@@ -508,6 +508,7 @@ xprt_rdma_allocate(struct rpc_task *task, size_t size)
 out:
 	dprintk("RPC:       %s: size %zd, request 0x%p\n", __func__, size, req);
 	req->rl_connect_cookie = 0;	/* our reserved value */
+	req->rl_task = task;
 	return req->rl_sendbuf->rg_base;
 
 out_rdmabuf:
@@ -555,6 +556,37 @@ out_fail:
 	return NULL;
 }
 
+/* Invalidate registered memory still associated with this req.
+ *
+ * Normally, the RPC reply handler invalidates chunks.
+ *
+ * If we're here because a signal fired, this is an exiting
+ * synchronous RPC and the reply handler has not run, leaving
+ * the RPC's chunks registered. The server is still processing
+ * this RPC and can still read or update those chunks.
+ *
+ * Synchronously fence the chunks before this RPC terminates
+ * to ensure the server doesn't write into memory that has
+ * been reallocated.
+ */
+static void xprt_rdma_free_chunks(struct rpcrdma_xprt *r_xprt,
+				  struct rpcrdma_req *req)
+{
+	unsigned int i;
+
+	if (!RPC_IS_ASYNC(req->rl_task)) {
+		r_xprt->rx_ia.ri_ops->ro_unmap_sync(r_xprt, req);
+		return;
+	}
+
+	pr_warn("rpcrdma: freeing async RPC task with registered chunks\n");
+	for (i = 0; req->rl_nchunks;) {
+		--req->rl_nchunks;
+		i += r_xprt->rx_ia.ri_ops->ro_unmap(r_xprt,
+						    &req->rl_segments[i]);
+	}
+}
+
 /*
  * This function returns all RDMA resources to the pool.
  */
@@ -564,7 +596,6 @@ xprt_rdma_free(void *buffer)
 	struct rpcrdma_req *req;
 	struct rpcrdma_xprt *r_xprt;
 	struct rpcrdma_regbuf *rb;
-	int i;
 
 	if (buffer == NULL)
 		return;
@@ -578,12 +609,8 @@ xprt_rdma_free(void *buffer)
 
 	dprintk("RPC:       %s: called on 0x%p\n", __func__, req->rl_reply);
 
-	for (i = 0; req->rl_nchunks;) {
-		--req->rl_nchunks;
-		i += r_xprt->rx_ia.ri_ops->ro_unmap(r_xprt,
-						    &req->rl_segments[i]);
-	}
-
+	if (req->rl_nchunks)
+		xprt_rdma_free_chunks(r_xprt, req);
 	rpcrdma_buffer_put(req);
 }
 
