@@ -930,18 +930,26 @@ static inline int of_get_available_child_count(const struct device_node *np)
 }
 
 #if defined(CONFIG_OF) && !defined(MODULE)
-#define _OF_DECLARE(table, name, compat, fn, fn_type)			\
-	static const struct of_device_id __of_table_##name		\
+#define __OF_DECLARE(table, name1, name2, compat, fn, fn_type)		\
+	static const struct of_device_id __UNIQUE_ID(__of_table_##name1)\
 		__used __section(__##table##_of_table)			\
-		 = { .compatible = compat,				\
+		 = { .name = name2,					\
+		     .compatible = compat,				\
 		     .data = (fn == (fn_type)NULL) ? fn : fn  }
 #else
-#define _OF_DECLARE(table, name, compat, fn, fn_type)			\
-	static const struct of_device_id __of_table_##name		\
+#define __OF_DECLARE(table, name1, name2, compat, fn, fn_type)		\
+	static const struct of_device_id __UNIQUE_ID(__of_table_##name1)\
 		__attribute__((unused))					\
-		 = { .compatible = compat,				\
-		     .data = (fn == (fn_type)NULL) ? fn : fn }
+		 = { .name = name2,					\
+		     .compatible = compat,				\
+		     .data = (fn == (fn_type)NULL) ? fn : fn  }
 #endif
+
+#define _OF_DECLARE(table, name, compat, fn, fn_type)	\
+	__OF_DECLARE(table, name, "", compat, fn, fn_type)
+
+#define _OF_DECLARE_WITH_NAME(table, name, compat, fn, fn_type)	\
+	__OF_DECLARE(table, name, __stringify(name), compat, fn, fn_type)
 
 typedef int (*of_init_fn_2)(struct device_node *, struct device_node *);
 typedef void (*of_init_fn_1)(struct device_node *);

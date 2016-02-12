@@ -38,6 +38,9 @@ static struct earlycon_device early_console_dev = {
 	.con = &early_con,
 };
 
+static const struct of_device_id __earlycon_of_table_sentinel
+	__used __section(__earlycon_of_table_end);
+
 static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
 {
 	void __iomem *base;
@@ -127,9 +130,10 @@ static int __init parse_options(struct earlycon_device *device, char *options)
 	return 0;
 }
 
-static int __init register_earlycon(char *buf, const struct earlycon_id *match)
+static int __init register_earlycon(char *buf, const struct of_device_id *match)
 {
 	int err;
+	int (*setup)(struct earlycon_device *, const char *options);
 	struct uart_port *port = &early_console_dev.port;
 
 	/* On parsing error, pass the options buf to the setup function */
@@ -142,7 +146,8 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
 		port->membase = earlycon_map(port->mapbase, 64);
 
 	earlycon_init(&early_console_dev, match->name);
-	err = match->setup(&early_console_dev, buf);
+	setup = match->data;
+	err = setup(&early_console_dev, buf);
 	if (err < 0)
 		return err;
 	if (!early_console_dev.con->write)
@@ -172,7 +177,7 @@ static int __init register_earlycon(char *buf, const struct earlycon_id *match)
  */
 int __init setup_earlycon(char *buf)
 {
-	const struct earlycon_id *match;
+	const struct of_device_id *match;
 
 	if (!buf || !buf[0])
 		return -EINVAL;
@@ -180,7 +185,7 @@ int __init setup_earlycon(char *buf)
 	if (early_con.flags & CON_ENABLED)
 		return -EALREADY;
 
-	for (match = __earlycon_table; match < __earlycon_table_end; match++) {
+	for (match = __earlycon_of_table; match->name[0]; match++) {
 		size_t len = strlen(match->name);
 
 		if (strncmp(buf, match->name, len))
@@ -220,12 +225,13 @@ early_param("earlycon", param_setup_earlycon);
 
 #ifdef CONFIG_OF_EARLY_FLATTREE
 
-int __init of_setup_earlycon(const struct earlycon_id *match,
+int __init of_setup_earlycon(const struct of_device_id *match,
 			     unsigned long node,
 			     const char *options)
 {
 	int err;
 	struct uart_port *port = &early_console_dev.port;
+	int (*setup)(struct earlycon_device *, const char *options);
 	const __be32 *val;
 	bool big_endian;
 	u64 addr;
@@ -273,7 +279,8 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
 			sizeof(early_console_dev.options));
 	}
 	earlycon_init(&early_console_dev, match->name);
-	err = match->setup(&early_console_dev, options);
+	setup = match->data;
+	err = setup(&early_console_dev, options);
 	if (err < 0)
 		return err;
 	if (!early_console_dev.con->write)
