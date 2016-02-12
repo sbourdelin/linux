@@ -1,3 +1,4 @@
+
 /*
  * Network-device interface management.
  *
@@ -149,6 +150,153 @@ void xenvif_wake_queue(struct xenvif_queue *queue)
 	struct net_device *dev = queue->vif->dev;
 	unsigned int id = queue->id;
 	netif_tx_wake_queue(netdev_get_tx_queue(dev, id));
+}
+
+static u32 toeplitz_hash(const u8 *k, unsigned int klen,
+			 const u8 *d, unsigned int dlen)
+{
+	unsigned int di, ki;
+	u64 prefix = 0;
+	u64 hash = 0;
+
+	/* Pre-load prefix with the first 8 bytes of the key */
+	for (ki = 0; ki < 8; ki++) {
+		prefix <<= 8;
+		prefix |= (ki < klen) ? k[ki] : 0;
+	}
+
+	for (di = 0; di < dlen; di++) {
+		u8 byte = d[di];
+		unsigned int bit;
+
+		for (bit = 0x80; bit != 0; bit >>= 1) {
+			if (byte & bit)
+				hash ^= prefix;
+			prefix <<= 1;
+		}
+
+		/* prefix has now been left-shifted by 8, so OR in
+		 * the next byte.
+		 */
+		prefix |= (ki < klen) ? k[ki] : 0;
+		ki++;
+	}
+
+	/* The valid part of the hash is in the upper 32 bits. */
+	return hash >> 32;
+}
+
+static void xenvif_set_toeplitz_hash(struct xenvif *vif, struct sk_buff *skb)
+{
+	struct flow_keys flow;
+	u32 hash = 0;
+	enum pkt_hash_types type = PKT_HASH_TYPE_NONE;
+	const u8 *key = vif->toeplitz.key;
+	u32 flags = vif->toeplitz.flags;
+	const unsigned int len = XEN_NETBK_MAX_TOEPLITZ_KEY_SIZE;
+	bool has_tcp_hdr;
+
+	/* Quick rejection test: If the network protocol doesn't
+	 * correspond to any enabled hash type then there's no point
+	 * in parsing the packet header.
+	 */
+	switch (skb->protocol) {
+	case htons(ETH_P_IP):
+		if (flags & (XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP |
+			     XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4))
+			break;
+
+		goto done;
+
+	case htons(ETH_P_IPV6):
+		if (flags & (XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP |
+			     XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6))
+			break;
+
+		goto done;
+
+	default:
+		goto done;
+	}
+
+	memset(&flow, 0, sizeof(flow));
+	if (!skb_flow_dissect_flow_keys(skb, &flow, 0))
+		goto done;
+
+	has_tcp_hdr = (flow.basic.ip_proto == IPPROTO_TCP) &&
+		      !(flow.control.flags & FLOW_DIS_IS_FRAGMENT);
+
+	switch (skb->protocol) {
+	case htons(ETH_P_IP):
+		if (has_tcp_hdr &&
+		    (flags & XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP)) {
+			u8 data[12];
+
+			memcpy(&data[0], &flow.addrs.v4addrs.src, 4);
+			memcpy(&data[4], &flow.addrs.v4addrs.dst, 4);
+			memcpy(&data[8], &flow.ports.src, 2);
+			memcpy(&data[10], &flow.ports.dst, 2);
+
+			hash = toeplitz_hash(key, len,
+					     data, sizeof(data));
+			type = PKT_HASH_TYPE_L4;
+		} else if (flags & XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4) {
+			u8 data[8];
+
+			memcpy(&data[0], &flow.addrs.v4addrs.src, 4);
+			memcpy(&data[4], &flow.addrs.v4addrs.dst, 4);
+
+			hash = toeplitz_hash(key, len,
+					     data, sizeof(data));
+			type = PKT_HASH_TYPE_L3;
+		}
+
+		break;
+
+	case htons(ETH_P_IPV6):
+		if (has_tcp_hdr &&
+		    (flags & XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP)) {
+			u8 data[36];
+
+			memcpy(&data[0], &flow.addrs.v6addrs.src, 16);
+			memcpy(&data[16], &flow.addrs.v6addrs.dst, 16);
+			memcpy(&data[32], &flow.ports.src, 2);
+			memcpy(&data[34], &flow.ports.dst, 2);
+
+			hash = toeplitz_hash(key, len,
+					     data, sizeof(data));
+			type = PKT_HASH_TYPE_L4;
+		} else if (flags & XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6) {
+			u8 data[32];
+
+			memcpy(&data[0], &flow.addrs.v6addrs.src, 16);
+			memcpy(&data[16], &flow.addrs.v6addrs.dst, 16);
+
+			hash = toeplitz_hash(key, len,
+					     data, sizeof(data));
+			type = PKT_HASH_TYPE_L3;
+		}
+
+		break;
+	}
+
+done:
+	skb_set_hash(skb, hash, type);
+}
+
+static u16 xenvif_select_queue(struct net_device *dev, struct sk_buff *skb,
+			       void *accel_priv,
+			       select_queue_fallback_t fallback)
+{
+	struct xenvif *vif = netdev_priv(dev);
+	unsigned int mask = (1u << vif->toeplitz.order) - 1;
+
+	if (vif->toeplitz.flags == 0)
+		return fallback(dev, skb) % dev->real_num_tx_queues;
+
+	xenvif_set_toeplitz_hash(vif, skb);
+
+	return vif->toeplitz.mapping[skb_get_hash_raw(skb) & mask];
 }
 
 static int xenvif_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -395,6 +543,7 @@ static const struct ethtool_ops xenvif_ethtool_ops = {
 };
 
 static const struct net_device_ops xenvif_netdev_ops = {
+	.ndo_select_queue = xenvif_select_queue,
 	.ndo_start_xmit	= xenvif_start_xmit,
 	.ndo_get_stats	= xenvif_get_stats,
 	.ndo_open	= xenvif_open,

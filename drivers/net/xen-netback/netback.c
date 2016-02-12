@@ -2163,6 +2163,89 @@ int xenvif_dealloc_kthread(void *data)
 	return 0;
 }
 
+static u32 xenvif_set_toeplitz_flags(struct xenvif *vif, u32 flags)
+{
+	if (flags & ~(XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4 |
+		      XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP |
+		      XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6 |
+		      XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP))
+		return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	vif->toeplitz.flags = flags;
+
+	return XEN_NETIF_CTRL_STATUS_SUCCESS;
+}
+
+static u32 xenvif_set_toeplitz_key(struct xenvif *vif, u32 gref, u32 len)
+{
+	u8 *key = vif->toeplitz.key;
+	struct gnttab_copy copy_op = {
+		.source.u.ref = gref,
+		.source.domid = vif->domid,
+		.dest.u.gmfn = virt_to_gfn(key),
+		.dest.domid = DOMID_SELF,
+		.dest.offset = xen_offset_in_page(key),
+		.len = len,
+		.flags = GNTCOPY_source_gref
+	};
+
+	if (len > XEN_NETBK_MAX_TOEPLITZ_KEY_SIZE)
+		return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	gnttab_batch_copy(&copy_op, 1);
+
+	if (copy_op.status != GNTST_okay)
+		return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	/* Clear any remaining key octets */
+	if (len < XEN_NETBK_MAX_TOEPLITZ_KEY_SIZE)
+		memset(key + len, 0, XEN_NETBK_MAX_TOEPLITZ_KEY_SIZE - len);
+
+	return XEN_NETIF_CTRL_STATUS_SUCCESS;
+}
+
+static u32 xenvif_set_toeplitz_mapping_order(struct xenvif *vif,
+					     u32 order)
+{
+	if (order > XEN_NETBK_MAX_TOEPLITZ_MAPPING_ORDER)
+		return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	vif->toeplitz.order = order;
+	memset(vif->toeplitz.mapping, 0, sizeof(u32) << order);
+
+	return XEN_NETIF_CTRL_STATUS_SUCCESS;
+}
+
+static u32 xenvif_set_toeplitz_mapping(struct xenvif *vif, u32 gref,
+				       u32 len, u32 off)
+{
+	u32 *mapping = &vif->toeplitz.mapping[off];
+	struct gnttab_copy copy_op = {
+		.source.u.ref = gref,
+		.source.domid = vif->domid,
+		.dest.u.gmfn = virt_to_gfn(mapping),
+		.dest.domid = DOMID_SELF,
+		.dest.offset = xen_offset_in_page(mapping),
+		.len = len * sizeof(u32),
+		.flags = GNTCOPY_source_gref
+	};
+
+	if ((off + len > (1u << vif->toeplitz.order)) ||
+	    copy_op.len > XEN_PAGE_SIZE)
+		return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	while (len-- != 0)
+		if (mapping[off++] >= vif->num_queues)
+			return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	gnttab_batch_copy(&copy_op, 1);
+
+	if (copy_op.status != GNTST_okay)
+		return XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER;
+
+	return XEN_NETIF_CTRL_STATUS_SUCCESS;
+}
+
 static void make_ctrl_response(struct xenvif *vif,
 			       const struct xen_netif_ctrl_request *req,
 			       u32 status, u32 data)
@@ -2191,9 +2274,48 @@ static void push_ctrl_response(struct xenvif *vif)
 static void process_ctrl_request(struct xenvif *vif,
 				 const struct xen_netif_ctrl_request *req)
 {
-	/* There is no support for control requests yet. */
-	make_ctrl_response(vif, req,
-			   XEN_NETIF_CTRL_STATUS_NOT_SUPPORTED, 0);
+	u32 status = XEN_NETIF_CTRL_STATUS_NOT_SUPPORTED;
+	u32 data = 0;
+
+	switch (req->type) {
+	case XEN_NETIF_CTRL_TYPE_GET_TOEPLITZ_FLAGS:
+		status = XEN_NETIF_CTRL_STATUS_SUCCESS;
+		data = XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4 |
+		       XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP |
+		       XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6 |
+		       XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP;
+		break;
+
+	case XEN_NETIF_CTRL_TYPE_SET_TOEPLITZ_FLAGS:
+		status = xenvif_set_toeplitz_flags(vif, req->data[0]);
+		break;
+
+	case XEN_NETIF_CTRL_TYPE_SET_TOEPLITZ_KEY:
+		status = xenvif_set_toeplitz_key(vif, req->data[0],
+						 req->data[1]);
+		break;
+
+	case XEN_NETIF_CTRL_TYPE_GET_TOEPLITZ_MAPPING_ORDER:
+		status = XEN_NETIF_CTRL_STATUS_SUCCESS;
+		data = XEN_NETBK_MAX_TOEPLITZ_MAPPING_ORDER;
+		break;
+
+	case XEN_NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING_ORDER:
+		status = xenvif_set_toeplitz_mapping_order(vif,
+							   req->data[0]);
+		break;
+
+	case XEN_NETIF_CTRL_TYPE_SET_TOEPLITZ_MAPPING:
+		status = xenvif_set_toeplitz_mapping(vif, req->data[0],
+						     req->data[1],
+						     req->data[2]);
+		break;
+
+	default:
+		break;
+	}
+
+	make_ctrl_response(vif, req, status, data);
 	push_ctrl_response(vif);
 }
 

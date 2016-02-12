@@ -220,6 +220,12 @@ struct xenvif_mcast_addr {
 
 #define XEN_NETBK_MCAST_MAX 64
 
+#define XEN_NETBK_MAX_TOEPLITZ_KEY_SIZE 40
+
+#define XEN_NETBK_MAX_TOEPLITZ_MAPPING_ORDER 7
+#define XEN_NETBK_MAX_TOEPLITZ_MAPPING_SIZE \
+	BIT(XEN_NETBK_MAX_TOEPLITZ_MAPPING_ORDER)
+
 struct xenvif {
 	/* Unique identifier for this interface. */
 	domid_t          domid;
@@ -250,6 +256,13 @@ struct xenvif {
 	struct xenvif_queue *queues;
 	unsigned int num_queues; /* active queues, resource allocated */
 	unsigned int stalled_queues;
+
+	struct {
+		u32 flags;
+		u8 key[XEN_NETBK_MAX_TOEPLITZ_KEY_SIZE];
+		u32 mapping[XEN_NETBK_MAX_TOEPLITZ_MAPPING_SIZE];
+		unsigned int order;
+	} toeplitz;
 
 	struct xenbus_watch credit_watch;
 	struct xenbus_watch mcast_ctrl_watch;
