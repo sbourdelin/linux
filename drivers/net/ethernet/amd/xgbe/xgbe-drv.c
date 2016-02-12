@@ -1629,27 +1629,12 @@ static void xgbe_poll_controller(struct net_device *netdev)
 static int xgbe_setup_tc(struct net_device *netdev, u8 tc)
 {
 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
-	unsigned int offset, queue;
-	u8 i;
 
-	if (tc && (tc != pdata->hw_feat.tc_cnt))
+	if (tc > pdata->hw_feat.tc_cnt)
 		return -EINVAL;
 
-	if (tc) {
-		netdev_set_num_tc(netdev, tc);
-		for (i = 0, queue = 0, offset = 0; i < tc; i++) {
-			while ((queue < pdata->tx_q_count) &&
-			       (pdata->q2tc_map[queue] == i))
-				queue++;
-
-			netif_dbg(pdata, drv, netdev, "TC%u using TXq%u-%u\n",
-				  i, offset, queue - 1);
-			netdev_set_tc_queue(netdev, i, queue - offset, offset);
-			offset = queue;
-		}
-	} else {
-		netdev_reset_tc(netdev);
-	}
+	pdata->num_tcs = tc;
+	pdata->hw_if.config_tc(pdata);
 
 	return 0;
 }
