@@ -273,11 +273,15 @@ static inline int mutex_can_spin_on_owner(struct mutex *lock)
 
 /*
  * Atomically try to take the lock when it is available
+ *
+ * For waiter-spinner, the count needs to be set to -1 first which will be
+ * cleared to 0 later on if the list becomes empty. For regular spinner,
+ * the count will be set to 0.
  */
-static inline bool mutex_try_to_acquire(struct mutex *lock)
+static inline bool mutex_try_to_acquire(struct mutex *lock, int waiter)
 {
 	return !mutex_is_locked(lock) &&
-		(atomic_cmpxchg_acquire(&lock->count, 1, 0) == 1);
+		(atomic_cmpxchg_acquire(&lock->count, 1, waiter ? -1 : 0) == 1);
 }
 
 /*
@@ -302,22 +306,33 @@ static inline bool mutex_try_to_acquire(struct mutex *lock)
  *
  * Returns true when the lock was taken, otherwise false, indicating
  * that we need to jump to the slowpath and sleep.
+ *
+ * The waiter flag is set to true if the spinner is a waiter in the wait
+ * queue. It doesn't go into OSQ as there can be only one waiter at the
+ * head of the queue spinning. It is possible that both head waiter and
+ * the head of the OSQ spinning on the lock. So there may be a bit more
+ * cacheline contention in this case. The waiter needs to set the lock
+ * to -1 instead of 0 on lock acquisition.
  */
 static bool mutex_optimistic_spin(struct mutex *lock,
-				  struct ww_acquire_ctx *ww_ctx, const bool use_ww_ctx)
+				  struct ww_acquire_ctx *ww_ctx,
+				  const bool use_ww_ctx, int waiter)
 {
 	struct task_struct *task = current;
+	bool acquired = false;
 
-	if (!mutex_can_spin_on_owner(lock))
-		goto done;
+	if (!waiter) {
+		if (!mutex_can_spin_on_owner(lock))
+			goto done;
 
-	/*
-	 * In order to avoid a stampede of mutex spinners trying to
-	 * acquire the mutex all at once, the spinners need to take a
-	 * MCS (queued) lock first before spinning on the owner field.
-	 */
-	if (!osq_lock(&lock->osq))
-		goto done;
+		/*
+		 * In order to avoid a stampede of mutex spinners trying to
+		 * acquire the mutex all at once, the spinners need to take a
+		 * MCS (queued) lock first before spinning on the owner field.
+		 */
+		if (!osq_lock(&lock->osq))
+			goto done;
+	}
 
 	while (true) {
 		struct task_struct *owner;
@@ -347,7 +362,7 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 			break;
 
 		/* Try to acquire the mutex if it is unlocked. */
-		if (mutex_try_to_acquire(lock)) {
+		if (mutex_try_to_acquire(lock, waiter)) {
 			lock_acquired(&lock->dep_map, ip);
 
 			if (use_ww_ctx) {
@@ -358,8 +373,8 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 			}
 
 			mutex_set_owner(lock);
-			osq_unlock(&lock->osq);
-			return true;
+			acquired = true;
+			break;
 		}
 
 		/*
@@ -380,7 +395,10 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 		cpu_relax_lowlatency();
 	}
 
-	osq_unlock(&lock->osq);
+	if (!waiter)
+		osq_unlock(&lock->osq);
+	if (acquired || waiter)
+		return acquired;
 done:
 	/*
 	 * If we fell out of the spin path because of need_resched(),
@@ -400,7 +418,8 @@ done:
 }
 #else
 static bool mutex_optimistic_spin(struct mutex *lock,
-				  struct ww_acquire_ctx *ww_ctx, const bool use_ww_ctx)
+				  struct ww_acquire_ctx *ww_ctx,
+				  const bool use_ww_ctx, int waiter)
 {
 	return false;
 }
@@ -517,7 +536,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 	preempt_disable();
 	mutex_acquire_nest(&lock->dep_map, subclass, 0, nest_lock, ip);
 
-	if (mutex_optimistic_spin(lock, ww_ctx, use_ww_ctx)) {
+	if (mutex_optimistic_spin(lock, ww_ctx, use_ww_ctx, false)) {
 		/* got the lock, yay! */
 		preempt_enable();
 		return 0;
