@@ -215,8 +215,9 @@ rpcrdma_update_granted_credits(struct rpcrdma_rep *rep)
 static void
 rpcrdma_recvcq_process_wc(struct ib_wc *wc)
 {
-	struct rpcrdma_rep *rep =
-			(struct rpcrdma_rep *)(unsigned long)wc->wr_id;
+	struct ib_cqe *cqe = wc->wr_cqe;
+	struct rpcrdma_rep *rep = container_of(cqe, struct rpcrdma_rep,
+					       rr_cqe);
 
 	/* WARNING: Only wr_id and status are reliable at this point */
 	if (wc->status != IB_WC_SUCCESS)
@@ -242,46 +243,23 @@ out_schedule:
 
 out_fail:
 	if (wc->status != IB_WC_WR_FLUSH_ERR)
-		pr_err("RPC:       %s: rep %p: %s\n",
-		       __func__, rep, ib_wc_status_msg(wc->status));
+		pr_err("RPC:       %s: Recv: %s (%u, vendor %u)\n",
+		       __func__, ib_wc_status_msg(wc->status),
+		       wc->status, wc->vendor_err);
 	rep->rr_len = RPCRDMA_BAD_LEN;
 	goto out_schedule;
 }
 
-/* The wc array is on stack: automatic memory is always CPU-local.
+/**
+ * rpcrdma_receive_wc - Invoked by RDMA provider for each polled Receive WC
+ * @cq:	completion queue (ignored)
+ * @wc:	completed WR
  *
- * struct ib_wc is 64 bytes, making the poll array potentially
- * large. But this is at the bottom of the call chain. Further
- * substantial work is done in another thread.
  */
 static void
-rpcrdma_recvcq_poll(struct ib_cq *cq)
+rpcrdma_receive_wc(struct ib_cq *cq, struct ib_wc *wc)
 {
-	struct ib_wc *pos, wcs[4];
-	int count, rc;
-
-	do {
-		pos = wcs;
-
-		rc = ib_poll_cq(cq, ARRAY_SIZE(wcs), pos);
-		if (rc < 0)
-			break;
-
-		count = rc;
-		while (count-- > 0)
-			rpcrdma_recvcq_process_wc(pos++);
-	} while (rc == ARRAY_SIZE(wcs));
-}
-
-/* Handle provider receive completion upcalls.
- */
-static void
-rpcrdma_recvcq_upcall(struct ib_cq *cq, void *cq_context)
-{
-	do {
-		rpcrdma_recvcq_poll(cq);
-	} while (ib_req_notify_cq(cq, IB_CQ_NEXT_COMP |
-				  IB_CQ_REPORT_MISSED_EVENTS) > 0);
+	rpcrdma_recvcq_process_wc(wc);
 }
 
 static void
@@ -655,21 +633,13 @@ rpcrdma_ep_create(struct rpcrdma_ep *ep, struct rpcrdma_ia *ia,
 		goto out2;
 	}
 
-	cq_attr.cqe = ep->rep_attr.cap.max_recv_wr + 1;
-	recvcq = ib_create_cq(ia->ri_device, rpcrdma_recvcq_upcall,
-			      rpcrdma_cq_async_error_upcall, NULL, &cq_attr);
+	recvcq = ib_alloc_cq(ia->ri_device, NULL,
+			     ep->rep_attr.cap.max_recv_wr + 1,
+			     0, IB_POLL_SOFTIRQ);
 	if (IS_ERR(recvcq)) {
 		rc = PTR_ERR(recvcq);
 		dprintk("RPC:       %s: failed to create recv CQ: %i\n",
 			__func__, rc);
-		goto out2;
-	}
-
-	rc = ib_req_notify_cq(recvcq, IB_CQ_NEXT_COMP);
-	if (rc) {
-		dprintk("RPC:       %s: ib_req_notify_cq failed: %i\n",
-			__func__, rc);
-		ib_destroy_cq(recvcq);
 		goto out2;
 	}
 
@@ -735,10 +705,7 @@ rpcrdma_ep_destroy(struct rpcrdma_ep *ep, struct rpcrdma_ia *ia)
 		ia->ri_id->qp = NULL;
 	}
 
-	rc = ib_destroy_cq(ep->rep_attr.recv_cq);
-	if (rc)
-		dprintk("RPC:       %s: ib_destroy_cq returned %i\n",
-			__func__, rc);
+	ib_free_cq(ep->rep_attr.recv_cq);
 
 	rc = ib_destroy_cq(ep->rep_attr.send_cq);
 	if (rc)
@@ -947,6 +914,7 @@ rpcrdma_create_rep(struct rpcrdma_xprt *r_xprt)
 	}
 
 	rep->rr_device = ia->ri_device;
+	rep->rr_cqe.done = rpcrdma_receive_wc;
 	rep->rr_rxprt = r_xprt;
 	INIT_WORK(&rep->rr_work, rpcrdma_receive_worker);
 	return rep;
@@ -1322,7 +1290,7 @@ rpcrdma_ep_post_recv(struct rpcrdma_ia *ia,
 	int rc;
 
 	recv_wr.next = NULL;
-	recv_wr.wr_id = (u64) (unsigned long) rep;
+	recv_wr.wr_cqe = &rep->rr_cqe;
 	recv_wr.sg_list = &rep->rr_rdmabuf->rg_iov;
 	recv_wr.num_sge = 1;
 
