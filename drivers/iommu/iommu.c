@@ -1415,6 +1415,27 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
 	return unmapped;
 }
 EXPORT_SYMBOL_GPL(iommu_unmap);
+int iommu_get_single_reserved(struct iommu_domain *domain,
+			      phys_addr_t addr, int prot,
+			      dma_addr_t *iova)
+{
+	if (!domain->ops->get_single_reserved)
+		return  -ENODEV;
+
+	return domain->ops->get_single_reserved(domain, addr, prot, iova);
+
+}
+EXPORT_SYMBOL_GPL(iommu_get_single_reserved);
+
+void iommu_put_single_reserved(struct iommu_domain *domain,
+			       dma_addr_t iova)
+{
+	if (!domain->ops->put_single_reserved)
+		return;
+
+	domain->ops->put_single_reserved(domain, iova);
+}
+EXPORT_SYMBOL_GPL(iommu_put_single_reserved);
 
 size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 			 struct scatterlist *sg, unsigned int nents, int prot)
