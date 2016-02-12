@@ -169,6 +169,7 @@ struct vcpu_svm {
 	bool nrips_enabled	: 1;
 
 	struct page *avic_bk_page;
+	atomic_t avic_pending_cnt;
 };
 
 struct __attribute__ ((__packed__))
@@ -231,6 +232,8 @@ static bool npt_enabled = true;
 #else
 static bool npt_enabled;
 #endif
+
+static struct kvm_x86_ops svm_x86_ops;
 
 /* allow nested paging (virtualized MMU) for all guests */
 static int npt = true;
@@ -974,6 +977,9 @@ static __init int svm_hardware_setup(void)
 
 	if (avic) {
 		printk(KERN_INFO "kvm: AVIC enabled\n");
+	} else {
+		svm_x86_ops.deliver_posted_interrupt = NULL;
+		svm_x86_ops.apicv_intr_pending = NULL;
 	}
 
 	return 0;
@@ -1188,8 +1194,10 @@ static void init_vmcb(struct vcpu_svm *svm)
 
 	enable_gif(svm);
 
-	if (avic)
+	if (avic) {
 		avic_init_vmcb(svm);
+		atomic_set(&svm->avic_pending_cnt, 0);
+	}
 }
 
 static struct svm_avic_phy_ait_entry *
@@ -3059,8 +3067,10 @@ static int clgi_interception(struct vcpu_svm *svm)
 	disable_gif(svm);
 
 	/* After a CLGI no interrupts should come */
-	svm_clear_vintr(svm);
-	svm->vmcb->control.v_irq = 0;
+	if (!avic) {
+		svm_clear_vintr(svm);
+		svm->vmcb->control.v_irq = 0;
+	}
 
 	mark_dirty(svm->vmcb, VMCB_INTR);
 
@@ -3635,6 +3645,9 @@ static int msr_interception(struct vcpu_svm *svm)
 
 static int interrupt_window_interception(struct vcpu_svm *svm)
 {
+	if (avic)
+		BUG_ON(1);
+
 	kvm_make_request(KVM_REQ_EVENT, &svm->vcpu);
 	svm_clear_vintr(svm);
 	svm->vmcb->control.v_irq = 0;
@@ -4190,7 +4203,7 @@ static inline void svm_inject_irq(struct vcpu_svm *svm, int irq)
 {
 	struct vmcb_control_area *control;
 
-
+	/* The following fields are ignored when AVIC is enabled */
 	control = &svm->vmcb->control;
 	control->int_vector = irq;
 	control->v_intr_prio = 0xf;
@@ -4261,6 +4274,27 @@ static void svm_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 	return;
 }
 
+static void svm_deliver_avic_intr(struct kvm_vcpu *vcpu, int vec)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	kvm_lapic_set_vector(vec, avic_get_bk_page_entry(svm, APIC_IRR));
+
+	/* Note:
+	 * This gives us a hint to check for pending interrupts
+	 * during #VMEXIT.
+	 */
+	atomic_inc(&svm->avic_pending_cnt);
+
+	if (vcpu->mode == IN_GUEST_MODE) {
+		wrmsrl(MSR_AMD64_AVIC_DOORBELL,
+		       __default_cpu_present_to_apicid(vcpu->cpu));
+	} else {
+		kvm_make_request(KVM_REQ_EVENT, vcpu);
+		kvm_vcpu_kick(vcpu);
+	}
+}
+
 static int svm_nmi_allowed(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -4321,6 +4355,9 @@ static void enable_irq_window(struct kvm_vcpu *vcpu)
 	 * get that intercept, this function will be called again though and
 	 * we'll get the vintr intercept.
 	 */
+	if (avic)
+		return;
+
 	if (gif_set(svm) && nested_svm_intr(svm)) {
 		svm_set_vintr(svm);
 		svm_inject_irq(svm, 0x0);
@@ -4462,6 +4499,67 @@ static void svm_cancel_injection(struct kvm_vcpu *vcpu)
 	svm_complete_interrupts(svm);
 }
 
+static bool avic_check_irr_pending(struct kvm_vcpu *vcpu)
+{
+	int i;
+	u32 irr;
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	for (i = 0; i < 8; i++) {
+		irr = *(avic_get_bk_page_entry(svm,
+					APIC_IRR + (0x10 * i)));
+		if (irr)
+			return true;
+	}
+
+	return false;
+}
+
+static bool svm_avic_check_ppr(struct vcpu_svm *svm)
+{
+	u32 tpr = *(avic_get_bk_page_entry(svm, APIC_TASKPRI));
+	u32 ppr = *(avic_get_bk_page_entry(svm, APIC_PROCPRI));
+
+	if (ppr && (ppr != tpr))
+		return true;
+
+	return false;
+}
+
+/* Note: Returns true means do not block */
+static bool svm_apicv_intr_pending (struct kvm_vcpu *vcpu)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (!avic)
+		return false;
+
+	if (atomic_read(&svm->avic_pending_cnt))
+		return true;
+
+	return avic_check_irr_pending(vcpu);
+}
+
+static void avic_post_vmrun(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_svm *svm = to_svm(vcpu);
+
+	if (!avic)
+		return;
+
+	if (atomic_read(&svm->avic_pending_cnt)) {
+		if (svm_avic_check_ppr(svm))
+			return;
+		if (avic_check_irr_pending(vcpu))
+			return;
+		/*
+		 * At this point, if there is no interrupt pending.
+		 * So, we decrement the pending count
+		 */
+		atomic_dec(&svm->avic_pending_cnt);
+	}
+}
+
 static void svm_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
@@ -4587,6 +4685,8 @@ static void svm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	if (unlikely(svm->vmcb->control.exit_code == SVM_EXIT_NMI))
 		kvm_after_handle_nmi(&svm->vcpu);
+
+	avic_post_vmrun(vcpu);
 
 	sync_cr8_to_lapic(vcpu);
 
@@ -5050,7 +5150,9 @@ static struct kvm_x86_ops svm_x86_ops = {
 
 	.sched_in = svm_sched_in,
 
+	.apicv_intr_pending = svm_apicv_intr_pending,
 	.pmu_ops = &amd_pmu_ops,
+	.deliver_posted_interrupt = svm_deliver_avic_intr,
 };
 
 static int __init svm_init(void)
