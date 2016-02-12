@@ -16,6 +16,7 @@ enum uncore_type {
 	L2C_TAD_TYPE,
 	L2C_CBC_TYPE,
 	LMC_TYPE,
+	OCX_LNE_TYPE,
 };
 
 extern int thunder_uncore_version;
@@ -64,9 +65,11 @@ extern struct attribute_group thunder_uncore_attr_group;
 extern struct thunder_uncore *thunder_uncore_l2c_tad;
 extern struct thunder_uncore *thunder_uncore_l2c_cbc;
 extern struct thunder_uncore *thunder_uncore_lmc;
+extern struct thunder_uncore *thunder_uncore_ocx_lne;
 extern struct pmu thunder_l2c_tad_pmu;
 extern struct pmu thunder_l2c_cbc_pmu;
 extern struct pmu thunder_lmc_pmu;
+extern struct pmu thunder_ocx_lne_pmu;
 
 /* Prototypes */
 struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
@@ -83,3 +86,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
 int thunder_uncore_l2c_tad_setup(void);
 int thunder_uncore_l2c_cbc_setup(void);
 int thunder_uncore_lmc_setup(void);
+int thunder_uncore_ocx_lne_setup(void);
