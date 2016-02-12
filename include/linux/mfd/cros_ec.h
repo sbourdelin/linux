@@ -304,6 +304,16 @@ int cros_ec_query_all(struct cros_ec_device *ec_dev);
  */
 int cros_ec_get_next_event(struct cros_ec_device *ec_dev);
 
+/**
+ * cros_ec_get_host_event - Return a mask of event set by the EC.
+ *
+ * Returns the mask of the event that caused the last interrupt to be raised.
+ *
+ * @ec_dev: Device to fetch event from
+ * @return event mask, 0 on error
+ */
+uint32_t cros_ec_get_host_event(struct cros_ec_device *ec_dev);
+
 /* sysfs stuff */
 extern struct attribute_group cros_ec_attr_group;
 extern struct attribute_group cros_ec_lightbar_attr_group;
