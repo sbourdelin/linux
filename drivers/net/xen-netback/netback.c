@@ -1341,6 +1341,28 @@ void xenvif_mcast_addr_list_free(struct xenvif *vif)
 	}
 }
 
+static void xenvif_set_skb_hash(struct xenvif *vif,
+				struct sk_buff *skb,
+				struct xen_netif_extra_info *extra)
+{
+	u32 hash = *(u32 *)extra->u.toeplitz.value;
+	enum pkt_hash_types type = PKT_HASH_TYPE_NONE;
+
+	switch (extra->u.toeplitz.type) {
+	case _XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4:
+	case _XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6:
+		type = PKT_HASH_TYPE_L3;
+		break;
+
+	case _XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV4_TCP:
+	case _XEN_NETIF_CTRL_TOEPLITZ_HASH_IPV6_TCP:
+		type = PKT_HASH_TYPE_L4;
+		break;
+	}
+
+	skb_set_hash(skb, hash, type);
+}
+
 static void xenvif_tx_build_gops(struct xenvif_queue *queue,
 				     int budget,
 				     unsigned *copy_ops,
@@ -1500,6 +1522,13 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
 				kfree_skb(nskb);
 				break;
 			}
+		}
+
+		if (extras[XEN_NETIF_EXTRA_TYPE_TOEPLITZ - 1].type) {
+			struct xen_netif_extra_info *extra;
+
+			extra = &extras[XEN_NETIF_EXTRA_TYPE_TOEPLITZ - 1];
+			xenvif_set_skb_hash(queue->vif, skb, extra);
 		}
 
 		XENVIF_TX_CB(skb)->pending_idx = pending_idx;
