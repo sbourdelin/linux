@@ -1052,7 +1052,7 @@ static void init_vmcb(struct vcpu_svm *svm)
 
 	control->iopm_base_pa = iopm_base;
 	control->msrpm_base_pa = __pa(svm->msrpm);
-	control->int_ctl = V_INTR_MASKING_MASK;
+	control->v_intr_masking = 1;
 
 	init_seg(&save->es);
 	init_seg(&save->ss);
@@ -2306,7 +2306,7 @@ static int nested_svm_vmexit(struct vcpu_svm *svm)
 
 	/* We always set V_INTR_MASKING and remember the old value in hflags */
 	if (!(svm->vcpu.arch.hflags & HF_VINTR_MASK))
-		nested_vmcb->control.int_ctl &= ~V_INTR_MASKING_MASK;
+		nested_vmcb->control.v_intr_masking = 0;
 
 	/* Restore the original control entries */
 	copy_vmcb_control_area(vmcb, hsave);
@@ -2516,8 +2516,9 @@ static bool nested_svm_vmrun(struct vcpu_svm *svm)
 	svm->nested.intercept            = nested_vmcb->control.intercept;
 
 	svm_flush_tlb(&svm->vcpu);
-	svm->vmcb->control.int_ctl = nested_vmcb->control.int_ctl | V_INTR_MASKING_MASK;
-	if (nested_vmcb->control.int_ctl & V_INTR_MASKING_MASK)
+	svm->vmcb->control.int_ctl = nested_vmcb->control.int_ctl;
+	svm->vmcb->control.v_intr_masking = 1;
+	if (nested_vmcb->control.v_intr_masking)
 		svm->vcpu.arch.hflags |= HF_VINTR_MASK;
 	else
 		svm->vcpu.arch.hflags &= ~HF_VINTR_MASK;
@@ -2670,7 +2671,7 @@ static int clgi_interception(struct vcpu_svm *svm)
 
 	/* After a CLGI no interrupts should come */
 	svm_clear_vintr(svm);
-	svm->vmcb->control.int_ctl &= ~V_IRQ_MASK;
+	svm->vmcb->control.v_irq = 0;
 
 	mark_dirty(svm->vmcb, VMCB_INTR);
 
@@ -3247,7 +3248,7 @@ static int interrupt_window_interception(struct vcpu_svm *svm)
 {
 	kvm_make_request(KVM_REQ_EVENT, &svm->vcpu);
 	svm_clear_vintr(svm);
-	svm->vmcb->control.int_ctl &= ~V_IRQ_MASK;
+	svm->vmcb->control.v_irq = 0;
 	mark_dirty(svm->vmcb, VMCB_INTR);
 	++svm->vcpu.stat.irq_window_exits;
 	return 1;
@@ -3558,11 +3559,11 @@ static inline void svm_inject_irq(struct vcpu_svm *svm, int irq)
 {
 	struct vmcb_control_area *control;
 
+
 	control = &svm->vmcb->control;
 	control->int_vector = irq;
-	control->int_ctl &= ~V_INTR_PRIO_MASK;
-	control->int_ctl |= V_IRQ_MASK |
-		((/*control->int_vector >> 4*/ 0xf) << V_INTR_PRIO_SHIFT);
+	control->v_intr_prio = 0xf;
+	control->v_irq = 1;
 	mark_dirty(svm->vmcb, VMCB_INTR);
 }
 
@@ -3728,7 +3729,7 @@ static inline void sync_cr8_to_lapic(struct kvm_vcpu *vcpu)
 		return;
 
 	if (!is_cr_intercept(svm, INTERCEPT_CR8_WRITE)) {
-		int cr8 = svm->vmcb->control.int_ctl & V_TPR_MASK;
+		int cr8 = svm->vmcb->control.v_tpr & V_TPR_MASK;
 		kvm_set_cr8(vcpu, cr8);
 	}
 }
@@ -3742,8 +3743,7 @@ static inline void sync_lapic_to_cr8(struct kvm_vcpu *vcpu)
 		return;
 
 	cr8 = kvm_get_cr8(vcpu);
-	svm->vmcb->control.int_ctl &= ~V_TPR_MASK;
-	svm->vmcb->control.int_ctl |= cr8 & V_TPR_MASK;
+	svm->vmcb->control.v_tpr = cr8 & V_TPR_MASK;
 }
 
 static void svm_complete_interrupts(struct vcpu_svm *svm)
