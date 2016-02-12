@@ -582,6 +582,14 @@ reviewers and to inform maintainers of the degree of review which has been
 done on the patch.  Reviewed-by: tags, when supplied by reviewers known to
 understand the subject area and to perform thorough reviews, will normally
 increase the likelihood of your patch getting into the kernel.
+The presence of Reviewed-by tags for an initial patch submission are indicative
+of an existing internal review process that may occur at various organizations,
+prior to a mainline kernel submission.  The presence of these tags can give the
+maintainer a good appreciation that somebody has done an internal review
+following the same guidelines as those done on a public mailing-list.
+Maintainers are encouraged to maintain these tags while accepting and merging
+patches, appreciation of these pre-existing Revivewed-by tags is left are their
+own discretion.
 
 A Suggested-by: tag indicates that the patch idea is suggested by the person
 named and ensures credit to the person for the idea. Please note that this
