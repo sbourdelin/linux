@@ -251,6 +251,11 @@ static void del_nbp(struct net_bridge_port *p)
 
 	nbp_vlan_flush(p);
 	br_fdb_delete_by_port(br, p, 0, 1);
+
+	/* If the port is part of an hardware switch, set its STP state to
+	 * forwarding to restore communication with the CPU port.
+	 */
+	br_set_state(p, BR_STATE_FORWARDING);
 	switchdev_deferred_process();
 
 	nbp_update_port_count(br);
