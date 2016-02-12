@@ -36,6 +36,7 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 #include "intel_drv.h"
+#include "intel_bios.h"
 
 /**
  * DOC: interrupt handling
@@ -3424,6 +3425,47 @@ static void ibx_hpd_irq_setup(struct drm_device *dev)
 	I915_WRITE(PCH_PORT_HOTPLUG, hotplug);
 }
 
+/*
+ * For BXT invert bit has to be set based on AOB design
+ * for HPD detection logic, update it based on VBT fields.
+ */
+static void bxt_hpd_set_invert(struct drm_device *dev, u32 hotplug_port)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int reg_val, val = 0;
+	enum port port;
+
+	for (port = PORT_A; port <= PORT_C; port++) {
+
+		/* Proceed only if invert bit is set */
+		if (intel_bios_is_port_hpd_inverted(dev, port)) {
+			switch (port) {
+			case PORT_A:
+				if (hotplug_port & BXT_DE_PORT_HP_DDIA)
+					val |= BXT_DDIA_HPD_INVERT;
+				break;
+			case PORT_B:
+				if (hotplug_port & BXT_DE_PORT_HP_DDIB)
+					val |= BXT_DDIB_HPD_INVERT;
+				break;
+			case PORT_C:
+				if (hotplug_port & BXT_DE_PORT_HP_DDIC)
+					val |= BXT_DDIC_HPD_INVERT;
+				break;
+			default:
+				DRM_ERROR("HPD invert set for invalid port %d\n",
+						port);
+				break;
+			}
+		}
+	}
+	reg_val = I915_READ(BXT_HOTPLUG_CTL);
+	DRM_DEBUG_KMS("Invert bit setting: hp_ctl:%x hp_port:%x val:%x\n",
+				reg_val, hotplug_port, val);
+	reg_val &= ~BXT_DDI_HPD_INVERT_MASK;
+	I915_WRITE(BXT_HOTPLUG_CTL, reg_val | val);
+}
+
 static void spt_hpd_irq_setup(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -3494,6 +3536,7 @@ static void bxt_hpd_irq_setup(struct drm_device *dev)
 	hotplug |= PORTC_HOTPLUG_ENABLE | PORTB_HOTPLUG_ENABLE |
 		PORTA_HOTPLUG_ENABLE;
 	I915_WRITE(PCH_PORT_HOTPLUG, hotplug);
+	bxt_hpd_set_invert(dev, enabled_irqs);
 }
 
 static void ibx_irq_postinstall(struct drm_device *dev)

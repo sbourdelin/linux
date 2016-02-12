@@ -5940,6 +5940,15 @@ enum skl_disp_power_wells {
 #define GEN8_PCU_IIR _MMIO(0x444e8)
 #define GEN8_PCU_IER _MMIO(0x444ec)
 
+/* BXT hotplug control */
+#define BXT_HOTPLUG_CTL			_MMIO(0xC4030)
+#define BXT_DDIA_HPD_INVERT		(1 << 27)
+#define BXT_DDIC_HPD_INVERT		(1 << 11)
+#define BXT_DDIB_HPD_INVERT		(1 << 3)
+#define BXT_DDI_HPD_INVERT_MASK		(BXT_DDIA_HPD_INVERT | \
+					 BXT_DDIB_HPD_INVERT | \
+					 BXT_DDIC_HPD_INVERT)
+
 #define ILK_DISPLAY_CHICKEN2	_MMIO(0x42004)
 /* Required on all Ironlake and Sandybridge according to the B-Spec. */
 #define  ILK_ELPIN_409_SELECT	(1 << 25)
