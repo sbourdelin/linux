@@ -18,6 +18,8 @@
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/irqchip/arm-gic.h>
+#include <linux/iommu.h>
+#include <linux/msi.h>
 
 #include "irq-gic-common.h"
 
@@ -121,3 +123,70 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
 	if (sync_access)
 		sync_access();
 }
+
+#if defined(CONFIG_IOMMU_API) && defined(CONFIG_PCI_MSI_IRQ_DOMAIN)
+static int gic_set_msi_addr(struct irq_data *data, struct msi_msg *msg)
+{
+	struct msi_desc *desc = irq_data_get_msi_desc(data);
+	struct device *dev = msi_desc_to_dev(desc);
+	struct iommu_domain *d;
+	phys_addr_t addr;
+	dma_addr_t iova;
+	int ret;
+
+	d = iommu_get_domain_for_dev(dev);
+	if (!d)
+		return 0;
+#ifdef CONFIG_PHYS_ADDR_T_64BIT
+	addr = ((phys_addr_t)(msg->address_hi) << 32) | msg->address_lo;
+#else
+	addr = msg->address_lo;
+#endif
+
+	ret = iommu_get_single_reserved(d, addr, IOMMU_WRITE, &iova);
+
+	if (!ret) {
+		msg->address_lo = lower_32_bits(iova);
+		msg->address_hi = upper_32_bits(iova);
+	}
+	return ret;
+}
+
+
+static void gic_unset_msi_addr(struct irq_data *data)
+{
+	struct msi_desc *desc = irq_data_get_msi_desc(data);
+	struct device *dev;
+	struct iommu_domain *d;
+	dma_addr_t iova;
+
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+	iova = ((dma_addr_t)(desc->msg.address_hi) << 32) |
+		desc->msg.address_lo;
+#else
+	iova = desc->msg.address_lo;
+#endif
+
+	dev = msi_desc_to_dev(desc);
+	if (!dev)
+		return;
+
+	d = iommu_get_domain_for_dev(dev);
+	if (!d)
+		return;
+
+	iommu_put_single_reserved(d, iova);
+}
+
+void gic_pci_msi_domain_write_msg(struct irq_data *irq_data,
+				  struct msi_msg *msg)
+{
+	if (!msg->address_hi && !msg->address_lo && !msg->data)
+		gic_unset_msi_addr(irq_data); /* deactivate */
+	else
+		gic_set_msi_addr(irq_data, msg); /* activate, set_affinity */
+
+	pci_msi_domain_write_msg(irq_data, msg);
+}
+#endif
+

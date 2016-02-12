@@ -24,6 +24,7 @@
 #include <linux/of_pci.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include "irq-gic-common.h"
 
 /*
 * MSI_TYPER:
@@ -83,7 +84,11 @@ static struct irq_chip gicv2m_msi_irq_chip = {
 	.irq_mask		= gicv2m_mask_msi_irq,
 	.irq_unmask		= gicv2m_unmask_msi_irq,
 	.irq_eoi		= irq_chip_eoi_parent,
-	.irq_write_msi_msg	= pci_msi_domain_write_msg,
+#ifdef CONFIG_IOMMU_API
+	.irq_write_msi_msg	= gic_pci_msi_domain_write_msg,
+#else
+	.irq_write_msi_msg      = pci_msi_domain_write_msg,
+#endif
 };
 
 static struct msi_domain_info gicv2m_msi_domain_info = {
