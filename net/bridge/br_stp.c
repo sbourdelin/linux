@@ -52,6 +52,8 @@ void br_set_state(struct net_bridge_port *p, unsigned int state)
 	if (err && err != -EOPNOTSUPP)
 		br_warn(p->br, "error setting offload STP state on port %u(%s)\n",
 				(unsigned int) p->port_no, p->dev->name);
+	else
+		br_log_state(p);
 }
 
 /* called under bridge lock */
@@ -126,7 +128,6 @@ static void br_root_port_block(const struct net_bridge *br,
 		  (unsigned int) p->port_no, p->dev->name);
 
 	br_set_state(p, BR_STATE_LISTENING);
-	br_log_state(p);
 	br_ifinfo_notify(RTM_NEWLINK, p);
 
 	if (br->forward_delay > 0)
@@ -407,7 +408,6 @@ static void br_make_blocking(struct net_bridge_port *p)
 			br_topology_change_detection(p->br);
 
 		br_set_state(p, BR_STATE_BLOCKING);
-		br_log_state(p);
 		br_ifinfo_notify(RTM_NEWLINK, p);
 
 		del_timer(&p->forward_delay_timer);
@@ -431,7 +431,6 @@ static void br_make_forwarding(struct net_bridge_port *p)
 	else
 		br_set_state(p, BR_STATE_LEARNING);
 
-	br_log_state(p);
 	br_ifinfo_notify(RTM_NEWLINK, p);
 
 	if (br->forward_delay != 0)
