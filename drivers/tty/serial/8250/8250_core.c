@@ -40,6 +40,7 @@
 #ifdef CONFIG_SPARC
 #include <linux/sunserialcore.h>
 #endif
+#include <linux/acpi.h>
 
 #include <asm/irq.h>
 
@@ -665,12 +666,34 @@ static int univ8250_console_match(struct console *co, char *name, int idx,
 	return -ENODEV;
 }
 
+static int __init univ8250_console_acpi_match(struct console *co,
+					      struct acpi_table_spcr *spcr)
+{
+	int index = co->index >= 0 ? co->index : 0;
+	struct uart_port *port = &serial8250_ports[index].port;
+
+	if (spcr->interface_type != ACPI_DBG2_16550_SUBSET &&
+	    spcr->interface_type != ACPI_DBG2_16550_COMPATIBLE)
+		return -ENODEV;
+
+	if (spcr->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY &&
+	    spcr->serial_port.address == (u64)port->mapbase)
+		return 0;
+
+	if (spcr->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_IO &&
+	    spcr->serial_port.address == (u64)port->iobase)
+		return 0;
+
+	return -ENODEV;
+}
+
 static struct console univ8250_console = {
 	.name		= "ttyS",
 	.write		= univ8250_console_write,
 	.device		= uart_console_device,
 	.setup		= univ8250_console_setup,
 	.match		= univ8250_console_match,
+	.acpi_match	= univ8250_console_acpi_match,
 	.flags		= CON_PRINTBUFFER | CON_ANYTIME,
 	.index		= -1,
 	.data		= &serial8250_reg,
