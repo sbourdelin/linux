@@ -2572,8 +2572,26 @@ void register_console(struct console *newcon)
 		break;
 	}
 
-	if (!(newcon->flags & CON_ENABLED))
-		return;
+	if (!(newcon->flags & CON_ENABLED)) {
+		char *opts;
+		int err;
+
+		if (newcon->flags & CON_BOOT)
+			return;
+
+		err = acpi_console_match(newcon, &opts);
+		if (err < 0)
+			return;
+
+		if (newcon->index < 0)
+			newcon->index = 0;
+
+		if (newcon->setup && newcon->setup(newcon, opts) != 0)
+			return;
+
+		newcon->flags |= CON_ENABLED | CON_CONSDEV;
+		has_preferred = true;
+	}
 
 	/*
 	 * If we have a bootconsole, and are switching to a real console,
