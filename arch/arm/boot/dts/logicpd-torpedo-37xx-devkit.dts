@@ -128,7 +128,7 @@
 
 	lcd0: display@0 {
 		compatible = "panel-dpi";
-		label = "15";
+		label = "28";
 		status = "okay";
 		/* default-on; */
 		pinctrl-names = "default";
@@ -147,11 +147,11 @@
 			hfront-porch = <3>;
 			hback-porch = <2>;
 			hsync-len = <42>;
-			vback-porch = <3>;
+			vback-porch = <2>;
 			vfront-porch = <4>;
 			vsync-len = <11>;
-			hsync-active = <0>;
-			vsync-active = <0>;
+			hsync-active = <1>;
+			vsync-active = <1>;
 			de-active = <1>;
 			pixelclk-active = <1>;
 		};
