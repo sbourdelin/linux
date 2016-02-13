@@ -53,6 +53,8 @@ struct tpm_chip *tpm_chip_find_get(int chip_num)
 			chip = pos;
 			break;
 		}
+
+		get_device(&chip->dev);
 	}
 	rcu_read_unlock();
 	return chip;

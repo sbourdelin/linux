@@ -207,6 +207,7 @@ struct tpm_chip {
 static inline void tpm_chip_put(struct tpm_chip *chip)
 {
 	module_put(chip->pdev->driver->owner);
+	put_device(&chip->dev);
 }
 
 static inline int tpm_read_index(int base, int index)
