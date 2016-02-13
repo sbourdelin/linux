@@ -1,0 +1,74 @@
+Chinese translated version of Documentation/arm64/silicon-errata.txt
+
+If you have any comment or update to the content, please contact the
+original document maintainer directly.  However, if you have a problem
+communicating in English you can also ask the Chinese maintainer for
+help.  Contact the Chinese maintainer if this translation is outdated
+or if there is a problem with the translation.
+
+M:	Will Deacon <will.deacon@arm.com>
+zh_CN:	Fu Wei <wefu@redhat.com>
+C:	e835a65f7ab143acf9aee6f9a98ef1c7afd2a835
+---------------------------------------------------------------------
+Documentation/arm64/silicon-errata.txt 的中文翻译
+
+如果想评论或更新本文的内容，请直接联系原文档的维护者。如果你使用英文
+交流有困难的话，也可以向中文版维护者求助。如果本翻译更新不及时或者翻
+译存在问题，请联系中文版维护者。
+
+英文版维护者： Will Deacon <will.deacon@arm.com>
+中文版维护者： 傅炜  Fu Wei <wefu@redhat.com>
+中文版翻译者： 傅炜  Fu Wei <wefu@redhat.com>
+中文版校译者： 傅炜  Fu Wei <wefu@redhat.com>
+本文翻译提交时的 Git 检出点为： e835a65f7ab143acf9aee6f9a98ef1c7afd2a835
+
+以下为正文
+---------------------------------------------------------------------
+                芯片勘误和软件解决办法
+                ==================
+
+作者: Will Deacon <will.deacon@arm.com>
+日期: 2015年11月27日
+
+一个不幸的现实：硬件经常带有一些所谓的“错误（errata）”，致使其在
+某些特定的情况下会违背构架定义的行为。对基于 ARM 的硬件，这些错误
+大体被分为以下几类：
+
+  A 类：无可行解决方法的严重错误。
+  B 类：有可接受的解决方法的重大或严重错误。
+  C 类：在正常操作中不会显现的小错误。
+
+更多资讯，请在 infocenter.arm.com （需注册）中查阅“软件开发者勘误
+笔记”（“Software Developers Errata Notice”）文档。
+
+对于 Linux 而言，B 类错误可能需要操作系统的某些特别处理。例如，避免
+一个特殊的代码序列，或是以一种特定的方式配置处理器。在某种不太常见的
+情况下，为将 A 类错误当作 C 类处理，可能需要用类似手段。这些手段被
+统称为“软件解决办法”，且仅在少数情况需要（例如，那些需要一个在非安全
+异常级运行的解决方法 *且* 能被 Linux 触发的情况）。
+
+对于尚在讨论中的可能对未受错误影响的系统产生不利影响的软件解决办法，
+有一个相应的内核配置（Kconfig）选项被加在 “内核特性（Kernel Features）”
+- > “基于可选方案框架的 ARM 错误解决办法（ARM errata workarounds via
+the alternatives framework）"。这些选项被默认开启，若探测到受影响的CPU，
+补丁将在运行时被打入。对于对系统运行影响较小的解决办法，内核配置选项
+并不存在，且代码以一种避开错误的方式被构造（带注释为宜）。
+
+这种做法对于在任意内核源代码树中准确地判断出哪个错误已被软件方法所解决
+稍微有点麻烦，所以这个文件在 Linux 内核中作为软件解决办法的注册表，
+并将在新的软件解决办法被提交和反向移植到稳定内核时被更新。
+
+| 实现者         | 受影响的组件    | 勘误编号        | 内核配置                |
++----------------+-----------------+-----------------+-------------------------+
+| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
+| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
+| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
+| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
+| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
+| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
+| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
+| ARM            | Cortex-A57      | #852523         | N/A                     |
+| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
+|                |                 |                 |                         |
+| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
