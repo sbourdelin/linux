@@ -1563,6 +1563,12 @@ temp_prefered_lft - INTEGER
 	Preferred lifetime (in seconds) for temporary addresses.
 	Default: 86400 (1 day)
 
+keep_addr_on_down - BOOLEAN
+	Keep all IPv6 addresses on an interface down event. If set static
+	global addresses with no expiration time are not flushed.
+
+	Default: disabled
+
 max_desync_factor - INTEGER
 	Maximum value for DESYNC_FACTOR, which is a random value
 	that ensures that clients don't synchronize with each
