@@ -222,7 +222,7 @@ static int setup_access_params_addr(struct platform_device *pdev,
 
 	aps = devm_kzalloc(&pdev->dev, sizeof(struct access_params), GFP_KERNEL);
 	if (!aps)
-		return -1;
+		return -ENOMEM;
 
 	/* FIXME */
 	paddr = __pa(aps);
