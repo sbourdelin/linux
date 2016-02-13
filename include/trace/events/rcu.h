@@ -435,6 +435,8 @@ TRACE_EVENT(rcu_callback,
 
 	TP_ARGS(rcuname, rhp, qlen_lazy, qlen),
 
+	TP_CONDITION(cpu_online(raw_smp_processor_id())),
+
 	TP_STRUCT__entry(
 		__field(const char *, rcuname)
 		__field(void *, rhp)
