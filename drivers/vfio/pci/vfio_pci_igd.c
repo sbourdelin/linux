@@ -18,11 +18,15 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 
+#include <drm/i915_drm.h>
+#include <drm/i915_pciids.h>
+
 #include "vfio_pci_private.h"
 
 #define OPREGION_SIGNATURE	"IntelGraphicsMem"
 #define OPREGION_SIZE		(8 * 1024)
 #define OPREGION_PCI_ADDR	0xfc
+#define BDSM_PCI_ADDR		0x5c /* Base Data Stolen Memory */
 
 static size_t vfio_pci_igd_rw(struct vfio_pci_device *vdev, char __user *buf,
 			      size_t count, loff_t *ppos, bool iswrite)
@@ -264,8 +268,64 @@ static int vfio_pci_igd_cfg_init(struct vfio_pci_device *vdev)
 	return 0;
 }
 
+struct vfio_pci_igd_info {
+	u16 gmch_gsm_mask;
+};
+
+static const struct vfio_pci_igd_info igd_gen6 = {
+	.gmch_gsm_mask = SNB_GMCH_GMS_MASK << SNB_GMCH_GMS_SHIFT,
+};
+
+static const struct vfio_pci_igd_info igd_gen8 = {
+	.gmch_gsm_mask = BDW_GMCH_GMS_MASK << BDW_GMCH_GMS_SHIFT,
+};
+
+static const struct pci_device_id vfio_pci_igd_ids[] = {
+	/* Gen6 - SandyBridge */
+	INTEL_SNB_D_IDS(&igd_gen6),
+	INTEL_SNB_M_IDS(&igd_gen6),
+	/* Gen7 - IvyBridge, ValleyView, Haswell */
+	INTEL_IVB_D_IDS(&igd_gen6),
+	INTEL_IVB_M_IDS(&igd_gen6),
+	INTEL_IVB_Q_IDS(&igd_gen6),
+	INTEL_VLV_M_IDS(&igd_gen6),
+	INTEL_VLV_D_IDS(&igd_gen6),
+	INTEL_HSW_D_IDS(&igd_gen6),
+	INTEL_HSW_M_IDS(&igd_gen6),
+	/* Gen8 - BroadWell, CherryView */
+	INTEL_BDW_GT12D_IDS(&igd_gen8),
+	INTEL_BDW_GT12M_IDS(&igd_gen8),
+	INTEL_BDW_GT3D_IDS(&igd_gen8),
+	INTEL_BDW_GT3M_IDS(&igd_gen8),
+	INTEL_CHV_IDS(&igd_gen8),
+	/* Gen9 - SkyLake, Broxton, KabyLake */
+	INTEL_SKL_GT1_IDS(&igd_gen8),
+	INTEL_SKL_GT2_IDS(&igd_gen8),
+	INTEL_SKL_GT3_IDS(&igd_gen8),
+	INTEL_SKL_GT4_IDS(&igd_gen8),
+	INTEL_BXT_IDS(&igd_gen8),
+	INTEL_KBL_GT1_IDS(&igd_gen8),
+	INTEL_KBL_GT2_IDS(&igd_gen8),
+	INTEL_KBL_GT3_IDS(&igd_gen8),
+	INTEL_KBL_GT4_IDS(&igd_gen8),
+	{ 0 }
+};
+
+static struct vfio_pci_igd_info *vfio_pci_igd_info(struct pci_dev *pdev)
+{
+	const struct pci_device_id *id;
+
+	id = pci_match_id(vfio_pci_igd_ids, pdev);
+	if (!id)
+		return NULL;
+
+	return (struct vfio_pci_igd_info *)id->driver_data;
+}
+
 int vfio_pci_igd_init(struct vfio_pci_device *vdev)
 {
+	struct vfio_pci_igd_info *info;
+	u16 gmch;
 	int ret;
 
 	ret = vfio_pci_igd_opregion_init(vdev);
@@ -275,6 +335,26 @@ int vfio_pci_igd_init(struct vfio_pci_device *vdev)
 	ret = vfio_pci_igd_cfg_init(vdev);
 	if (ret)
 		return ret;
+
+	memset(vdev->vconfig + BDSM_PCI_ADDR, 0, 4);
+	memset(vdev->pci_config_map + BDSM_PCI_ADDR,
+	       PCI_CAP_ID_INVALID_VIRT, 4);
+
+	info = vfio_pci_igd_info(vdev->pdev);
+	if (!info) {
+		dev_warn(&vdev->pdev->dev,
+			 "Unknown/Unsupported Intel IGD device\n");
+		return 0;
+	}
+
+	ret = pci_read_config_word(vdev->pdev, SNB_GMCH_CTRL, &gmch);
+	if (ret)
+		return ret;
+
+	gmch &= ~info->gmch_gsm_mask;
+	*(__le16 *)(vdev->vconfig + SNB_GMCH_CTRL) = cpu_to_le16(gmch);
+	memset(vdev->pci_config_map + SNB_GMCH_CTRL,
+	       PCI_CAP_ID_INVALID_VIRT, 2);
 
 	return 0;
 }
