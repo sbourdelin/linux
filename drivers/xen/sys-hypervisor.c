@@ -9,7 +9,7 @@
 
 #include <linux/slab.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/kobject.h>
 #include <linux/err.h>
 
@@ -366,11 +366,6 @@ static int __init xen_properties_init(void)
 	return sysfs_create_group(hypervisor_kobj, &xen_properties_group);
 }
 
-static void xen_properties_destroy(void)
-{
-	sysfs_remove_group(hypervisor_kobj, &xen_properties_group);
-}
-
 #ifdef CONFIG_XEN_HAVE_VPMU
 struct pmu_mode {
 	const char *name;
@@ -484,11 +479,6 @@ static int __init xen_pmu_init(void)
 {
 	return sysfs_create_group(hypervisor_kobj, &xen_pmu_group);
 }
-
-static void xen_pmu_destroy(void)
-{
-	sysfs_remove_group(hypervisor_kobj, &xen_pmu_group);
-}
 #endif
 
 static int __init hyper_sysfs_init(void)
@@ -517,7 +507,8 @@ static int __init hyper_sysfs_init(void)
 	if (xen_initial_domain()) {
 		ret = xen_pmu_init();
 		if (ret) {
-			xen_properties_destroy();
+			sysfs_remove_group(hypervisor_kobj,
+					   &xen_properties_group);
 			goto prop_out;
 		}
 	}
@@ -535,21 +526,7 @@ version_out:
 out:
 	return ret;
 }
-
-static void __exit hyper_sysfs_exit(void)
-{
-#ifdef CONFIG_XEN_HAVE_VPMU
-	xen_pmu_destroy();
-#endif
-	xen_properties_destroy();
-	xen_compilation_destroy();
-	xen_sysfs_uuid_destroy();
-	xen_sysfs_version_destroy();
-	xen_sysfs_type_destroy();
-
-}
-module_init(hyper_sysfs_init);
-module_exit(hyper_sysfs_exit);
+device_initcall(hyper_sysfs_init);
 
 static ssize_t hyp_sysfs_show(struct kobject *kobj,
 			      struct attribute *attr,
