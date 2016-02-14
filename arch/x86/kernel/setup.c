@@ -338,12 +338,12 @@ static void __init relocate_initrd(void)
 	memblock_reserve(relocated_ramdisk, area_size);
 	initrd_start = relocated_ramdisk + PAGE_OFFSET;
 	initrd_end   = initrd_start + ramdisk_size;
-	printk(KERN_INFO "Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
+	pr_info("Allocated new RAMDISK: [mem %#010llx-%#010llx]\n",
 	       relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
 
 	copy_from_early_mem((void *)initrd_start, ramdisk_image, ramdisk_size);
 
-	printk(KERN_INFO "Move RAMDISK from [mem %#010llx-%#010llx] to"
+	pr_info("Move RAMDISK from [mem %#010llx-%#010llx] to"
 		" [mem %#010llx-%#010llx]\n",
 		ramdisk_image, ramdisk_image + ramdisk_size - 1,
 		relocated_ramdisk, relocated_ramdisk + ramdisk_size - 1);
@@ -382,7 +382,7 @@ static void __init reserve_initrd(void)
 		       "disabling initrd (%lld needed, %lld available)\n",
 		       ramdisk_size, mapped_size>>1);
 
-	printk(KERN_INFO "RAMDISK: [mem %#010llx-%#010llx]\n", ramdisk_image,
+	pr_info("RAMDISK: [mem %#010llx-%#010llx]\n", ramdisk_image,
 			ramdisk_end - 1);
 
 	if (pfn_range_is_mapped(PFN_DOWN(ramdisk_image),
@@ -457,7 +457,7 @@ static void __init e820_reserve_setup_data(void)
 
 	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
 	memcpy(&e820_saved, &e820, sizeof(struct e820map));
-	printk(KERN_INFO "extended physical RAM map:\n");
+	pr_info("extended physical RAM map:\n");
 	e820_print_map("reserve setup_data");
 }
 
@@ -713,7 +713,7 @@ static void __init trim_snb_memory(void)
 	if (!snb_gfx_workaround_needed())
 		return;
 
-	printk(KERN_DEBUG "reserving inaccessible SNB gfx pages\n");
+	pr_debug("reserving inaccessible SNB gfx pages\n");
 
 	/*
 	 * Reserve all memory below the 1 MB mark that has not
@@ -723,8 +723,8 @@ static void __init trim_snb_memory(void)
 	
 	for (i = 0; i < ARRAY_SIZE(bad_pages); i++) {
 		if (memblock_reserve(bad_pages[i], PAGE_SIZE))
-			printk(KERN_WARNING "failed to reserve 0x%08lx\n",
-			       bad_pages[i]);
+			pr_warn("failed to reserve 0x%08lx\n",
+				bad_pages[i]);
 	}
 }
 
@@ -881,7 +881,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	__flush_tlb_all();
 #else
-	printk(KERN_INFO "Command line: %s\n", boot_command_line);
+	pr_info("Command line: %s\n", boot_command_line);
 #endif
 
 	/*
@@ -1030,7 +1030,7 @@ void __init setup_arch(char **cmdline_p)
 		e820_update_range(0x70000000ULL, 0x40000ULL, E820_RAM,
 				  E820_RESERVED);
 		sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
-		printk(KERN_INFO "fixed physical RAM map:\n");
+		pr_info("fixed physical RAM map:\n");
 		e820_print_map("bad_ppro");
 	}
 #else
@@ -1107,8 +1107,8 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_X86_32
-	printk(KERN_DEBUG "initial memory mapped: [mem 0x00000000-%#010lx]\n",
-			(max_pfn_mapped<<PAGE_SHIFT) - 1);
+	pr_debug("initial memory mapped: [mem 0x00000000-%#010lx]\n",
+		 (max_pfn_mapped<<PAGE_SHIFT) - 1);
 #endif
 
 	reserve_real_mode();

@@ -692,7 +692,7 @@ void smp_announce(void)
 {
 	int num_nodes = num_online_nodes();
 
-	printk(KERN_INFO "x86: Booted up %d node%s, %d CPUs\n",
+	pr_info("x86: Booted up %d node%s, %d CPUs\n",
 	       num_nodes, (num_nodes > 1 ? "s" : ""), num_online_cpus());
 }
 
@@ -710,7 +710,7 @@ static void announce_cpu(int cpu, int apicid)
 		node_width = num_digits(num_possible_nodes()) + 1; /* + '#' */
 
 	if (cpu == 1)
-		printk(KERN_INFO "x86: Booting SMP configuration:\n");
+		pr_info("x86: Booting SMP configuration:\n");
 
 	if (system_state == SYSTEM_BOOTING) {
 		if (node != current_node) {
@@ -718,7 +718,7 @@ static void announce_cpu(int cpu, int apicid)
 				pr_cont("\n");
 			current_node = node;
 
-			printk(KERN_INFO ".... node %*s#%d, CPUs:  ",
+			pr_info(".... node %*s#%d, CPUs:  ",
 			       node_width - num_digits(node), " ", node);
 		}
 

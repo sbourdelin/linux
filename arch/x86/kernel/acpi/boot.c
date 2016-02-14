@@ -55,7 +55,8 @@ EXPORT_SYMBOL(acpi_disabled);
 # include <asm/proto.h>
 #endif				/* X86 */
 
-#define PREFIX			"ACPI: "
+#undef pr_fmt
+#define pr_fmt(fmt) "ACPI: " fmt
 
 int acpi_noirq;				/* skip ACPI IRQ initialization */
 int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
@@ -141,14 +142,14 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 
 	madt = (struct acpi_table_madt *)table;
 	if (!madt) {
-		printk(KERN_WARNING PREFIX "Unable to map MADT\n");
+		pr_warn("Unable to map MADT\n");
 		return -ENODEV;
 	}
 
 	if (madt->address) {
 		acpi_lapic_addr = (u64) madt->address;
 
-		printk(KERN_DEBUG PREFIX "Local APIC address 0x%08x\n",
+		pr_debug("Local APIC address 0x%08x\n",
 		       madt->address);
 	}
 
@@ -170,7 +171,7 @@ static int acpi_register_lapic(int id, u8 enabled)
 	unsigned int ver = 0;
 
 	if (id >= MAX_LOCAL_APIC) {
-		printk(KERN_INFO PREFIX "skipped apicid that is too big\n");
+		pr_info("skipped apicid that is too big\n");
 		return -EINVAL;
 	}
 
@@ -210,11 +211,11 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	 * when we use CPU hotplug.
 	 */
 	if (!apic->apic_id_valid(apic_id) && enabled)
-		printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
+		pr_warn("x2apic entry ignored\n");
 	else
 		acpi_register_lapic(apic_id, enabled);
 #else
-	printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
+	pr_warn("x2apic entry ignored\n");
 #endif
 
 	return 0;
@@ -293,7 +294,7 @@ acpi_parse_x2apic_nmi(struct acpi_subtable_header *header,
 	acpi_table_print_madt_entry(header);
 
 	if (x2apic_nmi->lint != 1)
-		printk(KERN_WARNING PREFIX "NMI not connected to LINT 1!\n");
+		pr_warn("NMI not connected to LINT 1!\n");
 
 	return 0;
 }
@@ -311,7 +312,7 @@ acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long e
 	acpi_table_print_madt_entry(header);
 
 	if (lapic_nmi->lint != 1)
-		printk(KERN_WARNING PREFIX "NMI not connected to LINT 1!\n");
+		pr_warn("NMI not connected to LINT 1!\n");
 
 	return 0;
 }
@@ -478,14 +479,14 @@ acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
 
 	if (intsrc->source_irq == 0) {
 		if (acpi_skip_timer_override) {
-			printk(PREFIX "BIOS IRQ0 override ignored.\n");
+			pr_info("BIOS IRQ0 override ignored.\n");
 			return 0;
 		}
 
 		if ((intsrc->global_irq == 2) && acpi_fix_pin2_polarity
 			&& (intsrc->inti_flags & ACPI_MADT_POLARITY_MASK)) {
 			intsrc->inti_flags &= ~ACPI_MADT_POLARITY_MASK;
-			printk(PREFIX "BIOS IRQ0 pin2 override: forcing polarity to high active.\n");
+			pr_info("BIOS IRQ0 pin2 override: forcing polarity to high active.\n");
 		}
 	}
 
@@ -561,7 +562,7 @@ void __init acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
 	if (old == new)
 		return;
 
-	printk(PREFIX "setting ELCR to %04x (from %04x)\n", new, old);
+	pr_info("setting ELCR to %04x (from %04x)\n", new, old);
 	outb(new, 0x4d0);
 	outb(new >> 8, 0x4d1);
 }
@@ -717,7 +718,7 @@ int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
 
 	cpu = acpi_register_lapic(physid, ACPI_MADT_ENABLED);
 	if (cpu < 0) {
-		pr_info(PREFIX "Unable to map lapic to logical cpu number\n");
+		pr_info("Unable to map lapic to logical cpu number\n");
 		return cpu;
 	}
 
@@ -833,8 +834,7 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 	struct acpi_table_hpet *hpet_tbl = (struct acpi_table_hpet *)table;
 
 	if (hpet_tbl->address.space_id != ACPI_SPACE_MEM) {
-		printk(KERN_WARNING PREFIX "HPET timers must be located in "
-		       "memory.\n");
+		pr_warn("HPET timers must be located in memory.\n");
 		return -1;
 	}
 
@@ -846,9 +846,8 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 	 * want to allocate a resource there.
 	 */
 	if (!hpet_address) {
-		printk(KERN_WARNING PREFIX
-		       "HPET id: %#x base: %#lx is invalid\n",
-		       hpet_tbl->id, hpet_address);
+		pr_warn("HPET id: %#x base: %#lx is invalid\n",
+			hpet_tbl->id, hpet_address);
 		return 0;
 	}
 #ifdef CONFIG_X86_64
@@ -859,20 +858,19 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 	 */
 	if (hpet_address == 0xfed0000000000000UL) {
 		if (!hpet_force_user) {
-			printk(KERN_WARNING PREFIX "HPET id: %#x "
+			pr_warn("HPET id: %#x "
 			       "base: 0xfed0000000000000 is bogus\n "
 			       "try hpet=force on the kernel command line to "
 			       "fix it up to 0xfed00000.\n", hpet_tbl->id);
 			hpet_address = 0;
 			return 0;
 		}
-		printk(KERN_WARNING PREFIX
-		       "HPET id: %#x base: 0xfed0000000000000 fixed up "
-		       "to 0xfed00000.\n", hpet_tbl->id);
+		pr_warn("HPET id: %#x base: 0xfed0000000000000 fixed up to 0xfed00000.\n",
+			hpet_tbl->id);
 		hpet_address >>= 32;
 	}
 #endif
-	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
+	pr_info("HPET id: %#x base: %#lx\n",
 	       hpet_tbl->id, hpet_address);
 
 	/*
@@ -935,7 +933,7 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 		pmtmr_ioport = acpi_gbl_FADT.pm_timer_block;
 	}
 	if (pmtmr_ioport)
-		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n",
+		pr_info("PM-Timer IO Port: %#x\n",
 		       pmtmr_ioport);
 #endif
 	return 0;
@@ -962,8 +960,7 @@ static int __init early_acpi_parse_madt_lapic_addr_ovr(void)
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE,
 				      acpi_parse_lapic_addr_ovr, 0);
 	if (count < 0) {
-		printk(KERN_ERR PREFIX
-		       "Error parsing LAPIC address override entry\n");
+		pr_err("Error parsing LAPIC address override entry\n");
 		return count;
 	}
 
@@ -990,8 +987,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE,
 				      acpi_parse_lapic_addr_ovr, 0);
 	if (count < 0) {
-		printk(KERN_ERR PREFIX
-		       "Error parsing LAPIC address override entry\n");
+		pr_err("Error parsing LAPIC address override entry\n");
 		return count;
 	}
 
@@ -1010,8 +1006,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 				sizeof(struct acpi_table_madt),
 				madt_proc, ARRAY_SIZE(madt_proc), MAX_LOCAL_APIC);
 		if (ret < 0) {
-			printk(KERN_ERR PREFIX
-					"Error parsing LAPIC/X2APIC entries\n");
+			pr_err("Error parsing LAPIC/X2APIC entries\n");
 			return ret;
 		}
 
@@ -1019,11 +1014,11 @@ static int __init acpi_parse_madt_lapic_entries(void)
 		count = madt_proc[1].count;
 	}
 	if (!count && !x2count) {
-		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
+		pr_err("No LAPIC entries present\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return -ENODEV;
 	} else if (count < 0 || x2count < 0) {
-		printk(KERN_ERR PREFIX "Error parsing LAPIC entry\n");
+		pr_err("Error parsing LAPIC entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return count;
 	}
@@ -1033,7 +1028,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_NMI,
 				      acpi_parse_lapic_nmi, 0);
 	if (count < 0 || x2count < 0) {
-		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
+		pr_err("Error parsing LAPIC NMI entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return count;
 	}
@@ -1092,7 +1087,7 @@ static void __init mp_config_acpi_legacy_irqs(void)
 		}
 
 		if (idx != mp_irq_entries) {
-			printk(KERN_DEBUG "ACPI: IRQ%d used by override.\n", i);
+			pr_debug("ACPI: IRQ%d used by override.\n", i);
 			continue;	/* IRQ already used */
 		}
 
@@ -1132,26 +1127,24 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	 * if "noapic" boot option, don't look for IO-APICs
 	 */
 	if (skip_ioapic_setup) {
-		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
-		       "due to 'noapic' option.\n");
+		pr_info("Skipping IOAPIC probe due to 'noapic' option.\n");
 		return -ENODEV;
 	}
 
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_IO_APIC, acpi_parse_ioapic,
 				      MAX_IO_APICS);
 	if (!count) {
-		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
+		pr_err("No IOAPIC entries present\n");
 		return -ENODEV;
 	} else if (count < 0) {
-		printk(KERN_ERR PREFIX "Error parsing IOAPIC entry\n");
+		pr_err("Error parsing IOAPIC entry\n");
 		return count;
 	}
 
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
 				      acpi_parse_int_src_ovr, nr_irqs);
 	if (count < 0) {
-		printk(KERN_ERR PREFIX
-		       "Error parsing interrupt source overrides entry\n");
+		pr_err("Error parsing interrupt source overrides entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return count;
 	}
@@ -1170,7 +1163,7 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_NMI_SOURCE,
 				      acpi_parse_nmi_src, nr_irqs);
 	if (count < 0) {
-		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
+		pr_err("Error parsing NMI SRC entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return count;
 	}
@@ -1203,8 +1196,7 @@ static void __init early_acpi_process_madt(void)
 			/*
 			 * Dell Precision Workstation 410, 610 come here.
 			 */
-			printk(KERN_ERR PREFIX
-			       "Invalid BIOS MADT, disabling ACPI\n");
+			pr_err("Invalid BIOS MADT, disabling ACPI\n");
 			disable_acpi();
 		}
 	}
@@ -1241,8 +1233,7 @@ static void __init acpi_process_madt(void)
 			/*
 			 * Dell Precision Workstation 410, 610 come here.
 			 */
-			printk(KERN_ERR PREFIX
-			       "Invalid BIOS MADT, disabling ACPI\n");
+			pr_err("Invalid BIOS MADT, disabling ACPI\n");
 			disable_acpi();
 		}
 	} else {
@@ -1252,8 +1243,7 @@ static void __init acpi_process_madt(void)
  		 * Boot with "acpi=off" to use MPS on such a system.
  		 */
 		if (smp_found_config) {
-			printk(KERN_WARNING PREFIX
-				"No APIC-table, disabling MPS\n");
+			pr_warn("No APIC-table, disabling MPS\n");
 			smp_found_config = 0;
 		}
 	}
@@ -1263,11 +1253,9 @@ static void __init acpi_process_madt(void)
 	 * processors, where MPS only supports physical.
 	 */
 	if (acpi_lapic && acpi_ioapic)
-		printk(KERN_INFO "Using ACPI (MADT) for SMP configuration "
-		       "information\n");
+		pr_info("Using ACPI (MADT) for SMP configuration information\n");
 	else if (acpi_lapic)
-		printk(KERN_INFO "Using ACPI for processor (LAPIC) "
-		       "configuration information\n");
+		pr_info("Using ACPI for processor (LAPIC) configuration information\n");
 #endif
 	return;
 }
@@ -1275,8 +1263,8 @@ static void __init acpi_process_madt(void)
 static int __init disable_acpi_irq(const struct dmi_system_id *d)
 {
 	if (!acpi_force) {
-		printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n",
-		       d->ident);
+		pr_notice("%s detected: force use of acpi=noirq\n",
+			  d->ident);
 		acpi_noirq_set();
 	}
 	return 0;
@@ -1285,8 +1273,8 @@ static int __init disable_acpi_irq(const struct dmi_system_id *d)
 static int __init disable_acpi_pci(const struct dmi_system_id *d)
 {
 	if (!acpi_force) {
-		printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n",
-		       d->ident);
+		pr_notice("%s detected: force use of pci=noacpi\n",
+			  d->ident);
 		acpi_disable_pci();
 	}
 	return 0;
@@ -1295,11 +1283,10 @@ static int __init disable_acpi_pci(const struct dmi_system_id *d)
 static int __init dmi_disable_acpi(const struct dmi_system_id *d)
 {
 	if (!acpi_force) {
-		printk(KERN_NOTICE "%s detected: acpi off\n", d->ident);
+		pr_notice("%s detected: acpi off\n", d->ident);
 		disable_acpi();
 	} else {
-		printk(KERN_NOTICE
-		       "Warning: DMI blacklist says broken, but acpi forced\n");
+		pr_notice("Warning: DMI blacklist says broken, but acpi forced\n");
 	}
 	return 0;
 }
@@ -1514,9 +1501,9 @@ void __init acpi_boot_table_init(void)
 	 */
 	if (acpi_blacklisted()) {
 		if (acpi_force) {
-			printk(KERN_WARNING PREFIX "acpi=force override\n");
+			pr_warn("acpi=force override\n");
 		} else {
-			printk(KERN_WARNING PREFIX "Disabling ACPI support\n");
+			pr_warn("Disabling ACPI support\n");
 			disable_acpi();
 			return;
 		}
@@ -1630,9 +1617,8 @@ int __init acpi_mps_check(void)
 #if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_X86_MPPARSE)
 /* mptable code is not built-in*/
 	if (acpi_disabled || acpi_noirq) {
-		printk(KERN_WARNING "MPS support code is not built-in.\n"
-		       "Using acpi=off or acpi=noirq or pci=noacpi "
-		       "may have problem\n");
+		pr_warn("MPS support code is not built-in.\n"
+			"Using acpi=off or acpi=noirq or pci=noacpi may have problem\n");
 		return 1;
 	}
 #endif

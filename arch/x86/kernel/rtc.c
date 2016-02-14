@@ -48,11 +48,10 @@ int mach_set_rtc_mmss(const struct timespec *now)
 	if (!rtc_valid_tm(&tm)) {
 		retval = set_rtc_time(&tm);
 		if (retval)
-			printk(KERN_ERR "%s: RTC write failed with error %d\n",
-			       __func__, retval);
+			pr_err("%s: RTC write failed with error %d\n",
+				__func__, retval);
 	} else {
-		printk(KERN_ERR
-		       "%s: Invalid RTC value: write of %lx to RTC failed\n",
+		pr_err("%s: Invalid RTC value: write of %lx to RTC failed\n",
 			__func__, nowtime);
 		retval = -EINVAL;
 	}

@@ -38,7 +38,7 @@ static int check_stack_overflow(void)
 
 static void print_stack_overflow(void)
 {
-	printk(KERN_WARNING "low stack detected by irq handler\n");
+	pr_warn("low stack detected by irq handler\n");
 	dump_stack();
 	if (sysctl_panic_on_stackoverflow)
 		panic("low stack detected by irq handler - check messages\n");
@@ -124,8 +124,8 @@ void irq_ctx_init(int cpu)
 					       THREAD_SIZE_ORDER));
 	per_cpu(softirq_stack, cpu) = irqstk;
 
-	printk(KERN_DEBUG "CPU %u irqstacks, hard=%p soft=%p\n",
-	       cpu, per_cpu(hardirq_stack, cpu),  per_cpu(softirq_stack, cpu));
+	pr_debug("CPU %u irqstacks, hard=%p soft=%p\n",
+		 cpu, per_cpu(hardirq_stack, cpu), per_cpu(softirq_stack, cpu));
 }
 
 void do_softirq_own_stack(void)

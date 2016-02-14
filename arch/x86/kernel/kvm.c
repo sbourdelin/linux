@@ -344,8 +344,8 @@ static void kvm_guest_cpu_init(void)
 #endif
 		wrmsrl(MSR_KVM_ASYNC_PF_EN, pa | KVM_ASYNC_PF_ENABLED);
 		__this_cpu_write(apf_reason.enabled, 1);
-		printk(KERN_INFO"KVM setup async PF for cpu %d\n",
-		       smp_processor_id());
+		pr_info("KVM setup async PF for cpu %d\n",
+			smp_processor_id());
 	}
 
 	if (kvm_para_has_feature(KVM_FEATURE_PV_EOI)) {
@@ -370,8 +370,8 @@ static void kvm_pv_disable_apf(void)
 	wrmsrl(MSR_KVM_ASYNC_PF_EN, 0);
 	__this_cpu_write(apf_reason.enabled, 0);
 
-	printk(KERN_INFO"Unregister pv shared memory for cpu %d\n",
-	       smp_processor_id());
+	pr_info("Unregister pv shared memory for cpu %d\n",
+		smp_processor_id());
 }
 
 static void kvm_pv_guest_cpu_reboot(void *unused)
@@ -692,7 +692,7 @@ static struct dentry *kvm_init_debugfs(void)
 {
 	d_kvm_debug = debugfs_create_dir("kvm-guest", NULL);
 	if (!d_kvm_debug)
-		printk(KERN_WARNING "Could not create 'kvm' debugfs directory\n");
+		pr_warn("Could not create 'kvm' debugfs directory\n");
 
 	return d_kvm_debug;
 }
@@ -883,7 +883,7 @@ static __init int kvm_spinlock_init_jump(void)
 		return 0;
 
 	static_key_slow_inc(&paravirt_ticketlocks_enabled);
-	printk(KERN_INFO "KVM setup paravirtual spinlock\n");
+	pr_info("KVM setup paravirtual spinlock\n");
 
 	return 0;
 }

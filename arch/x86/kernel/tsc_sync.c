@@ -156,10 +156,10 @@ void check_tsc_sync_source(int cpu)
 		cpu_relax();
 
 	if (nr_warps) {
-		pr_warning("TSC synchronization [CPU#%d -> CPU#%d]:\n",
+		pr_warn("TSC synchronization [CPU#%d -> CPU#%d]:\n",
 			smp_processor_id(), cpu);
-		pr_warning("Measured %Ld cycles TSC warp between CPUs, "
-			   "turning off TSC clock.\n", max_warp);
+		pr_warn("Measured %lld cycles TSC warp between CPUs, turning off TSC clock.\n",
+			max_warp);
 		mark_tsc_unstable("check_tsc_sync_source failed");
 	} else {
 		pr_debug("TSC synchronization [CPU#%d -> CPU#%d]: passed\n",

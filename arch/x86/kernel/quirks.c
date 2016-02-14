@@ -86,7 +86,7 @@ static void ich_force_hpet_resume(void)
 	if (!(val & 0x80))
 		BUG();
 	else
-		printk(KERN_DEBUG "Force enabled HPET at resume\n");
+		pr_debug("Force enabled HPET at resume\n");
 
 	return;
 }
@@ -103,7 +103,7 @@ static void ich_force_enable_hpet(struct pci_dev *dev)
 	pci_read_config_dword(dev, 0xF0, &rcba);
 	rcba &= 0xFFFFC000;
 	if (rcba == 0) {
-		dev_printk(KERN_DEBUG, &dev->dev, "RCBA disabled; "
+		dev_dbg(&dev->dev, "RCBA disabled; "
 			"cannot force enable HPET\n");
 		return;
 	}
@@ -111,7 +111,7 @@ static void ich_force_enable_hpet(struct pci_dev *dev)
 	/* use bits 31:14, 16 kB aligned */
 	rcba_base = ioremap_nocache(rcba, 0x4000);
 	if (rcba_base == NULL) {
-		dev_printk(KERN_DEBUG, &dev->dev, "ioremap failed; "
+		dev_dbg(&dev->dev, "ioremap failed; "
 			"cannot force enable HPET\n");
 		return;
 	}
@@ -123,7 +123,7 @@ static void ich_force_enable_hpet(struct pci_dev *dev)
 		/* HPET is enabled in HPTC. Just not reported by BIOS */
 		val = val & 0x3;
 		force_hpet_address = 0xFED00000 | (val << 12);
-		dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at "
+		dev_dbg(&dev->dev, "Force enabled HPET at "
 			"0x%lx\n", force_hpet_address);
 		iounmap(rcba_base);
 		return;
@@ -143,12 +143,11 @@ static void ich_force_enable_hpet(struct pci_dev *dev)
 	if (err) {
 		force_hpet_address = 0;
 		iounmap(rcba_base);
-		dev_printk(KERN_DEBUG, &dev->dev,
-			"Failed to force enable HPET\n");
+		dev_dbg(&dev->dev, "Failed to force enable HPET\n");
 	} else {
 		force_hpet_resume_type = ICH_FORCE_HPET_RESUME;
-		dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at "
-			"0x%lx\n", force_hpet_address);
+		dev_dbg(&dev->dev, "Force enabled HPET at 0x%lx\n",
+			force_hpet_address);
 	}
 }
 
@@ -177,7 +176,7 @@ static struct pci_dev *cached_dev;
 
 static void hpet_print_force_info(void)
 {
-	printk(KERN_INFO "HPET not enabled in BIOS. "
+	pr_info("HPET not enabled in BIOS. "
 	       "You might try hpet=force boot option\n");
 }
 
@@ -198,7 +197,7 @@ static void old_ich_force_hpet_resume(void)
 	val = gen_cntl >> 15;
 	val &= 0x7;
 	if (val == 0x4)
-		printk(KERN_DEBUG "Force enabled HPET at resume\n");
+		pr_debug("Force enabled HPET at resume\n");
 	else
 		BUG();
 }
@@ -221,8 +220,7 @@ static void old_ich_force_enable_hpet(struct pci_dev *dev)
 	if (val & 0x4) {
 		val &= 0x3;
 		force_hpet_address = 0xFED00000 | (val << 12);
-		dev_printk(KERN_DEBUG, &dev->dev, "HPET at 0x%lx\n",
-			force_hpet_address);
+		dev_dbg(&dev->dev, "HPET at 0x%lx\n", force_hpet_address);
 		return;
 	}
 
@@ -242,14 +240,14 @@ static void old_ich_force_enable_hpet(struct pci_dev *dev)
 		/* HPET is enabled in HPTC. Just not reported by BIOS */
 		val &= 0x3;
 		force_hpet_address = 0xFED00000 | (val << 12);
-		dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at "
-			"0x%lx\n", force_hpet_address);
+		dev_dbg(&dev->dev, "Force enabled HPET at 0x%lx\n",
+			force_hpet_address);
 		cached_dev = dev;
 		force_hpet_resume_type = OLD_ICH_FORCE_HPET_RESUME;
 		return;
 	}
 
-	dev_printk(KERN_DEBUG, &dev->dev, "Failed to force enable HPET\n");
+	dev_dbg(&dev->dev, "Failed to force enable HPET\n");
 }
 
 /*
@@ -290,7 +288,7 @@ static void vt8237_force_hpet_resume(void)
 
 	pci_read_config_dword(cached_dev, 0x68, &val);
 	if (val & 0x80)
-		printk(KERN_DEBUG "Force enabled HPET at resume\n");
+		pr_debug("Force enabled HPET at resume\n");
 	else
 		BUG();
 }
@@ -314,7 +312,7 @@ static void vt8237_force_enable_hpet(struct pci_dev *dev)
 	 */
 	if (val & 0x80) {
 		force_hpet_address = (val & ~0x3ff);
-		dev_printk(KERN_DEBUG, &dev->dev, "HPET at 0x%lx\n",
+		dev_dbg(&dev->dev, "HPET at 0x%lx\n",
 			force_hpet_address);
 		return;
 	}
@@ -329,14 +327,14 @@ static void vt8237_force_enable_hpet(struct pci_dev *dev)
 	pci_read_config_dword(dev, 0x68, &val);
 	if (val & 0x80) {
 		force_hpet_address = (val & ~0x3ff);
-		dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at "
+		dev_dbg(&dev->dev, "Force enabled HPET at "
 			"0x%lx\n", force_hpet_address);
 		cached_dev = dev;
 		force_hpet_resume_type = VT8237_FORCE_HPET_RESUME;
 		return;
 	}
 
-	dev_printk(KERN_DEBUG, &dev->dev, "Failed to force enable HPET\n");
+	dev_dbg(&dev->dev, "Failed to force enable HPET\n");
 }
 
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8235,
@@ -349,7 +347,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_CX700,
 static void ati_force_hpet_resume(void)
 {
 	pci_write_config_dword(cached_dev, 0x14, 0xfed00000);
-	printk(KERN_DEBUG "Force enabled HPET at resume\n");
+	pr_debug("Force enabled HPET at resume\n");
 }
 
 static u32 ati_ixp4x0_rev(struct pci_dev *dev)
@@ -366,7 +364,7 @@ static u32 ati_ixp4x0_rev(struct pci_dev *dev)
 	err |= pci_write_config_dword(dev, 0x70, d);
 	err |= pci_read_config_dword(dev, 0x8, &d);
 	d &= 0xff;
-	dev_printk(KERN_DEBUG, &dev->dev, "SB4X0 revision 0x%x\n", d);
+	dev_dbg(&dev->dev, "SB4X0 revision 0x%x\n", d);
 
 	WARN_ON_ONCE(err);
 
@@ -410,7 +408,7 @@ static void ati_force_enable_hpet(struct pci_dev *dev)
 
 	force_hpet_address = val;
 	force_hpet_resume_type = ATI_FORCE_HPET_RESUME;
-	dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at 0x%lx\n",
+	dev_dbg(&dev->dev, "Force enabled HPET at 0x%lx\n",
 		   force_hpet_address);
 	cached_dev = dev;
 }
@@ -423,7 +421,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP400_SMBUS,
 static void nvidia_force_hpet_resume(void)
 {
 	pci_write_config_dword(cached_dev, 0x44, 0xfed00001);
-	printk(KERN_DEBUG "Force enabled HPET at resume\n");
+	pr_debug("Force enabled HPET at resume\n");
 }
 
 static void nvidia_force_enable_hpet(struct pci_dev *dev)
@@ -442,7 +440,7 @@ static void nvidia_force_enable_hpet(struct pci_dev *dev)
 	pci_read_config_dword(dev, 0x44, &val);
 	force_hpet_address = val & 0xfffffffe;
 	force_hpet_resume_type = NVIDIA_FORCE_HPET_RESUME;
-	dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at 0x%lx\n",
+	dev_dbg(&dev->dev, "Force enabled HPET at 0x%lx\n",
 		force_hpet_address);
 	cached_dev = dev;
 	return;
@@ -508,7 +506,7 @@ static void e6xx_force_enable_hpet(struct pci_dev *dev)
 
 	force_hpet_address = 0xFED00000;
 	force_hpet_resume_type = NONE_FORCE_HPET_RESUME;
-	dev_printk(KERN_DEBUG, &dev->dev, "Force enabled HPET at "
+	dev_dbg(&dev->dev, "Force enabled HPET at "
 		"0x%lx\n", force_hpet_address);
 	return;
 }

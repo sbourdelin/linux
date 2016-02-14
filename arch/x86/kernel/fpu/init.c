@@ -339,7 +339,8 @@ static void __init fpu__init_system_ctx_switch(void)
 	if (eagerfpu == ENABLE)
 		setup_force_cpu_cap(X86_FEATURE_EAGER_FPU);
 
-	printk(KERN_INFO "x86/fpu: Using '%s' FPU context switches.\n", eagerfpu == ENABLE ? "eager" : "lazy");
+	pr_info("x86/fpu: Using '%s' FPU context switches.\n",
+		eagerfpu == ENABLE ? "eager" : "lazy");
 }
 
 /*

@@ -119,15 +119,15 @@ static void __init dotest(void (*testcase_fn)(void), int expected)
 		unexpected_testcase_failures++;
 
 		if (nmi_fail == FAILURE)
-			printk(KERN_CONT "FAILED |");
+			pr_cont("FAILED |");
 		else if (nmi_fail == TIMEOUT)
-			printk(KERN_CONT "TIMEOUT|");
+			pr_cont("TIMEOUT|");
 		else
-			printk(KERN_CONT "ERROR  |");
+			pr_cont("ERROR  |");
 		dump_stack();
 	} else {
 		testcase_successes++;
-		printk(KERN_CONT "  ok  |");
+		pr_cont("  ok  |");
 	}
 	testcase_total++;
 
@@ -152,10 +152,10 @@ void __init nmi_selftest(void)
 
 	print_testname("remote IPI");
 	dotest(remote_ipi, SUCCESS);
-	printk(KERN_CONT "\n");
+	pr_cont("\n");
 	print_testname("local IPI");
 	dotest(local_ipi, SUCCESS);
-	printk(KERN_CONT "\n");
+	pr_cont("\n");
 
 	cleanup_nmi_testsuite();
 

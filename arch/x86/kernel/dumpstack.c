@@ -286,12 +286,12 @@ int __die(const char *str, struct pt_regs *regs, long err)
 		sp = kernel_stack_pointer(regs);
 		savesegment(ss, ss);
 	}
-	printk(KERN_EMERG "EIP: [<%08lx>] ", regs->ip);
+	pr_emerg("EIP: [<%08lx>] ", regs->ip);
 	print_symbol("%s", regs->ip);
 	printk(" SS:ESP %04x:%08lx\n", ss, sp);
 #else
 	/* Executive summary in case the oops scrolled away */
-	printk(KERN_ALERT "RIP ");
+	pr_alert("RIP ");
 	printk_address(regs->ip);
 	printk(" RSP <%016lx>\n", regs->sp);
 #endif

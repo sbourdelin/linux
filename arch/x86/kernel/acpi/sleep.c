@@ -48,7 +48,7 @@ int x86_acpi_suspend_lowlevel(void)
 		(struct wakeup_header *) __va(real_mode_header->wakeup_header);
 
 	if (header->signature != WAKEUP_HEADER_SIGNATURE) {
-		printk(KERN_ERR "wakeup header does not match\n");
+		pr_err("wakeup header does not match\n");
 		return -EINVAL;
 	}
 

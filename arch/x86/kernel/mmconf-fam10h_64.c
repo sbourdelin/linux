@@ -205,7 +205,7 @@ void fam10h_check_enable_mmcfg(void)
 		return;
 	}
 
-	printk(KERN_INFO "Enable MMCONFIG on AMD Family 10h\n");
+	pr_info("Enable MMCONFIG on AMD Family 10h\n");
 	val &= ~((FAM10H_MMIO_CONF_BASE_MASK<<FAM10H_MMIO_CONF_BASE_SHIFT) |
 	     (FAM10H_MMIO_CONF_BUSRANGE_MASK<<FAM10H_MMIO_CONF_BUSRANGE_SHIFT));
 	val |= fam10h_pci_mmconf_base | (8 << FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |

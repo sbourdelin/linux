@@ -586,19 +586,19 @@ static void calioc2_tce_cache_blast(struct iommu_table *tbl)
 	unsigned char bus = tbl->it_busno;
 
 begin:
-	printk(KERN_DEBUG "Calgary: CalIOC2 bus 0x%x entering tce cache blast "
-	       "sequence - count %d\n", bus, count);
+	pr_debug("Calgary: CalIOC2 bus 0x%x entering tce cache blast sequence - count %d\n",
+		 bus, count);
 
 	/* 1. using the Page Migration Control reg set SoftStop */
 	target = calgary_reg(bbar, phb_offset(bus) | PHB_PAGE_MIG_CTRL);
 	val = be32_to_cpu(readl(target));
-	printk(KERN_DEBUG "1a. read 0x%x [LE] from %p\n", val, target);
+	pr_debug("1a. read 0x%x [LE] from %p\n", val, target);
 	val |= PMR_SOFTSTOP;
-	printk(KERN_DEBUG "1b. writing 0x%x [LE] to %p\n", val, target);
+	pr_debug("1b. writing 0x%x [LE] to %p\n", val, target);
 	writel(cpu_to_be32(val), target);
 
 	/* 2. poll split queues until all DMA activity is done */
-	printk(KERN_DEBUG "2a. starting to poll split queues\n");
+	pr_debug("2a. starting to poll split queues\n");
 	target = calgary_reg(bbar, split_queue_offset(bus));
 	do {
 		val64 = readq(target);
@@ -610,7 +610,7 @@ begin:
 	/* 3. poll Page Migration DEBUG for SoftStopFault */
 	target = calgary_reg(bbar, phb_offset(bus) | PHB_PAGE_MIG_DEBUG);
 	val = be32_to_cpu(readl(target));
-	printk(KERN_DEBUG "3. read 0x%x [LE] from %p\n", val, target);
+	pr_debug("3. read 0x%x [LE] from %p\n", val, target);
 
 	/* 4. if SoftStopFault - goto (1) */
 	if (val & PMR_SOFTSTOPFAULT) {
@@ -624,32 +624,32 @@ begin:
 
 	/* 5. Slam into HardStop by reading PHB_PAGE_MIG_CTRL */
 	target = calgary_reg(bbar, phb_offset(bus) | PHB_PAGE_MIG_CTRL);
-	printk(KERN_DEBUG "5a. slamming into HardStop by reading %p\n", target);
+	pr_debug("5a. slamming into HardStop by reading %p\n", target);
 	val = be32_to_cpu(readl(target));
-	printk(KERN_DEBUG "5b. read 0x%x [LE] from %p\n", val, target);
+	pr_debug("5b. read 0x%x [LE] from %p\n", val, target);
 	target = calgary_reg(bbar, phb_offset(bus) | PHB_PAGE_MIG_DEBUG);
 	val = be32_to_cpu(readl(target));
-	printk(KERN_DEBUG "5c. read 0x%x [LE] from %p (debug)\n", val, target);
+	pr_debug("5c. read 0x%x [LE] from %p (debug)\n", val, target);
 
 	/* 6. invalidate TCE cache */
-	printk(KERN_DEBUG "6. invalidating TCE cache\n");
+	pr_debug("6. invalidating TCE cache\n");
 	target = calgary_reg(bbar, tar_offset(bus));
 	writeq(tbl->tar_val, target);
 
 	/* 7. Re-read PMCR */
-	printk(KERN_DEBUG "7a. Re-reading PMCR\n");
+	pr_debug("7a. Re-reading PMCR\n");
 	target = calgary_reg(bbar, phb_offset(bus) | PHB_PAGE_MIG_CTRL);
 	val = be32_to_cpu(readl(target));
-	printk(KERN_DEBUG "7b. read 0x%x [LE] from %p\n", val, target);
+	pr_debug("7b. read 0x%x [LE] from %p\n", val, target);
 
 	/* 8. Remove HardStop */
-	printk(KERN_DEBUG "8a. removing HardStop from PMCR\n");
+	pr_debug("8a. removing HardStop from PMCR\n");
 	target = calgary_reg(bbar, phb_offset(bus) | PHB_PAGE_MIG_CTRL);
 	val = 0;
-	printk(KERN_DEBUG "8b. writing 0x%x [LE] to %p\n", val, target);
+	pr_debug("8b. writing 0x%x [LE] to %p\n", val, target);
 	writel(cpu_to_be32(val), target);
 	val = be32_to_cpu(readl(target));
-	printk(KERN_DEBUG "8c. read 0x%x [LE] from %p\n", val, target);
+	pr_debug("8c. read 0x%x [LE] from %p\n", val, target);
 }
 
 static void __init calgary_reserve_mem_region(struct pci_dev *dev, u64 start,
@@ -885,8 +885,8 @@ static void calioc2_dump_error_regs(struct iommu_table *tbl)
 	/* root complex status */
 	target = calgary_reg(bbar, phboff | PHB_ROOT_COMPLEX_STATUS);
 	rcstat = be32_to_cpu(readl(target));
-	printk(KERN_EMERG "Calgary: 0x%08x@0x%x\n", rcstat,
-	       PHB_ROOT_COMPLEX_STATUS);
+	pr_emerg("Calgary: 0x%08x@0x%x\n", rcstat,
+		 PHB_ROOT_COMPLEX_STATUS);
 }
 
 static void calgary_watchdog(unsigned long data)
@@ -998,11 +998,10 @@ static void __init calgary_enable_translation(struct pci_dev *dev)
 	val32 = be32_to_cpu(readl(target));
 	val32 |= PHB_TCE_ENABLE | PHB_DAC_DISABLE | PHB_MCSR_ENABLE;
 
-	printk(KERN_INFO "Calgary: enabling translation on %s PHB %#x\n",
-	       (dev->device == PCI_DEVICE_ID_IBM_CALGARY) ?
-	       "Calgary" : "CalIOC2", busnum);
-	printk(KERN_INFO "Calgary: errant DMAs will now be prevented on this "
-	       "bus.\n");
+	pr_info("Calgary: enabling translation on %s PHB %#x\n",
+		(dev->device == PCI_DEVICE_ID_IBM_CALGARY) ?
+		"Calgary" : "CalIOC2", busnum);
+	pr_info("Calgary: errant DMAs will now be prevented on this bus.\n");
 
 	writel(cpu_to_be32(val32), target);
 	readl(target); /* flush */
@@ -1030,7 +1029,7 @@ static void __init calgary_disable_translation(struct pci_dev *dev)
 	val32 = be32_to_cpu(readl(target));
 	val32 &= ~(PHB_TCE_ENABLE | PHB_DAC_DISABLE | PHB_MCSR_ENABLE);
 
-	printk(KERN_INFO "Calgary: disabling translation on PHB %#x!\n", busnum);
+	pr_info("Calgary: disabling translation on PHB %#x!\n", busnum);
 	writel(cpu_to_be32(val32), target);
 	readl(target); /* flush */
 
@@ -1064,8 +1063,8 @@ static int __init calgary_init_one(struct pci_dev *dev)
 
 	if (dev->bus->parent) {
 		if (dev->bus->parent->self)
-			printk(KERN_WARNING "Calgary: IEEEE, dev %p has "
-			       "bus->parent->self!\n", dev);
+			pr_warn("Calgary: IEEEE, dev %p has bus->parent->self!\n",
+				dev);
 		dev->bus->parent->self = dev;
 	} else
 		dev->bus->self = dev;
@@ -1244,9 +1243,7 @@ static int __init build_detail_arrays(void)
 
 	numnodes = rio_table_hdr->num_scal_dev;
 	if (numnodes > MAX_NUMNODES){
-		printk(KERN_WARNING
-			"Calgary: MAX_NUMNODES too low! Defined as %d, "
-			"but system has %d nodes.\n",
+		pr_warn("Calgary: MAX_NUMNODES too low! Defined as %d, but system has %d nodes.\n",
 			MAX_NUMNODES, numnodes);
 		return -ENODEV;
 	}
@@ -1261,9 +1258,8 @@ static int __init build_detail_arrays(void)
 		rio_detail_size = 15;
 		break;
 	default:
-		printk(KERN_WARNING
-		       "Calgary: Invalid Rio Grande Table Version: %d\n",
-		       rio_table_hdr->version);
+		pr_warn("Calgary: Invalid Rio Grande Table Version: %d\n",
+			rio_table_hdr->version);
 		return -EPROTO;
 	}
 
@@ -1359,12 +1355,12 @@ static int __init calgary_iommu_init(void)
 	int ret;
 
 	/* ok, we're trying to use Calgary - let's roll */
-	printk(KERN_INFO "PCI-DMA: Using Calgary IOMMU\n");
+	pr_info("PCI-DMA: Using Calgary IOMMU\n");
 
 	ret = calgary_init();
 	if (ret) {
-		printk(KERN_ERR "PCI-DMA: Calgary init failed %d, "
-		       "falling back to no_iommu\n", ret);
+		pr_err("PCI-DMA: Calgary init failed %d, falling back to no_iommu\n",
+			ret);
 		return ret;
 	}
 
@@ -1393,7 +1389,7 @@ int __init detect_calgary(void)
 	if (!early_pci_allowed())
 		return -ENODEV;
 
-	printk(KERN_DEBUG "Calgary: detecting Calgary via BIOS EBDA area\n");
+	pr_debug("Calgary: detecting Calgary via BIOS EBDA area\n");
 
 	ptr = (unsigned long)phys_to_virt(get_bios_ebda());
 
@@ -1415,14 +1411,13 @@ int __init detect_calgary(void)
 		offset = *((unsigned short *)(ptr + offset));
 	}
 	if (!rio_table_hdr) {
-		printk(KERN_DEBUG "Calgary: Unable to locate Rio Grande table "
-		       "in EBDA - bailing!\n");
+		pr_debug("Calgary: Unable to locate Rio Grande table in EBDA - bailing!\n");
 		return -ENODEV;
 	}
 
 	ret = build_detail_arrays();
 	if (ret) {
-		printk(KERN_DEBUG "Calgary: build_detail_arrays ret %d\n", ret);
+		pr_debug("Calgary: build_detail_arrays ret %d\n", ret);
 		return -ENOMEM;
 	}
 
@@ -1458,15 +1453,15 @@ int __init detect_calgary(void)
 		}
 	}
 
-	printk(KERN_DEBUG "Calgary: finished detection, Calgary %s\n",
-	       calgary_found ? "found" : "not found");
+	pr_debug("Calgary: finished detection, Calgary %s\n",
+		 calgary_found ? "found" : "not found");
 
 	if (calgary_found) {
 		iommu_detected = 1;
 		calgary_detected = 1;
-		printk(KERN_INFO "PCI-DMA: Calgary IOMMU detected.\n");
-		printk(KERN_INFO "PCI-DMA: Calgary TCE table spec is %d\n",
-		       specified_table_size);
+		pr_info("PCI-DMA: Calgary IOMMU detected.\n");
+		pr_info("PCI-DMA: Calgary TCE table spec is %d\n",
+			specified_table_size);
 
 		x86_init.iommu.iommu_init = calgary_iommu_init;
 	}
@@ -1524,8 +1519,8 @@ static int __init calgary_parse_options(char *p)
 
 			bridge = val;
 			if (bridge < MAX_PHB_BUS_NUM) {
-				printk(KERN_INFO "Calgary: disabling "
-				       "translation for PHB %#x\n", bridge);
+				pr_info("Calgary: disabling translation for PHB %#x\n",
+					bridge);
 				bus_info[bridge].translation_disabled = 1;
 			}
 		}
@@ -1575,7 +1570,7 @@ static int __init calgary_fixup_tce_spaces(void)
 	if (no_iommu || swiotlb || !calgary_detected)
 		return -ENODEV;
 
-	printk(KERN_DEBUG "Calgary: fixing up tce spaces\n");
+	pr_debug("Calgary: fixing up tce spaces\n");
 
 	do {
 		dev = pci_get_device(PCI_VENDOR_ID_IBM, PCI_ANY_ID, dev);

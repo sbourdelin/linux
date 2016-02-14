@@ -112,8 +112,7 @@ void __init pci_swiotlb_late_init(void)
 	if (!swiotlb)
 		swiotlb_free();
 	else {
-		printk(KERN_INFO "PCI-DMA: "
-		       "Using software bounce buffering for IO (SWIOTLB)\n");
+		pr_info("PCI-DMA: Using software bounce buffering for IO (SWIOTLB)\n");
 		swiotlb_print_info();
 	}
 }

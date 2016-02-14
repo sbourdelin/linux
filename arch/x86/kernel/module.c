@@ -37,12 +37,12 @@
 
 #if 0
 #define DEBUGP(fmt, ...)				\
-	printk(KERN_DEBUG fmt, ##__VA_ARGS__)
+	pr_debug(fmt, ##__VA_ARGS__)
 #else
 #define DEBUGP(fmt, ...)				\
 do {							\
 	if (0)						\
-		printk(KERN_DEBUG fmt, ##__VA_ARGS__);	\
+		pr_debug(fmt, ##__VA_ARGS__);	\
 } while (0)
 #endif
 

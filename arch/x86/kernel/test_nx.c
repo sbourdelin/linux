@@ -54,8 +54,8 @@ static void fudze_exception_table(void *marker, void *new)
 	 * table.
 	 */
 	if (mod->num_exentries > 1) {
-		printk(KERN_ERR "test_nx: too many exception table entries!\n");
-		printk(KERN_ERR "test_nx: test results are not reliable.\n");
+		pr_err("test_nx: too many exception table entries!\n");
+		pr_err("test_nx: test results are not reliable.\n");
 		return;
 	}
 	extable = (struct exception_table_entry *)mod->extable;
@@ -115,11 +115,11 @@ static int test_NX(void)
 
 	test_data = 0xC3;
 
-	printk(KERN_INFO "Testing NX protection\n");
+	pr_info("Testing NX protection\n");
 
 	/* Test 1: check if the stack is not executable */
 	if (test_address(&stackcode)) {
-		printk(KERN_ERR "test_nx: stack was executable\n");
+		pr_err("test_nx: stack was executable\n");
 		ret = -ENODEV;
 	}
 
@@ -131,7 +131,7 @@ static int test_NX(void)
 	heap[0] = 0xC3; /* opcode for "ret" */
 
 	if (test_address(heap)) {
-		printk(KERN_ERR "test_nx: heap was executable\n");
+		pr_err("test_nx: heap was executable\n");
 		ret = -ENODEV;
 	}
 	kfree(heap);
@@ -145,10 +145,10 @@ static int test_NX(void)
 #ifdef CONFIG_DEBUG_RODATA
 	/* Test 3: Check if the .rodata section is executable */
 	if (rodata_test_data != 0xC3) {
-		printk(KERN_ERR "test_nx: .rodata marker has invalid value\n");
+		pr_err("test_nx: .rodata marker has invalid value\n");
 		ret = -ENODEV;
 	} else if (test_address(&rodata_test_data)) {
-		printk(KERN_ERR "test_nx: .rodata section is executable\n");
+		pr_err("test_nx: .rodata section is executable\n");
 		ret = -ENODEV;
 	}
 #endif
@@ -156,7 +156,7 @@ static int test_NX(void)
 #if 0
 	/* Test 4: Check if the .data section of a module is executable */
 	if (test_address(&test_data)) {
-		printk(KERN_ERR "test_nx: .data section is executable\n");
+		pr_err("test_nx: .data section is executable\n");
 		ret = -ENODEV;
 	}
 

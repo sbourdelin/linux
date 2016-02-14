@@ -319,8 +319,8 @@ static struct console early_serial_console = {
 static void early_console_register(struct console *con, int keep_early)
 {
 	if (con->index != -1) {
-		printk(KERN_CRIT "ERROR: earlyprintk= %s already used\n",
-		       con->name);
+		pr_crit("ERROR: earlyprintk= %s already used\n",
+			con->name);
 		return;
 	}
 	early_console = con;

@@ -112,7 +112,8 @@ void __init setup_bios_corruption_check(void)
 	}
 
 	if (num_scan_areas)
-		printk(KERN_INFO "Scanning %d areas for low memory corruption\n", num_scan_areas);
+		pr_info("Scanning %d areas for low memory corruption\n",
+			num_scan_areas);
 }
 
 
@@ -131,8 +132,8 @@ void check_for_bios_corruption(void)
 		for (; size; addr++, size -= sizeof(unsigned long)) {
 			if (!*addr)
 				continue;
-			printk(KERN_ERR "Corrupted low memory at %p (%lx phys) = %08lx\n",
-			       addr, __pa(addr), *addr);
+			pr_err("Corrupted low memory at %p (%lx phys) = %08lx\n",
+				addr, __pa(addr), *addr);
 			corruption = 1;
 			*addr = 0;
 		}
@@ -156,8 +157,8 @@ static int start_periodic_check_for_corruption(void)
 	if (!num_scan_areas || !memory_corruption_check || corruption_check_period == 0)
 		return 0;
 
-	printk(KERN_INFO "Scanning for low memory corruption every %d seconds\n",
-	       corruption_check_period);
+	pr_info("Scanning for low memory corruption every %d seconds\n",
+		corruption_check_period);
 
 	/* First time we run the checks right away */
 	schedule_delayed_work(&bios_check_work, 0);

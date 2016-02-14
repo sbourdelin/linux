@@ -73,7 +73,7 @@ __init int create_simplefb(const struct screen_info *si,
 	len = mode->height * mode->stride;
 	len = PAGE_ALIGN(len);
 	if (len > (u64)si->lfb_size << 16) {
-		printk(KERN_WARNING "sysfb: VRAM smaller than advertised\n");
+		pr_warn("sysfb: VRAM smaller than advertised\n");
 		return -EINVAL;
 	}
 

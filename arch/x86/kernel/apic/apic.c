@@ -349,7 +349,7 @@ static void __setup_APIC_LVTT(unsigned int clocks, int oneshot, int irqen)
 		 */
 		asm volatile("mfence" : : : "memory");
 
-		printk_once(KERN_DEBUG "TSC deadline timer enabled\n");
+		pr_debug_once("TSC deadline timer enabled\n");
 		return;
 	}
 
@@ -657,8 +657,8 @@ calibrate_by_pmtimer(long deltapm, long *delta, long *deltatsc)
 
 	res = (((u64)deltapm) *  mult) >> 22;
 	do_div(res, 1000000);
-	pr_warning("APIC calibration not consistent "
-		   "with PM-Timer: %ldms instead of 100ms\n",(long)res);
+	pr_warn("APIC calibration not consistent with PM-Timer: %ldms instead of 100ms\n",
+		(long)res);
 
 	/* Correct the lapic counter value */
 	res = (((u64)(*delta)) * pm_100ms);
@@ -777,7 +777,7 @@ static int __init calibrate_APIC_clock(void)
 	 */
 	if (lapic_timer_frequency < (1000000 / HZ)) {
 		local_irq_enable();
-		pr_warning("APIC frequency too slow, disabling apic timer\n");
+		pr_warn("APIC frequency too slow, disabling apic timer\n");
 		return -1;
 	}
 
@@ -820,7 +820,7 @@ static int __init calibrate_APIC_clock(void)
 	local_irq_enable();
 
 	if (levt->features & CLOCK_EVT_FEAT_DUMMY) {
-		pr_warning("APIC timer disabled due to verification failure\n");
+		pr_warn("APIC timer disabled due to verification failure\n");
 			return -1;
 	}
 
@@ -893,7 +893,7 @@ static void local_apic_timer_interrupt(void)
 	 * spurious.
 	 */
 	if (!evt->event_handler) {
-		pr_warning("Spurious LAPIC timer interrupt on cpu %d\n", cpu);
+		pr_warn("Spurious LAPIC timer interrupt on cpu %d\n", cpu);
 		/* Switch it off */
 		lapic_timer_shutdown(evt);
 		return;
@@ -1306,7 +1306,7 @@ void setup_local_APIC(void)
 			}
 		}
 		if (acked > 256) {
-			printk(KERN_ERR "LAPIC pending interrupts after %d EOI\n",
+			pr_err("LAPIC pending interrupts after %d EOI\n",
 			       acked);
 			break;
 		}
@@ -1454,7 +1454,7 @@ static void __x2apic_disable(void)
 	/* Disable xapic and x2apic first and then reenable xapic mode */
 	wrmsrl(MSR_IA32_APICBASE, msr & ~(X2APIC_ENABLE | XAPIC_ENABLE));
 	wrmsrl(MSR_IA32_APICBASE, msr & ~X2APIC_ENABLE);
-	printk_once(KERN_INFO "x2apic disabled\n");
+	pr_info_once("x2apic disabled\n");
 }
 
 static void __x2apic_enable(void)
@@ -1465,7 +1465,7 @@ static void __x2apic_enable(void)
 	if (msr & X2APIC_ENABLE)
 		return;
 	wrmsrl(MSR_IA32_APICBASE, msr | X2APIC_ENABLE);
-	printk_once(KERN_INFO "x2apic enabled\n");
+	pr_info_once("x2apic enabled\n");
 }
 
 static int __init setup_nox2apic(char *str)
@@ -1474,11 +1474,11 @@ static int __init setup_nox2apic(char *str)
 		int apicid = native_apic_msr_read(APIC_ID);
 
 		if (apicid >= 255) {
-			pr_warning("Apicid: %08x, cannot enforce nox2apic\n",
+			pr_warn("Apicid: %08x, cannot enforce nox2apic\n",
 				   apicid);
 			return 0;
 		}
-		pr_warning("x2apic already enabled.\n");
+		pr_warn("x2apic already enabled.\n");
 		__x2apic_disable();
 	}
 	setup_clear_cpu_cap(X86_FEATURE_X2APIC);
@@ -1652,7 +1652,7 @@ static int __init apic_verify(void)
 	 */
 	features = cpuid_edx(1);
 	if (!(features & (1 << X86_FEATURE_APIC))) {
-		pr_warning("Could not enable APIC!\n");
+		pr_warn("Could not enable APIC!\n");
 		return -1;
 	}
 	set_cpu_cap(&boot_cpu_data, X86_FEATURE_APIC);
@@ -2028,9 +2028,8 @@ int generic_processor_info(int apicid, int version)
 	    disabled_cpu_apicid == apicid) {
 		int thiscpu = num_processors + disabled_cpus;
 
-		pr_warning("APIC: Disabling requested cpu."
-			   " Processor %d/0x%x ignored.\n",
-			   thiscpu, apicid);
+		pr_warn("APIC: Disabling requested cpu. Processor %d/0x%x ignored.\n",
+			thiscpu, apicid);
 
 		disabled_cpus++;
 		return -ENODEV;
@@ -2044,8 +2043,7 @@ int generic_processor_info(int apicid, int version)
 	    apicid != boot_cpu_physical_apicid) {
 		int thiscpu = max + disabled_cpus - 1;
 
-		pr_warning(
-			"ACPI: NR_CPUS/possible_cpus limit of %i almost"
+		pr_warn("ACPI: NR_CPUS/possible_cpus limit of %i almost"
 			" reached. Keeping one slot for boot cpu."
 			"  Processor %d/0x%x ignored.\n", max, thiscpu, apicid);
 
@@ -2056,8 +2054,7 @@ int generic_processor_info(int apicid, int version)
 	if (num_processors >= nr_cpu_ids) {
 		int thiscpu = max + disabled_cpus;
 
-		pr_warning(
-			"ACPI: NR_CPUS/possible_cpus limit of %i reached."
+		pr_warn("ACPI: NR_CPUS/possible_cpus limit of %i reached."
 			"  Processor %d/0x%x ignored.\n", max, thiscpu, apicid);
 
 		disabled_cpus++;
@@ -2081,14 +2078,14 @@ int generic_processor_info(int apicid, int version)
 	 * Validate version
 	 */
 	if (version == 0x0) {
-		pr_warning("BIOS bug: APIC version is 0 for CPU %d/0x%x, fixing up to 0x10\n",
-			   cpu, apicid);
+		pr_warn("BIOS bug: APIC version is 0 for CPU %d/0x%x, fixing up to 0x10\n",
+			cpu, apicid);
 		version = 0x10;
 	}
 	apic_version[apicid] = version;
 
 	if (version != apic_version[boot_cpu_physical_apicid]) {
-		pr_warning("BIOS bug: APIC version mismatch, boot CPU: %x, CPU %d: version %x\n",
+		pr_warn("BIOS bug: APIC version mismatch, boot CPU: %x, CPU %d: version %x\n",
 			apic_version[boot_cpu_physical_apicid], cpu, version);
 	}
 
@@ -2531,7 +2528,7 @@ static int __init apic_set_verbosity(char *arg)
 	else if (strcmp("verbose", arg) == 0)
 		apic_verbosity = APIC_VERBOSE;
 	else {
-		pr_warning("APIC Verbosity level %s not recognised"
+		pr_warn("APIC Verbosity level %s not recognised"
 			" use apic=verbose or apic=debug\n", arg);
 		return -EINVAL;
 	}

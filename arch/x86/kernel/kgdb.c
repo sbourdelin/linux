@@ -300,7 +300,7 @@ kgdb_remove_hw_break(unsigned long addr, int len, enum kgdb_bptype bptype)
 		return -1;
 
 	if (hw_break_release_slot(i)) {
-		printk(KERN_ERR "Cannot remove hw breakpoint at %lx\n", addr);
+		pr_err("Cannot remove hw breakpoint at %lx\n", addr);
 		return -1;
 	}
 	breakinfo[i].enabled = 0;
@@ -327,7 +327,7 @@ static void kgdb_remove_all_hw_break(void)
 			early_dr7 &= ~encode_dr7(i, breakinfo[i].len,
 						 breakinfo[i].type);
 		else if (hw_break_release_slot(i))
-			printk(KERN_ERR "KGDB: hw bpt remove failed %lx\n",
+			pr_err("KGDB: hw bpt remove failed %lx\n",
 			       breakinfo[i].addr);
 		breakinfo[i].enabled = 0;
 	}
@@ -498,7 +498,7 @@ single_step_cont(struct pt_regs *regs, struct die_args *args)
 	 * Single step exception from kernel space to user space so
 	 * eat the exception and continue the process:
 	 */
-	printk(KERN_ERR "KGDB: trap/step from kernel to user space, "
+	pr_err("KGDB: trap/step from kernel to user space, "
 			"resuming...\n");
 	kgdb_arch_handle_exception(args->trapnr, args->signr,
 				   args->err, "c", "", regs);
@@ -675,7 +675,7 @@ void kgdb_arch_late(void)
 			continue;
 		breakinfo[i].pev = register_wide_hw_breakpoint(&attr, NULL, NULL);
 		if (IS_ERR((void * __force)breakinfo[i].pev)) {
-			printk(KERN_ERR "kgdb: Could not allocate hw"
+			pr_err("kgdb: Could not allocate hw"
 			       "breakpoints\nDisabling the kernel debugger\n");
 			breakinfo[i].pev = NULL;
 			kgdb_arch_exit();

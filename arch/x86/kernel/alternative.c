@@ -59,7 +59,7 @@ __setup("noreplace-paravirt", setup_noreplace_paravirt);
 #define DPRINTK(fmt, args...)						\
 do {									\
 	if (debug_alternative)						\
-		printk(KERN_DEBUG "%s: " fmt "\n", __func__, ##args);	\
+		pr_debug("%s: " fmt "\n", __func__, ##args);	\
 } while (0)
 
 #define DUMP_BYTES(buf, len, fmt, args...)				\
@@ -70,10 +70,10 @@ do {									\
 		if (!(len))						\
 			break;						\
 									\
-		printk(KERN_DEBUG fmt, ##args);				\
+		pr_debug(fmt, ##args);				\
 		for (j = 0; j < (len) - 1; j++)				\
-			printk(KERN_CONT "%02hhx ", buf[j]);		\
-		printk(KERN_CONT "%02hhx\n", buf[j]);			\
+			pr_cont("%02hhx ", buf[j]);		\
+		pr_cont("%02hhx\n", buf[j]);			\
 	}								\
 } while (0)
 

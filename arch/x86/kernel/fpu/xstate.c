@@ -222,7 +222,8 @@ static void __init setup_xstate_features(void)
 			"x86/fpu: misordered xstate at %d\n", last_good_offset);
 		last_good_offset = xstate_offsets[i];
 
-		printk(KERN_INFO "x86/fpu: xstate_offset[%d]: %4d, xstate_sizes[%d]: %4d\n", i, ebx, i, eax);
+		pr_info("x86/fpu: xstate_offset[%d]: %4d, xstate_sizes[%d]: %4d\n",
+			i, ebx, i, eax);
 	}
 }
 

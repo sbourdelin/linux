@@ -103,9 +103,8 @@ static long acpi_processor_ffh_cstate_probe_cpu(void *_cx)
 
 	if (!mwait_supported[cstate_type]) {
 		mwait_supported[cstate_type] = 1;
-		printk(KERN_DEBUG
-			"Monitor-Mwait will be used to enter C-%d "
-			"state\n", cx->type);
+		pr_debug("Monitor-Mwait will be used to enter C-%d state\n",
+			 cx->type);
 	}
 	snprintf(cx->desc,
 			ACPI_CX_DESC_LEN, "ACPI FFH INTEL MWAIT 0x%x",

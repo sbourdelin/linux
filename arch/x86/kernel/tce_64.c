@@ -113,7 +113,7 @@ static int tce_table_setparms(struct pci_dev *dev, struct iommu_table *tbl)
 	bitmapsz = tbl->it_size / BITS_PER_BYTE;
 	bmppages = __get_free_pages(GFP_KERNEL, get_order(bitmapsz));
 	if (!bmppages) {
-		printk(KERN_ERR "Calgary: cannot allocate bitmap\n");
+		pr_err("Calgary: cannot allocate bitmap\n");
 		ret = -ENOMEM;
 		goto done;
 	}
@@ -138,14 +138,13 @@ int __init build_tce_table(struct pci_dev *dev, void __iomem *bbar)
 	int ret;
 
 	if (pci_iommu(dev->bus)) {
-		printk(KERN_ERR "Calgary: dev %p has sysdata->iommu %p\n",
+		pr_err("Calgary: dev %p has sysdata->iommu %p\n",
 		       dev, pci_iommu(dev->bus));
 		BUG();
 	}
 
 	tbl = kzalloc(sizeof(struct iommu_table), GFP_KERNEL);
 	if (!tbl) {
-		printk(KERN_ERR "Calgary: error allocating iommu_table\n");
 		ret = -ENOMEM;
 		goto done;
 	}

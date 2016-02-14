@@ -94,7 +94,7 @@ static void noop_vector_allocation_domain(int cpu, struct cpumask *retmask,
 					  const struct cpumask *mask)
 {
 	if (cpu != 0)
-		pr_warning("APIC: Vector allocated for non-BSP cpu\n");
+		pr_warn("APIC: Vector allocated for non-BSP cpu\n");
 	cpumask_copy(retmask, cpumask_of(cpu));
 }
 

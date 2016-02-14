@@ -857,7 +857,7 @@ static int apm_do_idle(void)
 		 * Only report the failure the first 5 times.
 		 */
 		if (++t < 5) {
-			printk(KERN_DEBUG "apm_do_idle failed (%d)\n", err);
+			pr_debug("apm_do_idle failed (%d)\n", err);
 			t = jiffies;
 		}
 		return -1;
@@ -1326,11 +1326,11 @@ static void check_events(void)
 	while ((event = get_event()) != 0) {
 		if (debug) {
 			if (event <= NR_APM_EVENT_NAME)
-				printk(KERN_DEBUG "apm: received %s notify\n",
-				       apm_event_name[event - 1]);
+				pr_debug("apm: received %s notify\n",
+					 apm_event_name[event - 1]);
 			else
-				printk(KERN_DEBUG "apm: received unknown "
-				       "event 0x%02x\n", event);
+				pr_debug("apm: received unknown event 0x%02x\n",
+					 event);
 		}
 		if (ignore_bounce
 		    && (time_after(jiffies, last_resume + bounce_interval)))
@@ -1416,7 +1416,7 @@ static void apm_event_handler(void)
 		    (pending_count-- <= 0)) {
 			pending_count = 4;
 			if (debug)
-				printk(KERN_DEBUG "apm: setting state busy\n");
+				pr_debug("apm: setting state busy\n");
 			err = set_system_power_state(APM_STATE_BUSY);
 			if (err)
 				apm_error("busy", err);
@@ -1760,7 +1760,7 @@ static int apm(void *unused)
 	}
 
 	if (debug)
-		printk(KERN_INFO "apm: Connection version %d.%d\n",
+		pr_info("apm: Connection version %d.%d\n",
 			(apm_info.connection_version >> 8) & 0xff,
 			apm_info.connection_version & 0xff);
 
@@ -1791,7 +1791,7 @@ static int apm(void *unused)
 	if (debug && (num_online_cpus() == 1 || smp)) {
 		error = apm_get_power_status(&bx, &cx, &dx);
 		if (error)
-			printk(KERN_INFO "apm: power status not available\n");
+			pr_info("apm: power status not available\n");
 		else {
 			switch ((bx >> 8) & 0xff) {
 			case 0:
@@ -1824,17 +1824,15 @@ static int apm(void *unused)
 				bat_stat = "unknown";
 				break;
 			}
-			printk(KERN_INFO
-			       "apm: AC %s, battery status %s, battery life ",
-			       power_stat, bat_stat);
+			pr_info("apm: AC %s, battery status %s, battery life ",
+				power_stat, bat_stat);
 			if ((cx & 0xff) == 0xff)
 				printk("unknown\n");
 			else
 				printk("%d%%\n", cx & 0xff);
 			if (apm_info.connection_version > 0x100) {
-				printk(KERN_INFO
-				       "apm: battery flag 0x%02x, battery life ",
-				       (cx >> 8) & 0xff);
+				pr_info("apm: battery flag 0x%02x, battery life ",
+					(cx >> 8) & 0xff);
 				if (dx == 0xffff)
 					printk("unknown\n");
 				else
@@ -1943,8 +1941,8 @@ static int __init print_if_true(const struct dmi_system_id *d)
  */
 static int __init broken_ps2_resume(const struct dmi_system_id *d)
 {
-	printk(KERN_INFO "%s machine detected. Mousepad Resume Bug "
-	       "workaround hopefully not needed.\n", d->ident);
+	pr_info("%s machine detected. Mousepad Resume Bug workaround hopefully not needed.\n",
+		d->ident);
 	return 0;
 }
 
@@ -1953,8 +1951,8 @@ static int __init set_realmode_power_off(const struct dmi_system_id *d)
 {
 	if (apm_info.realmode_power_off == 0) {
 		apm_info.realmode_power_off = 1;
-		printk(KERN_INFO "%s bios detected. "
-		       "Using realmode poweroff only.\n", d->ident);
+		pr_info("%s bios detected. Using realmode poweroff only.\n",
+			d->ident);
 	}
 	return 0;
 }
@@ -1964,8 +1962,8 @@ static int __init set_apm_ints(const struct dmi_system_id *d)
 {
 	if (apm_info.allow_ints == 0) {
 		apm_info.allow_ints = 1;
-		printk(KERN_INFO "%s machine detected. "
-		       "Enabling interrupts during APM calls.\n", d->ident);
+		pr_info("%s machine detected. Enabling interrupts during APM calls.\n",
+			d->ident);
 	}
 	return 0;
 }
@@ -1975,8 +1973,7 @@ static int __init apm_is_horked(const struct dmi_system_id *d)
 {
 	if (apm_info.disabled == 0) {
 		apm_info.disabled = 1;
-		printk(KERN_INFO "%s machine detected. "
-		       "Disabling APM.\n", d->ident);
+		pr_info("%s machine detected. Disabling APM.\n", d->ident);
 	}
 	return 0;
 }
@@ -1985,10 +1982,9 @@ static int __init apm_is_horked_d850md(const struct dmi_system_id *d)
 {
 	if (apm_info.disabled == 0) {
 		apm_info.disabled = 1;
-		printk(KERN_INFO "%s machine detected. "
-		       "Disabling APM.\n", d->ident);
-		printk(KERN_INFO "This bug is fixed in bios P15 which is available for\n");
-		printk(KERN_INFO "download from support.intel.com\n");
+		pr_info("%s machine detected. Disabling APM.\n", d->ident);
+		pr_info("This bug is fixed in bios P15 which is available for\n");
+		pr_info("download from support.intel.com\n");
 	}
 	return 0;
 }
@@ -1998,8 +1994,8 @@ static int __init apm_likes_to_melt(const struct dmi_system_id *d)
 {
 	if (apm_info.forbid_idle == 0) {
 		apm_info.forbid_idle = 1;
-		printk(KERN_INFO "%s machine detected. "
-		       "Disabling APM idle calls.\n", d->ident);
+		pr_info("%s machine detected. Disabling APM idle calls.\n",
+			d->ident);
 	}
 	return 0;
 }
@@ -2022,8 +2018,7 @@ static int __init apm_likes_to_melt(const struct dmi_system_id *d)
 static int __init broken_apm_power(const struct dmi_system_id *d)
 {
 	apm_info.get_power_status_broken = 1;
-	printk(KERN_WARNING "BIOS strings suggest APM bugs, "
-	       "disabling power status reporting.\n");
+	pr_warn("BIOS strings suggest APM bugs, disabling power status reporting.\n");
 	return 0;
 }
 
@@ -2034,8 +2029,7 @@ static int __init broken_apm_power(const struct dmi_system_id *d)
 static int __init swab_apm_power_in_minutes(const struct dmi_system_id *d)
 {
 	apm_info.get_power_status_swabinminutes = 1;
-	printk(KERN_WARNING "BIOS strings suggest APM reports battery life "
-	       "in minutes and wrong byte order.\n");
+	pr_warn("BIOS strings suggest APM reports battery life in minutes and wrong byte order.\n");
 	return 0;
 }
 
@@ -2268,17 +2262,16 @@ static int __init apm_init(void)
 	dmi_check_system(apm_dmi_table);
 
 	if (apm_info.bios.version == 0 || paravirt_enabled() || machine_is_olpc()) {
-		printk(KERN_INFO "apm: BIOS not found.\n");
+		pr_info("apm: BIOS not found.\n");
 		return -ENODEV;
 	}
-	printk(KERN_INFO
-	       "apm: BIOS version %d.%d Flags 0x%02x (Driver version %s)\n",
-	       ((apm_info.bios.version >> 8) & 0xff),
-	       (apm_info.bios.version & 0xff),
-	       apm_info.bios.flags,
-	       driver_version);
+	pr_info("apm: BIOS version %d.%d Flags 0x%02x (Driver version %s)\n",
+		((apm_info.bios.version >> 8) & 0xff),
+		(apm_info.bios.version & 0xff),
+		apm_info.bios.flags,
+		driver_version);
 	if ((apm_info.bios.flags & APM_32_BIT_SUPPORT) == 0) {
-		printk(KERN_INFO "apm: no 32 bit BIOS support\n");
+		pr_info("apm: no 32 bit BIOS support\n");
 		return -ENODEV;
 	}
 
@@ -2304,7 +2297,7 @@ static int __init apm_init(void)
 		apm_info.bios.cseg_16_len = 0; /* 64k */
 
 	if (debug) {
-		printk(KERN_INFO "apm: entry %x:%x cseg16 %x dseg %x",
+		pr_info("apm: entry %x:%x cseg16 %x dseg %x",
 			apm_info.bios.cseg, apm_info.bios.offset,
 			apm_info.bios.cseg_16, apm_info.bios.dseg);
 		if (apm_info.bios.version > 0x100)
@@ -2369,8 +2362,7 @@ static int __init apm_init(void)
 	wake_up_process(kapmd_task);
 
 	if (num_online_cpus() > 1 && !smp) {
-		printk(KERN_NOTICE
-		       "apm: disabled - APM is not SMP safe (power off active).\n");
+		pr_notice("apm: disabled - APM is not SMP safe (power off active).\n");
 		return 0;
 	}
 
@@ -2380,7 +2372,7 @@ static int __init apm_init(void)
 	 * control it.  just log the error
 	 */
 	if (misc_register(&apm_device))
-		printk(KERN_WARNING "apm: Could not register misc device.\n");
+		pr_warn("apm: Could not register misc device.\n");
 
 	if (HZ != 100)
 		idle_period = (idle_period * HZ) / 100;

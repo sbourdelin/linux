@@ -16,8 +16,7 @@ check_addr(char *name, struct device *hwdev, dma_addr_t bus, size_t size)
 {
 	if (hwdev && !dma_capable(hwdev, bus, size)) {
 		if (*hwdev->dma_mask >= DMA_BIT_MASK(32))
-			printk(KERN_ERR
-			    "nommu_%s: overflow %Lx+%zu of device mask %Lx\n",
+			pr_err("nommu_%s: overflow %Lx+%zu of device mask %Lx\n",
 				name, (long long)bus, size,
 				(long long)*hwdev->dma_mask);
 		return 0;

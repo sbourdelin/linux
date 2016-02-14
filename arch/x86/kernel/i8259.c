@@ -204,8 +204,7 @@ spurious_8259A_irq:
 		 * lets ACK and report it. [once per IRQ]
 		 */
 		if (!(spurious_irq_mask & irqmask)) {
-			printk(KERN_DEBUG
-			       "spurious 8259A interrupt: IRQ%d.\n", irq);
+			pr_debug("spurious 8259A interrupt: IRQ%d.\n", irq);
 			spurious_irq_mask |= irqmask;
 		}
 		atomic_inc(&irq_err_count);
@@ -313,7 +312,7 @@ static int probe_8259A(void)
 	outb(probe_val, PIC_MASTER_IMR);
 	new_val = inb(PIC_MASTER_IMR);
 	if (new_val != probe_val) {
-		printk(KERN_INFO "Using NULL legacy PIC\n");
+		pr_info("Using NULL legacy PIC\n");
 		legacy_pic = &null_legacy_pic;
 	}
 

@@ -60,8 +60,7 @@ static int default_x86_32_early_logical_apicid(int cpu)
 static void setup_apic_flat_routing(void)
 {
 #ifdef CONFIG_X86_IO_APIC
-	printk(KERN_INFO
-		"Enabling APIC mode:  Flat.  Using %d I/O APICs\n",
+	pr_info("Enabling APIC mode:  Flat.  Using %d I/O APICs\n",
 		nr_ioapics);
 #endif
 }
@@ -202,7 +201,7 @@ void __init generic_apic_probe(void)
 		if (drv == __apicdrivers_end)
 			panic("Didn't find an APIC driver");
 	}
-	printk(KERN_INFO "Using APIC driver %s\n", apic->name);
+	pr_info("Using APIC driver %s\n", apic->name);
 }
 
 /* This function can switch the APIC even after the initial ->probe() */
@@ -218,8 +217,8 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 
 		if (!cmdline_apic) {
 			apic = *drv;
-			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
-			       apic->name);
+			pr_info("Switched to APIC driver `%s'.\n",
+				apic->name);
 		}
 		return 1;
 	}

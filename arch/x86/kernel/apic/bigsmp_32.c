@@ -67,8 +67,7 @@ static void bigsmp_init_apic_ldr(void)
 
 static void bigsmp_setup_apic_routing(void)
 {
-	printk(KERN_INFO
-		"Enabling APIC mode:  Physflat.  Using %d I/O APICs\n",
+	pr_info("Enabling APIC mode:  Physflat.  Using %d I/O APICs\n",
 		nr_ioapics);
 }
 
@@ -110,7 +109,7 @@ static int dmi_bigsmp; /* can be set by dmi scanners */
 
 static int hp_ht_bigsmp(const struct dmi_system_id *d)
 {
-	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
+	pr_notice("%s detected: force use of apic=bigsmp\n", d->ident);
 	dmi_bigsmp = 1;
 
 	return 0;

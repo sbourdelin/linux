@@ -165,7 +165,7 @@ static int __init cpuid_init(void)
 
 	if (__register_chrdev(CPUID_MAJOR, 0, NR_CPUS,
 			      "cpu/cpuid", &cpuid_fops)) {
-		printk(KERN_ERR "cpuid: unable to get major %d for cpuid\n",
+		pr_err("cpuid: unable to get major %d for cpuid\n",
 		       CPUID_MAJOR);
 		err = -EBUSY;
 		goto out;

@@ -65,8 +65,7 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
 		kunmap_atomic(vaddr);
 	} else {
 		if (!kdump_buf_page) {
-			printk(KERN_WARNING "Kdump: Kdump buffer page not"
-				" allocated\n");
+			pr_warn("Kdump: Kdump buffer page not allocated\n");
 			kunmap_atomic(vaddr);
 			return -EFAULT;
 		}
@@ -85,8 +84,7 @@ static int __init kdump_buf_page_init(void)
 
 	kdump_buf_page = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!kdump_buf_page) {
-		printk(KERN_WARNING "Kdump: Failed to allocate kdump buffer"
-			 " page\n");
+		pr_warn("Kdump: Failed to allocate kdump buffer page\n");
 		ret = -ENOMEM;
 	}
 

@@ -13,7 +13,7 @@
 #include <asm/e820.h>
 #include <asm/pci_x86.h>
 
-#define PREFIX "PCI: "
+#define pr_fmt(fmt) "PCI: " fmt
 
 static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned int devfn)
 {
@@ -137,7 +137,7 @@ int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
 {
 	cfg->virt = mcfg_ioremap(cfg);
 	if (!cfg->virt) {
-		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
+		pr_err("can't map MMCONFIG at %pR\n", &cfg->res);
 		return -ENOMEM;
 	}
 
