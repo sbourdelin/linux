@@ -446,7 +446,7 @@ static int m88e1510_config_aneg(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	return marvell_of_reg_init(phydev);
+	return 0;
 }
 
 static int m88e1116r_config_init(struct phy_device *phydev)
@@ -780,6 +780,17 @@ static int m88e1145_config_init(struct phy_device *phydev)
 		if (err < 0)
 			return err;
 	}
+
+	err = marvell_of_reg_init(phydev);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+static int m88e1510_config_init(struct phy_device *phydev)
+{
+	int err;
 
 	err = marvell_of_reg_init(phydev);
 	if (err < 0)
@@ -1259,6 +1270,7 @@ static struct phy_driver marvell_drivers[] = {
 		.features = PHY_GBIT_FEATURES,
 		.flags = PHY_HAS_INTERRUPT,
 		.probe = marvell_probe,
+		.config_init = &m88e1510_config_init,
 		.config_aneg = &m88e1510_config_aneg,
 		.read_status = &marvell_read_status,
 		.ack_interrupt = &marvell_ack_interrupt,
