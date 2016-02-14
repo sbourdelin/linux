@@ -203,7 +203,10 @@ int f2fs_inherit_context(struct inode *parent, struct inode *child,
 			F2FS_KEY_DESCRIPTOR_SIZE);
 
 	get_random_bytes(ctx.nonce, F2FS_KEY_DERIVATION_NONCE_SIZE);
-	return f2fs_setxattr(child, F2FS_XATTR_INDEX_ENCRYPTION,
+	res = f2fs_setxattr(child, F2FS_XATTR_INDEX_ENCRYPTION,
 				F2FS_XATTR_NAME_ENCRYPTION_CONTEXT, &ctx,
 				sizeof(ctx), ipage, XATTR_CREATE);
+	if (!res)
+		res = f2fs_get_encryption_info(child);
+	return res;
 }
