@@ -174,3 +174,17 @@ void kvm_page_track_remove_page(struct kvm *kvm, gfn_t gfn,
 		spin_unlock(&kvm->mmu_lock);
 	}
 }
+
+/*
+ * check if the corresponding access on the specified guest page is tracked.
+ */
+bool kvm_page_track_check_mode(struct kvm_vcpu *vcpu, gfn_t gfn,
+			       enum kvm_page_track_mode mode)
+{
+	struct kvm_memory_slot *slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
+	int index = gfn_to_index(gfn, slot->base_gfn, PT_PAGE_TABLE_LEVEL);
+
+	WARN_ON(!check_mode(mode));
+
+	return !!ACCESS_ONCE(slot->arch.gfn_track[mode][index]);
+}
