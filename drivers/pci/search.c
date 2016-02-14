@@ -55,6 +55,8 @@ int pci_for_each_dma_alias(struct pci_dev *pdev,
 			continue;
 
 		tmp = bus->self;
+		if (tmp->dev_flags & PCI_DEV_FLAGS_BRIDGE_SKIP_ALIAS)
+			continue;
 
 		/*
 		 * PCIe-to-PCI/X bridges alias transactions from downstream
