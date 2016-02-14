@@ -3705,6 +3705,27 @@ DECLARE_PCI_FIXUP_HEADER(0x1283, 0x8892, quirk_use_pcie_bridge_dma_alias);
 DECLARE_PCI_FIXUP_HEADER(0x8086, 0x244e, quirk_use_pcie_bridge_dma_alias);
 
 /*
+ * Two levels of bridges in Broadcom Vulcan are not real PCI or PCIe bridges.
+ * These are internal bridges and should not be used for dma alias
+ * calculations. Additionally, the BAR0 of thes bridges should not be
+ * assigned with a mem resource from linux
+ */
+static void quirk_bridge_brcm_vulcan_internal(struct pci_dev *pdev)
+{
+	struct resource *r = &pdev->resource[0];
+
+	/* skip from alias search */
+	pdev->dev_flags |= PCI_DEV_FLAGS_BRIDGE_SKIP_ALIAS;
+
+	/* clear BAR0, should not be used from Linux */
+	memset(r, 0, sizeof(*r));
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9000,
+				quirk_bridge_brcm_vulcan_internal);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9039,
+				quirk_bridge_brcm_vulcan_internal);
+
+/*
  * Intersil/Techwell TW686[4589]-based video capture cards have an empty (zero)
  * class code.  Fix it.
  */
