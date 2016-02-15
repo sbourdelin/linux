@@ -21,7 +21,6 @@ config USB_EHCI_BIG_ENDIAN_DESC
 
 menuconfig USB_SUPPORT
 	bool "USB support"
-	depends on HAS_IOMEM
 	default y
 	---help---
 	  This option adds core support for Universal Serial Bus (USB).
