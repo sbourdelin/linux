@@ -822,6 +822,8 @@ struct snd_soc_component {
 	struct dentry *debugfs_root;
 #endif
 
+	int ref_count;
+
 	/*
 	* DO NOT use any of the fields below in drivers, they are temporary and
 	* are going to be removed again soon. If you use them in driver code the

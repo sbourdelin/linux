@@ -1060,6 +1060,11 @@ static void soc_remove_component(struct snd_soc_component *component)
 	if (!component->card)
 		return;
 
+	component->ref_count--;
+
+	if (component->ref_count)
+		return;
+
 	/* This is a HACK and will be removed soon */
 	if (component->codec)
 		list_del(&component->codec->card_list);
@@ -1080,14 +1085,17 @@ static void soc_remove_dai(struct snd_soc_dai *dai, int order)
 
 	if (dai && dai->probed &&
 			dai->driver->remove_order == order) {
-		if (dai->driver->remove) {
-			err = dai->driver->remove(dai);
-			if (err < 0)
-				dev_err(dai->dev,
-					"ASoC: failed to remove %s: %d\n",
-					dai->name, err);
+		dai->ref_count--;
+		if (!dai->ref_count) {
+			if (dai->driver->remove) {
+				err = dai->driver->remove(dai);
+				if (err < 0)
+					dev_err(dai->dev,
+						"ASoC: failed to remove %s: %d\n",
+						dai->name, err);
+			}
+			dai->probed = 0;
 		}
-		dai->probed = 0;
 	}
 }
 
@@ -1367,6 +1375,7 @@ static int soc_probe_component(struct snd_soc_card *card,
 				card->name, component->card->name);
 			return -ENODEV;
 		}
+		component->ref_count++;
 		return 0;
 	}
 
@@ -1436,6 +1445,7 @@ static int soc_probe_component(struct snd_soc_card *card,
 	if (component->codec)
 		list_add(&component->codec->card_list, &card->codec_dev_list);
 
+	component->ref_count++;
 	return 0;
 
 err_probe:
@@ -1523,18 +1533,21 @@ static int soc_probe_dai(struct snd_soc_dai *dai, int order)
 {
 	int ret;
 
-	if (!dai->probed && dai->driver->probe_order == order) {
-		if (dai->driver->probe) {
-			ret = dai->driver->probe(dai);
-			if (ret < 0) {
-				dev_err(dai->dev,
-					"ASoC: failed to probe DAI %s: %d\n",
-					dai->name, ret);
-				return ret;
+	if (dai->driver->probe_order == order) {
+		if (!dai->probed) {
+			if (dai->driver->probe) {
+				ret = dai->driver->probe(dai);
+				if (ret < 0) {
+					dev_err(dai->dev,
+						"ASoC: failed to probe DAI %s: %d\n",
+						dai->name, ret);
+					return ret;
+				}
 			}
-		}
 
-		dai->probed = 1;
+			dai->probed = 1;
+		}
+		dai->ref_count++;
 	}
 
 	return 0;
