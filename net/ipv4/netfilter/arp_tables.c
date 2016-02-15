@@ -521,14 +521,16 @@ find_check_entry(struct arpt_entry *e, const char *name, unsigned int size)
 	struct xt_entry_target *t;
 	struct xt_target *target;
 	int ret;
+	unsigned long pcnt;
 
 	ret = check_entry(e, name);
 	if (ret)
 		return ret;
 
-	e->counters.pcnt = xt_percpu_counter_alloc();
-	if (IS_ERR_VALUE(e->counters.pcnt))
+	pcnt = xt_percpu_counter_alloc();
+	if (IS_ERR_VALUE(pcnt))
 		return -ENOMEM;
+	e->counters.pcnt = pcnt;
 
 	t = arpt_get_target(e);
 	target = xt_request_find_target(NFPROTO_ARP, t->u.user.name,
@@ -1423,11 +1425,12 @@ static int translate_compat_table(const char *name,
 
 	i = 0;
 	xt_entry_foreach(iter1, entry1, newinfo->size) {
-		iter1->counters.pcnt = xt_percpu_counter_alloc();
-		if (IS_ERR_VALUE(iter1->counters.pcnt)) {
+		unsigned long pcnt = xt_percpu_counter_alloc();
+		if (IS_ERR_VALUE(pcnt)) {
 			ret = -ENOMEM;
 			break;
 		}
+		iter1->counters.pcnt = pcnt;
 
 		ret = check_target(iter1, name);
 		if (ret != 0) {

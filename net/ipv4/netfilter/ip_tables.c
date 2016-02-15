@@ -665,14 +665,16 @@ find_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 	unsigned int j;
 	struct xt_mtchk_param mtpar;
 	struct xt_entry_match *ematch;
+	unsigned long pcnt;
 
 	ret = check_entry(e, name);
 	if (ret)
 		return ret;
 
-	e->counters.pcnt = xt_percpu_counter_alloc();
-	if (IS_ERR_VALUE(e->counters.pcnt))
+	pcnt = xt_percpu_counter_alloc();
+	if (IS_ERR_VALUE(pcnt))
 		return -ENOMEM;
+	e->counters.pcnt = pcnt;
 
 	j = 0;
 	mtpar.net	= net;
@@ -1609,10 +1611,12 @@ compat_check_entry(struct ipt_entry *e, struct net *net, const char *name)
 	struct xt_mtchk_param mtpar;
 	unsigned int j;
 	int ret = 0;
+	unsigned long pcnt;
 
-	e->counters.pcnt = xt_percpu_counter_alloc();
-	if (IS_ERR_VALUE(e->counters.pcnt))
+	pcnt = xt_percpu_counter_alloc();
+	if (IS_ERR_VALUE(pcnt))
 		return -ENOMEM;
+	e->counters.pcnt = pcnt;
 
 	j = 0;
 	mtpar.net	= net;
