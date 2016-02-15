@@ -27,6 +27,30 @@
 #include <net/rtnetlink.h>
 #include <net/ip6_fib.h>
 
+#ifdef CONFIG_MODULES
+
+static const char *lwtunnel_encap_str(enum lwtunnel_encap_types encap_type)
+{
+	switch (encap_type) {
+	case LWTUNNEL_ENCAP_MPLS:
+		return "LWTUNNEL_ENCAP_MPLS";
+	case LWTUNNEL_ENCAP_IP:
+		return "LWTUNNEL_ENCAP_IP";
+	case LWTUNNEL_ENCAP_ILA:
+		return "LWTUNNEL_ENCAP_ILA";
+	case LWTUNNEL_ENCAP_IP6:
+		return "LWTUNNEL_ENCAP_IP6";
+	case LWTUNNEL_ENCAP_NONE:
+	case __LWTUNNEL_ENCAP_MAX:
+		/* should not have got here */
+		break;
+	}
+	WARN_ON(1);
+	return "LWTUNNEL_ENCAP_NONE";
+}
+
+#endif /* CONFIG_MODULES */
+
 struct lwtunnel_state *lwtunnel_state_alloc(int encap_len)
 {
 	struct lwtunnel_state *lws;
@@ -85,6 +109,14 @@ int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
 	ret = -EOPNOTSUPP;
 	rcu_read_lock();
 	ops = rcu_dereference(lwtun_encaps[encap_type]);
+#ifdef CONFIG_MODULES
+	if (!ops) {
+		rcu_read_unlock();
+		request_module("rtnl-lwt-%s", lwtunnel_encap_str(encap_type));
+		rcu_read_lock();
+		ops = rcu_dereference(lwtun_encaps[encap_type]);
+	}
+#endif
 	if (likely(ops && ops->build_state))
 		ret = ops->build_state(dev, encap, family, cfg, lws);
 	rcu_read_unlock();
