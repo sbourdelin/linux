@@ -163,7 +163,14 @@ restart:
 		}
 
 		hci_uart_tx_complete(hu, hci_skb_pkt_type(skb));
-		kfree_skb(skb);
+#ifdef CONFIG_BT_HCIUART_MRVL
+		if (hu->proto->id == HCI_UART_MRVL &&
+		    !test_bit(HCI_UART_DNLD_FW, &hu->flags)) {
+#endif
+			kfree_skb(skb);
+#ifdef CONFIG_BT_HCIUART_MRVL
+		}
+#endif
 	}
 
 	if (test_bit(HCI_UART_TX_WAKEUP, &hu->tx_state))
@@ -805,6 +812,9 @@ static int __init hci_uart_init(void)
 	qca_init();
 #endif
 
+#ifdef CONFIG_BT_HCIUART_MRVL
+	mrvl_init();
+#endif
 	return 0;
 }
 
@@ -835,6 +845,9 @@ static void __exit hci_uart_exit(void)
 #endif
 #ifdef CONFIG_BT_HCIUART_QCA
 	qca_deinit();
+#endif
+#ifdef CONFIG_BT_HCIUART_MRVL
+	mrvl_deinit();
 #endif
 
 	/* Release tty registration of line discipline */
