@@ -938,7 +938,10 @@ static int ideapad_acpi_add(struct platform_device *pdev)
 	priv->cfg = cfg;
 	priv->adev = adev;
 	priv->platform_device = pdev;
-	priv->has_hw_rfkill_switch = !dmi_check_system(no_hw_rfkill_list);
+	if (!dmi_get_date(DMI_BIOS_DATE, &i, NULL, NULL))
+		i = 2015;
+	priv->has_hw_rfkill_switch = (i < 2016) &&
+		!dmi_check_system(no_hw_rfkill_list);
 
 	ret = ideapad_sysfs_init(priv);
 	if (ret)
