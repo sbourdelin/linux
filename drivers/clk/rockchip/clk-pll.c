@@ -90,9 +90,15 @@ static long rockchip_pll_round_rate(struct clk_hw *hw,
  */
 static int rockchip_pll_wait_lock(struct rockchip_clk_pll *pll)
 {
-	struct regmap *grf = rockchip_clk_get_grf();
+	struct regmap *grf;
 	unsigned int val;
 	int delay = 24000000, ret;
+
+	grf = rockchip_clk_get_grf();
+	if (IS_ERR(grf)) {
+		pr_err("%s: grf regmap not available\n", __func__);
+		return -ENODEV;
+	}
 
 	while (delay > 0) {
 		ret = regmap_read(grf, pll->lock_offset, &val);
