@@ -530,6 +530,29 @@ int snd_ctl_remove_id(struct snd_card *card, struct snd_ctl_elem_id *id)
 EXPORT_SYMBOL(snd_ctl_remove_id);
 
 /**
+ * snd_ctl_remove_id_locked - remove the control of the given id and release it
+ * @card: the card instance
+ * @id: the control id to remove
+ *
+ * Finds the control instance with the given id, removes it from the
+ * card list and releases it.
+ *
+ * Return: 0 if successful, or a negative error code on failure.
+ */
+int snd_ctl_remove_id_locked(struct snd_card *card, struct snd_ctl_elem_id *id)
+{
+	struct snd_kcontrol *kctl;
+	int ret;
+
+	kctl = snd_ctl_find_id(card, id);
+	if (kctl == NULL)
+		return -ENOENT;
+	ret = snd_ctl_remove(card, kctl);
+	return ret;
+}
+EXPORT_SYMBOL(snd_ctl_remove_id_locked);
+
+/**
  * snd_ctl_remove_user_ctl - remove and release the unlocked user control
  * @file: active control handle
  * @id: the control id to remove
