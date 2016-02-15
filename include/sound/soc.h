@@ -396,6 +396,7 @@ struct snd_soc_dai_link;
 struct snd_soc_platform_driver;
 struct snd_soc_codec;
 struct snd_soc_codec_driver;
+struct snd_soc_codec_conf;
 struct snd_soc_component;
 struct snd_soc_component_driver;
 struct soc_enum;
@@ -1074,6 +1075,7 @@ struct snd_soc_codec_conf {
 	 * associated per device
 	 */
 	const char *name_prefix;
+	struct list_head list; /* codec_conf list of the soc card */
 };
 
 struct snd_soc_aux_dev {
@@ -1140,8 +1142,9 @@ struct snd_soc_card {
 	int num_rtd;
 
 	/* optional codec specific configuration */
-	struct snd_soc_codec_conf *codec_conf;
+	struct snd_soc_codec_conf *codec_conf; /* predefined configs only */
 	int num_configs;
+	struct list_head codec_conf_list; /* all configs */
 
 	/*
 	 * optional auxiliary devices such as amplifiers or codecs with DAI
@@ -1687,6 +1690,11 @@ void snd_soc_remove_dai_link(struct snd_soc_card *card,
 int snd_soc_add_dailink(struct snd_soc_card *card,
 			struct snd_soc_dai_link *dai_link);
 void snd_soc_remove_dailink(struct snd_soc_card *card, const char *link_name);
+
+void snd_soc_add_codec_config(struct snd_soc_card *card,
+			      struct snd_soc_codec_conf *codec_conf);
+void snd_soc_remove_codec_config(struct snd_soc_card *card,
+				 const char *dev_name);
 
 int snd_soc_register_dai(struct snd_soc_component *component,
 	struct snd_soc_dai_driver *dai_drv);
