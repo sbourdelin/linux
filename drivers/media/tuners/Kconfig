@@ -277,4 +277,18 @@ config MEDIA_TUNER_QM1D1C0042
 	default m if !MEDIA_SUBDRV_AUTOSELECT
 	help
 	  Sharp QM1D1C0042 trellis coded 8PSK tuner driver.
+
+config MEDIA_TUNER_NM131
+	tristate "Newport Media tuners NM131, NM130 and NM120"
+	depends on MEDIA_SUPPORT && I2C
+	default m if !MEDIA_SUBDRV_AUTOSELECT
+	help
+	  Newport Media NM131, NM130 and NM120 tuner driver.
+
+config MEDIA_TUNER_TDA2014X
+	tristate "NXP Semiconductors TDA2014x tuner"
+	depends on MEDIA_SUPPORT && I2C
+	default m if !MEDIA_SUBDRV_AUTOSELECT
+	help
+	  NXP Semiconductor TDA2014x tuner driver.
 endmenu
