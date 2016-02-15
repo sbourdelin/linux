@@ -514,10 +514,8 @@ gigaset_tty_open(struct tty_struct *tty)
 
 	/* allocate memory for our device state and initialize it */
 	cs = gigaset_initcs(driver, 1, 1, 0, cidmode, GIGASET_MODULENAME);
-	if (!cs) {
-		rc = -ENODEV;
-		goto error;
-	}
+	if (!cs)
+		return -ENODEV;
 
 	cs->dev = &cs->hw.ser->dev.dev;
 	cs->hw.ser->tty = tty;
