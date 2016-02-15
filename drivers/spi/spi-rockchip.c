@@ -28,6 +28,10 @@
 #include <linux/io.h>
 #include <linux/dmaengine.h>
 
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#endif
+
 #define DRIVER_NAME "rockchip-spi"
 
 /* SPI register offsets */
@@ -199,7 +203,80 @@ struct rockchip_spi {
 	struct sg_table rx_sg;
 	struct rockchip_spi_dma_data dma_rx;
 	struct rockchip_spi_dma_data dma_tx;
+
+	#ifdef CONFIG_DEBUG_FS
+	struct dentry *debugfs;
+	#endif
 };
+
+#ifdef CONFIG_DEBUG_FS
+static int rockchip_spi_dbg_show(struct seq_file *s, void *v)
+{
+	struct rockchip_spi *rs = s->private;
+
+	seq_printf(s, "CTRLR0:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_CTRLR0));
+	seq_printf(s, "CTRLR1:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_CTRLR1));
+	seq_printf(s, "BAUDR:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_BAUDR));
+	seq_printf(s, "TXFTLR:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_TXFTLR));
+	seq_printf(s, "RXFTLR:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_RXFTLR));
+	seq_printf(s, "SR:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_SR));
+	seq_printf(s, "ISR:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_ISR));
+	seq_printf(s, "DMACR:\t0x%08x\n",
+		   readl_relaxed(rs->regs + ROCKCHIP_SPI_DMACR));
+	seq_printf(s, "rs->state:\t0x%08x\n", rs->state);
+	seq_printf(s, "rs->speed:\t0x%08x\n", rs->speed);
+	seq_printf(s, "rs->tmode:\t0x%08x\n", rs->tmode);
+	seq_printf(s, "rs->mode:\t0x%08x\n", rs->mode);
+
+	return 0;
+}
+
+static int rockchip_spi_dbg_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, rockchip_spi_dbg_show, inode->i_private);
+}
+
+static const struct file_operations rockchip_spi_dbg_ops = {
+	.owner          = THIS_MODULE,
+	.open           = rockchip_spi_dbg_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int rockchip_spi_debugfs_init(struct rockchip_spi *rs)
+{
+	rs->debugfs = debugfs_create_dir("rockchip_spi", NULL);
+	if (!rs->debugfs)
+		return -ENOMEM;
+
+	debugfs_create_file("regs", S_IFREG | S_IRUGO,
+		rs->debugfs, (void *)rs, &rockchip_spi_dbg_ops);
+	return 0;
+}
+
+static void rockchip_spi_debugfs_remove(struct rockchip_spi *rs)
+{
+	debugfs_remove_recursive(rs->debugfs);
+}
+#else
+static inline int rockchip_spi_debugfs_init(struct rockchip_spi *rs)
+{
+	return 0;
+}
+
+static inline void rockchip_spi_debugfs_remove(struct rockchip_spi *rs)
+{
+}
+#endif /* CONFIG_DEBUG_FS */
+
 
 static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
 {
@@ -746,6 +823,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
 		goto err_register_master;
 	}
 
+	rockchip_spi_debugfs_init(rs);
 	return 0;
 
 err_register_master:
@@ -770,6 +848,7 @@ static int rockchip_spi_remove(struct platform_device *pdev)
 	struct rockchip_spi *rs = spi_master_get_devdata(master);
 
 	pm_runtime_disable(&pdev->dev);
+	rockchip_spi_debugfs_remove(rs);
 
 	clk_disable_unprepare(rs->spiclk);
 	clk_disable_unprepare(rs->apb_pclk);
