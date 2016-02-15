@@ -4076,6 +4076,11 @@ struct sk_buff *skb_checksum_trimmed(struct sk_buff *skb,
 	struct sk_buff *skb_chk;
 	unsigned int offset = skb_transport_offset(skb);
 	__sum16 ret;
+	int ip_summed;
+	int csum_valid;
+	int csum_level;
+	int csum_bad;
+	__wsum csum;
 
 	skb_chk = skb_checksum_maybe_trim(skb, transport_len);
 	if (!skb_chk)
@@ -4084,9 +4089,21 @@ struct sk_buff *skb_checksum_trimmed(struct sk_buff *skb,
 	if (!pskb_may_pull(skb_chk, offset))
 		goto err;
 
-	__skb_pull(skb_chk, offset);
+	ip_summed = skb->ip_summed;
+	csum_valid = skb->csum_valid;
+	csum_level = skb->csum_level;
+	csum_bad = skb->csum_bad;
+	csum = skb->csum;
+
+	skb_pull_rcsum(skb_chk, offset);
 	ret = skb_chkf(skb_chk);
 	__skb_push(skb_chk, offset);
+
+	skb->ip_summed = ip_summed;
+	skb->csum_valid = csum_valid;
+	skb->csum_level = csum_level;
+	skb->csum_bad = csum_bad;
+	skb->csum = csum;
 
 	if (ret)
 		goto err;
