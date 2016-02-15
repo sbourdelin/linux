@@ -44,6 +44,28 @@ void __init usb_init_pool_max(void)
 
 /* SETUP primitives */
 
+static int _hcd_buffer_create(struct usb_hcd *hcd)
+{
+#ifdef CONFIG_HAS_DMA
+	char		name[16];
+	int		i, size;
+
+	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
+		size = pool_max[i];
+		if (!size)
+			continue;
+		snprintf(name, sizeof(name), "buffer-%d", size);
+		hcd->pool[i] = dma_pool_create(name, hcd->self.controller,
+				size, size, 0);
+		if (!hcd->pool[i]) {
+			hcd_buffer_destroy(hcd);
+			return -ENOMEM;
+		}
+	}
+#endif
+	return 0;
+}
+
 /**
  * hcd_buffer_create - initialize buffer pools
  * @hcd: the bus whose buffer pools are to be initialized
@@ -59,26 +81,11 @@ void __init usb_init_pool_max(void)
  */
 int hcd_buffer_create(struct usb_hcd *hcd)
 {
-	char		name[16];
-	int		i, size;
-
 	if (!hcd->self.controller->dma_mask &&
 	    !(hcd->driver->flags & HCD_LOCAL_MEM))
 		return 0;
 
-	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		size = pool_max[i];
-		if (!size)
-			continue;
-		snprintf(name, sizeof(name), "buffer-%d", size);
-		hcd->pool[i] = dma_pool_create(name, hcd->self.controller,
-				size, size, 0);
-		if (!hcd->pool[i]) {
-			hcd_buffer_destroy(hcd);
-			return -ENOMEM;
-		}
-	}
-	return 0;
+	return _hcd_buffer_create(hcd);
 }
 
 
@@ -91,6 +98,7 @@ int hcd_buffer_create(struct usb_hcd *hcd)
  */
 void hcd_buffer_destroy(struct usb_hcd *hcd)
 {
+#ifdef CONFIG_HAS_DMA
 	int i;
 
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
@@ -101,12 +109,34 @@ void hcd_buffer_destroy(struct usb_hcd *hcd)
 			hcd->pool[i] = NULL;
 		}
 	}
+#endif
 }
 
 
 /* sometimes alloc/free could use kmalloc with GFP_DMA, for
  * better sharing and to leverage mm/slab.c intelligence.
  */
+
+static void *_hcd_buffer_alloc(
+	struct usb_hcd		*hcd,
+	size_t			size,
+	gfp_t			mem_flags,
+	dma_addr_t		*dma
+)
+{
+#ifdef CONFIG_HAS_DMA
+	int			i;
+
+	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
+		if (size <= pool_max[i])
+			return dma_pool_alloc(hcd->pool[i], mem_flags, dma);
+	}
+	return dma_alloc_coherent(hcd->self.controller, size, dma, mem_flags);
+#else
+	WARN_ON_NO_DMA();
+	return NULL;
+#endif
+}
 
 void *hcd_buffer_alloc(
 	struct usb_bus		*bus,
@@ -116,7 +146,6 @@ void *hcd_buffer_alloc(
 )
 {
 	struct usb_hcd		*hcd = bus_to_hcd(bus);
-	int			i;
 
 	/* some USB hosts just use PIO */
 	if (!bus->controller->dma_mask &&
@@ -125,11 +154,27 @@ void *hcd_buffer_alloc(
 		return kmalloc(size, mem_flags);
 	}
 
+	return _hcd_buffer_alloc(hcd, size, mem_flags, dma);
+}
+
+static void _hcd_buffer_free(
+	struct usb_hcd		*hcd,
+	size_t			size,
+	void			*addr,
+	dma_addr_t		dma
+)
+{
+#ifdef CONFIG_HAS_DMA
+	int			i;
+
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		if (size <= pool_max[i])
-			return dma_pool_alloc(hcd->pool[i], mem_flags, dma);
+		if (size <= pool_max[i]) {
+			dma_pool_free(hcd->pool[i], addr, dma);
+			return;
+		}
 	}
-	return dma_alloc_coherent(hcd->self.controller, size, dma, mem_flags);
+	dma_free_coherent(hcd->self.controller, size, addr, dma);
+#endif
 }
 
 void hcd_buffer_free(
@@ -140,7 +185,6 @@ void hcd_buffer_free(
 )
 {
 	struct usb_hcd		*hcd = bus_to_hcd(bus);
-	int			i;
 
 	if (!addr)
 		return;
@@ -151,11 +195,5 @@ void hcd_buffer_free(
 		return;
 	}
 
-	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
-		if (size <= pool_max[i]) {
-			dma_pool_free(hcd->pool[i], addr, dma);
-			return;
-		}
-	}
-	dma_free_coherent(hcd->self.controller, size, addr, dma);
+	_hcd_buffer_free(hcd, size, addr, dma);
 }

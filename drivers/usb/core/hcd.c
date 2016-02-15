@@ -1426,13 +1426,76 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
 	*dma_handle = 0;
 }
 
+#ifdef CONFIG_HAS_DMA
+static void _usb_hcd_unmap_urb_setup_for_dma_single(struct usb_hcd *hcd,
+						    struct urb *urb)
+{
+	dma_unmap_single(hcd->self.controller,
+			urb->setup_dma,
+			sizeof(struct usb_ctrlrequest),
+			DMA_TO_DEVICE);
+}
+
+static void _usb_hcd_unmap_urb_for_dma_sg(struct usb_hcd *hcd,
+					  struct urb *urb,
+					  enum dma_data_direction dir)
+{
+	dma_unmap_sg(hcd->self.controller,
+			urb->sg,
+			urb->num_sgs,
+			dir);
+}
+
+static void _usb_hcd_unmap_urb_for_dma_page(struct usb_hcd *hcd,
+					    struct urb *urb,
+					    enum dma_data_direction dir)
+{
+	dma_unmap_page(hcd->self.controller,
+			urb->transfer_dma,
+			urb->transfer_buffer_length,
+			dir);
+}
+
+static void _usb_hcd_unmap_urb_for_dma_single(struct usb_hcd *hcd,
+					      struct urb *urb,
+					      enum dma_data_direction dir)
+{
+	dma_unmap_single(hcd->self.controller,
+			urb->transfer_dma,
+			urb->transfer_buffer_length,
+			dir);
+}
+
+#else /* !CONFIG_HAS_DMA */
+
+static void _usb_hcd_unmap_urb_setup_for_dma_single(struct usb_hcd *hcd,
+						    struct urb *urb)
+{
+}
+
+static void _usb_hcd_unmap_urb_for_dma_sg(struct usb_hcd *hcd,
+					  struct urb *urb,
+					  enum dma_data_direction dir)
+{
+}
+
+static void _usb_hcd_unmap_urb_for_dma_page(struct usb_hcd *hcd,
+					    struct urb *urb,
+					    enum dma_data_direction dir)
+{
+}
+
+static void _usb_hcd_unmap_urb_for_dma_single(struct usb_hcd *hcd,
+					      struct urb *urb,
+					      enum dma_data_direction dir)
+{
+}
+#endif
+
 void usb_hcd_unmap_urb_setup_for_dma(struct usb_hcd *hcd, struct urb *urb)
 {
 	if (urb->transfer_flags & URB_SETUP_MAP_SINGLE)
-		dma_unmap_single(hcd->self.controller,
-				urb->setup_dma,
-				sizeof(struct usb_ctrlrequest),
-				DMA_TO_DEVICE);
+		_usb_hcd_unmap_urb_setup_for_dma_single(hcd, urb);
 	else if (urb->transfer_flags & URB_SETUP_MAP_LOCAL)
 		hcd_free_coherent(urb->dev->bus,
 				&urb->setup_dma,
@@ -1461,20 +1524,11 @@ void usb_hcd_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 	if (urb->transfer_flags & URB_DMA_MAP_SG)
-		dma_unmap_sg(hcd->self.controller,
-				urb->sg,
-				urb->num_sgs,
-				dir);
+		_usb_hcd_unmap_urb_for_dma_sg(hcd, urb, dir);
 	else if (urb->transfer_flags & URB_DMA_MAP_PAGE)
-		dma_unmap_page(hcd->self.controller,
-				urb->transfer_dma,
-				urb->transfer_buffer_length,
-				dir);
+		_usb_hcd_unmap_urb_for_dma_page(hcd, urb, dir);
 	else if (urb->transfer_flags & URB_DMA_MAP_SINGLE)
-		dma_unmap_single(hcd->self.controller,
-				urb->transfer_dma,
-				urb->transfer_buffer_length,
-				dir);
+		_usb_hcd_unmap_urb_for_dma_single(hcd, urb, dir);
 	else if (urb->transfer_flags & URB_MAP_LOCAL)
 		hcd_free_coherent(urb->dev->bus,
 				&urb->transfer_dma,
@@ -1497,6 +1551,124 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 		return usb_hcd_map_urb_for_dma(hcd, urb, mem_flags);
 }
 
+#ifdef CONFIG_HAS_DMA
+static int _usb_hcd_map_urb_setup_for_dma_single(struct usb_hcd *hcd,
+						 struct urb *urb)
+{
+	int ret = 0;
+
+	urb->setup_dma = dma_map_single(
+			hcd->self.controller,
+			urb->setup_packet,
+			sizeof(struct usb_ctrlrequest),
+			DMA_TO_DEVICE);
+	if (dma_mapping_error(hcd->self.controller,
+				urb->setup_dma))
+		ret = -EAGAIN;
+	else
+		urb->transfer_flags |= URB_SETUP_MAP_SINGLE;
+
+	return ret;
+}
+
+static int _usb_hcd_map_urb_for_dma_sg(struct usb_hcd *hcd, struct urb *urb,
+				       enum dma_data_direction dir)
+{
+	int ret = 0;
+	int n;
+
+	n = dma_map_sg(
+			hcd->self.controller,
+			urb->sg,
+			urb->num_sgs,
+			dir);
+	if (n <= 0)
+		ret = -EAGAIN;
+	else
+		urb->transfer_flags |= URB_DMA_MAP_SG;
+
+	urb->num_mapped_sgs = n;
+	if (n != urb->num_sgs)
+		urb->transfer_flags |=
+				URB_DMA_SG_COMBINED;
+
+	return ret;
+}
+
+static int _usb_hcd_map_urb_for_dma_page(struct usb_hcd *hcd, struct urb *urb,
+					 enum dma_data_direction dir)
+{
+	int ret = 0;
+	struct scatterlist *sg = urb->sg;
+
+	urb->transfer_dma = dma_map_page(
+			hcd->self.controller,
+			sg_page(sg),
+			sg->offset,
+			urb->transfer_buffer_length,
+			dir);
+	if (dma_mapping_error(hcd->self.controller,
+			urb->transfer_dma))
+		ret = -EAGAIN;
+	else
+		urb->transfer_flags |= URB_DMA_MAP_PAGE;
+
+	return ret;
+}
+
+static int _usb_hcd_map_urb_for_dma_single(struct usb_hcd *hcd,
+					   struct urb *urb,
+					   enum dma_data_direction dir)
+{
+	int ret = 0;
+
+	urb->transfer_dma = dma_map_single(
+		hcd->self.controller,
+		urb->transfer_buffer,
+		urb->transfer_buffer_length,
+		dir);
+	if (dma_mapping_error(hcd->self.controller,
+			urb->transfer_dma))
+		ret = -EAGAIN;
+	else
+		urb->transfer_flags |= URB_DMA_MAP_SINGLE;
+
+	return ret;
+}
+
+
+#else /* !CONFIG_HAS_DMA */
+
+static int _usb_hcd_map_urb_setup_for_dma_single(struct usb_hcd *hcd,
+						 struct urb *urb)
+{
+	WARN_ON_NO_DMA();
+	return -EINVAL;
+}
+
+static int _usb_hcd_map_urb_for_dma_sg(struct usb_hcd *hcd, struct urb *urb,
+				       enum dma_data_direction dir)
+{
+	WARN_ON_NO_DMA();
+	return -EINVAL;
+}
+
+static int _usb_hcd_map_urb_for_dma_page(struct usb_hcd *hcd, struct urb *urb,
+					 enum dma_data_direction dir)
+{
+	WARN_ON_NO_DMA();
+	return -EINVAL;
+}
+
+static int _usb_hcd_map_urb_for_dma_single(struct usb_hcd *hcd,
+					   struct urb *urb,
+					   enum dma_data_direction dir)
+{
+	WARN_ON_NO_DMA();
+	return -EINVAL;
+}
+#endif
+
 int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 			    gfp_t mem_flags)
 {
@@ -1513,15 +1685,9 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 		if (hcd->self.uses_pio_for_control)
 			return ret;
 		if (hcd->self.uses_dma) {
-			urb->setup_dma = dma_map_single(
-					hcd->self.controller,
-					urb->setup_packet,
-					sizeof(struct usb_ctrlrequest),
-					DMA_TO_DEVICE);
-			if (dma_mapping_error(hcd->self.controller,
-						urb->setup_dma))
-				return -EAGAIN;
-			urb->transfer_flags |= URB_SETUP_MAP_SINGLE;
+			ret = _usb_hcd_map_urb_setup_for_dma_single(hcd, urb);
+			if (ret)
+				return ret;
 		} else if (hcd->driver->flags & HCD_LOCAL_MEM) {
 			ret = hcd_alloc_coherent(
 					urb->dev->bus, mem_flags,
@@ -1540,54 +1706,19 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 	    && !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP)) {
 		if (hcd->self.uses_dma) {
 			if (urb->num_sgs) {
-				int n;
-
 				/* We don't support sg for isoc transfers ! */
 				if (usb_endpoint_xfer_isoc(&urb->ep->desc)) {
 					WARN_ON(1);
 					return -EINVAL;
 				}
-
-				n = dma_map_sg(
-						hcd->self.controller,
-						urb->sg,
-						urb->num_sgs,
-						dir);
-				if (n <= 0)
-					ret = -EAGAIN;
-				else
-					urb->transfer_flags |= URB_DMA_MAP_SG;
-				urb->num_mapped_sgs = n;
-				if (n != urb->num_sgs)
-					urb->transfer_flags |=
-							URB_DMA_SG_COMBINED;
+				ret = _usb_hcd_map_urb_for_dma_sg(hcd, urb, dir);
 			} else if (urb->sg) {
-				struct scatterlist *sg = urb->sg;
-				urb->transfer_dma = dma_map_page(
-						hcd->self.controller,
-						sg_page(sg),
-						sg->offset,
-						urb->transfer_buffer_length,
-						dir);
-				if (dma_mapping_error(hcd->self.controller,
-						urb->transfer_dma))
-					ret = -EAGAIN;
-				else
-					urb->transfer_flags |= URB_DMA_MAP_PAGE;
+				ret = _usb_hcd_map_urb_for_dma_page(hcd, urb, dir);
 			} else if (is_vmalloc_addr(urb->transfer_buffer)) {
 				WARN_ONCE(1, "transfer buffer not dma capable\n");
 				ret = -EAGAIN;
 			} else {
-				urb->transfer_dma = dma_map_single(
-						hcd->self.controller,
-						urb->transfer_buffer,
-						urb->transfer_buffer_length,
-						dir);
-				if (dma_mapping_error(hcd->self.controller,
-						urb->transfer_dma))
-					ret = -EAGAIN;
-				else
-					urb->transfer_flags |= URB_DMA_MAP_SINGLE;
+				ret = _usb_hcd_map_urb_for_dma_single(hcd, urb, dir);
 			}
 		} else if (hcd->driver->flags & HCD_LOCAL_MEM) {
 			ret = hcd_alloc_coherent(

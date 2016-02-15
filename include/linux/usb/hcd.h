@@ -410,6 +410,12 @@ static inline bool hcd_periodic_completion_in_progress(struct usb_hcd *hcd,
 	return hcd->high_prio_bh.completing_ep == ep;
 }
 
+#ifndef CONFIG_HAS_DMA
+/* If this ever triggers, the correct fix is almost certainly
+ * to add a CONFIG_HAS_DMA dependency in the Kconfig for that driver. */
+#define WARN_ON_NO_DMA() WARN_ONCE(1, "HCD driver tried to use DMA memory")
+#endif
+
 extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);
 extern int usb_hcd_check_unlink_urb(struct usb_hcd *hcd, struct urb *urb,
 		int status);
