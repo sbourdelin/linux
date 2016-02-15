@@ -658,17 +658,30 @@ EXPORT_SYMBOL(make_flow_keys_digest);
  *
  * This function calculates a flow hash based on src/dst addresses
  * and src/dst port numbers.  Sets hash in skb to non-zero hash value
- * on success, zero indicates no valid hash.  Also, sets l4_hash in skb
- * if hash is a canonical 4-tuple hash over transport ports.
+ * on success, zero indicates no valid hash in which case the hash type
+ * is set to NONE. If the hash is a canonical 4-tuple hash over transport
+ * ports then type is set to L4. If the hash did not include transport
+ * then type is set to L3, otherwise it is assumed to be L2 only.
  */
 void __skb_get_hash(struct sk_buff *skb)
 {
 	struct flow_keys keys;
+	u32 hash;
+	enum pkt_hash_types type;
 
 	__flow_hash_secret_init();
 
-	__skb_set_sw_hash(skb, ___skb_get_hash(skb, &keys, hashrnd),
-			  flow_keys_have_l4(&keys));
+	hash = ___skb_get_hash(skb, &keys, hashrnd);
+	if (hash == 0)
+		type = PKT_HASH_TYPE_NONE;
+	else if (flow_keys_have_l4(&keys))
+		type = PKT_HASH_TYPE_L4;
+	else if (flow_keys_have_l3(&keys))
+		type = PKT_HASH_TYPE_L3;
+	else
+		type = PKT_HASH_TYPE_L2;
+
+	__skb_set_sw_hash(skb, hash, type);
 }
 EXPORT_SYMBOL(__skb_get_hash);
 
@@ -698,7 +711,8 @@ __u32 __skb_get_hash_flowi6(struct sk_buff *skb, const struct flowi6 *fl6)
 	keys.basic.ip_proto = fl6->flowi6_proto;
 
 	__skb_set_sw_hash(skb, flow_hash_from_keys(&keys),
-			  flow_keys_have_l4(&keys));
+			  flow_keys_have_l4(&keys) ?
+			  PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3);
 
 	return skb->hash;
 }
@@ -719,7 +733,8 @@ __u32 __skb_get_hash_flowi4(struct sk_buff *skb, const struct flowi4 *fl4)
 	keys.basic.ip_proto = fl4->flowi4_proto;
 
 	__skb_set_sw_hash(skb, flow_hash_from_keys(&keys),
-			  flow_keys_have_l4(&keys));
+			  flow_keys_have_l4(&keys) ?
+			  PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3);
 
 	return skb->hash;
 }

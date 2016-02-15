@@ -595,8 +595,7 @@ static inline bool skb_mstamp_after(const struct skb_mstamp *t1,
  *	@xmit_more: More SKBs are pending for this queue
  *	@ndisc_nodetype: router type (from link layer)
  *	@ooo_okay: allow the mapping of a socket to a queue to be changed
- *	@l4_hash: indicate hash is a canonical 4-tuple hash over transport
- *		ports.
+ *	@hash_type: indicates type of hash (see enum pkt_hash_types below)
  *	@sw_hash: indicates hash was computed in software stack
  *	@wifi_acked_valid: wifi_acked was set
  *	@wifi_acked: whether frame was acked on wifi or not
@@ -701,10 +700,10 @@ struct sk_buff {
 	__u8			nf_trace:1;
 	__u8			ip_summed:2;
 	__u8			ooo_okay:1;
-	__u8			l4_hash:1;
 	__u8			sw_hash:1;
 	__u8			wifi_acked_valid:1;
 	__u8			wifi_acked:1;
+	/* 1 bit hole */
 
 	__u8			no_fcs:1;
 	/* Indicates the inner headers are valid in the skbuff. */
@@ -721,7 +720,8 @@ struct sk_buff {
 	__u8			ipvs_property:1;
 	__u8			inner_protocol_type:1;
 	__u8			remcsum_offload:1;
-	/* 3 or 5 bit hole */
+	__u8			hash_type:2;
+	/* 1 or 3 bit hole */
 
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
@@ -1030,19 +1030,35 @@ static inline void skb_clear_hash(struct sk_buff *skb)
 {
 	skb->hash = 0;
 	skb->sw_hash = 0;
-	skb->l4_hash = 0;
+	skb->hash_type = 0;
+}
+
+static inline enum pkt_hash_types skb_hash_type(struct sk_buff *skb)
+{
+	return skb->hash_type;
+}
+
+static inline bool skb_has_l4_hash(struct sk_buff *skb)
+{
+	return skb_hash_type(skb) == PKT_HASH_TYPE_L4;
+}
+
+static inline bool skb_has_sw_hash(struct sk_buff *skb)
+{
+	return !!skb->sw_hash;
 }
 
 static inline void skb_clear_hash_if_not_l4(struct sk_buff *skb)
 {
-	if (!skb->l4_hash)
+	if (!skb_has_l4_hash(skb))
 		skb_clear_hash(skb);
 }
 
 static inline void
-__skb_set_hash(struct sk_buff *skb, __u32 hash, bool is_sw, bool is_l4)
+__skb_set_hash(struct sk_buff *skb, __u32 hash, bool is_sw,
+	       enum pkt_hash_types type)
 {
-	skb->l4_hash = is_l4;
+	skb->hash_type = type;
 	skb->sw_hash = is_sw;
 	skb->hash = hash;
 }
@@ -1051,13 +1067,13 @@ static inline void
 skb_set_hash(struct sk_buff *skb, __u32 hash, enum pkt_hash_types type)
 {
 	/* Used by drivers to set hash from HW */
-	__skb_set_hash(skb, hash, false, type == PKT_HASH_TYPE_L4);
+	__skb_set_hash(skb, hash, false, type);
 }
 
 static inline void
-__skb_set_sw_hash(struct sk_buff *skb, __u32 hash, bool is_l4)
+__skb_set_sw_hash(struct sk_buff *skb, __u32 hash, enum pkt_hash_types type)
 {
-	__skb_set_hash(skb, hash, true, is_l4);
+	__skb_set_hash(skb, hash, true, type);
 }
 
 void __skb_get_hash(struct sk_buff *skb);
@@ -1110,9 +1126,10 @@ static inline bool skb_flow_dissect_flow_keys_buf(struct flow_keys *flow,
 				  data, proto, nhoff, hlen, flags);
 }
 
+
 static inline __u32 skb_get_hash(struct sk_buff *skb)
 {
-	if (!skb->l4_hash && !skb->sw_hash)
+	if (!skb_has_l4_hash(skb) && !skb_has_sw_hash(skb))
 		__skb_get_hash(skb);
 
 	return skb->hash;
@@ -1122,11 +1139,12 @@ __u32 __skb_get_hash_flowi6(struct sk_buff *skb, const struct flowi6 *fl6);
 
 static inline __u32 skb_get_hash_flowi6(struct sk_buff *skb, const struct flowi6 *fl6)
 {
-	if (!skb->l4_hash && !skb->sw_hash) {
+	if (!skb_has_l4_hash(skb) && !skb_has_sw_hash(skb)) {
 		struct flow_keys keys;
 		__u32 hash = __get_hash_from_flowi6(fl6, &keys);
 
-		__skb_set_sw_hash(skb, hash, flow_keys_have_l4(&keys));
+		__skb_set_sw_hash(skb, hash, flow_keys_have_l4(&keys) ?
+				  PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3);
 	}
 
 	return skb->hash;
@@ -1136,11 +1154,12 @@ __u32 __skb_get_hash_flowi4(struct sk_buff *skb, const struct flowi4 *fl);
 
 static inline __u32 skb_get_hash_flowi4(struct sk_buff *skb, const struct flowi4 *fl4)
 {
-	if (!skb->l4_hash && !skb->sw_hash) {
+	if (!skb_has_l4_hash(skb) && !skb_has_sw_hash(skb)) {
 		struct flow_keys keys;
 		__u32 hash = __get_hash_from_flowi4(fl4, &keys);
 
-		__skb_set_sw_hash(skb, hash, flow_keys_have_l4(&keys));
+		__skb_set_sw_hash(skb, hash, flow_keys_have_l4(&keys) ?
+				  PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3);
 	}
 
 	return skb->hash;
@@ -1157,7 +1176,7 @@ static inline void skb_copy_hash(struct sk_buff *to, const struct sk_buff *from)
 {
 	to->hash = from->hash;
 	to->sw_hash = from->sw_hash;
-	to->l4_hash = from->l4_hash;
+	to->hash_type = from->hash_type;
 };
 
 static inline void skb_sender_cpu_clear(struct sk_buff *skb)
