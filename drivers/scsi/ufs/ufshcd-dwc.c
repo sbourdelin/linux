@@ -1,0 +1,431 @@
+/*
+ * UFS Host driver for Synopsys Designware Core
+ *
+ * Copyright (C) 2015-2016 Synopsys, Inc. (www.synopsys.com)
+ *
+ * Authors: Joao Pinto <jpinto@synopsys.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+#include "ufshcd.h"
+#include "unipro.h"
+
+#include "ufshcd-dwc.h"
+#include "ufshci-dwc.h"
+
+struct ufshcd_dme_attr_val {
+	u32 attr_sel;
+	u32 mib_val;
+	u8 peer;
+};
+
+int ufshcd_dme_set_attrs(struct ufs_hba *hba,
+				const struct ufshcd_dme_attr_val *v, int n)
+{
+	int ret = 0;
+	int attr_node = 0;
+
+	for (attr_node = 0; attr_node < n; attr_node++) {
+		ret = ufshcd_dme_set_attr(hba, v[attr_node].attr_sel,
+			ATTR_SET_NOR, v[attr_node].mib_val, v[attr_node].peer);
+
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * ufshcd_dwc_program_clk_div()
+ * This function programs the clk divider value. This value is needed to
+ * provide 1 microsecond tick to unipro layer.
+ * @hba: Private Structure pointer
+ * @divider_val: clock divider value to be programmed
+ *
+ */
+static void ufshcd_dwc_program_clk_div(struct ufs_hba *hba, u32 divider_val)
+{
+	ufshcd_writel(hba, divider_val, DWC_UFS_REG_HCLKDIV);
+}
+
+/**
+ * ufshcd_dwc_link_is_up()
+ * Check if link is up
+ * @hba: private structure poitner
+ *
+ * Returns 0 on success, non-zero value on failure
+ */
+static int ufshcd_dwc_link_is_up(struct ufs_hba *hba)
+{
+	int dme_result = 0;
+
+	ufshcd_dme_get(hba, UIC_ARG_MIB(VS_POWERSTATE), &dme_result);
+
+	if (dme_result == UFSHCD_LINK_IS_UP) {
+		ufshcd_set_link_active(hba);
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * ufshcd_dwc_connection_setup()
+ * This function configures both the local side (host) and the peer side
+ * (device) unipro attributes to establish the connection to application/
+ * cport.
+ * This function is not required if the hardware is properly configured to
+ * have this connection setup on reset. But invoking this function does no
+ * harm and should be fine even working with any ufs device.
+ *
+ * @hba: pointer to drivers private data
+ *
+ * Returns 0 on success non-zero value on failure
+ */
+static int ufshcd_dwc_connection_setup(struct ufs_hba *hba)
+{
+	const struct ufshcd_dme_attr_val setup_attrs[] = {
+		{ UIC_ARG_MIB(T_CONNECTIONSTATE), 0, DME_LOCAL },
+		{ UIC_ARG_MIB(N_DEVICEID), 0, DME_LOCAL },
+		{ UIC_ARG_MIB(N_DEVICEID_VALID), 0, DME_LOCAL },
+		{ UIC_ARG_MIB(T_PEERDEVICEID), 1, DME_LOCAL },
+		{ UIC_ARG_MIB(T_PEERCPORTID), 0, DME_LOCAL },
+		{ UIC_ARG_MIB(T_TRAFFICCLASS), 0, DME_LOCAL },
+		{ UIC_ARG_MIB(T_CPORTFLAGS), 0x6, DME_LOCAL },
+		{ UIC_ARG_MIB(T_CPORTMODE), 1, DME_LOCAL },
+		{ UIC_ARG_MIB(T_CONNECTIONSTATE), 1, DME_LOCAL },
+		{ UIC_ARG_MIB(T_CONNECTIONSTATE), 0, DME_PEER },
+		{ UIC_ARG_MIB(N_DEVICEID), 1, DME_PEER },
+		{ UIC_ARG_MIB(N_DEVICEID_VALID), 1, DME_PEER },
+		{ UIC_ARG_MIB(T_PEERDEVICEID), 1, DME_PEER },
+		{ UIC_ARG_MIB(T_PEERCPORTID), 0, DME_PEER },
+		{ UIC_ARG_MIB(T_TRAFFICCLASS), 0, DME_PEER },
+		{ UIC_ARG_MIB(T_CPORTFLAGS), 0x6, DME_PEER },
+		{ UIC_ARG_MIB(T_CPORTMODE), 1, DME_PEER },
+		{ UIC_ARG_MIB(T_CONNECTIONSTATE), 1, DME_PEER }
+	};
+
+	return ufshcd_dme_set_attrs(hba, setup_attrs, ARRAY_SIZE(setup_attrs));
+}
+
+#ifdef CONFIG_SCSI_UFS_DWC_40BIT_RMMI
+/**
+ * ufshcd_dwc_setup_40bit_rmmi()
+ * This function configures Synopsys TC specific atributes (40-bit RMMI)
+ * @hba: Pointer to drivers structure
+ *
+ * Returns 0 on success or non-zero value on failure
+ */
+static int ufshcd_dwc_setup_40bit_rmmi(struct ufs_hba *hba)
+{
+	const struct ufshcd_dme_attr_val setup_attrs[] = {
+		{ UIC_ARG_MIB(TX_GLOBALHIBERNATE), 0x00, DME_LOCAL },
+		{ UIC_ARG_MIB(REFCLKMODE), 0x01, DME_LOCAL },
+		{ UIC_ARG_MIB(CDIRECTCTRL6), 0x80, DME_LOCAL },
+		{ UIC_ARG_MIB(CBDIVFACTOR), 0x08, DME_LOCAL },
+		{ UIC_ARG_MIB(CBDCOCTRL5), 0x64, DME_LOCAL },
+		{ UIC_ARG_MIB(CBPRGTUNING), 0x09, DME_LOCAL },
+		{ UIC_ARG_MIB(RTOBSERVESELECT), 0x00, DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(TX_REFCLKFREQ, SELIND_LN0_TX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(TX_CFGCLKFREQVAL, SELIND_LN0_TX), 0x19,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGEXTRATTR, SELIND_LN0_TX), 0x14,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(DITHERCTRL2, SELIND_LN0_TX), 0xd6,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RX_REFCLKFREQ, SELIND_LN0_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RX_CFGCLKFREQVAL, SELIND_LN0_RX), 0x19,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGWIDEINLN, SELIND_LN0_RX), 4,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXCDR8, SELIND_LN0_RX), 0x80,
+								DME_LOCAL },
+		{ UIC_ARG_MIB(DIRECTCTRL10), 0x04, DME_LOCAL },
+		{ UIC_ARG_MIB(DIRECTCTRL19), 0x02, DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXCDR8, SELIND_LN0_RX), 0x80,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG4, SELIND_LN0_RX), 0x03,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR8, SELIND_LN0_RX), 0x16,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXDIRECTCTRL2, SELIND_LN0_RX), 0x42,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG3, SELIND_LN0_RX), 0xa4,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXCALCTRL, SELIND_LN0_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG2, SELIND_LN0_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR4, SELIND_LN0_RX), 0x28,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXSQCTRL, SELIND_LN0_RX), 0x1E,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR6, SELIND_LN0_RX), 0x2f,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR6, SELIND_LN0_RX), 0x2f,
+								DME_LOCAL },
+		{ UIC_ARG_MIB(CBPRGPLL2), 0x00, DME_LOCAL },
+	};
+
+	return ufshcd_dme_set_attrs(hba, setup_attrs, ARRAY_SIZE(setup_attrs));
+}
+
+#endif
+
+#ifdef CONFIG_SCSI_UFS_DWC_20BIT_RMMI
+/**
+ * ufshcd_dwc_setup_20bit_rmmi_lane0()
+ * This function configures Synopsys TC 20-bit RMMI Lane 0
+ * @hba: Pointer to drivers structure
+ *
+ * Returns 0 on success or non-zero value on failure
+ */
+static int ufshcd_dwc_setup_20bit_rmmi_lane0(struct ufs_hba *hba)
+{
+	const struct ufshcd_dme_attr_val setup_attrs[] = {
+		{ UIC_ARG_MIB_SEL(TX_REFCLKFREQ, SELIND_LN0_TX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(TX_CFGCLKFREQVAL, SELIND_LN0_TX), 0x19,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RX_CFGCLKFREQVAL, SELIND_LN0_RX), 0x19,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGEXTRATTR, SELIND_LN0_TX), 0x12,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(DITHERCTRL2, SELIND_LN0_TX), 0xd6,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RX_REFCLKFREQ, SELIND_LN0_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGWIDEINLN, SELIND_LN0_RX), 2,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXCDR8, SELIND_LN0_RX), 0x80,
+								DME_LOCAL },
+		{ UIC_ARG_MIB(DIRECTCTRL10), 0x04, DME_LOCAL },
+		{ UIC_ARG_MIB(DIRECTCTRL19), 0x02, DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG4, SELIND_LN0_RX), 0x03,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR8, SELIND_LN0_RX), 0x16,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXDIRECTCTRL2, SELIND_LN0_RX), 0x42,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG3, SELIND_LN0_RX), 0xa4,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXCALCTRL, SELIND_LN0_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG2, SELIND_LN0_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR4, SELIND_LN0_RX), 0x28,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXSQCTRL, SELIND_LN0_RX), 0x1E,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR6, SELIND_LN0_RX), 0x2f,
+								DME_LOCAL },
+		{ UIC_ARG_MIB(CBPRGPLL2), 0x00, DME_LOCAL },
+	};
+
+	return ufshcd_dme_set_attrs(hba, setup_attrs, ARRAY_SIZE(setup_attrs));
+}
+
+/**
+ * ufshcd_dwc_setup_20bit_rmmi_lane1()
+ * This function configures Synopsys TC 20-bit RMMI Lane 1
+ * @hba: Pointer to drivers structure
+ *
+ * Returns 0 on success or non-zero value on failure
+ */
+static int ufshcd_dwc_setup_20bit_rmmi_lane1(struct ufs_hba *hba)
+{
+	int connected_rx_lanes = 0;
+	int connected_tx_lanes = 0;
+	int ret = 0;
+
+	const struct ufshcd_dme_attr_val setup_tx_attrs[] = {
+		{ UIC_ARG_MIB_SEL(TX_REFCLKFREQ, SELIND_LN1_TX), 0x0d,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(TX_CFGCLKFREQVAL, SELIND_LN1_TX), 0x19,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGEXTRATTR, SELIND_LN1_TX), 0x12,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(DITHERCTRL2, SELIND_LN0_TX), 0xd6,
+								DME_LOCAL },
+	};
+
+	const struct ufshcd_dme_attr_val setup_rx_attrs[] = {
+		{ UIC_ARG_MIB_SEL(RX_REFCLKFREQ, SELIND_LN1_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RX_CFGCLKFREQVAL, SELIND_LN1_RX), 0x19,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGWIDEINLN, SELIND_LN1_RX), 2,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXCDR8, SELIND_LN1_RX), 0x80,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG4, SELIND_LN1_RX), 0x03,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR8, SELIND_LN1_RX), 0x16,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXDIRECTCTRL2, SELIND_LN1_RX), 0x42,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG3, SELIND_LN1_RX), 0xa4,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXCALCTRL, SELIND_LN1_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(ENARXDIRECTCFG2, SELIND_LN1_RX), 0x01,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR4, SELIND_LN1_RX), 0x28,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(RXSQCTRL, SELIND_LN1_RX), 0x1E,
+								DME_LOCAL },
+		{ UIC_ARG_MIB_SEL(CFGRXOVR6, SELIND_LN1_RX), 0x2f,
+								DME_LOCAL },
+	};
+
+	/* Get the available lane count */
+	ufshcd_dme_get(hba, UIC_ARG_MIB(PA_CONNECTEDRXDATALANES),
+			&connected_rx_lanes);
+	ufshcd_dme_get(hba, UIC_ARG_MIB(PA_CONNECTEDTXDATALANES),
+			&connected_tx_lanes);
+
+	if (connected_tx_lanes == 2) {
+
+		ret = ufshcd_dme_set_attrs(hba, setup_tx_attrs,
+						ARRAY_SIZE(setup_tx_attrs));
+
+		if (ret)
+			goto out;
+	}
+
+	if (connected_rx_lanes == 2) {
+		ret = ufshcd_dme_set_attrs(hba, setup_rx_attrs,
+						ARRAY_SIZE(setup_rx_attrs));
+	}
+
+out:
+	return ret;
+}
+
+/**
+ * ufshcd_dwc_setup_20bit_rmmi()
+ * This function configures Synopsys TC specific atributes (20-bit RMMI)
+ * @hba: Pointer to drivers structure
+ *
+ * Returns 0 on success or non-zero value on failure
+ */
+static int ufshcd_dwc_setup_20bit_rmmi(struct ufs_hba *hba)
+{
+	int ret = 0;
+
+	const struct ufshcd_dme_attr_val setup_attrs[] = {
+		{ UIC_ARG_MIB(TX_GLOBALHIBERNATE), 0x00, DME_LOCAL },
+		{ UIC_ARG_MIB(REFCLKMODE), 0x01, DME_LOCAL },
+		{ UIC_ARG_MIB(CDIRECTCTRL6), 0xc0, DME_LOCAL },
+		{ UIC_ARG_MIB(CBDIVFACTOR), 0x44, DME_LOCAL },
+		{ UIC_ARG_MIB(CBDCOCTRL5), 0x64, DME_LOCAL },
+		{ UIC_ARG_MIB(CBPRGTUNING), 0x09, DME_LOCAL },
+		{ UIC_ARG_MIB(RTOBSERVESELECT), 0x00, DME_LOCAL },
+	};
+
+	ret = ufshcd_dme_set_attrs(hba, setup_attrs, ARRAY_SIZE(setup_attrs));
+	if (ret)
+		goto out;
+
+	/* Lane 0 configuration*/
+	ret = ufshcd_dwc_setup_20bit_rmmi_lane0(hba);
+	if (ret)
+		goto out;
+
+	/* Lane 1 configuration*/
+	ret = ufshcd_dwc_setup_20bit_rmmi_lane1(hba);
+	if (ret)
+		goto out;
+
+out:
+	return ret;
+}
+#endif
+
+/**
+ * ufshcd_dwc_setup_tc()
+ * This function configures Local (host) Synopsys TC specific attributes
+ *
+ * @hba: Pointer to drivers structure
+ *
+ * Returns 0 on success non-zero value on failure
+ */
+static int ufshcd_dwc_setup_tc(struct ufs_hba *hba)
+{
+	int ret = 0;
+
+#ifdef CONFIG_SCSI_UFS_DWC_40BIT_RMMI
+	dev_info(hba->dev, "Configuring Test Chip 40-bit RMMI\n");
+	ret = ufshcd_dwc_setup_40bit_rmmi(hba);
+	if (ret) {
+		dev_err(hba->dev, "Configuration failed\n");
+		goto out;
+	}
+#endif
+
+#ifdef CONFIG_SCSI_UFS_DWC_20BIT_RMMI
+	dev_info(hba->dev, "Configuring Test Chip 20-bit RMMI\n");
+	ret = ufshcd_dwc_setup_20bit_rmmi(hba);
+	if (ret) {
+		dev_err(hba->dev, "Configuration failed\n");
+		goto out;
+	}
+#endif
+	/* To write Shadow register bank to effective configuration block */
+	ret = ufshcd_dme_set(hba, UIC_ARG_MIB(VS_MPHYCFGUPDT), 0x01);
+	if (ret)
+		goto out;
+
+	/* To configure Debug OMC */
+	ret = ufshcd_dme_set(hba, UIC_ARG_MIB(VS_DEBUGOMC), 0x01);
+
+out:
+	return ret;
+}
+
+/**
+ * ufshcd_dwc_link_startup_notify()
+ * UFS Host DWC specific link startup sequence
+ * @hba: private structure poitner
+ * @status: Callback notify status
+ *
+ * Returns 0 on success, non-zero value on failure
+ */
+int ufshcd_dwc_link_startup_notify(struct ufs_hba *hba,
+					enum ufs_notify_change_status status)
+{
+	int err = 0;
+
+	if (status == PRE_CHANGE) {
+		ufshcd_dwc_program_clk_div(hba, DWC_UFS_REG_HCLKDIV_DIV_125);
+#ifdef CONFIG_SCSI_UFS_DWC_TC
+		err = ufshcd_dwc_setup_tc(hba);
+		if (err) {
+			dev_err(hba->dev, "Configuration failed (%d)\n",
+									err);
+			goto out;
+		}
+#endif
+	} else { /* POST_CHANGE */
+		err = ufshcd_dwc_link_is_up(hba);
+		if (err) {
+			dev_err(hba->dev, "Link is not up\n");
+			goto out;
+		}
+
+		err = ufshcd_dwc_connection_setup(hba);
+		if (err)
+			dev_err(hba->dev, "Connection setup failed (%d)\n",
+									err);
+	}
+
+out:
+	return err;
+}
+EXPORT_SYMBOL(ufshcd_dwc_link_startup_notify);

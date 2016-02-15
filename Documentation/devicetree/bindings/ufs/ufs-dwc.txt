@@ -1,0 +1,19 @@
+* Universal Flash Storage (UFS) DesignWare Host Controller
+
+DWC_UFSHC nodes are defined to describe on-chip UFS host controllers.
+Each UFS controller instance should have its own node.
+
+Required properties:
+- compatible        : compatible list must contain "snps,ufshcd-dwc" and should
+		      also contain the JEDEC version of the controller:
+			"jedec,ufs-1.1"
+			"jedec,ufs-2.0"
+- reg               : <registers mapping>
+- interrupts        : <interrupt mapping for UFS host controller IRQ>
+
+Example:
+	ufs@0xd0000000 {
+		compatible = "jedec,ufs-2.0", "snps,dwc-ufshcd";
+		reg = < 0xd0000000 0x10000 >;
+		interrupts = < 24 >;
+	};
