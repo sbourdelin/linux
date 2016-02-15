@@ -2272,6 +2272,34 @@ static void dapm_free_path(struct snd_soc_dapm_path *path)
 	kfree(path);
 }
 
+static void snd_soc_dapm_remove_kcontrols(struct snd_soc_dapm_widget *w)
+{
+	int i, ret;
+	struct snd_kcontrol *kctl;
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_card *card = dapm->card->snd_card;
+
+	if (!w->num_kcontrols)
+		return;
+
+	for (i = 0; i < w->num_kcontrols; i++) {
+		kctl = w->kcontrols[i];
+		if (!kctl) {
+			dev_err(dapm->dev, "%s: Failed to find %d kcontrol\n",
+				w->name, i);
+			continue;
+		}
+		dev_dbg(dapm->dev, "Remove %d: %s\n", kctl->id.numid,
+			kctl->id.name);
+		ret = snd_ctl_remove_id_locked(card, &kctl->id);
+		if (ret < 0) {
+			dev_err(dapm->dev, "Err %d: while remove %s:%s\n", ret,
+				w->name, kctl->id.name);
+		}
+	}
+	w->num_kcontrols = 0;
+}
+
 void snd_soc_dapm_free_widget(struct snd_soc_dapm_widget *w)
 {
 	struct snd_soc_dapm_path *p, *next_p;
@@ -2288,6 +2316,12 @@ void snd_soc_dapm_free_widget(struct snd_soc_dapm_widget *w)
 			dapm_free_path(p);
 	}
 
+	/*
+	 * remove associated kcontrols,
+	 * in case added dynamically
+	 */
+	if (w->dapm->dynamic_registered && w->num_kcontrols)
+		snd_soc_dapm_remove_kcontrols(w);
 	kfree(w->kcontrols);
 	kfree_const(w->name);
 	kfree(w);
@@ -3778,6 +3812,58 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 	return 0;
 }
 
+int snd_soc_dapm_link_dai_widgets_component(struct snd_soc_card *card,
+					    struct snd_soc_dapm_context *dapm)
+{
+	struct snd_soc_dapm_widget *dai_w, *w;
+	struct snd_soc_dapm_widget *src, *sink;
+	struct snd_soc_dai *dai;
+
+	/* For each DAI widget... */
+	list_for_each_entry(dai_w, &card->widgets, list) {
+		if (dai_w->dapm != dapm)
+			continue;
+		switch (dai_w->id) {
+		case snd_soc_dapm_dai_in:
+		case snd_soc_dapm_dai_out:
+			break;
+		default:
+			continue;
+		}
+
+		dai = dai_w->priv;
+
+		/* ...find all widgets with the same stream and link them */
+		list_for_each_entry(w, &card->widgets, list) {
+			if (w->dapm != dai_w->dapm)
+				continue;
+
+			switch (w->id) {
+			case snd_soc_dapm_dai_in:
+			case snd_soc_dapm_dai_out:
+				continue;
+			default:
+				break;
+			}
+
+			if (!w->sname || !strstr(w->sname, dai_w->sname))
+				continue;
+
+			if (dai_w->id == snd_soc_dapm_dai_in) {
+				src = dai_w;
+				sink = w;
+			} else {
+				src = w;
+				sink = dai_w;
+			}
+			dev_dbg(dai->dev, "%s -> %s\n", src->name, sink->name);
+			snd_soc_dapm_add_path(w->dapm, src, sink, NULL, NULL);
+		}
+	}
+
+	return 0;
+}
+
 int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
 {
 	struct snd_soc_dapm_widget *dai_w, *w;
@@ -3827,7 +3913,7 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
 	return 0;
 }
 
-static void dapm_connect_dai_link_widgets(struct snd_soc_card *card,
+void snd_soc_dapm_connect_dai_link_widgets(struct snd_soc_card *card,
 					  struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
@@ -3900,23 +3986,6 @@ static void soc_dapm_dai_stream_event(struct snd_soc_dai *dai, int stream,
 		case SND_SOC_DAPM_STREAM_PAUSE_RELEASE:
 			break;
 		}
-	}
-}
-
-void snd_soc_dapm_connect_dai_link_widgets(struct snd_soc_card *card)
-{
-	struct snd_soc_pcm_runtime *rtd;
-
-	/* for each BE DAI link... */
-	list_for_each_entry(rtd, &card->rtd_list, list)  {
-		/*
-		 * dynamic FE links have no fixed DAI mapping.
-		 * CODEC<->CODEC links have no direct connection.
-		 */
-		if (rtd->dai_link->dynamic || rtd->dai_link->params)
-			continue;
-
-		dapm_connect_dai_link_widgets(card, rtd);
 	}
 }
 

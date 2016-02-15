@@ -384,7 +384,10 @@ int snd_soc_dapm_new_controls(struct snd_soc_dapm_context *dapm,
 int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 				 struct snd_soc_dai *dai);
 int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card);
-void snd_soc_dapm_connect_dai_link_widgets(struct snd_soc_card *card);
+int snd_soc_dapm_link_dai_widgets_component(struct snd_soc_card *card,
+					    struct snd_soc_dapm_context *dapm);
+void snd_soc_dapm_connect_dai_link_widgets(struct snd_soc_card *card,
+					   struct snd_soc_pcm_runtime *rtd);
 int snd_soc_dapm_new_pcm(struct snd_soc_card *card,
 			 const struct snd_soc_pcm_stream *params,
 			 unsigned int num_params,
@@ -620,6 +623,8 @@ struct snd_soc_dapm_context {
 	unsigned int idle_bias_off:1; /* Use BIAS_OFF instead of STANDBY */
 	/* Go to BIAS_OFF in suspend if the DAPM context is idle */
 	unsigned int suspend_bias_off:1;
+	/* registered dynamically in response to dynamic DAI links */
+	unsigned int dynamic_registered:1;
 	void (*seq_notifier)(struct snd_soc_dapm_context *,
 			     enum snd_soc_dapm_type, int);
 

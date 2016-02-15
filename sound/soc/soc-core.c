@@ -67,6 +67,13 @@ static int pmdown_time = 5000;
 module_param(pmdown_time, int, 0);
 MODULE_PARM_DESC(pmdown_time, "DAPM stream powerdown time (msecs)");
 
+static int snd_soc_init_codec_cache(struct snd_soc_codec *codec);
+static int soc_probe_link_components(struct snd_soc_card *card,
+				     struct snd_soc_pcm_runtime *rtd,
+				     int order);
+static int soc_probe_link_dais(struct snd_soc_card *card,
+			       struct snd_soc_pcm_runtime *rtd, int order);
+
 /* returns the minimum number of bytes needed to represent
  * a particular given value */
 static int min_bytes_needed(unsigned long val)
@@ -1055,8 +1062,41 @@ _err_defer:
 	return  -EPROBE_DEFER;
 }
 
+static void soc_remove_component_controls(struct snd_soc_component *component)
+{
+	int i, ret, name_len;
+	const struct snd_kcontrol_new *controls = component->controls;
+	struct snd_card *card = component->card->snd_card;
+	const char *prefix, *long_name;
+
+	for (i = 0; i < component->num_controls; i++) {
+		const struct snd_kcontrol_new *control = &controls[i];
+		struct snd_ctl_elem_id id;
+
+		long_name = control->name;
+		prefix = component->name_prefix;
+		name_len = sizeof(id.name);
+		if (prefix)
+			snprintf(id.name, name_len, "%s %s", prefix,
+				 long_name);
+		else
+			strlcpy(id.name, long_name, sizeof(id.name));
+		id.numid = 0;
+		id.iface = control->iface;
+		id.device = control->device;
+		id.subdevice = control->subdevice;
+		id.index = control->index;
+		ret = snd_ctl_remove_id_locked(card, &id);
+		if (ret < 0) {
+			dev_err(component->dev, "%d: Failed to remove %s\n",
+				ret, control->name);
+		}
+	}
+}
+
 static void soc_remove_component(struct snd_soc_component *component)
 {
+	struct snd_soc_dapm_context *dapm;
 	if (!component->card)
 		return;
 
@@ -1065,6 +1105,17 @@ static void soc_remove_component(struct snd_soc_component *component)
 	if (component->ref_count)
 		return;
 
+	/*
+	 * should be done, only in case
+	 * component probed after card instantiation
+	 * assumptions:
+	 * relevant DAI links are already removed
+	 * mutex acquired for soc-card
+	 * semaphore acquired for sound card
+	 */
+	if (component->controls && component->dynamic_registered)
+		soc_remove_component_controls(component);
+
 	/* This is a HACK and will be removed soon */
 	if (component->codec)
 		list_del(&component->codec->card_list);
@@ -1072,9 +1123,12 @@ static void soc_remove_component(struct snd_soc_component *component)
 	if (component->remove)
 		component->remove(component);
 
-	snd_soc_dapm_free(snd_soc_component_get_dapm(component));
+	dapm = snd_soc_component_get_dapm(component);
+	snd_soc_dapm_free(dapm);
 
 	soc_cleanup_component_debugfs(component);
+	component->dynamic_registered = 0;
+	dapm->dynamic_registered = 0;
 	component->card = NULL;
 	module_put(component->dev->driver->owner);
 }
@@ -1141,6 +1195,28 @@ static void soc_remove_link_components(struct snd_soc_card *card,
 		if (cpu_dai->component->driver->remove_order == order)
 			soc_remove_component(cpu_dai->component);
 	}
+}
+
+static void soc_remove_dai_link(struct snd_soc_card *card,
+				struct snd_soc_pcm_runtime *rtd)
+{
+	int order;
+	struct snd_soc_dai_link *link;
+
+	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
+			order++)
+		soc_remove_link_dais(card, rtd, order);
+
+	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
+			order++)
+		soc_remove_link_components(card, rtd, order);
+
+	link = rtd->dai_link;
+	if (link->dobj.type == SND_SOC_DOBJ_DAI_LINK)
+		dev_warn(card->dev, "Topology forgot to remove link %s?\n",
+			 link->name);
+	list_del(&link->list);
+	card->num_dai_links--;
 }
 
 static void soc_remove_dai_links(struct snd_soc_card *card)
@@ -1339,6 +1415,175 @@ void snd_soc_remove_dai_link(struct snd_soc_card *card,
 }
 EXPORT_SYMBOL_GPL(snd_soc_remove_dai_link);
 
+/**
+ * snd_soc_add_dailink - add DAI link to an instantiated sound card.
+ *
+ * @card: Sound card identifier to add DAI link to
+ * @dai_link: dai_link configuration to add
+ *
+ * Return 0 for success, else error.
+ */
+int snd_soc_add_dailink(struct snd_soc_card *card,
+			struct snd_soc_dai_link *dai_link)
+{
+	int ret, order;
+	struct snd_soc_pcm_runtime *rtd;
+	struct snd_soc_codec *codec;
+	struct snd_soc_dapm_context *dapm;
+
+	if (!card)
+		return -EINVAL;
+
+	mutex_lock(&card->mutex);
+	/* init check DAI link */
+	ret = soc_init_dai_link(card, dai_link);
+	if (ret)
+		goto init_error;
+
+	/* bind DAIs */
+	ret = soc_bind_dai_link(card, dai_link);
+	if (ret)
+		goto init_error;
+	rtd = snd_soc_get_pcm_runtime(card, dai_link->name);
+
+	ret = snd_soc_add_dai_link(card, dai_link);
+	if (ret)
+		goto base_error;
+
+	if (!card->instantiated) {
+		dev_info(card->dev,
+			 "ASoC: card not yet instantiated, can exit here\n");
+		mutex_unlock(&card->mutex);
+		return 0;
+	}
+
+	/* initialize the register cache for each available codec */
+	list_for_each_entry(codec, &codec_list, list) {
+		if (codec->cache_init)
+			continue;
+		ret = snd_soc_init_codec_cache(codec);
+		if (ret < 0)
+			goto probe_dai_err;
+	}
+
+	/* probe all components used by DAI link on this card */
+	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
+	     order++) {
+		ret = soc_probe_link_components(card, rtd, order);
+		if (ret < 0) {
+			dev_err(card->dev, "ASoC: failed to probe %s link components, %d\n",
+				dai_link->name, ret);
+			goto probe_dai_err;
+		}
+	}
+
+	/* Find new DAI links added during probing components and bind them.
+	 * Components with topology may bring new DAIs and DAI links.
+	 */
+	list_for_each_entry(dai_link, &card->dai_link_list, list) {
+		if (soc_is_dai_link_bound(card, dai_link))
+			continue;
+
+		ret = soc_init_dai_link(card, dai_link);
+		if (ret)
+			goto probe_dai_err;
+		ret = soc_bind_dai_link(card, dai_link);
+		if (ret)
+			goto probe_dai_err;
+	}
+
+
+	/* probe DAI links on this card */
+	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
+	     order++) {
+		ret = soc_probe_link_dais(card, rtd, order);
+		if (ret < 0) {
+			dev_err(card->dev, "ASoC: failed to probe %s dai link,%d\n",
+				dai_link->name, ret);
+			goto probe_dai_err;
+		}
+	}
+
+	dapm = &rtd->codec->component.dapm;
+	snd_soc_dapm_new_widgets(card);
+	snd_soc_dapm_link_dai_widgets_component(card, dapm);
+	snd_soc_dapm_connect_dai_link_widgets(card, rtd);
+	snd_device_register(rtd->card->snd_card, rtd->pcm);
+	snd_soc_dapm_sync(&card->dapm);
+	mutex_unlock(&card->mutex);
+
+	return 0;
+
+probe_dai_err:
+	soc_remove_dai_link(card, rtd);
+base_error:
+	list_del(&rtd->list);
+	card->num_rtd--;
+	soc_free_pcm_runtime(rtd);
+init_error:
+	mutex_unlock(&card->mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_add_dailink);
+
+/**
+ * snd_soc_remove_dailink - Remove DAI link from the active sound card
+ *
+ * @card_name: Sound card identifier to remove DAI link from
+ * @link_name: DAI link identfier to remove
+ */
+void snd_soc_remove_dailink(struct snd_soc_card *card, const char *link_name)
+{
+	int ret;
+	struct snd_soc_dai_link *dai_link;
+	struct snd_soc_pcm_runtime *rtd;
+	struct snd_card *sndcard = card->snd_card;
+
+	if (!card)
+		return;
+
+	rtd = snd_soc_get_pcm_runtime(card, link_name);
+	if (!rtd) {
+		dev_err(card->dev, "DAI link not found\n");
+		return;
+	}
+
+	dai_link = rtd->dai_link;
+
+	/* check if link is active */
+	if (rtd->codec_dai->active) {
+		mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
+		if (rtd->codec_dai->playback_active)
+			dpcm_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
+					       SND_SOC_DAPM_STREAM_STOP);
+		if (rtd->codec_dai->capture_active)
+			dpcm_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
+					       SND_SOC_DAPM_STREAM_STOP);
+		mutex_unlock(&rtd->pcm_mutex);
+		ret = soc_dpcm_runtime_update(rtd->card);
+	}
+	cancel_delayed_work_sync(&rtd->delayed_work);
+
+	down_write(&sndcard->controls_rwsem);
+	mutex_lock_nested(&card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
+	/* in case of BE DAI, update fe_clients list */
+	if (dai_link->no_pcm) {
+		dpcm_fe_disconnect(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		dpcm_fe_disconnect(rtd, SNDRV_PCM_STREAM_CAPTURE);
+	}
+
+	/* free associated PCM device */
+	snd_device_free(rtd->card->snd_card, rtd->pcm);
+	soc_remove_dai_link(card, rtd);
+	list_del(&rtd->list);
+	card->num_rtd--;
+	soc_free_pcm_runtime(rtd);
+
+	mutex_unlock(&card->mutex);
+	up_write(&sndcard->controls_rwsem);
+}
+EXPORT_SYMBOL_GPL(snd_soc_remove_dailink);
+
 static void soc_set_name_prefix(struct snd_soc_card *card,
 				struct snd_soc_component *component)
 {
@@ -1438,6 +1683,11 @@ static int soc_probe_component(struct snd_soc_card *card,
 	if (component->dapm_routes)
 		snd_soc_dapm_add_routes(dapm, component->dapm_routes,
 					component->num_dapm_routes);
+
+	if (card->instantiated) {
+		component->dynamic_registered = 1;
+		dapm->dynamic_registered = 1;
+	}
 
 	list_add(&dapm->list, &card->dapm_list);
 
@@ -1968,7 +2218,17 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	}
 
 	snd_soc_dapm_link_dai_widgets(card);
-	snd_soc_dapm_connect_dai_link_widgets(card);
+	/* for each BE DAI link... */
+	list_for_each_entry(rtd, &card->rtd_list, list)  {
+		/*
+		 * dynamic FE links have no fixed DAI mapping.
+		 * CODEC<->CODEC links have no direct connection.
+		 */
+		if (rtd->dai_link->dynamic || rtd->dai_link->params)
+			continue;
+
+		snd_soc_dapm_connect_dai_link_widgets(card, rtd);
+	}
 
 	if (card->controls)
 		snd_soc_add_card_controls(card, card->controls, card->num_controls);

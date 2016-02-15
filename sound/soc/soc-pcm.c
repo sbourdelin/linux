@@ -1192,6 +1192,31 @@ static void dpcm_be_reparent(struct snd_soc_pcm_runtime *fe,
 }
 
 /* disconnect a BE and FE */
+void dpcm_fe_disconnect(struct snd_soc_pcm_runtime *be, int stream)
+{
+	struct snd_soc_dpcm *dpcm, *d;
+
+	list_for_each_entry_safe(dpcm, d, &be->dpcm[stream].fe_clients,
+				 list_fe) {
+		dev_dbg(be->dev, "ASoC: BE %s disconnect check for %s\n",
+				stream ? "capture" : "playback",
+				dpcm->fe->dai_link->name);
+
+		dev_dbg(be->dev, "  freed DSP %s path %s %s %s\n",
+			stream ? "capture" : "playback", be->dai_link->name,
+			stream ? "<-" : "->", dpcm->fe->dai_link->name);
+
+#ifdef CONFIG_DEBUG_FS
+		debugfs_remove(dpcm->debugfs_state);
+#endif
+		/* FE still alive, update it's BE client list */
+		list_del(&dpcm->list_be);
+		list_del(&dpcm->list_fe);
+		kfree(dpcm);
+	}
+}
+
+/* disconnect a BE and FE */
 void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream)
 {
 	struct snd_soc_dpcm *dpcm, *d;

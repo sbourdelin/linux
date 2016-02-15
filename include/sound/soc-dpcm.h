@@ -144,6 +144,7 @@ int dpcm_process_paths(struct snd_soc_pcm_runtime *fe,
 	int stream, struct snd_soc_dapm_widget_list **list, int new);
 int dpcm_be_dai_startup(struct snd_soc_pcm_runtime *fe, int stream);
 int dpcm_be_dai_shutdown(struct snd_soc_pcm_runtime *fe, int stream);
+void dpcm_fe_disconnect(struct snd_soc_pcm_runtime *be, int stream);
 void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream);
 void dpcm_clear_pending_state(struct snd_soc_pcm_runtime *fe, int stream);
 int dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream);

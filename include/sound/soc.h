@@ -796,6 +796,8 @@ struct snd_soc_component {
 
 	unsigned int ignore_pmdown_time:1; /* pmdown_time is ignored at stop */
 	unsigned int registered_as_component:1;
+	/* registered dynamically in response to dynamic DAI links */
+	unsigned int dynamic_registered:1;
 
 	struct list_head list;
 	struct list_head list_aux; /* for auxiliary component of the card */
@@ -1681,6 +1683,10 @@ int snd_soc_add_dai_link(struct snd_soc_card *card,
 				struct snd_soc_dai_link *dai_link);
 void snd_soc_remove_dai_link(struct snd_soc_card *card,
 			     struct snd_soc_dai_link *dai_link);
+
+int snd_soc_add_dailink(struct snd_soc_card *card,
+			struct snd_soc_dai_link *dai_link);
+void snd_soc_remove_dailink(struct snd_soc_card *card, const char *link_name);
 
 int snd_soc_register_dai(struct snd_soc_component *component,
 	struct snd_soc_dai_driver *dai_drv);
