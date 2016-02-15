@@ -935,6 +935,7 @@ static struct irq_chip octeon_irq_chip_ciu_v2 = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu_set_affinity_v2,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -948,6 +949,7 @@ static struct irq_chip octeon_irq_chip_ciu_v2_edge = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu_set_affinity_v2,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -963,6 +965,7 @@ static struct irq_chip octeon_irq_chip_ciu_sum2 = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu_set_affinity_sum2,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -976,6 +979,7 @@ static struct irq_chip octeon_irq_chip_ciu_sum2_edge = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu_set_affinity_sum2,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -988,6 +992,7 @@ static struct irq_chip octeon_irq_chip_ciu = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -1001,6 +1006,7 @@ static struct irq_chip octeon_irq_chip_ciu_edge = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -1041,7 +1047,7 @@ static struct irq_chip octeon_irq_chip_ciu_gpio_v2 = {
 	.irq_set_affinity = octeon_irq_ciu_set_affinity_v2,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
 #endif
-	.flags = IRQCHIP_SET_TYPE_MASKED,
+	.flags = IRQCHIP_SET_TYPE_MASKED | IRQCHIP_ONOFFLINE_ENABLED,
 };
 
 static struct irq_chip octeon_irq_chip_ciu_gpio = {
@@ -1056,7 +1062,7 @@ static struct irq_chip octeon_irq_chip_ciu_gpio = {
 	.irq_set_affinity = octeon_irq_ciu_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
 #endif
-	.flags = IRQCHIP_SET_TYPE_MASKED,
+	.flags = IRQCHIP_SET_TYPE_MASKED | IRQCHIP_ONOFFLINE_ENABLED,
 };
 
 /*
@@ -1838,6 +1844,7 @@ static struct irq_chip octeon_irq_chip_ciu2 = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu2_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -1851,6 +1858,7 @@ static struct irq_chip octeon_irq_chip_ciu2_edge = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu2_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
@@ -1886,7 +1894,7 @@ static struct irq_chip octeon_irq_chip_ciu2_gpio = {
 	.irq_set_affinity = octeon_irq_ciu2_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
 #endif
-	.flags = IRQCHIP_SET_TYPE_MASKED,
+	.flags = IRQCHIP_SET_TYPE_MASKED | IRQCHIP_ONOFFLINE_ENABLED,
 };
 
 static int octeon_irq_ciu2_xlat(struct irq_domain *d,
@@ -2537,6 +2545,7 @@ static struct irq_chip octeon_irq_chip_ciu3 = {
 #ifdef CONFIG_SMP
 	.irq_set_affinity = octeon_irq_ciu3_set_affinity,
 	.irq_cpu_offline = octeon_irq_cpu_offline_ciu,
+	.flags = IRQCHIP_ONOFFLINE_ENABLED,
 #endif
 };
 
