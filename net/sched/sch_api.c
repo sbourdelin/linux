@@ -1818,12 +1818,13 @@ done:
 int tc_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 		struct tcf_result *res, bool compat_mode)
 {
-	__be16 protocol = tc_skb_protocol(skb);
 #ifdef CONFIG_NET_CLS_ACT
 	const struct tcf_proto *old_tp = tp;
 	int limit = 0;
+	__be16 protocol;
 
 reclassify:
+	protocol = tc_skb_protocol(skb);
 #endif
 	for (; tp; tp = rcu_dereference_bh(tp->next)) {
 		int err;
