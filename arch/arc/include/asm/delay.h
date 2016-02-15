@@ -57,7 +57,8 @@ static inline void __udelay(unsigned long usecs)
 	 */
 	loops = ((u64) usecs * 4295 * HZ * loops_per_jiffy) >> 32;
 
-	__delay(loops);
+	if (loops)
+		__delay(loops);
 }
 
 #define udelay(n) (__builtin_constant_p(n) ? ((n) > 20000 ? __bad_udelay() \
