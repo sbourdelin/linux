@@ -1408,12 +1408,15 @@ static void hcd_free_coherent(struct usb_bus *bus, dma_addr_t *dma_handle,
 
 void usb_hcd_unmap_urb_setup_for_dma(struct usb_hcd *hcd, struct urb *urb)
 {
+#ifdef CONFIG_HAS_DMA
 	if (urb->transfer_flags & URB_SETUP_MAP_SINGLE)
 		dma_unmap_single(hcd->self.controller,
 				urb->setup_dma,
 				sizeof(struct usb_ctrlrequest),
 				DMA_TO_DEVICE);
-	else if (urb->transfer_flags & URB_SETUP_MAP_LOCAL)
+	else
+#endif /* CONFIG_HAS_DMA */
+	if (urb->transfer_flags & URB_SETUP_MAP_LOCAL)
 		hcd_free_coherent(urb->dev->bus,
 				&urb->setup_dma,
 				(void **) &urb->setup_packet,
@@ -1440,6 +1443,7 @@ void usb_hcd_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 	usb_hcd_unmap_urb_setup_for_dma(hcd, urb);
 
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
+#ifdef CONFIG_HAS_DMA
 	if (urb->transfer_flags & URB_DMA_MAP_SG)
 		dma_unmap_sg(hcd->self.controller,
 				urb->sg,
@@ -1455,7 +1459,9 @@ void usb_hcd_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
-	else if (urb->transfer_flags & URB_MAP_LOCAL)
+	else
+#endif /* CONFIG_HAS_DMA */
+	if (urb->transfer_flags & URB_MAP_LOCAL)
 		hcd_free_coherent(urb->dev->bus,
 				&urb->transfer_dma,
 				&urb->transfer_buffer,
@@ -1492,7 +1498,7 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 	if (usb_endpoint_xfer_control(&urb->ep->desc)) {
 		if (hcd->self.uses_pio_for_control)
 			return ret;
-		if (hcd->self.uses_dma) {
+		if (IS_ENABLED(CONFIG_HAS_DMA) && hcd->self.uses_dma) {
 			urb->setup_dma = dma_map_single(
 					hcd->self.controller,
 					urb->setup_packet,
@@ -1518,7 +1524,7 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 	if (urb->transfer_buffer_length != 0
 	    && !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP)) {
-		if (hcd->self.uses_dma) {
+		if (IS_ENABLED(CONFIG_HAS_DMA) && hcd->self.uses_dma) {
 			if (urb->num_sgs) {
 				int n;
 
