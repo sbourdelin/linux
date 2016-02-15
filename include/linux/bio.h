@@ -265,6 +265,26 @@ static inline unsigned bio_segments(struct bio *bio)
 	return segs;
 }
 
+static inline void bio_get_first_bvec(struct bio *bio, struct bio_vec *bv)
+{
+	*bv = bio_iovec(bio);
+}
+
+/*
+ * bio_get_last_bvec() is introduced to get the last bvec of one
+ * bio for bio_will_gap().
+ *
+ * TODO: make it more efficient.
+ */
+static inline void bio_get_last_bvec(struct bio *bio, struct bio_vec *bv)
+{
+	struct bvec_iter iter;
+
+	bio_for_each_segment(*bv, bio, iter)
+		if (bv->bv_len == iter.bi_size)
+			break;
+}
+
 /*
  * get a reference to a bio, so it won't disappear. the intended use is
  * something like:
