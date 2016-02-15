@@ -497,7 +497,11 @@ void __ref acpi_os_unmap_memory(void *virt, acpi_size size)
 }
 EXPORT_SYMBOL_GPL(acpi_os_unmap_memory);
 
-void __init early_acpi_os_unmap_memory(void __iomem *virt, acpi_size size)
+/*
+ * acpi_gbl_permanent_mmap is set in __init acpi_early_init()
+ * so it is safe to call early_acpi_os_unmap_memory() from anywhere
+ */
+void __ref early_acpi_os_unmap_memory(void __iomem *virt, acpi_size size)
 {
 	if (!acpi_gbl_permanent_mmap)
 		__acpi_unmap_table(virt, size);
