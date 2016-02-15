@@ -737,6 +737,9 @@ gss_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 		case -ENOSYS:
 			gss_msg->msg.errno = -EAGAIN;
 			break;
+		case -ENOENT:
+			gss_msg->msg.errno = -EPROTONOSUPPORT;
+			break;
 		default:
 			printk(KERN_CRIT "%s: bad return from "
 				"gss_fill_context: %zd\n", __func__, err);
