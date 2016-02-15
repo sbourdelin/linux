@@ -1373,8 +1373,7 @@ static struct btrfs_root *create_reloc_root(struct btrfs_trans_handle *trans,
 	u64 last_snap = 0;
 	int ret;
 
-	root_item = kmalloc(sizeof(*root_item), GFP_NOFS);
-	BUG_ON(!root_item);
+	root_item = kmalloc(sizeof(*root_item), GFP_NOFS|__GFP_NOFAIL);
 
 	root_key.objectid = BTRFS_TREE_RELOC_OBJECTID;
 	root_key.type = BTRFS_ROOT_ITEM_KEY;

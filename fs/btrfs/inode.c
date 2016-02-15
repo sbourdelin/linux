@@ -357,8 +357,7 @@ static noinline int add_async_extent(struct async_cow *cow,
 {
 	struct async_extent *async_extent;
 
-	async_extent = kmalloc(sizeof(*async_extent), GFP_NOFS);
-	BUG_ON(!async_extent); /* -ENOMEM */
+	async_extent = kmalloc(sizeof(*async_extent), GFP_NOFS|__GFP_NOFAIL);
 	async_extent->start = start;
 	async_extent->ram_size = ram_size;
 	async_extent->compressed_size = compressed_size;
@@ -1143,8 +1142,7 @@ static int cow_file_range_async(struct inode *inode, struct page *locked_page,
 	clear_extent_bit(&BTRFS_I(inode)->io_tree, start, end, EXTENT_LOCKED,
 			 1, 0, NULL, GFP_NOFS);
 	while (start < end) {
-		async_cow = kmalloc(sizeof(*async_cow), GFP_NOFS);
-		BUG_ON(!async_cow); /* -ENOMEM */
+		async_cow = kmalloc(sizeof(*async_cow), GFP_NOFS|__GFP_NOFAIL);
 		async_cow->inode = igrab(inode);
 		async_cow->root = root;
 		async_cow->locked_page = locked_page;

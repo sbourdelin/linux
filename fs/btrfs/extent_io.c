@@ -874,10 +874,8 @@ __set_extent_bit(struct extent_io_tree *tree, u64 start, u64 end,
 
 	bits |= EXTENT_FIRST_DELALLOC;
 again:
-	if (!prealloc && gfpflags_allow_blocking(mask)) {
-		prealloc = alloc_extent_state(mask);
-		BUG_ON(!prealloc);
-	}
+	if (!prealloc && gfpflags_allow_blocking(mask))
+		prealloc = alloc_extent_state(mask|__GFP_NOFAIL);
 
 	spin_lock(&tree->lock);
 	if (cached_state && *cached_state) {
