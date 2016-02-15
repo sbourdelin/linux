@@ -47,6 +47,7 @@ ACPI_MODULE_NAME("pci_link");
 #define ACPI_PCI_LINK_FILE_INFO		"info"
 #define ACPI_PCI_LINK_FILE_STATUS	"state"
 #define ACPI_PCI_LINK_MAX_POSSIBLE	16
+#define ACPI_PCI_LINK_MAX_EARLY_IRQINFO 1024
 
 static int acpi_pci_link_add(struct acpi_device *device,
 			     const struct acpi_device_id *not_used);
@@ -470,9 +471,13 @@ struct irq_penalty_info {
 	int irq;
 	int penalty;
 	struct list_head node;
+	bool early;
 };
 
 static LIST_HEAD(acpi_irq_penalty_list);
+static int early_init_done;
+static struct irq_penalty_info early_irq_infos[ACPI_PCI_LINK_MAX_EARLY_IRQINFO];
+static int early_irq_info_counter;
 
 static int acpi_irq_get_penalty(int irq)
 {
@@ -507,10 +512,20 @@ static int acpi_irq_set_penalty(int irq, int new_penalty)
 		}
 	}
 
-	/* nope, let's allocate a slot for this IRQ */
-	irq_info = kzalloc(sizeof(*irq_info), GFP_KERNEL);
-	if (!irq_info)
-		return -ENOMEM;
+	if (!early_init_done) {
+		if (early_irq_info_counter < ARRAY_SIZE(early_irq_infos)) {
+			irq_info = &early_irq_infos[early_irq_info_counter];
+			irq_info->early = true;
+			early_irq_info_counter++;
+		} else {
+			return -ENOMEM;
+		}
+	} else {
+		/* nope, let's allocate a slot for this IRQ */
+		irq_info = kzalloc(sizeof(*irq_info), GFP_KERNEL);
+		if (!irq_info)
+			return -ENOMEM;
+	}
 
 	irq_info->irq = irq;
 	irq_info->penalty = new_penalty;
@@ -968,3 +983,12 @@ void __init acpi_pci_link_init(void)
 	register_syscore_ops(&irqrouter_syscore_ops);
 	acpi_scan_add_handler(&pci_link_handler);
 }
+
+
+static int acpi_pci_link_subsys_init(void)
+{
+	early_init_done = true;
+	return 0;
+}
+
+subsys_initcall(acpi_pci_link_subsys_init)
