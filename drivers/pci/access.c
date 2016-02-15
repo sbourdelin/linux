@@ -393,7 +393,7 @@ static ssize_t pci_vpd_pci22_read(struct pci_dev *dev, loff_t pos, size_t count,
 	if (pos < 0)
 		return -EINVAL;
 
-	if (!vpd->valid) {
+	if (!vpd->valid && vpd->base.len > 0) {
 		vpd->valid = true;
 		vpd->base.len = pci_vpd_pci22_size(dev, vpd->base.len);
 	}
@@ -459,7 +459,7 @@ static ssize_t pci_vpd_pci22_write(struct pci_dev *dev, loff_t pos, size_t count
 	if (pos < 0 || (pos & 3) || (count & 3))
 		return -EINVAL;
 
-	if (!vpd->valid) {
+	if (!vpd->valid && vpd->base.len > 0) {
 		vpd->valid = true;
 		vpd->base.len = pci_vpd_pci22_size(dev, vpd->base.len);
 	}
