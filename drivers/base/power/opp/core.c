@@ -564,7 +564,7 @@ static int _set_opp_voltage(struct device *dev, struct regulator *reg,
 	int ret;
 
 	/* Regulator not available for device */
-	if (IS_ERR(reg)) {
+	if (IS_ERR_OR_NULL(reg)) {
 		dev_dbg(dev, "%s: regulator not available: %ld\n", __func__,
 			PTR_ERR(reg));
 		return 0;
