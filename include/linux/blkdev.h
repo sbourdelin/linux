@@ -1385,7 +1385,7 @@ static inline bool bvec_gap_to_prev(struct request_queue *q,
 static inline bool bio_will_gap(struct request_queue *q, struct bio *prev,
 			 struct bio *next)
 {
-	if (!bio_has_data(prev))
+	if (!bio_has_data(prev) || !queue_virt_boundary(q))
 		return false;
 
 	return bvec_gap_to_prev(q, &prev->bi_io_vec[prev->bi_vcnt - 1],
