@@ -95,3 +95,28 @@ bool acpi_console_check(struct uart_port *uport)
 
 	return acpi_table_parse_spcr(spcr_table_handler_check, uport) > 0;
 }
+
+static int spcr_table_handler_32_bit(struct acpi_table_spcr *table, void *data)
+{
+	return table->interface_type == ACPI_DBG2_ARM_SBSA_32BIT;
+}
+
+/**
+ * acpi_console_sbsa_32bit - Tell if SPCR specifies 32-bit SBSA.
+ *
+ * Some implementations of ARM SBSA serial port hardware require that access
+ * to the registers should be 32-bit.  Unfortunately, the only way for
+ * the driver to tell if it's the case is to use the data from ACPI SPCR/DBG2
+ * tables.  In this case the value of the 'Interface Type' field of the SPCR
+ * table is ACPI_DBG2_ARM_SBSA_32BIT.
+ *
+ * Return: true if access should be 32-bit wide.
+ */
+bool acpi_console_sbsa_32bit(void)
+{
+	if (acpi_disabled)
+		return false;
+
+	return acpi_table_parse_spcr(spcr_table_handler_32_bit, NULL) > 0;
+}
+EXPORT_SYMBOL(acpi_console_sbsa_32bit);

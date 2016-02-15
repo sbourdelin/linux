@@ -2543,6 +2543,8 @@ static int sbsa_uart_probe(struct platform_device *pdev)
 		baudrate = 115200;
 	}
 
+	vendor_sbsa.access_32b = acpi_console_sbsa_32bit();
+
 	portnr = pl011_find_free_port();
 	if (portnr < 0)
 		return portnr;

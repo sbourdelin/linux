@@ -1007,10 +1007,15 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
 struct uart_port;
 #ifdef CONFIG_ACPI_SPCR_TABLE
 bool acpi_console_check(struct uart_port *uport);
+bool acpi_console_sbsa_32bit(void);
 #else
 static inline bool acpi_console_check(struct uart_port *uport)
 {
 	return FALSE;
+}
+static inline bool acpi_console_sbsa_32bit(void)
+{
+	return false;
 }
 #endif
 
