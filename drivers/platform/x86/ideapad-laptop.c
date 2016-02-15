@@ -226,6 +226,8 @@ static int debugfs_status_show(struct seq_file *s, void *data)
 		seq_printf(s, "BL power value:\t%s\n", value ? "On" : "Off");
 	seq_printf(s, "=====================\n");
 
+	seq_printf(s, "Has RF switch:\t%s\n",
+		priv->has_hw_rfkill_switch ? "Yes" : "No");
 	if (!read_ec_data(priv->adev->handle, VPCCMD_R_RF, &value))
 		seq_printf(s, "Radio status:\t%s(%lu)\n",
 			   value ? "On" : "Off", value);
