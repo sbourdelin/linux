@@ -8,6 +8,7 @@
  */
 / {
 	compatible = "cavium,octeon-3860";
+	model = "Cavium Octeon 3XXX";
 	#address-cells = <2>;
 	#size-cells = <2>;
 	interrupt-parent = <&ciu>;
