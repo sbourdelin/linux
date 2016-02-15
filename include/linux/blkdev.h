@@ -1385,11 +1385,16 @@ static inline bool bvec_gap_to_prev(struct request_queue *q,
 static inline bool bio_will_gap(struct request_queue *q, struct bio *prev,
 			 struct bio *next)
 {
-	if (!bio_has_data(prev) || !queue_virt_boundary(q))
+	if (!bio_has_data(prev) || !queue_virt_boundary(q)) {
 		return false;
+	} else {
+		struct bio_vec pb, nb;
 
-	return bvec_gap_to_prev(q, &prev->bi_io_vec[prev->bi_vcnt - 1],
-				next->bi_io_vec[0].bv_offset);
+		bio_get_last_bvec(prev, &pb);
+		bio_get_first_bvec(next, &nb);
+
+		return bvec_gap_to_prev(q, &pb, nb.bv_offset);
+	}
 }
 
 static inline bool req_gap_back_merge(struct request *req, struct bio *bio)
