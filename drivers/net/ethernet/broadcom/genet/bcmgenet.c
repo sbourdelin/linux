@@ -1904,7 +1904,7 @@ static int init_umac(struct bcmgenet_priv *priv)
 		bcmgenet_bp_mc_set(priv, reg);
 	}
 
-	/* Enable MDIO interrupts on GENET v3+ */
+	/* Enable MDIO interrupts on GENET v2+ */
 	if (priv->hw_params->flags & GENET_HAS_MDIO_INTR)
 		int0_enable |= (UMAC_IRQ_MDIO_DONE | UMAC_IRQ_MDIO_ERROR);
 
@@ -3168,7 +3168,7 @@ static struct bcmgenet_hw_params bcmgenet_hw_params[] = {
 		.rdma_offset = 0x3000,
 		.tdma_offset = 0x4000,
 		.words_per_bd = 2,
-		.flags = GENET_HAS_EXT,
+		.flags = GENET_HAS_EXT | GENET_HAS_MDIO_INTR,
 	},
 	[GENET_V3] = {
 		.tx_queues = 4,

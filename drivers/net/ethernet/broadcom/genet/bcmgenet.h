@@ -310,7 +310,7 @@ struct bcmgenet_mib_counters {
 #define UMAC_IRQ_TXDMA_BDONE		(1 << 18)
 #define UMAC_IRQ_TXDMA_DONE		UMAC_IRQ_TXDMA_MBDONE
 
-/* Only valid for GENETv3+ */
+/* Only valid for GENETv2+ */
 #define UMAC_IRQ_MDIO_DONE		(1 << 23)
 #define UMAC_IRQ_MDIO_ERROR		(1 << 24)
 
