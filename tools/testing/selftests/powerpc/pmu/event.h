@@ -11,6 +11,10 @@
 
 #include "utils.h"
 
+struct ring_buffer {
+	struct perf_event_mmap_page *page;
+	unsigned long ring_base, old, mask;
+};
 
 struct event {
 	struct perf_event_attr attr;
@@ -22,6 +26,7 @@ struct event {
 		u64 running;
 		u64 enabled;
 	} result;
+	struct ring_buffer ring_buffer;
 };
 
 void event_init(struct event *e, u64 config);

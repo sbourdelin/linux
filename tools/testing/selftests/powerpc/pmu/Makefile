@@ -4,7 +4,7 @@ noarg:
 TEST_PROGS := count_instructions l3_bank_test per_event_excludes
 EXTRA_SOURCES := ../harness.c event.c lib.c ../utils.c
 
-all: $(TEST_PROGS) ebb
+all: $(TEST_PROGS) ebb bhrb
 
 $(TEST_PROGS): $(EXTRA_SOURCES)
 
@@ -20,25 +20,32 @@ DEFAULT_RUN_TESTS := $(RUN_TESTS)
 override define RUN_TESTS
 	$(DEFAULT_RUN_TESTS)
 	$(MAKE) -C ebb run_tests
+	$(MAKE) -C bhrb run_tests
 endef
 
 DEFAULT_EMIT_TESTS := $(EMIT_TESTS)
 override define EMIT_TESTS
 	$(DEFAULT_EMIT_TESTS)
 	$(MAKE) -s -C ebb emit_tests
+	$(MAKE) -s -C bhrb emit_tests
 endef
 
 DEFAULT_INSTALL_RULE := $(INSTALL_RULE)
 override define INSTALL_RULE
 	$(DEFAULT_INSTALL_RULE)
 	$(MAKE) -C ebb install
+	$(MAKE) -C bhrb install
 endef
 
 clean:
 	rm -f $(TEST_PROGS) loop.o
 	$(MAKE) -C ebb clean
+	$(MAKE) -C bhrb clean
 
 ebb:
 	$(MAKE) -k -C $@ all
 
-.PHONY: all run_tests clean ebb
+bhrb:
+	$(MAKE) -k -C $@ all
+
+.PHONY: all run_tests clean ebb bhrb
