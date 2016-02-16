@@ -730,10 +730,10 @@ static int i915_gem_request_info(struct seq_file *m, void *data)
 static void i915_ring_seqno_info(struct seq_file *m,
 				 struct intel_engine_cs *ring)
 {
-	if (ring->get_seqno) {
-		seq_printf(m, "Current sequence (%s): %x\n",
-			   ring->name, ring->get_seqno(ring));
-	}
+	seq_printf(m, "Current sequence (%s): %x\n",
+		   ring->name, ring->get_seqno(ring));
+	seq_printf(m, "Current user interrupts (%s): %x\n",
+		   ring->name, READ_ONCE(ring->user_interrupts));
 }
 
 static int i915_gem_seqno_info(struct seq_file *m, void *data)
@@ -1361,6 +1361,9 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 		seq_printf(m, "%s:\n", ring->name);
 		seq_printf(m, "\tseqno = %x [current %x]\n",
 			   ring->hangcheck.seqno, seqno[i]);
+		seq_printf(m, "\tuser interrupts = %x [current %x]\n",
+			   ring->hangcheck.user_interrupts,
+			   ring->user_interrupts);
 		seq_printf(m, "\tACTHD = 0x%08llx [current 0x%08llx]\n",
 			   (long long)ring->hangcheck.acthd,
 			   (long long)acthd[i]);
