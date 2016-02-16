@@ -18,6 +18,7 @@
 #include <sound/soc.h>
 #include <sound/tlv.h>
 #include <linux/platform_data/adau17x1.h>
+#include <dt-bindings/sound/adau17x1.h>
 
 #include "adau17x1.h"
 #include "adau1761.h"
@@ -713,6 +714,122 @@ static int adau1761_codec_probe(struct snd_soc_codec *codec)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static inline void adau1761_parse_of_outmode(struct device *dev,
+					    uint32_t of_val,
+					    enum adau1761_output_mode *mode)
+{
+	switch (of_val) {
+	case OUTPUT_MODE_HEADPHONE:
+		*mode = ADAU1761_OUTPUT_MODE_HEADPHONE;
+		break;
+	case OUTPUT_MODE_HEADPHONE_CAPLESS:
+		*mode = ADAU1761_OUTPUT_MODE_HEADPHONE_CAPLESS;
+		break;
+	case OUTPUT_MODE_LINE:
+		*mode = ADAU1761_OUTPUT_MODE_LINE;
+		break;
+	default:
+		dev_warn(dev, "Invalid output mode %d\n", of_val);
+		*mode = ADAU1761_OUTPUT_MODE_LINE;
+		break;
+	}
+}
+
+static void adau1761_pdata_from_of(struct device *dev,
+				   struct adau1761_platform_data *pdata)
+{
+	struct device_node *np = dev->of_node;
+	uint32_t val;
+	uint32_t debounce_pars[2];
+
+	pdata->input_differential =
+		of_property_read_bool(np, "adi,input-differential");
+
+	if (of_get_property(np, "adi,jack-detection", NULL)) {
+		pdata->digmic_jackdetect_pin_mode =
+			ADAU1761_DIGMIC_JACKDET_PIN_MODE_JACKDETECT;
+		if (!of_property_read_u32_array(np, "adi,jack-detection",
+						debounce_pars, 2)) {
+			pdata->jackdetect_active_low =
+				debounce_pars[0] == JACKDETECT_ACTIVE_LO;
+			switch (debounce_pars[1]) {
+			case 5:
+				pdata->jackdetect_debounce_time =
+					ADAU1761_JACKDETECT_DEBOUNCE_5MS;
+				break;
+			case 10:
+				pdata->jackdetect_debounce_time =
+					ADAU1761_JACKDETECT_DEBOUNCE_10MS;
+				break;
+			case 20:
+				pdata->jackdetect_debounce_time =
+					ADAU1761_JACKDETECT_DEBOUNCE_20MS;
+				break;
+			case 40:
+				pdata->jackdetect_debounce_time =
+					ADAU1761_JACKDETECT_DEBOUNCE_40MS;
+				break;
+			default:
+				dev_warn(dev, "Invalid debounce_time %d\n",
+					debounce_pars[1]);
+				pdata->jackdetect_debounce_time =
+					ADAU1761_JACKDETECT_DEBOUNCE_40MS;
+				break;
+			}
+		} else if (!of_property_read_u32_array(np, "adi,jack-detection",
+						debounce_pars, 1)) {
+			dev_warn(dev, "Debounce time not provided\n");
+			pdata->jackdetect_active_low =
+				debounce_pars[0] == JACKDETECT_ACTIVE_LO;
+		} else {
+			dev_warn(dev, "No jack detection settings found\n");
+			pdata->jackdetect_active_low = 0;
+			pdata->jackdetect_debounce_time =
+				ADAU1761_JACKDETECT_DEBOUNCE_40MS;
+		}
+	} else if (of_property_read_bool(np, "adi,digital-microphone")) {
+		pdata->digmic_jackdetect_pin_mode =
+			ADAU1761_DIGMIC_JACKDET_PIN_MODE_DIGMIC;
+	} else {
+		pdata->digmic_jackdetect_pin_mode =
+			ADAU1761_DIGMIC_JACKDET_PIN_MODE_NONE;
+	}
+
+	if (!of_property_read_u32(np, "adi,headphone-mode", &val))
+		adau1761_parse_of_outmode(dev, val, &pdata->headphone_mode);
+	else
+		pdata->headphone_mode = ADAU1761_OUTPUT_MODE_LINE;
+
+	if (!of_property_read_u32(np, "adi,lineout-mode", &val))
+		adau1761_parse_of_outmode(dev, val, &pdata->lineout_mode);
+	else
+		pdata->lineout_mode = ADAU1761_OUTPUT_MODE_LINE;
+
+	if (!of_property_read_u32(np, "adi,micbias-vg", &val)) {
+		switch (val) {
+		case MICBIAS_0_65_AVDD:
+			pdata->micbias_voltage = ADAU17X1_MICBIAS_0_65_AVDD;
+			break;
+		case MICBIAS_0_90_AVDD:
+			pdata->micbias_voltage = ADAU17X1_MICBIAS_0_90_AVDD;
+			break;
+		default:
+			dev_warn(dev, "Invalid micbias voltage setting\n");
+			pdata->micbias_voltage = ADAU17X1_MICBIAS_0_90_AVDD;
+			break;
+		}
+	} else {
+		pdata->micbias_voltage = ADAU17X1_MICBIAS_0_90_AVDD;
+	}
+}
+#else
+static void adau1761_pdata_from_of(struct device *dev,
+				   struct adau1761_platform_data *pdata)
+{
+}
+#endif
+
 static const struct snd_soc_codec_driver adau1761_codec_driver = {
 	.probe = adau1761_codec_probe,
 	.resume	= adau17x1_resume,
@@ -772,6 +889,8 @@ int adau1761_probe(struct device *dev, struct regmap *regmap,
 	enum adau17x1_type type, void (*switch_mode)(struct device *dev))
 {
 	struct snd_soc_dai_driver *dai_drv;
+	struct adau1761_platform_data *of_pdata;
+	struct device_node *np = dev->of_node;
 	const char *firmware_name;
 	int ret;
 
@@ -781,6 +900,14 @@ int adau1761_probe(struct device *dev, struct regmap *regmap,
 	} else {
 		dai_drv = &adau1761_dai_driver;
 		firmware_name = ADAU1761_FIRMWARE;
+	}
+
+	if (!dev->platform_data && np) {
+		of_pdata = devm_kzalloc(dev, sizeof(*of_pdata), GFP_KERNEL);
+		if (!of_pdata)
+			return -ENOMEM;
+		adau1761_pdata_from_of(dev, of_pdata);
+		dev->platform_data = of_pdata;
 	}
 
 	ret = adau17x1_probe(dev, regmap, type, switch_mode, firmware_name);

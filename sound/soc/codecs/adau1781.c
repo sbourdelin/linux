@@ -18,6 +18,7 @@
 #include <sound/soc.h>
 #include <sound/tlv.h>
 #include <linux/platform_data/adau17x1.h>
+#include <dt-bindings/sound/adau17x1.h>
 
 #include "adau17x1.h"
 #include "adau1781.h"
@@ -426,6 +427,43 @@ static int adau1781_codec_probe(struct snd_soc_codec *codec)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static void adau1781_pdata_from_of(struct device *dev,
+				   struct adau1781_platform_data *pdata)
+{
+	struct device_node *np = dev->of_node;
+	uint32_t val;
+
+	val = of_property_read_bool(np, "adi,input-differential");
+	pdata->left_input_differential = val;
+	pdata->right_input_differential = val;
+
+	of_property_read_bool(np, "adi,digital-microphone");
+
+	if (!of_property_read_u32(np, "adi,micbias-vg", &val)) {
+		switch (val) {
+		case MICBIAS_0_65_AVDD:
+			pdata->micbias_voltage = ADAU17X1_MICBIAS_0_65_AVDD;
+			break;
+		case MICBIAS_0_90_AVDD:
+			pdata->micbias_voltage = ADAU17X1_MICBIAS_0_90_AVDD;
+			break;
+		default:
+			dev_warn(dev, "Invalid micbias voltage setting\n");
+			pdata->micbias_voltage = ADAU17X1_MICBIAS_0_90_AVDD;
+			break;
+		}
+	} else {
+		pdata->micbias_voltage = ADAU17X1_MICBIAS_0_90_AVDD;
+	}
+}
+#else
+static void adau1781_pdata_from_of(struct device *dev,
+				   struct adau1781_platform_data *pdata)
+{
+}
+#endif
+
 static const struct snd_soc_codec_driver adau1781_codec_driver = {
 	.probe = adau1781_codec_probe,
 	.resume = adau17x1_resume,
@@ -479,6 +517,8 @@ int adau1781_probe(struct device *dev, struct regmap *regmap,
 	enum adau17x1_type type, void (*switch_mode)(struct device *dev))
 {
 	const char *firmware_name;
+	struct adau1781_platform_data *of_pdata;
+	struct device_node *np = dev->of_node;
 	int ret;
 
 	switch (type) {
@@ -490,6 +530,14 @@ int adau1781_probe(struct device *dev, struct regmap *regmap,
 		break;
 	default:
 		return -EINVAL;
+	}
+
+	if (!dev->platform_data && np) {
+		of_pdata = devm_kzalloc(dev, sizeof(*of_pdata), GFP_KERNEL);
+		if (!of_pdata)
+			return -ENOMEM;
+		adau1781_pdata_from_of(dev, of_pdata);
+		dev->platform_data = of_pdata;
 	}
 
 	ret = adau17x1_probe(dev, regmap, type, switch_mode, firmware_name);
