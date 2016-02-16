@@ -654,7 +654,7 @@ static int power8_generic_events[] = {
 	[PERF_COUNT_HW_CACHE_MISSES] =			PM_LD_MISS_L1,
 };
 
-static u64 power8_bhrb_filter_map(u64 branch_sample_type)
+static u64 power8_bhrb_filter_map(u64 branch_sample_type, u64 *bhrb_filter)
 {
 	/* BHRB and regular PMU events share the same privilege state
 	 * filter configuration. BHRB is always recorded along with a

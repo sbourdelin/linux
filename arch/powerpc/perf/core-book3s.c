@@ -53,6 +53,8 @@ struct cpu_hw_events {
 
 	/* BHRB bits */
 	u64				bhrb_hw_filter;	/* BHRB HW filter */
+	u64				bhrb_sw_filter;	/* BHRB SW filter */
+	u64				bhrb_filter;	/* Branch filter mask */
 	unsigned int			bhrb_users;
 	void				*bhrb_context;
 	struct	perf_branch_stack	bhrb_stack;
@@ -430,6 +432,84 @@ static inline void insert_branch(struct cpu_hw_events *cpuhw,
 	cpuhw->bhrb_entries[index].predicted = !mispred;
 }
 
+/**
+ * check_instruction - Instruction opcode analysis
+ * @addr:	Instruction address
+ * @sw_filter:	SW branch filter
+ *
+ * Analyse instruction opcodes and classify them into various
+ * branch filter options available. This follows the standard
+ * semantics of OR which means that instructions which conforms
+ * to any of the requested branch filters get picked up.
+ */
+static bool check_instruction(unsigned int *addr, u64 sw_filter)
+{
+	if (sw_filter & PERF_SAMPLE_BRANCH_ANY_RETURN) {
+		if (instr_is_return_branch(*addr))
+			return true;
+	}
+
+	if (sw_filter & PERF_SAMPLE_BRANCH_IND_CALL) {
+		if (instr_is_indirect_func_call(*addr))
+			return true;
+	}
+
+	if (sw_filter & PERF_SAMPLE_BRANCH_ANY_CALL) {
+		if (instr_is_func_call(*addr))
+			return true;
+	}
+
+	if (sw_filter & PERF_SAMPLE_BRANCH_COND) {
+		if (instr_is_conditional_branch(*addr))
+			return true;
+	}
+	return false;
+}
+
+/**
+ * keep_branch - Whether the branch conforms to applicable filter
+ * @from:	From address
+ * @sw_filter	SW branch filter
+ *
+ * Access the instruction contained in the address and then check
+ * whether it complies with the applicable SW branch filters.
+ */
+static bool keep_branch(u64 from, u64 sw_filter)
+{
+	unsigned int instr;
+	bool ret;
+
+	/*
+	 * The "from" branch for every branch record has to go
+	 * through this filter verification. So this quick check
+	 * here for no SW filters will improve performance.
+	 */
+	if (sw_filter == 0)
+		return true;
+
+	if (is_kernel_addr(from)) {
+		return check_instruction((unsigned int *) from, sw_filter);
+	} else {
+		/*
+		 * Userspace address needs to be
+		 * copied first before analysis.
+		 */
+		pagefault_disable();
+		ret =  __get_user_inatomic(instr, (unsigned int __user *) from);
+
+		/*
+		 * If the instruction could not be accessible
+		 * from user space, we still 'okay' the entry.
+		 */
+		if (ret) {
+			pagefault_enable();
+			return true;
+		}
+		pagefault_enable();
+		return check_instruction(&instr, sw_filter);
+	}
+}
+
 /* Processing BHRB entries */
 static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 {
@@ -493,6 +573,11 @@ static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 			to_addr = power_pmu_bhrb_to(addr);
 			insert_branch(cpuhw, u_index, addr, to_addr, mispred);
 		}
+
+		/* Apply SW branch filters and drop the entry if required */
+		if (!keep_branch(cpuhw->bhrb_entries[u_index].from,
+						cpuhw->bhrb_sw_filter))
+			u_index--;
 		u_index++;
 	}
 	cpuhw->bhrb_stack.nr = u_index;
@@ -689,6 +774,79 @@ static void pmao_restore_workaround(bool ebb)
 	mtspr(SPRN_PMC6, pmcs[5]);
 }
 #endif /* CONFIG_PPC64 */
+
+/* SW implemented branch filters */
+static unsigned int power_sw_filter[] = { PERF_SAMPLE_BRANCH_USER,
+					  PERF_SAMPLE_BRANCH_KERNEL,
+					  PERF_SAMPLE_BRANCH_HV,
+					  PERF_SAMPLE_BRANCH_ANY_CALL,
+					  PERF_SAMPLE_BRANCH_COND,
+					  PERF_SAMPLE_BRANCH_ANY_RETURN,
+					  PERF_SAMPLE_BRANCH_IND_CALL };
+
+/**
+ * all_filters_covered - Whether requested filters covered
+ * @branch_sample_type:	Requested branch sample filter
+ * @bhrb_filter:	Branch Filters covered through SW and HW
+ *
+ * Validate whether all the user requested branch filters are getting
+ * processed either in the PMU HW or in SW.
+ */
+static int all_filters_covered(u64 branch_sample_type, u64 bhrb_filter)
+{
+	u64 x;
+
+	if (bhrb_filter == PERF_SAMPLE_BRANCH_ANY)
+		return true;
+
+	for_each_branch_sample_type(x) {
+		if (!(branch_sample_type & x))
+			continue;
+		/*
+		 * Requested filter not available either
+		 * in PMU or in SW.
+		 */
+		if (!(bhrb_filter & x))
+			return false;
+	}
+	return true;
+}
+
+/**
+ * bhrb_sw_filter_map - Required SW based branch filters
+ * @branch_sample_type:	Requested branch sample type
+ * @bhrb_filter:	Branch filters covered through HW
+ *
+ * This is called after figuring out what all branch filters the PMU HW
+ * supports for the requested branch filter set. Here we will go through
+ * all the SW implemented branch filters one by one and pick them up if
+ * its not already supported in the PMU.
+ */
+static u64 bhrb_sw_filter_map(u64 branch_sample_type, u64 *bhrb_filter)
+{
+	u64 branch_sw_filter = 0;
+	unsigned int i;
+
+	if (branch_sample_type & PERF_SAMPLE_BRANCH_ANY) {
+		WARN_ON(*bhrb_filter != PERF_SAMPLE_BRANCH_ANY);
+		return branch_sw_filter;
+	}
+
+	/*
+	 * PMU supported branch filters must be implemented in SW
+	 * when the PMU is unable to process them for some reason.
+	 */
+	for (i = 0; i < ARRAY_SIZE(power_sw_filter); i++) {
+		if (branch_sample_type & power_sw_filter[i]) {
+			if (!(*bhrb_filter & power_sw_filter[i])) {
+				branch_sw_filter |= power_sw_filter[i];
+				*bhrb_filter |= power_sw_filter[i];
+			}
+		}
+	}
+
+	return branch_sw_filter;
+}
 
 static void perf_event_interrupt(struct pt_regs *regs);
 
@@ -1355,6 +1513,8 @@ static void power_pmu_enable(struct pmu *pmu)
 	mmcr0 = ebb_switch_in(ebb, cpuhw);
 
 	mb();
+
+	/* Enable PMU based branch filters */
 	if (cpuhw->bhrb_users)
 		ppmu->config_bhrb(cpuhw->bhrb_hw_filter);
 
@@ -1464,8 +1624,12 @@ nocheck:
  out:
 	if (has_branch_stack(event)) {
 		power_pmu_bhrb_enable(event);
-		cpuhw->bhrb_hw_filter = ppmu->bhrb_filter_map(
-					event->attr.branch_sample_type);
+		cpuhw->bhrb_hw_filter = ppmu->bhrb_filter_map
+					(event->attr.branch_sample_type,
+							&cpuhw->bhrb_filter);
+		cpuhw->bhrb_sw_filter = bhrb_sw_filter_map
+					(event->attr.branch_sample_type,
+							&cpuhw->bhrb_filter);
 	}
 
 	perf_pmu_enable(event->pmu);
@@ -1870,11 +2034,27 @@ static int power_pmu_event_init(struct perf_event *event)
 
 	err = power_check_constraints(cpuhw, events, cflags, n + 1);
 
+	/*
+	 * BHRB branch filters implemented in PMU will take
+	 * effect when we enable the event and data set
+	 * collected thereafter will be compliant with those
+	 * branch filters. Where as the SW branch filters will
+	 * be applied during the post processing of BHRB data.
+	 */
 	if (has_branch_stack(event)) {
+		/* Query available PMU branch filter support */
 		cpuhw->bhrb_hw_filter = ppmu->bhrb_filter_map(
-					event->attr.branch_sample_type);
+					event->attr.branch_sample_type,
+					&cpuhw->bhrb_filter);
 
-		if (cpuhw->bhrb_hw_filter == -1) {
+		/* Query available SW branch filter support */
+		cpuhw->bhrb_sw_filter = bhrb_sw_filter_map(
+					event->attr.branch_sample_type,
+					&cpuhw->bhrb_filter);
+
+		/* Check overall coverage of branch filter request */
+		if (!all_filters_covered(event->attr.branch_sample_type,
+							cpuhw->bhrb_filter)) {
 			put_cpu_var(cpu_hw_events);
 			return -EOPNOTSUPP;
 		}

@@ -38,7 +38,8 @@ struct power_pmu {
 				unsigned long *valp);
 	int		(*get_alternatives)(u64 event_id, unsigned int flags,
 				u64 alt[]);
-	u64             (*bhrb_filter_map)(u64 branch_sample_type);
+	u64             (*bhrb_filter_map)(u64 branch_sample_type,
+							u64 *bhrb_filter);
 	void            (*config_bhrb)(u64 pmu_bhrb_filter);
 	void		(*disable_pmc)(unsigned int pmc, unsigned long mmcr[]);
 	int		(*limited_pmc_event)(u64 event_id);
@@ -79,6 +80,10 @@ struct pt_regs;
 extern unsigned long perf_misc_flags(struct pt_regs *regs);
 extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
 extern unsigned long int read_bhrb(int n);
+
+#define for_each_branch_sample_type(x) \
+		for ((x) = PERF_SAMPLE_BRANCH_USER; \
+			(x) < PERF_SAMPLE_BRANCH_MAX; (x) <<= 1)
 
 /*
  * Only override the default definitions in include/linux/perf_event.h
