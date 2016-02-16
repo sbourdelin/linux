@@ -99,7 +99,7 @@ void snd_jack_report(struct snd_jack *jack, int status);
 static inline int snd_jack_new(struct snd_card *card, const char *id, int type,
 			       struct snd_jack **jack, bool initial_kctl, bool phantom_jack)
 {
-	return 0;
+	return -ENXIO;
 }
 
 static inline int snd_jack_add_new_kctl(struct snd_jack *jack, const char * name, int mask)
