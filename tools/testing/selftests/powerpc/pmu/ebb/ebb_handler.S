@@ -4,7 +4,7 @@
  */
 
 #include <ppc-asm.h>
-#include "reg.h"
+#include "../../reg.h"
 
 
 /* ppc-asm.h defines most of the reg aliases, but not r1/r2. */

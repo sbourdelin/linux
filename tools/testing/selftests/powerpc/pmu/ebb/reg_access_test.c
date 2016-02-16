@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #include "ebb.h"
-#include "reg.h"
+#include "../../reg.h"
 
 
 /*
