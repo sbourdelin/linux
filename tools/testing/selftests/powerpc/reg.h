@@ -18,6 +18,19 @@
 
 #define mb()		asm volatile("sync" : : : "memory");
 
+/* Vector Instructions */
+#define VSX_XX1(xs, ra, rb)	(((xs) & 0x1f) << 21 | ((ra) << 16) |  \
+				 ((rb) << 11) | (((xs) >> 5)))
+#define STXVD2X(xs, ra, rb)	.long (0x7c000798 | VSX_XX1((xs), (ra), (rb)))
+#define LXVD2X(xs, ra, rb)	.long (0x7c000698 | VSX_XX1((xs), (ra), (rb)))
+
+/* TM instructions */
+#define TBEGIN		".long 0x7C00051D;"
+#define TABORT		".long 0x7C00071D;"
+#define TEND		".long 0x7C00055D;"
+#define TSUSPEND	".long 0x7C0005DD;"
+#define TRESUME		".long 0x7C2005DD;"
+
 #define SPRN_MMCR2     769
 #define SPRN_MMCRA     770
 #define SPRN_MMCR0     779
@@ -45,5 +58,13 @@
 #define SPRN_SIAR      780
 #define SPRN_SDAR      781
 #define SPRN_SIER      768
+
+#define SPRN_DSCR      3	/* Data Stream Control Register */
+#define SPRN_TAR       815	/* Target Address Register */
+#define SPRN_PPR       896	/* Program Priority Register */
+
+#define SPRN_TFHAR	0x80	/* TM Failure Handle Register */
+#define SPRN_TFIAR	0x81	/* TM Failure Instruction Address Register */
+#define SPRN_TEXASR	0x82	/* TM Exception and Status Register */
 
 #endif /* _SELFTESTS_POWERPC_REG_H */
