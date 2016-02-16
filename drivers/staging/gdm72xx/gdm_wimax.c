@@ -100,7 +100,7 @@ static struct evt_entry *get_event_entry(void)
 
 static void put_event_entry(struct evt_entry *e)
 {
-	BUG_ON(!e);
+	WARN_ON(!e);
 
 	list_add_tail(&e->list, &wm_event.freeq);
 }
