@@ -328,7 +328,8 @@ static void gdm_wimax_ind_if_updown(struct net_device *dev, int if_up)
 	hci->length = cpu_to_be16(sizeof(up_down));
 	hci->data[0] = up_down;
 
-	gdm_wimax_event_send(dev, (char *)hci, HCI_HEADER_SIZE + sizeof(up_down));
+	gdm_wimax_event_send(dev, (char *)hci, HCI_HEADER_SIZE +
+			     sizeof(up_down));
 }
 
 static int gdm_wimax_open(struct net_device *dev)
