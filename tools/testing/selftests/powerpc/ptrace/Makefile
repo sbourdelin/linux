@@ -1,4 +1,5 @@
-TEST_PROGS := ptrace-ebb
+TEST_PROGS := ptrace-ebb ptrace-gpr
+
 all: $(TEST_PROGS)
 
 $(TEST_PROGS): ../harness.c ptrace.S ../utils.c
