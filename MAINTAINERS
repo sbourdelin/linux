@@ -5353,6 +5353,11 @@ L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/ibm/ibmvnic.*
 
+IBM Power Virtual Management Channel Driver
+M:	Steven Royer <seroyer@linux.vnet.ibm.com>
+S:	Supported
+F:	drivers/misc/ibmvmc.*
+
 IBM Power Virtual SCSI Device Drivers
 M:	Tyrel Datwyler <tyreld@linux.vnet.ibm.com>
 L:	linux-scsi@vger.kernel.org
