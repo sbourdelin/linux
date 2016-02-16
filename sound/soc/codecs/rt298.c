@@ -961,10 +961,10 @@ static irqreturn_t rt298_irq(int irq, void *data)
 	bool mic = false;
 	int ret, status = 0;
 
-	ret = rt298_jack_detect(rt298, &hp, &mic);
-
 	/* Clear IRQ */
 	regmap_update_bits(rt298->regmap, RT298_IRQ_CTRL, 0x1, 0x1);
+
+	ret = rt298_jack_detect(rt298, &hp, &mic);
 
 	if (ret == 0) {
 		if (hp == true)
