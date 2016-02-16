@@ -4222,7 +4222,7 @@ M:	Maxim Levitsky <maximlevitsky@gmail.com>
 S:	Maintained
 F:	drivers/media/rc/ene_ir.*
 
-ENHANCED ERROR HANDLING (EEH)
+EXTENDED ERROR HANDLING (EEH)
 M:	Gavin Shan <shangw@linux.vnet.ibm.com>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Supported
