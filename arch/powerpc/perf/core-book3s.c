@@ -426,7 +426,8 @@ static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 {
 	u64 val;
 	u64 addr;
-	int r_index, u_index, pred;
+	int r_index, u_index;
+	bool mispred;
 
 	r_index = 0;
 	u_index = 0;
@@ -438,7 +439,7 @@ static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 			break;
 		else {
 			addr = val & BHRB_EA;
-			pred = val & BHRB_PREDICTION;
+			mispred = val & BHRB_PREDICTION;
 
 			if (!addr)
 				/* invalid entry */
@@ -467,8 +468,9 @@ static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 				 * (ie. computed gotos/XL form)
 				 */
 				cpuhw->bhrb_entries[u_index].to = addr;
-				cpuhw->bhrb_entries[u_index].mispred = pred;
-				cpuhw->bhrb_entries[u_index].predicted = ~pred;
+				cpuhw->bhrb_entries[u_index].mispred = mispred;
+				cpuhw->bhrb_entries[u_index].predicted =
+								~mispred;
 
 				/* Get from address in next entry */
 				val = read_bhrb(r_index++);
@@ -486,8 +488,9 @@ static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 				cpuhw->bhrb_entries[u_index].from = addr;
 				cpuhw->bhrb_entries[u_index].to =
 					power_pmu_bhrb_to(addr);
-				cpuhw->bhrb_entries[u_index].mispred = pred;
-				cpuhw->bhrb_entries[u_index].predicted = ~pred;
+				cpuhw->bhrb_entries[u_index].mispred = mispred;
+				cpuhw->bhrb_entries[u_index].predicted =
+								~mispred;
 			}
 			u_index++;
 
