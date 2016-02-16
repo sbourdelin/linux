@@ -2526,6 +2526,11 @@ static int add_hdmi_jack_kctl(struct hda_codec *codec,
 	struct snd_jack *jack;
 	int err;
 
+	if (!IS_ENABLED(CONFIG_SND_JACK)) {
+		spec->pcm_rec[pcm_idx].jack = NULL;
+		return 0;
+	}
+
 	err = snd_jack_new(codec->card, name, SND_JACK_AVOUT, &jack,
 			   true, false);
 	if (err < 0)
