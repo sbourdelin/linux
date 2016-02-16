@@ -20,6 +20,7 @@
 #include <asm/firmware.h>
 #include <asm/ptrace.h>
 #include <asm/code-patching.h>
+#include <asm/cputable.h>
 
 #define BHRB_MAX_ENTRIES	32
 #define BHRB_TARGET		0x0000000000000002
@@ -474,10 +475,10 @@ static bool check_instruction(unsigned int *addr, u64 sw_filter)
  * Access the instruction contained in the address and then check
  * whether it complies with the applicable SW branch filters.
  */
-static bool keep_branch(u64 from, u64 sw_filter)
+static bool keep_branch(u64 from, u64 to, u64 sw_filter)
 {
 	unsigned int instr;
-	bool ret;
+	bool to_plm, ret, select_branch;
 
 	/*
 	 * The "from" branch for every branch record has to go
@@ -486,6 +487,37 @@ static bool keep_branch(u64 from, u64 sw_filter)
 	 */
 	if (sw_filter == 0)
 		return true;
+
+	to_plm = is_kernel_addr(to) ? POWER_ADDR_KERNEL : POWER_ADDR_USER;
+
+	/*
+	 * XXX: Applying the privilege mode SW branch filters first on
+	 * the 'TO' address creates an AND semantic with other SW branch
+	 * filters which are ORed with each other being applied on the
+	 * 'FROM' address there after.
+	 */
+	if (sw_filter & PERF_SAMPLE_BRANCH_PLM_ALL) {
+		select_branch = false;
+
+		if (sw_filter & PERF_SAMPLE_BRANCH_USER) {
+			if (to_plm == POWER_ADDR_USER)
+				select_branch = true;
+		}
+
+		if (sw_filter & PERF_SAMPLE_BRANCH_KERNEL) {
+			if (to_plm == POWER_ADDR_KERNEL)
+				select_branch = true;
+		}
+
+		if (sw_filter & PERF_SAMPLE_BRANCH_HV) {
+			if (cpu_has_feature(CPU_FTR_HVMODE)
+				&& (to_plm == POWER_ADDR_KERNEL))
+				select_branch = true;
+		}
+
+		if (!select_branch)
+			return false;
+	}
 
 	if (is_kernel_addr(from)) {
 		return check_instruction((unsigned int *) from, sw_filter);
@@ -576,6 +608,7 @@ static void power_pmu_bhrb_read(struct cpu_hw_events *cpuhw)
 
 		/* Apply SW branch filters and drop the entry if required */
 		if (!keep_branch(cpuhw->bhrb_entries[u_index].from,
+					cpuhw->bhrb_entries[u_index].to,
 						cpuhw->bhrb_sw_filter))
 			u_index--;
 		u_index++;

@@ -85,6 +85,9 @@ extern unsigned long int read_bhrb(int n);
 		for ((x) = PERF_SAMPLE_BRANCH_USER; \
 			(x) < PERF_SAMPLE_BRANCH_MAX; (x) <<= 1)
 
+#define POWER_ADDR_USER		0
+#define POWER_ADDR_KERNEL	1
+
 /*
  * Only override the default definitions in include/linux/perf_event.h
  * if we have hardware PMU support.
