@@ -1548,8 +1548,8 @@ pc_render_add_request(struct drm_i915_gem_request *req)
 	return 0;
 }
 
-static u32
-gen6_ring_get_seqno(struct intel_engine_cs *ring, bool lazy_coherency)
+static void
+gen6_seqno_barrier(struct intel_engine_cs *ring)
 {
 	/* Workaround to force correct ordering between irq and seqno writes on
 	 * ivb (and maybe also on snb) by reading from a CS register (like
@@ -1563,16 +1563,12 @@ gen6_ring_get_seqno(struct intel_engine_cs *ring, bool lazy_coherency)
 	 * batch i.e. much more frequent than a delay when waiting for the
 	 * interrupt (with the same net latency).
 	 */
-	if (!lazy_coherency) {
-		struct drm_i915_private *dev_priv = ring->dev->dev_private;
-		POSTING_READ_FW(RING_ACTHD(ring->mmio_base));
-	}
-
-	return intel_read_status_page(ring, I915_GEM_HWS_INDEX);
+	struct drm_i915_private *dev_priv = to_i915(ring->dev);
+	POSTING_READ_FW(RING_ACTHD(ring->mmio_base));
 }
 
 static u32
-ring_get_seqno(struct intel_engine_cs *ring, bool lazy_coherency)
+ring_get_seqno(struct intel_engine_cs *ring)
 {
 	return intel_read_status_page(ring, I915_GEM_HWS_INDEX);
 }
@@ -1584,7 +1580,7 @@ ring_set_seqno(struct intel_engine_cs *ring, u32 seqno)
 }
 
 static u32
-pc_render_get_seqno(struct intel_engine_cs *ring, bool lazy_coherency)
+pc_render_get_seqno(struct intel_engine_cs *ring)
 {
 	return ring->scratch.cpu_page[0];
 }
@@ -2783,7 +2779,8 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		ring->irq_get = gen8_ring_get_irq;
 		ring->irq_put = gen8_ring_put_irq;
 		ring->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
-		ring->get_seqno = gen6_ring_get_seqno;
+		ring->irq_seqno_barrier = gen6_seqno_barrier;
+		ring->get_seqno = ring_get_seqno;
 		ring->set_seqno = ring_set_seqno;
 		if (i915_semaphore_is_enabled(dev)) {
 			WARN_ON(!dev_priv->semaphore_obj);
@@ -2800,7 +2797,8 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		ring->irq_get = gen6_ring_get_irq;
 		ring->irq_put = gen6_ring_put_irq;
 		ring->irq_enable_mask = GT_RENDER_USER_INTERRUPT;
-		ring->get_seqno = gen6_ring_get_seqno;
+		ring->irq_seqno_barrier = gen6_seqno_barrier;
+		ring->get_seqno = ring_get_seqno;
 		ring->set_seqno = ring_set_seqno;
 		if (i915_semaphore_is_enabled(dev)) {
 			ring->semaphore.sync_to = gen6_ring_sync;
@@ -2915,7 +2913,8 @@ int intel_init_bsd_ring_buffer(struct drm_device *dev)
 			ring->write_tail = gen6_bsd_ring_write_tail;
 		ring->flush = gen6_bsd_ring_flush;
 		ring->add_request = gen6_add_request;
-		ring->get_seqno = gen6_ring_get_seqno;
+		ring->irq_seqno_barrier = gen6_seqno_barrier;
+		ring->get_seqno = ring_get_seqno;
 		ring->set_seqno = ring_set_seqno;
 		if (INTEL_INFO(dev)->gen >= 8) {
 			ring->irq_enable_mask =
@@ -2988,7 +2987,8 @@ int intel_init_bsd2_ring_buffer(struct drm_device *dev)
 	ring->mmio_base = GEN8_BSD2_RING_BASE;
 	ring->flush = gen6_bsd_ring_flush;
 	ring->add_request = gen6_add_request;
-	ring->get_seqno = gen6_ring_get_seqno;
+	ring->irq_seqno_barrier = gen6_seqno_barrier;
+	ring->get_seqno = ring_get_seqno;
 	ring->set_seqno = ring_set_seqno;
 	ring->irq_enable_mask =
 			GT_RENDER_USER_INTERRUPT << GEN8_VCS2_IRQ_SHIFT;
@@ -3019,7 +3019,8 @@ int intel_init_blt_ring_buffer(struct drm_device *dev)
 	ring->write_tail = ring_write_tail;
 	ring->flush = gen6_ring_flush;
 	ring->add_request = gen6_add_request;
-	ring->get_seqno = gen6_ring_get_seqno;
+	ring->irq_seqno_barrier = gen6_seqno_barrier;
+	ring->get_seqno = ring_get_seqno;
 	ring->set_seqno = ring_set_seqno;
 	if (INTEL_INFO(dev)->gen >= 8) {
 		ring->irq_enable_mask =
@@ -3077,7 +3078,8 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 	ring->write_tail = ring_write_tail;
 	ring->flush = gen6_ring_flush;
 	ring->add_request = gen6_add_request;
-	ring->get_seqno = gen6_ring_get_seqno;
+	ring->irq_seqno_barrier = gen6_seqno_barrier;
+	ring->get_seqno = ring_get_seqno;
 	ring->set_seqno = ring_set_seqno;
 
 	if (INTEL_INFO(dev)->gen >= 8) {

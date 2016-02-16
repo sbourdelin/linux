@@ -600,7 +600,7 @@ static int i915_gem_pageflip_info(struct seq_file *m, void *data)
 					   ring->name,
 					   i915_gem_request_get_seqno(work->flip_queued_req),
 					   dev_priv->next_seqno,
-					   ring->get_seqno(ring, true),
+					   ring->get_seqno(ring),
 					   i915_gem_request_completed(work->flip_queued_req, true));
 			} else
 				seq_printf(m, "Flip not associated with any ring\n");
@@ -732,7 +732,7 @@ static void i915_ring_seqno_info(struct seq_file *m,
 {
 	if (ring->get_seqno) {
 		seq_printf(m, "Current sequence (%s): %x\n",
-			   ring->name, ring->get_seqno(ring, false));
+			   ring->name, ring->get_seqno(ring));
 	}
 }
 
@@ -1342,8 +1342,8 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 	intel_runtime_pm_get(dev_priv);
 
 	for_each_ring(ring, dev_priv, i) {
-		seqno[i] = ring->get_seqno(ring, false);
 		acthd[i] = intel_ring_get_active_head(ring);
+		seqno[i] = ring->get_seqno(ring);
 	}
 
 	i915_get_extra_instdone(dev, instdone);

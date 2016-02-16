@@ -2937,7 +2937,7 @@ static int semaphore_passed(struct intel_engine_cs *ring)
 	if (signaller->hangcheck.deadlock >= I915_NUM_RINGS)
 		return -1;
 
-	if (i915_seqno_passed(signaller->get_seqno(signaller, false), seqno))
+	if (i915_seqno_passed(signaller->get_seqno(signaller), seqno))
 		return 1;
 
 	/* cursory check for an unkickable deadlock */
@@ -3101,8 +3101,18 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 
 		semaphore_clear_deadlocks(dev_priv);
 
-		seqno = ring->get_seqno(ring, false);
+		/* We don't strictly need an irq-barrier here, as we are not
+		 * serving an interrupt request, be paranoid in case the
+		 * barrier has side-effects (such as preventing a broken
+		 * cacheline snoop) and so be sure that we can see the seqno
+		 * advance. If the seqno should stick, due to a stale
+		 * cacheline, we would erroneously declare the GPU hung.
+		 */
+		if (ring->irq_seqno_barrier)
+			ring->irq_seqno_barrier(ring);
+
 		acthd = intel_ring_get_active_head(ring);
+		seqno = ring->get_seqno(ring);
 
 		if (ring->hangcheck.seqno == seqno) {
 			if (ring_idle(ring, seqno)) {
