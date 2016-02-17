@@ -110,9 +110,7 @@ static void *i915_gem_dmabuf_vmap(struct dma_buf *dma_buf)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dma_buf);
 	struct drm_device *dev = obj->base.dev;
-	struct sg_page_iter sg_iter;
-	struct page **pages;
-	int ret, i;
+	int ret;
 
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret)
@@ -131,16 +129,7 @@ static void *i915_gem_dmabuf_vmap(struct dma_buf *dma_buf)
 
 	ret = -ENOMEM;
 
-	pages = drm_malloc_ab(obj->base.size >> PAGE_SHIFT, sizeof(*pages));
-	if (pages == NULL)
-		goto err_unpin;
-
-	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0)
-		pages[i++] = sg_page_iter_page(&sg_iter);
-
-	obj->dma_buf_vmapping = vmap(pages, i, 0, PAGE_KERNEL);
-	drm_free_large(pages);
+	obj->dma_buf_vmapping = i915_gem_object_vmap(obj, 0, obj->pages->nents);
 
 	if (!obj->dma_buf_vmapping)
 		goto err_unpin;

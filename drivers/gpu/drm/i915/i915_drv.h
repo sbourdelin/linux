@@ -2899,6 +2899,9 @@ struct drm_i915_gem_object *i915_gem_object_create_from_data(
 		struct drm_device *dev, const void *data, size_t size);
 void i915_gem_free_object(struct drm_gem_object *obj);
 void i915_gem_vma_destroy(struct i915_vma *vma);
+void *i915_gem_object_vmap(struct drm_i915_gem_object *obj,
+			   unsigned int first,
+			   unsigned int npages);
 
 /* Flags used by pin/bind&friends. */
 #define PIN_MAPPABLE	(1<<0)
