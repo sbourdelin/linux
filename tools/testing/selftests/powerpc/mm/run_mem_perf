@@ -1,0 +1,3 @@
+sysctl vm.nr_hugepages=10
+./mem_perf 1
+sysctl vm.nr_hugepages=0

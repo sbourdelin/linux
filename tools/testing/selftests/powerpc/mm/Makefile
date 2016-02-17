@@ -1,7 +1,7 @@
 noarg:
 	$(MAKE) -C ../
 
-TEST_PROGS := hugetlb_vs_thp_test subpage_prot
+TEST_PROGS := hugetlb_vs_thp_test subpage_prot mem_perf
 TEST_FILES := tempfile
 
 all: $(TEST_PROGS) $(TEST_FILES)
