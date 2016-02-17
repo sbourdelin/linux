@@ -194,7 +194,7 @@ static int __meminit vmemmap_populated(unsigned long start, int page_size)
 #ifdef CONFIG_PPC_BOOK3E
 static void __meminit vmemmap_create_mapping(unsigned long start,
 					     unsigned long page_size,
-					     unsigned long phys)
+					     unsigned long paddr)
 {
 	/* Create a PTE encoding without page size */
 	unsigned long i, flags = _PAGE_PRESENT | _PAGE_ACCESSED |
@@ -207,11 +207,11 @@ static void __meminit vmemmap_create_mapping(unsigned long start,
 	flags |= mmu_psize_defs[mmu_vmemmap_psize].enc << 8;
 
 	/* For each PTE for that area, map things. Note that we don't
-	 * increment phys because all PTEs are of the large size and
+	 * increment paddr because all PTEs are of the large size and
 	 * thus must have the low bits clear
 	 */
 	for (i = 0; i < page_size; i += PAGE_SIZE)
-		BUG_ON(map_kernel_page(start + i, phys, flags));
+		BUG_ON(map_kernel_page(start + i, paddr, flags));
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
@@ -223,9 +223,9 @@ static void vmemmap_remove_mapping(unsigned long start,
 #else /* CONFIG_PPC_BOOK3E */
 static void __meminit vmemmap_create_mapping(unsigned long start,
 					     unsigned long page_size,
-					     unsigned long phys)
+					     unsigned long paddr)
 {
-	int  mapped = htab_bolt_mapping(start, start + page_size, phys,
+	int  mapped = htab_bolt_mapping(start, start + page_size, paddr,
 					pgprot_val(PAGE_KERNEL),
 					mmu_vmemmap_psize,
 					mmu_kernel_ssize);
@@ -245,19 +245,19 @@ static void vmemmap_remove_mapping(unsigned long start,
 
 #endif /* CONFIG_PPC_BOOK3E */
 
-struct vmemmap_backing *vmemmap_list;
-static struct vmemmap_backing *next;
+struct vmemmap_hw_map *vmemmap_list;
+static struct vmemmap_hw_map *next;
 static int num_left;
 static int num_freed;
 
-static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
+static __meminit struct vmemmap_hw_map * vmemmap_list_alloc(int node)
 {
-	struct vmemmap_backing *vmem_back;
+	struct vmemmap_hw_map *vmem_back;
 	/* get from freed entries first */
 	if (num_freed) {
 		num_freed--;
 		vmem_back = next;
-		next = next->list;
+		next = next->link;
 
 		return vmem_back;
 	}
@@ -269,7 +269,7 @@ static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
 			WARN_ON(1);
 			return NULL;
 		}
-		num_left = PAGE_SIZE / sizeof(struct vmemmap_backing);
+		num_left = PAGE_SIZE / sizeof(struct vmemmap_hw_map);
 	}
 
 	num_left--;
@@ -277,11 +277,11 @@ static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
 	return next++;
 }
 
-static __meminit void vmemmap_list_populate(unsigned long phys,
+static __meminit void vmemmap_list_populate(unsigned long paddr,
 					    unsigned long start,
 					    int node)
 {
-	struct vmemmap_backing *vmem_back;
+	struct vmemmap_hw_map *vmem_back;
 
 	vmem_back = vmemmap_list_alloc(node);
 	if (unlikely(!vmem_back)) {
@@ -289,9 +289,9 @@ static __meminit void vmemmap_list_populate(unsigned long phys,
 		return;
 	}
 
-	vmem_back->phys = phys;
-	vmem_back->virt_addr = start;
-	vmem_back->list = vmemmap_list;
+	vmem_back->paddr = paddr;
+	vmem_back->vaddr = start;
+	vmem_back->link = vmemmap_list;
 
 	vmemmap_list = vmem_back;
 }
@@ -329,13 +329,13 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 #ifdef CONFIG_MEMORY_HOTPLUG
 static unsigned long vmemmap_list_free(unsigned long start)
 {
-	struct vmemmap_backing *vmem_back, *vmem_back_prev;
+	struct vmemmap_hw_map *vmem_back, *vmem_back_prev;
 
 	vmem_back_prev = vmem_back = vmemmap_list;
 
 	/* look for it with prev pointer recorded */
-	for (; vmem_back; vmem_back = vmem_back->list) {
-		if (vmem_back->virt_addr == start)
+	for (; vmem_back; vmem_back = vmem_back->link) {
+		if (vmem_back->vaddr == start)
 			break;
 		vmem_back_prev = vmem_back;
 	}
@@ -347,16 +347,16 @@ static unsigned long vmemmap_list_free(unsigned long start)
 
 	/* remove it from vmemmap_list */
 	if (vmem_back == vmemmap_list) /* remove head */
-		vmemmap_list = vmem_back->list;
+		vmemmap_list = vmem_back->link;
 	else
-		vmem_back_prev->list = vmem_back->list;
+		vmem_back_prev->link = vmem_back->link;
 
 	/* next point to this freed entry */
-	vmem_back->list = next;
+	vmem_back->link = next;
 	next = vmem_back;
 	num_freed++;
 
-	return vmem_back->phys;
+	return vmem_back->paddr;
 }
 
 void __ref vmemmap_free(unsigned long start, unsigned long end)
@@ -427,20 +427,20 @@ void register_page_bootmem_memmap(unsigned long section_nr,
  */
 struct page *realmode_pfn_to_page(unsigned long pfn)
 {
-	struct vmemmap_backing *vmem_back;
+	struct vmemmap_hw_map *vmem_back;
 	struct page *page;
 	unsigned long page_size = 1 << mmu_psize_defs[mmu_vmemmap_psize].shift;
 	unsigned long pg_va = (unsigned long) pfn_to_page(pfn);
 
-	for (vmem_back = vmemmap_list; vmem_back; vmem_back = vmem_back->list) {
-		if (pg_va < vmem_back->virt_addr)
+	for (vmem_back = vmemmap_list; vmem_back; vmem_back = vmem_back->link) {
+		if (pg_va < vmem_back->vaddr)
 			continue;
 
 		/* After vmemmap_list entry free is possible, need check all */
 		if ((pg_va + sizeof(struct page)) <=
-				(vmem_back->virt_addr + page_size)) {
-			page = (struct page *) (vmem_back->phys + pg_va -
-				vmem_back->virt_addr);
+				(vmem_back->vaddr + page_size)) {
+			page = (struct page *) (vmem_back->paddr + pg_va -
+				vmem_back->vaddr);
 			return page;
 		}
 	}

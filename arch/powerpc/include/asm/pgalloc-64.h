@@ -11,12 +11,18 @@
 #include <linux/cpumask.h>
 #include <linux/percpu.h>
 
-struct vmemmap_backing {
-	struct vmemmap_backing *list;
-	unsigned long phys;
-	unsigned long virt_addr;
+/*
+ * This structure tracks a single virtual page mapping from
+ * the vmemmap ddress space. This element is required to
+ * track virtual to physical mapping of page structures in
+ * absense of a page table at boot time.
+ */
+struct vmemmap_hw_map {
+	struct vmemmap_hw_map *link;
+	unsigned long paddr;
+	unsigned long vaddr;
 };
-extern struct vmemmap_backing *vmemmap_list;
+extern struct vmemmap_hw_map *vmemmap_list;
 
 /*
  * Functions that deal with pagetables that could be at any level of
