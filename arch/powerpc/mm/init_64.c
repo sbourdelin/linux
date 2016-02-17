@@ -245,45 +245,63 @@ static void vmemmap_remove_mapping(unsigned long start,
 
 #endif /* CONFIG_PPC_BOOK3E */
 
-struct vmemmap_hw_map *vmemmap_list;
-static struct vmemmap_hw_map *next;
-static int num_left;
-static int num_freed;
+/*
+ * vmemmap virtual address space does not have a page table to track
+ * existing physical mapping. The vmemmap_global list maintains the
+ * physical mapping at all times where as the vmemmap_avail list
+ * maintains the available vmemmap_hw_map structures which got deleted
+ * from the vmemmap_global list during system runtime (memory hotplug
+ * remove operation for example). They freed structures are reused later
+ * when new requests come in without allocating new fresh memory. This
+ * pointer also tracks the allocated vmemmap_hw_map structures as we
+ * allocate one full page memory at a time when we dont have any.
+ */
+struct vmemmap_hw_map *vmemmap_global;
+static struct vmemmap_hw_map *vmemmap_avail;
 
-static __meminit struct vmemmap_hw_map * vmemmap_list_alloc(int node)
+/* XXX: The same pointer vmemmap_avail tracks individual chunks inside
+ * the allocated full page during the boot time and again tracks the
+ * freeed nodes during runtime. It is racy but it does not happen as
+ * both they are separated by the boot process. Will create problem if
+ * some how we have memory hotplug operation during boot !!
+ */
+static int free_chunk;		/* Allocated chunks available */
+static int free_node;		/* Freeed nodes available */
+
+static __meminit struct vmemmap_hw_map * vmemmap_global_alloc(int node)
 {
 	struct vmemmap_hw_map *vmem_back;
 	/* get from freed entries first */
-	if (num_freed) {
-		num_freed--;
-		vmem_back = next;
-		next = next->link;
+	if (free_node) {
+		free_node--;
+		vmem_back = vmemmap_avail;
+		vmemmap_avail = vmemmap_avail->link;
 
 		return vmem_back;
 	}
 
 	/* allocate a page when required and hand out chunks */
-	if (!num_left) {
-		next = vmemmap_alloc_block(PAGE_SIZE, node);
-		if (unlikely(!next)) {
+	if (!free_chunk) {
+		vmemmap_avail = vmemmap_alloc_block(PAGE_SIZE, node);
+		if (unlikely(!vmemmap_avail)) {
 			WARN_ON(1);
 			return NULL;
 		}
-		num_left = PAGE_SIZE / sizeof(struct vmemmap_hw_map);
+		free_chunk = PAGE_SIZE / sizeof(struct vmemmap_hw_map);
 	}
 
-	num_left--;
+	free_chunk--;
 
-	return next++;
+	return vmemmap_avail++;
 }
 
-static __meminit void vmemmap_list_populate(unsigned long paddr,
+static __meminit void vmemmap_global_populate(unsigned long paddr,
 					    unsigned long start,
 					    int node)
 {
 	struct vmemmap_hw_map *vmem_back;
 
-	vmem_back = vmemmap_list_alloc(node);
+	vmem_back = vmemmap_global_alloc(node);
 	if (unlikely(!vmem_back)) {
 		WARN_ON(1);
 		return;
@@ -291,9 +309,9 @@ static __meminit void vmemmap_list_populate(unsigned long paddr,
 
 	vmem_back->paddr = paddr;
 	vmem_back->vaddr = start;
-	vmem_back->link = vmemmap_list;
+	vmem_back->link = vmemmap_global;
 
-	vmemmap_list = vmem_back;
+	vmemmap_global = vmem_back;
 }
 
 int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
@@ -315,7 +333,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 		if (!p)
 			return -ENOMEM;
 
-		vmemmap_list_populate(__pa(p), start, node);
+		vmemmap_global_populate(__pa(p), start, node);
 
 		pr_debug("      * %016lx..%016lx allocated at %p\n",
 			 start, start + page_size, p);
@@ -327,11 +345,11 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
-static unsigned long vmemmap_list_free(unsigned long start)
+static unsigned long vmemmap_global_free(unsigned long start)
 {
 	struct vmemmap_hw_map *vmem_back, *vmem_back_prev;
 
-	vmem_back_prev = vmem_back = vmemmap_list;
+	vmem_back_prev = vmem_back = vmemmap_global;
 
 	/* look for it with prev pointer recorded */
 	for (; vmem_back; vmem_back = vmem_back->link) {
@@ -345,16 +363,16 @@ static unsigned long vmemmap_list_free(unsigned long start)
 		return 0;
 	}
 
-	/* remove it from vmemmap_list */
-	if (vmem_back == vmemmap_list) /* remove head */
-		vmemmap_list = vmem_back->link;
+	/* remove it from vmemmap_global */
+	if (vmem_back == vmemmap_global) /* remove head */
+		vmemmap_global = vmem_back->link;
 	else
 		vmem_back_prev->link = vmem_back->link;
 
-	/* next point to this freed entry */
-	vmem_back->link = next;
-	next = vmem_back;
-	num_freed++;
+	/* vmemmap_avail point to this freed entry */
+	vmem_back->link = vmemmap_avail;
+	vmemmap_avail = vmem_back;
+	free_node++;
 
 	return vmem_back->paddr;
 }
@@ -378,7 +396,7 @@ void __ref vmemmap_free(unsigned long start, unsigned long end)
 		if (vmemmap_populated(start, page_size))
 			continue;
 
-		addr = vmemmap_list_free(start);
+		addr = vmemmap_global_free(start);
 		if (addr) {
 			struct page *page = pfn_to_page(addr >> PAGE_SHIFT);
 
@@ -432,11 +450,11 @@ struct page *realmode_pfn_to_page(unsigned long pfn)
 	unsigned long page_size = 1 << mmu_psize_defs[mmu_vmemmap_psize].shift;
 	unsigned long pg_va = (unsigned long) pfn_to_page(pfn);
 
-	for (vmem_back = vmemmap_list; vmem_back; vmem_back = vmem_back->link) {
+	for (vmem_back = vmemmap_global; vmem_back; vmem_back = vmem_back->link) {
 		if (pg_va < vmem_back->vaddr)
 			continue;
 
-		/* After vmemmap_list entry free is possible, need check all */
+		/* After vmemmap_global entry free is possible, need check all */
 		if ((pg_va + sizeof(struct page)) <=
 				(vmem_back->vaddr + page_size)) {
 			page = (struct page *) (vmem_back->paddr + pg_va -

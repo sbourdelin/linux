@@ -22,7 +22,7 @@ struct vmemmap_hw_map {
 	unsigned long paddr;
 	unsigned long vaddr;
 };
-extern struct vmemmap_hw_map *vmemmap_list;
+extern struct vmemmap_hw_map *vmemmap_global;
 
 /*
  * Functions that deal with pagetables that could be at any level of
