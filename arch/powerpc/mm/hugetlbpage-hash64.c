@@ -13,6 +13,7 @@
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
 #include <asm/machdep.h>
+#include <asm/trace.h>
 
 extern long hpte_insert_repeating(unsigned long hash, unsigned long vpn,
 				  unsigned long pa, unsigned long rlags,
@@ -28,6 +29,8 @@ int __hash_page_huge(unsigned long ea, unsigned long access, unsigned long vsid,
 	long slot;
 
 	BUG_ON(shift != mmu_psize_defs[mmu_psize].shift);
+
+	trace_hash_fault_hugetlb(ea, access, trap);
 
 	/* Search the Linux page table for a match with va */
 	vpn = hpt_vpn(ea, vsid, ssize);

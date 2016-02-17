@@ -17,6 +17,7 @@
  */
 #include <linux/mm.h>
 #include <asm/machdep.h>
+#include <asm/trace.h>
 
 int __hash_page_thp(unsigned long ea, unsigned long access, unsigned long vsid,
 		    pmd_t *pmdp, unsigned long trap, unsigned long flags,
@@ -29,6 +30,7 @@ int __hash_page_thp(unsigned long ea, unsigned long access, unsigned long vsid,
 	int ret, lpsize = MMU_PAGE_16M;
 	unsigned long vpn, hash, shift, slot;
 
+	trace_hash_fault_thp(ea, access, trap);
 	/*
 	 * atomically mark the linux large page PMD busy and dirty
 	 */

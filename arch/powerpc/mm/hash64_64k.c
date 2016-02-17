@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <asm/machdep.h>
 #include <asm/mmu.h>
+#include <asm/trace.h>
 /*
  * index from 0 - 15
  */
@@ -58,6 +59,7 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 	unsigned long vpn, hash, slot;
 	unsigned long shift = mmu_psize_defs[MMU_PAGE_4K].shift;
 
+	trace_hash_fault_4K(ea, access, trap);
 	/*
 	 * atomically mark the linux large page PTE busy and dirty
 	 */
@@ -221,6 +223,7 @@ int __hash_page_64K(unsigned long ea, unsigned long access,
 	unsigned long vpn, hash, slot;
 	unsigned long shift = mmu_psize_defs[MMU_PAGE_64K].shift;
 
+	trace_hash_fault_64K(ea, access, trap);
 	/*
 	 * atomically mark the linux large page PTE busy and dirty
 	 */
