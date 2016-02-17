@@ -34,6 +34,8 @@ struct i915_guc_client {
 	uint32_t priority;
 	uint32_t ctx_index;
 
+	void *client_base;
+
 	uint32_t proc_desc_offset;
 	uint32_t doorbell_offset;
 	uint32_t cookie;
@@ -43,7 +45,6 @@ struct i915_guc_client {
 	uint32_t wq_offset;
 	uint32_t wq_size;
 	uint32_t wq_tail;
-	uint32_t wq_head;
 
 	/* GuC submission statistics & status */
 	uint64_t submissions[GUC_MAX_ENGINES_NUM];
