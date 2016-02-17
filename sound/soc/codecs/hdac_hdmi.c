@@ -964,12 +964,14 @@ static int hdac_hdmi_add_cvt(struct hdac_ext_device *edev, hda_nid_t nid)
 static void hdac_hdmi_present_sense(struct hdac_hdmi_pin *pin, int repoll)
 {
 	struct hdac_ext_device *edev = pin->edev;
-	struct hdac_hdmi_priv *hdmi = edev->private_data;
+	struct hdac_hdmi_priv *hdmi;
 	struct hdac_hdmi_pcm *pcm;
 	int val;
 
 	if (!edev)
 		return;
+
+	hdmi = edev->private_data;
 
 	pin->repoll_count = repoll;
 
