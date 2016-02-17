@@ -26,6 +26,47 @@
 #define IOREMAP_BASE	(PHB_IO_END)
 #define IOREMAP_END	(KERN_VIRT_START + KERN_VIRT_SIZE)
 
+/*
+ * Starting address of the virtual address space where all page structs
+ * for the system physical memory are stored under the vmemmap sparse
+ * memory model. All possible struct pages are logically stored in a
+ * sequence in this virtual address space irrespective of the fact
+ * whether any given PFN is valid or even the memory section is valid
+ * or not. During boot and memory hotplug add operation when new memory
+ * sections are added, real physical allocation and hash table bolting
+ * will be performed. This saves precious physical memory when the system
+ * really does not have valid PFNs in some address ranges.
+ *
+ *  vmemmap +--------------+
+ *     +    |  page struct +----------+  PFN is valid
+ *     |    +--------------+          |
+ *     |    |  page struct |          |  PFN is invalid
+ *     |    +--------------+          |
+ *     |    |  page struct +------+   |
+ *     |    +--------------+      |   |
+ *     |    |  page struct |      |   |
+ *     |    +--------------+      |   |
+ *     |    |  page struct |      |   |
+ *     |    +--------------+      |   |
+ *     |    |  page struct +--+   |   |
+ *     |    +--------------+  |   |   |
+ *     |    |  page struct |  |   |   |       +-------------+
+ *     |    +--------------+  |   |   +-----> |     PFN     |
+ *     |    |  page struct |  |   |           +-------------+
+ *     |    +--------------+  |   +---------> |     PFN     |
+ *     |    |  page struct |  |               +-------------+
+ *     |    +--------------+  +-------------> |     PFN     |
+ *     |    |  page struct |                  +-------------+
+ *     |    +--------------+           +----> |     PFN     |
+ *     |    |  page struct |           |      +-------------+
+ *     |    +--------------+           |    Bolted in hash table
+ *     |    |  page struct +-----------+
+ *     v    +--------------+
+ *
+ * VMEMMAP_BASE (0xf000000000000000) region has a total range of 64TB but
+ * then it uses NR_MEM_SECTIONS * PAGES_PER_SECTION * sizeof(page struct)
+ * amount of virtual memory from it.
+ */
 #define vmemmap			((struct page *)VMEMMAP_BASE)
 
 /* Advertise special mapping type for AGP */
