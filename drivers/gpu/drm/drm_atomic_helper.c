@@ -106,25 +106,6 @@ check_pending_encoder_assignment(struct drm_atomic_state *state,
 	return true;
 }
 
-static struct drm_crtc *
-get_current_crtc_for_encoder(struct drm_device *dev,
-			     struct drm_encoder *encoder)
-{
-	struct drm_mode_config *config = &dev->mode_config;
-	struct drm_connector *connector;
-
-	WARN_ON(!drm_modeset_is_locked(&config->connection_mutex));
-
-	drm_for_each_connector(connector, dev) {
-		if (connector->state->best_encoder != encoder)
-			continue;
-
-		return connector->state->crtc;
-	}
-
-	return NULL;
-}
-
 static void
 set_best_encoder(struct drm_atomic_state *state,
 		 struct drm_connector_state *conn_state,
@@ -168,8 +149,7 @@ set_best_encoder(struct drm_atomic_state *state,
 
 static int
 steal_encoder(struct drm_atomic_state *state,
-	      struct drm_encoder *encoder,
-	      struct drm_crtc *encoder_crtc)
+	      struct drm_encoder *encoder)
 {
 	struct drm_mode_config *config = &state->dev->mode_config;
 	struct drm_crtc_state *crtc_state;
@@ -182,54 +162,48 @@ steal_encoder(struct drm_atomic_state *state,
 	 */
 	WARN_ON(!drm_modeset_is_locked(&config->connection_mutex));
 
-	DRM_DEBUG_ATOMIC("[ENCODER:%d:%s] in use on [CRTC:%d:%s], stealing it\n",
-			 encoder->base.id, encoder->name,
-			 encoder_crtc->base.id, encoder_crtc->name);
-
-	crtc_state = drm_atomic_get_crtc_state(state, encoder_crtc);
-	if (IS_ERR(crtc_state))
-		return PTR_ERR(crtc_state);
-
-	crtc_state->connectors_changed = true;
-
 	list_for_each_entry(connector, &config->connector_list, head) {
+		struct drm_crtc *encoder_crtc;
+
 		if (connector->state->best_encoder != encoder)
 			continue;
-
-		DRM_DEBUG_ATOMIC("Stealing encoder from [CONNECTOR:%d:%s]\n",
-				 connector->base.id,
-				 connector->name);
 
 		connector_state = drm_atomic_get_connector_state(state,
 								 connector);
 		if (IS_ERR(connector_state))
 			return PTR_ERR(connector_state);
 
-		if (connector_state->best_encoder != encoder)
+		if (connector_state->best_encoder != encoder ||
+		    WARN_ON(!connector_state->crtc))
 			continue;
 
+		encoder_crtc = connector_state->crtc;
+
+		DRM_DEBUG_ATOMIC("[ENCODER:%d:%s] in use on [CRTC:%d:%s], stealing it\n",
+				 encoder->base.id, encoder->name,
+				 encoder_crtc->base.id, encoder_crtc->name);
+
 		set_best_encoder(state, connector_state, NULL);
+
+		crtc_state = drm_atomic_get_existing_crtc_state(state, encoder_crtc);
+		crtc_state->connectors_changed = true;
+
+		return 0;
 	}
 
 	return 0;
 }
 
 static int
-update_connector_routing(struct drm_atomic_state *state, int conn_idx)
+update_connector_routing(struct drm_atomic_state *state,
+			 struct drm_connector *connector,
+			 struct drm_connector_state *connector_state,
+			 int conn_idx)
 {
 	const struct drm_connector_helper_funcs *funcs;
 	struct drm_encoder *new_encoder;
-	struct drm_crtc *encoder_crtc;
-	struct drm_connector *connector;
-	struct drm_connector_state *connector_state;
 	struct drm_crtc_state *crtc_state;
 	int idx, ret;
-
-	connector = state->connectors[conn_idx];
-	connector_state = state->connector_states[conn_idx];
-
-	if (!connector)
-		return 0;
 
 	DRM_DEBUG_ATOMIC("Updating routing for [CONNECTOR:%d:%s]\n",
 			 connector->base.id,
@@ -305,17 +279,12 @@ update_connector_routing(struct drm_atomic_state *state, int conn_idx)
 		return -EINVAL;
 	}
 
-	encoder_crtc = get_current_crtc_for_encoder(state->dev,
-						    new_encoder);
-
-	if (encoder_crtc) {
-		ret = steal_encoder(state, new_encoder, encoder_crtc);
-		if (ret) {
-			DRM_DEBUG_ATOMIC("Encoder stealing failed for [CONNECTOR:%d:%s]\n",
-					 connector->base.id,
-					 connector->name);
-			return ret;
-		}
+	ret = steal_encoder(state, new_encoder);
+	if (ret) {
+		DRM_DEBUG_ATOMIC("Encoder stealing failed for [CONNECTOR:%d:%s]\n",
+				 connector->base.id,
+				 connector->name);
+		return ret;
 	}
 
 	if (WARN_ON(!connector_state->crtc))
@@ -494,7 +463,8 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 		 * drivers must set crtc->mode_changed themselves when connector
 		 * properties need to be updated.
 		 */
-		ret = update_connector_routing(state, i);
+		ret = update_connector_routing(state, connector,
+					       connector_state, i);
 		if (ret)
 			return ret;
 	}
