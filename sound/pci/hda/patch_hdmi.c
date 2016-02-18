@@ -1962,6 +1962,7 @@ static void sync_eld_via_acomp(struct hda_codec *codec,
 {
 	struct hdmi_spec *spec = codec->spec;
 	struct hdmi_eld *eld = &spec->temp_eld;
+	struct hda_jack_tbl *jack_tbl;
 	struct snd_jack *jack = NULL;
 	int size;
 
@@ -1989,10 +1990,21 @@ static void sync_eld_via_acomp(struct hda_codec *codec,
 	/* pcm_idx >=0 before update_eld() means it is in monitor
 	 * disconnected event. Jack must be fetched before update_eld()
 	 */
-	if (per_pin->pcm_idx >= 0)
+	/* if !dyn_pcm_assign, get jack from hda_jack_tbl
+	 * in !dyn_pcm_assign case, spec->pcm_rec[].jack is not
+	 * NULL even after snd_hda_jack_tbl_clear() is called to
+	 * free snd_jack. This may cause access invalid memory
+	 * when calling snd_jack_report
+	 */
+	if (per_pin->pcm_idx >= 0 && spec->dyn_pcm_assign)
 		jack = spec->pcm_rec[per_pin->pcm_idx].jack;
+	else {
+		jack_tbl = snd_hda_jack_tbl_get(codec, per_pin->pin_nid);
+		if (jack_tbl)
+			jack = jack_tbl->jack;
+	}
 	update_eld(codec, per_pin, eld);
-	if (jack == NULL && per_pin->pcm_idx >= 0)
+	if (jack == NULL && per_pin->pcm_idx >= 0 && spec->dyn_pcm_assign)
 		jack = spec->pcm_rec[per_pin->pcm_idx].jack;
 	if (jack == NULL)
 		goto unlock;
