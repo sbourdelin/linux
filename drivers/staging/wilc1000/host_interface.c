@@ -1643,11 +1643,8 @@ static int Handle_Key(struct wilc_vif *vif,
 
 			pu8keybuf = kmalloc(pstrHostIFkeyAttr->attr.wep.key_len + 2,
 					    GFP_KERNEL);
-
-			if (pu8keybuf == NULL) {
-				PRINT_ER("No buffer to send Key\n");
+			if (!pu8keybuf)
 				return -ENOMEM;
-			}
 
 			pu8keybuf[0] = pstrHostIFkeyAttr->attr.wep.index;
 			pu8keybuf[1] = pstrHostIFkeyAttr->attr.wep.key_len;
@@ -1668,10 +1665,8 @@ static int Handle_Key(struct wilc_vif *vif,
 			kfree(pu8keybuf);
 		} else if (pstrHostIFkeyAttr->action & ADDKEY) {
 			pu8keybuf = kmalloc(pstrHostIFkeyAttr->attr.wep.key_len + 2, GFP_KERNEL);
-			if (!pu8keybuf) {
-				PRINT_ER("No buffer to send Key\n");
+			if (!pu8keybuf)
 				return -ENOMEM;
-			}
 			pu8keybuf[0] = pstrHostIFkeyAttr->attr.wep.index;
 			memcpy(pu8keybuf + 1, &pstrHostIFkeyAttr->attr.wep.key_len, 1);
 			memcpy(pu8keybuf + 2, pstrHostIFkeyAttr->attr.wep.key,
@@ -1715,7 +1710,6 @@ static int Handle_Key(struct wilc_vif *vif,
 		if (pstrHostIFkeyAttr->action & ADDKEY_AP) {
 			pu8keybuf = kzalloc(RX_MIC_KEY_MSG_LEN, GFP_KERNEL);
 			if (!pu8keybuf) {
-				PRINT_ER("No buffer to send RxGTK Key\n");
 				ret = -ENOMEM;
 				goto _WPARxGtk_end_case_;
 			}
@@ -1747,7 +1741,6 @@ static int Handle_Key(struct wilc_vif *vif,
 		} else if (pstrHostIFkeyAttr->action & ADDKEY) {
 			pu8keybuf = kzalloc(RX_MIC_KEY_MSG_LEN, GFP_KERNEL);
 			if (pu8keybuf == NULL) {
-				PRINT_ER("No buffer to send RxGTK Key\n");
 				ret = -ENOMEM;
 				goto _WPARxGtk_end_case_;
 			}
@@ -1787,7 +1780,6 @@ _WPARxGtk_end_case_:
 		if (pstrHostIFkeyAttr->action & ADDKEY_AP) {
 			pu8keybuf = kmalloc(PTK_KEY_MSG_LEN + 1, GFP_KERNEL);
 			if (!pu8keybuf) {
-				PRINT_ER("No buffer to send PTK Key\n");
 				ret = -ENOMEM;
 				goto _WPAPtk_end_case_;
 			}
