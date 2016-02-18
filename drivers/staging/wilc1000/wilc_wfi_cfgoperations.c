@@ -665,6 +665,8 @@ static int scan(struct wiphy *wiphy, struct cfg80211_scan_request *request)
 
 		if (request->n_ssids >= 1) {
 			strHiddenNetwork.net_info = kmalloc(request->n_ssids * sizeof(struct hidden_network), GFP_KERNEL);
+			if (!strHiddenNetwork.net_info)
+				return -ENOMEM;
 			strHiddenNetwork.n_ssids = request->n_ssids;
 
 
@@ -1154,6 +1156,8 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 					g_key_gtk_params.key_len = params->key_len;
 					g_key_gtk_params.seq_len = params->seq_len;
 					g_key_gtk_params.key =  kmalloc(params->key_len, GFP_KERNEL);
+					if (!g_key_gtk_params.key)
+						return -ENOMEM;
 					memcpy(g_key_gtk_params.key, params->key, params->key_len);
 					if (params->seq_len > 0) {
 						g_key_gtk_params.seq =  kmalloc(params->seq_len, GFP_KERNEL);
@@ -1191,6 +1195,8 @@ static int add_key(struct wiphy *wiphy, struct net_device *netdev, u8 key_index,
 					g_key_ptk_params.key_len = params->key_len;
 					g_key_ptk_params.seq_len = params->seq_len;
 					g_key_ptk_params.key =  kmalloc(params->key_len, GFP_KERNEL);
+					if (!g_key_ptk_params.key)
+						return -ENOMEM;
 					memcpy(g_key_ptk_params.key, params->key, params->key_len);
 					if (params->seq_len > 0) {
 						g_key_ptk_params.seq =  kmalloc(params->seq_len, GFP_KERNEL);
