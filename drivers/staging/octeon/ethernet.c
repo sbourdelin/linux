@@ -231,13 +231,8 @@ static struct net_device_stats *cvm_oct_common_get_stats(struct net_device *dev)
 		 * The drop counter must be incremented atomically
 		 * since the RX tasklet also increments it.
 		 */
-#ifdef CONFIG_64BIT
-		atomic64_add(rx_status.dropped_packets,
-			     (atomic64_t *)&priv->stats.rx_dropped);
-#else
-		atomic_add(rx_status.dropped_packets,
-			     (atomic_t *)&priv->stats.rx_dropped);
-#endif
+		atomic_long_add(rx_status.dropped_packets,
+				(atomic_long_t *)&priv->stats.rx_dropped);
 	}
 
 	return &priv->stats;

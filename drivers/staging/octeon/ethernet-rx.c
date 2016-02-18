@@ -364,17 +364,10 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 
 				/* Increment RX stats for virtual ports */
 				if (port >= CVMX_PIP_NUM_INPUT_PORTS) {
-#ifdef CONFIG_64BIT
-					atomic64_add(1,
-						     (atomic64_t *)&priv->stats.rx_packets);
-					atomic64_add(skb->len,
-						     (atomic64_t *)&priv->stats.rx_bytes);
-#else
-					atomic_add(1,
-						   (atomic_t *)&priv->stats.rx_packets);
-					atomic_add(skb->len,
-						   (atomic_t *)&priv->stats.rx_bytes);
-#endif
+					atomic_long_add(1,
+							(atomic_long_t *)&priv->stats.rx_packets);
+					atomic_long_add(skb->len,
+							(atomic_long_t *)&priv->stats.rx_bytes);
 				}
 				netif_receive_skb(skb);
 			} else {
@@ -383,13 +376,8 @@ static int cvm_oct_napi_poll(struct napi_struct *napi, int budget)
 				  printk_ratelimited("%s: Device not up, packet dropped\n",
 					   dev->name);
 				*/
-#ifdef CONFIG_64BIT
-				atomic64_add(1,
-					     (atomic64_t *)&priv->stats.rx_dropped);
-#else
-				atomic_add(1,
-					   (atomic_t *)&priv->stats.rx_dropped);
-#endif
+				atomic_long_add(1,
+						(atomic_long_t *)&priv->stats.rx_dropped);
 				dev_kfree_skb_irq(skb);
 			}
 		} else {
