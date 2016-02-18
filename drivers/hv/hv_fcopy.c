@@ -108,6 +108,7 @@ static int fcopy_handle_handshake(u32 version)
 		return -EINVAL;
 	}
 	pr_debug("FCP: userspace daemon ver. %d registered\n", version);
+	fcopy_transaction.state = HVUTIL_READY;
 	hv_poll_channel(fcopy_transaction.recv_channel, fcopy_poll_wrapper);
 	return 0;
 }
