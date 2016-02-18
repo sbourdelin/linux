@@ -2744,6 +2744,20 @@ static int gen8_enable_vblank(struct drm_device *dev, unsigned int pipe)
 	unsigned long irqflags;
 
 	spin_lock_irqsave(&dev_priv->irq_lock, irqflags);
+	/*
+	 * DMC firmware can't restore frame counter register that is read-only
+	 * so we need to force the drm layer to know what is our latest
+	 * frame counter.
+	 * FIXME: We might face some funny race condition with DC states
+	 * entering after this restore. Unfortunately a power domain to avoid
+	 * DC off is not possible at this point due to all spin locks drm layer
+	 * does with vblanks. Another idea was to add pre-enable and
+	 * post-disable functions at vblank, but at drm layer there are many
+	 * asynchronous vblank puts that it is not possible with a bigger
+	 * rework.
+	 */
+	if (HAS_CSR(dev))
+		dev->vblank[pipe].last = g4x_get_vblank_counter(dev, pipe);
 	bdw_enable_pipe_irq(dev_priv, pipe, GEN8_PIPE_VBLANK);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
 
