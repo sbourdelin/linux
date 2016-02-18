@@ -92,14 +92,21 @@ check_pending_encoder_assignment(struct drm_atomic_state *state,
 				 int conn_idx)
 {
 	struct drm_connector *connector;
-	struct drm_connector_state *conn_state;
-	int i;
 
-	for_each_connector_in_state(state, connector, conn_state, i) {
-		if (i >= conn_idx)
-			break;
+	drm_for_each_connector(connector, state->dev) {
+		struct drm_connector_state *conn_state =
+			drm_atomic_get_existing_connector_state(state,
+								connector);
 
-		if (conn_state->best_encoder == new_encoder)
+		if (!conn_state) {
+			if (connector->state->best_encoder == new_encoder)
+				return false;
+
+			continue;
+		}
+
+		if (drm_connector_index(connector) < conn_idx &&
+		    conn_state->best_encoder == new_encoder)
 			return false;
 	}
 
@@ -149,29 +156,19 @@ set_best_encoder(struct drm_atomic_state *state,
 
 static int
 steal_encoder(struct drm_atomic_state *state,
-	      struct drm_encoder *encoder)
+	      struct drm_encoder *encoder,
+	      int conn_idx)
 {
-	struct drm_mode_config *config = &state->dev->mode_config;
 	struct drm_crtc_state *crtc_state;
 	struct drm_connector *connector;
 	struct drm_connector_state *connector_state;
+	int i;
 
-	/*
-	 * We can only steal an encoder coming from a connector, which means we
-	 * must already hold the connection_mutex.
-	 */
-	WARN_ON(!drm_modeset_is_locked(&config->connection_mutex));
-
-	list_for_each_entry(connector, &config->connector_list, head) {
+	for_each_connector_in_state(state, connector, connector_state, i) {
 		struct drm_crtc *encoder_crtc;
 
-		if (connector->state->best_encoder != encoder)
-			continue;
-
-		connector_state = drm_atomic_get_connector_state(state,
-								 connector);
-		if (IS_ERR(connector_state))
-			return PTR_ERR(connector_state);
+		if (i >= conn_idx)
+			break;
 
 		if (connector_state->best_encoder != encoder ||
 		    WARN_ON(!connector_state->crtc))
@@ -279,7 +276,7 @@ update_connector_routing(struct drm_atomic_state *state,
 		return -EINVAL;
 	}
 
-	ret = steal_encoder(state, new_encoder);
+	ret = steal_encoder(state, new_encoder, conn_idx);
 	if (ret) {
 		DRM_DEBUG_ATOMIC("Encoder stealing failed for [CONNECTOR:%d:%s]\n",
 				 connector->base.id,
