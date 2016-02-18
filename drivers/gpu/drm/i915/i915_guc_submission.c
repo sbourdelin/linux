@@ -195,11 +195,9 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 	struct guc_process_desc *desc;
 	union guc_doorbell_qw db_cmp, db_exc, db_ret;
 	union guc_doorbell_qw *db;
-	void *base;
 	int attempt = 2, ret = -EAGAIN;
 
-	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
-	desc = base + gc->proc_desc_offset;
+	desc = gc->client_base + gc->proc_desc_offset;
 
 	/* Update the tail so it is visible to GuC */
 	desc->tail = gc->wq_tail;
@@ -215,7 +213,7 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 		db_exc.cookie = 1;
 
 	/* pointer of current doorbell cacheline */
-	db = base + gc->doorbell_offset;
+	db = gc->client_base + gc->doorbell_offset;
 
 	while (attempt--) {
 		/* lets ring the doorbell */
@@ -244,10 +242,6 @@ static int guc_ring_doorbell(struct i915_guc_client *gc)
 			db_exc.cookie = 1;
 	}
 
-	/* Finally, update the cached copy of the GuC's WQ head */
-	gc->wq_head = desc->head;
-
-	kunmap_atomic(base);
 	return ret;
 }
 
@@ -341,10 +335,8 @@ static void guc_init_proc_desc(struct intel_guc *guc,
 			       struct i915_guc_client *client)
 {
 	struct guc_process_desc *desc;
-	void *base;
 
-	base = kmap_atomic(i915_gem_object_get_page(client->client_obj, 0));
-	desc = base + client->proc_desc_offset;
+	desc = client->client_base + client->proc_desc_offset;
 
 	memset(desc, 0, sizeof(*desc));
 
@@ -361,8 +353,6 @@ static void guc_init_proc_desc(struct intel_guc *guc,
 	desc->wq_size_bytes = client->wq_size;
 	desc->wq_status = WQ_STATUS_ACTIVE;
 	desc->priority = client->priority;
-
-	kunmap_atomic(base);
 }
 
 /*
@@ -474,25 +464,16 @@ static void guc_fini_ctx_desc(struct intel_guc *guc,
 int i915_guc_wq_check_space(struct i915_guc_client *gc)
 {
 	struct guc_process_desc *desc;
-	void *base;
 	u32 size = sizeof(struct guc_wq_item);
 	int ret = -ETIMEDOUT, timeout_counter = 200;
 
 	if (!gc)
 		return 0;
 
-	/* Quickly return if wq space is available since last time we cache the
-	 * head position. */
-	if (CIRC_SPACE(gc->wq_tail, gc->wq_head, gc->wq_size) >= size)
-		return 0;
-
-	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj, 0));
-	desc = base + gc->proc_desc_offset;
+	desc = gc->client_base + gc->proc_desc_offset;
 
 	while (timeout_counter-- > 0) {
-		gc->wq_head = desc->head;
-
-		if (CIRC_SPACE(gc->wq_tail, gc->wq_head, gc->wq_size) >= size) {
+		if (CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size) >= size) {
 			ret = 0;
 			break;
 		}
@@ -501,24 +482,23 @@ int i915_guc_wq_check_space(struct i915_guc_client *gc)
 			usleep_range(1000, 2000);
 	};
 
-	kunmap_atomic(base);
-
 	return ret;
 }
 
 static int guc_add_workqueue_item(struct i915_guc_client *gc,
 				  struct drm_i915_gem_request *rq)
 {
+	struct guc_process_desc *desc;
 	struct guc_wq_item *wqi;
-	void *base;
-	u32 tail, wq_len, wq_off, space;
+	u32 tail, wq_len, wqi_off, space;
 
-	space = CIRC_SPACE(gc->wq_tail, gc->wq_head, gc->wq_size);
+	desc = gc->client_base + gc->proc_desc_offset;
+	space = CIRC_SPACE(gc->wq_tail, desc->head, gc->wq_size);
 	if (WARN_ON(space < sizeof(struct guc_wq_item)))
 		return -ENOSPC; /* shouldn't happen */
 
 	/* postincrement WQ tail for next time */
-	wq_off = gc->wq_tail;
+	wqi_off = gc->wq_tail;
 	gc->wq_tail += sizeof(struct guc_wq_item);
 	gc->wq_tail &= gc->wq_size - 1;
 
@@ -530,13 +510,10 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	 * workqueue buffer dw by dw.
 	 */
 	WARN_ON(sizeof(struct guc_wq_item) != 16);
-	WARN_ON(wq_off & 3);
+	WARN_ON(wqi_off & 3);
 
 	/* wq starts from the page after doorbell / process_desc */
-	base = kmap_atomic(i915_gem_object_get_page(gc->client_obj,
-			(wq_off + GUC_DB_SIZE) >> PAGE_SHIFT));
-	wq_off &= PAGE_SIZE - 1;
-	wqi = (struct guc_wq_item *)((char *)base + wq_off);
+	wqi = gc->client_base + gc->wq_offset + wqi_off;
 
 	/* len does not include the header */
 	wq_len = sizeof(struct guc_wq_item) / sizeof(u32) - 1;
@@ -552,8 +529,6 @@ static int guc_add_workqueue_item(struct i915_guc_client *gc,
 	tail = rq->ringbuf->tail >> 3;
 	wqi->ring_tail = tail << WQ_RING_TAIL_SHIFT;
 	wqi->fence_id = 0; /*XXX: what fence to be here */
-
-	kunmap_atomic(base);
 
 	return 0;
 }
@@ -675,6 +650,8 @@ static void guc_client_free(struct drm_device *dev,
 	 * Be sure to drop any locks
 	 */
 
+	vunmap(client->client_base);
+
 	gem_release_guc_obj(client->client_obj);
 
 	if (client->ctx_index != GUC_INVALID_CTX_ID) {
@@ -725,6 +702,11 @@ static struct i915_guc_client *guc_client_alloc(struct drm_device *dev,
 	/* The first page is doorbell/proc_desc. Two followed pages are wq. */
 	obj = gem_allocate_guc_obj(dev, GUC_DB_SIZE + GUC_WQ_SIZE);
 	if (!obj)
+		goto err;
+
+	client->client_base = i915_gem_object_vmap(obj, 0,
+			obj->base.size >> PAGE_SHIFT);
+	if (client->client_base == NULL)
 		goto err;
 
 	client->client_obj = obj;
