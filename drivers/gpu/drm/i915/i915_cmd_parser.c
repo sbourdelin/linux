@@ -863,37 +863,11 @@ find_reg(const struct drm_i915_reg_descriptor *table,
 static u32 *vmap_batch(struct drm_i915_gem_object *obj,
 		       unsigned start, unsigned len)
 {
-	int i;
-	void *addr = NULL;
-	struct sg_page_iter sg_iter;
 	int first_page = start >> PAGE_SHIFT;
 	int last_page = (len + start + 4095) >> PAGE_SHIFT;
 	int npages = last_page - first_page;
-	struct page **pages;
 
-	pages = drm_malloc_ab(npages, sizeof(*pages));
-	if (pages == NULL) {
-		DRM_DEBUG_DRIVER("Failed to get space for pages\n");
-		goto finish;
-	}
-
-	i = 0;
-	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, first_page) {
-		pages[i++] = sg_page_iter_page(&sg_iter);
-		if (i == npages)
-			break;
-	}
-
-	addr = vmap(pages, i, 0, PAGE_KERNEL);
-	if (addr == NULL) {
-		DRM_DEBUG_DRIVER("Failed to vmap pages\n");
-		goto finish;
-	}
-
-finish:
-	if (pages)
-		drm_free_large(pages);
-	return (u32*)addr;
+	return (u32*)i915_gem_object_vmap(obj, first_page, npages);
 }
 
 /* Returns a vmap'd pointer to dest_obj, which the caller must unmap */
