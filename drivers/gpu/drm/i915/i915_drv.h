@@ -1159,6 +1159,8 @@ struct intel_gen6_power_mgmt {
 	u8 up_threshold; /* Current %busy required to uplock */
 	u8 down_threshold; /* Current %busy required to downclock */
 
+	bool rps_disable;
+
 	int last_adj;
 	enum { LOW_POWER, BETWEEN, HIGH_POWER } power;
 

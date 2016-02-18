@@ -5037,6 +5037,60 @@ DEFINE_SIMPLE_ATTRIBUTE(i915_min_freq_fops,
 			i915_min_freq_get, i915_min_freq_set,
 			"%llu\n");
 
+static int i915_rps_disable_get(void *data, u64 *val)
+{
+	struct drm_device *dev = data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if(INTEL_INFO(dev)->gen < 6)
+		return -ENODEV;
+
+	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
+
+	*val = dev_priv->rps.rps_disable;
+
+	return 0;
+}
+
+static int i915_rps_disable_set(void *data, u64 val)
+{
+	struct drm_device *dev = data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	int ret;
+
+	flush_delayed_work(&dev_priv->rps.delayed_resume_work);
+
+	if(INTEL_INFO(dev)->gen < 6)
+		return -ENODEV;
+
+	DRM_DEBUG_DRIVER("Setting RPS disable %s\n",
+			 val ? "true" : "false");
+
+	ret = mutex_lock_interruptible(&dev_priv->rps.hw_lock);
+	if (ret)
+		return ret;
+
+	dev_priv->rps.rps_disable = val;
+
+	if (val)
+		I915_WRITE(GEN6_RP_CONTROL, 0);
+	else
+		I915_WRITE(GEN6_RP_CONTROL, GEN6_RP_MEDIA_TURBO |
+				GEN6_RP_MEDIA_HW_NORMAL_MODE |
+				GEN6_RP_MEDIA_IS_GFX |
+				GEN6_RP_ENABLE |
+				GEN6_RP_UP_BUSY_AVG |
+				GEN6_RP_DOWN_IDLE_AVG);
+
+	mutex_unlock(&dev_priv->rps.hw_lock);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(i915_rps_disable_fops,
+			i915_rps_disable_get, i915_rps_disable_set,
+			"%llu\n");
+
 static int
 i915_cache_sharing_get(void *data, u64 *val)
 {
@@ -5405,6 +5459,7 @@ static const struct i915_debugfs_files {
 	{"i915_wedged", &i915_wedged_fops},
 	{"i915_max_freq", &i915_max_freq_fops},
 	{"i915_min_freq", &i915_min_freq_fops},
+	{"i915_rps_disable", &i915_rps_disable_fops},
 	{"i915_cache_sharing", &i915_cache_sharing_fops},
 	{"i915_ring_stop", &i915_ring_stop_fops},
 	{"i915_ring_missed_irq", &i915_ring_missed_irq_fops},
