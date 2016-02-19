@@ -404,12 +404,60 @@ static int vbt_panel_get_modes(struct drm_panel *panel)
 	return 1;
 }
 
+static int vbt_panel_power_on(struct drm_panel *panel)
+{
+	generic_exec_sequence(panel, MIPI_SEQ_POWER_ON);
+
+	return 0;
+}
+
+static int vbt_panel_power_off(struct drm_panel *panel)
+{
+	generic_exec_sequence(panel, MIPI_SEQ_POWER_OFF);
+
+	return 0;
+}
+
+static int vbt_panel_backlight_on(struct drm_panel *panel)
+{
+	generic_exec_sequence(panel, MIPI_SEQ_BACKLIGHT_ON);
+
+	return 0;
+}
+
+static int vbt_panel_backlight_off(struct drm_panel *panel)
+{
+	generic_exec_sequence(panel, MIPI_SEQ_BACKLIGHT_OFF);
+
+	return 0;
+}
+
+static int vbt_panel_get_info(struct drm_panel *panel,
+					struct drm_connector *connector)
+{
+	struct intel_connector *intel_connector =
+				to_intel_connector(connector);
+
+	if (intel_connector) {
+		connector->display_info.width_mm =
+				intel_connector->panel.fixed_mode->width_mm;
+		connector->display_info.height_mm =
+				intel_connector->panel.fixed_mode->height_mm;
+	}
+	return 0;
+}
+
 static const struct drm_panel_funcs vbt_panel_funcs = {
 	.disable = vbt_panel_disable,
 	.unprepare = vbt_panel_unprepare,
 	.prepare = vbt_panel_prepare,
 	.enable = vbt_panel_enable,
 	.get_modes = vbt_panel_get_modes,
+	.power_on = vbt_panel_power_on,
+	.power_off = vbt_panel_power_off,
+	.backlight_on = vbt_panel_backlight_on,
+	.backlight_off = vbt_panel_backlight_off,
+	.get_info = vbt_panel_get_info,
 };
 
 struct drm_panel *vbt_panel_init(struct intel_dsi *intel_dsi, u16 panel_id)
