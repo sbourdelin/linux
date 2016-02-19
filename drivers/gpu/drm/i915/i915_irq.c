@@ -2996,7 +2996,13 @@ head_stuck(struct intel_engine_cs *ring, u64 acthd)
 		       sizeof(ring->hangcheck.instdone));
 
 		if (acthd > ring->hangcheck.max_acthd) {
+			u64 max_vma = READ_ONCE(ring->hangcheck.max_active_vma);
+
 			ring->hangcheck.max_acthd = acthd;
+
+			if (max_vma && acthd > max_vma)
+				return HANGCHECK_HUNG;
+
 			return HANGCHECK_ACTIVE;
 		}
 
@@ -3107,6 +3113,7 @@ static void i915_hangcheck_elapsed(struct work_struct *work)
 		if (ring->hangcheck.seqno == seqno) {
 			if (ring_idle(ring, seqno)) {
 				ring->hangcheck.action = HANGCHECK_IDLE;
+				ring->hangcheck.max_active_vma = 0;
 
 				if (waitqueue_active(&ring->irq_queue)) {
 					/* Issue a wake-up to catch stuck h/w. */

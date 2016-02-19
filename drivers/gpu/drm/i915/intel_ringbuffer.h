@@ -89,6 +89,7 @@ enum intel_ring_hangcheck_action {
 struct intel_ring_hangcheck {
 	u64 acthd;
 	u64 max_acthd;
+	u64 max_active_vma;
 	u32 seqno;
 	int score;
 	enum intel_ring_hangcheck_action action;

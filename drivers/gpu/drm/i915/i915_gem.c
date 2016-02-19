@@ -2416,6 +2416,10 @@ void i915_vma_move_to_active(struct i915_vma *vma,
 	list_move_tail(&obj->ring_list[ring->id], &ring->active_list);
 	i915_gem_request_assign(&obj->last_read_req[ring->id], req);
 
+	if (vma->node.start + vma->node.size > ring->hangcheck.max_active_vma)
+		ring->hangcheck.max_active_vma =
+			vma->node.start + vma->node.size;
+
 	list_move_tail(&vma->mm_list, &vma->vm->active_list);
 }
 

@@ -1371,6 +1371,8 @@ static int i915_hangcheck_info(struct seq_file *m, void *unused)
 			   (long long)acthd[i]);
 		seq_printf(m, "\tmax ACTHD = 0x%08llx\n",
 			   (long long)ring->hangcheck.max_acthd);
+		seq_printf(m, "\tmax vma = 0x%08llx\n",
+			   (long long)ring->hangcheck.max_active_vma);
 		seq_printf(m, "\tscore = %d\n", ring->hangcheck.score);
 		seq_printf(m, "\taction = %d\n", ring->hangcheck.action);
 
