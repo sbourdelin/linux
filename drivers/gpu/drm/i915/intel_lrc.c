@@ -223,7 +223,8 @@ enum {
 	FAULT_AND_CONTINUE /* Unsupported */
 };
 #define GEN8_CTX_ID_SHIFT 32
-#define CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT  0x17
+#define GEN8_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT	0x17
+#define GEN9_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT	0x26
 
 static int intel_lr_context_pin(struct drm_i915_gem_request *rq);
 static void lrc_setup_hardware_status_page(struct intel_engine_cs *ring,
@@ -2301,13 +2302,29 @@ populate_lr_context(struct intel_context *ctx, struct drm_i915_gem_object *ctx_o
 		if (ring->wa_ctx.obj) {
 			struct i915_ctx_workarounds *wa_ctx = &ring->wa_ctx;
 			uint32_t ggtt_offset = i915_gem_obj_ggtt_offset(wa_ctx->obj);
+			uint32_t indirect_ctx_offset;
 
 			reg_state[CTX_RCS_INDIRECT_CTX+1] =
 				(ggtt_offset + wa_ctx->indirect_ctx.offset * sizeof(uint32_t)) |
 				(wa_ctx->indirect_ctx.size / CACHELINE_DWORDS);
 
+			switch (INTEL_INFO(ring->dev)->gen) {
+				default:
+					DRM_ERROR("Unknown indirect ctx offset for GEN%d\n",
+						  INTEL_INFO(ring->dev)->gen);
+					/* fall through */
+				case 9:
+					indirect_ctx_offset =
+						GEN9_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT;
+					break;
+				case 8:
+					indirect_ctx_offset =
+						GEN8_CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT;
+					break;
+			}
+
 			reg_state[CTX_RCS_INDIRECT_CTX_OFFSET+1] =
-				CTX_RCS_INDIRECT_CTX_OFFSET_DEFAULT << 6;
+				indirect_ctx_offset << 6;
 
 			reg_state[CTX_BB_PER_CTX_PTR+1] =
 				(ggtt_offset + wa_ctx->per_ctx.offset * sizeof(uint32_t)) |
