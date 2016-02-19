@@ -23,6 +23,8 @@ static const u8 intel_dsm_guid[] = {
 	0x0f, 0x13, 0x17, 0xb0, 0x1c, 0x2c
 };
 
+static const char *irst_id = "INT3392";
+
 static char *intel_dsm_port_name(u8 id)
 {
 	switch (id) {
@@ -161,4 +163,9 @@ void intel_register_dsm_handler(void)
 
 void intel_unregister_dsm_handler(void)
 {
+}
+
+bool intel_detect_acpi_rst(void)
+{
+	return acpi_dev_present(irst_id);
 }
