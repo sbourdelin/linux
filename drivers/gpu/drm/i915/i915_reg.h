@@ -615,6 +615,16 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define   IOSF_PORT_NC				0x11
 #define   IOSF_PORT_DPIO			0x12
 #define   IOSF_PORT_GPIO_NC			0x13
+#define   CHV_IOSF_PORT_GPIO_N			0x13
+#define   CHV_IOSF_PORT_GPIO_SE			0x48
+#define   CHV_IOSF_PORT_GPIO_SW			0xB2
+#define   CHV_IOSF_PORT_GPIO_E			0xA8
+#define   CHV_MAX_GPIO_NUM_N			72
+#define   CHV_MAX_GPIO_NUM_SE			99
+#define   CHV_MAX_GPIO_NUM_SW			197
+#define   CHV_MIN_GPIO_NUM_SE			73
+#define   CHV_MIN_GPIO_NUM_SW			100
+#define   CHV_MIN_GPIO_NUM_E			198
 #define   IOSF_PORT_CCK				0x14
 #define   IOSF_PORT_DPIO_2			0x1a
 #define   IOSF_PORT_FLISDSI			0x1b
@@ -629,6 +639,16 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 
 #define VLV_GPIO_CFG				0x2000CC00
 #define VLV_GPIO_INPUT_DIS			0x04
+
+#define CHV_PAD_FMLY_BASE			0x4400
+#define CHV_PAD_FMLY_SIZE			0x400
+#define CHV_PAD_CFG_0_1_REG_SIZE		0x8
+#define CHV_PAD_CFG_REG_SIZE			0x4
+#define CHV_VBT_MAX_PINS_PER_FMLY		15
+
+#define CHV_GPIO_CFG_UNLOCK			0x00000000
+#define CHV_GPIO_CFG_HIZ			0x00008100
+#define CHV_GPIO_CFG_TX_STATE_SHIFT		1
 
 /* See configdb bunit SB addr map */
 #define BUNIT_REG_BISOC				0x11
