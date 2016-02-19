@@ -47,6 +47,7 @@
 #include <drm/intel-gtt.h>
 #include <drm/drm_legacy.h> /* for struct drm_dma_handle */
 #include <drm/drm_gem.h>
+#include <linux/acpi.h>
 #include <linux/backlight.h>
 #include <linux/hashtable.h>
 #include <linux/intel-iommu.h>
@@ -1880,6 +1881,11 @@ struct drm_i915_private {
 
 	struct i915_workarounds workarounds;
 
+	struct {
+		int i2c_bus_number;
+		int i2c_slave_address;
+	} acpi_data;
+
 	/* Reclocking support */
 	bool render_reclock_avail;
 
@@ -3426,6 +3432,7 @@ intel_opregion_notify_adapter(struct drm_device *dev, pci_power_t state)
 #ifdef CONFIG_ACPI
 extern void intel_register_dsm_handler(void);
 extern void intel_unregister_dsm_handler(void);
+extern acpi_status intel_acpi_find_i2c(struct drm_i915_private *dev_priv);
 #else
 static inline void intel_register_dsm_handler(void) { return; }
 static inline void intel_unregister_dsm_handler(void) { return; }
