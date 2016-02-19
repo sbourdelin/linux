@@ -126,6 +126,7 @@ static ssize_t chars_chartab_store(struct kobject *kobj,
 	int do_characters = !strcmp(attr->attr.name, "characters");
 	size_t desc_length = 0;
 	int i;
+	int err;
 
 	spin_lock_irqsave(&speakup_info.spinlock, flags);
 	while (cp < end) {
@@ -153,7 +154,10 @@ static ssize_t chars_chartab_store(struct kobject *kobj,
 			continue;
 		}
 
-		index = simple_strtoul(cp, &temp, 10);
+		temp = cp;
+		err = kstrtoul(temp, 10, &index);
+		if (err)
+			return err;
 		if (index > 255) {
 			rejected++;
 			cp = linefeed + 1;
@@ -754,6 +758,7 @@ static ssize_t message_store_helper(const char *buf, size_t count,
 	int used = 0;
 	int rejected = 0;
 	int reset = 0;
+	int err;
 	enum msg_index_t firstmessage = group->start;
 	enum msg_index_t lastmessage = group->end;
 	enum msg_index_t curmessage;
@@ -783,7 +788,10 @@ static ssize_t message_store_helper(const char *buf, size_t count,
 			continue;
 		}
 
-		index = simple_strtoul(cp, &temp, 10);
+		temp = cp;
+		err = kstrtoul(temp, 10, &index);
+		if (err)
+			return err;
 
 		while ((temp < linefeed) && (*temp == ' ' || *temp == '\t'))
 			temp++;

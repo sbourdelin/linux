@@ -1900,6 +1900,7 @@ static int handle_goto(struct vc_data *vc, u_char type, u_char ch, u_short key)
 	static int num;
 	int maxlen;
 	char *cp;
+	int ret;
 
 	if (type == KT_SPKUP && ch == SPEAKUP_GOTO)
 		goto do_goto;
@@ -1936,7 +1937,10 @@ oops:
 		return 1;
 	}
 
-	goto_pos = simple_strtoul(goto_buf, &cp, 10);
+	cp = goto_buf;
+	ret = kstrtoul(cp, 10, &goto_pos);
+	if (ret)
+		return ret;
 
 	if (*cp == 'x') {
 		if (*goto_buf < '0')

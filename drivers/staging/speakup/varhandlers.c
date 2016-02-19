@@ -324,8 +324,12 @@ char *spk_strlwr(char *s)
 char *spk_s2uchar(char *start, char *dest)
 {
 	int val;
+	int ret;
 
-	val = simple_strtoul(skip_spaces(start), &start, 10);
+	start = skip_spaces(start);
+	ret = kstrtoul(start, 10, (unsigned long *)&val);
+	if (ret)
+		return NULL;
 	if (*start == ',')
 		start++;
 	*dest = (u_char)val;
