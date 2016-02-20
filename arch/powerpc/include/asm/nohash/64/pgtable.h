@@ -127,10 +127,9 @@ static inline pte_t pmd_pte(pmd_t pmd)
 }
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
-#define	pmd_bad(pmd)		(!is_kernel_addr(pmd_val(pmd)) \
-				 || (pmd_val(pmd) & PMD_BAD_BITS))
+#define	pmd_bad(pmd)		(pmd_val(pmd) & PMD_BAD_BITS)
 #define	pmd_present(pmd)	(!pmd_none(pmd))
-#define pmd_page_vaddr(pmd)	(pmd_val(pmd) & ~PMD_MASKED_BITS)
+#define pmd_page_vaddr(pmd)	__va(pmd_val(pmd) & ~PMD_MASKED_BITS)
 extern struct page *pmd_page(pmd_t pmd);
 
 static inline void pud_set(pud_t *pudp, unsigned long val)
@@ -144,10 +143,9 @@ static inline void pud_clear(pud_t *pudp)
 }
 
 #define pud_none(pud)		(!pud_val(pud))
-#define	pud_bad(pud)		(!is_kernel_addr(pud_val(pud)) \
-				 || (pud_val(pud) & PUD_BAD_BITS))
+#define	pud_bad(pud)		(pud_val(pud) & PUD_BAD_BITS)
 #define pud_present(pud)	(pud_val(pud) != 0)
-#define pud_page_vaddr(pud)	(pud_val(pud) & ~PUD_MASKED_BITS)
+#define pud_page_vaddr(pud)	__va(pud_val(pud) & ~PUD_MASKED_BITS)
 
 extern struct page *pud_page(pud_t pud);
 

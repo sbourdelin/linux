@@ -53,7 +53,7 @@ static inline void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 
 #ifndef CONFIG_PPC_64K_PAGES
 
-#define pgd_populate(MM, PGD, PUD)	pgd_set(PGD, (unsigned long)PUD)
+#define pgd_populate(MM, PGD, PUD)	pgd_set(PGD, __pa(PUD))
 
 static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
@@ -68,19 +68,19 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
 
 static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 {
-	pud_set(pud, (unsigned long)pmd);
+	pud_set(pud, __pa(pmd));
 }
 
 static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd,
 				       pte_t *pte)
 {
-	pmd_set(pmd, (unsigned long)pte);
+	pmd_set(pmd, __pa(pte));
 }
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd,
 				pgtable_t pte_page)
 {
-	pmd_set(pmd, (unsigned long)page_address(pte_page));
+	pmd_set(pmd, __pa(page_address(pte_page)));
 }
 
 #define pmd_pgtable(pmd) pmd_page(pmd)
@@ -171,23 +171,23 @@ extern void pgtable_free_tlb(struct mmu_gather *tlb, void *table, int shift);
 extern void __tlb_remove_table(void *_table);
 #endif
 
-#define pud_populate(mm, pud, pmd)	pud_set(pud, (unsigned long)pmd)
+#define pud_populate(mm, pud, pmd)	pud_set(pud, __pa(pmd))
 
 static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd,
 				       pte_t *pte)
 {
-	pmd_set(pmd, (unsigned long)pte);
+	pmd_set(pmd, __pa(pte));
 }
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd,
 				pgtable_t pte_page)
 {
-	pmd_set(pmd, (unsigned long)pte_page);
+	pmd_set(pmd, __pa(pte_page));
 }
 
 static inline pgtable_t pmd_pgtable(pmd_t pmd)
 {
-	return (pgtable_t)(pmd_val(pmd) & ~PMD_MASKED_BITS);
+	return (pgtable_t)__va(pmd_val(pmd) & ~PMD_MASKED_BITS);
 }
 
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
