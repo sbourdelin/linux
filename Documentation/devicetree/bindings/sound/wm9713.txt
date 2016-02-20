@@ -1,0 +1,14 @@
+WM9713 audio CODEC
+
+This devices supports I2C.
+
+Required properties:
+  - compatible :
+	"wlf,wm9713"
+
+Example:
+	wm9713: wm9713@0 {
+		compatible = "wlf,wm9713";
+		#sound-dai-cells = <1>;
+		status = "okay";
+	};
