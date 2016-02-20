@@ -1272,9 +1272,19 @@ static int wm9713_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id wm9713_dt_ids[] = {
+	{ .compatible = "wlf,wm9713", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, wm9713_dt_ids);
+
+#endif
+
 static struct platform_driver wm9713_codec_driver = {
 	.driver = {
 			.name = "wm9713-codec",
+			.of_match_table = of_match_ptr(wm9713_dt_ids),
 	},
 
 	.probe = wm9713_probe,
