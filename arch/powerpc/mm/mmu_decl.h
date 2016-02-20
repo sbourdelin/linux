@@ -110,7 +110,7 @@ extern unsigned long Hash_size, Hash_mask;
 #endif /* CONFIG_PPC32 */
 
 #ifdef CONFIG_PPC64
-extern int map_kernel_page(unsigned long ea, unsigned long pa, int flags);
+extern int map_kernel_page(unsigned long ea, unsigned long pa, pgprot_t flags);
 #endif /* CONFIG_PPC64 */
 
 extern unsigned long ioremap_bot;
