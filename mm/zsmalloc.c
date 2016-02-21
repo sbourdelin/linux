@@ -73,13 +73,6 @@
  */
 #define ZS_ALIGN		8
 
-/*
- * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
- * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
- */
-#define ZS_MAX_ZSPAGE_ORDER 2
-#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
-
 #define ZS_HANDLE_SIZE (sizeof(unsigned long))
 
 /*
@@ -96,6 +89,7 @@
 #ifndef MAX_PHYSMEM_BITS
 #ifdef CONFIG_HIGHMEM64G
 #define MAX_PHYSMEM_BITS 36
+#define ZS_MAX_ZSPAGE_ORDER 2
 #else /* !CONFIG_HIGHMEM64G */
 /*
  * If this definition of MAX_PHYSMEM_BITS is used, OBJ_INDEX_BITS will just
@@ -104,7 +98,28 @@
 #define MAX_PHYSMEM_BITS BITS_PER_LONG
 #endif
 #endif
+
 #define _PFN_BITS		(MAX_PHYSMEM_BITS - PAGE_SHIFT)
+
+/*
+ * We don't have enough bits in OBJ_INDEX_BITS on HIGHMEM64G and
+ * PAGE_SHIFT 16 systems to have huge ZS_MAX_ZSPAGE_ORDER there.
+ * This will significantly increase ZS_MIN_ALLOC_SIZE and drop a
+ * number of important (frequently used in general) size classes.
+ */
+#if PAGE_SHIFT > 14
+#define ZS_MAX_ZSPAGE_ORDER 2
+#endif
+
+#ifndef ZS_MAX_ZSPAGE_ORDER
+#define ZS_MAX_ZSPAGE_ORDER 4
+#endif
+
+/*
+ * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
+ * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
+ */
+#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
 
 /*
  * Memory for allocating for handle keeps object position by
