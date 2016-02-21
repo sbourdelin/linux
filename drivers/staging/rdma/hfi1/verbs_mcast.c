@@ -140,11 +140,11 @@ struct hfi1_mcast *hfi1_mcast_find(struct hfi1_ibport *ibp, union ib_gid *mgid)
 
 		ret = memcmp(mgid->raw, mcast->mgid.raw,
 			     sizeof(union ib_gid));
-		if (ret < 0)
+		if (ret < 0) {
 			n = n->rb_left;
-		else if (ret > 0)
+		} else if (ret > 0) {
 			n = n->rb_right;
-		else {
+		} else {
 			atomic_inc(&mcast->refcount);
 			spin_unlock_irqrestore(&ibp->lock, flags);
 			goto bail;
