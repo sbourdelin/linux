@@ -2,6 +2,7 @@
  * Interface for controlling IO bandwidth on a request queue
  *
  * Copyright (C) 2010 Vivek Goyal <vgoyal@redhat.com>
+ * Proportional throttle - Shaohua Li <shli@kernel.org>
  */
 
 #include <linux/module.h>
@@ -11,6 +12,12 @@
 #include <linux/blktrace_api.h>
 #include <linux/blk-cgroup.h>
 #include "blk.h"
+
+#define MAX_WEIGHT (10000)
+#define MIN_WEIGHT (1)
+#define DFT_WEIGHT (100)
+#define SHARE_SHIFT (14)
+#define MAX_SHARE (1 << SHARE_SHIFT)
 
 /* Max dispatch from a group in 1 round */
 static int throtl_grp_quantum = 8;
@@ -74,6 +81,10 @@ struct throtl_service_queue {
 	unsigned int		nr_pending;	/* # queued in the tree */
 	unsigned long		first_pending_disptime;	/* disptime of the first tg */
 	struct timer_list	pending_timer;	/* fires on first_pending_disptime */
+
+	unsigned int		weight; /* this queue's weight against siblings */
+	unsigned int		children_weight; /* children weight */
+	unsigned int		share; /* disk bandwidth share of the queue */
 };
 
 enum tg_state_flags {
@@ -139,6 +150,22 @@ struct throtl_grp {
 	unsigned long slice_end[2];
 };
 
+enum run_mode {
+	MODE_NONE = 0,
+	MODE_THROTTLE = 1, /* bandwidth/iops based throttle */
+	/* below are weight based */
+	MODE_WEIGHT_BANDWIDTH = 2,
+	MODE_WEIGHT_IOPS = 3,
+	MAX_MODE = 4,
+};
+
+static char *run_mode_name[MAX_MODE] = {
+	[MODE_NONE] = "none",
+	[MODE_THROTTLE] = "throttle",
+	[MODE_WEIGHT_BANDWIDTH] = "weight_bw",
+	[MODE_WEIGHT_IOPS] = "weight_iops",
+};
+
 struct throtl_data
 {
 	/* service tree for active throtl groups */
@@ -156,7 +183,13 @@ struct throtl_data
 
 	/* Work for dispatching throttled bios */
 	struct work_struct dispatch_work;
+	enum run_mode mode;
 };
+
+static bool td_weight_based(struct throtl_data *td)
+{
+	return td->mode > MODE_THROTTLE;
+}
 
 static void throtl_pending_timer_fn(unsigned long arg);
 
@@ -209,7 +242,31 @@ static struct throtl_data *sq_to_td(struct throtl_service_queue *sq)
 
 static inline int tg_data_index(struct throtl_grp *tg, bool rw)
 {
+	if (td_weight_based(tg->td))
+		return 0;
 	return rw;
+}
+
+static inline uint64_t queue_bandwidth(struct throtl_data *td)
+{
+	uint64_t bw;
+
+	bw = td->queue->disk_bw * 512;
+	/* can't estimate bandwidth, can't do proporation control */
+	if (bw == 0)
+		bw = -1;
+	return bw;
+}
+
+static inline uint64_t queue_iops(struct throtl_data *td)
+{
+	uint64_t iops;
+
+	iops = td->queue->disk_iops;
+	/* can't estimate iops, can't do proporation control */
+	if (iops == 0)
+		iops = -1;
+	return iops;
 }
 
 /**
@@ -386,6 +443,8 @@ static void throtl_pd_init(struct blkg_policy_data *pd)
 	sq->parent_sq = &td->service_queue;
 	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && blkg->parent)
 		sq->parent_sq = &blkg_to_tg(blkg->parent)->service_queue;
+	sq->weight = DFT_WEIGHT;
+	sq->parent_sq->children_weight += sq->weight;
 	tg->td = td;
 }
 
@@ -406,7 +465,8 @@ static void tg_update_has_rules(struct throtl_grp *tg)
 
 	for (i = READ; i <= WRITE; i++)
 		tg->has_rules[i] = (parent_tg && parent_tg->has_rules[i]) ||
-				    io_cost_has_limit(tg, i);
+				    io_cost_has_limit(tg, i) ||
+				    (td_weight_based(tg->td));
 }
 
 static void throtl_pd_online(struct blkg_policy_data *pd)
@@ -421,6 +481,10 @@ static void throtl_pd_online(struct blkg_policy_data *pd)
 static void throtl_pd_free(struct blkg_policy_data *pd)
 {
 	struct throtl_grp *tg = pd_to_tg(pd);
+	struct throtl_service_queue *sq = &tg->service_queue;
+
+	if (sq->parent_sq)
+		sq->parent_sq->children_weight -= sq->weight;
 
 	del_timer_sync(&tg->service_queue.pending_timer);
 	kfree(tg);
@@ -812,6 +876,10 @@ static bool io_cost_with_in_limit(struct throtl_grp *tg, struct bio *bio,
 {
 	unsigned long bps_wait = 0, iops_wait = 0;
 
+	if (tg->td->mode == MODE_WEIGHT_BANDWIDTH)
+		return io_cost_with_in_bps_limit(tg, bio, wait);
+	if (tg->td->mode == MODE_WEIGHT_IOPS)
+		return io_cost_with_in_iops_limit(tg, bio, wait);
 	if (io_cost_with_in_bps_limit(tg, bio, &bps_wait) &&
 	    io_cost_with_in_iops_limit(tg, bio, &iops_wait)) {
 		*wait = 0;
@@ -967,6 +1035,77 @@ static void start_parent_slice_with_credit(struct throtl_grp *child_tg,
 
 }
 
+static void tg_update_perf(struct throtl_grp *tg)
+{
+	struct throtl_service_queue *sq;
+	u64 new_bps, abs_bps = 0;
+	unsigned int new_iops, abs_iops = 0;
+
+	sq = &tg->service_queue;
+
+	/* '/' cgroup in cgroup2 */
+	if (!td_weight_based(tg->td) || !sq->parent_sq ||
+	    (cgroup_subsys_on_dfl(io_cgrp_subsys) && !tg_to_blkg(tg)->parent))
+		return;
+
+	if (tg->td->mode == MODE_WEIGHT_BANDWIDTH) {
+		new_bps = max_t(uint64_t,
+			(queue_bandwidth(tg->td) * sq->share) >> SHARE_SHIFT,
+			1024);
+		if (new_bps > tg->io_cost.bps[0])
+			abs_bps = new_bps - tg->io_cost.bps[0];
+		if (new_bps < tg->io_cost.bps[0])
+			abs_bps = tg->io_cost.bps[0] - new_bps;
+		if (abs_bps > (tg->io_cost.bps[0] >> 3))
+			throtl_start_new_slice(tg, 0);
+		tg->io_cost.bps[0] = new_bps;
+		tg->io_cost.iops[0] = -1;
+	} else {
+		new_iops = max_t(uint64_t,
+			(queue_iops(tg->td) * sq->share) >> SHARE_SHIFT,
+			1);
+		if (new_iops > tg->io_cost.iops[0])
+			abs_iops = new_iops - tg->io_cost.iops[0];
+		if (new_iops < tg->io_cost.iops[0])
+			abs_iops = tg->io_cost.iops[0] - new_iops;
+		if (abs_iops > (tg->io_cost.iops[0] >> 3))
+			throtl_start_new_slice(tg, 0);
+		tg->io_cost.iops[0] = new_iops;
+		tg->io_cost.bps[0] = -1;
+	}
+}
+
+/* update share of tg's siblings */
+static void tg_update_share(struct throtl_data *td, struct throtl_grp *tg)
+{
+	struct cgroup_subsys_state *pos_css;
+	struct blkcg_gq *blkg, *parent_blkg;
+	struct throtl_grp *child;
+
+	if (!td_weight_based(td))
+		return;
+	if (!tg || !tg->service_queue.parent_sq ||
+	    !tg->service_queue.parent_sq->parent_sq)
+		parent_blkg = td->queue->root_blkg;
+	else
+		parent_blkg = tg_to_blkg(sq_to_tg(tg->service_queue.parent_sq));
+
+	blkg_for_each_descendant_pre(blkg, pos_css, parent_blkg) {
+		struct throtl_service_queue *sq;
+
+		child = blkg_to_tg(blkg);
+		sq = &child->service_queue;
+
+		if (!sq->parent_sq)
+			continue;
+
+		sq->share = max_t(unsigned int,
+			sq->parent_sq->share * sq->weight /
+				sq->parent_sq->children_weight,
+			1);
+	}
+}
+
 static void tg_dispatch_one_bio(struct throtl_grp *tg, bool rw)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
@@ -1014,11 +1153,18 @@ static int throtl_dispatch_tg(struct throtl_grp *tg)
 {
 	struct throtl_service_queue *sq = &tg->service_queue;
 	unsigned int nr_reads = 0, nr_writes = 0;
-	unsigned int max_nr_reads = throtl_grp_quantum*3/4;
-	unsigned int max_nr_writes = throtl_grp_quantum - max_nr_reads;
+	unsigned int max_nr_reads;
+	unsigned int max_nr_writes;
 	struct bio *bio;
 
-	/* Try to dispatch 75% READS and 25% WRITES */
+	if (td_weight_based(tg->td)) {
+		max_nr_reads = throtl_grp_quantum;
+		max_nr_writes = 0;
+	} else {
+		/* Try to dispatch 75% READS and 25% WRITES */
+		max_nr_reads = throtl_grp_quantum * 3 / 4;
+		max_nr_writes = throtl_grp_quantum - max_nr_reads;
+	}
 
 	while ((bio = throtl_peek_queued(&sq->queued[READ])) &&
 	       tg_may_dispatch(tg, bio, NULL)) {
@@ -1038,6 +1184,9 @@ static int throtl_dispatch_tg(struct throtl_grp *tg)
 
 		if (nr_writes >= max_nr_writes)
 			break;
+	}
+	if (nr_reads + nr_writes) {
+		tg_update_perf(tg);
 	}
 
 	return nr_reads + nr_writes;
@@ -1494,6 +1643,7 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		/* throtl is FIFO - if bios are already queued, should queue */
 		if (sq->nr_queued[index])
 			break;
+		tg_update_perf(tg);
 
 		/* if above limits, break to queue */
 		if (!tg_may_dispatch(tg, bio, NULL))
@@ -1639,6 +1789,8 @@ int blk_throtl_init(struct request_queue *q)
 
 	INIT_WORK(&td->dispatch_work, blk_throtl_dispatch_work_fn);
 	throtl_service_queue_init(&td->service_queue);
+	td->service_queue.share = MAX_SHARE;
+	td->mode = MODE_NONE;
 
 	q->td = td;
 	td->queue = q;
