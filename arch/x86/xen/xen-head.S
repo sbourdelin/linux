@@ -35,16 +35,31 @@
 #define PVH_FEATURES (0)
 #endif
 
+#ifdef CONFIG_X86_32
+#define REG(register)	%e##register
+#define WSIZE_SHIFT	2
+#define STOS		stosl
+#else
+#define REG(register)	%r##register
+#define WSIZE_SHIFT	3
+#define STOS		stosq
+#endif
+
 	__INIT
 ENTRY(startup_xen)
 	cld
-#ifdef CONFIG_X86_32
-	mov %esi,xen_start_info
-	mov $init_thread_union+THREAD_SIZE,%esp
-#else
-	mov %rsi,xen_start_info
-	mov $init_thread_union+THREAD_SIZE,%rsp
-#endif
+
+	/* Clear .bss */
+	xor REG(ax),REG(ax)
+	mov $__bss_start,REG(di)
+	mov $__bss_stop,REG(cx)
+	sub REG(di),REG(cx)
+	shr $WSIZE_SHIFT,REG(cx)
+	rep STOS
+
+	mov REG(si),xen_start_info
+	mov $init_thread_union+THREAD_SIZE,REG(sp)
+
 	jmp xen_start_kernel
 
 	__FINIT
