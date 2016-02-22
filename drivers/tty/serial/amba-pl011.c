@@ -59,6 +59,7 @@
 #include <linux/sizes.h>
 #include <linux/io.h>
 #include <linux/acpi.h>
+#include <linux/acpi_dbg2.h>
 
 #include "amba-pl011.h"
 
@@ -2329,6 +2330,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
 }
 EARLYCON_DECLARE(pl011, pl011_early_console_setup);
 OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+ACPI_DBG2_EARLYCON_DECLARE(pl011, ACPI_DBG2_ARM_PL011,
+			   pl011_early_console_setup);
 
 #else
 #define AMBA_CONSOLE	NULL
