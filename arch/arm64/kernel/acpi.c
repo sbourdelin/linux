@@ -213,6 +213,8 @@ void __init acpi_boot_table_init(void)
 		if (!param_acpi_force)
 			disable_acpi();
 	}
+
+	acpi_probe_device_table(dbg2);
 }
 
 #ifdef CONFIG_ACPI_APEI
