@@ -2820,8 +2820,13 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 		nth_active_pipe++;
 	}
 
-	pipe_size = ddb_size / config->num_pipes_active;
-	alloc->start = nth_active_pipe * ddb_size / config->num_pipes_active;
+	if (WARN_ON(!config->num_pipes_active)) {
+		pipe_size = 0;
+		alloc->start = 0;
+	} else {
+		pipe_size = ddb_size / config->num_pipes_active;
+		alloc->start = nth_active_pipe * ddb_size / config->num_pipes_active;
+	}
 	alloc->end = alloc->start + pipe_size;
 }
 
