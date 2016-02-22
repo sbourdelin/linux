@@ -1,7 +1,7 @@
 /*
  * Hisilicon Hi6220 reset controller driver
  *
- * Copyright (c) 2015 Hisilicon Limited.
+ * Copyright (c) 2015-2016 Hisilicon Limited.
  *
  * Author: Feng Chen <puck.chen@hisilicon.com>
  *
@@ -15,46 +15,88 @@
 #include <linux/module.h>
 #include <linux/bitops.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 #include <linux/reset-controller.h>
 #include <linux/reset.h>
 #include <linux/platform_device.h>
 
-#define ASSERT_OFFSET            0x300
-#define DEASSERT_OFFSET          0x304
-#define MAX_INDEX                0x509
+/* peritheral ctrl regs
+ */
+#define PERITH_ASSERT_OFFSET      0x300
+#define PERITH_DEASSERT_OFFSET    0x304
+#define PERITH_MAX_INDEX          0x509
+
+/* media ctrl regs
+ */
+#define SC_MEDIA_RSTEN            0x052C
+#define SC_MEDIA_RSTDIS           0x0530
+#define MEDIA_MAX_INDEX           8
+
+enum hi6220_reset_ctrl_type {
+	PERITHERAL,
+	MEDIA,
+};
 
 #define to_reset_data(x) container_of(x, struct hi6220_reset_data, rc_dev)
 
 struct hi6220_reset_data {
-	void __iomem			*assert_base;
-	void __iomem			*deassert_base;
-	struct reset_controller_dev	rc_dev;
+	struct reset_controller_dev rc_dev;
+	enum hi6220_reset_ctrl_type type;
+	struct regmap *regmap;
 };
+
+static int hi6220_media_assert(struct regmap *regmap, unsigned long idx)
+{
+	return regmap_write(regmap, SC_MEDIA_RSTEN, BIT(idx));
+}
+
+static int hi6220_media_deassert(struct regmap *regmap, unsigned long idx)
+{
+	return regmap_write(regmap, SC_MEDIA_RSTDIS, BIT(idx));
+}
+
+static int hi6220_peritheral_assert(struct regmap *regmap, unsigned long idx)
+{
+	u32 bank = idx >> 8;
+	u32 offset = idx & 0xff;
+	u32 reg = PERITH_ASSERT_OFFSET + bank * 0x10;
+
+	return regmap_write(regmap, reg, BIT(offset));
+}
+
+static int hi6220_peritheral_deassert(struct regmap *regmap, unsigned long idx)
+{
+	u32 bank = idx >> 8;
+	u32 offset = idx & 0xff;
+	u32 reg = PERITH_DEASSERT_OFFSET + bank * 0x10;
+
+	return regmap_write(regmap, reg, BIT(offset));
+}
 
 static int hi6220_reset_assert(struct reset_controller_dev *rc_dev,
 			       unsigned long idx)
 {
 	struct hi6220_reset_data *data = to_reset_data(rc_dev);
+	struct regmap *regmap = data->regmap;
 
-	int bank = idx >> 8;
-	int offset = idx & 0xff;
-
-	writel(BIT(offset), data->assert_base + (bank * 0x10));
-
-	return 0;
+	if (data->type == MEDIA)
+		return hi6220_media_assert(regmap, idx);
+	else
+		return hi6220_peritheral_assert(regmap, idx);
 }
 
 static int hi6220_reset_deassert(struct reset_controller_dev *rc_dev,
 				 unsigned long idx)
 {
 	struct hi6220_reset_data *data = to_reset_data(rc_dev);
+	struct regmap *regmap = data->regmap;
 
-	int bank = idx >> 8;
-	int offset = idx & 0xff;
-
-	writel(BIT(offset), data->deassert_base + (bank * 0x10));
-
-	return 0;
+	if (data->type == MEDIA)
+		return hi6220_media_deassert(regmap, idx);
+	else
+		return hi6220_peritheral_deassert(regmap, idx);
 }
 
 static struct reset_control_ops hi6220_reset_ops = {
@@ -64,24 +106,32 @@ static struct reset_control_ops hi6220_reset_ops = {
 
 static int hi6220_reset_probe(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
+	struct device *dev = &pdev->dev;
+	enum hi6220_reset_ctrl_type type;
 	struct hi6220_reset_data *data;
-	struct resource *res;
-	void __iomem *src_base;
+	struct regmap *regmap;
 
-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	src_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(src_base))
-		return PTR_ERR(src_base);
+	type = (enum hi6220_reset_ctrl_type)of_device_get_match_data(dev);
 
-	data->assert_base = src_base + ASSERT_OFFSET;
-	data->deassert_base = src_base + DEASSERT_OFFSET;
-	data->rc_dev.nr_resets = MAX_INDEX;
+	regmap = syscon_node_to_regmap(np);
+	if (IS_ERR(regmap)) {
+		dev_err(dev, "failed to get reset controller regmap\n");
+		return PTR_ERR(regmap);
+	}
+
+	data->type = type;
+	data->regmap = regmap;
 	data->rc_dev.ops = &hi6220_reset_ops;
-	data->rc_dev.of_node = pdev->dev.of_node;
+	data->rc_dev.of_node = np;
+	if (type == MEDIA)
+		data->rc_dev.nr_resets = MEDIA_MAX_INDEX;
+	else
+		data->rc_dev.nr_resets = PERITH_MAX_INDEX;
 
 	reset_controller_register(&data->rc_dev);
 
@@ -89,9 +139,17 @@ static int hi6220_reset_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id hi6220_reset_match[] = {
-	{ .compatible = "hisilicon,hi6220-sysctrl" },
-	{ },
+	{
+		.compatible = "hisilicon,hi6220-sysctrl",
+		.data = (void *)PERITHERAL,
+	},
+	{
+		.compatible = "hisilicon,hi6220-mediactrl",
+		.data = (void *)MEDIA,
+	},
+	{ /* sentinel */ },
 };
+MODULE_DEVICE_TABLE(of, hi6220_reset_match);
 
 static struct platform_driver hi6220_reset_driver = {
 	.probe = hi6220_reset_probe,
